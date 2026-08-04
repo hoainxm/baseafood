@@ -1,0 +1,989 @@
+[
+  {
+    "ma": "BAONGUGR",
+    "ten": "Bào ngư greenlip đông lạnh",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bào ngư"
+  },
+  {
+    "ma": "BAONGU-GR",
+    "ten": "Bào ngư greenlip tẩm gia vị đông lạnh",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bào ngư"
+  },
+  {
+    "ma": "BAONGUTR",
+    "ten": "Bào ngư tiger đông lạnh",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bào ngư"
+  },
+  {
+    "ma": "BT.COLUOC",
+    "ten": "Cổ bạch tuộc luộc",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "BT.NCLS",
+    "ten": "Bạch tuộc NCLS đông lạnh",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "BT.TIPLUOC",
+    "ten": "Típ bạch tuộc cắt luộc",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "BT-1D-NCLS",
+    "ten": "Bạch tuộc 1 da NCLS",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "BT-BOT5-10",
+    "ten": "Bạch tuộc 2 da tẩm bột 5-10",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "BT-BOT6-14",
+    "ten": "Bạch tuộc 2 da tẩm bột 6-14",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "BTC1,2-1,8",
+    "ten": "Bạch tuộc cắt chần 1,2-1,8",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "BTC1,8-2,2",
+    "ten": "Bạch tuộc cắt chần 1,8-2,2",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "BT-CAT",
+    "ten": "Bạch tuộc cắt đông lạnh",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "BT-CAT1,5G",
+    "ten": "Bạch tuộc 2 da cắt luộc 1,5gr",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "BT-CAT12KG",
+    "ten": "Bạch tuộc 1 da cắt hạt lựu 12kg",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "BT-CAT2GNĐ",
+    "ten": "Bạch tuộc 2 da cắt luộc 2gr",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "BT-CAT2GR",
+    "ten": "Bạch tuộc 2 da cắt luộc 2gr",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "BT-CAT3G",
+    "ten": "Bạch tuộc 2 da cắt luộc 3gr",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "BT-CAT3GNĐ",
+    "ten": "Bạch tuộc 2 da cắt luộc 3gr",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "BT-CAT4G",
+    "ten": "Bạch tuộc 2 da cắt luộc 4gr",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "BT-CAT5G",
+    "ten": "Bạch tuộc 2 da cắt luộc 5gr",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "BT-CAT8;10",
+    "ten": "Bạch tuộc 2 da cắt sống 8-10 gr",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "BT-CATLUOC",
+    "ten": "Bạch tuộc cắt luộc đông lạnh",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "BT-CATR500",
+    "ten": "Bạch tuộc 1 da cắt râu 500gr",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "BT-CATR900",
+    "ten": "Bạch tuộc 1 da cắt râu 900gr",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "BT-CATRAU",
+    "ten": "Bạch tuộc 2 da cắt râu",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "BT-CATRAUS",
+    "ten": "Bạch tuộc 2 da cắt 2 râu sống",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "BT-CC1-2",
+    "ten": "Bạch tuộc 2 da cắt chần 1-2",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "BT-CC1-3",
+    "ten": "Bạch tuộc 2 da cắt chần 1-3",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "BT-CC4G",
+    "ten": "Bạch tuộc cắt chần 4gr",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "BT-CC5G",
+    "ten": "Bạch tuộc cắt chần 5gr",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "BT-CC6-7",
+    "ten": "Bạch tuộc 2 da cắt chần 6-7",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "BT-CCHAN3G",
+    "ten": "Bạch tuộc cắt chần 3gr",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "BT-CCHAN5G",
+    "ten": "Bạch tuộc cắt chần 5gr",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "BT-CHAN",
+    "ten": "Bạch tuộc cắt chần",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "BT-CHAN2-3",
+    "ten": "Bạch tuộc cắt chần 2-3",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "BT-CHAN3;4",
+    "ten": "Bạch tuộc cắt chần 3-4g",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "BT-CHAN4,5",
+    "ten": "Bạch tuộc cắt chần 4-5",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "BT-CHAN4-5",
+    "ten": "Bạch tuộc 2 da cắt chần 4-5",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "BT-CHAN5-6",
+    "ten": "Bạch tuộc 2 da cắt chần 5-6",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "BT-CHOPTIP",
+    "ten": "Chóp típ bạch tuộc",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "BT-CL1000",
+    "ten": "Bạch tuộc 2 da cắt luộc 700-1000",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "BT-CL1-2",
+    "ten": "Bạch tuộc 2 da cắt luộc 1-2",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "BT-CL1200",
+    "ten": "Bạch tuộc 2 da cắt luộc 800-1200",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "BT-CL-1300",
+    "ten": "Bạch tuộc 2 da cắt luộc 1100-1300",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "BT-CL-1500",
+    "ten": "Bạch tuộc 2 da cắt luộc 1000-1500",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "BT-CL2-3",
+    "ten": "Bạch tuộc 2 da cắt luộc 2-3",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "BT-CL23-25",
+    "ten": "Bạch tuộc 2 da cắt luộc 230-250",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "BT-CL30-33",
+    "ten": "Bạch tuộc 2 da cắt luộc 300-330",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "BT-CL3-4",
+    "ten": "Bạch tuộc 2 da cắt luộc 3-4",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "BT-CL37-42",
+    "ten": "Bạch tuộc 2 da cắt luộc 370-420",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "BT-CL4-5",
+    "ten": "Bạch tuộc 2 da cắt luộc 4-5",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "BT-CL4-6",
+    "ten": "Bạch tuộc 2 da cắt luộc 4-6",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "BT-CL500",
+    "ten": "Bạch tuộc 2 da cắt luộc 450-500",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "BT-CL5-8",
+    "ten": "Bạch tuộc 2 da cắt luộc 500-800",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "BT-CL6-7",
+    "ten": "Bạch tuộc cắt luộc 6-7",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "BT-CL700",
+    "ten": "Bạch tuộc 2 da cắt luộc 500-700",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "BT-COL1-3",
+    "ten": "Cổ bạch tuộc 2 da luộc 1-3",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "BT-COLUOC",
+    "ten": "Cổ bao tử BT luộc",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "BT-HATLUU",
+    "ten": "Bạch tuộc cắt hạt lựu",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "BT-HLUUMAU",
+    "ten": "Bạch tuộc 2 da cắt hạt lựu luộc màu",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "BT-LUOC1-2",
+    "ten": "Bạch tuộc cắt luộc 1-2",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "BT-LUOC4-5",
+    "ten": "Bạch tuộc 2 da cắt luộc 4-5",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "BT-LUOC6-7",
+    "ten": "Bạch tuộc cắt luộc 6-7",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "BT-LUOCMAU",
+    "ten": "Bạch tuộc 2 da luộc màu",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "BTNCLS",
+    "ten": "Bạch tuộc nguyên con làm sạch ĐL",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "BT-NCLS",
+    "ten": "Bạch tuộc NCLS đông lạnh",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "BT-NCLS180",
+    "ten": "Bạch tuộc 1 da NCLS 180gr",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "BT-NCLS200",
+    "ten": "Bạch tuộc 1 da NCLS 200gr",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "BT-NCLS350",
+    "ten": "Bạch tuộc 1 da NCLS 350gr",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "BT-SHUSI",
+    "ten": "Bạch tuộc shusi",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "BT-SSVUN",
+    "ten": "Bạch tuộc 2 da sushi vụn",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "BT-T.BOT10",
+    "ten": "Bạch tuộc 2 da tẩm bột 10-15gr",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "BT-T.BOT8",
+    "ten": "Bạch tuộc 2 da tẩm bột 8-14gr",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "BT-T-BOT16",
+    "ten": "Bạch tuộc 2 da tẩm bột 7-16g",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "BT-T-BOT5",
+    "ten": "Bạch tuộc tẩm bột 5-10",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "BT-T-BOT6",
+    "ten": "Bạch tuộc 2 da tẩm bột 6-10",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "BT-T-BOT6-",
+    "ten": "Bạch tuộc 2 da tẩm bột 6-11",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "BT-T-BOT7",
+    "ten": "Bạch tuộc 2 da tẩm bột 8-16gr",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "BT-T-BOT8",
+    "ten": "Bạch tuộc 2 da tẩm bột 8-14",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "BT-T-BOT9",
+    "ten": "Bạch tuộc 2 da tẩm bột 9-12",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "BT-TIP",
+    "ten": "Bạch tuộc 2 da típ râu luộc",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "BT-TIPLUOC",
+    "ten": "Típ bạch tuộc luộc",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "BT-TIPSONG",
+    "ten": "Típ bạch tuộc 2 da cắt sống",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "BT-XEBANH",
+    "ten": "Bạch tuộc xẻ banh đông lạnh",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "BT-XIENQUE",
+    "ten": "Bạch tuộc xiên que",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "BTXIENQUEM",
+    "ten": "Bạch tuộc xiên que màu",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "C.BONGCAT",
+    "ten": "Cá bống cát đông lạnh",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Cá"
+  },
+  {
+    "ma": "C.CHEMFI",
+    "ten": "Cá chẽm hồng fillet đông lạnh",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Cá"
+  },
+  {
+    "ma": "C.CHEMKHO",
+    "ten": "Cá chẽm hồng khô tẩm gia vị ĐL",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Cá"
+  },
+  {
+    "ma": "C.DONG",
+    "ten": "Cá đổng đông lạnh",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Cá"
+  },
+  {
+    "ma": "C.DUCFI",
+    "ten": "Cá đục fillet đông lạnh",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Cá"
+  },
+  {
+    "ma": "C.MOIBUOM",
+    "ten": "Cá mòi xẻ bướm đông lạnh",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Cá"
+  },
+  {
+    "ma": "C.SONGTB",
+    "ten": "Cá sòng fillet tẩm bột (MSD)",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Cá"
+  },
+  {
+    "ma": "CA.MOI",
+    "ten": "Cá mòi bỏ nội tạng ĐL",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Cá"
+  },
+  {
+    "ma": "CA.NHONG",
+    "ten": "Cá nhồng fillet đông lạnh",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Cá"
+  },
+  {
+    "ma": "CA-BDUONGF",
+    "ten": "Cá bánh đường fillet đông lạnh",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Cá"
+  },
+  {
+    "ma": "CABOCĐ",
+    "ten": "Cá bò nguyên con cắt đầu đông lạnh",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Cá"
+  },
+  {
+    "ma": "CA-CHEM",
+    "ten": "Cá chẽm nguyên con ĐL",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Cá"
+  },
+  {
+    "ma": "CA-CHI",
+    "ten": "Cá chỉ đông lạnh",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Cá"
+  },
+  {
+    "ma": "CA-COM",
+    "ten": "Cá cơm đông lạnh",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Cá"
+  },
+  {
+    "ma": "CA-COMTB",
+    "ten": "Cá cơm tẩm bột ĐL",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Cá"
+  },
+  {
+    "ma": "CA-DIEUHON",
+    "ten": "Cá diêu hồng đông lạnh",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Cá"
+  },
+  {
+    "ma": "CA-DUC",
+    "ten": "Cá đục fillet đông lạnh",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Cá"
+  },
+  {
+    "ma": "CA-KEO",
+    "ten": "Cá kèo đông lạnh",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Cá"
+  },
+  {
+    "ma": "CA-LOCCK",
+    "ten": "Cá lóc cắt khúc ĐL",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Cá"
+  },
+  {
+    "ma": "CA-LOCDEN",
+    "ten": "Cá lóc đen NC đông lạnh",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Cá"
+  },
+  {
+    "ma": "CA-MO",
+    "ten": "Cá mó đông lạnh",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Cá"
+  },
+  {
+    "ma": "CA-MOI",
+    "ten": "Cá mòi đông lạnh",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Cá"
+  },
+  {
+    "ma": "CAMOI-F",
+    "ten": "Cá mòi fillet đông lạnh",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Cá"
+  },
+  {
+    "ma": "CA-NGAN",
+    "ten": "Cá ngân đông lạnh",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Cá"
+  },
+  {
+    "ma": "CANUC",
+    "ten": "Cá nục đông lạnh",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Cá"
+  },
+  {
+    "ma": "CA-NUC",
+    "ten": "Cá nục đông lạnh",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Cá"
+  },
+  {
+    "ma": "CA-RO",
+    "ten": "Cá rô đông lạnh",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Cá"
+  },
+  {
+    "ma": "CASONG.FI",
+    "ten": "Cá sòng fillet",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Cá"
+  },
+  {
+    "ma": "CA-THU",
+    "ten": "Cá thu fillet đông lạnh",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Cá"
+  },
+  {
+    "ma": "CATHUCK",
+    "ten": "Cá thu nhật fillet cắt khúc ĐL",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Cá"
+  },
+  {
+    "ma": "CATHU-DMR",
+    "ten": "Cá thu nhật fillet IQF DMR",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Cá"
+  },
+  {
+    "ma": "CATHU-FI",
+    "ten": "Cá thu fillet đông lạnh SBT",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Cá"
+  },
+  {
+    "ma": "CATHUMUOI",
+    "ten": "Cá thu Nhật fillet tẩm muối đông lạnh",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Cá"
+  },
+  {
+    "ma": "CATHUNF",
+    "ten": "Cá thu Nhật fillet đông lạnh",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Cá"
+  },
+  {
+    "ma": "CA-TRAO",
+    "ten": "Cá tráo fillet đông lạnh",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Cá"
+  },
+  {
+    "ma": "CATRICH",
+    "ten": "Cá trích fillet đông lạnh",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Cá"
+  },
+  {
+    "ma": "CA-TRICH",
+    "ten": "Cá trích fillet đông lạnh",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Cá"
+  },
+  {
+    "ma": "C-DOCU",
+    "ten": "Cá đỏ củ đông lạnh",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Cá"
+  },
+  {
+    "ma": "C-NHONGFI",
+    "ten": "Cá nhồng fillet đông lạnh",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Cá"
+  },
+  {
+    "ma": "C-SONGTB",
+    "ten": "Cá sòng fillet tẩm bột đông lạnh",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Cá"
+  },
+  {
+    "ma": "C-TRAOTB",
+    "ten": "Cá tráo fillet tẩm bột đông lạnh",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Cá"
+  },
+  {
+    "ma": "DAU- CHEM",
+    "ten": "Đầu cá chẽm hồng fillet đông lạnh",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Cá"
+  },
+  {
+    "ma": "DAUNANG",
+    "ten": "Đầu mực nang đông lạnh",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Mực"
+  },
+  {
+    "ma": "DAUONG-XQ",
+    "ten": "Đầu ống xiên que tẩm bột",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Khác"
+  },
+  {
+    "ma": "DENANG",
+    "ten": "Dè mực nang đông lạnh",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Mực"
+  },
+  {
+    "ma": "MUC-NANG",
+    "ten": "Mực nang đông lạnh",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Mực"
+  },
+  {
+    "ma": "ONGTRUNG",
+    "ten": "Mực ống trứng đông lạnh",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Mực"
+  },
+  {
+    "ma": "ONGTUBE",
+    "ten": "Mực ống tube",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Mực"
+  },
+  {
+    "ma": "T.DAOKIRI",
+    "ten": "Cá thu đao cắt kirimi đông lạnh",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Cá"
+  },
+  {
+    "ma": "THIT-BT",
+    "ten": "Thịt bạch tuộc chế biến ĐL",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Bạch tuộc"
+  },
+  {
+    "ma": "THUDAOBĐ",
+    "ten": "Cá thu đao xẻ banh bỏ đuôi ĐL",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Cá"
+  },
+  {
+    "ma": "THUDAO-FI",
+    "ten": "Cá thu đao fillet đông lạnh",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Cá"
+  },
+  {
+    "ma": "TOMDO",
+    "ten": "Tôm đỏ thịt ĐL",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Tôm"
+  },
+  {
+    "ma": "TOMTHELOT",
+    "ten": "Tôm thẻ lột đông lạnh",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Tôm"
+  },
+  {
+    "ma": "TOMTHETHIT",
+    "ten": "Tôm thẻ thịt ĐL",
+    "dvt": "kg",
+    "maTk": "1551",
+    "nhom": "Tôm"
+  }
+]

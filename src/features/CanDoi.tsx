@@ -14,7 +14,8 @@ import { KEYS, load, save, uid } from "@/lib/db";
 import { tinhCanDoi } from "@/lib/canDoi";
 import { Button, Card, Input, Select, Label, Badge } from "@/components/ui";
 import { num } from "@/lib/format";
-import { Plus, Trash2, ChevronLeft } from "lucide-react";
+import { Plus, Trash2, ChevronLeft, FileText } from "lucide-react";
+import BangCanDoi from "@/features/BangCanDoi";
 
 export default function CanDoiScreen() {
   const [kyList, setKyList] = useState<KyCanDoi[]>(() => load(KEYS.ky));
@@ -141,6 +142,7 @@ function KyDetail({
   );
   const matHang = load<MatHang>(KEYS.matHang);
   const khach = load<KhachHang>(KEYS.khachHang);
+  const [showBang, setShowBang] = useState(false);
 
   // Lưu: gộp lại toàn bộ collection (thay phần của kỳ này).
   const saveColl = <T extends { kyId: string }>(key: string, kyRows: T[]) => {
@@ -161,9 +163,14 @@ function KyDetail({
         <ChevronLeft className="size-4" /> Danh sách kỳ
       </button>
 
-      <div>
-        <h1 className="text-xl font-semibold text-slate-900">Cân đối: {ky.loaiNL}</h1>
-        <p className="mt-1 text-sm text-slate-500">{ky.ngayList || "Chưa ghi ngày"}</p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-semibold text-slate-900">Cân đối: {ky.loaiNL}</h1>
+          <p className="mt-1 text-sm text-slate-500">{ky.ngayList || "Chưa ghi ngày"}</p>
+        </div>
+        <Button variant="outline" onClick={() => setShowBang(true)}>
+          <FileText className="size-4" /> Xem / in bảng
+        </Button>
       </div>
 
       {/* Thông số kỳ */}
@@ -221,6 +228,19 @@ function KyDetail({
           </div>
         </div>
       </Card>
+
+      {showBang && (
+        <BangCanDoi
+          ky={ky}
+          nlVao={nlVao}
+          pheLieu={pheLieu}
+          tp={tp}
+          matHang={matHang}
+          khach={khach}
+          kq={kq}
+          onClose={() => setShowBang(false)}
+        />
+      )}
     </div>
   );
 }

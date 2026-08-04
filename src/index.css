@@ -23,3 +23,22 @@ body {
 .tnum {
   font-variant-numeric: tabular-nums;
 }
+
+/* In bảng cân đối: chỉ in vùng .print-root, ẩn phần còn lại */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .print-root,
+  .print-root * {
+    visibility: visible;
+  }
+  .print-root {
+    position: absolute;
+    inset: 0;
+    padding: 0;
+  }
+  .no-print {
+    display: none !important;
+  }
+}

@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import type { DongNhapNL, PhanXuong } from "@/types";
+import type { DongNhapNL, PhanXuong, Loai } from "@/types";
+import { LOAI, thanhTien } from "@/types";
 import { loadNhapNL, saveNhapNL, newId } from "@/lib/store";
 import { Button, Card, Input, Select, Label, Badge } from "@/components/ui";
 import { kg, num, todayISO, viDate } from "@/lib/format";
@@ -24,6 +25,7 @@ const LOAI_NL_GOI_Y = [
 ];
 
 interface FormState {
+  loai: Loai;
   daiLy: string;
   loaiNL: string;
   soLuongKg: string;
@@ -34,6 +36,7 @@ interface FormState {
 }
 
 const EMPTY: FormState = {
+  loai: "Bạch tuộc",
   daiLy: "",
   loaiNL: "",
   soLuongKg: "",
@@ -69,6 +72,10 @@ export default function NhapNguyenLieuScreen() {
     () => view.reduce((s, r) => s + (r.soLuongKg || 0), 0),
     [view],
   );
+  const tongTien = useMemo(
+    () => view.reduce((s, r) => s + thanhTien(r), 0),
+    [view],
+  );
 
   const canAdd =
     form.daiLy.trim() && form.loaiNL.trim() && Number(form.soLuongKg) > 0;
@@ -79,6 +86,7 @@ export default function NhapNguyenLieuScreen() {
       id: newId(),
       ngay,
       phanXuong,
+      loai: form.loai,
       daiLy: form.daiLy.trim(),
       loaiNL: form.loaiNL.trim(),
       soLuongKg: Number(form.soLuongKg),
@@ -133,6 +141,21 @@ export default function NhapNguyenLieuScreen() {
       {/* Form thêm dòng */}
       <Card className="p-4">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div>
+            <Label>Loài *</Label>
+            <Select
+              value={form.loai}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, loai: e.target.value as Loai }))
+              }
+            >
+              {LOAI.map((l) => (
+                <option key={l} value={l}>
+                  {l}
+                </option>
+              ))}
+            </Select>
+          </div>
           <div>
             <Label>Đại lý *</Label>
             <Input
@@ -225,10 +248,12 @@ export default function NhapNguyenLieuScreen() {
           <table className="w-full text-sm">
             <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
               <tr>
+                <th className="px-4 py-2.5 font-medium">Loài</th>
                 <th className="px-4 py-2.5 font-medium">Đại lý</th>
                 <th className="px-4 py-2.5 font-medium">Loại nguyên liệu</th>
                 <th className="px-4 py-2.5 text-right font-medium">SL (kg)</th>
                 <th className="px-4 py-2.5 text-right font-medium">Đơn giá</th>
+                <th className="px-4 py-2.5 text-right font-medium">Thành tiền</th>
                 <th className="px-4 py-2.5 font-medium">Xe</th>
                 <th className="px-4 py-2.5"></th>
               </tr>
@@ -236,6 +261,9 @@ export default function NhapNguyenLieuScreen() {
             <tbody className="divide-y divide-slate-100">
               {view.map((r) => (
                 <tr key={r.id} className="hover:bg-slate-50">
+                  <td className="px-4 py-2.5">
+                    <Badge>{r.loai}</Badge>
+                  </td>
                   <td className="px-4 py-2.5 text-slate-800">{r.daiLy}</td>
                   <td className="px-4 py-2.5 text-slate-800">{r.loaiNL}</td>
                   <td className="tnum px-4 py-2.5 text-right text-slate-800">
@@ -243,6 +271,9 @@ export default function NhapNguyenLieuScreen() {
                   </td>
                   <td className="tnum px-4 py-2.5 text-right text-slate-500">
                     {num(r.donGia)}
+                  </td>
+                  <td className="tnum px-4 py-2.5 text-right text-slate-800">
+                    {num(thanhTien(r))}
                   </td>
                   <td className="px-4 py-2.5 text-slate-500">
                     {[r.taiXe, r.bienSoXe].filter(Boolean).join(" · ")}
@@ -261,7 +292,7 @@ export default function NhapNguyenLieuScreen() {
               {view.length === 0 && (
                 <tr>
                   <td
-                    colSpan={6}
+                    colSpan={8}
                     className="px-4 py-10 text-center text-slate-400"
                   >
                     Chưa có dòng nhập nào cho ngày này.
@@ -272,13 +303,17 @@ export default function NhapNguyenLieuScreen() {
             {view.length > 0 && (
               <tfoot>
                 <tr className="border-t border-slate-200 bg-slate-50 font-medium">
-                  <td className="px-4 py-2.5" colSpan={2}>
+                  <td className="px-4 py-2.5" colSpan={3}>
                     Tổng cộng
                   </td>
                   <td className="tnum px-4 py-2.5 text-right text-slate-900">
                     {num(tong)}
                   </td>
-                  <td colSpan={3}></td>
+                  <td></td>
+                  <td className="tnum px-4 py-2.5 text-right text-slate-900">
+                    {num(tongTien)}
+                  </td>
+                  <td colSpan={2}></td>
                 </tr>
               </tfoot>
             )}

@@ -1,14 +1,20 @@
 import { useState } from "react";
 import ThanhPhamScreen from "@/features/ThanhPham";
 import NhapNguyenLieuScreen from "@/features/NhapNguyenLieu";
+import CanDoiScreen from "@/features/CanDoi";
+import MatHangScreen from "@/features/MatHang";
+import KhachHangScreen from "@/features/KhachHang";
 import { hasSupabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
-import { Boxes, ClipboardList, Fish } from "lucide-react";
+import { Boxes, ClipboardList, Fish, Scale, Package, Users } from "lucide-react";
 
-type Screen = "nhap-nl" | "thanh-pham";
+type Screen = "nhap-nl" | "can-doi" | "mat-hang" | "khach-hang" | "thanh-pham";
 
 const NAV: { id: Screen; label: string; icon: typeof Boxes }[] = [
   { id: "nhap-nl", label: "Nhập nguyên liệu hàng ngày", icon: ClipboardList },
+  { id: "can-doi", label: "Cân đối 5 ngày", icon: Scale },
+  { id: "mat-hang", label: "Mặt hàng cân đối", icon: Package },
+  { id: "khach-hang", label: "Khách hàng", icon: Users },
   { id: "thanh-pham", label: "Danh mục thành phẩm", icon: Boxes },
 ];
 
@@ -76,6 +82,9 @@ export default function App() {
 
         <main className="mx-auto w-full max-w-5xl flex-1 p-5 sm:p-8">
           {screen === "nhap-nl" && <NhapNguyenLieuScreen />}
+          {screen === "can-doi" && <CanDoiScreen />}
+          {screen === "mat-hang" && <MatHangScreen />}
+          {screen === "khach-hang" && <KhachHangScreen />}
           {screen === "thanh-pham" && <ThanhPhamScreen />}
         </main>
       </div>

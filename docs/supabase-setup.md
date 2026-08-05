@@ -23,8 +23,8 @@ Vì vậy localStorage chỉ dùng để chạy thử. Chạy thật thì phải
 
 ## Project và hiện trạng
 
-Project: **`izpxcjtgveazjnqtzfer`** (`https://izpxcjtgveazjnqtzfer.supabase.co`)
-— lấy từ `SDFactory/.env.example`.
+Project: dùng chung project Supabase mà SDFactory đang chạy. URL và anon key
+lấy ở Dashboard → Project Settings → API — **không ghi vào file nào trong repo**.
 
 Đang có sẵn của SDFactory (188 dòng SQL, 3 migration):
 
@@ -98,11 +98,11 @@ xóa `events`, `state_snapshots`, `sites` + 3 function của SDFactory.
 cp .env.example .env
 ```
 
-Rồi điền `VITE_SUPABASE_ANON_KEY`. Lấy ở Dashboard → **Project Settings → API →
-Project API keys → anon / publishable**.
+Điền `VITE_SUPABASE_URL` và `VITE_SUPABASE_ANON_KEY`, cả hai lấy ở
+Dashboard → **Project Settings → API**.
 
-> `.env.example` của SDFactory chỉ có key giả (`sb_publishable_xxxxx…`) nên
-> không copy sang được — phải lấy key thật từ Dashboard.
+`.env.example` cố tình để trống cả URL: repo private vẫn nên sạch, ai được thêm
+vào repo về sau không cần biết ngay project nào để nhắm tới.
 
 **Không bao giờ** đặt `service_role` key vào file này: Vite nhúng mọi biến
 `VITE_*` thẳng vào bundle mà ai mở trình duyệt cũng đọc được.
@@ -137,12 +137,29 @@ Muốn đẩy số liệu đang có trên máy lên máy chủ: mở màn tươn
 dòng bất kỳ — tầng repo sẽ đẩy toàn bộ danh sách lên. Bản nhập khẩu hàng loạt
 chưa làm.
 
-## Bảo mật — việc còn nợ
+## Bảo mật
 
-Migration hiện mở quyền `anon` đọc/ghi mọi bảng nghiệp vụ (`using (true)`), vì
-app chưa có đăng nhập và chạy trong mạng nội bộ xí nghiệp.
+### Đang ở đâu
 
-**Trước khi mở ra ngoài mạng nội bộ, bắt buộc phải:** bật Supabase Auth, thay
-policy bằng ràng buộc theo người dùng/vai trò, thu hồi quyền của `anon`. Với
-policy hiện tại, ai có anon key (đọc được từ bundle JS) là sửa được số liệu sản
-xuất.
+`0001` mở quyền `anon` đọc/ghi mọi bảng nghiệp vụ (`using (true)`) vì app chưa
+có đăng nhập. Anon key nằm trong bundle JS, ai mở DevTools cũng lấy được →
+**ai có key là sửa được số liệu sản xuất**.
+
+Chấp nhận được khi và chỉ khi app chạy trong mạng nội bộ xí nghiệp.
+
+### Phải làm gì trước khi mở ra ngoài
+
+1. Thêm màn đăng nhập bằng Supabase Auth (chưa làm).
+2. Chạy [`0003_siet_rls.sql`](../supabase/migrations/0003_siet_rls.sql) — thu
+   hồi toàn bộ quyền của `anon`, chỉ còn `authenticated`.
+   **Chạy trước bước 1 thì app ngừng đọc/ghi được** (không mất dữ liệu, nhưng
+   người dùng không làm việc được).
+3. Phân vai (chưa thiết kế): tổ trưởng chỉ ghi xưởng mình, kế toán đọc tất cả,
+   giám đốc chỉ đọc.
+
+### Không để lộ định danh trong repo
+
+- `.env` nằm trong `.gitignore`; `.env.example` để trống cả URL lẫn key.
+- Không ghi project ref / URL vào tài liệu, migration hay mã nguồn.
+- Nếu anon key từng bị commit ở bất kỳ repo nào: rotate lại ở Dashboard →
+  Project Settings → API → Rotate.

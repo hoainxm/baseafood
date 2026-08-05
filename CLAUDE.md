@@ -22,7 +22,7 @@ src/
 │   ├── tokens.css           NƠI DUY NHẤT định cỡ chữ / màu / chiều cao ô
 │   ├── patterns/            Field, NumberField, Combobox, DateField, RecordTable, DanhMucCrud,
 │   │                        ConfirmDelete, StepForm, ContextBar, ErrorSummary, EmptyState,
-│   │                        AccessibilityBar, notify, Logo
+│   │                        CaiDatHienThi, TrangThaiDuLieu, notify, Logo
 │   ├── kit/KitPage.tsx      trang duyệt bộ giao diện (đưa người dùng thật bấm thử)
 │   └── index.ts             cửa import duy nhất cho features
 ├── features/                NhapNguyenLieu · CanDoi + BangCanDoi · DanhMuc (5 tab) · ThanhPham (141 mã, chỉ đọc)
@@ -38,10 +38,10 @@ src/
 6. Nhãn luôn hiện (không dùng placeholder thay nhãn); vùng chạm ≥ 44px; nút Lưu không bao giờ `disabled` (thiếu thì bắn `ErrorSummary`).
 7. Danh mục thay nhập tự do: đại lý / loại NL / mặt hàng / khách hàng chọn qua `Combobox` (có tạo mới tại chỗ).
 8. Brand `#17529c` rút từ logo Baseafood (`public/baseafood-logo.png`). Tailwind v4.
-9. `npx shadcn add` **không chạy được** trên máy này (EPERM junction `C:\Users\ACER\My Documents`) — cách lấy component thủ công ghi trong `src/design-system/README.md`.
+9. `npx shadcn add` **không chạy được** trên Windows (CLI quét ngược thư mục cha, đụng junction bị khóa quyền) — cách lấy component thủ công ghi trong `src/design-system/README.md`.
 
 ## Dữ liệu
-Mọi màn đọc/ghi qua `src/lib/repo.ts` — **không** gọi localStorage trực tiếp. Chưa điền `.env` thì chạy localStorage; điền rồi thì chạy Supabase (project `izpxcjtgveazjnqtzfer`, lọc theo `xi_nghiep_id` = `VITE_SITE_ID`).
+Mọi màn đọc/ghi qua `src/lib/repo.ts` — **không** gọi localStorage trực tiếp. Chưa điền `.env` thì chạy localStorage; điền rồi thì chạy Supabase (URL/khóa lấy ở Dashboard, lọc theo `xi_nghiep_id` = `VITE_SITE_ID`).
 
 **Đặt tên DB: tiếng Việt KHÔNG DẤU, snake_case, không tiền tố** (`nhap_nguyen_lieu`, `so_luong_kg`). Cấm tên có dấu — Postgres bắt bọc nháy kép mọi nơi và dấu tiếng Việt có 2 dạng Unicode NFC/NFD trông giống hệt nhưng là 2 định danh khác nhau.
 
@@ -49,7 +49,9 @@ Mọi màn đọc/ghi qua `src/lib/repo.ts` — **không** gọi localStorage tr
 
 `src/data/thanh-pham.json` giờ chỉ là **seed** cho bảng `thanh_pham`, không còn là nguồn đọc trực tiếp.
 
-⚠️ RLS hiện mở cho `anon` (chưa có đăng nhập). Phải siết trước khi mở ra ngoài mạng nội bộ.
+⚠️ RLS hiện mở cho `anon` (chưa có đăng nhập) → ai có anon key là sửa được số liệu. Chỉ chạy trong mạng nội bộ xí nghiệp. Trước khi mở ra ngoài: thêm đăng nhập rồi chạy `0003_siet_rls.sql`.
+
+🔒 Không ghi project ref / URL / key vào bất kỳ file nào trong repo — `.env.example` để trống, `.env` đã gitignore.
 
 ## Trạng thái
 - **Đã build**: nhập hàng (lọc ngày/khoảng ngày/xưởng/đại lý/loại), cân đối + in bảng, danh mục 5 tab, bộ giao diện cho người lớn tuổi + cài đặt hiển thị, tầng dữ liệu Supabase↔localStorage.

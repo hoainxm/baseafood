@@ -1,6 +1,6 @@
 -- ============================================================
 -- Baseafood MES — toàn bộ schema nghiệp vụ
--- Chạy trên project Supabase `izpxcjtgveazjnqtzfer`.
+-- Chạy trên project Supabase của Baseafood (URL lấy ở Dashboard).
 --
 -- QUY ƯỚC ĐẶT TÊN: tiếng Việt KHÔNG DẤU, snake_case, không tiền tố.
 --

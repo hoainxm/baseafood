@@ -1,7 +1,7 @@
 -- ============================================================
 -- ⚠️⚠️ MIGRATION PHÁ HỦY — ĐỌC HẾT TRƯỚC KHI CHẠY ⚠️⚠️
 --
--- Gỡ toàn bộ dữ liệu cũ của SDFactory khỏi project izpxcjtgveazjnqtzfer.
+-- Gỡ toàn bộ dữ liệu cũ của SDFactory khỏi project Supabase của Baseafood.
 --
 -- KHÔNG THỂ HOÀN TÁC. Chạy file này sẽ:
 --   • Xóa vĩnh viễn bảng public.events (spine append-only — chính SDFactory

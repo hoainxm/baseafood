@@ -86,9 +86,9 @@ Header chỉ giữ nút cỡ chữ nhanh (`CoChuNhanh`) — thứ cần chỉnh 
 
 ## Thêm component shadcn mới
 
-CLI `npx shadcn add` **không chạy được** trên máy này (`EPERM: scandir
-'C:\Users\ACER\My Documents'` — CLI quét ngược lên thư mục cha và đụng junction
-bị khóa quyền của Windows). Cách thay thế:
+CLI `npx shadcn add` có thể lỗi `EPERM: scandir …` trên Windows: CLI quét
+ngược lên thư mục cha và đụng junction tương thích cũ bị khóa quyền
+(`My Documents`, `Local Settings`…). Cách thay thế:
 
 1. Tải trực tiếp từ registry:
    `https://ui.shadcn.com/r/styles/radix-nova/<tên>.json`, ghi `files[].content`

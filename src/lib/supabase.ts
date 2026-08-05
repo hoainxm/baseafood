@@ -17,6 +17,6 @@ export const supabase: SupabaseClient | null =
 
 export const hasSupabase = Boolean(supabase);
 
-/** Mã xí nghiệp (multi-site). Mọi bảng mes_* đều lọc theo cột này. */
+/** Mã xí nghiệp (multi-site). Mọi bảng nghiệp vụ đều lọc theo cột xi_nghiep_id này. */
 export const SITE_ID =
   (import.meta.env.VITE_SITE_ID as string | undefined)?.trim() || "site-default";

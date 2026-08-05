@@ -8,7 +8,7 @@ import type {
   KhachHang,
 } from "@/types";
 import type { KetQuaCanDoi } from "@/lib/canDoi";
-import { Button } from "@/components/ui";
+import { Button } from "@/design-system";
 import { num } from "@/lib/format";
 import { Printer, X } from "lucide-react";
 

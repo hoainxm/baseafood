@@ -57,6 +57,26 @@ export interface KhachHang {
   thiTruong: string; // VD Nhật, EU, Nội địa
 }
 
+/** Đại lý cung cấp nguyên liệu (đầu vào). */
+export interface DaiLy {
+  id: string;
+  ma: string;
+  ten: string;
+  dienThoai: string;
+  ghiChu: string;
+}
+
+/**
+ * Loại nguyên liệu (quy cách/size) — VD "2 da nguyên liệu", "Mực ống 7cm".
+ * Có danh mục để chống gõ tự do mỗi lần một kiểu → tổng hợp cuối kỳ mới đúng.
+ */
+export interface LoaiNguyenLieu {
+  id: string;
+  ten: string;
+  loai: string; // thuộc loài nào: Bạch tuộc / Mực / Cá…
+  ghiChu: string;
+}
+
 export type NhomNL = "Thủy sản" | "Xả đông" | "Bột phụ gia";
 export const NHOM_NL: NhomNL[] = ["Thủy sản", "Xả đông", "Bột phụ gia"];
 
@@ -67,7 +87,9 @@ export const KENH: Kenh[] = ["Xuất khẩu", "Nội địa"];
 export interface KyCanDoi {
   id: string;
   loaiNL: string; // VD "Bạch tuộc 2 da", "Mực ống khay"
-  ngayList: string; // tập ngày rời rạc, VD "19-22-23-24-26-27-29/07/2026"
+  ngayList: string; // chuỗi hiển thị/in, sinh từ tuNgay–denNgay hoặc gõ tay (bản cũ)
+  tuNgay?: string; // ISO yyyy-mm-dd — chọn bằng lịch
+  denNgay?: string; // ISO yyyy-mm-dd
   tongNLNhan: number | null; // tổng NL nhận cả kỳ (bảng phụ) — để tính tỉ lệ thu hồi
   tiGia: number | null; // VND/USD (VD 26.000)
   chiPhiCB: number | null; // chi phí chế biến / kg TP (VND)

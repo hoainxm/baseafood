@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import type { ReactNode } from "react";
 import type {
   KyCanDoi,
   DongNLVao,
@@ -10,39 +11,131 @@ import type {
   Kenh,
 } from "@/types";
 import { NHOM_NL, KENH } from "@/types";
-import { KEYS, load, save, uid } from "@/lib/db";
+import { uid } from "@/lib/db";
+import {
+  useKhachHang,
+  useKyCanDoi,
+  useLoaiNL,
+  useMatHang,
+  useNLVao,
+  usePheLieu,
+  useTPRa,
+} from "@/lib/danhMuc";
 import { tinhCanDoi } from "@/lib/canDoi";
-import { Button, Card, Input, Select, Label, Badge } from "@/components/ui";
-import { num } from "@/lib/format";
-import { Plus, Trash2, ChevronLeft, FileText } from "lucide-react";
+import {
+  Badge,
+  Button,
+  Card,
+  ChoiceGroup,
+  Combobox,
+  ConfirmDelete,
+  DateRangeField,
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  EmptyState,
+  ErrorSummary,
+  Field,
+  Input,
+  NumberField,
+  RecordTable,
+  dateToIso,
+  notify,
+  type Cot,
+  type LoiNhap,
+} from "@/design-system";
+import { num, viDate } from "@/lib/format";
+import { ChevronLeft, FileText, Pencil, Plus, Scale } from "lucide-react";
 import BangCanDoi from "@/features/BangCanDoi";
 
-export default function CanDoiScreen() {
-  const [kyList, setKyList] = useState<KyCanDoi[]>(() => load(KEYS.ky));
-  const [selId, setSelId] = useState<string | null>(null);
-  const [loaiNL, setLoaiNL] = useState("");
-  const [ngayList, setNgayList] = useState("");
+/** Chuỗi ngày để in trên bảng, sinh từ khoảng ngày đã chọn. */
+function moTaKhoang(tu?: string, den?: string): string {
+  if (!tu) return "";
+  if (!den || den === tu) return viDate(tu);
+  return `${viDate(tu)} – ${viDate(den)}`;
+}
 
-  const persistKy = (next: KyCanDoi[]) => {
-    setKyList(next);
-    save(KEYS.ky, next);
+export default function CanDoiScreen() {
+  const [kyList, persistKy] = useKyCanDoi();
+  const [selId, setSelId] = useState<string | null>(null);
+  const [loaiNLDanhMuc, setLoaiNLDanhMuc] = useLoaiNL();
+
+  /* Xóa kỳ phải xóa luôn dòng con của nó (NL vào / phế liệu / TP ra), nếu không
+     các dòng này mồ côi trong kho — chiếm chỗ, sai tổng khi thống kê sau này. */
+  const [tatCaNL, ghiNL] = useNLVao();
+  const [tatCaPL, ghiPL] = usePheLieu();
+  const [tatCaTP, ghiTP] = useTPRa();
+
+  /** Gõ loại mới trong ô chọn → LƯU LUÔN vào danh mục (rule 7), không để mồ côi. */
+  const themLoaiNL = (ten: string) => {
+    setLoaiNLDanhMuc([...loaiNLDanhMuc, { id: uid(), ten, loai: "", ghiChu: "" }]);
+    notify.daLuu(`Đã thêm loại nguyên liệu "${ten}" vào danh mục`);
+    return ten;
   };
 
-  const taoKy = () => {
-    if (!loaiNL.trim()) return;
-    const ky: KyCanDoi = {
+  const [dang, setDang] = useState<KyCanDoi | null>(null);
+  const [laThem, setLaThem] = useState(false);
+  const [loi, setLoi] = useState<LoiNhap[]>([]);
+
+  const moThem = () => {
+    const homNay = dateToIso(new Date());
+    setDang({
       id: uid(),
-      loaiNL: loaiNL.trim(),
-      ngayList: ngayList.trim(),
+      loaiNL: "",
+      ngayList: "",
+      tuNgay: homNay,
+      denNgay: homNay,
       tongNLNhan: null,
       tiGia: 26000,
       chiPhiCB: null,
       createdAt: new Date().toISOString(),
+    });
+    setLaThem(true);
+    setLoi([]);
+  };
+
+  const luuKy = () => {
+    if (!dang) return;
+    const ls: LoiNhap[] = [];
+    if (!dang.loaiNL.trim())
+      ls.push({ truong: "Loại nguyên liệu", thongBao: "Chưa chọn loại" });
+    if (!dang.tuNgay)
+      ls.push({ truong: "Ngày tiếp nhận", thongBao: "Chưa chọn ngày" });
+    setLoi(ls);
+    if (ls.length > 0) return;
+
+    const ban: KyCanDoi = {
+      ...dang,
+      ngayList: moTaKhoang(dang.tuNgay, dang.denNgay),
     };
-    persistKy([ky, ...kyList]);
-    setLoaiNL("");
-    setNgayList("");
-    setSelId(ky.id);
+    if (laThem) {
+      persistKy([ban, ...kyList]);
+      notify.daLuu(`Đã tạo kỳ cân đối "${ban.loaiNL}"`);
+      setSelId(ban.id);
+    } else {
+      persistKy(kyList.map((k) => (k.id === ban.id ? ban : k)));
+      notify.daLuu("Đã lưu thay đổi");
+    }
+    setDang(null);
+  };
+
+  const xoaKy = (k: KyCanDoi) => {
+    const truocKy = kyList;
+    const truocNL = tatCaNL;
+    const truocPL = tatCaPL;
+    const truocTP = tatCaTP;
+    persistKy(kyList.filter((x) => x.id !== k.id));
+    ghiNL(tatCaNL.filter((r) => r.kyId !== k.id));
+    ghiPL(tatCaPL.filter((r) => r.kyId !== k.id));
+    ghiTP(tatCaTP.filter((r) => r.kyId !== k.id));
+    notify.daXoa(`Đã xóa kỳ "${k.loaiNL}" và toàn bộ dòng của kỳ`, () => {
+      persistKy(truocKy);
+      ghiNL(truocNL);
+      ghiPL(truocPL);
+      ghiTP(truocTP);
+    });
   };
 
   const sel = kyList.find((k) => k.id === selId) || null;
@@ -59,63 +152,181 @@ export default function CanDoiScreen() {
     );
   }
 
+  const cols: Cot<KyCanDoi>[] = [
+    {
+      key: "loaiNL",
+      header: "Loại nguyên liệu",
+      chinh: true,
+      render: (r) => r.loaiNL,
+      sapXep: (r) => r.loaiNL,
+    },
+    {
+      key: "ngay",
+      header: "Ngày tiếp nhận",
+      render: (r) =>
+        r.ngayList || <span className="text-muted-foreground">Chưa ghi</span>,
+      sapXep: (r) => r.tuNgay ?? "",
+    },
+    {
+      key: "tongNLNhan",
+      header: "Tổng NL nhận (kg)",
+      so: true,
+      anTrenDienThoai: true,
+      render: (r) =>
+        r.tongNLNhan != null ? (
+          num(r.tongNLNhan)
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        ),
+      sapXep: (r) => r.tongNLNhan ?? 0,
+    },
+  ];
+
   return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="text-xl font-semibold text-slate-900">Cân đối 5 ngày (xưởng Đông)</h1>
-        <p className="mt-1 text-sm text-slate-500">
-          Mỗi bảng = một lô nguyên liệu theo loại. Cân đối nguyên liệu vào với thành phẩm ra → định mức, lãi/lỗ.
-        </p>
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-semibold text-foreground">
+            Cân đối nguyên liệu
+          </h1>
+          <p className="mt-2 max-w-2xl text-base text-muted-foreground">
+            Mỗi kỳ là một lô nguyên liệu theo loại. Cân đối nguyên liệu vào với
+            thành phẩm ra để ra định mức chế biến và lãi/lỗ.
+          </p>
+        </div>
+        <Button size="lg" onClick={moThem}>
+          <Plus />
+          Tạo kỳ cân đối
+        </Button>
       </div>
 
-      <Card className="p-4">
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <div>
-            <Label>Loại nguyên liệu *</Label>
-            <Input value={loaiNL} onChange={(e) => setLoaiNL(e.target.value)} placeholder="VD: Bạch tuộc 2 da" />
-          </div>
-          <div className="sm:col-span-2">
-            <Label>Các ngày tiếp nhận</Label>
-            <Input value={ngayList} onChange={(e) => setNgayList(e.target.value)} placeholder="VD: 19-22-23-24-26-27-29/07/2026" />
-          </div>
-        </div>
-        <div className="mt-4 flex justify-end">
-          <Button onClick={taoKy} disabled={!loaiNL.trim()}>
-            <Plus className="size-4" />
-            Tạo kỳ cân đối
-          </Button>
-        </div>
-      </Card>
+      {kyList.length === 0 ? (
+        <EmptyState
+          icon={Scale}
+          tieuDe="Chưa có kỳ cân đối nào"
+          moTa="Tạo kỳ đầu tiên: chọn loại nguyên liệu và khoảng ngày tiếp nhận."
+          action={
+            <Button size="lg" onClick={moThem}>
+              <Plus />
+              Tạo kỳ cân đối
+            </Button>
+          }
+        />
+      ) : (
+        <RecordTable
+          columns={cols}
+          rows={kyList}
+          getKey={(r) => r.id}
+          timKiem={(r) => `${r.loaiNL} ${r.ngayList}`}
+          nhanTimKiem="Tìm kỳ theo loại nguyên liệu…"
+          actions={(r) => (
+            <>
+              <Button size="sm" onClick={() => setSelId(r.id)}>
+                Mở kỳ
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setDang({ ...r });
+                  setLaThem(false);
+                  setLoi([]);
+                }}
+              >
+                <Pencil />
+                Sửa
+              </Button>
+              <ConfirmDelete
+                moTaBanGhi={`Kỳ "${r.loaiNL}" — ${r.ngayList || "chưa ghi ngày"}`}
+                onConfirm={() => xoaKy(r)}
+                tieuDe="Xóa kỳ cân đối này?"
+                nhanNut="Xóa kỳ"
+              />
+            </>
+          )}
+        />
+      )}
 
-      <Card className="overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
-              <tr>
-                <th className="px-4 py-2.5 font-medium">Loại nguyên liệu</th>
-                <th className="px-4 py-2.5 font-medium">Các ngày</th>
-                <th className="px-4 py-2.5"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {kyList.map((k) => (
-                <tr key={k.id} className="cursor-pointer hover:bg-slate-50" onClick={() => setSelId(k.id)}>
-                  <td className="px-4 py-2.5 font-medium text-slate-800">{k.loaiNL}</td>
-                  <td className="px-4 py-2.5 text-slate-500">{k.ngayList || "—"}</td>
-                  <td className="px-4 py-2.5 text-right text-cyan-700">Mở →</td>
-                </tr>
-              ))}
-              {kyList.length === 0 && (
-                <tr>
-                  <td colSpan={3} className="px-4 py-10 text-center text-slate-400">
-                    Chưa có kỳ cân đối nào.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </Card>
+      <Dialog
+        open={dang !== null}
+        onOpenChange={(o) => {
+          if (!o) setDang(null);
+        }}
+      >
+        <DialogContent className="max-h-[92vh] overflow-y-auto w-full sm:max-w-3xl lg:max-w-5xl">
+          <DialogHeader>
+            <DialogTitle className="text-2xl">
+              {laThem ? "Tạo kỳ cân đối" : "Sửa kỳ cân đối"}
+            </DialogTitle>
+          </DialogHeader>
+
+          {dang && (
+            <div className="space-y-6 py-2">
+              <ErrorSummary loi={loi} />
+
+              <Combobox
+                label="Loại nguyên liệu"
+                required
+                hint="Lô nguyên liệu đem cân đối, VD: Bạch tuộc 2 da."
+                value={dang.loaiNL}
+                onChange={(v) => setDang((d) => (d ? { ...d, loaiNL: v } : d))}
+                options={loaiNLDanhMuc.map((l) => ({
+                  value: l.ten,
+                  label: l.ten,
+                  phu: l.loai || undefined,
+                }))}
+                onCreate={themLoaiNL}
+              />
+
+              <DateRangeField
+                label="Ngày tiếp nhận"
+                required
+                hint="Kỳ xưởng Đông thường 5 ngày — có nút chọn nhanh bên dưới."
+                tuNgay={dang.tuNgay ?? ""}
+                denNgay={dang.denNgay ?? ""}
+                onChange={(tu, den) =>
+                  setDang((d) => (d ? { ...d, tuNgay: tu, denNgay: den } : d))
+                }
+              />
+
+              <div className="grid gap-6 sm:grid-cols-2">
+                <NumberField
+                  label="Tổng NL nhận cả kỳ"
+                  unit="kg"
+                  value={dang.tongNLNhan}
+                  onChange={(v) =>
+                    setDang((d) => (d ? { ...d, tongNLNhan: v } : d))
+                  }
+                  hint="Lấy từ bảng phụ — để tính tỉ lệ thu hồi."
+                />
+                <NumberField
+                  label="Chi phí chế biến / kg TP"
+                  unit="đ"
+                  value={dang.chiPhiCB}
+                  onChange={(v) =>
+                    setDang((d) => (d ? { ...d, chiPhiCB: v } : d))
+                  }
+                />
+                <NumberField
+                  label="Tỉ giá"
+                  unit="đ/USD"
+                  value={dang.tiGia}
+                  onChange={(v) => setDang((d) => (d ? { ...d, tiGia: v } : d))}
+                />
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" size="lg" onClick={() => setDang(null)}>
+              Hủy
+            </Button>
+            <Button size="lg" onClick={luuKy}>
+              {laThem ? "Tạo kỳ" : "Lưu thay đổi"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -131,102 +342,171 @@ function KyDetail({
   onBack: () => void;
   onChangeKy: (patch: Partial<KyCanDoi>) => void;
 }) {
-  const [nlVao, setNlVao] = useState<DongNLVao[]>(() =>
-    load<DongNLVao>(KEYS.nlVao).filter((r) => r.kyId === ky.id),
+  /* Repo trả về TOÀN BỘ dòng của mọi kỳ; màn này chỉ làm việc với dòng của kỳ
+     đang mở, khi ghi thì ghép lại với dòng của các kỳ khác. */
+  const [tatCaNL, ghiNL] = useNLVao();
+  const [tatCaPL, ghiPL] = usePheLieu();
+  const [tatCaTP, ghiTP] = useTPRa();
+
+  const nlVao = useMemo(
+    () => tatCaNL.filter((r) => r.kyId === ky.id),
+    [tatCaNL, ky.id]
   );
-  const [pheLieu, setPheLieu] = useState<DongPheLieu[]>(() =>
-    load<DongPheLieu>(KEYS.pheLieu).filter((r) => r.kyId === ky.id),
+  const pheLieu = useMemo(
+    () => tatCaPL.filter((r) => r.kyId === ky.id),
+    [tatCaPL, ky.id]
   );
-  const [tp, setTp] = useState<DongTP[]>(() =>
-    load<DongTP>(KEYS.tp).filter((r) => r.kyId === ky.id),
+  const tp = useMemo(
+    () => tatCaTP.filter((r) => r.kyId === ky.id),
+    [tatCaTP, ky.id]
   );
-  const matHang = load<MatHang>(KEYS.matHang);
-  const khach = load<KhachHang>(KEYS.khachHang);
+  const [matHang, setMatHang] = useMatHang();
+  const [khach, setKhach] = useKhachHang();
+  const [loaiNLDanhMuc, setLoaiNLDanhMuc] = useLoaiNL();
   const [showBang, setShowBang] = useState(false);
 
-  // Lưu: gộp lại toàn bộ collection (thay phần của kỳ này).
-  const saveColl = <T extends { kyId: string }>(key: string, kyRows: T[]) => {
-    const others = load<T>(key).filter((r) => r.kyId !== ky.id);
-    save(key, [...others, ...kyRows]);
-  };
-  const persistNL = (n: DongNLVao[]) => { setNlVao(n); saveColl(KEYS.nlVao, n); };
-  const persistPL = (n: DongPheLieu[]) => { setPheLieu(n); saveColl(KEYS.pheLieu, n); };
-  const persistTP = (n: DongTP[]) => { setTp(n); saveColl(KEYS.tp, n); };
+  const ghepLai = <T extends { kyId: string }>(tatCa: T[], kyRows: T[]) => [
+    ...tatCa.filter((r) => r.kyId !== ky.id),
+    ...kyRows,
+  ];
+  const persistNL = (n: DongNLVao[]) => ghiNL(ghepLai(tatCaNL, n));
+  const persistPL = (n: DongPheLieu[]) => ghiPL(ghepLai(tatCaPL, n));
+  const persistTP = (n: DongTP[]) => ghiTP(ghepLai(tatCaTP, n));
 
-  const kq = useMemo(() => tinhCanDoi(ky, nlVao, pheLieu, tp), [ky, nlVao, pheLieu, tp]);
-  const tenMatHang = (id: string) => matHang.find((m) => m.id === id)?.ten || "—";
+  const kq = useMemo(
+    () => tinhCanDoi(ky, nlVao, pheLieu, tp),
+    [ky, nlVao, pheLieu, tp]
+  );
+  /** Chưa có thành phẩm ra → định mức + lãi/lỗ chưa có nghĩa. */
+  const chuaCoTP = kq.tongTP <= 0;
+  const tenMatHang = (id: string) =>
+    matHang.find((m) => m.id === id)?.ten || "—";
   const tenKhach = (id: string) => khach.find((k) => k.id === id)?.ten || "—";
 
   return (
-    <div className="space-y-5">
-      <button onClick={onBack} className="flex items-center gap-1 text-sm text-slate-500 hover:text-cyan-700">
-        <ChevronLeft className="size-4" /> Danh sách kỳ
-      </button>
+    <div className="space-y-6">
+      <Button variant="ghost" onClick={onBack}>
+        <ChevronLeft />
+        Danh sách kỳ
+      </Button>
 
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-xl font-semibold text-slate-900">Cân đối: {ky.loaiNL}</h1>
-          <p className="mt-1 text-sm text-slate-500">{ky.ngayList || "Chưa ghi ngày"}</p>
+          <h1 className="text-3xl font-semibold text-foreground">{ky.loaiNL}</h1>
+          <p className="mt-2 text-base text-muted-foreground">
+            Ngày tiếp nhận: {ky.ngayList || "chưa ghi"}
+          </p>
         </div>
-        <Button variant="outline" onClick={() => setShowBang(true)}>
-          <FileText className="size-4" /> Xem / in bảng
+        <Button variant="outline" size="lg" onClick={() => setShowBang(true)}>
+          <FileText />
+          Xem / in bảng
         </Button>
       </div>
 
-      {/* Thông số kỳ */}
-      <Card className="p-4">
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <div>
-            <Label>Tổng NL nhận (kg)</Label>
-            <Input type="number" className="tnum" value={ky.tongNLNhan ?? ""}
-              onChange={(e) => onChangeKy({ tongNLNhan: e.target.value ? Number(e.target.value) : null })} placeholder="bảng phụ" />
-          </div>
-          <div>
-            <Label>Chi phí CB / kg TP</Label>
-            <Input type="number" className="tnum" value={ky.chiPhiCB ?? ""}
-              onChange={(e) => onChangeKy({ chiPhiCB: e.target.value ? Number(e.target.value) : null })} placeholder="VD: 30000" />
-          </div>
-          <div>
-            <Label>Tỉ giá (VND/USD)</Label>
-            <Input type="number" className="tnum" value={ky.tiGia ?? ""}
-              onChange={(e) => onChangeKy({ tiGia: e.target.value ? Number(e.target.value) : null })} placeholder="26000" />
-          </div>
-          <div>
-            <Label>Các ngày</Label>
-            <Input value={ky.ngayList} onChange={(e) => onChangeKy({ ngayList: e.target.value })} />
-          </div>
+      <Card className="p-5">
+        <h2 className="mb-4 text-xl font-semibold">Thông số kỳ</h2>
+        <div className="grid gap-6 sm:grid-cols-3">
+          <NumberField
+            label="Tổng NL nhận"
+            unit="kg"
+            anNhanBatBuoc
+            value={ky.tongNLNhan}
+            onChange={(v) => onChangeKy({ tongNLNhan: v })}
+          />
+          <NumberField
+            label="Chi phí CB / kg TP"
+            unit="đ"
+            anNhanBatBuoc
+            value={ky.chiPhiCB}
+            onChange={(v) => onChangeKy({ chiPhiCB: v })}
+          />
+          <NumberField
+            label="Tỉ giá"
+            unit="đ/USD"
+            anNhanBatBuoc
+            value={ky.tiGia}
+            onChange={(v) => onChangeKy({ tiGia: v })}
+          />
         </div>
       </Card>
 
-      {/* Khối 1: Nguyên liệu vào */}
-      <KhoiNLVao rows={nlVao} onChange={persistNL} kyId={ky.id} />
+      <KhoiNLVao
+        rows={nlVao}
+        onChange={persistNL}
+        kyId={ky.id}
+        goiYTen={loaiNLDanhMuc.map((l) => ({ value: l.ten, label: l.ten }))}
+        onThemLoai={(ten) => {
+          setLoaiNLDanhMuc([
+            ...loaiNLDanhMuc,
+            { id: uid(), ten, loai: "", ghiChu: "" },
+          ]);
+          notify.daLuu(`Đã thêm loại nguyên liệu "${ten}" vào danh mục`);
+          return ten;
+        }}
+      />
 
-      {/* Khối 2: Phế liệu */}
       <KhoiPheLieu rows={pheLieu} onChange={persistPL} kyId={ky.id} />
 
-      {/* Khối 3: Thành phẩm ra */}
-      <KhoiTP rows={tp} onChange={persistTP} kyId={ky.id} matHang={matHang} khach={khach}
-        tenMatHang={tenMatHang} tenKhach={tenKhach} />
+      <KhoiTP
+        rows={tp}
+        onChange={persistTP}
+        kyId={ky.id}
+        matHang={matHang}
+        khach={khach}
+        onThemMatHang={(ten) => {
+          const m: MatHang = { id: uid(), ma: "", ten, maTP: "" };
+          setMatHang([...matHang, m]);
+          notify.daLuu(`Đã thêm mặt hàng "${ten}" vào danh mục`);
+          return m.id;
+        }}
+        onThemKhach={(ten) => {
+          const k: KhachHang = { id: uid(), ma: "", ten, thiTruong: "" };
+          setKhach([...khach, k]);
+          notify.daLuu(`Đã thêm khách hàng "${ten}" vào danh mục`);
+          return k.id;
+        }}
+        tenMatHang={tenMatHang}
+        tenKhach={tenKhach}
+      />
 
-      {/* Panel tính */}
       <Card className="p-5">
-        <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">Kết quả cân đối</h3>
-        <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-3">
+        <h2 className="mb-4 text-xl font-semibold">Kết quả cân đối</h2>
+        <div className="grid gap-x-8 gap-y-1 sm:grid-cols-2 lg:grid-cols-3">
           <KV k="Tổng nguyên liệu vào" v={`${num(kq.tongNLVao)} kg`} />
           <KV k="Tổng thành phẩm" v={`${num(kq.tongTP)} kg`} />
-          <KV k="Định mức chế biến" v={num(kq.dinhMuc)} strong />
-          <KV k="Tỉ lệ thu hồi / tổng nhận" v={kq.tyLeThuHoi == null ? "—" : num(kq.tyLeThuHoi)} />
-          <KV k="Giá trị nguyên liệu" v={num(kq.giaTriNL)} />
-          <KV k="Giá thành" v={num(kq.giaThanh)} />
-          <KV k="Giá trị xuất (VND)" v={num(kq.giaTriXuat)} />
-          <KV k="Bình quân / kg NL" v={num(kq.binhQuanKgNL)} />
-          <KV k="Giá trị phế liệu" v={num(kq.giaTriPheLieu)} />
-          <div className="col-span-2 mt-1 sm:col-span-3">
-            <div className={`rounded-lg px-4 py-3 text-base font-semibold ${kq.laiLo >= 0 ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}>
-              {kq.laiLo >= 0 ? "Lãi" : "Lỗ"}: <span className="tnum">{num(Math.abs(kq.laiLo))}</span> VND
-            </div>
-          </div>
+          <KV
+            k="Định mức chế biến"
+            v={chuaCoTP ? "—" : num(kq.dinhMuc)}
+            strong
+          />
+          <KV
+            k="Tỉ lệ thu hồi"
+            v={kq.tyLeThuHoi == null ? "—" : num(kq.tyLeThuHoi)}
+          />
+          <KV k="Giá trị nguyên liệu" v={`${num(kq.giaTriNL)} đ`} />
+          <KV k="Giá thành" v={`${num(kq.giaThanh)} đ`} />
+          <KV k="Giá trị xuất" v={`${num(kq.giaTriXuat)} đ`} />
+          <KV k="Bình quân / kg NL" v={`${num(kq.binhQuanKgNL)} đ`} />
+          <KV k="Giá trị phế liệu" v={`${num(kq.giaTriPheLieu)} đ`} />
         </div>
+        {/* Chưa nhập thành phẩm ra thì KHÔNG kết luận lãi/lỗ — nếu không màn sẽ báo
+            "Lỗ = toàn bộ tiền nguyên liệu" (đỏ, hù người dùng) dù kỳ mới nhập một nửa. */}
+        {chuaCoTP ? (
+          <div className="mt-5 rounded-lg bg-muted px-5 py-4 text-base font-medium text-muted-foreground">
+            Chưa có thành phẩm ra — nhập khối 3 để tính được lãi/lỗ.
+          </div>
+        ) : (
+          <div
+            className={`mt-5 rounded-lg px-5 py-4 text-xl font-semibold ${
+              kq.laiLo >= 0
+                ? "bg-success-surface text-success"
+                : "bg-warning-surface text-destructive"
+            }`}
+          >
+            {kq.laiLo >= 0 ? "▲ Lãi" : "▼ Lỗ"}:{" "}
+            <span className="tnum">{num(Math.abs(kq.laiLo))}</span> đ
+          </div>
+        )}
       </Card>
 
       {showBang && (
@@ -247,175 +527,623 @@ function KyDetail({
 
 function KV({ k, v, strong }: { k: string; v: string; strong?: boolean }) {
   return (
-    <div className="flex items-baseline justify-between gap-3 border-b border-dashed border-slate-100 py-1">
-      <span className="text-slate-500">{k}</span>
-      <span className={`tnum text-right ${strong ? "font-semibold text-cyan-700" : "text-slate-800"}`}>{v}</span>
+    <div className="flex items-baseline justify-between gap-4 border-b border-border py-2.5">
+      <span className="text-base text-muted-foreground">{k}</span>
+      <span
+        className={`tnum text-right ${
+          strong ? "text-xl font-semibold text-primary" : "text-base font-medium"
+        }`}
+      >
+        {v}
+      </span>
     </div>
   );
 }
 
-/* ---------- Khối nhập liệu ---------- */
+/* ---------- Khối 1: Nguyên liệu vào ---------- */
 
-function KhoiNLVao({ rows, onChange, kyId }: { rows: DongNLVao[]; onChange: (n: DongNLVao[]) => void; kyId: string }) {
-  const [nhom, setNhom] = useState<NhomNL>("Thủy sản");
-  const [ten, setTen] = useState("");
-  const [sl, setSl] = useState("");
-  const [gia, setGia] = useState("");
-  const [tyLe, setTyLe] = useState("");
-  const add = () => {
-    if (!ten.trim() || !(Number(sl) > 0)) return;
-    onChange([...rows, {
-      id: uid(), kyId, nhom, ten: ten.trim(), soLuongKg: Number(sl),
-      donGia: gia ? Number(gia) : null, tyLe: tyLe ? Number(tyLe) : null,
-    }]);
-    setTen(""); setSl(""); setGia(""); setTyLe("");
+function KhoiNLVao({
+  rows,
+  onChange,
+  kyId,
+  goiYTen,
+  onThemLoai,
+}: {
+  rows: DongNLVao[];
+  onChange: (n: DongNLVao[]) => void;
+  kyId: string;
+  goiYTen: { value: string; label: string }[];
+  /** Gõ tên mới → lưu vào danh mục loại NL, trả về tên để dùng luôn. */
+  onThemLoai: (ten: string) => string;
+}) {
+  const [dang, setDang] = useState<DongNLVao | null>(null);
+  const [laThem, setLaThem] = useState(false);
+  const [loi, setLoi] = useState<LoiNhap[]>([]);
+
+  const luu = () => {
+    if (!dang) return;
+    const ls: LoiNhap[] = [];
+    if (!dang.ten.trim()) ls.push({ truong: "Tên", thongBao: "Chưa nhập tên" });
+    if (!(dang.soLuongKg > 0))
+      ls.push({ truong: "Số lượng", thongBao: "Phải lớn hơn 0 kg" });
+    setLoi(ls);
+    if (ls.length > 0) return;
+    onChange(
+      laThem ? [...rows, dang] : rows.map((r) => (r.id === dang.id ? dang : r))
+    );
+    notify.daLuu(laThem ? "Đã thêm dòng nguyên liệu" : "Đã lưu thay đổi");
+    setDang(null);
   };
+
+  const cols: Cot<DongNLVao>[] = [
+    { key: "ten", header: "Tên nguyên liệu", chinh: true, render: (r) => r.ten },
+    { key: "nhom", header: "Nhóm", render: (r) => <Badge>{r.nhom}</Badge> },
+    {
+      key: "sl",
+      header: "Số lượng (kg)",
+      so: true,
+      render: (r) => num(r.soLuongKg),
+    },
+    {
+      key: "gia",
+      header: "Đơn giá (đ)",
+      so: true,
+      render: (r) => num(r.donGia) || "—",
+    },
+    {
+      key: "tien",
+      header: "Thành tiền (đ)",
+      so: true,
+      render: (r) => num(r.soLuongKg * (r.donGia ?? 0)),
+    },
+  ];
+
   const tong = rows.reduce((s, r) => s + r.soLuongKg, 0);
   const tongTien = rows.reduce((s, r) => s + r.soLuongKg * (r.donGia ?? 0), 0);
+
   return (
-    <Card className="p-4">
-      <h3 className="mb-3 font-medium text-slate-800">1. Nguyên liệu vào</h3>
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-6">
-        <Select value={nhom} onChange={(e) => setNhom(e.target.value as NhomNL)}>
-          {NHOM_NL.map((n) => <option key={n} value={n}>{n}</option>)}
-        </Select>
-        <Input className="sm:col-span-2" value={ten} onChange={(e) => setTen(e.target.value)} placeholder="Tên (VD: 2 da nl lớn)" />
-        <Input type="number" className="tnum" value={sl} onChange={(e) => setSl(e.target.value)} placeholder="Số lượng kg" />
-        <Input type="number" className="tnum" value={gia} onChange={(e) => setGia(e.target.value)} placeholder="Đơn giá" />
-        <Input type="number" className="tnum" value={tyLe} onChange={(e) => setTyLe(e.target.value)} placeholder="Tỷ lệ % (bột)" />
-      </div>
-      <div className="mt-2 flex justify-end">
-        <Button variant="outline" onClick={add}><Plus className="size-4" />Thêm dòng</Button>
-      </div>
-      {rows.length > 0 && (
-        <div className="mt-3 overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="text-left text-xs uppercase text-slate-400">
-              <tr><th className="py-1.5">Nhóm</th><th>Tên</th><th className="text-right">SL (kg)</th><th className="text-right">Đơn giá</th><th className="text-right">Thành tiền</th><th className="text-right">Tỷ lệ</th><th></th></tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {rows.map((r) => (
-                <tr key={r.id}>
-                  <td className="py-1.5"><Badge>{r.nhom}</Badge></td>
-                  <td className="text-slate-800">{r.ten}</td>
-                  <td className="tnum text-right">{num(r.soLuongKg)}</td>
-                  <td className="tnum text-right text-slate-500">{num(r.donGia)}</td>
-                  <td className="tnum text-right text-slate-800">{num(r.soLuongKg * (r.donGia ?? 0))}</td>
-                  <td className="tnum text-right text-slate-500">{r.tyLe != null ? `${num(r.tyLe)}%` : "—"}</td>
-                  <td className="text-right"><button onClick={() => onChange(rows.filter((x) => x.id !== r.id))} className="text-slate-400 hover:text-red-600"><Trash2 className="size-4" /></button></td>
-                </tr>
-              ))}
-            </tbody>
-            <tfoot><tr className="border-t border-slate-200 font-medium"><td className="py-1.5" colSpan={2}>Tổng</td><td className="tnum text-right">{num(tong)}</td><td></td><td className="tnum text-right">{num(tongTien)}</td><td colSpan={2}></td></tr></tfoot>
-          </table>
-        </div>
-      )}
-    </Card>
+    <KhoiKhung
+      soThuTu="1"
+      tieuDe="Nguyên liệu vào"
+      tenDong="dòng nguyên liệu"
+      trong={rows.length === 0}
+      onThem={() => {
+        setDang({
+          id: uid(),
+          kyId,
+          nhom: "Thủy sản",
+          ten: "",
+          soLuongKg: 0,
+          donGia: null,
+          tyLe: null,
+        });
+        setLaThem(true);
+        setLoi([]);
+      }}
+      hopThoai={
+        <HopThoaiDong
+          mo={dang !== null}
+          laThem={laThem}
+          tieuDe="dòng nguyên liệu"
+          onDong={() => setDang(null)}
+          onLuu={luu}
+        >
+          {dang && (
+            <>
+              <ErrorSummary loi={loi} />
+              <ChoiceGroup
+                label="Nhóm"
+                value={dang.nhom}
+                onChange={(v) =>
+                  setDang((d) => (d ? { ...d, nhom: v as NhomNL } : d))
+                }
+                options={NHOM_NL.map((n) => ({ value: n, label: n }))}
+                cot={3}
+              />
+              <Combobox
+                label="Tên nguyên liệu"
+                required
+                hint="Chọn trong danh mục, hoặc gõ tên mới rồi bấm Thêm mới."
+                value={dang.ten}
+                onChange={(v) => setDang((d) => (d ? { ...d, ten: v } : d))}
+                options={goiYTen}
+                onCreate={onThemLoai}
+              />
+              <div className="grid gap-6 sm:grid-cols-2">
+                <NumberField
+                  label="Số lượng"
+                  required
+                  unit="kg"
+                  value={dang.soLuongKg || null}
+                  onChange={(v) =>
+                    setDang((d) => (d ? { ...d, soLuongKg: v ?? 0 } : d))
+                  }
+                />
+                <NumberField
+                  label="Đơn giá"
+                  unit="đ"
+                  value={dang.donGia}
+                  onChange={(v) => setDang((d) => (d ? { ...d, donGia: v } : d))}
+                />
+                <NumberField
+                  label="Tỷ lệ (bột phụ gia)"
+                  unit="%"
+                  value={dang.tyLe}
+                  onChange={(v) => setDang((d) => (d ? { ...d, tyLe: v } : d))}
+                />
+              </div>
+            </>
+          )}
+        </HopThoaiDong>
+      }
+    >
+      <RecordTable
+        columns={cols}
+        rows={rows}
+        getKey={(r) => r.id}
+        actions={(r) => (
+          <DongThaoTac
+            onSua={() => {
+              setDang({ ...r });
+              setLaThem(false);
+              setLoi([]);
+            }}
+            moTaBanGhi={`${r.ten} — ${num(r.soLuongKg)} kg`}
+            onXoa={() => {
+              const truoc = rows;
+              onChange(rows.filter((x) => x.id !== r.id));
+              notify.daXoa(`Đã xóa "${r.ten}"`, () => onChange(truoc));
+            }}
+          />
+        )}
+      />
+      <TongKet
+        muc={[
+          { nhan: "Tổng khối lượng", giaTri: `${num(tong)} kg` },
+          { nhan: "Tổng tiền", giaTri: `${num(tongTien)} đ` },
+        ]}
+      />
+    </KhoiKhung>
   );
 }
 
-function KhoiPheLieu({ rows, onChange, kyId }: { rows: DongPheLieu[]; onChange: (n: DongPheLieu[]) => void; kyId: string }) {
-  const [loai, setLoai] = useState("");
-  const [sl, setSl] = useState("");
-  const [gia, setGia] = useState("");
-  const add = () => {
-    if (!loai.trim() || !(Number(sl) > 0)) return;
-    onChange([...rows, { id: uid(), kyId, loai: loai.trim(), soLuongKg: Number(sl), donGiaBan: gia ? Number(gia) : null }]);
-    setLoai(""); setSl(""); setGia("");
-  };
-  return (
-    <Card className="p-4">
-      <h3 className="mb-3 font-medium text-slate-800">2. Phế liệu (bán giá riêng)</h3>
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <Input className="sm:col-span-2" value={loai} onChange={(e) => setLoai(e.target.value)} placeholder="Loại (nội tạng, dạt…)" />
-        <Input type="number" className="tnum" value={sl} onChange={(e) => setSl(e.target.value)} placeholder="Số lượng kg" />
-        <Input type="number" className="tnum" value={gia} onChange={(e) => setGia(e.target.value)} placeholder="Đơn giá bán" />
-      </div>
-      <div className="mt-2 flex justify-end">
-        <Button variant="outline" onClick={add}><Plus className="size-4" />Thêm dòng</Button>
-      </div>
-      {rows.length > 0 && (
-        <div className="mt-3 overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="text-left text-xs uppercase text-slate-400"><tr><th className="py-1.5">Loại</th><th className="text-right">SL (kg)</th><th className="text-right">Đơn giá bán</th><th className="text-right">Thành tiền</th><th></th></tr></thead>
-            <tbody className="divide-y divide-slate-100">
-              {rows.map((r) => (
-                <tr key={r.id}>
-                  <td className="py-1.5 text-slate-800">{r.loai}</td>
-                  <td className="tnum text-right">{num(r.soLuongKg)}</td>
-                  <td className="tnum text-right text-slate-500">{num(r.donGiaBan)}</td>
-                  <td className="tnum text-right text-slate-800">{num(r.soLuongKg * (r.donGiaBan ?? 0))}</td>
-                  <td className="text-right"><button onClick={() => onChange(rows.filter((x) => x.id !== r.id))} className="text-slate-400 hover:text-red-600"><Trash2 className="size-4" /></button></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </Card>
-  );
-}
+/* ---------- Khối 2: Phế liệu ---------- */
 
-function KhoiTP({ rows, onChange, kyId, matHang, khach, tenMatHang, tenKhach }: {
-  rows: DongTP[]; onChange: (n: DongTP[]) => void; kyId: string;
-  matHang: MatHang[]; khach: KhachHang[];
-  tenMatHang: (id: string) => string; tenKhach: (id: string) => string;
+function KhoiPheLieu({
+  rows,
+  onChange,
+  kyId,
+}: {
+  rows: DongPheLieu[];
+  onChange: (n: DongPheLieu[]) => void;
+  kyId: string;
 }) {
-  const [matHangId, setMatHangId] = useState("");
-  const [khachId, setKhachId] = useState("");
-  const [kenh, setKenh] = useState<Kenh>("Xuất khẩu");
-  const [luong, setLuong] = useState("");
-  const [gia, setGia] = useState("");
-  const add = () => {
-    if (!matHangId || !(Number(luong) > 0)) return;
-    onChange([...rows, { id: uid(), kyId, matHangId, khachId, kenh, luongKg: Number(luong), donGia: gia ? Number(gia) : null }]);
-    setLuong(""); setGia("");
+  const [dang, setDang] = useState<DongPheLieu | null>(null);
+  const [laThem, setLaThem] = useState(false);
+  const [loi, setLoi] = useState<LoiNhap[]>([]);
+
+  const luu = () => {
+    if (!dang) return;
+    const ls: LoiNhap[] = [];
+    if (!dang.loai.trim())
+      ls.push({ truong: "Loại", thongBao: "Chưa nhập loại" });
+    if (!(dang.soLuongKg > 0))
+      ls.push({ truong: "Số lượng", thongBao: "Phải lớn hơn 0 kg" });
+    setLoi(ls);
+    if (ls.length > 0) return;
+    onChange(
+      laThem ? [...rows, dang] : rows.map((r) => (r.id === dang.id ? dang : r))
+    );
+    notify.daLuu(laThem ? "Đã thêm dòng phế liệu" : "Đã lưu thay đổi");
+    setDang(null);
   };
-  const tong = rows.reduce((s, r) => s + r.luongKg, 0);
+
+  const cols: Cot<DongPheLieu>[] = [
+    { key: "loai", header: "Loại phế liệu", chinh: true, render: (r) => r.loai },
+    {
+      key: "sl",
+      header: "Số lượng (kg)",
+      so: true,
+      render: (r) => num(r.soLuongKg),
+    },
+    {
+      key: "gia",
+      header: "Đơn giá bán (đ)",
+      so: true,
+      render: (r) => num(r.donGiaBan) || "—",
+    },
+    {
+      key: "tien",
+      header: "Thành tiền (đ)",
+      so: true,
+      render: (r) => num(r.soLuongKg * (r.donGiaBan ?? 0)),
+    },
+  ];
+
   return (
-    <Card className="p-4">
-      <h3 className="mb-3 font-medium text-slate-800">3. Thành phẩm ra (xuất khẩu / nội địa)</h3>
-      {matHang.length === 0 && (
-        <p className="mb-2 text-sm text-amber-600">Chưa có mặt hàng — thêm ở màn "Mặt hàng cân đối" trước.</p>
-      )}
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-6">
-        <Select className="sm:col-span-2" value={matHangId} onChange={(e) => setMatHangId(e.target.value)}>
-          <option value="">— Mặt hàng —</option>
-          {matHang.map((m) => <option key={m.id} value={m.id}>{m.ten}</option>)}
-        </Select>
-        <Select value={khachId} onChange={(e) => setKhachId(e.target.value)}>
-          <option value="">— Khách —</option>
-          {khach.map((k) => <option key={k.id} value={k.id}>{k.ten}</option>)}
-        </Select>
-        <Select value={kenh} onChange={(e) => setKenh(e.target.value as Kenh)}>
-          {KENH.map((k) => <option key={k} value={k}>{k}</option>)}
-        </Select>
-        <Input type="number" className="tnum" value={luong} onChange={(e) => setLuong(e.target.value)} placeholder="Lượng kg" />
-        <Input type="number" className="tnum" value={gia} onChange={(e) => setGia(e.target.value)} placeholder={kenh === "Xuất khẩu" ? "Đơn giá USD" : "Đơn giá VND"} />
+    <KhoiKhung
+      soThuTu="2"
+      tieuDe="Phế liệu (bán giá riêng)"
+      tenDong="dòng phế liệu"
+      trong={rows.length === 0}
+      onThem={() => {
+        setDang({ id: uid(), kyId, loai: "", soLuongKg: 0, donGiaBan: null });
+        setLaThem(true);
+        setLoi([]);
+      }}
+      hopThoai={
+        <HopThoaiDong
+          mo={dang !== null}
+          laThem={laThem}
+          tieuDe="dòng phế liệu"
+          onDong={() => setDang(null)}
+          onLuu={luu}
+        >
+          {dang && (
+            <>
+              <ErrorSummary loi={loi} />
+              <Field label="Loại phế liệu" required>
+                <Input
+                  value={dang.loai}
+                  onChange={(e) =>
+                    setDang((d) => (d ? { ...d, loai: e.target.value } : d))
+                  }
+                  placeholder="VD: nội tạng, dạt"
+                />
+              </Field>
+              <div className="grid gap-6 sm:grid-cols-2">
+                <NumberField
+                  label="Số lượng"
+                  required
+                  unit="kg"
+                  value={dang.soLuongKg || null}
+                  onChange={(v) =>
+                    setDang((d) => (d ? { ...d, soLuongKg: v ?? 0 } : d))
+                  }
+                />
+                <NumberField
+                  label="Đơn giá bán"
+                  unit="đ"
+                  value={dang.donGiaBan}
+                  onChange={(v) =>
+                    setDang((d) => (d ? { ...d, donGiaBan: v } : d))
+                  }
+                />
+              </div>
+            </>
+          )}
+        </HopThoaiDong>
+      }
+    >
+      <RecordTable
+        columns={cols}
+        rows={rows}
+        getKey={(r) => r.id}
+        actions={(r) => (
+          <DongThaoTac
+            onSua={() => {
+              setDang({ ...r });
+              setLaThem(false);
+              setLoi([]);
+            }}
+            moTaBanGhi={`${r.loai} — ${num(r.soLuongKg)} kg`}
+            onXoa={() => {
+              const truoc = rows;
+              onChange(rows.filter((x) => x.id !== r.id));
+              notify.daXoa(`Đã xóa "${r.loai}"`, () => onChange(truoc));
+            }}
+          />
+        )}
+      />
+    </KhoiKhung>
+  );
+}
+
+/* ---------- Khối 3: Thành phẩm ra ---------- */
+
+function KhoiTP({
+  rows,
+  onChange,
+  kyId,
+  matHang,
+  khach,
+  onThemMatHang,
+  onThemKhach,
+  tenMatHang,
+  tenKhach,
+}: {
+  rows: DongTP[];
+  onChange: (n: DongTP[]) => void;
+  kyId: string;
+  matHang: MatHang[];
+  khach: KhachHang[];
+  onThemMatHang: (ten: string) => string;
+  onThemKhach: (ten: string) => string;
+  tenMatHang: (id: string) => string;
+  tenKhach: (id: string) => string;
+}) {
+  const [dang, setDang] = useState<DongTP | null>(null);
+  const [laThem, setLaThem] = useState(false);
+  const [loi, setLoi] = useState<LoiNhap[]>([]);
+
+  const luu = () => {
+    if (!dang) return;
+    const ls: LoiNhap[] = [];
+    if (!dang.matHangId)
+      ls.push({ truong: "Mặt hàng", thongBao: "Chưa chọn mặt hàng" });
+    if (!(dang.luongKg > 0))
+      ls.push({ truong: "Lượng", thongBao: "Phải lớn hơn 0 kg" });
+    setLoi(ls);
+    if (ls.length > 0) return;
+    onChange(
+      laThem ? [...rows, dang] : rows.map((r) => (r.id === dang.id ? dang : r))
+    );
+    notify.daLuu(laThem ? "Đã thêm dòng thành phẩm" : "Đã lưu thay đổi");
+    setDang(null);
+  };
+
+  const cols: Cot<DongTP>[] = [
+    {
+      key: "mh",
+      header: "Mặt hàng",
+      chinh: true,
+      render: (r) => tenMatHang(r.matHangId),
+    },
+    { key: "kh", header: "Khách", render: (r) => tenKhach(r.khachId) },
+    {
+      key: "kenh",
+      header: "Kênh",
+      render: (r) => <Badge>{r.kenh}</Badge>,
+    },
+    {
+      key: "sl",
+      header: "Lượng (kg)",
+      so: true,
+      render: (r) => num(r.luongKg),
+    },
+    {
+      key: "gia",
+      header: "Đơn giá",
+      so: true,
+      render: (r) =>
+        r.donGia == null
+          ? "—"
+          : `${num(r.donGia)} ${r.kenh === "Xuất khẩu" ? "USD" : "đ"}`,
+    },
+  ];
+
+  const tong = rows.reduce((s, r) => s + r.luongKg, 0);
+
+  return (
+    <KhoiKhung
+      soThuTu="3"
+      tieuDe="Thành phẩm ra"
+      tenDong="dòng thành phẩm"
+      trong={rows.length === 0}
+      onThem={() => {
+        setDang({
+          id: uid(),
+          kyId,
+          matHangId: "",
+          khachId: "",
+          kenh: "Xuất khẩu",
+          luongKg: 0,
+          donGia: null,
+        });
+        setLaThem(true);
+        setLoi([]);
+      }}
+      hopThoai={
+        <HopThoaiDong
+          mo={dang !== null}
+          laThem={laThem}
+          tieuDe="dòng thành phẩm"
+          onDong={() => setDang(null)}
+          onLuu={luu}
+        >
+          {dang && (
+            <>
+              <ErrorSummary loi={loi} />
+              <Combobox
+                label="Mặt hàng"
+                required
+                hint="Chưa có trong danh mục thì gõ tên rồi bấm Thêm mới."
+                value={dang.matHangId}
+                onChange={(v) =>
+                  setDang((d) => (d ? { ...d, matHangId: v } : d))
+                }
+                options={matHang.map((m) => ({
+                  value: m.id,
+                  label: m.ten,
+                  phu: m.ma || undefined,
+                }))}
+                onCreate={onThemMatHang}
+                emptyText="Chưa có mặt hàng nào trong danh mục."
+              />
+              <Combobox
+                label="Khách hàng"
+                hint="Bỏ trống nếu chưa xác định khách."
+                value={dang.khachId}
+                onChange={(v) => setDang((d) => (d ? { ...d, khachId: v } : d))}
+                options={khach.map((k) => ({
+                  value: k.id,
+                  label: k.ten,
+                  phu: k.thiTruong || undefined,
+                }))}
+                onCreate={onThemKhach}
+              />
+              <ChoiceGroup
+                label="Kênh bán"
+                value={dang.kenh}
+                onChange={(v) =>
+                  setDang((d) => (d ? { ...d, kenh: v as Kenh } : d))
+                }
+                options={KENH.map((k) => ({ value: k, label: k }))}
+              />
+              <div className="grid gap-6 sm:grid-cols-2">
+                <NumberField
+                  label="Lượng"
+                  required
+                  unit="kg"
+                  value={dang.luongKg || null}
+                  onChange={(v) =>
+                    setDang((d) => (d ? { ...d, luongKg: v ?? 0 } : d))
+                  }
+                />
+                <NumberField
+                  label="Đơn giá"
+                  unit={dang.kenh === "Xuất khẩu" ? "USD" : "đ"}
+                  value={dang.donGia}
+                  onChange={(v) => setDang((d) => (d ? { ...d, donGia: v } : d))}
+                />
+              </div>
+            </>
+          )}
+        </HopThoaiDong>
+      }
+    >
+      <RecordTable
+        columns={cols}
+        rows={rows}
+        getKey={(r) => r.id}
+        actions={(r) => (
+          <DongThaoTac
+            onSua={() => {
+              setDang({ ...r });
+              setLaThem(false);
+              setLoi([]);
+            }}
+            moTaBanGhi={`${tenMatHang(r.matHangId)} — ${num(r.luongKg)} kg`}
+            onXoa={() => {
+              const truoc = rows;
+              onChange(rows.filter((x) => x.id !== r.id));
+              notify.daXoa("Đã xóa dòng thành phẩm", () => onChange(truoc));
+            }}
+          />
+        )}
+      />
+      <TongKet muc={[{ nhan: "Tổng thành phẩm", giaTri: `${num(tong)} kg` }]} />
+    </KhoiKhung>
+  );
+}
+
+/* ---------- Mảnh dùng chung cho 3 khối ---------- */
+
+function DongThaoTac({
+  onSua,
+  onXoa,
+  moTaBanGhi,
+}: {
+  onSua: () => void;
+  onXoa: () => void;
+  moTaBanGhi: string;
+}) {
+  return (
+    <>
+      <Button variant="outline" size="sm" onClick={onSua}>
+        <Pencil />
+        Sửa
+      </Button>
+      <ConfirmDelete moTaBanGhi={moTaBanGhi} onConfirm={onXoa} />
+    </>
+  );
+}
+
+function KhoiKhung({
+  soThuTu,
+  tieuDe,
+  tenDong,
+  trong,
+  onThem,
+  hopThoai,
+  children,
+}: {
+  soThuTu: string;
+  tieuDe: string;
+  tenDong: string;
+  trong: boolean;
+  onThem: () => void;
+  /** Hộp thoại thêm/sửa — luôn gắn vào cây, kể cả khi khối chưa có dòng nào. */
+  hopThoai: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <Card className="p-5">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
+        <h2 className="flex items-center gap-3 text-xl font-semibold">
+          <span className="flex size-9 items-center justify-center rounded-full bg-primary text-base text-primary-foreground">
+            {soThuTu}
+          </span>
+          {tieuDe}
+        </h2>
+        <Button onClick={onThem}>
+          <Plus />
+          Thêm {tenDong}
+        </Button>
       </div>
-      <div className="mt-2 flex justify-end">
-        <Button variant="outline" onClick={add} disabled={!matHangId}><Plus className="size-4" />Thêm dòng</Button>
-      </div>
-      {rows.length > 0 && (
-        <div className="mt-3 overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="text-left text-xs uppercase text-slate-400"><tr><th className="py-1.5">Mặt hàng</th><th>Khách</th><th>Kênh</th><th className="text-right">Lượng (kg)</th><th className="text-right">Đơn giá</th><th></th></tr></thead>
-            <tbody className="divide-y divide-slate-100">
-              {rows.map((r) => (
-                <tr key={r.id}>
-                  <td className="py-1.5 text-slate-800">{tenMatHang(r.matHangId)}</td>
-                  <td className="text-slate-500">{tenKhach(r.khachId)}</td>
-                  <td><Badge>{r.kenh === "Xuất khẩu" ? "XK" : "Nội địa"}</Badge></td>
-                  <td className="tnum text-right">{num(r.luongKg)}</td>
-                  <td className="tnum text-right text-slate-500">{num(r.donGia)}{r.kenh === "Xuất khẩu" ? " $" : ""}</td>
-                  <td className="text-right"><button onClick={() => onChange(rows.filter((x) => x.id !== r.id))} className="text-slate-400 hover:text-red-600"><Trash2 className="size-4" /></button></td>
-                </tr>
-              ))}
-            </tbody>
-            <tfoot><tr className="border-t border-slate-200 font-medium"><td className="py-1.5" colSpan={3}>Tổng</td><td className="tnum text-right">{num(tong)}</td><td colSpan={2}></td></tr></tfoot>
-          </table>
-        </div>
+      {trong ? (
+        <p className="rounded-xl border-2 border-dashed border-border px-5 py-8 text-center text-base text-muted-foreground">
+          Chưa có {tenDong} nào.
+        </p>
+      ) : (
+        <div className="space-y-4">{children}</div>
       )}
+      {hopThoai}
     </Card>
+  );
+}
+
+function TongKet({ muc }: { muc: { nhan: string; giaTri: string }[] }) {
+  return (
+    <div className="flex flex-wrap justify-end gap-x-10 gap-y-2 rounded-lg bg-muted px-4 py-3">
+      {muc.map((m) => (
+        <div key={m.nhan} className="flex items-baseline gap-3">
+          <span className="text-base text-muted-foreground">{m.nhan}</span>
+          <span className="tnum text-lg font-semibold">{m.giaTri}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function HopThoaiDong({
+  mo,
+  laThem,
+  tieuDe,
+  onDong,
+  onLuu,
+  children,
+}: {
+  mo: boolean;
+  laThem: boolean;
+  tieuDe: string;
+  onDong: () => void;
+  onLuu: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <Dialog
+      open={mo}
+      onOpenChange={(o) => {
+        if (!o) onDong();
+      }}
+    >
+      <DialogContent className="max-h-[92vh] overflow-y-auto w-full sm:max-w-3xl lg:max-w-5xl">
+        <DialogHeader>
+          <DialogTitle className="text-2xl">
+            {laThem ? `Thêm ${tieuDe}` : `Sửa ${tieuDe}`}
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-6 py-2">{children}</div>
+        <DialogFooter>
+          <Button variant="outline" size="lg" onClick={onDong}>
+            Hủy
+          </Button>
+          <Button size="lg" onClick={onLuu}>
+            {laThem ? "Thêm" : "Lưu thay đổi"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

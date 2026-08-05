@@ -1,112 +1,122 @@
 import { useMemo, useState } from "react";
-import data from "@/data/thanh-pham.json";
 import type { ThanhPham } from "@/types";
-import { Card, Input, Select, Badge } from "@/components/ui";
-import { Search } from "lucide-react";
+import { useThanhPham } from "@/lib/danhMuc";
+import {
+  Badge,
+  Button,
+  Combobox,
+  EmptyState,
+  RecordTable,
+  type Cot,
+} from "@/design-system";
+import { Search, X } from "lucide-react";
 
-const ITEMS = data as ThanhPham[];
-
+/**
+ * Danh mục thành phẩm 141 mã (tài khoản 1551) — CHỈ ĐỌC.
+ *
+ * Danh mục do kế toán phát hành, sửa ở đây sẽ lệch sổ kế toán nên màn này
+ * không có Thêm/Sửa/Xóa. Việc dùng thực tế là TRA CỨU và ÁNH XẠ sang mặt hàng
+ * cân đối — nên màn tối ưu cho tìm kiếm và sắp xếp, không phải nhập liệu.
+ */
 export default function ThanhPhamScreen() {
-  const [q, setQ] = useState("");
   const [nhom, setNhom] = useState("");
+  const [items] = useThanhPham();
 
   const nhomList = useMemo(
-    () => Array.from(new Set(ITEMS.map((i) => i.nhom))).sort(),
-    [],
+    () => Array.from(new Set(items.map((i) => i.nhom))).sort(),
+    [items]
   );
 
-  const rows = useMemo(() => {
-    const kw = q.trim().toLowerCase();
-    return ITEMS.filter((i) => {
-      if (nhom && i.nhom !== nhom) return false;
-      if (!kw) return true;
-      return (
-        i.ma.toLowerCase().includes(kw) || i.ten.toLowerCase().includes(kw)
-      );
-    });
-  }, [q, nhom]);
+  const rows = useMemo(
+    () => (nhom ? items.filter((i) => i.nhom === nhom) : items),
+    [nhom, items]
+  );
+
+  const cols: Cot<ThanhPham>[] = [
+    {
+      key: "ten",
+      header: "Tên thành phẩm",
+      chinh: true,
+      render: (r) => r.ten,
+      sapXep: (r) => r.ten,
+    },
+    {
+      key: "ma",
+      header: "Mã",
+      render: (r) => <span className="tnum font-medium">{r.ma}</span>,
+      sapXep: (r) => r.ma,
+    },
+    {
+      key: "nhom",
+      header: "Nhóm",
+      render: (r) => <Badge>{r.nhom}</Badge>,
+      sapXep: (r) => r.nhom,
+    },
+    {
+      key: "dvt",
+      header: "Đơn vị",
+      render: (r) => r.dvt,
+      anTrenDienThoai: true,
+    },
+  ];
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <div>
-        <h1 className="text-xl font-semibold text-slate-900">
-          Danh mục thành phẩm
-        </h1>
-        <p className="mt-1 text-sm text-slate-500">
-          Nạp từ danh mục kế toán (tài khoản 1551). Tổng {ITEMS.length} mã, đơn vị
-          ki-lô-gam.
+        <h2 className="text-2xl font-semibold text-foreground">
+          Thành phẩm theo danh mục kế toán
+        </h2>
+        <p className="mt-1 text-base text-muted-foreground">
+          {items.length} mã, tài khoản 1551, đơn vị ki-lô-gam. Danh mục chỉ để
+          tra cứu — muốn đổi phải sửa ở sổ kế toán.
         </p>
       </div>
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <div className="relative flex-1">
-          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
-          <Input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Tìm theo mã hoặc tên…"
-            className="pl-9"
+      <div className="flex flex-wrap items-end gap-4">
+        <div className="min-w-64 flex-1">
+          <Combobox
+            label="Lọc theo nhóm hàng"
+            value={nhom}
+            onChange={setNhom}
+            options={nhomList.map((n) => ({ value: n, label: n }))}
+            placeholder="Tất cả nhóm"
           />
         </div>
-        <Select
-          value={nhom}
-          onChange={(e) => setNhom(e.target.value)}
-          className="sm:w-52"
-        >
-          <option value="">Tất cả nhóm</option>
-          {nhomList.map((n) => (
-            <option key={n} value={n}>
-              {n}
-            </option>
-          ))}
-        </Select>
+        <p className="pb-3 text-base text-muted-foreground">
+          Đang hiện{" "}
+          <span className="tnum font-semibold text-foreground">
+            {rows.length}
+          </span>{" "}
+          / {items.length} mã
+        </p>
+        {nhom && (
+          <Button variant="outline" className="mb-1" onClick={() => setNhom("")}>
+            <X />
+            Bỏ lọc nhóm
+          </Button>
+        )}
       </div>
 
-      <div className="text-sm text-slate-500">
-        Hiển thị <span className="font-medium text-slate-700">{rows.length}</span>{" "}
-        / {ITEMS.length} mã
-      </div>
-
-      <Card className="overflow-hidden">
-        <div className="max-h-[62vh] overflow-auto">
-          <table className="w-full text-sm">
-            <thead className="sticky top-0 bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
-              <tr>
-                <th className="px-4 py-2.5 font-medium">Mã</th>
-                <th className="px-4 py-2.5 font-medium">Tên thành phẩm</th>
-                <th className="px-4 py-2.5 font-medium">Nhóm</th>
-                <th className="px-4 py-2.5 text-right font-medium">ĐVT</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {rows.map((r) => (
-                <tr key={r.ma} className="hover:bg-slate-50">
-                  <td className="px-4 py-2.5 font-mono text-xs text-slate-700">
-                    {r.ma}
-                  </td>
-                  <td className="px-4 py-2.5 text-slate-800">{r.ten}</td>
-                  <td className="px-4 py-2.5">
-                    <Badge>{r.nhom}</Badge>
-                  </td>
-                  <td className="px-4 py-2.5 text-right text-slate-500">
-                    {r.dvt}
-                  </td>
-                </tr>
-              ))}
-              {rows.length === 0 && (
-                <tr>
-                  <td
-                    colSpan={4}
-                    className="px-4 py-10 text-center text-slate-400"
-                  >
-                    Không có mã nào khớp.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </Card>
+      {rows.length === 0 ? (
+        <EmptyState
+          icon={Search}
+          tieuDe="Không có mã nào trong nhóm này"
+          moTa="Bỏ lọc nhóm để xem lại toàn bộ danh mục."
+          action={
+            <Button size="lg" onClick={() => setNhom("")}>
+              Bỏ lọc nhóm
+            </Button>
+          }
+        />
+      ) : (
+        <RecordTable
+          columns={cols}
+          rows={rows}
+          getKey={(r) => r.ma}
+          timKiem={(r) => `${r.ma} ${r.ten} ${r.nhom}`}
+          nhanTimKiem="Tìm theo tên hoặc mã thành phẩm…"
+        />
+      )}
     </div>
   );
 }

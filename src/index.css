@@ -1,10 +1,9 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
 
-@theme {
-  --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
-  --color-brand: #0e7490;
-  --color-brand-dark: #155e75;
-}
+/* Token layer phải nạp SAU shadcn để đè cỡ chữ / màu mặc định (vốn quá nhỏ). */
+@import "./design-system/tokens.css";
 
 html,
 body,
@@ -14,14 +13,6 @@ body,
 
 body {
   margin: 0;
-  background: #f8fafc;
-  color: #0f172a;
-  font-family: var(--font-sans);
-  -webkit-font-smoothing: antialiased;
-}
-
-.tnum {
-  font-variant-numeric: tabular-nums;
 }
 
 /* In bảng cân đối: chỉ in vùng .print-root, ẩn phần còn lại */

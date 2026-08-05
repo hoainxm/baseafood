@@ -1,14 +1,6 @@
-// Kho localStorage dùng chung (giai đoạn đầu, chưa cutover Supabase).
-// Không xóa bản ghi nghiệp vụ tùy tiện — xóa dòng nháp thì lọc bỏ theo id.
-
-export const KEYS = {
-  matHang: "bsf.mathang.v1",
-  khachHang: "bsf.khachhang.v1",
-  ky: "bsf.ky.v1",
-  nlVao: "bsf.nlvao.v1",
-  pheLieu: "bsf.phelieu.v1",
-  tp: "bsf.tp.v1",
-} as const;
+// Bộ đệm localStorage cấp thấp. Màn hình KHÔNG gọi trực tiếp — đi qua
+// src/lib/repo.ts để chạy được cả hai chế độ (Supabase / chỉ máy này).
+// Khóa localStorage khai báo trong repo.ts (AnhXaBang.localKey).
 
 export function load<T>(key: string): T[] {
   try {
@@ -20,7 +12,11 @@ export function load<T>(key: string): T[] {
 }
 
 export function save<T>(key: string, rows: T[]): void {
-  localStorage.setItem(key, JSON.stringify(rows));
+  try {
+    localStorage.setItem(key, JSON.stringify(rows));
+  } catch {
+    // Hết dung lượng / chế độ riêng tư: bỏ qua, máy chủ vẫn là nguồn chính.
+  }
 }
 
 export function uid(): string {

@@ -37,6 +37,31 @@ const PHAN_XUONG: PhanXuong[] = ["Đông", "Cá", "Khô"];
 /** Xem sổ theo một ngày, hay theo cả khoảng ngày. */
 type CheDoXem = "mot-ngay" | "khoang-ngay";
 
+/** Đầu chuyến — dùng chung cho mọi dòng loại hàng trong cùng chuyến (1 đại lý, 1 xe). */
+interface PhienChuyen {
+  ngay: string;
+  phanXuong: PhanXuong;
+  daiLy: string;
+  taiXe: string;
+  bienSoXe: string;
+  ghiChu: string;
+}
+
+/** Một dòng loại hàng đang nhập trong chuyến. */
+interface DongMoi {
+  loai: Loai;
+  loaiNL: string;
+  soLuongKg: number;
+  donGia: number | null;
+}
+
+const DONG_MOI_RONG: DongMoi = {
+  loai: "Bạch tuộc",
+  loaiNL: "",
+  soLuongKg: 0,
+  donGia: null,
+};
+
 export default function NhapNguyenLieuScreen() {
   const [rows, persist] = useNhapNL();
   const [cheDo, setCheDo] = useState<CheDoXem>("mot-ngay");
@@ -50,10 +75,19 @@ export default function NhapNguyenLieuScreen() {
   const [daiLy, setDaiLy] = useDaiLy();
   const [loaiNL, setLoaiNL] = useLoaiNL();
 
+  // Sửa MỘT dòng đã ghi (bấm "Sửa" ở bảng).
   const [dang, setDang] = useState<DongNhapNL | null>(null);
-  const [laThem, setLaThem] = useState(false);
   const [loi, setLoi] = useState<LoiNhap[]>([]);
   const [moPhu, setMoPhu] = useState(false);
+
+  /* Ghi MỘT CHUYẾN = một đại lý đổ NHIỀU loại hàng (đúng sổ "Báo cáo tổng hợp
+     nguyên liệu hàng ngày": STT theo đại lý, mỗi loại một dòng). Thêm loại nào
+     LƯU LUÔN loại đó — không mất, không phải bấm mở lại từng dòng. */
+  const [phien, setPhien] = useState<PhienChuyen | null>(null);
+  const [dongMoi, setDongMoi] = useState<DongMoi>(DONG_MOI_RONG);
+  const [idsPhien, setIdsPhien] = useState<string[]>([]);
+  const [loiPhien, setLoiPhien] = useState<LoiNhap[]>([]);
+  const [moPhuPhien, setMoPhuPhien] = useState(false);
 
   const view = useMemo(
     () =>
@@ -92,6 +126,24 @@ export default function NhapNguyenLieuScreen() {
     [view]
   );
 
+  /* Dòng đã thêm trong chuyến đang ghi + tổng ngày của xưởng đó (như "TỔNG CỘNG"
+     cuối sổ giấy). */
+  const dongPhien = useMemo(
+    () =>
+      idsPhien
+        .map((id) => rows.find((r) => r.id === id))
+        .filter((r): r is DongNhapNL => Boolean(r)),
+    [rows, idsPhien]
+  );
+  const tongChuyen = dongPhien.reduce((s, r) => s + (r.soLuongKg || 0), 0);
+  const tongNgayPhien = phien
+    ? rows
+        .filter(
+          (r) => r.ngay === phien.ngay && r.phanXuong === phien.phanXuong
+        )
+        .reduce((s, r) => s + (r.soLuongKg || 0), 0)
+    : 0;
+
   /* ---- Danh mục: chọn sẵn, thiếu thì tạo ngay tại chỗ ----
      Lưu theo TÊN (không phải id) để dữ liệu cũ trong localStorage vẫn đọc được. */
 
@@ -121,28 +173,83 @@ export default function NhapNguyenLieuScreen() {
 
   /* ---- Thêm / sửa / xóa ---- */
 
+  /* ---- Ghi chuyến: mở sổ, thêm từng loại (lưu ngay), sửa đầu chuyến ---- */
+
   const moThem = () => {
-    setDang({
-      id: newId(),
+    setPhien({
       ngay: ngayGhi,
       phanXuong: xuongGhi,
-      loai: "Bạch tuộc",
       daiLy: "",
-      loaiNL: "",
-      soLuongKg: 0,
-      donGia: null,
       taiXe: "",
       bienSoXe: "",
       ghiChu: "",
     });
-    setLaThem(true);
-    setLoi([]);
-    setMoPhu(false);
+    setDongMoi(DONG_MOI_RONG);
+    setIdsPhien([]);
+    setLoiPhien([]);
+    setMoPhuPhien(false);
+  };
+
+  /** Đổi đầu chuyến (đại lý, ngày, xưởng, tài xế…) → áp cho MỌI dòng đã thêm
+      trong chuyến này, giữ chuyến nhất quán. */
+  const doiPhien = <K extends keyof PhienChuyen>(k: K, v: PhienChuyen[K]) => {
+    setPhien((p) => (p ? { ...p, [k]: v } : p));
+    if (idsPhien.length > 0) {
+      const ids = new Set(idsPhien);
+      persist(rows.map((r) => (ids.has(r.id) ? { ...r, [k]: v } : r)));
+    }
+  };
+
+  const setDong = <K extends keyof DongMoi>(k: K, v: DongMoi[K]) =>
+    setDongMoi((d) => ({ ...d, [k]: v }));
+
+  /** Thêm một loại vào sổ — LƯU NGAY thành một dòng nhap_nguyen_lieu. */
+  const themDong = () => {
+    if (!phien) return;
+    const ls: LoiNhap[] = [];
+    if (!phien.daiLy.trim())
+      ls.push({ truong: "Đại lý", thongBao: "Chưa chọn đại lý giao hàng" });
+    if (!dongMoi.loaiNL.trim())
+      ls.push({ truong: "Loại nguyên liệu", thongBao: "Chưa chọn loại hàng" });
+    if (!(dongMoi.soLuongKg > 0))
+      ls.push({ truong: "Số lượng", thongBao: "Phải lớn hơn 0 kg" });
+    setLoiPhien(ls);
+    if (ls.length > 0) return;
+
+    const dong: DongNhapNL = {
+      id: newId(),
+      ngay: phien.ngay,
+      phanXuong: phien.phanXuong,
+      loai: dongMoi.loai,
+      daiLy: phien.daiLy,
+      loaiNL: dongMoi.loaiNL,
+      soLuongKg: dongMoi.soLuongKg,
+      donGia: dongMoi.donGia,
+      taiXe: phien.taiXe,
+      bienSoXe: phien.bienSoXe,
+      ghiChu: phien.ghiChu,
+    };
+    persist([...rows, dong]);
+    setIdsPhien((xs) => [...xs, dong.id]);
+    notify.daLuu(`Đã ghi ${kg(dong.soLuongKg)} — ${dong.loaiNL}`);
+    // Giữ đại lý/tài xế/xe + loài để đổ tiếp loại sau cho nhanh; xóa loại/kg/giá.
+    setDongMoi((d) => ({ ...DONG_MOI_RONG, loai: d.loai }));
+    setLoiPhien([]);
+  };
+
+  /** Bỏ một dòng vừa thêm trong chuyến (có Hoàn tác). */
+  const boDongPhien = (r: DongNhapNL) => {
+    const truoc = rows;
+    persist(rows.filter((x) => x.id !== r.id));
+    setIdsPhien((xs) => xs.filter((id) => id !== r.id));
+    notify.daXoa(`Đã bỏ ${r.loaiNL} — ${kg(r.soLuongKg)}`, () => {
+      persist(truoc);
+      setIdsPhien((xs) => [...xs, r.id]);
+    });
   };
 
   const moSua = (r: DongNhapNL) => {
     setDang({ ...r });
-    setLaThem(false);
     setLoi([]);
     setMoPhu(Boolean(r.taiXe || r.bienSoXe || r.ghiChu));
   };
@@ -158,14 +265,8 @@ export default function NhapNguyenLieuScreen() {
       ls.push({ truong: "Số lượng", thongBao: "Phải lớn hơn 0 kg" });
     setLoi(ls);
     if (ls.length > 0) return;
-
-    if (laThem) {
-      persist([...rows, dang]);
-      notify.daLuu(`Đã ghi ${kg(dang.soLuongKg)} — ${dang.loaiNL}`);
-    } else {
-      persist(rows.map((r) => (r.id === dang.id ? dang : r)));
-      notify.daLuu("Đã lưu thay đổi");
-    }
+    persist(rows.map((r) => (r.id === dang.id ? dang : r)));
+    notify.daLuu("Đã lưu thay đổi");
     setDang(null);
   };
 
@@ -254,8 +355,8 @@ export default function NhapNguyenLieuScreen() {
           Nhập hàng về xưởng
         </h1>
         <p className="mt-2 max-w-2xl text-base text-muted-foreground">
-          Mỗi dòng là một chuyến hàng của đại lý, ghi theo sổ "Báo cáo tổng hợp
-          nguyên liệu hàng ngày".
+          Ghi theo sổ "Báo cáo tổng hợp nguyên liệu hàng ngày": mỗi chuyến là một
+          đại lý, đổ nhiều loại hàng — mỗi loại một dòng.
         </p>
       </div>
 
@@ -263,7 +364,12 @@ export default function NhapNguyenLieuScreen() {
         items={[
           { nhan: "Đang xem", giaTri: moTaPhamVi },
           { nhan: "Phân xưởng", giaTri: phanXuong },
-          { nhan: "Số chuyến", giaTri: view.length, so: true },
+          {
+            nhan: "Số chuyến",
+            giaTri: new Set(view.map((r) => r.daiLy)).size,
+            so: true,
+          },
+          { nhan: "Số dòng", giaTri: view.length, so: true },
           { nhan: "Tổng", giaTri: kg(tong), so: true },
         ]}
         actions={
@@ -418,7 +524,7 @@ export default function NhapNguyenLieuScreen() {
         </>
       )}
 
-      {/* Hộp thoại thêm / sửa — cùng một khuôn, chỉ khác tiêu đề */}
+      {/* Hộp thoại SỬA một dòng đã ghi */}
       <Dialog
         open={dang !== null}
         onOpenChange={(o) => {
@@ -427,9 +533,7 @@ export default function NhapNguyenLieuScreen() {
       >
         <DialogContent className="max-h-[92vh] overflow-y-auto w-full sm:max-w-3xl lg:max-w-5xl">
           <DialogHeader>
-            <DialogTitle className="text-2xl">
-              {laThem ? "Ghi chuyến hàng" : "Sửa chuyến hàng"}
-            </DialogTitle>
+            <DialogTitle className="text-2xl">Sửa dòng hàng</DialogTitle>
             <DialogDescription className="text-base">
               Sửa được ngày và phân xưởng ngay trong hộp thoại này.
             </DialogDescription>
@@ -562,7 +666,216 @@ export default function NhapNguyenLieuScreen() {
               Hủy
             </Button>
             <Button size="lg" onClick={luu}>
-              {laThem ? "Ghi vào sổ" : "Lưu thay đổi"}
+              Lưu thay đổi
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Hộp thoại GHI CHUYẾN — một đại lý, nhiều loại, thêm loại nào lưu ngay */}
+      <Dialog
+        open={phien !== null}
+        onOpenChange={(o) => {
+          if (!o) setPhien(null);
+        }}
+      >
+        <DialogContent className="max-h-[92vh] w-full overflow-y-auto sm:max-w-3xl lg:max-w-5xl">
+          <DialogHeader>
+            <DialogTitle className="text-2xl">Ghi chuyến hàng</DialogTitle>
+            <DialogDescription className="text-base">
+              Một chuyến = một đại lý. Thêm từng loại hàng — bấm "Thêm vào sổ" là
+              lưu ngay, không mất. Xong cả chuyến thì bấm "Hoàn thành".
+            </DialogDescription>
+          </DialogHeader>
+
+          {phien && (
+            <div className="space-y-6 py-2">
+              {/* Đầu chuyến: ngày + xưởng + đại lý (áp cho mọi dòng của chuyến) */}
+              <div className="grid gap-6 sm:grid-cols-2">
+                <DateField
+                  label="Ngày nhập hàng"
+                  required
+                  value={phien.ngay}
+                  onChange={(v) => doiPhien("ngay", v)}
+                />
+                <ChoiceGroup
+                  label="Phân xưởng"
+                  required
+                  value={phien.phanXuong}
+                  onChange={(v) => doiPhien("phanXuong", v as PhanXuong)}
+                  options={PHAN_XUONG.map((p) => ({ value: p, label: p }))}
+                  cot={3}
+                />
+              </div>
+
+              <Combobox
+                label="Đại lý giao hàng"
+                required
+                hint="Chọn trong danh mục. Chưa có thì gõ tên rồi bấm Thêm mới."
+                value={phien.daiLy}
+                onChange={(v) => doiPhien("daiLy", v)}
+                options={optDaiLy}
+                onCreate={themDaiLy}
+                emptyText="Chưa có đại lý nào trong danh mục."
+              />
+
+              {/* Xe + ghi chú của chuyến — gập lại */}
+              <div className="rounded-xl border-2 border-border">
+                <button
+                  type="button"
+                  onClick={() => setMoPhuPhien((v) => !v)}
+                  aria-expanded={moPhuPhien}
+                  className="flex min-h-14 w-full items-center justify-between px-4 text-base font-semibold"
+                >
+                  Xe và ghi chú của chuyến (không bắt buộc)
+                  <ChevronDown
+                    className={`size-6 transition-transform ${moPhuPhien ? "rotate-180" : ""}`}
+                    aria-hidden
+                  />
+                </button>
+                {moPhuPhien && (
+                  <div className="space-y-5 border-t-2 border-border p-4">
+                    <div className="grid gap-5 sm:grid-cols-2">
+                      <Field label="Tài xế">
+                        <Input
+                          value={phien.taiXe}
+                          onChange={(e) => doiPhien("taiXe", e.target.value)}
+                          placeholder="Tên tài xế"
+                        />
+                      </Field>
+                      <Field label="Biển số xe">
+                        <Input
+                          value={phien.bienSoXe}
+                          onChange={(e) => doiPhien("bienSoXe", e.target.value)}
+                          placeholder="VD: 86C 19555"
+                        />
+                      </Field>
+                    </div>
+                    <Field label="Ghi chú">
+                      <Input
+                        value={phien.ghiChu}
+                        onChange={(e) => doiPhien("ghiChu", e.target.value)}
+                        placeholder="Ghi chú thêm (nếu có)"
+                      />
+                    </Field>
+                  </div>
+                )}
+              </div>
+
+              {/* Danh sách loại đã thêm trong chuyến */}
+              {dongPhien.length > 0 && (
+                <div className="space-y-2 rounded-xl border-2 border-border p-4">
+                  <p className="text-base font-semibold">
+                    Đã thêm {dongPhien.length} loại — chuyến này{" "}
+                    <span className="tnum">{kg(tongChuyen)}</span>
+                  </p>
+                  <ul className="divide-y divide-border">
+                    {dongPhien.map((r, i) => (
+                      <li
+                        key={r.id}
+                        className="flex items-center justify-between gap-3 py-2"
+                      >
+                        <span className="min-w-0 flex-1 truncate text-base">
+                          <span className="tnum text-muted-foreground">
+                            {i + 1}.
+                          </span>{" "}
+                          {r.loaiNL} —{" "}
+                          <span className="tnum font-semibold">
+                            {num(r.soLuongKg)}
+                          </span>{" "}
+                          kg
+                          {r.donGia != null && (
+                            <span className="text-muted-foreground">
+                              {" "}
+                              · {num(r.donGia)} đ
+                            </span>
+                          )}
+                        </span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => boDongPhien(r)}
+                        >
+                          <X />
+                          Bỏ
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Thêm một loại hàng vào chuyến */}
+              <div className="space-y-5 rounded-xl border-2 border-primary/40 bg-accent/40 p-4">
+                <p className="text-base font-semibold">Thêm loại hàng</p>
+                <ErrorSummary loi={loiPhien} />
+
+                <Combobox
+                  label="Loại nguyên liệu"
+                  required
+                  hint="Quy cách / size hàng về, VD: 2 da nguyên liệu."
+                  value={dongMoi.loaiNL}
+                  onChange={(v) => setDong("loaiNL", v)}
+                  options={optLoaiNL}
+                  onCreate={themLoaiNL}
+                />
+
+                <ChoiceGroup
+                  label="Loài"
+                  required
+                  value={dongMoi.loai}
+                  onChange={(v) => setDong("loai", v as Loai)}
+                  options={LOAI.map((l) => ({ value: l, label: l }))}
+                  cot={3}
+                />
+
+                <div className="grid gap-6 sm:grid-cols-2">
+                  <NumberField
+                    label="Số lượng"
+                    required
+                    unit="kg"
+                    value={dongMoi.soLuongKg || null}
+                    onChange={(v) => setDong("soLuongKg", v ?? 0)}
+                  />
+                  <NumberField
+                    label="Đơn giá"
+                    unit="đ"
+                    value={dongMoi.donGia}
+                    onChange={(v) => setDong("donGia", v)}
+                    hint="Bỏ trống nếu chưa chốt giá."
+                  />
+                </div>
+
+                {dongMoi.soLuongKg > 0 && dongMoi.donGia ? (
+                  <div className="rounded-lg bg-accent px-4 py-3 text-base text-accent-foreground">
+                    Thành tiền:{" "}
+                    <span className="tnum text-lg font-semibold">
+                      {num(dongMoi.soLuongKg * dongMoi.donGia)} đ
+                    </span>
+                  </div>
+                ) : null}
+
+                <Button size="lg" className="w-full" onClick={themDong}>
+                  <Plus />
+                  Thêm loại này vào sổ
+                </Button>
+              </div>
+
+              {/* Tổng ngày — như "TỔNG CỘNG" cuối sổ giấy */}
+              <div className="flex flex-wrap items-baseline justify-end gap-x-8 gap-y-2 rounded-xl bg-muted px-5 py-4">
+                <span className="text-base text-muted-foreground">
+                  Tổng ngày {viDate(phien.ngay)} · xưởng {phien.phanXuong}
+                </span>
+                <span className="tnum text-2xl font-semibold">
+                  {kg(tongNgayPhien)}
+                </span>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button size="lg" onClick={() => setPhien(null)}>
+              Hoàn thành
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -264,6 +264,90 @@ export const BANG_TP_RA: AnhXaBang<DongTP> = {
   }),
 };
 
+/* ---------- Hàng chờ đồng bộ (chống mất số liệu khi ghi hụt) ----------
+   Ghi lên máy chủ có thể hụt giữa ca (wifi rớt, tablet ngủ, server nghẽn).
+   Mỗi bảng giữ một "hàng chờ" khóa các dòng chưa đẩy được:
+     - them: dòng thêm/sửa chưa lên server
+     - xoa : dòng đã xóa dưới máy nhưng chưa xóa được trên server (tombstone)
+   Mọi lần ghi HAY mở app đều thử đẩy lại hàng chờ. Lúc mở, HOÀ server với dòng
+   local chưa đẩy thay vì đè mù — nên reload không nuốt chuyến hàng ghi hụt. */
+
+interface ChoDongBo {
+  them: string[];
+  xoa: string[];
+}
+
+function layMsg(e: unknown): string {
+  // Lỗi Supabase là object thường (có .message), không phải Error →
+  // String(e) ra "[object Object]". Rút .message cho người dùng đọc được.
+  return e instanceof Error
+    ? e.message
+    : e && typeof e === "object" && "message" in e
+      ? String((e as { message: unknown }).message)
+      : String(e);
+}
+
+function napCho(localKey: string): ChoDongBo {
+  try {
+    const raw = localStorage.getItem(`${localKey}.cho`);
+    if (!raw) return { them: [], xoa: [] };
+    const p = JSON.parse(raw) as Partial<ChoDongBo>;
+    return {
+      them: Array.isArray(p.them) ? p.them : [],
+      xoa: Array.isArray(p.xoa) ? p.xoa : [],
+    };
+  } catch {
+    return { them: [], xoa: [] };
+  }
+}
+
+function luuCho(localKey: string, cho: ChoDongBo) {
+  try {
+    if (cho.them.length === 0 && cho.xoa.length === 0)
+      localStorage.removeItem(`${localKey}.cho`);
+    else localStorage.setItem(`${localKey}.cho`, JSON.stringify(cho));
+  } catch {
+    // Hết dung lượng: bỏ qua, lần ghi sau thử lại.
+  }
+}
+
+/** Đẩy toàn bộ hàng chờ của một bảng lên máy chủ. Sạch chờ nếu thành công. */
+async function dongBoCho<T>(
+  bang: AnhXaBang<T>,
+  khoa: string,
+  rows: T[],
+): Promise<{ ok: boolean; msg?: string }> {
+  if (!supabase) return { ok: true };
+  const cho = napCho(bang.localKey);
+  if (cho.them.length === 0 && cho.xoa.length === 0) return { ok: true };
+
+  const theoKhoa = new Map(rows.map((x) => [bang.layKhoa(x), x]));
+  const capNhat = cho.them
+    .map((k) => theoKhoa.get(k))
+    .filter((x): x is T => x !== undefined)
+    .map((x) => ({ ...bang.toRow(x), xi_nghiep_id: SITE_ID }));
+
+  try {
+    if (capNhat.length > 0) {
+      const { error } = await supabase
+        .from(bang.table)
+        .upsert(capNhat, { onConflict: khoa });
+      if (error) throw error;
+    }
+    if (cho.xoa.length > 0) {
+      const { error } = await supabase
+        .from(bang.table)
+        .delete()
+        .in(khoa, cho.xoa);
+      if (error) throw error;
+    }
+    luuCho(bang.localKey, { them: [], xoa: [] });
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, msg: layMsg(e) };
+  }
+}
+
 /* ---------- Hook ---------- */
 
 export type TrangThai = "dang-tai" | "san-sang" | "loi";
@@ -301,36 +385,68 @@ export function useBang<T>(bang: AnhXaBang<T>, seed: () => T[] = () => []) {
         ketNoi.baoLoi(error.message);
         return;
       }
-      const map = (data ?? []).map((r) =>
+      const may = (data ?? []).map((r) =>
         bang.fromRow(r as Record<string, unknown>)
       );
-      // Bảng rỗng lần đầu → đẩy seed lên để mọi máy có cùng danh mục.
-      if (map.length === 0) {
-        const s0 = seed();
-        if (s0.length > 0) {
-          const { error: e2 } = await supabase
-            .from(bang.table)
-            .upsert(
-              s0.map((x) => ({ ...bang.toRow(x), xi_nghiep_id: SITE_ID })),
-              { onConflict: khoa }
-            );
-          if (e2) {
-            setTrangThai("loi");
-            setLoi(e2.message);
-            ketNoi.baoLoi(e2.message);
+
+      // Bảng rỗng lần đầu + máy này cũng chưa có gì → đẩy seed lên danh mục.
+      if (may.length === 0) {
+        const cho0 = napCho(bang.localKey);
+        const localCu = load<T>(bang.localKey);
+        const chuaCoGi =
+          localCu.length === 0 && cho0.them.length === 0 && cho0.xoa.length === 0;
+        if (chuaCoGi) {
+          const s0 = seed();
+          if (s0.length > 0) {
+            const { error: e2 } = await supabase
+              .from(bang.table)
+              .upsert(
+                s0.map((x) => ({ ...bang.toRow(x), xi_nghiep_id: SITE_ID })),
+                { onConflict: khoa }
+              );
+            if (huy) return;
+            if (e2) {
+              setTrangThai("loi");
+              setLoi(e2.message);
+              ketNoi.baoLoi(e2.message);
+              return;
+            }
+            setRows(s0);
+            save(bang.localKey, s0);
+            setTrangThai("san-sang");
+            ketNoi.baoOK();
             return;
           }
-          setRows(s0);
-          save(bang.localKey, s0);
-          setTrangThai("san-sang");
-          ketNoi.baoOK();
-          return;
         }
       }
-      setRows(map);
-      save(bang.localKey, map);
-      setTrangThai("san-sang");
-      ketNoi.baoOK();
+
+      /* HOÀ server với dòng local CHƯA đồng bộ — KHÔNG đè mù, nếu không reload
+         sẽ nuốt chuyến hàng ghi hụt (dòng chỉ có dưới máy, chưa lên server). */
+      const cho = napCho(bang.localKey);
+      const local = load<T>(bang.localKey);
+      const localTheoKhoa = new Map(local.map((x) => [bang.layKhoa(x), x]));
+      const hoa = new Map(may.map((x) => [bang.layKhoa(x), x])); // nền = server
+      for (const k of cho.them) {
+        const r = localTheoKhoa.get(k); // bản local chưa đẩy → thắng server
+        if (r !== undefined) hoa.set(k, r);
+      }
+      for (const k of cho.xoa) hoa.delete(k); // đã xóa dưới máy → đừng hồi sinh
+      const ketQua = [...hoa.values()];
+      setRows(ketQua);
+      save(bang.localKey, ketQua);
+
+      // Thử đẩy hàng chờ lên server ngay khi vừa nối được.
+      const kq = await dongBoCho(bang, khoa, ketQua);
+      if (huy) return;
+      if (kq.ok) {
+        setLoi(null);
+        setTrangThai("san-sang");
+        ketNoi.baoOK();
+      } else {
+        setTrangThai("loi");
+        setLoi(kq.msg ?? "Lỗi đồng bộ máy chủ");
+        ketNoi.baoLoi(kq.msg ?? "Lỗi đồng bộ máy chủ");
+      }
     })();
     return () => {
       huy = true;
@@ -349,47 +465,33 @@ export function useBang<T>(bang: AnhXaBang<T>, seed: () => T[] = () => []) {
       const cuTheoKhoa = new Map(cu.map((x) => [bang.layKhoa(x), x]));
       const khoaMoi = new Set(next.map((x) => bang.layKhoa(x)));
 
-      const themHoacSua = next.filter((x) => {
-        const c = cuTheoKhoa.get(bang.layKhoa(x));
-        return !c || JSON.stringify(c) !== JSON.stringify(x);
-      });
-      const xoa = cu
+      const themKeys = next
+        .filter((x) => {
+          const c = cuTheoKhoa.get(bang.layKhoa(x));
+          return !c || JSON.stringify(c) !== JSON.stringify(x);
+        })
+        .map((x) => bang.layKhoa(x));
+      const xoaKeys = cu
         .filter((x) => !khoaMoi.has(bang.layKhoa(x)))
         .map((x) => bang.layKhoa(x));
 
+      /* Ghi vào hàng chờ TRƯỚC khi gọi server: hụt thì vẫn còn dấu để đẩy lại
+         lần sau. Gộp với hàng chờ cũ nên các dòng hụt trước cũng được đẩy kèm. */
+      const cho = napCho(bang.localKey);
+      const them = new Set([...cho.them, ...themKeys]);
+      const xoa = new Set([...cho.xoa, ...xoaKeys]);
+      xoaKeys.forEach((k) => them.delete(k)); // vừa xóa thì thôi thêm
+      themKeys.forEach((k) => xoa.delete(k)); // thêm/sửa lại thì thôi xóa
+      luuCho(bang.localKey, { them: [...them], xoa: [...xoa] });
+
       (async () => {
-        try {
-          if (themHoacSua.length > 0) {
-            const { error } = await supabase
-              .from(bang.table)
-              .upsert(
-                themHoacSua.map((x) => ({
-                  ...bang.toRow(x),
-                  xi_nghiep_id: SITE_ID,
-                })),
-                { onConflict: khoa }
-              );
-            if (error) throw error;
-          }
-          if (xoa.length > 0) {
-            const { error } = await supabase
-              .from(bang.table)
-              .delete()
-              .in(khoa, xoa);
-            if (error) throw error;
-          }
+        const kq = await dongBoCho(bang, khoa, next);
+        if (kq.ok) {
           setLoi(null);
           setTrangThai("san-sang");
           ketNoi.baoOK();
-        } catch (e) {
-          // Lỗi Supabase là object thường (có .message), không phải Error →
-          // String(e) ra "[object Object]". Rút .message cho người dùng đọc được.
-          const msg =
-            e instanceof Error
-              ? e.message
-              : e && typeof e === "object" && "message" in e
-                ? String((e as { message: unknown }).message)
-                : String(e);
+        } else {
+          const msg = kq.msg ?? "Lỗi ghi máy chủ";
           setTrangThai("loi");
           setLoi(msg);
           ketNoi.baoLoi(msg);

@@ -1,5 +1,6 @@
 import * as React from "react";
 import { hasSupabase, supabase, SITE_ID } from "@/lib/supabase";
+import { ketNoi } from "@/lib/ketNoi";
 import { cn } from "@/lib/utils";
 import { Cloud, CloudOff, HardDrive, Loader2 } from "lucide-react";
 
@@ -8,12 +9,13 @@ type Trang = "cuc-bo" | "dang-kiem" | "da-noi" | "loi";
 /**
  * Cho biết dữ liệu đang nằm ở đâu — câu hỏi người dùng hay hỏi nhất khi
  * chuyển máy. Nói thẳng hệ quả ("chỉ máy này thấy") thay vì tên công nghệ.
+ *
+ * Màu đèn bám theo KẾT QUẢ ĐỌC/GHI THẬT của repo.ts (qua store `ketNoi`):
+ * ghi bảng bất kỳ lỗi là đỏ ngay, không còn kiểu probe 1 bảng 1 lần rồi xanh
+ * mãi. Có thêm một probe lúc mở chỉ để có trạng thái ban đầu khi chưa thao tác.
  */
 export function TrangThaiDuLieu({ className }: { className?: string }) {
-  const [trang, setTrang] = React.useState<Trang>(
-    hasSupabase ? "dang-kiem" : "cuc-bo"
-  );
-  const [loi, setLoi] = React.useState("");
+  const anh = React.useSyncExternalStore(ketNoi.subscribe, ketNoi.laySnapshot);
 
   React.useEffect(() => {
     if (!supabase) return;
@@ -25,17 +27,20 @@ export function TrangThaiDuLieu({ className }: { className?: string }) {
         .eq("xi_nghiep_id", SITE_ID)
         .limit(1);
       if (huy) return;
-      if (error) {
-        setTrang("loi");
-        setLoi(error.message);
-      } else {
-        setTrang("da-noi");
-      }
+      if (error) ketNoi.baoLoi(error.message);
+      else ketNoi.baoOK();
     })();
     return () => {
       huy = true;
     };
   }, []);
+
+  const trang: Trang = !hasSupabase
+    ? "cuc-bo"
+    : anh.trang === "chua-ro"
+      ? "dang-kiem"
+      : anh.trang;
+  const loi = anh.loi;
 
   const cauHinh: Record<
     Trang,

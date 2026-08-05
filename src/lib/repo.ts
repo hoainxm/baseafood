@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase, hasSupabase, SITE_ID } from "@/lib/supabase";
+import { ketNoi } from "@/lib/ketNoi";
 import { load, save } from "@/lib/db";
 import type {
   DaiLy,
@@ -297,6 +298,7 @@ export function useBang<T>(bang: AnhXaBang<T>, seed: () => T[] = () => []) {
       if (error) {
         setTrangThai("loi");
         setLoi(error.message);
+        ketNoi.baoLoi(error.message);
         return;
       }
       const map = (data ?? []).map((r) =>
@@ -312,17 +314,23 @@ export function useBang<T>(bang: AnhXaBang<T>, seed: () => T[] = () => []) {
               s0.map((x) => ({ ...bang.toRow(x), xi_nghiep_id: SITE_ID })),
               { onConflict: khoa }
             );
-          if (!e2) {
-            setRows(s0);
-            save(bang.localKey, s0);
-            setTrangThai("san-sang");
+          if (e2) {
+            setTrangThai("loi");
+            setLoi(e2.message);
+            ketNoi.baoLoi(e2.message);
             return;
           }
+          setRows(s0);
+          save(bang.localKey, s0);
+          setTrangThai("san-sang");
+          ketNoi.baoOK();
+          return;
         }
       }
       setRows(map);
       save(bang.localKey, map);
       setTrangThai("san-sang");
+      ketNoi.baoOK();
     })();
     return () => {
       huy = true;
@@ -372,9 +380,19 @@ export function useBang<T>(bang: AnhXaBang<T>, seed: () => T[] = () => []) {
           }
           setLoi(null);
           setTrangThai("san-sang");
+          ketNoi.baoOK();
         } catch (e) {
+          // Lỗi Supabase là object thường (có .message), không phải Error →
+          // String(e) ra "[object Object]". Rút .message cho người dùng đọc được.
+          const msg =
+            e instanceof Error
+              ? e.message
+              : e && typeof e === "object" && "message" in e
+                ? String((e as { message: unknown }).message)
+                : String(e);
           setTrangThai("loi");
-          setLoi(e instanceof Error ? e.message : String(e));
+          setLoi(msg);
+          ketNoi.baoLoi(msg);
         }
       })();
     },

@@ -19,10 +19,41 @@ export const LOAI = [
 ] as const;
 export type Loai = (typeof LOAI)[number];
 
+/**
+ * Một chuyến hàng = MỘT đại lý đổ hàng MỘT lượt (một xe), gồm nhiều dòng loại
+ * hàng. Trước đây chuyến chỉ được gom ngầm theo (ngày + đại lý + xe) nên cùng
+ * một đại lý giao hai lượt trong ngày bị đếm thành một.
+ *
+ * Hai ngày tách riêng — kế toán vẫn phân biệt như vậy:
+ *   - `ngayGiao`  : hàng thực về xưởng. MỌI tổng hợp (sổ ngày, cân đối, báo cáo
+ *                   tháng) đều tính theo ngày này.
+ *   - `ngayGhiSo` : ngày ghi vào hệ thống. Hàng về 29/7 mà 31/7 mới có chứng từ
+ *                   thì ngayGiao = 29/7, ngayGhiSo = 31/7 → dòng mang nhãn
+ *                   "Ghi bù", tổng ngày 29/7 vẫn đúng và giải trình được vì sao
+ *                   khác bản đã chốt hôm 29/7.
+ */
+export interface ChuyenNhap {
+  id: string;
+  ngayGiao: string; // yyyy-mm-dd — hàng thực về xưởng
+  ngayGhiSo: string; // yyyy-mm-dd — ngày ghi vào hệ thống
+  lyDoGhiBu: string; // bắt buộc khi ngayGhiSo > ngayGiao
+  phanXuong: PhanXuong;
+  daiLy: string;
+  taiXe: string;
+  bienSoXe: string;
+  ghiChu: string;
+}
+
+/** Chuyến ghi sau ngày hàng về ⇒ ghi bù (cần lý do, hiện nhãn trên sổ). */
+export function laGhiBu(c: Pick<ChuyenNhap, "ngayGiao" | "ngayGhiSo">): boolean {
+  return Boolean(c.ngayGhiSo) && c.ngayGhiSo > c.ngayGiao;
+}
+
 /** Một dòng nhập nguyên liệu hàng ngày — theo sổ "Báo cáo tổng hợp nguyên liệu hàng ngày". */
 export interface DongNhapNL {
   id: string;
-  ngay: string; // yyyy-mm-dd
+  chuyenId: string; // rỗng = dữ liệu cũ, gom ngầm theo (ngày + đại lý + xe)
+  ngay: string; // yyyy-mm-dd — NGÀY GIAO (chép từ chuyến để tổng hợp nhanh)
   phanXuong: PhanXuong;
   loai: Loai; // loài: bạch tuộc / mực / cá… — ghi rõ
   daiLy: string;
@@ -37,6 +68,25 @@ export interface DongNhapNL {
 /** Thành tiền = số lượng × đơn giá. */
 export function thanhTien(r: Pick<DongNhapNL, "soLuongKg" | "donGia">): number {
   return r.soLuongKg * (r.donGia ?? 0);
+}
+
+/**
+ * Chốt số liệu nhập hàng của một (ngày + phân xưởng) — thay mốc "cộng tay xong
+ * là số ngày này đúng". Đã chốt thì không sửa/xóa/thêm chuyến thường nữa; chỉ
+ * còn hai đường: **ghi bù** (có lý do) hoặc **mở lại** cả ngày.
+ *
+ * `tongKgLucChot` giữ con số tại thời điểm chốt để đối chiếu: ghi bù xong hệ
+ * thống chỉ ngay ra tổng ngày đã đổi bao nhiêu so với bản đã gửi đi.
+ */
+export interface ChotNgay {
+  id: string;
+  ngay: string; // yyyy-mm-dd — ngày giao
+  phanXuong: PhanXuong;
+  daChot: boolean; // mở lại thì để false, KHÔNG xóa bản ghi
+  chotLuc: string; // ISO datetime
+  tongKgLucChot: number;
+  lyDoMoLai: string;
+  ghiChu: string;
 }
 
 /* ---------- Cân đối 5 ngày (xưởng Đông) ---------- */
@@ -106,12 +156,26 @@ export interface DongNLVao {
   tyLe: number | null; // % (dùng cho bột phụ gia)
 }
 
+/** Phế liệu cân ở màn Nhập hàng (gộp cuối ngày) hay nhập tay trong kỳ cân đối. */
+export type NguonPheLieu = "Nhập hàng" | "Cân đối";
+
+/**
+ * Phế liệu bán giá riêng (nội tạng, dạt).
+ *
+ * Nghiệp vụ thật: cân gộp cuối ngày theo phân xưởng, ngay lúc nhận hàng — nên
+ * nhập ở màn Nhập hàng (`nguon = "Nhập hàng"`, có `ngay`/`phanXuong`, chưa gắn
+ * kỳ). Màn Cân đối hút các dòng đó vào kỳ (gán `kyId`) thay vì nhập lại —
+ * một số liệu chỉ một nguồn chuẩn.
+ */
 export interface DongPheLieu {
   id: string;
-  kyId: string;
+  kyId: string; // rỗng = chưa gắn kỳ cân đối nào
   loai: string; // nội tạng / dạt…
   soLuongKg: number;
   donGiaBan: number | null; // VND
+  ngay: string; // yyyy-mm-dd — ngày cân (dòng nhập từ màn Nhập hàng)
+  phanXuong: PhanXuong | ""; // "" = dòng nhập tay trong kỳ, không gắn xưởng
+  nguon: NguonPheLieu;
 }
 
 export interface DongTP {

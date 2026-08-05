@@ -33,7 +33,7 @@ Từ số liệu **nhập nguyên liệu hàng ngày** và **thành phẩm sản
 | Khối | Nội dung | Đơn vị |
 |---|---|---|
 | **1. Nguyên liệu vào** | Thủy sản NL theo size (2 da nl lớn/nhỏ, 1 da…) · **bột phụ gia tẩm** (có cột tỷ lệ % trong TP) · **bán nội địa** (gồm dòng số âm = SL bán nội địa) | kg · VND |
-| **2. Phế liệu** *(mới)* | Nội tạng, dạt (hàng thải) — bán giá riêng | kg · VND |
+| **2. Phế liệu** *(sửa 05/08)* | Nội tạng, dạt (hàng thải) — bán giá riêng. **Nhập ở màn Nhập hàng** (cân gộp cuối ngày theo phân xưởng); kỳ cân đối **hút** các dòng rơi trong khoảng ngày của kỳ, không nhập tay lại | kg · VND |
 | **3. Thành phẩm — xuất khẩu / nội địa** | Mỗi **mặt hàng → khách hàng**: lượng (TP sản xuất ra) · đơn giá · thành tiền. Cùng mặt hàng có thể **nhiều dòng giá** theo chất lượng | kg · USD/VND |
 | **4. Ghi chú (tính toán)** | Tổng TP · định mức chế biến · chi phí CB/kg · giá thành · giá trị xuất · **lãi/lỗ** · bình quân/kg NL · tỉ giá | — |
 
@@ -48,7 +48,7 @@ Từ số liệu **nhập nguyên liệu hàng ngày** và **thành phẩm sản
 
 **Các dòng trong kỳ:**
 - `DòngNLVào`: kỳId · nhóm (thủy-sản-NL / **xả-đông** / bột-phụ-gia / bán-nội-địa) · tên · **soLượngKg** · **đơnGiáVND** · tỷLệ% (cho bột) · thànhTiền(computed). **Số dòng linh hoạt theo loại** — mực chỉ có N liệu + xả đông; bạch tuộc thêm bột + bán nội địa.
-- `DòngPhếLiệu`: kỳId · loại (nội tạng / dạt) · soLượngKg · đơnGiáBán · thànhTiền.
+- `DòngPhếLiệu`: kỳId (**rỗng khi chưa gắn kỳ**) · loại (nội tạng / dạt) · soLượngKg · đơnGiáBán · thànhTiền · **ngày · phânXưởng · nguồn** (Nhập hàng / Cân đối). Dòng nguồn *Nhập hàng* do màn Nhập hàng tạo; kỳ chỉ **mượn** — xóa kỳ thì gỡ liên kết chứ không xóa số gốc.
 - `DòngTPXuất`: kỳId · matHàngId · kháchId · **kênh** (xuất khẩu USD / nội địa VND) · **lượngKg** · **đơnGiá** · thànhTiền. *(Bán nội địa = kênh nội địa, đơn giá VND.)*
 
 **Giá trị tính ra (computed, không lưu):**
@@ -70,7 +70,8 @@ Lãi/Lỗ              = Giá trị xuất − Giá thành
 
 | Dữ liệu | Nguồn |
 |---|---|
-| Bảng phụ NL nhận theo ngày (tham chiếu) | Gợi ý từ màn Nhập nguyên liệu hàng ngày (đã build), lọc theo loại + các ngày của kỳ |
+| Bảng phụ NL nhận theo ngày (tham chiếu) | Gợi ý từ màn Nhập nguyên liệu hàng ngày (đã build), lọc theo loại + các ngày của kỳ. Chỉ tính theo **ngày hàng về xưởng** (`ngay_giao`), không phải ngày ghi sổ |
+| Phế liệu (khối 2) | **Hút từ màn Nhập hàng** — các dòng cân trong khoảng ngày của kỳ, chưa gắn kỳ nào |
 | Khối NL vào của bảng (N liệu · xả đông · bột · bán nội địa) | **Nhập/phân bổ tay theo bảng** — vì NL nhận được chia cho nhiều mặt hàng/bảng, không đổ trọn vào một bảng |
 | Thành phẩm (mặt hàng × khách × lượng) | Nhập tay theo lô *(sau này nối màn nhập thành phẩm hàng ngày khi có)* |
 | Chi phí CB · tỉ giá · đơn giá NL/USD | Nhập tay mỗi kỳ |
@@ -117,4 +118,13 @@ Kỳ theo ngày tiếp nhận NL, TP khớp theo lô có thể trễ · mỗi lo
 
 ---
 
-**Last updated**: 2026-08-04
+---
+
+## 13. Sửa 05/08/2026 (đợt 3)
+
+- **Khối 2 phế liệu đổi nguồn nhập**: cân gộp cuối ngày ở màn Nhập hàng theo (ngày + phân xưởng); kỳ cân đối hút vào bằng nút "Đưa vào kỳ". Bỏ thói quen nhập tay hai nơi.
+- **Ngày của sổ nhập tách đôi**: `ngay_giao` (hàng về — dùng để cộng kỳ) và `ngay_ghi_so` (ngày ghi). Chênh nhau ⇒ ghi bù, bắt buộc lý do.
+- **Chốt số liệu ngày** (ngày + phân xưởng) khóa sửa/xóa/thêm; sau chốt còn ghi bù hoặc mở lại, đều phải ghi lý do.
+- Bảng: `chuyen_nhap`, `chot_ngay`, `nhap_nguyen_lieu.chuyen_id`, `phe_lieu` (+`ngay`/`phan_xuong`/`nguon`, `ky_id` cho phép rỗng) — migration `0004_chuyen_chot_ngay_phe_lieu.sql`.
+
+**Last updated**: 2026-08-05

@@ -236,12 +236,31 @@
 1. Có số lượng + đơn giá nhưng **chưa có cột thành tiền** → thêm cột thành tiền = SL × đơn giá.
 2. Thông tin **tài xế/biển số đang nằm trong cột ghi chú** → tách cột riêng.
 3. **Loài nguyên liệu chưa ghi rõ** (VD ghi "1 DA NL", ngầm hiểu là bạch tuộc) → thêm trường loài/nhóm rõ ràng, không để mặc định ngầm.
+
+## Bổ sung đợt 3 (05/08) — chốt tại chỗ với chủ dự án
+
+**A. Phế liệu cân ở màn NHẬP HÀNG, không nhập trong kỳ cân đối nữa** *(lệch đợt 2 — bản này đúng)*
+Nghiệp vụ thật: nội tạng / dạt được **cân gộp cuối ngày theo phân xưởng**, ngay lúc nhận hàng — không gắn theo từng chuyến. Vì vậy:
+- Nhập một chỗ duy nhất: khối "Phế liệu cân trong ngày" ở màn Nhập hàng, khóa theo (ngày + phân xưởng).
+- Màn Cân đối **hút** các dòng đó vào kỳ (gán `ky_id`), không nhập tay lại → giữ nguyên tắc *một số liệu một nguồn chuẩn*. Gỡ khỏi kỳ chỉ bỏ liên kết, số gốc vẫn nằm ở sổ nhập.
+- Dòng phế liệu nhập tay trực tiếp trong kỳ vẫn giữ được (dữ liệu cũ), phân biệt bằng cột **Nguồn**.
+
+**B. Hàng về ngày này, mấy ngày sau mới ghi (chưa có hóa đơn) → TÁCH HAI NGÀY**
+Tình huống thật: đơn giao 29/7 tới 31/7 mới ghi vì đại lý chưa xuất hóa đơn.
+- `ngay_giao` = ngày hàng thực về xưởng → **mọi tổng hợp** (sổ ngày, kỳ cân đối, báo cáo tháng) tính theo ngày này, đúng quy ước "kỳ = ngày tiếp nhận NL" (Q2).
+- `ngay_ghi_so` = ngày ghi vào hệ thống. Ghi sau ngày hàng về ⇒ **ghi bù**, bắt buộc ghi lý do, sổ hiện nhãn "Ghi bù dd/mm".
+- Đơn giá **để trống được** khi chưa có hóa đơn; sổ có nhãn "Chưa có giá" + bộ lọc riêng để đòi giá sau.
+
+**C. Chốt số liệu ngày** (ngày + phân xưởng): chốt xong khóa sửa/xóa/thêm chuyến thường; còn hai đường là **ghi bù** (có lý do) hoặc **mở lại ngày** (có lý do). Hệ thống giữ tổng lúc chốt và chỉ ra chênh lệch nếu sau đó có ghi bù.
+
+**D. Chuyến thật:** mỗi lượt giao là một bản ghi `chuyen_nhap` — một đại lý giao hai lượt trong ngày là **hai chuyến**, không còn gom ngầm theo (ngày + đại lý + xe).
 | Nhóm 5 | Sẽ gửi: **BTP hàng ngày**, **cân đối 5 ngày loại khác**. Bảng giá khách + file xưởng Khô: ⏳ hỏi lại | |
 
 ---
 
 ## History
 
+- v3 (2026-08-05): thêm "Bổ sung đợt 3" — phế liệu chuyển sang nhập ở màn Nhập hàng (gộp cuối ngày theo xưởng), Cân đối hút vào kỳ; tách `ngay_giao` / `ngay_ghi_so` cho hàng ghi bù chờ hóa đơn; chốt số liệu ngày; chuyến thật thay gom ngầm.
 - v2 (2026-08-04): ghi kết quả xác nhận đợt 1 (Q1–12, 17–22 đã chốt; Q13–16, 24–26 hỏi lại; Q23, 27, 28 chờ trả lời). Nuance quan trọng: kỳ 5 ngày theo ngày tiếp nhận NL, TP khớp theo lô có thể trễ; "Bột" là phụ gia tẩm có tỷ lệ %; mặt hàng không khớp hẳn 141 mã.
 - v1 (2026-08-04): tạo mới — gom toàn bộ câu hỏi cần xác nhận (28 câu + danh mục file cần gửi) kèm phương án chọn sẵn, phục vụ chốt trước khi viết plan flow "cân đối 5 ngày". Nguồn: phân tích mẫu Loại hàng.pdf + 3 file dữ liệu + record1/record2.
 

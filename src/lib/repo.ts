@@ -3,6 +3,8 @@ import { supabase, hasSupabase, SITE_ID } from "@/lib/supabase";
 import { ketNoi } from "@/lib/ketNoi";
 import { load, save } from "@/lib/db";
 import type {
+  ChotNgay,
+  ChuyenNhap,
   DaiLy,
   DongNLVao,
   DongNhapNL,
@@ -14,6 +16,7 @@ import type {
   Loai,
   LoaiNguyenLieu,
   MatHang,
+  NguonPheLieu,
   NhomNL,
   PhanXuong,
   ThanhPham,
@@ -47,6 +50,12 @@ export interface AnhXaBang<T> {
   layKhoa: (x: T) => string;
   toRow: (x: T) => Record<string, unknown>;
   fromRow: (r: Record<string, unknown>) => T;
+  /**
+   * Vá dòng cũ còn thiếu trường mới thêm về sau. Bản sao dưới localStorage được
+   * đọc thẳng bằng JSON.parse (không qua `fromRow`), nên dữ liệu ghi từ bản
+   * trước sẽ thiếu trường — vá ở một chỗ này thay vì rải `?? ""` khắp màn hình.
+   */
+  vaDongCu?: (x: T) => T;
 }
 
 const s = (v: unknown) => (v == null ? "" : String(v));
@@ -136,12 +145,69 @@ export const BANG_KHACH_HANG: AnhXaBang<KhachHang> = {
   }),
 };
 
+/** Chuyến hàng — một đại lý, một lượt giao, nhiều dòng loại hàng. */
+export const BANG_CHUYEN_NHAP: AnhXaBang<ChuyenNhap> = {
+  table: "chuyen_nhap",
+  localKey: "bsf.chuyen.v1",
+  layKhoa: theoId,
+  toRow: (x) => ({
+    id: x.id,
+    ngay_giao: x.ngayGiao,
+    ngay_ghi_so: x.ngayGhiSo,
+    ly_do_ghi_bu: x.lyDoGhiBu,
+    phan_xuong: x.phanXuong,
+    ten_dai_ly: x.daiLy,
+    tai_xe: x.taiXe,
+    bien_so_xe: x.bienSoXe,
+    ghi_chu: x.ghiChu,
+  }),
+  fromRow: (r) => ({
+    id: s(r.id),
+    ngayGiao: s(r.ngay_giao).slice(0, 10),
+    ngayGhiSo: s(r.ngay_ghi_so).slice(0, 10),
+    lyDoGhiBu: s(r.ly_do_ghi_bu),
+    phanXuong: s(r.phan_xuong) as PhanXuong,
+    daiLy: s(r.ten_dai_ly),
+    taiXe: s(r.tai_xe),
+    bienSoXe: s(r.bien_so_xe),
+    ghiChu: s(r.ghi_chu),
+  }),
+};
+
+/** Chốt số liệu một ngày của một phân xưởng. */
+export const BANG_CHOT_NGAY: AnhXaBang<ChotNgay> = {
+  table: "chot_ngay",
+  localKey: "bsf.chot-ngay.v1",
+  layKhoa: theoId,
+  toRow: (x) => ({
+    id: x.id,
+    ngay: x.ngay,
+    phan_xuong: x.phanXuong,
+    da_chot: x.daChot,
+    chot_luc: x.chotLuc,
+    tong_kg_luc_chot: x.tongKgLucChot,
+    ly_do_mo_lai: x.lyDoMoLai,
+    ghi_chu: x.ghiChu,
+  }),
+  fromRow: (r) => ({
+    id: s(r.id),
+    ngay: s(r.ngay).slice(0, 10),
+    phanXuong: s(r.phan_xuong) as PhanXuong,
+    daChot: Boolean(r.da_chot),
+    chotLuc: s(r.chot_luc),
+    tongKgLucChot: Number(r.tong_kg_luc_chot ?? 0),
+    lyDoMoLai: s(r.ly_do_mo_lai),
+    ghiChu: s(r.ghi_chu),
+  }),
+};
+
 export const BANG_NHAP_NL: AnhXaBang<DongNhapNL> = {
   table: "nhap_nguyen_lieu",
   localKey: "bsf.nhap-nl.v1",
   layKhoa: theoId,
   toRow: (x) => ({
     id: x.id,
+    chuyen_id: x.chuyenId,
     ngay: x.ngay,
     phan_xuong: x.phanXuong,
     loai: x.loai,
@@ -155,6 +221,7 @@ export const BANG_NHAP_NL: AnhXaBang<DongNhapNL> = {
   }),
   fromRow: (r) => ({
     id: s(r.id),
+    chuyenId: s(r.chuyen_id),
     ngay: s(r.ngay).slice(0, 10),
     phanXuong: s(r.phan_xuong) as PhanXuong,
     loai: s(r.loai) as Loai,
@@ -166,6 +233,8 @@ export const BANG_NHAP_NL: AnhXaBang<DongNhapNL> = {
     bienSoXe: s(r.bien_so_xe),
     ghiChu: s(r.ghi_chu),
   }),
+  // Dòng ghi trước khi có "chuyến thật" → chưa gắn chuyến, app gom ngầm.
+  vaDongCu: (x) => (x.chuyenId == null ? { ...x, chuyenId: "" } : x),
 };
 
 export const BANG_KY: AnhXaBang<KyCanDoi> = {
@@ -226,10 +295,14 @@ export const BANG_PHE_LIEU: AnhXaBang<DongPheLieu> = {
   layKhoa: theoId,
   toRow: (x) => ({
     id: x.id,
-    ky_id: x.kyId,
+    // Chưa gắn kỳ thì phải là NULL — chuỗi rỗng vi phạm khóa ngoại ky_can_doi.
+    ky_id: x.kyId || null,
     loai: x.loai,
     so_luong_kg: x.soLuongKg,
     don_gia_ban: x.donGiaBan,
+    ngay: x.ngay || null,
+    phan_xuong: x.phanXuong,
+    nguon: x.nguon,
   }),
   fromRow: (r) => ({
     id: s(r.id),
@@ -237,7 +310,15 @@ export const BANG_PHE_LIEU: AnhXaBang<DongPheLieu> = {
     loai: s(r.loai),
     soLuongKg: Number(r.so_luong_kg ?? 0),
     donGiaBan: n(r.don_gia_ban),
+    ngay: s(r.ngay).slice(0, 10),
+    phanXuong: s(r.phan_xuong) as PhanXuong | "",
+    // Dòng cũ (trước 0004) không có cột nguồn → là dòng nhập tay trong kỳ.
+    nguon: (s(r.nguon) || "Cân đối") as NguonPheLieu,
   }),
+  vaDongCu: (x) =>
+    x.nguon == null
+      ? { ...x, ngay: x.ngay ?? "", phanXuong: x.phanXuong ?? "", nguon: "Cân đối" }
+      : x,
 };
 
 export const BANG_TP_RA: AnhXaBang<DongTP> = {
@@ -354,9 +435,14 @@ export type TrangThai = "dang-tai" | "san-sang" | "loi";
 
 export function useBang<T>(bang: AnhXaBang<T>, seed: () => T[] = () => []) {
   const khoa = bang.khoaChinh ?? "id";
+  const va = bang.vaDongCu;
+  const napLocal = (key: string) => {
+    const xs = load<T>(key);
+    return va ? xs.map(va) : xs;
+  };
 
   const [rows, setRows] = useState<T[]>(() => {
-    const co = load<T>(bang.localKey);
+    const co = napLocal(bang.localKey);
     if (co.length > 0) return co;
     const s0 = seed();
     if (s0.length > 0 && !hasSupabase) save(bang.localKey, s0);
@@ -392,7 +478,7 @@ export function useBang<T>(bang: AnhXaBang<T>, seed: () => T[] = () => []) {
       // Bảng rỗng lần đầu + máy này cũng chưa có gì → đẩy seed lên danh mục.
       if (may.length === 0) {
         const cho0 = napCho(bang.localKey);
-        const localCu = load<T>(bang.localKey);
+        const localCu = napLocal(bang.localKey);
         const chuaCoGi =
           localCu.length === 0 && cho0.them.length === 0 && cho0.xoa.length === 0;
         if (chuaCoGi) {
@@ -423,7 +509,7 @@ export function useBang<T>(bang: AnhXaBang<T>, seed: () => T[] = () => []) {
       /* HOÀ server với dòng local CHƯA đồng bộ — KHÔNG đè mù, nếu không reload
          sẽ nuốt chuyến hàng ghi hụt (dòng chỉ có dưới máy, chưa lên server). */
       const cho = napCho(bang.localKey);
-      const local = load<T>(bang.localKey);
+      const local = napLocal(bang.localKey);
       const localTheoKhoa = new Map(local.map((x) => [bang.layKhoa(x), x]));
       const hoa = new Map(may.map((x) => [bang.layKhoa(x), x])); // nền = server
       for (const k of cho.them) {

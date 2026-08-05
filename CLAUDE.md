@@ -45,7 +45,12 @@ Mọi màn đọc/ghi qua `src/lib/repo.ts` — **không** gọi localStorage tr
 
 **Đặt tên DB: tiếng Việt KHÔNG DẤU, snake_case, không tiền tố** (`nhap_nguyen_lieu`, `so_luong_kg`). Cấm tên có dấu — Postgres bắt bọc nháy kép mọi nơi và dấu tiếng Việt có 2 dạng Unicode NFC/NFD trông giống hệt nhưng là 2 định danh khác nhau.
 
-11 bảng: `xi_nghiep` · `dai_ly` · `loai_nguyen_lieu` · `thanh_pham` (141 mã, khóa chính là `ma`) · `mat_hang` · `khach_hang` · `nhap_nguyen_lieu` · `ky_can_doi` · `nguyen_lieu_vao` · `phe_lieu` · `thanh_pham_ra`. Migration `supabase/migrations/0001_baseafood_mes.sql`; `0002_go_bo_sdfactory.sql` gỡ 3 bảng cũ của SDFactory (**phá hủy, chạy thủ công**). Hướng dẫn: `docs/supabase-setup.md`.
+13 bảng: `xi_nghiep` · `dai_ly` · `loai_nguyen_lieu` · `thanh_pham` (141 mã, khóa chính là `ma`) · `mat_hang` · `khach_hang` · `chuyen_nhap` · `nhap_nguyen_lieu` · `chot_ngay` · `ky_can_doi` · `nguyen_lieu_vao` · `phe_lieu` · `thanh_pham_ra`. Migration `supabase/migrations/0001_baseafood_mes.sql`; `0002_go_bo_sdfactory.sql` gỡ 3 bảng cũ của SDFactory (**phá hủy, chạy thủ công**); `0004_chuyen_chot_ngay_phe_lieu.sql` thêm chuyến thật + chốt ngày + phế liệu tại màn nhập (**chạy ngay, chỉ thêm cột/bảng**). Hướng dẫn: `docs/supabase-setup.md`.
+
+**Sổ nhập hàng — ba quy ước đừng phá:**
+- `ngay_giao` (hàng thực về xưởng) là ngày dùng cho MỌI tổng hợp; `ngay_ghi_so` chỉ để giải trình. Ghi sau ngày hàng về ⇒ ghi bù, bắt buộc lý do.
+- Chuyến thật (`chuyen_nhap`) — một đại lý giao hai lượt trong ngày là hai chuyến. Dòng cũ chưa có `chuyen_id` được gom ngầm khi hiển thị, không chuyển đổi dữ liệu.
+- Phế liệu nhập MỘT chỗ: màn Nhập hàng, gộp cuối ngày theo (ngày + phân xưởng). Cân đối chỉ **hút** vào kỳ (gán `ky_id`), xóa kỳ thì gỡ liên kết chứ không xóa số gốc.
 
 `src/data/thanh-pham.json` giờ chỉ là **seed** cho bảng `thanh_pham`, không còn là nguồn đọc trực tiếp.
 
@@ -54,8 +59,8 @@ Mọi màn đọc/ghi qua `src/lib/repo.ts` — **không** gọi localStorage tr
 🔒 Không ghi project ref / URL / key vào bất kỳ file nào trong repo — `.env.example` để trống, `.env` đã gitignore.
 
 ## Trạng thái
-- **Đã build**: nhập hàng (lọc ngày/khoảng ngày/xưởng/đại lý/loại), cân đối + in bảng, danh mục 5 tab, bộ giao diện cho người lớn tuổi + cài đặt hiển thị, tầng dữ liệu Supabase↔localStorage.
-- **Backlog**: điền anon key + chạy migration, siết RLS theo người dùng, nhập khẩu số liệu cũ lên máy chủ, định mức NL→TP, báo cáo tháng 6 khối, vòng lặp đông gửi↔xả đông, tồn cuối kỳ, test thực địa với 5 người dùng ≥45 tuổi.
+- **Đã build**: nhập hàng (chuyến thật · ngày giao/ngày ghi sổ + ghi bù · chốt ngày · phế liệu cân trong ngày · lọc ngày/khoảng ngày/xưởng/đại lý/loại/thiếu đơn giá), cân đối + in bảng (phế liệu hút từ sổ nhập), danh mục 5 tab, bộ giao diện cho người lớn tuổi + cài đặt hiển thị, tầng dữ liệu Supabase↔localStorage.
+- **Backlog**: chạy migration `0004`, siết RLS theo người dùng, nhập khẩu số liệu cũ lên máy chủ, định mức NL→TP, báo cáo tháng 6 khối, vòng lặp đông gửi↔xả đông, tồn cuối kỳ, test thực địa với 5 người dùng ≥45 tuổi.
 
 ## Chạy
 `npm run dev` (:5173) · `npm run build`

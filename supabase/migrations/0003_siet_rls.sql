@@ -24,7 +24,8 @@ declare t text;
 begin
   foreach t in array array[
     'dai_ly','loai_nguyen_lieu','thanh_pham','mat_hang','khach_hang',
-    'nhap_nguyen_lieu','ky_can_doi','nguyen_lieu_vao','phe_lieu','thanh_pham_ra'
+    'nhap_nguyen_lieu','chuyen_nhap','chot_ngay',
+    'ky_can_doi','nguyen_lieu_vao','phe_lieu','thanh_pham_ra'
   ] loop
     -- Bỏ policy mở của giai đoạn chưa đăng nhập
     execute format('drop policy if exists %I on public.%I', t || '_toan_quyen', t);

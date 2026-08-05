@@ -34,8 +34,8 @@ Phần lớn là **tổ trưởng / thủ kho 45–60 tuổi**, dùng **tablet �
 
 | Màn hình | File | Trạng thái |
 |---|---|---|
-| Nhập nguyên liệu hàng ngày | [`src/features/NhapNguyenLieu.tsx`](../src/features/NhapNguyenLieu.tsx) | 🟡 **một phần** — nhập theo chuyến (1 đại lý nhiều dòng loại hàng) + lọc ngày/khoảng/xưởng/đại lý/loại chạy được; **thiếu chốt ngày, không có chuyến thật (chuyen_id), chưa nhập phế liệu** — xem §5 + §7 |
-| Cân đối 5 ngày + xuất bảng in | [`CanDoi.tsx`](../src/features/CanDoi.tsx) · [`BangCanDoi.tsx`](../src/features/BangCanDoi.tsx) | ✅ gồm khối phế liệu (nội tạng/dạt), tính định mức + lãi/lỗ |
+| Nhập nguyên liệu hàng ngày | [`src/features/NhapNguyenLieu.tsx`](../src/features/NhapNguyenLieu.tsx) | ✅ **chuyến thật** (`chuyen_nhap`) · tách **ngày hàng về / ngày ghi sổ** + ghi bù có lý do · **chốt ngày** (khóa số liệu, mở lại có lý do) · **phế liệu cân trong ngày** · sổ nhóm theo chuyến · lọc ngày/khoảng/xưởng/đại lý/loại/thiếu đơn giá |
+| Cân đối 5 ngày + xuất bảng in | [`CanDoi.tsx`](../src/features/CanDoi.tsx) · [`BangCanDoi.tsx`](../src/features/BangCanDoi.tsx) | ✅ tính định mức + lãi/lỗ; khối phế liệu giờ **hút từ sổ nhập hàng** (không nhập tay hai nơi) |
 | Danh mục (5 tab) | [`DanhMuc.tsx`](../src/features/DanhMuc.tsx) | ✅ đại lý · loại NL · mặt hàng · khách hàng |
 | Thành phẩm (141 mã, chỉ đọc) | [`ThanhPham.tsx`](../src/features/ThanhPham.tsx) | ✅ seed từ danh mục kế toán TK 1551 |
 | Bộ giao diện người lớn tuổi + cài đặt hiển thị | `src/design-system/` | ✅ |
@@ -43,17 +43,17 @@ Phần lớn là **tổ trưởng / thủ kho 45–60 tuổi**, dùng **tablet �
 
 **Đường điều hướng** (`App.tsx`): 3 mục — Nhập hàng · Cân đối · Danh mục.
 
-> ⚠️ **Đính chính bản handoff trước:** màn Nhập hàng **chưa "xong"** (thiếu chốt ngày + chuyến thật); phế liệu **đã build** ở màn Cân đối chứ không phải backlog. Chi tiết §7.
+> ⚠️ **Việc phải làm ngay khi tiếp nhận:** chạy [`0004_chuyen_chot_ngay_phe_lieu.sql`](../supabase/migrations/0004_chuyen_chot_ngay_phe_lieu.sql) ở SQL Editor. Chưa chạy thì app báo *"Mất kết nối máy chủ — Could not find the 'chuyen_id' column"*: số liệu vẫn ghi xuống máy và nằm trong hàng chờ, đẩy lên ngay sau khi migration chạy xong, nhưng máy khác chưa thấy.
 
 ### Backlog (chưa làm — cần khảo sát thực địa tiếp)
-- Điền anon key + chạy migration lên Supabase (đang chạy localStorage).
+- **Chạy migration `0004`** (chuyến thật · chốt ngày · phế liệu tại màn nhập) — bắt buộc, xem cảnh báo trên.
 - Siết RLS theo người dùng (thêm đăng nhập trước).
 - Nhập khẩu số liệu cũ lên máy chủ (hiện phải sửa/lưu tay từng màn để đẩy).
 - **Định mức NL → TP** (tỷ lệ thu hồi) — mắt xích tính tồn cuối kỳ.
 - Báo cáo tháng 6 khối.
 - **Vòng lặp đông gửi ↔ xả đông + tồn cuối kỳ** (vấn đề cốt lõi §1 — CHƯA số hóa).
-- Phế liệu (nội tạng, dạt — bán giá riêng) đưa vào cân đối.
 - Test thực địa với 5 người dùng ≥45 tuổi.
+- Chốt ngày hiện chưa gắn người chốt (chưa có đăng nhập) — bổ sung khi làm phân quyền.
 
 ---
 
@@ -95,12 +95,13 @@ src/
 
 **Quy ước đặt tên DB: tiếng Việt KHÔNG DẤU, snake_case, không tiền tố** (`nhap_nguyen_lieu`, `so_luong_kg`). Cấm tên có dấu — Postgres bắt bọc nháy kép + dấu tiếng Việt có 2 dạng Unicode NFC/NFD trông giống hệt nhưng là 2 định danh khác nhau.
 
-**11 bảng:** `xi_nghiep` · `dai_ly` · `loai_nguyen_lieu` · `thanh_pham` (khóa chính = `ma`) · `mat_hang` · `khach_hang` · `nhap_nguyen_lieu` · `ky_can_doi` · `nguyen_lieu_vao` · `phe_lieu` · `thanh_pham_ra`.
+**13 bảng:** `xi_nghiep` · `dai_ly` · `loai_nguyen_lieu` · `thanh_pham` (khóa chính = `ma`) · `mat_hang` · `khach_hang` · `chuyen_nhap` · `nhap_nguyen_lieu` · `chot_ngay` · `ky_can_doi` · `nguyen_lieu_vao` · `phe_lieu` · `thanh_pham_ra`.
 
 **Migration** (`supabase/migrations/`):
 - `0001_baseafood_mes.sql` — tạo 11 bảng MES.
 - `0002_go_bo_sdfactory.sql` — gỡ 3 bảng cũ SDFactory (**PHÁ HỦY, chạy thủ công, không hoàn tác**; không chạy cũng không ảnh hưởng MES).
 - `0003_siet_rls.sql` — siết RLS về `authenticated` (chạy SAU khi có đăng nhập, nếu không app ngừng đọc/ghi).
+- `0004_chuyen_chot_ngay_phe_lieu.sql` — **chạy ngay**: thêm `chuyen_nhap` (chuyến thật, `ngay_giao` / `ngay_ghi_so` / `ly_do_ghi_bu`), `chot_ngay` (khóa số liệu ngày + xưởng), `nhap_nguyen_lieu.chuyen_id`; nới `phe_lieu` (`ky_id` cho phép rỗng, thêm `ngay` / `phan_xuong` / `nguon`). Chỉ thêm, không xóa — an toàn với số liệu đang có.
 
 **Hướng dẫn cutover chi tiết:** [`docs/supabase-setup.md`](supabase-setup.md).
 
@@ -112,21 +113,25 @@ src/
 
 ---
 
-## 5. Việc đang làm dở (uncommitted — chú ý khi tiếp nhận)
+## 5. Mô hình sổ nhập hàng (đọc kỹ trước khi sửa màn Nhập hàng)
 
-`git status` có 2 file sửa **chưa commit**:
+**Chuyến** = một đại lý giao một lượt (một xe), gồm nhiều dòng loại hàng.
+- Đại lý giao 3 mặt hàng ⇒ **1 chuyến + 3 dòng** `nhap_nguyen_lieu` mang cùng `chuyen_id` (đúng Q21, đúng sổ giấy đánh STT theo đại lý).
+- Một đại lý giao **2 lượt trong ngày ⇒ 2 chuyến** — đây là chỗ bản trước đếm sai vì gom ngầm theo (ngày + đại lý + xe).
+- Dòng **cũ chưa có `chuyen_id`** vẫn đọc được: màn hình gom ngầm chúng theo (ngày + xưởng + đại lý + xe) và gắn nhãn *"Dữ liệu cũ"*. Không cần chuyển đổi dữ liệu.
 
-| File | Nội dung sửa dở |
-|---|---|
-| `src/features/NhapNguyenLieu.tsx` | Refactor màn nhập sang mô hình **"chuyến"**: 1 đại lý đổ NHIỀU loại hàng trong 1 lượt giao (1 xe), mỗi loại một dòng, thêm loại nào **lưu luôn** loại đó. Khớp **Q21 đã chốt** (gộp lượt giao) + đúng sổ giấy "Báo cáo tổng hợp NL hàng ngày" (STT theo đại lý). +341 dòng. |
-| `CLAUDE.md` | sửa nhỏ 1 dòng. |
+**Hai ngày, đừng lẫn:**
 
-**Mô hình dữ liệu hiện tại của "chuyến" — đọc kỹ để không hiểu nhầm:**
-- Đại lý giao 3 mặt hàng ⇒ **3 dòng** `nhap_nguyen_lieu`, KHÔNG phải 3 phiếu riêng (đúng Q21). Ba dòng chung đầu chuyến (ngày · đại lý · tài xế · biển số).
-- ⚠️ Nhưng **không có thực thể "phiếu/chuyến" thật**: 3 dòng chỉ **gom ngầm** theo (ngày + đại lý + xe), KHÔNG có `chuyen_id` liên kết. Hệ quả: ContextBar đếm "Số chuyến" = số đại lý phân biệt ([NhapNguyenLieu.tsx:369](../src/features/NhapNguyenLieu.tsx#L369)) → **cùng 1 đại lý giao 2 chuyến trong ngày bị gộp thành 1**.
-- `DongNhapNL` ([types.ts](../src/types.ts)) chưa có `chuyenId`, chưa có trường trạng thái **chốt/khóa**.
+| Trường | Nghĩa | Dùng ở đâu |
+|---|---|---|
+| `ngay_giao` (app: `ngayGiao`, dòng hàng vẫn là cột `ngay`) | hàng thực về xưởng | **Mọi tổng hợp**: sổ ngày, kỳ cân đối, báo cáo tháng |
+| `ngay_ghi_so` | ngày ghi vào hệ thống | Nhãn "Ghi bù", giải trình vì sao tổng ngày đã gửi đi bị đổi |
 
-→ Người tiếp nhận **quyết định commit hay tiếp tục** phần refactor "chuyến" này. Ba điểm sổ nhập cần bổ sung (từ xác nhận đợt 2, **đã làm** trong bản refactor): thêm thành tiền = SL × đơn giá · tách cột tài xế/biển số khỏi ghi chú · thêm trường loài NL rõ ràng (không mặc định ngầm "bạch tuộc").
+Ghi sau ngày hàng về (hoặc ghi vào ngày đã chốt) ⇒ **bắt buộc `ly_do_ghi_bu`**. Đơn giá được để trống khi chưa có hóa đơn → nhãn *"Chưa có giá"* + bộ lọc riêng để đòi giá sau.
+
+**Chốt ngày** (`chot_ngay`, khóa theo ngày + phân xưởng): chốt xong khóa sửa/xóa/thêm chuyến thường và khóa luôn khối phế liệu của ngày đó. Còn hai đường: **ghi bù** (có lý do) hoặc **mở lại ngày** (có lý do, `da_chot = false` chứ không xóa bản ghi). `tong_kg_luc_chot` giữ số lúc chốt để chỉ ra chênh lệch nếu sau đó có ghi bù.
+
+**Phế liệu** (`phe_lieu`): cân **gộp cuối ngày** theo (ngày + phân xưởng) ở màn Nhập hàng, `nguon = "Nhập hàng"`, `ky_id` rỗng. Màn Cân đối **hút** vào kỳ (gán `ky_id`) — không nhập tay hai nơi. Gỡ khỏi kỳ hay xóa kỳ chỉ bỏ liên kết, số gốc vẫn nằm ở sổ nhập.
 
 ---
 
@@ -152,24 +157,23 @@ Từ **28 câu hỏi xác nhận** — xem đầy đủ [`docs/trien-khai/bang-c
 
 ---
 
-## 7. Việc cần làm tiếp — hướng đi cụ thể cho từng gap
+## 7. Việc cần làm tiếp
 
-Ba gap dưới đây là **ưu tiên làm tiếp ngay** trên màn Nhập hàng, đã thống nhất hướng đi (chưa code):
+### ✅ Đã xong 05/08 — ba gap của màn Nhập hàng
 
-### 7.1 · Chốt nhập hàng của 1 ngày (khóa số liệu) — CHƯA có
-- **Vì sao:** docs §2 điểm 4 (`ke-hoach-tuan-1`) yêu cầu *"tự cộng và **khóa kỳ** — thay việc cộng tay"*; tổng ngày (VD 31/7 = 9.210 kg) chốt xong mới chuyển sang biểu mẫu tháng. Hiện mọi dòng sửa/xóa bất kỳ lúc nào → không có mốc "số liệu ngày này đã đúng, khóa lại".
-- **Hướng đi:** thêm bản ghi **trạng thái chốt theo (ngày + phân xưởng)** — nút **"Chốt ngày"** ⇒ khóa toàn bộ chuyến của ngày đó (không cho sửa/xóa/thêm), hiển thị tổng ngày đã chốt, chừa nút **"Mở lại"** cho người có quyền. Đây là **điểm đau nhất** — nên làm trước.
+| # | Việc | Kết quả |
+|---|---|---|
+| 7.1 | **Chốt nhập hàng của 1 ngày** (yêu cầu *"tự cộng và khóa kỳ"*, `ke-hoach-tuan-1` §2 điểm 4) | Bảng `chot_ngay` theo (ngày + phân xưởng); nút **Chốt ngày** / **Mở lại ngày** (đều ghi lý do), khóa sửa–xóa–thêm; giữ tổng lúc chốt và cảnh báo lệch khi có ghi bù |
+| 7.2 | **Chuyến thật** | Bảng `chuyen_nhap` + `nhap_nguyen_lieu.chuyen_id`; "Số chuyến" đếm theo chuyến thật; sổ nhóm theo chuyến; dòng cũ gom ngầm, gắn nhãn "Dữ liệu cũ" |
+| 7.3 | **Phế liệu tại màn Nhập hàng** | Cân **gộp cuối ngày** theo (ngày + xưởng); Cân đối **hút** vào kỳ thay vì nhập lại; `giaTriPheLieu` giữ nguyên cách tính |
+| + | **Hàng về trước, ghi sổ sau** (chưa có hóa đơn) | Tách `ngay_giao` / `ngay_ghi_so`, ghi bù bắt buộc lý do, nhãn "Ghi bù" + "Chưa có giá", bộ lọc dòng thiếu đơn giá |
+| + | **Dọn giao diện ghi chuyến** | Hai bước (đầu chuyến → đổ hàng), đầu chuyến gập thành thanh tóm tắt, một nút chính trong thân, footer *Xong chuyến* / *Ghi chuyến khác*, ghi xong **tự kéo bộ lọc về chuyến vừa ghi**, sửa dòng chỉ còn loại/kg/giá |
 
-### 7.2 · Chuyến thật (`chuyen_id`) — hiện gom ngầm
-- **Vì sao:** 3 dòng cùng chuyến chỉ gom theo (ngày+đại lý+xe); 1 đại lý giao 2 lần/ngày bị đếm thành 1 chuyến (§5).
-- **Hướng đi:** thêm bảng `chuyen_nhap` (id · ngày · phân xưởng · đại lý · tài xế · biển số · ghi chú · trạng thái chốt) + cột `chuyen_id` trên `nhap_nguyen_lieu`. Mỗi lần "Ghi chuyến hàng" tạo 1 chuyến; các dòng loại hàng gắn `chuyen_id`. "Số chuyến" đếm theo chuyến thật. *(Trạng thái chốt ở §7.1 nên gắn vào chuyến hoặc vào ngày — chốt sớm 2 cái này cùng nhau.)*
+Migration kèm theo: `0004_chuyen_chot_ngay_phe_lieu.sql` (**phải chạy** — xem §2).
 
-### 7.3 · Nhập phế liệu (nội tạng / dạt) ngay tại màn Nhập hàng — QUYẾT ĐỊNH MỚI
-- **Hiện trạng:** phế liệu **đã build** nhưng ở màn **Cân đối** (`KhoiPheLieu`, [CanDoi.tsx:712](../src/features/CanDoi.tsx#L712), bảng `phe_lieu`) — theo docs cũ (*"phế liệu từ NL **ra** → đưa vào cân đối"*).
-- **Quyết định mới (chủ dự án chốt 05/08):** nghiệp vụ thực tế **cân nội tạng/dạt ngay lúc nhận hàng** → **thêm ô nhập phế liệu vào màn Nhập hàng**. Đây là **thay đổi lệch docs cũ** — khi làm phải:
-  1. Cập nhật docs nghiệp vụ (`bang-cau-hoi` đợt 2 + `plan-flow` §4) cho khớp.
-  2. Quyết chỗ lưu: dùng lại bảng `phe_lieu` (gắn theo chuyến/ngày nhập thay vì theo kỳ cân đối) hay bảng riêng — **tránh nhập 2 nơi cho cùng 1 số liệu** (nguyên tắc "một số liệu một nguồn chuẩn").
-  3. Cân đối vẫn phải đọc được phế liệu (đang tính `giaTriPheLieu` trong [canDoi.ts](../src/lib/canDoi.ts)) — đừng làm gãy phần này.
+### Còn lại trên màn Nhập hàng
+- Chưa gắn **người chốt / người ghi bù** (chưa có đăng nhập) — làm cùng phân quyền.
+- Chưa có màn **xem lại lịch sử chốt/mở lại** (số liệu đã lưu đủ: `chot_luc`, `tong_kg_luc_chot`, `ly_do_mo_lai`).
 
 ### Câu chốt còn treo với xí nghiệp (xem [`can-xac-nhan-dot-tiep.md`](trien-khai/can-xac-nhan-dot-tiep.md))
 - Q23: giải nghĩa mã NL viết tắt còn lại ("80j", "100 NL", "R2C") — hỏi thủ kho.
@@ -211,4 +215,4 @@ Cutover Supabase: `cp .env.example .env` → điền `VITE_SUPABASE_URL`, `VITE_
 
 ---
 
-**Tóm một câu:** master data + cân đối 5 ngày (kèm phế liệu) đã xong và chạy được (localStorage); màn Nhập hàng nhập được theo chuyến nhưng **còn thiếu chốt ngày + chuyến thật + nhập phế liệu tại chỗ (§7)**; phần khó nhất — **số hóa vòng lặp gối đầu để chốt tồn cuối kỳ đúng** — vẫn còn nguyên phía trước, chờ khảo sát thực địa tiếp và chốt 2 điểm treo ở §6.
+**Tóm một câu:** master data + cân đối 5 ngày + **sổ nhập hàng đã đủ nghiệp vụ** (chuyến thật · ghi bù chờ hóa đơn · chốt ngày · phế liệu cân trong ngày) — nhớ **chạy migration `0004`**; phần khó nhất — **số hóa vòng lặp gối đầu để chốt tồn cuối kỳ đúng** — vẫn còn nguyên phía trước, chờ khảo sát thực địa tiếp và chốt 2 điểm treo ở §6.

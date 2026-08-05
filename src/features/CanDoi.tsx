@@ -47,7 +47,7 @@ import {
   type LoiNhap,
 } from "@/design-system";
 import { num, viDate } from "@/lib/format";
-import { ChevronLeft, FileText, Pencil, Plus, Scale } from "lucide-react";
+import { ChevronLeft, FileText, Pencil, Plus, Scale, X } from "lucide-react";
 import BangCanDoi from "@/features/BangCanDoi";
 
 /** Chuỗi ngày để in trên bảng, sinh từ khoảng ngày đã chọn. */
@@ -128,7 +128,15 @@ export default function CanDoiScreen() {
     const truocTP = tatCaTP;
     persistKy(kyList.filter((x) => x.id !== k.id));
     ghiNL(tatCaNL.filter((r) => r.kyId !== k.id));
-    ghiPL(tatCaPL.filter((r) => r.kyId !== k.id));
+    /* Phế liệu cân ở màn Nhập hàng chỉ MƯỢN kỳ này — xóa kỳ thì gỡ liên kết,
+       tuyệt đối không xóa theo, vì bản gốc là số cân của sổ nhập hàng. */
+    ghiPL(
+      tatCaPL
+        .filter((r) => r.kyId !== k.id || r.nguon === "Nhập hàng")
+        .map((r) =>
+          r.kyId === k.id && r.nguon === "Nhập hàng" ? { ...r, kyId: "" } : r
+        )
+    );
     ghiTP(tatCaTP.filter((r) => r.kyId !== k.id));
     notify.daXoa(`Đã xóa kỳ "${k.loaiNL}" và toàn bộ dòng của kỳ`, () => {
       persistKy(truocKy);
@@ -373,6 +381,34 @@ function KyDetail({
   const persistPL = (n: DongPheLieu[]) => ghiPL(ghepLai(tatCaPL, n));
   const persistTP = (n: DongTP[]) => ghiTP(ghepLai(tatCaTP, n));
 
+  /* Phế liệu cân ở màn Nhập hàng, chưa gắn kỳ nào, rơi trong khoảng ngày của
+     kỳ này → gợi ý hút về. Kỳ chưa khai ngày thì gợi ý tất cả dòng chưa gắn. */
+  const pheLieuChoHut = useMemo(
+    () =>
+      tatCaPL.filter(
+        (r) =>
+          r.nguon === "Nhập hàng" &&
+          !r.kyId &&
+          (!ky.tuNgay ||
+            !ky.denNgay ||
+            !r.ngay ||
+            (r.ngay >= ky.tuNgay && r.ngay <= ky.denNgay))
+      ),
+    [tatCaPL, ky.tuNgay, ky.denNgay]
+  );
+
+  const ganPheLieuVaoKy = (ids: string[]) => {
+    const bo = new Set(ids);
+    ghiPL(tatCaPL.map((r) => (bo.has(r.id) ? { ...r, kyId: ky.id } : r)));
+    notify.daLuu(`Đã đưa ${ids.length} dòng phế liệu vào kỳ này`);
+  };
+
+  /** Gỡ khỏi kỳ, KHÔNG xóa — bản gốc vẫn nằm ở sổ nhập hàng. */
+  const boPheLieuKhoiKy = (id: string) => {
+    ghiPL(tatCaPL.map((r) => (r.id === id ? { ...r, kyId: "" } : r)));
+    notify.daXoa("Đã bỏ dòng phế liệu khỏi kỳ (số gốc vẫn ở sổ nhập hàng)");
+  };
+
   const kq = useMemo(
     () => tinhCanDoi(ky, nlVao, pheLieu, tp),
     [ky, nlVao, pheLieu, tp]
@@ -445,7 +481,14 @@ function KyDetail({
         }}
       />
 
-      <KhoiPheLieu rows={pheLieu} onChange={persistPL} kyId={ky.id} />
+      <KhoiPheLieu
+        rows={pheLieu}
+        onChange={persistPL}
+        kyId={ky.id}
+        choHut={pheLieuChoHut}
+        onGanVaoKy={ganPheLieuVaoKy}
+        onBoKhoiKy={boPheLieuKhoiKy}
+      />
 
       <KhoiTP
         rows={tp}
@@ -713,10 +756,17 @@ function KhoiPheLieu({
   rows,
   onChange,
   kyId,
+  choHut,
+  onGanVaoKy,
+  onBoKhoiKy,
 }: {
   rows: DongPheLieu[];
   onChange: (n: DongPheLieu[]) => void;
   kyId: string;
+  /** Phế liệu đã cân ở màn Nhập hàng, chưa gắn kỳ nào, hợp khoảng ngày của kỳ. */
+  choHut: DongPheLieu[];
+  onGanVaoKy: (ids: string[]) => void;
+  onBoKhoiKy: (id: string) => void;
 }) {
   const [dang, setDang] = useState<DongPheLieu | null>(null);
   const [laThem, setLaThem] = useState(false);
@@ -758,6 +808,14 @@ function KhoiPheLieu({
       so: true,
       render: (r) => num(r.soLuongKg * (r.donGiaBan ?? 0)),
     },
+    {
+      key: "nguon",
+      header: "Nguồn",
+      render: (r) =>
+        r.nguon === "Nhập hàng"
+          ? `Sổ nhập ${r.ngay ? viDate(r.ngay) : ""}`.trim()
+          : "Nhập tại kỳ",
+    },
   ];
 
   return (
@@ -765,9 +823,20 @@ function KhoiPheLieu({
       soThuTu="2"
       tieuDe="Phế liệu (bán giá riêng)"
       tenDong="dòng phế liệu"
-      trong={rows.length === 0}
+      /* Còn dòng chờ hút thì KHÔNG coi là khối rỗng — nếu không, lời mời "đưa
+         phế liệu từ sổ nhập vào kỳ" bị ẩn đúng lúc cần nó nhất. */
+      trong={rows.length === 0 && choHut.length === 0}
       onThem={() => {
-        setDang({ id: uid(), kyId, loai: "", soLuongKg: 0, donGiaBan: null });
+        setDang({
+          id: uid(),
+          kyId,
+          loai: "",
+          soLuongKg: 0,
+          donGiaBan: null,
+          ngay: "",
+          phanXuong: "",
+          nguon: "Cân đối",
+        });
         setLaThem(true);
         setLoi([]);
       }}
@@ -815,25 +884,89 @@ function KhoiPheLieu({
         </HopThoaiDong>
       }
     >
+      {/* Phế liệu đã cân ở màn Nhập hàng — HÚT về kỳ, không nhập lại lần hai */}
+      {choHut.length > 0 && (
+        <div className="space-y-4 rounded-xl border-2 border-primary/40 bg-accent/40 p-4">
+          <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
+            <div>
+              <p className="text-base font-semibold text-foreground">
+                Có {choHut.length} dòng phế liệu đã cân ở sổ nhập hàng, chưa vào
+                kỳ nào
+              </p>
+              <p className="text-base text-muted-foreground">
+                Tổng{" "}
+                <span className="tnum">
+                  {num(choHut.reduce((s, r) => s + (r.soLuongKg || 0), 0))} kg
+                </span>{" "}
+                — đưa vào kỳ này thay vì nhập tay lại.
+              </p>
+            </div>
+            <Button
+              size="lg"
+              onClick={() => onGanVaoKy(choHut.map((r) => r.id))}
+            >
+              <Plus />
+              Đưa cả {choHut.length} dòng vào kỳ
+            </Button>
+          </div>
+          <ul className="divide-y divide-border">
+            {choHut.map((r) => (
+              <li
+                key={r.id}
+                className="flex flex-wrap items-center justify-between gap-3 py-2"
+              >
+                <span className="text-base">
+                  {r.ngay ? `${viDate(r.ngay)} · ` : ""}
+                  {r.phanXuong ? `xưởng ${r.phanXuong} · ` : ""}
+                  {r.loai} —{" "}
+                  <span className="tnum font-semibold">{num(r.soLuongKg)}</span>{" "}
+                  kg
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onGanVaoKy([r.id])}
+                >
+                  <Plus />
+                  Đưa vào kỳ
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       <RecordTable
         columns={cols}
         rows={rows}
         getKey={(r) => r.id}
-        actions={(r) => (
-          <DongThaoTac
-            onSua={() => {
-              setDang({ ...r });
-              setLaThem(false);
-              setLoi([]);
-            }}
-            moTaBanGhi={`${r.loai} — ${num(r.soLuongKg)} kg`}
-            onXoa={() => {
-              const truoc = rows;
-              onChange(rows.filter((x) => x.id !== r.id));
-              notify.daXoa(`Đã xóa "${r.loai}"`, () => onChange(truoc));
-            }}
-          />
-        )}
+        actions={(r) =>
+          r.nguon === "Nhập hàng" ? (
+            /* Số này thuộc sổ nhập hàng — chỉ gỡ khỏi kỳ, KHÔNG xóa bản gốc. */
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onBoKhoiKy(r.id)}
+            >
+              <X />
+              Bỏ khỏi kỳ
+            </Button>
+          ) : (
+            <DongThaoTac
+              onSua={() => {
+                setDang({ ...r });
+                setLaThem(false);
+                setLoi([]);
+              }}
+              moTaBanGhi={`${r.loai} — ${num(r.soLuongKg)} kg`}
+              onXoa={() => {
+                const truoc = rows;
+                onChange(rows.filter((x) => x.id !== r.id));
+                notify.daXoa(`Đã xóa "${r.loai}"`, () => onChange(truoc));
+              }}
+            />
+          )
+        }
       />
     </KhoiKhung>
   );

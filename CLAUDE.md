@@ -5,7 +5,7 @@ Hệ thống MES cho Xí nghiệp Baseafood BSF1 (Bà Rịa). **Repo mới, đ�
 ## Trọng tâm nghiệp vụ
 Quản lý **nguyên liệu trong sản xuất** theo vòng lặp gối đầu (mua → sơ chế → cấp đông → tồn dự trữ → xả đông tái dùng kỳ sau), kéo theo tồn kho. Đau nhất: tồn nguyên liệu cuối kỳ sai do ghi chép tay → kế toán chốt số sai. Ba phân xưởng: Đông, Cá, Khô.
 
-Nguồn phân tích: kế hoạch Tuần 1 + 2 record + 3 file Excel thật (danh mục 141 TP, báo cáo NL-BTP tháng, sổ nhập NL hàng ngày). Tài liệu ở repo SDFactory `docs/trien-khai/ke-hoach-tuan-1-thu-thap-du-lieu.md`.
+Nguồn phân tích: kế hoạch Tuần 1 + 2 record + 3 file Excel thật (danh mục 141 TP, báo cáo NL-BTP tháng, sổ nhập NL hàng ngày). **Tài liệu nghiệp vụ + flow ở `docs/trien-khai/`** (đọc [docs/trien-khai/README.md](docs/trien-khai/README.md) trước — kế hoạch tuần 1, bảng câu hỏi đã xác nhận, thiết kế flow cân đối 5 ngày).
 
 ## Người dùng
 Phần lớn là tổ trưởng/thủ kho **45–60 tuổi**, dùng tablet ở xưởng lạnh, tay ướt, đeo kính lão. Giao diện tối ưu cho nhóm này — xem `src/design-system/README.md` (luật bắt buộc, bảng chọn component, checklist bàn giao).

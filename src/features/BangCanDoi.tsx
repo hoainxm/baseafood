@@ -63,7 +63,7 @@ export default function BangCanDoi({
                 <Th right>SL (kg)</Th>
                 <Th right>Đơn giá</Th>
                 <Th right>Thành tiền</Th>
-                <Th right>Tỷ lệ</Th>
+                <Th right>Tỉ lệ</Th>
               </Tr>
             </thead>
             <tbody>
@@ -174,7 +174,7 @@ export default function BangCanDoi({
             <KV k="Tổng thành phẩm" v={`${num(kq.tongTP)} kg`} />
             <KV k="Tỉ giá (VND/USD)" v={num(ky.tiGia)} />
             <KV k="Định mức chế biến" v={num(kq.dinhMuc)} strong />
-            <KV k="Chi phí CB / kg TP" v={num(ky.chiPhiCB)} />
+            <KV k="Chi phí chế biến / kg TP" v={num(ky.chiPhiCB)} />
             <KV k="Tỉ lệ thu hồi / tổng nhận" v={kq.tyLeThuHoi == null ? "—" : num(kq.tyLeThuHoi)} />
             <KV k="Giá trị nguyên liệu" v={num(kq.giaTriNL)} />
             <KV k="Giá thành" v={num(kq.giaThanh)} />

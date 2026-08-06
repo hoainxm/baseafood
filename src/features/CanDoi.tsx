@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import type {
   KyCanDoi,
+  DongBan,
   DongNLVao,
   DongPheLieu,
   DongTP,
@@ -9,16 +10,19 @@ import type {
   KhachHang,
   NhomNL,
   Kenh,
+  PhieuBan,
 } from "@/types";
 import { NHOM_NL, KENH } from "@/types";
 import { uid } from "@/lib/db";
 import {
+  useBanHang,
   useKhachHang,
   useKyCanDoi,
   useLoaiNL,
   useMatHang,
   useNLVao,
   usePheLieu,
+  usePhieuBan,
   useTPRa,
 } from "@/lib/danhMuc";
 import { tinhCanDoi } from "@/lib/canDoi";
@@ -373,6 +377,36 @@ function KyDetail({
   const [loaiNLDanhMuc, setLoaiNLDanhMuc] = useLoaiNL();
   const [showBang, setShowBang] = useState(false);
 
+  /* Sổ bán — hút dòng bán trong khoảng ngày của kỳ vào khối thành phẩm ra,
+     giống hút phế liệu: một số liệu, một nguồn chuẩn (sổ bán). */
+  const [tatCaBan] = useBanHang();
+  const [dsPhieu] = usePhieuBan();
+  const phieuTheoId = useMemo(
+    () => new Map(dsPhieu.map((p) => [p.id, p])),
+    [dsPhieu]
+  );
+  /** Dòng bán đã hút vào bất kỳ kỳ nào — không gợi ý lại (chống hút trùng). */
+  const banDaHut = useMemo(
+    () => new Set(tatCaTP.map((t) => t.banHangId).filter(Boolean)),
+    [tatCaTP]
+  );
+  const banChoHut = useMemo(
+    () =>
+      tatCaBan
+        .filter((b) => {
+          const p = phieuTheoId.get(b.phieuId);
+          if (!p) return false;
+          if (banDaHut.has(b.id)) return false;
+          return (
+            !ky.tuNgay ||
+            !ky.denNgay ||
+            (p.ngayGiao >= ky.tuNgay && p.ngayGiao <= ky.denNgay)
+          );
+        })
+        .map((b) => ({ ban: b, phieu: phieuTheoId.get(b.phieuId)! })),
+    [tatCaBan, phieuTheoId, banDaHut, ky.tuNgay, ky.denNgay]
+  );
+
   const ghepLai = <T extends { kyId: string }>(tatCa: T[], kyRows: T[]) => [
     ...tatCa.filter((r) => r.kyId !== ky.id),
     ...kyRows,
@@ -380,6 +414,24 @@ function KyDetail({
   const persistNL = (n: DongNLVao[]) => ghiNL(ghepLai(tatCaNL, n));
   const persistPL = (n: DongPheLieu[]) => ghiPL(ghepLai(tatCaPL, n));
   const persistTP = (n: DongTP[]) => ghiTP(ghepLai(tatCaTP, n));
+
+  /** Hút dòng bán trong khoảng ngày của kỳ → tạo dòng thành phẩm ra (bản sao,
+      gắn banHangId để chống hút trùng). Bỏ khỏi kỳ = xóa bản sao, số gốc ở sổ bán. */
+  const hutBanVaoKy = (items: { ban: DongBan; phieu: PhieuBan }[]) => {
+    const them: DongTP[] = items.map(({ ban, phieu }) => ({
+      id: uid(),
+      kyId: ky.id,
+      matHangId: ban.matHangId,
+      khachId: phieu.khachId,
+      kenh: phieu.kenh,
+      luongKg: ban.luongKg,
+      donGia: ban.donGia,
+      quyCach: ban.quyCach,
+      banHangId: ban.id,
+    }));
+    persistTP([...tp, ...them]);
+    notify.daLuu(`Đã hút ${them.length} dòng bán vào kỳ này`);
+  };
 
   /* Phế liệu cân ở màn Nhập hàng, chưa gắn kỳ nào, rơi trong khoảng ngày của
      kỳ này → gợi ý hút về. Kỳ chưa khai ngày thì gợi ý tất cả dòng chưa gắn. */
@@ -496,6 +548,8 @@ function KyDetail({
         kyId={ky.id}
         matHang={matHang}
         khach={khach}
+        choHutBan={banChoHut}
+        onHutBan={hutBanVaoKy}
         onThemMatHang={(ten) => {
           const m: MatHang = { id: uid(), ma: "", ten, maTP: "" };
           setMatHang([...matHang, m]);
@@ -980,6 +1034,8 @@ function KhoiTP({
   kyId,
   matHang,
   khach,
+  choHutBan,
+  onHutBan,
   onThemMatHang,
   onThemKhach,
   tenMatHang,
@@ -990,6 +1046,9 @@ function KhoiTP({
   kyId: string;
   matHang: MatHang[];
   khach: KhachHang[];
+  /** Dòng bán ở sổ bán, hợp khoảng ngày của kỳ, chưa hút vào kỳ nào. */
+  choHutBan: { ban: DongBan; phieu: PhieuBan }[];
+  onHutBan: (items: { ban: DongBan; phieu: PhieuBan }[]) => void;
   onThemMatHang: (ten: string) => string;
   onThemKhach: (ten: string) => string;
   tenMatHang: (id: string) => string;
@@ -1020,7 +1079,22 @@ function KhoiTP({
       key: "mh",
       header: "Mặt hàng",
       chinh: true,
-      render: (r) => tenMatHang(r.matHangId),
+      render: (r) => (
+        <span className="flex flex-wrap items-center gap-2">
+          {tenMatHang(r.matHangId)}
+          {r.banHangId && (
+            <Badge variant="outline" className="shrink-0">
+              Từ sổ bán
+            </Badge>
+          )}
+        </span>
+      ),
+    },
+    {
+      key: "qc",
+      header: "Quy cách",
+      render: (r) =>
+        r.quyCach || <span className="text-muted-foreground">—</span>,
     },
     { key: "kh", header: "Khách", render: (r) => tenKhach(r.khachId) },
     {
@@ -1047,12 +1121,16 @@ function KhoiTP({
 
   const tong = rows.reduce((s, r) => s + r.luongKg, 0);
 
+  const tongHut = choHutBan.reduce((s, x) => s + (x.ban.luongKg || 0), 0);
+
   return (
     <KhoiKhung
       soThuTu="3"
       tieuDe="Thành phẩm ra"
       tenDong="dòng thành phẩm"
-      trong={rows.length === 0}
+      /* Còn dòng bán chờ hút thì KHÔNG coi là khối rỗng — nếu không, lời mời
+         "hút bán vào kỳ" bị ẩn đúng lúc cần nó nhất. */
+      trong={rows.length === 0 && choHutBan.length === 0}
       onThem={() => {
         setDang({
           id: uid(),
@@ -1135,25 +1213,90 @@ function KhoiTP({
         </HopThoaiDong>
       }
     >
+      {/* Dòng bán ở sổ bán, hợp khoảng ngày của kỳ — HÚT về kỳ, không nhập lại */}
+      {choHutBan.length > 0 && (
+        <div className="space-y-4 rounded-xl border-2 border-primary/40 bg-accent/40 p-4">
+          <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
+            <div>
+              <p className="text-base font-semibold text-foreground">
+                Có {choHutBan.length} dòng bán trong khoảng ngày của kỳ, chưa
+                vào kỳ nào
+              </p>
+              <p className="text-base text-muted-foreground">
+                Tổng <span className="tnum">{num(tongHut)} kg</span> — hút vào kỳ
+                này thay vì nhập tay lại.
+              </p>
+            </div>
+            <Button size="lg" onClick={() => onHutBan(choHutBan)}>
+              <Plus />
+              Hút cả {choHutBan.length} dòng vào kỳ
+            </Button>
+          </div>
+          <ul className="divide-y divide-border">
+            {choHutBan.map(({ ban, phieu }) => (
+              <li
+                key={ban.id}
+                className="flex flex-wrap items-center justify-between gap-3 py-2"
+              >
+                <span className="text-base">
+                  {viDate(phieu.ngayGiao)} · {phieu.kenh} ·{" "}
+                  {tenMatHang(ban.matHangId)}
+                  {ban.quyCach ? ` (${ban.quyCach})` : ""} —{" "}
+                  <span className="tnum font-semibold">{num(ban.luongKg)}</span>{" "}
+                  kg
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onHutBan([{ ban, phieu }])}
+                >
+                  <Plus />
+                  Hút vào kỳ
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       <RecordTable
         columns={cols}
         rows={rows}
         getKey={(r) => r.id}
-        actions={(r) => (
-          <DongThaoTac
-            onSua={() => {
-              setDang({ ...r });
-              setLaThem(false);
-              setLoi([]);
-            }}
-            moTaBanGhi={`${tenMatHang(r.matHangId)} — ${num(r.luongKg)} kg`}
-            onXoa={() => {
-              const truoc = rows;
-              onChange(rows.filter((x) => x.id !== r.id));
-              notify.daXoa("Đã xóa dòng thành phẩm", () => onChange(truoc));
-            }}
-          />
-        )}
+        actions={(r) =>
+          r.banHangId ? (
+            /* Dòng hút từ sổ bán — bỏ khỏi kỳ là XÓA bản sao; số gốc ở sổ bán. */
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                const truoc = rows;
+                onChange(rows.filter((x) => x.id !== r.id));
+                notify.daXoa(
+                  "Đã bỏ dòng bán khỏi kỳ (số gốc vẫn ở sổ bán)",
+                  () => onChange(truoc)
+                );
+              }}
+            >
+              <X />
+              Bỏ khỏi kỳ
+            </Button>
+          ) : (
+            <DongThaoTac
+              onSua={() => {
+                setDang({ ...r });
+                setLaThem(false);
+                setLoi([]);
+              }}
+              moTaBanGhi={`${tenMatHang(r.matHangId)} — ${num(r.luongKg)} kg`}
+              onXoa={() => {
+                const truoc = rows;
+                onChange(rows.filter((x) => x.id !== r.id));
+                notify.daXoa("Đã xóa dòng thành phẩm", () => onChange(truoc));
+              }}
+            />
+          )
+        }
       />
       <TongKet muc={[{ nhan: "Tổng thành phẩm", giaTri: `${num(tong)} kg` }]} />
     </KhoiKhung>

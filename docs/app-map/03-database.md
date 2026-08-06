@@ -5,7 +5,7 @@ ttl_days: 90
 
 # Cơ sở dữ liệu & migration
 
-Postgres qua Supabase. **13 bảng**, không có view, không có RPC, không có edge function, không có cron.
+Postgres qua Supabase. **15 bảng**, không có view, không có RPC, không có edge function, không có cron.
 Automation duy nhất: trigger `cap_nhat_thoi_diem_sua()` gắn cho mọi bảng nghiệp vụ để tự set `updated_at` — app không tự ghi cột này.
 
 ## Quy ước đặt tên — không thương lượng
@@ -18,7 +18,7 @@ Automation duy nhất: trigger `cap_nhat_thoi_diem_sua()` gắn cho mọi bảng
 
 App dùng camelCase, DB dùng snake_case — cầu nối là `AnhXaBang.toRow/fromRow` trong `src/lib/repo.ts`. Thêm cột ⇒ phải sửa **cả hai chiều**, xem [04-tang-du-lieu.md](04-tang-du-lieu.md).
 
-## 13 bảng
+## 15 bảng
 
 | Nhóm | Bảng | Khóa chính | Ghi chú |
 |---|---|---|---|
@@ -26,7 +26,10 @@ App dùng camelCase, DB dùng snake_case — cầu nối là `AnhXaBang.toRow/fr
 | Danh mục | `dai_ly` · `loai_nguyen_lieu` · `mat_hang` · `khach_hang` | `id` text | id sinh ở client |
 | Danh mục | `thanh_pham` | **`ma`** | 141 mã kế toán TK 1551 — khóa chính là MÃ, không phải id |
 | Nhập hàng | `chuyen_nhap` · `nhap_nguyen_lieu` · `chot_ngay` | `id` text | xem [30-nhap-hang.md](30-nhap-hang.md) |
+| Bán hàng | `phieu_ban` · `ban_hang` | `id` text | phiếu bán TP ngày; xem [33-ban-hang.md](33-ban-hang.md) |
 | Cân đối | `ky_can_doi` · `nguyen_lieu_vao` · `phe_lieu` · `thanh_pham_ra` | `id` text | xem [31-can-doi-ky.md](31-can-doi-ky.md) |
+
+`thanh_pham_ra` có thêm `quy_cach` + `ban_hang_id` (từ `0005`) để nhận dòng hút từ sổ bán, chống hút trùng.
 
 **Bất biến dữ liệu:**
 
@@ -44,6 +47,7 @@ App dùng camelCase, DB dùng snake_case — cầu nối là `AnhXaBang.toRow/fr
 | `0002_go_bo_sdfactory.sql` | 🔴 | **PHÁ HỦY** — gỡ 3 bảng cũ của SDFactory. Chạy thủ công, không hoàn tác. Không chạy cũng không ảnh hưởng MES. |
 | `0003_siet_rls.sql` | 🔴 | Siết RLS về `authenticated`. Chạy **SAU** khi app có đăng nhập, nếu không app ngừng đọc/ghi ngay. Xem [05-bao-mat-phan-quyen.md](05-bao-mat-phan-quyen.md). |
 | `0004_chuyen_chot_ngay_phe_lieu.sql` | 🟡 | Thêm `chuyen_nhap`, `chot_ngay`, `nhap_nguyen_lieu.chuyen_id`; nới `phe_lieu`. Chỉ thêm, an toàn với dữ liệu đang có. **Chạy ngay** — xem cảnh báo dưới. |
+| `0005_ban_thanh_pham.sql` | 🟡 | Thêm `phieu_ban`, `ban_hang`; nới `thanh_pham_ra` (`quy_cach`, `ban_hang_id`). Chỉ thêm, không phụ thuộc 0004. **Chưa chạy** ⇒ ghi bán nằm trong hàng chờ, tự lên khi migration chạy. |
 
 ⚠️ **`0004` chưa chạy** ⇒ app báo *"Mất kết nối máy chủ — Could not find the 'chuyen_id' column"*. Số liệu vẫn ghi xuống máy và nằm trong hàng chờ, tự đẩy lên sau khi migration chạy — nhưng máy khác chưa thấy.
 

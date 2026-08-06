@@ -1,13 +1,14 @@
 import { useState } from "react";
 import NhapNguyenLieuScreen from "@/features/NhapNguyenLieu";
+import BanHangScreen from "@/features/BanHang";
 import CanDoiScreen from "@/features/CanDoi";
 import DanhMucScreen from "@/features/DanhMuc";
 import KitPage from "@/design-system/kit/KitPage";
 import { CoChuNhanh, Logo, Toaster, TrangThaiDuLieu } from "@/design-system";
 import { cn } from "@/lib/utils";
-import { Truck, Scale, Library, Palette } from "lucide-react";
+import { Truck, ShoppingCart, Scale, Library, Palette } from "lucide-react";
 
-type Screen = "nhap-hang" | "can-doi" | "danh-muc" | "kit";
+type Screen = "nhap-hang" | "ban-hang" | "can-doi" | "danh-muc" | "kit";
 
 /**
  * Điều hướng: 3 việc, mỗi việc một động từ, mỗi việc một icon riêng.
@@ -25,6 +26,12 @@ const NAV: {
     label: "Nhập hàng",
     moTa: "Ghi chuyến nguyên liệu về xưởng",
     icon: Truck,
+  },
+  {
+    id: "ban-hang",
+    label: "Bán hàng",
+    moTa: "Ghi phiếu bán thành phẩm hằng ngày",
+    icon: ShoppingCart,
   },
   {
     id: "can-doi",
@@ -135,6 +142,7 @@ export default function App() {
         <main className="w-full flex-1 p-5 pb-28 sm:p-8 md:pb-8">
           <div className="mx-auto w-full max-w-(--app-content-width)">
             {screen === "nhap-hang" && <NhapNguyenLieuScreen />}
+            {screen === "ban-hang" && <BanHangScreen />}
             {screen === "can-doi" && <CanDoiScreen />}
             {screen === "danh-muc" && <DanhMucScreen />}
             {screen === "kit" && <KitPage />}
@@ -143,7 +151,7 @@ export default function App() {
       </div>
 
       {/* Tab dưới cho điện thoại — cao 64px, icon + chữ, ngón cái với tới */}
-      <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-3 border-t-2 border-border bg-card md:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 border-t-2 border-border bg-card md:hidden">
         {NAV.map((n) => {
           const Icon = n.icon;
           const active = screen === n.id;

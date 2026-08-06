@@ -6,6 +6,7 @@ import type {
   ChotNgay,
   ChuyenNhap,
   DaiLy,
+  DongBan,
   DongNLVao,
   DongNhapNL,
   DongPheLieu,
@@ -19,6 +20,7 @@ import type {
   NguonPheLieu,
   NhomNL,
   PhanXuong,
+  PhieuBan,
   ThanhPham,
 } from "@/types";
 
@@ -333,6 +335,8 @@ export const BANG_TP_RA: AnhXaBang<DongTP> = {
     kenh: x.kenh,
     luong_kg: x.luongKg,
     don_gia: x.donGia,
+    quy_cach: x.quyCach ?? "",
+    ban_hang_id: x.banHangId ?? "",
   }),
   fromRow: (r) => ({
     id: s(r.id),
@@ -342,6 +346,68 @@ export const BANG_TP_RA: AnhXaBang<DongTP> = {
     kenh: s(r.kenh) as Kenh,
     luongKg: Number(r.luong_kg ?? 0),
     donGia: n(r.don_gia),
+    quyCach: s(r.quy_cach),
+    banHangId: s(r.ban_hang_id),
+  }),
+  // Dòng ghi trước 0005 không có quy cách / nguồn bán → coi là dòng nhập tay.
+  vaDongCu: (x) => ({
+    ...x,
+    quyCach: x.quyCach ?? "",
+    banHangId: x.banHangId ?? "",
+  }),
+};
+
+/** Phiếu bán — một khách, một lượt, nhiều dòng mặt hàng. */
+export const BANG_PHIEU_BAN: AnhXaBang<PhieuBan> = {
+  table: "phieu_ban",
+  localKey: "bsf.phieu-ban.v1",
+  layKhoa: theoId,
+  toRow: (x) => ({
+    id: x.id,
+    ngay_giao: x.ngayGiao,
+    ngay_ghi_so: x.ngayGhiSo,
+    ly_do_ghi_bu: x.lyDoGhiBu,
+    phan_xuong: x.phanXuong,
+    khach_hang_id: x.khachId,
+    kenh: x.kenh,
+    ghi_chu: x.ghiChu,
+  }),
+  fromRow: (r) => ({
+    id: s(r.id),
+    ngayGiao: s(r.ngay_giao).slice(0, 10),
+    ngayGhiSo: s(r.ngay_ghi_so).slice(0, 10),
+    lyDoGhiBu: s(r.ly_do_ghi_bu),
+    phanXuong: s(r.phan_xuong) as PhanXuong,
+    khachId: s(r.khach_hang_id),
+    kenh: s(r.kenh) as Kenh,
+    ghiChu: s(r.ghi_chu),
+  }),
+};
+
+/** Dòng bán trong phiếu. */
+export const BANG_BAN_HANG: AnhXaBang<DongBan> = {
+  table: "ban_hang",
+  localKey: "bsf.ban-hang.v1",
+  layKhoa: theoId,
+  toRow: (x) => ({
+    id: x.id,
+    phieu_id: x.phieuId,
+    ngay: x.ngay || null,
+    mat_hang_id: x.matHangId,
+    quy_cach: x.quyCach,
+    luong_kg: x.luongKg,
+    don_gia: x.donGia,
+    kho_nguon: x.khoNguon,
+  }),
+  fromRow: (r) => ({
+    id: s(r.id),
+    phieuId: s(r.phieu_id),
+    ngay: s(r.ngay).slice(0, 10),
+    matHangId: s(r.mat_hang_id),
+    quyCach: s(r.quy_cach),
+    luongKg: Number(r.luong_kg ?? 0),
+    donGia: n(r.don_gia),
+    khoNguon: s(r.kho_nguon),
   }),
 };
 

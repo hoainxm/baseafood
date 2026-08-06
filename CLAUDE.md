@@ -24,14 +24,14 @@ npm run lint     # oxlint
 
 ```
 src/
-├── App.tsx · main.tsx        điều hướng 3 màn (KHÔNG router, state trong App)
+├── App.tsx · main.tsx        điều hướng 4 màn (KHÔNG router, state trong App)
 ├── types.ts                  kiểu + BẤT BIẾN nghiệp vụ (laGhiBu, thanhTien)
 ├── data/thanh-pham.json      141 mã TK 1551 — chỉ là SEED
 ├── lib/                      repo · danhMuc · db · supabase · ketNoi · canDoi · format · store · utils
 ├── components/ui/            primitive shadcn — ĐÃ đè size cho người lớn tuổi
 ├── design-system/            tokens.css · patterns/ · kit/ · index.ts (cửa import duy nhất)
-└── features/                 NhapNguyenLieu · CanDoi + BangCanDoi · DanhMuc (5 tab) · ThanhPham (chỉ đọc)
-supabase/migrations/          0001 … 0004
+└── features/                 NhapNguyenLieu · BanHang · CanDoi + BangCanDoi · DanhMuc (5 tab) · ThanhPham (chỉ đọc)
+supabase/migrations/          0001 … 0005
 docs/app-map/                 bản đồ ngữ cảnh cho agent
 docs/trien-khai/              nghiệp vụ gốc (phân tích, 28 câu hỏi đã chốt, thiết kế flow)
 ```
@@ -80,6 +80,7 @@ Chưa rõ tier ⇒ coi là 🔴. Dữ liệu ở đây là **sổ sách thật c
 | Đụng vào | Update doc |
 |---|---|
 | `features/NhapNguyenLieu.tsx`, quy tắc chuyến / chốt ngày | [`30-nhap-hang.md`](docs/app-map/30-nhap-hang.md) |
+| `features/BanHang.tsx`, phiếu bán / quy cách / hút bán | [`33-ban-hang.md`](docs/app-map/33-ban-hang.md) |
 | `features/CanDoi.tsx`, `BangCanDoi.tsx`, `lib/canDoi.ts` | [`31-can-doi-ky.md`](docs/app-map/31-can-doi-ky.md) |
 | `features/DanhMuc.tsx`, `ThanhPham.tsx`, `data/thanh-pham.json` | [`32-danh-muc.md`](docs/app-map/32-danh-muc.md) |
 | `supabase/migrations/**` | [`03-database.md`](docs/app-map/03-database.md) (+ [`04`](docs/app-map/04-tang-du-lieu.md) nếu đổi ánh xạ) |
@@ -121,6 +122,7 @@ Index đầy đủ + bảng định tuyến theo task: [`docs/app-map/README.md`
 | [`04-tang-du-lieu`](docs/app-map/04-tang-du-lieu.md) | đọc/ghi dữ liệu, "số liệu biến mất / không lên máy chủ" |
 | [`05-bao-mat-phan-quyen`](docs/app-map/05-bao-mat-phan-quyen.md) | 🔴 auth, RLS, key, mở app ra ngoài mạng nội bộ |
 | [`30-nhap-hang`](docs/app-map/30-nhap-hang.md) | chuyến, ngày giao / ngày ghi sổ, ghi bù, chốt ngày, phế liệu ngày |
+| [`33-ban-hang`](docs/app-map/33-ban-hang.md) | phiếu bán, dòng bán, quy cách, ghi bù, hút bán vào cân đối |
 | [`31-can-doi-ky`](docs/app-map/31-can-doi-ky.md) | kỳ, 3 khối, công thức, bảng in A4 |
 | [`32-danh-muc`](docs/app-map/32-danh-muc.md) | danh mục, 141 mã thành phẩm |
 
@@ -128,6 +130,6 @@ Ngoài app-map: [`src/design-system/README.md`](src/design-system/README.md) (UI
 
 ## Trạng thái
 
-**Đã build:** nhập hàng (chuyến thật · ngày giao/ngày ghi sổ + ghi bù · chốt ngày · phế liệu cân trong ngày · bộ lọc), cân đối + in bảng, danh mục 5 tab, bộ giao diện người lớn tuổi + cài đặt hiển thị, tầng dữ liệu Supabase↔localStorage.
+**Đã build:** nhập hàng (chuyến thật · ngày giao/ngày ghi sổ + ghi bù · chốt ngày · phế liệu cân trong ngày · bộ lọc), **bán thành phẩm ngày (phiếu bán · quy cách · 2 ngày + ghi bù · kênh XK/NĐ · hút vào cân đối)**, cân đối + in bảng, danh mục 5 tab, bộ giao diện người lớn tuổi + cài đặt hiển thị, tầng dữ liệu Supabase↔localStorage.
 
-**Backlog:** ⚠️ chạy migration `0004`; siết RLS theo người dùng; nhập khẩu số liệu cũ lên máy chủ; định mức NL→TP; báo cáo tháng 6 khối; **vòng lặp đông gửi ↔ xả đông + tồn cuối kỳ** (vấn đề cốt lõi, chưa số hóa); test thực địa với 5 người dùng ≥45 tuổi.
+**Backlog:** ⚠️ chạy migration `0004` + `0005`; **chốt ngày bán + phiếu bán in A4** (bán v1 chưa có); siết RLS theo người dùng; nhập khẩu số liệu cũ lên máy chủ; định mức NL→TP; báo cáo tháng 6 khối; **vòng lặp đông gửi ↔ xả đông + tồn cuối kỳ** (vấn đề cốt lõi, chưa số hóa — cột `ban_hang.kho_nguon` để dành seam); test thực địa với 5 người dùng ≥45 tuổi.

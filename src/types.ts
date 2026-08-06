@@ -186,4 +186,58 @@ export interface DongTP {
   kenh: Kenh;
   luongKg: number;
   donGia: number | null; // USD nếu Xuất khẩu, VND nếu Nội địa
+  quyCach?: string; // quy cách/size khi hút từ sổ bán (VD "18-20") — dòng nhập tay để trống
+  banHangId?: string; // id dòng bán nguồn nếu hút từ sổ bán — chống hút trùng vào kỳ
+}
+
+/* ---------- Bán thành phẩm hằng ngày ---------- */
+
+/**
+ * Một phiếu bán = MỘT khách nhận hàng MỘT lượt, gồm nhiều dòng mặt hàng
+ * (song song với chuyến nhập: một đại lý đổ nhiều loại).
+ *
+ * Hai ngày tách như nhập:
+ *   - `ngayGiao`  : hàng thực xuất bán. MỌI tổng hợp (sổ bán, hút vào cân đối)
+ *                   tính theo ngày này.
+ *   - `ngayGhiSo` : ngày ghi vào hệ thống → nhãn "Ghi bù" khi ghi sau.
+ *
+ * Kênh nằm ở phiếu: Xuất khẩu ⇒ đơn giá USD, Nội địa ⇒ đơn giá VND. Quy tỉ giá
+ * lúc tính giá trị, KHÔNG cộng thẳng hai kênh (bẫy kinh điển của cân đối).
+ */
+export interface PhieuBan {
+  id: string;
+  ngayGiao: string; // yyyy-mm-dd — ngày xuất bán
+  ngayGhiSo: string; // yyyy-mm-dd — ngày ghi vào hệ thống
+  lyDoGhiBu: string; // bắt buộc khi ngayGhiSo > ngayGiao
+  phanXuong: PhanXuong;
+  khachId: string; // khách hàng (danh mục đầu ra)
+  kenh: Kenh;
+  ghiChu: string;
+}
+
+/** Phiếu ghi sau ngày xuất bán ⇒ ghi bù (cần lý do). */
+export function laGhiBuBan(p: Pick<PhieuBan, "ngayGiao" | "ngayGhiSo">): boolean {
+  return Boolean(p.ngayGhiSo) && p.ngayGhiSo > p.ngayGiao;
+}
+
+/**
+ * Một dòng bán trong phiếu. `matHangId` trỏ danh mục mặt hàng (mở); `quyCach`
+ * là size/grade của thành phẩm (VD "18-20", "1000-1300") — tên sổ mẫu ẩn bớt
+ * phần thành phẩm vì cả bảng là một loại. `khoNguon` để dành cho tồn kho tương
+ * lai (xuất từ kho SX / kho lưu trữ), v1 chưa dùng — luôn "".
+ */
+export interface DongBan {
+  id: string;
+  phieuId: string;
+  ngay: string; // yyyy-mm-dd — chép từ phiếu.ngayGiao để lọc/tổng hợp nhanh
+  matHangId: string;
+  quyCach: string;
+  luongKg: number;
+  donGia: number | null; // USD nếu kênh Xuất khẩu, VND nếu Nội địa
+  khoNguon: string; // "" | "SX" | "Lưu trữ" — seam tồn kho, v1 để trống
+}
+
+/** Thành tiền một dòng bán = lượng × đơn giá (đơn vị theo kênh của phiếu). */
+export function thanhTienBan(r: Pick<DongBan, "luongKg" | "donGia">): number {
+  return r.luongKg * (r.donGia ?? 0);
 }

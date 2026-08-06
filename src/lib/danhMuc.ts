@@ -1,5 +1,6 @@
 import { uid } from "@/lib/db";
 import {
+  BANG_BAN_HANG,
   BANG_CHOT_NGAY,
   BANG_CHUYEN_NHAP,
   BANG_DAI_LY,
@@ -10,6 +11,7 @@ import {
   BANG_NHAP_NL,
   BANG_NL_VAO,
   BANG_PHE_LIEU,
+  BANG_PHIEU_BAN,
   BANG_THANH_PHAM,
   BANG_TP_RA,
   useBang,
@@ -59,3 +61,5 @@ export const useKyCanDoi = () => useBang(BANG_KY);
 export const useNLVao = () => useBang(BANG_NL_VAO);
 export const usePheLieu = () => useBang(BANG_PHE_LIEU);
 export const useTPRa = () => useBang(BANG_TP_RA);
+export const usePhieuBan = () => useBang(BANG_PHIEU_BAN);
+export const useBanHang = () => useBang(BANG_BAN_HANG);

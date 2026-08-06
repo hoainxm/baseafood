@@ -44,7 +44,7 @@ Giá trị phế liệu= Σ kg × đơn giá bán
 
 1. **NL vào** — nhóm `Thủy sản` / `Xả đông` / `Bột phụ gia`. "Bột" là **phụ gia tẩm** (có cột tỷ lệ %), không phải phụ phẩm.
 2. **Phế liệu** — nguồn thật là sổ nhập hàng, xem dưới.
-3. **TP ra** — mặt hàng (danh mục mở, ánh xạ lỏng sang 141 mã) × khách hàng × kênh.
+3. **TP ra** — mặt hàng (danh mục mở, ánh xạ lỏng sang 141 mã) × khách hàng × kênh. Nhập tay được, **hoặc HÚT từ sổ bán** (dòng bán trong khoảng ngày kỳ → tạo bản sao `thanh_pham_ra`, gắn `banHangId` chống trùng; bỏ khỏi kỳ = xóa bản sao, số gốc ở sổ bán). Xem [33-ban-hang.md](33-ban-hang.md).
 
 ### Phế liệu: HÚT, không nhập lại
 
@@ -69,6 +69,7 @@ Giá trị phế liệu= Σ kg × đơn giá bán
 
 ## Cross-references
 
+- Sổ bán — nguồn hút cho khối TP ra: [33-ban-hang.md](33-ban-hang.md)
 - Phế liệu nhập ở đâu: [30-nhap-hang.md](30-nhap-hang.md)
 - Bẫy ghi đè danh sách: [04-tang-du-lieu.md](04-tang-du-lieu.md)
 - Thiết kế gốc + số kiểm chứng (mực ống khay 3.106 ÷ 2.856 ≈ 1,09): [`docs/trien-khai/plan-flow-can-doi-5-ngay.md`](../trien-khai/plan-flow-can-doi-5-ngay.md)

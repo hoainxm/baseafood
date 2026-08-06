@@ -47,7 +47,9 @@ Hệ quả cho người vận hành: chưa chạy migration mới ⇒ số liệ
 
 ## `vaDongCu` — vá dòng cũ, một chỗ
 
-Bản sao localStorage được đọc thẳng bằng `JSON.parse`, **không đi qua `fromRow`** ⇒ dòng ghi từ bản app trước sẽ thiếu trường mới thêm. Vá ở `vaDongCu` (một chỗ) thay vì rải `?? ""` khắp màn hình. Ví dụ đang có: `chuyenId` (dòng trước khi có chuyến thật), `nguon`/`ngay`/`phanXuong` của `phe_lieu`.
+Bản sao localStorage được đọc thẳng bằng `JSON.parse`, **không đi qua `fromRow`** ⇒ dòng ghi từ bản app trước sẽ thiếu trường mới thêm. Vá ở `vaDongCu` (một chỗ) thay vì rải `?? ""` khắp màn hình. Ví dụ đang có: `chuyenId` (dòng trước khi có chuyến thật), `nguon`/`ngay`/`phanXuong` của `phe_lieu`, `quyCach`/`banHangId` của `thanh_pham_ra` (dòng trước khi có sổ bán).
+
+Bán thành phẩm dùng `usePhieuBan()` / `useBanHang()` (`BANG_PHIEU_BAN` / `BANG_BAN_HANG`) — cùng khuôn `useBang`, xem [33-ban-hang.md](33-ban-hang.md).
 
 ## Seed
 

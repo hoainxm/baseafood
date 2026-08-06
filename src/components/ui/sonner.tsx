@@ -8,6 +8,11 @@ const Toaster = ({ ...props }: ToasterProps) => {
   return (
     <Sonner
       theme="light"
+      position="top-center"
+      richColors
+      expand
+      closeButton
+      visibleToasts={3}
       className="toaster group"
       icons={{
         success: (
@@ -67,15 +72,18 @@ const Toaster = ({ ...props }: ToasterProps) => {
           "--normal-text": "var(--popover-foreground)",
           "--normal-border": "var(--border)",
           "--border-radius": "var(--radius)",
+          "--width": "26rem",
         } as React.CSSProperties
       }
       toastOptions={{
         classNames: {
-          toast: "cn-toast !text-base !gap-3 !p-4",
-          title: "!text-base !font-semibold",
+          toast:
+            "cn-toast !text-base !gap-3 !p-5 !rounded-xl !border-2 !shadow-lg",
+          title: "!text-lg !font-semibold !leading-snug",
           description: "!text-base",
-          actionButton: "!text-base !font-semibold !h-11 !px-4",
-          closeButton: "!size-8",
+          actionButton:
+            "!text-base !font-semibold !h-12 !px-5 !rounded-lg",
+          closeButton: "!size-9",
         },
       }}
       {...props}

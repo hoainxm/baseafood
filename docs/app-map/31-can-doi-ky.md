@@ -1,0 +1,75 @@
+> Load khi: sửa màn Cân đối, công thức định mức/lãi lỗ, hay bảng in A4.
+covers: src/features/CanDoi.tsx, src/features/BangCanDoi.tsx, src/lib/canDoi.ts
+last_verified: 2026-08-06
+ttl_days: 90
+
+# Cân đối theo kỳ (xưởng Đông, "cân đối 5 ngày")
+
+Trả lời câu: lô nguyên liệu này ra bao nhiêu thành phẩm, định mức bao nhiêu, lãi hay lỗ.
+
+## State hiện tại
+
+Đã có: CRUD kỳ · 3 khối (NL vào / phế liệu / TP ra) · thông số kỳ (tổng NL nhận, chi phí CB/kg TP, tỉ giá) · tính định mức + lãi/lỗ + tỉ lệ thu hồi · hút phế liệu từ sổ nhập · xem/in bảng A4.
+
+Chưa có: quy tắc **chia NL cho từng bảng cân đối** (bảng phụ theo ngày là tổng NL nhận cả xưởng, mỗi bảng chỉ lấy phần đưa vào mặt hàng đó — cân riêng hay ước tính? **chưa chốt với xí nghiệp**); tên gọi chính thức của chỉ số ≈ 0,45; liên kết tự động sang sổ nhập cho khối NL vào (hiện **nhập tay**, chỉ phế liệu là hút).
+
+Bảng dùng: `ky_can_doi`, `nguyen_lieu_vao`, `phe_lieu`, `thanh_pham_ra`, đọc `mat_hang` / `khach_hang` / `loai_nguyen_lieu`.
+
+## Logic / Rules
+
+### Kỳ = một lô, không phải một tuần
+
+Một kỳ = **một loại NL** + **tập ngày tiếp nhận** của lô đó. Ngày có thể rời rạc; `tuNgay`/`denNgay` chỉ là cách chọn nhanh, `ngayList` là chuỗi để in (sinh từ khoảng ngày, bản cũ gõ tay).
+**Thành phẩm có thể ra trễ hơn kỳ** — hệ thống vẫn cho nhập TP vào kỳ đã đóng ngày nhận NL. Đừng thêm ràng buộc "TP phải trong khoảng ngày".
+
+### Công thức (`src/lib/canDoi.ts` — hàm thuần, không React)
+
+```
+Định mức        = Tổng NL vào (kg) ÷ Tổng TP (kg)        // ~1,09 với mực ống khay
+Giá trị NL      = Σ kg × đơn giá
+Giá trị xuất    = Σ (kg × đơn giá), dòng Xuất khẩu × tỉ giá
+Giá thành       = Tổng TP × chi phí CB/kg + Giá trị NL
+Lãi/Lỗ         = Giá trị xuất − Giá thành
+Bình quân/kg NL = Giá thành ÷ Tổng NL vào
+Tỉ lệ thu hồi   = Tổng TP ÷ Tổng NL NHẬN (thông số kỳ, ≠ Tổng NL vào) — null nếu chưa khai
+Giá trị phế liệu= Σ kg × đơn giá bán
+```
+
+- Chi phí CB, tỉ giá (mặc định 26.000 đ/USD), đơn giá NL: **nhập tay mỗi kỳ**, không tra tự động.
+- Đơn giá TP là **USD nếu kênh Xuất khẩu, VND nếu Nội địa** — cùng một cột, quy tỉ giá lúc tính. Đây là nguồn sai số kinh điển: đừng cộng thẳng hai kênh.
+- `tongNLNhan` (thông số kỳ) **khác** tổng NL vào của khối 1. NL vào = phần thật sự đưa vào mặt hàng này; NL nhận = tổng cả xưởng theo bảng phụ. Nhầm hai cái là hỏng tỉ lệ thu hồi.
+- Chưa có TP ⇒ định mức và lãi/lỗ **chưa có nghĩa**, màn hình phải ẩn/ghi rõ thay vì hiện 0.
+
+### Ba khối
+
+1. **NL vào** — nhóm `Thủy sản` / `Xả đông` / `Bột phụ gia`. "Bột" là **phụ gia tẩm** (có cột tỷ lệ %), không phải phụ phẩm.
+2. **Phế liệu** — nguồn thật là sổ nhập hàng, xem dưới.
+3. **TP ra** — mặt hàng (danh mục mở, ánh xạ lỏng sang 141 mã) × khách hàng × kênh.
+
+### Phế liệu: HÚT, không nhập lại
+
+- `pheLieuChoHut` = dòng `nguon = "Nhập hàng"`, **chưa gắn kỳ**, ngày rơi trong `[tuNgay, denNgay]` của kỳ. Kỳ chưa khai ngày ⇒ gợi ý tất cả dòng chưa gắn.
+- Hút = gán `kyId`. Gỡ khỏi kỳ = xóa `kyId`, **không xóa dòng**.
+- **Xóa kỳ**: `nguyen_lieu_vao` + `thanh_pham_ra` của kỳ bị xóa theo; `phe_lieu` có `nguon = "Nhập hàng"` chỉ **gỡ liên kết** — số gốc thuộc về sổ nhập hàng. Dòng phế liệu nhập tay trong kỳ (`nguon = "Cân đối"`) thì xóa theo. Có Hoàn tác cho cả 4 danh sách.
+- Khối phế liệu **không được coi là rỗng** khi còn dòng chờ hút — nếu không, lời mời "đưa phế liệu từ sổ nhập vào kỳ" bị ẩn đúng lúc cần nhất.
+
+### Ghép lại danh sách con (bẫy mất dữ liệu)
+
+`useNLVao/usePheLieu/useTPRa` trả **toàn bộ dòng của mọi kỳ**. `KyDetail` lọc theo `ky.id` để hiển thị, nhưng khi ghi phải `ghepLai()` với dòng của kỳ khác. Viết `ghiNL(dongCuaKyNay)` thẳng = **xóa sạch mọi kỳ khác**. Xem [04-tang-du-lieu.md](04-tang-du-lieu.md).
+
+## Edge cases
+
+| Tình huống | Hành vi đúng |
+|---|---|
+| Gõ loại NL mới trong ô chọn kỳ | Lưu luôn vào danh mục `loai_nguyen_lieu` + toast — không để tên mồ côi. |
+| Đơn giá / tỉ giá / chi phí null | Coi như 0 khi tính (`?? 0`), nhưng hiển thị là "—", không phải `0 đ`. |
+| Tổng TP = 0 | `dinhMuc = 0`, `tyLeThuHoi = null` nếu chưa khai `tongNLNhan`. Màn hình gắn cờ `chuaCoTP`. |
+| Bảng in `BangCanDoi.tsx` | **Ngoại lệ luật design-system** — `text-sm`, `uppercase`, màu `slate` cứng để khớp khổ A4, in bằng `window.print()`. Đừng áp luật UI vào file này, cũng đừng lấy nó làm mẫu cho màn mới. |
+| Mặt hàng chưa ánh xạ mã 141 | Hợp lệ (`maTP` rỗng, hiện "Chưa ánh xạ"). Danh mục mặt hàng là **danh mục mở**. |
+
+## Cross-references
+
+- Phế liệu nhập ở đâu: [30-nhap-hang.md](30-nhap-hang.md)
+- Bẫy ghi đè danh sách: [04-tang-du-lieu.md](04-tang-du-lieu.md)
+- Thiết kế gốc + số kiểm chứng (mực ống khay 3.106 ÷ 2.856 ≈ 1,09): [`docs/trien-khai/plan-flow-can-doi-5-ngay.md`](../trien-khai/plan-flow-can-doi-5-ngay.md)
+- Câu hỏi đã chốt / còn treo: [`docs/trien-khai/bang-cau-hoi-xac-nhan-truoc-plan.md`](../trien-khai/bang-cau-hoi-xac-nhan-truoc-plan.md)

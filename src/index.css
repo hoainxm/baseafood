@@ -33,3 +33,13 @@ body {
     display: none !important;
   }
 }
+
+/* Phiếu in KHỔ NGANG (A4 landscape). Chỉ áp cho vùng gắn thêm class
+   .print-landscape (VD phiếu tổng hợp nguyên liệu ngày) — bảng cân đối vẫn
+   in dọc như cũ vì không mang class này. */
+@page landscape {
+  size: A4 landscape;
+}
+.print-landscape {
+  page: landscape;
+}

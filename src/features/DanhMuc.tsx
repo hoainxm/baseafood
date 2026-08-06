@@ -58,7 +58,7 @@ export default function DanhMucScreen() {
     { key: "ma", nhan: "Mã nội bộ", viDu: "Tự đặt (nếu cần)" },
     {
       key: "maTP",
-      nhan: "Mã thành phẩm (141 mã kế toán)",
+      nhan: "Mã thành phẩm (danh mục kế toán)",
       anTrenDienThoai: false,
       render: (giaTri, doiGiaTri) => (
         <Combobox
@@ -116,10 +116,10 @@ export default function DanhMucScreen() {
     },
     {
       key: "loai",
-      nhan: "Thuộc loài",
+      nhan: "Loài",
       render: (giaTri, doiGiaTri) => (
         <Combobox
-          label="Thuộc loài"
+          label="Loài"
           hint="Bạch tuộc, Mực, Cá…"
           value={giaTri}
           onChange={doiGiaTri}

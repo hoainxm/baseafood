@@ -1,0 +1,40 @@
+> Load khi: sửa danh mục (đại lý, loại NL, mặt hàng, khách hàng) hay danh mục 141 mã thành phẩm.
+covers: src/features/DanhMuc.tsx, src/features/ThanhPham.tsx, src/data/thanh-pham.json, src/design-system/patterns/DanhMucCrud.tsx
+last_verified: 2026-08-06
+ttl_days: 90
+
+# Danh mục (master data)
+
+Một màn, **5 tab**: Mặt hàng · Khách hàng · Đại lý · Loại nguyên liệu · Thành phẩm (141 mã).
+Gộp làm một vì ba mục điều hướng cũ có tên gần giống nhau — người dùng 45–60 tuổi phải nhớ cái nào ở đâu.
+
+## State hiện tại
+
+4 tab đầu dùng chung pattern `DanhMucCrud` (thêm/sửa/xóa/tìm). Tab thứ 5 (`ThanhPham.tsx`) **chỉ đọc** — 141 mã kế toán TK 1551.
+
+## Logic / Rules
+
+- **Đại lý (đầu vào) ≠ khách hàng (đầu ra).** Hai danh mục tách riêng, không gộp. Đại lý cung cấp NL; khách hàng mua TP (có `thiTruong`: Nhật / EU / Nội địa…).
+- **`thanh_pham` khóa chính là `ma`**, không phải `id` sinh tự động (`AnhXaBang.khoaChinh = "ma"`). Mã kế toán là danh tính thật của bản ghi.
+- `src/data/thanh-pham.json` **chỉ là SEED** cho bảng `thanh_pham`, nạp lần đầu khi cả server lẫn local đều rỗng. **Không đọc trực tiếp file này trong màn** — nguồn thật là bảng.
+- `mat_hang.maTP` ánh xạ **lỏng** sang `thanh_pham.ma`: được phép rỗng ("Chưa ánh xạ"). Mặt hàng thực tế chưa khớp hẳn 141 mã — danh mục mặt hàng là **danh mục mở**.
+- `loai_nguyen_lieu` = quy cách/size ("2 da nguyên liệu", "Mực ống 7cm"), có trường `loai` = **loài** (Bạch tuộc / Mực / Cá…). Có danh mục để chống mỗi lần gõ một kiểu → tổng hợp cuối kỳ mới đúng.
+- Sổ nghiệp vụ lưu **TÊN** chứ không phải id của danh mục (xem [30-nhap-hang.md](30-nhap-hang.md)). ⇒ **Đổi tên một đại lý KHÔNG hồi tố** vào các dòng đã ghi. Đó là chủ ý (sổ giữ nguyên tên tại thời điểm nhập), không phải bug.
+- Mọi màn nghiệp vụ đều **tạo mới tại chỗ** được từ `Combobox` và phải lưu ngay vào danh mục — không để tên mồ côi ngoài danh mục.
+- Quy ước ngầm của xưởng, giữ khi thiết kế: NL không ghi loài ⇒ mặc định **bạch tuộc**; "80 trên" = lớn, "80 dưới" = nhỏ (mốc ~80 g/con), định giá khác nhau.
+
+## Edge cases
+
+| Tình huống | Hành vi đúng |
+|---|---|
+| Xóa một đại lý đang có trong sổ nhập | Dòng sổ **không đổi** (lưu theo tên). Không có cascade, không cảnh báo — chấp nhận, vì sổ phải giữ nguyên. |
+| Thành phẩm 141 mã | Chỉ đọc trong app. Sửa danh mục kế toán ⇒ sửa `src/data/thanh-pham.json` **và** cập nhật bảng `thanh_pham` trên server (seed không chạy lại khi bảng đã có dữ liệu). |
+| Thêm trường cho một danh mục | Sửa `types.ts` → `AnhXaBang.toRow/fromRow` (+ `vaDongCu`) → migration cột → mảng `TruongDanhMuc` của tab. Thiếu bước nào cũng ra dữ liệu cụt. |
+| Xóa bản ghi danh mục | Qua `ConfirmDelete` + toast Hoàn tác. |
+
+## Cross-references
+
+- Ánh xạ DB & seed: [04-tang-du-lieu.md](04-tang-du-lieu.md)
+- Bảng `thanh_pham`, `mat_hang`, `dai_ly`, `khach_hang`, `loai_nguyen_lieu`: [03-database.md](03-database.md)
+- Nơi danh mục được tiêu thụ: [30-nhap-hang.md](30-nhap-hang.md) · [31-can-doi-ky.md](31-can-doi-ky.md)
+- Pattern CRUD dùng chung: [`src/design-system/README.md`](../../src/design-system/README.md)

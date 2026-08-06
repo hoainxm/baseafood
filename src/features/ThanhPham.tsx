@@ -75,7 +75,7 @@ export default function ThanhPhamScreen() {
       <div className="flex flex-wrap items-end gap-4">
         <div className="min-w-64 flex-1">
           <Combobox
-            label="Lọc theo nhóm hàng"
+            label="Nhóm hàng"
             value={nhom}
             onChange={setNhom}
             options={nhomList.map((n) => ({ value: n, label: n }))}

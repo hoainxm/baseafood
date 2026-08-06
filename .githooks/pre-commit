@@ -1,0 +1,107 @@
+#!/bin/sh
+# Cổng máy cho Baseafood MES — nguyên tắc 8 của ai-simple-product-dev:
+# invariant tự giác là invariant sẽ chết.
+#
+# Bật:      git config core.hooksPath .githooks
+# Tự kiểm:  sh .githooks/pre-commit --self-test
+# Bỏ qua 1 lần (chỉ khi thật sự cần):  git commit --no-verify
+#
+# CHẶN  : lộ khóa/URL Supabase · features import thẳng primitive · features gọi
+#         localStorage/supabase · chữ nhỏ & IN HOA trong màn nghiệp vụ
+# CẢNH BÁO: doc app-map có `covers:` trỏ tới file vừa sửa mà doc đứng yên
+#
+# Chỉ soi DÒNG THÊM MỚI — không bắt lỗi di sản đã có trong repo.
+
+loi=0
+canh_bao=0
+
+do_hong() { printf '\033[31m✘ %s\033[0m\n' "$1"; loi=1; }
+do_nhac() { printf '\033[33m▲ %s\033[0m\n' "$1"; canh_bao=1; }
+
+# Chuỗi ghép để chính file hook này không tự khớp mẫu của nó.
+MAU_JWT='eyJ[A-Za-z0-9_-]\{20,\}'
+MAU_URL='https://[a-z0-9]\{15,\}\.supabase''\.co'
+
+dong_them() { git diff --cached -U0 -- "$1" | grep '^+' | grep -v '^+++'; }
+
+# ---------- self-test ----------
+if [ "$1" = "--self-test" ]; then
+  ok=0
+  echo 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9' | grep -q "$MAU_JWT" || { echo "self-test: mẫu JWT hỏng"; ok=1; }
+  echo 'https://abcdefghijklmnop.supabase.co' | grep -q "$MAU_URL" || { echo "self-test: mẫu URL hỏng"; ok=1; }
+  echo 'import { Button } from "@/components/ui/button";' | grep -q '@/components/ui' || { echo "self-test: mẫu import hỏng"; ok=1; }
+  echo 'class="text-xs uppercase"' | grep -q 'text-xs\|uppercase' || { echo "self-test: mẫu cỡ chữ hỏng"; ok=1; }
+  [ -f docs/app-map/README.md ] || { echo "self-test: thiếu docs/app-map/README.md"; ok=1; }
+  [ "$ok" = 0 ] && echo "self-test: OK"
+  exit "$ok"
+fi
+
+staged=$(git diff --cached --name-only --diff-filter=ACM)
+[ -z "$staged" ] && exit 0
+
+# ---------- 1. Khóa / URL / .env (CHẶN) ----------
+for f in $staged; do
+  case "$f" in
+    .env|.env.*|*/.env) [ "$f" = ".env.example" ] || do_hong "$f — file môi trường không được commit" ;;
+  esac
+done
+
+for f in $staged; do
+  case "$f" in .githooks/*) continue ;; esac
+  them=$(dong_them "$f")
+  [ -z "$them" ] && continue
+  if printf '%s\n' "$them" | grep -q "$MAU_JWT"; then
+    do_hong "$f — có chuỗi giống anon/service key. Không ghi khóa vào repo (docs/app-map/05-bao-mat-phan-quyen.md)"
+  fi
+  if printf '%s\n' "$them" | grep -q "$MAU_URL"; then
+    do_hong "$f — có URL project Supabase thật. Chỉ để trống trong .env.example"
+  fi
+done
+
+# ---------- 2. Ranh giới import của màn nghiệp vụ (CHẶN) ----------
+for f in $staged; do
+  case "$f" in src/features/*) ;; *) continue ;; esac
+  them=$(dong_them "$f")
+  [ -z "$them" ] && continue
+
+  if printf '%s\n' "$them" | grep -q '@/components/ui'; then
+    do_hong "$f — features chỉ được import từ @/design-system (CLAUDE.md §3)"
+  fi
+  if printf '%s\n' "$them" | grep -q 'localStorage\.\|from "@/lib/supabase"\|from "@/lib/db"'; then
+    do_hong "$f — features không gọi localStorage/supabase/db trực tiếp, đi qua @/lib/danhMuc (CLAUDE.md §4)"
+  fi
+
+  # BangCanDoi.tsx là bản in A4 — ngoại lệ có chủ đích.
+  case "$f" in */BangCanDoi.tsx) continue ;; esac
+  if printf '%s\n' "$them" | grep -q 'text-xs\|uppercase'; then
+    do_hong "$f — cấm text-xs / IN HOA trong màn nghiệp vụ (người dùng 45–60 tuổi, src/design-system/README.md §3)"
+  fi
+done
+
+# ---------- 3. Doc app-map lệch code (CẢNH BÁO) ----------
+for doc in docs/app-map/*.md; do
+  [ -f "$doc" ] || continue
+  case "$staged" in *"$doc"*) continue ;; esac   # doc đã sửa trong commit này
+
+  covers=$(sed -n 's/^covers:[[:space:]]*//p' "$doc" | head -1 | tr ',' ' ')
+  [ -z "$covers" ] && continue
+
+  for mau in $covers; do
+    mau=$(printf '%s' "$mau" | sed 's|\*\*|*|g')
+    for f in $staged; do
+      # shellcheck disable=SC2254
+      case "$f" in
+        $mau) do_nhac "$f đổi nhưng $doc không — soát lại rồi cập nhật last_verified:"; break ;;
+      esac
+    done
+  done
+done
+
+[ "$canh_bao" = 1 ] && echo "  (cảnh báo không chặn commit)"
+
+if [ "$loi" = 1 ]; then
+  echo ""
+  echo "Commit bị chặn. Sửa xong commit lại."
+  exit 1
+fi
+exit 0

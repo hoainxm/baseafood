@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { CalendarDays, X } from "lucide-react";
+import { InfoTip } from "./InfoTip";
 
 /* ---- Chuyển đổi ISO (yyyy-mm-dd, dùng để lưu) ↔ Date ---- */
 
@@ -64,6 +65,7 @@ function KhoiNhan({
   label,
   required,
   hint,
+  info,
   error,
   htmlFor,
   anNhanBatBuoc,
@@ -71,6 +73,8 @@ function KhoiNhan({
   label: string;
   required?: boolean;
   hint?: string;
+  /** Câu diễn giải dài — gom vào nút ⓘ cạnh nhãn thay vì hiện thành dòng hint. */
+  info?: React.ReactNode;
   error?: string;
   htmlFor?: string;
   anNhanBatBuoc?: boolean;
@@ -79,6 +83,7 @@ function KhoiNhan({
     <>
       <div className="flex flex-wrap items-center gap-2">
         <Label htmlFor={htmlFor}>{label}</Label>
+        {info && <InfoTip label={label}>{info}</InfoTip>}
         {anNhanBatBuoc ? null : required ? (
           <span className="rounded bg-secondary px-2 py-0.5 text-sm font-semibold text-secondary-foreground">
             Bắt buộc
@@ -184,6 +189,7 @@ export function DateField({
   onChange,
   required,
   hint,
+  info,
   error,
   choPhepXoa = false,
   anNhanBatBuoc = false,
@@ -195,6 +201,8 @@ export function DateField({
   onChange: (iso: string) => void;
   required?: boolean;
   hint?: string;
+  /** Câu diễn giải dài — gom vào nút ⓘ cạnh nhãn (giữ nhãn 1 dòng, không đẩy ô lệch). */
+  info?: React.ReactNode;
   error?: string;
   choPhepXoa?: boolean;
   /** Ẩn nhãn "Bắt buộc / (không bắt buộc)" — dùng khi đây là BỘ LỌC, không phải ô nhập. */
@@ -208,6 +216,7 @@ export function DateField({
         label={label}
         required={required}
         hint={hint}
+        info={info}
         error={error}
         htmlFor={id}
         anNhanBatBuoc={anNhanBatBuoc}

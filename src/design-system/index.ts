@@ -29,6 +29,7 @@ export { StepForm, type BuocNhap } from "./patterns/StepForm";
 export { ContextBar, type MucNguCanh } from "./patterns/ContextBar";
 export { ErrorSummary, type LoiNhap } from "./patterns/ErrorSummary";
 export { EmptyState } from "./patterns/EmptyState";
+export { InfoTip } from "./patterns/InfoTip";
 export {
   CoChuNhanh,
   CaiDatHienThi,

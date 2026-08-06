@@ -40,10 +40,14 @@ src/features/*                 ← màn nghiệp vụ
     dùng tưởng danh sách đã hết.
 12. **Đơn vị trong ô nhập không dùng padding cố định.** `Field` đo bề rộng chữ
     đơn vị rồi chừa đúng chỗ — `pr-14` cứng làm "26.000" đè lên "đ/USD".
+13. **Mọi chữ hiển thị theo chuẩn label.** Sentence case; nhãn field = danh từ
+    trần (không "Chỉ xem…", không "… dòng", không `:`); nút = động từ đứng đầu.
+    Chi tiết + before→after: [`noi-dung-va-label.md`](noi-dung-va-label.md).
 
-**Ngoại lệ duy nhất:** `src/features/BangCanDoi.tsx` là bản in theo mẫu giấy —
-cố tình dùng chữ nhỏ, chữ hoa, màu slate cứng để khớp khổ A4. Đừng áp luật trên
-vào file đó, và cũng đừng lấy nó làm mẫu cho màn mới.
+**Ngoại lệ luật (bản in theo mẫu giấy):** `src/features/BangCanDoi.tsx` và
+`src/features/PhieuNLNgay.tsx` cố tình dùng chữ nhỏ, chữ hoa, màu slate cứng để
+khớp khổ A4. Đừng áp luật cỡ chữ / màu / sentence case vào hai file đó, và cũng
+đừng lấy chúng làm mẫu cho màn mới.
 
 ## Bảng chọn component
 
@@ -63,6 +67,7 @@ vào file đó, và cũng đừng lấy nó làm mẫu cho màn mới.
 | Báo lỗi cả form | `ErrorSummary` (đầu form, có link nhảy tới ô) |
 | Cho biết đang làm cho ngày/xưởng nào | `ContextBar` |
 | Danh sách rỗng | `EmptyState` (phải nói việc tiếp theo) |
+| Câu diễn giải dài cạnh nhãn | `InfoTip` (nút ⓘ + popover). `DateField` có sẵn prop `info` — dùng thay `hint` khi câu dài khiến hai ô cùng hàng lệch chiều cao. Nhãn tiêu đề vẫn luôn hiện. |
 
 ## Trang duyệt + cấu hình
 

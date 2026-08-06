@@ -443,14 +443,14 @@ function KyDetail({
         <h2 className="mb-4 text-xl font-semibold">Thông số kỳ</h2>
         <div className="grid gap-6 sm:grid-cols-3">
           <NumberField
-            label="Tổng NL nhận"
+            label="Tổng NL nhận cả kỳ"
             unit="kg"
             anNhanBatBuoc
             value={ky.tongNLNhan}
             onChange={(v) => onChangeKy({ tongNLNhan: v })}
           />
           <NumberField
-            label="Chi phí CB / kg TP"
+            label="Chi phí chế biến / kg TP"
             unit="đ"
             anNhanBatBuoc
             value={ky.chiPhiCB}
@@ -709,7 +709,7 @@ function KhoiNLVao({
                   onChange={(v) => setDang((d) => (d ? { ...d, donGia: v } : d))}
                 />
                 <NumberField
-                  label="Tỷ lệ (bột phụ gia)"
+                  label="Tỉ lệ (bột phụ gia)"
                   unit="%"
                   value={dang.tyLe}
                   onChange={(v) => setDang((d) => (d ? { ...d, tyLe: v } : d))}

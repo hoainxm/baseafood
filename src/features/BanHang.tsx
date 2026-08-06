@@ -454,12 +454,12 @@ export default function BanHangScreen() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-semibold text-foreground">
-          Bán thành phẩm
-        </h1>
+        <h1 className="text-3xl font-semibold text-foreground">Bán hàng</h1>
         <p className="mt-2 max-w-2xl text-base text-muted-foreground">
-          Ghi bán hằng ngày: mỗi phiếu là một khách, nhận nhiều mặt hàng — mỗi
-          mặt hàng một dòng. Cuối kỳ, màn Cân đối hút bán theo khoảng ngày.
+          Ghi bán thành phẩm RA cho khách hằng ngày: mỗi phiếu là một khách,
+          nhận nhiều mặt hàng — mỗi mặt hàng một dòng. Cuối kỳ, màn Cân đối hút
+          bán theo khoảng ngày. (Khác "bán thành phẩm" = công đoạn sản xuất WIP,
+          chưa số hoá.)
         </p>
       </div>
 

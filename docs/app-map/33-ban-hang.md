@@ -3,9 +3,16 @@ covers: src/features/BanHang.tsx, src/types.ts, src/lib/repo.ts
 last_verified: 2026-08-06
 ttl_days: 90
 
-# Bán thành phẩm hằng ngày
+# Bán hàng (bán thành phẩm RA) hằng ngày
 
-Số hóa sổ bán thành phẩm (bạch tuộc/mực chế biến) theo ngày. Sau khi bán, màn Cân đối **hút** bán theo khoảng ngày vào khối thành phẩm ra — nửa còn lại của bảng cân đối kỳ (nửa kia là nhập NL). Nav thứ 2 (giữa Nhập hàng và Cân đối).
+Số hóa sổ **bán hàng** — bán thành phẩm chế biến (bạch tuộc/mực) RA cho khách theo ngày. Sau khi bán, màn Cân đối **hút** bán theo khoảng ngày vào khối thành phẩm ra — nửa còn lại của bảng cân đối kỳ (nửa kia là nhập NL). Nav thứ 2 (giữa Nhập hàng và Cân đối).
+
+## ⚠️ Thuật ngữ — tránh nhầm
+
+- **Bán hàng** (màn này) = bán **thành phẩm RA** cho khách (đầu ra). Khối 3 bảng cân đối.
+- **"Bán thành phẩm"** (bán-thành-phẩm, WIP) = **công đoạn SẢN XUẤT** ra sản phẩm dở dang, **cất kho dự trữ**, CHƯA bán. **KHÁC** bán hàng. Đây là mảng **chưa số hoá** — thuộc vòng lặp kho / đông gửi ↔ xả đông ↔ tồn cuối kỳ (backlog cốt lõi).
+- Quy trình thật (chưa build): sản xuất bán thành phẩm ngày → **cất kho dự trữ** → gom đủ theo **đơn đặt** (khách đặt số lượng lớn) → **xuất container** (nhiều block, nhiều quy cách). `ban_hang.kho_nguon` để dành seam nối tồn kho.
+- **Đơn đặt = xuất khẩu**; **phí xuất khẩu do phòng kế hoạch tính riêng, đã trừ trong giá báo → cân đối KHÔNG tính phí XK** (công thức `canDoi.ts` không có phí XK — đúng). Nhãn kênh hiện tại vẫn "Xuất khẩu / Nội địa" theo plan gốc (đã chốt); đổi thành "Đơn đặt" là việc tương lai nếu cần.
 
 ## State hiện tại
 

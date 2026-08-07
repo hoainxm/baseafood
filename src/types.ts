@@ -11,26 +11,47 @@ export type PhanXuong = "Đông" | "Cá" | "Khô";
 /* ---------- Người dùng & phân quyền ---------- */
 
 /**
- * Vai trò — `admin` full quyền; rỗng = chưa gán (chỉ đăng nhập được, chưa dùng gì).
- * Các vai trò nghiệp vụ hiện CHƯA gate chức năng (chỉ là nhãn) — phân quyền theo
- * vai trò làm sau. `pgd-quan-doc-dong` = Phó giám đốc kiêm luôn Quản đốc xưởng Đông.
+ * Vai trò — `admin` full quyền. Một người có thể giữ **NHIỀU vai trò** (mảng):
+ * VD "Phó giám đốc kiêm Quản đốc xưởng Đông" = `["pho-giam-doc","quan-doc-dong"]`
+ * (hai vai trò riêng, KHÔNG phải một vai trò dài). Quản đốc theo từng xưởng.
+ * Các vai trò nghiệp vụ hiện CHƯA gate chức năng (chỉ là nhãn) — chỉ `admin`
+ * mở màn Người dùng. Mảng RỖNG = chưa gán.
  */
 export type VaiTro =
   | "admin"
   | "giam-doc"
   | "pho-giam-doc"
+  | "quan-doc-dong"
+  | "quan-doc-ca"
+  | "quan-doc-kho"
   | "ke-toan"
-  | "pgd-quan-doc-dong"
-  | "to-truong" // giữ tương thích dữ liệu cũ — không còn trong danh sách chọn
-  | "";
+  | "to-truong"; // giữ tương thích dữ liệu cũ — không còn trong danh sách chọn
 
 export const VAI_TRO: { value: VaiTro; label: string }[] = [
   { value: "admin", label: "Quản trị (full quyền)" },
   { value: "giam-doc", label: "Giám đốc" },
   { value: "pho-giam-doc", label: "Phó giám đốc" },
-  { value: "pgd-quan-doc-dong", label: "Phó giám đốc kiêm Quản đốc xưởng Đông" },
+  { value: "quan-doc-dong", label: "Quản đốc xưởng Đông" },
+  { value: "quan-doc-ca", label: "Quản đốc xưởng Cá" },
+  { value: "quan-doc-kho", label: "Quản đốc xưởng Khô" },
   { value: "ke-toan", label: "Kế toán" },
 ];
+
+/** Lưu DB dạng CSV (`vai_tro` là cột text) ↔ mảng trong app. */
+export function vaiTroTuChuoi(csv: string): VaiTro[] {
+  return csv
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean) as VaiTro[];
+}
+export function vaiTroThanhChuoi(arr: VaiTro[]): string {
+  return arr.join(",");
+}
+/** Nhãn hiển thị gộp các vai trò; rỗng = "Chưa gán". */
+export function nhanVaiTro(arr: VaiTro[]): string {
+  if (!arr.length) return "Chưa gán";
+  return arr.map((v) => VAI_TRO.find((x) => x.value === v)?.label ?? v).join(", ");
+}
 
 /**
  * Hồ sơ người dùng — 1-1 với tài khoản Supabase Auth (`id` = auth user id).
@@ -41,7 +62,7 @@ export interface NguoiDung {
   id: string; // = auth.users.id
   hoTen: string;
   username: string;
-  vaiTro: VaiTro;
+  vaiTro: VaiTro[]; // nhiều vai trò; [] = chưa gán
 }
 
 /** Loài nguyên liệu — ghi rõ, không để mặc định ngầm "bạch tuộc". */

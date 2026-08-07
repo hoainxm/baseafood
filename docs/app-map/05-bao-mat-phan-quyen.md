@@ -2,7 +2,7 @@
 covers: src/lib/auth.ts, src/lib/username.ts, src/features/DangNhap.tsx, src/features/QuanLyNguoiDung.tsx, supabase/migrations/0006_nguoi_dung.sql, supabase/migrations/0007_seed_admin.sql, supabase/migrations/0010_email_domain_vn.sql, supabase/migrations/0003_siet_rls.sql, src/lib/supabase.ts, .env.example, .gitignore
 last_verified: 2026-08-07
 ttl_days: 90
-<!-- updated: 2026-08-07 — đuôi email .local→.vn (GoTrue chặn .local, migration 0010); role list mới (giam-doc/pho-giam-doc/pgd-quan-doc-dong/ke-toan) -->
+<!-- updated: 2026-08-07 — đuôi email .local→.vn (GoTrue chặn .local, migration 0010); vai trò NHIỀU/người (VaiTro[], CSV cột vai_tro), gán lúc tạo TK, Quản đốc theo xưởng -->
 
 # Bảo mật & phân quyền
 
@@ -11,7 +11,7 @@ ttl_days: 90
 - **Đăng nhập từ UI**: Supabase Auth, email tổng hợp `<username>@bsf1.vn` (người dùng chỉ gõ username, `src/lib/username.ts` ghép đuôi). Màn `DangNhap.tsx` **chỉ đăng nhập** — KHÔNG mở đăng ký tự do (chính sách app nội bộ). Logic `src/lib/auth.ts` (`useAuth`: `dangNhap`/`taoTaiKhoan`/`dangXuat`). Gate ở `App.tsx`. **Chạy localStorage (thiếu env) ⇒ KHÔNG chặn** (offline ở xưởng).
   - ⚠️ **Đuôi phải là TLD thật (`.vn`), KHÔNG `.local`**: GoTrue chặn TLD dành riêng (`.local`/`.test`/`.example`/`.invalid`) khi signUp → "Email address … is invalid", admin không tạo được tài khoản. Đổi từ `.local` sang `.vn` ở migration `0010` (đã đổi cả admin seed).
 - **Admin tạo tài khoản**: chỉ `admin` (nav **Người dùng**, `QuanLyNguoiDung.tsx`) tạo được tài khoản: họ tên · tên đăng nhập (gợi ý từ họ tên, sửa được) · mật khẩu, có **check trùng username**. Tạo bằng `taoTaiKhoan` (`auth.ts`): signUp trên **client PHỤ** (`taoClientTam` — `persistSession:false`) nên **KHÔNG đá văng phiên admin**; hồ sơ lưu qua client chính, vai trò rỗng (admin gán sau).
-- **Vai trò**: bảng `nguoi_dung` (khóa `id` = auth user id) giữ họ tên · username · `vai_tro`. Danh sách chọn (`VAI_TRO` trong `types.ts`): `admin` (Quản trị) · `giam-doc` · `pho-giam-doc` · `pgd-quan-doc-dong` (Phó giám đốc kiêm Quản đốc xưởng Đông) · `ke-toan`; rỗng = chưa gán. `to-truong` giữ trong union cho dữ liệu cũ, không còn trong danh sách chọn. **Chỉ `admin` gate chức năng** (màn Người dùng + tạo tài khoản); các vai trò nghiệp vụ khác hiện là **nhãn**, chưa phân quyền. Admin gán vai trò + sửa họ tên trong màn Người dùng.
+- **Vai trò — NHIỀU vai trò / người** (`NguoiDung.vaiTro: VaiTro[]`): một người giữ nhiều vai trò, VD "Phó giám đốc kiêm Quản đốc xưởng Đông" = `["pho-giam-doc","quan-doc-dong"]` (hai vai trò riêng, KHÔNG phải một vai trò dài). Lưu DB dạng **CSV** trong cột `vai_tro` (text, không cần migration) — `vaiTroTuChuoi`/`vaiTroThanhChuoi` trong `types.ts` chuyển đổi; dữ liệu cũ 1 vai trò (`admin`) parse ra `["admin"]` bình thường. Danh sách chọn (`VAI_TRO`): `admin` · `giam-doc` · `pho-giam-doc` · `quan-doc-dong`/`quan-doc-ca`/`quan-doc-kho` (Quản đốc theo xưởng) · `ke-toan`; `[]` = chưa gán. `to-truong` giữ trong union cho dữ liệu cũ, không trong danh sách chọn. **Chỉ `admin` gate chức năng** (`laAdmin = vaiTro.includes("admin")`); vai trò khác là **nhãn**, chưa phân quyền. Admin **gán vai trò ngay lúc tạo tài khoản** (chip chọn nhiều) hoặc sửa sau trong màn Người dùng.
 - **CHƯA siết RLS**: policy vẫn `for all to anon, authenticated using(true)`. Gate + đóng-đăng-ký hiện là **app-level**; anon key vẫn đọc/ghi được nếu bypass UI ⇒ **vẫn chỉ chạy trong mạng nội bộ** cho tới khi chạy `0003`.
 
 ## Thiết lập admin đầu tiên

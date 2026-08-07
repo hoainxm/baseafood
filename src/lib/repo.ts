@@ -23,8 +23,8 @@ import type {
   PhanXuong,
   PhieuBan,
   ThanhPham,
-  VaiTro,
 } from "@/types";
+import { vaiTroTuChuoi, vaiTroThanhChuoi } from "@/types";
 
 /**
  * Tầng dữ liệu dùng chung.
@@ -384,13 +384,13 @@ export const BANG_NGUOI_DUNG: AnhXaBang<NguoiDung> = {
     id: x.id,
     ho_ten: x.hoTen,
     username: x.username,
-    vai_tro: x.vaiTro,
+    vai_tro: vaiTroThanhChuoi(x.vaiTro), // mảng → CSV (cột text)
   }),
   fromRow: (r) => ({
     id: s(r.id),
     hoTen: s(r.ho_ten),
     username: s(r.username),
-    vaiTro: s(r.vai_tro) as VaiTro,
+    vaiTro: vaiTroTuChuoi(s(r.vai_tro)), // CSV → mảng
   }),
 };
 

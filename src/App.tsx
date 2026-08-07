@@ -9,7 +9,7 @@ import KitPage from "@/design-system/kit/KitPage";
 import { CoChuNhanh, Logo, Toaster, TrangThaiDuLieu } from "@/design-system";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
-import { VAI_TRO } from "@/types";
+import { nhanVaiTro } from "@/types";
 import {
   Truck,
   ShoppingCart,
@@ -70,9 +70,6 @@ const NAV_NGUOI_DUNG: MucNav = {
   moTa: "Tài khoản & vai trò",
   icon: Users,
 };
-
-const nhanVaiTro = (v: string) =>
-  VAI_TRO.find((x) => x.value === v)?.label ?? "Chưa gán";
 
 /* Hai thanh header (thanh bên và thanh nội dung) PHẢI cùng chiều cao,
    nếu không đường kẻ dưới chúng lệch nhau và cả trang trông vênh. */
@@ -169,7 +166,7 @@ export default function App() {
               <div className="flex items-center justify-between gap-2">
                 <span className="truncate text-sm text-muted-foreground">
                   {auth.nguoiDung?.username} ·{" "}
-                  {nhanVaiTro(auth.nguoiDung?.vaiTro ?? "")}
+                  {nhanVaiTro(auth.nguoiDung?.vaiTro ?? [])}
                 </span>
                 <button
                   onClick={auth.dangXuat}

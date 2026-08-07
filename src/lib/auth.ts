@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase, hasSupabase, SITE_ID, taoClientTam } from "@/lib/supabase";
 import type { NguoiDung, VaiTro } from "@/types";
+import { vaiTroTuChuoi, vaiTroThanhChuoi } from "@/types";
 import { emailToUsername, usernameToEmail } from "@/lib/username";
 
 /**
@@ -22,7 +23,7 @@ function hoSoTuRow(r: Record<string, unknown>): NguoiDung {
     id: s(r.id),
     hoTen: s(r.ho_ten),
     username: s(r.username),
-    vaiTro: s(r.vai_tro) as VaiTro,
+    vaiTro: vaiTroTuChuoi(s(r.vai_tro)),
   };
 }
 
@@ -44,7 +45,7 @@ async function layHoacTaoHoSo(session: Session): Promise<NguoiDung | null> {
 
   const row = { id, xi_nghiep_id: SITE_ID, ho_ten: hoTen, username, vai_tro: "" };
   await supabase.from("nguoi_dung").upsert(row, { onConflict: "id" });
-  return { id, hoTen, username, vaiTro: "" };
+  return { id, hoTen, username, vaiTro: [] };
 }
 
 /** Dịch lỗi Supabase Auth sang tiếng Việt cho người dùng đọc được. */
@@ -148,7 +149,8 @@ export function useAuth() {
     async (
       hoTen: string,
       username: string,
-      matKhau: string
+      matKhau: string,
+      vaiTro: VaiTro[] = []
     ): Promise<KetQuaDangNhap> => {
       if (!supabase) return { ok: false, loi: "Chưa cấu hình máy chủ" };
       const u = username.trim().toLowerCase();
@@ -183,13 +185,13 @@ export function useAuth() {
           xi_nghiep_id: SITE_ID,
           ho_ten: hoTen.trim(),
           username: u,
-          vai_tro: "",
+          vai_tro: vaiTroThanhChuoi(vaiTro),
         },
         { onConflict: "id" }
       );
       return {
         ok: true,
-        nguoiDung: { id: uid, hoTen: hoTen.trim(), username: u, vaiTro: "" },
+        nguoiDung: { id: uid, hoTen: hoTen.trim(), username: u, vaiTro },
       };
     },
     []
@@ -205,7 +207,7 @@ export function useAuth() {
     dangTai: hasSupabase && !daKhoiTao,
     /** Có cần đăng nhập không (chỉ khi đã cấu hình Supabase). */
     canDangNhap: hasSupabase,
-    laAdmin: nguoiDung?.vaiTro === "admin",
+    laAdmin: nguoiDung?.vaiTro.includes("admin") ?? false,
     dangNhap,
     taoTaiKhoan,
     dangXuat,

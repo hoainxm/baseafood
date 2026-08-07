@@ -1,13 +1,12 @@
 import { useState } from "react";
 import type { NguoiDung, VaiTro } from "@/types";
-import { VAI_TRO } from "@/types";
+import { VAI_TRO, nhanVaiTro } from "@/types";
 import { useNguoiDung } from "@/lib/danhMuc";
 import { hoTenToUsername } from "@/lib/username";
 import type { KetQuaDangNhap } from "@/lib/auth";
 import {
   Badge,
   Button,
-  Combobox,
   Dialog,
   DialogContent,
   DialogFooter,
@@ -22,22 +21,52 @@ import {
   type Cot,
   type LoiNhap,
 } from "@/design-system";
-import { Pencil, Plus, Users } from "lucide-react";
+import { Check, Pencil, Plus, Users } from "lucide-react";
 
-const nhanVaiTro = (v: VaiTro) =>
-  VAI_TRO.find((x) => x.value === v)?.label ?? "Chưa gán";
+/** Chọn NHIỀU vai trò (chip bật/tắt). Người 45–60t: chip to, bấm là xong. */
+function ChonVaiTro({
+  chon,
+  onDoi,
+}: {
+  chon: VaiTro[];
+  onDoi: (v: VaiTro[]) => void;
+}) {
+  const bat = (v: VaiTro) =>
+    onDoi(chon.includes(v) ? chon.filter((x) => x !== v) : [...chon, v]);
+  return (
+    <div className="flex flex-wrap gap-2">
+      {VAI_TRO.map((r) => {
+        const dangChon = chon.includes(r.value);
+        return (
+          <Button
+            key={r.value}
+            type="button"
+            variant={dangChon ? "default" : "outline"}
+            size="lg"
+            onClick={() => bat(r.value)}
+          >
+            {dangChon && <Check className="size-4" />}
+            {r.label}
+          </Button>
+        );
+      })}
+    </div>
+  );
+}
 
 interface TaoMoi {
   hoTen: string;
   username: string;
   usernameTuSua: boolean;
   matKhau: string;
+  vaiTro: VaiTro[];
 }
 const TAO_RONG: TaoMoi = {
   hoTen: "",
   username: "",
   usernameTuSua: false,
   matKhau: "",
+  vaiTro: [],
 };
 
 /** Màn quản lý người dùng — CHỈ admin. Đăng ký KHÔNG mở tự do: admin tạo tài
@@ -48,7 +77,8 @@ export default function QuanLyNguoiDungScreen({
   taoTaiKhoan: (
     hoTen: string,
     username: string,
-    matKhau: string
+    matKhau: string,
+    vaiTro: VaiTro[]
   ) => Promise<KetQuaDangNhap>;
 }) {
   const [ds, ghi] = useNguoiDung();
@@ -84,7 +114,12 @@ export default function QuanLyNguoiDungScreen({
     if (ls.length > 0) return;
 
     setDangTao(true);
-    const kq = await taoTaiKhoan(tao.hoTen, tao.username, tao.matKhau);
+    const kq = await taoTaiKhoan(
+      tao.hoTen,
+      tao.username,
+      tao.matKhau,
+      tao.vaiTro
+    );
     setDangTao(false);
     if (!kq.ok) {
       setLoiTao([{ truong: "Tạo tài khoản", thongBao: kq.loi ?? "Thất bại" }]);
@@ -115,14 +150,18 @@ export default function QuanLyNguoiDungScreen({
       key: "vaiTro",
       header: "Vai trò",
       render: (r) =>
-        r.vaiTro ? (
-          <Badge variant={r.vaiTro === "admin" ? "default" : "secondary"}>
-            {nhanVaiTro(r.vaiTro)}
-          </Badge>
+        r.vaiTro.length ? (
+          <span className="flex flex-wrap gap-1">
+            {r.vaiTro.map((v) => (
+              <Badge key={v} variant={v === "admin" ? "default" : "secondary"}>
+                {nhanVaiTro([v])}
+              </Badge>
+            ))}
+          </span>
         ) : (
           <Badge variant="outline">Chưa gán</Badge>
         ),
-      sapXep: (r) => r.vaiTro,
+      sapXep: (r) => nhanVaiTro(r.vaiTro),
     },
   ];
 
@@ -233,6 +272,15 @@ export default function QuanLyNguoiDungScreen({
                   placeholder="Mật khẩu"
                 />
               </Field>
+              <Field
+                label="Vai trò"
+                hint="Chọn một hoặc nhiều. VD Phó giám đốc kiêm Quản đốc xưởng Đông = bấm cả hai. Bỏ trống cũng được, gán sau."
+              >
+                <ChonVaiTro
+                  chon={tao.vaiTro}
+                  onDoi={(v) => setTao((t) => (t ? { ...t, vaiTro: v } : t))}
+                />
+              </Field>
             </div>
           )}
 
@@ -272,18 +320,15 @@ export default function QuanLyNguoiDungScreen({
                   placeholder="Họ tên đầy đủ"
                 />
               </Field>
-              <Combobox
+              <Field
                 label="Vai trò"
-                choPhepXoa={false}
-                value={dang.vaiTro}
-                onChange={(v) =>
-                  setDang((d) => (d ? { ...d, vaiTro: v as VaiTro } : d))
-                }
-                options={[
-                  { value: "", label: "Chưa gán" },
-                  ...VAI_TRO.map((x) => ({ value: x.value, label: x.label })),
-                ]}
-              />
+                hint="Chọn một hoặc nhiều. Bấm lại để bỏ. Bỏ hết = Chưa gán."
+              >
+                <ChonVaiTro
+                  chon={dang.vaiTro}
+                  onDoi={(v) => setDang((d) => (d ? { ...d, vaiTro: v } : d))}
+                />
+              </Field>
             </div>
           )}
 

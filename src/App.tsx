@@ -52,7 +52,7 @@ const NAV: MucNav[] = [
   {
     id: "can-doi",
     label: "Cân đối",
-    moTa: "Nguyên liệu vào ↔ thành phẩm ra",
+    moTa: "Nguyên liệu vào ↔ bán thành phẩm sản xuất",
     icon: Scale,
   },
   {

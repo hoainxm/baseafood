@@ -78,11 +78,23 @@ export const BANG_DAI_LY: AnhXaBang<DaiLy> = {
     ten: x.ten,
     dien_thoai: x.dienThoai,
     ghi_chu: x.ghiChu,
+    // Cột mới (migration 0009) — chỉ gửi khi có giá trị ⇒ đại lý vẫn ghi được
+    // kể cả khi chưa chạy 0009.
+    ...(x.tenGhiPhieu ? { ten_ghi_phieu: x.tenGhiPhieu } : {}),
+    ...(x.diaChi ? { dia_chi: x.diaChi } : {}),
+    ...(x.cmnd ? { cmnd: x.cmnd } : {}),
+    ...(x.ngayCap ? { ngay_cap: x.ngayCap } : {}),
+    ...(x.noiCap ? { noi_cap: x.noiCap } : {}),
   }),
   fromRow: (r) => ({
     id: s(r.id),
     ma: s(r.ma),
     ten: s(r.ten),
+    tenGhiPhieu: r.ten_ghi_phieu == null ? "" : s(r.ten_ghi_phieu),
+    diaChi: r.dia_chi == null ? "" : s(r.dia_chi),
+    cmnd: r.cmnd == null ? "" : s(r.cmnd),
+    ngayCap: r.ngay_cap == null ? "" : s(r.ngay_cap),
+    noiCap: r.noi_cap == null ? "" : s(r.noi_cap),
     dienThoai: s(r.dien_thoai),
     ghiChu: s(r.ghi_chu),
   }),
@@ -281,6 +293,9 @@ export const BANG_NL_VAO: AnhXaBang<DongNLVao> = {
     so_luong_kg: x.soLuongKg,
     don_gia: x.donGia,
     ty_le_phan_tram: x.tyLe,
+    // Chỉ gửi khi có giá trị — cột `nguon_kho` (migration 0008) có thể chưa tồn
+    // tại trên DB; bỏ trống ⇒ ghi NL vào chạy bình thường không cần migration.
+    ...(x.nguonKho ? { nguon_kho: x.nguonKho } : {}),
   }),
   fromRow: (r) => ({
     id: s(r.id),
@@ -290,6 +305,7 @@ export const BANG_NL_VAO: AnhXaBang<DongNLVao> = {
     soLuongKg: Number(r.so_luong_kg ?? 0),
     donGia: n(r.don_gia),
     tyLe: n(r.ty_le_phan_tram),
+    nguonKho: r.nguon_kho == null ? "" : s(r.nguon_kho),
   }),
 };
 

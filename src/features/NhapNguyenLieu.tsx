@@ -313,7 +313,21 @@ export default function NhapNguyenLieuScreen() {
   }));
 
   const themDaiLy = (ten: string) => {
-    setDaiLy([...daiLy, { id: uid(), ma: "", ten, dienThoai: "", ghiChu: "" }]);
+    setDaiLy([
+      ...daiLy,
+      {
+        id: uid(),
+        ma: "",
+        ten,
+        tenGhiPhieu: "",
+        diaChi: "",
+        cmnd: "",
+        ngayCap: "",
+        noiCap: "",
+        dienThoai: "",
+        ghiChu: "",
+      },
+    ]);
     notify.daLuu(`Đã thêm đại lý "${ten}" vào danh mục`);
     return ten;
   };

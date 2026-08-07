@@ -1,7 +1,8 @@
 > Load khi: thêm/sửa bảng, cột, migration, hay đọc lỗi Postgres lạ.
 covers: supabase/migrations/**, docs/supabase-setup.md
-last_verified: 2026-08-06
+last_verified: 2026-08-07
 ttl_days: 90
+<!-- updated: 2026-08-07 — thêm migration 0008 (nguyen_lieu_vao.nguon_kho, cờ nguồn xả đông) -->
 
 # Cơ sở dữ liệu & migration
 
@@ -40,7 +41,7 @@ App dùng camelCase, DB dùng snake_case — cầu nối là `AnhXaBang.toRow/fr
 - `nguyen_lieu_vao` / `thanh_pham_ra` FK `ky_id` **on delete cascade**. `phe_lieu.ky_id` thì **nullable, không cascade theo ý nghĩa nghiệp vụ** — xóa kỳ chỉ gỡ liên kết (app tự làm), số gốc thuộc về sổ nhập hàng.
 - `phe_lieu.ky_id` rỗng phải ghi xuống DB là **NULL**, chuỗi rỗng vi phạm FK (`repo.ts` đã xử lý: `x.kyId || null`).
 
-## 4 migration — thứ tự & rủi ro
+## 9 migration — thứ tự & rủi ro
 
 | File | Tier | Việc |
 |---|---|---|
@@ -51,6 +52,8 @@ App dùng camelCase, DB dùng snake_case — cầu nối là `AnhXaBang.toRow/fr
 | `0005_ban_thanh_pham.sql` | 🟡 | Thêm `phieu_ban`, `ban_hang`; nới `thanh_pham_ra` (`quy_cach`, `ban_hang_id`). Chỉ thêm, không phụ thuộc 0004. Đã chạy. |
 | `0006_nguoi_dung.sql` | 🟡 | Thêm `nguoi_dung` (hồ sơ + vai trò, khóa = auth user id). Chỉ thêm. Xem [05-bao-mat-phan-quyen.md](05-bao-mat-phan-quyen.md). |
 | `0007_seed_admin.sql` | 🟡 | Seed `admin`/`admin` thẳng vào `auth.users` + `auth.identities` + `nguoi_dung` (idempotent). ⚠️ mật khẩu tạm rất yếu — đổi ngay. Con-gà-quả-trứng: đăng ký đã đóng. |
+| `0008_nguon_kho.sql` | 🟡 | Thêm cột `nguyen_lieu_vao.nguon_kho` (`Mua về` / `Kho mình` / `""`) — cờ nguồn xả đông, seam tồn kho. Chỉ thêm, idempotent. **Không bắt buộc**: `repo.ts` chỉ gửi `nguon_kho` khi có giá trị ⇒ NL vào ghi được kể cả khi chưa chạy. Lùi: `alter table nguyen_lieu_vao drop column if exists nguon_kho`. |
+| `0009_dai_ly_thong_tin.sql` | 🟡 | Thêm 5 cột `dai_ly`: `ten_ghi_phieu` · `dia_chi` · `cmnd` · `ngay_cap` · `noi_cap` — thông tin lập phiếu cho đại lý. Chỉ thêm, idempotent. **Không bắt buộc**: `repo.ts` chỉ gửi cột mới khi có giá trị. Lùi: `drop column if exists` từng cột. |
 
 ⚠️ **`0004` chưa chạy** ⇒ app báo *"Mất kết nối máy chủ — Could not find the 'chuyen_id' column"*. Số liệu vẫn ghi xuống máy và nằm trong hàng chờ, tự đẩy lên sau khi migration chạy — nhưng máy khác chưa thấy.
 

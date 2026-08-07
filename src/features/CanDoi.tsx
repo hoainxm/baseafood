@@ -203,7 +203,7 @@ export default function CanDoiScreen() {
           </h1>
           <p className="mt-2 max-w-2xl text-base text-muted-foreground">
             Mỗi kỳ là một lô nguyên liệu theo loại. Cân đối nguyên liệu vào với
-            thành phẩm ra để ra định mức chế biến và lãi/lỗ.
+            bán thành phẩm sản xuất ra để ra định mức chế biến và lãi/lỗ.
           </p>
         </div>
         <Button size="lg" onClick={moThem}>
@@ -570,7 +570,7 @@ function KyDetail({
         <h2 className="mb-4 text-xl font-semibold">Kết quả cân đối</h2>
         <div className="grid gap-x-8 gap-y-1 sm:grid-cols-2 lg:grid-cols-3">
           <KV k="Tổng nguyên liệu vào" v={`${num(kq.tongNLVao)} kg`} />
-          <KV k="Tổng thành phẩm" v={`${num(kq.tongTP)} kg`} />
+          <KV k="Tổng bán thành phẩm" v={`${num(kq.tongTP)} kg`} />
           <KV
             k="Định mức chế biến"
             v={chuaCoTP ? "—" : num(kq.dinhMuc)}
@@ -590,7 +590,7 @@ function KyDetail({
             "Lỗ = toàn bộ tiền nguyên liệu" (đỏ, hù người dùng) dù kỳ mới nhập một nửa. */}
         {chuaCoTP ? (
           <div className="mt-5 rounded-lg bg-muted px-5 py-4 text-base font-medium text-muted-foreground">
-            Chưa có thành phẩm ra — nhập khối 3 để tính được lãi/lỗ.
+            Chưa có bán thành phẩm sản xuất — nhập khối 3 để tính được lãi/lỗ.
           </div>
         ) : (
           <div
@@ -661,8 +661,12 @@ function KhoiNLVao({
     if (!dang) return;
     const ls: LoiNhap[] = [];
     if (!dang.ten.trim()) ls.push({ truong: "Tên", thongBao: "Chưa nhập tên" });
-    if (!(dang.soLuongKg > 0))
-      ls.push({ truong: "Số lượng", thongBao: "Phải lớn hơn 0 kg" });
+    // Cho phép ÂM (điều chỉnh giảm, VD "bán nội địa" trừ khỏi pool NL) — chỉ chặn 0.
+    if (!dang.soLuongKg)
+      ls.push({
+        truong: "Số lượng",
+        thongBao: "Phải khác 0 kg (âm = điều chỉnh giảm, VD bán nội địa)",
+      });
     setLoi(ls);
     if (ls.length > 0) return;
     onChange(
@@ -674,7 +678,16 @@ function KhoiNLVao({
 
   const cols: Cot<DongNLVao>[] = [
     { key: "ten", header: "Tên nguyên liệu", chinh: true, render: (r) => r.ten },
-    { key: "nhom", header: "Nhóm", render: (r) => <Badge>{r.nhom}</Badge> },
+    {
+      key: "nhom",
+      header: "Nhóm",
+      render: (r) => (
+        <span className="flex flex-wrap items-center gap-1">
+          <Badge>{r.nhom}</Badge>
+          {r.nguonKho && <Badge variant="outline">{r.nguonKho}</Badge>}
+        </span>
+      ),
+    },
     {
       key: "sl",
       header: "Số lượng (kg)",
@@ -713,6 +726,7 @@ function KhoiNLVao({
           soLuongKg: 0,
           donGia: null,
           tyLe: null,
+          nguonKho: "",
         });
         setLaThem(true);
         setLoi([]);
@@ -769,6 +783,23 @@ function KhoiNLVao({
                   onChange={(v) => setDang((d) => (d ? { ...d, tyLe: v } : d))}
                 />
               </div>
+              {/* Nguồn kho — chỉ cho hàng xả đông: phân biệt mua từ kho khác về
+                 và xả đông kho mình. Seam cho quản lý tồn kho sau này. */}
+              {dang.nhom === "Xả đông" && (
+                <ChoiceGroup
+                  label="Nguồn kho (hàng xả đông)"
+                  value={dang.nguonKho || ""}
+                  onChange={(v) =>
+                    setDang((d) => (d ? { ...d, nguonKho: v } : d))
+                  }
+                  options={[
+                    { value: "", label: "Chưa rõ" },
+                    { value: "Mua về", label: "Mua về (kho khác)" },
+                    { value: "Kho mình", label: "Kho mình" },
+                  ]}
+                  cot={3}
+                />
+              )}
             </>
           )}
         </HopThoaiDong>
@@ -1026,7 +1057,7 @@ function KhoiPheLieu({
   );
 }
 
-/* ---------- Khối 3: Thành phẩm ra ---------- */
+/* ---------- Khối 3: Bán thành phẩm sản xuất ---------- */
 
 function KhoiTP({
   rows,
@@ -1070,7 +1101,7 @@ function KhoiTP({
     onChange(
       laThem ? [...rows, dang] : rows.map((r) => (r.id === dang.id ? dang : r))
     );
-    notify.daLuu(laThem ? "Đã thêm dòng thành phẩm" : "Đã lưu thay đổi");
+    notify.daLuu(laThem ? "Đã thêm dòng bán thành phẩm" : "Đã lưu thay đổi");
     setDang(null);
   };
 
@@ -1126,8 +1157,8 @@ function KhoiTP({
   return (
     <KhoiKhung
       soThuTu="3"
-      tieuDe="Thành phẩm ra"
-      tenDong="dòng thành phẩm"
+      tieuDe="Bán thành phẩm sản xuất"
+      tenDong="dòng bán thành phẩm"
       /* Còn dòng bán chờ hút thì KHÔNG coi là khối rỗng — nếu không, lời mời
          "hút bán vào kỳ" bị ẩn đúng lúc cần nó nhất. */
       trong={rows.length === 0 && choHutBan.length === 0}
@@ -1148,7 +1179,7 @@ function KhoiTP({
         <HopThoaiDong
           mo={dang !== null}
           laThem={laThem}
-          tieuDe="dòng thành phẩm"
+          tieuDe="dòng bán thành phẩm"
           onDong={() => setDang(null)}
           onLuu={luu}
         >
@@ -1292,13 +1323,13 @@ function KhoiTP({
               onXoa={() => {
                 const truoc = rows;
                 onChange(rows.filter((x) => x.id !== r.id));
-                notify.daXoa("Đã xóa dòng thành phẩm", () => onChange(truoc));
+                notify.daXoa("Đã xóa dòng bán thành phẩm", () => onChange(truoc));
               }}
             />
           )
         }
       />
-      <TongKet muc={[{ nhan: "Tổng thành phẩm", giaTri: `${num(tong)} kg` }]} />
+      <TongKet muc={[{ nhan: "Tổng bán thành phẩm", giaTri: `${num(tong)} kg` }]} />
     </KhoiKhung>
   );
 }

@@ -1,7 +1,8 @@
 > Load khi: sửa danh mục (đại lý, loại NL, mặt hàng, khách hàng) hay danh mục 141 mã thành phẩm.
 covers: src/features/DanhMuc.tsx, src/features/ThanhPham.tsx, src/data/thanh-pham.json, src/design-system/patterns/DanhMucCrud.tsx
-last_verified: 2026-08-06
+last_verified: 2026-08-07
 ttl_days: 90
+<!-- updated: 2026-08-07 — đại lý thêm tenGhiPhieu/diaChi/cmnd/ngayCap/noiCap (migration 0009) -->
 
 # Danh mục (master data)
 
@@ -15,6 +16,7 @@ Gộp làm một vì ba mục điều hướng cũ có tên gần giống nhau �
 ## Logic / Rules
 
 - **Đại lý (đầu vào) ≠ khách hàng (đầu ra).** Hai danh mục tách riêng, không gộp. Đại lý cung cấp NL; khách hàng mua TP (có `thiTruong`: Nhật / EU / Nội địa…).
+- **Đại lý có 2 tên:** `ten` = biệt danh gọi tắt trên sổ (VD "Hồng Phú", "mậu"); `tenGhiPhieu` = tên đầy đủ ghi hóa đơn/phiếu (VD "Công ty TNHH TM Hồng Phú"). Kèm `diaChi`, `cmnd` (CMND/CCCD người đại diện hoặc MST công ty), `ngayCap`, `noiCap` — thông tin lập phiếu. Lưu qua migration `0009`; `repo.ts` chỉ gửi cột mới khi có giá trị ⇒ đại lý ghi được **kể cả khi chưa chạy 0009**. Sổ nhập vẫn lưu theo `ten` (biệt danh), không hồi tố khi sửa.
 - **`thanh_pham` khóa chính là `ma`**, không phải `id` sinh tự động (`AnhXaBang.khoaChinh = "ma"`). Mã kế toán là danh tính thật của bản ghi.
 - `src/data/thanh-pham.json` **chỉ là SEED** cho bảng `thanh_pham`, nạp lần đầu khi cả server lẫn local đều rỗng. **Không đọc trực tiếp file này trong màn** — nguồn thật là bảng.
 - `mat_hang.maTP` ánh xạ **lỏng** sang `thanh_pham.ma`: được phép rỗng ("Chưa ánh xạ"). Mặt hàng thực tế chưa khớp hẳn 141 mã — danh mục mặt hàng là **danh mục mở**.

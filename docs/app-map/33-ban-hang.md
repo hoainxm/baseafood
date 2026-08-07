@@ -1,7 +1,8 @@
 > Load khi: sửa màn Bán hàng — phiếu bán, dòng bán, quy cách, ghi bù, hoặc hút bán vào cân đối.
 covers: src/features/BanHang.tsx, src/types.ts, src/lib/repo.ts
-last_verified: 2026-08-06
+last_verified: 2026-08-07
 ttl_days: 90
+<!-- re-verified: 2026-08-07 — phiếu multi-line (phieuId), 2 ngày, seam hút banHangId khớp BanHang.tsx + CanDoi.tsx:389 -->
 
 # Bán hàng (bán thành phẩm RA) hằng ngày
 

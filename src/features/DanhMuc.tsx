@@ -101,9 +101,38 @@ export default function DanhMucScreen() {
   ];
 
   const fDaiLy: TruongDanhMuc<DaiLy>[] = [
-    { key: "ten", nhan: "Tên đại lý", batBuoc: true, viDu: "VD: H.Phú" },
-    { key: "ma", nhan: "Mã nội bộ", viDu: "Tự đặt (nếu cần)" },
-    { key: "dienThoai", nhan: "Điện thoại", viDu: "VD: 0913 xxx xxx" },
+    { key: "ten", nhan: "Tên đại lý (gọi tắt)", batBuoc: true, viDu: "VD: Hồng Phú" },
+    {
+      key: "tenGhiPhieu",
+      nhan: "Tên ghi phiếu (đầy đủ)",
+      viDu: "VD: Công ty TNHH TM Hồng Phú",
+    },
+    {
+      key: "diaChi",
+      nhan: "Địa chỉ",
+      anTrenDienThoai: true,
+      viDu: "Số nhà, đường, phường, tỉnh",
+    },
+    {
+      key: "cmnd",
+      nhan: "CMND / CCCD / MST",
+      anTrenDienThoai: true,
+      viDu: "VD: 3500424848",
+    },
+    { key: "ngayCap", nhan: "Ngày cấp", anTrenDienThoai: true, viDu: "VD: 12/05/2015" },
+    {
+      key: "noiCap",
+      nhan: "Nơi cấp",
+      anTrenDienThoai: true,
+      viDu: "VD: CA Bà Rịa - Vũng Tàu",
+    },
+    { key: "ma", nhan: "Mã nội bộ", anTrenDienThoai: true, viDu: "Tự đặt (nếu cần)" },
+    {
+      key: "dienThoai",
+      nhan: "Điện thoại",
+      anTrenDienThoai: true,
+      viDu: "VD: 0913 xxx xxx",
+    },
     { key: "ghiChu", nhan: "Ghi chú", anTrenDienThoai: true, viDu: "Ghi chú thêm" },
   ];
 
@@ -153,7 +182,7 @@ export default function DanhMucScreen() {
         <TabsContent value="mat-hang" className="pt-6">
           <DanhMucCrud
             tieuDe="Mặt hàng cân đối"
-            moTa="Mặt hàng dùng khi ghi thành phẩm ra trong bảng cân đối."
+            moTa="Mặt hàng dùng khi ghi bán thành phẩm sản xuất trong bảng cân đối."
             tenDonVi="mặt hàng"
             rows={matHang}
             onChange={setMatHang}
@@ -192,10 +221,17 @@ export default function DanhMucScreen() {
               id: uid(),
               ma: "",
               ten: "",
+              tenGhiPhieu: "",
+              diaChi: "",
+              cmnd: "",
+              ngayCap: "",
+              noiCap: "",
               dienThoai: "",
               ghiChu: "",
             })}
-            timTheo={(r) => `${r.ma} ${r.ten} ${r.dienThoai}`}
+            timTheo={(r) =>
+              `${r.ma} ${r.ten} ${r.tenGhiPhieu} ${r.diaChi} ${r.dienThoai}`
+            }
             moTaBanGhi={(r) => r.ten}
           />
         </TabsContent>

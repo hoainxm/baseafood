@@ -135,7 +135,12 @@ export interface KhachHang {
 export interface DaiLy {
   id: string;
   ma: string;
-  ten: string;
+  ten: string; // tên gọi tắt / biệt danh trên sổ (VD "Hồng Phú", "mậu")
+  tenGhiPhieu: string; // tên đầy đủ ghi trên phiếu/hóa đơn (VD "Công ty TNHH TM Hồng Phú")
+  diaChi: string;
+  cmnd: string; // CMND / CCCD người đại diện, hoặc mã số thuế công ty
+  ngayCap: string; // ngày cấp CMND (chuỗi tự do — nhiều dòng để trống)
+  noiCap: string; // nơi cấp
   dienThoai: string;
   ghiChu: string;
 }
@@ -175,9 +180,10 @@ export interface DongNLVao {
   kyId: string;
   nhom: NhomNL;
   ten: string;
-  soLuongKg: number;
+  soLuongKg: number; // có thể ÂM — điều chỉnh giảm (VD "bán nội địa" trừ khỏi pool NL chế biến)
   donGia: number | null; // VND
   tyLe: number | null; // % (dùng cho bột phụ gia)
+  nguonKho?: string; // nguồn khi nhóm = Xả đông: "Mua về" (kho khác bán về) | "Kho mình" — seam quản lý tồn kho sau này
 }
 
 /** Phế liệu cân ở màn Nhập hàng (gộp cuối ngày) hay nhập tay trong kỳ cân đối. */

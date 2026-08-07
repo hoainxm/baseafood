@@ -123,7 +123,7 @@ export default function BangCanDoi({
         )}
 
         {/* Thành phẩm */}
-        <Section title="Thành phẩm ra (xuất khẩu / nội địa)">
+        <Section title="Bán thành phẩm sản xuất (xuất khẩu / nội địa)">
           <table className="w-full border-collapse text-sm">
             <thead>
               <Tr head>
@@ -157,7 +157,7 @@ export default function BangCanDoi({
                 );
               })}
               <Tr total>
-                <Td>Tổng thành phẩm</Td>
+                <Td>Tổng bán thành phẩm</Td>
                 <Td></Td>
                 <Td></Td>
                 <Td right>{num(kq.tongTP)}</Td>
@@ -171,7 +171,7 @@ export default function BangCanDoi({
         {/* Ghi chú / tính toán */}
         <Section title="Cân đối">
           <div className="grid grid-cols-2 gap-x-8 gap-y-1 text-sm">
-            <KV k="Tổng thành phẩm" v={`${num(kq.tongTP)} kg`} />
+            <KV k="Tổng bán thành phẩm" v={`${num(kq.tongTP)} kg`} />
             <KV k="Tỉ giá (VND/USD)" v={num(ky.tiGia)} />
             <KV k="Định mức chế biến" v={num(kq.dinhMuc)} strong />
             <KV k="Chi phí chế biến / kg TP" v={num(ky.chiPhiCB)} />

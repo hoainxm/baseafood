@@ -1,7 +1,9 @@
 > Load khi: sửa màn Cân đối, công thức định mức/lãi lỗ, hay bảng in A4.
 covers: src/features/CanDoi.tsx, src/features/BangCanDoi.tsx, src/lib/canDoi.ts
-last_verified: 2026-08-06
+last_verified: 2026-08-07
 ttl_days: 90
+<!-- re-verified: 2026-08-07 — công thức canDoi.ts + KhoiTP hút bán khớp source -->
+<!-- updated: 2026-08-07 — khối 3 đổi nhãn "Bán thành phẩm sản xuất" (WIP làm ra ≠ bán ra); NL vào cho kg âm (bán nội địa); cờ nguonKho cho xả đông (migration 0008) -->
 
 # Cân đối theo kỳ (xưởng Đông, "cân đối 5 ngày")
 
@@ -43,8 +45,10 @@ Giá trị phế liệu= Σ kg × đơn giá bán
 ### Ba khối
 
 1. **NL vào** — nhóm `Thủy sản` / `Xả đông` / `Bột phụ gia`. "Bột" là **phụ gia tẩm** (có cột tỷ lệ %), không phải phụ phẩm.
+   - **Số lượng có thể ÂM** — dòng điều chỉnh giảm (VD "Bán nội địa −987": NL bán thẳng nội địa, không chế biến ⇒ trừ khỏi pool NL đưa vào sản xuất). Validate chỉ chặn `= 0`, không chặn âm. Tổng NL vào cộng cả dòng âm ⇒ khớp T.CỘNG của báo cáo gốc.
+   - **Cờ nguồn kho** (`nguonKho`, chỉ hiện khi nhóm = `Xả đông`): `"Mua về"` (hàng cấp đông kho KHÁC bán về) / `"Kho mình"` (xả đông hàng kho mình) / `""` (chưa rõ). **Seam** cho quản lý tồn kho / vòng lặp đông gửi ↔ xả đông sau này — chưa dùng vào công thức. Lưu qua cột `nguon_kho` (migration `0008`); `repo.ts` chỉ gửi khi có giá trị ⇒ ghi NL vào chạy được **kể cả khi chưa chạy 0008**.
 2. **Phế liệu** — nguồn thật là sổ nhập hàng, xem dưới.
-3. **TP ra** — mặt hàng (danh mục mở, ánh xạ lỏng sang 141 mã) × khách hàng × kênh. Nhập tay được, **hoặc HÚT từ sổ bán** (dòng bán trong khoảng ngày kỳ → tạo bản sao `thanh_pham_ra`, gắn `banHangId` chống trùng; bỏ khỏi kỳ = xóa bản sao, số gốc ở sổ bán). Xem [33-ban-hang.md](33-ban-hang.md).
+3. **Bán thành phẩm sản xuất** (nhãn cũ "TP ra") — **bán thành phẩm LÀM RA trong kỳ** (cấp đông, cất kho lưu trữ, **CHƯA bán** — gom đủ đơn đặt mới xuất container). ≠ hàng đã bán ra ở màn Bán hàng. Mặt hàng (danh mục mở, ánh xạ lỏng sang 141 mã) × quy cách/size × khách (đơn đặt) × kênh. **Nhập tay** là đường chính cho báo cáo sản lượng. Seam **HÚT từ sổ bán** vẫn còn (dòng bán trong khoảng ngày → bản sao `thanh_pham_ra`, gắn `banHangId` chống trùng; bỏ kỳ = xóa bản sao, số gốc ở sổ bán) — dùng cho tình huống output=bán ra, sẽ tổ chức lại khi có module kho + bán hàng. Xem [33-ban-hang.md](33-ban-hang.md).
 
 ### Phế liệu: HÚT, không nhập lại
 

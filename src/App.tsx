@@ -2,6 +2,8 @@ import { useState } from "react";
 import NhapNguyenLieuScreen from "@/features/NhapNguyenLieu";
 import SanXuatBTPScreen from "@/features/SanXuatBTP";
 import BanHangScreen from "@/features/BanHang";
+import KhoDuTruScreen from "@/features/KhoDuTru";
+import DonDatScreen from "@/features/DonDat";
 import CanDoiScreen from "@/features/CanDoi";
 import DanhMucScreen from "@/features/DanhMuc";
 import QuanLyNguoiDungScreen from "@/features/QuanLyNguoiDung";
@@ -15,6 +17,8 @@ import {
   Truck,
   Factory,
   ShoppingCart,
+  Snowflake,
+  ClipboardList,
   Scale,
   Library,
   Palette,
@@ -26,6 +30,8 @@ type Screen =
   | "nhap-hang"
   | "san-xuat"
   | "ban-hang"
+  | "kho"
+  | "don-dat"
   | "can-doi"
   | "danh-muc"
   | "nguoi-dung"
@@ -57,6 +63,18 @@ const NAV: MucNav[] = [
     label: "Bán hàng",
     moTa: "Ghi phiếu bán thành phẩm hằng ngày",
     icon: ShoppingCart,
+  },
+  {
+    id: "kho",
+    label: "Kho dự trữ",
+    moTa: "Duyệt nhập kho, theo dõi tồn đông",
+    icon: Snowflake,
+  },
+  {
+    id: "don-dat",
+    label: "Đơn đặt",
+    moTa: "Gom đủ đơn, xuất container",
+    icon: ClipboardList,
   },
   {
     id: "can-doi",
@@ -235,6 +253,8 @@ export default function App() {
             {screenThuc === "nhap-hang" && <NhapNguyenLieuScreen />}
             {screenThuc === "san-xuat" && <SanXuatBTPScreen />}
             {screenThuc === "ban-hang" && <BanHangScreen />}
+            {screenThuc === "kho" && <KhoDuTruScreen />}
+            {screenThuc === "don-dat" && <DonDatScreen />}
             {screenThuc === "can-doi" && <CanDoiScreen />}
             {screenThuc === "danh-muc" && <DanhMucScreen />}
             {screenThuc === "nguoi-dung" && (

@@ -165,7 +165,8 @@ export interface MatHang {
   ma: string;
   ten: string;
   maTP: string; // mã trong danh mục 141 (nếu có)
-  loai?: string; // loài (Bạch tuộc/Mực/Cá…) — để LỌC theo loài khi ghi sản lượng; seed từ nhóm thành phẩm 141
+  loai?: string; // loài (Bạch tuộc/Mực/Cá…) — seed từ nhóm thành phẩm 141
+  loaiNLId?: string; // khóa chính loại nguyên liệu (loai_nguyen_lieu.id) — thành phẩm THUỘC loại NL nào (VD "Bạch tuộc 2 da"); lọc thành phẩm theo loại NL
 }
 
 /** Khách hàng (đầu ra) — tách riêng đại lý (đầu vào). */

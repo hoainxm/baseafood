@@ -117,7 +117,6 @@ export default function KhoDuTruScreen() {
       render: (r) => tenMH(r.matHangId),
       sapXep: (r) => tenMH(r.matHangId),
     },
-    { key: "qc", header: "Quy cách", render: (r) => r.quyCach || "—" },
     { key: "kho", header: "Kho", render: (r) => <Badge>{r.kho || "—"}</Badge>, sapXep: (r) => r.kho },
     {
       key: "lo",

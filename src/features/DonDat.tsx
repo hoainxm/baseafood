@@ -94,12 +94,6 @@ export default function DonDatScreen() {
     label: k.ten,
     phu: k.thiTruong || undefined,
   }));
-  const optQuyCach: MucChon[] = useMemo(() => {
-    const set = new Set<string>();
-    for (const s of sanXuat) if (s.quyCach) set.add(s.quyCach);
-    return [...set].map((q) => ({ value: q, label: q }));
-  }, [sanXuat]);
-
   /** kg đã xuất cho (đơn × mặt hàng × quy cách) — gom dòng lệnh của lệnh thuộc đơn. */
   const daXuat = (donId: string, mh: string, qc: string) => {
     const lenhCuaDon = new Set(
@@ -462,20 +456,12 @@ export default function DonDatScreen() {
                     className="space-y-4 rounded-xl border-2 border-border p-4"
                   >
                     <Combobox
-                      label="Mặt hàng"
+                      label="Thành phẩm"
                       required
                       value={dc.matHangId}
                       onChange={(v) => datDong(i, { matHangId: v })}
                       options={optMatHang}
                       onCreate={themMatHang}
-                    />
-                    <Combobox
-                      label="Quy cách"
-                      value={dc.quyCach}
-                      onChange={(v) => datDong(i, { quyCach: v })}
-                      options={optQuyCach}
-                      onCreate={(t) => t}
-                      placeholder="— Chọn / gõ quy cách —"
                     />
                     <div className="grid gap-6 sm:grid-cols-2">
                       <NumberField

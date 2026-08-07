@@ -151,9 +151,10 @@ export const BANG_MAT_HANG: AnhXaBang<MatHang> = {
     ma: x.ma,
     ten: x.ten,
     ma_thanh_pham: x.maTP,
-    // Cột mới (migration 0014) — chỉ gửi khi có giá trị ⇒ mặt hàng vẫn ghi được
-    // kể cả khi chưa chạy 0014.
+    // Cột mới — chỉ gửi khi có giá trị ⇒ mặt hàng vẫn ghi được kể cả khi chưa
+    // chạy migration (0014 loai, 0015 loai_nguyen_lieu_id).
     ...(x.loai ? { loai: x.loai } : {}),
+    ...(x.loaiNLId ? { loai_nguyen_lieu_id: x.loaiNLId } : {}),
   }),
   fromRow: (r) => ({
     id: s(r.id),
@@ -161,6 +162,7 @@ export const BANG_MAT_HANG: AnhXaBang<MatHang> = {
     ten: s(r.ten),
     maTP: s(r.ma_thanh_pham),
     loai: r.loai == null ? "" : s(r.loai),
+    loaiNLId: r.loai_nguyen_lieu_id == null ? "" : s(r.loai_nguyen_lieu_id),
   }),
 };
 

@@ -59,12 +59,35 @@ export default function DanhMucScreen() {
       viDu: "VD: 2 da cắt luộc 1000-1300",
     },
     {
+      key: "loaiNLId",
+      nhan: "Loại nguyên liệu",
+      render: (giaTri, doiGiaTri) => (
+        <Combobox
+          label="Loại nguyên liệu"
+          hint="Thành phẩm này thuộc loại NL nào (VD Bạch tuộc 2 da) — để lọc khi ghi sản lượng."
+          value={giaTri}
+          onChange={doiGiaTri}
+          options={loaiNL.map((l) => ({
+            value: l.id,
+            label: l.ten,
+            phu: l.loai || undefined,
+          }))}
+          placeholder="— Chọn loại nguyên liệu —"
+          emptyText="Chưa có loại NL — thêm ở tab Loại nguyên liệu."
+        />
+      ),
+      hienThi: (r) =>
+        loaiNL.find((l) => l.id === r.loaiNLId)?.ten || (
+          <span className="text-muted-foreground">—</span>
+        ),
+    },
+    {
       key: "loai",
       nhan: "Loài",
       render: (giaTri, doiGiaTri) => (
         <Combobox
           label="Loài"
-          hint="Bạch tuộc, Mực, Cá… — để lọc theo loài khi ghi sản lượng."
+          hint="Bạch tuộc, Mực, Cá…"
           value={giaTri}
           onChange={doiGiaTri}
           options={NHOM_TP.map((n) => ({ value: n, label: n }))}
@@ -72,8 +95,9 @@ export default function DanhMucScreen() {
           placeholder="— Chọn loài —"
         />
       ),
+      anTrenDienThoai: true,
     },
-    { key: "ma", nhan: "Mã nội bộ", viDu: "Tự đặt (nếu cần)" },
+    { key: "ma", nhan: "Mã nội bộ", anTrenDienThoai: true, viDu: "Tự đặt (nếu cần)" },
     {
       key: "maTP",
       nhan: "Mã thành phẩm (danh mục kế toán)",
@@ -205,7 +229,14 @@ export default function DanhMucScreen() {
             rows={matHang}
             onChange={setMatHang}
             fields={fMatHang}
-            taoMoi={() => ({ id: uid(), ma: "", ten: "", maTP: "", loai: "" })}
+            taoMoi={() => ({
+              id: uid(),
+              ma: "",
+              ten: "",
+              maTP: "",
+              loai: "",
+              loaiNLId: "",
+            })}
             timTheo={(r) => `${r.ma} ${r.ten} ${r.maTP}`}
             moTaBanGhi={(r) => `${r.ten}${r.ma ? ` (mã ${r.ma})` : ""}`}
           />

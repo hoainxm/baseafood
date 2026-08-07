@@ -41,7 +41,7 @@ App dùng camelCase, DB dùng snake_case — cầu nối là `AnhXaBang.toRow/fr
 - `nguyen_lieu_vao` / `thanh_pham_ra` FK `ky_id` **on delete cascade**. `phe_lieu.ky_id` thì **nullable, không cascade theo ý nghĩa nghiệp vụ** — xóa kỳ chỉ gỡ liên kết (app tự làm), số gốc thuộc về sổ nhập hàng.
 - `phe_lieu.ky_id` rỗng phải ghi xuống DB là **NULL**, chuỗi rỗng vi phạm FK (`repo.ts` đã xử lý: `x.kyId || null`).
 
-## 14 migration — thứ tự & rủi ro
+## 15 migration — thứ tự & rủi ro
 
 | File | Tier | Việc |
 |---|---|---|
@@ -58,6 +58,7 @@ App dùng camelCase, DB dùng snake_case — cầu nối là `AnhXaBang.toRow/fr
 | `0011_wip_san_xuat_kho_don.sql` | 🟡 | Module WIP: thêm `san_xuat_btp` · `chot_san_xuat` · `don_dat` · `dong_don` · `lenh_xuat` · `dong_lenh`. Chỉ thêm bảng, idempotent, RLS mở cho anon (siết ở 0003). Nền cho 3 màn Sản xuất BTP / Kho dự trữ / Đơn đặt (ba-spec 34, design-spec 35). |
 | `0012_seed_khach_hang.sql` | 🟢 | Seed 11 khách hàng từ bảng cân đối (Lucky · Seachemot · Daiko · Peacock · Hanwa · Matsuda · Hatchando · JFDA · Dairei · Orient · Sasano). Idempotent (so theo tên), `thi_truong` để trống. Chỉ thêm khách chưa có. |
 | `0014_mat_hang_loai.sql` | 🟡 | Thêm cột `mat_hang.loai` (loài) + nạp mặt hàng từ 141 thành phẩm (mỗi cái gắn loài = nhóm), backfill loài cho mặt hàng đã ánh xạ. Idempotent theo tên. `repo.ts` chỉ gửi `loai` khi có giá trị ⇒ không bắt buộc để ghi. App cũng `seedMatHang` từ 141 khi mat_hang rỗng. |
+| `0015_mat_hang_loai_nl.sql` | 🟡 | Thêm cột `mat_hang.loai_nguyen_lieu_id` (khóa chính loại NL) — thành phẩm THUỘC loại NL nào; ghi sản lượng lọc thành phẩm theo loại NL. Chỉ thêm cột, idempotent. `repo.ts` gửi có điều kiện. |
 | `0013_seed_dai_ly.sql` | 🟢 | Seed 10 đại lý từ ảnh người dùng (Hồng Phú · mậu · Trọng Hòa · Hương Pháp · Nam Tuyền · hiếu phấn · thuận pt · P Cơ · Hoàn Truyền · Tuấn Tô) — đủ tên ghi phiếu/địa chỉ/CMND/nơi cấp. **Chạy SAU 0009** (cần cột mới của dai_ly). Idempotent (so theo tên ghi phiếu). Ảnh bị cắt ở "Tuấn Tô" — còn đại lý dưới chưa seed. |
 
 ⚠️ **`0004` chưa chạy** ⇒ app báo *"Mất kết nối máy chủ — Could not find the 'chuyen_id' column"*. Số liệu vẫn ghi xuống máy và nằm trong hàng chờ, tự đẩy lên sau khi migration chạy — nhưng máy khác chưa thấy.

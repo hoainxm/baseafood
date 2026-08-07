@@ -65,6 +65,12 @@ function dichLoiTaoTK(msg: string): string {
     return "Mật khẩu quá ngắn (tối thiểu 6 ký tự)";
   if (/signups? (are )?disabled/i.test(msg))
     return "Máy chủ đang tắt đăng ký — bật Email provider trong Supabase";
+  // GoTrue cố gửi mail xác nhận tới email tổng hợp (hòm thư ảo) → dội trần SMTP.
+  // Cách sửa: TẮT "Confirm email" (app nội bộ, không dùng mail xác nhận).
+  if (/rate limit|over_email_send/i.test(msg))
+    return 'Máy chủ chặn do gửi mail xác nhận quá nhiều. TẮT "Confirm email" trong Supabase (Authentication → Providers → Email) rồi thử lại.';
+  if (/email.*invalid|invalid.*email|email_address_invalid/i.test(msg))
+    return "Email tổng hợp không hợp lệ — kiểm tra đuôi email (đang dùng @bsf1.vn, KHÔNG dùng .local).";
   return msg;
 }
 

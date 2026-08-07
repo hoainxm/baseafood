@@ -165,6 +165,7 @@ export interface MatHang {
   ma: string;
   ten: string;
   maTP: string; // mã trong danh mục 141 (nếu có)
+  loai?: string; // loài (Bạch tuộc/Mực/Cá…) — để LỌC theo loài khi ghi sản lượng; seed từ nhóm thành phẩm 141
 }
 
 /** Khách hàng (đầu ra) — tách riêng đại lý (đầu vào). */

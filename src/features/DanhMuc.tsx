@@ -22,6 +22,9 @@ import ThanhPham141 from "@/features/ThanhPham";
 
 const THI_TRUONG = ["Nhật", "EU", "Mỹ", "Hàn Quốc", "Trung Quốc", "Nội địa"];
 
+/** Nhóm/loài của thành phẩm 141 — dùng cho ô Loài của mặt hàng. */
+const NHOM_TP = ["Bạch tuộc", "Mực", "Cá", "Tôm", "Bào ngư", "Khác"];
+
 /**
  * Một trang "Danh mục" cho tất cả danh sách dùng chung.
  *
@@ -54,6 +57,21 @@ export default function DanhMucScreen() {
       nhan: "Tên mặt hàng",
       batBuoc: true,
       viDu: "VD: 2 da cắt luộc 1000-1300",
+    },
+    {
+      key: "loai",
+      nhan: "Loài",
+      render: (giaTri, doiGiaTri) => (
+        <Combobox
+          label="Loài"
+          hint="Bạch tuộc, Mực, Cá… — để lọc theo loài khi ghi sản lượng."
+          value={giaTri}
+          onChange={doiGiaTri}
+          options={NHOM_TP.map((n) => ({ value: n, label: n }))}
+          onCreate={(t) => t}
+          placeholder="— Chọn loài —"
+        />
+      ),
     },
     { key: "ma", nhan: "Mã nội bộ", viDu: "Tự đặt (nếu cần)" },
     {
@@ -187,7 +205,7 @@ export default function DanhMucScreen() {
             rows={matHang}
             onChange={setMatHang}
             fields={fMatHang}
-            taoMoi={() => ({ id: uid(), ma: "", ten: "", maTP: "" })}
+            taoMoi={() => ({ id: uid(), ma: "", ten: "", maTP: "", loai: "" })}
             timTheo={(r) => `${r.ma} ${r.ten} ${r.maTP}`}
             moTaBanGhi={(r) => `${r.ten}${r.ma ? ` (mã ${r.ma})` : ""}`}
           />

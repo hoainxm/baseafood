@@ -146,12 +146,21 @@ export const BANG_MAT_HANG: AnhXaBang<MatHang> = {
   table: "mat_hang",
   localKey: "bsf.mathang.v1",
   layKhoa: theoId,
-  toRow: (x) => ({ id: x.id, ma: x.ma, ten: x.ten, ma_thanh_pham: x.maTP }),
+  toRow: (x) => ({
+    id: x.id,
+    ma: x.ma,
+    ten: x.ten,
+    ma_thanh_pham: x.maTP,
+    // Cột mới (migration 0014) — chỉ gửi khi có giá trị ⇒ mặt hàng vẫn ghi được
+    // kể cả khi chưa chạy 0014.
+    ...(x.loai ? { loai: x.loai } : {}),
+  }),
   fromRow: (r) => ({
     id: s(r.id),
     ma: s(r.ma),
     ten: s(r.ten),
     maTP: s(r.ma_thanh_pham),
+    loai: r.loai == null ? "" : s(r.loai),
   }),
 };
 

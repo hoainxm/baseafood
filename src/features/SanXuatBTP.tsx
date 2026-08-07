@@ -33,6 +33,7 @@ import { KY_OPT, phamViKy, type KyXem } from "@/lib/ky";
 import { Factory, Lock, LockOpen, Pencil, Plus, TriangleAlert } from "lucide-react";
 
 const PHAN_XUONG: PhanXuong[] = ["Đông", "Cá", "Khô"];
+const NHOM = ["Bạch tuộc", "Mực", "Cá", "Tôm", "Bào ngư", "Khác"];
 
 interface DongMoi {
   ngay: string;
@@ -71,6 +72,7 @@ export default function SanXuatBTPScreen() {
 
   const [dangMoi, setDangMoi] = useState<DongMoi | null>(null);
   const [suaId, setSuaId] = useState<string | null>(null);
+  const [loaiLoc, setLoaiLoc] = useState("Bạch tuộc"); // lọc mặt hàng theo loài trong dialog
   const [loi, setLoi] = useState<LoiNhap[]>([]);
 
   const [hoiChot, setHoiChot] = useState(false);
@@ -123,11 +125,24 @@ export default function SanXuatBTPScreen() {
       : 0;
   const daChot = (n: string, x: PhanXuong) => Boolean(banGhiChot(n, x)?.daChot);
 
-  const optMatHang: MucChon[] = matHang.map((m) => ({
-    value: m.id,
-    label: m.ten,
-    phu: m.ma || undefined,
-  }));
+  /** Loài có trong danh mục mặt hàng (để lọc). */
+  const optLoai: MucChon[] = useMemo(() => {
+    const set = new Set<string>();
+    for (const m of matHang) if (m.loai) set.add(m.loai);
+    return [...set].sort((a, b) => a.localeCompare(b, "vi")).map((l) => ({
+      value: l,
+      label: l,
+    }));
+  }, [matHang]);
+
+  /** Mặt hàng lọc theo loài đang chọn (bảng cân đối thường 1 loài). */
+  const optMatHang: MucChon[] = useMemo(
+    () =>
+      matHang
+        .filter((m) => !loaiLoc || (m.loai || "") === loaiLoc)
+        .map((m) => ({ value: m.id, label: m.ten, phu: m.loai || undefined })),
+    [matHang, loaiLoc]
+  );
   const optQuyCach: MucChon[] = useMemo(() => {
     const set = new Map<string, string>();
     for (const r of rows) if (r.quyCach) set.set(r.quyCach, r.quyCach);
@@ -135,9 +150,11 @@ export default function SanXuatBTPScreen() {
   }, [rows]);
 
   const themMatHang = (ten: string) => {
-    const m: MatHang = { id: uid(), ma: "", ten, maTP: "" };
+    const m: MatHang = { id: uid(), ma: "", ten, maTP: "", loai: loaiLoc };
     setMatHang([...matHang, m]);
-    notify.daLuu(`Đã thêm mặt hàng "${ten}" vào danh mục`);
+    notify.daLuu(
+      `Đã thêm mặt hàng "${ten}"${loaiLoc ? ` (${loaiLoc})` : ""} vào danh mục`
+    );
     return m.id;
   };
 
@@ -150,6 +167,8 @@ export default function SanXuatBTPScreen() {
     setLoi([]);
   };
   const moSua = (r: DongSanXuat) => {
+    const l = matHang.find((m) => m.id === r.matHangId)?.loai;
+    if (l) setLoaiLoc(l);
     setDangMoi({
       ngay: r.ngay,
       ngayGhiSo: r.ngayGhiSo || r.ngay,
@@ -541,14 +560,32 @@ export default function SanXuatBTPScreen() {
               />
 
               <Combobox
-                label="Mặt hàng"
+                label="Loài"
+                choPhepXoa={false}
+                hint="Chọn loài trước — mặt hàng lọc theo loài (bảng cân đối thường 1 loài)."
+                value={loaiLoc}
+                onChange={(v) => {
+                  setLoaiLoc(v);
+                  // đổi loài thì bỏ mặt hàng cũ (khác loài)
+                  dat("matHangId", "");
+                }}
+                options={
+                  optLoai.length
+                    ? optLoai
+                    : NHOM.map((n) => ({ value: n, label: n }))
+                }
+                onCreate={(t) => t}
+              />
+
+              <Combobox
+                label="Mặt hàng (thành phẩm)"
                 required
-                hint="Chưa có thì gõ tên rồi bấm Thêm mới."
+                hint="Lấy từ danh mục thành phẩm theo loài. Chưa có thì gõ tên rồi Thêm mới."
                 value={dangMoi.matHangId}
                 onChange={(v) => dat("matHangId", v)}
                 options={optMatHang}
                 onCreate={themMatHang}
-                emptyText="Chưa có mặt hàng nào trong danh mục."
+                emptyText={`Chưa có mặt hàng loài ${loaiLoc || "này"} — gõ tên rồi Thêm mới.`}
               />
 
               <Combobox

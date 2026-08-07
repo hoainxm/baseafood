@@ -23,7 +23,7 @@ import {
   BANG_TP_RA,
   useBang,
 } from "@/lib/repo";
-import type { LoaiNguyenLieu, ThanhPham } from "@/types";
+import type { LoaiNguyenLieu, MatHang, ThanhPham } from "@/types";
 import tp141 from "@/data/thanh-pham.json";
 
 /**
@@ -53,8 +53,19 @@ export const seedLoaiNL = (): LoaiNguyenLieu[] =>
 /** 141 mã kế toán — file JSON chỉ còn là SEED, nguồn thật là bảng thanh_pham. */
 export const seedThanhPham = (): ThanhPham[] => tp141 as ThanhPham[];
 
+/** Mặt hàng nạp sẵn TỪ 141 thành phẩm (mỗi cái gắn loài = nhóm) — để lần đầu mở
+ *  đã có cái mà chọn, lọc theo loài. `maTP` trỏ về mã 141; `loai` = nhóm. */
+export const seedMatHang = (): MatHang[] =>
+  (tp141 as ThanhPham[]).map((t) => ({
+    id: uid(),
+    ma: "",
+    ten: t.ten,
+    maTP: t.ma,
+    loai: t.nhom,
+  }));
+
 /* --- Danh mục --- */
-export const useMatHang = () => useBang(BANG_MAT_HANG);
+export const useMatHang = () => useBang(BANG_MAT_HANG, seedMatHang);
 export const useKhachHang = () => useBang(BANG_KHACH_HANG);
 export const useDaiLy = () => useBang(BANG_DAI_LY);
 export const useLoaiNL = () => useBang(BANG_LOAI_NL, seedLoaiNL);

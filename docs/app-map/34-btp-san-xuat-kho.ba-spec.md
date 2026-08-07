@@ -72,9 +72,10 @@ Rubric: Định hướng · Input/Output · Không dead-end · Cross tường mi
 
 ## Mô hình tồn (WHAT — bất biến dữ liệu, KHÔNG phải schema)
 
-**Khoá tồn = (mặt hàng × quy cách × lô[ngày SX/mẻ] × trạng thái-đông)**, đo bằng **kg VÀ số block song song** (không quy đổi mất mát).
+**Khoá tồn = (mặt hàng × quy cách × lô[ngày SX/mẻ] × kho[phòng đông] × trạng thái-đông)**, đo bằng **kg VÀ số block song song** (không quy đổi mất mát). *(Chốt 2026-08-07: nhiều phòng đông ⇒ `kho` là chiều khoá.)*
 - **Quy cách** = chiều khoá cứng (không phải ghi chú) — đơn XK đặt theo size, giá theo size.
 - **Lô/ngày SX** bắt buộc: traceability XK (thu hồi theo lô) + hạn cấp đông (FIFO gợi ý, cho ghi đè).
+- **Kho (phòng đông)** = chiều khoá — xí nghiệp có nhiều phòng đông; tồn theo từng phòng. Thủ kho gán kho khi duyệt nhập.
 - **Trạng thái-đông:** chờ nhập · đã cấp đông · đông gửi kỳ sau · đã phân bổ cho đơn · đã xuất.
 - **Phân bổ cho đơn** = liên kết mềm (rã được khi khách huỷ), KHÔNG phải chiều khoá.
 
@@ -147,16 +148,18 @@ Rubric: Định hướng · Input/Output · Không dead-end · Cross tường mi
 ## Assumptions (fail-closed — safe default; ⚠️ = cần xí nghiệp chốt)
 
 1. Đơn vị tồn = **kg** chuẩn + **block** song song (không quy đổi cứng). Giá vốn theo **mẻ**.
-2. Tồn khoá 4 chiều (mặt hàng×quy cách×lô×trạng thái); "phân bổ cho đơn" là liên kết mềm.
+2. Tồn khoá **5 chiều** (mặt hàng×quy cách×lô×**kho**×trạng thái); "phân bổ cho đơn" là liên kết mềm.
 3. Xuất **một phần** được phép mặc định; "đủ" do **Phòng KH** xác nhận thủ công.
 4. Kế toán read-only vận hành; chỉ đối chiếu cuối kỳ (H6).
-5. ⚠️ Chưa chốt **1 hay nhiều phòng đông** → mặc định **1 kho** (seam `ban_hang.kho_nguon` để dành, chưa thêm chiều kho).
-6. ⚠️ Chưa chốt **xả đông FIFO hay chỉ định lô** → mặc định **FIFO gợi ý + cho ghi đè**.
-7. ⚠️ Chưa chốt **Tổ trưởng SX và Thủ kho có phải cùng người** ở phân xưởng nhỏ → mặc định **hai người, hai sự kiện** (giữ seam đối chiếu). Nếu cùng người: gộp thao tác, vẫn ghi hai sự kiện.
 
-## Open decisions — cần xí nghiệp chốt trước khi DESIGN chiều dữ liệu
+## Open decisions — ĐÃ CHỐT với xí nghiệp (2026-08-07)
 
-Ba câu ở Assumptions #5/#6/#7 ảnh hưởng **chiều khoá tồn + logic gối đầu** (đổi sau khi có dữ liệu = RED). Mặc định an toàn đã chọn để không chặn; xác nhận để khoá mô hình.
+| Quyết định | Chốt | Ảnh hưởng |
+|---|---|---|
+| Số phòng đông | **Nhiều phòng đông** | `kho` là chiều khoá tồn (thủ kho gán khi duyệt nhập) |
+| Xả đông rút lô nào | **FIFO gợi ý + cho ghi đè** | mặc định gợi ý lô cũ nhất; cho chọn lô khác |
+| Tổ trưởng SX vs Thủ kho | **Hai người, hai sự kiện** | giữ 2 chữ ký (chốt chặn bắt lệch tồn) |
 
 ## History
 - 2026-08-07 — tạo ba-spec (team-agent: Flow-Optimizer+Cross-User-Integrity, Domain-Specialist kho đông lạnh). Chưa design, chưa code.
+- 2026-08-07 — chốt 3 open decision với user: nhiều phòng đông (thêm chiều `kho`), FIFO gợi ý+ghi đè, hai người hai sự kiện. Mô hình tồn → 5 chiều.

@@ -1,8 +1,8 @@
 > Load khi: thiết kế/build 3 màn module WIP — Sản xuất BTP, Kho dự trữ, Đơn đặt.
-covers: (chưa có code — design-spec cho module WIP; khi build trỏ features/SanXuatBTP.tsx, features/KhoDuTru.tsx, features/DonDat.tsx)
+covers: src/features/SanXuatBTP.tsx, src/features/KhoDuTru.tsx, src/features/DonDat.tsx
 last_verified: 2026-08-07
 ttl_days: 90
-status: design-spec (GIAO DIỆN — CHƯA code)
+status: design-spec — ĐÃ BUILD v1 (còn thiếu: QA screenshot 3 viewport, nav gom nhóm, một số AC tồn nâng cao)
 
 # DESIGN-SPEC — Module WIP (Sản xuất BTP · Kho dự trữ · Đơn đặt)
 

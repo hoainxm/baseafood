@@ -41,7 +41,7 @@ App dùng camelCase, DB dùng snake_case — cầu nối là `AnhXaBang.toRow/fr
 - `nguyen_lieu_vao` / `thanh_pham_ra` FK `ky_id` **on delete cascade**. `phe_lieu.ky_id` thì **nullable, không cascade theo ý nghĩa nghiệp vụ** — xóa kỳ chỉ gỡ liên kết (app tự làm), số gốc thuộc về sổ nhập hàng.
 - `phe_lieu.ky_id` rỗng phải ghi xuống DB là **NULL**, chuỗi rỗng vi phạm FK (`repo.ts` đã xử lý: `x.kyId || null`).
 
-## 10 migration — thứ tự & rủi ro
+## 11 migration — thứ tự & rủi ro
 
 | File | Tier | Việc |
 |---|---|---|
@@ -55,6 +55,7 @@ App dùng camelCase, DB dùng snake_case — cầu nối là `AnhXaBang.toRow/fr
 | `0008_nguon_kho.sql` | 🟡 | Thêm cột `nguyen_lieu_vao.nguon_kho` (`Mua về` / `Kho mình` / `""`) — cờ nguồn xả đông, seam tồn kho. Chỉ thêm, idempotent. **Không bắt buộc**: `repo.ts` chỉ gửi `nguon_kho` khi có giá trị ⇒ NL vào ghi được kể cả khi chưa chạy. Lùi: `alter table nguyen_lieu_vao drop column if exists nguon_kho`. |
 | `0009_dai_ly_thong_tin.sql` | 🟡 | Thêm 5 cột `dai_ly`: `ten_ghi_phieu` · `dia_chi` · `cmnd` · `ngay_cap` · `noi_cap` — thông tin lập phiếu cho đại lý. Chỉ thêm, idempotent. **Không bắt buộc**: `repo.ts` chỉ gửi cột mới khi có giá trị. Lùi: `drop column if exists` từng cột. |
 | `0010_email_domain_vn.sql` | 🔴 | Đổi đuôi email tổng hợp `@bsf1.local` → `@bsf1.vn` trong `auth.users` + `auth.identities` (GoTrue chặn TLD `.local` khi signUp). **Chạy SAU khi deploy code** đổi `DUOI_EMAIL`. Chỉ đụng tài khoản `.local` (thực tế chỉ admin seed). Idempotent. Không đụng mật khẩu. Lùi: xem đầu file. Đừng chạy lại `0007` trên DB đã seed `.local` — chạy `0010`. |
+| `0011_wip_san_xuat_kho_don.sql` | 🟡 | Module WIP: thêm `san_xuat_btp` · `chot_san_xuat` · `don_dat` · `dong_don` · `lenh_xuat` · `dong_lenh`. Chỉ thêm bảng, idempotent, RLS mở cho anon (siết ở 0003). Nền cho 3 màn Sản xuất BTP / Kho dự trữ / Đơn đặt (ba-spec 34, design-spec 35). |
 
 ⚠️ **`0004` chưa chạy** ⇒ app báo *"Mất kết nối máy chủ — Could not find the 'chuyen_id' column"*. Số liệu vẫn ghi xuống máy và nằm trong hàng chờ, tự đẩy lên sau khi migration chạy — nhưng máy khác chưa thấy.
 

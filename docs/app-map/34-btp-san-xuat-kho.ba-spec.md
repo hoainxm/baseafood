@@ -1,8 +1,8 @@
 > Load khi: thiết kế/xây module WIP — sản xuất bán thành phẩm ngày, kho dự trữ đông, đơn đặt, xuất container.
-covers: (chưa có code — ba-spec cho module WIP; khi build sẽ trỏ features/SanXuatBTP, features/KhoDuTru, features/DonDat, lib/kho.ts + migration kho)
+covers: src/features/SanXuatBTP.tsx, src/features/KhoDuTru.tsx, src/features/DonDat.tsx, src/lib/kho.ts, supabase/migrations/0011_wip_san_xuat_kho_don.sql
 last_verified: 2026-08-07
 ttl_days: 90
-status: ba-spec (PHÂN TÍCH — CHƯA code, chưa design UI)
+status: ba-spec — ĐÃ BUILD v1 (migration 0011 + 3 màn SanXuatBTP/KhoDuTru/DonDat)
 
 # BA-SPEC — Module WIP: Sản xuất BTP · Kho dự trữ · Đơn đặt · Xuất container
 

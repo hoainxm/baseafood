@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { NguoiDung, VaiTro } from "@/types";
-import { VAI_TRO, nhanVaiTro } from "@/types";
+import { VAI_TRO, nhanVaiTro, dsVaiTro } from "@/types";
 import { useNguoiDung } from "@/lib/danhMuc";
 import { hoTenToUsername } from "@/lib/username";
 import type { KetQuaDangNhap } from "@/lib/auth";
@@ -149,10 +149,11 @@ export default function QuanLyNguoiDungScreen({
     {
       key: "vaiTro",
       header: "Vai trò",
-      render: (r) =>
-        r.vaiTro.length ? (
+      render: (r) => {
+        const vt = dsVaiTro(r.vaiTro);
+        return vt.length ? (
           <span className="flex flex-wrap gap-1">
-            {r.vaiTro.map((v) => (
+            {vt.map((v) => (
               <Badge key={v} variant={v === "admin" ? "default" : "secondary"}>
                 {nhanVaiTro([v])}
               </Badge>
@@ -160,7 +161,8 @@ export default function QuanLyNguoiDungScreen({
           </span>
         ) : (
           <Badge variant="outline">Chưa gán</Badge>
-        ),
+        );
+      },
       sapXep: (r) => nhanVaiTro(r.vaiTro),
     },
   ];
@@ -213,7 +215,11 @@ export default function QuanLyNguoiDungScreen({
           timKiem={(r) => `${r.username} ${r.hoTen} ${nhanVaiTro(r.vaiTro)}`}
           nhanTimKiem="Tìm theo tên đăng nhập / họ tên…"
           actions={(r) => (
-            <Button variant="outline" size="sm" onClick={() => setDang({ ...r })}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setDang({ ...r, vaiTro: dsVaiTro(r.vaiTro) })}
+            >
               <Pencil />
               Sửa
             </Button>

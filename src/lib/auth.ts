@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase, hasSupabase, SITE_ID, taoClientTam } from "@/lib/supabase";
 import type { NguoiDung, VaiTro } from "@/types";
-import { vaiTroTuChuoi, vaiTroThanhChuoi } from "@/types";
+import { vaiTroTuChuoi, vaiTroThanhChuoi, dsVaiTro } from "@/types";
 import { emailToUsername, usernameToEmail } from "@/lib/username";
 
 /**
@@ -207,7 +207,7 @@ export function useAuth() {
     dangTai: hasSupabase && !daKhoiTao,
     /** Có cần đăng nhập không (chỉ khi đã cấu hình Supabase). */
     canDangNhap: hasSupabase,
-    laAdmin: nguoiDung?.vaiTro.includes("admin") ?? false,
+    laAdmin: dsVaiTro(nguoiDung?.vaiTro).includes("admin"),
     dangNhap,
     taoTaiKhoan,
     dangXuat,

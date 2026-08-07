@@ -47,10 +47,21 @@ export function vaiTroTuChuoi(csv: string): VaiTro[] {
 export function vaiTroThanhChuoi(arr: VaiTro[]): string {
   return arr.join(",");
 }
-/** Nhãn hiển thị gộp các vai trò; rỗng = "Chưa gán". */
-export function nhanVaiTro(arr: VaiTro[]): string {
-  if (!arr.length) return "Chưa gán";
-  return arr.map((v) => VAI_TRO.find((x) => x.value === v)?.label ?? v).join(", ");
+/**
+ * Về LUÔN mảng, kể cả dữ liệu cũ `vaiTro` là chuỗi ("admin") còn kẹt trong cache
+ * localStorage từ bản một-vai-trò. Đây là `vaDongCu` cho đổi shape mảng — thiếu
+ * nó thì màn Người dùng trắng trang (`.map`/`.length` trên chuỗi).
+ */
+export function dsVaiTro(v: unknown): VaiTro[] {
+  if (Array.isArray(v)) return v as VaiTro[];
+  if (typeof v === "string") return vaiTroTuChuoi(v);
+  return [];
+}
+/** Nhãn hiển thị gộp các vai trò; rỗng = "Chưa gán". Chịu cả chuỗi cũ lẫn mảng. */
+export function nhanVaiTro(arr: VaiTro[] | string | null | undefined): string {
+  const a = dsVaiTro(arr);
+  if (!a.length) return "Chưa gán";
+  return a.map((v) => VAI_TRO.find((x) => x.value === v)?.label ?? v).join(", ");
 }
 
 /**

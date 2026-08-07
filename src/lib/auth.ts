@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
-import { supabase, hasSupabase, SITE_ID } from "@/lib/supabase";
+import { supabase, hasSupabase, SITE_ID, taoClientTam } from "@/lib/supabase";
 import type { NguoiDung, VaiTro } from "@/types";
 import { emailToUsername, usernameToEmail } from "@/lib/username";
 
@@ -58,21 +58,21 @@ function dichLoi(msg: string): string {
   return msg;
 }
 
-function dichLoiDangKy(msg: string): string {
+function dichLoiTaoTK(msg: string): string {
   if (/already registered|already exists|user_already_exists/i.test(msg))
     return "Tên đăng nhập đã tồn tại";
   if (/password.*(6|short|weak)|weak.?password/i.test(msg))
     return "Mật khẩu quá ngắn (tối thiểu 6 ký tự)";
   if (/signups? (are )?disabled/i.test(msg))
-    return "Máy chủ đang tắt đăng ký — báo quản trị";
+    return "Máy chủ đang tắt đăng ký — bật Email provider trong Supabase";
   return msg;
 }
 
 export interface KetQuaDangNhap {
   ok: boolean;
   loi?: string;
-  /** Đăng ký xong đã có phiên đăng nhập luôn chưa (email confirm tắt ⇒ có). */
-  coPhien?: boolean;
+  /** Hồ sơ vừa tạo (taoTaiKhoan) — để màn admin cập nhật danh sách ngay. */
+  nguoiDung?: NguoiDung;
 }
 
 export function useAuth() {
@@ -133,7 +133,12 @@ export function useAuth() {
     []
   );
 
-  const dangKy = useCallback(
+  /**
+   * ADMIN tạo tài khoản cho người khác. Đăng ký KHÔNG mở tự do — chỉ gọi từ màn
+   * Người dùng (admin). Dùng client PHỤ để signUp nên KHÔNG đá văng phiên admin
+   * trên client chính. Hồ sơ `nguoi_dung` tạo với vai trò rỗng (admin gán sau).
+   */
+  const taoTaiKhoan = useCallback(
     async (
       hoTen: string,
       username: string,
@@ -154,28 +159,32 @@ export function useAuth() {
         .maybeSingle();
       if (trung) return { ok: false, loi: "Tên đăng nhập đã tồn tại" };
 
-      const { data, error } = await supabase.auth.signUp({
+      const phu = taoClientTam();
+      if (!phu) return { ok: false, loi: "Chưa cấu hình máy chủ" };
+      const { data, error } = await phu.auth.signUp({
         email: usernameToEmail(u),
         password: matKhau,
         options: { data: { ho_ten: hoTen.trim(), username: u } },
       });
-      if (error) return { ok: false, loi: dichLoiDangKy(error.message) };
+      if (error) return { ok: false, loi: dichLoiTaoTK(error.message) };
 
-      // Có phiên (email confirm tắt) ⇒ lưu hồ sơ luôn kèm họ tên.
+      // Lưu hồ sơ qua client CHÍNH (phiên admin) — vai trò rỗng.
       const uid = data.user?.id;
-      if (uid && data.session) {
-        await supabase.from("nguoi_dung").upsert(
-          {
-            id: uid,
-            xi_nghiep_id: SITE_ID,
-            ho_ten: hoTen.trim(),
-            username: u,
-            vai_tro: "",
-          },
-          { onConflict: "id" }
-        );
-      }
-      return { ok: true, coPhien: Boolean(data.session) };
+      if (!uid) return { ok: false, loi: "Tạo tài khoản không thành công" };
+      await supabase.from("nguoi_dung").upsert(
+        {
+          id: uid,
+          xi_nghiep_id: SITE_ID,
+          ho_ten: hoTen.trim(),
+          username: u,
+          vai_tro: "",
+        },
+        { onConflict: "id" }
+      );
+      return {
+        ok: true,
+        nguoiDung: { id: uid, hoTen: hoTen.trim(), username: u, vaiTro: "" },
+      };
     },
     []
   );
@@ -192,7 +201,7 @@ export function useAuth() {
     canDangNhap: hasSupabase,
     laAdmin: nguoiDung?.vaiTro === "admin",
     dangNhap,
-    dangKy,
+    taoTaiKhoan,
     dangXuat,
   };
 }

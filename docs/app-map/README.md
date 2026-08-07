@@ -33,7 +33,7 @@ Cửa vào là [`CLAUDE.md`](../../CLAUDE.md) ở root (quy tắc code, risk tie
 |---|---|---|
 | [01-app-structure.md](01-app-structure.md) | Map thư mục `src/` thật, ranh giới import, file nào là ngoại lệ | `src/**` |
 | [02-pages-navigation.md](02-pages-navigation.md) | 5 màn + Người dùng (admin) + Bộ giao diện, gate đăng nhập, state điều hướng | `src/App.tsx`, `src/main.tsx` |
-| [03-database.md](03-database.md) | 16 bảng, quy ước đặt tên, `xi_nghiep_id`, 6 migration + thứ tự chạy, trigger | `supabase/migrations/**` |
+| [03-database.md](03-database.md) | 16 bảng, quy ước đặt tên, `xi_nghiep_id`, 7 migration + thứ tự chạy, trigger | `supabase/migrations/**` |
 | [04-tang-du-lieu.md](04-tang-du-lieu.md) | `useBang`, hàng chờ đồng bộ, hoà server↔local, seed, `vaDongCu`, đèn kết nối | `src/lib/repo.ts`, `src/lib/db.ts`, `src/lib/danhMuc.ts`, `src/lib/ketNoi.ts`, `src/lib/supabase.ts` |
 | [05-bao-mat-phan-quyen.md](05-bao-mat-phan-quyen.md) | Đăng nhập Supabase Auth + `nguoi_dung`/vai trò, gate, thiết lập admin, RLS mở `anon` chờ `0003` | `src/lib/auth.ts`, `src/lib/username.ts`, `src/features/DangNhap.tsx`, `src/features/QuanLyNguoiDung.tsx`, `supabase/migrations/0006_nguoi_dung.sql`, `0003_siet_rls.sql` |
 | [30-nhap-hang.md](30-nhap-hang.md) | Sổ nhập ngày: chuyến, hai ngày + ghi bù, chốt ngày, phế liệu ngày | `src/features/NhapNguyenLieu.tsx`, `src/types.ts` |

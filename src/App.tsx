@@ -95,7 +95,7 @@ export default function App() {
   if (auth.canDangNhap && !auth.session) {
     return (
       <>
-        <DangNhap dangNhap={auth.dangNhap} dangKy={auth.dangKy} />
+        <DangNhap dangNhap={auth.dangNhap} />
         <Toaster position="bottom-center" richColors closeButton />
       </>
     );
@@ -230,7 +230,9 @@ export default function App() {
             {screenThuc === "ban-hang" && <BanHangScreen />}
             {screenThuc === "can-doi" && <CanDoiScreen />}
             {screenThuc === "danh-muc" && <DanhMucScreen />}
-            {screenThuc === "nguoi-dung" && <QuanLyNguoiDungScreen />}
+            {screenThuc === "nguoi-dung" && (
+              <QuanLyNguoiDungScreen taoTaiKhoan={auth.taoTaiKhoan} />
+            )}
             {screenThuc === "kit" && <KitPage />}
           </div>
         </main>

@@ -2,11 +2,11 @@ import { useState } from "react";
 import type { NguoiDung, VaiTro } from "@/types";
 import { VAI_TRO } from "@/types";
 import { useNguoiDung } from "@/lib/danhMuc";
-import { hoTenToUsername, usernameToEmail } from "@/lib/username";
+import { hoTenToUsername } from "@/lib/username";
+import type { KetQuaDangNhap } from "@/lib/auth";
 import {
   Badge,
   Button,
-  Card,
   Combobox,
   Dialog,
   DialogContent,
@@ -14,32 +14,86 @@ import {
   DialogHeader,
   DialogTitle,
   EmptyState,
+  ErrorSummary,
   Field,
   Input,
   RecordTable,
   notify,
   type Cot,
+  type LoiNhap,
 } from "@/design-system";
-import { Pencil, Users } from "lucide-react";
+import { Pencil, Plus, Users } from "lucide-react";
 
 const nhanVaiTro = (v: VaiTro) =>
   VAI_TRO.find((x) => x.value === v)?.label ?? "Chưa gán";
 
-/** Màn quản lý người dùng — CHỈ admin. Tài khoản đăng nhập tạo ở Supabase
- * Dashboard; ở đây admin gán họ tên + vai trò cho hồ sơ đã đăng nhập. */
-export default function QuanLyNguoiDungScreen() {
+interface TaoMoi {
+  hoTen: string;
+  username: string;
+  usernameTuSua: boolean;
+  matKhau: string;
+}
+const TAO_RONG: TaoMoi = {
+  hoTen: "",
+  username: "",
+  usernameTuSua: false,
+  matKhau: "",
+};
+
+/** Màn quản lý người dùng — CHỈ admin. Đăng ký KHÔNG mở tự do: admin tạo tài
+ * khoản ngay tại đây, và gán họ tên + vai trò. */
+export default function QuanLyNguoiDungScreen({
+  taoTaiKhoan,
+}: {
+  taoTaiKhoan: (
+    hoTen: string,
+    username: string,
+    matKhau: string
+  ) => Promise<KetQuaDangNhap>;
+}) {
   const [ds, ghi] = useNguoiDung();
   const [dang, setDang] = useState<NguoiDung | null>(null);
 
-  // Công cụ sinh username từ họ tên (để biết đặt email gì khi tạo TK ở Dashboard)
-  const [hoTenThu, setHoTenThu] = useState("");
-  const usernameThu = hoTenToUsername(hoTenThu);
+  const [tao, setTao] = useState<TaoMoi | null>(null);
+  const [loiTao, setLoiTao] = useState<LoiNhap[]>([]);
+  const [dangTao, setDangTao] = useState(false);
 
   const luu = () => {
     if (!dang) return;
     ghi(ds.map((n) => (n.id === dang.id ? dang : n)));
     notify.daLuu(`Đã lưu người dùng ${dang.username || dang.id}`);
     setDang(null);
+  };
+
+  const doiHoTenTao = (v: string) =>
+    setTao((t) =>
+      t
+        ? { ...t, hoTen: v, username: t.usernameTuSua ? t.username : hoTenToUsername(v) }
+        : t
+    );
+
+  const luuTao = async () => {
+    if (!tao) return;
+    const ls: LoiNhap[] = [];
+    if (!tao.hoTen.trim()) ls.push({ truong: "Họ tên", thongBao: "Chưa nhập họ tên" });
+    if (!tao.username.trim())
+      ls.push({ truong: "Tên đăng nhập", thongBao: "Chưa nhập tên đăng nhập" });
+    if (tao.matKhau.length < 6)
+      ls.push({ truong: "Mật khẩu", thongBao: "Tối thiểu 6 ký tự" });
+    setLoiTao(ls);
+    if (ls.length > 0) return;
+
+    setDangTao(true);
+    const kq = await taoTaiKhoan(tao.hoTen, tao.username, tao.matKhau);
+    setDangTao(false);
+    if (!kq.ok) {
+      setLoiTao([{ truong: "Tạo tài khoản", thongBao: kq.loi ?? "Thất bại" }]);
+      return;
+    }
+    if (kq.nguoiDung) ghi([...ds, kq.nguoiDung]);
+    notify.daLuu(`Đã tạo tài khoản ${tao.username}`);
+    setTao(null);
+    setLoiTao([]);
   };
 
   const cols: Cot<NguoiDung>[] = [
@@ -74,50 +128,43 @@ export default function QuanLyNguoiDungScreen() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-semibold text-foreground">Người dùng</h1>
-        <p className="mt-2 max-w-2xl text-base text-muted-foreground">
-          Gán vai trò (và sửa họ tên) cho tài khoản. Người dùng tự đăng ký từ màn
-          đăng nhập; hồ sơ hiện ở đây với vai trò trống tới khi bạn gán.
-        </p>
-      </div>
-
-      {/* Công cụ tham chiếu: họ tên → tên đăng nhập (khớp quy tắc màn đăng ký) */}
-      <Card className="space-y-4 p-5">
-        <h2 className="text-xl font-semibold">Xem tên đăng nhập từ họ tên</h2>
-        <Field
-          label="Họ tên"
-          hint="Quy tắc: chữ đầu mỗi từ + từ cuối đầy đủ (bỏ dấu). Màn đăng ký tự gợi ý theo quy tắc này."
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-semibold text-foreground">Người dùng</h1>
+          <p className="mt-2 max-w-2xl text-base text-muted-foreground">
+            Tạo tài khoản và gán vai trò. Chỉ quản trị tạo được tài khoản — không
+            mở đăng ký tự do.
+          </p>
+        </div>
+        <Button
+          size="lg"
+          onClick={() => {
+            setTao({ ...TAO_RONG });
+            setLoiTao([]);
+          }}
         >
-          <Input
-            value={hoTenThu}
-            onChange={(e) => setHoTenThu(e.target.value)}
-            placeholder="VD: Phan Nguyễn Hoài Nam"
-          />
-        </Field>
-        {usernameThu && (
-          <div className="flex flex-wrap gap-x-8 gap-y-2 rounded-lg bg-muted px-4 py-3 text-base">
-            <span>
-              Tên đăng nhập:{" "}
-              <span className="font-semibold text-foreground">
-                {usernameThu}
-              </span>
-            </span>
-            <span>
-              Email tổng hợp (dùng ngầm):{" "}
-              <span className="font-semibold text-foreground">
-                {usernameToEmail(usernameThu)}
-              </span>
-            </span>
-          </div>
-        )}
-      </Card>
+          <Plus />
+          Tạo tài khoản
+        </Button>
+      </div>
 
       {ds.length === 0 ? (
         <EmptyState
           icon={Users}
           tieuDe="Chưa có người dùng nào"
-          moTa="Người dùng tự đăng ký ở màn đăng nhập (Chưa có tài khoản? Đăng ký). Đăng ký xong hồ sơ hiện ở đây để bạn gán vai trò."
+          moTa="Bấm “Tạo tài khoản” để thêm người dùng đầu tiên, rồi gán vai trò."
+          action={
+            <Button
+              size="lg"
+              onClick={() => {
+                setTao({ ...TAO_RONG });
+                setLoiTao([]);
+              }}
+            >
+              <Plus />
+              Tạo tài khoản
+            </Button>
+          }
         />
       ) : (
         <RecordTable
@@ -135,6 +182,72 @@ export default function QuanLyNguoiDungScreen() {
         />
       )}
 
+      {/* Tạo tài khoản (admin) */}
+      <Dialog
+        open={tao !== null}
+        onOpenChange={(o) => {
+          if (!o) setTao(null);
+        }}
+      >
+        <DialogContent className="w-full sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-2xl">Tạo tài khoản</DialogTitle>
+          </DialogHeader>
+
+          {tao && (
+            <div className="space-y-6 py-2">
+              <ErrorSummary loi={loiTao} />
+              <Field label="Họ tên" required>
+                <Input
+                  value={tao.hoTen}
+                  onChange={(e) => doiHoTenTao(e.target.value)}
+                  autoFocus
+                  placeholder="VD: Nguyễn Văn A"
+                />
+              </Field>
+              <Field
+                label="Tên đăng nhập"
+                required
+                hint="Gợi ý từ họ tên — sửa được. Người dùng dùng tên này để đăng nhập."
+              >
+                <Input
+                  value={tao.username}
+                  onChange={(e) =>
+                    setTao((t) =>
+                      t ? { ...t, username: e.target.value, usernameTuSua: true } : t
+                    )
+                  }
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  placeholder="Tên đăng nhập"
+                />
+              </Field>
+              <Field label="Mật khẩu" required hint="Tối thiểu 6 ký tự.">
+                <Input
+                  type="password"
+                  value={tao.matKhau}
+                  onChange={(e) =>
+                    setTao((t) => (t ? { ...t, matKhau: e.target.value } : t))
+                  }
+                  placeholder="Mật khẩu"
+                />
+              </Field>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" size="lg" onClick={() => setTao(null)}>
+              Hủy
+            </Button>
+            <Button size="lg" onClick={luuTao} disabled={dangTao}>
+              {dangTao ? "Đang tạo…" : "Tạo tài khoản"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Sửa họ tên + vai trò */}
       <Dialog
         open={dang !== null}
         onOpenChange={(o) => {

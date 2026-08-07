@@ -1,5 +1,5 @@
 > Load khi: đụng auth, đăng nhập, RLS, `.env`, key, hay có ý định cho app chạy ngoài mạng nội bộ. 🔴
-covers: src/lib/auth.ts, src/lib/username.ts, src/features/DangNhap.tsx, src/features/QuanLyNguoiDung.tsx, supabase/migrations/0006_nguoi_dung.sql, supabase/migrations/0003_siet_rls.sql, src/lib/supabase.ts, .env.example, .gitignore
+covers: src/lib/auth.ts, src/lib/username.ts, src/features/DangNhap.tsx, src/features/QuanLyNguoiDung.tsx, supabase/migrations/0006_nguoi_dung.sql, supabase/migrations/0007_seed_admin.sql, supabase/migrations/0003_siet_rls.sql, src/lib/supabase.ts, .env.example, .gitignore
 last_verified: 2026-08-06
 ttl_days: 90
 
@@ -7,22 +7,19 @@ ttl_days: 90
 
 ## Trạng thái: CÓ đăng nhập (Supabase Auth), CHƯA siết RLS
 
-- **Đăng nhập + đăng ký từ UI**: Supabase Auth, email tổng hợp `<username>@bsf1.local` (người dùng chỉ gõ username, `src/lib/username.ts` ghép đuôi). Màn `DangNhap.tsx` có 2 chế độ: đăng nhập (username + mật khẩu) và **đăng ký** (họ tên · tên đăng nhập gợi ý từ họ tên · mật khẩu · xác nhận). Đăng ký = `supabase.auth.signUp` (frontend, KHÔNG cần edge function/service_role), có **check trùng username** trước. Logic `src/lib/auth.ts` (`useAuth`: `dangNhap`/`dangKy`/`dangXuat`). Gate ở `App.tsx`. **Chạy localStorage (thiếu env) ⇒ KHÔNG chặn** (offline ở xưởng).
-- **Vai trò**: bảng `nguoi_dung` (khóa `id` = auth user id) giữ họ tên · username · `vai_tro` (`admin`/`giam-doc`/`ke-toan`/`to-truong`/rỗng). Đăng ký xong hồ sơ tạo với **vai trò rỗng** (chỉ đăng nhập được, chưa làm gì cho tới khi admin gán vai trò). Họ tên/username lưu qua `user_metadata` lúc signUp. `admin` thấy nav **Người dùng** (`QuanLyNguoiDung.tsx`) để gán vai trò + sửa họ tên.
-- **CHƯA siết RLS**: policy vẫn `for all to anon, authenticated using(true)`. Gate hiện là **app-level** (ẩn màn admin), CHƯA phải DB-level; đăng ký hiện **mở** cho ai vào được app. Anon key vẫn đọc/ghi được nếu bypass UI ⇒ **vẫn chỉ chạy trong mạng nội bộ** cho tới khi chạy `0003`. Siết đăng ký (chỉ admin tạo user) cần edge function + service_role — việc tương lai.
+- **Đăng nhập từ UI**: Supabase Auth, email tổng hợp `<username>@bsf1.local` (người dùng chỉ gõ username, `src/lib/username.ts` ghép đuôi). Màn `DangNhap.tsx` **chỉ đăng nhập** — KHÔNG mở đăng ký tự do (chính sách app nội bộ). Logic `src/lib/auth.ts` (`useAuth`: `dangNhap`/`taoTaiKhoan`/`dangXuat`). Gate ở `App.tsx`. **Chạy localStorage (thiếu env) ⇒ KHÔNG chặn** (offline ở xưởng).
+- **Admin tạo tài khoản**: chỉ `admin` (nav **Người dùng**, `QuanLyNguoiDung.tsx`) tạo được tài khoản: họ tên · tên đăng nhập (gợi ý từ họ tên, sửa được) · mật khẩu, có **check trùng username**. Tạo bằng `taoTaiKhoan` (`auth.ts`): signUp trên **client PHỤ** (`taoClientTam` — `persistSession:false`) nên **KHÔNG đá văng phiên admin**; hồ sơ lưu qua client chính, vai trò rỗng (admin gán sau).
+- **Vai trò**: bảng `nguoi_dung` (khóa `id` = auth user id) giữ họ tên · username · `vai_tro` (`admin`/`giam-doc`/`ke-toan`/`to-truong`/rỗng). Admin gán vai trò + sửa họ tên trong màn Người dùng.
+- **CHƯA siết RLS**: policy vẫn `for all to anon, authenticated using(true)`. Gate + đóng-đăng-ký hiện là **app-level**; anon key vẫn đọc/ghi được nếu bypass UI ⇒ **vẫn chỉ chạy trong mạng nội bộ** cho tới khi chạy `0003`.
 
 ## Thiết lập admin đầu tiên
 
-1. Chạy `supabase/migrations/0006_nguoi_dung.sql` (tạo bảng `nguoi_dung`).
-2. Supabase → **Authentication → Providers → Email → TẮT "Confirm email"** (email `@bsf1.local` không nhận được mail xác nhận; không tắt thì đăng ký xong không đăng nhập được).
-3. Mở app → **"Chưa có tài khoản? Đăng ký"**: họ tên `Admin`, tên đăng nhập `admin`, mật khẩu. (Claude KHÔNG tạo hộ được — không đặt mật khẩu thật.)
-4. Gán quyền admin (SQL Editor):
-   ```sql
-   update public.nguoi_dung set vai_tro='admin', ho_ten='Admin' where username='admin';
-   ```
-5. Đăng xuất/đăng nhập lại ⇒ thấy nav **Người dùng**. User khác **tự đăng ký từ UI**, admin gán vai trò.
+1. Chạy `0006_nguoi_dung.sql` rồi `0007_seed_admin.sql` — `0007` **seed sẵn admin / admin** (mồi con-gà-quả-trứng: đăng ký đã đóng, chưa admin thì không ai tạo được admin).
+2. Mở app → đăng nhập **admin / admin**.
+3. ⚠️ **ĐỔI MẬT KHẨU NGAY** (Dashboard → Auth → Users → admin@bsf1.local → Update password). `admin` là mật khẩu tạm rất yếu.
+4. Tạo user khác ngay trong app (nút **Tạo tài khoản** ở màn Người dùng) + gán vai trò.
 
-⚠️ **Sau khi deploy bản này, app đòi đăng nhập** — làm bước 1-3 để có tài khoản đầu tiên.
+⚠️ Tài khoản admin do **admin tạo qua signUp** (bước 4) cần **TẮT "Confirm email"** (Supabase → Authentication → Providers → Email) vì email `@bsf1.local` không nhận mail xác nhận. Admin seed ở `0007` đã `email_confirmed_at` sẵn nên đăng nhập được ngay bất kể cài đặt này.
 
 ## Lộ trình siết RLS (mở ra ngoài mạng nội bộ)
 

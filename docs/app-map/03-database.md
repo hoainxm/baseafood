@@ -49,7 +49,8 @@ App dùng camelCase, DB dùng snake_case — cầu nối là `AnhXaBang.toRow/fr
 | `0003_siet_rls.sql` | 🔴 | Siết RLS về `authenticated`. Chạy **SAU** khi app có đăng nhập, nếu không app ngừng đọc/ghi ngay. Xem [05-bao-mat-phan-quyen.md](05-bao-mat-phan-quyen.md). |
 | `0004_chuyen_chot_ngay_phe_lieu.sql` | 🟡 | Thêm `chuyen_nhap`, `chot_ngay`, `nhap_nguyen_lieu.chuyen_id`; nới `phe_lieu`. Chỉ thêm, an toàn với dữ liệu đang có. **Chạy ngay** — xem cảnh báo dưới. |
 | `0005_ban_thanh_pham.sql` | 🟡 | Thêm `phieu_ban`, `ban_hang`; nới `thanh_pham_ra` (`quy_cach`, `ban_hang_id`). Chỉ thêm, không phụ thuộc 0004. Đã chạy. |
-| `0006_nguoi_dung.sql` | 🟡 | Thêm `nguoi_dung` (hồ sơ + vai trò, khóa = auth user id). Chỉ thêm. Tài khoản đăng nhập tạo ở Dashboard; xem [05-bao-mat-phan-quyen.md](05-bao-mat-phan-quyen.md). |
+| `0006_nguoi_dung.sql` | 🟡 | Thêm `nguoi_dung` (hồ sơ + vai trò, khóa = auth user id). Chỉ thêm. Xem [05-bao-mat-phan-quyen.md](05-bao-mat-phan-quyen.md). |
+| `0007_seed_admin.sql` | 🟡 | Seed `admin`/`admin` thẳng vào `auth.users` + `auth.identities` + `nguoi_dung` (idempotent). ⚠️ mật khẩu tạm rất yếu — đổi ngay. Con-gà-quả-trứng: đăng ký đã đóng. |
 
 ⚠️ **`0004` chưa chạy** ⇒ app báo *"Mất kết nối máy chủ — Could not find the 'chuyen_id' column"*. Số liệu vẫn ghi xuống máy và nằm trong hàng chờ, tự đẩy lên sau khi migration chạy — nhưng máy khác chưa thấy.
 

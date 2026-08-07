@@ -27,11 +27,11 @@ src/
 ├── App.tsx · main.tsx        điều hướng 4 màn (KHÔNG router, state trong App)
 ├── types.ts                  kiểu + BẤT BIẾN nghiệp vụ (laGhiBu, thanhTien)
 ├── data/thanh-pham.json      141 mã TK 1551 — chỉ là SEED
-├── lib/                      repo · danhMuc · db · supabase · ketNoi · canDoi · format · store · utils
+├── lib/                      repo · danhMuc · db · supabase · ketNoi · canDoi · auth · username · format · store · utils
 ├── components/ui/            primitive shadcn — ĐÃ đè size cho người lớn tuổi
 ├── design-system/            tokens.css · patterns/ · kit/ · index.ts (cửa import duy nhất)
-└── features/                 NhapNguyenLieu · BanHang · CanDoi + BangCanDoi · DanhMuc (5 tab) · ThanhPham (chỉ đọc)
-supabase/migrations/          0001 … 0005
+└── features/                 NhapNguyenLieu · BanHang · CanDoi + BangCanDoi · DanhMuc (5 tab) · ThanhPham (chỉ đọc) · DangNhap · QuanLyNguoiDung
+supabase/migrations/          0001 … 0006
 docs/app-map/                 bản đồ ngữ cảnh cho agent
 docs/trien-khai/              nghiệp vụ gốc (phân tích, 28 câu hỏi đã chốt, thiết kế flow)
 ```
@@ -87,7 +87,7 @@ Chưa rõ tier ⇒ coi là 🔴. Dữ liệu ở đây là **sổ sách thật c
 | `lib/repo.ts`, `db.ts`, `danhMuc.ts`, `ketNoi.ts` | [`04-tang-du-lieu.md`](docs/app-map/04-tang-du-lieu.md) |
 | `App.tsx` (thêm màn / đổi nav) | [`02-pages-navigation.md`](docs/app-map/02-pages-navigation.md) |
 | Thêm thư mục / đổi ranh giới import | [`01-app-structure.md`](docs/app-map/01-app-structure.md) |
-| `0003_siet_rls.sql`, auth, `.env.example` | [`05-bao-mat-phan-quyen.md`](docs/app-map/05-bao-mat-phan-quyen.md) |
+| `lib/auth.ts`, `lib/username.ts`, `DangNhap.tsx`, `QuanLyNguoiDung.tsx`, `0006`, `0003_siet_rls.sql`, `.env.example` | [`05-bao-mat-phan-quyen.md`](docs/app-map/05-bao-mat-phan-quyen.md) |
 | `design-system/**`, `components/ui/**`, `tokens.css` | [`src/design-system/README.md`](src/design-system/README.md) — canonical, **không** nhân bản sang app-map |
 
 Sửa doc xong ⇒ cập nhật `last_verified:` trong frontmatter. Hook pre-commit cảnh báo khi code trong `covers:` đổi mà doc đứng yên.
@@ -130,8 +130,8 @@ Ngoài app-map: [`src/design-system/README.md`](src/design-system/README.md) (UI
 
 ## Trạng thái
 
-**Đã build:** nhập hàng (chuyến thật · ngày giao/ngày ghi sổ + ghi bù · chốt ngày · phế liệu cân trong ngày · bộ lọc), **bán thành phẩm ngày (phiếu bán · quy cách · 2 ngày + ghi bù · kênh XK/NĐ · hút vào cân đối)**, cân đối + in bảng, danh mục 5 tab, bộ giao diện người lớn tuổi + cài đặt hiển thị, tầng dữ liệu Supabase↔localStorage.
+**Đã build:** nhập hàng (chuyến thật · ngày giao/ngày ghi sổ + ghi bù · chốt ngày · phế liệu cân trong ngày · bộ lọc), **bán thành phẩm ngày (phiếu bán · quy cách · 2 ngày + ghi bù · kênh XK/NĐ · hút vào cân đối)**, cân đối + in bảng, danh mục 5 tab, **đăng nhập (Supabase Auth, email tổng hợp) + hồ sơ/vai trò `nguoi_dung` + màn Người dùng (admin) + gate ở App**, bộ giao diện người lớn tuổi + cài đặt hiển thị, tầng dữ liệu Supabase↔localStorage.
 
-**Backlog:** ⚠️ chạy migration `0004` + `0005`; **chốt ngày bán + phiếu bán in A4** (bán v1 chưa có); siết RLS theo người dùng; nhập khẩu số liệu cũ lên máy chủ; định mức NL→TP; báo cáo tháng 6 khối; **SẢN XUẤT bán thành phẩm (WIP) + kho dự trữ + vòng lặp đông gửi ↔ xả đông ↔ tồn cuối kỳ** (vấn đề cốt lõi, chưa số hóa) — quy trình: SX bán thành phẩm ngày → cất kho dự trữ → gom đủ theo **đơn đặt** (số lượng lớn) → **xuất container** nhiều block/quy cách; cột `ban_hang.kho_nguon` để dành seam. Lưu ý: **đơn đặt = xuất khẩu**, phí XK do phòng kế hoạch tính riêng (đã trừ trong giá báo) ⇒ cân đối KHÔNG tính phí XK. Test thực địa với 5 người dùng ≥45 tuổi.
+**Backlog:** ⚠️ chạy migration `0004` + `0005` + `0006`; **thiết lập admin đầu tiên** (Dashboard tạo TK + seed `vai_tro='admin'` — xem [05-bao-mat-phan-quyen.md](docs/app-map/05-bao-mat-phan-quyen.md)); siết RLS (`0003`, cập nhật bao bảng mới) **sau khi login ổn**; **chốt ngày bán + phiếu bán in A4** (bán v1 chưa có); siết RLS theo người dùng; nhập khẩu số liệu cũ lên máy chủ; định mức NL→TP; báo cáo tháng 6 khối; **SẢN XUẤT bán thành phẩm (WIP) + kho dự trữ + vòng lặp đông gửi ↔ xả đông ↔ tồn cuối kỳ** (vấn đề cốt lõi, chưa số hóa) — quy trình: SX bán thành phẩm ngày → cất kho dự trữ → gom đủ theo **đơn đặt** (số lượng lớn) → **xuất container** nhiều block/quy cách; cột `ban_hang.kho_nguon` để dành seam. Lưu ý: **đơn đặt = xuất khẩu**, phí XK do phòng kế hoạch tính riêng (đã trừ trong giá báo) ⇒ cân đối KHÔNG tính phí XK. Test thực địa với 5 người dùng ≥45 tuổi.
 
 > ⚠️ **Đừng nhầm thuật ngữ:** "bán thành phẩm" (WIP, công đoạn sản xuất, backlog trên) ≠ màn **Bán hàng** (bán thành phẩm RA cho khách, đã build — [33-ban-hang.md](docs/app-map/33-ban-hang.md)).

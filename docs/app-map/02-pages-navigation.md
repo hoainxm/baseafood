@@ -5,10 +5,14 @@ ttl_days: 90
 
 # Trang & điều hướng
 
-**Không có router.** Một state `screen` trong `App.tsx` (`"nhap-hang" | "ban-hang" | "can-doi" | "danh-muc" | "kit"`) quyết định màn nào render. Không có URL, không deep link, F5 là về màn mặc định `nhap-hang`.
+**Không có router.** Một state `screen` trong `App.tsx` (`"nhap-hang" | "ban-hang" | "can-doi" | "danh-muc" | "nguoi-dung" | "kit"`) quyết định màn nào render. Không có URL, không deep link, F5 là về màn mặc định `nhap-hang`.
 Hệ quả cần biết trước khi thiết kế tính năng: **không share được link tới một ngày / một kỳ**. Muốn có thì phải thêm router — đó là thay đổi kiến trúc, không phải sửa vặt.
 
-## Năm màn
+## Gate đăng nhập
+
+`App.tsx` gọi `useAuth()` (`src/lib/auth.ts`) TRƯỚC khi render app: `dangTai` → màn "Đang tải"; đã cấu hình Supabase mà **chưa có phiên** → `features/DangNhap.tsx` (che toàn app). Chạy localStorage (thiếu env) ⇒ **không chặn**. Thanh bên/header có chip người dùng + **Đăng xuất**. Chi tiết auth: [05-bao-mat-phan-quyen.md](05-bao-mat-phan-quyen.md).
+
+## Các màn
 
 | id | Nhãn | File | Ghi chú |
 |---|---|---|---|
@@ -16,14 +20,15 @@ Hệ quả cần biết trước khi thiết kế tính năng: **không share đ
 | `ban-hang` | Bán hàng | `features/BanHang.tsx` | phiếu bán thành phẩm ngày; nguồn hút cho khối TP ra của cân đối |
 | `can-doi` | Cân đối | `features/CanDoi.tsx` | có màn con `KyDetail` (state nội bộ `selId`, không phải route) |
 | `danh-muc` | Danh mục | `features/DanhMuc.tsx` | 5 tab, trong đó tab Thành phẩm render `features/ThanhPham.tsx` |
+| `nguoi-dung` | Người dùng | `features/QuanLyNguoiDung.tsx` | **chỉ hiện khi `laAdmin`** — gán họ tên + vai trò |
 | `kit` | Bộ giao diện | `design-system/kit/KitPage.tsx` | không nằm trong `NAV`, vào từ nút cuối thanh bên; **desktop-only** |
 
-`NAV` có 4 mục — mỗi mục **một việc, một động từ, một icon**. Ba danh mục cũ (Mặt hàng / Khách hàng / Thành phẩm) đã gộp thành 1 mục có tab bên trong vì tên gần giống nhau, người dùng 45–60 tuổi phải nhớ cái nào ở đâu.
+`NAV` có 4 mục cơ bản; admin có thêm mục **Người dùng** (`navList = laAdmin ? [...NAV, NAV_NGUOI_DUNG] : NAV`). Mỗi mục **một việc, một động từ, một icon**. Ba danh mục cũ (Mặt hàng / Khách hàng / Thành phẩm) đã gộp thành 1 mục có tab bên trong.
 
 ## Cạm bẫy bố cục
 
 - Thanh bên và header nội dung dùng **chung hằng `CAO_HEADER`** trong `App.tsx`. Đặt chiều cao riêng từng bên ⇒ đường kẻ lệch, cả trang trông vênh.
-- Bottom-tab điện thoại (`md:hidden`) là **lưới cột cứng** (`grid-cols-4` cho 4 mục hiện tại). Thêm mục vào `NAV` phải sửa số cột grid cho khớp, nếu không vỡ lưới.
+- Bottom-tab điện thoại (`md:hidden`) đặt số cột **động** theo `navList.length` bằng inline `style` (`gridTemplateColumns: repeat(N, …)`) — vì admin có 5 mục, thường 4. Đừng quay lại `grid-cols-N` cứng (Tailwind purge lớp động từ template literal).
 - `main` có `pb-28` trên điện thoại để nội dung không bị bottom-tab che.
 - Bề rộng nội dung là biến `--app-content-width`, người dùng đổi được trong Bộ giao diện — **đừng** hardcode `max-w-*` ở màn.
 

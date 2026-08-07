@@ -21,6 +21,7 @@ Cửa vào là [`CLAUDE.md`](../../CLAUDE.md) ở root (quy tắc code, risk tie
 | Thêm bảng / cột / migration | [03-database](03-database.md) → [04-tang-du-lieu](04-tang-du-lieu.md) |
 | Số liệu mất, không lên server, đèn đỏ, reload nuốt dòng | [04-tang-du-lieu](04-tang-du-lieu.md) |
 | Thêm màn hình / đổi điều hướng | [02-pages-navigation](02-pages-navigation.md) → [01-app-structure](01-app-structure.md) |
+| Đăng nhập, phân quyền, tạo tài khoản, vai trò | [05-bao-mat-phan-quyen](05-bao-mat-phan-quyen.md) 🔴 |
 | Đụng UI, component, cỡ chữ, màu | [`src/design-system/README.md`](../../src/design-system/README.md) (canonical, **không** nhân bản sang đây) |
 | Thêm đăng nhập / phân quyền / mở app ra ngoài mạng nội bộ | [05-bao-mat-phan-quyen](05-bao-mat-phan-quyen.md) 🔴 |
 | Tìm hiểu nghiệp vụ gốc, vì sao thiết kế vậy | [`docs/trien-khai/README.md`](../trien-khai/README.md) |
@@ -31,10 +32,10 @@ Cửa vào là [`CLAUDE.md`](../../CLAUDE.md) ở root (quy tắc code, risk tie
 | File | Nội dung | covers |
 |---|---|---|
 | [01-app-structure.md](01-app-structure.md) | Map thư mục `src/` thật, ranh giới import, file nào là ngoại lệ | `src/**` |
-| [02-pages-navigation.md](02-pages-navigation.md) | 4 màn + Bộ giao diện, state điều hướng, header/bottom-tab | `src/App.tsx`, `src/main.tsx` |
-| [03-database.md](03-database.md) | 15 bảng, quy ước đặt tên, `xi_nghiep_id`, 5 migration + thứ tự chạy, trigger | `supabase/migrations/**` |
+| [02-pages-navigation.md](02-pages-navigation.md) | 5 màn + Người dùng (admin) + Bộ giao diện, gate đăng nhập, state điều hướng | `src/App.tsx`, `src/main.tsx` |
+| [03-database.md](03-database.md) | 16 bảng, quy ước đặt tên, `xi_nghiep_id`, 6 migration + thứ tự chạy, trigger | `supabase/migrations/**` |
 | [04-tang-du-lieu.md](04-tang-du-lieu.md) | `useBang`, hàng chờ đồng bộ, hoà server↔local, seed, `vaDongCu`, đèn kết nối | `src/lib/repo.ts`, `src/lib/db.ts`, `src/lib/danhMuc.ts`, `src/lib/ketNoi.ts`, `src/lib/supabase.ts` |
-| [05-bao-mat-phan-quyen.md](05-bao-mat-phan-quyen.md) | Chưa có auth, RLS mở `anon`, điều kiện chạy `0003` | `supabase/migrations/0003_siet_rls.sql`, `src/lib/supabase.ts`, `.env.example` |
+| [05-bao-mat-phan-quyen.md](05-bao-mat-phan-quyen.md) | Đăng nhập Supabase Auth + `nguoi_dung`/vai trò, gate, thiết lập admin, RLS mở `anon` chờ `0003` | `src/lib/auth.ts`, `src/lib/username.ts`, `src/features/DangNhap.tsx`, `src/features/QuanLyNguoiDung.tsx`, `supabase/migrations/0006_nguoi_dung.sql`, `0003_siet_rls.sql` |
 | [30-nhap-hang.md](30-nhap-hang.md) | Sổ nhập ngày: chuyến, hai ngày + ghi bù, chốt ngày, phế liệu ngày | `src/features/NhapNguyenLieu.tsx`, `src/types.ts` |
 | [33-ban-hang.md](33-ban-hang.md) | Sổ bán ngày: phiếu bán, quy cách, hai ngày + ghi bù, kênh XK/NĐ, hút vào cân đối | `src/features/BanHang.tsx`, `src/types.ts`, `src/lib/repo.ts` |
 | [31-can-doi-ky.md](31-can-doi-ky.md) | Kỳ theo lô, 3 khối, công thức, hút phế liệu + hút bán, bản in A4 | `src/features/CanDoi.tsx`, `src/features/BangCanDoi.tsx`, `src/lib/canDoi.ts` |

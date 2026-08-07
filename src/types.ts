@@ -8,6 +8,30 @@ export interface ThanhPham {
 
 export type PhanXuong = "Đông" | "Cá" | "Khô";
 
+/* ---------- Người dùng & phân quyền ---------- */
+
+/** Vai trò — `admin` full quyền; rỗng = chưa gán (chỉ đăng nhập được, chưa dùng gì). */
+export type VaiTro = "admin" | "giam-doc" | "ke-toan" | "to-truong" | "";
+
+export const VAI_TRO: { value: VaiTro; label: string }[] = [
+  { value: "admin", label: "Quản trị (full quyền)" },
+  { value: "giam-doc", label: "Giám đốc" },
+  { value: "ke-toan", label: "Kế toán" },
+  { value: "to-truong", label: "Tổ trưởng" },
+];
+
+/**
+ * Hồ sơ người dùng — 1-1 với tài khoản Supabase Auth (`id` = auth user id).
+ * Tài khoản đăng nhập (email tổng hợp `<username>@bsf1.local` + mật khẩu) tạo ở
+ * Supabase Dashboard; app tự tạo hồ sơ này lần đầu đăng nhập, admin gán vai trò.
+ */
+export interface NguoiDung {
+  id: string; // = auth.users.id
+  hoTen: string;
+  username: string;
+  vaiTro: VaiTro;
+}
+
 /** Loài nguyên liệu — ghi rõ, không để mặc định ngầm "bạch tuộc". */
 export const LOAI = [
   "Bạch tuộc",

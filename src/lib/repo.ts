@@ -18,10 +18,12 @@ import type {
   LoaiNguyenLieu,
   MatHang,
   NguonPheLieu,
+  NguoiDung,
   NhomNL,
   PhanXuong,
   PhieuBan,
   ThanhPham,
+  VaiTro,
 } from "@/types";
 
 /**
@@ -354,6 +356,25 @@ export const BANG_TP_RA: AnhXaBang<DongTP> = {
     ...x,
     quyCach: x.quyCach ?? "",
     banHangId: x.banHangId ?? "",
+  }),
+};
+
+/** Hồ sơ người dùng — khóa `id` = auth user id (uuid). */
+export const BANG_NGUOI_DUNG: AnhXaBang<NguoiDung> = {
+  table: "nguoi_dung",
+  localKey: "bsf.nguoi-dung.v1",
+  layKhoa: theoId,
+  toRow: (x) => ({
+    id: x.id,
+    ho_ten: x.hoTen,
+    username: x.username,
+    vai_tro: x.vaiTro,
+  }),
+  fromRow: (r) => ({
+    id: s(r.id),
+    hoTen: s(r.ho_ten),
+    username: s(r.username),
+    vaiTro: s(r.vai_tro) as VaiTro,
   }),
 };
 

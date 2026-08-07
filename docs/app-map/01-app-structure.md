@@ -18,6 +18,8 @@ src/
 │   ├── supabase.ts          client env-gated + SITE_ID
 │   ├── ketNoi.ts            trạng thái kết nối dùng chung (đèn xanh/đỏ)
 │   ├── canDoi.ts            công thức cân đối thuần — 31-can-doi-ky.md
+│   ├── auth.ts              useAuth + Supabase Auth — 05-bao-mat-phan-quyen.md
+│   ├── username.ts          họ tên → username + email tổng hợp
 │   ├── format.ts            num/kg/todayISO/viDate (locale vi-VN)
 │   ├── store.ts             newId()
 │   └── utils.ts             cn()
@@ -27,7 +29,7 @@ src/
 │   ├── patterns/            Field, NumberField, Combobox, DateField, RecordTable, DanhMucCrud…
 │   ├── kit/KitPage.tsx      trang duyệt bộ giao diện (đưa người dùng thật bấm thử)
 │   └── index.ts             cửa import DUY NHẤT cho features
-└── features/                5 màn nghiệp vụ (NhapNguyenLieu · CanDoi + BangCanDoi · DanhMuc · ThanhPham)
+└── features/                màn nghiệp vụ (NhapNguyenLieu · BanHang · CanDoi + BangCanDoi · DanhMuc · ThanhPham · DangNhap · QuanLyNguoiDung)
 ```
 
 ## Ranh giới import (cứng)

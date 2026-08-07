@@ -1,0 +1,39 @@
+/**
+ * Sinh username từ họ tên: chữ đầu mỗi từ TRỪ từ cuối + từ cuối đầy đủ, bỏ dấu.
+ * "Phan Nguyễn Hoài Nam" → "pnhnam". Một từ → chính nó.
+ *
+ * Email đăng nhập tổng hợp = `<username>@bsf1.local` (Supabase Auth cần email;
+ * người dùng chỉ gõ username, app ghép đuôi).
+ */
+export const DUOI_EMAIL = "@bsf1.local";
+
+/** Bỏ dấu tiếng Việt + đổi đ→d, về chữ thường ASCII. */
+export function boDau(s: string): string {
+  return s
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "") // dấu tổ hợp
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "D");
+}
+
+export function hoTenToUsername(hoTen: string): string {
+  const tu = boDau(hoTen).toLowerCase().trim().split(/\s+/).filter(Boolean);
+  if (tu.length === 0) return "";
+  if (tu.length === 1) return tu[0];
+  const dau = tu
+    .slice(0, -1)
+    .map((t) => t[0])
+    .join("");
+  return dau + tu[tu.length - 1];
+}
+
+/** username → email tổng hợp để đưa vào Supabase Auth. */
+export function usernameToEmail(username: string): string {
+  const u = username.trim().toLowerCase();
+  return u.includes("@") ? u : `${u}${DUOI_EMAIL}`;
+}
+
+/** email tổng hợp → username (phần trước @). */
+export function emailToUsername(email: string): string {
+  return (email || "").split("@")[0] || "";
+}

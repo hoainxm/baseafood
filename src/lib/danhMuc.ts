@@ -8,6 +8,7 @@ import {
   BANG_KY,
   BANG_LOAI_NL,
   BANG_MAT_HANG,
+  BANG_NGUOI_DUNG,
   BANG_NHAP_NL,
   BANG_NL_VAO,
   BANG_PHE_LIEU,
@@ -63,3 +64,4 @@ export const usePheLieu = () => useBang(BANG_PHE_LIEU);
 export const useTPRa = () => useBang(BANG_TP_RA);
 export const usePhieuBan = () => useBang(BANG_PHIEU_BAN);
 export const useBanHang = () => useBang(BANG_BAN_HANG);
+export const useNguoiDung = () => useBang(BANG_NGUOI_DUNG);

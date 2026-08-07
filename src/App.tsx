@@ -3,24 +3,40 @@ import NhapNguyenLieuScreen from "@/features/NhapNguyenLieu";
 import BanHangScreen from "@/features/BanHang";
 import CanDoiScreen from "@/features/CanDoi";
 import DanhMucScreen from "@/features/DanhMuc";
+import QuanLyNguoiDungScreen from "@/features/QuanLyNguoiDung";
+import DangNhap from "@/features/DangNhap";
 import KitPage from "@/design-system/kit/KitPage";
 import { CoChuNhanh, Logo, Toaster, TrangThaiDuLieu } from "@/design-system";
 import { cn } from "@/lib/utils";
-import { Truck, ShoppingCart, Scale, Library, Palette } from "lucide-react";
+import { useAuth } from "@/lib/auth";
+import { VAI_TRO } from "@/types";
+import {
+  Truck,
+  ShoppingCart,
+  Scale,
+  Library,
+  Palette,
+  Users,
+  LogOut,
+} from "lucide-react";
 
-type Screen = "nhap-hang" | "ban-hang" | "can-doi" | "danh-muc" | "kit";
+type Screen =
+  | "nhap-hang"
+  | "ban-hang"
+  | "can-doi"
+  | "danh-muc"
+  | "nguoi-dung"
+  | "kit";
 
-/**
- * Điều hướng: 3 việc, mỗi việc một động từ, mỗi việc một icon riêng.
- * 3 danh mục cũ (Mặt hàng / Khách hàng / Thành phẩm) tên gần giống nhau nên
- * gộp thành một mục "Danh mục" có tab bên trong.
- */
-const NAV: {
+interface MucNav {
   id: Screen;
   label: string;
   moTa: string;
   icon: typeof Truck;
-}[] = [
+}
+
+/** Điều hướng chính — mỗi việc một động từ, một icon riêng. */
+const NAV: MucNav[] = [
   {
     id: "nhap-hang",
     label: "Nhập hàng",
@@ -47,15 +63,50 @@ const NAV: {
   },
 ];
 
+/** Mục điều hướng chỉ hiện cho admin. */
+const NAV_NGUOI_DUNG: MucNav = {
+  id: "nguoi-dung",
+  label: "Người dùng",
+  moTa: "Tài khoản & vai trò",
+  icon: Users,
+};
+
+const nhanVaiTro = (v: string) =>
+  VAI_TRO.find((x) => x.value === v)?.label ?? "Chưa gán";
+
 /* Hai thanh header (thanh bên và thanh nội dung) PHẢI cùng chiều cao,
    nếu không đường kẻ dưới chúng lệch nhau và cả trang trông vênh. */
 const CAO_HEADER = "h-20";
 
 export default function App() {
+  const auth = useAuth();
   const [screen, setScreen] = useState<Screen>("nhap-hang");
 
-  const hienTai = NAV.find((n) => n.id === screen);
+  // Đang lấy phiên đăng nhập từ máy chủ → tránh nháy màn login.
+  if (auth.dangTai) {
+    return (
+      <div className="flex min-h-full items-center justify-center p-6">
+        <p className="text-base text-muted-foreground">Đang tải…</p>
+      </div>
+    );
+  }
+
+  // Đã cấu hình máy chủ mà chưa đăng nhập → chặn bằng màn đăng nhập.
+  if (auth.canDangNhap && !auth.session) {
+    return (
+      <>
+        <DangNhap dangNhap={auth.dangNhap} dangKy={auth.dangKy} />
+        <Toaster position="bottom-center" richColors closeButton />
+      </>
+    );
+  }
+
+  const navList: MucNav[] = auth.laAdmin ? [...NAV, NAV_NGUOI_DUNG] : NAV;
+  const hienTai = navList.find((n) => n.id === screen);
   const tieuDeMan = screen === "kit" ? "Bộ giao diện" : (hienTai?.label ?? "");
+  // Screen admin-only mà không phải admin (VD vừa mất quyền) → về màn mặc định.
+  const screenHopLe = navList.some((n) => n.id === screen) || screen === "kit";
+  const screenThuc: Screen = screenHopLe ? screen : "nhap-hang";
 
   return (
     <div className="flex min-h-full flex-col md:flex-row">
@@ -71,9 +122,9 @@ export default function App() {
         </div>
 
         <nav className="flex-1 space-y-2 p-3">
-          {NAV.map((n) => {
+          {navList.map((n) => {
             const Icon = n.icon;
-            const active = screen === n.id;
+            const active = screenThuc === n.id;
             return (
               <button
                 key={n.id}
@@ -108,11 +159,33 @@ export default function App() {
         </nav>
 
         <div className="space-y-3 border-t border-border px-5 py-4">
+          {auth.canDangNhap && auth.session && (
+            <div className="space-y-2 rounded-lg bg-muted px-3 py-2.5">
+              <p className="truncate text-base font-semibold text-foreground">
+                {auth.nguoiDung?.hoTen ||
+                  auth.nguoiDung?.username ||
+                  "Người dùng"}
+              </p>
+              <div className="flex items-center justify-between gap-2">
+                <span className="truncate text-sm text-muted-foreground">
+                  {auth.nguoiDung?.username} ·{" "}
+                  {nhanVaiTro(auth.nguoiDung?.vaiTro ?? "")}
+                </span>
+                <button
+                  onClick={auth.dangXuat}
+                  className="flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1 text-sm font-medium text-muted-foreground hover:bg-card hover:text-destructive"
+                >
+                  <LogOut className="size-5" aria-hidden />
+                  Đăng xuất
+                </button>
+              </div>
+            </div>
+          )}
           <button
             onClick={() => setScreen("kit")}
             className={cn(
               "flex min-h-12 w-full items-center gap-2 rounded-lg px-3 text-base font-medium transition-colors",
-              screen === "kit"
+              screenThuc === "kit"
                 ? "bg-accent text-accent-foreground"
                 : "text-muted-foreground hover:bg-muted",
             )}
@@ -136,25 +209,43 @@ export default function App() {
           <h1 className="hidden truncate text-xl font-semibold text-foreground md:block">
             {tieuDeMan}
           </h1>
-          <CoChuNhanh className="shrink-0" />
+          <div className="flex shrink-0 items-center gap-3">
+            {/* Đăng xuất cho điện thoại (thanh bên ẩn) */}
+            {auth.canDangNhap && auth.session && (
+              <button
+                onClick={auth.dangXuat}
+                className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm font-medium text-muted-foreground hover:text-destructive md:hidden"
+              >
+                <LogOut className="size-5" aria-hidden />
+                Đăng xuất
+              </button>
+            )}
+            <CoChuNhanh />
+          </div>
         </header>
 
         <main className="w-full flex-1 p-5 pb-28 sm:p-8 md:pb-8">
           <div className="mx-auto w-full max-w-(--app-content-width)">
-            {screen === "nhap-hang" && <NhapNguyenLieuScreen />}
-            {screen === "ban-hang" && <BanHangScreen />}
-            {screen === "can-doi" && <CanDoiScreen />}
-            {screen === "danh-muc" && <DanhMucScreen />}
-            {screen === "kit" && <KitPage />}
+            {screenThuc === "nhap-hang" && <NhapNguyenLieuScreen />}
+            {screenThuc === "ban-hang" && <BanHangScreen />}
+            {screenThuc === "can-doi" && <CanDoiScreen />}
+            {screenThuc === "danh-muc" && <DanhMucScreen />}
+            {screenThuc === "nguoi-dung" && <QuanLyNguoiDungScreen />}
+            {screenThuc === "kit" && <KitPage />}
           </div>
         </main>
       </div>
 
-      {/* Tab dưới cho điện thoại — cao 64px, icon + chữ, ngón cái với tới */}
-      <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 border-t-2 border-border bg-card md:hidden">
-        {NAV.map((n) => {
+      {/* Tab dưới cho điện thoại — số cột theo số mục (4 hoặc 5 khi có admin) */}
+      <nav
+        className="fixed inset-x-0 bottom-0 z-40 grid border-t-2 border-border bg-card md:hidden"
+        style={{
+          gridTemplateColumns: `repeat(${navList.length}, minmax(0, 1fr))`,
+        }}
+      >
+        {navList.map((n) => {
           const Icon = n.icon;
-          const active = screen === n.id;
+          const active = screenThuc === n.id;
           return (
             <button
               key={n.id}

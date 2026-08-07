@@ -67,7 +67,7 @@ khớp khổ A4. Đừng áp luật cỡ chữ / màu / sentence case vào hai f
 | Báo lỗi cả form | `ErrorSummary` (đầu form, có link nhảy tới ô) |
 | Cho biết đang làm cho ngày/xưởng nào | `ContextBar` |
 | Danh sách rỗng | `EmptyState` (phải nói việc tiếp theo) |
-| Câu diễn giải dài cạnh nhãn | `InfoTip` (nút ⓘ + popover). `DateField` có sẵn prop `info` — dùng thay `hint` khi câu dài khiến hai ô cùng hàng lệch chiều cao. Nhãn tiêu đề vẫn luôn hiện. |
+| Câu diễn giải dài cạnh nhãn | `InfoTip` (nút ⓘ + popover). `DateField` **và** `Combobox` có sẵn prop `info` — dùng thay `hint` khi câu dài khiến hai ô cùng hàng lệch chiều cao. Nhãn tiêu đề vẫn luôn hiện. |
 
 ## Trang duyệt + cấu hình
 

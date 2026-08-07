@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { InfoTip } from "./InfoTip";
 import { cn } from "@/lib/utils";
 import { Check, ChevronsUpDown, Plus, X } from "lucide-react";
 
@@ -45,6 +46,7 @@ export function Combobox({
   onCreate,
   required,
   hint,
+  info,
   error,
   placeholder,
   emptyText = "Không tìm thấy mục nào khớp.",
@@ -60,6 +62,8 @@ export function Combobox({
   onCreate?: (ten: string) => string;
   required?: boolean;
   hint?: string;
+  /** Câu hướng dẫn dài → nút ⓘ cạnh nhãn (không đẩy chiều cao ô, canh đều lưới). */
+  info?: React.ReactNode;
   error?: string;
   placeholder?: string;
   emptyText?: string;
@@ -104,6 +108,7 @@ export function Combobox({
         ) : (
           <span className="text-sm text-muted-foreground">(không bắt buộc)</span>
         )}
+        {info && <InfoTip label={label}>{info}</InfoTip>}
       </div>
       {hint && <p className="text-base text-muted-foreground">{hint}</p>}
       {error && (

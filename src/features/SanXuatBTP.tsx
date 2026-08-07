@@ -73,6 +73,7 @@ export default function SanXuatBTPScreen() {
 
   /* Ghi nhiều dòng trong một phiên: đầu phiên chọn 1 lần, đổ nhiều thành phẩm. */
   const [phien, setPhien] = useState<DauPhien | null>(null);
+  const [loaiNLGanNhat, setLoaiNLGanNhat] = useState(""); // nhớ loại NL lần trước, đỡ chọn lại
   const [phienIds, setPhienIds] = useState<string[]>([]);
   const [dongMoi, setDongMoi] = useState<DongMoi>(DONG_RONG);
   const [loiPhien, setLoiPhien] = useState<LoiNhap[]>([]);
@@ -93,10 +94,21 @@ export default function SanXuatBTPScreen() {
 
   const tenMH = (id: string) => matHang.find((m) => m.id === id)?.ten || "—";
   const tenLoaiNL = (id: string) => loaiNL.find((l) => l.id === id)?.ten || "";
-  const matHangCuaLoaiNL = (loaiNLId: string): MucChon[] =>
-    matHang
-      .filter((m) => (m.loaiNLId || "") === loaiNLId)
-      .map((m) => ({ value: m.id, label: m.ten }));
+  /** Thành phẩm của loại NL: đã gắn đúng loại NL, HOẶC chưa gắn nhưng CÙNG LOÀI
+   *  (gợi ý — chọn/thêm là gắn luôn). Nhờ đó thành phẩm 141 hiện ngay khỏi cấu hình tay. */
+  const matHangCuaLoaiNL = (loaiNLId: string): MucChon[] => {
+    const loai = loaiNL.find((l) => l.id === loaiNLId)?.loai || "";
+    return matHang
+      .filter(
+        (m) =>
+          m.loaiNLId === loaiNLId || (!m.loaiNLId && loai && m.loai === loai)
+      )
+      .map((m) => ({
+        value: m.id,
+        label: m.ten,
+        phu: !m.loaiNLId ? "gợi ý theo loài" : undefined,
+      }));
+  };
 
   const optLoaiNL: MucChon[] = loaiNL.map((l) => ({
     value: l.id,
@@ -162,7 +174,7 @@ export default function SanXuatBTPScreen() {
       ngayGhiSo: todayISO(),
       lyDoGhiBu: "",
       phanXuong: xuongGhi,
-      loaiNLId: loaiNL[0]?.id ?? "",
+      loaiNLId: loaiNLGanNhat || loaiNL[0]?.id || "",
     });
     setPhienIds([]);
     setDongMoi(DONG_RONG);
@@ -194,6 +206,17 @@ export default function SanXuatBTPScreen() {
       ls.push({ truong: "Lý do ghi bù", thongBao: "Ghi sau ngày SX / ngày đã chốt — ghi rõ lý do" });
     setLoiPhien(ls);
     if (ls.length > 0) return;
+
+    // Cấu hình dần: thành phẩm chưa gắn loại NL → gắn theo loại NL đang nhập.
+    const mh = matHang.find((m) => m.id === dongMoi.matHangId);
+    if (mh && !mh.loaiNLId) {
+      const loai = mh.loai || loaiNL.find((l) => l.id === phien.loaiNLId)?.loai || "";
+      setMatHang(
+        matHang.map((m) =>
+          m.id === mh.id ? { ...m, loaiNLId: phien.loaiNLId, loai } : m
+        )
+      );
+    }
 
     const moi: DongSanXuat = {
       id: newId(),
@@ -565,10 +588,12 @@ export default function SanXuatBTPScreen() {
                 <Combobox
                   label="Loại nguyên liệu"
                   required
-                  hint="Chọn loại NL của bảng cân đối (VD Bạch tuộc 2 da) — thành phẩm lọc theo đây."
+                  choPhepXoa={false}
+                  info="Loại NL của bảng cân đối (VD Bạch tuộc 2 da). Thành phẩm lọc theo loại NL này. Chưa gắn thì hiện thành phẩm cùng loài để gợi ý."
                   value={phien.loaiNLId}
                   onChange={(v) => {
                     datPhien("loaiNLId", v);
+                    setLoaiNLGanNhat(v);
                     setDongMoi(DONG_RONG); // đổi loại NL thì bỏ thành phẩm cũ
                   }}
                   options={optLoaiNL}
@@ -611,7 +636,7 @@ export default function SanXuatBTPScreen() {
                 <Combobox
                   label="Thành phẩm"
                   required
-                  hint="Thành phẩm của loại NL đang chọn. Chưa có thì gõ tên rồi Thêm mới."
+                  info="Gõ để tìm. Chưa có thì gõ tên rồi bấm Thêm mới — tự gắn vào loại NL đang nhập."
                   value={dongMoi.matHangId}
                   onChange={(v) => setDongMoi((d) => ({ ...d, matHangId: v }))}
                   options={matHangCuaLoaiNL(phien.loaiNLId)}

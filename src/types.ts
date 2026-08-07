@@ -10,19 +10,31 @@ export type PhanXuong = "Đông" | "Cá" | "Khô";
 
 /* ---------- Người dùng & phân quyền ---------- */
 
-/** Vai trò — `admin` full quyền; rỗng = chưa gán (chỉ đăng nhập được, chưa dùng gì). */
-export type VaiTro = "admin" | "giam-doc" | "ke-toan" | "to-truong" | "";
+/**
+ * Vai trò — `admin` full quyền; rỗng = chưa gán (chỉ đăng nhập được, chưa dùng gì).
+ * Các vai trò nghiệp vụ hiện CHƯA gate chức năng (chỉ là nhãn) — phân quyền theo
+ * vai trò làm sau. `pgd-quan-doc-dong` = Phó giám đốc kiêm luôn Quản đốc xưởng Đông.
+ */
+export type VaiTro =
+  | "admin"
+  | "giam-doc"
+  | "pho-giam-doc"
+  | "ke-toan"
+  | "pgd-quan-doc-dong"
+  | "to-truong" // giữ tương thích dữ liệu cũ — không còn trong danh sách chọn
+  | "";
 
 export const VAI_TRO: { value: VaiTro; label: string }[] = [
   { value: "admin", label: "Quản trị (full quyền)" },
   { value: "giam-doc", label: "Giám đốc" },
+  { value: "pho-giam-doc", label: "Phó giám đốc" },
+  { value: "pgd-quan-doc-dong", label: "Phó giám đốc kiêm Quản đốc xưởng Đông" },
   { value: "ke-toan", label: "Kế toán" },
-  { value: "to-truong", label: "Tổ trưởng" },
 ];
 
 /**
  * Hồ sơ người dùng — 1-1 với tài khoản Supabase Auth (`id` = auth user id).
- * Tài khoản đăng nhập (email tổng hợp `<username>@bsf1.local` + mật khẩu) tạo ở
+ * Tài khoản đăng nhập (email tổng hợp `<username>@bsf1.vn` + mật khẩu) tạo ở
  * Supabase Dashboard; app tự tạo hồ sơ này lần đầu đăng nhập, admin gán vai trò.
  */
 export interface NguoiDung {

@@ -2,10 +2,14 @@
  * Sinh username từ họ tên: chữ đầu mỗi từ TRỪ từ cuối + từ cuối đầy đủ, bỏ dấu.
  * "Phan Nguyễn Hoài Nam" → "pnhnam". Một từ → chính nó.
  *
- * Email đăng nhập tổng hợp = `<username>@bsf1.local` (Supabase Auth cần email;
+ * Email đăng nhập tổng hợp = `<username>@bsf1.vn` (Supabase Auth cần email;
  * người dùng chỉ gõ username, app ghép đuôi).
+ *
+ * ⚠️ KHÔNG dùng `.local` (hay `.test` / `.example` / `.invalid`): GoTrue chặn các
+ * TLD dành riêng này khi signUp ("Email address ... is invalid"). Dùng TLD thật
+ * `.vn` — email tổng hợp không nhận mail nên chỉ cần đúng định dạng, không cần MX.
  */
-export const DUOI_EMAIL = "@bsf1.local";
+export const DUOI_EMAIL = "@bsf1.vn";
 
 /** Bỏ dấu tiếng Việt + đổi đ→d, về chữ thường ASCII. */
 export function boDau(s: string): string {

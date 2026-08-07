@@ -1,25 +1,27 @@
 > Load khi: đụng auth, đăng nhập, RLS, `.env`, key, hay có ý định cho app chạy ngoài mạng nội bộ. 🔴
-covers: src/lib/auth.ts, src/lib/username.ts, src/features/DangNhap.tsx, src/features/QuanLyNguoiDung.tsx, supabase/migrations/0006_nguoi_dung.sql, supabase/migrations/0007_seed_admin.sql, supabase/migrations/0003_siet_rls.sql, src/lib/supabase.ts, .env.example, .gitignore
-last_verified: 2026-08-06
+covers: src/lib/auth.ts, src/lib/username.ts, src/features/DangNhap.tsx, src/features/QuanLyNguoiDung.tsx, supabase/migrations/0006_nguoi_dung.sql, supabase/migrations/0007_seed_admin.sql, supabase/migrations/0010_email_domain_vn.sql, supabase/migrations/0003_siet_rls.sql, src/lib/supabase.ts, .env.example, .gitignore
+last_verified: 2026-08-07
 ttl_days: 90
+<!-- updated: 2026-08-07 — đuôi email .local→.vn (GoTrue chặn .local, migration 0010); role list mới (giam-doc/pho-giam-doc/pgd-quan-doc-dong/ke-toan) -->
 
 # Bảo mật & phân quyền
 
 ## Trạng thái: CÓ đăng nhập (Supabase Auth), CHƯA siết RLS
 
-- **Đăng nhập từ UI**: Supabase Auth, email tổng hợp `<username>@bsf1.local` (người dùng chỉ gõ username, `src/lib/username.ts` ghép đuôi). Màn `DangNhap.tsx` **chỉ đăng nhập** — KHÔNG mở đăng ký tự do (chính sách app nội bộ). Logic `src/lib/auth.ts` (`useAuth`: `dangNhap`/`taoTaiKhoan`/`dangXuat`). Gate ở `App.tsx`. **Chạy localStorage (thiếu env) ⇒ KHÔNG chặn** (offline ở xưởng).
+- **Đăng nhập từ UI**: Supabase Auth, email tổng hợp `<username>@bsf1.vn` (người dùng chỉ gõ username, `src/lib/username.ts` ghép đuôi). Màn `DangNhap.tsx` **chỉ đăng nhập** — KHÔNG mở đăng ký tự do (chính sách app nội bộ). Logic `src/lib/auth.ts` (`useAuth`: `dangNhap`/`taoTaiKhoan`/`dangXuat`). Gate ở `App.tsx`. **Chạy localStorage (thiếu env) ⇒ KHÔNG chặn** (offline ở xưởng).
+  - ⚠️ **Đuôi phải là TLD thật (`.vn`), KHÔNG `.local`**: GoTrue chặn TLD dành riêng (`.local`/`.test`/`.example`/`.invalid`) khi signUp → "Email address … is invalid", admin không tạo được tài khoản. Đổi từ `.local` sang `.vn` ở migration `0010` (đã đổi cả admin seed).
 - **Admin tạo tài khoản**: chỉ `admin` (nav **Người dùng**, `QuanLyNguoiDung.tsx`) tạo được tài khoản: họ tên · tên đăng nhập (gợi ý từ họ tên, sửa được) · mật khẩu, có **check trùng username**. Tạo bằng `taoTaiKhoan` (`auth.ts`): signUp trên **client PHỤ** (`taoClientTam` — `persistSession:false`) nên **KHÔNG đá văng phiên admin**; hồ sơ lưu qua client chính, vai trò rỗng (admin gán sau).
-- **Vai trò**: bảng `nguoi_dung` (khóa `id` = auth user id) giữ họ tên · username · `vai_tro` (`admin`/`giam-doc`/`ke-toan`/`to-truong`/rỗng). Admin gán vai trò + sửa họ tên trong màn Người dùng.
+- **Vai trò**: bảng `nguoi_dung` (khóa `id` = auth user id) giữ họ tên · username · `vai_tro`. Danh sách chọn (`VAI_TRO` trong `types.ts`): `admin` (Quản trị) · `giam-doc` · `pho-giam-doc` · `pgd-quan-doc-dong` (Phó giám đốc kiêm Quản đốc xưởng Đông) · `ke-toan`; rỗng = chưa gán. `to-truong` giữ trong union cho dữ liệu cũ, không còn trong danh sách chọn. **Chỉ `admin` gate chức năng** (màn Người dùng + tạo tài khoản); các vai trò nghiệp vụ khác hiện là **nhãn**, chưa phân quyền. Admin gán vai trò + sửa họ tên trong màn Người dùng.
 - **CHƯA siết RLS**: policy vẫn `for all to anon, authenticated using(true)`. Gate + đóng-đăng-ký hiện là **app-level**; anon key vẫn đọc/ghi được nếu bypass UI ⇒ **vẫn chỉ chạy trong mạng nội bộ** cho tới khi chạy `0003`.
 
 ## Thiết lập admin đầu tiên
 
 1. Chạy `0006_nguoi_dung.sql` rồi `0007_seed_admin.sql` — `0007` **seed sẵn admin / admin** (mồi con-gà-quả-trứng: đăng ký đã đóng, chưa admin thì không ai tạo được admin).
 2. Mở app → đăng nhập **admin / admin**.
-3. ⚠️ **ĐỔI MẬT KHẨU NGAY** (Dashboard → Auth → Users → admin@bsf1.local → Update password). `admin` là mật khẩu tạm rất yếu.
+3. ⚠️ **ĐỔI MẬT KHẨU NGAY** (Dashboard → Auth → Users → admin@bsf1.vn → Update password). `admin` là mật khẩu tạm rất yếu.
 4. Tạo user khác ngay trong app (nút **Tạo tài khoản** ở màn Người dùng) + gán vai trò.
 
-⚠️ Tài khoản admin do **admin tạo qua signUp** (bước 4) cần **TẮT "Confirm email"** (Supabase → Authentication → Providers → Email) vì email `@bsf1.local` không nhận mail xác nhận. Admin seed ở `0007` đã `email_confirmed_at` sẵn nên đăng nhập được ngay bất kể cài đặt này.
+⚠️ Tài khoản admin do **admin tạo qua signUp** (bước 4) cần **TẮT "Confirm email"** (Supabase → Authentication → Providers → Email) vì email `@bsf1.vn` (tổng hợp) không nhận mail xác nhận. Admin seed ở `0007` đã `email_confirmed_at` sẵn nên đăng nhập được ngay bất kể cài đặt này.
 
 ## Lộ trình siết RLS (mở ra ngoài mạng nội bộ)
 

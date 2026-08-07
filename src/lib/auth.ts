@@ -5,7 +5,7 @@ import type { NguoiDung, VaiTro } from "@/types";
 import { emailToUsername, usernameToEmail } from "@/lib/username";
 
 /**
- * Đăng nhập qua Supabase Auth (email tổng hợp `<username>@bsf1.local`).
+ * Đăng nhập qua Supabase Auth (email tổng hợp `<username>@bsf1.vn`).
  *
  * Tài khoản (email + mật khẩu) tạo ở Supabase Dashboard; bảng `nguoi_dung` giữ
  * hồ sơ nghiệp vụ (họ tên, username, vai trò), khóa `id` = auth user id. Lần đầu

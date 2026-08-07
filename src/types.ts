@@ -304,3 +304,79 @@ export interface DongBan {
 export function thanhTienBan(r: Pick<DongBan, "luongKg" | "donGia">): number {
   return r.luongKg * (r.donGia ?? 0);
 }
+
+/* ---------- Module WIP: sản xuất BTP · kho dự trữ · đơn đặt · lệnh xuất ----------
+   Vòng lặp: sản xuất BTP ngày → cấp đông → kho dự trữ → gom đủ đơn đặt →
+   xuất container → nối sổ Bán hàng. Xem ba-spec 34 + design-spec 35. */
+
+/** Trạng thái một dòng BTP sản xuất trong kho. */
+export type TrangThaiKho = "cho-nhap" | "da-nhap";
+
+/**
+ * Một dòng BTP SẢN XUẤT trong ngày (owner: Tổ trưởng SX). Chốt ngày như Nhập
+ * hàng; ghi sau ngày SX ⇒ ghi bù (bắt lý do). `trangThai`:
+ *  - `cho-nhap`: đã ghi sản lượng, Thủ kho chưa duyệt vào kho ⇒ CHƯA tính tồn.
+ *  - `da-nhap` : Thủ kho đã duyệt lô vào `kho` ⇒ tính tồn kho dự trữ.
+ * Lô tồn khoá theo (matHangId × quyCach × id-lô × kho). Xuất trừ tồn ở `dong_lenh`.
+ */
+export interface DongSanXuat {
+  id: string;
+  ngay: string; // yyyy-mm-dd — ngày SX
+  ngayGhiSo: string;
+  lyDoGhiBu: string;
+  phanXuong: PhanXuong;
+  matHangId: string;
+  quyCach: string;
+  luongKg: number;
+  soBlock: number;
+  kho: string; // phòng đông đích (Thủ kho gán khi duyệt)
+  trangThai: TrangThaiKho;
+  ghiChu: string;
+}
+
+/** Ghi sau ngày SX ⇒ ghi bù (cần lý do). */
+export function laGhiBuSX(c: Pick<DongSanXuat, "ngay" | "ngayGhiSo">): boolean {
+  return Boolean(c.ngayGhiSo) && c.ngayGhiSo > c.ngay;
+}
+
+/** Trạng thái đơn đặt: đang gom hàng / đã đủ / đã đóng (xuất xong). */
+export type TrangThaiDon = "dang-gom" | "du" | "dong";
+
+/** Đơn đặt của khách (owner: Phòng KH) — khách đặt số lượng lớn, gom nhiều ngày. */
+export interface DonDat {
+  id: string;
+  khachId: string;
+  ngayDat: string;
+  trangThai: TrangThaiDon;
+  ghiChu: string;
+}
+
+/** Dòng cần của đơn: mặt hàng × quy cách × kg/block cần. */
+export interface DongDon {
+  id: string;
+  donId: string;
+  matHangId: string;
+  quyCach: string;
+  luongKgCan: number;
+  soBlockCan: number;
+}
+
+/** Lệnh xuất container (sinh khi đơn đủ; cho xuất một phần). */
+export interface LenhXuat {
+  id: string;
+  donId: string;
+  ngay: string;
+  trangThai: "mo" | "dong";
+  ghiChu: string;
+}
+
+/** Dòng thực xuất — trừ tồn theo lô sản xuất nguồn (`sanXuatId`). */
+export interface DongLenh {
+  id: string;
+  lenhId: string;
+  sanXuatId: string;
+  matHangId: string;
+  quyCach: string;
+  luongKg: number;
+  soBlock: number;
+}

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import NhapNguyenLieuScreen from "@/features/NhapNguyenLieu";
+import SanXuatBTPScreen from "@/features/SanXuatBTP";
 import BanHangScreen from "@/features/BanHang";
 import CanDoiScreen from "@/features/CanDoi";
 import DanhMucScreen from "@/features/DanhMuc";
@@ -12,6 +13,7 @@ import { useAuth } from "@/lib/auth";
 import { nhanVaiTro } from "@/types";
 import {
   Truck,
+  Factory,
   ShoppingCart,
   Scale,
   Library,
@@ -22,6 +24,7 @@ import {
 
 type Screen =
   | "nhap-hang"
+  | "san-xuat"
   | "ban-hang"
   | "can-doi"
   | "danh-muc"
@@ -42,6 +45,12 @@ const NAV: MucNav[] = [
     label: "Nhập hàng",
     moTa: "Ghi chuyến nguyên liệu về xưởng",
     icon: Truck,
+  },
+  {
+    id: "san-xuat",
+    label: "Sản xuất BTP",
+    moTa: "Ghi sản lượng bán thành phẩm ngày",
+    icon: Factory,
   },
   {
     id: "ban-hang",
@@ -224,6 +233,7 @@ export default function App() {
         <main className="w-full flex-1 p-5 pb-28 sm:p-8 md:pb-8">
           <div className="mx-auto w-full max-w-(--app-content-width)">
             {screenThuc === "nhap-hang" && <NhapNguyenLieuScreen />}
+            {screenThuc === "san-xuat" && <SanXuatBTPScreen />}
             {screenThuc === "ban-hang" && <BanHangScreen />}
             {screenThuc === "can-doi" && <CanDoiScreen />}
             {screenThuc === "danh-muc" && <DanhMucScreen />}

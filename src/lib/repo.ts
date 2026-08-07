@@ -23,6 +23,13 @@ import type {
   PhanXuong,
   PhieuBan,
   ThanhPham,
+  DongSanXuat,
+  TrangThaiKho,
+  DonDat,
+  TrangThaiDon,
+  DongDon,
+  LenhXuat,
+  DongLenh,
 } from "@/types";
 import { vaiTroTuChuoi, vaiTroThanhChuoi } from "@/types";
 
@@ -445,6 +452,160 @@ export const BANG_BAN_HANG: AnhXaBang<DongBan> = {
     luongKg: Number(r.luong_kg ?? 0),
     donGia: n(r.don_gia),
     khoNguon: s(r.kho_nguon),
+  }),
+};
+
+/* ---------- Module WIP ---------- */
+
+/** Dòng BTP sản xuất ngày. */
+export const BANG_SAN_XUAT: AnhXaBang<DongSanXuat> = {
+  table: "san_xuat_btp",
+  localKey: "bsf.san-xuat.v1",
+  layKhoa: theoId,
+  toRow: (x) => ({
+    id: x.id,
+    ngay: x.ngay,
+    ngay_ghi_so: x.ngayGhiSo || null,
+    ly_do_ghi_bu: x.lyDoGhiBu,
+    phan_xuong: x.phanXuong,
+    mat_hang_id: x.matHangId,
+    quy_cach: x.quyCach,
+    luong_kg: x.luongKg,
+    so_block: x.soBlock,
+    kho: x.kho,
+    trang_thai: x.trangThai,
+    ghi_chu: x.ghiChu,
+  }),
+  fromRow: (r) => ({
+    id: s(r.id),
+    ngay: s(r.ngay).slice(0, 10),
+    ngayGhiSo: s(r.ngay_ghi_so).slice(0, 10),
+    lyDoGhiBu: s(r.ly_do_ghi_bu),
+    phanXuong: s(r.phan_xuong) as PhanXuong,
+    matHangId: s(r.mat_hang_id),
+    quyCach: s(r.quy_cach),
+    luongKg: Number(r.luong_kg ?? 0),
+    soBlock: Number(r.so_block ?? 0),
+    kho: s(r.kho),
+    trangThai: (s(r.trang_thai) || "cho-nhap") as TrangThaiKho,
+    ghiChu: s(r.ghi_chu),
+  }),
+};
+
+/** Chốt ngày sản xuất (bảng riêng, cùng hình dạng ChotNgay). */
+export const BANG_CHOT_SX: AnhXaBang<ChotNgay> = {
+  table: "chot_san_xuat",
+  localKey: "bsf.chot-san-xuat.v1",
+  layKhoa: theoId,
+  toRow: (x) => ({
+    id: x.id,
+    ngay: x.ngay,
+    phan_xuong: x.phanXuong,
+    da_chot: x.daChot,
+    chot_luc: x.chotLuc,
+    tong_kg_luc_chot: x.tongKgLucChot,
+    ly_do_mo_lai: x.lyDoMoLai,
+    ghi_chu: x.ghiChu,
+  }),
+  fromRow: (r) => ({
+    id: s(r.id),
+    ngay: s(r.ngay).slice(0, 10),
+    phanXuong: s(r.phan_xuong) as PhanXuong,
+    daChot: Boolean(r.da_chot),
+    chotLuc: s(r.chot_luc),
+    tongKgLucChot: Number(r.tong_kg_luc_chot ?? 0),
+    lyDoMoLai: s(r.ly_do_mo_lai),
+    ghiChu: s(r.ghi_chu),
+  }),
+};
+
+/** Đơn đặt. */
+export const BANG_DON_DAT: AnhXaBang<DonDat> = {
+  table: "don_dat",
+  localKey: "bsf.don-dat.v1",
+  layKhoa: theoId,
+  toRow: (x) => ({
+    id: x.id,
+    khach_id: x.khachId,
+    ngay_dat: x.ngayDat,
+    trang_thai: x.trangThai,
+    ghi_chu: x.ghiChu,
+  }),
+  fromRow: (r) => ({
+    id: s(r.id),
+    khachId: s(r.khach_id),
+    ngayDat: s(r.ngay_dat).slice(0, 10),
+    trangThai: (s(r.trang_thai) || "dang-gom") as TrangThaiDon,
+    ghiChu: s(r.ghi_chu),
+  }),
+};
+
+/** Dòng cần của đơn. */
+export const BANG_DONG_DON: AnhXaBang<DongDon> = {
+  table: "dong_don",
+  localKey: "bsf.dong-don.v1",
+  layKhoa: theoId,
+  toRow: (x) => ({
+    id: x.id,
+    don_id: x.donId,
+    mat_hang_id: x.matHangId,
+    quy_cach: x.quyCach,
+    luong_kg_can: x.luongKgCan,
+    so_block_can: x.soBlockCan,
+  }),
+  fromRow: (r) => ({
+    id: s(r.id),
+    donId: s(r.don_id),
+    matHangId: s(r.mat_hang_id),
+    quyCach: s(r.quy_cach),
+    luongKgCan: Number(r.luong_kg_can ?? 0),
+    soBlockCan: Number(r.so_block_can ?? 0),
+  }),
+};
+
+/** Lệnh xuất. */
+export const BANG_LENH_XUAT: AnhXaBang<LenhXuat> = {
+  table: "lenh_xuat",
+  localKey: "bsf.lenh-xuat.v1",
+  layKhoa: theoId,
+  toRow: (x) => ({
+    id: x.id,
+    don_id: x.donId,
+    ngay: x.ngay,
+    trang_thai: x.trangThai,
+    ghi_chu: x.ghiChu,
+  }),
+  fromRow: (r) => ({
+    id: s(r.id),
+    donId: s(r.don_id),
+    ngay: s(r.ngay).slice(0, 10),
+    trangThai: (s(r.trang_thai) || "mo") as "mo" | "dong",
+    ghiChu: s(r.ghi_chu),
+  }),
+};
+
+/** Dòng thực xuất (trừ tồn theo lô). */
+export const BANG_DONG_LENH: AnhXaBang<DongLenh> = {
+  table: "dong_lenh",
+  localKey: "bsf.dong-lenh.v1",
+  layKhoa: theoId,
+  toRow: (x) => ({
+    id: x.id,
+    lenh_id: x.lenhId,
+    san_xuat_id: x.sanXuatId,
+    mat_hang_id: x.matHangId,
+    quy_cach: x.quyCach,
+    luong_kg: x.luongKg,
+    so_block: x.soBlock,
+  }),
+  fromRow: (r) => ({
+    id: s(r.id),
+    lenhId: s(r.lenh_id),
+    sanXuatId: s(r.san_xuat_id),
+    matHangId: s(r.mat_hang_id),
+    quyCach: s(r.quy_cach),
+    luongKg: Number(r.luong_kg ?? 0),
+    soBlock: Number(r.so_block ?? 0),
   }),
 };
 

@@ -2,10 +2,15 @@ import { uid } from "@/lib/db";
 import {
   BANG_BAN_HANG,
   BANG_CHOT_NGAY,
+  BANG_CHOT_SX,
   BANG_CHUYEN_NHAP,
   BANG_DAI_LY,
+  BANG_DON_DAT,
+  BANG_DONG_DON,
+  BANG_DONG_LENH,
   BANG_KHACH_HANG,
   BANG_KY,
+  BANG_LENH_XUAT,
   BANG_LOAI_NL,
   BANG_MAT_HANG,
   BANG_NGUOI_DUNG,
@@ -13,6 +18,7 @@ import {
   BANG_NL_VAO,
   BANG_PHE_LIEU,
   BANG_PHIEU_BAN,
+  BANG_SAN_XUAT,
   BANG_THANH_PHAM,
   BANG_TP_RA,
   useBang,
@@ -65,3 +71,11 @@ export const useTPRa = () => useBang(BANG_TP_RA);
 export const usePhieuBan = () => useBang(BANG_PHIEU_BAN);
 export const useBanHang = () => useBang(BANG_BAN_HANG);
 export const useNguoiDung = () => useBang(BANG_NGUOI_DUNG);
+
+/* --- Module WIP: sản xuất BTP · kho · đơn đặt --- */
+export const useSanXuat = () => useBang(BANG_SAN_XUAT);
+export const useChotSX = () => useBang(BANG_CHOT_SX);
+export const useDonDat = () => useBang(BANG_DON_DAT);
+export const useDongDon = () => useBang(BANG_DONG_DON);
+export const useLenhXuat = () => useBang(BANG_LENH_XUAT);
+export const useDongLenh = () => useBang(BANG_DONG_LENH);

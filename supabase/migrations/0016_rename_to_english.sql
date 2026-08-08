@@ -30,208 +30,186 @@ ALTER TABLE IF EXISTS public.dong_don RENAME TO order_items;
 ALTER TABLE IF EXISTS public.lenh_xuat RENAME TO export_orders;
 ALTER TABLE IF EXISTS public.dong_lenh RENAME TO export_items;
 
--- 2. Đổi tên cột trong các bảng
--- sites
-ALTER TABLE public.sites RENAME COLUMN IF EXISTS ten TO name;
+-- 2. Đổi tên cột — do-block idempotent (Postgres KHÔNG hỗ trợ
+--    "RENAME COLUMN IF EXISTS"). Chỉ đổi khi cột cũ CÒN và cột mới CHƯA có →
+--    chạy lại nhiều lần an toàn.
+do $$
+declare r record;
+begin
+  for r in select * from (values
+      ('sites','ten','name'),
+      ('suppliers','xi_nghiep_id','site_id'),
+      ('suppliers','ma','code'),
+      ('suppliers','ten','short_name'),
+      ('suppliers','dien_thoai','phone'),
+      ('suppliers','ghi_chu','note'),
+      ('suppliers','ten_ghi_phieu','billing_name'),
+      ('suppliers','dia_chi','address'),
+      ('suppliers','cmnd','national_id'),
+      ('suppliers','ngay_cap','issued_date'),
+      ('suppliers','noi_cap','issued_place'),
+      ('material_types','xi_nghiep_id','site_id'),
+      ('material_types','ten','name'),
+      ('material_types','loai','category'),
+      ('material_types','ghi_chu','note'),
+      ('finished_goods','xi_nghiep_id','site_id'),
+      ('finished_goods','ma','code'),
+      ('finished_goods','ten','name'),
+      ('finished_goods','dvt','unit'),
+      ('finished_goods','ma_tai_khoan','account_code'),
+      ('finished_goods','nhom','group_name'),
+      ('products','xi_nghiep_id','site_id'),
+      ('products','ma','code'),
+      ('products','ten','name'),
+      ('products','ma_thanh_pham','finished_good_code'),
+      ('products','loai','category'),
+      ('products','loai_nguyen_lieu_id','material_type_id'),
+      ('customers','xi_nghiep_id','site_id'),
+      ('customers','ma','code'),
+      ('customers','ten','name'),
+      ('customers','thi_truong','market'),
+      ('import_shipments','xi_nghiep_id','site_id'),
+      ('import_shipments','ngay_giao','delivery_date'),
+      ('import_shipments','ngay_ghi_so','posting_date'),
+      ('import_shipments','ly_do_ghi_bu','backdate_reason'),
+      ('import_shipments','phan_xuong','workshop'),
+      ('import_shipments','ten_dai_ly','supplier_name'),
+      ('import_shipments','tai_xe','driver_name'),
+      ('import_shipments','bien_so_xe','license_plate'),
+      ('import_shipments','ghi_chu','note'),
+      ('daily_locks','xi_nghiep_id','site_id'),
+      ('daily_locks','ngay','lock_date'),
+      ('daily_locks','phan_xuong','workshop'),
+      ('daily_locks','da_chot','is_locked'),
+      ('daily_locks','chot_luc','locked_at'),
+      ('daily_locks','tong_kg_luc_chot','total_kg_at_lock'),
+      ('daily_locks','ly_do_mo_lai','reopen_reason'),
+      ('daily_locks','ghi_chu','note'),
+      ('material_imports','xi_nghiep_id','site_id'),
+      ('material_imports','chuyen_id','shipment_id'),
+      ('material_imports','ngay','delivery_date'),
+      ('material_imports','phan_xuong','workshop'),
+      ('material_imports','loai','category'),
+      ('material_imports','ten_dai_ly','supplier_name'),
+      ('material_imports','ten_loai_nguyen_lieu','material_type_name'),
+      ('material_imports','so_luong_kg','quantity_kg'),
+      ('material_imports','don_gia','unit_price'),
+      ('material_imports','tai_xe','driver_name'),
+      ('material_imports','bien_so_xe','license_plate'),
+      ('material_imports','ghi_chu','note'),
+      ('balancing_periods','xi_nghiep_id','site_id'),
+      ('balancing_periods','ten_loai_nguyen_lieu','material_type_name'),
+      ('balancing_periods','mo_ta_ngay','date_range_description'),
+      ('balancing_periods','tu_ngay','start_date'),
+      ('balancing_periods','den_ngay','end_date'),
+      ('balancing_periods','tong_nl_nhan_kg','total_input_kg'),
+      ('balancing_periods','ti_gia','exchange_rate'),
+      ('balancing_periods','chi_phi_che_bien','processing_cost_per_kg'),
+      ('balancing_inputs','xi_nghiep_id','site_id'),
+      ('balancing_inputs','ky_id','period_id'),
+      ('balancing_inputs','nhom','group_name'),
+      ('balancing_inputs','ten','name'),
+      ('balancing_inputs','so_luong_kg','quantity_kg'),
+      ('balancing_inputs','don_gia','unit_price'),
+      ('balancing_inputs','ty_le_phan_tram','ratio_percentage'),
+      ('balancing_inputs','nguon_kho','source_warehouse'),
+      ('scraps','xi_nghiep_id','site_id'),
+      ('scraps','ky_id','period_id'),
+      ('scraps','loai','name'),
+      ('scraps','so_luong_kg','quantity_kg'),
+      ('scraps','don_gia_ban','selling_price'),
+      ('scraps','ngay','date'),
+      ('scraps','phan_xuong','workshop'),
+      ('scraps','nguon','source'),
+      ('balancing_outputs','xi_nghiep_id','site_id'),
+      ('balancing_outputs','ky_id','period_id'),
+      ('balancing_outputs','mat_hang_id','product_id'),
+      ('balancing_outputs','khach_hang_id','customer_id'),
+      ('balancing_outputs','kenh','channel'),
+      ('balancing_outputs','luong_kg','quantity_kg'),
+      ('balancing_outputs','don_gia','unit_price'),
+      ('balancing_outputs','quy_cach','spec'),
+      ('balancing_outputs','ban_hang_id','sales_item_id'),
+      ('user_profiles','xi_nghiep_id','site_id'),
+      ('user_profiles','ho_ten','full_name'),
+      ('user_profiles','username','username'),
+      ('user_profiles','vai_tro','roles'),
+      ('sales_invoices','xi_nghiep_id','site_id'),
+      ('sales_invoices','ngay_giao','delivery_date'),
+      ('sales_invoices','ngay_ghi_so','posting_date'),
+      ('sales_invoices','ly_do_ghi_bu','backdate_reason'),
+      ('sales_invoices','phan_xuong','workshop'),
+      ('sales_invoices','khach_hang_id','customer_id'),
+      ('sales_invoices','kenh','channel'),
+      ('sales_invoices','ghi_chu','note'),
+      ('sales_items','xi_nghiep_id','site_id'),
+      ('sales_items','phieu_id','invoice_id'),
+      ('sales_items','ngay','delivery_date'),
+      ('sales_items','mat_hang_id','product_id'),
+      ('sales_items','quy_cach','spec'),
+      ('sales_items','luong_kg','quantity_kg'),
+      ('sales_items','don_gia','unit_price'),
+      ('sales_items','kho_nguon','source_warehouse'),
+      ('production_wips','xi_nghiep_id','site_id'),
+      ('production_wips','ngay','production_date'),
+      ('production_wips','ngay_ghi_so','posting_date'),
+      ('production_wips','ly_do_ghi_bu','backdate_reason'),
+      ('production_wips','phan_xuong','workshop'),
+      ('production_wips','mat_hang_id','product_id'),
+      ('production_wips','quy_cach','spec'),
+      ('production_wips','luong_kg','quantity_kg'),
+      ('production_wips','so_block','blocks_count'),
+      ('production_wips','kho','warehouse'),
+      ('production_wips','trang_thai','status'),
+      ('production_wips','ghi_chu','note'),
+      ('production_locks','xi_nghiep_id','site_id'),
+      ('production_locks','ngay','lock_date'),
+      ('production_locks','phan_xuong','workshop'),
+      ('production_locks','da_chot','is_locked'),
+      ('production_locks','chot_luc','locked_at'),
+      ('production_locks','tong_kg_luc_chot','total_kg_at_lock'),
+      ('production_locks','ly_do_mo_lai','reopen_reason'),
+      ('production_locks','ghi_chu','note'),
+      ('sales_orders','xi_nghiep_id','site_id'),
+      ('sales_orders','khach_id','customer_id'),
+      ('sales_orders','ngay_dat','order_date'),
+      ('sales_orders','trang_thai','status'),
+      ('sales_orders','ghi_chu','note'),
+      ('order_items','xi_nghiep_id','site_id'),
+      ('order_items','don_id','order_id'),
+      ('order_items','mat_hang_id','product_id'),
+      ('order_items','quy_cach','spec'),
+      ('order_items','luong_kg_can','required_quantity_kg'),
+      ('order_items','so_block_can','required_blocks_count'),
+      ('export_orders','xi_nghiep_id','site_id'),
+      ('export_orders','don_id','order_id'),
+      ('export_orders','ngay','export_date'),
+      ('export_orders','trang_thai','status'),
+      ('export_orders','ghi_chu','note'),
+      ('export_items','xi_nghiep_id','site_id'),
+      ('export_items','lenh_id','export_id'),
+      ('export_items','san_xuat_id','wip_id'),
+      ('export_items','mat_hang_id','product_id'),
+      ('export_items','quy_cach','spec'),
+      ('export_items','luong_kg','quantity_kg'),
+      ('export_items','so_block','blocks_count')
+  ) as v(tbl, old_name, new_name)
+  loop
+    if exists (
+         select 1 from information_schema.columns
+         where table_schema='public' and table_name=r.tbl and column_name=r.old_name
+       ) and not exists (
+         select 1 from information_schema.columns
+         where table_schema='public' and table_name=r.tbl and column_name=r.new_name
+       )
+    then
+      execute format('alter table public.%I rename column %I to %I', r.tbl, r.old_name, r.new_name);
+    end if;
+  end loop;
+end $$;
 
--- suppliers
-ALTER TABLE public.suppliers RENAME COLUMN IF EXISTS xi_nghiep_id TO site_id;
-ALTER TABLE public.suppliers RENAME COLUMN IF EXISTS ma TO code;
-ALTER TABLE public.suppliers RENAME COLUMN IF EXISTS ten TO short_name;
-ALTER TABLE public.suppliers RENAME COLUMN IF EXISTS dien_thoai TO phone;
-ALTER TABLE public.suppliers RENAME COLUMN IF EXISTS ghi_chu TO note;
-ALTER TABLE public.suppliers RENAME COLUMN IF EXISTS ten_ghi_phieu TO billing_name;
-ALTER TABLE public.suppliers RENAME COLUMN IF EXISTS dia_chi TO address;
-ALTER TABLE public.suppliers RENAME COLUMN IF EXISTS cmnd TO national_id;
-ALTER TABLE public.suppliers RENAME COLUMN IF EXISTS ngay_cap TO issued_date;
-ALTER TABLE public.suppliers RENAME COLUMN IF EXISTS noi_cap TO issued_place;
-
--- material_types
-ALTER TABLE public.material_types RENAME COLUMN IF EXISTS xi_nghiep_id TO site_id;
-ALTER TABLE public.material_types RENAME COLUMN IF EXISTS ten TO name;
-ALTER TABLE public.material_types RENAME COLUMN IF EXISTS loai TO category;
-ALTER TABLE public.material_types RENAME COLUMN IF EXISTS ghi_chu TO note;
-
--- finished_goods
-ALTER TABLE public.finished_goods RENAME COLUMN IF EXISTS xi_nghiep_id TO site_id;
-ALTER TABLE public.finished_goods RENAME COLUMN IF EXISTS ma TO code;
-ALTER TABLE public.finished_goods RENAME COLUMN IF EXISTS ten TO name;
-ALTER TABLE public.finished_goods RENAME COLUMN IF EXISTS dvt TO unit;
-ALTER TABLE public.finished_goods RENAME COLUMN IF EXISTS ma_tai_khoan TO account_code;
-ALTER TABLE public.finished_goods RENAME COLUMN IF EXISTS nhom TO group_name;
-
--- products
-ALTER TABLE public.products RENAME COLUMN IF EXISTS xi_nghiep_id TO site_id;
-ALTER TABLE public.products RENAME COLUMN IF EXISTS ma TO code;
-ALTER TABLE public.products RENAME COLUMN IF EXISTS ten TO name;
-ALTER TABLE public.products RENAME COLUMN IF EXISTS ma_thanh_pham TO finished_good_code;
-ALTER TABLE public.products RENAME COLUMN IF EXISTS loai TO category;
-ALTER TABLE public.products RENAME COLUMN IF EXISTS loai_nguyen_lieu_id TO material_type_id;
-
--- customers
-ALTER TABLE public.customers RENAME COLUMN IF EXISTS xi_nghiep_id TO site_id;
-ALTER TABLE public.customers RENAME COLUMN IF EXISTS ma TO code;
-ALTER TABLE public.customers RENAME COLUMN IF EXISTS ten TO name;
-ALTER TABLE public.customers RENAME COLUMN IF EXISTS thi_truong TO market;
-
--- import_shipments
-ALTER TABLE public.import_shipments RENAME COLUMN IF EXISTS xi_nghiep_id TO site_id;
-ALTER TABLE public.import_shipments RENAME COLUMN IF EXISTS ngay_giao TO delivery_date;
-ALTER TABLE public.import_shipments RENAME COLUMN IF EXISTS ngay_ghi_so TO posting_date;
-ALTER TABLE public.import_shipments RENAME COLUMN IF EXISTS ly_do_ghi_bu TO backdate_reason;
-ALTER TABLE public.import_shipments RENAME COLUMN IF EXISTS phan_xuong TO workshop;
-ALTER TABLE public.import_shipments RENAME COLUMN IF EXISTS ten_dai_ly TO supplier_name;
-ALTER TABLE public.import_shipments RENAME COLUMN IF EXISTS tai_xe TO driver_name;
-ALTER TABLE public.import_shipments RENAME COLUMN IF EXISTS bien_so_xe TO license_plate;
-ALTER TABLE public.import_shipments RENAME COLUMN IF EXISTS ghi_chu TO note;
-
--- daily_locks
-ALTER TABLE public.daily_locks RENAME COLUMN IF EXISTS xi_nghiep_id TO site_id;
-ALTER TABLE public.daily_locks RENAME COLUMN IF EXISTS ngay TO lock_date;
-ALTER TABLE public.daily_locks RENAME COLUMN IF EXISTS phan_xuong TO workshop;
-ALTER TABLE public.daily_locks RENAME COLUMN IF EXISTS da_chot TO is_locked;
-ALTER TABLE public.daily_locks RENAME COLUMN IF EXISTS chot_luc TO locked_at;
-ALTER TABLE public.daily_locks RENAME COLUMN IF EXISTS tong_kg_luc_chot TO total_kg_at_lock;
-ALTER TABLE public.daily_locks RENAME COLUMN IF EXISTS ly_do_mo_lai TO reopen_reason;
-ALTER TABLE public.daily_locks RENAME COLUMN IF EXISTS ghi_chu TO note;
-
--- material_imports
-ALTER TABLE public.material_imports RENAME COLUMN IF EXISTS xi_nghiep_id TO site_id;
-ALTER TABLE public.material_imports RENAME COLUMN IF EXISTS chuyen_id TO shipment_id;
-ALTER TABLE public.material_imports RENAME COLUMN IF EXISTS ngay TO delivery_date;
-ALTER TABLE public.material_imports RENAME COLUMN IF EXISTS phan_xuong TO workshop;
-ALTER TABLE public.material_imports RENAME COLUMN IF EXISTS loai TO category;
-ALTER TABLE public.material_imports RENAME COLUMN IF EXISTS ten_dai_ly TO supplier_name;
-ALTER TABLE public.material_imports RENAME COLUMN IF EXISTS ten_loai_nguyen_lieu TO material_type_name;
-ALTER TABLE public.material_imports RENAME COLUMN IF EXISTS so_luong_kg TO quantity_kg;
-ALTER TABLE public.material_imports RENAME COLUMN IF EXISTS don_gia TO unit_price;
-ALTER TABLE public.material_imports RENAME COLUMN IF EXISTS tai_xe TO driver_name;
-ALTER TABLE public.material_imports RENAME COLUMN IF EXISTS bien_so_xe TO license_plate;
-ALTER TABLE public.material_imports RENAME COLUMN IF EXISTS ghi_chu TO note;
-
--- balancing_periods
-ALTER TABLE public.balancing_periods RENAME COLUMN IF EXISTS xi_nghiep_id TO site_id;
-ALTER TABLE public.balancing_periods RENAME COLUMN IF EXISTS ten_loai_nguyen_lieu TO material_type_name;
-ALTER TABLE public.balancing_periods RENAME COLUMN IF EXISTS mo_ta_ngay TO date_range_description;
-ALTER TABLE public.balancing_periods RENAME COLUMN IF EXISTS tu_ngay TO start_date;
-ALTER TABLE public.balancing_periods RENAME COLUMN IF EXISTS den_ngay TO end_date;
-ALTER TABLE public.balancing_periods RENAME COLUMN IF EXISTS tong_nl_nhan_kg TO total_input_kg;
-ALTER TABLE public.balancing_periods RENAME COLUMN IF EXISTS ti_gia TO exchange_rate;
-ALTER TABLE public.balancing_periods RENAME COLUMN IF EXISTS chi_phi_che_bien TO processing_cost_per_kg;
-
--- balancing_inputs
-ALTER TABLE public.balancing_inputs RENAME COLUMN IF EXISTS xi_nghiep_id TO site_id;
-ALTER TABLE public.balancing_inputs RENAME COLUMN IF EXISTS ky_id TO period_id;
-ALTER TABLE public.balancing_inputs RENAME COLUMN IF EXISTS nhom TO group_name;
-ALTER TABLE public.balancing_inputs RENAME COLUMN IF EXISTS ten TO name;
-ALTER TABLE public.balancing_inputs RENAME COLUMN IF EXISTS so_luong_kg TO quantity_kg;
-ALTER TABLE public.balancing_inputs RENAME COLUMN IF EXISTS don_gia TO unit_price;
-ALTER TABLE public.balancing_inputs RENAME COLUMN IF EXISTS ty_le_phan_tram TO ratio_percentage;
-ALTER TABLE public.balancing_inputs RENAME COLUMN IF EXISTS nguon_kho TO source_warehouse;
-
--- scraps
-ALTER TABLE public.scraps RENAME COLUMN IF EXISTS xi_nghiep_id TO site_id;
-ALTER TABLE public.scraps RENAME COLUMN IF EXISTS ky_id TO period_id;
-ALTER TABLE public.scraps RENAME COLUMN IF EXISTS loai TO name;
-ALTER TABLE public.scraps RENAME COLUMN IF EXISTS so_luong_kg TO quantity_kg;
-ALTER TABLE public.scraps RENAME COLUMN IF EXISTS don_gia_ban TO selling_price;
-ALTER TABLE public.scraps RENAME COLUMN IF EXISTS ngay TO date;
-ALTER TABLE public.scraps RENAME COLUMN IF EXISTS phan_xuong TO workshop;
-ALTER TABLE public.scraps RENAME COLUMN IF EXISTS nguon TO source;
-
--- balancing_outputs
-ALTER TABLE public.balancing_outputs RENAME COLUMN IF EXISTS xi_nghiep_id TO site_id;
-ALTER TABLE public.balancing_outputs RENAME COLUMN IF EXISTS ky_id TO period_id;
-ALTER TABLE public.balancing_outputs RENAME COLUMN IF EXISTS mat_hang_id TO product_id;
-ALTER TABLE public.balancing_outputs RENAME COLUMN IF EXISTS khach_hang_id TO customer_id;
-ALTER TABLE public.balancing_outputs RENAME COLUMN IF EXISTS kenh TO channel;
-ALTER TABLE public.balancing_outputs RENAME COLUMN IF EXISTS luong_kg TO quantity_kg;
-ALTER TABLE public.balancing_outputs RENAME COLUMN IF EXISTS don_gia TO unit_price;
-ALTER TABLE public.balancing_outputs RENAME COLUMN IF EXISTS quy_cach TO spec;
-ALTER TABLE public.balancing_outputs RENAME COLUMN IF EXISTS ban_hang_id TO sales_item_id;
-
--- user_profiles
-ALTER TABLE public.user_profiles RENAME COLUMN IF EXISTS xi_nghiep_id TO site_id;
-ALTER TABLE public.user_profiles RENAME COLUMN IF EXISTS ho_ten TO full_name;
-ALTER TABLE public.user_profiles RENAME COLUMN IF EXISTS username TO username;
-ALTER TABLE public.user_profiles RENAME COLUMN IF EXISTS vai_tro TO roles;
-ALTER TABLE public.user_profiles DROP CONSTRAINT IF EXISTS nguoi_dung_vai_tro_check;
-
--- sales_invoices
-ALTER TABLE public.sales_invoices RENAME COLUMN IF EXISTS xi_nghiep_id TO site_id;
-ALTER TABLE public.sales_invoices RENAME COLUMN IF EXISTS ngay_giao TO delivery_date;
-ALTER TABLE public.sales_invoices RENAME COLUMN IF EXISTS ngay_ghi_so TO posting_date;
-ALTER TABLE public.sales_invoices RENAME COLUMN IF EXISTS ly_do_ghi_bu TO backdate_reason;
-ALTER TABLE public.sales_invoices RENAME COLUMN IF EXISTS phan_xuong TO workshop;
-ALTER TABLE public.sales_invoices RENAME COLUMN IF EXISTS khach_hang_id TO customer_id;
-ALTER TABLE public.sales_invoices RENAME COLUMN IF EXISTS kenh TO channel;
-ALTER TABLE public.sales_invoices RENAME COLUMN IF EXISTS ghi_chu TO note;
-
--- sales_items
-ALTER TABLE public.sales_items RENAME COLUMN IF EXISTS xi_nghiep_id TO site_id;
-ALTER TABLE public.sales_items RENAME COLUMN IF EXISTS phieu_id TO invoice_id;
-ALTER TABLE public.sales_items RENAME COLUMN IF EXISTS ngay TO delivery_date;
-ALTER TABLE public.sales_items RENAME COLUMN IF EXISTS mat_hang_id TO product_id;
-ALTER TABLE public.sales_items RENAME COLUMN IF EXISTS quy_cach TO spec;
-ALTER TABLE public.sales_items RENAME COLUMN IF EXISTS luong_kg TO quantity_kg;
-ALTER TABLE public.sales_items RENAME COLUMN IF EXISTS don_gia TO unit_price;
-ALTER TABLE public.sales_items RENAME COLUMN IF EXISTS kho_nguon TO source_warehouse;
-
--- production_wips
-ALTER TABLE public.production_wips RENAME COLUMN IF EXISTS xi_nghiep_id TO site_id;
-ALTER TABLE public.production_wips RENAME COLUMN IF EXISTS ngay TO production_date;
-ALTER TABLE public.production_wips RENAME COLUMN IF EXISTS ngay_ghi_so TO posting_date;
-ALTER TABLE public.production_wips RENAME COLUMN IF EXISTS ly_do_ghi_bu TO backdate_reason;
-ALTER TABLE public.production_wips RENAME COLUMN IF EXISTS phan_xuong TO workshop;
-ALTER TABLE public.production_wips RENAME COLUMN IF EXISTS mat_hang_id TO product_id;
-ALTER TABLE public.production_wips RENAME COLUMN IF EXISTS quy_cach TO spec;
-ALTER TABLE public.production_wips RENAME COLUMN IF EXISTS luong_kg TO quantity_kg;
-ALTER TABLE public.production_wips RENAME COLUMN IF EXISTS so_block TO blocks_count;
-ALTER TABLE public.production_wips RENAME COLUMN IF EXISTS kho TO warehouse;
-ALTER TABLE public.production_wips RENAME COLUMN IF EXISTS trang_thai TO status;
-ALTER TABLE public.production_wips RENAME COLUMN IF EXISTS ghi_chu TO note;
-
--- production_locks
-ALTER TABLE public.production_locks RENAME COLUMN IF EXISTS xi_nghiep_id TO site_id;
-ALTER TABLE public.production_locks RENAME COLUMN IF EXISTS ngay TO lock_date;
-ALTER TABLE public.production_locks RENAME COLUMN IF EXISTS phan_xuong TO workshop;
-ALTER TABLE public.production_locks RENAME COLUMN IF EXISTS da_chot TO is_locked;
-ALTER TABLE public.production_locks RENAME COLUMN IF EXISTS chot_luc TO locked_at;
-ALTER TABLE public.production_locks RENAME COLUMN IF EXISTS tong_kg_luc_chot TO total_kg_at_lock;
-ALTER TABLE public.production_locks RENAME COLUMN IF EXISTS ly_do_mo_lai TO reopen_reason;
-ALTER TABLE public.production_locks RENAME COLUMN IF EXISTS ghi_chu TO note;
-
--- sales_orders
-ALTER TABLE public.sales_orders RENAME COLUMN IF EXISTS xi_nghiep_id TO site_id;
-ALTER TABLE public.sales_orders RENAME COLUMN IF EXISTS khach_id TO customer_id;
-ALTER TABLE public.sales_orders RENAME COLUMN IF EXISTS ngay_dat TO order_date;
-ALTER TABLE public.sales_orders RENAME COLUMN IF EXISTS trang_thai TO status;
-ALTER TABLE public.sales_orders RENAME COLUMN IF EXISTS ghi_chu TO note;
-
--- order_items
-ALTER TABLE public.order_items RENAME COLUMN IF EXISTS xi_nghiep_id TO site_id;
-ALTER TABLE public.order_items RENAME COLUMN IF EXISTS don_id TO order_id;
-ALTER TABLE public.order_items RENAME COLUMN IF EXISTS mat_hang_id TO product_id;
-ALTER TABLE public.order_items RENAME COLUMN IF EXISTS quy_cach TO spec;
-ALTER TABLE public.order_items RENAME COLUMN IF EXISTS luong_kg_can TO required_quantity_kg;
-ALTER TABLE public.order_items RENAME COLUMN IF EXISTS so_block_can TO required_blocks_count;
-
--- export_orders
-ALTER TABLE public.export_orders RENAME COLUMN IF EXISTS xi_nghiep_id TO site_id;
-ALTER TABLE public.export_orders RENAME COLUMN IF EXISTS don_id TO order_id;
-ALTER TABLE public.export_orders RENAME COLUMN IF EXISTS ngay TO export_date;
-ALTER TABLE public.export_orders RENAME COLUMN IF EXISTS trang_thai TO status;
-ALTER TABLE public.export_orders RENAME COLUMN IF EXISTS ghi_chu TO note;
-
--- export_items
-ALTER TABLE public.export_items RENAME COLUMN IF EXISTS xi_nghiep_id TO site_id;
-ALTER TABLE public.export_items RENAME COLUMN IF EXISTS lenh_id TO export_id;
-ALTER TABLE public.export_items RENAME COLUMN IF EXISTS san_xuat_id TO wip_id;
-ALTER TABLE public.export_items RENAME COLUMN IF EXISTS mat_hang_id TO product_id;
-ALTER TABLE public.export_items RENAME COLUMN IF EXISTS quy_cach TO spec;
-ALTER TABLE public.export_items RENAME COLUMN IF EXISTS luong_kg TO quantity_kg;
-ALTER TABLE public.export_items RENAME COLUMN IF EXISTS so_block TO blocks_count;
-
+-- Bỏ ràng buộc check vai trò cũ (nếu còn)
+alter table public.user_profiles drop constraint if exists nguoi_dung_vai_tro_check;
 -- 3. Cập nhật các Triggers (Đổi sang tên Tiếng Anh)
 do $$
 declare

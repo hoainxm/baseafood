@@ -33,6 +33,6 @@ export function taoClientTam(): SupabaseClient | null {
   });
 }
 
-/** Mã xí nghiệp (multi-site). Mọi bảng nghiệp vụ đều lọc theo cột xi_nghiep_id này. */
+/** Mã xí nghiệp (multi-site). Mọi bảng nghiệp vụ đều lọc theo cột site_id này. */
 export const SITE_ID =
   (import.meta.env.VITE_SITE_ID as string | undefined)?.trim() || "site-default";

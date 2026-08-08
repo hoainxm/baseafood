@@ -1,110 +1,23 @@
-import { useState } from "react";
-import NhapNguyenLieuScreen from "@/features/NhapNguyenLieu";
-import SanXuatBTPScreen from "@/features/SanXuatBTP";
-import BanHangScreen from "@/features/BanHang";
-import KhoDuTruScreen from "@/features/KhoDuTru";
-import DonDatScreen from "@/features/DonDat";
-import CanDoiScreen from "@/features/CanDoi";
-import DanhMucScreen from "@/features/DanhMuc";
-import QuanLyNguoiDungScreen from "@/features/QuanLyNguoiDung";
-import DangNhap from "@/features/DangNhap";
-import KitPage from "@/design-system/kit/KitPage";
-import { CoChuNhanh, Logo, Toaster, TrangThaiDuLieu } from "@/design-system";
-import { cn } from "@/lib/utils";
+import { lazy, Suspense } from "react";
+import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
+import DangNhap from "@/features/auth";
+import { AppLayout, NotFound } from "@/features/shared";
+import { Toaster } from "@/design-system";
 import { useAuth } from "@/lib/auth";
-import { nhanVaiTro } from "@/types";
-import {
-  Truck,
-  Factory,
-  ShoppingCart,
-  Snowflake,
-  ClipboardList,
-  Scale,
-  Library,
-  Palette,
-  Users,
-  LogOut,
-} from "lucide-react";
 
-type Screen =
-  | "nhap-hang"
-  | "san-xuat"
-  | "ban-hang"
-  | "kho"
-  | "don-dat"
-  | "can-doi"
-  | "danh-muc"
-  | "nguoi-dung"
-  | "kit";
-
-interface MucNav {
-  id: Screen;
-  label: string;
-  moTa: string;
-  icon: typeof Truck;
-}
-
-/** Điều hướng chính — mỗi việc một động từ, một icon riêng. */
-const NAV: MucNav[] = [
-  {
-    id: "nhap-hang",
-    label: "Nhập hàng",
-    moTa: "Ghi chuyến nguyên liệu về xưởng",
-    icon: Truck,
-  },
-  {
-    id: "san-xuat",
-    label: "Sản xuất BTP",
-    moTa: "Ghi sản lượng bán thành phẩm ngày",
-    icon: Factory,
-  },
-  {
-    id: "ban-hang",
-    label: "Bán hàng",
-    moTa: "Ghi phiếu bán thành phẩm hằng ngày",
-    icon: ShoppingCart,
-  },
-  {
-    id: "kho",
-    label: "Kho dự trữ",
-    moTa: "Duyệt nhập kho, theo dõi tồn đông",
-    icon: Snowflake,
-  },
-  {
-    id: "don-dat",
-    label: "Đơn đặt",
-    moTa: "Gom đủ đơn, xuất container",
-    icon: ClipboardList,
-  },
-  {
-    id: "can-doi",
-    label: "Cân đối",
-    moTa: "Nguyên liệu vào ↔ bán thành phẩm sản xuất",
-    icon: Scale,
-  },
-  {
-    id: "danh-muc",
-    label: "Danh mục",
-    moTa: "Mặt hàng, khách, đại lý, loại NL",
-    icon: Library,
-  },
-];
-
-/** Mục điều hướng chỉ hiện cho admin. */
-const NAV_NGUOI_DUNG: MucNav = {
-  id: "nguoi-dung",
-  label: "Người dùng",
-  moTa: "Tài khoản & vai trò",
-  icon: Users,
-};
-
-/* Hai thanh header (thanh bên và thanh nội dung) PHẢI cùng chiều cao,
-   nếu không đường kẻ dưới chúng lệch nhau và cả trang trông vênh. */
-const CAO_HEADER = "h-20";
+// Lazy loaded feature screens
+const NhapNguyenLieuScreen = lazy(() => import("@/features/nhap-hang"));
+const SanXuatBTPScreen = lazy(() => import("@/features/san-xuat"));
+const BanHangScreen = lazy(() => import("@/features/ban-hang"));
+const KhoDuTruScreen = lazy(() => import("@/features/kho"));
+const DonDatScreen = lazy(() => import("@/features/don-dat"));
+const CanDoiScreen = lazy(() => import("@/features/can-doi"));
+const DanhMucScreen = lazy(() => import("@/features/danh-muc"));
+const QuanLyNguoiDungScreen = lazy(() => import("@/features/nguoi-dung"));
+const KitPage = lazy(() => import("@/design-system/kit/KitPage"));
 
 export default function App() {
   const auth = useAuth();
-  const [screen, setScreen] = useState<Screen>("nhap-hang");
 
   // Đang lấy phiên đăng nhập từ máy chủ → tránh nháy màn login.
   if (auth.dangTai) {
@@ -125,176 +38,41 @@ export default function App() {
     );
   }
 
-  const navList: MucNav[] = auth.laAdmin ? [...NAV, NAV_NGUOI_DUNG] : NAV;
-  const hienTai = navList.find((n) => n.id === screen);
-  const tieuDeMan = screen === "kit" ? "Bộ giao diện" : (hienTai?.label ?? "");
-  // Screen admin-only mà không phải admin (VD vừa mất quyền) → về màn mặc định.
-  const screenHopLe = navList.some((n) => n.id === screen) || screen === "kit";
-  const screenThuc: Screen = screenHopLe ? screen : "nhap-hang";
-
   return (
-    <div className="flex min-h-full flex-col md:flex-row">
-      {/* Thanh bên (desktop / tablet ngang) */}
-      <aside className="hidden w-72 shrink-0 flex-col border-r-2 border-border bg-card md:flex">
-        <div
-          className={cn(
-            "flex shrink-0 items-center border-b-2 border-border px-5",
-            CAO_HEADER,
-          )}
-        >
-          <Logo cao="h-11" phuDe="Xí nghiệp BSF1" />
-        </div>
-
-        <nav className="flex-1 space-y-2 p-3">
-          {navList.map((n) => {
-            const Icon = n.icon;
-            const active = screenThuc === n.id;
-            return (
-              <button
-                key={n.id}
-                onClick={() => setScreen(n.id)}
-                aria-current={active ? "page" : undefined}
-                className={cn(
-                  "flex w-full items-start gap-3 rounded-lg border-2 px-4 py-3 text-left transition-colors",
-                  active
-                    ? "border-primary bg-accent text-accent-foreground"
-                    : "border-transparent text-foreground hover:bg-muted",
-                )}
-              >
-                <Icon className="mt-0.5 size-6 shrink-0" aria-hidden />
-                <span className="min-w-0">
-                  <span className="block text-base font-semibold">
-                    {n.label}
-                  </span>
-                  <span
-                    className={cn(
-                      "block text-sm",
-                      active
-                        ? "text-accent-foreground"
-                        : "text-muted-foreground",
-                    )}
-                  >
-                    {n.moTa}
-                  </span>
-                </span>
-              </button>
-            );
-          })}
-        </nav>
-
-        <div className="space-y-3 border-t border-border px-5 py-4">
-          {auth.canDangNhap && auth.session && (
-            <div className="space-y-2 rounded-lg bg-muted px-3 py-2.5">
-              <p className="truncate text-base font-semibold text-foreground">
-                {auth.nguoiDung?.hoTen ||
-                  auth.nguoiDung?.username ||
-                  "Người dùng"}
-              </p>
-              <div className="flex items-center justify-between gap-2">
-                <span className="truncate text-sm text-muted-foreground">
-                  {auth.nguoiDung?.username} ·{" "}
-                  {nhanVaiTro(auth.nguoiDung?.vaiTro ?? [])}
-                </span>
-                <button
-                  onClick={auth.dangXuat}
-                  className="flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1 text-sm font-medium text-muted-foreground hover:bg-card hover:text-destructive"
-                >
-                  <LogOut className="size-5" aria-hidden />
-                  Đăng xuất
-                </button>
-              </div>
-            </div>
-          )}
-          <button
-            onClick={() => setScreen("kit")}
-            className={cn(
-              "flex min-h-12 w-full items-center gap-2 rounded-lg px-3 text-base font-medium transition-colors",
-              screenThuc === "kit"
-                ? "bg-accent text-accent-foreground"
-                : "text-muted-foreground hover:bg-muted",
-            )}
-          >
-            <Palette className="size-5" aria-hidden />
-            Bộ giao diện
-          </button>
-          <TrangThaiDuLieu />
-        </div>
-      </aside>
-
-      {/* Nội dung */}
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header
-          className={cn(
-            "flex shrink-0 items-center justify-between gap-4 border-b-2 border-border bg-card px-5 sm:px-8",
-            CAO_HEADER,
-          )}
-        >
-          <Logo cao="h-10" phuDe="Xí nghiệp BSF1" className="md:hidden" />
-          <h1 className="hidden truncate text-xl font-semibold text-foreground md:block">
-            {tieuDeMan}
-          </h1>
-          <div className="flex shrink-0 items-center gap-3">
-            {/* Đăng xuất cho điện thoại (thanh bên ẩn) */}
-            {auth.canDangNhap && auth.session && (
-              <button
-                onClick={auth.dangXuat}
-                className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm font-medium text-muted-foreground hover:text-destructive md:hidden"
-              >
-                <LogOut className="size-5" aria-hidden />
-                Đăng xuất
-              </button>
-            )}
-            <CoChuNhanh />
+    <HashRouter>
+      <Suspense
+        fallback={
+          <div className="flex h-screen items-center justify-center p-6">
+            <p className="text-base text-muted-foreground">Đang tải màn hình…</p>
           </div>
-        </header>
-
-        <main className="w-full flex-1 p-5 pb-28 sm:p-8 md:pb-8">
-          <div className="mx-auto w-full max-w-(--app-content-width)">
-            {screenThuc === "nhap-hang" && <NhapNguyenLieuScreen />}
-            {screenThuc === "san-xuat" && <SanXuatBTPScreen />}
-            {screenThuc === "ban-hang" && <BanHangScreen />}
-            {screenThuc === "kho" && <KhoDuTruScreen />}
-            {screenThuc === "don-dat" && <DonDatScreen />}
-            {screenThuc === "can-doi" && <CanDoiScreen />}
-            {screenThuc === "danh-muc" && <DanhMucScreen />}
-            {screenThuc === "nguoi-dung" && (
-              <QuanLyNguoiDungScreen taoTaiKhoan={auth.taoTaiKhoan} />
-            )}
-            {screenThuc === "kit" && <KitPage />}
-          </div>
-        </main>
-      </div>
-
-      {/* Tab dưới cho điện thoại — số cột theo số mục (4 hoặc 5 khi có admin) */}
-      <nav
-        className="fixed inset-x-0 bottom-0 z-40 grid border-t-2 border-border bg-card md:hidden"
-        style={{
-          gridTemplateColumns: `repeat(${navList.length}, minmax(0, 1fr))`,
-        }}
+        }
       >
-        {navList.map((n) => {
-          const Icon = n.icon;
-          const active = screenThuc === n.id;
-          return (
-            <button
-              key={n.id}
-              onClick={() => setScreen(n.id)}
-              aria-current={active ? "page" : undefined}
-              className={cn(
-                "flex min-h-16 flex-col items-center justify-center gap-1 px-1 text-sm font-semibold transition-colors",
-                active
-                  ? "bg-accent text-accent-foreground"
-                  : "text-muted-foreground",
-              )}
-            >
-              <Icon className="size-6" aria-hidden />
-              <span className="leading-tight">{n.label}</span>
-            </button>
-          );
-        })}
-      </nav>
-
-      <Toaster position="bottom-center" richColors closeButton />
-    </div>
+        <Routes>
+          <Route element={<AppLayout />}>
+            <Route path="/" element={<Navigate to="/nhap-hang" replace />} />
+            <Route path="/nhap-hang" element={<NhapNguyenLieuScreen />} />
+            <Route path="/san-xuat" element={<SanXuatBTPScreen />} />
+            <Route path="/ban-hang" element={<BanHangScreen />} />
+            <Route path="/kho" element={<KhoDuTruScreen />} />
+            <Route path="/don-dat" element={<DonDatScreen />} />
+            <Route path="/can-doi" element={<CanDoiScreen />} />
+            <Route path="/can-doi/:kyId" element={<CanDoiScreen />} />
+            <Route path="/danh-muc" element={<DanhMucScreen />} />
+            <Route
+              path="/nguoi-dung"
+              element={
+                auth.laAdmin ? (
+                  <QuanLyNguoiDungScreen taoTaiKhoan={auth.taoTaiKhoan} />
+                ) : (
+                  <Navigate to="/nhap-hang" replace />
+                )
+              }
+            />
+            <Route path="/kit" element={<KitPage />} />
+          </Route>
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </Suspense>
+    </HashRouter>
   );
 }

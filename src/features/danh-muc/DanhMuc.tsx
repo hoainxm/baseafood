@@ -1,13 +1,13 @@
 import { useMemo, useState } from "react";
-import type { DaiLy, KhachHang, LoaiNguyenLieu, MatHang } from "@/types";
-import { LOAI } from "@/types";
+import type { Supplier, Customer, MaterialType, Product } from "@/types";
+import { CATEGORIES } from "@/types";
 import { uid } from "@/lib/db";
 import {
-  useDaiLy,
-  useKhachHang,
-  useLoaiNL,
-  useMatHang,
-  useThanhPham,
+  useSuppliers,
+  useCustomers,
+  useMaterialTypes,
+  useProducts,
+  useFinishedGoods,
 } from "@/lib/danhMuc";
 import {
   Combobox,
@@ -18,7 +18,7 @@ import {
   TabsTrigger,
   type TruongDanhMuc,
 } from "@/design-system";
-import ThanhPham141 from "@/features/ThanhPham";
+import ThanhPham141 from "./ThanhPham";
 
 const THI_TRUONG = ["Nhật", "EU", "Mỹ", "Hàn Quốc", "Trung Quốc", "Nội địa"];
 
@@ -35,31 +35,31 @@ const NHOM_TP = ["Bạch tuộc", "Mực", "Cá", "Tôm", "Bào ngư", "Khác"];
 export default function DanhMucScreen() {
   const [tab, setTab] = useState("mat-hang");
 
-  const [matHang, setMatHang] = useMatHang();
-  const [khachHang, setKhachHang] = useKhachHang();
-  const [daiLy, setDaiLy] = useDaiLy();
-  const [loaiNL, setLoaiNL] = useLoaiNL();
-  const [thanhPham] = useThanhPham();
+  const [matHang, setMatHang] = useProducts();
+  const [khachHang, setKhachHang] = useCustomers();
+  const [daiLy, setDaiLy] = useSuppliers();
+  const [loaiNL, setLoaiNL] = useMaterialTypes();
+  const [thanhPham] = useFinishedGoods();
 
   const optTP141 = useMemo(
     () =>
       thanhPham.map((t) => ({
-        value: t.ma,
-        label: t.ten,
-        phu: `Mã ${t.ma} · ${t.nhom}`,
+        value: t.code,
+        label: t.name,
+        phu: `Mã ${t.code} · ${t.groupName}`,
       })),
     [thanhPham]
   );
 
-  const fMatHang: TruongDanhMuc<MatHang>[] = [
+  const fMatHang: TruongDanhMuc<Product>[] = [
     {
-      key: "ten",
+      key: "name",
       nhan: "Tên mặt hàng",
       batBuoc: true,
       viDu: "VD: 2 da cắt luộc 1000-1300",
     },
     {
-      key: "loaiNLId",
+      key: "materialTypeId",
       nhan: "Loại nguyên liệu",
       render: (giaTri, doiGiaTri) => (
         <Combobox
@@ -69,20 +69,20 @@ export default function DanhMucScreen() {
           onChange={doiGiaTri}
           options={loaiNL.map((l) => ({
             value: l.id,
-            label: l.ten,
-            phu: l.loai || undefined,
+            label: l.name,
+            phu: l.category || undefined,
           }))}
           placeholder="— Chọn loại nguyên liệu —"
           emptyText="Chưa có loại NL — thêm ở tab Loại nguyên liệu."
         />
       ),
       hienThi: (r) =>
-        loaiNL.find((l) => l.id === r.loaiNLId)?.ten || (
+        loaiNL.find((l) => l.id === r.materialTypeId)?.name || (
           <span className="text-muted-foreground">—</span>
         ),
     },
     {
-      key: "loai",
+      key: "category",
       nhan: "Loài",
       render: (giaTri, doiGiaTri) => (
         <Combobox
@@ -97,9 +97,9 @@ export default function DanhMucScreen() {
       ),
       anTrenDienThoai: true,
     },
-    { key: "ma", nhan: "Mã nội bộ", anTrenDienThoai: true, viDu: "Tự đặt (nếu cần)" },
+    { key: "code", nhan: "Mã nội bộ", anTrenDienThoai: true, viDu: "Tự đặt (nếu cần)" },
     {
-      key: "maTP",
+      key: "finishedGoodCode",
       nhan: "Mã thành phẩm (danh mục kế toán)",
       anTrenDienThoai: false,
       render: (giaTri, doiGiaTri) => (
@@ -114,19 +114,19 @@ export default function DanhMucScreen() {
         />
       ),
       hienThi: (r) =>
-        r.maTP ? (
-          <span className="tnum">{r.maTP}</span>
+        r.finishedGoodCode ? (
+          <span className="tnum">{r.finishedGoodCode}</span>
         ) : (
           <span className="text-muted-foreground">Chưa ánh xạ</span>
         ),
     },
   ];
 
-  const fKhachHang: TruongDanhMuc<KhachHang>[] = [
-    { key: "ten", nhan: "Tên khách hàng", batBuoc: true, viDu: "VD: Lucky" },
-    { key: "ma", nhan: "Mã nội bộ", viDu: "Tự đặt (nếu cần)" },
+  const fKhachHang: TruongDanhMuc<Customer>[] = [
+    { key: "name", nhan: "Tên khách hàng", batBuoc: true, viDu: "VD: Lucky" },
+    { key: "code", nhan: "Mã nội bộ", viDu: "Tự đặt (nếu cần)" },
     {
-      key: "thiTruong",
+      key: "market",
       nhan: "Thị trường",
       render: (giaTri, doiGiaTri) => (
         <Combobox
@@ -142,51 +142,51 @@ export default function DanhMucScreen() {
     },
   ];
 
-  const fDaiLy: TruongDanhMuc<DaiLy>[] = [
-    { key: "ten", nhan: "Tên đại lý (gọi tắt)", batBuoc: true, viDu: "VD: Hồng Phú" },
+  const fDaiLy: TruongDanhMuc<Supplier>[] = [
+    { key: "shortName", nhan: "Tên đại lý (gọi tắt)", batBuoc: true, viDu: "VD: Hồng Phú" },
     {
-      key: "tenGhiPhieu",
+      key: "billingName",
       nhan: "Tên ghi phiếu (đầy đủ)",
       viDu: "VD: Công ty TNHH TM Hồng Phú",
     },
     {
-      key: "diaChi",
+      key: "address",
       nhan: "Địa chỉ",
       anTrenDienThoai: true,
       viDu: "Số nhà, đường, phường, tỉnh",
     },
     {
-      key: "cmnd",
+      key: "nationalId",
       nhan: "CMND / CCCD / MST",
       anTrenDienThoai: true,
       viDu: "VD: 3500424848",
     },
-    { key: "ngayCap", nhan: "Ngày cấp", anTrenDienThoai: true, viDu: "VD: 12/05/2015" },
+    { key: "issuedDate", nhan: "Ngày cấp", anTrenDienThoai: true, viDu: "VD: 12/05/2015" },
     {
-      key: "noiCap",
+      key: "issuedPlace",
       nhan: "Nơi cấp",
       anTrenDienThoai: true,
       viDu: "VD: CA Bà Rịa - Vũng Tàu",
     },
-    { key: "ma", nhan: "Mã nội bộ", anTrenDienThoai: true, viDu: "Tự đặt (nếu cần)" },
+    { key: "code", nhan: "Mã nội bộ", anTrenDienThoai: true, viDu: "Tự đặt (nếu cần)" },
     {
-      key: "dienThoai",
+      key: "phone",
       nhan: "Điện thoại",
       anTrenDienThoai: true,
       viDu: "VD: 0913 xxx xxx",
     },
-    { key: "ghiChu", nhan: "Ghi chú", anTrenDienThoai: true, viDu: "Ghi chú thêm" },
+    { key: "note", nhan: "Ghi chú", anTrenDienThoai: true, viDu: "Ghi chú thêm" },
   ];
 
-  const fLoaiNL: TruongDanhMuc<LoaiNguyenLieu>[] = [
+  const fLoaiNL: TruongDanhMuc<MaterialType>[] = [
     {
-      key: "ten",
+      key: "name",
       nhan: "Tên loại nguyên liệu",
       batBuoc: true,
       viDu: "VD: 2 da nguyên liệu",
     },
     {
-      key: "loai",
+      key: "category",
       nhan: "Loài",
       render: (giaTri, doiGiaTri) => (
         <Combobox
@@ -194,12 +194,12 @@ export default function DanhMucScreen() {
           hint="Bạch tuộc, Mực, Cá…"
           value={giaTri}
           onChange={doiGiaTri}
-          options={LOAI.map((l) => ({ value: l, label: l }))}
+          options={CATEGORIES.map((l) => ({ value: l, label: l }))}
           placeholder="— Chọn loài —"
         />
       ),
     },
-    { key: "ghiChu", nhan: "Ghi chú", anTrenDienThoai: true, viDu: "Ghi chú thêm" },
+    { key: "note", nhan: "Ghi chú", anTrenDienThoai: true, viDu: "Ghi chú thêm" },
   ];
 
   return (
@@ -231,14 +231,14 @@ export default function DanhMucScreen() {
             fields={fMatHang}
             taoMoi={() => ({
               id: uid(),
-              ma: "",
-              ten: "",
-              maTP: "",
-              loai: "",
-              loaiNLId: "",
+              code: "",
+              name: "",
+              finishedGoodCode: "",
+              category: "",
+              materialTypeId: "",
             })}
-            timTheo={(r) => `${r.ma} ${r.ten} ${r.maTP}`}
-            moTaBanGhi={(r) => `${r.ten}${r.ma ? ` (mã ${r.ma})` : ""}`}
+            timTheo={(r) => `${r.code} ${r.name} ${r.finishedGoodCode}`}
+            moTaBanGhi={(r) => `${r.name}${r.code ? ` (mã ${r.code})` : ""}`}
           />
         </TabsContent>
 
@@ -250,10 +250,10 @@ export default function DanhMucScreen() {
             rows={khachHang}
             onChange={setKhachHang}
             fields={fKhachHang}
-            taoMoi={() => ({ id: uid(), ma: "", ten: "", thiTruong: "" })}
-            timTheo={(r) => `${r.ma} ${r.ten} ${r.thiTruong}`}
+            taoMoi={() => ({ id: uid(), code: "", name: "", market: "" })}
+            timTheo={(r) => `${r.code} ${r.name} ${r.market}`}
             moTaBanGhi={(r) =>
-              `${r.ten}${r.thiTruong ? ` — thị trường ${r.thiTruong}` : ""}`
+              `${r.name}${r.market ? ` — thị trường ${r.market}` : ""}`
             }
           />
         </TabsContent>
@@ -268,20 +268,20 @@ export default function DanhMucScreen() {
             fields={fDaiLy}
             taoMoi={() => ({
               id: uid(),
-              ma: "",
-              ten: "",
-              tenGhiPhieu: "",
-              diaChi: "",
-              cmnd: "",
-              ngayCap: "",
-              noiCap: "",
-              dienThoai: "",
-              ghiChu: "",
+              code: "",
+              shortName: "",
+              billingName: "",
+              address: "",
+              nationalId: "",
+              issuedDate: "",
+              issuedPlace: "",
+              phone: "",
+              note: "",
             })}
             timTheo={(r) =>
-              `${r.ma} ${r.ten} ${r.tenGhiPhieu} ${r.diaChi} ${r.dienThoai}`
+              `${r.code} ${r.shortName} ${r.billingName} ${r.address} ${r.phone}`
             }
-            moTaBanGhi={(r) => r.ten}
+            moTaBanGhi={(r) => r.shortName}
           />
         </TabsContent>
 
@@ -293,9 +293,9 @@ export default function DanhMucScreen() {
             rows={loaiNL}
             onChange={setLoaiNL}
             fields={fLoaiNL}
-            taoMoi={() => ({ id: uid(), ten: "", loai: "", ghiChu: "" })}
-            timTheo={(r) => `${r.ten} ${r.loai}`}
-            moTaBanGhi={(r) => `${r.ten}${r.loai ? ` (${r.loai})` : ""}`}
+            taoMoi={() => ({ id: uid(), name: "", category: "", note: "" })}
+            timTheo={(r) => `${r.name} ${r.category}`}
+            moTaBanGhi={(r) => `${r.name}${r.category ? ` (${r.category})` : ""}`}
           />
         </TabsContent>
 

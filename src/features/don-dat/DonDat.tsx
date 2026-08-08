@@ -1,23 +1,23 @@
 import { useMemo, useState } from "react";
 import type {
-  DongDon,
-  DongLenh,
-  DonDat,
-  LenhXuat,
-  PhieuBan,
-  DongBan,
+  OrderItem,
+  ExportItem,
+  SalesOrder,
+  ExportOrder,
+  SalesInvoice,
+  SalesItem,
 } from "@/types";
 import { newId } from "@/lib/store";
 import {
-  useBanHang,
-  useDonDat,
-  useDongDon,
-  useDongLenh,
-  useKhachHang,
-  useLenhXuat,
-  useMatHang,
-  usePhieuBan,
-  useSanXuat,
+  useSalesItems,
+  useSalesOrders,
+  useOrderItems,
+  useExportItems,
+  useCustomers,
+  useExportOrders,
+  useProducts,
+  useSalesInvoices,
+  useWipProductions,
 } from "@/lib/danhMuc";
 import { loConHang, tinhTon } from "@/lib/kho";
 import {
@@ -46,85 +46,85 @@ import { kg, num, todayISO, viDate } from "@/lib/format";
 import { ClipboardList, PackageCheck, Plus, Truck } from "lucide-react";
 
 interface DongCanMoi {
-  matHangId: string;
-  quyCach: string;
-  luongKgCan: number;
-  soBlockCan: number;
+  productId: string;
+  spec: string;
+  requiredQuantityKg: number;
+  requiredBlocksCount: number;
 }
 interface DonMoi {
-  khachId: string;
-  ngayDat: string;
-  ghiChu: string;
+  customerId: string;
+  orderDate: string;
+  note: string;
   dong: DongCanMoi[];
 }
 
-const NHAN_TT: Record<DonDat["trangThai"], string> = {
+const NHAN_TT: Record<SalesOrder["status"], string> = {
   "dang-gom": "Đang gom",
   du: "Đủ",
   dong: "Đã xuất",
 };
 
 export default function DonDatScreen() {
-  const [don, persistDon] = useDonDat();
-  const [dongDon, persistDongDon] = useDongDon();
-  const [lenh, persistLenh] = useLenhXuat();
-  const [dongLenh, persistDongLenh] = useDongLenh();
-  const [sanXuat] = useSanXuat();
-  const [matHang, setMatHang] = useMatHang();
-  const [khach] = useKhachHang();
-  const [phieuBan, persistPhieu] = usePhieuBan();
-  const [banHang, persistBan] = useBanHang();
+  const [don, persistDon] = useSalesOrders();
+  const [dongDon, persistDongDon] = useOrderItems();
+  const [lenh, persistLenh] = useExportOrders();
+  const [dongLenh, persistDongLenh] = useExportItems();
+  const [sanXuat] = useWipProductions();
+  const [matHang, setMatHang] = useProducts();
+  const [khach] = useCustomers();
+  const [phieuBan, persistPhieu] = useSalesInvoices();
+  const [banHang, persistBan] = useSalesItems();
 
   const [chon, setChon] = useState<string | null>(null);
   const [tao, setTao] = useState<DonMoi | null>(null);
   const [loi, setLoi] = useState<LoiNhap[]>([]);
 
-  const tenMH = (id: string) => matHang.find((m) => m.id === id)?.ten || "—";
-  const tenKH = (id: string) => khach.find((k) => k.id === id)?.ten || "—";
+  const tenMH = (id: string) => matHang.find((m) => m.id === id)?.name || "—";
+  const tenKH = (id: string) => khach.find((k) => k.id === id)?.name || "—";
 
   const ton = useMemo(() => tinhTon(sanXuat, dongLenh), [sanXuat, dongLenh]);
 
   const optMatHang: MucChon[] = matHang.map((m) => ({
     value: m.id,
-    label: m.ten,
-    phu: m.ma || undefined,
+    label: m.name,
+    phu: m.code || undefined,
   }));
   const optKhach: MucChon[] = khach.map((k) => ({
     value: k.id,
-    label: k.ten,
-    phu: k.thiTruong || undefined,
+    label: k.name,
+    phu: k.market || undefined,
   }));
   /** kg đã xuất cho (đơn × mặt hàng × quy cách) — gom dòng lệnh của lệnh thuộc đơn. */
-  const daXuat = (donId: string, mh: string, qc: string) => {
+  const daXuat = (orderId: string, mh: string, qc: string) => {
     const lenhCuaDon = new Set(
-      lenh.filter((l) => l.donId === donId).map((l) => l.id)
+      lenh.filter((l) => l.orderId === orderId).map((l) => l.id)
     );
     return dongLenh
       .filter(
         (d) =>
-          lenhCuaDon.has(d.lenhId) && d.matHangId === mh && d.quyCach === qc
+          lenhCuaDon.has(d.exportId) && d.productId === mh && d.spec === qc
       )
-      .reduce((s, d) => s + (d.luongKg || 0), 0);
+      .reduce((s, d) => s + (d.quantityKg || 0), 0);
   };
 
   const donCuaChon = chon ? don.find((d) => d.id === chon) : undefined;
   const dongCuaChon = useMemo(
-    () => (chon ? dongDon.filter((d) => d.donId === chon) : []),
+    () => (chon ? dongDon.filter((d) => d.orderId === chon) : []),
     [dongDon, chon]
   );
 
   /* ---- Tạo đơn ---- */
   const moTao = () => {
     setTao({
-      khachId: "",
-      ngayDat: todayISO(),
-      ghiChu: "",
-      dong: [{ matHangId: "", quyCach: "", luongKgCan: 0, soBlockCan: 0 }],
+      customerId: "",
+      orderDate: todayISO(),
+      note: "",
+      dong: [{ productId: "", spec: "", requiredQuantityKg: 0, requiredBlocksCount: 0 }],
     });
     setLoi([]);
   };
   const themMatHang = (ten: string) => {
-    const m = { id: newId(), ma: "", ten, maTP: "" };
+    const m = { id: newId(), code: "", name: ten, finishedGoodCode: "" };
     setMatHang([...matHang, m]);
     notify.daLuu(`Đã thêm mặt hàng "${ten}"`);
     return m.id;
@@ -139,45 +139,45 @@ export default function DonDatScreen() {
   const luuTao = () => {
     if (!tao) return;
     const ls: LoiNhap[] = [];
-    if (!tao.khachId) ls.push({ truong: "Khách", thongBao: "Chưa chọn khách" });
-    const dongHopLe = tao.dong.filter((d) => d.matHangId && d.luongKgCan > 0);
+    if (!tao.customerId) ls.push({ truong: "Khách", thongBao: "Chưa chọn khách" });
+    const dongHopLe = tao.dong.filter((d) => d.productId && d.requiredQuantityKg > 0);
     if (dongHopLe.length === 0)
       ls.push({ truong: "Dòng cần", thongBao: "Thêm ít nhất 1 mặt hàng cần" });
     setLoi(ls);
     if (ls.length > 0) return;
     const donId = newId();
-    const donMoi: DonDat = {
+    const donMoi: SalesOrder = {
       id: donId,
-      khachId: tao.khachId,
-      ngayDat: tao.ngayDat,
-      trangThai: "dang-gom",
-      ghiChu: tao.ghiChu,
+      customerId: tao.customerId,
+      orderDate: tao.orderDate,
+      status: "dang-gom",
+      note: tao.note,
     };
-    const dongMoi: DongDon[] = dongHopLe.map((d) => ({
+    const dongMoi: OrderItem[] = dongHopLe.map((d) => ({
       id: newId(),
-      donId,
-      matHangId: d.matHangId,
-      quyCach: d.quyCach,
-      luongKgCan: d.luongKgCan,
-      soBlockCan: d.soBlockCan,
+      orderId: donId,
+      productId: d.productId,
+      spec: d.spec,
+      requiredQuantityKg: d.requiredQuantityKg,
+      requiredBlocksCount: d.requiredBlocksCount,
     }));
     persistDon([...don, donMoi]);
     persistDongDon([...dongDon, ...dongMoi]);
-    notify.daLuu(`Đã tạo đơn cho ${tenKH(tao.khachId)}`);
+    notify.daLuu(`Đã tạo đơn cho ${tenKH(tao.customerId)}`);
     setTao(null);
     setChon(donId);
   };
 
   /* ---- Tạo lệnh xuất (FIFO, cho xuất một phần) + handoff sổ Bán hàng ---- */
-  const taoLenhXuat = (d: DonDat) => {
-    const dsDong = dongDon.filter((x) => x.donId === d.id);
+  const taoLenhXuat = (d: SalesOrder) => {
+    const dsDong = dongDon.filter((x) => x.orderId === d.id);
     const tonHienTai = tinhTon(sanXuat, dongLenh);
     const lenhId = newId();
-    const dlMoi: DongLenh[] = [];
+    const dlMoi: ExportItem[] = [];
     for (const dc of dsDong) {
-      let conCan = dc.luongKgCan - daXuat(d.id, dc.matHangId, dc.quyCach);
+      let conCan = dc.requiredQuantityKg - daXuat(d.id, dc.productId, dc.spec);
       if (conCan <= 0) continue;
-      const los = loConHang(tonHienTai, dc.matHangId, dc.quyCach);
+      const los = loConHang(tonHienTai, dc.productId, dc.spec);
       for (const lo of los) {
         if (conCan <= 0) break;
         const lay = Math.min(conCan, lo.conLai);
@@ -185,12 +185,12 @@ export default function DonDatScreen() {
         const tyLe = lo.conLai > 0 ? lay / lo.conLai : 0;
         dlMoi.push({
           id: newId(),
-          lenhId,
-          sanXuatId: lo.sanXuatId,
-          matHangId: dc.matHangId,
-          quyCach: dc.quyCach,
-          luongKg: lay,
-          soBlock: Math.round(lo.blockConLai * tyLe),
+          exportId: lenhId,
+          wipId: lo.wipId,
+          productId: dc.productId,
+          spec: dc.spec,
+          quantityKg: lay,
+          blocksCount: Math.round(lo.blockConLai * tyLe),
         });
         lo.conLai -= lay; // trừ tồn trong bộ nhớ để lô sau tính đúng
         conCan -= lay;
@@ -200,34 +200,34 @@ export default function DonDatScreen() {
       notify.canhBao("Chưa có tồn khả dụng để xuất cho đơn này");
       return;
     }
-    const lenhMoi: LenhXuat = {
+    const lenhMoi: ExportOrder = {
       id: lenhId,
-      donId: d.id,
-      ngay: todayISO(),
-      trangThai: "dong",
-      ghiChu: "",
+      orderId: d.id,
+      exportDate: todayISO(),
+      status: "dong",
+      note: "",
     };
     // Handoff sổ Bán hàng: 1 phiếu bán (kênh Xuất khẩu), mỗi dòng lệnh = 1 dòng bán.
     const phieuId = newId();
-    const phieu: PhieuBan = {
+    const phieu: SalesInvoice = {
       id: phieuId,
-      ngayGiao: todayISO(),
-      ngayGhiSo: todayISO(),
-      lyDoGhiBu: "",
-      phanXuong: "Đông",
-      khachId: d.khachId,
-      kenh: "Xuất khẩu",
-      ghiChu: `Xuất container từ đơn ${tenKH(d.khachId)}`,
+      deliveryDate: todayISO(),
+      postingDate: todayISO(),
+      backdateReason: "",
+      workshop: "Đông",
+      customerId: d.customerId,
+      channel: "Xuất khẩu",
+      note: `Xuất container từ đơn ${tenKH(d.customerId)}`,
     };
-    const dongBanMoi: DongBan[] = dlMoi.map((dl) => ({
+    const dongBanMoi: SalesItem[] = dlMoi.map((dl) => ({
       id: newId(),
-      phieuId,
-      ngay: todayISO(),
-      matHangId: dl.matHangId,
-      quyCach: dl.quyCach,
-      luongKg: dl.luongKg,
-      donGia: null,
-      khoNguon: "Lưu trữ",
+      invoiceId: phieuId,
+      deliveryDate: todayISO(),
+      productId: dl.productId,
+      spec: dl.spec,
+      quantityKg: dl.quantityKg,
+      unitPrice: null,
+      sourceWarehouse: "Lưu trữ",
     }));
 
     persistDongLenh([...dongLenh, ...dlMoi]);
@@ -238,62 +238,62 @@ export default function DonDatScreen() {
     // Cập nhật trạng thái đơn: đủ hết → "dong", còn thiếu → "dang-gom".
     const conThieu = dsDong.some(
       (dc) =>
-        dc.luongKgCan -
-          (daXuat(d.id, dc.matHangId, dc.quyCach) +
+        dc.requiredQuantityKg -
+          (daXuat(d.id, dc.productId, dc.spec) +
             dlMoi
               .filter(
-                (dl) => dl.matHangId === dc.matHangId && dl.quyCach === dc.quyCach
+                (dl) => dl.productId === dc.productId && dl.spec === dc.spec
               )
-              .reduce((s, dl) => s + dl.luongKg, 0)) >
+              .reduce((s, dl) => s + dl.quantityKg, 0)) >
         0.001
     );
     persistDon(
       don.map((x) =>
-        x.id === d.id ? { ...x, trangThai: conThieu ? "dang-gom" : "dong" } : x
+        x.id === d.id ? { ...x, status: conThieu ? "dang-gom" : "dong" } : x
       )
     );
-    const tongXuat = dlMoi.reduce((s, dl) => s + dl.luongKg, 0);
+    const tongXuat = dlMoi.reduce((s, dl) => s + dl.quantityKg, 0);
     notify.daLuu(
-      `Đã xuất ${kg(tongXuat)} → sổ Bán hàng (phiếu ${tenKH(d.khachId)})` +
+      `Đã xuất ${kg(tongXuat)} → sổ Bán hàng (phiếu ${tenKH(d.customerId)})` +
         (conThieu ? " · đơn còn thiếu, vẫn mở" : " · đơn đóng")
     );
   };
 
-  const xacNhanDu = (d: DonDat) => {
-    persistDon(don.map((x) => (x.id === d.id ? { ...x, trangThai: "du" } : x)));
+  const xacNhanDu = (d: SalesOrder) => {
+    persistDon(don.map((x) => (x.id === d.id ? { ...x, status: "du" } : x)));
     notify.daLuu("Đã đánh dấu đơn đủ — bấm Lệnh xuất để xuất container");
   };
 
-  const xoaDon = (d: DonDat) => {
+  const xoaDon = (d: SalesOrder) => {
     const truocDon = don;
     const truocDong = dongDon;
     persistDon(don.filter((x) => x.id !== d.id));
-    persistDongDon(dongDon.filter((x) => x.donId !== d.id));
+    persistDongDon(dongDon.filter((x) => x.orderId !== d.id));
     if (chon === d.id) setChon(null);
-    notify.daXoa(`Đã xóa đơn ${tenKH(d.khachId)}`, () => {
+    notify.daXoa(`Đã xóa đơn ${tenKH(d.customerId)}`, () => {
       persistDon(truocDon);
       persistDongDon(truocDong);
     });
   };
 
-  const colsDon: Cot<DonDat>[] = [
-    { key: "kh", header: "Khách", chinh: true, render: (r) => tenKH(r.khachId), sapXep: (r) => tenKH(r.khachId) },
-    { key: "ngay", header: "Ngày đặt", render: (r) => viDate(r.ngayDat), sapXep: (r) => r.ngayDat },
+  const colsDon: Cot<SalesOrder>[] = [
+    { key: "kh", header: "Khách", chinh: true, render: (r) => tenKH(r.customerId), sapXep: (r) => tenKH(r.customerId) },
+    { key: "ngay", header: "Ngày đặt", render: (r) => viDate(r.orderDate), sapXep: (r) => r.orderDate },
     {
       key: "sd",
       header: "Số dòng",
       so: true,
-      render: (r) => num(dongDon.filter((d) => d.donId === r.id).length),
+      render: (r) => num(dongDon.filter((d) => d.orderId === r.id).length),
     },
     {
       key: "tt",
       header: "Trạng thái",
       render: (r) => (
-        <Badge variant={r.trangThai === "dong" ? "secondary" : r.trangThai === "du" ? "default" : "outline"}>
-          {NHAN_TT[r.trangThai]}
+        <Badge variant={r.status === "dong" ? "secondary" : r.status === "du" ? "default" : "outline"}>
+          {NHAN_TT[r.status]}
         </Badge>
       ),
-      sapXep: (r) => r.trangThai,
+      sapXep: (r) => r.status,
     },
   ];
 
@@ -312,8 +312,8 @@ export default function DonDatScreen() {
       <ContextBar
         items={[
           { nhan: "Số đơn", giaTri: don.length, so: true },
-          { nhan: "Đang gom", giaTri: don.filter((d) => d.trangThai === "dang-gom").length, so: true },
-          { nhan: "Đã xuất", giaTri: don.filter((d) => d.trangThai === "dong").length, so: true },
+          { nhan: "Đang gom", giaTri: don.filter((d) => d.status === "dang-gom").length, so: true },
+          { nhan: "Đã xuất", giaTri: don.filter((d) => d.status === "dong").length, so: true },
         ]}
         actions={
           <Button size="lg" onClick={moTao}>
@@ -340,7 +340,7 @@ export default function DonDatScreen() {
           columns={colsDon}
           rows={don}
           getKey={(r) => r.id}
-          timKiem={(r) => tenKH(r.khachId)}
+          timKiem={(r) => tenKH(r.customerId)}
           nhanTimKiem="Tìm theo khách…"
           actions={(r) => (
             <div className="flex flex-wrap gap-2">
@@ -361,14 +361,14 @@ export default function DonDatScreen() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="text-xl font-semibold text-foreground">
-                {tenKH(donCuaChon.khachId)}
+                {tenKH(donCuaChon.customerId)}
               </p>
               <p className="text-base text-muted-foreground">
-                Đặt {viDate(donCuaChon.ngayDat)} · {NHAN_TT[donCuaChon.trangThai]}
+                Đặt {viDate(donCuaChon.orderDate)} · {NHAN_TT[donCuaChon.status]}
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
-              {donCuaChon.trangThai !== "dong" && (
+              {donCuaChon.status !== "dong" && (
                 <>
                   <Button variant="outline" onClick={() => xacNhanDu(donCuaChon)}>
                     <PackageCheck />
@@ -388,13 +388,13 @@ export default function DonDatScreen() {
 
           <ul className="divide-y divide-border">
             {dongCuaChon.map((dc) => {
-              const xuat = daXuat(donCuaChon.id, dc.matHangId, dc.quyCach);
+              const xuat = daXuat(donCuaChon.id, dc.productId, dc.spec);
               const kd = ton
                 .filter(
-                  (t) => t.matHangId === dc.matHangId && t.quyCach === dc.quyCach
+                  (t) => t.productId === dc.productId && t.spec === dc.spec
                 )
                 .reduce((s, t) => s + Math.max(0, t.conLai), 0);
-              const con = dc.luongKgCan - xuat;
+              const con = dc.requiredQuantityKg - xuat;
               const du = con <= 0.001;
               return (
                 <li
@@ -402,12 +402,12 @@ export default function DonDatScreen() {
                   className="flex flex-wrap items-center justify-between gap-3 py-3"
                 >
                   <span className="min-w-0 flex-1 text-base">
-                    {tenMH(dc.matHangId)}
-                    {dc.quyCach ? ` · ${dc.quyCach}` : ""}
+                    {tenMH(dc.productId)}
+                    {dc.spec ? ` · ${dc.spec}` : ""}
                   </span>
                   <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-base">
                     <span className="text-muted-foreground">
-                      Cần <span className="tnum font-semibold text-foreground">{num(dc.luongKgCan)}</span> kg
+                      Cần <span className="tnum font-semibold text-foreground">{num(dc.requiredQuantityKg)}</span> kg
                     </span>
                     <span className="text-muted-foreground">
                       Đã xuất <span className="tnum">{num(xuat)}</span>
@@ -443,8 +443,8 @@ export default function DonDatScreen() {
               <Combobox
                 label="Khách hàng"
                 required
-                value={tao.khachId}
-                onChange={(v) => setTao((t) => (t ? { ...t, khachId: v } : t))}
+                value={tao.customerId}
+                onChange={(v) => setTao((t) => (t ? { ...t, customerId: v } : t))}
                 options={optKhach}
                 emptyText="Chưa có khách nào — thêm ở Danh mục."
               />
@@ -458,8 +458,8 @@ export default function DonDatScreen() {
                     <Combobox
                       label="Thành phẩm"
                       required
-                      value={dc.matHangId}
-                      onChange={(v) => datDong(i, { matHangId: v })}
+                      value={dc.productId}
+                      onChange={(v) => datDong(i, { productId: v })}
                       options={optMatHang}
                       onCreate={themMatHang}
                     />
@@ -468,14 +468,14 @@ export default function DonDatScreen() {
                         label="Khối lượng cần"
                         required
                         unit="kg"
-                        value={dc.luongKgCan || null}
-                        onChange={(v) => datDong(i, { luongKgCan: v ?? 0 })}
+                        value={dc.requiredQuantityKg || null}
+                        onChange={(v) => datDong(i, { requiredQuantityKg: v ?? 0 })}
                       />
                       <NumberField
                         label="Block cần"
                         unit="block"
-                        value={dc.soBlockCan || null}
-                        onChange={(v) => datDong(i, { soBlockCan: v ?? 0 })}
+                        value={dc.requiredBlocksCount || null}
+                        onChange={(v) => datDong(i, { requiredBlocksCount: v ?? 0 })}
                       />
                     </div>
                     {tao.dong.length > 1 && (
@@ -503,7 +503,7 @@ export default function DonDatScreen() {
                             ...t,
                             dong: [
                               ...t.dong,
-                              { matHangId: "", quyCach: "", luongKgCan: 0, soBlockCan: 0 },
+                              { productId: "", spec: "", requiredQuantityKg: 0, requiredBlocksCount: 0 },
                             ],
                           }
                         : t
@@ -516,9 +516,9 @@ export default function DonDatScreen() {
               </div>
               <Field label="Ghi chú">
                 <Input
-                  value={tao.ghiChu}
+                  value={tao.note}
                   onChange={(e) =>
-                    setTao((t) => (t ? { ...t, ghiChu: e.target.value } : t))
+                    setTao((t) => (t ? { ...t, note: e.target.value } : t))
                   }
                   placeholder="Ghi chú đơn (nếu có)"
                 />

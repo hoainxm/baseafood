@@ -1,13 +1,13 @@
 import { useMemo, useState } from "react";
-import type { DongBan, KhachHang, MatHang, PhanXuong, Kenh, PhieuBan } from "@/types";
-import { KENH, laGhiBuBan, thanhTienBan } from "@/types";
+import type { SalesItem, Customer, Product, Workshop, SalesChannel, SalesInvoice } from "@/types";
+import { SALES_CHANNELS, isBackdatedSales, calculateSalesAmount } from "@/types";
 import { newId } from "@/lib/store";
 import { uid } from "@/lib/db";
 import {
-  useBanHang,
-  useKhachHang,
-  useMatHang,
-  usePhieuBan,
+  useSalesItems,
+  useCustomers,
+  useProducts,
+  useSalesInvoices,
 } from "@/lib/danhMuc";
 import {
   Badge,
@@ -46,49 +46,49 @@ import {
   X,
 } from "lucide-react";
 
-const PHAN_XUONG: PhanXuong[] = ["Đông", "Cá", "Khô"];
+const PHAN_XUONG: Workshop[] = ["Đông", "Cá", "Khô"];
 
 /** Đầu phiếu bán đang nhập — dùng chung cho mọi dòng mặt hàng của phiếu. */
 interface DauPhieu {
-  ngayGiao: string;
-  ngayGhiSo: string;
-  lyDoGhiBu: string;
-  phanXuong: PhanXuong;
-  khachId: string;
-  kenh: Kenh;
-  ghiChu: string;
+  deliveryDate: string;
+  postingDate: string;
+  backdateReason: string;
+  workshop: Workshop;
+  customerId: string;
+  channel: SalesChannel;
+  note: string;
 }
 
 /** Một dòng mặt hàng đang nhập trong phiếu. */
 interface DongMoi {
-  matHangId: string;
-  quyCach: string;
-  luongKg: number;
-  donGia: number | null;
+  productId: string;
+  spec: string;
+  quantityKg: number;
+  unitPrice: number | null;
 }
 
 const DONG_MOI_RONG: DongMoi = {
-  matHangId: "",
-  quyCach: "",
-  luongKg: 0,
-  donGia: null,
+  productId: "",
+  spec: "",
+  quantityKg: 0,
+  unitPrice: null,
 };
 
 /** Một phiếu bán hiện trên sổ, gom từ các dòng của nó. */
 interface NhomPhieu {
-  phieu: PhieuBan;
-  dong: DongBan[];
+  phieu: SalesInvoice;
+  dong: SalesItem[];
   tongKg: number;
   tongTien: number;
   ghiBu: boolean;
 }
 
-function gomPhieu(rows: DongBan[], phieu: PhieuBan[]): NhomPhieu[] {
+function gomPhieu(rows: SalesItem[], phieu: SalesInvoice[]): NhomPhieu[] {
   const theoId = new Map(phieu.map((p) => [p.id, p]));
   const nhoms = new Map<string, NhomPhieu>();
 
   for (const r of rows) {
-    const p = theoId.get(r.phieuId);
+    const p = theoId.get(r.invoiceId);
     if (!p) continue; // dòng mồ côi (phiếu đã xóa) — bỏ qua
     let nhom = nhoms.get(p.id);
     if (!nhom) {
@@ -97,18 +97,18 @@ function gomPhieu(rows: DongBan[], phieu: PhieuBan[]): NhomPhieu[] {
         dong: [],
         tongKg: 0,
         tongTien: 0,
-        ghiBu: laGhiBuBan(p),
+        ghiBu: isBackdatedSales(p),
       };
       nhoms.set(p.id, nhom);
     }
     nhom.dong.push(r);
-    nhom.tongKg += r.luongKg || 0;
-    nhom.tongTien += thanhTienBan(r);
+    nhom.tongKg += r.quantityKg || 0;
+    nhom.tongTien += calculateSalesAmount(r);
   }
 
   return [...nhoms.values()].sort(
     (a, b) =>
-      a.phieu.ngayGiao.localeCompare(b.phieu.ngayGiao) ||
+      a.phieu.deliveryDate.localeCompare(b.phieu.deliveryDate) ||
       a.phieu.id.localeCompare(b.phieu.id)
   );
 }
@@ -116,12 +116,12 @@ function gomPhieu(rows: DongBan[], phieu: PhieuBan[]): NhomPhieu[] {
 /** Kiểm đầu phiếu — dùng chung lúc ghi mới và lúc sửa. */
 function loiDauPhieu(d: DauPhieu): LoiNhap[] {
   const ls: LoiNhap[] = [];
-  if (d.ngayGhiSo < d.ngayGiao)
+  if (d.postingDate < d.deliveryDate)
     ls.push({
       truong: "Ngày ghi sổ",
       thongBao: "Ngày ghi sổ không thể trước ngày xuất bán",
     });
-  if (laGhiBuBan(d) && !d.lyDoGhiBu.trim())
+  if (isBackdatedSales(d) && !d.backdateReason.trim())
     ls.push({
       truong: "Lý do ghi bù",
       thongBao: "Ghi sau ngày xuất bán — phải ghi rõ lý do",
@@ -130,17 +130,17 @@ function loiDauPhieu(d: DauPhieu): LoiNhap[] {
 }
 
 export default function BanHangScreen() {
-  const [rows, persist] = useBanHang();
-  const [phieu, persistPhieu] = usePhieuBan();
-  const [matHang, setMatHang] = useMatHang();
-  const [khach, setKhach] = useKhachHang();
+  const [rows, persist] = useSalesItems();
+  const [phieu, persistPhieu] = useSalesInvoices();
+  const [matHang, setMatHang] = useProducts();
+  const [khach, setKhach] = useCustomers();
 
   // Kỳ xem sổ: ngày/tuần/tháng/năm/khoảng tự chọn
   const [ky, setKy] = useState<KyXem>("ngay");
   const [ngay, setNgay] = useState(todayISO());
   const [tuNgay, setTuNgay] = useState(todayISO());
   const [denNgay, setDenNgay] = useState(todayISO());
-  const [phanXuong, setPhanXuong] = useState<PhanXuong | "Tất cả">("Đông");
+  const [phanXuong, setPhanXuong] = useState<Workshop | "Tất cả">("Đông");
 
   /* Phiên ghi phiếu: đầu phiếu + đổ từng dòng mặt hàng. */
   const [phien, setPhien] = useState<DauPhieu | null>(null);
@@ -150,23 +150,23 @@ export default function BanHangScreen() {
   const [loiPhien, setLoiPhien] = useState<LoiNhap[]>([]);
 
   /* Sửa MỘT dòng mặt hàng — chỉ mặt hàng / quy cách / kg / giá. */
-  const [dang, setDang] = useState<DongBan | null>(null);
+  const [dang, setDang] = useState<SalesItem | null>(null);
   const [loi, setLoi] = useState<LoiNhap[]>([]);
 
   const [tuHieuLuc, denHieuLuc] = phamViKy(ky, ngay, tuNgay, denNgay);
   const laMotNgay = tuHieuLuc === denHieuLuc;
 
   const tenMatHang = (id: string) =>
-    matHang.find((m) => m.id === id)?.ten || "—";
-  const tenKhach = (id: string) => khach.find((k) => k.id === id)?.ten || "";
+    matHang.find((m) => m.id === id)?.name || "—";
+  const tenKhach = (id: string) => khach.find((k) => k.id === id)?.name || "";
 
   const view = useMemo(
     () =>
       rows.filter((r) => {
-        const p = phieu.find((x) => x.id === r.phieuId);
+        const p = phieu.find((x) => x.id === r.invoiceId);
         if (!p) return false;
-        const hopNgay = p.ngayGiao >= tuHieuLuc && p.ngayGiao <= denHieuLuc;
-        const hopXuong = phanXuong === "Tất cả" || p.phanXuong === phanXuong;
+        const hopNgay = p.deliveryDate >= tuHieuLuc && p.deliveryDate <= denHieuLuc;
+        const hopXuong = phanXuong === "Tất cả" || p.workshop === phanXuong;
         return hopNgay && hopXuong;
       }),
     [rows, phieu, tuHieuLuc, denHieuLuc, phanXuong]
@@ -179,38 +179,38 @@ export default function BanHangScreen() {
     : `${viDate(tuHieuLuc)} – ${viDate(denHieuLuc)}`;
 
   const tong = useMemo(
-    () => view.reduce((s, r) => s + (r.luongKg || 0), 0),
+    () => view.reduce((s, r) => s + (r.quantityKg || 0), 0),
     [view]
   );
   const tongTien = useMemo(
-    () => view.reduce((s, r) => s + thanhTienBan(r), 0),
+    () => view.reduce((s, r) => s + calculateSalesAmount(r), 0),
     [view]
   );
 
   const ngayGhi = laMotNgay ? tuHieuLuc : denHieuLuc;
-  const xuongGhi: PhanXuong = phanXuong === "Tất cả" ? "Đông" : phanXuong;
+  const xuongGhi: Workshop = phanXuong === "Tất cả" ? "Đông" : phanXuong;
 
   /* ---- Danh mục: chọn sẵn, thiếu thì tạo ngay tại chỗ ---- */
 
   const optMatHang: MucChon[] = matHang.map((m) => ({
     value: m.id,
-    label: m.ten,
-    phu: m.ma || undefined,
+    label: m.name,
+    phu: m.code || undefined,
   }));
   const optKhach: MucChon[] = khach.map((k) => ({
     value: k.id,
-    label: k.ten,
-    phu: k.thiTruong || undefined,
+    label: k.name,
+    phu: k.market || undefined,
   }));
 
   const themMatHang = (ten: string) => {
-    const m: MatHang = { id: uid(), ma: "", ten, maTP: "" };
+    const m: Product = { id: uid(), code: "", name: ten, finishedGoodCode: "" };
     setMatHang([...matHang, m]);
     notify.daLuu(`Đã thêm mặt hàng "${ten}" vào danh mục`);
     return m.id;
   };
   const themKhach = (ten: string) => {
-    const k: KhachHang = { id: uid(), ma: "", ten, thiTruong: "" };
+    const k: Customer = { id: uid(), code: "", name: ten, market: "" };
     setKhach([...khach, k]);
     notify.daLuu(`Đã thêm khách hàng "${ten}" vào danh mục`);
     return k.id;
@@ -220,13 +220,13 @@ export default function BanHangScreen() {
 
   const moThem = () => {
     setPhien({
-      ngayGiao: ngayGhi,
-      ngayGhiSo: todayISO(),
-      lyDoGhiBu: "",
-      phanXuong: xuongGhi,
-      khachId: "",
-      kenh: "Xuất khẩu",
-      ghiChu: "",
+      deliveryDate: ngayGhi,
+      postingDate: todayISO(),
+      backdateReason: "",
+      workshop: xuongGhi,
+      customerId: "",
+      channel: "Xuất khẩu",
+      note: "",
     });
     setPhieuIdPhien(null);
     setSuaRowIds(null);
@@ -236,13 +236,13 @@ export default function BanHangScreen() {
 
   const moSuaPhieu = (n: NhomPhieu) => {
     setPhien({
-      ngayGiao: n.phieu.ngayGiao,
-      ngayGhiSo: n.phieu.ngayGhiSo || n.phieu.ngayGiao,
-      lyDoGhiBu: n.phieu.lyDoGhiBu,
-      phanXuong: n.phieu.phanXuong,
-      khachId: n.phieu.khachId,
-      kenh: n.phieu.kenh,
-      ghiChu: n.phieu.ghiChu,
+      deliveryDate: n.phieu.deliveryDate,
+      postingDate: n.phieu.postingDate || n.phieu.deliveryDate,
+      backdateReason: n.phieu.backdateReason,
+      workshop: n.phieu.workshop,
+      customerId: n.phieu.customerId,
+      channel: n.phieu.channel,
+      note: n.phieu.note,
     });
     setPhieuIdPhien(n.phieu.id);
     setSuaRowIds(n.dong.map((r) => r.id));
@@ -255,12 +255,12 @@ export default function BanHangScreen() {
 
   const dongPhien = useMemo(() => {
     if (suaRowIds) return rows.filter((r) => suaRowIds.includes(r.id));
-    if (phieuIdPhien) return rows.filter((r) => r.phieuId === phieuIdPhien);
+    if (phieuIdPhien) return rows.filter((r) => r.invoiceId === phieuIdPhien);
     return [];
   }, [rows, suaRowIds, phieuIdPhien]);
 
   const dangSuaPhieu = suaRowIds !== null;
-  const tongPhien = dongPhien.reduce((s, r) => s + (r.luongKg || 0), 0);
+  const tongPhien = dongPhien.reduce((s, r) => s + (r.quantityKg || 0), 0);
 
   const setDong = <K extends keyof DongMoi>(k: K, v: DongMoi[K]) =>
     setDongMoi((d) => ({ ...d, [k]: v }));
@@ -269,9 +269,9 @@ export default function BanHangScreen() {
   const themDong = () => {
     if (!phien) return;
     const ls: LoiNhap[] = [...loiDauPhieu(phien)];
-    if (!dongMoi.matHangId)
+    if (!dongMoi.productId)
       ls.push({ truong: "Mặt hàng", thongBao: "Chưa chọn mặt hàng" });
-    if (!(dongMoi.luongKg > 0))
+    if (!(dongMoi.quantityKg > 0))
       ls.push({ truong: "Lượng", thongBao: "Phải lớn hơn 0 kg" });
     setLoiPhien(ls);
     if (ls.length > 0) return;
@@ -291,39 +291,39 @@ export default function BanHangScreen() {
       setPhieuIdPhien(idPhieu);
     }
 
-    const dong: DongBan = {
+    const dong: SalesItem = {
       id: newId(),
-      phieuId: idPhieu ?? "",
-      ngay: phien.ngayGiao,
-      matHangId: dongMoi.matHangId,
-      quyCach: dongMoi.quyCach.trim(),
-      luongKg: dongMoi.luongKg,
-      donGia: dongMoi.donGia,
-      khoNguon: "",
+      invoiceId: idPhieu ?? "",
+      deliveryDate: phien.deliveryDate,
+      productId: dongMoi.productId,
+      spec: dongMoi.spec.trim(),
+      quantityKg: dongMoi.quantityKg,
+      unitPrice: dongMoi.unitPrice,
+      sourceWarehouse: "",
     };
     // Đồng bộ đầu phiếu cho MỌI dòng của phiếu (khách/ngày/kênh có thể vừa đổi
     // tại chỗ) rồi thêm dòng mới — giữ bất biến "đầu phiếu áp cả phiếu".
-    const thuocPhieu = (r: DongBan) =>
-      suaRowIds ? suaRowIds.includes(r.id) : r.phieuId === idPhieu;
+    const thuocPhieu = (r: SalesItem) =>
+      suaRowIds ? suaRowIds.includes(r.id) : r.invoiceId === idPhieu;
     persist([
       ...rows.map((r) =>
-        thuocPhieu(r) ? { ...r, ngay: phien.ngayGiao } : r
+        thuocPhieu(r) ? { ...r, deliveryDate: phien.deliveryDate } : r
       ),
       dong,
     ]);
     if (suaRowIds) setSuaRowIds([...suaRowIds, dong.id]);
-    notify.daLuu(`Đã vào sổ: ${tenMatHang(dong.matHangId)} — ${kg(dong.luongKg)}`);
+    notify.daLuu(`Đã vào sổ: ${tenMatHang(dong.productId)} — ${kg(dong.quantityKg)}`);
 
     setDongMoi(DONG_MOI_RONG);
     setLoiPhien([]);
   };
 
-  const boDongPhien = (r: DongBan) => {
+  const boDongPhien = (r: SalesItem) => {
     const truoc = rows;
     const truocIds = suaRowIds;
     persist(rows.filter((x) => x.id !== r.id));
     if (suaRowIds) setSuaRowIds(suaRowIds.filter((id) => id !== r.id));
-    notify.daXoa(`Đã bỏ ${tenMatHang(r.matHangId)} — ${kg(r.luongKg)}`, () => {
+    notify.daXoa(`Đã bỏ ${tenMatHang(r.productId)} — ${kg(r.quantityKg)}`, () => {
       persist(truoc);
       if (truocIds) setSuaRowIds(truocIds);
     });
@@ -339,17 +339,17 @@ export default function BanHangScreen() {
       persistPhieu(
         phieu.map((x) => (x.id === phieuIdPhien ? { ...x, ...p, id: x.id } : x))
       );
-      const thuoc = (r: DongBan) =>
-        suaRowIds ? suaRowIds.includes(r.id) : r.phieuId === phieuIdPhien;
-      persist(rows.map((r) => (thuoc(r) ? { ...r, ngay: p.ngayGiao } : r)));
+      const thuoc = (r: SalesItem) =>
+        suaRowIds ? suaRowIds.includes(r.id) : r.invoiceId === phieuIdPhien;
+      persist(rows.map((r) => (thuoc(r) ? { ...r, deliveryDate: p.deliveryDate } : r)));
     }
     if (p && dongPhien.length > 0) {
-      if (p.ngayGiao < tuHieuLuc || p.ngayGiao > denHieuLuc) {
+      if (p.deliveryDate < tuHieuLuc || p.deliveryDate > denHieuLuc) {
         setKy("ngay");
-        setNgay(p.ngayGiao);
+        setNgay(p.deliveryDate);
       }
-      if (phanXuong !== "Tất cả" && phanXuong !== p.phanXuong)
-        setPhanXuong(p.phanXuong);
+      if (phanXuong !== "Tất cả" && phanXuong !== p.workshop)
+        setPhanXuong(p.workshop);
     }
 
     if (mo === "dong") {
@@ -359,7 +359,7 @@ export default function BanHangScreen() {
       return;
     }
     // Ghi phiếu khác: giữ ngày + xưởng, làm mới khách.
-    setPhien(p ? { ...p, khachId: "", ghiChu: "" } : null);
+    setPhien(p ? { ...p, customerId: "", note: "" } : null);
     setPhieuIdPhien(null);
     setSuaRowIds(null);
     setDongMoi(DONG_MOI_RONG);
@@ -374,7 +374,7 @@ export default function BanHangScreen() {
     persist(rows.filter((r) => !ids.has(r.id)));
     if (phieuIdPhien) persistPhieu(phieu.filter((x) => x.id !== phieuIdPhien));
     notify.daXoa(
-      `Đã xóa phiếu ${tenKhach(phien?.khachId ?? "") || "(chưa có khách)"} — ${suaRowIds.length} dòng`,
+      `Đã xóa phiếu ${tenKhach(phien?.customerId ?? "") || "(chưa có khách)"} — ${suaRowIds.length} dòng`,
       () => {
         persist(truocRows);
         persistPhieu(truocPhieu);
@@ -390,9 +390,9 @@ export default function BanHangScreen() {
   const luu = () => {
     if (!dang) return;
     const ls: LoiNhap[] = [];
-    if (!dang.matHangId)
+    if (!dang.productId)
       ls.push({ truong: "Mặt hàng", thongBao: "Chưa chọn mặt hàng" });
-    if (!(dang.luongKg > 0))
+    if (!(dang.quantityKg > 0))
       ls.push({ truong: "Lượng", thongBao: "Phải lớn hơn 0 kg" });
     setLoi(ls);
     if (ls.length > 0) return;
@@ -401,53 +401,53 @@ export default function BanHangScreen() {
     setDang(null);
   };
 
-  const set = <K extends keyof DongBan>(k: K, v: DongBan[K]) =>
+  const set = <K extends keyof SalesItem>(k: K, v: SalesItem[K]) =>
     setDang((d) => (d ? { ...d, [k]: v } : d));
 
   /** Kênh của phiếu đang mở — quyết định đơn vị đơn giá. */
-  const donViGia = phien?.kenh === "Nội địa" ? "đ" : "USD";
-  const donViGiaDong = (kenh: Kenh) => (kenh === "Nội địa" ? "đ" : "USD");
+  const donViGia = phien?.channel === "Nội địa" ? "đ" : "USD";
+  const donViGiaDong = (kenh: SalesChannel) => (kenh === "Nội địa" ? "đ" : "USD");
 
-  const cotDong = (kenh: Kenh): Cot<DongBan>[] => [
+  const cotDong = (kenh: SalesChannel): Cot<SalesItem>[] => [
     {
       key: "mh",
       header: "Mặt hàng",
       chinh: true,
-      render: (r) => tenMatHang(r.matHangId),
-      sapXep: (r) => tenMatHang(r.matHangId),
+      render: (r) => tenMatHang(r.productId),
+      sapXep: (r) => tenMatHang(r.productId),
     },
     {
       key: "qc",
       header: "Quy cách",
       render: (r) =>
-        r.quyCach || <span className="text-muted-foreground">—</span>,
-      sapXep: (r) => r.quyCach,
+        r.spec || <span className="text-muted-foreground">—</span>,
+      sapXep: (r) => r.spec,
     },
     {
       key: "sl",
       header: "Lượng (kg)",
       so: true,
-      render: (r) => num(r.luongKg),
-      sapXep: (r) => r.luongKg,
+      render: (r) => num(r.quantityKg),
+      sapXep: (r) => r.quantityKg,
     },
     {
       key: "gia",
       header: `Đơn giá (${donViGiaDong(kenh)})`,
       so: true,
       render: (r) =>
-        r.donGia != null ? (
-          num(r.donGia)
+        r.unitPrice != null ? (
+          num(r.unitPrice)
         ) : (
           <Badge variant="outline">Chưa có giá</Badge>
         ),
-      sapXep: (r) => r.donGia ?? 0,
+      sapXep: (r) => r.unitPrice ?? 0,
     },
     {
       key: "tien",
       header: `Thành tiền (${donViGiaDong(kenh)})`,
       so: true,
-      render: (r) => num(thanhTienBan(r)),
-      sapXep: (r) => thanhTienBan(r),
+      render: (r) => num(calculateSalesAmount(r)),
+      sapXep: (r) => calculateSalesAmount(r),
     },
   ];
 
@@ -498,8 +498,8 @@ export default function BanHangScreen() {
                 label="Khoảng ngày xuất bán"
                 anNhanBatBuoc
                 presets={false}
-                tuNgay={tuNgay}
-                denNgay={denNgay}
+                startDate={tuNgay}
+                endDate={denNgay}
                 onChange={(tu, den) => {
                   setTuNgay(tu);
                   setDenNgay(den);
@@ -533,7 +533,7 @@ export default function BanHangScreen() {
             anNhanBatBuoc
             choPhepXoa={false}
             value={phanXuong}
-            onChange={(v) => setPhanXuong(v as PhanXuong | "Tất cả")}
+            onChange={(v) => setPhanXuong(v as Workshop | "Tất cả")}
             options={[
               ...PHAN_XUONG.map((p) => ({ value: p, label: p })),
               { value: "Tất cả", label: "Tất cả" },
@@ -575,28 +575,28 @@ export default function BanHangScreen() {
                         Phiếu {i + 1}
                       </span>
                       <span className="text-xl font-semibold text-foreground">
-                        {tenKhach(n.phieu.khachId) || "(chưa có khách)"}
+                        {tenKhach(n.phieu.customerId) || "(chưa có khách)"}
                       </span>
                       <span className="text-base text-muted-foreground">
-                        {viDate(n.phieu.ngayGiao)} · xưởng {n.phieu.phanXuong}
+                        {viDate(n.phieu.deliveryDate)} · xưởng {n.phieu.workshop}
                       </span>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
-                      <Badge>{n.phieu.kenh}</Badge>
+                      <Badge>{n.phieu.channel}</Badge>
                       {n.ghiBu && (
                         <Badge variant="outline">
-                          Ghi bù {viDate(n.phieu.ngayGhiSo)}
+                          Ghi bù {viDate(n.phieu.postingDate)}
                         </Badge>
                       )}
                     </div>
-                    {n.ghiBu && n.phieu.lyDoGhiBu && (
+                    {n.ghiBu && n.phieu.backdateReason && (
                       <p className="text-base text-muted-foreground">
-                        Lý do ghi bù: {n.phieu.lyDoGhiBu}
+                        Lý do ghi bù: {n.phieu.backdateReason}
                       </p>
                     )}
-                    {n.phieu.ghiChu && (
+                    {n.phieu.note && (
                       <p className="text-base text-muted-foreground">
-                        Ghi chú: {n.phieu.ghiChu}
+                        Ghi chú: {n.phieu.note}
                       </p>
                     )}
                   </div>
@@ -616,7 +616,7 @@ export default function BanHangScreen() {
                 </div>
 
                 <RecordTable
-                  columns={cotDong(n.phieu.kenh)}
+                  columns={cotDong(n.phieu.channel)}
                   rows={n.dong}
                   getKey={(r) => r.id}
                 />
@@ -671,27 +671,27 @@ export default function BanHangScreen() {
                   label="Ngày ghi sổ"
                   required
                   info="Ngày ghi vào hệ thống. Khác ngày xuất bán ⇒ ghi bù."
-                  value={phien.ngayGhiSo}
-                  onChange={(v) => datPhien("ngayGhiSo", v)}
+                  value={phien.postingDate}
+                  onChange={(v) => datPhien("postingDate", v)}
                 />
                 <DateField
                   label="Ngày xuất bán"
                   required
                   info="Ngày hàng thực xuất bán — mọi tổng hợp tính theo ngày này."
-                  value={phien.ngayGiao}
-                  onChange={(v) => datPhien("ngayGiao", v)}
+                  value={phien.deliveryDate}
+                  onChange={(v) => datPhien("deliveryDate", v)}
                 />
               </div>
 
-              {laGhiBuBan(phien) && (
+              {isBackdatedSales(phien) && (
                 <Field
                   label="Lý do ghi bù"
                   required
                   hint="VD: xuất bán 29/7, 31/7 mới ghi sổ."
                 >
                   <Input
-                    value={phien.lyDoGhiBu}
-                    onChange={(e) => datPhien("lyDoGhiBu", e.target.value)}
+                    value={phien.backdateReason}
+                    onChange={(e) => datPhien("backdateReason", e.target.value)}
                     placeholder="Vì sao tới hôm nay mới ghi?"
                   />
                 </Field>
@@ -702,15 +702,15 @@ export default function BanHangScreen() {
                   label="Phân xưởng"
                   required
                   choPhepXoa={false}
-                  value={phien.phanXuong}
-                  onChange={(v) => datPhien("phanXuong", v as PhanXuong)}
+                  value={phien.workshop}
+                  onChange={(v) => datPhien("workshop", v as Workshop)}
                   options={PHAN_XUONG.map((p) => ({ value: p, label: p }))}
                 />
                 <ChoiceGroup
                   label="Kênh bán"
-                  value={phien.kenh}
-                  onChange={(v) => datPhien("kenh", v as Kenh)}
-                  options={KENH.map((k) => ({ value: k, label: k }))}
+                  value={phien.channel}
+                  onChange={(v) => datPhien("channel", v as SalesChannel)}
+                  options={SALES_CHANNELS.map((k) => ({ value: k, label: k }))}
                   cot={2}
                 />
               </div>
@@ -718,8 +718,8 @@ export default function BanHangScreen() {
               <Combobox
                 label="Khách hàng"
                 hint="Chọn trong danh mục. Chưa có thì gõ tên rồi bấm Thêm mới. Bỏ trống nếu chưa xác định khách."
-                value={phien.khachId}
-                onChange={(v) => datPhien("khachId", v)}
+                value={phien.customerId}
+                onChange={(v) => datPhien("customerId", v)}
                 options={optKhach}
                 onCreate={themKhach}
                 emptyText="Chưa có khách hàng nào trong danh mục."
@@ -727,8 +727,8 @@ export default function BanHangScreen() {
 
               <Field label="Ghi chú phiếu">
                 <Input
-                  value={phien.ghiChu}
-                  onChange={(e) => datPhien("ghiChu", e.target.value)}
+                  value={phien.note}
+                  onChange={(e) => datPhien("note", e.target.value)}
                   placeholder="Ghi chú thêm (nếu có)"
                 />
               </Field>
@@ -753,16 +753,16 @@ export default function BanHangScreen() {
                           <span className="tnum text-muted-foreground">
                             {i + 1}.
                           </span>{" "}
-                          {tenMatHang(r.matHangId)}
-                          {r.quyCach ? (
+                          {tenMatHang(r.productId)}
+                          {r.spec ? (
                             <span className="text-muted-foreground">
                               {" "}
-                              · {r.quyCach}
+                              · {r.spec}
                             </span>
                           ) : null}{" "}
                           —{" "}
                           <span className="tnum font-semibold">
-                            {num(r.luongKg)}
+                            {num(r.quantityKg)}
                           </span>{" "}
                           kg
                         </span>
@@ -801,8 +801,8 @@ export default function BanHangScreen() {
                   label="Mặt hàng"
                   required
                   hint="Chưa có trong danh mục thì gõ tên rồi bấm Thêm mới."
-                  value={dongMoi.matHangId}
-                  onChange={(v) => setDong("matHangId", v)}
+                  value={dongMoi.productId}
+                  onChange={(v) => setDong("productId", v)}
                   options={optMatHang}
                   onCreate={themMatHang}
                   emptyText="Chưa có mặt hàng nào trong danh mục."
@@ -813,8 +813,8 @@ export default function BanHangScreen() {
                   hint="Size/grade của thành phẩm. VD: 18-20, 1000-1300, 1.5g."
                 >
                   <Input
-                    value={dongMoi.quyCach}
-                    onChange={(e) => setDong("quyCach", e.target.value)}
+                    value={dongMoi.spec}
+                    onChange={(e) => setDong("spec", e.target.value)}
                     placeholder="VD: 18-20"
                   />
                 </Field>
@@ -824,23 +824,23 @@ export default function BanHangScreen() {
                     label="Lượng"
                     required
                     unit="kg"
-                    value={dongMoi.luongKg || null}
-                    onChange={(v) => setDong("luongKg", v ?? 0)}
+                    value={dongMoi.quantityKg || null}
+                    onChange={(v) => setDong("quantityKg", v ?? 0)}
                   />
                   <NumberField
                     label="Đơn giá"
                     unit={donViGia}
-                    value={dongMoi.donGia}
-                    onChange={(v) => setDong("donGia", v)}
+                    value={dongMoi.unitPrice}
+                    onChange={(v) => setDong("unitPrice", v)}
                     hint="Bỏ trống nếu chưa chốt giá."
                   />
                 </div>
 
-                {dongMoi.luongKg > 0 && dongMoi.donGia ? (
+                {dongMoi.quantityKg > 0 && dongMoi.unitPrice ? (
                   <div className="rounded-lg bg-accent px-4 py-3 text-base text-accent-foreground">
                     Thành tiền:{" "}
                     <span className="tnum text-lg font-semibold">
-                      {num(dongMoi.luongKg * dongMoi.donGia)} {donViGia}
+                      {num(dongMoi.quantityKg * dongMoi.unitPrice)} {donViGia}
                     </span>
                   </div>
                 ) : null}
@@ -854,7 +854,7 @@ export default function BanHangScreen() {
               {/* Tổng phiếu */}
               <div className="flex flex-wrap items-baseline justify-end gap-x-8 gap-y-2 rounded-xl bg-muted px-5 py-4">
                 <span className="text-base text-muted-foreground">
-                  Tổng phiếu {viDate(phien.ngayGiao)} · xưởng {phien.phanXuong}
+                  Tổng phiếu {viDate(phien.deliveryDate)} · xưởng {phien.workshop}
                 </span>
                 <span className="tnum text-2xl font-semibold">
                   {kg(tongPhien)}
@@ -866,7 +866,7 @@ export default function BanHangScreen() {
           <DialogFooter>
             {dangSuaPhieu ? (
               <ConfirmDelete
-                moTaBanGhi={`Phiếu ${tenKhach(phien?.khachId ?? "") || "(chưa có khách)"} — ${viDate(phien?.ngayGiao ?? "")} — ${dongPhien.length} dòng — ${kg(tongPhien)}`}
+                moTaBanGhi={`Phiếu ${tenKhach(phien?.customerId ?? "") || "(chưa có khách)"} — ${viDate(phien?.deliveryDate ?? "")} — ${dongPhien.length} dòng — ${kg(tongPhien)}`}
                 onConfirm={xoaPhieuDangSua}
                 tieuDe="Xóa cả phiếu này?"
                 nhanNut="Xóa phiếu"
@@ -912,8 +912,8 @@ export default function BanHangScreen() {
                 label="Mặt hàng"
                 required
                 hint="Chưa có trong danh mục thì gõ tên rồi bấm Thêm mới."
-                value={dang.matHangId}
-                onChange={(v) => set("matHangId", v)}
+                value={dang.productId}
+                onChange={(v) => set("productId", v)}
                 options={optMatHang}
                 onCreate={themMatHang}
                 emptyText="Chưa có mặt hàng nào trong danh mục."
@@ -924,8 +924,8 @@ export default function BanHangScreen() {
                 hint="Size/grade của thành phẩm. VD: 18-20, 1000-1300."
               >
                 <Input
-                  value={dang.quyCach}
-                  onChange={(e) => set("quyCach", e.target.value)}
+                  value={dang.spec}
+                  onChange={(e) => set("spec", e.target.value)}
                   placeholder="VD: 18-20"
                 />
               </Field>
@@ -935,14 +935,14 @@ export default function BanHangScreen() {
                   label="Lượng"
                   required
                   unit="kg"
-                  value={dang.luongKg || null}
-                  onChange={(v) => set("luongKg", v ?? 0)}
+                  value={dang.quantityKg || null}
+                  onChange={(v) => set("quantityKg", v ?? 0)}
                 />
                 <NumberField
                   label="Đơn giá"
                   unit={donViGia}
-                  value={dang.donGia}
-                  onChange={(v) => set("donGia", v)}
+                  value={dang.unitPrice}
+                  onChange={(v) => set("unitPrice", v)}
                   hint="Bỏ trống nếu chưa chốt giá."
                 />
               </div>

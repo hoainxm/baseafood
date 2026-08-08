@@ -1,22 +1,22 @@
 import { useMemo, useState } from "react";
 import type {
-  ChotNgay,
-  ChuyenNhap,
-  DongNhapNL,
-  DongPheLieu,
-  PhanXuong,
-  Loai,
+  DailyLock,
+  ImportShipment,
+  MaterialImportItem,
+  ScrapItem,
+  Workshop,
+  Category,
 } from "@/types";
-import { LOAI, laGhiBu, thanhTien } from "@/types";
+import { CATEGORIES, isBackdatedImport, calculateImportAmount } from "@/types";
 import { newId } from "@/lib/store";
 import { uid } from "@/lib/db";
 import {
-  useChotNgay,
-  useChuyenNhap,
-  useDaiLy,
-  useLoaiNL,
-  useNhapNL,
-  usePheLieu,
+  useDailyLocks,
+  useImportShipments,
+  useSuppliers,
+  useMaterialTypes,
+  useMaterialImports,
+  useScraps,
 } from "@/lib/danhMuc";
 import {
   Badge,
@@ -60,38 +60,38 @@ import {
   Truck,
   X,
 } from "lucide-react";
-import PhieuNLNgay from "@/features/PhieuNLNgay";
+import PhieuNLNgay from "@/features/nhap-hang/PhieuNLNgay";
 
-const PHAN_XUONG: PhanXuong[] = ["Đông", "Cá", "Khô"];
+const PHAN_XUONG: Workshop[] = ["Đông", "Cá", "Khô"];
 
 /** Loại phế liệu hay gặp — vẫn thêm mới tại chỗ được. */
 const PHE_LIEU_GOI_Y = ["Nội tạng", "Dạt"];
 
 /** Đầu chuyến đang nhập — dùng chung cho mọi dòng loại hàng trong chuyến. */
 interface DauChuyen {
-  ngayGiao: string;
-  ngayGhiSo: string;
-  lyDoGhiBu: string;
-  phanXuong: PhanXuong;
-  daiLy: string;
-  taiXe: string;
-  bienSoXe: string;
-  ghiChu: string;
+  deliveryDate: string;
+  postingDate: string;
+  backdateReason: string;
+  workshop: Workshop;
+  supplierName: string;
+  driverName: string;
+  licensePlate: string;
+  note: string;
 }
 
 /** Một dòng loại hàng đang nhập trong chuyến. */
 interface DongMoi {
-  loai: Loai;
-  loaiNL: string;
-  soLuongKg: number;
-  donGia: number | null;
+  category: Category;
+  materialTypeName: string;
+  quantityKg: number;
+  unitPrice: number | null;
 }
 
 const DONG_MOI_RONG: DongMoi = {
-  loai: "Bạch tuộc",
-  loaiNL: "",
-  soLuongKg: 0,
-  donGia: null,
+  category: "Bạch tuộc",
+  materialTypeName: "",
+  quantityKg: 0,
+  unitPrice: null,
 };
 
 /**
@@ -102,60 +102,63 @@ const DONG_MOI_RONG: DongMoi = {
  */
 interface NhomChuyen {
   khoa: string;
-  chuyen: ChuyenNhap | null;
-  ngayGiao: string;
-  ngayGhiSo: string;
-  lyDoGhiBu: string;
-  phanXuong: PhanXuong;
-  daiLy: string;
-  taiXe: string;
-  bienSoXe: string;
-  ghiChu: string;
-  dong: DongNhapNL[];
+  chuyen: ImportShipment | null;
+  deliveryDate: string;
+  postingDate: string;
+  backdateReason: string;
+  workshop: Workshop;
+  supplierName: string;
+  driverName: string;
+  licensePlate: string;
+  note: string;
+  dong: MaterialImportItem[];
   tongKg: number;
   tongTien: number;
   ghiBu: boolean;
 }
 
-function gomChuyen(rows: DongNhapNL[], chuyen: ChuyenNhap[]): NhomChuyen[] {
+function gomChuyen(
+  rows: MaterialImportItem[],
+  chuyen: ImportShipment[]
+): NhomChuyen[] {
   const theoId = new Map(chuyen.map((c) => [c.id, c]));
   const nhoms = new Map<string, NhomChuyen>();
 
   for (const r of rows) {
-    const c = r.chuyenId ? theoId.get(r.chuyenId) : undefined;
+    const c = r.shipmentId ? theoId.get(r.shipmentId) : undefined;
     const khoa = c
       ? c.id
-      : `ngam|${r.ngay}|${r.phanXuong}|${r.daiLy}|${r.taiXe}|${r.bienSoXe}`;
+      : `ngam|${r.deliveryDate}|${r.workshop}|${r.supplierName}|${r.driverName}|${r.licensePlate}`;
     let nhom = nhoms.get(khoa);
     if (!nhom) {
       nhom = {
         khoa,
         chuyen: c ?? null,
-        ngayGiao: c?.ngayGiao ?? r.ngay,
-        ngayGhiSo: c?.ngayGhiSo ?? r.ngay,
-        lyDoGhiBu: c?.lyDoGhiBu ?? "",
-        phanXuong: c?.phanXuong ?? r.phanXuong,
-        daiLy: c?.daiLy ?? r.daiLy,
-        taiXe: c?.taiXe ?? r.taiXe,
-        bienSoXe: c?.bienSoXe ?? r.bienSoXe,
-        ghiChu: c?.ghiChu ?? r.ghiChu,
+        deliveryDate: c?.deliveryDate ?? r.deliveryDate,
+        postingDate: c?.postingDate ?? r.deliveryDate,
+        backdateReason: c?.backdateReason ?? "",
+        workshop: c?.workshop ?? r.workshop,
+        supplierName: c?.supplierName ?? r.supplierName,
+        driverName: c?.driverName ?? r.driverName,
+        licensePlate: c?.licensePlate ?? r.licensePlate,
+        note: c?.note ?? r.note,
         dong: [],
         tongKg: 0,
         tongTien: 0,
         ghiBu: false,
       };
-      nhom.ghiBu = laGhiBu(nhom);
+      nhom.ghiBu = isBackdatedImport(nhom);
       nhoms.set(khoa, nhom);
     }
     nhom.dong.push(r);
-    nhom.tongKg += r.soLuongKg || 0;
-    nhom.tongTien += thanhTien(r);
+    nhom.tongKg += r.quantityKg || 0;
+    nhom.tongTien += calculateImportAmount(r);
   }
 
   return [...nhoms.values()].sort(
     (a, b) =>
-      a.ngayGiao.localeCompare(b.ngayGiao) ||
-      a.daiLy.localeCompare(b.daiLy, "vi") ||
+      a.deliveryDate.localeCompare(b.deliveryDate) ||
+      a.supplierName.localeCompare(b.supplierName, "vi") ||
       a.khoa.localeCompare(b.khoa)
   );
 }
@@ -163,15 +166,15 @@ function gomChuyen(rows: DongNhapNL[], chuyen: ChuyenNhap[]): NhomChuyen[] {
 /** Kiểm tra đầu chuyến — dùng chung cho lúc ghi mới và lúc sửa. */
 function loiDauChuyen(d: DauChuyen, daChot: boolean): LoiNhap[] {
   const ls: LoiNhap[] = [];
-  if (!d.daiLy.trim())
+  if (!d.supplierName.trim())
     ls.push({ truong: "Đại lý", thongBao: "Chưa chọn đại lý giao hàng" });
-  if (d.ngayGhiSo < d.ngayGiao)
+  if (d.postingDate < d.deliveryDate)
     ls.push({
       truong: "Ngày ghi sổ",
       thongBao: "Ngày ghi sổ không thể trước ngày hàng về xưởng",
     });
-  const canLyDo = laGhiBu(d) || daChot;
-  if (canLyDo && !d.lyDoGhiBu.trim())
+  const canLyDo = isBackdatedImport(d) || daChot;
+  if (canLyDo && !d.backdateReason.trim())
     ls.push({
       truong: "Lý do ghi bù",
       thongBao: daChot
@@ -183,24 +186,24 @@ function loiDauChuyen(d: DauChuyen, daChot: boolean): LoiNhap[] {
 
 export default function NhapNguyenLieuScreen() {
   // kỳ xem sổ: ngày/tuần/tháng/năm/khoảng tự chọn
-  const [rows, persist] = useNhapNL();
-  const [chuyen, persistChuyen] = useChuyenNhap();
-  const [chot, persistChot] = useChotNgay();
-  const [pheLieu, persistPheLieu] = usePheLieu();
+  const [rows, persist] = useMaterialImports();
+  const [chuyen, persistChuyen] = useImportShipments();
+  const [chot, persistChot] = useDailyLocks();
+  const [pheLieu, persistPheLieu] = useScraps();
 
   const [ky, setKy] = useState<KyXem>("ngay");
   const [ngay, setNgay] = useState(todayISO()); // ngày neo cho ngày/tuần/tháng/năm
   const [tuNgay, setTuNgay] = useState(todayISO());
   const [denNgay, setDenNgay] = useState(todayISO());
-  const [phanXuong, setPhanXuong] = useState<PhanXuong | "Tất cả">("Đông");
+  const [phanXuong, setPhanXuong] = useState<Workshop | "Tất cả">("Đông");
   const [locDaiLy, setLocDaiLy] = useState("");
   const [locLoaiNL, setLocLoaiNL] = useState("");
   const [locGia, setLocGia] = useState<"tat-ca" | "thieu-gia">("tat-ca");
   const [moLocThem, setMoLocThem] = useState(false);
   const [xemPhieu, setXemPhieu] = useState(false);
 
-  const [daiLy, setDaiLy] = useDaiLy();
-  const [loaiNL, setLoaiNL] = useLoaiNL();
+  const [daiLy, setDaiLy] = useSuppliers();
+  const [loaiNL, setLoaiNL] = useMaterialTypes();
 
   /* Ghi chuyến: bước 1 điền đầu chuyến, bước 2 đổ từng loại hàng. */
   const [phien, setPhien] = useState<DauChuyen | null>(null);
@@ -214,7 +217,7 @@ export default function NhapNguyenLieuScreen() {
   const [suaRowIds, setSuaRowIds] = useState<string[] | null>(null);
 
   /* Sửa MỘT dòng hàng — chỉ loại / loài / kg / giá */
-  const [dang, setDang] = useState<DongNhapNL | null>(null);
+  const [dang, setDang] = useState<MaterialImportItem | null>(null);
   const [loi, setLoi] = useState<LoiNhap[]>([]);
 
   /* Chốt ngày */
@@ -233,15 +236,18 @@ export default function NhapNguyenLieuScreen() {
     () =>
       rows
         .filter((r) => {
-          const hopNgay = r.ngay >= tuHieuLuc && r.ngay <= denHieuLuc;
-          const hopXuong = phanXuong === "Tất cả" || r.phanXuong === phanXuong;
-          const hopDaiLy = !locDaiLy || r.daiLy === locDaiLy;
-          const hopLoai = !locLoaiNL || r.loaiNL === locLoaiNL;
-          const hopGia = locGia === "tat-ca" || r.donGia == null;
+          const hopNgay =
+            r.deliveryDate >= tuHieuLuc && r.deliveryDate <= denHieuLuc;
+          const hopXuong = phanXuong === "Tất cả" || r.workshop === phanXuong;
+          const hopDaiLy = !locDaiLy || r.supplierName === locDaiLy;
+          const hopLoai = !locLoaiNL || r.materialTypeName === locLoaiNL;
+          const hopGia = locGia === "tat-ca" || r.unitPrice == null;
           return hopNgay && hopXuong && hopDaiLy && hopLoai && hopGia;
         })
         .sort(
-          (a, b) => a.ngay.localeCompare(b.ngay) || a.id.localeCompare(b.id)
+          (a, b) =>
+            a.deliveryDate.localeCompare(b.deliveryDate) ||
+            a.id.localeCompare(b.id)
         ),
     [rows, tuHieuLuc, denHieuLuc, phanXuong, locDaiLy, locLoaiNL, locGia]
   );
@@ -250,22 +256,22 @@ export default function NhapNguyenLieuScreen() {
 
   /** Ngày / xưởng mặc định khi ghi chuyến mới — theo bộ lọc đang xem. */
   const ngayGhi = laMotNgay ? tuHieuLuc : denHieuLuc;
-  const xuongGhi: PhanXuong = phanXuong === "Tất cả" ? "Đông" : phanXuong;
+  const xuongGhi: Workshop = phanXuong === "Tất cả" ? "Đông" : phanXuong;
 
   const moTaPhamVi = laMotNgay
     ? viDate(tuHieuLuc)
     : `${viDate(tuHieuLuc)} – ${viDate(denHieuLuc)}`;
 
   const tong = useMemo(
-    () => view.reduce((s, r) => s + (r.soLuongKg || 0), 0),
+    () => view.reduce((s, r) => s + (r.quantityKg || 0), 0),
     [view]
   );
   const tongTien = useMemo(
-    () => view.reduce((s, r) => s + thanhTien(r), 0),
+    () => view.reduce((s, r) => s + calculateImportAmount(r), 0),
     [view]
   );
   const soThieuGia = useMemo(
-    () => view.filter((r) => r.donGia == null).length,
+    () => view.filter((r) => r.unitPrice == null).length,
     [view]
   );
 
@@ -276,17 +282,17 @@ export default function NhapNguyenLieuScreen() {
   /* ---- Chốt ngày ---- */
 
   /** Bản ghi chốt của một (ngày + xưởng) — kể cả bản đã mở lại. */
-  const banGhiChot = (n: string, x: PhanXuong): ChotNgay | undefined =>
-    chot.find((c) => c.ngay === n && c.phanXuong === x);
+  const banGhiChot = (n: string, x: Workshop): DailyLock | undefined =>
+    chot.find((c) => c.lockDate === n && c.workshop === x);
 
-  const daChot = (n: string, x: PhanXuong): boolean =>
-    Boolean(banGhiChot(n, x)?.daChot);
+  const daChot = (n: string, x: Workshop): boolean =>
+    Boolean(banGhiChot(n, x)?.isLocked);
 
   /** Tổng kg thực tế của một (ngày + xưởng), không phụ thuộc bộ lọc đang xem. */
-  const tongNgayXuong = (n: string, x: PhanXuong): number =>
+  const tongNgayXuong = (n: string, x: Workshop): number =>
     rows
-      .filter((r) => r.ngay === n && r.phanXuong === x)
-      .reduce((s, r) => s + (r.soLuongKg || 0), 0);
+      .filter((r) => r.deliveryDate === n && r.workshop === x)
+      .reduce((s, r) => s + (r.quantityKg || 0), 0);
 
   /* Thanh chốt chỉ có nghĩa khi đang xem MỘT ngày của MỘT xưởng. */
   const xemMotNgayMotXuong = laMotNgay && phanXuong !== "Tất cả";
@@ -294,22 +300,22 @@ export default function NhapNguyenLieuScreen() {
   const chotHienTai = xemMotNgayMotXuong
     ? banGhiChot(tuHieuLuc, xuongDangXem)
     : undefined;
-  const dangKhoa = Boolean(chotHienTai?.daChot);
+  const dangKhoa = Boolean(chotHienTai?.isLocked);
   const tongThucTe = xemMotNgayMotXuong
     ? tongNgayXuong(tuHieuLuc, xuongDangXem)
     : 0;
   const lechSauChot =
-    chotHienTai?.daChot && tongThucTe !== chotHienTai.tongKgLucChot
-      ? tongThucTe - chotHienTai.tongKgLucChot
+    chotHienTai?.isLocked && tongThucTe !== chotHienTai.totalKgAtLock
+      ? tongThucTe - chotHienTai.totalKgAtLock
       : 0;
 
   /* ---- Danh mục: chọn sẵn, thiếu thì tạo ngay tại chỗ ----
      Lưu theo TÊN (không phải id) để dữ liệu cũ trong localStorage vẫn đọc được. */
 
   const optDaiLy: MucChon[] = daiLy.map((d) => ({
-    value: d.ten,
-    label: d.ten,
-    phu: d.dienThoai || undefined,
+    value: d.shortName,
+    label: d.shortName,
+    phu: d.phone || undefined,
   }));
 
   const themDaiLy = (ten: string) => {
@@ -317,15 +323,15 @@ export default function NhapNguyenLieuScreen() {
       ...daiLy,
       {
         id: uid(),
-        ma: "",
-        ten,
-        tenGhiPhieu: "",
-        diaChi: "",
-        cmnd: "",
-        ngayCap: "",
-        noiCap: "",
-        dienThoai: "",
-        ghiChu: "",
+        code: "",
+        shortName: ten,
+        billingName: "",
+        address: "",
+        nationalId: "",
+        issuedDate: "",
+        issuedPlace: "",
+        phone: "",
+        note: "",
       },
     ]);
     notify.daLuu(`Đã thêm đại lý "${ten}" vào danh mục`);
@@ -334,20 +340,24 @@ export default function NhapNguyenLieuScreen() {
 
   /** Tất cả loại NL — dùng cho BỘ LỌC (xem theo loại, không ràng loài). */
   const optLoaiNL: MucChon[] = loaiNL.map((l) => ({
-    value: l.ten,
-    label: l.ten,
-    phu: l.loai || undefined,
+    value: l.name,
+    label: l.name,
+    phu: l.category || undefined,
   }));
 
   /** Loại NL lọc theo loài: mục chưa gán loài (loai rỗng) hiện cho mọi loài;
       mục đã gán chỉ hiện đúng loài đang chọn. Chọn loài trước, loại NL sau. */
   const optLoaiNLTheoLoai = (loai: string): MucChon[] =>
     loaiNL
-      .filter((l) => !l.loai || l.loai === loai)
-      .map((l) => ({ value: l.ten, label: l.ten, phu: l.loai || undefined }));
+      .filter((l) => !l.category || l.category === loai)
+      .map((l) => ({
+        value: l.name,
+        label: l.name,
+        phu: l.category || undefined,
+      }));
 
   const themLoaiNL = (ten: string, loai = "") => {
-    setLoaiNL([...loaiNL, { id: uid(), ten, loai, ghiChu: "" }]);
+    setLoaiNL([...loaiNL, { id: uid(), name: ten, category: loai, note: "" }]);
     notify.daLuu(`Đã thêm loại nguyên liệu "${ten}" vào danh mục`);
     return ten;
   };
@@ -356,14 +366,14 @@ export default function NhapNguyenLieuScreen() {
 
   const moThem = () => {
     setPhien({
-      ngayGiao: ngayGhi,
-      ngayGhiSo: todayISO(),
-      lyDoGhiBu: "",
-      phanXuong: xuongGhi,
-      daiLy: "",
-      taiXe: "",
-      bienSoXe: "",
-      ghiChu: "",
+      deliveryDate: ngayGhi,
+      postingDate: todayISO(),
+      backdateReason: "",
+      workshop: xuongGhi,
+      supplierName: "",
+      driverName: "",
+      licensePlate: "",
+      note: "",
     });
     setChuyenIdPhien(null);
     setSuaRowIds(null);
@@ -375,14 +385,14 @@ export default function NhapNguyenLieuScreen() {
   /** Mở lại một chuyến đã ghi để sửa — dùng CHUNG dialog với ghi chuyến mới. */
   const moSuaChuyen = (n: NhomChuyen) => {
     setPhien({
-      ngayGiao: n.ngayGiao,
-      ngayGhiSo: n.ngayGhiSo || n.ngayGiao,
-      lyDoGhiBu: n.lyDoGhiBu,
-      phanXuong: n.phanXuong,
-      daiLy: n.daiLy,
-      taiXe: n.taiXe,
-      bienSoXe: n.bienSoXe,
-      ghiChu: n.ghiChu,
+      deliveryDate: n.deliveryDate,
+      postingDate: n.postingDate || n.deliveryDate,
+      backdateReason: n.backdateReason,
+      workshop: n.workshop,
+      supplierName: n.supplierName,
+      driverName: n.driverName,
+      licensePlate: n.licensePlate,
+      note: n.note,
     });
     setChuyenIdPhien(n.chuyen?.id ?? null);
     setSuaRowIds(n.dong.map((r) => r.id));
@@ -397,18 +407,18 @@ export default function NhapNguyenLieuScreen() {
   /** Dòng đã ghi trong chuyến đang mở (tạo mới: theo chuyenId; sửa: theo id-set). */
   const dongPhien = useMemo(() => {
     if (suaRowIds) return rows.filter((r) => suaRowIds.includes(r.id));
-    if (chuyenIdPhien) return rows.filter((r) => r.chuyenId === chuyenIdPhien);
+    if (chuyenIdPhien) return rows.filter((r) => r.shipmentId === chuyenIdPhien);
     return [];
   }, [rows, suaRowIds, chuyenIdPhien]);
 
   /** Đang sửa chuyến đã ghi (khác với tạo chuyến mới). */
   const dangSuaChuyen = suaRowIds !== null;
-  const tongChuyen = dongPhien.reduce((s, r) => s + (r.soLuongKg || 0), 0);
+  const tongChuyen = dongPhien.reduce((s, r) => s + (r.quantityKg || 0), 0);
   const tongNgayPhien = phien
-    ? tongNgayXuong(phien.ngayGiao, phien.phanXuong)
+    ? tongNgayXuong(phien.deliveryDate, phien.workshop)
     : 0;
   const chotPhien = phien
-    ? daChot(phien.ngayGiao, phien.phanXuong)
+    ? daChot(phien.deliveryDate, phien.workshop)
     : false;
 
   const setDong = <K extends keyof DongMoi>(k: K, v: DongMoi[K]) =>
@@ -420,9 +430,9 @@ export default function NhapNguyenLieuScreen() {
     // Đầu chuyến giờ sửa tại chỗ cùng màn đổ hàng (gộp một bước) → kiểm luôn
     // đầu chuyến ở đây, tránh tạo chuyến thiếu đại lý / sai ngày.
     const ls: LoiNhap[] = [...loiDauChuyen(phien, chotPhien)];
-    if (!dongMoi.loaiNL.trim())
+    if (!dongMoi.materialTypeName.trim())
       ls.push({ truong: "Loại nguyên liệu", thongBao: "Chưa chọn loại hàng" });
-    if (!(dongMoi.soLuongKg > 0))
+    if (!(dongMoi.quantityKg > 0))
       ls.push({ truong: "Số lượng", thongBao: "Phải lớn hơn 0 kg" });
     setLoiPhien(ls);
     if (ls.length > 0) return;
@@ -446,64 +456,65 @@ export default function NhapNguyenLieuScreen() {
       setChuyenIdPhien(idChuyen);
     }
 
-    const dong: DongNhapNL = {
+    const dong: MaterialImportItem = {
       id: newId(),
-      chuyenId: idChuyen ?? "",
-      ngay: phien.ngayGiao,
-      phanXuong: phien.phanXuong,
-      loai: dongMoi.loai,
-      daiLy: phien.daiLy,
-      loaiNL: dongMoi.loaiNL,
-      soLuongKg: dongMoi.soLuongKg,
-      donGia: dongMoi.donGia,
-      taiXe: phien.taiXe,
-      bienSoXe: phien.bienSoXe,
-      ghiChu: phien.ghiChu,
+      shipmentId: idChuyen ?? "",
+      deliveryDate: phien.deliveryDate,
+      workshop: phien.workshop,
+      category: dongMoi.category,
+      supplierName: phien.supplierName,
+      materialTypeName: dongMoi.materialTypeName,
+      quantityKg: dongMoi.quantityKg,
+      unitPrice: dongMoi.unitPrice,
+      driverName: phien.driverName,
+      licensePlate: phien.licensePlate,
+      note: phien.note,
     };
     // Đồng bộ đầu chuyến cho MỌI dòng của chuyến (đại lý/ngày/xe có thể vừa đổi
     // tại chỗ) rồi thêm dòng mới — một lần persist, đúng bất biến "sửa đầu chuyến
     // áp cho cả chuyến". Nhóm theo id-set khi sửa, theo chuyenId khi tạo mới.
-    const thuocChuyen = (r: DongNhapNL) =>
-      suaRowIds ? suaRowIds.includes(r.id) : r.chuyenId === idChuyen;
+    const thuocChuyen = (r: MaterialImportItem) =>
+      suaRowIds ? suaRowIds.includes(r.id) : r.shipmentId === idChuyen;
     persist([
       ...rows.map((r) =>
         thuocChuyen(r)
           ? {
               ...r,
-              ngay: phien.ngayGiao,
-              phanXuong: phien.phanXuong,
-              daiLy: phien.daiLy,
-              taiXe: phien.taiXe,
-              bienSoXe: phien.bienSoXe,
-              ghiChu: phien.ghiChu,
+              deliveryDate: phien.deliveryDate,
+              workshop: phien.workshop,
+              supplierName: phien.supplierName,
+              driverName: phien.driverName,
+              licensePlate: phien.licensePlate,
+              note: phien.note,
             }
           : r
       ),
       dong,
     ]);
     if (suaRowIds) setSuaRowIds([...suaRowIds, dong.id]);
-    notify.daLuu(`Đã vào sổ: ${dong.loaiNL} — ${kg(dong.soLuongKg)}`);
+    notify.daLuu(`Đã vào sổ: ${dong.materialTypeName} — ${kg(dong.quantityKg)}`);
 
     // Ngày đã chốt mà ghi bù → nói ngay tổng ngày lệch bao nhiêu so với lúc chốt.
-    const bg = banGhiChot(phien.ngayGiao, phien.phanXuong);
-    if (bg?.daChot) {
-      const moi = tongNgayXuong(phien.ngayGiao, phien.phanXuong) + dong.soLuongKg;
+    const bg = banGhiChot(phien.deliveryDate, phien.workshop);
+    if (bg?.isLocked) {
+      const moi =
+        tongNgayXuong(phien.deliveryDate, phien.workshop) + dong.quantityKg;
       notify.canhBao(
-        `Ngày ${viDate(phien.ngayGiao)} đã chốt ${kg(bg.tongKgLucChot)} — sau khi ghi bù thành ${kg(moi)}`
+        `Ngày ${viDate(phien.deliveryDate)} đã chốt ${kg(bg.totalKgAtLock)} — sau khi ghi bù thành ${kg(moi)}`
       );
     }
 
     // Giữ loài để đổ tiếp loại sau cho nhanh; xóa loại / kg / giá.
-    setDongMoi((d) => ({ ...DONG_MOI_RONG, loai: d.loai }));
+    setDongMoi((d) => ({ ...DONG_MOI_RONG, category: d.category }));
     setLoiPhien([]);
   };
 
-  const boDongPhien = (r: DongNhapNL) => {
+  const boDongPhien = (r: MaterialImportItem) => {
     const truoc = rows;
     const truocIds = suaRowIds;
     persist(rows.filter((x) => x.id !== r.id));
     if (suaRowIds) setSuaRowIds(suaRowIds.filter((id) => id !== r.id));
-    notify.daXoa(`Đã bỏ ${r.loaiNL} — ${kg(r.soLuongKg)}`, () => {
+    notify.daXoa(`Đã bỏ ${r.materialTypeName} — ${kg(r.quantityKg)}`, () => {
       persist(truoc);
       if (truocIds) setSuaRowIds(truocIds);
     });
@@ -524,19 +535,19 @@ export default function NhapNguyenLieuScreen() {
             c.id === chuyenIdPhien ? { ...c, ...p, id: c.id } : c
           )
         );
-      const thuoc = (r: DongNhapNL) =>
-        suaRowIds ? suaRowIds.includes(r.id) : r.chuyenId === chuyenIdPhien;
+      const thuoc = (r: MaterialImportItem) =>
+        suaRowIds ? suaRowIds.includes(r.id) : r.shipmentId === chuyenIdPhien;
       persist(
         rows.map((r) =>
           thuoc(r)
             ? {
                 ...r,
-                ngay: p.ngayGiao,
-                phanXuong: p.phanXuong,
-                daiLy: p.daiLy,
-                taiXe: p.taiXe,
-                bienSoXe: p.bienSoXe,
-                ghiChu: p.ghiChu,
+                deliveryDate: p.deliveryDate,
+                workshop: p.workshop,
+                supplierName: p.supplierName,
+                driverName: p.driverName,
+                licensePlate: p.licensePlate,
+                note: p.note,
               }
             : r
         )
@@ -544,13 +555,13 @@ export default function NhapNguyenLieuScreen() {
     }
     if (p && dongPhien.length > 0) {
       // Điểm hay mất hàng nhất: ghi ngày ngoài kỳ đang lọc rồi tưởng mất.
-      if (p.ngayGiao < tuHieuLuc || p.ngayGiao > denHieuLuc) {
+      if (p.deliveryDate < tuHieuLuc || p.deliveryDate > denHieuLuc) {
         setKy("ngay");
-        setNgay(p.ngayGiao);
+        setNgay(p.deliveryDate);
       }
-      if (phanXuong !== "Tất cả" && phanXuong !== p.phanXuong)
-        setPhanXuong(p.phanXuong);
-      if (locDaiLy && locDaiLy !== p.daiLy) setLocDaiLy("");
+      if (phanXuong !== "Tất cả" && phanXuong !== p.workshop)
+        setPhanXuong(p.workshop);
+      if (locDaiLy && locDaiLy !== p.supplierName) setLocDaiLy("");
       if (locGia === "thieu-gia") setLocGia("tat-ca");
     }
 
@@ -565,10 +576,10 @@ export default function NhapNguyenLieuScreen() {
       p
         ? {
             ...p,
-            daiLy: "",
-            taiXe: "",
-            bienSoXe: "",
-            ghiChu: "",
+            supplierName: "",
+            driverName: "",
+            licensePlate: "",
+            note: "",
           }
         : null
     );
@@ -589,7 +600,7 @@ export default function NhapNguyenLieuScreen() {
     if (chuyenIdPhien)
       persistChuyen(chuyen.filter((c) => c.id !== chuyenIdPhien));
     notify.daXoa(
-      `Đã xóa chuyến ${phien?.daiLy || ""} — ${suaRowIds.length} dòng`,
+      `Đã xóa chuyến ${phien?.supplierName || ""} — ${suaRowIds.length} dòng`,
       () => {
         persist(truocRows);
         persistChuyen(truocChuyen);
@@ -605,9 +616,9 @@ export default function NhapNguyenLieuScreen() {
   const luu = () => {
     if (!dang) return;
     const ls: LoiNhap[] = [];
-    if (!dang.loaiNL.trim())
+    if (!dang.materialTypeName.trim())
       ls.push({ truong: "Loại nguyên liệu", thongBao: "Chưa chọn loại hàng" });
-    if (!(dang.soLuongKg > 0))
+    if (!(dang.quantityKg > 0))
       ls.push({ truong: "Số lượng", thongBao: "Phải lớn hơn 0 kg" });
     setLoi(ls);
     if (ls.length > 0) return;
@@ -616,22 +627,25 @@ export default function NhapNguyenLieuScreen() {
     setDang(null);
   };
 
-  const set = <K extends keyof DongNhapNL>(k: K, v: DongNhapNL[K]) =>
+  const set = <K extends keyof MaterialImportItem>(
+    k: K,
+    v: MaterialImportItem[K]
+  ) =>
     setDang((d) => (d ? { ...d, [k]: v } : d));
 
   /* ---- Chốt / mở lại ngày ---- */
 
   const chotNgay = () => {
     const bg = banGhiChot(tuHieuLuc, xuongDangXem);
-    const ban: ChotNgay = {
+    const ban: DailyLock = {
       id: bg?.id ?? newId(),
-      ngay: tuHieuLuc,
-      phanXuong: xuongDangXem,
-      daChot: true,
-      chotLuc: new Date().toISOString(),
-      tongKgLucChot: tongThucTe,
-      lyDoMoLai: "",
-      ghiChu: ghiChuChot,
+      lockDate: tuHieuLuc,
+      workshop: xuongDangXem,
+      isLocked: true,
+      lockedAt: new Date().toISOString(),
+      totalKgAtLock: tongThucTe,
+      reopenReason: "",
+      note: ghiChuChot,
     };
     persistChot(
       bg ? chot.map((c) => (c.id === bg.id ? ban : c)) : [...chot, ban]
@@ -654,7 +668,7 @@ export default function NhapNguyenLieuScreen() {
     }
     persistChot(
       chot.map((c) =>
-        c.id === bg.id ? { ...c, daChot: false, lyDoMoLai } : c
+        c.id === bg.id ? { ...c, isLocked: false, reopenReason: lyDoMoLai } : c
       )
     );
     notify.canhBao(
@@ -667,45 +681,45 @@ export default function NhapNguyenLieuScreen() {
 
   /* ---- Cột bảng dòng hàng trong một chuyến ---- */
 
-  const cotDong = (khoaChuyen: boolean): Cot<DongNhapNL>[] => [
+  const cotDong = (khoaChuyen: boolean): Cot<MaterialImportItem>[] => [
     {
-      key: "loaiNL",
+      key: "materialTypeName",
       header: "Loại nguyên liệu",
       chinh: true,
-      render: (r) => r.loaiNL,
-      sapXep: (r) => r.loaiNL,
+      render: (r) => r.materialTypeName,
+      sapXep: (r) => r.materialTypeName,
     },
     {
-      key: "loai",
+      key: "category",
       header: "Loài",
-      render: (r) => <Badge>{r.loai}</Badge>,
-      sapXep: (r) => r.loai,
+      render: (r) => <Badge>{r.category}</Badge>,
+      sapXep: (r) => r.category,
     },
     {
       key: "sl",
       header: "Số lượng (kg)",
       so: true,
-      render: (r) => num(r.soLuongKg),
-      sapXep: (r) => r.soLuongKg,
+      render: (r) => num(r.quantityKg),
+      sapXep: (r) => r.quantityKg,
     },
     {
       key: "gia",
       header: "Đơn giá (đ)",
       so: true,
       render: (r) =>
-        r.donGia != null ? (
-          num(r.donGia)
+        r.unitPrice != null ? (
+          num(r.unitPrice)
         ) : (
           <Badge variant="outline">Chưa có giá</Badge>
         ),
-      sapXep: (r) => r.donGia ?? 0,
+      sapXep: (r) => r.unitPrice ?? 0,
     },
     {
       key: "tien",
       header: "Thành tiền (đ)",
       so: true,
-      render: (r) => num(thanhTien(r)),
-      sapXep: (r) => thanhTien(r),
+      render: (r) => num(calculateImportAmount(r)),
+      sapXep: (r) => calculateImportAmount(r),
     },
     ...(khoaChuyen
       ? [
@@ -713,7 +727,7 @@ export default function NhapNguyenLieuScreen() {
             key: "khoa",
             header: "Trạng thái",
             render: () => <Badge variant="secondary">Đã chốt</Badge>,
-          } as Cot<DongNhapNL>,
+          } as Cot<MaterialImportItem>,
         ]
       : []),
   ];
@@ -776,8 +790,8 @@ export default function NhapNguyenLieuScreen() {
                 label="Khoảng ngày hàng về xưởng"
                 anNhanBatBuoc
                 presets={false}
-                tuNgay={tuNgay}
-                denNgay={denNgay}
+                startDate={tuNgay}
+                endDate={denNgay}
                 onChange={(tu, den) => {
                   setTuNgay(tu);
                   setDenNgay(den);
@@ -811,7 +825,7 @@ export default function NhapNguyenLieuScreen() {
             anNhanBatBuoc
             choPhepXoa={false}
             value={phanXuong}
-            onChange={(v) => setPhanXuong(v as PhanXuong | "Tất cả")}
+            onChange={(v) => setPhanXuong(v as Workshop | "Tất cả")}
             options={[
               ...PHAN_XUONG.map((p) => ({ value: p, label: p })),
               { value: "Tất cả", label: "Tất cả" },
@@ -918,7 +932,7 @@ export default function NhapNguyenLieuScreen() {
         <>
           <div className="space-y-5">
             {nhomView.map((n, i) => {
-              const khoaChuyen = daChot(n.ngayGiao, n.phanXuong);
+              const khoaChuyen = daChot(n.deliveryDate, n.workshop);
               return (
                 <section
                   key={n.khoa}
@@ -931,16 +945,16 @@ export default function NhapNguyenLieuScreen() {
                           Chuyến {i + 1}
                         </span>
                         <span className="text-xl font-semibold text-foreground">
-                          {n.daiLy || "(chưa có đại lý)"}
+                          {n.supplierName || "(chưa có đại lý)"}
                         </span>
                         <span className="text-base text-muted-foreground">
-                          {viDate(n.ngayGiao)} · xưởng {n.phanXuong}
+                          {viDate(n.deliveryDate)} · xưởng {n.workshop}
                         </span>
                       </div>
                       <div className="flex flex-wrap items-center gap-2">
                         {n.ghiBu && (
                           <Badge variant="outline">
-                            Ghi bù {viDate(n.ngayGhiSo)}
+                            Ghi bù {viDate(n.postingDate)}
                           </Badge>
                         )}
                         {khoaChuyen && (
@@ -952,20 +966,20 @@ export default function NhapNguyenLieuScreen() {
                         {!n.chuyen && (
                           <Badge variant="outline">Dữ liệu cũ</Badge>
                         )}
-                        {[n.taiXe, n.bienSoXe].filter(Boolean).length > 0 && (
+                        {[n.driverName, n.licensePlate].filter(Boolean).length > 0 && (
                           <span className="text-base text-muted-foreground">
-                            {[n.taiXe, n.bienSoXe].filter(Boolean).join(" · ")}
+                            {[n.driverName, n.licensePlate].filter(Boolean).join(" · ")}
                           </span>
                         )}
                       </div>
-                      {n.ghiBu && n.lyDoGhiBu && (
+                      {n.ghiBu && n.backdateReason && (
                         <p className="text-base text-muted-foreground">
-                          Lý do ghi bù: {n.lyDoGhiBu}
+                          Lý do ghi bù: {n.backdateReason}
                         </p>
                       )}
-                      {n.ghiChu && (
+                      {n.note && (
                         <p className="text-base text-muted-foreground">
-                          Ghi chú: {n.ghiChu}
+                          Ghi chú: {n.note}
                         </p>
                       )}
                     </div>
@@ -1048,7 +1062,7 @@ export default function NhapNguyenLieuScreen() {
                 {kg(tongThucTe)}
               </span>
               {dangKhoa && chotHienTai
-                ? ` · lúc chốt ${kg(chotHienTai.tongKgLucChot)}`
+                ? ` · lúc chốt ${kg(chotHienTai.totalKgAtLock)}`
                 : ""}
             </span>
             {lechSauChot !== 0 && (
@@ -1112,7 +1126,7 @@ export default function NhapNguyenLieuScreen() {
                     <p className="flex items-start gap-3 rounded-lg bg-accent px-4 py-3 text-base text-accent-foreground">
                       <Lock className="mt-0.5 size-6 shrink-0" aria-hidden />
                       <span>
-                        Ngày {viDate(phien.ngayGiao)} · xưởng {phien.phanXuong}{" "}
+                        Ngày {viDate(phien.deliveryDate)} · xưởng {phien.workshop}{" "}
                         <strong>đã chốt</strong>. Vẫn ghi được nhưng là{" "}
                         <strong>ghi bù</strong> — bắt buộc ghi rõ lý do.
                       </span>
@@ -1135,27 +1149,27 @@ export default function NhapNguyenLieuScreen() {
                       label="Ngày ghi sổ"
                       required
                       info="Ngày ghi vào hệ thống. Khác ngày hàng về ⇒ ghi bù."
-                      value={phien.ngayGhiSo}
-                      onChange={(v) => datPhien("ngayGhiSo", v)}
+                      value={phien.postingDate}
+                      onChange={(v) => datPhien("postingDate", v)}
                     />
                     <DateField
                       label="Ngày hàng về xưởng"
                       required
                       info="Ngày xe đổ hàng thật — mọi tổng hợp tính theo ngày này."
-                      value={phien.ngayGiao}
-                      onChange={(v) => datPhien("ngayGiao", v)}
+                      value={phien.deliveryDate}
+                      onChange={(v) => datPhien("deliveryDate", v)}
                     />
                   </div>
 
-                  {(laGhiBu(phien) || chotPhien) && (
+                  {(isBackdatedImport(phien) || chotPhien) && (
                     <Field
                       label="Lý do ghi bù"
                       required
                       hint="VD: đại lý chưa xuất hóa đơn, 31/7 mới có chứng từ."
                     >
                       <Input
-                        value={phien.lyDoGhiBu}
-                        onChange={(e) => datPhien("lyDoGhiBu", e.target.value)}
+                        value={phien.backdateReason}
+                        onChange={(e) => datPhien("backdateReason", e.target.value)}
                         placeholder="Vì sao tới hôm nay mới ghi?"
                       />
                     </Field>
@@ -1165,8 +1179,8 @@ export default function NhapNguyenLieuScreen() {
                     label="Phân xưởng"
                     required
                     choPhepXoa={false}
-                    value={phien.phanXuong}
-                    onChange={(v) => datPhien("phanXuong", v as PhanXuong)}
+                    value={phien.workshop}
+                    onChange={(v) => datPhien("workshop", v as Workshop)}
                     options={PHAN_XUONG.map((p) => ({ value: p, label: p }))}
                   />
 
@@ -1174,8 +1188,8 @@ export default function NhapNguyenLieuScreen() {
                     label="Đại lý giao hàng"
                     required
                     hint="Chọn trong danh mục. Chưa có thì gõ tên rồi bấm Thêm mới."
-                    value={phien.daiLy}
-                    onChange={(v) => datPhien("daiLy", v)}
+                    value={phien.supplierName}
+                    onChange={(v) => datPhien("supplierName", v)}
                     options={optDaiLy}
                     onCreate={themDaiLy}
                     emptyText="Chưa có đại lý nào trong danh mục."
@@ -1199,16 +1213,16 @@ export default function NhapNguyenLieuScreen() {
                         <div className="grid gap-5 sm:grid-cols-2">
                           <Field label="Tài xế">
                             <Input
-                              value={phien.taiXe}
-                              onChange={(e) => datPhien("taiXe", e.target.value)}
+                              value={phien.driverName}
+                              onChange={(e) => datPhien("driverName", e.target.value)}
                               placeholder="Tên tài xế"
                             />
                           </Field>
                           <Field label="Biển số xe">
                             <Input
-                              value={phien.bienSoXe}
+                              value={phien.licensePlate}
                               onChange={(e) =>
-                                datPhien("bienSoXe", e.target.value)
+                                datPhien("licensePlate", e.target.value)
                               }
                               placeholder="VD: 86C 19555"
                             />
@@ -1216,8 +1230,8 @@ export default function NhapNguyenLieuScreen() {
                         </div>
                         <Field label="Ghi chú">
                           <Input
-                            value={phien.ghiChu}
-                            onChange={(e) => datPhien("ghiChu", e.target.value)}
+                            value={phien.note}
+                            onChange={(e) => datPhien("note", e.target.value)}
                             placeholder="Ghi chú thêm (nếu có)"
                           />
                         </Field>
@@ -1245,15 +1259,15 @@ export default function NhapNguyenLieuScreen() {
                               <span className="tnum text-muted-foreground">
                                 {i + 1}.
                               </span>{" "}
-                              {r.loaiNL} —{" "}
+                              {r.materialTypeName} —{" "}
                               <span className="tnum font-semibold">
-                                {num(r.soLuongKg)}
+                                {num(r.quantityKg)}
                               </span>{" "}
                               kg
-                              {r.donGia != null ? (
+                              {r.unitPrice != null ? (
                                 <span className="text-muted-foreground">
                                   {" "}
-                                  · {num(r.donGia)} đ
+                                  · {num(r.unitPrice)} đ
                                 </span>
                               ) : (
                                 <span className="text-muted-foreground">
@@ -1297,22 +1311,22 @@ export default function NhapNguyenLieuScreen() {
                       label="Loài"
                       required
                       choPhepXoa={false}
-                      value={dongMoi.loai}
+                      value={dongMoi.category}
                       onChange={(v) => {
-                        setDong("loai", v as Loai);
-                        setDong("loaiNL", "");
+                        setDong("category", v as Category);
+                        setDong("materialTypeName", "");
                       }}
-                      options={LOAI.map((l) => ({ value: l, label: l }))}
+                      options={CATEGORIES.map((l) => ({ value: l, label: l }))}
                     />
 
                     <Combobox
                       label="Loại nguyên liệu"
                       required
                       hint="Chọn loài trước — danh sách chỉ hiện loại của loài đó."
-                      value={dongMoi.loaiNL}
-                      onChange={(v) => setDong("loaiNL", v)}
-                      options={optLoaiNLTheoLoai(dongMoi.loai)}
-                      onCreate={(ten) => themLoaiNL(ten, dongMoi.loai)}
+                      value={dongMoi.materialTypeName}
+                      onChange={(v) => setDong("materialTypeName", v)}
+                      options={optLoaiNLTheoLoai(dongMoi.category)}
+                      onCreate={(ten) => themLoaiNL(ten, dongMoi.category)}
                     />
 
                     <div className="grid gap-6 sm:grid-cols-2">
@@ -1320,23 +1334,23 @@ export default function NhapNguyenLieuScreen() {
                         label="Số lượng"
                         required
                         unit="kg"
-                        value={dongMoi.soLuongKg || null}
-                        onChange={(v) => setDong("soLuongKg", v ?? 0)}
+                        value={dongMoi.quantityKg || null}
+                        onChange={(v) => setDong("quantityKg", v ?? 0)}
                       />
                       <NumberField
                         label="Đơn giá"
                         unit="đ"
-                        value={dongMoi.donGia}
-                        onChange={(v) => setDong("donGia", v)}
+                        value={dongMoi.unitPrice}
+                        onChange={(v) => setDong("unitPrice", v)}
                         hint="Bỏ trống nếu chưa chốt giá / chưa có hóa đơn."
                       />
                     </div>
 
-                    {dongMoi.soLuongKg > 0 && dongMoi.donGia ? (
+                    {dongMoi.quantityKg > 0 && dongMoi.unitPrice ? (
                       <div className="rounded-lg bg-accent px-4 py-3 text-base text-accent-foreground">
                         Thành tiền:{" "}
                         <span className="tnum text-lg font-semibold">
-                          {num(dongMoi.soLuongKg * dongMoi.donGia)} đ
+                          {num(dongMoi.quantityKg * dongMoi.unitPrice)} đ
                         </span>
                       </div>
                     ) : null}
@@ -1350,8 +1364,8 @@ export default function NhapNguyenLieuScreen() {
                   {/* Tổng ngày — như "TỔNG CỘNG" cuối sổ giấy */}
                   <div className="flex flex-wrap items-baseline justify-end gap-x-8 gap-y-2 rounded-xl bg-muted px-5 py-4">
                     <span className="text-base text-muted-foreground">
-                      Tổng ngày {viDate(phien.ngayGiao)} · xưởng{" "}
-                      {phien.phanXuong}
+                      Tổng ngày {viDate(phien.deliveryDate)} · xưởng{" "}
+                      {phien.workshop}
                     </span>
                     <span className="tnum text-2xl font-semibold">
                       {kg(tongNgayPhien)}
@@ -1363,7 +1377,7 @@ export default function NhapNguyenLieuScreen() {
           <DialogFooter>
             {dangSuaChuyen ? (
               <ConfirmDelete
-                moTaBanGhi={`Chuyến ${phien?.daiLy || "(chưa có đại lý)"} — ${viDate(phien?.ngayGiao ?? "")} — ${dongPhien.length} dòng — ${kg(tongChuyen)}`}
+                moTaBanGhi={`Chuyến ${phien?.supplierName || "(chưa có đại lý)"} — ${viDate(phien?.deliveryDate ?? "")} — ${dongPhien.length} dòng — ${kg(tongChuyen)}`}
                 onConfirm={xoaChuyenDangSua}
                 tieuDe="Xóa cả chuyến này?"
                 nhanNut="Xóa chuyến"
@@ -1408,7 +1422,7 @@ export default function NhapNguyenLieuScreen() {
               <div className="rounded-xl bg-muted px-5 py-4">
                 <p className="text-base text-muted-foreground">Thuộc chuyến</p>
                 <p className="text-lg font-semibold text-foreground">
-                  {viDate(dang.ngay)} · xưởng {dang.phanXuong} · {dang.daiLy}
+                  {viDate(dang.deliveryDate)} · xưởng {dang.workshop} · {dang.supplierName}
                 </p>
               </div>
 
@@ -1416,22 +1430,22 @@ export default function NhapNguyenLieuScreen() {
                 label="Loài"
                 required
                 choPhepXoa={false}
-                value={dang.loai}
+                value={dang.category}
                 onChange={(v) => {
-                  set("loai", v as Loai);
-                  set("loaiNL", "");
+                  set("category", v as Category);
+                  set("materialTypeName", "");
                 }}
-                options={LOAI.map((l) => ({ value: l, label: l }))}
+                options={CATEGORIES.map((l) => ({ value: l, label: l }))}
               />
 
               <Combobox
                 label="Loại nguyên liệu"
                 required
                 hint="Chọn loài trước — danh sách chỉ hiện loại của loài đó."
-                value={dang.loaiNL}
-                onChange={(v) => set("loaiNL", v)}
-                options={optLoaiNLTheoLoai(dang.loai)}
-                onCreate={(ten) => themLoaiNL(ten, dang.loai)}
+                value={dang.materialTypeName}
+                onChange={(v) => set("materialTypeName", v)}
+                options={optLoaiNLTheoLoai(dang.category)}
+                onCreate={(ten) => themLoaiNL(ten, dang.category)}
               />
 
               <div className="grid gap-6 sm:grid-cols-2">
@@ -1439,23 +1453,23 @@ export default function NhapNguyenLieuScreen() {
                   label="Số lượng"
                   required
                   unit="kg"
-                  value={dang.soLuongKg || null}
-                  onChange={(v) => set("soLuongKg", v ?? 0)}
+                  value={dang.quantityKg || null}
+                  onChange={(v) => set("quantityKg", v ?? 0)}
                 />
                 <NumberField
                   label="Đơn giá"
                   unit="đ"
-                  value={dang.donGia}
-                  onChange={(v) => set("donGia", v)}
+                  value={dang.unitPrice}
+                  onChange={(v) => set("unitPrice", v)}
                   hint="Bỏ trống nếu chưa chốt giá / chưa có hóa đơn."
                 />
               </div>
 
-              {dang.soLuongKg > 0 && dang.donGia ? (
+              {dang.quantityKg > 0 && dang.unitPrice ? (
                 <div className="rounded-lg bg-accent px-4 py-3 text-base text-accent-foreground">
                   Thành tiền:{" "}
                   <span className="tnum text-lg font-semibold">
-                    {num(dang.soLuongKg * dang.donGia)} đ
+                    {num(dang.quantityKg * dang.unitPrice)} đ
                   </span>
                 </div>
               ) : null}
@@ -1564,9 +1578,9 @@ export default function NhapNguyenLieuScreen() {
         <PhieuNLNgay
           ky={ky}
           ngay={ngay}
-          tuNgay={tuNgay}
-          denNgay={denNgay}
-          phanXuong={phanXuong}
+          startDate={tuNgay}
+          endDate={denNgay}
+          workshop={phanXuong}
           rows={rows}
           pheLieu={pheLieu}
           onClose={() => setXemPhieu(false)}
@@ -1586,12 +1600,12 @@ function KhoiPheLieuNgay({
   khoa,
 }: {
   ngay: string;
-  phanXuong: PhanXuong;
-  rows: DongPheLieu[];
-  onChange: (n: DongPheLieu[]) => void;
+  phanXuong: Workshop;
+  rows: ScrapItem[];
+  onChange: (n: ScrapItem[]) => void;
   khoa: boolean;
 }) {
-  const [dang, setDang] = useState<DongPheLieu | null>(null);
+  const [dang, setDang] = useState<ScrapItem | null>(null);
   const [laThem, setLaThem] = useState(false);
   const [loi, setLoi] = useState<LoiNhap[]>([]);
 
@@ -1599,14 +1613,14 @@ function KhoiPheLieuNgay({
     () =>
       rows.filter(
         (r) =>
-          r.nguon === "Nhập hàng" && r.ngay === ngay && r.phanXuong === phanXuong
+          r.source === "Nhập hàng" && r.date === ngay && r.workshop === phanXuong
       ),
     [rows, ngay, phanXuong]
   );
 
-  const tongKg = cuaNgay.reduce((s, r) => s + (r.soLuongKg || 0), 0);
+  const tongKg = cuaNgay.reduce((s, r) => s + (r.quantityKg || 0), 0);
   const tongTien = cuaNgay.reduce(
-    (s, r) => s + r.soLuongKg * (r.donGiaBan ?? 0),
+    (s, r) => s + r.quantityKg * (r.sellingPrice ?? 0),
     0
   );
 
@@ -1618,9 +1632,9 @@ function KhoiPheLieuNgay({
   const luu = () => {
     if (!dang) return;
     const ls: LoiNhap[] = [];
-    if (!dang.loai.trim())
+    if (!dang.name.trim())
       ls.push({ truong: "Loại phế liệu", thongBao: "Chưa chọn loại phế liệu" });
-    if (!(dang.soLuongKg > 0))
+    if (!(dang.quantityKg > 0))
       ls.push({ truong: "Số lượng", thongBao: "Phải lớn hơn 0 kg" });
     setLoi(ls);
     if (ls.length > 0) return;
@@ -1629,20 +1643,20 @@ function KhoiPheLieuNgay({
     );
     notify.daLuu(
       laThem
-        ? `Đã ghi phế liệu ${dang.loai} — ${kg(dang.soLuongKg)}`
+        ? `Đã ghi phế liệu ${dang.name} — ${kg(dang.quantityKg)}`
         : "Đã lưu thay đổi"
     );
     if (laThem) {
       // Thêm được NHIỀU loại trong một lần: reset form, giữ hộp thoại mở.
       setDang({
         id: newId(),
-        kyId: "",
-        loai: "",
-        soLuongKg: 0,
-        donGiaBan: null,
-        ngay,
-        phanXuong,
-        nguon: "Nhập hàng",
+        periodId: "",
+        name: "",
+        quantityKg: 0,
+        sellingPrice: null,
+        date: ngay,
+        workshop: phanXuong,
+        source: "Nhập hàng",
       });
       setLoi([]);
     } else {
@@ -1650,45 +1664,45 @@ function KhoiPheLieuNgay({
     }
   };
 
-  const cols: Cot<DongPheLieu>[] = [
+  const cols: Cot<ScrapItem>[] = [
     {
-      key: "loai",
+      key: "category",
       header: "Loại phế liệu",
       chinh: true,
-      render: (r) => r.loai,
-      sapXep: (r) => r.loai,
+      render: (r) => r.name,
+      sapXep: (r) => r.name,
     },
     {
       key: "sl",
       header: "Số lượng (kg)",
       so: true,
-      render: (r) => num(r.soLuongKg),
-      sapXep: (r) => r.soLuongKg,
+      render: (r) => num(r.quantityKg),
+      sapXep: (r) => r.quantityKg,
     },
     {
       key: "gia",
       header: "Đơn giá bán (đ)",
       so: true,
       render: (r) =>
-        r.donGiaBan != null ? (
-          num(r.donGiaBan)
+        r.sellingPrice != null ? (
+          num(r.sellingPrice)
         ) : (
           <Badge variant="outline">Chưa có giá</Badge>
         ),
-      sapXep: (r) => r.donGiaBan ?? 0,
+      sapXep: (r) => r.sellingPrice ?? 0,
     },
     {
       key: "tien",
       header: "Thành tiền (đ)",
       so: true,
-      render: (r) => num(r.soLuongKg * (r.donGiaBan ?? 0)),
-      sapXep: (r) => r.soLuongKg * (r.donGiaBan ?? 0),
+      render: (r) => num(r.quantityKg * (r.sellingPrice ?? 0)),
+      sapXep: (r) => r.quantityKg * (r.sellingPrice ?? 0),
     },
     {
       key: "ky",
       header: "Kỳ cân đối",
       render: (r) =>
-        r.kyId ? (
+        r.periodId ? (
           <Badge variant="secondary">Đã vào kỳ</Badge>
         ) : (
           <Badge variant="outline">Chưa vào kỳ</Badge>
@@ -1722,13 +1736,13 @@ function KhoiPheLieuNgay({
             onClick={() => {
               setDang({
                 id: newId(),
-                kyId: "",
-                loai: "",
-                soLuongKg: 0,
-                donGiaBan: null,
-                ngay,
-                phanXuong,
-                nguon: "Nhập hàng",
+                periodId: "",
+                name: "",
+                quantityKg: 0,
+                sellingPrice: null,
+                date: ngay,
+                workshop: phanXuong,
+                source: "Nhập hàng",
               });
               setLaThem(true);
               setLoi([]);
@@ -1763,11 +1777,11 @@ function KhoiPheLieuNgay({
                     Sửa
                   </Button>
                   <ConfirmDelete
-                    moTaBanGhi={`${r.loai} — ${kg(r.soLuongKg)} — ngày ${viDate(r.ngay)}`}
+                    moTaBanGhi={`${r.name} — ${kg(r.quantityKg)} — ngày ${viDate(r.date)}`}
                     onConfirm={() => {
                       const truoc = rows;
                       onChange(rows.filter((x) => x.id !== r.id));
-                      notify.daXoa(`Đã xóa phế liệu ${r.loai}`, () =>
+                      notify.daXoa(`Đã xóa phế liệu ${r.name}`, () =>
                         onChange(truoc)
                       );
                     }}
@@ -1823,7 +1837,7 @@ function KhoiPheLieuNgay({
                 label="Loại phế liệu"
                 required
                 hint="Chưa có trong danh sách thì gõ tên rồi bấm Thêm mới."
-                value={dang.loai}
+                value={dang.name}
                 onChange={(v) => setDang((d) => (d ? { ...d, loai: v } : d))}
                 options={optLoai}
                 onCreate={(ten) => ten}
@@ -1834,15 +1848,15 @@ function KhoiPheLieuNgay({
                   label="Số lượng"
                   required
                   unit="kg"
-                  value={dang.soLuongKg || null}
+                  value={dang.quantityKg || null}
                   onChange={(v) =>
-                    setDang((d) => (d ? { ...d, soLuongKg: v ?? 0 } : d))
+                    setDang((d) => (d ? { ...d, quantityKg: v ?? 0 } : d))
                   }
                 />
                 <NumberField
                   label="Đơn giá bán"
                   unit="đ"
-                  value={dang.donGiaBan}
+                  value={dang.sellingPrice}
                   onChange={(v) =>
                     setDang((d) => (d ? { ...d, donGiaBan: v } : d))
                   }

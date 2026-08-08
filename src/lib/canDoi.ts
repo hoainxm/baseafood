@@ -1,55 +1,55 @@
-import type { KyCanDoi, DongNLVao, DongPheLieu, DongTP } from "@/types";
+import type { BalancingPeriod, BalancingInputItem, ScrapItem, BalancingOutputItem } from "@/types";
 
-export interface KetQuaCanDoi {
-  tongNLVao: number; // kg
-  giaTriNL: number; // VND
-  tongTP: number; // kg
-  dinhMuc: number; // Tổng NL vào ÷ Tổng TP
-  giaTriXuat: number; // VND (đã quy tỉ giá cho hàng USD)
-  giaThanh: number; // VND
-  laiLo: number; // VND ( + lãi / − lỗ )
-  binhQuanKgNL: number; // giá thành / tổng NL vào
-  tyLeThuHoi: number | null; // Tổng TP ÷ Tổng NL nhận (chỉ số ~0,45)
-  giaTriPheLieu: number; // VND
+export interface BalancingResult {
+  totalInputKg: number; // kg
+  materialValue: number; // VND
+  totalOutputKg: number; // kg
+  norm: number; // totalInputKg ÷ totalOutputKg
+  exportValue: number; // VND (adjusted by exchange rate for USD channels)
+  costOfGoods: number; // VND
+  profitOrLoss: number; // VND ( + profit / − loss )
+  avgCostPerKgMaterial: number; // costOfGoods ÷ totalInputKg
+  yieldRate: number | null; // totalOutputKg ÷ totalInputKg (typically ~0.45)
+  scrapValue: number; // VND
 }
 
-export function tinhCanDoi(
-  ky: KyCanDoi,
-  nlVao: DongNLVao[],
-  pheLieu: DongPheLieu[],
-  tp: DongTP[],
-): KetQuaCanDoi {
-  const tiGia = ky.tiGia ?? 0;
-  const chiPhiCB = ky.chiPhiCB ?? 0;
+export function calculateBalancing(
+  period: BalancingPeriod,
+  inputs: BalancingInputItem[],
+  scraps: ScrapItem[],
+  outputs: BalancingOutputItem[],
+): BalancingResult {
+  const exchangeRate = period.exchangeRate ?? 0;
+  const processingCostPerKg = period.processingCostPerKg ?? 0;
 
-  const tongNLVao = nlVao.reduce((s, r) => s + (r.soLuongKg || 0), 0);
-  const giaTriNL = nlVao.reduce((s, r) => s + r.soLuongKg * (r.donGia ?? 0), 0);
-  const tongTP = tp.reduce((s, r) => s + (r.luongKg || 0), 0);
+  const totalInputKg = inputs.reduce((s, r) => s + (r.quantityKg || 0), 0);
+  const materialValue = inputs.reduce((s, r) => s + r.quantityKg * (r.unitPrice ?? 0), 0);
+  const totalOutputKg = outputs.reduce((s, r) => s + (r.quantityKg || 0), 0);
 
-  const giaTriXuat = tp.reduce((s, r) => {
-    const tien = r.luongKg * (r.donGia ?? 0);
-    return s + (r.kenh === "Xuất khẩu" ? tien * tiGia : tien);
+  const exportValue = outputs.reduce((s, r) => {
+    const amount = r.quantityKg * (r.unitPrice ?? 0);
+    return s + (r.channel === "Xuất khẩu" ? amount * exchangeRate : amount);
   }, 0);
 
-  const giaThanh = tongTP * chiPhiCB + giaTriNL;
-  const laiLo = giaTriXuat - giaThanh;
+  const costOfGoods = totalOutputKg * processingCostPerKg + materialValue;
+  const profitOrLoss = exportValue - costOfGoods;
 
-  const giaTriPheLieu = pheLieu.reduce(
-    (s, r) => s + r.soLuongKg * (r.donGiaBan ?? 0),
+  const scrapValue = scraps.reduce(
+    (s, r) => s + r.quantityKg * (r.sellingPrice ?? 0),
     0,
   );
 
   return {
-    tongNLVao,
-    giaTriNL,
-    tongTP,
-    dinhMuc: tongTP > 0 ? tongNLVao / tongTP : 0,
-    giaTriXuat,
-    giaThanh,
-    laiLo,
-    binhQuanKgNL: tongNLVao > 0 ? giaThanh / tongNLVao : 0,
-    tyLeThuHoi:
-      ky.tongNLNhan && ky.tongNLNhan > 0 ? tongTP / ky.tongNLNhan : null,
-    giaTriPheLieu,
+    totalInputKg,
+    materialValue,
+    totalOutputKg,
+    norm: totalOutputKg > 0 ? totalInputKg / totalOutputKg : 0,
+    exportValue,
+    costOfGoods,
+    profitOrLoss,
+    avgCostPerKgMaterial: totalInputKg > 0 ? costOfGoods / totalInputKg : 0,
+    yieldRate:
+      period.totalInputKg && period.totalInputKg > 0 ? totalOutputKg / period.totalInputKg : null,
+    scrapValue,
   };
 }

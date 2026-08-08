@@ -255,8 +255,8 @@ export function DateField({
  */
 export function DateRangeField({
   label,
-  tuNgay,
-  denNgay,
+  startDate,
+  endDate,
   onChange,
   required,
   hint,
@@ -266,8 +266,8 @@ export function DateRangeField({
   className,
 }: {
   label: string;
-  tuNgay: string;
-  denNgay: string;
+  startDate: string;
+  endDate: string;
   onChange: (tu: string, den: string) => void;
   required?: boolean;
   hint?: string;
@@ -284,7 +284,7 @@ export function DateRangeField({
   };
 
   const soNgay =
-    tuNgay && denNgay ? ngayTrongKhoang(tuNgay, denNgay).length : 0;
+    startDate && endDate ? ngayTrongKhoang(startDate, endDate).length : 0;
 
   return (
     <div className={cn("space-y-2", className)}>
@@ -302,10 +302,10 @@ export function DateRangeField({
             Từ ngày
           </span>
           <NutLich
-            value={tuNgay}
-            onChange={(v) => onChange(v, denNgay && denNgay < v ? v : denNgay)}
+            value={startDate}
+            onChange={(v) => onChange(v, endDate && endDate < v ? v : endDate)}
             chuMacDinh="Chọn ngày đầu"
-            max={denNgay || undefined}
+            max={endDate || undefined}
           />
         </div>
         <div className="space-y-1.5">
@@ -313,10 +313,10 @@ export function DateRangeField({
             Đến ngày
           </span>
           <NutLich
-            value={denNgay}
-            onChange={(v) => onChange(tuNgay, v)}
+            value={endDate}
+            onChange={(v) => onChange(startDate, v)}
             chuMacDinh="Chọn ngày cuối"
-            min={tuNgay || undefined}
+            min={startDate || undefined}
           />
         </div>
       </div>

@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
-import type { DongSanXuat } from "@/types";
-import { useDongLenh, useMatHang, useSanXuat } from "@/lib/danhMuc";
+import type { WipProductionItem } from "@/types";
+import { useExportItems, useProducts, useWipProductions } from "@/lib/danhMuc";
 import { tinhTon, type LoTon } from "@/lib/kho";
 import {
   Badge,
@@ -30,50 +30,50 @@ import { PackageCheck, Snowflake } from "lucide-react";
 const KHO_GOI_Y = ["Kho đông 1", "Kho đông 2", "Kho đông 3"];
 
 interface DuyetForm {
-  sanXuatId: string;
-  kho: string;
+  wipId: string;
+  warehouse: string;
   luongThuc: number;
   blockThuc: number;
-  ghiChu: string;
+  note: string;
 }
 
 export default function KhoDuTruScreen() {
-  const [sanXuat, persistSX] = useSanXuat();
-  const [dongLenh] = useDongLenh();
-  const [matHang] = useMatHang();
+  const [sanXuat, persistSX] = useWipProductions();
+  const [dongLenh] = useExportItems();
+  const [matHang] = useProducts();
 
   const [locKho, setLocKho] = useState("");
   const [duyet, setDuyet] = useState<DuyetForm | null>(null);
   const [loi, setLoi] = useState<LoiNhap[]>([]);
 
-  const tenMH = (id: string) => matHang.find((m) => m.id === id)?.ten || "—";
+  const tenMH = (id: string) => matHang.find((m) => m.id === id)?.name || "—";
 
   const choNhap = useMemo(
-    () => sanXuat.filter((s) => s.trangThai === "cho-nhap"),
+    () => sanXuat.filter((s) => s.status === "cho-nhap"),
     [sanXuat]
   );
   const ton = useMemo(() => tinhTon(sanXuat, dongLenh), [sanXuat, dongLenh]);
 
   const dsKho = useMemo(() => {
     const set = new Set<string>(KHO_GOI_Y);
-    for (const s of sanXuat) if (s.kho) set.add(s.kho);
+    for (const s of sanXuat) if (s.warehouse) set.add(s.warehouse);
     return [...set];
   }, [sanXuat]);
   const optKho: MucChon[] = dsKho.map((k) => ({ value: k, label: k }));
 
   const tonLoc = useMemo(
-    () => ton.filter((t) => (!locKho || t.kho === locKho) && t.conLai > 0),
+    () => ton.filter((t) => (!locKho || t.warehouse === locKho) && t.conLai > 0),
     [ton, locKho]
   );
   const tongTon = tonLoc.reduce((s, t) => s + t.conLai, 0);
 
-  const moDuyet = (s: DongSanXuat) => {
+  const moDuyet = (s: WipProductionItem) => {
     setDuyet({
-      sanXuatId: s.id,
-      kho: s.kho || KHO_GOI_Y[0],
-      luongThuc: s.luongKg,
-      blockThuc: s.soBlock,
-      ghiChu: "",
+      wipId: s.id,
+      warehouse: s.warehouse || KHO_GOI_Y[0],
+      luongThuc: s.quantityKg,
+      blockThuc: s.blocksCount,
+      note: "",
     });
     setLoi([]);
   };
@@ -81,29 +81,29 @@ export default function KhoDuTruScreen() {
   const luuDuyet = () => {
     if (!duyet) return;
     const ls: LoiNhap[] = [];
-    if (!duyet.kho.trim()) ls.push({ truong: "Kho", thongBao: "Chưa chọn kho" });
+    if (!duyet.warehouse.trim()) ls.push({ truong: "Kho", thongBao: "Chưa chọn kho" });
     if (!(duyet.luongThuc > 0))
       ls.push({ truong: "Lượng thực", thongBao: "Phải lớn hơn 0 kg" });
     setLoi(ls);
     if (ls.length > 0) return;
-    const goc = sanXuat.find((s) => s.id === duyet.sanXuatId);
-    const lech = goc ? duyet.luongThuc - goc.luongKg : 0;
+    const goc = sanXuat.find((s) => s.id === duyet.wipId);
+    const lech = goc ? duyet.luongThuc - goc.quantityKg : 0;
     persistSX(
       sanXuat.map((s) =>
-        s.id === duyet.sanXuatId
+        s.id === duyet.wipId
           ? {
               ...s,
-              kho: duyet.kho,
-              luongKg: duyet.luongThuc,
-              soBlock: duyet.blockThuc,
-              trangThai: "da-nhap",
-              ghiChu: duyet.ghiChu || s.ghiChu,
+              warehouse: duyet.warehouse,
+              quantityKg: duyet.luongThuc,
+              blocksCount: duyet.blockThuc,
+              status: "da-nhap",
+              note: duyet.note || s.note,
             }
           : s
       )
     );
     notify.daLuu(
-      `Đã nhập kho ${duyet.kho} — ${kg(duyet.luongThuc)}` +
+      `Đã nhập kho ${duyet.warehouse} — ${kg(duyet.luongThuc)}` +
         (lech ? ` (lệch ${lech > 0 ? "+" : ""}${num(lech)} kg)` : "")
     );
     setDuyet(null);
@@ -114,10 +114,10 @@ export default function KhoDuTruScreen() {
       key: "mh",
       header: "Mặt hàng",
       chinh: true,
-      render: (r) => tenMH(r.matHangId),
-      sapXep: (r) => tenMH(r.matHangId),
+      render: (r) => tenMH(r.productId),
+      sapXep: (r) => tenMH(r.productId),
     },
-    { key: "kho", header: "Kho", render: (r) => <Badge>{r.kho || "—"}</Badge>, sapXep: (r) => r.kho },
+    { key: "kho", header: "Kho", render: (r) => <Badge>{r.warehouse || "—"}</Badge>, sapXep: (r) => r.warehouse },
     {
       key: "lo",
       header: "Lô (ngày SX)",
@@ -138,7 +138,7 @@ export default function KhoDuTruScreen() {
   ];
 
   const duyetGoc = duyet
-    ? sanXuat.find((s) => s.id === duyet.sanXuatId)
+    ? sanXuat.find((s) => s.id === duyet.wipId)
     : undefined;
 
   return (
@@ -172,12 +172,12 @@ export default function KhoDuTruScreen() {
                 className="flex flex-wrap items-center justify-between gap-3 py-2"
               >
                 <span className="min-w-0 flex-1 text-base">
-                  {tenMH(s.matHangId)}
-                  {s.quyCach ? ` · ${s.quyCach}` : ""} —{" "}
-                  <span className="tnum font-semibold">{num(s.luongKg)}</span> kg
+                  {tenMH(s.productId)}
+                  {s.spec ? ` · ${s.spec}` : ""} —{" "}
+                  <span className="tnum font-semibold">{num(s.quantityKg)}</span> kg
                   <span className="text-muted-foreground">
                     {" "}
-                    · SX {viDate(s.ngay)} · xưởng {s.phanXuong}
+                    · SX {viDate(s.productionDate)} · xưởng {s.workshop}
                   </span>
                 </span>
                 <Button size="sm" onClick={() => moDuyet(s)}>
@@ -217,8 +217,8 @@ export default function KhoDuTruScreen() {
           <RecordTable
             columns={colsTon}
             rows={tonLoc}
-            getKey={(r) => r.sanXuatId}
-            timKiem={(r) => `${tenMH(r.matHangId)} ${r.quyCach} ${r.kho}`}
+            getKey={(r) => r.wipId}
+            timKiem={(r) => `${tenMH(r.productId)} ${r.spec} ${r.warehouse}`}
             nhanTimKiem="Tìm theo mặt hàng / quy cách / kho…"
           />
           <div className="flex justify-end rounded-xl bg-muted px-5 py-4">
@@ -237,7 +237,7 @@ export default function KhoDuTruScreen() {
             <DialogTitle className="text-2xl">Duyệt nhập kho</DialogTitle>
             <DialogDescription className="text-base">
               {duyetGoc
-                ? `${tenMH(duyetGoc.matHangId)}${duyetGoc.quyCach ? ` · ${duyetGoc.quyCach}` : ""} — SX ${viDate(duyetGoc.ngay)}. Đối chiếu kg/block thực, chọn kho.`
+                ? `${tenMH(duyetGoc.productId)}${duyetGoc.spec ? ` · ${duyetGoc.spec}` : ""} — SX ${viDate(duyetGoc.productionDate)}. Đối chiếu kg/block thực, chọn kho.`
                 : ""}
             </DialogDescription>
           </DialogHeader>
@@ -247,8 +247,8 @@ export default function KhoDuTruScreen() {
               <Combobox
                 label="Kho (phòng đông)"
                 required
-                value={duyet.kho}
-                onChange={(v) => setDuyet((d) => (d ? { ...d, kho: v } : d))}
+                value={duyet.warehouse}
+                onChange={(v) => setDuyet((d) => (d ? { ...d, warehouse: v } : d))}
                 options={optKho}
                 onCreate={(t) => t}
                 hint="Chọn phòng đông. Gõ tên mới rồi Thêm nếu chưa có."
@@ -272,21 +272,21 @@ export default function KhoDuTruScreen() {
                   }
                 />
               </div>
-              {duyetGoc && duyet.luongThuc !== duyetGoc.luongKg && (
+              {duyetGoc && duyet.luongThuc !== duyetGoc.quantityKg && (
                 <p className="rounded-lg bg-accent px-4 py-3 text-base text-accent-foreground">
                   Lệch so ghi sản lượng:{" "}
                   <span className="tnum font-semibold">
-                    {duyet.luongThuc - duyetGoc.luongKg > 0 ? "+" : ""}
-                    {num(duyet.luongThuc - duyetGoc.luongKg)} kg
+                    {duyet.luongThuc - duyetGoc.quantityKg > 0 ? "+" : ""}
+                    {num(duyet.luongThuc - duyetGoc.quantityKg)} kg
                   </span>{" "}
                   — ghi rõ lý do ở ghi chú.
                 </p>
               )}
               <Field label="Ghi chú (lý do lệch, nếu có)">
                 <Input
-                  value={duyet.ghiChu}
+                  value={duyet.note}
                   onChange={(e) =>
-                    setDuyet((d) => (d ? { ...d, ghiChu: e.target.value } : d))
+                    setDuyet((d) => (d ? { ...d, note: e.target.value } : d))
                   }
                   placeholder="VD: hao khi cấp đông"
                 />

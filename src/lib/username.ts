@@ -20,8 +20,8 @@ export function boDau(s: string): string {
     .replace(/Đ/g, "D");
 }
 
-export function hoTenToUsername(hoTen: string): string {
-  const tu = boDau(hoTen).toLowerCase().trim().split(/\s+/).filter(Boolean);
+export function hoTenToUsername(fullName: string): string {
+  const tu = boDau(fullName).toLowerCase().trim().split(/\s+/).filter(Boolean);
   if (tu.length === 0) return "";
   if (tu.length === 1) return tu[0];
   const dau = tu

@@ -1,7 +1,7 @@
 import { useState } from "react";
-import type { NguoiDung, VaiTro } from "@/types";
-import { VAI_TRO, nhanVaiTro, dsVaiTro } from "@/types";
-import { useNguoiDung } from "@/lib/danhMuc";
+import type { UserProfile, Role } from "@/types";
+import { ROLES, roleLabel, rolesList } from "@/types";
+import { useUserProfiles } from "@/lib/danhMuc";
 import { hoTenToUsername } from "@/lib/username";
 import type { KetQuaDangNhap } from "@/lib/auth";
 import {
@@ -28,14 +28,14 @@ function ChonVaiTro({
   chon,
   onDoi,
 }: {
-  chon: VaiTro[];
-  onDoi: (v: VaiTro[]) => void;
+  chon: Role[];
+  onDoi: (v: Role[]) => void;
 }) {
-  const bat = (v: VaiTro) =>
+  const bat = (v: Role) =>
     onDoi(chon.includes(v) ? chon.filter((x) => x !== v) : [...chon, v]);
   return (
     <div className="flex flex-wrap gap-2">
-      {VAI_TRO.map((r) => {
+      {ROLES.map((r) => {
         const dangChon = chon.includes(r.value);
         return (
           <Button
@@ -55,18 +55,18 @@ function ChonVaiTro({
 }
 
 interface TaoMoi {
-  hoTen: string;
+  fullName: string;
   username: string;
   usernameTuSua: boolean;
   matKhau: string;
-  vaiTro: VaiTro[];
+  roles: Role[];
 }
 const TAO_RONG: TaoMoi = {
-  hoTen: "",
+  fullName: "",
   username: "",
   usernameTuSua: false,
   matKhau: "",
-  vaiTro: [],
+  roles: [],
 };
 
 /** Màn quản lý người dùng — CHỈ admin. Đăng ký KHÔNG mở tự do: admin tạo tài
@@ -75,14 +75,14 @@ export default function QuanLyNguoiDungScreen({
   taoTaiKhoan,
 }: {
   taoTaiKhoan: (
-    hoTen: string,
+    fullName: string,
     username: string,
     matKhau: string,
-    vaiTro: VaiTro[]
+    roles: Role[]
   ) => Promise<KetQuaDangNhap>;
 }) {
-  const [ds, ghi] = useNguoiDung();
-  const [dang, setDang] = useState<NguoiDung | null>(null);
+  const [ds, ghi] = useUserProfiles();
+  const [dang, setDang] = useState<UserProfile | null>(null);
 
   const [tao, setTao] = useState<TaoMoi | null>(null);
   const [loiTao, setLoiTao] = useState<LoiNhap[]>([]);
@@ -98,14 +98,14 @@ export default function QuanLyNguoiDungScreen({
   const doiHoTenTao = (v: string) =>
     setTao((t) =>
       t
-        ? { ...t, hoTen: v, username: t.usernameTuSua ? t.username : hoTenToUsername(v) }
+        ? { ...t, fullName: v, username: t.usernameTuSua ? t.username : hoTenToUsername(v) }
         : t
     );
 
   const luuTao = async () => {
     if (!tao) return;
     const ls: LoiNhap[] = [];
-    if (!tao.hoTen.trim()) ls.push({ truong: "Họ tên", thongBao: "Chưa nhập họ tên" });
+    if (!tao.fullName.trim()) ls.push({ truong: "Họ tên", thongBao: "Chưa nhập họ tên" });
     if (!tao.username.trim())
       ls.push({ truong: "Tên đăng nhập", thongBao: "Chưa nhập tên đăng nhập" });
     if (tao.matKhau.length < 6)
@@ -115,10 +115,10 @@ export default function QuanLyNguoiDungScreen({
 
     setDangTao(true);
     const kq = await taoTaiKhoan(
-      tao.hoTen,
+      tao.fullName,
       tao.username,
       tao.matKhau,
-      tao.vaiTro
+      tao.roles
     );
     setDangTao(false);
     if (!kq.ok) {
@@ -131,7 +131,7 @@ export default function QuanLyNguoiDungScreen({
     setLoiTao([]);
   };
 
-  const cols: Cot<NguoiDung>[] = [
+  const cols: Cot<UserProfile>[] = [
     {
       key: "username",
       header: "Tên đăng nhập",
@@ -143,19 +143,19 @@ export default function QuanLyNguoiDungScreen({
       key: "hoTen",
       header: "Họ tên",
       render: (r) =>
-        r.hoTen || <span className="text-muted-foreground">Chưa đặt</span>,
-      sapXep: (r) => r.hoTen,
+        r.fullName || <span className="text-muted-foreground">Chưa đặt</span>,
+      sapXep: (r) => r.fullName,
     },
     {
       key: "vaiTro",
       header: "Vai trò",
       render: (r) => {
-        const vt = dsVaiTro(r.vaiTro);
+        const vt = rolesList(r.roles);
         return vt.length ? (
           <span className="flex flex-wrap gap-1">
             {vt.map((v) => (
               <Badge key={v} variant={v === "admin" ? "default" : "secondary"}>
-                {nhanVaiTro([v])}
+                {roleLabel([v])}
               </Badge>
             ))}
           </span>
@@ -163,7 +163,7 @@ export default function QuanLyNguoiDungScreen({
           <Badge variant="outline">Chưa gán</Badge>
         );
       },
-      sapXep: (r) => nhanVaiTro(r.vaiTro),
+      sapXep: (r) => roleLabel(r.roles),
     },
   ];
 
@@ -212,13 +212,13 @@ export default function QuanLyNguoiDungScreen({
           columns={cols}
           rows={ds}
           getKey={(r) => r.id}
-          timKiem={(r) => `${r.username} ${r.hoTen} ${nhanVaiTro(r.vaiTro)}`}
+          timKiem={(r) => `${r.username} ${r.fullName} ${roleLabel(r.roles)}`}
           nhanTimKiem="Tìm theo tên đăng nhập / họ tên…"
           actions={(r) => (
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setDang({ ...r, vaiTro: dsVaiTro(r.vaiTro) })}
+              onClick={() => setDang({ ...r, roles: rolesList(r.roles) })}
             >
               <Pencil />
               Sửa
@@ -244,7 +244,7 @@ export default function QuanLyNguoiDungScreen({
               <ErrorSummary loi={loiTao} />
               <Field label="Họ tên" required>
                 <Input
-                  value={tao.hoTen}
+                  value={tao.fullName}
                   onChange={(e) => doiHoTenTao(e.target.value)}
                   autoFocus
                   placeholder="VD: Nguyễn Văn A"
@@ -283,8 +283,8 @@ export default function QuanLyNguoiDungScreen({
                 hint="Chọn một hoặc nhiều. VD Phó giám đốc kiêm Quản đốc xưởng Đông = bấm cả hai. Bỏ trống cũng được, gán sau."
               >
                 <ChonVaiTro
-                  chon={tao.vaiTro}
-                  onDoi={(v) => setTao((t) => (t ? { ...t, vaiTro: v } : t))}
+                  chon={tao.roles}
+                  onDoi={(v) => setTao((t) => (t ? { ...t, roles: v } : t))}
                 />
               </Field>
             </div>
@@ -319,9 +319,9 @@ export default function QuanLyNguoiDungScreen({
             <div className="space-y-6 py-2">
               <Field label="Họ tên">
                 <Input
-                  value={dang.hoTen}
+                  value={dang.fullName}
                   onChange={(e) =>
-                    setDang((d) => (d ? { ...d, hoTen: e.target.value } : d))
+                    setDang((d) => (d ? { ...d, fullName: e.target.value } : d))
                   }
                   placeholder="Họ tên đầy đủ"
                 />
@@ -331,8 +331,8 @@ export default function QuanLyNguoiDungScreen({
                 hint="Chọn một hoặc nhiều. Bấm lại để bỏ. Bỏ hết = Chưa gán."
               >
                 <ChonVaiTro
-                  chon={dang.vaiTro}
-                  onDoi={(v) => setDang((d) => (d ? { ...d, vaiTro: v } : d))}
+                  chon={dang.roles}
+                  onDoi={(v) => setDang((d) => (d ? { ...d, roles: v } : d))}
                 />
               </Field>
             </div>

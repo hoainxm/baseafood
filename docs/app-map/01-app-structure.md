@@ -1,6 +1,6 @@
 > Load khi: thêm file mới, không biết đặt ở đâu, hay chuẩn bị import xuyên tầng.
 covers: src/**
-last_verified: 2026-08-06
+last_verified: 2026-08-07
 ttl_days: 90
 
 # Cấu trúc mã nguồn
@@ -8,7 +8,7 @@ ttl_days: 90
 ```
 src/
 ├── main.tsx                 điểm vào; nạp index.css + apDungCaiDatHienThi() TRƯỚC khi vẽ (tránh nhảy cỡ chữ)
-├── App.tsx                  điều hướng 3 màn (xem 02-pages-navigation.md)
+├── App.tsx                  cấu hình định tuyến và route guards (xem 02-pages-navigation.md)
 ├── types.ts                 KIỂU + BẤT BIẾN nghiệp vụ (laGhiBu, thanhTien) — không phải file kiểu thuần
 ├── data/thanh-pham.json     141 mã TK 1551 — chỉ là SEED, không đọc trực tiếp trong màn
 ├── lib/
@@ -29,7 +29,7 @@ src/
 │   ├── patterns/            Field, NumberField, Combobox, DateField, RecordTable, DanhMucCrud…
 │   ├── kit/KitPage.tsx      trang duyệt bộ giao diện (đưa người dùng thật bấm thử)
 │   └── index.ts             cửa import DUY NHẤT cho features
-└── features/                màn nghiệp vụ (NhapNguyenLieu · BanHang · CanDoi + BangCanDoi · DanhMuc · ThanhPham · DangNhap · QuanLyNguoiDung)
+└── features/                thư mục chức năng chia theo route (auth, nhap-hang, san-xuat, ban-hang, kho, don-dat, can-doi, danh-muc, nguoi-dung, shared)
 ```
 
 ## Ranh giới import (cứng)

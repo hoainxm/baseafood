@@ -52,8 +52,8 @@ export const cuoiNam = (iso: string): string => `${iso.slice(0, 4)}-12-31`;
 export function phamViKy(
   ky: KyXem,
   moc: string,
-  tuNgay: string,
-  denNgay: string
+  startDate: string,
+  endDate: string
 ): [string, string] {
   switch (ky) {
     case "ngay":
@@ -65,6 +65,6 @@ export function phamViKy(
     case "nam":
       return [dauNam(moc), cuoiNam(moc)];
     case "tuy-chon":
-      return [tuNgay, denNgay];
+      return [startDate, endDate];
   }
 }

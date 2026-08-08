@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import type { DongNhapNL, DongPheLieu, PhanXuong } from "@/types";
+import type { MaterialImportItem, ScrapItem, Workshop } from "@/types";
 import {
   Button,
   Combobox,
@@ -20,23 +20,23 @@ function ngayChu(iso: string): string {
 
 /** Gom dòng theo đại lý — mỗi đại lý một cụm, giữ thứ tự xuất hiện. */
 interface CumDaiLy {
-  daiLy: string;
-  dong: DongNhapNL[];
-  ghiChu: string[];
+  supplierName: string;
+  dong: MaterialImportItem[];
+  note: string[];
 }
 
-function gomTheoDaiLy(rows: DongNhapNL[]): CumDaiLy[] {
+function gomTheoDaiLy(rows: MaterialImportItem[]): CumDaiLy[] {
   const map = new Map<string, CumDaiLy>();
   for (const r of rows) {
-    const ten = r.daiLy || "(chưa có đại lý)";
+    const ten = r.supplierName || "(chưa có đại lý)";
     let cum = map.get(ten);
     if (!cum) {
-      cum = { daiLy: ten, dong: [], ghiChu: [] };
+      cum = { supplierName: ten, dong: [], note: [] };
       map.set(ten, cum);
     }
     cum.dong.push(r);
-    const moTaXe = [r.taiXe, r.bienSoXe].filter(Boolean).join(" - ");
-    if (moTaXe && !cum.ghiChu.includes(moTaXe)) cum.ghiChu.push(moTaXe);
+    const moTaXe = [r.driverName, r.licensePlate].filter(Boolean).join(" - ");
+    if (moTaXe && !cum.note.includes(moTaXe)) cum.note.push(moTaXe);
   }
   return [...map.values()];
 }
@@ -53,9 +53,9 @@ function gomTheoDaiLy(rows: DongNhapNL[]): CumDaiLy[] {
 export default function PhieuNLNgay({
   ky: kyBanDau,
   ngay: ngayBanDau,
-  tuNgay,
-  denNgay,
-  phanXuong,
+  startDate,
+  endDate,
+  workshop,
   rows,
   pheLieu,
   onClose,
@@ -63,38 +63,38 @@ export default function PhieuNLNgay({
   /** Kỳ + ngày neo + khoảng tự chọn — khởi tạo theo bộ lọc ngoài màn. */
   ky: KyXem;
   ngay: string;
-  tuNgay: string;
-  denNgay: string;
+  startDate: string;
+  endDate: string;
   /** Xưởng đang lọc; "Tất cả" ⇒ gộp cả ba xưởng như phiếu giấy. */
-  phanXuong: PhanXuong | "Tất cả";
-  rows: DongNhapNL[];
-  pheLieu: DongPheLieu[];
+  workshop: Workshop | "Tất cả";
+  rows: MaterialImportItem[];
+  pheLieu: ScrapItem[];
   onClose: () => void;
 }) {
   // Bộ chọn kỳ NGAY trong phiếu — cùng cách với màn Nhập hàng.
   const [ky, setKy] = useState<KyXem>(kyBanDau);
   const [moc, setMoc] = useState(ngayBanDau);
-  const [tuTC, setTuTC] = useState(tuNgay);
-  const [denTC, setDenTC] = useState(denNgay);
+  const [tuTC, setTuTC] = useState(startDate);
+  const [denTC, setDenTC] = useState(endDate);
   const [tu, den] = phamViKy(ky, moc, tuTC, denTC);
 
   const trongXuong = (px: string) =>
-    phanXuong === "Tất cả" || px === phanXuong;
+    workshop === "Tất cả" || px === workshop;
 
   const laMotNgay = tu === den;
 
   const ngayCoData = ngayTrongKhoang(tu, den).filter(
     (d) =>
-      rows.some((r) => r.ngay === d && trongXuong(r.phanXuong)) ||
+      rows.some((r) => r.deliveryDate === d && trongXuong(r.workshop)) ||
       pheLieu.some(
         (r) =>
-          r.nguon === "Nhập hàng" && r.ngay === d && trongXuong(r.phanXuong)
+          r.source === "Nhập hàng" && r.date === d && trongXuong(r.workshop)
       )
   );
 
   const tongCaKy = rows
-    .filter((r) => r.ngay >= tu && r.ngay <= den && trongXuong(r.phanXuong))
-    .reduce((s, r) => s + (r.soLuongKg || 0), 0);
+    .filter((r) => r.deliveryDate >= tu && r.deliveryDate <= den && trongXuong(r.workshop))
+    .reduce((s, r) => s + (r.quantityKg || 0), 0);
 
   return (
     <div className="print-root print-landscape fixed inset-0 z-50 overflow-auto bg-white p-6 text-slate-900 sm:p-10">
@@ -121,8 +121,8 @@ export default function PhieuNLNgay({
               label="Khoảng ngày"
               anNhanBatBuoc
               presets={false}
-              tuNgay={tuTC}
-              denNgay={denTC}
+              startDate={tuTC}
+              endDate={denTC}
               onChange={(a, b) => {
                 setTuTC(a);
                 setDenTC(b);
@@ -171,7 +171,7 @@ export default function PhieuNLNgay({
             {laMotNgay
               ? `Ngày ${ngayChu(tu)}`
               : `Từ ${ngayChu(tu)} đến ${ngayChu(den)}`}
-            {phanXuong !== "Tất cả" ? ` · Phân xưởng ${phanXuong}` : ""}
+            {workshop !== "Tất cả" ? ` · Phân xưởng ${workshop}` : ""}
           </p>
         </div>
 
@@ -184,7 +184,7 @@ export default function PhieuNLNgay({
             <KhoiNgay
               key={d}
               ngay={d}
-              phanXuong={phanXuong}
+              workshop={workshop}
               rows={rows}
               pheLieu={pheLieu}
               hienTieuDeNgay={!laMotNgay}
@@ -209,31 +209,31 @@ export default function PhieuNLNgay({
 /** Một ngày = một khối như tờ giấy: STT theo đại lý + tổng cộng + phụ phẩm. */
 function KhoiNgay({
   ngay,
-  phanXuong,
+  workshop,
   rows,
   pheLieu,
   hienTieuDeNgay,
   sangTrang,
 }: {
   ngay: string;
-  phanXuong: PhanXuong | "Tất cả";
-  rows: DongNhapNL[];
-  pheLieu: DongPheLieu[];
+  workshop: Workshop | "Tất cả";
+  rows: MaterialImportItem[];
+  pheLieu: ScrapItem[];
   hienTieuDeNgay: boolean;
   sangTrang: boolean;
 }) {
   const trongXuong = (px: string) =>
-    phanXuong === "Tất cả" || px === phanXuong;
+    workshop === "Tất cả" || px === workshop;
 
   const dongNgay = rows.filter(
-    (r) => r.ngay === ngay && trongXuong(r.phanXuong)
+    (r) => r.deliveryDate === ngay && trongXuong(r.workshop)
   );
   const pheNgay = pheLieu.filter(
     (r) =>
-      r.nguon === "Nhập hàng" && r.ngay === ngay && trongXuong(r.phanXuong)
+      r.source === "Nhập hàng" && r.date === ngay && trongXuong(r.workshop)
   );
   const cum = gomTheoDaiLy(dongNgay);
-  const tongKg = dongNgay.reduce((s, r) => s + (r.soLuongKg || 0), 0);
+  const tongKg = dongNgay.reduce((s, r) => s + (r.quantityKg || 0), 0);
 
   let stt = 0;
 
@@ -274,19 +274,19 @@ function KhoiNgay({
                 )}
                 {i === 0 && (
                   <Td rowSpan={n} className="align-top font-medium">
-                    {c.daiLy}
+                    {c.supplierName}
                   </Td>
                 )}
-                <Td>{r.loaiNL}</Td>
+                <Td>{r.materialTypeName}</Td>
                 <Td right className="tnum">
-                  {num(r.soLuongKg)}
+                  {num(r.quantityKg)}
                 </Td>
                 <Td right className="tnum">
-                  {r.donGia != null ? num(r.donGia) : ""}
+                  {r.unitPrice != null ? num(r.unitPrice) : ""}
                 </Td>
                 {i === 0 && (
                   <Td rowSpan={n} className="align-top">
-                    {c.ghiChu.join(" · ")}
+                    {c.note.join(" · ")}
                   </Td>
                 )}
               </tr>
@@ -317,9 +317,9 @@ function KhoiNgay({
             <tbody>
               {pheNgay.map((r) => (
                 <tr key={r.id}>
-                  <Td>{r.loai}</Td>
+                  <Td>{r.name}</Td>
                   <Td right className="tnum">
-                    {num(r.soLuongKg)}
+                    {num(r.quantityKg)}
                   </Td>
                 </tr>
               ))}

@@ -3,35 +3,35 @@ import { supabase, hasSupabase, SITE_ID } from "@/lib/supabase";
 import { ketNoi } from "@/lib/ketNoi";
 import { load, save } from "@/lib/db";
 import type {
-  ChotNgay,
-  ChuyenNhap,
-  DaiLy,
-  DongBan,
-  DongNLVao,
-  DongNhapNL,
-  DongPheLieu,
-  DongTP,
-  KhachHang,
-  Kenh,
-  KyCanDoi,
-  Loai,
-  LoaiNguyenLieu,
-  MatHang,
-  NguonPheLieu,
-  NguoiDung,
-  NhomNL,
-  PhanXuong,
-  PhieuBan,
-  ThanhPham,
-  DongSanXuat,
-  TrangThaiKho,
-  DonDat,
-  TrangThaiDon,
-  DongDon,
-  LenhXuat,
-  DongLenh,
+  FinishedGood,
+  Workshop,
+  UserProfile,
+  Category,
+  ImportShipment,
+  MaterialImportItem,
+  DailyLock,
+  Product,
+  Customer,
+  Supplier,
+  MaterialType,
+  InputGroup,
+  SalesChannel,
+  BalancingPeriod,
+  BalancingInputItem,
+  ScrapSource,
+  ScrapItem,
+  BalancingOutputItem,
+  SalesInvoice,
+  SalesItem,
+  WipProductionItem,
+  WipWarehouseStatus,
+  SalesOrder,
+  SalesOrderStatus,
+  OrderItem,
+  ExportOrder,
+  ExportItem,
 } from "@/types";
-import { vaiTroTuChuoi, vaiTroThanhChuoi } from "@/types";
+import { rolesFromCsv, rolesToCsv } from "@/types";
 
 /**
  * Tầng dữ liệu dùng chung.
@@ -42,20 +42,19 @@ import { vaiTroTuChuoi, vaiTroThanhChuoi } from "@/types";
  *                              localStorage làm bộ đệm: mất mạng giữa ca vẫn
  *                              còn số liệu để đối chiếu, không trắng màn hình.
  *
- * Màn hình vẫn dùng `const [rows, ghi] = useNhapNL()` và truyền NGUYÊN danh
- * sách mới; tầng này tự so danh sách cũ/mới để biết dòng nào thêm, dòng nào
+ * Màn hình vẫn dùng `const [rows, ghi] = useMaterialImports()` và truyền NGUYÊN
+ * danh sách mới; tầng này tự so danh sách cũ/mới để biết dòng nào thêm, dòng nào
  * sửa, dòng nào xóa rồi mới gọi Supabase.
  *
- * Tên bảng/cột trong DB: tiếng Việt không dấu, snake_case
- * (xem supabase/migrations/0001_baseafood_mes.sql).
+ * Tên bảng/cột trong DB: Tiếng Anh, snake_case.
  */
 
 export interface AnhXaBang<T> {
   /** Tên bảng trong Supabase */
   table: string;
-  /** Khóa chính trong DB — mặc định "id", danh mục thành phẩm dùng "ma" */
+  /** Khóa chính trong DB — mặc định "id", danh mục thành phẩm dùng "code" */
   khoaChinh?: string;
-  /** Khóa localStorage (giữ nguyên khóa cũ để dữ liệu đang có không mất) */
+  /** Khóa localStorage (phiên bản v2 dùng Tiếng Anh) */
   localKey: string;
   /** Lấy khóa của một bản ghi ở phía app */
   layKhoa: (x: T) => string;
@@ -75,548 +74,542 @@ const theoId = <T extends { id: string }>(x: T) => x.id;
 
 /* ---------- Ánh xạ camelCase (app) ↔ snake_case (Postgres) ---------- */
 
-export const BANG_DAI_LY: AnhXaBang<DaiLy> = {
-  table: "dai_ly",
-  localKey: "bsf.daily.v1",
+export const BANG_SUPPLIER: AnhXaBang<Supplier> = {
+  table: "suppliers",
+  localKey: "bsf.suppliers.v2",
   layKhoa: theoId,
   toRow: (x) => ({
     id: x.id,
-    ma: x.ma,
-    ten: x.ten,
-    dien_thoai: x.dienThoai,
-    ghi_chu: x.ghiChu,
-    // Cột mới (migration 0009) — chỉ gửi khi có giá trị ⇒ đại lý vẫn ghi được
-    // kể cả khi chưa chạy 0009.
-    ...(x.tenGhiPhieu ? { ten_ghi_phieu: x.tenGhiPhieu } : {}),
-    ...(x.diaChi ? { dia_chi: x.diaChi } : {}),
-    ...(x.cmnd ? { cmnd: x.cmnd } : {}),
-    ...(x.ngayCap ? { ngay_cap: x.ngayCap } : {}),
-    ...(x.noiCap ? { noi_cap: x.noiCap } : {}),
+    code: x.code,
+    short_name: x.shortName,
+    phone: x.phone,
+    note: x.note,
+    billing_name: x.billingName,
+    address: x.address,
+    national_id: x.nationalId,
+    issued_date: x.issuedDate,
+    issued_place: x.issuedPlace,
   }),
   fromRow: (r) => ({
     id: s(r.id),
-    ma: s(r.ma),
-    ten: s(r.ten),
-    tenGhiPhieu: r.ten_ghi_phieu == null ? "" : s(r.ten_ghi_phieu),
-    diaChi: r.dia_chi == null ? "" : s(r.dia_chi),
-    cmnd: r.cmnd == null ? "" : s(r.cmnd),
-    ngayCap: r.ngay_cap == null ? "" : s(r.ngay_cap),
-    noiCap: r.noi_cap == null ? "" : s(r.noi_cap),
-    dienThoai: s(r.dien_thoai),
-    ghiChu: s(r.ghi_chu),
+    code: s(r.code),
+    shortName: s(r.short_name),
+    billingName: r.billing_name == null ? "" : s(r.billing_name),
+    address: r.address == null ? "" : s(r.address),
+    nationalId: r.national_id == null ? "" : s(r.national_id),
+    issuedDate: r.issued_date == null ? "" : s(r.issued_date),
+    issuedPlace: r.issued_place == null ? "" : s(r.issued_place),
+    phone: s(r.phone),
+    note: s(r.note),
   }),
 };
 
-export const BANG_LOAI_NL: AnhXaBang<LoaiNguyenLieu> = {
-  table: "loai_nguyen_lieu",
-  localKey: "bsf.loainl.v1",
+export const BANG_MATERIAL_TYPE: AnhXaBang<MaterialType> = {
+  table: "material_types",
+  localKey: "bsf.material-types.v2",
   layKhoa: theoId,
-  toRow: (x) => ({ id: x.id, ten: x.ten, loai: x.loai, ghi_chu: x.ghiChu }),
+  toRow: (x) => ({ id: x.id, name: x.name, category: x.category, note: x.note }),
   fromRow: (r) => ({
     id: s(r.id),
-    ten: s(r.ten),
-    loai: s(r.loai),
-    ghiChu: s(r.ghi_chu),
+    name: s(r.name),
+    category: s(r.category),
+    note: s(r.note),
   }),
 };
 
-/** Danh mục 141 mã kế toán — khóa chính là MÃ, không phải id sinh tự động. */
-export const BANG_THANH_PHAM: AnhXaBang<ThanhPham> = {
-  table: "thanh_pham",
-  khoaChinh: "ma",
-  localKey: "bsf.thanhpham.v1",
-  layKhoa: (x) => x.ma,
+/** Danh mục 141 mã kế toán — khóa chính là CODE, không phải id sinh tự động. */
+export const BANG_FINISHED_GOOD: AnhXaBang<FinishedGood> = {
+  table: "finished_goods",
+  khoaChinh: "code",
+  localKey: "bsf.finished-goods.v2",
+  layKhoa: (x) => x.code,
   toRow: (x) => ({
-    ma: x.ma,
-    ten: x.ten,
-    dvt: x.dvt,
-    ma_tai_khoan: x.maTk,
-    nhom: x.nhom,
+    code: x.code,
+    name: x.name,
+    unit: x.unit,
+    account_code: x.accountCode,
+    group_name: x.groupName,
   }),
   fromRow: (r) => ({
-    ma: s(r.ma),
-    ten: s(r.ten),
-    dvt: s(r.dvt),
-    maTk: s(r.ma_tai_khoan),
-    nhom: s(r.nhom),
+    code: s(r.code),
+    name: s(r.name),
+    unit: s(r.unit),
+    accountCode: s(r.account_code),
+    groupName: s(r.group_name),
   }),
 };
 
-export const BANG_MAT_HANG: AnhXaBang<MatHang> = {
-  table: "mat_hang",
-  localKey: "bsf.mathang.v1",
+export const BANG_PRODUCT: AnhXaBang<Product> = {
+  table: "products",
+  localKey: "bsf.products.v2",
   layKhoa: theoId,
   toRow: (x) => ({
     id: x.id,
-    ma: x.ma,
-    ten: x.ten,
-    ma_thanh_pham: x.maTP,
-    // Cột mới — chỉ gửi khi có giá trị ⇒ mặt hàng vẫn ghi được kể cả khi chưa
-    // chạy migration (0014 loai, 0015 loai_nguyen_lieu_id).
-    ...(x.loai ? { loai: x.loai } : {}),
-    ...(x.loaiNLId ? { loai_nguyen_lieu_id: x.loaiNLId } : {}),
+    code: x.code,
+    name: x.name,
+    finished_good_code: x.finishedGoodCode,
+    category: x.category,
+    material_type_id: x.materialTypeId,
   }),
   fromRow: (r) => ({
     id: s(r.id),
-    ma: s(r.ma),
-    ten: s(r.ten),
-    maTP: s(r.ma_thanh_pham),
-    loai: r.loai == null ? "" : s(r.loai),
-    loaiNLId: r.loai_nguyen_lieu_id == null ? "" : s(r.loai_nguyen_lieu_id),
+    code: s(r.code),
+    name: s(r.name),
+    finishedGoodCode: s(r.finished_good_code),
+    category: r.category == null ? "" : s(r.category),
+    materialTypeId: r.material_type_id == null ? "" : s(r.material_type_id),
   }),
 };
 
-export const BANG_KHACH_HANG: AnhXaBang<KhachHang> = {
-  table: "khach_hang",
-  localKey: "bsf.khachhang.v1",
+export const BANG_CUSTOMER: AnhXaBang<Customer> = {
+  table: "customers",
+  localKey: "bsf.customers.v2",
   layKhoa: theoId,
-  toRow: (x) => ({ id: x.id, ma: x.ma, ten: x.ten, thi_truong: x.thiTruong }),
+  toRow: (x) => ({ id: x.id, code: x.code, name: x.name, market: x.market }),
   fromRow: (r) => ({
     id: s(r.id),
-    ma: s(r.ma),
-    ten: s(r.ten),
-    thiTruong: s(r.thi_truong),
+    code: s(r.code),
+    name: s(r.name),
+    market: s(r.market),
   }),
 };
 
 /** Chuyến hàng — một đại lý, một lượt giao, nhiều dòng loại hàng. */
-export const BANG_CHUYEN_NHAP: AnhXaBang<ChuyenNhap> = {
-  table: "chuyen_nhap",
-  localKey: "bsf.chuyen.v1",
+export const BANG_IMPORT_SHIPMENT: AnhXaBang<ImportShipment> = {
+  table: "import_shipments",
+  localKey: "bsf.import-shipments.v2",
   layKhoa: theoId,
   toRow: (x) => ({
     id: x.id,
-    ngay_giao: x.ngayGiao,
-    ngay_ghi_so: x.ngayGhiSo,
-    ly_do_ghi_bu: x.lyDoGhiBu,
-    phan_xuong: x.phanXuong,
-    ten_dai_ly: x.daiLy,
-    tai_xe: x.taiXe,
-    bien_so_xe: x.bienSoXe,
-    ghi_chu: x.ghiChu,
+    delivery_date: x.deliveryDate,
+    posting_date: x.postingDate,
+    backdate_reason: x.backdateReason,
+    workshop: x.workshop,
+    supplier_name: x.supplierName,
+    driver_name: x.driverName,
+    license_plate: x.licensePlate,
+    note: x.note,
   }),
   fromRow: (r) => ({
     id: s(r.id),
-    ngayGiao: s(r.ngay_giao).slice(0, 10),
-    ngayGhiSo: s(r.ngay_ghi_so).slice(0, 10),
-    lyDoGhiBu: s(r.ly_do_ghi_bu),
-    phanXuong: s(r.phan_xuong) as PhanXuong,
-    daiLy: s(r.ten_dai_ly),
-    taiXe: s(r.tai_xe),
-    bienSoXe: s(r.bien_so_xe),
-    ghiChu: s(r.ghi_chu),
+    deliveryDate: s(r.delivery_date).slice(0, 10),
+    postingDate: s(r.posting_date).slice(0, 10),
+    backdateReason: s(r.backdate_reason),
+    workshop: s(r.workshop) as Workshop,
+    supplierName: s(r.supplier_name),
+    driverName: s(r.driver_name),
+    licensePlate: s(r.license_plate),
+    note: s(r.note),
   }),
 };
 
 /** Chốt số liệu một ngày của một phân xưởng. */
-export const BANG_CHOT_NGAY: AnhXaBang<ChotNgay> = {
-  table: "chot_ngay",
-  localKey: "bsf.chot-ngay.v1",
+export const BANG_DAILY_LOCK: AnhXaBang<DailyLock> = {
+  table: "daily_locks",
+  localKey: "bsf.daily-locks.v2",
   layKhoa: theoId,
   toRow: (x) => ({
     id: x.id,
-    ngay: x.ngay,
-    phan_xuong: x.phanXuong,
-    da_chot: x.daChot,
-    chot_luc: x.chotLuc,
-    tong_kg_luc_chot: x.tongKgLucChot,
-    ly_do_mo_lai: x.lyDoMoLai,
-    ghi_chu: x.ghiChu,
+    lock_date: x.lockDate,
+    workshop: x.workshop,
+    is_locked: x.isLocked,
+    locked_at: x.lockedAt,
+    total_kg_at_lock: x.totalKgAtLock,
+    reopen_reason: x.reopenReason,
+    note: x.note,
   }),
   fromRow: (r) => ({
     id: s(r.id),
-    ngay: s(r.ngay).slice(0, 10),
-    phanXuong: s(r.phan_xuong) as PhanXuong,
-    daChot: Boolean(r.da_chot),
-    chotLuc: s(r.chot_luc),
-    tongKgLucChot: Number(r.tong_kg_luc_chot ?? 0),
-    lyDoMoLai: s(r.ly_do_mo_lai),
-    ghiChu: s(r.ghi_chu),
+    lockDate: s(r.lock_date).slice(0, 10),
+    workshop: s(r.workshop) as Workshop,
+    isLocked: Boolean(r.is_locked),
+    lockedAt: s(r.locked_at),
+    totalKgAtLock: Number(r.total_kg_at_lock ?? 0),
+    reopenReason: s(r.reopen_reason),
+    note: s(r.note),
   }),
 };
 
-export const BANG_NHAP_NL: AnhXaBang<DongNhapNL> = {
-  table: "nhap_nguyen_lieu",
-  localKey: "bsf.nhap-nl.v1",
+export const BANG_MATERIAL_IMPORT: AnhXaBang<MaterialImportItem> = {
+  table: "material_imports",
+  localKey: "bsf.material-imports.v2",
   layKhoa: theoId,
   toRow: (x) => ({
     id: x.id,
-    chuyen_id: x.chuyenId,
-    ngay: x.ngay,
-    phan_xuong: x.phanXuong,
-    loai: x.loai,
-    ten_dai_ly: x.daiLy,
-    ten_loai_nguyen_lieu: x.loaiNL,
-    so_luong_kg: x.soLuongKg,
-    don_gia: x.donGia,
-    tai_xe: x.taiXe,
-    bien_so_xe: x.bienSoXe,
-    ghi_chu: x.ghiChu,
+    shipment_id: x.shipmentId,
+    delivery_date: x.deliveryDate,
+    workshop: x.workshop,
+    category: x.category,
+    supplier_name: x.supplierName,
+    material_type_name: x.materialTypeName,
+    quantity_kg: x.quantityKg,
+    unit_price: x.unitPrice,
+    driver_name: x.driverName,
+    license_plate: x.licensePlate,
+    note: x.note,
   }),
   fromRow: (r) => ({
     id: s(r.id),
-    chuyenId: s(r.chuyen_id),
-    ngay: s(r.ngay).slice(0, 10),
-    phanXuong: s(r.phan_xuong) as PhanXuong,
-    loai: s(r.loai) as Loai,
-    daiLy: s(r.ten_dai_ly),
-    loaiNL: s(r.ten_loai_nguyen_lieu),
-    soLuongKg: Number(r.so_luong_kg ?? 0),
-    donGia: n(r.don_gia),
-    taiXe: s(r.tai_xe),
-    bienSoXe: s(r.bien_so_xe),
-    ghiChu: s(r.ghi_chu),
+    shipmentId: s(r.shipment_id),
+    deliveryDate: s(r.delivery_date).slice(0, 10),
+    workshop: s(r.workshop) as Workshop,
+    category: s(r.category) as Category,
+    supplierName: s(r.supplier_name),
+    materialTypeName: s(r.material_type_name),
+    quantityKg: Number(r.quantity_kg ?? 0),
+    unitPrice: n(r.unit_price),
+    driverName: s(r.driver_name),
+    licensePlate: s(r.license_plate),
+    note: s(r.note),
   }),
   // Dòng ghi trước khi có "chuyến thật" → chưa gắn chuyến, app gom ngầm.
-  vaDongCu: (x) => (x.chuyenId == null ? { ...x, chuyenId: "" } : x),
+  vaDongCu: (x) => (x.shipmentId == null ? { ...x, shipmentId: "" } : x),
 };
 
-export const BANG_KY: AnhXaBang<KyCanDoi> = {
-  table: "ky_can_doi",
-  localKey: "bsf.ky.v1",
+export const BANG_BALANCING_PERIOD: AnhXaBang<BalancingPeriod> = {
+  table: "balancing_periods",
+  localKey: "bsf.balancing-periods.v2",
   layKhoa: theoId,
   toRow: (x) => ({
     id: x.id,
-    ten_loai_nguyen_lieu: x.loaiNL,
-    mo_ta_ngay: x.ngayList,
-    tu_ngay: x.tuNgay || null,
-    den_ngay: x.denNgay || null,
-    tong_nl_nhan_kg: x.tongNLNhan,
-    ti_gia: x.tiGia,
-    chi_phi_che_bien: x.chiPhiCB,
+    material_type_name: x.materialTypeName,
+    date_range_description: x.dateRangeDescription,
+    start_date: x.startDate || null,
+    end_date: x.endDate || null,
+    total_input_kg: x.totalInputKg,
+    exchange_rate: x.exchangeRate,
+    processing_cost_per_kg: x.processingCostPerKg,
     created_at: x.createdAt,
   }),
   fromRow: (r) => ({
     id: s(r.id),
-    loaiNL: s(r.ten_loai_nguyen_lieu),
-    ngayList: s(r.mo_ta_ngay),
-    tuNgay: r.tu_ngay ? s(r.tu_ngay).slice(0, 10) : undefined,
-    denNgay: r.den_ngay ? s(r.den_ngay).slice(0, 10) : undefined,
-    tongNLNhan: n(r.tong_nl_nhan_kg),
-    tiGia: n(r.ti_gia),
-    chiPhiCB: n(r.chi_phi_che_bien),
+    materialTypeName: s(r.material_type_name),
+    dateRangeDescription: s(r.date_range_description),
+    startDate: r.start_date ? s(r.start_date).slice(0, 10) : undefined,
+    endDate: r.end_date ? s(r.end_date).slice(0, 10) : undefined,
+    totalInputKg: n(r.total_input_kg),
+    exchangeRate: n(r.exchange_rate),
+    processingCostPerKg: n(r.processing_cost_per_kg),
     createdAt: s(r.created_at),
   }),
 };
 
-export const BANG_NL_VAO: AnhXaBang<DongNLVao> = {
-  table: "nguyen_lieu_vao",
-  localKey: "bsf.nlvao.v1",
+export const BANG_BALANCING_INPUT: AnhXaBang<BalancingInputItem> = {
+  table: "balancing_inputs",
+  localKey: "bsf.balancing-inputs.v2",
   layKhoa: theoId,
   toRow: (x) => ({
     id: x.id,
-    ky_id: x.kyId,
-    nhom: x.nhom,
-    ten: x.ten,
-    so_luong_kg: x.soLuongKg,
-    don_gia: x.donGia,
-    ty_le_phan_tram: x.tyLe,
-    // Chỉ gửi khi có giá trị — cột `nguon_kho` (migration 0008) có thể chưa tồn
-    // tại trên DB; bỏ trống ⇒ ghi NL vào chạy bình thường không cần migration.
-    ...(x.nguonKho ? { nguon_kho: x.nguonKho } : {}),
+    period_id: x.periodId,
+    group_name: x.groupName,
+    name: x.name,
+    quantity_kg: x.quantityKg,
+    unit_price: x.unitPrice,
+    ratio_percentage: x.ratioPercentage,
+    source_warehouse: x.sourceWarehouse,
   }),
   fromRow: (r) => ({
     id: s(r.id),
-    kyId: s(r.ky_id),
-    nhom: s(r.nhom) as NhomNL,
-    ten: s(r.ten),
-    soLuongKg: Number(r.so_luong_kg ?? 0),
-    donGia: n(r.don_gia),
-    tyLe: n(r.ty_le_phan_tram),
-    nguonKho: r.nguon_kho == null ? "" : s(r.nguon_kho),
+    periodId: s(r.period_id),
+    groupName: s(r.group_name) as InputGroup,
+    name: s(r.name),
+    quantityKg: Number(r.quantity_kg ?? 0),
+    unitPrice: n(r.unit_price),
+    ratioPercentage: n(r.ratio_percentage),
+    sourceWarehouse: r.source_warehouse == null ? "" : s(r.source_warehouse),
   }),
 };
 
-export const BANG_PHE_LIEU: AnhXaBang<DongPheLieu> = {
-  table: "phe_lieu",
-  localKey: "bsf.phelieu.v1",
+export const BANG_SCRAP: AnhXaBang<ScrapItem> = {
+  table: "scraps",
+  localKey: "bsf.scraps.v2",
   layKhoa: theoId,
   toRow: (x) => ({
     id: x.id,
-    // Chưa gắn kỳ thì phải là NULL — chuỗi rỗng vi phạm khóa ngoại ky_can_doi.
-    ky_id: x.kyId || null,
-    loai: x.loai,
-    so_luong_kg: x.soLuongKg,
-    don_gia_ban: x.donGiaBan,
-    ngay: x.ngay || null,
-    phan_xuong: x.phanXuong,
-    nguon: x.nguon,
+    // Chưa gắn kỳ thì phải là NULL — chuỗi rỗng vi phạm khóa ngoại balancing_periods.
+    period_id: x.periodId || null,
+    name: x.name,
+    quantity_kg: x.quantityKg,
+    selling_price: x.sellingPrice,
+    date: x.date || null,
+    workshop: x.workshop,
+    source: x.source,
   }),
   fromRow: (r) => ({
     id: s(r.id),
-    kyId: s(r.ky_id),
-    loai: s(r.loai),
-    soLuongKg: Number(r.so_luong_kg ?? 0),
-    donGiaBan: n(r.don_gia_ban),
-    ngay: s(r.ngay).slice(0, 10),
-    phanXuong: s(r.phan_xuong) as PhanXuong | "",
+    periodId: s(r.period_id),
+    name: s(r.name),
+    quantityKg: Number(r.quantity_kg ?? 0),
+    sellingPrice: n(r.selling_price),
+    date: s(r.date).slice(0, 10),
+    workshop: s(r.workshop) as Workshop | "",
     // Dòng cũ (trước 0004) không có cột nguồn → là dòng nhập tay trong kỳ.
-    nguon: (s(r.nguon) || "Cân đối") as NguonPheLieu,
+    source: (s(r.source) || "Cân đối") as ScrapSource,
   }),
   vaDongCu: (x) =>
-    x.nguon == null
-      ? { ...x, ngay: x.ngay ?? "", phanXuong: x.phanXuong ?? "", nguon: "Cân đối" }
+    x.source == null
+      ? { ...x, date: x.date ?? "", workshop: x.workshop ?? "", source: "Cân đối" }
       : x,
 };
 
-export const BANG_TP_RA: AnhXaBang<DongTP> = {
-  table: "thanh_pham_ra",
-  localKey: "bsf.tp.v1",
+export const BANG_BALANCING_OUTPUT: AnhXaBang<BalancingOutputItem> = {
+  table: "balancing_outputs",
+  localKey: "bsf.balancing-outputs.v2",
   layKhoa: theoId,
   toRow: (x) => ({
     id: x.id,
-    ky_id: x.kyId,
-    mat_hang_id: x.matHangId,
-    khach_hang_id: x.khachId,
-    kenh: x.kenh,
-    luong_kg: x.luongKg,
-    don_gia: x.donGia,
-    quy_cach: x.quyCach ?? "",
-    ban_hang_id: x.banHangId ?? "",
+    period_id: x.periodId,
+    product_id: x.productId,
+    customer_id: x.customerId,
+    channel: x.channel,
+    quantity_kg: x.quantityKg,
+    unit_price: x.unitPrice,
+    spec: x.spec ?? "",
+    sales_item_id: x.salesItemId ?? "",
   }),
   fromRow: (r) => ({
     id: s(r.id),
-    kyId: s(r.ky_id),
-    matHangId: s(r.mat_hang_id),
-    khachId: s(r.khach_hang_id),
-    kenh: s(r.kenh) as Kenh,
-    luongKg: Number(r.luong_kg ?? 0),
-    donGia: n(r.don_gia),
-    quyCach: s(r.quy_cach),
-    banHangId: s(r.ban_hang_id),
+    periodId: s(r.period_id),
+    productId: s(r.product_id),
+    customerId: s(r.customer_id),
+    channel: s(r.channel) as SalesChannel,
+    quantityKg: Number(r.quantity_kg ?? 0),
+    unitPrice: n(r.unit_price),
+    spec: s(r.spec),
+    salesItemId: s(r.sales_item_id),
   }),
   // Dòng ghi trước 0005 không có quy cách / nguồn bán → coi là dòng nhập tay.
   vaDongCu: (x) => ({
     ...x,
-    quyCach: x.quyCach ?? "",
-    banHangId: x.banHangId ?? "",
+    spec: x.spec ?? "",
+    salesItemId: x.salesItemId ?? "",
   }),
 };
 
 /** Hồ sơ người dùng — khóa `id` = auth user id (uuid). */
-export const BANG_NGUOI_DUNG: AnhXaBang<NguoiDung> = {
-  table: "nguoi_dung",
-  localKey: "bsf.nguoi-dung.v1",
+export const BANG_USER_PROFILE: AnhXaBang<UserProfile> = {
+  table: "user_profiles",
+  localKey: "bsf.user-profiles.v2",
   layKhoa: theoId,
   toRow: (x) => ({
     id: x.id,
-    ho_ten: x.hoTen,
+    full_name: x.fullName,
     username: x.username,
-    vai_tro: vaiTroThanhChuoi(x.vaiTro), // mảng → CSV (cột text)
+    roles: rolesToCsv(x.roles), // mảng → CSV (cột text)
   }),
   fromRow: (r) => ({
     id: s(r.id),
-    hoTen: s(r.ho_ten),
+    fullName: s(r.full_name),
     username: s(r.username),
-    vaiTro: vaiTroTuChuoi(s(r.vai_tro)), // CSV → mảng
+    roles: rolesFromCsv(s(r.roles)), // CSV → mảng
   }),
 };
 
 /** Phiếu bán — một khách, một lượt, nhiều dòng mặt hàng. */
-export const BANG_PHIEU_BAN: AnhXaBang<PhieuBan> = {
-  table: "phieu_ban",
-  localKey: "bsf.phieu-ban.v1",
+export const BANG_SALES_INVOICE: AnhXaBang<SalesInvoice> = {
+  table: "sales_invoices",
+  localKey: "bsf.sales-invoices.v2",
   layKhoa: theoId,
   toRow: (x) => ({
     id: x.id,
-    ngay_giao: x.ngayGiao,
-    ngay_ghi_so: x.ngayGhiSo,
-    ly_do_ghi_bu: x.lyDoGhiBu,
-    phan_xuong: x.phanXuong,
-    khach_hang_id: x.khachId,
-    kenh: x.kenh,
-    ghi_chu: x.ghiChu,
+    delivery_date: x.deliveryDate,
+    posting_date: x.postingDate,
+    backdate_reason: x.backdateReason,
+    workshop: x.workshop,
+    customer_id: x.customerId,
+    channel: x.channel,
+    note: x.note,
   }),
   fromRow: (r) => ({
     id: s(r.id),
-    ngayGiao: s(r.ngay_giao).slice(0, 10),
-    ngayGhiSo: s(r.ngay_ghi_so).slice(0, 10),
-    lyDoGhiBu: s(r.ly_do_ghi_bu),
-    phanXuong: s(r.phan_xuong) as PhanXuong,
-    khachId: s(r.khach_hang_id),
-    kenh: s(r.kenh) as Kenh,
-    ghiChu: s(r.ghi_chu),
+    deliveryDate: s(r.delivery_date).slice(0, 10),
+    postingDate: s(r.posting_date).slice(0, 10),
+    backdateReason: s(r.backdate_reason),
+    workshop: s(r.workshop) as Workshop,
+    customerId: s(r.customer_id),
+    channel: s(r.channel) as SalesChannel,
+    note: s(r.note),
   }),
 };
 
 /** Dòng bán trong phiếu. */
-export const BANG_BAN_HANG: AnhXaBang<DongBan> = {
-  table: "ban_hang",
-  localKey: "bsf.ban-hang.v1",
+export const BANG_SALES_ITEM: AnhXaBang<SalesItem> = {
+  table: "sales_items",
+  localKey: "bsf.sales-items.v2",
   layKhoa: theoId,
   toRow: (x) => ({
     id: x.id,
-    phieu_id: x.phieuId,
-    ngay: x.ngay || null,
-    mat_hang_id: x.matHangId,
-    quy_cach: x.quyCach,
-    luong_kg: x.luongKg,
-    don_gia: x.donGia,
-    kho_nguon: x.khoNguon,
+    invoice_id: x.invoiceId,
+    delivery_date: x.deliveryDate || null,
+    product_id: x.productId,
+    spec: x.spec,
+    quantity_kg: x.quantityKg,
+    unit_price: x.unitPrice,
+    source_warehouse: x.sourceWarehouse,
   }),
   fromRow: (r) => ({
     id: s(r.id),
-    phieuId: s(r.phieu_id),
-    ngay: s(r.ngay).slice(0, 10),
-    matHangId: s(r.mat_hang_id),
-    quyCach: s(r.quy_cach),
-    luongKg: Number(r.luong_kg ?? 0),
-    donGia: n(r.don_gia),
-    khoNguon: s(r.kho_nguon),
+    invoiceId: s(r.invoice_id),
+    deliveryDate: s(r.delivery_date).slice(0, 10),
+    productId: s(r.product_id),
+    spec: s(r.spec),
+    quantityKg: Number(r.quantity_kg ?? 0),
+    unitPrice: n(r.unit_price),
+    sourceWarehouse: s(r.source_warehouse),
   }),
 };
 
 /* ---------- Module WIP ---------- */
 
 /** Dòng BTP sản xuất ngày. */
-export const BANG_SAN_XUAT: AnhXaBang<DongSanXuat> = {
-  table: "san_xuat_btp",
-  localKey: "bsf.san-xuat.v1",
+export const BANG_WIP_PRODUCTION: AnhXaBang<WipProductionItem> = {
+  table: "production_wips",
+  localKey: "bsf.production-wips.v2",
   layKhoa: theoId,
   toRow: (x) => ({
     id: x.id,
-    ngay: x.ngay,
-    ngay_ghi_so: x.ngayGhiSo || null,
-    ly_do_ghi_bu: x.lyDoGhiBu,
-    phan_xuong: x.phanXuong,
-    mat_hang_id: x.matHangId,
-    quy_cach: x.quyCach,
-    luong_kg: x.luongKg,
-    so_block: x.soBlock,
-    kho: x.kho,
-    trang_thai: x.trangThai,
-    ghi_chu: x.ghiChu,
+    production_date: x.productionDate,
+    posting_date: x.postingDate || null,
+    backdate_reason: x.backdateReason,
+    workshop: x.workshop,
+    product_id: x.productId,
+    spec: x.spec,
+    quantity_kg: x.quantityKg,
+    blocks_count: x.blocksCount,
+    warehouse: x.warehouse,
+    status: x.status,
+    note: x.note,
   }),
   fromRow: (r) => ({
     id: s(r.id),
-    ngay: s(r.ngay).slice(0, 10),
-    ngayGhiSo: s(r.ngay_ghi_so).slice(0, 10),
-    lyDoGhiBu: s(r.ly_do_ghi_bu),
-    phanXuong: s(r.phan_xuong) as PhanXuong,
-    matHangId: s(r.mat_hang_id),
-    quyCach: s(r.quy_cach),
-    luongKg: Number(r.luong_kg ?? 0),
-    soBlock: Number(r.so_block ?? 0),
-    kho: s(r.kho),
-    trangThai: (s(r.trang_thai) || "cho-nhap") as TrangThaiKho,
-    ghiChu: s(r.ghi_chu),
+    productionDate: s(r.production_date).slice(0, 10),
+    postingDate: s(r.posting_date).slice(0, 10),
+    backdateReason: s(r.backdate_reason),
+    workshop: s(r.workshop) as Workshop,
+    productId: s(r.product_id),
+    spec: s(r.spec),
+    quantityKg: Number(r.quantity_kg ?? 0),
+    blocksCount: Number(r.blocks_count ?? 0),
+    warehouse: s(r.warehouse),
+    status: (s(r.status) || "cho-nhap") as WipWarehouseStatus,
+    note: s(r.note),
   }),
 };
 
-/** Chốt ngày sản xuất (bảng riêng, cùng hình dạng ChotNgay). */
-export const BANG_CHOT_SX: AnhXaBang<ChotNgay> = {
-  table: "chot_san_xuat",
-  localKey: "bsf.chot-san-xuat.v1",
+/** Chốt ngày sản xuất (bảng riêng, cùng hình dạng DailyLock). */
+export const BANG_PRODUCTION_LOCK: AnhXaBang<DailyLock> = {
+  table: "production_locks",
+  localKey: "bsf.production-locks.v2",
   layKhoa: theoId,
   toRow: (x) => ({
     id: x.id,
-    ngay: x.ngay,
-    phan_xuong: x.phanXuong,
-    da_chot: x.daChot,
-    chot_luc: x.chotLuc,
-    tong_kg_luc_chot: x.tongKgLucChot,
-    ly_do_mo_lai: x.lyDoMoLai,
-    ghi_chu: x.ghiChu,
+    lock_date: x.lockDate,
+    workshop: x.workshop,
+    is_locked: x.isLocked,
+    locked_at: x.lockedAt,
+    total_kg_at_lock: x.totalKgAtLock,
+    reopen_reason: x.reopenReason,
+    note: x.note,
   }),
   fromRow: (r) => ({
     id: s(r.id),
-    ngay: s(r.ngay).slice(0, 10),
-    phanXuong: s(r.phan_xuong) as PhanXuong,
-    daChot: Boolean(r.da_chot),
-    chotLuc: s(r.chot_luc),
-    tongKgLucChot: Number(r.tong_kg_luc_chot ?? 0),
-    lyDoMoLai: s(r.ly_do_mo_lai),
-    ghiChu: s(r.ghi_chu),
+    lockDate: s(r.lock_date).slice(0, 10),
+    workshop: s(r.workshop) as Workshop,
+    isLocked: Boolean(r.is_locked),
+    lockedAt: s(r.locked_at),
+    totalKgAtLock: Number(r.total_kg_at_lock ?? 0),
+    reopenReason: s(r.reopen_reason),
+    note: s(r.note),
   }),
 };
 
 /** Đơn đặt. */
-export const BANG_DON_DAT: AnhXaBang<DonDat> = {
-  table: "don_dat",
-  localKey: "bsf.don-dat.v1",
+export const BANG_SALES_ORDER: AnhXaBang<SalesOrder> = {
+  table: "sales_orders",
+  localKey: "bsf.sales-orders.v2",
   layKhoa: theoId,
   toRow: (x) => ({
     id: x.id,
-    khach_id: x.khachId,
-    ngay_dat: x.ngayDat,
-    trang_thai: x.trangThai,
-    ghi_chu: x.ghiChu,
+    customer_id: x.customerId,
+    order_date: x.orderDate,
+    status: x.status,
+    note: x.note,
   }),
   fromRow: (r) => ({
     id: s(r.id),
-    khachId: s(r.khach_id),
-    ngayDat: s(r.ngay_dat).slice(0, 10),
-    trangThai: (s(r.trang_thai) || "dang-gom") as TrangThaiDon,
-    ghiChu: s(r.ghi_chu),
+    customerId: s(r.customer_id),
+    orderDate: s(r.order_date).slice(0, 10),
+    status: (s(r.status) || "dang-gom") as SalesOrderStatus,
+    note: s(r.note),
   }),
 };
 
 /** Dòng cần của đơn. */
-export const BANG_DONG_DON: AnhXaBang<DongDon> = {
-  table: "dong_don",
-  localKey: "bsf.dong-don.v1",
+export const BANG_ORDER_ITEM: AnhXaBang<OrderItem> = {
+  table: "order_items",
+  localKey: "bsf.order-items.v2",
   layKhoa: theoId,
   toRow: (x) => ({
     id: x.id,
-    don_id: x.donId,
-    mat_hang_id: x.matHangId,
-    quy_cach: x.quyCach,
-    luong_kg_can: x.luongKgCan,
-    so_block_can: x.soBlockCan,
+    order_id: x.orderId,
+    product_id: x.productId,
+    spec: x.spec,
+    required_quantity_kg: x.requiredQuantityKg,
+    required_blocks_count: x.requiredBlocksCount,
   }),
   fromRow: (r) => ({
     id: s(r.id),
-    donId: s(r.don_id),
-    matHangId: s(r.mat_hang_id),
-    quyCach: s(r.quy_cach),
-    luongKgCan: Number(r.luong_kg_can ?? 0),
-    soBlockCan: Number(r.so_block_can ?? 0),
+    orderId: s(r.order_id),
+    productId: s(r.product_id),
+    spec: s(r.spec),
+    requiredQuantityKg: Number(r.required_quantity_kg ?? 0),
+    requiredBlocksCount: Number(r.required_blocks_count ?? 0),
   }),
 };
 
 /** Lệnh xuất. */
-export const BANG_LENH_XUAT: AnhXaBang<LenhXuat> = {
-  table: "lenh_xuat",
-  localKey: "bsf.lenh-xuat.v1",
+export const BANG_EXPORT_ORDER: AnhXaBang<ExportOrder> = {
+  table: "export_orders",
+  localKey: "bsf.export-orders.v2",
   layKhoa: theoId,
   toRow: (x) => ({
     id: x.id,
-    don_id: x.donId,
-    ngay: x.ngay,
-    trang_thai: x.trangThai,
-    ghi_chu: x.ghiChu,
+    order_id: x.orderId,
+    export_date: x.exportDate,
+    status: x.status,
+    note: x.note,
   }),
   fromRow: (r) => ({
     id: s(r.id),
-    donId: s(r.don_id),
-    ngay: s(r.ngay).slice(0, 10),
-    trangThai: (s(r.trang_thai) || "mo") as "mo" | "dong",
-    ghiChu: s(r.ghi_chu),
+    orderId: s(r.order_id),
+    exportDate: s(r.export_date).slice(0, 10),
+    status: (s(r.status) || "mo") as "mo" | "dong",
+    note: s(r.note),
   }),
 };
 
 /** Dòng thực xuất (trừ tồn theo lô). */
-export const BANG_DONG_LENH: AnhXaBang<DongLenh> = {
-  table: "dong_lenh",
-  localKey: "bsf.dong-lenh.v1",
+export const BANG_EXPORT_ITEM: AnhXaBang<ExportItem> = {
+  table: "export_items",
+  localKey: "bsf.export-items.v2",
   layKhoa: theoId,
   toRow: (x) => ({
     id: x.id,
-    lenh_id: x.lenhId,
-    san_xuat_id: x.sanXuatId,
-    mat_hang_id: x.matHangId,
-    quy_cach: x.quyCach,
-    luong_kg: x.luongKg,
-    so_block: x.soBlock,
+    export_id: x.exportId,
+    wip_id: x.wipId,
+    product_id: x.productId,
+    spec: x.spec,
+    quantity_kg: x.quantityKg,
+    blocks_count: x.blocksCount,
   }),
   fromRow: (r) => ({
     id: s(r.id),
-    lenhId: s(r.lenh_id),
-    sanXuatId: s(r.san_xuat_id),
-    matHangId: s(r.mat_hang_id),
-    quyCach: s(r.quy_cach),
-    luongKg: Number(r.luong_kg ?? 0),
-    soBlock: Number(r.so_block ?? 0),
+    exportId: s(r.export_id),
+    wipId: s(r.wip_id),
+    productId: s(r.product_id),
+    spec: s(r.spec),
+    quantityKg: Number(r.quantity_kg ?? 0),
+    blocksCount: Number(r.blocks_count ?? 0),
   }),
 };
 
@@ -681,7 +674,7 @@ async function dongBoCho<T>(
   const capNhat = cho.them
     .map((k) => theoKhoa.get(k))
     .filter((x): x is T => x !== undefined)
-    .map((x) => ({ ...bang.toRow(x), xi_nghiep_id: SITE_ID }));
+    .map((x) => ({ ...bang.toRow(x), site_id: SITE_ID }));
 
   try {
     if (capNhat.length > 0) {
@@ -738,7 +731,7 @@ export function useBang<T>(bang: AnhXaBang<T>, seed: () => T[] = () => []) {
       const { data, error } = await supabase
         .from(bang.table)
         .select("*")
-        .eq("xi_nghiep_id", SITE_ID);
+        .eq("site_id", SITE_ID);
       if (huy) return;
       if (error) {
         setTrangThai("loi");
@@ -762,7 +755,7 @@ export function useBang<T>(bang: AnhXaBang<T>, seed: () => T[] = () => []) {
             const { error: e2 } = await supabase
               .from(bang.table)
               .upsert(
-                s0.map((x) => ({ ...bang.toRow(x), xi_nghiep_id: SITE_ID })),
+                s0.map((x) => ({ ...bang.toRow(x), site_id: SITE_ID })),
                 { onConflict: khoa }
               );
             if (huy) return;

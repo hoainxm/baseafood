@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
-import type { ThanhPham } from "@/types";
-import { useThanhPham } from "@/lib/danhMuc";
+import type { FinishedGood } from "@/types";
+import { useFinishedGoods } from "@/lib/danhMuc";
 import {
   Badge,
   Button,
@@ -20,42 +20,42 @@ import { Search, X } from "lucide-react";
  */
 export default function ThanhPhamScreen() {
   const [nhom, setNhom] = useState("");
-  const [items] = useThanhPham();
+  const [items] = useFinishedGoods();
 
   const nhomList = useMemo(
-    () => Array.from(new Set(items.map((i) => i.nhom))).sort(),
+    () => Array.from(new Set(items.map((i) => i.groupName))).sort(),
     [items]
   );
 
   const rows = useMemo(
-    () => (nhom ? items.filter((i) => i.nhom === nhom) : items),
+    () => (nhom ? items.filter((i) => i.groupName === nhom) : items),
     [nhom, items]
   );
 
-  const cols: Cot<ThanhPham>[] = [
+  const cols: Cot<FinishedGood>[] = [
     {
-      key: "ten",
+      key: "name",
       header: "Tên thành phẩm",
       chinh: true,
-      render: (r) => r.ten,
-      sapXep: (r) => r.ten,
+      render: (r) => r.name,
+      sapXep: (r) => r.name,
     },
     {
-      key: "ma",
+      key: "code",
       header: "Mã",
-      render: (r) => <span className="tnum font-medium">{r.ma}</span>,
-      sapXep: (r) => r.ma,
+      render: (r) => <span className="tnum font-medium">{r.code}</span>,
+      sapXep: (r) => r.code,
     },
     {
-      key: "nhom",
+      key: "groupName",
       header: "Nhóm",
-      render: (r) => <Badge>{r.nhom}</Badge>,
-      sapXep: (r) => r.nhom,
+      render: (r) => <Badge>{r.groupName}</Badge>,
+      sapXep: (r) => r.groupName,
     },
     {
-      key: "dvt",
+      key: "unit",
       header: "Đơn vị",
-      render: (r) => r.dvt,
+      render: (r) => r.unit,
       anTrenDienThoai: true,
     },
   ];
@@ -112,8 +112,8 @@ export default function ThanhPhamScreen() {
         <RecordTable
           columns={cols}
           rows={rows}
-          getKey={(r) => r.ma}
-          timKiem={(r) => `${r.ma} ${r.ten} ${r.nhom}`}
+          getKey={(r) => r.code}
+          timKiem={(r) => `${r.code} ${r.name} ${r.groupName}`}
           nhanTimKiem="Tìm theo tên hoặc mã thành phẩm…"
         />
       )}

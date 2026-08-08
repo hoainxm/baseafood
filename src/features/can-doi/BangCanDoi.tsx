@@ -1,13 +1,13 @@
 import type { ReactNode } from "react";
 import type {
-  KyCanDoi,
-  DongNLVao,
-  DongPheLieu,
-  DongTP,
-  MatHang,
-  KhachHang,
+  BalancingPeriod,
+  BalancingInputItem,
+  ScrapItem,
+  BalancingOutputItem,
+  Product,
+  Customer,
 } from "@/types";
-import type { KetQuaCanDoi } from "@/lib/canDoi";
+import type { BalancingResult } from "@/lib/canDoi";
 import { Button } from "@/design-system";
 import { num } from "@/lib/format";
 import { Printer, X } from "lucide-react";
@@ -22,17 +22,17 @@ export default function BangCanDoi({
   kq,
   onClose,
 }: {
-  ky: KyCanDoi;
-  nlVao: DongNLVao[];
-  pheLieu: DongPheLieu[];
-  tp: DongTP[];
-  matHang: MatHang[];
-  khach: KhachHang[];
-  kq: KetQuaCanDoi;
+  ky: BalancingPeriod;
+  nlVao: BalancingInputItem[];
+  pheLieu: ScrapItem[];
+  tp: BalancingOutputItem[];
+  matHang: Product[];
+  khach: Customer[];
+  kq: BalancingResult;
   onClose: () => void;
 }) {
-  const tenMH = (id: string) => matHang.find((m) => m.id === id)?.ten || "—";
-  const tenKH = (id: string) => khach.find((k) => k.id === id)?.ten || "—";
+  const tenMH = (id: string) => matHang.find((m) => m.id === id)?.name || "—";
+  const tenKH = (id: string) => khach.find((k) => k.id === id)?.name || "—";
 
   return (
     <div className="print-root fixed inset-0 z-50 overflow-auto bg-white p-6 text-slate-900 sm:p-10">
@@ -49,9 +49,9 @@ export default function BangCanDoi({
       <div className="mx-auto max-w-4xl">
         <div className="text-center">
           <h1 className="text-lg font-bold uppercase tracking-wide">
-            Bảng cân đối {ky.loaiNL}
+            Bảng cân đối {ky.materialTypeName}
           </h1>
-          <p className="text-sm">Ngày {ky.ngayList || "…"}</p>
+          <p className="text-sm">Ngày {ky.dateRangeDescription || "…"}</p>
         </div>
 
         {/* Nguyên liệu vào */}
@@ -70,20 +70,20 @@ export default function BangCanDoi({
               {nlVao.map((r) => (
                 <Tr key={r.id}>
                   <Td>
-                    {r.ten}
-                    <span className="ml-1 text-xs text-slate-500">({r.nhom})</span>
+                    {r.name}
+                    <span className="ml-1 text-xs text-slate-500">({r.groupName})</span>
                   </Td>
-                  <Td right>{num(r.soLuongKg)}</Td>
-                  <Td right>{num(r.donGia)}</Td>
-                  <Td right>{num(r.soLuongKg * (r.donGia ?? 0))}</Td>
-                  <Td right>{r.tyLe != null ? `${num(r.tyLe)}%` : ""}</Td>
+                  <Td right>{num(r.quantityKg)}</Td>
+                  <Td right>{num(r.unitPrice)}</Td>
+                  <Td right>{num(r.quantityKg * (r.unitPrice ?? 0))}</Td>
+                  <Td right>{r.ratioPercentage != null ? `${num(r.ratioPercentage)}%` : ""}</Td>
                 </Tr>
               ))}
               <Tr total>
                 <Td>Tổng nguyên liệu</Td>
-                <Td right>{num(kq.tongNLVao)}</Td>
+                <Td right>{num(kq.totalInputKg)}</Td>
                 <Td right></Td>
-                <Td right>{num(kq.giaTriNL)}</Td>
+                <Td right>{num(kq.materialValue)}</Td>
                 <Td right></Td>
               </Tr>
             </tbody>
@@ -105,17 +105,17 @@ export default function BangCanDoi({
               <tbody>
                 {pheLieu.map((r) => (
                   <Tr key={r.id}>
-                    <Td>{r.loai}</Td>
-                    <Td right>{num(r.soLuongKg)}</Td>
-                    <Td right>{num(r.donGiaBan)}</Td>
-                    <Td right>{num(r.soLuongKg * (r.donGiaBan ?? 0))}</Td>
+                    <Td>{r.name}</Td>
+                    <Td right>{num(r.quantityKg)}</Td>
+                    <Td right>{num(r.sellingPrice)}</Td>
+                    <Td right>{num(r.quantityKg * (r.sellingPrice ?? 0))}</Td>
                   </Tr>
                 ))}
                 <Tr total>
                   <Td>Tổng phế liệu</Td>
                   <Td right></Td>
                   <Td right></Td>
-                  <Td right>{num(kq.giaTriPheLieu)}</Td>
+                  <Td right>{num(kq.scrapValue)}</Td>
                 </Tr>
               </tbody>
             </table>
@@ -137,16 +137,16 @@ export default function BangCanDoi({
             </thead>
             <tbody>
               {tp.map((r) => {
-                const xk = r.kenh === "Xuất khẩu";
-                const tien = r.luongKg * (r.donGia ?? 0);
+                const xk = r.channel === "Xuất khẩu";
+                const tien = r.quantityKg * (r.unitPrice ?? 0);
                 return (
                   <Tr key={r.id}>
-                    <Td>{tenMH(r.matHangId)}</Td>
-                    <Td>{tenKH(r.khachId)}</Td>
+                    <Td>{tenMH(r.productId)}</Td>
+                    <Td>{tenKH(r.customerId)}</Td>
                     <Td>{xk ? "XK" : "Nội địa"}</Td>
-                    <Td right>{num(r.luongKg)}</Td>
+                    <Td right>{num(r.quantityKg)}</Td>
                     <Td right>
-                      {num(r.donGia)}
+                      {num(r.unitPrice)}
                       {xk ? " $" : ""}
                     </Td>
                     <Td right>
@@ -160,7 +160,7 @@ export default function BangCanDoi({
                 <Td>Tổng bán thành phẩm</Td>
                 <Td></Td>
                 <Td></Td>
-                <Td right>{num(kq.tongTP)}</Td>
+                <Td right>{num(kq.totalOutputKg)}</Td>
                 <Td right></Td>
                 <Td right></Td>
               </Tr>
@@ -171,18 +171,18 @@ export default function BangCanDoi({
         {/* Ghi chú / tính toán */}
         <Section title="Cân đối">
           <div className="grid grid-cols-2 gap-x-8 gap-y-1 text-sm">
-            <KV k="Tổng bán thành phẩm" v={`${num(kq.tongTP)} kg`} />
-            <KV k="Tỉ giá (VND/USD)" v={num(ky.tiGia)} />
-            <KV k="Định mức chế biến" v={num(kq.dinhMuc)} strong />
-            <KV k="Chi phí chế biến / kg TP" v={num(ky.chiPhiCB)} />
-            <KV k="Tỉ lệ thu hồi / tổng nhận" v={kq.tyLeThuHoi == null ? "—" : num(kq.tyLeThuHoi)} />
-            <KV k="Giá trị nguyên liệu" v={num(kq.giaTriNL)} />
-            <KV k="Giá thành" v={num(kq.giaThanh)} />
-            <KV k="Giá trị xuất (VND)" v={num(kq.giaTriXuat)} />
-            <KV k="Bình quân / kg NL" v={num(kq.binhQuanKgNL)} />
+            <KV k="Tổng bán thành phẩm" v={`${num(kq.totalOutputKg)} kg`} />
+            <KV k="Tỉ giá (VND/USD)" v={num(ky.exchangeRate)} />
+            <KV k="Định mức chế biến" v={num(kq.norm)} strong />
+            <KV k="Chi phí chế biến / kg TP" v={num(ky.processingCostPerKg)} />
+            <KV k="Tỉ lệ thu hồi / tổng nhận" v={kq.yieldRate == null ? "—" : num(kq.yieldRate)} />
+            <KV k="Giá trị nguyên liệu" v={num(kq.materialValue)} />
+            <KV k="Giá thành" v={num(kq.costOfGoods)} />
+            <KV k="Giá trị xuất (VND)" v={num(kq.exportValue)} />
+            <KV k="Bình quân / kg NL" v={num(kq.avgCostPerKgMaterial)} />
             <KV
-              k={kq.laiLo >= 0 ? "LÃI" : "LỖ"}
-              v={`${num(Math.abs(kq.laiLo))} VND`}
+              k={kq.profitOrLoss >= 0 ? "LÃI" : "LỖ"}
+              v={`${num(Math.abs(kq.profitOrLoss))} VND`}
               strong
             />
           </div>

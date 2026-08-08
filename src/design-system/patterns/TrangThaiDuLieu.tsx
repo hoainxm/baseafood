@@ -24,7 +24,7 @@ export function TrangThaiDuLieu({ className }: { className?: string }) {
       const { error } = await supabase
         .from("dai_ly")
         .select("id")
-        .eq("xi_nghiep_id", SITE_ID)
+        .eq("site_id", SITE_ID)
         .limit(1);
       if (huy) return;
       if (error) ketNoi.baoLoi(error.message);

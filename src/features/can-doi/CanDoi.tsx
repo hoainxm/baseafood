@@ -1,31 +1,32 @@
 import { useMemo, useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import type { ReactNode } from "react";
 import type {
-  KyCanDoi,
-  DongBan,
-  DongNLVao,
-  DongPheLieu,
-  DongTP,
-  MatHang,
-  KhachHang,
-  NhomNL,
-  Kenh,
-  PhieuBan,
+  BalancingPeriod,
+  SalesItem,
+  BalancingInputItem,
+  ScrapItem,
+  BalancingOutputItem,
+  Product,
+  Customer,
+  InputGroup,
+  SalesChannel,
+  SalesInvoice,
 } from "@/types";
-import { NHOM_NL, KENH } from "@/types";
+import { INPUT_GROUPS, SALES_CHANNELS } from "@/types";
 import { uid } from "@/lib/db";
 import {
-  useBanHang,
-  useKhachHang,
-  useKyCanDoi,
-  useLoaiNL,
-  useMatHang,
-  useNLVao,
-  usePheLieu,
-  usePhieuBan,
-  useTPRa,
+  useSalesItems,
+  useCustomers,
+  useBalancingPeriods,
+  useMaterialTypes,
+  useProducts,
+  useBalancingInputs,
+  useScraps,
+  useSalesInvoices,
+  useBalancingOutputs,
 } from "@/lib/danhMuc";
-import { tinhCanDoi } from "@/lib/canDoi";
+import { calculateBalancing } from "@/lib/canDoi";
 import {
   Badge,
   Button,
@@ -52,7 +53,7 @@ import {
 } from "@/design-system";
 import { num, viDate } from "@/lib/format";
 import { ChevronLeft, FileText, Pencil, Plus, Scale, X } from "lucide-react";
-import BangCanDoi from "@/features/BangCanDoi";
+import BangCanDoi from "./BangCanDoi";
 
 /** Chuỗi ngày để in trên bảng, sinh từ khoảng ngày đã chọn. */
 function moTaKhoang(tu?: string, den?: string): string {
@@ -62,24 +63,33 @@ function moTaKhoang(tu?: string, den?: string): string {
 }
 
 export default function CanDoiScreen() {
-  const [kyList, persistKy] = useKyCanDoi();
-  const [selId, setSelId] = useState<string | null>(null);
-  const [loaiNLDanhMuc, setLoaiNLDanhMuc] = useLoaiNL();
+  const [kyList, persistKy] = useBalancingPeriods();
+  const { kyId } = useParams<{ kyId?: string }>();
+  const navigate = useNavigate();
+  const selId = kyId || null;
+  const setSelId = (id: string | null) => {
+    if (id) {
+      navigate(`/can-doi/${id}`);
+    } else {
+      navigate("/can-doi");
+    }
+  };
+  const [loaiNLDanhMuc, setLoaiNLDanhMuc] = useMaterialTypes();
 
   /* Xóa kỳ phải xóa luôn dòng con của nó (NL vào / phế liệu / TP ra), nếu không
      các dòng này mồ côi trong kho — chiếm chỗ, sai tổng khi thống kê sau này. */
-  const [tatCaNL, ghiNL] = useNLVao();
-  const [tatCaPL, ghiPL] = usePheLieu();
-  const [tatCaTP, ghiTP] = useTPRa();
+  const [tatCaNL, ghiNL] = useBalancingInputs();
+  const [tatCaPL, ghiPL] = useScraps();
+  const [tatCaTP, ghiTP] = useBalancingOutputs();
 
   /** Gõ loại mới trong ô chọn → LƯU LUÔN vào danh mục (rule 7), không để mồ côi. */
   const themLoaiNL = (ten: string) => {
-    setLoaiNLDanhMuc([...loaiNLDanhMuc, { id: uid(), ten, loai: "", ghiChu: "" }]);
+    setLoaiNLDanhMuc([...loaiNLDanhMuc, { id: uid(), name: ten, category: "", note: "" }]);
     notify.daLuu(`Đã thêm loại nguyên liệu "${ten}" vào danh mục`);
     return ten;
   };
 
-  const [dang, setDang] = useState<KyCanDoi | null>(null);
+  const [dang, setDang] = useState<BalancingPeriod | null>(null);
   const [laThem, setLaThem] = useState(false);
   const [loi, setLoi] = useState<LoiNhap[]>([]);
 
@@ -87,13 +97,13 @@ export default function CanDoiScreen() {
     const homNay = dateToIso(new Date());
     setDang({
       id: uid(),
-      loaiNL: "",
-      ngayList: "",
-      tuNgay: homNay,
-      denNgay: homNay,
-      tongNLNhan: null,
-      tiGia: 26000,
-      chiPhiCB: null,
+      materialTypeName: "",
+      dateRangeDescription: "",
+      startDate: homNay,
+      endDate: homNay,
+      totalInputKg: null,
+      exchangeRate: 26000,
+      processingCostPerKg: null,
       createdAt: new Date().toISOString(),
     });
     setLaThem(true);
@@ -103,20 +113,20 @@ export default function CanDoiScreen() {
   const luuKy = () => {
     if (!dang) return;
     const ls: LoiNhap[] = [];
-    if (!dang.loaiNL.trim())
+    if (!dang.materialTypeName.trim())
       ls.push({ truong: "Loại nguyên liệu", thongBao: "Chưa chọn loại" });
-    if (!dang.tuNgay)
+    if (!dang.startDate)
       ls.push({ truong: "Ngày tiếp nhận", thongBao: "Chưa chọn ngày" });
     setLoi(ls);
     if (ls.length > 0) return;
 
-    const ban: KyCanDoi = {
+    const ban: BalancingPeriod = {
       ...dang,
-      ngayList: moTaKhoang(dang.tuNgay, dang.denNgay),
+      dateRangeDescription: moTaKhoang(dang.startDate, dang.endDate),
     };
     if (laThem) {
       persistKy([ban, ...kyList]);
-      notify.daLuu(`Đã tạo kỳ cân đối "${ban.loaiNL}"`);
+      notify.daLuu(`Đã tạo kỳ cân đối "${ban.materialTypeName}"`);
       setSelId(ban.id);
     } else {
       persistKy(kyList.map((k) => (k.id === ban.id ? ban : k)));
@@ -125,24 +135,24 @@ export default function CanDoiScreen() {
     setDang(null);
   };
 
-  const xoaKy = (k: KyCanDoi) => {
+  const xoaKy = (k: BalancingPeriod) => {
     const truocKy = kyList;
     const truocNL = tatCaNL;
     const truocPL = tatCaPL;
     const truocTP = tatCaTP;
     persistKy(kyList.filter((x) => x.id !== k.id));
-    ghiNL(tatCaNL.filter((r) => r.kyId !== k.id));
+    ghiNL(tatCaNL.filter((r) => r.periodId !== k.id));
     /* Phế liệu cân ở màn Nhập hàng chỉ MƯỢN kỳ này — xóa kỳ thì gỡ liên kết,
        tuyệt đối không xóa theo, vì bản gốc là số cân của sổ nhập hàng. */
     ghiPL(
       tatCaPL
-        .filter((r) => r.kyId !== k.id || r.nguon === "Nhập hàng")
+        .filter((r) => r.periodId !== k.id || r.source === "Nhập hàng")
         .map((r) =>
-          r.kyId === k.id && r.nguon === "Nhập hàng" ? { ...r, kyId: "" } : r
+          r.periodId === k.id && r.source === "Nhập hàng" ? { ...r, periodId: "" } : r
         )
     );
-    ghiTP(tatCaTP.filter((r) => r.kyId !== k.id));
-    notify.daXoa(`Đã xóa kỳ "${k.loaiNL}" và toàn bộ dòng của kỳ`, () => {
+    ghiTP(tatCaTP.filter((r) => r.periodId !== k.id));
+    notify.daXoa(`Đã xóa kỳ "${k.materialTypeName}" và toàn bộ dòng của kỳ`, () => {
       persistKy(truocKy);
       ghiNL(truocNL);
       ghiPL(truocPL);
@@ -164,20 +174,20 @@ export default function CanDoiScreen() {
     );
   }
 
-  const cols: Cot<KyCanDoi>[] = [
+  const cols: Cot<BalancingPeriod>[] = [
     {
       key: "loaiNL",
       header: "Loại nguyên liệu",
       chinh: true,
-      render: (r) => r.loaiNL,
-      sapXep: (r) => r.loaiNL,
+      render: (r) => r.materialTypeName,
+      sapXep: (r) => r.materialTypeName,
     },
     {
       key: "ngay",
       header: "Ngày tiếp nhận",
       render: (r) =>
-        r.ngayList || <span className="text-muted-foreground">Chưa ghi</span>,
-      sapXep: (r) => r.tuNgay ?? "",
+        r.dateRangeDescription || <span className="text-muted-foreground">Chưa ghi</span>,
+      sapXep: (r) => r.startDate ?? "",
     },
     {
       key: "tongNLNhan",
@@ -185,12 +195,12 @@ export default function CanDoiScreen() {
       so: true,
       anTrenDienThoai: true,
       render: (r) =>
-        r.tongNLNhan != null ? (
-          num(r.tongNLNhan)
+        r.totalInputKg != null ? (
+          num(r.totalInputKg)
         ) : (
           <span className="text-muted-foreground">—</span>
         ),
-      sapXep: (r) => r.tongNLNhan ?? 0,
+      sapXep: (r) => r.totalInputKg ?? 0,
     },
   ];
 
@@ -229,7 +239,7 @@ export default function CanDoiScreen() {
           columns={cols}
           rows={kyList}
           getKey={(r) => r.id}
-          timKiem={(r) => `${r.loaiNL} ${r.ngayList}`}
+          timKiem={(r) => `${r.materialTypeName} ${r.dateRangeDescription}`}
           nhanTimKiem="Tìm kỳ theo loại nguyên liệu…"
           actions={(r) => (
             <>
@@ -249,7 +259,7 @@ export default function CanDoiScreen() {
                 Sửa
               </Button>
               <ConfirmDelete
-                moTaBanGhi={`Kỳ "${r.loaiNL}" — ${r.ngayList || "chưa ghi ngày"}`}
+                moTaBanGhi={`Kỳ "${r.materialTypeName}" — ${r.dateRangeDescription || "chưa ghi ngày"}`}
                 onConfirm={() => xoaKy(r)}
                 tieuDe="Xóa kỳ cân đối này?"
                 nhanNut="Xóa kỳ"
@@ -280,12 +290,12 @@ export default function CanDoiScreen() {
                 label="Loại nguyên liệu"
                 required
                 hint="Lô nguyên liệu đem cân đối, VD: Bạch tuộc 2 da."
-                value={dang.loaiNL}
-                onChange={(v) => setDang((d) => (d ? { ...d, loaiNL: v } : d))}
+                value={dang.materialTypeName}
+                onChange={(v) => setDang((d) => (d ? { ...d, materialTypeName: v } : d))}
                 options={loaiNLDanhMuc.map((l) => ({
-                  value: l.ten,
-                  label: l.ten,
-                  phu: l.loai || undefined,
+                  value: l.name,
+                  label: l.name,
+                  phu: l.category || undefined,
                 }))}
                 onCreate={themLoaiNL}
               />
@@ -294,10 +304,10 @@ export default function CanDoiScreen() {
                 label="Ngày tiếp nhận"
                 required
                 hint="Kỳ xưởng Đông thường 5 ngày — có nút chọn nhanh bên dưới."
-                tuNgay={dang.tuNgay ?? ""}
-                denNgay={dang.denNgay ?? ""}
+                startDate={dang.startDate ?? ""}
+                endDate={dang.endDate ?? ""}
                 onChange={(tu, den) =>
-                  setDang((d) => (d ? { ...d, tuNgay: tu, denNgay: den } : d))
+                  setDang((d) => (d ? { ...d, startDate: tu, endDate: den } : d))
                 }
               />
 
@@ -305,25 +315,25 @@ export default function CanDoiScreen() {
                 <NumberField
                   label="Tổng NL nhận cả kỳ"
                   unit="kg"
-                  value={dang.tongNLNhan}
+                  value={dang.totalInputKg}
                   onChange={(v) =>
-                    setDang((d) => (d ? { ...d, tongNLNhan: v } : d))
+                    setDang((d) => (d ? { ...d, totalInputKg: v } : d))
                   }
                   hint="Lấy từ bảng phụ — để tính tỉ lệ thu hồi."
                 />
                 <NumberField
                   label="Chi phí chế biến / kg TP"
                   unit="đ"
-                  value={dang.chiPhiCB}
+                  value={dang.processingCostPerKg}
                   onChange={(v) =>
-                    setDang((d) => (d ? { ...d, chiPhiCB: v } : d))
+                    setDang((d) => (d ? { ...d, processingCostPerKg: v } : d))
                   }
                 />
                 <NumberField
                   label="Tỉ giá"
                   unit="đ/USD"
-                  value={dang.tiGia}
-                  onChange={(v) => setDang((d) => (d ? { ...d, tiGia: v } : d))}
+                  value={dang.exchangeRate}
+                  onChange={(v) => setDang((d) => (d ? { ...d, exchangeRate: v } : d))}
                 />
               </div>
             </div>
@@ -350,84 +360,84 @@ function KyDetail({
   onBack,
   onChangeKy,
 }: {
-  ky: KyCanDoi;
+  ky: BalancingPeriod;
   onBack: () => void;
-  onChangeKy: (patch: Partial<KyCanDoi>) => void;
+  onChangeKy: (patch: Partial<BalancingPeriod>) => void;
 }) {
   /* Repo trả về TOÀN BỘ dòng của mọi kỳ; màn này chỉ làm việc với dòng của kỳ
      đang mở, khi ghi thì ghép lại với dòng của các kỳ khác. */
-  const [tatCaNL, ghiNL] = useNLVao();
-  const [tatCaPL, ghiPL] = usePheLieu();
-  const [tatCaTP, ghiTP] = useTPRa();
+  const [tatCaNL, ghiNL] = useBalancingInputs();
+  const [tatCaPL, ghiPL] = useScraps();
+  const [tatCaTP, ghiTP] = useBalancingOutputs();
 
   const nlVao = useMemo(
-    () => tatCaNL.filter((r) => r.kyId === ky.id),
+    () => tatCaNL.filter((r) => r.periodId === ky.id),
     [tatCaNL, ky.id]
   );
   const pheLieu = useMemo(
-    () => tatCaPL.filter((r) => r.kyId === ky.id),
+    () => tatCaPL.filter((r) => r.periodId === ky.id),
     [tatCaPL, ky.id]
   );
   const tp = useMemo(
-    () => tatCaTP.filter((r) => r.kyId === ky.id),
+    () => tatCaTP.filter((r) => r.periodId === ky.id),
     [tatCaTP, ky.id]
   );
-  const [matHang, setMatHang] = useMatHang();
-  const [khach, setKhach] = useKhachHang();
-  const [loaiNLDanhMuc, setLoaiNLDanhMuc] = useLoaiNL();
+  const [matHang, setMatHang] = useProducts();
+  const [khach, setKhach] = useCustomers();
+  const [loaiNLDanhMuc, setLoaiNLDanhMuc] = useMaterialTypes();
   const [showBang, setShowBang] = useState(false);
 
   /* Sổ bán — hút dòng bán trong khoảng ngày của kỳ vào khối thành phẩm ra,
      giống hút phế liệu: một số liệu, một nguồn chuẩn (sổ bán). */
-  const [tatCaBan] = useBanHang();
-  const [dsPhieu] = usePhieuBan();
+  const [tatCaBan] = useSalesItems();
+  const [dsPhieu] = useSalesInvoices();
   const phieuTheoId = useMemo(
     () => new Map(dsPhieu.map((p) => [p.id, p])),
     [dsPhieu]
   );
   /** Dòng bán đã hút vào bất kỳ kỳ nào — không gợi ý lại (chống hút trùng). */
   const banDaHut = useMemo(
-    () => new Set(tatCaTP.map((t) => t.banHangId).filter(Boolean)),
+    () => new Set(tatCaTP.map((t) => t.salesItemId).filter(Boolean)),
     [tatCaTP]
   );
   const banChoHut = useMemo(
     () =>
       tatCaBan
         .filter((b) => {
-          const p = phieuTheoId.get(b.phieuId);
+          const p = phieuTheoId.get(b.invoiceId);
           if (!p) return false;
           if (banDaHut.has(b.id)) return false;
           return (
-            !ky.tuNgay ||
-            !ky.denNgay ||
-            (p.ngayGiao >= ky.tuNgay && p.ngayGiao <= ky.denNgay)
+            !ky.startDate ||
+            !ky.endDate ||
+            (p.deliveryDate >= ky.startDate && p.deliveryDate <= ky.endDate)
           );
         })
-        .map((b) => ({ ban: b, phieu: phieuTheoId.get(b.phieuId)! })),
-    [tatCaBan, phieuTheoId, banDaHut, ky.tuNgay, ky.denNgay]
+        .map((b) => ({ ban: b, phieu: phieuTheoId.get(b.invoiceId)! })),
+    [tatCaBan, phieuTheoId, banDaHut, ky.startDate, ky.endDate]
   );
 
-  const ghepLai = <T extends { kyId: string }>(tatCa: T[], kyRows: T[]) => [
-    ...tatCa.filter((r) => r.kyId !== ky.id),
+  const ghepLai = <T extends { periodId: string }>(tatCa: T[], kyRows: T[]) => [
+    ...tatCa.filter((r) => r.periodId !== ky.id),
     ...kyRows,
   ];
-  const persistNL = (n: DongNLVao[]) => ghiNL(ghepLai(tatCaNL, n));
-  const persistPL = (n: DongPheLieu[]) => ghiPL(ghepLai(tatCaPL, n));
-  const persistTP = (n: DongTP[]) => ghiTP(ghepLai(tatCaTP, n));
+  const persistNL = (n: BalancingInputItem[]) => ghiNL(ghepLai(tatCaNL, n));
+  const persistPL = (n: ScrapItem[]) => ghiPL(ghepLai(tatCaPL, n));
+  const persistTP = (n: BalancingOutputItem[]) => ghiTP(ghepLai(tatCaTP, n));
 
   /** Hút dòng bán trong khoảng ngày của kỳ → tạo dòng thành phẩm ra (bản sao,
       gắn banHangId để chống hút trùng). Bỏ khỏi kỳ = xóa bản sao, số gốc ở sổ bán. */
-  const hutBanVaoKy = (items: { ban: DongBan; phieu: PhieuBan }[]) => {
-    const them: DongTP[] = items.map(({ ban, phieu }) => ({
+  const hutBanVaoKy = (items: { ban: SalesItem; phieu: SalesInvoice }[]) => {
+    const them: BalancingOutputItem[] = items.map(({ ban, phieu }) => ({
       id: uid(),
-      kyId: ky.id,
-      matHangId: ban.matHangId,
-      khachId: phieu.khachId,
-      kenh: phieu.kenh,
-      luongKg: ban.luongKg,
-      donGia: ban.donGia,
-      quyCach: ban.quyCach,
-      banHangId: ban.id,
+      periodId: ky.id,
+      productId: ban.productId,
+      customerId: phieu.customerId,
+      channel: phieu.channel,
+      quantityKg: ban.quantityKg,
+      unitPrice: ban.unitPrice,
+      spec: ban.spec,
+      salesItemId: ban.id,
     }));
     persistTP([...tp, ...them]);
     notify.daLuu(`Đã hút ${them.length} dòng bán vào kỳ này`);
@@ -439,37 +449,37 @@ function KyDetail({
     () =>
       tatCaPL.filter(
         (r) =>
-          r.nguon === "Nhập hàng" &&
-          !r.kyId &&
-          (!ky.tuNgay ||
-            !ky.denNgay ||
-            !r.ngay ||
-            (r.ngay >= ky.tuNgay && r.ngay <= ky.denNgay))
+          r.source === "Nhập hàng" &&
+          !r.periodId &&
+          (!ky.startDate ||
+            !ky.endDate ||
+            !r.date ||
+            (r.date >= ky.startDate && r.date <= ky.endDate))
       ),
-    [tatCaPL, ky.tuNgay, ky.denNgay]
+    [tatCaPL, ky.startDate, ky.endDate]
   );
 
   const ganPheLieuVaoKy = (ids: string[]) => {
     const bo = new Set(ids);
-    ghiPL(tatCaPL.map((r) => (bo.has(r.id) ? { ...r, kyId: ky.id } : r)));
+    ghiPL(tatCaPL.map((r) => (bo.has(r.id) ? { ...r, periodId: ky.id } : r)));
     notify.daLuu(`Đã đưa ${ids.length} dòng phế liệu vào kỳ này`);
   };
 
   /** Gỡ khỏi kỳ, KHÔNG xóa — bản gốc vẫn nằm ở sổ nhập hàng. */
   const boPheLieuKhoiKy = (id: string) => {
-    ghiPL(tatCaPL.map((r) => (r.id === id ? { ...r, kyId: "" } : r)));
+    ghiPL(tatCaPL.map((r) => (r.id === id ? { ...r, periodId: "" } : r)));
     notify.daXoa("Đã bỏ dòng phế liệu khỏi kỳ (số gốc vẫn ở sổ nhập hàng)");
   };
 
   const kq = useMemo(
-    () => tinhCanDoi(ky, nlVao, pheLieu, tp),
+    () => calculateBalancing(ky, nlVao, pheLieu, tp),
     [ky, nlVao, pheLieu, tp]
   );
   /** Chưa có thành phẩm ra → định mức + lãi/lỗ chưa có nghĩa. */
-  const chuaCoTP = kq.tongTP <= 0;
+  const chuaCoTP = kq.totalOutputKg <= 0;
   const tenMatHang = (id: string) =>
-    matHang.find((m) => m.id === id)?.ten || "—";
-  const tenKhach = (id: string) => khach.find((k) => k.id === id)?.ten || "—";
+    matHang.find((m) => m.id === id)?.name || "—";
+  const tenKhach = (id: string) => khach.find((k) => k.id === id)?.name || "—";
 
   return (
     <div className="space-y-6">
@@ -480,9 +490,9 @@ function KyDetail({
 
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-semibold text-foreground">{ky.loaiNL}</h1>
+          <h1 className="text-3xl font-semibold text-foreground">{ky.materialTypeName}</h1>
           <p className="mt-2 text-base text-muted-foreground">
-            Ngày tiếp nhận: {ky.ngayList || "chưa ghi"}
+            Ngày tiếp nhận: {ky.dateRangeDescription || "chưa ghi"}
           </p>
         </div>
         <Button variant="outline" size="lg" onClick={() => setShowBang(true)}>
@@ -498,22 +508,22 @@ function KyDetail({
             label="Tổng NL nhận cả kỳ"
             unit="kg"
             anNhanBatBuoc
-            value={ky.tongNLNhan}
-            onChange={(v) => onChangeKy({ tongNLNhan: v })}
+            value={ky.totalInputKg}
+            onChange={(v) => onChangeKy({ totalInputKg: v })}
           />
           <NumberField
             label="Chi phí chế biến / kg TP"
             unit="đ"
             anNhanBatBuoc
-            value={ky.chiPhiCB}
-            onChange={(v) => onChangeKy({ chiPhiCB: v })}
+            value={ky.processingCostPerKg}
+            onChange={(v) => onChangeKy({ processingCostPerKg: v })}
           />
           <NumberField
             label="Tỉ giá"
             unit="đ/USD"
             anNhanBatBuoc
-            value={ky.tiGia}
-            onChange={(v) => onChangeKy({ tiGia: v })}
+            value={ky.exchangeRate}
+            onChange={(v) => onChangeKy({ exchangeRate: v })}
           />
         </div>
       </Card>
@@ -521,12 +531,12 @@ function KyDetail({
       <KhoiNLVao
         rows={nlVao}
         onChange={persistNL}
-        kyId={ky.id}
-        goiYTen={loaiNLDanhMuc.map((l) => ({ value: l.ten, label: l.ten }))}
+        periodId={ky.id}
+        goiYTen={loaiNLDanhMuc.map((l) => ({ value: l.name, label: l.name }))}
         onThemLoai={(ten) => {
           setLoaiNLDanhMuc([
             ...loaiNLDanhMuc,
-            { id: uid(), ten, loai: "", ghiChu: "" },
+            { id: uid(), name: ten, category: "", note: "" },
           ]);
           notify.daLuu(`Đã thêm loại nguyên liệu "${ten}" vào danh mục`);
           return ten;
@@ -536,7 +546,7 @@ function KyDetail({
       <KhoiPheLieu
         rows={pheLieu}
         onChange={persistPL}
-        kyId={ky.id}
+        periodId={ky.id}
         choHut={pheLieuChoHut}
         onGanVaoKy={ganPheLieuVaoKy}
         onBoKhoiKy={boPheLieuKhoiKy}
@@ -545,19 +555,19 @@ function KyDetail({
       <KhoiTP
         rows={tp}
         onChange={persistTP}
-        kyId={ky.id}
+        periodId={ky.id}
         matHang={matHang}
         khach={khach}
         choHutBan={banChoHut}
         onHutBan={hutBanVaoKy}
         onThemMatHang={(ten) => {
-          const m: MatHang = { id: uid(), ma: "", ten, maTP: "" };
+          const m: Product = { id: uid(), code: "", name: ten, finishedGoodCode: "" };
           setMatHang([...matHang, m]);
           notify.daLuu(`Đã thêm mặt hàng "${ten}" vào danh mục`);
           return m.id;
         }}
         onThemKhach={(ten) => {
-          const k: KhachHang = { id: uid(), ma: "", ten, thiTruong: "" };
+          const k: Customer = { id: uid(), code: "", name: ten, market: "" };
           setKhach([...khach, k]);
           notify.daLuu(`Đã thêm khách hàng "${ten}" vào danh mục`);
           return k.id;
@@ -569,22 +579,22 @@ function KyDetail({
       <Card className="p-5">
         <h2 className="mb-4 text-xl font-semibold">Kết quả cân đối</h2>
         <div className="grid gap-x-8 gap-y-1 sm:grid-cols-2 lg:grid-cols-3">
-          <KV k="Tổng nguyên liệu vào" v={`${num(kq.tongNLVao)} kg`} />
-          <KV k="Tổng bán thành phẩm" v={`${num(kq.tongTP)} kg`} />
+          <KV k="Tổng nguyên liệu vào" v={`${num(kq.totalInputKg)} kg`} />
+          <KV k="Tổng bán thành phẩm" v={`${num(kq.totalOutputKg)} kg`} />
           <KV
             k="Định mức chế biến"
-            v={chuaCoTP ? "—" : num(kq.dinhMuc)}
+            v={chuaCoTP ? "—" : num(kq.norm)}
             strong
           />
           <KV
             k="Tỉ lệ thu hồi"
-            v={kq.tyLeThuHoi == null ? "—" : num(kq.tyLeThuHoi)}
+            v={kq.yieldRate == null ? "—" : num(kq.yieldRate)}
           />
-          <KV k="Giá trị nguyên liệu" v={`${num(kq.giaTriNL)} đ`} />
-          <KV k="Giá thành" v={`${num(kq.giaThanh)} đ`} />
-          <KV k="Giá trị xuất" v={`${num(kq.giaTriXuat)} đ`} />
-          <KV k="Bình quân / kg NL" v={`${num(kq.binhQuanKgNL)} đ`} />
-          <KV k="Giá trị phế liệu" v={`${num(kq.giaTriPheLieu)} đ`} />
+          <KV k="Giá trị nguyên liệu" v={`${num(kq.materialValue)} đ`} />
+          <KV k="Giá thành" v={`${num(kq.costOfGoods)} đ`} />
+          <KV k="Giá trị xuất" v={`${num(kq.exportValue)} đ`} />
+          <KV k="Bình quân / kg NL" v={`${num(kq.avgCostPerKgMaterial)} đ`} />
+          <KV k="Giá trị phế liệu" v={`${num(kq.scrapValue)} đ`} />
         </div>
         {/* Chưa nhập thành phẩm ra thì KHÔNG kết luận lãi/lỗ — nếu không màn sẽ báo
             "Lỗ = toàn bộ tiền nguyên liệu" (đỏ, hù người dùng) dù kỳ mới nhập một nửa. */}
@@ -595,13 +605,13 @@ function KyDetail({
         ) : (
           <div
             className={`mt-5 rounded-lg px-5 py-4 text-xl font-semibold ${
-              kq.laiLo >= 0
+              kq.profitOrLoss >= 0
                 ? "bg-success-surface text-success"
                 : "bg-warning-surface text-destructive"
             }`}
           >
-            {kq.laiLo >= 0 ? "▲ Lãi" : "▼ Lỗ"}:{" "}
-            <span className="tnum">{num(Math.abs(kq.laiLo))}</span> đ
+            {kq.profitOrLoss >= 0 ? "▲ Lãi" : "▼ Lỗ"}:{" "}
+            <span className="tnum">{num(Math.abs(kq.profitOrLoss))}</span> đ
           </div>
         )}
       </Card>
@@ -642,27 +652,27 @@ function KV({ k, v, strong }: { k: string; v: string; strong?: boolean }) {
 function KhoiNLVao({
   rows,
   onChange,
-  kyId,
+  periodId,
   goiYTen,
   onThemLoai,
 }: {
-  rows: DongNLVao[];
-  onChange: (n: DongNLVao[]) => void;
-  kyId: string;
+  rows: BalancingInputItem[];
+  onChange: (n: BalancingInputItem[]) => void;
+  periodId: string;
   goiYTen: { value: string; label: string }[];
   /** Gõ tên mới → lưu vào danh mục loại NL, trả về tên để dùng luôn. */
   onThemLoai: (ten: string) => string;
 }) {
-  const [dang, setDang] = useState<DongNLVao | null>(null);
+  const [dang, setDang] = useState<BalancingInputItem | null>(null);
   const [laThem, setLaThem] = useState(false);
   const [loi, setLoi] = useState<LoiNhap[]>([]);
 
   const luu = () => {
     if (!dang) return;
     const ls: LoiNhap[] = [];
-    if (!dang.ten.trim()) ls.push({ truong: "Tên", thongBao: "Chưa nhập tên" });
+    if (!dang.name.trim()) ls.push({ truong: "Tên", thongBao: "Chưa nhập tên" });
     // Cho phép ÂM (điều chỉnh giảm, VD "bán nội địa" trừ khỏi pool NL) — chỉ chặn 0.
-    if (!dang.soLuongKg)
+    if (!dang.quantityKg)
       ls.push({
         truong: "Số lượng",
         thongBao: "Phải khác 0 kg (âm = điều chỉnh giảm, VD bán nội địa)",
@@ -676,15 +686,15 @@ function KhoiNLVao({
     setDang(null);
   };
 
-  const cols: Cot<DongNLVao>[] = [
-    { key: "ten", header: "Tên nguyên liệu", chinh: true, render: (r) => r.ten },
+  const cols: Cot<BalancingInputItem>[] = [
+    { key: "ten", header: "Tên nguyên liệu", chinh: true, render: (r) => r.name },
     {
       key: "nhom",
       header: "Nhóm",
       render: (r) => (
         <span className="flex flex-wrap items-center gap-1">
-          <Badge>{r.nhom}</Badge>
-          {r.nguonKho && <Badge variant="outline">{r.nguonKho}</Badge>}
+          <Badge>{r.groupName}</Badge>
+          {r.sourceWarehouse && <Badge variant="outline">{r.sourceWarehouse}</Badge>}
         </span>
       ),
     },
@@ -692,24 +702,24 @@ function KhoiNLVao({
       key: "sl",
       header: "Số lượng (kg)",
       so: true,
-      render: (r) => num(r.soLuongKg),
+      render: (r) => num(r.quantityKg),
     },
     {
       key: "gia",
       header: "Đơn giá (đ)",
       so: true,
-      render: (r) => num(r.donGia) || "—",
+      render: (r) => num(r.unitPrice) || "—",
     },
     {
       key: "tien",
       header: "Thành tiền (đ)",
       so: true,
-      render: (r) => num(r.soLuongKg * (r.donGia ?? 0)),
+      render: (r) => num(r.quantityKg * (r.unitPrice ?? 0)),
     },
   ];
 
-  const tong = rows.reduce((s, r) => s + r.soLuongKg, 0);
-  const tongTien = rows.reduce((s, r) => s + r.soLuongKg * (r.donGia ?? 0), 0);
+  const tong = rows.reduce((s, r) => s + r.quantityKg, 0);
+  const tongTien = rows.reduce((s, r) => s + r.quantityKg * (r.unitPrice ?? 0), 0);
 
   return (
     <KhoiKhung
@@ -720,13 +730,13 @@ function KhoiNLVao({
       onThem={() => {
         setDang({
           id: uid(),
-          kyId,
-          nhom: "Thủy sản",
-          ten: "",
-          soLuongKg: 0,
-          donGia: null,
-          tyLe: null,
-          nguonKho: "",
+          periodId,
+          groupName: "Thủy sản",
+          name: "",
+          quantityKg: 0,
+          unitPrice: null,
+          ratioPercentage: null,
+          sourceWarehouse: "",
         });
         setLaThem(true);
         setLoi([]);
@@ -744,19 +754,19 @@ function KhoiNLVao({
               <ErrorSummary loi={loi} />
               <ChoiceGroup
                 label="Nhóm"
-                value={dang.nhom}
+                value={dang.groupName}
                 onChange={(v) =>
-                  setDang((d) => (d ? { ...d, nhom: v as NhomNL } : d))
+                  setDang((d) => (d ? { ...d, groupName: v as InputGroup } : d))
                 }
-                options={NHOM_NL.map((n) => ({ value: n, label: n }))}
+                options={INPUT_GROUPS.map((n) => ({ value: n, label: n }))}
                 cot={3}
               />
               <Combobox
                 label="Tên nguyên liệu"
                 required
                 hint="Chọn trong danh mục, hoặc gõ tên mới rồi bấm Thêm mới."
-                value={dang.ten}
-                onChange={(v) => setDang((d) => (d ? { ...d, ten: v } : d))}
+                value={dang.name}
+                onChange={(v) => setDang((d) => (d ? { ...d, name: v } : d))}
                 options={goiYTen}
                 onCreate={onThemLoai}
               />
@@ -765,32 +775,32 @@ function KhoiNLVao({
                   label="Số lượng"
                   required
                   unit="kg"
-                  value={dang.soLuongKg || null}
+                  value={dang.quantityKg || null}
                   onChange={(v) =>
-                    setDang((d) => (d ? { ...d, soLuongKg: v ?? 0 } : d))
+                    setDang((d) => (d ? { ...d, quantityKg: v ?? 0 } : d))
                   }
                 />
                 <NumberField
                   label="Đơn giá"
                   unit="đ"
-                  value={dang.donGia}
-                  onChange={(v) => setDang((d) => (d ? { ...d, donGia: v } : d))}
+                  value={dang.unitPrice}
+                  onChange={(v) => setDang((d) => (d ? { ...d, unitPrice: v } : d))}
                 />
                 <NumberField
                   label="Tỉ lệ (bột phụ gia)"
                   unit="%"
-                  value={dang.tyLe}
-                  onChange={(v) => setDang((d) => (d ? { ...d, tyLe: v } : d))}
+                  value={dang.ratioPercentage}
+                  onChange={(v) => setDang((d) => (d ? { ...d, ratioPercentage: v } : d))}
                 />
               </div>
               {/* Nguồn kho — chỉ cho hàng xả đông: phân biệt mua từ kho khác về
                  và xả đông kho mình. Seam cho quản lý tồn kho sau này. */}
-              {dang.nhom === "Xả đông" && (
+              {dang.groupName === "Xả đông" && (
                 <ChoiceGroup
                   label="Nguồn kho (hàng xả đông)"
-                  value={dang.nguonKho || ""}
+                  value={dang.sourceWarehouse || ""}
                   onChange={(v) =>
-                    setDang((d) => (d ? { ...d, nguonKho: v } : d))
+                    setDang((d) => (d ? { ...d, sourceWarehouse: v } : d))
                   }
                   options={[
                     { value: "", label: "Chưa rõ" },
@@ -816,11 +826,11 @@ function KhoiNLVao({
               setLaThem(false);
               setLoi([]);
             }}
-            moTaBanGhi={`${r.ten} — ${num(r.soLuongKg)} kg`}
+            moTaBanGhi={`${r.name} — ${num(r.quantityKg)} kg`}
             onXoa={() => {
               const truoc = rows;
               onChange(rows.filter((x) => x.id !== r.id));
-              notify.daXoa(`Đã xóa "${r.ten}"`, () => onChange(truoc));
+              notify.daXoa(`Đã xóa "${r.name}"`, () => onChange(truoc));
             }}
           />
         )}
@@ -840,29 +850,29 @@ function KhoiNLVao({
 function KhoiPheLieu({
   rows,
   onChange,
-  kyId,
+  periodId,
   choHut,
   onGanVaoKy,
   onBoKhoiKy,
 }: {
-  rows: DongPheLieu[];
-  onChange: (n: DongPheLieu[]) => void;
-  kyId: string;
+  rows: ScrapItem[];
+  onChange: (n: ScrapItem[]) => void;
+  periodId: string;
   /** Phế liệu đã cân ở màn Nhập hàng, chưa gắn kỳ nào, hợp khoảng ngày của kỳ. */
-  choHut: DongPheLieu[];
+  choHut: ScrapItem[];
   onGanVaoKy: (ids: string[]) => void;
   onBoKhoiKy: (id: string) => void;
 }) {
-  const [dang, setDang] = useState<DongPheLieu | null>(null);
+  const [dang, setDang] = useState<ScrapItem | null>(null);
   const [laThem, setLaThem] = useState(false);
   const [loi, setLoi] = useState<LoiNhap[]>([]);
 
   const luu = () => {
     if (!dang) return;
     const ls: LoiNhap[] = [];
-    if (!dang.loai.trim())
+    if (!dang.name.trim())
       ls.push({ truong: "Loại", thongBao: "Chưa nhập loại" });
-    if (!(dang.soLuongKg > 0))
+    if (!(dang.quantityKg > 0))
       ls.push({ truong: "Số lượng", thongBao: "Phải lớn hơn 0 kg" });
     setLoi(ls);
     if (ls.length > 0) return;
@@ -873,32 +883,32 @@ function KhoiPheLieu({
     setDang(null);
   };
 
-  const cols: Cot<DongPheLieu>[] = [
-    { key: "loai", header: "Loại phế liệu", chinh: true, render: (r) => r.loai },
+  const cols: Cot<ScrapItem>[] = [
+    { key: "loai", header: "Loại phế liệu", chinh: true, render: (r) => r.name },
     {
       key: "sl",
       header: "Số lượng (kg)",
       so: true,
-      render: (r) => num(r.soLuongKg),
+      render: (r) => num(r.quantityKg),
     },
     {
       key: "gia",
       header: "Đơn giá bán (đ)",
       so: true,
-      render: (r) => num(r.donGiaBan) || "—",
+      render: (r) => num(r.sellingPrice) || "—",
     },
     {
       key: "tien",
       header: "Thành tiền (đ)",
       so: true,
-      render: (r) => num(r.soLuongKg * (r.donGiaBan ?? 0)),
+      render: (r) => num(r.quantityKg * (r.sellingPrice ?? 0)),
     },
     {
       key: "nguon",
       header: "Nguồn",
       render: (r) =>
-        r.nguon === "Nhập hàng"
-          ? `Sổ nhập ${r.ngay ? viDate(r.ngay) : ""}`.trim()
+        r.source === "Nhập hàng"
+          ? `Sổ nhập ${r.date ? viDate(r.date) : ""}`.trim()
           : "Nhập tại kỳ",
     },
   ];
@@ -914,13 +924,13 @@ function KhoiPheLieu({
       onThem={() => {
         setDang({
           id: uid(),
-          kyId,
-          loai: "",
-          soLuongKg: 0,
-          donGiaBan: null,
-          ngay: "",
-          phanXuong: "",
-          nguon: "Cân đối",
+          periodId,
+          name: "",
+          quantityKg: 0,
+          sellingPrice: null,
+          date: "",
+          workshop: "",
+          source: "Cân đối",
         });
         setLaThem(true);
         setLoi([]);
@@ -938,9 +948,9 @@ function KhoiPheLieu({
               <ErrorSummary loi={loi} />
               <Field label="Loại phế liệu" required>
                 <Input
-                  value={dang.loai}
+                  value={dang.name}
                   onChange={(e) =>
-                    setDang((d) => (d ? { ...d, loai: e.target.value } : d))
+                    setDang((d) => (d ? { ...d, name: e.target.value } : d))
                   }
                   placeholder="VD: nội tạng, dạt"
                 />
@@ -950,17 +960,17 @@ function KhoiPheLieu({
                   label="Số lượng"
                   required
                   unit="kg"
-                  value={dang.soLuongKg || null}
+                  value={dang.quantityKg || null}
                   onChange={(v) =>
-                    setDang((d) => (d ? { ...d, soLuongKg: v ?? 0 } : d))
+                    setDang((d) => (d ? { ...d, quantityKg: v ?? 0 } : d))
                   }
                 />
                 <NumberField
                   label="Đơn giá bán"
                   unit="đ"
-                  value={dang.donGiaBan}
+                  value={dang.sellingPrice}
                   onChange={(v) =>
-                    setDang((d) => (d ? { ...d, donGiaBan: v } : d))
+                    setDang((d) => (d ? { ...d, sellingPrice: v } : d))
                   }
                 />
               </div>
@@ -981,7 +991,7 @@ function KhoiPheLieu({
               <p className="text-base text-muted-foreground">
                 Tổng{" "}
                 <span className="tnum">
-                  {num(choHut.reduce((s, r) => s + (r.soLuongKg || 0), 0))} kg
+                  {num(choHut.reduce((s, r) => s + (r.quantityKg || 0), 0))} kg
                 </span>{" "}
                 — đưa vào kỳ này thay vì nhập tay lại.
               </p>
@@ -1001,10 +1011,10 @@ function KhoiPheLieu({
                 className="flex flex-wrap items-center justify-between gap-3 py-2"
               >
                 <span className="text-base">
-                  {r.ngay ? `${viDate(r.ngay)} · ` : ""}
-                  {r.phanXuong ? `xưởng ${r.phanXuong} · ` : ""}
-                  {r.loai} —{" "}
-                  <span className="tnum font-semibold">{num(r.soLuongKg)}</span>{" "}
+                  {r.date ? `${viDate(r.date)} · ` : ""}
+                  {r.workshop ? `xưởng ${r.workshop} · ` : ""}
+                  {r.name} —{" "}
+                  <span className="tnum font-semibold">{num(r.quantityKg)}</span>{" "}
                   kg
                 </span>
                 <Button
@@ -1026,7 +1036,7 @@ function KhoiPheLieu({
         rows={rows}
         getKey={(r) => r.id}
         actions={(r) =>
-          r.nguon === "Nhập hàng" ? (
+          r.source === "Nhập hàng" ? (
             /* Số này thuộc sổ nhập hàng — chỉ gỡ khỏi kỳ, KHÔNG xóa bản gốc. */
             <Button
               variant="outline"
@@ -1043,11 +1053,11 @@ function KhoiPheLieu({
                 setLaThem(false);
                 setLoi([]);
               }}
-              moTaBanGhi={`${r.loai} — ${num(r.soLuongKg)} kg`}
+              moTaBanGhi={`${r.name} — ${num(r.quantityKg)} kg`}
               onXoa={() => {
                 const truoc = rows;
                 onChange(rows.filter((x) => x.id !== r.id));
-                notify.daXoa(`Đã xóa "${r.loai}"`, () => onChange(truoc));
+                notify.daXoa(`Đã xóa "${r.name}"`, () => onChange(truoc));
               }}
             />
           )
@@ -1062,7 +1072,7 @@ function KhoiPheLieu({
 function KhoiTP({
   rows,
   onChange,
-  kyId,
+  periodId,
   matHang,
   khach,
   choHutBan,
@@ -1072,29 +1082,29 @@ function KhoiTP({
   tenMatHang,
   tenKhach,
 }: {
-  rows: DongTP[];
-  onChange: (n: DongTP[]) => void;
-  kyId: string;
-  matHang: MatHang[];
-  khach: KhachHang[];
+  rows: BalancingOutputItem[];
+  onChange: (n: BalancingOutputItem[]) => void;
+  periodId: string;
+  matHang: Product[];
+  khach: Customer[];
   /** Dòng bán ở sổ bán, hợp khoảng ngày của kỳ, chưa hút vào kỳ nào. */
-  choHutBan: { ban: DongBan; phieu: PhieuBan }[];
-  onHutBan: (items: { ban: DongBan; phieu: PhieuBan }[]) => void;
+  choHutBan: { ban: SalesItem; phieu: SalesInvoice }[];
+  onHutBan: (items: { ban: SalesItem; phieu: SalesInvoice }[]) => void;
   onThemMatHang: (ten: string) => string;
   onThemKhach: (ten: string) => string;
   tenMatHang: (id: string) => string;
   tenKhach: (id: string) => string;
 }) {
-  const [dang, setDang] = useState<DongTP | null>(null);
+  const [dang, setDang] = useState<BalancingOutputItem | null>(null);
   const [laThem, setLaThem] = useState(false);
   const [loi, setLoi] = useState<LoiNhap[]>([]);
 
   const luu = () => {
     if (!dang) return;
     const ls: LoiNhap[] = [];
-    if (!dang.matHangId)
+    if (!dang.productId)
       ls.push({ truong: "Mặt hàng", thongBao: "Chưa chọn mặt hàng" });
-    if (!(dang.luongKg > 0))
+    if (!(dang.quantityKg > 0))
       ls.push({ truong: "Lượng", thongBao: "Phải lớn hơn 0 kg" });
     setLoi(ls);
     if (ls.length > 0) return;
@@ -1105,15 +1115,15 @@ function KhoiTP({
     setDang(null);
   };
 
-  const cols: Cot<DongTP>[] = [
+  const cols: Cot<BalancingOutputItem>[] = [
     {
       key: "mh",
       header: "Mặt hàng",
       chinh: true,
       render: (r) => (
         <span className="flex flex-wrap items-center gap-2">
-          {tenMatHang(r.matHangId)}
-          {r.banHangId && (
+          {tenMatHang(r.productId)}
+          {r.salesItemId && (
             <Badge variant="outline" className="shrink-0">
               Từ sổ bán
             </Badge>
@@ -1125,34 +1135,34 @@ function KhoiTP({
       key: "qc",
       header: "Quy cách",
       render: (r) =>
-        r.quyCach || <span className="text-muted-foreground">—</span>,
+        r.spec || <span className="text-muted-foreground">—</span>,
     },
-    { key: "kh", header: "Khách", render: (r) => tenKhach(r.khachId) },
+    { key: "kh", header: "Khách", render: (r) => tenKhach(r.customerId) },
     {
       key: "kenh",
       header: "Kênh",
-      render: (r) => <Badge>{r.kenh}</Badge>,
+      render: (r) => <Badge>{r.channel}</Badge>,
     },
     {
       key: "sl",
       header: "Lượng (kg)",
       so: true,
-      render: (r) => num(r.luongKg),
+      render: (r) => num(r.quantityKg),
     },
     {
       key: "gia",
       header: "Đơn giá",
       so: true,
       render: (r) =>
-        r.donGia == null
+        r.unitPrice == null
           ? "—"
-          : `${num(r.donGia)} ${r.kenh === "Xuất khẩu" ? "USD" : "đ"}`,
+          : `${num(r.unitPrice)} ${r.channel === "Xuất khẩu" ? "USD" : "đ"}`,
     },
   ];
 
-  const tong = rows.reduce((s, r) => s + r.luongKg, 0);
+  const tong = rows.reduce((s, r) => s + r.quantityKg, 0);
 
-  const tongHut = choHutBan.reduce((s, x) => s + (x.ban.luongKg || 0), 0);
+  const tongHut = choHutBan.reduce((s, x) => s + (x.ban.quantityKg || 0), 0);
 
   return (
     <KhoiKhung
@@ -1165,12 +1175,12 @@ function KhoiTP({
       onThem={() => {
         setDang({
           id: uid(),
-          kyId,
-          matHangId: "",
-          khachId: "",
-          kenh: "Xuất khẩu",
-          luongKg: 0,
-          donGia: null,
+          periodId,
+          productId: "",
+          customerId: "",
+          channel: "Xuất khẩu",
+          quantityKg: 0,
+          unitPrice: null,
         });
         setLaThem(true);
         setLoi([]);
@@ -1190,14 +1200,14 @@ function KhoiTP({
                 label="Mặt hàng"
                 required
                 hint="Chưa có trong danh mục thì gõ tên rồi bấm Thêm mới."
-                value={dang.matHangId}
+                value={dang.productId}
                 onChange={(v) =>
-                  setDang((d) => (d ? { ...d, matHangId: v } : d))
+                  setDang((d) => (d ? { ...d, productId: v } : d))
                 }
                 options={matHang.map((m) => ({
                   value: m.id,
-                  label: m.ten,
-                  phu: m.ma || undefined,
+                  label: m.name,
+                  phu: m.code || undefined,
                 }))}
                 onCreate={onThemMatHang}
                 emptyText="Chưa có mặt hàng nào trong danh mục."
@@ -1205,38 +1215,38 @@ function KhoiTP({
               <Combobox
                 label="Khách hàng"
                 hint="Bỏ trống nếu chưa xác định khách."
-                value={dang.khachId}
-                onChange={(v) => setDang((d) => (d ? { ...d, khachId: v } : d))}
+                value={dang.customerId}
+                onChange={(v) => setDang((d) => (d ? { ...d, customerId: v } : d))}
                 options={khach.map((k) => ({
                   value: k.id,
-                  label: k.ten,
-                  phu: k.thiTruong || undefined,
+                  label: k.name,
+                  phu: k.market || undefined,
                 }))}
                 onCreate={onThemKhach}
               />
               <ChoiceGroup
                 label="Kênh bán"
-                value={dang.kenh}
+                value={dang.channel}
                 onChange={(v) =>
-                  setDang((d) => (d ? { ...d, kenh: v as Kenh } : d))
+                  setDang((d) => (d ? { ...d, channel: v as SalesChannel } : d))
                 }
-                options={KENH.map((k) => ({ value: k, label: k }))}
+                options={SALES_CHANNELS.map((k) => ({ value: k, label: k }))}
               />
               <div className="grid gap-6 sm:grid-cols-2">
                 <NumberField
                   label="Lượng"
                   required
                   unit="kg"
-                  value={dang.luongKg || null}
+                  value={dang.quantityKg || null}
                   onChange={(v) =>
-                    setDang((d) => (d ? { ...d, luongKg: v ?? 0 } : d))
+                    setDang((d) => (d ? { ...d, quantityKg: v ?? 0 } : d))
                   }
                 />
                 <NumberField
                   label="Đơn giá"
-                  unit={dang.kenh === "Xuất khẩu" ? "USD" : "đ"}
-                  value={dang.donGia}
-                  onChange={(v) => setDang((d) => (d ? { ...d, donGia: v } : d))}
+                  unit={dang.channel === "Xuất khẩu" ? "USD" : "đ"}
+                  value={dang.unitPrice}
+                  onChange={(v) => setDang((d) => (d ? { ...d, unitPrice: v } : d))}
                 />
               </div>
             </>
@@ -1270,10 +1280,10 @@ function KhoiTP({
                 className="flex flex-wrap items-center justify-between gap-3 py-2"
               >
                 <span className="text-base">
-                  {viDate(phieu.ngayGiao)} · {phieu.kenh} ·{" "}
-                  {tenMatHang(ban.matHangId)}
-                  {ban.quyCach ? ` (${ban.quyCach})` : ""} —{" "}
-                  <span className="tnum font-semibold">{num(ban.luongKg)}</span>{" "}
+                  {viDate(phieu.deliveryDate)} · {phieu.channel} ·{" "}
+                  {tenMatHang(ban.productId)}
+                  {ban.spec ? ` (${ban.spec})` : ""} —{" "}
+                  <span className="tnum font-semibold">{num(ban.quantityKg)}</span>{" "}
                   kg
                 </span>
                 <Button
@@ -1295,7 +1305,7 @@ function KhoiTP({
         rows={rows}
         getKey={(r) => r.id}
         actions={(r) =>
-          r.banHangId ? (
+          r.salesItemId ? (
             /* Dòng hút từ sổ bán — bỏ khỏi kỳ là XÓA bản sao; số gốc ở sổ bán. */
             <Button
               variant="outline"
@@ -1319,7 +1329,7 @@ function KhoiTP({
                 setLaThem(false);
                 setLoi([]);
               }}
-              moTaBanGhi={`${tenMatHang(r.matHangId)} — ${num(r.luongKg)} kg`}
+              moTaBanGhi={`${tenMatHang(r.productId)} — ${num(r.quantityKg)} kg`}
               onXoa={() => {
                 const truoc = rows;
                 onChange(rows.filter((x) => x.id !== r.id));

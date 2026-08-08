@@ -99,7 +99,9 @@ export function Combobox({
 
   return (
     <div className={cn("space-y-2", className)}>
-      <div className="flex flex-wrap items-center gap-2">
+      {/* min-h-9 = chiều cao nút ⓘ: hàng nhãn luôn cao bằng nhau dù có/không ⓘ,
+         hai ô cùng lưới không lệch. */}
+      <div className="flex min-h-9 flex-wrap items-center gap-2">
         <Label htmlFor={id}>{label}</Label>
         {anNhanBatBuoc ? null : required ? (
           <span className="rounded bg-secondary px-2 py-0.5 text-sm font-semibold text-secondary-foreground">

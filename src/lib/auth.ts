@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase, hasSupabase, SITE_ID, taoClientTam } from "@/lib/supabase";
-import type { NguoiDung, VaiTro } from "@/types";
-import { vaiTroTuChuoi, vaiTroThanhChuoi, dsVaiTro } from "@/types";
+import type { UserProfile, Role } from "@/types";
+import { rolesFromCsv, rolesToCsv, rolesList } from "@/types";
 import { emailToUsername, usernameToEmail } from "@/lib/username";
 
 /**
  * Đăng nhập qua Supabase Auth (email tổng hợp `<username>@bsf1.vn`).
  *
- * Tài khoản (email + mật khẩu) tạo ở Supabase Dashboard; bảng `nguoi_dung` giữ
+ * Tài khoản (email + mật khẩu) tạo ở Supabase Dashboard; bảng `user_profiles` giữ
  * hồ sơ nghiệp vụ (họ tên, username, vai trò), khóa `id` = auth user id. Lần đầu
  * đăng nhập, app tự tạo hồ sơ (vai trò rỗng — admin gán sau).
  *
@@ -18,34 +18,34 @@ import { emailToUsername, usernameToEmail } from "@/lib/username";
 
 const s = (v: unknown) => (v == null ? "" : String(v));
 
-function hoSoTuRow(r: Record<string, unknown>): NguoiDung {
+function hoSoTuRow(r: Record<string, unknown>): UserProfile {
   return {
     id: s(r.id),
-    hoTen: s(r.ho_ten),
+    fullName: s(r.full_name),
     username: s(r.username),
-    vaiTro: vaiTroTuChuoi(s(r.vai_tro)),
+    roles: rolesFromCsv(s(r.roles)),
   };
 }
 
 /** Lấy hồ sơ của tài khoản đang đăng nhập; chưa có thì tạo (vai trò rỗng).
  * Họ tên/username lấy từ metadata lúc đăng ký (nếu có), không thì suy từ email. */
-async function layHoacTaoHoSo(session: Session): Promise<NguoiDung | null> {
+async function layHoacTaoHoSo(session: Session): Promise<UserProfile | null> {
   if (!supabase) return null;
   const id = session.user.id;
   const meta = (session.user.user_metadata ?? {}) as Record<string, unknown>;
   const username = s(meta.username) || emailToUsername(session.user.email ?? "");
-  const hoTen = s(meta.ho_ten);
+  const fullName = s(meta.ho_ten);
 
   const { data, error } = await supabase
-    .from("nguoi_dung")
+    .from("user_profiles")
     .select("*")
     .eq("id", id)
     .maybeSingle();
   if (!error && data) return hoSoTuRow(data as Record<string, unknown>);
 
-  const row = { id, xi_nghiep_id: SITE_ID, ho_ten: hoTen, username, vai_tro: "" };
-  await supabase.from("nguoi_dung").upsert(row, { onConflict: "id" });
-  return { id, hoTen, username, vaiTro: [] };
+  const row = { id, site_id: SITE_ID, full_name: fullName, username, roles: "" };
+  await supabase.from("user_profiles").upsert(row, { onConflict: "id" });
+  return { id, fullName, username, roles: [] };
 }
 
 /** Dịch lỗi Supabase Auth sang tiếng Việt cho người dùng đọc được. */
@@ -79,12 +79,12 @@ export interface KetQuaDangNhap {
   ok: boolean;
   loi?: string;
   /** Hồ sơ vừa tạo (taoTaiKhoan) — để màn admin cập nhật danh sách ngay. */
-  nguoiDung?: NguoiDung;
+  nguoiDung?: UserProfile;
 }
 
 export function useAuth() {
   const [session, setSession] = useState<Session | null>(null);
-  const [nguoiDung, setNguoiDung] = useState<NguoiDung | null>(null);
+  const [nguoiDung, setNguoiDung] = useState<UserProfile | null>(null);
   const [daKhoiTao, setDaKhoiTao] = useState(!hasSupabase);
 
   useEffect(() => {
@@ -143,25 +143,25 @@ export function useAuth() {
   /**
    * ADMIN tạo tài khoản cho người khác. Đăng ký KHÔNG mở tự do — chỉ gọi từ màn
    * Người dùng (admin). Dùng client PHỤ để signUp nên KHÔNG đá văng phiên admin
-   * trên client chính. Hồ sơ `nguoi_dung` tạo với vai trò rỗng (admin gán sau).
+   * trên client chính. Hồ sơ `user_profiles` tạo với vai trò rỗng (admin gán sau).
    */
   const taoTaiKhoan = useCallback(
     async (
-      hoTen: string,
+      fullName: string,
       username: string,
       matKhau: string,
-      vaiTro: VaiTro[] = []
+      roles: Role[] = []
     ): Promise<KetQuaDangNhap> => {
       if (!supabase) return { ok: false, loi: "Chưa cấu hình máy chủ" };
       const u = username.trim().toLowerCase();
-      if (!hoTen.trim()) return { ok: false, loi: "Nhập họ tên" };
+      if (!fullName.trim()) return { ok: false, loi: "Nhập họ tên" };
       if (!u) return { ok: false, loi: "Nhập tên đăng nhập" };
       if (matKhau.length < 6)
         return { ok: false, loi: "Mật khẩu tối thiểu 6 ký tự" };
 
       // Check trùng tên đăng nhập trước (thông báo rõ hơn lỗi Auth).
       const { data: trung } = await supabase
-        .from("nguoi_dung")
+        .from("user_profiles")
         .select("id")
         .eq("username", u)
         .maybeSingle();
@@ -172,26 +172,26 @@ export function useAuth() {
       const { data, error } = await phu.auth.signUp({
         email: usernameToEmail(u),
         password: matKhau,
-        options: { data: { ho_ten: hoTen.trim(), username: u } },
+        options: { data: { ho_ten: fullName.trim(), username: u } },
       });
       if (error) return { ok: false, loi: dichLoiTaoTK(error.message) };
 
       // Lưu hồ sơ qua client CHÍNH (phiên admin) — vai trò rỗng.
       const uid = data.user?.id;
       if (!uid) return { ok: false, loi: "Tạo tài khoản không thành công" };
-      await supabase.from("nguoi_dung").upsert(
+      await supabase.from("user_profiles").upsert(
         {
           id: uid,
-          xi_nghiep_id: SITE_ID,
-          ho_ten: hoTen.trim(),
+          site_id: SITE_ID,
+          full_name: fullName.trim(),
           username: u,
-          vai_tro: vaiTroThanhChuoi(vaiTro),
+          roles: rolesToCsv(roles),
         },
         { onConflict: "id" }
       );
       return {
         ok: true,
-        nguoiDung: { id: uid, hoTen: hoTen.trim(), username: u, vaiTro },
+        nguoiDung: { id: uid, fullName: fullName.trim(), username: u, roles },
       };
     },
     []
@@ -207,7 +207,7 @@ export function useAuth() {
     dangTai: hasSupabase && !daKhoiTao,
     /** Có cần đăng nhập không (chỉ khi đã cấu hình Supabase). */
     canDangNhap: hasSupabase,
-    laAdmin: dsVaiTro(nguoiDung?.vaiTro).includes("admin"),
+    laAdmin: rolesList(nguoiDung?.roles).includes("admin"),
     dangNhap,
     taoTaiKhoan,
     dangXuat,

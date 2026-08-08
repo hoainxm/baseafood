@@ -34,32 +34,32 @@ import { Fish, Plus } from "lucide-react";
 interface DongDemo {
   id: string;
   loai: string;
-  daiLy: string;
-  soLuongKg: number;
-  donGia: number;
+  supplierName: string;
+  quantityKg: number;
+  unitPrice: number;
 }
 
 const DEMO: DongDemo[] = [
   {
     id: "1",
     loai: "Bạch tuộc 2 da",
-    daiLy: "H.Phú",
-    soLuongKg: 1250,
-    donGia: 92000,
+    supplierName: "H.Phú",
+    quantityKg: 1250,
+    unitPrice: 92000,
   },
   {
     id: "2",
     loai: "Mực ống 7cm",
-    daiLy: "Tân Phước",
-    soLuongKg: 430.5,
-    donGia: 145000,
+    supplierName: "Tân Phước",
+    quantityKg: 430.5,
+    unitPrice: 145000,
   },
   {
     id: "3",
     loai: "Cá nục",
-    daiLy: "Bảy Lành",
-    soLuongKg: 2010,
-    donGia: 21500,
+    supplierName: "Bảy Lành",
+    quantityKg: 2010,
+    unitPrice: 21500,
   },
 ];
 
@@ -105,22 +105,22 @@ export default function KitPage() {
     {
       key: "daiLy",
       header: "Đại lý",
-      render: (r) => r.daiLy,
-      sapXep: (r) => r.daiLy,
+      render: (r) => r.supplierName,
+      sapXep: (r) => r.supplierName,
     },
     {
       key: "sl",
       header: "Số lượng (kg)",
       so: true,
-      render: (r) => r.soLuongKg.toLocaleString("vi-VN"),
-      sapXep: (r) => r.soLuongKg,
+      render: (r) => r.quantityKg.toLocaleString("vi-VN"),
+      sapXep: (r) => r.quantityKg,
     },
     {
       key: "gia",
       header: "Đơn giá (đ)",
       so: true,
-      render: (r) => r.donGia.toLocaleString("vi-VN"),
-      sapXep: (r) => r.donGia,
+      render: (r) => r.unitPrice.toLocaleString("vi-VN"),
+      sapXep: (r) => r.unitPrice,
     },
   ];
 
@@ -234,8 +234,8 @@ export default function KitPage() {
           </div>
           <DateRangeField
             label="Khoảng ngày tiếp nhận"
-            tuNgay={tuNgay}
-            denNgay={denNgay}
+            startDate={tuNgay}
+            endDate={denNgay}
             onChange={(tu, den) => {
               setTuNgay(tu);
               setDenNgay(den);
@@ -315,10 +315,10 @@ export default function KitPage() {
           columns={cols}
           rows={rows}
           getKey={(r) => r.id}
-          timKiem={(r) => `${r.loai} ${r.daiLy}`}
+          timKiem={(r) => `${r.loai} ${r.supplierName}`}
           actions={(r) => (
             <ConfirmDelete
-              moTaBanGhi={`${r.loai} — ${r.soLuongKg.toLocaleString("vi-VN")} kg — đại lý ${r.daiLy}`}
+              moTaBanGhi={`${r.loai} — ${r.quantityKg.toLocaleString("vi-VN")} kg — đại lý ${r.supplierName}`}
               onConfirm={() => xoa(r)}
             />
           )}

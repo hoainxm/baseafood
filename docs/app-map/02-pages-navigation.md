@@ -1,29 +1,33 @@
 > Load khi: thêm/bớt màn hình, đổi điều hướng, hay tìm xem một màn được gắn vào đâu.
-covers: src/App.tsx, src/main.tsx
-last_verified: 2026-08-06
+covers: src/App.tsx, src/features/shared/AppLayout.tsx, src/features/shared/NotFound.tsx
+last_verified: 2026-08-07
 ttl_days: 90
 
 # Trang & điều hướng
 
-**Không có router.** Một state `screen` trong `App.tsx` (`"nhap-hang" | "ban-hang" | "can-doi" | "danh-muc" | "nguoi-dung" | "kit"`) quyết định màn nào render. Không có URL, không deep link, F5 là về màn mặc định `nhap-hang`.
-Hệ quả cần biết trước khi thiết kế tính năng: **không share được link tới một ngày / một kỳ**. Muốn có thì phải thêm router — đó là thay đổi kiến trúc, không phải sửa vặt.
+**Có định tuyến (Router).** Ứng dụng sử dụng `react-router-dom` v7 (`HashRouter` để tối ưu chạy offline tại xưởng). Các trang và đường dẫn được phân mảnh rõ ràng trên URL, cho phép refresh (F5) giữ trạng thái, dùng nút Back/Forward, và chia sẻ liên kết sâu (deep link) như `#/can-doi/:kyId`.
 
 ## Gate đăng nhập
 
-`App.tsx` gọi `useAuth()` (`src/lib/auth.ts`) TRƯỚC khi render app: `dangTai` → màn "Đang tải"; đã cấu hình Supabase mà **chưa có phiên** → `features/DangNhap.tsx` (che toàn app). Chạy localStorage (thiếu env) ⇒ **không chặn**. Thanh bên/header có chip người dùng + **Đăng xuất**. Chi tiết auth: [05-bao-mat-phan-quyen.md](05-bao-mat-phan-quyen.md).
+`App.tsx` gọi `useAuth()` (`src/lib/auth.ts`) TRƯỚC khi khởi tạo Router. Nếu đang tải phiên $\rightarrow$ màn "Đang tải"; chưa có phiên đăng nhập $\rightarrow$ render `DangNhap.tsx` chặn toàn app. Thanh bên/header có chip người dùng + **Đăng xuất**. Chi tiết auth: [05-bao-mat-phan-quyen.md](05-bao-mat-phan-quyen.md).
 
-## Các màn
+## Các màn & Cấu trúc Route
 
-| id | Nhãn | File | Ghi chú |
+| Path | Nhãn | File chính | Ghi chú |
 |---|---|---|---|
-| `nhap-hang` | Nhập hàng | `features/NhapNguyenLieu.tsx` | mặc định khi mở app |
-| `ban-hang` | Bán hàng | `features/BanHang.tsx` | phiếu bán thành phẩm ngày; nguồn hút cho khối TP ra của cân đối |
-| `can-doi` | Cân đối | `features/CanDoi.tsx` | có màn con `KyDetail` (state nội bộ `selId`, không phải route) |
-| `danh-muc` | Danh mục | `features/DanhMuc.tsx` | 5 tab, trong đó tab Thành phẩm render `features/ThanhPham.tsx` |
-| `nguoi-dung` | Người dùng | `features/QuanLyNguoiDung.tsx` | **chỉ hiện khi `laAdmin`** — gán họ tên + vai trò |
-| `kit` | Bộ giao diện | `design-system/kit/KitPage.tsx` | không nằm trong `NAV`, vào từ nút cuối thanh bên; **desktop-only** |
+| `/login` | Đăng nhập | `features/auth/DangNhap.tsx` | Màn chặn đăng nhập toàn app |
+| `/nhap-hang` | Nhập hàng | `features/nhap-hang/NhapNguyenLieu.tsx` | Mặc định khi mở app |
+| `/san-xuat` | Sản xuất BTP | `features/san-xuat/SanXuatBTP.tsx` | Ghi sản lượng bán thành phẩm ngày (WIP) |
+| `/ban-hang` | Bán hàng | `features/ban-hang/BanHang.tsx` | Phiếu bán thành phẩm ngày; nguồn hút cân đối |
+| `/kho` | Kho dự trữ | `features/kho/KhoDuTru.tsx` | Duyệt nhập kho, theo dõi tồn đông |
+| `/don-dat` | Đơn đặt | `features/don-dat/DonDat.tsx` | Gom đơn và lệnh xuất |
+| `/can-doi` | Cân đối | `features/can-doi/CanDoi.tsx` | Danh sách kỳ cân đối |
+| `/can-doi/:kyId` | Chi tiết kỳ | `features/can-doi/CanDoi.tsx` | Màn chi tiết kỳ cân đối (dùng URL param thay `selId`) |
+| `/danh-muc` | Danh mục | `features/danh-muc/DanhMuc.tsx` | Quản lý danh mục (render thêm `ThanhPham.tsx` bên trong) |
+| `/nguoi-dung` | Người dùng | `features/nguoi-dung/QuanLyNguoiDung.tsx` | **Chỉ Admin truy cập được** (Route Guard chặn) |
+| `/kit` | Bộ giao diện | `design-system/kit/KitPage.tsx` | Nhập từ nút cuối thanh bên; **desktop-only** |
 
-`NAV` có 4 mục cơ bản; admin có thêm mục **Người dùng** (`navList = laAdmin ? [...NAV, NAV_NGUOI_DUNG] : NAV`). Mỗi mục **một việc, một động từ, một icon**. Ba danh mục cũ (Mặt hàng / Khách hàng / Thành phẩm) đã gộp thành 1 mục có tab bên trong.
+Danh sách `NAV` trong `AppLayout.tsx` hiển thị menu tương ứng theo vai trò.
 
 ## Cạm bẫy bố cục
 
@@ -34,10 +38,10 @@ Hệ quả cần biết trước khi thiết kế tính năng: **không share đ
 
 ## Thêm màn mới — checklist
 
-1. Tạo `src/features/TenMan.tsx`, chỉ import từ `@/design-system` + `@/lib/danhMuc`.
-2. Thêm id vào type `Screen`, thêm mục vào `NAV` (label = một động từ, `moTa` một dòng, icon riêng biệt).
-3. Sửa số cột `grid-cols-N` của bottom-tab cho khớp số mục `NAV`.
-4. Thêm dòng vào bảng trên + tạo doc domain `docs/app-map/3x-*.md` nếu là nghiệp vụ mới.
+1. Tạo thư mục `src/features/ten-man/`, viết file `TenMan.tsx`, export qua `index.ts` chỉ import `@/design-system` + `@/lib/danhMuc`.
+2. Thêm Route path tương ứng trong `src/App.tsx` sử dụng React `lazy()`.
+3. Thêm cấu hình vào danh sách `NAV` trong `src/features/shared/AppLayout.tsx` (nhãn, icon, mô tả) nếu muốn hiển thị trên menu điều hướng.
+4. Thêm dòng vào bảng trên + tạo tài liệu domain `docs/app-map/3x-*.md` nếu là nghiệp vụ nghiệp vụ mới.
 
 ## Cross-references
 

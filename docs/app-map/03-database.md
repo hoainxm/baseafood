@@ -1,5 +1,5 @@
 > Load khi: thêm/sửa bảng, cột, migration, hay đọc lỗi Postgres lạ.
-covers: supabase/migrations/**, docs/supabase-setup.md
+covers: supabase/migrations/**, docs/ops/supabase-setup.md
 last_verified: 2026-08-07
 ttl_days: 90
 <!-- updated: 2026-08-07 — thêm migration 0008 (nguyen_lieu_vao.nguon_kho, cờ nguồn xả đông) -->
@@ -74,6 +74,7 @@ App dùng camelCase, DB dùng snake_case — cầu nối là `AnhXaBang.toRow/fr
 
 ## Cross-references
 
-- Cutover Supabase, lấy URL/key, đối chiếu: [`docs/supabase-setup.md`](../supabase-setup.md)
+- Cutover Supabase, lấy URL/key, đối chiếu: [`docs/ops/supabase-setup.md`](../ops/supabase-setup.md)
+- Deploy Vercel (env production, 2 repo đồng bộ): [`docs/ops/deploy-vercel.md`](../ops/deploy-vercel.md)
 - Ánh xạ camelCase↔snake_case, hàng chờ: [04-tang-du-lieu.md](04-tang-du-lieu.md)
 - RLS & bảo mật: [05-bao-mat-phan-quyen.md](05-bao-mat-phan-quyen.md)

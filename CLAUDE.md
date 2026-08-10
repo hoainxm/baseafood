@@ -32,7 +32,10 @@ src/
 ├── design-system/            tokens.css · patterns/ · kit/ · index.ts (cửa import duy nhất)
 └── features/                 NhapNguyenLieu · BanHang · CanDoi + BangCanDoi · DanhMuc (5 tab) · ThanhPham (chỉ đọc) · DangNhap · QuanLyNguoiDung
 supabase/migrations/          0001 … 0006
-docs/app-map/                 bản đồ ngữ cảnh cho agent
+docs/README.md                bản đồ tài liệu — doc nào ở đâu, doc mới bỏ đâu
+docs/app-map/                 bản đồ ngữ cảnh cho agent (đọc khi CODE)
+docs/ops/                     vận hành: cutover Supabase · deploy Vercel · env
+docs/spec/                    đặc tả/ADR trước khi build
 docs/trien-khai/              nghiệp vụ gốc (phân tích, 28 câu hỏi đã chốt, thiết kế flow)
 ```
 
@@ -88,6 +91,7 @@ Chưa rõ tier ⇒ coi là 🔴. Dữ liệu ở đây là **sổ sách thật c
 | `App.tsx` (thêm màn / đổi nav) | [`02-pages-navigation.md`](docs/app-map/02-pages-navigation.md) |
 | Thêm thư mục / đổi ranh giới import | [`01-app-structure.md`](docs/app-map/01-app-structure.md) |
 | `lib/auth.ts`, `lib/username.ts`, `DangNhap.tsx`, `QuanLyNguoiDung.tsx`, `0006`, `0003_siet_rls.sql`, `.env.example` | [`05-bao-mat-phan-quyen.md`](docs/app-map/05-bao-mat-phan-quyen.md) |
+| `index.html`, cấu hình build/deploy (`package.json`, `vite.config.ts`), env Supabase | [`ops/deploy-vercel.md`](docs/ops/deploy-vercel.md) |
 | `design-system/**`, `components/ui/**`, `tokens.css` | [`src/design-system/README.md`](src/design-system/README.md) — canonical, **không** nhân bản sang app-map |
 
 Sửa doc xong ⇒ cập nhật `last_verified:` trong frontmatter. Hook pre-commit cảnh báo khi code trong `covers:` đổi mà doc đứng yên.
@@ -126,7 +130,8 @@ Index đầy đủ + bảng định tuyến theo task: [`docs/app-map/README.md`
 | [`31-can-doi-ky`](docs/app-map/31-can-doi-ky.md) | kỳ, 3 khối, công thức, bảng in A4 |
 | [`32-danh-muc`](docs/app-map/32-danh-muc.md) | danh mục, 141 mã thành phẩm |
 
-Ngoài app-map: [`src/design-system/README.md`](src/design-system/README.md) (UI) · [`docs/supabase-setup.md`](docs/supabase-setup.md) (cutover) · [`docs/trien-khai/`](docs/trien-khai/README.md) (nghiệp vụ gốc) · [`docs/BAN-GIAO.md`](docs/BAN-GIAO.md) (bối cảnh công ty, đầu mối, câu treo với xí nghiệp).
+Bản đồ tài liệu đầy đủ + luật "doc mới bỏ đâu": [`docs/README.md`](docs/README.md).
+Ngoài app-map: [`src/design-system/README.md`](src/design-system/README.md) (UI) · [`docs/ops/deploy-vercel.md`](docs/ops/deploy-vercel.md) (deploy) · [`docs/ops/supabase-setup.md`](docs/ops/supabase-setup.md) (cutover) · [`docs/trien-khai/`](docs/trien-khai/README.md) (nghiệp vụ gốc) · [`docs/BAN-GIAO.md`](docs/BAN-GIAO.md) (bối cảnh công ty, đầu mối, câu treo với xí nghiệp).
 
 ## Trạng thái
 

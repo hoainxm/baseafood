@@ -50,7 +50,7 @@ Cũng **bỏ tiền tố `mes_`** vì project này giờ chỉ phục vụ MES.
 
 ## Schema mới — 11 bảng
 
-[`supabase/migrations/0001_baseafood_mes.sql`](../supabase/migrations/0001_baseafood_mes.sql)
+[`supabase/migrations/0001_baseafood_mes.sql`](../../supabase/migrations/0001_baseafood_mes.sql)
 
 | Nhóm | Bảng |
 |---|---|
@@ -81,7 +81,7 @@ File tự dọn bản nháp `mes_*` cũ nếu đã lỡ chạy migration trướ
 
 ### Bước 2 (tùy chọn, PHÁ HỦY) — gỡ bảng SDFactory
 
-[`0002_go_bo_sdfactory.sql`](../supabase/migrations/0002_go_bo_sdfactory.sql)
+[`0002_go_bo_sdfactory.sql`](../../supabase/migrations/0002_go_bo_sdfactory.sql)
 xóa `events`, `state_snapshots`, `sites` + 3 function của SDFactory.
 
 > ⚠️ **Không hoàn tác được.** `public.events` là spine append-only mà chính
@@ -124,7 +124,7 @@ where table_schema = 'public' order by table_name;
 
 ## Cách tầng dữ liệu hoạt động
 
-[`src/lib/repo.ts`](../src/lib/repo.ts) — một API cho cả hai chế độ:
+[`src/lib/repo.ts`](../../src/lib/repo.ts) — một API cho cả hai chế độ:
 
 - Chưa có env → đọc/ghi localStorage như cũ.
 - Có env → đọc/ghi Supabase, **đồng thời** ghi bản sao xuống localStorage. Mất
@@ -150,7 +150,7 @@ Chấp nhận được khi và chỉ khi app chạy trong mạng nội bộ xí 
 ### Phải làm gì trước khi mở ra ngoài
 
 1. Thêm màn đăng nhập bằng Supabase Auth (chưa làm).
-2. Chạy [`0003_siet_rls.sql`](../supabase/migrations/0003_siet_rls.sql) — thu
+2. Chạy [`0003_siet_rls.sql`](../../supabase/migrations/0003_siet_rls.sql) — thu
    hồi toàn bộ quyền của `anon`, chỉ còn `authenticated`.
    **Chạy trước bước 1 thì app ngừng đọc/ghi được** (không mất dữ liệu, nhưng
    người dùng không làm việc được).

@@ -103,7 +103,8 @@ src/
 - `0003_siet_rls.sql` — siết RLS về `authenticated` (chạy SAU khi có đăng nhập, nếu không app ngừng đọc/ghi).
 - `0004_chuyen_chot_ngay_phe_lieu.sql` — **chạy ngay**: thêm `chuyen_nhap` (chuyến thật, `ngay_giao` / `ngay_ghi_so` / `ly_do_ghi_bu`), `chot_ngay` (khóa số liệu ngày + xưởng), `nhap_nguyen_lieu.chuyen_id`; nới `phe_lieu` (`ky_id` cho phép rỗng, thêm `ngay` / `phan_xuong` / `nguon`). Chỉ thêm, không xóa — an toàn với số liệu đang có.
 
-**Hướng dẫn cutover chi tiết:** [`docs/supabase-setup.md`](supabase-setup.md).
+**Hướng dẫn cutover chi tiết:** [`docs/ops/supabase-setup.md`](ops/supabase-setup.md).
+**Deploy Vercel (bản chạy thật):** [`docs/ops/deploy-vercel.md`](ops/deploy-vercel.md).
 
 ### 🔒 Bảo mật — đọc kỹ trước khi bàn giao
 - ⚠️ RLS hiện **mở cho `anon`** (chưa có đăng nhập) → **ai có anon key là sửa được số liệu**. Chỉ chạy trong **mạng nội bộ xí nghiệp**. Trước khi mở ra ngoài: thêm đăng nhập → chạy `0003`.
@@ -210,8 +211,9 @@ Cutover Supabase: `cp .env.example .env` → điền `VITE_SUPABASE_URL`, `VITE_
 | 3 | [`docs/trien-khai/bang-cau-hoi-xac-nhan-truoc-plan.md`](trien-khai/bang-cau-hoi-xac-nhan-truoc-plan.md) | 28 câu hỏi + **kết quả xác nhận** với người dùng |
 | 4 | [`docs/trien-khai/plan-flow-can-doi-5-ngay.md`](trien-khai/plan-flow-can-doi-5-ngay.md) | Thiết kế flow cân đối 5 ngày (đã code) |
 | 5 | [`docs/trien-khai/diem-can-xac-nhan-theo-buoi.md`](trien-khai/diem-can-xac-nhan-theo-buoi.md) · [`can-xac-nhan-dot-tiep.md`](trien-khai/can-xac-nhan-dot-tiep.md) | Sổ điểm cần xác nhận theo buổi/đợt |
-| 6 | [`docs/supabase-setup.md`](supabase-setup.md) | Cutover Supabase + bảo mật + tầng repo |
-| 7 | [`src/design-system/README.md`](../src/design-system/README.md) | Luật UI cho người lớn tuổi + bảng chọn component |
+| 6 | [`docs/ops/supabase-setup.md`](ops/supabase-setup.md) | Cutover Supabase + bảo mật + tầng repo |
+| 7 | [`docs/ops/deploy-vercel.md`](ops/deploy-vercel.md) | Deploy Vercel (bản chạy thật) + 2 repo đồng bộ + env |
+| 8 | [`src/design-system/README.md`](../src/design-system/README.md) | Luật UI cho người lớn tuổi + bảng chọn component |
 
 ---
 

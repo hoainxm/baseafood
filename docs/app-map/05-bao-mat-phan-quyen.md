@@ -44,5 +44,6 @@ Còn thiếu (làm sau): cột "người ghi/người chốt" (dữ liệu `chot
 ## Cross-references
 
 - Policy hiện hành nằm trong: [03-database.md](03-database.md) (`0001`, `0004`)
-- Cutover + cách lấy key: [`docs/supabase-setup.md`](../supabase-setup.md)
+- Cutover + cách lấy key: [`docs/ops/supabase-setup.md`](../ops/supabase-setup.md)
+- Deploy Vercel + Supabase Auth URL (redirect production): [`docs/ops/deploy-vercel.md`](../ops/deploy-vercel.md)
 - Chốt ngày (chỗ đang thiếu "ai chốt"): [30-nhap-hang.md](30-nhap-hang.md)

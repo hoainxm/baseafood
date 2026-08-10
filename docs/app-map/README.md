@@ -8,7 +8,7 @@ ttl_days: 90
 Bản đồ ngữ cảnh cho AI agent. Mỗi file **một chủ đề canonical**: không copy nội dung giữa các file, chỉ link.
 Doc ở đây ghi **cái không suy được từ code** — quyết định kiến trúc, invariant nghiệp vụ, cạm bẫy. Danh sách hàm/prop thì đọc thẳng source.
 
-Cửa vào là [`CLAUDE.md`](../../CLAUDE.md) ở root (quy tắc code, risk tier, bảng doc/test). File này chỉ định tuyến.
+Cửa vào là [`CLAUDE.md`](../../CLAUDE.md) ở root (quy tắc code, risk tier, bảng doc/test). File này chỉ định tuyến ngữ cảnh **khi code**. Bản đồ toàn bộ tài liệu (ops, spec, nghiệp vụ) + luật "doc mới bỏ đâu": [`docs/README.md`](../README.md).
 
 ## Task nào đọc file nào
 
@@ -26,6 +26,7 @@ Cửa vào là [`CLAUDE.md`](../../CLAUDE.md) ở root (quy tắc code, risk tie
 | Thêm đăng nhập / phân quyền / mở app ra ngoài mạng nội bộ | [05-bao-mat-phan-quyen](05-bao-mat-phan-quyen.md) 🔴 |
 | Tìm hiểu nghiệp vụ gốc, vì sao thiết kế vậy | [`docs/trien-khai/README.md`](../trien-khai/README.md) |
 | Nhận bàn giao dự án, cần đầu mối liên hệ / câu treo với xí nghiệp | [`docs/BAN-GIAO.md`](../BAN-GIAO.md) |
+| Deploy Vercel · cutover Supabase · env production | [`docs/ops/`](../ops/README.md) |
 
 ## Index
 

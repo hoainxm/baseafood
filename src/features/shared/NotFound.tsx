@@ -9,7 +9,7 @@ export default function NotFound() {
       <p className="mt-2 text-base text-muted-foreground max-w-md">
         Đường dẫn bạn truy cập không tồn tại hoặc đã được thay đổi. Vui lòng kiểm tra lại.
       </p>
-      <Link to="/nhap-hang" className="mt-6">
+      <Link to="/imports" className="mt-6">
         <Button size="lg">Quay lại trang chủ</Button>
       </Link>
     </div>

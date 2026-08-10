@@ -64,14 +64,14 @@ function moTaKhoang(tu?: string, den?: string): string {
 
 export default function CanDoiScreen() {
   const [kyList, persistKy] = useBalancingPeriods();
-  const { kyId } = useParams<{ kyId?: string }>();
+  const { periodId } = useParams<{ periodId?: string }>();
   const navigate = useNavigate();
-  const selId = kyId || null;
+  const selId = periodId || null;
   const setSelId = (id: string | null) => {
     if (id) {
-      navigate(`/can-doi/${id}`);
+      navigate(`/balancing/${id}`);
     } else {
-      navigate("/can-doi");
+      navigate("/balancing");
     }
   };
   const [loaiNLDanhMuc, setLoaiNLDanhMuc] = useMaterialTypes();

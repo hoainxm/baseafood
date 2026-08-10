@@ -6,14 +6,14 @@ import { Toaster } from "@/design-system";
 import { useAuth } from "@/lib/auth";
 
 // Lazy loaded feature screens
-const NhapNguyenLieuScreen = lazy(() => import("@/features/nhap-hang"));
-const SanXuatBTPScreen = lazy(() => import("@/features/san-xuat"));
-const BanHangScreen = lazy(() => import("@/features/ban-hang"));
-const KhoDuTruScreen = lazy(() => import("@/features/kho"));
-const DonDatScreen = lazy(() => import("@/features/don-dat"));
-const CanDoiScreen = lazy(() => import("@/features/can-doi"));
-const DanhMucScreen = lazy(() => import("@/features/danh-muc"));
-const QuanLyNguoiDungScreen = lazy(() => import("@/features/nguoi-dung"));
+const NhapNguyenLieuScreen = lazy(() => import("@/features/imports"));
+const SanXuatBTPScreen = lazy(() => import("@/features/production"));
+const BanHangScreen = lazy(() => import("@/features/sales"));
+const KhoDuTruScreen = lazy(() => import("@/features/warehouse"));
+const DonDatScreen = lazy(() => import("@/features/orders"));
+const CanDoiScreen = lazy(() => import("@/features/balancing"));
+const DanhMucScreen = lazy(() => import("@/features/catalog"));
+const QuanLyNguoiDungScreen = lazy(() => import("@/features/users"));
 const KitPage = lazy(() => import("@/design-system/kit/KitPage"));
 
 export default function App() {
@@ -49,22 +49,22 @@ export default function App() {
       >
         <Routes>
           <Route element={<AppLayout />}>
-            <Route path="/" element={<Navigate to="/nhap-hang" replace />} />
-            <Route path="/nhap-hang" element={<NhapNguyenLieuScreen />} />
-            <Route path="/san-xuat" element={<SanXuatBTPScreen />} />
-            <Route path="/ban-hang" element={<BanHangScreen />} />
-            <Route path="/kho" element={<KhoDuTruScreen />} />
-            <Route path="/don-dat" element={<DonDatScreen />} />
-            <Route path="/can-doi" element={<CanDoiScreen />} />
-            <Route path="/can-doi/:kyId" element={<CanDoiScreen />} />
-            <Route path="/danh-muc" element={<DanhMucScreen />} />
+            <Route path="/" element={<Navigate to="/imports" replace />} />
+            <Route path="/imports" element={<NhapNguyenLieuScreen />} />
+            <Route path="/production" element={<SanXuatBTPScreen />} />
+            <Route path="/sales" element={<BanHangScreen />} />
+            <Route path="/warehouse" element={<KhoDuTruScreen />} />
+            <Route path="/orders" element={<DonDatScreen />} />
+            <Route path="/balancing" element={<CanDoiScreen />} />
+            <Route path="/balancing/:periodId" element={<CanDoiScreen />} />
+            <Route path="/catalog" element={<DanhMucScreen />} />
             <Route
-              path="/nguoi-dung"
+              path="/users"
               element={
                 auth.laAdmin ? (
                   <QuanLyNguoiDungScreen taoTaiKhoan={auth.taoTaiKhoan} />
                 ) : (
-                  <Navigate to="/nhap-hang" replace />
+                  <Navigate to="/imports" replace />
                 )
               }
             />

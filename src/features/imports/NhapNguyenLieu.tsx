@@ -60,7 +60,7 @@ import {
   Truck,
   X,
 } from "lucide-react";
-import PhieuNLNgay from "@/features/nhap-hang/PhieuNLNgay";
+import PhieuNLNgay from "@/features/imports/PhieuNLNgay";
 
 const PHAN_XUONG: Workshop[] = ["Đông", "Cá", "Khô"];
 

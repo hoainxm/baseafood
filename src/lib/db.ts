@@ -194,7 +194,7 @@ export function migrateOldLocalStorage(): void {
       }),
     },
     {
-      oldKey: "bsf.nguoi-dung.v1",
+      oldKey: "bsf.users.v1",
       newKey: "bsf.user-profiles.v2",
       mapFn: (o) => ({
         id: o.id,
@@ -218,7 +218,7 @@ export function migrateOldLocalStorage(): void {
       }),
     },
     {
-      oldKey: "bsf.ban-hang.v1",
+      oldKey: "bsf.sales.v1",
       newKey: "bsf.sales-items.v2",
       mapFn: (o) => ({
         id: o.id,
@@ -232,7 +232,7 @@ export function migrateOldLocalStorage(): void {
       }),
     },
     {
-      oldKey: "bsf.san-xuat.v1",
+      oldKey: "bsf.production.v1",
       newKey: "bsf.production-wips.v2",
       mapFn: (o) => ({
         id: o.id,
@@ -250,7 +250,7 @@ export function migrateOldLocalStorage(): void {
       }),
     },
     {
-      oldKey: "bsf.chot-san-xuat.v1",
+      oldKey: "bsf.chot-production.v1",
       newKey: "bsf.production-locks.v2",
       mapFn: (o) => ({
         id: o.id,
@@ -264,7 +264,7 @@ export function migrateOldLocalStorage(): void {
       }),
     },
     {
-      oldKey: "bsf.don-dat.v1",
+      oldKey: "bsf.orders.v1",
       newKey: "bsf.sales-orders.v2",
       mapFn: (o) => ({
         id: o.id,

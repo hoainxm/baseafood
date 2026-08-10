@@ -17,14 +17,14 @@ import {
 } from "lucide-react";
 
 type Screen =
-  | "nhap-hang"
-  | "san-xuat"
-  | "ban-hang"
+  | "imports"
+  | "production"
+  | "sales"
   | "kho"
-  | "don-dat"
-  | "can-doi"
-  | "danh-muc"
-  | "nguoi-dung"
+  | "orders"
+  | "balancing"
+  | "catalog"
+  | "users"
   | "kit";
 
 interface MucNav {
@@ -36,19 +36,19 @@ interface MucNav {
 
 const NAV: MucNav[] = [
   {
-    id: "nhap-hang",
+    id: "imports",
     label: "Nhập hàng",
     moTa: "Ghi chuyến nguyên liệu về xưởng",
     icon: Truck,
   },
   {
-    id: "san-xuat",
+    id: "production",
     label: "Sản xuất BTP",
     moTa: "Ghi sản lượng bán thành phẩm ngày",
     icon: Factory,
   },
   {
-    id: "ban-hang",
+    id: "sales",
     label: "Bán hàng",
     moTa: "Ghi phiếu bán thành phẩm hằng ngày",
     icon: ShoppingCart,
@@ -60,19 +60,19 @@ const NAV: MucNav[] = [
     icon: Snowflake,
   },
   {
-    id: "don-dat",
+    id: "orders",
     label: "Đơn đặt",
     moTa: "Gom đủ đơn, xuất container",
     icon: ClipboardList,
   },
   {
-    id: "can-doi",
+    id: "balancing",
     label: "Cân đối",
     moTa: "Nguyên liệu vào ↔ bán thành phẩm sản xuất",
     icon: Scale,
   },
   {
-    id: "danh-muc",
+    id: "catalog",
     label: "Danh mục",
     moTa: "Mặt hàng, khách, đại lý, loại NL",
     icon: Library,
@@ -80,7 +80,7 @@ const NAV: MucNav[] = [
 ];
 
 const NAV_NGUOI_DUNG: MucNav = {
-  id: "nguoi-dung",
+  id: "users",
   label: "Người dùng",
   moTa: "Tài khoản & vai trò",
   icon: Users,
@@ -95,8 +95,8 @@ export default function AppLayout() {
   const navList: MucNav[] = auth.laAdmin ? [...NAV, NAV_NGUOI_DUNG] : NAV;
   
   const activeNav = navList.find((n) => {
-    if (n.id === "can-doi") {
-      return location.pathname.startsWith("/can-doi");
+    if (n.id === "balancing") {
+      return location.pathname.startsWith("/balancing");
     }
     return location.pathname === `/${n.id}`;
   });

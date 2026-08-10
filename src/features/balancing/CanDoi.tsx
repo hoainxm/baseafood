@@ -211,10 +211,6 @@ export default function CanDoiScreen() {
           <h1 className="text-3xl font-semibold text-foreground">
             Cân đối nguyên liệu
           </h1>
-          <p className="mt-2 max-w-2xl text-base text-muted-foreground">
-            Mỗi kỳ là một lô nguyên liệu theo loại. Cân đối nguyên liệu vào với
-            bán thành phẩm sản xuất ra để ra định mức chế biến và lãi/lỗ.
-          </p>
         </div>
         <Button size="lg" onClick={moThem}>
           <Plus />

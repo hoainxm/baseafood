@@ -206,10 +206,6 @@ export default function DanhMucScreen() {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-semibold text-foreground">Danh mục</h1>
-        <p className="mt-2 max-w-2xl text-base text-muted-foreground">
-          Các danh sách dùng chung cho toàn hệ thống. Khai đúng ở đây một lần thì
-          mọi màn nhập liệu chỉ việc chọn — không ai gõ tay mỗi lần một kiểu nữa.
-        </p>
       </div>
 
       <Tabs value={tab} onValueChange={setTab}>

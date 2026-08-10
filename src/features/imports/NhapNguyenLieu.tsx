@@ -24,7 +24,6 @@ import {
   ChoiceGroup,
   Combobox,
   ConfirmDelete,
-  ContextBar,
   DateField,
   DateRangeField,
   Dialog,
@@ -39,6 +38,7 @@ import {
   Input,
   NumberField,
   RecordTable,
+  ThongKe,
   notify,
   type Cot,
   type LoiNhap,
@@ -47,6 +47,7 @@ import {
 import { kg, num, todayISO, viDate } from "@/lib/format";
 import { KY_OPT, phamViKy, type KyXem } from "@/lib/ky";
 import {
+  CalendarRange,
   ChevronDown,
   CircleCheck,
   FileText,
@@ -58,6 +59,7 @@ import {
   SlidersHorizontal,
   TriangleAlert,
   Truck,
+  Warehouse,
   X,
 } from "lucide-react";
 import PhieuNLNgay from "@/features/imports/PhieuNLNgay";
@@ -734,40 +736,37 @@ export default function NhapNguyenLieuScreen() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-semibold text-foreground">
-          Nhập hàng về xưởng
-        </h1>
-        <p className="mt-2 max-w-2xl text-base text-muted-foreground">
-          Ghi theo sổ "Báo cáo tổng hợp nguyên liệu hàng ngày": mỗi chuyến là một
-          đại lý, đổ nhiều loại hàng — mỗi loại một dòng.
-        </p>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-3xl font-semibold text-foreground">
+            Nhập hàng về xưởng
+          </h1>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            size="lg"
+            onClick={() => setXemPhieu(true)}
+          >
+            <FileText />
+            Xem báo cáo
+          </Button>
+          <Button size="lg" onClick={moThem}>
+            <Plus />
+            Ghi chuyến hàng
+          </Button>
+        </div>
       </div>
 
-      <ContextBar
-        items={[
-          { nhan: "Đang xem", giaTri: moTaPhamVi },
-          { nhan: "Phân xưởng", giaTri: phanXuong },
-          { nhan: "Số chuyến", giaTri: nhomView.length, so: true },
-          { nhan: "Số dòng", giaTri: view.length, so: true },
-          { nhan: "Tổng", giaTri: kg(tong), so: true },
+      <ThongKe
+        className="grid-cols-2 sm:grid-cols-3 lg:grid-cols-5"
+        the={[
+          { nhan: "Đang xem", giaTri: moTaPhamVi, icon: CalendarRange, mau: "trung-tinh" },
+          { nhan: "Phân xưởng", giaTri: phanXuong, icon: Warehouse, mau: "trung-tinh" },
+          { nhan: "Số chuyến", giaTri: nhomView.length, so: true, icon: Truck, mau: "brand" },
+          { nhan: "Số dòng", giaTri: view.length, so: true, icon: FileText, mau: "brand" },
+          { nhan: "Tổng nhập", giaTri: kg(tong), so: true, icon: Scale, mau: "success" },
         ]}
-        actions={
-          <>
-            <Button
-              variant="outline"
-              size="lg"
-              onClick={() => setXemPhieu(true)}
-            >
-              <FileText />
-              Xem báo cáo
-            </Button>
-            <Button size="lg" onClick={moThem}>
-              <Plus />
-              Ghi chuyến hàng
-            </Button>
-          </>
-        }
       />
 
       {/* Bộ lọc — toolbar một hàng; lọc ít dùng gom vào "Bộ lọc thêm" để sổ

@@ -8,7 +8,6 @@ import {
   Badge,
   Button,
   Combobox,
-  ContextBar,
   DateField,
   DateRangeField,
   Dialog,
@@ -23,6 +22,7 @@ import {
   Input,
   NumberField,
   RecordTable,
+  ThongKe,
   notify,
   type Cot,
   type LoiNhap,
@@ -31,13 +31,18 @@ import {
 import { kg, num, todayISO, viDate } from "@/lib/format";
 import { KY_OPT, phamViKy, type KyXem } from "@/lib/ky";
 import {
+  CalendarRange,
   CircleCheck,
+  ClipboardList,
   Factory,
+  Hourglass,
   Lock,
   LockOpen,
   Pencil,
   Plus,
+  Scale,
   TriangleAlert,
+  Warehouse,
   X,
 } from "lucide-react";
 
@@ -347,31 +352,29 @@ export default function SanXuatBTPScreen() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-semibold text-foreground">
-          Sản xuất bán thành phẩm
-        </h1>
-        <p className="mt-2 max-w-2xl text-base text-muted-foreground">
-          Ghi sản lượng bán thành phẩm làm ra mỗi ngày. Chọn ngày + loại nguyên
-          liệu một lần, đổ nhiều thành phẩm liền tay. Thủ kho duyệt vào kho ở màn
-          Kho dự trữ.
-        </p>
-      </div>
-
-      <ContextBar
-        items={[
-          { nhan: "Đang xem", giaTri: moTaPhamVi },
-          { nhan: "Phân xưởng", giaTri: phanXuong },
-          { nhan: "Số dòng", giaTri: view.length, so: true },
-          { nhan: "Chờ nhập", giaTri: soChoNhap, so: true },
-          { nhan: "Tổng", giaTri: kg(tong), so: true },
-        ]}
-        actions={
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-3xl font-semibold text-foreground">
+            Sản xuất bán thành phẩm
+          </h1>
+        </div>
+        <div className="flex flex-wrap gap-2">
           <Button size="lg" onClick={moThem}>
             <Plus />
             Ghi sản lượng
           </Button>
-        }
+        </div>
+      </div>
+
+      <ThongKe
+        className="grid-cols-2 sm:grid-cols-3 lg:grid-cols-5"
+        the={[
+          { nhan: "Đang xem", giaTri: moTaPhamVi, icon: CalendarRange, mau: "trung-tinh" },
+          { nhan: "Phân xưởng", giaTri: phanXuong, icon: Warehouse, mau: "trung-tinh" },
+          { nhan: "Số dòng BTP", giaTri: view.length, so: true, icon: ClipboardList, mau: "brand" },
+          { nhan: "Chờ nhập kho", giaTri: soChoNhap, so: true, icon: Hourglass, mau: "warning" },
+          { nhan: "Tổng sản lượng", giaTri: kg(tong), so: true, icon: Scale, mau: "success" },
+        ]}
       />
 
       <div className="flex flex-wrap items-end gap-4 rounded-xl border-2 border-border p-4">

@@ -15,7 +15,6 @@ import {
   ChoiceGroup,
   Combobox,
   ConfirmDelete,
-  ContextBar,
   DateField,
   DateRangeField,
   Dialog,
@@ -30,6 +29,7 @@ import {
   Input,
   NumberField,
   RecordTable,
+  ThongKe,
   notify,
   type Cot,
   type LoiNhap,
@@ -38,11 +38,15 @@ import {
 import { kg, num, todayISO, viDate } from "@/lib/format";
 import { KY_OPT, phamViKy, type KyXem } from "@/lib/ky";
 import {
+  CalendarRange,
   CircleCheck,
+  FileText,
   Pencil,
   Plus,
+  Scale,
   ShoppingCart,
   Truck,
+  Warehouse,
   X,
 } from "lucide-react";
 
@@ -453,30 +457,27 @@ export default function BanHangScreen() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-semibold text-foreground">Bán hàng</h1>
-        <p className="mt-2 max-w-2xl text-base text-muted-foreground">
-          Ghi bán thành phẩm RA cho khách hằng ngày: mỗi phiếu là một khách,
-          nhận nhiều mặt hàng — mỗi mặt hàng một dòng. Cuối kỳ, màn Cân đối hút
-          bán theo khoảng ngày. (Khác "bán thành phẩm" = công đoạn sản xuất WIP,
-          chưa số hoá.)
-        </p>
-      </div>
-
-      <ContextBar
-        items={[
-          { nhan: "Đang xem", giaTri: moTaPhamVi },
-          { nhan: "Phân xưởng", giaTri: phanXuong },
-          { nhan: "Số phiếu", giaTri: nhomView.length, so: true },
-          { nhan: "Số dòng", giaTri: view.length, so: true },
-          { nhan: "Tổng", giaTri: kg(tong), so: true },
-        ]}
-        actions={
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-3xl font-semibold text-foreground">Bán hàng</h1>
+        </div>
+        <div className="flex flex-wrap gap-2">
           <Button size="lg" onClick={moThem}>
             <Plus />
             Ghi phiếu bán
           </Button>
-        }
+        </div>
+      </div>
+
+      <ThongKe
+        className="grid-cols-2 sm:grid-cols-3 lg:grid-cols-5"
+        the={[
+          { nhan: "Đang xem", giaTri: moTaPhamVi, icon: CalendarRange, mau: "trung-tinh" },
+          { nhan: "Phân xưởng", giaTri: phanXuong, icon: Warehouse, mau: "trung-tinh" },
+          { nhan: "Số phiếu", giaTri: nhomView.length, so: true, icon: Truck, mau: "brand" },
+          { nhan: "Số dòng", giaTri: view.length, so: true, icon: FileText, mau: "brand" },
+          { nhan: "Tổng bán", giaTri: kg(tong), so: true, icon: Scale, mau: "success" },
+        ]}
       />
 
       {/* Bộ lọc — toolbar một hàng */}

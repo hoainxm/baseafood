@@ -24,7 +24,7 @@ export function Logo({
   phuDe?: string;
 }) {
   return (
-    <span className={cn("flex items-center gap-3", className)}>
+    <span className={cn("flex items-center gap-2", className)}>
       <img
         src="/baseafood-logo.png"
         alt=""
@@ -32,12 +32,12 @@ export function Logo({
         className={cn("w-auto shrink-0 object-contain", cao)}
       />
       {hienChu && (
-        <span className="min-w-0">
-          <span className="block truncate text-xl leading-tight font-bold tracking-tight text-primary">
+        <span className="min-w-0 shrink-0">
+          <span className="block text-lg lg:text-xl leading-tight font-bold tracking-tight text-primary whitespace-nowrap">
             BASEAFOOD
           </span>
           {phuDe && (
-            <span className="block truncate text-sm text-muted-foreground">
+            <span className="block text-sm text-muted-foreground whitespace-nowrap">
               {phuDe}
             </span>
           )}

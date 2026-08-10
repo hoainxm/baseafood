@@ -58,7 +58,7 @@ export function FormDialog({
       {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
       <DialogContent
         className={cn(
-          "flex max-h-[88vh] flex-col gap-0 overflow-hidden p-0",
+          "flex max-h-[88vh] flex-col items-stretch gap-0 overflow-hidden p-0",
           RONG[rong]
         )}
       >

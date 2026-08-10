@@ -52,6 +52,14 @@ export function ThongKe({
       {the.map((t) => {
         const mau = MAU[t.mau ?? "brand"];
         const Icon = t.icon;
+        const isString = typeof t.giaTri === "string";
+        const isLong = isString && (t.giaTri as string).length > 12;
+        const fontSizeClass = t.so
+          ? "text-xl sm:text-2xl"
+          : isLong
+            ? "text-[13px] sm:text-sm lg:text-base font-semibold leading-snug"
+            : "text-base sm:text-lg lg:text-xl";
+
         return (
           <div
             key={t.nhan}
@@ -70,20 +78,21 @@ export function ThongKe({
                 <Icon className="size-6" aria-hidden />
               </span>
             )}
-            <div className="min-w-0">
-              <p className="truncate text-sm font-medium text-muted-foreground">
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-muted-foreground break-words">
                 {t.nhan}
               </p>
               <p
                 className={cn(
-                  "truncate text-2xl font-bold text-foreground",
+                  "font-bold text-foreground break-words leading-tight",
+                  fontSizeClass,
                   t.so && "tnum"
                 )}
               >
                 {t.giaTri}
               </p>
               {t.phu && (
-                <p className="truncate text-sm text-muted-foreground">{t.phu}</p>
+                <p className="text-sm text-muted-foreground break-words">{t.phu}</p>
               )}
             </div>
           </div>

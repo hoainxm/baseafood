@@ -1,17 +1,17 @@
 import { useMemo, useState } from "react";
 import {
   BangTong,
-  BieuDoCot,
+  BieuDoCotDoc,
   Combobox,
   DateField,
   DateRangeField,
   ThongKe,
   homNay,
-  type CotBieuDo,
+  type CotBieuDoDoc,
   type CotTong,
   type TheThongTin,
 } from "@/design-system";
-import { useMaterialImports } from "@/lib/danhMuc";
+import { useMaterialImports, useScraps } from "@/lib/danhMuc";
 import { KY_OPT, phamViKy, type KyXem } from "@/lib/ky";
 import { num, viDate } from "@/lib/format";
 import { calculateImportAmount } from "@/types";
@@ -37,6 +37,7 @@ interface DongTong {
  */
 export default function BaoCaoNhap() {
   const [rows] = useMaterialImports();
+  const [scraps] = useScraps();
 
   const [ky, setKy] = useState<KyXem>("thang");
   const [moc, setMoc] = useState(homNay());
@@ -46,14 +47,27 @@ export default function BaoCaoNhap() {
   const [tu, den] = phamViKy(ky, moc, tuTC, denTC);
 
   const { dong, chart, soDaiLy, tongKg, tongTien } = useMemo(() => {
-    const loc = rows.filter(
+    // Lọc nguyên liệu nhập khẩu
+    const locImports = rows.filter(
       (r) =>
         r.deliveryDate >= tu &&
         r.deliveryDate <= den &&
         (xuong === "Tất cả" || r.workshop === xuong)
     );
+
+    // Lọc phế liệu cân gộp trong khoảng ngày
+    const locScraps = scraps.filter(
+      (r) =>
+        r.source === "Nhập hàng" &&
+        r.date >= tu &&
+        r.date <= den &&
+        (xuong === "Tất cả" || r.workshop === xuong)
+    );
+
     const map = new Map<string, DongTong>();
-    for (const r of loc) {
+
+    // Gom nguyên liệu
+    for (const r of locImports) {
       const sup = r.supplierName || "(chưa có đại lý)";
       const mt = r.materialTypeName || "(chưa rõ loại)";
       const k = `${sup}|||${mt}`;
@@ -65,20 +79,52 @@ export default function BaoCaoNhap() {
       d.quantityKg += r.quantityKg || 0;
       d.amount += calculateImportAmount(r);
     }
+
+    // Gom phế liệu nhập
+    for (const r of locScraps) {
+      const sup = "(Phế liệu nội bộ)";
+      const mt = r.name || "(chưa rõ loại phế liệu)";
+      const k = `${sup}|||${mt}`;
+      let d = map.get(k);
+      if (!d) {
+        d = { supplierName: sup, materialTypeName: mt, quantityKg: 0, amount: 0 };
+        map.set(k, d);
+      }
+      d.quantityKg += r.quantityKg || 0;
+      d.amount += r.quantityKg * (r.sellingPrice ?? 0);
+    }
+
     const dong = [...map.values()].sort(
       (a, b) =>
         a.supplierName.localeCompare(b.supplierName, "vi") ||
         a.materialTypeName.localeCompare(b.materialTypeName, "vi")
     );
 
-    // Gom theo đại lý cho biểu đồ.
-    const theoDL = new Map<string, number>();
-    for (const d of dong)
-      theoDL.set(d.supplierName, (theoDL.get(d.supplierName) ?? 0) + d.quantityKg);
-    const chart: CotBieuDo[] = [...theoDL.entries()].map(([nhan, giaTri]) => ({
-      nhan,
-      giaTri,
+    // Gom theo ngày để vẽ biểu đồ (thứ tự thời gian)
+    const theoNgay = new Map<string, number>();
+    for (const r of locImports) {
+      const d = r.deliveryDate;
+      theoNgay.set(d, (theoNgay.get(d) ?? 0) + (r.quantityKg || 0));
+    }
+    for (const r of locScraps) {
+      const d = r.date;
+      theoNgay.set(d, (theoNgay.get(d) ?? 0) + (r.quantityKg || 0));
+    }
+
+    const datesSorted = [...theoNgay.keys()].sort();
+    const chart: CotBieuDoDoc[] = datesSorted.map((date) => ({
+      nhan: viDate(date).slice(0, 5), // Lấy dạng dd/mm
+      giaTri: theoNgay.get(date) ?? 0,
+      phu: viDate(date),
     }));
+
+    // Đếm số đại lý thực tế (không tính phế liệu nội bộ)
+    const theoDL = new Map<string, number>();
+    for (const d of dong) {
+      if (d.supplierName !== "(Phế liệu nội bộ)") {
+        theoDL.set(d.supplierName, (theoDL.get(d.supplierName) ?? 0) + d.quantityKg);
+      }
+    }
 
     return {
       dong,
@@ -87,7 +133,7 @@ export default function BaoCaoNhap() {
       tongKg: dong.reduce((s, d) => s + d.quantityKg, 0),
       tongTien: dong.reduce((s, d) => s + d.amount, 0),
     };
-  }, [rows, tu, den, xuong]);
+  }, [rows, scraps, tu, den, xuong]);
 
   const the: TheThongTin[] = [
     { nhan: "Kỳ báo cáo", giaTri: `${viDate(tu)} – ${viDate(den)}`, icon: CalendarRange, mau: "trung-tinh" },
@@ -168,9 +214,9 @@ export default function BaoCaoNhap() {
       {chart.length > 0 && (
         <section className="space-y-3 rounded-xl border-2 border-border bg-card p-5">
           <h3 className="text-lg font-semibold text-foreground">
-            Sản lượng nhập theo đại lý
+            Sản lượng nhập theo ngày (kèm trung bình chu kỳ)
           </h3>
-          <BieuDoCot data={chart} donVi="kg" />
+          <BieuDoCotDoc data={chart} donVi="kg" />
         </section>
       )}
 

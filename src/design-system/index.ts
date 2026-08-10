@@ -42,6 +42,7 @@ export { FormDialog, NutDong } from "./patterns/FormDialog";
 export { BangTong, type CotTong } from "./patterns/BangTong";
 export { ThongKe, type TheThongTin } from "./patterns/ThongKe";
 export { BieuDoCot, type CotBieuDo } from "./patterns/BieuDoCot";
+export { BieuDoCotDoc, type CotBieuDoDoc } from "./patterns/BieuDoCotDoc";
 export { notify } from "./patterns/notify";
 
 /* Primitive được phép dùng lại nguyên bản (đã đè size trong components/ui). */

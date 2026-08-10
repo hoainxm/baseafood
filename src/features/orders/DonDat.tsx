@@ -24,7 +24,6 @@ import {
   Badge,
   Button,
   Combobox,
-  ContextBar,
   Dialog,
   DialogContent,
   DialogDescription,
@@ -37,13 +36,14 @@ import {
   Input,
   NumberField,
   RecordTable,
+  ThongKe,
   notify,
   type Cot,
   type LoiNhap,
   type MucChon,
 } from "@/design-system";
 import { kg, num, todayISO, viDate } from "@/lib/format";
-import { ClipboardList, PackageCheck, Plus, Truck } from "lucide-react";
+import { CheckCircle, ClipboardList, Package, PackageCheck, Plus, Truck } from "lucide-react";
 
 interface DongCanMoi {
   productId: string;
@@ -299,28 +299,27 @@ export default function DonDatScreen() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-semibold text-foreground">
-          Đơn đặt &amp; lệnh xuất
-        </h1>
-        <p className="mt-2 max-w-2xl text-base text-muted-foreground">
-          Khách đặt số lượng lớn — gom đủ qua nhiều ngày sản xuất rồi xuất
-          container (được xuất một phần). Xuất xong đẩy sang sổ Bán hàng.
-        </p>
-      </div>
-
-      <ContextBar
-        items={[
-          { nhan: "Số đơn", giaTri: don.length, so: true },
-          { nhan: "Đang gom", giaTri: don.filter((d) => d.status === "dang-gom").length, so: true },
-          { nhan: "Đã xuất", giaTri: don.filter((d) => d.status === "dong").length, so: true },
-        ]}
-        actions={
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-3xl font-semibold text-foreground">
+            Đơn đặt &amp; lệnh xuất
+          </h1>
+        </div>
+        <div className="flex flex-wrap gap-2">
           <Button size="lg" onClick={moTao}>
             <Plus />
             Tạo đơn
           </Button>
-        }
+        </div>
+      </div>
+
+      <ThongKe
+        className="grid-cols-1 sm:grid-cols-3"
+        the={[
+          { nhan: "Tổng số đơn", giaTri: don.length, so: true, icon: ClipboardList, mau: "trung-tinh" },
+          { nhan: "Đang gom hàng", giaTri: don.filter((d) => d.status === "dang-gom").length, so: true, icon: Package, mau: "brand" },
+          { nhan: "Đã xuất xong", giaTri: don.filter((d) => d.status === "dong").length, so: true, icon: CheckCircle, mau: "success" },
+        ]}
       />
 
       {don.length === 0 ? (

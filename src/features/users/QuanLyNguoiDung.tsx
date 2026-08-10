@@ -172,10 +172,6 @@ export default function QuanLyNguoiDungScreen({
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-3xl font-semibold text-foreground">Người dùng</h1>
-          <p className="mt-2 max-w-2xl text-base text-muted-foreground">
-            Tạo tài khoản và gán vai trò. Chỉ quản trị tạo được tài khoản — không
-            mở đăng ký tự do.
-          </p>
         </div>
         <Button
           size="lg"

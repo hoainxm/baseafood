@@ -6,7 +6,6 @@ import {
   Badge,
   Button,
   Combobox,
-  ContextBar,
   Dialog,
   DialogContent,
   DialogDescription,
@@ -19,13 +18,14 @@ import {
   Input,
   NumberField,
   RecordTable,
+  ThongKe,
   notify,
   type Cot,
   type LoiNhap,
   type MucChon,
 } from "@/design-system";
 import { kg, num, viDate } from "@/lib/format";
-import { PackageCheck, Snowflake } from "lucide-react";
+import { CalendarRange, ClipboardList, PackageCheck, Scale, Snowflake, Warehouse } from "lucide-react";
 
 const KHO_GOI_Y = ["Kho đông 1", "Kho đông 2", "Kho đông 3"];
 
@@ -145,17 +145,15 @@ export default function KhoDuTruScreen() {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-semibold text-foreground">Kho dự trữ đông</h1>
-        <p className="mt-2 max-w-2xl text-base text-muted-foreground">
-          Duyệt bán thành phẩm sản xuất vào kho (cấp đông), theo dõi tồn từng lô.
-          Tồn = đã nhập − đã xuất; chỉ lô đã duyệt mới tính tồn.
-        </p>
       </div>
 
-      <ContextBar
-        items={[
-          { nhan: "Chờ nhập", giaTri: choNhap.length, so: true },
-          { nhan: "Lô còn hàng", giaTri: tonLoc.length, so: true },
-          { nhan: "Tổng tồn", giaTri: kg(tongTon), so: true },
+      <ThongKe
+        className="grid-cols-2 lg:grid-cols-4"
+        the={[
+          { nhan: "Đang xem", giaTri: "Tồn hiện tại", icon: CalendarRange, mau: "trung-tinh" },
+          { nhan: "Chờ nhập", giaTri: choNhap.length, so: true, icon: Warehouse, mau: "trung-tinh" },
+          { nhan: "Số lô hàng", giaTri: tonLoc.length, so: true, icon: ClipboardList, mau: "brand" },
+          { nhan: "Tổng tồn", giaTri: kg(tongTon), so: true, icon: Scale, mau: "success" },
         ]}
       />
 

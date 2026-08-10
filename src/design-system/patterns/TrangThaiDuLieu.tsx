@@ -19,7 +19,7 @@ type Trang = "cuc-bo" | "dang-kiem" | "da-noi" | "loi";
 async function probeKetNoi(): Promise<void> {
   if (!supabase) return;
   const { error } = await supabase
-    .from("dai_ly")
+    .from("suppliers")
     .select("id")
     .eq("site_id", SITE_ID)
     .limit(1);

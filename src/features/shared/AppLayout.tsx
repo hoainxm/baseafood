@@ -129,7 +129,7 @@ export default function AppLayout() {
         <div
           className={cn(
             "flex shrink-0 items-center border-b-2 border-border",
-            thuGon ? "justify-center px-2" : "px-5",
+            thuGon ? "justify-center px-2" : "px-4",
             CAO_HEADER
           )}
         >

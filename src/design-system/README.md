@@ -68,14 +68,28 @@ khớp khổ A4. Đừng áp luật cỡ chữ / màu / sentence case vào hai f
 | Cho biết đang làm cho ngày/xưởng nào | `ContextBar` |
 | Danh sách rỗng | `EmptyState` (phải nói việc tiếp theo) |
 | Câu diễn giải dài cạnh nhãn | `InfoTip` (nút ⓘ + popover). `DateField` **và** `Combobox` có sẵn prop `info` — dùng thay `hint` khi câu dài khiến hai ô cùng hàng lệch chiều cao. Nhãn tiêu đề vẫn luôn hiện. |
+| Bảng tổng hợp cho trang Báo cáo | `BangTong` — cột số căn phải `tnum`, hàng TỔNG CỘNG ở chân tự cộng theo `tong` từng cột. Component cha lo gom nhóm; `BangTong` chỉ hiển thị. |
+| **Dialog/form thông tin hay thao tác** | `FormDialog` — khung CHUẨN: đầu cố định (icon + tiêu đề + mô tả) · thân cuộn `scroll-nice` · chân cố định chứa nút. `rong`: sm/vua/rong/xl. Điều khiển bằng `open`/`onOpenChange` hoặc `trigger`. Nút đóng tiện dụng: `NutDong`. |
+| Các con số bối cảnh/tổng | `ThongKe` (lưới thẻ KPI: nhãn nhỏ + số TO + icon màu) — sinh động hơn nhồi một dòng. `ContextBar` chỉ dùng cho thanh dính "đang xem ngày/xưởng nào" trong màn nhập liệu. |
+| Biểu đồ trong Báo cáo | `BieuDoCot` — thanh NGANG + đường trung bình nét đứt, một màu thương hiệu, thuần HTML + token (ăn theo cỡ chữ). KHÔNG thêm thư viện chart. |
+
+## Nút toàn cục trên header (AppLayout)
+
+Gom mọi thứ toàn cục thành **nút icon 44px** ở góc phải header, luôn hiện kể cả điện thoại:
+
+| Component | Vai trò |
+|---|---|
+| `NutGiaoDien` | Icon 🎨 → `FormDialog` chứa `CaiDatHienThi`. Nhận `taiKhoan` để **lưu theo người dùng**. Có **draft**: xem trước live, **Lưu** mới giữ, **Hủy**/đóng khôi phục ảnh chụp (`docCaiDatHienThi`/`ghiCaiDatHienThi`). |
+| `NutTrangThai` | Icon theo màu store `ketNoi`. Popover chi tiết + nút **Thử kết nối lại** (`probeKetNoi`). |
+| `NutHuongDan` | Icon "?" → hộp hướng dẫn của trang. Nội dung lấy từ `features/shared/huongDan.tsx`, chỉ hiện ở trang có trong registry. |
 
 ## Trang duyệt + cấu hình
 
-`Bộ giao diện` ở cuối thanh bên (`src/design-system/kit/KitPage.tsx`) — mở trên
-tablet, đưa cho người dùng thật bấm thử trước khi nhân bản ra màn nghiệp vụ.
+`Bộ giao diện` (`src/design-system/kit/KitPage.tsx`) — trang demo component, vào
+bằng URL `/kit` (đã gỡ khỏi sidebar), desktop-only.
 
-Mục 1 của trang là **Cài đặt hiển thị** (`patterns/CaiDatHienThi.tsx`), áp ngay
-cho toàn hệ thống và nhớ qua các lần mở:
+**Cài đặt hiển thị** (`patterns/CaiDatHienThi.tsx`) giờ mở từ nút `NutGiaoDien`
+trên header. Áp ngay và **nhớ theo từng tài khoản**:
 
 | Cấu hình | Cách áp | Giá trị |
 |---|---|---|
@@ -83,11 +97,14 @@ cho toàn hệ thống và nhớ qua các lần mở:
 | Mật độ | `data-density` trên `<html>` | thoáng 48px · vừa 44px · gọn 40px |
 | Bề rộng nội dung | `--app-content-width` | 64rem / 80rem / 100% |
 
-Header chỉ giữ nút cỡ chữ nhanh (`CoChuNhanh`) — thứ cần chỉnh giữa ca làm.
+Khóa localStorage theo username: `bsf.<username>.<coChu|matDo|beRong>`; chưa đăng
+nhập ⇒ bucket mặc định `bsf.coChu` (tương thích ngược). Đổi tài khoản →
+`AppLayout` gọi `apDungCaiDatHienThi(username)` nạp lại. (`CoChuNhanh` — nút cỡ
+chữ nhanh cũ — vẫn còn trong file nhưng không còn gắn trên header.)
 
 > Hai thanh header (thanh bên và thanh nội dung) dùng chung hằng `CAO_HEADER`
-> trong `App.tsx`. Đổi chiều cao thì đổi ở đó, đừng đặt riêng từng bên — lệch
-> một bên là cả trang trông vênh.
+> trong `AppLayout.tsx`. Đổi chiều cao thì đổi ở đó, đừng đặt riêng từng bên —
+> lệch một bên là cả trang trông vênh.
 
 ## Thêm component shadcn mới
 

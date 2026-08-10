@@ -1,1 +1,1 @@
-export { default } from "./NhapNguyenLieu";
+export { default } from "./NhapHangTab";

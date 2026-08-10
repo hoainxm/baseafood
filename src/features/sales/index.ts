@@ -1,1 +1,1 @@
-export { default } from "./BanHang";
+export { default } from "./BanHangTab";

@@ -1,6 +1,6 @@
 > Load khi: sửa màn Bán hàng — phiếu bán, dòng bán, quy cách, ghi bù, hoặc hút bán vào cân đối.
-covers: src/features/BanHang.tsx, src/types.ts, src/lib/repo.ts
-last_verified: 2026-08-07
+covers: src/features/sales/BanHang.tsx, src/features/sales/BaoCaoBan.tsx, src/features/sales/BanHangTab.tsx, src/types.ts, src/lib/repo.ts
+last_verified: 2026-08-10
 ttl_days: 90
 <!-- re-verified: 2026-08-07 — phiếu multi-line (phieuId), 2 ngày, seam hút banHangId khớp BanHang.tsx + CanDoi.tsx:389 -->
 
@@ -22,6 +22,8 @@ Số hóa sổ **bán hàng** — bán thành phẩm chế biến (bạch tuộc
 Chưa có (backlog): **chốt ngày bán** (bảng `chot_ngay` hiện chỉ dùng cho nhập — bán cần bảng chốt riêng, chưa làm); **phiếu bán in A4** riêng (bảng cân đối đã in được); **trừ tồn kho TP** khi bán (cột `kho_nguon` để dành, chưa dùng — chờ vòng lặp đông gửi/xả đông).
 
 Bảng dùng: `phieu_ban`, `ban_hang`, đọc danh mục `mat_hang` / `khach_hang`. Migration `0005`.
+
+**Hai tab** (bọc ở `BanHangTab.tsx`): **Sổ bán hàng** = màn ghi (`BanHang`) · **Báo cáo** (`BaoCaoBan`) = tổng bán theo kỳ, gom **khách × kênh**, trình bày bằng thẻ `ThongKe` + `BieuDoCot` (sản lượng theo khách) + `BangTong`. Giá trị để **riêng theo kênh** (Xuất khẩu USD ≠ Nội địa VND — không cộng thẳng, đúng bẫy §4); chỉ tổng kg gộp được (thẻ + chart chỉ dùng kg).
 
 ## Logic / Rules
 

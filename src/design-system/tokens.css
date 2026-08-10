@@ -210,3 +210,25 @@
 @utility tnum {
   font-variant-numeric: tabular-nums;
 }
+
+/* Thanh cuộn gọn, bám màu token — dùng cho thân dialog/form cuộn dài.
+   Bản rộng hơn mặc định để người lớn tuổi thấy rõ mình đang cuộn. */
+@utility scroll-nice {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+  &::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+  }
+  &::-webkit-scrollbar-thumb {
+    background-color: var(--border);
+    border-radius: 9999px;
+    border: 3px solid var(--background);
+  }
+  &::-webkit-scrollbar-thumb:hover {
+    background-color: var(--input);
+  }
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}

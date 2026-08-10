@@ -35,7 +35,13 @@ export {
   CaiDatHienThi,
   apDungCaiDatHienThi,
 } from "./patterns/CaiDatHienThi";
-export { TrangThaiDuLieu } from "./patterns/TrangThaiDuLieu";
+export { TrangThaiDuLieu, NutTrangThai } from "./patterns/TrangThaiDuLieu";
+export { NutGiaoDien } from "./patterns/NutGiaoDien";
+export { NutHuongDan } from "./patterns/NutHuongDan";
+export { FormDialog, NutDong } from "./patterns/FormDialog";
+export { BangTong, type CotTong } from "./patterns/BangTong";
+export { ThongKe, type TheThongTin } from "./patterns/ThongKe";
+export { BieuDoCot, type CotBieuDo } from "./patterns/BieuDoCot";
 export { notify } from "./patterns/notify";
 
 /* Primitive được phép dùng lại nguyên bản (đã đè size trong components/ui). */

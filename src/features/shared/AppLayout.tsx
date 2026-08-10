@@ -1,8 +1,17 @@
+import { useEffect, useState } from "react";
 import { Outlet, Link, useLocation } from "react-router-dom";
-import { CoChuNhanh, Logo, Toaster, TrangThaiDuLieu } from "@/design-system";
+import {
+  Logo,
+  Toaster,
+  NutGiaoDien,
+  NutHuongDan,
+  NutTrangThai,
+  apDungCaiDatHienThi,
+} from "@/design-system";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
 import { roleLabel } from "@/types";
+import { HUONG_DAN } from "./huongDan";
 import {
   Truck,
   Factory,
@@ -11,16 +20,17 @@ import {
   ClipboardList,
   Scale,
   Library,
-  Palette,
   Users,
   LogOut,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from "lucide-react";
 
 type Screen =
   | "imports"
   | "production"
   | "sales"
-  | "kho"
+  | "warehouse"
   | "orders"
   | "balancing"
   | "catalog"
@@ -30,94 +40,107 @@ type Screen =
 interface MucNav {
   id: Screen;
   label: string;
-  moTa: string;
   icon: typeof Truck;
 }
 
 const NAV: MucNav[] = [
-  {
-    id: "imports",
-    label: "Nhập hàng",
-    moTa: "Ghi chuyến nguyên liệu về xưởng",
-    icon: Truck,
-  },
-  {
-    id: "production",
-    label: "Sản xuất BTP",
-    moTa: "Ghi sản lượng bán thành phẩm ngày",
-    icon: Factory,
-  },
-  {
-    id: "sales",
-    label: "Bán hàng",
-    moTa: "Ghi phiếu bán thành phẩm hằng ngày",
-    icon: ShoppingCart,
-  },
-  {
-    id: "kho",
-    label: "Kho dự trữ",
-    moTa: "Duyệt nhập kho, theo dõi tồn đông",
-    icon: Snowflake,
-  },
-  {
-    id: "orders",
-    label: "Đơn đặt",
-    moTa: "Gom đủ đơn, xuất container",
-    icon: ClipboardList,
-  },
-  {
-    id: "balancing",
-    label: "Cân đối",
-    moTa: "Nguyên liệu vào ↔ bán thành phẩm sản xuất",
-    icon: Scale,
-  },
-  {
-    id: "catalog",
-    label: "Danh mục",
-    moTa: "Mặt hàng, khách, đại lý, loại NL",
-    icon: Library,
-  },
+  { id: "imports", label: "Nhập hàng", icon: Truck },
+  { id: "production", label: "Sản xuất BTP", icon: Factory },
+  { id: "sales", label: "Bán hàng", icon: ShoppingCart },
+  { id: "warehouse", label: "Kho dự trữ", icon: Snowflake },
+  { id: "orders", label: "Đơn đặt", icon: ClipboardList },
+  { id: "balancing", label: "Cân đối", icon: Scale },
+  { id: "catalog", label: "Danh mục", icon: Library },
 ];
 
 const NAV_NGUOI_DUNG: MucNav = {
   id: "users",
   label: "Người dùng",
-  moTa: "Tài khoản & vai trò",
   icon: Users,
 };
 
 const CAO_HEADER = "h-20";
+const KEY_THU_GON = "bsf.sidebarThu";
 
 export default function AppLayout() {
   const auth = useAuth();
   const location = useLocation();
 
+  // Thu/mở thanh bên (chỉ desktop) — nhớ lựa chọn qua localStorage.
+  const [thuGon, setThuGon] = useState(
+    () => localStorage.getItem(KEY_THU_GON) === "1"
+  );
+  const doiThuGon = () =>
+    setThuGon((v) => {
+      const n = !v;
+      localStorage.setItem(KEY_THU_GON, n ? "1" : "0");
+      return n;
+    });
+
   const navList: MucNav[] = auth.laAdmin ? [...NAV, NAV_NGUOI_DUNG] : NAV;
-  
+
   const activeNav = navList.find((n) => {
     if (n.id === "balancing") {
       return location.pathname.startsWith("/balancing");
     }
     return location.pathname === `/${n.id}`;
   });
-  
-  const screenThuc = activeNav ? activeNav.id : (location.pathname === "/kit" ? "kit" : "");
-  const tieuDeMan = screenThuc === "kit" ? "Bộ giao diện" : (activeNav?.label ?? "");
+
+  const screenThuc: string = activeNav
+    ? activeNav.id
+    : location.pathname === "/kit"
+      ? "kit"
+      : "";
+  const tieuDeMan =
+    screenThuc === "kit" ? "Bộ giao diện" : (activeNav?.label ?? "");
+
+  const dangNhap = auth.canDangNhap && auth.session;
+  const username = auth.nguoiDung?.username;
+  const huongDan = HUONG_DAN[screenThuc];
+
+  // Đổi tài khoản → nạp lại giao diện đã lưu của người vừa đăng nhập.
+  useEffect(() => {
+    apDungCaiDatHienThi(username);
+  }, [username]);
+
+  // Cụm nút bên phải header: hướng dẫn (theo trang) · giao diện · trạng thái.
+  // Luôn hiện, kể cả trên điện thoại (tablet xưởng tay ướt bấm icon dễ hơn text).
+  const nutHeader = (
+    <div className="flex shrink-0 items-center gap-2">
+      {huongDan && (
+        <NutHuongDan tieuDe={huongDan.tieuDe} moTa={huongDan.moTa}>
+          {huongDan.noiDung}
+        </NutHuongDan>
+      )}
+      <NutGiaoDien taiKhoan={username} />
+      <NutTrangThai />
+    </div>
+  );
 
   return (
     <div className="flex min-h-full flex-col md:flex-row">
-      {/* Thanh bên (desktop / tablet ngang) */}
-      <aside className="hidden w-72 shrink-0 flex-col border-r-2 border-border bg-card md:flex">
+      {/* Thanh bên (desktop / tablet ngang) — thu/mở được, chỉ icon + nhãn */}
+      <aside
+        className={cn(
+          "hidden shrink-0 flex-col border-r-2 border-border bg-card transition-[width] duration-200 md:flex",
+          thuGon ? "w-20" : "w-64"
+        )}
+      >
         <div
           className={cn(
-            "flex shrink-0 items-center border-b-2 border-border px-5",
-            CAO_HEADER,
+            "flex shrink-0 items-center border-b-2 border-border",
+            thuGon ? "justify-center px-2" : "px-5",
+            CAO_HEADER
           )}
         >
-          <Logo cao="h-11" phuDe="Xí nghiệp BSF1" />
+          <Logo
+            cao="h-11"
+            hienChu={!thuGon}
+            phuDe={thuGon ? undefined : "Xí nghiệp BSF1"}
+          />
         </div>
 
-        <nav className="flex-1 space-y-2 p-3">
+        <nav className="flex-1 space-y-1.5 p-3">
           {navList.map((n) => {
             const Icon = n.icon;
             const active = screenThuc === n.id;
@@ -126,97 +149,76 @@ export default function AppLayout() {
                 key={n.id}
                 to={`/${n.id}`}
                 aria-current={active ? "page" : undefined}
+                title={thuGon ? n.label : undefined}
                 className={cn(
-                  "flex w-full items-start gap-3 rounded-lg border-2 px-4 py-3 text-left transition-colors",
+                  "flex min-h-12 w-full items-center gap-3 rounded-lg border-2 text-left text-base font-semibold transition-colors",
+                  thuGon ? "justify-center px-0" : "px-4",
                   active
                     ? "border-primary bg-accent text-accent-foreground"
-                    : "border-transparent text-foreground hover:bg-muted",
+                    : "border-transparent text-foreground hover:bg-muted"
                 )}
               >
-                <Icon className="mt-0.5 size-6 shrink-0" aria-hidden />
-                <span className="min-w-0">
-                  <span className="block text-base font-semibold">
-                    {n.label}
-                  </span>
-                  <span
-                    className={cn(
-                      "block text-sm",
-                      active
-                        ? "text-accent-foreground"
-                        : "text-muted-foreground",
-                    )}
-                  >
-                    {n.moTa}
-                  </span>
-                </span>
+                <Icon className="size-6 shrink-0" aria-hidden />
+                {!thuGon && <span className="min-w-0 truncate">{n.label}</span>}
               </Link>
             );
           })}
         </nav>
-
-        <div className="space-y-3 border-t border-border px-5 py-4">
-          {auth.canDangNhap && auth.session && (
-            <div className="space-y-2 rounded-lg bg-muted px-3 py-2.5">
-              <p className="truncate text-base font-semibold text-foreground">
-                {auth.nguoiDung?.fullName ||
-                  auth.nguoiDung?.username ||
-                  "Người dùng"}
-              </p>
-              <div className="flex items-center justify-between gap-2">
-                <span className="truncate text-sm text-muted-foreground">
-                  {auth.nguoiDung?.username} ·{" "}
-                  {roleLabel(auth.nguoiDung?.roles ?? [])}
-                </span>
-                <button
-                  onClick={auth.dangXuat}
-                  className="flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1 text-sm font-medium text-muted-foreground hover:bg-card hover:text-destructive"
-                >
-                  <LogOut className="size-5" aria-hidden />
-                  Đăng xuất
-                </button>
-              </div>
-            </div>
-          )}
-          <Link
-            to="/kit"
-            className={cn(
-              "flex min-h-12 w-full items-center gap-2 rounded-lg px-3 text-base font-medium transition-colors",
-              screenThuc === "kit"
-                ? "bg-accent text-accent-foreground"
-                : "text-muted-foreground hover:bg-muted",
-            )}
-          >
-            <Palette className="size-5" aria-hidden />
-            Bộ giao diện
-          </Link>
-          <TrangThaiDuLieu />
-        </div>
       </aside>
 
       {/* Nội dung */}
       <div className="flex min-w-0 flex-1 flex-col">
         <header
           className={cn(
-            "flex shrink-0 items-center justify-between gap-4 border-b-2 border-border bg-card px-5 sm:px-8",
-            CAO_HEADER,
+            "flex shrink-0 items-center justify-between gap-3 border-b-2 border-border bg-card px-4 sm:px-6",
+            CAO_HEADER
           )}
         >
-          <Logo cao="h-10" phuDe="Xí nghiệp BSF1" className="md:hidden" />
-          <h1 className="hidden truncate text-xl font-semibold text-foreground md:block">
-            {tieuDeMan}
-          </h1>
-          <div className="flex shrink-0 items-center gap-3">
-            {/* Đăng xuất cho điện thoại (thanh bên ẩn) */}
-            {auth.canDangNhap && auth.session && (
-              <button
-                onClick={auth.dangXuat}
-                className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm font-medium text-muted-foreground hover:text-destructive md:hidden"
-              >
-                <LogOut className="size-5" aria-hidden />
-                Đăng xuất
-              </button>
+          {/* Trái: nút thu/mở (desktop) + logo (mobile) + tiêu đề màn */}
+          <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+            <button
+              onClick={doiThuGon}
+              aria-label={thuGon ? "Mở thanh bên" : "Thu thanh bên"}
+              title={thuGon ? "Mở thanh bên" : "Thu thanh bên"}
+              className="hidden size-11 shrink-0 items-center justify-center rounded-lg border-2 border-input text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring md:inline-flex"
+            >
+              {thuGon ? (
+                <PanelLeftOpen className="size-6" aria-hidden />
+              ) : (
+                <PanelLeftClose className="size-6" aria-hidden />
+              )}
+            </button>
+            <Logo cao="h-9" hienChu={false} className="md:hidden" />
+            <h1 className="truncate text-lg font-semibold text-foreground sm:text-xl">
+              {tieuDeMan}
+            </h1>
+          </div>
+
+          {/* Phải: cụm nút + tài khoản */}
+          <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+            {nutHeader}
+            {dangNhap && (
+              <div className="flex items-center gap-2 border-l-2 border-border pl-2 sm:pl-3">
+                <div className="hidden min-w-0 text-right sm:block">
+                  <p className="truncate text-sm font-semibold text-foreground">
+                    {auth.nguoiDung?.fullName ||
+                      auth.nguoiDung?.username ||
+                      "Người dùng"}
+                  </p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {roleLabel(auth.nguoiDung?.roles ?? [])}
+                  </p>
+                </div>
+                <button
+                  onClick={auth.dangXuat}
+                  aria-label="Đăng xuất"
+                  title="Đăng xuất"
+                  className="inline-flex size-11 shrink-0 items-center justify-center rounded-lg border-2 border-input text-muted-foreground transition-colors hover:bg-muted hover:text-destructive focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                >
+                  <LogOut className="size-6" aria-hidden />
+                </button>
+              </div>
             )}
-            <CoChuNhanh />
           </div>
         </header>
 
@@ -227,7 +229,7 @@ export default function AppLayout() {
         </main>
       </div>
 
-      {/* Tab dưới cho điện thoại — số cột theo số mục (4 hoặc 5 khi có admin) */}
+      {/* Tab dưới cho điện thoại — số cột theo số mục (7 hoặc 8 khi có admin) */}
       <nav
         className="fixed inset-x-0 bottom-0 z-40 grid border-t-2 border-border bg-card md:hidden"
         style={{
@@ -243,10 +245,10 @@ export default function AppLayout() {
               to={`/${n.id}`}
               aria-current={active ? "page" : undefined}
               className={cn(
-                "flex min-h-16 flex-col items-center justify-center gap-1 px-1 text-sm font-semibold transition-colors",
+                "flex min-h-16 flex-col items-center justify-center gap-1 px-1 text-xs font-semibold transition-colors",
                 active
                   ? "bg-accent text-accent-foreground"
-                  : "text-muted-foreground",
+                  : "text-muted-foreground"
               )}
             >
               <Icon className="size-6" aria-hidden />

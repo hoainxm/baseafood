@@ -8,9 +8,20 @@ import { RotateCcw } from "lucide-react";
    Lưu localStorage, áp bằng thuộc tính / biến CSS trên <html>.
    ============================================================ */
 
-const KEY_CO_CHU = "bsf.coChu";
-const KEY_MAT_DO = "bsf.matDo";
-const KEY_BE_RONG = "bsf.beRong";
+/**
+ * Khóa lưu THEO NGƯỜI DÙNG: mỗi tài khoản giữ giao diện riêng (cỡ chữ / mật độ /
+ * bề rộng) — tổ trưởng mắt kém để cỡ 130%, kế toán để Gọn, không đạp lên nhau khi
+ * dùng chung một tablet. Không có username (chạy localStorage ở xưởng, chưa đăng
+ * nhập) ⇒ dùng bucket mặc định = khóa cũ `bsf.coChu` → tương thích ngược, không
+ * làm mất cài đặt người dùng đã chọn trước khi có tính năng này.
+ */
+const BASE_CO_CHU = "coChu";
+const BASE_MAT_DO = "matDo";
+const BASE_BE_RONG = "beRong";
+
+function khoa(base: string, taiKhoan?: string) {
+  return taiKhoan ? `bsf.${taiKhoan}.${base}` : `bsf.${base}`;
+}
 
 export const CO_CHU = [
   { id: "100", nhan: "A", scale: "100%", moTa: "Thường — 18px" },
@@ -49,19 +60,59 @@ function apBeRong(id: string) {
   document.documentElement.style.setProperty("--app-content-width", m.css);
 }
 
-/** Nạp cài đặt đã lưu — gọi một lần lúc app khởi động, trước khi vẽ. */
-export function apDungCaiDatHienThi() {
-  apCoChu(doc(KEY_CO_CHU, "100"));
-  apMatDo(doc(KEY_MAT_DO, "thoang"));
-  apBeRong(doc(KEY_BE_RONG, "vua"));
+/**
+ * Nạp cài đặt đã lưu và áp vào `<html>`. Gọi lúc app khởi động (chưa có
+ * username → bucket mặc định) VÀ mỗi khi đổi tài khoản đăng nhập (nạp lại đúng
+ * giao diện của người vừa đăng nhập).
+ */
+export function apDungCaiDatHienThi(taiKhoan?: string) {
+  apCoChu(doc(khoa(BASE_CO_CHU, taiKhoan), "100"));
+  apMatDo(doc(khoa(BASE_MAT_DO, taiKhoan), "thoang"));
+  apBeRong(doc(khoa(BASE_BE_RONG, taiKhoan), "vua"));
+}
+
+export interface AnhCaiDat {
+  coChu: string;
+  matDo: string;
+  beRong: string;
+}
+
+/** Chụp cài đặt hiện tại của một tài khoản — để làm mốc "hoàn tác" khi Hủy. */
+export function docCaiDatHienThi(taiKhoan?: string): AnhCaiDat {
+  return {
+    coChu: doc(khoa(BASE_CO_CHU, taiKhoan), "100"),
+    matDo: doc(khoa(BASE_MAT_DO, taiKhoan), "thoang"),
+    beRong: doc(khoa(BASE_BE_RONG, taiKhoan), "vua"),
+  };
+}
+
+/** Ghi lại một ảnh cài đặt và áp ngay — dùng để khôi phục khi người dùng Hủy. */
+export function ghiCaiDatHienThi(taiKhoan: string | undefined, snap: AnhCaiDat) {
+  localStorage.setItem(khoa(BASE_CO_CHU, taiKhoan), snap.coChu);
+  localStorage.setItem(khoa(BASE_MAT_DO, taiKhoan), snap.matDo);
+  localStorage.setItem(khoa(BASE_BE_RONG, taiKhoan), snap.beRong);
+  apDungCaiDatHienThi(taiKhoan);
 }
 
 /* ---------- Hook dùng chung cho cả nút nhanh và panel đầy đủ ---------- */
 
-function useCaiDat() {
-  const [coChu, setCoChu] = React.useState(() => doc(KEY_CO_CHU, "100"));
-  const [matDo, setMatDo] = React.useState(() => doc(KEY_MAT_DO, "thoang"));
-  const [beRong, setBeRong] = React.useState(() => doc(KEY_BE_RONG, "vua"));
+function useCaiDat(taiKhoan?: string) {
+  const kCoChu = khoa(BASE_CO_CHU, taiKhoan);
+  const kMatDo = khoa(BASE_MAT_DO, taiKhoan);
+  const kBeRong = khoa(BASE_BE_RONG, taiKhoan);
+
+  const [coChu, setCoChu] = React.useState(() => doc(kCoChu, "100"));
+  const [matDo, setMatDo] = React.useState(() => doc(kMatDo, "thoang"));
+  const [beRong, setBeRong] = React.useState(() => doc(kBeRong, "vua"));
+
+  // Đổi tài khoản → nạp lại state từ bucket của người mới rồi áp ngay.
+  React.useEffect(() => {
+    setCoChu(doc(kCoChu, "100"));
+    setMatDo(doc(kMatDo, "thoang"));
+    setBeRong(doc(kBeRong, "vua"));
+    apDungCaiDatHienThi(taiKhoan);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [taiKhoan]);
 
   return {
     coChu,
@@ -69,27 +120,27 @@ function useCaiDat() {
     beRong,
     doiCoChu: (id: string) => {
       setCoChu(id);
-      localStorage.setItem(KEY_CO_CHU, id);
+      localStorage.setItem(kCoChu, id);
       apCoChu(id);
     },
     doiMatDo: (id: string) => {
       setMatDo(id);
-      localStorage.setItem(KEY_MAT_DO, id);
+      localStorage.setItem(kMatDo, id);
       apMatDo(id);
     },
     doiBeRong: (id: string) => {
       setBeRong(id);
-      localStorage.setItem(KEY_BE_RONG, id);
+      localStorage.setItem(kBeRong, id);
       apBeRong(id);
     },
     datLai: () => {
       setCoChu("100");
       setMatDo("thoang");
       setBeRong("vua");
-      localStorage.removeItem(KEY_CO_CHU);
-      localStorage.removeItem(KEY_MAT_DO);
-      localStorage.removeItem(KEY_BE_RONG);
-      apDungCaiDatHienThi();
+      localStorage.removeItem(kCoChu);
+      localStorage.removeItem(kMatDo);
+      localStorage.removeItem(kBeRong);
+      apDungCaiDatHienThi(taiKhoan);
     },
   };
 }
@@ -100,8 +151,14 @@ function useCaiDat() {
  * Chỉ có cỡ chữ — thứ người dùng cần chỉnh ngay giữa ca làm.
  * Các cấu hình còn lại nằm trong trang "Bộ giao diện".
  */
-export function CoChuNhanh({ className }: { className?: string }) {
-  const { coChu, doiCoChu } = useCaiDat();
+export function CoChuNhanh({
+  className,
+  taiKhoan,
+}: {
+  className?: string;
+  taiKhoan?: string;
+}) {
+  const { coChu, doiCoChu } = useCaiDat(taiKhoan);
 
   return (
     <div
@@ -194,8 +251,8 @@ function NhomChon({
   );
 }
 
-export function CaiDatHienThi() {
-  const c = useCaiDat();
+export function CaiDatHienThi({ taiKhoan }: { taiKhoan?: string }) {
+  const c = useCaiDat(taiKhoan);
 
   return (
     <div className="space-y-8 rounded-xl border-2 border-border p-5">

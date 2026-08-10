@@ -33,7 +33,7 @@ export function Logo({
       />
       {hienChu && (
         <span className="min-w-0">
-          <span className="block text-xl leading-tight font-bold tracking-tight text-primary">
+          <span className="block truncate text-xl leading-tight font-bold tracking-tight text-primary">
             BASEAFOOD
           </span>
           {phuDe && (

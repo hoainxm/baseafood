@@ -1,8 +1,9 @@
 > Load khi: sửa màn Cân đối, công thức định mức/lãi lỗ, hay bảng in A4.
 covers: src/features/CanDoi.tsx, src/features/BangCanDoi.tsx, src/lib/canDoi.ts
-last_verified: 2026-08-07
+last_verified: 2026-08-10
 ttl_days: 90
 <!-- re-verified: 2026-08-07 — công thức canDoi.ts + KhoiTP hút bán khớp source -->
+<!-- fixed: 2026-08-10 — đối chiếu bảng cân đối bạch tuộc 2 da (21-25/07) thật: sửa "Bình quân/kg NL" = Lãi÷NL (trước tính nhầm Giá thành÷NL); đổi field avgCostPerKgMaterial→avgProfitPerKgMaterial. 8 chỉ số kia khớp tuyệt đối -->
 <!-- updated: 2026-08-07 — khối 3 đổi nhãn "Bán thành phẩm sản xuất" (WIP làm ra ≠ bán ra); NL vào cho kg âm (bán nội địa); cờ nguonKho cho xả đông (migration 0008) -->
 
 # Cân đối theo kỳ (xưởng Đông, "cân đối 5 ngày")
@@ -32,7 +33,7 @@ Giá trị NL      = Σ kg × đơn giá
 Giá trị xuất    = Σ (kg × đơn giá), dòng Xuất khẩu × tỉ giá
 Giá thành       = Tổng TP × chi phí CB/kg + Giá trị NL
 Lãi/Lỗ         = Giá trị xuất − Giá thành
-Bình quân/kg NL = Giá thành ÷ Tổng NL vào
+Bình quân/kg NL = Lãi/Lỗ ÷ Tổng NL vào   // LÃI bình quân mỗi kg NL, KHÔNG phải giá thành/NL — khớp ô "Bình quân /kg nl" báo cáo giấy (VD 242.346.218 ÷ 63.926 ≈ 3.791)
 Tỉ lệ thu hồi   = Tổng TP ÷ Tổng NL NHẬN (thông số kỳ, ≠ Tổng NL vào) — null nếu chưa khai
 Giá trị phế liệu= Σ kg × đơn giá bán
 ```

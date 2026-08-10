@@ -589,7 +589,7 @@ function KyDetail({
           <KV k="Giá trị nguyên liệu" v={`${num(kq.materialValue)} đ`} />
           <KV k="Giá thành" v={`${num(kq.costOfGoods)} đ`} />
           <KV k="Giá trị xuất" v={`${num(kq.exportValue)} đ`} />
-          <KV k="Bình quân / kg NL" v={`${num(kq.avgCostPerKgMaterial)} đ`} />
+          <KV k="Bình quân / kg NL" v={chuaCoTP ? "—" : `${num(kq.avgProfitPerKgMaterial)} đ`} />
           <KV k="Giá trị phế liệu" v={`${num(kq.scrapValue)} đ`} />
         </div>
         {/* Chưa nhập thành phẩm ra thì KHÔNG kết luận lãi/lỗ — nếu không màn sẽ báo

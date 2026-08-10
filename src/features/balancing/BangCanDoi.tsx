@@ -179,7 +179,7 @@ export default function BangCanDoi({
             <KV k="Giá trị nguyên liệu" v={num(kq.materialValue)} />
             <KV k="Giá thành" v={num(kq.costOfGoods)} />
             <KV k="Giá trị xuất (VND)" v={num(kq.exportValue)} />
-            <KV k="Bình quân / kg NL" v={num(kq.avgCostPerKgMaterial)} />
+            <KV k="Bình quân / kg NL" v={num(kq.avgProfitPerKgMaterial)} />
             <KV
               k={kq.profitOrLoss >= 0 ? "LÃI" : "LỖ"}
               v={`${num(Math.abs(kq.profitOrLoss))} VND`}

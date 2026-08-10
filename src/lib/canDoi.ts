@@ -8,7 +8,7 @@ export interface BalancingResult {
   exportValue: number; // VND (adjusted by exchange rate for USD channels)
   costOfGoods: number; // VND
   profitOrLoss: number; // VND ( + profit / − loss )
-  avgCostPerKgMaterial: number; // costOfGoods ÷ totalInputKg
+  avgProfitPerKgMaterial: number; // profitOrLoss ÷ totalInputKg — lãi bình quân mỗi kg NL (khớp "Bình quân /kg nl" của báo cáo giấy)
   yieldRate: number | null; // totalOutputKg ÷ totalInputKg (typically ~0.45)
   scrapValue: number; // VND
 }
@@ -47,7 +47,7 @@ export function calculateBalancing(
     exportValue,
     costOfGoods,
     profitOrLoss,
-    avgCostPerKgMaterial: totalInputKg > 0 ? costOfGoods / totalInputKg : 0,
+    avgProfitPerKgMaterial: totalInputKg > 0 ? profitOrLoss / totalInputKg : 0,
     yieldRate:
       period.totalInputKg && period.totalInputKg > 0 ? totalOutputKg / period.totalInputKg : null,
     scrapValue,

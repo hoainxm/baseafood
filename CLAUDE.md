@@ -46,7 +46,7 @@ Chi tiết + ranh giới import: [`01-app-structure.md`](docs/app-map/01-app-str
 1. TypeScript strict; function components.
 2. Mọi khối lượng là **kg**; số hiển thị locale **vi-VN** qua `lib/format.ts`, class `tnum` (tabular-nums).
 3. **`src/features/**` chỉ import từ `@/design-system`.** Cấm `@/components/ui/*` trực tiếp; cấm viết class cỡ chữ/mã màu tay — sửa `tokens.css` thay vì đè cục bộ. *(hook pre-commit chặn)*
-4. Mọi đọc/ghi dữ liệu qua hook trong `lib/danhMuc.ts` → `lib/repo.ts`. **Không** gọi `localStorage` hay `supabase` từ màn hình.
+4. Mọi đọc/ghi dữ liệu qua hook trong `lib/catalogRepo.ts` → `lib/repo.ts`. **Không** gọi `localStorage` hay `supabase` từ màn hình.
 5. Nhãn luôn hiện (không dùng placeholder thay nhãn); vùng chạm ≥ 44px; nút Lưu **không bao giờ** `disabled` (thiếu thì bắn `ErrorSummary`).
 6. Không xóa bản ghi nghiệp vụ theo kiểu lặng lẽ — dùng trạng thái; mọi xóa hiện tại qua `ConfirmDelete` + toast **Hoàn tác**.
 7. Danh mục thay nhập tự do: đại lý / loại NL / mặt hàng / khách hàng chọn qua `Combobox` (tạo mới tại chỗ, lưu ngay vào danh mục).
@@ -82,15 +82,15 @@ Chưa rõ tier ⇒ coi là 🔴. Dữ liệu ở đây là **sổ sách thật c
 
 | Đụng vào | Update doc |
 |---|---|
-| `features/NhapNguyenLieu.tsx`, quy tắc chuyến / chốt ngày | [`30-nhap-hang.md`](docs/app-map/30-nhap-hang.md) |
-| `features/BanHang.tsx`, phiếu bán / quy cách / hút bán | [`33-ban-hang.md`](docs/app-map/33-ban-hang.md) |
-| `features/CanDoi.tsx`, `BangCanDoi.tsx`, `lib/canDoi.ts` | [`31-can-doi-ky.md`](docs/app-map/31-can-doi-ky.md) |
-| `features/DanhMuc.tsx`, `ThanhPham.tsx`, `data/thanh-pham.json` | [`32-danh-muc.md`](docs/app-map/32-danh-muc.md) |
+| `features/MaterialImportScreen.tsx`, quy tắc chuyến / chốt ngày | [`30-nhap-hang.md`](docs/app-map/30-nhap-hang.md) |
+| `features/SalesScreen.tsx`, phiếu bán / quy cách / hút bán | [`33-ban-hang.md`](docs/app-map/33-ban-hang.md) |
+| `features/BalancingScreen.tsx`, `BangBalancingScreen.tsx`, `lib/balancingCalc.ts` | [`31-can-doi-ky.md`](docs/app-map/31-can-doi-ky.md) |
+| `features/CatalogScreen.tsx`, `ThanhPham.tsx`, `data/thanh-pham.json` | [`32-danh-muc.md`](docs/app-map/32-danh-muc.md) |
 | `supabase/migrations/**` | [`03-database.md`](docs/app-map/03-database.md) (+ [`04`](docs/app-map/04-tang-du-lieu.md) nếu đổi ánh xạ) |
 | `lib/repo.ts`, `db.ts`, `danhMuc.ts`, `ketNoi.ts` | [`04-tang-du-lieu.md`](docs/app-map/04-tang-du-lieu.md) |
 | `App.tsx` (thêm màn / đổi nav) | [`02-pages-navigation.md`](docs/app-map/02-pages-navigation.md) |
 | Thêm thư mục / đổi ranh giới import | [`01-app-structure.md`](docs/app-map/01-app-structure.md) |
-| `lib/auth.ts`, `lib/username.ts`, `DangNhap.tsx`, `QuanLyNguoiDung.tsx`, `0006`, `0003_siet_rls.sql`, `.env.example` | [`05-bao-mat-phan-quyen.md`](docs/app-map/05-bao-mat-phan-quyen.md) |
+| `lib/auth.ts`, `lib/username.ts`, `LoginScreen.tsx`, `UserManagementScreen.tsx`, `0006`, `0003_siet_rls.sql`, `.env.example` | [`05-bao-mat-phan-quyen.md`](docs/app-map/05-bao-mat-phan-quyen.md) |
 | `index.html`, cấu hình build/deploy (`package.json`, `vite.config.ts`), env Supabase | [`ops/deploy-vercel.md`](docs/ops/deploy-vercel.md) |
 | `design-system/**`, `components/ui/**`, `tokens.css` | [`src/design-system/README.md`](src/design-system/README.md) — canonical, **không** nhân bản sang app-map |
 
@@ -103,7 +103,7 @@ Chưa có test tự động ⇒ cổng là những cái này, **chạy thật, k
 | Đụng vào | Bắt buộc |
 |---|---|
 | Bất cứ file `.ts` / `.tsx` nào | `npm run build` + `npm run lint` |
-| `lib/canDoi.ts` hay công thức | Mở một kỳ có số liệu, đối chiếu tay: định mức = NL÷TP; lãi/lỗ = giá trị xuất − giá thành |
+| `lib/balancingCalc.ts` hay công thức | Mở một kỳ có số liệu, đối chiếu tay: định mức = NL÷TP; lãi/lỗ = giá trị xuất − giá thành |
 | `lib/repo.ts` / hàng chờ / `AnhXaBang` | Thử **cả hai chế độ** (có `.env` và không); ghi khi ngắt mạng rồi nối lại — dòng phải lên server, reload không nuốt dòng |
 | Màn Nhập hàng | Ghi 1 chuyến 2 dòng → chốt ngày → ghi bù (phải bắt lý do) → mở lại; kiểm tổng ngày + cảnh báo lệch |
 | Màn Cân đối | Tạo kỳ → hút phế liệu → **xóa kỳ**: dòng phế liệu `nguon="Nhập hàng"` phải còn nguyên ở sổ nhập |
@@ -112,7 +112,7 @@ Chưa có test tự động ⇒ cổng là những cái này, **chạy thật, k
 
 Preview chạy qua `preview_start` với cấu hình `baseafood-dev` (`.claude/launch.json`) — **không** chạy dev server bằng Bash.
 
-**Backlog đã biết:** thêm vitest cho `lib/canDoi.ts` + logic gom chuyến / chốt ngày (hàm thuần, dễ test nhất). Chưa cài package — đừng tự thêm nếu không được yêu cầu.
+**Backlog đã biết:** thêm vitest cho `lib/balancingCalc.ts` + logic gom chuyến / chốt ngày (hàm thuần, dễ test nhất). Chưa cài package — đừng tự thêm nếu không được yêu cầu.
 
 ## App-map — đọc file nào khi nào
 

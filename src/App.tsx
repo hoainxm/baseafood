@@ -1,3 +1,8 @@
+// ============================================================
+// Tên file: src/App.tsx
+// Tên tiếng Việt tương đương: Chương trình chính & Điều hướng ứng dụng MES BSF1
+// Description: Main Application Component & Router Setup
+// ============================================================
 // src/App.tsx
 import { lazy, Suspense, useEffect } from "react";
 import {
@@ -12,24 +17,24 @@ import {
 import DangNhap from "@/features/auth";
 import { NotFound } from "@/features/shared";
 import AppShell, { KIT_NAV } from "@/features/shared/AppShell";
-import { HUONG_DAN } from "@/features/shared/huongDan";
+import { HUONG_DAN } from "@/features/shared/guideContent";
 import { Toaster, apDungCaiDatHienThi } from "@/design-system";
 import { useAuth } from "@/lib/auth";
 import { roleLabel } from "@/types";
 
 // Module MES (màn trưng bày)
-const ManTongQuan = lazy(() => import("@/features/dashboard/ManTongQuan"));
-const ManLenhSX = lazy(() => import("@/features/production/ManLenhSX"));
-const ManChatLuong = lazy(() => import("@/features/quality/ManChatLuong"));
-const ManTruyXuat = lazy(() => import("@/features/traceability/ManTruyXuat"));
-const ManKhoLanh = lazy(() => import("@/features/cold-storage/ManKhoLanh"));
-const ManBaoCao = lazy(() => import("@/features/reports/ManBaoCao"));
+const ManTongQuan = lazy(() => import("@/features/dashboard/DashboardScreen"));
+const ManLenhSX = lazy(() => import("@/features/production/WorkOrderScreen"));
+const ManChatLuong = lazy(() => import("@/features/quality/QualityScreen"));
+const ManTruyXuat = lazy(() => import("@/features/traceability/TraceabilityScreen"));
+const ManKhoLanh = lazy(() => import("@/features/cold-storage/ColdStorageScreen"));
+const ManBaoCao = lazy(() => import("@/features/reports/ReportsScreen"));
 
 // Màn nghiệp vụ gốc
 const NhapNguyenLieuScreen = lazy(() => import("@/features/imports"));
 const BanHangScreen = lazy(() => import("@/features/sales"));
 const KhoDuTruScreen = lazy(() => import("@/features/warehouse"));
-const BaoCaoNhapXuatTonScreen = lazy(() => import("@/features/reports/BaoCaoNhapXuatTon"));
+const BaoCaoNhapXuatTonScreen = lazy(() => import("@/features/reports/NxtReportScreen"));
 const DonDatScreen = lazy(() => import("@/features/orders"));
 const CanDoiScreen = lazy(() => import("@/features/balancing"));
 const DanhMucScreen = lazy(() => import("@/features/catalog"));

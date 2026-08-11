@@ -1,5 +1,5 @@
 > Load khi: thiết kế/build 3 màn module WIP — Sản xuất BTP, Kho dự trữ, Đơn đặt.
-covers: src/features/SanXuatBTP.tsx, src/features/KhoDuTru.tsx, src/features/DonDat.tsx
+covers: src/features/production/WipProductionScreen.tsx, src/features/warehouse/ReserveWarehouseScreen.tsx, src/features/orders/SalesOrderScreen.tsx
 last_verified: 2026-08-07
 ttl_days: 90
 status: design-spec — ĐÃ BUILD v1 (còn thiếu: QA screenshot 3 viewport, nav gom nhóm, một số AC tồn nâng cao)

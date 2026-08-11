@@ -25,7 +25,7 @@ NL vào ngày ──► chế biến
 - **Kho**: danh mục **nhiều kho** (to + nhỏ) + **phân loại kho** (VD đông WIP / lưu trữ thành phẩm / …). Lọc + báo cáo theo loại.
 - **Đơn vị tồn**: **cả block + kg** — mỗi **block** = một **quy cách**, có số **kg**; tồn = số block **và** tổng kg.
 - **Trạng thái tồn**: WIP (block đông, dang dở) vs Thành phẩm (đóng gói, sẵn sàng bán) — hai loại tồn riêng.
-- **Kỳ tồn đầu/cuối**: theo **bộ lọc tùy chỉnh người dùng chọn** (`src/lib/ky.ts` — ngày/tuần/tháng/năm/tùy chọn), có **mặc định** một kiểu (chốt khi build), chỉnh lại sau.
+- **Kỳ tồn đầu/cuối**: theo **bộ lọc tùy chỉnh người dùng chọn** (`src/lib/periodUtils.ts` — ngày/tuần/tháng/năm/tùy chọn), có **mặc định** một kiểu (chốt khi build), chỉnh lại sau.
 - Mọi nhập/tồn/xuất gắn **kho** + **trạng thái**.
 
 ## 4. Ngoài scope phase đầu (làm sau)
@@ -42,7 +42,7 @@ Giá thành = Tổng TP × chi phí CB/kg + Giá trị NL
 Giá trị xuất = Σ(TP × đơn giá USD) × tỉ giá (dòng nội địa giữ VND)
 Lãi/Lỗ = Giá trị xuất − Giá thành
 ```
-Code `src/lib/canDoi.ts` đã khớp — **không sửa** khi làm kho.
+Code `src/lib/balancingCalc.ts` đã khớp — **không sửa** khi làm kho.
 
 ## 6. Phase đề xuất (khi build session sau)
 

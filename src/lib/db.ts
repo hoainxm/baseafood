@@ -1,3 +1,8 @@
+// ============================================================
+// Tên file: src/lib/db.ts
+// Tên tiếng Việt tương đương: Khởi tạo Cơ sở Dữ liệu LocalStorage
+// Description: Local storage database seed and initial data store
+// ============================================================
 // Bộ đệm localStorage cấp thấp. Màn hình KHÔNG gọi trực tiếp — đi qua
 // src/lib/repo.ts để chạy được cả hai chế độ (Supabase / chỉ máy này).
 // Khóa localStorage khai báo trong repo.ts (AnhXaBang.localKey).

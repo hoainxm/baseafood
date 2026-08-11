@@ -1,5 +1,5 @@
 > Load khi: sửa màn Cân đối, công thức định mức/lãi lỗ, hay bảng in A4.
-covers: src/features/CanDoi.tsx, src/features/BangCanDoi.tsx, src/lib/canDoi.ts
+covers: src/features/balancing/BalancingScreen.tsx, src/features/balancing/BalancingTable.tsx, src/lib/balancingCalc.ts
 last_verified: 2026-08-10
 ttl_days: 90
 <!-- re-verified: 2026-08-07 — công thức canDoi.ts + KhoiTP hút bán khớp source -->
@@ -25,7 +25,7 @@ Bảng dùng: `ky_can_doi`, `nguyen_lieu_vao`, `phe_lieu`, `thanh_pham_ra`, đ�
 Một kỳ = **một loại NL** + **tập ngày tiếp nhận** của lô đó. Ngày có thể rời rạc; `tuNgay`/`denNgay` chỉ là cách chọn nhanh, `ngayList` là chuỗi để in (sinh từ khoảng ngày, bản cũ gõ tay).
 **Thành phẩm có thể ra trễ hơn kỳ** — hệ thống vẫn cho nhập TP vào kỳ đã đóng ngày nhận NL. Đừng thêm ràng buộc "TP phải trong khoảng ngày".
 
-### Công thức (`src/lib/canDoi.ts` — hàm thuần, không React)
+### Công thức (`src/lib/balancingCalc.ts` — hàm thuần, không React)
 
 ```
 Định mức        = Tổng NL vào (kg) ÷ Tổng TP (kg)        // ~1,09 với mực ống khay
@@ -69,7 +69,7 @@ Giá trị phế liệu= Σ kg × đơn giá bán
 | Gõ loại NL mới trong ô chọn kỳ | Lưu luôn vào danh mục `loai_nguyen_lieu` + toast — không để tên mồ côi. |
 | Đơn giá / tỉ giá / chi phí null | Coi như 0 khi tính (`?? 0`), nhưng hiển thị là "—", không phải `0 đ`. |
 | Tổng TP = 0 | `dinhMuc = 0`, `tyLeThuHoi = null` nếu chưa khai `tongNLNhan`. Màn hình gắn cờ `chuaCoTP`. |
-| Bảng in `BangCanDoi.tsx` | **Ngoại lệ luật design-system** — `text-sm`, `uppercase`, màu `slate` cứng để khớp khổ A4, in bằng `window.print()`. Đừng áp luật UI vào file này, cũng đừng lấy nó làm mẫu cho màn mới. |
+| Bảng in `BangBalancingScreen.tsx` | **Ngoại lệ luật design-system** — `text-sm`, `uppercase`, màu `slate` cứng để khớp khổ A4, in bằng `window.print()`. Đừng áp luật UI vào file này, cũng đừng lấy nó làm mẫu cho màn mới. |
 | Mặt hàng chưa ánh xạ mã 141 | Hợp lệ (`maTP` rỗng, hiện "Chưa ánh xạ"). Danh mục mặt hàng là **danh mục mở**. |
 
 ## Cross-references

@@ -1,3 +1,8 @@
+// ============================================================
+// Tên file: src/lib/supabase.ts
+// Tên tiếng Việt tương đương: Khởi tạo Supabase Client Connection
+// Description: Supabase client initialization and environment variables handling
+// ============================================================
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 /**

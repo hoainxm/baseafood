@@ -1,1 +1,1 @@
-export { default } from "./QuanLyNguoiDung";
+export { default } from "./UserManagementScreen";

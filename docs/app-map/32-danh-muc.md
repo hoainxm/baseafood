@@ -1,5 +1,5 @@
 > Load khi: sửa danh mục (đại lý, loại NL, mặt hàng, khách hàng) hay danh mục 141 mã thành phẩm.
-covers: src/features/DanhMuc.tsx, src/features/ThanhPham.tsx, src/data/thanh-pham.json, src/design-system/patterns/DanhMucCrud.tsx
+covers: src/features/catalog/CatalogScreen.tsx, src/features/catalog/FinishedGoodScreen.tsx, src/data/thanh-pham.json, src/design-system/patterns/DanhMucCrud.tsx
 last_verified: 2026-08-07
 ttl_days: 90
 <!-- updated: 2026-08-07 — đại lý thêm tenGhiPhieu/diaChi/cmnd/ngayCap/noiCap (migration 0009) -->

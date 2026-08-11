@@ -1,3 +1,8 @@
+// ============================================================
+// Tên file: src/lib/nxtExcel.ts
+// Tên tiếng Việt tương đương: Xử lý Import/Export Excel báo cáo Nhập Xuất Tồn
+// Description: Parser and generator for 10-column NXT Excel report files
+// ============================================================
 import * as XLSX from "xlsx";
 import type { NxtGoodsCategory } from "@/types";
 

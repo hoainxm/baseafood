@@ -1,1 +1,1 @@
-export { default } from "./NhapHangTab";
+export { default } from "./ImportTab";

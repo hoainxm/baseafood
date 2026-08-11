@@ -1,8 +1,8 @@
 > Load khi: sửa màn Bán hàng — phiếu bán, dòng bán, quy cách, ghi bù, hoặc hút bán vào cân đối.
-covers: src/features/sales/BanHang.tsx, src/features/sales/BaoCaoBan.tsx, src/features/sales/BanHangTab.tsx, src/types.ts, src/lib/repo.ts
+covers: src/features/sales/SalesScreen.tsx, src/features/sales/BaoCaoBan.tsx, src/features/sales/BanHangTab.tsx, src/types.ts, src/lib/repo.ts
 last_verified: 2026-08-10
 ttl_days: 90
-<!-- re-verified: 2026-08-07 — phiếu multi-line (phieuId), 2 ngày, seam hút banHangId khớp BanHang.tsx + CanDoi.tsx:389 -->
+<!-- re-verified: 2026-08-07 — phiếu multi-line (phieuId), 2 ngày, seam hút banHangId khớp SalesScreen.tsx + BalancingScreen.tsx:389 -->
 
 # Bán hàng (bán thành phẩm RA) hằng ngày
 
@@ -17,7 +17,7 @@ Số hóa sổ **bán hàng** — bán thành phẩm chế biến (bạch tuộc
 
 ## State hiện tại
 
-Đã có: phiếu bán (một khách, một lượt, nhiều mặt hàng) · 2 ngày (xuất bán / ghi sổ) + ghi bù có lý do · quy cách (size/grade) mỗi dòng · kênh Xuất khẩu (USD) / Nội địa (VND) trên phiếu · lọc theo kỳ (`lib/ky.ts`) · sổ nhóm theo phiếu + tổng · sửa/xóa phiếu, sửa/bỏ dòng · **hút bán vào kỳ cân đối** (khối TP ra).
+Đã có: phiếu bán (một khách, một lượt, nhiều mặt hàng) · 2 ngày (xuất bán / ghi sổ) + ghi bù có lý do · quy cách (size/grade) mỗi dòng · kênh Xuất khẩu (USD) / Nội địa (VND) trên phiếu · lọc theo kỳ (`lib/periodUtils.ts`) · sổ nhóm theo phiếu + tổng · sửa/xóa phiếu, sửa/bỏ dòng · **hút bán vào kỳ cân đối** (khối TP ra).
 
 Chưa có (backlog): **chốt ngày bán** (bảng `chot_ngay` hiện chỉ dùng cho nhập — bán cần bảng chốt riêng, chưa làm); **phiếu bán in A4** riêng (bảng cân đối đã in được); **trừ tồn kho TP** khi bán (cột `kho_nguon` để dành, chưa dùng — chờ vòng lặp đông gửi/xả đông).
 

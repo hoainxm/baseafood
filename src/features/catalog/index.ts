@@ -1,1 +1,1 @@
-export { default } from "./DanhMuc";
+export { default } from "./CatalogScreen";

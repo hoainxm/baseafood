@@ -40,7 +40,7 @@ features → lib/danhMuc → lib/repo → lib/db + lib/supabase
 ```
 
 - `src/features/**` **chỉ** import từ `@/design-system`. Cấm `@/components/ui/*` trực tiếp — hook pre-commit chặn.
-- `src/features/**` **không** gọi `localStorage`, không gọi `supabase` trực tiếp; luôn qua hook trong `lib/danhMuc.ts`.
+- `src/features/**` **không** gọi `localStorage`, không gọi `supabase` trực tiếp; luôn qua hook trong `lib/catalogRepo.ts`.
 - `lib/db.ts` chỉ có `repo.ts` được gọi.
 - Alias `@/*` → `src/*` (`tsconfig.app.json` + `vite.config.ts`) — dùng alias, không dùng đường dẫn tương đối dài.
 
@@ -48,7 +48,7 @@ features → lib/danhMuc → lib/repo → lib/db + lib/supabase
 
 | File | Vì sao ngoại lệ |
 |---|---|
-| `src/features/BangCanDoi.tsx` | Bản in theo mẫu giấy A4 — cố tình dùng `text-sm`, `uppercase`, màu `slate` cứng. Luật design-system KHÔNG áp vào đây. |
+| `src/features/balancing/BalancingTable.tsx` | Bản in theo mẫu giấy A4 — cố tình dùng `text-sm`, `uppercase`, màu `slate` cứng. Luật design-system KHÔNG áp vào đây. |
 | `src/components/ui/**` | Tầng primitive, được phép viết class cỡ chữ/màu. Sửa size ở đây khi thêm component mới (mặc định shadcn `h-8`/`h-9` là quá nhỏ). |
 
 ## Nơi hay đặt sai

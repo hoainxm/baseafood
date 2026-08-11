@@ -1,1 +1,1 @@
-export { default } from "./CanDoi";
+export { default } from "./BalancingScreen";

@@ -1,3 +1,8 @@
+// ============================================================
+// Tên file: src/features/shared/NotFound.tsx
+// Tên tiếng Việt tương đương: Trang Cảnh báo 404 Không tìm thấy
+// Description: 404 Page Not Found Error Component
+// ============================================================
 import { Link } from "react-router-dom";
 import { Button } from "@/design-system";
 

@@ -1,5 +1,5 @@
 > Load khi: đụng đọc/ghi dữ liệu, thêm bảng vào app, hay điều tra "số liệu biến mất / không lên máy chủ".
-covers: src/lib/repo.ts, src/lib/db.ts, src/lib/danhMuc.ts, src/lib/ketNoi.ts, src/lib/supabase.ts, src/lib/store.ts, src/design-system/patterns/TrangThaiDuLieu.tsx
+covers: src/lib/repo.ts, src/lib/db.ts, src/lib/catalogRepo.ts, src/lib/connectivity.ts, src/lib/supabase.ts, src/lib/store.ts, src/design-system/patterns/TrangThaiDuLieu.tsx
 last_verified: 2026-08-06
 ttl_days: 90
 
@@ -18,7 +18,7 @@ Chạy Supabase hay localStorage là do `.env` quyết định (`src/lib/supabas
 Không có `add/update/delete` riêng. `useBang.ghi(next)` **so danh sách cũ với mới** để suy ra dòng nào thêm/sửa/xóa. Đổi lại:
 
 - Màn hình viết code thuần (map/filter), không phải nghĩ về API mạng.
-- **Bẫy:** repo trả về **toàn bộ** dòng của mọi kỳ/mọi ngày. Màn nào lọc ra tập con thì lúc ghi **phải ghép lại** với phần còn lại (`KyDetail.ghepLai` trong `CanDoi.tsx` là mẫu). Quên ghép = xóa sạch dữ liệu của kỳ khác.
+- **Bẫy:** repo trả về **toàn bộ** dòng của mọi kỳ/mọi ngày. Màn nào lọc ra tập con thì lúc ghi **phải ghép lại** với phần còn lại (`KyDetail.ghepLai` trong `BalancingScreen.tsx` là mẫu). Quên ghép = xóa sạch dữ liệu của kỳ khác.
 - So sánh bằng `JSON.stringify` → thứ tự khóa trong object có ý nghĩa; đừng dựng lại object với thứ tự trường khác chỉ để "cho đẹp", sẽ tạo update thừa.
 
 ## Hàng chờ đồng bộ — đừng tháo
@@ -42,7 +42,7 @@ Hệ quả cho người vận hành: chưa chạy migration mới ⇒ số liệ
 1. Migration DB ([03-database.md](03-database.md)).
 2. Thêm `interface` + bất biến vào `src/types.ts`.
 3. Thêm `BANG_X: AnhXaBang<T>` trong `repo.ts`: `table`, `localKey` (**đặt mới, đừng đổi khóa cũ** — đổi là mất dữ liệu đang có trên máy người dùng), `toRow`/`fromRow` đủ hai chiều, `khoaChinh` nếu không phải `id`.
-4. Thêm `export const useX = () => useBang(BANG_X)` trong `lib/danhMuc.ts`.
+4. Thêm `export const useX = () => useBang(BANG_X)` trong `lib/catalogRepo.ts`.
 5. Màn hình gọi hook đó — **không** import `repo.ts` trực tiếp trừ khi cần `AnhXaBang`.
 
 ## `vaDongCu` — vá dòng cũ, một chỗ
@@ -57,7 +57,7 @@ Bán thành phẩm dùng `usePhieuBan()` / `useBanHang()` (`BANG_PHIEU_BAN` / `B
 
 ## Đèn kết nối
 
-`lib/ketNoi.ts` là store nhỏ dùng chung, quy ước **"lần gần nhất thắng"**: mỗi thao tác server (bảng nào cũng vậy) báo về; ghi lỗi → đỏ ngay, lần ghi sau thành công → xanh lại. Cố tình không phải "probe 1 bảng lúc mở app rồi xanh mãi" — đèn phải phản ánh sức khỏe ghi/đọc thật. `TrangThaiDuLieu` (góc thanh bên) đọc qua `useSyncExternalStore`; snapshot bất biến, đừng trả object mới mỗi lần gọi (render vô hạn).
+`lib/connectivity.ts` là store nhỏ dùng chung, quy ước **"lần gần nhất thắng"**: mỗi thao tác server (bảng nào cũng vậy) báo về; ghi lỗi → đỏ ngay, lần ghi sau thành công → xanh lại. Cố tình không phải "probe 1 bảng lúc mở app rồi xanh mãi" — đèn phải phản ánh sức khỏe ghi/đọc thật. `TrangThaiDuLieu` (góc thanh bên) đọc qua `useSyncExternalStore`; snapshot bất biến, đừng trả object mới mỗi lần gọi (render vô hạn).
 
 ## Cross-references
 

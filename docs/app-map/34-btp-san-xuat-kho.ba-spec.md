@@ -1,5 +1,5 @@
 > Load khi: thiết kế/xây module WIP — sản xuất bán thành phẩm ngày, kho dự trữ đông, đơn đặt, xuất container.
-covers: src/features/SanXuatBTP.tsx, src/features/KhoDuTru.tsx, src/features/DonDat.tsx, src/lib/kho.ts, supabase/migrations/0011_wip_san_xuat_kho_don.sql
+covers: src/features/production/WipProductionScreen.tsx, src/features/warehouse/ReserveWarehouseScreen.tsx, src/features/orders/SalesOrderScreen.tsx, src/lib/inventory.ts, supabase/migrations/0011_wip_san_xuat_kho_don.sql
 last_verified: 2026-08-07
 ttl_days: 90
 status: ba-spec — ĐÃ BUILD v1 (migration 0011 + 3 màn SanXuatBTP/KhoDuTru/DonDat)

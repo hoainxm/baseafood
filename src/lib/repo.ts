@@ -1,6 +1,11 @@
+// ============================================================
+// Tên file: src/lib/repo.ts
+// Tên tiếng Việt tương đương: Tầng Repository Dữ liệu Supabase & Sync Queue
+// Description: Data Access Layer bridging LocalStorage and Supabase backend
+// ============================================================
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase, hasSupabase, SITE_ID } from "@/lib/supabase";
-import { ketNoi } from "@/lib/ketNoi";
+import { ketNoi } from "@/lib/connectivity";
 import { load, save } from "@/lib/db";
 import type {
   FinishedGood,

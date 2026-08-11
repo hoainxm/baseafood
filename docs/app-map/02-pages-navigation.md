@@ -10,7 +10,7 @@ ttl_days: 90
 
 ## Gate đăng nhập
 
-`App.tsx` gọi `useAuth()` (`src/lib/auth.ts`) TRƯỚC khi khởi tạo Router. Nếu đang tải phiên $\rightarrow$ màn "Đang tải"; chưa có phiên đăng nhập $\rightarrow$ render `DangNhap.tsx` chặn toàn app. Chi tiết auth: [05-bao-mat-phan-quyen.md](05-bao-mat-phan-quyen.md).
+`App.tsx` gọi `useAuth()` (`src/lib/auth.ts`) TRƯỚC khi khởi tạo Router. Nếu đang tải phiên $\rightarrow$ màn "Đang tải"; chưa có phiên đăng nhập $\rightarrow$ render `LoginScreen.tsx` chặn toàn app. Chi tiết auth: [05-bao-mat-phan-quyen.md](05-bao-mat-phan-quyen.md).
 
 ## Header (AppLayout)
 
@@ -31,16 +31,16 @@ Cỡ chữ / trạng thái kết nối **không còn ở chân sidebar** (đã d
 
 | Path | id NAV | Nhãn | File chính | Ghi chú |
 |---|---|---|---|---|
-| — | — | Đăng nhập | `features/auth/DangNhap.tsx` | Màn chặn đăng nhập toàn app (không có route, gate ở `App.tsx`) |
+| — | — | Đăng nhập | `features/auth/LoginScreen.tsx` | Màn chặn đăng nhập toàn app (không có route, gate ở `App.tsx`) |
 | `/imports` | `imports` | Nhập hàng | `features/imports/NhapHangTab.tsx` | Mặc định khi mở app. Bọc 2 tab: **Sổ** (`NhapNguyenLieu`) + **Báo cáo** (`BaoCaoNhap`) |
-| `/production` | `production` | Sản xuất BTP | `features/production/SanXuatBTP.tsx` | Ghi sản lượng bán thành phẩm ngày (WIP) |
+| `/production` | `production` | Sản xuất BTP | `features/production/WipProductionScreen.tsx` | Ghi sản lượng bán thành phẩm ngày (WIP) |
 | `/sales` | `sales` | Bán hàng | `features/sales/BanHangTab.tsx` | Bọc 2 tab: **Sổ** (`BanHang`) + **Báo cáo** (`BaoCaoBan`) |
-| `/warehouse` | `warehouse` | Kho dự trữ | `features/warehouse/KhoDuTru.tsx` | Duyệt nhập kho, theo dõi tồn đông |
-| `/orders` | `orders` | Đơn đặt | `features/orders/DonDat.tsx` | Gom đơn và lệnh xuất |
-| `/balancing` | `balancing` | Cân đối | `features/balancing/CanDoi.tsx` | Danh sách kỳ. "Báo cáo" = bảng in A4 sẵn có (`BangCanDoi`) |
-| `/balancing/:periodId` | — | Chi tiết kỳ | `features/balancing/CanDoi.tsx` | Chi tiết kỳ (URL param thay `selId`) |
-| `/catalog` | `catalog` | Danh mục | `features/catalog/DanhMuc.tsx` | 5 tab (render thêm `ThanhPham.tsx`) |
-| `/users` | `users` | Người dùng | `features/users/QuanLyNguoiDung.tsx` | **Chỉ Admin** (Route Guard + chỉ admin thấy trong NAV) |
+| `/warehouse` | `warehouse` | Kho dự trữ | `features/warehouse/ReserveWarehouseScreen.tsx` | Duyệt nhập kho, theo dõi tồn đông |
+| `/orders` | `orders` | Đơn đặt | `features/orders/SalesOrderScreen.tsx` | Gom đơn và lệnh xuất |
+| `/balancing` | `balancing` | Cân đối | `features/balancing/BalancingScreen.tsx` | Danh sách kỳ. "Báo cáo" = bảng in A4 sẵn có (`BangCanDoi`) |
+| `/balancing/:periodId` | — | Chi tiết kỳ | `features/balancing/BalancingScreen.tsx` | Chi tiết kỳ (URL param thay `selId`) |
+| `/catalog` | `catalog` | Danh mục | `features/catalog/CatalogScreen.tsx` | 5 tab (render thêm `ThanhPham.tsx`) |
+| `/users` | `users` | Người dùng | `features/users/UserManagementScreen.tsx` | **Chỉ Admin** (Route Guard + chỉ admin thấy trong NAV) |
 | `/kit` | — | Bộ giao diện | `design-system/kit/KitPage.tsx` | Trang demo component. **Đã gỡ khỏi sidebar** — vào bằng URL, desktop-only |
 
 Danh sách `NAV` trong `AppLayout.tsx` hiển thị menu theo vai trò (admin thêm mục Người dùng).

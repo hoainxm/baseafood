@@ -34,10 +34,10 @@ Phần lớn là **tổ trưởng / thủ kho 45–60 tuổi**, dùng **tablet �
 
 | Màn hình | File | Trạng thái |
 |---|---|---|
-| Nhập nguyên liệu hàng ngày | [`src/features/NhapNguyenLieu.tsx`](../src/features/NhapNguyenLieu.tsx) | ✅ **chuyến thật** (`chuyen_nhap`) · tách **ngày hàng về / ngày ghi sổ** + ghi bù có lý do · **chốt ngày** (khóa số liệu, mở lại có lý do) · **phế liệu cân trong ngày** · sổ nhóm theo chuyến · lọc ngày/khoảng/xưởng/đại lý/loại/thiếu đơn giá |
-| Cân đối 5 ngày + xuất bảng in | [`CanDoi.tsx`](../src/features/CanDoi.tsx) · [`BangCanDoi.tsx`](../src/features/BangCanDoi.tsx) | ✅ tính định mức + lãi/lỗ; khối phế liệu giờ **hút từ sổ nhập hàng** (không nhập tay hai nơi) |
-| Danh mục (5 tab) | [`DanhMuc.tsx`](../src/features/DanhMuc.tsx) | ✅ đại lý · loại NL · mặt hàng · khách hàng |
-| Thành phẩm (141 mã, chỉ đọc) | [`ThanhPham.tsx`](../src/features/ThanhPham.tsx) | ✅ seed từ danh mục kế toán TK 1551 |
+| Nhập nguyên liệu hàng ngày | [`src/features/imports/MaterialImportScreen.tsx`](../src/features/imports/MaterialImportScreen.tsx) | ✅ **chuyến thật** (`chuyen_nhap`) · tách **ngày hàng về / ngày ghi sổ** + ghi bù có lý do · **chốt ngày** (khóa số liệu, mở lại có lý do) · **phế liệu cân trong ngày** · sổ nhóm theo chuyến · lọc ngày/khoảng/xưởng/đại lý/loại/thiếu đơn giá |
+| Cân đối 5 ngày + xuất bảng in | [`BalancingScreen.tsx`](../src/features/balancing/BalancingScreen.tsx) · [`BangBalancingScreen.tsx`](../src/features/balancing/BalancingTable.tsx) | ✅ tính định mức + lãi/lỗ; khối phế liệu giờ **hút từ sổ nhập hàng** (không nhập tay hai nơi) |
+| Danh mục (5 tab) | [`CatalogScreen.tsx`](../src/features/catalog/CatalogScreen.tsx) | ✅ đại lý · loại NL · mặt hàng · khách hàng |
+| Thành phẩm (141 mã, chỉ đọc) | [`ThanhPham.tsx`](../src/features/catalog/FinishedGoodScreen.tsx) | ✅ seed từ danh mục kế toán TK 1551 |
 | Bộ giao diện người lớn tuổi + cài đặt hiển thị | `src/design-system/` | ✅ |
 | Tầng dữ liệu Supabase ↔ localStorage | [`src/lib/repo.ts`](../src/lib/repo.ts) | ✅ env-gated |
 

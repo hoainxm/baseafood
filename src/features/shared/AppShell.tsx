@@ -1,3 +1,8 @@
+// ============================================================
+// Tên file: src/features/shared/AppShell.tsx
+// Tên tiếng Việt tương đương: Khung Giao diện MES BSF1 (Sidebar + Header + Content)
+// Description: Main MES Layout App Shell with Navigation Sidebar
+// ============================================================
 // src/features/shared/AppShell.tsx
 import { useState, type ReactNode } from "react";
 import {

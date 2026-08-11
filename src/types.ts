@@ -1,3 +1,8 @@
+// ============================================================
+// Tên file: src/types.ts
+// Tên tiếng Việt tương đương: Định nghĩa Kiểu dữ liệu & Invariants Nghiệp vụ
+// Description: TypeScript Types & Invariant Business Interfaces
+// ============================================================
 export interface FinishedGood {
   code: string;
   name: string;

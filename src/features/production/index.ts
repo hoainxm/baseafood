@@ -1,1 +1,1 @@
-export { default } from "./SanXuatBTP";
+export { default } from "./WipProductionScreen";

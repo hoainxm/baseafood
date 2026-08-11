@@ -21,7 +21,7 @@ export {
   congNgay,
   homNay,
 } from "./patterns/DateField";
-export { DanhMucCrud, type TruongDanhMuc } from "./patterns/DanhMucCrud";
+export { DanhMucCrud, type TruongDanhMuc } from "./patterns/CatalogCrudModal";
 export { Logo } from "./patterns/Logo";
 export { RecordTable, type Cot } from "./patterns/RecordTable";
 export { ConfirmDelete } from "./patterns/ConfirmDelete";
@@ -34,17 +34,17 @@ export {
   CoChuNhanh,
   CaiDatHienThi,
   apDungCaiDatHienThi,
-} from "./patterns/CaiDatHienThi";
-export { TrangThaiDuLieu, NutTrangThai } from "./patterns/TrangThaiDuLieu";
-export { NutGiaoDien } from "./patterns/NutGiaoDien";
-export { NutHuongDan } from "./patterns/NutHuongDan";
+} from "./patterns/DisplaySettings";
+export { TrangThaiDuLieu, NutTrangThai } from "./patterns/DataStatusBadge";
+export { NutGiaoDien } from "./patterns/ThemeToggleButton";
+export { NutHuongDan } from "./patterns/GuideButton";
 export { FormDialog, NutDong } from "./patterns/FormDialog";
-export { BangTong, type CotTong } from "./patterns/BangTong";
+export { BangTong, type CotTong } from "./patterns/SummaryTable";
 export { ThongKe, type TheThongTin } from "./patterns/ThongKe";
-export { BieuDoCot, type CotBieuDo } from "./patterns/BieuDoCot";
+export { BieuDoCot, type CotBieuDo } from "./patterns/BarChart";
 export { StatusChip, type TrangThaiSX } from "./patterns/StatusChip";
-export { DuLieuMau } from "./patterns/DuLieuMau";
-export { BieuDoCotDoc, type CotBieuDoDoc } from "./patterns/BieuDoCotDoc";
+export { DuLieuMau } from "./patterns/MockPatternData";
+export { BieuDoCotDoc, type CotBieuDoDoc } from "./patterns/VerticalBarChart";
 export { notify } from "./patterns/notify";
 
 /* Primitive được phép dùng lại nguyên bản (đã đè size trong components/ui). */

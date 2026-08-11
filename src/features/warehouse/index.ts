@@ -1,1 +1,1 @@
-export { default } from "./KhoDuTru";
+export { default } from "./ReserveWarehouseScreen";

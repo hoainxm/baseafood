@@ -1,3 +1,8 @@
+// ============================================================
+// Tên file: src/lib/username.ts
+// Tên tiếng Việt tương đương: Tiện ích Chuẩn hóa Tên đăng nhập
+// Description: Username formatting, sanitization, and display helpers
+// ============================================================
 /**
  * Sinh username từ họ tên: chữ đầu mỗi từ TRỪ từ cuối + từ cuối đầy đủ, bỏ dấu.
  * "Phan Nguyễn Hoài Nam" → "pnhnam". Một từ → chính nó.

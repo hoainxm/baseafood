@@ -1,3 +1,8 @@
+// ============================================================
+// Tên file: src/lib/format.ts
+// Tên tiếng Việt tương đương: Định dạng Số & Ngày tháng Locale vi-VN
+// Description: Formatting helpers for numbers, currency, dates, and weights (kg)
+// ============================================================
 const nf = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 2 });
 
 /** Số khối lượng/tiền theo locale vi-VN, cắt tối đa 2 số lẻ. */

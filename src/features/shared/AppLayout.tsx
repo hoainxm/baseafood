@@ -1,3 +1,8 @@
+// ============================================================
+// Tên file: src/features/shared/AppLayout.tsx
+// Tên tiếng Việt tương đương: Khung Bố cục Điều hướng Tổng quan
+// Description: App Layout Wrapper Component
+// ============================================================
 import { useEffect, useState } from "react";
 import { Outlet, Link, useLocation } from "react-router-dom";
 import {
@@ -11,7 +16,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
 import { roleLabel } from "@/types";
-import { HUONG_DAN } from "./huongDan";
+import { HUONG_DAN } from "./guideContent";
 import {
   Truck,
   Factory,

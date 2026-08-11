@@ -76,15 +76,15 @@ graph TD
 ```
 
 *Chi tiết các Route:*
-1. **`/login`**: Trang đăng nhập (`DangNhap.tsx`). Không yêu cầu phiên đăng nhập. Nếu đã đăng nhập, tự động redirect về trang chủ (`/nhap-hang`).
-2. **`/nhap-hang`**: Trang nhập nguyên liệu (`NhapNguyenLieu.tsx`). Vai trò: Mọi vai trò.
-3. **`/san-xuat`**: Trang sản xuất bán thành phẩm (`SanXuatBTP.tsx`). Vai trò: Mọi vai trò.
-4. **`/ban-hang`**: Trang bán hàng (`BanHang.tsx`). Vai trò: Mọi vai trò.
-5. **`/kho`**: Trang kho dự trữ (`KhoDuTru.tsx`). Vai trò: Mọi vai trò.
-6. **`/don-dat`**: Trang quản lý đơn đặt (`DonDat.tsx`). Vai trò: Mọi vai trò.
-7. **`/can-doi`**: Trang quản lý kỳ cân đối (`CanDoi.tsx`). Vai trò: Kế toán, Giám đốc, Admin.
+1. **`/login`**: Trang đăng nhập (`LoginScreen.tsx`). Không yêu cầu phiên đăng nhập. Nếu đã đăng nhập, tự động redirect về trang chủ (`/nhap-hang`).
+2. **`/nhap-hang`**: Trang nhập nguyên liệu (`MaterialImportScreen.tsx`). Vai trò: Mọi vai trò.
+3. **`/san-xuat`**: Trang sản xuất bán thành phẩm (`WipProductionScreen.tsx`). Vai trò: Mọi vai trò.
+4. **`/ban-hang`**: Trang bán hàng (`SalesScreen.tsx`). Vai trò: Mọi vai trò.
+5. **`/kho`**: Trang kho dự trữ (`ReserveWarehouseScreen.tsx`). Vai trò: Mọi vai trò.
+6. **`/don-dat`**: Trang quản lý đơn đặt (`SalesOrderScreen.tsx`). Vai trò: Mọi vai trò.
+7. **`/can-doi`**: Trang quản lý kỳ cân đối (`BalancingScreen.tsx`). Vai trò: Kế toán, Giám đốc, Admin.
 8. **`/can-doi/:kyId`**: Trang chi tiết một kỳ cân đối cụ thể. *Đặc biệt hữu ích để liên kết sâu dữ liệu.*
-9. **`/danh-muc`**: Quản lý danh mục chung (`DanhMuc.tsx`). Vai trò: Mọi vai trò.
+9. **`/danh-muc`**: Quản lý danh mục chung (`CatalogScreen.tsx`). Vai trò: Mọi vai trò.
 10. **`/nguoi-dung`**: Quản lý tài khoản và phân quyền. Vai trò: Chỉ `admin` được phép vào. Nếu cố tình truy cập sẽ redirect về `/403` hoặc `/nhap-hang`.
 11. **`/kit`**: Trang Kit duyệt UI. Vai trò: Chỉ dev/admin truy cập được từ nút cuối thanh bên (chỉ hiện trên màn hình desktop).
 12. **`*` (404 Page)**: Hiển thị giao diện báo lỗi đường dẫn không hợp lệ kèm nút quay về trang chủ.
@@ -96,35 +96,35 @@ graph TD
 src/features/
 ├── auth/
 │   ├── index.ts
-│   └── DangNhap.tsx
+│   └── LoginScreen.tsx
 ├── nhap-hang/
 │   ├── index.ts
-│   └── NhapNguyenLieu.tsx
+│   └── MaterialImportScreen.tsx
 ├── san-xuat/
 │   ├── index.ts
-│   └── SanXuatBTP.tsx
+│   └── WipProductionScreen.tsx
 ├── ban-hang/
 │   ├── index.ts
-│   └── BanHang.tsx
+│   └── SalesScreen.tsx
 ├── kho/
 │   ├── index.ts
-│   └── KhoDuTru.tsx
+│   └── ReserveWarehouseScreen.tsx
 ├── don-dat/
 │   ├── index.ts
-│   └── DonDat.tsx
+│   └── SalesOrderScreen.tsx
 ├── can-doi/
 │   ├── index.ts
-│   ├── CanDoi.tsx
-│   ├── BangCanDoi.tsx
+│   ├── BalancingScreen.tsx
+│   ├── BangBalancingScreen.tsx
 │   └── components/
 │       └── KyDetail.tsx
 ├── danh-muc/
 │   ├── index.ts
-│   ├── DanhMuc.tsx
+│   ├── CatalogScreen.tsx
 │   └── ThanhPham.tsx
 ├── nguoi-dung/
 │   ├── index.ts
-│   └── QuanLyNguoiDung.tsx
+│   └── UserManagementScreen.tsx
 └── shared/                          # Chứa các component dùng chung cho features
     └── NotFound.tsx
 ```
@@ -360,8 +360,8 @@ Nếu phê duyệt phương án chuyển đổi sang Tiếng Anh, các file sau 
 3. **Mã nguồn Frontend:**
    * `src/types.ts`: Đổi tên toàn bộ các kiểu dữ liệu nghiệp vụ (`ChuyenNhap` -> `ImportShipment`, `DongNhapNL` -> `MaterialImportItem`,...).
    * `src/lib/repo.ts`: Cập nhật toàn bộ các cấu hình `AnhXaBang` (đổi tên bảng, đổi `localKey`, cấu hình `toRow`/`fromRow` sang trường tiếng Anh).
-   * `src/lib/danhMuc.ts`: Đổi tên các hook xuất ra cho các màn hình (ví dụ: `useNhapNL` -> `useMaterialImports`).
-   * `src/lib/canDoi.ts`: Đổi tên các biến tính toán định mức và cân đối kỳ.
+   * `src/lib/catalogRepo.ts`: Đổi tên các hook xuất ra cho các màn hình (ví dụ: `useNhapNL` -> `useMaterialImports`).
+   * `src/lib/balancingCalc.ts`: Đổi tên các biến tính toán định mức và cân đối kỳ.
    * **Toàn bộ 11 màn hình chức năng** trong `src/features/`: Cập nhật các biến hiển thị, gọi hook và gán dữ liệu sang trường tiếng Anh mới.
 
 ---

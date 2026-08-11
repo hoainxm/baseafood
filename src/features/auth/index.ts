@@ -1,1 +1,1 @@
-export { default } from "./DangNhap";
+export { default } from "./LoginScreen";

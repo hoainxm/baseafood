@@ -1,3 +1,8 @@
+// ============================================================
+// Tên file: src/lib/auth.ts
+// Tên tiếng Việt tương đương: Quản lý Xác thực Đăng nhập & Phân quyền User
+// Description: Supabase Auth & User Profile State Hook
+// ============================================================
 import { useCallback, useEffect, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase, hasSupabase, SITE_ID, taoClientTam } from "@/lib/supabase";

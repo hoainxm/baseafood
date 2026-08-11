@@ -1,4 +1,5 @@
-import type { WipProductionItem, ExportItem } from "@/types";
+import type { WipProductionItem, ExportItem, WarehouseInfo } from "@/types";
+import { BSF1_WAREHOUSES } from "@/types";
 
 /** Tồn của MỘT lô = dòng BTP sản xuất đã duyệt vào kho, trừ đi phần đã xuất. */
 export interface LoTon {
@@ -70,3 +71,56 @@ export function loConHang(
     )
     .sort((a, b) => a.ngaySX.localeCompare(b.ngaySX));
 }
+
+/** Lấy thông tin kho BSF1 theo tên hoặc mã kho. */
+export function getWarehouseInfo(nameOrCode: string): WarehouseInfo | undefined {
+  if (!nameOrCode) return undefined;
+  const key = nameOrCode.trim().toLowerCase();
+  return BSF1_WAREHOUSES.find(
+    (w) =>
+      w.name.toLowerCase() === key ||
+      w.code.toLowerCase() === key ||
+      w.id.toLowerCase() === key
+  );
+}
+
+export interface WarehouseOccupancy {
+  warehouse: WarehouseInfo;
+  currentKg: number;
+  capacityKg: number;
+  percentage: number;
+  isOverCapacity: boolean;
+}
+
+/** Tính mức độ sử dụng (%) của từng kho BSF1 từ danh sách lô tồn. */
+export function tinhDungTichKho(ton: LoTon[]): WarehouseOccupancy[] {
+  const tonTheoKho = new Map<string, number>();
+  for (const t of ton) {
+    if (!t.warehouse) continue;
+    const cur = tonTheoKho.get(t.warehouse) ?? 0;
+    tonTheoKho.set(t.warehouse, cur + Math.max(0, t.conLai));
+  }
+
+  return BSF1_WAREHOUSES.map((wh) => {
+    // gom ton theo name / code
+    let totalKg = 0;
+    for (const [k, kgVal] of tonTheoKho.entries()) {
+      if (
+        k === wh.name ||
+        k === wh.code ||
+        k.toLowerCase().includes(wh.name.toLowerCase())
+      ) {
+        totalKg += kgVal;
+      }
+    }
+    const pct = wh.capacityKg > 0 ? (totalKg / wh.capacityKg) * 100 : 0;
+    return {
+      warehouse: wh,
+      currentKg: totalKg,
+      capacityKg: wh.capacityKg,
+      percentage: Math.round(pct * 10) / 10,
+      isOverCapacity: totalKg > wh.capacityKg,
+    };
+  });
+}
+

@@ -27,7 +27,10 @@ import {
 import { kg, num, viDate } from "@/lib/format";
 import { CalendarRange, ClipboardList, PackageCheck, Scale, Snowflake, Warehouse } from "lucide-react";
 
-const KHO_GOI_Y = ["Kho đông 1", "Kho đông 2", "Kho đông 3"];
+import { BSF1_WAREHOUSES } from "@/types";
+import { tinhDungTichKho } from "@/lib/kho";
+
+const KHO_BSF1_NAMES = BSF1_WAREHOUSES.map((w) => w.name);
 
 interface DuyetForm {
   wipId: string;
@@ -53,13 +56,20 @@ export default function KhoDuTruScreen() {
     [sanXuat]
   );
   const ton = useMemo(() => tinhTon(sanXuat, dongLenh), [sanXuat, dongLenh]);
+  const dungTichKho = useMemo(() => tinhDungTichKho(ton), [ton]);
 
   const dsKho = useMemo(() => {
-    const set = new Set<string>(KHO_GOI_Y);
+    const set = new Set<string>(KHO_BSF1_NAMES);
     for (const s of sanXuat) if (s.warehouse) set.add(s.warehouse);
     return [...set];
   }, [sanXuat]);
-  const optKho: MucChon[] = dsKho.map((k) => ({ value: k, label: k }));
+  const optKho: MucChon[] = dsKho.map((k) => {
+    const wh = BSF1_WAREHOUSES.find((w) => w.name === k);
+    return {
+      value: k,
+      label: wh ? `${wh.name} (${num(wh.capacityKg / 1000)} tấn)` : k,
+    };
+  });
 
   const tonLoc = useMemo(
     () => ton.filter((t) => (!locKho || t.warehouse === locKho) && t.conLai > 0),
@@ -70,7 +80,7 @@ export default function KhoDuTruScreen() {
   const moDuyet = (s: WipProductionItem) => {
     setDuyet({
       wipId: s.id,
-      warehouse: s.warehouse || KHO_GOI_Y[0],
+      warehouse: s.warehouse || KHO_BSF1_NAMES[0],
       luongThuc: s.quantityKg,
       blockThuc: s.blocksCount,
       note: "",
@@ -156,6 +166,60 @@ export default function KhoDuTruScreen() {
           { nhan: "Tổng tồn", giaTri: kg(tongTon), so: true, icon: Scale, mau: "success" },
         ]}
       />
+
+      {/* Dung tích & Tải trọng 5 Kho BSF1 */}
+      <div className="rounded-xl border-2 border-border p-4 bg-card space-y-3">
+        <h2 className="text-lg font-semibold flex items-center gap-2 text-foreground">
+          <Warehouse className="w-5 h-5 text-primary" />
+          Dung tích & Tải trọng Kho BSF1
+        </h2>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+          {dungTichKho.map((item) => (
+            <div
+              key={item.warehouse.id}
+              className={`rounded-lg border p-3 flex flex-col justify-between transition-colors ${
+                item.isOverCapacity
+                  ? "border-destructive bg-destructive/10"
+                  : locKho === item.warehouse.name
+                  ? "border-primary bg-primary/10"
+                  : "border-border bg-background"
+              }`}
+            >
+              <div>
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-sm text-foreground">{item.warehouse.name}</span>
+                  <Badge variant={item.warehouse.type === "xi-nghiep" ? "default" : "outline"} className="text-xs">
+                    {item.warehouse.type === "xi-nghiep" ? "Kho lớn" : `Xưởng ${item.warehouse.workshop}`}
+                  </Badge>
+                </div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  Sức chứa: <span className="font-medium tnum">{num(item.warehouse.capacityKg / 1000)}</span> tấn
+                </div>
+              </div>
+              <div className="mt-3 space-y-1">
+                <div className="flex justify-between text-xs font-semibold tnum">
+                  <span>{num(item.currentKg)} kg</span>
+                  <span className={item.isOverCapacity ? "text-destructive font-bold" : "text-muted-foreground"}>
+                    {item.percentage}%
+                  </span>
+                </div>
+                <div className="w-full h-2 rounded-full bg-muted overflow-hidden">
+                  <div
+                    className={`h-full transition-all ${
+                      item.isOverCapacity
+                        ? "bg-destructive"
+                        : item.percentage > 85
+                        ? "bg-amber-500"
+                        : "bg-primary"
+                    }`}
+                    style={{ width: `${Math.min(100, item.percentage)}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
 
       {/* Khối chờ nhập — lời mời duyệt (không coi rỗng khi còn lô chờ) */}
       {choNhap.length > 0 && (

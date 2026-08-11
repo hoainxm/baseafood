@@ -29,6 +29,7 @@ const ManBaoCao = lazy(() => import("@/features/reports/ManBaoCao"));
 const NhapNguyenLieuScreen = lazy(() => import("@/features/imports"));
 const BanHangScreen = lazy(() => import("@/features/sales"));
 const KhoDuTruScreen = lazy(() => import("@/features/warehouse"));
+const BaoCaoNhapXuatTonScreen = lazy(() => import("@/features/reports/BaoCaoNhapXuatTon"));
 const DonDatScreen = lazy(() => import("@/features/orders"));
 const CanDoiScreen = lazy(() => import("@/features/balancing"));
 const DanhMucScreen = lazy(() => import("@/features/catalog"));
@@ -132,6 +133,7 @@ export default function App() {
             <Route path="/imports" element={<NhapNguyenLieuScreen />} />
             <Route path="/sales" element={<BanHangScreen />} />
             <Route path="/warehouse" element={<KhoDuTruScreen />} />
+            <Route path="/nxt" element={<BaoCaoNhapXuatTonScreen />} />
             <Route path="/orders" element={<DonDatScreen />} />
             <Route path="/balancing" element={<CanDoiScreen />} />
             <Route path="/balancing/:periodId" element={<CanDoiScreen />} />

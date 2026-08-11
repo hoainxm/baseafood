@@ -299,3 +299,86 @@ export interface ExportItem {
   quantityKg: number;
   blocksCount: number;
 }
+
+/* ---------- BSF1 Warehouse & NXT Report Types ---------- */
+
+export type WarehouseType = "xi-nghiep" | "phan-xuong";
+
+export interface WarehouseInfo {
+  id: string;
+  code: string;
+  name: string;
+  type: WarehouseType;
+  capacityKg: number; // (kg) e.g. 1,000,000 kg (1000 tấn), 1,500,000 kg (1500 tấn), 250,000 kg (250 tấn)
+  workshop?: Workshop;
+  note?: string;
+}
+
+export type NxtGoodsCategory = "Hàng nhập khẩu" | "Hàng trong nước" | "Hàng tạm";
+
+export const NXT_GOODS_CATEGORIES: NxtGoodsCategory[] = [
+  "Hàng nhập khẩu",
+  "Hàng trong nước",
+  "Hàng tạm",
+];
+
+export const BSF1_WAREHOUSES: WarehouseInfo[] = [
+  {
+    id: "kho-1000t",
+    code: "K1000T",
+    name: "Kho 1000 tấn",
+    type: "xi-nghiep",
+    capacityKg: 1000000,
+    note: "Kho tổng BSF1 — dung tích 1.000 tấn",
+  },
+  {
+    id: "kho-1500t",
+    code: "K1500T",
+    name: "Kho 1500 tấn",
+    type: "xi-nghiep",
+    capacityKg: 1500000,
+    note: "Kho tổng BSF1 — dung tích 1.500 tấn",
+  },
+  {
+    id: "kho-dong",
+    code: "KX-DONG",
+    name: "Kho xưởng Đông",
+    type: "phan-xuong",
+    capacityKg: 250000,
+    workshop: "Đông",
+    note: "Kho trong phân xưởng Đông — dung tích 250 tấn",
+  },
+  {
+    id: "kho-ca",
+    code: "KX-CA",
+    name: "Kho xưởng Cá",
+    type: "phan-xuong",
+    capacityKg: 150000,
+    workshop: "Cá",
+    note: "Kho trong phân xưởng Cá — dung tích 150 tấn",
+  },
+  {
+    id: "kho-kho",
+    code: "KX-KHO",
+    name: "Kho xưởng Khô",
+    type: "phan-xuong",
+    capacityKg: 150000,
+    workshop: "Khô",
+    note: "Kho trong phân xưởng Khô — dung tích 150 tấn",
+  },
+];
+
+export interface NxtReportItem {
+  productId: string;
+  productCode: string;
+  productName: string;
+  category: NxtGoodsCategory;
+  unit: string;
+  tonDauKg: number;
+  nhapTrongKyKg: number;
+  xuatTrongKyKg: number;
+  tonCuoiKg: number;
+  warehouse: string;
+  note?: string;
+}
+

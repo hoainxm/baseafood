@@ -42,6 +42,8 @@ export { FormDialog, NutDong } from "./patterns/FormDialog";
 export { BangTong, type CotTong } from "./patterns/BangTong";
 export { ThongKe, type TheThongTin } from "./patterns/ThongKe";
 export { BieuDoCot, type CotBieuDo } from "./patterns/BieuDoCot";
+export { StatusChip, type TrangThaiSX } from "./patterns/StatusChip";
+export { DuLieuMau } from "./patterns/DuLieuMau";
 export { BieuDoCotDoc, type CotBieuDoDoc } from "./patterns/BieuDoCotDoc";
 export { notify } from "./patterns/notify";
 
@@ -73,6 +75,11 @@ export {
   DialogClose,
 } from "@/components/ui/dialog";
 export { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+export {
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+} from "@/components/ui/popover";
 export {
   Table,
   TableHeader,

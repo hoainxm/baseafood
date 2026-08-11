@@ -67,8 +67,8 @@ function apBeRong(id: string) {
  */
 export function apDungCaiDatHienThi(taiKhoan?: string) {
   apCoChu(doc(khoa(BASE_CO_CHU, taiKhoan), "100"));
-  apMatDo(doc(khoa(BASE_MAT_DO, taiKhoan), "thoang"));
-  apBeRong(doc(khoa(BASE_BE_RONG, taiKhoan), "vua"));
+  apMatDo(doc(khoa(BASE_MAT_DO, taiKhoan), "gon"));
+  apBeRong(doc(khoa(BASE_BE_RONG, taiKhoan), "toi-da"));
 }
 
 export interface AnhCaiDat {
@@ -81,8 +81,8 @@ export interface AnhCaiDat {
 export function docCaiDatHienThi(taiKhoan?: string): AnhCaiDat {
   return {
     coChu: doc(khoa(BASE_CO_CHU, taiKhoan), "100"),
-    matDo: doc(khoa(BASE_MAT_DO, taiKhoan), "thoang"),
-    beRong: doc(khoa(BASE_BE_RONG, taiKhoan), "vua"),
+    matDo: doc(khoa(BASE_MAT_DO, taiKhoan), "gon"),
+    beRong: doc(khoa(BASE_BE_RONG, taiKhoan), "toi-da"),
   };
 }
 
@@ -102,14 +102,14 @@ function useCaiDat(taiKhoan?: string) {
   const kBeRong = khoa(BASE_BE_RONG, taiKhoan);
 
   const [coChu, setCoChu] = React.useState(() => doc(kCoChu, "100"));
-  const [matDo, setMatDo] = React.useState(() => doc(kMatDo, "thoang"));
-  const [beRong, setBeRong] = React.useState(() => doc(kBeRong, "vua"));
+  const [matDo, setMatDo] = React.useState(() => doc(kMatDo, "gon"));
+  const [beRong, setBeRong] = React.useState(() => doc(kBeRong, "toi-da"));
 
   // Đổi tài khoản → nạp lại state từ bucket của người mới rồi áp ngay.
   React.useEffect(() => {
     setCoChu(doc(kCoChu, "100"));
-    setMatDo(doc(kMatDo, "thoang"));
-    setBeRong(doc(kBeRong, "vua"));
+    setMatDo(doc(kMatDo, "gon"));
+    setBeRong(doc(kBeRong, "toi-da"));
     apDungCaiDatHienThi(taiKhoan);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [taiKhoan]);
@@ -135,8 +135,8 @@ function useCaiDat(taiKhoan?: string) {
     },
     datLai: () => {
       setCoChu("100");
-      setMatDo("thoang");
-      setBeRong("vua");
+      setMatDo("gon");
+      setBeRong("toi-da");
       localStorage.removeItem(kCoChu);
       localStorage.removeItem(kMatDo);
       localStorage.removeItem(kBeRong);

@@ -100,33 +100,6 @@ export const HUONG_DAN: Record<string, NoiDungHuongDan> = {
     ),
   },
 
-  production: {
-    tieuDe: "Sản xuất bán thành phẩm",
-    moTa: "Ghi sản lượng bán thành phẩm làm ra trong ngày.",
-    noiDung: (
-      <>
-        <Muc tieuDe="Ghi sản lượng ngày">
-          <Buoc>
-            <li>Chọn ngày và phân xưởng.</li>
-            <li>
-              Chọn <b>loại nguyên liệu</b> (VD "Bạch tuộc 2 da") — danh sách
-              thành phẩm lọc theo đúng loại đó.
-            </li>
-            <li>
-              Chọn thành phẩm và ghi số cân làm ra. Tên thành phẩm{" "}
-              <b>đã gồm quy cách/size</b> (VD "2 râu cắt sống 18-20"), không cần
-              nhập quy cách riêng.
-            </li>
-          </Buoc>
-        </Muc>
-        <p className="text-muted-foreground">
-          Bán thành phẩm làm ra được cất kho dự trữ, gom đủ theo đơn đặt mới xuất
-          — khác với màn <b>Bán hàng</b> (bán ra cho khách).
-        </p>
-      </>
-    ),
-  },
-
   sales: {
     tieuDe: "Bán hàng",
     moTa: "Ghi phiếu bán thành phẩm ra cho khách mỗi ngày.",

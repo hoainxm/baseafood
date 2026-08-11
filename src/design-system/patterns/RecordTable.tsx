@@ -171,7 +171,9 @@ export function RecordTable<T>({
   const cotChinh = columns.find((c) => c.chinh) ?? columns[0];
 
   return (
-    <div className={cn("space-y-4", className)}>
+    // min-w-0: khi RecordTable là con của lưới (VD dashboard 2 cột), không cho
+    // bảng ép ô rộng theo nội-dung-tối-thiểu → tránh tràn đè khối bên cạnh.
+    <div className={cn("min-w-0 space-y-4", className)}>
       {thanhCongCu}
 
       {daSap.length === 0 ? (
@@ -180,8 +182,9 @@ export function RecordTable<T>({
         </div>
       ) : (
         <>
-          {/* Desktop */}
-          <div className="hidden overflow-hidden rounded-xl ring-1 ring-foreground/10 md:block">
+          {/* Desktop — cuộn ngang khi ô chứa hẹp (VD nằm trong lưới 2 cột) để bảng
+              KHÔNG tràn đè khối bên cạnh; đủ rộng thì không có thanh cuộn. */}
+          <div className="scroll-nice hidden overflow-x-auto rounded-xl ring-1 ring-foreground/10 md:block">
             <Table>
               <TableHeader>
                 <TableRow>

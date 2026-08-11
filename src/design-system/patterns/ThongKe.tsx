@@ -35,17 +35,27 @@ const MAU: Record<MauThe, { chip: string; vien: string }> = {
   "trung-tinh": { chip: "bg-muted text-muted-foreground", vien: "border-border" },
 };
 
+const COT_LG: Record<number, string> = {
+  2: "lg:grid-cols-2",
+  3: "lg:grid-cols-3",
+  4: "lg:grid-cols-4",
+};
+
 export function ThongKe({
   the,
+  cot = 4,
   className,
 }: {
   the: TheThongTin[];
+  /** Số cột tối đa (màn rộng). Mặc định 4. */
+  cot?: 2 | 3 | 4;
   className?: string;
 }) {
   return (
     <div
       className={cn(
-        "grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4",
+        "grid grid-cols-2 gap-3 sm:gap-4",
+        COT_LG[cot] ?? "lg:grid-cols-4",
         className
       )}
     >

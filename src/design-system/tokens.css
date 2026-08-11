@@ -96,6 +96,21 @@
   --ring: #1a5fb8;
 
   --overlay: rgb(15 23 42 / 0.5);
+
+  /* --- Trạng thái sản xuất MES (dây chuyền, kho lạnh, OEE) ---
+     Không có trong nghiệp vụ gốc; bổ sung cho các màn MES (Tổng quan…). Dùng làm
+     CHIP có chấm + nhãn chữ, KHÔNG dùng làm màu chữ trên nền trắng (tương phản
+     thấp) — vì vậy có bản "-ink" đậm hơn để viết chữ trên nền sáng. */
+  --status-running: #10b981;
+  --status-idle: #f59e0b;
+  --status-stopped: #ef4444;
+  --status-maintenance: #8b5cf6;
+  --status-changeover: #3b82f6;
+  --status-running-ink: #15803d;
+  --status-idle-ink: #b45309;
+  --status-stopped-ink: #b91c1c;
+  --status-maintenance-ink: #6d28d9;
+  --status-changeover-ink: #1d4ed8;
 }
 
 @theme inline {
@@ -125,6 +140,18 @@
   --color-input: var(--input);
   --color-ring: var(--ring);
 
+  /* Trạng thái MES → tiện ích Tailwind: bg-status-running, text-status-stopped-ink… */
+  --color-status-running: var(--status-running);
+  --color-status-idle: var(--status-idle);
+  --color-status-stopped: var(--status-stopped);
+  --color-status-maintenance: var(--status-maintenance);
+  --color-status-changeover: var(--status-changeover);
+  --color-status-running-ink: var(--status-running-ink);
+  --color-status-idle-ink: var(--status-idle-ink);
+  --color-status-stopped-ink: var(--status-stopped-ink);
+  --color-status-maintenance-ink: var(--status-maintenance-ink);
+  --color-status-changeover-ink: var(--status-changeover-ink);
+
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -133,7 +160,7 @@
 
 /* ============================================================
    MẬT ĐỘ — đặt bằng data-density trên <html> (xem CaiDatHienThi).
-   "thoang" (mặc định) 48px · "vua" 44px · "gon" 40px.
+   "thoang" 48px · "vua" 44px · "gon" (MẶC ĐỊNH) 40px.
    Người mới / mắt kém để Thoáng; kế toán quen Excel chọn Gọn để thấy
    nhiều dòng hơn trong một màn. Không bao giờ xuống dưới 40px.
    ============================================================ */

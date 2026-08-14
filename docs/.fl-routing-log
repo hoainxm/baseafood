@@ -2,3 +2,5 @@
 2026-08-07 | ban-hang+can-doi | CLAUDE.md, docs/app-map/README.md, docs/app-map/33-ban-hang.md, docs/app-map/31-can-doi-ky.md, docs/app-map/03-database.md, docs/trien-khai/README.md
 2026-08-07 | can-doi+ban-hang | CLAUDE.md, docs/app-map/31-can-doi-ky.md, docs/trien-khai/plan-flow-can-doi-5-ngay.md, docs/trien-khai/bang-cau-hoi-xac-nhan-truoc-plan.md, docs/app-map/33-ban-hang.md, docs/app-map/03-database.md
 2026-08-10 | ui/design-system | design-system/README.md, 02-pages-navigation.md, 30-nhap-hang.md, 33-ban-hang.md, 01-app-structure.md
+2026-08-14 | demo/can-doi-ky | docs/demo/kich-ban-demo.md, docs/demo/kich-ban-demo-live.md, docs/app-map/31-can-doi-ky.md
+2026-08-14 | docs-sync | CLAUDE.md, docs/README.md, docs/app-map/*.md, src/design-system/README.md, docs/spec/routing-va-naming.md, docs/BAN-GIAO.md

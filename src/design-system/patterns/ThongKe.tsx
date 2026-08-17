@@ -54,7 +54,7 @@ export function ThongKe({
   return (
     <div
       className={cn(
-        "grid grid-cols-2 gap-3 sm:gap-4",
+        "grid grid-cols-2 gap-3 md:gap-4",
         COT_LG[cot] ?? "lg:grid-cols-4",
         className
       )}
@@ -64,11 +64,12 @@ export function ThongKe({
         const Icon = t.icon;
         const isString = typeof t.giaTri === "string";
         const isLong = isString && (t.giaTri as string).length > 12;
+        // Không bao giờ xuống dưới text-sm (16px) — kể cả chuỗi dài trên điện thoại.
         const fontSizeClass = t.so
-          ? "text-xl sm:text-2xl"
+          ? "text-xl md:text-2xl"
           : isLong
-            ? "text-[13px] sm:text-sm lg:text-base font-semibold leading-snug"
-            : "text-base sm:text-lg lg:text-xl";
+            ? "text-sm font-semibold leading-snug lg:text-base"
+            : "text-base md:text-lg lg:text-xl";
 
         return (
           <div

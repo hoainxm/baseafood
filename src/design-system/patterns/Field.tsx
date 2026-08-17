@@ -5,14 +5,56 @@ import { cn } from "@/lib/utils";
 /**
  * Field — bọc mọi ô nhập.
  *
- * Luật (GOV.UK Design System):
+ * Luật:
  *  - Nhãn LUÔN hiện, nằm TRÊN ô, không bao giờ thay bằng placeholder
  *    (placeholder biến mất khi gõ → người lớn tuổi quên đang nhập ô gì).
- *  - Ô bắt buộc ghi chữ "Bắt buộc", không dùng dấu * (người dùng không quen
- *    ký hiệu, và trình đọc màn hình đọc "sao").
+ *  - Ô bắt buộc đánh dấu bằng **dấu * đỏ** sau nhãn; form đặt `ChuThichBatBuoc`
+ *    ở đầu để giải nghĩa. Dấu * là `aria-hidden` — trình đọc màn hình nhận
+ *    thông tin bắt buộc qua `aria-required` trên chính ô nhập, không đọc "sao".
+ *    (Khác GOV.UK — quyết định của chủ dự án 2026-08-17 vì chip "Bắt buộc"
+ *    lặp trên mọi hàng làm form rối mắt.)
+ *  - Ô KHÔNG bắt buộc không ghi gì thêm.
  *  - Gợi ý (hint) nằm TRƯỚC ô, không phải sau.
  *  - Lỗi hiện ngay dưới nhãn, kèm icon + viền đỏ ở ô.
  */
+/**
+ * Chú thích giải nghĩa dấu *. Đặt MỘT lần ở đầu form / đầu thân dialog có ô bắt
+ * buộc — dấu * không tự nói lên điều gì với người chưa quen ký hiệu.
+ */
+export function ChuThichBatBuoc({ className }: { className?: string }) {
+  return (
+    <p className={cn("text-base text-muted-foreground", className)}>
+      Ô có dấu <span className="font-bold text-destructive">*</span> là bắt buộc.
+    </p>
+  );
+}
+
+/**
+ * Dò xem trong một vùng DOM có ô bắt buộc không (`aria-required="true"`), để
+ * form tự quyết định có hiện `ChuThichBatBuoc` hay không — khỏi phải bật cờ tay
+ * ở từng chỗ gọi và không bao giờ hiện thừa.
+ */
+export function useCoOBatBuoc(
+  ref: React.RefObject<HTMLElement | null>,
+  deps: React.DependencyList = []
+) {
+  const [co, setCo] = React.useState(false);
+  React.useEffect(() => {
+    const el = ref.current;
+    if (!el) {
+      setCo(false);
+      return;
+    }
+    const kiem = () => setCo(!!el.querySelector('[aria-required="true"]'));
+    kiem();
+    const mo = new MutationObserver(kiem);
+    mo.observe(el, { subtree: true, childList: true, attributes: true });
+    return () => mo.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, deps);
+  return co;
+}
+
 export function Field({
   label,
   required,
@@ -68,6 +110,9 @@ export function Field({
       id,
       "aria-describedby": describedBy,
       "aria-invalid": error ? true : undefined,
+      // Dấu * chỉ là tín hiệu THỊ GIÁC (aria-hidden). Trình đọc màn hình lấy
+      // thông tin bắt buộc từ đây.
+      "aria-required": required && !anNhanBatBuoc ? true : undefined,
       className: (children.props as { className?: string }).className,
       style: {
         ...((children.props as { style?: React.CSSProperties }).style ?? {}),
@@ -82,14 +127,14 @@ export function Field({
        (VD "Số lượng" cạnh "Đơn giá" có hint → trước đây hai ô lệch nhau). */
     <div className={cn("flex h-full flex-col gap-2", className)}>
       <div className="flex flex-wrap items-center gap-2">
-        <Label htmlFor={id}>{label}</Label>
-        {anNhanBatBuoc ? null : required ? (
-          <span className="rounded bg-secondary px-2 py-0.5 text-sm font-semibold text-secondary-foreground">
-            Bắt buộc
-          </span>
-        ) : (
-          <span className="text-sm text-muted-foreground">(không bắt buộc)</span>
-        )}
+        <Label htmlFor={id}>
+          {label}
+          {!anNhanBatBuoc && required && (
+            <span aria-hidden className="ml-1 font-bold text-destructive">
+              *
+            </span>
+          )}
+        </Label>
       </div>
 
       {hint && (

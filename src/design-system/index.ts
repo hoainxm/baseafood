@@ -7,7 +7,7 @@
  * Quy tắc đầy đủ: xem src/design-system/README.md
  */
 
-export { Field } from "./patterns/Field";
+export { Field, ChuThichBatBuoc } from "./patterns/Field";
 export { NumberField, parseSo, dinhDangSo } from "./patterns/NumberField";
 export { ChoiceGroup, type LuaChon } from "./patterns/ChoiceGroup";
 export { Combobox, type MucChon } from "./patterns/Combobox";
@@ -25,6 +25,7 @@ export { DanhMucCrud, type TruongDanhMuc } from "./patterns/CatalogCrudModal";
 export { Logo } from "./patterns/Logo";
 export { RecordTable, type Cot } from "./patterns/RecordTable";
 export { ConfirmDelete } from "./patterns/ConfirmDelete";
+export { XacNhan } from "./patterns/ConfirmAction";
 export { StepForm, type BuocNhap } from "./patterns/StepForm";
 export { ContextBar, type MucNguCanh } from "./patterns/ContextBar";
 export { ErrorSummary, type LoiNhap } from "./patterns/ErrorSummary";

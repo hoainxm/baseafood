@@ -24,6 +24,7 @@ import {
   DateField,
   EmptyState,
   RecordTable,
+  XacNhan,
   ThongKe,
   notify,
   type Cot,
@@ -215,7 +216,7 @@ export default function BaoCaoNhapXuatTonScreen() {
       header: "SL Nhập (kg)",
       so: true,
       render: (r) => (
-        <span className={r.nhapKg > 0 ? "font-semibold text-emerald-600 dark:text-emerald-400" : ""}>
+        <span className={r.nhapKg > 0 ? "font-semibold text-success" : ""}>
           {num(r.nhapKg)}
         </span>
       ),
@@ -226,7 +227,7 @@ export default function BaoCaoNhapXuatTonScreen() {
       header: "SL Xuất (kg)",
       so: true,
       render: (r) => (
-        <span className={r.xuatKg > 0 ? "font-semibold text-amber-600 dark:text-amber-400" : ""}>
+        <span className={r.xuatKg > 0 ? "font-semibold text-warning" : ""}>
           {num(r.xuatKg)}
         </span>
       ),
@@ -268,14 +269,33 @@ export default function BaoCaoNhapXuatTonScreen() {
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
-          <Button
-            variant="outline"
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <Upload className="w-4 h-4 mr-2" />
-            Import Excel mẫu
-          </Button>
+        <div className="flex w-full flex-wrap items-center gap-3 md:w-auto">
+          {/* Đang xem dữ liệu import ⇒ nạp file mới sẽ ĐÈ lên, phải hỏi lại. */}
+          {importedExcelData ? (
+            <XacNhan
+              tieuDe="Nạp file Excel khác đè lên dữ liệu đang xem?"
+              moTa="Dữ liệu từ file đang xem sẽ bị thay hoàn toàn bằng file mới. Không hoàn tác được — muốn xem lại thì phải nạp lại file cũ."
+              chiTiet={`Đang xem: ${importedExcelData.items.length} mặt hàng${importedExcelData.warehouseText ? ` · ${importedExcelData.warehouseText}` : ""}`}
+              nhanNut="Chọn file khác"
+              nguyHiem
+              icon={Upload}
+              onConfirm={() => fileInputRef.current?.click()}
+              trigger={
+                <Button variant="outline">
+                  <Upload className="w-4 h-4 mr-2" />
+                  Import Excel mẫu
+                </Button>
+              }
+            />
+          ) : (
+            <Button
+              variant="outline"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <Upload className="w-4 h-4 mr-2" />
+              Import Excel mẫu
+            </Button>
+          )}
 
           <Button variant="default" onClick={handleExportExcel}>
             <Download className="w-4 h-4 mr-2" />
@@ -286,22 +306,29 @@ export default function BaoCaoNhapXuatTonScreen() {
 
       {/* Badge báo trạng thái dữ liệu (đang dùng dữ liệu Import hay Hệ thống) */}
       {importedExcelData && (
-        <div className="flex items-center justify-between rounded-lg border-2 border-emerald-500/40 bg-emerald-500/10 p-3">
-          <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-300 flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border-2 border-success bg-success-surface p-3">
+          <span className="flex items-center gap-2 text-base font-semibold text-success">
             <FileSpreadsheet className="w-4 h-4" />
             Đang xem dữ liệu từ file Excel import: {importedExcelData.items.length} mặt hàng ({importedExcelData.warehouseText || "Chi nhánh KHO 1000"})
           </span>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => {
+          <XacNhan
+            tieuDe="Bỏ dữ liệu file Excel, quay về số của hệ thống?"
+            moTa="Dữ liệu vừa nạp từ file sẽ bị bỏ khỏi màn hình. Muốn xem lại phải nạp lại file."
+            chiTiet={`${importedExcelData.items.length} mặt hàng${importedExcelData.warehouseText ? ` · ${importedExcelData.warehouseText}` : ""}`}
+            nhanNut="Dùng dữ liệu MES"
+            nguyHiem
+            icon={RefreshCw}
+            onConfirm={() => {
               setImportedExcelData(null);
               notify.daLuu("Đã chuyển về dữ liệu MES hệ thống");
             }}
-          >
-            <RefreshCw className="w-4 h-4 mr-1" />
-            Dùng dữ liệu MES
-          </Button>
+            trigger={
+              <Button size="sm" variant="ghost">
+                <RefreshCw className="w-4 h-4 mr-1" />
+                Dùng dữ liệu MES
+              </Button>
+            }
+          />
         </div>
       )}
 
@@ -340,7 +367,9 @@ export default function BaoCaoNhapXuatTonScreen() {
       />
 
       {/* Thanh điều khiển Bộ lọc */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 rounded-xl border-2 border-border bg-card p-4">
+      {/* [&>*]:min-w-0 — ô lưới mặc định min-width:auto, placeholder dài ("Tất cả
+          5 kho BSF1") ở cỡ chữ 130% sẽ đẩy rộng cả trang nếu không cho co. */}
+      <div className="grid gap-4 rounded-xl border-2 border-border bg-card p-4 [&>*]:min-w-0 md:grid-cols-2 lg:grid-cols-4">
         <Combobox
           label="Lọc theo Kho"
           value={locKho}
@@ -394,8 +423,8 @@ export default function BaoCaoNhapXuatTonScreen() {
             </span>
             <div className="flex flex-wrap items-center gap-6 tnum font-bold text-base">
               <span>Tồn đầu: <span className="text-primary">{num(tongTonDau)} kg</span></span>
-              <span>Nhập: <span className="text-emerald-600 dark:text-emerald-400">+{num(tongNhap)} kg</span></span>
-              <span>Xuất: <span className="text-amber-600 dark:text-amber-400">-{num(tongXuat)} kg</span></span>
+              <span>Nhập: <span className="text-success">+{num(tongNhap)} kg</span></span>
+              <span>Xuất: <span className="text-warning">-{num(tongXuat)} kg</span></span>
               <span className="text-lg">Tồn cuối: <span className="text-primary">{kg(tongTonCuoi)}</span></span>
             </div>
           </div>

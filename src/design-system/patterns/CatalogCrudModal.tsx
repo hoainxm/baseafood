@@ -191,7 +191,7 @@ export function DanhMucCrud<T extends { id: string }>({
               {laThem ? `Thêm ${tenDonVi}` : `Sửa ${tenDonVi}`}
             </DialogTitle>
             <DialogDescription className="text-base">
-              Ô nào ghi "Bắt buộc" thì phải nhập mới lưu được.
+              Ô có dấu * phải nhập mới lưu được.
             </DialogDescription>
           </DialogHeader>
 

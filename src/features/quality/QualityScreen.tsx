@@ -10,12 +10,14 @@ import {
   BieuDoCot,
   Button,
   Combobox,
+  type Cot,
   DuLieuMau,
   EmptyState,
   Field,
   FormDialog,
   Input,
   NutDong,
+  RecordTable,
   Textarea,
   notify,
 } from "@/design-system";
@@ -75,6 +77,69 @@ const QC_KET: Record<
   dat: { nhan: "Đạt", icon: CircleCheck, chu: "text-success", nen: "bg-success-surface", vien: "border-success/40" },
   vipham: { nhan: "Vi phạm", icon: CircleX, chu: "text-destructive", nen: "bg-destructive/10", vien: "border-destructive/40" },
 };
+
+/** Chip kết quả — dùng chung cho bảng desktop và thẻ điện thoại. */
+function ChipKetQua({ ket }: { ket: KetQua }) {
+  const k = QC_KET[ket];
+  const Icon = k.icon;
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-semibold",
+        k.vien,
+        k.chu,
+        k.nen
+      )}
+    >
+      <Icon className="size-icon-sm" aria-hidden />
+      {k.nhan}
+    </span>
+  );
+}
+
+/** Cột bảng CCP. `chinh` = tiêu đề thẻ trên điện thoại. */
+const COT_CCP: Cot<CCP>[] = [
+  {
+    key: "id",
+    header: "CCP",
+    chinh: true,
+    sapXep: (r) => r.id,
+    render: (r) => <span className="font-mono font-bold">{r.id}</span>,
+  },
+  { key: "mo", header: "Mô tả", sapXep: (r) => r.mo, render: (r) => r.mo },
+  {
+    key: "han",
+    header: "Giới hạn tới hạn",
+    render: (r) => <span className="font-mono text-muted-foreground">{r.han}</span>,
+  },
+  {
+    key: "do",
+    header: "Giá trị đo",
+    render: (r) => (
+      <span
+        className={cn(
+          "font-mono font-bold",
+          r.ket === "vipham" ? "text-destructive" : "text-foreground"
+        )}
+      >
+        {r.do}
+      </span>
+    ),
+  },
+  {
+    key: "ket",
+    header: "Trạng thái",
+    sapXep: (r) => r.ket,
+    render: (r) => <ChipKetQua ket={r.ket} />,
+  },
+  { key: "ai", header: "Người kiểm", render: (r) => r.ai },
+  {
+    key: "gio",
+    header: "Giờ",
+    sapXep: (r) => r.gio,
+    render: (r) => <span className="font-mono">{r.gio}</span>,
+  },
+];
 
 const QC_NGAY = [
   { nhan: "04/08", giaTri: 97.2 },
@@ -259,117 +324,41 @@ export default function ManChatLuong() {
             Vi phạm phải có hành động khắc phục ghi lại trước khi đóng ca.
           </p>
         </div>
-        <div className="scroll-nice w-full max-w-full overflow-x-auto rounded-xl ring-1 ring-foreground/10">
-          <table className="w-full min-w-[1120px] border-collapse text-base">
-            <thead>
-              <tr>
-                {["CCP", "Mô tả", "Giới hạn tới hạn", "Giá trị đo", "Trạng thái", "Người kiểm", "Giờ", ""].map(
-                  (h, i) => (
-                    <th
-                      key={i}
-                      className={cn(
-                        "h-14 whitespace-nowrap border-b border-border bg-muted px-4 font-semibold",
-                        i === 7 ? "text-right" : "text-left"
-                      )}
-                    >
-                      {h}
-                    </th>
-                  )
-                )}
-              </tr>
-            </thead>
-            <tbody>
-              {QC_CCP.map((r, i) => {
-                const k = QC_KET[r.ket];
-                const vp = r.ket === "vipham";
-                const xong = daXuLy.includes(r.id);
-                const Icon = k.icon;
-                return (
-                  <tr
-                    key={r.id}
-                    className={cn(
-                      "border-b border-border",
-                      vp
-                        ? "bg-destructive/10 font-semibold"
-                        : i % 2 === 1
-                          ? "bg-muted/40"
-                          : "bg-background"
-                    )}
-                  >
-                    <td className="h-14 whitespace-nowrap px-4 font-mono font-bold">
-                      {r.id}
-                    </td>
-                    <td className="h-14 px-4">{r.mo}</td>
-                    <td className="h-14 whitespace-nowrap px-4 font-mono text-muted-foreground">
-                      {r.han}
-                    </td>
-                    <td
-                      className={cn(
-                        "h-14 whitespace-nowrap px-4 font-mono font-bold",
-                        vp ? "text-destructive" : "text-foreground"
-                      )}
-                    >
-                      {r.do}
-                    </td>
-                    <td className="h-14 whitespace-nowrap px-4">
-                      <span
-                        className={cn(
-                          "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-semibold",
-                          k.vien,
-                          k.chu,
-                          vp ? "bg-background" : k.nen
-                        )}
-                      >
-                        <Icon className="size-5" aria-hidden />
-                        {k.nhan}
-                      </span>
-                    </td>
-                    <td className="h-14 whitespace-nowrap px-4">{r.ai}</td>
-                    <td className="h-14 whitespace-nowrap px-4 font-mono">
-                      {r.gio}
-                    </td>
-                    <td className="h-14 whitespace-nowrap px-4 text-right">
-                      {vp ? (
-                        <span className="flex justify-end gap-2">
-                          {xong ? (
-                            <Badge className="border-success/40 bg-success-surface text-success">
-                              Đã khắc phục
-                            </Badge>
-                          ) : (
-                            <>
-                              <Button
-                                variant="destructive"
-                                size="sm"
-                                onClick={() => setXuLy(r)}
-                              >
-                                Xử lý
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => setKhacPhuc(r)}
-                              >
-                                Ghi hành động khắc phục
-                              </Button>
-                            </>
-                          )}
-                        </span>
-                      ) : (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setCcp(r)}
-                        >
-                          Xem
-                        </Button>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+        {/* RecordTable: desktop ra bảng, điện thoại ra THẺ — không bắt cuộn
+            ngang để đọc số đo CCP. */}
+        <RecordTable
+          columns={COT_CCP}
+          rows={QC_CCP}
+          getKey={(r) => r.id}
+          timKiem={(r) => `${r.id} ${r.mo} ${r.ai}`}
+          nhanTimKiem="Tìm điểm kiểm soát…"
+          actions={(r) => {
+            if (r.ket !== "vipham") {
+              return (
+                <Button variant="outline" size="sm" onClick={() => setCcp(r)}>
+                  Xem
+                </Button>
+              );
+            }
+            if (daXuLy.includes(r.id)) {
+              return (
+                <Badge className="border-success/40 bg-success-surface text-success">
+                  Đã khắc phục
+                </Badge>
+              );
+            }
+            return (
+              <>
+                <Button variant="destructive" size="sm" onClick={() => setXuLy(r)}>
+                  Xử lý
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => setKhacPhuc(r)}>
+                  Ghi hành động khắc phục
+                </Button>
+              </>
+            );
+          }}
+        />
       </section>
 
       {/* Biểu đồ */}
@@ -383,32 +372,36 @@ export default function ManChatLuong() {
               7 ngày gần nhất · đường ngang là mục tiêu 95%
             </p>
           </div>
-          <div className="relative flex h-60 items-end gap-3 pt-6">
-            <span
-              aria-hidden
-              className="absolute inset-x-0 border-t-2 border-dashed border-warning"
-              style={{ bottom: Math.round(((95 - 90) / 10) * 176) + 24 }}
-            />
-            {QC_NGAY.map((d) => {
-              const h = Math.max(6, Math.round(((d.giaTri - 90) / 10) * 176));
-              const dat = d.giaTri >= 95;
-              return (
-                <span
-                  key={d.nhan}
-                  className="flex h-full flex-1 flex-col items-center justify-end gap-1.5"
-                >
-                  <span className="font-mono text-xs font-bold">{d.giaTri}</span>
+          {/* Cuộn NGANG trong thẻ — nhãn ngày không co được, để tràn ra ngoài
+              là cả trang bị đẩy rộng trên điện thoại. */}
+          <div className="scroll-nice w-full max-w-full overflow-x-auto">
+            <div className="relative flex h-60 min-w-80 items-end gap-3 pt-6">
+              <span
+                aria-hidden
+                className="absolute inset-x-0 border-t-2 border-dashed border-warning"
+                style={{ bottom: Math.round(((95 - 90) / 10) * 176) + 24 }}
+              />
+              {QC_NGAY.map((d) => {
+                const h = Math.max(6, Math.round(((d.giaTri - 90) / 10) * 176));
+                const dat = d.giaTri >= 95;
+                return (
                   <span
-                    className={cn(
-                      "w-full max-w-11 shrink-0 rounded-t-md",
-                      dat ? "bg-success" : "bg-warning"
-                    )}
-                    style={{ height: h }}
-                  />
-                  <span className="text-xs text-muted-foreground">{d.nhan}</span>
-                </span>
-              );
-            })}
+                    key={d.nhan}
+                    className="flex h-full flex-1 flex-col items-center justify-end gap-1.5"
+                  >
+                    <span className="font-mono text-sm font-bold">{d.giaTri}</span>
+                    <span
+                      className={cn(
+                        "w-full max-w-11 shrink-0 rounded-t-md",
+                        dat ? "bg-success" : "bg-warning"
+                      )}
+                      style={{ height: h }}
+                    />
+                    <span className="text-sm text-muted-foreground">{d.nhan}</span>
+                  </span>
+                );
+              })}
+            </div>
           </div>
         </section>
 

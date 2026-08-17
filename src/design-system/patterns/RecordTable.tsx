@@ -100,9 +100,9 @@ export function RecordTable<T>({
   };
 
   const thanhCongCu = (timKiem || cotSapDuoc.length > 0) && rows.length > 0 && (
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+    <div className="flex min-w-0 flex-col gap-3 md:flex-row md:items-center">
       {timKiem && (
-        <div className="relative flex-1">
+        <div className="relative min-w-0 flex-1">
           <Search
             className="pointer-events-none absolute top-1/2 left-4 size-5 -translate-y-1/2 text-muted-foreground"
             aria-hidden
@@ -118,7 +118,7 @@ export function RecordTable<T>({
       )}
       {/* Sắp xếp trên điện thoại: header bảng không hiện nên cần nút riêng */}
       {cotSapDuoc.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2 md:hidden">
+        <div className="flex min-w-0 flex-wrap items-center gap-2 md:hidden">
           <span className="text-base text-muted-foreground">Sắp theo</span>
           {cotSapDuoc.map((c) => (
             <Button
@@ -126,8 +126,9 @@ export function RecordTable<T>({
               variant={sapTheo === c.key ? "default" : "outline"}
               size="sm"
               onClick={() => doiSap(c.key)}
+              className="max-w-full min-w-0"
             >
-              {c.header}
+              <span className="truncate">{c.header}</span>
               {sapTheo === c.key ? (
                 huong === "tang" ? (
                   <ArrowUp />

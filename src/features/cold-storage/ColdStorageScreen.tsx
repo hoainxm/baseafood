@@ -8,11 +8,13 @@ import { useMemo, useState } from "react";
 import {
   Badge,
   Button,
+  type Cot,
   DuLieuMau,
   EmptyState,
   Field,
   FormDialog,
   NutDong,
+  RecordTable,
   Separator,
   Textarea,
   notify,
@@ -133,6 +135,88 @@ function klNgayConLai(het: string): number {
   return Math.round((new Date(y, m - 1, d).getTime() - HOM_NAY_KL.getTime()) / 86400000);
 }
 
+/** Cột bảng tồn kho. `chinh` = tiêu đề thẻ trên điện thoại. */
+const COT_TON: Cot<TonKho>[] = [
+  {
+    key: "lo",
+    header: "Mã lô",
+    chinh: true,
+    sapXep: (r) => r.lo,
+    render: (r) => <span className="font-mono font-semibold">{r.lo}</span>,
+  },
+  {
+    key: "kho",
+    header: "Kho",
+    sapXep: (r) => r.kho,
+    render: (r) => <Badge variant="secondary">{r.kho}</Badge>,
+  },
+  { key: "sp", header: "Sản phẩm", sapXep: (r) => r.sp, render: (r) => r.sp },
+  {
+    key: "kg",
+    header: "SL (kg)",
+    so: true,
+    sapXep: (r) => r.kg,
+    render: (r) => so(r.kg),
+  },
+  {
+    key: "nhap",
+    header: "Ngày nhập",
+    anTrenDienThoai: true,
+    render: (r) => <span className="font-mono text-muted-foreground">{r.nhap}</span>,
+  },
+  {
+    key: "het",
+    header: "Hạn dùng",
+    sapXep: (r) => klNgayConLai(r.het),
+    render: (r) => {
+      const con = klNgayConLai(r.het);
+      const qua = con < 0;
+      const sap = con >= 0 && con <= 7;
+      return (
+        <span
+          className={cn(
+            "inline-flex items-center gap-2 font-mono",
+            qua
+              ? "font-bold text-destructive"
+              : sap
+                ? "font-bold text-warning"
+                : "text-foreground"
+          )}
+        >
+          {(qua || sap) &&
+            (qua ? (
+              <CircleX className="size-icon-sm" aria-hidden />
+            ) : (
+              <Clock className="size-icon-sm" aria-hidden />
+            ))}
+          {r.het}
+          <span className="font-sans text-sm font-semibold">
+            {qua ? `· quá ${-con} ngày` : sap ? `· còn ${con} ngày` : ""}
+          </span>
+        </span>
+      );
+    },
+  },
+  {
+    key: "fifo",
+    header: "FIFO",
+    so: true,
+    sapXep: (r) => r.fifo,
+    render: (r) => (
+      <span
+        className={cn(
+          "inline-flex size-9 items-center justify-center rounded-full font-mono text-sm font-bold",
+          r.fifo === 1
+            ? "bg-primary text-primary-foreground"
+            : "bg-secondary text-secondary-foreground"
+        )}
+      >
+        {r.fifo}
+      </span>
+    ),
+  },
+];
+
 function mucDung(p: number): { bg: string; text: string } {
   if (p > 90) return { bg: "bg-destructive", text: "text-destructive" };
   if (p >= 70) return { bg: "bg-warning", text: "text-warning" };
@@ -213,11 +297,13 @@ function BieuDoNhiet({ hien }: { hien: string[] }) {
   const y = (v: number) => pad.t + ((yMax - v) / (yMax - yMin)) * (H - pad.t - pad.b);
 
   return (
+    // min-w của <svg> = đúng W của viewBox: thu nhỏ SVG là thu nhỏ luôn chữ trục
+    // (680/900 → nhãn 16px còn ~12px). Hẹp hơn thì CUỘN, không co.
     <div className="scroll-nice w-full max-w-full overflow-x-auto">
       <svg
         viewBox={`0 0 ${W} ${H}`}
         width="100%"
-        className="block min-w-[680px]"
+        className="block min-w-[900px]"
         role="img"
         aria-label="Nhiệt độ 6 kho lạnh trong 24 giờ"
       >
@@ -238,7 +324,7 @@ function BieuDoNhiet({ hien }: { hien: string[] }) {
         {[-14, -18, -22, -25, -28].map((v) => (
           <g key={v}>
             <line x1={pad.l} x2={W - pad.r} y1={y(v)} y2={y(v)} stroke="var(--border)" strokeWidth="1" />
-            <text x={pad.l - 10} y={y(v) + 5} textAnchor="end" fontFamily="var(--font-mono)" fontSize="13" fill="var(--muted-foreground)">
+            <text x={pad.l - 10} y={y(v) + 5} textAnchor="end" fontFamily="var(--font-mono)" fontSize="16" fill="var(--muted-foreground)">
               {v} °C
             </text>
           </g>
@@ -260,7 +346,7 @@ function BieuDoNhiet({ hien }: { hien: string[] }) {
           );
         })}
         {KL_GIO.map((g, i) => (
-          <text key={g} x={x(i)} y={H - 14} textAnchor="middle" fontFamily="var(--font-sans)" fontSize="13" fill="var(--muted-foreground)">
+          <text key={g} x={x(i)} y={H - 14} textAnchor="middle" fontFamily="var(--font-sans)" fontSize="16" fill="var(--muted-foreground)">
             {g}:00
           </text>
         ))}
@@ -374,93 +460,15 @@ export default function ManKhoLanh() {
             Xếp theo hạn dùng gần nhất · cột FIFO là thứ tự phải xuất
           </p>
         </div>
-        <div className="scroll-nice w-full max-w-full overflow-x-auto rounded-xl ring-1 ring-foreground/10">
-          <table className="w-full min-w-[1060px] border-collapse text-base">
-            <thead>
-              <tr>
-                {["Kho", "Mã lô", "Sản phẩm", "SL (kg)", "Ngày nhập", "Hạn dùng", "FIFO"].map(
-                  (h, i) => (
-                    <th
-                      key={h}
-                      className={cn(
-                        "h-14 whitespace-nowrap border-b border-border bg-muted px-4 font-semibold",
-                        i === 3 || i === 6 ? "text-right" : "text-left"
-                      )}
-                    >
-                      {h}
-                    </th>
-                  )
-                )}
-              </tr>
-            </thead>
-            <tbody>
-              {ton.map((r, i) => {
-                const con = klNgayConLai(r.het);
-                const qua = con < 0;
-                const sap = con >= 0 && con <= 7;
-                const nen = qua
-                  ? "bg-destructive/10 font-semibold"
-                  : sap
-                    ? "bg-warning-surface"
-                    : i % 2 === 1
-                      ? "bg-muted/40"
-                      : "bg-background";
-                return (
-                  <tr key={r.lo} className={cn("border-b border-border", nen)}>
-                    <td className="h-14 whitespace-nowrap px-4">
-                      <Badge variant="secondary">{r.kho}</Badge>
-                    </td>
-                    <td className="h-14 whitespace-nowrap px-4 font-mono font-semibold">
-                      {r.lo}
-                    </td>
-                    <td className="h-14 whitespace-nowrap px-4">{r.sp}</td>
-                    <td className="h-14 whitespace-nowrap px-4 text-right font-mono tnum">
-                      {so(r.kg)}
-                    </td>
-                    <td className="h-14 whitespace-nowrap px-4 font-mono text-muted-foreground">
-                      {r.nhap}
-                    </td>
-                    <td className="h-14 whitespace-nowrap px-4">
-                      <span
-                        className={cn(
-                          "inline-flex items-center gap-2 font-mono",
-                          qua
-                            ? "font-bold text-destructive"
-                            : sap
-                              ? "font-bold text-warning"
-                              : "text-foreground"
-                        )}
-                      >
-                        {(qua || sap) &&
-                          (qua ? (
-                            <CircleX className="size-5" aria-hidden />
-                          ) : (
-                            <Clock className="size-5" aria-hidden />
-                          ))}
-                        {r.het}
-                        <span className="font-sans text-sm font-semibold">
-                          {qua ? `· quá ${-con} ngày` : sap ? `· còn ${con} ngày` : ""}
-                        </span>
-                      </span>
-                    </td>
-                    <td className="h-14 whitespace-nowrap px-4 text-right">
-                      <span
-                        className={cn(
-                          "inline-flex size-9 items-center justify-center rounded-full font-mono text-sm font-bold",
-                          r.fifo === 1
-                            ? "bg-primary text-primary-foreground"
-                            : "bg-secondary text-secondary-foreground"
-                        )}
-                      >
-                        {r.fifo}
-                      </span>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+        {/* RecordTable: desktop ra bảng, điện thoại ra THẺ. Trước đây là bảng
+            tay min-w-[1060px] → cuộn ngang trên điện thoại. */}
+        <RecordTable
+          columns={COT_TON}
+          rows={ton}
+          getKey={(r) => r.lo}
+          timKiem={(r) => `${r.lo} ${r.sp} ${r.kho}`}
+          nhanTimKiem="Tìm lô hàng…"
+        />
       </section>
 
       {/* Lịch sử cảnh báo */}

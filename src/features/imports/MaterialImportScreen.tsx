@@ -25,6 +25,7 @@ import {
 } from "@/lib/catalogRepo";
 import {
   Badge,
+  ChuThichBatBuoc,
   Button,
   ChoiceGroup,
   Combobox,
@@ -1125,6 +1126,7 @@ export default function NhapNguyenLieuScreen() {
           {phien && (
             <div className="space-y-6 py-2">
                   <ErrorSummary loi={loiPhien} />
+                  <ChuThichBatBuoc />
 
                   {chotPhien && (
                     <p className="flex items-start gap-3 rounded-lg bg-accent px-4 py-3 text-base text-accent-foreground">
@@ -1422,6 +1424,7 @@ export default function NhapNguyenLieuScreen() {
           {dang && (
             <div className="space-y-6 py-2">
               <ErrorSummary loi={loi} />
+              <ChuThichBatBuoc />
 
               <div className="rounded-xl bg-muted px-5 py-4">
                 <p className="text-base text-muted-foreground">Thuộc chuyến</p>
@@ -1552,6 +1555,7 @@ export default function NhapNguyenLieuScreen() {
 
           <div className="space-y-5 py-2">
             <ErrorSummary loi={loiChot} />
+            <ChuThichBatBuoc />
             <Field label="Lý do mở lại" required>
               <Input
                 value={lyDoMoLai}
@@ -1836,6 +1840,7 @@ function KhoiPheLieuNgay({
           {dang && (
             <div className="space-y-6 py-2">
               <ErrorSummary loi={loi} />
+              <ChuThichBatBuoc />
 
               <Combobox
                 label="Loại phế liệu"

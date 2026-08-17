@@ -27,6 +27,7 @@ import {
 import { loConHang, tinhTon } from "@/lib/inventory";
 import {
   Badge,
+  ChuThichBatBuoc,
   Button,
   Combobox,
   Dialog,
@@ -42,6 +43,7 @@ import {
   NumberField,
   RecordTable,
   ThongKe,
+  XacNhan,
   notify,
   type Cot,
   type LoiNhap,
@@ -378,10 +380,22 @@ export default function DonDatScreen() {
                     <PackageCheck />
                     Xác nhận đủ
                   </Button>
-                  <Button onClick={() => taoLenhXuat(donCuaChon)}>
-                    <Truck />
-                    Lệnh xuất (một phần được)
-                  </Button>
+                  {/* Lệnh xuất TRỪ TỒN KHO + đẻ phiếu ở sổ Bán hàng — chạm hai
+                      sổ cùng lúc, không có nút hoàn tác. Phải hỏi lại. */}
+                  <XacNhan
+                    tieuDe="Xuất hàng cho đơn này?"
+                    moTa="Sẽ trừ tồn kho dự trữ theo FIFO và tạo một phiếu bán (kênh Xuất khẩu) ở sổ Bán hàng. Không hoàn tác được — sai thì phải sửa tay ở cả hai sổ."
+                    chiTiet={`${tenKH(donCuaChon.customerId)} · đặt ${viDate(donCuaChon.orderDate)} · ${dongCuaChon.length} dòng hàng`}
+                    nhanNut="Xuất hàng"
+                    icon={Truck}
+                    onConfirm={() => taoLenhXuat(donCuaChon)}
+                    trigger={
+                      <Button>
+                        <Truck />
+                        Lệnh xuất (một phần được)
+                      </Button>
+                    }
+                  />
                 </>
               )}
               <Button variant="outline" onClick={() => setChon(null)}>
@@ -444,6 +458,7 @@ export default function DonDatScreen() {
           {tao && (
             <div className="space-y-6 py-2">
               <ErrorSummary loi={loi} />
+              <ChuThichBatBuoc />
               <Combobox
                 label="Khách hàng"
                 required

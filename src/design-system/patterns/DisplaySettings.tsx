@@ -28,12 +28,19 @@ function khoa(base: string, taiKhoan?: string) {
   return taiKhoan ? `bsf.${taiKhoan}.${base}` : `bsf.${base}`;
 }
 
+/** MẶC ĐỊNH là "90" — màn hình văn phòng ngày nay dày điểm ảnh, 18px trông quá
+ *  to. Thang token GIỮ NGUYÊN (nền 18px) nên tổ trưởng mắt kém vẫn kéo lên
+ *  110–130% được; đây chỉ là điểm xuất phát. */
 export const CO_CHU = [
-  { id: "100", nhan: "A", scale: "100%", moTa: "Thường — 18px" },
-  { id: "110", nhan: "A", scale: "110%", moTa: "Hơi lớn — 20px" },
-  { id: "120", nhan: "A", scale: "120%", moTa: "Lớn — 22px" },
-  { id: "130", nhan: "A", scale: "130%", moTa: "Rất lớn — 23px" },
+  { id: "90", nhan: "A", scale: "90%", moTa: "Thường — 16px" },
+  { id: "100", nhan: "A", scale: "100%", moTa: "Hơi lớn — 18px" },
+  { id: "110", nhan: "A", scale: "110%", moTa: "Lớn — 20px" },
+  { id: "120", nhan: "A", scale: "120%", moTa: "Rất lớn — 22px" },
+  { id: "130", nhan: "A", scale: "130%", moTa: "Cực lớn — 23px" },
 ] as const;
+
+/** Bậc cỡ chữ mặc định khi chưa ai chọn gì. */
+export const CO_CHU_MAC_DINH = "90";
 
 export const MAT_DO = [
   { id: "thoang", nhan: "Thoáng", moTa: "Ô cao 48px — dễ bấm nhất" },
@@ -71,7 +78,7 @@ function apBeRong(id: string) {
  * giao diện của người vừa đăng nhập).
  */
 export function apDungCaiDatHienThi(taiKhoan?: string) {
-  apCoChu(doc(khoa(BASE_CO_CHU, taiKhoan), "100"));
+  apCoChu(doc(khoa(BASE_CO_CHU, taiKhoan), CO_CHU_MAC_DINH));
   apMatDo(doc(khoa(BASE_MAT_DO, taiKhoan), "gon"));
   apBeRong(doc(khoa(BASE_BE_RONG, taiKhoan), "toi-da"));
 }
@@ -85,7 +92,7 @@ export interface AnhCaiDat {
 /** Chụp cài đặt hiện tại của một tài khoản — để làm mốc "hoàn tác" khi Hủy. */
 export function docCaiDatHienThi(taiKhoan?: string): AnhCaiDat {
   return {
-    coChu: doc(khoa(BASE_CO_CHU, taiKhoan), "100"),
+    coChu: doc(khoa(BASE_CO_CHU, taiKhoan), CO_CHU_MAC_DINH),
     matDo: doc(khoa(BASE_MAT_DO, taiKhoan), "gon"),
     beRong: doc(khoa(BASE_BE_RONG, taiKhoan), "toi-da"),
   };
@@ -106,13 +113,13 @@ function useCaiDat(taiKhoan?: string) {
   const kMatDo = khoa(BASE_MAT_DO, taiKhoan);
   const kBeRong = khoa(BASE_BE_RONG, taiKhoan);
 
-  const [coChu, setCoChu] = React.useState(() => doc(kCoChu, "100"));
+  const [coChu, setCoChu] = React.useState(() => doc(kCoChu, CO_CHU_MAC_DINH));
   const [matDo, setMatDo] = React.useState(() => doc(kMatDo, "gon"));
   const [beRong, setBeRong] = React.useState(() => doc(kBeRong, "toi-da"));
 
   // Đổi tài khoản → nạp lại state từ bucket của người mới rồi áp ngay.
   React.useEffect(() => {
-    setCoChu(doc(kCoChu, "100"));
+    setCoChu(doc(kCoChu, CO_CHU_MAC_DINH));
     setMatDo(doc(kMatDo, "gon"));
     setBeRong(doc(kBeRong, "toi-da"));
     apDungCaiDatHienThi(taiKhoan);
@@ -139,7 +146,7 @@ function useCaiDat(taiKhoan?: string) {
       apBeRong(id);
     },
     datLai: () => {
-      setCoChu("100");
+      setCoChu(CO_CHU_MAC_DINH);
       setMatDo("gon");
       setBeRong("toi-da");
       localStorage.removeItem(kCoChu);
@@ -188,10 +195,11 @@ export function CoChuNhanh({
           onClick={() => doiCoChu(m.id)}
           className={cn(
             "min-h-10 min-w-10 rounded-md px-2 font-semibold transition-colors",
-            i === 0 && "text-sm",
-            i === 1 && "text-base",
-            i === 2 && "text-lg",
-            i === 3 && "text-xl",
+            i === 0 && "text-xs",
+            i === 1 && "text-sm",
+            i === 2 && "text-base",
+            i === 3 && "text-lg",
+            i === 4 && "text-xl",
             coChu === m.id
               ? "bg-primary text-primary-foreground"
               : "text-foreground hover:bg-muted"

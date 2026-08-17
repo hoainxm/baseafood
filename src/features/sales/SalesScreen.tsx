@@ -16,6 +16,7 @@ import {
 } from "@/lib/catalogRepo";
 import {
   Badge,
+  ChuThichBatBuoc,
   Button,
   ChoiceGroup,
   Combobox,
@@ -671,6 +672,7 @@ export default function BanHangScreen() {
           {phien && (
             <div className="space-y-6 py-2">
               <ErrorSummary loi={loiPhien} />
+              <ChuThichBatBuoc />
 
               <div className="grid gap-6 sm:grid-cols-2">
                 <DateField
@@ -913,6 +915,7 @@ export default function BanHangScreen() {
           {dang && (
             <div className="space-y-6 py-2">
               <ErrorSummary loi={loi} />
+              <ChuThichBatBuoc />
 
               <Combobox
                 label="Mặt hàng"

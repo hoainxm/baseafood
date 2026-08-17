@@ -34,6 +34,7 @@ import {
 import { calculateBalancing } from "@/lib/balancingCalc";
 import {
   Badge,
+  ChuThichBatBuoc,
   Button,
   Card,
   ChoiceGroup,
@@ -286,6 +287,7 @@ export default function CanDoiScreen() {
           {dang && (
             <div className="space-y-6 py-2">
               <ErrorSummary loi={loi} />
+              <ChuThichBatBuoc />
 
               <Combobox
                 label="Loại nguyên liệu"
@@ -753,6 +755,7 @@ function KhoiNLVao({
           {dang && (
             <>
               <ErrorSummary loi={loi} />
+              <ChuThichBatBuoc />
               <ChoiceGroup
                 label="Nhóm"
                 value={dang.groupName}
@@ -947,6 +950,7 @@ function KhoiPheLieu({
           {dang && (
             <>
               <ErrorSummary loi={loi} />
+              <ChuThichBatBuoc />
               <Field label="Loại phế liệu" required>
                 <Input
                   value={dang.name}
@@ -1197,6 +1201,7 @@ function KhoiTP({
           {dang && (
             <>
               <ErrorSummary loi={loi} />
+              <ChuThichBatBuoc />
               <Combobox
                 label="Mặt hàng"
                 required

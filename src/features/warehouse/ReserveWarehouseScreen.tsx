@@ -9,6 +9,7 @@ import { useExportItems, useProducts, useWipProductions } from "@/lib/catalogRep
 import { tinhTon, type LoTon } from "@/lib/inventory";
 import {
   Badge,
+  ChuThichBatBuoc,
   Button,
   Combobox,
   Dialog,
@@ -214,7 +215,7 @@ export default function KhoDuTruScreen() {
                       item.isOverCapacity
                         ? "bg-destructive"
                         : item.percentage > 85
-                        ? "bg-amber-500"
+                        ? "bg-warning"
                         : "bg-primary"
                     }`}
                     style={{ width: `${Math.min(100, item.percentage)}%` }}
@@ -311,6 +312,7 @@ export default function KhoDuTruScreen() {
           {duyet && (
             <div className="space-y-6 py-2">
               <ErrorSummary loi={loi} />
+              <ChuThichBatBuoc />
               <Combobox
                 label="Kho (phòng đông)"
                 required

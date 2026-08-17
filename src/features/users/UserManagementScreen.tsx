@@ -11,6 +11,7 @@ import { hoTenToUsername } from "@/lib/username";
 import type { KetQuaDangNhap } from "@/lib/auth";
 import {
   Badge,
+  ChuThichBatBuoc,
   Button,
   Dialog,
   DialogContent,
@@ -243,6 +244,7 @@ export default function QuanLyNguoiDungScreen({
           {tao && (
             <div className="space-y-6 py-2">
               <ErrorSummary loi={loiTao} />
+              <ChuThichBatBuoc />
               <Field label="Họ tên" required>
                 <Input
                   value={tao.fullName}

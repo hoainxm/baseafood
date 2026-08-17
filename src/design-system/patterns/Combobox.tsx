@@ -98,18 +98,20 @@ export function Combobox({
   };
 
   return (
-    <div className={cn("space-y-2", className)}>
+    /* min-w-0: ô này thường nằm trong grid/flex — mặc định min-width:auto lấy
+       theo chữ dài nhất trong nút, ở cỡ chữ 130% sẽ đẩy rộng cả trang. */
+    <div className={cn("min-w-0 space-y-2", className)}>
       {/* min-h-9 = chiều cao nút ⓘ: hàng nhãn luôn cao bằng nhau dù có/không ⓘ,
          hai ô cùng lưới không lệch. */}
       <div className="flex min-h-9 flex-wrap items-center gap-2">
-        <Label htmlFor={id}>{label}</Label>
-        {anNhanBatBuoc ? null : required ? (
-          <span className="rounded bg-secondary px-2 py-0.5 text-sm font-semibold text-secondary-foreground">
-            Bắt buộc
-          </span>
-        ) : (
-          <span className="text-sm text-muted-foreground">(không bắt buộc)</span>
-        )}
+        <Label htmlFor={id}>
+          {label}
+          {!anNhanBatBuoc && required && (
+            <span aria-hidden className="ml-1 font-bold text-destructive">
+              *
+            </span>
+          )}
+        </Label>
         {info && <InfoTip label={label}>{info}</InfoTip>}
       </div>
       {hint && <p className="text-base text-muted-foreground">{hint}</p>}
@@ -130,6 +132,7 @@ export function Combobox({
               role="combobox"
               aria-expanded={open}
               aria-invalid={error ? true : undefined}
+              aria-required={required && !anNhanBatBuoc ? true : undefined}
               className="h-12 min-w-0 flex-1 justify-between border-2 px-3.5 text-base font-medium"
             >
               <span className={cn("truncate", !daChon && "text-muted-foreground")}>

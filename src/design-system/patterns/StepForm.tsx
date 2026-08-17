@@ -1,6 +1,7 @@
 import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { ErrorSummary, type LoiNhap } from "./ErrorSummary";
+import { ChuThichBatBuoc, useCoOBatBuoc } from "./Field";
 import { cn } from "@/lib/utils";
 import { ArrowLeft, ArrowRight, Check } from "lucide-react";
 
@@ -56,6 +57,10 @@ export function StepForm({
     setI((v) => Math.max(0, v - 1));
   };
 
+  // Bước nào có ô bắt buộc thì bước đó mới hiện chú thích dấu *.
+  const thanRef = React.useRef<HTMLDivElement>(null);
+  const coOBatBuoc = useCoOBatBuoc(thanRef, [i]);
+
   return (
     <div className="space-y-6">
       {/* Thanh tiến độ — luôn cho biết đang ở đâu và còn bao xa */}
@@ -99,7 +104,10 @@ export function StepForm({
         )}
       </div>
 
-      <div className="space-y-6">{laXemLai ? xemLai : buoc!.noiDung}</div>
+      <div ref={thanRef} className="space-y-6">
+        {coOBatBuoc && <ChuThichBatBuoc />}
+        {laXemLai ? xemLai : buoc!.noiDung}
+      </div>
 
       <div className="flex flex-col-reverse gap-3 border-t border-border pt-5 sm:flex-row sm:justify-between">
         <Button

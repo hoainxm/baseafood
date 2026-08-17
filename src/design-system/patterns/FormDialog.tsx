@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { ChuThichBatBuoc, useCoOBatBuoc } from "./Field";
 
 /**
  * FormDialog — khung dialog/form CHUẨN cho toàn hệ thống.
@@ -39,6 +40,7 @@ export function FormDialog({
   icon: Icon,
   rong = "rong",
   chan,
+  coOBatBuoc = false,
   children,
 }: {
   open?: boolean;
@@ -51,8 +53,16 @@ export function FormDialog({
   rong?: keyof typeof RONG;
   /** Nút hành động ở chân (VD Hủy / Lưu). Bỏ trống ⇒ không có chân. */
   chan?: React.ReactNode;
+  /** Ép hiện chú thích dấu * kể cả khi không dò thấy `aria-required`. */
+  coOBatBuoc?: boolean;
   children: React.ReactNode;
 }) {
+  /* Tự dò ô bắt buộc trong thân form (`aria-required`) rồi mới hiện chú thích
+     dấu * — không phải đi bật cờ ở từng chỗ gọi, và không bao giờ hiện thừa ở
+     dialog chỉ để xem. */
+  const thanRef = React.useRef<HTMLDivElement>(null);
+  const doThayBatBuoc = useCoOBatBuoc(thanRef, [open]);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
@@ -82,7 +92,11 @@ export function FormDialog({
         </div>
 
         {/* Thân — cuộn riêng */}
-        <div className="scroll-nice min-h-0 flex-1 overflow-y-auto px-6 py-5">
+        <div
+          ref={thanRef}
+          className="scroll-nice min-h-0 flex-1 overflow-y-auto px-6 py-5"
+        >
+          {(coOBatBuoc || doThayBatBuoc) && <ChuThichBatBuoc className="mb-4" />}
           {children}
         </div>
 

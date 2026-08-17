@@ -86,14 +86,14 @@ export function BieuDoGio({ data }: { data: DiemGio[] }) {
       <svg
         viewBox={`0 0 ${W} ${H}`}
         width="100%"
-        className="block min-w-[640px]"
+        className="block min-w-[820px]"
         role="img"
         aria-label="Sản lượng theo giờ, thực tế so với kế hoạch"
       >
         {[0, 0.25, 0.5, 0.75, 1].map((f) => (
           <g key={f}>
             <line x1={pad.l} x2={W - pad.r} y1={y(max * f)} y2={y(max * f)} stroke="var(--border)" strokeWidth="1" />
-            <text x={pad.l - 10} y={y(max * f) + 5} textAnchor="end" fontFamily="var(--font-mono)" fontSize="13" fill="var(--muted-foreground)">
+            <text x={pad.l - 10} y={y(max * f) + 5} textAnchor="end" fontFamily="var(--font-mono)" fontSize="16" fill="var(--muted-foreground)">
               {(max * f).toLocaleString("vi-VN")}
             </text>
           </g>
@@ -106,7 +106,7 @@ export function BieuDoGio({ data }: { data: DiemGio[] }) {
         ))}
         {data.map((d, i) =>
           i % 2 === 0 ? (
-            <text key={d.gio} x={x(i)} y={H - 14} textAnchor="middle" fontFamily="var(--font-sans)" fontSize="13" fill="var(--muted-foreground)">
+            <text key={d.gio} x={x(i)} y={H - 14} textAnchor="middle" fontFamily="var(--font-sans)" fontSize="16" fill="var(--muted-foreground)">
               {d.gio}
             </text>
           ) : null

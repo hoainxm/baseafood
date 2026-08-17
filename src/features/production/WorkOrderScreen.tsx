@@ -557,15 +557,18 @@ export default function ManLenhSX() {
             <thead>
               <tr>
                 <th className="h-14 w-14 border-b border-border bg-muted px-4 text-center font-semibold">
-                  <input
-                    type="checkbox"
-                    aria-label="Chọn tất cả lệnh trên trang này"
-                    checked={tatCaChon}
-                    onChange={() =>
-                      setChon(tatCaChon ? [] : hienThi.map((r) => r.id))
-                    }
-                    className="size-5 cursor-pointer accent-primary"
-                  />
+                  {/* Vùng chạm phải ≥ size-tap — ô tick 20px trần là quá nhỏ. */}
+                  <label className="inline-flex size-tap cursor-pointer items-center justify-center">
+                    <input
+                      type="checkbox"
+                      aria-label="Chọn tất cả lệnh trên trang này"
+                      checked={tatCaChon}
+                      onChange={() =>
+                        setChon(tatCaChon ? [] : hienThi.map((r) => r.id))
+                      }
+                      className="size-icon-sm cursor-pointer accent-primary"
+                    />
+                  </label>
                 </th>
                 {["Mã LSX", "Sản phẩm", "Khách hàng"].map((h) => (
                   <Th key={h}>{h}</Th>
@@ -594,17 +597,19 @@ export default function ManLenhSX() {
                 return (
                   <tr key={r.id} className={cn("border-b border-border", nen)}>
                     <td className="h-14 px-4 text-center">
-                      <input
-                        type="checkbox"
-                        aria-label={`Chọn lệnh ${r.id}`}
-                        checked={daChon}
-                        onChange={() =>
-                          setChon((cs) =>
-                            daChon ? cs.filter((x) => x !== r.id) : [...cs, r.id]
-                          )
-                        }
-                        className="size-5 cursor-pointer accent-primary"
-                      />
+                      <label className="inline-flex size-tap cursor-pointer items-center justify-center">
+                        <input
+                          type="checkbox"
+                          aria-label={`Chọn lệnh ${r.id}`}
+                          checked={daChon}
+                          onChange={() =>
+                            setChon((cs) =>
+                              daChon ? cs.filter((x) => x !== r.id) : [...cs, r.id]
+                            )
+                          }
+                          className="size-icon-sm cursor-pointer accent-primary"
+                        />
+                      </label>
                     </td>
                     <Td className="font-mono font-semibold">{r.id}</Td>
                     <Td className="font-medium">{r.sp}</Td>

@@ -11,6 +11,7 @@ import { uid } from "@/lib/db";
 import { useProductionLocks, useMaterialTypes, useProducts, useWipProductions } from "@/lib/catalogRepo";
 import {
   Badge,
+  ChuThichBatBuoc,
   Button,
   Combobox,
   DateField,
@@ -539,6 +540,7 @@ export default function SanXuatBTPScreen() {
           {phien && (
             <div className="space-y-6 py-2">
               <ErrorSummary loi={loiPhien} />
+              <ChuThichBatBuoc />
 
               {chotDangGhi && (
                 <p className="flex items-start gap-3 rounded-lg bg-accent px-4 py-3 text-base text-accent-foreground">
@@ -689,6 +691,7 @@ export default function SanXuatBTPScreen() {
           {sua && (
             <div className="space-y-6 py-2">
               <ErrorSummary loi={loiSua} />
+              <ChuThichBatBuoc />
               <div className="grid gap-6 sm:grid-cols-2">
                 <DateField
                   label="Ngày ghi sổ"
@@ -797,6 +800,7 @@ export default function SanXuatBTPScreen() {
             </DialogDescription>
           </DialogHeader>
           <ErrorSummary loi={loiChot} />
+          <ChuThichBatBuoc />
           <Field label="Lý do mở lại" required>
             <Input
               value={lyDoMoLai}

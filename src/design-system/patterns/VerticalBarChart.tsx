@@ -119,7 +119,7 @@ export function BieuDoCotDoc({
               }}
             >
               <div
-                className="absolute right-0 -translate-y-1/2 bg-warning text-warning-foreground text-[10px] sm:text-xs font-bold px-2.5 py-1 rounded shadow-md border border-warning select-none whitespace-nowrap"
+                className="absolute right-0 -translate-y-1/2 select-none whitespace-nowrap rounded border border-warning bg-warning px-2.5 py-1 text-sm font-bold text-warning-foreground shadow-md"
                 style={{ bottom: `${tbPct}%` }}
               >
                 TB: {dinhDang(Math.round(tb))}

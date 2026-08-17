@@ -414,7 +414,10 @@ export default function ManBaoCao() {
           </p>
         </div>
         <div className="scroll-nice w-full max-w-full overflow-x-auto rounded-xl ring-1 ring-foreground/10">
-          <table className="w-full min-w-[1180px] border-collapse text-base">
+          {/* Báo cáo kiểu Excel: giữ bảng rộng + CUỘN NGANG có chủ đích, khoá
+              cột đầu để không lạc dòng. Không đổi sang thẻ như RecordTable vì
+              người dùng cần đối chiếu nhiều cột số cùng lúc. */}
+          <table className="cot-dau-dinh w-full min-w-[1180px] border-collapse text-base">
             <thead>
               <tr>
                 <th className="h-14 w-14 border-b border-border bg-muted" />

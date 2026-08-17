@@ -82,15 +82,15 @@ function KhoiNhan({
   return (
     <>
       <div className="flex flex-wrap items-center gap-2">
-        <Label htmlFor={htmlFor}>{label}</Label>
+        <Label htmlFor={htmlFor}>
+          {label}
+          {!anNhanBatBuoc && required && (
+            <span aria-hidden className="ml-1 font-bold text-destructive">
+              *
+            </span>
+          )}
+        </Label>
         {info && <InfoTip label={label}>{info}</InfoTip>}
-        {anNhanBatBuoc ? null : required ? (
-          <span className="rounded bg-secondary px-2 py-0.5 text-sm font-semibold text-secondary-foreground">
-            Bắt buộc
-          </span>
-        ) : (
-          <span className="text-sm text-muted-foreground">(không bắt buộc)</span>
-        )}
       </div>
       {hint && <p className="text-base text-muted-foreground">{hint}</p>}
       {error && (
@@ -112,6 +112,7 @@ function NutLich({
   min,
   max,
   id,
+  batBuoc,
 }: {
   value: string;
   onChange: (iso: string) => void;
@@ -121,6 +122,8 @@ function NutLich({
   /** Giới hạn: không cho chọn sau ngày này (ISO) */
   max?: string;
   id?: string;
+  /** Đánh dấu bắt buộc cho trình đọc màn hình + để form dò ra ô bắt buộc. */
+  batBuoc?: boolean;
 }) {
   const [open, setOpen] = React.useState(false);
   const d = isoToDate(value);
@@ -137,6 +140,7 @@ function NutLich({
           id={id}
           data-slot="date-trigger"
           variant="outline"
+          aria-required={batBuoc ? true : undefined}
           className="h-12 w-full justify-start border-2 px-3.5 text-base font-medium"
         >
           <CalendarDays className="shrink-0 text-muted-foreground" />
@@ -211,7 +215,7 @@ export function DateField({
 }) {
   const id = React.useId();
   return (
-    <div className={cn("space-y-2", className)}>
+    <div className={cn("min-w-0 space-y-2", className)}>
       <KhoiNhan
         label={label}
         required={required}
@@ -228,6 +232,7 @@ export function DateField({
             value={value}
             onChange={onChange}
             chuMacDinh="Bấm để chọn ngày"
+            batBuoc={required && !anNhanBatBuoc}
           />
         </div>
         {choPhepXoa && value && (
@@ -287,7 +292,7 @@ export function DateRangeField({
     startDate && endDate ? ngayTrongKhoang(startDate, endDate).length : 0;
 
   return (
-    <div className={cn("space-y-2", className)}>
+    <div className={cn("min-w-0 space-y-2", className)}>
       <KhoiNhan
         label={label}
         required={required}

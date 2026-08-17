@@ -66,18 +66,16 @@ export function ChoiceGroup({
   }
 
   return (
-    <fieldset className={cn("space-y-2", className)}>
+    <fieldset className={cn("min-w-0 space-y-2", className)}>
       <div className="flex flex-wrap items-center gap-2">
         <legend className="text-base leading-snug font-semibold text-foreground">
           {label}
+          {!anNhanBatBuoc && required && (
+            <span aria-hidden className="ml-1 font-bold text-destructive">
+              *
+            </span>
+          )}
         </legend>
-        {anNhanBatBuoc ? null : required ? (
-          <span className="rounded bg-secondary px-2 py-0.5 text-sm font-semibold text-secondary-foreground">
-            Bắt buộc
-          </span>
-        ) : (
-          <span className="text-sm text-muted-foreground">(không bắt buộc)</span>
-        )}
       </div>
       {hint && <p className="text-base text-muted-foreground">{hint}</p>}
       {error && (

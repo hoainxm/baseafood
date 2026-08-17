@@ -25,10 +25,20 @@ src/features/*                 ← màn nghiệp vụ
 4. **Vùng chạm ≥ 44px**, mặc định 48px, hành động chính 56px.
 5. **Không có nút chỉ-icon** trong màn nghiệp vụ. Icon luôn kèm chữ.
 6. **Mọi ô nhập phải bọc `Field` / `NumberField` / `Combobox` / `DateField`.**
-   Nhãn luôn hiện. Placeholder không bao giờ thay nhãn.
+   Nhãn luôn hiện. Placeholder không bao giờ thay nhãn. Ô bắt buộc đánh dấu
+   **`*` đỏ sau nhãn**; ô không bắt buộc không ghi gì. `*` là `aria-hidden`,
+   thông tin bắt buộc đi qua `aria-required` trên chính ô — `FormDialog` và
+   `StepForm` dò thuộc tính này để tự hiện `ChuThichBatBuoc` ("Ô có dấu * là
+   bắt buộc"), không phải bật cờ tay.
 7. **Nút Lưu không bao giờ `disabled`.** Thiếu dữ liệu thì bấm ra `ErrorSummary`.
 8. **Mọi thao tác ghi dữ liệu phải bắn `notify`**, xóa phải qua `ConfirmDelete`
    và có nút Hoàn tác.
+8b. **Thao tác hệ trọng KHÔNG phải xóa đi qua `XacNhan`** — đúng ba nhóm:
+    mất việc đang làm (đăng xuất, bỏ dữ liệu vừa nạp) · ghi đè dữ liệu đang có ·
+    khóa sổ hay đổi trạng thái khó quay đầu (chốt ngày, lệnh xuất).
+    **Lưu thường ngày KHÔNG hỏi** — tổ trưởng ghi 30 chuyến/ngày mà lần nào cũng
+    hỏi thì họ bấm Đồng ý theo phản xạ, hộp xác nhận mất tác dụng đúng lúc cần.
+    Lưu thường dùng toast + Hoàn tác.
 9. **Màu không bao giờ là tín hiệu duy nhất.** Luôn kèm icon hoặc chữ.
 10. **Danh mục thay nhập tự do.** Đại lý / loại NL / mặt hàng / khách hàng đều
     chọn qua `Combobox` (có tạo mới tại chỗ), không gõ tay.
@@ -44,10 +54,96 @@ src/features/*                 ← màn nghiệp vụ
     trần (không "Chỉ xem…", không "… dòng", không `:`); nút = động từ đứng đầu.
     Chi tiết + before→after: [`noi-dung-va-label.md`](noi-dung-va-label.md).
 
-**Ngoại lệ luật (bản in theo mẫu giấy):** `src/features/BangCanDoi.tsx` và
-`src/features/PhieuNLNgay.tsx` cố tình dùng chữ nhỏ, chữ hoa, màu slate cứng để
+**Ngoại lệ luật (bản in theo mẫu giấy):** `src/features/balancing/BalancingTable.tsx` và
+`src/features/imports/DailyImportInvoice.tsx` cố tình dùng chữ nhỏ, chữ hoa, màu slate cứng để
 khớp khổ A4. Đừng áp luật cỡ chữ / màu / sentence case vào hai file đó, và cũng
 đừng lấy chúng làm mẫu cho màn mới.
+
+## Quy chuẩn mobile
+
+Thiết bị đích chỉ có **HAI**: điện thoại và web desktop. **Không** thiết kế
+riêng cho tablet — vùng 768–1024px ăn luật desktop.
+
+### 1. Một mốc duy nhất
+
+| Tầng | Bề rộng | Viết thế nào |
+|---|---|---|
+| Điện thoại | < 768px | **mặc định**, không tiền tố |
+| Desktop | ≥ 768px | tiền tố `md:` |
+
+**Cấm mốc thứ ba cho bố cục khung.** Không `sm:` (640) — nó tạo một tầng
+"tablet" mà ta không hề thiết kế, và là nguồn gốc của phần lớn lỗi vỡ cũ.
+`lg:` / `xl:` chỉ dùng để **chia thêm cột** trong lưới đã chạy tốt ở cả hai mốc
+(`grid gap-4 md:grid-cols-2 lg:grid-cols-4`).
+
+### 2. Thang chạm và icon — một nguồn
+
+| Dùng cho | Class | Giá trị |
+|---|---|---|
+| Nút icon vuông | `size-tap` | 44px |
+| Nút có chữ | `min-h-11` | 44px |
+| Icon trong nút chạm | `size-icon` | 24px |
+| Icon phụ trong dòng chữ | `size-icon-sm` | 20px |
+
+Định nghĩa ở `tokens.css` (`--size-tap`, `--size-icon`, `--size-icon-sm`). Tất
+cả đều **rem** nên phóng/thu ĐỒNG BỘ khi đổi cỡ chữ 100→130%. Viết `size-11` +
+`size-6` rời rạc là cách cũ: hai chỗ, đổi một chỗ là lệch tỉ lệ.
+⚠️ Tailwind chỉ sinh `size-tap` từ `--size-*`; **không có `h-tap`** — nút có chữ
+dùng `min-h-11`.
+
+### 3. Ngân sách ngang của header thuộc về TIÊU ĐỀ
+
+- Cụm trái (menu · logo · tiêu đề) = `min-w-0 flex-1`. Cụm phải = `shrink-0`
+  nhưng **phải ít nút**.
+- Điện thoại chỉ giữ: `☰` · `NutTrangThai` (+ `NutHuongDan` nếu trang có).
+  Đổi ca · thông báo · giao diện · tài khoản · đăng xuất nằm ở **chân drawer**.
+- Lý do: 6 nút icon ở cỡ chữ 130% = 407px > màn 390px → tiêu đề bị bóp còn 0px
+  và cả trang cuộn ngang.
+
+### 4. Điều hướng: DỌC, gom nhóm, một cây dùng chung
+
+`AppShell` có **một** cây nav (`CayNav`) dựng từ `KIT_NAV` + `NHOM_NAV`:
+desktop hiện làm sidebar, điện thoại hiện làm **drawer trượt trái**. Thêm màn
+mới ⇒ thêm 1 dòng vào `KIT_NAV` **và** xếp id vào đúng nhóm trong `NHOM_NAV` —
+quên bước sau thì mục rơi vào nhóm "Khác".
+
+Không dùng bottom-tab cuộn ngang: 14 mục nhét vào thanh 390px thì 7 mục nằm
+ngoài màn mà người dùng không biết là còn.
+
+### 5. Bảng: mặc định đổi sang THẺ
+
+| Loại bảng | Cách làm |
+|---|---|
+| Danh sách bản ghi (mặc định) | `RecordTable` — desktop ra bảng, điện thoại ra thẻ. Đánh dấu `chinh` cho cột tiêu đề thẻ, `anTrenDienThoai` cho cột phụ |
+| Báo cáo kiểu Excel, phải đối chiếu nhiều cột số | Giữ bảng rộng + `overflow-x-auto` + **`cot-dau-dinh`** trên `<table>` để khoá cột đầu |
+| Bản in A4 | Ngoại lệ, giữ nguyên bố cục giấy — không responsive hoá |
+
+**Cấm** viết `<table className="min-w-[1120px]">` tay trong màn mới rồi bọc
+`overflow-x-auto` và coi là xong.
+
+### 6. Ba cái bẫy làm vỡ trang ở cỡ chữ 130%
+
+1. **Ô lưới không co**: con của `grid`/`flex` mặc định `min-width:auto` = rộng
+   theo chữ dài nhất. Thêm `min-w-0` (hoặc `[&>*]:min-w-0` trên lưới).
+   `Field` · `Combobox` · `DateField` · `ChoiceGroup` đã có sẵn `min-w-0`.
+2. **Cụm nút không xuống dòng**: mọi hàng nút phải có `flex-wrap`.
+3. **Biểu đồ / SVG có bề rộng tối thiểu**: bọc `overflow-x-auto` và đặt
+   `min-w` = đúng `W` của `viewBox`. Thu nhỏ SVG là thu nhỏ luôn chữ trục
+   (680/900 → nhãn 16px còn 12px).
+
+### 7. Checklist màn mới PHẢI qua
+
+- [ ] 390px: `document.documentElement.scrollWidth === 390` — trang **không**
+      cuộn ngang (chỉ vùng bảng/biểu đồ được cuộn, có chủ đích)
+- [ ] 390px + cỡ chữ **130%** + mật độ **Gọn**: vẫn không cuộn ngang, không đè chữ
+- [ ] Mọi nút / ô tick chạm được ≥ 44×44px (ô tick nhỏ thì bọc `<label>` `size-tap`)
+- [ ] Không chữ nào nhỏ hơn **`text-sm`** (16px ở thang gốc; người dùng để cỡ
+      chữ 90% thì mọi thứ cùng nhỏ theo — đo bằng TOKEN, không bằng px tuyệt
+      đối). `text-xs` = 15px chỉ cho chip/badge phụ chú, không cho nội dung.
+      Không `fontSize` cứng trong SVG dưới 16
+- [ ] Bảng dài đã ra thẻ trên điện thoại (hoặc có `cot-dau-dinh` nếu là báo cáo Excel)
+- [ ] Chỉ dùng `md:` cho bố cục khung; không thêm `sm:`
+- [ ] Màn mới đã vào `KIT_NAV` **và** `NHOM_NAV`
 
 ## Bảng chọn component
 
@@ -62,6 +158,7 @@ khớp khổ A4. Đừng áp luật cỡ chữ / màu / sentence case vào hai f
 | Danh sách bản ghi | `RecordTable` — truyền `sapXep` cho cột để bấm tiêu đề sắp xếp, truyền `timKiem` để hiện ô tìm |
 | Danh mục có Thêm/Sửa/Xóa/Tìm | `DanhMucCrud` |
 | Xóa bất kỳ thứ gì | `ConfirmDelete` |
+| Thao tác hệ trọng không phải xóa (đăng xuất · chốt sổ · ghi đè · lệnh xuất) | `XacNhan` — nêu đích danh việc sắp làm + hệ quả, nút an toàn đứng trước |
 | Form > 5 ô, nhập không thường xuyên | `StepForm` |
 | Form > 5 ô, nhập lặp nhiều lần/ngày | `Dialog` + nhóm ô, phần phụ gập lại |
 | Báo lỗi cả form | `ErrorSummary` (đầu form, có link nhảy tới ô) |
@@ -73,38 +170,41 @@ khớp khổ A4. Đừng áp luật cỡ chữ / màu / sentence case vào hai f
 | Các con số bối cảnh/tổng | `ThongKe` (lưới thẻ KPI: nhãn nhỏ + số TO + icon màu) — sinh động hơn nhồi một dòng. `ContextBar` chỉ dùng cho thanh dính "đang xem ngày/xưởng nào" trong màn nhập liệu. |
 | Biểu đồ trong Báo cáo | `BieuDoCot` — thanh NGANG + đường trung bình nét đứt, một màu thương hiệu, thuần HTML + token (ăn theo cỡ chữ). KHÔNG thêm thư viện chart. |
 
-## Nút toàn cục trên header (AppLayout)
+## Nút toàn cục trên header (`features/shared/AppShell.tsx`)
 
-Gom mọi thứ toàn cục thành **nút icon 44px** ở góc phải header, luôn hiện kể cả điện thoại:
+Nút toàn cục là **nút icon `size-tap`** ở góc phải header. Trên **desktop** hiện
+đủ; trên **điện thoại** header chỉ giữ `NutTrangThai` (+ `NutHuongDan` nếu trang
+có) — phần còn lại nằm ở **chân drawer**. Lý do: ngân sách ngang của header
+thuộc về tiêu đề màn, xem § Quy chuẩn mobile.
 
 | Component | Vai trò |
 |---|---|
 | `NutGiaoDien` | Icon 🎨 → `FormDialog` chứa `CaiDatHienThi`. Nhận `taiKhoan` để **lưu theo người dùng**. Có **draft**: xem trước live, **Lưu** mới giữ, **Hủy**/đóng khôi phục ảnh chụp (`docCaiDatHienThi`/`ghiCaiDatHienThi`). |
 | `NutTrangThai` | Icon theo màu store `ketNoi`. Popover chi tiết + nút **Thử kết nối lại** (`probeKetNoi`). |
-| `NutHuongDan` | Icon "?" → hộp hướng dẫn của trang. Nội dung lấy từ `features/shared/huongDan.tsx`, chỉ hiện ở trang có trong registry. |
+| `NutHuongDan` | Icon "?" → hộp hướng dẫn của trang. Nội dung lấy từ `features/shared/guideContent.tsx`, chỉ hiện ở trang có trong registry. |
 
 ## Trang duyệt + cấu hình
 
 `Bộ giao diện` (`src/design-system/kit/KitPage.tsx`) — trang demo component, vào
 bằng URL `/kit` (đã gỡ khỏi sidebar), desktop-only.
 
-**Cài đặt hiển thị** (`patterns/CaiDatHienThi.tsx`) giờ mở từ nút `NutGiaoDien`
+**Cài đặt hiển thị** (`patterns/DisplaySettings.tsx`) giờ mở từ nút `NutGiaoDien`
 trên header. Áp ngay và **nhớ theo từng tài khoản**:
 
 | Cấu hình | Cách áp | Giá trị |
 |---|---|---|
-| Cỡ chữ | `--app-font-scale` trên `<html>` | 100 / 110 / 120 / 130 % |
+| Cỡ chữ | `--app-font-scale` trên `<html>` | **90 (mặc định)** / 100 / 110 / 120 / 130 % |
 | Mật độ | `data-density` trên `<html>` | thoáng 48px · vừa 44px · gọn 40px |
 | Bề rộng nội dung | `--app-content-width` | 64rem / 80rem / 100% |
 
 Khóa localStorage theo username: `bsf.<username>.<coChu|matDo|beRong>`; chưa đăng
 nhập ⇒ bucket mặc định `bsf.coChu` (tương thích ngược). Đổi tài khoản →
-`AppLayout` gọi `apDungCaiDatHienThi(username)` nạp lại. (`CoChuNhanh` — nút cỡ
-chữ nhanh cũ — vẫn còn trong file nhưng không còn gắn trên header.)
+`ShellLayout` trong `App.tsx` gọi `apDungCaiDatHienThi(username)` nạp lại.
+(`CoChuNhanh` — nút cỡ chữ nhanh cũ — vẫn còn trong file nhưng không còn gắn
+trên header.)
 
-> Hai thanh header (thanh bên và thanh nội dung) dùng chung hằng `CAO_HEADER`
-> trong `AppLayout.tsx`. Đổi chiều cao thì đổi ở đó, đừng đặt riêng từng bên —
-> lệch một bên là cả trang trông vênh.
+> Đầu thanh bên và header nội dung cùng cao `h-20` trong `AppShell.tsx`. Đổi
+> chiều cao thì đổi CẢ HAI, lệch một bên là cả trang trông vênh.
 
 ## Thêm component shadcn mới
 
@@ -128,6 +228,6 @@ ngược lên thư mục cha và đụng junction tương thích cũ bị khóa 
 - [ ] Không còn `slate-400` / `slate-300` làm màu chữ
 - [ ] Mọi nút bấm được ≥ 44×44px
 - [ ] Tab được hết màn bằng bàn phím, focus ring luôn thấy
-- [ ] Bật cỡ chữ `130%` + mật độ `Gọn` — bố cục không vỡ, không đè chữ
 - [ ] Dropdown danh sách dài: cuộn được và THẤY thanh cuộn
-- [ ] Thu màn còn 390px — bảng đã đổi sang thẻ, không cuộn ngang
+- [ ] **Chạy hết checklist ở § Quy chuẩn mobile · mục 7** (390px · 130% + Gọn ·
+      vùng chạm · bảng ra thẻ · chỉ dùng `md:`)

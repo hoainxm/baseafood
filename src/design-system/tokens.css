@@ -42,13 +42,26 @@
   --size-control: 3rem; /* 48px — mặc định */
   --size-control-lg: 3.5rem; /* 56px — hành động chính / mobile */
   --size-row: 3.5rem; /* 56px — dòng bảng */
+
+  /* --- THANG CHẠM & ICON — MỘT nguồn cho cả nút icon lẫn icon bên trong ---
+     Luật: nút icon dùng `size-tap`, icon bên trong dùng `size-icon`. Hai giá trị
+     này cùng đơn vị rem nên phóng/thu ĐỒNG BỘ khi đổi cỡ chữ (100→130%).
+     Viết `size-11` + `size-6` rời rạc là cách cũ — hai chỗ, dễ lệch.
+     Tailwind chỉ sinh tiện ích `size-*` từ namespace này — KHÔNG có `h-tap`.
+     Nút có chữ (cao 44px, rộng theo nội dung) dùng `min-h-11`. */
+  --size-tap: 2.75rem; /* 44px — `size-tap` cho nút icon vuông (WCAG 2.2 AA) */
+  --size-icon: 1.5rem; /* 24px — icon trong nút chạm */
+  --size-icon-sm: 1.25rem; /* 20px — icon phụ nằm trong dòng chữ */
 }
 
 :root {
   color-scheme: light;
 
-  /* Cỡ chữ gốc — TextSizeControl ghi đè bằng inline style trên <html>.
-     100% = 16px browser → text-base = 18px. */
+  /* Cỡ chữ gốc — CaiDatHienThi ghi đè bằng inline style trên <html>.
+     100% = 16px browser → text-base = 18px.
+     MẶC ĐỊNH thực tế của app là 90% (xem CO_CHU_MAC_DINH trong
+     patterns/DisplaySettings.tsx) ⇒ text-base ≈ 16px. Thang token giữ nguyên,
+     người mắt kém kéo lên 110–130% là về đúng cỡ cũ. */
   --app-font-scale: 100%;
 
   /* Bề rộng vùng nội dung — đổi trong "Bộ giao diện" */
@@ -139,6 +152,7 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-overlay: var(--overlay);
 
   /* Trạng thái MES → tiện ích Tailwind: bg-status-running, text-status-stopped-ink… */
   --color-status-running: var(--status-running);
@@ -236,6 +250,35 @@
 /* Số căn cột thẳng hàng — bắt buộc cho mọi cột kg / tiền */
 @utility tnum {
   font-variant-numeric: tabular-nums;
+}
+
+/* ============================================================
+   MOBILE — MỘT MỐC DUY NHẤT
+   ------------------------------------------------------------
+   Thiết bị đích chỉ có HAI: điện thoại và web desktop.
+     • điện thoại : < 768px  → mặc định, viết KHÔNG tiền tố
+     • desktop    : ≥ 768px  → tiền tố `md:`
+   Vùng 768–1024 (tablet) KHÔNG được thiết kế riêng — nó ăn luật desktop.
+   CẤM đẻ mốc thứ ba: không `sm:`, không `lg:` cho bố cục khung. `lg:`/`xl:`
+   chỉ dùng để CHIA THÊM CỘT trong lưới đã chạy tốt ở cả hai mốc.
+   Luật đầy đủ + checklist màn mới: src/design-system/README.md
+   ============================================================ */
+
+/* Bảng quá rộng buộc phải cuộn ngang (báo cáo kiểu Excel): khoá cột đầu để
+   người dùng luôn biết đang đọc dòng nào. Đặt lên chính thẻ <table>. */
+@utility cot-dau-dinh {
+  & th:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    background: var(--muted);
+  }
+  & td:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background: var(--card);
+  }
 }
 
 /* Thanh cuộn gọn, bám màu token — dùng cho thân dialog/form cuộn dài.

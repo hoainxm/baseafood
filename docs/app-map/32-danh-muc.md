@@ -1,8 +1,9 @@
 > Load khi: sửa danh mục (đại lý, loại NL, mặt hàng, khách hàng) hay danh mục 141 mã thành phẩm.
-covers: src/features/catalog/CatalogScreen.tsx, src/features/catalog/FinishedGoodScreen.tsx, src/data/thanh-pham.json, src/design-system/patterns/DanhMucCrud.tsx
-last_verified: 2026-08-07
+covers: src/features/catalog/CatalogScreen.tsx, src/features/catalog/FinishedGoodScreen.tsx, src/data/thanh-pham.json, src/design-system/patterns/CatalogCrudModal.tsx
+last_verified: 2026-08-14
 ttl_days: 90
 <!-- updated: 2026-08-07 — đại lý thêm tenGhiPhieu/diaChi/cmnd/ngayCap/noiCap (migration 0009) -->
+<!-- re-verified: 2026-08-14 — đồng bộ tên file sau rename eadc360: patterns/CatalogCrudModal.tsx + FinishedGoodScreen.tsx (symbol DanhMucCrud giữ nguyên) -->
 
 # Danh mục (master data)
 
@@ -11,7 +12,7 @@ Gộp làm một vì ba mục điều hướng cũ có tên gần giống nhau �
 
 ## State hiện tại
 
-4 tab đầu dùng chung pattern `DanhMucCrud` (thêm/sửa/xóa/tìm). Tab thứ 5 (`ThanhPham.tsx`) **chỉ đọc** — 141 mã kế toán TK 1551.
+4 tab đầu dùng chung pattern `DanhMucCrud` (thêm/sửa/xóa/tìm). Tab thứ 5 (`FinishedGoodScreen.tsx`) **chỉ đọc** — 141 mã kế toán TK 1551.
 
 ## Logic / Rules
 

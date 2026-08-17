@@ -115,13 +115,13 @@ src/features/
 ├── can-doi/
 │   ├── index.ts
 │   ├── BalancingScreen.tsx
-│   ├── BangBalancingScreen.tsx
+│   ├── BalancingTable.tsx
 │   └── components/
 │       └── KyDetail.tsx
 ├── danh-muc/
 │   ├── index.ts
 │   ├── CatalogScreen.tsx
-│   └── ThanhPham.tsx
+│   └── FinishedGoodScreen.tsx
 ├── nguoi-dung/
 │   ├── index.ts
 │   └── UserManagementScreen.tsx

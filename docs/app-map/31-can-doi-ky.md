@@ -1,8 +1,9 @@
 > Load khi: sửa màn Cân đối, công thức định mức/lãi lỗ, hay bảng in A4.
 covers: src/features/balancing/BalancingScreen.tsx, src/features/balancing/BalancingTable.tsx, src/lib/balancingCalc.ts
-last_verified: 2026-08-10
+last_verified: 2026-08-14
 ttl_days: 90
-<!-- re-verified: 2026-08-07 — công thức canDoi.ts + KhoiTP hút bán khớp source -->
+<!-- re-verified: 2026-08-07 — công thức balancingCalc.ts + KhoiTP hút bán khớp source -->
+<!-- re-verified: 2026-08-14 — đồng bộ tên file sau rename eadc360: lib canDoi.ts → balancingCalc.ts -->
 <!-- fixed: 2026-08-10 — đối chiếu bảng cân đối bạch tuộc 2 da (21-25/07) thật: sửa "Bình quân/kg NL" = Lãi÷NL (trước tính nhầm Giá thành÷NL); đổi field avgCostPerKgMaterial→avgProfitPerKgMaterial. 8 chỉ số kia khớp tuyệt đối -->
 <!-- updated: 2026-08-07 — khối 3 đổi nhãn "Bán thành phẩm sản xuất" (WIP làm ra ≠ bán ra); NL vào cho kg âm (bán nội địa); cờ nguonKho cho xả đông (migration 0008) -->
 
@@ -69,7 +70,7 @@ Giá trị phế liệu= Σ kg × đơn giá bán
 | Gõ loại NL mới trong ô chọn kỳ | Lưu luôn vào danh mục `loai_nguyen_lieu` + toast — không để tên mồ côi. |
 | Đơn giá / tỉ giá / chi phí null | Coi như 0 khi tính (`?? 0`), nhưng hiển thị là "—", không phải `0 đ`. |
 | Tổng TP = 0 | `dinhMuc = 0`, `tyLeThuHoi = null` nếu chưa khai `tongNLNhan`. Màn hình gắn cờ `chuaCoTP`. |
-| Bảng in `BangBalancingScreen.tsx` | **Ngoại lệ luật design-system** — `text-sm`, `uppercase`, màu `slate` cứng để khớp khổ A4, in bằng `window.print()`. Đừng áp luật UI vào file này, cũng đừng lấy nó làm mẫu cho màn mới. |
+| Bảng in `BalancingTable.tsx` | **Ngoại lệ luật design-system** — `text-sm`, `uppercase`, màu `slate` cứng để khớp khổ A4, in bằng `window.print()`. Đừng áp luật UI vào file này, cũng đừng lấy nó làm mẫu cho màn mới. |
 | Mặt hàng chưa ánh xạ mã 141 | Hợp lệ (`maTP` rỗng, hiện "Chưa ánh xạ"). Danh mục mặt hàng là **danh mục mở**. |
 
 ## Cross-references

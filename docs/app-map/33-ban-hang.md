@@ -1,8 +1,9 @@
 > Load khi: sửa màn Bán hàng — phiếu bán, dòng bán, quy cách, ghi bù, hoặc hút bán vào cân đối.
-covers: src/features/sales/SalesScreen.tsx, src/features/sales/BaoCaoBan.tsx, src/features/sales/BanHangTab.tsx, src/types.ts, src/lib/repo.ts
-last_verified: 2026-08-10
+covers: src/features/sales/SalesScreen.tsx, src/features/sales/SalesReport.tsx, src/features/sales/SalesTab.tsx, src/types.ts, src/lib/repo.ts
+last_verified: 2026-08-14
 ttl_days: 90
 <!-- re-verified: 2026-08-07 — phiếu multi-line (phieuId), 2 ngày, seam hút banHangId khớp SalesScreen.tsx + BalancingScreen.tsx:389 -->
+<!-- re-verified: 2026-08-14 — đồng bộ tên file sau rename eadc360: SalesReport.tsx/SalesTab.tsx + lib balancingCalc.ts (symbol BanHang/BaoCaoBan/BieuDoCot/BangTong giữ nguyên) -->
 
 # Bán hàng (bán thành phẩm RA) hằng ngày
 
@@ -13,7 +14,7 @@ Số hóa sổ **bán hàng** — bán thành phẩm chế biến (bạch tuộc
 - **Bán hàng** (màn này) = bán **thành phẩm RA** cho khách (đầu ra). Khối 3 bảng cân đối.
 - **"Bán thành phẩm"** (bán-thành-phẩm, WIP) = **công đoạn SẢN XUẤT** ra sản phẩm dở dang, **cất kho dự trữ**, CHƯA bán. **KHÁC** bán hàng. Đây là mảng **chưa số hoá** — thuộc vòng lặp kho / đông gửi ↔ xả đông ↔ tồn cuối kỳ (backlog cốt lõi).
 - Quy trình thật (chưa build): sản xuất bán thành phẩm ngày → **cất kho dự trữ** → gom đủ theo **đơn đặt** (khách đặt số lượng lớn) → **xuất container** (nhiều block, nhiều quy cách). `ban_hang.kho_nguon` để dành seam nối tồn kho.
-- **Đơn đặt = xuất khẩu**; **phí xuất khẩu do phòng kế hoạch tính riêng, đã trừ trong giá báo → cân đối KHÔNG tính phí XK** (công thức `canDoi.ts` không có phí XK — đúng). Nhãn kênh hiện tại vẫn "Xuất khẩu / Nội địa" theo plan gốc (đã chốt); đổi thành "Đơn đặt" là việc tương lai nếu cần.
+- **Đơn đặt = xuất khẩu**; **phí xuất khẩu do phòng kế hoạch tính riêng, đã trừ trong giá báo → cân đối KHÔNG tính phí XK** (công thức `balancingCalc.ts` không có phí XK — đúng). Nhãn kênh hiện tại vẫn "Xuất khẩu / Nội địa" theo plan gốc (đã chốt); đổi thành "Đơn đặt" là việc tương lai nếu cần.
 
 ## State hiện tại
 
@@ -23,7 +24,7 @@ Chưa có (backlog): **chốt ngày bán** (bảng `chot_ngay` hiện chỉ dùn
 
 Bảng dùng: `phieu_ban`, `ban_hang`, đọc danh mục `mat_hang` / `khach_hang`. Migration `0005`.
 
-**Hai tab** (bọc ở `BanHangTab.tsx`): **Sổ bán hàng** = màn ghi (`BanHang`) · **Báo cáo** (`BaoCaoBan`) = tổng bán theo kỳ, gom **khách × kênh**, trình bày bằng thẻ `ThongKe` + `BieuDoCot` (sản lượng theo khách) + `BangTong`. Giá trị để **riêng theo kênh** (Xuất khẩu USD ≠ Nội địa VND — không cộng thẳng, đúng bẫy §4); chỉ tổng kg gộp được (thẻ + chart chỉ dùng kg).
+**Hai tab** (bọc ở `SalesTab.tsx`): **Sổ bán hàng** = màn ghi (`SalesScreen`) · **Báo cáo** (`SalesReport`) = tổng bán theo kỳ, gom **khách × kênh**, trình bày bằng thẻ `ThongKe` + `BieuDoCot` (sản lượng theo khách) + `BangTong`. Giá trị để **riêng theo kênh** (Xuất khẩu USD ≠ Nội địa VND — không cộng thẳng, đúng bẫy §4); chỉ tổng kg gộp được (thẻ + chart chỉ dùng kg).
 
 ## Logic / Rules
 
@@ -64,7 +65,7 @@ Khác phế liệu (gán `kyId` lên chính dòng gốc) vì `ban_hang` và `tha
 | Đơn giá null | Hợp lệ — badge "Chưa có giá"; mọi nơi tính tiền `?? 0`. |
 | Ghi phiếu ngày ngoài kỳ đang lọc | Màn tự kéo bộ lọc về ngày vừa ghi (`dongPhienLai`) — tránh tưởng mất phiếu. |
 | Hút dòng bán rồi sửa giá ở sổ bán | Bản sao trong kỳ KHÔNG tự cập nhật (đã tách bảng). Bỏ khỏi kỳ rồi hút lại nếu cần số mới. |
-| Nội địa (VND) và Xuất khẩu (USD) chung kỳ | Đơn vị đơn giá theo kênh từng dòng; giá trị xuất quy tỉ giá lúc tính (canDoi.ts). |
+| Nội địa (VND) và Xuất khẩu (USD) chung kỳ | Đơn vị đơn giá theo kênh từng dòng; giá trị xuất quy tỉ giá lúc tính (balancingCalc.ts). |
 
 ## Cross-references
 

@@ -1,8 +1,9 @@
 > Load khi: sửa bất cứ thứ gì ở màn Nhập hàng — chuyến, ngày, ghi bù, chốt ngày, phế liệu ngày, phiếu báo cáo ngày.
-covers: src/features/imports/MaterialImportScreen.tsx, src/features/imports/PhieuNLNgay.tsx, src/features/imports/BaoCaoNhap.tsx, src/features/imports/NhapHangTab.tsx, src/types.ts
-last_verified: 2026-08-10
+covers: src/features/imports/MaterialImportScreen.tsx, src/features/imports/DailyImportInvoice.tsx, src/features/imports/ImportReport.tsx, src/features/imports/ImportTab.tsx, src/types.ts
+last_verified: 2026-08-14
 ttl_days: 90
-<!-- re-verified: 2026-08-06 — bộ lọc theo KỲ (ngày/tuần/tháng/năm/tùy chọn → phamViKy); loài/phân xưởng nhập bằng dropdown; báo cáo theo kỳ (mỗi ngày một khối, PhieuNLNgay nhận tuNgay/denNgay); phế liệu thêm nhiều loại/lần; chốt ngày cuối màn — khớp MaterialImportScreen.tsx + PhieuNLNgay.tsx -->
+<!-- re-verified: 2026-08-06 — bộ lọc theo KỲ (ngày/tuần/tháng/năm/tùy chọn → phamViKy); loài/phân xưởng nhập bằng dropdown; báo cáo theo kỳ (mỗi ngày một khối, PhieuNLNgay nhận tuNgay/denNgay); phế liệu thêm nhiều loại/lần; chốt ngày cuối màn — khớp MaterialImportScreen.tsx + DailyImportInvoice.tsx -->
+<!-- re-verified: 2026-08-14 — đồng bộ tên file sau rename eadc360: DailyImportInvoice.tsx/ImportReport.tsx/ImportTab.tsx (symbol PhieuNLNgay/BaoCaoNhap giữ nguyên) -->
 
 # Sổ nhập nguyên liệu hàng ngày
 
@@ -14,13 +15,13 @@ Số hóa sổ giấy *"Báo cáo tổng hợp nguyên liệu hàng ngày"*. Đ�
 
 Bố cục lọc: **toolbar một hàng** (Kỳ xem sổ · Ngày/khoảng · Phân xưởng + nhóm nút Xem báo cáo / Ghi chuyến); lọc ít dùng (đại lý / loại NL / đơn giá) gom trong nút **"Bộ lọc thêm"**. Khối chốt ngày là **strip mỏng ở CUỐI màn**.
 
-**Bộ lọc theo KỲ** — logic dùng chung ở [`src/lib/periodUtils.ts`](../../src/lib/periodUtils.ts) (`ky`: `ngay | tuan | thang | nam | tuy-chon`): `phamViKy()` suy ra `[từ, đến]` từ một **ngày neo** — tuần = Thứ 2→CN, tháng/năm = đầu→cuối; `tuy-chon` dùng `tuNgay/denNgay`. Mọi lọc/tổng/chốt tính theo khoảng này. `laMotNgay = từ === đến` mới cho chốt/phế liệu ngày. **Phiếu báo cáo mang cùng bộ chọn kỳ** (mirror `ky.ts`) nên xem/in linh hoạt trong phiếu. Nhập bằng **dropdown** (`Combobox`) cho các trường ít lựa chọn: kỳ, phân xưởng, loài — có giá trị mặc định, `choPhepXoa={false}`.
+**Bộ lọc theo KỲ** — logic dùng chung ở [`src/lib/periodUtils.ts`](../../src/lib/periodUtils.ts) (`ky`: `ngay | tuan | thang | nam | tuy-chon`): `phamViKy()` suy ra `[từ, đến]` từ một **ngày neo** — tuần = Thứ 2→CN, tháng/năm = đầu→cuối; `tuy-chon` dùng `tuNgay/denNgay`. Mọi lọc/tổng/chốt tính theo khoảng này. `laMotNgay = từ === đến` mới cho chốt/phế liệu ngày. **Phiếu báo cáo mang cùng bộ chọn kỳ** (mirror `periodUtils.ts`) nên xem/in linh hoạt trong phiếu. Nhập bằng **dropdown** (`Combobox`) cho các trường ít lựa chọn: kỳ, phân xưởng, loài — có giá trị mặc định, `choPhepXoa={false}`.
 
 Chưa có: **người chốt / người ghi bù** (chưa có đăng nhập — [05-bao-mat-phan-quyen](05-bao-mat-phan-quyen.md)); màn xem lại **lịch sử chốt/mở lại** (dữ liệu đã đủ: `chot_luc`, `tong_kg_luc_chot`, `ly_do_mo_lai`).
 
 Bảng dùng: `chuyen_nhap`, `nhap_nguyen_lieu`, `chot_ngay`, `phe_lieu` (dòng `nguon = "Nhập hàng"`), đọc thêm danh mục `dai_ly` / `loai_nguyen_lieu`.
 
-**Hai tab** (bọc ở `NhapHangTab.tsx`, tầng `index.ts`): **Sổ nhập hàng** = màn ghi (`NhapNguyenLieu`) · **Báo cáo** (`BaoCaoNhap`) = tổng nhập theo kỳ (`lib/periodUtils.ts`), gom **đại lý × loại NL**; chỉ đọc. Báo cáo trình bày bằng **thẻ `ThongKe`** (kỳ · tổng kg · giá trị · số đại lý) + **`BieuDoCot`** (sản lượng theo đại lý, có đường trung bình) + `BangTong`. Khác **phiếu A4** (`PhieuNLNgay`, in đúng tờ giấy) — báo cáo là màn phân tích, phiếu là bản in.
+**Hai tab** (bọc ở `ImportTab.tsx`, tầng `index.ts`): **Sổ nhập hàng** = màn ghi (`NhapNguyenLieu`) · **Báo cáo** (`BaoCaoNhap`) = tổng nhập theo kỳ (`lib/periodUtils.ts`), gom **đại lý × loại NL**; chỉ đọc. Báo cáo trình bày bằng **thẻ `ThongKe`** (kỳ · tổng kg · giá trị · số đại lý) + **`BieuDoCot`** (sản lượng theo đại lý, có đường trung bình) + `BangTong`. Khác **phiếu A4** (`PhieuNLNgay`, in đúng tờ giấy) — báo cáo là màn phân tích, phiếu là bản in.
 
 ## Logic / Rules
 
@@ -75,7 +76,7 @@ Cân **gộp cuối ngày** theo (ngày + phân xưởng), ngay lúc nhận hàn
 Màn Cân đối chỉ **hút** vào kỳ (gán `kyId`), không nhập lại lần hai. Xem [31-can-doi-ky](31-can-doi-ky.md).
 Hộp "Thêm phế liệu" cho **thêm nhiều loại trong một lần**: mỗi loại bấm *"Thêm loại này"* (lưu ngay + reset form, hộp thoại vẫn mở), xong bấm *"Xong"* — không phải mở lại hộp cho từng loại (nội tạng, dạt…).
 
-### 6. Phiếu báo cáo tổng hợp — in A4 NGANG, theo KỲ (`PhieuNLNgay.tsx`)
+### 6. Phiếu báo cáo tổng hợp — in A4 NGANG, theo KỲ (`DailyImportInvoice.tsx`)
 
 Số hóa đúng tờ giấy *"Báo cáo tổng hợp nguyên liệu hàng ngày"*. Nút **"Xem báo cáo"** luôn hiện; mở overlay xem + `window.print()`. Nhận `tuNgay/denNgay` = kỳ đang lọc.
 **Một ngày** ⇒ đúng một tờ. **Nhiều ngày** (tuần/tháng/năm/khoảng) ⇒ **mỗi ngày một khối** (`KhoiNgay`, sang trang khi in), cuối phiếu có **Tổng cộng cả kỳ**. Đổi khoảng ngay trong phiếu bằng `DateRangeField` (không cần đóng). Chỉ render ngày **có dữ liệu**.

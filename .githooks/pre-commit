@@ -68,11 +68,11 @@ for f in $staged; do
     do_hong "$f — features chỉ được import từ @/design-system (CLAUDE.md §3)"
   fi
   if printf '%s\n' "$them" | grep -q 'localStorage\.\|from "@/lib/supabase"\|from "@/lib/db"'; then
-    do_hong "$f — features không gọi localStorage/supabase/db trực tiếp, đi qua @/lib/danhMuc (CLAUDE.md §4)"
+    do_hong "$f — features không gọi localStorage/supabase/db trực tiếp, đi qua @/lib/catalogRepo (CLAUDE.md §4)"
   fi
 
-  # BangCanDoi.tsx là bản in A4 — ngoại lệ có chủ đích.
-  case "$f" in */BangCanDoi.tsx) continue ;; esac
+  # BalancingTable.tsx là bản in A4 — ngoại lệ có chủ đích.
+  case "$f" in */BalancingTable.tsx) continue ;; esac
   if printf '%s\n' "$them" | grep -q 'text-xs\|uppercase'; then
     do_hong "$f — cấm text-xs / IN HOA trong màn nghiệp vụ (người dùng 45–60 tuổi, src/design-system/README.md §3)"
   fi

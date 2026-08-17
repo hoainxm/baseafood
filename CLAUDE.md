@@ -27,10 +27,10 @@ src/
 ├── App.tsx · main.tsx        điều hướng 4 màn (KHÔNG router, state trong App)
 ├── types.ts                  kiểu + BẤT BIẾN nghiệp vụ (laGhiBu, thanhTien)
 ├── data/thanh-pham.json      141 mã TK 1551 — chỉ là SEED
-├── lib/                      repo · danhMuc · db · supabase · ketNoi · canDoi · auth · username · format · store · utils
+├── lib/                      repo · catalogRepo · db · supabase · connectivity · balancingCalc · auth · username · format · store · utils
 ├── components/ui/            primitive shadcn — ĐÃ đè size cho người lớn tuổi
 ├── design-system/            tokens.css · patterns/ · kit/ · index.ts (cửa import duy nhất)
-└── features/                 NhapNguyenLieu · BanHang · CanDoi + BangCanDoi · DanhMuc (5 tab) · ThanhPham (chỉ đọc) · DangNhap · QuanLyNguoiDung
+└── features/                 MaterialImportScreen · SalesScreen · BalancingScreen + BalancingTable · CatalogScreen (5 tab) · FinishedGoodScreen (chỉ đọc) · LoginScreen · UserManagementScreen
 supabase/migrations/          0001 … 0006
 docs/README.md                bản đồ tài liệu — doc nào ở đâu, doc mới bỏ đâu
 docs/app-map/                 bản đồ ngữ cảnh cho agent (đọc khi CODE)
@@ -73,7 +73,7 @@ Repo này **commit thẳng vào `main`**, không tách nhánh feat. Chỉ commit
 | Tier | Nghĩa | Cách xử |
 |---|---|---|
 | 🟢 **GREEN** | Hoàn tác được bằng `git` | Làm thẳng. Sửa component, màn hình, doc, thêm bộ lọc, đổi chữ hiển thị. |
-| 🟡 **YELLOW** | Hoàn tác được nhưng phải có chủ đích | Tự làm, **không hỏi**, nhưng phải kèm đường lùi. Migration chỉ-thêm-cột (viết sẵn câu `drop` để lùi); đổi hình dạng dữ liệu trong `repo.ts` (kèm `vaDongCu`); đổi `localKey`; đổi công thức `canDoi.ts`. |
+| 🟡 **YELLOW** | Hoàn tác được nhưng phải có chủ đích | Tự làm, **không hỏi**, nhưng phải kèm đường lùi. Migration chỉ-thêm-cột (viết sẵn câu `drop` để lùi); đổi hình dạng dữ liệu trong `repo.ts` (kèm `vaDongCu`); đổi `localKey`; đổi công thức `balancingCalc.ts`. |
 | 🔴 **RED** | Không quay đầu được / nổ ở production | **Một câu xác nhận rồi ĐỢI.** `drop` / `alter … drop` trên bảng đang có số liệu; chạy `0002` hoặc `0003`; đổi RLS; mở app ra ngoài mạng nội bộ; xóa hàng loạt bản ghi nghiệp vụ; `git push --force`; đụng `.env` / key. |
 
 Chưa rõ tier ⇒ coi là 🔴. Dữ liệu ở đây là **sổ sách thật của xưởng**, mất là không dựng lại được.
@@ -84,10 +84,10 @@ Chưa rõ tier ⇒ coi là 🔴. Dữ liệu ở đây là **sổ sách thật c
 |---|---|
 | `features/MaterialImportScreen.tsx`, quy tắc chuyến / chốt ngày | [`30-nhap-hang.md`](docs/app-map/30-nhap-hang.md) |
 | `features/SalesScreen.tsx`, phiếu bán / quy cách / hút bán | [`33-ban-hang.md`](docs/app-map/33-ban-hang.md) |
-| `features/BalancingScreen.tsx`, `BangBalancingScreen.tsx`, `lib/balancingCalc.ts` | [`31-can-doi-ky.md`](docs/app-map/31-can-doi-ky.md) |
-| `features/CatalogScreen.tsx`, `ThanhPham.tsx`, `data/thanh-pham.json` | [`32-danh-muc.md`](docs/app-map/32-danh-muc.md) |
+| `features/BalancingScreen.tsx`, `BalancingTable.tsx`, `lib/balancingCalc.ts` | [`31-can-doi-ky.md`](docs/app-map/31-can-doi-ky.md) |
+| `features/CatalogScreen.tsx`, `FinishedGoodScreen.tsx`, `data/thanh-pham.json` | [`32-danh-muc.md`](docs/app-map/32-danh-muc.md) |
 | `supabase/migrations/**` | [`03-database.md`](docs/app-map/03-database.md) (+ [`04`](docs/app-map/04-tang-du-lieu.md) nếu đổi ánh xạ) |
-| `lib/repo.ts`, `db.ts`, `danhMuc.ts`, `ketNoi.ts` | [`04-tang-du-lieu.md`](docs/app-map/04-tang-du-lieu.md) |
+| `lib/repo.ts`, `db.ts`, `catalogRepo.ts`, `connectivity.ts` | [`04-tang-du-lieu.md`](docs/app-map/04-tang-du-lieu.md) |
 | `App.tsx` (thêm màn / đổi nav) | [`02-pages-navigation.md`](docs/app-map/02-pages-navigation.md) |
 | Thêm thư mục / đổi ranh giới import | [`01-app-structure.md`](docs/app-map/01-app-structure.md) |
 | `lib/auth.ts`, `lib/username.ts`, `LoginScreen.tsx`, `UserManagementScreen.tsx`, `0006`, `0003_siet_rls.sql`, `.env.example` | [`05-bao-mat-phan-quyen.md`](docs/app-map/05-bao-mat-phan-quyen.md) |

@@ -52,7 +52,7 @@ Nguồn (đã đối chiếu): GOV.UK / Home Office content style guide · Niels
 
 ## Before → After đã áp (mẫu tham chiếu)
 
-Toolbar bộ lọc `features/NhapNguyenLieu.tsx`:
+Toolbar bộ lọc `features/imports/MaterialImportScreen.tsx`:
 
 | Trước | Sau | Luật |
 |---|---|---|

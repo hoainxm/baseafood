@@ -13,11 +13,11 @@ src/
 ├── data/thanh-pham.json     141 mã TK 1551 — chỉ là SEED, không đọc trực tiếp trong màn
 ├── lib/
 │   ├── repo.ts              tầng dữ liệu (Supabase↔localStorage) — 04-tang-du-lieu.md
-│   ├── danhMuc.ts           hook từng bảng (useNhapNL, useKyCanDoi…) + seed
+│   ├── catalogRepo.ts       hook từng bảng (useNhapNL, useKyCanDoi…) + seed
 │   ├── db.ts                bộ đệm localStorage cấp thấp — MÀN HÌNH KHÔNG GỌI
 │   ├── supabase.ts          client env-gated + SITE_ID
-│   ├── ketNoi.ts            trạng thái kết nối dùng chung (đèn xanh/đỏ)
-│   ├── canDoi.ts            công thức cân đối thuần — 31-can-doi-ky.md
+│   ├── connectivity.ts      trạng thái kết nối dùng chung (đèn xanh/đỏ)
+│   ├── balancingCalc.ts     công thức cân đối thuần — 31-can-doi-ky.md
 │   ├── auth.ts              useAuth + Supabase Auth — 05-bao-mat-phan-quyen.md
 │   ├── username.ts          họ tên → username + email tổng hợp
 │   ├── format.ts            num/kg/todayISO/viDate (locale vi-VN)
@@ -36,7 +36,7 @@ src/
 
 ```
 features → design-system → components/ui → tokens.css
-features → lib/danhMuc → lib/repo → lib/db + lib/supabase
+features → lib/catalogRepo → lib/repo → lib/db + lib/supabase
 ```
 
 - `src/features/**` **chỉ** import từ `@/design-system`. Cấm `@/components/ui/*` trực tiếp — hook pre-commit chặn.
@@ -53,7 +53,7 @@ features → lib/danhMuc → lib/repo → lib/db + lib/supabase
 
 ## Nơi hay đặt sai
 
-- Công thức nghiệp vụ mới → `src/lib/*.ts` thuần, không nhét vào component (xem `canDoi.ts` làm mẫu: không import React).
+- Công thức nghiệp vụ mới → `src/lib/*.ts` thuần, không nhét vào component (xem `balancingCalc.ts` làm mẫu: không import React).
 - Bất biến nghiệp vụ dùng ở ≥2 màn (`laGhiBu`, `thanhTien`) → `src/types.ts`, cạnh interface nó ràng buộc.
 - Pattern UI mới → `design-system/patterns/` + export ở `design-system/index.ts`; **không** viết component dùng chung trong `features/`.
 - Hai file sinh id: `lib/db.ts#uid` và `lib/store.ts#newId` — **cùng thuật toán, trùng nhau**. Dùng lại cái file bên cạnh đang dùng; đừng thêm cái thứ ba (cần dọn, chưa dọn).

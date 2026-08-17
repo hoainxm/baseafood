@@ -35,9 +35,9 @@ Phần lớn là **tổ trưởng / thủ kho 45–60 tuổi**, dùng **tablet �
 | Màn hình | File | Trạng thái |
 |---|---|---|
 | Nhập nguyên liệu hàng ngày | [`src/features/imports/MaterialImportScreen.tsx`](../src/features/imports/MaterialImportScreen.tsx) | ✅ **chuyến thật** (`chuyen_nhap`) · tách **ngày hàng về / ngày ghi sổ** + ghi bù có lý do · **chốt ngày** (khóa số liệu, mở lại có lý do) · **phế liệu cân trong ngày** · sổ nhóm theo chuyến · lọc ngày/khoảng/xưởng/đại lý/loại/thiếu đơn giá |
-| Cân đối 5 ngày + xuất bảng in | [`BalancingScreen.tsx`](../src/features/balancing/BalancingScreen.tsx) · [`BangBalancingScreen.tsx`](../src/features/balancing/BalancingTable.tsx) | ✅ tính định mức + lãi/lỗ; khối phế liệu giờ **hút từ sổ nhập hàng** (không nhập tay hai nơi) |
+| Cân đối 5 ngày + xuất bảng in | [`BalancingScreen.tsx`](../src/features/balancing/BalancingScreen.tsx) · [`BalancingTable.tsx`](../src/features/balancing/BalancingTable.tsx) | ✅ tính định mức + lãi/lỗ; khối phế liệu giờ **hút từ sổ nhập hàng** (không nhập tay hai nơi) |
 | Danh mục (5 tab) | [`CatalogScreen.tsx`](../src/features/catalog/CatalogScreen.tsx) | ✅ đại lý · loại NL · mặt hàng · khách hàng |
-| Thành phẩm (141 mã, chỉ đọc) | [`ThanhPham.tsx`](../src/features/catalog/FinishedGoodScreen.tsx) | ✅ seed từ danh mục kế toán TK 1551 |
+| Thành phẩm (141 mã, chỉ đọc) | [`FinishedGoodScreen.tsx`](../src/features/catalog/FinishedGoodScreen.tsx) | ✅ seed từ danh mục kế toán TK 1551 |
 | Bộ giao diện người lớn tuổi + cài đặt hiển thị | `src/design-system/` | ✅ |
 | Tầng dữ liệu Supabase ↔ localStorage | [`src/lib/repo.ts`](../src/lib/repo.ts) | ✅ env-gated |
 
@@ -66,7 +66,7 @@ Phần lớn là **tổ trưởng / thủ kho 45–60 tuổi**, dùng **tablet �
 src/
 ├── data/thanh-pham.json     141 mã thành phẩm (TK 1551) — chỉ là SEED cho bảng thanh_pham
 ├── types.ts                 ThanhPham, DongNhapNL, MatHang, KhachHang, DaiLy, LoaiNguyenLieu, KyCanDoi…
-├── lib/                     repo (Supabase↔localStorage) · danhMuc · format (vi-VN) · db · canDoi · supabase · store
+├── lib/                     repo (Supabase↔localStorage) · catalogRepo · format (vi-VN) · db · balancingCalc · supabase · store
 ├── components/ui/           primitive shadcn — ĐÃ đè size cho người lớn tuổi
 ├── design-system/
 │   ├── tokens.css           NƠI DUY NHẤT định cỡ chữ / màu / chiều cao ô

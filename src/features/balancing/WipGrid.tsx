@@ -210,6 +210,17 @@ export function LuoiBanThanhPham({
     },
   ];
 
+  /* Kỳ đã chốt ⇒ khoá TOÀN BỘ ô + gỡ ô điều khiển. Khoá ở một chỗ thay vì rải
+     `disabled` khắp nơi: thêm cột mới về sau tự động được khoá theo. */
+  const cotHienThi: CotLuoi<HangLuoiTP>[] = luoi.daChot
+    ? cot.map((c) => ({
+        ...c,
+        oRieng: undefined,
+        khoa: () => true,
+        lyDoKhoa: () => "Kỳ đã chốt — mở lại ở cuối màn mới sửa được",
+      }))
+    : cot;
+
   const hang: HangLuoi<HangLuoiTP>[] = hangTP.map((h) => ({
     id: h.id,
     du: h,
@@ -266,7 +277,7 @@ export function LuoiBanThanhPham({
       ) : (
         <LuoiNhap
           moTa="Lưới bán thành phẩm sản xuất theo ngày trong kỳ"
-          cot={cot}
+          cot={cotHienThi}
           hang={hang}
           nhomAn={anNgay ? ["ngay"] : []}
           onGhiO={ghiO}

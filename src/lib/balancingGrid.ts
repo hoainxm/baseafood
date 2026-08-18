@@ -332,3 +332,49 @@ export function ghiNguocNhapNgay(
   }
   return { loai: "sua", id: cuoi.id, kg: conLai };
 }
+
+/* ---------- Chuyển kỳ: nối kỳ trước sang kỳ sau ---------- */
+
+/**
+ * Kỳ liền trước của cùng một họ nguyên liệu: kết thúc TRƯỚC ngày bắt đầu kỳ này,
+ * gần nhất. Dùng để lấy phần "chuyển kỳ âm" (hàng làm ra nhưng đẩy sang kỳ sau)
+ * mà kỳ trước đã khai.
+ */
+export function kyLienTruoc(
+  ky: BalancingPeriod,
+  tatCaKy: BalancingPeriod[]
+): BalancingPeriod | null {
+  const batDau = ky.startDate;
+  if (!batDau) return null;
+  const truoc = tatCaKy
+    .filter(
+      (k) =>
+        k.id !== ky.id &&
+        cungHoNguyenLieu(k.materialTypeName, ky.materialTypeName) &&
+        (k.endDate || k.startDate || "") < batDau
+    )
+    .sort((a, b) => (b.endDate || b.startDate || "").localeCompare(a.endDate || a.startDate || ""));
+  return truoc[0] ?? null;
+}
+
+export interface DongChuyenKy {
+  /** id dòng ở kỳ TRƯỚC — đánh dấu đã nhận để không lấy hai lần. */
+  nguonId: string;
+  ten: string;
+  kg: number;
+}
+
+/**
+ * Phần chuyển kỳ ÂM của kỳ trước mà chưa kỳ nào nhận.
+ *
+ * Quy ước dấu (xem 31-can-doi-ky.md): âm = đẩy sang kỳ sau. Kỳ này nhận thì
+ * dựng dòng có chuyển kỳ DƯƠNG bằng đúng trị tuyệt đối — vòng gối đầu khép lại
+ * mà không ai phải mở file kỳ cũ ra chép tay.
+ */
+export function chuyenKyChoNhan<
+  T extends { id: string; carryOverKg?: number; carryOverPeriodId?: string },
+>(dongKyTruoc: T[], ten: (r: T) => string): DongChuyenKy[] {
+  return dongKyTruoc
+    .filter((r) => (r.carryOverKg ?? 0) < 0 && !r.carryOverPeriodId)
+    .map((r) => ({ nguonId: r.id, ten: ten(r), kg: Math.abs(r.carryOverKg ?? 0) }));
+}

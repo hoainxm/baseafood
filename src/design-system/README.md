@@ -122,6 +122,24 @@ ngoài màn mà người dùng không biết là còn.
 **Cấm** viết `<table className="min-w-[1120px]">` tay trong màn mới rồi bọc
 `overflow-x-auto` và coi là xong.
 
+### 5a. Bẫy: dropdown đã đóng vẫn ăn click
+
+Radix chỉ gỡ nội dung Popover/Select khỏi DOM khi **animation thoát kết thúc**.
+Với bộ `tw-animate-css` đang dùng, animation `exit` mắc kẹt ở `playState:
+running` nên `animationend` không bao giờ bắn ⇒ danh sách đã đóng vẫn nằm đó,
+`opacity: 1`, `pointer-events: auto`, và **chặn click** ở đúng vị trí cũ.
+
+Triệu chứng: bấm một Combobox nhưng giá trị nhảy vào Combobox KHÁC trên cùng
+màn. Trên màn nhập số liệu, đây là lỗi ghi nhầm ô mà không ai truy ra được.
+
+Vá ở `src/index.css`: ẩn cứng `[data-slot="popover-content"][data-state="closed"]`
+và `[data-slot="select-content"][data-state="closed"]`. Mất hiệu ứng thoát, đổi
+lại không mất số.
+
+⇒ **Đừng gỡ luật này khi nâng cấp tw-animate-css** mà chưa kiểm lại: mở hai
+Combobox trên cùng một hộp thoại, đóng cái đầu, đếm `document.querySelectorAll(
+'[cmdk-root]')` — phải bằng 1.
+
 ### 5b. `LuoiNhap` — lưới nhập kiểu bảng tính
 
 Dùng khi người dùng phải gõ **nhiều ô số cùng lúc** và đang có sẵn thói quen làm

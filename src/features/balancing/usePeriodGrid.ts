@@ -23,7 +23,9 @@ import {
   gomNhapTheoLoai,
   gomSanXuatTheoMatHang,
   khoaMatHang,
+  chuyenKyChoNhan,
   chuyenNhapTheoNgay,
+  kyLienTruoc,
   nhapHangHopLe,
   nhapTrongKhoangNgay,
   ngayTrongKy,
@@ -34,6 +36,7 @@ import {
 import {
   useBalancingInputs,
   useBalancingOutputs,
+  useBalancingPeriods,
   useMaterialImports,
   useProductionLocks,
   useWipProductions,
@@ -74,6 +77,12 @@ export interface PeriodGrid {
   hutSanXuat: () => void;
   ghiSanXuatNhieuNgay: (dsO: ONgay[], lyDoGhiBu: string) => boolean;
   ngayDaChot: Set<string>;
+  /* --- chuyển kỳ --- */
+  kyTruoc: BalancingPeriod | null;
+  soDongChuyenKy: number;
+  nhanChuyenKy: () => void;
+  /* --- chốt kỳ --- */
+  daChot: boolean;
   /* --- hoàn tác --- */
   hoanTacDuoc: boolean;
   lamLaiDuoc: boolean;
@@ -109,6 +118,10 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
   const [tatCaNhap, ghiTatCaNhap] = useMaterialImports();
   const [tatCaSanXuat, ghiTatCaSanXuat] = useWipProductions();
   const [chotSanXuat] = useProductionLocks();
+  const [tatCaKy] = useBalancingPeriods();
+
+  /** Kỳ đã chốt ⇒ mọi ô khoá, mọi nút ghi ẩn. Mở lại ở thanh cuối màn. */
+  const daChot = Boolean(ky.isLocked);
 
   const ngay = useMemo(() => ngayTrongKy(ky), [ky]);
 
@@ -527,6 +540,95 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
     [ky, nlChoTinh, tpChoTinh]
   );
 
+  /* ---------- Chuyển kỳ từ kỳ liền trước ---------- */
+
+  const kyTruoc = useMemo(() => kyLienTruoc(ky, tatCaKy), [ky, tatCaKy]);
+
+  const chuyenKyNL = useMemo(() => {
+    if (!kyTruoc) return [];
+    const dong = tatCaNL.filter((r) => r.periodId === kyTruoc.id);
+    return chuyenKyChoNhan(dong, (r) => r.name);
+  }, [kyTruoc, tatCaNL]);
+
+  const chuyenKyTP = useMemo(() => {
+    if (!kyTruoc) return [];
+    const dong = tatCaTP.filter((r) => r.periodId === kyTruoc.id);
+    return chuyenKyChoNhan(dong, (r) => r.productId);
+  }, [kyTruoc, tatCaTP]);
+
+  /**
+   * Nhận phần chuyển kỳ ÂM của kỳ trước thành dòng chuyển kỳ DƯƠNG ở kỳ này,
+   * và đánh dấu dòng nguồn đã được kỳ nào nhận để không lấy hai lần.
+   * Đây là mắt xích khép vòng gối đầu: trước đó kỳ sau phải mở file kỳ cũ ra
+   * chép tay, và chép tay là chỗ số bắt đầu lệch.
+   */
+  const nhanChuyenKy = useCallback(() => {
+    if (!kyTruoc || (chuyenKyNL.length === 0 && chuyenKyTP.length === 0)) return;
+    const truocNL = tatCaNL;
+    const truocTP = tatCaTP;
+    luuMoc(`nhan-chuyen-ky:${kyTruoc.id}`);
+
+    const nhanNL = new Set(chuyenKyNL.map((d) => d.nguonId));
+    const themNL: BalancingInputItem[] = chuyenKyNL.map((d) => ({
+      id: uid(),
+      periodId: ky.id,
+      /* Hàng kỳ trước cất kho, kỳ này lấy ra dùng ⇒ đúng nhóm Xả đông. */
+      groupName: "Xả đông",
+      name: d.ten,
+      quantityKg: d.kg,
+      unitPrice: null,
+      ratioPercentage: null,
+      sourceWarehouse: "Kho mình",
+      dailyQuantities: {},
+      carryOverKg: d.kg,
+      carryOverPeriodId: "",
+      isReduction: false,
+      reductionWarehouseId: "",
+      autoSource: "",
+    }));
+
+    const nhanTP = new Set(chuyenKyTP.map((d) => d.nguonId));
+    const mauTP = new Map(tatCaTP.map((r) => [r.id, r]));
+    const themTP: BalancingOutputItem[] = chuyenKyTP.map((d) => {
+      const mau = mauTP.get(d.nguonId);
+      return {
+        id: uid(),
+        periodId: ky.id,
+        productId: d.ten,
+        customerId: mau?.customerId ?? "",
+        channel: mau?.channel ?? "Xuất khẩu",
+        quantityKg: d.kg,
+        unitPrice: mau?.unitPrice ?? null,
+        spec: mau?.spec ?? "",
+        salesItemId: "",
+        dailyQuantities: {},
+        carryOverKg: d.kg,
+        carryOverPeriodId: "",
+        autoSource: "",
+      };
+    });
+
+    ghiTatCaNL([
+      ...tatCaNL.map((r) =>
+        nhanNL.has(r.id) ? { ...r, carryOverPeriodId: ky.id } : r
+      ),
+      ...themNL,
+    ]);
+    ghiTatCaTP([
+      ...tatCaTP.map((r) =>
+        nhanTP.has(r.id) ? { ...r, carryOverPeriodId: ky.id } : r
+      ),
+      ...themTP,
+    ]);
+    notify.daLuu(
+      `Đã nhận ${themNL.length + themTP.length} dòng chuyển từ kỳ ${kyTruoc.dateRangeDescription || "trước"}`,
+      () => {
+        ghiTatCaNL(truocNL);
+        ghiTatCaTP(truocTP);
+      }
+    );
+  }, [kyTruoc, chuyenKyNL, chuyenKyTP, tatCaNL, tatCaTP, ghiTatCaNL, ghiTatCaTP, luuMoc, ky.id]);
+
   return {
     kyId: ky.id,
     ngay,
@@ -548,6 +650,10 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
     hutSanXuat,
     ghiSanXuatNhieuNgay,
     ngayDaChot,
+    kyTruoc,
+    soDongChuyenKy: chuyenKyNL.length + chuyenKyTP.length,
+    nhanChuyenKy,
+    daChot,
     hoanTacDuoc: lui.current.length > 0,
     lamLaiDuoc: tien.current.length > 0,
     hoanTac,

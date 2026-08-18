@@ -60,8 +60,12 @@ import {
   Redo2,
   Rows3,
   Scale,
+  Lock,
+  LockOpen,
+  ArrowRightLeft,
   Undo2,
 } from "lucide-react";
+import { HopChotKy } from "./gridDialogs";
 import BangCanDoi from "./BalancingTable";
 
 /** Chuỗi ngày để in trên bảng, sinh từ khoảng ngày đã chọn. */
@@ -410,6 +414,7 @@ function KyDetail({
   /* Xếp hai khối cạnh nhau (như file Excel gốc) — người dùng tự bật, không tự
      đổi theo bề rộng: bố cục nhảy khi thu cột là thứ gây mất phương hướng nhất. */
   const [xepNgang, setXepNgang] = useState(false);
+  const [chotMo, setChotMo] = useState(false);
 
   /* Ctrl+Z / Ctrl+Y — nghe ở cấp màn, bỏ qua khi con trỏ đang trong hộp thoại. */
   useEffect(() => {
@@ -588,6 +593,22 @@ function KyDetail({
         />
       </Card>
 
+      {/* Vòng gối đầu: phần kỳ trước đẩy sang được kéo vào đây bằng một nút, thay
+          cho việc mở file kỳ cũ ra chép tay. */}
+      {luoi.soDongChuyenKy > 0 && !luoi.daChot && (
+        <Card className="flex flex-wrap items-center justify-between gap-3 p-5">
+          <p className="text-base">
+            Kỳ trước ({luoi.kyTruoc?.dateRangeDescription || "…"}) có{" "}
+            <strong>{luoi.soDongChuyenKy}</strong> dòng đẩy sang kỳ này mà chưa kỳ nào
+            nhận.
+          </p>
+          <Button size="lg" onClick={luoi.nhanChuyenKy}>
+            <ArrowRightLeft />
+            Nhận {luoi.soDongChuyenKy} dòng chuyển kỳ
+          </Button>
+        </Card>
+      )}
+
       <Card className="p-5">
         <h2 className="mb-4 text-xl font-semibold">Kết quả cân đối</h2>
         <div className="grid gap-x-8 gap-y-1 sm:grid-cols-2 lg:grid-cols-3">
@@ -623,6 +644,53 @@ function KyDetail({
           </div>
         )}
       </Card>
+
+      {/* Chốt kỳ đặt CUỐI màn — xem hết số rồi mới chốt, đúng chỗ của thanh chốt
+          ngày ở sổ nhập hàng. */}
+      <Card className="flex flex-wrap items-center justify-between gap-3 p-5">
+        <div>
+          <p className="text-lg font-semibold">
+            {ky.isLocked ? "Kỳ đã chốt" : "Kỳ đang mở"}
+          </p>
+          <p className="text-base text-muted-foreground">
+            {ky.isLocked
+              ? `Khoá lúc ${ky.lockedAt ? new Date(ky.lockedAt).toLocaleString("vi-VN") : "—"}${
+                  ky.lockNote ? ` · ${ky.lockNote}` : ""
+                }`
+              : "Chốt khi đã đối chiếu xong và gửi kế toán — sau đó mọi ô trong lưới khoá lại."}
+          </p>
+          {ky.reopenReason && (
+            <p className="text-base text-warning">Lần mở lại gần nhất: {ky.reopenReason}</p>
+          )}
+        </div>
+        <Button
+          variant={ky.isLocked ? "outline" : "default"}
+          size="lg"
+          onClick={() => setChotMo(true)}
+        >
+          {ky.isLocked ? <LockOpen /> : <Lock />}
+          {ky.isLocked ? "Mở lại kỳ" : "Chốt kỳ"}
+        </Button>
+      </Card>
+
+      {chotMo && (
+        <HopChotKy
+          daChot={Boolean(ky.isLocked)}
+          tenKy={`${ky.materialTypeName} · ${ky.dateRangeDescription}`}
+          tongTP={`${num(kq.totalOutputKg)} kg bán thành phẩm`}
+          onClose={() => setChotMo(false)}
+          onLuu={(ghiChu) => {
+            /* Mở lại KHÔNG xoá dấu đã chốt — chỉ hạ cờ và ghi lý do, giữ vết. */
+            onChangeKy(
+              ky.isLocked
+                ? { isLocked: false, reopenReason: ghiChu }
+                : { isLocked: true, lockedAt: new Date().toISOString(), lockNote: ghiChu }
+            );
+            notify.daLuu(ky.isLocked ? "Đã mở lại kỳ" : "Đã chốt kỳ");
+            setChotMo(false);
+          }}
+        />
+      )}
 
       {showBang && (
         <BangCanDoi

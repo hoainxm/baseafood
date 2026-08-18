@@ -323,3 +323,61 @@ export function HopLyDoGhiBu({
     </Dialog>
   );
 }
+
+/* ---------- Chốt kỳ / mở lại kỳ ---------- */
+
+export function HopChotKy({
+  daChot,
+  tenKy,
+  tongTP,
+  onClose,
+  onLuu,
+}: {
+  daChot: boolean;
+  tenKy: string;
+  tongTP: string;
+  onClose: () => void;
+  onLuu: (ghiChu: string) => void;
+}) {
+  const [ghiChu, setGhiChu] = useState("");
+  return (
+    <Dialog open onOpenChange={(v) => !v && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{daChot ? "Mở lại kỳ đã chốt?" : "Chốt kỳ này?"}</DialogTitle>
+          <DialogDescription>
+            {daChot
+              ? `Kỳ "${tenKy}" đang khoá. Mở lại để sửa số — hệ thống giữ vết ai mở và vì sao, không xoá dấu đã chốt.`
+              : `Chốt kỳ "${tenKy}" (${tongTP}). Sau khi chốt, mọi ô trong lưới khoá lại để số đã gửi kế toán không bị đổi âm thầm. Vẫn mở lại được.`}
+          </DialogDescription>
+        </DialogHeader>
+        <Field label={daChot ? "Lý do mở lại" : "Ghi chú khi chốt"}>
+          <Textarea
+            value={ghiChu}
+            onChange={(e) => setGhiChu(e.target.value)}
+            placeholder={daChot ? "Kế toán báo lệch 12 kg mặt hàng luộc 230-250" : "Đã đối chiếu với bảng phụ, gửi kế toán"}
+          />
+        </Field>
+        <DialogFooter>
+          <Button variant="outline" size="lg" onClick={onClose}>
+            Hủy
+          </Button>
+          <Button
+            size="lg"
+            onClick={() => {
+              /* Mở lại BẮT BUỘC có lý do — giống mở lại ngày đã chốt ở sổ nhập.
+                 Chốt thì ghi chú không bắt buộc. */
+              if (daChot && !ghiChu.trim()) {
+                notify.loi("Chưa ghi lý do mở lại");
+                return;
+              }
+              onLuu(ghiChu.trim());
+            }}
+          >
+            {daChot ? "Mở lại kỳ" : "Chốt kỳ"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}

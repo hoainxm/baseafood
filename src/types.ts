@@ -177,6 +177,11 @@ export interface BalancingPeriod {
   exchangeRate: number | null; // VND/USD (e.g. 26000)
   processingCostPerKg: number | null; // VND
   createdAt: string;
+  /** Chốt kỳ — khoá số sau khi gửi kế toán. Mở lại được nhưng phải ghi lý do. */
+  isLocked?: boolean;
+  lockedAt?: string;
+  lockNote?: string;
+  reopenReason?: string;
 }
 
 /** Nguồn dựng dòng lưới: rỗng = nhập tay, còn lại = dựng từ sổ khác. */
@@ -198,6 +203,8 @@ export interface BalancingInputItem {
   dailyQuantities?: DailyQuantities;
   /** Chuyển kỳ: âm = đẩy sang kỳ sau, dương = lấy từ kỳ trước. */
   carryOverKg?: number;
+  /** Kỳ đã nhận phần chuyển kỳ âm của dòng này (chống lấy hai lần). */
+  carryOverPeriodId?: string;
   /** Dòng "Giảm": nguyên liệu không chế biến hết, nhập về kho xưởng. */
   isReduction?: boolean;
   reductionWarehouseId?: string;

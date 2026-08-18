@@ -2,6 +2,7 @@
 covers: src/features/balancing/BalancingScreen.tsx, src/features/balancing/usePeriodGrid.ts, src/features/balancing/MaterialGrid.tsx, src/features/balancing/WipGrid.tsx, src/features/balancing/gridDialogs.tsx, src/features/balancing/BalancingTable.tsx, src/lib/balancingCalc.ts, src/lib/balancingGrid.ts, src/design-system/patterns/EditableGrid.tsx
 last_verified: 2026-08-18
 ttl_days: 90
+<!-- updated: 2026-08-18 (b) — CHỐT KỲ (migration 0020) khoá toàn bộ ô, mở lại bắt lý do; NHẬN CHUYỂN KỲ tự dựng dòng từ kỳ liền trước (khép vòng gối đầu) -->
 <!-- updated: 2026-08-18 — Ctrl+Z/Ctrl+Y cho cả kỳ (ngăn xếp ảnh chụp trong usePeriodGrid); dòng CHẨN ĐOÁN vì sao kỳ trống + kéo dòng từ kỳ khác; thu/mở cột ngay trong phiếu in; nút Xếp ngang hai khối -->
 <!-- updated: 2026-08-17 (c) — TÁCH FILE: usePeriodGrid.ts (dữ liệu + thao tác) · MaterialGrid/WipGrid/gridDialogs (giao diện); ô ngày dòng hút GÕ ĐƯỢC và ghi thẳng về sổ Nhập hàng; ô tính lại theo TỪNG PHÍM; thêm đường 'Chọn dòng nhập' khi tên loại NL lệch; dòng Giảm chọn loại NL từ danh mục -->
 <!-- updated: 2026-08-17 (b) — BỎ khối phế liệu khỏi kỳ; gộp 2 khối vào MỘT thẻ chung 1 công tắc cột ngày; cột Khách thành Combobox chọn/tạo tại chỗ; vá lỗi sr-only caption đội chiều cao trang; khoá cuộn nền khi mở phiếu in -->
@@ -19,7 +20,23 @@ Trả lời câu: lô nguyên liệu này ra bao nhiêu thành phẩm, định m
 
 Đã có: CRUD kỳ · **lưới theo ngày một màn** (hàng = mặt hàng, cột = ngày) · thông số kỳ (tổng NL nhận, chi phí CB/kg TP, tỉ giá) · tính định mức + lãi/lỗ + tỉ lệ thu hồi · **hút sổ Nhập hàng + sổ Sản xuất BTP** · **ô Giảm → kho xưởng** · **cột Chuyển kỳ** · **dán khối số từ Excel** · xem/in bảng A4 (có cột ngày, in ngang khi kỳ > 3 ngày).
 
-Chưa có: quy tắc **chia NL cho từng bảng cân đối** (bảng phụ theo ngày là tổng NL nhận cả xưởng, mỗi bảng chỉ lấy phần đưa vào mặt hàng đó — cân riêng hay ước tính? **chưa chốt với xí nghiệp**); tên gọi chính thức của chỉ số ≈ 0,45; **dựng dòng đối ứng tự động ở kỳ kế tiếp** cho phần Chuyển kỳ âm (hiện mới ghi được số + kho đích, kỳ sau vẫn phải khai tay).
+### Chốt kỳ (migration 0020)
+
+Cùng luật với chốt ngày ở sổ nhập hàng: chốt xong **mọi ô trong lưới khoá**, mở lại được nhưng **bắt lý do**, và mở lại KHÔNG xoá vết đã chốt (`lockedAt` / `lockNote` giữ nguyên, chỉ hạ `isLocked` và ghi `reopenReason`).
+
+Khoá ở MỘT chỗ: `MaterialGrid` / `WipGrid` map lại mảng cột thành `khoa: () => true` khi `luoi.daChot`. Thêm cột mới về sau tự động được khoá theo — đừng rải `disabled` từng ô.
+
+Thanh chốt đặt **cuối màn**, đúng chỗ của thanh chốt ngày: xem hết số rồi mới chốt.
+
+### Nhận chuyển kỳ từ kỳ liền trước
+
+`kyLienTruoc()` tìm kỳ **cùng họ nguyên liệu**, kết thúc trước ngày bắt đầu kỳ này, gần nhất. Dòng của kỳ đó có `carryOverKg < 0` (đẩy sang kỳ sau) và chưa ai nhận ⇒ nút *"Nhận N dòng chuyển kỳ"*.
+
+Nhận = dựng dòng mới ở kỳ này với `carryOverKg` **dương** bằng trị tuyệt đối, và ghi `carryOverPeriodId` lên dòng NGUỒN để không lấy hai lần. Dòng nguyên liệu nhận về vào nhóm **Xả đông** (hàng kỳ trước cất kho, kỳ này lấy ra dùng) với `sourceWarehouse = "Kho mình"`.
+
+⇒ Vòng gối đầu khép lại mà không ai phải mở file kỳ cũ ra chép tay — chép tay là chỗ số bắt đầu lệch.
+
+Chưa có: quy tắc **chia NL cho từng bảng cân đối** (bảng phụ theo ngày là tổng NL nhận cả xưởng, mỗi bảng chỉ lấy phần đưa vào mặt hàng đó — cân riêng hay ước tính? **chưa chốt với xí nghiệp**); tên gọi chính thức của chỉ số ≈ 0,45.
 
 Bảng dùng: `balancing_periods`, `balancing_inputs`, `balancing_outputs`, đọc `products` / `customers` / `material_types`, và **đọc-ghi `material_imports` + `production_wips`** (cột `balancing_period_id`).
 

@@ -317,6 +317,10 @@ export const BANG_BALANCING_PERIOD: AnhXaBang<BalancingPeriod> = {
     exchange_rate: x.exchangeRate,
     processing_cost_per_kg: x.processingCostPerKg,
     created_at: x.createdAt,
+    is_locked: x.isLocked ?? false,
+    locked_at: x.lockedAt || null,
+    lock_note: x.lockNote ?? "",
+    reopen_reason: x.reopenReason ?? "",
   }),
   fromRow: (r) => ({
     id: s(r.id),
@@ -328,6 +332,18 @@ export const BANG_BALANCING_PERIOD: AnhXaBang<BalancingPeriod> = {
     exchangeRate: n(r.exchange_rate),
     processingCostPerKg: n(r.processing_cost_per_kg),
     createdAt: s(r.created_at),
+    isLocked: Boolean(r.is_locked),
+    lockedAt: s(r.locked_at),
+    lockNote: s(r.lock_note),
+    reopenReason: s(r.reopen_reason),
+  }),
+  // Kỳ ghi trước 0020 chưa có cờ chốt → coi như chưa chốt.
+  vaDongCu: (x) => ({
+    ...x,
+    isLocked: x.isLocked ?? false,
+    lockedAt: x.lockedAt ?? "",
+    lockNote: x.lockNote ?? "",
+    reopenReason: x.reopenReason ?? "",
   }),
 };
 
@@ -346,6 +362,7 @@ export const BANG_BALANCING_INPUT: AnhXaBang<BalancingInputItem> = {
     source_warehouse: x.sourceWarehouse,
     daily_quantities: x.dailyQuantities ?? {},
     carry_over_kg: x.carryOverKg ?? 0,
+    carry_over_period_id: x.carryOverPeriodId ?? "",
     is_reduction: x.isReduction ?? false,
     reduction_warehouse_id: x.reductionWarehouseId ?? "",
     auto_source: x.autoSource ?? "",
@@ -361,6 +378,7 @@ export const BANG_BALANCING_INPUT: AnhXaBang<BalancingInputItem> = {
     sourceWarehouse: r.source_warehouse == null ? "" : s(r.source_warehouse),
     dailyQuantities: doiSanLuongNgay(r.daily_quantities),
     carryOverKg: Number(r.carry_over_kg ?? 0),
+    carryOverPeriodId: s(r.carry_over_period_id),
     isReduction: Boolean(r.is_reduction),
     reductionWarehouseId: s(r.reduction_warehouse_id),
     autoSource: s(r.auto_source) as GridAutoSource,
@@ -370,6 +388,7 @@ export const BANG_BALANCING_INPUT: AnhXaBang<BalancingInputItem> = {
     ...x,
     dailyQuantities: x.dailyQuantities ?? {},
     carryOverKg: x.carryOverKg ?? 0,
+    carryOverPeriodId: x.carryOverPeriodId ?? "",
     isReduction: x.isReduction ?? false,
     reductionWarehouseId: x.reductionWarehouseId ?? "",
     autoSource: x.autoSource ?? "",

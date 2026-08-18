@@ -67,8 +67,11 @@ import {
   Truck,
   Warehouse,
   X,
+  Replace,
 } from "lucide-react";
 import PhieuNLNgay from "@/features/imports/DailyImportInvoice";
+
+import { HopDoiLoaiHangLoat } from "./BulkTypeChange";
 
 const PHAN_XUONG: Workshop[] = ["Đông", "Cá", "Khô"];
 
@@ -208,6 +211,7 @@ export default function NhapNguyenLieuScreen() {
   const [locLoaiNL, setLocLoaiNL] = useState("");
   const [locGia, setLocGia] = useState<"tat-ca" | "thieu-gia">("tat-ca");
   const [moLocThem, setMoLocThem] = useState(false);
+  const [doiLoaiMo, setDoiLoaiMo] = useState(false);
   const [xemPhieu, setXemPhieu] = useState(false);
 
   const [daiLy, setDaiLy] = useSuppliers();
@@ -757,12 +761,36 @@ export default function NhapNguyenLieuScreen() {
             <FileText />
             Xem báo cáo
           </Button>
+          <Button variant="outline" size="lg" onClick={() => setDoiLoaiMo(true)}>
+            <Replace />
+            Đổi loại hàng loạt
+          </Button>
           <Button size="lg" onClick={moThem}>
             <Plus />
             Ghi chuyến hàng
           </Button>
         </div>
       </div>
+
+      {doiLoaiMo && (
+        <HopDoiLoaiHangLoat
+          rows={rows}
+          loaiNL={loaiNL}
+          onThemLoaiNL={themLoaiNL}
+          onClose={() => setDoiLoaiMo(false)}
+          onLuu={(ids, loaiDich) => {
+            const bo = new Set(ids);
+            const truoc = rows;
+            persist(
+              rows.map((r) => (bo.has(r.id) ? { ...r, materialTypeName: loaiDich } : r))
+            );
+            notify.daLuu(`Đã đổi ${ids.length} chuyến sang "${loaiDich}"`, () =>
+              persist(truoc)
+            );
+            setDoiLoaiMo(false);
+          }}
+        />
+      )}
 
       <ThongKe
         className="grid-cols-2 sm:grid-cols-3 lg:grid-cols-5"

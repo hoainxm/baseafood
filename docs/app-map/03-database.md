@@ -1,9 +1,10 @@
 > Load khi: thêm/sửa bảng, cột, migration, hay đọc lỗi Postgres lạ.
 covers: supabase/migrations/**, docs/ops/supabase-setup.md
-last_verified: 2026-08-17
+last_verified: 2026-08-18
 ttl_days: 90
 <!-- updated: 2026-08-07 — thêm migration 0008 (nguyen_lieu_vao.nguon_kho, cờ nguồn xả đông) -->
 <!-- updated: 2026-08-14 — bổ sung dòng migration 0016/0017/0018 (trước đó bảng dừng ở 0015); 0018 cho NL vào âm -->
+<!-- updated: 2026-08-18 — thêm 0020 (chốt kỳ cân đối + carry_over_period_id cho balancing_inputs) -->
 <!-- updated: 2026-08-17 — thêm 0019 (lưới cân đối theo ngày: cột hút kỳ, Giảm, chuyển kỳ, tách size 2 da) -->
 
 # Cơ sở dữ liệu & migration
@@ -66,6 +67,7 @@ App dùng camelCase, DB dùng snake_case — cầu nối là `AnhXaBang.toRow/fr
 | `0017_kho_bsf1_nxt.sql` | 🟡 | Thêm bảng kho BSF1 + báo cáo Nhập-Xuất-Tồn 5 kho. Chỉ thêm, idempotent. |
 | `0018_nl_vao_cho_phep_am.sql` | 🟡 | Đổi CHECK `balancing_inputs.quantity_kg`: `>= 0` → `<> 0` (cho **NL vào ÂM** — điều chỉnh giảm / "bán nội địa", khớp luật app Khối 1). `NOT VALID` (không kiểm dòng cũ), idempotent, lùi được. Sửa bug 23514 khi ghi dòng NL âm lên Supabase. |
 | `0019_can_doi_luoi_ngay.sql` | 🟡 | **Lưới cân đối theo ngày.** Thêm `balancing_period_id` vào `material_imports` + `production_wips` (hút = gán kỳ lên bản ghi gốc, không chép số); thêm `daily_quantities` (jsonb) · `carry_over_kg` · `auto_source` cho `balancing_inputs`/`balancing_outputs`; `is_reduction` + `reduction_warehouse_id` cho ô **Giảm**. Tách size: `Bạch tuộc 2 da` → **lớn (80↑)** (dữ liệu cũ đổi hết sang lớn) + thêm **nhỏ (80↓)**. **KHÔNG** đổi `balancing_periods.material_type_name` — kỳ giữ tên HỌ để gom cả hai size. Chỉ thêm cột, idempotent, có khối `ROLLBACK` sẵn trong file. |
+| `0020_chot_ky_va_chuyen_ky.sql` | 🟡 | **Chốt kỳ cân đối**: `balancing_periods` thêm `is_locked` / `locked_at` / `lock_note` / `reopen_reason` (cùng luật chốt ngày: mở lại bắt lý do, KHÔNG xoá vết). **Chuyển kỳ**: `balancing_inputs` thêm `carry_over_period_id` (bảng outputs đã có từ 0019) + index cho cả hai — dòng đẩy sang kỳ sau nhớ đã được kỳ nào nhận, chống lấy hai lần. Chỉ thêm cột, idempotent, có khối `ROLLBACK`. |
 
 ⚠️ **`0004` chưa chạy** ⇒ app báo *"Mất kết nối máy chủ — Could not find the 'chuyen_id' column"*. Số liệu vẫn ghi xuống máy và nằm trong hàng chờ, tự đẩy lên sau khi migration chạy — nhưng máy khác chưa thấy.
 

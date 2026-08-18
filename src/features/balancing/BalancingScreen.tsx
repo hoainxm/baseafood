@@ -23,6 +23,8 @@ import {
   useScraps,
   useSalesInvoices,
   useBalancingOutputs,
+  useMaterialImports,
+  useWipProductions,
 } from "@/lib/catalogRepo";
 import { usePeriodGrid } from "./usePeriodGrid";
 import { LuoiNguyenLieu } from "./MaterialGrid";
@@ -78,6 +80,9 @@ export default function CanDoiScreen() {
   const [tatCaNL, ghiNL] = useBalancingInputs();
   const [tatCaPL, ghiPL] = useScraps();
   const [tatCaTP, ghiTP] = useBalancingOutputs();
+  /* Hai sổ nguồn: kỳ chỉ MƯỢN dòng của chúng bằng `balancingPeriodId`. */
+  const [tatCaNhap, ghiNhap] = useMaterialImports();
+  const [tatCaSanXuat, ghiSanXuat] = useWipProductions();
 
   /** Gõ loại mới trong ô chọn → LƯU LUÔN vào danh mục (rule 7), không để mồ côi. */
   const themLoaiNL = (ten: string) => {
@@ -137,6 +142,8 @@ export default function CanDoiScreen() {
     const truocNL = tatCaNL;
     const truocPL = tatCaPL;
     const truocTP = tatCaTP;
+    const truocNhap = tatCaNhap;
+    const truocSanXuat = tatCaSanXuat;
     persistKy(kyList.filter((x) => x.id !== k.id));
     ghiNL(tatCaNL.filter((r) => r.periodId !== k.id));
     /* Phế liệu cân ở màn Nhập hàng chỉ MƯỢN kỳ này — xóa kỳ thì gỡ liên kết,
@@ -149,12 +156,31 @@ export default function CanDoiScreen() {
         )
     );
     ghiTP(tatCaTP.filter((r) => r.periodId !== k.id));
-    notify.daXoa(`Đã xóa kỳ "${k.materialTypeName}" và toàn bộ dòng của kỳ`, () => {
-      persistKy(truocKy);
-      ghiNL(truocNL);
-      ghiPL(truocPL);
-      ghiTP(truocTP);
-    });
+    /* Sổ nhập hàng và sổ sản xuất cũng chỉ MƯỢN kỳ này: xóa kỳ phải NHẢ dòng
+       ra, không thì chúng còn ghim vào một kỳ đã chết — mọi kỳ sau lọc theo
+       "chưa gắn kỳ nào" sẽ không thấy chúng nữa và số liệu biến mất khỏi cân
+       đối vĩnh viễn (dù sổ gốc vẫn còn nguyên). */
+    ghiNhap(
+      tatCaNhap.map((r) =>
+        r.balancingPeriodId === k.id ? { ...r, balancingPeriodId: "" } : r
+      )
+    );
+    ghiSanXuat(
+      tatCaSanXuat.map((r) =>
+        r.balancingPeriodId === k.id ? { ...r, balancingPeriodId: "" } : r
+      )
+    );
+    notify.daXoa(
+      `Đã xóa kỳ "${k.materialTypeName}" — số ở sổ nhập hàng và sổ sản xuất vẫn còn`,
+      () => {
+        persistKy(truocKy);
+        ghiNL(truocNL);
+        ghiPL(truocPL);
+        ghiTP(truocTP);
+        ghiNhap(truocNhap);
+        ghiSanXuat(truocSanXuat);
+      }
+    );
   };
 
   const sel = kyList.find((k) => k.id === selId) || null;

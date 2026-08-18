@@ -1,4 +1,14 @@
 -- ============================================================
+-- ⛔ ĐÃ THAY THẾ BỞI `0021_siet_rls_tieng_anh.sql` — ĐỪNG CHẠY FILE NÀY.
+--
+-- File này viết theo tên bảng TIẾNG VIỆT của thời trước `0016_rename_to_english`
+-- (nhap_nguyen_lieu, ky_can_doi, phe_lieu…). Sau `0016` những tên đó không còn
+-- tồn tại, nên chạy file này sẽ lỗi hoặc không siết được gì; nó cũng bỏ sót
+-- toàn bộ bảng thêm từ `0011`/`0017` (sản xuất BTP, đơn đặt, lệnh xuất, kho).
+-- Giữ lại để đọc lịch sử. Siết RLS: dùng `0021`.
+-- ============================================================
+
+-- ============================================================
 -- Siết RLS: thu hồi quyền của `anon`, chỉ cho người đã đăng nhập.
 --
 -- ⚠️ CHỈ CHẠY SAU KHI app đã có màn đăng nhập Supabase Auth.

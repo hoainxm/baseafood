@@ -1,9 +1,11 @@
 > Load khi: thiết kế/xây module WIP — sản xuất bán thành phẩm ngày, kho dự trữ đông, đơn đặt, xuất container.
 covers: src/features/production/WipProductionScreen.tsx, src/features/warehouse/ReserveWarehouseScreen.tsx, src/features/orders/SalesOrderScreen.tsx, src/lib/inventory.ts, supabase/migrations/0011_wip_san_xuat_kho_don.sql
-last_verified: 2026-08-07
+last_verified: 2026-08-17
 ttl_days: 90
 status: ba-spec — ĐÃ BUILD v1 (migration 0011 + 3 màn WipProductionScreen/ReserveWarehouseScreen/SalesOrderScreen)
 <!-- re-verified: 2026-08-14 — đồng bộ tên file sau rename eadc360: WipProductionScreen/ReserveWarehouseScreen/SalesOrderScreen -->
+
+<!-- updated: 2026-08-17 — production_wips thêm balancing_period_id: kỳ cân đối hút sản lượng BTP theo ngày và GHI NGƯỢC khi sửa ô trong lưới (xem 31-can-doi-ky). Ngày đã chốt sản xuất vẫn sửa được nhưng bắt lý do ghi bù. -->
 
 # BA-SPEC — Module WIP: Sản xuất BTP · Kho dự trữ · Đơn đặt · Xuất container
 

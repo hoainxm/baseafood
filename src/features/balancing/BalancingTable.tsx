@@ -3,16 +3,18 @@
 // Tên tiếng Việt: Bảng tính cân đối chi tiết và in ấn
 // Description: Balancing Period Detail Table and Print Layout
 // ============================================================
+import { useEffect } from "react";
 import type { ReactNode } from "react";
 import type {
   BalancingPeriod,
   BalancingInputItem,
-  ScrapItem,
   BalancingOutputItem,
   Product,
   Customer,
 } from "@/types";
 import type { BalancingResult } from "@/lib/balancingCalc";
+import type { MaterialImportItem, WipProductionItem } from "@/types";
+import { dungHangNL, dungHangTP, nhanNgay, ngayTrongKy } from "@/lib/balancingGrid";
 import { Button } from "@/design-system";
 import { num } from "@/lib/format";
 import { Printer, X } from "lucide-react";
@@ -20,27 +22,46 @@ import { Printer, X } from "lucide-react";
 export default function BangCanDoi({
   ky,
   nlVao,
-  pheLieu,
   tp,
   matHang,
   khach,
   kq,
+  nhapDaGan,
+  sanXuatDaGan,
   onClose,
 }: {
   ky: BalancingPeriod;
   nlVao: BalancingInputItem[];
-  pheLieu: ScrapItem[];
   tp: BalancingOutputItem[];
   matHang: Product[];
   khach: Customer[];
   kq: BalancingResult;
+  /** So nguon da gan ky — de ban in co cot tung ngay nhu bang giay. */
+  nhapDaGan: MaterialImportItem[];
+  sanXuatDaGan: WipProductionItem[];
   onClose: () => void;
 }) {
   const tenMH = (id: string) => matHang.find((m) => m.id === id)?.name || "—";
   const tenKH = (id: string) => khach.find((k) => k.id === id)?.name || "—";
 
+  const ngay = ngayTrongKy(ky);
+  const hangNL = dungHangNL(nlVao, nhapDaGan);
+  const hangTP = dungHangTP(tp, sanXuatDaGan);
+  /* Nhieu cot ngay ⇒ in NGANG, neu khong bang bi cat mat cot cuoi. */
+  const inNgang = ngay.length > 3;
+
+  /* Khoá cuộn nền khi phiếu đang mở — xem ghi chú ở src/index.css. */
+  useEffect(() => {
+    document.documentElement.setAttribute("data-xem-phieu", "");
+    return () => document.documentElement.removeAttribute("data-xem-phieu");
+  }, []);
+
   return (
-    <div className="print-root fixed inset-0 z-50 overflow-auto bg-white p-6 text-slate-900 sm:p-10">
+    <div
+      className={`print-root fixed inset-0 z-50 overflow-auto bg-white p-6 text-slate-900 sm:p-10 ${
+        inNgang ? "print-landscape" : ""
+      }`}
+    >
       {/* Thanh công cụ */}
       <div className="no-print mx-auto mb-5 flex max-w-4xl items-center justify-between">
         <Button variant="outline" onClick={onClose}>
@@ -51,7 +72,7 @@ export default function BangCanDoi({
         </Button>
       </div>
 
-      <div className="mx-auto max-w-4xl">
+      <div className={inNgang ? "mx-auto max-w-6xl" : "mx-auto max-w-4xl"}>
         <div className="text-center">
           <h1 className="text-lg font-bold uppercase tracking-wide">
             Bảng cân đối {ky.materialTypeName}
@@ -65,6 +86,12 @@ export default function BangCanDoi({
             <thead>
               <Tr head>
                 <Th>Loại</Th>
+                {ngay.map((iso) => (
+                  <Th key={iso} right>
+                    {nhanNgay(iso)}
+                  </Th>
+                ))}
+                <Th right>Chuyển kỳ</Th>
                 <Th right>SL (kg)</Th>
                 <Th right>Đơn giá</Th>
                 <Th right>Thành tiền</Th>
@@ -72,20 +99,36 @@ export default function BangCanDoi({
               </Tr>
             </thead>
             <tbody>
-              {nlVao.map((r) => (
+              {hangNL.map((r) => (
                 <Tr key={r.id}>
                   <Td>
-                    {r.name}
-                    <span className="ml-1 text-xs text-slate-500">({r.groupName})</span>
+                    {r.ten}
+                    <span className="ml-1 text-xs text-slate-500">
+                      ({r.laGiam ? "Giảm" : r.nhom})
+                    </span>
                   </Td>
-                  <Td right>{num(r.quantityKg)}</Td>
-                  <Td right>{num(r.unitPrice)}</Td>
-                  <Td right>{num(r.quantityKg * (r.unitPrice ?? 0))}</Td>
-                  <Td right>{r.ratioPercentage != null ? `${num(r.ratioPercentage)}%` : ""}</Td>
+                  {ngay.map((iso) => (
+                    <Td key={iso} right>
+                      {r.theoNgay[iso] ? num(r.theoNgay[iso]) : ""}
+                    </Td>
+                  ))}
+                  <Td right>{r.chuyenKy ? num(r.chuyenKy) : ""}</Td>
+                  <Td right>{num(r.tong)}</Td>
+                  <Td right>{num(r.donGia)}</Td>
+                  {/* Chưa khai đơn giá thì để trống — "-0" (dòng giảm × giá 0)
+                      đọc như một con số thật, người xem bảng in sẽ tưởng lỗi. */}
+                  <Td right>{r.donGia ? num(r.tong * r.donGia) : ""}</Td>
+                  <Td right>{r.tyLe != null ? `${num(r.tyLe)}%` : ""}</Td>
                 </Tr>
               ))}
               <Tr total>
-                <Td>Tổng nguyên liệu</Td>
+                <Td>T. CỘNG</Td>
+                {ngay.map((iso) => (
+                  <Td key={iso} right>
+                    {num(hangNL.reduce((s, r) => s + (r.theoNgay[iso] ?? 0), 0))}
+                  </Td>
+                ))}
+                <Td right>{num(hangNL.reduce((s, r) => s + r.chuyenKy, 0))}</Td>
                 <Td right>{num(kq.totalInputKg)}</Td>
                 <Td right></Td>
                 <Td right>{num(kq.materialValue)}</Td>
@@ -95,38 +138,6 @@ export default function BangCanDoi({
           </table>
         </Section>
 
-        {/* Phế liệu */}
-        {pheLieu.length > 0 && (
-          <Section title="Phế liệu (bán giá riêng)">
-            <table className="w-full border-collapse text-sm">
-              <thead>
-                <Tr head>
-                  <Th>Loại</Th>
-                  <Th right>SL (kg)</Th>
-                  <Th right>Đơn giá bán</Th>
-                  <Th right>Thành tiền</Th>
-                </Tr>
-              </thead>
-              <tbody>
-                {pheLieu.map((r) => (
-                  <Tr key={r.id}>
-                    <Td>{r.name}</Td>
-                    <Td right>{num(r.quantityKg)}</Td>
-                    <Td right>{num(r.sellingPrice)}</Td>
-                    <Td right>{num(r.quantityKg * (r.sellingPrice ?? 0))}</Td>
-                  </Tr>
-                ))}
-                <Tr total>
-                  <Td>Tổng phế liệu</Td>
-                  <Td right></Td>
-                  <Td right></Td>
-                  <Td right>{num(kq.scrapValue)}</Td>
-                </Tr>
-              </tbody>
-            </table>
-          </Section>
-        )}
-
         {/* Thành phẩm */}
         <Section title="Bán thành phẩm sản xuất (xuất khẩu / nội địa)">
           <table className="w-full border-collapse text-sm">
@@ -135,23 +146,40 @@ export default function BangCanDoi({
                 <Th>Mặt hàng</Th>
                 <Th>Khách</Th>
                 <Th>Kênh</Th>
+                <Th right>Chuyển kỳ</Th>
+                {ngay.map((iso) => (
+                  <Th key={iso} right>
+                    {nhanNgay(iso)}
+                  </Th>
+                ))}
                 <Th right>Lượng (kg)</Th>
                 <Th right>Đơn giá</Th>
                 <Th right>Thành tiền</Th>
               </Tr>
             </thead>
             <tbody>
-              {tp.map((r) => {
-                const xk = r.channel === "Xuất khẩu";
-                const tien = r.quantityKg * (r.unitPrice ?? 0);
+              {hangTP.map((r) => {
+                const xk = r.kenh === "Xuất khẩu";
+                const tien = r.tong * (r.donGia ?? 0);
                 return (
                   <Tr key={r.id}>
-                    <Td>{tenMH(r.productId)}</Td>
-                    <Td>{tenKH(r.customerId)}</Td>
+                    <Td>
+                      {tenMH(r.matHangId)}
+                      {r.quyCach && (
+                        <span className="ml-1 text-xs text-slate-500">{r.quyCach}</span>
+                      )}
+                    </Td>
+                    <Td>{tenKH(r.khachId)}</Td>
                     <Td>{xk ? "XK" : "Nội địa"}</Td>
-                    <Td right>{num(r.quantityKg)}</Td>
+                    <Td right>{r.chuyenKy ? num(r.chuyenKy) : ""}</Td>
+                    {ngay.map((iso) => (
+                      <Td key={iso} right>
+                        {r.theoNgay[iso] ? num(r.theoNgay[iso]) : ""}
+                      </Td>
+                    ))}
+                    <Td right>{num(r.tong)}</Td>
                     <Td right>
-                      {num(r.unitPrice)}
+                      {num(r.donGia)}
                       {xk ? " $" : ""}
                     </Td>
                     <Td right>
@@ -162,9 +190,15 @@ export default function BangCanDoi({
                 );
               })}
               <Tr total>
-                <Td>Tổng bán thành phẩm</Td>
+                <Td>Tổng cộng</Td>
                 <Td></Td>
                 <Td></Td>
+                <Td right>{num(hangTP.reduce((s, r) => s + r.chuyenKy, 0))}</Td>
+                {ngay.map((iso) => (
+                  <Td key={iso} right>
+                    {num(hangTP.reduce((s, r) => s + (r.theoNgay[iso] ?? 0), 0))}
+                  </Td>
+                ))}
                 <Td right>{num(kq.totalOutputKg)}</Td>
                 <Td right></Td>
                 <Td right></Td>

@@ -116,10 +116,48 @@ ngoài màn mà người dùng không biết là còn.
 |---|---|
 | Danh sách bản ghi (mặc định) | `RecordTable` — desktop ra bảng, điện thoại ra thẻ. Đánh dấu `chinh` cho cột tiêu đề thẻ, `anTrenDienThoai` cho cột phụ |
 | Báo cáo kiểu Excel, phải đối chiếu nhiều cột số | Giữ bảng rộng + `overflow-x-auto` + **`cot-dau-dinh`** trên `<table>` để khoá cột đầu |
+| **Nhập số hàng loạt kiểu bảng tính** (hàng = mặt hàng, cột = ngày) | `LuoiNhap` — xem mục 5b |
 | Bản in A4 | Ngoại lệ, giữ nguyên bố cục giấy — không responsive hoá |
 
 **Cấm** viết `<table className="min-w-[1120px]">` tay trong màn mới rồi bọc
 `overflow-x-auto` và coi là xong.
+
+### 5b. `LuoiNhap` — lưới nhập kiểu bảng tính
+
+Dùng khi người dùng phải gõ **nhiều ô số cùng lúc** và đang có sẵn thói quen làm
+việc đó trên Excel (màn Cân đối kỳ). Mở hộp thoại cho từng ô thì Excel vẫn nhanh
+hơn và người dùng sẽ quay về Excel — đó là lý do primitive này tồn tại.
+
+Cho sẵn:
+
+- Enter / mũi tên xuống → ô dưới; Tab → ô phải, hết hàng thì xuống dòng.
+- Ô khoá tự bị bỏ qua khi di chuyển, không làm kẹt con trỏ; khai `lyDoKhoa` để
+  người dùng biết vì sao không gõ được (đừng để ô câm).
+- **Dán khối từ Excel** (TSV). Hiểu cả `(2.000)` = −2.000 kiểu kế toán. Ô rỗng
+  trong khối dán **giữ nguyên** số cũ, không xoá về 0.
+- Cột dính bên trái, `min-w-44` trên máy nhỏ → `sm:min-w-60`.
+- Ô cao ≥ 44px, `tabular-nums`, số âm tô `text-destructive`.
+
+Luật khi dùng:
+
+- Ô nhập **ghi theo từng phím** (như `NumberField`), không đợi rời ô — cột tổng
+  và khối kết quả phải nhúc nhích theo con số đang gõ.
+- **Cột tổng phải là `kieu: "tinh"`** (ô tính, không gõ). Cho gõ tay vào cột tổng
+  là cách chắc chắn nhất để bảng lệch — bảng cân đối giấy của xí nghiệp đã lệch
+  1.109 kg đúng vì lý do đó.
+- Khoá ô (`khoa`) chỉ dùng khi ô **thật sự không có nghĩa**, không dùng để
+  "bảo vệ" số: ô khoá đọc ra là ô hỏng. Số đến từ sổ khác thì cho gõ rồi ghi
+  ngược về sổ đó.
+- Khai `onDanKhoi` nếu màn có ghi ra ngoài (state cha, sổ khác). Không khai thì
+  lưới rải từng ô qua `onGhiO`, và **nhiều `setState` liên tiếp trên cùng mảng
+  sẽ ghi đè nhau** — chỉ ô cuối sống sót.
+- Ô cần điều khiển (chọn khách, nút…): `CotLuoi.oRieng`, KHÔNG phải `hien`.
+  Combobox trong ô dùng `anNhan` — tiêu đề cột đã nói ô đó là gì.
+- **Cấm `sr-only` cho nhãn nằm trong hộp cuộn.** `sr-only` là `position:absolute`;
+  gặp tổ tiên không định vị thì rơi ra toạ độ trang, đội chiều cao trang lên và
+  sinh thêm một thanh cuộn dọc + mảng trắng dưới cùng. Dùng `aria-label`.
+- Dòng tiêu đề nhóm: `HangLuoi.tieuDeNhom`. Dòng tổng cuối bảng tự dựng ở màn
+  gọi qua `cuoiBang` (số cột phải khớp, kể cả khi nhóm cột đang thu).
 
 ### 6. Ba cái bẫy làm vỡ trang ở cỡ chữ 130%
 
@@ -156,6 +194,7 @@ ngoài màn mà người dùng không biết là còn.
 | Chọn ngày | `DateField` |
 | Chọn khoảng ngày | `DateRangeField` (hai ô riêng Từ / Đến) |
 | Danh sách bản ghi | `RecordTable` — truyền `sapXep` cho cột để bấm tiêu đề sắp xếp, truyền `timKiem` để hiện ô tìm |
+| Nhập nhiều ô số một lúc (lưới ngày) | `LuoiNhap` — cột tổng luôn `kieu: "tinh"` |
 | Danh mục có Thêm/Sửa/Xóa/Tìm | `DanhMucCrud` |
 | Xóa bất kỳ thứ gì | `ConfirmDelete` |
 | Thao tác hệ trọng không phải xóa (đăng xuất · chốt sổ · ghi đè · lệnh xuất) | `XacNhan` — nêu đích danh việc sắp làm + hệ quả, nút an toàn đứng trước |

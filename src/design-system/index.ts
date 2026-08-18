@@ -24,6 +24,12 @@ export {
 export { DanhMucCrud, type TruongDanhMuc } from "./patterns/CatalogCrudModal";
 export { Logo } from "./patterns/Logo";
 export { RecordTable, type Cot } from "./patterns/RecordTable";
+export {
+  LuoiNhap,
+  type CotLuoi,
+  type HangLuoi,
+  type KieuOLuoi,
+} from "./patterns/EditableGrid";
 export { ConfirmDelete } from "./patterns/ConfirmDelete";
 export { XacNhan } from "./patterns/ConfirmAction";
 export { StepForm, type BuocNhap } from "./patterns/StepForm";

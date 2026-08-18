@@ -35,6 +35,8 @@ import type {
   OrderItem,
   ExportOrder,
   ExportItem,
+  DailyQuantities,
+  GridAutoSource,
 } from "@/types";
 import { rolesFromCsv, rolesToCsv } from "@/types";
 
@@ -76,6 +78,29 @@ export interface AnhXaBang<T> {
 const s = (v: unknown) => (v == null ? "" : String(v));
 const n = (v: unknown) => (v == null || v === "" ? null : Number(v));
 const theoId = <T extends { id: string }>(x: T) => x.id;
+
+/**
+ * Cột `daily_quantities` (jsonb) → `{ "2025-07-22": 5120 }`.
+ * Supabase trả về object; bản sao localStorage có thể là chuỗi JSON. Bỏ mọi ô
+ * không phải số hữu hạn để một ô hỏng không làm tổng của cả kỳ thành NaN.
+ */
+function doiSanLuongNgay(v: unknown): DailyQuantities {
+  let raw: unknown = v;
+  if (typeof raw === "string") {
+    try {
+      raw = JSON.parse(raw);
+    } catch {
+      return {};
+    }
+  }
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  const ra: DailyQuantities = {};
+  for (const [ngay, so] of Object.entries(raw as Record<string, unknown>)) {
+    const x = Number(so);
+    if (Number.isFinite(x)) ra[ngay] = x;
+  }
+  return ra;
+}
 
 /* ---------- Ánh xạ camelCase (app) ↔ snake_case (Postgres) ---------- */
 
@@ -252,6 +277,7 @@ export const BANG_MATERIAL_IMPORT: AnhXaBang<MaterialImportItem> = {
     driver_name: x.driverName,
     license_plate: x.licensePlate,
     note: x.note,
+    balancing_period_id: x.balancingPeriodId ?? "",
   }),
   fromRow: (r) => ({
     id: s(r.id),
@@ -266,9 +292,15 @@ export const BANG_MATERIAL_IMPORT: AnhXaBang<MaterialImportItem> = {
     driverName: s(r.driver_name),
     licensePlate: s(r.license_plate),
     note: s(r.note),
+    balancingPeriodId: s(r.balancing_period_id),
   }),
   // Dòng ghi trước khi có "chuyến thật" → chưa gắn chuyến, app gom ngầm.
-  vaDongCu: (x) => (x.shipmentId == null ? { ...x, shipmentId: "" } : x),
+  // Dòng ghi trước 0019 chưa có cột kỳ cân đối → coi như chưa gắn kỳ nào.
+  vaDongCu: (x) => ({
+    ...x,
+    shipmentId: x.shipmentId ?? "",
+    balancingPeriodId: x.balancingPeriodId ?? "",
+  }),
 };
 
 export const BANG_BALANCING_PERIOD: AnhXaBang<BalancingPeriod> = {
@@ -312,6 +344,11 @@ export const BANG_BALANCING_INPUT: AnhXaBang<BalancingInputItem> = {
     unit_price: x.unitPrice,
     ratio_percentage: x.ratioPercentage,
     source_warehouse: x.sourceWarehouse,
+    daily_quantities: x.dailyQuantities ?? {},
+    carry_over_kg: x.carryOverKg ?? 0,
+    is_reduction: x.isReduction ?? false,
+    reduction_warehouse_id: x.reductionWarehouseId ?? "",
+    auto_source: x.autoSource ?? "",
   }),
   fromRow: (r) => ({
     id: s(r.id),
@@ -322,6 +359,20 @@ export const BANG_BALANCING_INPUT: AnhXaBang<BalancingInputItem> = {
     unitPrice: n(r.unit_price),
     ratioPercentage: n(r.ratio_percentage),
     sourceWarehouse: r.source_warehouse == null ? "" : s(r.source_warehouse),
+    dailyQuantities: doiSanLuongNgay(r.daily_quantities),
+    carryOverKg: Number(r.carry_over_kg ?? 0),
+    isReduction: Boolean(r.is_reduction),
+    reductionWarehouseId: s(r.reduction_warehouse_id),
+    autoSource: s(r.auto_source) as GridAutoSource,
+  }),
+  // Dòng ghi trước 0019 chưa có cột lưới ngày → mặc định rỗng, không vỡ tổng.
+  vaDongCu: (x) => ({
+    ...x,
+    dailyQuantities: x.dailyQuantities ?? {},
+    carryOverKg: x.carryOverKg ?? 0,
+    isReduction: x.isReduction ?? false,
+    reductionWarehouseId: x.reductionWarehouseId ?? "",
+    autoSource: x.autoSource ?? "",
   }),
 };
 
@@ -371,6 +422,10 @@ export const BANG_BALANCING_OUTPUT: AnhXaBang<BalancingOutputItem> = {
     unit_price: x.unitPrice,
     spec: x.spec ?? "",
     sales_item_id: x.salesItemId ?? "",
+    daily_quantities: x.dailyQuantities ?? {},
+    carry_over_kg: x.carryOverKg ?? 0,
+    carry_over_period_id: x.carryOverPeriodId ?? "",
+    auto_source: x.autoSource ?? "",
   }),
   fromRow: (r) => ({
     id: s(r.id),
@@ -382,12 +437,21 @@ export const BANG_BALANCING_OUTPUT: AnhXaBang<BalancingOutputItem> = {
     unitPrice: n(r.unit_price),
     spec: s(r.spec),
     salesItemId: s(r.sales_item_id),
+    dailyQuantities: doiSanLuongNgay(r.daily_quantities),
+    carryOverKg: Number(r.carry_over_kg ?? 0),
+    carryOverPeriodId: s(r.carry_over_period_id),
+    autoSource: s(r.auto_source) as GridAutoSource,
   }),
   // Dòng ghi trước 0005 không có quy cách / nguồn bán → coi là dòng nhập tay.
+  // Dòng ghi trước 0019 chưa có lưới ngày / chuyển kỳ → mặc định rỗng.
   vaDongCu: (x) => ({
     ...x,
     spec: x.spec ?? "",
     salesItemId: x.salesItemId ?? "",
+    dailyQuantities: x.dailyQuantities ?? {},
+    carryOverKg: x.carryOverKg ?? 0,
+    carryOverPeriodId: x.carryOverPeriodId ?? "",
+    autoSource: x.autoSource ?? "",
   }),
 };
 
@@ -484,6 +548,7 @@ export const BANG_WIP_PRODUCTION: AnhXaBang<WipProductionItem> = {
     warehouse: x.warehouse,
     status: x.status,
     note: x.note,
+    balancing_period_id: x.balancingPeriodId ?? "",
   }),
   fromRow: (r) => ({
     id: s(r.id),
@@ -498,7 +563,10 @@ export const BANG_WIP_PRODUCTION: AnhXaBang<WipProductionItem> = {
     warehouse: s(r.warehouse),
     status: (s(r.status) || "cho-nhap") as WipWarehouseStatus,
     note: s(r.note),
+    balancingPeriodId: s(r.balancing_period_id),
   }),
+  // Dòng ghi trước 0019 chưa có cột kỳ cân đối → coi như chưa gắn kỳ nào.
+  vaDongCu: (x) => ({ ...x, balancingPeriodId: x.balancingPeriodId ?? "" }),
 };
 
 /** Chốt ngày sản xuất (bảng riêng, cùng hình dạng DailyLock). */

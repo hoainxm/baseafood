@@ -15,6 +15,13 @@ body {
   margin: 0;
 }
 
+/* Mở phiếu in (overlay fixed phủ toàn màn): KHOÁ cuộn của nền. Không khoá thì
+   thanh cuộn của khung app vẫn nằm đó cạnh thanh cuộn của phiếu → người dùng
+   thấy hai thanh cuộn và không biết thanh nào là của phiếu. */
+html[data-xem-phieu] .scroll-nice {
+  overflow: hidden !important;
+}
+
 /* In bảng cân đối: chỉ in vùng .print-root, ẩn phần còn lại */
 @media print {
   body * {

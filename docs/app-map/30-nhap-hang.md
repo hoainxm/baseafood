@@ -1,9 +1,11 @@
 > Load khi: sửa bất cứ thứ gì ở màn Nhập hàng — chuyến, ngày, ghi bù, chốt ngày, phế liệu ngày, phiếu báo cáo ngày.
 covers: src/features/imports/MaterialImportScreen.tsx, src/features/imports/DailyImportInvoice.tsx, src/features/imports/ImportReport.tsx, src/features/imports/ImportTab.tsx, src/types.ts
-last_verified: 2026-08-14
+last_verified: 2026-08-17
 ttl_days: 90
 <!-- re-verified: 2026-08-06 — bộ lọc theo KỲ (ngày/tuần/tháng/năm/tùy chọn → phamViKy); loài/phân xưởng nhập bằng dropdown; báo cáo theo kỳ (mỗi ngày một khối, PhieuNLNgay nhận tuNgay/denNgay); phế liệu thêm nhiều loại/lần; chốt ngày cuối màn — khớp MaterialImportScreen.tsx + DailyImportInvoice.tsx -->
 <!-- re-verified: 2026-08-14 — đồng bộ tên file sau rename eadc360: DailyImportInvoice.tsx/ImportReport.tsx/ImportTab.tsx (symbol PhieuNLNgay/BaoCaoNhap giữ nguyên) -->
+
+<!-- updated: 2026-08-17 — 0019: cột balancing_period_id (kỳ cân đối hút dòng nhập); loại NL 'Bạch tuộc 2 da' tách thành lớn (80↑)/nhỏ (80↓) -->
 
 # Sổ nhập nguyên liệu hàng ngày
 

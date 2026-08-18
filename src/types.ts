@@ -104,6 +104,8 @@ export interface MaterialImportItem {
   driverName: string;
   licensePlate: string;
   note: string;
+  /** Kỳ cân đối đã hút dòng này (rỗng = chưa gắn kỳ nào). */
+  balancingPeriodId?: string;
 }
 
 export function calculateImportAmount(r: Pick<MaterialImportItem, "quantityKg" | "unitPrice">): number {
@@ -177,6 +179,12 @@ export interface BalancingPeriod {
   createdAt: string;
 }
 
+/** Nguồn dựng dòng lưới: rỗng = nhập tay, còn lại = dựng từ sổ khác. */
+export type GridAutoSource = "" | "imports" | "production" | "sales";
+
+/** Sản lượng theo ngày trong kỳ: { "2025-07-22": 5120 }. */
+export type DailyQuantities = Record<string, number>;
+
 export interface BalancingInputItem {
   id: string;
   periodId: string;
@@ -186,6 +194,14 @@ export interface BalancingInputItem {
   unitPrice: number | null; // VND
   ratioPercentage: number | null; // % (for additive powder)
   sourceWarehouse?: string; // "Mua về" | "Kho mình"
+  /** Chỉ dùng cho dòng nhập tay — dòng hút lấy ngày từ sổ nhập hàng. */
+  dailyQuantities?: DailyQuantities;
+  /** Chuyển kỳ: âm = đẩy sang kỳ sau, dương = lấy từ kỳ trước. */
+  carryOverKg?: number;
+  /** Dòng "Giảm": nguyên liệu không chế biến hết, nhập về kho xưởng. */
+  isReduction?: boolean;
+  reductionWarehouseId?: string;
+  autoSource?: GridAutoSource;
 }
 
 export type ScrapSource = "Nhập hàng" | "Cân đối";
@@ -211,6 +227,23 @@ export interface BalancingOutputItem {
   unitPrice: number | null; // USD or VND
   spec?: string;
   salesItemId?: string;
+  /** Chỉ dùng cho dòng nhập tay — dòng hút lấy ngày từ sổ sản xuất. */
+  dailyQuantities?: DailyQuantities;
+  /** Chuyển kỳ: âm = đẩy sang kỳ sau, dương = lấy từ kỳ trước. */
+  carryOverKg?: number;
+  /** Kỳ nhận phần chuyển kỳ âm (dựng dòng đối ứng ở kỳ sau). */
+  carryOverPeriodId?: string;
+  autoSource?: GridAutoSource;
+}
+
+/**
+ * Tổng của một dòng lưới = tổng sản lượng các ngày + phần chuyển kỳ.
+ * Cột Tổng là ô TÍNH, không cho gõ — đây là chỗ bảng Excel gốc sai
+ * (mặt hàng chép hai lần, tổng lệch 1.109 kg).
+ */
+export function sumGridRow(daily: DailyQuantities | undefined, carryOverKg?: number): number {
+  const days = daily ? Object.values(daily).reduce((s, v) => s + (v || 0), 0) : 0;
+  return days + (carryOverKg ?? 0);
 }
 
 /* ---------- Daily Sales ---------- */
@@ -262,6 +295,8 @@ export interface WipProductionItem {
   warehouse: string;
   status: WipWarehouseStatus;
   note: string;
+  /** Kỳ cân đối đã hút dòng này (rỗng = chưa gắn kỳ nào). */
+  balancingPeriodId?: string;
 }
 
 export function isBackdatedWip(c: Pick<WipProductionItem, "productionDate" | "postingDate">): boolean {

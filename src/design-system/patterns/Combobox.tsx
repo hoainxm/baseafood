@@ -52,6 +52,7 @@ export function Combobox({
   emptyText = "Không tìm thấy mục nào khớp.",
   choPhepXoa = true,
   anNhanBatBuoc = false,
+  anNhan = false,
   className,
 }: {
   label: string;
@@ -71,6 +72,12 @@ export function Combobox({
   choPhepXoa?: boolean;
   /** Ẩn nhãn "Bắt buộc / (không bắt buộc)" — dùng khi đây là BỘ LỌC, không phải ô nhập. */
   anNhanBatBuoc?: boolean;
+  /**
+   * Giấu nhãn nhìn thấy được, giữ nhãn cho trình đọc màn hình. CHỈ dùng khi
+   * tiêu đề cột đã nói rõ ô này là gì (ô trong lưới nhập). Ngoài lưới thì
+   * nhãn phải luôn hiện — xem luật ở src/design-system/README.md.
+   */
+  anNhan?: boolean;
   className?: string;
 }) {
   const [open, setOpen] = React.useState(false);
@@ -100,20 +107,25 @@ export function Combobox({
   return (
     /* min-w-0: ô này thường nằm trong grid/flex — mặc định min-width:auto lấy
        theo chữ dài nhất trong nút, ở cỡ chữ 130% sẽ đẩy rộng cả trang. */
-    <div className={cn("min-w-0 space-y-2", className)}>
+    <div className={cn("min-w-0", anNhan ? "space-y-0" : "space-y-2", className)}>
       {/* min-h-9 = chiều cao nút ⓘ: hàng nhãn luôn cao bằng nhau dù có/không ⓘ,
          hai ô cùng lưới không lệch. */}
-      <div className="flex min-h-9 flex-wrap items-center gap-2">
-        <Label htmlFor={id}>
-          {label}
-          {!anNhanBatBuoc && required && (
-            <span aria-hidden className="ml-1 font-bold text-destructive">
-              *
-            </span>
-          )}
-        </Label>
-        {info && <InfoTip label={label}>{info}</InfoTip>}
-      </div>
+      {/* anNhan: BỎ HẲN hàng nhãn, tên ô đi bằng aria-label trên nút. Không dùng
+          class sr-only ở đây — sr-only là position:absolute, gặp tổ tiên không
+          định vị sẽ rơi ra toạ độ trang và đội chiều cao trang lên. */}
+      {!anNhan && (
+        <div className="flex min-h-9 flex-wrap items-center gap-2">
+          <Label htmlFor={id}>
+            {label}
+            {!anNhanBatBuoc && required && (
+              <span aria-hidden className="ml-1 font-bold text-destructive">
+                *
+              </span>
+            )}
+          </Label>
+          {info && <InfoTip label={label}>{info}</InfoTip>}
+        </div>
+      )}
       {hint && <p className="text-base text-muted-foreground">{hint}</p>}
       {error && (
         <p className="flex items-start gap-2 text-base font-semibold text-destructive">
@@ -127,6 +139,7 @@ export function Combobox({
           <PopoverTrigger asChild>
             <Button
               id={id}
+              aria-label={label}
               data-slot="combobox-trigger"
               variant="outline"
               role="combobox"

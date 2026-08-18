@@ -1,8 +1,10 @@
 > Load khi: đụng đọc/ghi dữ liệu, thêm bảng vào app, hay điều tra "số liệu biến mất / không lên máy chủ".
 covers: src/lib/repo.ts, src/lib/db.ts, src/lib/catalogRepo.ts, src/lib/connectivity.ts, src/lib/supabase.ts, src/lib/store.ts, src/design-system/patterns/DataStatusBadge.tsx
-last_verified: 2026-08-14
+last_verified: 2026-08-17
 ttl_days: 90
 <!-- re-verified: 2026-08-14 — đồng bộ tên file sau rename eadc360: patterns/DataStatusBadge.tsx (symbol TrangThaiDuLieu giữ nguyên) -->
+
+<!-- updated: 2026-08-17 — 0019: cột lưới ngày (daily_quantities jsonb, carry_over_kg, auto_source, is_reduction) + balancing_period_id trên material_imports/production_wips; doiSanLuongNgay() lọc ô không phải số -->
 
 # Tầng dữ liệu & đồng bộ
 

@@ -1,9 +1,11 @@
 > Load khi: sửa danh mục (đại lý, loại NL, mặt hàng, khách hàng) hay danh mục 141 mã thành phẩm.
 covers: src/features/catalog/CatalogScreen.tsx, src/features/catalog/FinishedGoodScreen.tsx, src/data/thanh-pham.json, src/design-system/patterns/CatalogCrudModal.tsx
-last_verified: 2026-08-14
+last_verified: 2026-08-17
 ttl_days: 90
 <!-- updated: 2026-08-07 — đại lý thêm tenGhiPhieu/diaChi/cmnd/ngayCap/noiCap (migration 0009) -->
 <!-- re-verified: 2026-08-14 — đồng bộ tên file sau rename eadc360: patterns/CatalogCrudModal.tsx + FinishedGoodScreen.tsx (symbol DanhMucCrud giữ nguyên) -->
+
+<!-- updated: 2026-08-17 — 0019 tách size bạch tuộc 2 da: 'Bạch tuộc 2 da' → 'Bạch tuộc 2 da lớn (80↑)' + thêm 'Bạch tuộc 2 da nhỏ (80↓)'. '1 da' KHÔNG tách. Kỳ cân đối gom theo HỌ tên (hoNguyenLieu) nên vẫn thấy cả hai size. -->
 
 # Danh mục (master data)
 

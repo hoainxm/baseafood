@@ -87,14 +87,21 @@ export function HopThemDongNL({
 
 export function HopChonDongNhap({
   dong,
+  kyDangGiu,
   onClose,
   onLuu,
 }: {
   dong: MaterialImportItem[];
+  /** Id các dòng đang thuộc kỳ KHÁC — tick là kéo về kỳ đang mở. */
+  kyDangGiu: Set<string>;
   onClose: () => void;
   onLuu: (ids: string[]) => void;
 }) {
-  const [chon, setChon] = useState<Set<string>>(() => new Set(dong.map((r) => r.id)));
+  /* Mặc định tick sẵn dòng CHƯA kỳ nào giữ. Dòng đang thuộc kỳ khác thì để
+     người dùng tự tick — kéo về là lấy số ra khỏi một kỳ đang dùng. */
+  const [chon, setChon] = useState<Set<string>>(
+    () => new Set(dong.filter((r) => !kyDangGiu.has(r.id)).map((r) => r.id))
+  );
   const doi = (id: string) =>
     setChon((cu) => {
       const moi = new Set(cu);
@@ -112,9 +119,10 @@ export function HopChonDongNhap({
         <DialogHeader>
           <DialogTitle>Chọn dòng nhập hàng đưa vào kỳ</DialogTitle>
           <DialogDescription>
-            Đây là các chuyến nhập trong khoảng ngày của kỳ nhưng tên loại nguyên liệu
-            không khớp tên kỳ. Sổ nhập ghi tên tự do nên chuyện lệch tên là bình thường —
-            tick dòng nào thuộc kỳ này.
+            Các chuyến nhập trong khoảng ngày của kỳ nhưng khác tên loại nguyên liệu,
+            hoặc đang thuộc một kỳ khác. Sổ nhập ghi tên tự do nên lệch tên là chuyện
+            bình thường — tick dòng nào thuộc kỳ này. Dòng đang thuộc kỳ khác mà tick
+            thì sẽ được KÉO khỏi kỳ đó.
           </DialogDescription>
         </DialogHeader>
 
@@ -129,6 +137,9 @@ export function HopChonDongNhap({
                 </th>
                 <th className="border-b-2 border-border bg-card px-3 py-2 text-left">Đại lý</th>
                 <th className="border-b-2 border-border bg-card px-3 py-2 text-right">kg</th>
+                <th className="border-b-2 border-border bg-card px-3 py-2 text-left">
+                  Tình trạng
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -148,6 +159,13 @@ export function HopChonDongNhap({
                   <td className="border-b border-border px-3 py-2">{r.supplierName}</td>
                   <td className="tnum border-b border-border px-3 py-2 text-right">
                     {num(r.quantityKg)}
+                  </td>
+                  <td className="border-b border-border px-3 py-2">
+                    {kyDangGiu.has(r.id) ? (
+                      <span className="text-warning">Đang thuộc kỳ khác</span>
+                    ) : (
+                      <span className="text-muted-foreground">Chưa gắn kỳ</span>
+                    )}
                   </td>
                 </tr>
               ))}

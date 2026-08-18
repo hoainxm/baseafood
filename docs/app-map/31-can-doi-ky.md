@@ -1,7 +1,8 @@
 > Load khi: sửa màn Cân đối, lưới theo ngày, công thức định mức/lãi lỗ, hay bảng in A4.
 covers: src/features/balancing/BalancingScreen.tsx, src/features/balancing/usePeriodGrid.ts, src/features/balancing/MaterialGrid.tsx, src/features/balancing/WipGrid.tsx, src/features/balancing/gridDialogs.tsx, src/features/balancing/BalancingTable.tsx, src/lib/balancingCalc.ts, src/lib/balancingGrid.ts, src/design-system/patterns/EditableGrid.tsx
-last_verified: 2026-08-17
+last_verified: 2026-08-18
 ttl_days: 90
+<!-- updated: 2026-08-18 — Ctrl+Z/Ctrl+Y cho cả kỳ (ngăn xếp ảnh chụp trong usePeriodGrid); dòng CHẨN ĐOÁN vì sao kỳ trống + kéo dòng từ kỳ khác; thu/mở cột ngay trong phiếu in; nút Xếp ngang hai khối -->
 <!-- updated: 2026-08-17 (c) — TÁCH FILE: usePeriodGrid.ts (dữ liệu + thao tác) · MaterialGrid/WipGrid/gridDialogs (giao diện); ô ngày dòng hút GÕ ĐƯỢC và ghi thẳng về sổ Nhập hàng; ô tính lại theo TỪNG PHÍM; thêm đường 'Chọn dòng nhập' khi tên loại NL lệch; dòng Giảm chọn loại NL từ danh mục -->
 <!-- updated: 2026-08-17 (b) — BỎ khối phế liệu khỏi kỳ; gộp 2 khối vào MỘT thẻ chung 1 công tắc cột ngày; cột Khách thành Combobox chọn/tạo tại chỗ; vá lỗi sr-only caption đội chiều cao trang; khoá cuộn nền khi mở phiếu in -->
 <!-- updated: 2026-08-17 — LƯỚI THEO NGÀY (migration 0019): hàng = mặt hàng, cột = ngày; hút sổ Nhập hàng + sổ Sản xuất bằng cách gán balancing_period_id; ô Giảm → kho xưởng; cột Chuyển kỳ; dán khối từ Excel. Thay flow thêm-từng-dòng. balancingCalc.ts KHÔNG đổi. -->
@@ -35,6 +36,8 @@ Bản trước bắt mở hộp thoại cho từng dòng NL và từng dòng th�
 - **Cột Tổng là ô TÍNH, không gõ được** (đây là ô duy nhất bị khoá). Chính file cân đối thật của xí nghiệp (bạch tuộc 2 da 21–25/07) đã sai vì mặt hàng bị chép hai lần: dòng *2 da ncls* ghi `2.218` nhưng cộng theo ngày chỉ `1.109`, tổng cả bảng lệch đúng `1.109 kg`. Đừng bao giờ cho gõ tay vào cột Tổng.
 - **Thêm dòng không vỡ công thức.**
 
+**Xếp ngang.** Nút "Xếp ngang" đặt hai khối cạnh nhau (như file Excel gốc) từ breakpoint `2xl`. Cố ý để người dùng tự bật chứ không tự đổi theo bề rộng màn: bố cục tự nhảy khi thu cột là thứ gây mất phương hướng nhất trên tablet.
+
 **Hai khối, một tờ.** Khối 1 (nguyên liệu) và khối 2 (bán thành phẩm) không thể chung một bảng — cột khác hẳn nhau (NL có đơn giá VNĐ + tỷ lệ bột; BTP có khách + giá USD). Nhưng chúng nằm trong **cùng một thẻ**, chỉ ngăn nhau bằng một đường kẻ, và **dùng CHUNG một công tắc "Thu cột ngày"** (state ở `KyDetail`, truyền xuống qua `anNgay` / `onDoiAnNgay`). Cột ngày của hai khối phải dóng thẳng nhau thì mới đối chiếu được NL vào ↔ BTP ra của cùng một ngày — đó là lý do công tắc không thuộc về từng khối.
 
 **Cột Khách** là `Combobox` ngay trong ô (`CotLuoi.oRieng`): chọn trong danh mục, gõ tên lạ thì tạo mới tại chỗ. Không bao giờ để nhập tự do — "Hanwa" / "hanwa" / "Han wa" sẽ thành ba khách khi tổng hợp cuối kỳ.
@@ -59,6 +62,29 @@ Cùng một cách với mọi nguồn: gán kỳ lên bản ghi gốc, không nh
 | Bán thành phẩm | `production_wips` | gán `balancing_period_id`, ngày trong kỳ (KHÔNG lọc theo loại NL — một lô NL ra nhiều mặt hàng) | gõ được, **ghi ngược về sổ Sản xuất** |
 
 **Không khoá ô.** Bản đầu khoá ô ngày của dòng hút với lý do "sửa ở sổ gốc cho khỏi lệch". Người dùng đọc ra là ô hỏng. Số vẫn không lệch được vì ô ghi THẲNG về sổ gốc chứ không giữ bản sao — khoá là thừa.
+
+### Màn phải TỰ GIẢI THÍCH khi trống
+
+Kỳ không thấy số có ba nguyên nhân, nhìn màn không đoán ra được cái nào:
+
+1. **Lệch tên loại NL** — sổ nhập ghi tên tự do (xem dưới).
+2. **Dòng đang thuộc kỳ khác** — lỡ hút vào nhầm kỳ; mọi kỳ sau lọc "chưa gắn kỳ nào" nên không thấy nữa.
+3. **Kỳ khai nhầm ngày** — kỳ lọc theo **ngày hàng về xưởng**, không phải ngày ghi sổ. Hàng ghi bù thì hai ngày khác nhau.
+
+Khối 1 luôn in một dòng đếm: *"Sổ nhập hàng có N chuyến trong khoảng ngày của kỳ: A khớp loại · B khác tên loại · C đang thuộc kỳ khác"*. Không có chuyến nào thì nói thẳng luật ngày hàng về. `chanDoanNhap` trong `usePeriodGrid` giữ ba con số này.
+
+Hộp **"Chọn dòng nhập"** gộp cả nhóm lệch tên và nhóm đang thuộc kỳ khác; tick dòng của kỳ khác = **kéo về** kỳ đang mở (cột Tình trạng nói rõ, và dòng của kỳ khác KHÔNG tick sẵn).
+
+⇒ Luật: **màn trống phải nói được vì sao trống.** Đừng thêm bộ lọc nào mà không đếm luôn số bị lọc ra.
+
+### Hoàn tác — Ctrl+Z / Ctrl+Y
+
+Người dùng đến từ Excel: ở đó Ctrl+Z lùi **mọi** thứ vừa làm, không riêng ô số. `usePeriodGrid` giữ ngăn xếp **ảnh chụp bốn bảng** mà một kỳ có quyền đụng (`balancing_inputs` · `balancing_outputs` · `material_imports` · `production_wips`), tối đa 100 mốc.
+
+- `luuMoc(nhom)` gọi TRƯỚC mỗi lần ghi. Cùng `nhom` liên tiếp ⇒ **một mốc** — gõ `2` → `20` → `200` vào cùng một ô là một bước lùi, không phải ba. Khoá nhóm là `nhap:<loại>:<ngày>` / `sx:<mặt hàng|quy cách>:<ngày>`.
+- `nhom` **rỗng** = ghi tự động (đồng bộ `quantityKg`), không tạo mốc. Nếu không, mỗi lần đồng bộ lại chèn một bước lùi rác.
+- Nút Hoàn tác trên toast vẫn còn cho người dùng chuột; cả hai đường đều khôi phục từ ảnh chụp nên không đá nhau.
+- Lịch sử thuộc về **kỳ đang mở** — rời kỳ là mất.
 
 ### Khi tên loại nguyên liệu không khớp
 
@@ -156,6 +182,7 @@ Dòng `material_imports` / `production_wips` đã hút thì **chỉ xóa `balanc
 | Gõ loại NL mới trong ô chọn kỳ | Lưu luôn vào danh mục `loai_nguyen_lieu` + toast — không để tên mồ côi. |
 | Đơn giá / tỉ giá / chi phí null | Coi như 0 khi tính (`?? 0`), nhưng hiển thị là "—", không phải `0 đ`. |
 | Tổng TP = 0 | `dinhMuc = 0`, `tyLeThuHoi = null` nếu chưa khai `tongNLNhan`. Màn hình gắn cờ `chuaCoTP`. |
+| Thu/mở cột trong phiếu in | Phiếu có nút **Thu cột ngày** / **Thu cột tiền** riêng, không dùng chung state với lưới ngoài. Trước đó muốn in gọn phải thoát phiếu → thu cột → mở lại. Thu ở đây quyết định luôn bản in ra giấy. |
 | Bảng in `BalancingTable.tsx` | **Ngoại lệ luật design-system** — `text-sm`, `uppercase`, màu `slate` cứng để khớp khổ A4, in bằng `window.print()`. Đừng áp luật UI vào file này, cũng đừng lấy nó làm mẫu cho màn mới. Kỳ **> 3 ngày** tự gắn `print-landscape` (in ngang), nếu không cột cuối bị cắt. |
 | Dòng giảm chưa khai đơn giá | Cột thành tiền để **trống**, không in `-0` (`−987 × 0` ra `-0`, người xem bảng tưởng lỗi). |
 | Kỳ chưa khai ngày | Lưới không có cột ngày, chỉ còn Tổng + Chuyển kỳ — vẫn nhập tay được. Hút thì **không hút gì** (tránh kéo cả sổ vào một kỳ trống). |

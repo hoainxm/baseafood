@@ -292,6 +292,23 @@ export function nhapTrongKhoangNgay(
 }
 
 /**
+ * MỌI chuyến nhập rơi trong khoảng ngày của kỳ, kể cả dòng đang thuộc kỳ khác.
+ *
+ * Dùng để màn hình GIẢI THÍCH được vì sao trống. Ba lý do làm kỳ không thấy số
+ * mà nhìn màn không đoán ra: tên loại NL lệch · dòng đã bị kỳ khác giữ · kỳ
+ * khai nhầm ngày (sổ lọc theo ngày HÀNG VỀ, không phải ngày ghi sổ). Không đếm
+ * được ba con số này thì màn chỉ biết nói "chưa có nguyên liệu".
+ */
+export function chuyenNhapTheoNgay(
+  ky: BalancingPeriod,
+  imports: MaterialImportItem[]
+): MaterialImportItem[] {
+  const ngay = new Set(ngayTrongKy(ky));
+  if (ngay.size === 0) return [];
+  return imports.filter((r) => ngay.has(r.deliveryDate));
+}
+
+/**
  * Sửa một ô ngày của dòng nguyên liệu ⇒ ghi ngược về sổ Nhập hàng.
  * Cùng luật với `ghiNguocSanLuongNgay`: một dòng thì sửa thẳng, nhiều dòng thì
  * chỉnh dòng CUỐI cho tổng ngày khớp, phải làm âm thì từ chối.

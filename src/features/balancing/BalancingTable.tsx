@@ -3,7 +3,7 @@
 // Tên tiếng Việt: Bảng tính cân đối chi tiết và in ấn
 // Description: Balancing Period Detail Table and Print Layout
 // ============================================================
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import type {
   BalancingPeriod,
@@ -17,7 +17,7 @@ import type { MaterialImportItem, WipProductionItem } from "@/types";
 import { dungHangNL, dungHangTP, nhanNgay, ngayTrongKy } from "@/lib/balancingGrid";
 import { Button } from "@/design-system";
 import { num } from "@/lib/format";
-import { Printer, X } from "lucide-react";
+import { ChevronsLeftRight, Coins, Printer, X } from "lucide-react";
 
 export default function BangCanDoi({
   ky,
@@ -50,6 +50,13 @@ export default function BangCanDoi({
   /* Nhieu cot ngay ⇒ in NGANG, neu khong bang bi cat mat cot cuoi. */
   const inNgang = ngay.length > 3;
 
+  /* Thu/mở cột NGAY TRONG phiếu. Bản trước chỉ có nút này ở lưới ngoài, nên khi
+     kỳ dài người dùng phải thoát phiếu, thu cột, mở lại phiếu — ba bước cho một
+     việc. Thu ở đây còn quyết định bản in ra giấy gồm cột nào. */
+  const [anNgay, setAnNgay] = useState(false);
+  const [anTien, setAnTien] = useState(false);
+  const cotNgay = anNgay ? [] : ngay;
+
   /* Khoá cuộn nền khi phiếu đang mở — xem ghi chú ở src/index.css. */
   useEffect(() => {
     document.documentElement.setAttribute("data-xem-phieu", "");
@@ -58,21 +65,36 @@ export default function BangCanDoi({
 
   return (
     <div
-      className={`print-root fixed inset-0 z-50 overflow-auto bg-white p-6 text-slate-900 sm:p-10 ${
+      className={`print-root fixed inset-0 z-50 overflow-auto bg-white p-8 text-slate-900 sm:p-12 ${
         inNgang ? "print-landscape" : ""
       }`}
     >
       {/* Thanh công cụ */}
-      <div className="no-print mx-auto mb-5 flex max-w-4xl items-center justify-between">
+      <div
+        className={`no-print mx-auto mb-6 flex flex-wrap items-center justify-between gap-3 ${
+          inNgang ? "max-w-[100rem]" : "max-w-5xl"
+        }`}
+      >
         <Button variant="outline" onClick={onClose}>
           <X className="size-4" /> Đóng
         </Button>
-        <Button onClick={() => window.print()}>
-          <Printer className="size-4" /> In / Xuất PDF
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={() => setAnNgay((v) => !v)}>
+            <ChevronsLeftRight className="size-4" />
+            {anNgay ? "Mở cột ngày" : "Thu cột ngày"}
+          </Button>
+          <Button variant="outline" onClick={() => setAnTien((v) => !v)}>
+            <Coins className="size-4" />
+            {anTien ? "Mở cột tiền" : "Thu cột tiền"}
+          </Button>
+          <Button onClick={() => window.print()}>
+            <Printer className="size-4" /> In / Xuất PDF
+          </Button>
+        </div>
       </div>
 
-      <div className={inNgang ? "mx-auto max-w-6xl" : "mx-auto max-w-4xl"}>
+      {/* Rộng hơn + thoáng hơn: bảng cân đối là bảng số dày, chật thì đọc nhầm dòng. */}
+      <div className={inNgang ? "mx-auto max-w-[100rem]" : "mx-auto max-w-5xl"}>
         <div className="text-center">
           <h1 className="text-lg font-bold uppercase tracking-wide">
             Bảng cân đối {ky.materialTypeName}
@@ -86,16 +108,16 @@ export default function BangCanDoi({
             <thead>
               <Tr head>
                 <Th>Loại</Th>
-                {ngay.map((iso) => (
+                {cotNgay.map((iso) => (
                   <Th key={iso} right>
                     {nhanNgay(iso)}
                   </Th>
                 ))}
                 <Th right>Chuyển kỳ</Th>
                 <Th right>SL (kg)</Th>
-                <Th right>Đơn giá</Th>
-                <Th right>Thành tiền</Th>
-                <Th right>Tỉ lệ</Th>
+                {!anTien && <Th right>Đơn giá</Th>}
+                {!anTien && <Th right>Thành tiền</Th>}
+                {!anTien && <Th right>Tỉ lệ</Th>}
               </Tr>
             </thead>
             <tbody>
@@ -107,32 +129,32 @@ export default function BangCanDoi({
                       ({r.laGiam ? "Giảm" : r.nhom})
                     </span>
                   </Td>
-                  {ngay.map((iso) => (
+                  {cotNgay.map((iso) => (
                     <Td key={iso} right>
                       {r.theoNgay[iso] ? num(r.theoNgay[iso]) : ""}
                     </Td>
                   ))}
                   <Td right>{r.chuyenKy ? num(r.chuyenKy) : ""}</Td>
                   <Td right>{num(r.tong)}</Td>
-                  <Td right>{num(r.donGia)}</Td>
+                  {!anTien && <Td right>{num(r.donGia)}</Td>}
                   {/* Chưa khai đơn giá thì để trống — "-0" (dòng giảm × giá 0)
                       đọc như một con số thật, người xem bảng in sẽ tưởng lỗi. */}
-                  <Td right>{r.donGia ? num(r.tong * r.donGia) : ""}</Td>
-                  <Td right>{r.tyLe != null ? `${num(r.tyLe)}%` : ""}</Td>
+                  {!anTien && <Td right>{r.donGia ? num(r.tong * r.donGia) : ""}</Td>}
+                  {!anTien && <Td right>{r.tyLe != null ? `${num(r.tyLe)}%` : ""}</Td>}
                 </Tr>
               ))}
               <Tr total>
                 <Td>T. CỘNG</Td>
-                {ngay.map((iso) => (
+                {cotNgay.map((iso) => (
                   <Td key={iso} right>
                     {num(hangNL.reduce((s, r) => s + (r.theoNgay[iso] ?? 0), 0))}
                   </Td>
                 ))}
                 <Td right>{num(hangNL.reduce((s, r) => s + r.chuyenKy, 0))}</Td>
                 <Td right>{num(kq.totalInputKg)}</Td>
-                <Td right></Td>
-                <Td right>{num(kq.materialValue)}</Td>
-                <Td right></Td>
+                {!anTien && <Td right></Td>}
+                {!anTien && <Td right>{num(kq.materialValue)}</Td>}
+                {!anTien && <Td right></Td>}
               </Tr>
             </tbody>
           </table>
@@ -147,14 +169,14 @@ export default function BangCanDoi({
                 <Th>Khách</Th>
                 <Th>Kênh</Th>
                 <Th right>Chuyển kỳ</Th>
-                {ngay.map((iso) => (
+                {cotNgay.map((iso) => (
                   <Th key={iso} right>
                     {nhanNgay(iso)}
                   </Th>
                 ))}
                 <Th right>Lượng (kg)</Th>
-                <Th right>Đơn giá</Th>
-                <Th right>Thành tiền</Th>
+                {!anTien && <Th right>Đơn giá</Th>}
+                {!anTien && <Th right>Thành tiền</Th>}
               </Tr>
             </thead>
             <tbody>
@@ -172,20 +194,24 @@ export default function BangCanDoi({
                     <Td>{tenKH(r.khachId)}</Td>
                     <Td>{xk ? "XK" : "Nội địa"}</Td>
                     <Td right>{r.chuyenKy ? num(r.chuyenKy) : ""}</Td>
-                    {ngay.map((iso) => (
+                    {cotNgay.map((iso) => (
                       <Td key={iso} right>
                         {r.theoNgay[iso] ? num(r.theoNgay[iso]) : ""}
                       </Td>
                     ))}
                     <Td right>{num(r.tong)}</Td>
-                    <Td right>
-                      {num(r.donGia)}
-                      {xk ? " $" : ""}
-                    </Td>
-                    <Td right>
-                      {num(tien)}
-                      {xk ? " $" : ""}
-                    </Td>
+                    {!anTien && (
+                      <Td right>
+                        {num(r.donGia)}
+                        {xk ? " $" : ""}
+                      </Td>
+                    )}
+                    {!anTien && (
+                      <Td right>
+                        {num(tien)}
+                        {xk ? " $" : ""}
+                      </Td>
+                    )}
                   </Tr>
                 );
               })}
@@ -194,14 +220,14 @@ export default function BangCanDoi({
                 <Td></Td>
                 <Td></Td>
                 <Td right>{num(hangTP.reduce((s, r) => s + r.chuyenKy, 0))}</Td>
-                {ngay.map((iso) => (
+                {cotNgay.map((iso) => (
                   <Td key={iso} right>
                     {num(hangTP.reduce((s, r) => s + (r.theoNgay[iso] ?? 0), 0))}
                   </Td>
                 ))}
                 <Td right>{num(kq.totalOutputKg)}</Td>
-                <Td right></Td>
-                <Td right></Td>
+                {!anTien && <Td right></Td>}
+                {!anTien && <Td right></Td>}
               </Tr>
             </tbody>
           </table>

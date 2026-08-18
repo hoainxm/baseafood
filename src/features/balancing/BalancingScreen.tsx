@@ -3,7 +3,7 @@
 // Tên tiếng Việt: Màn hình Cân đối kỳ sản xuất 5 ngày
 // Description: Balancing Period Management Screen
 // ============================================================
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import type {
   BalancingPeriod,
@@ -51,7 +51,17 @@ import {
   type LoiNhap,
 } from "@/design-system";
 import { num, viDate } from "@/lib/format";
-import { ChevronLeft, FileText, Pencil, Plus, Scale } from "lucide-react";
+import {
+  ChevronLeft,
+  Columns2,
+  FileText,
+  Pencil,
+  Plus,
+  Redo2,
+  Rows3,
+  Scale,
+  Undo2,
+} from "lucide-react";
 import BangCanDoi from "./BalancingTable";
 
 /** Chuỗi ngày để in trên bảng, sinh từ khoảng ngày đã chọn. */
@@ -397,6 +407,26 @@ function KyDetail({
   /* Một công tắc cho CẢ HAI lưới: hai khối nằm trên cùng một tờ, cột ngày phải
      dóng thẳng nhau thì mới đối chiếu được NL vào ↔ BTP ra của cùng một ngày. */
   const [anCotNgay, setAnCotNgay] = useState(false);
+  /* Xếp hai khối cạnh nhau (như file Excel gốc) — người dùng tự bật, không tự
+     đổi theo bề rộng: bố cục nhảy khi thu cột là thứ gây mất phương hướng nhất. */
+  const [xepNgang, setXepNgang] = useState(false);
+
+  /* Ctrl+Z / Ctrl+Y — nghe ở cấp màn, bỏ qua khi con trỏ đang trong hộp thoại. */
+  useEffect(() => {
+    const nghe = (e: KeyboardEvent) => {
+      if (!e.ctrlKey && !e.metaKey) return;
+      const k = e.key.toLowerCase();
+      if (k === "z" && !e.shiftKey) {
+        e.preventDefault();
+        luoi.hoanTac();
+      } else if (k === "y" || (k === "z" && e.shiftKey)) {
+        e.preventDefault();
+        luoi.lamLai();
+      }
+    };
+    window.addEventListener("keydown", nghe);
+    return () => window.removeEventListener("keydown", nghe);
+  }, [luoi]);
 
   /* Sổ bán — seam cũ cho tình huống output = hàng đã bán ra. */
   const [tatCaBan] = useSalesItems();
@@ -453,10 +483,36 @@ function KyDetail({
             Ngày tiếp nhận: {ky.dateRangeDescription || "chưa ghi"}
           </p>
         </div>
-        <Button variant="outline" size="lg" onClick={() => setShowBang(true)}>
-          <FileText />
-          Xem / in bảng
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            size="lg"
+            onClick={luoi.hoanTac}
+            disabled={!luoi.hoanTacDuoc}
+            title="Ctrl+Z"
+          >
+            <Undo2 />
+            Hoàn tác
+          </Button>
+          <Button
+            variant="outline"
+            size="lg"
+            onClick={luoi.lamLai}
+            disabled={!luoi.lamLaiDuoc}
+            title="Ctrl+Y"
+          >
+            <Redo2 />
+            Làm lại
+          </Button>
+          <Button variant="outline" size="lg" onClick={() => setXepNgang((v) => !v)}>
+            {xepNgang ? <Rows3 /> : <Columns2 />}
+            {xepNgang ? "Xếp dọc" : "Xếp ngang"}
+          </Button>
+          <Button variant="outline" size="lg" onClick={() => setShowBang(true)}>
+            <FileText />
+            Xem / in bảng
+          </Button>
+        </div>
       </div>
 
       <Card className="p-5">
@@ -488,7 +544,13 @@ function KyDetail({
 
       {/* Hai khối trong MỘT tờ: cùng khung, cùng công tắc cột ngày, chỉ ngăn nhau
           bằng một đường kẻ — đọc như một bảng cân đối liền mạch. */}
-      <Card className="overflow-hidden p-0">
+      <Card
+        className={
+          xepNgang
+            ? "grid grid-cols-1 overflow-hidden p-0 2xl:grid-cols-2"
+            : "overflow-hidden p-0"
+        }
+      >
         <LuoiNguyenLieu
           luoi={luoi}
           loaiNLDanhMuc={loaiNLDanhMuc}

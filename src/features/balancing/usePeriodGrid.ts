@@ -3,7 +3,7 @@
 // Tên tiếng Việt: Hook dữ liệu + thao tác của một kỳ cân đối
 // Description: Data + actions for one balancing period (grid screen)
 // ============================================================
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   BalancingInputItem,
   BalancingOutputItem,
@@ -23,6 +23,7 @@ import {
   gomNhapTheoLoai,
   gomSanXuatTheoMatHang,
   khoaMatHang,
+  chuyenNhapTheoNgay,
   nhapHangHopLe,
   nhapTrongKhoangNgay,
   ngayTrongKy,
@@ -56,6 +57,10 @@ export interface PeriodGrid {
   nhapChoHut: MaterialImportItem[];
   /** Dòng sổ nhập trong khoảng ngày nhưng KHÁC họ nguyên liệu — chọn tay. */
   nhapKhacLoai: MaterialImportItem[];
+  /** Dòng trong khoảng ngày nhưng ĐANG thuộc kỳ khác — giải thích + kéo về. */
+  nhapKyKhac: MaterialImportItem[];
+  /** Đếm để màn hình nói được vì sao trống. */
+  chanDoanNhap: { tongTrongKhoang: number; chuaGan: number; kyKhac: number; lechTen: number };
   ghiNL: (rows: BalancingInputItem[]) => void;
   hutNhapHang: (ids?: string[]) => void;
   /** Ghi nhiều ô ngày về sổ Nhập hàng. Trả về false nếu bị từ chối. */
@@ -69,9 +74,26 @@ export interface PeriodGrid {
   hutSanXuat: () => void;
   ghiSanXuatNhieuNgay: (dsO: ONgay[], lyDoGhiBu: string) => boolean;
   ngayDaChot: Set<string>;
+  /* --- hoàn tác --- */
+  hoanTacDuoc: boolean;
+  lamLaiDuoc: boolean;
+  hoanTac: () => void;
+  lamLai: () => void;
   /* --- kết quả --- */
   kq: BalancingResult;
 }
+
+/** Ảnh chụp bốn bảng mà một kỳ có quyền đụng tới. */
+interface MocLichSu {
+  nhom: string;
+  nl: BalancingInputItem[];
+  tp: BalancingOutputItem[];
+  nhap: MaterialImportItem[];
+  sanXuat: WipProductionItem[];
+}
+
+/** Giữ tối đa ngần này bước lùi — đủ cho một ca nhập, không phình bộ nhớ. */
+const SO_MOC_TOI_DA = 100;
 
 /**
  * Tất cả dữ liệu + thao tác của MỘT kỳ cân đối.
@@ -90,20 +112,90 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
 
   const ngay = useMemo(() => ngayTrongKy(ky), [ky]);
 
+  /* ---------- Ngăn xếp hoàn tác (Ctrl+Z / Ctrl+Y) ----------
+     Người dùng đến từ Excel, ở đó Ctrl+Z lùi được MỌI thứ vừa làm chứ không chỉ
+     ô số. Nút "Hoàn tác" trên toast vẫn còn cho người dùng chuột; hai đường
+     cùng khôi phục từ ảnh chụp nên không đá nhau.
+
+     Gộp theo `nhom`: gõ liên tiếp vào CÙNG một ô chỉ tạo MỘT mốc, nếu không mỗi
+     phím là một bước lùi và Ctrl+Z thành vô dụng. */
+  const lui = useRef<MocLichSu[]>([]);
+  const tien = useRef<MocLichSu[]>([]);
+  /* `lui`/`tien` là ref (không gây render), nên cần một biến state để nút
+     Hoàn tác / Làm lại bật-tắt đúng lúc. Chỉ dùng làm cờ vẽ lại. */
+  const [, setDemLichSu] = useState(0);
+
+  const chupHienTai = useCallback(
+    (nhom: string): MocLichSu => ({
+      nhom,
+      nl: tatCaNL,
+      tp: tatCaTP,
+      nhap: tatCaNhap,
+      sanXuat: tatCaSanXuat,
+    }),
+    [tatCaNL, tatCaTP, tatCaNhap, tatCaSanXuat]
+  );
+
+  /** Đánh dấu "trước khi đổi" — gọi TRƯỚC mọi lần ghi. */
+  const luuMoc = useCallback(
+    (nhom: string) => {
+      if (!nhom) return; // ghi tự động (đồng bộ tổng) — không phải việc người dùng làm
+      const dinh = lui.current[lui.current.length - 1];
+      if (dinh && dinh.nhom === nhom) return; // gõ tiếp cùng ô — không tạo mốc mới
+      lui.current.push(chupHienTai(nhom));
+      if (lui.current.length > SO_MOC_TOI_DA) lui.current.shift();
+      tien.current = [];
+      setDemLichSu((n) => n + 1);
+    },
+    [chupHienTai]
+  );
+
+  const apMoc = useCallback(
+    (m: MocLichSu) => {
+      ghiTatCaNL(m.nl);
+      ghiTatCaTP(m.tp);
+      ghiTatCaNhap(m.nhap);
+      ghiTatCaSanXuat(m.sanXuat);
+    },
+    [ghiTatCaNL, ghiTatCaTP, ghiTatCaNhap, ghiTatCaSanXuat]
+  );
+
+  const hoanTac = useCallback(() => {
+    const m = lui.current.pop();
+    if (!m) return;
+    tien.current.push(chupHienTai(m.nhom));
+    apMoc(m);
+    setDemLichSu((n) => n + 1);
+    notify.daLuu("Đã hoàn tác");
+  }, [apMoc, chupHienTai]);
+
+  const lamLai = useCallback(() => {
+    const m = tien.current.pop();
+    if (!m) return;
+    lui.current.push(chupHienTai(m.nhom));
+    apMoc(m);
+    setDemLichSu((n) => n + 1);
+    notify.daLuu("Đã làm lại");
+  }, [apMoc, chupHienTai]);
+
   /* Repo trả về dòng của MỌI kỳ. Ghi mà quên ghép lại với kỳ khác = xoá sạch
      các kỳ đó (xem 04-tang-du-lieu.md). Bọc một lần ở đây. */
   const nlVao = useMemo(() => tatCaNL.filter((r) => r.periodId === ky.id), [tatCaNL, ky.id]);
   const tp = useMemo(() => tatCaTP.filter((r) => r.periodId === ky.id), [tatCaTP, ky.id]);
 
   const ghiNL = useCallback(
-    (rows: BalancingInputItem[]) =>
-      ghiTatCaNL([...tatCaNL.filter((r) => r.periodId !== ky.id), ...rows]),
-    [ghiTatCaNL, tatCaNL, ky.id]
+    (rows: BalancingInputItem[], nhom = "nl") => {
+      luuMoc(nhom);
+      ghiTatCaNL([...tatCaNL.filter((r) => r.periodId !== ky.id), ...rows]);
+    },
+    [ghiTatCaNL, tatCaNL, ky.id, luuMoc]
   );
   const ghiTP = useCallback(
-    (rows: BalancingOutputItem[]) =>
-      ghiTatCaTP([...tatCaTP.filter((r) => r.periodId !== ky.id), ...rows]),
-    [ghiTatCaTP, tatCaTP, ky.id]
+    (rows: BalancingOutputItem[], nhom = "tp") => {
+      luuMoc(nhom);
+      ghiTatCaTP([...tatCaTP.filter((r) => r.periodId !== ky.id), ...rows]);
+    },
+    [ghiTatCaTP, tatCaTP, ky.id, luuMoc]
   );
 
   /* ---------- Sổ Nhập hàng ---------- */
@@ -124,14 +216,37 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
     return nhapTrongKhoangNgay(ky, tatCaNhap).filter((r) => !daGoiY.has(r.id));
   }, [ky, tatCaNhap, nhapChoHut]);
 
+  /* Dòng đang bị kỳ KHÁC giữ. Không đếm được nhóm này thì khi người dùng lỡ hút
+     vào nhầm kỳ, mọi kỳ sau chỉ thấy màn trống và không có manh mối nào. */
+  const nhapKyKhac = useMemo(
+    () =>
+      chuyenNhapTheoNgay(ky, tatCaNhap).filter(
+        (r) => r.balancingPeriodId && r.balancingPeriodId !== ky.id
+      ),
+    [ky, tatCaNhap]
+  );
+
+  const chanDoanNhap = useMemo(() => {
+    const trong = chuyenNhapTheoNgay(ky, tatCaNhap);
+    return {
+      tongTrongKhoang: trong.length,
+      chuaGan: nhapChoHut.length,
+      kyKhac: nhapKyKhac.length,
+      lechTen: nhapKhacLoai.length,
+    };
+  }, [ky, tatCaNhap, nhapChoHut, nhapKyKhac, nhapKhacLoai]);
+
   const hutNhapHang = useCallback(
     (ids?: string[]) => {
+      /* Có `ids` = người dùng tự tick, kể cả dòng đang thuộc kỳ khác ⇒ KÉO VỀ
+         kỳ này. Không có `ids` = lấy tự động, chỉ đụng dòng chưa kỳ nào giữ. */
       const chon = ids
-        ? tatCaNhap.filter((r) => ids.includes(r.id) && !r.balancingPeriodId)
+        ? tatCaNhap.filter((r) => ids.includes(r.id) && r.balancingPeriodId !== ky.id)
         : nhapChoHut;
       if (chon.length === 0) return;
       const truocNhap = tatCaNhap;
       const truocNL = tatCaNL;
+      luuMoc(`hut-nhap:${chon.length}:${chon[0].id}`);
       const bo = new Set(chon.map((r) => r.id));
       ghiTatCaNhap(
         tatCaNhap.map((r) => (bo.has(r.id) ? { ...r, balancingPeriodId: ky.id } : r))
@@ -158,13 +273,13 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
           autoSource: "imports",
         });
       }
-      if (them.length > 0) ghiNL([...nlVao, ...them]);
+      if (them.length > 0) ghiNL([...nlVao, ...them], "");
       notify.daLuu(`Đã lấy ${chon.length} dòng nhập hàng vào kỳ`, () => {
         ghiTatCaNhap(truocNhap);
         ghiTatCaNL(truocNL);
       });
     },
-    [tatCaNhap, nhapChoHut, tatCaNL, nlVao, nhapDaGan, ghiTatCaNhap, ghiTatCaNL, ghiNL, ky.id]
+    [tatCaNhap, nhapChoHut, tatCaNL, nlVao, nhapDaGan, ghiTatCaNhap, ghiTatCaNL, ghiNL, luuMoc, ky.id]
   );
 
   /**
@@ -213,6 +328,10 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
       }
       if (sua.size === 0 && them.length === 0) return true;
       const truoc = tatCaNhap;
+      /* Gõ tiếp vào cùng một ô ⇒ cùng nhóm ⇒ một bước lùi cho cả lần gõ. */
+      luuMoc(
+        dsO.length === 1 ? `nhap:${dsO[0].khoa}:${dsO[0].ngay}` : `nhap-khoi:${dsO.length}`
+      );
       ghiTatCaNhap([
         ...tatCaNhap.map((r) => {
           const kg = sua.get(r.id);
@@ -228,7 +347,7 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
       );
       return true;
     },
-    [nhapDaGan, tatCaNhap, ghiTatCaNhap, ky.id]
+    [nhapDaGan, tatCaNhap, ghiTatCaNhap, luuMoc, ky.id]
   );
 
   /* ---------- Sổ Sản xuất ---------- */
@@ -246,6 +365,7 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
     if (sanXuatChoHut.length === 0) return;
     const truocSX = tatCaSanXuat;
     const truocTP = tatCaTP;
+    luuMoc(`hut-sx:${sanXuatChoHut.length}:${sanXuatChoHut[0].id}`);
     const bo = new Set(sanXuatChoHut.map((r) => r.id));
     ghiTatCaSanXuat(
       tatCaSanXuat.map((r) => (bo.has(r.id) ? { ...r, balancingPeriodId: ky.id } : r))
@@ -275,7 +395,7 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
         autoSource: "production",
       });
     }
-    if (them.length > 0) ghiTP([...tp, ...them]);
+    if (them.length > 0) ghiTP([...tp, ...them], "");
     notify.daLuu(`Đã lấy ${sanXuatChoHut.length} dòng sản xuất vào kỳ`, () => {
       ghiTatCaSanXuat(truocSX);
       ghiTatCaTP(truocTP);
@@ -289,6 +409,7 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
     ghiTatCaSanXuat,
     ghiTatCaTP,
     ghiTP,
+    luuMoc,
     ky.id,
   ]);
 
@@ -340,6 +461,7 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
       }
       if (sua.size === 0 && them.length === 0) return true;
       const truoc = tatCaSanXuat;
+      luuMoc(dsO.length === 1 ? `sx:${dsO[0].khoa}:${dsO[0].ngay}` : `sx-khoi:${dsO.length}`);
       ghiTatCaSanXuat([
         ...tatCaSanXuat.map((r) => {
           const kg = sua.get(r.id);
@@ -361,7 +483,7 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
       );
       return true;
     },
-    [sanXuatDaGan, tatCaSanXuat, ghiTatCaSanXuat, ky.id]
+    [sanXuatDaGan, tatCaSanXuat, ghiTatCaSanXuat, luuMoc, ky.id]
   );
 
   /* ---------- Dòng lưới + kết quả ---------- */
@@ -393,10 +515,10 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
      trong effect (không phải lúc render) và chỉ ghi khi thật sự lệch nên hội tụ
      sau đúng một vòng. */
   useEffect(() => {
-    if (nlChoTinh.some((r, i) => r !== nlVao[i])) ghiNL(nlChoTinh);
+    if (nlChoTinh.some((r, i) => r !== nlVao[i])) ghiNL(nlChoTinh, "");
   }, [nlChoTinh, nlVao, ghiNL]);
   useEffect(() => {
-    if (tpChoTinh.some((r, i) => r !== tp[i])) ghiTP(tpChoTinh);
+    if (tpChoTinh.some((r, i) => r !== tp[i])) ghiTP(tpChoTinh, "");
   }, [tpChoTinh, tp, ghiTP]);
 
   /* Phế liệu không còn là đầu vào của kỳ (xem 31-can-doi-ky.md) — truyền []. */
@@ -413,6 +535,8 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
     nhapDaGan,
     nhapChoHut,
     nhapKhacLoai,
+    nhapKyKhac,
+    chanDoanNhap,
     ghiNL,
     hutNhapHang,
     ghiNhapNhieuNgay,
@@ -424,6 +548,10 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
     hutSanXuat,
     ghiSanXuatNhieuNgay,
     ngayDaChot,
+    hoanTacDuoc: lui.current.length > 0,
+    lamLaiDuoc: tien.current.length > 0,
+    hoanTac,
+    lamLai,
     kq,
   };
 }

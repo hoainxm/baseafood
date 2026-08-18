@@ -41,8 +41,18 @@ export function LuoiNguyenLieu({
   anNgay: boolean;
   onDoiAnNgay: () => void;
 }) {
-  const { ngay, nlVao, hangNL, nhapChoHut, nhapKhacLoai, ghiNL, hutNhapHang, ghiNhapNhieuNgay } =
-    luoi;
+  const {
+    ngay,
+    nlVao,
+    hangNL,
+    nhapChoHut,
+    nhapKhacLoai,
+    nhapKyKhac,
+    chanDoanNhap,
+    ghiNL,
+    hutNhapHang,
+    ghiNhapNhieuNgay,
+  } = luoi;
   const [anTien, setAnTien] = useState(false);
   const [themMo, setThemMo] = useState<InputGroup | "giam" | null>(null);
   const [chonNhapMo, setChonNhapMo] = useState(false);
@@ -249,6 +259,12 @@ export function LuoiNguyenLieu({
     }
   }
 
+  /* Dòng lệch tên + dòng đang thuộc kỳ khác đều chọn tay được từ một chỗ. */
+  const dongChonDuoc = useMemo(
+    () => [...nhapKhacLoai, ...nhapKyKhac],
+    [nhapKhacLoai, nhapKyKhac]
+  );
+
   const tongKg = hangNL.reduce((s, h) => s + h.tong, 0);
   const tongTien = hangNL.reduce((s, h) => s + h.tong * (h.donGia ?? 0), 0);
 
@@ -278,10 +294,10 @@ export function LuoiNguyenLieu({
               Lấy {nhapChoHut.length} dòng từ sổ nhập
             </Button>
           )}
-          {nhapKhacLoai.length > 0 && (
+          {dongChonDuoc.length > 0 && (
             <Button variant="outline" size="lg" onClick={() => setChonNhapMo(true)}>
               <ListChecks />
-              Chọn dòng nhập ({nhapKhacLoai.length})
+              Chọn dòng nhập ({dongChonDuoc.length})
             </Button>
           )}
           <Button variant="outline" size="lg" onClick={onDoiAnNgay}>
@@ -294,6 +310,26 @@ export function LuoiNguyenLieu({
         </div>
       </div>
 
+      {/* Nói thẳng sổ nhập có gì trong khoảng ngày này. Màn trống mà im lặng là
+          lỗi nặng nhất của bản trước: ba nguyên nhân (lệch tên loại, dòng đã bị
+          kỳ khác giữ, kỳ khai nhầm ngày) nhìn màn không đoán ra được cái nào. */}
+      {chanDoanNhap.tongTrongKhoang > 0 && (
+        <p className="mb-3 rounded-lg bg-muted px-4 py-3 text-base text-muted-foreground">
+          Sổ nhập hàng có <strong>{chanDoanNhap.tongTrongKhoang}</strong> chuyến trong
+          khoảng ngày của kỳ: <strong>{chanDoanNhap.chuaGan}</strong> khớp loại nguyên
+          liệu của kỳ · <strong>{chanDoanNhap.lechTen}</strong> khác tên loại ·{" "}
+          <strong>{chanDoanNhap.kyKhac}</strong> đang thuộc kỳ khác.
+          {chanDoanNhap.chuaGan === 0 && " Bấm “Chọn dòng nhập” để tự tick dòng thuộc kỳ này."}
+        </p>
+      )}
+      {chanDoanNhap.tongTrongKhoang === 0 && ngay.length > 0 && hangNL.length === 0 && (
+        <p className="mb-3 rounded-lg bg-warning-surface px-4 py-3 text-base text-warning">
+          Sổ nhập hàng không có chuyến nào trong khoảng ngày của kỳ. Kỳ lọc theo{" "}
+          <strong>ngày hàng về xưởng</strong>, không phải ngày ghi sổ — hàng ghi bù thì
+          ngày hàng về mới là ngày tính vào kỳ.
+        </p>
+      )}
+
       {hangNL.length === 0 ? (
         <EmptyState
           icon={Layers}
@@ -301,8 +337,8 @@ export function LuoiNguyenLieu({
           moTa={
             nhapChoHut.length > 0
               ? `Có ${nhapChoHut.length} dòng ở sổ nhập hàng khớp kỳ này — bấm "Lấy từ sổ nhập".`
-              : nhapKhacLoai.length > 0
-                ? `Sổ nhập có ${nhapKhacLoai.length} chuyến trong khoảng ngày của kỳ nhưng tên loại nguyên liệu khác tên kỳ — bấm "Chọn dòng nhập" để tick.`
+              : dongChonDuoc.length > 0
+                ? `Có ${dongChonDuoc.length} chuyến trong khoảng ngày nhưng khác tên loại hoặc đang thuộc kỳ khác — bấm "Chọn dòng nhập" để tick.`
                 : "Chưa có chuyến nhập nào trong khoảng ngày của kỳ. Ghi ở màn Nhập hàng, hoặc thêm dòng xả đông / bột bên dưới."
           }
         />
@@ -415,7 +451,8 @@ export function LuoiNguyenLieu({
 
       {chonNhapMo && (
         <HopChonDongNhap
-          dong={nhapKhacLoai}
+          dong={dongChonDuoc}
+          kyDangGiu={new Set(nhapKyKhac.map((r) => r.id))}
           onClose={() => setChonNhapMo(false)}
           onLuu={(ids) => {
             hutNhapHang(ids);

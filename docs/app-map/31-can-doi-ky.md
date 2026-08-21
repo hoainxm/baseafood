@@ -1,7 +1,8 @@
 > Load khi: sửa màn Cân đối, lưới theo ngày, công thức định mức/lãi lỗ, hay bảng in A4.
 covers: src/features/balancing/BalancingScreen.tsx, src/features/balancing/usePeriodGrid.ts, src/features/balancing/MaterialGrid.tsx, src/features/balancing/WipGrid.tsx, src/features/balancing/gridDialogs.tsx, src/features/balancing/BalancingTable.tsx, src/lib/balancingCalc.ts, src/lib/balancingGrid.ts, src/design-system/patterns/EditableGrid.tsx
-last_verified: 2026-08-18
+last_verified: 2026-08-21
 ttl_days: 90
+<!-- updated: 2026-08-21 — thêm mục "Tồn kho nguyên liệu (sổ NXT)": màn /nxt-nl suy Nhập–Xuất–Tồn NL từ carryOver (đông gửi/xả đông), lib/inventoryMaterial.ts + migration 0022 (material_opening_stock) -->
 <!-- updated: 2026-08-18 (b) — CHỐT KỲ (migration 0020) khoá toàn bộ ô, mở lại bắt lý do; NHẬN CHUYỂN KỲ tự dựng dòng từ kỳ liền trước (khép vòng gối đầu) -->
 <!-- updated: 2026-08-18 — Ctrl+Z/Ctrl+Y cho cả kỳ (ngăn xếp ảnh chụp trong usePeriodGrid); dòng CHẨN ĐOÁN vì sao kỳ trống + kéo dòng từ kỳ khác; thu/mở cột ngay trong phiếu in; nút Xếp ngang hai khối -->
 <!-- updated: 2026-08-17 (c) — TÁCH FILE: usePeriodGrid.ts (dữ liệu + thao tác) · MaterialGrid/WipGrid/gridDialogs (giao diện); ô ngày dòng hút GÕ ĐƯỢC và ghi thẳng về sổ Nhập hàng; ô tính lại theo TỪNG PHÍM; thêm đường 'Chọn dòng nhập' khi tên loại NL lệch; dòng Giảm chọn loại NL từ danh mục -->
@@ -131,6 +132,16 @@ Một cột, hai chiều — **đọc theo dấu**:
 - **Dương** (VD `2.000`, `258`) = phần lấy từ kỳ trước đưa vào kỳ này.
 
 Cộng vào Tổng của dòng (`sumGridRow = Σ ngày + chuyển kỳ`) — kiểm chứng trên bảng thật: dòng *2 da luộc 230-250* `258+261+1.785+3.384+5.749+154 = 11.591` khớp cột Lượng.
+
+### Tồn kho nguyên liệu (sổ NXT) — đọc chuyển kỳ, KHÔNG chép số
+
+Cột "Chuyển kỳ" chính là dòng vào/ra của **kho đông dự trữ nguyên liệu**. Màn **Tồn kho NL** (`/nxt-nl`, [`features/reports/MaterialNxtScreen.tsx`](../../src/features/reports/MaterialNxtScreen.tsx)) suy sổ Nhập–Xuất–Tồn nguyên liệu (kg thuần) thẳng từ đây, không thêm bản ghi nhập tay:
+
+- `carryOverKg < 0` (đông gửi) = **NHẬP** vào kho tồn · `carryOverKg > 0` (xả đông/nhận chuyển kỳ) = **XUẤT** khỏi kho tồn.
+- **Tồn cuối = Tồn đầu + Đông gửi − Xả đông**; kỳ sau kế thừa tồn cuối kỳ trước (chuỗi theo `hoNguyenLieu`). Kỳ đầu tiên của mỗi họ lấy tồn đầu từ bảng `material_opening_stock` (khai tay, migration `0022`).
+- **Tồn cuối < 0** = xả đông nhiều hơn số đang trữ ⇒ chắc chắn sai ghi chép; màn gọi tên (badge + banner đỏ), đúng luật "màn tự giải thích".
+- Hàm thuần: [`lib/inventoryMaterial.ts`](../../src/lib/inventoryMaterial.ts) (`tinhSoTonNL` / `tongSoTonNL`) — quy tắc chính xác nằm DUY NHẤT ở đây, **phải đối chiếu tay với số thật** (bạch tuộc 2 da 21–25/07) trước khi tin.
+- "Nhập tươi" (từ `material_imports`) đi kèm làm bối cảnh để phủ toàn bộ NL mỗi ngày; phần lớn chế biến ngay nên không đọng thành tồn — chỉ phần cấp đông (đông gửi) mới ở lại kho.
 
 ### Ngày trong kỳ — bẫy múi giờ
 

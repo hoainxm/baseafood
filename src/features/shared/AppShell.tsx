@@ -28,6 +28,7 @@ import {
   Library,
   Users,
   FileSpreadsheet,
+  Boxes,
   Factory,
   PanelLeftClose,
   PanelLeftOpen,
@@ -73,6 +74,7 @@ export const KIT_NAV: MucNavShell[] = [
   { id: "sales", label: "Bán hàng", icon: ShoppingCart },
   { id: "orders", label: "Đơn đặt", icon: PackageCheck },
   { id: "balancing", label: "Cân đối", icon: Scale },
+  { id: "nxt-nl", label: "Tồn kho NL", icon: Boxes },
   { id: "nxt", label: "Báo cáo NXT", icon: FileSpreadsheet },
   { id: "reports", label: "Báo cáo", icon: BarChart3 },
   { id: "traceability", label: "Truy xuất", icon: GitBranch },
@@ -86,7 +88,7 @@ export const NHOM_NAV: { ten: string; ids: string[] }[] = [
   { ten: "Sản xuất", ids: ["production", "wip", "quality"] },
   { ten: "Kho", ids: ["imports", "warehouse", "cold-storage"] },
   { ten: "Kinh doanh", ids: ["sales", "orders"] },
-  { ten: "Báo cáo", ids: ["balancing", "nxt", "reports", "traceability"] },
+  { ten: "Báo cáo", ids: ["balancing", "nxt-nl", "nxt", "reports", "traceability"] },
   { ten: "Hệ thống", ids: ["catalog", "users"] },
 ];
 

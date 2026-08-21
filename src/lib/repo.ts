@@ -37,6 +37,7 @@ import type {
   ExportItem,
   DailyQuantities,
   GridAutoSource,
+  MaterialOpeningStock,
 } from "@/types";
 import { rolesFromCsv, rolesToCsv } from "@/types";
 
@@ -702,6 +703,29 @@ export const BANG_EXPORT_ITEM: AnhXaBang<ExportItem> = {
     spec: s(r.spec),
     quantityKg: Number(r.quantity_kg ?? 0),
     blocksCount: Number(r.blocks_count ?? 0),
+  }),
+};
+
+/** Tồn đầu kho nguyên liệu — số dư đông dự trữ có sẵn trước khi số hoá (kg). */
+export const BANG_OPENING_STOCK: AnhXaBang<MaterialOpeningStock> = {
+  table: "material_opening_stock",
+  localKey: "bsf.material-opening-stock.v2",
+  layKhoa: theoId,
+  toRow: (x) => ({
+    id: x.id,
+    workshop: x.workshop,
+    material_type_name: x.materialTypeName,
+    as_of_date: x.asOfDate || null,
+    quantity_kg: x.quantityKg,
+    note: x.note,
+  }),
+  fromRow: (r) => ({
+    id: s(r.id),
+    workshop: s(r.workshop) as Workshop,
+    materialTypeName: s(r.material_type_name),
+    asOfDate: s(r.as_of_date).slice(0, 10),
+    quantityKg: Number(r.quantity_kg ?? 0),
+    note: s(r.note),
   }),
 };
 

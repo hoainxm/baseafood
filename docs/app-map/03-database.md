@@ -1,7 +1,8 @@
 > Load khi: thêm/sửa bảng, cột, migration, hay đọc lỗi Postgres lạ.
 covers: supabase/migrations/**, docs/ops/supabase-setup.md
-last_verified: 2026-08-18
+last_verified: 2026-08-21
 ttl_days: 90
+<!-- updated: 2026-08-21 — thêm 0022 (material_opening_stock: tồn đầu kho nguyên liệu, kg thuần) cho sổ NXT nguyên liệu; xem 31-can-doi-ky.md § Tồn kho nguyên liệu -->
 <!-- updated: 2026-08-07 — thêm migration 0008 (nguyen_lieu_vao.nguon_kho, cờ nguồn xả đông) -->
 <!-- updated: 2026-08-14 — bổ sung dòng migration 0016/0017/0018 (trước đó bảng dừng ở 0015); 0018 cho NL vào âm -->
 <!-- updated: 2026-08-18 — thêm 0020 (chốt kỳ cân đối + carry_over_period_id cho balancing_inputs) -->
@@ -68,7 +69,8 @@ App dùng camelCase, DB dùng snake_case — cầu nối là `AnhXaBang.toRow/fr
 | `0018_nl_vao_cho_phep_am.sql` | 🟡 | Đổi CHECK `balancing_inputs.quantity_kg`: `>= 0` → `<> 0` (cho **NL vào ÂM** — điều chỉnh giảm / "bán nội địa", khớp luật app Khối 1). `NOT VALID` (không kiểm dòng cũ), idempotent, lùi được. Sửa bug 23514 khi ghi dòng NL âm lên Supabase. |
 | `0019_can_doi_luoi_ngay.sql` | 🟡 | **Lưới cân đối theo ngày.** Thêm `balancing_period_id` vào `material_imports` + `production_wips` (hút = gán kỳ lên bản ghi gốc, không chép số); thêm `daily_quantities` (jsonb) · `carry_over_kg` · `auto_source` cho `balancing_inputs`/`balancing_outputs`; `is_reduction` + `reduction_warehouse_id` cho ô **Giảm**. Tách size: `Bạch tuộc 2 da` → **lớn (80↑)** (dữ liệu cũ đổi hết sang lớn) + thêm **nhỏ (80↓)**. **KHÔNG** đổi `balancing_periods.material_type_name` — kỳ giữ tên HỌ để gom cả hai size. Chỉ thêm cột, idempotent, có khối `ROLLBACK` sẵn trong file. |
 | `0020_chot_ky_va_chuyen_ky.sql` | 🟡 | **Chốt kỳ cân đối**: `balancing_periods` thêm `is_locked` / `locked_at` / `lock_note` / `reopen_reason` (cùng luật chốt ngày: mở lại bắt lý do, KHÔNG xoá vết). **Chuyển kỳ**: `balancing_inputs` thêm `carry_over_period_id` (bảng outputs đã có từ 0019) + index cho cả hai — dòng đẩy sang kỳ sau nhớ đã được kỳ nào nhận, chống lấy hai lần. Chỉ thêm cột, idempotent, có khối `ROLLBACK`. |
-| `0021_siet_rls_tieng_anh.sql` | 🔴 | **Siết RLS** — thay `0003` (đã lỗi thời sau rename `0016`). Thu hồi `anon` ở cả policy lẫn GRANT + `revoke usage on schema public`, policy `authenticated` cho đủ **23 bảng** tên hiện hành. Bỏ qua bảng chưa tồn tại thay vì gãy giữa chừng. Idempotent, có `ROLLBACK`. **Tiền kiểm bắt buộc**: mọi máy đăng nhập được, còn admin đăng nhập được — chạy sớm là cả xưởng đứng (401). Xem [05-bao-mat-phan-quyen.md](05-bao-mat-phan-quyen.md). |
+| `0021_siet_rls_tieng_anh.sql` | 🔴 | **Siết RLS** — thay `0003` (đã lỗi thời sau rename `0016`). Thu hồi `anon` ở cả policy lẫn GRANT + `revoke usage on schema public`, policy `authenticated` cho đủ **23 bảng** tên hiện hành. Bỏ qua bảng chưa tồn tại thay vì gãy giữa chừng. Idempotent, có `ROLLBACK`. **Tiền kiểm bắt buộc**: mọi máy đăng nhập được, còn admin đăng nhập được — chạy sớm là cả xưởng đứng (401). Xem [05-bao-mat-phan-quyen.md](05-bao-mat-phan-quyen.md). ⚠️ Bảng mới `material_opening_stock` (0022) chưa nằm trong danh sách 23 — bổ sung khi chạy lại. |
+| `0022_ton_dau_nguyen_lieu.sql` | 🟡 | **Tồn đầu kho nguyên liệu** — bảng `material_opening_stock` (site_id · workshop · material_type_name · as_of_date · quantity_kg, **kg thuần**). Số dư đông dự trữ có sẵn trước khi số hoá, làm tồn đầu cho kỳ ĐẦU của mỗi họ NL trong sổ NXT nguyên liệu (kỳ sau tự kế thừa). Chỉ thêm bảng, idempotent, RLS mở anon (siết sau ở `0021`), có `ROLLBACK`. Xem [31-can-doi-ky.md](31-can-doi-ky.md). |
 
 ⚠️ **`0004` chưa chạy** ⇒ app báo *"Mất kết nối máy chủ — Could not find the 'chuyen_id' column"*. Số liệu vẫn ghi xuống máy và nằm trong hàng chờ, tự đẩy lên sau khi migration chạy — nhưng máy khác chưa thấy.
 

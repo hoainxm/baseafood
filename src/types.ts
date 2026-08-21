@@ -429,3 +429,20 @@ export interface NxtReportItem {
   note?: string;
 }
 
+/* ---------- Tồn đầu kho nguyên liệu (NXT nguyên liệu) ---------- */
+
+/**
+ * Số dư tồn kho nguyên liệu (cấp đông dự trữ) có sẵn TRƯỚC khi số hoá.
+ * Sổ NXT nguyên liệu suy tồn ra từ vòng chuyển kỳ của Cân đối; kỳ đầu tiên của
+ * mỗi họ nguyên liệu không có kỳ trước để kế thừa nên cần con số khai tay này.
+ * Chỉ kg — giá trị tiền vẫn tính riêng ở màn Cân đối.
+ */
+export interface MaterialOpeningStock {
+  id: string;
+  workshop: Workshop;
+  materialTypeName: string; // theo TÊN loại NL (như sổ nhập), không phải khóa ngoại
+  asOfDate: string; // yyyy-mm-dd — tồn đầu tính từ ngày này
+  quantityKg: number;
+  note: string;
+}
+

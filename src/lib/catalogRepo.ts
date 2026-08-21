@@ -26,6 +26,7 @@ import {
   BANG_WIP_PRODUCTION,
   BANG_FINISHED_GOOD,
   BANG_BALANCING_OUTPUT,
+  BANG_OPENING_STOCK,
   useBang,
 } from "@/lib/repo";
 import type { MaterialType, Product, FinishedGood } from "@/types";
@@ -102,3 +103,6 @@ export const useSalesOrders = () => useBang(BANG_SALES_ORDER);
 export const useOrderItems = () => useBang(BANG_ORDER_ITEM);
 export const useExportOrders = () => useBang(BANG_EXPORT_ORDER);
 export const useExportItems = () => useBang(BANG_EXPORT_ITEM);
+
+/* --- Tồn kho nguyên liệu (NXT nguyên liệu) --- */
+export const useMaterialOpeningStock = () => useBang(BANG_OPENING_STOCK);

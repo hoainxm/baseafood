@@ -135,8 +135,8 @@ export function DanhMucCrud<T extends { id: string }>({
     <div className="space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-semibold text-foreground">{tieuDe}</h2>
-          {moTa && <p className="mt-1 text-base text-muted-foreground">{moTa}</p>}
+          <h2 className="text-xl font-semibold text-foreground">{tieuDe}</h2>
+          {moTa && <p className="mt-1 text-sm text-muted-foreground">{moTa}</p>}
         </div>
         <Button size="lg" onClick={moThem}>
           <Plus />
@@ -187,10 +187,10 @@ export function DanhMucCrud<T extends { id: string }>({
       >
         <DialogContent className="max-h-[92vh] overflow-y-auto w-full sm:max-w-3xl lg:max-w-5xl">
           <DialogHeader>
-            <DialogTitle className="text-2xl">
+            <DialogTitle className="text-xl">
               {laThem ? `Thêm ${tenDonVi}` : `Sửa ${tenDonVi}`}
             </DialogTitle>
-            <DialogDescription className="text-base">
+            <DialogDescription>
               Ô có dấu * phải nhập mới lưu được.
             </DialogDescription>
           </DialogHeader>

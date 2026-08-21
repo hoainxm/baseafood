@@ -50,7 +50,7 @@ export function BangTong<T>({
 }) {
   if (rows.length === 0) {
     return (
-      <p className="rounded-lg border-2 border-dashed border-border p-6 text-center text-base text-muted-foreground">
+      <p className="rounded-lg border-2 border-dashed border-border p-6 text-center text-sm text-muted-foreground">
         {emptyText}
       </p>
     );

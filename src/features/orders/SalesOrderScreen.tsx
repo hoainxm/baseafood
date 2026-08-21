@@ -308,7 +308,7 @@ export default function DonDatScreen() {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-semibold text-foreground">
+          <h1 className="text-2xl font-semibold text-foreground">
             Đơn đặt &amp; lệnh xuất
           </h1>
         </div>

@@ -12,7 +12,7 @@ function Table({ className, ...props }: React.ComponentProps<"table">) {
     >
       <table
         data-slot="table"
-        className={cn("w-full caption-bottom text-base", className)}
+        className={cn("w-full caption-bottom text-sm", className)}
         {...props}
       />
     </div>
@@ -70,8 +70,8 @@ function TableHead({ className, ...props }: React.ComponentProps<"th">) {
     <th
       data-slot="table-head"
       className={cn(
-        /* Header bảng: KHÔNG in hoa, KHÔNG text-xs — chữ hoa làm chậm đọc ~15% */
-        "h-14 bg-muted px-4 text-left align-middle text-base font-semibold whitespace-nowrap text-foreground [&:has([role=checkbox])]:pr-0",
+        /* Header bảng: KHÔNG in hoa — chữ hoa làm chậm đọc ~15% */
+        "h-11 bg-muted px-4 text-left align-middle text-sm font-semibold whitespace-nowrap text-foreground [&:has([role=checkbox])]:pr-0",
         className
       )}
       {...props}
@@ -84,8 +84,8 @@ function TableCell({ className, ...props }: React.ComponentProps<"td">) {
     <td
       data-slot="table-cell"
       className={cn(
-        /* Dòng cao 56px — chống lạc dòng khi dò ngang bảng cân đối */
-        "h-14 px-4 py-3 align-middle whitespace-nowrap [&:has([role=checkbox])]:pr-0",
+        /* Dòng cao 44px — đủ để dò ngang bảng cân đối, gọn hơn cho web */
+        "h-11 px-4 py-2.5 align-middle whitespace-nowrap [&:has([role=checkbox])]:pr-0",
         className
       )}
       {...props}

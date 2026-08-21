@@ -66,7 +66,7 @@ export function StepForm({
       {/* Thanh tiến độ — luôn cho biết đang ở đâu và còn bao xa */}
       <div>
         <div className="flex items-baseline justify-between gap-4">
-          <p className="text-base font-semibold text-muted-foreground">
+          <p className="text-sm font-semibold text-muted-foreground">
             Bước {i + 1} / {tong}
           </p>
           {onCancel && (
@@ -80,7 +80,7 @@ export function StepForm({
             <div
               key={k}
               className={cn(
-                "h-3 flex-1 rounded-full",
+                "h-2 flex-1 rounded-full transition-colors",
                 k <= i ? "bg-primary" : "bg-secondary"
               )}
             />
@@ -91,14 +91,14 @@ export function StepForm({
       <ErrorSummary loi={loi} />
 
       <div>
-        <h2 className="text-2xl font-semibold text-foreground">
+        <h2 className="text-xl font-semibold text-foreground">
           {laXemLai ? "Xem lại trước khi ghi" : buoc!.tieuDe}
         </h2>
         {!laXemLai && buoc!.moTa && (
-          <p className="mt-2 text-base text-muted-foreground">{buoc!.moTa}</p>
+          <p className="mt-2 text-sm text-muted-foreground">{buoc!.moTa}</p>
         )}
         {laXemLai && (
-          <p className="mt-2 text-base text-muted-foreground">
+          <p className="mt-2 text-sm text-muted-foreground">
             Đọc lại số một lượt. Sai chỗ nào bấm "Quay lại" để sửa.
           </p>
         )}

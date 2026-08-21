@@ -78,12 +78,12 @@ const Toaster = ({ ...props }: ToasterProps) => {
       toastOptions={{
         classNames: {
           toast:
-            "cn-toast !text-base !gap-3 !p-5 !rounded-xl !border-2 !shadow-lg",
-          title: "!text-lg !font-semibold !leading-snug",
-          description: "!text-base",
+            "cn-toast !text-sm !gap-3 !p-4 !rounded-xl !border !shadow-lg",
+          title: "!text-base !font-semibold !leading-snug",
+          description: "!text-sm",
           actionButton:
-            "!text-base !font-semibold !h-12 !px-5 !rounded-lg",
-          closeButton: "!size-9",
+            "!text-sm !font-semibold !h-9 !px-4 !rounded-lg",
+          closeButton: "!size-8",
         },
       }}
       {...props}

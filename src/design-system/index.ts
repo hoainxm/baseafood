@@ -52,10 +52,12 @@ export { BieuDoCot, type CotBieuDo } from "./patterns/BarChart";
 export { StatusChip, type TrangThaiSX } from "./patterns/StatusChip";
 export { DuLieuMau } from "./patterns/MockPatternData";
 export { BieuDoCotDoc, type CotBieuDoDoc } from "./patterns/VerticalBarChart";
+export { ThinkingDots, DangXuLy, SkeletonBang } from "./patterns/Loading";
 export { notify } from "./patterns/notify";
 
 /* Primitive được phép dùng lại nguyên bản (đã đè size trong components/ui). */
 export { Button } from "@/components/ui/button";
+export { Skeleton } from "@/components/ui/skeleton";
 export { Input } from "@/components/ui/input";
 export { Textarea } from "@/components/ui/textarea";
 export { Label } from "@/components/ui/label";

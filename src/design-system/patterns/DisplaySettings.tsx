@@ -28,24 +28,24 @@ function khoa(base: string, taiKhoan?: string) {
   return taiKhoan ? `bsf.${taiKhoan}.${base}` : `bsf.${base}`;
 }
 
-/** MẶC ĐỊNH là "90" — màn hình văn phòng ngày nay dày điểm ảnh, 18px trông quá
- *  to. Thang token GIỮ NGUYÊN (nền 18px) nên tổ trưởng mắt kém vẫn kéo lên
- *  110–130% được; đây chỉ là điểm xuất phát. */
+/** MẶC ĐỊNH là "100" — thang token nền 16px (mật độ web thường). Người mắt kém
+ *  kéo lên 110–130% như một lối phóng to; ai muốn gọn hơn nữa hạ 90%. Thang rem
+ *  nên bố cục giãn theo, không vỡ như phóng to trình duyệt. */
 export const CO_CHU = [
-  { id: "90", nhan: "A", scale: "90%", moTa: "Thường — 16px" },
-  { id: "100", nhan: "A", scale: "100%", moTa: "Hơi lớn — 18px" },
-  { id: "110", nhan: "A", scale: "110%", moTa: "Lớn — 20px" },
-  { id: "120", nhan: "A", scale: "120%", moTa: "Rất lớn — 22px" },
-  { id: "130", nhan: "A", scale: "130%", moTa: "Cực lớn — 23px" },
+  { id: "90", nhan: "A", scale: "90%", moTa: "Nhỏ — 14px" },
+  { id: "100", nhan: "A", scale: "100%", moTa: "Thường — 16px" },
+  { id: "110", nhan: "A", scale: "110%", moTa: "Lớn — 18px" },
+  { id: "120", nhan: "A", scale: "120%", moTa: "Rất lớn — 19px" },
+  { id: "130", nhan: "A", scale: "130%", moTa: "Cực lớn — 21px" },
 ] as const;
 
 /** Bậc cỡ chữ mặc định khi chưa ai chọn gì. */
-export const CO_CHU_MAC_DINH = "90";
+export const CO_CHU_MAC_DINH = "100";
 
 export const MAT_DO = [
-  { id: "thoang", nhan: "Thoáng", moTa: "Ô cao 48px — dễ bấm nhất" },
-  { id: "vua", nhan: "Vừa", moTa: "Ô cao 44px" },
-  { id: "gon", nhan: "Gọn", moTa: "Ô cao 40px — thấy nhiều dòng hơn" },
+  { id: "thoang", nhan: "Thoáng", moTa: "Ô cao 44px — dễ bấm nhất" },
+  { id: "vua", nhan: "Vừa", moTa: "Ô cao 40px" },
+  { id: "gon", nhan: "Gọn", moTa: "Ô cao 36px — thấy nhiều dòng hơn" },
 ] as const;
 
 export const BE_RONG = [
@@ -230,7 +230,7 @@ function NhomChon({
   return (
     <fieldset className="space-y-3">
       <legend className="text-lg font-semibold text-foreground">{nhan}</legend>
-      <p className="text-base text-muted-foreground">{moTa}</p>
+      <p className="text-sm text-muted-foreground">{moTa}</p>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {muc.map((m) => {
           const chon = m.id === giaTri;
@@ -241,13 +241,13 @@ function NhomChon({
               aria-pressed={chon}
               onClick={() => onChange(m.id)}
               className={cn(
-                "min-h-16 rounded-lg border-2 px-4 py-3 text-left transition-colors",
+                "min-h-14 rounded-lg border-2 px-4 py-3 text-left transition-colors",
                 chon
                   ? "border-primary bg-accent text-accent-foreground"
                   : "border-input bg-background hover:bg-muted"
               )}
             >
-              <span className="block text-base font-semibold">{m.nhan}</span>
+              <span className="block text-sm font-semibold">{m.nhan}</span>
               <span
                 className={cn(
                   "block text-sm",
@@ -268,7 +268,7 @@ export function CaiDatHienThi({ taiKhoan }: { taiKhoan?: string }) {
   const c = useCaiDat(taiKhoan);
 
   return (
-    <div className="space-y-8 rounded-xl border-2 border-border p-5">
+    <div className="space-y-8 rounded-xl border border-border p-5">
       <NhomChon
         nhan="Cỡ chữ toàn hệ thống"
         moTa="Áp cho mọi màn. Bố cục giãn theo, không vỡ như khi phóng to trình duyệt."

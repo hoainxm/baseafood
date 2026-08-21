@@ -12,6 +12,7 @@ import {
   Combobox,
   EmptyState,
   RecordTable,
+  SkeletonBang,
   type Cot,
 } from "@/design-system";
 import { Search, X } from "lucide-react";
@@ -25,7 +26,8 @@ import { Search, X } from "lucide-react";
  */
 export default function ThanhPhamScreen() {
   const [nhom, setNhom] = useState("");
-  const [items] = useFinishedGoods();
+  const [items, , { trangThai }] = useFinishedGoods();
+  const dangTai = trangThai === "dang-tai" && items.length === 0;
 
   const nhomList = useMemo(
     () => Array.from(new Set(items.map((i) => i.groupName))).sort(),
@@ -68,10 +70,10 @@ export default function ThanhPhamScreen() {
   return (
     <div className="space-y-5">
       <div>
-        <h2 className="text-2xl font-semibold text-foreground">
+        <h2 className="text-xl font-semibold text-foreground">
           Thành phẩm theo danh mục kế toán
         </h2>
-        <p className="mt-1 text-base text-muted-foreground">
+        <p className="mt-1 text-sm text-muted-foreground">
           {items.length} mã, tài khoản 1551, đơn vị ki-lô-gam. Danh mục chỉ để
           tra cứu — muốn đổi phải sửa ở sổ kế toán.
         </p>
@@ -87,7 +89,7 @@ export default function ThanhPhamScreen() {
             placeholder="Tất cả nhóm"
           />
         </div>
-        <p className="pb-3 text-base text-muted-foreground">
+        <p className="pb-3 text-sm text-muted-foreground">
           Đang hiện{" "}
           <span className="tnum font-semibold text-foreground">
             {rows.length}
@@ -102,7 +104,9 @@ export default function ThanhPhamScreen() {
         )}
       </div>
 
-      {rows.length === 0 ? (
+      {dangTai ? (
+        <SkeletonBang />
+      ) : rows.length === 0 ? (
         <EmptyState
           icon={Search}
           tieuDe="Không có mã nào trong nhóm này"

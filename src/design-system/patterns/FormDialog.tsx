@@ -73,18 +73,18 @@ export function FormDialog({
         )}
       >
         {/* Đầu — cố định */}
-        <div className="flex shrink-0 items-start gap-3 border-b-2 border-border px-6 py-5">
+        <div className="flex shrink-0 items-start gap-3 border-b border-border px-6 py-4">
           {Icon && (
-            <span className="mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-lg bg-accent text-accent-foreground">
-              <Icon className="size-6" aria-hidden />
+            <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-accent text-accent-foreground">
+              <Icon className="size-5" aria-hidden />
             </span>
           )}
           <div className="min-w-0 flex-1">
-            <DialogTitle className="text-xl leading-tight font-semibold text-foreground">
+            <DialogTitle className="text-lg leading-tight font-semibold text-foreground">
               {tieuDe}
             </DialogTitle>
             {moTa && (
-              <DialogDescription className="mt-1 text-base text-muted-foreground">
+              <DialogDescription className="mt-1 text-sm text-muted-foreground">
                 {moTa}
               </DialogDescription>
             )}
@@ -102,7 +102,7 @@ export function FormDialog({
 
         {/* Chân — cố định */}
         {chan && (
-          <div className="flex shrink-0 flex-wrap items-center justify-end gap-3 border-t-2 border-border bg-muted/40 px-6 py-4">
+          <div className="flex shrink-0 flex-wrap items-center justify-end gap-3 border-t border-border bg-muted/40 px-6 py-3.5">
             {chan}
           </div>
         )}

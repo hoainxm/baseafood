@@ -90,7 +90,7 @@ export function TrangThaiDuLieu({ className }: { className?: string }) {
 
   return (
     <div className={cn("space-y-1", className)}>
-      <p className={cn("flex items-center gap-2 text-base font-semibold", c.mau)}>
+      <p className={cn("flex items-center gap-2 text-sm font-semibold", c.mau)}>
         <Icon
           className={cn("size-5 shrink-0", trang === "dang-kiem" && "animate-spin")}
           aria-hidden
@@ -137,14 +137,14 @@ export function NutTrangThai({ className }: { className?: string }) {
           aria-label={`Trạng thái máy chủ: ${c.chu}`}
           title={c.chu}
           className={cn(
-            "inline-flex size-11 shrink-0 items-center justify-center rounded-lg border-2 border-input transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+            "inline-flex size-10 shrink-0 items-center justify-center rounded-lg border border-input transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
             c.mau,
             className
           )}
         >
           <Icon
             className={cn(
-              "size-6",
+              "size-5",
               (trang === "dang-kiem" || dangThu) && "animate-spin"
             )}
             aria-hidden
@@ -155,7 +155,7 @@ export function NutTrangThai({ className }: { className?: string }) {
         <div className="space-y-1">
           <p
             className={cn(
-              "flex items-center gap-2 text-base font-semibold",
+              "flex items-center gap-2 text-sm font-semibold",
               c.mau
             )}
           >
@@ -169,7 +169,7 @@ export function NutTrangThai({ className }: { className?: string }) {
             type="button"
             onClick={thuLai}
             disabled={dangThu}
-            className="flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border-2 border-input text-base font-medium transition-colors hover:bg-muted disabled:opacity-60"
+            className="mt-2 flex min-h-10 w-full items-center justify-center gap-2 rounded-lg border border-input text-sm font-medium transition-colors hover:bg-muted disabled:opacity-60"
           >
             <RotateCcw
               className={cn("size-5", dangThu && "animate-spin")}

@@ -53,7 +53,7 @@ export function BieuDoCot({
 
   if (data.length === 0) {
     return (
-      <p className="rounded-lg border-2 border-dashed border-border p-6 text-center text-base text-muted-foreground">
+      <p className="rounded-lg border-2 border-dashed border-border p-6 text-center text-sm text-muted-foreground">
         Chưa có số liệu để vẽ biểu đồ.
       </p>
     );

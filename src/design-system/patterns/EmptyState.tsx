@@ -4,7 +4,7 @@ import { Inbox } from "lucide-react";
 
 /**
  * EmptyState — màn trống phải NÓI VIỆC TIẾP THEO, không chỉ báo "không có dữ liệu".
- * Chữ 18px, màu muted-foreground đạt 7.4:1 (không dùng slate-400 như bản cũ).
+ * Màu muted-foreground đạt 7.4:1 (không dùng slate-400 như bản cũ).
  */
 export function EmptyState({
   icon: Icon = Inbox,
@@ -19,10 +19,10 @@ export function EmptyState({
 }) {
   return (
     <div className="rounded-xl border-2 border-dashed border-border px-6 py-12 text-center">
-      <Icon className="mx-auto size-12 text-muted-foreground" aria-hidden />
-      <p className="mt-4 text-xl font-semibold text-foreground">{tieuDe}</p>
+      <Icon className="mx-auto size-10 text-muted-foreground" aria-hidden />
+      <p className="mt-4 text-lg font-semibold text-foreground">{tieuDe}</p>
       {moTa && (
-        <p className="mx-auto mt-2 max-w-md text-base text-muted-foreground">
+        <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
           {moTa}
         </p>
       )}

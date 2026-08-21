@@ -119,7 +119,7 @@ export function RecordTable<T>({
       {/* Sắp xếp trên điện thoại: header bảng không hiện nên cần nút riêng */}
       {cotSapDuoc.length > 0 && (
         <div className="flex min-w-0 flex-wrap items-center gap-2 md:hidden">
-          <span className="text-base text-muted-foreground">Sắp theo</span>
+          <span className="text-sm text-muted-foreground">Sắp theo</span>
           {cotSapDuoc.map((c) => (
             <Button
               key={c.key}
@@ -160,7 +160,7 @@ export function RecordTable<T>({
     return (
       <div
         className={cn(
-          "rounded-xl border-2 border-dashed border-border px-6 py-12 text-center text-base text-muted-foreground",
+          "rounded-xl border-2 border-dashed border-border px-6 py-12 text-center text-sm text-muted-foreground",
           className
         )}
       >
@@ -178,7 +178,7 @@ export function RecordTable<T>({
       {thanhCongCu}
 
       {daSap.length === 0 ? (
-        <div className="rounded-xl border-2 border-dashed border-border px-6 py-10 text-center text-base text-muted-foreground">
+        <div className="rounded-xl border-2 border-dashed border-border px-6 py-10 text-center text-sm text-muted-foreground">
           Không có dòng nào khớp “{q}”.
         </div>
       ) : (
@@ -206,7 +206,7 @@ export function RecordTable<T>({
                           type="button"
                           onClick={() => doiSap(c.key)}
                           className={cn(
-                            "flex h-14 w-full items-center gap-2 px-4 text-base font-semibold hover:bg-accent",
+                            "flex h-11 w-full items-center gap-2 px-4 text-sm font-semibold hover:bg-accent",
                             c.so && "justify-end"
                           )}
                         >
@@ -224,7 +224,7 @@ export function RecordTable<T>({
                       ) : (
                         <span
                           className={cn(
-                            "flex h-14 items-center px-4",
+                            "flex h-11 items-center px-4",
                             c.so && "justify-end"
                           )}
                         >
@@ -281,12 +281,12 @@ export function RecordTable<T>({
                         key={c.key}
                         className="flex items-baseline justify-between gap-4 border-b border-border/60 pb-2 last:border-0"
                       >
-                        <dt className="text-base text-muted-foreground">
+                        <dt className="text-sm text-muted-foreground">
                           {c.header}
                         </dt>
                         <dd
                           className={cn(
-                            "text-right text-base font-medium",
+                            "text-right text-sm font-medium",
                             c.so && "tnum"
                           )}
                         >

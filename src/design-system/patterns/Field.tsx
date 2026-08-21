@@ -23,7 +23,7 @@ import { cn } from "@/lib/utils";
  */
 export function ChuThichBatBuoc({ className }: { className?: string }) {
   return (
-    <p className={cn("text-base text-muted-foreground", className)}>
+    <p className={cn("text-sm text-muted-foreground", className)}>
       Ô có dấu <span className="font-bold text-destructive">*</span> là bắt buộc.
     </p>
   );
@@ -138,7 +138,7 @@ export function Field({
       </div>
 
       {hint && (
-        <p id={hintId} className="text-base text-muted-foreground">
+        <p id={hintId} className="text-sm text-muted-foreground">
           {hint}
         </p>
       )}
@@ -146,7 +146,7 @@ export function Field({
       {error && (
         <p
           id={errId}
-          className="flex items-start gap-2 text-base font-semibold text-destructive"
+          className="flex items-start gap-2 text-sm font-semibold text-destructive"
         >
           <span aria-hidden>⚠</span>
           <span>{error}</span>
@@ -159,7 +159,7 @@ export function Field({
           <span
             ref={unitRef}
             aria-hidden
-            className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-base font-medium whitespace-nowrap text-muted-foreground"
+            className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm font-medium whitespace-nowrap text-muted-foreground"
           >
             {unit}
           </span>

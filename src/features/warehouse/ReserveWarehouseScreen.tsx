@@ -160,7 +160,7 @@ export default function KhoDuTruScreen() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-semibold text-foreground">Kho dự trữ đông</h1>
+        <h1 className="text-2xl font-semibold text-foreground">Kho dự trữ đông</h1>
       </div>
 
       <ThongKe

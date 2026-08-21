@@ -214,12 +214,12 @@ export function LuoiNhap<R>({
           sr-only là position:absolute, mà hộp cuộn ngoài không phải khối định vị
           ⇒ caption rơi ra toạ độ trang, đội chiều cao trang lên và sinh thêm một
           thanh cuộn dọc + mảng trắng dưới cùng. */}
-      <table className="w-full border-collapse text-base" aria-label={moTa}>
+      <table className="w-full border-collapse text-sm" aria-label={moTa}>
         <thead>
           <tr>
             <th
               scope="col"
-              className="sticky left-0 z-30 min-w-44 border-b-2 border-border bg-card px-4 py-3 text-left align-bottom text-base font-semibold sm:min-w-60"
+              className="sticky left-0 z-30 min-w-44 border-b-2 border-border bg-card px-4 py-3 text-left align-bottom text-sm font-semibold sm:min-w-60"
             >
               Mặt hàng
             </th>
@@ -229,7 +229,7 @@ export function LuoiNhap<R>({
                 scope="col"
                 style={c.rong ? { minWidth: c.rong } : undefined}
                 className={cn(
-                  "border-b-2 border-l border-border bg-card px-3 py-3 text-right align-bottom text-base font-semibold whitespace-nowrap",
+                  "border-b-2 border-l border-border bg-card px-3 py-3 text-right align-bottom text-sm font-semibold whitespace-nowrap",
                   c.toNen === "chuyen-ky" && "text-warning"
                 )}
               >
@@ -244,7 +244,7 @@ export function LuoiNhap<R>({
               <tr key={h.id}>
                 <td
                   colSpan={cotHien.length + 1}
-                  className="sticky left-0 border-b border-border bg-muted px-4 py-2 text-left text-base font-semibold text-muted-foreground"
+                  className="sticky left-0 border-b border-border bg-muted px-4 py-2 text-left text-sm font-semibold text-muted-foreground"
                 >
                   {h.tieuDeNhom}
                 </td>
@@ -378,7 +378,7 @@ function OLuoi({
       onPaste={onDan}
       onKeyDown={onPhim}
       className={cn(
-        "tnum h-11 w-full min-w-24 border-0 bg-transparent px-3 text-right text-base",
+        "tnum h-11 w-full min-w-24 border-0 bg-transparent px-3 text-right text-sm",
         "focus:ring-2 focus:ring-ring focus:ring-inset focus:outline-none",
         giaTri != null && giaTri < 0 && "text-destructive"
       )}

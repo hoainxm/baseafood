@@ -232,7 +232,7 @@ export default function MaterialNxtScreen() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-semibold text-foreground flex items-center gap-2">
+          <h1 className="text-2xl font-semibold text-foreground flex items-center gap-2">
             <Snowflake className="w-8 h-8 text-primary" />
             Tồn kho nguyên liệu (Nhập – Xuất – Tồn)
           </h1>

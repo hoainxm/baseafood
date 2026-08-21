@@ -23,6 +23,7 @@ import {
   Field,
   Input,
   RecordTable,
+  SkeletonBang,
   notify,
   type Cot,
   type LoiNhap,
@@ -87,7 +88,8 @@ export default function QuanLyNguoiDungScreen({
     roles: Role[]
   ) => Promise<KetQuaDangNhap>;
 }) {
-  const [ds, ghi] = useUserProfiles();
+  const [ds, ghi, { trangThai }] = useUserProfiles();
+  const dangTai = trangThai === "dang-tai" && ds.length === 0;
   const [dang, setDang] = useState<UserProfile | null>(null);
 
   const [tao, setTao] = useState<TaoMoi | null>(null);
@@ -177,7 +179,7 @@ export default function QuanLyNguoiDungScreen({
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-semibold text-foreground">Người dùng</h1>
+          <h1 className="text-2xl font-semibold text-foreground">Người dùng</h1>
         </div>
         <Button
           size="lg"
@@ -191,7 +193,9 @@ export default function QuanLyNguoiDungScreen({
         </Button>
       </div>
 
-      {ds.length === 0 ? (
+      {dangTai ? (
+        <SkeletonBang />
+      ) : ds.length === 0 ? (
         <EmptyState
           icon={Users}
           tieuDe="Chưa có người dùng nào"

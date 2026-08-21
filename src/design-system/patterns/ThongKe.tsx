@@ -63,30 +63,34 @@ export function ThongKe({
         const mau = MAU[t.mau ?? "brand"];
         const Icon = t.icon;
         const isString = typeof t.giaTri === "string";
-        const isLong = isString && (t.giaTri as string).length > 12;
-        // Không bao giờ xuống dưới text-sm (16px) — kể cả chuỗi dài trên điện thoại.
+        const len = isString ? (t.giaTri as string).length : 0;
+        // Chuỗi vừa (ngày "21/08/2026"…) để cỡ nhỏ đủ HIỆN TRỌN 1 dòng trong thẻ
+        // hẹp nhất (mobile 2 cột) — không bẻ dòng giữa số, không cắt mất năm.
+        // Chuỗi thật dài (>12) mới cho ngắt từ; số (t.so) luôn to.
         const fontSizeClass = t.so
           ? "text-xl md:text-2xl"
-          : isLong
+          : len > 12
             ? "text-sm font-semibold leading-snug lg:text-base"
-            : "text-base md:text-lg lg:text-xl";
+            : len > 7
+              ? "text-xs md:text-sm"
+              : "text-base md:text-lg lg:text-xl";
 
         return (
           <div
             key={t.nhan}
             className={cn(
-              "flex items-center gap-3 rounded-xl border-2 bg-card px-4 py-3",
+              "flex items-center gap-2.5 rounded-xl border bg-card px-3 py-3",
               mau.vien
             )}
           >
             {Icon && (
               <span
                 className={cn(
-                  "flex size-11 shrink-0 items-center justify-center rounded-lg",
+                  "flex size-9 shrink-0 items-center justify-center rounded-lg",
                   mau.chip
                 )}
               >
-                <Icon className="size-6" aria-hidden />
+                <Icon className="size-5" aria-hidden />
               </span>
             )}
             <div className="min-w-0 flex-1">
@@ -95,7 +99,13 @@ export function ThongKe({
               </p>
               <p
                 className={cn(
-                  "font-bold text-foreground break-words leading-tight",
+                  "min-w-0 text-foreground leading-tight",
+                  // Số & chuỗi ngắn để bold cho nổi; chuỗi vừa/dài (ngày…) chỉ
+                  // semibold để hẹp hơn, vừa thẻ mà không cắt chữ.
+                  t.so || len <= 7 ? "font-bold" : "font-semibold",
+                  // Số (tiền/kg) KHÔNG truncate — thà bẻ dòng còn hơn cắt mất chữ
+                  // số. Chỉ chuỗi vừa (ngày…) mới truncate cho gọn 1 dòng.
+                  t.so || len > 12 ? "break-words" : "truncate",
                   fontSizeClass,
                   t.so && "tnum"
                 )}

@@ -6,7 +6,7 @@ Hệ thống MES cho Xí nghiệp Baseafood BSF1 (Bà Rịa). **Repo mới, đ�
 
 **Nghiệp vụ trọng tâm:** quản lý nguyên liệu trong sản xuất theo vòng lặp gối đầu (mua → sơ chế → cấp đông → tồn dự trữ → xả đông tái dùng kỳ sau), kéo theo tồn kho. Đau nhất: tồn nguyên liệu cuối kỳ sai do ghi chép tay → kế toán chốt số sai. Ba phân xưởng: **Đông · Cá · Khô**.
 
-**Người dùng:** tổ trưởng/thủ kho **45–60 tuổi**, tablet ở xưởng lạnh, tay ướt, đeo kính lão. Đây là ràng buộc thiết kế số 1 — luật UI ở [`src/design-system/README.md`](src/design-system/README.md).
+**Người dùng:** tổ trưởng/thủ kho + kế toán, thao tác trên **web** ở nhiều cỡ màn (điện thoại → desktop). Ưu tiên thiết kế: **responsive gọn, mật độ web thường, chạy khít mọi cỡ màn** (bỏ lối ép cỡ lớn cho người lớn tuổi/tablet — quyết định 2026-08-21). Người mắt kém vẫn có lối phóng to 90–130% ở Cài đặt hiển thị. Luật UI ở [`src/design-system/README.md`](src/design-system/README.md).
 
 ## Stack & lệnh
 
@@ -28,7 +28,7 @@ src/
 ├── types.ts                  kiểu + BẤT BIẾN nghiệp vụ (laGhiBu, thanhTien)
 ├── data/thanh-pham.json      141 mã TK 1551 — chỉ là SEED
 ├── lib/                      repo · catalogRepo · db · supabase · connectivity · balancingCalc · auth · username · format · store · utils
-├── components/ui/            primitive shadcn — ĐÃ đè size cho người lớn tuổi
+├── components/ui/            primitive shadcn — size mật độ web thường (token-driven)
 ├── design-system/            tokens.css · patterns/ · kit/ · index.ts (cửa import duy nhất)
 └── features/                 MaterialImportScreen · SalesScreen · BalancingScreen + BalancingTable · CatalogScreen (5 tab) · FinishedGoodScreen (chỉ đọc) · LoginScreen · UserManagementScreen
 supabase/migrations/          0001 … 0006
@@ -107,7 +107,7 @@ Chưa có test tự động ⇒ cổng là những cái này, **chạy thật, k
 | `lib/repo.ts` / hàng chờ / `AnhXaBang` | Thử **cả hai chế độ** (có `.env` và không); ghi khi ngắt mạng rồi nối lại — dòng phải lên server, reload không nuốt dòng |
 | Màn Nhập hàng | Ghi 1 chuyến 2 dòng → chốt ngày → ghi bù (phải bắt lý do) → mở lại; kiểm tổng ngày + cảnh báo lệch |
 | Màn Cân đối | Tạo kỳ → hút phế liệu → **xóa kỳ**: dòng phế liệu `nguon="Nhập hàng"` phải còn nguyên ở sổ nhập |
-| Bất kỳ màn nghiệp vụ nào | Bật cỡ chữ **130%** + mật độ **Gọn**, thu còn **390px** — không vỡ bố cục, không đè chữ |
+| Bất kỳ màn nghiệp vụ nào | Thu còn **360px** → giãn tới **desktop**: không cuộn ngang toàn trang, không đè chữ (bảng dài cuộn trong khung riêng). Thử thêm cỡ chữ **130%** vẫn không vỡ |
 | Migration | Chạy lại file **hai lần** trên DB thật vẫn không lỗi (idempotent) |
 
 Preview chạy qua `preview_start` với cấu hình `baseafood-dev` (`.claude/launch.json`) — **không** chạy dev server bằng Bash.
@@ -135,7 +135,7 @@ Ngoài app-map: [`src/design-system/README.md`](src/design-system/README.md) (UI
 
 ## Trạng thái
 
-**Đã build:** nhập hàng (chuyến thật · ngày giao/ngày ghi sổ + ghi bù · chốt ngày · phế liệu cân trong ngày · bộ lọc), **bán thành phẩm ngày (phiếu bán · quy cách · 2 ngày + ghi bù · kênh XK/NĐ · hút vào cân đối)**, cân đối + in bảng, danh mục 5 tab, **đăng nhập (Supabase Auth, email tổng hợp) + hồ sơ/vai trò `nguoi_dung` + màn Người dùng (admin) + gate ở App**, bộ giao diện người lớn tuổi + cài đặt hiển thị, tầng dữ liệu Supabase↔localStorage.
+**Đã build:** nhập hàng (chuyến thật · ngày giao/ngày ghi sổ + ghi bù · chốt ngày · phế liệu cân trong ngày · bộ lọc), **bán thành phẩm ngày (phiếu bán · quy cách · 2 ngày + ghi bù · kênh XK/NĐ · hút vào cân đối)**, cân đối + in bảng, danh mục 5 tab, **đăng nhập (Supabase Auth, email tổng hợp) + hồ sơ/vai trò `nguoi_dung` + màn Người dùng (admin) + gate ở App**, bộ giao diện **responsive web (mật độ thường, 360px→desktop) + micro-animation + loading→thinking (skeleton/ThinkingDots)** + cài đặt hiển thị (phóng 90–130%), tầng dữ liệu Supabase↔localStorage.
 
 **Backlog:** ⚠️ chạy migration `0004` + `0005` + `0006` + `0007` (`0007` seed sẵn **admin/admin** — ĐỔI MẬT KHẨU NGAY); đăng ký ĐÓNG, chỉ admin tạo tài khoản; siết RLS (`0003`, cập nhật bao bảng mới) **sau khi login ổn**; **chốt ngày bán + phiếu bán in A4** (bán v1 chưa có); siết RLS theo người dùng; nhập khẩu số liệu cũ lên máy chủ; định mức NL→TP; báo cáo tháng 6 khối; **SẢN XUẤT bán thành phẩm (WIP) + kho dự trữ + vòng lặp đông gửi ↔ xả đông ↔ tồn cuối kỳ** (vấn đề cốt lõi, chưa số hóa) — quy trình: SX bán thành phẩm ngày → cất kho dự trữ → gom đủ theo **đơn đặt** (số lượng lớn) → **xuất container** nhiều block/quy cách; cột `ban_hang.kho_nguon` để dành seam. Lưu ý: **đơn đặt = xuất khẩu**, phí XK do phòng kế hoạch tính riêng (đã trừ trong giá báo) ⇒ cân đối KHÔNG tính phí XK. Test thực địa với 5 người dùng ≥45 tuổi.
 

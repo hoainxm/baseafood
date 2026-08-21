@@ -68,7 +68,7 @@ export function ChoiceGroup({
   return (
     <fieldset className={cn("min-w-0 space-y-2", className)}>
       <div className="flex flex-wrap items-center gap-2">
-        <legend className="text-base leading-snug font-semibold text-foreground">
+        <legend className="text-sm leading-snug font-semibold text-foreground">
           {label}
           {!anNhanBatBuoc && required && (
             <span aria-hidden className="ml-1 font-bold text-destructive">
@@ -77,9 +77,9 @@ export function ChoiceGroup({
           )}
         </legend>
       </div>
-      {hint && <p className="text-base text-muted-foreground">{hint}</p>}
+      {hint && <p className="text-sm text-muted-foreground">{hint}</p>}
       {error && (
-        <p className="flex items-start gap-2 text-base font-semibold text-destructive">
+        <p className="flex items-start gap-2 text-sm font-semibold text-destructive">
           <span aria-hidden>⚠</span>
           <span>{error}</span>
         </p>
@@ -105,9 +105,10 @@ export function ChoiceGroup({
               aria-pressed={chon}
               onClick={() => onChange(o.value)}
               className={cn(
-                /* 48px — bằng đúng chiều cao ô nhập, để hai cột cạnh nhau
-                   (VD "Ngày nhập hàng" ↔ "Phân xưởng") thẳng hàng. */
-                "flex min-h-12 w-full items-center justify-between gap-4 rounded-lg border-2 px-4 py-2 text-left text-base font-semibold transition-colors",
+                /* 40px — bằng đúng chiều cao ô nhập, để hai cột cạnh nhau
+                   (VD "Ngày nhập hàng" ↔ "Phân xưởng") thẳng hàng.
+                   Giữ border-2: viền dày là tín hiệu CHỌN (không chỉ dựa màu). */
+                "flex min-h-10 w-full items-center justify-between gap-4 rounded-lg border-2 px-4 py-2 text-left text-sm font-semibold transition-colors",
                 chon
                   ? "border-primary bg-accent text-accent-foreground"
                   : "border-input bg-background text-foreground hover:bg-muted"
@@ -124,7 +125,7 @@ export function ChoiceGroup({
               <Check
                 aria-hidden
                 className={cn(
-                  "size-6 shrink-0 text-primary",
+                  "size-5 shrink-0 text-primary",
                   chon ? "opacity-100" : "opacity-0"
                 )}
               />

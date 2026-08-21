@@ -27,7 +27,7 @@ export function DuLieuMau({
     <div
       role="note"
       className={cn(
-        "flex items-center gap-2.5 rounded-lg border-2 border-warning/40 bg-warning-surface px-4 py-2.5 text-base font-medium text-warning",
+        "flex items-center gap-2.5 rounded-lg border-2 border-warning/40 bg-warning-surface px-4 py-2.5 text-sm font-medium text-warning",
         className
       )}
     >

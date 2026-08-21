@@ -17,41 +17,41 @@
    ============================================================ */
 
 @theme {
-  /* --- Thang chữ: nền 18px. text-xs ĐÃ ĐƯỢC NÂNG lên 15px ---
-     Nâng ngay tại thang nên mọi component shadcn (dùng text-sm/text-base)
-     tự to lên mà không phải sửa từng file. */
-  --text-xs: 0.9375rem; /* 15px */
+  /* --- Thang chữ: nền 16px (mật độ web thường) ---
+     Sửa ngay tại thang nên mọi component shadcn (dùng text-sm/text-base) đổi
+     theo, không phải sửa từng file. Người mắt kém phóng to bằng Cài đặt hiển
+     thị (90–130%) — thang rem nên phóng/thu đồng bộ. */
+  --text-xs: 0.75rem; /* 12px — chip / phụ chú */
   --text-xs--line-height: 1.5;
-  --text-sm: 1rem; /* 16px */
+  --text-sm: 0.875rem; /* 14px — nhãn · nút · ô nhập */
   --text-sm--line-height: 1.5;
-  --text-base: 1.125rem; /* 18px */
+  --text-base: 1rem; /* 16px — thân chữ */
   --text-base--line-height: 1.55;
-  --text-lg: 1.25rem; /* 20px */
+  --text-lg: 1.125rem; /* 18px */
   --text-lg--line-height: 1.5;
-  --text-xl: 1.5rem; /* 24px */
+  --text-xl: 1.25rem; /* 20px */
   --text-xl--line-height: 1.4;
-  --text-2xl: 1.75rem; /* 28px */
-  --text-2xl--line-height: 1.35;
-  --text-3xl: 2rem; /* 32px */
-  --text-3xl--line-height: 1.3;
+  --text-2xl: 1.5rem; /* 24px */
+  --text-2xl--line-height: 1.3;
+  --text-3xl: 1.875rem; /* 30px */
+  --text-3xl--line-height: 1.25;
 
   --font-sans:
     "Be Vietnam Pro", "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
 
   /* --- Chiều cao vùng chạm (dùng cho primitive, đừng hardcode nơi khác) --- */
-  --size-control: 3rem; /* 48px — mặc định */
-  --size-control-lg: 3.5rem; /* 56px — hành động chính / mobile */
-  --size-row: 3.5rem; /* 56px — dòng bảng */
+  --size-control: 2.5rem; /* 40px — mặc định (web thường) */
+  --size-control-lg: 2.75rem; /* 44px — hành động chính */
+  --size-row: 2.75rem; /* 44px — dòng bảng */
 
   /* --- THANG CHẠM & ICON — MỘT nguồn cho cả nút icon lẫn icon bên trong ---
-     Luật: nút icon dùng `size-tap`, icon bên trong dùng `size-icon`. Hai giá trị
-     này cùng đơn vị rem nên phóng/thu ĐỒNG BỘ khi đổi cỡ chữ (100→130%).
-     Viết `size-11` + `size-6` rời rạc là cách cũ — hai chỗ, dễ lệch.
+     Luật: nút icon dùng `size-tap`, icon bên trong dùng `size-icon`. Cùng đơn
+     vị rem nên phóng/thu ĐỒNG BỘ khi đổi cỡ chữ (90→130%).
      Tailwind chỉ sinh tiện ích `size-*` từ namespace này — KHÔNG có `h-tap`.
-     Nút có chữ (cao 44px, rộng theo nội dung) dùng `min-h-11`. */
-  --size-tap: 2.75rem; /* 44px — `size-tap` cho nút icon vuông (WCAG 2.2 AA) */
-  --size-icon: 1.5rem; /* 24px — icon trong nút chạm */
-  --size-icon-sm: 1.25rem; /* 20px — icon phụ nằm trong dòng chữ */
+     Nút có chữ (cao 40px, rộng theo nội dung) dùng `min-h-10`. */
+  --size-tap: 2.5rem; /* 40px — nút icon vuông (mật độ web thường) */
+  --size-icon: 1.25rem; /* 20px — icon trong nút chạm */
+  --size-icon-sm: 1.125rem; /* 18px — icon phụ nằm trong dòng chữ */
 }
 
 :root {
@@ -174,19 +174,24 @@
 
 /* ============================================================
    MẬT ĐỘ — đặt bằng data-density trên <html> (xem CaiDatHienThi).
-   "thoang" 48px · "vua" 44px · "gon" (MẶC ĐỊNH) 40px.
-   Người mới / mắt kém để Thoáng; kế toán quen Excel chọn Gọn để thấy
-   nhiều dòng hơn trong một màn. Không bao giờ xuống dưới 40px.
+   "thoang" 44px · "vua" 40px · "gon" (MẶC ĐỊNH) 36px.
+   Kế toán quen Excel chọn Gọn để thấy nhiều dòng hơn trong một màn;
+   ai muốn thoáng hơn thì Vừa/Thoáng. Mật độ web thường.
    ============================================================ */
-:root[data-density="vua"] {
+:root[data-density="thoang"] {
   --h-control: 2.75rem;
-  --h-row: 3.25rem;
-}
-:root[data-density="gon"] {
-  --h-control: 2.5rem;
   --h-row: 3rem;
 }
+:root[data-density="vua"] {
+  --h-control: 2.5rem;
+  --h-row: 2.75rem;
+}
+:root[data-density="gon"] {
+  --h-control: 2.25rem;
+  --h-row: 2.5rem;
+}
 
+:root[data-density="thoang"],
 :root[data-density="vua"],
 :root[data-density="gon"] {
   [data-slot="input"],
@@ -241,6 +246,21 @@
   }
 }
 
+/* ============================================================
+   GIẢM CHUYỂN ĐỘNG — người đặt hệ điều hành "giảm animation" thì
+   tắt gần hết hiệu ứng. Bắt buộc khi thêm micro-animation (a11y).
+   ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 /* shadcn "nova" dùng class này cho tiêu đề card */
 @utility cn-font-heading {
   font-family: var(--font-sans);
@@ -281,19 +301,18 @@
   }
 }
 
-/* Thanh cuộn gọn, bám màu token — dùng cho thân dialog/form cuộn dài.
-   Bản rộng hơn mặc định để người lớn tuổi thấy rõ mình đang cuộn. */
+/* Thanh cuộn gọn, bám màu token — dùng cho thân dialog/form cuộn dài. */
 @utility scroll-nice {
   scrollbar-width: thin;
   scrollbar-color: var(--border) transparent;
   &::-webkit-scrollbar {
-    width: 12px;
-    height: 12px;
+    width: 9px;
+    height: 9px;
   }
   &::-webkit-scrollbar-thumb {
     background-color: var(--border);
     border-radius: 9999px;
-    border: 3px solid var(--background);
+    border: 2px solid var(--background);
   }
   &::-webkit-scrollbar-thumb:hover {
     background-color: var(--input);

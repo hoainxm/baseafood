@@ -37,13 +37,13 @@ export function ErrorSummary({ loi }: { loi: LoiNhap[] }) {
       tabIndex={-1}
       role="alert"
       aria-labelledby="loi-tieu-de"
-      className="rounded-xl border-4 border-destructive bg-background p-5"
+      className="rounded-xl border-2 border-destructive bg-background p-4"
     >
       <h2
         id="loi-tieu-de"
-        className="flex items-center gap-3 text-xl font-semibold text-destructive"
+        className="flex items-center gap-3 text-lg font-semibold text-destructive"
       >
-        <AlertTriangle className="size-7 shrink-0" aria-hidden />
+        <AlertTriangle className="size-6 shrink-0" aria-hidden />
         Còn {loi.length} chỗ chưa xong
       </h2>
       <ul className="mt-4 space-y-3">
@@ -57,12 +57,12 @@ export function ErrorSummary({ loi }: { loi: LoiNhap[] }) {
                   el?.focus();
                   el?.scrollIntoView({ block: "center", behavior: "smooth" });
                 }}
-                className="text-left text-base font-semibold text-destructive underline underline-offset-4"
+                className="text-left text-sm font-semibold text-destructive underline underline-offset-4"
               >
                 {l.truong}: {l.thongBao}
               </button>
             ) : (
-              <span className="text-base font-semibold text-destructive">
+              <span className="text-sm font-semibold text-destructive">
                 {l.truong}: {l.thongBao}
               </span>
             )}

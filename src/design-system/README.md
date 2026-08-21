@@ -1,16 +1,19 @@
-# Baseafood Senior Kit — luật dùng
+# Baseafood UI Kit — luật dùng
 
-Bộ giao diện cho hệ thống MES Baseafood. Người dùng chính là tổ trưởng / thủ kho
-45–60 tuổi, thao tác trên tablet ở xưởng lạnh, tay ướt, đeo kính lão.
+Bộ giao diện cho hệ thống MES Baseafood — **web responsive, mật độ thường**, chạy
+khít từ điện thoại (~360px) tới desktop. (Trước 2026-08-21 tối ưu cho người lớn
+tuổi/tablet với cỡ chữ/nút ép lớn — **đã bỏ**; người mắt kém vẫn có lối phóng to
+90–130% ở Cài đặt hiển thị, thang rem nên bố cục giãn theo không vỡ.)
 
 Nền: **shadcn/ui (style `radix-nova`) + Tailwind v4 + React 19**.
-Sách luật tiếp cận: **WCAG 2.2 AA** + **GOV.UK Design System**.
+Tương phản màu vẫn giữ chuẩn **WCAG 2.2 AA** (token trong `tokens.css`); riêng
+target-size/cỡ-chữ-tối-thiểu đã nới về mật độ web thường (đánh đổi có chủ đích).
 
 ## Ba tầng
 
 ```
 src/design-system/tokens.css   ← cỡ chữ, màu, chiều cao ô. NƠI DUY NHẤT.
-src/components/ui/*            ← primitive shadcn, ĐÃ đè size cho người lớn tuổi
+src/components/ui/*            ← primitive shadcn, size theo mật độ web thường
 src/design-system/patterns/*   ← pattern nghiệp vụ (Field, Combobox, RecordTable…)
 src/features/*                 ← màn nghiệp vụ
 ```
@@ -21,9 +24,12 @@ src/features/*                 ← màn nghiệp vụ
    Cấm `import … from "@/components/ui/button"` trong `src/features/**`.
 2. **Cấm viết class cỡ chữ / mã màu tay** trong màn nghiệp vụ
    (`text-sm`, `text-slate-400`, `bg-cyan-700`…). Muốn đổi → sửa `tokens.css`.
-3. **Cấm `text-xs` và chữ IN HOA** cho nội dung. Nhỏ nhất là `text-sm` = 16px.
-4. **Vùng chạm ≥ 44px**, mặc định 48px, hành động chính 56px.
-5. **Không có nút chỉ-icon** trong màn nghiệp vụ. Icon luôn kèm chữ.
+3. **Cấm chữ IN HOA cho nội dung** (chậm đọc). Thân chữ dùng `text-sm` (14px) /
+   `text-base` (16px); `text-xs` (12px) chỉ cho chip · badge · phụ chú.
+4. **Vùng chạm mật độ web thường**: ô/nút mặc định ~40px (`--size-control`), nút
+   icon `size-tap` 40px. Cần to hơn → đổi mật độ **Thoáng** ở Cài đặt hiển thị.
+5. **Nút chỉ-icon được phép** nhưng PHẢI có `aria-label` + `title` (vd nút toàn
+   cục header). Nút hành động chính trong form vẫn nên kèm chữ.
 6. **Mọi ô nhập phải bọc `Field` / `NumberField` / `Combobox` / `DateField`.**
    Nhãn luôn hiện. Placeholder không bao giờ thay nhãn. Ô bắt buộc đánh dấu
    **`*` đỏ sau nhãn**; ô không bắt buộc không ghi gì. `*` là `aria-hidden`,
@@ -80,16 +86,16 @@ riêng cho tablet — vùng 768–1024px ăn luật desktop.
 
 | Dùng cho | Class | Giá trị |
 |---|---|---|
-| Nút icon vuông | `size-tap` | 44px |
-| Nút có chữ | `min-h-11` | 44px |
-| Icon trong nút chạm | `size-icon` | 24px |
-| Icon phụ trong dòng chữ | `size-icon-sm` | 20px |
+| Nút icon vuông | `size-tap` | 40px |
+| Nút có chữ | `min-h-10` | 40px |
+| Icon trong nút chạm | `size-icon` | 20px |
+| Icon phụ trong dòng chữ | `size-icon-sm` | 18px |
 
 Định nghĩa ở `tokens.css` (`--size-tap`, `--size-icon`, `--size-icon-sm`). Tất
-cả đều **rem** nên phóng/thu ĐỒNG BỘ khi đổi cỡ chữ 100→130%. Viết `size-11` +
-`size-6` rời rạc là cách cũ: hai chỗ, đổi một chỗ là lệch tỉ lệ.
+cả đều **rem** nên phóng/thu ĐỒNG BỘ khi đổi cỡ chữ 90→130%. Viết `size-10` +
+`size-5` rời rạc là cách cũ: hai chỗ, đổi một chỗ là lệch tỉ lệ.
 ⚠️ Tailwind chỉ sinh `size-tap` từ `--size-*`; **không có `h-tap`** — nút có chữ
-dùng `min-h-11`.
+dùng `min-h-10`.
 
 ### 3. Ngân sách ngang của header thuộc về TIÊU ĐỀ
 
@@ -189,14 +195,12 @@ Luật khi dùng:
 
 ### 7. Checklist màn mới PHẢI qua
 
-- [ ] 390px: `document.documentElement.scrollWidth === 390` — trang **không**
-      cuộn ngang (chỉ vùng bảng/biểu đồ được cuộn, có chủ đích)
-- [ ] 390px + cỡ chữ **130%** + mật độ **Gọn**: vẫn không cuộn ngang, không đè chữ
-- [ ] Mọi nút / ô tick chạm được ≥ 44×44px (ô tick nhỏ thì bọc `<label>` `size-tap`)
-- [ ] Không chữ nào nhỏ hơn **`text-sm`** (16px ở thang gốc; người dùng để cỡ
-      chữ 90% thì mọi thứ cùng nhỏ theo — đo bằng TOKEN, không bằng px tuyệt
-      đối). `text-xs` = 15px chỉ cho chip/badge phụ chú, không cho nội dung.
-      Không `fontSize` cứng trong SVG dưới 16
+- [ ] 360px: `document.documentElement.scrollWidth === clientWidth` — trang
+      **không** cuộn ngang (chỉ vùng bảng/biểu đồ được cuộn, có chủ đích)
+- [ ] Thử thêm cỡ chữ **130%** (lối phóng to): vẫn không cuộn ngang, không đè chữ
+- [ ] Nút / ô tick chạm được thoải mái (~40px `size-tap`; ô tick nhỏ bọc `<label>`)
+- [ ] Thân chữ ≥ **`text-sm`** (14px); `text-xs` (12px) CHỈ cho chip/badge/phụ chú
+      (đo bằng TOKEN, không bằng px tuyệt đối). Không `fontSize` cứng < 12 trong SVG
 - [ ] Bảng dài đã ra thẻ trên điện thoại (hoặc có `cot-dau-dinh` nếu là báo cáo Excel)
 - [ ] Chỉ dùng `md:` cho bố cục khung; không thêm `sm:`
 - [ ] Màn mới đã vào `KIT_NAV` **và** `NHOM_NAV`
@@ -226,6 +230,41 @@ Luật khi dùng:
 | **Dialog/form thông tin hay thao tác** | `FormDialog` — khung CHUẨN: đầu cố định (icon + tiêu đề + mô tả) · thân cuộn `scroll-nice` · chân cố định chứa nút. `rong`: sm/vua/rong/xl. Điều khiển bằng `open`/`onOpenChange` hoặc `trigger`. Nút đóng tiện dụng: `NutDong`. |
 | Các con số bối cảnh/tổng | `ThongKe` (lưới thẻ KPI: nhãn nhỏ + số TO + icon màu) — sinh động hơn nhồi một dòng. `ContextBar` chỉ dùng cho thanh dính "đang xem ngày/xưởng nào" trong màn nhập liệu. |
 | Biểu đồ trong Báo cáo | `BieuDoCot` — thanh NGANG + đường trung bình nét đứt, một màu thương hiệu, thuần HTML + token (ăn theo cỡ chữ). KHÔNG thêm thư viện chart. |
+| **Khung tải danh sách** (chờ dữ liệu về) | `SkeletonBang` — vài dòng nhấp nháy; hiện khi `trangThai==="dang-tai" && rows.length===0` (đọc phần tử thứ 3 của `useBang`), tránh chớp "Chưa có dữ liệu". |
+| **Đang xử lý cả màn / tác vụ dài** | `DangXuLy` (chấm suy nghĩ + chữ). Fallback `Suspense` khi mở màn lazy cũng dùng cái này (thay "Đang tải…"). |
+| **Chấm "đang suy nghĩ" nội tuyến** | `ThinkingDots` — ba chấm nhấp nháy so le, bám màu chữ hiện tại. |
+| **Khối xương tuỳ biến** | `Skeleton` (primitive) — `<Skeleton className="h-4 w-32" />`. Ghép nên khung tải riêng khi `SkeletonBang` không hợp. |
+
+## Animation & Loading → "Thinking"
+
+Mục tiêu: tinh tế, không phô — giao diện *mượt* chứ không *ồn ào*.
+
+**Luật animation (bắt buộc):**
+- Thời lượng ngắn: **≤ 200–300ms**. Chỉ micro-interaction (fade/slide nhẹ, hover,
+  toast, chuyển tab, chuyển màn). Tránh parallax / zoom lớn / confetti.
+- Chỉ animate **`transform` / `opacity`** (chạy GPU). Tránh animate layout
+  (width/height/top…) gây reflow, giật máy yếu.
+- **Tôn trọng `prefers-reduced-motion`**: `tokens.css` có khối `@media` tắt gần
+  hết animation/transition. Khi thêm hiệu ứng mới KHÔNG cần tự viết lại — nó bao
+  toàn cục — nhưng đừng dựa vào animation để TRUYỀN THÔNG TIN (phải có trạng thái
+  tĩnh tương đương).
+- Chuyển màn: `AppShell` bọc `children` trong `<div key={active}
+  className="animate-in fade-in-0 duration-150">` → đổi menu là fade nhẹ.
+
+**⚠️ Bẫy dropdown (đọc kỹ trước khi đụng animation Radix):** `index.css` ẩn cứng
+`[data-slot="popover-content"][data-state="closed"]` và `select-content` đã đóng
+(xem § 5a). **Giữ luật này** khi nâng cấp `tw-animate-css` — bỏ đi là tái phát lỗi
+"ghi nhầm ô". Kiểm: mở 2 Combobox cùng dialog, đóng 1, `document.querySelectorAll(
+'[cmdk-root]').length === 1`.
+
+**Loading → Thinking:** thay spinner/"Đang tải" khô khan bằng cảm giác "hệ thống
+đang suy nghĩ".
+- Tải danh sách lần đầu → `SkeletonBang` (không chớp EmptyState). Màn đọc phần tử
+  thứ 3 của `useBang`: `const [rows, ghi, { trangThai }] = useX();` rồi
+  `const dangTai = trangThai === "dang-tai" && rows.length === 0;`.
+- Mở màn lazy / kết nối / tác vụ dài → `DangXuLy` (chấm suy nghĩ + chữ).
+- Nhấn nút / đồng bộ → giữ toast; đèn `NutTrangThai` đã phản ánh trạng thái đồng bộ.
+- Định nghĩa ở `patterns/Loading.tsx` + primitive `components/ui/skeleton.tsx`.
 
 ## Nút toàn cục trên header (`features/shared/AppShell.tsx`)
 
@@ -250,8 +289,8 @@ trên header. Áp ngay và **nhớ theo từng tài khoản**:
 
 | Cấu hình | Cách áp | Giá trị |
 |---|---|---|
-| Cỡ chữ | `--app-font-scale` trên `<html>` | **90 (mặc định)** / 100 / 110 / 120 / 130 % |
-| Mật độ | `data-density` trên `<html>` | thoáng 48px · vừa 44px · gọn 40px |
+| Cỡ chữ | `--app-font-scale` trên `<html>` | 90 / **100 (mặc định)** / 110 / 120 / 130 % (nền token 16px) |
+| Mật độ | `data-density` trên `<html>` | thoáng 44px · vừa 40px · **gọn 36px (mặc định)** |
 | Bề rộng nội dung | `--app-content-width` | 64rem / 80rem / 100% |
 
 Khóa localStorage theo username: `bsf.<username>.<coChu|matDo|beRong>`; chưa đăng
@@ -260,8 +299,8 @@ nhập ⇒ bucket mặc định `bsf.coChu` (tương thích ngược). Đổi t�
 (`CoChuNhanh` — nút cỡ chữ nhanh cũ — vẫn còn trong file nhưng không còn gắn
 trên header.)
 
-> Đầu thanh bên và header nội dung cùng cao `h-20` trong `AppShell.tsx`. Đổi
-> chiều cao thì đổi CẢ HAI, lệch một bên là cả trang trông vênh.
+> Đầu thanh bên và header nội dung cùng cao `h-16` trong `AppShell.tsx`. Đổi
+> chiều cao thì đổi CẢ HAI (3 chỗ: sidebar · drawer · header), lệch là trang vênh.
 
 ## Thêm component shadcn mới
 
@@ -276,15 +315,16 @@ ngược lên thư mục cha và đụng junction tương thích cũ bị khóa 
    `@/registry/radix-nova/ui/x` → `@/components/ui/x`,
    `@/app/(create)/components/icon-placeholder` → `@/components/ui/icon-placeholder`.
 3. Thêm icon mới dùng đến vào `src/components/ui/icon-placeholder.tsx`.
-4. **Đè size ngay**: mặc định shadcn là `h-8`/`h-9` + `text-sm` — nhỏ hơn cả bản
-   cũ. Không đè là tái phát toàn bộ vấn đề tiếp cận.
+4. **Đè size cho khớp mật độ hệ**: mặc định ~`h-10` + `text-sm`, chiều cao nên
+   bám token density qua `data-slot` (xem override trong `tokens.css`). Đừng để
+   lẫn `h-8`/`h-9` lạc cỡ giữa các primitive.
 
 ## Kiểm tra trước khi giao
 
-- [ ] Không còn `text-xs` / `uppercase` trong `src/features/**`
+- [ ] Không `uppercase` cho nội dung; `text-xs` chỉ cho chip/badge/phụ chú
 - [ ] Không còn `slate-400` / `slate-300` làm màu chữ
-- [ ] Mọi nút bấm được ≥ 44×44px
+- [ ] Nút bấm được thoải mái (~40px `size-tap`)
 - [ ] Tab được hết màn bằng bàn phím, focus ring luôn thấy
 - [ ] Dropdown danh sách dài: cuộn được và THẤY thanh cuộn
-- [ ] **Chạy hết checklist ở § Quy chuẩn mobile · mục 7** (390px · 130% + Gọn ·
+- [ ] **Chạy hết checklist ở § Quy chuẩn mobile · mục 7** (360px · thử 130% ·
       vùng chạm · bảng ra thẻ · chỉ dùng `md:`)

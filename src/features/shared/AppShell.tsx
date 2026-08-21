@@ -121,7 +121,7 @@ function gomNhom(items: MucNavShell[]): NhomHienThi[] {
 }
 
 const CN_NUT_ICON =
-  "inline-flex size-tap shrink-0 items-center justify-center rounded-lg border-2 border-input text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
+  "inline-flex size-tap shrink-0 items-center justify-center rounded-lg border border-input text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
 
 function HeaderNut({
   label,
@@ -182,7 +182,7 @@ function CayNav({
                   aria-current={chon ? "page" : undefined}
                   title={thuGon ? n.label : undefined}
                   className={cn(
-                    "flex min-h-12 w-full items-center gap-3 rounded-lg border-2 text-left text-base font-semibold transition-colors",
+                    "flex min-h-10 w-full items-center gap-3 rounded-lg border text-left text-sm font-semibold transition-colors",
                     thuGon ? "justify-center px-0" : "px-4",
                     chon
                       ? "border-primary bg-accent text-accent-foreground"
@@ -284,17 +284,17 @@ export default function AppShell({
       {/* Sidebar dọc — chỉ desktop */}
       <aside
         className={cn(
-          "hidden shrink-0 flex-col border-r-2 border-border bg-card transition-[width] duration-200 md:flex md:h-full md:overflow-hidden",
+          "hidden shrink-0 flex-col border-r border-border bg-card transition-[width] duration-200 md:flex md:h-full md:overflow-hidden",
           thuGon ? "w-20" : "w-64"
         )}
       >
         <div
           className={cn(
-            "flex h-20 shrink-0 items-center border-b-2 border-border",
+            "flex h-16 shrink-0 items-center border-b border-border",
             thuGon ? "justify-center px-2" : "px-4"
           )}
         >
-          <Logo cao="h-11" hienChu={!thuGon} phuDe={thuGon ? undefined : "Xí nghiệp BSF1"} />
+          <Logo cao="h-9" hienChu={!thuGon} phuDe={thuGon ? undefined : "Xí nghiệp BSF1"} />
         </div>
         <CayNav nhom={nhom} active={active} onSelect={onSelect} thuGon={thuGon} />
       </aside>
@@ -312,26 +312,26 @@ export default function AppShell({
             role="dialog"
             aria-modal="true"
             aria-label="Điều hướng"
-            className="absolute inset-y-0 left-0 flex w-80 max-w-[85vw] flex-col border-r-2 border-border bg-card shadow-xl"
+            className="absolute inset-y-0 left-0 flex w-80 max-w-[85vw] flex-col border-r border-border bg-card shadow-xl"
           >
-            <div className="flex h-20 shrink-0 items-center justify-between gap-2 border-b-2 border-border px-4">
-              <Logo cao="h-11" phuDe="Xí nghiệp BSF1" />
+            <div className="flex h-16 shrink-0 items-center justify-between gap-2 border-b border-border px-4">
+              <Logo cao="h-9" phuDe="Xí nghiệp BSF1" />
               <HeaderNut label="Đóng menu" icon={X} onClick={() => setMoNav(false)} />
             </div>
 
             <CayNav nhom={nhom} active={active} onSelect={chon} />
 
             {/* Chân drawer: những gì KHÔNG còn chỗ trên header điện thoại */}
-            <div className="shrink-0 space-y-3 border-t-2 border-border p-3">
+            <div className="shrink-0 space-y-3 border-t border-border p-3">
               <div className="flex items-center gap-3">
                 <span
                   aria-hidden
-                  className="flex size-tap shrink-0 items-center justify-center rounded-full bg-accent text-base font-bold text-accent-foreground"
+                  className="flex size-tap shrink-0 items-center justify-center rounded-full bg-accent text-sm font-bold text-accent-foreground"
                 >
                   {VietTat(nguoiDung)}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-base font-semibold text-foreground">
+                  <p className="truncate text-sm font-semibold text-foreground">
                     {nguoiDung}
                   </p>
                   <p className="truncate text-sm text-muted-foreground">{vaiTro}</p>
@@ -344,7 +344,7 @@ export default function AppShell({
                   <button
                     type="button"
                     onClick={onDoiCa}
-                    className="inline-flex min-h-11 items-center gap-2 rounded-lg border-2 border-input px-3.5 text-base font-semibold text-foreground transition-colors hover:bg-muted"
+                    className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-input px-3.5 text-sm font-semibold text-foreground transition-colors hover:bg-muted"
                   >
                     <RefreshCw className="size-icon-sm" aria-hidden />
                     {ca}
@@ -354,12 +354,12 @@ export default function AppShell({
                   <button
                     type="button"
                     onClick={onThongBao}
-                    className="inline-flex min-h-11 items-center gap-2 rounded-lg border-2 border-input px-3.5 text-base font-semibold text-foreground transition-colors hover:bg-muted"
+                    className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-input px-3.5 text-sm font-semibold text-foreground transition-colors hover:bg-muted"
                   >
                     <Bell className="size-icon-sm" aria-hidden />
                     Thông báo
                     {soThongBao > 0 && (
-                      <span className="tnum rounded-full bg-destructive px-2 text-sm font-bold text-destructive-foreground">
+                      <span className="tnum rounded-full bg-destructive px-2 text-xs font-bold text-destructive-foreground">
                         {soThongBao}
                       </span>
                     )}
@@ -377,7 +377,7 @@ export default function AppShell({
                     trigger={
                       <button
                         type="button"
-                        className="inline-flex min-h-11 items-center gap-2 rounded-lg border-2 border-input px-3.5 text-base font-semibold text-foreground transition-colors hover:bg-muted hover:text-destructive"
+                        className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-input px-3.5 text-sm font-semibold text-foreground transition-colors hover:bg-muted hover:text-destructive"
                       >
                         <LogOut className="size-icon-sm" aria-hidden />
                         Đăng xuất
@@ -393,7 +393,7 @@ export default function AppShell({
 
       {/* Cột nội dung — cuộn riêng trên desktop */}
       <div className="scroll-nice flex min-w-0 flex-1 flex-col md:h-full md:overflow-y-auto">
-        <header className="sticky top-0 z-40 flex h-20 shrink-0 items-center gap-2 border-b-2 border-border bg-card px-4 md:gap-3 md:px-6">
+        <header className="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-2 border-b border-border bg-card px-4 md:gap-3 md:px-6">
           {/* Trái — ĐƯỢC ƯU TIÊN ngân sách ngang (flex-1, không shrink-0) */}
           <div className="flex min-w-0 flex-1 items-center gap-2 md:gap-3">
             <HeaderNut
@@ -424,7 +424,7 @@ export default function AppShell({
               <button
                 type="button"
                 onClick={onDoiCa}
-                className="hidden min-h-11 items-center gap-2 rounded-lg border-2 border-input px-3.5 text-base font-semibold text-foreground transition-colors hover:bg-muted xl:inline-flex"
+                className="hidden min-h-10 items-center gap-2 rounded-lg border border-input px-3.5 text-sm font-semibold text-foreground transition-colors hover:bg-muted xl:inline-flex"
               >
                 <RefreshCw className="size-icon-sm" aria-hidden />
                 {ca}
@@ -441,7 +441,7 @@ export default function AppShell({
                 {soThongBao > 0 && (
                   <span
                     aria-hidden
-                    className="tnum absolute -right-1.5 -top-1.5 flex h-6 min-w-6 items-center justify-center rounded-full bg-destructive px-1.5 text-sm font-bold text-destructive-foreground"
+                    className="tnum absolute -right-1.5 -top-1.5 flex h-6 min-w-6 items-center justify-center rounded-full bg-destructive px-1.5 text-xs font-bold text-destructive-foreground"
                   >
                     {soThongBao}
                   </span>
@@ -459,10 +459,10 @@ export default function AppShell({
             </span>
             <NutTrangThai />
 
-            <div className="hidden items-center gap-2 border-l-2 border-border pl-2 md:flex md:gap-3 md:pl-3">
+            <div className="hidden items-center gap-2 border-l border-border pl-2 md:flex md:gap-3 md:pl-3">
               <span
                 aria-hidden
-                className="flex size-tap shrink-0 items-center justify-center rounded-full bg-accent text-base font-bold text-accent-foreground"
+                className="flex size-tap shrink-0 items-center justify-center rounded-full bg-accent text-sm font-bold text-accent-foreground"
               >
                 {VietTat(nguoiDung)}
               </span>
@@ -498,7 +498,13 @@ export default function AppShell({
         </header>
 
         <main className="w-full flex-1 p-5 md:p-8">
-          <div className="mx-auto w-full max-w-(--app-content-width)">{children}</div>
+          {/* key theo màn đang mở → fade nhẹ mỗi lần đổi trang (reduced-motion tắt) */}
+          <div
+            key={active}
+            className="mx-auto w-full max-w-(--app-content-width) animate-in fade-in-0 duration-150"
+          >
+            {children}
+          </div>
         </main>
       </div>
     </div>

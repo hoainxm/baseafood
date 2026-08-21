@@ -210,7 +210,7 @@ export default function DanhMucScreen() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-semibold text-foreground">Danh mục</h1>
+        <h1 className="text-2xl font-semibold text-foreground">Danh mục</h1>
       </div>
 
       <Tabs value={tab} onValueChange={setTab}>

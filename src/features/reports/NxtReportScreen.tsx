@@ -260,7 +260,7 @@ export default function BaoCaoNhapXuatTonScreen() {
       {/* Header chính */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-semibold text-foreground flex items-center gap-2">
+          <h1 className="text-2xl font-semibold text-foreground flex items-center gap-2">
             <FileSpreadsheet className="w-8 h-8 text-primary" />
             Báo cáo Nhập - Xuất - Tồn (NXT)
           </h1>

@@ -36,7 +36,7 @@ export function StatusChip({
   return (
     <span
       className={cn(
-        "inline-flex h-8 items-center gap-2 whitespace-nowrap rounded-full border px-3 text-sm font-semibold",
+        "inline-flex h-7 items-center gap-2 whitespace-nowrap rounded-full border px-3 text-xs font-semibold",
         s.nen,
         s.vien,
         s.chu,

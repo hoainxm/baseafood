@@ -92,9 +92,9 @@ function KhoiNhan({
         </Label>
         {info && <InfoTip label={label}>{info}</InfoTip>}
       </div>
-      {hint && <p className="text-base text-muted-foreground">{hint}</p>}
+      {hint && <p className="text-sm text-muted-foreground">{hint}</p>}
       {error && (
-        <p className="flex items-start gap-2 text-base font-semibold text-destructive">
+        <p className="flex items-start gap-2 text-sm font-semibold text-destructive">
           <span aria-hidden>⚠</span>
           <span>{error}</span>
         </p>
@@ -141,7 +141,7 @@ function NutLich({
           data-slot="date-trigger"
           variant="outline"
           aria-required={batBuoc ? true : undefined}
-          className="h-12 w-full justify-start border-2 px-3.5 text-base font-medium"
+          className="h-10 w-full justify-start px-3 text-sm font-medium"
         >
           <CalendarDays className="shrink-0 text-muted-foreground" />
           <span className={cn("truncate", !d && "text-muted-foreground")}>
@@ -341,7 +341,7 @@ export function DateRangeField({
             30 ngày
           </Button>
           {soNgay > 0 && (
-            <span className="ml-auto text-base text-muted-foreground">
+            <span className="ml-auto text-sm text-muted-foreground">
               Đang chọn{" "}
               <span className="tnum font-semibold text-foreground">
                 {soNgay}

@@ -45,6 +45,7 @@ import {
   ErrorSummary,
   NumberField,
   RecordTable,
+  SkeletonBang,
   dateToIso,
   notify,
   type Cot,
@@ -76,7 +77,8 @@ function moTaKhoang(tu?: string, den?: string): string {
 }
 
 export default function CanDoiScreen() {
-  const [kyList, persistKy] = useBalancingPeriods();
+  const [kyList, persistKy, { trangThai: ttKy }] = useBalancingPeriods();
+  const dangTaiKy = ttKy === "dang-tai" && kyList.length === 0;
   const { periodId } = useParams<{ periodId?: string }>();
   const navigate = useNavigate();
   const selId = periodId || null;
@@ -245,7 +247,7 @@ export default function CanDoiScreen() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-semibold text-foreground">
+          <h1 className="text-2xl font-semibold text-foreground">
             Cân đối nguyên liệu
           </h1>
         </div>
@@ -255,7 +257,9 @@ export default function CanDoiScreen() {
         </Button>
       </div>
 
-      {kyList.length === 0 ? (
+      {dangTaiKy ? (
+        <SkeletonBang />
+      ) : kyList.length === 0 ? (
         <EmptyState
           icon={Scale}
           tieuDe="Chưa có kỳ cân đối nào"
@@ -310,7 +314,7 @@ export default function CanDoiScreen() {
       >
         <DialogContent className="max-h-[92vh] overflow-y-auto w-full sm:max-w-3xl lg:max-w-5xl">
           <DialogHeader>
-            <DialogTitle className="text-2xl">
+            <DialogTitle className="text-xl">
               {laThem ? "Tạo kỳ cân đối" : "Sửa kỳ cân đối"}
             </DialogTitle>
           </DialogHeader>
@@ -483,7 +487,7 @@ function KyDetail({
 
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-semibold text-foreground">{ky.materialTypeName}</h1>
+          <h1 className="text-2xl font-semibold text-foreground">{ky.materialTypeName}</h1>
           <p className="mt-2 text-base text-muted-foreground">
             Ngày tiếp nhận: {ky.dateRangeDescription || "chưa ghi"}
           </p>

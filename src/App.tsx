@@ -18,7 +18,7 @@ import DangNhap from "@/features/auth";
 import { NotFound } from "@/features/shared";
 import AppShell, { KIT_NAV } from "@/features/shared/AppShell";
 import { HUONG_DAN } from "@/features/shared/guideContent";
-import { Toaster, apDungCaiDatHienThi } from "@/design-system";
+import { Toaster, apDungCaiDatHienThi, DangXuLy } from "@/design-system";
 import { useAuth } from "@/lib/auth";
 import { roleLabel } from "@/types";
 
@@ -85,13 +85,7 @@ function ShellLayout() {
       }
       items={items}
     >
-      <Suspense
-        fallback={
-          <div className="flex h-full items-center justify-center p-6">
-            <p className="text-base text-muted-foreground">Đang tải màn hình…</p>
-          </div>
-        }
-      >
+      <Suspense fallback={<DangXuLy chu="Đang mở màn hình…" />}>
         <Outlet />
       </Suspense>
     </AppShell>
@@ -104,8 +98,8 @@ export default function App() {
   // Đang lấy phiên đăng nhập từ máy chủ → tránh nháy màn login.
   if (auth.dangTai) {
     return (
-      <div className="flex min-h-full items-center justify-center p-6">
-        <p className="text-base text-muted-foreground">Đang tải…</p>
+      <div className="flex min-h-dvh items-center justify-center p-6">
+        <DangXuLy chu="Đang kết nối…" />
       </div>
     );
   }

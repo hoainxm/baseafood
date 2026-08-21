@@ -5,7 +5,7 @@ import { Slot } from "radix-ui"
 import { cn } from "@/lib/utils"
 
 const buttonVariants = cva(
-  "group/button inline-flex shrink-0 items-center justify-center rounded-lg border border-transparent bg-clip-padding text-base font-semibold whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  "group/button inline-flex shrink-0 items-center justify-center rounded-lg border border-transparent bg-clip-padding text-sm font-semibold whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {
     variants: {
       variant: {
@@ -22,19 +22,19 @@ const buttonVariants = cva(
           "bg-destructive text-destructive-foreground hover:brightness-90 focus-visible:border-destructive focus-visible:ring-destructive/30",
         link: "text-primary underline-offset-4 hover:underline",
       },
-      /* Vùng chạm: mặc định 48px, hành động chính 56px (WCAG 2.5.5 + tay ướt/găng tay).
-         KHÔNG hạ xuống dưới 44px ở bất kỳ biến thể nào dùng trong màn nghiệp vụ. */
+      /* Vùng chạm: mặc định 40px, hành động chính 44px (mật độ web thường).
+         Người cần vùng chạm to hơn: đổi mật độ Thoáng trong Cài đặt hiển thị. */
       size: {
         default:
-          "h-12 gap-2 px-4 has-data-[icon=inline-end]:pr-3 has-data-[icon=inline-start]:pl-3 [&_svg:not([class*='size-'])]:size-5",
-        sm: "h-11 gap-2 px-3.5 text-sm [&_svg:not([class*='size-'])]:size-4",
-        lg: "h-14 gap-2.5 px-6 text-lg [&_svg:not([class*='size-'])]:size-6",
+          "h-10 gap-2 px-4 has-data-[icon=inline-end]:pr-3 has-data-[icon=inline-start]:pl-3 [&_svg:not([class*='size-'])]:size-4",
+        sm: "h-9 gap-2 px-3 text-sm [&_svg:not([class*='size-'])]:size-4",
+        lg: "h-11 gap-2.5 px-6 text-base [&_svg:not([class*='size-'])]:size-5",
         /* xs chỉ dùng cho khu kỹ thuật (trang /kit, thanh cỡ chữ) — cấm dùng trong features */
-        xs: "h-9 gap-1 rounded-md px-2.5 text-sm [&_svg:not([class*='size-'])]:size-4",
-        icon: "size-12 [&_svg:not([class*='size-'])]:size-5",
-        "icon-xs": "size-9 rounded-md [&_svg:not([class*='size-'])]:size-4",
-        "icon-sm": "size-11 [&_svg:not([class*='size-'])]:size-5",
-        "icon-lg": "size-14 [&_svg:not([class*='size-'])]:size-6",
+        xs: "h-8 gap-1 rounded-md px-2.5 text-xs [&_svg:not([class*='size-'])]:size-4",
+        icon: "size-10 [&_svg:not([class*='size-'])]:size-4",
+        "icon-xs": "size-8 rounded-md [&_svg:not([class*='size-'])]:size-4",
+        "icon-sm": "size-9 [&_svg:not([class*='size-'])]:size-4",
+        "icon-lg": "size-11 [&_svg:not([class*='size-'])]:size-5",
       },
     },
     defaultVariants: {

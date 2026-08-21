@@ -126,9 +126,9 @@ export function Combobox({
           {info && <InfoTip label={label}>{info}</InfoTip>}
         </div>
       )}
-      {hint && <p className="text-base text-muted-foreground">{hint}</p>}
+      {hint && <p className="text-sm text-muted-foreground">{hint}</p>}
       {error && (
-        <p className="flex items-start gap-2 text-base font-semibold text-destructive">
+        <p className="flex items-start gap-2 text-sm font-semibold text-destructive">
           <span aria-hidden>⚠</span>
           <span>{error}</span>
         </p>
@@ -146,7 +146,7 @@ export function Combobox({
               aria-expanded={open}
               aria-invalid={error ? true : undefined}
               aria-required={required && !anNhanBatBuoc ? true : undefined}
-              className="h-12 min-w-0 flex-1 justify-between border-2 px-3.5 text-base font-medium"
+              className="h-10 min-w-0 flex-1 justify-between px-3 text-sm font-medium"
             >
               <span className={cn("truncate", !daChon && "text-muted-foreground")}>
                 {daChon?.label ?? placeholder ?? cachDung}
@@ -179,7 +179,7 @@ export function Combobox({
                     <button
                       type="button"
                       onClick={taoMoi}
-                      className="mx-auto flex min-h-12 items-center gap-2 rounded-lg bg-primary px-4 text-base font-semibold text-primary-foreground"
+                      className="mx-auto flex min-h-9 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground"
                     >
                       <Plus className="size-5" />
                       Thêm mới “{timSach}”

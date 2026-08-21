@@ -21,6 +21,7 @@
 - Mỗi dòng = 1 mặt hàng + 1 khách: cột **"Lượng" (cột 8)** = **tổng cả kỳ** của mặt hàng đó; `Đơn giá` USD; kênh **Xuất khẩu**.
 - ⭐ **Lượng lấy từ CỘT "Lượng" (cột 8), KHÔNG lấy tổng cột ngày.** (đã xác nhận với chủ dữ liệu 14/08/2026)
 - Tổng khối: **43.144 kg · 410.684 USD**.
+- 📐 **Quy tắc gộp từ báo cáo BTP ngày → mặt hàng cân đối** (tẩm bột = râu+bao tử+cổ theo grade; luộc/chần theo công đoạn+size; bột tẩm → Khối 1; bỏ ghẹ gửi): xem [`31-can-doi-ky.md` § Gộp bán thành phẩm](../app-map/31-can-doi-ky.md). Chốt với kế toán 21/08/2026.
 
 ## ④ Cột ngày 22/07 → 29/07 (cột 15–22) — chỉ là chi tiết
 - Đây là ô ghi tay **bán thành phẩm theo từng ngày** (khối bên phải, danh sách theo cột 13, tách khỏi khối ②).

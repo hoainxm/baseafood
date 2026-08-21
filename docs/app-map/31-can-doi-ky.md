@@ -2,6 +2,8 @@
 covers: src/features/balancing/BalancingScreen.tsx, src/features/balancing/usePeriodGrid.ts, src/features/balancing/MaterialGrid.tsx, src/features/balancing/WipGrid.tsx, src/features/balancing/gridDialogs.tsx, src/features/balancing/BalancingTable.tsx, src/lib/balancingCalc.ts, src/lib/balancingGrid.ts, src/design-system/patterns/EditableGrid.tsx
 last_verified: 2026-08-21
 ttl_days: 90
+<!-- updated: 2026-08-21 (c) — CHỐT NỐT 4 mục treo: dạt = thành phẩm giữ theo size; cổ luộc 1-2 + cắt chần 1000 = mặt hàng mới; bao tử tách phiếu = phần bao tử của tẩm bột cùng grade (tẩm bột 9-12 = 1.390+940=2.330). Quy tắc gộp BTP→cân đối không còn mục treo -->
+<!-- updated: 2026-08-21 (b) — CHỐT quy tắc gộp BTP báo cáo ngày → mặt hàng cân đối (kế toán chị Trúc): tẩm bột = râu+bao tử+cổ gộp theo grade; luộc/chần theo công đoạn+size; bột tẩm → Khối 1; bỏ ghẹ gửi + dòng ngày khác. 4 dòng CHƯA CHỐT đánh dấu ⚠️ -->
 <!-- updated: 2026-08-21 — thêm mục "Tồn kho nguyên liệu (sổ NXT)": màn /nxt-nl suy Nhập–Xuất–Tồn NL từ carryOver (đông gửi/xả đông), lib/inventoryMaterial.ts + migration 0022 (material_opening_stock) -->
 <!-- updated: 2026-08-18 (b) — CHỐT KỲ (migration 0020) khoá toàn bộ ô, mở lại bắt lý do; NHẬN CHUYỂN KỲ tự dựng dòng từ kỳ liền trước (khép vòng gối đầu) -->
 <!-- updated: 2026-08-18 — Ctrl+Z/Ctrl+Y cho cả kỳ (ngăn xếp ảnh chụp trong usePeriodGrid); dòng CHẨN ĐOÁN vì sao kỳ trống + kéo dòng từ kỳ khác; thu/mở cột ngay trong phiếu in; nút Xếp ngang hai khối -->
@@ -192,6 +194,33 @@ Giá trị phế liệu= Σ kg × đơn giá bán
    - **Số lượng có thể ÂM** — dòng điều chỉnh giảm (VD "Bán nội địa −987": NL bán thẳng nội địa, không chế biến ⇒ trừ khỏi pool NL đưa vào sản xuất). Validate chỉ chặn `= 0`, không chặn âm. Tổng NL vào cộng cả dòng âm ⇒ khớp T.CỘNG của báo cáo gốc.
    - **Cờ nguồn kho** (`nguonKho`, chỉ hiện khi nhóm = `Xả đông`): `"Mua về"` (hàng cấp đông kho KHÁC bán về) / `"Kho mình"` (xả đông hàng kho mình) / `""` (chưa rõ). **Seam** cho quản lý tồn kho / vòng lặp đông gửi ↔ xả đông sau này — chưa dùng vào công thức. Lưu qua cột `nguon_kho` (migration `0008`); `repo.ts` chỉ gửi khi có giá trị ⇒ ghi NL vào chạy được **kể cả khi chưa chạy 0008**.
 2. **Bán thành phẩm sản xuất** (nhãn cũ "TP ra") — **bán thành phẩm LÀM RA trong kỳ** (cấp đông, cất kho lưu trữ, **CHƯA bán** — gom đủ đơn đặt mới xuất container). ≠ hàng đã bán ra ở màn Bán hàng. Mặt hàng (danh mục mở, ánh xạ lỏng sang 141 mã) × quy cách/size × khách (đơn đặt) × kênh. **Nhập tay** là đường chính cho báo cáo sản lượng. Seam **HÚT từ sổ bán** vẫn còn (dòng bán trong khoảng ngày → bản sao `thanh_pham_ra`, gắn `banHangId` chống trùng; bỏ kỳ = xóa bản sao, số gốc ở sổ bán) — dùng cho tình huống output=bán ra, sẽ tổ chức lại khi có module kho + bán hàng. Xem [33-ban-hang.md](33-ban-hang.md).
+
+### Gộp bán thành phẩm: báo cáo ngày → mặt hàng cân đối (CHỐT với kế toán 21/08/2026)
+
+**Hai tầng, đừng lẫn** — kế toán (chị Trúc) nói thẳng *"báo cáo thì kệ… lúc cân đối là 1 loại sp"*, *"ko lẽ gửi cho sếp là r750"*:
+
+| | Báo cáo BTP **ngày** (sổ Sản xuất) | **Khối 2 Cân đối** (bảng gửi sếp) |
+|---|---|---|
+| Mục đích | kiểm soát lượng lên theo ngày | tính định mức / lãi lỗ |
+| Chia theo | **bộ phận** (R = râu · BT = bao tử · cổ) + size lẻ | **gộp bộ phận**, theo **công đoạn + grade** |
+| Ví dụ | `R750`, `R2g`, `cổ luộc 1-2` | `2 da cắt chần 700-750`, `2 da luộc 2g` |
+
+Quy tắc gộp (báo cáo ngày → mặt hàng cân đối):
+
+- **Tẩm bột** = **râu + bao tử + cổ cộng lại thành MỘT**, chỉ chia theo **grade** (5-10 · 9-13 · 9-12) → `2 da tẩm bột 9-12`.
+- **Luộc / Chần**: tách theo **công đoạn + size grade**; trong mỗi mặt hàng **râu & bao tử một giá → gộp**, không tách bộ phận.
+- **Luộc màu**: MỘT mặt hàng, gộp hết size lẻ (50/60/80/100/120).
+- **Dạt**: **là thành phẩm**, GIỮ theo **từng size** (dạt 80, dạt 100) — thêm mặt hàng vào danh mục (không phải phụ phẩm).
+- **Mặt hàng mới đúng tên phiếu** khi mẫu chưa có grade đó: VD `cổ luộc 1-2`, `cắt chần 1000` (danh mục mặt hàng là danh mục MỞ).
+- **Bột tẩm** (mã `22601`, `27102`, `24v`, `18v`, `2204`…) = **Bột phụ gia → Khối 1**, KHÔNG phải BTP ra. Số **trong ngoặc** trên phiếu = kế toán cộng tổng ⇒ **bỏ**, chỉ lấy lượng bột.
+
+- **Bao tử tách dòng riêng trên phiếu = phần bao tử của tẩm bột cùng grade** (báo cáo tách râu/bao tử để kiểm soát ngày; cân đối GỘP). Ví dụ chốt: *2 da tẩm bột 9-12 = râu 1.390 + bao tử 940 = **2.330 kg*** — đúng số `(2.330)` cô Hạnh ghi trong ngoặc (tổng SAU gộp, không phải rác).
+
+Bỏ khỏi sản lượng ngày: dòng có **chú thích ngày khác** (VD "(11/8)") — của ngày khác; **ghẹ gửi** — không phải bạch tuộc, không phải thành phẩm.
+
+✅ Toàn bộ quy tắc trên **đã CHỐT với kế toán (chị Trúc) 21/08/2026** — không còn mục treo.
+
+Số kiểm chứng: 21 mặt hàng 2 da ở [`docs/demo/cach-doc-excel.md`](../demo/cach-doc-excel.md) + [`docs/demo/seed_bt2da.sql`](../demo/seed_bt2da.sql).
 
 ### Xóa kỳ
 

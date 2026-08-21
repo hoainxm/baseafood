@@ -23,6 +23,7 @@ import {
   DialogHeader,
   DialogTitle,
   EmptyState,
+  SkeletonBang,
   ErrorSummary,
   Field,
   Input,
@@ -71,7 +72,8 @@ interface DongMoi {
 const DONG_RONG: DongMoi = { productId: "", quantityKg: 0, blocksCount: 0 };
 
 export default function SanXuatBTPScreen() {
-  const [rows, persist] = useWipProductions();
+  const [rows, persist, { trangThai }] = useWipProductions();
+  const dangTai = trangThai === "dang-tai" && rows.length === 0;
   const [chot, persistChot] = useProductionLocks();
   const [matHang, setMatHang] = useProducts();
   const [loaiNL] = useMaterialTypes();
@@ -434,7 +436,9 @@ export default function SanXuatBTPScreen() {
         />
       </div>
 
-      {view.length === 0 ? (
+      {dangTai ? (
+        <SkeletonBang />
+      ) : view.length === 0 ? (
         <EmptyState
           icon={Factory}
           tieuDe={`Chưa ghi sản lượng trong ${moTaPhamVi}`}

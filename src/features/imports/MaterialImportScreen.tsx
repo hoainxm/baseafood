@@ -39,6 +39,7 @@ import {
   DialogHeader,
   DialogTitle,
   EmptyState,
+  SkeletonBang,
   ErrorSummary,
   Field,
   Input,
@@ -197,7 +198,8 @@ function loiDauChuyen(d: DauChuyen, daChot: boolean): LoiNhap[] {
 
 export default function NhapNguyenLieuScreen() {
   // kỳ xem sổ: ngày/tuần/tháng/năm/khoảng tự chọn
-  const [rows, persist] = useMaterialImports();
+  const [rows, persist, { trangThai }] = useMaterialImports();
+  const dangTai = trangThai === "dang-tai" && rows.length === 0;
   const [chuyen, persistChuyen] = useImportShipments();
   const [chot, persistChot] = useDailyLocks();
   const [pheLieu, persistPheLieu] = useScraps();
@@ -943,7 +945,9 @@ export default function NhapNguyenLieuScreen() {
       </div>
 
       {/* Sổ: mỗi chuyến một cụm, đúng như sổ giấy đánh STT theo đại lý */}
-      {nhomView.length === 0 ? (
+      {dangTai ? (
+        <SkeletonBang />
+      ) : nhomView.length === 0 ? (
         <EmptyState
           icon={Truck}
           tieuDe={`Chưa có chuyến nào trong ${moTaPhamVi}`}

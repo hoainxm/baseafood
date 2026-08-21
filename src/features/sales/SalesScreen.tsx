@@ -30,6 +30,7 @@ import {
   DialogHeader,
   DialogTitle,
   EmptyState,
+  SkeletonBang,
   ErrorSummary,
   Field,
   Input,
@@ -141,7 +142,8 @@ function loiDauPhieu(d: DauPhieu): LoiNhap[] {
 
 export default function BanHangScreen() {
   const [rows, persist] = useSalesItems();
-  const [phieu, persistPhieu] = useSalesInvoices();
+  const [phieu, persistPhieu, { trangThai }] = useSalesInvoices();
+  const dangTai = trangThai === "dang-tai" && phieu.length === 0;
   const [matHang, setMatHang] = useProducts();
   const [khach, setKhach] = useCustomers();
 
@@ -551,7 +553,9 @@ export default function BanHangScreen() {
       </div>
 
       {/* Sổ: mỗi phiếu một cụm */}
-      {nhomView.length === 0 ? (
+      {dangTai ? (
+        <SkeletonBang />
+      ) : nhomView.length === 0 ? (
         <EmptyState
           icon={ShoppingCart}
           tieuDe={`Chưa có phiếu bán nào trong ${moTaPhamVi}`}

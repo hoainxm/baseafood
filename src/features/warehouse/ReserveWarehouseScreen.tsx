@@ -19,6 +19,7 @@ import {
   DialogHeader,
   DialogTitle,
   EmptyState,
+  SkeletonBang,
   ErrorSummary,
   Field,
   Input,
@@ -47,7 +48,8 @@ interface DuyetForm {
 }
 
 export default function KhoDuTruScreen() {
-  const [sanXuat, persistSX] = useWipProductions();
+  const [sanXuat, persistSX, { trangThai }] = useWipProductions();
+  const dangTai = trangThai === "dang-tai" && sanXuat.length === 0;
   const [dongLenh] = useExportItems();
   const [matHang] = useProducts();
 
@@ -270,7 +272,9 @@ export default function KhoDuTruScreen() {
         />
       </div>
 
-      {tonLoc.length === 0 ? (
+      {dangTai ? (
+        <SkeletonBang />
+      ) : tonLoc.length === 0 ? (
         <EmptyState
           icon={Snowflake}
           tieuDe="Chưa có tồn trong kho"

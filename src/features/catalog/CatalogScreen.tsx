@@ -40,11 +40,16 @@ const NHOM_TP = ["Bạch tuộc", "Mực", "Cá", "Tôm", "Bào ngư", "Khác"];
 export default function DanhMucScreen() {
   const [tab, setTab] = useState("mat-hang");
 
-  const [matHang, setMatHang] = useProducts();
-  const [khachHang, setKhachHang] = useCustomers();
-  const [daiLy, setDaiLy] = useSuppliers();
-  const [loaiNL, setLoaiNL] = useMaterialTypes();
+  const [matHang, setMatHang, { trangThai: ttMH }] = useProducts();
+  const [khachHang, setKhachHang, { trangThai: ttKH }] = useCustomers();
+  const [daiLy, setDaiLy, { trangThai: ttDL }] = useSuppliers();
+  const [loaiNL, setLoaiNL, { trangThai: ttNL }] = useMaterialTypes();
   const [thanhPham] = useFinishedGoods();
+
+  const taiMH = ttMH === "dang-tai" && matHang.length === 0;
+  const taiKH = ttKH === "dang-tai" && khachHang.length === 0;
+  const taiDL = ttDL === "dang-tai" && daiLy.length === 0;
+  const taiNL = ttNL === "dang-tai" && loaiNL.length === 0;
 
   const optTP141 = useMemo(
     () =>
@@ -224,6 +229,7 @@ export default function DanhMucScreen() {
 
         <TabsContent value="mat-hang" className="pt-6">
           <DanhMucCrud
+            dangTai={taiMH}
             tieuDe="Mặt hàng cân đối"
             moTa="Mặt hàng dùng khi ghi bán thành phẩm sản xuất trong bảng cân đối."
             tenDonVi="mặt hàng"
@@ -245,6 +251,7 @@ export default function DanhMucScreen() {
 
         <TabsContent value="khach-hang" className="pt-6">
           <DanhMucCrud
+            dangTai={taiKH}
             tieuDe="Khách hàng"
             moTa="Khách mua thành phẩm (đầu ra) — khác với đại lý cung cấp nguyên liệu."
             tenDonVi="khách hàng"
@@ -261,6 +268,7 @@ export default function DanhMucScreen() {
 
         <TabsContent value="dai-ly" className="pt-6">
           <DanhMucCrud
+            dangTai={taiDL}
             tieuDe="Đại lý cung cấp nguyên liệu"
             moTa="Nơi giao hàng về xưởng — dùng khi ghi chuyến nguyên liệu hàng ngày."
             tenDonVi="đại lý"
@@ -288,6 +296,7 @@ export default function DanhMucScreen() {
 
         <TabsContent value="loai-nl" className="pt-6">
           <DanhMucCrud
+            dangTai={taiNL}
             tieuDe="Loại nguyên liệu"
             moTa="Quy cách / size nguyên liệu. Đã nạp sẵn các loại thường gặp trong sổ."
             tenDonVi="loại nguyên liệu"

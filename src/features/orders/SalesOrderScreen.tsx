@@ -37,6 +37,7 @@ import {
   DialogHeader,
   DialogTitle,
   EmptyState,
+  SkeletonBang,
   ErrorSummary,
   Field,
   Input,
@@ -72,7 +73,8 @@ const NHAN_TT: Record<SalesOrder["status"], string> = {
 };
 
 export default function DonDatScreen() {
-  const [don, persistDon] = useSalesOrders();
+  const [don, persistDon, { trangThai }] = useSalesOrders();
+  const dangTai = trangThai === "dang-tai" && don.length === 0;
   const [dongDon, persistDongDon] = useOrderItems();
   const [lenh, persistLenh] = useExportOrders();
   const [dongLenh, persistDongLenh] = useExportItems();
@@ -329,7 +331,9 @@ export default function DonDatScreen() {
         ]}
       />
 
-      {don.length === 0 ? (
+      {dangTai ? (
+        <SkeletonBang />
+      ) : don.length === 0 ? (
         <EmptyState
           icon={ClipboardList}
           tieuDe="Chưa có đơn đặt nào"

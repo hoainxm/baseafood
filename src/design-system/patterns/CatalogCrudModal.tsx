@@ -19,6 +19,7 @@ import { RecordTable, type Cot } from "./RecordTable";
 import { ConfirmDelete } from "./ConfirmDelete";
 import { ErrorSummary, type LoiNhap } from "./ErrorSummary";
 import { EmptyState } from "./EmptyState";
+import { SkeletonBang } from "./Loading";
 import { notify } from "./notify";
 import { Pencil, Plus } from "lucide-react";
 
@@ -58,6 +59,7 @@ export function DanhMucCrud<T extends { id: string }>({
   timTheo,
   moTaBanGhi,
   tenDonVi,
+  dangTai = false,
 }: {
   tieuDe: string;
   moTa?: string;
@@ -72,6 +74,8 @@ export function DanhMucCrud<T extends { id: string }>({
   moTaBanGhi: (row: T) => string;
   /** Danh từ đơn vị, vd "mặt hàng" → nút "Thêm mặt hàng". */
   tenDonVi: string;
+  /** Đang tải danh sách từ máy chủ (chưa có dữ liệu local) → hiện skeleton. */
+  dangTai?: boolean;
 }) {
   const [dang, setDang] = React.useState<T | null>(null);
   const [laThem, setLaThem] = React.useState(false);
@@ -144,7 +148,9 @@ export function DanhMucCrud<T extends { id: string }>({
         </Button>
       </div>
 
-      {rows.length === 0 ? (
+      {dangTai ? (
+        <SkeletonBang />
+      ) : rows.length === 0 ? (
         <EmptyState
           tieuDe={`Chưa có ${tenDonVi} nào`}
           moTa={`Bấm "Thêm ${tenDonVi}" để tạo mục đầu tiên.`}

@@ -217,7 +217,7 @@ Luật khi dùng:
 | Chọn khoảng ngày | `DateRangeField` (hai ô riêng Từ / Đến) |
 | Danh sách bản ghi | `RecordTable` — truyền `sapXep` cho cột để bấm tiêu đề sắp xếp, truyền `timKiem` để hiện ô tìm |
 | Nhập nhiều ô số một lúc (lưới ngày) | `LuoiNhap` — cột tổng luôn `kieu: "tinh"` |
-| Danh mục có Thêm/Sửa/Xóa/Tìm | `DanhMucCrud` |
+| Danh mục có Thêm/Sửa/Xóa/Tìm | `DanhMucCrud` — nhận `dangTai` để hiện `SkeletonBang` trong lúc tải, vẫn giữ header + nút Thêm |
 | Xóa bất kỳ thứ gì | `ConfirmDelete` |
 | Thao tác hệ trọng không phải xóa (đăng xuất · chốt sổ · ghi đè · lệnh xuất) | `XacNhan` — nêu đích danh việc sắp làm + hệ quả, nút an toàn đứng trước |
 | Form > 5 ô, nhập không thường xuyên | `StepForm` |

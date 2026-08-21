@@ -159,6 +159,9 @@ export default function BanHangScreen() {
   const [phieuIdPhien, setPhieuIdPhien] = useState<string | null>(null);
   const [suaRowIds, setSuaRowIds] = useState<string[] | null>(null);
   const [dongMoi, setDongMoi] = useState<DongMoi>(DONG_MOI_RONG);
+  /** Kênh bán dùng gần nhất trong phiên — làm mặc định cho phiếu mới thay vì
+   *  luôn về "Xuất khẩu" (người bán Nội địa khỏi lật kênh mỗi phiếu). */
+  const [kenhGanNhat, setKenhGanNhat] = useState<SalesChannel>("Xuất khẩu");
   const [loiPhien, setLoiPhien] = useState<LoiNhap[]>([]);
 
   /* Sửa MỘT dòng mặt hàng — chỉ mặt hàng / quy cách / kg / giá. */
@@ -237,7 +240,7 @@ export default function BanHangScreen() {
       backdateReason: "",
       workshop: xuongGhi,
       customerId: "",
-      channel: "Xuất khẩu",
+      channel: kenhGanNhat,
       note: "",
     });
     setPhieuIdPhien(null);
@@ -326,7 +329,10 @@ export default function BanHangScreen() {
     if (suaRowIds) setSuaRowIds([...suaRowIds, dong.id]);
     notify.daLuu(`Đã vào sổ: ${tenMatHang(dong.productId)} — ${kg(dong.quantityKg)}`);
 
-    setDongMoi(DONG_MOI_RONG);
+    // Nhớ kênh vừa bán để phiếu sau khỏi lật lại.
+    setKenhGanNhat(phien.channel);
+    // Giữ quy cách cho dòng kế (một lô thường cùng size); xóa mặt hàng / kg / giá.
+    setDongMoi((d) => ({ ...DONG_MOI_RONG, spec: d.spec }));
     setLoiPhien([]);
   };
 

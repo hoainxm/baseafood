@@ -64,6 +64,7 @@ import {
   Lock,
   LockOpen,
   ArrowRightLeft,
+  ArrowDownToLine,
   Undo2,
 } from "lucide-react";
 import { HopChotKy } from "./gridDialogs";
@@ -329,7 +330,23 @@ export default function CanDoiScreen() {
                 required
                 hint="Lô nguyên liệu đem cân đối, VD: Bạch tuộc 2 da."
                 value={dang.materialTypeName}
-                onChange={(v) => setDang((d) => (d ? { ...d, materialTypeName: v } : d))}
+                onChange={(v) =>
+                  setDang((d) => {
+                    if (!d) return d;
+                    const next = { ...d, materialTypeName: v };
+                    // Prefill chi phí chế biến + tỉ giá từ kỳ gần nhất CÙNG loại
+                    // NL, chỉ khi chi phí còn trống (chưa gõ) — khỏi gõ lại mỗi
+                    // kỳ, vẫn sửa được. kyList mới-nhất-trước nên find lấy kỳ gần.
+                    if (d.processingCostPerKg == null) {
+                      const truoc = kyList.find((k) => k.materialTypeName === v);
+                      if (truoc) {
+                        next.processingCostPerKg = truoc.processingCostPerKg;
+                        if (truoc.exchangeRate) next.exchangeRate = truoc.exchangeRate;
+                      }
+                    }
+                    return next;
+                  })
+                }
                 options={loaiNLDanhMuc.map((l) => ({
                   value: l.name,
                   label: l.name,
@@ -477,6 +494,11 @@ function KyDetail({
   const { kq } = luoi;
   /** Chưa có bán thành phẩm → định mức + lãi/lỗ chưa có nghĩa. */
   const chuaCoTP = kq.totalOutputKg <= 0;
+  /** Lệch giữa Tổng NL nhận (thông số kỳ) và Tổng NL vào lưới (khối 1) — hiện
+   *  sẵn để khỏi nhẩm tay khi đối chiếu. */
+  const lechNL = ky.totalInputKg != null ? ky.totalInputKg - kq.totalInputKg : null;
+  /** Số dòng ở hai sổ nguồn tự động còn chờ hút vào kỳ. */
+  const soNguonChoHut = luoi.nhapChoHut.length + luoi.sanXuatChoHut.length;
 
   return (
     <div className="space-y-6">
@@ -550,6 +572,22 @@ function KyDetail({
           />
         </div>
       </Card>
+
+      {/* Một chạm kéo cả hai sổ nguồn tự động vào kỳ, thay cho bấm rời từng nút
+          "lấy từ sổ nhập" + "lấy từ sổ sản xuất". Không gộp sổ bán. */}
+      {!luoi.daChot && soNguonChoHut > 0 && (
+        <Card className="flex flex-wrap items-center justify-between gap-3 p-5">
+          <p className="text-base">
+            Còn <strong>{soNguonChoHut}</strong> dòng ở sổ nguồn chờ hút vào kỳ
+            {" "}(nhập {luoi.nhapChoHut.length} · sản xuất{" "}
+            {luoi.sanXuatChoHut.length}).
+          </p>
+          <Button size="lg" onClick={luoi.hutTatCaNguon}>
+            <ArrowDownToLine />
+            Lấy tất cả {soNguonChoHut} dòng
+          </Button>
+        </Card>
+      )}
 
       {/* Hai khối trong MỘT tờ: cùng khung, cùng công tắc cột ngày, chỉ ngăn nhau
           bằng một đường kẻ — đọc như một bảng cân đối liền mạch. */}
@@ -628,6 +666,20 @@ function KyDetail({
             v={chuaCoTP ? "—" : `${num(kq.avgProfitPerKgMaterial)} đ`}
           />
         </div>
+        {/* Badge lệch: đối chiếu Tổng NL nhận (thông số) với NL vào lưới — bắt
+            nhanh chỗ vênh mà không phải nhẩm tay. */}
+        {lechNL != null &&
+          (lechNL === 0 ? (
+            <div className="mt-4 rounded-lg bg-success-surface px-4 py-2.5 text-base font-medium text-success">
+              ✓ Tổng NL nhận khớp NL vào lưới ({num(kq.totalInputKg)} kg)
+            </div>
+          ) : (
+            <div className="mt-4 rounded-lg bg-warning-surface px-4 py-2.5 text-base font-medium text-destructive">
+              ⚠ Lệch NL nhận − NL vào lưới:{" "}
+              <span className="tnum font-semibold">{num(lechNL)} kg</span>{" "}
+              (nhận {num(kq.totalInputKg + lechNL)} − vào {num(kq.totalInputKg)})
+            </div>
+          ))}
         {/* Chưa nhập bán thành phẩm thì KHÔNG kết luận lãi/lỗ — nếu không màn sẽ
             báo "Lỗ = toàn bộ tiền nguyên liệu" (đỏ, hù người dùng) dù kỳ mới nhập
             được một nửa. */}

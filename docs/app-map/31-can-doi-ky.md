@@ -2,6 +2,7 @@
 covers: src/features/balancing/BalancingScreen.tsx, src/features/balancing/usePeriodGrid.ts, src/features/balancing/MaterialGrid.tsx, src/features/balancing/WipGrid.tsx, src/features/balancing/gridDialogs.tsx, src/features/balancing/BalancingTable.tsx, src/lib/balancingCalc.ts, src/lib/balancingGrid.ts, src/design-system/patterns/EditableGrid.tsx
 last_verified: 2026-08-21
 ttl_days: 90
+<!-- updated: 2026-08-21 (d) — GIẢM THAO TÁC (đổi UI, GREEN): nút "Lấy tất cả từ sổ nguồn" gộp hút Nhập + Sản xuất 1 chạm (usePeriodGrid.hutTatCaNguon — uỷ hàm đơn khi chỉ 1 nguồn; KHÔNG gộp sổ bán); prefill Chi phí chế biến + Tỉ giá từ kỳ gần nhất CÙNG loại NL khi chọn loại ở dialog tạo kỳ (chỉ khi chi phí còn trống); badge lệch "Tổng NL nhận − NL vào lưới" ở thẻ Kết quả. balancingCalc.ts KHÔNG đổi -->
 <!-- updated: 2026-08-21 (c) — CHỐT NỐT 4 mục treo: dạt = thành phẩm giữ theo size; cổ luộc 1-2 + cắt chần 1000 = mặt hàng mới; bao tử tách phiếu = phần bao tử của tẩm bột cùng grade (tẩm bột 9-12 = 1.390+940=2.330). Quy tắc gộp BTP→cân đối không còn mục treo -->
 <!-- updated: 2026-08-21 (b) — CHỐT quy tắc gộp BTP báo cáo ngày → mặt hàng cân đối (kế toán chị Trúc): tẩm bột = râu+bao tử+cổ gộp theo grade; luộc/chần theo công đoạn+size; bột tẩm → Khối 1; bỏ ghẹ gửi + dòng ngày khác. 4 dòng CHƯA CHỐT đánh dấu ⚠️ -->
 <!-- updated: 2026-08-21 — thêm mục "Tồn kho nguyên liệu (sổ NXT)": màn /nxt-nl suy Nhập–Xuất–Tồn NL từ carryOver (đông gửi/xả đông), lib/inventoryMaterial.ts + migration 0022 (material_opening_stock) -->

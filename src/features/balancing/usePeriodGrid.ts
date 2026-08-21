@@ -75,6 +75,8 @@ export interface PeriodGrid {
   sanXuatChoHut: WipProductionItem[];
   ghiTP: (rows: BalancingOutputItem[]) => void;
   hutSanXuat: () => void;
+  /** Hút cả sổ nhập + sổ sản xuất trong một chạm (KHÔNG đụng sổ bán). */
+  hutTatCaNguon: () => void;
   ghiSanXuatNhieuNgay: (dsO: ONgay[], lyDoGhiBu: string) => boolean;
   ngayDaChot: Set<string>;
   /* --- chuyển kỳ --- */
@@ -426,6 +428,18 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
     ky.id,
   ]);
 
+  /* Một chạm kéo CẢ HAI nguồn tự động (nhập + sản xuất) vào kỳ. KHÔNG gộp sổ bán
+     — bán là seam đầu ra thay thế, kéo nhầm sẽ sai nguồn. Chỉ một nguồn có dòng
+     thì uỷ thẳng cho hàm chuyên trách (giữ nguyên toast + undo của nó); cả hai
+     thì chạy tuần tự — bốn bảng ghi RỜI nhau nên số không đè, Ctrl+Z một lần
+     trả cả hai vì ảnh chụp lấy trước cả hai thao tác. */
+  const hutTatCaNguon = useCallback(() => {
+    const coNhap = nhapChoHut.length > 0;
+    const coSX = sanXuatChoHut.length > 0;
+    if (coNhap) hutNhapHang();
+    if (coSX) hutSanXuat();
+  }, [nhapChoHut.length, sanXuatChoHut.length, hutNhapHang, hutSanXuat]);
+
   const ngayDaChot = useMemo(
     () => new Set(chotSanXuat.filter((c) => c.isLocked).map((c) => c.lockDate)),
     [chotSanXuat]
@@ -648,6 +662,7 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
     sanXuatChoHut,
     ghiTP,
     hutSanXuat,
+    hutTatCaNguon,
     ghiSanXuatNhieuNgay,
     ngayDaChot,
     kyTruoc,

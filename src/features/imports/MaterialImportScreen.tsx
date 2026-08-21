@@ -223,6 +223,11 @@ export default function NhapNguyenLieuScreen() {
   const [phien, setPhien] = useState<DauChuyen | null>(null);
   const [chuyenIdPhien, setChuyenIdPhien] = useState<string | null>(null);
   const [dongMoi, setDongMoi] = useState<DongMoi>(DONG_MOI_RONG);
+  /** Loài dùng gần nhất trong phiên — làm mặc định cho chuyến/dòng mới thay vì
+   *  luôn nhảy về "Bạch tuộc" (sai ở xưởng Khô/Cá). */
+  const [loaiGanNhat, setLoaiGanNhat] = useState<Category>(
+    DONG_MOI_RONG.category
+  );
   const [loiPhien, setLoiPhien] = useState<LoiNhap[]>([]);
   const [moPhuPhien, setMoPhuPhien] = useState(false);
 
@@ -384,14 +389,15 @@ export default function NhapNguyenLieuScreen() {
       postingDate: todayISO(),
       backdateReason: "",
       workshop: xuongGhi,
-      supplierName: "",
+      // Đang lọc theo một đại lý → điền sẵn đại lý đó, khỏi chọn lại.
+      supplierName: locDaiLy,
       driverName: "",
       licensePlate: "",
       note: "",
     });
     setChuyenIdPhien(null);
     setSuaRowIds(null);
-    setDongMoi(DONG_MOI_RONG);
+    setDongMoi({ ...DONG_MOI_RONG, category: loaiGanNhat });
     setLoiPhien([]);
     setMoPhuPhien(false);
   };
@@ -410,7 +416,11 @@ export default function NhapNguyenLieuScreen() {
     });
     setChuyenIdPhien(n.chuyen?.id ?? null);
     setSuaRowIds(n.dong.map((r) => r.id));
-    setDongMoi(DONG_MOI_RONG);
+    // Thêm loại vào chuyến cũ → mặc định đúng loài của chuyến đó.
+    setDongMoi({
+      ...DONG_MOI_RONG,
+      category: n.dong[0]?.category ?? loaiGanNhat,
+    });
     setLoiPhien([]);
     setMoPhuPhien(false);
   };
@@ -520,6 +530,8 @@ export default function NhapNguyenLieuScreen() {
 
     // Giữ loài để đổ tiếp loại sau cho nhanh; xóa loại / kg / giá.
     setDongMoi((d) => ({ ...DONG_MOI_RONG, category: d.category }));
+    // Nhớ loài vừa ghi để chuyến sau khỏi nhảy về "Bạch tuộc".
+    setLoaiGanNhat(dong.category);
     setLoiPhien([]);
   };
 
@@ -585,12 +597,12 @@ export default function NhapNguyenLieuScreen() {
       setSuaRowIds(null);
       return;
     }
-    // Ghi chuyến khác: giữ ngày + xưởng, làm mới đại lý / xe.
+    // Ghi chuyến khác: giữ ngày + xưởng + đại lý (một đại lý thường giao nhiều
+    // lượt trong ngày, khỏi chọn lại), chỉ làm mới xe + ghi chú.
     setPhien(
       p
         ? {
             ...p,
-            supplierName: "",
             driverName: "",
             licensePlate: "",
             note: "",
@@ -1367,7 +1379,18 @@ export default function NhapNguyenLieuScreen() {
                       onCreate={(ten) => themLoaiNL(ten, dongMoi.category)}
                     />
 
-                    <div className="grid gap-6 sm:grid-cols-2">
+                    <div
+                      className="grid gap-6 sm:grid-cols-2"
+                      onKeyDown={(e) => {
+                        // Enter ở ô số = "Thêm loại này vào sổ", khỏi rời tay
+                        // khỏi bàn phím. Vẫn qua themDong nên ErrorSummary và mọi
+                        // cổng kiểm chạy y như bấm nút.
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          themDong();
+                        }
+                      }}
+                    >
                       <NumberField
                         label="Số lượng"
                         required
@@ -1879,7 +1902,7 @@ function KhoiPheLieuNgay({
                 required
                 hint="Chưa có trong danh sách thì gõ tên rồi bấm Thêm mới."
                 value={dang.name}
-                onChange={(v) => setDang((d) => (d ? { ...d, loai: v } : d))}
+                onChange={(v) => setDang((d) => (d ? { ...d, name: v } : d))}
                 options={optLoai}
                 onCreate={(ten) => ten}
               />
@@ -1899,7 +1922,7 @@ function KhoiPheLieuNgay({
                   unit="đ"
                   value={dang.sellingPrice}
                   onChange={(v) =>
-                    setDang((d) => (d ? { ...d, donGiaBan: v } : d))
+                    setDang((d) => (d ? { ...d, sellingPrice: v } : d))
                   }
                   hint="Bỏ trống nếu chưa chốt giá bán."
                 />

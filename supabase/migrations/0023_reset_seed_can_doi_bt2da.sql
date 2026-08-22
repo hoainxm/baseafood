@@ -1,17 +1,24 @@
 -- ============================================================
--- Baseafood MES — 0023: RESET kỳ cân đối + SEED "Bạch tuộc 2 da" (21–25/07/2025)
+-- Baseafood MES — 0023: RESET kỳ cân đối + SEED "Bạch tuộc 2 da" (21–29/07/2025)
 --
 -- 🔴 PHÁ HỦY: XÓA TOÀN BỘ kỳ cân đối (balancing_periods/inputs/outputs) của site
 --    'bsf1' — theo yêu cầu (mọi kỳ hiện có đều là TEST). Xóa xong nạp lại DUY NHẤT
---    kỳ 21–25/07 (số thật, khớp bảng giấy: Lãi ≈ 242.346.204 đ).
---    Không đụng danh mục thật (id khác 'seed-') và material_imports.
+--    kỳ bạch tuộc 2 da. Không đụng danh mục thật (id khác 'seed-') và material_imports.
 --
--- ⚠️ QUAN TRỌNG: mỗi dòng có CẢ quantity_kg LẪN daily_quantities (dồn vào 21/07).
---    Lưới cân đối hiển thị theo daily_quantities — thiếu nó thì ô ngày TRỐNG dù
---    tổng có (bản 0023 đầu tiên thiếu cột này → chi tiết rỗng).
+-- ⚠️ SỐ LIỆU THEO TỪNG NGÀY THẬT (sửa 2026-08-22): Khối 2 nạp daily_quantities +
+--    carry_over_kg TRÍCH ĐÚNG khối "BTP theo ngày" của file Excel gốc — cột chuyển
+--    kỳ (N) + các cột 22/07…29/07. KHÔNG còn dồn giả vào 21/07.
+--    · Vì cột ngày chạy tới 29/07 nên KỲ MỞ RỘNG end_date = 2025-07-29 để lưới hiện
+--      đủ ô (sumGridRow cộng MỌI ngày; nếu kỳ dừng 25/07 thì ô 26–29 ẩn nhưng vẫn
+--      vào Tổng ⇒ nhìn lệch). NL nhận 21–25, BTP ra kéo tới 29 — đúng dòng thực tế.
+--    · Cột "Lượng" (tổng) của file KHỚP Σ ngày+chuyển kỳ ở MỌI mặt hàng, TRỪ '2 da
+--      ncls': Lượng ghi 2.218 nhưng cộng ngày chỉ 1.109 (đúng 2×) = chép đôi kinh
+--      điển (xem 31-can-doi-ky.md). Lưới bắt Tổng = Σ ngày ⇒ ncls = 1.109 (SỐ THẬT).
+--    · Hệ quả: Lãi = 86.723.746 đ (KHÔNG phải 242.346.218 của bảng giấy — con số
+--      giấy bị thổi lên do đếm ncls hai lần; đây chính là lỗi lưới sinh ra để bắt).
 --
 -- CHẠY: Supabase → SQL Editor → dán → Run (idempotent, chạy lại vẫn đúng 1 kỳ).
--- ⚠️ Tiên quyết: migration 0018 (NL âm) + 0019 (cột daily_quantities) đã chạy.
+-- ⚠️ Tiên quyết: migration 0018 (NL âm) + 0019 (daily_quantities + carry_over_kg) đã chạy.
 -- ⚠️ site_id='bsf1' phải = VITE_SITE_ID mà Vercel BUILD dùng (không thì app không hiện).
 -- ============================================================
 BEGIN;
@@ -58,11 +65,12 @@ INSERT INTO products (id,code,name,finished_good_code,category,site_id) VALUES
  ('seed-prod-20','','2 da luộc màu','','Bạch tuộc','bsf1'),
  ('seed-prod-21','','2 da ncls','','Bạch tuộc','bsf1');
 
--- 3. Kỳ cân đối 21–25/07/2025
+-- 3. Kỳ cân đối 21–29/07/2025 (NL nhận 21–25, BTP ra kéo tới 29 — xem đầu file)
 INSERT INTO balancing_periods (id,material_type_name,date_range_description,start_date,end_date,total_input_kg,exchange_rate,processing_cost_per_kg,created_at,site_id)
-VALUES ('seed-ky-bt2da','Bạch tuộc 2 da','21/07/2025 – 25/07/2025','2025-07-21','2025-07-25',63926.3,26000,30000,'2025-07-26T02:00:00.000Z','bsf1');
+VALUES ('seed-ky-bt2da','Bạch tuộc 2 da','21/07/2025 – 29/07/2025','2025-07-21','2025-07-29',63926.3,26000,30000,'2025-07-26T02:00:00.000Z','bsf1');
 
--- Khối 1: Nguyên liệu vào (11 dòng — có daily_quantities dồn vào 21/07; giá 6/7/8 khớp giấy)
+-- Khối 1: Nguyên liệu vào (11 dòng — file gốc CHỈ có tổng, không có cột ngày cho NL
+--    ⇒ đặt trọn vào 21/07 (ngày mở kỳ). Đây là số thật, không phải dồn giả. Giá 6/7/8 khớp giấy)
 INSERT INTO balancing_inputs (id,period_id,group_name,name,quantity_kg,unit_price,ratio_percentage,source_warehouse,daily_quantities,site_id) VALUES
  ('seed-in-1','seed-ky-bt2da','Thủy sản','Bán nội địa',-987,145000,NULL,'','{"2025-07-21": -987}','bsf1'),
  ('seed-in-2','seed-ky-bt2da','Xả đông','x.đ Cò May',13584,157000,NULL,'Mua về','{"2025-07-21": 13584}','bsf1'),
@@ -76,35 +84,41 @@ INSERT INTO balancing_inputs (id,period_id,group_name,name,quantity_kg,unit_pric
  ('seed-in-10','seed-ky-bt2da','Bột phụ gia','Bột 22601',155,53000,NULL,'','{"2025-07-21": 155}','bsf1'),
  ('seed-in-11','seed-ky-bt2da','Bột phụ gia','Bột 2204',188.3,89340,NULL,'','{"2025-07-21": 188.3}','bsf1');
 
--- Khối 2: Bán thành phẩm ra (24 dòng — có daily_quantities dồn vào 21/07)
-INSERT INTO balancing_outputs (id,period_id,product_id,customer_id,channel,quantity_kg,unit_price,spec,sales_item_id,daily_quantities,site_id) VALUES
- ('seed-out-1','seed-ky-bt2da','seed-prod-1','seed-cust-1','Xuất khẩu',1083,10.81,'','','{"2025-07-21": 1083}','bsf1'),
- ('seed-out-2','seed-ky-bt2da','seed-prod-2','seed-cust-1','Xuất khẩu',93,9.65,'','','{"2025-07-21": 93}','bsf1'),
- ('seed-out-3','seed-ky-bt2da','seed-prod-3','seed-cust-2','Xuất khẩu',6,10.9,'','','{"2025-07-21": 6}','bsf1'),
- ('seed-out-4','seed-ky-bt2da','seed-prod-4','seed-cust-1','Xuất khẩu',2399,10.75,'','','{"2025-07-21": 2399}','bsf1'),
- ('seed-out-5','seed-ky-bt2da','seed-prod-5','seed-cust-1','Xuất khẩu',56,10.51,'','','{"2025-07-21": 56}','bsf1'),
- ('seed-out-6','seed-ky-bt2da','seed-prod-6','seed-cust-3','Xuất khẩu',1815,8.56,'','','{"2025-07-21": 1815}','bsf1'),
- ('seed-out-7','seed-ky-bt2da','seed-prod-7','seed-cust-3','Xuất khẩu',7521,8.51,'','','{"2025-07-21": 7521}','bsf1'),
- ('seed-out-8','seed-ky-bt2da','seed-prod-8','seed-cust-4','Xuất khẩu',11591,10.43,'','','{"2025-07-21": 11591}','bsf1'),
- ('seed-out-9','seed-ky-bt2da','seed-prod-9','seed-cust-5','Xuất khẩu',12,11.4,'','','{"2025-07-21": 12}','bsf1'),
- ('seed-out-10','seed-ky-bt2da','seed-prod-10','seed-cust-4','Xuất khẩu',1369,10.23,'','','{"2025-07-21": 1369}','bsf1'),
- ('seed-out-11','seed-ky-bt2da','seed-prod-11','seed-cust-1','Xuất khẩu',558,10.06,'','','{"2025-07-21": 558}','bsf1'),
- ('seed-out-12','seed-ky-bt2da','seed-prod-12','seed-cust-1','Xuất khẩu',380,10.06,'','','{"2025-07-21": 380}','bsf1'),
- ('seed-out-13','seed-ky-bt2da','seed-prod-13','seed-cust-6','Xuất khẩu',1890,10.67,'','','{"2025-07-21": 1890}','bsf1'),
- ('seed-out-14','seed-ky-bt2da','seed-prod-14','seed-cust-6','Xuất khẩu',538,10.87,'','','{"2025-07-21": 538}','bsf1'),
- ('seed-out-15','seed-ky-bt2da','seed-prod-15','seed-cust-6','Xuất khẩu',70,11.02,'','','{"2025-07-21": 70}','bsf1'),
- ('seed-out-16','seed-ky-bt2da','seed-prod-16','seed-cust-1','Xuất khẩu',325,10.75,'','','{"2025-07-21": 325}','bsf1'),
- ('seed-out-17','seed-ky-bt2da','seed-prod-17','seed-cust-1','Xuất khẩu',169,11.1,'','','{"2025-07-21": 169}','bsf1'),
- ('seed-out-18','seed-ky-bt2da','seed-prod-18','seed-cust-7','Xuất khẩu',5119,9.3,'','','{"2025-07-21": 5119}','bsf1'),
- ('seed-out-19','seed-ky-bt2da','seed-prod-18','seed-cust-8','Xuất khẩu',2000,9.2,'','','{"2025-07-21": 2000}','bsf1'),
- ('seed-out-20','seed-ky-bt2da','seed-prod-19','seed-cust-1','Xuất khẩu',1411,7.95,'','','{"2025-07-21": 1411}','bsf1'),
- ('seed-out-21','seed-ky-bt2da','seed-prod-19','seed-cust-1','Xuất khẩu',1000,9.2,'','','{"2025-07-21": 1000}','bsf1'),
- ('seed-out-22','seed-ky-bt2da','seed-prod-20','','Xuất khẩu',1260,9.75,'','','{"2025-07-21": 1260}','bsf1'),
- ('seed-out-23','seed-ky-bt2da','seed-prod-20','','Xuất khẩu',261,8.55,'','','{"2025-07-21": 261}','bsf1'),
- ('seed-out-24','seed-ky-bt2da','seed-prod-21','','Xuất khẩu',2218,6.55,'','','{"2025-07-21": 2218}','bsf1');
+-- Khối 2: Bán thành phẩm ra (24 dòng — daily_quantities THẬT theo cột ngày 22–29/07
+--    + carry_over_kg = cột "chuyển kỳ" (N) của file. quantity_kg = Σ ngày + chuyển kỳ
+--    (đúng cái lưới tự tính; app cũng ép lại giá trị này). out-24 'ncls' = 1.109 (số
+--    thật cộng theo ngày), KHÔNG phải 2.218 của cột Lượng — xem đầu file.)
+INSERT INTO balancing_outputs (id,period_id,product_id,customer_id,channel,quantity_kg,unit_price,spec,sales_item_id,carry_over_kg,daily_quantities,site_id) VALUES
+ ('seed-out-1','seed-ky-bt2da','seed-prod-1','seed-cust-1','Xuất khẩu',1083,10.81,'','',0,'{"2025-07-24":766,"2025-07-27":317}','bsf1'),
+ ('seed-out-2','seed-ky-bt2da','seed-prod-2','seed-cust-1','Xuất khẩu',93,9.65,'','',0,'{"2025-07-24":15,"2025-07-25":18,"2025-07-26":5,"2025-07-27":46,"2025-07-28":9}','bsf1'),
+ ('seed-out-3','seed-ky-bt2da','seed-prod-3','seed-cust-2','Xuất khẩu',6,10.9,'','',0,'{"2025-07-22":6}','bsf1'),
+ ('seed-out-4','seed-ky-bt2da','seed-prod-4','seed-cust-1','Xuất khẩu',2399,10.75,'','',0,'{"2025-07-22":424,"2025-07-23":1620,"2025-07-24":355}','bsf1'),
+ ('seed-out-5','seed-ky-bt2da','seed-prod-5','seed-cust-1','Xuất khẩu',56,10.51,'','',0,'{"2025-07-24":4,"2025-07-25":11,"2025-07-26":28,"2025-07-27":13}','bsf1'),
+ ('seed-out-6','seed-ky-bt2da','seed-prod-6','seed-cust-3','Xuất khẩu',1815,8.56,'','',0,'{"2025-07-26":624,"2025-07-27":326,"2025-07-28":65,"2025-07-29":800}','bsf1'),
+ ('seed-out-7','seed-ky-bt2da','seed-prod-7','seed-cust-3','Xuất khẩu',7521,8.51,'','',-2000,'{"2025-07-24":366,"2025-07-25":300,"2025-07-26":494,"2025-07-27":2068,"2025-07-28":3113,"2025-07-29":3180}','bsf1'),
+ ('seed-out-8','seed-ky-bt2da','seed-prod-8','seed-cust-4','Xuất khẩu',11591,10.43,'','',258,'{"2025-07-22":261,"2025-07-23":1785,"2025-07-24":3384,"2025-07-25":5749,"2025-07-26":154}','bsf1'),
+ ('seed-out-9','seed-ky-bt2da','seed-prod-9','seed-cust-5','Xuất khẩu',12,11.4,'','',0,'{"2025-07-23":7,"2025-07-24":5}','bsf1'),
+ ('seed-out-10','seed-ky-bt2da','seed-prod-10','seed-cust-4','Xuất khẩu',1369,10.23,'','',0,'{"2025-07-23":607,"2025-07-24":644,"2025-07-25":103,"2025-07-27":15}','bsf1'),
+ ('seed-out-11','seed-ky-bt2da','seed-prod-11','seed-cust-1','Xuất khẩu',558,10.06,'','',0,'{"2025-07-23":246,"2025-07-24":188,"2025-07-25":42,"2025-07-26":52,"2025-07-27":30}','bsf1'),
+ ('seed-out-12','seed-ky-bt2da','seed-prod-12','seed-cust-1','Xuất khẩu',380,10.06,'','',0,'{"2025-07-23":66,"2025-07-24":29,"2025-07-25":14,"2025-07-26":74,"2025-07-27":116,"2025-07-28":41,"2025-07-29":40}','bsf1'),
+ ('seed-out-13','seed-ky-bt2da','seed-prod-13','seed-cust-6','Xuất khẩu',1890,10.67,'','',150,'{"2025-07-24":25,"2025-07-25":124,"2025-07-26":406,"2025-07-27":556,"2025-07-28":229,"2025-07-29":400}','bsf1'),
+ ('seed-out-14','seed-ky-bt2da','seed-prod-14','seed-cust-6','Xuất khẩu',538,10.87,'','',0,'{"2025-07-23":7,"2025-07-24":55,"2025-07-26":268,"2025-07-27":208}','bsf1'),
+ ('seed-out-15','seed-ky-bt2da','seed-prod-15','seed-cust-6','Xuất khẩu',70,11.02,'','',0,'{"2025-07-26":70}','bsf1'),
+ ('seed-out-16','seed-ky-bt2da','seed-prod-16','seed-cust-1','Xuất khẩu',325,10.75,'','',0,'{"2025-07-23":15,"2025-07-24":249,"2025-07-25":61}','bsf1'),
+ ('seed-out-17','seed-ky-bt2da','seed-prod-17','seed-cust-1','Xuất khẩu',169,11.1,'','',0,'{"2025-07-26":19,"2025-07-29":150}','bsf1'),
+ ('seed-out-18','seed-ky-bt2da','seed-prod-18','seed-cust-7','Xuất khẩu',5119,9.3,'','',0,'{"2025-07-23":365,"2025-07-25":1352,"2025-07-26":1902,"2025-07-29":1500}','bsf1'),
+ ('seed-out-19','seed-ky-bt2da','seed-prod-18','seed-cust-8','Xuất khẩu',2000,9.2,'','',2000,'{}','bsf1'),
+ ('seed-out-20','seed-ky-bt2da','seed-prod-19','seed-cust-1','Xuất khẩu',1411,7.95,'','',0,'{"2025-07-24":1411}','bsf1'),
+ ('seed-out-21','seed-ky-bt2da','seed-prod-19','seed-cust-1','Xuất khẩu',1000,9.2,'','',1000,'{}','bsf1'),
+ ('seed-out-22','seed-ky-bt2da','seed-prod-20','','Xuất khẩu',1260,9.75,'','',0,'{"2025-07-22":40,"2025-07-25":210,"2025-07-26":222,"2025-07-27":354,"2025-07-28":334,"2025-07-29":100}','bsf1'),
+ ('seed-out-23','seed-ky-bt2da','seed-prod-20','','Xuất khẩu',261,8.55,'','',-170,'{"2025-07-25":319,"2025-07-26":25,"2025-07-27":27,"2025-07-28":60}','bsf1'),
+ ('seed-out-24','seed-ky-bt2da','seed-prod-21','','Xuất khẩu',1109,6.55,'','',0,'{"2025-07-22":223,"2025-07-23":112,"2025-07-26":774}','bsf1');
 
 COMMIT;
 
--- Sau Run + reload Vercel: Cân đối → 1 kỳ "Bạch tuộc 2 da 21–25/07"
---   Khối 1: 11 dòng NL (ô 21/7 có số) · Khối 2: 24 mặt hàng · Tổng NL 63.926,3 ·
---   Tổng TP 43.144 · Định mức 1,48 · Lãi ≈ 242.346.204 đ.
+-- Sau Run + reload Vercel: Cân đối → 1 kỳ "Bạch tuộc 2 da 21–29/07"
+--   Khối 1: 11 dòng NL (ô 21/7 có số) · Khối 2: 24 mặt hàng, ô ngày trải 22–29/07 +
+--   cột Chuyển kỳ · Tổng NL 63.926,3 · Tổng TP 42.035 (ncls theo ngày = 1.109) ·
+--   Định mức 63.926,3 ÷ 42.035 ≈ 1,52 · Lãi = 86.723.746 đ.
+--   ⚠️ Lãi KHÁC 242.346.218 của bảng giấy: giấy đếm 'ncls' hai lần (2.218 = 1.109×2).
+--      Lưới lấy Tổng = Σ ngày ⇒ tự loại phần chép đôi. Đây là số ĐÚNG theo sản lượng ngày.

@@ -2,15 +2,15 @@
 
 > Dùng khi seed / đối chiếu demo. File Excel là **sổ giấy 1 kỳ** (bạch tuộc 2 da, **21–25/07/2025**, gộp NL của 6 đại lý: Bê 3, Hồng Phú, H Mũng, Pháp M Né, Hưng V Tàu, Mậu H Tân). Sheet `Loai hang` chia **4 khối theo cột**.
 
-> ⚠️ **ĐÍNH CHÍNH 2026-08-22 (đối chiếu lại file thật + code):** khối ④ "BTP theo ngày"
-> **KHÔNG phải nháp thiếu** như mô tả cũ. Nó có thêm cột **"chuyển kỳ" (cột N=13)** mà
-> bản đọc đầu bỏ sót. Cộng **Σ ngày (22–29/07) + chuyển kỳ = cột Lượng ở 23/24 mặt hàng**
-> (khớp tuyệt đối). Chỉ **`2 da ncls` lệch**: Lượng ghi `2.218` nhưng cộng ngày chỉ `1.109`
-> (`2.218 = 1.109 × 2` = **chép đôi**). Lưới cân đối lấy **Tổng = Σ ngày + chuyển kỳ** nên
-> tự loại phần chép đôi ⇒ số ĐÚNG theo sản lượng ngày: **Tổng TP 42.035**, **Lãi 86.723.746 đ**
-> (KHÁC Lãi giấy 242.346.218 vì giấy đếm ncls hai lần). Migration `0023` đã nạp theo per-day này.
-> ⇒ Câu "cân đối luôn lấy cột Lượng 43.144" ở §② và §④ dưới đây **chỉ đúng nếu chấp nhận lỗi
-> chép đôi của giấy**; số phản ánh SẢN LƯỢNG THẬT là 42.035 / Lãi 86,7tr. Hỏi lại kế toán khi chốt.
+> ⚠️ **BỔ SUNG 2026-08-22 (đối chiếu lại file thật + code):** khối ④ "BTP theo ngày" có thêm
+> cột **"chuyển kỳ" (cột N=13)** mà bản đọc đầu bỏ sót. Cộng **Σ ngày (22–29/07) + chuyển kỳ
+> = cột Lượng** ở **23/24 mặt hàng** (khớp tuyệt đối) ⇒ per-day TIN CẬY, không phải nháp
+> vô dụng. Chỉ **`2 da ncls` ghi THIẾU ngày**: per-day cộng `1.109`, còn Lượng `2.218`.
+> **Cột Lượng (2.218) + Lãi 242.346.218 là SỐ CHỐT THẬT của xí nghiệp** (kế toán khẳng định
+> 2026-08-22) — giữ nguyên. Migration `0023` nạp per-day cho 23 dòng khớp, riêng ncls giữ
+> tổng 2.218 và để phần 1.109 thiếu ngày ở `carry_over_kg` (Lãi ra 242.346.205 ≈ giấy).
+> ⇒ Quy tắc §② "cân đối lấy cột Lượng" VẪN ĐÚNG. Lưu ý phụ: nếu sau này xác định ncls thật
+> chỉ 1.109 (per-day đúng, Lượng chép đôi) thì Lãi tụt còn ~86,7tr — cần kế toán chốt lại.
 
 ## Sơ đồ cột → khối
 

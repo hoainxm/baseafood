@@ -11,11 +11,10 @@
 --    · Vì cột ngày chạy tới 29/07 nên KỲ MỞ RỘNG end_date = 2025-07-29 để lưới hiện
 --      đủ ô (sumGridRow cộng MỌI ngày; nếu kỳ dừng 25/07 thì ô 26–29 ẩn nhưng vẫn
 --      vào Tổng ⇒ nhìn lệch). NL nhận 21–25, BTP ra kéo tới 29 — đúng dòng thực tế.
---    · Cột "Lượng" (tổng) của file KHỚP Σ ngày+chuyển kỳ ở MỌI mặt hàng, TRỪ '2 da
---      ncls': Lượng ghi 2.218 nhưng cộng ngày chỉ 1.109 (đúng 2×) = chép đôi kinh
---      điển (xem 31-can-doi-ky.md). Lưới bắt Tổng = Σ ngày ⇒ ncls = 1.109 (SỐ THẬT).
---    · Hệ quả: Lãi = 86.723.746 đ (KHÔNG phải 242.346.218 của bảng giấy — con số
---      giấy bị thổi lên do đếm ncls hai lần; đây chính là lỗi lưới sinh ra để bắt).
+--    · Cột "Lượng" (tổng của kế toán) là SỐ CHỐT THẬT của xí nghiệp — Σ ngày+chuyển kỳ
+--      KHỚP Lượng ở 23/24 mặt hàng. Riêng '2 da ncls': per-day file ghi THIẾU (chỉ 1.109)
+--      so với Lượng thật 2.218 ⇒ tổng ncls giữ 2.218, phần 1.109 thiếu ngày để ở carry.
+--    · Lãi = 242.346.205 đ (≈ bảng giấy 242.346.218; lệch 13đ do làm tròn đơn giá NL).
 --
 -- CHẠY: Supabase → SQL Editor → dán → Run (idempotent, chạy lại vẫn đúng 1 kỳ).
 -- ⚠️ Tiên quyết: migration 0018 (NL âm) + 0019 (daily_quantities + carry_over_kg) đã chạy.
@@ -86,8 +85,8 @@ INSERT INTO balancing_inputs (id,period_id,group_name,name,quantity_kg,unit_pric
 
 -- Khối 2: Bán thành phẩm ra (24 dòng — daily_quantities THẬT theo cột ngày 22–29/07
 --    + carry_over_kg = cột "chuyển kỳ" (N) của file. quantity_kg = Σ ngày + chuyển kỳ
---    (đúng cái lưới tự tính; app cũng ép lại giá trị này). out-24 'ncls' = 1.109 (số
---    thật cộng theo ngày), KHÔNG phải 2.218 của cột Lượng — xem đầu file.)
+--    (đúng cái lưới tự tính; app cũng ép lại giá trị này). out-24 'ncls' = 2.218 (số
+--    chốt thật của kế toán); per-day file ghi thiếu nên 1.109 để ở carry — xem đầu file.)
 INSERT INTO balancing_outputs (id,period_id,product_id,customer_id,channel,quantity_kg,unit_price,spec,sales_item_id,carry_over_kg,daily_quantities,site_id) VALUES
  ('seed-out-1','seed-ky-bt2da','seed-prod-1','seed-cust-1','Xuất khẩu',1083,10.81,'','',0,'{"2025-07-24":766,"2025-07-27":317}','bsf1'),
  ('seed-out-2','seed-ky-bt2da','seed-prod-2','seed-cust-1','Xuất khẩu',93,9.65,'','',0,'{"2025-07-24":15,"2025-07-25":18,"2025-07-26":5,"2025-07-27":46,"2025-07-28":9}','bsf1'),
@@ -112,13 +111,17 @@ INSERT INTO balancing_outputs (id,period_id,product_id,customer_id,channel,quant
  ('seed-out-21','seed-ky-bt2da','seed-prod-19','seed-cust-1','Xuất khẩu',1000,9.2,'','',1000,'{}','bsf1'),
  ('seed-out-22','seed-ky-bt2da','seed-prod-20','','Xuất khẩu',1260,9.75,'','',0,'{"2025-07-22":40,"2025-07-25":210,"2025-07-26":222,"2025-07-27":354,"2025-07-28":334,"2025-07-29":100}','bsf1'),
  ('seed-out-23','seed-ky-bt2da','seed-prod-20','','Xuất khẩu',261,8.55,'','',-170,'{"2025-07-25":319,"2025-07-26":25,"2025-07-27":27,"2025-07-28":60}','bsf1'),
- ('seed-out-24','seed-ky-bt2da','seed-prod-21','','Xuất khẩu',1109,6.55,'','',0,'{"2025-07-22":223,"2025-07-23":112,"2025-07-26":774}','bsf1');
+ ('seed-out-24','seed-ky-bt2da','seed-prod-21','','Xuất khẩu',2218,6.55,'','',1109,'{"2025-07-22":223,"2025-07-23":112,"2025-07-26":774}','bsf1');
+--   ↑ ncls: TỔNG THẬT xí nghiệp = 2.218 (cột Lượng, số chốt của kế toán). Khối per-day
+--     của file chỉ ghi 223+112+774 = 1.109 (ghi THIẾU ngày). Phần 1.109 còn lại chưa rõ
+--     ngày ⇒ để ở carry_over_kg cho Σ = 2.218, giữ Lãi = 242.346.205 (≈ giấy 242.346.218).
+--     Nếu biết 1.109 rơi vào ngày nào, chuyển từ carry sang ô ngày tương ứng.
 
 COMMIT;
 
 -- Sau Run + reload Vercel: Cân đối → 1 kỳ "Bạch tuộc 2 da 21–29/07"
 --   Khối 1: 11 dòng NL (ô 21/7 có số) · Khối 2: 24 mặt hàng, ô ngày trải 22–29/07 +
---   cột Chuyển kỳ · Tổng NL 63.926,3 · Tổng TP 42.035 (ncls theo ngày = 1.109) ·
---   Định mức 63.926,3 ÷ 42.035 ≈ 1,52 · Lãi = 86.723.746 đ.
---   ⚠️ Lãi KHÁC 242.346.218 của bảng giấy: giấy đếm 'ncls' hai lần (2.218 = 1.109×2).
---      Lưới lấy Tổng = Σ ngày ⇒ tự loại phần chép đôi. Đây là số ĐÚNG theo sản lượng ngày.
+--   cột Chuyển kỳ · Tổng NL 63.926,3 · Tổng TP 43.144 · Định mức 63.926,3 ÷ 43.144 ≈ 1,48 ·
+--   Lãi = 242.346.205 đ (≈ bảng giấy 242.346.218; lệch 13đ do làm tròn đơn giá NL).
+--   ℹ️ 'ncls' ô Chuyển kỳ = 1.109: phần per-day file ghi thiếu, để đây cho Σ = 2.218 (số
+--      chốt thật). Biết ngày thật thì chuyển sang ô ngày tương ứng.

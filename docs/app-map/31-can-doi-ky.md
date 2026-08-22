@@ -3,8 +3,8 @@ covers: src/features/balancing/BalancingScreen.tsx, src/features/balancing/usePe
 last_verified: 2026-08-22
 ttl_days: 90
 <!-- re-verified: 2026-08-22 14:00 — Tổng = Σ ngày + chuyển kỳ (types.ts:252 sumGridRow); usePeriodGrid.ts:524-548 ÉP quantity_kg = h.tong cho MỌI dòng (kể cả nhập tay) rồi ghi xuống kho. Dùng khi sửa seed 0023 per-day. -->
-<!-- ⚠️ line 57 (ncls chép đôi → 1.109): KẾ TOÁN XÍ NGHIỆP nói NGƯỢC (2026-08-22): 2.218 + Lãi 242.346.218 là số chốt thật; per-day ncls ghi THIẾU chứ không phải Lượng chép đôi. Ví dụ ở line 57 đang tranh chấp — cần xác nhận lại trước khi dựa vào. Seed 0023 theo kế toán: ncls = 2.218. -->
-<!-- per-day reconcile Σ ngày + chuyển kỳ = Lượng ở 23/24 dòng (đối chiếu file thật 2026-08-22); chỉ ncls lệch. -->
+<!-- ✅ CHỐT 2026-08-22 (kế toán xí nghiệp): '2 da ncls' số THẬT = 2.218 (cột Lượng), Lãi 242.346.218 là số chốt. Per-day file ghi THIẾU (cộng ngày chỉ 1.109) — KHÔNG phải Lượng chép đôi. Sửa lại ví dụ ở line 57 cho đúng. Seed 0023: ncls = 2.218, bù 1.109 vào carry. -->
+<!-- per-day reconcile Σ ngày + chuyển kỳ = Lượng ở 23/24 dòng (đối chiếu file thật 2026-08-22); chỉ ncls per-day thiếu. -->
 
 <!-- updated: 2026-08-21 (d) — GIẢM THAO TÁC (đổi UI, GREEN): nút "Lấy tất cả từ sổ nguồn" gộp hút Nhập + Sản xuất 1 chạm (usePeriodGrid.hutTatCaNguon — uỷ hàm đơn khi chỉ 1 nguồn; KHÔNG gộp sổ bán); prefill Chi phí chế biến + Tỉ giá từ kỳ gần nhất CÙNG loại NL khi chọn loại ở dialog tạo kỳ (chỉ khi chi phí còn trống); badge lệch "Tổng NL nhận − NL vào lưới" ở thẻ Kết quả. balancingCalc.ts KHÔNG đổi -->
 <!-- updated: 2026-08-21 (c) — CHỐT NỐT 4 mục treo: dạt = thành phẩm giữ theo size; cổ luộc 1-2 + cắt chần 1000 = mặt hàng mới; bao tử tách phiếu = phần bao tử của tẩm bột cùng grade (tẩm bột 9-12 = 1.390+940=2.330). Quy tắc gộp BTP→cân đối không còn mục treo -->
@@ -58,7 +58,7 @@ Bảng `scraps` và luật gỡ liên kết khi **xóa kỳ** vẫn còn (`CanDo
 
 Bản trước bắt mở hộp thoại cho từng dòng NL và từng dòng thành phẩm. Người dùng nói thẳng: làm trên Excel còn nhanh hơn. Lưới này giữ ba thứ Excel làm tốt (gõ liên tục, di chuyển bằng phím, dán cả khối) và bỏ hai thứ Excel làm dở:
 
-- **Cột Tổng là ô TÍNH, không gõ được** (đây là ô duy nhất bị khoá). Chính file cân đối thật của xí nghiệp (bạch tuộc 2 da 21–25/07) đã sai vì mặt hàng bị chép hai lần: dòng *2 da ncls* ghi `2.218` nhưng cộng theo ngày chỉ `1.109`, tổng cả bảng lệch đúng `1.109 kg`. Đừng bao giờ cho gõ tay vào cột Tổng.
+- **Cột Tổng là ô TÍNH (Σ ngày + chuyển kỳ), không gõ được** (ô duy nhất bị khoá). Ngược lại, cột ngày ghi tay CÓ THỂ THIẾU: file cân đối thật (bạch tuộc 2 da 21–25/07) dòng *2 da ncls* số chốt kế toán `2.218` nhưng cộng theo ngày chỉ `1.109` — ghi thiếu `1.109 kg`. **Số chốt là cột Lượng của kế toán**, không phải tổng cột ngày; khi per-day thiếu thì bù cho khớp Lượng (seed `0023` để `1.109` ở `carry_over_kg`). Đừng cho gõ tay vào cột Tổng — nhưng cũng đừng coi Σ cột ngày là chân lý khi ngày ghi chưa đủ.
 - **Thêm dòng không vỡ công thức.**
 
 **Xếp ngang.** Nút "Xếp ngang" đặt hai khối cạnh nhau (như file Excel gốc) từ breakpoint `2xl`. Cố ý để người dùng tự bật chứ không tự đổi theo bề rộng màn: bố cục tự nhảy khi thu cột là thứ gây mất phương hướng nhất trên tablet.

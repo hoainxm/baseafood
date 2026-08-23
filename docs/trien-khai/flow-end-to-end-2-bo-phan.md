@@ -114,7 +114,7 @@ Cùng một cơ sở dữ liệu, **tách theo vai trò** để mỗi bộ phậ
 | 2 | Ghi **phần chưa làm xong → lưu kho dự trữ** (BTP đông gửi) | 🟡 một phần (có trạng thái "chờ nhập kho", **thiếu ô "còn dở bao nhiêu"** rõ ràng — G1) |
 | 3 | Thủ kho **duyệt BTP vào kho** | ✅ |
 | 4 | **Chốt ngày sản xuất** (khóa số, ghi bù có lý do) | ✅ |
-| — | *Nhắc: đối chiếu "nhập hôm nay X kg ↔ sản xuất Y kg"* | ❌ cần build (phụ thuộc G1) |
+| — | *Đối chiếu "nhập hôm nay X kg ↔ sản xuất Y kg"* | ✅ read-only trong Dialog `/wip` (G1 v1); nhắc chủ động vẫn cần build |
 
 **Nhịp chốt số** giữ nguyên pattern toàn hệ: nhập nháp nhiều lần trong ngày (sửa được) → **chốt ngày** (khóa) → sửa sau = **ghi bù bắt buộc lý do**.
 
@@ -142,7 +142,7 @@ Cùng một cơ sở dữ liệu, **tách theo vai trò** để mỗi bộ phậ
 
 Ưu tiên theo mức khép vòng:
 
-1. **[G1] Nối sản xuất ↔ nguyên liệu:** thêm ô "nguyên liệu tiêu hao / còn dở" ở màn Sản xuất; đối chiếu tự động "nhập X ↔ ra Y" trong ngày. 🟡 YELLOW (đổi hình dạng dữ liệu `production_wips`).
+1. **[G1] Nối sản xuất ↔ nguyên liệu:** ✅ **v1 (read-only) đã làm** — Dialog "Ghi sản lượng" ở `/wip` hiện panel *Đối chiếu hôm nay*: Nhập cùng loại (hút `useMaterialImports` theo ngày SX + xưởng + cùng họ NL) ↔ Đã sản xuất ↔ Định mức tạm; có ghi chú "sản xuất có thể dùng thêm hàng xả đông kỳ trước nên không ràng buộc". **Chưa làm (🟡 YELLOW):** lưu con số hao hụt/"còn dở" (thêm cột `production_wips`) để chốt lại và đưa vào daily-task.
 2. **[G3] Đóng gói BTP → Thành phẩm:** flow + trạng thái tồn thành phẩm tách khỏi BTP.
 3. **[G2] Gộp/tách 2 màn kho:** chốt kho canonical, nối `cold-storage` vào WIP hoặc gộp vào `warehouse`.
 4. **[G4] Bán trừ tồn:** kích hoạt `source_warehouse` để bán lẻ trừ tồn kho thành phẩm.

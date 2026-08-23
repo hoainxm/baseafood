@@ -8,7 +8,13 @@ import type { DailyLock, WipProductionItem, Product, Workshop } from "@/types";
 import { isBackdatedWip } from "@/types";
 import { newId } from "@/lib/store";
 import { uid } from "@/lib/db";
-import { useProductionLocks, useMaterialTypes, useProducts, useWipProductions } from "@/lib/catalogRepo";
+import {
+  useMaterialImports,
+  useProductionLocks,
+  useMaterialTypes,
+  useProducts,
+  useWipProductions,
+} from "@/lib/catalogRepo";
 import {
   Badge,
   ChuThichBatBuoc,
@@ -37,6 +43,7 @@ import {
 } from "@/design-system";
 import { kg, num, todayISO, viDate } from "@/lib/format";
 import { KY_OPT, phamViKy, type KyXem } from "@/lib/periodUtils";
+import { cungHoNguyenLieu } from "@/lib/balancingGrid";
 import {
   CalendarRange,
   CircleCheck,
@@ -77,6 +84,7 @@ export default function SanXuatBTPScreen() {
   const [chot, persistChot] = useProductionLocks();
   const [matHang, setMatHang] = useProducts();
   const [loaiNL] = useMaterialTypes();
+  const [imports] = useMaterialImports();
 
   const [ky, setKy] = useState<KyXem>("ngay");
   const [ngay, setNgay] = useState(todayISO());
@@ -192,6 +200,31 @@ export default function SanXuatBTPScreen() {
     [rows, phienIds]
   );
   const tongPhien = dongPhien.reduce((s, r) => s + (r.quantityKg || 0), 0);
+
+  /* ---- Đối chiếu Nhập ↔ Sản xuất trong ngày, cùng họ nguyên liệu (G1) ----
+   * Read-only: lượng nhập hôm nay chỉ để tham khảo — sản xuất còn có thể dùng
+   * hàng xả đông kỳ trước, nên KHÔNG ràng buộc, chỉ hiển thị để tổ trưởng soát. */
+  const doiChieu = useMemo(() => {
+    if (!phien || !phien.materialTypeId) return null;
+    const tenNL = loaiNL.find((l) => l.id === phien.materialTypeId)?.name || "";
+    const nhap = imports
+      .filter(
+        (i) =>
+          i.deliveryDate === phien.productionDate &&
+          i.workshop === phien.workshop &&
+          cungHoNguyenLieu(i.materialTypeName, tenNL)
+      )
+      .reduce((s, i) => s + (i.quantityKg || 0), 0);
+    const sx = rows
+      .filter(
+        (r) =>
+          r.productionDate === phien.productionDate &&
+          r.workshop === phien.workshop &&
+          matHang.find((m) => m.id === r.productId)?.materialTypeId === phien.materialTypeId
+      )
+      .reduce((s, r) => s + (r.quantityKg || 0), 0);
+    return { tenNL, nhap, sx, dinhMuc: sx > 0 ? nhap / sx : null };
+  }, [phien, imports, rows, matHang, loaiNL]);
 
   const themDong = () => {
     if (!phien) return;
@@ -608,6 +641,37 @@ export default function SanXuatBTPScreen() {
                   emptyText="Chưa có loại NL — thêm ở Danh mục."
                 />
               </div>
+
+              {/* Đối chiếu Nhập ↔ Sản xuất trong ngày (cùng loại NL) — G1 */}
+              {doiChieu && (
+                <div className="space-y-2 rounded-xl border-2 border-border bg-muted/30 p-4">
+                  <p className="flex items-center gap-2 text-base font-semibold text-foreground">
+                    <Scale className="size-5 text-primary" aria-hidden />
+                    Đối chiếu hôm nay — {doiChieu.tenNL || "loại NL"}
+                  </p>
+                  <div className="grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-3">
+                    <div>
+                      <span className="text-sm text-muted-foreground">Nhập cùng loại</span>
+                      <div className="tnum text-base font-semibold">{kg(doiChieu.nhap)}</div>
+                    </div>
+                    <div>
+                      <span className="text-sm text-muted-foreground">Đã sản xuất</span>
+                      <div className="tnum text-base font-semibold">{kg(doiChieu.sx)}</div>
+                    </div>
+                    <div>
+                      <span className="text-sm text-muted-foreground">Định mức tạm (NL÷TP)</span>
+                      <div className="tnum text-base font-semibold">
+                        {doiChieu.dinhMuc == null ? "—" : num(doiChieu.dinhMuc)}
+                      </div>
+                    </div>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    {doiChieu.nhap === 0
+                      ? `Chưa có phiếu nhập ${doiChieu.tenNL || "loại này"} hôm nay — có thể đang dùng hàng xả đông kỳ trước.`
+                      : "Nhập cùng ngày chỉ để tham khảo — sản xuất có thể dùng thêm hàng xả đông kỳ trước, nên không ràng buộc."}
+                  </p>
+                </div>
+              )}
 
               {/* Đã vào sổ trong phiên này */}
               {dongPhien.length > 0 && (

@@ -24,6 +24,7 @@ import {
   BANG_SCRAP,
   BANG_SALES_INVOICE,
   BANG_WIP_PRODUCTION,
+  BANG_PACKAGING,
   BANG_FINISHED_GOOD,
   BANG_BALANCING_OUTPUT,
   BANG_OPENING_STOCK,
@@ -99,6 +100,7 @@ export const useUserProfiles = () => useBang(BANG_USER_PROFILE);
 /* --- Module WIP: sản xuất BTP · kho · đơn đặt --- */
 export const useWipProductions = () => useBang(BANG_WIP_PRODUCTION);
 export const useProductionLocks = () => useBang(BANG_PRODUCTION_LOCK);
+export const usePackagings = () => useBang(BANG_PACKAGING);
 export const useSalesOrders = () => useBang(BANG_SALES_ORDER);
 export const useOrderItems = () => useBang(BANG_ORDER_ITEM);
 export const useExportOrders = () => useBang(BANG_EXPORT_ORDER);

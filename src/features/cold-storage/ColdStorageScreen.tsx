@@ -21,8 +21,8 @@ import {
   notify,
 } from "@/design-system";
 import { cn } from "@/lib/utils";
-import { useExportItems, useSalesItems, useWipProductions } from "@/lib/catalogRepo";
-import { tinhTon, tinhDungTichKho, locBanLe } from "@/lib/inventory";
+import { useExportItems, usePackagings, useSalesItems, useWipProductions } from "@/lib/catalogRepo";
+import { tinhTon, tinhDungTichKho, locBanLe, dongGoiTruTon } from "@/lib/inventory";
 import { kg } from "@/lib/format";
 import {
   Check,
@@ -382,7 +382,11 @@ export default function ManKhoLanh() {
   const [sanXuat] = useWipProductions();
   const [dongLenh] = useExportItems();
   const [banHang] = useSalesItems();
-  const banLe = useMemo(() => locBanLe(banHang), [banHang]);
+  const [packagings] = usePackagings();
+  const banLe = useMemo(
+    () => [...locBanLe(banHang), ...dongGoiTruTon(packagings)],
+    [banHang, packagings]
+  );
   const tonThat = useMemo(() => tinhTon(sanXuat, dongLenh, banLe), [sanXuat, dongLenh, banLe]);
   const tongTonThat = tonThat.reduce((s, t) => s + Math.max(0, t.conLai), 0);
   const soLoThat = tonThat.filter((t) => t.conLai > 0).length;

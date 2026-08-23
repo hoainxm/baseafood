@@ -64,8 +64,8 @@ Phân loại: **THẬT** = nối kho dữ liệu, ghi/sửa/chốt thật · **D
 ### G2 · Hai màn kho chồng nhau ✅ (đã xử v1)
 "Kho dự trữ" (`/warehouse`, THẬT) là **sổ tồn canonical**. "Kho lạnh" (`/cold-storage`) nay **hết chồng số liệu**: thêm section *Tồn kho dự trữ (số thật)* hút cùng nguồn `tinhTon` (SX BTP − lệnh xuất) + badge "Nguồn: màn Kho dự trữ", và ghi rõ sơ đồ nhiệt độ/bố trí lô là **dữ liệu minh hoạ (chưa nối cảm biến)**. **Còn:** nối cảm biến nhiệt thật hoặc gỡ hẳn phần minh hoạ khi chạy thật.
 
-### G3 · Thành phẩm đóng gói vs bán thành phẩm chưa tách trạng thái tồn 🟡
-Doc `34` phân biệt **BTP (còn trong khuôn đá)** ≠ **Thành phẩm (đã đóng gói, sẵn bán)** là **hai tồn riêng**, nhưng luồng đóng gói BTP→TP (ai ghi, khi nào, có phiếu không) **chưa build** → tồn thành phẩm thật để bán chưa tách khỏi tồn BTP.
+### G3 · Đóng gói BTP → thành phẩm ✅ (đã build v1)
+Doc `34` phân biệt **BTP (còn khuôn đá)** ≠ **Thành phẩm (đã đóng gói, sẵn bán)** — **hai tồn riêng**. Nay đã tách: màn **Đóng gói `/packaging`** ghi *phiếu đóng gói* (chọn Q1 = phiếu riêng): BTP tiêu hao (kg/block) → TP đóng gói ra (kg + số thùng + quy cách đóng gói), **hao hụt = vào − ra** (bảng `packagings`, `0026`). Tồn suy 2 pool ở `inventory.ts`: **BTP** = sản xuất − xuất − bán block thô − **đã đóng gói** (`dongGoiTruTon`); **TP** = output đóng gói − bán TP (`tinhTonTP`). Bán (chọn Q2 = cho bán cả hai): dòng bán có **Nguồn bán** — *Block thô* (marker `KHO_BAN_LE`, trừ BTP) hoặc *Đóng gói* (marker `KHO_TP`, trừ TP). warehouse/cold-storage/orders đều trừ input đóng gói khỏi BTP. **Còn:** tách kho TP theo nhiệt/vị trí; nối hao hụt đóng gói vào cân đối.
 
 ### G4 · Bán lẻ trừ tồn ✅ (đã làm v1)
 Bán lẻ trực tiếp ở màn Bán hàng nay **trừ tồn kho dự trữ**: dòng bán mới set `sourceWarehouse = "Kho dự trữ"` (hằng `KHO_BAN_LE`), và tồn được trừ **SUY** trong `tinhTon(sanXuat, dongLenh, banLe)` — FIFO theo (mặt hàng × quy cách), `banLe = locBanLe(sales_items)` (chỉ dòng marker `KHO_BAN_LE`, **bỏ** handoff Đơn đặt `"Lưu trữ"` đã trừ qua `export_items`, và dòng cũ `""`). Vì trừ suy từ dòng bán, **xóa dòng bán là tồn tự hồi** — không cần logic đảo, không trừ hai lần. Cả `warehouse`, `cold-storage`, `orders` đều truyền `banLe` nên tồn nhất quán và export không cấp phát hàng đã bán lẻ. Màn Bán hàng hiện **tồn khả dụng** + cảnh báo khi bán vượt (vẫn ghi được, tồn báo âm). **Còn:** tách tồn thành phẩm đóng gói khỏi BTP khi có G3.
@@ -143,7 +143,7 @@ Cùng một cơ sở dữ liệu, **tách theo vai trò** để mỗi bộ phậ
 Ưu tiên theo mức khép vòng:
 
 1. **[G1] Nối sản xuất ↔ nguyên liệu:** ✅ **v1 (read-only) đã làm** — Dialog "Ghi sản lượng" ở `/wip` hiện panel *Đối chiếu hôm nay*: Nhập cùng loại (hút `useMaterialImports` theo ngày SX + xưởng + cùng họ NL) ↔ Đã sản xuất ↔ Định mức tạm; có ghi chú "sản xuất có thể dùng thêm hàng xả đông kỳ trước nên không ràng buộc". ✅ **Lưu "còn dở" đã làm (`0025`):** dialog chốt ngày SX có ô *Nguyên liệu còn dở đem lưu kho* → lưu `production_locks.leftover_kg`, hiện lại trong panel đối chiếu (Nhập ↔ SX ↔ Còn dở). **Còn:** ràng số này vào tồn kho/đông gửi ở Cân đối cho khép vòng.
-2. **[G3] Đóng gói BTP → Thành phẩm:** flow + trạng thái tồn thành phẩm tách khỏi BTP.
+2. **[G3] Đóng gói BTP → Thành phẩm:** ✅ v1 — màn `/packaging` + tồn TP suy + nguồn bán BTP/TP. Còn: tách kho TP, nối hao hụt vào cân đối.
 3. **[G2] Gộp/tách 2 màn kho:** ✅ v1 — warehouse canonical, cold-storage hút tồn thật + gắn nhãn nhiệt độ minh hoạ. Còn: cảm biến thật / gỡ minh hoạ khi chạy thật.
 4. **[G4] Bán trừ tồn:** ✅ v1 — bán lẻ set `KHO_BAN_LE`, trừ tồn suy qua `tinhTon(...,banLe)` FIFO, nhất quán 4 màn. Còn: tách tồn TP đóng gói (G3).
 5. **2 giao diện bộ phận:** ✅ route-guard + trang chủ theo vai trò + banner nhắc daily-task (`/imports`, `/wip`) đã làm. **Còn:** siết RLS theo vai trò ở server; tinh chỉnh tập nav mỗi bộ phận với xí nghiệp.

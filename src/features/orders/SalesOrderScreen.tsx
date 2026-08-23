@@ -23,8 +23,9 @@ import {
   useProducts,
   useSalesInvoices,
   useWipProductions,
+  usePackagings,
 } from "@/lib/catalogRepo";
-import { loConHang, tinhTon, locBanLe } from "@/lib/inventory";
+import { loConHang, tinhTon, locBanLe, dongGoiTruTon } from "@/lib/inventory";
 import {
   Badge,
   ChuThichBatBuoc,
@@ -91,7 +92,11 @@ export default function DonDatScreen() {
   const tenMH = (id: string) => matHang.find((m) => m.id === id)?.name || "—";
   const tenKH = (id: string) => khach.find((k) => k.id === id)?.name || "—";
 
-  const banLe = useMemo(() => locBanLe(banHang), [banHang]);
+  const [packagings] = usePackagings();
+  const banLe = useMemo(
+    () => [...locBanLe(banHang), ...dongGoiTruTon(packagings)],
+    [banHang, packagings]
+  );
   const ton = useMemo(() => tinhTon(sanXuat, dongLenh, banLe), [sanXuat, dongLenh, banLe]);
 
   const optMatHang: MucChon[] = matHang.map((m) => ({

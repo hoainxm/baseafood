@@ -30,6 +30,7 @@ import type {
   SalesItem,
   WipProductionItem,
   WipWarehouseStatus,
+  Packaging,
   SalesOrder,
   SalesOrderStatus,
   OrderItem,
@@ -617,6 +618,43 @@ export const BANG_PRODUCTION_LOCK: AnhXaBang<DailyLock> = {
     reopenReason: s(r.reopen_reason),
     note: s(r.note),
     leftoverKg: Number(r.leftover_kg ?? 0),
+  }),
+};
+
+/** Phiếu đóng gói BTP → thành phẩm (G3, migration 0026). */
+export const BANG_PACKAGING: AnhXaBang<Packaging> = {
+  table: "packagings",
+  localKey: "bsf.packagings.v1",
+  layKhoa: theoId,
+  toRow: (x) => ({
+    id: x.id,
+    date: x.date,
+    workshop: x.workshop,
+    from_product_id: x.fromProductId,
+    from_spec: x.fromSpec,
+    input_kg: x.inputKg,
+    input_blocks: x.inputBlocks,
+    to_product_id: x.toProductId,
+    to_spec: x.toSpec,
+    output_kg: x.outputKg,
+    output_units: x.outputUnits,
+    warehouse: x.warehouse,
+    note: x.note,
+  }),
+  fromRow: (r) => ({
+    id: s(r.id),
+    date: s(r.date).slice(0, 10),
+    workshop: s(r.workshop) as Workshop,
+    fromProductId: s(r.from_product_id),
+    fromSpec: s(r.from_spec),
+    inputKg: Number(r.input_kg ?? 0),
+    inputBlocks: Number(r.input_blocks ?? 0),
+    toProductId: s(r.to_product_id),
+    toSpec: s(r.to_spec),
+    outputKg: Number(r.output_kg ?? 0),
+    outputUnits: Number(r.output_units ?? 0),
+    warehouse: s(r.warehouse),
+    note: s(r.note),
   }),
 };
 

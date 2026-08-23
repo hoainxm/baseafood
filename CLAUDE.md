@@ -30,9 +30,9 @@ src/
 ├── lib/                      repo · catalogRepo · db · supabase · connectivity · balancingCalc · balancingGrid · periodUtils · inventory · inventoryMaterial · nxtExcel · auth · username · format · store · utils
 ├── components/ui/            primitive shadcn — size mật độ web thường (token-driven)
 ├── design-system/            tokens.css · patterns/ · kit/ · index.ts (cửa import duy nhất)
-└── features/                 THẬT: imports · production/WipProductionScreen (/wip) · warehouse · orders · sales · balancing · catalog · reports/NXT · auth · users
+└── features/                 THẬT: imports · production/WipProductionScreen (/wip) · packaging (/packaging) · warehouse · orders · sales · balancing · catalog · reports/NXT · auth · users
                               DEMO (dữ liệu mẫu): production/WorkOrderScreen (/production) · cold-storage · reports · dashboard · quality · traceability
-supabase/migrations/          0001 … 0025
+supabase/migrations/          0001 … 0026
 docs/README.md                bản đồ tài liệu — doc nào ở đâu, doc mới bỏ đâu
 docs/app-map/                 bản đồ ngữ cảnh cho agent (đọc khi CODE)
 docs/ops/                     vận hành: cutover Supabase · deploy Vercel · env
@@ -130,7 +130,7 @@ Index đầy đủ + bảng định tuyến theo task: [`docs/app-map/README.md`
 | [`33-ban-hang`](docs/app-map/33-ban-hang.md) | phiếu bán, dòng bán, quy cách, ghi bù, hút bán vào cân đối |
 | [`31-can-doi-ky`](docs/app-map/31-can-doi-ky.md) | kỳ, 3 khối, công thức, bảng in A4 |
 | [`32-danh-muc`](docs/app-map/32-danh-muc.md) | danh mục, 141 mã thành phẩm |
-| [`34-btp-san-xuat-kho`](docs/app-map/34-btp-san-xuat-kho.ba-spec.md) · [`35-btp-ui`](docs/app-map/35-btp-ui.design-spec.md) | sản xuất BTP/WIP, kho dự trữ, đơn/xuất, vòng đông gửi↔xả đông |
+| [`34-btp-san-xuat-kho`](docs/app-map/34-btp-san-xuat-kho.ba-spec.md) · [`35-btp-ui`](docs/app-map/35-btp-ui.design-spec.md) | sản xuất BTP/WIP, **đóng gói BTP→TP** (`/packaging`), kho dự trữ, đơn/xuất, vòng đông gửi↔xả đông |
 | [`trien-khai/flow-end-to-end-2-bo-phan`](docs/trien-khai/flow-end-to-end-2-bo-phan.md) | nối luồng nhập→sản xuất→kho→bán, 2 giao diện bộ phận, daily-task (họp 2026-08-22) |
 
 Bản đồ tài liệu đầy đủ + luật "doc mới bỏ đâu": [`docs/README.md`](docs/README.md).
@@ -145,8 +145,8 @@ Ngoài app-map: [`src/design-system/README.md`](src/design-system/README.md) (UI
 **Màn DEMO (dữ liệu mẫu, chưa nối bảng — đừng coi là đã có):** Lệnh sản xuất `/production` · Kho lạnh `/cold-storage` · Báo cáo tổng `/reports` · Tổng quan `/dashboard` · Chất lượng `/quality` · Truy xuất `/traceability`.
 
 **Backlog (cập nhật 2026-08-22):**
-- ⚠️ Chạy đủ migration `0001…0025` trên DB thật; siết RLS `0021` **+ bổ sung `material_opening_stock`**; đổi mật khẩu admin (`0007` seed admin/admin) 🔴.
-- **Chỗ đứt gãy chuỗi** (chi tiết [`flow §3`](docs/trien-khai/flow-end-to-end-2-bo-phan.md)): (G1) ✅ đối chiếu nhập↔SX ở `/wip` + lưu "còn dở" khi chốt SX (`production_locks.leftover_kg`, `0025`) — còn: ràng "còn dở" vào tồn/đông gửi ở Cân đối; (G2) ✅ hết chồng: `cold-storage` hút tồn thật (`tinhTon`) + nhãn nhiệt độ minh hoạ, `warehouse` canonical — còn: cảm biến thật; (G3) đóng gói BTP→thành phẩm chưa build; (G4) ✅ bán lẻ trừ tồn: dòng bán set `KHO_BAN_LE`, trừ suy FIFO qua `tinhTon(...,banLe)` nhất quán warehouse/cold-storage/orders — còn: tách tồn TP đóng gói khi có G3.
+- ⚠️ Chạy đủ migration `0001…0026` trên DB thật; siết RLS `0021` **+ bổ sung `material_opening_stock`**; đổi mật khẩu admin (`0007` seed admin/admin) 🔴.
+- **Chỗ đứt gãy chuỗi** (chi tiết [`flow §3`](docs/trien-khai/flow-end-to-end-2-bo-phan.md)): (G1) ✅ đối chiếu nhập↔SX ở `/wip` + lưu "còn dở" khi chốt SX (`production_locks.leftover_kg`, `0025`) — còn: ràng "còn dở" vào tồn/đông gửi ở Cân đối; (G2) ✅ hết chồng: `cold-storage` hút tồn thật (`tinhTon`) + nhãn nhiệt độ minh hoạ, `warehouse` canonical — còn: cảm biến thật; (G3) ✅ đóng gói BTP→TP đã build: màn `/packaging` (phiếu đóng gói BTP tiêu hao→TP ra + hao hụt, `0026`) + tồn TP suy (`tinhTonTP`); bán chọn nguồn Block thô (trừ BTP)/Đóng gói (trừ TP) — còn: tách kho TP theo nhiệt/vị trí; (G4) ✅ bán lẻ trừ tồn: dòng bán chọn **nguồn** (`KHO_BAN_LE` trừ BTP / `KHO_TP` trừ TP đóng gói), trừ suy FIFO qua `tinhTon(...,banLe)`/`tinhTonTP`, nhất quán warehouse/cold-storage/orders/packaging.
 - **2 giao diện bộ phận:** ✅ route-guard + trang chủ theo vai trò (`lib/nav-access.ts`) + banner nhắc daily-task (`/imports`,`/wip`) — còn: siết RLS theo vai trò ở server.
 - **Cutover 01/09:** baseline 30/06 + nhập báo cáo T7–T8 ([`ke-hoach-cutover`](docs/trien-khai/ke-hoach-cutover-1-9-2026.md)).
 - **Bộ quy cách × chế biến:** ✅ Chiều B kiểu chế biến (`processing_type`, `0024` + combobox danh mục) — còn: chuẩn hoá quy cách (Chiều C) ([`spec`](docs/spec/bo-quy-cach-che-bien-thanh-pham.md)).

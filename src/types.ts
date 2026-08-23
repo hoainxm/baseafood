@@ -316,6 +316,32 @@ export function isBackdatedWip(c: Pick<WipProductionItem, "productionDate" | "po
   return Boolean(c.postingDate) && c.postingDate > c.productionDate;
 }
 
+/* ---------- Đóng gói BTP → Thành phẩm (G3, migration 0026) ---------- */
+
+/** Một phiếu đóng gói: BTP tiêu hao → TP đóng gói ra. Hao hụt = inputKg − outputKg. */
+export interface Packaging {
+  id: string;
+  date: string; // yyyy-mm-dd
+  workshop: Workshop;
+  // BTP tiêu hao (định danh theo mặt hàng + quy cách, như tồn WIP)
+  fromProductId: string;
+  fromSpec: string;
+  inputKg: number;
+  inputBlocks: number;
+  // TP đóng gói ra
+  toProductId: string;
+  toSpec: string;
+  outputKg: number;
+  outputUnits: number; // số thùng / gói
+  warehouse: string; // kho chứa TP đóng gói
+  note: string;
+}
+
+/** Hao hụt đóng gói (kg) = BTP vào − TP ra. Âm = ghi nhầm (TP ra > BTP vào). */
+export function haoHutDongGoi(p: Pick<Packaging, "inputKg" | "outputKg">): number {
+  return p.inputKg - p.outputKg;
+}
+
 export type SalesOrderStatus = "dang-gom" | "du" | "dong";
 
 export interface SalesOrder {

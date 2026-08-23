@@ -22,9 +22,13 @@ Số hóa sổ **bán hàng** — bán thành phẩm chế biến (bạch tuộc
 
 Đã có: phiếu bán (một khách, một lượt, nhiều mặt hàng) · 2 ngày (xuất bán / ghi sổ) + ghi bù có lý do · quy cách (size/grade) mỗi dòng · kênh Xuất khẩu (USD) / Nội địa (VND) trên phiếu · lọc theo kỳ (`lib/periodUtils.ts`) · sổ nhóm theo phiếu + tổng · sửa/xóa phiếu, sửa/bỏ dòng · **hút bán vào kỳ cân đối** (khối TP ra).
 
-**Trừ tồn khi bán lẻ (ĐÃ LÀM v1, 2026-08-23):** dòng bán mới set `sourceWarehouse = "Kho dự trữ"` (hằng `KHO_BAN_LE` ở `lib/inventory.ts`) ⇒ trừ tồn kho dự trữ **suy** qua `tinhTon(sanXuat, dongLenh, banLe)` (FIFO theo mặt hàng × quy cách; `banLe = locBanLe(rows)` chỉ lấy dòng marker bán lẻ, **bỏ** handoff Đơn đặt `"Lưu trữ"` đã trừ qua `export_items`, và dòng cũ `""`). Trừ suy nên xóa dòng bán = tồn tự hồi, không trừ hai lần. Màn hiện **tồn khả dụng** + cảnh báo bán vượt (vẫn ghi được). `warehouse`/`cold-storage`/`orders` cùng truyền `banLe` ⇒ tồn nhất quán.
+**Bán trừ tồn — chọn NGUỒN (ĐÃ LÀM, 2026-08-23):** mỗi dòng bán có ô **Nguồn bán** (`dongMoi.nguon` → `sourceWarehouse`):
+- **Block thô** = `KHO_BAN_LE` (`"Kho dự trữ"`) ⇒ trừ tồn **BTP** suy qua `tinhTon(sanXuat, dongLenh, [...locBanLe(rows), ...dongGoiTruTon(packagings)])`.
+- **Đóng gói** = `KHO_TP` (`"Kho thành phẩm"`) ⇒ trừ tồn **TP đóng gói** suy qua `tinhTonTP(packagings, locBanLe(rows, KHO_TP))` (G3, xem [flow §3 G3](../trien-khai/flow-end-to-end-2-bo-phan.md)).
 
-Chưa có (backlog): **chốt ngày bán** (bảng `chot_ngay` hiện chỉ dùng cho nhập — bán cần bảng chốt riêng, chưa làm); **phiếu bán in A4** riêng (bảng cân đối đã in được); **tách tồn thành phẩm đóng gói khỏi BTP** (G3 — đóng gói BTP→TP chưa build; hiện bán lẻ trừ thẳng tồn BTP).
+FIFO theo (mặt hàng × quy cách). `locBanLe(rows, marker)` **bỏ** handoff Đơn đặt (`"Lưu trữ"`, đã trừ qua `export_items`) và dòng cũ (`""`). Trừ suy nên xóa/sửa dòng bán = tồn tự hồi, không trừ hai lần. Màn hiện **tồn khả dụng** (theo pool đã chọn) + cảnh báo bán vượt (vẫn ghi được). `warehouse`/`cold-storage`/`orders`/`packaging` cùng dùng `dongGoiTruTon` ⇒ tồn BTP nhất quán.
+
+Chưa có (backlog): **chốt ngày bán** (bảng `chot_ngay` hiện chỉ dùng cho nhập — bán cần bảng chốt riêng, chưa làm); **phiếu bán in A4** riêng (bảng cân đối đã in được); tách kho TP theo nhiệt/vị trí.
 
 Bảng dùng: `phieu_ban`, `ban_hang`, đọc danh mục `mat_hang` / `khach_hang`. Migration `0005`.
 

@@ -11,7 +11,7 @@ import type { Role } from "@/types";
  * đầy đủ — chỉ 2 bộ phận thao tác theo bước bị giới hạn nav cho gọn.
  */
 const DEPT_NHAP_HANG = ["imports", "warehouse", "nxt-nl", "catalog"];
-const DEPT_SAN_XUAT = ["wip", "warehouse", "quality", "catalog"];
+const DEPT_SAN_XUAT = ["wip", "packaging", "warehouse", "quality", "catalog"];
 
 /** Vai trò bị giới hạn → tập nav id được phép thấy. */
 export const ALLOWED_NAV: Partial<Record<Role, string[]>> = {

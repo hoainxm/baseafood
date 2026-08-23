@@ -1,8 +1,9 @@
 > Load khi: thiết kế/xây module WIP — sản xuất bán thành phẩm ngày, kho dự trữ đông, đơn đặt, xuất container.
-covers: src/features/production/WipProductionScreen.tsx, src/features/warehouse/ReserveWarehouseScreen.tsx, src/features/orders/SalesOrderScreen.tsx, src/lib/inventory.ts, supabase/migrations/0011_wip_san_xuat_kho_don.sql
-last_verified: 2026-08-17
+covers: src/features/production/WipProductionScreen.tsx, src/features/warehouse/ReserveWarehouseScreen.tsx, src/features/orders/SalesOrderScreen.tsx, src/features/packaging/PackagingScreen.tsx, src/lib/inventory.ts, supabase/migrations/0011_wip_san_xuat_kho_don.sql, supabase/migrations/0026_dong_goi_thanh_pham.sql
+last_verified: 2026-08-23
 ttl_days: 90
-status: ba-spec — ĐÃ BUILD v1 (migration 0011 + 3 màn WipProductionScreen/ReserveWarehouseScreen/SalesOrderScreen)
+status: ba-spec — ĐÃ BUILD v1 (migration 0011 + 3 màn WipProductionScreen/ReserveWarehouseScreen/SalesOrderScreen); + đóng gói BTP→TP (G3, migration 0026, màn PackagingScreen)
+<!-- updated: 2026-08-23 — G3 đóng gói BTP→TP: bảng packagings (0026) + màn /packaging (phiếu đóng gói: BTP tiêu hao→TP ra, hao hụt). Tồn 2 pool suy ở inventory.ts: BTP trừ thêm dongGoiTruTon(); TP = tinhTonTP(). Bán chọn nguồn Block thô (KHO_BAN_LE→BTP) / Đóng gói (KHO_TP→TP). -->
 <!-- re-verified: 2026-08-14 — đồng bộ tên file sau rename eadc360: WipProductionScreen/ReserveWarehouseScreen/SalesOrderScreen -->
 
 <!-- updated: 2026-08-17 — production_wips thêm balancing_period_id: kỳ cân đối hút sản lượng BTP theo ngày và GHI NGƯỢC khi sửa ô trong lưới (xem 31-can-doi-ky). Ngày đã chốt sản xuất vẫn sửa được nhưng bắt lý do ghi bù. -->

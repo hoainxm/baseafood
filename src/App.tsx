@@ -42,6 +42,7 @@ const CanDoiScreen = lazy(() => import("@/features/balancing"));
 const DanhMucScreen = lazy(() => import("@/features/catalog"));
 const QuanLyNguoiDungScreen = lazy(() => import("@/features/users"));
 const SanXuatBTPScreen = lazy(() => import("@/features/production")); // Sản xuất BTP (WIP), route /wip
+const DongGoiScreen = lazy(() => import("@/features/packaging")); // Đóng gói BTP → TP, route /packaging
 const KitPage = lazy(() => import("@/design-system/kit/KitPage"));
 
 /**
@@ -155,6 +156,7 @@ export default function App() {
             <Route path="/balancing/:periodId" element={<CanDoiScreen />} />
             <Route path="/catalog" element={<DanhMucScreen />} />
             <Route path="/wip" element={<SanXuatBTPScreen />} />
+            <Route path="/packaging" element={<DongGoiScreen />} />
             <Route
               path="/users"
               element={

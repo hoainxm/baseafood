@@ -181,6 +181,7 @@ export const BANG_PRODUCT: AnhXaBang<Product> = {
     finished_good_code: x.finishedGoodCode,
     category: x.category,
     material_type_id: x.materialTypeId,
+    processing_type: x.processingType,
   }),
   fromRow: (r) => ({
     id: s(r.id),
@@ -189,6 +190,7 @@ export const BANG_PRODUCT: AnhXaBang<Product> = {
     finishedGoodCode: s(r.finished_good_code),
     category: r.category == null ? "" : s(r.category),
     materialTypeId: r.material_type_id == null ? "" : s(r.material_type_id),
+    processingType: r.processing_type == null ? "" : s(r.processing_type),
   }),
 };
 

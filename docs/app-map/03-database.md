@@ -2,6 +2,7 @@
 covers: supabase/migrations/**, docs/ops/supabase-setup.md
 last_verified: 2026-08-21
 ttl_days: 90
+<!-- updated: 2026-08-23 — thêm 0023 (reset+seed cân đối bt2da) và 0024 (products.processing_type: facet kiểu chế biến); xem spec/bo-quy-cach-che-bien-thanh-pham.md -->
 <!-- updated: 2026-08-21 — thêm 0022 (material_opening_stock: tồn đầu kho nguyên liệu, kg thuần) cho sổ NXT nguyên liệu; xem 31-can-doi-ky.md § Tồn kho nguyên liệu -->
 <!-- updated: 2026-08-07 — thêm migration 0008 (nguyen_lieu_vao.nguon_kho, cờ nguồn xả đông) -->
 <!-- updated: 2026-08-14 — bổ sung dòng migration 0016/0017/0018 (trước đó bảng dừng ở 0015); 0018 cho NL vào âm -->
@@ -71,6 +72,8 @@ App dùng camelCase, DB dùng snake_case — cầu nối là `AnhXaBang.toRow/fr
 | `0020_chot_ky_va_chuyen_ky.sql` | 🟡 | **Chốt kỳ cân đối**: `balancing_periods` thêm `is_locked` / `locked_at` / `lock_note` / `reopen_reason` (cùng luật chốt ngày: mở lại bắt lý do, KHÔNG xoá vết). **Chuyển kỳ**: `balancing_inputs` thêm `carry_over_period_id` (bảng outputs đã có từ 0019) + index cho cả hai — dòng đẩy sang kỳ sau nhớ đã được kỳ nào nhận, chống lấy hai lần. Chỉ thêm cột, idempotent, có khối `ROLLBACK`. |
 | `0021_siet_rls_tieng_anh.sql` | 🔴 | **Siết RLS** — thay `0003` (đã lỗi thời sau rename `0016`). Thu hồi `anon` ở cả policy lẫn GRANT + `revoke usage on schema public`, policy `authenticated` cho đủ **23 bảng** tên hiện hành. Bỏ qua bảng chưa tồn tại thay vì gãy giữa chừng. Idempotent, có `ROLLBACK`. **Tiền kiểm bắt buộc**: mọi máy đăng nhập được, còn admin đăng nhập được — chạy sớm là cả xưởng đứng (401). Xem [05-bao-mat-phan-quyen.md](05-bao-mat-phan-quyen.md). ⚠️ Bảng mới `material_opening_stock` (0022) chưa nằm trong danh sách 23 — bổ sung khi chạy lại. |
 | `0022_ton_dau_nguyen_lieu.sql` | 🟡 | **Tồn đầu kho nguyên liệu** — bảng `material_opening_stock` (site_id · workshop · material_type_name · as_of_date · quantity_kg, **kg thuần**). Số dư đông dự trữ có sẵn trước khi số hoá, làm tồn đầu cho kỳ ĐẦU của mỗi họ NL trong sổ NXT nguyên liệu (kỳ sau tự kế thừa). Chỉ thêm bảng, idempotent, RLS mở anon (siết sau ở `0021`), có `ROLLBACK`. Xem [31-can-doi-ky.md](31-can-doi-ky.md). |
+| `0023_reset_seed_can_doi_bt2da.sql` | 🔴 | **PHÁ HỦY (seed demo/thật)** — XÓA mọi kỳ cân đối site `bsf1` rồi nạp lại 1 kỳ thật "Bạch tuộc 2 da" 21–29/07/2025 (8 khách, 21 mặt hàng, `daily_quantities` theo ngày; số chốt ncls 2.218 giữ nguyên). Chỉ chạy khi cố ý reset dữ liệu cân đối. |
+| `0024_products_processing_type.sql` | 🟡 | Thêm cột `products.processing_type` (kiểu chế biến: luộc/chần/cắt/tẩm bột…) — facet thứ 3 bên cạnh `category` (loài) + `material_type_id` (nguyên liệu). Chỉ thêm cột, default `''`, idempotent, có `ROLLBACK`. Xem [spec/bo-quy-cach-che-bien-thanh-pham.md](../spec/bo-quy-cach-che-bien-thanh-pham.md). |
 
 ⚠️ **`0004` chưa chạy** ⇒ app báo *"Mất kết nối máy chủ — Could not find the 'chuyen_id' column"*. Số liệu vẫn ghi xuống máy và nằm trong hàng chờ, tự đẩy lên sau khi migration chạy — nhưng máy khác chưa thấy.
 

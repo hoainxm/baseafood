@@ -1,7 +1,7 @@
 # Đặc tả: Bộ quy cách × kiểu chế biến × nguyên liệu
 
-- **Trạng thái:** DỰ THẢO (chờ chốt với xí nghiệp)
-- **Ngày lập:** 2026-08-22
+- **Trạng thái:** Chiều B (kiểu chế biến) **ĐÃ BUILD v1** (`0024` + UI danh mục); Chiều C (quy cách chuẩn hoá) còn dự thảo — chờ chốt với xí nghiệp
+- **Ngày lập:** 2026-08-22 · **Cập nhật:** 2026-08-23
 - **Nguồn quyết định:** [`hop-2026-08-22-so-hoa-flow-2-bo-phan.md`](../trien-khai/hop-2026-08-22-so-hoa-flow-2-bo-phan.md) (QĐ-1, QĐ-7)
 - **Đối chiếu:** [`32-danh-muc.md`](../app-map/32-danh-muc.md) (141 mã) · [`34-btp-san-xuat-kho.ba-spec.md`](../app-map/34-btp-san-xuat-kho.ba-spec.md) (quy cách là chiều khóa tồn) · `src/data/thanh-pham.json`
 
@@ -66,10 +66,11 @@ Chuỗi size hoặc khoảng size, **là chiều khóa cứng của tồn** (doc
 
 ## 3. Ánh xạ vào schema hiện có (không đập đi làm lại)
 
-Bảng `products` (`mat_hang`) đã có sẵn đường bám:
-- `products.material_type_id` (`0015`) → **Chiều A**.
-- `products.loai` (`0014`) → tạm giữ **Chiều B** (kiểu chế biến) nếu đang dùng vậy — **cần đọc code để chốt** trước khi đổi.
-- **Quy cách** hiện là chuỗi tự do trong dòng bán/sản xuất (`33-ban-hang.md` §3) → đề xuất nâng thành trường có kiểm soát ở Chiều C.
+Bảng `products` (`mat_hang`) đã có sẵn đường bám (đối chiếu code 2026-08-23):
+- `products.material_type_id` (`0015`) → **Chiều A** (nguyên liệu / loại NL).
+- `products.category` (`0014`, tên cũ `loai`, đổi ở `0016`) → **nhóm LOÀI** (Bạch tuộc/Mực/Cá/Tôm/Bào ngư/Khác) — UI gọi là ô "Loài". **KHÔNG** phải kiểu chế biến; đừng tái dùng cho Chiều B.
+- `products.processing_type` (**`0024` — ĐÃ THÊM**) → **Chiều B** (kiểu chế biến). Combobox "Kiểu chế biến" ở tab Mặt hàng (danh mục mở, thêm tại chỗ): Nguyên con làm sạch · Luộc · Chần · Cắt · Cắt luộc · Cắt chần · Tẩm bột · Tẩm gia vị.
+- **Quy cách** (Chiều C) hiện là chuỗi tự do: `spec` free-text ở dòng bán (`33-ban-hang.md` §3), hardcode `""` ở dòng sản xuất `/wip`. **Chưa chuẩn hoá** → đề xuất nâng thành trường có kiểm soát (bảng `spec_sets` + `products.spec_set_id`) là bước sau, thay đổi lớn hơn.
 
 `finished_goods` (141 mã TK 1551) **giữ nguyên làm mã kế toán** (khóa `code`); 3 facet là **lớp phủ phân loại** trên `products`, ánh xạ **lỏng** sang 141 mã (được phép "chưa ánh xạ") — đúng nguyên tắc [`32-danh-muc.md`](../app-map/32-danh-muc.md).
 
@@ -90,10 +91,10 @@ Bảng `products` (`mat_hang`) đã có sẵn đường bám:
 
 ## 5. Việc cần xác nhận trước khi build
 
-1. **Danh mục kiểu chế biến** ở §2.2 — đủ chưa, còn kiểu nào (xưởng Cá, xưởng Khô khác xưởng Đông)?
+1. **Danh mục kiểu chế biến** ở §2.2 — đủ chưa, còn kiểu nào (xưởng Cá, xưởng Khô khác xưởng Đông)? *(đã build danh mục mở, xí nghiệp bổ sung tại chỗ được)*
 2. **Quy cách có ràng kg/block cố định** hay hoàn toàn tự do (treo từ doc `34`)?
-3. **`products.loai` hiện chứa gì** — đọc code xác nhận trước khi gán làm Chiều B.
-4. Ánh xạ **141 mã ↔ (A×B×C)** — mã nào ra tổ hợp nào; mã nào là NL không phải TP.
+3. ~~`products.loai` hiện chứa gì~~ ✅ **đã rõ:** là `category` = nhóm LOÀI (không phải chế biến); Chiều B nay dùng cột riêng `processing_type` (`0024`).
+4. Ánh xạ **141 mã ↔ (A×B×C)** — mã nào ra tổ hợp nào; mã nào là NL không phải TP. *(nhập dần qua UI danh mục; chưa backfill hàng loạt)*
 
 Khi chốt xong: cập nhật [`32-danh-muc.md`](../app-map/32-danh-muc.md) + [`03-database.md`](../app-map/03-database.md), rồi mới viết migration.
 </content>

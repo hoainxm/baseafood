@@ -130,8 +130,9 @@ export interface Product {
   code: string;
   name: string;
   finishedGoodCode: string;
-  category?: string;
-  materialTypeId?: string;
+  category?: string; // nhóm LOÀI (Bạch tuộc/Mực/Cá…)
+  materialTypeId?: string; // nguyên liệu / loại NL
+  processingType?: string; // KIỂU CHẾ BIẾN (luộc/chần/cắt/tẩm bột…) — facet thứ 3, migration 0024
 }
 
 export interface Customer {

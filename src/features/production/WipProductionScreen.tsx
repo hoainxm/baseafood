@@ -44,6 +44,7 @@ import {
 import { kg, num, todayISO, viDate } from "@/lib/format";
 import { KY_OPT, phamViKy, type KyXem } from "@/lib/periodUtils";
 import { cungHoNguyenLieu } from "@/lib/balancingGrid";
+import { DailyTaskReminder } from "@/features/shared";
 import {
   CalendarRange,
   CircleCheck,
@@ -169,6 +170,11 @@ export default function SanXuatBTPScreen() {
 
   const ngayGhi = laMotNgay ? tuHieuLuc : denHieuLuc;
   const xuongGhi: Workshop = phanXuong === "Tất cả" ? "Đông" : phanXuong;
+
+  /* Nhắc daily-task: hôm nay (xưởng đang chọn) đã chốt sản xuất chưa. */
+  const daChotSXHomNay = chot.some(
+    (c) => c.lockDate === todayISO() && c.workshop === xuongGhi && c.isLocked
+  );
 
   /* ---- Thêm mặt hàng (thành phẩm) tại chỗ, gắn loại NL đang chọn ---- */
   const themMatHang = (ten: string, materialTypeId: string): string => {
@@ -406,6 +412,8 @@ export default function SanXuatBTPScreen() {
           </Button>
         </div>
       </div>
+
+      <DailyTaskReminder daChot={daChotSXHomNay} viec={`sản lượng BTP hôm nay — xưởng ${xuongGhi}`} />
 
       <ThongKe
         className="grid-cols-2 sm:grid-cols-3 lg:grid-cols-5"

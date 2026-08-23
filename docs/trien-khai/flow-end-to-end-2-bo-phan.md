@@ -90,7 +90,7 @@ Cùng một cơ sở dữ liệu, **tách theo vai trò** để mỗi bộ phậ
 - **Đi theo bước:** ① chọn ngày SX + xưởng + loại nguyên liệu (từ lượng nhập trong ngày) → ② đổ từng dòng thành phẩm làm ra (mặt hàng + quy cách + kg + số block) → ③ phần **chưa làm xong → để trạng thái "chờ nhập kho"** → ④ thủ kho **duyệt vào kho dự trữ** → ⑤ **chốt ngày sản xuất**.
 - **Chỉ thấy:** Sản xuất BTP + Kho dự trữ + (đọc) lượng nhập trong ngày để đối chiếu.
 
-> **Trạng thái build:** ✅ **route-guard + trang chủ theo vai trò đã làm** (`src/lib/nav-access.ts` + `App.tsx`): vai trò `warehouse-keeper` → bộ phận Nhập hàng (trang chủ `/imports`), `team-leader`/`manager-dong`/`manager-ca`/`manager-kho` → bộ phận Sản xuất (trang chủ `/wip`); mỗi bộ phận chỉ thấy nav của mình, gõ URL ngoài bộ phận bị đưa về trang chủ. Thêm 2 vai trò vào `ROLES` (`team-leader` trước bị thiếu + `warehouse-keeper` mới). Vai trò giám đốc/kế toán/admin/chưa-gán vẫn xem đầy đủ. **Còn lại:** nhắc daily-task chủ động; phân quyền RLS ở server (hiện mới gate UI).
+> **Trạng thái build:** ✅ **route-guard + trang chủ theo vai trò đã làm** (`src/lib/nav-access.ts` + `App.tsx`): vai trò `warehouse-keeper` → bộ phận Nhập hàng (trang chủ `/imports`), `team-leader`/`manager-dong`/`manager-ca`/`manager-kho` → bộ phận Sản xuất (trang chủ `/wip`); mỗi bộ phận chỉ thấy nav của mình, gõ URL ngoài bộ phận bị đưa về trang chủ. Thêm 2 vai trò vào `ROLES` (`team-leader` trước bị thiếu + `warehouse-keeper` mới). Vai trò giám đốc/kế toán/admin/chưa-gán vẫn xem đầy đủ. Thêm banner **nhắc daily-task** (`DailyTaskReminder`) ở đầu `/imports` + `/wip`: hôm nay (theo xưởng đang chọn) đã chốt chưa. **Còn lại:** phân quyền RLS ở server (hiện mới gate UI).
 
 ---
 
@@ -105,7 +105,7 @@ Cùng một cơ sở dữ liệu, **tách theo vai trò** để mỗi bộ phậ
 | 2 | Điền đơn giá (hoặc đánh dấu "chưa có giá" chờ hóa đơn) | ✅ |
 | 3 | Cân **phế liệu gộp cuối ngày** | ✅ |
 | 4 | **Chốt ngày nhập** (khóa số, mở lại có lý do) | ✅ |
-| — | *Nhắc: "hôm nay chưa chốt ngày"* trên trang chủ bộ phận | ❌ cần build |
+| — | *Nhắc: "hôm nay chưa chốt ngày"* trên trang chủ bộ phận | ✅ banner `DailyTaskReminder` ở đầu màn `/imports` (theo xưởng đang chọn) |
 
 ### 5.2 Daily task — Sản xuất
 | Bước | Việc | Đã có? |
@@ -146,7 +146,7 @@ Cùng một cơ sở dữ liệu, **tách theo vai trò** để mỗi bộ phậ
 2. **[G3] Đóng gói BTP → Thành phẩm:** flow + trạng thái tồn thành phẩm tách khỏi BTP.
 3. **[G2] Gộp/tách 2 màn kho:** chốt kho canonical, nối `cold-storage` vào WIP hoặc gộp vào `warehouse`.
 4. **[G4] Bán trừ tồn:** kích hoạt `source_warehouse` để bán lẻ trừ tồn kho thành phẩm.
-5. **2 giao diện bộ phận:** route-guard + trang chủ theo vai trò + nhắc daily-task.
+5. **2 giao diện bộ phận:** ✅ route-guard + trang chủ theo vai trò + banner nhắc daily-task (`/imports`, `/wip`) đã làm. **Còn:** siết RLS theo vai trò ở server; tinh chỉnh tập nav mỗi bộ phận với xí nghiệp.
 6. **Gỡ/ẩn màn DEMO** khỏi nav vận hành thật (hoặc gắn nhãn rõ) để không gây hiểu nhầm khi chạy thật 01/09.
 
 Mốc đưa vào chạy thật: [`ke-hoach-cutover-1-9-2026.md`](ke-hoach-cutover-1-9-2026.md).

@@ -146,10 +146,10 @@ Ngoài app-map: [`src/design-system/README.md`](src/design-system/README.md) (UI
 
 **Backlog (cập nhật 2026-08-22):**
 - ⚠️ Chạy đủ migration `0001…0024` trên DB thật; siết RLS `0021` **+ bổ sung `material_opening_stock`**; đổi mật khẩu admin (`0007` seed admin/admin) 🔴.
-- **Chỗ đứt gãy chuỗi** (chi tiết [`flow §3`](docs/trien-khai/flow-end-to-end-2-bo-phan.md)): (G1) sản xuất chưa nối ngược nguyên liệu nhập / chưa ghi hao hụt-yield; (G2) hai màn kho (`warehouse` thật ↔ `cold-storage` demo) chồng nhau; (G3) đóng gói BTP→thành phẩm chưa build; (G4) bán LẺ trực tiếp chưa trừ tồn (đơn đặt→lệnh xuất đã trừ tồn WIP; màn Bán hàng set `source_warehouse=""`).
-- **2 giao diện bộ phận:** route-guard + trang chủ theo vai trò + nhắc daily-task.
+- **Chỗ đứt gãy chuỗi** (chi tiết [`flow §3`](docs/trien-khai/flow-end-to-end-2-bo-phan.md)): (G1) ✅ đối chiếu nhập↔SX read-only ở `/wip` — còn: lưu hao hụt/"còn dở" (thêm cột `production_wips`); (G2) hai màn kho (`warehouse` thật ↔ `cold-storage` demo) chồng nhau; (G3) đóng gói BTP→thành phẩm chưa build; (G4) bán LẺ trực tiếp chưa trừ tồn (đơn đặt→lệnh xuất đã trừ tồn WIP; màn Bán hàng set `source_warehouse=""`).
+- **2 giao diện bộ phận:** ✅ route-guard + trang chủ theo vai trò (`lib/nav-access.ts`) + banner nhắc daily-task (`/imports`,`/wip`) — còn: siết RLS theo vai trò ở server.
 - **Cutover 01/09:** baseline 30/06 + nhập báo cáo T7–T8 ([`ke-hoach-cutover`](docs/trien-khai/ke-hoach-cutover-1-9-2026.md)).
-- **Bộ quy cách × chế biến:** tách facet nguyên liệu/chế biến/quy cách ([`spec`](docs/spec/bo-quy-cach-che-bien-thanh-pham.md)).
+- **Bộ quy cách × chế biến:** ✅ Chiều B kiểu chế biến (`processing_type`, `0024` + combobox danh mục) — còn: chuẩn hoá quy cách (Chiều C) ([`spec`](docs/spec/bo-quy-cach-che-bien-thanh-pham.md)).
 - Import file Excel + scan viết tay (**tay trước**, file/scan sau); chốt ngày bán + phiếu bán in A4; định mức NL→TP; báo cáo tháng 6 khối; ẩn/gắn nhãn màn DEMO trước khi chạy thật. Test thực địa 5 người dùng ≥45 tuổi.
 - Lưu ý giữ nguyên: **đơn đặt = xuất khẩu**, phí XK phòng kế hoạch tính riêng (đã trừ trong giá báo) ⇒ cân đối KHÔNG tính phí XK.
 

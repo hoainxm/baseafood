@@ -23,7 +23,8 @@ export type Role =
   | "manager-ca"
   | "manager-kho"
   | "accountant"
-  | "team-leader";
+  | "team-leader"
+  | "warehouse-keeper";
 
 export const ROLES: { value: Role; label: string }[] = [
   { value: "admin", label: "Quản trị (full quyền)" },
@@ -32,6 +33,8 @@ export const ROLES: { value: Role; label: string }[] = [
   { value: "manager-dong", label: "Quản đốc xưởng Đông" },
   { value: "manager-ca", label: "Quản đốc xưởng Cá" },
   { value: "manager-kho", label: "Quản đốc xưởng Khô" },
+  { value: "team-leader", label: "Tổ trưởng sản xuất" },
+  { value: "warehouse-keeper", label: "Thủ kho / nhập hàng" },
   { value: "accountant", label: "Kế toán" },
 ];
 

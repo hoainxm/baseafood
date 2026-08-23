@@ -21,6 +21,7 @@ import { HUONG_DAN } from "@/features/shared/guideContent";
 import { Toaster, apDungCaiDatHienThi, DangXuLy } from "@/design-system";
 import { useAuth } from "@/lib/auth";
 import { roleLabel } from "@/types";
+import { allowedIds, homeFor } from "@/lib/nav-access";
 
 // Module MES (màn trưng bày)
 const ManTongQuan = lazy(() => import("@/features/dashboard/DashboardScreen"));
@@ -59,7 +60,20 @@ function ShellLayout() {
   }, [username]);
 
   const seg = location.pathname.split("/").filter(Boolean)[0] ?? "dashboard";
-  const items = auth.laAdmin ? KIT_NAV : KIT_NAV.filter((n) => n.id !== "users");
+  const roles = auth.nguoiDung?.roles ?? [];
+  // 2 giao diện bộ phận: vai trò bộ phận chỉ thấy nav của bộ phận đó (null = đầy đủ).
+  const cacIdChoPhep = allowedIds(roles, auth.laAdmin);
+  const items = cacIdChoPhep
+    ? KIT_NAV.filter((n) => cacIdChoPhep.has(n.id))
+    : auth.laAdmin
+      ? KIT_NAV
+      : KIT_NAV.filter((n) => n.id !== "users");
+
+  // Vào path ngoài bộ phận (gõ URL / link cũ) ⇒ đưa về trang chủ bộ phận.
+  if (cacIdChoPhep && seg && !cacIdChoPhep.has(seg)) {
+    return <Navigate to={`/${homeFor(roles)}`} replace />;
+  }
+
   const current = KIT_NAV.find((n) => n.id === seg);
   const guide = HUONG_DAN[seg];
 
@@ -94,6 +108,7 @@ function ShellLayout() {
 
 export default function App() {
   const auth = useAuth();
+  const roles = auth.nguoiDung?.roles ?? [];
 
   // Đang lấy phiên đăng nhập từ máy chủ → tránh nháy màn login.
   if (auth.dangTai) {
@@ -119,7 +134,7 @@ export default function App() {
       <HashRouter>
         <Routes>
           <Route element={<ShellLayout />}>
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/" element={<Navigate to={`/${homeFor(roles)}`} replace />} />
 
             {/* MES */}
             <Route path="/dashboard" element={<ManTongQuan />} />

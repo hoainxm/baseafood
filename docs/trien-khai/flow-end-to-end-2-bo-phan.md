@@ -90,7 +90,7 @@ Cùng một cơ sở dữ liệu, **tách theo vai trò** để mỗi bộ phậ
 - **Đi theo bước:** ① chọn ngày SX + xưởng + loại nguyên liệu (từ lượng nhập trong ngày) → ② đổ từng dòng thành phẩm làm ra (mặt hàng + quy cách + kg + số block) → ③ phần **chưa làm xong → để trạng thái "chờ nhập kho"** → ④ thủ kho **duyệt vào kho dự trữ** → ⑤ **chốt ngày sản xuất**.
 - **Chỉ thấy:** Sản xuất BTP + Kho dự trữ + (đọc) lượng nhập trong ngày để đối chiếu.
 
-> **Việc cần build để 2 giao diện "theo bước" đúng nghĩa:** gắn **route-guard theo vai trò** (đã có `AdminRoute`, cần thêm guard cho 2 nhóm bộ phận) + **màn khởi đầu (home) riêng mỗi vai trò** đưa thẳng vào việc-hằng-ngày của bộ phận đó. Không phải viết lại màn — là **lọc nav + guard + trang chủ theo vai trò**.
+> **Trạng thái build:** ✅ **route-guard + trang chủ theo vai trò đã làm** (`src/lib/nav-access.ts` + `App.tsx`): vai trò `warehouse-keeper` → bộ phận Nhập hàng (trang chủ `/imports`), `team-leader`/`manager-dong`/`manager-ca`/`manager-kho` → bộ phận Sản xuất (trang chủ `/wip`); mỗi bộ phận chỉ thấy nav của mình, gõ URL ngoài bộ phận bị đưa về trang chủ. Thêm 2 vai trò vào `ROLES` (`team-leader` trước bị thiếu + `warehouse-keeper` mới). Vai trò giám đốc/kế toán/admin/chưa-gán vẫn xem đầy đủ. **Còn lại:** nhắc daily-task chủ động; phân quyền RLS ở server (hiện mới gate UI).
 
 ---
 

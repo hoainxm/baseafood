@@ -58,7 +58,7 @@ Phân loại: **THẬT** = nối kho dữ liệu, ghi/sửa/chốt thật · **D
 Đây là phần cốt lõi buổi họp. Bốn chỗ đứt, xếp theo mức chặn vòng lặp:
 
 ### G1 · Sản xuất KHÔNG nối ngược về nguyên liệu nhập 🔴 (đau nhất)
-`WipProductionItem` chỉ có `productId` + `quantityKg` + `blocksCount`, **không** có tham chiếu lô nhập, **không** ghi lượng nguyên liệu tiêu hao, **không** có hiệu suất (yield). Phép *"lượng nhập trong ngày → ra bao nhiêu thành phẩm, hao bao nhiêu"* hiện **chỉ tính gián tiếp ở màn Cân đối** theo kỳ 5 ngày (`Định mức = Tổng NL ÷ Tổng TP`), **không** tính trực tiếp ở bước sản xuất.
+`WipProductionItem` (kiểm chứng `src/types.ts:292`) có `productId`, **`spec` (quy cách)**, `quantityKg`, `blocksCount`, `warehouse`, `status` (`cho-nhap`/`da-nhap`) — nhưng **không** có tham chiếu lô nhập, **không** ghi lượng nguyên liệu tiêu hao, **không** có hiệu suất (yield). Màn `WipProductionScreen.tsx` chỉ dùng `useMaterialTypes` (chọn **loại** NL làm nhãn), **không** dùng `useMaterialImports` ⇒ không đọc lượng nhập thực trong ngày. Phép *"lượng nhập trong ngày → ra bao nhiêu thành phẩm, hao bao nhiêu"* hiện **chỉ tính gián tiếp ở màn Cân đối** theo kỳ 5 ngày (`Định mức = Tổng NL ÷ Tổng TP`, `yieldRate` ở `balancingCalc.ts`), **không** tính trực tiếp ở bước sản xuất.
 → Hệ quả: không truy được *mẻ nào ăn nguyên liệu nào*; daily-task "hôm nay nhập X kg, ra Y kg thành phẩm, còn Z kg dở" (QĐ-3) **chưa có chỗ ghi Z và chưa tự nhắc**.
 
 ### G2 · Hai màn kho chồng nhau, một thật một demo 🟡
@@ -68,7 +68,7 @@ Phân loại: **THẬT** = nối kho dữ liệu, ghi/sửa/chốt thật · **D
 Doc `34` phân biệt **BTP (còn trong khuôn đá)** ≠ **Thành phẩm (đã đóng gói, sẵn bán)** là **hai tồn riêng**, nhưng luồng đóng gói BTP→TP (ai ghi, khi nào, có phiếu không) **chưa build** → tồn thành phẩm thật để bán chưa tách khỏi tồn BTP.
 
 ### G4 · Bán không trừ tồn kho 🟡
-`sales_items.source_warehouse` (`kho_nguon`) là **seam để dành, chưa dùng** — bán hút vào cân đối bằng *bản sao*, **không** trừ tồn kho thành phẩm. Đơn đặt/lệnh xuất (5a) thì có trừ tồn WIP; bán lẻ (5b) thì chưa.
+`sales_items.source_warehouse` (`kho_nguon`, `types.ts:281` — `"" | "SX" | "Lưu trữ"`) dùng **không đều**: đường **đơn đặt → lệnh xuất** (`SalesOrderScreen.taoLenhXuat`) CÓ trừ tồn WIP (qua `export_items.wipId`) và set handoff `sourceWarehouse:"Lưu trữ"`; còn **bán lẻ nhập thẳng ở màn Bán hàng** (`SalesScreen.tsx:317`) set `""` và **không** trừ tồn — bán hút vào cân đối bằng *bản sao*. Vậy G4 = **bán trực tiếp chưa trừ tồn**, không phải "seam hoàn toàn chưa dùng".
 
 **Nút thắt chung:** kho là mắt xích trung tâm còn hở. Nhập và bán đều nối thẳng vào Cân đối, nên khi cần tồn cuối kỳ đúng, hệ vẫn phải dựa vào Cân đối gộp lại thay vì suy từ dòng tồn liên tục.
 

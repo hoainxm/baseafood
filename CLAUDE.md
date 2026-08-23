@@ -146,7 +146,7 @@ Ngoài app-map: [`src/design-system/README.md`](src/design-system/README.md) (UI
 
 **Backlog (cập nhật 2026-08-22):**
 - ⚠️ Chạy đủ migration `0001…0023` trên DB thật; siết RLS `0021` **+ bổ sung `material_opening_stock`**; đổi mật khẩu admin (`0007` seed admin/admin) 🔴.
-- **Chỗ đứt gãy chuỗi** (chi tiết [`flow §3`](docs/trien-khai/flow-end-to-end-2-bo-phan.md)): (G1) sản xuất chưa nối ngược nguyên liệu nhập / chưa ghi hao hụt-yield; (G2) hai màn kho (`warehouse` thật ↔ `cold-storage` demo) chồng nhau; (G3) đóng gói BTP→thành phẩm chưa build; (G4) bán chưa trừ tồn (`sales_items.source_warehouse` seam để dành).
+- **Chỗ đứt gãy chuỗi** (chi tiết [`flow §3`](docs/trien-khai/flow-end-to-end-2-bo-phan.md)): (G1) sản xuất chưa nối ngược nguyên liệu nhập / chưa ghi hao hụt-yield; (G2) hai màn kho (`warehouse` thật ↔ `cold-storage` demo) chồng nhau; (G3) đóng gói BTP→thành phẩm chưa build; (G4) bán LẺ trực tiếp chưa trừ tồn (đơn đặt→lệnh xuất đã trừ tồn WIP; màn Bán hàng set `source_warehouse=""`).
 - **2 giao diện bộ phận:** route-guard + trang chủ theo vai trò + nhắc daily-task.
 - **Cutover 01/09:** baseline 30/06 + nhập báo cáo T7–T8 ([`ke-hoach-cutover`](docs/trien-khai/ke-hoach-cutover-1-9-2026.md)).
 - **Bộ quy cách × chế biến:** tách facet nguyên liệu/chế biến/quy cách ([`spec`](docs/spec/bo-quy-cach-che-bien-thanh-pham.md)).

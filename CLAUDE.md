@@ -32,7 +32,7 @@ src/
 ├── design-system/            tokens.css · patterns/ · kit/ · index.ts (cửa import duy nhất)
 └── features/                 THẬT: imports · production/WipProductionScreen (/wip) · warehouse · orders · sales · balancing · catalog · reports/NXT · auth · users
                               DEMO (dữ liệu mẫu): production/WorkOrderScreen (/production) · cold-storage · reports · dashboard · quality · traceability
-supabase/migrations/          0001 … 0024
+supabase/migrations/          0001 … 0025
 docs/README.md                bản đồ tài liệu — doc nào ở đâu, doc mới bỏ đâu
 docs/app-map/                 bản đồ ngữ cảnh cho agent (đọc khi CODE)
 docs/ops/                     vận hành: cutover Supabase · deploy Vercel · env
@@ -145,8 +145,8 @@ Ngoài app-map: [`src/design-system/README.md`](src/design-system/README.md) (UI
 **Màn DEMO (dữ liệu mẫu, chưa nối bảng — đừng coi là đã có):** Lệnh sản xuất `/production` · Kho lạnh `/cold-storage` · Báo cáo tổng `/reports` · Tổng quan `/dashboard` · Chất lượng `/quality` · Truy xuất `/traceability`.
 
 **Backlog (cập nhật 2026-08-22):**
-- ⚠️ Chạy đủ migration `0001…0024` trên DB thật; siết RLS `0021` **+ bổ sung `material_opening_stock`**; đổi mật khẩu admin (`0007` seed admin/admin) 🔴.
-- **Chỗ đứt gãy chuỗi** (chi tiết [`flow §3`](docs/trien-khai/flow-end-to-end-2-bo-phan.md)): (G1) ✅ đối chiếu nhập↔SX read-only ở `/wip` — còn: lưu hao hụt/"còn dở" (thêm cột `production_wips`); (G2) hai màn kho (`warehouse` thật ↔ `cold-storage` demo) chồng nhau; (G3) đóng gói BTP→thành phẩm chưa build; (G4) bán LẺ trực tiếp chưa trừ tồn (đơn đặt→lệnh xuất đã trừ tồn WIP; màn Bán hàng set `source_warehouse=""`).
+- ⚠️ Chạy đủ migration `0001…0025` trên DB thật; siết RLS `0021` **+ bổ sung `material_opening_stock`**; đổi mật khẩu admin (`0007` seed admin/admin) 🔴.
+- **Chỗ đứt gãy chuỗi** (chi tiết [`flow §3`](docs/trien-khai/flow-end-to-end-2-bo-phan.md)): (G1) ✅ đối chiếu nhập↔SX ở `/wip` + lưu "còn dở" khi chốt SX (`production_locks.leftover_kg`, `0025`) — còn: ràng "còn dở" vào tồn/đông gửi ở Cân đối; (G2) hai màn kho (`warehouse` thật ↔ `cold-storage` demo) chồng nhau; (G3) đóng gói BTP→thành phẩm chưa build; (G4) bán LẺ trực tiếp chưa trừ tồn (đơn đặt→lệnh xuất đã trừ tồn WIP; màn Bán hàng set `source_warehouse=""`).
 - **2 giao diện bộ phận:** ✅ route-guard + trang chủ theo vai trò (`lib/nav-access.ts`) + banner nhắc daily-task (`/imports`,`/wip`) — còn: siết RLS theo vai trò ở server.
 - **Cutover 01/09:** baseline 30/06 + nhập báo cáo T7–T8 ([`ke-hoach-cutover`](docs/trien-khai/ke-hoach-cutover-1-9-2026.md)).
 - **Bộ quy cách × chế biến:** ✅ Chiều B kiểu chế biến (`processing_type`, `0024` + combobox danh mục) — còn: chuẩn hoá quy cách (Chiều C) ([`spec`](docs/spec/bo-quy-cach-che-bien-thanh-pham.md)).

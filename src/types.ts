@@ -124,6 +124,8 @@ export interface DailyLock {
   totalKgAtLock: number;
   reopenReason: string;
   note: string;
+  /** Chỉ production_locks (migration 0025): nguyên liệu còn dở cuối ngày đem lưu kho (kg). */
+  leftoverKg?: number;
 }
 
 /* ---------- 5-Day Balancing (Dong workshop) ---------- */

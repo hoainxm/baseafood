@@ -39,7 +39,7 @@ Báo cáo **tồn kho tổng** gần nhất mà xí nghiệp đã chốt là **3
 
 ### Giai đoạn A — Hạ tầng (làm trước 01/09)
 1. **Cutover Supabase** cho toàn hệ (đang chạy localStorage → dễ mất số). Theo [`ops/supabase-setup.md`](../ops/supabase-setup.md).
-2. **Chạy đủ migration** `0001…0024` trên DB thật; mỗi file chạy **2 lần vẫn không lỗi** (idempotent) — xem [`03-database.md`](../app-map/03-database.md).
+2. **Chạy đủ migration** `0001…0025` trên DB thật; mỗi file chạy **2 lần vẫn không lỗi** (idempotent) — xem [`03-database.md`](../app-map/03-database.md).
 3. **Siết RLS** trước khi mở ra ngoài mạng nội bộ: `0021` + **bổ sung `material_opening_stock`** (hiện chưa nằm trong danh sách 23 bảng của `0021`) 🔴.
 4. **Đổi mật khẩu admin** (seed `0007` là admin/admin) 🔴.
 
@@ -89,7 +89,7 @@ Thứ tự triển khai **có chủ đích**:
 
 ## 6. Điều kiện "sẵn sàng 01/09" (Definition of Ready)
 
-- [ ] Supabase đã cutover, migration `0001…0024` xanh, RLS siết (kể cả `material_opening_stock`), mật khẩu admin đã đổi.
+- [ ] Supabase đã cutover, migration `0001…0025` xanh, RLS siết (kể cả `material_opening_stock`), mật khẩu admin đã đổi.
 - [ ] Tồn gốc 30/06 đã khai và đối chiếu khớp báo cáo.
 - [ ] T7 + T8 nhập báo cáo xong, tồn cuối 31/08 khớp báo cáo tháng.
 - [ ] Vai trò 2 bộ phận đã gán (`user_profiles`), route-guard + trang chủ theo vai trò đã bật.

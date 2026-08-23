@@ -142,7 +142,7 @@ Cùng một cơ sở dữ liệu, **tách theo vai trò** để mỗi bộ phậ
 
 Ưu tiên theo mức khép vòng:
 
-1. **[G1] Nối sản xuất ↔ nguyên liệu:** ✅ **v1 (read-only) đã làm** — Dialog "Ghi sản lượng" ở `/wip` hiện panel *Đối chiếu hôm nay*: Nhập cùng loại (hút `useMaterialImports` theo ngày SX + xưởng + cùng họ NL) ↔ Đã sản xuất ↔ Định mức tạm; có ghi chú "sản xuất có thể dùng thêm hàng xả đông kỳ trước nên không ràng buộc". **Chưa làm (🟡 YELLOW):** lưu con số hao hụt/"còn dở" (thêm cột `production_wips`) để chốt lại và đưa vào daily-task.
+1. **[G1] Nối sản xuất ↔ nguyên liệu:** ✅ **v1 (read-only) đã làm** — Dialog "Ghi sản lượng" ở `/wip` hiện panel *Đối chiếu hôm nay*: Nhập cùng loại (hút `useMaterialImports` theo ngày SX + xưởng + cùng họ NL) ↔ Đã sản xuất ↔ Định mức tạm; có ghi chú "sản xuất có thể dùng thêm hàng xả đông kỳ trước nên không ràng buộc". ✅ **Lưu "còn dở" đã làm (`0025`):** dialog chốt ngày SX có ô *Nguyên liệu còn dở đem lưu kho* → lưu `production_locks.leftover_kg`, hiện lại trong panel đối chiếu (Nhập ↔ SX ↔ Còn dở). **Còn:** ràng số này vào tồn kho/đông gửi ở Cân đối cho khép vòng.
 2. **[G3] Đóng gói BTP → Thành phẩm:** flow + trạng thái tồn thành phẩm tách khỏi BTP.
 3. **[G2] Gộp/tách 2 màn kho:** chốt kho canonical, nối `cold-storage` vào WIP hoặc gộp vào `warehouse`.
 4. **[G4] Bán trừ tồn:** kích hoạt `source_warehouse` để bán lẻ trừ tồn kho thành phẩm.

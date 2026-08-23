@@ -605,6 +605,7 @@ export const BANG_PRODUCTION_LOCK: AnhXaBang<DailyLock> = {
     total_kg_at_lock: x.totalKgAtLock,
     reopen_reason: x.reopenReason,
     note: x.note,
+    leftover_kg: x.leftoverKg ?? 0,
   }),
   fromRow: (r) => ({
     id: s(r.id),
@@ -615,6 +616,7 @@ export const BANG_PRODUCTION_LOCK: AnhXaBang<DailyLock> = {
     totalKgAtLock: Number(r.total_kg_at_lock ?? 0),
     reopenReason: s(r.reopen_reason),
     note: s(r.note),
+    leftoverKg: Number(r.leftover_kg ?? 0),
   }),
 };
 

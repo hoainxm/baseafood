@@ -107,6 +107,7 @@ export default function SanXuatBTPScreen() {
 
   const [hoiChot, setHoiChot] = useState(false);
   const [ghiChuChot, setGhiChuChot] = useState("");
+  const [conDoChot, setConDoChot] = useState<number | null>(null); // NL còn dở đem lưu kho
   const [hoiMoLai, setHoiMoLai] = useState(false);
   const [lyDoMoLai, setLyDoMoLai] = useState("");
   const [loiChot, setLoiChot] = useState<LoiNhap[]>([]);
@@ -229,8 +230,12 @@ export default function SanXuatBTPScreen() {
           matHang.find((m) => m.id === r.productId)?.materialTypeId === phien.materialTypeId
       )
       .reduce((s, r) => s + (r.quantityKg || 0), 0);
-    return { tenNL, nhap, sx, dinhMuc: sx > 0 ? nhap / sx : null };
-  }, [phien, imports, rows, matHang, loaiNL]);
+    const conDo =
+      chot.find(
+        (c) => c.lockDate === phien.productionDate && c.workshop === phien.workshop
+      )?.leftoverKg ?? null;
+    return { tenNL, nhap, sx, conDo, dinhMuc: sx > 0 ? nhap / sx : null };
+  }, [phien, imports, rows, matHang, loaiNL, chot]);
 
   const themDong = () => {
     if (!phien) return;
@@ -347,11 +352,13 @@ export default function SanXuatBTPScreen() {
       totalKgAtLock: tongThucTe,
       reopenReason: "",
       note: ghiChuChot,
+      leftoverKg: conDoChot ?? 0,
     };
     persistChot(bg ? chot.map((c) => (c.id === bg.id ? ban : c)) : [...chot, ban]);
     notify.daLuu(`Đã chốt SX ${viDate(tuHieuLuc)} · xưởng ${xuong} — ${kg(tongThucTe)}`);
     setHoiChot(false);
     setGhiChuChot("");
+    setConDoChot(null);
   };
   const moLaiNgay = () => {
     const bg = banGhiChot(tuHieuLuc, xuong);
@@ -563,7 +570,14 @@ export default function SanXuatBTPScreen() {
               Mở lại ngày
             </Button>
           ) : (
-            <Button size="lg" onClick={() => setHoiChot(true)}>
+            <Button
+              size="lg"
+              onClick={() => {
+                setConDoChot(chotHienTai?.leftoverKg ?? null);
+                setGhiChuChot(chotHienTai?.note ?? "");
+                setHoiChot(true);
+              }}
+            >
               <Lock />
               Chốt ngày
             </Button>
@@ -673,6 +687,12 @@ export default function SanXuatBTPScreen() {
                       </div>
                     </div>
                   </div>
+                  {doiChieu.conDo != null && doiChieu.conDo > 0 && (
+                    <p className="text-sm text-foreground">
+                      Còn dở đã lưu kho hôm nay:{" "}
+                      <span className="tnum font-semibold">{kg(doiChieu.conDo)}</span> (ghi lúc chốt ngày SX).
+                    </p>
+                  )}
                   <p className="text-sm text-muted-foreground">
                     {doiChieu.nhap === 0
                       ? `Chưa có phiếu nhập ${doiChieu.tenNL || "loại này"} hôm nay — có thể đang dùng hàng xả đông kỳ trước.`
@@ -847,6 +867,13 @@ export default function SanXuatBTPScreen() {
               thêm sau khi chốt phải ghi bù.
             </DialogDescription>
           </DialogHeader>
+          <NumberField
+            label="Nguyên liệu còn dở đem lưu kho"
+            unit="kg"
+            hint="Phần NL chưa làm xong cuối ngày, cất đông cho kỳ sau. Để trống nếu đã làm hết."
+            value={conDoChot}
+            onChange={(v) => setConDoChot(v)}
+          />
           <Field label="Ghi chú chốt">
             <Input
               value={ghiChuChot}

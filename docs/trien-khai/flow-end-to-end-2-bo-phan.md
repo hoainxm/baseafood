@@ -61,8 +61,8 @@ Phân loại: **THẬT** = nối kho dữ liệu, ghi/sửa/chốt thật · **D
 `WipProductionItem` (kiểm chứng `src/types.ts:292`) có `productId`, **`spec` (quy cách)**, `quantityKg`, `blocksCount`, `warehouse`, `status` (`cho-nhap`/`da-nhap`) — nhưng **không** có tham chiếu lô nhập, **không** ghi lượng nguyên liệu tiêu hao, **không** có hiệu suất (yield). Màn `WipProductionScreen.tsx` chỉ dùng `useMaterialTypes` (chọn **loại** NL làm nhãn), **không** dùng `useMaterialImports` ⇒ không đọc lượng nhập thực trong ngày. Phép *"lượng nhập trong ngày → ra bao nhiêu thành phẩm, hao bao nhiêu"* hiện **chỉ tính gián tiếp ở màn Cân đối** theo kỳ 5 ngày (`Định mức = Tổng NL ÷ Tổng TP`, `yieldRate` ở `balancingCalc.ts`), **không** tính trực tiếp ở bước sản xuất.
 → Hệ quả: không truy được *mẻ nào ăn nguyên liệu nào*; daily-task "hôm nay nhập X kg, ra Y kg thành phẩm, còn Z kg dở" (QĐ-3) **chưa có chỗ ghi Z và chưa tự nhắc**.
 
-### G2 · Hai màn kho chồng nhau, một thật một demo 🟡
-"Kho dự trữ" (`/warehouse`, THẬT) và "Kho lạnh" (`/cold-storage`, DEMO) cùng nói về nơi cất BTP đông nhưng **không chung dữ liệu**. Cần chốt: một kho canonical (nối WIP) + màn giám sát nhiệt là lớp phủ, hay gộp.
+### G2 · Hai màn kho chồng nhau ✅ (đã xử v1)
+"Kho dự trữ" (`/warehouse`, THẬT) là **sổ tồn canonical**. "Kho lạnh" (`/cold-storage`) nay **hết chồng số liệu**: thêm section *Tồn kho dự trữ (số thật)* hút cùng nguồn `tinhTon` (SX BTP − lệnh xuất) + badge "Nguồn: màn Kho dự trữ", và ghi rõ sơ đồ nhiệt độ/bố trí lô là **dữ liệu minh hoạ (chưa nối cảm biến)**. **Còn:** nối cảm biến nhiệt thật hoặc gỡ hẳn phần minh hoạ khi chạy thật.
 
 ### G3 · Thành phẩm đóng gói vs bán thành phẩm chưa tách trạng thái tồn 🟡
 Doc `34` phân biệt **BTP (còn trong khuôn đá)** ≠ **Thành phẩm (đã đóng gói, sẵn bán)** là **hai tồn riêng**, nhưng luồng đóng gói BTP→TP (ai ghi, khi nào, có phiếu không) **chưa build** → tồn thành phẩm thật để bán chưa tách khỏi tồn BTP.
@@ -144,7 +144,7 @@ Cùng một cơ sở dữ liệu, **tách theo vai trò** để mỗi bộ phậ
 
 1. **[G1] Nối sản xuất ↔ nguyên liệu:** ✅ **v1 (read-only) đã làm** — Dialog "Ghi sản lượng" ở `/wip` hiện panel *Đối chiếu hôm nay*: Nhập cùng loại (hút `useMaterialImports` theo ngày SX + xưởng + cùng họ NL) ↔ Đã sản xuất ↔ Định mức tạm; có ghi chú "sản xuất có thể dùng thêm hàng xả đông kỳ trước nên không ràng buộc". ✅ **Lưu "còn dở" đã làm (`0025`):** dialog chốt ngày SX có ô *Nguyên liệu còn dở đem lưu kho* → lưu `production_locks.leftover_kg`, hiện lại trong panel đối chiếu (Nhập ↔ SX ↔ Còn dở). **Còn:** ràng số này vào tồn kho/đông gửi ở Cân đối cho khép vòng.
 2. **[G3] Đóng gói BTP → Thành phẩm:** flow + trạng thái tồn thành phẩm tách khỏi BTP.
-3. **[G2] Gộp/tách 2 màn kho:** chốt kho canonical, nối `cold-storage` vào WIP hoặc gộp vào `warehouse`.
+3. **[G2] Gộp/tách 2 màn kho:** ✅ v1 — warehouse canonical, cold-storage hút tồn thật + gắn nhãn nhiệt độ minh hoạ. Còn: cảm biến thật / gỡ minh hoạ khi chạy thật.
 4. **[G4] Bán trừ tồn:** kích hoạt `source_warehouse` để bán lẻ trừ tồn kho thành phẩm.
 5. **2 giao diện bộ phận:** ✅ route-guard + trang chủ theo vai trò + banner nhắc daily-task (`/imports`, `/wip`) đã làm. **Còn:** siết RLS theo vai trò ở server; tinh chỉnh tập nav mỗi bộ phận với xí nghiệp.
 6. **Gỡ/ẩn màn DEMO** khỏi nav vận hành thật (hoặc gắn nhãn rõ) để không gây hiểu nhầm khi chạy thật 01/09.

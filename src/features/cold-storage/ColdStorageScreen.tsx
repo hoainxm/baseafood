@@ -17,9 +17,13 @@ import {
   RecordTable,
   Separator,
   Textarea,
+  ThongKe,
   notify,
 } from "@/design-system";
 import { cn } from "@/lib/utils";
+import { useExportItems, useWipProductions } from "@/lib/catalogRepo";
+import { tinhTon, tinhDungTichKho } from "@/lib/inventory";
+import { kg } from "@/lib/format";
 import {
   Check,
   CircleAlert,
@@ -373,6 +377,17 @@ export default function ManKhoLanh() {
     () => [...KL_TON].sort((a, b) => klNgayConLai(a.het) - klNgayConLai(b.het)),
     []
   );
+
+  /* Tồn kho dự trữ THẬT — cùng nguồn với màn Kho dự trữ (suy từ SX BTP − lệnh xuất). */
+  const [sanXuat] = useWipProductions();
+  const [dongLenh] = useExportItems();
+  const tonThat = useMemo(() => tinhTon(sanXuat, dongLenh), [sanXuat, dongLenh]);
+  const tongTonThat = tonThat.reduce((s, t) => s + Math.max(0, t.conLai), 0);
+  const soLoThat = tonThat.filter((t) => t.conLai > 0).length;
+  const dungTichThat = useMemo(
+    () => tinhDungTichKho(tonThat).filter((d) => d.currentKg > 0),
+    [tonThat]
+  );
   const cb = KL_CANH_BAO.filter((w) => {
     if (locCB === "tat-ca") return true;
     if (locCB === "da-xu-ly") return daXuLy.includes(w.id);
@@ -395,6 +410,44 @@ export default function ManKhoLanh() {
           </Button>
         </div>
       )}
+
+      {/* Tồn kho dự trữ THẬT — nối từ Sản xuất BTP + lệnh xuất (nguồn: màn Kho dự trữ) */}
+      <section className="grid gap-3 rounded-xl border-2 border-border bg-card p-5">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-lg font-semibold text-foreground">Tồn kho dự trữ (số thật)</h2>
+          <Badge variant="outline">Nguồn: màn Kho dự trữ</Badge>
+        </div>
+        <p className="text-sm text-muted-foreground">
+          Suy từ Sản xuất BTP đã nhập kho trừ lệnh xuất — cùng nguồn với màn{" "}
+          <strong className="text-foreground">Kho dự trữ</strong> (nơi duyệt nhập kho và xem chi
+          tiết từng lô). Sơ đồ nhiệt độ và bố trí lô bên dưới là dữ liệu minh hoạ (chưa nối cảm biến).
+        </p>
+        <ThongKe
+          the={[
+            { nhan: "Tổng tồn", giaTri: kg(tongTonThat), so: true, icon: Snowflake, mau: "success" },
+            { nhan: "Số lô còn hàng", giaTri: soLoThat, so: true, icon: ClipboardList, mau: "brand" },
+            { nhan: "Kho có hàng", giaTri: dungTichThat.length, so: true, icon: Thermometer, mau: "trung-tinh" },
+          ]}
+        />
+        {dungTichThat.length > 0 ? (
+          <div className="flex flex-wrap gap-2">
+            {dungTichThat.map((d) => (
+              <span
+                key={d.warehouse.code}
+                className="rounded-lg border-2 border-border px-3 py-1.5 text-sm"
+              >
+                {d.warehouse.name}:{" "}
+                <span className="tnum font-semibold text-foreground">{kg(d.currentKg)}</span>{" "}
+                <span className="text-muted-foreground">({d.percentage}%)</span>
+              </span>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            Chưa có tồn dự trữ thật — ghi Sản xuất BTP và duyệt nhập kho ở màn Kho dự trữ để có số.
+          </p>
+        )}
+      </section>
 
       {/* Sơ đồ kho */}
       <section className="grid gap-4">

@@ -13,7 +13,10 @@ import {
   useCustomers,
   useProducts,
   useSalesInvoices,
+  useWipProductions,
+  useExportItems,
 } from "@/lib/catalogRepo";
+import { tinhTon, khaDung, KHO_BAN_LE, locBanLe } from "@/lib/inventory";
 import {
   Badge,
   ChuThichBatBuoc,
@@ -143,6 +146,13 @@ function loiDauPhieu(d: DauPhieu): LoiNhap[] {
 export default function BanHangScreen() {
   const [rows, persist] = useSalesItems();
   const [phieu, persistPhieu, { trangThai }] = useSalesInvoices();
+
+  /* Tồn khả dụng để bán lẻ: trừ SUY từ chính các dòng bán lẻ (marker KHO_BAN_LE),
+   * không trừ dòng handoff Đơn đặt ("Lưu trữ" — đã trừ qua lệnh xuất). */
+  const [sanXuat] = useWipProductions();
+  const [dongLenh] = useExportItems();
+  const banLe = useMemo(() => locBanLe(rows), [rows]);
+  const ton = useMemo(() => tinhTon(sanXuat, dongLenh, banLe), [sanXuat, dongLenh, banLe]);
   const dangTai = trangThai === "dang-tai" && phieu.length === 0;
   const [matHang, setMatHang] = useProducts();
   const [khach, setKhach] = useCustomers();
@@ -159,6 +169,10 @@ export default function BanHangScreen() {
   const [phieuIdPhien, setPhieuIdPhien] = useState<string | null>(null);
   const [suaRowIds, setSuaRowIds] = useState<string[] | null>(null);
   const [dongMoi, setDongMoi] = useState<DongMoi>(DONG_MOI_RONG);
+  const kdDongMoi = dongMoi.productId
+    ? khaDung(ton, dongMoi.productId, dongMoi.spec.trim())
+    : null;
+  const banVuotTon = kdDongMoi != null && dongMoi.quantityKg > kdDongMoi;
   /** Kênh bán dùng gần nhất trong phiên — làm mặc định cho phiếu mới thay vì
    *  luôn về "Xuất khẩu" (người bán Nội địa khỏi lật kênh mỗi phiếu). */
   const [kenhGanNhat, setKenhGanNhat] = useState<SalesChannel>("Xuất khẩu");
@@ -314,7 +328,7 @@ export default function BanHangScreen() {
       spec: dongMoi.spec.trim(),
       quantityKg: dongMoi.quantityKg,
       unitPrice: dongMoi.unitPrice,
-      sourceWarehouse: "",
+      sourceWarehouse: KHO_BAN_LE, // bán lẻ trực tiếp ⇒ trừ tồn kho dự trữ (suy qua tinhTon)
     };
     // Đồng bộ đầu phiếu cho MỌI dòng của phiếu (khách/ngày/kênh có thể vừa đổi
     // tại chỗ) rồi thêm dòng mới — giữ bất biến "đầu phiếu áp cả phiếu".
@@ -853,6 +867,22 @@ export default function BanHangScreen() {
                     hint="Bỏ trống nếu chưa chốt giá."
                   />
                 </div>
+
+                {kdDongMoi != null ? (
+                  <div
+                    className={
+                      banVuotTon
+                        ? "rounded-lg bg-warning-surface px-4 py-3 text-base text-warning"
+                        : "rounded-lg bg-muted px-4 py-3 text-base text-muted-foreground"
+                    }
+                  >
+                    Tồn khả dụng ở kho dự trữ:{" "}
+                    <span className="tnum font-semibold">{kg(kdDongMoi)}</span>
+                    {banVuotTon
+                      ? " — bán vượt tồn, kiểm lại (vẫn ghi được, tồn sẽ báo âm)."
+                      : ""}
+                  </div>
+                ) : null}
 
                 {dongMoi.quantityKg > 0 && dongMoi.unitPrice ? (
                   <div className="rounded-lg bg-accent px-4 py-3 text-base text-accent-foreground">

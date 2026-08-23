@@ -21,8 +21,8 @@ import {
   notify,
 } from "@/design-system";
 import { cn } from "@/lib/utils";
-import { useExportItems, useWipProductions } from "@/lib/catalogRepo";
-import { tinhTon, tinhDungTichKho } from "@/lib/inventory";
+import { useExportItems, useSalesItems, useWipProductions } from "@/lib/catalogRepo";
+import { tinhTon, tinhDungTichKho, locBanLe } from "@/lib/inventory";
 import { kg } from "@/lib/format";
 import {
   Check,
@@ -381,7 +381,9 @@ export default function ManKhoLanh() {
   /* Tồn kho dự trữ THẬT — cùng nguồn với màn Kho dự trữ (suy từ SX BTP − lệnh xuất). */
   const [sanXuat] = useWipProductions();
   const [dongLenh] = useExportItems();
-  const tonThat = useMemo(() => tinhTon(sanXuat, dongLenh), [sanXuat, dongLenh]);
+  const [banHang] = useSalesItems();
+  const banLe = useMemo(() => locBanLe(banHang), [banHang]);
+  const tonThat = useMemo(() => tinhTon(sanXuat, dongLenh, banLe), [sanXuat, dongLenh, banLe]);
   const tongTonThat = tonThat.reduce((s, t) => s + Math.max(0, t.conLai), 0);
   const soLoThat = tonThat.filter((t) => t.conLai > 0).length;
   const dungTichThat = useMemo(

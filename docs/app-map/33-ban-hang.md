@@ -1,7 +1,8 @@
 > Load khi: sửa màn Bán hàng — phiếu bán, dòng bán, quy cách, ghi bù, hoặc hút bán vào cân đối.
-covers: src/features/sales/SalesScreen.tsx, src/features/sales/SalesReport.tsx, src/features/sales/SalesTab.tsx, src/types.ts, src/lib/repo.ts
-last_verified: 2026-08-21
+covers: src/features/sales/SalesScreen.tsx, src/features/sales/SalesReport.tsx, src/features/sales/SalesTab.tsx, src/types.ts, src/lib/repo.ts, src/lib/inventory.ts
+last_verified: 2026-08-23
 ttl_days: 90
+<!-- updated: 2026-08-23 — bán lẻ trừ tồn (G4): dòng bán set KHO_BAN_LE, trừ suy qua tinhTon(...,banLe) FIFO; warehouse/cold-storage/orders cùng truyền banLe -->
 <!-- re-verified: 2026-08-07 — phiếu multi-line (phieuId), 2 ngày, seam hút banHangId khớp SalesScreen.tsx + BalancingScreen.tsx:389 -->
 <!-- re-verified: 2026-08-14 — đồng bộ tên file sau rename eadc360: SalesReport.tsx/SalesTab.tsx + lib balancingCalc.ts (symbol BanHang/BaoCaoBan/BieuDoCot/BangTong giữ nguyên) -->
 <!-- updated: 2026-08-21 — GIẢM THAO TÁC (đổi UI, GREEN): kênh phiếu mới = kênh bán gần nhất trong phiên (state kenhGanNhat) thay "Xuất khẩu" cứng; giữ Quy cách của dòng trước làm mặc định dòng kế CÙNG phiếu (chỉ reset mặt hàng/kg/giá). Cổng ghi-bù 2 ngày + ErrorSummary + gán kênh khi hút vào cân đối KHÔNG đổi -->
@@ -21,7 +22,9 @@ Số hóa sổ **bán hàng** — bán thành phẩm chế biến (bạch tuộc
 
 Đã có: phiếu bán (một khách, một lượt, nhiều mặt hàng) · 2 ngày (xuất bán / ghi sổ) + ghi bù có lý do · quy cách (size/grade) mỗi dòng · kênh Xuất khẩu (USD) / Nội địa (VND) trên phiếu · lọc theo kỳ (`lib/periodUtils.ts`) · sổ nhóm theo phiếu + tổng · sửa/xóa phiếu, sửa/bỏ dòng · **hút bán vào kỳ cân đối** (khối TP ra).
 
-Chưa có (backlog): **chốt ngày bán** (bảng `chot_ngay` hiện chỉ dùng cho nhập — bán cần bảng chốt riêng, chưa làm); **phiếu bán in A4** riêng (bảng cân đối đã in được); **trừ tồn kho TP** khi bán (cột `kho_nguon` để dành, chưa dùng — chờ vòng lặp đông gửi/xả đông).
+**Trừ tồn khi bán lẻ (ĐÃ LÀM v1, 2026-08-23):** dòng bán mới set `sourceWarehouse = "Kho dự trữ"` (hằng `KHO_BAN_LE` ở `lib/inventory.ts`) ⇒ trừ tồn kho dự trữ **suy** qua `tinhTon(sanXuat, dongLenh, banLe)` (FIFO theo mặt hàng × quy cách; `banLe = locBanLe(rows)` chỉ lấy dòng marker bán lẻ, **bỏ** handoff Đơn đặt `"Lưu trữ"` đã trừ qua `export_items`, và dòng cũ `""`). Trừ suy nên xóa dòng bán = tồn tự hồi, không trừ hai lần. Màn hiện **tồn khả dụng** + cảnh báo bán vượt (vẫn ghi được). `warehouse`/`cold-storage`/`orders` cùng truyền `banLe` ⇒ tồn nhất quán.
+
+Chưa có (backlog): **chốt ngày bán** (bảng `chot_ngay` hiện chỉ dùng cho nhập — bán cần bảng chốt riêng, chưa làm); **phiếu bán in A4** riêng (bảng cân đối đã in được); **tách tồn thành phẩm đóng gói khỏi BTP** (G3 — đóng gói BTP→TP chưa build; hiện bán lẻ trừ thẳng tồn BTP).
 
 Bảng dùng: `phieu_ban`, `ban_hang`, đọc danh mục `mat_hang` / `khach_hang`. Migration `0005`.
 

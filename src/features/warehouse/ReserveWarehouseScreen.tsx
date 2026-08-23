@@ -5,8 +5,8 @@
 // ============================================================
 import { useMemo, useState } from "react";
 import type { WipProductionItem } from "@/types";
-import { useExportItems, useProducts, useWipProductions } from "@/lib/catalogRepo";
-import { tinhTon, type LoTon } from "@/lib/inventory";
+import { useExportItems, useProducts, useSalesItems, useWipProductions } from "@/lib/catalogRepo";
+import { tinhTon, locBanLe, type LoTon } from "@/lib/inventory";
 import {
   Badge,
   ChuThichBatBuoc,
@@ -52,6 +52,8 @@ export default function KhoDuTruScreen() {
   const dangTai = trangThai === "dang-tai" && sanXuat.length === 0;
   const [dongLenh] = useExportItems();
   const [matHang] = useProducts();
+  const [banHang] = useSalesItems();
+  const banLe = useMemo(() => locBanLe(banHang), [banHang]);
 
   const [locKho, setLocKho] = useState("");
   const [duyet, setDuyet] = useState<DuyetForm | null>(null);
@@ -63,7 +65,7 @@ export default function KhoDuTruScreen() {
     () => sanXuat.filter((s) => s.status === "cho-nhap"),
     [sanXuat]
   );
-  const ton = useMemo(() => tinhTon(sanXuat, dongLenh), [sanXuat, dongLenh]);
+  const ton = useMemo(() => tinhTon(sanXuat, dongLenh, banLe), [sanXuat, dongLenh, banLe]);
   const dungTichKho = useMemo(() => tinhDungTichKho(ton), [ton]);
 
   const dsKho = useMemo(() => {

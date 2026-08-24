@@ -37,6 +37,7 @@ const KhoDuTruScreen = lazy(() => import("@/features/warehouse"));
 const BaoCaoNhapXuatTonScreen = lazy(() => import("@/features/reports/NxtReportScreen"));
 const TonKhoNguyenLieuScreen = lazy(() => import("@/features/reports/MaterialNxtScreen"));
 const BaoCaoThanhPhamScreen = lazy(() => import("@/features/reports/DailyProductionReport"));
+const BaoCaoDonXuatScreen = lazy(() => import("@/features/reports/OrderExportReport"));
 const DonDatScreen = lazy(() => import("@/features/orders"));
 const CanDoiScreen = lazy(() => import("@/features/balancing"));
 const DanhMucScreen = lazy(() => import("@/features/catalog"));
@@ -137,6 +138,7 @@ export default function App() {
             <Route path="/nxt" element={<BaoCaoNhapXuatTonScreen />} />
             <Route path="/nxt-nl" element={<TonKhoNguyenLieuScreen />} />
             <Route path="/bc-thanh-pham" element={<BaoCaoThanhPhamScreen />} />
+            <Route path="/bc-don-xuat" element={<BaoCaoDonXuatScreen />} />
             <Route path="/orders" element={<DonDatScreen />} />
             <Route path="/balancing" element={<CanDoiScreen />} />
             <Route path="/balancing/:periodId" element={<CanDoiScreen />} />

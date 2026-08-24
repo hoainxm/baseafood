@@ -31,6 +31,7 @@ import {
   Boxes,
   Factory,
   CalendarCheck,
+  Ship,
   PanelLeftClose,
   PanelLeftOpen,
   Menu,
@@ -76,6 +77,7 @@ export const KIT_NAV: MucNavShell[] = [
   { id: "orders", label: "Đơn đặt", icon: PackageCheck },
   { id: "balancing", label: "Cân đối", icon: Scale },
   { id: "bc-thanh-pham", label: "BC Thành phẩm", icon: CalendarCheck },
+  { id: "bc-don-xuat", label: "BC Đơn xuất", icon: Ship },
   { id: "nxt-nl", label: "Tồn kho NL", icon: Boxes },
   { id: "nxt", label: "Báo cáo NXT", icon: FileSpreadsheet },
   { id: "reports", label: "Báo cáo", icon: BarChart3 },
@@ -90,7 +92,7 @@ export const NHOM_NAV: { ten: string; ids: string[] }[] = [
   { ten: "Sản xuất", ids: ["production", "wip", "quality"] },
   { ten: "Kho", ids: ["imports", "warehouse", "cold-storage"] },
   { ten: "Kinh doanh", ids: ["sales", "orders"] },
-  { ten: "Báo cáo", ids: ["balancing", "bc-thanh-pham", "nxt-nl", "nxt", "reports", "traceability"] },
+  { ten: "Báo cáo", ids: ["balancing", "bc-thanh-pham", "bc-don-xuat", "nxt-nl", "nxt", "reports", "traceability"] },
   { ten: "Hệ thống", ids: ["catalog", "users"] },
 ];
 

@@ -1,7 +1,8 @@
 > Load khi: thêm/bớt màn hình, đổi điều hướng, header, hay tìm xem một màn được gắn vào đâu.
 covers: src/App.tsx, src/features/shared/AppShell.tsx, src/features/shared/NotFound.tsx, src/features/shared/guideContent.tsx
-last_verified: 2026-08-17
+last_verified: 2026-08-24
 ttl_days: 90
+<!-- updated: 2026-08-24 — thêm 2 màn báo cáo khép vòng: /bc-thanh-pham (DailyProductionReport) + /bc-don-xuat (OrderExportReport), xếp nhóm Báo cáo cùng nxt-nl/nxt -->
 <!-- re-verified: 2026-08-10 14:00 — AppLayout header (NutGiaoDien/NutTrangThai/NutHuongDan) + thu/mở sidebar (KEY_THU_GON) + fix logo đè khớp source -->
 <!-- re-verified: 2026-08-14 — đồng bộ tên file sau rename eadc360: guideContent.tsx, ImportTab/SalesTab, MaterialImportScreen/ImportReport/SalesScreen/SalesReport/BalancingTable/FinishedGoodScreen, @/lib/catalogRepo (symbol NutHuongDan/NutGiaoDien/CaiDatHienThi giữ nguyên) -->
 <!-- re-verified: 2026-08-17 — khung THẬT là AppShell.tsx (AppLayout.tsx đã XOÁ, là khung chết không ai import); nav dọc gom 6 nhóm (KIT_NAV + NHOM_NAV) dùng chung sidebar/drawer; bottom-tab điện thoại đã bỏ -->
@@ -31,7 +32,7 @@ Cả hai dùng CHUNG một cây nav (`CayNav`) dựng từ `KIT_NAV` (danh sách
 | Sản xuất | `production` · `wip` · `quality` |
 | Kho | `imports` · `warehouse` · `cold-storage` |
 | Kinh doanh | `sales` · `orders` |
-| Báo cáo | `balancing` · `nxt` · `reports` · `traceability` |
+| Báo cáo | `balancing` · `bc-thanh-pham` · `bc-don-xuat` · `nxt-nl` · `nxt` · `reports` · `traceability` |
 | Hệ thống | `catalog` · `users` (chỉ admin) |
 
 Mục có trong `KIT_NAV` nhưng thiếu trong `NHOM_NAV` sẽ rơi vào nhóm **"Khác"** — không mất, nhưng là dấu hiệu quên xếp nhóm.
@@ -67,7 +68,9 @@ Cỡ chữ / trạng thái kết nối **không còn ở chân sidebar** (đã d
 | `/users` | `users` | Người dùng | `features/users/UserManagementScreen.tsx` | **Chỉ Admin** (Route Guard + chỉ admin thấy trong NAV) |
 | `/kit` | — | Bộ giao diện | `design-system/kit/KitPage.tsx` | Trang demo component. **Đã gỡ khỏi sidebar** — vào bằng URL, desktop-only |
 
-Ngoài bảng trên, khung còn các màn MES: `/dashboard` (Tổng quan) · `/quality` (Chất lượng) · `/cold-storage` (Kho lạnh) · `/reports` (Báo cáo) · `/traceability` (Truy xuất) · `/nxt` (Báo cáo NXT) · `/wip` (Sản xuất BTP).
+Ngoài bảng trên, khung còn các màn MES: `/dashboard` (Tổng quan) · `/quality` (Chất lượng) · `/cold-storage` (Kho lạnh) · `/reports` (Báo cáo) · `/traceability` (Truy xuất) · `/wip` (Sản xuất BTP).
+
+Cụm báo cáo khép vòng (đọc dữ liệu thật, không mock): `/bc-thanh-pham` (`features/reports/DailyProductionReport.tsx` — tổng hợp thành phẩm SX hàng ngày, lưới mặt hàng×ngày + Excel) · `/bc-don-xuat` (`features/reports/OrderExportReport.tsx` — đơn đặt được xuất theo kỳ + Excel) · `/nxt-nl` (`features/reports/MaterialNxtScreen.tsx` — NXT nguyên liệu) · `/nxt` (`features/reports/NxtReportScreen.tsx` — NXT thành phẩm, suy từ SX/đơn/bán + tồn đầu). Lưu ý: `/production` là màn TRƯNG BÀY (WorkOrderScreen, mock); màn ghi sản lượng thật là `/wip`.
 
 `App.tsx` lọc `KIT_NAV` theo vai trò (bỏ `users` nếu không phải admin) rồi truyền vào `AppShell` qua prop `items`.
 

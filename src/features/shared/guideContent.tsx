@@ -249,4 +249,83 @@ export const HUONG_DAN: Record<string, NoiDungHuongDan> = {
       </>
     ),
   },
+
+  "bc-thanh-pham": {
+    tieuDe: "Báo cáo thành phẩm hàng ngày",
+    moTa: "Tổng hợp thành phẩm sản xuất theo ngày, gom theo phân xưởng.",
+    noiDung: (
+      <>
+        <Muc tieuDe="Cách xem">
+          <Buoc>
+            <li>Chọn <b>kỳ</b> (ngày / tuần / tháng / khoảng tự chọn) và <b>phân xưởng</b>.</li>
+            <li>
+              Bảng hiện <b>mặt hàng × ngày</b>: mỗi cột là một ngày, cột cuối là tổng.
+              Có dòng <b>cộng xưởng</b> và <b>tổng cộng</b> ở chân.
+            </li>
+          </Buoc>
+        </Muc>
+        <Muc tieuDe="Xuất Excel">
+          <p>
+            Bấm <b>Xuất Excel</b> để tải file cho kế toán đối chiếu — giữ đúng lưới
+            ngày, cộng xưởng và tổng.
+          </p>
+        </Muc>
+        <p className="text-muted-foreground">
+          Đây là sản lượng <b>làm ra</b> (mọi trạng thái), không phải tồn kho. Số lấy
+          từ màn <b>Sản xuất BTP</b>.
+        </p>
+      </>
+    ),
+  },
+
+  "bc-don-xuat": {
+    tieuDe: "Báo cáo đơn đặt được xuất hàng",
+    moTa: "Những ngày này đơn nào được xuất, xuất bao nhiêu.",
+    noiDung: (
+      <>
+        <Muc tieuDe="Cách xem">
+          <Buoc>
+            <li>Chọn <b>khoảng ngày xuất</b> và (tùy chọn) <b>khách hàng</b>.</li>
+            <li>
+              Kết quả gom theo <b>đơn</b>: đầu đơn ghi khách · ngày đặt · trạng thái ·
+              kg đã đặt; bên dưới liệt kê từng dòng <b>thực xuất</b> (ngày xuất · mặt
+              hàng · quy cách · kg · block).
+            </li>
+          </Buoc>
+        </Muc>
+        <p className="text-muted-foreground">
+          Số lấy từ <b>lệnh xuất</b> ở màn Đơn đặt. Bấm <b>Xuất Excel</b> để lưu hồ sơ.
+        </p>
+      </>
+    ),
+  },
+
+  nxt: {
+    tieuDe: "Báo cáo NXT thành phẩm",
+    moTa: "Nhập – Xuất – Tồn kho thành phẩm cấp đông.",
+    noiDung: (
+      <>
+        <Muc tieuDe="Đọc bảng">
+          <Y>
+            <li><b>Nhập</b>: bán thành phẩm đã duyệt vào kho (màn Kho dự trữ).</li>
+            <li><b>Xuất đơn</b>: xuất container theo Đơn đặt.</li>
+            <li><b>Xuất bán</b>: bán hàng ngày (sổ Bán hàng) — không tính hai lần phần đã xuất qua đơn.</li>
+            <li><b>Tồn cuối</b> = Tồn đầu + Nhập − Xuất. Khớp với Tổng tồn ở màn Kho dự trữ.</li>
+          </Y>
+        </Muc>
+        <Muc tieuDe="Tồn đầu">
+          <p>
+            Có bán thành phẩm cấp đông <b>trước khi dùng app</b> thì bấm <b>Tồn đầu</b>,
+            khai một lần theo mặt hàng × quy cách. Các kỳ sau tự kế thừa.
+          </p>
+        </Muc>
+        <Muc tieuDe="Tồn âm">
+          <p>
+            Dòng báo <b>Tồn âm</b> = xuất nhiều hơn số đang trữ → kiểm lại sản xuất /
+            đơn / bán, hoặc thiếu khai tồn đầu. Không được bỏ qua.
+          </p>
+        </Muc>
+      </>
+    ),
+  },
 };

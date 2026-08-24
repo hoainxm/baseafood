@@ -20,6 +20,7 @@ import {
   DateField,
   DateRangeField,
   EmptyState,
+  PhieuIn,
   SkeletonBang,
   Table,
   TableBody,
@@ -28,6 +29,8 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  TdIn,
+  ThIn,
   ThongKe,
   homNay,
   notify,
@@ -41,6 +44,7 @@ import {
   FileSpreadsheet,
   Layers,
   PackageCheck,
+  Printer,
   Scale,
 } from "lucide-react";
 
@@ -87,6 +91,7 @@ export default function OrderExportReport() {
   const [tuTC, setTuTC] = useState(homNay());
   const [denTC, setDenTC] = useState(homNay());
   const [khachLoc, setKhachLoc] = useState("Tất cả");
+  const [inPrint, setInPrint] = useState(false);
   const [tu, den] = phamViKy(ky, moc, tuTC, denTC);
 
   const optKhach = [
@@ -194,10 +199,16 @@ export default function OrderExportReport() {
         <h1 className="text-2xl font-semibold text-foreground">
           Báo cáo đơn đặt được xuất hàng
         </h1>
-        <Button size="lg" variant="outline" onClick={xuatExcel} disabled={!nhom.length}>
-          <FileSpreadsheet />
-          Xuất Excel
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button size="lg" variant="outline" onClick={() => setInPrint(true)} disabled={!nhom.length}>
+            <Printer />
+            In A4
+          </Button>
+          <Button size="lg" variant="outline" onClick={xuatExcel} disabled={!nhom.length}>
+            <FileSpreadsheet />
+            Xuất Excel
+          </Button>
+        </div>
       </div>
 
       <div className="flex flex-wrap items-end gap-4 rounded-xl border-2 border-border p-4">
@@ -317,6 +328,73 @@ export default function OrderExportReport() {
             </TableFooter>
           </Table>
         </div>
+      )}
+
+      {inPrint && (
+        <PhieuIn
+          tieuDe="Báo cáo đơn đặt được xuất hàng"
+          phuDe={`Kỳ: ${viDate(tu)} – ${viDate(den)}${khachLoc !== "Tất cả" ? ` · Khách ${nhom[0]?.customerName ?? ""}` : ""}`}
+          onClose={() => setInPrint(false)}
+        >
+          <table className="w-full border-collapse">
+            <thead>
+              <tr>
+                <ThIn>Ngày xuất</ThIn>
+                <ThIn>Mặt hàng</ThIn>
+                <ThIn>Quy cách</ThIn>
+                <ThIn right>Kg xuất</ThIn>
+                <ThIn right>Block</ThIn>
+              </tr>
+            </thead>
+            <tbody>
+              {nhom.map((g) => (
+                <Fragment key={g.orderId}>
+                  <tr>
+                    <TdIn dam colSpan={5}>
+                      {g.customerName} · đặt {g.orderDate ? viDate(g.orderDate) : "—"} · {NHAN_TT[g.status]}
+                      {g.requiredKg > 0 ? ` · đã đặt ${num(g.requiredKg)} kg` : ""}
+                    </TdIn>
+                  </tr>
+                  {g.lines.map((l, i) => (
+                    <tr key={`${g.orderId}-${i}`}>
+                      <TdIn>{viDate(l.exportDate)}</TdIn>
+                      <TdIn>{l.productName}</TdIn>
+                      <TdIn>{l.spec || "—"}</TdIn>
+                      <TdIn right className="tnum">
+                        {num(l.quantityKg)}
+                      </TdIn>
+                      <TdIn right className="tnum">
+                        {num(l.blocksCount)}
+                      </TdIn>
+                    </tr>
+                  ))}
+                  <tr>
+                    <TdIn dam colSpan={3}>
+                      Cộng đơn {g.customerName}
+                    </TdIn>
+                    <TdIn dam right className="tnum">
+                      {num(g.tongKg)}
+                    </TdIn>
+                    <TdIn dam right className="tnum">
+                      {num(g.tongBlock)}
+                    </TdIn>
+                  </tr>
+                </Fragment>
+              ))}
+              <tr>
+                <TdIn dam colSpan={3}>
+                  TỔNG CỘNG
+                </TdIn>
+                <TdIn dam right className="tnum">
+                  {num(tongKg)}
+                </TdIn>
+                <TdIn dam right className="tnum">
+                  {num(tongBlock)}
+                </TdIn>
+              </tr>
+            </tbody>
+          </table>
+        </PhieuIn>
       )}
     </div>
   );

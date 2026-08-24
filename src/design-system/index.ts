@@ -52,6 +52,7 @@ export { BieuDoCot, type CotBieuDo } from "./patterns/BarChart";
 export { StatusChip, type TrangThaiSX } from "./patterns/StatusChip";
 export { DuLieuMau } from "./patterns/MockPatternData";
 export { BieuDoCotDoc, type CotBieuDoDoc } from "./patterns/VerticalBarChart";
+export { PhieuIn, ThIn, TdIn } from "./patterns/PrintSheet";
 export { ThinkingDots, DangXuLy, SkeletonBang } from "./patterns/Loading";
 export { notify } from "./patterns/notify";
 

@@ -13,6 +13,7 @@ import {
   DateField,
   DateRangeField,
   EmptyState,
+  PhieuIn,
   SkeletonBang,
   Table,
   TableBody,
@@ -21,6 +22,8 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  TdIn,
+  ThIn,
   ThongKe,
   homNay,
   notify,
@@ -36,6 +39,7 @@ import {
   FileSpreadsheet,
   Layers,
   Package,
+  Printer,
   Scale,
 } from "lucide-react";
 
@@ -80,6 +84,7 @@ export default function DailyProductionReport() {
   const [tuTC, setTuTC] = useState(homNay());
   const [denTC, setDenTC] = useState(homNay());
   const [xuong, setXuong] = useState("Tất cả");
+  const [inPrint, setInPrint] = useState(false);
   const [tu, den] = phamViKy(ky, moc, tuTC, denTC);
 
   const { days, groups, tongNgayTong, tongKgTong, tongBlockTong, soMatHang } =
@@ -200,10 +205,16 @@ export default function DailyProductionReport() {
         <h1 className="text-2xl font-semibold text-foreground">
           Báo cáo thành phẩm hàng ngày
         </h1>
-        <Button size="lg" variant="outline" onClick={xuatExcel} disabled={!groups.length}>
-          <FileSpreadsheet />
-          Xuất Excel
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button size="lg" variant="outline" onClick={() => setInPrint(true)} disabled={!groups.length}>
+            <Printer />
+            In A4
+          </Button>
+          <Button size="lg" variant="outline" onClick={xuatExcel} disabled={!groups.length}>
+            <FileSpreadsheet />
+            Xuất Excel
+          </Button>
+        </div>
       </div>
 
       <div className="flex flex-wrap items-end gap-4 rounded-xl border-2 border-border p-4">
@@ -341,6 +352,88 @@ export default function DailyProductionReport() {
             </Table>
           </div>
         </>
+      )}
+
+      {inPrint && (
+        <PhieuIn
+          tieuDe="Báo cáo tổng hợp thành phẩm hàng ngày"
+          phuDe={`Kỳ: ${viDate(tu)} – ${viDate(den)}${xuong !== "Tất cả" ? ` · Phân xưởng ${xuong}` : ""}`}
+          onClose={() => setInPrint(false)}
+        >
+          <table className="w-full border-collapse">
+            <thead>
+              <tr>
+                <ThIn>Mặt hàng</ThIn>
+                <ThIn>Quy cách</ThIn>
+                {days.map((d) => (
+                  <ThIn key={d} right>
+                    {viDate(d).slice(0, 5)}
+                  </ThIn>
+                ))}
+                <ThIn right>Tổng kg</ThIn>
+                <ThIn right>Block</ThIn>
+              </tr>
+            </thead>
+            <tbody>
+              {groups.map((g) => (
+                <Fragment key={g.workshop}>
+                  <tr>
+                    <TdIn dam colSpan={soCot}>
+                      Phân xưởng {g.workshop}
+                    </TdIn>
+                  </tr>
+                  {g.rows.map((r) => (
+                    <tr key={`${r.workshop}|||${r.productId}|||${r.spec}`}>
+                      <TdIn>{r.productName}</TdIn>
+                      <TdIn>{r.spec || "—"}</TdIn>
+                      {days.map((d) => (
+                        <TdIn key={d} right className="tnum">
+                          {r.theoNgay[d] ? num(r.theoNgay[d]) : ""}
+                        </TdIn>
+                      ))}
+                      <TdIn right className="tnum">
+                        {num(r.tongKg)}
+                      </TdIn>
+                      <TdIn right className="tnum">
+                        {num(r.tongBlock)}
+                      </TdIn>
+                    </tr>
+                  ))}
+                  <tr>
+                    <TdIn dam>Cộng xưởng {g.workshop}</TdIn>
+                    <TdIn dam />
+                    {days.map((d) => (
+                      <TdIn key={d} dam right className="tnum">
+                        {g.theoNgay[d] ? num(g.theoNgay[d]) : ""}
+                      </TdIn>
+                    ))}
+                    <TdIn dam right className="tnum">
+                      {num(g.tongKg)}
+                    </TdIn>
+                    <TdIn dam right className="tnum">
+                      {num(g.tongBlock)}
+                    </TdIn>
+                  </tr>
+                </Fragment>
+              ))}
+              <tr>
+                <TdIn dam>TỔNG CỘNG</TdIn>
+                <TdIn dam />
+                {days.map((d) => (
+                  <TdIn key={d} dam right className="tnum">
+                    {tongNgayTong[d] ? num(tongNgayTong[d]) : ""}
+                  </TdIn>
+                ))}
+                <TdIn dam right className="tnum">
+                  {num(tongKgTong)}
+                </TdIn>
+                <TdIn dam right className="tnum">
+                  {num(tongBlockTong)}
+                </TdIn>
+              </tr>
+            </tbody>
+          </table>
+        </PhieuIn>
       )}
     </div>
   );

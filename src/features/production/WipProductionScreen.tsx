@@ -66,10 +66,11 @@ interface DauPhien {
 /** Một dòng thành phẩm đang thêm. */
 interface DongMoi {
   productId: string;
+  spec: string;
   quantityKg: number;
   blocksCount: number;
 }
-const DONG_RONG: DongMoi = { productId: "", quantityKg: 0, blocksCount: 0 };
+const DONG_RONG: DongMoi = { productId: "", spec: "", quantityKg: 0, blocksCount: 0 };
 
 export default function SanXuatBTPScreen() {
   const [rows, persist, { trangThai }] = useWipProductions();
@@ -232,7 +233,7 @@ export default function SanXuatBTPScreen() {
       backdateReason: phien.backdateReason,
       workshop: phien.workshop,
       productId: dongMoi.productId,
-      spec: "",
+      spec: dongMoi.spec.trim(),
       quantityKg: dongMoi.quantityKg,
       blocksCount: dongMoi.blocksCount,
       warehouse: "",
@@ -337,6 +338,12 @@ export default function SanXuatBTPScreen() {
       chinh: true,
       render: (r) => tenMH(r.productId),
       sapXep: (r) => tenMH(r.productId),
+    },
+    {
+      key: "qc",
+      header: "Quy cách",
+      render: (r) => r.spec || "—",
+      sapXep: (r) => r.spec,
     },
     { key: "kg", header: "Lượng (kg)", so: true, render: (r) => num(r.quantityKg), sapXep: (r) => r.quantityKg },
     { key: "bl", header: "Block", so: true, render: (r) => num(r.blocksCount) },
@@ -622,7 +629,8 @@ export default function SanXuatBTPScreen() {
                       <li key={r.id} className="flex items-center justify-between gap-3 py-2">
                         <span className="min-w-0 flex-1 truncate text-base">
                           <span className="tnum text-muted-foreground">{i + 1}.</span>{" "}
-                          {tenMH(r.productId)} —{" "}
+                          {tenMH(r.productId)}
+                          {r.spec ? <span className="text-muted-foreground"> · {r.spec}</span> : null} —{" "}
                           <span className="tnum font-semibold">{num(r.quantityKg)}</span> kg
                           {r.blocksCount ? (
                             <span className="text-muted-foreground"> · {num(r.blocksCount)} block</span>
@@ -655,6 +663,16 @@ export default function SanXuatBTPScreen() {
                       : "Chọn loại nguyên liệu trước."
                   }
                 />
+                <Field
+                  label="Quy cách"
+                  hint="Size/quy cách, VD 18-20. Để trống nếu không tách size."
+                >
+                  <Input
+                    value={dongMoi.spec}
+                    onChange={(e) => setDongMoi((d) => ({ ...d, spec: e.target.value }))}
+                    placeholder="VD 18-20"
+                  />
+                </Field>
                 <div className="grid gap-6 sm:grid-cols-2">
                   <NumberField
                     label="Khối lượng"
@@ -737,6 +755,13 @@ export default function SanXuatBTPScreen() {
                 onCreate={(ten) => themMatHang(ten, suaMaterialTypeId)}
                 emptyText="Chưa có thành phẩm — gõ tên rồi Thêm mới."
               />
+              <Field label="Quy cách" hint="Size/quy cách, VD 18-20. Để trống nếu không tách size.">
+                <Input
+                  value={sua.spec}
+                  onChange={(e) => setSua((d) => (d ? { ...d, spec: e.target.value } : d))}
+                  placeholder="VD 18-20"
+                />
+              </Field>
               <div className="grid gap-6 sm:grid-cols-2">
                 <NumberField
                   label="Khối lượng"

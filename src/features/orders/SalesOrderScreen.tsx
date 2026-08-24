@@ -166,7 +166,7 @@ export default function DonDatScreen() {
       id: newId(),
       orderId: donId,
       productId: d.productId,
-      spec: d.spec,
+      spec: d.spec.trim(),
       requiredQuantityKg: d.requiredQuantityKg,
       requiredBlocksCount: d.requiredBlocksCount,
     }));
@@ -486,6 +486,16 @@ export default function DonDatScreen() {
                       options={optMatHang}
                       onCreate={themMatHang}
                     />
+                    <Field
+                      label="Quy cách"
+                      hint="Size/quy cách phải khớp hàng trong kho (VD 18-20). Để trống nếu không tách size."
+                    >
+                      <Input
+                        value={dc.spec}
+                        onChange={(e) => datDong(i, { spec: e.target.value })}
+                        placeholder="VD 18-20"
+                      />
+                    </Field>
                     <div className="grid gap-6 sm:grid-cols-2">
                       <NumberField
                         label="Khối lượng cần"

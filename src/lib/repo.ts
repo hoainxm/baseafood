@@ -38,6 +38,7 @@ import type {
   DailyQuantities,
   GridAutoSource,
   MaterialOpeningStock,
+  FinishedGoodsOpeningStock,
 } from "@/types";
 import { rolesFromCsv, rolesToCsv } from "@/types";
 
@@ -725,6 +726,33 @@ export const BANG_OPENING_STOCK: AnhXaBang<MaterialOpeningStock> = {
     materialTypeName: s(r.material_type_name),
     asOfDate: s(r.as_of_date).slice(0, 10),
     quantityKg: Number(r.quantity_kg ?? 0),
+    note: s(r.note),
+  }),
+};
+
+/** Tồn đầu kho thành phẩm — số dư BTP đông dự trữ có sẵn trước khi số hoá (kg + block). */
+export const BANG_FINISHED_OPENING_STOCK: AnhXaBang<FinishedGoodsOpeningStock> = {
+  table: "finished_goods_opening_stock",
+  localKey: "bsf.finished-opening-stock.v2",
+  layKhoa: theoId,
+  toRow: (x) => ({
+    id: x.id,
+    product_id: x.productId,
+    spec: x.spec,
+    as_of_date: x.asOfDate || null,
+    quantity_kg: x.quantityKg,
+    blocks_count: x.blocksCount,
+    warehouse: x.warehouse,
+    note: x.note,
+  }),
+  fromRow: (r) => ({
+    id: s(r.id),
+    productId: s(r.product_id),
+    spec: s(r.spec),
+    asOfDate: s(r.as_of_date).slice(0, 10),
+    quantityKg: Number(r.quantity_kg ?? 0),
+    blocksCount: Number(r.blocks_count ?? 0),
+    warehouse: s(r.warehouse),
     note: s(r.note),
   }),
 };

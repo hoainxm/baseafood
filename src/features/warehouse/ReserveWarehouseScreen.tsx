@@ -5,7 +5,7 @@
 // ============================================================
 import { useMemo, useState } from "react";
 import type { WipProductionItem } from "@/types";
-import { useExportItems, useProducts, useWipProductions } from "@/lib/catalogRepo";
+import { useExportItems, useProducts, useSalesItems, useWipProductions } from "@/lib/catalogRepo";
 import { tinhTon, type LoTon } from "@/lib/inventory";
 import {
   Badge,
@@ -51,6 +51,7 @@ export default function KhoDuTruScreen() {
   const [sanXuat, persistSX, { trangThai }] = useWipProductions();
   const dangTai = trangThai === "dang-tai" && sanXuat.length === 0;
   const [dongLenh] = useExportItems();
+  const [banHang] = useSalesItems();
   const [matHang] = useProducts();
 
   const [locKho, setLocKho] = useState("");
@@ -63,7 +64,10 @@ export default function KhoDuTruScreen() {
     () => sanXuat.filter((s) => s.status === "cho-nhap"),
     [sanXuat]
   );
-  const ton = useMemo(() => tinhTon(sanXuat, dongLenh), [sanXuat, dongLenh]);
+  const ton = useMemo(
+    () => tinhTon(sanXuat, dongLenh, banHang),
+    [sanXuat, dongLenh, banHang]
+  );
   const dungTichKho = useMemo(() => tinhDungTichKho(ton), [ton]);
 
   const dsKho = useMemo(() => {

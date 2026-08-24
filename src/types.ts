@@ -278,7 +278,7 @@ export interface SalesItem {
   spec: string;
   quantityKg: number;
   unitPrice: number | null; // USD or VND
-  sourceWarehouse: string; // "" | "SX" | "Lưu trữ"
+  sourceWarehouse: string; // "" | "SX" | "Lưu trữ" | "Đơn đặt" (handoff từ lệnh xuất đơn — không đếm hai lần ở NXT)
 }
 
 export function calculateSalesAmount(r: Pick<SalesItem, "quantityKg" | "unitPrice">): number {
@@ -443,6 +443,24 @@ export interface MaterialOpeningStock {
   materialTypeName: string; // theo TÊN loại NL (như sổ nhập), không phải khóa ngoại
   asOfDate: string; // yyyy-mm-dd — tồn đầu tính từ ngày này
   quantityKg: number;
+  note: string;
+}
+
+/**
+ * Tồn đầu kho THÀNH PHẨM (bán thành phẩm cấp đông dự trữ) có sẵn TRƯỚC khi số hoá.
+ * Sổ NXT thành phẩm suy tồn từ lịch sử sản xuất − xuất; nhưng số dư đông dự trữ có
+ * sẵn trước ngày dùng app (chưa có dòng sản xuất nào) phải khai tay một lần theo
+ * (mặt hàng × quy cách). Chỉ kg — giá trị tiền tính riêng ở Cân đối.
+ * Đối xứng với MaterialOpeningStock nhưng cho thành phẩm (khóa theo mặt hàng).
+ */
+export interface FinishedGoodsOpeningStock {
+  id: string;
+  productId: string;
+  spec: string;
+  asOfDate: string; // yyyy-mm-dd — tồn đầu tính từ ngày này
+  quantityKg: number;
+  blocksCount: number;
+  warehouse: string;
   note: string;
 }
 

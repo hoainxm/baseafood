@@ -1,435 +1,490 @@
 // ============================================================
 // Tên file cũ: src/features/reports/BaoCaoNhapXuatTon.tsx
-// Tên tiếng Việt: Màn hình Báo cáo Nhập Xuất Tồn 10 cột Excel
-// Description: Import-Export-Inventory 10-Column Report Screen
+// Tên tiếng Việt: Màn hình Báo cáo Nhập Xuất Tồn thành phẩm
+// Description: Finished-goods Import-Export-Inventory (NXT) report screen
 // ============================================================
-import { useMemo, useState, useRef } from "react";
+import { useMemo, useState } from "react";
+import type { FinishedGoodsOpeningStock } from "@/types";
 import {
-  BSF1_WAREHOUSES,
-  NXT_GOODS_CATEGORIES,
-  type NxtGoodsCategory,
-} from "@/types";
-import { useWipProductions, useExportItems, useProducts } from "@/lib/catalogRepo";
-import { tinhTon } from "@/lib/inventory";
+  useWipProductions,
+  useExportItems,
+  useExportOrders,
+  useSalesItems,
+  useProducts,
+  useFinishedGoodsOpeningStock,
+} from "@/lib/catalogRepo";
 import {
-  parseNxtExcelFile,
-  exportNxtToExcel,
-  type NxtExcelRow,
-  type NxtExcelReportData,
-} from "@/lib/nxtExcel";
+  tinhSoTonTP,
+  tongSoTonTP,
+  type SoTonTPRow,
+} from "@/lib/inventoryFinished";
+import { exportNxtToExcel, inferCategory, type NxtExcelRow } from "@/lib/nxtExcel";
 import {
   Badge,
+  BangTong,
   Button,
+  ChuThichBatBuoc,
   Combobox,
+  ConfirmDelete,
   DateField,
+  DateRangeField,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
   EmptyState,
-  RecordTable,
-  XacNhan,
+  ErrorSummary,
+  Field,
+  Input,
+  NumberField,
   ThongKe,
+  homNay,
   notify,
-  type Cot,
+  type CotTong,
+  type LoiNhap,
   type MucChon,
+  type TheThongTin,
 } from "@/design-system";
-import { kg, num } from "@/lib/format";
+import { KY_OPT, phamViKy, dauThang, type KyXem } from "@/lib/periodUtils";
+import { num, viDate } from "@/lib/format";
+import { uid } from "@/lib/db";
 import {
-  FileSpreadsheet,
-  Upload,
+  AlertTriangle,
+  ArrowDownToLine,
   Download,
-  RefreshCw,
-  Package,
-  Layers,
+  PackagePlus,
   Scale,
+  Ship,
+  Snowflake,
+  Store,
 } from "lucide-react";
 
+interface OpeningForm {
+  productId: string;
+  spec: string;
+  asOfDate: string;
+  quantityKg: number | null;
+  blocksCount: number | null;
+  warehouse: string;
+  note: string;
+}
+
+/**
+ * Báo cáo NXT thành phẩm — kho bán thành phẩm cấp đông dự trữ. Số suy thẳng từ
+ * lịch sử: Nhập = BTP duyệt vào kho; Xuất = đơn đặt (dòng lệnh) + bán hàng ngày;
+ * Tồn đầu = khai tay + lịch sử trước kỳ. Xem lib/inventoryFinished.ts.
+ * Chỉ đọc; ô nhập tay duy nhất là "Tồn đầu" (số dư trước khi số hoá).
+ */
 export default function BaoCaoNhapXuatTonScreen() {
   const [sanXuat] = useWipProductions();
-  const [dongLenh] = useExportItems();
+  const [exportItems] = useExportItems();
+  const [exportOrders] = useExportOrders();
+  const [salesItems] = useSalesItems();
   const [matHang] = useProducts();
+  const [opening, ghiOpening] = useFinishedGoodsOpeningStock();
 
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [ky, setKy] = useState<KyXem>("thang");
+  const [moc, setMoc] = useState(homNay());
+  const [tuTC, setTuTC] = useState(dauThang(homNay()));
+  const [denTC, setDenTC] = useState(homNay());
+  const [tu, den] = phamViKy(ky, moc, tuTC, denTC);
 
-  // Filters
-  const [locKho, setLocKho] = useState<string>("");
-  const [locLoaiHang, setLocLoaiHang] = useState<string>("");
-  const [tuNgay, setTuNgay] = useState<string>("2026-07-01");
-  const [denNgay, setDenNgay] = useState<string>("2026-07-31");
+  // Dialog tồn đầu
+  const [moTonDau, setMoTonDau] = useState(false);
+  const [form, setForm] = useState<OpeningForm | null>(null);
+  const [loi, setLoi] = useState<LoiNhap[]>([]);
 
-  // State dữ liệu từ Excel mẫu (nếu được import)
-  const [importedExcelData, setImportedExcelData] = useState<NxtExcelReportData | null>(null);
+  const tenMH = (id: string) => matHang.find((m) => m.id === id)?.name || "—";
 
-  // Computed data từ hệ thống MES (nếu không import file ngoài)
-  const tonSystem = useMemo(() => tinhTon(sanXuat, dongLenh), [sanXuat, dongLenh]);
+  const rows = useMemo(
+    () =>
+      tinhSoTonTP({
+        sanXuat,
+        exportOrders,
+        exportItems,
+        salesItems,
+        opening,
+        products: matHang,
+        tuNgay: tu,
+        denNgay: den,
+      }),
+    [sanXuat, exportOrders, exportItems, salesItems, opening, matHang, tu, den]
+  );
+  const tong = useMemo(() => tongSoTonTP(rows), [rows]);
 
-  // Phân loại danh sách mặt hàng hệ thống
-  const systemRows = useMemo<NxtExcelRow[]>(() => {
-    // Gom nhóm theo mặt hàng & kho
-    const map = new Map<string, NxtExcelRow>();
-
-    for (const t of tonSystem) {
-      if (locKho && t.warehouse !== locKho) continue;
-
-      const mh = matHang.find((m) => m.id === t.productId);
-      const code = mh?.code || t.productId;
-      const name = mh?.name || `Mặt hàng ${t.productId}`;
-
-      const key = `${t.productId}_${t.warehouse}`;
-
-      let cat: NxtGoodsCategory = "Hàng trong nước";
-      if (code.includes("NK") || name.toUpperCase().includes("NK")) {
-        cat = "Hàng nhập khẩu";
-      }
-
-      const cur = map.get(key) || {
-        code,
-        name: `${name} ${t.spec ? `(${t.spec})` : ""}`,
-        category: cat,
-        tonDauKg: 0,
-        giaTriDau: 0,
-        nhapKg: 0,
-        giaTriNhap: 0,
-        xuatKg: 0,
-        giaTriXuat: 0,
-        tonCuoiKg: 0,
-        giaTriCuoi: 0,
-      };
-
-      cur.nhapKg += t.luongNhap;
-      cur.xuatKg += t.luongXuat;
-      cur.tonCuoiKg += t.conLai;
-
-      map.set(key, cur);
-    }
-
-    return Array.from(map.values());
-  }, [tonSystem, matHang, locKho]);
-
-  // Danh sách dòng hiển thị cuối cùng
-  const finalRows = useMemo(() => {
-    const rawList = importedExcelData ? importedExcelData.items : systemRows;
-    return rawList.filter((r) => {
-      if (locLoaiHang && r.category !== locLoaiHang) return false;
-      return true;
-    });
-  }, [importedExcelData, systemRows, locLoaiHang]);
-
-  // Thống kê tổng
-  const tongTonDau = useMemo(() => finalRows.reduce((s, r) => s + r.tonDauKg, 0), [finalRows]);
-  const tongNhap = useMemo(() => finalRows.reduce((s, r) => s + r.nhapKg, 0), [finalRows]);
-  const tongXuat = useMemo(() => finalRows.reduce((s, r) => s + r.xuatKg, 0), [finalRows]);
-  const tongTonCuoi = useMemo(() => finalRows.reduce((s, r) => s + r.tonCuoiKg, 0), [finalRows]);
-
-  // Xử lý upload file Excel
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    try {
-      const data = await parseNxtExcelFile(file);
-      setImportedExcelData(data);
-      notify.daLuu(`Đã import thành công mẫu Excel (${data.items.length} mặt hàng)`);
-    } catch (err: any) {
-      notify.loi(`Không thể đọc file Excel: ${err.message || err}`);
-    }
-  };
-
-  // Xử lý xuất Excel
-  const handleExportExcel = () => {
-    const reportData: NxtExcelReportData = {
-      createdDateText: `Ngày lập: ${new Date().toLocaleString("vi-VN")}`,
-      title: "Báo cáo xuất nhập tồn",
-      dateRangeText: `Từ ngày ${tuNgay} đến ngày ${denNgay}`,
-      warehouseText: locKho ? `Chi nhánh: ${locKho}` : "Chi nhánh: Tất cả kho BSF1",
-      items: finalRows,
-      totalItemCount: finalRows.length,
-      totalTonDauKg: tongTonDau,
-      totalGiaTriDau: 0,
-      totalNhapKg: tongNhap,
-      totalGiaTriNhap: 0,
-      totalXuatKg: tongXuat,
-      totalGiaTriXuat: 0,
-      totalTonCuoiKg: tongTonCuoi,
-      totalGiaTriCuoi: 0,
-    };
-
-    exportNxtToExcel(reportData, `Bao-Cao-NXT-BSF1-${tuNgay}-${denNgay}.xlsx`);
-    notify.daLuu("Đã xuất file Excel thành công!");
-  };
-
-  // Các tùy chọn Combobox
-  const optKho: MucChon[] = [
-    { value: "", label: "Tất cả kho BSF1" },
-    ...BSF1_WAREHOUSES.map((w) => ({
-      value: w.name,
-      label: `${w.name} (${num(w.capacityKg / 1000)} tấn)`,
-    })),
-  ];
-
-  const optLoaiHang: MucChon[] = [
-    { value: "", label: "Tất cả 3 loại hàng" },
-    ...NXT_GOODS_CATEGORIES.map((c) => ({ value: c, label: c })),
-  ];
-
-  const columns: Cot<NxtExcelRow>[] = [
+  const the: TheThongTin[] = [
+    { nhan: "Tồn đầu kho", giaTri: `${num(tong.tonDau)} kg`, so: true, icon: Snowflake, mau: "trung-tinh" },
+    { nhan: "Nhập kho", giaTri: `${num(tong.nhap)} kg`, so: true, icon: ArrowDownToLine, mau: "brand" },
     {
-      key: "code",
-      header: "Mã hàng",
-      chinh: true,
-      render: (r) => <span className="font-mono font-semibold">{r.code}</span>,
-      sapXep: (r) => r.code,
+      nhan: "Xuất (đơn + bán)",
+      giaTri: `${num(tong.xuatDon)} + ${num(tong.xuatBan)} kg`,
+      icon: Ship,
+      mau: "warning",
     },
+    { nhan: "Tồn cuối kho", giaTri: `${num(tong.tonCuoi)} kg`, so: true, icon: Scale, mau: "success" },
+  ];
+
+  const cot: CotTong<SoTonTPRow>[] = [
     {
-      key: "name",
-      header: "Tên hàng",
+      key: "mh",
+      header: "Mặt hàng · quy cách",
       render: (r) => (
-        <div className="whitespace-pre-line text-sm leading-snug">
-          {r.name}
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-semibold text-foreground">{r.productName}</span>
+            {r.spec && <Badge variant="outline">{r.spec}</Badge>}
+            {r.seedTonDau && <Badge variant="outline">Tồn đầu khai tay</Badge>}
+            {r.canhBaoAm && (
+              <Badge variant="destructive" className="gap-1">
+                <AlertTriangle className="size-icon-sm" aria-hidden />
+                Tồn âm
+              </Badge>
+            )}
+          </div>
+          {r.productCode && (
+            <div className="font-mono text-sm text-muted-foreground">{r.productCode}</div>
+          )}
         </div>
       ),
-      sapXep: (r) => r.name,
     },
-    {
-      key: "category",
-      header: "Phân loại",
-      render: (r) => (
-        <Badge
-          variant={
-            r.category === "Hàng nhập khẩu"
-              ? "default"
-              : r.category === "Hàng tạm"
-              ? "secondary"
-              : "outline"
-          }
-        >
-          {r.category}
-        </Badge>
-      ),
-      sapXep: (r) => r.category,
-    },
-    {
-      key: "tonDau",
-      header: "Tồn đầu kỳ (kg)",
-      so: true,
-      render: (r) => num(r.tonDauKg),
-      sapXep: (r) => r.tonDauKg,
-    },
+    { key: "tonDau", header: "Tồn đầu (kg)", so: true, render: (r) => num(r.tonDau), tong: () => num(tong.tonDau) },
     {
       key: "nhap",
-      header: "SL Nhập (kg)",
+      header: "Nhập (kg)",
       so: true,
       render: (r) => (
-        <span className={r.nhapKg > 0 ? "font-semibold text-success" : ""}>
-          {num(r.nhapKg)}
-        </span>
+        <span className={r.nhap > 0 ? "font-semibold text-success" : ""}>{r.nhap ? `+${num(r.nhap)}` : "—"}</span>
       ),
-      sapXep: (r) => r.nhapKg,
+      tong: () => num(tong.nhap),
     },
     {
-      key: "xuat",
-      header: "SL Xuất (kg)",
+      key: "xuatDon",
+      header: "Xuất đơn (kg)",
       so: true,
-      render: (r) => (
-        <span className={r.xuatKg > 0 ? "font-semibold text-warning" : ""}>
-          {num(r.xuatKg)}
-        </span>
-      ),
-      sapXep: (r) => r.xuatKg,
+      render: (r) => (r.xuatDon ? `−${num(r.xuatDon)}` : "—"),
+      tong: () => num(tong.xuatDon),
+    },
+    {
+      key: "xuatBan",
+      header: "Xuất bán (kg)",
+      so: true,
+      render: (r) => (r.xuatBan ? `−${num(r.xuatBan)}` : "—"),
+      tong: () => num(tong.xuatBan),
     },
     {
       key: "tonCuoi",
-      header: "Tồn cuối kỳ (kg)",
+      header: "Tồn cuối (kg)",
       so: true,
       render: (r) => (
-        <span className="tnum font-bold text-foreground">
-          {num(r.tonCuoiKg)}
+        <span className={`tnum font-bold ${r.canhBaoAm ? "text-destructive" : "text-foreground"}`}>
+          {num(r.tonCuoi)}
         </span>
       ),
-      sapXep: (r) => r.tonCuoiKg,
+      tong: () => num(tong.tonCuoi),
     },
   ];
 
+  // ----- Xuất Excel (mẫu 10 cột) -----
+  const xuatExcel = () => {
+    if (!rows.length) {
+      notify.canhBao("Không có số liệu để xuất");
+      return;
+    }
+    const items: NxtExcelRow[] = rows.map((r) => ({
+      code: r.productCode || r.productId,
+      name: `${r.productName}${r.spec ? ` (${r.spec})` : ""}`,
+      category: inferCategory(r.productCode, r.productName),
+      tonDauKg: r.tonDau,
+      giaTriDau: 0,
+      nhapKg: r.nhap,
+      giaTriNhap: 0,
+      xuatKg: r.xuat,
+      giaTriXuat: 0,
+      tonCuoiKg: r.tonCuoi,
+      giaTriCuoi: 0,
+    }));
+    exportNxtToExcel(
+      {
+        createdDateText: `Ngày lập: ${viDate(homNay())}`,
+        title: "Báo cáo xuất nhập tồn thành phẩm",
+        dateRangeText: `Từ ngày ${viDate(tu)} đến ngày ${viDate(den)}`,
+        warehouseText: "Chi nhánh: Kho thành phẩm BSF1",
+        items,
+        totalItemCount: items.length,
+        totalTonDauKg: tong.tonDau,
+        totalGiaTriDau: 0,
+        totalNhapKg: tong.nhap,
+        totalGiaTriNhap: 0,
+        totalXuatKg: tong.xuat,
+        totalGiaTriXuat: 0,
+        totalTonCuoiKg: tong.tonCuoi,
+        totalGiaTriCuoi: 0,
+      },
+      `Bao-Cao-NXT-Thanh-Pham-${tu}-${den}.xlsx`
+    );
+    notify.daLuu("Đã xuất Excel báo cáo NXT thành phẩm");
+  };
+
+  // ----- Tồn đầu: thêm / xóa -----
+  const optMatHang: MucChon[] = matHang.map((m) => ({ value: m.id, label: m.name, phu: m.code || undefined }));
+
+  const moThemTonDau = () => {
+    setForm({
+      productId: "",
+      spec: "",
+      asOfDate: homNay(),
+      quantityKg: null,
+      blocksCount: null,
+      warehouse: "",
+      note: "",
+    });
+    setLoi([]);
+  };
+
+  const luuTonDau = () => {
+    if (!form) return;
+    const ls: LoiNhap[] = [];
+    if (!form.productId) ls.push({ truong: "Mặt hàng", thongBao: "Chưa chọn mặt hàng" });
+    if (!form.asOfDate) ls.push({ truong: "Ngày mốc", thongBao: "Chưa chọn ngày tồn đầu" });
+    if (!(Number(form.quantityKg) > 0)) ls.push({ truong: "Khối lượng", thongBao: "Phải lớn hơn 0 kg" });
+    setLoi(ls);
+    if (ls.length > 0) return;
+    const moi: FinishedGoodsOpeningStock = {
+      id: uid(),
+      productId: form.productId,
+      spec: form.spec.trim(),
+      asOfDate: form.asOfDate,
+      quantityKg: Number(form.quantityKg),
+      blocksCount: Number(form.blocksCount) || 0,
+      warehouse: form.warehouse.trim(),
+      note: form.note.trim(),
+    };
+    ghiOpening([...opening, moi]);
+    notify.daLuu(`Đã lưu tồn đầu ${num(moi.quantityKg)} kg — ${tenMH(moi.productId)}`);
+    setForm(null);
+  };
+
+  const xoaTonDau = (id: string) => {
+    ghiOpening(opening.filter((o) => o.id !== id));
+    notify.daXoa("Đã xóa dòng tồn đầu");
+  };
+
   return (
     <div className="space-y-6">
-      {/* Input ẩn để upload file excel */}
-      <input
-        type="file"
-        ref={fileInputRef}
-        onChange={handleFileUpload}
-        accept=".xlsx, .xls"
-        className="hidden"
-      />
-
-      {/* Header chính */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-foreground flex items-center gap-2">
-            <FileSpreadsheet className="w-8 h-8 text-primary" />
-            Báo cáo Nhập - Xuất - Tồn (NXT)
+          <h1 className="flex items-center gap-2 text-2xl font-semibold text-foreground">
+            <Snowflake className="h-8 w-8 text-primary" />
+            Báo cáo Nhập – Xuất – Tồn thành phẩm
           </h1>
-          <p className="text-muted-foreground mt-1">
-            Xí nghiệp Baseafood BSF1 — Theo dõi tồn kho 5 kho và 3 nhóm mặt hàng (Nhập khẩu, Trong nước, Hàng tạm)
+          <p className="mt-1 text-muted-foreground">
+            Kho bán thành phẩm cấp đông dự trữ. Số suy từ sổ Sản xuất, Đơn đặt và Bán hàng — không nhập
+            tay lần hai.
           </p>
         </div>
-
-        <div className="flex w-full flex-wrap items-center gap-3 md:w-auto">
-          {/* Đang xem dữ liệu import ⇒ nạp file mới sẽ ĐÈ lên, phải hỏi lại. */}
-          {importedExcelData ? (
-            <XacNhan
-              tieuDe="Nạp file Excel khác đè lên dữ liệu đang xem?"
-              moTa="Dữ liệu từ file đang xem sẽ bị thay hoàn toàn bằng file mới. Không hoàn tác được — muốn xem lại thì phải nạp lại file cũ."
-              chiTiet={`Đang xem: ${importedExcelData.items.length} mặt hàng${importedExcelData.warehouseText ? ` · ${importedExcelData.warehouseText}` : ""}`}
-              nhanNut="Chọn file khác"
-              nguyHiem
-              icon={Upload}
-              onConfirm={() => fileInputRef.current?.click()}
-              trigger={
-                <Button variant="outline">
-                  <Upload className="w-4 h-4 mr-2" />
-                  Import Excel mẫu
-                </Button>
-              }
-            />
-          ) : (
-            <Button
-              variant="outline"
-              onClick={() => fileInputRef.current?.click()}
-            >
-              <Upload className="w-4 h-4 mr-2" />
-              Import Excel mẫu
-            </Button>
-          )}
-
-          <Button variant="default" onClick={handleExportExcel}>
-            <Download className="w-4 h-4 mr-2" />
-            Xuất file Excel mẫu
+        <div className="flex flex-wrap items-center gap-3">
+          <Button variant="outline" onClick={() => setMoTonDau(true)}>
+            <PackagePlus className="mr-2 h-4 w-4" />
+            Tồn đầu ({opening.length})
+          </Button>
+          <Button onClick={xuatExcel} disabled={!rows.length}>
+            <Download className="mr-2 h-4 w-4" />
+            Xuất Excel
           </Button>
         </div>
       </div>
 
-      {/* Badge báo trạng thái dữ liệu (đang dùng dữ liệu Import hay Hệ thống) */}
-      {importedExcelData && (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border-2 border-success bg-success-surface p-3">
-          <span className="flex items-center gap-2 text-base font-semibold text-success">
-            <FileSpreadsheet className="w-4 h-4" />
-            Đang xem dữ liệu từ file Excel import: {importedExcelData.items.length} mặt hàng ({importedExcelData.warehouseText || "Chi nhánh KHO 1000"})
-          </span>
-          <XacNhan
-            tieuDe="Bỏ dữ liệu file Excel, quay về số của hệ thống?"
-            moTa="Dữ liệu vừa nạp từ file sẽ bị bỏ khỏi màn hình. Muốn xem lại phải nạp lại file."
-            chiTiet={`${importedExcelData.items.length} mặt hàng${importedExcelData.warehouseText ? ` · ${importedExcelData.warehouseText}` : ""}`}
-            nhanNut="Dùng dữ liệu MES"
-            nguyHiem
-            icon={RefreshCw}
-            onConfirm={() => {
-              setImportedExcelData(null);
-              notify.daLuu("Đã chuyển về dữ liệu MES hệ thống");
-            }}
-            trigger={
-              <Button size="sm" variant="ghost">
-                <RefreshCw className="w-4 h-4 mr-1" />
-                Dùng dữ liệu MES
-              </Button>
-            }
+      <div className="flex flex-wrap items-end gap-4">
+        <div className="min-w-[12rem]">
+          <Combobox
+            label="Kỳ báo cáo"
+            anNhanBatBuoc
+            choPhepXoa={false}
+            value={ky}
+            onChange={(v) => setKy(v as KyXem)}
+            options={KY_OPT}
           />
         </div>
-      )}
-
-      {/* Thẻ Thống kê tổng hợp */}
-      <ThongKe
-        className="grid-cols-2 lg:grid-cols-4"
-        the={[
-          {
-            nhan: "SL Mặt hàng",
-            giaTri: finalRows.length,
-            so: true,
-            icon: Package,
-            mau: "trung-tinh",
-          },
-          {
-            nhan: "Tồn đầu kỳ",
-            giaTri: kg(tongTonDau),
-            so: true,
-            icon: Scale,
-            mau: "trung-tinh",
-          },
-          {
-            nhan: "Tổng Nhập / Xuất",
-            giaTri: `${num(tongNhap)} / ${num(tongXuat)} kg`,
-            icon: Layers,
-            mau: "brand",
-          },
-          {
-            nhan: "Tổng Tồn cuối kỳ",
-            giaTri: kg(tongTonCuoi),
-            so: true,
-            icon: Scale,
-            mau: "success",
-          },
-        ]}
-      />
-
-      {/* Thanh điều khiển Bộ lọc */}
-      {/* [&>*]:min-w-0 — ô lưới mặc định min-width:auto, placeholder dài ("Tất cả
-          5 kho BSF1") ở cỡ chữ 130% sẽ đẩy rộng cả trang nếu không cho co. */}
-      <div className="grid gap-4 rounded-xl border-2 border-border bg-card p-4 [&>*]:min-w-0 md:grid-cols-2 lg:grid-cols-4">
-        <Combobox
-          label="Lọc theo Kho"
-          value={locKho}
-          onChange={setLocKho}
-          options={optKho}
-          placeholder="Tất cả 5 kho BSF1"
-        />
-
-        <Combobox
-          label="Phân loại Mặt hàng"
-          value={locLoaiHang}
-          onChange={setLocLoaiHang}
-          options={optLoaiHang}
-          placeholder="Tất cả 3 loại hàng"
-        />
-
-        <DateField
-          label="Từ ngày"
-          value={tuNgay}
-          onChange={setTuNgay}
-        />
-
-        <DateField
-          label="Đến ngày"
-          value={denNgay}
-          onChange={setDenNgay}
-        />
+        <div className="min-w-[16rem] flex-1">
+          {ky === "tuy-chon" ? (
+            <DateRangeField
+              label="Khoảng ngày"
+              anNhanBatBuoc
+              presets={false}
+              startDate={tuTC}
+              endDate={denTC}
+              onChange={(a, b) => {
+                setTuTC(a);
+                setDenTC(b);
+              }}
+            />
+          ) : (
+            <DateField
+              label={ky === "ngay" ? "Ngày" : "Ngày bất kỳ trong kỳ"}
+              anNhanBatBuoc
+              hint={ky === "ngay" ? undefined : `Kỳ: ${viDate(tu)} – ${viDate(den)}`}
+              value={moc}
+              onChange={setMoc}
+            />
+          )}
+        </div>
       </div>
 
-      {/* Bảng Báo cáo Nhập Xuất Tồn */}
-      {finalRows.length === 0 ? (
-        <EmptyState
-          icon={FileSpreadsheet}
-          tieuDe="Chưa có dữ liệu Báo cáo Nhập Xuất Tồn"
-          moTa="Hãy chọn lại bộ lọc hoặc bấm 'Import Excel mẫu' để tải file dữ liệu lên."
-        />
-      ) : (
-        <div className="space-y-4">
-          <RecordTable
-            columns={columns}
-            rows={finalRows}
-            getKey={(r) => `${r.code}_${r.name}`}
-            timKiem={(r) => `${r.code} ${r.name} ${r.category}`}
-            nhanTimKiem="Tìm kiếm theo mã hàng / tên hàng / phân loại…"
-          />
+      <ThongKe the={the} />
 
-          {/* Hàng tổng cộng hợp nhất ở chân bảng */}
-          <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border-2 border-primary/30 bg-accent/40 p-4">
-            <span className="font-semibold text-base text-foreground">
-              Tổng cộng ({finalRows.length} mặt hàng):
-            </span>
-            <div className="flex flex-wrap items-center gap-6 tnum font-bold text-base">
-              <span>Tồn đầu: <span className="text-primary">{num(tongTonDau)} kg</span></span>
-              <span>Nhập: <span className="text-success">+{num(tongNhap)} kg</span></span>
-              <span>Xuất: <span className="text-warning">-{num(tongXuat)} kg</span></span>
-              <span className="text-lg">Tồn cuối: <span className="text-primary">{kg(tongTonCuoi)}</span></span>
-            </div>
-          </div>
+      {tong.soCanhBao > 0 && (
+        <div className="flex flex-wrap items-center gap-3 rounded-xl border-2 border-destructive bg-destructive/10 p-4">
+          <AlertTriangle className="h-5 w-5 shrink-0 text-destructive" aria-hidden />
+          <span className="text-base font-semibold text-destructive">
+            {tong.soCanhBao} mặt hàng có tồn cuối ÂM — xuất nhiều hơn số đang trữ. Kiểm lại sản xuất /
+            đơn đặt / bán hàng (số ghi tay có thể sai, hoặc thiếu khai tồn đầu).
+          </span>
         </div>
       )}
+
+      {rows.length === 0 ? (
+        <EmptyState
+          icon={Snowflake}
+          tieuDe="Chưa có số liệu thành phẩm trong khoảng ngày này"
+          moTa="Ghi sản lượng ở Sản xuất BTP, duyệt vào Kho dự trữ, rồi xuất theo Đơn đặt / Bán hàng — số sẽ tổng hợp về đây. Có số dư đông trước khi số hoá thì khai ở nút Tồn đầu."
+        />
+      ) : (
+        <BangTong rows={rows} cot={cot} getKey={(r) => `${r.productId}|||${r.spec}`} />
+      )}
+
+      <p className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+        <Store className="size-icon-sm" aria-hidden />
+        "Xuất đơn" = lệnh xuất container theo Đơn đặt; "Xuất bán" = phiếu Bán hàng ngày (không tính
+        hai lần phần đã xuất qua đơn). Tồn cuối khớp với Tổng tồn ở màn Kho dự trữ.
+      </p>
+
+      {/* Dialog quản lý Tồn đầu thành phẩm */}
+      <Dialog open={moTonDau} onOpenChange={setMoTonDau}>
+        <DialogContent className="w-full sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-2xl">Tồn đầu kho thành phẩm</DialogTitle>
+            <DialogDescription className="text-base">
+              Số dư bán thành phẩm cấp đông có sẵn TRƯỚC khi dùng app, theo (mặt hàng × quy cách). Chỉ
+              cần khai một lần — các kỳ sau tự kế thừa từ lịch sử nhập/xuất.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            {opening.length > 0 ? (
+              <ul className="divide-y divide-border rounded-lg border-2 border-border">
+                {opening.map((o) => (
+                  <li key={o.id} className="flex flex-wrap items-center justify-between gap-3 p-3">
+                    <span className="min-w-0 flex-1 text-base">
+                      <span className="font-semibold">{tenMH(o.productId)}</span>
+                      {o.spec ? <span className="text-muted-foreground"> · {o.spec}</span> : null}
+                      {" — "}
+                      <span className="tnum font-semibold">{num(o.quantityKg)}</span> kg
+                      <span className="text-muted-foreground">
+                        {" "}
+                        · từ {viDate(o.asOfDate)}
+                        {o.warehouse ? ` · ${o.warehouse}` : ""}
+                        {o.note ? ` · ${o.note}` : ""}
+                      </span>
+                    </span>
+                    <ConfirmDelete
+                      moTaBanGhi={`${tenMH(o.productId)}${o.spec ? ` · ${o.spec}` : ""} — ${num(o.quantityKg)} kg`}
+                      onConfirm={() => xoaTonDau(o.id)}
+                      trigger={
+                        <Button size="sm" variant="ghost">
+                          Xóa
+                        </Button>
+                      }
+                    />
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="rounded-lg border-2 border-dashed border-border p-4 text-center text-base text-muted-foreground">
+                Chưa khai tồn đầu thành phẩm nào.
+              </p>
+            )}
+
+            {form ? (
+              <div className="space-y-4 rounded-xl border-2 border-primary/40 bg-accent/30 p-4">
+                <ErrorSummary loi={loi} />
+                <ChuThichBatBuoc />
+                <Combobox
+                  label="Mặt hàng"
+                  required
+                  value={form.productId}
+                  onChange={(v) => setForm((f) => (f ? { ...f, productId: v } : f))}
+                  options={optMatHang}
+                  emptyText="Chưa có mặt hàng — thêm ở Danh mục."
+                />
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field label="Quy cách" hint="Khớp size hàng trong kho (để trống nếu không tách).">
+                    <Input
+                      value={form.spec}
+                      onChange={(e) => setForm((f) => (f ? { ...f, spec: e.target.value } : f))}
+                      placeholder="VD 18-20"
+                    />
+                  </Field>
+                  <DateField
+                    label="Tồn đầu tính từ ngày"
+                    required
+                    value={form.asOfDate}
+                    onChange={(v) => setForm((f) => (f ? { ...f, asOfDate: v } : f))}
+                  />
+                  <NumberField
+                    label="Khối lượng tồn"
+                    required
+                    unit="kg"
+                    value={form.quantityKg}
+                    onChange={(v) => setForm((f) => (f ? { ...f, quantityKg: v } : f))}
+                  />
+                  <NumberField
+                    label="Số block"
+                    unit="block"
+                    value={form.blocksCount}
+                    onChange={(v) => setForm((f) => (f ? { ...f, blocksCount: v } : f))}
+                  />
+                </div>
+                <Field label="Kho (tùy chọn)">
+                  <Input
+                    value={form.warehouse}
+                    onChange={(e) => setForm((f) => (f ? { ...f, warehouse: e.target.value } : f))}
+                    placeholder="VD: Kho 1000 tấn"
+                  />
+                </Field>
+                <Field label="Ghi chú">
+                  <Input
+                    value={form.note}
+                    onChange={(e) => setForm((f) => (f ? { ...f, note: e.target.value } : f))}
+                    placeholder="VD: số kiểm kê đầu năm"
+                  />
+                </Field>
+                <div className="flex flex-wrap justify-end gap-3">
+                  <Button variant="outline" onClick={() => setForm(null)}>
+                    Hủy
+                  </Button>
+                  <Button onClick={luuTonDau}>
+                    <PackagePlus className="mr-1 h-4 w-4" />
+                    Lưu tồn đầu
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <Button variant="outline" onClick={moThemTonDau}>
+                <PackagePlus className="mr-2 h-4 w-4" />
+                Thêm tồn đầu
+              </Button>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" size="lg" onClick={() => setMoTonDau(false)}>
+              Đóng
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

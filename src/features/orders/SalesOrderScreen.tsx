@@ -91,7 +91,10 @@ export default function DonDatScreen() {
   const tenMH = (id: string) => matHang.find((m) => m.id === id)?.name || "—";
   const tenKH = (id: string) => khach.find((k) => k.id === id)?.name || "—";
 
-  const ton = useMemo(() => tinhTon(sanXuat, dongLenh), [sanXuat, dongLenh]);
+  const ton = useMemo(
+    () => tinhTon(sanXuat, dongLenh, banHang),
+    [sanXuat, dongLenh, banHang]
+  );
 
   const optMatHang: MucChon[] = matHang.map((m) => ({
     value: m.id,
@@ -180,7 +183,7 @@ export default function DonDatScreen() {
   /* ---- Tạo lệnh xuất (FIFO, cho xuất một phần) + handoff sổ Bán hàng ---- */
   const taoLenhXuat = (d: SalesOrder) => {
     const dsDong = dongDon.filter((x) => x.orderId === d.id);
-    const tonHienTai = tinhTon(sanXuat, dongLenh);
+    const tonHienTai = tinhTon(sanXuat, dongLenh, banHang);
     const lenhId = newId();
     const dlMoi: ExportItem[] = [];
     for (const dc of dsDong) {
@@ -236,7 +239,7 @@ export default function DonDatScreen() {
       spec: dl.spec,
       quantityKg: dl.quantityKg,
       unitPrice: null,
-      sourceWarehouse: "Lưu trữ",
+      sourceWarehouse: "Đơn đặt", // đánh dấu handoff — NXT/tồn kho không đếm hai lần
     }));
 
     persistDongLenh([...dongLenh, ...dlMoi]);

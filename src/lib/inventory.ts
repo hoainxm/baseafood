@@ -3,7 +3,7 @@
 // Tên tiếng Việt: Quản lý Tồn kho & Dung tích 5 kho BSF1
 // Description: Inventory calculation, batch availability, and 5 BSF1 warehouse capacities
 // ============================================================
-import type { WipProductionItem, ExportItem, WarehouseInfo } from "@/types";
+import type { WipProductionItem, ExportItem, SalesItem, WarehouseInfo } from "@/types";
 import { BSF1_WAREHOUSES } from "@/types";
 
 /** Tồn của MỘT lô = dòng BTP sản xuất đã duyệt vào kho, trừ đi phần đã xuất. */
@@ -23,9 +23,19 @@ export interface LoTon {
 
 /**
  * Tính tồn từng lô (bất biến: tồn = nhập − xuất). Chỉ lô `da-nhap` mới tính tồn;
- * `cho-nhap` (chưa duyệt) KHÔNG có trong kho. Xuất gom theo `sanXuatId` từ dòng lệnh.
+ * `cho-nhap` (chưa duyệt) KHÔNG có trong kho. Xuất gom theo `wipId` từ dòng lệnh.
+ *
+ * `banHang` (tùy chọn) = sổ Bán hàng ngày: mọi dòng bán KHÔNG phải handoff của
+ * đơn đặt (sourceWarehouse !== "Đơn đặt") cũng rút khỏi kho dự trữ, phân bổ FIFO
+ * lô cũ trước theo (mặt hàng × quy cách). Nhờ vậy tồn kho ở màn Kho dự trữ ăn
+ * khớp với Tồn cuối ở Báo cáo NXT thành phẩm (cùng định nghĩa "xuất"), và Đơn đặt
+ * không thể xuất phần đã bán ngày. Bỏ trống ⇒ giữ nguyên hành vi cũ (chỉ trừ đơn).
  */
-export function tinhTon(sanXuat: WipProductionItem[], dongLenh: ExportItem[]): LoTon[] {
+export function tinhTon(
+  sanXuat: WipProductionItem[],
+  dongLenh: ExportItem[],
+  banHang: SalesItem[] = []
+): LoTon[] {
   const xuatTheoLo = new Map<string, { kg: number; block: number }>();
   for (const d of dongLenh) {
     const cur = xuatTheoLo.get(d.wipId) ?? { kg: 0, block: 0 };
@@ -33,7 +43,7 @@ export function tinhTon(sanXuat: WipProductionItem[], dongLenh: ExportItem[]): L
     cur.block += d.blocksCount || 0;
     xuatTheoLo.set(d.wipId, cur);
   }
-  return sanXuat
+  const los = sanXuat
     .filter((s) => s.status === "da-nhap")
     .map((s) => {
       const x = xuatTheoLo.get(s.id) ?? { kg: 0, block: 0 };
@@ -51,6 +61,48 @@ export function tinhTon(sanXuat: WipProductionItem[], dongLenh: ExportItem[]): L
         blockConLai: s.blocksCount - x.block,
       };
     });
+  if (banHang.length) truBanNgay(los, banHang);
+  return los;
+}
+
+/**
+ * Trừ bán hàng ngày (không phải handoff đơn đặt) khỏi các lô — FIFO lô cũ trước,
+ * theo (mặt hàng × quy cách). Sửa `los` tại chỗ. Bán vượt tồn ⇒ lô cuối âm (tín
+ * hiệu bán quá số đang trữ; khaDung/loConHang đã kẹp ≥0 nên vẫn an toàn phía đơn).
+ */
+function truBanNgay(los: LoTon[], banHang: SalesItem[]): void {
+  const canTru = new Map<string, number>(); // productId|||spec → kg
+  for (const b of banHang) {
+    if (b.sourceWarehouse === "Đơn đặt") continue; // handoff đơn đặt đã trừ qua dòng lệnh
+    const k = `${b.productId}|||${b.spec}`;
+    canTru.set(k, (canTru.get(k) ?? 0) + (b.quantityKg || 0));
+  }
+  if (canTru.size === 0) return;
+
+  const theoMH = new Map<string, LoTon[]>();
+  for (const l of los) {
+    const k = `${l.productId}|||${l.spec}`;
+    const ds = theoMH.get(k);
+    if (ds) ds.push(l);
+    else theoMH.set(k, [l]);
+  }
+
+  for (const [k, kg0] of canTru) {
+    const ds = (theoMH.get(k) ?? []).slice().sort((a, b) => a.ngaySX.localeCompare(b.ngaySX));
+    let con = kg0;
+    for (const l of ds) {
+      if (con <= 0) break;
+      const lay = Math.min(con, Math.max(0, l.conLai));
+      if (lay <= 0) continue;
+      const tyLe = l.luongNhap > 0 ? lay / l.luongNhap : 0;
+      const blk = Math.round(l.blockNhap * tyLe);
+      l.conLai -= lay;
+      l.blockConLai -= blk;
+      l.luongXuat += lay;
+      l.blockXuat += blk;
+      con -= lay;
+    }
+  }
 }
 
 /** Khả dụng (kg) cho một (mặt hàng × quy cách): tổng phần còn lại các lô. */

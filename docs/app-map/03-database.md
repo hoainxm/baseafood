@@ -2,6 +2,7 @@
 covers: supabase/migrations/**, docs/ops/supabase-setup.md
 last_verified: 2026-08-24
 ttl_days: 90
+<!-- updated: 2026-08-24 — thêm 0025 (audit_log: nhật ký thao tác, append-only, admin đọc) — KHÔNG đưa vào vòng siết 0021; xem lib/audit.ts -->
 <!-- updated: 2026-08-24 — thêm 0024 (finished_goods_opening_stock: tồn đầu kho THÀNH PHẨM, kg+block) cho sổ NXT thành phẩm khép vòng; xem lib/inventoryFinished.ts -->
 <!-- updated: 2026-08-21 — thêm 0022 (material_opening_stock: tồn đầu kho nguyên liệu, kg thuần) cho sổ NXT nguyên liệu; xem 31-can-doi-ky.md § Tồn kho nguyên liệu -->
 <!-- updated: 2026-08-07 — thêm migration 0008 (nguyen_lieu_vao.nguon_kho, cờ nguồn xả đông) -->
@@ -73,6 +74,7 @@ App dùng camelCase, DB dùng snake_case — cầu nối là `AnhXaBang.toRow/fr
 | `0021_siet_rls_tieng_anh.sql` | 🔴 | **Siết RLS** — thay `0003` (đã lỗi thời sau rename `0016`). Thu hồi `anon` ở cả policy lẫn GRANT + `revoke usage on schema public`, policy `authenticated` cho đủ **23 bảng** tên hiện hành. Bỏ qua bảng chưa tồn tại thay vì gãy giữa chừng. Idempotent, có `ROLLBACK`. **Tiền kiểm bắt buộc**: mọi máy đăng nhập được, còn admin đăng nhập được — chạy sớm là cả xưởng đứng (401). Xem [05-bao-mat-phan-quyen.md](05-bao-mat-phan-quyen.md). Danh sách nay **25 bảng** — đã gồm `material_opening_stock` (0022) + `finished_goods_opening_stock` (0024). |
 | `0022_ton_dau_nguyen_lieu.sql` | 🟡 | **Tồn đầu kho nguyên liệu** — bảng `material_opening_stock` (site_id · workshop · material_type_name · as_of_date · quantity_kg, **kg thuần**). Số dư đông dự trữ có sẵn trước khi số hoá, làm tồn đầu cho kỳ ĐẦU của mỗi họ NL trong sổ NXT nguyên liệu (kỳ sau tự kế thừa). Chỉ thêm bảng, idempotent, RLS mở anon (siết sau ở `0021`), có `ROLLBACK`. Xem [31-can-doi-ky.md](31-can-doi-ky.md). |
 | `0024_ton_dau_thanh_pham.sql` | 🟡 | **Tồn đầu kho thành phẩm** — bảng `finished_goods_opening_stock` (site_id · product_id · spec · as_of_date · quantity_kg · blocks_count · warehouse). Đối xứng `0022` nhưng cho THÀNH PHẨM, khóa theo (mặt hàng × quy cách). Làm tồn đầu cho sổ NXT thành phẩm (khép vòng nhập → SX → kho → xuất đơn/bán); kỳ sau suy tồn đầu từ lịch sử. Chỉ thêm bảng, idempotent, RLS mở anon (đã có trong danh sách siết của `0021`), có `ROLLBACK`. Xem `lib/inventoryFinished.ts`. |
+| `0025_nhat_ky_thao_tac.sql` | 🟡 | **Nhật ký thao tác (audit_log)** — append-only: at · actor_id/username · action (them/sua/xoa/dang-nhap/dang-xuat) · entity (bảng) · entity_key · summary · diff(jsonb) · device_id. RLS RIÊNG: authenticated **chỉ INSERT + SELECT**, SELECT chỉ admin (đọc vai trò từ `user_profiles`), **cấm UPDATE/DELETE** (revoke + không có policy). ⚠️ **KHÔNG** đưa vào vòng lặp siết của `0021` (policy `for all` sẽ phá append-only). Chạy SAU `0006`. Idempotent, có `ROLLBACK`. Xem `lib/audit.ts`. |
 
 ⚠️ **`0004` chưa chạy** ⇒ app báo *"Mất kết nối máy chủ — Could not find the 'chuyen_id' column"*. Số liệu vẫn ghi xuống máy và nằm trong hàng chờ, tự đẩy lên sau khi migration chạy — nhưng máy khác chưa thấy.
 

@@ -20,6 +20,7 @@ import AppShell, { KIT_NAV } from "@/features/shared/AppShell";
 import { HUONG_DAN } from "@/features/shared/guideContent";
 import { Toaster, apDungCaiDatHienThi, DangXuLy } from "@/design-system";
 import { useAuth } from "@/lib/auth";
+import { datNguoiThaoTac } from "@/lib/audit";
 import { roleLabel } from "@/types";
 
 // Module MES (màn trưng bày)
@@ -42,6 +43,7 @@ const DonDatScreen = lazy(() => import("@/features/orders"));
 const CanDoiScreen = lazy(() => import("@/features/balancing"));
 const DanhMucScreen = lazy(() => import("@/features/catalog"));
 const QuanLyNguoiDungScreen = lazy(() => import("@/features/users"));
+const NhatKyScreen = lazy(() => import("@/features/audit"));
 const SanXuatBTPScreen = lazy(() => import("@/features/production")); // Sản xuất BTP (WIP), route /wip
 const KitPage = lazy(() => import("@/design-system/kit/KitPage"));
 
@@ -60,8 +62,19 @@ function ShellLayout() {
     apDungCaiDatHienThi(username);
   }, [username]);
 
+  // Ai đang thao tác — cho nhật ký (audit) gắn đúng người.
+  useEffect(() => {
+    datNguoiThaoTac(
+      auth.nguoiDung
+        ? { id: auth.nguoiDung.id, username: auth.nguoiDung.username }
+        : null
+    );
+  }, [auth.nguoiDung]);
+
   const seg = location.pathname.split("/").filter(Boolean)[0] ?? "dashboard";
-  const items = auth.laAdmin ? KIT_NAV : KIT_NAV.filter((n) => n.id !== "users");
+  const items = auth.laAdmin
+    ? KIT_NAV
+    : KIT_NAV.filter((n) => n.id !== "users" && n.id !== "audit");
   const current = KIT_NAV.find((n) => n.id === seg);
   const guide = HUONG_DAN[seg];
 
@@ -152,6 +165,12 @@ export default function App() {
                 ) : (
                   <Navigate to="/dashboard" replace />
                 )
+              }
+            />
+            <Route
+              path="/audit"
+              element={
+                auth.laAdmin ? <NhatKyScreen /> : <Navigate to="/dashboard" replace />
               }
             />
             <Route path="/kit" element={<KitPage />} />

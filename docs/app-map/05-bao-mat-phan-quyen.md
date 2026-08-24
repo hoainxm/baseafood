@@ -1,7 +1,8 @@
 > Load khi: đụng auth, đăng nhập, RLS, `.env`, key, hay có ý định cho app chạy ngoài mạng nội bộ. 🔴
 covers: src/lib/auth.ts, src/lib/username.ts, src/features/auth/LoginScreen.tsx, src/features/users/UserManagementScreen.tsx, supabase/migrations/0006_nguoi_dung.sql, supabase/migrations/0007_seed_admin.sql, supabase/migrations/0010_email_domain_vn.sql, supabase/migrations/0003_siet_rls.sql, src/lib/supabase.ts, .env.example, .gitignore
-last_verified: 2026-08-18
+last_verified: 2026-08-24
 ttl_days: 90
+<!-- updated: 2026-08-24 — nhật ký thao tác (audit_log, migration 0025): auth.ts log đăng nhập/xuất; 0021 nay bao 25 bảng (thêm 2 tồn đầu) NHƯNG audit_log giữ RLS RIÊNG (append-only, admin đọc), KHÔNG vào vòng siết 0021 -->
 <!-- updated: 2026-08-18 — viết 0021_siet_rls_tieng_anh.sql (thay 0003 đã lỗi thời sau rename 0016, bao đủ 23 bảng); 0003 đánh dấu ĐỪNG CHẠY -->
 <!-- updated: 2026-08-07 — đuôi email .local→.vn (GoTrue chặn .local, migration 0010); vai trò NHIỀU/người (VaiTro[], CSV cột vai_tro), gán lúc tạo TK, Quản đốc theo xưởng -->
 

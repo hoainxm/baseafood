@@ -32,6 +32,7 @@ import {
   Factory,
   CalendarCheck,
   Ship,
+  History,
   PanelLeftClose,
   PanelLeftOpen,
   Menu,
@@ -84,6 +85,7 @@ export const KIT_NAV: MucNavShell[] = [
   { id: "traceability", label: "Truy xuất", icon: GitBranch },
   { id: "catalog", label: "Danh mục", icon: Library },
   { id: "users", label: "Người dùng", icon: Users },
+  { id: "audit", label: "Nhật ký", icon: History },
 ];
 
 /** Nav DỌC gom theo nhóm chức năng — dùng chung cho sidebar và drawer. */
@@ -93,7 +95,7 @@ export const NHOM_NAV: { ten: string; ids: string[] }[] = [
   { ten: "Kho", ids: ["imports", "warehouse", "cold-storage"] },
   { ten: "Kinh doanh", ids: ["sales", "orders"] },
   { ten: "Báo cáo", ids: ["balancing", "bc-thanh-pham", "bc-don-xuat", "nxt-nl", "nxt", "reports", "traceability"] },
-  { ten: "Hệ thống", ids: ["catalog", "users"] },
+  { ten: "Hệ thống", ids: ["catalog", "users", "audit"] },
 ];
 
 interface NhomHienThi {

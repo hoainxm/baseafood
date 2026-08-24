@@ -2,6 +2,7 @@
 covers: src/App.tsx, src/features/shared/AppShell.tsx, src/features/shared/NotFound.tsx, src/features/shared/guideContent.tsx
 last_verified: 2026-08-24
 ttl_days: 90
+<!-- updated: 2026-08-24 — thêm /audit (NhatKyScreen, CHỈ admin) nhóm Hệ thống; App set datNguoiThaoTac theo tài khoản -->
 <!-- updated: 2026-08-24 — thêm 2 màn báo cáo khép vòng: /bc-thanh-pham (DailyProductionReport) + /bc-don-xuat (OrderExportReport), xếp nhóm Báo cáo cùng nxt-nl/nxt -->
 <!-- re-verified: 2026-08-10 14:00 — AppLayout header (NutGiaoDien/NutTrangThai/NutHuongDan) + thu/mở sidebar (KEY_THU_GON) + fix logo đè khớp source -->
 <!-- re-verified: 2026-08-14 — đồng bộ tên file sau rename eadc360: guideContent.tsx, ImportTab/SalesTab, MaterialImportScreen/ImportReport/SalesScreen/SalesReport/BalancingTable/FinishedGoodScreen, @/lib/catalogRepo (symbol NutHuongDan/NutGiaoDien/CaiDatHienThi giữ nguyên) -->
@@ -33,7 +34,7 @@ Cả hai dùng CHUNG một cây nav (`CayNav`) dựng từ `KIT_NAV` (danh sách
 | Kho | `imports` · `warehouse` · `cold-storage` |
 | Kinh doanh | `sales` · `orders` |
 | Báo cáo | `balancing` · `bc-thanh-pham` · `bc-don-xuat` · `nxt-nl` · `nxt` · `reports` · `traceability` |
-| Hệ thống | `catalog` · `users` (chỉ admin) |
+| Hệ thống | `catalog` · `users` (chỉ admin) · `audit` (chỉ admin) |
 
 Mục có trong `KIT_NAV` nhưng thiếu trong `NHOM_NAV` sẽ rơi vào nhóm **"Khác"** — không mất, nhưng là dấu hiệu quên xếp nhóm.
 
@@ -66,6 +67,7 @@ Cỡ chữ / trạng thái kết nối **không còn ở chân sidebar** (đã d
 | `/balancing/:periodId` | — | Chi tiết kỳ | `features/balancing/BalancingScreen.tsx` | Chi tiết kỳ (URL param thay `selId`) |
 | `/catalog` | `catalog` | Danh mục | `features/catalog/CatalogScreen.tsx` | 5 tab (render thêm `FinishedGoodScreen.tsx`) |
 | `/users` | `users` | Người dùng | `features/users/UserManagementScreen.tsx` | **Chỉ Admin** (Route Guard + chỉ admin thấy trong NAV) |
+| `/audit` | `audit` | Nhật ký | `features/audit/AuditLogScreen.tsx` | **Chỉ Admin** — đọc `audit_log` (nhật ký thao tác); lọc + xuất Excel. Xem [04-tang-du-lieu.md](04-tang-du-lieu.md) §Nhật ký |
 | `/kit` | — | Bộ giao diện | `design-system/kit/KitPage.tsx` | Trang demo component. **Đã gỡ khỏi sidebar** — vào bằng URL, desktop-only |
 
 Ngoài bảng trên, khung còn các màn MES: `/dashboard` (Tổng quan) · `/quality` (Chất lượng) · `/cold-storage` (Kho lạnh) · `/reports` (Báo cáo) · `/traceability` (Truy xuất) · `/wip` (Sản xuất BTP).

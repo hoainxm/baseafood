@@ -1,7 +1,8 @@
 > Load khi: đụng đọc/ghi dữ liệu, thêm bảng vào app, hay điều tra "số liệu biến mất / không lên máy chủ".
-covers: src/lib/repo.ts, src/lib/db.ts, src/lib/catalogRepo.ts, src/lib/connectivity.ts, src/lib/supabase.ts, src/lib/store.ts, src/design-system/patterns/DataStatusBadge.tsx
+covers: src/lib/repo.ts, src/lib/db.ts, src/lib/catalogRepo.ts, src/lib/connectivity.ts, src/lib/supabase.ts, src/lib/store.ts, src/lib/audit.ts, src/design-system/patterns/DataStatusBadge.tsx
 last_verified: 2026-08-24
 ttl_days: 90
+<!-- updated: 2026-08-24 — nhật ký thao tác: useBang.ghi so cũ↔mới rồi gọi ghiNhatKy (lib/audit.ts); audit_log append-only, đẩy im lặng, không bật đèn đỏ -->
 <!-- updated: 2026-08-24 — thêm BANG_FINISHED_OPENING_STOCK (finished_goods_opening_stock) + hook useFinishedGoodsOpeningStock cho sổ NXT thành phẩm; hàm thuần lib/inventoryFinished.ts suy tồn TP từ SX/đơn/bán; tinhTon() nhận thêm tham số bán hàng (tùy chọn) -->
 <!-- updated: 2026-08-21 — thêm BANG_OPENING_STOCK (material_opening_stock) + hook useMaterialOpeningStock cho sổ NXT nguyên liệu; hàm thuần lib/inventoryMaterial.ts suy tồn từ carryOver của Cân đối -->
 <!-- re-verified: 2026-08-14 — đồng bộ tên file sau rename eadc360: patterns/DataStatusBadge.tsx (symbol TrangThaiDuLieu giữ nguyên) -->
@@ -57,6 +58,10 @@ Bản sao localStorage được đọc thẳng bằng `JSON.parse`, **không đi
 Bán thành phẩm dùng `usePhieuBan()` / `useBanHang()` (`BANG_PHIEU_BAN` / `BANG_BAN_HANG`) — cùng khuôn `useBang`, xem [33-ban-hang.md](33-ban-hang.md).
 
 Tồn kho nguyên liệu dùng `useMaterialOpeningStock()` (`BANG_OPENING_STOCK` → `material_opening_stock`) — **chỉ** lưu tồn đầu khai tay. Con số Nhập/Xuất/Tồn còn lại **không có bảng riêng**: hàm thuần `lib/inventoryMaterial.ts` suy thẳng từ `material_imports` (nhập tươi) + `carry_over_kg` của `balancing_inputs` (đông gửi/xả đông). Không chép số ⇒ không lệch sổ Cân đối. Xem [31-can-doi-ky.md](31-can-doi-ky.md).
+
+### Nhật ký thao tác (audit)
+
+Mọi ghi dữ liệu đều qua `useBang.ghi` — nên đây là CHỐT duy nhất để lưu vết. `ghi` so danh sách cũ↔mới, gọi `nhatKyThayDoi()` phát entry **thêm/sửa/xóa** (kèm `diff` trường đổi) rồi `ghiNhatKy()` trong `lib/audit.ts` đẩy vào `audit_log`. Chạy CẢ hai chế độ (chạy trước cả `if (!supabase) return`). Đăng nhập/xuất log ở `auth.ts`. "Ai" lấy từ `datNguoiThaoTac()` (App set theo tài khoản đăng nhập). Đặc tính: **append-only**, buffer localStorage (cap 3000), đẩy **im lặng** — hụt thì giữ buffer, **KHÔNG** bật đèn đỏ kết nối (nhật ký là phụ, không chặn nghiệp vụ). Màn đọc: `/audit` (chỉ admin). Không tự lưu vết bảng `audit_log`. Migration `0025`.
 
 Tồn kho **thành phẩm** đối xứng: `useFinishedGoodsOpeningStock()` (`BANG_FINISHED_OPENING_STOCK` → `finished_goods_opening_stock`) **chỉ** lưu tồn đầu khai tay theo (mặt hàng × quy cách). Con số N/X/T suy thẳng ở hàm thuần `lib/inventoryFinished.ts`: **Nhập** = `production_wips` đã `da-nhap` (theo ngày SX), **Xuất** = `export_items` (đơn đặt, theo `export_orders.export_date`) + `sales_items` (bán ngày) *trừ* handoff đơn đặt (`source_warehouse = "Đơn đặt"`, chống đếm hai lần), **Tồn đầu** = khai tay + lịch sử trước kỳ. `lib/inventory.ts#tinhTon()` nhận thêm tham số `banHang` (tùy chọn, mặc định `[]` = hành vi cũ) để trừ bán ngày FIFO ⇒ tồn Kho dự trữ ăn khớp Tồn cuối NXT thành phẩm. Không chép số ⇒ không lệch các sổ nguồn.
 

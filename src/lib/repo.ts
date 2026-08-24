@@ -41,6 +41,7 @@ import type {
   FinishedGoodsOpeningStock,
 } from "@/types";
 import { rolesFromCsv, rolesToCsv } from "@/types";
+import { ghiNhatKy, type NhatKyMoi } from "@/lib/audit";
 
 /**
  * Tầng dữ liệu dùng chung.
@@ -841,6 +842,67 @@ async function dongBoCho<T>(
   }
 }
 
+/* ---------- Nhật ký thao tác (audit) ---------- */
+
+/** Nhãn tiếng Việt của bảng — cho câu tóm tắt nhật ký dễ đọc. */
+const NHAN_BANG: Record<string, string> = {
+  material_imports: "Nhập nguyên liệu",
+  import_shipments: "Chuyến nhập",
+  daily_locks: "Chốt ngày nhập",
+  scraps: "Phế liệu",
+  production_wips: "Sản xuất BTP",
+  production_locks: "Chốt ngày sản xuất",
+  balancing_periods: "Kỳ cân đối",
+  balancing_inputs: "Nguyên liệu vào (cân đối)",
+  balancing_outputs: "Thành phẩm ra (cân đối)",
+  sales_invoices: "Phiếu bán",
+  sales_items: "Dòng bán",
+  sales_orders: "Đơn đặt",
+  order_items: "Dòng đơn đặt",
+  export_orders: "Lệnh xuất",
+  export_items: "Dòng lệnh xuất",
+  products: "Mặt hàng",
+  customers: "Khách hàng",
+  suppliers: "Đại lý",
+  material_types: "Loại nguyên liệu",
+  finished_goods: "Thành phẩm (danh mục)",
+  user_profiles: "Người dùng",
+  material_opening_stock: "Tồn đầu nguyên liệu",
+  finished_goods_opening_stock: "Tồn đầu thành phẩm",
+};
+
+/** Trường đổi giữa hai bản ghi → { trường: [trước, sau] }. */
+function khacBiet(a: unknown, b: unknown): Record<string, [unknown, unknown]> {
+  const ra: Record<string, [unknown, unknown]> = {};
+  const oa = (a ?? {}) as Record<string, unknown>;
+  const ob = (b ?? {}) as Record<string, unknown>;
+  for (const k of new Set([...Object.keys(oa), ...Object.keys(ob)])) {
+    if (JSON.stringify(oa[k]) !== JSON.stringify(ob[k])) ra[k] = [oa[k], ob[k]];
+  }
+  return ra;
+}
+
+/** So danh sách cũ↔mới của một bảng, phát entry nhật ký thêm/sửa/xóa. */
+function nhatKyThayDoi<T>(bang: AnhXaBang<T>, cu: T[], next: T[]): void {
+  if (bang.table === "audit_log") return; // không tự lưu vết chính mình
+  const nhan = NHAN_BANG[bang.table] ?? bang.table;
+  const cuMap = new Map(cu.map((x) => [bang.layKhoa(x), x]));
+  const nextMap = new Map(next.map((x) => [bang.layKhoa(x), x]));
+  const entries: NhatKyMoi[] = [];
+  for (const [k, x] of nextMap) {
+    const c = cuMap.get(k);
+    if (c === undefined) {
+      entries.push({ action: "them", entity: bang.table, entityKey: k, summary: `Thêm ${nhan}`, diff: { _new: x } });
+    } else if (JSON.stringify(c) !== JSON.stringify(x)) {
+      entries.push({ action: "sua", entity: bang.table, entityKey: k, summary: `Sửa ${nhan}`, diff: khacBiet(c, x) });
+    }
+  }
+  for (const [k] of cuMap) {
+    if (!nextMap.has(k)) entries.push({ action: "xoa", entity: bang.table, entityKey: k, summary: `Xóa ${nhan}` });
+  }
+  ghiNhatKy(entries);
+}
+
 /* ---------- Hook ---------- */
 
 export type TrangThai = "dang-tai" | "san-sang" | "loi";
@@ -957,6 +1019,9 @@ export function useBang<T>(bang: AnhXaBang<T>, seed: () => T[] = () => []) {
       const cu = truoc.current;
       setRows(next);
       save(bang.localKey, next); // luôn có bản sao dưới máy
+
+      // Nhật ký thao tác — chạy cả hai chế độ (server + localStorage).
+      nhatKyThayDoi(bang, cu, next);
 
       if (!supabase) return;
 

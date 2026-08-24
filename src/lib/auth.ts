@@ -9,6 +9,7 @@ import { supabase, hasSupabase, SITE_ID, taoClientTam } from "@/lib/supabase";
 import type { UserProfile, Role } from "@/types";
 import { rolesFromCsv, rolesToCsv, rolesList } from "@/types";
 import { emailToUsername, usernameToEmail } from "@/lib/username";
+import { datNguoiThaoTac, ghiNhatKy } from "@/lib/audit";
 
 /**
  * Đăng nhập qua Supabase Auth (email tổng hợp `<username>@bsf1.vn`).
@@ -140,6 +141,9 @@ export function useAuth() {
         password: matKhau,
       });
       if (error) return { ok: false, loi: dichLoi(error.message) };
+      const u = username.trim().toLowerCase();
+      datNguoiThaoTac({ username: u });
+      ghiNhatKy([{ action: "dang-nhap", entity: "auth", entityKey: u, summary: `Đăng nhập: ${u}` }]);
       return { ok: true };
     },
     []
@@ -203,7 +207,9 @@ export function useAuth() {
   );
 
   const dangXuat = useCallback(async () => {
+    ghiNhatKy([{ action: "dang-xuat", entity: "auth", entityKey: "", summary: "Đăng xuất" }]);
     await supabase?.auth.signOut();
+    datNguoiThaoTac(null);
   }, []);
 
   return {

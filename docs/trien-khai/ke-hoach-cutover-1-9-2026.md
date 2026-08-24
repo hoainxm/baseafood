@@ -3,7 +3,7 @@
 > **Load khi:** chuẩn bị đưa hệ thống vào chạy thật; dựng tồn gốc; nhập số liệu cũ; làm import file/scan.
 > **Nguồn quyết định:** [`hop-2026-08-22-so-hoa-flow-2-bo-phan.md`](hop-2026-08-22-so-hoa-flow-2-bo-phan.md) (QĐ-4, QĐ-5).
 > **Vận hành kỹ thuật:** [`ops/supabase-setup.md`](../ops/supabase-setup.md) · [`ops/deploy-vercel.md`](../ops/deploy-vercel.md) · [`03-database.md`](../app-map/03-database.md).
-> **last_verified:** 2026-08-22
+> **last_verified:** 2026-08-24
 
 ---
 
@@ -32,6 +32,32 @@ Báo cáo **tồn kho tổng** gần nhất mà xí nghiệp đã chốt là **3
 - Số tồn đầu là **số kế toán đã ký**, không phải suy đoán.
 - T7–T8 chỉ cần **khớp tổng** với báo cáo tháng đã có, dễ đối chiếu.
 - 01/09 trở đi mới cần độ chi tiết từng ngày.
+
+---
+
+## 2b. Nguồn dữ liệu backfill — TRẠNG THÁI (chốt với người dùng 2026-08-24)
+
+> 📌 **Đọc mục này TRƯỚC khi làm import.** Đây là điểm dừng có chủ đích: chưa có file số hoá nên **chưa build import**; khi có file thực tế thì đọc từ đây làm tiếp.
+
+**Mục tiêu tiên quyết (nhắc lại):** đưa hệ chạy **realtime từ 01/09/2026**. Điều kiện = **tồn đầu 01/09 đúng** = **baseline 30/06 + nhập bù dịch chuyển T7–T8**. Tạm **gác** tồn BTP/TP + các bước duyệt kho (chờ nhập kho…) — không chặn mục tiêu này; đợt backfill tập trung **tồn nguyên liệu + cân đối**.
+
+**Dữ liệu người dùng đang có (2 báo cáo):**
+1. **Báo cáo tồn kho làm khi hết tháng 6** → dùng làm **baseline tồn 30/06** (Giai đoạn B).
+2. **Báo cáo làm khi hết tháng 7 và 8** → dùng **nhập bù dịch chuyển T7–T8** (Giai đoạn C).
+
+**Cách làm đã chốt:**
+- **Import bằng file, làm SAU** — người dùng sẽ đưa file thực tế rồi ta **cấu hình chức năng import cho khớp đúng cấu trúc file đó** (không đoán trước format). Trước mắt vẫn có thể nhập tay đường Giai đoạn B/C bằng màn hiện có.
+- **Độ sâu backfill** (chỉ đủ để tồn NL đúng · hay đầy đủ cân đối có lãi/lỗ) — **phân tích và quyết khi có file thực tế** (chưa chốt bây giờ).
+
+### ✅ TODO khi có file thực tế (checklist cho lần sau)
+1. **Đọc lại mục 2b này** + [flow §3](flow-end-to-end-2-bo-phan.md) để nhớ mục tiêu + ranh giới.
+2. **Đọc file** báo cáo 30/06 và báo cáo cuối T7/T8: xác định cấu trúc thật (cột nào là họ NL, kho, đông gửi, xả đông, NL vào, BTP, bán…). Tham chiếu cách đọc bảng cân đối: [`demo/cach-doc-excel.md`](../demo/cach-doc-excel.md); lib đọc Excel sẵn có: `src/lib/nxtExcel.ts`.
+3. **Chốt độ sâu**: tồn-NL-only (nhanh, đủ cho 01/09) hay đầy đủ cân đối (thêm TP ra + bán + đơn giá → lãi/lỗ).
+4. **Chốt granularity**: 1 kỳ/tháng (số tổng) hay theo kỳ 5-ngày thật.
+5. **Cấu hình import** map cột file → `material_opening_stock` (baseline 30/06) + kỳ Cân đối T7/T8 (đông gửi/xả đông, NL vào). Map phải **hiện cho người xác nhận**, không map ngầm (xem §4).
+6. **Đối chiếu** tồn cuối 31/08 hệ suy ra ↔ báo cáo tháng 8 (Giai đoạn C bước 9) trước khi bật realtime.
+
+**Kỹ thuật cần biết (khỏi dò lại):** tồn NL **suy** ra, không lưu số dư — từ `material_opening_stock` (`0022`) + vòng chuyển kỳ đông gửi/xả đông của Cân đối (`src/lib/inventoryMaterial.ts`: `tồn cuối = tồn đầu + đông gửi − xả đông`, gối đầu tự kế thừa). Vậy import chỉ cần đổ đúng **tồn đầu 30/06** + **các dòng chuyển kỳ T7/T8** là tồn 01/09 tự đúng — **không cần bảng số dư mới**.
 
 ---
 
@@ -67,6 +93,8 @@ Thứ tự triển khai **có chủ đích**:
 | **1. Nhập tay thủ công** | Người dùng gõ trực tiếp trên màn | ✅ đã có (mọi màn THẬT) | **Làm trước hết** — chuẩn để đối chiếu |
 | **2. Import file Excel** | Tải file báo cáo → map cột → nạp | ⏳ sau | Đã có tiền lệ đọc Excel: [`demo/cach-doc-excel.md`](../demo/cach-doc-excel.md), lib `nxtExcel.ts` |
 | **3. Scan chữ viết tay** | Chụp/scan phiếu tay → OCR → điền sẵn ô nhập | ⏳ sau cùng | Người dùng vẫn **soát + sửa tay** trước khi chốt |
+
+**File đầu tiên sẽ import** (chốt 2026-08-24, chi tiết [§2b](#2b-nguồn-dữ-liệu-backfill--trạng-thái-chốt-với-người-dùng-2026-08-24)): **báo cáo tồn cuối T6 (30/06)** + **báo cáo cuối T7/T8**. Chức năng import chỉ **cấu hình khi có file thực tế** — bám đúng cấu trúc file đó, không đoán trước.
 
 **Nguyên tắc chung cho import file/scan:**
 - Import **không tự chốt** — nạp vào pha *nhập liệu (nháp)*, người dùng soát rồi mới **phát hành/chốt** (xem [bảng thuật ngữ](flow-end-to-end-2-bo-phan.md#6-bảng-thuật-ngữ-thao-tác-theo-flow)).

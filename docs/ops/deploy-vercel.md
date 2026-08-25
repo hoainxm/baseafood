@@ -92,6 +92,14 @@ Không thao tác thêm. Mỗi branch/PR khác sinh **Preview deploy** riêng.
 | Env timing | build-time | đổi env ⇒ **Redeploy**, không nóng |
 | Favicon | `public/favicon.png` + `?v=2` trong [`index.html`](../../index.html) | cache-bust; đã bỏ `favicon.svg` rác template |
 
+## Nhắc "có bản cập nhật mới" (version.json)
+
+Vì là SPA, tab mở cả ngày sẽ **kẹt bản cũ** cho tới khi người dùng tự tải lại — nguồn gây nhầm "đã deploy mà không thấy đổi". Cơ chế nhắc:
+
+- `vite.config.ts` tính `buildId` (ưu tiên `VERCEL_GIT_COMMIT_SHA`, local thì mốc thời gian) → **nhúng vào bundle** (`__BUILD_ID__`) **và** ghi ra `dist/version.json` (`{ "buildId": "…" }`).
+- `src/features/shared/UpdateBanner.tsx` poll `version.json` (lúc mở · mỗi 3 phút · khi quay lại tab), so với `__BUILD_ID__` bản đang chạy. Khác ⇒ hiện băng **"Đã có bản cập nhật mới — Tải lại ngay"** ở đầu vùng nội dung (AppShell).
+- Chỉ có tác dụng cho các bản **từ bản này trở đi** (bản cũ chưa có cơ chế). Dev không sinh `version.json` ⇒ không báo nhầm.
+
 ## Custom domain (tùy chọn)
 
 Vercel → project → **Settings → Domains** → add domain → trỏ DNS theo hướng dẫn.

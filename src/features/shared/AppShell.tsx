@@ -13,6 +13,7 @@ import {
   XacNhan,
 } from "@/design-system";
 import { cn } from "@/lib/utils";
+import { BangCapNhat } from "./UpdateBanner";
 import {
   LayoutDashboard,
   ClipboardList,
@@ -506,6 +507,11 @@ export default function AppShell({
         </header>
 
         <main className="w-full flex-1 p-5 md:p-8">
+          {/* Nhắc tải lại khi có bản deploy mới — ĐẶT NGOÀI khối đổi-trang để
+              không bị mất/khởi tạo lại mỗi lần chuyển màn. */}
+          <div className="mx-auto w-full max-w-(--app-content-width)">
+            <BangCapNhat />
+          </div>
           {/* key theo màn đang mở → fade nhẹ mỗi lần đổi trang (reduced-motion tắt) */}
           <div
             key={active}

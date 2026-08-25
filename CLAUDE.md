@@ -138,6 +138,8 @@ Ngoài app-map: [`src/design-system/README.md`](src/design-system/README.md) (UI
 
 ## Trạng thái
 
+> 📋 **Việc còn lại + go-live (cập nhật 2026-08-25):** [`docs/BAN-GIAO-tiep-theo.md`](docs/BAN-GIAO-tiep-theo.md) — đọc file này trước khi làm tiếp. Đã lên main: cụm báo cáo khép vòng + NXT thành phẩm + nhật ký thao tác (audit) + đóng gói BTP→TP + bán lẻ trừ tồn + phân quyền 2 bộ phận. Quy tắc: commit/push thẳng `main`, không tách nhánh.
+
 > **Định hướng hiện hành — họp 2026-08-22:** số hóa TRỌN chuỗi nhập→sản xuất, tách **2 giao diện bộ phận** (nhập hàng / sản xuất) vận hành theo bước + daily-task, **cutover chạy realtime 01/09/2026** (baseline tồn 30/06, nhập báo cáo T7–T8). Cửa vào: [`trien-khai/hop-2026-08-22-so-hoa-flow-2-bo-phan.md`](docs/trien-khai/hop-2026-08-22-so-hoa-flow-2-bo-phan.md).
 
 **Đã build (THẬT — nối dữ liệu):** nhập hàng (chuyến thật · 2 ngày + ghi bù · chốt ngày · phế liệu ngày · bộ lọc), **sản xuất BTP ngày `/wip`** (sản lượng theo ngày/xưởng/loại NL · chốt ngày SX · ghi bù), **kho dự trữ `/warehouse`** (duyệt BTP chờ→đã nhập · tồn), **đơn đặt `/orders`** (lệnh xuất FIFO từ tồn WIP), bán hàng (phiếu bán · quy cách · XK/NĐ · hút cân đối), cân đối + in A4 + chốt/chuyển kỳ, NXT + tồn NL, danh mục 5 tab, đăng nhập + vai trò `user_profiles` + màn Người dùng, bộ giao diện responsive, tầng dữ liệu Supabase↔localStorage. Điều hướng **react-router v7 (HashRouter)**, ~17 route.

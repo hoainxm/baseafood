@@ -67,7 +67,20 @@ docs(app-map): bổ sung invariant phế liệu
 ```
 
 Body giải thích **vì sao**, không liệt kê file đã sửa. Kết bằng `Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>`.
-Repo này **commit thẳng vào `main`**, không tách nhánh feat. Chỉ commit khi người dùng yêu cầu.
+
+### Workflow push & deploy — quy tắc chuẩn cho MỌI session (chốt với chủ dự án 2026-08-25)
+
+- **Làm thẳng trên `main`.** Commit/push **trực tiếp vào `main`**, **KHÔNG** tách nhánh feature, **KHÔNG** mở PR (trừ khi người dùng yêu cầu rõ). Nếu harness cấp sẵn một nhánh `claude/...` ở đầu session, **vẫn ưu tiên quy tắc này** — chủ dự án đã chốt làm trên `main`. Chỉ commit khi người dùng yêu cầu.
+- **Deploy = phải đẩy CẢ HAI repo.** Vercel build từ repo cá nhân **`hoainxm/baseafood`**; nguồn thật là **`sdvico/baseafood`**. Một commit **chỉ lên bản chạy khi có mặt ở cả hai**. **Giữ Vercel ở `hoainxm` — ĐỪNG tự đổi sang sdvico** (quyết định của chủ dự án).
+- **Phiên Claude trên web chỉ push được `sdvico`** — proxy chặn `hoainxm` (khác chủ sở hữu; `add_repo` cross-owner bị từ chối, `git push` thẳng bị 403). ⇒ Sau khi push `sdvico/main`, **tự mình không mirror được** sang `hoainxm`.
+- **Cách xử mỗi lần push:** push `sdvico/main` xong, **đưa người dùng lệnh mirror** để họ chạy ở máy local (máy họ có quyền cả hai repo). Nhắc **`pull` trước** kẻo "non-fast-forward":
+  ```bash
+  git fetch origin main
+  git push https://github.com/hoainxm/baseafood.git origin/main:main
+  ```
+  (Máy local người dùng có `origin` 2 push URL, nên `git checkout main && git pull && git push` cũng đẩy **cả hai cùng lúc** — miễn là `pull` trước.)
+- **Muốn agent tự đẩy cả hai:** mở session với **cả `sdvico` lẫn `hoainxm` làm nguồn ban đầu**, rồi cấu hình `origin` 2 push URL và push một phát cả hai.
+- Cơ chế **nhắc tải lại khi có bản mới** (`version.json` + `UpdateBanner`): xem [`ops/deploy-vercel.md`](docs/ops/deploy-vercel.md).
 
 ## Risk tier — xác định TRƯỚC khi làm
 

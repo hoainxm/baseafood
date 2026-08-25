@@ -303,11 +303,17 @@ export interface WipProductionItem {
   workshop: Workshop;
   productId: string;
   spec: string;
-  quantityKg: number;
+  quantityKg: number; // TỔNG khối lượng dòng (khi tách = râu + bao tử)
   blocksCount: number;
   warehouse: string;
   status: WipWarehouseStatus;
   note: string;
+  /** Khách hàng của dòng thành phẩm (làm theo đơn) — lưu theo TÊN. */
+  customerName?: string;
+  /** Thành phẩm tách 2 thành phần cùng giá (VD cắt chần: râu + bao tử).
+   *  null = dòng KHÔNG tách. quantityKg vẫn giữ tổng để cân đối dùng. */
+  componentRauKg?: number | null;
+  componentBaoTuKg?: number | null;
   /** Kỳ cân đối đã hút dòng này (rỗng = chưa gắn kỳ nào). */
   balancingPeriodId?: string;
 }

@@ -573,6 +573,9 @@ export const BANG_WIP_PRODUCTION: AnhXaBang<WipProductionItem> = {
     warehouse: x.warehouse,
     status: x.status,
     note: x.note,
+    customer_name: x.customerName ?? "",
+    component_rau_kg: x.componentRauKg ?? null,
+    component_bao_tu_kg: x.componentBaoTuKg ?? null,
     balancing_period_id: x.balancingPeriodId ?? "",
   }),
   fromRow: (r) => ({
@@ -588,10 +591,20 @@ export const BANG_WIP_PRODUCTION: AnhXaBang<WipProductionItem> = {
     warehouse: s(r.warehouse),
     status: (s(r.status) || "cho-nhap") as WipWarehouseStatus,
     note: s(r.note),
+    customerName: s(r.customer_name),
+    componentRauKg: r.component_rau_kg == null ? null : Number(r.component_rau_kg),
+    componentBaoTuKg:
+      r.component_bao_tu_kg == null ? null : Number(r.component_bao_tu_kg),
     balancingPeriodId: s(r.balancing_period_id),
   }),
-  // Dòng ghi trước 0019 chưa có cột kỳ cân đối → coi như chưa gắn kỳ nào.
-  vaDongCu: (x) => ({ ...x, balancingPeriodId: x.balancingPeriodId ?? "" }),
+  // Dòng ghi trước 0019/0030 chưa có cột kỳ / khách / thành phần → mặc định trống.
+  vaDongCu: (x) => ({
+    ...x,
+    customerName: x.customerName ?? "",
+    componentRauKg: x.componentRauKg ?? null,
+    componentBaoTuKg: x.componentBaoTuKg ?? null,
+    balancingPeriodId: x.balancingPeriodId ?? "",
+  }),
 };
 
 /** Chốt ngày sản xuất (bảng riêng, cùng hình dạng DailyLock). */

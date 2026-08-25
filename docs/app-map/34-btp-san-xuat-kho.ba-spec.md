@@ -1,8 +1,9 @@
 > Load khi: thiết kế/xây module WIP — sản xuất bán thành phẩm ngày, kho dự trữ đông, đơn đặt, xuất container.
 covers: src/features/production/WipProductionScreen.tsx, src/features/warehouse/ReserveWarehouseScreen.tsx, src/features/orders/SalesOrderScreen.tsx, src/features/packaging/PackagingScreen.tsx, src/lib/inventory.ts, supabase/migrations/0011_wip_san_xuat_kho_don.sql, supabase/migrations/0026_dong_goi_thanh_pham.sql
-last_verified: 2026-08-23
+last_verified: 2026-08-25
 ttl_days: 90
 status: ba-spec — ĐÃ BUILD v1 (migration 0011 + 3 màn WipProductionScreen/ReserveWarehouseScreen/SalesOrderScreen); + đóng gói BTP→TP (G3, migration 0026, màn PackagingScreen)
+<!-- updated: 2026-08-25 — GIẢN LƯỢC màn ghi thành phẩm ngày (/wip, chốt với chủ dự án): mục tiêu v1 chỉ "ghi lượng thành phẩm làm ra mỗi ngày", KHÔNG quản lý nguyên liệu lấy ra kho. BỎ khỏi đầu phiên + entry: ô "Loại nguyên liệu", panel "Đối chiếu Nhập↔SX", "còn dở nguyên liệu" khi chốt, ô Quy cách/Block (cột DB spec/blocks_count giữ nguyên, dòng mới để trống/0). THÊM (migration 0030): mỗi dòng gắn KHÁCH HÀNG (useCustomers, lưu theo tên); thành phẩm cắt chần TÁCH 2 thành phần cùng giá (râu + bao tử) qua nút "Tách" → 2 ô, quantity_kg = tổng, component_rau_kg/component_bao_tu_kg lưu breakdown (cân đối chỉ dùng tổng). Entry đổi sang BẢNG trải ngang nhập-một-lượt-lưu-một-lần (BangDongSX) + ngày ghi sổ kéo ngày SX theo — đồng bộ màn Nhập hàng. Định mức NL÷TP để dành tính ở kỳ Cân đối (map qua product.materialTypeId, không cần chọn NL ở đầu phiên). -->
 <!-- updated: 2026-08-23 — G3 đóng gói BTP→TP: bảng packagings (0026) + màn /packaging (phiếu đóng gói: BTP tiêu hao→TP ra, hao hụt). Tồn 2 pool suy ở inventory.ts: BTP trừ thêm dongGoiTruTon(); TP = tinhTonTP(). Bán chọn nguồn Block thô (KHO_BAN_LE→BTP) / Đóng gói (KHO_TP→TP). -->
 <!-- re-verified: 2026-08-14 — đồng bộ tên file sau rename eadc360: WipProductionScreen/ReserveWarehouseScreen/SalesOrderScreen -->
 

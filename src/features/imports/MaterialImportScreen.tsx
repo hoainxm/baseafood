@@ -1496,10 +1496,10 @@ export default function NhapNguyenLieuScreen() {
 /* ---------- Bảng loại hàng của một chuyến (nhập nhiều dòng một lượt) ---------- */
 
 /**
- * Mỗi loại hàng là một thẻ (Loài · Loại NL · Số lượng · Đơn giá) — nhãn luôn
- * hiện để người lớn tuổi đọc rõ, xếp dọc nên khít từ 360px tới desktop, không
- * cuộn ngang. Thêm dòng bằng nút "Thêm loại hàng" ở CUỐI (dòng mới xuống cuối,
- * không tự nhảy) rồi lưu cả chuyến một lần.
+ * Bảng nhập ĐƠN GIẢN, TRẢI NGANG: mỗi loại là MỘT HÀNG — các ô nằm ngang trên
+ * desktop (Loài · Loại NL · Số lượng · Đơn giá · Bỏ), xuống dòng gọn trên điện
+ * thoại. Nhãn luôn hiện để người lớn tuổi đọc rõ. Thêm loại bằng nút ở cuối,
+ * dòng mới xuống CUỐI — không tự nhảy, không xô layout.
  */
 function BangDongHang({
   dong,
@@ -1519,87 +1519,57 @@ function BangDongHang({
   const coTheBo = dong.length > 1;
   return (
     <div className="space-y-3">
-      {dong.map((d, i) => {
-        const thanhTien =
-          d.quantityKg > 0 && d.unitPrice ? d.quantityKg * d.unitPrice : null;
-        return (
-          <div
-            key={d.key}
-            className="rounded-xl border-2 border-border bg-card p-4"
-          >
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <span className="flex min-w-0 items-center gap-2 text-base font-semibold">
-                <span className="tnum flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-sm">
-                  {i + 1}
-                </span>
-                <span className="truncate">
-                  {d.materialTypeName || "Chưa chọn loại"}
-                </span>
-              </span>
-              {coTheBo && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="shrink-0"
-                  onClick={() => onBo(d.key)}
-                >
-                  <X />
-                  Bỏ dòng
-                </Button>
-              )}
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Combobox
-                label="Loài"
-                required
-                choPhepXoa={false}
-                value={d.category}
-                onChange={(v) =>
-                  onSua(d.key, {
-                    category: v as Category,
-                    materialTypeName: "",
-                  })
-                }
-                options={CATEGORIES.map((l) => ({ value: l, label: l }))}
-              />
-              <Combobox
-                label="Loại nguyên liệu"
-                required
-                value={d.materialTypeName}
-                onChange={(v) => onSua(d.key, { materialTypeName: v })}
-                options={optLoaiTheoLoai(d.category)}
-                onCreate={(ten) => onTaoLoai(ten, d.category)}
-              />
-            </div>
-
-            <div className="mt-4 grid gap-4 sm:grid-cols-2">
-              <NumberField
-                label="Số lượng"
-                required
-                unit="kg"
-                value={d.quantityKg || null}
-                onChange={(v) => onSua(d.key, { quantityKg: v ?? 0 })}
-              />
-              <NumberField
-                label="Đơn giá"
-                unit="đ"
-                value={d.unitPrice}
-                onChange={(v) => onSua(d.key, { unitPrice: v })}
-              />
-            </div>
-
-            {thanhTien != null && (
-              <p className="mt-3 text-right text-base text-muted-foreground">
-                Thành tiền:{" "}
-                <span className="tnum font-semibold text-foreground">
-                  {num(thanhTien)} đ
-                </span>
-              </p>
-            )}
-          </div>
-        );
-      })}
+      {dong.map((d) => (
+        <div
+          key={d.key}
+          className="grid gap-3 rounded-lg border border-border bg-card p-3 sm:grid-cols-2 lg:grid-cols-[1.1fr_1.6fr_0.9fr_0.9fr_auto] lg:items-end"
+        >
+          <Combobox
+            label="Loài"
+            required
+            choPhepXoa={false}
+            value={d.category}
+            onChange={(v) =>
+              onSua(d.key, { category: v as Category, materialTypeName: "" })
+            }
+            options={CATEGORIES.map((l) => ({ value: l, label: l }))}
+          />
+          <Combobox
+            label="Loại nguyên liệu"
+            required
+            value={d.materialTypeName}
+            onChange={(v) => onSua(d.key, { materialTypeName: v })}
+            options={optLoaiTheoLoai(d.category)}
+            onCreate={(ten) => onTaoLoai(ten, d.category)}
+          />
+          <NumberField
+            label="Số lượng"
+            required
+            unit="kg"
+            value={d.quantityKg || null}
+            onChange={(v) => onSua(d.key, { quantityKg: v ?? 0 })}
+          />
+          <NumberField
+            label="Đơn giá"
+            unit="đ"
+            value={d.unitPrice}
+            onChange={(v) => onSua(d.key, { unitPrice: v })}
+          />
+          {coTheBo ? (
+            <Button
+              variant="outline"
+              aria-label="Bỏ dòng"
+              className="justify-center sm:col-span-2 lg:col-span-1"
+              onClick={() => onBo(d.key)}
+            >
+              <X />
+              <span className="lg:hidden">Bỏ dòng</span>
+            </Button>
+          ) : (
+            <span className="hidden lg:block" aria-hidden />
+          )}
+        </div>
+      ))}
 
       <Button
         type="button"

@@ -52,7 +52,6 @@ import {
   type MucChon,
 } from "@/design-system";
 import { kg, num, todayISO, viDate } from "@/lib/format";
-import { cn } from "@/lib/utils";
 import { DailyTaskReminder } from "@/features/shared";
 import { KY_OPT, phamViKy, type KyXem } from "@/lib/periodUtils";
 import {
@@ -127,14 +126,6 @@ const dongCoData = (d: DongBang): boolean =>
 /** Dòng đủ để lưu (có loại + số lượng > 0). */
 const dongDayDu = (d: DongBang): boolean =>
   d.materialTypeName.trim() !== "" && d.quantityKg > 0;
-
-/** Luôn để đúng MỘT dòng trống ở cuối bảng để gõ tiếp — không phải bấm "Thêm". */
-const chuanCuoiBang = (ds: DongBang[]): DongBang[] => {
-  const cuoi = ds[ds.length - 1];
-  if (!cuoi || dongCoData(cuoi))
-    return [...ds, dongBangRong(cuoi?.category ?? LOAI_MAC_DINH)];
-  return ds;
-};
 
 /**
  * Một chuyến hiện trên sổ. Có hai nguồn:
@@ -457,19 +448,17 @@ export default function NhapNguyenLieuScreen() {
     });
     setChuyenIdPhien(n.chuyen?.id ?? null);
     setSuaRowIds(n.dong.map((r) => r.id));
-    // Nạp mọi dòng đã ghi vào bảng (giữ id để cập nhật đúng bản ghi) + một dòng
-    // trống cuối để thêm loại mới ngay.
+    // Nạp mọi dòng đã ghi vào bảng (giữ id để cập nhật đúng bản ghi). Muốn thêm
+    // loại mới thì bấm nút "Thêm loại hàng" — không tự sinh dòng.
     setDongBang(
-      chuanCuoiBang(
-        n.dong.map((r) => ({
-          key: r.id,
-          id: r.id,
-          category: r.category,
-          materialTypeName: r.materialTypeName,
-          quantityKg: r.quantityKg,
-          unitPrice: r.unitPrice,
-        }))
-      )
+      n.dong.map((r) => ({
+        key: r.id,
+        id: r.id,
+        category: r.category,
+        materialTypeName: r.materialTypeName,
+        quantityKg: r.quantityKg,
+        unitPrice: r.unitPrice,
+      }))
     );
     setNgayLienNhau((n.postingDate || n.deliveryDate) === n.deliveryDate);
     setLoiPhien([]);
@@ -525,17 +514,23 @@ export default function NhapNguyenLieuScreen() {
     : 0;
   const tongNgayPhien = tongNgayNgoaiChuyen + tongChuyen;
 
-  /** Sửa một ô trong bảng; tự đảm bảo còn một dòng trống ở cuối để gõ tiếp. */
+  /** Sửa một ô trong bảng (không tự sinh/xô dòng — thêm dòng bằng nút riêng). */
   const capNhatDong = (key: string, patch: Partial<DongBang>) =>
-    setDongBang((ds) =>
-      chuanCuoiBang(ds.map((d) => (d.key === key ? { ...d, ...patch } : d)))
-    );
+    setDongBang((ds) => ds.map((d) => (d.key === key ? { ...d, ...patch } : d)));
 
+  /** Bỏ một dòng; luôn còn ít nhất một dòng để nhập. */
   const boDong = (key: string) =>
     setDongBang((ds) => {
       const con = ds.filter((d) => d.key !== key);
-      return con.length ? chuanCuoiBang(con) : [dongBangRong(loaiGanNhat)];
+      return con.length ? con : [dongBangRong(loaiGanNhat)];
     });
+
+  /** Thêm một dòng trống ở CUỐI bảng (mặc định loài theo dòng cuối cho nhanh). */
+  const themDongMoi = () =>
+    setDongBang((ds) => [
+      ...ds,
+      dongBangRong(ds[ds.length - 1]?.category ?? loaiGanNhat),
+    ]);
 
   /**
    * Lưu cả chuyến MỘT LẦN: tạo/ghi chuyến + mọi dòng hợp lệ trong bảng, một lần
@@ -1329,8 +1324,8 @@ export default function NhapNguyenLieuScreen() {
                         Các loại hàng trong chuyến
                       </p>
                       <p className="text-sm text-muted-foreground">
-                        Điền xong một dòng, dòng trống mới tự hiện ở dưới — không
-                        phải bấm thêm. Đơn giá để trống nếu chưa có hóa đơn.
+                        Mỗi loại một dòng. Cần thêm loại nữa thì bấm “Thêm loại
+                        hàng” ở cuối. Đơn giá để trống nếu chưa có hóa đơn.
                       </p>
                     </div>
 
@@ -1338,6 +1333,7 @@ export default function NhapNguyenLieuScreen() {
                       dong={dongBang}
                       onSua={capNhatDong}
                       onBo={boDong}
+                      onThem={themDongMoi}
                       optLoaiTheoLoai={optLoaiNLTheoLoai}
                       onTaoLoai={themLoaiNL}
                     />
@@ -1502,35 +1498,34 @@ export default function NhapNguyenLieuScreen() {
 /**
  * Mỗi loại hàng là một thẻ (Loài · Loại NL · Số lượng · Đơn giá) — nhãn luôn
  * hiện để người lớn tuổi đọc rõ, xếp dọc nên khít từ 360px tới desktop, không
- * cuộn ngang. Dòng trống cuối tự nhân bản khi vừa gõ ⇒ nhập cả chuyến liền tay,
- * lưu một lần thay vì bấm "Thêm" từng loại.
+ * cuộn ngang. Thêm dòng bằng nút "Thêm loại hàng" ở CUỐI (dòng mới xuống cuối,
+ * không tự nhảy) rồi lưu cả chuyến một lần.
  */
 function BangDongHang({
   dong,
   onSua,
   onBo,
+  onThem,
   optLoaiTheoLoai,
   onTaoLoai,
 }: {
   dong: DongBang[];
   onSua: (key: string, patch: Partial<DongBang>) => void;
   onBo: (key: string) => void;
+  onThem: () => void;
   optLoaiTheoLoai: (loai: string) => MucChon[];
   onTaoLoai: (ten: string, loai: string) => string;
 }) {
+  const coTheBo = dong.length > 1;
   return (
     <div className="space-y-3">
       {dong.map((d, i) => {
-        const coData = dongCoData(d);
         const thanhTien =
           d.quantityKg > 0 && d.unitPrice ? d.quantityKg * d.unitPrice : null;
         return (
           <div
             key={d.key}
-            className={cn(
-              "rounded-xl border-2 p-4",
-              coData ? "border-border bg-card" : "border-dashed border-border"
-            )}
+            className="rounded-xl border-2 border-border bg-card p-4"
           >
             <div className="mb-3 flex items-center justify-between gap-3">
               <span className="flex min-w-0 items-center gap-2 text-base font-semibold">
@@ -1538,12 +1533,10 @@ function BangDongHang({
                   {i + 1}
                 </span>
                 <span className="truncate">
-                  {coData
-                    ? d.materialTypeName || "Chưa chọn loại"
-                    : "Dòng mới"}
+                  {d.materialTypeName || "Chưa chọn loại"}
                 </span>
               </span>
-              {coData && (
+              {coTheBo && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -1607,6 +1600,17 @@ function BangDongHang({
           </div>
         );
       })}
+
+      <Button
+        type="button"
+        variant="outline"
+        size="lg"
+        className="w-full border-dashed"
+        onClick={onThem}
+      >
+        <Plus />
+        Thêm loại hàng
+      </Button>
     </div>
   );
 }

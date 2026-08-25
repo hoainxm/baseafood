@@ -7,8 +7,9 @@
 -- `0016_rename_to_english` (nhap_nguyen_lieu, ky_can_doi…). Sau `0016` những
 -- tên đó không còn tồn tại nên `0003` chạy sẽ báo lỗi hoặc không siết gì, và
 -- nó cũng bỏ sót 11 bảng thêm từ `0011`/`0017` trở đi (sản xuất BTP, đơn đặt,
--- lệnh xuất, kho…). File này siết ĐỦ 25 bảng đang dùng, theo tên hiện hành
--- (đã gồm material_opening_stock 0022 + finished_goods_opening_stock 0024).
+-- lệnh xuất, kho…). File này siết ĐỦ 26 bảng đang dùng, theo tên hiện hành
+-- (gồm material_opening_stock 0022 + finished_goods_opening_stock 0024 +
+--  packagings 0029). audit_log KHÔNG nằm ở đây — giữ RLS riêng ở 0025.
 --
 -- Làm gì:
 --   • Bỏ policy mở `to anon, authenticated using (true)` của giai đoạn chưa
@@ -48,8 +49,8 @@ declare
     'balancing_periods', 'balancing_inputs', 'balancing_outputs',
     -- bán hàng
     'sales_invoices', 'sales_items',
-    -- sản xuất BTP + kho + đơn đặt + lệnh xuất
-    'production_wips', 'production_locks', 'sales_orders', 'order_items',
+    -- sản xuất BTP + kho + đơn đặt + lệnh xuất + đóng gói
+    'production_wips', 'production_locks', 'packagings', 'sales_orders', 'order_items',
     'export_orders', 'export_items',
     -- tồn đầu kho (nguyên liệu 0022 + thành phẩm 0024)
     'material_opening_stock', 'finished_goods_opening_stock',

@@ -13,7 +13,20 @@ import {
   useCustomers,
   useProducts,
   useSalesInvoices,
+  useWipProductions,
+  useExportItems,
+  usePackagings,
 } from "@/lib/catalogRepo";
+import {
+  tinhTon,
+  khaDung,
+  KHO_BAN_LE,
+  KHO_TP,
+  locBanLe,
+  dongGoiTruTon,
+  tinhTonTP,
+  khaDungTP,
+} from "@/lib/inventory";
 import {
   Badge,
   ChuThichBatBuoc,
@@ -76,6 +89,7 @@ interface DongMoi {
   spec: string;
   quantityKg: number;
   unitPrice: number | null;
+  nguon: string; // KHO_BAN_LE (block thô) | KHO_TP (đóng gói)
 }
 
 const DONG_MOI_RONG: DongMoi = {
@@ -83,6 +97,7 @@ const DONG_MOI_RONG: DongMoi = {
   spec: "",
   quantityKg: 0,
   unitPrice: null,
+  nguon: KHO_BAN_LE,
 };
 
 /** Một phiếu bán hiện trên sổ, gom từ các dòng của nó. */
@@ -143,6 +158,25 @@ function loiDauPhieu(d: DauPhieu): LoiNhap[] {
 export default function BanHangScreen() {
   const [rows, persist] = useSalesItems();
   const [phieu, persistPhieu, { trangThai }] = useSalesInvoices();
+
+  /* Tồn khả dụng để bán: trừ SUY từ chính các dòng bán (theo marker nguồn).
+   * - Block thô (KHO_BAN_LE) trừ tồn BTP; đóng gói (KHO_TP) trừ tồn TP.
+   * - Handoff Đơn đặt ("Lưu trữ") đã trừ qua lệnh xuất → không đưa vào đây. */
+  const [sanXuat] = useWipProductions();
+  const [dongLenh] = useExportItems();
+  const [packagings] = usePackagings();
+  const truBTP = useMemo(
+    () => [...locBanLe(rows), ...dongGoiTruTon(packagings)],
+    [rows, packagings]
+  );
+  const tonBTP = useMemo(
+    () => tinhTon(sanXuat, dongLenh, truBTP),
+    [sanXuat, dongLenh, truBTP]
+  );
+  const tonTP = useMemo(
+    () => tinhTonTP(packagings, locBanLe(rows, KHO_TP)),
+    [packagings, rows]
+  );
   const dangTai = trangThai === "dang-tai" && phieu.length === 0;
   const [matHang, setMatHang] = useProducts();
   const [khach, setKhach] = useCustomers();
@@ -159,6 +193,12 @@ export default function BanHangScreen() {
   const [phieuIdPhien, setPhieuIdPhien] = useState<string | null>(null);
   const [suaRowIds, setSuaRowIds] = useState<string[] | null>(null);
   const [dongMoi, setDongMoi] = useState<DongMoi>(DONG_MOI_RONG);
+  const kdDongMoi = dongMoi.productId
+    ? dongMoi.nguon === KHO_TP
+      ? khaDungTP(tonTP, dongMoi.productId, dongMoi.spec.trim())
+      : khaDung(tonBTP, dongMoi.productId, dongMoi.spec.trim())
+    : null;
+  const banVuotTon = kdDongMoi != null && dongMoi.quantityKg > kdDongMoi;
   /** Kênh bán dùng gần nhất trong phiên — làm mặc định cho phiếu mới thay vì
    *  luôn về "Xuất khẩu" (người bán Nội địa khỏi lật kênh mỗi phiếu). */
   const [kenhGanNhat, setKenhGanNhat] = useState<SalesChannel>("Xuất khẩu");
@@ -314,7 +354,7 @@ export default function BanHangScreen() {
       spec: dongMoi.spec.trim(),
       quantityKg: dongMoi.quantityKg,
       unitPrice: dongMoi.unitPrice,
-      sourceWarehouse: "",
+      sourceWarehouse: dongMoi.nguon, // KHO_BAN_LE ⇒ trừ tồn BTP; KHO_TP ⇒ trừ tồn TP đóng gói
     };
     // Đồng bộ đầu phiếu cho MỌI dòng của phiếu (khách/ngày/kênh có thể vừa đổi
     // tại chỗ) rồi thêm dòng mới — giữ bất biến "đầu phiếu áp cả phiếu".
@@ -332,7 +372,7 @@ export default function BanHangScreen() {
     // Nhớ kênh vừa bán để phiếu sau khỏi lật lại.
     setKenhGanNhat(phien.channel);
     // Giữ quy cách cho dòng kế (một lô thường cùng size); xóa mặt hàng / kg / giá.
-    setDongMoi((d) => ({ ...DONG_MOI_RONG, spec: d.spec }));
+    setDongMoi((d) => ({ ...DONG_MOI_RONG, spec: d.spec, nguon: d.nguon }));
     setLoiPhien([]);
   };
 
@@ -826,6 +866,17 @@ export default function BanHangScreen() {
                   emptyText="Chưa có mặt hàng nào trong danh mục."
                 />
 
+                <ChoiceGroup
+                  label="Nguồn bán"
+                  value={dongMoi.nguon}
+                  onChange={(v) => setDong("nguon", v)}
+                  options={[
+                    { value: KHO_BAN_LE, label: "Block thô (kho dự trữ)" },
+                    { value: KHO_TP, label: "Đóng gói (kho thành phẩm)" },
+                  ]}
+                  cot={2}
+                />
+
                 <Field
                   label="Quy cách"
                   hint="Size/grade của thành phẩm. VD: 18-20, 1000-1300, 1.5g."
@@ -853,6 +904,22 @@ export default function BanHangScreen() {
                     hint="Bỏ trống nếu chưa chốt giá."
                   />
                 </div>
+
+                {kdDongMoi != null ? (
+                  <div
+                    className={
+                      banVuotTon
+                        ? "rounded-lg bg-warning-surface px-4 py-3 text-base text-warning"
+                        : "rounded-lg bg-muted px-4 py-3 text-base text-muted-foreground"
+                    }
+                  >
+                    Tồn khả dụng ({dongMoi.nguon === KHO_TP ? "kho thành phẩm" : "kho dự trữ"}):{" "}
+                    <span className="tnum font-semibold">{kg(kdDongMoi)}</span>
+                    {banVuotTon
+                      ? " — bán vượt tồn, kiểm lại (vẫn ghi được, tồn sẽ báo âm)."
+                      : ""}
+                  </div>
+                ) : null}
 
                 {dongMoi.quantityKg > 0 && dongMoi.unitPrice ? (
                   <div className="rounded-lg bg-accent px-4 py-3 text-base text-accent-foreground">

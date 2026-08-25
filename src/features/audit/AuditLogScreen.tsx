@@ -39,6 +39,7 @@ const NHAN_BANG: Record<string, string> = {
   scraps: "Phế liệu",
   production_wips: "Sản xuất BTP",
   production_locks: "Chốt ngày sản xuất",
+  packagings: "Đóng gói BTP → TP",
   balancing_periods: "Kỳ cân đối",
   balancing_inputs: "Nguyên liệu vào (cân đối)",
   balancing_outputs: "Thành phẩm ra (cân đối)",

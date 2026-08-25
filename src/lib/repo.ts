@@ -30,6 +30,7 @@ import type {
   SalesItem,
   WipProductionItem,
   WipWarehouseStatus,
+  Packaging,
   SalesOrder,
   SalesOrderStatus,
   OrderItem,
@@ -183,6 +184,7 @@ export const BANG_PRODUCT: AnhXaBang<Product> = {
     finished_good_code: x.finishedGoodCode,
     category: x.category,
     material_type_id: x.materialTypeId,
+    processing_type: x.processingType,
   }),
   fromRow: (r) => ({
     id: s(r.id),
@@ -191,6 +193,7 @@ export const BANG_PRODUCT: AnhXaBang<Product> = {
     finishedGoodCode: s(r.finished_good_code),
     category: r.category == null ? "" : s(r.category),
     materialTypeId: r.material_type_id == null ? "" : s(r.material_type_id),
+    processingType: r.processing_type == null ? "" : s(r.processing_type),
   }),
 };
 
@@ -605,6 +608,7 @@ export const BANG_PRODUCTION_LOCK: AnhXaBang<DailyLock> = {
     total_kg_at_lock: x.totalKgAtLock,
     reopen_reason: x.reopenReason,
     note: x.note,
+    leftover_kg: x.leftoverKg ?? 0,
   }),
   fromRow: (r) => ({
     id: s(r.id),
@@ -614,6 +618,44 @@ export const BANG_PRODUCTION_LOCK: AnhXaBang<DailyLock> = {
     lockedAt: s(r.locked_at),
     totalKgAtLock: Number(r.total_kg_at_lock ?? 0),
     reopenReason: s(r.reopen_reason),
+    note: s(r.note),
+    leftoverKg: Number(r.leftover_kg ?? 0),
+  }),
+};
+
+/** Phiếu đóng gói BTP → thành phẩm (G3, migration 0029). */
+export const BANG_PACKAGING: AnhXaBang<Packaging> = {
+  table: "packagings",
+  localKey: "bsf.packagings.v1",
+  layKhoa: theoId,
+  toRow: (x) => ({
+    id: x.id,
+    date: x.date,
+    workshop: x.workshop,
+    from_product_id: x.fromProductId,
+    from_spec: x.fromSpec,
+    input_kg: x.inputKg,
+    input_blocks: x.inputBlocks,
+    to_product_id: x.toProductId,
+    to_spec: x.toSpec,
+    output_kg: x.outputKg,
+    output_units: x.outputUnits,
+    warehouse: x.warehouse,
+    note: x.note,
+  }),
+  fromRow: (r) => ({
+    id: s(r.id),
+    date: s(r.date).slice(0, 10),
+    workshop: s(r.workshop) as Workshop,
+    fromProductId: s(r.from_product_id),
+    fromSpec: s(r.from_spec),
+    inputKg: Number(r.input_kg ?? 0),
+    inputBlocks: Number(r.input_blocks ?? 0),
+    toProductId: s(r.to_product_id),
+    toSpec: s(r.to_spec),
+    outputKg: Number(r.output_kg ?? 0),
+    outputUnits: Number(r.output_units ?? 0),
+    warehouse: s(r.warehouse),
     note: s(r.note),
   }),
 };
@@ -852,6 +894,7 @@ const NHAN_BANG: Record<string, string> = {
   scraps: "Phế liệu",
   production_wips: "Sản xuất BTP",
   production_locks: "Chốt ngày sản xuất",
+  packagings: "Đóng gói BTP → TP",
   balancing_periods: "Kỳ cân đối",
   balancing_inputs: "Nguyên liệu vào (cân đối)",
   balancing_outputs: "Thành phẩm ra (cân đối)",

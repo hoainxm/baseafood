@@ -1,7 +1,7 @@
 // ============================================================
 // Tên file: src/lib/inventoryFinished.ts
-// Tên tiếng Việt: Sổ Nhập–Xuất–Tồn kho thành phẩm (bán thành phẩm cấp đông dự trữ)
-// Description: Finished-goods (WIP reserve) NXT ledger — pure, no React
+// Tên tiếng Việt: Sổ Nhập–Xuất–Tồn kho BÁN THÀNH PHẨM (cấp đông dự trữ)
+// Description: WIP-reserve (BTP) NXT ledger — pure, no React
 // ============================================================
 import type {
   WipProductionItem,
@@ -10,29 +10,32 @@ import type {
   SalesItem,
   FinishedGoodsOpeningStock,
   Product,
+  Packaging,
 } from "@/types";
+import { KHO_BAN_LE } from "@/lib/inventory";
 
 /**
- * VÌ SAO CÓ FILE NÀY — khép vòng phía THÀNH PHẨM (đối xứng inventoryMaterial.ts
- * cho nguyên liệu). Suy TỒN THÀNH PHẨM hoàn toàn từ dữ liệu đã ghi, không bắt
- * ghi tay lần hai:
+ * VÌ SAO CÓ FILE NÀY — khép vòng phía KHO BTP DỰ TRỮ (đối xứng inventoryMaterial.ts
+ * cho nguyên liệu). Suy TỒN hoàn toàn từ dữ liệu đã ghi, không ghi tay lần hai:
  *
  *   Tồn cuối = Tồn đầu + Nhập kho − Xuất kho
  *
  *   - Nhập kho = BTP sản xuất đã DUYỆT vào kho (status "da-nhap"), theo ngày SX.
- *   - Xuất kho = Xuất đơn đặt (dòng lệnh, theo ngày lệnh xuất)
- *              + Bán hàng ngày (sổ Bán hàng, theo ngày xuất bán).
- *   - Tồn đầu = tồn đầu khai tay (số dư trước khi số hoá, ≤ ngày bắt đầu kỳ)
- *              + (nhập − xuất) của mọi ngày TRƯỚC kỳ (suy từ lịch sử).
+ *   - Xuất kho (3 luồng, đúng mô hình 2 kho của inventory.ts):
+ *       • Xuất đơn đặt   = dòng lệnh xuất container (theo ngày lệnh).
+ *       • Xuất bán lẻ    = phiếu bán block thô rút từ KHO DỰ TRỮ
+ *                          (sourceWarehouse === KHO_BAN_LE), theo ngày bán.
+ *       • Xuất đóng gói  = BTP tiêu hao để đóng gói ra thành phẩm G3 (inputKg),
+ *                          theo ngày đóng gói.
+ *   - Tồn đầu = khai tay (≤ tuNgay) + (nhập − xuất) mọi ngày TRƯỚC kỳ (suy lịch sử).
  *
- * KHÔNG ĐẾM HAI LẦN: mỗi lần "Lệnh xuất" ở màn Đơn đặt vừa đẻ dòng lệnh (đơn)
- * VỪA đẻ một phiếu bán ở sổ Bán hàng để hiện trong báo cáo bán. Phiếu handoff đó
- * được đánh dấu sourceWarehouse = "Đơn đặt"; sổ này chỉ đếm xuất bán của các dòng
- * KHÔNG phải handoff, nên phần đơn đặt chỉ vào "xuất đơn" một lần.
+ * ĂN KHỚP: dùng ĐÚNG định nghĩa "xuất" như `inventory.tinhTon(... banLe = [
+ *   ...locBanLe(banHang, KHO_BAN_LE), ...dongGoiTruTon(packagings) ])`, nên Tồn cuối
+ *   ở đây == Tổng tồn ở màn Kho dự trữ / Kho lạnh. KHÔNG đếm hai lần: bán đóng gói
+ *   (KHO_TP) rút từ kho THÀNH PHẨM riêng (tinhTonTP), không đụng kho này; handoff
+ *   đơn đặt (KHO_TP/"Đơn đặt") cũng bỏ qua vì đã tính ở "xuất đơn".
  *
- * BỘ DÒ LỖI: tồn cuối < 0 = xuất nhiều hơn số đang trữ → chắc chắn sai ghi chép,
- * màn phải gọi tên (luật "màn tự giải thích").
- *
+ * BỘ DÒ LỖI: tồn cuối < 0 = xuất nhiều hơn số đang trữ → sai ghi chép, màn gọi tên.
  * ⚠️ v1 — đối chiếu tay với một mặt hàng có số thật trước khi tin con số.
  */
 
@@ -44,12 +47,13 @@ export interface SoTonTPRow {
   tonDau: number;
   nhap: number; // BTP da-nhap trong kỳ
   xuatDon: number; // xuất đơn đặt (dòng lệnh) trong kỳ
-  xuatBan: number; // bán hàng ngày (không handoff) trong kỳ
-  xuat: number; // xuatDon + xuatBan
+  xuatBan: number; // bán lẻ block rút kho dự trữ (KHO_BAN_LE) trong kỳ
+  xuatDongGoi: number; // BTP tiêu hao để đóng gói TP (G3) trong kỳ
+  xuat: number; // xuatDon + xuatBan + xuatDongGoi
   tonCuoi: number;
   tonDauBlock: number;
   nhapBlock: number;
-  xuatBlock: number; // block xuất đơn (bán ngày không theo dõi block)
+  xuatBlock: number; // block xuất đơn (bán lẻ/đóng gói không theo dõi block chắc)
   tonCuoiBlock: number;
   canhBaoAm: boolean;
   seedTonDau: boolean; // có tồn đầu khai tay
@@ -70,6 +74,8 @@ interface Acc {
   xuatDonKyBlock: number;
   xuatBanTruocKg: number;
   xuatBanKyKg: number;
+  xuatGoiTruocKg: number;
+  xuatGoiKyKg: number;
   seed: boolean;
 }
 
@@ -96,6 +102,8 @@ function layAcc(map: Map<string, Acc>, productId: string, spec: string): Acc {
       xuatDonKyBlock: 0,
       xuatBanTruocKg: 0,
       xuatBanKyKg: 0,
+      xuatGoiTruocKg: 0,
+      xuatGoiKyKg: 0,
       seed: false,
     };
     map.set(k, a);
@@ -108,6 +116,7 @@ export interface NxtTPArgs {
   exportOrders: ExportOrder[];
   exportItems: ExportItem[];
   salesItems: SalesItem[];
+  packagings: Packaging[];
   opening: FinishedGoodsOpeningStock[];
   products: Product[];
   tuNgay: string;
@@ -115,12 +124,11 @@ export interface NxtTPArgs {
 }
 
 /**
- * Dựng sổ NXT thành phẩm theo (mặt hàng × quy cách) cho khoảng [tuNgay, denNgay].
- * Tồn đầu = khai tay (≤ tuNgay) + lịch sử nhập−xuất TRƯỚC tuNgay; nên chuyển kỳ
- * tự động, không phải chép tay tồn cuối kỳ trước.
+ * Dựng sổ NXT kho BTP dự trữ theo (mặt hàng × quy cách) cho khoảng [tuNgay, denNgay].
+ * Tồn đầu = khai tay (≤ tuNgay) + lịch sử nhập−xuất TRƯỚC tuNgay ⇒ chuyển kỳ tự động.
  */
 export function tinhSoTonTP(args: NxtTPArgs): SoTonTPRow[] {
-  const { sanXuat, exportOrders, exportItems, salesItems, opening, products, tuNgay, denNgay } = args;
+  const { sanXuat, exportOrders, exportItems, salesItems, packagings, opening, products, tuNgay, denNgay } = args;
   const map = new Map<string, Acc>();
 
   // Ngày xuất của mỗi lệnh
@@ -164,32 +172,35 @@ export function tinhSoTonTP(args: NxtTPArgs): SoTonTPRow[] {
     }
   }
 
-  // Xuất bán ngày = sổ Bán hàng KHÔNG phải handoff đơn đặt, theo ngày xuất bán
+  // Xuất bán lẻ = phiếu bán block thô rút KHO DỰ TRỮ (marker KHO_BAN_LE), theo ngày bán
   for (const b of salesItems) {
-    if (b.sourceWarehouse === "Đơn đặt") continue; // handoff đơn đặt: đã tính ở xuất đơn
+    if (b.sourceWarehouse !== KHO_BAN_LE) continue; // chỉ bán lẻ rút kho dự trữ mới trừ tồn BTP
     if (b.deliveryDate > denNgay) continue;
     const a = layAcc(map, b.productId, b.spec);
     if (b.deliveryDate < tuNgay) a.xuatBanTruocKg += b.quantityKg || 0;
     else a.xuatBanKyKg += b.quantityKg || 0;
   }
 
+  // Xuất đóng gói = BTP tiêu hao (inputKg) để đóng gói TP, theo ngày đóng gói
+  for (const p of packagings) {
+    if (p.date > denNgay) continue;
+    const a = layAcc(map, p.fromProductId, p.fromSpec);
+    if (p.date < tuNgay) a.xuatGoiTruocKg += p.inputKg || 0;
+    else a.xuatGoiKyKg += p.inputKg || 0;
+  }
+
   const tenMH = (id: string) => products.find((m) => m.id === id);
   const rows: SoTonTPRow[] = [];
   for (const a of map.values()) {
-    const tonDau = a.openKg + a.nhapTruocKg - a.xuatDonTruocKg - a.xuatBanTruocKg;
-    const xuat = a.xuatDonKyKg + a.xuatBanKyKg;
+    const tonDau =
+      a.openKg + a.nhapTruocKg - a.xuatDonTruocKg - a.xuatBanTruocKg - a.xuatGoiTruocKg;
+    const xuat = a.xuatDonKyKg + a.xuatBanKyKg + a.xuatGoiKyKg;
     const tonCuoi = tonDau + a.nhapKyKg - xuat;
     const tonDauBlock = a.openBlock + a.nhapTruocBlock - a.xuatDonTruocBlock;
     const tonCuoiBlock = tonDauBlock + a.nhapKyBlock - a.xuatDonKyBlock;
 
     // Bỏ dòng hoàn toàn trống (không tồn, không phát sinh trong kỳ)
-    if (
-      tonDau === 0 &&
-      a.nhapKyKg === 0 &&
-      xuat === 0 &&
-      tonCuoi === 0
-    )
-      continue;
+    if (tonDau === 0 && a.nhapKyKg === 0 && xuat === 0 && tonCuoi === 0) continue;
 
     const p = tenMH(a.productId);
     rows.push({
@@ -201,6 +212,7 @@ export function tinhSoTonTP(args: NxtTPArgs): SoTonTPRow[] {
       nhap: a.nhapKyKg,
       xuatDon: a.xuatDonKyKg,
       xuatBan: a.xuatBanKyKg,
+      xuatDongGoi: a.xuatGoiKyKg,
       xuat,
       tonCuoi,
       tonDauBlock,
@@ -225,6 +237,7 @@ export interface TongSoTonTP {
   nhap: number;
   xuatDon: number;
   xuatBan: number;
+  xuatDongGoi: number;
   xuat: number;
   tonCuoi: number;
   soMatHang: number;
@@ -237,6 +250,7 @@ export function tongSoTonTP(rows: SoTonTPRow[]): TongSoTonTP {
     nhap: rows.reduce((s, r) => s + r.nhap, 0),
     xuatDon: rows.reduce((s, r) => s + r.xuatDon, 0),
     xuatBan: rows.reduce((s, r) => s + r.xuatBan, 0),
+    xuatDongGoi: rows.reduce((s, r) => s + r.xuatDongGoi, 0),
     xuat: rows.reduce((s, r) => s + r.xuat, 0),
     tonCuoi: rows.reduce((s, r) => s + r.tonCuoi, 0),
     soMatHang: rows.length,

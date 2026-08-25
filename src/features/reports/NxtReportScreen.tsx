@@ -10,6 +10,7 @@ import {
   useExportItems,
   useExportOrders,
   useSalesItems,
+  usePackagings,
   useProducts,
   useFinishedGoodsOpeningStock,
 } from "@/lib/catalogRepo";
@@ -82,6 +83,7 @@ export default function BaoCaoNhapXuatTonScreen() {
   const [exportItems] = useExportItems();
   const [exportOrders] = useExportOrders();
   const [salesItems] = useSalesItems();
+  const [packagings] = usePackagings();
   const [matHang] = useProducts();
   const [opening, ghiOpening] = useFinishedGoodsOpeningStock();
 
@@ -105,12 +107,13 @@ export default function BaoCaoNhapXuatTonScreen() {
         exportOrders,
         exportItems,
         salesItems,
+        packagings,
         opening,
         products: matHang,
         tuNgay: tu,
         denNgay: den,
       }),
-    [sanXuat, exportOrders, exportItems, salesItems, opening, matHang, tu, den]
+    [sanXuat, exportOrders, exportItems, salesItems, packagings, opening, matHang, tu, den]
   );
   const tong = useMemo(() => tongSoTonTP(rows), [rows]);
 
@@ -118,8 +121,8 @@ export default function BaoCaoNhapXuatTonScreen() {
     { nhan: "Tồn đầu kho", giaTri: `${num(tong.tonDau)} kg`, so: true, icon: Snowflake, mau: "trung-tinh" },
     { nhan: "Nhập kho", giaTri: `${num(tong.nhap)} kg`, so: true, icon: ArrowDownToLine, mau: "brand" },
     {
-      nhan: "Xuất (đơn + bán)",
-      giaTri: `${num(tong.xuatDon)} + ${num(tong.xuatBan)} kg`,
+      nhan: "Xuất (đơn+bán+gói)",
+      giaTri: `${num(tong.xuatDon)} + ${num(tong.xuatBan)} + ${num(tong.xuatDongGoi)} kg`,
       icon: Ship,
       mau: "warning",
     },
@@ -172,6 +175,13 @@ export default function BaoCaoNhapXuatTonScreen() {
       so: true,
       render: (r) => (r.xuatBan ? `−${num(r.xuatBan)}` : "—"),
       tong: () => num(tong.xuatBan),
+    },
+    {
+      key: "xuatDongGoi",
+      header: "Đóng gói (kg)",
+      so: true,
+      render: (r) => (r.xuatDongGoi ? `−${num(r.xuatDongGoi)}` : "—"),
+      tong: () => num(tong.xuatDongGoi),
     },
     {
       key: "tonCuoi",

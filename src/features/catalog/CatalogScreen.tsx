@@ -30,6 +30,18 @@ const THI_TRUONG = ["Nhật", "EU", "Mỹ", "Hàn Quốc", "Trung Quốc", "Nộ
 /** Nhóm/loài của thành phẩm 141 — dùng cho ô Loài của mặt hàng. */
 const NHOM_TP = ["Bạch tuộc", "Mực", "Cá", "Tôm", "Bào ngư", "Khác"];
 
+/** Kiểu chế biến của thành phẩm — facet thứ 3 (migration 0027). Danh mục MỞ, thêm tại chỗ. */
+const KIEU_CHE_BIEN = [
+  "Nguyên con làm sạch",
+  "Luộc",
+  "Chần",
+  "Cắt",
+  "Cắt luộc",
+  "Cắt chần",
+  "Tẩm bột",
+  "Tẩm gia vị",
+];
+
 /**
  * Một trang "Danh mục" cho tất cả danh sách dùng chung.
  *
@@ -105,6 +117,24 @@ export default function DanhMucScreen() {
           placeholder="— Chọn loài —"
         />
       ),
+      anTrenDienThoai: true,
+    },
+    {
+      key: "processingType",
+      nhan: "Kiểu chế biến",
+      render: (giaTri, doiGiaTri) => (
+        <Combobox
+          label="Kiểu chế biến"
+          hint="Luộc, chần, cắt, tẩm bột… Chưa có thì gõ rồi Thêm mới."
+          value={giaTri}
+          onChange={doiGiaTri}
+          options={KIEU_CHE_BIEN.map((k) => ({ value: k, label: k }))}
+          onCreate={(t) => t}
+          placeholder="— Chọn kiểu chế biến —"
+        />
+      ),
+      hienThi: (r) =>
+        r.processingType || <span className="text-muted-foreground">—</span>,
       anTrenDienThoai: true,
     },
     { key: "code", nhan: "Mã nội bộ", anTrenDienThoai: true, viDu: "Tự đặt (nếu cần)" },
@@ -243,6 +273,7 @@ export default function DanhMucScreen() {
               finishedGoodCode: "",
               category: "",
               materialTypeId: "",
+              processingType: "",
             })}
             timTheo={(r) => `${r.code} ${r.name} ${r.finishedGoodCode}`}
             moTaBanGhi={(r) => `${r.name}${r.code ? ` (mã ${r.code})` : ""}`}

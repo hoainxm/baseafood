@@ -3,7 +3,7 @@
 // Tên tiếng Việt: Quản lý Tồn kho & Dung tích 5 kho BSF1
 // Description: Inventory calculation, batch availability, and 5 BSF1 warehouse capacities
 // ============================================================
-import type { WipProductionItem, ExportItem, SalesItem, WarehouseInfo } from "@/types";
+import type { WipProductionItem, ExportItem, WarehouseInfo, Packaging } from "@/types";
 import { BSF1_WAREHOUSES } from "@/types";
 
 /** Tồn của MỘT lô = dòng BTP sản xuất đã duyệt vào kho, trừ đi phần đã xuất. */
@@ -21,20 +21,26 @@ export interface LoTon {
   blockConLai: number;
 }
 
+/** Dòng bán lẻ trừ tồn (không gắn lô): trừ theo FIFO trên các lô cùng mặt hàng × quy cách. */
+export interface BanLeTruTon {
+  productId: string;
+  spec: string;
+  quantityKg: number;
+}
+
 /**
  * Tính tồn từng lô (bất biến: tồn = nhập − xuất). Chỉ lô `da-nhap` mới tính tồn;
- * `cho-nhap` (chưa duyệt) KHÔNG có trong kho. Xuất gom theo `wipId` từ dòng lệnh.
+ * `cho-nhap` (chưa duyệt) KHÔNG có trong kho. Xuất gom theo `sanXuatId` từ dòng lệnh.
  *
- * `banHang` (tùy chọn) = sổ Bán hàng ngày: mọi dòng bán KHÔNG phải handoff của
- * đơn đặt (sourceWarehouse !== "Đơn đặt") cũng rút khỏi kho dự trữ, phân bổ FIFO
- * lô cũ trước theo (mặt hàng × quy cách). Nhờ vậy tồn kho ở màn Kho dự trữ ăn
- * khớp với Tồn cuối ở Báo cáo NXT thành phẩm (cùng định nghĩa "xuất"), và Đơn đặt
- * không thể xuất phần đã bán ngày. Bỏ trống ⇒ giữ nguyên hành vi cũ (chỉ trừ đơn).
+ * `banLe` (tùy chọn) = các dòng bán LẺ trực tiếp (không qua lệnh xuất, không gắn lô).
+ * Trừ FIFO trên lô cùng (mặt hàng × quy cách), lô SX sớm trước. Vì trừ SUY từ dòng
+ * bán, xóa dòng bán là tồn tự hồi — không cần logic đảo. KHÔNG gồm dòng handoff của
+ * Đơn đặt (đã trừ qua `dongLenh`) — bên gọi lọc theo marker bán lẻ trước khi truyền vào.
  */
 export function tinhTon(
   sanXuat: WipProductionItem[],
   dongLenh: ExportItem[],
-  banHang: SalesItem[] = []
+  banLe: BanLeTruTon[] = []
 ): LoTon[] {
   const xuatTheoLo = new Map<string, { kg: number; block: number }>();
   for (const d of dongLenh) {
@@ -61,48 +67,56 @@ export function tinhTon(
         blockConLai: s.blocksCount - x.block,
       };
     });
-  if (banHang.length) truBanNgay(los, banHang);
+
+  if (banLe.length) {
+    const canTru = new Map<string, number>();
+    for (const b of banLe) {
+      const k = `${b.productId}|${b.spec}`;
+      canTru.set(k, (canTru.get(k) ?? 0) + (b.quantityKg || 0));
+    }
+    const theoKey = new Map<string, LoTon[]>();
+    for (const lo of los) {
+      const k = `${lo.productId}|${lo.spec}`;
+      const arr = theoKey.get(k);
+      if (arr) arr.push(lo);
+      else theoKey.set(k, [lo]);
+    }
+    for (const [k, arr] of theoKey) {
+      let con = canTru.get(k) ?? 0;
+      if (con <= 0) continue;
+      arr.sort((a, b) => a.ngaySX.localeCompare(b.ngaySX) || a.wipId.localeCompare(b.wipId));
+      for (const lo of arr) {
+        if (con <= 0) break;
+        const lay = Math.min(con, Math.max(0, lo.conLai));
+        if (lay <= 0) continue;
+        const ty = lo.conLai > 0 ? lay / lo.conLai : 0;
+        lo.blockConLai = Math.max(0, lo.blockConLai - Math.round(lo.blockConLai * ty));
+        lo.conLai -= lay;
+        lo.luongXuat += lay;
+        con -= lay;
+      }
+    }
+  }
   return los;
 }
 
+/** Marker `sales_items.sourceWarehouse`: bán block thô ⇒ trừ tồn BTP dự trữ. */
+export const KHO_BAN_LE = "Kho dự trữ";
+/** Marker `sales_items.sourceWarehouse`: bán hàng đóng gói ⇒ trừ tồn thành phẩm (G3). */
+export const KHO_TP = "Kho thành phẩm";
+
 /**
- * Trừ bán hàng ngày (không phải handoff đơn đặt) khỏi các lô — FIFO lô cũ trước,
- * theo (mặt hàng × quy cách). Sửa `los` tại chỗ. Bán vượt tồn ⇒ lô cuối âm (tín
- * hiệu bán quá số đang trữ; khaDung/loConHang đã kẹp ≥0 nên vẫn an toàn phía đơn).
+ * Lọc các dòng bán lẻ (trừ tồn) từ sổ bán theo marker nguồn.
+ * Mặc định `KHO_BAN_LE` (bán block thô, trừ tồn BTP). Truyền `KHO_TP` để lấy
+ * dòng bán hàng đóng gói (trừ tồn TP). Bỏ handoff Đơn đặt ("Lưu trữ") và dòng cũ ("").
  */
-function truBanNgay(los: LoTon[], banHang: SalesItem[]): void {
-  const canTru = new Map<string, number>(); // productId|||spec → kg
-  for (const b of banHang) {
-    if (b.sourceWarehouse === "Đơn đặt") continue; // handoff đơn đặt đã trừ qua dòng lệnh
-    const k = `${b.productId}|||${b.spec}`;
-    canTru.set(k, (canTru.get(k) ?? 0) + (b.quantityKg || 0));
-  }
-  if (canTru.size === 0) return;
-
-  const theoMH = new Map<string, LoTon[]>();
-  for (const l of los) {
-    const k = `${l.productId}|||${l.spec}`;
-    const ds = theoMH.get(k);
-    if (ds) ds.push(l);
-    else theoMH.set(k, [l]);
-  }
-
-  for (const [k, kg0] of canTru) {
-    const ds = (theoMH.get(k) ?? []).slice().sort((a, b) => a.ngaySX.localeCompare(b.ngaySX));
-    let con = kg0;
-    for (const l of ds) {
-      if (con <= 0) break;
-      const lay = Math.min(con, Math.max(0, l.conLai));
-      if (lay <= 0) continue;
-      const tyLe = l.luongNhap > 0 ? lay / l.luongNhap : 0;
-      const blk = Math.round(l.blockNhap * tyLe);
-      l.conLai -= lay;
-      l.blockConLai -= blk;
-      l.luongXuat += lay;
-      l.blockXuat += blk;
-      con -= lay;
-    }
-  }
+export function locBanLe(
+  banHang: { productId: string; spec: string; quantityKg: number; sourceWarehouse: string }[],
+  marker: string = KHO_BAN_LE
+): BanLeTruTon[] {
+  return banHang
+    .filter((r) => r.sourceWarehouse === marker)
+    .map((r) => ({ productId: r.productId, spec: r.spec, quantityKg: r.quantityKg }));
 }
 
 /** Khả dụng (kg) cho một (mặt hàng × quy cách): tổng phần còn lại các lô. */
@@ -179,5 +193,64 @@ export function tinhDungTichKho(ton: LoTon[]): WarehouseOccupancy[] {
       isOverCapacity: totalKg > wh.capacityKg,
     };
   });
+}
+
+/* ---------- Đóng gói BTP → Thành phẩm (G3) ---------- */
+
+/**
+ * Phiếu đóng gói TIÊU HAO BTP — trả về dạng `BanLeTruTon` để trừ tồn BTP (dùng
+ * cùng tham số `banLe` của `tinhTon`). Nhờ vậy BTP đã đóng gói không còn tính là
+ * tồn dự trữ nữa. Truyền kèm với `locBanLe(sales)` ở các màn tồn.
+ */
+export function dongGoiTruTon(packagings: Packaging[]): BanLeTruTon[] {
+  return packagings.map((p) => ({
+    productId: p.fromProductId,
+    spec: p.fromSpec,
+    quantityKg: p.inputKg,
+  }));
+}
+
+/** Tồn thành phẩm đóng gói theo (mặt hàng × quy cách): output đóng gói − bán TP. */
+export interface TonTP {
+  productId: string;
+  spec: string;
+  outputKg: number;
+  outputUnits: number;
+  soldKg: number;
+  conLai: number; // kg còn = output − bán
+}
+
+/**
+ * Tồn TP đóng gói (SUY). `banLeTP` = dòng bán LẺ chọn nguồn "Kho thành phẩm"
+ * (marker `KHO_TP`). Trừ suy nên xóa dòng bán/đóng gói là tồn tự hồi.
+ */
+export function tinhTonTP(packagings: Packaging[], banLeTP: BanLeTruTon[] = []): TonTP[] {
+  const map = new Map<string, TonTP>();
+  const lay = (productId: string, spec: string): TonTP => {
+    const k = `${productId}|${spec}`;
+    let cur = map.get(k);
+    if (!cur) {
+      cur = { productId, spec, outputKg: 0, outputUnits: 0, soldKg: 0, conLai: 0 };
+      map.set(k, cur);
+    }
+    return cur;
+  };
+  for (const p of packagings) {
+    const cur = lay(p.toProductId, p.toSpec);
+    cur.outputKg += p.outputKg || 0;
+    cur.outputUnits += p.outputUnits || 0;
+  }
+  for (const b of banLeTP) {
+    lay(b.productId, b.spec).soldKg += b.quantityKg || 0;
+  }
+  const arr = [...map.values()];
+  for (const t of arr) t.conLai = t.outputKg - t.soldKg;
+  return arr;
+}
+
+/** Tồn TP khả dụng của một (mặt hàng × quy cách). */
+export function khaDungTP(tonTP: TonTP[], productId: string, spec: string): number {
+  const t = tonTP.find((x) => x.productId === productId && x.spec === spec);
+  return t ? t.conLai : 0;
 }
 

@@ -8,7 +8,13 @@ import type { DailyLock, WipProductionItem, Product, Workshop } from "@/types";
 import { isBackdatedWip } from "@/types";
 import { newId } from "@/lib/store";
 import { uid } from "@/lib/db";
-import { useProductionLocks, useMaterialTypes, useProducts, useWipProductions } from "@/lib/catalogRepo";
+import {
+  useMaterialImports,
+  useProductionLocks,
+  useMaterialTypes,
+  useProducts,
+  useWipProductions,
+} from "@/lib/catalogRepo";
 import {
   Badge,
   ChuThichBatBuoc,
@@ -37,6 +43,8 @@ import {
 } from "@/design-system";
 import { kg, num, todayISO, viDate } from "@/lib/format";
 import { KY_OPT, phamViKy, type KyXem } from "@/lib/periodUtils";
+import { cungHoNguyenLieu } from "@/lib/balancingGrid";
+import { DailyTaskReminder } from "@/features/shared";
 import {
   CalendarRange,
   CircleCheck,
@@ -78,6 +86,7 @@ export default function SanXuatBTPScreen() {
   const [chot, persistChot] = useProductionLocks();
   const [matHang, setMatHang] = useProducts();
   const [loaiNL] = useMaterialTypes();
+  const [imports] = useMaterialImports();
 
   const [ky, setKy] = useState<KyXem>("ngay");
   const [ngay, setNgay] = useState(todayISO());
@@ -99,6 +108,7 @@ export default function SanXuatBTPScreen() {
 
   const [hoiChot, setHoiChot] = useState(false);
   const [ghiChuChot, setGhiChuChot] = useState("");
+  const [conDoChot, setConDoChot] = useState<number | null>(null); // NL còn dở đem lưu kho
   const [hoiMoLai, setHoiMoLai] = useState(false);
   const [lyDoMoLai, setLyDoMoLai] = useState("");
   const [loiChot, setLoiChot] = useState<LoiNhap[]>([]);
@@ -163,6 +173,11 @@ export default function SanXuatBTPScreen() {
   const ngayGhi = laMotNgay ? tuHieuLuc : denHieuLuc;
   const xuongGhi: Workshop = phanXuong === "Tất cả" ? "Đông" : phanXuong;
 
+  /* Nhắc daily-task: hôm nay (xưởng đang chọn) đã chốt sản xuất chưa. */
+  const daChotSXHomNay = chot.some(
+    (c) => c.lockDate === todayISO() && c.workshop === xuongGhi && c.isLocked
+  );
+
   /* ---- Thêm mặt hàng (thành phẩm) tại chỗ, gắn loại NL đang chọn ---- */
   const themMatHang = (ten: string, materialTypeId: string): string => {
     const loai = loaiNL.find((l) => l.id === materialTypeId)?.category || "";
@@ -193,6 +208,35 @@ export default function SanXuatBTPScreen() {
     [rows, phienIds]
   );
   const tongPhien = dongPhien.reduce((s, r) => s + (r.quantityKg || 0), 0);
+
+  /* ---- Đối chiếu Nhập ↔ Sản xuất trong ngày, cùng họ nguyên liệu (G1) ----
+   * Read-only: lượng nhập hôm nay chỉ để tham khảo — sản xuất còn có thể dùng
+   * hàng xả đông kỳ trước, nên KHÔNG ràng buộc, chỉ hiển thị để tổ trưởng soát. */
+  const doiChieu = useMemo(() => {
+    if (!phien || !phien.materialTypeId) return null;
+    const tenNL = loaiNL.find((l) => l.id === phien.materialTypeId)?.name || "";
+    const nhap = imports
+      .filter(
+        (i) =>
+          i.deliveryDate === phien.productionDate &&
+          i.workshop === phien.workshop &&
+          cungHoNguyenLieu(i.materialTypeName, tenNL)
+      )
+      .reduce((s, i) => s + (i.quantityKg || 0), 0);
+    const sx = rows
+      .filter(
+        (r) =>
+          r.productionDate === phien.productionDate &&
+          r.workshop === phien.workshop &&
+          matHang.find((m) => m.id === r.productId)?.materialTypeId === phien.materialTypeId
+      )
+      .reduce((s, r) => s + (r.quantityKg || 0), 0);
+    const conDo =
+      chot.find(
+        (c) => c.lockDate === phien.productionDate && c.workshop === phien.workshop
+      )?.leftoverKg ?? null;
+    return { tenNL, nhap, sx, conDo, dinhMuc: sx > 0 ? nhap / sx : null };
+  }, [phien, imports, rows, matHang, loaiNL, chot]);
 
   const themDong = () => {
     if (!phien) return;
@@ -309,11 +353,13 @@ export default function SanXuatBTPScreen() {
       totalKgAtLock: tongThucTe,
       reopenReason: "",
       note: ghiChuChot,
+      leftoverKg: conDoChot ?? 0,
     };
     persistChot(bg ? chot.map((c) => (c.id === bg.id ? ban : c)) : [...chot, ban]);
     notify.daLuu(`Đã chốt SX ${viDate(tuHieuLuc)} · xưởng ${xuong} — ${kg(tongThucTe)}`);
     setHoiChot(false);
     setGhiChuChot("");
+    setConDoChot(null);
   };
   const moLaiNgay = () => {
     const bg = banGhiChot(tuHieuLuc, xuong);
@@ -380,6 +426,8 @@ export default function SanXuatBTPScreen() {
           </Button>
         </div>
       </div>
+
+      <DailyTaskReminder daChot={daChotSXHomNay} viec={`sản lượng BTP hôm nay — xưởng ${xuongGhi}`} />
 
       <ThongKe
         className="grid-cols-2 sm:grid-cols-3 lg:grid-cols-5"
@@ -529,7 +577,14 @@ export default function SanXuatBTPScreen() {
               Mở lại ngày
             </Button>
           ) : (
-            <Button size="lg" onClick={() => setHoiChot(true)}>
+            <Button
+              size="lg"
+              onClick={() => {
+                setConDoChot(chotHienTai?.leftoverKg ?? null);
+                setGhiChuChot(chotHienTai?.note ?? "");
+                setHoiChot(true);
+              }}
+            >
               <Lock />
               Chốt ngày
             </Button>
@@ -615,6 +670,43 @@ export default function SanXuatBTPScreen() {
                   emptyText="Chưa có loại NL — thêm ở Danh mục."
                 />
               </div>
+
+              {/* Đối chiếu Nhập ↔ Sản xuất trong ngày (cùng loại NL) — G1 */}
+              {doiChieu && (
+                <div className="space-y-2 rounded-xl border-2 border-border bg-muted/30 p-4">
+                  <p className="flex items-center gap-2 text-base font-semibold text-foreground">
+                    <Scale className="size-5 text-primary" aria-hidden />
+                    Đối chiếu hôm nay — {doiChieu.tenNL || "loại NL"}
+                  </p>
+                  <div className="grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-3">
+                    <div>
+                      <span className="text-sm text-muted-foreground">Nhập cùng loại</span>
+                      <div className="tnum text-base font-semibold">{kg(doiChieu.nhap)}</div>
+                    </div>
+                    <div>
+                      <span className="text-sm text-muted-foreground">Đã sản xuất</span>
+                      <div className="tnum text-base font-semibold">{kg(doiChieu.sx)}</div>
+                    </div>
+                    <div>
+                      <span className="text-sm text-muted-foreground">Định mức tạm (NL÷TP)</span>
+                      <div className="tnum text-base font-semibold">
+                        {doiChieu.dinhMuc == null ? "—" : num(doiChieu.dinhMuc)}
+                      </div>
+                    </div>
+                  </div>
+                  {doiChieu.conDo != null && doiChieu.conDo > 0 && (
+                    <p className="text-sm text-foreground">
+                      Còn dở đã lưu kho hôm nay:{" "}
+                      <span className="tnum font-semibold">{kg(doiChieu.conDo)}</span> (ghi lúc chốt ngày SX).
+                    </p>
+                  )}
+                  <p className="text-sm text-muted-foreground">
+                    {doiChieu.nhap === 0
+                      ? `Chưa có phiếu nhập ${doiChieu.tenNL || "loại này"} hôm nay — có thể đang dùng hàng xả đông kỳ trước.`
+                      : "Nhập cùng ngày chỉ để tham khảo — sản xuất có thể dùng thêm hàng xả đông kỳ trước, nên không ràng buộc."}
+                  </p>
+                </div>
+              )}
 
               {/* Đã vào sổ trong phiên này */}
               {dongPhien.length > 0 && (
@@ -800,6 +892,13 @@ export default function SanXuatBTPScreen() {
               thêm sau khi chốt phải ghi bù.
             </DialogDescription>
           </DialogHeader>
+          <NumberField
+            label="Nguyên liệu còn dở đem lưu kho"
+            unit="kg"
+            hint="Phần NL chưa làm xong cuối ngày, cất đông cho kỳ sau. Để trống nếu đã làm hết."
+            value={conDoChot}
+            onChange={(v) => setConDoChot(v)}
+          />
           <Field label="Ghi chú chốt">
             <Input
               value={ghiChuChot}

@@ -5,8 +5,8 @@
 // ============================================================
 import { useMemo, useState } from "react";
 import type { WipProductionItem } from "@/types";
-import { useExportItems, useProducts, useSalesItems, useWipProductions } from "@/lib/catalogRepo";
-import { tinhTon, type LoTon } from "@/lib/inventory";
+import { useExportItems, usePackagings, useProducts, useSalesItems, useWipProductions } from "@/lib/catalogRepo";
+import { tinhTon, locBanLe, dongGoiTruTon, type LoTon } from "@/lib/inventory";
 import {
   Badge,
   ChuThichBatBuoc,
@@ -51,8 +51,13 @@ export default function KhoDuTruScreen() {
   const [sanXuat, persistSX, { trangThai }] = useWipProductions();
   const dangTai = trangThai === "dang-tai" && sanXuat.length === 0;
   const [dongLenh] = useExportItems();
-  const [banHang] = useSalesItems();
   const [matHang] = useProducts();
+  const [banHang] = useSalesItems();
+  const [packagings] = usePackagings();
+  const banLe = useMemo(
+    () => [...locBanLe(banHang), ...dongGoiTruTon(packagings)],
+    [banHang, packagings]
+  );
 
   const [locKho, setLocKho] = useState("");
   const [duyet, setDuyet] = useState<DuyetForm | null>(null);
@@ -64,10 +69,7 @@ export default function KhoDuTruScreen() {
     () => sanXuat.filter((s) => s.status === "cho-nhap"),
     [sanXuat]
   );
-  const ton = useMemo(
-    () => tinhTon(sanXuat, dongLenh, banHang),
-    [sanXuat, dongLenh, banHang]
-  );
+  const ton = useMemo(() => tinhTon(sanXuat, dongLenh, banLe), [sanXuat, dongLenh, banLe]);
   const dungTichKho = useMemo(() => tinhDungTichKho(ton), [ton]);
 
   const dsKho = useMemo(() => {

@@ -24,14 +24,15 @@ npm run lint     # oxlint
 
 ```
 src/
-├── App.tsx · main.tsx        điều hướng 4 màn (KHÔNG router, state trong App)
+├── App.tsx · main.tsx        điều hướng react-router-dom v7 (HashRouter) — ~17 route, khung ở features/shared/AppShell.tsx
 ├── types.ts                  kiểu + BẤT BIẾN nghiệp vụ (laGhiBu, thanhTien)
 ├── data/thanh-pham.json      141 mã TK 1551 — chỉ là SEED
-├── lib/                      repo · catalogRepo · db · supabase · connectivity · balancingCalc · auth · username · format · store · utils
+├── lib/                      repo · catalogRepo · db · supabase · connectivity · balancingCalc · balancingGrid · periodUtils · inventory · inventoryMaterial · nxtExcel · auth · username · format · store · utils
 ├── components/ui/            primitive shadcn — size mật độ web thường (token-driven)
 ├── design-system/            tokens.css · patterns/ · kit/ · index.ts (cửa import duy nhất)
-└── features/                 MaterialImportScreen · SalesScreen · BalancingScreen + BalancingTable · CatalogScreen (5 tab) · FinishedGoodScreen (chỉ đọc) · LoginScreen · UserManagementScreen
-supabase/migrations/          0001 … 0006
+└── features/                 THẬT: imports · production/WipProductionScreen (/wip) · packaging (/packaging) · warehouse · orders · sales · balancing · catalog · reports/NXT · auth · users
+                              DEMO (dữ liệu mẫu): production/WorkOrderScreen (/production) · cold-storage · reports · dashboard · quality · traceability
+supabase/migrations/          0001 … 0026
 docs/README.md                bản đồ tài liệu — doc nào ở đâu, doc mới bỏ đâu
 docs/app-map/                 bản đồ ngữ cảnh cho agent (đọc khi CODE)
 docs/ops/                     vận hành: cutover Supabase · deploy Vercel · env
@@ -50,7 +51,7 @@ Chi tiết + ranh giới import: [`01-app-structure.md`](docs/app-map/01-app-str
 5. Nhãn luôn hiện (không dùng placeholder thay nhãn); vùng chạm ≥ 44px; nút Lưu **không bao giờ** `disabled` (thiếu thì bắn `ErrorSummary`).
 6. Không xóa bản ghi nghiệp vụ theo kiểu lặng lẽ — dùng trạng thái; mọi xóa hiện tại qua `ConfirmDelete` + toast **Hoàn tác**.
 7. Danh mục thay nhập tự do: đại lý / loại NL / mặt hàng / khách hàng chọn qua `Combobox` (tạo mới tại chỗ, lưu ngay vào danh mục).
-8. Đặt tên DB: **tiếng Việt KHÔNG DẤU, snake_case, không tiền tố**. Cấm tên có dấu (NFC/NFD trông giống hệt nhưng là 2 định danh).
+8. Đặt tên DB: **tiếng Anh, snake_case, không tiền tố** (đã đổi từ tiếng Việt-không-dấu sang tiếng Anh ở migration `0016_rename_to_english.sql` — theo [`spec/routing-va-naming.md`](docs/spec/routing-va-naming.md)). Vẫn cấm tên có dấu (NFC/NFD trông giống hệt nhưng là 2 định danh). Bảng cũ tiếng Việt chỉ còn trong migration `0001…0015`.
 9. Brand `#17529c` (từ `public/baseafood-logo.png`).
 10. `npx shadcn add` **không chạy được trên Windows** (CLI quét ngược thư mục cha, đụng junction bị khóa quyền) — lấy component thủ công theo `src/design-system/README.md`.
 11. 🔒 Không ghi project ref / URL / key vào bất kỳ file nào trong repo.
@@ -129,14 +130,27 @@ Index đầy đủ + bảng định tuyến theo task: [`docs/app-map/README.md`
 | [`33-ban-hang`](docs/app-map/33-ban-hang.md) | phiếu bán, dòng bán, quy cách, ghi bù, hút bán vào cân đối |
 | [`31-can-doi-ky`](docs/app-map/31-can-doi-ky.md) | kỳ, 3 khối, công thức, bảng in A4 |
 | [`32-danh-muc`](docs/app-map/32-danh-muc.md) | danh mục, 141 mã thành phẩm |
+| [`34-btp-san-xuat-kho`](docs/app-map/34-btp-san-xuat-kho.ba-spec.md) · [`35-btp-ui`](docs/app-map/35-btp-ui.design-spec.md) | sản xuất BTP/WIP, **đóng gói BTP→TP** (`/packaging`), kho dự trữ, đơn/xuất, vòng đông gửi↔xả đông |
+| [`trien-khai/flow-end-to-end-2-bo-phan`](docs/trien-khai/flow-end-to-end-2-bo-phan.md) | nối luồng nhập→sản xuất→kho→bán, 2 giao diện bộ phận, daily-task (họp 2026-08-22) |
 
 Bản đồ tài liệu đầy đủ + luật "doc mới bỏ đâu": [`docs/README.md`](docs/README.md).
 Ngoài app-map: [`src/design-system/README.md`](src/design-system/README.md) (UI) · [`docs/ops/deploy-vercel.md`](docs/ops/deploy-vercel.md) (deploy) · [`docs/ops/supabase-setup.md`](docs/ops/supabase-setup.md) (cutover) · [`docs/trien-khai/`](docs/trien-khai/README.md) (nghiệp vụ gốc) · [`docs/BAN-GIAO.md`](docs/BAN-GIAO.md) (bối cảnh công ty, đầu mối, câu treo với xí nghiệp).
 
 ## Trạng thái
 
-**Đã build:** nhập hàng (chuyến thật · ngày giao/ngày ghi sổ + ghi bù · chốt ngày · phế liệu cân trong ngày · bộ lọc), **bán thành phẩm ngày (phiếu bán · quy cách · 2 ngày + ghi bù · kênh XK/NĐ · hút vào cân đối)**, cân đối + in bảng, danh mục 5 tab, **đăng nhập (Supabase Auth, email tổng hợp) + hồ sơ/vai trò `nguoi_dung` + màn Người dùng (admin) + gate ở App**, bộ giao diện **responsive web (mật độ thường, 360px→desktop) + micro-animation + loading→thinking (skeleton/ThinkingDots)** + cài đặt hiển thị (phóng 90–130%), tầng dữ liệu Supabase↔localStorage.
+> **Định hướng hiện hành — họp 2026-08-22:** số hóa TRỌN chuỗi nhập→sản xuất, tách **2 giao diện bộ phận** (nhập hàng / sản xuất) vận hành theo bước + daily-task, **cutover chạy realtime 01/09/2026** (baseline tồn 30/06, nhập báo cáo T7–T8). Cửa vào: [`trien-khai/hop-2026-08-22-so-hoa-flow-2-bo-phan.md`](docs/trien-khai/hop-2026-08-22-so-hoa-flow-2-bo-phan.md).
 
-**Backlog:** ⚠️ chạy migration `0004` + `0005` + `0006` + `0007` (`0007` seed sẵn **admin/admin** — ĐỔI MẬT KHẨU NGAY); đăng ký ĐÓNG, chỉ admin tạo tài khoản; siết RLS (`0003`, cập nhật bao bảng mới) **sau khi login ổn**; **chốt ngày bán + phiếu bán in A4** (bán v1 chưa có); siết RLS theo người dùng; nhập khẩu số liệu cũ lên máy chủ; định mức NL→TP; báo cáo tháng 6 khối; **SẢN XUẤT bán thành phẩm (WIP) + kho dự trữ + vòng lặp đông gửi ↔ xả đông ↔ tồn cuối kỳ** (vấn đề cốt lõi, chưa số hóa) — quy trình: SX bán thành phẩm ngày → cất kho dự trữ → gom đủ theo **đơn đặt** (số lượng lớn) → **xuất container** nhiều block/quy cách; cột `ban_hang.kho_nguon` để dành seam. Lưu ý: **đơn đặt = xuất khẩu**, phí XK do phòng kế hoạch tính riêng (đã trừ trong giá báo) ⇒ cân đối KHÔNG tính phí XK. Test thực địa với 5 người dùng ≥45 tuổi.
+**Đã build (THẬT — nối dữ liệu):** nhập hàng (chuyến thật · 2 ngày + ghi bù · chốt ngày · phế liệu ngày · bộ lọc), **sản xuất BTP ngày `/wip`** (sản lượng theo ngày/xưởng/loại NL · chốt ngày SX · ghi bù), **kho dự trữ `/warehouse`** (duyệt BTP chờ→đã nhập · tồn), **đơn đặt `/orders`** (lệnh xuất FIFO từ tồn WIP), bán hàng (phiếu bán · quy cách · XK/NĐ · hút cân đối), cân đối + in A4 + chốt/chuyển kỳ, NXT + tồn NL, danh mục 5 tab, đăng nhập + vai trò `user_profiles` + màn Người dùng, bộ giao diện responsive, tầng dữ liệu Supabase↔localStorage. Điều hướng **react-router v7 (HashRouter)**, ~17 route.
+
+**Màn DEMO (dữ liệu mẫu, chưa nối bảng — đừng coi là đã có):** Lệnh sản xuất `/production` · Kho lạnh `/cold-storage` · Báo cáo tổng `/reports` · Tổng quan `/dashboard` · Chất lượng `/quality` · Truy xuất `/traceability`.
+
+**Backlog (cập nhật 2026-08-22):**
+- ⚠️ Chạy đủ migration `0001…0026` trên DB thật; siết RLS `0021` **+ bổ sung `material_opening_stock`**; đổi mật khẩu admin (`0007` seed admin/admin) 🔴.
+- **Chỗ đứt gãy chuỗi** (chi tiết [`flow §3`](docs/trien-khai/flow-end-to-end-2-bo-phan.md)): (G1) ✅ đối chiếu nhập↔SX ở `/wip` + lưu "còn dở" khi chốt SX (`production_locks.leftover_kg`, `0025`) — còn: ràng "còn dở" vào tồn/đông gửi ở Cân đối; (G2) ✅ hết chồng: `cold-storage` hút tồn thật (`tinhTon`) + nhãn nhiệt độ minh hoạ, `warehouse` canonical — còn: cảm biến thật; (G3) ✅ đóng gói BTP→TP đã build: màn `/packaging` (phiếu đóng gói BTP tiêu hao→TP ra + hao hụt, `0026`) + tồn TP suy (`tinhTonTP`); bán chọn nguồn Block thô (trừ BTP)/Đóng gói (trừ TP) — còn: tách kho TP theo nhiệt/vị trí; (G4) ✅ bán lẻ trừ tồn: dòng bán chọn **nguồn** (`KHO_BAN_LE` trừ BTP / `KHO_TP` trừ TP đóng gói), trừ suy FIFO qua `tinhTon(...,banLe)`/`tinhTonTP`, nhất quán warehouse/cold-storage/orders/packaging.
+- **2 giao diện bộ phận:** ✅ route-guard + trang chủ theo vai trò (`lib/nav-access.ts`) + banner nhắc daily-task (`/imports`,`/wip`) — còn: siết RLS theo vai trò ở server.
+- **Cutover 01/09 (mục tiêu tiên quyết):** baseline tồn 30/06 + nhập bù báo cáo T7–T8 → tồn đầu 01/09 đúng. Người dùng có **2 báo cáo** (tồn cuối T6 · báo cáo cuối T7/T8), **import khi có file thực tế** (cấu hình theo file, chưa build). Đọc [`ke-hoach-cutover §2b`](docs/trien-khai/ke-hoach-cutover-1-9-2026.md) trước khi làm import.
+- **Bộ quy cách × chế biến:** ✅ Chiều B kiểu chế biến (`processing_type`, `0024` + combobox danh mục) — còn: chuẩn hoá quy cách (Chiều C) ([`spec`](docs/spec/bo-quy-cach-che-bien-thanh-pham.md)).
+- Import file Excel + scan viết tay (**tay trước**, file/scan sau); chốt ngày bán + phiếu bán in A4; định mức NL→TP; báo cáo tháng 6 khối; ẩn/gắn nhãn màn DEMO trước khi chạy thật. Test thực địa 5 người dùng ≥45 tuổi.
+- Lưu ý giữ nguyên: **đơn đặt = xuất khẩu**, phí XK phòng kế hoạch tính riêng (đã trừ trong giá báo) ⇒ cân đối KHÔNG tính phí XK.
 
 > ⚠️ **Đừng nhầm thuật ngữ:** "bán thành phẩm" (WIP, công đoạn sản xuất, backlog trên) ≠ màn **Bán hàng** (bán thành phẩm RA cho khách, đã build — [33-ban-hang.md](docs/app-map/33-ban-hang.md)).

@@ -23,8 +23,9 @@ import {
   useProducts,
   useSalesInvoices,
   useWipProductions,
+  usePackagings,
 } from "@/lib/catalogRepo";
-import { loConHang, tinhTon } from "@/lib/inventory";
+import { loConHang, tinhTon, locBanLe, dongGoiTruTon } from "@/lib/inventory";
 import {
   Badge,
   ChuThichBatBuoc,
@@ -91,10 +92,12 @@ export default function DonDatScreen() {
   const tenMH = (id: string) => matHang.find((m) => m.id === id)?.name || "—";
   const tenKH = (id: string) => khach.find((k) => k.id === id)?.name || "—";
 
-  const ton = useMemo(
-    () => tinhTon(sanXuat, dongLenh, banHang),
-    [sanXuat, dongLenh, banHang]
+  const [packagings] = usePackagings();
+  const banLe = useMemo(
+    () => [...locBanLe(banHang), ...dongGoiTruTon(packagings)],
+    [banHang, packagings]
   );
+  const ton = useMemo(() => tinhTon(sanXuat, dongLenh, banLe), [sanXuat, dongLenh, banLe]);
 
   const optMatHang: MucChon[] = matHang.map((m) => ({
     value: m.id,
@@ -183,7 +186,7 @@ export default function DonDatScreen() {
   /* ---- Tạo lệnh xuất (FIFO, cho xuất một phần) + handoff sổ Bán hàng ---- */
   const taoLenhXuat = (d: SalesOrder) => {
     const dsDong = dongDon.filter((x) => x.orderId === d.id);
-    const tonHienTai = tinhTon(sanXuat, dongLenh, banHang);
+    const tonHienTai = tinhTon(sanXuat, dongLenh, banLe);
     const lenhId = newId();
     const dlMoi: ExportItem[] = [];
     for (const dc of dsDong) {

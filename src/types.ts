@@ -23,7 +23,8 @@ export type Role =
   | "manager-ca"
   | "manager-kho"
   | "accountant"
-  | "team-leader";
+  | "team-leader"
+  | "warehouse-keeper";
 
 export const ROLES: { value: Role; label: string }[] = [
   { value: "admin", label: "Quản trị (full quyền)" },
@@ -32,6 +33,8 @@ export const ROLES: { value: Role; label: string }[] = [
   { value: "manager-dong", label: "Quản đốc xưởng Đông" },
   { value: "manager-ca", label: "Quản đốc xưởng Cá" },
   { value: "manager-kho", label: "Quản đốc xưởng Khô" },
+  { value: "team-leader", label: "Tổ trưởng sản xuất" },
+  { value: "warehouse-keeper", label: "Thủ kho / nhập hàng" },
   { value: "accountant", label: "Kế toán" },
 ];
 
@@ -121,6 +124,8 @@ export interface DailyLock {
   totalKgAtLock: number;
   reopenReason: string;
   note: string;
+  /** Chỉ production_locks (migration 0028): nguyên liệu còn dở cuối ngày đem lưu kho (kg). */
+  leftoverKg?: number;
 }
 
 /* ---------- 5-Day Balancing (Dong workshop) ---------- */
@@ -130,8 +135,9 @@ export interface Product {
   code: string;
   name: string;
   finishedGoodCode: string;
-  category?: string;
-  materialTypeId?: string;
+  category?: string; // nhóm LOÀI (Bạch tuộc/Mực/Cá…)
+  materialTypeId?: string; // nguyên liệu / loại NL
+  processingType?: string; // KIỂU CHẾ BIẾN (luộc/chần/cắt/tẩm bột…) — facet thứ 3, migration 0027
 }
 
 export interface Customer {
@@ -308,6 +314,32 @@ export interface WipProductionItem {
 
 export function isBackdatedWip(c: Pick<WipProductionItem, "productionDate" | "postingDate">): boolean {
   return Boolean(c.postingDate) && c.postingDate > c.productionDate;
+}
+
+/* ---------- Đóng gói BTP → Thành phẩm (G3, migration 0029) ---------- */
+
+/** Một phiếu đóng gói: BTP tiêu hao → TP đóng gói ra. Hao hụt = inputKg − outputKg. */
+export interface Packaging {
+  id: string;
+  date: string; // yyyy-mm-dd
+  workshop: Workshop;
+  // BTP tiêu hao (định danh theo mặt hàng + quy cách, như tồn WIP)
+  fromProductId: string;
+  fromSpec: string;
+  inputKg: number;
+  inputBlocks: number;
+  // TP đóng gói ra
+  toProductId: string;
+  toSpec: string;
+  outputKg: number;
+  outputUnits: number; // số thùng / gói
+  warehouse: string; // kho chứa TP đóng gói
+  note: string;
+}
+
+/** Hao hụt đóng gói (kg) = BTP vào − TP ra. Âm = ghi nhầm (TP ra > BTP vào). */
+export function haoHutDongGoi(p: Pick<Packaging, "inputKg" | "outputKg">): number {
+  return p.inputKg - p.outputKg;
 }
 
 export type SalesOrderStatus = "dang-gom" | "du" | "dong";

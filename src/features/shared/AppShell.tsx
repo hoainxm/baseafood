@@ -24,6 +24,7 @@ import {
   ShoppingCart,
   Snowflake,
   PackageCheck,
+  Package,
   Scale,
   Library,
   Users,
@@ -70,6 +71,7 @@ export const KIT_NAV: MucNavShell[] = [
   { id: "dashboard", label: "Tổng quan", icon: LayoutDashboard },
   { id: "production", label: "Lệnh sản xuất", icon: ClipboardList },
   { id: "wip", label: "Sản xuất BTP", icon: Factory },
+  { id: "packaging", label: "Đóng gói", icon: Package },
   { id: "quality", label: "Chất lượng", icon: ShieldCheck },
   { id: "imports", label: "Nhập hàng", icon: Truck },
   { id: "warehouse", label: "Kho dự trữ", icon: Snowflake },
@@ -91,7 +93,7 @@ export const KIT_NAV: MucNavShell[] = [
 /** Nav DỌC gom theo nhóm chức năng — dùng chung cho sidebar và drawer. */
 export const NHOM_NAV: { ten: string; ids: string[] }[] = [
   { ten: "Tổng quan", ids: ["dashboard"] },
-  { ten: "Sản xuất", ids: ["production", "wip", "quality"] },
+  { ten: "Sản xuất", ids: ["production", "wip", "packaging", "quality"] },
   { ten: "Kho", ids: ["imports", "warehouse", "cold-storage"] },
   { ten: "Kinh doanh", ids: ["sales", "orders"] },
   { ten: "Báo cáo", ids: ["balancing", "bc-thanh-pham", "bc-don-xuat", "nxt-nl", "nxt", "reports", "traceability"] },

@@ -52,6 +52,7 @@ import {
   type MucChon,
 } from "@/design-system";
 import { kg, num, todayISO, viDate } from "@/lib/format";
+import { DailyTaskReminder } from "@/features/shared";
 import { KY_OPT, phamViKy, type KyXem } from "@/lib/periodUtils";
 import {
   CalendarRange,
@@ -306,6 +307,9 @@ export default function NhapNguyenLieuScreen() {
 
   const daChot = (n: string, x: Workshop): boolean =>
     Boolean(banGhiChot(n, x)?.isLocked);
+
+  /* Nhắc daily-task: hôm nay (xưởng đang chọn) đã chốt nhập chưa. */
+  const daChotNhapHomNay = daChot(todayISO(), xuongGhi);
 
   /** Tổng kg thực tế của một (ngày + xưởng), không phụ thuộc bộ lọc đang xem. */
   const tongNgayXuong = (n: string, x: Workshop): number =>
@@ -805,6 +809,8 @@ export default function NhapNguyenLieuScreen() {
           }}
         />
       )}
+
+      <DailyTaskReminder daChot={daChotNhapHomNay} viec={`chuyến nhập nguyên liệu hôm nay — xưởng ${xuongGhi}`} />
 
       <ThongKe
         className="grid-cols-2 sm:grid-cols-3 lg:grid-cols-5"

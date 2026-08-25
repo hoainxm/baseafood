@@ -4,6 +4,9 @@
 >
 > **Cập nhật:** 2026-08-05 · **Người bàn giao:** tài khoản Claude hiện tại.
 
+> ⚠️ **File này đã LỖI THỜI ở phần trạng thái code** (viết 2026-08-05). Các mục §2 "nav 3 mục", "13 bảng", "WIP chưa số hóa" **không còn đúng**: hệ đã có router (~17 route), ~24 bảng (tên tiếng Anh sau `0016`), và sản xuất BTP/kho/đơn đã build v1. Phần **bối cảnh công ty · vòng lặp gối đầu · đầu mối · câu treo** (§1, §5, §6) vẫn dùng tốt.
+> **Trạng thái + định hướng hiện hành:** [`trien-khai/hop-2026-08-22-so-hoa-flow-2-bo-phan.md`](trien-khai/hop-2026-08-22-so-hoa-flow-2-bo-phan.md) · [`trien-khai/flow-end-to-end-2-bo-phan.md`](trien-khai/flow-end-to-end-2-bo-phan.md) · [`bao-cao-ban-giao-nhap-kho-candoi.md`](bao-cao-ban-giao-nhap-kho-candoi.md).
+
 ---
 
 ## 1. Dự án là gì

@@ -52,12 +52,12 @@ import {
   type MucChon,
 } from "@/design-system";
 import { kg, num, todayISO, viDate } from "@/lib/format";
+import { cn } from "@/lib/utils";
 import { DailyTaskReminder } from "@/features/shared";
 import { KY_OPT, phamViKy, type KyXem } from "@/lib/periodUtils";
 import {
   CalendarRange,
   ChevronDown,
-  CircleCheck,
   FileText,
   Lock,
   LockOpen,
@@ -92,19 +92,48 @@ interface DauChuyen {
   note: string;
 }
 
-/** Một dòng loại hàng đang nhập trong chuyến. */
-interface DongMoi {
+/**
+ * Một dòng loại hàng trong BẢNG nhập của chuyến. Cả chuyến điền một lượt rồi
+ * lưu một lần (batch) thay vì "thêm từng loại → bấm lưu" như bản trước.
+ *  - `key`: khóa React ổn định theo dòng (không đổi khi gõ).
+ *  - `id`: id dòng ĐÃ LƯU (`null` = dòng mới chưa lưu). Khi sửa chuyến, dòng cũ
+ *    giữ nguyên id để cập nhật đúng bản ghi; bỏ dòng = không đưa lại vào persist.
+ */
+interface DongBang {
+  key: string;
+  id: string | null;
   category: Category;
   materialTypeName: string;
   quantityKg: number;
   unitPrice: number | null;
 }
 
-const DONG_MOI_RONG: DongMoi = {
-  category: "Bạch tuộc",
+const LOAI_MAC_DINH: Category = "Bạch tuộc";
+
+/** Dòng trống mới cho bảng (mặc định theo loài đang dùng cho nhanh). */
+const dongBangRong = (cat: Category = LOAI_MAC_DINH): DongBang => ({
+  key: newId(),
+  id: null,
+  category: cat,
   materialTypeName: "",
   quantityKg: 0,
   unitPrice: null,
+});
+
+/** Dòng đã có dữ liệu (dù chưa đủ) — dùng để biết khi nào cần thêm dòng trống. */
+const dongCoData = (d: DongBang): boolean =>
+  d.materialTypeName.trim() !== "" || d.quantityKg > 0 || d.unitPrice != null;
+
+/** Dòng đủ để lưu (có loại + số lượng > 0). */
+const dongDayDu = (d: DongBang): boolean =>
+  d.materialTypeName.trim() !== "" && d.quantityKg > 0;
+
+/** Luôn để đúng MỘT dòng trống ở cuối bảng để gõ tiếp — không phải bấm "Thêm". */
+const chuanCuoiBang = (ds: DongBang[]): DongBang[] => {
+  const cuoi = ds[ds.length - 1];
+  if (!cuoi || dongCoData(cuoi))
+    return [...ds, dongBangRong(cuoi?.category ?? LOAI_MAC_DINH)];
+  return ds;
 };
 
 /**
@@ -220,25 +249,22 @@ export default function NhapNguyenLieuScreen() {
   const [daiLy, setDaiLy] = useSuppliers();
   const [loaiNL, setLoaiNL] = useMaterialTypes();
 
-  /* Ghi chuyến: bước 1 điền đầu chuyến, bước 2 đổ từng loại hàng. */
+  /* Ghi chuyến: đầu chuyến ở trên, cả BẢNG loại hàng điền một lượt rồi lưu. */
   const [phien, setPhien] = useState<DauChuyen | null>(null);
   const [chuyenIdPhien, setChuyenIdPhien] = useState<string | null>(null);
-  const [dongMoi, setDongMoi] = useState<DongMoi>(DONG_MOI_RONG);
+  const [dongBang, setDongBang] = useState<DongBang[]>([]);
+  /** Ngày ghi sổ kéo ngày hàng về theo (khi hai ngày đang đi liền). Sửa tay ngày
+   *  hàng về ⇒ tách (đây là ghi bù, hai ngày khác nhau). */
+  const [ngayLienNhau, setNgayLienNhau] = useState(true);
   /** Loài dùng gần nhất trong phiên — làm mặc định cho chuyến/dòng mới thay vì
    *  luôn nhảy về "Bạch tuộc" (sai ở xưởng Khô/Cá). */
-  const [loaiGanNhat, setLoaiGanNhat] = useState<Category>(
-    DONG_MOI_RONG.category
-  );
+  const [loaiGanNhat, setLoaiGanNhat] = useState<Category>(LOAI_MAC_DINH);
   const [loiPhien, setLoiPhien] = useState<LoiNhap[]>([]);
   const [moPhuPhien, setMoPhuPhien] = useState(false);
 
   /* Đang sửa một chuyến đã ghi: id các dòng của chuyến đó (null = đang tạo mới).
      Dùng id-set thay vì chỉ chuyenId để sửa được CẢ dữ liệu cũ (không có chuyenId). */
   const [suaRowIds, setSuaRowIds] = useState<string[] | null>(null);
-
-  /* Sửa MỘT dòng hàng — chỉ loại / loài / kg / giá */
-  const [dang, setDang] = useState<MaterialImportItem | null>(null);
-  const [loi, setLoi] = useState<LoiNhap[]>([]);
 
   /* Chốt ngày */
   const [hoiChot, setHoiChot] = useState(false);
@@ -335,10 +361,18 @@ export default function NhapNguyenLieuScreen() {
   /* ---- Danh mục: chọn sẵn, thiếu thì tạo ngay tại chỗ ----
      Lưu theo TÊN (không phải id) để dữ liệu cũ trong localStorage vẫn đọc được. */
 
+  /** Dòng phụ của đại lý: gộp các thông tin nhận diện, ngăn bởi dấu gạch ngang.
+   *  Vừa hiện dưới tên trong dropdown, vừa nằm trong chuỗi tìm kiếm của Combobox. */
+  const moTaDaiLy = (d: (typeof daiLy)[number]): string | undefined =>
+    [d.code, d.billingName, d.phone, d.address]
+      .map((s) => s?.trim())
+      .filter(Boolean)
+      .join(" – ") || undefined;
+
   const optDaiLy: MucChon[] = daiLy.map((d) => ({
     value: d.shortName,
     label: d.shortName,
-    phu: d.phone || undefined,
+    phu: moTaDaiLy(d),
   }));
 
   const themDaiLy = (ten: string) => {
@@ -401,7 +435,10 @@ export default function NhapNguyenLieuScreen() {
     });
     setChuyenIdPhien(null);
     setSuaRowIds(null);
-    setDongMoi({ ...DONG_MOI_RONG, category: loaiGanNhat });
+    setDongBang([dongBangRong(loaiGanNhat)]);
+    // Ngày về mặc định = ngày đang xem sổ, ngày ghi sổ = hôm nay. Đi liền khi
+    // trùng (mở sổ hôm nay) — kéo theo nhau; tách sẵn khi xem ngày cũ (ghi bù).
+    setNgayLienNhau(ngayGhi === todayISO());
     setLoiPhien([]);
     setMoPhuPhien(false);
   };
@@ -420,11 +457,21 @@ export default function NhapNguyenLieuScreen() {
     });
     setChuyenIdPhien(n.chuyen?.id ?? null);
     setSuaRowIds(n.dong.map((r) => r.id));
-    // Thêm loại vào chuyến cũ → mặc định đúng loài của chuyến đó.
-    setDongMoi({
-      ...DONG_MOI_RONG,
-      category: n.dong[0]?.category ?? loaiGanNhat,
-    });
+    // Nạp mọi dòng đã ghi vào bảng (giữ id để cập nhật đúng bản ghi) + một dòng
+    // trống cuối để thêm loại mới ngay.
+    setDongBang(
+      chuanCuoiBang(
+        n.dong.map((r) => ({
+          key: r.id,
+          id: r.id,
+          category: r.category,
+          materialTypeName: r.materialTypeName,
+          quantityKg: r.quantityKg,
+          unitPrice: r.unitPrice,
+        }))
+      )
+    );
+    setNgayLienNhau((n.postingDate || n.deliveryDate) === n.deliveryDate);
     setLoiPhien([]);
     setMoPhuPhien(false);
   };
@@ -432,191 +479,193 @@ export default function NhapNguyenLieuScreen() {
   const datPhien = <K extends keyof DauChuyen>(k: K, v: DauChuyen[K]) =>
     setPhien((p) => (p ? { ...p, [k]: v } : p));
 
-  /** Dòng đã ghi trong chuyến đang mở (tạo mới: theo chuyenId; sửa: theo id-set). */
-  const dongPhien = useMemo(() => {
-    if (suaRowIds) return rows.filter((r) => suaRowIds.includes(r.id));
-    if (chuyenIdPhien) return rows.filter((r) => r.shipmentId === chuyenIdPhien);
-    return [];
-  }, [rows, suaRowIds, chuyenIdPhien]);
+  /** Đổi ngày ghi sổ: kéo ngày hàng về theo khi hai ngày đang đi liền. */
+  const doiNgayGhiSo = (v: string) =>
+    setPhien((p) =>
+      !p
+        ? p
+        : ngayLienNhau
+          ? { ...p, postingDate: v, deliveryDate: v }
+          : { ...p, postingDate: v }
+    );
+
+  /** Chỉnh tay ngày hàng về ⇒ tách khỏi ngày ghi sổ (đây là ghi bù, hai ngày khác). */
+  const doiNgayVe = (v: string) => {
+    setNgayLienNhau(false);
+    datPhien("deliveryDate", v);
+  };
 
   /** Đang sửa chuyến đã ghi (khác với tạo chuyến mới). */
   const dangSuaChuyen = suaRowIds !== null;
-  const tongChuyen = dongPhien.reduce((s, r) => s + (r.quantityKg || 0), 0);
-  const tongNgayPhien = phien
-    ? tongNgayXuong(phien.deliveryDate, phien.workshop)
-    : 0;
-  const chotPhien = phien
-    ? daChot(phien.deliveryDate, phien.workshop)
-    : false;
+  /** Các dòng trong bảng đủ để lưu (có loại + số lượng). */
+  const dongHopLe = dongBang.filter(dongDayDu);
+  const tongChuyen = dongHopLe.reduce((s, d) => s + d.quantityKg, 0);
+  const tienChuyen = dongHopLe.reduce(
+    (s, d) => s + d.quantityKg * (d.unitPrice ?? 0),
+    0
+  );
+  /** Số dòng ĐÃ LƯU đang mở trong bảng — cho câu "sửa đầu chuyến áp cho N dòng". */
+  const soDongDaLuu = dongBang.filter((d) => d.id).length;
+  const chotPhien = phien ? daChot(phien.deliveryDate, phien.workshop) : false;
 
-  const setDong = <K extends keyof DongMoi>(k: K, v: DongMoi[K]) =>
-    setDongMoi((d) => ({ ...d, [k]: v }));
-
-  /** Thêm một loại vào sổ — LƯU NGAY thành một dòng nhap_nguyen_lieu. */
-  const themDong = () => {
-    if (!phien) return;
-    // Đầu chuyến giờ sửa tại chỗ cùng màn đổ hàng (gộp một bước) → kiểm luôn
-    // đầu chuyến ở đây, tránh tạo chuyến thiếu đại lý / sai ngày.
-    const ls: LoiNhap[] = [...loiDauChuyen(phien, chotPhien)];
-    if (!dongMoi.materialTypeName.trim())
-      ls.push({ truong: "Loại nguyên liệu", thongBao: "Chưa chọn loại hàng" });
-    if (!(dongMoi.quantityKg > 0))
-      ls.push({ truong: "Số lượng", thongBao: "Phải lớn hơn 0 kg" });
-    setLoiPhien(ls);
-    if (ls.length > 0) return;
-
-    // Sửa dữ liệu cũ (không có bản ghi chuyến) → dòng mới cũng để chuyenId rỗng,
-    // gom lại cùng nhóm nhờ (ngày + xưởng + đại lý + xe). KHÔNG tự sinh chuyến.
-    const suaDuLieuCu = dangSuaChuyen && !chuyenIdPhien;
-
-    let idChuyen = chuyenIdPhien;
-    if (chuyenIdPhien) {
-      // Chuyến thật (đang tạo dở hoặc đang sửa) → áp đầu chuyến vào bản ghi.
-      persistChuyen(
-        chuyen.map((c) =>
-          c.id === chuyenIdPhien ? { ...c, ...phien, id: c.id } : c
+  /** Dòng đã lưu thuộc chuyến đang mở (id-set khi sửa; tạo mới thì chưa có gì). */
+  const thuocPhienDaLuu = (r: MaterialImportItem) =>
+    suaRowIds ? suaRowIds.includes(r.id) : false;
+  /** Tổng ngày = số đã lưu của ngày/xưởng (trừ chuyến đang mở, khỏi đếm đôi) +
+   *  số đang gõ trong bảng ⇒ xem trước tổng ngày ngay cả khi chưa lưu. */
+  const tongNgayNgoaiChuyen = phien
+    ? rows
+        .filter(
+          (r) =>
+            r.deliveryDate === phien.deliveryDate &&
+            r.workshop === phien.workshop &&
+            !thuocPhienDaLuu(r)
         )
-      );
-    } else if (!suaDuLieuCu) {
-      // Chuyến mới: chỉ tạo khi có dòng đầu tiên — không để lại chuyến rỗng.
-      idChuyen = newId();
-      persistChuyen([...chuyen, { id: idChuyen, ...phien }]);
-      setChuyenIdPhien(idChuyen);
+        .reduce((s, r) => s + (r.quantityKg || 0), 0)
+    : 0;
+  const tongNgayPhien = tongNgayNgoaiChuyen + tongChuyen;
+
+  /** Sửa một ô trong bảng; tự đảm bảo còn một dòng trống ở cuối để gõ tiếp. */
+  const capNhatDong = (key: string, patch: Partial<DongBang>) =>
+    setDongBang((ds) =>
+      chuanCuoiBang(ds.map((d) => (d.key === key ? { ...d, ...patch } : d)))
+    );
+
+  const boDong = (key: string) =>
+    setDongBang((ds) => {
+      const con = ds.filter((d) => d.key !== key);
+      return con.length ? chuanCuoiBang(con) : [dongBangRong(loaiGanNhat)];
+    });
+
+  /**
+   * Lưu cả chuyến MỘT LẦN: tạo/ghi chuyến + mọi dòng hợp lệ trong bảng, một lần
+   * persist. Giữ nguyên bất biến "đầu chuyến áp cho mọi dòng", "chuyến chỉ tạo
+   * khi có dòng", "dữ liệu cũ không tự sinh chuyến".
+   *
+   * `imLang` = đóng nhanh bằng X / Esc / bấm ra ngoài: có dòng đủ thì vẫn lưu
+   * (không để mất số đã gõ), chưa đủ thì bỏ qua lặng lẽ, không nài lỗi.
+   * Trả về true nếu đóng được dialog (đã lưu, hoặc không có gì để lưu khi imLang).
+   */
+  const luuPhien = (imLang: boolean): boolean => {
+    if (!phien) return true;
+    const hopLe = dongBang.filter(dongDayDu);
+    const ls: LoiNhap[] = [...loiDauChuyen(phien, chotPhien)];
+    if (hopLe.length === 0)
+      ls.push({
+        truong: "Loại hàng",
+        thongBao: "Thêm ít nhất một loại hàng vào chuyến",
+      });
+    // Dòng dở dang (có loại thiếu số, hoặc có số chưa chọn loại): chỉ chặn khi
+    // người dùng bấm Lưu — đóng nhanh bằng X thì lặng lẽ bỏ dòng dở, giữ dòng đủ.
+    if (!imLang)
+      dongBang.forEach((d, i) => {
+        if (dongCoData(d) && !dongDayDu(d))
+          ls.push({
+            truong: `Dòng ${i + 1}`,
+            thongBao: !d.materialTypeName.trim()
+              ? "Chưa chọn loại hàng"
+              : "Số lượng phải lớn hơn 0 kg",
+          });
+      });
+
+    if (ls.length > 0) {
+      if (!imLang) setLoiPhien(ls);
+      return false;
     }
 
-    const dong: MaterialImportItem = {
-      id: newId(),
+    // Sửa dữ liệu cũ (không có bản ghi chuyến) → giữ chuyenId rỗng, gom nhóm nhờ
+    // (ngày + xưởng + đại lý + xe). KHÔNG tự sinh chuyến cho dữ liệu cũ.
+    const suaDuLieuCu = dangSuaChuyen && !chuyenIdPhien;
+    let idChuyen = chuyenIdPhien;
+    let chuyenSau = chuyen;
+    if (chuyenIdPhien) {
+      chuyenSau = chuyen.map((c) =>
+        c.id === chuyenIdPhien ? { ...c, ...phien, id: c.id } : c
+      );
+    } else if (!suaDuLieuCu) {
+      idChuyen = newId();
+      chuyenSau = [...chuyen, { id: idChuyen, ...phien }];
+    }
+
+    // Dòng của chuyến = các dòng hợp lệ trong bảng: dòng cũ giữ id (cập nhật),
+    // dòng mới cấp id mới; dòng đã bỏ khỏi bảng không đưa lại (tức là xóa).
+    const rowsGiuLai = rows.filter((r) => !thuocPhienDaLuu(r));
+    const rowsChuyen: MaterialImportItem[] = hopLe.map((d) => ({
+      id: d.id ?? newId(),
       shipmentId: idChuyen ?? "",
       deliveryDate: phien.deliveryDate,
       workshop: phien.workshop,
-      category: dongMoi.category,
+      category: d.category,
       supplierName: phien.supplierName,
-      materialTypeName: dongMoi.materialTypeName,
-      quantityKg: dongMoi.quantityKg,
-      unitPrice: dongMoi.unitPrice,
+      materialTypeName: d.materialTypeName,
+      quantityKg: d.quantityKg,
+      unitPrice: d.unitPrice,
       driverName: phien.driverName,
       licensePlate: phien.licensePlate,
       note: phien.note,
-    };
-    // Đồng bộ đầu chuyến cho MỌI dòng của chuyến (đại lý/ngày/xe có thể vừa đổi
-    // tại chỗ) rồi thêm dòng mới — một lần persist, đúng bất biến "sửa đầu chuyến
-    // áp cho cả chuyến". Nhóm theo id-set khi sửa, theo chuyenId khi tạo mới.
-    const thuocChuyen = (r: MaterialImportItem) =>
-      suaRowIds ? suaRowIds.includes(r.id) : r.shipmentId === idChuyen;
-    persist([
-      ...rows.map((r) =>
-        thuocChuyen(r)
-          ? {
-              ...r,
-              deliveryDate: phien.deliveryDate,
-              workshop: phien.workshop,
-              supplierName: phien.supplierName,
-              driverName: phien.driverName,
-              licensePlate: phien.licensePlate,
-              note: phien.note,
-            }
-          : r
-      ),
-      dong,
-    ]);
-    if (suaRowIds) setSuaRowIds([...suaRowIds, dong.id]);
-    notify.daLuu(`Đã vào sổ: ${dong.materialTypeName} — ${kg(dong.quantityKg)}`);
+    }));
+    persistChuyen(chuyenSau);
+    persist([...rowsGiuLai, ...rowsChuyen]);
 
-    // Ngày đã chốt mà ghi bù → nói ngay tổng ngày lệch bao nhiêu so với lúc chốt.
+    const tongMoi = hopLe.reduce((s, d) => s + d.quantityKg, 0);
+    notify.daLuu(
+      `Đã lưu chuyến ${phien.supplierName} — ${hopLe.length} loại · ${kg(tongMoi)}`
+    );
+    // Ngày đã chốt mà ghi thêm → báo ngay tổng ngày lệch bao nhiêu so với lúc chốt.
     const bg = banGhiChot(phien.deliveryDate, phien.workshop);
-    if (bg?.isLocked) {
-      const moi =
-        tongNgayXuong(phien.deliveryDate, phien.workshop) + dong.quantityKg;
+    if (bg?.isLocked)
       notify.canhBao(
-        `Ngày ${viDate(phien.deliveryDate)} đã chốt ${kg(bg.totalKgAtLock)} — sau khi ghi bù thành ${kg(moi)}`
+        `Ngày ${viDate(phien.deliveryDate)} đã chốt ${kg(bg.totalKgAtLock)} — sau khi ghi bù thành ${kg(tongNgayNgoaiChuyen + tongMoi)}`
       );
-    }
 
-    // Giữ loài để đổ tiếp loại sau cho nhanh; xóa loại / kg / giá.
-    setDongMoi((d) => ({ ...DONG_MOI_RONG, category: d.category }));
-    // Nhớ loài vừa ghi để chuyến sau khỏi nhảy về "Bạch tuộc".
-    setLoaiGanNhat(dong.category);
+    // Nhớ loài cuối để chuyến/dòng sau khỏi nhảy về "Bạch tuộc".
+    setLoaiGanNhat(hopLe[hopLe.length - 1].category);
+
+    // Ghi ngày ngoài kỳ đang lọc → kéo bộ lọc về chuyến vừa ghi (khỏi tưởng mất).
+    if (phien.deliveryDate < tuHieuLuc || phien.deliveryDate > denHieuLuc) {
+      setKy("ngay");
+      setNgay(phien.deliveryDate);
+    }
+    if (phanXuong !== "Tất cả" && phanXuong !== phien.workshop)
+      setPhanXuong(phien.workshop);
+    if (locDaiLy && locDaiLy !== phien.supplierName) setLocDaiLy("");
+    if (locGia === "thieu-gia") setLocGia("tat-ca");
+    return true;
+  };
+
+  const datLaiPhien = () => {
+    setPhien(null);
+    setChuyenIdPhien(null);
+    setSuaRowIds(null);
+    setDongBang([]);
     setLoiPhien([]);
   };
 
-  const boDongPhien = (r: MaterialImportItem) => {
-    const truoc = rows;
-    const truocIds = suaRowIds;
-    persist(rows.filter((x) => x.id !== r.id));
-    if (suaRowIds) setSuaRowIds(suaRowIds.filter((id) => id !== r.id));
-    notify.daXoa(`Đã bỏ ${r.materialTypeName} — ${kg(r.quantityKg)}`, () => {
-      persist(truoc);
-      if (truocIds) setSuaRowIds(truocIds);
-    });
+  /** Lưu xong, đóng dialog. */
+  const xongChuyen = () => {
+    if (luuPhien(false)) datLaiPhien();
   };
 
-  /** Đóng chuyến: bỏ chuyến rỗng, kéo bộ lọc về đúng ngày/xưởng vừa ghi. */
-  const dongPhienLai = (mo: "dong" | "chuyen-khac") => {
-    const p = phien;
-    if (p && chuyenIdPhien && dongPhien.length === 0) {
-      persistChuyen(chuyen.filter((c) => c.id !== chuyenIdPhien));
-    }
-    // Đầu chuyến có thể vừa sửa tại chỗ mà chưa thêm dòng mới → áp cho chuyến
-    // + mọi dòng trước khi đóng, giữ đúng bất biến "đầu chuyến áp cả chuyến".
-    if (p && dongPhien.length > 0 && (chuyenIdPhien || suaRowIds)) {
-      if (chuyenIdPhien)
-        persistChuyen(
-          chuyen.map((c) =>
-            c.id === chuyenIdPhien ? { ...c, ...p, id: c.id } : c
-          )
-        );
-      const thuoc = (r: MaterialImportItem) =>
-        suaRowIds ? suaRowIds.includes(r.id) : r.shipmentId === chuyenIdPhien;
-      persist(
-        rows.map((r) =>
-          thuoc(r)
-            ? {
-                ...r,
-                deliveryDate: p.deliveryDate,
-                workshop: p.workshop,
-                supplierName: p.supplierName,
-                driverName: p.driverName,
-                licensePlate: p.licensePlate,
-                note: p.note,
-              }
-            : r
-        )
-      );
-    }
-    if (p && dongPhien.length > 0) {
-      // Điểm hay mất hàng nhất: ghi ngày ngoài kỳ đang lọc rồi tưởng mất.
-      if (p.deliveryDate < tuHieuLuc || p.deliveryDate > denHieuLuc) {
-        setKy("ngay");
-        setNgay(p.deliveryDate);
-      }
-      if (phanXuong !== "Tất cả" && phanXuong !== p.workshop)
-        setPhanXuong(p.workshop);
-      if (locDaiLy && locDaiLy !== p.supplierName) setLocDaiLy("");
-      if (locGia === "thieu-gia") setLocGia("tat-ca");
-    }
-
-    if (mo === "dong") {
-      setPhien(null);
-      setChuyenIdPhien(null);
-      setSuaRowIds(null);
-      return;
-    }
-    // Ghi chuyến khác: giữ ngày + xưởng + đại lý (một đại lý thường giao nhiều
-    // lượt trong ngày, khỏi chọn lại), chỉ làm mới xe + ghi chú.
-    setPhien(
-      p
-        ? {
-            ...p,
-            driverName: "",
-            licensePlate: "",
-            note: "",
-          }
-        : null
+  /** Lưu xong, dọn bảng nhưng GIỮ ngày + xưởng + đại lý cho chuyến kế (một đại
+   *  lý hay giao nhiều lượt trong ngày) — chỉ làm mới xe + bảng loại hàng. */
+  const luuThemChuyenKhac = () => {
+    if (!luuPhien(false)) return;
+    const catCuoi = dongHopLe.length
+      ? dongHopLe[dongHopLe.length - 1].category
+      : loaiGanNhat;
+    setPhien((p) =>
+      p ? { ...p, driverName: "", licensePlate: "", note: "" } : p
     );
     setChuyenIdPhien(null);
     setSuaRowIds(null);
-    setDongMoi(DONG_MOI_RONG);
+    setDongBang([dongBangRong(catCuoi)]);
     setLoiPhien([]);
+  };
+
+  /** Đóng bằng X / Esc / bấm ra ngoài: đủ thì lưu, chưa đủ thì bỏ (không nài lỗi). */
+  const dongKhongLuu = () => {
+    luuPhien(true);
+    datLaiPhien();
   };
 
   /* ---- Xóa cả chuyến đang sửa (nút trong dialog) ---- */
@@ -636,32 +685,8 @@ export default function NhapNguyenLieuScreen() {
         persistChuyen(truocChuyen);
       }
     );
-    setPhien(null);
-    setChuyenIdPhien(null);
-    setSuaRowIds(null);
+    datLaiPhien();
   };
-
-  /* ---- Sửa / xóa một dòng hàng ---- */
-
-  const luu = () => {
-    if (!dang) return;
-    const ls: LoiNhap[] = [];
-    if (!dang.materialTypeName.trim())
-      ls.push({ truong: "Loại nguyên liệu", thongBao: "Chưa chọn loại hàng" });
-    if (!(dang.quantityKg > 0))
-      ls.push({ truong: "Số lượng", thongBao: "Phải lớn hơn 0 kg" });
-    setLoi(ls);
-    if (ls.length > 0) return;
-    persist(rows.map((r) => (r.id === dang.id ? dang : r)));
-    notify.daLuu("Đã lưu thay đổi");
-    setDang(null);
-  };
-
-  const set = <K extends keyof MaterialImportItem>(
-    k: K,
-    v: MaterialImportItem[K]
-  ) =>
-    setDang((d) => (d ? { ...d, [k]: v } : d));
 
   /* ---- Chốt / mở lại ngày ---- */
 
@@ -1158,7 +1183,7 @@ export default function NhapNguyenLieuScreen() {
       <Dialog
         open={phien !== null}
         onOpenChange={(o) => {
-          if (!o) dongPhienLai("dong");
+          if (!o) dongKhongLuu();
         }}
       >
         <DialogContent className="max-h-[92vh] w-full overflow-y-auto sm:max-w-3xl lg:max-w-5xl">
@@ -1168,8 +1193,8 @@ export default function NhapNguyenLieuScreen() {
             </DialogTitle>
             <DialogDescription className="text-base">
               {dangSuaChuyen
-                ? "Sửa đầu chuyến (áp cho mọi dòng), thêm hoặc bỏ loại hàng ngay bên dưới."
-                : "Điền đầu chuyến (đại lý, ngày, xe) rồi đổ từng loại ngay bên dưới — mỗi loại bấm “Thêm loại này vào sổ” là vào sổ ngay."}
+                ? "Sửa đầu chuyến (áp cho mọi dòng) và cả bảng loại hàng bên dưới, rồi bấm Lưu."
+                : "Điền đầu chuyến (đại lý, ngày, xe), nhập cả bảng loại hàng bên dưới rồi bấm Lưu một lần."}
             </DialogDescription>
           </DialogHeader>
 
@@ -1189,13 +1214,13 @@ export default function NhapNguyenLieuScreen() {
                     </p>
                   )}
 
-                  {chuyenIdPhien && dongPhien.length > 0 && (
+                  {dangSuaChuyen && soDongDaLuu > 0 && (
                     <p className="flex items-start gap-3 rounded-lg bg-accent px-4 py-3 text-base text-accent-foreground">
                       <TriangleAlert className="mt-0.5 size-6 shrink-0" aria-hidden />
                       <span>
                         Sửa đầu chuyến sẽ áp cho{" "}
-                        <strong>{dongPhien.length} dòng</strong> đã ghi trong
-                        chuyến này.
+                        <strong>{soDongDaLuu} dòng</strong> đã ghi trong chuyến
+                        này.
                       </span>
                     </p>
                   )}
@@ -1204,16 +1229,16 @@ export default function NhapNguyenLieuScreen() {
                     <DateField
                       label="Ngày ghi sổ"
                       required
-                      info="Ngày ghi vào hệ thống. Khác ngày hàng về ⇒ ghi bù."
+                      info="Ngày ghi vào hệ thống. Chọn ngày này thì ngày hàng về tự nhảy theo (cho tới khi bạn tự sửa)."
                       value={phien.postingDate}
-                      onChange={(v) => datPhien("postingDate", v)}
+                      onChange={doiNgayGhiSo}
                     />
                     <DateField
                       label="Ngày hàng về xưởng"
                       required
-                      info="Ngày xe đổ hàng thật — mọi tổng hợp tính theo ngày này."
+                      info="Ngày xe đổ hàng thật — mọi tổng hợp tính theo ngày này. Mặc định đi theo ngày ghi sổ; sửa tay khi hàng về hôm khác (ghi bù)."
                       value={phien.deliveryDate}
-                      onChange={(v) => datPhien("deliveryDate", v)}
+                      onChange={doiNgayVe}
                     />
                   </div>
 
@@ -1297,135 +1322,41 @@ export default function NhapNguyenLieuScreen() {
 
                   <div className="border-t-2 border-border pt-1" />
 
-                  {/* Đã vào sổ */}
-                  {dongPhien.length > 0 && (
-                    <div className="space-y-3 rounded-xl border-2 border-border p-4">
-                      <p className="flex items-center gap-2 text-base font-semibold text-foreground">
-                        <CircleCheck className="size-6 text-primary" aria-hidden />
-                        Đã vào sổ {dongPhien.length} loại — chuyến này{" "}
-                        <span className="tnum">{kg(tongChuyen)}</span>
+                  {/* Bảng loại hàng — nhập cả chuyến một lượt, lưu một lần */}
+                  <div className="space-y-4 rounded-xl border-2 border-primary/40 bg-accent/40 p-4">
+                    <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                      <p className="text-base font-semibold">
+                        Các loại hàng trong chuyến
                       </p>
-                      <ul className="divide-y divide-border">
-                        {dongPhien.map((r, i) => (
-                          <li
-                            key={r.id}
-                            className="flex items-center justify-between gap-3 py-2"
-                          >
-                            <span className="min-w-0 flex-1 truncate text-base">
-                              <span className="tnum text-muted-foreground">
-                                {i + 1}.
-                              </span>{" "}
-                              {r.materialTypeName} —{" "}
-                              <span className="tnum font-semibold">
-                                {num(r.quantityKg)}
-                              </span>{" "}
-                              kg
-                              {r.unitPrice != null ? (
-                                <span className="text-muted-foreground">
-                                  {" "}
-                                  · {num(r.unitPrice)} đ
-                                </span>
-                              ) : (
-                                <span className="text-muted-foreground">
-                                  {" "}
-                                  · chưa có giá
-                                </span>
-                              )}
-                            </span>
-                            <div className="flex shrink-0 items-center gap-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                  setDang({ ...r });
-                                  setLoi([]);
-                                }}
-                              >
-                                <Pencil />
-                                Sửa
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => boDongPhien(r)}
-                              >
-                                <X />
-                                Bỏ
-                              </Button>
-                            </div>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  {/* Thêm một loại hàng — NÚT CHÍNH DUY NHẤT trong thân */}
-                  <div className="space-y-5 rounded-xl border-2 border-primary/40 bg-accent/40 p-4">
-                    <p className="text-base font-semibold">Thêm loại hàng</p>
-
-                    <Combobox
-                      label="Loài"
-                      required
-                      choPhepXoa={false}
-                      value={dongMoi.category}
-                      onChange={(v) => {
-                        setDong("category", v as Category);
-                        setDong("materialTypeName", "");
-                      }}
-                      options={CATEGORIES.map((l) => ({ value: l, label: l }))}
-                    />
-
-                    <Combobox
-                      label="Loại nguyên liệu"
-                      required
-                      hint="Chọn loài trước — danh sách chỉ hiện loại của loài đó."
-                      value={dongMoi.materialTypeName}
-                      onChange={(v) => setDong("materialTypeName", v)}
-                      options={optLoaiNLTheoLoai(dongMoi.category)}
-                      onCreate={(ten) => themLoaiNL(ten, dongMoi.category)}
-                    />
-
-                    <div
-                      className="grid gap-6 sm:grid-cols-2"
-                      onKeyDown={(e) => {
-                        // Enter ở ô số = "Thêm loại này vào sổ", khỏi rời tay
-                        // khỏi bàn phím. Vẫn qua themDong nên ErrorSummary và mọi
-                        // cổng kiểm chạy y như bấm nút.
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          themDong();
-                        }
-                      }}
-                    >
-                      <NumberField
-                        label="Số lượng"
-                        required
-                        unit="kg"
-                        value={dongMoi.quantityKg || null}
-                        onChange={(v) => setDong("quantityKg", v ?? 0)}
-                      />
-                      <NumberField
-                        label="Đơn giá"
-                        unit="đ"
-                        value={dongMoi.unitPrice}
-                        onChange={(v) => setDong("unitPrice", v)}
-                        hint="Bỏ trống nếu chưa chốt giá / chưa có hóa đơn."
-                      />
+                      <p className="text-sm text-muted-foreground">
+                        Điền xong một dòng, dòng trống mới tự hiện ở dưới — không
+                        phải bấm thêm. Đơn giá để trống nếu chưa có hóa đơn.
+                      </p>
                     </div>
 
-                    {dongMoi.quantityKg > 0 && dongMoi.unitPrice ? (
-                      <div className="rounded-lg bg-accent px-4 py-3 text-base text-accent-foreground">
-                        Thành tiền:{" "}
-                        <span className="tnum text-lg font-semibold">
-                          {num(dongMoi.quantityKg * dongMoi.unitPrice)} đ
+                    <BangDongHang
+                      dong={dongBang}
+                      onSua={capNhatDong}
+                      onBo={boDong}
+                      optLoaiTheoLoai={optLoaiNLTheoLoai}
+                      onTaoLoai={themLoaiNL}
+                    />
+
+                    {dongHopLe.length > 0 && (
+                      <div className="flex flex-wrap items-baseline justify-end gap-x-6 gap-y-1">
+                        <span className="text-base text-muted-foreground">
+                          {dongHopLe.length} loại · chuyến này
                         </span>
+                        <span className="tnum text-lg font-semibold">
+                          {kg(tongChuyen)}
+                        </span>
+                        {tienChuyen > 0 && (
+                          <span className="tnum text-base text-muted-foreground">
+                            {num(tienChuyen)} đ
+                          </span>
+                        )}
                       </div>
-                    ) : null}
-
-                    <Button size="lg" className="w-full" onClick={themDong}>
-                      <Plus />
-                      Thêm loại này vào sổ
-                    </Button>
+                    )}
                   </div>
 
                   {/* Tổng ngày — như "TỔNG CỘNG" cuối sổ giấy */}
@@ -1444,112 +1375,19 @@ export default function NhapNguyenLieuScreen() {
           <DialogFooter>
             {dangSuaChuyen ? (
               <ConfirmDelete
-                moTaBanGhi={`Chuyến ${phien?.supplierName || "(chưa có đại lý)"} — ${viDate(phien?.deliveryDate ?? "")} — ${dongPhien.length} dòng — ${kg(tongChuyen)}`}
+                moTaBanGhi={`Chuyến ${phien?.supplierName || "(chưa có đại lý)"} — ${viDate(phien?.deliveryDate ?? "")} — ${soDongDaLuu} dòng — ${kg(tongChuyen)}`}
                 onConfirm={xoaChuyenDangSua}
                 tieuDe="Xóa cả chuyến này?"
                 nhanNut="Xóa chuyến"
               />
             ) : (
-              <Button
-                variant="outline"
-                size="lg"
-                onClick={() => dongPhienLai("chuyen-khac")}
-              >
+              <Button variant="outline" size="lg" onClick={luuThemChuyenKhac}>
                 <Truck />
                 Lưu &amp; thêm chuyến khác
               </Button>
             )}
-            <Button size="lg" onClick={() => dongPhienLai("dong")}>
-              {dangSuaChuyen ? "Xong" : "Xong chuyến"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* ---- Hộp thoại: sửa một dòng hàng (mở từ trong dialog chuyến) ---- */}
-      <Dialog
-        open={dang !== null}
-        onOpenChange={(o) => {
-          if (!o) setDang(null);
-        }}
-      >
-        <DialogContent className="max-h-[92vh] w-full overflow-y-auto sm:max-w-3xl">
-          <DialogHeader>
-            <DialogTitle className="text-2xl">Sửa dòng hàng</DialogTitle>
-            <DialogDescription className="text-base">
-              Ngày, phân xưởng, đại lý và xe thuộc về cả chuyến — sửa ở nút "Sửa
-              chuyến" trên đầu cụm.
-            </DialogDescription>
-          </DialogHeader>
-
-          {dang && (
-            <div className="space-y-6 py-2">
-              <ErrorSummary loi={loi} />
-              <ChuThichBatBuoc />
-
-              <div className="rounded-xl bg-muted px-5 py-4">
-                <p className="text-base text-muted-foreground">Thuộc chuyến</p>
-                <p className="text-lg font-semibold text-foreground">
-                  {viDate(dang.deliveryDate)} · xưởng {dang.workshop} · {dang.supplierName}
-                </p>
-              </div>
-
-              <Combobox
-                label="Loài"
-                required
-                choPhepXoa={false}
-                value={dang.category}
-                onChange={(v) => {
-                  set("category", v as Category);
-                  set("materialTypeName", "");
-                }}
-                options={CATEGORIES.map((l) => ({ value: l, label: l }))}
-              />
-
-              <Combobox
-                label="Loại nguyên liệu"
-                required
-                hint="Chọn loài trước — danh sách chỉ hiện loại của loài đó."
-                value={dang.materialTypeName}
-                onChange={(v) => set("materialTypeName", v)}
-                options={optLoaiNLTheoLoai(dang.category)}
-                onCreate={(ten) => themLoaiNL(ten, dang.category)}
-              />
-
-              <div className="grid gap-6 sm:grid-cols-2">
-                <NumberField
-                  label="Số lượng"
-                  required
-                  unit="kg"
-                  value={dang.quantityKg || null}
-                  onChange={(v) => set("quantityKg", v ?? 0)}
-                />
-                <NumberField
-                  label="Đơn giá"
-                  unit="đ"
-                  value={dang.unitPrice}
-                  onChange={(v) => set("unitPrice", v)}
-                  hint="Bỏ trống nếu chưa chốt giá / chưa có hóa đơn."
-                />
-              </div>
-
-              {dang.quantityKg > 0 && dang.unitPrice ? (
-                <div className="rounded-lg bg-accent px-4 py-3 text-base text-accent-foreground">
-                  Thành tiền:{" "}
-                  <span className="tnum text-lg font-semibold">
-                    {num(dang.quantityKg * dang.unitPrice)} đ
-                  </span>
-                </div>
-              ) : null}
-            </div>
-          )}
-
-          <DialogFooter>
-            <Button variant="outline" size="lg" onClick={() => setDang(null)}>
-              Hủy
-            </Button>
-            <Button size="lg" onClick={luu}>
-              Lưu thay đổi
+            <Button size="lg" onClick={xongChuyen}>
+              {dangSuaChuyen ? "Lưu chuyến" : "Lưu vào sổ"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1655,6 +1493,120 @@ export default function NhapNguyenLieuScreen() {
           onClose={() => setXemPhieu(false)}
         />
       )}
+    </div>
+  );
+}
+
+/* ---------- Bảng loại hàng của một chuyến (nhập nhiều dòng một lượt) ---------- */
+
+/**
+ * Mỗi loại hàng là một thẻ (Loài · Loại NL · Số lượng · Đơn giá) — nhãn luôn
+ * hiện để người lớn tuổi đọc rõ, xếp dọc nên khít từ 360px tới desktop, không
+ * cuộn ngang. Dòng trống cuối tự nhân bản khi vừa gõ ⇒ nhập cả chuyến liền tay,
+ * lưu một lần thay vì bấm "Thêm" từng loại.
+ */
+function BangDongHang({
+  dong,
+  onSua,
+  onBo,
+  optLoaiTheoLoai,
+  onTaoLoai,
+}: {
+  dong: DongBang[];
+  onSua: (key: string, patch: Partial<DongBang>) => void;
+  onBo: (key: string) => void;
+  optLoaiTheoLoai: (loai: string) => MucChon[];
+  onTaoLoai: (ten: string, loai: string) => string;
+}) {
+  return (
+    <div className="space-y-3">
+      {dong.map((d, i) => {
+        const coData = dongCoData(d);
+        const thanhTien =
+          d.quantityKg > 0 && d.unitPrice ? d.quantityKg * d.unitPrice : null;
+        return (
+          <div
+            key={d.key}
+            className={cn(
+              "rounded-xl border-2 p-4",
+              coData ? "border-border bg-card" : "border-dashed border-border"
+            )}
+          >
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <span className="flex min-w-0 items-center gap-2 text-base font-semibold">
+                <span className="tnum flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-sm">
+                  {i + 1}
+                </span>
+                <span className="truncate">
+                  {coData
+                    ? d.materialTypeName || "Chưa chọn loại"
+                    : "Dòng mới"}
+                </span>
+              </span>
+              {coData && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="shrink-0"
+                  onClick={() => onBo(d.key)}
+                >
+                  <X />
+                  Bỏ dòng
+                </Button>
+              )}
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Combobox
+                label="Loài"
+                required
+                choPhepXoa={false}
+                value={d.category}
+                onChange={(v) =>
+                  onSua(d.key, {
+                    category: v as Category,
+                    materialTypeName: "",
+                  })
+                }
+                options={CATEGORIES.map((l) => ({ value: l, label: l }))}
+              />
+              <Combobox
+                label="Loại nguyên liệu"
+                required
+                value={d.materialTypeName}
+                onChange={(v) => onSua(d.key, { materialTypeName: v })}
+                options={optLoaiTheoLoai(d.category)}
+                onCreate={(ten) => onTaoLoai(ten, d.category)}
+              />
+            </div>
+
+            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+              <NumberField
+                label="Số lượng"
+                required
+                unit="kg"
+                value={d.quantityKg || null}
+                onChange={(v) => onSua(d.key, { quantityKg: v ?? 0 })}
+              />
+              <NumberField
+                label="Đơn giá"
+                unit="đ"
+                value={d.unitPrice}
+                onChange={(v) => onSua(d.key, { unitPrice: v })}
+              />
+            </div>
+
+            {thanhTien != null && (
+              <p className="mt-3 text-right text-base text-muted-foreground">
+                Thành tiền:{" "}
+                <span className="tnum font-semibold text-foreground">
+                  {num(thanhTien)} đ
+                </span>
+              </p>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }

@@ -1,10 +1,11 @@
 > Load khi: sửa bất cứ thứ gì ở màn Nhập hàng — chuyến, ngày, ghi bù, chốt ngày, phế liệu ngày, phiếu báo cáo ngày.
 covers: src/features/imports/MaterialImportScreen.tsx, src/features/imports/DailyImportInvoice.tsx, src/features/imports/ImportReport.tsx, src/features/imports/ImportTab.tsx, src/types.ts
-last_verified: 2026-08-21
+last_verified: 2026-08-25
 ttl_days: 90
 <!-- re-verified: 2026-08-06 — bộ lọc theo KỲ (ngày/tuần/tháng/năm/tùy chọn → phamViKy); loài/phân xưởng nhập bằng dropdown; báo cáo theo kỳ (mỗi ngày một khối, PhieuNLNgay nhận tuNgay/denNgay); phế liệu thêm nhiều loại/lần; chốt ngày cuối màn — khớp MaterialImportScreen.tsx + DailyImportInvoice.tsx -->
 <!-- re-verified: 2026-08-14 — đồng bộ tên file sau rename eadc360: DailyImportInvoice.tsx/ImportReport.tsx/ImportTab.tsx (symbol PhieuNLNgay/BaoCaoNhap giữ nguyên) -->
 
+<!-- updated: 2026-08-25 — GIẢM THAO TÁC (đổi UI, GREEN): (1) hộp Ghi/Sửa chuyến giờ NHẬP CẢ BẢNG loại hàng một lượt rồi LƯU MỘT LẦN — bỏ "thêm từng loại → bấm Thêm" + bỏ dialog "Sửa dòng hàng" (sửa/xóa dòng ngay trong bảng); dòng trống cuối tự nhân bản khi vừa gõ (chuanCuoiBang) nên khỏi bấm "Thêm dòng"; state DongBang[] (key + id|null), lưu qua luuPhien (batch persist rows+chuyến một lần) giữ nguyên bất biến "đầu chuyến áp mọi dòng"/"chuyến chỉ tạo khi có dòng"/"dữ liệu cũ không tự sinh chuyến"; đóng bằng X/Esc = luuPhien(imLang) đủ-thì-lưu-thiếu-thì-bỏ (thay dongPhienLai). (2) NGÀY: chọn ngày ghi sổ kéo ngày hàng về theo (state ngayLienNhau) tới khi tự sửa tay ngày hàng về (doiNgayGhiSo/doiNgayVe). (3) DROPDOWN ĐẠI LÝ: dòng phụ gộp code · billingName · phone · address ngăn bởi " – " (moTaDaiLy) — vừa hiện vừa nằm trong chuỗi tìm kiếm Combobox. Lưu ý: mô hình "nháp = đã lưu ngay" từng-dòng đổi thành lưu-một-lần; đóng nhanh vẫn giữ dòng đủ nhờ auto-save-khi-đóng. -->
 <!-- updated: 2026-08-21 — GIẢM THAO TÁC (đổi UI, GREEN): Enter ở ô Số lượng/Đơn giá = "Thêm loại này vào sổ" (qua themDong nên ErrorSummary + kiểm đầu chuyến còn nguyên); loài mặc định = loài ghi gần nhất trong phiên (state loaiGanNhat) thay "Bạch tuộc" cứng, thêm loại vào chuyến cũ mặc định theo loài chuyến đó; prefill đại lý khi đang lọc 1 đại lý; "Lưu & thêm chuyến khác" GIỮ đại lý (chỉ reset xe/ghi chú). VÁ BUG: hộp phế liệu ngày (KhoiPheLieuNgay) onChange ghi sai key sau rename EN — loai→name, donGiaBan→sellingPrice — khiến KHÔNG lưu được loại phế liệu + đơn giá bán -->
 <!-- updated: 2026-08-18 — thêm 'Đổi loại hàng loạt' (BulkTypeChange.tsx): tick nhiều chuyến đổi tên loại NL một lượt, dùng để gán lại size 80↓ sau migration 0019 -->
 <!-- updated: 2026-08-17 — 0019: cột balancing_period_id (kỳ cân đối hút dòng nhập); loại NL 'Bạch tuộc 2 da' tách thành lớn (80↑)/nhỏ (80↓) -->
@@ -47,11 +48,14 @@ Thuộc về chuyến: ngày, phân xưởng, đại lý, tài xế, biển số
 
 **Chọn LOÀI trước, rồi LOẠI NL.** Ô loại NL lọc theo loài đang chọn (`optLoaiNLTheoLoai`): mục danh mục **chưa gán loài** (`loai` rỗng — gồm toàn bộ dữ liệu cũ) hiện cho **mọi** loài; mục đã gán chỉ hiện đúng loài. Tạo mới loại NL tại chỗ sẽ **đóng dấu loài đang chọn** (`themLoaiNL(ten, loai)`). Bộ lọc "Chỉ xem loại NL" vẫn dùng danh sách đầy đủ (`optLoaiNL`), không ràng loài.
 
-**Một dialog dùng CHUNG cho ghi mới + sửa chuyến** (bỏ 2 bước "đầu chuyến → đổ hàng"; bỏ luôn `HopThoaiDauChuyen` sửa-đầu-riêng): đầu chuyến ở trên (sửa tại chỗ, luôn hiện) — dưới là "Thêm loại hàng" + danh sách đã đổ (mỗi dòng có **Sửa** mở hộp sửa dòng lồng + **Bỏ**). `themDong` kiểm luôn `loiDauChuyen` (tránh tạo chuyến thiếu đại lý) và **đồng bộ đầu chuyến cho mọi dòng** mỗi lần thêm; `dongPhienLai` đồng bộ lần cuối khi đóng — giữ bất biến "đầu chuyến áp cả chuyến" dù sửa giữa chừng. Chuyến chỉ tạo khi có dòng đầu (không chuyến rỗng).
+**Một dialog dùng CHUNG cho ghi mới + sửa chuyến** (bỏ 2 bước "đầu chuyến → đổ hàng"; bỏ luôn `HopThoaiDauChuyen` sửa-đầu-riêng): đầu chuyến ở trên (sửa tại chỗ, luôn hiện) — dưới là **BẢNG loại hàng** (`BangDongHang`): mỗi loại một thẻ (Loài · Loại NL · Số lượng · Đơn giá), nhập **cả chuyến một lượt rồi LƯU MỘT LẦN**. Không còn "thêm từng loại → bấm Thêm" và không còn dialog "Sửa dòng hàng" lồng — sửa/bỏ dòng ngay trong bảng. Dòng trống cuối **tự nhân bản** khi vừa gõ (`chuanCuoiBang`), nên khỏi bấm "Thêm dòng"; mặc định loài của dòng mới = loài dòng trước.
 
-- **Sổ chỉ 1 nút "Sửa chuyến"/chuyến** (`moSuaChuyen`) mở đúng dialog trên ở chế độ sửa; bảng dòng trong sổ là **chỉ đọc** — mọi sửa/xóa dòng + **"Xóa cả chuyến"** nằm trong dialog. Chuyến đã chốt không hiện nút sửa.
+- Bảng giữ ở state `DongBang[]` (`key` React + `id|null` = dòng đã lưu hay mới). Lưu qua **`luuPhien`** — một lần `persist` gộp: tạo/ghi `chuyen_nhap` + mọi dòng hợp lệ (loại + kg>0). Dòng cũ giữ `id` (cập nhật), dòng mới cấp `id` mới, dòng đã bỏ khỏi bảng thì **không đưa lại** (tức là xóa). `luuPhien` kiểm `loiDauChuyen` trước (tránh tạo chuyến thiếu đại lý) và áp đầu chuyến cho **mọi** dòng ⇒ giữ bất biến "đầu chuyến áp cả chuyến". Chuyến chỉ tạo khi có ≥1 dòng hợp lệ (không chuyến rỗng — không cần dọn chuyến rỗng nữa).
+- **Đóng bằng X / Esc / bấm ra ngoài** = `dongKhongLuu` → `luuPhien(imLang=true)`: đủ thì vẫn LƯU (khỏi mất số đã gõ, thay cho "nháp = đã lưu ngay" của bản từng-dòng), chưa đủ (thiếu đại lý / chưa có dòng) thì bỏ lặng, không nài lỗi. Bấm nút footer thì báo lỗi như thường.
+- **Sổ chỉ 1 nút "Sửa chuyến"/chuyến** (`moSuaChuyen`) mở đúng dialog trên ở chế độ sửa, nạp mọi dòng đã ghi vào bảng (giữ `id`) + một dòng trống cuối; bảng dòng trong sổ là **chỉ đọc** — mọi sửa/xóa dòng + **"Xóa cả chuyến"** nằm trong dialog. Chuyến đã chốt không hiện nút sửa.
 - **Nhóm dòng khi sửa theo `suaRowIds` (id-set), không theo `chuyenId`** ⇒ sửa được CẢ dữ liệu cũ (chuyenId rỗng): dòng thêm khi sửa dữ liệu cũ vẫn để `chuyenId=""`, gom lại nhờ (ngày+xưởng+đại lý+xe) — **không tự sinh `chuyen_nhap`** cho dữ liệu cũ.
-- Footer khi tạo mới: **"Lưu & thêm chuyến khác"** (giữ ngày+xưởng, làm mới đại lý/xe — cho một đại lý giao nhiều lượt, mỗi lượt một chuyến) + "Xong chuyến".
+- Footer khi tạo mới: **"Lưu & thêm chuyến khác"** (`luuThemChuyenKhac`: lưu rồi giữ ngày+xưởng+đại lý, làm mới xe + bảng — cho một đại lý giao nhiều lượt, mỗi lượt một chuyến) + **"Lưu vào sổ"** (`xongChuyen`). Khi sửa: nút **"Lưu chuyến"** + **"Xóa chuyến"**.
+- **Dropdown đại lý** (`optDaiLy`): dòng phụ dưới tên gộp `code · billingName · phone · address` ngăn bởi **" – "** (`moTaDaiLy`), lọc bỏ ô rỗng; chuỗi này vừa hiển thị vừa nằm trong bộ tìm của `Combobox` (tìm theo số điện thoại / tên hóa đơn được).
 
 ### 2. Hai ngày — đừng bao giờ lẫn
 
@@ -63,6 +67,8 @@ Thuộc về chuyến: ngày, phân xưởng, đại lý, tài xế, biển số
 Dòng `nhap_nguyen_lieu.ngay` là **bản chép của `ngayGiao`** để tổng hợp nhanh. Sửa ngày giao của chuyến ⇒ phải cập nhật `ngay` của mọi dòng con, nếu không sổ và cân đối lệch nhau.
 
 Trên UI hai ô này đứng cùng hàng, **"Ngày ghi sổ" đặt trước, "Ngày hàng về xưởng" đặt sau** (theo thứ tự thao tác: mở sổ hôm nay rồi mới chọn ngày hàng thật về). Câu diễn giải dài gom vào nút **ⓘ** cạnh nhãn (`DateField info` → pattern `InfoTip`) để hai ô cùng chiều cao, không lệch — nhãn tiêu đề vẫn luôn hiện.
+
+**Hai ngày đi liền theo mặc định** (state `ngayLienNhau`): đổi **ngày ghi sổ** thì ngày hàng về **tự nhảy theo** (`doiNgayGhiSo`) — khớp ca thường gặp (hàng về đúng ngày ghi). Chỉ khi người dùng **tự sửa ngày hàng về** (`doiNgayVe`) thì hai ngày mới **tách** (đây là ghi bù) và ô ghi sổ thôi kéo theo. Khởi tạo: `moThem` liền khi ngày xem = hôm nay, tách sẵn khi đang xem ngày cũ; `moSuaChuyen` liền khi `postingDate === deliveryDate` của chuyến.
 
 ### 3. Ghi bù
 

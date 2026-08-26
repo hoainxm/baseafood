@@ -89,6 +89,7 @@ interface DongSX {
   rauKg: number;
   baoTuKg: number;
   blocksCount: number;
+  blockSpecKg: number; // quy cách kg/khối — nhập ngay trên dòng, nhớ về mặt hàng
 }
 
 const dongSXRong = (category = ""): DongSX => ({
@@ -101,6 +102,7 @@ const dongSXRong = (category = ""): DongSX => ({
   rauKg: 0,
   baoTuKg: 0,
   blocksCount: 0,
+  blockSpecKg: 0,
 });
 
 /** Dòng có tách râu/bao tử = đã nhập ít nhất một trong hai thành phần. */
@@ -362,6 +364,21 @@ export default function SanXuatBTPScreen() {
       componentBaoTuKg: laTach(d) ? d.baoTuKg || 0 : null,
     }));
     persist([...rows, ...moi]);
+
+    // Nhớ quy cách block về MẶT HÀNG (đúng ý "gắn trên mặt hàng") — lần sau tự điền.
+    const qcMoi = new Map<string, number>();
+    for (const d of hopLe)
+      if (d.productId && d.blockSpecKg > 0) {
+        const p = matHang.find((m) => m.id === d.productId);
+        if (p && quyCachBlock(p) !== d.blockSpecKg)
+          qcMoi.set(d.productId, d.blockSpecKg);
+      }
+    if (qcMoi.size > 0)
+      setMatHang(
+        matHang.map((m) =>
+          qcMoi.has(m.id) ? { ...m, blockSpecKg: qcMoi.get(m.id)! } : m
+        )
+      );
 
     const tongMoi = moi.reduce((s, r) => s + r.quantityKg, 0);
     notify.daLuu(`Đã lưu ${moi.length} thành phẩm · ${kg(tongMoi)}`);
@@ -1087,7 +1104,7 @@ function BangDongSX({
               </span>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[720px] border-collapse text-sm">
+              <table className="w-full min-w-[840px] border-collapse text-sm">
                 <thead>
                   <tr>
                     <th className={`${th} w-10`} aria-label="Mở tách" />
@@ -1098,17 +1115,17 @@ function BangDongSX({
                       Số lượng (kg) <span className="text-destructive">*</span>
                     </th>
                     <th className={`${th} min-w-[11rem]`}>Khách hàng</th>
-                    <th className={`${th} min-w-[7rem]`}>Block</th>
+                    <th className={`${th} min-w-[13rem]`}>
+                      Số block × quy cách
+                    </th>
                     <th className={`${th} w-12`} aria-label="Bỏ dòng" />
                   </tr>
                 </thead>
                 <tbody>
                   {rows.map((d) => {
-                    const sp = matHang.find((m) => m.id === d.productId);
                     // Mũi tên tách hiện ở MỌI dòng; tách "tính" khi đã nhập
                     // râu/bao tử. Mã đánh dấu "Có tách" chỉ để tự mở sẵn.
                     const tach = laTach(d);
-                    const spec = quyCachBlock(sp);
                     return (
                       <Fragment key={d.key}>
                         <tr>
@@ -1133,17 +1150,16 @@ function BangDongSX({
                               label="Thành phẩm"
                               required
                               value={d.productId}
-                              onChange={(v) =>
+                              onChange={(v) => {
+                                const p = matHang.find((m) => m.id === v);
                                 onSua(d.key, {
                                   productId: v,
                                   // Mã đánh dấu "Có tách" → tự mở ô tách.
-                                  moRong: laCoTach(
-                                    matHang.find((m) => m.id === v)
-                                  )
-                                    ? true
-                                    : d.moRong,
-                                })
-                              }
+                                  moRong: laCoTach(p) ? true : d.moRong,
+                                  // Có quy cách đã gắn ở mặt hàng → tự điền kg/khối.
+                                  blockSpecKg: quyCachBlock(p) ?? d.blockSpecKg,
+                                });
+                              }}
                               options={optMatHangNhom(g)}
                               onCreate={(ten) => onTaoMatHang(ten, g)}
                               emptyText="Chưa có thành phẩm của loài này — gõ tên rồi Thêm mới."
@@ -1185,28 +1201,48 @@ function BangDongSX({
                             />
                           </td>
                           <td className={td}>
-                            <NumberField
-                              anNhan
-                              anNhanBatBuoc
-                              label="Số block"
-                              unit="block"
-                              value={d.blocksCount || null}
-                              onChange={(v) => {
-                                const b = v ?? 0;
-                                // Có quy cách block & chưa tách → tự tính kg = block × quy cách.
-                                onSua(
-                                  d.key,
-                                  spec && !tach
-                                    ? { blocksCount: b, quantityKg: b * spec }
-                                    : { blocksCount: b }
-                                );
-                              }}
-                            />
-                            {spec ? (
-                              <p className="mt-1 text-xs text-muted-foreground">
-                                × {num(spec)} kg/khối
-                              </p>
-                            ) : null}
+                            <div className="flex items-center gap-1.5">
+                              <NumberField
+                                anNhan
+                                anNhanBatBuoc
+                                label="Số block"
+                                unit="block"
+                                className="min-w-[5.5rem] flex-1"
+                                value={d.blocksCount || null}
+                                onChange={(v) => {
+                                  const b = v ?? 0;
+                                  const s = d.blockSpecKg || 0;
+                                  // Có quy cách & chưa tách → tự tính kg = block × quy cách.
+                                  onSua(
+                                    d.key,
+                                    s > 0 && !tach
+                                      ? { blocksCount: b, quantityKg: b * s }
+                                      : { blocksCount: b }
+                                  );
+                                }}
+                              />
+                              <span className="text-sm text-muted-foreground">
+                                ×
+                              </span>
+                              <NumberField
+                                anNhan
+                                anNhanBatBuoc
+                                label="Quy cách kg/khối"
+                                unit="kg/khối"
+                                className="min-w-[6rem] flex-1"
+                                value={d.blockSpecKg || null}
+                                onChange={(v) => {
+                                  const s = v ?? 0;
+                                  const b = d.blocksCount || 0;
+                                  onSua(
+                                    d.key,
+                                    b > 0 && s > 0 && !tach
+                                      ? { blockSpecKg: s, quantityKg: b * s }
+                                      : { blockSpecKg: s }
+                                  );
+                                }}
+                              />
+                            </div>
                           </td>
                           <td className={`${td} text-center`}>
                             <Button

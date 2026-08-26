@@ -40,11 +40,38 @@ export const ROLES: { value: Role; label: string }[] = [
   { value: "accountant", label: "Kế toán" },
 ];
 
+/**
+ * Ánh xạ slug vai trò CŨ (tiếng Việt không dấu, trước rename tiếng Anh 0016) →
+ * slug CHUẨN hiện tại. Dữ liệu người dùng tạo trước rename vẫn lưu slug cũ trong
+ * cột roles ⇒ chuẩn hoá lúc ĐỌC để hiện đúng nhãn + chạy đúng phân quyền. Ghi
+ * lại (rolesToCsv) luôn ra slug chuẩn nên dữ liệu tự lành dần khi admin lưu lại.
+ */
+const VAI_TRO_CU_CHUAN: Record<string, Role> = {
+  "giam-doc": "director",
+  "pho-giam-doc": "vice-director",
+  "quan-doc-dong": "manager-dong",
+  "quan-doc-ca": "manager-ca",
+  "quan-doc-kho": "manager-kho",
+  "pho-quan-doc": "vice-manager",
+  "ke-toan": "accountant",
+  "to-truong": "team-leader",
+  "thu-kho": "warehouse-keeper",
+  "nhap-hang": "warehouse-keeper",
+  // "admin" giữ nguyên (không đổi khi rename)
+};
+
+/** Chuẩn hoá một slug vai trò: slug cũ → chuẩn; slug đã chuẩn giữ nguyên. */
+export function chuanHoaVaiTro(v: string): Role {
+  const t = v.trim();
+  return (VAI_TRO_CU_CHUAN[t] ?? t) as Role;
+}
+
 export function rolesFromCsv(csv: string): Role[] {
   return csv
     .split(",")
     .map((s) => s.trim())
-    .filter(Boolean) as Role[];
+    .filter(Boolean)
+    .map(chuanHoaVaiTro);
 }
 
 export function rolesToCsv(arr: Role[]): string {
@@ -52,7 +79,7 @@ export function rolesToCsv(arr: Role[]): string {
 }
 
 export function rolesList(v: unknown): Role[] {
-  if (Array.isArray(v)) return v as Role[];
+  if (Array.isArray(v)) return v.map((x) => chuanHoaVaiTro(String(x)));
   if (typeof v === "string") return rolesFromCsv(v);
   return [];
 }

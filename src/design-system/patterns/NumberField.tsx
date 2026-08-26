@@ -38,6 +38,7 @@ export function NumberField({
   step,
   placeholder = "0",
   anNhanBatBuoc = false,
+  anNhan = false,
   className,
 }: {
   label: string;
@@ -52,6 +53,8 @@ export function NumberField({
   placeholder?: string;
   /** Ẩn nhãn "Bắt buộc / (không bắt buộc)" — dùng cho ô sửa nhanh trong bảng thông số. */
   anNhanBatBuoc?: boolean;
+  /** Giấu hẳn nhãn (aria-label), dùng trong bảng/lưới có tiêu đề cột. */
+  anNhan?: boolean;
   className?: string;
 }) {
   const [raw, setRaw] = React.useState(() => dinhDangSo(value));
@@ -96,6 +99,7 @@ export function NumberField({
       error={error}
       unit={step ? undefined : unit}
       anNhanBatBuoc={anNhanBatBuoc}
+      anNhan={anNhan}
       className={className}
     >
       {step ? (

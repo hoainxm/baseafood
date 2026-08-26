@@ -3,7 +3,7 @@
 // Tên tiếng Việt: Màn hình Ghi Thành Phẩm ngày (sản xuất)
 // Description: Daily finished-goods production entry (v1: product · qty · customer)
 // ============================================================
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import type { DailyLock, WipProductionItem, Product, Workshop } from "@/types";
 import { isBackdatedWip } from "@/types";
 import { newId } from "@/lib/store";
@@ -1006,9 +1006,11 @@ export default function SanXuatBTPScreen() {
 /* ---------- Bảng thành phẩm của một phiên (nhập nhiều dòng một lượt) ---------- */
 
 /**
- * Mỗi thành phẩm một thẻ trải ngang (Thành phẩm · Số lượng · Khách hàng). Loại
- * tách râu/bao tử (cùng giá) thì bật ô “Tách” → hiện 2 ô râu + bao tử, tổng tự
- * cộng. Thêm dòng bằng nút ở cuối — dòng mới xuống cuối, không tự nhảy.
+ * BẢNG trải ngang kiểu bảng tính: mỗi thành phẩm MỘT DÒNG, các cột nằm ngang
+ * (Thành phẩm · Số lượng · Block · Khách hàng), nhãn đi bằng tiêu đề cột (ô ẩn
+ * nhãn). Loại tách râu/bao tử: bật nút "Tách" → ô Số lượng thành nút hiện TỔNG,
+ * bấm mở ra DÒNG CON (collapse theo dòng) nhập Râu + Bao tử. Hẹp thì bảng cuộn
+ * ngang trong khung riêng, không xuống dòng.
  */
 function BangDongSX({
   dong,
@@ -1030,122 +1032,165 @@ function BangDongSX({
   onTaoKhach: (ten: string) => string;
 }) {
   const coTheBo = dong.length > 1;
+  const th =
+    "border-b-2 border-border bg-card px-2 py-2 text-left text-sm font-semibold whitespace-nowrap";
+  const td = "border-b border-border px-2 py-2 align-middle";
   return (
     <div className="space-y-3">
-      {dong.map((d) => (
-        <div
-          key={d.key}
-          className="space-y-3 rounded-lg border border-border bg-card p-3"
-        >
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1.6fr_1.3fr_auto] lg:items-end">
-            <Combobox
-              label="Thành phẩm"
-              required
-              value={d.productId}
-              onChange={(v) => onSua(d.key, { productId: v })}
-              options={optMatHang}
-              onCreate={(ten) => onTaoMatHang(ten)}
-              emptyText="Chưa có — gõ tên rồi Thêm mới."
-            />
-            <Combobox
-              label="Khách hàng"
-              value={d.customerName}
-              onChange={(v) => onSua(d.key, { customerName: v })}
-              options={optKhach}
-              onCreate={(ten) => onTaoKhach(ten)}
-              placeholder="Chọn khách (nếu có)"
-              emptyText="Chưa có — gõ tên rồi Thêm mới."
-            />
-            {coTheBo ? (
-              <Button
-                variant="outline"
-                aria-label="Bỏ dòng"
-                className="justify-center sm:col-span-2 lg:col-span-1"
-                onClick={() => onBo(d.key)}
-              >
-                <X />
-                <span className="lg:hidden">Bỏ dòng</span>
-              </Button>
-            ) : (
-              <span className="hidden lg:block" aria-hidden />
-            )}
-          </div>
+      <div className="overflow-x-auto rounded-lg ring-1 ring-border">
+        <table className="w-full min-w-[760px] border-collapse text-sm">
+          <thead>
+            <tr>
+              <th className={`${th} w-8 text-center`}>#</th>
+              <th className={`${th} min-w-[13rem]`}>
+                Thành phẩm <span className="text-destructive">*</span>
+              </th>
+              <th className={`${th} min-w-[8.5rem]`}>
+                Số lượng (kg) <span className="text-destructive">*</span>
+              </th>
+              <th className={`${th} min-w-[6.5rem]`}>Block</th>
+              <th className={`${th} min-w-[11rem]`}>Khách hàng</th>
+              <th className={`${th} w-14 text-center`}>Tách</th>
+              <th className={`${th} w-12`} aria-label="Bỏ dòng" />
+            </tr>
+          </thead>
+          <tbody>
+            {dong.map((d, i) => (
+              <Fragment key={d.key}>
+                <tr>
+                  <td className={`${td} tnum text-center text-muted-foreground`}>
+                    {i + 1}
+                  </td>
+                  <td className={td}>
+                    <Combobox
+                      anNhan
+                      label="Thành phẩm"
+                      required
+                      value={d.productId}
+                      onChange={(v) => onSua(d.key, { productId: v })}
+                      options={optMatHang}
+                      onCreate={(ten) => onTaoMatHang(ten)}
+                      emptyText="Chưa có — gõ tên rồi Thêm mới."
+                    />
+                  </td>
+                  <td className={td}>
+                    {d.tach ? (
+                      <button
+                        type="button"
+                        onClick={() => onSua(d.key, { moRong: !d.moRong })}
+                        aria-expanded={d.moRong}
+                        aria-label="Mở/đóng dòng râu + bao tử"
+                        className="tnum flex h-10 w-full items-center justify-between gap-1 rounded-md bg-muted px-3 font-semibold"
+                      >
+                        {num(tongDong(d))}
+                        <ChevronDown
+                          className={`size-4 shrink-0 text-muted-foreground transition-transform ${d.moRong ? "rotate-180" : ""}`}
+                          aria-hidden
+                        />
+                      </button>
+                    ) : (
+                      <NumberField
+                        anNhan
+                        label="Số lượng"
+                        required
+                        unit="kg"
+                        value={d.quantityKg || null}
+                        onChange={(v) => onSua(d.key, { quantityKg: v ?? 0 })}
+                      />
+                    )}
+                  </td>
+                  <td className={td}>
+                    <NumberField
+                      anNhan
+                      anNhanBatBuoc
+                      label="Số block"
+                      unit="block"
+                      value={d.blocksCount || null}
+                      onChange={(v) => onSua(d.key, { blocksCount: v ?? 0 })}
+                    />
+                  </td>
+                  <td className={td}>
+                    <Combobox
+                      anNhan
+                      label="Khách hàng"
+                      value={d.customerName}
+                      onChange={(v) => onSua(d.key, { customerName: v })}
+                      options={optKhach}
+                      onCreate={(ten) => onTaoKhach(ten)}
+                      placeholder="Chọn khách"
+                      emptyText="Chưa có — gõ tên rồi Thêm mới."
+                    />
+                  </td>
+                  <td className={`${td} text-center`}>
+                    <Button
+                      variant={d.tach ? "secondary" : "outline"}
+                      size="icon"
+                      aria-label={d.tach ? "Bỏ tách râu/bao tử" : "Tách râu + bao tử"}
+                      title="Tách râu + bao tử (cùng giá)"
+                      onClick={() =>
+                        onSua(
+                          d.key,
+                          d.tach
+                            ? { tach: false }
+                            : { tach: true, moRong: true, quantityKg: 0 }
+                        )
+                      }
+                    >
+                      <Split />
+                    </Button>
+                  </td>
+                  <td className={`${td} text-center`}>
+                    {coTheBo && (
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        aria-label="Bỏ dòng"
+                        onClick={() => onBo(d.key)}
+                      >
+                        <X />
+                      </Button>
+                    )}
+                  </td>
+                </tr>
 
-          <div className="flex flex-wrap items-end gap-3">
-            {!d.tach && (
-              <NumberField
-                label="Số lượng"
-                required
-                unit="kg"
-                className="min-w-[8rem] flex-1"
-                value={d.quantityKg || null}
-                onChange={(v) => onSua(d.key, { quantityKg: v ?? 0 })}
-              />
-            )}
-            <NumberField
-              label="Số block"
-              unit="block"
-              className="min-w-[7rem] flex-1"
-              value={d.blocksCount || null}
-              onChange={(v) => onSua(d.key, { blocksCount: v ?? 0 })}
-            />
-            <Button
-              variant={d.tach ? "secondary" : "outline"}
-              className="shrink-0"
-              onClick={() =>
-                onSua(
-                  d.key,
-                  d.tach
-                    ? { tach: false }
-                    : { tach: true, moRong: true, quantityKg: 0 }
-                )
-              }
-            >
-              <Split />
-              {d.tach ? "Bỏ tách" : "Tách râu + bao tử"}
-            </Button>
-          </div>
-
-          {/* Thẻ collapse: thu gọn hiện TỔNG, mở ra mới thấy 2 thành phần */}
-          {d.tach && (
-            <div className="rounded-lg border border-primary/40 bg-accent/30">
-              <button
-                type="button"
-                onClick={() => onSua(d.key, { moRong: !d.moRong })}
-                aria-expanded={d.moRong}
-                className="flex min-h-12 w-full items-center justify-between gap-2 px-3 text-base font-semibold"
-              >
-                <span>
-                  Râu + bao tử · Tổng{" "}
-                  <span className="tnum">{num(tongDong(d))}</span> kg
-                </span>
-                <ChevronDown
-                  className={`size-5 shrink-0 transition-transform ${d.moRong ? "rotate-180" : ""}`}
-                  aria-hidden
-                />
-              </button>
-              {d.moRong && (
-                <div className="grid gap-3 border-t border-border p-3 sm:grid-cols-2">
-                  <NumberField
-                    label="Râu"
-                    required
-                    unit="kg"
-                    value={d.rauKg || null}
-                    onChange={(v) => onSua(d.key, { rauKg: v ?? 0 })}
-                  />
-                  <NumberField
-                    label="Bao tử"
-                    required
-                    unit="kg"
-                    value={d.baoTuKg || null}
-                    onChange={(v) => onSua(d.key, { baoTuKg: v ?? 0 })}
-                  />
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      ))}
+                {/* Collapse theo DÒNG: dòng con nhập râu + bao tử */}
+                {d.tach && d.moRong && (
+                  <tr className="bg-accent/30">
+                    <td className="border-b border-border" />
+                    <td className="border-b border-border px-2 pb-3" colSpan={6}>
+                      <div className="flex flex-wrap items-end gap-4">
+                        <NumberField
+                          label="Râu"
+                          required
+                          unit="kg"
+                          className="min-w-[8rem] flex-1"
+                          value={d.rauKg || null}
+                          onChange={(v) => onSua(d.key, { rauKg: v ?? 0 })}
+                        />
+                        <NumberField
+                          label="Bao tử"
+                          required
+                          unit="kg"
+                          className="min-w-[8rem] flex-1"
+                          value={d.baoTuKg || null}
+                          onChange={(v) => onSua(d.key, { baoTuKg: v ?? 0 })}
+                        />
+                        <div className="pb-2 text-base text-muted-foreground">
+                          Tổng ={" "}
+                          <span className="tnum font-semibold text-foreground">
+                            {num(tongDong(d))}
+                          </span>{" "}
+                          kg
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
       <Button
         type="button"

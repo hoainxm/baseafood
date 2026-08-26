@@ -177,6 +177,11 @@ Luật khi dùng:
   sẽ ghi đè nhau** — chỉ ô cuối sống sót.
 - Ô cần điều khiển (chọn khách, nút…): `CotLuoi.oRieng`, KHÔNG phải `hien`.
   Combobox trong ô dùng `anNhan` — tiêu đề cột đã nói ô đó là gì.
+- **Bảng nhập tự dựng (không qua `LuoiNhap`):** `Field` / `NumberField` cũng nhận
+  `anNhan` (giấu nhãn nhìn thấy, giữ `aria-label`) — dùng khi bảng có **hàng tiêu
+  đề cột**. Ngoài bảng thì KHÔNG dùng, nhãn phải luôn hiện. Bảng phải cuộn ngang
+  trong khung riêng (`overflow-x-auto`), không để cuộn ngang cả trang. VD: bảng
+  ghi thành phẩm ngày (`WipProductionScreen` › `BangDongSX`).
 - **Cấm `sr-only` cho nhãn nằm trong hộp cuộn.** `sr-only` là `position:absolute`;
   gặp tổ tiên không định vị thì rơi ra toạ độ trang, đội chiều cao trang lên và
   sinh thêm một thanh cuộn dọc + mảng trắng dưới cùng. Dùng `aria-label`.

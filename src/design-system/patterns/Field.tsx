@@ -62,6 +62,7 @@ export function Field({
   error,
   unit,
   anNhanBatBuoc = false,
+  anNhan = false,
   className,
   children,
 }: {
@@ -73,6 +74,12 @@ export function Field({
   unit?: string;
   /** Ẩn nhãn "Bắt buộc / (không bắt buộc)" — dùng khi đây là BỘ LỌC hoặc ô sửa nhanh. */
   anNhanBatBuoc?: boolean;
+  /**
+   * Giấu HẲN nhãn nhìn thấy, giữ nhãn cho trình đọc màn hình (aria-label). CHỈ
+   * dùng khi tiêu đề CỘT đã nói rõ ô này là gì (ô trong bảng/lưới nhập) — giống
+   * `Combobox anNhan`. Ngoài bảng thì nhãn phải luôn hiện.
+   */
+  anNhan?: boolean;
   className?: string;
   children: React.ReactElement;
 }) {
@@ -108,6 +115,8 @@ export function Field({
     children as React.ReactElement<Record<string, unknown>>,
     {
       id,
+      // anNhan: nhãn nhìn thấy bị giấu → chuyển tên ô cho trình đọc màn hình.
+      "aria-label": anNhan ? label : undefined,
       "aria-describedby": describedBy,
       "aria-invalid": error ? true : undefined,
       // Dấu * chỉ là tín hiệu THỊ GIÁC (aria-hidden). Trình đọc màn hình lấy
@@ -126,16 +135,18 @@ export function Field({
        ô nhập LUÔN thẳng hàng dưới cùng — kể cả khi ô bên cạnh có thêm dòng gợi ý
        (VD "Số lượng" cạnh "Đơn giá" có hint → trước đây hai ô lệch nhau). */
     <div className={cn("flex h-full flex-col gap-2", className)}>
-      <div className="flex flex-wrap items-center gap-2">
-        <Label htmlFor={id}>
-          {label}
-          {!anNhanBatBuoc && required && (
-            <span aria-hidden className="ml-1 font-bold text-destructive">
-              *
-            </span>
-          )}
-        </Label>
-      </div>
+      {!anNhan && (
+        <div className="flex flex-wrap items-center gap-2">
+          <Label htmlFor={id}>
+            {label}
+            {!anNhanBatBuoc && required && (
+              <span aria-hidden className="ml-1 font-bold text-destructive">
+                *
+              </span>
+            )}
+          </Label>
+        </div>
+      )}
 
       {hint && (
         <p id={hintId} className="text-sm text-muted-foreground">

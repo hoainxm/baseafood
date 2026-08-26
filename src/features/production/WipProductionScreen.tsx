@@ -140,12 +140,9 @@ export default function SanXuatBTPScreen() {
   /* Sửa một dòng đã ghi (từ bảng sổ). */
   const [sua, setSua] = useState<WipProductionItem | null>(null);
   const [loiSua, setLoiSua] = useState<LoiNhap[]>([]);
-  /** Thành phẩm đang sửa có được đánh dấu tách râu/bao tử ở Danh mục không. */
-  const suaChoTach = laCoTach(matHang.find((m) => m.id === sua?.productId));
-  /** Dòng đang sửa có tách không = mã có cờ tách VÀ đã nhập râu/bao tử. */
+  /** Dòng đang sửa có tách không = đã nhập râu/bao tử (ô tách luôn có sẵn). */
   const suaTach =
-    suaChoTach &&
-    ((sua?.componentRauKg ?? 0) > 0 || (sua?.componentBaoTuKg ?? 0) > 0);
+    (sua?.componentRauKg ?? 0) > 0 || (sua?.componentBaoTuKg ?? 0) > 0;
 
   const [hoiChot, setHoiChot] = useState(false);
   const [ghiChuChot, setGhiChuChot] = useState("");
@@ -792,8 +789,9 @@ export default function SanXuatBTPScreen() {
                     Thành phẩm làm ra trong ngày
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    Chọn loài → dưới là thành phẩm của nó. Mã có tách râu/bao tử
-                    sẽ hiện mũi tên đầu dòng.
+                    Chọn loài → dưới là thành phẩm của nó. Bấm mũi tên ▸ đầu dòng
+                    để tách râu + bao tử (cùng giá); mã đánh dấu "Có tách" tự mở
+                    sẵn.
                   </p>
                 </div>
 
@@ -916,28 +914,26 @@ export default function SanXuatBTPScreen() {
                 />
               )}
 
-              {suaChoTach && (
-                <div className="rounded-lg border border-border p-3">
-                  <p className="mb-2 text-sm text-muted-foreground">
-                    Tách râu + bao tử (cùng giá) — bỏ trống nếu không tách. Nhập
-                    vào thì Số lượng = tổng hai ô.
-                  </p>
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <NumberField
-                      label="Râu"
-                      unit="kg"
-                      value={sua.componentRauKg ?? null}
-                      onChange={(v) => datSua({ componentRauKg: v ?? 0 })}
-                    />
-                    <NumberField
-                      label="Bao tử"
-                      unit="kg"
-                      value={sua.componentBaoTuKg ?? null}
-                      onChange={(v) => datSua({ componentBaoTuKg: v ?? 0 })}
-                    />
-                  </div>
+              <div className="rounded-lg border border-border p-3">
+                <p className="mb-2 text-sm text-muted-foreground">
+                  Tách râu + bao tử (cùng giá) — bỏ trống nếu không tách. Nhập
+                  vào thì Số lượng = tổng hai ô.
+                </p>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <NumberField
+                    label="Râu"
+                    unit="kg"
+                    value={sua.componentRauKg ?? null}
+                    onChange={(v) => datSua({ componentRauKg: v ?? 0 })}
+                  />
+                  <NumberField
+                    label="Bao tử"
+                    unit="kg"
+                    value={sua.componentBaoTuKg ?? null}
+                    onChange={(v) => datSua({ componentBaoTuKg: v ?? 0 })}
+                  />
                 </div>
-              )}
+              </div>
 
               <NumberField
                 label="Số block"
@@ -1109,30 +1105,27 @@ function BangDongSX({
                 <tbody>
                   {rows.map((d) => {
                     const sp = matHang.find((m) => m.id === d.productId);
-                    const choTach = laCoTach(sp);
-                    const tach = choTach && laTach(d);
+                    // Mũi tên tách hiện ở MỌI dòng; tách "tính" khi đã nhập
+                    // râu/bao tử. Mã đánh dấu "Có tách" chỉ để tự mở sẵn.
+                    const tach = laTach(d);
                     const spec = quyCachBlock(sp);
                     return (
                       <Fragment key={d.key}>
                         <tr>
                           <td className={`${td} text-center`}>
-                            {choTach && (
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  onSua(d.key, { moRong: !d.moRong })
-                                }
-                                aria-expanded={d.moRong}
-                                aria-label="Mở/đóng ô râu + bao tử"
-                                title="Tách râu + bao tử (cùng giá)"
-                                className="inline-flex size-9 items-center justify-center rounded-md text-muted-foreground hover:bg-muted"
-                              >
-                                <ChevronDown
-                                  className={`size-5 transition-transform ${d.moRong ? "" : "-rotate-90"}`}
-                                  aria-hidden
-                                />
-                              </button>
-                            )}
+                            <button
+                              type="button"
+                              onClick={() => onSua(d.key, { moRong: !d.moRong })}
+                              aria-expanded={d.moRong}
+                              aria-label="Mở/đóng ô râu + bao tử"
+                              title="Tách râu + bao tử (cùng giá)"
+                              className="inline-flex size-9 items-center justify-center rounded-md text-muted-foreground hover:bg-muted"
+                            >
+                              <ChevronDown
+                                className={`size-5 transition-transform ${d.moRong ? "" : "-rotate-90"}`}
+                                aria-hidden
+                              />
+                            </button>
                           </td>
                           <td className={td}>
                             <Combobox
@@ -1140,7 +1133,17 @@ function BangDongSX({
                               label="Thành phẩm"
                               required
                               value={d.productId}
-                              onChange={(v) => onSua(d.key, { productId: v })}
+                              onChange={(v) =>
+                                onSua(d.key, {
+                                  productId: v,
+                                  // Mã đánh dấu "Có tách" → tự mở ô tách.
+                                  moRong: laCoTach(
+                                    matHang.find((m) => m.id === v)
+                                  )
+                                    ? true
+                                    : d.moRong,
+                                })
+                              }
                               options={optMatHangNhom(g)}
                               onCreate={(ten) => onTaoMatHang(ten, g)}
                               emptyText="Chưa có thành phẩm của loài này — gõ tên rồi Thêm mới."
@@ -1217,7 +1220,7 @@ function BangDongSX({
                           </td>
                         </tr>
 
-                        {choTach && d.moRong && (
+                        {d.moRong && (
                           <tr className="bg-accent/30">
                             <td className="border-b border-border" />
                             <td

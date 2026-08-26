@@ -68,12 +68,18 @@ export interface UserProfile {
   roles: Role[]; // multiple roles; [] = unassigned
 }
 
+/**
+ * Loài (nhóm thủy sản) — DANH SÁCH CHUẨN DUY NHẤT của toàn hệ thống.
+ * Dùng cho cả loại nguyên liệu, mặt hàng và sổ nhập. Trước đây có 2 danh sách
+ * lệch nhau (thiếu "Ghẹ" ở một nơi, thiếu "Bào ngư" ở nơi kia) → gộp về đây.
+ */
 export const CATEGORIES = [
   "Bạch tuộc",
   "Mực",
   "Cá",
   "Tôm",
   "Ghẹ",
+  "Bào ngư",
   "Khác",
 ] as const;
 export type Category = (typeof CATEGORIES)[number];

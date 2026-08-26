@@ -30,9 +30,6 @@ import ThanhPham141 from "./FinishedGoodScreen";
 
 const THI_TRUONG = ["Nhật", "EU", "Mỹ", "Hàn Quốc", "Trung Quốc", "Nội địa"];
 
-/** Nhóm/loài của thành phẩm 141 — dùng cho ô Loài của mặt hàng. */
-const NHOM_TP = ["Bạch tuộc", "Mực", "Cá", "Tôm", "Bào ngư", "Khác"];
-
 /** Kiểu chế biến của thành phẩm — facet thứ 3 (migration 0027). Danh mục MỞ, thêm tại chỗ. */
 const KIEU_CHE_BIEN = [
   "Nguyên con làm sạch",
@@ -112,10 +109,10 @@ export default function DanhMucScreen() {
       render: (giaTri, doiGiaTri) => (
         <Combobox
           label="Loài"
-          hint="Bạch tuộc, Mực, Cá…"
+          hint="Bạch tuộc, Mực, Cá… Đây là cấp gom nhóm khi ghi thành phẩm."
           value={giaTri}
           onChange={doiGiaTri}
-          options={NHOM_TP.map((n) => ({ value: n, label: n }))}
+          options={CATEGORIES.map((l) => ({ value: l, label: l }))}
           onCreate={(t) => t}
           placeholder="— Chọn loài —"
         />

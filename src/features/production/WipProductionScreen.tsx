@@ -8,10 +8,9 @@ import type {
   DailyLock,
   WipProductionItem,
   Product,
-  MaterialType,
   Workshop,
 } from "@/types";
-import { isBackdatedWip, laCoTach, quyCachBlock } from "@/types";
+import { CATEGORIES, isBackdatedWip, laCoTach, quyCachBlock } from "@/types";
 import { newId } from "@/lib/store";
 import { uid } from "@/lib/db";
 import {
@@ -19,7 +18,6 @@ import {
   useProducts,
   useWipProductions,
   useCustomers,
-  useMaterialTypes,
 } from "@/lib/catalogRepo";
 import {
   Badge,
@@ -83,7 +81,7 @@ interface DauPhien {
  */
 interface DongSX {
   key: string;
-  materialTypeId: string; // NHÓM theo loại nguyên liệu (chỉ để tổ chức màn ghi)
+  category: string; // NHÓM theo LOÀI (Bạch tuộc/Mực/Cá…) — cấp gom màn ghi
   productId: string;
   customerName: string;
   moRong: boolean; // dòng con (râu/bao tử) đang mở — trạng thái hiển thị
@@ -93,9 +91,9 @@ interface DongSX {
   blocksCount: number;
 }
 
-const dongSXRong = (materialTypeId = ""): DongSX => ({
+const dongSXRong = (category = ""): DongSX => ({
   key: newId(),
-  materialTypeId,
+  category,
   productId: "",
   customerName: "",
   moRong: false,
@@ -126,7 +124,6 @@ export default function SanXuatBTPScreen() {
   const [chot, persistChot] = useProductionLocks();
   const [matHang, setMatHang] = useProducts();
   const [khach, setKhach] = useCustomers();
-  const [loaiNL] = useMaterialTypes();
 
   const [ky, setKy] = useState<KyXem>("ngay");
   const [ngay, setNgay] = useState(todayISO());
@@ -175,13 +172,13 @@ export default function SanXuatBTPScreen() {
     phu: c.market || undefined,
   }));
 
-  const themMatHang = (ten: string, materialTypeId = ""): string => {
+  const themMatHang = (ten: string, category = ""): string => {
     const m: Product = {
       id: uid(),
       code: "",
       name: ten,
       finishedGoodCode: "",
-      materialTypeId,
+      category, // gắn LOÀI để mã mới tạo tại chỗ nằm đúng nhóm
     };
     setMatHang([...matHang, m]);
     notify.daLuu(`Đã thêm thành phẩm "${ten}"`);
@@ -294,12 +291,12 @@ export default function SanXuatBTPScreen() {
     setDongBang((ds) => ds.map((d) => (d.key === key ? { ...d, ...patch } : d)));
   const boDong = (key: string) =>
     setDongBang((ds) => ds.filter((d) => d.key !== key));
-  /** Thêm một dòng thành phẩm vào NHÓM loại nguyên liệu đang có. */
-  const themDong = (materialTypeId: string) =>
-    setDongBang((ds) => [...ds, dongSXRong(materialTypeId)]);
-  /** Thêm một NHÓM loại nguyên liệu mới (kèm một dòng trống để nhập). */
-  const themNhom = (materialTypeId: string) =>
-    setDongBang((ds) => [...ds, dongSXRong(materialTypeId)]);
+  /** Thêm một dòng thành phẩm vào NHÓM loài đang có. */
+  const themDong = (category: string) =>
+    setDongBang((ds) => [...ds, dongSXRong(category)]);
+  /** Thêm một NHÓM loài mới (kèm một dòng trống để nhập). */
+  const themNhom = (category: string) =>
+    setDongBang((ds) => [...ds, dongSXRong(category)]);
 
   /** Kiểm đầu phiên (ngày + lý do ghi bù). */
   const loiDauPhien = (p: DauPhien): LoiNhap[] => {
@@ -795,15 +792,14 @@ export default function SanXuatBTPScreen() {
                     Thành phẩm làm ra trong ngày
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    Chọn loại nguyên liệu → dưới là thành phẩm của nó. Mã có tách
-                    râu/bao tử sẽ hiện mũi tên đầu dòng.
+                    Chọn loài → dưới là thành phẩm của nó. Mã có tách râu/bao tử
+                    sẽ hiện mũi tên đầu dòng.
                   </p>
                 </div>
 
                 <BangDongSX
                   dong={dongBang}
                   matHang={matHang}
-                  loaiNL={loaiNL}
                   onSua={capNhatDong}
                   onBo={boDong}
                   onThemDong={themDong}
@@ -1027,16 +1023,16 @@ export default function SanXuatBTPScreen() {
 /* ---------- Bảng thành phẩm của một phiên (nhập nhiều dòng một lượt) ---------- */
 
 /**
- * BẢNG nhập NHÓM THEO LOẠI NGUYÊN LIỆU: mỗi loại NL một cụm, dưới là bảng thành
- * phẩm của nó (cột ngang kiểu bảng tính, nhãn đi bằng tiêu đề cột). Mã có cờ
- * "tách râu/bao tử" (Danh mục) mới hiện mũi tên đầu dòng để mở ô râu + bao tử.
- * Mã có "quy cách block" thì nhập số block tự tính kg gợi ý. Thêm nhóm bằng ô
- * "Thêm loại nguyên liệu" ở cuối.
+ * BẢNG nhập NHÓM THEO LOÀI: mỗi loài một cụm (Bạch tuộc, Mực, Cá…), dưới là bảng
+ * thành phẩm của loài đó (cột ngang kiểu bảng tính, nhãn đi bằng tiêu đề cột).
+ * Gom theo LOÀI vì loài có sẵn trên mọi mặt hàng (141 mã seed) và gộp lớn/nhỏ tự
+ * nhiên — "Bạch tuộc 2 da lớn/nhỏ" đều là loài Bạch tuộc. Mã có cờ "tách râu/bao
+ * tử" (Danh mục) mới hiện mũi tên đầu dòng để mở ô râu + bao tử. Mã có "quy cách
+ * block" thì nhập số block tự tính kg gợi ý. Thêm nhóm bằng ô "Thêm loài" ở cuối.
  */
 function BangDongSX({
   dong,
   matHang,
-  loaiNL,
   onSua,
   onBo,
   onThemDong,
@@ -1047,12 +1043,11 @@ function BangDongSX({
 }: {
   dong: DongSX[];
   matHang: Product[];
-  loaiNL: MaterialType[];
   onSua: (key: string, patch: Partial<DongSX>) => void;
   onBo: (key: string) => void;
-  onThemDong: (materialTypeId: string) => void;
-  onThemNhom: (materialTypeId: string) => void;
-  onTaoMatHang: (ten: string, materialTypeId: string) => string;
+  onThemDong: (category: string) => void;
+  onThemNhom: (category: string) => void;
+  onTaoMatHang: (ten: string, category: string) => string;
   optKhach: MucChon[];
   onTaoKhach: (ten: string) => string;
 }) {
@@ -1060,21 +1055,19 @@ function BangDongSX({
     "border-b-2 border-border bg-card px-2 py-2 text-left text-sm font-semibold whitespace-nowrap";
   const td = "border-b border-border px-2 py-2 align-middle";
 
-  // Nhóm theo loại nguyên liệu, giữ thứ tự xuất hiện.
+  // Nhóm theo LOÀI, giữ thứ tự xuất hiện.
   const nhomIds: string[] = [];
   for (const d of dong)
-    if (!nhomIds.includes(d.materialTypeId)) nhomIds.push(d.materialTypeId);
+    if (!nhomIds.includes(d.category)) nhomIds.push(d.category);
 
-  const tenNL = (id: string) =>
-    loaiNL.find((l) => l.id === id)?.name || "Chưa gán loại nguyên liệu";
-  const optNL: MucChon[] = loaiNL.map((l) => ({
-    value: l.id,
-    label: l.name,
-    phu: l.category || undefined,
-  }));
+  const tenLoai = (g: string) => g || "Chưa gán loài";
+  // Loài đã có nhóm rồi thì ẩn khỏi ô "Thêm loài" (đỡ tạo trùng nhóm).
+  const optLoai: MucChon[] = CATEGORIES.filter(
+    (l) => !nhomIds.includes(l)
+  ).map((l) => ({ value: l, label: l }));
   const optMatHangNhom = (g: string): MucChon[] =>
     matHang
-      .filter((m) => (m.materialTypeId || "") === g)
+      .filter((m) => (m.category || "") === g)
       .map((m) => ({
         value: m.id,
         label: m.name,
@@ -1083,7 +1076,7 @@ function BangDongSX({
   return (
     <div className="space-y-4">
       {nhomIds.map((g) => {
-        const rows = dong.filter((d) => d.materialTypeId === g);
+        const rows = dong.filter((d) => d.category === g);
         return (
           <div
             key={g || "__none"}
@@ -1091,7 +1084,7 @@ function BangDongSX({
           >
             <div className="flex flex-wrap items-center justify-between gap-2 bg-muted px-3 py-2">
               <span className="text-base font-semibold text-foreground">
-                {tenNL(g)}
+                {tenLoai(g)}
               </span>
               <span className="text-sm text-muted-foreground">
                 {rows.length} thành phẩm
@@ -1150,7 +1143,7 @@ function BangDongSX({
                               onChange={(v) => onSua(d.key, { productId: v })}
                               options={optMatHangNhom(g)}
                               onCreate={(ten) => onTaoMatHang(ten, g)}
-                              emptyText="Chưa có thành phẩm của loại NL này — gõ tên rồi Thêm mới."
+                              emptyText="Chưa có thành phẩm của loài này — gõ tên rồi Thêm mới."
                             />
                           </td>
                           <td className={td}>
@@ -1286,22 +1279,23 @@ function BangDongSX({
         );
       })}
 
-      {/* Thêm nhóm loại nguyên liệu */}
+      {/* Thêm nhóm loài */}
       <div className="rounded-lg border-2 border-dashed border-border p-3">
         <Combobox
-          label="Thêm loại nguyên liệu"
+          label="Thêm loài"
           anNhanBatBuoc
           choPhepXoa={false}
           value=""
           onChange={(v) => {
             if (v) onThemNhom(v);
           }}
-          options={optNL}
-          placeholder="Chọn loại nguyên liệu để thêm nhóm thành phẩm"
-          emptyText="Chưa có loại NL — thêm ở Danh mục."
+          options={optLoai}
+          placeholder="Chọn loài để thêm nhóm thành phẩm"
+          emptyText="Đã thêm hết các loài."
         />
         <p className="mt-2 text-sm text-muted-foreground">
-          VD Bạch tuộc 2 da → nhóm thành phẩm của nó; rồi Mực, Bạch tuộc 1 da…
+          VD Bạch tuộc → nhóm thành phẩm của nó; rồi Mực, Cá… Lớn/nhỏ gộp chung
+          vì cùng loài.
         </p>
       </div>
     </div>

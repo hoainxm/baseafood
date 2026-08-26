@@ -4,7 +4,7 @@ last_verified: 2026-08-26
 ttl_days: 90
 <!-- updated: 2026-08-24 — thêm 0025 (audit_log: nhật ký thao tác, append-only, admin đọc) — KHÔNG đưa vào vòng siết 0021; xem lib/audit.ts -->
 <!-- updated: 2026-08-24 — thêm 0024 (finished_goods_opening_stock: tồn đầu kho THÀNH PHẨM, kg+block) cho sổ NXT thành phẩm khép vòng; xem lib/inventoryFinished.ts -->
-<!-- updated: 2026-08-26 — thêm 0030 (production_wips: customer_name + component_rau/bao_tu_kg) & 0031 (products: split_components + block_spec_kg) cho màn ghi thành phẩm ngày /wip: nhóm theo loại NL, cờ tách râu/bao tử, quy cách block trên mặt hàng -->
+<!-- updated: 2026-08-26 — thêm 0030 (production_wips: customer_name + component_rau/bao_tu_kg) & 0031 (products: split_components + block_spec_kg) cho màn ghi thành phẩm ngày /wip: gom nhóm THEO LOÀI (products.category, không theo loại NL — xem 34-btp), cờ tách râu/bao tử, quy cách block trên mặt hàng -->
 <!-- updated: 2026-08-24 — hòa nhánh docs-flow: 0027 (products.processing_type), 0028 (production_locks.leftover_kg), 0029 (packagings: đóng gói BTP→TP, G3) — đổi số từ 0024/0025/0026 tránh trùng -->
 <!-- updated: 2026-08-21 — thêm 0022 (material_opening_stock: tồn đầu kho nguyên liệu, kg thuần) cho sổ NXT nguyên liệu; xem 31-can-doi-ky.md § Tồn kho nguyên liệu -->
 <!-- updated: 2026-08-07 — thêm migration 0008 (nguyen_lieu_vao.nguon_kho, cờ nguồn xả đông) -->

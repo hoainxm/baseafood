@@ -54,7 +54,6 @@ import {
   Pencil,
   Plus,
   Scale,
-  Split,
   TriangleAlert,
   Warehouse,
   X,
@@ -79,8 +78,7 @@ interface DongSX {
   key: string;
   productId: string;
   customerName: string;
-  tach: boolean;
-  moRong: boolean; // thẻ tách đang mở (chỉ là trạng thái hiển thị)
+  moRong: boolean; // dòng con (râu/bao tử) đang mở — trạng thái hiển thị
   quantityKg: number; // dùng khi KHÔNG tách
   rauKg: number;
   baoTuKg: number;
@@ -91,17 +89,20 @@ const dongSXRong = (): DongSX => ({
   key: newId(),
   productId: "",
   customerName: "",
-  tach: false,
-  moRong: true,
+  moRong: false,
   quantityKg: 0,
   rauKg: 0,
   baoTuKg: 0,
   blocksCount: 0,
 });
 
+/** Dòng có tách râu/bao tử = đã nhập ít nhất một trong hai thành phần. */
+const laTach = (d: DongSX): boolean =>
+  (d.rauKg || 0) > 0 || (d.baoTuKg || 0) > 0;
+
 /** Tổng khối lượng một dòng (tách thì cộng 2 thành phần). */
 const tongDong = (d: DongSX): number =>
-  d.tach ? (d.rauKg || 0) + (d.baoTuKg || 0) : d.quantityKg || 0;
+  laTach(d) ? (d.rauKg || 0) + (d.baoTuKg || 0) : d.quantityKg || 0;
 
 /** Dòng đủ để lưu: có thành phẩm + tổng > 0. */
 const dongDayDu = (d: DongSX): boolean => Boolean(d.productId) && tongDong(d) > 0;
@@ -131,8 +132,10 @@ export default function SanXuatBTPScreen() {
 
   /* Sửa một dòng đã ghi (từ bảng sổ). */
   const [sua, setSua] = useState<WipProductionItem | null>(null);
-  const [suaTach, setSuaTach] = useState(false);
   const [loiSua, setLoiSua] = useState<LoiNhap[]>([]);
+  /** Dòng đang sửa có tách không = suy từ có nhập râu/bao tử hay chưa. */
+  const suaTach =
+    (sua?.componentRauKg ?? 0) > 0 || (sua?.componentBaoTuKg ?? 0) > 0;
 
   const [hoiChot, setHoiChot] = useState(false);
   const [ghiChuChot, setGhiChuChot] = useState("");
@@ -345,8 +348,8 @@ export default function SanXuatBTPScreen() {
       status: "cho-nhap",
       note: "",
       customerName: d.customerName.trim(),
-      componentRauKg: d.tach ? d.rauKg || 0 : null,
-      componentBaoTuKg: d.tach ? d.baoTuKg || 0 : null,
+      componentRauKg: laTach(d) ? d.rauKg || 0 : null,
+      componentBaoTuKg: laTach(d) ? d.baoTuKg || 0 : null,
     }));
     persist([...rows, ...moi]);
 
@@ -388,7 +391,6 @@ export default function SanXuatBTPScreen() {
   /* ---- Sửa / xóa một dòng đã ghi ---- */
   const moSua = (r: WipProductionItem) => {
     setSua({ ...r });
-    setSuaTach(r.componentRauKg != null || r.componentBaoTuKg != null);
     setLoiSua([]);
   };
   const datSua = (patch: Partial<WipProductionItem>) =>
@@ -778,7 +780,7 @@ export default function SanXuatBTPScreen() {
                   </p>
                   <p className="text-sm text-muted-foreground">
                     Mỗi loại một dòng; thêm dòng bằng nút ở cuối. Loại tách râu +
-                    bao tử thì bật ô “Tách”.
+                    bao tử thì bấm mũi tên đầu dòng để nhập.
                   </p>
                 </div>
 
@@ -884,16 +886,28 @@ export default function SanXuatBTPScreen() {
                 emptyText="Chưa có khách — gõ tên rồi Thêm mới."
               />
 
-              <Button
-                variant={suaTach ? "secondary" : "outline"}
-                onClick={() => setSuaTach((v) => !v)}
-              >
-                <Split />
-                {suaTach ? "Đang tách râu + bao tử" : "Tách râu + bao tử (cùng giá)"}
-              </Button>
-
               {suaTach ? (
-                <div className="grid gap-6 sm:grid-cols-3">
+                <Field label="Số lượng (tổng râu + bao tử)">
+                  <div className="tnum flex h-10 items-center rounded-md bg-muted px-3 text-base font-semibold">
+                    {num(suaTong)} kg
+                  </div>
+                </Field>
+              ) : (
+                <NumberField
+                  label="Số lượng"
+                  required
+                  unit="kg"
+                  value={sua.quantityKg || null}
+                  onChange={(v) => datSua({ quantityKg: v ?? 0 })}
+                />
+              )}
+
+              <div className="rounded-lg border border-border p-3">
+                <p className="mb-2 text-sm text-muted-foreground">
+                  Tách râu + bao tử (cùng giá) — bỏ trống nếu không tách. Nhập vào
+                  thì Số lượng = tổng hai ô.
+                </p>
+                <div className="grid gap-4 sm:grid-cols-2">
                   <NumberField
                     label="Râu"
                     unit="kg"
@@ -906,21 +920,8 @@ export default function SanXuatBTPScreen() {
                     value={sua.componentBaoTuKg ?? null}
                     onChange={(v) => datSua({ componentBaoTuKg: v ?? 0 })}
                   />
-                  <Field label="Tổng">
-                    <div className="tnum flex h-10 items-center rounded-md bg-muted px-3 text-base font-semibold">
-                      {num(suaTong)} kg
-                    </div>
-                  </Field>
                 </div>
-              ) : (
-                <NumberField
-                  label="Số lượng"
-                  required
-                  unit="kg"
-                  value={sua.quantityKg || null}
-                  onChange={(v) => datSua({ quantityKg: v ?? 0 })}
-                />
-              )}
+              </div>
 
               <NumberField
                 label="Số block"
@@ -1041,153 +1042,144 @@ function BangDongSX({
         <table className="w-full min-w-[760px] border-collapse text-sm">
           <thead>
             <tr>
-              <th className={`${th} w-8 text-center`}>#</th>
+              <th className={`${th} w-10`} aria-label="Mở tách râu/bao tử" />
               <th className={`${th} min-w-[13rem]`}>
                 Thành phẩm <span className="text-destructive">*</span>
               </th>
               <th className={`${th} min-w-[8.5rem]`}>
                 Số lượng (kg) <span className="text-destructive">*</span>
               </th>
-              <th className={`${th} min-w-[6.5rem]`}>Block</th>
               <th className={`${th} min-w-[11rem]`}>Khách hàng</th>
-              <th className={`${th} w-14 text-center`}>Tách</th>
+              <th className={`${th} min-w-[6.5rem]`}>Block</th>
               <th className={`${th} w-12`} aria-label="Bỏ dòng" />
             </tr>
           </thead>
           <tbody>
-            {dong.map((d, i) => (
-              <Fragment key={d.key}>
-                <tr>
-                  <td className={`${td} tnum text-center text-muted-foreground`}>
-                    {i + 1}
-                  </td>
-                  <td className={td}>
-                    <Combobox
-                      anNhan
-                      label="Thành phẩm"
-                      required
-                      value={d.productId}
-                      onChange={(v) => onSua(d.key, { productId: v })}
-                      options={optMatHang}
-                      onCreate={(ten) => onTaoMatHang(ten)}
-                      emptyText="Chưa có — gõ tên rồi Thêm mới."
-                    />
-                  </td>
-                  <td className={td}>
-                    {d.tach ? (
+            {dong.map((d) => {
+              const tach = laTach(d);
+              return (
+                <Fragment key={d.key}>
+                  <tr>
+                    <td className={`${td} text-center`}>
                       <button
                         type="button"
                         onClick={() => onSua(d.key, { moRong: !d.moRong })}
                         aria-expanded={d.moRong}
-                        aria-label="Mở/đóng dòng râu + bao tử"
-                        className="tnum flex h-10 w-full items-center justify-between gap-1 rounded-md bg-muted px-3 font-semibold"
+                        aria-label="Mở/đóng ô tách râu + bao tử"
+                        title="Tách râu + bao tử (cùng giá)"
+                        className="inline-flex size-9 items-center justify-center rounded-md text-muted-foreground hover:bg-muted"
                       >
-                        {num(tongDong(d))}
                         <ChevronDown
-                          className={`size-4 shrink-0 text-muted-foreground transition-transform ${d.moRong ? "rotate-180" : ""}`}
+                          className={`size-5 transition-transform ${d.moRong ? "" : "-rotate-90"}`}
                           aria-hidden
                         />
                       </button>
-                    ) : (
+                    </td>
+                    <td className={td}>
+                      <Combobox
+                        anNhan
+                        label="Thành phẩm"
+                        required
+                        value={d.productId}
+                        onChange={(v) => onSua(d.key, { productId: v })}
+                        options={optMatHang}
+                        onCreate={(ten) => onTaoMatHang(ten)}
+                        emptyText="Chưa có — gõ tên rồi Thêm mới."
+                      />
+                    </td>
+                    <td className={td}>
+                      {tach ? (
+                        <div
+                          className="tnum flex h-10 items-center rounded-md bg-muted px-3 font-semibold"
+                          title="Tổng = râu + bao tử"
+                        >
+                          {num(tongDong(d))}
+                        </div>
+                      ) : (
+                        <NumberField
+                          anNhan
+                          label="Số lượng"
+                          required
+                          unit="kg"
+                          value={d.quantityKg || null}
+                          onChange={(v) => onSua(d.key, { quantityKg: v ?? 0 })}
+                        />
+                      )}
+                    </td>
+                    <td className={td}>
+                      <Combobox
+                        anNhan
+                        label="Khách hàng"
+                        value={d.customerName}
+                        onChange={(v) => onSua(d.key, { customerName: v })}
+                        options={optKhach}
+                        onCreate={(ten) => onTaoKhach(ten)}
+                        placeholder="Chọn khách"
+                        emptyText="Chưa có — gõ tên rồi Thêm mới."
+                      />
+                    </td>
+                    <td className={td}>
                       <NumberField
                         anNhan
-                        label="Số lượng"
-                        required
-                        unit="kg"
-                        value={d.quantityKg || null}
-                        onChange={(v) => onSua(d.key, { quantityKg: v ?? 0 })}
+                        anNhanBatBuoc
+                        label="Số block"
+                        unit="block"
+                        value={d.blocksCount || null}
+                        onChange={(v) => onSua(d.key, { blocksCount: v ?? 0 })}
                       />
-                    )}
-                  </td>
-                  <td className={td}>
-                    <NumberField
-                      anNhan
-                      anNhanBatBuoc
-                      label="Số block"
-                      unit="block"
-                      value={d.blocksCount || null}
-                      onChange={(v) => onSua(d.key, { blocksCount: v ?? 0 })}
-                    />
-                  </td>
-                  <td className={td}>
-                    <Combobox
-                      anNhan
-                      label="Khách hàng"
-                      value={d.customerName}
-                      onChange={(v) => onSua(d.key, { customerName: v })}
-                      options={optKhach}
-                      onCreate={(ten) => onTaoKhach(ten)}
-                      placeholder="Chọn khách"
-                      emptyText="Chưa có — gõ tên rồi Thêm mới."
-                    />
-                  </td>
-                  <td className={`${td} text-center`}>
-                    <Button
-                      variant={d.tach ? "secondary" : "outline"}
-                      size="icon"
-                      aria-label={d.tach ? "Bỏ tách râu/bao tử" : "Tách râu + bao tử"}
-                      title="Tách râu + bao tử (cùng giá)"
-                      onClick={() =>
-                        onSua(
-                          d.key,
-                          d.tach
-                            ? { tach: false }
-                            : { tach: true, moRong: true, quantityKg: 0 }
-                        )
-                      }
-                    >
-                      <Split />
-                    </Button>
-                  </td>
-                  <td className={`${td} text-center`}>
-                    {coTheBo && (
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        aria-label="Bỏ dòng"
-                        onClick={() => onBo(d.key)}
-                      >
-                        <X />
-                      </Button>
-                    )}
-                  </td>
-                </tr>
-
-                {/* Collapse theo DÒNG: dòng con nhập râu + bao tử */}
-                {d.tach && d.moRong && (
-                  <tr className="bg-accent/30">
-                    <td className="border-b border-border" />
-                    <td className="border-b border-border px-2 pb-3" colSpan={6}>
-                      <div className="flex flex-wrap items-end gap-4">
-                        <NumberField
-                          label="Râu"
-                          required
-                          unit="kg"
-                          className="min-w-[8rem] flex-1"
-                          value={d.rauKg || null}
-                          onChange={(v) => onSua(d.key, { rauKg: v ?? 0 })}
-                        />
-                        <NumberField
-                          label="Bao tử"
-                          required
-                          unit="kg"
-                          className="min-w-[8rem] flex-1"
-                          value={d.baoTuKg || null}
-                          onChange={(v) => onSua(d.key, { baoTuKg: v ?? 0 })}
-                        />
-                        <div className="pb-2 text-base text-muted-foreground">
-                          Tổng ={" "}
-                          <span className="tnum font-semibold text-foreground">
-                            {num(tongDong(d))}
-                          </span>{" "}
-                          kg
-                        </div>
-                      </div>
+                    </td>
+                    <td className={`${td} text-center`}>
+                      {coTheBo && (
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          aria-label="Bỏ dòng"
+                          onClick={() => onBo(d.key)}
+                        >
+                          <X />
+                        </Button>
+                      )}
                     </td>
                   </tr>
-                )}
-              </Fragment>
-            ))}
+
+                  {/* Collapse theo DÒNG: bấm mũi tên đầu dòng để nhập râu + bao tử */}
+                  {d.moRong && (
+                    <tr className="bg-accent/30">
+                      <td className="border-b border-border" />
+                      <td className="border-b border-border px-2 pb-3" colSpan={5}>
+                        <p className="mb-2 text-sm text-muted-foreground">
+                          Tách râu + bao tử (cùng giá) — bỏ trống nếu không tách.
+                          Nhập vào thì Số lượng = tổng hai ô.
+                        </p>
+                        <div className="flex flex-wrap items-end gap-4">
+                          <NumberField
+                            label="Râu"
+                            unit="kg"
+                            className="min-w-[8rem] flex-1"
+                            value={d.rauKg || null}
+                            onChange={(v) => onSua(d.key, { rauKg: v ?? 0 })}
+                          />
+                          <NumberField
+                            label="Bao tử"
+                            unit="kg"
+                            className="min-w-[8rem] flex-1"
+                            value={d.baoTuKg || null}
+                            onChange={(v) => onSua(d.key, { baoTuKg: v ?? 0 })}
+                          />
+                          <div className="pb-2 text-base text-muted-foreground">
+                            Tổng ={" "}
+                            <span className="tnum font-semibold text-foreground">
+                              {num(tongDong(d))}
+                            </span>{" "}
+                            kg
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
+              );
+            })}
           </tbody>
         </table>
       </div>

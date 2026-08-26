@@ -28,15 +28,15 @@ export type Role =
   | "warehouse-keeper";
 
 export const ROLES: { value: Role; label: string }[] = [
-  { value: "admin", label: "Quản trị (full quyền)" },
+  { value: "admin", label: "Quản trị viên" },
   { value: "director", label: "Giám đốc" },
   { value: "vice-director", label: "Phó giám đốc" },
   { value: "manager-dong", label: "Quản đốc xưởng Đông" },
   { value: "manager-ca", label: "Quản đốc xưởng Cá" },
   { value: "manager-kho", label: "Quản đốc xưởng Khô" },
-  { value: "vice-manager", label: "Phó quản đốc (ghi thành phẩm)" },
+  { value: "vice-manager", label: "Phó quản đốc" },
   { value: "team-leader", label: "Tổ trưởng sản xuất" },
-  { value: "warehouse-keeper", label: "Thủ kho / nhập hàng" },
+  { value: "warehouse-keeper", label: "Thủ kho nhập hàng" },
   { value: "accountant", label: "Kế toán" },
 ];
 

@@ -29,6 +29,9 @@
 4. **Chốt ngày bán + phiếu bán in A4** (đối xứng chốt ngày nhập/SX).
 5. **Chuẩn hoá quy cách × chế biến (Chiều C)** — xem `docs/spec/bo-quy-cach-che-bien-thanh-pham.md`.
 6. **Cutover 01/09:** import baseline tồn 30/06 + nhập bù báo cáo T7–T8 → tồn đầu 01/09; xem `docs/trien-khai/ke-hoach-cutover-1-9-2026.md`. Import Excel + scan viết tay (tay trước).
+   - ⏳ **Đã có báo cáo XNT thật (KHO 1000 T7/2026: cá .xlsx + bạch tuộc .pdf) + SPEC:** [`docs/spec/import-xnt-kho-cutover.md`](spec/import-xnt-kho-cutover.md). Chốt tới 2026-08-26: **cấp lô (Phương án A)** · đọc cả .xlsx lẫn .pdf · mã hàng `PX<phân xưởng>.<nhóm><nguồn>.<lô>` (mới chắc PX*=Đông/Cá/Khô) · **realtime chạy cấp lô** (mirror phần mềm kế toán) ⇒ module = **sổ tồn kho NL cấp lô đầy đủ**, chia **2 pha** (Pha 1 import cutover đủ cho tồn đầu 01/09; Pha 2 nhập/xuất realtime theo lô).
+     - ⏸️ **NHẮC CHỦ DỰ ÁN (HOLD):** chốt "người dùng thao tác nhập/xuất **chi tiết tới lô**" trước khi thiết kế màn nhập Pha 2 (hướng CÓ, chưa chốt cứng).
+     - Việc kế tiếp: chủ dự án trả lời §9 (nhỏ) + gửi **file mềm T7 & T8 mọi phân xưởng** → mở **session mới** build Pha 1 (migration 🟡 2 bảng + màn import).
 7. **Định mức NL→TP; báo cáo tháng 6 khối.**
 
 ## 5. Cạm bẫy cần nhớ

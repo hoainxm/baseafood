@@ -38,6 +38,8 @@ Báo cáo **tồn kho tổng** gần nhất mà xí nghiệp đã chốt là **3
 ## 2b. Nguồn dữ liệu backfill — TRẠNG THÁI (chốt với người dùng 2026-08-24)
 
 > 📌 **Đọc mục này TRƯỚC khi làm import.** Đây là điểm dừng có chủ đích: chưa có file số hoá nên **chưa build import**; khi có file thực tế thì đọc từ đây làm tiếp.
+>
+> 🆕 **Cập nhật 2026-08-26 — đã có báo cáo thật + SPEC dự thảo:** chủ dự án đã đưa **báo cáo XNT KHO 1000 kỳ T7/2026**. Đã phân tích + viết đặc tả: [`spec/import-xnt-kho-cutover.md`](../spec/import-xnt-kho-cutover.md). **Điểm lệch quan trọng với giả định dưới đây:** file thực tế là **báo cáo XNT theo kho, cấp LÔ, chỉ Tồn đầu/Nhập/Xuất/Tồn cuối (kg)** — KHÔNG phải báo cáo cân đối theo *họ NL* + *đông gửi/xả đông* như checklist §2b giả định. Đề xuất Phương án A (bảng snapshot XNT riêng, tận dụng parser `nxtExcel.ts` sẵn có), thay vì map thẳng vào `material_opening_stock` + kỳ Cân đối. Chờ chủ dự án chốt 8 câu hỏi (§9 của SPEC) + gửi file mềm rồi build.
 
 **Mục tiêu tiên quyết (nhắc lại):** đưa hệ chạy **realtime từ 01/09/2026**. Điều kiện = **tồn đầu 01/09 đúng** = **baseline 30/06 + nhập bù dịch chuyển T7–T8**. Tạm **gác** tồn BTP/TP + các bước duyệt kho (chờ nhập kho…) — không chặn mục tiêu này; đợt backfill tập trung **tồn nguyên liệu + cân đối**.
 

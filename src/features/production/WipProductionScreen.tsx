@@ -45,6 +45,7 @@ import { KY_OPT, phamViKy, type KyXem } from "@/lib/periodUtils";
 import { DailyTaskReminder } from "@/features/shared";
 import {
   CalendarRange,
+  ChevronDown,
   ClipboardList,
   Factory,
   Hourglass,
@@ -79,9 +80,11 @@ interface DongSX {
   productId: string;
   customerName: string;
   tach: boolean;
+  moRong: boolean; // thẻ tách đang mở (chỉ là trạng thái hiển thị)
   quantityKg: number; // dùng khi KHÔNG tách
   rauKg: number;
   baoTuKg: number;
+  blocksCount: number;
 }
 
 const dongSXRong = (): DongSX => ({
@@ -89,9 +92,11 @@ const dongSXRong = (): DongSX => ({
   productId: "",
   customerName: "",
   tach: false,
+  moRong: true,
   quantityKg: 0,
   rauKg: 0,
   baoTuKg: 0,
+  blocksCount: 0,
 });
 
 /** Tổng khối lượng một dòng (tách thì cộng 2 thành phần). */
@@ -190,6 +195,7 @@ export default function SanXuatBTPScreen() {
   );
 
   const tong = view.reduce((s, r) => s + (r.quantityKg || 0), 0);
+  const tongBlock = view.reduce((s, r) => s + (r.blocksCount || 0), 0);
   const soChoNhap = view.filter((r) => r.status === "cho-nhap").length;
 
   const moTaPhamVi = laMotNgay
@@ -334,7 +340,7 @@ export default function SanXuatBTPScreen() {
       productId: d.productId,
       spec: "",
       quantityKg: tongDong(d),
-      blocksCount: 0,
+      blocksCount: d.blocksCount || 0,
       warehouse: "",
       status: "cho-nhap",
       note: "",
@@ -482,6 +488,14 @@ export default function SanXuatBTPScreen() {
       sapXep: (r) => r.quantityKg,
     },
     {
+      key: "bl",
+      header: "Block",
+      so: true,
+      render: (r) =>
+        r.blocksCount ? num(r.blocksCount) : <span className="text-muted-foreground">—</span>,
+      sapXep: (r) => r.blocksCount,
+    },
+    {
       key: "kh",
       header: "Khách hàng",
       render: (r) => r.customerName || <span className="text-muted-foreground">—</span>,
@@ -624,6 +638,10 @@ export default function SanXuatBTPScreen() {
             )}
           />
           <div className="flex flex-wrap justify-end gap-x-10 gap-y-2 rounded-xl bg-muted px-5 py-4">
+            <div className="flex items-baseline gap-3">
+              <span className="text-base text-muted-foreground">Tổng block</span>
+              <span className="tnum text-xl font-semibold">{num(tongBlock)}</span>
+            </div>
             <div className="flex items-baseline gap-3">
               <span className="text-base text-muted-foreground">
                 Tổng sản lượng
@@ -903,6 +921,13 @@ export default function SanXuatBTPScreen() {
                   onChange={(v) => datSua({ quantityKg: v ?? 0 })}
                 />
               )}
+
+              <NumberField
+                label="Số block"
+                unit="block"
+                value={sua.blocksCount || null}
+                onChange={(v) => datSua({ blocksCount: v ?? 0 })}
+              />
             </div>
           )}
           <DialogFooter>
@@ -1047,31 +1072,7 @@ function BangDongSX({
           </div>
 
           <div className="flex flex-wrap items-end gap-3">
-            {d.tach ? (
-              <>
-                <NumberField
-                  label="Râu"
-                  required
-                  unit="kg"
-                  className="min-w-[7rem] flex-1"
-                  value={d.rauKg || null}
-                  onChange={(v) => onSua(d.key, { rauKg: v ?? 0 })}
-                />
-                <NumberField
-                  label="Bao tử"
-                  required
-                  unit="kg"
-                  className="min-w-[7rem] flex-1"
-                  value={d.baoTuKg || null}
-                  onChange={(v) => onSua(d.key, { baoTuKg: v ?? 0 })}
-                />
-                <Field label="Tổng">
-                  <div className="tnum flex h-10 min-w-[6rem] items-center rounded-md bg-muted px-3 text-base font-semibold">
-                    {num(tongDong(d))} kg
-                  </div>
-                </Field>
-              </>
-            ) : (
+            {!d.tach && (
               <NumberField
                 label="Số lượng"
                 required
@@ -1081,20 +1082,68 @@ function BangDongSX({
                 onChange={(v) => onSua(d.key, { quantityKg: v ?? 0 })}
               />
             )}
+            <NumberField
+              label="Số block"
+              unit="block"
+              className="min-w-[7rem] flex-1"
+              value={d.blocksCount || null}
+              onChange={(v) => onSua(d.key, { blocksCount: v ?? 0 })}
+            />
             <Button
               variant={d.tach ? "secondary" : "outline"}
               className="shrink-0"
               onClick={() =>
-                onSua(d.key, {
-                  tach: !d.tach,
-                  ...(d.tach ? {} : { quantityKg: 0 }),
-                })
+                onSua(
+                  d.key,
+                  d.tach
+                    ? { tach: false }
+                    : { tach: true, moRong: true, quantityKg: 0 }
+                )
               }
             >
               <Split />
-              {d.tach ? "Đang tách râu + bao tử" : "Tách râu + bao tử"}
+              {d.tach ? "Bỏ tách" : "Tách râu + bao tử"}
             </Button>
           </div>
+
+          {/* Thẻ collapse: thu gọn hiện TỔNG, mở ra mới thấy 2 thành phần */}
+          {d.tach && (
+            <div className="rounded-lg border border-primary/40 bg-accent/30">
+              <button
+                type="button"
+                onClick={() => onSua(d.key, { moRong: !d.moRong })}
+                aria-expanded={d.moRong}
+                className="flex min-h-12 w-full items-center justify-between gap-2 px-3 text-base font-semibold"
+              >
+                <span>
+                  Râu + bao tử · Tổng{" "}
+                  <span className="tnum">{num(tongDong(d))}</span> kg
+                </span>
+                <ChevronDown
+                  className={`size-5 shrink-0 transition-transform ${d.moRong ? "rotate-180" : ""}`}
+                  aria-hidden
+                />
+              </button>
+              {d.moRong && (
+                <div className="grid gap-3 border-t border-border p-3 sm:grid-cols-2">
+                  <NumberField
+                    label="Râu"
+                    required
+                    unit="kg"
+                    value={d.rauKg || null}
+                    onChange={(v) => onSua(d.key, { rauKg: v ?? 0 })}
+                  />
+                  <NumberField
+                    label="Bao tử"
+                    required
+                    unit="kg"
+                    value={d.baoTuKg || null}
+                    onChange={(v) => onSua(d.key, { baoTuKg: v ?? 0 })}
+                  />
+                </div>
+              )}
+            </div>
+          )}
         </div>
       ))}
 

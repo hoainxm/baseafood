@@ -71,7 +71,7 @@ export interface MucNavShell {
 export const KIT_NAV: MucNavShell[] = [
   { id: "dashboard", label: "Tổng quan", icon: LayoutDashboard },
   { id: "production", label: "Lệnh sản xuất", icon: ClipboardList },
-  { id: "wip", label: "Sản xuất BTP", icon: Factory },
+  { id: "wip", label: "Sản xuất thành phẩm", icon: Factory },
   { id: "packaging", label: "Đóng gói", icon: Package },
   { id: "quality", label: "Chất lượng", icon: ShieldCheck },
   { id: "imports", label: "Nhập hàng", icon: Truck },

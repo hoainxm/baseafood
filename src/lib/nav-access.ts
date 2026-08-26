@@ -20,6 +20,7 @@ export const ALLOWED_NAV: Partial<Record<Role, string[]>> = {
   "manager-dong": DEPT_SAN_XUAT, // quản đốc xưởng Đông
   "manager-ca": DEPT_SAN_XUAT, // quản đốc xưởng Cá
   "manager-kho": DEPT_SAN_XUAT, // quản đốc xưởng Khô
+  "vice-manager": DEPT_SAN_XUAT, // phó quản đốc — ghi thành phẩm hằng ngày
 };
 
 /** Vai trò bị giới hạn → trang chủ (màn mở đầu khi đăng nhập vào). */
@@ -29,6 +30,7 @@ export const HOME_BY_ROLE: Partial<Record<Role, string>> = {
   "manager-dong": "wip",
   "manager-ca": "wip",
   "manager-kho": "wip",
+  "vice-manager": "wip",
 };
 
 /** Trang chủ theo vai trò: vai trò bộ phận đầu tiên khớp, mặc định "dashboard". */

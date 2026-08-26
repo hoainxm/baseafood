@@ -5,8 +5,9 @@
 // ============================================================
 import { useMemo, useState } from "react";
 import type { Supplier, Customer, MaterialType, Product } from "@/types";
-import { CATEGORIES } from "@/types";
+import { CATEGORIES, laCoTach, quyCachBlock } from "@/types";
 import { uid } from "@/lib/db";
+import { num } from "@/lib/format";
 import {
   useSuppliers,
   useCustomers,
@@ -15,8 +16,10 @@ import {
   useFinishedGoods,
 } from "@/lib/catalogRepo";
 import {
+  ChoiceGroup,
   Combobox,
   DanhMucCrud,
+  NumberField,
   Tabs,
   TabsContent,
   TabsList,
@@ -135,6 +138,55 @@ export default function DanhMucScreen() {
       ),
       hienThi: (r) =>
         r.processingType || <span className="text-muted-foreground">—</span>,
+      anTrenDienThoai: true,
+    },
+    {
+      key: "splitComponents",
+      nhan: "Tách râu + bao tử",
+      render: (giaTri, doiGiaTri) => {
+        const on = giaTri === "1" || giaTri === "true";
+        return (
+          <ChoiceGroup
+            label="Tách râu + bao tử (cùng giá)"
+            hint="Bật nếu mã này khi làm ra tách 2 thành phần râu + bao tử cùng 1 giá — màn ghi thành phẩm sẽ hiện ô tách. Mã thường để 'Không tách'."
+            value={on ? "1" : "0"}
+            onChange={(v) => doiGiaTri(v === "1" ? "1" : "")}
+            options={[
+              { value: "1", label: "Có tách" },
+              { value: "0", label: "Không tách" },
+            ]}
+            cot={2}
+          />
+        );
+      },
+      hienThi: (r) =>
+        laCoTach(r) ? (
+          "Có tách"
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        ),
+      anTrenDienThoai: true,
+    },
+    {
+      key: "blockSpecKg",
+      nhan: "Quy cách block (kg/khối)",
+      render: (giaTri, doiGiaTri) => (
+        <NumberField
+          label="Quy cách mỗi block"
+          unit="kg"
+          hint="Kg mỗi khối khi đóng gói (VD 2, 5). Để trống nếu không cố định — màn ghi tính kg gợi ý = số block × quy cách."
+          value={Number(giaTri) > 0 ? Number(giaTri) : null}
+          onChange={(v) => doiGiaTri(v == null ? "" : String(v))}
+        />
+      ),
+      hienThi: (r) => {
+        const q = quyCachBlock(r);
+        return q ? (
+          `${num(q)} kg/khối`
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        );
+      },
       anTrenDienThoai: true,
     },
     { key: "code", nhan: "Mã nội bộ", anTrenDienThoai: true, viDu: "Tự đặt (nếu cần)" },
@@ -274,6 +326,8 @@ export default function DanhMucScreen() {
               category: "",
               materialTypeId: "",
               processingType: "",
+              splitComponents: false,
+              blockSpecKg: null,
             })}
             timTheo={(r) => `${r.code} ${r.name} ${r.finishedGoodCode}`}
             moTaBanGhi={(r) => `${r.name}${r.code ? ` (mã ${r.code})` : ""}`}

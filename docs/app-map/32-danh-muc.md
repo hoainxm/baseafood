@@ -1,7 +1,8 @@
 > Load khi: sửa danh mục (đại lý, loại NL, mặt hàng, khách hàng) hay danh mục 141 mã thành phẩm.
 covers: src/features/catalog/CatalogScreen.tsx, src/features/catalog/FinishedGoodScreen.tsx, src/data/thanh-pham.json, src/design-system/patterns/CatalogCrudModal.tsx
-last_verified: 2026-08-23
+last_verified: 2026-08-26
 ttl_days: 90
+<!-- updated: 2026-08-26 — tab Mặt hàng thêm 2 thuộc tính cho màn ghi thành phẩm /wip (migration 0031): split_components (ChoiceGroup "Có tách/Không tách" — mã cắt chần tách râu+bao tử cùng giá) + block_spec_kg (NumberField kg/khối). Xem 34-btp-san-xuat-kho.ba-spec.md. -->
 <!-- updated: 2026-08-23 — mat_hang thêm facet processing_type (kiểu chế biến, 0024); combobox "Kiểu chế biến" ở tab Mặt hàng -->
 <!-- updated: 2026-08-07 — đại lý thêm tenGhiPhieu/diaChi/cmnd/ngayCap/noiCap (migration 0009) -->
 <!-- re-verified: 2026-08-14 — đồng bộ tên file sau rename eadc360: patterns/CatalogCrudModal.tsx + FinishedGoodScreen.tsx (symbol DanhMucCrud giữ nguyên) -->

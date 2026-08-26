@@ -138,6 +138,24 @@ export interface Product {
   category?: string; // nhóm LOÀI (Bạch tuộc/Mực/Cá…)
   materialTypeId?: string; // nguyên liệu / loại NL
   processingType?: string; // KIỂU CHẾ BIẾN (luộc/chần/cắt/tẩm bột…) — facet thứ 3, migration 0027
+  /** Mã tách 2 thành phần râu/bao tử (cùng giá) — chỉ mã này mới hiện ô tách ở
+   *  màn ghi thành phẩm. Migration 0031. Nhận cả boolean lẫn chuỗi "1"/"" từ
+   *  danh mục (CRUD lưu chuỗi) — đọc bằng `laCoTach()`. */
+  splitComponents?: boolean | string;
+  /** Quy cách MỖI block (kg/khối). Migration 0031. Danh mục lưu chuỗi. */
+  blockSpecKg?: number | string | null;
+}
+
+/** Mặt hàng có tách râu/bao tử không (chịu cả boolean lẫn chuỗi "1"/"true"). */
+export function laCoTach(p: Pick<Product, "splitComponents"> | undefined): boolean {
+  const v = p?.splitComponents;
+  return v === true || v === "1" || v === "true";
+}
+
+/** Quy cách block (kg/khối) dạng số, 0/không hợp lệ → null. */
+export function quyCachBlock(p: Pick<Product, "blockSpecKg"> | undefined): number | null {
+  const n = Number(p?.blockSpecKg);
+  return Number.isFinite(n) && n > 0 ? n : null;
 }
 
 export interface Customer {

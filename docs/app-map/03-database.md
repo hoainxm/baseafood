@@ -1,9 +1,10 @@
 > Load khi: thêm/sửa bảng, cột, migration, hay đọc lỗi Postgres lạ.
 covers: supabase/migrations/**, docs/ops/supabase-setup.md
-last_verified: 2026-08-25
+last_verified: 2026-08-26
 ttl_days: 90
 <!-- updated: 2026-08-24 — thêm 0025 (audit_log: nhật ký thao tác, append-only, admin đọc) — KHÔNG đưa vào vòng siết 0021; xem lib/audit.ts -->
 <!-- updated: 2026-08-24 — thêm 0024 (finished_goods_opening_stock: tồn đầu kho THÀNH PHẨM, kg+block) cho sổ NXT thành phẩm khép vòng; xem lib/inventoryFinished.ts -->
+<!-- updated: 2026-08-26 — thêm 0030 (production_wips: customer_name + component_rau/bao_tu_kg) & 0031 (products: split_components + block_spec_kg) cho màn ghi thành phẩm ngày /wip: nhóm theo loại NL, cờ tách râu/bao tử, quy cách block trên mặt hàng -->
 <!-- updated: 2026-08-24 — hòa nhánh docs-flow: 0027 (products.processing_type), 0028 (production_locks.leftover_kg), 0029 (packagings: đóng gói BTP→TP, G3) — đổi số từ 0024/0025/0026 tránh trùng -->
 <!-- updated: 2026-08-21 — thêm 0022 (material_opening_stock: tồn đầu kho nguyên liệu, kg thuần) cho sổ NXT nguyên liệu; xem 31-can-doi-ky.md § Tồn kho nguyên liệu -->
 <!-- updated: 2026-08-07 — thêm migration 0008 (nguyen_lieu_vao.nguon_kho, cờ nguồn xả đông) -->
@@ -82,6 +83,7 @@ App dùng camelCase, DB dùng snake_case — cầu nối là `AnhXaBang.toRow/fr
 | `0028_production_leftover.sql` | 🟡 | Thêm cột `production_locks.leftover_kg` (numeric, default 0) — nguyên liệu còn dở đem lưu kho, ghi lúc chốt ngày SX (daily-task bộ phận Sản xuất). Chỉ thêm cột, idempotent, có `ROLLBACK`. Chỉ đụng `production_locks`, không đụng `daily_locks`. |
 | `0030_production_customer_components.sql` | 🟡 | **Thành phẩm ngày — khách + râu/bao tử.** Thêm 3 cột vào `production_wips`: `customer_name` (mỗi dòng gắn 1 khách, làm theo đơn), `component_rau_kg` + `component_bao_tu_kg` (thành phẩm cắt chần tách 2 thành phần cùng giá; `quantity_kg` giữ TỔNG, null = không tách). Chỉ thêm cột, idempotent, có `ROLLBACK`. Chỉ đụng `production_wips`. |
 | `0029_dong_goi_thanh_pham.sql` | 🟡 | **Đóng gói BTP → thành phẩm (G3)** — bảng `packagings` (from_product/from_spec + input_kg/blocks → to_product/to_spec + output_kg/units, warehouse). Ghi phiếu đóng gói: BTP tiêu hao → TP ra, hao hụt = input−output. Tồn BTP trừ thêm input, tồn TP cộng output — cả hai SUY runtime (`inventory.ts`: `dongGoiTruTon`, `tinhTonTP`). Chỉ thêm bảng, idempotent, RLS mở anon (siết ở `0021`), có `ROLLBACK`. Xem [flow §3 G3](../trien-khai/flow-end-to-end-2-bo-phan.md). |
+| `0031_product_split_blockspec.sql` | 🟡 | **Mặt hàng — cờ tách + quy cách block.** Thêm 2 cột vào `products`: `split_components` (bool, default false — mã có tách râu/bao tử cùng giá hay không; CHỈ mã bật cờ mới hiện mũi tên tách ở màn ghi thành phẩm) + `block_spec_kg` (numeric, null — quy cách MỖI block kg/khối, VD 2/5; màn ghi tự tính kg gợi ý = số block × quy cách). Đẩy 2 thuộc tính về mặt hàng để `/wip` tự suy thay vì hỏi mỗi dòng. Chỉ thêm cột, idempotent, có `ROLLBACK`. Chỉ đụng `products`. Xem [34-btp-san-xuat-kho.ba-spec.md](34-btp-san-xuat-kho.ba-spec.md). |
 
 ⚠️ **`0004` chưa chạy** ⇒ app báo *"Mất kết nối máy chủ — Could not find the 'chuyen_id' column"*. Số liệu vẫn ghi xuống máy và nằm trong hàng chờ, tự đẩy lên sau khi migration chạy — nhưng máy khác chưa thấy.
 

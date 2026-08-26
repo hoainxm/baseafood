@@ -185,6 +185,12 @@ export const BANG_PRODUCT: AnhXaBang<Product> = {
     category: x.category,
     material_type_id: x.materialTypeId,
     processing_type: x.processingType,
+    // Danh mục (CRUD) lưu chuỗi "1"/"" cho cờ tách; chuẩn hoá về boolean.
+    split_components: x.splitComponents === true || x.splitComponents === "1",
+    block_spec_kg:
+      x.blockSpecKg == null || x.blockSpecKg === "" || Number(x.blockSpecKg) <= 0
+        ? null
+        : Number(x.blockSpecKg),
   }),
   fromRow: (r) => ({
     id: s(r.id),
@@ -194,6 +200,14 @@ export const BANG_PRODUCT: AnhXaBang<Product> = {
     category: r.category == null ? "" : s(r.category),
     materialTypeId: r.material_type_id == null ? "" : s(r.material_type_id),
     processingType: r.processing_type == null ? "" : s(r.processing_type),
+    splitComponents: Boolean(r.split_components),
+    blockSpecKg: r.block_spec_kg == null ? null : Number(r.block_spec_kg),
+  }),
+  // Dòng ghi trước 0031 chưa có cờ tách / quy cách block → mặc định trống.
+  vaDongCu: (x) => ({
+    ...x,
+    splitComponents: x.splitComponents ?? false,
+    blockSpecKg: x.blockSpecKg ?? null,
   }),
 };
 

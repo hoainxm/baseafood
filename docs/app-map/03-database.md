@@ -1,7 +1,8 @@
 > Load khi: thêm/sửa bảng, cột, migration, hay đọc lỗi Postgres lạ.
 covers: supabase/migrations/**, docs/ops/supabase-setup.md
-last_verified: 2026-08-26
+last_verified: 2026-08-27
 ttl_days: 90
+<!-- updated: 2026-08-27 — thêm 0032 (nxt_snapshots: snapshot Xuất–Nhập–Tồn nhập từ báo cáo THẬT của xí nghiệp, hạt Kho × Mã hàng × Kỳ; cột opening/in/out + giá trị; tồn cuối SUY ở app không lưu). CHỈ-THÊM bảng, idempotent, RLS anon+authenticated (chưa vào vòng siết 0021). Xem 04-tang-du-lieu (BANG_NXT_SNAPSHOT) + màn /nxt-kho. -->
 <!-- updated: 2026-08-24 — thêm 0025 (audit_log: nhật ký thao tác, append-only, admin đọc) — KHÔNG đưa vào vòng siết 0021; xem lib/audit.ts -->
 <!-- updated: 2026-08-24 — thêm 0024 (finished_goods_opening_stock: tồn đầu kho THÀNH PHẨM, kg+block) cho sổ NXT thành phẩm khép vòng; xem lib/inventoryFinished.ts -->
 <!-- updated: 2026-08-26 — thêm 0030 (production_wips: customer_name + component_rau/bao_tu_kg) & 0031 (products: split_components + block_spec_kg) cho màn ghi thành phẩm ngày /wip: gom nhóm THEO LOÀI (products.category, không theo loại NL — xem 34-btp), cờ tách râu/bao tử, quy cách block trên mặt hàng -->

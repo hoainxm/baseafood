@@ -13,6 +13,19 @@ import type { Role } from "@/types";
 const DEPT_NHAP_HANG = ["imports", "warehouse", "nxt-nl", "catalog"];
 const DEPT_SAN_XUAT = ["wip", "packaging", "warehouse", "quality", "catalog"];
 
+/**
+ * Màn DEMO — còn dùng DỮ LIỆU MẪU, chưa nối bảng thật. Tạm CHỈ admin thấy (để
+ * còn vào kiểm/hoàn thiện), gắn cờ "DEMO" trên nav. Người dùng thường không thấy
+ * để khỏi nhầm là số liệu vận hành. Gỡ id khỏi đây khi màn đã nối dữ liệu thật.
+ * (Tổng quan /dashboard KHÔNG nằm đây — đang được tổ chức lại bằng số thật.)
+ */
+export const DEMO_IDS = ["production", "quality", "cold-storage", "reports", "traceability"];
+
+/** Màn này còn là demo (dữ liệu mẫu)? */
+export function laDemo(id: string): boolean {
+  return DEMO_IDS.includes(id);
+}
+
 /** Vai trò bị giới hạn → tập nav id được phép thấy. */
 export const ALLOWED_NAV: Partial<Record<Role, string[]>> = {
   "warehouse-keeper": DEPT_NHAP_HANG, // thủ kho / nhập hàng

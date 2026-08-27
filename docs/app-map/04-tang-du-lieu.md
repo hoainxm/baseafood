@@ -1,8 +1,8 @@
 > Load khi: đụng đọc/ghi dữ liệu, thêm bảng vào app, hay điều tra "số liệu biến mất / không lên máy chủ".
 covers: src/lib/repo.ts, src/lib/db.ts, src/lib/catalogRepo.ts, src/lib/connectivity.ts, src/lib/supabase.ts, src/lib/store.ts, src/lib/audit.ts, src/design-system/patterns/DataStatusBadge.tsx
-last_verified: 2026-08-24
+last_verified: 2026-08-27
 ttl_days: 90
-<!-- updated: 2026-08-24 — nhật ký thao tác: useBang.ghi so cũ↔mới rồi gọi ghiNhatKy (lib/audit.ts); audit_log append-only, đẩy im lặng, không bật đèn đỏ -->
+<!-- updated: 2026-08-27 — thêm BANG_NXT_SNAPSHOT (nxt_snapshots) + hook useNxtSnapshots(seedNxtSnapshots) cho báo cáo Xuất–Nhập–Tồn kho (/nxt-kho). Seed số THẬT từ src/data/nxt-bachtuoc-2026-07.json (30 mã bạch tuộc, KHO TP-1000, đã kiểm định khớp tổng); id snapshot TẤT ĐỊNH theo (kho×kỳ×mã) để seed idempotent. NHAN_BANG['nxt_snapshots']. Màn nhập được Excel báo cáo thật qua lib/nxtExcel.ts parseNxtExcelFile. -->
 <!-- updated: 2026-08-24 — thêm BANG_FINISHED_OPENING_STOCK (finished_goods_opening_stock) + hook useFinishedGoodsOpeningStock cho sổ NXT thành phẩm; hàm thuần lib/inventoryFinished.ts suy tồn TP từ SX/đơn/bán; tinhTon() nhận thêm tham số bán hàng (tùy chọn) -->
 <!-- updated: 2026-08-21 — thêm BANG_OPENING_STOCK (material_opening_stock) + hook useMaterialOpeningStock cho sổ NXT nguyên liệu; hàm thuần lib/inventoryMaterial.ts suy tồn từ carryOver của Cân đối -->
 <!-- re-verified: 2026-08-14 — đồng bộ tên file sau rename eadc360: patterns/DataStatusBadge.tsx (symbol TrangThaiDuLieu giữ nguyên) -->

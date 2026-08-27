@@ -1,0 +1,220 @@
+{
+  "warehouseCode": "KHO TP - KHO 1000",
+  "warehouseAddress": "Bà Rịa - Phường Phước Trung - Thành phố Bà Rịa - Bà Rịa - Vũng Tàu",
+  "periodFrom": "2026-07-01",
+  "periodTo": "2026-07-31",
+  "unit": "KG",
+  "sourceNote": "Trích + kiểm định từ báo cáo thật 'BẠCH TUỘC NL TỰ ĐỘNG THÁNG 7' (KHO TP - KHO 1000). Σđầu 135.769 + Σnhập 37.068 − Σxuất 13.040 = Σcuối 159.797.",
+  "items": [
+    {
+      "code": "PXĐ.BTNL.TĐ 1001",
+      "name": "2 DA NGUYÊN LIỆU 100-UP F34 ( KHO 1500- Ô A19 )",
+      "opening": 0,
+      "in": 26928,
+      "out": 0
+    },
+    {
+      "code": "PXĐ.BTNL.TĐ 0090",
+      "name": "BAO TỬ MAZA",
+      "opening": 21207,
+      "in": 0,
+      "out": 4224
+    },
+    {
+      "code": "PXĐ.BTNL.TĐ 1008",
+      "name": "2 DA NGUYÊN LIỆU 80GR-UP F34 ( NL MUA HỒNG PHÚ )",
+      "opening": 15432,
+      "in": 72,
+      "out": 0
+    },
+    {
+      "code": "PXĐ.BTNL.TĐ 10010",
+      "name": "2 DA NGUYÊN LIỆU <80GR F34 ( NL MUA PHƯỚC CƠ )",
+      "opening": 14568,
+      "in": 0,
+      "out": 1464
+    },
+    {
+      "code": "PXĐ.BTNL.TĐ 059",
+      "name": "BAO TỬ 2DA NHẬP 100-200",
+      "opening": 12480,
+      "in": 0,
+      "out": 0
+    },
+    {
+      "code": "PXĐ.BTNL.TĐ 1006",
+      "name": "2 DA NGUYÊN LIỆU >80GR F34",
+      "opening": 10032,
+      "in": 0,
+      "out": 0
+    },
+    {
+      "code": "PXĐ.BTNL.TĐ 0219",
+      "name": "BAO TỬ 2DA CÒN CỔ <100G",
+      "opening": 6912,
+      "in": 3024,
+      "out": 0
+    },
+    {
+      "code": "PXĐ.BTNL.TĐ 020",
+      "name": "BAO TỬ 2DA CÒN CỔ",
+      "opening": 7628,
+      "in": 0,
+      "out": 0
+    },
+    {
+      "code": "PXĐ.BTNL.TĐ 0211",
+      "name": "BAO TỬ 2DA NHẬP 50-100",
+      "opening": 6624,
+      "in": 0,
+      "out": 0
+    },
+    {
+      "code": "PXĐ.BTNL.TĐ 1009",
+      "name": "2 DA NGUYÊN LIỆU 80GR-UP F34 ( NL MUA BÉ BA )",
+      "opening": 6162,
+      "in": 0,
+      "out": 0
+    },
+    {
+      "code": "PXĐ.BTNL.TĐ 015",
+      "name": "CỔ BẠCH TUỘC 2DA F34",
+      "opening": 4488,
+      "in": 1752,
+      "out": 576
+    },
+    {
+      "code": "PXĐ.BTNL.TĐ 109",
+      "name": "BẠCH TUỘC 2 DA NGUYÊN LIỆU >80GR - ÔNG MẬU",
+      "opening": 0,
+      "in": 4704,
+      "out": 0
+    },
+    {
+      "code": "PXĐ.BTNL.TĐ 0212",
+      "name": "BAO TỬ 2 DA 100-UP",
+      "opening": 5352,
+      "in": 0,
+      "out": 1344
+    },
+    {
+      "code": "PXĐ.BTNL.TĐ 019",
+      "name": "BAO TỬ 2DA",
+      "opening": 2784,
+      "in": 0,
+      "out": 0
+    },
+    {
+      "code": "PXĐ.BTNL.TĐ 10047",
+      "name": "TIP BẠCH TUỘC 2 DA LUỘC GỬI ( F34 )",
+      "opening": 3088,
+      "in": 0,
+      "out": 560
+    },
+    {
+      "code": "PXĐ.BTNL.TĐ 1005",
+      "name": "2 DA NGUYÊN LIỆU <80GR F34",
+      "opening": 2280,
+      "in": 0,
+      "out": 0
+    },
+    {
+      "code": "PXĐ.BTNL.TĐ 10046",
+      "name": "BẠCH TUỘC 2 RÂU LUỘC DÍNH RONG",
+      "opening": 2080,
+      "in": 0,
+      "out": 0
+    },
+    {
+      "code": "PXĐ.BTNL.TĐ 2022-14",
+      "name": "ĐUÔI BẠCH TUỘC LUỘC 2DA",
+      "opening": 1600,
+      "in": 180,
+      "out": 0
+    },
+    {
+      "code": "PXĐ.BTNL.TĐ 10022",
+      "name": "2 DA NGUYÊN LIỆU 250-UP F34",
+      "opening": 5420,
+      "in": 144,
+      "out": 3984
+    },
+    {
+      "code": "PXĐ.BTNL.TĐ 0221",
+      "name": "BAO TỬ 2DA NHẬP 200-300",
+      "opening": 1464,
+      "in": 0,
+      "out": 0
+    },
+    {
+      "code": "PXĐ.BTNL.TĐ 10044",
+      "name": "BẠCH TUỘC NGUYÊN CON MÀU DẠT",
+      "opening": 1824,
+      "in": 0,
+      "out": 600
+    },
+    {
+      "code": "PXĐ.BTNL.TĐ 0101111",
+      "name": "BẠCH TUỘC MAZA NGUYÊN LIỆU F34",
+      "opening": 1128,
+      "in": 0,
+      "out": 0
+    },
+    {
+      "code": "PXĐ.BTNL.TĐ 0201",
+      "name": "BAO TỬ 2DA 30-100 NHẬP",
+      "opening": 864,
+      "in": 0,
+      "out": 0
+    },
+    {
+      "code": "PXĐ.BTNL.TĐ 0220",
+      "name": "BAO TỬ 2DA <100G",
+      "opening": 576,
+      "in": 0,
+      "out": 0
+    },
+    {
+      "code": "PXĐ.HT 051",
+      "name": "BAO TỬ 2DA NGUYÊN LIỆU CÒN CỔ 100-UP",
+      "opening": 264,
+      "in": 264,
+      "out": 0
+    },
+    {
+      "code": "PXĐ.BTNL.TĐ 10011",
+      "name": "2 DA NGUYÊN LIỆU <80GR F34 ( NL MUA HIẾU PHẤN )",
+      "opening": 504,
+      "in": 0,
+      "out": 0
+    },
+    {
+      "code": "PXĐ.BTNL.TĐ 10045",
+      "name": "BẠCH TUỘC 2 RÂU CHẦN DÍNH RONG",
+      "opening": 384,
+      "in": 0,
+      "out": 0
+    },
+    {
+      "code": "PXĐ.BTNL.TĐ 016",
+      "name": "CỔ BẠCH TUỘC MAZA F34",
+      "opening": 288,
+      "in": 0,
+      "out": 0
+    },
+    {
+      "code": "PXĐ.BTNL.TĐ 004",
+      "name": "RÂU BẠCH TUỘC 6-10 ĐỂ TẢM BỘT",
+      "opening": 48,
+      "in": 0,
+      "out": 0
+    },
+    {
+      "code": "PXĐ.BTNL.TĐ 0055",
+      "name": "BAO TỬ BẠCH TUỘC 6-10 ĐỂ TẢM BỘT",
+      "opening": 288,
+      "in": 0,
+      "out": 288
+    }
+  ]
+}

@@ -4,7 +4,7 @@
 // Description: Main Application Component & Router Setup
 // ============================================================
 // src/App.tsx
-import { lazy, Suspense, useEffect } from "react";
+import { lazy, Suspense, useEffect, type ReactElement } from "react";
 import {
   HashRouter,
   Routes,
@@ -22,7 +22,7 @@ import { Toaster, apDungCaiDatHienThi, DangXuLy } from "@/design-system";
 import { useAuth } from "@/lib/auth";
 import { datNguoiThaoTac } from "@/lib/audit";
 import { roleLabel } from "@/types";
-import { allowedIds, homeFor } from "@/lib/nav-access";
+import { allowedIds, homeFor, laDemo } from "@/lib/nav-access";
 
 // Module MES (màn trưng bày)
 const ManTongQuan = lazy(() => import("@/features/dashboard/DashboardScreen"));
@@ -38,6 +38,7 @@ const BanHangScreen = lazy(() => import("@/features/sales"));
 const KhoDuTruScreen = lazy(() => import("@/features/warehouse"));
 const BaoCaoNhapXuatTonScreen = lazy(() => import("@/features/reports/NxtReportScreen"));
 const TonKhoNguyenLieuScreen = lazy(() => import("@/features/reports/MaterialNxtScreen"));
+const BaoCaoXuatNhapTonKhoScreen = lazy(() => import("@/features/reports/WarehouseNxtScreen"));
 const BaoCaoThanhPhamScreen = lazy(() => import("@/features/reports/DailyProductionReport"));
 const BaoCaoDonXuatScreen = lazy(() => import("@/features/reports/OrderExportReport"));
 const DonDatScreen = lazy(() => import("@/features/orders"));
@@ -77,11 +78,14 @@ function ShellLayout() {
   const roles = auth.nguoiDung?.roles ?? [];
   // 2 giao diện bộ phận: vai trò bộ phận chỉ thấy nav của bộ phận đó (null = đầy đủ).
   const cacIdChoPhep = allowedIds(roles, auth.laAdmin);
-  const items = cacIdChoPhep
+  const base = cacIdChoPhep
     ? KIT_NAV.filter((n) => cacIdChoPhep.has(n.id))
     : auth.laAdmin
       ? KIT_NAV
       : KIT_NAV.filter((n) => n.id !== "users" && n.id !== "audit");
+  // Màn demo (dữ liệu mẫu) chỉ admin thấy — người dùng thường không thấy để khỏi
+  // nhầm là số vận hành. Admin vẫn thấy, kèm cờ "DEMO" trong nav (AppShell).
+  const items = auth.laAdmin ? base : base.filter((n) => !laDemo(n.id));
 
   // Vào path ngoài bộ phận (gõ URL / link cũ) ⇒ đưa về trang chủ bộ phận.
   if (cacIdChoPhep && seg && !cacIdChoPhep.has(seg)) {
@@ -123,6 +127,10 @@ export default function App() {
   const auth = useAuth();
   const roles = auth.nguoiDung?.roles ?? [];
 
+  // Màn demo (dữ liệu mẫu) chỉ admin vào được; người khác gõ URL → về trang chủ.
+  const demoGuard = (el: ReactElement) =>
+    auth.laAdmin ? el : <Navigate to={`/${homeFor(roles)}`} replace />;
+
   // Đang lấy phiên đăng nhập từ máy chủ → tránh nháy màn login.
   if (auth.dangTai) {
     return (
@@ -151,11 +159,12 @@ export default function App() {
 
             {/* MES */}
             <Route path="/dashboard" element={<ManTongQuan />} />
-            <Route path="/production" element={<ManLenhSX />} />
-            <Route path="/quality" element={<ManChatLuong />} />
-            <Route path="/cold-storage" element={<ManKhoLanh />} />
-            <Route path="/reports" element={<ManBaoCao />} />
-            <Route path="/traceability" element={<ManTruyXuat />} />
+            {/* Màn DEMO (dữ liệu mẫu) — chỉ admin, xem lib/nav-access.ts DEMO_IDS */}
+            <Route path="/production" element={demoGuard(<ManLenhSX />)} />
+            <Route path="/quality" element={demoGuard(<ManChatLuong />)} />
+            <Route path="/cold-storage" element={demoGuard(<ManKhoLanh />)} />
+            <Route path="/reports" element={demoGuard(<ManBaoCao />)} />
+            <Route path="/traceability" element={demoGuard(<ManTruyXuat />)} />
 
             {/* Nghiệp vụ gốc */}
             <Route path="/imports" element={<NhapNguyenLieuScreen />} />
@@ -163,6 +172,7 @@ export default function App() {
             <Route path="/warehouse" element={<KhoDuTruScreen />} />
             <Route path="/nxt" element={<BaoCaoNhapXuatTonScreen />} />
             <Route path="/nxt-nl" element={<TonKhoNguyenLieuScreen />} />
+            <Route path="/nxt-kho" element={<BaoCaoXuatNhapTonKhoScreen />} />
             <Route path="/bc-thanh-pham" element={<BaoCaoThanhPhamScreen />} />
             <Route path="/bc-don-xuat" element={<BaoCaoDonXuatScreen />} />
             <Route path="/orders" element={<DonDatScreen />} />

@@ -520,6 +520,30 @@ export interface NxtReportItem {
   note?: string;
 }
 
+/**
+ * Một DÒNG snapshot Xuất–Nhập–Tồn nhập trực tiếp từ báo cáo THẬT của xí nghiệp
+ * (file NXT xuất từ hệ thống đang dùng), theo đúng hạt (Kho × Mã hàng × Kỳ).
+ * Đây là NGUỒN SỐ THẬT để dựng lại báo cáo khớp 100% trước khi nối giao dịch sống.
+ * Tồn cuối = tồn đầu + nhập − xuất (suy ở tầng app, KHÔNG lưu — bất biến luôn đúng).
+ * Cột giá trị (tiền) giữ theo file; báo cáo nguyên liệu phần lớn để 0.
+ */
+export interface NxtSnapshotLine {
+  id: string;
+  warehouseCode: string; // "KHO TP - KHO 1000" — đúng như in trên báo cáo
+  periodFrom: string; // yyyy-mm-dd
+  periodTo: string; // yyyy-mm-dd
+  itemCode: string; // "PXĐ.BTNL.TĐ 1001"
+  itemName: string;
+  unit: string; // "KG"
+  openingKg: number;
+  inKg: number;
+  outKg: number;
+  openingValue: number; // giá trị đầu kỳ (thường 0 với NL)
+  inValue: number;
+  outValue: number;
+  note: string;
+}
+
 /* ---------- Tồn đầu kho nguyên liệu (NXT nguyên liệu) ---------- */
 
 /**

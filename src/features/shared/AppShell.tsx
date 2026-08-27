@@ -6,6 +6,7 @@
 // src/features/shared/AppShell.tsx
 import { useEffect, useState, type ReactNode } from "react";
 import {
+  Badge,
   Logo,
   NutGiaoDien,
   NutHuongDan,
@@ -30,6 +31,7 @@ import {
   Library,
   Users,
   FileSpreadsheet,
+  Warehouse,
   Boxes,
   Factory,
   CalendarCheck,
@@ -65,18 +67,20 @@ export interface MucNavShell {
   id: string;
   label: string;
   icon: LucideIcon;
+  /** Màn còn dùng dữ liệu mẫu (chỉ admin thấy) — hiện cờ "DEMO" trên nav. */
+  demo?: boolean;
 }
 
 /** id = path route. Danh sách phẳng — thứ tự hiển thị do NHOM_NAV quyết định. */
 export const KIT_NAV: MucNavShell[] = [
   { id: "dashboard", label: "Tổng quan", icon: LayoutDashboard },
-  { id: "production", label: "Lệnh sản xuất", icon: ClipboardList },
+  { id: "production", label: "Lệnh sản xuất", icon: ClipboardList, demo: true },
   { id: "wip", label: "Sản xuất thành phẩm", icon: Factory },
   { id: "packaging", label: "Đóng gói", icon: Package },
-  { id: "quality", label: "Chất lượng", icon: ShieldCheck },
+  { id: "quality", label: "Chất lượng", icon: ShieldCheck, demo: true },
   { id: "imports", label: "Nhập hàng", icon: Truck },
   { id: "warehouse", label: "Kho dự trữ", icon: Snowflake },
-  { id: "cold-storage", label: "Kho lạnh", icon: ThermometerSnowflake },
+  { id: "cold-storage", label: "Kho lạnh", icon: ThermometerSnowflake, demo: true },
   { id: "sales", label: "Bán hàng", icon: ShoppingCart },
   { id: "orders", label: "Đơn đặt", icon: PackageCheck },
   { id: "balancing", label: "Cân đối", icon: Scale },
@@ -84,8 +88,9 @@ export const KIT_NAV: MucNavShell[] = [
   { id: "bc-don-xuat", label: "BC Đơn xuất", icon: Ship },
   { id: "nxt-nl", label: "Tồn kho NL", icon: Boxes },
   { id: "nxt", label: "Báo cáo NXT", icon: FileSpreadsheet },
-  { id: "reports", label: "Báo cáo", icon: BarChart3 },
-  { id: "traceability", label: "Truy xuất", icon: GitBranch },
+  { id: "nxt-kho", label: "XNT kho (số thật)", icon: Warehouse },
+  { id: "reports", label: "Báo cáo", icon: BarChart3, demo: true },
+  { id: "traceability", label: "Truy xuất", icon: GitBranch, demo: true },
   { id: "catalog", label: "Danh mục", icon: Library },
   { id: "users", label: "Người dùng", icon: Users },
   { id: "audit", label: "Nhật ký", icon: History },
@@ -97,7 +102,7 @@ export const NHOM_NAV: { ten: string; ids: string[] }[] = [
   { ten: "Sản xuất", ids: ["production", "wip", "packaging", "quality"] },
   { ten: "Kho", ids: ["imports", "warehouse", "cold-storage"] },
   { ten: "Kinh doanh", ids: ["sales", "orders"] },
-  { ten: "Báo cáo", ids: ["balancing", "bc-thanh-pham", "bc-don-xuat", "nxt-nl", "nxt", "reports", "traceability"] },
+  { ten: "Báo cáo", ids: ["balancing", "bc-thanh-pham", "bc-don-xuat", "nxt-nl", "nxt", "nxt-kho", "reports", "traceability"] },
   { ten: "Hệ thống", ids: ["catalog", "users", "audit"] },
 ];
 
@@ -200,6 +205,11 @@ function CayNav({
                 >
                   <Icon className="size-icon shrink-0" aria-hidden />
                   {!thuGon && <span className="min-w-0 truncate">{n.label}</span>}
+                  {!thuGon && n.demo && (
+                    <Badge variant="outline" className="ml-auto shrink-0">
+                      DEMO
+                    </Badge>
+                  )}
                 </button>
               );
             })}

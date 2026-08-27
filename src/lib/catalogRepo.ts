@@ -29,10 +29,12 @@ import {
   BANG_BALANCING_OUTPUT,
   BANG_OPENING_STOCK,
   BANG_FINISHED_OPENING_STOCK,
+  BANG_NXT_SNAPSHOT,
   useBang,
 } from "@/lib/repo";
-import type { MaterialType, Product, FinishedGood } from "@/types";
+import type { MaterialType, Product, FinishedGood, NxtSnapshotLine } from "@/types";
 import fgSeed from "@/data/thanh-pham.json";
+import nxtBachTuoc from "@/data/nxt-bachtuoc-2026-07.json";
 
 /**
  * Các bảng dữ liệu của hệ thống, gói sẵn để màn hình gọi một dòng.
@@ -79,6 +81,37 @@ export const seedProducts = (): Product[] =>
     category: t.nhom,
   }));
 
+/**
+ * Snapshot Xuất–Nhập–Tồn nạp sẵn từ báo cáo THẬT tháng 7 (KHO TP - KHO 1000,
+ * 30 mã bạch tuộc). Số đã kiểm định khớp tổng của báo cáo gốc. `id` tất định
+ * theo (kho × kỳ × mã) để nạp lại nhiều lần vẫn không đẻ dòng trùng.
+ */
+export const seedNxtSnapshots = (): NxtSnapshotLine[] => {
+  const h = nxtBachTuoc as {
+    warehouseCode: string;
+    periodFrom: string;
+    periodTo: string;
+    unit: string;
+    items: { code: string; name: string; opening: number; in: number; out: number }[];
+  };
+  return h.items.map((it) => ({
+    id: `nxt|${h.warehouseCode}|${h.periodFrom}|${h.periodTo}|${it.code}`,
+    warehouseCode: h.warehouseCode,
+    periodFrom: h.periodFrom,
+    periodTo: h.periodTo,
+    itemCode: it.code,
+    itemName: it.name,
+    unit: h.unit || "KG",
+    openingKg: it.opening,
+    inKg: it.in,
+    outKg: it.out,
+    openingValue: 0,
+    inValue: 0,
+    outValue: 0,
+    note: "",
+  }));
+};
+
 /* --- Danh mục --- */
 export const useProducts = () => useBang(BANG_PRODUCT, seedProducts);
 export const useCustomers = () => useBang(BANG_CUSTOMER);
@@ -112,3 +145,6 @@ export const useMaterialOpeningStock = () => useBang(BANG_OPENING_STOCK);
 
 /* --- Tồn đầu kho thành phẩm (NXT thành phẩm) --- */
 export const useFinishedGoodsOpeningStock = () => useBang(BANG_FINISHED_OPENING_STOCK);
+
+/* --- Xuất–Nhập–Tồn kho (snapshot từ báo cáo thật) --- */
+export const useNxtSnapshots = () => useBang(BANG_NXT_SNAPSHOT, seedNxtSnapshots);

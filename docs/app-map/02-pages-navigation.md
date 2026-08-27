@@ -1,7 +1,8 @@
 > Load khi: thêm/bớt màn hình, đổi điều hướng, header, hay tìm xem một màn được gắn vào đâu.
 covers: src/App.tsx, src/features/shared/AppShell.tsx, src/features/shared/NotFound.tsx, src/features/shared/guideContent.tsx, src/lib/nav-access.ts
-last_verified: 2026-08-24
+last_verified: 2026-08-27
 ttl_days: 90
+<!-- updated: 2026-08-27 — thêm route /nxt-kho (WarehouseNxtScreen, "XNT kho (số thật)") nhóm Báo cáo — báo cáo Xuất–Nhập–Tồn dựng từ snapshot số thật. + ẨN MÀN DEMO: lib/nav-access.ts DEMO_IDS = [production, quality, cold-storage, reports, traceability] + laDemo(); App.tsx lọc nav non-admin (auth.laAdmin ? base : base.filter(!laDemo)) + demoGuard bọc 5 route (non-admin → homeFor); AppShell KIT_NAV cờ demo:true + badge "DEMO". Dashboard /dashboard KHÔNG ẩn (tổ chức lại số thật). -->
 <!-- updated: 2026-08-24 — thêm /audit (NhatKyScreen, CHỈ admin) nhóm Hệ thống; App set datNguoiThaoTac theo tài khoản -->
 <!-- updated: 2026-08-24 — thêm 2 màn báo cáo khép vòng: /bc-thanh-pham (DailyProductionReport) + /bc-don-xuat (OrderExportReport), xếp nhóm Báo cáo cùng nxt-nl/nxt -->
 <!-- updated: 2026-08-23 — phân quyền nav theo vai trò (2 giao diện bộ phận): ShellLayout lọc KIT_NAV + guard theo allowedIds(), route "/" → homeFor(roles), đều ở src/lib/nav-access.ts -->

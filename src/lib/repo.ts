@@ -40,6 +40,7 @@ import type {
   GridAutoSource,
   MaterialOpeningStock,
   FinishedGoodsOpeningStock,
+  NxtSnapshotLine,
 } from "@/types";
 import { rolesFromCsv, rolesToCsv } from "@/types";
 import { ghiNhatKy, type NhatKyMoi } from "@/lib/audit";
@@ -827,6 +828,45 @@ export const BANG_FINISHED_OPENING_STOCK: AnhXaBang<FinishedGoodsOpeningStock> =
   }),
 };
 
+/** Snapshot Xuất–Nhập–Tồn nhập từ báo cáo thật (Kho × Mã hàng × Kỳ). Tồn cuối suy ở app. */
+export const BANG_NXT_SNAPSHOT: AnhXaBang<NxtSnapshotLine> = {
+  table: "nxt_snapshots",
+  localKey: "bsf.nxt-snapshots.v2",
+  layKhoa: theoId,
+  toRow: (x) => ({
+    id: x.id,
+    warehouse_code: x.warehouseCode,
+    period_from: x.periodFrom || null,
+    period_to: x.periodTo || null,
+    item_code: x.itemCode,
+    item_name: x.itemName,
+    unit: x.unit,
+    opening_kg: x.openingKg,
+    in_kg: x.inKg,
+    out_kg: x.outKg,
+    opening_value: x.openingValue,
+    in_value: x.inValue,
+    out_value: x.outValue,
+    note: x.note,
+  }),
+  fromRow: (r) => ({
+    id: s(r.id),
+    warehouseCode: s(r.warehouse_code),
+    periodFrom: s(r.period_from).slice(0, 10),
+    periodTo: s(r.period_to).slice(0, 10),
+    itemCode: s(r.item_code),
+    itemName: s(r.item_name),
+    unit: s(r.unit) || "KG",
+    openingKg: Number(r.opening_kg ?? 0),
+    inKg: Number(r.in_kg ?? 0),
+    outKg: Number(r.out_kg ?? 0),
+    openingValue: Number(r.opening_value ?? 0),
+    inValue: Number(r.in_value ?? 0),
+    outValue: Number(r.out_value ?? 0),
+    note: s(r.note),
+  }),
+};
+
 /* ---------- Hàng chờ đồng bộ (chống mất số liệu khi ghi hụt) ----------
    Ghi lên máy chủ có thể hụt giữa ca (wifi rớt, tablet ngủ, server nghẽn).
    Mỗi bảng giữ một "hàng chờ" khóa các dòng chưa đẩy được:
@@ -939,6 +979,7 @@ const NHAN_BANG: Record<string, string> = {
   user_profiles: "Người dùng",
   material_opening_stock: "Tồn đầu nguyên liệu",
   finished_goods_opening_stock: "Tồn đầu thành phẩm",
+  nxt_snapshots: "Xuất–Nhập–Tồn kho (báo cáo)",
 };
 
 /** Trường đổi giữa hai bản ghi → { trường: [trước, sau] }. */

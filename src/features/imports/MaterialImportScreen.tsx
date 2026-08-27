@@ -805,7 +805,7 @@ export default function NhapNguyenLieuScreen() {
           </Button>
           <Button size="lg" onClick={moThem}>
             <Plus />
-            Ghi chuyến hàng
+            Ghi nhập trong ngày
           </Button>
         </div>
       </div>
@@ -999,7 +999,7 @@ export default function NhapNguyenLieuScreen() {
           action={
             <Button size="lg" onClick={moThem}>
               <Plus />
-              Ghi chuyến hàng
+              Ghi nhập trong ngày
             </Button>
           }
         />
@@ -1112,6 +1112,7 @@ export default function NhapNguyenLieuScreen() {
           rows={pheLieu}
           onChange={persistPheLieu}
           khoa={dangKhoa}
+          chiXem
         />
       )}
 
@@ -1184,12 +1185,12 @@ export default function NhapNguyenLieuScreen() {
         <DialogContent className="max-h-[92vh] w-full overflow-y-auto sm:max-w-3xl lg:max-w-5xl">
           <DialogHeader>
             <DialogTitle className="text-2xl">
-              {dangSuaChuyen ? "Sửa chuyến" : "Ghi chuyến hàng"}
+              {dangSuaChuyen ? "Sửa chuyến" : "Ghi nhập trong ngày"}
             </DialogTitle>
             <DialogDescription className="text-base">
               {dangSuaChuyen
-                ? "Sửa đầu chuyến (áp cho mọi dòng) và cả bảng loại hàng bên dưới, rồi bấm Lưu."
-                : "Điền đầu chuyến (đại lý, ngày, xe), nhập cả bảng loại hàng bên dưới rồi bấm Lưu một lần."}
+                ? "Sửa đầu chuyến (áp cho mọi dòng), bảng loại hàng và phế liệu bên dưới, rồi bấm Lưu."
+                : "Một chỗ ghi cả chuyến: đầu chuyến (đại lý, ngày, xe) · các loại hàng · phế liệu cân trong ngày. Nguyên liệu lưu khi bấm Lưu; phế liệu lưu ngay khi thêm."}
             </DialogDescription>
           </DialogHeader>
 
@@ -1354,6 +1355,15 @@ export default function NhapNguyenLieuScreen() {
                       </div>
                     )}
                   </div>
+
+                  {/* Phế liệu cân trong ngày — GỘP CHUNG một chỗ với nguyên liệu */}
+                  <KhoiPheLieuNgay
+                    ngay={phien.deliveryDate}
+                    phanXuong={phien.workshop}
+                    rows={pheLieu}
+                    onChange={persistPheLieu}
+                    khoa={chotPhien}
+                  />
 
                   {/* Tổng ngày — như "TỔNG CỘNG" cuối sổ giấy */}
                   <div className="flex flex-wrap items-baseline justify-end gap-x-8 gap-y-2 rounded-xl bg-muted px-5 py-4">
@@ -1593,12 +1603,15 @@ function KhoiPheLieuNgay({
   rows,
   onChange,
   khoa,
+  chiXem = false,
 }: {
   ngay: string;
   phanXuong: Workshop;
   rows: ScrapItem[];
   onChange: (n: ScrapItem[]) => void;
   khoa: boolean;
+  /** Chỉ hiển thị tóm tắt (ngoài trang) — ghi/sửa phế liệu làm trong dialog "Ghi nhập trong ngày". */
+  chiXem?: boolean;
 }) {
   const [dang, setDang] = useState<ScrapItem | null>(null);
   const [laThem, setLaThem] = useState(false);
@@ -1725,6 +1738,8 @@ function KhoiPheLieuNgay({
             <Lock aria-hidden />
             Ngày đã chốt
           </Badge>
+        ) : chiXem ? (
+          <Badge variant="outline">Ghi ở “Ghi nhập trong ngày”</Badge>
         ) : (
           <Button
             size="lg"
@@ -1755,7 +1770,7 @@ function KhoiPheLieuNgay({
         getKey={(r) => r.id}
         emptyText="Chưa cân phế liệu cho ngày này."
         actions={
-          khoa
+          khoa || chiXem
             ? undefined
             : (r) => (
                 <>

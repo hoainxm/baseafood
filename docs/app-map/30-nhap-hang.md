@@ -1,7 +1,10 @@
 > Load khi: sửa bất cứ thứ gì ở màn Nhập hàng — chuyến, ngày, ghi bù, chốt ngày, phế liệu ngày, phiếu báo cáo ngày.
 covers: src/features/imports/MaterialImportScreen.tsx, src/features/imports/DailyImportInvoice.tsx, src/features/imports/ImportReport.tsx, src/features/imports/ImportTab.tsx, src/types.ts
-last_verified: 2026-08-25
+last_verified: 2026-08-27
 ttl_days: 90
+<!-- updated: 2026-08-27 — GỘP NHẬP NL + PHẾ LIỆU VÀO 1 CHỖ (đổi UI, GREEN): dialog ghi chuyến đổi tên "Ghi nhập trong ngày" và NHÚNG luôn khối KhoiPheLieuNgay (nguyên liệu + phế liệu cùng một dialog). Phế liệu lưu NGAY khi thêm (onChange=persistPheLieu, như cũ); nguyên liệu lưu khi bấm "Lưu vào sổ" (luuPhien GIỮ NGUYÊN — không đụng). Khối phế liệu ngoài trang thành CHỈ-XEM (prop chiXem: ẩn nút Thêm/Sửa/Xóa + badge "Ghi ở Ghi nhập trong ngày"). Nút mở dialog ở trang + empty-state đổi nhãn "Ghi nhập trong ngày". Model phế liệu KHÔNG đổi (vẫn gộp ngày×xưởng, source "Nhập hàng") nên Cân đối hút y nguyên. -->
+<!-- re-verified: 2026-08-27 — cổng nhập: lưu 1 chuyến (2 da nguyên liệu 500kg) + phế liệu (Nội tạng 120kg) cùng ngày qua dialog gộp → material_imports + import_shipments + scraps đều ghi đúng; validation vẫn chặn dòng thiếu loại. -->
+
 <!-- re-verified: 2026-08-06 — bộ lọc theo KỲ (ngày/tuần/tháng/năm/tùy chọn → phamViKy); loài/phân xưởng nhập bằng dropdown; báo cáo theo kỳ (mỗi ngày một khối, PhieuNLNgay nhận tuNgay/denNgay); phế liệu thêm nhiều loại/lần; chốt ngày cuối màn — khớp MaterialImportScreen.tsx + DailyImportInvoice.tsx -->
 <!-- re-verified: 2026-08-14 — đồng bộ tên file sau rename eadc360: DailyImportInvoice.tsx/ImportReport.tsx/ImportTab.tsx (symbol PhieuNLNgay/BaoCaoNhap giữ nguyên) -->
 

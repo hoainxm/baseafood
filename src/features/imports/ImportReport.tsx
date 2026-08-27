@@ -25,6 +25,14 @@ import { calculateImportAmount } from "@/types";
 import { exportAoaToXlsx, type OExcel } from "@/lib/reportXlsx";
 import { CalendarRange, Coins, FileClock, FileSpreadsheet, Scale } from "lucide-react";
 
+const THU = ["Chủ nhật", "Thứ hai", "Thứ ba", "Thứ tư", "Thứ năm", "Thứ sáu", "Thứ bảy"];
+/** Thứ trong tuần từ ngày ISO (yyyy-mm-dd) — tính theo UTC để không lệch múi giờ. */
+function thuTrongTuan(iso: string): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  if (!y || !m || !d) return "";
+  return THU[new Date(Date.UTC(y, m - 1, d)).getUTCDay()] ?? "";
+}
+
 const XUONG_OPT = [
   { value: "Tất cả", label: "Tất cả xưởng" },
   { value: "Đông", label: "Đông" },
@@ -122,14 +130,60 @@ export default function BaoCaoNhap() {
     }
     const dongPhe = [...phe.values()].sort((a, b) => a.name.localeCompare(b.name, "vi"));
 
-    // Biểu đồ: nguyên liệu MUA theo ngày (không trộn phế liệu)
-    const theoNgay = new Map<string, number>();
-    for (const r of locImports)
-      theoNgay.set(r.deliveryDate, (theoNgay.get(r.deliveryDate) ?? 0) + (r.quantityKg || 0));
-    const chart: CotBieuDo[] = [...theoNgay.keys()].sort().map((date) => ({
-      nhan: viDate(date),
-      giaTri: theoNgay.get(date) ?? 0,
-    }));
+    // Biểu đồ: nguyên liệu MUA theo ngày (không trộn phế liệu) + tóm tắt hover
+    interface CtNgay {
+      tongKg: number;
+      tongTien: number;
+      chuyen: Set<string>;
+      loai: Map<string, number>;
+    }
+    const ct = new Map<string, CtNgay>();
+    for (const r of locImports) {
+      let d = ct.get(r.deliveryDate);
+      if (!d) {
+        d = { tongKg: 0, tongTien: 0, chuyen: new Set(), loai: new Map() };
+        ct.set(r.deliveryDate, d);
+      }
+      d.tongKg += r.quantityKg || 0;
+      d.tongTien += calculateImportAmount(r);
+      if (r.shipmentId) d.chuyen.add(r.shipmentId);
+      const nhomKey = `${r.supplierName || "(chưa có đại lý)"} · ${r.materialTypeName || "(chưa rõ loại)"}`;
+      d.loai.set(nhomKey, (d.loai.get(nhomKey) ?? 0) + (r.quantityKg || 0));
+    }
+    const chart: CotBieuDo[] = [...ct.keys()].sort().map((date) => {
+      const d = ct.get(date)!;
+      const loaiArr = [...d.loai.entries()].sort((a, b) => b[1] - a[1]);
+      return {
+        nhan: viDate(date),
+        giaTri: d.tongKg,
+        chiTiet: (
+          <div className="space-y-2">
+            <div className="border-b border-border pb-1.5">
+              <div className="font-semibold text-foreground">
+                {viDate(date)}
+                {thuTrongTuan(date) ? ` · ${thuTrongTuan(date)}` : ""}
+              </div>
+              <div className="text-muted-foreground">
+                {d.chuyen.size} chuyến ·{" "}
+                <span className="tnum font-semibold text-foreground">{num(d.tongKg)} kg</span>
+                {d.tongTien > 0 ? ` · ${num(d.tongTien)} đ` : ""}
+              </div>
+            </div>
+            <ul className="space-y-1">
+              {loaiArr.slice(0, 5).map(([ten, kg]) => (
+                <li key={ten} className="flex items-baseline justify-between gap-4">
+                  <span className="min-w-0 truncate text-muted-foreground">{ten}</span>
+                  <span className="tnum shrink-0 font-medium text-foreground">{num(kg)} kg</span>
+                </li>
+              ))}
+              {loaiArr.length > 5 && (
+                <li className="text-muted-foreground">… +{loaiArr.length - 5} loại khác</li>
+              )}
+            </ul>
+          </div>
+        ),
+      };
+    });
 
     return {
       dongMua,

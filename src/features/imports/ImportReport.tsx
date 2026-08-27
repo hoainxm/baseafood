@@ -6,7 +6,7 @@
 import { useMemo, useState } from "react";
 import {
   BangTong,
-  BieuDoCotDoc,
+  BieuDoCot,
   Button,
   Combobox,
   DateField,
@@ -14,7 +14,7 @@ import {
   ThongKe,
   homNay,
   notify,
-  type CotBieuDoDoc,
+  type CotBieuDo,
   type CotTong,
   type TheThongTin,
 } from "@/design-system";
@@ -126,10 +126,9 @@ export default function BaoCaoNhap() {
     const theoNgay = new Map<string, number>();
     for (const r of locImports)
       theoNgay.set(r.deliveryDate, (theoNgay.get(r.deliveryDate) ?? 0) + (r.quantityKg || 0));
-    const chart: CotBieuDoDoc[] = [...theoNgay.keys()].sort().map((date) => ({
-      nhan: viDate(date).slice(0, 5),
+    const chart: CotBieuDo[] = [...theoNgay.keys()].sort().map((date) => ({
+      nhan: viDate(date),
       giaTri: theoNgay.get(date) ?? 0,
-      phu: viDate(date),
     }));
 
     return {
@@ -270,10 +269,15 @@ export default function BaoCaoNhap() {
 
       {chart.length > 0 && (
         <section className="space-y-3 rounded-xl border-2 border-border bg-card p-5">
-          <h3 className="text-lg font-semibold text-foreground">
-            Nguyên liệu mua theo ngày
-          </h3>
-          <BieuDoCotDoc data={chart} donVi="kg" />
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h3 className="text-lg font-semibold text-foreground">
+              Nguyên liệu mua theo ngày
+            </h3>
+            <span className="text-sm text-muted-foreground">
+              {chart.length} ngày có nhập · tổng {num(tongKg)} kg
+            </span>
+          </div>
+          <BieuDoCot data={chart} donVi="kg" giuThuTu soDongToiDa={62} />
         </section>
       )}
 

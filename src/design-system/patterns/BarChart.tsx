@@ -29,6 +29,7 @@ export function BieuDoCot({
   donVi,
   duongTrungBinh = true,
   soDongToiDa = 12,
+  giuThuTu = false,
   className,
 }: {
   data: CotBieuDo[];
@@ -38,9 +39,14 @@ export function BieuDoCot({
   duongTrungBinh?: boolean;
   /** Cắt bớt còn N thanh lớn nhất (gọn màn). */
   soDongToiDa?: number;
+  /**
+   * Giữ NGUYÊN thứ tự `data` truyền vào (VD chuỗi theo ngày) thay vì sắp giảm
+   * dần theo giá trị. Khi bật, `soDongToiDa` cắt từ đầu danh sách.
+   */
+  giuThuTu?: boolean;
   className?: string;
 }) {
-  const sap = [...data].sort((a, b) => b.giaTri - a.giaTri);
+  const sap = giuThuTu ? [...data] : [...data].sort((a, b) => b.giaTri - a.giaTri);
   const hienThi = sap.slice(0, soDongToiDa);
   const con = sap.length - hienThi.length;
 

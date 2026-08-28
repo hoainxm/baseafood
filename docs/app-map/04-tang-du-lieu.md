@@ -1,8 +1,8 @@
 > Load khi: đụng đọc/ghi dữ liệu, thêm bảng vào app, hay điều tra "số liệu biến mất / không lên máy chủ".
 covers: src/lib/repo.ts, src/lib/db.ts, src/lib/catalogRepo.ts, src/lib/connectivity.ts, src/lib/supabase.ts, src/lib/store.ts, src/lib/audit.ts, src/design-system/patterns/DataStatusBadge.tsx
-last_verified: 2026-08-27
+last_verified: 2026-08-28
 ttl_days: 90
-<!-- updated: 2026-08-27 — BANG_WIP_PRODUCTION map thêm `processing_type` (↔ WipProductionItem.processingType, migration 0033) — kiểu chế biến của nhóm ghi thành phẩm ngày; vaDongCu mặc định "" cho dòng cũ. -->
+<!-- updated: 2026-08-28 — seedProducts (nạp mat_hang) nay: (a) gắn processingType = suyKieuCheBien(tên) — suy kiểu chế biến TỪ TÊN, bảo thủ (không rõ để "", khớp trước thắng); (b) nối 8 mặt hàng thật thiếu ở 141 (finishedGoodCode="" = chưa ánh xạ, mức gộp). Chỉ chạy khi bảng rỗng ⇒ bản đã seed dùng migration 0034 để backfill/nạp. suyKieuCheBien export dùng chung với SQL 0034. -->
 <!-- updated: 2026-08-27 (P5-A) — /nxt-kho thành SỔ SỐNG trên nxt_snapshots: chế độ Ghi (LuoiNhap sửa tồn đầu/nhập/xuất từng mã, tồn cuối suy tự cập nhật) + Thêm/Xóa mã + "Tạo kỳ kế tiếp" kế thừa tồn cuối kỳ này → tồn đầu kỳ sau (id tất định nxt|kho|từ|đến|mã). Chưa nối bảng giao dịch (P5-B chờ bảng ánh xạ mã). -->
 <!-- updated: 2026-08-27 — thêm BANG_NXT_SNAPSHOT (nxt_snapshots) + hook useNxtSnapshots(seedNxtSnapshots) cho báo cáo Xuất–Nhập–Tồn kho (/nxt-kho). Seed số THẬT từ src/data/nxt-bachtuoc-2026-07.json (30 mã bạch tuộc, KHO TP-1000, đã kiểm định khớp tổng); id snapshot TẤT ĐỊNH theo (kho×kỳ×mã) để seed idempotent. NHAN_BANG['nxt_snapshots']. Màn nhập được Excel báo cáo thật qua lib/nxtExcel.ts parseNxtExcelFile. -->
 <!-- updated: 2026-08-24 — thêm BANG_FINISHED_OPENING_STOCK (finished_goods_opening_stock) + hook useFinishedGoodsOpeningStock cho sổ NXT thành phẩm; hàm thuần lib/inventoryFinished.ts suy tồn TP từ SX/đơn/bán; tinhTon() nhận thêm tham số bán hàng (tùy chọn) -->

@@ -70,16 +70,71 @@ export const seedFinishedGoods = (): FinishedGood[] =>
     groupName: t.nhom,
   }));
 
-/** Mặt hàng nạp sẵn TỪ 141 thành phẩm (mỗi cái gắn loài = nhóm) — để lần đầu mở
- *  đã có cái mà chọn, lọc theo loài. `finishedGoodCode` trỏ về mã 141; `category` = nhóm. */
-export const seedProducts = (): Product[] =>
-  (fgSeed as any[]).map((t) => ({
+/**
+ * Suy KIỂU CHẾ BIẾN (facet B, `0027`) từ TÊN thành phẩm — để dropdown "Kiểu chế
+ * biến" ở màn ghi thành phẩm (`/wip`) có sẵn nhãn, khỏi rỗng. Bảo thủ: chỉ gắn
+ * khi tên chứa từ khóa RÕ; không rõ thì để trống ("chưa phân loại"), KHÔNG đoán.
+ * Thứ tự khớp có chủ đích — khớp trước thắng (VD "luộc màu" trước "luộc";
+ * "cắt luộc" trước "luộc"/"cắt"). Nhãn theo spec bo-quy-cach-che-bien §2.2.
+ * Từ vựng này của xưởng Đông (bạch tuộc); mã Cá/Mực/Tôm phần lớn rơi về "" — đúng
+ * chủ ý, loài đó cần từ khóa riêng mới bổ sung (spec §5.1). Migration 0034 nhân
+ * bản luật này bằng SQL để vá cả bản đã deploy.
+ */
+export const suyKieuCheBien = (ten: string): string => {
+  const t = ten.toLowerCase();
+  if (t.includes("ncls") || t.includes("nguyên con làm sạch"))
+    return "Nguyên con làm sạch";
+  if (t.includes("luộc màu")) return "Luộc màu";
+  if (t.includes("cắt chần")) return "Cắt chần";
+  if (t.includes("cắt luộc")) return "Cắt luộc";
+  if (t.includes("tẩm bột")) return "Tẩm bột";
+  if (t.includes("tẩm gia vị") || t.includes("tẩm muối")) return "Tẩm gia vị";
+  if (t.includes("luộc")) return "Luộc";
+  if (t.includes("chần")) return "Chần";
+  if (t.includes("cắt")) return "Cắt";
+  return "";
+};
+
+/**
+ * Mặt hàng THẬT có trong file cân đối (bạch tuộc 2 da) nhưng THIẾU hẳn ở 141 mã
+ * kế toán — bổ sung vào danh mục MỞ (`finishedGoodCode=""` = chưa ánh xạ; kế toán
+ * cấp mã sau thì nối). Đặt tên theo lối kế toán 141 cho nhất quán. 6 dòng "lệch
+ * tên" (VD "luộc 2g" = mã "cắt luộc 2gr") KHÔNG thêm — đã chốt là cùng thứ.
+ * Mức GỘP (theo lựa chọn của chủ dữ liệu 2026-08-28). Migration 0034 nạp bản này
+ * lên server (id tất định để chạy lại không đẻ trùng).
+ */
+const MAT_HANG_BO_SUNG: { id: string; name: string }[] = [
+  { id: "mh-bs-cc-380-420", name: "Bạch tuộc 2 da cắt chần 380-420" },
+  { id: "mh-bs-cc-455-555", name: "Bạch tuộc 2 da cắt chần 455-555" },
+  { id: "mh-bs-cc-700-750", name: "Bạch tuộc 2 da cắt chần 700-750" },
+  { id: "mh-bs-cl-600-900", name: "Bạch tuộc 2 da cắt luộc 600-900" },
+  { id: "mh-bs-cl-1000-1300", name: "Bạch tuộc 2 da cắt luộc 1000-1300" },
+  { id: "mh-bs-cl-5-5gr", name: "Bạch tuộc 2 da cắt luộc 5,5gr" },
+  { id: "mh-bs-rau-16-20", name: "Bạch tuộc 2 da cắt râu luộc 16-20" },
+  { id: "mh-bs-bot-nuoctuong", name: "Bạch tuộc 2 da tẩm bột nước tương" },
+];
+
+/** Mặt hàng nạp sẵn TỪ 141 thành phẩm (mỗi cái gắn loài = nhóm + kiểu chế biến suy
+ *  từ tên) + các mặt hàng thật còn thiếu. Để lần đầu mở đã có cái mà chọn, lọc theo
+ *  loài. `finishedGoodCode` trỏ về mã 141; `category` = nhóm; `processingType` = facet B. */
+export const seedProducts = (): Product[] => [
+  ...(fgSeed as any[]).map((t) => ({
     id: uid(),
     code: "",
     name: t.ten,
     finishedGoodCode: t.ma,
     category: t.nhom,
-  }));
+    processingType: suyKieuCheBien(t.ten),
+  })),
+  ...MAT_HANG_BO_SUNG.map((m) => ({
+    id: uid(),
+    code: "",
+    name: m.name,
+    finishedGoodCode: "",
+    category: "Bạch tuộc",
+    processingType: suyKieuCheBien(m.name),
+  })),
+];
 
 /**
  * Snapshot Xuất–Nhập–Tồn nạp sẵn từ báo cáo THẬT tháng 7 (KHO TP - KHO 1000,

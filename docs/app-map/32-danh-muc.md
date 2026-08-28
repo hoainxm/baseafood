@@ -1,7 +1,8 @@
 > Load khi: sửa danh mục (đại lý, loại NL, mặt hàng, khách hàng) hay danh mục 141 mã thành phẩm.
-covers: src/features/catalog/CatalogScreen.tsx, src/features/catalog/FinishedGoodScreen.tsx, src/data/thanh-pham.json, src/design-system/patterns/CatalogCrudModal.tsx
-last_verified: 2026-08-26
+covers: src/features/catalog/CatalogScreen.tsx, src/features/catalog/FinishedGoodScreen.tsx, src/data/thanh-pham.json, src/design-system/patterns/CatalogCrudModal.tsx, src/lib/catalogRepo.ts
+last_verified: 2026-08-28
 ttl_days: 90
+<!-- updated: 2026-08-28 — SEED kiểu chế biến + bổ sung mặt hàng thiếu (đối chiếu file cân đối bạch tuộc 2 da). catalogRepo.seedProducts: (a) hàm suyKieuCheBien(tên) suy processing_type TỪ TÊN khi seed (bảo thủ — không rõ để '', khớp trước thắng; phủ 77/84 mã bạch tuộc, Cá/Mực phần lớn để '' vì từ vựng khác); (b) nối 8 mặt hàng thật thiếu hẳn ở 141 (finishedGoodCode='' = chưa ánh xạ, mức GỘP). Migration 0034 nhân bản cả hai bằng SQL cho bản đã deploy (backfill CHỈ dòng trống + INSERT id 'mh-bs-*' idempotent). KHÔNG đụng 141 mã kế toán (thanh-pham.json). 6 dòng "lệch tên" luộc↔cắt luộc = cùng thứ, giữ mã kế toán. -->
 <!-- updated: 2026-08-26 — tab Mặt hàng thêm 2 thuộc tính cho màn ghi thành phẩm /wip (migration 0031): split_components (ChoiceGroup "Có tách/Không tách" — mã cắt chần tách râu+bao tử cùng giá) + block_spec_kg (NumberField kg/khối). GỘP 1 danh sách LOÀI chuẩn: types.ts CATEGORIES thêm "Bào ngư", BỎ NHOM_TP — tab Mặt hàng + tab Loại NL dùng chung CATEGORIES (trước lệch: Mặt hàng có Bào ngư thiếu Ghẹ, Loại NL ngược lại). Màn /wip GOM THEO LOÀI (products.category có sẵn trên 141 mã), KHÔNG theo loại NL. Xem 34-btp-san-xuat-kho.ba-spec.md. -->
 <!-- updated: 2026-08-23 — mat_hang thêm facet processing_type (kiểu chế biến, 0024); combobox "Kiểu chế biến" ở tab Mặt hàng -->
 <!-- updated: 2026-08-07 — đại lý thêm tenGhiPhieu/diaChi/cmnd/ngayCap/noiCap (migration 0009) -->

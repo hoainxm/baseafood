@@ -10,7 +10,7 @@ import type {
   Product,
   Workshop,
 } from "@/types";
-import { CATEGORIES, isBackdatedWip, laCoTach, quyCachBlock } from "@/types";
+import { isBackdatedWip, laCoTach, quyCachBlock } from "@/types";
 import { newId } from "@/lib/store";
 import { uid } from "@/lib/db";
 import {
@@ -81,9 +81,9 @@ interface DauPhien {
  */
 interface DongSX {
   key: string;
-  category: string; // NHÓM theo LOÀI (Bạch tuộc/Mực/Cá…) — cấp gom màn ghi
+  processingType: string; // NHÓM theo KIỂU CHẾ BIẾN (luộc/chần/cắt…) — cấp gom (× khách)
+  customerName: string; // NHÓM theo KHÁCH — cấp gom, mọi dòng cùng nhóm chung khách
   productId: string;
-  customerName: string;
   moRong: boolean; // dòng con (râu/bao tử) đang mở — trạng thái hiển thị
   quantityKg: number; // dùng khi KHÔNG tách
   rauKg: number;
@@ -92,11 +92,11 @@ interface DongSX {
   blockSpecKg: number; // quy cách kg/khối — nhập ngay trên dòng, nhớ về mặt hàng
 }
 
-const dongSXRong = (category = ""): DongSX => ({
+const dongSXRong = (processingType = "", customerName = ""): DongSX => ({
   key: newId(),
-  category,
+  processingType,
+  customerName,
   productId: "",
-  customerName: "",
   moRong: false,
   quantityKg: 0,
   rauKg: 0,
@@ -104,6 +104,10 @@ const dongSXRong = (category = ""): DongSX => ({
   blocksCount: 0,
   blockSpecKg: 0,
 });
+
+/** Khóa nhóm = (kiểu chế biến × khách) — trục tổ chức như sổ giấy. */
+const khoaNhom = (d: { processingType: string; customerName: string }) =>
+  `${d.processingType}|||${d.customerName}`;
 
 /** Dòng có tách râu/bao tử = đã nhập ít nhất một trong hai thành phần. */
 const laTach = (d: DongSX): boolean =>
@@ -171,13 +175,14 @@ export default function SanXuatBTPScreen() {
     phu: c.market || undefined,
   }));
 
-  const themMatHang = (ten: string, category = ""): string => {
+  const themMatHang = (ten: string, processingType = ""): string => {
     const m: Product = {
       id: uid(),
       code: "",
       name: ten,
       finishedGoodCode: "",
-      category, // gắn LOÀI để mã mới tạo tại chỗ nằm đúng nhóm
+      category: "Bạch tuộc", // xưởng Đông; loài chỉnh sau ở Danh mục nếu cần
+      processingType, // gắn KIỂU CHẾ BIẾN của nhóm để mã mới nằm đúng nhóm
     };
     setMatHang([...matHang, m]);
     notify.daLuu(`Đã thêm thành phẩm "${ten}"`);
@@ -290,12 +295,12 @@ export default function SanXuatBTPScreen() {
     setDongBang((ds) => ds.map((d) => (d.key === key ? { ...d, ...patch } : d)));
   const boDong = (key: string) =>
     setDongBang((ds) => ds.filter((d) => d.key !== key));
-  /** Thêm một dòng thành phẩm vào NHÓM loài đang có. */
-  const themDong = (category: string) =>
-    setDongBang((ds) => [...ds, dongSXRong(category)]);
-  /** Thêm một NHÓM loài mới (kèm một dòng trống để nhập). */
-  const themNhom = (category: string) =>
-    setDongBang((ds) => [...ds, dongSXRong(category)]);
+  /** Thêm một dòng thành phẩm vào NHÓM (chế biến × khách) đang có. */
+  const themDong = (processingType: string, customerName: string) =>
+    setDongBang((ds) => [...ds, dongSXRong(processingType, customerName)]);
+  /** Thêm một NHÓM mới (kiểu chế biến × khách) kèm một dòng trống để nhập. */
+  const themNhom = (processingType: string, customerName: string) =>
+    setDongBang((ds) => [...ds, dongSXRong(processingType, customerName)]);
 
   /** Kiểm đầu phiên (ngày + lý do ghi bù). */
   const loiDauPhien = (p: DauPhien): LoiNhap[] => {
@@ -360,6 +365,7 @@ export default function SanXuatBTPScreen() {
       status: "cho-nhap",
       note: "",
       customerName: d.customerName.trim(),
+      processingType: d.processingType.trim(),
       componentRauKg: laTach(d) ? d.rauKg || 0 : null,
       componentBaoTuKg: laTach(d) ? d.baoTuKg || 0 : null,
     }));
@@ -523,6 +529,12 @@ export default function SanXuatBTPScreen() {
       render: (r) =>
         r.blocksCount ? num(r.blocksCount) : <span className="text-muted-foreground">—</span>,
       sapXep: (r) => r.blocksCount,
+    },
+    {
+      key: "cb",
+      header: "Chế biến",
+      render: (r) => r.processingType || <span className="text-muted-foreground">—</span>,
+      sapXep: (r) => r.processingType ?? "",
     },
     {
       key: "kh",
@@ -806,9 +818,9 @@ export default function SanXuatBTPScreen() {
                     Thành phẩm làm ra trong ngày
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    Chọn loài → dưới là thành phẩm của nó. Bấm mũi tên ▸ đầu dòng
-                    để tách râu + bao tử (cùng giá); mã đánh dấu "Có tách" tự mở
-                    sẵn.
+                    Thêm nhóm (kiểu chế biến × khách) như một khối trên sổ, rồi
+                    thêm từng dòng thành phẩm + kg. Bấm mũi tên ▸ đầu dòng để tách
+                    râu + bao tử (cùng giá).
                   </p>
                 </div>
 
@@ -1058,9 +1070,9 @@ function BangDongSX({
   matHang: Product[];
   onSua: (key: string, patch: Partial<DongSX>) => void;
   onBo: (key: string) => void;
-  onThemDong: (category: string) => void;
-  onThemNhom: (category: string) => void;
-  onTaoMatHang: (ten: string, category: string) => string;
+  onThemDong: (processingType: string, customerName: string) => void;
+  onThemNhom: (processingType: string, customerName: string) => void;
+  onTaoMatHang: (ten: string, processingType: string) => string;
   optKhach: MucChon[];
   onTaoKhach: (ten: string) => string;
 }) {
@@ -1068,36 +1080,53 @@ function BangDongSX({
     "border-b-2 border-border bg-card px-2 py-2 text-left text-sm font-semibold whitespace-nowrap";
   const td = "border-b border-border px-2 py-2 align-middle";
 
-  // Nhóm theo LOÀI, giữ thứ tự xuất hiện.
-  const nhomIds: string[] = [];
-  for (const d of dong)
-    if (!nhomIds.includes(d.category)) nhomIds.push(d.category);
+  // Ô nhập nhóm mới (kiểu chế biến × khách) trước khi bấm "Thêm nhóm".
+  const [ptMoi, setPtMoi] = useState("");
+  const [khachMoi, setKhachMoi] = useState("");
 
-  const tenLoai = (g: string) => g || "Chưa gán loài";
-  // Loài đã có nhóm rồi thì ẩn khỏi ô "Thêm loài" (đỡ tạo trùng nhóm).
-  const optLoai: MucChon[] = CATEGORIES.filter(
-    (l) => !nhomIds.includes(l)
-  ).map((l) => ({ value: l, label: l }));
-  const optMatHangNhom = (g: string): MucChon[] =>
-    matHang
-      .filter((m) => (m.category || "") === g)
-      .map((m) => ({
-        value: m.id,
-        label: m.name,
-        phu: m.processingType || undefined,
-      }));
+  // Nhóm theo (KIỂU CHẾ BIẾN × KHÁCH), giữ thứ tự xuất hiện — như sổ giấy.
+  const nhomKeys: string[] = [];
+  const nhomInfo = new Map<string, { pt: string; cust: string }>();
+  for (const d of dong) {
+    const k = khoaNhom(d);
+    if (!nhomInfo.has(k)) {
+      nhomInfo.set(k, { pt: d.processingType, cust: d.customerName });
+      nhomKeys.push(k);
+    }
+  }
+
+  // Gợi ý kiểu chế biến = các giá trị đã có trên mặt hàng (thêm mới tại chỗ được).
+  const optCheBien: MucChon[] = [
+    ...new Set(
+      matHang.map((m) => (m.processingType || "").trim()).filter(Boolean)
+    ),
+  ]
+    .sort((a, b) => a.localeCompare(b, "vi"))
+    .map((v) => ({ value: v, label: v }));
+
+  // Mọi mặt hàng (gõ tên để tìm) — không giới hạn theo loài.
+  const optMatHangTatCa: MucChon[] = matHang.map((m) => ({
+    value: m.id,
+    label: m.name,
+    phu: [m.processingType, m.category].filter(Boolean).join(" · ") || undefined,
+  }));
+
+  const tenNhom = (pt: string, cust: string) =>
+    `${pt || "(chưa rõ chế biến)"} · ${cust || "(chưa có khách)"}`;
+
   return (
     <div className="space-y-4">
-      {nhomIds.map((g) => {
-        const rows = dong.filter((d) => d.category === g);
+      {nhomKeys.map((k) => {
+        const info = nhomInfo.get(k)!;
+        const rows = dong.filter((d) => khoaNhom(d) === k);
         return (
           <div
-            key={g || "__none"}
+            key={k}
             className="overflow-hidden rounded-lg border-2 border-border"
           >
             <div className="flex flex-wrap items-center justify-between gap-2 bg-muted px-3 py-2">
               <span className="text-base font-semibold text-foreground">
-                {tenLoai(g)}
+                {tenNhom(info.pt, info.cust)}
               </span>
               <span className="text-sm text-muted-foreground">
                 {rows.length} thành phẩm
@@ -1114,7 +1143,6 @@ function BangDongSX({
                     <th className={`${th} min-w-[8.5rem]`}>
                       Số lượng (kg) <span className="text-destructive">*</span>
                     </th>
-                    <th className={`${th} min-w-[11rem]`}>Khách hàng</th>
                     <th className={`${th} min-w-[13rem]`}>
                       Số block × quy cách
                     </th>
@@ -1160,9 +1188,9 @@ function BangDongSX({
                                   blockSpecKg: quyCachBlock(p) ?? d.blockSpecKg,
                                 });
                               }}
-                              options={optMatHangNhom(g)}
-                              onCreate={(ten) => onTaoMatHang(ten, g)}
-                              emptyText="Chưa có thành phẩm của loài này — gõ tên rồi Thêm mới."
+                              options={optMatHangTatCa}
+                              onCreate={(ten) => onTaoMatHang(ten, info.pt)}
+                              emptyText="Chưa có mặt hàng — gõ tên rồi Thêm mới."
                             />
                           </td>
                           <td className={td}>
@@ -1185,20 +1213,6 @@ function BangDongSX({
                                 }
                               />
                             )}
-                          </td>
-                          <td className={td}>
-                            <Combobox
-                              anNhan
-                              label="Khách hàng"
-                              value={d.customerName}
-                              onChange={(v) =>
-                                onSua(d.key, { customerName: v })
-                              }
-                              options={optKhach}
-                              onCreate={(ten) => onTaoKhach(ten)}
-                              placeholder="Chọn khách"
-                              emptyText="Chưa có — gõ tên rồi Thêm mới."
-                            />
                           </td>
                           <td className={td}>
                             <div className="flex items-center gap-1.5">
@@ -1261,7 +1275,7 @@ function BangDongSX({
                             <td className="border-b border-border" />
                             <td
                               className="border-b border-border px-2 pb-3"
-                              colSpan={5}
+                              colSpan={4}
                             >
                               <p className="mb-2 text-sm text-muted-foreground">
                                 Tách râu + bao tử (cùng giá) — Số lượng = tổng
@@ -1308,7 +1322,7 @@ function BangDongSX({
                 type="button"
                 variant="outline"
                 className="border-dashed"
-                onClick={() => onThemDong(g)}
+                onClick={() => onThemDong(info.pt, info.cust)}
               >
                 <Plus />
                 Thêm thành phẩm
@@ -1318,23 +1332,50 @@ function BangDongSX({
         );
       })}
 
-      {/* Thêm nhóm loài */}
-      <div className="rounded-lg border-2 border-dashed border-border p-3">
-        <Combobox
-          label="Thêm loài"
-          anNhanBatBuoc
-          choPhepXoa={false}
-          value=""
-          onChange={(v) => {
-            if (v) onThemNhom(v);
-          }}
-          options={optLoai}
-          placeholder="Chọn loài để thêm nhóm thành phẩm"
-          emptyText="Đã thêm hết các loài."
-        />
-        <p className="mt-2 text-sm text-muted-foreground">
-          VD Bạch tuộc → nhóm thành phẩm của nó; rồi Mực, Cá… Lớn/nhỏ gộp chung
-          vì cùng loài.
+      {/* Thêm NHÓM mới = (kiểu chế biến × khách) — như một khối trên sổ giấy */}
+      <div className="space-y-3 rounded-lg border-2 border-dashed border-border p-3">
+        <p className="text-base font-semibold text-foreground">
+          Thêm nhóm (kiểu chế biến × khách)
+        </p>
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="min-w-[12rem] flex-1">
+            <Combobox
+              label="Kiểu chế biến"
+              value={ptMoi}
+              onChange={setPtMoi}
+              options={optCheBien}
+              onCreate={(ten) => ten}
+              placeholder="VD: 2 da chần, luộc, cổ luộc…"
+              emptyText="Chưa có — gõ tên rồi Thêm mới."
+            />
+          </div>
+          <div className="min-w-[12rem] flex-1">
+            <Combobox
+              label="Khách hàng"
+              value={khachMoi}
+              onChange={setKhachMoi}
+              options={optKhach}
+              onCreate={(ten) => onTaoKhach(ten)}
+              placeholder="VD: Peacock, Seachomot…"
+              emptyText="Chưa có — gõ tên rồi Thêm mới."
+            />
+          </div>
+          <Button
+            type="button"
+            onClick={() => {
+              if (!ptMoi.trim() && !khachMoi.trim()) return;
+              onThemNhom(ptMoi.trim(), khachMoi.trim());
+              setPtMoi("");
+              setKhachMoi("");
+            }}
+          >
+            <Plus />
+            Thêm nhóm
+          </Button>
+        </div>
+        <p className="text-sm text-muted-foreground">
+          Mỗi nhóm là một khối trên sổ (VD “2 da chần · Peacock”); trong nhóm thêm
+          từng dòng thành phẩm (bộ phận/size) + kg.
         </p>
       </div>
     </div>

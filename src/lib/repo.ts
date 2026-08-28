@@ -589,6 +589,7 @@ export const BANG_WIP_PRODUCTION: AnhXaBang<WipProductionItem> = {
     status: x.status,
     note: x.note,
     customer_name: x.customerName ?? "",
+    processing_type: x.processingType ?? "",
     component_rau_kg: x.componentRauKg ?? null,
     component_bao_tu_kg: x.componentBaoTuKg ?? null,
     balancing_period_id: x.balancingPeriodId ?? "",
@@ -607,15 +608,17 @@ export const BANG_WIP_PRODUCTION: AnhXaBang<WipProductionItem> = {
     status: (s(r.status) || "cho-nhap") as WipWarehouseStatus,
     note: s(r.note),
     customerName: s(r.customer_name),
+    processingType: r.processing_type == null ? "" : s(r.processing_type),
     componentRauKg: r.component_rau_kg == null ? null : Number(r.component_rau_kg),
     componentBaoTuKg:
       r.component_bao_tu_kg == null ? null : Number(r.component_bao_tu_kg),
     balancingPeriodId: s(r.balancing_period_id),
   }),
-  // Dòng ghi trước 0019/0030 chưa có cột kỳ / khách / thành phần → mặc định trống.
+  // Dòng ghi trước 0019/0030/0033 chưa có cột kỳ / khách / chế biến / thành phần → mặc định trống.
   vaDongCu: (x) => ({
     ...x,
     customerName: x.customerName ?? "",
+    processingType: x.processingType ?? "",
     componentRauKg: x.componentRauKg ?? null,
     componentBaoTuKg: x.componentBaoTuKg ?? null,
     balancingPeriodId: x.balancingPeriodId ?? "",

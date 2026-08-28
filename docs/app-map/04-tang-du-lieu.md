@@ -2,6 +2,7 @@
 covers: src/lib/repo.ts, src/lib/db.ts, src/lib/catalogRepo.ts, src/lib/connectivity.ts, src/lib/supabase.ts, src/lib/store.ts, src/lib/audit.ts, src/design-system/patterns/DataStatusBadge.tsx
 last_verified: 2026-08-27
 ttl_days: 90
+<!-- updated: 2026-08-27 — BANG_WIP_PRODUCTION map thêm `processing_type` (↔ WipProductionItem.processingType, migration 0033) — kiểu chế biến của nhóm ghi thành phẩm ngày; vaDongCu mặc định "" cho dòng cũ. -->
 <!-- updated: 2026-08-27 (P5-A) — /nxt-kho thành SỔ SỐNG trên nxt_snapshots: chế độ Ghi (LuoiNhap sửa tồn đầu/nhập/xuất từng mã, tồn cuối suy tự cập nhật) + Thêm/Xóa mã + "Tạo kỳ kế tiếp" kế thừa tồn cuối kỳ này → tồn đầu kỳ sau (id tất định nxt|kho|từ|đến|mã). Chưa nối bảng giao dịch (P5-B chờ bảng ánh xạ mã). -->
 <!-- updated: 2026-08-27 — thêm BANG_NXT_SNAPSHOT (nxt_snapshots) + hook useNxtSnapshots(seedNxtSnapshots) cho báo cáo Xuất–Nhập–Tồn kho (/nxt-kho). Seed số THẬT từ src/data/nxt-bachtuoc-2026-07.json (30 mã bạch tuộc, KHO TP-1000, đã kiểm định khớp tổng); id snapshot TẤT ĐỊNH theo (kho×kỳ×mã) để seed idempotent. NHAN_BANG['nxt_snapshots']. Màn nhập được Excel báo cáo thật qua lib/nxtExcel.ts parseNxtExcelFile. -->
 <!-- updated: 2026-08-24 — thêm BANG_FINISHED_OPENING_STOCK (finished_goods_opening_stock) + hook useFinishedGoodsOpeningStock cho sổ NXT thành phẩm; hàm thuần lib/inventoryFinished.ts suy tồn TP từ SX/đơn/bán; tinhTon() nhận thêm tham số bán hàng (tùy chọn) -->

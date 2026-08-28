@@ -363,6 +363,9 @@ export interface WipProductionItem {
   note: string;
   /** Khách hàng của dòng thành phẩm (làm theo đơn) — lưu theo TÊN. */
   customerName?: string;
+  /** KIỂU CHẾ BIẾN của nhóm (luộc/chần/cắt…) — trục gom sổ ngày (chế biến × khách),
+   *  snapshot ngay trên dòng để dựng lại đúng bố cục sổ giấy (migration 0033). */
+  processingType?: string;
   /** Thành phẩm tách 2 thành phần cùng giá (VD cắt chần: râu + bao tử).
    *  null = dòng KHÔNG tách. quantityKg vẫn giữ tổng để cân đối dùng. */
   componentRauKg?: number | null;

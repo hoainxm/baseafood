@@ -2,6 +2,7 @@
 covers: supabase/migrations/**, docs/ops/supabase-setup.md
 last_verified: 2026-08-27
 ttl_days: 90
+<!-- updated: 2026-08-27 — thêm 0033 (production_wips.processing_type, text default ''): KIỂU CHẾ BIẾN của nhóm ghi thành phẩm ngày /wip (gom theo chế biến × khách như sổ giấy). CHỈ-THÊM cột nullable/default, idempotent. Xem 34-btp ba-spec + repo.ts BANG_WIP_PRODUCTION. -->
 <!-- updated: 2026-08-27 — thêm 0032 (nxt_snapshots: snapshot Xuất–Nhập–Tồn nhập từ báo cáo THẬT của xí nghiệp, hạt Kho × Mã hàng × Kỳ; cột opening/in/out + giá trị; tồn cuối SUY ở app không lưu). CHỈ-THÊM bảng, idempotent, RLS anon+authenticated (chưa vào vòng siết 0021). Xem 04-tang-du-lieu (BANG_NXT_SNAPSHOT) + màn /nxt-kho. -->
 <!-- updated: 2026-08-24 — thêm 0025 (audit_log: nhật ký thao tác, append-only, admin đọc) — KHÔNG đưa vào vòng siết 0021; xem lib/audit.ts -->
 <!-- updated: 2026-08-24 — thêm 0024 (finished_goods_opening_stock: tồn đầu kho THÀNH PHẨM, kg+block) cho sổ NXT thành phẩm khép vòng; xem lib/inventoryFinished.ts -->

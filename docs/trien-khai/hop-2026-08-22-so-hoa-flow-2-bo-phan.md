@@ -110,5 +110,3 @@ Kế thừa các câu treo cũ ([`can-xac-nhan-dot-tiep.md`](can-xac-nhan-dot-ti
 | [Bộ quy cách × chế biến thành phẩm](../spec/bo-quy-cach-che-bien-thanh-pham.md) | Cấu trúc dữ liệu quy cách/chế biến/nguyên liệu | `spec/bo-quy-cach-che-bien-thanh-pham.md` |
 
 Cập nhật kèm theo: trạng thái/backlog trong [`CLAUDE.md`](../../CLAUDE.md), index [`app-map/README.md`](../app-map/README.md), ghi chú lệch của [`BAN-GIAO.md`](../BAN-GIAO.md).
-</content>
-</invoke>

@@ -150,4 +150,3 @@ Cùng một cơ sở dữ liệu, **tách theo vai trò** để mỗi bộ phậ
 6. **Gỡ/ẩn màn DEMO** khỏi nav vận hành thật (hoặc gắn nhãn rõ) để không gây hiểu nhầm khi chạy thật 01/09.
 
 Mốc đưa vào chạy thật: [`ke-hoach-cutover-1-9-2026.md`](ke-hoach-cutover-1-9-2026.md).
-</content>

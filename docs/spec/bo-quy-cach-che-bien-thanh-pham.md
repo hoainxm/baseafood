@@ -97,4 +97,3 @@ Bảng `products` (`mat_hang`) đã có sẵn đường bám (đối chiếu cod
 4. Ánh xạ **141 mã ↔ (A×B×C)** — mã nào ra tổ hợp nào; mã nào là NL không phải TP. *(nhập dần qua UI danh mục; chưa backfill hàng loạt)*
 
 Khi chốt xong: cập nhật [`32-danh-muc.md`](../app-map/32-danh-muc.md) + [`03-database.md`](../app-map/03-database.md), rồi mới viết migration.
-</content>

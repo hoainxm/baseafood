@@ -124,4 +124,3 @@ Thứ tự triển khai **có chủ đích**:
 - [ ] T7 + T8 nhập báo cáo xong, tồn cuối 31/08 khớp báo cáo tháng.
 - [ ] Vai trò 2 bộ phận đã gán (`user_profiles`), route-guard + trang chủ theo vai trò đã bật.
 - [ ] Màn DEMO đã ẩn/gắn nhãn; nhập tay là đường chính thức.
-</content>

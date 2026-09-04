@@ -4,6 +4,7 @@
 > **Loại:** đặc tả kỹ thuật + phân tích dữ liệu, trước khi build. Chưa có code.
 > **Nguồn kích hoạt:** chủ dự án cung cấp 2 báo cáo XNT thật của **KHO TP – KHO 1000**, kỳ 01/07→31/07/2026 — (1) **cá** (bản in, dạng .xlsx đúng mẫu parser); (2) **bạch tuộc tự đông** (file PDF 3 trang) — để số hoá phục vụ chạy realtime từ 01/09.
 > **Liên quan:** [`trien-khai/ke-hoach-cutover-1-9-2026.md`](../trien-khai/ke-hoach-cutover-1-9-2026.md) (§2b, §3–4) · [`trien-khai/flow-end-to-end-2-bo-phan.md`](../trien-khai/flow-end-to-end-2-bo-phan.md) · [`app-map/04-tang-du-lieu.md`](../app-map/04-tang-du-lieu.md) · [`app-map/03-database.md`](../app-map/03-database.md).
+> **Định hướng lô/QR:** hướng cấp lô ở đây ăn khớp [`trien-khai/hop-2026-09-02-form-nhap-trace-gia-qc.md`](../trien-khai/hop-2026-09-02-form-nhap-trace-gia-qc.md) QĐ-6 (định danh lô + mã QR để trace nội bộ; SSCC nhà nước chừa ô trống, làm sau — QĐ-10).
 > **Risk (bước build sau):** 🟡 YELLOW (thêm bảng/cột + down migration). Bước SPEC này 🟢 (chỉ đọc + viết `.md`).
 
 ---

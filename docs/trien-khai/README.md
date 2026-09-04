@@ -2,11 +2,12 @@
 
 Bộ tài liệu phân tích + thiết kế flow cho hệ thống này (chuyển từ repo SDFactory sang để repo tự chứa ngữ cảnh). Đọc theo thứ tự để hiểu flow làm việc:
 
-### Mới nhất — buổi họp 2026-08-22 (số hóa trọn chuỗi + cutover 01/09)
+### Mới nhất — buổi họp 2026-09-02 (form nhập + OCR · lô/QR · giá · QC · nhân sự), nối tiếp 2026-08-22
 
 | # | Tài liệu | Nội dung |
 |---|---|---|
-| ★ | [hop-2026-08-22-so-hoa-flow-2-bo-phan.md](hop-2026-08-22-so-hoa-flow-2-bo-phan.md) | **Biên bản họp + 8 quyết định** — cửa vào cho đợt việc này |
+| ★ | [hop-2026-09-02-form-nhap-trace-gia-qc.md](hop-2026-09-02-form-nhap-trace-gia-qc.md) | **Biên bản họp + 12 quyết định** — form nhập chuẩn + chụp ảnh/OCR, định danh lô/QR, giá & bình quân gia quyền, QC chấm điểm, khung nhân sự · **cửa vào mới nhất** |
+| ★ | [hop-2026-08-22-so-hoa-flow-2-bo-phan.md](hop-2026-08-22-so-hoa-flow-2-bo-phan.md) | **Biên bản họp + 8 quyết định** — số hóa trọn chuỗi + tách 2 giao diện bộ phận + cutover 01/09 |
 | ★ | [flow-end-to-end-2-bo-phan.md](flow-end-to-end-2-bo-phan.md) | Chuỗi nhập→sản xuất→kho→bán→cân đối, chỗ đứt gãy, 2 giao diện bộ phận, daily-task, bảng thuật ngữ ("second step", ghi bù, phát hành) |
 | ★ | [ke-hoach-cutover-1-9-2026.md](ke-hoach-cutover-1-9-2026.md) | Baseline tồn 30/06, nhập báo cáo T7–T8, realtime 01/09, lộ trình import file/scan |
 | ★ | [../spec/bo-quy-cach-che-bien-thanh-pham.md](../spec/bo-quy-cach-che-bien-thanh-pham.md) | Cấu trúc dữ liệu quy cách × kiểu chế biến × nguyên liệu (spec) |

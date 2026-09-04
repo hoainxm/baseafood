@@ -10,6 +10,8 @@ ttl_days: 90
 
 <!-- updated: 2026-08-17 — 0019 tách size bạch tuộc 2 da: 'Bạch tuộc 2 da' → 'Bạch tuộc 2 da lớn (80↑)' + thêm 'Bạch tuộc 2 da nhỏ (80↓)'. '1 da' KHÔNG tách. Kỳ cân đối gom theo HỌ tên (hoNguyenLieu) nên vẫn thấy cả hai size. -->
 
+<!-- updated: 2026-09-04 — ĐÃ BUILD (họp [2026-09-02](../trien-khai/hop-2026-09-02-form-nhap-trace-gia-qc.md) QĐ-4): TÁI DÙNG cột `code` sẵn có (Customer/Supplier) — đổi nhãn "Mã nội bộ"→"Mã số" ở tab Khách hàng + Đại lý (KHÔNG đổi tab Mặt hàng), thêm kiểm TRÙNG số qua prop `kiemTraThem` của DanhMucCrud (helper `trungMaSo` trong CatalogScreen). Ở màn Nhập hàng/Bán hàng, combobox prefix "‹số› · ‹tên›" nên gõ số ra tên (optKhach thêm code vào phu). KHÔNG migration. -->
+
 # Danh mục (master data)
 
 Một màn, **5 tab**: Mặt hàng · Khách hàng · Đại lý · Loại nguyên liệu · Thành phẩm (141 mã).

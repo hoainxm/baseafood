@@ -1,9 +1,9 @@
 # Kế hoạch cutover — chạy dữ liệu thật từ 01/09/2026
 
 > **Load khi:** chuẩn bị đưa hệ thống vào chạy thật; dựng tồn gốc; nhập số liệu cũ; làm import file/scan.
-> **Nguồn quyết định:** [`hop-2026-08-22-so-hoa-flow-2-bo-phan.md`](hop-2026-08-22-so-hoa-flow-2-bo-phan.md) (QĐ-4, QĐ-5).
+> **Nguồn quyết định:** [`hop-2026-08-22-so-hoa-flow-2-bo-phan.md`](hop-2026-08-22-so-hoa-flow-2-bo-phan.md) (QĐ-4, QĐ-5) · xác nhận + mở rộng ở [`hop-2026-09-02-form-nhap-trace-gia-qc.md`](hop-2026-09-02-form-nhap-trace-gia-qc.md) (QĐ-2 chạy realtime từ tháng 9; QĐ-1 form nhập + chụp ảnh/OCR).
 > **Vận hành kỹ thuật:** [`ops/supabase-setup.md`](../ops/supabase-setup.md) · [`ops/deploy-vercel.md`](../ops/deploy-vercel.md) · [`03-database.md`](../app-map/03-database.md).
-> **last_verified:** 2026-08-24
+> **last_verified:** 2026-09-04
 
 ---
 
@@ -87,6 +87,8 @@ Báo cáo **tồn kho tổng** gần nhất mà xí nghiệp đã chốt là **3
 ---
 
 ## 4. Chức năng import: tay trước, file/scan sau (QĐ-5)
+
+> 🆕 **Nâng mức từ buổi [2026-09-02](hop-2026-09-02-form-nhap-trace-gia-qc.md) (QĐ-1):** chủ dự án đặt **một form nhập chuẩn duy nhất** + **chụp ảnh phiếu viết tay → OCR tự bóc số** làm **định hướng vận hành chính** (không chỉ là giai đoạn "sau"). Giai đoạn 3 dưới đây (scan tay) vì vậy là **mục tiêu vận hành**, không phải tùy chọn — nhưng vẫn giữ nguyên tắc **viết tay song song app ~1 tháng cho quen**, và **OCR chỉ là gợi ý, luôn có ô sửa, không tự chốt**.
 
 Thứ tự triển khai **có chủ đích**:
 

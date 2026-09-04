@@ -12,6 +12,8 @@ status: ba-spec — ĐÃ BUILD v1 (migration 0011 + 3 màn WipProductionScreen/R
 
 <!-- updated: 2026-08-17 — production_wips thêm balancing_period_id: kỳ cân đối hút sản lượng BTP theo ngày và GHI NGƯỢC khi sửa ô trong lưới (xem 31-can-doi-ky). Ngày đã chốt sản xuất vẫn sửa được nhưng bắt lý do ghi bù. -->
 
+<!-- updated: 2026-09-04 — ĐỊNH HƯỚNG (chưa build) từ họp [2026-09-02](../trien-khai/hop-2026-09-02-form-nhap-trace-gia-qc.md) QĐ-6: trace mẻ sản xuất ↔ lô nguyên liệu qua mã QR (quét/nhập series khi lấy ra SX); sinh mã lúc nhập hoặc sau sơ chế+đông (điểm mở). Ăn khớp cấp lô Phương án A ở spec/import-xnt-kho-cutover.md. -->
+
 # BA-SPEC — Module WIP: Sản xuất BTP · Kho dự trữ · Đơn đặt · Xuất container
 
 Số hoá **vòng lặp cốt lõi chưa số hoá** của BSF1: BTP làm ra ngày → cấp đông → kho dự trữ → gom đủ đơn đặt → xuất container. Đây là nơi **tồn cuối kỳ sai** hiện nay (ghi tay) → kế toán chốt số sai. Spec này là **oracle hành vi** (AC), KHÔNG nói UI, KHÔNG code. Pha sau: `ui-design-logic` → build.

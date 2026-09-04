@@ -3,6 +3,8 @@ covers: src/**
 last_verified: 2026-08-07
 ttl_days: 90
 
+<!-- updated: 2026-09-05 — (họp 2026-09-02 QĐ-8) THÊM feature `src/features/quality-check/` (QcChecklistScreen + index) — màn Kiểm tra QC chấm điểm cuối ngày, route `/qc`. Chỉ import từ `@/design-system` + hook `catalogRepo` (useQcChecklists/useQcLocks). -->
+
 # Cấu trúc mã nguồn
 
 ```

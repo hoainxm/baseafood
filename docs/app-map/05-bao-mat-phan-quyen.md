@@ -9,6 +9,8 @@ ttl_days: 90
 <!-- updated: 2026-08-18 — viết 0021_siet_rls_tieng_anh.sql (thay 0003 đã lỗi thời sau rename 0016, bao đủ 23 bảng); 0003 đánh dấu ĐỪNG CHẠY -->
 <!-- updated: 2026-08-07 — đuôi email .local→.vn (GoTrue chặn .local, migration 0010); vai trò NHIỀU/người (VaiTro[], CSV cột vai_tro), gán lúc tạo TK, Quản đốc theo xưởng -->
 
+<!-- updated: 2026-09-05 — (họp 2026-09-02) màn `/qc` thêm vào `DEPT_SAN_XUAT` (nav-access.ts) → bộ phận sản xuất/kỹ thuật thấy; bảng `qc_checklists`,`qc_locks` đã vào mảng siết RLS của `0021` (nhớ chạy lại 0021 sau 0036). Phân quyền vẫn ở tầng app (nav-access) — RLS server chưa siết theo vai trò. -->
+
 # Bảo mật & phân quyền
 
 ## Trạng thái: CÓ đăng nhập (Supabase Auth), migration siết RLS ĐÃ VIẾT — chờ chạy

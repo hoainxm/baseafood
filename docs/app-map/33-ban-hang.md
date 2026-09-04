@@ -7,6 +7,8 @@ ttl_days: 90
 <!-- re-verified: 2026-08-14 — đồng bộ tên file sau rename eadc360: SalesReport.tsx/SalesTab.tsx + lib balancingCalc.ts (symbol BanHang/BaoCaoBan/BieuDoCot/BangTong giữ nguyên) -->
 <!-- updated: 2026-08-21 — GIẢM THAO TÁC (đổi UI, GREEN): kênh phiếu mới = kênh bán gần nhất trong phiên (state kenhGanNhat) thay "Xuất khẩu" cứng; giữ Quy cách của dòng trước làm mặc định dòng kế CÙNG phiếu (chỉ reset mặt hàng/kg/giá). Cổng ghi-bù 2 ngày + ErrorSummary + gán kênh khi hút vào cân đối KHÔNG đổi -->
 
+<!-- updated: 2026-09-05 — (họp 2026-09-02 QĐ-4) combobox chọn KHÁCH ở màn Bán hàng nay prefix "‹mã số› · ‹tên›" (optKhach: label có code, phu gộp code+market) → gõ số khách ra tên. Mã số quản ở Danh mục (tái dùng cột `code`). -->
+
 # Bán hàng (bán thành phẩm RA) hằng ngày
 
 Số hóa sổ **bán hàng** — bán thành phẩm chế biến (bạch tuộc/mực) RA cho khách theo ngày. Sau khi bán, màn Cân đối **hút** bán theo khoảng ngày vào khối thành phẩm ra — nửa còn lại của bảng cân đối kỳ (nửa kia là nhập NL). Nav thứ 2 (giữa Nhập hàng và Cân đối).

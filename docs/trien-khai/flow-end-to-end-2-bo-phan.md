@@ -1,9 +1,9 @@
 # Flow end-to-end & 2 giao diện bộ phận
 
 > **Load khi:** thiết kế/nối luồng nhập → sản xuất → kho → bán → cân đối; tách giao diện theo bộ phận; định nghĩa việc-hằng-ngày.
-> **Nguồn quyết định:** [`hop-2026-08-22-so-hoa-flow-2-bo-phan.md`](hop-2026-08-22-so-hoa-flow-2-bo-phan.md) (QĐ-1..6).
+> **Nguồn quyết định:** [`hop-2026-08-22-so-hoa-flow-2-bo-phan.md`](hop-2026-08-22-so-hoa-flow-2-bo-phan.md) (QĐ-1..6) · bổ sung [`hop-2026-09-02-form-nhap-trace-gia-qc.md`](hop-2026-09-02-form-nhap-trace-gia-qc.md) (form+OCR, ranh giới nhập→SX→kho QĐ-3, khung nhân sự QĐ-5).
 > **Đối chiếu code thật:** [`02-pages-navigation.md`](../app-map/02-pages-navigation.md) · [`34-btp-san-xuat-kho.ba-spec.md`](../app-map/34-btp-san-xuat-kho.ba-spec.md) · [`31-can-doi-ky.md`](../app-map/31-can-doi-ky.md).
-> **last_verified:** 2026-08-22
+> **last_verified:** 2026-09-04
 
 File này mô tả **chuỗi giá trị end-to-end thật của xưởng**, chỉ đúng **chỗ đang đứt gãy**, và thiết kế **2 giao diện bộ phận** vận hành theo bước với **việc-hằng-ngày** rõ ràng. Danh sách hàm/màn cụ thể đọc thẳng ở app-map + source.
 

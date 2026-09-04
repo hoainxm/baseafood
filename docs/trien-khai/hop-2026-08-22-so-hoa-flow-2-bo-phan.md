@@ -2,6 +2,7 @@
 
 > **Chủ đề:** số hóa toàn bộ luồng từ nhập nguyên liệu → sản xuất thành phẩm; tách 2 giao diện bộ phận; chốt mốc chạy dữ liệu thật.
 > **Trạng thái:** đã chốt định hướng, đang chuyển thành kế hoạch build. Các tài liệu chi tiết sinh ra từ buổi này liệt kê ở [§7](#7-tài-liệu-sinh-ra-từ-buổi-này).
+> **Buổi kế tiếp:** [`hop-2026-09-02-form-nhap-trace-gia-qc.md`](hop-2026-09-02-form-nhap-trace-gia-qc.md) — kế thừa QĐ-1..8 buổi này, bổ sung form nhập + OCR, định danh lô/QR, giá & bình quân gia quyền, QC chấm điểm, khung nhân sự.
 > **Bối cảnh nền:** [`BAN-GIAO.md`](../BAN-GIAO.md) · vòng lặp gối đầu [`ke-hoach-tuan-1-thu-thap-du-lieu.md`](ke-hoach-tuan-1-thu-thap-du-lieu.md) · BTP/kho [`34-btp-san-xuat-kho.ba-spec.md`](../app-map/34-btp-san-xuat-kho.ba-spec.md).
 
 File này là **nguồn canonical cho các quyết định của buổi họp**. Chi tiết thiết kế nằm ở các doc con — ở đây chỉ ghi *quyết định gì, vì sao, đụng vào đâu*.

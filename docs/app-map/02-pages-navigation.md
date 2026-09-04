@@ -11,6 +11,8 @@ ttl_days: 90
 <!-- re-verified: 2026-08-14 — đồng bộ tên file sau rename eadc360: guideContent.tsx, ImportTab/SalesTab, MaterialImportScreen/ImportReport/SalesScreen/SalesReport/BalancingTable/FinishedGoodScreen, @/lib/catalogRepo (symbol NutHuongDan/NutGiaoDien/CaiDatHienThi giữ nguyên) -->
 <!-- re-verified: 2026-08-17 — khung THẬT là AppShell.tsx (AppLayout.tsx đã XOÁ, là khung chết không ai import); nav dọc gom 6 nhóm (KIT_NAV + NHOM_NAV) dùng chung sidebar/drawer; bottom-tab điện thoại đã bỏ -->
 
+<!-- updated: 2026-09-05 — (họp 2026-09-02 QĐ-8) THÊM route `/qc` "Kiểm tra QC" (features/quality-check, màn THẬT — KHÔNG demoGuard): KIT_NAV icon ClipboardCheck, nhóm nav "Sản xuất", gate qua DEPT_SAN_XUAT (nav-access.ts). ~18 route. -->
+
 # Trang & điều hướng
 
 **Có định tuyến (Router).** Ứng dụng sử dụng `react-router-dom` v7 (`HashRouter` để tối ưu chạy offline tại xưởng). Đường dẫn + `NAV` dùng **id tiếng Anh** (`imports`, `sales`, `warehouse`…) — id của mục nav CHÍNH LÀ path (`to={/${id}}`), nên id phải khớp `Route path` trong `App.tsx`, nếu lệch thì menu bấm ra NotFound. Refresh (F5) giữ trạng thái, dùng Back/Forward, deep link như `#/balancing/:periodId`.

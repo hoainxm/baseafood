@@ -13,6 +13,8 @@ ttl_days: 90
 <!-- updated: 2026-08-18 — thêm 'Đổi loại hàng loạt' (BulkTypeChange.tsx): tick nhiều chuyến đổi tên loại NL một lượt, dùng để gán lại size 80↓ sau migration 0019 -->
 <!-- updated: 2026-08-17 — 0019: cột balancing_period_id (kỳ cân đối hút dòng nhập); loại NL 'Bạch tuộc 2 da' tách thành lớn (80↑)/nhỏ (80↓) -->
 
+<!-- updated: 2026-09-04 — ĐÃ BUILD (họp [2026-09-02](../trien-khai/hop-2026-09-02-form-nhap-trace-gia-qc.md), migration 0035): mỗi CHUYẾN sinh MÃ LÔ nội bộ đọc được `‹chữ xưởng›-‹yymmdd›-‹stt›` (vd "Đ-260902-01", hàm sinhMaLo trong MaterialImportScreen — NHÃN trace, không phải khóa) + ô SSCC (QĐ-10, để trống điền sau); cột `import_shipments.lot_code`/`sscc_code` (nullable) + `ImportShipment.lotCode/ssccCode`, hiện ở header phiên + badge nhóm chuyến. CÒN ĐỂ SAU: (QĐ-6) in/quét QR mã lô; (QĐ-1) OCR chụp phiếu tay; (QĐ-7) giá bình quân gia quyền theo ngày — CHƯA sửa `balancingCalc.ts` (chờ chốt PA). -->
+
 # Sổ nhập nguyên liệu hàng ngày
 
 Số hóa sổ giấy *"Báo cáo tổng hợp nguyên liệu hàng ngày"*. Đây là màn dùng nhiều nhất, mỗi ngày, ở xưởng lạnh.

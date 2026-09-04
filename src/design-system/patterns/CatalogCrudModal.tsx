@@ -60,6 +60,7 @@ export function DanhMucCrud<T extends { id: string }>({
   moTaBanGhi,
   tenDonVi,
   dangTai = false,
+  kiemTraThem,
 }: {
   tieuDe: string;
   moTa?: string;
@@ -76,6 +77,8 @@ export function DanhMucCrud<T extends { id: string }>({
   tenDonVi: string;
   /** Đang tải danh sách từ máy chủ (chưa có dữ liệu local) → hiện skeleton. */
   dangTai?: boolean;
+  /** Kiểm tra thêm (ngoài ô bắt buộc) — vd trùng mã số. Trả về danh sách lỗi. */
+  kiemTraThem?: (dang: T, rows: T[], laThem: boolean) => LoiNhap[];
 }) {
   const [dang, setDang] = React.useState<T | null>(null);
   const [laThem, setLaThem] = React.useState(false);
@@ -98,8 +101,10 @@ export function DanhMucCrud<T extends { id: string }>({
     const ls: LoiNhap[] = fields
       .filter((f) => f.batBuoc && !String(dang[f.key] ?? "").trim())
       .map((f) => ({ truong: f.nhan, thongBao: `Chưa nhập ${f.nhan.toLowerCase()}` }));
-    setLoi(ls);
-    if (ls.length > 0) return;
+    const lsThem = kiemTraThem?.(dang, rows, laThem) ?? [];
+    const tatCa = [...ls, ...lsThem];
+    setLoi(tatCa);
+    if (tatCa.length > 0) return;
 
     if (laThem) {
       onChange([...rows, dang]);

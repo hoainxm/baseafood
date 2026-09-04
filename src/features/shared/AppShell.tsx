@@ -18,6 +18,7 @@ import { BangCapNhat } from "./UpdateBanner";
 import {
   LayoutDashboard,
   ClipboardList,
+  ClipboardCheck,
   ShieldCheck,
   ThermometerSnowflake,
   BarChart3,
@@ -78,6 +79,7 @@ export const KIT_NAV: MucNavShell[] = [
   { id: "wip", label: "Sản xuất thành phẩm", icon: Factory },
   { id: "packaging", label: "Đóng gói", icon: Package },
   { id: "quality", label: "Chất lượng", icon: ShieldCheck, demo: true },
+  { id: "qc", label: "Kiểm tra QC", icon: ClipboardCheck },
   { id: "imports", label: "Nhập hàng", icon: Truck },
   { id: "warehouse", label: "Kho dự trữ", icon: Snowflake },
   { id: "cold-storage", label: "Kho lạnh", icon: ThermometerSnowflake, demo: true },
@@ -99,7 +101,7 @@ export const KIT_NAV: MucNavShell[] = [
 /** Nav DỌC gom theo nhóm chức năng — dùng chung cho sidebar và drawer. */
 export const NHOM_NAV: { ten: string; ids: string[] }[] = [
   { ten: "Tổng quan", ids: ["dashboard"] },
-  { ten: "Sản xuất", ids: ["production", "wip", "packaging", "quality"] },
+  { ten: "Sản xuất", ids: ["production", "wip", "packaging", "quality", "qc"] },
   { ten: "Kho", ids: ["imports", "warehouse", "cold-storage"] },
   { ten: "Kinh doanh", ids: ["sales", "orders"] },
   { ten: "Báo cáo", ids: ["balancing", "bc-thanh-pham", "bc-don-xuat", "nxt-nl", "nxt", "nxt-kho", "reports", "traceability"] },

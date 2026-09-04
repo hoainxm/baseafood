@@ -15,6 +15,7 @@ import type {
   ImportShipment,
   MaterialImportItem,
   DailyLock,
+  QcChecklistItem,
   Product,
   Customer,
   Supplier,
@@ -240,6 +241,8 @@ export const BANG_IMPORT_SHIPMENT: AnhXaBang<ImportShipment> = {
     driver_name: x.driverName,
     license_plate: x.licensePlate,
     note: x.note,
+    lot_code: x.lotCode ?? "",
+    sscc_code: x.ssccCode ?? "",
   }),
   fromRow: (r) => ({
     id: s(r.id),
@@ -251,6 +254,14 @@ export const BANG_IMPORT_SHIPMENT: AnhXaBang<ImportShipment> = {
     driverName: s(r.driver_name),
     licensePlate: s(r.license_plate),
     note: s(r.note),
+    lotCode: s(r.lot_code),
+    ssccCode: s(r.sscc_code),
+  }),
+  // Chuyến ghi trước 0035 chưa có mã lô/SSCC → coi như để trống.
+  vaDongCu: (x) => ({
+    ...x,
+    lotCode: x.lotCode ?? "",
+    ssccCode: x.ssccCode ?? "",
   }),
 };
 
@@ -651,6 +662,60 @@ export const BANG_PRODUCTION_LOCK: AnhXaBang<DailyLock> = {
     reopenReason: s(r.reopen_reason),
     note: s(r.note),
     leftoverKg: Number(r.leftover_kg ?? 0),
+  }),
+};
+
+/** QC checklist chấm điểm cuối ngày (họp 2026-09-02, migration 0036). */
+export const BANG_QC_CHECKLIST: AnhXaBang<QcChecklistItem> = {
+  table: "qc_checklists",
+  localKey: "bsf.qc-checklists.v1",
+  layKhoa: theoId,
+  toRow: (x) => ({
+    id: x.id,
+    date: x.date,
+    workshop: x.workshop,
+    criterion: x.criterion,
+    result: x.result,
+    score: x.score,
+    note: x.note,
+    backdate_reason: x.backdateReason,
+  }),
+  fromRow: (r) => ({
+    id: s(r.id),
+    date: s(r.date).slice(0, 10),
+    workshop: s(r.workshop) as Workshop,
+    criterion: s(r.criterion),
+    result: (s(r.result) || "dat") as QcChecklistItem["result"],
+    score: n(r.score),
+    note: s(r.note),
+    backdateReason: s(r.backdate_reason),
+  }),
+};
+
+/** Chốt ngày QC (cùng hình dạng DailyLock, migration 0036). */
+export const BANG_QC_LOCK: AnhXaBang<DailyLock> = {
+  table: "qc_locks",
+  localKey: "bsf.qc-locks.v1",
+  layKhoa: theoId,
+  toRow: (x) => ({
+    id: x.id,
+    lock_date: x.lockDate,
+    workshop: x.workshop,
+    is_locked: x.isLocked,
+    locked_at: x.lockedAt,
+    total_kg_at_lock: x.totalKgAtLock,
+    reopen_reason: x.reopenReason,
+    note: x.note,
+  }),
+  fromRow: (r) => ({
+    id: s(r.id),
+    lockDate: s(r.lock_date).slice(0, 10),
+    workshop: s(r.workshop) as Workshop,
+    isLocked: Boolean(r.is_locked),
+    lockedAt: s(r.locked_at),
+    totalKgAtLock: Number(r.total_kg_at_lock ?? 0),
+    reopenReason: s(r.reopen_reason),
+    note: s(r.note),
   }),
 };
 

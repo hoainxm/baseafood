@@ -52,6 +52,8 @@ declare
     -- sản xuất BTP + kho + đơn đặt + lệnh xuất + đóng gói
     'production_wips', 'production_locks', 'packagings', 'sales_orders', 'order_items',
     'export_orders', 'export_items',
+    -- QC checklist chấm điểm cuối ngày (0036)
+    'qc_checklists', 'qc_locks',
     -- tồn đầu kho (nguyên liệu 0022 + thành phẩm 0024)
     'material_opening_stock', 'finished_goods_opening_stock',
     -- người dùng

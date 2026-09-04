@@ -49,6 +49,25 @@ const KIEU_CHE_BIEN = [
  * tên trang gần giống nhau, người dùng phải nhớ cái nào ở đâu.
  * Gộp lại: điều hướng còn 3 mục, mỗi mục là MỘT VIỆC rõ ràng.
  */
+/** Cảnh báo khi mã số trùng với bản ghi khác (khách hàng / đại lý). Mã trống thì bỏ qua. */
+function trungMaSo<T extends { id: string; code: string }>(
+  dang: T,
+  rows: T[],
+  tenDonVi: string
+): { truong: string; thongBao: string }[] {
+  const ma = (dang.code ?? "").trim();
+  if (!ma) return [];
+  const trung = rows.some((r) => r.id !== dang.id && (r.code ?? "").trim() === ma);
+  return trung
+    ? [
+        {
+          truong: "Mã số",
+          thongBao: `Mã số "${ma}" đã dùng cho ${tenDonVi} khác — đổi số khác hoặc để trống.`,
+        },
+      ]
+    : [];
+}
+
 export default function DanhMucScreen() {
   const [tab, setTab] = useState("mat-hang");
 
@@ -213,7 +232,12 @@ export default function DanhMucScreen() {
 
   const fKhachHang: TruongDanhMuc<Customer>[] = [
     { key: "name", nhan: "Tên khách hàng", batBuoc: true, viDu: "VD: Lucky" },
-    { key: "code", nhan: "Mã nội bộ", viDu: "Tự đặt (nếu cần)" },
+    {
+      key: "code",
+      nhan: "Mã số",
+      goiY: "Nhập số để gọi nhanh (VD: 1 = Hanwha). Gõ số này ở màn Bán hàng là ra tên.",
+      viDu: "VD: 1",
+    },
     {
       key: "market",
       nhan: "Thị trường",
@@ -257,7 +281,13 @@ export default function DanhMucScreen() {
       anTrenDienThoai: true,
       viDu: "VD: CA Bà Rịa - Vũng Tàu",
     },
-    { key: "code", nhan: "Mã nội bộ", anTrenDienThoai: true, viDu: "Tự đặt (nếu cần)" },
+    {
+      key: "code",
+      nhan: "Mã số",
+      anTrenDienThoai: true,
+      goiY: "Nhập số để gọi nhanh. Gõ số này ở màn Nhập hàng là ra tên.",
+      viDu: "VD: 1",
+    },
     {
       key: "phone",
       nhan: "Điện thoại",
@@ -340,6 +370,7 @@ export default function DanhMucScreen() {
             rows={khachHang}
             onChange={setKhachHang}
             fields={fKhachHang}
+            kiemTraThem={(dang, rows) => trungMaSo(dang, rows, "khách hàng")}
             taoMoi={() => ({ id: uid(), code: "", name: "", market: "" })}
             timTheo={(r) => `${r.code} ${r.name} ${r.market}`}
             moTaBanGhi={(r) =>
@@ -357,6 +388,7 @@ export default function DanhMucScreen() {
             rows={daiLy}
             onChange={setDaiLy}
             fields={fDaiLy}
+            kiemTraThem={(dang, rows) => trungMaSo(dang, rows, "đại lý")}
             taoMoi={() => ({
               id: uid(),
               code: "",

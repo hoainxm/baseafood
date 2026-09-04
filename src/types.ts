@@ -123,6 +123,10 @@ export interface ImportShipment {
   driverName: string;
   licensePlate: string;
   note: string;
+  /** Mã lô nội bộ đọc được (vd "Đ-260902-01"). NHÃN hiển thị/trace, không phải khóa. */
+  lotCode?: string;
+  /** Mã SSCC do nhà nước cấp — chừa sẵn, thường để trống, điền sau. */
+  ssccCode?: string;
 }
 
 export function isBackdatedImport(c: Pick<ImportShipment, "deliveryDate" | "postingDate">): boolean {
@@ -161,6 +165,27 @@ export interface DailyLock {
   note: string;
   /** Chỉ production_locks (migration 0028): nguyên liệu còn dở cuối ngày đem lưu kho (kg). */
   leftoverKg?: number;
+}
+
+/* ---------- QC checklist chấm điểm cuối ngày (họp 2026-09-02, QĐ-8) ---------- */
+
+/** Kết quả một chỉ tiêu: đạt · tạm (cần khắc phục) · không đạt (cần kiểm tra lại). */
+export type QcResult = "dat" | "tam" | "khong-dat";
+
+export interface QcChecklistItem {
+  id: string;
+  date: string; // yyyy-mm-dd
+  workshop: Workshop;
+  criterion: string; // tên chỉ tiêu kiểm
+  result: QcResult;
+  score: number | null; // điểm tùy chọn (0–10), trống nếu không chấm điểm
+  note: string;
+  backdateReason: string; // bắt buộc khi ghi bù (ngày cũ hoặc ngày đã chốt)
+}
+
+/** Ghi QC cho ngày trước hôm nay = ghi bù (bắt buộc lý do). */
+export function isBackdatedQc(date: string, today: string): boolean {
+  return Boolean(date) && date < today;
 }
 
 /* ---------- 5-Day Balancing (Dong workshop) ---------- */

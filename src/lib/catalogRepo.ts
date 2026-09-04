@@ -24,6 +24,8 @@ import {
   BANG_SCRAP,
   BANG_SALES_INVOICE,
   BANG_WIP_PRODUCTION,
+  BANG_QC_CHECKLIST,
+  BANG_QC_LOCK,
   BANG_PACKAGING,
   BANG_FINISHED_GOOD,
   BANG_BALANCING_OUTPUT,
@@ -185,6 +187,10 @@ export const useBalancingOutputs = () => useBang(BANG_BALANCING_OUTPUT);
 export const useSalesInvoices = () => useBang(BANG_SALES_INVOICE);
 export const useSalesItems = () => useBang(BANG_SALES_ITEM);
 export const useUserProfiles = () => useBang(BANG_USER_PROFILE);
+
+/* --- QC checklist chấm điểm cuối ngày --- */
+export const useQcChecklists = () => useBang(BANG_QC_CHECKLIST);
+export const useQcLocks = () => useBang(BANG_QC_LOCK);
 
 /* --- Module WIP: sản xuất BTP · kho · đơn đặt --- */
 export const useWipProductions = () => useBang(BANG_WIP_PRODUCTION);

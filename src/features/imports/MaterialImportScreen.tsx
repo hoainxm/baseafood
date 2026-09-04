@@ -89,6 +89,21 @@ interface DauChuyen {
   driverName: string;
   licensePlate: string;
   note: string;
+  /** Mã SSCC nhà nước — thường để trống, điền sau khi được cấp. */
+  ssccCode: string;
+}
+
+/** Chữ viết tắt phân xưởng cho mã lô. */
+const CHU_XUONG: Record<Workshop, string> = { Đông: "Đ", Cá: "C", Khô: "K" };
+
+/** Sinh mã lô nội bộ đọc được: ‹chữ xưởng›-‹yymmdd›-‹stt trong ngày›, vd "Đ-260902-01".
+ *  Là NHÃN hiển thị/trace, không phải khóa — trùng cũng không sao, cho sửa tay sau. */
+function sinhMaLo(deliveryDate: string, workshop: Workshop, dsChuyen: ImportShipment[]): string {
+  const w = CHU_XUONG[workshop] ?? "X";
+  const ngay = (deliveryDate || "").replace(/-/g, "").slice(2); // yymmdd
+  const stt =
+    dsChuyen.filter((c) => c.deliveryDate === deliveryDate && c.workshop === workshop).length + 1;
+  return `${w}-${ngay}-${String(stt).padStart(2, "0")}`;
 }
 
 /**
@@ -362,7 +377,7 @@ export default function NhapNguyenLieuScreen() {
 
   const optDaiLy: MucChon[] = daiLy.map((d) => ({
     value: d.shortName,
-    label: d.shortName,
+    label: d.code ? `${d.code} · ${d.shortName}` : d.shortName,
     phu: moTaDaiLy(d),
   }));
 
@@ -423,6 +438,7 @@ export default function NhapNguyenLieuScreen() {
       driverName: "",
       licensePlate: "",
       note: "",
+      ssccCode: "",
     });
     setChuyenIdPhien(null);
     setSuaRowIds(null);
@@ -445,6 +461,7 @@ export default function NhapNguyenLieuScreen() {
       driverName: n.driverName,
       licensePlate: n.licensePlate,
       note: n.note,
+      ssccCode: n.chuyen?.ssccCode ?? "",
     });
     setChuyenIdPhien(n.chuyen?.id ?? null);
     setSuaRowIds(n.dong.map((r) => r.id));
@@ -579,7 +596,10 @@ export default function NhapNguyenLieuScreen() {
       );
     } else if (!suaDuLieuCu) {
       idChuyen = newId();
-      chuyenSau = [...chuyen, { id: idChuyen, ...phien }];
+      chuyenSau = [
+        ...chuyen,
+        { id: idChuyen, ...phien, lotCode: sinhMaLo(phien.deliveryDate, phien.workshop, chuyen) },
+      ];
     }
 
     // Dòng của chuyến = các dòng hợp lệ trong bảng: dòng cũ giữ id (cập nhật),
@@ -649,7 +669,7 @@ export default function NhapNguyenLieuScreen() {
       ? dongHopLe[dongHopLe.length - 1].category
       : loaiGanNhat;
     setPhien((p) =>
-      p ? { ...p, driverName: "", licensePlate: "", note: "" } : p
+      p ? { ...p, driverName: "", licensePlate: "", note: "", ssccCode: "" } : p
     );
     setChuyenIdPhien(null);
     setSuaRowIds(null);
@@ -1041,6 +1061,16 @@ export default function NhapNguyenLieuScreen() {
                         {!n.chuyen && (
                           <Badge variant="outline">Dữ liệu cũ</Badge>
                         )}
+                        {n.chuyen?.lotCode && (
+                          <Badge variant="outline" className="tnum">
+                            Lô {n.chuyen.lotCode}
+                          </Badge>
+                        )}
+                        {n.chuyen?.ssccCode && (
+                          <Badge variant="outline" className="tnum">
+                            SSCC {n.chuyen.ssccCode}
+                          </Badge>
+                        )}
                         {[n.driverName, n.licensePlate].filter(Boolean).length > 0 && (
                           <span className="text-base text-muted-foreground">
                             {[n.driverName, n.licensePlate].filter(Boolean).join(" · ")}
@@ -1312,6 +1342,26 @@ export default function NhapNguyenLieuScreen() {
                             placeholder="Ghi chú thêm (nếu có)"
                           />
                         </Field>
+                        <div className="grid gap-5 sm:grid-cols-2">
+                          <Field
+                            label="Mã SSCC (nhà nước)"
+                            hint="Để trống nếu chưa được cấp — điền sau."
+                          >
+                            <Input
+                              value={phien.ssccCode}
+                              onChange={(e) => datPhien("ssccCode", e.target.value)}
+                              placeholder="Chưa có — điền sau"
+                            />
+                          </Field>
+                          <Field label="Mã lô nội bộ" hint="Tự sinh, dùng để truy xuất.">
+                            <div className="flex min-h-11 items-center tnum text-base text-muted-foreground">
+                              {chuyenIdPhien
+                                ? chuyen.find((c) => c.id === chuyenIdPhien)?.lotCode ||
+                                  "— (dữ liệu cũ)"
+                                : sinhMaLo(phien.deliveryDate, phien.workshop, chuyen)}
+                            </div>
+                          </Field>
+                        </div>
                       </div>
                     )}
                   </div>

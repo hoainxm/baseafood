@@ -254,8 +254,8 @@ export default function BanHangScreen() {
   }));
   const optKhach: MucChon[] = khach.map((k) => ({
     value: k.id,
-    label: k.name,
-    phu: k.market || undefined,
+    label: k.code ? `${k.code} · ${k.name}` : k.name,
+    phu: [k.code, k.market].map((s) => s?.trim()).filter(Boolean).join(" – ") || undefined,
   }));
 
   const themMatHang = (ten: string) => {

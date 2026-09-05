@@ -397,6 +397,9 @@ export interface WipProductionItem {
   componentBaoTuKg?: number | null;
   /** Kỳ cân đối đã hút dòng này (rỗng = chưa gắn kỳ nào). */
   balancingPeriodId?: string;
+  /** Người thao tác ghi dòng này (họ tên tài khoản đăng nhập) — lưu vết ai gửi
+   *  báo cáo thành phẩm ngày lên hệ thống (migration 0037). */
+  operator?: string;
 }
 
 export function isBackdatedWip(c: Pick<WipProductionItem, "productionDate" | "postingDate">): boolean {

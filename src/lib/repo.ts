@@ -604,6 +604,7 @@ export const BANG_WIP_PRODUCTION: AnhXaBang<WipProductionItem> = {
     component_rau_kg: x.componentRauKg ?? null,
     component_bao_tu_kg: x.componentBaoTuKg ?? null,
     balancing_period_id: x.balancingPeriodId ?? "",
+    operator: x.operator ?? "",
   }),
   fromRow: (r) => ({
     id: s(r.id),
@@ -624,8 +625,9 @@ export const BANG_WIP_PRODUCTION: AnhXaBang<WipProductionItem> = {
     componentBaoTuKg:
       r.component_bao_tu_kg == null ? null : Number(r.component_bao_tu_kg),
     balancingPeriodId: s(r.balancing_period_id),
+    operator: s(r.operator),
   }),
-  // Dòng ghi trước 0019/0030/0033 chưa có cột kỳ / khách / chế biến / thành phần → mặc định trống.
+  // Dòng ghi trước 0019/0030/0033/0037 chưa có cột kỳ / khách / chế biến / thành phần / người thao tác → mặc định trống.
   vaDongCu: (x) => ({
     ...x,
     customerName: x.customerName ?? "",
@@ -633,6 +635,7 @@ export const BANG_WIP_PRODUCTION: AnhXaBang<WipProductionItem> = {
     componentRauKg: x.componentRauKg ?? null,
     componentBaoTuKg: x.componentBaoTuKg ?? null,
     balancingPeriodId: x.balancingPeriodId ?? "",
+    operator: x.operator ?? "",
   }),
 };
 

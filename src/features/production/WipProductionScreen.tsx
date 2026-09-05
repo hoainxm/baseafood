@@ -46,6 +46,7 @@ import {
   type MucChon,
 } from "@/design-system";
 import { kg, num, todayISO, viDate } from "@/lib/format";
+import { useAuth } from "@/lib/auth";
 import { KY_OPT, phamViKy, type KyXem } from "@/lib/periodUtils";
 import { DailyTaskReminder } from "@/features/shared";
 import {
@@ -131,6 +132,10 @@ export default function SanXuatBTPScreen() {
   const [matHang, setMatHang] = useProducts();
   const [khach, setKhach] = useCustomers();
 
+  // Người thao tác = tài khoản đang đăng nhập — gắn vào dòng khi lưu để lưu vết ai gửi.
+  const { nguoiDung } = useAuth();
+  const nguoiThaoTac = nguoiDung?.fullName || nguoiDung?.username || "";
+
   const [ky, setKy] = useState<KyXem>("ngay");
   const [ngay, setNgay] = useState(todayISO());
   const [tuNgay, setTuNgay] = useState(todayISO());
@@ -164,8 +169,8 @@ export default function SanXuatBTPScreen() {
   /** Danh mục thành phẩm — gõ để tìm, thêm mới tại chỗ. */
   const optMatHang: MucChon[] = matHang.map((m) => ({
     value: m.id,
-    label: m.name,
-    phu: m.category || undefined,
+    label: m.code ? `${m.code} · ${m.name}` : m.name,
+    phu: [m.code, m.category].filter(Boolean).join(" · ") || undefined,
   }));
 
   /** Danh mục khách hàng — chọn/ thêm mới tại chỗ (lưu theo TÊN). */
@@ -368,6 +373,7 @@ export default function SanXuatBTPScreen() {
       processingType: d.processingType.trim(),
       componentRauKg: laTach(d) ? d.rauKg || 0 : null,
       componentBaoTuKg: laTach(d) ? d.baoTuKg || 0 : null,
+      operator: nguoiThaoTac,
     }));
     persist([...rows, ...moi]);
 
@@ -554,6 +560,13 @@ export default function SanXuatBTPScreen() {
           <Badge variant="outline">Chờ nhập kho</Badge>
         ),
       sapXep: (r) => r.status,
+    },
+    {
+      key: "nguoi",
+      header: "Người ghi",
+      anTrenDienThoai: true,
+      render: (r) => r.operator || <span className="text-muted-foreground">—</span>,
+      sapXep: (r) => r.operator ?? "",
     },
   ];
 
@@ -1107,8 +1120,8 @@ function BangDongSX({
   // Mọi mặt hàng (gõ tên để tìm) — không giới hạn theo loài.
   const optMatHangTatCa: MucChon[] = matHang.map((m) => ({
     value: m.id,
-    label: m.name,
-    phu: [m.processingType, m.category].filter(Boolean).join(" · ") || undefined,
+    label: m.code ? `${m.code} · ${m.name}` : m.name,
+    phu: [m.code, m.processingType, m.category].filter(Boolean).join(" · ") || undefined,
   }));
 
   const tenNhom = (pt: string, cust: string) =>

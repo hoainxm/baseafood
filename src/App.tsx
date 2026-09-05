@@ -49,6 +49,7 @@ const NhatKyScreen = lazy(() => import("@/features/audit"));
 const SanXuatBTPScreen = lazy(() => import("@/features/production")); // Sản xuất BTP (WIP), route /wip
 const DongGoiScreen = lazy(() => import("@/features/packaging")); // Đóng gói BTP → TP, route /packaging
 const KiemTraQcScreen = lazy(() => import("@/features/quality-check")); // QC checklist chấm điểm, route /qc
+const QuetLoScreen = lazy(() => import("@/features/qr")); // Quét/tra lô theo QR, route /qr
 const KitPage = lazy(() => import("@/design-system/kit/KitPage"));
 
 /**
@@ -183,6 +184,7 @@ export default function App() {
             <Route path="/wip" element={<SanXuatBTPScreen />} />
             <Route path="/packaging" element={<DongGoiScreen />} />
             <Route path="/qc" element={<KiemTraQcScreen />} />
+            <Route path="/qr" element={<QuetLoScreen />} />
             <Route
               path="/users"
               element={

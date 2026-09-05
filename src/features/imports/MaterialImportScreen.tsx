@@ -52,7 +52,7 @@ import {
   type MucChon,
 } from "@/design-system";
 import { kg, num, todayISO, viDate } from "@/lib/format";
-import { DailyTaskReminder } from "@/features/shared";
+import { DailyTaskReminder, QrTemLoIn } from "@/features/shared";
 import { KY_OPT, phamViKy, type KyXem } from "@/lib/periodUtils";
 import {
   CalendarRange,
@@ -61,6 +61,7 @@ import {
   Lock,
   LockOpen,
   Pencil,
+  QrCode,
   Plus,
   Scale,
   SlidersHorizontal,
@@ -257,6 +258,7 @@ export default function NhapNguyenLieuScreen() {
 
   /* Ghi chuyến: đầu chuyến ở trên, cả BẢNG loại hàng điền một lượt rồi lưu. */
   const [phien, setPhien] = useState<DauChuyen | null>(null);
+  const [chuyenInTem, setChuyenInTem] = useState<ImportShipment | null>(null);
   const [chuyenIdPhien, setChuyenIdPhien] = useState<string | null>(null);
   const [dongBang, setDongBang] = useState<DongBang[]>([]);
   /** Ngày ghi sổ kéo ngày hàng về theo (khi hai ngày đang đi liền). Sửa tay ngày
@@ -1102,6 +1104,15 @@ export default function NhapNguyenLieuScreen() {
                           Sửa chuyến
                         </Button>
                       )}
+                      {n.chuyen?.lotCode && (
+                        <Button
+                          variant="outline"
+                          onClick={() => setChuyenInTem(n.chuyen)}
+                        >
+                          <QrCode />
+                          In tem QR
+                        </Button>
+                      )}
                     </div>
                   </div>
 
@@ -1548,6 +1559,9 @@ export default function NhapNguyenLieuScreen() {
           pheLieu={pheLieu}
           onClose={() => setXemPhieu(false)}
         />
+      )}
+      {chuyenInTem && (
+        <QrTemLoIn chuyen={chuyenInTem} onClose={() => setChuyenInTem(null)} />
       )}
     </div>
   );

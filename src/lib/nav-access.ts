@@ -10,8 +10,8 @@ import type { Role } from "@/types";
  * Vai trò KHÔNG nằm trong bảng này (giám đốc, phó GĐ, kế toán, admin) = xem
  * đầy đủ — chỉ 2 bộ phận thao tác theo bước bị giới hạn nav cho gọn.
  */
-const DEPT_NHAP_HANG = ["imports", "warehouse", "nxt-nl", "catalog"];
-const DEPT_SAN_XUAT = ["wip", "packaging", "warehouse", "quality", "qc", "catalog"];
+const DEPT_NHAP_HANG = ["imports", "warehouse", "nxt-nl", "qr", "catalog"];
+const DEPT_SAN_XUAT = ["wip", "packaging", "warehouse", "quality", "qc", "qr", "catalog"];
 
 /**
  * Màn DEMO — còn dùng DỮ LIỆU MẪU, chưa nối bảng thật. Tạm CHỈ admin thấy (để

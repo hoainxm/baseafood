@@ -205,7 +205,13 @@ export default function DanhMucScreen() {
       },
       anTrenDienThoai: true,
     },
-    { key: "code", nhan: "Mã nội bộ", anTrenDienThoai: true, viDu: "Tự đặt (nếu cần)" },
+    {
+      key: "code",
+      nhan: "Mã số",
+      anTrenDienThoai: true,
+      goiY: "Nhập số để gọi nhanh. Gõ số này khi chọn mặt hàng là ra tên.",
+      viDu: "VD: 12",
+    },
     {
       key: "finishedGoodCode",
       nhan: "Mã thành phẩm (danh mục kế toán)",
@@ -345,6 +351,7 @@ export default function DanhMucScreen() {
             rows={matHang}
             onChange={setMatHang}
             fields={fMatHang}
+            kiemTraThem={(dang, rows) => trungMaSo(dang, rows, "mặt hàng")}
             taoMoi={() => ({
               id: uid(),
               code: "",

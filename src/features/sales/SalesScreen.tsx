@@ -249,7 +249,7 @@ export default function BanHangScreen() {
 
   const optMatHang: MucChon[] = matHang.map((m) => ({
     value: m.id,
-    label: m.name,
+    label: m.code ? `${m.code} · ${m.name}` : m.name,
     phu: m.code || undefined,
   }));
   const optKhach: MucChon[] = khach.map((k) => ({

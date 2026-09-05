@@ -95,7 +95,11 @@ export default function DongGoiScreen() {
     : `${viDate(tuHieuLuc)} – ${viDate(denHieuLuc)}`;
 
   const tenMH = (id: string) => matHang.find((m) => m.id === id)?.name || "—";
-  const optMatHang: MucChon[] = matHang.map((m) => ({ value: m.id, label: m.name }));
+  const optMatHang: MucChon[] = matHang.map((m) => ({
+    value: m.id,
+    label: m.code ? `${m.code} · ${m.name}` : m.name,
+    phu: m.code || undefined,
+  }));
 
   /* Tồn BTP khả dụng: sản xuất − xuất − bán lẻ block thô − ĐÃ đóng gói. */
   const truBTP = useMemo(

@@ -21,3 +21,14 @@ createRoot(document.getElementById("root")!).render(
     <App />
   </StrictMode>,
 );
+
+// PWA: đăng ký service worker — CHỈ ở bản production (dev bỏ qua để không kẹt cache
+// khi đang sửa). SW network-first nên vẫn nhận bản mới khi có mạng; version.json
+// được bỏ qua trong SW để cơ chế nhắc-bản-mới hoạt động bình thường.
+if (import.meta.env.PROD && "serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/sw.js").catch(() => {
+      /* SW không bắt buộc để app chạy — lỗi đăng ký thì bỏ qua */
+    });
+  });
+}

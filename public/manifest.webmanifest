@@ -1,0 +1,17 @@
+{
+  "name": "Baseafood MES — Quản lý nguyên liệu & sản xuất",
+  "short_name": "Baseafood",
+  "description": "Số hóa nhập nguyên liệu, sản xuất, kho và kiểm tra QC cho Xí nghiệp Baseafood BSF1.",
+  "lang": "vi",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#17529c",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

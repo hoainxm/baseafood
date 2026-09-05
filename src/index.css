@@ -13,6 +13,12 @@ body,
 
 body {
   margin: 0;
+  /* Mobile: chặn double-tap phóng to (vẫn cuộn/pan bình thường), không đổi cỡ chữ
+     khi xoay ngang. Zoom pinch đã tắt ở viewport meta (index.html). App có lối
+     phóng to riêng ở Cài đặt hiển thị. */
+  touch-action: manipulation;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 /* Dropdown ĐÃ ĐÓNG nhưng vẫn nằm trong DOM và VẪN ĂN CLICK.

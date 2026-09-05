@@ -13,6 +13,8 @@ ttl_days: 90
 
 <!-- updated: 2026-09-05 — (họp 2026-09-02 QĐ-8) THÊM route `/qc` "Kiểm tra QC" (features/quality-check, màn THẬT — KHÔNG demoGuard): KIT_NAV icon ClipboardCheck, nhóm nav "Sản xuất", gate qua DEPT_SAN_XUAT (nav-access.ts). ~18 route. -->
 
+<!-- updated: 2026-09-05 — (đợt 2) THÊM route `/qr` "Quét lô (QR)" (features/qr, màn THẬT) — nhóm nav "Kho", gate cả DEPT_NHAP_HANG + DEPT_SAN_XUAT. PWA: index.html thêm manifest + viewport khóa zoom + theme-color; SW đăng ký ở PROD (main.tsx). ~19 route. -->
+
 # Trang & điều hướng
 
 **Có định tuyến (Router).** Ứng dụng sử dụng `react-router-dom` v7 (`HashRouter` để tối ưu chạy offline tại xưởng). Đường dẫn + `NAV` dùng **id tiếng Anh** (`imports`, `sales`, `warehouse`…) — id của mục nav CHÍNH LÀ path (`to={/${id}}`), nên id phải khớp `Route path` trong `App.tsx`, nếu lệch thì menu bấm ra NotFound. Refresh (F5) giữ trạng thái, dùng Back/Forward, deep link như `#/balancing/:periodId`.

@@ -157,3 +157,66 @@ Mỗi khâu gắn một người; Nam soạn biểu mẫu/form trước, rồi c
 Cập nhật kèm theo trạng thái sống: mục **Backlog/Trạng thái** trong [`CLAUDE.md`](../../CLAUDE.md) + [`BAN-GIAO-tiep-theo.md`](../BAN-GIAO-tiep-theo.md).
 
 **Chưa có doc, sẽ tách khi build:** `docs/spec/qc-checklist.md` (QĐ-8) · phần lương/BHXH/nghỉ phép (QĐ-11).
+
+---
+
+## 8. Bổ sung & ưu tiên đợt 2 (yêu cầu 2026-09-05)
+
+Sau khi build xong đợt 1 (QĐ-4/6-lite/8) và chạy migration, chủ dự án bổ sung 6 hạng mục — phần lớn **làm rõ / nâng cấp** các QĐ đã có. Ký hiệu **NR** (new requirement). Trạng thái: ✅ đã có nền · 🔨 làm được ngay · 🧭 cần chốt thiết kế · ⛔ chờ đầu vào.
+
+### NR-1 · Biểu mẫu nhập (phiếu giấy in được) 🧭 — nâng QĐ-1
+Thiết kế **phiếu giấy chuẩn (in A4)** để xưởng ghi tay hằng ngày, đúng bố cục để: ghi tay thống nhất → chụp ảnh OCR (sau) → hoặc gõ vào app web theo đúng thứ tự ô. Hai mẫu: **phiếu nhập nguyên liệu** (bám màn `/imports`) + **phiếu báo cáo thành phẩm ngày** (bám `/wip`). Bám "form các tờ của chị Trúc".
+- Tái dùng được: primitive `PhieuIn` (in A4) để render mẫu trống.
+- **Cần chốt:** bố cục cột chính xác (xin ảnh/bản mẫu tờ giấy của chị Trúc).
+
+### NR-2 · App web nhập cho xưởng 🧭/✅ — làm rõ QĐ-1/QĐ-2/QĐ-5
+Giao diện web nhập liệu **form-first, mobile-friendly** cho người dưới xưởng, khớp biểu mẫu NR-1. **Nền đã có:** 2 giao diện bộ phận (`/imports`, `/wip`) + route-guard theo vai trò (`nav-access.ts`).
+- **Cần chốt:** "app web nhập" = (a) **tinh chỉnh** `/imports`+`/wip` hiện có thành luồng nhập gọn theo bước (khuyến nghị — tái dùng nền), hay (b) **app/PWA tách riêng** cho điện thoại?
+
+### NR-3 · Viết lại danh mục thành phẩm theo form kiểu chế biến 🧭 — nâng QĐ-1 (Chiều C)
+Cấu trúc lại **danh mục thành phẩm** quanh **kiểu chế biến** dạng form, ví dụ nêu: `cắt 2-3:`, `cắt chần:` … Đây là **Chiều C (chuẩn hoá quy cách × chế biến)** trong backlog, liên quan [`spec/bo-quy-cach-che-bien-thanh-pham.md`](../spec/bo-quy-cach-che-bien-thanh-pham.md). Đã có facet `processing_type` (0024/0027) + màn `/wip` gom theo (chế biến × khách).
+- ⚠️ **Ràng buộc bất di:** **KHÔNG đụng 141 mã kế toán** (`thanh-pham.json`); chỉ bổ sung/cấu trúc ở `mat_hang` (danh mục mở).
+- **Cần chốt:** danh sách ĐẦY ĐỦ kiểu chế biến chuẩn (cắt 2-3, cắt chần, luộc, chần, tẩm bột…) + các trường của form mỗi kiểu; "cắt 2-3" nghĩa chính xác (2 da/3 da hay số miếng).
+
+### NR-4 · Gom báo cáo thành phẩm ngày, lưu vết theo người thao tác, gửi → hệ thống 🔨 — nâng QĐ-3/QĐ-5
+Báo cáo sản xuất thành phẩm ngày (`/wip`) cần: (a) gắn **người thao tác** (ai nhập/gửi), (b) hành động **"gửi báo cáo lên hệ thống"**, (c) **lưu vết** (audit) ai gửi lúc nào. Đã có: `/wip` + chốt ngày + `audit_log` (bắt ở `useBang.ghi`, màn `/audit`). Còn: cột/hiển thị **người thao tác** trên báo cáo ngày + màn "Báo cáo TP ngày" gom theo người + nút gửi.
+- **Cần chốt:** "người thao tác" = **tài khoản đăng nhập** (`user_profiles`, tự gắn) — khuyến nghị; luồng "gửi" có khác "chốt ngày" không (có thể gộp: chốt = gửi).
+
+### NR-5 · Mã hoá số cho MỌI danh mục (mở rộng) 🔨 — mở rộng QĐ-4 (đã làm KH/đại lý)
+Mở rộng "mã số → gõ số ra tên" (đã làm cho **khách hàng + đại lý** ở đợt 1) sang **mặt hàng · loại nguyên liệu · (thành phẩm)**. "Phân tích xây dựng tương tự".
+- **Làm được ngay:** Mặt hàng đã có cột `code` → đổi nhãn "Mã số" + kiểm trùng + prefix "‹số› · ‹tên›" ở mọi combobox chọn mặt hàng (`SalesScreen`, `WipProductionScreen`, `PackagingScreen`). Loại NL: **chưa có cột code** → cần migration nhỏ (thêm `code` nullable) nếu muốn mã số. Thành phẩm 141 mã: **đã có `finishedGoodCode`** — dùng luôn, KHÔNG đụng.
+- **Cần chốt:** có thêm mã số cho **loại NL** (cần migration) không, hay chỉ mặt hàng.
+
+### NR-6 · Quản lý theo QR code 🧭 — nâng QĐ-6 (phần QR đã hoãn)
+Đã có **mã lô nội bộ** (`lot_code`, đợt 1). Nay: (a) **render QR** từ `lot_code` (+ thông tin lô), (b) **trang in tem QR** để dán, (c) **quét QR** để tra cứu/xuất theo lô.
+- Cần **thư viện QR** (hiện chưa có dep) — user đã yêu cầu nên bổ sung hợp lý (`qrcode` để render; quét cần thư viện decode + quyền camera).
+- **Cần chốt:** chỉ **IN QR** (đủ để dán, quét bằng app điện thoại bất kỳ — nhẹ) hay cần **QUÉT trong app** (nặng hơn: camera + decode)?
+
+### Bảng tổng hợp trạng thái toàn bộ hạng mục
+
+| Hạng mục | Nguồn | Trạng thái |
+|---|---|---|
+| Mã số KH/đại lý | QĐ-4 | ✅ đã build (đợt 1) |
+| Mã lô nội bộ + ô SSCC | QĐ-6-lite/QĐ-10 | ✅ đã build (đợt 1) |
+| Màn QC checklist chấm điểm | QĐ-8 | ✅ đã build (đợt 1, ảnh để sau) |
+| Chốt tồn → realtime T9 | QĐ-2/C | ✅ ops (đang chạy) |
+| Ranh giới nhập→SX→kho | QĐ-3/D | ✅ đã có (còn G1 leftover→cân đối) |
+| **Mã số mọi danh mục (mặt hàng…)** | **NR-5**/QĐ-4 | 🔨 làm được ngay (mặt hàng); loại NL cần migration nhỏ |
+| **Gom báo cáo TP ngày + người thao tác** | **NR-4**/QĐ-3/5 | 🔨 vừa (thêm người thao tác + màn gom + gửi) |
+| **Biểu mẫu nhập (phiếu giấy)** | **NR-1**/QĐ-1 | 🧭 cần bố cục tờ mẫu |
+| **App web nhập cho xưởng** | **NR-2**/QĐ-1/2/5 | 🧭 chốt: tinh chỉnh màn cũ vs app riêng |
+| **Viết lại danh mục TP theo kiểu chế biến** | **NR-3**/QĐ-1 | 🧭 chốt danh sách kiểu chế biến + form (không đụng 141 mã) |
+| **Quản lý QR code (in/quét)** | **NR-6**/QĐ-6 | 🧭 chốt in-only vs có quét; thêm thư viện QR |
+| Giá bình quân gia quyền | QĐ-7/F | ⛔ chờ chốt PA |
+| OCR chụp phiếu | QĐ-1 | ⛔ chờ hạ tầng Storage |
+| Lương/BHXH/nghỉ phép · điện thoại xưởng | QĐ-11/12 | 🅿️ để sau |
+
+**Đề xuất thứ tự đợt 2 (bám ưu tiên "cái chắc trước"):** NR-5 (mã số mặt hàng) → NR-4 (báo cáo TP + người thao tác) → NR-1/NR-3 (biểu mẫu + form kiểu chế biến, đi cùng nhau) → NR-2 (tinh chỉnh app web nhập) → NR-6 (QR in trước, quét sau).
+
+### Tiến độ đợt 2 (cập nhật 2026-09-05)
+Chủ dự án chốt hướng (hỏi-đáp): NR-5 = chỉ mặt hàng (không migration) · NR-6 = QR **in + quét** · NR-2 = tinh chỉnh màn hiện có · NR-3 = **tái cấu trúc lớn → cần spec trước**. Bổ sung ưu tiên: **PWA + mobile-first + tắt zoom**.
+- ✅ **PWA + tắt zoom + mobile** (ưu tiên hiện hành): `public/manifest.webmanifest` + `public/sw.js` (network-first, bỏ qua version.json, chỉ đăng ký ở PROD) + icons 192/512 + `index.html` (viewport `user-scalable=no, maximum-scale=1`, theme-color, apple metas) + `body{touch-action:manipulation}`. Cài được như app "Baseafood", khóa pinch/double-tap. Đây là **nền của NR-2** (app web nhập = dùng chính app hiện có, mobile-first).
+- ✅ **NR-5 mã số mặt hàng:** đổi nhãn "Mã nội bộ"→"Mã số" ở tab Mặt hàng + kiểm trùng (`trungMaSo`); combobox chọn mặt hàng prefix "‹số› · ‹tên›" ở Bán hàng/Sản xuất/Đóng gói (gõ số ra tên). Không migration.
+- ✅ **NR-4 người thao tác trên báo cáo TP ngày:** cột `production_wips.operator` (migration `0037`) gắn họ tên tài khoản đăng nhập (`useAuth().fullName`) khi lưu; hiện cột "Người ghi" ở báo cáo `/wip`. "Gửi → hệ thống" = lưu + chốt ngày (đã có) + audit_log. *(Còn có thể mở rộng: màn gom báo cáo TP theo người + nút "gửi" riêng nếu cần.)*
+- ✅ **NR-6 QR in + quét:** thêm thư viện `qrcode` (render) + `html5-qrcode` (quét camera). (a) **In tem QR** mã lô ở màn Nhập hàng (nút "In tem QR" mỗi chuyến → `QrTemLoIn` phủ A4 in được, `src/features/shared`); (b) **màn Quét/tra lô** `/qr` (`src/features/qr`): quét camera HOẶC gõ tay mã lô → tra chuyến nhập + dòng nguyên liệu của lô. Helper `src/lib/qr.ts`. Verify: qrcode render ra PNG hợp lệ; màn /qr + html5-qrcode nạp không lỗi; **quét camera cần test trên máy thật** (preview không có camera). Nav "Quét lô (QR)" nhóm Kho, gate cả 2 bộ phận.
+- ⏭️ **Còn lại đợt 2:** NR-3 (spec tái cấu trúc DM thành phẩm — chờ **danh sách kiểu chế biến** + nghĩa "cắt 2-3"/"cắt chần") · NR-1 (biểu mẫu giấy — chờ **bố cục tờ mẫu của chị Trúc**).

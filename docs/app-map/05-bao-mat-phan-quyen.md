@@ -11,6 +11,8 @@ ttl_days: 90
 
 <!-- updated: 2026-09-05 — (họp 2026-09-02) màn `/qc` thêm vào `DEPT_SAN_XUAT` (nav-access.ts) → bộ phận sản xuất/kỹ thuật thấy; bảng `qc_checklists`,`qc_locks` đã vào mảng siết RLS của `0021` (nhớ chạy lại 0021 sau 0036). Phân quyền vẫn ở tầng app (nav-access) — RLS server chưa siết theo vai trò. -->
 
+<!-- updated: 2026-09-05 — (đợt 2) route `/qr` (Quét lô) thêm vào CẢ `DEPT_NHAP_HANG` + `DEPT_SAN_XUAT` (nav-access.ts) → cả hai bộ phận quét/tra lô được. PWA service worker (public/sw.js) network-first, chỉ đăng ký ở PROD, KHÔNG cache version.json. Quét QR dùng camera → cần HTTPS + quyền camera trên máy thật. -->
+
 # Bảo mật & phân quyền
 
 ## Trạng thái: CÓ đăng nhập (Supabase Auth), migration siết RLS ĐÃ VIẾT — chờ chạy

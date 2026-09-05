@@ -12,6 +12,8 @@ ttl_days: 90
 
 <!-- updated: 2026-09-04 — ĐÃ BUILD (họp [2026-09-02](../trien-khai/hop-2026-09-02-form-nhap-trace-gia-qc.md) QĐ-4): TÁI DÙNG cột `code` sẵn có (Customer/Supplier) — đổi nhãn "Mã nội bộ"→"Mã số" ở tab Khách hàng + Đại lý (KHÔNG đổi tab Mặt hàng), thêm kiểm TRÙNG số qua prop `kiemTraThem` của DanhMucCrud (helper `trungMaSo` trong CatalogScreen). Ở màn Nhập hàng/Bán hàng, combobox prefix "‹số› · ‹tên›" nên gõ số ra tên (optKhach thêm code vào phu). KHÔNG migration. -->
 
+<!-- updated: 2026-09-05 — (NR-5) MỞ RỘNG mã số sang tab MẶT HÀNG: đổi nhãn "Mã nội bộ"→"Mã số" (dùng cột `code` sẵn có) + kiểm TRÙNG (`trungMaSo`, dùng chung với KH/đại lý); combobox chọn mặt hàng prefix "‹số› · ‹tên›" ở Bán hàng/Sản xuất/Đóng gói. KHÔNG đụng 141 mã kế toán (finishedGoodCode giữ nguyên). -->
+
 # Danh mục (master data)
 
 Một màn, **5 tab**: Mặt hàng · Khách hàng · Đại lý · Loại nguyên liệu · Thành phẩm (141 mã).

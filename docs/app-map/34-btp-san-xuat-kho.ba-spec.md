@@ -14,6 +14,8 @@ status: ba-spec — ĐÃ BUILD v1 (migration 0011 + 3 màn WipProductionScreen/R
 
 <!-- updated: 2026-09-04 — ĐỊNH HƯỚNG (chưa build) từ họp [2026-09-02](../trien-khai/hop-2026-09-02-form-nhap-trace-gia-qc.md) QĐ-6: trace mẻ sản xuất ↔ lô nguyên liệu qua mã QR (quét/nhập series khi lấy ra SX); sinh mã lúc nhập hoặc sau sơ chế+đông (điểm mở). Ăn khớp cấp lô Phương án A ở spec/import-xnt-kho-cutover.md. -->
 
+<!-- updated: 2026-09-05 — (NR-4) màn ghi thành phẩm /wip: mỗi dòng gắn NGƯỜI THAO TÁC (cột `production_wips.operator`, `0037`) = họ tên tài khoản đăng nhập (`useAuth().fullName`) lúc lưu; hiện cột "Người ghi" trên báo cáo ngày. Lưu vết ai gửi báo cáo TP lên hệ thống (kèm audit_log ở chốt). -->
+
 # BA-SPEC — Module WIP: Sản xuất BTP · Kho dự trữ · Đơn đặt · Xuất container
 
 Số hoá **vòng lặp cốt lõi chưa số hoá** của BSF1: BTP làm ra ngày → cấp đông → kho dự trữ → gom đủ đơn đặt → xuất container. Đây là nơi **tồn cuối kỳ sai** hiện nay (ghi tay) → kế toán chốt số sai. Spec này là **oracle hành vi** (AC), KHÔNG nói UI, KHÔNG code. Pha sau: `ui-design-logic` → build.

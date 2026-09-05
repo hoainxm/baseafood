@@ -5,6 +5,8 @@ ttl_days: 90
 
 <!-- updated: 2026-09-05 — (họp 2026-09-02 QĐ-8) THÊM feature `src/features/quality-check/` (QcChecklistScreen + index) — màn Kiểm tra QC chấm điểm cuối ngày, route `/qc`. Chỉ import từ `@/design-system` + hook `catalogRepo` (useQcChecklists/useQcLocks). -->
 
+<!-- updated: 2026-09-05 — (đợt 2) THÊM `src/features/qr/` (QrTraCuuScreen — quét/tra lô QR, route /qr) + `src/features/shared/QrTemLoIn.tsx` (tem QR in được, export từ shared) + `src/lib/qr.ts` (render QR dataURL, bọc `qrcode`). PWA: `public/manifest.webmanifest` + `public/sw.js` + `public/icons/`. Dep mới: `qrcode`, `html5-qrcode`. -->
+
 # Cấu trúc mã nguồn
 
 ```

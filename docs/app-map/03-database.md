@@ -17,6 +17,8 @@ ttl_days: 90
 
 <!-- updated: 2026-09-05 — (họp 2026-09-02) THÊM: `0035_shipment_lo_sscc.sql` — 2 cột nullable `import_shipments.lot_code` + `sscc_code` (mã lô nội bộ + SSCC, QĐ-6/QĐ-10). `0036_qc_checklist.sql` — 2 bảng MỚI `qc_checklists` (chỉ tiêu QC ngày×xưởng: result dat/tam/khong-dat, score, backdate_reason) + `qc_locks` (chốt ngày, hình dạng như production_locks) — QĐ-8. Đã đăng ký `qc_checklists`,`qc_locks` vào mảng `ds` của `0021` (chạy lại 0021). Migration cao nhất nay = 0036. -->
 
+<!-- updated: 2026-09-05 — (đợt 2) THÊM `0037_production_operator.sql`: cột nullable `production_wips.operator` (họ tên người thao tác ghi dòng — NR-4). Không đụng bảng khác, production_wips đã trong RLS 0021. Migration cao nhất nay = 0037. -->
+
 # Cơ sở dữ liệu & migration
 
 Postgres qua Supabase. **16 bảng**, không có view, không có RPC, không có edge function, không có cron.

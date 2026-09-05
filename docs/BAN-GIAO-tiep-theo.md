@@ -11,7 +11,7 @@
 - **Mô hình tồn kho: 2 KHO** (BTP dự trữ + TP đóng gói) ở `lib/inventory.ts` (`tinhTon` với `banLe = [...locBanLe(bán, KHO_BAN_LE), ...dongGoiTruTon(đóng gói)]`, `tinhTonTP` cho kho TP) + `lib/inventoryFinished.ts` (`tinhSoTonTP`). Đã kiểm chứng: Tồn Kho dự trữ == Tồn cuối NXT; handoff đơn đặt không đếm 2 lần; kho TP tách riêng.
 
 ## 2. Migration cần chạy trên Supabase (theo thứ tự)
-`0024_ton_dau_thanh_pham` → `0025_nhat_ky_thao_tac` → `0026_nl_vao_cho_phep_khong` → `0027_products_processing_type` → `0028_production_leftover` → `0029_dong_goi_thanh_pham` → `0030…0034` (customer/components, split/block, nxt snapshot, wip processing_type) → **`0035_shipment_lo_sscc`** (2 cột nullable mã lô + SSCC vào `import_shipments`) → **`0036_qc_checklist`** (2 bảng mới `qc_checklists` + `qc_locks`) → **chạy lại `0021_siet_rls_tieng_anh`** (nay bao thêm `qc_checklists`,`qc_locks`; gồm 2 tồn đầu + `packagings`; `audit_log` giữ RLS riêng ở `0025`).
+`0024_ton_dau_thanh_pham` → `0025_nhat_ky_thao_tac` → `0026_nl_vao_cho_phep_khong` → `0027_products_processing_type` → `0028_production_leftover` → `0029_dong_goi_thanh_pham` → `0030…0034` (customer/components, split/block, nxt snapshot, wip processing_type) → **`0035_shipment_lo_sscc`** (2 cột nullable mã lô + SSCC vào `import_shipments`) → **`0036_qc_checklist`** (2 bảng mới `qc_checklists` + `qc_locks`) → **`0037_production_operator`** (cột `production_wips.operator`) → **chạy lại `0021_siet_rls_tieng_anh`** (nay bao thêm `qc_checklists`,`qc_locks`; gồm 2 tồn đầu + `packagings`; `audit_log` giữ RLS riêng ở `0025`).
 ⛔ **ĐỪNG chạy:** `0002` (phá SDFactory), `0003` (lỗi thời), `0023` (reset+seed demo cân đối).
 
 ## 3. Go-live — đưa vào chạy hằng ngày (người dùng làm, session hỗ trợ)

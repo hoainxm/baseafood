@@ -1,7 +1,8 @@
 > Load khi: thêm/sửa bảng, cột, migration, hay đọc lỗi Postgres lạ.
 covers: supabase/migrations/**, docs/ops/supabase-setup.md
-last_verified: 2026-09-05
+last_verified: 2026-09-07
 ttl_days: 90
+<!-- updated: 2026-09-07 — thêm 0039 (qc_checklists.photo_paths jsonb, nullable): lưu MẢNG đường dẫn ảnh QC (QĐ-8) trên Supabase Storage bucket "qc" (private, xem qua signed URL). Chỉ-thêm-cột, idempotent, có ROLLBACK. Client nén→upload→signed URL ở src/lib/storage.ts + nút chụp/xem/xóa ảnh mỗi chỉ tiêu ở /qc. Ảnh là phụ, không chặn chốt ngày. Xem docs/ops/supabase-storage.md + 04-tang-du-lieu (BANG_QC_CHECKLIST). Migration mới nhất = 0039. -->
 <!-- updated: 2026-08-28 — thêm 0034 (BACKFILL DỮ LIỆU, không đổi schema): điền products.processing_type suy TỪ TÊN cho dòng còn trống (CASE mirror lib/catalogRepo.suyKieuCheBien, khớp trước thắng) + INSERT 8 mặt hàng thật thiếu ở 141 (id 'mh-bs-*', ON CONFLICT DO NOTHING). Idempotent, có ROLLBACK. Đối xứng seed local seedProducts. KHÔNG đụng 141 mã kế toán. Xem 32-danh-muc. -->
 <!-- updated: 2026-08-27 — thêm 0033 (production_wips.processing_type, text default ''): KIỂU CHẾ BIẾN của nhóm ghi thành phẩm ngày /wip (gom theo chế biến × khách như sổ giấy). CHỈ-THÊM cột nullable/default, idempotent. Xem 34-btp ba-spec + repo.ts BANG_WIP_PRODUCTION. -->
 <!-- updated: 2026-08-27 — thêm 0032 (nxt_snapshots: snapshot Xuất–Nhập–Tồn nhập từ báo cáo THẬT của xí nghiệp, hạt Kho × Mã hàng × Kỳ; cột opening/in/out + giá trị; tồn cuối SUY ở app không lưu). CHỈ-THÊM bảng, idempotent, RLS anon+authenticated (chưa vào vòng siết 0021). Xem 04-tang-du-lieu (BANG_NXT_SNAPSHOT) + màn /nxt-kho. -->

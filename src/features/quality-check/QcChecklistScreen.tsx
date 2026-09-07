@@ -5,11 +5,12 @@
 // chú, rồi CHỐT NGÀY. Sửa sau khi chốt hoặc ghi cho ngày cũ = ghi bù (bắt lý do).
 // Ảnh kèm: để sau (chưa có hạ tầng lưu ảnh).
 // ============================================================
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { QcChecklistItem, QcResult, Workshop } from "@/types";
 import { isBackdatedQc } from "@/types";
 import { newId } from "@/lib/store";
 import { useQcChecklists, useQcLocks } from "@/lib/catalogRepo";
+import { taiAnhLen, urlAnh, xoaAnh, coLuuAnh } from "@/lib/storage";
 import { todayISO, viDate } from "@/lib/format";
 import {
   Field,
@@ -23,7 +24,7 @@ import {
   notify,
   type LuaChon,
 } from "@/design-system";
-import { Lock, Plus } from "lucide-react";
+import { Camera, Lock, Plus, X } from "lucide-react";
 
 const XUONG_OPT: LuaChon[] = [
   { value: "Đông", label: "Đông" },
@@ -57,6 +58,7 @@ interface Dong {
   result: QcResult | "";
   score: number | null;
   note: string;
+  photoPaths: string[]; // đường dẫn ảnh đã tải (Supabase Storage bucket "qc")
 }
 
 export default function QcChecklistScreen() {
@@ -96,6 +98,7 @@ export default function QcChecklistScreen() {
           result: (cu?.result ?? "") as QcResult | "",
           score: cu?.score ?? null,
           note: cu?.note ?? "",
+          photoPaths: cu?.photoPaths ?? [],
         };
       })
     );
@@ -112,7 +115,10 @@ export default function QcChecklistScreen() {
       notify.canhBao("Chỉ tiêu này đã có trong danh sách");
       return;
     }
-    setDongs((ds) => [...ds, { criterion: ten, result: "", score: null, note: "" }]);
+    setDongs((ds) => [
+      ...ds,
+      { criterion: ten, result: "", score: null, note: "", photoPaths: [] },
+    ]);
     setThemTen("");
   };
 
@@ -144,6 +150,7 @@ export default function QcChecklistScreen() {
       score: d.score,
       note: d.note,
       backdateReason: ghiBu ? lyDoGhiBu.trim() : "",
+      photoPaths: d.photoPaths,
     }));
     const giuLai = rows.filter((r) => !(r.date === ngay && r.workshop === xuong));
     persist([...giuLai, ...moi]);
@@ -283,6 +290,13 @@ export default function QcChecklistScreen() {
                   />
                 </Field>
               </div>
+              {coLuuAnh && (
+                <AnhChiTieu
+                  paths={d.photoPaths}
+                  onChange={(p) => doiDong(i, { photoPaths: p })}
+                  khoa={dangKhoa}
+                />
+              )}
             </div>
           ))}
         </div>
@@ -315,6 +329,127 @@ export default function QcChecklistScreen() {
           Lưu chấm điểm
         </Button>
       </div>
+    </div>
+  );
+}
+
+/* ---------- Ảnh của một chỉ tiêu QC (chụp/chọn → tải Storage → xem signed URL) ---------- */
+
+/** Ô ảnh: tự lấy signed URL (có hạn) từ path rồi hiện; bấm mở ảnh lớn. */
+function AnhThumb({ path, onXoa }: { path: string; onXoa?: () => void }) {
+  const [url, setUrl] = useState<string | null>(null);
+  useEffect(() => {
+    let con = true;
+    urlAnh(path).then((u) => con && setUrl(u));
+    return () => {
+      con = false;
+    };
+  }, [path]);
+  return (
+    <div className="relative">
+      {url ? (
+        <a href={url} target="_blank" rel="noreferrer">
+          <img
+            src={url}
+            alt="Ảnh QC"
+            className="size-20 rounded-md border-2 border-border object-cover"
+          />
+        </a>
+      ) : (
+        <div className="flex size-20 items-center justify-center rounded-md border-2 border-dashed border-border bg-muted text-sm text-muted-foreground">
+          …
+        </div>
+      )}
+      {onXoa && (
+        <button
+          type="button"
+          onClick={onXoa}
+          aria-label="Bỏ ảnh"
+          className="absolute -right-2 -top-2 flex size-6 items-center justify-center rounded-full bg-destructive text-destructive-foreground"
+        >
+          <X className="size-4" aria-hidden />
+        </button>
+      )}
+    </div>
+  );
+}
+
+/** Khối ảnh của một chỉ tiêu: các thumbnail + nút "Chụp / chọn ảnh" (ẩn khi đã chốt). */
+function AnhChiTieu({
+  paths,
+  onChange,
+  khoa,
+}: {
+  paths: string[];
+  onChange: (paths: string[]) => void;
+  khoa: boolean;
+}) {
+  const [dangTai, setDangTai] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const chon = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    setDangTai(true);
+    const them: string[] = [];
+    for (const f of Array.from(files)) {
+      const p = await taiAnhLen(f);
+      if (p) them.push(p);
+    }
+    setDangTai(false);
+    if (inputRef.current) inputRef.current.value = "";
+    if (them.length) {
+      onChange([...paths, ...them]);
+      notify.daLuu(`Đã tải ${them.length} ảnh`);
+    } else {
+      notify.canhBao("Không tải được ảnh — thử lại");
+    }
+  };
+
+  return (
+    <div className="space-y-2">
+      {(paths.length > 0 || !khoa) && (
+        <p className="text-sm text-muted-foreground">Ảnh minh chứng (nếu có)</p>
+      )}
+      {paths.length > 0 && (
+        <div className="flex flex-wrap gap-3">
+          {paths.map((p) => (
+            <AnhThumb
+              key={p}
+              path={p}
+              onXoa={
+                khoa
+                  ? undefined
+                  : () => {
+                      void xoaAnh(p); // xóa file khỏi Storage; bỏ path khỏi dòng ngay
+                      onChange(paths.filter((x) => x !== p));
+                    }
+              }
+            />
+          ))}
+        </div>
+      )}
+      {!khoa && (
+        <>
+          <input
+            ref={inputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            multiple
+            hidden
+            onChange={(e) => chon(e.target.files)}
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => inputRef.current?.click()}
+            disabled={dangTai}
+          >
+            <Camera aria-hidden />
+            {dangTai ? "Đang tải ảnh…" : "Chụp / chọn ảnh"}
+          </Button>
+        </>
+      )}
     </div>
   );
 }

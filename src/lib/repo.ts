@@ -689,6 +689,9 @@ export const BANG_QC_CHECKLIST: AnhXaBang<QcChecklistItem> = {
     score: x.score,
     note: x.note,
     backdate_reason: x.backdateReason,
+    // Migration 0039 đã chạy → gửi LUÔN (như leftover_by_material 0038). Gửi có
+    // điều kiện sẽ KHÔNG xoá được ảnh khi bỏ hết (upsert onConflict giữ giá trị cũ).
+    photo_paths: x.photoPaths ?? [],
   }),
   fromRow: (r) => ({
     id: s(r.id),
@@ -699,6 +702,7 @@ export const BANG_QC_CHECKLIST: AnhXaBang<QcChecklistItem> = {
     score: n(r.score),
     note: s(r.note),
     backdateReason: s(r.backdate_reason),
+    photoPaths: Array.isArray(r.photo_paths) ? (r.photo_paths as string[]) : [],
   }),
 };
 

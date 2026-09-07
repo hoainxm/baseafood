@@ -187,6 +187,9 @@ export interface QcChecklistItem {
   score: number | null; // điểm tùy chọn (0–10), trống nếu không chấm điểm
   note: string;
   backdateReason: string; // bắt buộc khi ghi bù (ngày cũ hoặc ngày đã chốt)
+  /** Đường dẫn ảnh trong Supabase Storage bucket "qc" (mảng path). Migration 0039.
+   *  Ảnh là phụ — không chặn chốt ngày; xem qua signed URL (lib/storage.ts). */
+  photoPaths?: string[];
 }
 
 /** Ghi QC cho ngày trước hôm nay = ghi bù (bắt buộc lý do). */

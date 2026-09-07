@@ -1,5 +1,14 @@
 # Hạ tầng lưu ảnh (Supabase Storage) — QĐ-8 ảnh QC + nền OCR (QĐ-1)
 
+> **✅ ĐÃ BUILD ảnh QC (2026-09-07):** bucket tên **`qc`** (chủ dự án tạo, private +
+> RLS authenticated đã chạy) · migration `0039_qc_photos.sql` (cột
+> `qc_checklists.photo_paths jsonb`) · `src/lib/storage.ts` (nén→upload→signed URL,
+> hằng `BUCKET="qc"`) · nút "Chụp / chọn ảnh" + xem/xóa ảnh mỗi chỉ tiêu ở màn `/qc`
+> (`QcChecklistScreen`, ẩn khi `!supabase`). Đã verify end-to-end trên bucket thật.
+> **Lưu ý:** bucket tên `qc` (KHÔNG phải `bsf-anh` như mẫu mục 1–2 bên dưới) —
+> policy RLS check `bucket_id = 'qc'`. OCR phiếu tay (QĐ-1) vẫn để sau, dùng lại
+> `lib/storage.ts` cùng bucket, thư mục `phieu-nhap/`.
+
 > Load khi: cần lưu **ảnh** (ảnh QC chấm điểm cuối ngày, ảnh phiếu tay chụp để
 > OCR, ảnh chứng từ). Dùng **Supabase Storage** — cùng dự án Supabase đang chạy,
 > **không cần dịch vụ mới, không cần key mới**.

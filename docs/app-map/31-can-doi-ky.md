@@ -1,7 +1,9 @@
 > Load khi: sửa màn Cân đối, lưới theo ngày, công thức định mức/lãi lỗ, hay bảng in A4.
 covers: src/features/balancing/BalancingScreen.tsx, src/features/balancing/usePeriodGrid.ts, src/features/balancing/MaterialGrid.tsx, src/features/balancing/WipGrid.tsx, src/features/balancing/gridDialogs.tsx, src/features/balancing/BalancingTable.tsx, src/lib/balancingCalc.ts, src/lib/balancingGrid.ts, src/design-system/patterns/EditableGrid.tsx
-last_verified: 2026-08-22
+last_verified: 2026-09-05
 ttl_days: 90
+<!-- re-verified: 2026-09-05 — calculateBalancing (balancingCalc.ts) chữ ký + công thức khớp source (KHÔNG đổi ở A3); carryOver âm=đông gửi / dương=xả đông khớp inventoryMaterial.ts:143-148. -->
+<!-- updated: 2026-09-05 — (A3 khép vòng G1) inventoryMaterial.tinhSoTonNL nhận thêm `locks: DailyLock[]` + trả `conDoSX` mỗi kỳ: cộng còn dở SX (production_locks.leftover_by_material, mig 0038) cùng họ NL + ngày chốt trong kỳ, vào ĐÔNG GỬI. Tồn cuối = tồn đầu + đông gửi + CÒN DỞ SX − xả đông. /nxt-nl thêm thẻ + cột "Còn dở SX (+kho)". calculateBalancing KHÔNG đổi. ⚠️ conDoSX là cột RIÊNG (không lẫn carryOver kế toán tự khai) vì quy tắc "chia NL cho từng bảng" xí nghiệp CHƯA chốt → có thể cộng đôi nếu khai cả hai chỗ; giữ tách để đối soát. -->
 <!-- re-verified: 2026-08-22 14:00 — Tổng = Σ ngày + chuyển kỳ (types.ts:252 sumGridRow); usePeriodGrid.ts:524-548 ÉP quantity_kg = h.tong cho MỌI dòng (kể cả nhập tay) rồi ghi xuống kho. Dùng khi sửa seed 0023 per-day. -->
 <!-- ✅ CHỐT 2026-08-22 (kế toán xí nghiệp): '2 da ncls' số THẬT = 2.218 (cột Lượng), Lãi 242.346.218 là số chốt. Per-day file ghi THIẾU (cộng ngày chỉ 1.109) — KHÔNG phải Lượng chép đôi. Sửa lại ví dụ ở line 57 cho đúng. Seed 0023: ncls = 2.218, bù 1.109 vào carry. -->
 <!-- per-day reconcile Σ ngày + chuyển kỳ = Lượng ở 23/24 dòng (đối chiếu file thật 2026-08-22); chỉ ncls per-day thiếu. -->
@@ -145,7 +147,8 @@ Cộng vào Tổng của dòng (`sumGridRow = Σ ngày + chuyển kỳ`) — ki�
 Cột "Chuyển kỳ" chính là dòng vào/ra của **kho đông dự trữ nguyên liệu**. Màn **Tồn kho NL** (`/nxt-nl`, [`features/reports/MaterialNxtScreen.tsx`](../../src/features/reports/MaterialNxtScreen.tsx)) suy sổ Nhập–Xuất–Tồn nguyên liệu (kg thuần) thẳng từ đây, không thêm bản ghi nhập tay:
 
 - `carryOverKg < 0` (đông gửi) = **NHẬP** vào kho tồn · `carryOverKg > 0` (xả đông/nhận chuyển kỳ) = **XUẤT** khỏi kho tồn.
-- **Tồn cuối = Tồn đầu + Đông gửi − Xả đông**; kỳ sau kế thừa tồn cuối kỳ trước (chuỗi theo `hoNguyenLieu`). Kỳ đầu tiên của mỗi họ lấy tồn đầu từ bảng `material_opening_stock` (khai tay, migration `0022`).
+- **Còn dở SX (`conDoSX`, khép vòng G1, mig 0038):** khi chốt ngày SX (`/wip`), tổ trưởng ghi NL chưa chế biến hết đem lưu kho, **tách theo loại NL** (`production_locks.leftover_by_material`). Sổ cộng phần cùng họ NL + ngày chốt trong kỳ vào **đông gửi** → +NHẬP kho tồn. Giữ cột RIÊNG "Còn dở SX" ở `/nxt-nl` để đối soát, **không lẫn** với "Chuyển kỳ" (kế toán tự khai) — quy tắc chia NL cho từng bảng CHƯA chốt nên hai chỗ có thể cộng đôi nếu khai cả hai.
+- **Tồn cuối = Tồn đầu + Đông gửi + Còn dở SX − Xả đông**; kỳ sau kế thừa tồn cuối kỳ trước (chuỗi theo `hoNguyenLieu`). Kỳ đầu tiên của mỗi họ lấy tồn đầu từ bảng `material_opening_stock` (khai tay, migration `0022`).
 - **Tồn cuối < 0** = xả đông nhiều hơn số đang trữ ⇒ chắc chắn sai ghi chép; màn gọi tên (badge + banner đỏ), đúng luật "màn tự giải thích".
 - Hàm thuần: [`lib/inventoryMaterial.ts`](../../src/lib/inventoryMaterial.ts) (`tinhSoTonNL` / `tongSoTonNL`) — quy tắc chính xác nằm DUY NHẤT ở đây, **phải đối chiếu tay với số thật** (bạch tuộc 2 da 21–25/07) trước khi tin.
 - "Nhập tươi" (từ `material_imports`) đi kèm làm bối cảnh để phủ toàn bộ NL mỗi ngày; phần lớn chế biến ngay nên không đọng thành tồn — chỉ phần cấp đông (đông gửi) mới ở lại kho.

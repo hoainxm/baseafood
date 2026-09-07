@@ -163,8 +163,14 @@ export interface DailyLock {
   totalKgAtLock: number;
   reopenReason: string;
   note: string;
-  /** Chỉ production_locks (migration 0028): nguyên liệu còn dở cuối ngày đem lưu kho (kg). */
+  /** Chỉ production_locks (migration 0028): nguyên liệu còn dở cuối ngày đem lưu kho (kg) — tổng. */
   leftoverKg?: number;
+  /**
+   * Chỉ production_locks (migration 0038): còn dở tách theo loại nguyên liệu
+   * `{ "<tên loại NL>": kg }`. Sổ NXT nguyên liệu cộng phần này vào "đông gửi" kỳ
+   * tương ứng (khép vòng G1). Tổng của map = leftoverKg.
+   */
+  leftoverByMaterial?: Record<string, number>;
 }
 
 /* ---------- QC checklist chấm điểm cuối ngày (họp 2026-09-02, QĐ-8) ---------- */

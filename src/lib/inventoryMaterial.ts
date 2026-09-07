@@ -8,6 +8,7 @@ import type {
   BalancingInputItem,
   MaterialImportItem,
   MaterialOpeningStock,
+  DailyLock,
   DailyQuantities,
   Workshop,
 } from "@/types";
@@ -28,6 +29,14 @@ import { hoNguyenLieu, cungHoNguyenLieu, ngayTrongKy } from "@/lib/balancingGrid
  *   - carryOverKg > 0  = XẢ ĐÔNG   → phần lấy từ kỳ trước ra dùng, −khỏi kho tồn.
  * Nên tồn cuối kỳ này = phần "nhận chuyển kỳ" mà kỳ sau lấy về — khép vòng mà
  * không ai phải mở file kỳ cũ chép tay.
+ *
+ * CÒN DỞ SẢN XUẤT (khép vòng G1, migration 0038): khi chốt ngày SX, tổ trưởng
+ * ghi NL chưa chế biến hết đem lưu kho, TÁCH THEO loại NL (production_locks
+ * .leftover_by_material). Sổ này cộng phần còn dở vào ĐÔNG GỬI của kỳ có ngày
+ * chốt rơi trong khoảng kỳ + cùng họ NL — giữ RIÊNG cột `conDoSX` để đối chiếu
+ * (đừng lẫn với "Chuyển kỳ" kế toán tự khai). ⚠️ Nếu kế toán ĐỒNG THỜI khai
+ * carryOver cho cùng lô, hai chỗ sẽ cộng đôi — cột riêng để thấy mà đối soát;
+ * quy tắc "chia NL cho từng bảng" xí nghiệp CHƯA chốt (31-can-doi-ky §State).
  *
  * "Nhập tươi" (material_imports) đi kèm làm bối cảnh để sổ phủ TOÀN BỘ nguyên
  * liệu mỗi ngày; phần lớn NL tươi chế biến ngay trong kỳ nên không đọng thành
@@ -50,8 +59,9 @@ export interface SoTonNLKy {
   endDate: string;
   tonDau: number; // kho đông đầu kỳ (kế thừa kỳ trước / tồn đầu khai tay)
   dongGui: number; // + vào kho tồn (Σ |carryOverKg<0|)
+  conDoSX: number; // + vào kho tồn: còn dở SX chốt ngày (0038), cùng họ NL, ngày trong kỳ
   xaDong: number; // − khỏi kho tồn (Σ carryOverKg>0)
-  tonCuoi: number; // tonDau + dongGui − xaDong
+  tonCuoi: number; // tonDau + dongGui + conDoSX − xaDong
   nhapTuoi: number; // Σ nhập tươi trong kỳ (bối cảnh, không vào kho tồn)
   theoNgayNhap: DailyQuantities; // nhập tươi theo ngày (cho báo cáo theo ngày)
   canhBaoAm: boolean; // tonCuoi < 0 → lỗi ghi chép
@@ -87,6 +97,64 @@ function tonDauKhaiTay(
     .reduce((s, o) => s + (o.quantityKg || 0), 0);
 }
 
+/**
+ * Còn dở SX (0038) rơi vào một kỳ: các lần chốt ngày SX có ngày chốt trong kỳ,
+ * cộng phần leftover của loại NL cùng họ với kỳ. Xưởng lọc như nhập tươi.
+ */
+function conDoTrongKy(
+  locks: DailyLock[],
+  ky: BalancingPeriod,
+  workshop?: Workshop,
+): number {
+  const ngay = new Set(ngayTrongKy(ky));
+  if (ngay.size === 0) return 0;
+  let tong = 0;
+  for (const lk of locks) {
+    if (workshop && lk.workshop !== workshop) continue;
+    if (!ngay.has(lk.lockDate)) continue;
+    const lb = lk.leftoverByMaterial;
+    if (!lb) continue;
+    for (const [ten, v] of Object.entries(lb)) {
+      if (cungHoNguyenLieu(ten, ky.materialTypeName)) tong += Number(v) || 0;
+    }
+  }
+  return tong;
+}
+
+/**
+ * Còn dở SX (0038) KHÔNG khớp kỳ nào: leftover ghi ở ngày chốt mà không có kỳ cân
+ * đối nào (cùng họ NL) phủ ngày đó → sẽ KHÔNG vào tồn (rơi ra ngoài). Trả tổng kg
+ * bị rớt trong khoảng ngày/xưởng đang xem để màn gọi tên (không giấu số như tồn âm).
+ */
+export function conDoChuaKhopKy(
+  periods: BalancingPeriod[],
+  locks: DailyLock[],
+  range?: { tuNgay?: string; denNgay?: string; workshop?: Workshop },
+): number {
+  const workshop = range?.workshop;
+  const ngayCuaKy = periods.map((ky) => ({
+    ky,
+    ngay: new Set(ngayTrongKy(ky)),
+  }));
+  let chuaKhop = 0;
+  for (const lk of locks) {
+    if (workshop && lk.workshop !== workshop) continue;
+    if (range?.tuNgay && lk.lockDate < range.tuNgay) continue;
+    if (range?.denNgay && lk.lockDate > range.denNgay) continue;
+    const lb = lk.leftoverByMaterial;
+    if (!lb) continue;
+    for (const [ten, v] of Object.entries(lb)) {
+      const kgv = Number(v) || 0;
+      if (kgv <= 0) continue;
+      const khop = ngayCuaKy.some(
+        (p) => p.ngay.has(lk.lockDate) && cungHoNguyenLieu(ten, p.ky.materialTypeName),
+      );
+      if (!khop) chuaKhop += kgv;
+    }
+  }
+  return chuaKhop;
+}
+
 /** Nhập tươi theo ngày của một kỳ: gom material_imports cùng họ NL, ngày trong kỳ. */
 function nhapTuoiTheoNgay(
   ky: BalancingPeriod,
@@ -117,6 +185,7 @@ export function tinhSoTonNL(
   inputs: BalancingInputItem[],
   imports: MaterialImportItem[],
   opening: MaterialOpeningStock[],
+  locks: DailyLock[],
   range?: { tuNgay?: string; denNgay?: string; workshop?: Workshop },
 ): SoTonNLKy[] {
   const workshop = range?.workshop;
@@ -141,8 +210,9 @@ export function tinhSoTonNL(
     }
 
     const dongGui = tongCarryAm(inputs, ky.id);
+    const conDoSX = conDoTrongKy(locks, ky, workshop);
     const xaDong = tongCarryDuong(inputs, ky.id);
-    const tonCuoi = tonDau + dongGui - xaDong;
+    const tonCuoi = tonDau + dongGui + conDoSX - xaDong;
     tonChay.set(khoa, tonCuoi);
 
     const theoNgayNhap = nhapTuoiTheoNgay(ky, imports, workshop);
@@ -156,6 +226,7 @@ export function tinhSoTonNL(
       endDate: ky.endDate || ky.startDate || "",
       tonDau,
       dongGui,
+      conDoSX,
       xaDong,
       tonCuoi,
       nhapTuoi,
@@ -181,6 +252,7 @@ export function tinhSoTonNL(
 export interface TongSoTonNL {
   tonDau: number;
   dongGui: number;
+  conDoSX: number;
   xaDong: number;
   tonCuoi: number;
   nhapTuoi: number;
@@ -209,6 +281,7 @@ export function tongSoTonNL(rows: SoTonNLKy[]): TongSoTonNL {
   return {
     tonDau,
     dongGui: rows.reduce((s, r) => s + r.dongGui, 0),
+    conDoSX: rows.reduce((s, r) => s + r.conDoSX, 0),
     xaDong: rows.reduce((s, r) => s + r.xaDong, 0),
     tonCuoi,
     nhapTuoi: rows.reduce((s, r) => s + r.nhapTuoi, 0),

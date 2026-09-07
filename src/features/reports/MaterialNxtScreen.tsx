@@ -38,9 +38,15 @@ import {
   useMaterialImports,
   useMaterialOpeningStock,
   useMaterialTypes,
+  useProductionLocks,
 } from "@/lib/catalogRepo";
 import { KY_OPT, phamViKy, type KyXem } from "@/lib/periodUtils";
-import { tinhSoTonNL, tongSoTonNL, type SoTonNLKy } from "@/lib/inventoryMaterial";
+import {
+  tinhSoTonNL,
+  tongSoTonNL,
+  conDoChuaKhopKy,
+  type SoTonNLKy,
+} from "@/lib/inventoryMaterial";
 import { num, viDate } from "@/lib/format";
 import { uid } from "@/lib/db";
 import type { MaterialOpeningStock, Workshop } from "@/types";
@@ -49,6 +55,7 @@ import {
   ArrowDownToLine,
   ArrowUpFromLine,
   CalendarRange,
+  Hourglass,
   PackagePlus,
   Scale,
   Snowflake,
@@ -82,6 +89,7 @@ export default function MaterialNxtScreen() {
   const [imports] = useMaterialImports();
   const [opening, ghiOpening] = useMaterialOpeningStock();
   const [materialTypes] = useMaterialTypes();
+  const [locks] = useProductionLocks();
 
   const [ky, setKy] = useState<KyXem>("nam");
   const [moc, setMoc] = useState(homNay());
@@ -98,14 +106,25 @@ export default function MaterialNxtScreen() {
   const workshop = xuong === "Tất cả" ? undefined : (xuong as Workshop);
 
   const rows = useMemo(
-    () => tinhSoTonNL(periods, inputs, imports, opening, { tuNgay: tu, denNgay: den, workshop }),
-    [periods, inputs, imports, opening, tu, den, workshop],
+    () =>
+      tinhSoTonNL(periods, inputs, imports, opening, locks, {
+        tuNgay: tu,
+        denNgay: den,
+        workshop,
+      }),
+    [periods, inputs, imports, opening, locks, tu, den, workshop],
   );
   const tong = useMemo(() => tongSoTonNL(rows), [rows]);
+  // Còn dở SX ghi ở ngày không có kỳ cân đối nào phủ → rơi ra ngoài tồn, phải gọi tên.
+  const conDoRot = useMemo(
+    () => conDoChuaKhopKy(periods, locks, { tuNgay: tu, denNgay: den, workshop }),
+    [periods, locks, tu, den, workshop],
+  );
 
   const the: TheThongTin[] = [
     { nhan: "Tồn đầu kho", giaTri: `${num(tong.tonDau)} kg`, so: true, icon: Snowflake, mau: "trung-tinh" },
     { nhan: "Đông gửi (+kho)", giaTri: `${num(tong.dongGui)} kg`, so: true, icon: ArrowDownToLine, mau: "brand" },
+    { nhan: "Còn dở SX (+kho)", giaTri: `${num(tong.conDoSX)} kg`, so: true, icon: Hourglass, mau: "brand" },
     { nhan: "Xả đông (−kho)", giaTri: `${num(tong.xaDong)} kg`, so: true, icon: ArrowUpFromLine, mau: "trung-tinh" },
     { nhan: "Tồn cuối kho", giaTri: `${num(tong.tonCuoi)} kg`, so: true, icon: Scale, mau: "success" },
   ];
@@ -156,6 +175,17 @@ export default function MaterialNxtScreen() {
         </span>
       ),
       tong: () => num(tong.dongGui),
+    },
+    {
+      key: "conDoSX",
+      header: "Còn dở SX +",
+      so: true,
+      render: (r) => (
+        <span className={r.conDoSX > 0 ? "font-semibold text-success" : ""}>
+          {r.conDoSX > 0 ? `+${num(r.conDoSX)}` : "—"}
+        </span>
+      ),
+      tong: () => num(tong.conDoSX),
     },
     {
       key: "xaDong",
@@ -303,6 +333,18 @@ export default function MaterialNxtScreen() {
           <span className="text-base font-semibold text-destructive">
             {tong.soCanhBao} kỳ có tồn cuối ÂM — xả đông nhiều hơn số đang trữ. Kiểm lại đông gửi /
             xả đông của kỳ đó ở màn Cân đối (số ghi tay có thể sai).
+          </span>
+        </div>
+      )}
+
+      {/* Còn dở SX ghi nhưng KHÔNG có kỳ cân đối phủ ngày đó → không vào tồn.
+          Gọi tên thay vì để số biến mất (luật "màn tự giải thích"). */}
+      {conDoRot > 0 && (
+        <div className="flex flex-wrap items-center gap-3 rounded-xl border-2 border-warning bg-warning/10 p-4">
+          <AlertTriangle className="w-5 h-5 shrink-0 text-warning" aria-hidden />
+          <span className="text-base font-semibold text-warning">
+            {num(conDoRot)} kg còn dở SX chưa vào tồn — ghi ở ngày CHƯA có kỳ cân đối nào (cùng họ
+            NL) phủ. Tạo kỳ cân đối phủ ngày đó ở màn Cân đối để phần còn dở được cộng vào đông gửi.
           </span>
         </div>
       )}

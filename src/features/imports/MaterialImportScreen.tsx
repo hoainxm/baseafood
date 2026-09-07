@@ -812,22 +812,30 @@ export default function NhapNguyenLieuScreen() {
             Nhập hàng về xưởng
           </h1>
         </div>
-        <div className="flex flex-wrap gap-2">
+        {/* Mobile-first: nút CHÍNH "Ghi nhập" lên đầu + full-width cho tổ dưới
+            xưởng (thao tác gõ điện thoại); hành động phụ xuống hàng dưới, gọn. */}
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+          <Button size="lg" onClick={moThem} className="w-full sm:w-auto">
+            <Plus />
+            Ghi nhập trong ngày
+          </Button>
           <Button
             variant="outline"
             size="lg"
             onClick={() => setXemPhieu(true)}
+            className="w-full sm:w-auto"
           >
             <FileText />
             Xem báo cáo
           </Button>
-          <Button variant="outline" size="lg" onClick={() => setDoiLoaiMo(true)}>
+          <Button
+            variant="outline"
+            size="lg"
+            onClick={() => setDoiLoaiMo(true)}
+            className="w-full sm:w-auto"
+          >
             <Replace />
             Đổi loại hàng loạt
-          </Button>
-          <Button size="lg" onClick={moThem}>
-            <Plus />
-            Ghi nhập trong ngày
           </Button>
         </div>
       </div>

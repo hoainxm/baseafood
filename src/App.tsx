@@ -13,6 +13,7 @@ import {
   Outlet,
   useNavigate,
   useLocation,
+  useSearchParams,
 } from "react-router-dom";
 import DangNhap from "@/features/auth";
 import { NotFound } from "@/features/shared";
@@ -61,6 +62,7 @@ function ShellLayout() {
   const auth = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
   const username = auth.nguoiDung?.username;
 
   useEffect(() => {
@@ -99,6 +101,7 @@ function ShellLayout() {
   return (
     <AppShell
       active={seg}
+      activeTab={seg === "catalog" ? searchParams.get("tab") ?? undefined : undefined}
       onSelect={(id) => navigate(`/${id}`)}
       tieuDe={current?.label ?? ""}
       taiKhoan={username}

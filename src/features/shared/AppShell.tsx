@@ -46,6 +46,9 @@ import {
   RefreshCw,
   Bell,
   LogOut,
+  ChevronDown,
+  Tags,
+  Contact,
   type LucideIcon,
 } from "lucide-react";
 
@@ -73,7 +76,7 @@ export interface MucNavShell {
   demo?: boolean;
 }
 
-/** id = path route. Danh sách phẳng — thứ tự hiển thị do NHOM_NAV quyết định. */
+/** id = path route. Danh sách phẳng (icon/nhãn/cờ demo) — thứ tự & gom nhóm do CAY_NAV quyết định. */
 export const KIT_NAV: MucNavShell[] = [
   { id: "dashboard", label: "Tổng quan", icon: LayoutDashboard },
   { id: "production", label: "Lệnh sản xuất", icon: ClipboardList, demo: true },
@@ -100,41 +103,165 @@ export const KIT_NAV: MucNavShell[] = [
   { id: "audit", label: "Nhật ký", icon: History },
 ];
 
-/** Nav DỌC gom theo nhóm chức năng — dùng chung cho sidebar và drawer. */
-export const NHOM_NAV: { ten: string; ids: string[] }[] = [
-  { ten: "Tổng quan", ids: ["dashboard"] },
-  { ten: "Sản xuất", ids: ["production", "wip", "packaging", "quality", "qc"] },
-  { ten: "Kho", ids: ["imports", "warehouse", "cold-storage", "qr"] },
-  { ten: "Kinh doanh", ids: ["sales", "orders"] },
-  { ten: "Báo cáo", ids: ["balancing", "bc-thanh-pham", "bc-don-xuat", "nxt-nl", "nxt", "nxt-kho", "reports", "traceability"] },
-  { ten: "Hệ thống", ids: ["catalog", "users", "audit"] },
-];
-
-interface NhomHienThi {
+/**
+ * CÂY ĐIỀU HƯỚNG module-centric (họp 2026-09-02 QĐ-9): mỗi nhánh = một module,
+ * con của nhánh gồm các màn của module + **deep-link tra danh mục NGAY trong
+ * module** (VD Nhập hàng → Đại lý / Loại NL). Danh mục vẫn là MỘT nguồn duy nhất
+ * (`/catalog`), deep-link chỉ mở đúng tab qua `?tab=` — không nhân bản dữ liệu.
+ *
+ * Một mục con là:
+ *  - `{ ref }`  → trỏ tới một mục trong `KIT_NAV` (màn có route thật; lấy
+ *    nhãn/icon/cờ demo từ đó, kiểm quyền theo `ref`).
+ *  - deep-link `{ to, gateId, label, icon }` → mở `/catalog?tab=…`; kiểm quyền
+ *    theo `gateId` (= "catalog").
+ */
+export interface NavCon {
+  ref?: string;
+  to?: string;
+  gateId?: string;
+  label?: string;
+  icon?: LucideIcon;
+}
+export interface NhomCay {
   ten: string;
-  muc: MucNavShell[];
+  icon: LucideIcon;
+  con: NavCon[];
 }
 
-/** Gom danh sách đã lọc quyền vào nhóm; mục lạ rơi vào nhóm "Khác" để không mất. */
-function gomNhom(items: MucNavShell[]): NhomHienThi[] {
+const CAT = (tab: string, label: string, icon: LucideIcon): NavCon => ({
+  to: `catalog?tab=${tab}`,
+  gateId: "catalog",
+  label,
+  icon,
+});
+
+export const CAY_NAV: NhomCay[] = [
+  { ten: "Tổng quan", icon: LayoutDashboard, con: [{ ref: "dashboard" }] },
+  {
+    ten: "Nhập hàng",
+    icon: Truck,
+    con: [
+      { ref: "imports" },
+      { ref: "nxt-nl" },
+      CAT("dai-ly", "Đại lý", Contact),
+      CAT("loai-nl", "Loại nguyên liệu", Boxes),
+    ],
+  },
+  {
+    ten: "Sản xuất",
+    icon: Factory,
+    con: [
+      { ref: "wip" },
+      { ref: "packaging" },
+      { ref: "qc" },
+      CAT("mat-hang", "Mặt hàng", Tags),
+      { ref: "production" },
+      { ref: "quality" },
+    ],
+  },
+  {
+    ten: "Kho",
+    icon: Warehouse,
+    con: [{ ref: "warehouse" }, { ref: "qr" }, { ref: "nxt-kho" }, { ref: "cold-storage" }],
+  },
+  {
+    ten: "Kinh doanh",
+    icon: ShoppingCart,
+    con: [{ ref: "sales" }, { ref: "orders" }, CAT("khach-hang", "Khách hàng", Users)],
+  },
+  {
+    ten: "Báo cáo & Cân đối",
+    icon: BarChart3,
+    con: [
+      { ref: "balancing" },
+      { ref: "bc-thanh-pham" },
+      { ref: "bc-don-xuat" },
+      { ref: "nxt" },
+      { ref: "reports" },
+      { ref: "traceability" },
+    ],
+  },
+  {
+    ten: "Hệ thống",
+    icon: Library,
+    con: [{ ref: "catalog" }, { ref: "users" }, { ref: "audit" }],
+  },
+];
+
+/** Một mục con đã phân giải để hiển thị (đã lọc quyền). */
+interface MucCon {
+  key: string; // định danh so khớp active
+  target: string; // path để điều hướng (id hoặc "catalog?tab=…")
+  label: string;
+  icon: LucideIcon;
+  demo?: boolean;
+  laDanhMuc: boolean; // deep-link danh mục (style phụ + ẩn khi thu gọn)
+}
+interface NhomHienThi {
+  ten: string;
+  icon: LucideIcon;
+  muc: MucCon[];
+}
+
+/**
+ * Phân giải cây theo danh sách nav đã lọc quyền (`items`).
+ * - `ref`: giữ khi `items` có id đó (đã gồm lọc demo/vai trò ở App.tsx).
+ * - deep-link: giữ khi `items` có `gateId` (VD "catalog").
+ * Mục trong `items` không nằm trong cây rơi vào nhóm "Khác" để không mất.
+ */
+function gomCay(items: MucNavShell[]): NhomHienThi[] {
   const con = new Map(items.map((i) => [i.id, i]));
   const daDung = new Set<string>();
   const nhom: NhomHienThi[] = [];
 
-  for (const g of NHOM_NAV) {
-    const muc: MucNavShell[] = [];
-    for (const id of g.ids) {
-      const m = con.get(id);
-      if (m) {
-        muc.push(m);
-        daDung.add(id);
+  for (const g of CAY_NAV) {
+    const muc: MucCon[] = [];
+    for (const c of g.con) {
+      if (c.ref) {
+        const m = con.get(c.ref);
+        if (!m) continue;
+        muc.push({
+          key: m.id === "catalog" ? "catalog" : m.id,
+          target: m.id,
+          label: m.label,
+          icon: m.icon,
+          demo: m.demo,
+          laDanhMuc: false,
+        });
+        daDung.add(c.ref);
+      } else if (c.to && c.gateId && con.has(c.gateId)) {
+        muc.push({
+          key: c.to,
+          target: c.to,
+          label: c.label ?? "",
+          icon: c.icon ?? Library,
+          laDanhMuc: true,
+        });
       }
     }
-    if (muc.length) nhom.push({ ten: g.ten, muc });
+    // Bỏ deep-link danh mục MỒ CÔI: nếu module không có MÀN thật nào người dùng
+    // thấy (vai trò bộ phận), đừng hiện nhánh chỉ có shortcut danh mục — danh mục
+    // đầy đủ vẫn vào được ở nhóm Hệ thống. (Admin có đủ màn nên không đụng.)
+    const coMan = muc.some((m) => !m.laDanhMuc);
+    const mucGiu = coMan ? muc : [];
+    if (mucGiu.length) nhom.push({ ten: g.ten, icon: g.icon, muc: mucGiu });
   }
 
-  const con_lai = items.filter((i) => !daDung.has(i.id));
-  if (con_lai.length) nhom.push({ ten: "Khác", muc: con_lai });
+  const conLai = items.filter((i) => !daDung.has(i.id));
+  if (conLai.length) {
+    nhom.push({
+      ten: "Khác",
+      icon: Library,
+      muc: conLai.map((m) => ({
+        key: m.id,
+        target: m.id,
+        label: m.label,
+        icon: m.icon,
+        demo: m.demo,
+        laDanhMuc: false,
+      })),
+    });
+  }
   return nhom;
 }
 
@@ -165,61 +292,145 @@ function HeaderNut({
   );
 }
 
-/** Cây nav dọc gom nhóm. `thuGon` chỉ dùng cho sidebar desktop (icon-only). */
+/** Một mục lá trong cây nav. */
+function MucNut({
+  m,
+  chon,
+  thuGon,
+  onSelect,
+}: {
+  m: MucCon;
+  chon: boolean;
+  thuGon: boolean;
+  onSelect: (target: string) => void;
+}) {
+  const Icon = m.icon;
+  return (
+    <button
+      type="button"
+      onClick={() => onSelect(m.target)}
+      aria-current={chon ? "page" : undefined}
+      title={thuGon ? m.label : undefined}
+      className={cn(
+        "flex min-h-10 w-full items-center gap-3 rounded-lg border text-left transition-colors",
+        thuGon ? "justify-center px-0" : "px-3",
+        m.laDanhMuc ? "text-sm font-medium" : "text-sm font-semibold",
+        chon
+          ? "border-primary bg-accent text-accent-foreground shadow-sm"
+          : m.laDanhMuc
+            ? "border-transparent text-muted-foreground hover:bg-muted hover:text-foreground"
+            : "border-transparent text-foreground hover:bg-muted"
+      )}
+    >
+      <Icon className={cn("shrink-0", m.laDanhMuc ? "size-icon-sm" : "size-icon")} aria-hidden />
+      {!thuGon && <span className="min-w-0 truncate">{m.label}</span>}
+      {!thuGon && m.demo && (
+        <Badge variant="outline" className="ml-auto shrink-0">
+          DEMO
+        </Badge>
+      )}
+    </button>
+  );
+}
+
+/**
+ * Cây nav dọc gập/mở theo nhóm module. `thuGon` (chỉ sidebar desktop) = icon-only:
+ * bỏ nhãn + bỏ deep-link danh mục (còn nút Danh mục đầy đủ), bỏ qua trạng thái gập.
+ */
 function CayNav({
   nhom,
-  active,
+  activeKey,
   onSelect,
   thuGon = false,
+  moNhom,
+  onToggle,
 }: {
   nhom: NhomHienThi[];
-  active: string;
-  onSelect: (id: string) => void;
+  activeKey: string;
+  onSelect: (target: string) => void;
   thuGon?: boolean;
+  moNhom: Record<string, boolean>;
+  onToggle: (ten: string) => void;
 }) {
   return (
     <nav className="scroll-nice flex-1 overflow-y-auto p-3">
-      {nhom.map((g, i) => (
-        <div key={g.ten} className={cn(i > 0 && "mt-4")}>
-          {thuGon ? (
-            i > 0 && <div className="mx-2 mb-3 border-t-2 border-border" />
-          ) : (
-            <p className="px-4 pb-1.5 text-sm font-semibold text-muted-foreground">
-              {g.ten}
-            </p>
-          )}
-          <div className="space-y-1.5">
-            {g.muc.map((n) => {
-              const Icon = n.icon;
-              const chon = active === n.id;
-              return (
-                <button
-                  key={n.id}
-                  type="button"
-                  onClick={() => onSelect(n.id)}
-                  aria-current={chon ? "page" : undefined}
-                  title={thuGon ? n.label : undefined}
-                  className={cn(
-                    "flex min-h-10 w-full items-center gap-3 rounded-lg border text-left text-sm font-semibold transition-colors",
-                    thuGon ? "justify-center px-0" : "px-4",
-                    chon
-                      ? "border-primary bg-accent text-accent-foreground"
-                      : "border-transparent text-foreground hover:bg-muted"
-                  )}
-                >
-                  <Icon className="size-icon shrink-0" aria-hidden />
-                  {!thuGon && <span className="min-w-0 truncate">{n.label}</span>}
-                  {!thuGon && n.demo && (
-                    <Badge variant="outline" className="ml-auto shrink-0">
-                      DEMO
-                    </Badge>
-                  )}
-                </button>
-              );
-            })}
+      {nhom.map((g, i) => {
+        if (thuGon) {
+          const muc = g.muc.filter((m) => !m.laDanhMuc);
+          if (!muc.length) return null;
+          return (
+            <div key={g.ten} className={cn(i > 0 && "mt-4")}>
+              {i > 0 && <div className="mx-2 mb-3 border-t-2 border-border" />}
+              <div className="space-y-1.5">
+                {muc.map((m) => (
+                  <MucNut
+                    key={m.key}
+                    m={m}
+                    chon={activeKey === m.key}
+                    thuGon
+                    onSelect={onSelect}
+                  />
+                ))}
+              </div>
+            </div>
+          );
+        }
+        // Nhóm chỉ một màn (VD Tổng quan) → hiện thẳng, khỏi tiêu đề gập cho đỡ lặp.
+        if (g.muc.length === 1) {
+          return (
+            <div key={g.ten} className={cn(i > 0 && "mt-3")}>
+              <MucNut
+                m={g.muc[0]}
+                chon={activeKey === g.muc[0].key}
+                thuGon={false}
+                onSelect={onSelect}
+              />
+            </div>
+          );
+        }
+        const mo = moNhom[g.ten] !== false; // mặc định mở
+        const GIcon = g.icon;
+        const coActive = g.muc.some((m) => m.key === activeKey);
+        return (
+          <div key={g.ten} className={cn(i > 0 && "mt-2")}>
+            {/* Tiêu đề nhóm module = 1 LỚP: chữ hoa nhỏ + gạch dưới nhạt cho tách
+                lớp; đổi màu brand khi có màn con đang mở hoặc nhóm đang thu. */}
+            <button
+              type="button"
+              onClick={() => onToggle(g.ten)}
+              aria-expanded={mo}
+              className={cn(
+                "flex min-h-9 w-full items-center gap-2 rounded-lg px-3 text-left text-xs font-bold uppercase tracking-wide transition-colors hover:bg-muted",
+                coActive ? "text-primary" : "text-muted-foreground"
+              )}
+            >
+              <GIcon className="size-icon-sm shrink-0" aria-hidden />
+              <span className="min-w-0 flex-1 truncate">{g.ten}</span>
+              <ChevronDown
+                className={cn(
+                  "size-icon-sm shrink-0 transition-transform",
+                  mo ? "" : "-rotate-90"
+                )}
+                aria-hidden
+              />
+            </button>
+            {mo && (
+              // Rail dọc + thụt lề = con thuộc nhóm này (nhìn thấy rõ phân lớp).
+              <div className="mt-1 ml-5 space-y-1 border-l-2 border-border pl-2">
+                {g.muc.map((m) => (
+                  <MucNut
+                    key={m.key}
+                    m={m}
+                    chon={activeKey === m.key}
+                    thuGon={false}
+                    onSelect={onSelect}
+                  />
+                ))}
+              </div>
+            )}
           </div>
-        </div>
-      ))}
+        );
+      })}
     </nav>
   );
 }
@@ -244,6 +455,8 @@ export interface HuongDanTrang {
 
 export interface AppShellProps {
   active: string;
+  /** Tab danh mục đang mở (chỉ dùng khi active = "catalog") để tô sáng đúng deep-link. */
+  activeTab?: string;
   onSelect: (id: string) => void;
   tieuDe: string;
   breadcrumb?: string;
@@ -263,8 +476,11 @@ export interface AppShellProps {
   children: ReactNode;
 }
 
+const KEY_NAV_NHOM = "bsf1:nav-nhom";
+
 export default function AppShell({
   active,
+  activeTab,
   onSelect,
   tieuDe,
   breadcrumb,
@@ -282,7 +498,30 @@ export default function AppShell({
 }: AppShellProps) {
   const [thuGon, setThuGon] = useState(false);
   const [moNav, setMoNav] = useState(false);
-  const nhom = gomNhom(items);
+  const nhom = gomCay(items);
+
+  // Deep-link danh mục tô sáng theo tab; các màn khác so theo id path.
+  const activeKey =
+    active === "catalog" ? (activeTab ? `catalog?tab=${activeTab}` : "catalog") : active;
+
+  // Trạng thái gập/mở từng nhóm (mặc định mở), nhớ theo máy.
+  const [moNhom, setMoNhom] = useState<Record<string, boolean>>(() => {
+    try {
+      return JSON.parse(localStorage.getItem(KEY_NAV_NHOM) || "{}");
+    } catch {
+      return {};
+    }
+  });
+  const toggleNhom = (ten: string) =>
+    setMoNhom((m) => {
+      const next = { ...m, [ten]: m[ten] === false };
+      try {
+        localStorage.setItem(KEY_NAV_NHOM, JSON.stringify(next));
+      } catch {
+        /* bộ nhớ đầy / chặn cookie — bỏ qua, mặc định mở */
+      }
+      return next;
+    });
 
   // Drawer: đóng bằng Escape (bàn phím vẫn phải thoát được).
   useEffect(() => {
@@ -319,7 +558,14 @@ export default function AppShell({
         >
           <Logo cao="h-9" hienChu={!thuGon} phuDe={thuGon ? undefined : "Xí nghiệp BSF1"} />
         </div>
-        <CayNav nhom={nhom} active={active} onSelect={onSelect} thuGon={thuGon} />
+        <CayNav
+          nhom={nhom}
+          activeKey={activeKey}
+          onSelect={onSelect}
+          thuGon={thuGon}
+          moNhom={moNhom}
+          onToggle={toggleNhom}
+        />
       </aside>
 
       {/* Drawer điện thoại — CÙNG cây nav dọc, thêm chân chứa nút toàn cục */}
@@ -342,7 +588,13 @@ export default function AppShell({
               <HeaderNut label="Đóng menu" icon={X} onClick={() => setMoNav(false)} />
             </div>
 
-            <CayNav nhom={nhom} active={active} onSelect={chon} />
+            <CayNav
+              nhom={nhom}
+              activeKey={activeKey}
+              onSelect={chon}
+              moNhom={moNhom}
+              onToggle={toggleNhom}
+            />
 
             {/* Chân drawer: những gì KHÔNG còn chỗ trên header điện thoại */}
             <div className="shrink-0 space-y-3 border-t border-border p-3">

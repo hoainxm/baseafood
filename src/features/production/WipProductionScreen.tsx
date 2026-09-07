@@ -18,6 +18,7 @@ import {
   useProducts,
   useWipProductions,
   useCustomers,
+  useMaterialTypes,
 } from "@/lib/catalogRepo";
 import {
   Badge,
@@ -47,6 +48,7 @@ import {
 } from "@/design-system";
 import { kg, num, todayISO, viDate } from "@/lib/format";
 import { useAuth } from "@/lib/auth";
+import { ghiNhatKy } from "@/lib/audit";
 import { KY_OPT, phamViKy, type KyXem } from "@/lib/periodUtils";
 import { DailyTaskReminder } from "@/features/shared";
 import {
@@ -60,12 +62,16 @@ import {
   Pencil,
   Plus,
   Scale,
+  Send,
+  Trash2,
   TriangleAlert,
+  Users,
   Warehouse,
   X,
 } from "lucide-react";
 
 const PHAN_XUONG: Workshop[] = ["Đông", "Cá", "Khô"];
+const KEY_WIP_REPORT = "bsf.wip-report-sent.v1";
 
 /** Đầu phiên ghi — chọn một lần, đổ nhiều thành phẩm bên dưới. */
 interface DauPhien {
@@ -131,6 +137,7 @@ export default function SanXuatBTPScreen() {
   const [chot, persistChot] = useProductionLocks();
   const [matHang, setMatHang] = useProducts();
   const [khach, setKhach] = useCustomers();
+  const [loaiNL, setLoaiNL] = useMaterialTypes();
 
   // Người thao tác = tài khoản đang đăng nhập — gắn vào dòng khi lưu để lưu vết ai gửi.
   const { nguoiDung } = useAuth();
@@ -157,6 +164,18 @@ export default function SanXuatBTPScreen() {
 
   const [hoiChot, setHoiChot] = useState(false);
   const [ghiChuChot, setGhiChuChot] = useState("");
+  /** Còn dở cuối ngày SX tách theo loại NL (khép vòng G1) — nhập khi chốt ngày. */
+  const [conDo, setConDo] = useState<{ id: string; ten: string; kg: number | null }[]>([]);
+  const tongConDoNhap = conDo.reduce((s, d) => s + (d.kg ?? 0), 0);
+
+  /** A4: mốc "đã gửi báo cáo" theo (phạm vi·xưởng), lưu theo máy để phản hồi tại chỗ. */
+  const [daGui, setDaGui] = useState<Record<string, string>>(() => {
+    try {
+      return JSON.parse(localStorage.getItem(KEY_WIP_REPORT) || "{}");
+    } catch {
+      return {};
+    }
+  });
   const [hoiMoLai, setHoiMoLai] = useState(false);
   const [lyDoMoLai, setLyDoMoLai] = useState("");
   const [loiChot, setLoiChot] = useState<LoiNhap[]>([]);
@@ -220,6 +239,26 @@ export default function SanXuatBTPScreen() {
   const tong = view.reduce((s, r) => s + (r.quantityKg || 0), 0);
   const tongBlock = view.reduce((s, r) => s + (r.blocksCount || 0), 0);
   const soChoNhap = view.filter((r) => r.status === "cho-nhap").length;
+
+  /* ---- A4: gom báo cáo TP ngày theo (xưởng × người thao tác) ---- */
+  const baoCaoNguoi = useMemo(() => {
+    const m = new Map<
+      string,
+      { workshop: Workshop; operator: string; soDong: number; kg: number }
+    >();
+    for (const r of view) {
+      const op = (r.operator ?? "").trim() || "(không rõ)";
+      const k = `${r.workshop}·${op}`;
+      const cur = m.get(k) ?? { workshop: r.workshop, operator: op, soDong: 0, kg: 0 };
+      cur.soDong += 1;
+      cur.kg += r.quantityKg || 0;
+      m.set(k, cur);
+    }
+    return [...m.values()].sort(
+      (a, b) =>
+        a.workshop.localeCompare(b.workshop) || a.operator.localeCompare(b.operator)
+    );
+  }, [view]);
 
   const moTaPhamVi = laMotNgay
     ? viDate(tuHieuLuc)
@@ -464,9 +503,46 @@ export default function SanXuatBTPScreen() {
     );
   };
 
+  /* ---- A4: gửi báo cáo TP lên hệ thống (tách khỏi chốt ngày) ---- */
+  const baoCaoKey = `${tuHieuLuc}${laMotNgay ? "" : `..${denHieuLuc}`}·${phanXuong}`;
+  const guiBaoCao = () => {
+    const dong = baoCaoNguoi
+      .map((b) => `${b.workshop}/${b.operator}: ${b.soDong} dòng · ${kg(b.kg)}`)
+      .join("; ");
+    ghiNhatKy([
+      {
+        action: "gui",
+        entity: "production_report",
+        entityKey: baoCaoKey,
+        summary: `Gửi báo cáo thành phẩm ${moTaPhamVi} · ${phanXuong} — tổng ${kg(tong)} (${view.length} dòng). ${dong}`,
+        diff: { nguoiGui: nguoiThaoTac, tong, theoNguoi: baoCaoNguoi },
+      },
+    ]);
+    const luc = new Date().toLocaleString("vi-VN");
+    const next = { ...daGui, [baoCaoKey]: luc };
+    setDaGui(next);
+    try {
+      localStorage.setItem(KEY_WIP_REPORT, JSON.stringify(next));
+    } catch {
+      /* hết quota / chặn cookie — mốc "đã gửi" chỉ là phản hồi tại chỗ, bỏ qua */
+    }
+    notify.daLuu(
+      `Đã gửi báo cáo thành phẩm ${moTaPhamVi} · ${phanXuong} lên hệ thống`
+    );
+  };
+
   /* ---- Chốt / mở lại ngày ---- */
   const chotNgay = () => {
     const bg = banGhiChot(tuHieuLuc, xuong);
+    // Gom còn dở theo tên loại NL (cộng dồn trùng, bỏ dòng trống / ≤ 0).
+    const leftoverByMaterial: Record<string, number> = {};
+    for (const d of conDo) {
+      const ten = d.ten.trim();
+      const kgv = d.kg ?? 0;
+      if (!ten || kgv <= 0) continue;
+      leftoverByMaterial[ten] = (leftoverByMaterial[ten] ?? 0) + kgv;
+    }
+    const tongConDo = Object.values(leftoverByMaterial).reduce((s, v) => s + v, 0);
     const ban: DailyLock = {
       id: bg?.id ?? newId(),
       lockDate: tuHieuLuc,
@@ -476,13 +552,17 @@ export default function SanXuatBTPScreen() {
       totalKgAtLock: tongThucTe,
       reopenReason: "",
       note: ghiChuChot,
+      leftoverKg: tongConDo,
+      leftoverByMaterial,
     };
     persistChot(bg ? chot.map((c) => (c.id === bg.id ? ban : c)) : [...chot, ban]);
     notify.daLuu(
-      `Đã chốt SX ${viDate(tuHieuLuc)} · xưởng ${xuong} — ${kg(tongThucTe)}`
+      `Đã chốt SX ${viDate(tuHieuLuc)} · xưởng ${xuong} — ${kg(tongThucTe)}` +
+        (tongConDo > 0 ? ` · còn dở ${kg(tongConDo)}` : "")
     );
     setHoiChot(false);
     setGhiChuChot("");
+    setConDo([]);
   };
   const moLaiNgay = () => {
     const bg = banGhiChot(tuHieuLuc, xuong);
@@ -582,8 +662,9 @@ export default function SanXuatBTPScreen() {
             Sản xuất thành phẩm
           </h1>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button size="lg" onClick={moThem}>
+        <div className="flex w-full flex-wrap gap-2 sm:w-auto">
+          {/* Mobile-first: nút chính full-width cho tổ dưới xưởng gõ điện thoại. */}
+          <Button size="lg" onClick={moThem} className="w-full sm:w-auto">
             <Plus />
             Ghi thành phẩm
           </Button>
@@ -749,6 +830,14 @@ export default function SanXuatBTPScreen() {
               size="lg"
               onClick={() => {
                 setGhiChuChot(chotHienTai?.note ?? "");
+                const lb = chotHienTai?.leftoverByMaterial ?? {};
+                setConDo(
+                  Object.entries(lb).map(([ten, v]) => ({
+                    id: uid(),
+                    ten,
+                    kg: Number(v) || null,
+                  }))
+                );
                 setHoiChot(true);
               }}
             >
@@ -756,6 +845,69 @@ export default function SanXuatBTPScreen() {
               Chốt ngày
             </Button>
           )}
+        </div>
+      )}
+
+      {/* A4 — Báo cáo công việc ngày: gom theo (xưởng × người thao tác) + Gửi lên
+          hệ thống (lưu vết audit), TÁCH khỏi "Chốt ngày" (khoá sửa). */}
+      {view.length > 0 && (
+        <div className="space-y-3 rounded-xl border-2 border-border p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h2 className="flex items-center gap-2 text-lg font-semibold text-foreground">
+                <Users className="size-icon shrink-0" aria-hidden />
+                Báo cáo công việc ngày
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                Gom theo xưởng × người thao tác cho {moTaPhamVi} · {phanXuong}.
+                <b> Gửi</b> báo lên hệ thống (lưu vết) — khác với <b>Chốt ngày</b>{" "}
+                (khoá sửa).
+              </p>
+            </div>
+            <div className="flex flex-col items-end gap-1">
+              <Button onClick={guiBaoCao}>
+                <Send />
+                Gửi báo cáo lên hệ thống
+              </Button>
+              {daGui[baoCaoKey] && (
+                <span className="text-sm text-success">
+                  Đã gửi lúc {daGui[baoCaoKey]}
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div className="overflow-x-auto rounded-lg border border-border">
+            <table className="w-full border-collapse text-base">
+              <thead>
+                <tr className="border-b border-border bg-muted/50 text-left">
+                  <th className="px-3 py-2 font-semibold">Xưởng</th>
+                  <th className="px-3 py-2 font-semibold">Người thao tác</th>
+                  <th className="px-3 py-2 text-right font-semibold">Số dòng</th>
+                  <th className="px-3 py-2 text-right font-semibold">Tổng kg</th>
+                </tr>
+              </thead>
+              <tbody>
+                {baoCaoNguoi.map((b) => (
+                  <tr key={`${b.workshop}·${b.operator}`} className="border-b border-border last:border-0">
+                    <td className="px-3 py-2">{b.workshop}</td>
+                    <td className="px-3 py-2">{b.operator}</td>
+                    <td className="tnum px-3 py-2 text-right">{num(b.soDong)}</td>
+                    <td className="tnum px-3 py-2 text-right font-semibold">{kg(b.kg)}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="bg-muted/50 font-semibold">
+                  <td className="px-3 py-2" colSpan={2}>
+                    Tổng cộng
+                  </td>
+                  <td className="tnum px-3 py-2 text-right">{num(view.length)}</td>
+                  <td className="tnum px-3 py-2 text-right">{kg(tong)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
         </div>
       )}
 
@@ -1013,6 +1165,93 @@ export default function SanXuatBTPScreen() {
               placeholder="Ghi chú (nếu có)"
             />
           </Field>
+
+          {/* Còn dở cuối ngày (khép vòng G1): NL chưa chế biến hết đem lưu kho →
+              sổ Tồn kho NL cộng vào "đông gửi" kỳ tương ứng. Tách theo loại NL. */}
+          <div className="min-w-0 space-y-2 rounded-lg border-2 border-border p-3">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-base font-semibold text-foreground">
+                Nguyên liệu còn dở đem lưu kho
+              </p>
+              {tongConDoNhap > 0 && (
+                <span className="tnum text-base font-semibold text-primary">
+                  {kg(tongConDoNhap)}
+                </span>
+              )}
+            </div>
+            <p className="text-sm text-muted-foreground">
+              NL chưa chế biến hết trong ngày, đem cấp đông lưu kho. Ghi ở đây để
+              sổ Tồn kho NL cộng vào <b>đông gửi</b> — bỏ trống nếu không còn dở.
+            </p>
+            {conDo.length > 0 && (
+              <div className="space-y-2">
+                {conDo.map((d) => (
+                  <div key={d.id} className="flex flex-wrap items-end gap-2">
+                    <div className="min-w-0 flex-1 basis-40">
+                      <Combobox
+                        label="Loại nguyên liệu"
+                        anNhan
+                        value={d.ten}
+                        onChange={(v) =>
+                          setConDo((rs) =>
+                            rs.map((x) => (x.id === d.id ? { ...x, ten: v } : x))
+                          )
+                        }
+                        options={loaiNL.map((l) => ({
+                          value: l.name,
+                          label: l.name,
+                          phu: l.category || undefined,
+                        }))}
+                        onCreate={(ten) => {
+                          setLoaiNL([
+                            ...loaiNL,
+                            { id: uid(), name: ten, category: "", note: "" },
+                          ]);
+                          return ten;
+                        }}
+                        placeholder="— Chọn loại NL —"
+                      />
+                    </div>
+                    <div className="w-28 shrink-0">
+                      <NumberField
+                        label="Kg còn dở"
+                        anNhan
+                        unit="kg"
+                        value={d.kg}
+                        onChange={(v) =>
+                          setConDo((rs) =>
+                            rs.map((x) => (x.id === d.id ? { ...x, kg: v } : x))
+                          )
+                        }
+                      />
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="shrink-0"
+                      aria-label="Xóa dòng còn dở"
+                      onClick={() =>
+                        setConDo((rs) => rs.filter((x) => x.id !== d.id))
+                      }
+                    >
+                      <Trash2 />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                setConDo((rs) => [...rs, { id: uid(), ten: "", kg: null }])
+              }
+            >
+              <Plus />
+              Thêm loại còn dở
+            </Button>
+          </div>
+
           <DialogFooter>
             <Button variant="outline" size="lg" onClick={() => setHoiChot(false)}>
               Hủy

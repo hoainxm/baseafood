@@ -1,6 +1,6 @@
 > Load khi: thêm/sửa bảng, cột, migration, hay đọc lỗi Postgres lạ.
 covers: supabase/migrations/**, docs/ops/supabase-setup.md
-last_verified: 2026-08-28
+last_verified: 2026-09-05
 ttl_days: 90
 <!-- updated: 2026-08-28 — thêm 0034 (BACKFILL DỮ LIỆU, không đổi schema): điền products.processing_type suy TỪ TÊN cho dòng còn trống (CASE mirror lib/catalogRepo.suyKieuCheBien, khớp trước thắng) + INSERT 8 mặt hàng thật thiếu ở 141 (id 'mh-bs-*', ON CONFLICT DO NOTHING). Idempotent, có ROLLBACK. Đối xứng seed local seedProducts. KHÔNG đụng 141 mã kế toán. Xem 32-danh-muc. -->
 <!-- updated: 2026-08-27 — thêm 0033 (production_wips.processing_type, text default ''): KIỂU CHẾ BIẾN của nhóm ghi thành phẩm ngày /wip (gom theo chế biến × khách như sổ giấy). CHỈ-THÊM cột nullable/default, idempotent. Xem 34-btp ba-spec + repo.ts BANG_WIP_PRODUCTION. -->
@@ -18,6 +18,8 @@ ttl_days: 90
 <!-- updated: 2026-09-05 — (họp 2026-09-02) THÊM: `0035_shipment_lo_sscc.sql` — 2 cột nullable `import_shipments.lot_code` + `sscc_code` (mã lô nội bộ + SSCC, QĐ-6/QĐ-10). `0036_qc_checklist.sql` — 2 bảng MỚI `qc_checklists` (chỉ tiêu QC ngày×xưởng: result dat/tam/khong-dat, score, backdate_reason) + `qc_locks` (chốt ngày, hình dạng như production_locks) — QĐ-8. Đã đăng ký `qc_checklists`,`qc_locks` vào mảng `ds` của `0021` (chạy lại 0021). Migration cao nhất nay = 0036. -->
 
 <!-- updated: 2026-09-05 — (đợt 2) THÊM `0037_production_operator.sql`: cột nullable `production_wips.operator` (họ tên người thao tác ghi dòng — NR-4). Không đụng bảng khác, production_wips đã trong RLS 0021. Migration cao nhất nay = 0037. -->
+
+<!-- updated: 2026-09-05 — (A3 khép vòng G1) THÊM `0038_production_leftover_by_material.sql`: cột nullable jsonb `production_locks.leftover_by_material` ({tên loại NL → kg còn dở}) — chốt ngày SX ghi còn dở TÁCH theo loại NL; sổ NXT nguyên liệu (/nxt-nl) cộng vào "đông gửi" kỳ tương ứng (lib/inventoryMaterial.ts conDoSX). `leftover_kg` (0028) giữ làm tổng. repo.ts BANG_PRODUCTION_LOCK gửi cột LUÔN (như `leftover_kg`) — gửi có điều kiện sẽ KHÔNG xoá được còn-dở khi sửa về rỗng vì upsert `onConflict` giữ giá trị cũ. Chỉ-thêm cột, idempotent, có ROLLBACK. Migration cao nhất nay = 0038. -->
 
 # Cơ sở dữ liệu & migration
 

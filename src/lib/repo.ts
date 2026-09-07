@@ -654,6 +654,9 @@ export const BANG_PRODUCTION_LOCK: AnhXaBang<DailyLock> = {
     reopen_reason: x.reopenReason,
     note: x.note,
     leftover_kg: x.leftoverKg ?? 0,
+    // Migration 0038 đã chạy → gửi LUÔN (như leftover_kg). Gửi có điều kiện sẽ
+    // KHÔNG xoá được còn-dở khi sửa về rỗng (upsert onConflict giữ giá trị cũ).
+    leftover_by_material: x.leftoverByMaterial ?? {},
   }),
   fromRow: (r) => ({
     id: s(r.id),
@@ -665,6 +668,10 @@ export const BANG_PRODUCTION_LOCK: AnhXaBang<DailyLock> = {
     reopenReason: s(r.reopen_reason),
     note: s(r.note),
     leftoverKg: Number(r.leftover_kg ?? 0),
+    leftoverByMaterial:
+      r.leftover_by_material && typeof r.leftover_by_material === "object"
+        ? (r.leftover_by_material as Record<string, number>)
+        : {},
   }),
 };
 

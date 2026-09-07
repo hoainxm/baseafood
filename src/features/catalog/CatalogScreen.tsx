@@ -3,7 +3,8 @@
 // Tên tiếng Việt: Màn hình Quản lý Danh mục chung
 // Description: Master Catalog Management Screen
 // ============================================================
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
+import { useSearchParams } from "react-router-dom";
 import type { Supplier, Customer, MaterialType, Product } from "@/types";
 import { CATEGORIES, laCoTach, quyCachBlock } from "@/types";
 import { uid } from "@/lib/db";
@@ -68,8 +69,26 @@ function trungMaSo<T extends { id: string; code: string }>(
     : [];
 }
 
+/** Tab hợp lệ — deep-link từ nav module (VD /catalog?tab=dai-ly) mở đúng tab. */
+const TABS = ["mat-hang", "khach-hang", "dai-ly", "loai-nl", "tp-141"];
+
 export default function DanhMucScreen() {
-  const [tab, setTab] = useState("mat-hang");
+  // Tab điều khiển bằng URL (?tab=) để deep-link từ nav module mở đúng tab —
+  // vẫn MỘT nguồn danh mục duy nhất, chỉ đổi tab đang xem.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get("tab") ?? "";
+  const tab = TABS.includes(tabParam) ? tabParam : "mat-hang";
+  const setTab = (t: string) =>
+    setSearchParams(
+      (prev) => {
+        const p = new URLSearchParams(prev);
+        // Xoá RIÊNG key "tab" (mặc định mat-hang), giữ nguyên param khác nếu sau này có.
+        if (t === "mat-hang") p.delete("tab");
+        else p.set("tab", t);
+        return p;
+      },
+      { replace: true }
+    );
 
   const [matHang, setMatHang, { trangThai: ttMH }] = useProducts();
   const [khachHang, setKhachHang, { trangThai: ttKH }] = useCustomers();

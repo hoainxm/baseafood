@@ -108,10 +108,12 @@ dùng `min-h-10`.
 
 ### 4. Điều hướng: DỌC, gom nhóm, một cây dùng chung
 
-`AppShell` có **một** cây nav (`CayNav`) dựng từ `KIT_NAV` + `NHOM_NAV`:
-desktop hiện làm sidebar, điện thoại hiện làm **drawer trượt trái**. Thêm màn
-mới ⇒ thêm 1 dòng vào `KIT_NAV` **và** xếp id vào đúng nhóm trong `NHOM_NAV` —
-quên bước sau thì mục rơi vào nhóm "Khác".
+`AppShell` có **một** cây nav (`CayNav`) module-centric gập/mở dựng từ `KIT_NAV`
+(danh sách phẳng: icon/nhãn/cờ demo) + `CAY_NAV` (cây nhóm module; con = màn
+`{ ref }` hoặc deep-link danh mục `catalog?tab=…`): desktop hiện làm sidebar,
+điện thoại hiện làm **drawer trượt trái**. Thêm màn mới ⇒ thêm 1 dòng vào
+`KIT_NAV` **và** xếp `{ ref: "<id>" }` vào đúng nhánh trong `CAY_NAV` — quên bước
+sau thì mục rơi vào nhóm "Khác". Chi tiết: [`docs/app-map/02-pages-navigation.md`](../../docs/app-map/02-pages-navigation.md).
 
 Không dùng bottom-tab cuộn ngang: 14 mục nhét vào thanh 390px thì 7 mục nằm
 ngoài màn mà người dùng không biết là còn.
@@ -208,7 +210,7 @@ Luật khi dùng:
       (đo bằng TOKEN, không bằng px tuyệt đối). Không `fontSize` cứng < 12 trong SVG
 - [ ] Bảng dài đã ra thẻ trên điện thoại (hoặc có `cot-dau-dinh` nếu là báo cáo Excel)
 - [ ] Chỉ dùng `md:` cho bố cục khung; không thêm `sm:`
-- [ ] Màn mới đã vào `KIT_NAV` **và** `NHOM_NAV`
+- [ ] Màn mới đã vào `KIT_NAV` **và** `CAY_NAV`
 
 ## Bảng chọn component
 

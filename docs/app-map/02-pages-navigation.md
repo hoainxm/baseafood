@@ -1,6 +1,8 @@
 > Load khi: thêm/bớt màn hình, đổi điều hướng, header, hay tìm xem một màn được gắn vào đâu.
 covers: src/App.tsx, src/features/shared/AppShell.tsx, src/features/shared/NotFound.tsx, src/features/shared/guideContent.tsx, src/lib/nav-access.ts
-last_verified: 2026-08-27
+last_verified: 2026-09-05
+<!-- re-verified: 2026-09-05 — nav-access gate (allowedIds/homeFor/DEMO) khớp source; App.tsx lọc KIT_NAV theo quyền + demoGuard giữ nguyên. -->
+<!-- updated: 2026-09-05 — (A1 họp 2026-09-02 QĐ-9) NAV CÂY module-centric: NHOM_NAV (danh sách phẳng ids) → CAY_NAV (cây gập/mở, mỗi nhóm = module, con = màn + DEEP-LINK tra danh mục ngay trong module). AppShell: gomCay() phân giải cây theo `items` đã lọc quyền; CayNav render nhóm gập/mở (nhớ trạng thái ở localStorage `bsf1:nav-nhom`, mặc định MỞ; nhóm 1 màn hiện thẳng, không tiêu đề); thu gọn sidebar (thuGon) = icon-only, bỏ deep-link danh mục. Deep-link danh mục = `catalog?tab=<tab>` (gateId="catalog" để giữ gate 2 bộ phận). App.tsx truyền `activeTab` (searchParams `tab`) để tô sáng đúng deep-link; onSelect navigate(`/${target}`) nhận cả path có query. CatalogScreen điều khiển tab bằng `useSearchParams` (?tab=) — MỘT nguồn danh mục, chỉ đổi tab. `index.ts` export CAY_NAV (thay NHOM_NAV). -->
 ttl_days: 90
 <!-- updated: 2026-08-27 — thêm route /nxt-kho (WarehouseNxtScreen, "XNT kho (số thật)") nhóm Báo cáo — báo cáo Xuất–Nhập–Tồn dựng từ snapshot số thật. + ẨN MÀN DEMO: lib/nav-access.ts DEMO_IDS = [production, quality, cold-storage, reports, traceability] + laDemo(); App.tsx lọc nav non-admin (auth.laAdmin ? base : base.filter(!laDemo)) + demoGuard bọc 5 route (non-admin → homeFor); AppShell KIT_NAV cờ demo:true + badge "DEMO". Dashboard /dashboard KHÔNG ẩn (tổ chức lại số thật). -->
 <!-- updated: 2026-08-24 — thêm /audit (NhatKyScreen, CHỈ admin) nhóm Hệ thống; App set datNguoiThaoTac theo tài khoản -->
@@ -32,18 +34,22 @@ Bố cục: **nav dọc gom nhóm** · **header trên** · nội dung phải.
 - **Desktop (≥ md)**: nav là sidebar trái, thu/mở được.
 - **Điện thoại (< md)**: nav là **drawer trượt trái**, mở bằng nút `☰` ở header, đóng bằng nền mờ hoặc `Esc`. **Không còn bottom-tab.**
 
-Cả hai dùng CHUNG một cây nav (`CayNav`) dựng từ `KIT_NAV` (danh sách phẳng, `id` = path) + `NHOM_NAV` (thứ tự nhóm):
+Cả hai dùng CHUNG một cây nav (`CayNav`) dựng từ `KIT_NAV` (danh sách phẳng: icon/nhãn/cờ demo, `id` = path) + **`CAY_NAV`** (cây module-centric gập/mở). Mỗi nhánh = một module; con của nhánh gồm **các màn** (`{ ref }` → trỏ id trong `KIT_NAV`) và **deep-link tra danh mục** (`catalog?tab=…`) NGAY trong module:
 
-| Nhóm | Mục |
+| Nhóm (module) | Con — màn + (deep-link danh mục) |
 |---|---|
 | Tổng quan | `dashboard` |
-| Sản xuất | `production` · `wip` · `quality` |
-| Kho | `imports` · `warehouse` · `cold-storage` |
-| Kinh doanh | `sales` · `orders` |
-| Báo cáo | `balancing` · `bc-thanh-pham` · `bc-don-xuat` · `nxt-nl` · `nxt` · `reports` · `traceability` |
-| Hệ thống | `catalog` · `users` (chỉ admin) · `audit` (chỉ admin) |
+| Nhập hàng | `imports` · `nxt-nl` · (Đại lý `?tab=dai-ly`) · (Loại NL `?tab=loai-nl`) |
+| Sản xuất | `wip` · `packaging` · `qc` · (Mặt hàng `?tab=mat-hang`) · `production` · `quality` |
+| Kho | `warehouse` · `qr` · `nxt-kho` · `cold-storage` |
+| Kinh doanh | `sales` · `orders` · (Khách hàng `?tab=khach-hang`) |
+| Báo cáo & Cân đối | `balancing` · `bc-thanh-pham` · `bc-don-xuat` · `nxt` · `reports` · `traceability` |
+| Hệ thống | `catalog` (danh mục đầy đủ) · `users` (chỉ admin) · `audit` (chỉ admin) |
 
-Mục có trong `KIT_NAV` nhưng thiếu trong `NHOM_NAV` sẽ rơi vào nhóm **"Khác"** — không mất, nhưng là dấu hiệu quên xếp nhóm.
+- **Gập/mở**: mỗi nhóm là nút gập/mở (chevron), nhớ trạng thái theo máy (`localStorage bsf1:nav-nhom`, mặc định MỞ). Nhóm chỉ 1 màn (Tổng quan) hiện thẳng, không có tiêu đề gập.
+- **Deep-link danh mục**: mở đúng tab của `/catalog` qua `?tab=` — **MỘT nguồn danh mục duy nhất** (không nhân bản), `CatalogScreen` đọc tab bằng `useSearchParams`. Kiểm quyền theo `gateId="catalog"`, nên gate 2 bộ phận (`nav-access.ts`) không vỡ.
+- Mục có trong `KIT_NAV` (đã lọc quyền) nhưng thiếu trong `CAY_NAV` rơi vào nhóm **"Khác"** — không mất, nhưng là dấu hiệu quên xếp nhánh.
+- Thu gọn sidebar (`thuGon`, chỉ desktop) = icon-only: bỏ deep-link danh mục (còn nút Danh mục đầy đủ), bỏ qua trạng thái gập.
 
 ### Header
 
@@ -95,7 +101,7 @@ Cụm báo cáo khép vòng (đọc dữ liệu thật, không mock): `/bc-thanh
 
 1. Tạo thư mục `src/features/ten-man/`, viết file `TenMan.tsx`, export qua `index.ts` chỉ import `@/design-system` + `@/lib/catalogRepo`.
 2. Thêm Route path tương ứng trong `src/App.tsx` sử dụng React `lazy()`.
-3. Thêm mục vào `KIT_NAV` trong `src/features/shared/AppShell.tsx` (`id` = path, nhãn, icon) **và xếp `id` đó vào đúng nhóm trong `NHOM_NAV`** — thiếu bước sau thì mục rơi vào nhóm "Khác". Muốn trang có nút Hướng dẫn thì thêm mục vào `guideContent.tsx` (khóa = id nav). Muốn tab Báo cáo thì bọc màn bằng `Tabs` ở tầng `index.ts` như `imports`/`sales`.
+3. Thêm mục vào `KIT_NAV` trong `src/features/shared/AppShell.tsx` (`id` = path, nhãn, icon) **và xếp `{ ref: "<id>" }` vào đúng nhánh module trong `CAY_NAV`** — thiếu bước sau thì mục rơi vào nhóm "Khác". Muốn trang có nút Hướng dẫn thì thêm mục vào `guideContent.tsx` (khóa = id nav). Muốn tab Báo cáo thì bọc màn bằng `Tabs` ở tầng `index.ts` như `imports`/`sales`.
 4. Thêm dòng vào bảng trên + tạo tài liệu domain `docs/app-map/3x-*.md` nếu là nghiệp vụ mới.
 5. Chạy checklist mobile ([`design-system/README.md` § Quy chuẩn mobile · mục 7](../../src/design-system/README.md)) trước khi coi là xong.
 

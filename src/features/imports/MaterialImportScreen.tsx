@@ -52,7 +52,7 @@ import {
   type MucChon,
 } from "@/design-system";
 import { kg, num, todayISO, viDate } from "@/lib/format";
-import { DailyTaskReminder, QrTemLoIn } from "@/features/shared";
+import { DailyTaskReminder, QrTemLoIn, PhieuTrongNhapNL } from "@/features/shared";
 import { KY_OPT, phamViKy, type KyXem } from "@/lib/periodUtils";
 import {
   CalendarRange,
@@ -63,6 +63,7 @@ import {
   Pencil,
   QrCode,
   Plus,
+  Printer,
   Scale,
   SlidersHorizontal,
   TriangleAlert,
@@ -254,6 +255,7 @@ export default function NhapNguyenLieuScreen() {
   const [moLocThem, setMoLocThem] = useState(false);
   const [doiLoaiMo, setDoiLoaiMo] = useState(false);
   const [xemPhieu, setXemPhieu] = useState(false);
+  const [inPhieuTrong, setInPhieuTrong] = useState(false);
 
   const [daiLy, setDaiLy] = useSuppliers();
   const [loaiNL, setLoaiNL] = useMaterialTypes();
@@ -879,15 +881,7 @@ export default function NhapNguyenLieuScreen() {
         </Field>
       )}
 
-      <Combobox
-        label="Phân xưởng"
-        required
-        choPhepXoa={false}
-        value={phien.workshop}
-        onChange={(v) => datPhien("workshop", v as Workshop)}
-        options={PHAN_XUONG.map((p) => ({ value: p, label: p }))}
-      />
-
+      {/* Đại lý lên đầu — khớp cột TÊN ĐẠI LÝ mở đầu tờ báo cáo giấy của chị Trúc. */}
       <Combobox
         label="Đại lý giao hàng"
         required
@@ -897,6 +891,15 @@ export default function NhapNguyenLieuScreen() {
         options={optDaiLy}
         onCreate={themDaiLy}
         emptyText="Chưa có đại lý nào trong danh mục."
+      />
+
+      <Combobox
+        label="Phân xưởng"
+        required
+        choPhepXoa={false}
+        value={phien.workshop}
+        onChange={(v) => datPhien("workshop", v as Workshop)}
+        options={PHAN_XUONG.map((p) => ({ value: p, label: p }))}
       />
 
       <div className="rounded-xl border-2 border-border">
@@ -1118,6 +1121,10 @@ export default function NhapNguyenLieuScreen() {
         <Button variant="outline" size="lg" onClick={() => setXemPhieu(true)}>
           <FileText />
           Xem báo cáo
+        </Button>
+        <Button variant="outline" size="lg" onClick={() => setInPhieuTrong(true)}>
+          <Printer />
+          In phiếu trống
         </Button>
         <Button variant="outline" size="lg" onClick={() => setDoiLoaiMo(true)}>
           <Replace />
@@ -1593,6 +1600,9 @@ export default function NhapNguyenLieuScreen() {
       )}
       {chuyenInTem && (
         <QrTemLoIn chuyen={chuyenInTem} onClose={() => setChuyenInTem(null)} />
+      )}
+      {inPhieuTrong && (
+        <PhieuTrongNhapNL onClose={() => setInPhieuTrong(false)} />
       )}
     </div>
   );

@@ -51,7 +51,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
 import { ghiNhatKy } from "@/lib/audit";
 import { KY_OPT, phamViKy, type KyXem } from "@/lib/periodUtils";
-import { DailyTaskReminder } from "@/features/shared";
+import { DailyTaskReminder, PhieuTrongTPNgay } from "@/features/shared";
 import {
   CalendarRange,
   ChevronDown,
@@ -62,6 +62,7 @@ import {
   LockOpen,
   Pencil,
   Plus,
+  Printer,
   Scale,
   Send,
   Trash2,
@@ -191,6 +192,7 @@ export default function SanXuatBTPScreen() {
 
   /** Hai chế độ: "nhap" = form ghi (mặc định, form-first cho tổ xưởng); "so" = sổ + báo cáo. */
   const [cheDo, setCheDo] = useState<"nhap" | "so">("nhap");
+  const [inPhieuTrong, setInPhieuTrong] = useState(false);
 
   const [hoiChot, setHoiChot] = useState(false);
   const [ghiChuChot, setGhiChuChot] = useState("");
@@ -907,6 +909,12 @@ export default function SanXuatBTPScreen() {
 
       {cheDo === "so" && (
         <>
+      <div className="flex flex-wrap gap-2">
+        <Button variant="outline" size="lg" onClick={() => setInPhieuTrong(true)}>
+          <Printer />
+          In phiếu trống
+        </Button>
+      </div>
       <ThongKe
         className="grid-cols-2 sm:grid-cols-3 lg:grid-cols-5"
         the={[
@@ -1398,6 +1406,10 @@ export default function SanXuatBTPScreen() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {inPhieuTrong && (
+        <PhieuTrongTPNgay onClose={() => setInPhieuTrong(false)} />
+      )}
     </div>
   );
 }

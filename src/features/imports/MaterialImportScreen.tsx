@@ -72,6 +72,7 @@ import {
   Replace,
 } from "lucide-react";
 import PhieuNLNgay from "@/features/imports/DailyImportInvoice";
+import BaoCaoNhap from "@/features/imports/ImportReport";
 import { cn } from "@/lib/utils";
 
 import { HopDoiLoaiHangLoat } from "./BulkTypeChange";
@@ -259,8 +260,8 @@ export default function NhapNguyenLieuScreen() {
 
   /* Ghi chuyến: đầu chuyến ở trên, cả BẢNG loại hàng điền một lượt rồi lưu. */
   const [phien, setPhien] = useState<DauChuyen | null>(null);
-  /** Hai chế độ: "nhap" = form ghi (mặc định, form-first cho tổ xưởng); "so" = sổ + báo cáo. */
-  const [cheDo, setCheDo] = useState<"nhap" | "so">("nhap");
+  /** Ba chế độ phẳng: "nhap" = form ghi (mặc định); "so" = sổ ngày; "bao-cao" = báo cáo tổng hợp. */
+  const [cheDo, setCheDo] = useState<"nhap" | "so" | "bao-cao">("nhap");
   const [chuyenInTem, setChuyenInTem] = useState<ImportShipment | null>(null);
   const [chuyenIdPhien, setChuyenIdPhien] = useState<string | null>(null);
   const [dongBang, setDongBang] = useState<DongBang[]>([]);
@@ -1068,8 +1069,22 @@ export default function NhapNguyenLieuScreen() {
           >
             📖 Sổ ngày
           </button>
+          <button
+            type="button"
+            onClick={() => setCheDo("bao-cao")}
+            className={cn(
+              "flex-1 border-l-2 border-border px-4 py-2.5 text-base font-semibold transition-colors sm:flex-none",
+              cheDo === "bao-cao"
+                ? "bg-primary text-primary-foreground"
+                : "bg-card text-muted-foreground hover:bg-muted"
+            )}
+          >
+            📊 Báo cáo
+          </button>
         </div>
       </div>
+
+      {cheDo === "bao-cao" && <BaoCaoNhap />}
 
       {doiLoaiMo && (
         <HopDoiLoaiHangLoat
@@ -1091,7 +1106,9 @@ export default function NhapNguyenLieuScreen() {
         />
       )}
 
-      <DailyTaskReminder daChot={daChotNhapHomNay} viec={`chuyến nhập nguyên liệu hôm nay — xưởng ${xuongGhi}`} />
+      {cheDo !== "bao-cao" && (
+        <DailyTaskReminder daChot={daChotNhapHomNay} viec={`chuyến nhập nguyên liệu hôm nay — xưởng ${xuongGhi}`} />
+      )}
 
       {cheDo === "nhap" && formGhi}
 
@@ -1413,8 +1430,8 @@ export default function NhapNguyenLieuScreen() {
         </>
       )}
 
-      {/* Chốt số liệu ngày — đặt CUỐI: xem hết sổ + phế liệu rồi mới chốt */}
-      {xemMotNgayMotXuong && (
+      {/* Chốt số liệu ngày — đặt CUỐI: xem hết sổ + phế liệu rồi mới chốt (ẩn ở tab Báo cáo) */}
+      {cheDo !== "bao-cao" && xemMotNgayMotXuong && (
         <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 rounded-xl border-2 border-border px-4 py-3">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             {dangKhoa ? (

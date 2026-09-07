@@ -1,1 +1,1 @@
-export { default } from "./ImportTab";
+export { default } from "./MaterialImportScreen";

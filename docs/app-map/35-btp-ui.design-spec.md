@@ -1,8 +1,25 @@
 > Load khi: thiết kế/build 3 màn module WIP — Sản xuất BTP, Kho dự trữ, Đơn đặt.
 covers: src/features/production/WipProductionScreen.tsx, src/features/warehouse/ReserveWarehouseScreen.tsx, src/features/orders/SalesOrderScreen.tsx
-last_verified: 2026-08-07
+last_verified: 2026-09-07
 ttl_days: 90
-status: design-spec — ĐÃ BUILD v1 (còn thiếu: QA screenshot 3 viewport, nav gom nhóm, một số AC tồn nâng cao)
+status: design-spec — ĐÃ BUILD v1 (còn thiếu: QA screenshot 3 viewport, một số AC tồn nâng cao)
+<!-- re-verified: 2026-09-07 — màn Sản xuất BTP ghi INLINE form-first (không dialog),
+     nhập bảng nhóm (chế biến × khách) + chốt ngày SX + ghi bù + báo cáo TP ngày;
+     đã đối chiếu WipProductionScreen.tsx trước khi tối ưu thao tác. -->
+
+> **Cập nhật 2026-09-07 (tối ưu thao tác ghi TP ngày — màn Sản xuất BTP `/wip`):**
+> ghi nay là **form-first INLINE** (không phải dialog "Ghi sản lượng" như bản
+> thiết kế gốc). Bốn tối ưu giảm thao tác, GIỮ nguyên dữ liệu lưu:
+> - **Nhóm mở sẵn + dòng trống** ngay khi vào — gõ thành phẩm liền, bỏ bước "Thêm
+>   nhóm" bắt buộc.
+> - **Nhãn nhóm (kiểu chế biến × khách) sửa tại chỗ** ở đầu mỗi nhóm; nhóm có
+>   `groupId` ổn định (chỉ state form, KHÔNG lưu DB) nên sửa nhãn không remount /
+>   mất focus. Dữ liệu lưu vẫn là `processingType` + `customerName` trên từng dòng.
+> - **Dòng trống tự hiện** sau mỗi dòng ĐỦ (có mã + kg) — kiểu bảng tính, hết bấm
+>   "Thêm thành phẩm" từng dòng.
+> - **Nhớ phân xưởng theo máy** (`bsf.wip-xuong.v1`) + phiếu mới **điền sẵn nhóm
+>   gần nhất** — ngày/người đã tự động ⇒ lặp cùng ngày/xưởng/chế biến/khách = 0
+>   thao tác chọn lại.
 
 # DESIGN-SPEC — Module WIP (Sản xuất BTP · Kho dự trữ · Đơn đặt)
 
@@ -93,4 +110,5 @@ Tablet/desktop: sidebar 4 nhóm collapse được. Mobile 390px: bottom tab 5 m�
 Sau khi code: preview → screenshot mỗi màn ở **3 viewport** (tablet 1024 · desktop 1280 · mobile 390) + bật **cỡ chữ 130% / mật độ Gọn**. Check: 1 primary/màn · badge ≤2 từ · touch ≥44px · dropdown thấy thanh cuộn · không `text-xs`/uppercase trong features · tồn nhiều lô không vỡ. Lỗi → sửa → chụp lại. *(Bằng chứng screenshot bổ sung khi build, chưa có ở pha design.)*
 
 ## History
+- 2026-09-07 — tối ưu thao tác ghi TP ngày (`/wip`): form-first inline · nhóm mở sẵn + dòng trống tự hiện · nhãn nhóm sửa tại chỗ (groupId ổn định) · nhớ phân xưởng theo máy + điền sẵn nhóm gần nhất. GIỮ schema/repo. Kèm fix scroll thanh bên/drawer không tràn (`overscroll-contain` ở `scroll-nice`). Đã verify preview: build xanh · 360px+130% không cuộn ngang · auto-row · lưu/điền lại nhóm.
 - 2026-08-07 — design-spec từ ba-spec 34 (ui-design-logic). Chưa code. Bước tiếp: build (bảng+migration+3 màn) → QA screenshot loop.

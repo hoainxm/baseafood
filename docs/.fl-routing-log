@@ -8,3 +8,4 @@
 2026-08-22 | db/can-doi-ky | docs/app-map/31-can-doi-ky.md, docs/app-map/03-database.md, docs/demo/cach-doc-excel.md
 2026-09-05 | cross(nav·nhap-hang·san-xuat·can-doi·bao-cao) | 02-pages-navigation.md,32-danh-muc.md,01-app-structure.md,30-nhap-hang.md,34-btp-san-xuat-kho.ba-spec.md,31-can-doi-ky.md,03-database.md,hop-2026-09-02-form-nhap-trace-gia-qc.md,flow-end-to-end-2-bo-phan.md
 2026-09-06 | ui(form-first)·nhap-hang·san-xuat | hop-2026-09-02-form-nhap-trace-gia-qc.md,BAN-GIAO-tiep-theo.md,30-nhap-hang.md,34-btp-san-xuat-kho.ba-spec.md,35-btp-ui.design-spec.md,design-system-README.md,02-pages-navigation.md
+2026-09-07 | production/ui | docs/app-map/34-btp-san-xuat-kho.ba-spec.md, docs/app-map/35-btp-ui.design-spec.md, docs/app-map/02-pages-navigation.md, src/design-system/README.md, docs/app-map/04-tang-du-lieu.md, docs/trien-khai/hop-2026-09-02-form-nhap-trace-gia-qc.md

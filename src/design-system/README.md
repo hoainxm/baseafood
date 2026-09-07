@@ -130,6 +130,17 @@ ngoài màn mà người dùng không biết là còn.
 **Cấm** viết `<table className="min-w-[1120px]">` tay trong màn mới rồi bọc
 `overflow-x-auto` và coi là xong.
 
+### 5c. Vùng cuộn không được TRÀN ra ngoài (`overscroll-contain`)
+
+Mọi vùng cuộn riêng (thanh bên, drawer điện thoại, cột nội dung, thân dialog)
+dùng utility **`scroll-nice`** (`tokens.css`), đã gắn sẵn
+`overscroll-behavior: contain`. Nhờ vậy cuộn hết một vùng thì DỪNG, không
+"chuyền" (scroll-chaining) sang phần tử phía sau — trước đây thiếu dòng này nên
+cuộn hết thanh bên / drawer là **nội dung trang phía sau trôi theo** (vi phạm
+luật "thanh bên và vùng nội dung cuộn riêng" ở `AppShell`). Đặt một chỗ ở token
+nên áp cho mọi nơi; **đừng gỡ** khi chỉnh `scroll-nice`. Cần một vùng cuộn mới
+không tràn ⇒ thêm class `scroll-nice`, không tự viết `overflow` rời.
+
 ### 5a. Bẫy: dropdown đã đóng vẫn ăn click
 
 Radix chỉ gỡ nội dung Popover/Select khỏi DOM khi **animation thoát kết thúc**.

@@ -305,6 +305,13 @@
 @utility scroll-nice {
   scrollbar-width: thin;
   scrollbar-color: var(--border) transparent;
+  /* Cuộn RIÊNG, không chuyền ra ngoài: cuộn hết vùng này thì DỪNG, không đẩy
+     tiếp phần tử phía sau/xung quanh. Trước đây thiếu dòng này nên cuộn hết
+     thanh bên (hoặc drawer điện thoại) là NỘI DUNG TRANG PHÍA SAU trôi theo —
+     đúng luật "thanh bên và vùng nội dung cuộn riêng" (AppShell). Áp một chỗ ở
+     token nên mọi vùng scroll-nice (nav sidebar · nav drawer · cột nội dung ·
+     thân dialog) đều tự chặn cuộn-chuyền. */
+  overscroll-behavior: contain;
   &::-webkit-scrollbar {
     width: 9px;
     height: 9px;

@@ -1,6 +1,7 @@
 > Load khi: thêm/bớt màn hình, đổi điều hướng, header, hay tìm xem một màn được gắn vào đâu.
 covers: src/App.tsx, src/features/shared/AppShell.tsx, src/features/shared/NotFound.tsx, src/features/shared/guideContent.tsx, src/lib/nav-access.ts
-last_verified: 2026-09-05
+last_verified: 2026-09-06
+<!-- updated: 2026-09-06 — (A) NAV: gom deep-link danh mục về MỘT mục "Tra cứu"/module (helper TRACUU, icon Search) thay 1-mục-mỗi-tab (bỏ Đại lý+Loại NL riêng ở Nhập hàng…) — danh mục vốn 1 trang nhiều tab; "Danh mục" đầy đủ vẫn ở Hệ thống. gomCay: BỎ nhánh deep-link mồ côi khi module không có màn thật nào (vai trò bộ phận). (B) FORM-FIRST: /imports + /wip đổi "trang quản lý + Dialog nhập" → toggle 2 chế độ "📝 Ghi nhập" (form inline, tự mở phiếu trống, KHÔNG modal) ↔ "📖 Sổ ngày[& báo cáo]"; form dùng lại 100% logic (luuPhien/chốt/phế liệu), ngày+xưởng của phiếu đồng bộ về bộ lọc (2 useEffect). Bỏ Dialog ghi. Xem 30-nhap-hang + 34-btp. -->
 <!-- re-verified: 2026-09-05 — nav-access gate (allowedIds/homeFor/DEMO) khớp source; App.tsx lọc KIT_NAV theo quyền + demoGuard giữ nguyên. -->
 <!-- updated: 2026-09-05 — (A1 họp 2026-09-02 QĐ-9) NAV CÂY module-centric: NHOM_NAV (danh sách phẳng ids) → CAY_NAV (cây gập/mở, mỗi nhóm = module, con = màn + DEEP-LINK tra danh mục ngay trong module). AppShell: gomCay() phân giải cây theo `items` đã lọc quyền; CayNav render nhóm gập/mở (nhớ trạng thái ở localStorage `bsf1:nav-nhom`, mặc định MỞ; nhóm 1 màn hiện thẳng, không tiêu đề); thu gọn sidebar (thuGon) = icon-only, bỏ deep-link danh mục. Deep-link danh mục = `catalog?tab=<tab>` (gateId="catalog" để giữ gate 2 bộ phận). App.tsx truyền `activeTab` (searchParams `tab`) để tô sáng đúng deep-link; onSelect navigate(`/${target}`) nhận cả path có query. CatalogScreen điều khiển tab bằng `useSearchParams` (?tab=) — MỘT nguồn danh mục, chỉ đổi tab. `index.ts` export CAY_NAV (thay NHOM_NAV). -->
 ttl_days: 90
@@ -39,15 +40,15 @@ Cả hai dùng CHUNG một cây nav (`CayNav`) dựng từ `KIT_NAV` (danh sách
 | Nhóm (module) | Con — màn + (deep-link danh mục) |
 |---|---|
 | Tổng quan | `dashboard` |
-| Nhập hàng | `imports` · `nxt-nl` · (Đại lý `?tab=dai-ly`) · (Loại NL `?tab=loai-nl`) |
-| Sản xuất | `wip` · `packaging` · `qc` · (Mặt hàng `?tab=mat-hang`) · `production` · `quality` |
+| Nhập hàng | `imports` · `nxt-nl` · (**Tra cứu** → `catalog?tab=dai-ly`) |
+| Sản xuất | `wip` · `packaging` · `qc` · (**Tra cứu** → `catalog?tab=mat-hang`) · `production` · `quality` |
 | Kho | `warehouse` · `qr` · `nxt-kho` · `cold-storage` |
-| Kinh doanh | `sales` · `orders` · (Khách hàng `?tab=khach-hang`) |
+| Kinh doanh | `sales` · `orders` · (**Tra cứu** → `catalog?tab=khach-hang`) |
 | Báo cáo & Cân đối | `balancing` · `bc-thanh-pham` · `bc-don-xuat` · `nxt` · `reports` · `traceability` |
 | Hệ thống | `catalog` (danh mục đầy đủ) · `users` (chỉ admin) · `audit` (chỉ admin) |
 
 - **Gập/mở**: mỗi nhóm là nút gập/mở (chevron), nhớ trạng thái theo máy (`localStorage bsf1:nav-nhom`, mặc định MỞ). Nhóm chỉ 1 màn (Tổng quan) hiện thẳng, không có tiêu đề gập.
-- **Deep-link danh mục**: mở đúng tab của `/catalog` qua `?tab=` — **MỘT nguồn danh mục duy nhất** (không nhân bản), `CatalogScreen` đọc tab bằng `useSearchParams`. Kiểm quyền theo `gateId="catalog"`, nên gate 2 bộ phận (`nav-access.ts`) không vỡ.
+- **Tra cứu (deep-link danh mục)**: mỗi module có MỘT mục "Tra cứu" mở đúng tab liên quan của `/catalog` qua `?tab=` (helper `TRACUU`, icon `Search`) — **MỘT nguồn danh mục duy nhất** (không nhân bản, không tách 1-mục-mỗi-tab), `CatalogScreen` đọc tab bằng `useSearchParams`. Kiểm quyền theo `gateId="catalog"`, nên gate 2 bộ phận (`nav-access.ts`) không vỡ. `gomCay` bỏ nhánh Tra cứu **mồ côi** khi module không có màn thật nào người dùng thấy.
 - Mục có trong `KIT_NAV` (đã lọc quyền) nhưng thiếu trong `CAY_NAV` rơi vào nhóm **"Khác"** — không mất, nhưng là dấu hiệu quên xếp nhánh.
 - Thu gọn sidebar (`thuGon`, chỉ desktop) = icon-only: bỏ deep-link danh mục (còn nút Danh mục đầy đủ), bỏ qua trạng thái gập.
 

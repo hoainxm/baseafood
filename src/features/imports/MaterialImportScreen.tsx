@@ -3,7 +3,7 @@
 // Tên tiếng Việt: Màn hình Nhập Nguyên Liệu ngày
 // Description: Material Import Management Screen
 // ============================================================
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type {
   DailyLock,
   ImportShipment,
@@ -72,6 +72,7 @@ import {
   Replace,
 } from "lucide-react";
 import PhieuNLNgay from "@/features/imports/DailyImportInvoice";
+import { cn } from "@/lib/utils";
 
 import { HopDoiLoaiHangLoat } from "./BulkTypeChange";
 
@@ -258,6 +259,8 @@ export default function NhapNguyenLieuScreen() {
 
   /* Ghi chuyến: đầu chuyến ở trên, cả BẢNG loại hàng điền một lượt rồi lưu. */
   const [phien, setPhien] = useState<DauChuyen | null>(null);
+  /** Hai chế độ: "nhap" = form ghi (mặc định, form-first cho tổ xưởng); "so" = sổ + báo cáo. */
+  const [cheDo, setCheDo] = useState<"nhap" | "so">("nhap");
   const [chuyenInTem, setChuyenInTem] = useState<ImportShipment | null>(null);
   const [chuyenIdPhien, setChuyenIdPhien] = useState<string | null>(null);
   const [dongBang, setDongBang] = useState<DongBang[]>([]);
@@ -452,6 +455,22 @@ export default function NhapNguyenLieuScreen() {
     setMoPhuPhien(false);
   };
 
+  // Form-first: vào "Ghi nhập" mà chưa có phiếu → tự mở phiếu trống (không modal).
+  useEffect(() => {
+    if (cheDo === "nhap" && phien === null && !dangTai) moThem();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cheDo, phien, dangTai]);
+
+  // Trong "Ghi nhập", ngày+xưởng của PHIẾU là ngữ cảnh → đồng bộ về bộ lọc để
+  // sổ/phế liệu/chốt/tổng ngày bám đúng ngày đang ghi.
+  useEffect(() => {
+    if (cheDo === "nhap" && phien) {
+      setKy("ngay");
+      setNgay(phien.deliveryDate);
+      setPhanXuong(phien.workshop);
+    }
+  }, [cheDo, phien?.deliveryDate, phien?.workshop]);
+
   /** Mở lại một chuyến đã ghi để sửa — dùng CHUNG dialog với ghi chuyến mới. */
   const moSuaChuyen = (n: NhomChuyen) => {
     setPhien({
@@ -482,6 +501,7 @@ export default function NhapNguyenLieuScreen() {
     setNgayLienNhau((n.postingDate || n.deliveryDate) === n.deliveryDate);
     setLoiPhien([]);
     setMoPhuPhien(false);
+    setCheDo("nhap"); // sửa chuyến mở trong form inline (chế độ Ghi nhập)
   };
 
   const datPhien = <K extends keyof DauChuyen>(k: K, v: DauChuyen[K]) =>
@@ -679,11 +699,6 @@ export default function NhapNguyenLieuScreen() {
     setLoiPhien([]);
   };
 
-  /** Đóng bằng X / Esc / bấm ra ngoài: đủ thì lưu, chưa đủ thì bỏ (không nài lỗi). */
-  const dongKhongLuu = () => {
-    luuPhien(true);
-    datLaiPhien();
-  };
 
   /* ---- Xóa cả chuyến đang sửa (nút trong dialog) ---- */
 
@@ -804,6 +819,221 @@ export default function NhapNguyenLieuScreen() {
       : []),
   ];
 
+  // FORM NHẬP (form-first) — trước đây trong Dialog, nay render INLINE ở chế độ
+  // "Ghi nhập": điền như tờ giấy (đầu chuyến · loại hàng · phế liệu), không modal.
+  const formGhi = phien && (
+    <div className="space-y-6 rounded-xl border-2 border-border bg-card p-4 md:p-6">
+      <ErrorSummary loi={loiPhien} />
+      <ChuThichBatBuoc />
+
+      {chotPhien && (
+        <p className="flex items-start gap-3 rounded-lg bg-accent px-4 py-3 text-base text-accent-foreground">
+          <Lock className="mt-0.5 size-6 shrink-0" aria-hidden />
+          <span>
+            Ngày {viDate(phien.deliveryDate)} · xưởng {phien.workshop}{" "}
+            <strong>đã chốt</strong>. Vẫn ghi được nhưng là <strong>ghi bù</strong>{" "}
+            — bắt buộc ghi rõ lý do.
+          </span>
+        </p>
+      )}
+
+      {dangSuaChuyen && soDongDaLuu > 0 && (
+        <p className="flex items-start gap-3 rounded-lg bg-accent px-4 py-3 text-base text-accent-foreground">
+          <TriangleAlert className="mt-0.5 size-6 shrink-0" aria-hidden />
+          <span>
+            Sửa đầu chuyến sẽ áp cho <strong>{soDongDaLuu} dòng</strong> đã ghi
+            trong chuyến này.
+          </span>
+        </p>
+      )}
+
+      <div className="grid gap-6 sm:grid-cols-2">
+        <DateField
+          label="Ngày ghi sổ"
+          required
+          info="Ngày ghi vào hệ thống. Chọn ngày này thì ngày hàng về tự nhảy theo (cho tới khi bạn tự sửa)."
+          value={phien.postingDate}
+          onChange={doiNgayGhiSo}
+        />
+        <DateField
+          label="Ngày hàng về xưởng"
+          required
+          info="Ngày xe đổ hàng thật — mọi tổng hợp tính theo ngày này. Mặc định đi theo ngày ghi sổ; sửa tay khi hàng về hôm khác (ghi bù)."
+          value={phien.deliveryDate}
+          onChange={doiNgayVe}
+        />
+      </div>
+
+      {(isBackdatedImport(phien) || chotPhien) && (
+        <Field
+          label="Lý do ghi bù"
+          required
+          hint="VD: đại lý chưa xuất hóa đơn, 31/7 mới có chứng từ."
+        >
+          <Input
+            value={phien.backdateReason}
+            onChange={(e) => datPhien("backdateReason", e.target.value)}
+            placeholder="Vì sao tới hôm nay mới ghi?"
+          />
+        </Field>
+      )}
+
+      <Combobox
+        label="Phân xưởng"
+        required
+        choPhepXoa={false}
+        value={phien.workshop}
+        onChange={(v) => datPhien("workshop", v as Workshop)}
+        options={PHAN_XUONG.map((p) => ({ value: p, label: p }))}
+      />
+
+      <Combobox
+        label="Đại lý giao hàng"
+        required
+        hint="Chọn trong danh mục. Chưa có thì gõ tên rồi bấm Thêm mới."
+        value={phien.supplierName}
+        onChange={(v) => datPhien("supplierName", v)}
+        options={optDaiLy}
+        onCreate={themDaiLy}
+        emptyText="Chưa có đại lý nào trong danh mục."
+      />
+
+      <div className="rounded-xl border-2 border-border">
+        <button
+          type="button"
+          onClick={() => setMoPhuPhien((v) => !v)}
+          aria-expanded={moPhuPhien}
+          className="flex min-h-14 w-full items-center justify-between px-4 text-base font-semibold"
+        >
+          Xe và ghi chú của chuyến (không bắt buộc)
+          <ChevronDown
+            className={`size-6 transition-transform ${moPhuPhien ? "rotate-180" : ""}`}
+            aria-hidden
+          />
+        </button>
+        {moPhuPhien && (
+          <div className="space-y-5 border-t-2 border-border p-4">
+            <div className="grid gap-5 sm:grid-cols-2">
+              <Field label="Tài xế">
+                <Input
+                  value={phien.driverName}
+                  onChange={(e) => datPhien("driverName", e.target.value)}
+                  placeholder="Tên tài xế"
+                />
+              </Field>
+              <Field label="Biển số xe">
+                <Input
+                  value={phien.licensePlate}
+                  onChange={(e) => datPhien("licensePlate", e.target.value)}
+                  placeholder="VD: 86C 19555"
+                />
+              </Field>
+            </div>
+            <Field label="Ghi chú">
+              <Input
+                value={phien.note}
+                onChange={(e) => datPhien("note", e.target.value)}
+                placeholder="Ghi chú thêm (nếu có)"
+              />
+            </Field>
+            <div className="grid gap-5 sm:grid-cols-2">
+              <Field
+                label="Mã SSCC (nhà nước)"
+                hint="Để trống nếu chưa được cấp — điền sau."
+              >
+                <Input
+                  value={phien.ssccCode}
+                  onChange={(e) => datPhien("ssccCode", e.target.value)}
+                  placeholder="Chưa có — điền sau"
+                />
+              </Field>
+              <Field label="Mã lô nội bộ" hint="Tự sinh, dùng để truy xuất.">
+                <div className="flex min-h-11 items-center tnum text-base text-muted-foreground">
+                  {chuyenIdPhien
+                    ? chuyen.find((c) => c.id === chuyenIdPhien)?.lotCode ||
+                      "— (dữ liệu cũ)"
+                    : sinhMaLo(phien.deliveryDate, phien.workshop, chuyen)}
+                </div>
+              </Field>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="border-t-2 border-border pt-1" />
+
+      {/* Bảng loại hàng — nhập cả chuyến một lượt, lưu một lần */}
+      <div className="space-y-4 rounded-xl border-2 border-primary/40 bg-accent/40 p-4">
+        <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+          <p className="text-base font-semibold">Các loại hàng trong chuyến</p>
+          <p className="text-sm text-muted-foreground">
+            Mỗi loại một dòng. Cần thêm loại nữa thì bấm “Thêm loại hàng” ở cuối.
+            Đơn giá để trống nếu chưa có hóa đơn.
+          </p>
+        </div>
+
+        <BangDongHang
+          dong={dongBang}
+          onSua={capNhatDong}
+          onBo={boDong}
+          onThem={themDongMoi}
+          optLoaiTheoLoai={optLoaiNLTheoLoai}
+          onTaoLoai={themLoaiNL}
+        />
+
+        {dongHopLe.length > 0 && (
+          <div className="flex flex-wrap items-baseline justify-end gap-x-6 gap-y-1">
+            <span className="text-base text-muted-foreground">
+              {dongHopLe.length} loại · chuyến này
+            </span>
+            <span className="tnum text-lg font-semibold">{kg(tongChuyen)}</span>
+            {tienChuyen > 0 && (
+              <span className="tnum text-base text-muted-foreground">
+                {num(tienChuyen)} đ
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Phế liệu cân trong ngày — GỘP CHUNG một chỗ với nguyên liệu */}
+      <KhoiPheLieuNgay
+        ngay={phien.deliveryDate}
+        phanXuong={phien.workshop}
+        rows={pheLieu}
+        onChange={persistPheLieu}
+        khoa={chotPhien}
+      />
+
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <span className="text-base text-muted-foreground">
+          Tổng ngày {viDate(phien.deliveryDate)} · xưởng {phien.workshop}:{" "}
+          <span className="tnum text-xl font-semibold text-foreground">
+            {kg(tongNgayPhien)}
+          </span>
+        </span>
+        <div className="flex flex-wrap gap-2">
+          {dangSuaChuyen ? (
+            <ConfirmDelete
+              moTaBanGhi={`Chuyến ${phien?.supplierName || "(chưa có đại lý)"} — ${viDate(phien?.deliveryDate ?? "")} — ${soDongDaLuu} dòng — ${kg(tongChuyen)}`}
+              onConfirm={xoaChuyenDangSua}
+              tieuDe="Xóa cả chuyến này?"
+              nhanNut="Xóa chuyến"
+            />
+          ) : (
+            <Button variant="outline" size="lg" onClick={luuThemChuyenKhac}>
+              <Truck />
+              Lưu &amp; thêm chuyến khác
+            </Button>
+          )}
+          <Button size="lg" onClick={xongChuyen}>
+            {dangSuaChuyen ? "Lưu chuyến" : "Lưu vào sổ"}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -812,31 +1042,32 @@ export default function NhapNguyenLieuScreen() {
             Nhập hàng về xưởng
           </h1>
         </div>
-        {/* Mobile-first: nút CHÍNH "Ghi nhập" lên đầu + full-width cho tổ dưới
-            xưởng (thao tác gõ điện thoại); hành động phụ xuống hàng dưới, gọn. */}
-        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-          <Button size="lg" onClick={moThem} className="w-full sm:w-auto">
-            <Plus />
-            Ghi nhập trong ngày
-          </Button>
-          <Button
-            variant="outline"
-            size="lg"
-            onClick={() => setXemPhieu(true)}
-            className="w-full sm:w-auto"
+        {/* Tách rõ NHẬP với TRA CỨU: một màn làm một việc. */}
+        <div className="flex w-full overflow-hidden rounded-xl border-2 border-border sm:w-auto">
+          <button
+            type="button"
+            onClick={() => setCheDo("nhap")}
+            className={cn(
+              "flex-1 px-4 py-2.5 text-base font-semibold transition-colors sm:flex-none",
+              cheDo === "nhap"
+                ? "bg-primary text-primary-foreground"
+                : "bg-card text-muted-foreground hover:bg-muted"
+            )}
           >
-            <FileText />
-            Xem báo cáo
-          </Button>
-          <Button
-            variant="outline"
-            size="lg"
-            onClick={() => setDoiLoaiMo(true)}
-            className="w-full sm:w-auto"
+            📝 Ghi nhập
+          </button>
+          <button
+            type="button"
+            onClick={() => setCheDo("so")}
+            className={cn(
+              "flex-1 border-l-2 border-border px-4 py-2.5 text-base font-semibold transition-colors sm:flex-none",
+              cheDo === "so"
+                ? "bg-primary text-primary-foreground"
+                : "bg-card text-muted-foreground hover:bg-muted"
+            )}
           >
-            <Replace />
-            Đổi loại hàng loạt
-          </Button>
+            📖 Sổ ngày
+          </button>
         </div>
       </div>
 
@@ -861,6 +1092,21 @@ export default function NhapNguyenLieuScreen() {
       )}
 
       <DailyTaskReminder daChot={daChotNhapHomNay} viec={`chuyến nhập nguyên liệu hôm nay — xưởng ${xuongGhi}`} />
+
+      {cheDo === "nhap" && formGhi}
+
+      {cheDo === "so" && (
+        <>
+      <div className="flex flex-wrap gap-2">
+        <Button variant="outline" size="lg" onClick={() => setXemPhieu(true)}>
+          <FileText />
+          Xem báo cáo
+        </Button>
+        <Button variant="outline" size="lg" onClick={() => setDoiLoaiMo(true)}>
+          <Replace />
+          Đổi loại hàng loạt
+        </Button>
+      </div>
 
       <ThongKe
         className="grid-cols-2 sm:grid-cols-3 lg:grid-cols-5"
@@ -1023,13 +1269,13 @@ export default function NhapNguyenLieuScreen() {
             locGia === "thieu-gia"
               ? "Đang lọc “Chưa có giá”. Bỏ lọc để xem đủ sổ."
               : phanXuong === "Tất cả"
-                ? "Bấm nút dưới để ghi chuyến đầu tiên."
-                : `Phân xưởng ${phanXuong}. Bấm nút dưới để ghi chuyến đầu tiên.`
+                ? "Chuyển sang “Ghi nhập” để ghi chuyến đầu tiên."
+                : `Phân xưởng ${phanXuong}. Chuyển sang “Ghi nhập” để ghi chuyến.`
           }
           action={
-            <Button size="lg" onClick={moThem}>
+            <Button size="lg" onClick={() => setCheDo("nhap")}>
               <Plus />
-              Ghi nhập trong ngày
+              Sang Ghi nhập
             </Button>
           }
         />
@@ -1164,6 +1410,8 @@ export default function NhapNguyenLieuScreen() {
           chiXem
         />
       )}
+        </>
+      )}
 
       {/* Chốt số liệu ngày — đặt CUỐI: xem hết sổ + phế liệu rồi mới chốt */}
       {xemMotNgayMotXuong && (
@@ -1224,249 +1472,7 @@ export default function NhapNguyenLieuScreen() {
         </div>
       )}
 
-      {/* ---- Hộp thoại: ghi chuyến ---- */}
-      <Dialog
-        open={phien !== null}
-        onOpenChange={(o) => {
-          if (!o) dongKhongLuu();
-        }}
-      >
-        <DialogContent className="max-h-[92vh] w-full overflow-y-auto sm:max-w-3xl lg:max-w-5xl">
-          <DialogHeader>
-            <DialogTitle className="text-2xl">
-              {dangSuaChuyen ? "Sửa chuyến" : "Ghi nhập trong ngày"}
-            </DialogTitle>
-            <DialogDescription className="text-base">
-              {dangSuaChuyen
-                ? "Sửa đầu chuyến (áp cho mọi dòng), bảng loại hàng và phế liệu bên dưới, rồi bấm Lưu."
-                : "Một chỗ ghi cả chuyến: đầu chuyến (đại lý, ngày, xe) · các loại hàng · phế liệu cân trong ngày. Nguyên liệu lưu khi bấm Lưu; phế liệu lưu ngay khi thêm."}
-            </DialogDescription>
-          </DialogHeader>
-
-          {phien && (
-            <div className="space-y-6 py-2">
-                  <ErrorSummary loi={loiPhien} />
-                  <ChuThichBatBuoc />
-
-                  {chotPhien && (
-                    <p className="flex items-start gap-3 rounded-lg bg-accent px-4 py-3 text-base text-accent-foreground">
-                      <Lock className="mt-0.5 size-6 shrink-0" aria-hidden />
-                      <span>
-                        Ngày {viDate(phien.deliveryDate)} · xưởng {phien.workshop}{" "}
-                        <strong>đã chốt</strong>. Vẫn ghi được nhưng là{" "}
-                        <strong>ghi bù</strong> — bắt buộc ghi rõ lý do.
-                      </span>
-                    </p>
-                  )}
-
-                  {dangSuaChuyen && soDongDaLuu > 0 && (
-                    <p className="flex items-start gap-3 rounded-lg bg-accent px-4 py-3 text-base text-accent-foreground">
-                      <TriangleAlert className="mt-0.5 size-6 shrink-0" aria-hidden />
-                      <span>
-                        Sửa đầu chuyến sẽ áp cho{" "}
-                        <strong>{soDongDaLuu} dòng</strong> đã ghi trong chuyến
-                        này.
-                      </span>
-                    </p>
-                  )}
-
-                  <div className="grid gap-6 sm:grid-cols-2">
-                    <DateField
-                      label="Ngày ghi sổ"
-                      required
-                      info="Ngày ghi vào hệ thống. Chọn ngày này thì ngày hàng về tự nhảy theo (cho tới khi bạn tự sửa)."
-                      value={phien.postingDate}
-                      onChange={doiNgayGhiSo}
-                    />
-                    <DateField
-                      label="Ngày hàng về xưởng"
-                      required
-                      info="Ngày xe đổ hàng thật — mọi tổng hợp tính theo ngày này. Mặc định đi theo ngày ghi sổ; sửa tay khi hàng về hôm khác (ghi bù)."
-                      value={phien.deliveryDate}
-                      onChange={doiNgayVe}
-                    />
-                  </div>
-
-                  {(isBackdatedImport(phien) || chotPhien) && (
-                    <Field
-                      label="Lý do ghi bù"
-                      required
-                      hint="VD: đại lý chưa xuất hóa đơn, 31/7 mới có chứng từ."
-                    >
-                      <Input
-                        value={phien.backdateReason}
-                        onChange={(e) => datPhien("backdateReason", e.target.value)}
-                        placeholder="Vì sao tới hôm nay mới ghi?"
-                      />
-                    </Field>
-                  )}
-
-                  <Combobox
-                    label="Phân xưởng"
-                    required
-                    choPhepXoa={false}
-                    value={phien.workshop}
-                    onChange={(v) => datPhien("workshop", v as Workshop)}
-                    options={PHAN_XUONG.map((p) => ({ value: p, label: p }))}
-                  />
-
-                  <Combobox
-                    label="Đại lý giao hàng"
-                    required
-                    hint="Chọn trong danh mục. Chưa có thì gõ tên rồi bấm Thêm mới."
-                    value={phien.supplierName}
-                    onChange={(v) => datPhien("supplierName", v)}
-                    options={optDaiLy}
-                    onCreate={themDaiLy}
-                    emptyText="Chưa có đại lý nào trong danh mục."
-                  />
-
-                  <div className="rounded-xl border-2 border-border">
-                    <button
-                      type="button"
-                      onClick={() => setMoPhuPhien((v) => !v)}
-                      aria-expanded={moPhuPhien}
-                      className="flex min-h-14 w-full items-center justify-between px-4 text-base font-semibold"
-                    >
-                      Xe và ghi chú của chuyến (không bắt buộc)
-                      <ChevronDown
-                        className={`size-6 transition-transform ${moPhuPhien ? "rotate-180" : ""}`}
-                        aria-hidden
-                      />
-                    </button>
-                    {moPhuPhien && (
-                      <div className="space-y-5 border-t-2 border-border p-4">
-                        <div className="grid gap-5 sm:grid-cols-2">
-                          <Field label="Tài xế">
-                            <Input
-                              value={phien.driverName}
-                              onChange={(e) => datPhien("driverName", e.target.value)}
-                              placeholder="Tên tài xế"
-                            />
-                          </Field>
-                          <Field label="Biển số xe">
-                            <Input
-                              value={phien.licensePlate}
-                              onChange={(e) =>
-                                datPhien("licensePlate", e.target.value)
-                              }
-                              placeholder="VD: 86C 19555"
-                            />
-                          </Field>
-                        </div>
-                        <Field label="Ghi chú">
-                          <Input
-                            value={phien.note}
-                            onChange={(e) => datPhien("note", e.target.value)}
-                            placeholder="Ghi chú thêm (nếu có)"
-                          />
-                        </Field>
-                        <div className="grid gap-5 sm:grid-cols-2">
-                          <Field
-                            label="Mã SSCC (nhà nước)"
-                            hint="Để trống nếu chưa được cấp — điền sau."
-                          >
-                            <Input
-                              value={phien.ssccCode}
-                              onChange={(e) => datPhien("ssccCode", e.target.value)}
-                              placeholder="Chưa có — điền sau"
-                            />
-                          </Field>
-                          <Field label="Mã lô nội bộ" hint="Tự sinh, dùng để truy xuất.">
-                            <div className="flex min-h-11 items-center tnum text-base text-muted-foreground">
-                              {chuyenIdPhien
-                                ? chuyen.find((c) => c.id === chuyenIdPhien)?.lotCode ||
-                                  "— (dữ liệu cũ)"
-                                : sinhMaLo(phien.deliveryDate, phien.workshop, chuyen)}
-                            </div>
-                          </Field>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="border-t-2 border-border pt-1" />
-
-                  {/* Bảng loại hàng — nhập cả chuyến một lượt, lưu một lần */}
-                  <div className="space-y-4 rounded-xl border-2 border-primary/40 bg-accent/40 p-4">
-                    <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                      <p className="text-base font-semibold">
-                        Các loại hàng trong chuyến
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        Mỗi loại một dòng. Cần thêm loại nữa thì bấm “Thêm loại
-                        hàng” ở cuối. Đơn giá để trống nếu chưa có hóa đơn.
-                      </p>
-                    </div>
-
-                    <BangDongHang
-                      dong={dongBang}
-                      onSua={capNhatDong}
-                      onBo={boDong}
-                      onThem={themDongMoi}
-                      optLoaiTheoLoai={optLoaiNLTheoLoai}
-                      onTaoLoai={themLoaiNL}
-                    />
-
-                    {dongHopLe.length > 0 && (
-                      <div className="flex flex-wrap items-baseline justify-end gap-x-6 gap-y-1">
-                        <span className="text-base text-muted-foreground">
-                          {dongHopLe.length} loại · chuyến này
-                        </span>
-                        <span className="tnum text-lg font-semibold">
-                          {kg(tongChuyen)}
-                        </span>
-                        {tienChuyen > 0 && (
-                          <span className="tnum text-base text-muted-foreground">
-                            {num(tienChuyen)} đ
-                          </span>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Phế liệu cân trong ngày — GỘP CHUNG một chỗ với nguyên liệu */}
-                  <KhoiPheLieuNgay
-                    ngay={phien.deliveryDate}
-                    phanXuong={phien.workshop}
-                    rows={pheLieu}
-                    onChange={persistPheLieu}
-                    khoa={chotPhien}
-                  />
-
-                  {/* Tổng ngày — như "TỔNG CỘNG" cuối sổ giấy */}
-                  <div className="flex flex-wrap items-baseline justify-end gap-x-8 gap-y-2 rounded-xl bg-muted px-5 py-4">
-                    <span className="text-base text-muted-foreground">
-                      Tổng ngày {viDate(phien.deliveryDate)} · xưởng{" "}
-                      {phien.workshop}
-                    </span>
-                    <span className="tnum text-2xl font-semibold">
-                      {kg(tongNgayPhien)}
-                    </span>
-                  </div>
-            </div>
-          )}
-
-          <DialogFooter>
-            {dangSuaChuyen ? (
-              <ConfirmDelete
-                moTaBanGhi={`Chuyến ${phien?.supplierName || "(chưa có đại lý)"} — ${viDate(phien?.deliveryDate ?? "")} — ${soDongDaLuu} dòng — ${kg(tongChuyen)}`}
-                onConfirm={xoaChuyenDangSua}
-                tieuDe="Xóa cả chuyến này?"
-                nhanNut="Xóa chuyến"
-              />
-            ) : (
-              <Button variant="outline" size="lg" onClick={luuThemChuyenKhac}>
-                <Truck />
-                Lưu &amp; thêm chuyến khác
-              </Button>
-            )}
-            <Button size="lg" onClick={xongChuyen}>
-              {dangSuaChuyen ? "Lưu chuyến" : "Lưu vào sổ"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Form ghi chuyến đã chuyển INLINE (chế độ "Ghi nhập" — biến formGhi ở trên). */}
 
       {/* ---- Hộp thoại: chốt ngày ---- */}
       <Dialog open={hoiChot} onOpenChange={setHoiChot}>

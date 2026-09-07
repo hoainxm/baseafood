@@ -47,8 +47,7 @@ import {
   Bell,
   LogOut,
   ChevronDown,
-  Tags,
-  Contact,
+  Search,
   type LucideIcon,
 } from "lucide-react";
 
@@ -128,11 +127,16 @@ export interface NhomCay {
   con: NavCon[];
 }
 
-const CAT = (tab: string, label: string, icon: LucideIcon): NavCon => ({
+/**
+ * MỘT mục "Tra cứu" cho mỗi module — mở đúng danh mục liên quan (deep-link `?tab=`).
+ * Gom về 1 mục thay vì 1-mục-mỗi-tab: danh mục vốn là MỘT trang nhiều tab, không
+ * cần tách sidebar theo từng tab. Danh mục ĐẦY ĐỦ vẫn ở nhóm Hệ thống ("Danh mục").
+ */
+const TRACUU = (tab: string): NavCon => ({
   to: `catalog?tab=${tab}`,
   gateId: "catalog",
-  label,
-  icon,
+  label: "Tra cứu",
+  icon: Search,
 });
 
 export const CAY_NAV: NhomCay[] = [
@@ -140,12 +144,7 @@ export const CAY_NAV: NhomCay[] = [
   {
     ten: "Nhập hàng",
     icon: Truck,
-    con: [
-      { ref: "imports" },
-      { ref: "nxt-nl" },
-      CAT("dai-ly", "Đại lý", Contact),
-      CAT("loai-nl", "Loại nguyên liệu", Boxes),
-    ],
+    con: [{ ref: "imports" }, { ref: "nxt-nl" }, TRACUU("dai-ly")],
   },
   {
     ten: "Sản xuất",
@@ -154,7 +153,7 @@ export const CAY_NAV: NhomCay[] = [
       { ref: "wip" },
       { ref: "packaging" },
       { ref: "qc" },
-      CAT("mat-hang", "Mặt hàng", Tags),
+      TRACUU("mat-hang"),
       { ref: "production" },
       { ref: "quality" },
     ],
@@ -167,7 +166,7 @@ export const CAY_NAV: NhomCay[] = [
   {
     ten: "Kinh doanh",
     icon: ShoppingCart,
-    con: [{ ref: "sales" }, { ref: "orders" }, CAT("khach-hang", "Khách hàng", Users)],
+    con: [{ ref: "sales" }, { ref: "orders" }, TRACUU("khach-hang")],
   },
   {
     ten: "Báo cáo & Cân đối",

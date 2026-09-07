@@ -3,7 +3,7 @@
 // Tên tiếng Việt: Màn hình Ghi Thành Phẩm ngày (sản xuất)
 // Description: Daily finished-goods production entry (v1: product · qty · customer)
 // ============================================================
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import type {
   DailyLock,
   WipProductionItem,
@@ -47,6 +47,7 @@ import {
   type MucChon,
 } from "@/design-system";
 import { kg, num, todayISO, viDate } from "@/lib/format";
+import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
 import { ghiNhatKy } from "@/lib/audit";
 import { KY_OPT, phamViKy, type KyXem } from "@/lib/periodUtils";
@@ -161,6 +162,9 @@ export default function SanXuatBTPScreen() {
   /** Dòng đang sửa có tách không = đã nhập râu/bao tử (ô tách luôn có sẵn). */
   const suaTach =
     (sua?.componentRauKg ?? 0) > 0 || (sua?.componentBaoTuKg ?? 0) > 0;
+
+  /** Hai chế độ: "nhap" = form ghi (mặc định, form-first cho tổ xưởng); "so" = sổ + báo cáo. */
+  const [cheDo, setCheDo] = useState<"nhap" | "so">("nhap");
 
   const [hoiChot, setHoiChot] = useState(false);
   const [ghiChuChot, setGhiChuChot] = useState("");
@@ -322,6 +326,24 @@ export default function SanXuatBTPScreen() {
     datPhien("productionDate", v);
   };
 
+  // Form-first: vào chế độ "Ghi nhập" mà chưa có phiếu → tự mở một phiếu trống
+  // (không cần bấm nút, không modal). Lưu xong phiếu về null → tự mở phiếu mới.
+  useEffect(() => {
+    if (cheDo === "nhap" && phien === null && !dangTai) moThem();
+    // moThem đọc bộ lọc hiện tại; guard theo phien===null nên không lặp.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cheDo, phien, dangTai]);
+
+  // Trong "Ghi nhập", ngày+xưởng của PHIẾU là ngữ cảnh: đồng bộ về bộ lọc để
+  // "đã ghi hôm nay", tổng ngày, chốt ngày, báo cáo A4 bám đúng ngày đang ghi.
+  useEffect(() => {
+    if (cheDo === "nhap" && phien) {
+      setKy("ngay");
+      setNgay(phien.productionDate);
+      setPhanXuong(phien.workshop);
+    }
+  }, [cheDo, phien?.productionDate, phien?.workshop]);
+
   const dongHopLe = dongBang.filter(dongDayDu);
   const tongPhien = dongHopLe.reduce((s, d) => s + tongDong(d), 0);
   const chotDangGhi = phien
@@ -459,11 +481,8 @@ export default function SanXuatBTPScreen() {
     setLoiPhien([]);
   };
   const xongPhien = () => {
+    // Lưu xong → reset phiếu; effect form-first tự mở phiếu trống mới.
     if (luuPhien(false)) datLaiPhien();
-  };
-  const dongKhongLuu = () => {
-    luuPhien(true);
-    datLaiPhien();
   };
 
   /* ---- Sửa / xóa một dòng đã ghi ---- */
@@ -654,6 +673,117 @@ export default function SanXuatBTPScreen() {
     ? (sua?.componentRauKg || 0) + (sua?.componentBaoTuKg || 0)
     : sua?.quantityKg || 0;
 
+  // FORM NHẬP (form-first) — trước đây nằm trong Dialog, nay render INLINE ở chế độ
+  // "Ghi nhập": điền như tờ giấy, không phải mở modal trong trang quản lý.
+  const formGhi = phien && (
+    <div className="space-y-6 rounded-xl border-2 border-border bg-card p-4 md:p-6">
+      <ErrorSummary loi={loiPhien} />
+      <ChuThichBatBuoc />
+
+      {chotDangGhi && (
+        <p className="flex items-start gap-3 rounded-lg bg-accent px-4 py-3 text-base text-accent-foreground">
+          <Lock className="mt-0.5 size-6 shrink-0" aria-hidden />
+          <span>
+            Ngày {viDate(phien.productionDate)} · xưởng {phien.workshop}{" "}
+            <strong>đã chốt</strong> — ghi thêm là <strong>ghi bù</strong>, bắt
+            buộc lý do.
+          </span>
+        </p>
+      )}
+
+      <div className="grid gap-6 sm:grid-cols-2">
+        <DateField
+          label="Ngày ghi sổ"
+          required
+          info="Ngày ghi vào hệ thống. Chọn ngày này thì ngày SX tự nhảy theo (tới khi bạn tự sửa)."
+          value={phien.postingDate}
+          onChange={doiNgayGhiSo}
+        />
+        <DateField
+          label="Ngày sản xuất"
+          required
+          info="Ngày làm ra thật — mọi tổng hợp tính theo ngày này. Sửa tay khi làm hôm khác (ghi bù)."
+          value={phien.productionDate}
+          onChange={doiNgaySX}
+        />
+      </div>
+
+      {canLyDoPhien && (
+        <Field label="Lý do ghi bù" required hint="VD: cuối ca mới cân xong.">
+          <Input
+            value={phien.backdateReason}
+            onChange={(e) => datPhien("backdateReason", e.target.value)}
+            placeholder="Vì sao ghi sau ngày SX?"
+          />
+        </Field>
+      )}
+
+      <Combobox
+        label="Phân xưởng"
+        required
+        choPhepXoa={false}
+        value={phien.workshop}
+        onChange={(v) => datPhien("workshop", v as Workshop)}
+        options={PHAN_XUONG.map((p) => ({ value: p, label: p }))}
+      />
+
+      <div className="border-t-2 border-border pt-1" />
+
+      {/* Bảng thành phẩm — nhập cả phiên một lượt, lưu một lần */}
+      <div className="space-y-4 rounded-xl border-2 border-primary/40 bg-accent/40 p-4">
+        <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+          <p className="text-base font-semibold">Thành phẩm làm ra trong ngày</p>
+          <p className="text-sm text-muted-foreground">
+            Thêm nhóm (kiểu chế biến × khách) như một khối trên sổ, rồi thêm từng
+            dòng thành phẩm + kg. Bấm mũi tên ▸ đầu dòng để tách râu + bao tử.
+          </p>
+        </div>
+
+        <BangDongSX
+          dong={dongBang}
+          matHang={matHang}
+          onSua={capNhatDong}
+          onBo={boDong}
+          onThemDong={themDong}
+          onThemNhom={themNhom}
+          onTaoMatHang={themMatHang}
+          optKhach={optKhach}
+          onTaoKhach={themKhach}
+        />
+
+        {dongHopLe.length > 0 && (
+          <div className="flex flex-wrap items-baseline justify-end gap-x-6 gap-y-1">
+            <span className="text-base text-muted-foreground">
+              {dongHopLe.length} thành phẩm · phiên này
+            </span>
+            <span className="tnum text-lg font-semibold">{kg(tongPhien)}</span>
+          </div>
+        )}
+      </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <span className="text-base text-muted-foreground">
+          Tổng ngày {viDate(phien.productionDate)} · xưởng {phien.workshop}:{" "}
+          <span className="tnum text-xl font-semibold text-foreground">
+            {kg(
+              rows
+                .filter(
+                  (r) =>
+                    r.productionDate === phien.productionDate &&
+                    r.workshop === phien.workshop
+                )
+                .reduce((s, r) => s + (r.quantityKg || 0), 0) + tongPhien
+            )}
+          </span>
+        </span>
+        <Button size="lg" onClick={xongPhien} className="w-full sm:w-auto">
+          <Plus />
+          Lưu vào sổ
+        </Button>
+      </div>
+    </div>
+  );
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -662,12 +792,32 @@ export default function SanXuatBTPScreen() {
             Sản xuất thành phẩm
           </h1>
         </div>
-        <div className="flex w-full flex-wrap gap-2 sm:w-auto">
-          {/* Mobile-first: nút chính full-width cho tổ dưới xưởng gõ điện thoại. */}
-          <Button size="lg" onClick={moThem} className="w-full sm:w-auto">
-            <Plus />
-            Ghi thành phẩm
-          </Button>
+        {/* Tách rõ NHẬP với TRA CỨU: một màn làm một việc. */}
+        <div className="flex w-full overflow-hidden rounded-xl border-2 border-border sm:w-auto">
+          <button
+            type="button"
+            onClick={() => setCheDo("nhap")}
+            className={cn(
+              "flex-1 px-4 py-2.5 text-base font-semibold transition-colors sm:flex-none",
+              cheDo === "nhap"
+                ? "bg-primary text-primary-foreground"
+                : "bg-card text-muted-foreground hover:bg-muted"
+            )}
+          >
+            📝 Ghi nhập
+          </button>
+          <button
+            type="button"
+            onClick={() => setCheDo("so")}
+            className={cn(
+              "flex-1 border-l-2 border-border px-4 py-2.5 text-base font-semibold transition-colors sm:flex-none",
+              cheDo === "so"
+                ? "bg-primary text-primary-foreground"
+                : "bg-card text-muted-foreground hover:bg-muted"
+            )}
+          >
+            📖 Sổ ngày & báo cáo
+          </button>
         </div>
       </div>
 
@@ -676,6 +826,10 @@ export default function SanXuatBTPScreen() {
         viec={`thành phẩm làm ra hôm nay — xưởng ${xuongGhi}`}
       />
 
+      {cheDo === "nhap" && formGhi}
+
+      {cheDo === "so" && (
+        <>
       <ThongKe
         className="grid-cols-2 sm:grid-cols-3 lg:grid-cols-5"
         the={[
@@ -744,11 +898,11 @@ export default function SanXuatBTPScreen() {
         <EmptyState
           icon={Factory}
           tieuDe={`Chưa ghi thành phẩm trong ${moTaPhamVi}`}
-          moTa={`Phân xưởng ${phanXuong}. Bấm nút dưới để ghi.`}
+          moTa={`Phân xưởng ${phanXuong}. Chuyển sang "Ghi nhập" để ghi.`}
           action={
-            <Button size="lg" onClick={moThem}>
+            <Button size="lg" onClick={() => setCheDo("nhap")}>
               <Plus />
-              Ghi thành phẩm
+              Sang Ghi nhập
             </Button>
           }
         />
@@ -784,6 +938,8 @@ export default function SanXuatBTPScreen() {
               <span className="tnum text-xl font-semibold">{kg(tong)}</span>
             </div>
           </div>
+        </>
+      )}
         </>
       )}
 
@@ -911,135 +1067,7 @@ export default function SanXuatBTPScreen() {
         </div>
       )}
 
-      {/* Dialog ghi cả bảng thành phẩm */}
-      <Dialog open={phien !== null} onOpenChange={(o) => !o && dongKhongLuu()}>
-        <DialogContent className="max-h-[92vh] w-full overflow-y-auto sm:max-w-3xl lg:max-w-5xl">
-          <DialogHeader>
-            <DialogTitle className="text-2xl">Ghi thành phẩm</DialogTitle>
-            <DialogDescription className="text-base">
-              Chọn ngày + phân xưởng một lần, nhập cả bảng thành phẩm bên dưới
-              rồi bấm Lưu một lần.
-            </DialogDescription>
-          </DialogHeader>
-
-          {phien && (
-            <div className="space-y-6 py-2">
-              <ErrorSummary loi={loiPhien} />
-              <ChuThichBatBuoc />
-
-              {chotDangGhi && (
-                <p className="flex items-start gap-3 rounded-lg bg-accent px-4 py-3 text-base text-accent-foreground">
-                  <Lock className="mt-0.5 size-6 shrink-0" aria-hidden />
-                  <span>
-                    Ngày {viDate(phien.productionDate)} · xưởng {phien.workshop}{" "}
-                    <strong>đã chốt</strong> — ghi thêm là <strong>ghi bù</strong>,
-                    bắt buộc lý do.
-                  </span>
-                </p>
-              )}
-
-              <div className="grid gap-6 sm:grid-cols-2">
-                <DateField
-                  label="Ngày ghi sổ"
-                  required
-                  info="Ngày ghi vào hệ thống. Chọn ngày này thì ngày SX tự nhảy theo (tới khi bạn tự sửa)."
-                  value={phien.postingDate}
-                  onChange={doiNgayGhiSo}
-                />
-                <DateField
-                  label="Ngày sản xuất"
-                  required
-                  info="Ngày làm ra thật — mọi tổng hợp tính theo ngày này. Sửa tay khi làm hôm khác (ghi bù)."
-                  value={phien.productionDate}
-                  onChange={doiNgaySX}
-                />
-              </div>
-
-              {canLyDoPhien && (
-                <Field label="Lý do ghi bù" required hint="VD: cuối ca mới cân xong.">
-                  <Input
-                    value={phien.backdateReason}
-                    onChange={(e) => datPhien("backdateReason", e.target.value)}
-                    placeholder="Vì sao ghi sau ngày SX?"
-                  />
-                </Field>
-              )}
-
-              <Combobox
-                label="Phân xưởng"
-                required
-                choPhepXoa={false}
-                value={phien.workshop}
-                onChange={(v) => datPhien("workshop", v as Workshop)}
-                options={PHAN_XUONG.map((p) => ({ value: p, label: p }))}
-              />
-
-              <div className="border-t-2 border-border pt-1" />
-
-              {/* Bảng thành phẩm — nhập cả phiên một lượt, lưu một lần */}
-              <div className="space-y-4 rounded-xl border-2 border-primary/40 bg-accent/40 p-4">
-                <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                  <p className="text-base font-semibold">
-                    Thành phẩm làm ra trong ngày
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    Thêm nhóm (kiểu chế biến × khách) như một khối trên sổ, rồi
-                    thêm từng dòng thành phẩm + kg. Bấm mũi tên ▸ đầu dòng để tách
-                    râu + bao tử (cùng giá).
-                  </p>
-                </div>
-
-                <BangDongSX
-                  dong={dongBang}
-                  matHang={matHang}
-                  onSua={capNhatDong}
-                  onBo={boDong}
-                  onThemDong={themDong}
-                  onThemNhom={themNhom}
-                  onTaoMatHang={themMatHang}
-                  optKhach={optKhach}
-                  onTaoKhach={themKhach}
-                />
-
-                {dongHopLe.length > 0 && (
-                  <div className="flex flex-wrap items-baseline justify-end gap-x-6 gap-y-1">
-                    <span className="text-base text-muted-foreground">
-                      {dongHopLe.length} thành phẩm · phiên này
-                    </span>
-                    <span className="tnum text-lg font-semibold">
-                      {kg(tongPhien)}
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              {/* Tổng ngày */}
-              <div className="flex flex-wrap items-baseline justify-end gap-x-8 gap-y-2 rounded-xl bg-muted px-5 py-4">
-                <span className="text-base text-muted-foreground">
-                  Tổng ngày {viDate(phien.productionDate)} · xưởng {phien.workshop}
-                </span>
-                <span className="tnum text-2xl font-semibold">
-                  {kg(
-                    rows
-                      .filter(
-                        (r) =>
-                          r.productionDate === phien.productionDate &&
-                          r.workshop === phien.workshop
-                      )
-                      .reduce((s, r) => s + (r.quantityKg || 0), 0) + tongPhien
-                  )}
-                </span>
-              </div>
-            </div>
-          )}
-
-          <DialogFooter>
-            <Button size="lg" onClick={xongPhien}>
-              Lưu vào sổ
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Form ghi thành phẩm đã chuyển INLINE (chế độ "Ghi nhập" — biến formGhi ở trên). */}
 
       {/* Dialog sửa một dòng */}
       <Dialog open={sua !== null} onOpenChange={(o) => !o && setSua(null)}>

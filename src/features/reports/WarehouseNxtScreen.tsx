@@ -442,7 +442,7 @@ export default function WarehouseNxtScreen() {
 
       {coDuLieu && (
         <div className="flex flex-wrap items-end gap-4">
-          <div className="min-w-[16rem]">
+          <div className="min-w-0 sm:min-w-[16rem]">
             <Combobox
               label="Kho / chi nhánh"
               anNhanBatBuoc

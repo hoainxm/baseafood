@@ -228,7 +228,7 @@ export default function DailyProductionReport() {
             options={KY_OPT}
           />
         </div>
-        <div className="min-w-[16rem] flex-1">
+        <div className="min-w-0 sm:min-w-[16rem] flex-1">
           {ky === "tuy-chon" ? (
             <DateRangeField
               label="Khoảng ngày sản xuất"

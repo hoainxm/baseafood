@@ -55,7 +55,6 @@ import {
   ArrowDownToLine,
   ArrowUpFromLine,
   CalendarRange,
-  Hourglass,
   PackagePlus,
   Scale,
   Snowflake,
@@ -124,7 +123,6 @@ export default function MaterialNxtScreen() {
   const the: TheThongTin[] = [
     { nhan: "Tồn đầu kho", giaTri: `${num(tong.tonDau)} kg`, so: true, icon: Snowflake, mau: "trung-tinh" },
     { nhan: "Đông gửi (+kho)", giaTri: `${num(tong.dongGui)} kg`, so: true, icon: ArrowDownToLine, mau: "brand" },
-    { nhan: "Còn dở SX (+kho)", giaTri: `${num(tong.conDoSX)} kg`, so: true, icon: Hourglass, mau: "brand" },
     { nhan: "Xả đông (−kho)", giaTri: `${num(tong.xaDong)} kg`, so: true, icon: ArrowUpFromLine, mau: "trung-tinh" },
     { nhan: "Tồn cuối kho", giaTri: `${num(tong.tonCuoi)} kg`, so: true, icon: Scale, mau: "success" },
   ];
@@ -172,20 +170,12 @@ export default function MaterialNxtScreen() {
       render: (r) => (
         <span className={r.dongGui > 0 ? "font-semibold text-success" : ""}>
           {r.dongGui > 0 ? `+${num(r.dongGui)}` : "—"}
+          {r.conDoSX > 0 && (
+            <span className="ml-1 text-xs font-medium text-muted-foreground">(SX)</span>
+          )}
         </span>
       ),
       tong: () => num(tong.dongGui),
-    },
-    {
-      key: "conDoSX",
-      header: "Còn dở SX +",
-      so: true,
-      render: (r) => (
-        <span className={r.conDoSX > 0 ? "font-semibold text-success" : ""}>
-          {r.conDoSX > 0 ? `+${num(r.conDoSX)}` : "—"}
-        </span>
-      ),
-      tong: () => num(tong.conDoSX),
     },
     {
       key: "xaDong",

@@ -13,6 +13,8 @@ File này trả lời **một câu**: *doc nào ở đâu, và doc mới bỏ v�
 | [`trien-khai/`](trien-khai/README.md) | hiểu **vì sao nghiệp vụ vậy** | Phân tích gốc, 28 câu hỏi đã chốt, thiết kế flow, kế hoạch |
 | [`BAN-GIAO.md`](BAN-GIAO.md) | **tiếp nhận dự án** | Bối cảnh công ty, đầu mối liên hệ, câu treo với xí nghiệp |
 
+> Ngoài 5 bucket trên: [`demo/`](demo/) chứa seed + kịch bản demo (**dữ liệu mẫu**, không phải tài liệu canonical); [`BAN-GIAO-tiep-theo.md`](BAN-GIAO-tiep-theo.md) = việc còn lại + go-live, đọc cùng [`BAN-GIAO.md`](BAN-GIAO.md).
+
 > Microcopy + luật UI **không** ở `docs/` — chúng nằm cạnh code tại
 > [`src/design-system/README.md`](../src/design-system/README.md) (luật giao diện) và
 > [`src/design-system/noi-dung-va-label.md`](../src/design-system/noi-dung-va-label.md) (nội dung/label). Canonical, không nhân bản sang đây.
@@ -45,3 +47,10 @@ last_verified: YYYY-MM-DD          # sửa doc xong thì cập nhật
 ttl_days: 90
 ```
 Sửa doc xong ⇒ cập nhật `last_verified:`. Đổi code trong `covers:` mà doc đứng yên ⇒ hook cảnh báo.
+
+## Quy ước tên file (git-friendly)
+
+- **Không dấu cách, không dấu tiếng Việt** trong tên file — `kebab-case` mặc định (vd `ke-hoach-cutover-1-9-2026.md`); `SCREAMING_SNAKE` chỉ cho doc-mốc lớn ở gốc (`BAN-GIAO.md`).
+- **Ngày, nếu cần, đặt CUỐI** dạng `-YYYY-MM-DD`. Ngày/stage **không** dùng làm khóa định danh — vòng đời thể hiện bằng **thư mục** (bucket), không bằng tên file.
+- **`app-map/` đánh số** (xem trên); các bucket khác đặt tên theo chủ đề.
+- **Không đổi tên / di chuyển** file source, migration, generated, config, asset được code tham chiếu — chỉ dọn tài liệu.

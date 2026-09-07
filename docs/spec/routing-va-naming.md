@@ -4,10 +4,10 @@
 - **Ngày lập:** 2026-08-07
 - **Trạng thái:** DỰ THẢO (Chờ phê duyệt)
 - **Tài liệu liên quan:** 
-  - [`CLAUDE.md`](file:///c:/Users/ACER/baseafood-mes/CLAUDE.md)
-  - [`docs/app-map/02-pages-navigation.md`](file:///c:/Users/ACER/baseafood-mes/docs/app-map/02-pages-navigation.md)
-  - [`docs/app-map/03-database.md`](file:///c:/Users/ACER/baseafood-mes/docs/app-map/03-database.md)
-  - [`docs/app-map/04-tang-du-lieu.md`](file:///c:/Users/ACER/baseafood-mes/docs/app-map/04-tang-du-lieu.md)
+  - [`CLAUDE.md`](../../CLAUDE.md)
+  - [`docs/app-map/02-pages-navigation.md`](../app-map/02-pages-navigation.md)
+  - [`docs/app-map/03-database.md`](../app-map/03-database.md)
+  - [`docs/app-map/04-tang-du-lieu.md`](../app-map/04-tang-du-lieu.md)
 
 ---
 
@@ -197,7 +197,7 @@ export function AdminRoute() {
 ---
 
 ### 4. Đề xuất cập nhật Quy tắc "1-trang-1-route" vào `02-pages-navigation.md`
-Chúng ta sẽ sửa đổi nội dung hướng dẫn tại [`docs/app-map/02-pages-navigation.md`](file:///c:/Users/ACER/baseafood-mes/docs/app-map/02-pages-navigation.md) để phản ánh quy tắc mới:
+Chúng ta sẽ sửa đổi nội dung hướng dẫn tại [`docs/app-map/02-pages-navigation.md`](../app-map/02-pages-navigation.md) để phản ánh quy tắc mới:
 * Thay đổi mục **"Không có router"** thành **"Quy tắc Điều hướng & Routing"**.
 * Bổ sung bắt buộc: *"Mọi trang chức năng mới bắt buộc phải đăng ký 1 route path tương ứng trong `src/App.tsx` (hoặc `src/routes.tsx`) và được đặt trong thư mục `src/features/<feature-name>/` dưới dạng lazy-loaded component."*
 * Bổ sung quy tắc truyền tham số ID trên URL thay vì sử dụng state cục bộ cho các chi tiết đối tượng (ví dụ: `/can-doi/:kyId` thay thế cho state `selId` trong component `CanDoi`).
@@ -353,7 +353,7 @@ function migrateLocalStorageData() {
 Nếu phê duyệt phương án chuyển đổi sang Tiếng Anh, các file sau đây bắt buộc phải được chỉnh sửa đồng loạt:
 
 1. **Quy tắc & Hướng dẫn hệ thống:**
-   * [`CLAUDE.md`](file:///c:/Users/ACER/baseafood-mes/CLAUDE.md): Sửa đổi Rule #8 về đặt tên.
+   * [`CLAUDE.md`](../../CLAUDE.md): Sửa đổi Rule #8 về đặt tên.
    * `docs/app-map/README.md` và toàn bộ các tài liệu domain trong `docs/app-map/` (bao gồm `01`, `02`, `03`, `04`, `05`, `30`, `31`, `32`, `33`, `34`, `35`): Cập nhật mô tả nghiệp vụ, tên bảng DB và tên các trường sang tiếng Anh.
 2. **Cơ sở dữ liệu (Supabase Migrations):**
    * Tạo tệp migration mới (ví dụ: `supabase/migrations/0016_rename_tables_to_english.sql`) chứa toàn bộ câu lệnh rename bảng, cột, RLS policies, trigger.

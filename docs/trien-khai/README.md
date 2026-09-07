@@ -21,6 +21,7 @@ Bộ tài liệu phân tích + thiết kế flow cho hệ thống này (chuyển
 | 3 | [plan-flow-can-doi-5-ngay.md](plan-flow-can-doi-5-ngay.md) | **Thiết kế flow cân đối 5 ngày** (xưởng Đông): mô hình dữ liệu, công thức, màn hình — đã code trong `src/features/balancing/BalancingScreen.tsx` + `BalancingTable.tsx` |
 | 4 | [plan-ton-kho-ban-thanh-pham.md](plan-ton-kho-ban-thanh-pham.md) | Ghi chú tiền-spec tồn kho BTP/WIP (phân biệt BTP còn khuôn đá ≠ thành phẩm đóng gói) — đã lên spec ở [`app-map/34`](../app-map/34-btp-san-xuat-kho.ba-spec.md) |
 | — | [diem-can-xac-nhan-theo-buoi.md](diem-can-xac-nhan-theo-buoi.md) · [can-xac-nhan-dot-tiep.md](can-xac-nhan-dot-tiep.md) | Sổ theo dõi điểm cần xác nhận theo buổi / đợt tiếp |
+| — | [bao-cao-ban-giao-nhap-kho-candoi.md](bao-cao-ban-giao-nhap-kho-candoi.md) | Báo cáo bàn giao 3 module lõi (Nhập hàng · Tồn NL · Cân đối) — mức độ hoàn thiện + kiểm thử end-to-end, chốt 2026-08-21 |
 
 **Còn treo** (chưa chốt, không chặn code hiện tại): quy tắc chia nguyên liệu cho từng bảng cân đối; tên gọi + định nghĩa chính xác chỉ số ~0,45 (tỉ lệ thu hồi / tổng nhận); định dạng báo cáo tồn 30/06 + mẫu báo cáo T7–T8 (xem [cutover §6](ke-hoach-cutover-1-9-2026.md)).
 

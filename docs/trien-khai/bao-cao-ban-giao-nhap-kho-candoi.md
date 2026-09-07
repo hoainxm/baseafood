@@ -13,13 +13,13 @@ Ba module **Nhập hàng → Cân đối → Tồn kho NL** đã **chạy khép 
 ### 2.1 Nhập hàng — ✅ đủ nghiệp vụ
 - Chuyến thật (`import_shipments` + `material_imports`), tách **ngày hàng về / ngày ghi sổ** + ghi bù bắt buộc lý do, **chốt ngày** (ngày × xưởng, mở lại có lý do), **phế liệu cân gộp cuối ngày**, bộ lọc theo kỳ, **báo cáo kỳ** (thẻ + biểu đồ) + **phiếu A4 ngang**, đổi loại hàng loạt, tách size Bạch tuộc 2 da (0019).
 - **Kiểm thử phiên này:** nhập chuyến thật Hồng Phú 16/08 (3 dòng · 12.980 đ) — hiển thị đúng ở sổ. ✓
-- Doc: [30-nhap-hang.md](app-map/30-nhap-hang.md).
+- Doc: [30-nhap-hang.md](../app-map/30-nhap-hang.md).
 - Còn thiếu: người chốt / người ghi bù (chờ đăng nhập); màn xem lịch sử chốt/mở lại (dữ liệu đã đủ).
 
 ### 2.2 Cân đối — ✅ đủ nghiệp vụ, có bản in
 - Lưới theo ngày, **hút sổ Nhập + sổ Sản xuất** (gán `balancing_period_id`, không chép số), **chuyển kỳ** (đông gửi/xả đông), **nhận chuyển kỳ** từ kỳ trước, **chốt kỳ** (0020), dòng Giảm → kho xưởng, xả đông, bột phụ gia, in A4, Ctrl+Z, dòng chẩn đoán khi kỳ trống.
 - Công thức `balancingCalc.ts` **bất biến, đã kiểm chứng 100%** với bảng giấy (mẫu bạch tuộc 2 da 21–25/07: Lãi 242.346.218).
-- **Quy tắc gộp báo cáo BTP ngày → mặt hàng cân đối: CHỐT với kế toán (chị Trúc) 21/08** — lưu ở [31-can-doi-ky.md § Gộp bán thành phẩm](app-map/31-can-doi-ky.md).
+- **Quy tắc gộp báo cáo BTP ngày → mặt hàng cân đối: CHỐT với kế toán (chị Trúc) 21/08** — lưu ở [31-can-doi-ky.md § Gộp bán thành phẩm](../app-map/31-can-doi-ky.md).
 - **Kiểm thử phiên này:** tạo kỳ 16–21/08, hút **2 dòng nhập + 9 dòng sản xuất** → Định mức 3,86 (1 ngày nên cao, đúng kỳ vọng). ✓
 - Còn thiếu: **đơn giá USD + khách** cho BTP (cần giá báo thật) để ra lãi/lỗ; 2 điểm treo với xí nghiệp (quy tắc chia NL cho từng bảng; định nghĩa chỉ số ≈ 0,45).
 
@@ -27,7 +27,7 @@ Ba module **Nhập hàng → Cân đối → Tồn kho NL** đã **chạy khép 
 - Sổ Nhập–Xuất–Tồn nguyên liệu = **kho đông dự trữ** của vòng gối đầu, **suy thẳng từ chuyển kỳ Cân đối** (đông gửi = +kho, xả đông = −kho), **kg thuần**. Màn `/nxt-nl`, hàm thuần `lib/inventoryMaterial.ts`, tồn đầu khai tay (`material_opening_stock`, migration **0022**).
 - **Bộ dò lỗi thật:** tồn cuối < 0 = xả đông vượt tồn → badge + banner đỏ.
 - **Kiểm thử phiên này:** đối chiếu 3 kỳ (tồn đầu 150 → chuỗi → tồn âm cảnh báo); khớp cột Chuyển kỳ của Cân đối tuyệt đối. Đã commit (`990e3f1`). ✓
-- Doc: [31-can-doi-ky.md § Tồn kho nguyên liệu](app-map/31-can-doi-ky.md) · [04-tang-du-lieu.md](app-map/04-tang-du-lieu.md).
+- Doc: [31-can-doi-ky.md § Tồn kho nguyên liệu](../app-map/31-can-doi-ky.md) · [04-tang-du-lieu.md](../app-map/04-tang-du-lieu.md).
 - Còn thiếu: **hiệu chỉnh v1 với một kỳ số thật** (dailyQuantities Thủy sản ghi ngược từ sổ nhập); hiện chỉ **xưởng Đông**; **RLS 0021 chưa bao** `material_opening_stock`.
 
 ## 3. Tầng dữ liệu & migration
@@ -56,7 +56,7 @@ Tờ 2 (BTP ra)   → sổ Sản xuất  → hút Khối 2 Cân đối
 
 ## 6. Cần làm trước khi "đóng" cụm để chuyển module
 
-1. **Cutover Supabase** cho 3 module (persistence + đa máy) — [ops/supabase-setup.md](ops/supabase-setup.md).
+1. **Cutover Supabase** cho 3 module (persistence + đa máy) — [ops/supabase-setup.md](../ops/supabase-setup.md).
 2. **Hiệu chỉnh Tồn kho NL** với một kỳ số thật (đối chiếu tay).
 3. **Nhập giá báo USD + khách** cho BTP để ra lãi/lỗ thật (khách điền được từ báo cáo ngày; giá chờ phòng kế hoạch).
 4. **Cập nhật `docs/BAN-GIAO.md`** — đang lệch: ghi "vòng lặp đông gửi/xả đông CHƯA số hóa" và nav "3 mục", trong khi đã có Tồn kho NL + nhiều màn. (Đề xuất, chưa tự ghi đè.)
@@ -68,5 +68,5 @@ Tờ 2 (BTP ra)   → sổ Sản xuất  → hút Khối 2 Cân đối
 - Bạch tuộc 1 da (348 kg) không hút vào kỳ "Bạch tuộc 2 da" là **đúng** (khác họ) — cần kỳ riêng.
 
 ## 8. Cross-references
-- [30-nhap-hang.md](app-map/30-nhap-hang.md) · [31-can-doi-ky.md](app-map/31-can-doi-ky.md) · [03-database.md](app-map/03-database.md) · [04-tang-du-lieu.md](app-map/04-tang-du-lieu.md) · [33-ban-hang.md](app-map/33-ban-hang.md)
-- Mẫu cân đối thật: [docs/demo/cach-doc-excel.md](demo/cach-doc-excel.md) · [docs/demo/seed_bt2da.sql](demo/seed_bt2da.sql)
+- [30-nhap-hang.md](../app-map/30-nhap-hang.md) · [31-can-doi-ky.md](../app-map/31-can-doi-ky.md) · [03-database.md](../app-map/03-database.md) · [04-tang-du-lieu.md](../app-map/04-tang-du-lieu.md) · [33-ban-hang.md](../app-map/33-ban-hang.md)
+- Mẫu cân đối thật: [docs/demo/cach-doc-excel.md](../demo/cach-doc-excel.md) · [docs/demo/seed_bt2da.sql](../demo/seed_bt2da.sql)

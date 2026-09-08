@@ -53,9 +53,13 @@ import {
 } from "@/design-system";
 import { kg, num, todayISO, viDate } from "@/lib/format";
 import { DailyTaskReminder, QrTemLoIn, PhieuTrongNhapNL } from "@/features/shared";
+import { OcrPhieuNhap } from "./OcrPhieuNhap";
+import { coOcr, type DanhMucOcr } from "@/lib/ocr";
+import { coLuuAnh, urlAnh } from "@/lib/storage";
 import { KY_OPT, phamViKy, type KyXem } from "@/lib/periodUtils";
 import {
   CalendarRange,
+  Camera,
   ChevronDown,
   FileText,
   Lock,
@@ -95,6 +99,8 @@ interface DauChuyen {
   note: string;
   /** Mã SSCC nhà nước — thường để trống, điền sau khi được cấp. */
   ssccCode: string;
+  /** Đường dẫn ảnh phiếu tay đã chụp (nền OCR). Rỗng = chưa chụp. */
+  scanPath: string;
 }
 
 /** Chữ viết tắt phân xưởng cho mã lô. */
@@ -264,6 +270,7 @@ export default function NhapNguyenLieuScreen() {
   const [phien, setPhien] = useState<DauChuyen | null>(null);
   /** Ba chế độ phẳng: "nhap" = form ghi (mặc định); "so" = sổ ngày; "bao-cao" = báo cáo tổng hợp. */
   const [cheDo, setCheDo] = useState<"nhap" | "so" | "bao-cao">("nhap");
+  const [ocrMo, setOcrMo] = useState(false); // modal nhận diện ảnh phiếu (OCR)
   const [chuyenInTem, setChuyenInTem] = useState<ImportShipment | null>(null);
   const [chuyenIdPhien, setChuyenIdPhien] = useState<string | null>(null);
   const [dongBang, setDongBang] = useState<DongBang[]>([]);
@@ -447,6 +454,7 @@ export default function NhapNguyenLieuScreen() {
       licensePlate: "",
       note: "",
       ssccCode: "",
+      scanPath: "",
     });
     setChuyenIdPhien(null);
     setSuaRowIds(null);
@@ -486,6 +494,7 @@ export default function NhapNguyenLieuScreen() {
       licensePlate: n.licensePlate,
       note: n.note,
       ssccCode: n.chuyen?.ssccCode ?? "",
+      scanPath: n.chuyen?.scanPath ?? "",
     });
     setChuyenIdPhien(n.chuyen?.id ?? null);
     setSuaRowIds(n.dong.map((r) => r.id));
@@ -573,6 +582,34 @@ export default function NhapNguyenLieuScreen() {
       ...ds,
       dongBangRong(ds[ds.length - 1]?.category ?? loaiGanNhat),
     ]);
+
+  /* ---- OCR: chụp ảnh phiếu → gợi ý điền form (nháp, người soát lại) ---- */
+
+  /** Danh mục để OCR dò khớp tên trên phiếu (đại lý theo tên tắt, loại NL). */
+  const danhMucOcr: DanhMucOcr = useMemo(
+    () => ({
+      daiLy: daiLy.map((d) => ({ name: d.shortName, code: d.code })),
+      loaiNL: loaiNL.map((l) => ({ name: l.name })),
+    }),
+    [daiLy, loaiNL]
+  );
+
+  /** OCR đề xuất một dòng: nối vào bảng (thay dòng trống đầu nếu bảng chưa có data). */
+  const themDongTuOcr = (ten: string, soKg: number) =>
+    setDongBang((ds) => {
+      const mt = loaiNL.find((l) => l.name === ten);
+      const cat = (mt?.category || ds[ds.length - 1]?.category || loaiGanNhat) as Category;
+      const moi: DongBang = { ...dongBangRong(cat), materialTypeName: ten, quantityKg: soKg };
+      return ds.some(dongCoData) ? [...ds, moi] : [moi];
+    });
+
+  /** Mở ảnh phiếu đã đính (signed URL có hạn) để đối chiếu tay. */
+  const xemAnhPhieu = async () => {
+    if (!phien?.scanPath) return;
+    const url = await urlAnh(phien.scanPath);
+    if (url) window.open(url, "_blank", "noopener");
+    else notify.loi("Chưa xem được ảnh (cần đăng nhập máy chủ).");
+  };
 
   /**
    * Lưu cả chuyến MỘT LẦN: tạo/ghi chuyến + mọi dòng hợp lệ trong bảng, một lần
@@ -694,7 +731,9 @@ export default function NhapNguyenLieuScreen() {
       ? dongHopLe[dongHopLe.length - 1].category
       : loaiGanNhat;
     setPhien((p) =>
-      p ? { ...p, driverName: "", licensePlate: "", note: "", ssccCode: "" } : p
+      p
+        ? { ...p, driverName: "", licensePlate: "", note: "", ssccCode: "", scanPath: "" }
+        : p
     );
     setChuyenIdPhien(null);
     setSuaRowIds(null);
@@ -828,6 +867,32 @@ export default function NhapNguyenLieuScreen() {
     <div className="space-y-6 rounded-xl border-2 border-border bg-card p-4 md:p-6">
       <ErrorSummary loi={loiPhien} />
       <ChuThichBatBuoc />
+
+      {/* OCR: chụp ảnh phiếu tay → máy đọc chữ gợi ý điền (soát lại trước khi lưu). */}
+      {coOcr && (
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="lg"
+            className="w-full sm:w-auto"
+            onClick={() => setOcrMo(true)}
+          >
+            <Camera />
+            Nhận diện từ ảnh phiếu
+          </Button>
+          {phien.scanPath && (
+            <span className="flex items-center gap-1">
+              <Badge variant="secondary">Đã đính ảnh phiếu</Badge>
+              {coLuuAnh && (
+                <Button type="button" variant="link" size="sm" onClick={xemAnhPhieu}>
+                  Xem
+                </Button>
+              )}
+            </span>
+          )}
+        </div>
+      )}
 
       {chotPhien && (
         <p className="flex items-start gap-3 rounded-lg bg-accent px-4 py-3 text-base text-accent-foreground">
@@ -1603,6 +1668,18 @@ export default function NhapNguyenLieuScreen() {
       )}
       {inPhieuTrong && (
         <PhieuTrongNhapNL onClose={() => setInPhieuTrong(false)} />
+      )}
+
+      {/* ---- Nhận diện ảnh phiếu (OCR) → gợi ý điền form Ghi nhập ---- */}
+      {ocrMo && phien && (
+        <OcrPhieuNhap
+          danhMuc={danhMucOcr}
+          onLuuAnh={(path) => datPhien("scanPath", path)}
+          onApDaiLy={(name) => datPhien("supplierName", name)}
+          onApNgay={(iso) => doiNgayVe(iso)}
+          onThemDong={themDongTuOcr}
+          onClose={() => setOcrMo(false)}
+        />
       )}
     </div>
   );

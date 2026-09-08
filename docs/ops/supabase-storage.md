@@ -6,8 +6,15 @@
 > hằng `BUCKET="qc"`) · nút "Chụp / chọn ảnh" + xem/xóa ảnh mỗi chỉ tiêu ở màn `/qc`
 > (`QcChecklistScreen`, ẩn khi `!supabase`). Đã verify end-to-end trên bucket thật.
 > **Lưu ý:** bucket tên `qc` (KHÔNG phải `bsf-anh` như mẫu mục 1–2 bên dưới) —
-> policy RLS check `bucket_id = 'qc'`. OCR phiếu tay (QĐ-1) vẫn để sau, dùng lại
-> `lib/storage.ts` cùng bucket, thư mục `phieu-nhap/`.
+> policy RLS check `bucket_id = 'qc'`.
+
+> **✅ ĐÃ BUILD OCR phiếu nhập (QĐ-1, 2026-09-08):** ảnh phiếu tay lưu cùng bucket
+> `qc` (thư mục `bsf1/qc/yyyy/mm/`, tái dùng `lib/storage.ts`) → cột
+> `import_shipments.scan_path` (migration `0040`). Nhận diện chữ chạy **client-side**
+> bằng **Tesseract** (`src/lib/ocr.ts`, nạp động — KHÔNG cần key/dịch vụ/edge
+> function), tự điền NHÁP ở màn `/imports`. Chữ viết tay là bản nháp người soát lại;
+> bộ nhận diện tách sau hàm `chayTesseract` để **nâng cấp Google Vision** (mục 6 §3)
+> sau chỉ thay một chỗ. Ảnh phiếu (khác ảnh QC) vẫn dùng chung bucket/RLS.
 
 > Load khi: cần lưu **ảnh** (ảnh QC chấm điểm cuối ngày, ảnh phiếu tay chụp để
 > OCR, ảnh chứng từ). Dùng **Supabase Storage** — cùng dự án Supabase đang chạy,

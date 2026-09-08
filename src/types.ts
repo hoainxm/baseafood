@@ -127,6 +127,8 @@ export interface ImportShipment {
   lotCode?: string;
   /** Mã SSCC do nhà nước cấp — chừa sẵn, thường để trống, điền sau. */
   ssccCode?: string;
+  /** Đường dẫn ảnh phiếu tay chụp kèm (nền OCR). Rỗng = chưa chụp. */
+  scanPath?: string;
 }
 
 export function isBackdatedImport(c: Pick<ImportShipment, "deliveryDate" | "postingDate">): boolean {

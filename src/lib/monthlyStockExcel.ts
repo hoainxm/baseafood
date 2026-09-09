@@ -86,6 +86,22 @@ function nhomTuMuc(b: string): string | null {
 const laDongTong = (a: string) => /^(TỔNG|CỘNG|TONG|CONG)\b/i.test(a.trim());
 const chiToanSo = (b: string) => /^[\d.,\s]+$/.test(b.trim());
 
+/**
+ * Suy SỐ THÁNG từ tên sheet. Nhận: "8", "08", "T8", "Tháng 8", "thang 8"
+ * (dùng cho báo cáo bù tháng 8, dữ liệu tháng 9 live…). KHÔNG đoán bừa từ chuỗi
+ * có năm ("2026-08" → null để người dùng đặt lại, tránh bắt nhầm "20").
+ */
+function suyThang(name: string): number | null {
+  const s = name.trim();
+  let n: number | null = null;
+  if (/^\d{1,2}$/.test(s)) n = Number(s);
+  else {
+    const m = s.match(/th[aá]ng\s*(\d{1,2})/i) || s.match(/^t\s*(\d{1,2})$/i);
+    if (m) n = Number(m[1]);
+  }
+  return n != null && n >= 1 && n <= 12 ? n : null;
+}
+
 function parseSheet(sheetName: string, rows: unknown[][]): BangKeKhoSheet {
   const out: BangKeKhoRow[] = [];
   let category: string | null = null;
@@ -122,10 +138,9 @@ function parseSheet(sheetName: string, rows: unknown[][]): BangKeKhoSheet {
     });
   }
 
-  const mn = Number(sheetName);
   return {
     sheetName,
-    monthNum: Number.isInteger(mn) && mn >= 1 && mn <= 12 ? mn : null,
+    monthNum: suyThang(sheetName),
     rows: out,
   };
 }

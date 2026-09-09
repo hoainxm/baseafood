@@ -366,15 +366,18 @@ export default function MonthlyStockScreen() {
     setNhomDB({});
     setMoDongBo(true);
   };
+  // Tách: MÃ KHÓ cần người quyết vs tên RÕ RÀNG (tự nhận loài, khỏi bận tâm).
+  const canDongBo = dongBo.chuaCo.filter((x) => !x.roRang);
+  const dsRoRang = dongBo.chuaCo.filter((x) => x.roRang);
+  const nhomCua = (x: { name: string; nhomGoiY: string }) => (nhomDB[x.name] || x.nhomGoiY || "Khác").trim();
   const dichCua = (x: { name: string; dichGoiY: DichDanhMuc }): DichDanhMuc => dichDB[x.name] ?? x.dichGoiY;
-  const soMH = dongBo.chuaCo.filter((x) => dichCua(x) === "product").length;
-  const soNL = dongBo.chuaCo.filter((x) => dichCua(x) === "material").length;
+  const soMH = canDongBo.filter((x) => dichCua(x) === "product").length;
+  const soNL = canDongBo.filter((x) => dichCua(x) === "material").length;
 
   const themVaoDanhMuc = () => {
-    const nhomCua = (x: { name: string; nhomGoiY: string }) => (nhomDB[x.name] || x.nhomGoiY || "Khác").trim();
     const themNL: MaterialType[] = [];
     const themMH: Product[] = [];
-    for (const x of dongBo.chuaCo) {
+    for (const x of canDongBo) {
       const d = dichCua(x);
       if (d === "material") {
         themNL.push({ id: uid(), name: x.name, category: nhomCua(x), note: "Từ sổ kho theo tháng" });
@@ -399,13 +402,26 @@ export default function MonthlyStockScreen() {
     notify.daLuu(`Đã thêm ${themMH.length} mặt hàng + ${themNL.length} loại nguyên liệu`);
   };
 
-  /** Đặt đích cho MỌI dòng chưa có (bulk). */
+  /** Thêm hết nhóm RÕ RÀNG vào Loại nguyên liệu theo loài (không cần soi tay). */
+  const themRoRangVaoNL = () => {
+    if (!dsRoRang.length) return;
+    const themMoi: MaterialType[] = dsRoRang.map((x) => ({
+      id: uid(),
+      name: x.name,
+      category: nhomCua(x),
+      note: "Từ sổ kho theo tháng",
+    }));
+    ghiMtypes([...mtypes, ...themMoi]);
+    notify.daLuu(`Đã thêm ${themMoi.length} tên rõ ràng vào Loại nguyên liệu`);
+  };
+
+  /** Đặt đích cho MỌI mã cần đồng bộ (bulk). */
   const datDichTatCa = (d: DichDanhMuc | "goiY") => {
     if (d === "goiY") {
       setDichDB({});
       return;
     }
-    setDichDB(Object.fromEntries(dongBo.chuaCo.map((x) => [x.name, d])));
+    setDichDB(Object.fromEntries(canDongBo.map((x) => [x.name, d])));
   };
 
   // ---------- Nhập Excel bảng kê ----------
@@ -610,7 +626,7 @@ export default function MonthlyStockScreen() {
           </Button>
           <Button variant="outline" onClick={moDongBoDialog}>
             <Library className="mr-2 h-4 w-4" />
-            Đồng bộ danh mục{dongBo.chuaCo.length ? ` (${dongBo.chuaCo.length})` : ""}
+            Đồng bộ danh mục{canDongBo.length ? ` (${canDongBo.length})` : ""}
           </Button>
           <Button onClick={() => setMoIn(true)} disabled={!coDuLieu}>
             <Printer className="mr-2 h-4 w-4" />
@@ -1063,10 +1079,9 @@ export default function MonthlyStockScreen() {
           <DialogHeader>
             <DialogTitle className="text-2xl">Đồng bộ danh mục</DialogTitle>
             <DialogDescription className="text-base">
-              Đối chiếu tên trong sổ với CẢ HAI danh mục — <span className="font-semibold">Loại nguyên liệu</span> và{" "}
-              <span className="font-semibold">Mặt hàng</span>. Mỗi tên chưa có tự đoán ĐÍCH (cá/tôm/mực nguyên con →
-              Loại NL; bạch tuộc phân loại + có size → Mặt hàng); đổi từng dòng hoặc "Bỏ qua". Thành phẩm 141 mã kế
-              toán cố định — không thêm ở đây.
+              Tên tự nhận loài (CÁ THU, SANMA…) coi như rõ — gom riêng, khỏi bận tâm. Việc chính là các
+              <span className="font-semibold"> mã khó</span> (2 DA RÂU NGẮN, MADA…): chọn ĐÍCH từng dòng —
+              Mặt hàng / Loại NL / Bỏ qua (tự đoán sẵn). Thành phẩm 141 mã kế toán cố định — không thêm ở đây.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
@@ -1075,15 +1090,16 @@ export default function MonthlyStockScreen() {
               <Badge variant="outline">
                 đã có: {dongBo.daCoMH} mặt hàng · {dongBo.daCoNL} loại NL
               </Badge>
-              <Badge variant="outline">{dongBo.chuaCo.length} chưa có</Badge>
+              <Badge variant="secondary">{canDongBo.length} mã khó cần đồng bộ</Badge>
+              <Badge variant="outline">{dsRoRang.length} tên rõ ràng</Badge>
               <Badge variant="outline">{dongBo.nhomTrung.length} nhóm trùng cách ghi</Badge>
             </div>
 
-            {dongBo.chuaCo.length > 0 && (
+            {canDongBo.length > 0 && (
               <div className="space-y-2">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <h3 className="flex items-center gap-2 font-semibold text-foreground">
-                    <ListChecks className="h-4 w-4" /> {dongBo.chuaCo.length} tên chưa có — chọn ĐÍCH từng dòng
+                    <ListChecks className="h-4 w-4" /> {canDongBo.length} mã khó — chọn ĐÍCH từng dòng
                   </h3>
                   <div className="flex flex-wrap gap-1">
                     <Button size="sm" variant="ghost" onClick={() => datDichTatCa("goiY")}>
@@ -1101,7 +1117,7 @@ export default function MonthlyStockScreen() {
                   </div>
                 </div>
                 <div className="max-h-[40vh] space-y-1 overflow-auto rounded-lg border border-border p-2">
-                  {dongBo.chuaCo.map((x) => (
+                  {canDongBo.map((x) => (
                     <div key={x.name} className="flex items-center gap-2 rounded p-1 hover:bg-muted/50">
                       <span className="min-w-0 flex-1 truncate text-foreground" title={x.name}>
                         {x.name}
@@ -1135,6 +1151,31 @@ export default function MonthlyStockScreen() {
                   Thêm {soMH} mặt hàng + {soNL} loại NL
                 </Button>
               </div>
+            )}
+
+            {dsRoRang.length > 0 && (
+              <details className="rounded-lg border border-border">
+                <summary className="cursor-pointer px-3 py-2 font-medium text-foreground">
+                  Tên rõ ràng — tự nhận loài ({dsRoRang.length}) · cá/tôm/mực… khỏi cần soi tay
+                </summary>
+                <div className="space-y-2 px-3 pb-3">
+                  <p className="text-sm text-muted-foreground">
+                    Những tên này tên đã nói rõ loài (VD "CÁ THU" = Cá). Không cần ánh xạ; thêm hết vào Loại
+                    nguyên liệu theo loài nếu muốn danh mục đủ.
+                  </p>
+                  <div className="max-h-[24vh] overflow-auto text-sm text-muted-foreground">
+                    {dsRoRang.map((x) => (
+                      <span key={x.name} className="mr-2 inline-block">
+                        {x.name} <span className="text-foreground/70">({x.nhomGoiY})</span> ·
+                      </span>
+                    ))}
+                  </div>
+                  <Button size="sm" variant="outline" onClick={themRoRangVaoNL}>
+                    <Library className="mr-2 h-4 w-4" />
+                    Thêm {dsRoRang.length} tên vào Loại nguyên liệu (theo loài)
+                  </Button>
+                </div>
+              </details>
             )}
 
             {dongBo.nhomTrung.length > 0 && (

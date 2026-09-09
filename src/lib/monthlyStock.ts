@@ -289,11 +289,22 @@ export function suyDichDanhMuc(name: string): DichDanhMuc {
   return coSize || cheBien ? "product" : "material";
 }
 
+/**
+ * "Rõ ràng" = tên tự nói lên loài NGUYÊN LIỆU (cá/tôm/mực/ghẹ/bào ngư nguyên con)
+ * — ai nhìn cũng biết, KHÔNG cần đồng bộ tay (VD "CÁ THU"). "Cần đồng bộ" = mã khó:
+ * bạch tuộc phân loại/bộ phận (2 DA RÂU NGẮN, MADA…) hoặc không rõ loài — phải
+ * người quyết ánh xạ về danh mục nào.
+ */
+export function laRoRang(name: string): boolean {
+  const nhom = suyNhomNguyenLieu(name);
+  return nhom !== "Bạch tuộc" && nhom !== "Khác";
+}
+
 export interface DongBoDong {
   name: string;
   nhomGoiY: string;
   dichGoiY: DichDanhMuc; // đích gợi ý (product/material)
-  daCoODau: "" | "material" | "product"; // đã có sẵn ở danh mục nào (nếu có)
+  roRang: boolean; // true = tự nhận loài, khỏi bận tâm; false = mã khó, cần đồng bộ
 }
 
 export interface DongBoDanhMuc {
@@ -329,7 +340,7 @@ export function phanTichDongBoDanhMuc(
     if (oNL) daCoNL++;
     if (oMH) daCoMH++;
     if (oNL || oMH) continue;
-    chuaCo.push({ name, nhomGoiY: suyNhomNguyenLieu(name), dichGoiY: suyDichDanhMuc(name), daCoODau: "" });
+    chuaCo.push({ name, nhomGoiY: suyNhomNguyenLieu(name), dichGoiY: suyDichDanhMuc(name), roRang: laRoRang(name) });
   }
 
   // Gom trùng-cách-ghi trong chính danh sách tên của sổ.

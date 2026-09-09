@@ -94,16 +94,22 @@ addable — `material_types` (loại NL) + `products` (mặt hàng) — và cho 
 dòng**. **Thành phẩm 141 mã kế toán (`finished_goods`) CỐ ĐỊNH — KHÔNG thêm ở đây**
 (memory `danh-muc-mat-hang-3-tang`).
 
+**Tách RÕ RÀNG vs MÃ KHÓ (điểm mấu chốt):** tên tự nói lên loài nguyên liệu (CÁ THU,
+SANMA, TÔM… — `laRoRang`: loài ≠ Bạch tuộc và ≠ "Khác") thì KHÔNG cần soi tay ("đồng bộ
+cá với cá" là vô nghĩa) → gom vào mục thu gọn "Tên rõ ràng", 1 nút thêm hết vào Loại NL
+theo loài. Việc CHÍNH là **mã khó**: bạch tuộc phân loại/bộ phận (2 DA RÂU NGẮN, MADA,
+BẠCH TUỘC 2 DA 250UP…) + tên không rõ loài — đây mới cần người ánh xạ.
+
 Hàm thuần `phanTichDongBoDanhMuc(tênSổ, tênLoạiNL, tênMặtHàng)` → mỗi tên chưa có (ở cả
-hai) kèm **đích gợi ý** (`suyDichDanhMuc`: có size/grade — 250UP, 150-250, <40 — hoặc
-dấu chế biến/phân loại — râu/cắt/luộc/tẩm/bột/dạt/cổ/bao tử/mada/"X da" → `product`;
-còn lại cá/tôm/mực/bào ngư nguyên con → `material`) + **nhóm gợi ý** (`suyNhomNguyenLieu`).
-Kiểm thật: 142 chưa có → đoán **84 Mặt hàng · 58 Loại NL** (SANMA→Loại NL, "4 DA RÂU
-NGẮN"/"BẠCH TUỘC 2 DA 150-250"→Mặt hàng). Dialog: mỗi dòng có **select đích** (Mặt hàng
-/ Loại NL / Bỏ qua) + nhóm (Combobox tạo mới); nút bulk (Theo gợi ý / Tất cả→MH / Tất
-cả→NL / Bỏ hết). "Thêm" ghi `material_types` ({id,name,category,note}) và `products`
-({id,code:"",name,finishedGoodCode:"" chưa ánh xạ,category,processingType:""}) trong
-một lần. Dòng "Bỏ qua" không thêm.
+hai) kèm `roRang`, **đích gợi ý** (`suyDichDanhMuc`: có size/grade hoặc dấu chế biến/phân
+loại → `product`; còn lại → `material`) + **nhóm gợi ý** (`suyNhomNguyenLieu`). Dialog:
+list CHÍNH chỉ **mã khó** — mỗi dòng có select đích (Mặt hàng / Loại NL / Bỏ qua) + nhóm
+(Combobox tạo mới) + nút bulk; mục "rõ ràng" thu gọn (`<details>`) có nút thêm-hết-vào-NL.
+"Thêm" ghi `material_types` ({id,name,category,note}) và/hoặc `products` ({id,code:"",name,
+finishedGoodCode:"" chưa ánh xạ,category,processingType:""}). Kiểm thật (kho 1000 năm
+2026): 144 tên → **73 mã khó** (2 DA RÂU NGẮN…, đoán 66 MH · 7 NL) + **69 rõ ràng** (CÁ
+THU/SANMA→Loại NL). Mã khó ≠ khớp `products` sẵn (products là hàng đã chế biến cắt/luộc/
+tẩm bột; mã file là NL phân loại) → thêm mới, không map được.
 - **Trùng cách ghi**: các tên chỉ khác khoảng trắng/hoa thường/dấu câu (chuẩn hoá ngặt
   bỏ hết space+dấu câu), VD `"BẠCH TUỘC 2 DA 250UP"` ≡ `"…250 UP"`, `"200 UP"` ≡ `"200 up"`.
   Đây là nguồn **đếm thành nhiều mặt hàng** khi tổng hợp → liệt kê để sửa tay về một cách ghi.

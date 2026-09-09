@@ -103,13 +103,16 @@ BẠCH TUỘC 2 DA 250UP…) + tên không rõ loài — đây mới cần ngư�
 Hàm thuần `phanTichDongBoDanhMuc(tênSổ, tênLoạiNL, tênMặtHàng)` → mỗi tên chưa có (ở cả
 hai) kèm `roRang`, **đích gợi ý** (`suyDichDanhMuc`: có size/grade hoặc dấu chế biến/phân
 loại → `product`; còn lại → `material`) + **nhóm gợi ý** (`suyNhomNguyenLieu`). Dialog:
-list CHÍNH chỉ **mã khó** — mỗi dòng có select đích (Mặt hàng / Loại NL / Bỏ qua) + nhóm
-(Combobox tạo mới) + nút bulk; mục "rõ ràng" thu gọn (`<details>`) có nút thêm-hết-vào-NL.
-"Thêm" ghi `material_types` ({id,name,category,note}) và/hoặc `products` ({id,code:"",name,
-finishedGoodCode:"" chưa ánh xạ,category,processingType:""}). Kiểm thật (kho 1000 năm
-2026): 144 tên → **73 mã khó** (2 DA RÂU NGẮN…, đoán 66 MH · 7 NL) + **69 rõ ràng** (CÁ
-THU/SANMA→Loại NL). Mã khó ≠ khớp `products` sẵn (products là hàng đã chế biến cắt/luộc/
-tẩm bột; mã file là NL phân loại) → thêm mới, không map được.
+**MỌI dòng** (cả mã khó lẫn rõ ràng) đều có **select đích riêng** (Mặt hàng / Loại NL /
+Bỏ qua) + nhóm (Combobox tạo mới) + bulk theo section — KHÔNG khoá rõ-ràng vào Loại NL
+(chủ dự án chốt: leftover phải thêm được vào mặt hàng nữa). Mã khó ở list CHÍNH; rõ ràng
+trong `<details>` thu gọn (mặc định đích → Loại NL nhưng đổi được). MỘT nút "Thêm {n} mặt
+hàng + {m} loại nguyên liệu" gộp cả hai section; ghi `material_types` ({id,name,category,
+note}) và/hoặc `products` ({id,code:"",name,finishedGoodCode:"" chưa ánh xạ,category,
+processingType:""}). Kiểm thật (kho 1000 năm 2026): 144 tên → **73 mã khó** + **69 rõ
+ràng**, mỗi dòng đổi đích độc lập (đổi 1 rõ-ràng sang MH: nút 84→85 MH · 58→57 NL). Mã khó
+≠ khớp `products` sẵn (products là hàng đã chế biến cắt/luộc/tẩm bột; mã file là NL phân
+loại) → thêm mới, không map được.
 - **Trùng cách ghi**: các tên chỉ khác khoảng trắng/hoa thường/dấu câu (chuẩn hoá ngặt
   bỏ hết space+dấu câu), VD `"BẠCH TUỘC 2 DA 250UP"` ≡ `"…250 UP"`, `"200 UP"` ≡ `"200 up"`.
   Đây là nguồn **đếm thành nhiều mặt hàng** khi tổng hợp → liệt kê để sửa tay về một cách ghi.

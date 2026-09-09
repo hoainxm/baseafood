@@ -27,6 +27,7 @@ import {
   type MonthlyStockRow,
   type DoiChieuDong,
   type DichDanhMuc,
+  type DongBoDong,
 } from "@/lib/monthlyStock";
 import {
   Badge,
@@ -371,13 +372,14 @@ export default function MonthlyStockScreen() {
   const dsRoRang = dongBo.chuaCo.filter((x) => x.roRang);
   const nhomCua = (x: { name: string; nhomGoiY: string }) => (nhomDB[x.name] || x.nhomGoiY || "Khác").trim();
   const dichCua = (x: { name: string; dichGoiY: DichDanhMuc }): DichDanhMuc => dichDB[x.name] ?? x.dichGoiY;
-  const soMH = canDongBo.filter((x) => dichCua(x) === "product").length;
-  const soNL = canDongBo.filter((x) => dichCua(x) === "material").length;
+  // Đếm trên TOÀN BỘ (cả mã khó lẫn rõ ràng) — mỗi dòng tự chọn đích.
+  const soMH = dongBo.chuaCo.filter((x) => dichCua(x) === "product").length;
+  const soNL = dongBo.chuaCo.filter((x) => dichCua(x) === "material").length;
 
   const themVaoDanhMuc = () => {
     const themNL: MaterialType[] = [];
     const themMH: Product[] = [];
-    for (const x of canDongBo) {
+    for (const x of dongBo.chuaCo) {
       const d = dichCua(x);
       if (d === "material") {
         themNL.push({ id: uid(), name: x.name, category: nhomCua(x), note: "Từ sổ kho theo tháng" });
@@ -402,27 +404,47 @@ export default function MonthlyStockScreen() {
     notify.daLuu(`Đã thêm ${themMH.length} mặt hàng + ${themNL.length} loại nguyên liệu`);
   };
 
-  /** Thêm hết nhóm RÕ RÀNG vào Loại nguyên liệu theo loài (không cần soi tay). */
-  const themRoRangVaoNL = () => {
-    if (!dsRoRang.length) return;
-    const themMoi: MaterialType[] = dsRoRang.map((x) => ({
-      id: uid(),
-      name: x.name,
-      category: nhomCua(x),
-      note: "Từ sổ kho theo tháng",
-    }));
-    ghiMtypes([...mtypes, ...themMoi]);
-    notify.daLuu(`Đã thêm ${themMoi.length} tên rõ ràng vào Loại nguyên liệu`);
+  /** Đặt đích cho một NHÓM dòng (bulk theo section). */
+  const datDich = (list: DongBoDong[], d: DichDanhMuc | "goiY") => {
+    setDichDB((m) => {
+      const next = { ...m };
+      for (const x of list) {
+        if (d === "goiY") delete next[x.name];
+        else next[x.name] = d;
+      }
+      return next;
+    });
   };
 
-  /** Đặt đích cho MỌI mã cần đồng bộ (bulk). */
-  const datDichTatCa = (d: DichDanhMuc | "goiY") => {
-    if (d === "goiY") {
-      setDichDB({});
-      return;
-    }
-    setDichDB(Object.fromEntries(canDongBo.map((x) => [x.name, d])));
-  };
+  /** Bộ chọn đích cho MỘT dòng (dùng chung mã khó + rõ ràng). */
+  const dongRow = (x: DongBoDong) => (
+    <div key={x.name} className="flex items-center gap-2 rounded p-1 hover:bg-muted/50">
+      <span className="min-w-0 flex-1 truncate text-foreground" title={x.name}>
+        {x.name}
+      </span>
+      <select
+        className="h-9 shrink-0 rounded-md border border-border bg-background px-2"
+        value={dichCua(x)}
+        onChange={(e) => setDichDB((m) => ({ ...m, [x.name]: e.target.value as DichDanhMuc }))}
+        aria-label={`Đích ${x.name}`}
+      >
+        <option value="product">→ Mặt hàng</option>
+        <option value="material">→ Loại NL</option>
+        <option value="skip">Bỏ qua</option>
+      </select>
+      <div className="w-36 shrink-0">
+        <Combobox
+          anNhan
+          label={`Nhóm ${x.name}`}
+          value={nhomDB[x.name] ?? x.nhomGoiY}
+          onChange={(v) => setNhomDB((m) => ({ ...m, [x.name]: v }))}
+          options={nhomOpts}
+          onCreate={(t) => t}
+          choPhepXoa={false}
+        />
+      </div>
+    </div>
+  );
 
   // ---------- Nhập Excel bảng kê ----------
   const chonFile = () => fileRef.current?.click();
@@ -1102,80 +1124,58 @@ export default function MonthlyStockScreen() {
                     <ListChecks className="h-4 w-4" /> {canDongBo.length} mã khó — chọn ĐÍCH từng dòng
                   </h3>
                   <div className="flex flex-wrap gap-1">
-                    <Button size="sm" variant="ghost" onClick={() => datDichTatCa("goiY")}>
+                    <Button size="sm" variant="ghost" onClick={() => datDich(canDongBo, "goiY")}>
                       Theo gợi ý
                     </Button>
-                    <Button size="sm" variant="ghost" onClick={() => datDichTatCa("product")}>
+                    <Button size="sm" variant="ghost" onClick={() => datDich(canDongBo, "product")}>
                       Tất cả → Mặt hàng
                     </Button>
-                    <Button size="sm" variant="ghost" onClick={() => datDichTatCa("material")}>
+                    <Button size="sm" variant="ghost" onClick={() => datDich(canDongBo, "material")}>
                       Tất cả → Loại NL
                     </Button>
-                    <Button size="sm" variant="ghost" onClick={() => datDichTatCa("skip")}>
+                    <Button size="sm" variant="ghost" onClick={() => datDich(canDongBo, "skip")}>
                       Bỏ qua hết
                     </Button>
                   </div>
                 </div>
-                <div className="max-h-[40vh] space-y-1 overflow-auto rounded-lg border border-border p-2">
-                  {canDongBo.map((x) => (
-                    <div key={x.name} className="flex items-center gap-2 rounded p-1 hover:bg-muted/50">
-                      <span className="min-w-0 flex-1 truncate text-foreground" title={x.name}>
-                        {x.name}
-                      </span>
-                      <select
-                        className="h-9 shrink-0 rounded-md border border-border bg-background px-2"
-                        value={dichCua(x)}
-                        onChange={(e) => setDichDB((m) => ({ ...m, [x.name]: e.target.value as DichDanhMuc }))}
-                        aria-label={`Đích ${x.name}`}
-                      >
-                        <option value="product">→ Mặt hàng</option>
-                        <option value="material">→ Loại NL</option>
-                        <option value="skip">Bỏ qua</option>
-                      </select>
-                      <div className="w-36 shrink-0">
-                        <Combobox
-                          anNhan
-                          label={`Nhóm ${x.name}`}
-                          value={nhomDB[x.name] ?? x.nhomGoiY}
-                          onChange={(v) => setNhomDB((m) => ({ ...m, [x.name]: v }))}
-                          options={nhomOpts}
-                          onCreate={(t) => t}
-                          choPhepXoa={false}
-                        />
-                      </div>
-                    </div>
-                  ))}
+                <div className="max-h-[38vh] space-y-1 overflow-auto rounded-lg border border-border p-2">
+                  {canDongBo.map(dongRow)}
                 </div>
-                <Button onClick={themVaoDanhMuc} disabled={soMH + soNL === 0}>
-                  <Library className="mr-2 h-4 w-4" />
-                  Thêm {soMH} mặt hàng + {soNL} loại NL
-                </Button>
               </div>
             )}
 
             {dsRoRang.length > 0 && (
               <details className="rounded-lg border border-border">
                 <summary className="cursor-pointer px-3 py-2 font-medium text-foreground">
-                  Tên rõ ràng — tự nhận loài ({dsRoRang.length}) · cá/tôm/mực… khỏi cần soi tay
+                  Tên rõ ràng — tự nhận loài ({dsRoRang.length}) · CÁ THU/SANMA… (mặc định → Loại NL, đổi được)
                 </summary>
                 <div className="space-y-2 px-3 pb-3">
-                  <p className="text-sm text-muted-foreground">
-                    Những tên này tên đã nói rõ loài (VD "CÁ THU" = Cá). Không cần ánh xạ; thêm hết vào Loại
-                    nguyên liệu theo loài nếu muốn danh mục đủ.
-                  </p>
-                  <div className="max-h-[24vh] overflow-auto text-sm text-muted-foreground">
-                    {dsRoRang.map((x) => (
-                      <span key={x.name} className="mr-2 inline-block">
-                        {x.name} <span className="text-foreground/70">({x.nhomGoiY})</span> ·
-                      </span>
-                    ))}
+                  <div className="flex flex-wrap gap-1">
+                    <Button size="sm" variant="ghost" onClick={() => datDich(dsRoRang, "goiY")}>
+                      Theo gợi ý
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => datDich(dsRoRang, "material")}>
+                      Tất cả → Loại NL
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => datDich(dsRoRang, "product")}>
+                      Tất cả → Mặt hàng
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => datDich(dsRoRang, "skip")}>
+                      Bỏ qua hết
+                    </Button>
                   </div>
-                  <Button size="sm" variant="outline" onClick={themRoRangVaoNL}>
-                    <Library className="mr-2 h-4 w-4" />
-                    Thêm {dsRoRang.length} tên vào Loại nguyên liệu (theo loài)
-                  </Button>
+                  <div className="max-h-[30vh] space-y-1 overflow-auto rounded-lg border border-border p-2">
+                    {dsRoRang.map(dongRow)}
+                  </div>
                 </div>
               </details>
+            )}
+
+            {(canDongBo.length > 0 || dsRoRang.length > 0) && (
+              <Button onClick={themVaoDanhMuc} disabled={soMH + soNL === 0}>
+                <Library className="mr-2 h-4 w-4" />
+                Thêm {soMH} mặt hàng + {soNL} loại nguyên liệu
+              </Button>
             )}
 
             {dongBo.nhomTrung.length > 0 && (

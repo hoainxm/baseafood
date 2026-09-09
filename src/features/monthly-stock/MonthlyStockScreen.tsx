@@ -3,12 +3,13 @@
 // Tên tiếng Việt: Sổ kho theo THÁNG — dồn tồn cuối kỳ → đầu kỳ sau
 // Description: Monthly stock ledger — carry closing balance into next month
 // ============================================================
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import type { MonthlyStockLine } from "@/types";
 import { MONTHLY_STOCK_CATEGORIES } from "@/types";
 import { useMonthlyStock } from "@/lib/catalogRepo";
 import { uid } from "@/lib/db";
 import { num, viDate } from "@/lib/format";
+import { parseBangKeKhoFile, namTuTenFile, type BangKeKhoSheet } from "@/lib/monthlyStockExcel";
 import {
   suyDong,
   tongDong,
@@ -71,6 +72,7 @@ import {
   Ship,
   Snowflake,
   Trash2,
+  Upload,
 } from "lucide-react";
 
 const TAT_CA_KHO = "__tat_ca__";
@@ -128,6 +130,10 @@ export default function MonthlyStockScreen() {
   const [kho, setKho] = useState(TAT_CA_KHO);
   const [ghiMode, setGhiMode] = useState(false);
   const [moIn, setMoIn] = useState(false);
+
+  // ---------- Nhập Excel bảng kê (seed số cũ) ----------
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [napForm, setNapForm] = useState<{ sheets: BangKeKhoSheet[]; nam: number; kho: string } | null>(null);
 
   // ---------- Tuỳ chọn tháng / kho ----------
   const thangCoData = useMemo(
@@ -295,6 +301,76 @@ export default function MonthlyStockScreen() {
     notify.daLuu(`Đã dồn tồn cuối sang ${nhanThang(dich)} · ${carried.length} dòng`);
   };
 
+  // ---------- Nhập Excel bảng kê ----------
+  const chonFile = () => fileRef.current?.click();
+  const napFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    try {
+      const sheets = await parseBangKeKhoFile(file);
+      if (!sheets.length) {
+        notify.canhBao("File không có sheet dữ liệu nào đọc được (mẫu 'bảng kê kho').");
+        return;
+      }
+      setNapForm({ sheets, nam: namTuTenFile(file.name), kho: "Kho 1500T" });
+    } catch (err) {
+      notify.loi(`Không đọc được file: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  };
+  const soDongNap = napForm
+    ? napForm.sheets.reduce((s, sh) => s + (sh.monthNum ? sh.rows.length : 0), 0)
+    : 0;
+  const xacNhanNap = () => {
+    if (!napForm) return;
+    const { sheets, nam, kho: khoNap } = napForm;
+    if (nam < 2000 || nam > 2100) {
+      notify.canhBao("Năm không hợp lệ (2000–2100).");
+      return;
+    }
+    const moi: MonthlyStockLine[] = [];
+    for (const sh of sheets) {
+      if (sh.monthNum == null) continue;
+      const period = `${nam}-${String(sh.monthNum).padStart(2, "0")}`;
+      sh.rows.forEach((r, idx) => {
+        moi.push({
+          id: `xlsx|${sh.sheetName}|${nam}|${r.rowIndex}`,
+          period,
+          category: r.category,
+          warehouse: khoNap.trim(),
+          itemName: r.itemName,
+          size: r.size,
+          origin: r.origin,
+          importDate: r.importDate,
+          kgPerCtn: r.kgPerCtn,
+          unitPrice: r.unitPrice,
+          openCtn: r.openCtn,
+          openKg: r.openKg,
+          inCtn: r.inCtn,
+          inKg: r.inKg,
+          outCtn: r.outCtn,
+          outKg: r.outKg,
+          carriedFromId: "",
+          sortOrder: idx,
+          note: "",
+        });
+      });
+    }
+    if (!moi.length) {
+      notify.canhBao("Không nạp được tháng nào — tên sheet phải là số tháng (1–12).");
+      return;
+    }
+    const idMoi = new Set(moi.map((x) => x.id));
+    const giuLai = lines.filter((l) => !idMoi.has(l.id));
+    ghiLines([...giuLai, ...moi]);
+    const dauKy = [...new Set(moi.map((m) => m.period))].sort()[0];
+    setThang(dauKy);
+    setKho(TAT_CA_KHO);
+    setGhiMode(false);
+    setNapForm(null);
+    notify.daLuu(`Đã nạp ${moi.length} dòng · ${new Set(moi.map((m) => m.period)).size} tháng từ Excel bảng kê`);
+  };
+
   // ---------- Thẻ số liệu ----------
   const the: TheThongTin[] = [
     { nhan: "Tồn đầu kỳ", giaTri: `${num(tong.openKg)} kg`, so: true, icon: Snowflake, mau: "trung-tinh" },
@@ -415,6 +491,11 @@ export default function MonthlyStockScreen() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
+          <input ref={fileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={napFile} />
+          <Button variant="outline" onClick={chonFile}>
+            <Upload className="mr-2 h-4 w-4" />
+            Nhập Excel bảng kê
+          </Button>
           <Button variant="outline" onClick={moThem}>
             <Plus className="mr-2 h-4 w-4" />
             Thêm dòng
@@ -657,6 +738,81 @@ export default function MonthlyStockScreen() {
             <Button onClick={luuDong}>
               <Plus className="mr-1 h-4 w-4" />
               {form?.id ? "Lưu dòng" : "Thêm dòng"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog nhập Excel bảng kê */}
+      <Dialog open={!!napForm} onOpenChange={(o) => !o && setNapForm(null)}>
+        <DialogContent className="w-full sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-2xl">Nhập Excel bảng kê kho</DialogTitle>
+            <DialogDescription className="text-base">
+              Mỗi sheet = một tháng. Nạp tồn đầu · nhập · xuất (kiện & kg) đúng theo file — tồn cuối &
+              tiền còn lại app tự suy. Nạp lại cùng file chỉ cập nhật, không nhân đôi.
+            </DialogDescription>
+          </DialogHeader>
+          {napForm && (
+            <div className="space-y-4 py-2">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label="Năm (cho mọi sheet)">
+                  <Input
+                    inputMode="numeric"
+                    value={String(napForm.nam)}
+                    onChange={(e) => {
+                      const n = parseInt(e.target.value.replace(/\D/g, "") || "0", 10);
+                      setNapForm((f) => (f ? { ...f, nam: n } : f));
+                    }}
+                  />
+                </Field>
+                <Field label="Kho">
+                  <Input
+                    value={napForm.kho}
+                    onChange={(e) => setNapForm((f) => (f ? { ...f, kho: e.target.value } : f))}
+                    placeholder="VD: Kho 1500T"
+                  />
+                </Field>
+              </div>
+              <div className="overflow-hidden rounded-lg border border-border">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border bg-muted/40 text-left text-muted-foreground">
+                      <th className="px-3 py-2">Sheet</th>
+                      <th className="px-3 py-2">Tháng</th>
+                      <th className="px-3 py-2 text-right">Số dòng</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {napForm.sheets.map((sh) => (
+                      <tr key={sh.sheetName} className="border-b border-border last:border-0">
+                        <td className="px-3 py-2 font-mono">{sh.sheetName}</td>
+                        <td className="px-3 py-2">
+                          {sh.monthNum ? (
+                            nhanThang(`${napForm.nam}-${String(sh.monthNum).padStart(2, "0")}`)
+                          ) : (
+                            <span className="text-warning">bỏ (tên sheet không phải số tháng)</span>
+                          )}
+                        </td>
+                        <td className="tnum px-3 py-2 text-right">{sh.rows.length}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Nạp trung thực theo sổ cũ (kể cả lệch dồn kỳ trong file). Sau khi nạp, mở tháng đầu rồi
+                bấm "Dồn sang tháng sau" lần lượt để chuẩn hóa tồn đầu các tháng kế.
+              </p>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setNapForm(null)}>
+              Hủy
+            </Button>
+            <Button onClick={xacNhanNap} disabled={soDongNap === 0}>
+              <Upload className="mr-1 h-4 w-4" />
+              Nạp {soDongNap} dòng
             </Button>
           </DialogFooter>
         </DialogContent>

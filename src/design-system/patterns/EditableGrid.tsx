@@ -206,7 +206,7 @@ export function LuoiNhap<R>({
   return (
     <div
       className={cn(
-        "scroll-nice overflow-x-auto rounded-xl ring-1 ring-foreground/10",
+        "scroll-nice-x overflow-x-auto rounded-xl ring-1 ring-foreground/10",
         className
       )}
     >

@@ -284,7 +284,7 @@ export default function DailyProductionReport() {
             </section>
           )}
 
-          <div className="scroll-nice overflow-x-auto rounded-xl border-2 border-border">
+          <div className="scroll-nice-x overflow-x-auto rounded-xl border-2 border-border">
             <Table>
               <TableHeader>
                 <TableRow>

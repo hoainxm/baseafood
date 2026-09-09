@@ -328,3 +328,30 @@
     background: transparent;
   }
 }
+
+/* Vùng cuộn NGANG (bảng rộng, biểu đồ): thanh cuộn token + CHỈ chặn cuộn-chuyền
+   theo TRỤC NGANG. Trục dọc để `auto` để lăn chuột trên bảng vẫn cuộn được TRANG.
+   Bẫy CSS: `overflow-x:auto` ép `overflow-y` thành `auto` → nếu dùng `scroll-nice`
+   (overscroll-behavior: contain cả 2 trục) thì wheel dọc trên bảng bị NUỐT, trang
+   không cuộn. `scroll-nice-x` sửa đúng chỗ: chỉ contain trục X. */
+@utility scroll-nice-x {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+  overscroll-behavior-x: contain;
+  overscroll-behavior-y: auto;
+  &::-webkit-scrollbar {
+    width: 9px;
+    height: 9px;
+  }
+  &::-webkit-scrollbar-thumb {
+    background-color: var(--border);
+    border-radius: 9999px;
+    border: 2px solid var(--background);
+  }
+  &::-webkit-scrollbar-thumb:hover {
+    background-color: var(--input);
+  }
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}

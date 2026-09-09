@@ -59,7 +59,7 @@ export function BangTong<T>({
   const coTong = cot.some((c) => c.tong);
 
   return (
-    <div className={cn("overflow-x-auto", className)}>
+    <div className={cn("scroll-nice-x overflow-x-auto", className)}>
       <Table>
         <TableHeader>
           <TableRow>

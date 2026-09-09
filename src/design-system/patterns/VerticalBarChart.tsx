@@ -55,7 +55,7 @@ export function BieuDoCotDoc({
     <div className={cn("space-y-4", className)}>
       <div className="relative border-2 border-border rounded-xl bg-card p-5">
         {/* Vùng cuộn ngang chứa danh sách các ngày */}
-        <div className="overflow-x-auto scroll-nice pb-2">
+        <div className="overflow-x-auto scroll-nice-x pb-2">
           {/* Lớp định vị chứa các cột và đường trung bình */}
           <div className="relative pt-8 pb-2 min-w-max">
             {/* Lớp cột sản lượng */}

@@ -185,7 +185,7 @@ export function RecordTable<T>({
         <>
           {/* Desktop — cuộn ngang khi ô chứa hẹp (VD nằm trong lưới 2 cột) để bảng
               KHÔNG tràn đè khối bên cạnh; đủ rộng thì không có thanh cuộn. */}
-          <div className="scroll-nice hidden overflow-x-auto rounded-xl ring-1 ring-foreground/10 md:block">
+          <div className="scroll-nice-x hidden overflow-x-auto rounded-xl ring-1 ring-foreground/10 md:block">
             <Table>
               <TableHeader>
                 <TableRow>

@@ -141,6 +141,15 @@ luật "thanh bên và vùng nội dung cuộn riêng" ở `AppShell`). Đặt m
 nên áp cho mọi nơi; **đừng gỡ** khi chỉnh `scroll-nice`. Cần một vùng cuộn mới
 không tràn ⇒ thêm class `scroll-nice`, không tự viết `overflow` rời.
 
+**Bảng/biểu đồ cuộn NGANG dùng `scroll-nice-x`, KHÔNG dùng `scroll-nice`.** Bẫy CSS:
+`overflow-x:auto` ép `overflow-y` thành `auto` → vùng thành scroll-container CẢ HAI
+trục. Với `scroll-nice` (`overscroll-behavior: contain` cả 2 trục), lăn chuột DỌC khi
+con trỏ ĐANG TRÊN BẢNG bị **nuốt** — trang không cuộn (đã dính ở màn Danh mục). Utility
+**`scroll-nice-x`** (`tokens.css`) chỉ `overscroll-behavior-x: contain`, để `-y: auto`
+nên cuộn dọc trên bảng vẫn đẩy được trang. Áp cho `RecordTable`, `BangTong`, `LuoiNhap`
+(`EditableGrid`), biểu đồ cuộn ngang. `scroll-nice` (contain 2 trục) chỉ cho vùng cuộn
+DỌC (thân `FormDialog`, nav sidebar/drawer, cột nội dung).
+
 ### 5a. Bẫy: dropdown đã đóng vẫn ăn click
 
 Radix chỉ gỡ nội dung Popover/Select khỏi DOM khi **animation thoát kết thúc**.

@@ -268,7 +268,7 @@ export default function OrderExportReport() {
           moTa="Tạo lệnh xuất ở màn Đơn đặt, số liệu xuất sẽ tổng hợp về đây."
         />
       ) : (
-        <div className="scroll-nice overflow-x-auto rounded-xl border-2 border-border">
+        <div className="scroll-nice-x overflow-x-auto rounded-xl border-2 border-border">
           <Table>
             <TableHeader>
               <TableRow>

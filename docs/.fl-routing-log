@@ -11,3 +11,4 @@
 2026-09-07 | production/ui | docs/app-map/34-btp-san-xuat-kho.ba-spec.md, docs/app-map/35-btp-ui.design-spec.md, docs/app-map/02-pages-navigation.md, src/design-system/README.md, docs/app-map/04-tang-du-lieu.md, docs/trien-khai/hop-2026-09-02-form-nhap-trace-gia-qc.md
 2026-09-07 | nhap-hang,btp-san-xuat,design-system,pages-navigation | 30-nhap-hang.md,34-btp-san-xuat-kho.ba-spec.md,35-btp-ui.design-spec.md,src/design-system/README.md,02-pages-navigation.md,01-app-structure.md,hop-2026-09-02-form-nhap-trace-gia-qc.md
 2026-09-07 | qc,db,data-layer,ops-storage | supabase-storage.md,03-database.md,04-tang-du-lieu.md,05-bao-mat-phan-quyen.md,design-system-README.md
+2026-09-09 | inventory+data-layer+ops | 36-so-kho-thang.md, 04-tang-du-lieu.md, 03-database.md, 01-app-structure.md, 02-pages-navigation.md, ops/supabase-setup.md

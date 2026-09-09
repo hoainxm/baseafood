@@ -1,6 +1,7 @@
 > Load khi: thêm/bớt màn hình, đổi điều hướng, header, hay tìm xem một màn được gắn vào đâu.
 covers: src/App.tsx, src/features/shared/AppShell.tsx, src/features/shared/NotFound.tsx, src/features/shared/guideContent.tsx, src/lib/nav-access.ts
 last_verified: 2026-09-09
+<!-- re-verified: 2026-09-09 15:00 — route /ton-kho-thang: App.tsx:182 + lazy:43, KIT_NAV AppShell:99, CAY_NAV nhóm Kho:168, gate DEPT_NHAP_HANG (nav-access.ts:13) — khớp code. -->
 <!-- updated: 2026-09-09 — THÊM route `/ton-kho-thang` "Sổ kho theo tháng" (features/monthly-stock, màn THẬT) nhóm nav "Kho"; gate DEPT_NHAP_HANG. Sổ kho theo THÁNG dương lịch, dồn tồn cuối kỳ → đầu kỳ sau. Xem 36-so-kho-thang.md. ~20 route. -->
 <!-- updated: 2026-09-06 — (A) NAV: gom deep-link danh mục về MỘT mục "Tra cứu"/module (helper TRACUU, icon Search) thay 1-mục-mỗi-tab (bỏ Đại lý+Loại NL riêng ở Nhập hàng…) — danh mục vốn 1 trang nhiều tab; "Danh mục" đầy đủ vẫn ở Hệ thống. gomCay: BỎ nhánh deep-link mồ côi khi module không có màn thật nào (vai trò bộ phận). (B) FORM-FIRST: /imports + /wip đổi "trang quản lý + Dialog nhập" → toggle 2 chế độ "📝 Ghi nhập" (form inline, tự mở phiếu trống, KHÔNG modal) ↔ "📖 Sổ ngày[& báo cáo]"; form dùng lại 100% logic (luuPhien/chốt/phế liệu), ngày+xưởng của phiếu đồng bộ về bộ lọc (2 useEffect). Bỏ Dialog ghi. Xem 30-nhap-hang + 34-btp. -->
 <!-- re-verified: 2026-09-05 — nav-access gate (allowedIds/homeFor/DEMO) khớp source; App.tsx lọc KIT_NAV theo quyền + demoGuard giữ nguyên. -->

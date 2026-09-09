@@ -140,6 +140,54 @@ export function gomNhom(rows: MonthlyStockRow[]): NhomKho[] {
     });
 }
 
+/* ---------- Cờ lệch dồn kỳ (tồn đầu tháng này vs tồn cuối tháng trước) ---------- */
+
+export interface LechNhom {
+  category: string;
+  closeTruoc: number; // tồn cuối tháng trước (kg)
+  openNay: number; // tồn đầu tháng này (kg)
+  lech: number; // openNay − closeTruoc
+}
+
+export interface LechDonKy {
+  closeTruoc: number;
+  openNay: number;
+  lech: number; // tổng: tồn đầu tháng này − tồn cuối tháng trước
+  theoNhom: LechNhom[]; // các nhóm có chênh (|lech| > NGUONG)
+}
+
+const NGUONG_LECH = 1; // < 1 kg coi như khớp (làm tròn số lẻ)
+
+const congTheoNhom = (rows: MonthlyStockRow[], lay: (r: MonthlyStockRow) => number) => {
+  const m = new Map<string, number>();
+  for (const r of rows) m.set(r.category || "(Chưa phân nhóm)", (m.get(r.category || "(Chưa phân nhóm)") ?? 0) + lay(r));
+  return m;
+};
+
+/**
+ * So tồn đầu tháng NÀY với tồn cuối tháng TRƯỚC (kg). Vòng gối đầu đúng thì
+ * bằng nhau; lệch = ghi chép dồn kỳ sai (đúng nỗi đau file Excel gốc). Trả tổng
+ * + các nhóm chênh để gọi tên đúng chỗ. KHÔNG sửa số — chỉ soi.
+ */
+export function soLechDonKy(rowsTruoc: MonthlyStockRow[], rowsNay: MonthlyStockRow[]): LechDonKy {
+  const closeTruoc = rowsTruoc.reduce((s, r) => s + r.closeKg, 0);
+  const openNay = rowsNay.reduce((s, r) => s + r.openKg, 0);
+  const mClose = congTheoNhom(rowsTruoc, (r) => r.closeKg);
+  const mOpen = congTheoNhom(rowsNay, (r) => r.openKg);
+  const cats = new Set([...mClose.keys(), ...mOpen.keys()]);
+  const theoNhom: LechNhom[] = [];
+  for (const c of cats) {
+    const ct = mClose.get(c) ?? 0;
+    const on = mOpen.get(c) ?? 0;
+    if (Math.abs(on - ct) > NGUONG_LECH) theoNhom.push({ category: c, closeTruoc: ct, openNay: on, lech: on - ct });
+  }
+  theoNhom.sort((a, b) => Math.abs(b.lech) - Math.abs(a.lech));
+  return { closeTruoc, openNay, lech: openNay - closeTruoc, theoNhom };
+}
+
+/** Có đáng gắn cờ lệch không (có tháng trước + tổng lệch quá ngưỡng). */
+export const coLechDonKy = (l: LechDonKy | null) => !!l && Math.abs(l.lech) > NGUONG_LECH;
+
 /* ---------- Dồn kỳ: tồn cuối tháng N → tồn đầu tháng N+1 ---------- */
 
 /** id tất định của dòng sinh ra khi dồn kỳ — chạy lại không đẻ dòng trùng. */

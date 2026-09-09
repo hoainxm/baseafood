@@ -1196,20 +1196,30 @@ export function useBang<T>(bang: AnhXaBang<T>, seed: () => T[] = () => []) {
     if (!supabase) return;
     let huy = false;
     (async () => {
-      const { data, error } = await supabase
-        .from(bang.table)
-        .select("*")
-        .eq("site_id", SITE_ID);
-      if (huy) return;
-      if (error) {
-        setTrangThai("loi");
-        setLoi(error.message);
-        ketNoi.baoLoi(error.message);
-        return;
+      // Nạp THEO TRANG: PostgREST mặc định trả tối đa 1000 dòng/‌lần. Bảng lớn
+      // (VD sổ kho theo tháng >1000 dòng) sẽ bị cắt cụt nếu chỉ select một phát.
+      // Lặp .range() tới khi trang trả về ít hơn cỡ trang → lấy đủ mọi dòng.
+      const CO_TRANG = 1000;
+      const thoRaw: Record<string, unknown>[] = [];
+      for (let tu = 0; ; tu += CO_TRANG) {
+        const { data, error } = await supabase
+          .from(bang.table)
+          .select("*")
+          .eq("site_id", SITE_ID)
+          .order(khoa)
+          .range(tu, tu + CO_TRANG - 1);
+        if (huy) return;
+        if (error) {
+          setTrangThai("loi");
+          setLoi(error.message);
+          ketNoi.baoLoi(error.message);
+          return;
+        }
+        const trang = data ?? [];
+        for (const r of trang) thoRaw.push(r as Record<string, unknown>);
+        if (trang.length < CO_TRANG) break;
       }
-      const may = (data ?? []).map((r) =>
-        bang.fromRow(r as Record<string, unknown>)
-      );
+      const may = thoRaw.map((r) => bang.fromRow(r));
 
       // Bảng rỗng lần đầu + máy này cũng chưa có gì → đẩy seed lên danh mục.
       if (may.length === 0) {

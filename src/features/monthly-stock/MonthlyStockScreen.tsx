@@ -20,6 +20,8 @@ import {
   thangTruoc,
   thangSau,
   nhanThang,
+  soLechDonKy,
+  coLechDonKy,
   type MonthlyStockRow,
 } from "@/lib/monthlyStock";
 import {
@@ -56,6 +58,7 @@ import {
   type TheThongTin,
 } from "@/design-system";
 import {
+  AlertTriangle,
   ArrowDownToLine,
   ArrowRightLeft,
   CalendarRange,
@@ -180,6 +183,10 @@ export default function MonthlyStockScreen() {
   const coTonSang = rowsThangDayDu.some(
     (r) => Math.abs(r.closeKg) > 1e-9 || Math.abs(r.closeCtn) > 1e-9
   );
+
+  // Cờ lệch dồn kỳ: tồn đầu tháng này (mọi kho) vs tồn cuối tháng trước.
+  const lech = useMemo(() => soLechDonKy(rowsTruoc, rowsThangDayDu), [rowsTruoc, rowsThangDayDu]);
+  const canhBaoLech = rowsTruoc.length > 0 && coLechDonKy(lech);
 
   // ---------- Ghi ô lưới ----------
   const suaSo = (id: string, patch: Partial<MonthlyStockLine>) => {
@@ -605,6 +612,41 @@ export default function MonthlyStockScreen() {
               {rowsThang.length} mặt hàng · {nhomList.length} nhóm
             </Badge>
           </div>
+
+          {canhBaoLech && (
+            <div className="space-y-2 rounded-xl border border-warning/50 bg-warning/10 p-3">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-warning" aria-hidden />
+                <div className="min-w-0 space-y-1">
+                  <p className="font-semibold text-foreground">
+                    Lệch dồn kỳ: tồn đầu {nhanThang(thang)} ({num(lech.openNay)} kg) ≠ tồn cuối{" "}
+                    {nhanThang(thangTr)} ({num(lech.closeTruoc)} kg) — lệch{" "}
+                    <span className="text-warning">
+                      {lech.lech > 0 ? "+" : ""}
+                      {num(lech.lech)} kg
+                    </span>
+                    .
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    Vòng gối đầu đúng thì tồn đầu tháng này phải bằng tồn cuối tháng trước. Chênh = ghi
+                    chép dồn kỳ sai — soi các nhóm dưới rồi sửa lô ghi lệch (giữ số theo sổ, không ghi đè
+                    tự động).
+                  </p>
+                  {lech.theoNhom.length > 0 && (
+                    <ul className="text-sm text-muted-foreground">
+                      {lech.theoNhom.map((g) => (
+                        <li key={g.category}>
+                          • <span className="font-medium text-foreground">{g.category}</span>: cuối{" "}
+                          {num(g.closeTruoc)} → đầu {num(g.openNay)} ({g.lech > 0 ? "+" : ""}
+                          {num(g.lech)} kg)
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
 
           {ghiMode ? (
             <div className="space-y-3">

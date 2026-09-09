@@ -65,6 +65,21 @@ Nút **"Nhập Excel bảng kê"** đọc thẳng file `kho ... .xlsx` ("BẢNG 
 - **Nạp TRUNG THỰC theo sổ cũ** — KHÔNG chép tồn cuối của file (file gốc dồn kỳ sai ở dòng tổng). Sau khi nạp, mở tháng đầu rồi bấm "Dồn sang tháng sau" lần lượt để **chuẩn hóa** tồn đầu các tháng kế.
 - Kiểm thật (file `kho 1000 năm 2026.xlsx`): 7 sheet → 1.405 dòng, 7 tháng; id duy nhất; nạp lại idempotent (1405→1405).
 
+## Cờ lệch dồn kỳ (chuẩn hóa = SOI, không ghi đè)
+
+Sau khi nạp cả năm, mỗi tháng vẫn giữ số theo file. Module **gắn cờ** khi tồn đầu
+tháng này ≠ tồn cuối tháng trước (`soLechDonKy` trong `lib/monthlyStock.ts`, so
+tổng + tách theo nhóm; ngưỡng 1 kg). Banner cảnh báo (warning) hiện tổng lệch +
+danh sách nhóm chênh để kế toán soi đúng chỗ rồi **sửa tay lô ghi lệch** — KHÔNG
+ghi đè tự động (quyết định của chủ dự án: giữ số theo sổ).
+
+Vì sao không ép `tồn đầu = tồn cuối tháng trước` per lô: file không có mã lô ổn
+định giữa các tháng, **~35,7% dòng trùng khóa lô** (cùng tên+size+xuất xứ+giá, VD
+NODOGURO nhiều dòng) → gán closing sai lô + phá số kế toán đã ghi. "Dồn sang
+tháng sau" chỉ dùng cho tháng **trống** (dựng tiếp), KHÔNG chạy chồng lên tháng đã
+nạp (sẽ cộng đôi). Kiểm thật file `kho 1000 năm 2026.xlsx`: T5→T6 lệch −173.466 kg
+(nhóm mua ngoài −154.277,88 · nhập khẩu −19.188,28) — cờ chỉ đúng chỗ sai.
+
 ## Cạm bẫy
 
 - **Cộng đôi**: mỗi dòng độc lập trong CÙNG một tháng ⇒ `tongDong` cộng thẳng an toàn. Nhưng KHÔNG cộng dồn tồn đầu/cuối qua NHIỀU tháng (phần kế thừa sẽ đếm lại) — module chỉ tổng trong một tháng.

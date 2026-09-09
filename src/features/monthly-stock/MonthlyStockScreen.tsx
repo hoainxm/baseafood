@@ -24,6 +24,7 @@ import {
   coLechDonKy,
   doiChieuDonKy,
   phanTichDongBoDanhMuc,
+  suyNhomNguyenLieu,
   type MonthlyStockRow,
   type DoiChieuDong,
   type DichDanhMuc,
@@ -224,7 +225,7 @@ export default function MonthlyStockScreen() {
   );
   const [moDongBo, setMoDongBo] = useState(false);
   const [dichDB, setDichDB] = useState<Record<string, DichDanhMuc>>({}); // đích từng dòng (đè gợi ý)
-  const [nhomDB, setNhomDB] = useState<Record<string, string>>({});
+  const [mapDB, setMapDB] = useState<Record<string, string>>({}); // ánh xạ tên file → tên chuẩn trong danh mục
 
   // ---------- Ghi ô lưới ----------
   const suaSo = (id: string, patch: Partial<MonthlyStockLine>) => {
@@ -355,53 +356,68 @@ export default function MonthlyStockScreen() {
   };
 
   // ---------- Đồng bộ danh mục loại nguyên liệu ----------
-  const nhomOpts: MucChon[] = useMemo(() => {
-    const set = new Set<string>(["Bạch tuộc", "Mực", "Cá", "Tôm", "Ghẹ", "Bào ngư", "Khác"]);
-    for (const m of mtypes) if (m.category) set.add(m.category);
-    for (const p of products) if (p.category) set.add(p.category);
-    return [...set].map((c) => ({ value: c, label: c }));
-  }, [mtypes, products]);
+  // Danh sách tên CHUẨN để ánh xạ tới (gõ tìm / thêm mới).
+  const matHangOpts: MucChon[] = useMemo(
+    () => [...products].map((p) => p.name).sort((a, b) => a.localeCompare(b)).map((n) => ({ value: n, label: n })),
+    [products]
+  );
+  const loaiNLOpts: MucChon[] = useMemo(
+    () => [...mtypes].map((m) => m.name).sort((a, b) => a.localeCompare(b)).map((n) => ({ value: n, label: n })),
+    [mtypes]
+  );
 
   const moDongBoDialog = () => {
     setDichDB({}); // rỗng = dùng đích GỢI Ý mỗi dòng
-    setNhomDB({});
+    setMapDB({}); // rỗng = giữ nguyên tên file (chưa ánh xạ)
     setMoDongBo(true);
   };
   // Tách: MÃ KHÓ cần người quyết vs tên RÕ RÀNG (tự nhận loài, khỏi bận tâm).
   const canDongBo = dongBo.chuaCo.filter((x) => !x.roRang);
   const dsRoRang = dongBo.chuaCo.filter((x) => x.roRang);
-  const nhomCua = (x: { name: string; nhomGoiY: string }) => (nhomDB[x.name] || x.nhomGoiY || "Khác").trim();
   const dichCua = (x: { name: string; dichGoiY: DichDanhMuc }): DichDanhMuc => dichDB[x.name] ?? x.dichGoiY;
+  // Tên chuẩn được ánh xạ tới (mặc định = tên file nếu chưa chọn).
+  const mapCua = (x: { name: string }) => (mapDB[x.name] ?? x.name).trim();
+  const chuan = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " ");
   // Đếm trên TOÀN BỘ (cả mã khó lẫn rõ ràng) — mỗi dòng tự chọn đích.
   const soMH = dongBo.chuaCo.filter((x) => dichCua(x) === "product").length;
   const soNL = dongBo.chuaCo.filter((x) => dichCua(x) === "material").length;
 
-  const themVaoDanhMuc = () => {
+  /**
+   * Áp đồng bộ: mỗi mã (đích ≠ bỏ qua) NỐI vào tên chuẩn (mapCua). Tên chuẩn chưa
+   * có trong danh mục đích ⇒ thêm mới; và ĐỔI TÊN mọi dòng sổ mang tên file cũ
+   * sang tên chuẩn (đồng bộ sổ + gộp trùng cách ghi).
+   */
+  const apDongBo = () => {
+    const coNL = new Set(mtypes.map((m) => chuan(m.name)));
+    const coMH = new Set(products.map((p) => chuan(p.name)));
     const themNL: MaterialType[] = [];
     const themMH: Product[] = [];
+    const doiTen = new Map<string, string>(); // tên file → tên chuẩn (khi khác nhau)
     for (const x of dongBo.chuaCo) {
       const d = dichCua(x);
-      if (d === "material") {
-        themNL.push({ id: uid(), name: x.name, category: nhomCua(x), note: "Từ sổ kho theo tháng" });
-      } else if (d === "product") {
-        themMH.push({
-          id: uid(),
-          code: "",
-          name: x.name,
-          finishedGoodCode: "", // chưa ánh xạ 141 mã kế toán (hợp lệ)
-          category: nhomCua(x),
-          processingType: "",
-        });
+      if (d === "skip") continue;
+      const canon = mapCua(x);
+      if (!canon) continue;
+      if (d === "material" && !coNL.has(chuan(canon))) {
+        themNL.push({ id: uid(), name: canon, category: suyNhomNguyenLieu(canon), note: "Từ sổ kho theo tháng" });
+        coNL.add(chuan(canon));
+      } else if (d === "product" && !coMH.has(chuan(canon))) {
+        themMH.push({ id: uid(), code: "", name: canon, finishedGoodCode: "", category: suyNhomNguyenLieu(canon), processingType: "" });
+        coMH.add(chuan(canon));
       }
+      if (chuan(canon) !== chuan(x.name)) doiTen.set(x.name, canon);
     }
-    if (!themNL.length && !themMH.length) {
-      notify.canhBao("Chưa dòng nào để thêm (toàn Bỏ qua).");
+    if (!themNL.length && !themMH.length && !doiTen.size) {
+      notify.canhBao("Chưa ánh xạ/chọn đích dòng nào.");
       return;
     }
     if (themNL.length) ghiMtypes([...mtypes, ...themNL]);
     if (themMH.length) ghiProducts([...products, ...themMH]);
+    if (doiTen.size) ghiLines(lines.map((l) => (doiTen.has(l.itemName) ? { ...l, itemName: doiTen.get(l.itemName)! } : l)));
     setMoDongBo(false);
-    notify.daLuu(`Đã thêm ${themMH.length} mặt hàng + ${themNL.length} loại nguyên liệu`);
+    notify.daLuu(
+      `Đồng bộ: +${themMH.length} mặt hàng · +${themNL.length} loại NL · đổi tên ${doiTen.size} mã trong sổ`
+    );
   };
 
   /** Đặt đích cho một NHÓM dòng (bulk theo section). */
@@ -416,35 +432,40 @@ export default function MonthlyStockScreen() {
     });
   };
 
-  /** Bộ chọn đích cho MỘT dòng (dùng chung mã khó + rõ ràng). */
-  const dongRow = (x: DongBoDong) => (
-    <div key={x.name} className="flex items-center gap-2 rounded p-1 hover:bg-muted/50">
-      <span className="min-w-0 flex-1 truncate text-foreground" title={x.name}>
-        {x.name}
-      </span>
-      <select
-        className="h-9 shrink-0 rounded-md border border-border bg-background px-2"
-        value={dichCua(x)}
-        onChange={(e) => setDichDB((m) => ({ ...m, [x.name]: e.target.value as DichDanhMuc }))}
-        aria-label={`Đích ${x.name}`}
-      >
-        <option value="product">→ Mặt hàng</option>
-        <option value="material">→ Loại NL</option>
-        <option value="skip">Bỏ qua</option>
-      </select>
-      <div className="w-36 shrink-0">
-        <Combobox
-          anNhan
-          label={`Nhóm ${x.name}`}
-          value={nhomDB[x.name] ?? x.nhomGoiY}
-          onChange={(v) => setNhomDB((m) => ({ ...m, [x.name]: v }))}
-          options={nhomOpts}
-          onCreate={(t) => t}
-          choPhepXoa={false}
-        />
+  /** Một dòng: tên file · đích (Mặt hàng/Loại NL/Bỏ qua) · ánh xạ tới tên CHUẨN. */
+  const dongRow = (x: DongBoDong) => {
+    const d = dichCua(x);
+    const opts = d === "product" ? matHangOpts : loaiNLOpts;
+    return (
+      <div key={x.name} className="flex flex-wrap items-center gap-2 rounded p-1 hover:bg-muted/50">
+        <span className="min-w-0 flex-1 truncate text-foreground" title={x.name}>
+          {x.name}
+        </span>
+        <select
+          className="h-9 shrink-0 rounded-md border border-border bg-background px-2"
+          value={d}
+          onChange={(e) => setDichDB((m) => ({ ...m, [x.name]: e.target.value as DichDanhMuc }))}
+          aria-label={`Đích ${x.name}`}
+        >
+          <option value="product">→ Mặt hàng</option>
+          <option value="material">→ Loại NL</option>
+          <option value="skip">Bỏ qua</option>
+        </select>
+        <div className="w-64 shrink-0">
+          <Combobox
+            anNhan
+            label={`Ánh xạ ${x.name} tới`}
+            value={mapCua(x)}
+            onChange={(v) => setMapDB((m) => ({ ...m, [x.name]: v }))}
+            options={opts}
+            onCreate={(t) => t}
+            choPhepXoa={false}
+            placeholder={d === "skip" ? "— bỏ qua —" : "Gõ tìm tên chuẩn / thêm mới"}
+          />
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   // ---------- Nhập Excel bảng kê ----------
   const chonFile = () => fileRef.current?.click();
@@ -1101,9 +1122,10 @@ export default function MonthlyStockScreen() {
           <DialogHeader>
             <DialogTitle className="text-2xl">Đồng bộ danh mục</DialogTitle>
             <DialogDescription className="text-base">
-              Tên tự nhận loài (CÁ THU, SANMA…) coi như rõ — gom riêng, khỏi bận tâm. Việc chính là các
-              <span className="font-semibold"> mã khó</span> (2 DA RÂU NGẮN, MADA…): chọn ĐÍCH từng dòng —
-              Mặt hàng / Loại NL / Bỏ qua (tự đoán sẵn). Thành phẩm 141 mã kế toán cố định — không thêm ở đây.
+              Với mỗi mã khó (2 DA RÂU NGẮN…): chọn ĐÍCH (Mặt hàng / Loại NL) rồi **ánh xạ tới tên CHUẨN
+              có sẵn** trong danh mục (gõ tìm) — hoặc gõ thêm mới nếu chưa có. Áp xong: tên chuẩn được thêm
+              (nếu mới) và MỌI dòng sổ mang tên cũ được đổi sang tên chuẩn (đồng bộ + gộp trùng cách ghi).
+              Tên tự rõ loài (CÁ THU…) gom ở mục "rõ ràng". Thành phẩm 141 mã kế toán cố định — không thêm ở đây.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
@@ -1172,9 +1194,9 @@ export default function MonthlyStockScreen() {
             )}
 
             {(canDongBo.length > 0 || dsRoRang.length > 0) && (
-              <Button onClick={themVaoDanhMuc} disabled={soMH + soNL === 0}>
+              <Button onClick={apDongBo} disabled={soMH + soNL === 0}>
                 <Library className="mr-2 h-4 w-4" />
-                Thêm {soMH} mặt hàng + {soNL} loại nguyên liệu
+                Đồng bộ: {soMH} → Mặt hàng · {soNL} → Loại NL
               </Button>
             )}
 

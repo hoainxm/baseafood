@@ -42,6 +42,7 @@ import type {
   MaterialOpeningStock,
   FinishedGoodsOpeningStock,
   NxtSnapshotLine,
+  MonthlyStockLine,
 } from "@/types";
 import { rolesFromCsv, rolesToCsv } from "@/types";
 import { ghiNhatKy, type NhatKyMoi } from "@/lib/audit";
@@ -952,6 +953,70 @@ export const BANG_NXT_SNAPSHOT: AnhXaBang<NxtSnapshotLine> = {
   }),
 };
 
+/** Sổ kho theo THÁNG — dồn tồn cuối kỳ → đầu kỳ sau. Tồn cuối suy ở app (kiện + kg). */
+export const BANG_MONTHLY_STOCK: AnhXaBang<MonthlyStockLine> = {
+  table: "monthly_stock_ledger",
+  localKey: "bsf.monthly-stock.v2",
+  layKhoa: theoId,
+  toRow: (x) => ({
+    id: x.id,
+    period: x.period,
+    category: x.category,
+    warehouse: x.warehouse,
+    item_name: x.itemName,
+    size: x.size,
+    origin: x.origin,
+    import_date: x.importDate || null,
+    kg_per_ctn: n(x.kgPerCtn),
+    unit_price: n(x.unitPrice),
+    open_ctn: x.openCtn,
+    open_kg: x.openKg,
+    in_ctn: x.inCtn,
+    in_kg: x.inKg,
+    out_ctn: x.outCtn,
+    out_kg: x.outKg,
+    carried_from_id: x.carriedFromId,
+    sort_order: x.sortOrder,
+    note: x.note,
+  }),
+  fromRow: (r) => ({
+    id: s(r.id),
+    period: s(r.period),
+    category: s(r.category),
+    warehouse: s(r.warehouse),
+    itemName: s(r.item_name),
+    size: s(r.size),
+    origin: s(r.origin),
+    importDate: s(r.import_date).slice(0, 10),
+    kgPerCtn: r.kg_per_ctn == null ? null : Number(r.kg_per_ctn),
+    unitPrice: r.unit_price == null ? null : Number(r.unit_price),
+    openCtn: Number(r.open_ctn ?? 0),
+    openKg: Number(r.open_kg ?? 0),
+    inCtn: Number(r.in_ctn ?? 0),
+    inKg: Number(r.in_kg ?? 0),
+    outCtn: Number(r.out_ctn ?? 0),
+    outKg: Number(r.out_kg ?? 0),
+    carriedFromId: s(r.carried_from_id),
+    sortOrder: Number(r.sort_order ?? 0),
+    note: s(r.note),
+  }),
+  // Dòng ghi từ bản app trước khi có sổ tháng: vá field mới để không NaN/undefined.
+  vaDongCu: (x) => ({
+    ...x,
+    size: x.size ?? "",
+    origin: x.origin ?? "",
+    importDate: x.importDate ?? "",
+    kgPerCtn: x.kgPerCtn ?? null,
+    unitPrice: x.unitPrice ?? null,
+    openCtn: x.openCtn ?? 0,
+    inCtn: x.inCtn ?? 0,
+    outCtn: x.outCtn ?? 0,
+    carriedFromId: x.carriedFromId ?? "",
+    sortOrder: x.sortOrder ?? 0,
+    note: x.note ?? "",
+  }),
+};
+
 /* ---------- Hàng chờ đồng bộ (chống mất số liệu khi ghi hụt) ----------
    Ghi lên máy chủ có thể hụt giữa ca (wifi rớt, tablet ngủ, server nghẽn).
    Mỗi bảng giữ một "hàng chờ" khóa các dòng chưa đẩy được:
@@ -1065,6 +1130,7 @@ const NHAN_BANG: Record<string, string> = {
   material_opening_stock: "Tồn đầu nguyên liệu",
   finished_goods_opening_stock: "Tồn đầu thành phẩm",
   nxt_snapshots: "Xuất–Nhập–Tồn kho (báo cáo)",
+  monthly_stock_ledger: "Sổ kho theo tháng",
 };
 
 /** Trường đổi giữa hai bản ghi → { trường: [trước, sau] }. */

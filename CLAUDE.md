@@ -100,6 +100,7 @@ Chưa rõ tier ⇒ coi là 🔴. Dữ liệu ở đây là **sổ sách thật c
 | `features/SalesScreen.tsx`, phiếu bán / quy cách / hút bán | [`33-ban-hang.md`](docs/app-map/33-ban-hang.md) |
 | `features/BalancingScreen.tsx`, `BalancingTable.tsx`, `lib/balancingCalc.ts` | [`31-can-doi-ky.md`](docs/app-map/31-can-doi-ky.md) |
 | `features/CatalogScreen.tsx`, `FinishedGoodScreen.tsx`, `data/thanh-pham.json` | [`32-danh-muc.md`](docs/app-map/32-danh-muc.md) |
+| `features/monthly-stock/**`, `lib/monthlyStock.ts` (sổ kho theo tháng, dồn kỳ) | [`36-so-kho-thang.md`](docs/app-map/36-so-kho-thang.md) |
 | `supabase/migrations/**` | [`03-database.md`](docs/app-map/03-database.md) (+ [`04`](docs/app-map/04-tang-du-lieu.md) nếu đổi ánh xạ) |
 | `lib/repo.ts`, `db.ts`, `catalogRepo.ts`, `connectivity.ts` | [`04-tang-du-lieu.md`](docs/app-map/04-tang-du-lieu.md) |
 | `App.tsx` (thêm màn / đổi nav) | [`02-pages-navigation.md`](docs/app-map/02-pages-navigation.md) |
@@ -144,6 +145,7 @@ Index đầy đủ + bảng định tuyến theo task: [`docs/app-map/README.md`
 | [`31-can-doi-ky`](docs/app-map/31-can-doi-ky.md) | kỳ, 3 khối, công thức, bảng in A4 |
 | [`32-danh-muc`](docs/app-map/32-danh-muc.md) | danh mục, 141 mã thành phẩm |
 | [`34-btp-san-xuat-kho`](docs/app-map/34-btp-san-xuat-kho.ba-spec.md) · [`35-btp-ui`](docs/app-map/35-btp-ui.design-spec.md) | sản xuất BTP/WIP, **đóng gói BTP→TP** (`/packaging`), kho dự trữ, đơn/xuất, vòng đông gửi↔xả đông |
+| [`36-so-kho-thang`](docs/app-map/36-so-kho-thang.md) | **Sổ kho theo THÁNG** (`/ton-kho-thang`): dồn tồn cuối kỳ → đầu kỳ sau, đủ cột kiện+kg, mọi đối tượng NL/BTP/TP |
 | [`trien-khai/flow-end-to-end-2-bo-phan`](docs/trien-khai/flow-end-to-end-2-bo-phan.md) | nối luồng nhập→sản xuất→kho→bán, 2 giao diện bộ phận, daily-task (họp 2026-08-22) |
 
 Bản đồ tài liệu đầy đủ + luật "doc mới bỏ đâu": [`docs/README.md`](docs/README.md).
@@ -157,7 +159,7 @@ Ngoài app-map: [`src/design-system/README.md`](src/design-system/README.md) (UI
 
 > **Bổ sung — họp 2026-09-02:** chốt số chạy realtime **từ tháng 9**; định hướng lớn cho vận hành: **một form nhập chuẩn + chụp ảnh phiếu tay → OCR** (giảm gõ tay ở xưởng), **định danh lô + QR** (trace nội bộ; SSCC nhà nước chừa ô trống làm sau), **giá & bình quân gia quyền theo ngày** (đang chốt PA), **QC chấm điểm + ảnh**, **khung nhân sự gắn từng khâu**. Cửa vào: [`trien-khai/hop-2026-09-02-form-nhap-trace-gia-qc.md`](docs/trien-khai/hop-2026-09-02-form-nhap-trace-gia-qc.md).
 
-**Đã build (THẬT — nối dữ liệu):** nhập hàng (chuyến thật · 2 ngày + ghi bù · chốt ngày · phế liệu ngày · bộ lọc), **sản xuất BTP ngày `/wip`** (sản lượng theo ngày/xưởng/loại NL · chốt ngày SX · ghi bù), **kho dự trữ `/warehouse`** (duyệt BTP chờ→đã nhập · tồn), **đơn đặt `/orders`** (lệnh xuất FIFO từ tồn WIP), bán hàng (phiếu bán · quy cách · XK/NĐ · hút cân đối), cân đối + in A4 + chốt/chuyển kỳ, NXT + tồn NL, danh mục 5 tab, đăng nhập + vai trò `user_profiles` + màn Người dùng, bộ giao diện responsive, tầng dữ liệu Supabase↔localStorage. Điều hướng **react-router v7 (HashRouter)**, ~19 route, **nav CÂY module-centric** (`CAY_NAV`, gập/mở + deep-link danh mục trong module).
+**Đã build (THẬT — nối dữ liệu):** nhập hàng (chuyến thật · 2 ngày + ghi bù · chốt ngày · phế liệu ngày · bộ lọc), **sản xuất BTP ngày `/wip`** (sản lượng theo ngày/xưởng/loại NL · chốt ngày SX · ghi bù), **kho dự trữ `/warehouse`** (duyệt BTP chờ→đã nhập · tồn), **đơn đặt `/orders`** (lệnh xuất FIFO từ tồn WIP), bán hàng (phiếu bán · quy cách · XK/NĐ · hút cân đối), cân đối + in A4 + chốt/chuyển kỳ, NXT + tồn NL, danh mục 5 tab, đăng nhập + vai trò `user_profiles` + màn Người dùng, **sổ kho theo tháng `/ton-kho-thang`** (dồn tồn cuối kỳ tháng N → tồn đầu kỳ N+1, đủ cột kiện+kg cho NL/BTP/TP — [36-so-kho-thang](docs/app-map/36-so-kho-thang.md)), bộ giao diện responsive, tầng dữ liệu Supabase↔localStorage. Điều hướng **react-router v7 (HashRouter)**, ~20 route, **nav CÂY module-centric** (`CAY_NAV`, gập/mở + deep-link danh mục trong module).
 
 **Màn DEMO (dữ liệu mẫu, chưa nối bảng — đừng coi là đã có):** Lệnh sản xuất `/production` · Kho lạnh `/cold-storage` · Báo cáo tổng `/reports` · Tổng quan `/dashboard` · Chất lượng `/quality` · Truy xuất `/traceability`.
 

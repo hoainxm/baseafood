@@ -1,6 +1,7 @@
 > Load khi: thêm/bớt màn hình, đổi điều hướng, header, hay tìm xem một màn được gắn vào đâu.
 covers: src/App.tsx, src/features/shared/AppShell.tsx, src/features/shared/NotFound.tsx, src/features/shared/guideContent.tsx, src/lib/nav-access.ts
-last_verified: 2026-09-06
+last_verified: 2026-09-09
+<!-- updated: 2026-09-09 — THÊM route `/ton-kho-thang` "Sổ kho theo tháng" (features/monthly-stock, màn THẬT) nhóm nav "Kho"; gate DEPT_NHAP_HANG. Sổ kho theo THÁNG dương lịch, dồn tồn cuối kỳ → đầu kỳ sau. Xem 36-so-kho-thang.md. ~20 route. -->
 <!-- updated: 2026-09-06 — (A) NAV: gom deep-link danh mục về MỘT mục "Tra cứu"/module (helper TRACUU, icon Search) thay 1-mục-mỗi-tab (bỏ Đại lý+Loại NL riêng ở Nhập hàng…) — danh mục vốn 1 trang nhiều tab; "Danh mục" đầy đủ vẫn ở Hệ thống. gomCay: BỎ nhánh deep-link mồ côi khi module không có màn thật nào (vai trò bộ phận). (B) FORM-FIRST: /imports + /wip đổi "trang quản lý + Dialog nhập" → toggle 2 chế độ "📝 Ghi nhập" (form inline, tự mở phiếu trống, KHÔNG modal) ↔ "📖 Sổ ngày[& báo cáo]"; form dùng lại 100% logic (luuPhien/chốt/phế liệu), ngày+xưởng của phiếu đồng bộ về bộ lọc (2 useEffect). Bỏ Dialog ghi. Xem 30-nhap-hang + 34-btp. -->
 <!-- re-verified: 2026-09-05 — nav-access gate (allowedIds/homeFor/DEMO) khớp source; App.tsx lọc KIT_NAV theo quyền + demoGuard giữ nguyên. -->
 <!-- updated: 2026-09-05 — (A1 họp 2026-09-02 QĐ-9) NAV CÂY module-centric: NHOM_NAV (danh sách phẳng ids) → CAY_NAV (cây gập/mở, mỗi nhóm = module, con = màn + DEEP-LINK tra danh mục ngay trong module). AppShell: gomCay() phân giải cây theo `items` đã lọc quyền; CayNav render nhóm gập/mở (nhớ trạng thái ở localStorage `bsf1:nav-nhom`, mặc định MỞ; nhóm 1 màn hiện thẳng, không tiêu đề); thu gọn sidebar (thuGon) = icon-only, bỏ deep-link danh mục. Deep-link danh mục = `catalog?tab=<tab>` (gateId="catalog" để giữ gate 2 bộ phận). App.tsx truyền `activeTab` (searchParams `tab`) để tô sáng đúng deep-link; onSelect navigate(`/${target}`) nhận cả path có query. CatalogScreen điều khiển tab bằng `useSearchParams` (?tab=) — MỘT nguồn danh mục, chỉ đổi tab. `index.ts` export CAY_NAV (thay NHOM_NAV). -->
@@ -42,7 +43,7 @@ Cả hai dùng CHUNG một cây nav (`CayNav`) dựng từ `KIT_NAV` (danh sách
 | Tổng quan | `dashboard` |
 | Nhập hàng | `imports` · `nxt-nl` · (**Tra cứu** → `catalog?tab=dai-ly`) |
 | Sản xuất | `wip` · `packaging` · `qc` · (**Tra cứu** → `catalog?tab=mat-hang`) · `production` · `quality` |
-| Kho | `warehouse` · `qr` · `nxt-kho` · `cold-storage` |
+| Kho | `warehouse` · `ton-kho-thang` · `qr` · `nxt-kho` · `cold-storage` |
 | Kinh doanh | `sales` · `orders` · (**Tra cứu** → `catalog?tab=khach-hang`) |
 | Báo cáo & Cân đối | `balancing` · `bc-thanh-pham` · `bc-don-xuat` · `nxt` · `reports` · `traceability` |
 | Hệ thống | `catalog` (danh mục đầy đủ) · `users` (chỉ admin) · `audit` (chỉ admin) |
@@ -85,6 +86,8 @@ Cỡ chữ / trạng thái kết nối **không còn ở chân sidebar** (đã d
 | `/kit` | — | Bộ giao diện | `design-system/kit/KitPage.tsx` | Trang demo component. **Đã gỡ khỏi sidebar** — vào bằng URL, desktop-only |
 
 Ngoài bảng trên, khung còn các màn MES: `/dashboard` (Tổng quan) · `/quality` (Chất lượng) · `/cold-storage` (Kho lạnh) · `/reports` (Báo cáo) · `/traceability` (Truy xuất) · `/wip` (Sản xuất BTP).
+
+Sổ kho theo THÁNG dương lịch: `/ton-kho-thang` (`features/monthly-stock/MonthlyStockScreen.tsx` — dồn tồn cuối kỳ tháng N → tồn đầu kỳ N+1, cho mọi đối tượng NL/BTP/TP, đủ cột kiện+kg như bảng kê kho; xem [36-so-kho-thang.md](36-so-kho-thang.md)).
 
 Cụm báo cáo khép vòng (đọc dữ liệu thật, không mock): `/bc-thanh-pham` (`features/reports/DailyProductionReport.tsx` — tổng hợp thành phẩm SX hàng ngày, lưới mặt hàng×ngày + Excel) · `/bc-don-xuat` (`features/reports/OrderExportReport.tsx` — đơn đặt được xuất theo kỳ + Excel) · `/nxt-nl` (`features/reports/MaterialNxtScreen.tsx` — NXT nguyên liệu) · `/nxt` (`features/reports/NxtReportScreen.tsx` — NXT thành phẩm, suy từ SX/đơn/bán + tồn đầu). Lưu ý: `/production` là màn TRƯNG BÀY (WorkOrderScreen, mock); màn ghi sản lượng thật là `/wip`.
 

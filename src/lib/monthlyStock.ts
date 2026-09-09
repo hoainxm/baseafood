@@ -1,0 +1,180 @@
+// ============================================================
+// Tên file: src/lib/monthlyStock.ts
+// Tên tiếng Việt: Sổ kho theo THÁNG — hàm thuần (dồn tồn cuối kỳ → đầu kỳ sau)
+// Description: Monthly stock ledger — pure helpers (carry closing → next opening)
+// ============================================================
+import type { MonthlyStockLine } from "@/types";
+import { MONTHLY_STOCK_CATEGORIES } from "@/types";
+
+/**
+ * Toàn bộ TOÁN của sổ kho theo tháng nằm ở đây — thuần, không React, dễ đối chiếu
+ * tay với "bảng kê kho" thật. Quy tắc chính xác nằm DUY NHẤT ở file này.
+ *
+ * Bất biến: Tồn cuối = Tồn đầu + Nhập − Xuất (cho CẢ kiện và kg). Tồn cuối KHÔNG
+ * lưu — suy tại đây nên luôn khớp. Chỉ tồn ĐẦU kỳ được lưu (snapshot kế thừa).
+ */
+
+export interface MonthlyStockRow extends MonthlyStockLine {
+  closeCtn: number;
+  closeKg: number;
+  /** Tiền còn lại = tồn cuối (kg) × đơn giá. */
+  remainingValue: number;
+}
+
+export interface MonthlyStockTotals {
+  openCtn: number;
+  openKg: number;
+  inCtn: number;
+  inKg: number;
+  outCtn: number;
+  outKg: number;
+  closeCtn: number;
+  closeKg: number;
+  remainingValue: number;
+  soDong: number;
+}
+
+/** Suy tồn cuối + tiền còn lại cho một dòng (không lưu, luôn tính lại). */
+export function suyDong(l: MonthlyStockLine): MonthlyStockRow {
+  const closeCtn = l.openCtn + l.inCtn - l.outCtn;
+  const closeKg = l.openKg + l.inKg - l.outKg;
+  return {
+    ...l,
+    closeCtn,
+    closeKg,
+    remainingValue: closeKg * (l.unitPrice ?? 0),
+  };
+}
+
+/** Cộng tổng một tập dòng (mỗi dòng độc lập trong cùng một tháng ⇒ cộng thẳng). */
+export function tongDong(rows: MonthlyStockRow[]): MonthlyStockTotals {
+  const t: MonthlyStockTotals = {
+    openCtn: 0, openKg: 0, inCtn: 0, inKg: 0, outCtn: 0, outKg: 0,
+    closeCtn: 0, closeKg: 0, remainingValue: 0, soDong: rows.length,
+  };
+  for (const r of rows) {
+    t.openCtn += r.openCtn; t.openKg += r.openKg;
+    t.inCtn += r.inCtn; t.inKg += r.inKg;
+    t.outCtn += r.outCtn; t.outKg += r.outKg;
+    t.closeCtn += r.closeCtn; t.closeKg += r.closeKg;
+    t.remainingValue += r.remainingValue;
+  }
+  return t;
+}
+
+/* ---------- Tháng dương lịch ---------- */
+
+/** Tháng hiện tại theo giờ máy, dạng 'YYYY-MM'. */
+export function thangHienTai(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+/** 'YYYY-MM' → tháng kế tiếp (qua năm khi tháng 12). */
+export function thangSau(period: string): string {
+  const [y, m] = period.split("-").map(Number);
+  const d = new Date(y, (m || 1) - 1 + 1, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+/** 'YYYY-MM' → tháng liền trước. */
+export function thangTruoc(period: string): string {
+  const [y, m] = period.split("-").map(Number);
+  const d = new Date(y, (m || 1) - 1 - 1, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+/** 'YYYY-MM' → "Tháng 7/2026". */
+export function nhanThang(period: string): string {
+  const [y, m] = period.split("-");
+  return `Tháng ${Number(m)}/${y}`;
+}
+
+/**
+ * Danh sách N tháng gần đây (mới → cũ) từ mốc `moc` (mặc định tháng hiện tại),
+ * hợp nhất với mọi tháng đã có dữ liệu để không bao giờ thiếu kỳ nào trong sổ.
+ */
+export function danhSachThang(coSan: string[], moc = thangHienTai(), soThang = 24): string[] {
+  const set = new Set<string>(coSan);
+  let p = moc;
+  for (let i = 0; i < soThang; i++) {
+    set.add(p);
+    p = thangTruoc(p);
+  }
+  return [...set].sort((a, b) => b.localeCompare(a));
+}
+
+/* ---------- Gom nhóm hiển thị (như các "TỔNG" của bảng kê) ---------- */
+
+export interface NhomKho {
+  category: string;
+  rows: MonthlyStockRow[];
+  tong: MonthlyStockTotals;
+}
+
+/**
+ * Gom dòng theo NHÓM (category). Nhóm mặc định lên trước theo thứ tự
+ * MONTHLY_STOCK_CATEGORIES, nhóm lạ xếp cuối theo bảng chữ cái. Trong mỗi nhóm
+ * giữ `sortOrder` rồi tới tên.
+ */
+export function gomNhom(rows: MonthlyStockRow[]): NhomKho[] {
+  const map = new Map<string, MonthlyStockRow[]>();
+  for (const r of rows) {
+    const k = r.category || "(Chưa phân nhóm)";
+    let arr = map.get(k);
+    if (!arr) {
+      arr = [];
+      map.set(k, arr);
+    }
+    arr.push(r);
+  }
+  const uuTien = (c: string) => {
+    const i = MONTHLY_STOCK_CATEGORIES.indexOf(c);
+    return i === -1 ? MONTHLY_STOCK_CATEGORIES.length : i;
+  };
+  return [...map.entries()]
+    .sort((a, b) => uuTien(a[0]) - uuTien(b[0]) || a[0].localeCompare(b[0]))
+    .map(([category, rs]) => {
+      rs.sort((x, y) => x.sortOrder - y.sortOrder || x.itemName.localeCompare(y.itemName));
+      return { category, rows: rs, tong: tongDong(rs) };
+    });
+}
+
+/* ---------- Dồn kỳ: tồn cuối tháng N → tồn đầu tháng N+1 ---------- */
+
+/** id tất định của dòng sinh ra khi dồn kỳ — chạy lại không đẻ dòng trùng. */
+export const idDon = (srcId: string) => `carry|${srcId}`;
+
+/**
+ * Dựng dòng tồn đầu cho `thangDich` bằng cách KẾ THỪA tồn cuối các dòng
+ * `nguon` (đã suy tồn cuối). Nhập/xuất = 0 (chờ ghi trong kỳ mới). Giữ nguyên
+ * mô tả (nhóm, kho, tên, size, xuất xứ, đơn giá, kg/kiện). id tất định theo dòng
+ * nguồn ⇒ dồn lại nhiều lần chỉ CẬP NHẬT, không nhân đôi.
+ *
+ * Chỉ mang sang dòng còn tồn (tồn cuối ≠ 0) — dòng đã hết không cần đầu kỳ mới.
+ */
+export function donSangThang(nguon: MonthlyStockRow[], thangDich: string): MonthlyStockLine[] {
+  return nguon
+    .filter((r) => Math.abs(r.closeKg) > 1e-9 || Math.abs(r.closeCtn) > 1e-9)
+    .map((r) => ({
+      id: idDon(r.id),
+      period: thangDich,
+      category: r.category,
+      warehouse: r.warehouse,
+      itemName: r.itemName,
+      size: r.size,
+      origin: r.origin,
+      importDate: r.importDate,
+      kgPerCtn: r.kgPerCtn,
+      unitPrice: r.unitPrice,
+      openCtn: r.closeCtn,
+      openKg: r.closeKg,
+      inCtn: 0,
+      inKg: 0,
+      outCtn: 0,
+      outKg: 0,
+      carriedFromId: r.id,
+      sortOrder: r.sortOrder,
+      note: "",
+    }));
+}

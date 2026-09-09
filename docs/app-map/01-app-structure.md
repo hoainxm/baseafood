@@ -3,6 +3,7 @@ covers: src/**
 last_verified: 2026-08-07
 ttl_days: 90
 
+<!-- updated: 2026-09-09 — THÊM feature `src/features/monthly-stock/` (MonthlyStockScreen + index) — Sổ kho theo THÁNG dương lịch, route `/ton-kho-thang`. Chỉ import `@/design-system` + hook `catalogRepo` (useMonthlyStock) + `lib/monthlyStock.ts` (toán thuần) + `lib/format`, `lib/db` (uid). Dồn tồn cuối kỳ → đầu kỳ sau. Xem 36-so-kho-thang. -->
 <!-- updated: 2026-09-05 — (họp 2026-09-02 QĐ-8) THÊM feature `src/features/quality-check/` (QcChecklistScreen + index) — màn Kiểm tra QC chấm điểm cuối ngày, route `/qc`. Chỉ import từ `@/design-system` + hook `catalogRepo` (useQcChecklists/useQcLocks). -->
 
 <!-- updated: 2026-09-05 — (đợt 2) THÊM `src/features/qr/` (QrTraCuuScreen — quét/tra lô QR, route /qr) + `src/features/shared/QrTemLoIn.tsx` (tem QR in được, export từ shared) + `src/lib/qr.ts` (render QR dataURL, bọc `qrcode`). PWA: `public/manifest.webmanifest` + `public/sw.js` + `public/icons/`. Dep mới: `qrcode`, `html5-qrcode`. -->

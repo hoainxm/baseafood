@@ -621,3 +621,51 @@ export interface FinishedGoodsOpeningStock {
   note: string;
 }
 
+/* ---------- Sổ kho theo THÁNG (dồn tồn cuối kỳ → đầu kỳ sau) ---------- */
+
+/**
+ * Nhóm hàng trong sổ kho theo tháng. Danh mục MỞ (Combobox tạo mới tại chỗ);
+ * đây chỉ là gợi ý mặc định, gom được cả NL, bán thành phẩm và thành phẩm.
+ * Khớp hai nhóm gốc của "BẢNG KÊ NGUYÊN LIỆU KHO 1500 T" (nhập khẩu / mua ngoài).
+ */
+export const MONTHLY_STOCK_CATEGORIES: string[] = [
+  "Nguyên liệu nhập khẩu",
+  "Nguyên liệu mua ngoài",
+  "Bán thành phẩm",
+  "Thành phẩm đóng gói",
+];
+
+/**
+ * Một DÒNG sổ kho theo THÁNG DƯƠNG LỊCH (kỳ = tháng). Số hoá đúng "bảng kê kho"
+ * kế toán/thủ kho đang giữ trên Excel, theo hạt (Tháng × Nhóm × Mặt hàng × Size ×
+ * Xuất xứ). Theo dõi SONG SONG kiện (CTN) và kg.
+ *
+ * BẤT BIẾN (suy ở tầng app, KHÔNG lưu):
+ *   Tồn cuối (kiện) = tồn đầu + nhập − xuất; Tồn cuối (kg) tương tự.
+ *   Tiền còn lại   = Tồn cuối (kg) × đơn giá.
+ * Tồn ĐẦU kỳ thì LƯU: là snapshot kế thừa từ tồn cuối tháng trước (đóng băng để
+ * số không trôi khi sửa lại tháng cũ). Dồn kỳ tạo dòng mới với `openCtn/openKg` =
+ * tồn cuối kỳ trước, nhập/xuất = 0, `carriedFromId` = id dòng nguồn (chống trùng).
+ */
+export interface MonthlyStockLine {
+  id: string;
+  period: string; // 'YYYY-MM' — kỳ = tháng dương lịch
+  category: string; // nhóm hàng (MONTHLY_STOCK_CATEGORIES, danh mục mở)
+  warehouse: string; // kho, VD "Kho 1500T"
+  itemName: string;
+  size: string; // rỗng nếu không có
+  origin: string; // xuất xứ — rỗng nếu không rõ
+  importDate: string; // yyyy-mm-dd — ngày nhập (tham chiếu), rỗng nếu không rõ
+  kgPerCtn: number | null; // KG/kiện (cột "KG/GS")
+  unitPrice: number | null; // đơn giá VNĐ
+  openCtn: number;
+  openKg: number;
+  inCtn: number;
+  inKg: number;
+  outCtn: number;
+  outKg: number;
+  carriedFromId: string; // id dòng nguồn khi tạo bằng dồn kỳ; rỗng = nhập tay
+  sortOrder: number;
+  note: string;
+}
+

@@ -32,6 +32,7 @@ import {
   BANG_OPENING_STOCK,
   BANG_FINISHED_OPENING_STOCK,
   BANG_NXT_SNAPSHOT,
+  BANG_MONTHLY_STOCK,
   useBang,
 } from "@/lib/repo";
 import type { MaterialType, Product, FinishedGood, NxtSnapshotLine } from "@/types";
@@ -209,3 +210,6 @@ export const useFinishedGoodsOpeningStock = () => useBang(BANG_FINISHED_OPENING_
 
 /* --- Xuất–Nhập–Tồn kho (snapshot từ báo cáo thật) --- */
 export const useNxtSnapshots = () => useBang(BANG_NXT_SNAPSHOT, seedNxtSnapshots);
+
+/* --- Sổ kho theo tháng (dồn tồn cuối kỳ → đầu kỳ sau) --- */
+export const useMonthlyStock = () => useBang(BANG_MONTHLY_STOCK);

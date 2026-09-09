@@ -19,6 +19,7 @@ Cửa vào là [`CLAUDE.md`](../../CLAUDE.md) ở root (quy tắc code, risk tie
 | Sửa màn Cân đối / bảng in / công thức | [31-can-doi-ky](31-can-doi-ky.md) → [33-ban-hang](33-ban-hang.md) (bán hút) · [30-nhap-hang](30-nhap-hang.md) (phế liệu hút) |
 | Sửa danh mục, thêm trường master data | [32-danh-muc](32-danh-muc.md) → [03-database](03-database.md) |
 | Sửa Sản xuất BTP / Kho dự trữ / Đơn đặt · vòng đông gửi↔xả đông | [34-btp-san-xuat-kho](34-btp-san-xuat-kho.ba-spec.md) → [35-btp-ui](35-btp-ui.design-spec.md) → [31-can-doi-ky](31-can-doi-ky.md) |
+| Sổ kho theo THÁNG dương lịch, dồn tồn cuối kỳ → đầu kỳ sau | [36-so-kho-thang](36-so-kho-thang.md) → [04-tang-du-lieu](04-tang-du-lieu.md) |
 | Nối luồng nhập→sản xuất→kho→bán, tách giao diện bộ phận, daily-task | [`trien-khai/flow-end-to-end-2-bo-phan`](../trien-khai/flow-end-to-end-2-bo-phan.md) |
 | Thêm bảng / cột / migration | [03-database](03-database.md) → [04-tang-du-lieu](04-tang-du-lieu.md) |
 | Số liệu mất, không lên server, đèn đỏ, reload nuốt dòng | [04-tang-du-lieu](04-tang-du-lieu.md) |
@@ -45,6 +46,7 @@ Cửa vào là [`CLAUDE.md`](../../CLAUDE.md) ở root (quy tắc code, risk tie
 | [32-danh-muc.md](32-danh-muc.md) | 4 danh mục + 141 mã TP, lưu theo TÊN, seed vs nguồn thật | `src/features/catalog/CatalogScreen.tsx`, `src/features/catalog/FinishedGoodScreen.tsx`, `src/data/thanh-pham.json` |
 | [34-btp-san-xuat-kho.ba-spec.md](34-btp-san-xuat-kho.ba-spec.md) | Sản xuất BTP (WIP) + kho dự trữ + đơn/xuất: mô hình tồn 5 chiều (kg + block), xả đông "hai chân một số hai sổ", gối đầu liên tục, ghi-ngược từ cân đối | `src/features/production/**`, `src/features/warehouse/**`, `src/features/orders/**`, `supabase/migrations/0011_wip_san_xuat_kho_don.sql` |
 | [35-btp-ui.design-spec.md](35-btp-ui.design-spec.md) | Đặc tả giao diện BTP: 3 màn (Sản xuất ngày · Kho dự trữ · Đơn & lệnh xuất), tablet ngang xưởng lạnh | `src/features/production/**`, `src/features/warehouse/**`, `src/features/orders/**` |
+| [36-so-kho-thang.md](36-so-kho-thang.md) | Sổ kho theo THÁNG dương lịch: dồn tồn cuối kỳ → đầu kỳ sau, đủ cột kiện+kg như bảng kê kho, cho mọi đối tượng NL/BTP/TP | `src/features/monthly-stock/**`, `src/lib/monthlyStock.ts` |
 
 Không có file cho edge function / cron / job nền — **dự án không có**. Automation duy nhất ở DB là trigger `updated_at` (xem [03-database](03-database.md)).
 

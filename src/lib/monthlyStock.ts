@@ -188,6 +188,71 @@ export function soLechDonKy(rowsTruoc: MonthlyStockRow[], rowsNay: MonthlyStockR
 /** Có đáng gắn cờ lệch không (có tháng trước + tổng lệch quá ngưỡng). */
 export const coLechDonKy = (l: LechDonKy | null) => !!l && Math.abs(l.lech) > NGUONG_LECH;
 
+/* ---------- Đối chiếu lệch theo MẶT HÀNG (chẩn đoán, không tự sửa) ---------- */
+
+/**
+ * Khóa so hai tháng ở mức MẶT HÀNG: kho · nhóm · tên (BỎ size + xuất xứ). Cố ý
+ * thô: giữa các tháng, một lô hay bị TÁCH theo size hoặc đổi mã lô (VD SANMA →
+ * SANMA + SANMA 50-90) — gộp về tên thì các tách đó TRIỆT TIÊU, chỉ còn lệch
+ * THẬT. So theo size sẽ báo động giả và dẫn tới sửa sai (cộng đôi).
+ */
+export const khoaLo = (l: { warehouse: string; category: string; itemName: string }) =>
+  [l.warehouse, l.category, l.itemName].map((s) => (s || "").trim().toLowerCase()).join("|");
+
+export interface DoiChieuDong {
+  key: string;
+  warehouse: string;
+  category: string;
+  itemName: string;
+  closeTruocKg: number; // tổng tồn cuối tháng trước của mặt hàng
+  openNayKg: number; // tổng tồn đầu tháng này của mặt hàng
+  lechKg: number; // openNay − closeTruoc
+  soDongNay: number; // số dòng tháng này của mặt hàng (để biết sửa ở đâu)
+}
+
+function gomTheoTen(rows: MonthlyStockRow[], layKg: (r: MonthlyStockRow) => number) {
+  const m = new Map<string, { kg: number; sl: number; w: string; c: string; ten: string }>();
+  for (const r of rows) {
+    const k = khoaLo(r);
+    const g = m.get(k) ?? { kg: 0, sl: 0, w: r.warehouse, c: r.category, ten: r.itemName };
+    g.kg += layKg(r);
+    g.sl += 1;
+    m.set(k, g);
+  }
+  return m;
+}
+
+/**
+ * Đối chiếu tồn cuối tháng TRƯỚC ↔ tồn đầu tháng NÀY theo MẶT HÀNG. Chỉ trả mặt
+ * hàng LỆCH THẬT (|Δkg| > ngưỡng, sau khi gộp các tách size). KHÔNG sửa gì —
+ * chẩn đoán để người dùng tự sửa ở lưới Ghi (con người phán đoán, tránh cộng đôi).
+ */
+export function doiChieuDonKy(rowsTruoc: MonthlyStockRow[], rowsNay: MonthlyStockRow[]): DoiChieuDong[] {
+  const mTruoc = gomTheoTen(rowsTruoc, (r) => r.closeKg);
+  const mNay = gomTheoTen(rowsNay, (r) => r.openKg);
+  const keys = new Set([...mTruoc.keys(), ...mNay.keys()]);
+  const out: DoiChieuDong[] = [];
+  for (const k of keys) {
+    const t = mTruoc.get(k);
+    const n = mNay.get(k);
+    const closeKg = t?.kg ?? 0;
+    const openKg = n?.kg ?? 0;
+    if (Math.abs(openKg - closeKg) <= NGUONG_LECH) continue;
+    const g = (t ?? n)!;
+    out.push({
+      key: k,
+      warehouse: g.w,
+      category: g.c,
+      itemName: g.ten,
+      closeTruocKg: closeKg,
+      openNayKg: openKg,
+      lechKg: openKg - closeKg,
+      soDongNay: n?.sl ?? 0,
+    });
+  }
+  return out.sort((a, b) => Math.abs(b.lechKg) - Math.abs(a.lechKg));
+}
+
 /* ---------- Dồn kỳ: tồn cuối tháng N → tồn đầu tháng N+1 ---------- */
 
 /** id tất định của dòng sinh ra khi dồn kỳ — chạy lại không đẻ dòng trùng. */

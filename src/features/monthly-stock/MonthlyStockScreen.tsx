@@ -22,7 +22,9 @@ import {
   nhanThang,
   soLechDonKy,
   coLechDonKy,
+  doiChieuDonKy,
   type MonthlyStockRow,
+  type DoiChieuDong,
 } from "@/lib/monthlyStock";
 import {
   Badge,
@@ -76,6 +78,7 @@ import {
   Snowflake,
   Trash2,
   Upload,
+  Wrench,
 } from "lucide-react";
 
 const TAT_CA_KHO = "__tat_ca__";
@@ -139,6 +142,7 @@ export default function MonthlyStockScreen() {
   const [thang, setThang] = useState(thangHienTai());
   const [kho, setKho] = useState(TAT_CA_KHO);
   const [ghiMode, setGhiMode] = useState(false);
+  const [locMatHang, setLocMatHang] = useState(""); // lọc lưới Ghi theo 1 mặt hàng (từ đối chiếu)
   const [moIn, setMoIn] = useState(false);
 
   // ---------- Nhập Excel bảng kê (seed số cũ) ----------
@@ -195,6 +199,10 @@ export default function MonthlyStockScreen() {
   // Cờ lệch dồn kỳ: tồn đầu tháng này (mọi kho) vs tồn cuối tháng trước.
   const lech = useMemo(() => soLechDonKy(rowsTruoc, rowsThangDayDu), [rowsTruoc, rowsThangDayDu]);
   const canhBaoLech = rowsTruoc.length > 0 && coLechDonKy(lech);
+
+  // Đối chiếu lệch theo MẶT HÀNG (chẩn đoán — người dùng tự sửa ở lưới Ghi).
+  const dsDoiChieu = useMemo(() => doiChieuDonKy(rowsTruoc, rowsThangDayDu), [rowsTruoc, rowsThangDayDu]);
+  const [moDoiChieu, setMoDoiChieu] = useState(false);
 
   // ---------- Ghi ô lưới ----------
   const suaSo = (id: string, patch: Partial<MonthlyStockLine>) => {
@@ -314,6 +322,14 @@ export default function MonthlyStockScreen() {
     setKho(TAT_CA_KHO);
     setGhiMode(false);
     notify.daLuu(`Đã dồn tồn cuối sang ${nhanThang(dich)} · ${carried.length} dòng`);
+  };
+
+  // Mở lưới Ghi lọc theo một mặt hàng để sửa tay lệch dồn kỳ.
+  const suaTayMatHang = (d: DoiChieuDong) => {
+    setKho(d.warehouse);
+    setLocMatHang(d.itemName);
+    setGhiMode(true);
+    setMoDoiChieu(false);
   };
 
   // ---------- Nhập Excel bảng kê ----------
@@ -483,7 +499,8 @@ export default function MonthlyStockScreen() {
       ),
     },
   ];
-  const hangLuoi: HangLuoi<MonthlyStockRow>[] = rowsThang.map((r) => ({
+  const rowsGrid = locMatHang ? rowsThang.filter((r) => r.itemName === locMatHang) : rowsThang;
+  const hangLuoi: HangLuoi<MonthlyStockRow>[] = rowsGrid.map((r) => ({
     id: r.id,
     du: r,
     ten: r.itemName,
@@ -564,7 +581,13 @@ export default function MonthlyStockScreen() {
         </div>
         <div className="flex flex-wrap items-center gap-3">
           {coDuLieu && (
-            <Button variant={ghiMode ? "default" : "outline"} onClick={() => setGhiMode((v) => !v)}>
+            <Button
+              variant={ghiMode ? "default" : "outline"}
+              onClick={() => {
+                if (ghiMode) setLocMatHang("");
+                setGhiMode((v) => !v);
+              }}
+            >
               {ghiMode ? <Eye className="mr-2 h-4 w-4" /> : <Pencil className="mr-2 h-4 w-4" />}
               {ghiMode ? "Xong · xem lại" : "Ghi nhập/xuất"}
             </Button>
@@ -651,6 +674,12 @@ export default function MonthlyStockScreen() {
                       ))}
                     </ul>
                   )}
+                  <div className="pt-1">
+                    <Button size="sm" onClick={() => setMoDoiChieu(true)}>
+                      <Wrench className="mr-2 h-4 w-4" />
+                      Đối chiếu & sửa lệch ({dsDoiChieu.length} mặt hàng)
+                    </Button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -662,6 +691,16 @@ export default function MonthlyStockScreen() {
                 Gõ tồn đầu / nhập / xuất từng mã (kiện & kg) — tồn cuối tự tính. Dán được cả khối từ Excel.
                 Enter/Tab sang ô. Sửa mô tả (tên, size, đơn giá) bằng nút ✎ ở chế độ xem.
               </p>
+              {locMatHang && (
+                <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-muted/40 p-2 text-sm">
+                  <span>
+                    Đang lọc mặt hàng: <span className="font-semibold text-foreground">{locMatHang}</span> ({rowsGrid.length} dòng)
+                  </span>
+                  <Button size="sm" variant="ghost" onClick={() => setLocMatHang("")}>
+                    Bỏ lọc
+                  </Button>
+                </div>
+              )}
               <LuoiNhap
                 moTa={`Sổ kho ${nhanThang(thang)}`}
                 cot={cotLuoi}
@@ -863,6 +902,76 @@ export default function MonthlyStockScreen() {
             <Button onClick={xacNhanNap} disabled={soDongNap === 0}>
               <Upload className="mr-1 h-4 w-4" />
               Nạp {soDongNap} dòng
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog đối chiếu lệch dồn kỳ (chẩn đoán theo mặt hàng) */}
+      <Dialog open={moDoiChieu} onOpenChange={setMoDoiChieu}>
+        <DialogContent className="w-full sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle className="text-2xl">Đối chiếu lệch dồn kỳ theo mặt hàng</DialogTitle>
+            <DialogDescription className="text-base">
+              So tồn cuối {nhanThang(thangTr)} ↔ tồn đầu {nhanThang(thang)} theo MẶT HÀNG (đã gộp các
+              tách size để bỏ báo động giả). Đây là chẩn đoán — bấm "Sửa tay" để mở lưới Ghi lọc đúng mặt
+              hàng đó rồi chỉnh số theo phán đoán (không tự sửa để tránh cộng đôi khi lô bị tách/đổi mã).
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            {dsDoiChieu.length === 0 ? (
+              <div className="flex items-center gap-2 rounded-lg border border-success/50 bg-success/10 p-3 text-success">
+                <CheckCircle2 className="h-5 w-5" aria-hidden />
+                <span className="font-semibold">Khớp — không còn mặt hàng lệch giữa hai tháng.</span>
+              </div>
+            ) : (
+              <div className="max-h-[55vh] overflow-auto rounded-lg border border-border">
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0 bg-muted">
+                    <tr className="text-left">
+                      <th className="px-3 py-2">Mặt hàng · kho · nhóm</th>
+                      <th className="px-3 py-2 text-right">Cuối {nhanThang(thangTr).replace("Tháng ", "T")}</th>
+                      <th className="px-3 py-2 text-right">Đầu {nhanThang(thang).replace("Tháng ", "T")}</th>
+                      <th className="px-3 py-2 text-right">Lệch (kg)</th>
+                      <th className="px-3 py-2 text-right">Sửa</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {dsDoiChieu.map((d) => (
+                      <tr key={d.key} className="border-t border-border align-top">
+                        <td className="px-3 py-2">
+                          <div className="font-medium text-foreground">{d.itemName}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {[d.warehouse, d.category].filter(Boolean).join(" · ")}
+                          </div>
+                        </td>
+                        <td className="tnum px-3 py-2 text-right">{num(d.closeTruocKg)}</td>
+                        <td className="tnum px-3 py-2 text-right">{num(d.openNayKg)}</td>
+                        <td className="tnum px-3 py-2 text-right font-semibold text-warning">
+                          {d.lechKg > 0 ? "+" : ""}
+                          {num(d.lechKg)}
+                        </td>
+                        <td className="px-3 py-2 text-right">
+                          <Button size="sm" variant="outline" onClick={() => suaTayMatHang(d)}>
+                            <Pencil className="mr-1 h-4 w-4" />
+                            Sửa tay
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            <p className="text-sm text-muted-foreground">
+              Lệch = ghi chép dồn kỳ chưa khớp (tồn đầu tháng này ≠ tồn cuối tháng trước). "Sửa tay" mở
+              lưới Ghi đã lọc mặt hàng để bạn chỉnh tồn đầu/nhập/xuất; hoặc dùng "Dồn sang tháng sau" từ
+              tháng trước cho tháng còn TRỐNG.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setMoDoiChieu(false)}>
+              Đóng
             </Button>
           </DialogFooter>
         </DialogContent>

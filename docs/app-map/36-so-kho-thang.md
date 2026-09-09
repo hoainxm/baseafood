@@ -84,6 +84,22 @@ mặt hàng, SANMA biến mất** ✓.
 người dùng chỉnh tồn đầu/nhập/xuất theo phán đoán (con người quyết, tránh cộng đôi khi
 lô tách/đổi mã). Tháng **trống** thì dùng "Dồn sang tháng sau" từ tháng trước.
 
+## Đồng bộ danh mục loại nguyên liệu
+
+Nút **"Đồng bộ danh mục"** đối chiếu tên mặt hàng trong sổ với danh mục Loại nguyên
+liệu (`useMaterialTypes`). Hàm thuần `phanTichDongBoDanhMuc` trả:
+- **Chưa có**: tên trong sổ chưa có trong danh mục (khớp bằng trim+thường+gộp trắng),
+  kèm **nhóm gợi ý** (`suyNhomNguyenLieu`: Bạch tuộc/Mực/Cá/Ghẹ/Khác — sửa được).
+  Dialog cho tick chọn + chọn nhóm → **thêm vào `material_types`** (id mới, note "Từ
+  sổ kho theo tháng"). Chọn/bỏ tất cả.
+- **Trùng cách ghi**: các tên chỉ khác khoảng trắng/hoa thường/dấu câu (chuẩn hoá ngặt
+  bỏ hết space+dấu câu), VD `"BẠCH TUỘC 2 DA 250UP"` ≡ `"…250 UP"`, `"200 UP"` ≡ `"200 up"`.
+  Đây là nguồn **đếm thành nhiều mặt hàng** khi tổng hợp → liệt kê để sửa tay về một cách ghi.
+
+Kiểm thật (`kho 1000 năm 2026.xlsx`): 144 tên · 2 đã có · **142 chưa có** · 2 nhóm trùng
+cách ghi. ⚠ Tên trong sổ nhiều size/grade (mịn hơn "loại NL" gốc) — cân nhắc bỏ chọn
+bớt + chuẩn hoá trùng-cách-ghi TRƯỚC khi thêm để danh mục khỏi phình/lặp.
+
 ## Cạm bẫy
 
 - **Cộng đôi**: mỗi dòng độc lập trong CÙNG một tháng ⇒ `tongDong` cộng thẳng an toàn. Nhưng KHÔNG cộng dồn tồn đầu/cuối qua NHIỀU tháng (phần kế thừa sẽ đếm lại) — module chỉ tổng trong một tháng.

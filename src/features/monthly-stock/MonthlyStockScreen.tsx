@@ -4,9 +4,9 @@
 // Description: Monthly stock ledger — carry closing balance into next month
 // ============================================================
 import { useMemo, useRef, useState } from "react";
-import type { MonthlyStockLine } from "@/types";
+import type { MonthlyStockLine, MaterialType } from "@/types";
 import { MONTHLY_STOCK_CATEGORIES, BSF1_WAREHOUSES } from "@/types";
-import { useMonthlyStock } from "@/lib/catalogRepo";
+import { useMonthlyStock, useMaterialTypes } from "@/lib/catalogRepo";
 import { uid } from "@/lib/db";
 import { num, viDate } from "@/lib/format";
 import { parseBangKeKhoFile, namTuTenFile, type BangKeKhoSheet } from "@/lib/monthlyStockExcel";
@@ -23,6 +23,7 @@ import {
   soLechDonKy,
   coLechDonKy,
   doiChieuDonKy,
+  phanTichDongBoDanhMuc,
   type MonthlyStockRow,
   type DoiChieuDong,
 } from "@/lib/monthlyStock";
@@ -79,6 +80,8 @@ import {
   Trash2,
   Upload,
   Wrench,
+  Library,
+  ListChecks,
 } from "lucide-react";
 
 const TAT_CA_KHO = "__tat_ca__";
@@ -138,6 +141,7 @@ const soHoacGach = (v: number) => (v ? num(v) : "—");
  */
 export default function MonthlyStockScreen() {
   const [lines, ghiLines] = useMonthlyStock();
+  const [mtypes, ghiMtypes] = useMaterialTypes();
 
   const [thang, setThang] = useState(thangHienTai());
   const [kho, setKho] = useState(TAT_CA_KHO);
@@ -203,6 +207,15 @@ export default function MonthlyStockScreen() {
   // Đối chiếu lệch theo MẶT HÀNG (chẩn đoán — người dùng tự sửa ở lưới Ghi).
   const dsDoiChieu = useMemo(() => doiChieuDonKy(rowsTruoc, rowsThangDayDu), [rowsTruoc, rowsThangDayDu]);
   const [moDoiChieu, setMoDoiChieu] = useState(false);
+
+  // Đồng bộ tên mặt hàng trong sổ ↔ danh mục loại nguyên liệu.
+  const dongBo = useMemo(
+    () => phanTichDongBoDanhMuc([...new Set(lines.map((l) => l.itemName))], mtypes.map((m) => m.name)),
+    [lines, mtypes]
+  );
+  const [moDongBo, setMoDongBo] = useState(false);
+  const [chonDB, setChonDB] = useState<Record<string, boolean>>({});
+  const [nhomDB, setNhomDB] = useState<Record<string, string>>({});
 
   // ---------- Ghi ô lưới ----------
   const suaSo = (id: string, patch: Partial<MonthlyStockLine>) => {
@@ -331,6 +344,44 @@ export default function MonthlyStockScreen() {
     setGhiMode(true);
     setMoDoiChieu(false);
   };
+
+  // ---------- Đồng bộ danh mục loại nguyên liệu ----------
+  const nhomOpts: MucChon[] = useMemo(() => {
+    const set = new Set<string>(["Bạch tuộc", "Mực", "Cá", "Ghẹ", "Khác"]);
+    for (const m of mtypes) if (m.category) set.add(m.category);
+    return [...set].map((c) => ({ value: c, label: c }));
+  }, [mtypes]);
+
+  const moDongBoDialog = () => {
+    const c: Record<string, boolean> = {};
+    const n: Record<string, string> = {};
+    for (const x of dongBo.chuaCo) {
+      c[x.name] = true;
+      n[x.name] = x.nhomGoiY;
+    }
+    setChonDB(c);
+    setNhomDB(n);
+    setMoDongBo(true);
+  };
+
+  const themVaoDanhMuc = () => {
+    const chon = dongBo.chuaCo.filter((x) => chonDB[x.name]);
+    if (!chon.length) {
+      notify.canhBao("Chưa chọn mục nào để thêm.");
+      return;
+    }
+    const themMoi: MaterialType[] = chon.map((x) => ({
+      id: uid(),
+      name: x.name,
+      category: (nhomDB[x.name] || x.nhomGoiY || "Khác").trim(),
+      note: "Từ sổ kho theo tháng",
+    }));
+    ghiMtypes([...mtypes, ...themMoi]);
+    setMoDongBo(false);
+    notify.daLuu(`Đã thêm ${themMoi.length} loại nguyên liệu vào danh mục`);
+  };
+
+  const soChonDB = dongBo.chuaCo.filter((x) => chonDB[x.name]).length;
 
   // ---------- Nhập Excel bảng kê ----------
   const chonFile = () => fileRef.current?.click();
@@ -531,6 +582,10 @@ export default function MonthlyStockScreen() {
           <Button variant="outline" onClick={moThem}>
             <Plus className="mr-2 h-4 w-4" />
             Thêm dòng
+          </Button>
+          <Button variant="outline" onClick={moDongBoDialog}>
+            <Library className="mr-2 h-4 w-4" />
+            Đồng bộ danh mục{dongBo.chuaCo.length ? ` (${dongBo.chuaCo.length})` : ""}
           </Button>
           <Button onClick={() => setMoIn(true)} disabled={!coDuLieu}>
             <Printer className="mr-2 h-4 w-4" />
@@ -971,6 +1026,109 @@ export default function MonthlyStockScreen() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setMoDoiChieu(false)}>
+              Đóng
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog đồng bộ danh mục loại nguyên liệu */}
+      <Dialog open={moDongBo} onOpenChange={setMoDongBo}>
+        <DialogContent className="w-full sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle className="text-2xl">Đồng bộ danh mục loại nguyên liệu</DialogTitle>
+            <DialogDescription className="text-base">
+              Đối chiếu tên mặt hàng trong sổ kho với danh mục Loại nguyên liệu. Thêm các tên chưa có để
+              danh mục dùng chung nhất quán; soi các tên chỉ khác nhau cách ghi để chuẩn hoá.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="flex flex-wrap gap-2 text-sm">
+              <Badge variant="outline">{dongBo.tongTen} tên trong sổ</Badge>
+              <Badge variant="outline">{dongBo.daCo} đã có trong danh mục</Badge>
+              <Badge variant="outline">{dongBo.chuaCo.length} chưa có</Badge>
+              <Badge variant="outline">{dongBo.nhomTrung.length} nhóm trùng cách ghi</Badge>
+            </div>
+
+            {dongBo.chuaCo.length > 0 && (
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h3 className="flex items-center gap-2 font-semibold text-foreground">
+                    <ListChecks className="h-4 w-4" /> Tên chưa có trong danh mục — chọn để thêm
+                  </h3>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setChonDB(Object.fromEntries(dongBo.chuaCo.map((x) => [x.name, true])))}
+                    >
+                      Chọn tất cả
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => setChonDB({})}>
+                      Bỏ chọn
+                    </Button>
+                  </div>
+                </div>
+                <div className="max-h-[40vh] space-y-1 overflow-auto rounded-lg border border-border p-2">
+                  {dongBo.chuaCo.map((x) => (
+                    <div key={x.name} className="flex items-center gap-2 rounded p-1 hover:bg-muted/50">
+                      <input
+                        type="checkbox"
+                        className="size-4 accent-primary"
+                        checked={!!chonDB[x.name]}
+                        onChange={(e) => setChonDB((m) => ({ ...m, [x.name]: e.target.checked }))}
+                        aria-label={`Chọn ${x.name}`}
+                      />
+                      <span className="min-w-0 flex-1 truncate text-sm text-foreground" title={x.name}>
+                        {x.name}
+                      </span>
+                      <div className="w-40 shrink-0">
+                        <Combobox
+                          anNhan
+                          label={`Nhóm ${x.name}`}
+                          value={nhomDB[x.name] ?? x.nhomGoiY}
+                          onChange={(v) => setNhomDB((m) => ({ ...m, [x.name]: v }))}
+                          options={nhomOpts}
+                          onCreate={(t) => t}
+                          choPhepXoa={false}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <Button onClick={themVaoDanhMuc} disabled={soChonDB === 0}>
+                  <Library className="mr-2 h-4 w-4" />
+                  Thêm {soChonDB} mục vào Loại nguyên liệu
+                </Button>
+              </div>
+            )}
+
+            {dongBo.nhomTrung.length > 0 && (
+              <div className="space-y-2">
+                <h3 className="font-semibold text-foreground">Tên chỉ khác nhau cách ghi (nên gộp về một)</h3>
+                <div className="max-h-[28vh] space-y-1 overflow-auto rounded-lg border border-warning/40 bg-warning/5 p-2 text-sm">
+                  {dongBo.nhomTrung.map((g) => (
+                    <div key={g.variants.join("|")} className="text-muted-foreground">
+                      • {g.variants.map((v) => `"${v}"`).join("  ·  ")}
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Các tên trên bị đếm THÀNH NHIỀU mặt hàng khi tổng hợp. Sửa về một cách ghi ở lưới Ghi
+                  (nút ✎) để sổ gộp đúng.
+                </p>
+              </div>
+            )}
+
+            {dongBo.chuaCo.length === 0 && dongBo.nhomTrung.length === 0 && (
+              <div className="flex items-center gap-2 rounded-lg border border-success/50 bg-success/10 p-3 text-success">
+                <CheckCircle2 className="h-5 w-5" aria-hidden />
+                <span className="font-semibold">Tên trong sổ đã khớp danh mục, không có tên trùng cách ghi.</span>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setMoDongBo(false)}>
               Đóng
             </Button>
           </DialogFooter>

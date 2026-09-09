@@ -253,6 +253,68 @@ export function doiChieuDonKy(rowsTruoc: MonthlyStockRow[], rowsNay: MonthlyStoc
   return out.sort((a, b) => Math.abs(b.lechKg) - Math.abs(a.lechKg));
 }
 
+/* ---------- Đồng bộ tên mặt hàng trong sổ với danh mục loại nguyên liệu ---------- */
+
+/** Chuẩn hoá để SO KHỚP với danh mục: bỏ khoảng trắng thừa + thường hoá. */
+const chuanKhop = (s: string) => (s || "").trim().toLowerCase().replace(/\s+/g, " ");
+/** Chuẩn hoá NGẶT để dò TRÙNG CÁCH GHI: bỏ hết khoảng trắng + dấu câu (250UP≡250 UP). */
+const chuanNgat = (s: string) => (s || "").toLowerCase().replace(/[\s.,\-()/]+/g, "");
+
+/** Đoán nhóm (category) loại NL từ tên — chỉ gợi ý, người dùng sửa được. */
+export function suyNhomNguyenLieu(name: string): string {
+  const s = name.toLowerCase();
+  if (/(b[aạ]ch\s*tu[ộo]c|b\.\s*tu[ộo]c|\bda\b|mada|râu|dạt)/.test(s)) return "Bạch tuộc";
+  if (/(m[ựu]c|\bống\b|nang|bao\s*t[ửu]|đầu\s*ống)/.test(s)) return "Mực";
+  if (/ghẹ/.test(s)) return "Ghẹ";
+  if (/(cá|saba|sanma|nodoguro|sòng|nục|thu|mòi|cơm|chỉ|nhồng|bò|đổng|hố)/.test(s)) return "Cá";
+  return "Khác";
+}
+
+export interface DongBoDanhMuc {
+  tongTen: number; // số tên phân biệt trong sổ
+  daCo: number; // số tên đã có trong danh mục loại NL
+  chuaCo: { name: string; nhomGoiY: string }[]; // tên chưa có (kèm nhóm gợi ý)
+  nhomTrung: { variants: string[] }[]; // các nhóm tên TRÙNG CÁCH GHI (>1 biến thể)
+}
+
+/**
+ * Phân tích tên mặt hàng trong sổ kho so với danh mục loại nguyên liệu:
+ *  - `chuaCo`: tên chưa có trong danh mục (để thêm vào, kèm nhóm gợi ý).
+ *  - `nhomTrung`: các tên chỉ khác nhau cách ghi (khoảng trắng/hoa thường/dấu câu),
+ *    VD "250UP" / "250 UP" / "250 up" — gom để chuẩn hoá tay, tránh tách khi tổng hợp.
+ * KHÔNG sửa gì — chỉ báo.
+ */
+export function phanTichDongBoDanhMuc(
+  tenTrongSo: string[],
+  tenDanhMuc: string[]
+): DongBoDanhMuc {
+  const dm = new Set(tenDanhMuc.map(chuanKhop));
+  const phanBiet = [...new Set(tenTrongSo.map((t) => t.trim()).filter(Boolean))];
+  const chuaCo = phanBiet
+    .filter((t) => !dm.has(chuanKhop(t)))
+    .map((name) => ({ name, nhomGoiY: suyNhomNguyenLieu(name) }));
+
+  // Gom trùng-cách-ghi trong chính danh sách tên của sổ.
+  const gom = new Map<string, Set<string>>();
+  for (const t of phanBiet) {
+    const k = chuanNgat(t);
+    if (!k) continue;
+    const set = gom.get(k) ?? new Set<string>();
+    set.add(t);
+    gom.set(k, set);
+  }
+  const nhomTrung = [...gom.values()]
+    .filter((s) => s.size > 1)
+    .map((s) => ({ variants: [...s].sort() }));
+
+  return {
+    tongTen: phanBiet.length,
+    daCo: phanBiet.length - chuaCo.length,
+    chuaCo,
+    nhomTrung,
+  };
+}
+
 /* ---------- Dồn kỳ: tồn cuối tháng N → tồn đầu tháng N+1 ---------- */
 
 /** id tất định của dòng sinh ra khi dồn kỳ — chạy lại không đẻ dòng trùng. */

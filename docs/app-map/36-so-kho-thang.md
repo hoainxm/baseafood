@@ -85,14 +85,21 @@ mặt hàng, SANMA biến mất** ✓.
 người dùng chỉnh tồn đầu/nhập/xuất theo phán đoán (con người quyết, tránh cộng đôi khi
 lô tách/đổi mã). Tháng **trống** thì dùng "Dồn sang tháng sau" từ tháng trước.
 
-## Đồng bộ danh mục loại nguyên liệu
+## Đồng bộ danh mục
 
-Nút **"Đồng bộ danh mục"** đối chiếu tên mặt hàng trong sổ với danh mục Loại nguyên
-liệu (`useMaterialTypes`). Hàm thuần `phanTichDongBoDanhMuc` trả:
-- **Chưa có**: tên trong sổ chưa có trong danh mục (khớp bằng trim+thường+gộp trắng),
+Nút **"Đồng bộ danh mục"** đối chiếu tên mặt hàng trong sổ với danh mục ĐÍCH, chọn
+bằng toggle **"Danh mục đích"**: **Loại nguyên liệu** (`material_types`, `useMaterialTypes`)
+HOẶC **Mặt hàng** (`products`, `useProducts`). **Thành phẩm — 141 mã kế toán
+(`finished_goods`) CỐ ĐỊNH — KHÔNG thêm ở đây** (kế toán cấp mã; xem memory
+`danh-muc-mat-hang-3-tang`). Sổ kho gom mọi đối tượng (NL/BTP/TP) nên đích do người
+dùng chọn, không ép vào loại NL.
+
+Hàm thuần `phanTichDongBoDanhMuc(tênTrongSổ, tênDanhMụcĐích)` trả:
+- **Chưa có**: tên trong sổ chưa có trong danh mục đích (khớp trim+thường+gộp trắng),
   kèm **nhóm gợi ý** (`suyNhomNguyenLieu`: Bạch tuộc/Mực/Cá/Ghẹ/Khác — sửa được).
-  Dialog cho tick chọn + chọn nhóm → **thêm vào `material_types`** (id mới, note "Từ
-  sổ kho theo tháng"). Chọn/bỏ tất cả.
+  Dialog tick chọn (mặc định tích hết) + chọn nhóm → thêm vào danh mục đích: `material_types`
+  ({id,name,category,note}) hoặc `products` ({id,code:"",name,finishedGoodCode:"" chưa
+  ánh xạ,category,processingType:""}). Đổi đích thì đối chiếu + số đếm tính lại.
 - **Trùng cách ghi**: các tên chỉ khác khoảng trắng/hoa thường/dấu câu (chuẩn hoá ngặt
   bỏ hết space+dấu câu), VD `"BẠCH TUỘC 2 DA 250UP"` ≡ `"…250 UP"`, `"200 UP"` ≡ `"200 up"`.
   Đây là nguồn **đếm thành nhiều mặt hàng** khi tổng hợp → liệt kê để sửa tay về một cách ghi.

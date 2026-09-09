@@ -26,6 +26,7 @@ import {
   phanTichDongBoDanhMuc,
   type MonthlyStockRow,
   type DoiChieuDong,
+  type DichDanhMuc,
 } from "@/lib/monthlyStock";
 import {
   Badge,
@@ -209,17 +210,19 @@ export default function MonthlyStockScreen() {
   const dsDoiChieu = useMemo(() => doiChieuDonKy(rowsTruoc, rowsThangDayDu), [rowsTruoc, rowsThangDayDu]);
   const [moDoiChieu, setMoDoiChieu] = useState(false);
 
-  // Đồng bộ tên mặt hàng trong sổ ↔ danh mục ĐÍCH (loại nguyên liệu HOẶC mặt hàng).
+  // Đồng bộ tên trong sổ ↔ CẢ HAI danh mục (loại NL + mặt hàng), định tuyến TỪNG DÒNG.
   // Thành phẩm (141 mã kế toán) CỐ ĐỊNH — không thêm ở đây.
-  const [dbDich, setDbDich] = useState<"material" | "product">("material");
-  const tenDanhMucDich = dbDich === "material" ? mtypes.map((m) => m.name) : products.map((p) => p.name);
   const dongBo = useMemo(
-    () => phanTichDongBoDanhMuc([...new Set(lines.map((l) => l.itemName))], tenDanhMucDich),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [lines, mtypes, products, dbDich]
+    () =>
+      phanTichDongBoDanhMuc(
+        [...new Set(lines.map((l) => l.itemName))],
+        mtypes.map((m) => m.name),
+        products.map((p) => p.name)
+      ),
+    [lines, mtypes, products]
   );
   const [moDongBo, setMoDongBo] = useState(false);
-  const [chonDB, setChonDB] = useState<Record<string, boolean>>({});
+  const [dichDB, setDichDB] = useState<Record<string, DichDanhMuc>>({}); // đích từng dòng (đè gợi ý)
   const [nhomDB, setNhomDB] = useState<Record<string, string>>({});
 
   // ---------- Ghi ô lưới ----------
@@ -352,52 +355,58 @@ export default function MonthlyStockScreen() {
 
   // ---------- Đồng bộ danh mục loại nguyên liệu ----------
   const nhomOpts: MucChon[] = useMemo(() => {
-    const set = new Set<string>(["Bạch tuộc", "Mực", "Cá", "Ghẹ", "Khác"]);
-    const src = dbDich === "material" ? mtypes.map((m) => m.category) : products.map((p) => p.category ?? "");
-    for (const c of src) if (c) set.add(c);
+    const set = new Set<string>(["Bạch tuộc", "Mực", "Cá", "Tôm", "Ghẹ", "Bào ngư", "Khác"]);
+    for (const m of mtypes) if (m.category) set.add(m.category);
+    for (const p of products) if (p.category) set.add(p.category);
     return [...set].map((c) => ({ value: c, label: c }));
-  }, [mtypes, products, dbDich]);
+  }, [mtypes, products]);
 
   const moDongBoDialog = () => {
-    setChonDB({}); // rỗng = mặc định TÍCH hết (chonDB[name] !== false)
+    setDichDB({}); // rỗng = dùng đích GỢI Ý mỗi dòng
     setNhomDB({});
     setMoDongBo(true);
   };
-  const nhanDich = dbDich === "material" ? "Loại nguyên liệu" : "Mặt hàng";
+  const dichCua = (x: { name: string; dichGoiY: DichDanhMuc }): DichDanhMuc => dichDB[x.name] ?? x.dichGoiY;
+  const soMH = dongBo.chuaCo.filter((x) => dichCua(x) === "product").length;
+  const soNL = dongBo.chuaCo.filter((x) => dichCua(x) === "material").length;
 
   const themVaoDanhMuc = () => {
-    const chon = dongBo.chuaCo.filter((x) => chonDB[x.name] !== false);
-    if (!chon.length) {
-      notify.canhBao("Chưa chọn mục nào để thêm.");
+    const nhomCua = (x: { name: string; nhomGoiY: string }) => (nhomDB[x.name] || x.nhomGoiY || "Khác").trim();
+    const themNL: MaterialType[] = [];
+    const themMH: Product[] = [];
+    for (const x of dongBo.chuaCo) {
+      const d = dichCua(x);
+      if (d === "material") {
+        themNL.push({ id: uid(), name: x.name, category: nhomCua(x), note: "Từ sổ kho theo tháng" });
+      } else if (d === "product") {
+        themMH.push({
+          id: uid(),
+          code: "",
+          name: x.name,
+          finishedGoodCode: "", // chưa ánh xạ 141 mã kế toán (hợp lệ)
+          category: nhomCua(x),
+          processingType: "",
+        });
+      }
+    }
+    if (!themNL.length && !themMH.length) {
+      notify.canhBao("Chưa dòng nào để thêm (toàn Bỏ qua).");
       return;
     }
-    const nhomCua = (x: { name: string; nhomGoiY: string }) =>
-      (nhomDB[x.name] || x.nhomGoiY || "Khác").trim();
-    if (dbDich === "material") {
-      const themMoi: MaterialType[] = chon.map((x) => ({
-        id: uid(),
-        name: x.name,
-        category: nhomCua(x),
-        note: "Từ sổ kho theo tháng",
-      }));
-      ghiMtypes([...mtypes, ...themMoi]);
-      notify.daLuu(`Đã thêm ${themMoi.length} loại nguyên liệu vào danh mục`);
-    } else {
-      const themMoi: Product[] = chon.map((x) => ({
-        id: uid(),
-        code: "",
-        name: x.name,
-        finishedGoodCode: "", // chưa ánh xạ 141 mã kế toán (hợp lệ)
-        category: nhomCua(x),
-        processingType: "",
-      }));
-      ghiProducts([...products, ...themMoi]);
-      notify.daLuu(`Đã thêm ${themMoi.length} mặt hàng vào danh mục`);
-    }
+    if (themNL.length) ghiMtypes([...mtypes, ...themNL]);
+    if (themMH.length) ghiProducts([...products, ...themMH]);
     setMoDongBo(false);
+    notify.daLuu(`Đã thêm ${themMH.length} mặt hàng + ${themNL.length} loại nguyên liệu`);
   };
 
-  const soChonDB = dongBo.chuaCo.filter((x) => chonDB[x.name] !== false).length;
+  /** Đặt đích cho MỌI dòng chưa có (bulk). */
+  const datDichTatCa = (d: DichDanhMuc | "goiY") => {
+    if (d === "goiY") {
+      setDichDB({});
+      return;
+    }
+    setDichDB(Object.fromEntries(dongBo.chuaCo.map((x) => [x.name, d])));
+  };
 
   // ---------- Nhập Excel bảng kê ----------
   const chonFile = () => fileRef.current?.click();
@@ -1054,35 +1063,18 @@ export default function MonthlyStockScreen() {
           <DialogHeader>
             <DialogTitle className="text-2xl">Đồng bộ danh mục</DialogTitle>
             <DialogDescription className="text-base">
-              Đối chiếu tên mặt hàng trong sổ kho với danh mục <span className="font-semibold">{nhanDich}</span>.
-              Thêm các tên chưa có để danh mục dùng chung nhất quán; soi các tên chỉ khác nhau cách ghi để
-              chuẩn hoá.
+              Đối chiếu tên trong sổ với CẢ HAI danh mục — <span className="font-semibold">Loại nguyên liệu</span> và{" "}
+              <span className="font-semibold">Mặt hàng</span>. Mỗi tên chưa có tự đoán ĐÍCH (cá/tôm/mực nguyên con →
+              Loại NL; bạch tuộc phân loại + có size → Mặt hàng); đổi từng dòng hoặc "Bỏ qua". Thành phẩm 141 mã kế
+              toán cố định — không thêm ở đây.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm font-medium text-foreground">Danh mục đích:</span>
-              <Button
-                size="sm"
-                variant={dbDich === "material" ? "default" : "outline"}
-                onClick={() => setDbDich("material")}
-              >
-                Loại nguyên liệu
-              </Button>
-              <Button
-                size="sm"
-                variant={dbDich === "product" ? "default" : "outline"}
-                onClick={() => setDbDich("product")}
-              >
-                Mặt hàng
-              </Button>
-              <span className="text-xs text-muted-foreground">
-                (Thành phẩm — 141 mã kế toán — cố định, không thêm ở đây)
-              </span>
-            </div>
             <div className="flex flex-wrap gap-2 text-sm">
               <Badge variant="outline">{dongBo.tongTen} tên trong sổ</Badge>
-              <Badge variant="outline">{dongBo.daCo} đã có trong {nhanDich}</Badge>
+              <Badge variant="outline">
+                đã có: {dongBo.daCoMH} mặt hàng · {dongBo.daCoNL} loại NL
+              </Badge>
               <Badge variant="outline">{dongBo.chuaCo.length} chưa có</Badge>
               <Badge variant="outline">{dongBo.nhomTrung.length} nhóm trùng cách ghi</Badge>
             </div>
@@ -1091,35 +1083,40 @@ export default function MonthlyStockScreen() {
               <div className="space-y-2">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <h3 className="flex items-center gap-2 font-semibold text-foreground">
-                    <ListChecks className="h-4 w-4" /> Tên chưa có trong {nhanDich} — chọn để thêm
+                    <ListChecks className="h-4 w-4" /> {dongBo.chuaCo.length} tên chưa có — chọn ĐÍCH từng dòng
                   </h3>
-                  <div className="flex gap-2">
-                    <Button size="sm" variant="ghost" onClick={() => setChonDB({})}>
-                      Chọn tất cả
+                  <div className="flex flex-wrap gap-1">
+                    <Button size="sm" variant="ghost" onClick={() => datDichTatCa("goiY")}>
+                      Theo gợi ý
                     </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => setChonDB(Object.fromEntries(dongBo.chuaCo.map((x) => [x.name, false])))}
-                    >
-                      Bỏ chọn
+                    <Button size="sm" variant="ghost" onClick={() => datDichTatCa("product")}>
+                      Tất cả → Mặt hàng
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => datDichTatCa("material")}>
+                      Tất cả → Loại NL
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => datDichTatCa("skip")}>
+                      Bỏ qua hết
                     </Button>
                   </div>
                 </div>
                 <div className="max-h-[40vh] space-y-1 overflow-auto rounded-lg border border-border p-2">
                   {dongBo.chuaCo.map((x) => (
                     <div key={x.name} className="flex items-center gap-2 rounded p-1 hover:bg-muted/50">
-                      <input
-                        type="checkbox"
-                        className="size-4 accent-primary"
-                        checked={chonDB[x.name] !== false}
-                        onChange={(e) => setChonDB((m) => ({ ...m, [x.name]: e.target.checked }))}
-                        aria-label={`Chọn ${x.name}`}
-                      />
-                      <span className="min-w-0 flex-1 truncate text-sm text-foreground" title={x.name}>
+                      <span className="min-w-0 flex-1 truncate text-foreground" title={x.name}>
                         {x.name}
                       </span>
-                      <div className="w-40 shrink-0">
+                      <select
+                        className="h-9 shrink-0 rounded-md border border-border bg-background px-2"
+                        value={dichCua(x)}
+                        onChange={(e) => setDichDB((m) => ({ ...m, [x.name]: e.target.value as DichDanhMuc }))}
+                        aria-label={`Đích ${x.name}`}
+                      >
+                        <option value="product">→ Mặt hàng</option>
+                        <option value="material">→ Loại NL</option>
+                        <option value="skip">Bỏ qua</option>
+                      </select>
+                      <div className="w-36 shrink-0">
                         <Combobox
                           anNhan
                           label={`Nhóm ${x.name}`}
@@ -1133,9 +1130,9 @@ export default function MonthlyStockScreen() {
                     </div>
                   ))}
                 </div>
-                <Button onClick={themVaoDanhMuc} disabled={soChonDB === 0}>
+                <Button onClick={themVaoDanhMuc} disabled={soMH + soNL === 0}>
                   <Library className="mr-2 h-4 w-4" />
-                  Thêm {soChonDB} mục vào {nhanDich}
+                  Thêm {soMH} mặt hàng + {soNL} loại NL
                 </Button>
               </div>
             )}

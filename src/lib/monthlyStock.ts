@@ -260,39 +260,77 @@ const chuanKhop = (s: string) => (s || "").trim().toLowerCase().replace(/\s+/g, 
 /** Chuẩn hoá NGẶT để dò TRÙNG CÁCH GHI: bỏ hết khoảng trắng + dấu câu (250UP≡250 UP). */
 const chuanNgat = (s: string) => (s || "").toLowerCase().replace(/[\s.,\-()/]+/g, "");
 
-/** Đoán nhóm (category) loại NL từ tên — chỉ gợi ý, người dùng sửa được. */
+/** Đoán nhóm (category, loài) từ tên — chỉ gợi ý, người dùng sửa được. */
 export function suyNhomNguyenLieu(name: string): string {
   const s = name.toLowerCase();
   if (/(b[aạ]ch\s*tu[ộo]c|b\.\s*tu[ộo]c|\bda\b|mada|râu|dạt)/.test(s)) return "Bạch tuộc";
   if (/(m[ựu]c|\bống\b|nang|bao\s*t[ửu]|đầu\s*ống)/.test(s)) return "Mực";
   if (/ghẹ/.test(s)) return "Ghẹ";
-  if (/(cá|saba|sanma|nodoguro|sòng|nục|thu|mòi|cơm|chỉ|nhồng|bò|đổng|hố)/.test(s)) return "Cá";
+  if (/(t[ôo]m)/.test(s)) return "Tôm";
+  if (/(b[àa]o\s*ng[ưu])/.test(s)) return "Bào ngư";
+  if (/(cá|saba|sanma|nodoguro|sòng|nục|thu|mòi|cơm|chỉ|nhồng|bò|đổng|hố|sardine|tráo|trích|đục)/.test(s)) return "Cá";
   return "Khác";
+}
+
+export type DichDanhMuc = "product" | "material" | "skip";
+
+/**
+ * Đoán ĐÍCH danh mục cho một tên trong sổ kho:
+ *  - Có size/grade (250UP, 150-250, <40…) HOẶC dấu chế biến/phân loại (râu, cắt,
+ *    luộc, chần, tẩm, bột, dạt, cổ, bao tử, mada, "X da") → "product" (mặt hàng).
+ *  - Còn lại (cá/tôm/mực/bào ngư NGUYÊN CON) → "material" (loại nguyên liệu).
+ * Chỉ GỢI Ý — người dùng đổi từng dòng.
+ */
+export function suyDichDanhMuc(name: string): DichDanhMuc {
+  const coSize = /(\d+\s*[-/]\s*\d+|\d+\s*up\b|\bup\b|<\s*\d+|>\s*\d+|\d+\s*gr?\b)/i.test(name);
+  const cheBien = /(r[âa]u|c[ắa]t|lu[ộo]c|ch[ầa]n|t[ẩa]m|b[ộo]t|d[aạ]t|\bc[ổo]\b|bao\s*t[ửu]|mada|vòi|\bda\b)/i.test(
+    name.toLowerCase()
+  );
+  return coSize || cheBien ? "product" : "material";
+}
+
+export interface DongBoDong {
+  name: string;
+  nhomGoiY: string;
+  dichGoiY: DichDanhMuc; // đích gợi ý (product/material)
+  daCoODau: "" | "material" | "product"; // đã có sẵn ở danh mục nào (nếu có)
 }
 
 export interface DongBoDanhMuc {
   tongTen: number; // số tên phân biệt trong sổ
-  daCo: number; // số tên đã có trong danh mục loại NL
-  chuaCo: { name: string; nhomGoiY: string }[]; // tên chưa có (kèm nhóm gợi ý)
-  nhomTrung: { variants: string[] }[]; // các nhóm tên TRÙNG CÁCH GHI (>1 biến thể)
+  daCoNL: number; // đã có trong loại NL
+  daCoMH: number; // đã có trong mặt hàng
+  chuaCo: DongBoDong[]; // chưa có ở CẢ HAI (kèm đích + nhóm gợi ý)
+  nhomTrung: { variants: string[] }[]; // các tên TRÙNG CÁCH GHI (>1 biến thể)
 }
 
 /**
- * Phân tích tên mặt hàng trong sổ kho so với danh mục loại nguyên liệu:
- *  - `chuaCo`: tên chưa có trong danh mục (để thêm vào, kèm nhóm gợi ý).
- *  - `nhomTrung`: các tên chỉ khác nhau cách ghi (khoảng trắng/hoa thường/dấu câu),
- *    VD "250UP" / "250 UP" / "250 up" — gom để chuẩn hoá tay, tránh tách khi tổng hợp.
- * KHÔNG sửa gì — chỉ báo.
+ * Phân tích tên trong sổ kho so với CẢ HAI danh mục (loại NL + mặt hàng):
+ *  - `chuaCo`: tên chưa có ở cả hai (kèm đích + nhóm gợi ý để định tuyến từng dòng).
+ *  - `daCoNL`/`daCoMH`: đã có sẵn ở đâu.
+ *  - `nhomTrung`: tên chỉ khác nhau cách ghi (chuẩn hoá ngặt) — gom để sửa tay.
+ * KHÔNG sửa gì — chỉ báo. Thành phẩm 141 mã kế toán KHÔNG xét (cố định).
  */
 export function phanTichDongBoDanhMuc(
   tenTrongSo: string[],
-  tenDanhMuc: string[]
+  tenLoaiNL: string[],
+  tenMatHang: string[]
 ): DongBoDanhMuc {
-  const dm = new Set(tenDanhMuc.map(chuanKhop));
+  const setNL = new Set(tenLoaiNL.map(chuanKhop));
+  const setMH = new Set(tenMatHang.map(chuanKhop));
   const phanBiet = [...new Set(tenTrongSo.map((t) => t.trim()).filter(Boolean))];
-  const chuaCo = phanBiet
-    .filter((t) => !dm.has(chuanKhop(t)))
-    .map((name) => ({ name, nhomGoiY: suyNhomNguyenLieu(name) }));
+  let daCoNL = 0;
+  let daCoMH = 0;
+  const chuaCo: DongBoDong[] = [];
+  for (const name of phanBiet) {
+    const k = chuanKhop(name);
+    const oNL = setNL.has(k);
+    const oMH = setMH.has(k);
+    if (oNL) daCoNL++;
+    if (oMH) daCoMH++;
+    if (oNL || oMH) continue;
+    chuaCo.push({ name, nhomGoiY: suyNhomNguyenLieu(name), dichGoiY: suyDichDanhMuc(name), daCoODau: "" });
+  }
 
   // Gom trùng-cách-ghi trong chính danh sách tên của sổ.
   const gom = new Map<string, Set<string>>();
@@ -309,7 +347,8 @@ export function phanTichDongBoDanhMuc(
 
   return {
     tongTen: phanBiet.length,
-    daCo: phanBiet.length - chuaCo.length,
+    daCoNL,
+    daCoMH,
     chuaCo,
     nhomTrung,
   };

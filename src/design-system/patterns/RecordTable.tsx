@@ -239,8 +239,12 @@ export function RecordTable<T>({
                 </TableRow>
               </TableHeader>
               <TableBody>
+                {/* hien-len: mỗi dòng hiện vào (mờ→rõ + nhích lên) khi MOUNT.
+                    Sắp/lọc giữ nguyên key → KHÔNG re-animate; thêm 1 dòng mới
+                    (key mới) thì chỉ dòng đó chạy. Lần đầu/đổi trang thì cả bảng
+                    hiện vào một lượt — nhẹ, nằm gọn trong page-fade của AppShell. */}
                 {daSap.map((r) => (
-                  <TableRow key={getKey(r)}>
+                  <TableRow key={getKey(r)} className="hien-len">
                     {columns.map((c) => (
                       <TableCell
                         key={c.key}
@@ -268,7 +272,7 @@ export function RecordTable<T>({
             {daSap.map((r) => (
               <li
                 key={getKey(r)}
-                className="rounded-xl bg-card p-4 ring-1 ring-foreground/10"
+                className="hien-len rounded-xl bg-card p-4 ring-1 ring-foreground/10"
               >
                 <div className="mb-3 text-lg font-semibold text-foreground">
                   {cotChinh.render(r)}

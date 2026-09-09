@@ -13,3 +13,4 @@
 2026-09-07 | qc,db,data-layer,ops-storage | supabase-storage.md,03-database.md,04-tang-du-lieu.md,05-bao-mat-phan-quyen.md,design-system-README.md
 2026-09-09 | inventory+data-layer+ops | 36-so-kho-thang.md, 04-tang-du-lieu.md, 03-database.md, 01-app-structure.md, 02-pages-navigation.md, ops/supabase-setup.md
 2026-09-09 | inventory+danh-muc (logic đồng bộ) | 36-so-kho-thang.md, 32-danh-muc.md, memory:danh-muc-mat-hang-3-tang | reuse route (context fresh, không spawn lại)
+2026-09-09 | ui/design-system | src/design-system/README.md, docs/app-map/01-app-structure.md, docs/app-map/02-pages-navigation.md, docs/app-map/README.md

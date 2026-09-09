@@ -423,7 +423,8 @@ function CayNav({
             </button>
             {mo && (
               // Rail dọc + thụt lề = con thuộc nhóm này (nhìn thấy rõ phân lớp).
-              <div className="mt-1 ml-5 space-y-1 border-l-2 border-border pl-2">
+              // hien-len: mở nhóm thì danh sách con nhích lên hiện vào.
+              <div className="hien-len mt-1 ml-5 space-y-1 border-l-2 border-border pl-2">
                 {g.muc.map((m) => (
                   <MucNut
                     key={m.key}
@@ -553,7 +554,7 @@ export default function AppShell({
       {/* Sidebar dọc — chỉ desktop */}
       <aside
         className={cn(
-          "hidden shrink-0 flex-col border-r border-border bg-card transition-[width] duration-200 md:flex md:h-full md:overflow-hidden",
+          "hidden shrink-0 flex-col border-r border-border bg-card transition-[width] duration-base md:flex md:h-full md:overflow-hidden",
           thuGon ? "w-20" : "w-64"
         )}
       >
@@ -582,13 +583,13 @@ export default function AppShell({
             type="button"
             aria-label="Đóng menu"
             onClick={() => setMoNav(false)}
-            className="absolute inset-0 bg-overlay"
+            className="absolute inset-0 bg-overlay duration-fast animate-in fade-in-0"
           />
           <div
             role="dialog"
             aria-modal="true"
             aria-label="Điều hướng"
-            className="absolute inset-y-0 left-0 flex w-80 max-w-[85vw] flex-col border-r border-border bg-card shadow-xl"
+            className="absolute inset-y-0 left-0 flex w-80 max-w-[85vw] flex-col border-r border-border bg-card shadow-xl duration-base animate-in slide-in-from-left"
           >
             <div className="flex h-16 shrink-0 items-center justify-between gap-2 border-b border-border px-4">
               <Logo cao="h-9" phuDe="Xí nghiệp BSF1" />
@@ -788,7 +789,7 @@ export default function AppShell({
           {/* key theo màn đang mở → fade nhẹ mỗi lần đổi trang (reduced-motion tắt) */}
           <div
             key={active}
-            className="mx-auto w-full max-w-(--app-content-width) animate-in fade-in-0 duration-150"
+            className="mx-auto w-full max-w-(--app-content-width) duration-fast animate-in fade-in-0"
           >
             {children}
           </div>

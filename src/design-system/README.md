@@ -276,7 +276,34 @@ Mục tiêu: tinh tế, không phô — giao diện *mượt* chứ không *ồn
   toàn cục — nhưng đừng dựa vào animation để TRUYỀN THÔNG TIN (phải có trạng thái
   tĩnh tương đương).
 - Chuyển màn: `AppShell` bọc `children` trong `<div key={active}
-  className="animate-in fade-in-0 duration-150">` → đổi menu là fade nhẹ.
+  className="duration-fast animate-in fade-in-0">` → đổi menu là fade nhẹ.
+
+**Token & utility chuyển động — MỘT nguồn, gọi theo tên (đừng viết transition rời ở feature):**
+
+| Thời lượng / easing | Token (`tokens.css`) | Class dùng | Giá trị |
+|---|---|---|---|
+| Nhanh (hover · tab · route fade) | `--duration-fast` | `duration-fast` | 150ms |
+| Chuẩn (dialog · dòng mới · banner · bước) | `--duration-base` | `duration-base` | 200ms |
+| Easing ra dịu | `--ease-soft` | `ease-soft` | `cubic-bezier(.22,1,.36,1)` |
+
+`duration-fast`/`duration-base` là `@utility` tự khai (Tailwind v4 không có namespace
+`--duration-*`): đặt cả `--tw-duration` (cho `animate-in`/`animate-out` của
+tw-animate-css đọc) LẪN `transition-duration` (cho `transition-*` thường) → dùng
+được cho cả hai. **Đừng gõ `duration-150`/`duration-200` rời** ở màn mới — gọi token.
+
+Utility "hiện vào" cho phần tử MỚI xuất hiện (chỉ `transform`/`opacity`, `both`
+fill-mode nên reduced-motion tắt vẫn dừng ở trạng thái HIỆN RÕ):
+
+| Utility | Hiệu ứng | Áp ở đâu (design-system, features chỉ dùng lại) |
+|---|---|---|
+| `hien-len` | mờ→rõ + `translateY(6px)→0` | `RecordTable` (dòng/thẻ mới, keyed nên chỉ dòng MỚI animate) · `DailyTaskReminder` · nhóm nav mở (`AppShell`) |
+| `hien-ngang` | mờ→rõ + `translateX(10px)→0` | nội dung mỗi bước `StepForm` (keyed theo `i`) |
+| `hien-xuong` | mờ→rõ + `translateY(-8px)→0` | `UpdateBanner` (băng nhắc tải lại) |
+
+Drawer điện thoại (`AppShell`) dùng tw-animate-css `animate-in slide-in-from-left
+duration-base`, overlay `animate-in fade-in-0 duration-fast`. **Không** làm
+row-leave animation khi xóa (cần theo dõi presence → thêm framer-motion, nặng);
+`ConfirmDelete` + toast Hoàn tác đã là phản hồi đủ.
 
 **⚠️ Bẫy dropdown (đọc kỹ trước khi đụng animation Radix):** `index.css` ẩn cứng
 `[data-slot="popover-content"][data-state="closed"]` và `select-content` đã đóng

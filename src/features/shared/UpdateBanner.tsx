@@ -71,7 +71,7 @@ export function BangCapNhat() {
   return (
     <div
       role="status"
-      className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border-2 border-primary/40 bg-accent px-4 py-3 text-accent-foreground"
+      className="hien-xuong mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border-2 border-primary/40 bg-accent px-4 py-3 text-accent-foreground"
     >
       <span className="flex items-center gap-2 text-base font-semibold">
         <RefreshCw className="size-5 shrink-0" aria-hidden />

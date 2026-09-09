@@ -104,7 +104,10 @@ export function StepForm({
         )}
       </div>
 
-      <div ref={thanRef} className="space-y-6">
+      {/* key theo bước → đổi bước là nội dung fade-trượt nhẹ vào (hien-ngang;
+          prefers-reduced-motion tắt). thanRef remount theo nhưng useCoOBatBuoc
+          dò lại theo dep [i] nên chú thích dấu * vẫn đúng. */}
+      <div key={i} ref={thanRef} className="hien-ngang space-y-6">
         {coOBatBuoc && <ChuThichBatBuoc />}
         {laXemLai ? xemLai : buoc!.noiDung}
       </div>

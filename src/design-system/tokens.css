@@ -52,6 +52,15 @@
   --size-tap: 2.5rem; /* 40px — nút icon vuông (mật độ web thường) */
   --size-icon: 1.25rem; /* 20px — icon trong nút chạm */
   --size-icon-sm: 1.125rem; /* 18px — icon phụ nằm trong dòng chữ */
+
+  /* --- CHUYỂN ĐỘNG: MỘT nguồn thời lượng/easing cho mọi micro-animation ---
+     Luật (src/design-system/README.md § Animation): ngắn ≤ 200–300ms, CHỈ
+     animate transform/opacity. `prefers-reduced-motion` tắt toàn cục ở khối
+     @media phía dưới → utility/transition mới KHÔNG cần tự lo a11y.
+     Tailwind sinh tiện ích `duration-fast` · `duration-base` · `ease-soft`. */
+  --duration-fast: 150ms; /* hover · tab · route fade */
+  --duration-base: 200ms; /* dialog · dòng mới · banner · bước StepForm */
+  --ease-soft: cubic-bezier(0.22, 1, 0.36, 1); /* ease-out dịu, không nảy */
 }
 
 :root {
@@ -353,5 +362,58 @@
   }
   &::-webkit-scrollbar-track {
     background: transparent;
+  }
+}
+
+/* Thời lượng token hoá thành class dùng chung. Đặt cả `--tw-duration` (để
+   `animate-in`/`animate-out` của tw-animate-css đọc: animate-in = enter
+   var(--tw-animation-duration, var(--tw-duration, .15s)) …) LẪN
+   `transition-duration` (để `transition-*` thường cũng ăn). Nhờ vậy một class
+   `duration-fast`/`duration-base` chạy đúng cho CẢ animate-in LẪN transition,
+   thay cho các số rời 100/150/200 rải rác. Tailwind v4 không có namespace
+   `--duration-*` nên phải khai tay ở đây. */
+@utility duration-fast {
+  --tw-duration: var(--duration-fast);
+  transition-duration: var(--duration-fast);
+}
+@utility duration-base {
+  --tw-duration: var(--duration-base);
+  transition-duration: var(--duration-base);
+}
+
+/* ============================================================
+   CHUYỂN ĐỘNG VÀO — micro-animation cho phần tử MỚI xuất hiện: dòng/thẻ mới
+   trong bảng, nội dung bước StepForm, banner. CHỈ transform/opacity (chạy GPU,
+   không reflow). Đặt MỘT chỗ ở token; patterns/components gọi theo tên, màn
+   nghiệp vụ (features) KHÔNG tự viết class animation.
+   reduced-motion: khối @media ở trên đã ép animation-duration → 0.01ms nên mọi
+   utility dưới đây TỰ tắt, không cần lặp @media. `both` fill-mode đảm bảo khi
+   tắt vẫn dừng ở trạng thái cuối (hiện rõ), không kẹt ở opacity 0.
+   ============================================================ */
+@utility hien-len {
+  animation: bsf-hien-len var(--duration-base) var(--ease-soft) both;
+}
+@utility hien-ngang {
+  animation: bsf-hien-ngang var(--duration-base) var(--ease-soft) both;
+}
+@utility hien-xuong {
+  animation: bsf-hien-xuong var(--duration-base) var(--ease-soft) both;
+}
+@keyframes bsf-hien-len {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+@keyframes bsf-hien-ngang {
+  from {
+    opacity: 0;
+    transform: translateX(10px);
+  }
+}
+@keyframes bsf-hien-xuong {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
   }
 }

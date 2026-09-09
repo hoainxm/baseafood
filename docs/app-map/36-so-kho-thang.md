@@ -51,7 +51,7 @@ Tiền còn lại    = Tồn cuối (kg) × đơn giá      // suyDong().remaini
 
 ## Màn hình
 
-- Chọn kỳ = tháng (Combobox + nút ◀ ▶), lọc theo kho, hai chế độ: **xem** (nhóm × bảng đủ cột + dòng cộng nhóm) và **Ghi nhập/xuất** (`LuoiNhap` gõ kiện/kg từng mã, dán khối Excel). Mô tả (tên/size/đơn giá) sửa ở nút ✎ dialog.
+- Chọn kỳ = tháng (Combobox + nút ◀ ▶), lọc theo kho (5 kho hệ thống `BSF1_WAREHOUSES` + kho lạ nếu có), hai chế độ: **xem** (nhóm × bảng đủ cột + dòng cộng nhóm) và **Ghi nhập/xuất** (`LuoiNhap` gõ kiện/kg từng mã, dán khối Excel). Mô tả (tên/size/đơn giá) sửa ở nút ✎ dialog.
 - `gomNhom()` xếp theo `MONTHLY_STOCK_CATEGORIES` trước, nhóm lạ cuối; mỗi nhóm có tổng riêng, thẻ `ThongKe` tổng toàn tháng (gồm tiền còn lại). In A4 (`PhieuIn`).
 - Tháng mặc định = tháng hiện tại (`thangHienTai`). Tháng trống + có tháng trước ⇒ EmptyState mời "Kế thừa tồn cuối tháng trước".
 
@@ -61,7 +61,7 @@ Nút **"Nhập Excel bảng kê"** đọc thẳng file `kho ... .xlsx` ("BẢNG 
 
 - Mỗi **sheet = một tháng** (tên sheet là số tháng 1–12). Cột 0-based: 0 ngày nhập · 1 tên · 2 kg/kiện · 3 giá · 4 xuất xứ · 5 size · 8/9 tồn đầu (kiện/kg) · 10/11 nhập · 12/13 xuất. **Bỏ** 6/7 "Nhập đầu kỳ" (số tham chiếu tĩnh) và 14/15/16 (tồn cuối + tiền = SUY ở app).
 - Nhóm lấy từ dòng tiêu đề mục ("I HÀNG NHẬP KHẨU" / "II HÀNG MUA NGOÀI"); dòng **"TỔNG …"/"CỘNG …"** và mọi dòng **trước mục đầu tiên** đều bỏ (kiểm "TỔNG" TRƯỚC khi dò mục vì "TỔNG HÀNG NHẬP KHẨU" cũng chứa "NHẬP KHẨU").
-- Dialog cho chọn **Năm** (suy từ tên file, VD "năm 2026") + **Kho**, xem trước số dòng mỗi tháng. id nạp **tất định** `xlsx|<sheet>|<năm>|<rowIndex>` ⇒ nạp lại cùng file+năm chỉ CẬP NHẬT, không nhân đôi.
+- Dialog cho chọn **Năm** (suy từ tên file, VD "năm 2026") + **Kho** (Combobox 5 kho hệ thống `BSF1_WAREHOUSES` — K1000T/K1500T/KX-DONG/KX-CA/KX-KHO, mặc định Kho 1500 tấn; cho tạo mới tại chỗ), xem trước số dòng mỗi tháng. **Một file = một kho** (bảng kê theo từng kho). id nạp **tất định** `xlsx|<mã kho>|<sheet>|<năm>|<rowIndex>` — CÓ mã kho nên nhập nhiều kho cùng tháng KHÔNG đè nhau; nạp lại cùng file+năm+kho chỉ CẬP NHẬT, không nhân đôi.
 - **Nạp TRUNG THỰC theo sổ cũ** — KHÔNG chép tồn cuối của file (file gốc dồn kỳ sai ở dòng tổng). Sau khi nạp, mở tháng đầu rồi bấm "Dồn sang tháng sau" lần lượt để **chuẩn hóa** tồn đầu các tháng kế.
 - Kiểm thật (file `kho 1000 năm 2026.xlsx`): 7 sheet → 1.405 dòng, 7 tháng; id duy nhất; nạp lại idempotent (1405→1405).
 

@@ -5,7 +5,7 @@
 // ============================================================
 import { useMemo, useRef, useState } from "react";
 import type { MonthlyStockLine } from "@/types";
-import { MONTHLY_STOCK_CATEGORIES } from "@/types";
+import { MONTHLY_STOCK_CATEGORIES, BSF1_WAREHOUSES } from "@/types";
 import { useMonthlyStock } from "@/lib/catalogRepo";
 import { uid } from "@/lib/db";
 import { num, viDate } from "@/lib/format";
@@ -80,6 +80,13 @@ import {
 
 const TAT_CA_KHO = "__tat_ca__";
 
+/** 5 kho hệ thống (BSF1_WAREHOUSES) — chọn chuẩn, không gõ tự do. Lưu theo TÊN kho. */
+const KHO_HE_THONG: MucChon[] = BSF1_WAREHOUSES.map((w) => ({ value: w.name, label: `${w.name} · ${w.code}` }));
+const MA_KHO = new Map(BSF1_WAREHOUSES.map((w) => [w.name, w.code]));
+/** Token ASCII ổn định của kho cho id nhập (mã kho nếu là kho hệ thống). */
+const maKho = (ten: string) => MA_KHO.get(ten) ?? ten.replace(/[|\s]+/g, "-");
+const KHO_MAC_DINH = BSF1_WAREHOUSES.find((w) => w.code === "K1500T")?.name ?? BSF1_WAREHOUSES[0].name;
+
 /** Form thêm/sửa một dòng (phần mô tả + số liệu đầy đủ). */
 interface DongForm {
   id: string | null; // null = thêm mới
@@ -149,11 +156,12 @@ export default function MonthlyStockScreen() {
   );
 
   const khoOpts: MucChon[] = useMemo(() => {
-    const set = new Set<string>();
+    // 5 kho hệ thống luôn chọn được + kho lạ đã có trong dữ liệu (nếu import tự tạo).
+    const set = new Set<string>(BSF1_WAREHOUSES.map((w) => w.name));
     for (const l of lines) if (l.warehouse) set.add(l.warehouse);
     return [
       { value: TAT_CA_KHO, label: "Tất cả kho" },
-      ...[...set].sort().map((k) => ({ value: k, label: k })),
+      ...[...set].sort().map((k) => ({ value: k, label: MA_KHO.has(k) ? `${k} · ${MA_KHO.get(k)}` : k })),
     ];
   }, [lines]);
 
@@ -218,7 +226,7 @@ export default function MonthlyStockScreen() {
 
   const moThem = () => {
     const catGoiY = nhomList[0]?.category || MONTHLY_STOCK_CATEGORIES[0];
-    const khoGoiY = kho !== TAT_CA_KHO ? kho : khoOpts[1]?.value ?? "";
+    const khoGoiY = kho !== TAT_CA_KHO ? kho : KHO_MAC_DINH;
     setForm(formRong(catGoiY, khoGoiY));
     setLoi([]);
   };
@@ -320,7 +328,7 @@ export default function MonthlyStockScreen() {
         notify.canhBao("File không có sheet dữ liệu nào đọc được (mẫu 'bảng kê kho').");
         return;
       }
-      setNapForm({ sheets, nam: namTuTenFile(file.name), kho: "Kho 1500T" });
+      setNapForm({ sheets, nam: namTuTenFile(file.name), kho: KHO_MAC_DINH });
     } catch (err) {
       notify.loi(`Không đọc được file: ${err instanceof Error ? err.message : String(err)}`);
     }
@@ -341,7 +349,7 @@ export default function MonthlyStockScreen() {
       const period = `${nam}-${String(sh.monthNum).padStart(2, "0")}`;
       sh.rows.forEach((r, idx) => {
         moi.push({
-          id: `xlsx|${sh.sheetName}|${nam}|${r.rowIndex}`,
+          id: `xlsx|${maKho(khoNap.trim())}|${sh.sheetName}|${nam}|${r.rowIndex}`,
           period,
           category: r.category,
           warehouse: khoNap.trim(),
@@ -715,13 +723,13 @@ export default function MonthlyStockScreen() {
                   ].map((c) => ({ value: c, label: c }))}
                   onCreate={(t) => t}
                 />
-                <Field label="Kho">
-                  <Input
-                    value={form.warehouse}
-                    onChange={(e) => setForm((f) => (f ? { ...f, warehouse: e.target.value } : f))}
-                    placeholder="VD: Kho 1500T"
-                  />
-                </Field>
+                <Combobox
+                  label="Kho"
+                  value={form.warehouse}
+                  onChange={(v) => setForm((f) => (f ? { ...f, warehouse: v } : f))}
+                  options={KHO_HE_THONG}
+                  onCreate={(t) => t}
+                />
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="Tên hàng" required>
@@ -808,13 +816,13 @@ export default function MonthlyStockScreen() {
                     }}
                   />
                 </Field>
-                <Field label="Kho">
-                  <Input
-                    value={napForm.kho}
-                    onChange={(e) => setNapForm((f) => (f ? { ...f, kho: e.target.value } : f))}
-                    placeholder="VD: Kho 1500T"
-                  />
-                </Field>
+                <Combobox
+                  label="Kho (chọn đúng kho cho cả file)"
+                  value={napForm.kho}
+                  onChange={(v) => setNapForm((f) => (f ? { ...f, kho: v } : f))}
+                  options={KHO_HE_THONG}
+                  onCreate={(t) => t}
+                />
               </div>
               <div className="overflow-hidden rounded-lg border border-border">
                 <table className="w-full text-sm">

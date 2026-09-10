@@ -3,6 +3,7 @@ covers: src/features/balancing/BalancingScreen.tsx, src/features/balancing/usePe
 last_verified: 2026-09-10
 ttl_days: 90
 <!-- re-verified: 2026-09-10 — ngayTrongKy (UTC), nhapHangHopLe/sanXuatHopLe (lọc ngày+họ NL), chanDoanNhap, hútNhapHang/hútSanXuat khớp source; đối chiếu dữ liệu thật: kỳ 2026 khớp 46 chuyến/36 khớp loại. -->
+<!-- updated: 2026-09-10 (b) — QUY TẮC "kỳ dùng tên HỌ, không size": BalancingScreen.luuKy chuẩn hoá materialTypeName bằng hoNguyenLieu() KHI LƯU → chọn "… lớn (80↑)"/"… nhỏ (80↓)" đều lưu "Bạch tuộc 2 da". Combobox GIỮ tên đã chọn để hiển thị đúng (chuẩn hoá ở onChange làm ô rỗng vì danh mục chỉ có biến thể size); prefill chi phí tìm theo họ. Tên không có mốc 80↑/↓ giữ nguyên. Xem §"Một kỳ = một HỌ nguyên liệu". -->
 <!-- updated: 2026-09-10 — (bug "không lấy được dữ liệu") CHẨN ĐOÁN LUÔN HIỆN: cảnh báo "sổ nhập không có chuyến nào trong khoảng ngày <21/7–29/7> → kiểm lại NGÀY của kỳ" giờ hiện KỂ CẢ khi kỳ đã có dòng (bỏ chặn `hangNL.length===0` ở MaterialGrid) — trước đây kỳ có sẵn dòng rỗng (VD seed) thì lưới đầy ô "—" mà không giải thích. Gốc bug: seed cân đối để 2025 còn dữ liệu nhập/SX là 2026 (lệch năm) → đã dời seed demo (demo-seed.js + seed_bt2da*.sql + mig 0023) sang 2026. Ô số của lưới nay hiểu BIỂU THỨC "1+2"→3 (parseSoHoacBieuThuc, xem design-system README §5d). balancingCalc.ts KHÔNG đổi. -->
 <!-- updated: 2026-09-06 — (A3 HƯỚNG 1 chốt với chủ dự án) HẾT cộng đôi: đông gửi = còn dở SX của kỳ NẾU có, chưa có mới dùng Chuyển kỳ âm (`conDoSX>0 ? conDoSX : tongCarryAm` trong tinhSoTonNL). Tồn cuối = tồn đầu + đông gửi(hoà giải) − xả đông. /nxt-nl BỎ thẻ+cột "Còn dở SX" riêng, gộp vào 1 cột "Đông gửi" (nhãn "(SX)" khi lấy từ SX). Dữ liệu cũ (carry âm, conDoSX=0) KHÔNG hồi quy — đối chiếu tay 4 case khớp. -->
 <!-- re-verified: 2026-09-05 — calculateBalancing (balancingCalc.ts) chữ ký + công thức khớp source (KHÔNG đổi ở A3); carryOver âm=đông gửi / dương=xả đông khớp inventoryMaterial.ts:143-148. -->
@@ -78,8 +79,9 @@ Primitive: `LuoiNhap` (`design-system/patterns/EditableGrid.tsx`) — Enter/Tab/
 
 ### Một kỳ = một HỌ nguyên liệu
 
-Kỳ tên `Bạch tuộc 2 da` gom **cả hai size**: `Bạch tuộc 2 da lớn (80↑)` và `Bạch tuộc 2 da nhỏ (80↓)` (bảng giấy đã tách sẵn "2 da nl lớn 23.150" / "2 da nl nhỏ 16.356"). Ghép bằng `hoNguyenLieu()` — cắt hậu tố size rồi so tên. `Bạch tuộc 1 da` **không tách**. Migration `0019` đổi dữ liệu cũ mang tên chung sang **size lớn**; xưởng tự sửa dòng nào là nhỏ.
-⇒ **Đừng đổi `balancing_periods.material_type_name` thành tên có size** — kỳ sẽ mất nửa số liệu.
+Kỳ tên `Bạch tuộc 2 da` gom **cả hai size**: `Bạch tuộc 2 da lớn (80↑)` và `Bạch tuộc 2 da nhỏ (80↓)` (bảng giấy đã tách sẵn "2 da nl lớn 23.150" / "2 da nl nhỏ 16.356"). Ghép bằng `hoNguyenLieu()` — cắt hậu tố size `(lớn|nhỏ)(80↑/↓)` rồi so tên. `Bạch tuộc 1 da` **không tách**. Migration `0019` đổi dữ liệu cũ mang tên chung sang **size lớn**; xưởng tự sửa dòng nào là nhỏ.
+
+⇒ **QUY TẮC: tên kỳ luôn là tên HỌ, không mang size.** Lớn hay nhỏ đều là "Bạch tuộc 2 da". Người dùng chọn biến thể `… lớn (80↑)` / `… nhỏ (80↓)` trong ô loại NL cũng KHÔNG sao: `BalancingScreen.luuKy` **chuẩn hoá `material_type_name` bằng `hoNguyenLieu()` khi LƯU** nên `balancing_periods.material_type_name` không bao giờ mang size — trước đây để tên có size thì kỳ mất nửa số liệu (hút lọc theo họ nhưng nhãn kỳ gây hiểu nhầm). **Ô Combobox GIỮ nguyên tên đã chọn để hiển thị đúng** (danh mục thường chỉ có biến thể size, KHÔNG có tên họ trần — chuẩn hoá trong `onChange` sẽ làm ô hiện rỗng); prefill chi phí tìm kỳ trước theo họ. Tên không có mốc `80↑/↓` (VD `Bạch tuộc 1 da`, `Mực ống 7cm`) giữ nguyên, không bị cắt.
 
 ### Hút = gán kỳ lên bản ghi gốc, KHÔNG chép số
 

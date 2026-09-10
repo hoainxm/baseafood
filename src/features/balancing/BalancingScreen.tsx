@@ -28,6 +28,7 @@ import {
 } from "@/lib/catalogRepo";
 import { usePeriodGrid } from "./usePeriodGrid";
 import { LuoiNguyenLieu } from "./MaterialGrid";
+import { hoNguyenLieu } from "@/lib/balancingGrid";
 import { LuoiBanThanhPham } from "./WipGrid";
 import {
   ChuThichBatBuoc,
@@ -141,6 +142,11 @@ export default function CanDoiScreen() {
 
     const ban: BalancingPeriod = {
       ...dang,
+      // QUY TẮC: kỳ dùng tên HỌ nguyên liệu — "Bạch tuộc 2 da lớn (80↑)" và
+      // "… nhỏ (80↓)" đều là "Bạch tuộc 2 da", một kỳ gộp cả hai size. Chuẩn hoá
+      // ở đây để dù chọn biến thể size nào, tên kỳ vẫn là họ (khớp cách hút theo
+      // họ ở nhapHangHopLe/kyLienTruoc). Tên khác (không có mốc 80↑/↓) giữ nguyên.
+      materialTypeName: hoNguyenLieu(dang.materialTypeName.trim()),
       dateRangeDescription: moTaKhoang(dang.startDate, dang.endDate),
     };
     if (laThem) {
@@ -328,17 +334,23 @@ export default function CanDoiScreen() {
               <Combobox
                 label="Loại nguyên liệu"
                 required
-                hint="Lô nguyên liệu đem cân đối, VD: Bạch tuộc 2 da."
+                hint="Lô đem cân đối. Lớn/nhỏ (80↑/80↓) gộp chung — kỳ tự dùng tên họ, VD: Bạch tuộc 2 da."
                 value={dang.materialTypeName}
                 onChange={(v) =>
                   setDang((d) => {
                     if (!d) return d;
+                    // GIỮ nguyên tên đã chọn để ô Combobox hiển thị đúng (tên họ
+                    // "Bạch tuộc 2 da" thường KHÔNG có trong danh mục, chỉ có biến
+                    // thể size). Quy về HỌ để bỏ size làm ở bước LƯU (luuKy).
                     const next = { ...d, materialTypeName: v };
-                    // Prefill chi phí chế biến + tỉ giá từ kỳ gần nhất CÙNG loại
+                    // Prefill chi phí chế biến + tỉ giá từ kỳ gần nhất CÙNG HỌ
                     // NL, chỉ khi chi phí còn trống (chưa gõ) — khỏi gõ lại mỗi
                     // kỳ, vẫn sửa được. kyList mới-nhất-trước nên find lấy kỳ gần.
                     if (d.processingCostPerKg == null) {
-                      const truoc = kyList.find((k) => k.materialTypeName === v);
+                      const ho = hoNguyenLieu(v);
+                      const truoc = kyList.find(
+                        (k) => hoNguyenLieu(k.materialTypeName) === ho
+                      );
                       if (truoc) {
                         next.processingCostPerKg = truoc.processingCostPerKg;
                         if (truoc.exchangeRate) next.exchangeRate = truoc.exchangeRate;

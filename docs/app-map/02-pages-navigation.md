@@ -1,6 +1,7 @@
 > Load khi: thêm/bớt màn hình, đổi điều hướng, header, hay tìm xem một màn được gắn vào đâu.
 covers: src/App.tsx, src/features/shared/AppShell.tsx, src/features/shared/NotFound.tsx, src/features/shared/guideContent.tsx, src/lib/nav-access.ts
-last_verified: 2026-09-09
+last_verified: 2026-09-10
+<!-- updated: 2026-09-10 — THÊM route `/doi-soat` "Đối soát HĐĐT" (features/doi-soat, màn THẬT — KHÔNG demoGuard, KHÔNG gate bộ phận nên kế toán/admin thấy): KIT_NAV icon FileCheck2 (AppShell), CAY_NAV nhóm "Báo cáo & Cân đối". Đối soát hóa đơn điện tử (cổng thuế) ⇄ phần mềm kế toán TỪ FILE EXCEL upload (không đọc DB/repo). Xem 37-doi-soat-hddt.md. ~21 route. -->
 <!-- re-verified: 2026-09-09 16:30 — AppShell.tsx là khung THẬT: <main> bọc children trong <div key={active}> fade khi đổi route (AppShell.tsx ~789) — khớp code. (task thêm animation) -->
 <!-- re-verified: 2026-09-09 15:00 — route /ton-kho-thang: App.tsx:182 + lazy:43, KIT_NAV AppShell:99, CAY_NAV nhóm Kho:168, gate DEPT_NHAP_HANG (nav-access.ts:13) — khớp code. -->
 <!-- updated: 2026-09-09 — THÊM route `/ton-kho-thang` "Sổ kho theo tháng" (features/monthly-stock, màn THẬT) nhóm nav "Kho"; gate DEPT_NHAP_HANG. Sổ kho theo THÁNG dương lịch, dồn tồn cuối kỳ → đầu kỳ sau. Xem 36-so-kho-thang.md. ~20 route. -->
@@ -47,7 +48,7 @@ Cả hai dùng CHUNG một cây nav (`CayNav`) dựng từ `KIT_NAV` (danh sách
 | Sản xuất | `wip` · `packaging` · `qc` · (**Tra cứu** → `catalog?tab=mat-hang`) · `production` · `quality` |
 | Kho | `warehouse` · `ton-kho-thang` · `qr` · `nxt-kho` · `cold-storage` |
 | Kinh doanh | `sales` · `orders` · (**Tra cứu** → `catalog?tab=khach-hang`) |
-| Báo cáo & Cân đối | `balancing` · `bc-thanh-pham` · `bc-don-xuat` · `nxt` · `reports` · `traceability` |
+| Báo cáo & Cân đối | `balancing` · `bc-thanh-pham` · `bc-don-xuat` · `nxt` · `doi-soat` · `reports` · `traceability` |
 | Hệ thống | `catalog` (danh mục đầy đủ) · `users` (chỉ admin) · `audit` (chỉ admin) |
 
 - **Gập/mở**: mỗi nhóm là nút gập/mở (chevron), nhớ trạng thái theo máy (`localStorage bsf1:nav-nhom`, mặc định MỞ). Nhóm chỉ 1 màn (Tổng quan) hiện thẳng, không có tiêu đề gập.
@@ -92,6 +93,8 @@ Ngoài bảng trên, khung còn các màn MES: `/dashboard` (Tổng quan) · `/q
 Sổ kho theo THÁNG dương lịch: `/ton-kho-thang` (`features/monthly-stock/MonthlyStockScreen.tsx` — dồn tồn cuối kỳ tháng N → tồn đầu kỳ N+1, cho mọi đối tượng NL/BTP/TP, đủ cột kiện+kg như bảng kê kho; xem [36-so-kho-thang.md](36-so-kho-thang.md)).
 
 Cụm báo cáo khép vòng (đọc dữ liệu thật, không mock): `/bc-thanh-pham` (`features/reports/DailyProductionReport.tsx` — tổng hợp thành phẩm SX hàng ngày, lưới mặt hàng×ngày + Excel) · `/bc-don-xuat` (`features/reports/OrderExportReport.tsx` — đơn đặt được xuất theo kỳ + Excel) · `/nxt-nl` (`features/reports/MaterialNxtScreen.tsx` — NXT nguyên liệu) · `/nxt` (`features/reports/NxtReportScreen.tsx` — NXT thành phẩm, suy từ SX/đơn/bán + tồn đầu). Lưu ý: `/production` là màn TRƯNG BÀY (WorkOrderScreen, mock); màn ghi sản lượng thật là `/wip`.
+
+Đối soát hóa đơn điện tử: `/doi-soat` (`features/doi-soat/DoiSoatScreen.tsx` — upload 1 file Excel gồm các sheet HĐĐT cổng thuế + sheet PHẦN MỀM kế toán, đối chiếu theo `MST bán · ký hiệu · số HĐ chuẩn`, quy về VND, ngưỡng khớp chỉnh được; xuất lại Excel tô màu. Công cụ kế toán, KHÔNG đọc DB/`repo.ts`; logic thuần ở `lib/doiSoatHddt.ts`. Xem [37-doi-soat-hddt.md](37-doi-soat-hddt.md)).
 
 `App.tsx` lọc `KIT_NAV` theo vai trò (bỏ `users` nếu không phải admin) rồi truyền vào `AppShell` qua prop `items`.
 

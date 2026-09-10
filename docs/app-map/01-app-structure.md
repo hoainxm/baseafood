@@ -1,8 +1,9 @@
 > Load khi: thêm file mới, không biết đặt ở đâu, hay chuẩn bị import xuyên tầng.
 covers: src/**
-last_verified: 2026-09-09
+last_verified: 2026-09-10
 ttl_days: 90
 
+<!-- updated: 2026-09-10 — THÊM feature `src/features/doi-soat/` (DoiSoatScreen + index) — Đối soát hóa đơn điện tử ⇄ phần mềm kế toán, route `/doi-soat`. Chỉ import `@/design-system` + `lib/doiSoatHddt.ts` (logic thuần: parse workbook + đối soát + xuất Excel) + `lib/format`. Đọc dữ liệu TỪ FILE EXCEL upload, KHÔNG qua repo/DB. Dep mới: `xlsx-js-style` (ghi Excel có màu; `xlsx` bản free không ghi được style). Xem 37-doi-soat-hddt.md. -->
 <!-- re-verified: 2026-09-09 16:30 — ranh giới import (quy tắc 3): features/shared/AppShell.tsx + UpdateBanner.tsx chỉ import @/design-system + @/lib, KHÔNG @/components/ui — khớp. (task thêm animation) -->
 <!-- re-verified: 2026-09-09 15:00 — src/features/monthly-stock/MonthlyStockScreen.tsx KHÔNG import thẳng @/components/ui (chỉ @/design-system + @/lib) — khớp ranh giới import (quy tắc 3). -->
 <!-- updated: 2026-09-09 — THÊM feature `src/features/monthly-stock/` (MonthlyStockScreen + index) — Sổ kho theo THÁNG dương lịch, route `/ton-kho-thang`. Chỉ import `@/design-system` + hook `catalogRepo` (useMonthlyStock) + `lib/monthlyStock.ts` (toán thuần) + `lib/format`, `lib/db` (uid). Dồn tồn cuối kỳ → đầu kỳ sau. Xem 36-so-kho-thang. -->

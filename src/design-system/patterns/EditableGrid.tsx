@@ -367,15 +367,31 @@ function OLuoi({
       onChange={(e) => {
         setTho(e.target.value);
         const s = e.target.value.trim();
-        // Hiểu cả biểu thức "1+2" → 3 (tính ngay khi biểu thức đủ hợp lệ).
-        onGhi(s === "" ? null : parseSoHoacBieuThuc(s));
+        if (s === "") {
+          onGhi(null); // xoá ô
+          return;
+        }
+        // Hiểu cả biểu thức "1+2" → 3, CẬP NHẬT NGAY khi biểu thức đã ra số.
+        // Biểu thức gõ dở ("250+") hay chuỗi chưa hợp lệ ⇒ CHƯA ghi: ô lưới ghi
+        // THẲNG về sổ nguồn nên ghi 0 tạm sẽ xoá số thật (thậm chí bắn lỗi ở ô
+        // nhiều chuyến). Giữ số cũ, chốt nốt khi rời ô (onBlur).
+        const v = parseSoHoacBieuThuc(s);
+        if (v != null) onGhi(v);
       }}
       onFocus={(e) => {
         setTho(giaTri == null || giaTri === 0 ? "" : String(giaTri).replace(".", ","));
         setDangGo(true);
         e.currentTarget.select();
       }}
-      onBlur={() => setDangGo(false)}
+      onBlur={() => {
+        // Rời ô: chốt biểu thức nếu đã ra số (VD gõ "250+300" rồi Tab luôn).
+        const s = tho.trim();
+        if (s !== "") {
+          const v = parseSoHoacBieuThuc(s);
+          if (v != null) onGhi(v);
+        }
+        setDangGo(false);
+      }}
       onPaste={onDan}
       onKeyDown={onPhim}
       className={cn(

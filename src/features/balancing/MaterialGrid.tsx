@@ -21,9 +21,14 @@ import {
   type HangLuoi,
 } from "@/design-system";
 import { num, viDate } from "@/lib/format";
-import { ChevronsLeftRight, Download, Layers, ListChecks, Plus, Trash2 } from "lucide-react";
+import { ChevronsLeftRight, Combine, Download, Layers, ListChecks, Plus, Trash2 } from "lucide-react";
 
 const KHO_XUONG = BSF1_WAREHOUSES.filter((w) => w.type === "phan-xuong");
+
+/** Cắt hậu tố size để gom "2 da lớn"/"2 da nhỏ" về một họ — CHỈ dùng cho nút Gộp,
+    KHÔNG đổi `hoNguyenLieu` (logic hút) để tránh đụng khớp họ khi hút. */
+const hoGop = (ten: string) =>
+  ten.replace(/\s*(lớn|nhỏ)(\s*\([^)]*\))?\s*$/iu, "").replace(/\s+/g, " ").trim();
 
 export function LuoiNguyenLieu({
   luoi,
@@ -174,6 +179,67 @@ export function LuoiNguyenLieu({
     notify.daXoa(`Đã xóa dòng "${d?.name ?? ""}"`, () => ghiNL(truoc));
   };
 
+  /* Các dòng nhập TAY cùng HỌ (2 da lớn + nhỏ) — để bật nút "Gộp cùng loại". */
+  const nhomGopDuoc = useMemo(() => {
+    const m = new Map<string, BalancingInputItem[]>();
+    for (const r of nlVao) {
+      if (r.autoSource === "imports") continue; // dòng hút đã một-dòng-mỗi-họ
+      const k = `${r.groupName} ${r.isReduction ? 1 : 0} ${hoGop(r.name).toLowerCase()}`;
+      const g = m.get(k);
+      if (g) g.push(r);
+      else m.set(k, [r]);
+    }
+    return [...m.values()].filter((g) => g.length > 1);
+  }, [nlVao]);
+
+  /**
+   * GỘP MỘT LẦN (bấm nút): dồn các dòng nhập tay cùng họ thành một dòng — cộng kg
+   * + chuyển kỳ, đơn giá BÌNH QUÂN GIA QUYỀN nên Giá trị NL (Σ kg×giá) giữ nguyên.
+   * Một lần ghi (atomic), có Hoàn tác. KHÔNG chạy tự động lúc mở kỳ để tránh đua
+   * ghi bất đồng bộ làm cộng đôi (đã thử auto → bỏ).
+   */
+  const gopSize = () => {
+    if (nhomGopDuoc.length === 0) {
+      notify.daLuu("Không có dòng cùng loại để gộp");
+      return;
+    }
+    const truoc = nlVao;
+    const boId = new Set<string>();
+    const them: BalancingInputItem[] = [];
+    let soDongCu = 0;
+    for (const g of nhomGopDuoc) {
+      soDongCu += g.length;
+      const neo = g[0];
+      const daily: DailyQuantities = {};
+      let kgTong = 0;
+      let giaTri = 0;
+      let carry = 0;
+      for (const r of g) {
+        for (const [d, v] of Object.entries(r.dailyQuantities ?? {}))
+          daily[d] = (daily[d] ?? 0) + v;
+        // Cân theo TỔNG mỗi dòng (kể cả chuyển kỳ) để Σ kg×giá GIỮ NGUYÊN chính xác.
+        const kg = sumGridRow(r.dailyQuantities ?? {}, r.carryOverKg ?? 0);
+        kgTong += kg;
+        giaTri += kg * (r.unitPrice ?? 0);
+        carry += r.carryOverKg ?? 0;
+        boId.add(r.id);
+      }
+      them.push({
+        ...neo,
+        name: hoGop(neo.name),
+        dailyQuantities: daily,
+        carryOverKg: carry,
+        quantityKg: sumGridRow(daily, carry),
+        // Bình quân gia quyền, KHÔNG làm tròn ⇒ Giá trị NL (Σ kg×giá) không lệch.
+        unitPrice: kgTong !== 0 ? giaTri / kgTong : neo.unitPrice,
+      });
+    }
+    ghiNL([...nlVao.filter((r) => !boId.has(r.id)), ...them]);
+    notify.daLuu(`Đã gộp ${soDongCu} dòng thành ${them.length} dòng cùng loại`, () =>
+      ghiNL(truoc)
+    );
+  };
+
   const cot: CotLuoi<HangLuoiNL>[] = [
     ...ngay.map<CotLuoi<HangLuoiNL>>((iso) => ({
       key: `ngay:${iso}`,
@@ -309,6 +375,12 @@ export function LuoiNguyenLieu({
             <Button variant="outline" size="lg" onClick={() => setChonNhapMo(true)}>
               <ListChecks />
               Chọn dòng nhập ({dongChonDuoc.length})
+            </Button>
+          )}
+          {!luoi.daChot && nhomGopDuoc.length > 0 && (
+            <Button variant="outline" size="lg" onClick={gopSize}>
+              <Combine />
+              Gộp cùng loại ({nhomGopDuoc.reduce((s, g) => s + g.length, 0)})
             </Button>
           )}
           <Button variant="outline" size="lg" onClick={onDoiAnNgay}>

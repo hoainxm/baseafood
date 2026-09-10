@@ -3,6 +3,7 @@ covers: src/features/balancing/BalancingScreen.tsx, src/features/balancing/usePe
 last_verified: 2026-09-10
 ttl_days: 90
 <!-- re-verified: 2026-09-10 — ngayTrongKy (UTC), nhapHangHopLe/sanXuatHopLe (lọc ngày+họ NL), chanDoanNhap, hútNhapHang/hútSanXuat khớp source; đối chiếu dữ liệu thật: kỳ 2026 khớp 46 chuyến/36 khớp loại. -->
+<!-- updated: 2026-09-10 (e) — NÚT "Gộp cùng loại" (MaterialGrid): gộp MỘT LẦN các dòng nhập tay cùng họ (2 da lớn+nhỏ) → 1 dòng, bình quân gia quyền (Giá trị NL giữ nguyên), atomic + Hoàn tác. CỐ Ý bấm tay — auto-gộp trong useEffect đã BỎ vì đua ghi bất đồng bộ (Supabase) làm cộng đôi (thử ra 62.656 kg / 14,5 tỷ). helper hoGop RIÊNG (không đổi hoNguyenLieu logic hút). Dữ liệu cũ: mở kỳ → bấm nút. -->
 <!-- updated: 2026-09-10 (d) — GỘP SIZE ở tầng DỮ LIỆU, không hiển thị: hút đã tạo 1 dòng/họ; dòng NHẬP TAY cùng họ phải là 1 dòng (seed "2 da nl lớn"+"nhỏ" → gộp "Bạch tuộc 2 da" bình quân gia quyền ở demo-seed.js + seed_bt2da*.sql + mig 0023). ĐÃ THỬ gộp ở dungHangNL (giữ 2 dòng hiện 1) → BỎ vì nlChoTinh đồng bộ quantityKg từng dòng ⇒ calculateBalancing cộng đôi. Không đụng code (revert). -->
 <!-- updated: 2026-09-10 (c) — GỘP SIZE Ở KHỐI 1 (chốt với chủ dự án): gomNhapTheoLoai + dungHangNL + hutNhapHang gom nhập theo HỌ (hoNguyenLieu) → "2 da lớn (80↑)" + "… nhỏ (80↓)" hiện MỘT dòng "Bạch tuộc 2 da" (cộng kg), đơn giá ĐỂ TRỐNG khi gộp nhiều size khác giá. ghiNhapNhieuNgay tra chuyến theo họ (không đẻ chuyến "họ" ma). Chỉ ở CÂN ĐỐI; sổ Nhập hàng/Tồn kho NL giữ tên size. balancingCalc KHÔNG đổi. Verify dữ liệu thật: lớn+nhỏ (107 chuyến) → 1 dòng 269.694 kg, đơn giá null. Xem §"Một kỳ = một HỌ nguyên liệu". -->
 <!-- updated: 2026-09-10 (b) — QUY TẮC "kỳ dùng tên HỌ, không size": BalancingScreen.luuKy chuẩn hoá materialTypeName bằng hoNguyenLieu() KHI LƯU → chọn "… lớn (80↑)"/"… nhỏ (80↓)" đều lưu "Bạch tuộc 2 da". Combobox GIỮ tên đã chọn để hiển thị đúng (chuẩn hoá ở onChange làm ô rỗng vì danh mục chỉ có biến thể size); prefill chi phí tìm theo họ. Tên không có mốc 80↑/↓ giữ nguyên. Xem §"Một kỳ = một HỌ nguyên liệu". -->
@@ -88,6 +89,15 @@ Kỳ tên `Bạch tuộc 2 da` gom **cả hai size**: `Bạch tuộc 2 da lớn 
 ⇒ **Khối 1 GỘP SIZE thành MỘT dòng** (chốt với chủ dự án 2026-09-10): khi hút, `gomNhapTheoLoai` gom nhập theo **HỌ** (`hoNguyenLieu`) nên `2 da lớn (80↑)` + `2 da nhỏ (80↓)` ra **một dòng `Bạch tuộc 2 da`**, cộng kg cả hai size. **Đơn giá ĐỂ TRỐNG** khi gộp nhiều size khác giá (kế toán gõ MỘT giá chung — không gợi ý bừa giá một size); một nguồn thì vẫn gợi ý giá như cũ. `dungHangNL` tra nguồn theo họ (`hoNguyenLieu(r.name)`) nên dòng cũ mang tên size vẫn khớp; `hutNhapHang` chống trùng theo họ; ghi ngược ô ngày (`ghiNhapNhieuNgay`) tra chuyến nhập theo họ, chỉnh chuyến size cuối của ngày cho khớp tổng (KHÔNG đẻ chuyến "họ" ma). **Chỉ gộp ở CÂN ĐỐI** — sổ Nhập hàng & Tồn kho NL vẫn giữ tên có size để truy nguyên. `calculateBalancing` KHÔNG đổi (đọc `quantityKg`/`unitPrice` của dòng đã gộp).
 
 ⚠️ **Gộp ở tầng DỮ LIỆU (một dòng `balancing_inputs` cho mỗi họ), KHÔNG gộp ở tầng hiển thị.** Hút tạo sẵn MỘT dòng/họ (đúng). Dòng NHẬP TAY cùng họ (VD seed cũ "2 da nl lớn"/"2 da nl nhỏ") thì phải là MỘT dòng — seed đã gộp thành "Bạch tuộc 2 da" (bình quân gia quyền để giữ Giá trị NL). **ĐÃ THỬ gộp ở `dungHangNL` (giữ 2 dòng, hiện 1) rồi BỎ**: `usePeriodGrid.nlChoTinh` đồng bộ `quantityKg` TỪNG dòng theo `hangNL.id`, dòng gộp làm dòng neo mang TỔNG gộp còn dòng kia giữ số cũ ⇒ `calculateBalancing` (Σ `quantityKg` mỗi dòng) **CỘNG ĐÔI**; giá gộp để trống cũng không khớp 2 giá lưu. Muốn gộp arbitrary dòng tay ⇒ phải gộp ở tầng dữ liệu (một dòng thật), không phải hiển thị.
+
+**Nút "Gộp cùng loại" (Khối 1) — gộp MỘT LẦN, an toàn.** Hiện khi có ≥2 dòng nhập
+TAY cùng họ (helper `hoGop` cắt "lớn/nhỏ" ± mốc; RIÊNG cho nút, KHÔNG đổi `hoNguyenLieu`
+của logic hút). Bấm ⇒ dồn thành MỘT dòng: cộng kg + chuyển kỳ, **đơn giá = bình quân
+gia quyền (không làm tròn)** nên `Σ kg×giá` GIỮ NGUYÊN → `calculateBalancing` không
+lệch. MỘT lần ghi (atomic) + có Hoàn tác. **CỐ Ý là hành động bấm tay, KHÔNG chạy tự
+động lúc mở kỳ** — đã thử auto-gộp trong `useEffect` và BỎ vì effect tái chạy trên
+state cũ / ghi bất đồng bộ (Supabase) ⇒ đua ghi, gộp CHỒNG lên dòng đã gộp → cộng đôi
+(thử thật ra 62.656 kg / 14,5 tỷ). Dữ liệu Supabase cũ (2 dòng size) ⇒ mở kỳ, bấm nút.
 
 ### Hút = gán kỳ lên bản ghi gốc, KHÔNG chép số
 

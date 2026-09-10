@@ -109,6 +109,23 @@ export default function CanDoiScreen() {
     return ten;
   };
 
+  /* Chọn loại NL cho kỳ: GỘP biến thể size về HỌ — "Bạch tuộc 2 da lớn (80↑)" +
+     "… nhỏ (80↓)" chỉ hiện MỘT mục "Bạch tuộc 2 da" (cân đối không tách size, chốt
+     với chủ dự án). Tên không có mốc 80↑/↓ giữ nguyên. Value = tên họ nên chọn xong
+     ô hiển thị đúng và lưu thẳng tên họ. Danh mục gốc (sổ nhập) vẫn giữ đủ size. */
+  const optLoaiNL = useMemo(() => {
+    const daCo = new Set<string>();
+    const ra: { value: string; label: string; phu?: string }[] = [];
+    for (const l of loaiNLDanhMuc) {
+      const ho = hoNguyenLieu(l.name) || l.name;
+      const khoa = ho.toLowerCase();
+      if (daCo.has(khoa)) continue;
+      daCo.add(khoa);
+      ra.push({ value: ho, label: ho, phu: l.category || undefined });
+    }
+    return ra;
+  }, [loaiNLDanhMuc]);
+
   const [dang, setDang] = useState<BalancingPeriod | null>(null);
   const [laThem, setLaThem] = useState(false);
   const [loi, setLoi] = useState<LoiNhap[]>([]);
@@ -339,9 +356,9 @@ export default function CanDoiScreen() {
                 onChange={(v) =>
                   setDang((d) => {
                     if (!d) return d;
-                    // GIỮ nguyên tên đã chọn để ô Combobox hiển thị đúng (tên họ
-                    // "Bạch tuộc 2 da" thường KHÔNG có trong danh mục, chỉ có biến
-                    // thể size). Quy về HỌ để bỏ size làm ở bước LƯU (luuKy).
+                    // optLoaiNL đã gộp về HỌ nên `v` là tên họ (VD "Bạch tuộc 2 da")
+                    // — vừa hiển thị đúng, vừa lưu thẳng. luuKy vẫn chuẩn hoá lần nữa
+                    // (phòng khi gõ tay tên có size).
                     const next = { ...d, materialTypeName: v };
                     // Prefill chi phí chế biến + tỉ giá từ kỳ gần nhất CÙNG HỌ
                     // NL, chỉ khi chi phí còn trống (chưa gõ) — khỏi gõ lại mỗi
@@ -359,11 +376,7 @@ export default function CanDoiScreen() {
                     return next;
                   })
                 }
-                options={loaiNLDanhMuc.map((l) => ({
-                  value: l.name,
-                  label: l.name,
-                  phu: l.category || undefined,
-                }))}
+                options={optLoaiNL}
                 onCreate={themLoaiNL}
               />
 

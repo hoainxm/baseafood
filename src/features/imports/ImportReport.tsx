@@ -170,14 +170,14 @@ export default function BaoCaoNhap() {
               </div>
             </div>
             <ul className="space-y-1">
-              {loaiArr.slice(0, 5).map(([ten, kg]) => (
+              {loaiArr.slice(0, 16).map(([ten, kg]) => (
                 <li key={ten} className="flex items-baseline justify-between gap-4">
-                  <span className="min-w-0 truncate text-muted-foreground">{ten}</span>
+                  <span className="min-w-0 break-words text-muted-foreground">{ten}</span>
                   <span className="tnum shrink-0 font-medium text-foreground">{num(kg)} kg</span>
                 </li>
               ))}
-              {loaiArr.length > 5 && (
-                <li className="text-muted-foreground">… +{loaiArr.length - 5} loại khác</li>
+              {loaiArr.length > 16 && (
+                <li className="text-muted-foreground">… +{loaiArr.length - 16} loại khác</li>
               )}
             </ul>
           </div>

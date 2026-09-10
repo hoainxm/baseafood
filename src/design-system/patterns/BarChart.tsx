@@ -122,7 +122,7 @@ export function BieuDoCot({
                   <div
                     role="tooltip"
                     className={cn(
-                      "pointer-events-none absolute left-1/2 z-40 w-max max-w-[18rem] -translate-x-1/2 scale-95 rounded-lg border-2 border-border bg-card p-3 text-left text-sm text-foreground opacity-0 shadow-xl transition-all duration-150 ease-out group-hover:scale-100 group-hover:opacity-100",
+                      "pointer-events-none absolute left-1/2 z-40 w-max max-w-[16rem] sm:max-w-[26rem] -translate-x-1/2 scale-95 rounded-lg border-2 border-border bg-card p-3.5 text-left text-sm text-foreground opacity-0 shadow-xl transition-all duration-150 ease-out group-hover:scale-100 group-hover:opacity-100",
                       thePhiaDuoi
                         ? "top-full mt-2 -translate-y-1 group-hover:translate-y-0"
                         : "bottom-full mb-2 translate-y-1 group-hover:translate-y-0"

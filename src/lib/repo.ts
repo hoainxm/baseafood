@@ -245,6 +245,7 @@ export const BANG_IMPORT_SHIPMENT: AnhXaBang<ImportShipment> = {
     lot_code: x.lotCode ?? "",
     sscc_code: x.ssccCode ?? "",
     scan_path: x.scanPath ?? "",
+    operator: x.operator ?? "",
   }),
   fromRow: (r) => ({
     id: s(r.id),
@@ -259,13 +260,15 @@ export const BANG_IMPORT_SHIPMENT: AnhXaBang<ImportShipment> = {
     lotCode: s(r.lot_code),
     ssccCode: s(r.sscc_code),
     scanPath: s(r.scan_path),
+    operator: s(r.operator),
   }),
-  // Chuyến ghi trước 0035/0040 chưa có mã lô/SSCC/ảnh → coi như để trống.
+  // Chuyến ghi trước 0035/0040/0042 chưa có mã lô/SSCC/ảnh/người ghi → để trống.
   vaDongCu: (x) => ({
     ...x,
     lotCode: x.lotCode ?? "",
     ssccCode: x.ssccCode ?? "",
     scanPath: x.scanPath ?? "",
+    operator: x.operator ?? "",
   }),
 };
 

@@ -52,6 +52,7 @@ import {
   type MucChon,
 } from "@/design-system";
 import { kg, num, todayISO, viDate } from "@/lib/format";
+import { useAuth } from "@/lib/auth";
 import { DailyTaskReminder, QrTemLoIn, PhieuTrongNhapNL } from "@/features/shared";
 import { OcrPhieuNhap } from "./OcrPhieuNhap";
 import { coOcr, type DanhMucOcr } from "@/lib/ocr";
@@ -68,6 +69,7 @@ import {
   QrCode,
   Plus,
   Printer,
+  Save,
   Scale,
   SlidersHorizontal,
   TriangleAlert,
@@ -243,6 +245,9 @@ function loiDauChuyen(d: DauChuyen, daChot: boolean): LoiNhap[] {
 }
 
 export default function NhapNguyenLieuScreen() {
+  // Người đang đăng nhập → gắn làm "người ghi" của chuyến khi lưu.
+  const { nguoiDung } = useAuth();
+  const nguoiThaoTac = nguoiDung?.fullName || nguoiDung?.username || "";
   // kỳ xem sổ: ngày/tuần/tháng/năm/khoảng tự chọn
   const [rows, persist, { trangThai }] = useMaterialImports();
   const dangTai = trangThai === "dang-tai" && rows.length === 0;
@@ -274,14 +279,12 @@ export default function NhapNguyenLieuScreen() {
   const [chuyenInTem, setChuyenInTem] = useState<ImportShipment | null>(null);
   const [chuyenIdPhien, setChuyenIdPhien] = useState<string | null>(null);
   const [dongBang, setDongBang] = useState<DongBang[]>([]);
-  /** Ngày ghi sổ kéo ngày hàng về theo (khi hai ngày đang đi liền). Sửa tay ngày
-   *  hàng về ⇒ tách (đây là ghi bù, hai ngày khác nhau). */
-  const [ngayLienNhau, setNgayLienNhau] = useState(true);
   /** Loài dùng gần nhất trong phiên — làm mặc định cho chuyến/dòng mới thay vì
    *  luôn nhảy về "Bạch tuộc" (sai ở xưởng Khô/Cá). */
   const [loaiGanNhat, setLoaiGanNhat] = useState<Category>(LOAI_MAC_DINH);
   const [loiPhien, setLoiPhien] = useState<LoiNhap[]>([]);
-  const [moPhuPhien, setMoPhuPhien] = useState(false);
+  // Khối "Xe và ghi chú" (tài xế/biển số) mở sẵn — hầu hết chuyến đều có.
+  const [moPhuPhien, setMoPhuPhien] = useState(true);
 
   /* Đang sửa một chuyến đã ghi: id các dòng của chuyến đó (null = đang tạo mới).
      Dùng id-set thay vì chỉ chuyenId để sửa được CẢ dữ liệu cũ (không có chuyenId). */
@@ -289,6 +292,8 @@ export default function NhapNguyenLieuScreen() {
 
   /* Chốt ngày */
   const [hoiChot, setHoiChot] = useState(false);
+  /** Nhắc "còn dòng nhập chưa lưu" trước khi mở hộp chốt. */
+  const [nhacLuu, setNhacLuu] = useState(false);
   const [ghiChuChot, setGhiChuChot] = useState("");
   const [hoiMoLai, setHoiMoLai] = useState(false);
   const [lyDoMoLai, setLyDoMoLai] = useState("");
@@ -459,11 +464,9 @@ export default function NhapNguyenLieuScreen() {
     setChuyenIdPhien(null);
     setSuaRowIds(null);
     setDongBang([dongBangRong(loaiGanNhat)]);
-    // Ngày về mặc định = ngày đang xem sổ, ngày ghi sổ = hôm nay. Đi liền khi
-    // trùng (mở sổ hôm nay) — kéo theo nhau; tách sẵn khi xem ngày cũ (ghi bù).
-    setNgayLienNhau(ngayGhi === todayISO());
     setLoiPhien([]);
-    setMoPhuPhien(false);
+    // Auto mở khối "Xe và ghi chú" — hầu hết chuyến đều có tài xế/biển số.
+    setMoPhuPhien(true);
   };
 
   // Form-first: vào "Ghi nhập" mà chưa có phiếu → tự mở phiếu trống (không modal).
@@ -510,30 +513,22 @@ export default function NhapNguyenLieuScreen() {
         unitPrice: r.unitPrice,
       }))
     );
-    setNgayLienNhau((n.postingDate || n.deliveryDate) === n.deliveryDate);
     setLoiPhien([]);
-    setMoPhuPhien(false);
+    setMoPhuPhien(true);
     setCheDo("nhap"); // sửa chuyến mở trong form inline (chế độ Ghi nhập)
   };
 
   const datPhien = <K extends keyof DauChuyen>(k: K, v: DauChuyen[K]) =>
     setPhien((p) => (p ? { ...p, [k]: v } : p));
 
-  /** Đổi ngày ghi sổ: kéo ngày hàng về theo khi hai ngày đang đi liền. */
+  /** Đổi ngày ghi sổ: LUÔN kéo ngày hàng về nhảy theo (chủ động). Muốn hàng về
+   *  ngày khác (ghi bù) thì sửa tay ô "Ngày hàng về xưởng" sau đó. */
   const doiNgayGhiSo = (v: string) =>
-    setPhien((p) =>
-      !p
-        ? p
-        : ngayLienNhau
-          ? { ...p, postingDate: v, deliveryDate: v }
-          : { ...p, postingDate: v }
-    );
+    setPhien((p) => (p ? { ...p, postingDate: v, deliveryDate: v } : p));
 
-  /** Chỉnh tay ngày hàng về ⇒ tách khỏi ngày ghi sổ (đây là ghi bù, hai ngày khác). */
-  const doiNgayVe = (v: string) => {
-    setNgayLienNhau(false);
-    datPhien("deliveryDate", v);
-  };
+  /** Chỉnh tay ngày hàng về ⇒ khác ngày ghi sổ (ghi bù). Đổi lại ngày ghi sổ sau
+   *  đó thì ngày hàng về vẫn nhảy theo như thường. */
+  const doiNgayVe = (v: string) => datPhien("deliveryDate", v);
 
   /** Đang sửa chuyến đã ghi (khác với tạo chuyến mới). */
   const dangSuaChuyen = suaRowIds !== null;
@@ -546,6 +541,9 @@ export default function NhapNguyenLieuScreen() {
   );
   /** Số dòng ĐÃ LƯU đang mở trong bảng — cho câu "sửa đầu chuyến áp cho N dòng". */
   const soDongDaLuu = dongBang.filter((d) => d.id).length;
+  /** Đang ở "Ghi nhập" và còn dòng hợp lệ CHƯA lưu vào sổ (dòng mới id=null) —
+   *  để nhắc trước khi chốt ngày, kẻo số vừa gõ chưa tính vào tổng chốt. */
+  const coDongChuaLuu = cheDo === "nhap" && dongHopLe.some((d) => !d.id);
   const chotPhien = phien ? daChot(phien.deliveryDate, phien.workshop) : false;
 
   /** Dòng đã lưu thuộc chuyến đang mở (id-set khi sửa; tạo mới thì chưa có gì). */
@@ -660,7 +658,12 @@ export default function NhapNguyenLieuScreen() {
       idChuyen = newId();
       chuyenSau = [
         ...chuyen,
-        { id: idChuyen, ...phien, lotCode: sinhMaLo(phien.deliveryDate, phien.workshop, chuyen) },
+        {
+          id: idChuyen,
+          ...phien,
+          lotCode: sinhMaLo(phien.deliveryDate, phien.workshop, chuyen),
+          operator: nguoiThaoTac,
+        },
       ];
     }
 
@@ -919,14 +922,14 @@ export default function NhapNguyenLieuScreen() {
         <DateField
           label="Ngày ghi sổ"
           required
-          info="Ngày ghi vào hệ thống. Chọn ngày này thì ngày hàng về tự nhảy theo (cho tới khi bạn tự sửa)."
+          info="Ngày ghi vào hệ thống. Chọn ngày này thì ngày hàng về tự nhảy theo. Cần khác thì sửa ô ngày hàng về bên cạnh."
           value={phien.postingDate}
           onChange={doiNgayGhiSo}
         />
         <DateField
           label="Ngày hàng về xưởng"
           required
-          info="Ngày xe đổ hàng thật — mọi tổng hợp tính theo ngày này. Mặc định đi theo ngày ghi sổ; sửa tay khi hàng về hôm khác (ghi bù)."
+          info="Ngày xe đổ hàng thật — mọi tổng hợp tính theo ngày này. Mặc định nhảy theo ngày ghi sổ; sửa tay ô này khi hàng về hôm khác (ghi bù)."
           value={phien.deliveryDate}
           onChange={doiNgayVe}
         />
@@ -1432,6 +1435,11 @@ export default function NhapNguyenLieuScreen() {
                           Ghi chú: {n.note}
                         </p>
                       )}
+                      {n.chuyen?.operator && (
+                        <p className="text-base text-muted-foreground">
+                          Người ghi: {n.chuyen.operator}
+                        </p>
+                      )}
                     </div>
 
                     <div className="flex flex-wrap items-center gap-3">
@@ -1553,7 +1561,12 @@ export default function NhapNguyenLieuScreen() {
               Mở lại ngày
             </Button>
           ) : (
-            <Button size="lg" onClick={() => setHoiChot(true)}>
+            <Button
+              size="lg"
+              onClick={() =>
+                coDongChuaLuu ? setNhacLuu(true) : setHoiChot(true)
+              }
+            >
               <Lock />
               Chốt ngày
             </Button>
@@ -1606,6 +1619,56 @@ export default function NhapNguyenLieuScreen() {
             <Button size="lg" onClick={chotNgay}>
               <Lock />
               Chốt ngày
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ---- Hộp thoại: nhắc còn dòng nhập chưa lưu trước khi chốt ---- */}
+      <Dialog open={nhacLuu} onOpenChange={setNhacLuu}>
+        <DialogContent className="w-full sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-2xl">
+              Còn dòng nhập chưa lưu vào sổ
+            </DialogTitle>
+            <DialogDescription className="text-base">
+              Bạn đang gõ dở một chuyến nhập nhưng chưa bấm{" "}
+              <strong>"Lưu vào sổ"</strong>. Chốt ngay thì số vừa gõ{" "}
+              <strong>chưa được tính vào tổng chốt</strong>. Lưu vào sổ trước cho
+              chắc.
+            </DialogDescription>
+          </DialogHeader>
+
+          <DialogFooter className="flex-wrap gap-2">
+            <Button
+              variant="ghost"
+              size="lg"
+              onClick={() => setNhacLuu(false)}
+            >
+              Quay lại nhập tiếp
+            </Button>
+            <Button
+              variant="outline"
+              size="lg"
+              onClick={() => {
+                setNhacLuu(false);
+                setHoiChot(true);
+              }}
+            >
+              Vẫn chốt (bỏ dòng đang gõ)
+            </Button>
+            <Button
+              size="lg"
+              onClick={() => {
+                if (luuPhien(false)) {
+                  datLaiPhien();
+                  setNhacLuu(false);
+                  setHoiChot(true);
+                }
+              }}
+            >
+              <Save />
+              Lưu vào sổ rồi chốt
             </Button>
           </DialogFooter>
         </DialogContent>

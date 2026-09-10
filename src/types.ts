@@ -129,6 +129,8 @@ export interface ImportShipment {
   ssccCode?: string;
   /** Đường dẫn ảnh phiếu tay chụp kèm (nền OCR). Rỗng = chưa chụp. */
   scanPath?: string;
+  /** Người thao tác ghi chuyến (họ tên/username tài khoản lúc lưu). Rỗng = dữ liệu cũ. */
+  operator?: string;
 }
 
 export function isBackdatedImport(c: Pick<ImportShipment, "deliveryDate" | "postingDate">): boolean {

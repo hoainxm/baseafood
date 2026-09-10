@@ -1,6 +1,7 @@
 > Load khi: sửa bất cứ thứ gì ở màn Nhập hàng — chuyến, ngày, ghi bù, chốt ngày, phế liệu ngày, phiếu báo cáo ngày.
 covers: src/features/imports/MaterialImportScreen.tsx, src/features/imports/DailyImportInvoice.tsx, src/features/imports/ImportReport.tsx, src/features/imports/OcrPhieuNhap.tsx, src/lib/ocr.ts, src/types.ts
-last_verified: 2026-09-08
+last_verified: 2026-09-10
+<!-- re-verified: 2026-09-10 — đối chiếu MaterialImportScreen.tsx cho 3 sửa UI (build+lint xanh, thử tay preview localStorage): (a) bỏ state `ngayLienNhau` — `doiNgayGhiSo` LUÔN set cả postingDate+deliveryDate ⇒ ngày ghi sổ luôn kéo ngày hàng về nhảy theo mọi lần (sửa bug "lần 2 không nhảy" do ngayLienNhau bị reset khi bộ lọc trôi ngày); `doiNgayVe` chỉ set deliveryDate (ghi bù); (b) khối "Xe và ghi chú" (tài xế/biển số) mở sẵn — `moPhuPhien` khởi tạo true + moThem/moSuaChuyen set true; (c) nút "Chốt ngày" khi còn dòng hợp lệ chưa lưu (`coDongChuaLuu = cheDo==="nhap" && dongHopLe.some(d=>!d.id)`) mở hộp nhắc `nhacLuu` trước (Lưu rồi chốt / Vẫn chốt / Quay lại) thay vì chốt thẳng; (d) NGƯỜI GHI chuyến: cột `import_shipments.operator` (mig `0042`), gắn `useAuth().fullName` khi tạo chuyến ở `luuPhien`, sổ hiện "Người ghi: …" (sửa chuyến KHÔNG ghi đè operator gốc). Kèm sửa dữ liệu 1 lần `docs/ops/fix-2026-09-10-swap-31-08-01-09-va-operator-nnttruc.sql` (swap ngày 31/08↔01/09 + audit admin→nnttruc). -->
 <!-- updated: 2026-09-07 — (QĐ-1/NR-1 form nhập + biểu mẫu giấy, họp [2026-09-02](../trien-khai/hop-2026-09-02-form-nhap-trace-gia-qc.md)) CĂN FIELD form "Ghi nhập" KHỚP TỜ CHỊ TRÚC: đưa "Đại lý giao hàng" LÊN TRƯỚC "Phân xưởng" — khớp cột TÊN ĐẠI LÝ mở đầu tờ "Báo cáo tổng hợp nguyên liệu hàng ngày" (Excel mẫu tab 2 + 9 ảnh phiếu tay); CHỈ đổi thứ tự hiển thị, KHÔNG đổi logic lưu/luuPhien. THÊM nút "In phiếu trống" ở chế độ "Sổ ngày" (state inPhieuTrong) → mở `PhieuTrongNhapNL` (src/features/shared/PhieuTrongIn.tsx): biểu mẫu A4 TRỐNG in cho xưởng ghi tay (cột STT·Tên đại lý·Loại NL·Số lượng·Đơn giá·Ghi chú + dòng NGÀY trống + Tổng cộng, primitive PhieuIn) — cùng cột với bản in có số liệu DailyImportInvoice để ghi tay xong khớp app 1:1. -->
 <!-- re-verified: 2026-09-07 — đối chiếu MaterialImportScreen.tsx: form Ghi nhập render Đại lý TRƯỚC Phân xưởng; nút "In phiếu trống" ở toolbar Sổ ngày mở PhieuTrongNhapNL; build+lint xanh (0 error), preview render đúng 6 cột + dòng NGÀY trống + Tổng cộng, mobile 375px không cuộn ngang. -->
 <!-- updated: 2026-09-06 — GỘP PHẲNG TAB: bỏ wrapper `ImportTab.tsx` (2 tab ngoài "Sổ nhập hàng | Báo cáo") — nay `/imports` = thẳng `MaterialImportScreen` với toggle 3 chế độ PHẲNG ở đầu màn: "📝 Ghi nhập" (form) · "📖 Sổ ngày" (sổ + lọc) · "📊 Báo cáo" (render `ImportReport` inline; ẩn form + DailyTaskReminder + thanh chốt). `index.ts` export thẳng MaterialImportScreen; `ImportTab.tsx` đã XÓA. Cũng vá `min-w-[16rem]` → `min-w-0 sm:min-w-[16rem]` ở ImportReport/DailyImportInvoice/SalesReport + 5 màn reports (mobile 360px + cỡ chữ 130% không cuộn ngang). -->
@@ -33,7 +34,7 @@ Bố cục lọc: **toolbar một hàng** (Kỳ xem sổ · Ngày/khoảng · Ph
 
 **Bộ lọc theo KỲ** — logic dùng chung ở [`src/lib/periodUtils.ts`](../../src/lib/periodUtils.ts) (`ky`: `ngay | tuan | thang | nam | tuy-chon`): `phamViKy()` suy ra `[từ, đến]` từ một **ngày neo** — tuần = Thứ 2→CN, tháng/năm = đầu→cuối; `tuy-chon` dùng `tuNgay/denNgay`. Mọi lọc/tổng/chốt tính theo khoảng này. `laMotNgay = từ === đến` mới cho chốt/phế liệu ngày. **Phiếu báo cáo mang cùng bộ chọn kỳ** (mirror `periodUtils.ts`) nên xem/in linh hoạt trong phiếu. Nhập bằng **dropdown** (`Combobox`) cho các trường ít lựa chọn: kỳ, phân xưởng, loài — có giá trị mặc định, `choPhepXoa={false}`.
 
-Chưa có: **người chốt / người ghi bù** (chưa có đăng nhập — [05-bao-mat-phan-quyen](05-bao-mat-phan-quyen.md)); màn xem lại **lịch sử chốt/mở lại** (dữ liệu đã đủ: `chot_luc`, `tong_kg_luc_chot`, `ly_do_mo_lai`).
+**Người ghi chuyến** đã có (cột `import_shipments.operator`, migration `0042`): app gắn `useAuth().fullName` (rỗng thì username) lúc lưu chuyến, sổ hiện dòng "Người ghi: …". Chưa có: **người chốt / người ghi bù** riêng; màn xem lại **lịch sử chốt/mở lại** (dữ liệu đã đủ: `chot_luc`, `tong_kg_luc_chot`, `ly_do_mo_lai`). Xem [05-bao-mat-phan-quyen](05-bao-mat-phan-quyen.md).
 
 Bảng dùng: `chuyen_nhap`, `nhap_nguyen_lieu`, `chot_ngay`, `phe_lieu` (dòng `nguon = "Nhập hàng"`), đọc thêm danh mục `dai_ly` / `loai_nguyen_lieu`.
 
@@ -67,6 +68,7 @@ Thuộc về chuyến: ngày, phân xưởng, đại lý, tài xế, biển số
 - **Nhóm dòng khi sửa theo `suaRowIds` (id-set), không theo `chuyenId`** ⇒ sửa được CẢ dữ liệu cũ (chuyenId rỗng): dòng thêm khi sửa dữ liệu cũ vẫn để `chuyenId=""`, gom lại nhờ (ngày+xưởng+đại lý+xe) — **không tự sinh `chuyen_nhap`** cho dữ liệu cũ.
 - Footer khi tạo mới: **"Lưu & thêm chuyến khác"** (`luuThemChuyenKhac`: lưu rồi giữ ngày+xưởng+đại lý, làm mới xe + bảng — cho một đại lý giao nhiều lượt, mỗi lượt một chuyến) + **"Lưu vào sổ"** (`xongChuyen`). Khi sửa: nút **"Lưu chuyến"** + **"Xóa chuyến"**.
 - **Dropdown đại lý** (`optDaiLy`): dòng phụ dưới tên gộp `code · billingName · phone · address` ngăn bởi **" – "** (`moTaDaiLy`), lọc bỏ ô rỗng; chuỗi này vừa hiển thị vừa nằm trong bộ tìm của `Combobox` (tìm theo số điện thoại / tên hóa đơn được).
+- **Khối "Xe và ghi chú của chuyến" (tài xế · biển số · ghi chú · SSCC · mã lô) mở SẴN** (`moPhuPhien` khởi tạo `true`, `moThem`/`moSuaChuyen` cũng set `true`) — không bắt buộc nhưng hầu hết chuyến đều có tài xế/biển số nên khỏi phải bấm mở mỗi lần.
 
 ### 2. Hai ngày — đừng bao giờ lẫn
 
@@ -79,7 +81,7 @@ Dòng `nhap_nguyen_lieu.ngay` là **bản chép của `ngayGiao`** để tổng 
 
 Trên UI hai ô này đứng cùng hàng, **"Ngày ghi sổ" đặt trước, "Ngày hàng về xưởng" đặt sau** (theo thứ tự thao tác: mở sổ hôm nay rồi mới chọn ngày hàng thật về). Câu diễn giải dài gom vào nút **ⓘ** cạnh nhãn (`DateField info` → pattern `InfoTip`) để hai ô cùng chiều cao, không lệch — nhãn tiêu đề vẫn luôn hiện.
 
-**Hai ngày đi liền theo mặc định** (state `ngayLienNhau`): đổi **ngày ghi sổ** thì ngày hàng về **tự nhảy theo** (`doiNgayGhiSo`) — khớp ca thường gặp (hàng về đúng ngày ghi). Chỉ khi người dùng **tự sửa ngày hàng về** (`doiNgayVe`) thì hai ngày mới **tách** (đây là ghi bù) và ô ghi sổ thôi kéo theo. Khởi tạo: `moThem` liền khi ngày xem = hôm nay, tách sẵn khi đang xem ngày cũ; `moSuaChuyen` liền khi `postingDate === deliveryDate` của chuyến.
+**Ngày ghi sổ LUÔN kéo ngày hàng về nhảy theo** (`doiNgayGhiSo` set cả `postingDate` + `deliveryDate` mỗi lần chọn) — chủ động, khớp ca thường gặp (hàng về đúng ngày ghi). Muốn hàng về **ngày khác** (ghi bù) thì **sửa tay ô "Ngày hàng về xưởng"** (`doiNgayVe` chỉ set `deliveryDate`); đổi lại ngày ghi sổ sau đó thì ngày hàng về **vẫn nhảy theo** như thường. *(Bỏ state `ngayLienNhau` cũ: nó tách hai ngày sau lần sửa đầu và bị reset khi bộ lọc trôi ngày → gây bug "chọn ngày ghi sổ lần 2 không nhảy theo".)*
 
 ### 3. Ghi bù
 
@@ -92,6 +94,7 @@ Tình huống thật: hàng về 29/7, 31/7 mới có hóa đơn → `ngayGiao =
 Khóa theo **(ngày + phân xưởng)**, một bản ghi duy nhất mỗi cặp (unique index).
 
 - Chốt xong: khóa sửa/xóa/thêm chuyến thường **và** khóa khối phế liệu của ngày đó.
+- **Còn dòng nhập chưa lưu → nhắc trước khi chốt:** ở "Ghi nhập", nếu còn dòng hợp lệ chưa bấm "Lưu vào sổ" (`coDongChuaLuu = cheDo==="nhap" && dongHopLe.some(d=>!d.id)`), nút "Chốt ngày" mở hộp `nhacLuu` (Lưu vào sổ rồi chốt / Vẫn chốt bỏ dòng đang gõ / Quay lại) thay vì chốt thẳng — kẻo số vừa gõ chưa tính vào tổng chốt (`tongThucTe` chỉ tính dòng đã lưu).
 - Còn đúng hai đường: **ghi bù** (bắt buộc lý do) hoặc **mở lại ngày** (bắt buộc lý do).
 - Mở lại là `daChot = false`, **KHÔNG xóa bản ghi** — giữ vết ai mở, vì sao. Chốt lại thì ghi đè cùng `id` (`tongKgLucChot` cập nhật theo tổng mới).
 - `tongKgLucChot` giữ con số **tại thời điểm chốt**; sau đó ghi bù thì màn hình chỉ ngay `lechSauChot = tổng thực tế − tổng lúc chốt`. Đừng âm thầm đổi con số đã gửi đi.

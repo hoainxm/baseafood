@@ -11,8 +11,9 @@
 --    (Ctrl+H trong SQL editor: __SITE_ID__  →  site-default)
 --
 -- Idempotent: xoá mọi dòng id LIKE 'seed-%' của site này rồi nạp lại → chạy nhiều lần vẫn đúng.
--- 2 dòng "chốt" (NL '2 da nl nhỏ' + TP '2 da luộc 230-250') CỐ Ý không nạp —
---    để nhập LIVE trên sân khấu, xem tổng leo đúng số file. Chi tiết ở kich-ban-demo-live.md.
+-- 2 số "chốt" (phần NHỎ của 'Bạch tuộc 2 da' +16.356 + TP '2 da luộc 230-250') CỐ Ý
+--    không nạp — nhập LIVE trên sân khấu, xem tổng leo đúng số file. Cân đối KHÔNG tách
+--    size: phần nhỏ cộng THẲNG vào dòng "Bạch tuộc 2 da". Chi tiết kich-ban-demo-live.md.
 --
 -- GỠ DEMO: chạy khối "CLEANUP" cuối file.
 -- ============================================================
@@ -79,8 +80,8 @@ INSERT INTO balancing_inputs (id,period_id,group_name,name,quantity_kg,unit_pric
 INSERT INTO balancing_inputs (id,period_id,group_name,name,quantity_kg,unit_price,ratio_percentage,source_warehouse,site_id) VALUES ('seed-in-2','seed-ky-bt2da','Xả đông','x.đ Cò May',13584,157000,NULL,'Mua về','__SITE_ID__');
 INSERT INTO balancing_inputs (id,period_id,group_name,name,quantity_kg,unit_price,ratio_percentage,source_warehouse,site_id) VALUES ('seed-in-3','seed-ky-bt2da','Xả đông','x.đ Tả',5100,157000,NULL,'Mua về','__SITE_ID__');
 INSERT INTO balancing_inputs (id,period_id,group_name,name,quantity_kg,unit_price,ratio_percentage,source_warehouse,site_id) VALUES ('seed-in-4','seed-ky-bt2da','Xả đông','x.đ 2 da lớn',3984,149000,NULL,'Mua về','__SITE_ID__');
-INSERT INTO balancing_inputs (id,period_id,group_name,name,quantity_kg,unit_price,ratio_percentage,source_warehouse,site_id) VALUES ('seed-in-5','seed-ky-bt2da','Thủy sản','2 da nl lớn',23150,145000,NULL,'','__SITE_ID__');
--- [GIỮ LẠI — nhập LIVE] INSERT INTO balancing_inputs (id,period_id,group_name,name,quantity_kg,unit_price,ratio_percentage,source_warehouse,site_id) VALUES ('seed-in-6','seed-ky-bt2da','Thủy sản','2 da nl nhỏ',16356,137737,NULL,'','__SITE_ID__');
+-- Cân đối KHÔNG tách size: MỘT dòng "Bạch tuộc 2 da" (lớn 23.150; nhập LIVE thêm nhỏ 16.356 → 39.506).
+INSERT INTO balancing_inputs (id,period_id,group_name,name,quantity_kg,unit_price,ratio_percentage,source_warehouse,site_id) VALUES ('seed-in-5','seed-ky-bt2da','Thủy sản','Bạch tuộc 2 da',23150,145000,NULL,'','__SITE_ID__');
 INSERT INTO balancing_inputs (id,period_id,group_name,name,quantity_kg,unit_price,ratio_percentage,source_warehouse,site_id) VALUES ('seed-in-7','seed-ky-bt2da','Bột phụ gia','Bột 24v',245,50428,NULL,'','__SITE_ID__');
 INSERT INTO balancing_inputs (id,period_id,group_name,name,quantity_kg,unit_price,ratio_percentage,source_warehouse,site_id) VALUES ('seed-in-8','seed-ky-bt2da','Bột phụ gia','Bột 18v',1481,52497,NULL,'','__SITE_ID__');
 INSERT INTO balancing_inputs (id,period_id,group_name,name,quantity_kg,unit_price,ratio_percentage,source_warehouse,site_id) VALUES ('seed-in-9','seed-ky-bt2da','Bột phụ gia','Bột 27102',670,48540,NULL,'','__SITE_ID__');

@@ -71,8 +71,8 @@ INSERT INTO balancing_inputs (id,period_id,group_name,name,quantity_kg,unit_pric
  ('seed-in-2','seed-ky-bt2da','Xả đông','x.đ Cò May',13584,157000,NULL,'Mua về','bsf1'),
  ('seed-in-3','seed-ky-bt2da','Xả đông','x.đ Tả',5100,157000,NULL,'Mua về','bsf1'),
  ('seed-in-4','seed-ky-bt2da','Xả đông','x.đ 2 da lớn',3984,149000,NULL,'Mua về','bsf1'),
- ('seed-in-5','seed-ky-bt2da','Thủy sản','2 da nl lớn',23150,145000,NULL,'','bsf1'),
- ('seed-in-6','seed-ky-bt2da','Thủy sản','2 da nl nhỏ',16356,137736.55,NULL,'','bsf1'),   -- sửa: khớp thành tiền 2.252.819.000
+ -- Cân đối KHÔNG tách size: lớn + nhỏ gộp 1 dòng "Bạch tuộc 2 da" 39.506 kg, giá bình quân gia quyền.
+ ('seed-in-5','seed-ky-bt2da','Thủy sản','Bạch tuộc 2 da',39506,141993,NULL,'','bsf1'),
  ('seed-in-7','seed-ky-bt2da','Bột phụ gia','Bột 24v',245,50427.86,NULL,'','bsf1'),       -- sửa: khớp 12.354.825
  ('seed-in-8','seed-ky-bt2da','Bột phụ gia','Bột 18v',1481,52496.81,NULL,'','bsf1'),      -- sửa: khớp 77.747.775
  ('seed-in-9','seed-ky-bt2da','Bột phụ gia','Bột 27102',670,48540,NULL,'','bsf1'),

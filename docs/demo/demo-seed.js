@@ -68,8 +68,9 @@
     ["x.đ Cò May", "Xả đông", 13584, 157000, "Mua về"],
     ["x.đ Tả", "Xả đông", 5100, 157000, "Mua về"],
     ["x.đ 2 da lớn", "Xả đông", 3984, 149000, "Mua về"],
-    ["2 da nl lớn", "Thủy sản", 23150, 145000, ""],
-    ["2 da nl nhỏ", "Thủy sản", 16356, 137737, ""],
+    // Cân đối KHÔNG tách size: 2 da lớn (23.150) + nhỏ (16.356) gộp 1 dòng
+    // "Bạch tuộc 2 da" 39.506 kg; đơn giá bình quân gia quyền để giữ Giá trị NL.
+    ["Bạch tuộc 2 da", "Thủy sản", 39506, 141993, ""],
     ["Bột 24v", "Bột phụ gia", 245, 50428, ""],
     ["Bột 18v", "Bột phụ gia", 1481, 52497, ""],
     ["Bột 27102", "Bột phụ gia", 670, 48540, ""],

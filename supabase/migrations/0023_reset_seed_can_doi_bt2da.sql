@@ -75,8 +75,9 @@ INSERT INTO balancing_inputs (id,period_id,group_name,name,quantity_kg,unit_pric
  ('seed-in-2','seed-ky-bt2da','Xả đông','x.đ Cò May',13584,157000,NULL,'Mua về','{"2026-07-21": 13584}','bsf1'),
  ('seed-in-3','seed-ky-bt2da','Xả đông','x.đ Tả',5100,157000,NULL,'Mua về','{"2026-07-21": 5100}','bsf1'),
  ('seed-in-4','seed-ky-bt2da','Xả đông','x.đ 2 da lớn',3984,149000,NULL,'Mua về','{"2026-07-21": 3984}','bsf1'),
- ('seed-in-5','seed-ky-bt2da','Thủy sản','2 da nl lớn',23150,145000,NULL,'','{"2026-07-21": 23150}','bsf1'),
- ('seed-in-6','seed-ky-bt2da','Thủy sản','2 da nl nhỏ',16356,137736.55,NULL,'','{"2026-07-21": 16356}','bsf1'),
+ -- Cân đối KHÔNG tách size: 2 da lớn (23.150) + nhỏ (16.356) gộp 1 dòng "Bạch tuộc 2 da"
+ -- 39.506 kg; đơn giá bình quân gia quyền để giữ nguyên Giá trị NL (khớp thành tiền cũ).
+ ('seed-in-5','seed-ky-bt2da','Thủy sản','Bạch tuộc 2 da',39506,141993,NULL,'','{"2026-07-21": 39506}','bsf1'),
  ('seed-in-7','seed-ky-bt2da','Bột phụ gia','Bột 24v',245,50427.86,NULL,'','{"2026-07-21": 245}','bsf1'),
  ('seed-in-8','seed-ky-bt2da','Bột phụ gia','Bột 18v',1481,52496.81,NULL,'','{"2026-07-21": 1481}','bsf1'),
  ('seed-in-9','seed-ky-bt2da','Bột phụ gia','Bột 27102',670,48540,NULL,'','{"2026-07-21": 670}','bsf1'),

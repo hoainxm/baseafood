@@ -5,7 +5,7 @@
 // ============================================================
 import * as React from "react";
 import { cn } from "@/lib/utils";
-import { dinhDangSo, parseSo } from "./NumberField";
+import { dinhDangSo, parseSo, parseSoHoacBieuThuc } from "./NumberField";
 
 /**
  * LuoiNhap — lưới nhập liệu thay cho "mở hộp thoại, điền, bấm lưu" từng dòng.
@@ -367,7 +367,8 @@ function OLuoi({
       onChange={(e) => {
         setTho(e.target.value);
         const s = e.target.value.trim();
-        onGhi(s === "" ? null : parseSo(s));
+        // Hiểu cả biểu thức "1+2" → 3 (tính ngay khi biểu thức đủ hợp lệ).
+        onGhi(s === "" ? null : parseSoHoacBieuThuc(s));
       }}
       onFocus={(e) => {
         setTho(giaTri == null || giaTri === 0 ? "" : String(giaTri).replace(".", ","));

@@ -72,7 +72,7 @@ INSERT INTO products (id,code,name,finished_good_code,category,site_id) VALUES (
 INSERT INTO products (id,code,name,finished_good_code,category,site_id) VALUES ('seed-prod-21','','2 da ncls','','Bạch tuộc','__SITE_ID__');
 
 -- ---------- Kỳ cân đối ----------
-INSERT INTO balancing_periods (id,material_type_name,date_range_description,start_date,end_date,total_input_kg,exchange_rate,processing_cost_per_kg,created_at,site_id) VALUES ('seed-ky-bt2da','Bạch tuộc 2 da','21/07/2025 – 25/07/2025','2025-07-21','2025-07-25',63926,26000,30000,'2025-07-26T02:00:00.000Z','__SITE_ID__');
+INSERT INTO balancing_periods (id,material_type_name,date_range_description,start_date,end_date,total_input_kg,exchange_rate,processing_cost_per_kg,created_at,site_id) VALUES ('seed-ky-bt2da','Bạch tuộc 2 da','21/07/2026 – 25/07/2026','2026-07-21','2026-07-25',63926,26000,30000,'2026-07-26T02:00:00.000Z','__SITE_ID__');
 
 -- ---------- Khối 1: Nguyên liệu vào (giữ lại 1 dòng chốt) ----------
 INSERT INTO balancing_inputs (id,period_id,group_name,name,quantity_kg,unit_price,ratio_percentage,source_warehouse,site_id) VALUES ('seed-in-1','seed-ky-bt2da','Thủy sản','Bán nội địa',-987,145000,NULL,'','__SITE_ID__');
@@ -114,7 +114,7 @@ INSERT INTO balancing_outputs (id,period_id,product_id,customer_id,channel,quant
 INSERT INTO balancing_outputs (id,period_id,product_id,customer_id,channel,quantity_kg,unit_price,spec,sales_item_id,site_id) VALUES ('seed-out-24','seed-ky-bt2da','seed-prod-21','','Xuất khẩu',2218,6.55,'','','__SITE_ID__');
 
 -- ---------- Khối 2: Phế liệu (1 dòng) ----------
-INSERT INTO scraps (id,period_id,name,quantity_kg,selling_price,date,workshop,source,site_id) VALUES ('seed-scrap-1','seed-ky-bt2da','Nội tạng bạch tuộc',820,9000,'2025-07-23','Đông','Cân đối','__SITE_ID__');
+INSERT INTO scraps (id,period_id,name,quantity_kg,selling_price,date,workshop,source,site_id) VALUES ('seed-scrap-1','seed-ky-bt2da','Nội tạng bạch tuộc',820,9000,'2026-07-23','Đông','Cân đối','__SITE_ID__');
 
 -- ---------- Nhập nguyên liệu: 2 chuyến (ngày = hôm demo) ----------
 INSERT INTO import_shipments (id,delivery_date,posting_date,backdate_reason,workshop,supplier_name,driver_name,license_plate,note,site_id) VALUES ('seed-sh-1',CURRENT_DATE,CURRENT_DATE,'','Đông','Bê 3','','','Demo — đại lý Bê 3','__SITE_ID__');

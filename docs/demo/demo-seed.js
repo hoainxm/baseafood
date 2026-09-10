@@ -57,9 +57,9 @@
 
   // --- Kỳ cân đối (bản sao "Bảng cân đối bạch tuộc 2 da" — kỳ 21-25/07) ---
   put("bsf.balancing-periods.v2", [{
-    id: PID, materialTypeName: "Bạch tuộc 2 da", dateRangeDescription: "21/07/2025 – 25/07/2025",
-    startDate: "2025-07-21", endDate: "2025-07-25", totalInputKg: 63926,
-    exchangeRate: 26000, processingCostPerKg: 30000, createdAt: "2025-07-26T02:00:00.000Z",
+    id: PID, materialTypeName: "Bạch tuộc 2 da", dateRangeDescription: "21/07/2026 – 25/07/2026",
+    startDate: "2026-07-21", endDate: "2026-07-25", totalInputKg: 63926,
+    exchangeRate: 26000, processingCostPerKg: 30000, createdAt: "2026-07-26T02:00:00.000Z",
   }]);
 
   // Khối 1 — Nguyên liệu vào (11 dòng). Đơn giá = tiền/kg từ file giấy.
@@ -100,7 +100,7 @@
   // Khối 2 — Phế liệu (1 dòng minh hoạ)
   put("bsf.scraps.v2", [{
     id: "seed-scrap-1", periodId: PID, name: "Nội tạng bạch tuộc", quantityKg: 820,
-    sellingPrice: 9000, date: "2025-07-23", workshop: "Đông", source: "Cân đối",
+    sellingPrice: 9000, date: "2026-07-23", workshop: "Đông", source: "Cân đối",
   }]);
 
   // --- Nhập nguyên liệu: 2 chuyến hôm nay (kg thật từ báo cáo ngày) ---

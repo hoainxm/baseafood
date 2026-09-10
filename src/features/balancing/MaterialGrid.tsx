@@ -333,11 +333,18 @@ export function LuoiNguyenLieu({
           {chanDoanNhap.chuaGan === 0 && " Bấm “Chọn dòng nhập” để tự tick dòng thuộc kỳ này."}
         </p>
       )}
-      {chanDoanNhap.tongTrongKhoang === 0 && ngay.length > 0 && hangNL.length === 0 && (
+      {/* Sổ nhập TRỐNG trong khoảng ngày ⇒ luôn nói rõ, KỂ CẢ khi kỳ đã có dòng
+          (dòng cũ/seed rỗng). Trước đây chặn thêm `hangNL.length === 0` nên kỳ có
+          sẵn dòng rỗng thì lưới đầy ô "—" mà không một lời giải thích — đúng lúc
+          người dùng cần biết "mình khai nhầm NGÀY" nhất (vd kỳ 2025, sổ nhập 2026). */}
+      {chanDoanNhap.tongTrongKhoang === 0 && ngay.length > 0 && (
         <p className="mb-3 rounded-lg bg-warning-surface px-4 py-3 text-base text-warning">
-          Sổ nhập hàng không có chuyến nào trong khoảng ngày của kỳ. Kỳ lọc theo{" "}
-          <strong>ngày hàng về xưởng</strong>, không phải ngày ghi sổ — hàng ghi bù thì
-          ngày hàng về mới là ngày tính vào kỳ.
+          Sổ nhập hàng không có chuyến nào trong khoảng ngày của kỳ{" "}
+          <strong>
+            {nhanNgay(ngay[0])}–{nhanNgay(ngay[ngay.length - 1])}
+          </strong>
+          . Kiểm lại <strong>ngày của kỳ</strong> (kỳ lọc theo ngày hàng về xưởng,
+          không phải ngày ghi sổ) — hoặc ghi ở màn Nhập hàng.
         </p>
       )}
 

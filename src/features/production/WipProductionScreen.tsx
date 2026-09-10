@@ -1486,7 +1486,8 @@ function BangDongSX({
   }));
 
   return (
-    <div className="space-y-4">
+    // data-luoi-phim: khung điều hướng ↑/↓/Enter theo cột cho các ô số (navCol).
+    <div className="space-y-4" data-luoi-phim>
       {nhomKeys.map((gid) => {
         const rows = nhomRows.get(gid)!;
         const info = { pt: rows[0].processingType, cust: rows[0].customerName };
@@ -1597,6 +1598,7 @@ function BangDongSX({
                             ) : (
                               <NumberField
                                 anNhan
+                                navCol="sl"
                                 label="Số lượng"
                                 required
                                 unit="kg"
@@ -1612,6 +1614,7 @@ function BangDongSX({
                               <NumberField
                                 anNhan
                                 anNhanBatBuoc
+                                navCol="block"
                                 label="Số block"
                                 unit="block"
                                 className="min-w-[5.5rem] flex-1"
@@ -1634,6 +1637,7 @@ function BangDongSX({
                               <NumberField
                                 anNhan
                                 anNhanBatBuoc
+                                navCol="quycach"
                                 label="Quy cách kg/khối"
                                 unit="kg/khối"
                                 className="min-w-[6rem] flex-1"
@@ -1678,6 +1682,7 @@ function BangDongSX({
                                 <NumberField
                                   label="Râu"
                                   unit="kg"
+                                  navCol="rau"
                                   className="min-w-[8rem] flex-1"
                                   value={d.rauKg || null}
                                   onChange={(v) =>
@@ -1687,6 +1692,7 @@ function BangDongSX({
                                 <NumberField
                                   label="Bao tử"
                                   unit="kg"
+                                  navCol="baotu"
                                   className="min-w-[8rem] flex-1"
                                   value={d.baoTuKg || null}
                                   onChange={(v) =>

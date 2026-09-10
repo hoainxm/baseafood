@@ -1,5 +1,5 @@
 -- ============================================================
--- seed_bt2da_supabase.sql — Cân đối Bạch tuộc 2 da (kỳ 21–25/07/2025) LÊN SUPABASE
+-- seed_bt2da_supabase.sql — Cân đối Bạch tuộc 2 da (kỳ 21–25/07/2026) LÊN SUPABASE
 -- ------------------------------------------------------------
 -- Bản ĐẦY ĐỦ (24 dòng TP + 11 dòng NL, KHÔNG bỏ dòng nào) + ĐÃ SỬA 3 đơn giá NL
 -- để khớp bảng giấy: Lãi ≈ 242.346.204 đ (lệch ~14 đ do đơn giá làm tròn 2 số lẻ).
@@ -63,7 +63,7 @@ INSERT INTO products (id,code,name,finished_good_code,category,site_id) VALUES
 
 -- ---------- Kỳ cân đối ----------
 INSERT INTO balancing_periods (id,material_type_name,date_range_description,start_date,end_date,total_input_kg,exchange_rate,processing_cost_per_kg,created_at,site_id)
-VALUES ('seed-ky-bt2da','Bạch tuộc 2 da','21/07/2025 – 25/07/2025','2025-07-21','2025-07-25',63926.3,26000,30000,'2025-07-26T02:00:00.000Z','bsf1');
+VALUES ('seed-ky-bt2da','Bạch tuộc 2 da','21/07/2026 – 25/07/2026','2026-07-21','2026-07-25',63926.3,26000,30000,'2026-07-26T02:00:00.000Z','bsf1');
 
 -- ---------- Khối 1: Nguyên liệu vào (11 dòng — ĐỦ; giá dòng 6/7/8 đã sửa khớp giấy) ----------
 INSERT INTO balancing_inputs (id,period_id,group_name,name,quantity_kg,unit_price,ratio_percentage,source_warehouse,site_id) VALUES

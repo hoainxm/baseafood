@@ -210,6 +210,21 @@ Luật khi dùng:
 - Dòng tiêu đề nhóm: `HangLuoi.tieuDeNhom`. Dòng tổng cuối bảng tự dựng ở màn
   gọi qua `cuoiBang` (số cột phải khớp, kể cả khi nhóm cột đang thu).
 
+### 5d. Ô số: nhập biểu thức + điều hướng phím kiểu Excel
+
+**Biểu thức số học.** `NumberField` và ô lưới `LuoiNhap` hiểu cả biểu thức: gõ
+`250+300` ra `550`, `(3+4)*2` ra `14`, `1.000+250` ra `1250`. Chỉ `+ − * / ( )`;
+tính bằng `parseSoHoacBieuThuc` (trong `NumberField.tsx`) — tự tách token, **không
+`eval`**, chia 0 → bỏ. Số theo vi-VN như cũ (`.` phân nghìn, `,` thập phân), nên
+`-5` hay `1.234,5` vẫn là số thường. Đặt MỘT chỗ ở `NumberField`/`OLuoi` nên phủ
+mọi màn có ô số — màn KHÔNG cần tự parse.
+
+**Điều hướng ↑/↓/Enter theo cột** cho **bảng số TỰ DỰNG** (không qua `LuoiNhap`,
+VD `WipProductionScreen › BangDongSX`): bọc bảng trong `[data-luoi-phim]`, mỗi
+`NumberField` khai `navCol="<tên cột>"`. ↑/↓/Enter nhảy dọc trong cùng cột (theo
+thứ tự DOM, tự bỏ ô ẩn của dòng chưa mở); Tab để trình duyệt lo đi ngang. `LuoiNhap`
+đã có sẵn nav đầy đủ (§ 5b) — `navCol` chỉ dành cho bảng dựng tay.
+
 ### 6. Ba cái bẫy làm vỡ trang ở cỡ chữ 130%
 
 1. **Ô lưới không co**: con của `grid`/`flex` mặc định `min-width:auto` = rộng

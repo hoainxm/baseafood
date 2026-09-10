@@ -22,6 +22,7 @@ import {
   ghiNguocSanLuongNgay,
   gomNhapTheoLoai,
   gomSanXuatTheoMatHang,
+  hoNguyenLieu,
   khoaMatHang,
   chuyenKyChoNhan,
   chuyenNhapTheoNgay,
@@ -267,8 +268,11 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
         tatCaNhap.map((r) => (bo.has(r.id) ? { ...r, balancingPeriodId: ky.id } : r))
       );
 
-      /* Mỗi loại NL một dòng lưới; loại đã có dòng thì giữ nguyên. */
-      const daCo = new Set(nlVao.filter((r) => r.autoSource === "imports").map((r) => r.name));
+      /* Mỗi HỌ nguyên liệu một dòng lưới (lớn/nhỏ gộp chung); họ đã có dòng thì
+         giữ nguyên. gomNhapTheoLoai trả key theo họ nên so theo họ. */
+      const daCo = new Set(
+        nlVao.filter((r) => r.autoSource === "imports").map((r) => hoNguyenLieu(r.name))
+      );
       const them: BalancingInputItem[] = [];
       for (const [loai, o] of gomNhapTheoLoai([...nhapDaGan, ...chon])) {
         if (daCo.has(loai)) continue;
@@ -308,8 +312,10 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
       const them: MaterialImportItem[] = [];
       let hienTai = nhapDaGan;
       for (const o of dsO) {
+        // Dòng lưới mang tên HỌ (lớn/nhỏ gộp) ⇒ tìm chuyến nhập theo HỌ; sửa ô
+        // ngày gộp sẽ chỉnh chuyến size cuối cùng của ngày cho khớp tổng.
         const trongNgay = hienTai.filter(
-          (r) => r.materialTypeName === o.khoa && r.deliveryDate === o.ngay
+          (r) => hoNguyenLieu(r.materialTypeName) === o.khoa && r.deliveryDate === o.ngay
         );
         const kq = ghiNguocNhapNgay(trongNgay, o.kg);
         if (kq.loai === "tuChoi") {
@@ -321,7 +327,7 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
           hienTai = hienTai.map((r) => (r.id === kq.id ? { ...r, quantityKg: kq.kg } : r));
         } else {
           if (kq.kg === 0) continue;
-          const mau = nhapDaGan.find((r) => r.materialTypeName === o.khoa);
+          const mau = nhapDaGan.find((r) => hoNguyenLieu(r.materialTypeName) === o.khoa);
           const moi: MaterialImportItem = {
             id: uid(),
             shipmentId: "",
@@ -329,7 +335,9 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
             workshop: mau?.workshop ?? "Đông",
             category: mau?.category ?? "Khác",
             supplierName: mau?.supplierName ?? "",
-            materialTypeName: o.khoa,
+            // Giữ tên size của chuyến mẫu để sổ Nhập hàng vẫn có size; chưa có mẫu
+            // (thêm ngày mới) thì đành dùng tên họ.
+            materialTypeName: mau?.materialTypeName ?? o.khoa,
             quantityKg: kq.kg,
             unitPrice: mau?.unitPrice ?? null,
             driverName: "",

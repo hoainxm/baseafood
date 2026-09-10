@@ -132,17 +132,31 @@ export interface HangLuoiNL {
 export function gomNhapTheoLoai(
   rows: MaterialImportItem[]
 ): Map<string, { theoNgay: DailyQuantities; ids: string[]; donGia: number | null }> {
-  const ra = new Map<string, { theoNgay: DailyQuantities; ids: string[]; donGia: number | null }>();
+  /* GỘP theo HỌ nguyên liệu: "Bạch tuộc 2 da lớn (80↑)" + "… nhỏ (80↓)" gom về
+     MỘT dòng "Bạch tuộc 2 da" — chốt với chủ dự án: cân đối KHÔNG tách size, gộp
+     chung. Sổ Nhập hàng vẫn ghi tên có size (truy nguyên); chỉ khi ĐƯA VÀO cân
+     đối mới gộp. Tên không có mốc 80↑/↓ giữ nguyên (hoNguyenLieu không cắt). */
+  const ra = new Map<
+    string,
+    { theoNgay: DailyQuantities; ids: string[]; donGia: number | null; tenNguon: Set<string> }
+  >();
   for (const r of rows) {
-    const k = r.materialTypeName || "(chưa ghi loại)";
-    const o = ra.get(k) ?? { theoNgay: {}, ids: [], donGia: null };
+    const k = hoNguyenLieu(r.materialTypeName || "") || "(chưa ghi loại)";
+    const o = ra.get(k) ?? { theoNgay: {}, ids: [], donGia: null, tenNguon: new Set<string>() };
     o.theoNgay[r.deliveryDate] = (o.theoNgay[r.deliveryDate] ?? 0) + r.quantityKg;
     o.ids.push(r.id);
-    /* Đơn giá gợi ý = giá của dòng gần nhất có giá; kế toán vẫn sửa tay được. */
+    o.tenNguon.add(r.materialTypeName || "");
     if (r.unitPrice != null) o.donGia = r.unitPrice;
     ra.set(k, o);
   }
-  return ra;
+  /* Gộp NHIỀU size giá khác nhau (lớn vs nhỏ) ⇒ ĐỂ TRỐNG đơn giá cho kế toán gõ
+     MỘT giá chung (chốt) — không gợi ý bừa giá của một size. Một nguồn ⇒ giữ giá
+     gợi ý như cũ. */
+  const out = new Map<string, { theoNgay: DailyQuantities; ids: string[]; donGia: number | null }>();
+  for (const [k, o] of ra) {
+    out.set(k, { theoNgay: o.theoNgay, ids: o.ids, donGia: o.tenNguon.size > 1 ? null : o.donGia });
+  }
+  return out;
 }
 
 export interface HangLuoiTP {
@@ -191,7 +205,9 @@ export function dungHangNL(
   const theoLoai = gomNhapTheoLoai(nhapDaGan);
   return inputs.map((r) => {
     const tuSoNhap = r.autoSource === "imports";
-    const nguon = tuSoNhap ? theoLoai.get(r.name) : undefined;
+    // Tra theo HỌ: gom nhập keyed theo họ, dòng lưới có thể mang tên họ (hút mới)
+    // hoặc tên size cũ ⇒ chuẩn hoá r.name về họ khi tra.
+    const nguon = tuSoNhap ? theoLoai.get(hoNguyenLieu(r.name)) : undefined;
     const theoNgay = nguon ? nguon.theoNgay : (r.dailyQuantities ?? {});
     const chuyenKy = r.carryOverKg ?? 0;
     return {

@@ -255,22 +255,6 @@ export function tinhSoTonNL(
   });
 }
 
-export interface TongSoTonNL {
-  tonDau: number;
-  dongGui: number;
-  conDoSX: number;
-  xaDong: number;
-  tonCuoi: number;
-  nhapTuoi: number;
-  soHo: number; // số họ nguyên liệu
-  soCanhBao: number; // số kỳ tồn âm
-}
-
-/**
- * Cộng gộp cho thẻ Thống kê. Tồn đầu/cuối cộng theo HỌ nguyên liệu (mỗi họ lấy
- * kỳ sớm nhất cho tồn đầu, muộn nhất cho tồn cuối) — không cộng dồn từng kỳ,
- * tránh đếm hai lần phần đã kế thừa.
- */
 /* ============================================================
  * TỒN NL "TỔNG" theo NHẬP HÀNG (2026-09-11, PA-a) — khác engine kỳ ở trên.
  *
@@ -354,64 +338,69 @@ export function tinhTonNLTong(
     dongXa.set(k, cur);
   }
 
-  // Tập họ NL: từ nhập hàng + tồn đầu khai tay + kỳ (đều lọc xưởng).
+  // Gom theo HỌ NL bằng MỘT lượt qua opening + MỘT lượt qua imports (thay vì lọc
+  // toàn bộ imports 3 lần/mỗi họ). Khoá gom = hoNguyenLieu(tên).toLowerCase() —
+  // đúng bằng cách `cungHoNguyenLieu` so khớp trước đây.
   const dsHo = new Map<string, string>(); // key(lower) → tên họ hiển thị
-  const themHo = (ten: string) => {
+  const themHo = (ten: string): string => {
     const h = hoNguyenLieu(ten);
     if (h) dsHo.set(h.toLowerCase(), h);
+    return h;
   };
-  for (const r of imports) if (dungXuong(r.workshop)) themHo(r.materialTypeName);
-  for (const o of opening) if (dungXuong(o.workshop)) themHo(o.materialTypeName);
+
+  // Baseline-MỘT-LẦN theo họ: openTruoc (tồn đầu khai tay ≤ đầu kỳ) + mốc asOfDate
+  // mới nhất. Nhập TRƯỚC mốc coi như đã nằm trong tồn đầu ⇒ không cộng lại.
+  const openByHo = new Map<string, { open: number; moc: string }>();
+  for (const o of opening) {
+    if (!dungXuong(o.workshop)) continue;
+    const ho = themHo(o.materialTypeName);
+    if (!ho) continue;
+    if (o.asOfDate && o.asOfDate > tu) continue; // chỉ baseline ≤ đầu kỳ
+    const k = ho.toLowerCase();
+    const cur = openByHo.get(k) ?? { open: 0, moc: "" };
+    cur.open += o.quantityKg || 0;
+    if (o.asOfDate && o.asOfDate > cur.moc) cur.moc = o.asOfDate;
+    openByHo.set(k, cur);
+  }
+
+  // Nhập theo họ: tách trước-kỳ / trong-kỳ, LỌC baseline; đồng thời gom nhập theo
+  // ngày (chỉ phần đã qua baseline ⇒ tồn theo ngày khớp Σ tồn theo họ).
+  const nhapByHo = new Map<string, { truoc: number; ky: number }>();
+  const nhapNgay = new Map<string, number>();
+  for (const r of imports) {
+    if (!dungXuong(r.workshop)) continue;
+    const ho = themHo(r.materialTypeName);
+    if (!ho) continue;
+    const k = ho.toLowerCase();
+    const moc = openByHo.get(k)?.moc ?? "";
+    if (moc && r.deliveryDate < moc) continue; // trước baseline → đã trong tồn đầu
+    const kg = r.quantityKg || 0;
+    const cur = nhapByHo.get(k) ?? { truoc: 0, ky: 0 };
+    if (r.deliveryDate < tu) cur.truoc += kg;
+    else if (r.deliveryDate <= den) {
+      cur.ky += kg;
+      nhapNgay.set(r.deliveryDate, (nhapNgay.get(r.deliveryDate) ?? 0) + kg);
+    }
+    nhapByHo.set(k, cur);
+  }
+
+  // Họ chỉ có ở kỳ (đông gửi/xả đông) cũng phải hiện.
   for (const r of kyRows) dsHo.set(r.hoNL.toLowerCase(), r.hoNL);
 
   const theoHo: TonNLTongHo[] = [];
   for (const [k, hoNL] of dsHo) {
-    const cungHo = (ten: string) => cungHoNguyenLieu(ten, hoNL);
-    // Baseline-MỘT-LẦN (chốt 2026-09-11): "Tồn đầu" là số dư CHỐT tại mốc asOfDate
-    // (mới nhất ≤ đầu kỳ) của họ — nghĩa là mọi chuyến nhập TRƯỚC mốc đó ĐÃ nằm
-    // trong số tồn đầu, KHÔNG cộng lại (chống đếm đôi). Nhập TỪ mốc đó trở đi (≥)
-    // mới cộng thêm. Không khai tồn đầu (mốc rỗng) ⇒ cộng mọi chuyến nhập.
-    const openApDung = opening.filter(
-      (o) =>
-        dungXuong(o.workshop) &&
-        cungHo(o.materialTypeName) &&
-        (!o.asOfDate || o.asOfDate <= tu),
-    );
-    const openTruoc = openApDung.reduce((s, o) => s + (o.quantityKg || 0), 0);
-    const mocBaseline = openApDung.reduce(
-      (m, o) => (o.asOfDate && o.asOfDate > m ? o.asOfDate : m),
-      "",
-    );
-    const sauBaseline = (d: string) => !mocBaseline || d >= mocBaseline;
-    const nhapTruoc = imports
-      .filter(
-        (r) =>
-          dungXuong(r.workshop) &&
-          cungHo(r.materialTypeName) &&
-          r.deliveryDate < tu &&
-          sauBaseline(r.deliveryDate),
-      )
-      .reduce((s, r) => s + (r.quantityKg || 0), 0);
-    const nhapKy = imports
-      .filter(
-        (r) =>
-          dungXuong(r.workshop) &&
-          cungHo(r.materialTypeName) &&
-          r.deliveryDate >= tu &&
-          r.deliveryDate <= den &&
-          sauBaseline(r.deliveryDate),
-      )
-      .reduce((s, r) => s + (r.quantityKg || 0), 0);
+    const openTruoc = openByHo.get(k)?.open ?? 0;
+    const nh = nhapByHo.get(k) ?? { truoc: 0, ky: 0 };
     const info = dongXa.get(k) ?? { dongGui: 0, xaDong: 0 };
     // Bỏ họ trống trơn (không tồn đầu, không nhập, không đông/xả) khỏi bảng.
-    if (openTruoc === 0 && nhapTruoc === 0 && nhapKy === 0 && info.dongGui === 0 && info.xaDong === 0)
+    if (openTruoc === 0 && nh.truoc === 0 && nh.ky === 0 && info.dongGui === 0 && info.xaDong === 0)
       continue;
-    const tonDau = openTruoc + nhapTruoc;
-    const tonCuoi = tonDau + nhapKy; // − xuất SX(0)
+    const tonDau = openTruoc + nh.truoc;
+    const tonCuoi = tonDau + nh.ky; // − xuất SX(0)
     theoHo.push({
       hoNL,
       tonDau,
-      nhapKy,
+      nhapKy: nh.ky,
       xuatSX: 0,
       tonCuoi,
       dongGui: info.dongGui,
@@ -424,13 +413,7 @@ export function tinhTonNLTong(
 
   const tongTonDau = theoHo.reduce((s, r) => s + r.tonDau, 0);
 
-  // Tồn tổng theo NGÀY: mỗi ngày có nhập → tồn cuối ngày = tồn đầu tổng + Σ nhập ≤ ngày.
-  const nhapNgay = new Map<string, number>();
-  for (const r of imports) {
-    if (!dungXuong(r.workshop)) continue;
-    if (r.deliveryDate < tu || r.deliveryDate > den) continue;
-    nhapNgay.set(r.deliveryDate, (nhapNgay.get(r.deliveryDate) ?? 0) + (r.quantityKg || 0));
-  }
+  // Tồn tổng theo NGÀY: tồn cuối ngày = tồn đầu tổng + Σ nhập (đã qua baseline) ≤ ngày.
   const theoNgay: TonNLTongNgay[] = [...nhapNgay.keys()].sort().reduce<TonNLTongNgay[]>(
     (acc, date) => {
       const nhap = nhapNgay.get(date)!;
@@ -451,30 +434,5 @@ export function tinhTonNLTong(
     tongXaDong: theoHo.reduce((s, r) => s + r.xaDong, 0),
     soHo: theoHo.length,
     soCanhBao: theoHo.filter((r) => r.canhBaoAm).length,
-  };
-}
-
-export function tongSoTonNL(rows: SoTonNLKy[]): TongSoTonNL {
-  const theoHo = new Map<string, SoTonNLKy[]>();
-  for (const r of rows) {
-    const k = r.hoNL.toLowerCase();
-    (theoHo.get(k) ?? theoHo.set(k, []).get(k)!).push(r);
-  }
-  let tonDau = 0;
-  let tonCuoi = 0;
-  for (const ds of theoHo.values()) {
-    const theoNgay = [...ds].sort((a, b) => a.startDate.localeCompare(b.startDate));
-    tonDau += theoNgay[0].tonDau;
-    tonCuoi += theoNgay[theoNgay.length - 1].tonCuoi;
-  }
-  return {
-    tonDau,
-    dongGui: rows.reduce((s, r) => s + r.dongGui, 0),
-    conDoSX: rows.reduce((s, r) => s + r.conDoSX, 0),
-    xaDong: rows.reduce((s, r) => s + r.xaDong, 0),
-    tonCuoi,
-    nhapTuoi: rows.reduce((s, r) => s + r.nhapTuoi, 0),
-    soHo: theoHo.size,
-    soCanhBao: rows.filter((r) => r.canhBaoAm).length,
   };
 }

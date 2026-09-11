@@ -43,6 +43,7 @@ import {
 import { KY_OPT, phamViKy, type KyXem } from "@/lib/periodUtils";
 import {
   tinhTonNLTong,
+  conDoChuaKhopKy,
   type TonNLTongHo,
   type TonNLTongNgay,
 } from "@/lib/inventoryMaterial";
@@ -117,6 +118,12 @@ export default function MaterialNxtScreen() {
   );
 
   const coDongXa = data.tongDongGui > 0 || data.tongXaDong > 0;
+  // Còn dở SX ghi ở ngày KHÔNG có kỳ cân đối nào phủ → không lọt vào cột "Đông gửi"
+  // (info) nào. Gọi tên thay vì để số biến mất (luật "màn tự giải thích").
+  const conDoRot = useMemo(
+    () => conDoChuaKhopKy(periods, locks, { tuNgay: tu, denNgay: den, workshop }),
+    [periods, locks, tu, den, workshop],
+  );
 
   const the: TheThongTin[] = [
     { nhan: "Tồn đầu kỳ", giaTri: `${num(data.tongTonDau)} kg`, so: true, icon: Snowflake, mau: "trung-tinh" },
@@ -333,12 +340,24 @@ export default function MaterialNxtScreen() {
       {/* Chú thích phạm vi — trung thực (nhất là với BGĐ) */}
       <div className="flex flex-wrap items-start gap-3 rounded-xl border-2 border-warning bg-warning/10 p-4">
         <AlertTriangle className="mt-0.5 size-5 shrink-0 text-warning" aria-hidden />
-        <span className="text-base text-warning-foreground">
+        <span className="text-base text-warning">
           <b>Xuất SX chưa được ghi</b> (màn Sản xuất chưa có ô "NL lấy ra sản xuất") nên tạm = 0 —
           tồn hiện là <b>tồn theo nhập, CHƯA trừ phần đưa vào chế biến</b>. Cột "Đông gửi / Xả đông"
           là thông tin kho đông dự trữ (vòng gối đầu ở Cân đối), <b>không cộng vào tồn</b>.
         </span>
       </div>
+
+      {/* Còn dở SX ghi ở ngày không có kỳ cân đối phủ → không hiện ở cột đông gửi
+          info nào. Gọi tên thay vì để số biến mất. */}
+      {conDoRot > 0 && (
+        <div className="flex flex-wrap items-center gap-3 rounded-xl border-2 border-warning bg-warning/10 p-4">
+          <AlertTriangle className="h-5 w-5 shrink-0 text-warning" aria-hidden />
+          <span className="text-base font-semibold text-warning">
+            {num(conDoRot)} kg còn dở SX chưa hiện ở đâu — ghi ở ngày CHƯA có kỳ cân đối nào (cùng
+            họ NL) phủ. Tạo kỳ cân đối phủ ngày đó ở màn Cân đối để phần còn dở vào cột "Đông gửi".
+          </span>
+        </div>
+      )}
 
       {/* Cảnh báo tồn âm — bộ dò lỗi ghi chép */}
       {data.soCanhBao > 0 && (

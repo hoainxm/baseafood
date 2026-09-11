@@ -2,6 +2,7 @@
 covers: src/features/balancing/BalancingScreen.tsx, src/features/balancing/usePeriodGrid.ts, src/features/balancing/MaterialGrid.tsx, src/features/balancing/WipGrid.tsx, src/features/balancing/gridDialogs.tsx, src/features/balancing/BalancingTable.tsx, src/lib/balancingCalc.ts, src/lib/balancingGrid.ts, src/design-system/patterns/EditableGrid.tsx
 last_verified: 2026-09-11
 ttl_days: 90
+<!-- updated: 2026-09-11 — (PA-a chốt chủ dự án) MÀN /nxt-nl ĐỔI CÔNG THỨC: tồn NL suy THẲNG từ NHẬP HÀNG (`inventoryMaterial.ts#tinhTonNLTong` MỚI), dòng theo họ NL, phủ CẢ 3 xưởng, theo NGÀY. `Tồn cuối = Tồn đầu(opening + Σ nhập trước kỳ) + Nhập hàng − Xuất SX(=0, chờ capture NL-xuất ở /wip)`. Đông gửi/xả đông (engine kỳ `tinhSoTonNL` cũ) hạ xuống CỘT THÔNG TIN, KHÔNG cộng vào tồn (tránh đếm đôi leftover). MaterialNxtScreen viết lại (bảng theo ngày + theo họ + cột đông gửi/xả đông info). Verify tay: nhập T8 2.560 + nhập T9 275 = tồn cuối 2.835 (kỳ Tháng 9); mobile 360 bảng cuộn khung riêng; build+lint xanh. `tinhSoTonNL`/`tongSoTonNL` giữ lại làm nguồn info; `conDoChuaKhopKy` hết dùng ở màn. -->
 <!-- re-verified: 2026-09-11 09:00 — §Tồn kho NL: tinhSoTonNL/tongSoTonNL (inventoryMaterial.ts) khớp doc — tồn cuối = tồn đầu + đông gửi(conDoSX>0?conDoSX:tongCarryAm) − xả đông(carryOver>0); "Nhập tươi" (material_imports) CHỈ là cột bối cảnh, KHÔNG vào tồn; MaterialNxtScreen mặc định kỳ=năm, chỉ có dòng khi CÓ kỳ Cân đối. Audit live: 9 chuyến nhập/3 ngày + 0 kỳ ⇒ /nxt-nl = 0 kg (đúng thiết kế period-based, tồn NL không tự cập nhật theo ngày từ nhập hàng). -->
 <!-- re-verified: 2026-09-10 — ngayTrongKy (UTC), nhapHangHopLe/sanXuatHopLe (lọc ngày+họ NL), chanDoanNhap, hútNhapHang/hútSanXuat khớp source; đối chiếu dữ liệu thật: kỳ 2026 khớp 46 chuyến/36 khớp loại. -->
 <!-- updated: 2026-09-10 (e) — NÚT "Gộp cùng loại" (MaterialGrid): gộp MỘT LẦN các dòng nhập tay cùng họ (2 da lớn+nhỏ) → 1 dòng, bình quân gia quyền (Giá trị NL giữ nguyên), atomic + Hoàn tác. CỐ Ý bấm tay — auto-gộp trong useEffect đã BỎ vì đua ghi bất đồng bộ (Supabase) làm cộng đôi (thử ra 62.656 kg / 14,5 tỷ). helper hoGop RIÊNG (không đổi hoNguyenLieu logic hút). Dữ liệu cũ: mở kỳ → bấm nút. -->
@@ -165,16 +166,17 @@ Một cột, hai chiều — **đọc theo dấu**:
 
 Cộng vào Tổng của dòng (`sumGridRow = Σ ngày + chuyển kỳ`) — kiểm chứng trên bảng thật: dòng *2 da luộc 230-250* `258+261+1.785+3.384+5.749+154 = 11.591` khớp cột Lượng.
 
-### Tồn kho nguyên liệu (sổ NXT) — đọc chuyển kỳ, KHÔNG chép số
+### Tồn kho nguyên liệu (sổ NXT) — tồn theo NHẬP HÀNG (PA-a, 2026-09-11)
 
-Cột "Chuyển kỳ" chính là dòng vào/ra của **kho đông dự trữ nguyên liệu**. Màn **Tồn kho NL** (`/nxt-nl`, [`features/reports/MaterialNxtScreen.tsx`](../../src/features/reports/MaterialNxtScreen.tsx)) suy sổ Nhập–Xuất–Tồn nguyên liệu (kg thuần) thẳng từ đây, không thêm bản ghi nhập tay:
+Màn **Tồn kho NL** (`/nxt-nl`, [`features/reports/MaterialNxtScreen.tsx`](../../src/features/reports/MaterialNxtScreen.tsx)) suy sổ Nhập–Xuất–Tồn nguyên liệu (kg thuần) **THẲNG TỪ SỔ NHẬP HÀNG** (`material_imports`), dòng theo **họ NL**, phủ **cả 3 phân xưởng**, xem **theo ngày**. Hàm thuần: [`inventoryMaterial.ts#tinhTonNLTong`](../../src/lib/inventoryMaterial.ts).
 
-- `carryOverKg < 0` (đông gửi) = **NHẬP** vào kho tồn · `carryOverKg > 0` (xả đông/nhận chuyển kỳ) = **XUẤT** khỏi kho tồn.
-- **Còn dở SX → đông gửi (khép vòng G1, mig 0038, HƯỚNG 1 chốt 2026-09-06):** khi chốt ngày SX (`/wip`), tổ trưởng ghi NL chưa chế biến hết đem lưu kho, **tách theo loại NL** (`production_locks.leftover_by_material`). "**Ghi ở Sản xuất là chính**": `dongGui = còn dở SX của kỳ NẾU có; chưa có (dữ liệu cũ) thì mới lấy Chuyển kỳ âm khai tay`. **KHÔNG cộng cả hai** → hết cộng đôi (kế toán khỏi khai Chuyển kỳ âm cho đông gửi; **xả đông = Chuyển kỳ dương vẫn khai bình thường**). `/nxt-nl` hiện MỘT cột "Đông gửi" (kèm nhãn "(SX)" khi lấy từ còn dở SX). Hàm: `conDoSX>0 ? conDoSX : tongCarryAm` ở `inventoryMaterial.tinhSoTonNL`.
-- **Tồn cuối = Tồn đầu + Đông gửi − Xả đông** (Đông gửi đã hoà giải như trên); kỳ sau kế thừa tồn cuối kỳ trước (chuỗi theo `hoNguyenLieu`). Kỳ đầu tiên của mỗi họ lấy tồn đầu từ bảng `material_opening_stock` (khai tay, migration `0022`).
-- **Tồn cuối < 0** = xả đông nhiều hơn số đang trữ ⇒ chắc chắn sai ghi chép; màn gọi tên (badge + banner đỏ), đúng luật "màn tự giải thích".
-- Hàm thuần: [`lib/inventoryMaterial.ts`](../../src/lib/inventoryMaterial.ts) (`tinhSoTonNL` / `tongSoTonNL`) — quy tắc chính xác nằm DUY NHẤT ở đây, **phải đối chiếu tay với số thật** (bạch tuộc 2 da 21–25/07) trước khi tin.
-- "Nhập tươi" (từ `material_imports`) đi kèm làm bối cảnh để phủ toàn bộ NL mỗi ngày; phần lớn chế biến ngay nên không đọng thành tồn — chỉ phần cấp đông (đông gửi) mới ở lại kho.
+- **Công thức (PA-a):** `Tồn cuối = Tồn đầu + Nhập hàng − Xuất SX`.
+  - **Tồn đầu kỳ** = `material_opening_stock` (khai tay, mốc ≤ đầu kỳ, mig `0022`) **+ Σ nhập hàng TRƯỚC kỳ** ⇒ số dư chạy tới đầu khoảng đang xem.
+  - **Nhập** = Σ nhập hàng trong kỳ (mọi chuyến).
+  - **Xuất SX = 0** (cột chờ) — "NL lấy ra sản xuất" CHƯA capture ở màn Sản xuất (quyết định giản lược `/wip` 2026-08-25). Tồn hiện là "tồn theo nhập, chưa trừ xuất"; màn có banner nói rõ. Khi có capture NL-xuất → cột này ra số, tồn thành tồn thật.
+- **Đông gửi / Xả đông = CỘT THÔNG TIN, KHÔNG vào tổng** (PA-a — tránh đếm đôi: leftover cấp đông vốn đã nằm trong nhập hàng; xả đông kho mình cũng đã đếm khi nhập). Số này đọc lại từ engine kỳ `tinhSoTonNL` (đông gửi = `conDoSX>0 ? conDoSX : tongCarryAm`; xả đông = `tongCarryDuong`, `carryOverKg>0`) và chỉ hiển thị bên cạnh làm tham khảo vòng gối đầu.
+- **Tồn cuối < 0** = badge "Tồn âm" + banner (sai ghi chép), đúng luật "màn tự giải thích".
+- ⚠️ Engine kỳ cũ `tinhSoTonNL` (`Tồn cuối = Tồn đầu + Đông gửi − Xả đông`, theo KỲ × họ NL, chỉ xưởng Đông) **VẪN CÒN** — nay chỉ dùng làm nguồn 2 cột thông tin đông gửi/xả đông cho `tinhTonNLTong`, không còn là công thức tồn chính. `conDoChuaKhopKy` không còn hiển thị.
 
 ### Ngày trong kỳ — bẫy múi giờ
 

@@ -1,7 +1,7 @@
 // ============================================================
 // Tên file: src/features/reports/MaterialNxtScreen.tsx
-// Tên tiếng Việt: Báo cáo Nhập–Xuất–Tồn kho nguyên liệu (kho đông dự trữ)
-// Description: Raw-material inventory (frozen reserve) NXT report screen
+// Tên tiếng Việt: Báo cáo Nhập–Xuất–Tồn kho nguyên liệu
+// Description: Raw-material inventory (Nhập–Xuất–Tồn) report screen
 // ============================================================
 import { useMemo, useState } from "react";
 import {
@@ -42,10 +42,9 @@ import {
 } from "@/lib/catalogRepo";
 import { KY_OPT, phamViKy, type KyXem } from "@/lib/periodUtils";
 import {
-  tinhSoTonNL,
-  tongSoTonNL,
-  conDoChuaKhopKy,
-  type SoTonNLKy,
+  tinhTonNLTong,
+  type TonNLTongHo,
+  type TonNLTongNgay,
 } from "@/lib/inventoryMaterial";
 import { num, viDate } from "@/lib/format";
 import { uid } from "@/lib/db";
@@ -53,8 +52,7 @@ import type { MaterialOpeningStock, Workshop } from "@/types";
 import {
   AlertTriangle,
   ArrowDownToLine,
-  ArrowUpFromLine,
-  CalendarRange,
+  CalendarDays,
   PackagePlus,
   Scale,
   Snowflake,
@@ -62,10 +60,10 @@ import {
 } from "lucide-react";
 
 const XUONG_OPT: MucChon[] = [
+  { value: "Tất cả", label: "Tất cả xưởng" },
   { value: "Đông", label: "Đông" },
   { value: "Cá", label: "Cá" },
   { value: "Khô", label: "Khô" },
-  { value: "Tất cả", label: "Tất cả xưởng" },
 ];
 
 interface OpeningForm {
@@ -77,10 +75,14 @@ interface OpeningForm {
 }
 
 /**
- * Báo cáo NXT nguyên liệu — tồn kho nguyên liệu chính là KHO ĐÔNG DỰ TRỮ của
- * vòng gối đầu. Số suy thẳng từ cột "Chuyển kỳ" của Cân đối (đông gửi = nhập kho
- * tồn, xả đông = xuất kho tồn) nên không lệch sổ gốc. Xem lib/inventoryMaterial.ts.
- * Chỉ đọc; ô nhập tay duy nhất là "Tồn đầu" (số dư trước khi số hoá).
+ * Báo cáo Nhập–Xuất–Tồn nguyên liệu. Tồn suy THẲNG từ sổ Nhập hàng (material_imports):
+ *
+ *   Tồn cuối = Tồn đầu + Nhập hàng − Xuất SX
+ *
+ * Xuất SX ("NL lấy ra sản xuất") CHƯA được ghi ở màn Sản xuất nên = 0 (cột chờ) —
+ * tồn hiện là "chưa trừ xuất". Đông gửi / xả đông (vòng gối đầu ở Cân đối) chỉ hiện
+ * làm CỘT THÔNG TIN, KHÔNG cộng vào tồn (tránh đếm đôi — PA-a, chốt 2026-09-11).
+ * Ô nhập tay duy nhất là "Tồn đầu". Xem lib/inventoryMaterial.ts#tinhTonNLTong.
  */
 export default function MaterialNxtScreen() {
   const [periods] = useBalancingPeriods();
@@ -90,11 +92,11 @@ export default function MaterialNxtScreen() {
   const [materialTypes] = useMaterialTypes();
   const [locks] = useProductionLocks();
 
-  const [ky, setKy] = useState<KyXem>("nam");
+  const [ky, setKy] = useState<KyXem>("thang");
   const [moc, setMoc] = useState(homNay());
   const [tuTC, setTuTC] = useState(homNay());
   const [denTC, setDenTC] = useState(homNay());
-  const [xuong, setXuong] = useState<string>("Đông");
+  const [xuong, setXuong] = useState<string>("Tất cả");
   const [tu, den] = phamViKy(ky, moc, tuTC, denTC);
 
   // Dialog tồn đầu
@@ -104,89 +106,86 @@ export default function MaterialNxtScreen() {
 
   const workshop = xuong === "Tất cả" ? undefined : (xuong as Workshop);
 
-  const rows = useMemo(
+  const data = useMemo(
     () =>
-      tinhSoTonNL(periods, inputs, imports, opening, locks, {
+      tinhTonNLTong(periods, inputs, imports, opening, locks, {
         tuNgay: tu,
         denNgay: den,
         workshop,
       }),
     [periods, inputs, imports, opening, locks, tu, den, workshop],
   );
-  const tong = useMemo(() => tongSoTonNL(rows), [rows]);
-  // Còn dở SX ghi ở ngày không có kỳ cân đối nào phủ → rơi ra ngoài tồn, phải gọi tên.
-  const conDoRot = useMemo(
-    () => conDoChuaKhopKy(periods, locks, { tuNgay: tu, denNgay: den, workshop }),
-    [periods, locks, tu, den, workshop],
-  );
+
+  const coDongXa = data.tongDongGui > 0 || data.tongXaDong > 0;
 
   const the: TheThongTin[] = [
-    { nhan: "Tồn đầu kho", giaTri: `${num(tong.tonDau)} kg`, so: true, icon: Snowflake, mau: "trung-tinh" },
-    { nhan: "Đông gửi (+kho)", giaTri: `${num(tong.dongGui)} kg`, so: true, icon: ArrowDownToLine, mau: "brand" },
-    { nhan: "Xả đông (−kho)", giaTri: `${num(tong.xaDong)} kg`, so: true, icon: ArrowUpFromLine, mau: "trung-tinh" },
-    { nhan: "Tồn cuối kho", giaTri: `${num(tong.tonCuoi)} kg`, so: true, icon: Scale, mau: "success" },
+    { nhan: "Tồn đầu kỳ", giaTri: `${num(data.tongTonDau)} kg`, so: true, icon: Snowflake, mau: "trung-tinh" },
+    { nhan: "Nhập trong kỳ", giaTri: `${num(data.tongNhap)} kg`, so: true, icon: ArrowDownToLine, mau: "brand" },
+    { nhan: "Xuất SX (chờ)", giaTri: "0 kg", so: true, icon: Truck, mau: "trung-tinh" },
+    { nhan: "Tồn cuối (chưa trừ SX)", giaTri: `${num(data.tongTonCuoi)} kg`, so: true, icon: Scale, mau: "success" },
   ];
 
-  const cot: CotTong<SoTonNLKy>[] = [
+  // Bảng tồn theo NGÀY (mọi họ gộp) — trục "theo ngày" cho BGĐ.
+  const cotNgay: CotTong<TonNLTongNgay>[] = [
     {
-      key: "ky",
-      header: "Kỳ / họ nguyên liệu",
+      key: "date",
+      header: "Ngày",
+      render: (r) => <span className="font-semibold text-foreground">{viDate(r.date)}</span>,
+    },
+    {
+      key: "nhap",
+      header: "Nhập (kg)",
+      so: true,
+      render: (r) => <span className="font-semibold text-primary">+{num(r.nhap)}</span>,
+      tong: () => num(data.tongNhap),
+    },
+    {
+      key: "xuatSX",
+      header: "Xuất SX (kg)",
+      so: true,
+      render: () => <span className="text-muted-foreground">—</span>,
+      tong: () => "—",
+    },
+    {
+      key: "tonCuoi",
+      header: "Tồn cuối ngày (kg)",
+      so: true,
+      render: (r) => <span className="tnum font-bold text-foreground">{num(r.tonCuoi)}</span>,
+    },
+  ];
+
+  // Bảng tồn theo LOẠI (họ) NL.
+  const cotHo: CotTong<TonNLTongHo>[] = [
+    {
+      key: "hoNL",
+      header: "Loại nguyên liệu",
       render: (r) => (
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="font-semibold text-foreground">{r.hoNL}</span>
-            {r.seedTonDau && <Badge variant="outline">Tồn đầu khai tay</Badge>}
-            {r.canhBaoAm && (
-              <Badge variant="destructive" className="gap-1">
-                <AlertTriangle className="size-icon-sm" aria-hidden />
-                Tồn âm
-              </Badge>
-            )}
-          </div>
-          <div className="text-sm text-muted-foreground">
-            {r.startDate ? `${viDate(r.startDate)} – ${viDate(r.endDate)}` : "Chưa khai ngày"}
-          </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="font-semibold text-foreground">{r.hoNL}</span>
+          {r.seedTonDau && <Badge variant="outline">Tồn đầu khai tay</Badge>}
+          {r.canhBaoAm && (
+            <Badge variant="destructive" className="gap-1">
+              <AlertTriangle className="size-icon-sm" aria-hidden />
+              Tồn âm
+            </Badge>
+          )}
         </div>
       ),
     },
+    { key: "tonDau", header: "Tồn đầu (kg)", so: true, render: (r) => num(r.tonDau), tong: () => num(data.tongTonDau) },
     {
-      key: "tonDau",
-      header: "Tồn đầu (kg)",
+      key: "nhapKy",
+      header: "Nhập (kg)",
       so: true,
-      render: (r) => num(r.tonDau),
-      tong: () => num(tong.tonDau),
+      render: (r) => <span className="font-semibold text-primary">+{num(r.nhapKy)}</span>,
+      tong: () => num(data.tongNhap),
     },
     {
-      key: "nhapTuoi",
-      header: "Nhập tươi (kg)",
+      key: "xuatSX",
+      header: "Xuất SX (kg)",
       so: true,
-      render: (r) => <span className="text-muted-foreground">{num(r.nhapTuoi)}</span>,
-      tong: () => num(tong.nhapTuoi),
-    },
-    {
-      key: "dongGui",
-      header: "Đông gửi +",
-      so: true,
-      render: (r) => (
-        <span className={r.dongGui > 0 ? "font-semibold text-success" : ""}>
-          {r.dongGui > 0 ? `+${num(r.dongGui)}` : "—"}
-          {r.conDoSX > 0 && (
-            <span className="ml-1 text-xs font-medium text-muted-foreground">(SX)</span>
-          )}
-        </span>
-      ),
-      tong: () => num(tong.dongGui),
-    },
-    {
-      key: "xaDong",
-      header: "Xả đông −",
-      so: true,
-      render: (r) => (
-        <span className={r.xaDong > 0 ? "font-semibold text-warning" : ""}>
-          {r.xaDong > 0 ? `−${num(r.xaDong)}` : "—"}
-        </span>
-      ),
-      tong: () => num(tong.xaDong),
+      render: () => <span className="text-muted-foreground">—</span>,
+      tong: () => "—",
     },
     {
       key: "tonCuoi",
@@ -197,7 +196,22 @@ export default function MaterialNxtScreen() {
           {num(r.tonCuoi)}
         </span>
       ),
-      tong: () => num(tong.tonCuoi),
+      tong: () => num(data.tongTonCuoi),
+    },
+    // Cột THÔNG TIN (kho đông dự trữ) — không vào tồn.
+    {
+      key: "dongGui",
+      header: "Đông gửi (kho đông)",
+      so: true,
+      render: (r) => <span className="text-muted-foreground">{r.dongGui > 0 ? num(r.dongGui) : "—"}</span>,
+      tong: () => (data.tongDongGui > 0 ? num(data.tongDongGui) : "—"),
+    },
+    {
+      key: "xaDong",
+      header: "Xả đông (kho đông)",
+      so: true,
+      render: (r) => <span className="text-muted-foreground">{r.xaDong > 0 ? num(r.xaDong) : "—"}</span>,
+      tong: () => (data.tongXaDong > 0 ? num(data.tongXaDong) : "—"),
     },
   ];
 
@@ -252,22 +266,22 @@ export default function MaterialNxtScreen() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-foreground flex items-center gap-2">
-            <Snowflake className="w-8 h-8 text-primary" />
+          <h1 className="flex items-center gap-2 text-2xl font-semibold text-foreground">
+            <Snowflake className="h-8 w-8 text-primary" />
             Tồn kho nguyên liệu (Nhập – Xuất – Tồn)
           </h1>
-          <p className="text-muted-foreground mt-1">
-            Kho đông dự trữ của vòng gối đầu — đông gửi vào kho, xả đông ra dùng kỳ sau. Số suy từ sổ
-            Cân đối, không nhập tay lần hai.
+          <p className="mt-1 text-muted-foreground">
+            Tồn suy thẳng từ sổ Nhập hàng: <b>Tồn cuối = Tồn đầu + Nhập − Xuất SX</b>. Cả 3 phân
+            xưởng, xem theo ngày.
           </p>
         </div>
         <Button variant="outline" onClick={() => setMoTonDau(true)}>
-          <PackagePlus className="w-4 h-4 mr-2" />
+          <PackagePlus className="mr-2 h-4 w-4" />
           Tồn đầu ({openingLoc.length})
         </Button>
       </div>
 
-      {/* Bộ chọn kỳ + phân xưởng (mẫu giống Báo cáo nhập hàng) */}
+      {/* Bộ chọn kỳ + phân xưởng */}
       <div className="flex flex-wrap items-end gap-4">
         <div className="min-w-[12rem]">
           <Combobox
@@ -279,7 +293,7 @@ export default function MaterialNxtScreen() {
             options={KY_OPT}
           />
         </div>
-        <div className="min-w-0 sm:min-w-[16rem] flex-1">
+        <div className="min-w-0 flex-1 sm:min-w-[16rem]">
           {ky === "tuy-chon" ? (
             <DateRangeField
               label="Khoảng ngày"
@@ -316,46 +330,58 @@ export default function MaterialNxtScreen() {
 
       <ThongKe the={the} />
 
-      {/* Cảnh báo tồn âm — bộ dò lỗi ghi chép, không giấu */}
-      {tong.soCanhBao > 0 && (
+      {/* Chú thích phạm vi — trung thực (nhất là với BGĐ) */}
+      <div className="flex flex-wrap items-start gap-3 rounded-xl border-2 border-warning bg-warning/10 p-4">
+        <AlertTriangle className="mt-0.5 size-5 shrink-0 text-warning" aria-hidden />
+        <span className="text-base text-warning-foreground">
+          <b>Xuất SX chưa được ghi</b> (màn Sản xuất chưa có ô "NL lấy ra sản xuất") nên tạm = 0 —
+          tồn hiện là <b>tồn theo nhập, CHƯA trừ phần đưa vào chế biến</b>. Cột "Đông gửi / Xả đông"
+          là thông tin kho đông dự trữ (vòng gối đầu ở Cân đối), <b>không cộng vào tồn</b>.
+        </span>
+      </div>
+
+      {/* Cảnh báo tồn âm — bộ dò lỗi ghi chép */}
+      {data.soCanhBao > 0 && (
         <div className="flex flex-wrap items-center gap-3 rounded-xl border-2 border-destructive bg-destructive/10 p-4">
-          <AlertTriangle className="w-5 h-5 shrink-0 text-destructive" aria-hidden />
+          <AlertTriangle className="h-5 w-5 shrink-0 text-destructive" aria-hidden />
           <span className="text-base font-semibold text-destructive">
-            {tong.soCanhBao} kỳ có tồn cuối ÂM — xả đông nhiều hơn số đang trữ. Kiểm lại đông gửi /
-            xả đông của kỳ đó ở màn Cân đối (số ghi tay có thể sai).
+            {data.soCanhBao} loại có tồn cuối ÂM — kiểm lại tồn đầu / nhập hàng đã ghi đúng chưa.
           </span>
         </div>
       )}
 
-      {/* Còn dở SX ghi nhưng KHÔNG có kỳ cân đối phủ ngày đó → không vào tồn.
-          Gọi tên thay vì để số biến mất (luật "màn tự giải thích"). */}
-      {conDoRot > 0 && (
-        <div className="flex flex-wrap items-center gap-3 rounded-xl border-2 border-warning bg-warning/10 p-4">
-          <AlertTriangle className="w-5 h-5 shrink-0 text-warning" aria-hidden />
-          <span className="text-base font-semibold text-warning">
-            {num(conDoRot)} kg còn dở SX chưa vào tồn — ghi ở ngày CHƯA có kỳ cân đối nào (cùng họ
-            NL) phủ. Tạo kỳ cân đối phủ ngày đó ở màn Cân đối để phần còn dở được cộng vào đông gửi.
-          </span>
-        </div>
-      )}
-
-      {rows.length === 0 ? (
+      {data.soHo === 0 ? (
         <EmptyState
-          icon={CalendarRange}
-          tieuDe="Chưa có kỳ cân đối nào trong khoảng ngày này"
-          moTa={
-            periods.length === 0
-              ? "Tồn kho nguyên liệu suy từ vòng chuyển kỳ của Cân đối. Hãy tạo kỳ cân đối và khai đông gửi / xả đông ở màn Cân đối trước."
-              : "Đổi lại Kỳ báo cáo / phân xưởng, hoặc kiểm ngày bắt đầu của kỳ. Sổ lọc theo ngày kỳ giao nhau với khoảng đang xem."
-          }
+          icon={CalendarDays}
+          tieuDe="Chưa có nhập hàng nào trong khoảng ngày này"
+          moTa="Đổi lại Kỳ báo cáo / phân xưởng, hoặc ghi chuyến nhập ở màn Nhập hàng trước. Có thể khai Tồn đầu để cộng vào tồn."
         />
       ) : (
-        <BangTong
-          rows={rows}
-          cot={cot}
-          getKey={(r) => r.periodId}
-          emptyText="Không có kỳ nào trong khoảng ngày này."
-        />
+        <>
+          {/* Tồn theo NGÀY */}
+          {data.theoNgay.length > 0 && (
+            <section className="space-y-2">
+              <h3 className="text-lg font-semibold text-foreground">Tồn theo ngày</h3>
+              <BangTong
+                rows={data.theoNgay}
+                cot={cotNgay}
+                getKey={(r) => r.date}
+                emptyText="Không có ngày nào có nhập."
+              />
+            </section>
+          )}
+
+          {/* Tồn theo loại NL */}
+          <section className="space-y-2">
+            <h3 className="text-lg font-semibold text-foreground">Tồn theo loại nguyên liệu</h3>
+            <BangTong
+              rows={data.theoHo}
+              cot={cotHo}
+              getKey={(r) => r.hoNL}
+              emptyText="Chưa có loại nguyên liệu nào."
+            />
+          </section>
+        </>
       )}
 
       {/* Dialog quản lý Tồn đầu */}
@@ -364,8 +390,8 @@ export default function MaterialNxtScreen() {
           <DialogHeader>
             <DialogTitle className="text-2xl">Tồn đầu kho nguyên liệu</DialogTitle>
             <DialogDescription className="text-base">
-              Số dư cấp đông dự trữ có sẵn TRƯỚC khi dùng app. Chỉ cần khai cho kỳ đầu tiên của mỗi
-              loại — các kỳ sau tự kế thừa tồn cuối kỳ trước.
+              Số dư nguyên liệu có sẵn TRƯỚC khi dùng app (mốc đầu kỳ). Cộng vào tồn cùng với nhập
+              hàng.
             </DialogDescription>
           </DialogHeader>
 
@@ -424,7 +450,7 @@ export default function MaterialNxtScreen() {
                     onChange={(v) => setForm((f) => (f ? { ...f, materialTypeName: v } : f))}
                     onCreate={(t) => t}
                     options={optLoaiNL}
-                    hint="Chọn hoặc gõ tên loại; gõ đúng tên trong sổ Cân đối để khớp họ."
+                    hint="Chọn hoặc gõ tên loại; gõ đúng tên trong sổ Nhập hàng để khớp họ."
                   />
                   <DateField
                     label="Tồn đầu tính từ ngày"
@@ -476,8 +502,10 @@ export default function MaterialNxtScreen() {
       {/* Chú thích đơn vị + cách đọc */}
       <p className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
         <Truck className="size-icon-sm" aria-hidden />
-        "Nhập tươi" là nguyên liệu về xưởng trong kỳ (bối cảnh, phần lớn chế biến ngay). Kho tồn chỉ
-        cộng/trừ khi <b>đông gửi</b> / <b>xả đông</b>.
+        "Nhập" lấy từ sổ Nhập hàng (mọi chuyến nhập trong kỳ).{" "}
+        {coDongXa
+          ? "Đông gửi / Xả đông là số kho đông dự trữ (Cân đối) — chỉ để tham khảo, không vào tồn."
+          : "Chưa có đông gửi / xả đông nào trong kỳ."}
       </p>
     </div>
   );

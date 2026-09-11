@@ -271,6 +271,173 @@ export interface TongSoTonNL {
  * kỳ sớm nhất cho tồn đầu, muộn nhất cho tồn cuối) — không cộng dồn từng kỳ,
  * tránh đếm hai lần phần đã kế thừa.
  */
+/* ============================================================
+ * TỒN NL "TỔNG" theo NHẬP HÀNG (2026-09-11, PA-a) — khác engine kỳ ở trên.
+ *
+ * Vì sao: màn /nxt-nl cũ suy tồn theo KỲ cân đối (đông gửi/xả đông) nên nhập hàng
+ * không vào tồn + chỉ xưởng Đông có số. Yêu cầu chủ dự án: dùng NHẬP HÀNG làm vế
+ * NHẬP thật của tồn kho NL, phủ CẢ 3 xưởng, xem theo NGÀY. Xuất (NL lấy ra SX)
+ * CHƯA capture nên = 0 (chừa sẵn cột), tồn hiện là "chưa trừ xuất".
+ *
+ *   Tồn cuối = Tồn đầu + Nhập hàng − Xuất SX(=0)
+ *
+ * PA-a (chốt 2026-09-11): đông gửi/xả đông là CHUYỂN NỘI BỘ tươi↔kho đông, KHÔNG
+ * cộng vào tổng (tránh đếm đôi phần leftover đã nằm trong nhập hàng) — chỉ lấy làm
+ * CỘT THÔNG TIN "kho đông dự trữ" (đọc lại từ engine kỳ `tinhSoTonNL`).
+ *
+ * Tồn đầu kỳ = tồn đầu khai tay (material_opening_stock, mốc ≤ đầu kỳ) + Σ nhập
+ * hàng TRƯỚC kỳ → chính là số dư chạy tới đầu khoảng đang xem.
+ * ============================================================ */
+
+/** Một dòng tồn NL "tổng" cho MỘT họ nguyên liệu, trong khoảng ngày đang xem. */
+export interface TonNLTongHo {
+  hoNL: string;
+  tonDau: number; // opening(≤ đầu kỳ) + Σ nhập trước kỳ
+  nhapKy: number; // Σ nhập hàng trong kỳ
+  xuatSX: number; // 0 — chờ capture "NL lấy ra sản xuất"
+  tonCuoi: number; // tonDau + nhapKy − xuatSX
+  dongGui: number; // THÔNG TIN (kho đông) — KHÔNG vào tonCuoi
+  xaDong: number; // THÔNG TIN — KHÔNG vào tonCuoi
+  seedTonDau: boolean; // tồn đầu có phần khai tay
+  canhBaoAm: boolean; // tonCuoi < 0
+}
+
+/** Một mốc tồn tổng cuối ngày (mọi họ gộp) — cho bảng "tồn theo ngày". */
+export interface TonNLTongNgay {
+  date: string;
+  nhap: number;
+  xuatSX: number; // 0
+  tonCuoi: number; // tồn tổng cuối ngày = tồn đầu tổng + Σ nhập ≤ ngày
+}
+
+export interface TonNLTong {
+  theoHo: TonNLTongHo[];
+  theoNgay: TonNLTongNgay[];
+  tongTonDau: number;
+  tongNhap: number;
+  tongTonCuoi: number;
+  tongDongGui: number;
+  tongXaDong: number;
+  soHo: number;
+  soCanhBao: number;
+}
+
+/**
+ * Dựng tồn NL "tổng" theo nhập hàng cho khoảng ngày [tuNgay, denNgay] + xưởng.
+ * Dòng theo HỌ nguyên liệu (không cần kỳ cân đối) ⇒ phủ cả 3 xưởng. Đông gửi/xả
+ * đông lấy làm cột thông tin từ `tinhSoTonNL` (engine kỳ), KHÔNG cộng vào tồn.
+ */
+export function tinhTonNLTong(
+  periods: BalancingPeriod[],
+  inputs: BalancingInputItem[],
+  imports: MaterialImportItem[],
+  opening: MaterialOpeningStock[],
+  locks: DailyLock[],
+  range?: { tuNgay?: string; denNgay?: string; workshop?: Workshop },
+): TonNLTong {
+  const workshop = range?.workshop;
+  const tu = range?.tuNgay ?? "0000-01-01";
+  const den = range?.denNgay ?? "9999-12-31";
+  const dungXuong = (w?: Workshop) => !workshop || w === workshop;
+
+  // Đông gửi / xả đông (THÔNG TIN) — gom theo họ từ engine kỳ (kỳ giao khoảng).
+  const kyRows = tinhSoTonNL(periods, inputs, imports, opening, locks, range);
+  const dongXa = new Map<string, { dongGui: number; xaDong: number }>();
+  for (const r of kyRows) {
+    const k = r.hoNL.toLowerCase();
+    const cur = dongXa.get(k) ?? { dongGui: 0, xaDong: 0 };
+    cur.dongGui += r.dongGui;
+    cur.xaDong += r.xaDong;
+    dongXa.set(k, cur);
+  }
+
+  // Tập họ NL: từ nhập hàng + tồn đầu khai tay + kỳ (đều lọc xưởng).
+  const dsHo = new Map<string, string>(); // key(lower) → tên họ hiển thị
+  const themHo = (ten: string) => {
+    const h = hoNguyenLieu(ten);
+    if (h) dsHo.set(h.toLowerCase(), h);
+  };
+  for (const r of imports) if (dungXuong(r.workshop)) themHo(r.materialTypeName);
+  for (const o of opening) if (dungXuong(o.workshop)) themHo(o.materialTypeName);
+  for (const r of kyRows) dsHo.set(r.hoNL.toLowerCase(), r.hoNL);
+
+  const theoHo: TonNLTongHo[] = [];
+  for (const [k, hoNL] of dsHo) {
+    const cungHo = (ten: string) => cungHoNguyenLieu(ten, hoNL);
+    const openTruoc = opening
+      .filter(
+        (o) =>
+          dungXuong(o.workshop) &&
+          cungHo(o.materialTypeName) &&
+          (!o.asOfDate || o.asOfDate <= tu),
+      )
+      .reduce((s, o) => s + (o.quantityKg || 0), 0);
+    const nhapTruoc = imports
+      .filter(
+        (r) => dungXuong(r.workshop) && cungHo(r.materialTypeName) && r.deliveryDate < tu,
+      )
+      .reduce((s, r) => s + (r.quantityKg || 0), 0);
+    const nhapKy = imports
+      .filter(
+        (r) =>
+          dungXuong(r.workshop) &&
+          cungHo(r.materialTypeName) &&
+          r.deliveryDate >= tu &&
+          r.deliveryDate <= den,
+      )
+      .reduce((s, r) => s + (r.quantityKg || 0), 0);
+    const info = dongXa.get(k) ?? { dongGui: 0, xaDong: 0 };
+    // Bỏ họ trống trơn (không tồn đầu, không nhập, không đông/xả) khỏi bảng.
+    if (openTruoc === 0 && nhapTruoc === 0 && nhapKy === 0 && info.dongGui === 0 && info.xaDong === 0)
+      continue;
+    const tonDau = openTruoc + nhapTruoc;
+    const tonCuoi = tonDau + nhapKy; // − xuất SX(0)
+    theoHo.push({
+      hoNL,
+      tonDau,
+      nhapKy,
+      xuatSX: 0,
+      tonCuoi,
+      dongGui: info.dongGui,
+      xaDong: info.xaDong,
+      seedTonDau: openTruoc > 0,
+      canhBaoAm: tonCuoi < 0,
+    });
+  }
+  theoHo.sort((a, b) => b.tonCuoi - a.tonCuoi);
+
+  const tongTonDau = theoHo.reduce((s, r) => s + r.tonDau, 0);
+
+  // Tồn tổng theo NGÀY: mỗi ngày có nhập → tồn cuối ngày = tồn đầu tổng + Σ nhập ≤ ngày.
+  const nhapNgay = new Map<string, number>();
+  for (const r of imports) {
+    if (!dungXuong(r.workshop)) continue;
+    if (r.deliveryDate < tu || r.deliveryDate > den) continue;
+    nhapNgay.set(r.deliveryDate, (nhapNgay.get(r.deliveryDate) ?? 0) + (r.quantityKg || 0));
+  }
+  const theoNgay: TonNLTongNgay[] = [...nhapNgay.keys()].sort().reduce<TonNLTongNgay[]>(
+    (acc, date) => {
+      const nhap = nhapNgay.get(date)!;
+      const truoc = acc.length ? acc[acc.length - 1].tonCuoi : tongTonDau;
+      acc.push({ date, nhap, xuatSX: 0, tonCuoi: truoc + nhap });
+      return acc;
+    },
+    [],
+  );
+
+  return {
+    theoHo,
+    theoNgay,
+    tongTonDau,
+    tongNhap: theoHo.reduce((s, r) => s + r.nhapKy, 0),
+    tongTonCuoi: theoHo.reduce((s, r) => s + r.tonCuoi, 0),
+    tongDongGui: theoHo.reduce((s, r) => s + r.dongGui, 0),
+    tongXaDong: theoHo.reduce((s, r) => s + r.xaDong, 0),
+    soHo: theoHo.length,
+    soCanhBao: theoHo.filter((r) => r.canhBaoAm).length,
+  };
+}
+
 export function tongSoTonNL(rows: SoTonNLKy[]): TongSoTonNL {
   const theoHo = new Map<string, SoTonNLKy[]>();
   for (const r of rows) {

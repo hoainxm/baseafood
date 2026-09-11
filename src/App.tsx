@@ -39,7 +39,6 @@ const BanHangScreen = lazy(() => import("@/features/sales"));
 const KhoDuTruScreen = lazy(() => import("@/features/warehouse"));
 const BaoCaoNhapXuatTonScreen = lazy(() => import("@/features/reports/NxtReportScreen"));
 const TonKhoNguyenLieuScreen = lazy(() => import("@/features/reports/MaterialNxtScreen"));
-const SoNhapNLNgayScreen = lazy(() => import("@/features/reports/MaterialDailyIntakeScreen"));
 const BaoCaoXuatNhapTonKhoScreen = lazy(() => import("@/features/reports/WarehouseNxtScreen"));
 const SoKhoThangScreen = lazy(() => import("@/features/monthly-stock")); // Sổ kho theo tháng, route /ton-kho-thang
 const BaoCaoThanhPhamScreen = lazy(() => import("@/features/reports/DailyProductionReport"));
@@ -180,7 +179,6 @@ export default function App() {
             <Route path="/warehouse" element={<KhoDuTruScreen />} />
             <Route path="/nxt" element={<BaoCaoNhapXuatTonScreen />} />
             <Route path="/nxt-nl" element={<TonKhoNguyenLieuScreen />} />
-            <Route path="/nhap-nl-ngay" element={<SoNhapNLNgayScreen />} />
             <Route path="/nxt-kho" element={<BaoCaoXuatNhapTonKhoScreen />} />
             <Route path="/ton-kho-thang" element={<SoKhoThangScreen />} />
             <Route path="/bc-thanh-pham" element={<BaoCaoThanhPhamScreen />} />

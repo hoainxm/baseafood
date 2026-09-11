@@ -1,7 +1,6 @@
 > Load khi: thêm/bớt màn hình, đổi điều hướng, header, hay tìm xem một màn được gắn vào đâu.
 covers: src/App.tsx, src/features/shared/AppShell.tsx, src/features/shared/NotFound.tsx, src/features/shared/guideContent.tsx, src/lib/nav-access.ts
-last_verified: 2026-09-11
-<!-- updated: 2026-09-11 — THÊM route `/nhap-nl-ngay` "Nhập NL theo ngày" (features/reports/MaterialDailyIntakeScreen, màn THẬT đọc `material_imports`): SỔ NHẬP NGUYÊN LIỆU THEO NGÀY cho cả 3 xưởng, KHÔNG cần kỳ Cân đối — mỗi ngày nhập bao nhiêu + tồn cộng dồn (tồn đầu + lũy kế nhập, CHƯA trừ NL lấy ra SX vì phần đó chưa capture — có banner cảnh báo). KIT_NAV icon ScrollText (AppShell), CAY_NAV nhóm "Nhập hàng" (sau imports), gate DEPT_NHAP_HANG (nav-access.ts). Bù chỗ /nxt-nl (kho ĐÔNG DỰ TRỮ theo kỳ) không cho thấy tồn theo NGÀY từ nhập hàng. ~22 route. Xem 30-nhap-hang.md. -->
+last_verified: 2026-09-10
 <!-- updated: 2026-09-10 — THÊM route `/doi-soat` "Đối soát HĐĐT" (features/doi-soat, màn THẬT — KHÔNG demoGuard, KHÔNG gate bộ phận nên kế toán/admin thấy): KIT_NAV icon FileCheck2 (AppShell), CAY_NAV nhóm "Báo cáo & Cân đối". Đối soát hóa đơn điện tử (cổng thuế) ⇄ phần mềm kế toán TỪ FILE EXCEL upload (không đọc DB/repo). Xem 37-doi-soat-hddt.md. ~21 route. -->
 <!-- re-verified: 2026-09-09 16:30 — AppShell.tsx là khung THẬT: <main> bọc children trong <div key={active}> fade khi đổi route (AppShell.tsx ~789) — khớp code. (task thêm animation) -->
 <!-- re-verified: 2026-09-09 15:00 — route /ton-kho-thang: App.tsx:182 + lazy:43, KIT_NAV AppShell:99, CAY_NAV nhóm Kho:168, gate DEPT_NHAP_HANG (nav-access.ts:13) — khớp code. -->
@@ -45,7 +44,7 @@ Cả hai dùng CHUNG một cây nav (`CayNav`) dựng từ `KIT_NAV` (danh sách
 | Nhóm (module) | Con — màn + (deep-link danh mục) |
 |---|---|
 | Tổng quan | `dashboard` |
-| Nhập hàng | `imports` · `nhap-nl-ngay` · `nxt-nl` · (**Tra cứu** → `catalog?tab=dai-ly`) |
+| Nhập hàng | `imports` · `nxt-nl` · (**Tra cứu** → `catalog?tab=dai-ly`) |
 | Sản xuất | `wip` · `packaging` · `qc` · (**Tra cứu** → `catalog?tab=mat-hang`) · `production` · `quality` |
 | Kho | `warehouse` · `ton-kho-thang` · `qr` · `nxt-kho` · `cold-storage` |
 | Kinh doanh | `sales` · `orders` · (**Tra cứu** → `catalog?tab=khach-hang`) |

@@ -285,8 +285,11 @@ export interface TongSoTonNL {
  * cộng vào tổng (tránh đếm đôi phần leftover đã nằm trong nhập hàng) — chỉ lấy làm
  * CỘT THÔNG TIN "kho đông dự trữ" (đọc lại từ engine kỳ `tinhSoTonNL`).
  *
- * Tồn đầu kỳ = tồn đầu khai tay (material_opening_stock, mốc ≤ đầu kỳ) + Σ nhập
- * hàng TRƯỚC kỳ → chính là số dư chạy tới đầu khoảng đang xem.
+ * Tồn đầu kỳ = tồn đầu khai tay (material_opening_stock — BASELINE MỘT LẦN tại mốc
+ * asOfDate) + Σ nhập hàng TỪ mốc baseline tới trước kỳ. Nhập TRƯỚC mốc baseline coi
+ * như đã nằm trong số khai tay (không cộng đôi). Không khai baseline ⇒ cộng mọi nhập
+ * trước kỳ. ⇒ khai "Tồn đầu" với asOfDate = ngày ĐẦU TIÊN app bắt đầu tính nhập (VD
+ * 01/07 cho baseline tồn cuối 30/06).
  * ============================================================ */
 
 /** Một dòng tồn NL "tổng" cho MỘT họ nguyên liệu, trong khoảng ngày đang xem. */
@@ -364,17 +367,29 @@ export function tinhTonNLTong(
   const theoHo: TonNLTongHo[] = [];
   for (const [k, hoNL] of dsHo) {
     const cungHo = (ten: string) => cungHoNguyenLieu(ten, hoNL);
-    const openTruoc = opening
-      .filter(
-        (o) =>
-          dungXuong(o.workshop) &&
-          cungHo(o.materialTypeName) &&
-          (!o.asOfDate || o.asOfDate <= tu),
-      )
-      .reduce((s, o) => s + (o.quantityKg || 0), 0);
+    // Baseline-MỘT-LẦN (chốt 2026-09-11): "Tồn đầu" là số dư CHỐT tại mốc asOfDate
+    // (mới nhất ≤ đầu kỳ) của họ — nghĩa là mọi chuyến nhập TRƯỚC mốc đó ĐÃ nằm
+    // trong số tồn đầu, KHÔNG cộng lại (chống đếm đôi). Nhập TỪ mốc đó trở đi (≥)
+    // mới cộng thêm. Không khai tồn đầu (mốc rỗng) ⇒ cộng mọi chuyến nhập.
+    const openApDung = opening.filter(
+      (o) =>
+        dungXuong(o.workshop) &&
+        cungHo(o.materialTypeName) &&
+        (!o.asOfDate || o.asOfDate <= tu),
+    );
+    const openTruoc = openApDung.reduce((s, o) => s + (o.quantityKg || 0), 0);
+    const mocBaseline = openApDung.reduce(
+      (m, o) => (o.asOfDate && o.asOfDate > m ? o.asOfDate : m),
+      "",
+    );
+    const sauBaseline = (d: string) => !mocBaseline || d >= mocBaseline;
     const nhapTruoc = imports
       .filter(
-        (r) => dungXuong(r.workshop) && cungHo(r.materialTypeName) && r.deliveryDate < tu,
+        (r) =>
+          dungXuong(r.workshop) &&
+          cungHo(r.materialTypeName) &&
+          r.deliveryDate < tu &&
+          sauBaseline(r.deliveryDate),
       )
       .reduce((s, r) => s + (r.quantityKg || 0), 0);
     const nhapKy = imports
@@ -383,7 +398,8 @@ export function tinhTonNLTong(
           dungXuong(r.workshop) &&
           cungHo(r.materialTypeName) &&
           r.deliveryDate >= tu &&
-          r.deliveryDate <= den,
+          r.deliveryDate <= den &&
+          sauBaseline(r.deliveryDate),
       )
       .reduce((s, r) => s + (r.quantityKg || 0), 0);
     const info = dongXa.get(k) ?? { dongGui: 0, xaDong: 0 };

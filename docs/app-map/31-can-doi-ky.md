@@ -171,7 +171,7 @@ Cộng vào Tổng của dòng (`sumGridRow = Σ ngày + chuyển kỳ`) — ki�
 Màn **Tồn kho NL** (`/nxt-nl`, [`features/reports/MaterialNxtScreen.tsx`](../../src/features/reports/MaterialNxtScreen.tsx)) suy sổ Nhập–Xuất–Tồn nguyên liệu (kg thuần) **THẲNG TỪ SỔ NHẬP HÀNG** (`material_imports`), dòng theo **họ NL**, phủ **cả 3 phân xưởng**, xem **theo ngày**. Hàm thuần: [`inventoryMaterial.ts#tinhTonNLTong`](../../src/lib/inventoryMaterial.ts).
 
 - **Công thức (PA-a):** `Tồn cuối = Tồn đầu + Nhập hàng − Xuất SX`.
-  - **Tồn đầu kỳ** = `material_opening_stock` (khai tay, mốc ≤ đầu kỳ, mig `0022`) **+ Σ nhập hàng TRƯỚC kỳ** ⇒ số dư chạy tới đầu khoảng đang xem.
+  - **Tồn đầu kỳ** = `material_opening_stock` (khai tay, mốc `asOfDate` ≤ đầu kỳ, mig `0022`) **+ Σ nhập hàng TỪ mốc baseline tới trước kỳ**. **BASELINE MỘT LẦN (chốt 2026-09-11):** nhập TRƯỚC mốc `asOfDate` coi như đã nằm trong số khai tay ⇒ KHÔNG cộng lại (chống đếm đôi). Khai "Tồn đầu" với `asOfDate` = ngày ĐẦU TIÊN app tính nhập (VD 01/07 cho tồn cuối 30/06). Không khai baseline ⇒ cộng mọi nhập trước kỳ.
   - **Nhập** = Σ nhập hàng trong kỳ (mọi chuyến).
   - **Xuất SX = 0** (cột chờ) — "NL lấy ra sản xuất" CHƯA capture ở màn Sản xuất (quyết định giản lược `/wip` 2026-08-25). Tồn hiện là "tồn theo nhập, chưa trừ xuất"; màn có banner nói rõ. Khi có capture NL-xuất → cột này ra số, tồn thành tồn thật.
 - **Đông gửi / Xả đông = CỘT THÔNG TIN, KHÔNG vào tổng** (PA-a — tránh đếm đôi: leftover cấp đông vốn đã nằm trong nhập hàng; xả đông kho mình cũng đã đếm khi nhập). Số này đọc lại từ engine kỳ `tinhSoTonNL` (đông gửi = `conDoSX>0 ? conDoSX : tongCarryAm`; xả đông = `tongCarryDuong`, `carryOverKg>0`) và chỉ hiển thị bên cạnh làm tham khảo vòng gối đầu.

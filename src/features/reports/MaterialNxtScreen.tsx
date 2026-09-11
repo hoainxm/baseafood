@@ -390,8 +390,9 @@ export default function MaterialNxtScreen() {
           <DialogHeader>
             <DialogTitle className="text-2xl">Tồn đầu kho nguyên liệu</DialogTitle>
             <DialogDescription className="text-base">
-              Số dư nguyên liệu có sẵn TRƯỚC khi dùng app (mốc đầu kỳ). Cộng vào tồn cùng với nhập
-              hàng.
+              Số dư nguyên liệu có sẵn TRƯỚC khi dùng app (baseline một lần). Đặt "tính từ ngày" =
+              ngày ĐẦU TIÊN app bắt đầu tính nhập (VD 01/07 cho tồn cuối 30/06) — chuyến nhập trước
+              ngày đó coi như đã nằm trong số này, nhập từ ngày đó trở đi cộng thêm.
             </DialogDescription>
           </DialogHeader>
 

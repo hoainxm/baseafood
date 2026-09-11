@@ -36,6 +36,7 @@ import {
   FileCheck2,
   Warehouse,
   Boxes,
+  ScrollText,
   Factory,
   CalendarCheck,
   CalendarRange,
@@ -94,6 +95,7 @@ export const KIT_NAV: MucNavShell[] = [
   { id: "balancing", label: "Cân đối", icon: Scale },
   { id: "bc-thanh-pham", label: "BC Thành phẩm", icon: CalendarCheck },
   { id: "bc-don-xuat", label: "BC Đơn xuất", icon: Ship },
+  { id: "nhap-nl-ngay", label: "Nhập NL theo ngày", icon: ScrollText },
   { id: "nxt-nl", label: "Tồn kho NL", icon: Boxes },
   { id: "nxt", label: "Báo cáo NXT", icon: FileSpreadsheet },
   { id: "nxt-kho", label: "XNT kho (số thật)", icon: Warehouse },
@@ -148,7 +150,12 @@ export const CAY_NAV: NhomCay[] = [
   {
     ten: "Nhập hàng",
     icon: Truck,
-    con: [{ ref: "imports" }, { ref: "nxt-nl" }, TRACUU("dai-ly")],
+    con: [
+      { ref: "imports" },
+      { ref: "nhap-nl-ngay" },
+      { ref: "nxt-nl" },
+      TRACUU("dai-ly"),
+    ],
   },
   {
     ten: "Sản xuất",

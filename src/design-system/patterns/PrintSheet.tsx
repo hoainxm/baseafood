@@ -159,34 +159,43 @@ export function PhieuInTem({
         className="print-tem-box mx-auto border border-slate-300 bg-white"
         style={{ width: rong * PX, height: cao * PX, containerType: "size" }}
       >
-        <div className="flex h-full w-full items-center" style={{ gap: "3cqw", padding: "5cqmin" }}>
+        <div className="flex h-full w-full items-center" style={{ gap: "4cqw", padding: "6cqmin" }}>
           {qrDataUrl ? (
             <img
               src={qrDataUrl}
               alt={`QR mã lô ${maLo}`}
               className="shrink-0"
-              style={{ height: "82cqh", width: "82cqh" }}
+              style={{ height: "min(88cqh, 44cqw)", width: "min(88cqh, 44cqw)" }}
             />
           ) : (
             <div
               className="flex shrink-0 items-center justify-center border border-dashed border-slate-300 text-slate-400"
-              style={{ height: "82cqh", width: "82cqh", fontSize: "8cqh" }}
+              style={{ height: "min(88cqh, 44cqw)", width: "min(88cqh, 44cqw)", fontSize: "6cqh" }}
             >
               QR
             </div>
           )}
-          <div className="flex min-w-0 flex-1 flex-col justify-center" style={{ gap: "2cqh" }}>
+          {/* Cột chữ = container riêng (inline-size): cỡ chữ theo BỀ RỘNG cột nên
+              mã lô luôn vừa MỘT dòng, chữ phụ xuống dòng hiện đủ, không bị cắt. */}
+          <div
+            className="flex min-w-0 flex-1 flex-col justify-center"
+            style={{ containerType: "inline-size", gap: "4cqh" }}
+          >
             <div
-              className="tnum font-bold uppercase tracking-wide"
-              style={{ fontSize: "22cqh", lineHeight: 1.05, color: "#0f172a", wordBreak: "break-all" }}
+              className="tnum font-bold leading-none"
+              style={{ fontSize: "min(14cqw, 32cqh)", color: "#0f172a", whiteSpace: "nowrap" }}
             >
               {maLo || "—"}
             </div>
             {dong.map((d, i) => (
               <div
                 key={i}
-                className="truncate"
-                style={{ fontSize: i === 0 ? "10cqh" : "9cqh", color: "#334155" }}
+                style={{
+                  fontSize: i === 0 ? "8.5cqw" : "7.8cqw",
+                  lineHeight: 1.2,
+                  color: i === 0 ? "#1e293b" : "#475569",
+                  overflowWrap: "anywhere",
+                }}
               >
                 {d}
               </div>

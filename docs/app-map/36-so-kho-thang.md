@@ -1,8 +1,9 @@
 > Load khi: sửa màn Sổ kho theo tháng (/ton-kho-thang), logic dồn tồn cuối kỳ → đầu kỳ sau, hay công thức tồn cuối/tiền còn lại theo tháng.
 covers: src/features/monthly-stock/MonthlyStockScreen.tsx, src/features/monthly-stock/index.ts, src/lib/monthlyStock.ts, src/lib/monthlyStockExcel.ts
-last_verified: 2026-09-09
+last_verified: 2026-09-11
 ttl_days: 90
 <!-- re-verified: 2026-09-09 15:00 — id nhập `xlsx|<mã kho>|<sheet>|<năm>|<rowIndex>` (MonthlyStockScreen:419), khoaLo đối chiếu = kho·nhóm·tên name-level (monthlyStock.ts:199), migration 0041 create-if-not-exists idempotent — khớp code. -->
+<!-- re-verified: 2026-09-11 16:40 — parser cột 0/1/2/3/4/5/8-13 + nhóm "NHẬP KHẨU"/"MUA NGOÀI" + bỏ dòng "TỔNG" (monthlyStockExcel.ts:105-146), nhận sheet số tháng qua suyThang() "1".."12"/"T8"/"Tháng 8" (monthlyStockExcel.ts:94-103), id nạp `xlsx|${maKho}|${sheetName}|${nam}|${rowIndex}` + nạp lại thay-theo-id giuLai=filter(!idMoi) (MonthlyStockScreen.tsx:503,529-531), namTuTenFile year=/20\d{2}/ (monthlyStockExcel.ts:164-167) — khớp code. -->
 
 # Sổ kho theo THÁNG dương lịch (`/ton-kho-thang`)
 
@@ -64,7 +65,8 @@ Nút **"Nhập Excel bảng kê"** đọc thẳng file `kho ... .xlsx` ("BẢNG 
 - Nhóm lấy từ dòng tiêu đề mục ("I HÀNG NHẬP KHẨU" / "II HÀNG MUA NGOÀI"); dòng **"TỔNG …"/"CỘNG …"** và mọi dòng **trước mục đầu tiên** đều bỏ (kiểm "TỔNG" TRƯỚC khi dò mục vì "TỔNG HÀNG NHẬP KHẨU" cũng chứa "NHẬP KHẨU").
 - Dialog cho chọn **Năm** (suy từ tên file, VD "năm 2026") + **Kho** (Combobox 5 kho hệ thống `BSF1_WAREHOUSES` — K1000T/K1500T/KX-DONG/KX-CA/KX-KHO, mặc định Kho 1500 tấn; cho tạo mới tại chỗ), xem trước số dòng mỗi tháng. **Một file = một kho** (bảng kê theo từng kho). id nạp **tất định** `xlsx|<mã kho>|<sheet>|<năm>|<rowIndex>` — CÓ mã kho nên nhập nhiều kho cùng tháng KHÔNG đè nhau; nạp lại cùng file+năm+kho chỉ CẬP NHẬT, không nhân đôi.
 - **Nạp TRUNG THỰC theo sổ cũ** — KHÔNG chép tồn cuối của file (file gốc dồn kỳ sai ở dòng tổng). Sau khi nạp, mở tháng đầu rồi bấm "Dồn sang tháng sau" lần lượt để **chuẩn hóa** tồn đầu các tháng kế.
-- Kiểm thật (file `kho 1000 năm 2026.xlsx`): 7 sheet → 1.405 dòng, 7 tháng; id duy nhất; nạp lại idempotent (1405→1405).
+- ⚠️ **CHỌN ĐÚNG KHO — mặc định K1500T có thể SAI.** Mã kho nằm TRONG id (`xlsx|<mã kho>|…`), nên nạp NHẦM kho ≠ ghi đè: nó tạo BẢN SAO ở kho khác → "Tất cả kho" cộng đôi (khắc phục: xoá bản thừa theo `warehouse` rồi nạp lại đúng kho — id trùng khớp nên lần đúng chỉ CẬP NHẬT). File **`kho 1000 năm 2026`** thực tế thuộc **Kho 1000 tấn (K1000T)** (theo chủ dữ liệu 2026-09-11) DÙ tiêu đề mỗi sheet ghi "…KHO 1500" — tên file/tiêu đề chỏi nhau, **đừng theo mặc định**, hỏi/đối chiếu trước khi nạp.
+- Kiểm thật: file `.xlsx` cũ 7 sheet → 1.405 dòng; file `.numbers` cập nhật (2026-09-11) **8 sheet → 1.593 dòng** (thêm tháng 8; T1–7 cùng số dòng nhưng vài giá trị đã sửa). `.numbers` phải convert sang `.xlsx` (giữ tên sheet + vị trí cột) trước khi nạp — module chỉ đọc `.xlsx`. Nạp lại idempotent (1593→1593), id duy nhất.
 
 ## Cờ lệch dồn kỳ + Đối chiếu (SOI + sửa tay, KHÔNG tự ghi đè)
 

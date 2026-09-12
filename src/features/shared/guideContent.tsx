@@ -101,6 +101,26 @@ export const HUONG_DAN: Record<string, NoiDungHuongDan> = {
             mở tab <b>Báo cáo</b> để xem tổng nhập theo đại lý và loại nguyên liệu.
           </p>
         </Muc>
+        <Muc tieuDe="Mã lô & in tem QR">
+          <Y>
+            <li>
+              Khi chọn <b>ngày về</b> và <b>phân xưởng</b>, ô <b>Mã lô nội bộ</b>{" "}
+              tự hiện mã (vd <b>Đ-260912-01</b>) — không phải gõ, mỗi chuyến một mã.
+            </li>
+            <li>
+              Lưu chuyến xong, sang tab <b>📖 Sổ ngày</b>, tìm chuyến (có nhãn{" "}
+              <b>Lô …</b>) rồi bấm <b>In tem QR</b>.
+            </li>
+            <li>
+              Chọn <b>khổ tem</b> đúng máy in tem → bấm <b>In tem</b> →{" "}
+              <b>dán tem lên lô hàng</b>. Sau này quét tem ở màn <b>Quét lô (QR)</b>{" "}
+              là ra đúng lô.
+            </li>
+            <li>
+              Ô <b>Mã SSCC</b> chưa được cấp thì để trống, điền sau.
+            </li>
+          </Y>
+        </Muc>
       </>
     ),
   },
@@ -324,6 +344,83 @@ export const HUONG_DAN: Record<string, NoiDungHuongDan> = {
             Dòng báo <b>Tồn âm</b> = xuất nhiều hơn số đang trữ → kiểm lại sản xuất /
             đơn / bán, hoặc thiếu khai tồn đầu. Không được bỏ qua.
           </p>
+        </Muc>
+      </>
+    ),
+  },
+
+  qr: {
+    tieuDe: "Quét lô (QR)",
+    moTa: "Tạo mã lô, in tem QR dán lên hàng, và quét để tra lô.",
+    noiDung: (
+      <>
+        <Muc tieuDe="Mã lô là gì">
+          <Y>
+            <li>
+              Mỗi <b>chuyến nguyên liệu</b> nhập về có <b>một mã lô riêng</b>, tự
+              sinh — vd <b>Đ-260912-01</b> (Đ = xưởng Đông · 260912 = ngày
+              12/09/2026 · 01 = chuyến thứ nhất trong ngày).
+            </li>
+            <li>
+              <b>Tem QR</b> in ra mang đúng mã lô đó. Dán tem lên lô hàng; sau này{" "}
+              <b>quét</b> hoặc <b>gõ mã</b> là ra đúng lô.
+            </li>
+          </Y>
+        </Muc>
+        <Muc tieuDe="Bước 1 — Tạo mã lô (ở màn Nhập hàng)">
+          <Buoc>
+            <li>
+              Mở màn <b>Nhập hàng</b>, tab <b>📝 Ghi nhập</b>.
+            </li>
+            <li>
+              Chọn <b>Ngày về</b> và <b>Phân xưởng</b> → ô <b>Mã lô nội bộ</b> tự
+              hiện mã. <b>Không phải gõ.</b>
+            </li>
+            <li>
+              Điền đại lý + bảng loại hàng như thường, rồi bấm <b>Lưu vào sổ</b>.
+              (Ô <b>Mã SSCC</b> chưa được cấp thì để trống.)
+            </li>
+          </Buoc>
+        </Muc>
+        <Muc tieuDe="Bước 2 — In & dán tem QR">
+          <Buoc>
+            <li>
+              Ở màn Nhập hàng, sang tab <b>📖 Sổ ngày</b>, tìm chuyến vừa lưu (có
+              nhãn <b>Lô …</b>).
+            </li>
+            <li>
+              Bấm <b>In tem QR</b> → chọn <b>khổ tem</b> đúng máy in tem của xưởng
+              (vd 50×30 mm, có thể tự nhập số).
+            </li>
+            <li>
+              Bấm <b>In tem</b> → chọn <b>máy in tem</b> trong hộp thoại in → In →{" "}
+              <b>dán tem lên lô hàng</b>.
+            </li>
+          </Buoc>
+        </Muc>
+        <Muc tieuDe="Bước 3 — Quét / tra lô (màn này)">
+          <Buoc>
+            <li>
+              Bấm <b>Quét bằng camera</b> rồi đưa tem QR vào khung; hoặc <b>gõ tay
+              mã lô</b> vào ô bên dưới.
+            </li>
+            <li>
+              Màn hiện <b>chuyến nhập</b> của lô + <b>danh sách nguyên liệu</b>
+              (loại, kg, giá). Cần in lại tem thì bấm <b>In tem QR</b> ngay đây.
+            </li>
+          </Buoc>
+        </Muc>
+        <Muc tieuDe="Lưu ý">
+          <Y>
+            <li>
+              Chuyến <b>nhập trước khi có tính năng này</b> chưa có mã lô (hiện
+              nhãn "Dữ liệu cũ") — chưa in tem được.
+            </li>
+            <li>
+              <b>Không có camera</b> hoặc quét không được thì cứ <b>gõ tay mã lô</b>,
+              vẫn tra ra đúng lô.
+            </li>
+          </Y>
         </Muc>
       </>
     ),

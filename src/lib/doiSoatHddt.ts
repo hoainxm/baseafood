@@ -382,8 +382,7 @@ interface SheetTho {
   rows: unknown[][];
 }
 
-export async function docWorkbook(file: File): Promise<SheetTho[]> {
-  const buf = await file.arrayBuffer();
+function docSheetsTuBuffer(buf: ArrayBuffer | Uint8Array): SheetTho[] {
   const wb = XLSX.read(buf, { type: "array", cellDates: true });
   return wb.SheetNames.map((ten) => ({
     ten,
@@ -394,6 +393,28 @@ export async function docWorkbook(file: File): Promise<SheetTho[]> {
       defval: null,
     }),
   })).filter((s) => s.rows.length > 0);
+}
+
+export async function docWorkbook(file: File): Promise<SheetTho[]> {
+  return docSheetsTuBuffer(await file.arrayBuffer());
+}
+
+/** File Excel → base64 (để LƯU file gốc theo tài khoản). Mã hoá theo khối, an toàn file lớn. */
+export async function fileSangBase64(file: File): Promise<string> {
+  const u = new Uint8Array(await file.arrayBuffer());
+  let bin = "";
+  const CHUNK = 0x8000;
+  for (let i = 0; i < u.length; i += CHUNK)
+    bin += String.fromCharCode(...u.subarray(i, i + CHUNK));
+  return btoa(bin);
+}
+
+/** base64 (bản đã lưu) → các sheet thô, để MỞ LẠI chạy lại đối soát. */
+export function sheetsTuBase64(b64: string): SheetTho[] {
+  const bin = atob(b64);
+  const u = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+  return docSheetsTuBuffer(u);
 }
 
 /**

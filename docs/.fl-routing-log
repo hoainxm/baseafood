@@ -20,3 +20,5 @@
 2026-09-11 | data-layer + so-kho-thang | docs/app-map/36-so-kho-thang.md, docs/app-map/04-tang-du-lieu.md, docs/app-map/03-database.md
 2026-09-14 | navigation/ui-pages | docs/app-map/02-pages-navigation.md, docs/app-map/01-app-structure.md, src/design-system/README.md, src/design-system/noi-dung-va-label.md, docs/app-map/README.md
 2026-09-14 | ke-toan/doi-soat-hddt (engine v3) | CLAUDE.md, docs/app-map/37-doi-soat-hddt.md, src/design-system/README.md
+2026-09-14 | data-layer+db+auth/doi-soat-luu (persist per account) | docs/app-map/37-doi-soat-hddt.md, docs/app-map/04-tang-du-lieu.md, docs/app-map/03-database.md, docs/app-map/05-bao-mat-phan-quyen.md, docs/spec/routing-va-naming.md, docs/app-map/01-app-structure.md
+2026-09-14 | ui-layout/design-system | src/design-system/README.md, docs/app-map/02-pages-navigation.md, docs/app-map/01-app-structure.md

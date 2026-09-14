@@ -671,3 +671,39 @@ export interface MonthlyStockLine {
   note: string;
 }
 
+/**
+ * Bản đối soát hóa đơn đã LƯU theo tài khoản (màn /doi-soat). Lưu file gốc
+ * (base64, để mở lại chạy lại) + tham số + ảnh chụp tóm tắt kết quả. Bản
+ * `official` (chính thức) đóng băng `summary`. Logic đối soát ở `lib/doiSoatHddt.ts`
+ * (không import ở đây để repo.ts không kéo xlsx vào bundle chính).
+ */
+export interface ReconciliationSummary {
+  soHoaDon: number;
+  khop: number;
+  lech: number;
+  thieu: number;
+  ganKhop: number;
+  soDongPm: number;
+  pmCo: number;
+  pmThieu: number;
+  tongChenh: number;
+  nguong: number;
+  savedAt: string; // ISO — thời điểm đóng băng ảnh chụp
+}
+export interface ReconciliationRun {
+  id: string;
+  userId: string; // id tài khoản tạo (chủ sở hữu)
+  ownerUsername: string;
+  ownerName: string;
+  title: string;
+  period: string; // VD "T02-2026"
+  status: "draft" | "official";
+  threshold: number;
+  fileName: string;
+  fileB64: string; // file Excel gốc, base64
+  options: { soChuanTen?: string; edits?: Record<string, number> };
+  summary: ReconciliationSummary;
+  createdAt: string;
+  updatedAt: string;
+}
+

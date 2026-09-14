@@ -2,6 +2,9 @@
 covers: src/features/doi-soat/DoiSoatScreen.tsx, src/features/doi-soat/index.ts, src/lib/doiSoatHddt.ts
 last_verified: 2026-09-14
 ttl_days: 90
+<!-- updated: 2026-09-14 — v4 LƯU THEO TÀI KHOẢN: màn /doi-soat nay lưu bản NHÁP/CHÍNH THỨC (bảng reconciliation_runs, 0043; hook useReconciliationRuns). Lưu file gốc base64 (file_b64) + options{soChuanTen,edits} + summary (ảnh chụp 4 nhãn+tổng chênh; bản chính thức đóng băng). MỞ LẠI = sheetsTuBase64(file_b64) → doiSoat chạy lại (round-trip đã kiểm: khớp đọc trực tiếp). Riêng-tư-theo-account ép ở TẦNG APP (hook lọc userId===nguoiDung.id, admin xem tất; chưa đăng nhập/localStorage = per-máy). Xóa qua ConfirmDelete + toast Hoàn tác. lib thêm fileSangBase64/sheetsTuBase64. Xem 04-tang-du-lieu + 03-database (0043) + 05-bao-mat (RLS). -->
+<!-- re-verified: 2026-09-14 — chạy engine v3 trên 6 file thật T1–T6: T2/T6 khớp §12 tuyệt đối, T3/T4/T5 lệch đúng ±1 dòng (file xuất lại ±1 dòng, không phải lỗi); GẦN KHỚP (T3: 61380754↔613080754) + bỏ mẫu số (1C26TTN) đúng ca spec. -->
+
 <!-- re-verified: 2026-09-14 — đối chiếu code thật doiSoatHddt.ts khi nâng v3: khóa (taoKhoa dùng kyHieuChuan+soHoaDonChuan), chọn sổ "mới" (chuan(ten).includes("moi")), cầu nối/tự kiểm, xuất dựng-mới — khớp. (task engine v3) -->
 <!-- updated: 2026-09-14 — v3 (spec ENGINE ĐẦY ĐỦ): chuẩn hóa KÝ HIỆU bỏ chữ số mẫu số gộp đầu (kyHieuChuan: sổ 1C26TTN ↔ HĐ C26TTN, áp cả hai bên qua taoKhoa); GẦN KHỚP (nhóm 3 — dò cùng MST + cùng số tiền ±1đ cho dòng THIẾU hai bên, chú thích `ganKhopMoTa`, KHÔNG đổi bucket đếm); gộp sheet HĐĐT trùng (tập con → laPhu, không cộng đôi — như đã làm cho sheet sổ); GỠ cột đối soát cũ (goCotDoiSoatCu — idempotent, cờ daGoCotCu); 7 nhóm nghi vấn (chèn Gần khớp=3, dồn: thiếu-cả-cụm=4, tổng-xóa=5, cột-phụ=6, sheet-trùng=7); 9 phép tự kiểm (thêm "tổng cột Chênh lệch = phần dư trừ chéo"); ngưỡng KHỚP mặc định 1đ (§5.3, vẫn chỉnh được trên màn); XUẤT FILE MẪU (xuatFileMau — 3 sheet HĐĐT + PMEM + HƯỚNG DẪN, người dùng làm theo format, engine vẫn đọc mọi biến thể). Kiểm code thật: file "pmem mới" T02 ra ĐÚNG spec §12 T2 = 264 khớp/4 lệch/155 chưa, sổ 291/5; tự kiểm 9/9; idempotent (chạy lại trên file đã xuất ra y hệt). CÒN CHỜ file T1,T3–T6 để chạy thật GẦN KHỚP + gộp sheet HĐĐT + strip mẫu số (T2 không có các ca này). -->
 <!-- updated: 2026-09-11 — v2 (quy tắc thực chiến 6 tháng): KHÔNG tự sửa dữ liệu (chỉ báo + nút Sửa từng dòng, giữ giá trị cũ, áp trong phiên + vào file xuất qua Map edits); 6 NHÓM NGHI VẤN (1 cộng sai chỉ báo khi CẢ HAI cách lệch · 2 thiếu 1 ô suy được · 3 thiếu cả cụm gộp thống kê · 4 tổng bị xóa gộp · 5 cột phụ trùng tên · 6 sheet trùng lặp); dò cột trùng theo ĐỘ KHỚP với tổng (chonCotDongNhat); CHỌN SỔ CHUẨN khi có nhiều sheet sổ (ưu tiên "mới", subset → sheet phụ không cộng đôi); CẦU NỐI số liệu (2 cách tính = nhau + bóc tách phần dư trừ chéo); KHỐI TỰ KIỂM 8 phép (phép #8 so số nghi vấn với baseline); xuất Excel chuẩn hóa (dựng mới → 0 ẩn, neo A1, nút lọc, nới cột) + sheet NHẬT KÝ SỬA. Nhận CẢ định dạng sổ mã máy (SCT_GHISO/KY_HIEU/SO_HD/RMST/TIENHANG/TIENTHUE/TONGCONG) lẫn nhãn tiếng Việt. Kiểm code thật trên file T02-2026: oracle 268/268; tự kiểm 8/8; §4 chọn pmem mới, PMEM là tập con. -->
@@ -70,6 +73,16 @@ Màu chip lấy **token** `--status-*` (không viết mã màu tay); màu nền 
 
 > ⚠️ **Verify**: mới chạy thật trên **T02** (khớp spec §12 T2 = 264/4/155, sổ 291/5; tự kiểm 9/9; idempotent). GẦN KHỚP, strip mẫu số, gộp sheet HĐĐT trùng CHƯA có dữ liệu thật để chạy (T2 không dính) — cần file T1/T3–T6 để đóng bộ hồi quy §12.
 
+## v4 — lưu & mở lại theo tài khoản
+
+Trước đây module chỉ import → xử lý → tải về (file-only). v4 cho **lưu bản đối soát theo TÀI KHOẢN** để xem lại/đối chiếu:
+
+- **Bảng `reconciliation_runs`** (0043) + hook `useReconciliationRuns()` (khuôn `useBang` — chạy cả Supabase lẫn localStorage). Lưu: `file_b64` (file Excel gốc base64), `options` {soChuanTen, edits}, `summary` (ảnh chụp 4 nhãn + tổng chênh), `status` 'draft'|'official', `user_id`/owner.
+- **Lưu file gốc BASE64 trong bảng** (không dùng Storage): nằm dưới RLS của bảng (tránh cấu hình ACL Storage theo user — nguồn rò rỉ), và lưu được cả khi offline. File xlsx ~150–420KB base64/bản.
+- **Mở lại** = `sheetsTuBase64(file_b64)` → `doiSoat` chạy lại với `threshold`+`edits`+`soChuanTen` đã lưu (round-trip đã kiểm: khớp đọc trực tiếp). **Chính thức** đóng băng `summary` (đối chiếu về sau); mở lại vẫn recompute từ file.
+- **Riêng tư theo account ép ở TẦNG APP**: hook lọc `userId === nguoiDung.id` (admin xem tất); chưa đăng nhập / chế độ localStorage ⇒ per-máy. RLS server siết `user_id=auth.uid()` để nhánh 0021 (câu sẵn trong 0043). Xóa qua `ConfirmDelete` + toast Hoàn tác.
+- UI: ô "Tên bản" + nút **Lưu nháp** / **Lưu chính thức** (khi có kết quả); card **"Bản đã lưu"** (RecordTable, luôn hiện) với Mở lại / Tải Excel / Xóa. lib thêm `fileSangBase64` / `sheetsTuBase64`.
+
 ## Không thuộc phạm vi (để sau nếu cần)
 
-Sửa/ghi ngược vào phần mềm; lưu lịch sử các lần đối soát (chưa có bảng); đối soát hóa đơn **bán ra**; gộp nhiều file (đang chỉ 1 workbook); đóng băng khung nhìn khi xuất (thư viện không hỗ trợ ghi).
+Sửa/ghi ngược vào phần mềm; đối soát hóa đơn **bán ra**; gộp nhiều file (đang chỉ 1 workbook); đóng băng khung nhìn khi xuất (thư viện không hỗ trợ ghi); siết RLS server theo user (đang ép ở tầng app, chờ nhánh 0021).

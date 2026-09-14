@@ -33,6 +33,7 @@ import {
   BANG_FINISHED_OPENING_STOCK,
   BANG_NXT_SNAPSHOT,
   BANG_MONTHLY_STOCK,
+  BANG_RECONCILIATION_RUN,
   useBang,
 } from "@/lib/repo";
 import type { MaterialType, Product, FinishedGood, NxtSnapshotLine } from "@/types";
@@ -213,3 +214,5 @@ export const useNxtSnapshots = () => useBang(BANG_NXT_SNAPSHOT, seedNxtSnapshots
 
 /* --- Sổ kho theo tháng (dồn tồn cuối kỳ → đầu kỳ sau) --- */
 export const useMonthlyStock = () => useBang(BANG_MONTHLY_STOCK);
+/** Bản đối soát hóa đơn đã lưu (màn /doi-soat) — nháp/chính thức theo tài khoản. */
+export const useReconciliationRuns = () => useBang(BANG_RECONCILIATION_RUN);

@@ -13,7 +13,9 @@ import {
   CardContent,
   CardHeader,
   CardTitle,
+  ConfirmDelete,
   EmptyState,
+  Input,
   NumberField,
   RecordTable,
   StatusChip,
@@ -31,6 +33,8 @@ import {
   docWorkbook,
   xuatExcelDoiSoat,
   xuatFileMau,
+  fileSangBase64,
+  sheetsTuBase64,
   type CauNoi,
   type DongHoaDon,
   type DongPhanMem,
@@ -43,6 +47,9 @@ import {
   type TrangThaiHoaDon,
 } from "@/lib/doiSoatHddt";
 import { num } from "@/lib/format";
+import { useReconciliationRuns } from "@/lib/catalogRepo";
+import { useAuth } from "@/lib/auth";
+import type { ReconciliationRun } from "@/types";
 import {
   Upload,
   FileSpreadsheet,
@@ -55,6 +62,9 @@ import {
   Undo2,
   ChevronDown,
   ChevronRight,
+  Save,
+  FolderOpen,
+  History,
 } from "lucide-react";
 
 type Workbook = Awaited<ReturnType<typeof docWorkbook>>;
@@ -65,6 +75,108 @@ function chipHoaDon(t: TrangThaiHoaDon) {
   if (t === "KHOP") return <StatusChip trangThai="running" nhan="Khớp" />;
   if (t === "LECH") return <StatusChip trangThai="idle" nhan="Lệch tiền" />;
   return <StatusChip trangThai="stopped" nhan="Chưa có ở PM" />;
+}
+
+/** Suy kỳ "T02-2026" / "T3" từ tên file. */
+function suyKy(name: string): string {
+  const m = name.match(/T\s?0?(\d{1,2})(?:[-_ ]?(\d{4}))?/i);
+  if (!m) return "";
+  return m[2] ? `T${m[1].padStart(2, "0")}-${m[2]}` : `T${m[1]}`;
+}
+function dtHienThi(iso: string): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+// ---------- Bản đã lưu (theo tài khoản) ----------
+function BanDaLuuBox({
+  runs,
+  banDangMo,
+  laAdmin,
+  onMo,
+  onTai,
+  onXoa,
+}: {
+  runs: ReconciliationRun[];
+  banDangMo: string | null;
+  laAdmin: boolean;
+  onMo: (r: ReconciliationRun) => void;
+  onTai: (r: ReconciliationRun) => void;
+  onXoa: (r: ReconciliationRun) => void;
+}) {
+  const cot: Cot<ReconciliationRun>[] = [
+    {
+      key: "ten",
+      header: "Tên bản",
+      chinh: true,
+      render: (r) => (
+        <span>
+          {r.title}
+          {r.id === banDangMo && <span className="ml-2 text-sm text-primary">(đang mở)</span>}
+        </span>
+      ),
+    },
+    {
+      key: "tt",
+      header: "Trạng thái",
+      render: (r) =>
+        r.status === "official" ? (
+          <Badge>Chính thức</Badge>
+        ) : (
+          <Badge variant="secondary">Nháp</Badge>
+        ),
+    },
+    { key: "ky", header: "Kỳ", render: (r) => r.period || "—" },
+    {
+      key: "tom",
+      header: "Kết quả (lúc lưu)",
+      render: (r) =>
+        `${num(r.summary?.khop ?? 0)} khớp · ${num(r.summary?.lech ?? 0)} lệch · ${num(r.summary?.thieu ?? 0)} chưa`,
+    },
+    { key: "luc", header: "Lưu lúc", render: (r) => dtHienThi(r.updatedAt), anTrenDienThoai: true },
+    ...(laAdmin
+      ? [{ key: "nguoi", header: "Người lưu", render: (r: ReconciliationRun) => r.ownerName || r.ownerUsername || "—" }]
+      : []),
+  ];
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <History className="size-5" aria-hidden />
+          Bản đã lưu ({runs.length})
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <RecordTable
+          columns={cot}
+          rows={runs}
+          getKey={(r) => r.id}
+          timKiem={(r) => `${r.title} ${r.period} ${r.ownerName}`}
+          nhanTimKiem="Tìm theo tên / kỳ…"
+          emptyText="Chưa có bản đối soát nào được lưu. Chạy đối soát rồi bấm Lưu."
+          actions={(r) => (
+            <>
+              <Button size="sm" onClick={() => onMo(r)}>
+                <FolderOpen /> Mở lại
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => onTai(r)}>
+                <Download /> Tải Excel
+              </Button>
+              <ConfirmDelete
+                moTaBanGhi={`${r.title} — ${r.period || "không rõ kỳ"} — ${r.status === "official" ? "Chính thức" : "Nháp"}`}
+                tieuDe="Xóa bản đối soát này?"
+                nhanNut="Xóa bản"
+                onConfirm={() => onXoa(r)}
+              />
+            </>
+          )}
+        />
+      </CardContent>
+    </Card>
+  );
 }
 
 // ---------- Khối tự kiểm (§6) ----------
@@ -440,6 +552,20 @@ export default function DoiSoatScreen() {
   const [soChuanTen, setSoChuanTen] = useState<string | undefined>(undefined);
   const [dangChay, setDangChay] = useState(false);
   const [tab, setTab] = useState<string>("");
+  // Lưu theo tài khoản (v4)
+  const [b64, setB64] = useState<string>(""); // base64 file gốc hiện hành (để lưu / mở lại)
+  const [tenHienThi, setTenHienThi] = useState<string>(""); // tên file / tên bản đang mở
+  const [tenBanLuu, setTenBanLuu] = useState<string>(""); // ô nhập tên bản lưu
+  const [banDangMo, setBanDangMo] = useState<string | null>(null); // id bản đã lưu đang mở (lưu = cập nhật)
+  const auth = useAuth();
+  const [runs, ghiRuns] = useReconciliationRuns();
+
+  const runsCuaToi = useMemo(() => {
+    const list = auth.laAdmin
+      ? runs
+      : runs.filter((r) => !r.userId || r.userId === auth.nguoiDung?.id);
+    return [...list].sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || ""));
+  }, [runs, auth.laAdmin, auth.nguoiDung]);
 
   const ketQua: KetQuaDoiSoat | null = useMemo(() => {
     if (!wb) return null;
@@ -460,6 +586,9 @@ export default function DoiSoatScreen() {
     setSuaLog({});
     setNghiVanBanDau(null);
     setSoChuanTen(undefined);
+    setB64("");
+    setTenHienThi(f?.name ?? "");
+    setBanDangMo(null);
     e.target.value = "";
   };
 
@@ -477,6 +606,10 @@ export default function DoiSoatScreen() {
       setSuaLog({});
       setNghiVanBanDau(baseline);
       setSoChuanTen(undefined);
+      setB64(await fileSangBase64(file));
+      setTenHienThi(file.name);
+      setTenBanLuu(file.name.replace(/\.xlsx?$/i, ""));
+      setBanDangMo(null);
       setWb(raw);
       setTab(kq0.sheetsHoaDon[0]?.ten ?? (kq0.sheetPhanMem ? PM_TAB : ""));
       notify.daLuu(
@@ -517,6 +650,91 @@ export default function DoiSoatScreen() {
       delete n[k];
       return n;
     });
+  };
+
+  // ---- Lưu / mở lại / xóa bản đối soát theo tài khoản ----
+  const luuBan = (status: "draft" | "official") => {
+    if (!ketQua || !b64) {
+      notify.canhBao("Chưa có kết quả để lưu — hãy chọn file và bấm Đối soát.");
+      return;
+    }
+    const nd = auth.nguoiDung;
+    const now = new Date().toISOString();
+    const t = ketQua.tong;
+    const id = banDangMo ?? crypto.randomUUID();
+    const cu = banDangMo ? runs.find((r) => r.id === banDangMo) : null;
+    const run: ReconciliationRun = {
+      id,
+      userId: nd?.id ?? "",
+      ownerUsername: nd?.username ?? "",
+      ownerName: nd?.fullName || nd?.username || "",
+      title: tenBanLuu.trim() || tenHienThi || "Bản đối soát",
+      period: suyKy(tenHienThi),
+      status,
+      threshold: nguong ?? 1,
+      fileName: tenHienThi,
+      fileB64: b64,
+      options: { soChuanTen, edits },
+      summary: {
+        soHoaDon: t.soHoaDon, khop: t.khop, lech: t.lech, thieu: t.thieu, ganKhop: t.ganKhop,
+        soDongPm: t.soDongPm, pmCo: t.pmCo, pmThieu: t.pmThieu, tongChenh: t.tongChenh,
+        nguong: ketQua.nguong, savedAt: now,
+      },
+      createdAt: cu?.createdAt || now,
+      updatedAt: now,
+    };
+    ghiRuns([...runs.filter((r) => r.id !== id), run]);
+    setBanDangMo(id);
+    notify.daLuu(`Đã lưu bản ${status === "official" ? "CHÍNH THỨC" : "nháp"}: "${run.title}".`);
+  };
+
+  const moLai = (run: ReconciliationRun) => {
+    try {
+      const raw = sheetsTuBase64(run.fileB64);
+      const kq0 = doiSoat(raw, {
+        nguong: run.threshold,
+        edits: run.options?.edits,
+        soChuanTen: run.options?.soChuanTen,
+      });
+      const baseline = kq0.nghiVan.length + kq0.nghiVanGop.reduce((s, g) => s + g.soDong, 0);
+      setFile(null);
+      setB64(run.fileB64);
+      setTenHienThi(run.fileName || run.title);
+      setTenBanLuu(run.title);
+      setNguong(run.threshold);
+      setEdits(run.options?.edits ?? {});
+      setSuaLog({});
+      setSoChuanTen(run.options?.soChuanTen);
+      setNghiVanBanDau(baseline);
+      setBanDangMo(run.id);
+      setWb(raw);
+      setTab(kq0.sheetsHoaDon[0]?.ten ?? (kq0.sheetPhanMem ? PM_TAB : ""));
+      notify.daLuu(`Đã mở lại "${run.title}" (${run.status === "official" ? "chính thức" : "nháp"}).`);
+    } catch (err) {
+      notify.loi(`Không mở lại được: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  };
+
+  const xoaBan = (run: ReconciliationRun) => {
+    const con = runs.filter((r) => r.id !== run.id);
+    ghiRuns(con);
+    if (banDangMo === run.id) setBanDangMo(null);
+    notify.daXoa(`Đã xóa bản "${run.title}".`, () => ghiRuns([...con, run]));
+  };
+
+  const taiExcelBan = (run: ReconciliationRun) => {
+    try {
+      const raw = sheetsTuBase64(run.fileB64);
+      const kq = doiSoat(raw, {
+        nguong: run.threshold,
+        edits: run.options?.edits,
+        soChuanTen: run.options?.soChuanTen,
+      });
+      xuatExcelDoiSoat(kq, `${(run.title || "doi-soat").replace(/\.xlsx?$/i, "")} - đã đối soát.xlsx`);
+      notify.daLuu("Đã xuất Excel từ bản đã lưu.");
+    } catch (err) {
+      notify.loi(`Không xuất được: ${err instanceof Error ? err.message : String(err)}`);
+    }
   };
 
   const the: TheThongTin[] = useMemo(() => {
@@ -612,8 +830,49 @@ export default function DoiSoatScreen() {
               </div>
             </div>
           )}
+          {/* Lưu bản đối soát theo tài khoản (v4) */}
+          {ketQua && (
+            <div className="rounded-xl border border-border p-3">
+              <p className="text-sm font-medium">Lưu bản đối soát này theo tài khoản</p>
+              <div className="mt-2 flex flex-col gap-2 md:flex-row md:items-end">
+                <div className="w-full md:flex-1">
+                  <Input
+                    value={tenBanLuu}
+                    onChange={(e) => setTenBanLuu(e.target.value)}
+                    placeholder="Tên bản (VD: Đối soát T02-2026)"
+                    aria-label="Tên bản lưu"
+                  />
+                </div>
+                <Button variant="outline" onClick={() => luuBan("draft")} className="w-full md:w-auto">
+                  <Save /> Lưu nháp
+                </Button>
+                <Button onClick={() => luuBan("official")} className="w-full md:w-auto">
+                  <Save /> Lưu chính thức
+                </Button>
+              </div>
+              {banDangMo && (
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Đang mở một bản đã lưu — bấm Lưu sẽ CẬP NHẬT bản đó (không tạo bản mới).
+                </p>
+              )}
+              {!auth.session && (
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Chưa đăng nhập máy chủ → bản lưu chỉ nằm trên MÁY NÀY. Đăng nhập để lưu theo tài khoản, xem trên máy khác.
+                </p>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
+
+      <BanDaLuuBox
+        runs={runsCuaToi}
+        banDangMo={banDangMo}
+        laAdmin={auth.laAdmin}
+        onMo={moLai}
+        onTai={taiExcelBan}
+        onXoa={xoaBan}
+      />
 
       {!ketQua ? (
         <EmptyState

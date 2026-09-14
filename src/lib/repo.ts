@@ -43,6 +43,7 @@ import type {
   FinishedGoodsOpeningStock,
   NxtSnapshotLine,
   MonthlyStockLine,
+  ReconciliationRun,
 } from "@/types";
 import { rolesFromCsv, rolesToCsv } from "@/types";
 import { ghiNhatKy, type NhatKyMoi } from "@/lib/audit";
@@ -1104,6 +1105,60 @@ async function dongBoCho<T>(
   }
 }
 
+/** jsonb (Supabase trả object; localStorage có thể là chuỗi) → object an toàn. */
+const parseObj = (v: unknown): Record<string, unknown> => {
+  if (typeof v === "string") {
+    try {
+      return JSON.parse(v) as Record<string, unknown>;
+    } catch {
+      return {};
+    }
+  }
+  return v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
+};
+
+/**
+ * Bản đối soát hóa đơn đã lưu (màn /doi-soat). file_b64 = file Excel gốc để mở
+ * lại chạy lại; options/summary là jsonb. Riêng tư theo tài khoản ép ở tầng app.
+ */
+export const BANG_RECONCILIATION_RUN: AnhXaBang<ReconciliationRun> = {
+  table: "reconciliation_runs",
+  localKey: "bsf.reconciliation-runs.v1",
+  layKhoa: theoId,
+  toRow: (x) => ({
+    id: x.id,
+    user_id: x.userId,
+    owner_username: x.ownerUsername,
+    owner_name: x.ownerName,
+    title: x.title,
+    period: x.period,
+    status: x.status,
+    threshold: x.threshold,
+    file_name: x.fileName,
+    file_b64: x.fileB64,
+    options: x.options ?? {},
+    summary: x.summary ?? {},
+    created_at: x.createdAt || undefined,
+    updated_at: x.updatedAt || undefined,
+  }),
+  fromRow: (r) => ({
+    id: s(r.id),
+    userId: s(r.user_id),
+    ownerUsername: s(r.owner_username),
+    ownerName: s(r.owner_name),
+    title: s(r.title),
+    period: s(r.period),
+    status: s(r.status) === "official" ? "official" : "draft",
+    threshold: r.threshold == null ? 1 : Number(r.threshold),
+    fileName: s(r.file_name),
+    fileB64: s(r.file_b64),
+    options: parseObj(r.options) as unknown as ReconciliationRun["options"],
+    summary: parseObj(r.summary) as unknown as ReconciliationRun["summary"],
+    createdAt: s(r.created_at),
+    updatedAt: s(r.updated_at),
+  }),
+};
+
 /* ---------- Nhật ký thao tác (audit) ---------- */
 
 /** Nhãn tiếng Việt của bảng — cho câu tóm tắt nhật ký dễ đọc. */
@@ -1134,6 +1189,7 @@ const NHAN_BANG: Record<string, string> = {
   finished_goods_opening_stock: "Tồn đầu thành phẩm",
   nxt_snapshots: "Xuất–Nhập–Tồn kho (báo cáo)",
   monthly_stock_ledger: "Sổ kho theo tháng",
+  reconciliation_runs: "Bản đối soát hóa đơn",
 };
 
 /** Trường đổi giữa hai bản ghi → { trường: [trước, sau] }. */

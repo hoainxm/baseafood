@@ -1,6 +1,8 @@
 > Load khi: thêm/bớt màn hình, đổi điều hướng, header, hay tìm xem một màn được gắn vào đâu.
 covers: src/App.tsx, src/features/shared/AppShell.tsx, src/features/shared/NotFound.tsx, src/features/shared/guideContent.tsx, src/lib/nav-access.ts
-last_verified: 2026-09-10
+last_verified: 2026-09-14
+<!-- re-verified: 2026-09-14 12:00 — KIT_NAV labels (AppShell.tsx:82-106) + CAY_NAV nhóm (nav-access grouping) + tieuDe header lấy TỪ label (App.tsx:108 `tieuDe={current?.label}`) đối chiếu khớp code. -->
+<!-- updated: 2026-09-14 — CHUẨN HÓA NHÃN TRANG theo microcopy (src/design-system/noi-dung-va-label.md): bỏ viết tắt & qualifier kỹ thuật, nhất quán họ báo cáo. Đổi 11 nhãn KIT_NAV: balancing "Cân đối"→"Cân đối kỳ"; bc-thanh-pham "BC Thành phẩm"→"Báo cáo thành phẩm"; bc-don-xuat "BC Đơn xuất"→"Báo cáo đơn xuất"; nxt-nl "Tồn kho NL"→"Tồn kho nguyên liệu"; nxt "Báo cáo NXT"→"Tồn kho thành phẩm"; nxt-kho "XNT kho (số thật)"→"Nhập xuất tồn kho" (giữ "Nhập xuất tồn" cho sổ tổng hợp; 2 báo cáo NL/TP để "Tồn kho X" ngắn hơn, không cụt chữ phân biệt khi sidebar rút gọn); doi-soat "Đối soát HĐĐT"→"Đối soát hóa đơn điện tử"; qr "Quét lô (QR)"→"Quét mã lô"; reports(DEMO) "Báo cáo"→"Báo cáo tổng"; traceability(DEMO) "Truy xuất"→"Truy xuất nguồn gốc"; audit "Nhật ký"→"Nhật ký thao tác". Id/route KHÔNG đổi (deep-link, guideContent key giữ nguyên). guideContent tieuDe đồng bộ cho balancing/nxt/qr. FIX drift: bảng route cũ nhầm /production↔/wip. -->
 <!-- updated: 2026-09-10 — THÊM route `/doi-soat` "Đối soát HĐĐT" (features/doi-soat, màn THẬT — KHÔNG demoGuard, KHÔNG gate bộ phận nên kế toán/admin thấy): KIT_NAV icon FileCheck2 (AppShell), CAY_NAV nhóm "Báo cáo & Cân đối". Đối soát hóa đơn điện tử (cổng thuế) ⇄ phần mềm kế toán TỪ FILE EXCEL upload (không đọc DB/repo). Xem 37-doi-soat-hddt.md. ~21 route. -->
 <!-- re-verified: 2026-09-09 16:30 — AppShell.tsx là khung THẬT: <main> bọc children trong <div key={active}> fade khi đổi route (AppShell.tsx ~789) — khớp code. (task thêm animation) -->
 <!-- re-verified: 2026-09-09 15:00 — route /ton-kho-thang: App.tsx:182 + lazy:43, KIT_NAV AppShell:99, CAY_NAV nhóm Kho:168, gate DEPT_NHAP_HANG (nav-access.ts:13) — khớp code. -->
@@ -77,18 +79,19 @@ Cỡ chữ / trạng thái kết nối **không còn ở chân sidebar** (đã d
 |---|---|---|---|---|
 | — | — | Đăng nhập | `features/auth/LoginScreen.tsx` | Màn chặn đăng nhập toàn app (không có route, gate ở `App.tsx`) |
 | `/imports` | `imports` | Nhập hàng | `features/imports/ImportTab.tsx` | Mặc định khi mở app. Bọc 2 tab: **Sổ** (`MaterialImportScreen`) + **Báo cáo** (`ImportReport`) |
-| `/production` | `production` | Sản xuất BTP | `features/production/WipProductionScreen.tsx` | Ghi sản lượng bán thành phẩm ngày (WIP) |
+| `/wip` | `wip` | Sản xuất thành phẩm | `features/production/WipProductionScreen.tsx` | Màn THẬT — ghi sản lượng thành phẩm ngày (WIP). Nhãn dùng "thành phẩm" khớp copy trong màn |
+| `/production` | `production` | Lệnh sản xuất | `features/production/WorkOrderScreen.tsx` | 🔶 DEMO (dữ liệu mẫu, admin-only + badge). ĐỪNG nhầm với `/wip` |
 | `/sales` | `sales` | Bán hàng | `features/sales/SalesTab.tsx` | Bọc 2 tab: **Sổ** (`SalesScreen`) + **Báo cáo** (`SalesReport`) |
 | `/warehouse` | `warehouse` | Kho dự trữ | `features/warehouse/ReserveWarehouseScreen.tsx` | Duyệt nhập kho, theo dõi tồn đông |
 | `/orders` | `orders` | Đơn đặt | `features/orders/SalesOrderScreen.tsx` | Gom đơn và lệnh xuất |
-| `/balancing` | `balancing` | Cân đối | `features/balancing/BalancingScreen.tsx` | Danh sách kỳ. "Báo cáo" = bảng in A4 sẵn có (`BalancingTable`) |
+| `/balancing` | `balancing` | Cân đối kỳ | `features/balancing/BalancingScreen.tsx` | Danh sách kỳ. "Báo cáo" = bảng in A4 sẵn có (`BalancingTable`) |
 | `/balancing/:periodId` | — | Chi tiết kỳ | `features/balancing/BalancingScreen.tsx` | Chi tiết kỳ (URL param thay `selId`) |
 | `/catalog` | `catalog` | Danh mục | `features/catalog/CatalogScreen.tsx` | 5 tab (render thêm `FinishedGoodScreen.tsx`) |
 | `/users` | `users` | Người dùng | `features/users/UserManagementScreen.tsx` | **Chỉ Admin** (Route Guard + chỉ admin thấy trong NAV) |
-| `/audit` | `audit` | Nhật ký | `features/audit/AuditLogScreen.tsx` | **Chỉ Admin** — đọc `audit_log` (nhật ký thao tác); lọc + xuất Excel. Xem [04-tang-du-lieu.md](04-tang-du-lieu.md) §Nhật ký |
+| `/audit` | `audit` | Nhật ký thao tác | `features/audit/AuditLogScreen.tsx` | **Chỉ Admin** — đọc `audit_log` (nhật ký thao tác); lọc + xuất Excel. Xem [04-tang-du-lieu.md](04-tang-du-lieu.md) §Nhật ký |
 | `/kit` | — | Bộ giao diện | `design-system/kit/KitPage.tsx` | Trang demo component. **Đã gỡ khỏi sidebar** — vào bằng URL, desktop-only |
 
-Ngoài bảng trên, khung còn các màn MES: `/dashboard` (Tổng quan) · `/quality` (Chất lượng) · `/cold-storage` (Kho lạnh) · `/reports` (Báo cáo) · `/traceability` (Truy xuất) · `/wip` (Sản xuất BTP).
+Ngoài bảng trên, khung còn các màn MES: `/dashboard` (Tổng quan) · `/quality` (Chất lượng, DEMO) · `/cold-storage` (Kho lạnh, DEMO) · `/reports` (Báo cáo tổng, DEMO) · `/traceability` (Truy xuất nguồn gốc, DEMO).
 
 Sổ kho theo THÁNG dương lịch: `/ton-kho-thang` (`features/monthly-stock/MonthlyStockScreen.tsx` — dồn tồn cuối kỳ tháng N → tồn đầu kỳ N+1, cho mọi đối tượng NL/BTP/TP, đủ cột kiện+kg như bảng kê kho; xem [36-so-kho-thang.md](36-so-kho-thang.md)).
 

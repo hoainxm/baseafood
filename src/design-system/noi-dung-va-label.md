@@ -39,6 +39,7 @@ Nguồn (đã đối chiếu): GOV.UK / Home Office content style guide · Niels
 - Nút là **động từ/cụm động từ** ("Ghi chuyến hàng", "Chốt ngày").
 - Tránh giới từ treo lửng: "Xem theo" ❌ → gọi thẳng chiều: "Kỳ xem sổ" ✅.
 - Nhất quán số & đơn vị: khối lượng luôn **kg**, tiền **đ**, locale vi-VN (xem `lib/format.ts`).
+- **Nhãn nav rút gọn trong sidebar** (`truncate`, hết ~13–14 ký tự là `…`): đặt **từ phân biệt lên trước**, đừng để nhiều mục cùng tiền tố dài rồi cụt ở chỗ khác nhau. VD 3 báo cáo NXT: "Tồn kho nguyên liệu" · "Tồn kho thành phẩm" · "Nhập xuất tồn kho" — KHÔNG để cả ba là "Nhập xuất tồn …" (rút gọn xong nhìn giống hệt nhau). Tên đầy đủ vẫn hiện ở tiêu đề header (lấy từ chính nhãn) + `title` khi hover.
 
 ## Checklist khi thêm/sửa 1 label
 

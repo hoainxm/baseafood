@@ -197,7 +197,7 @@ export const HUONG_DAN: Record<string, NoiDungHuongDan> = {
   },
 
   balancing: {
-    tieuDe: "Cân đối",
+    tieuDe: "Cân đối kỳ",
     moTa: "Cân đối một lô nguyên liệu ra thành phẩm, tính định mức và lãi/lỗ.",
     noiDung: (
       <>
@@ -321,7 +321,7 @@ export const HUONG_DAN: Record<string, NoiDungHuongDan> = {
   },
 
   nxt: {
-    tieuDe: "Báo cáo NXT thành phẩm",
+    tieuDe: "Tồn kho thành phẩm",
     moTa: "Nhập – Xuất – Tồn kho thành phẩm cấp đông.",
     noiDung: (
       <>
@@ -350,7 +350,7 @@ export const HUONG_DAN: Record<string, NoiDungHuongDan> = {
   },
 
   qr: {
-    tieuDe: "Quét lô (QR)",
+    tieuDe: "Quét mã lô",
     moTa: "Tạo mã lô, in tem QR dán lên hàng, và quét để tra lô.",
     noiDung: (
       <>

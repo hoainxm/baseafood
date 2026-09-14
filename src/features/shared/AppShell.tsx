@@ -333,7 +333,9 @@ function MucNut({
       )}
     >
       <Icon className={cn("shrink-0", m.laDanhMuc ? "size-icon-sm" : "size-icon")} aria-hidden />
-      {!thuGon && <span className="min-w-0 truncate">{m.label}</span>}
+      {!thuGon && (
+        <span className="min-w-0 whitespace-normal break-words leading-tight">{m.label}</span>
+      )}
       {!thuGon && m.demo && (
         <Badge variant="outline" className="ml-auto shrink-0">
           DEMO
@@ -558,7 +560,7 @@ export default function AppShell({
       <aside
         className={cn(
           "hidden shrink-0 flex-col border-r border-border bg-card transition-[width] duration-base md:flex md:h-full md:overflow-hidden",
-          thuGon ? "w-20" : "w-64"
+          thuGon ? "w-20" : "w-72"
         )}
       >
         <div

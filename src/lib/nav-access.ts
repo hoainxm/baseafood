@@ -7,8 +7,8 @@ import type { Role } from "@/types";
 
 /**
  * Hai bộ phận vận hành đầu chuỗi, mỗi bộ phận một tập màn + một trang chủ.
- * Vai trò KHÔNG nằm trong bảng này (giám đốc, phó GĐ, kế toán, admin) = xem
- * đầy đủ — chỉ 2 bộ phận thao tác theo bước bị giới hạn nav cho gọn.
+ * Vai trò KHÔNG nằm trong bảng này (giám đốc, phó GĐ, kế toán, kế toán trưởng,
+ * admin) = xem đầy đủ — chỉ 2 bộ phận thao tác theo bước bị giới hạn nav cho gọn.
  */
 const DEPT_NHAP_HANG = ["imports", "warehouse", "nxt-nl", "ton-kho-thang", "qr", "catalog"];
 const DEPT_SAN_XUAT = ["wip", "packaging", "warehouse", "quality", "qc", "qr", "catalog"];

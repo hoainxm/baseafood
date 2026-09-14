@@ -23,6 +23,7 @@ export type Role =
   | "manager-ca"
   | "manager-kho"
   | "vice-manager"
+  | "chief-accountant"
   | "accountant"
   | "team-leader"
   | "warehouse-keeper";
@@ -37,6 +38,7 @@ export const ROLES: { value: Role; label: string }[] = [
   { value: "vice-manager", label: "Phó quản đốc" },
   { value: "team-leader", label: "Tổ trưởng sản xuất" },
   { value: "warehouse-keeper", label: "Thủ kho nhập hàng" },
+  { value: "chief-accountant", label: "Kế toán trưởng" },
   { value: "accountant", label: "Kế toán" },
 ];
 
@@ -54,6 +56,7 @@ const VAI_TRO_CU_CHUAN: Record<string, Role> = {
   "quan-doc-kho": "manager-kho",
   "pho-quan-doc": "vice-manager",
   "ke-toan": "accountant",
+  "ke-toan-truong": "chief-accountant",
   "to-truong": "team-leader",
   "thu-kho": "warehouse-keeper",
   "nhap-hang": "warehouse-keeper",

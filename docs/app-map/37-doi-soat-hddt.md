@@ -1,7 +1,9 @@
 > Load khi: sửa màn `/doi-soat`, logic đối soát hóa đơn điện tử ⇄ phần mềm kế toán, đọc/ghi file Excel hóa đơn.
 covers: src/features/doi-soat/DoiSoatScreen.tsx, src/features/doi-soat/index.ts, src/lib/doiSoatHddt.ts
-last_verified: 2026-09-11
+last_verified: 2026-09-14
 ttl_days: 90
+<!-- re-verified: 2026-09-14 — đối chiếu code thật doiSoatHddt.ts khi nâng v3: khóa (taoKhoa dùng kyHieuChuan+soHoaDonChuan), chọn sổ "mới" (chuan(ten).includes("moi")), cầu nối/tự kiểm, xuất dựng-mới — khớp. (task engine v3) -->
+<!-- updated: 2026-09-14 — v3 (spec ENGINE ĐẦY ĐỦ): chuẩn hóa KÝ HIỆU bỏ chữ số mẫu số gộp đầu (kyHieuChuan: sổ 1C26TTN ↔ HĐ C26TTN, áp cả hai bên qua taoKhoa); GẦN KHỚP (nhóm 3 — dò cùng MST + cùng số tiền ±1đ cho dòng THIẾU hai bên, chú thích `ganKhopMoTa`, KHÔNG đổi bucket đếm); gộp sheet HĐĐT trùng (tập con → laPhu, không cộng đôi — như đã làm cho sheet sổ); GỠ cột đối soát cũ (goCotDoiSoatCu — idempotent, cờ daGoCotCu); 7 nhóm nghi vấn (chèn Gần khớp=3, dồn: thiếu-cả-cụm=4, tổng-xóa=5, cột-phụ=6, sheet-trùng=7); 9 phép tự kiểm (thêm "tổng cột Chênh lệch = phần dư trừ chéo"); ngưỡng KHỚP mặc định 1đ (§5.3, vẫn chỉnh được trên màn); XUẤT FILE MẪU (xuatFileMau — 3 sheet HĐĐT + PMEM + HƯỚNG DẪN, người dùng làm theo format, engine vẫn đọc mọi biến thể). Kiểm code thật: file "pmem mới" T02 ra ĐÚNG spec §12 T2 = 264 khớp/4 lệch/155 chưa, sổ 291/5; tự kiểm 9/9; idempotent (chạy lại trên file đã xuất ra y hệt). CÒN CHỜ file T1,T3–T6 để chạy thật GẦN KHỚP + gộp sheet HĐĐT + strip mẫu số (T2 không có các ca này). -->
 <!-- updated: 2026-09-11 — v2 (quy tắc thực chiến 6 tháng): KHÔNG tự sửa dữ liệu (chỉ báo + nút Sửa từng dòng, giữ giá trị cũ, áp trong phiên + vào file xuất qua Map edits); 6 NHÓM NGHI VẤN (1 cộng sai chỉ báo khi CẢ HAI cách lệch · 2 thiếu 1 ô suy được · 3 thiếu cả cụm gộp thống kê · 4 tổng bị xóa gộp · 5 cột phụ trùng tên · 6 sheet trùng lặp); dò cột trùng theo ĐỘ KHỚP với tổng (chonCotDongNhat); CHỌN SỔ CHUẨN khi có nhiều sheet sổ (ưu tiên "mới", subset → sheet phụ không cộng đôi); CẦU NỐI số liệu (2 cách tính = nhau + bóc tách phần dư trừ chéo); KHỐI TỰ KIỂM 8 phép (phép #8 so số nghi vấn với baseline); xuất Excel chuẩn hóa (dựng mới → 0 ẩn, neo A1, nút lọc, nới cột) + sheet NHẬT KÝ SỬA. Nhận CẢ định dạng sổ mã máy (SCT_GHISO/KY_HIEU/SO_HD/RMST/TIENHANG/TIENTHUE/TONGCONG) lẫn nhãn tiếng Việt. Kiểm code thật trên file T02-2026: oracle 268/268; tự kiểm 8/8; §4 chọn pmem mới, PMEM là tập con. -->
 
 # 37 — Đối soát Hóa đơn điện tử ⇄ Phần mềm kế toán (`/doi-soat`)
@@ -55,6 +57,19 @@ Màu chip lấy **token** `--status-*` (không viết mã màu tay); màu nền 
 - **Xuất Excel §7**: dựng workbook MỚI từ giá trị (không copy nguồn) ⇒ tự sạch dòng/cột ẩn, bộ lọc lưu sẵn, ô góc khung nhìn; thêm nút lọc (autofilter, không ẩn dòng), neo A1, nới cột hẹp, màu cứng. (Freeze panes không ghi được qua `xlsx-js-style` — chấp nhận, nguồn cũng không dính freeze.)
 - **Hai định dạng cột sổ**: nhãn tiếng Việt (`CTGS·KHHĐ·Số HĐ·MASOTHUE·ST chưa thuế·Tiền thuế·Tổng cộng`) và mã máy (`SCT_GHISO·KY_HIEU·SO_HD·RMST·TIENHANG·TIENTHUE·TONGCONG`). Dò sổ neo `so hd`+`tổng cộng` (HĐĐT không có) để không nhận nhầm.
 
+## v3 — engine đầy đủ (spec sau 6 tháng chạy thật)
+
+- **Chuẩn hóa khóa mạnh hơn** (`taoKhoa`): số HĐ bỏ số 0 đầu (`soHoaDonChuan`) + **ký hiệu bỏ chữ số mẫu số gộp đầu** (`kyHieuChuan`: sổ `1C26TTN` ↔ cổng thuế `C26TTN`; ký hiệu thật luôn bắt đầu bằng chữ cái nên cắt số đầu an toàn). MST giữ nguyên đuôi chi nhánh; MST bắt buộc trong khóa.
+- **GẦN KHỚP** (nhóm 3): dòng THIẾU ở CẢ HAI bên, **cùng MST + cùng số tiền ±1đ** → ghép 1-1 (greedy), gắn `ganKhopMoTa` vào cả hai + đẩy nghi vấn nhóm 3. KHÔNG tạo nhãn/bucket đếm mới — vẫn là THIẾU, chỉ thêm gợi ý (giữ 4 nhãn: Khớp/Lệch/Chưa kê + sổ Có/Không như spec §12).
+- **Gộp sheet HĐĐT trùng** (`laPhu` trên `SheetHoaDon`): sheet có tập khóa là TẬP CON của sheet khác → không vào tổng (dùng `hdActive = sheetsHoaDon.filter(!laPhu)` cho ghép/đếm/cầu nối), nghi vấn nhóm 7. (Trước đây chỉ làm cho sheet sổ.)
+- **Idempotent** (`goCotDoiSoatCu`): file đã xử lý lần trước (có cột `KẾT QUẢ` + cột phân tích) → tự gỡ cột đó trước khi chạy, cờ `daGoCotCu` (màn hiện chú thích). Chỉ bỏ CỘT, giữ số dòng.
+- **9 phép tự kiểm** (thêm "tổng cột Chênh lệch = phần dư trừ chéo").
+- **Ngưỡng KHỚP mặc định 1đ** (spec §5.3) — vẫn có ô chỉnh trên màn.
+- **Xuất file mẫu** (`xuatFileMau`): 3 sheet HĐĐT (tiêu đề hàng 6) + PMEM (mã máy) + HƯỚNG DẪN, kèm dòng ví dụ. Engine vẫn đọc mọi biến thể tên sheet/cột — file mẫu chỉ để đỡ sai định dạng.
+- **Locale**: `soVN` tự suy dấu thập phân theo dấu cuối, lỗi → null (không mặc định 0/1). Xuất là dựng workbook MỚI từ GIÁ TRỊ (không mang công thức/liên kết file ngoài/dòng ẩn của nguồn) nên các luật công thức §3.2–3.4/§9 của spec phần lớn không áp — trừ đóng băng khung nhìn: `xlsx-js-style` không ghi freeze, chấp nhận (nguồn cũng không dính).
+
+> ⚠️ **Verify**: mới chạy thật trên **T02** (khớp spec §12 T2 = 264/4/155, sổ 291/5; tự kiểm 9/9; idempotent). GẦN KHỚP, strip mẫu số, gộp sheet HĐĐT trùng CHƯA có dữ liệu thật để chạy (T2 không dính) — cần file T1/T3–T6 để đóng bộ hồi quy §12.
+
 ## Không thuộc phạm vi (để sau nếu cần)
 
-Sửa/ghi ngược vào phần mềm; lưu lịch sử các lần đối soát (chưa có bảng); đối soát hóa đơn **bán ra**; gộp nhiều file (đang chỉ 1 workbook).
+Sửa/ghi ngược vào phần mềm; lưu lịch sử các lần đối soát (chưa có bảng); đối soát hóa đơn **bán ra**; gộp nhiều file (đang chỉ 1 workbook); đóng băng khung nhìn khi xuất (thư viện không hỗ trợ ghi).

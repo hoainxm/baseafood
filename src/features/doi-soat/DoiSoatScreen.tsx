@@ -30,6 +30,7 @@ import {
   doiSoat,
   docWorkbook,
   xuatExcelDoiSoat,
+  xuatFileMau,
   type CauNoi,
   type DongHoaDon,
   type DongPhanMem,
@@ -45,6 +46,7 @@ import { num } from "@/lib/format";
 import {
   Upload,
   FileSpreadsheet,
+  FileDown,
   Download,
   AlertTriangle,
   ScanSearch,
@@ -169,11 +171,12 @@ function CauNoiBox({ cauNoi }: { cauNoi: CauNoi }) {
 // ---------- Nghi vấn ----------
 const TEN_NHOM: Record<number, string> = {
   1: "Cộng không khớp",
-  2: "Thiếu 1 ô (suy được)",
-  3: "Thiếu cả cụm",
-  4: "Tổng bị xóa",
-  5: "Cột phụ trùng tên",
-  6: "Sheet trùng lặp",
+  2: "Thiếu ô chưa thuế/thuế",
+  3: "Gần khớp",
+  4: "Thiếu cả cụm",
+  5: "Tổng bị xóa",
+  6: "Cột quy đổi phụ",
+  7: "Sheet trùng lặp",
 };
 
 function NghiVanBox({
@@ -430,7 +433,7 @@ export default function DoiSoatScreen() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [wb, setWb] = useState<Workbook | null>(null);
-  const [nguong, setNguong] = useState<number | null>(1000);
+  const [nguong, setNguong] = useState<number | null>(1);
   const [edits, setEdits] = useState<Record<string, number>>({});
   const [suaLog, setSuaLog] = useState<Record<string, { viTri: string; cu: string; moi: string }>>({});
   const [nghiVanBanDau, setNghiVanBanDau] = useState<number | null>(null);
@@ -524,7 +527,7 @@ export default function DoiSoatScreen() {
       { nhan: "Hóa đơn điện tử", giaTri: num(t.soHoaDon), so: true, mau: "brand", icon: FileSpreadsheet },
       { nhan: "Khớp", giaTri: num(t.khop), so: true, mau: "success" },
       { nhan: "Lệch tiền", giaTri: num(t.lech), so: true, mau: "warning" },
-      { nhan: "Chưa có ở PMKT", giaTri: num(t.thieu), so: true, mau: "danger" },
+      { nhan: "Chưa có ở PMKT", giaTri: num(t.thieu), so: true, mau: "danger", phu: t.ganKhop ? `${num(t.ganKhop)} gần khớp` : undefined },
       { nhan: "Bút toán phần mềm", giaTri: num(t.soDongPm), so: true, mau: "brand" },
       { nhan: "PM chưa có HĐĐT", giaTri: num(t.pmThieu), so: true, mau: "danger" },
       { nhan: "Tổng chênh (đ)", giaTri: num(t.tongChenh), so: true, mau: "warning", phu: "các dòng lệch" },
@@ -551,6 +554,17 @@ export default function DoiSoatScreen() {
             <Button variant="outline" onClick={chonFile} className="w-full md:w-auto">
               <Upload />
               {file ? "Chọn file khác" : "Chọn file Excel"}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                xuatFileMau();
+                notify.daLuu("Đã tải file mẫu — làm theo format này (hệ thống vẫn đọc file khác).");
+              }}
+              className="w-full md:w-auto"
+            >
+              <FileDown />
+              Tải file mẫu
             </Button>
             <div className="w-full md:w-56">
               <NumberField
@@ -615,6 +629,12 @@ export default function DoiSoatScreen() {
       ) : (
         <>
           <ThongKe the={the} cot={4} />
+
+          {ketQua.daGoCotCu && (
+            <p className="rounded-xl border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+              Đã tự gỡ cột đối soát của lần chạy trước (KẾT QUẢ + các cột phân tích) để chạy lại sạch — file gốc của bạn không bị đổi.
+            </p>
+          )}
 
           <TuKiemBox phepThu={ketQua.phepThu} />
 

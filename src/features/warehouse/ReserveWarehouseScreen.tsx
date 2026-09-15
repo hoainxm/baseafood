@@ -256,7 +256,8 @@ export default function KhoDuTruScreen() {
                     · SX {viDate(s.productionDate)} · xưởng {s.workshop}
                   </span>
                 </span>
-                <Button size="sm" onClick={() => moDuyet(s)}>
+                <Button
+                  title="Duyệt lô bán thành phẩm này từ trạng thái chờ sang đã nhập kho, để tính vào tồn dự trữ." size="sm" onClick={() => moDuyet(s)}>
                   <PackageCheck />
                   Duyệt nhập kho
                 </Button>
@@ -376,7 +377,8 @@ export default function KhoDuTruScreen() {
             <Button variant="outline" size="lg" onClick={() => setDuyet(null)}>
               Hủy
             </Button>
-            <Button size="lg" onClick={luuDuyet}>
+            <Button
+              title="Xác nhận cho lô này vào kho dự trữ — từ đây mới xuất bán hoặc đóng gói được." size="lg" onClick={luuDuyet}>
               <PackageCheck />
               Xác nhận nhập kho
             </Button>

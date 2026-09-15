@@ -232,6 +232,7 @@ function OKho({ k, onClick }: { k: Kho; onClick: () => void }) {
   const md = mucDung(k.dung);
   return (
     <button
+      title="Xem chi tiết kho lạnh này: nhiệt độ, sức chứa và hàng đang gửi."
       type="button"
       onClick={onClick}
       className={cn(
@@ -411,7 +412,8 @@ export default function ManKhoLanh() {
             <TriangleAlert className="size-6" aria-hidden />
             {soLoi} kho đang vượt ngưỡng nhiệt — cần xử lý trong ca
           </span>
-          <Button variant="destructive" onClick={() => setCanhBao(KL_CANH_BAO[0])}>
+          <Button
+            title="Xem chi tiết cảnh báo nhiệt độ đang có." variant="destructive" onClick={() => setCanhBao(KL_CANH_BAO[0])}>
             Xem cảnh báo
           </Button>
         </div>
@@ -484,6 +486,7 @@ export default function ManKhoLanh() {
             const on = hien.includes(k.id);
             return (
               <button
+                title="Hiện / ẩn đường nhiệt độ của kho này trên biểu đồ."
                 key={k.id}
                 type="button"
                 aria-pressed={on}
@@ -545,6 +548,7 @@ export default function ManKhoLanh() {
             const on = locCB === v;
             return (
               <button
+                title="Lọc danh sách cảnh báo theo mức này."
                 key={v}
                 type="button"
                 aria-pressed={on}
@@ -576,6 +580,7 @@ export default function ManKhoLanh() {
               return (
                 <li key={w.id}>
                   <button
+                    title="Xem chi tiết cảnh báo nhiệt độ này."
                     type="button"
                     onClick={() => setCanhBao(w)}
                     className={cn(
@@ -629,6 +634,7 @@ export default function ManKhoLanh() {
             <>
               <NutDong>Đóng</NutDong>
               <Button
+                title="Mở nhật ký nhiệt độ 24 giờ gần nhất của kho này."
                 size="lg"
                 onClick={() => {
                   const k = kho;
@@ -714,6 +720,7 @@ export default function ManKhoLanh() {
                 </Button>
               ) : (
                 <Button
+                  title="Đánh dấu cảnh báo này đã được xử lý xong."
                   size="lg"
                   onClick={() => {
                     const w = canhBao;

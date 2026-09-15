@@ -191,6 +191,7 @@ function MenuThaoTac({ onChon }: { onChon: (id: string) => void }) {
           const Icon = m.icon;
           return (
             <button
+              title="Chọn máy / dây chuyền này."
               key={m.id}
               type="button"
               onClick={() => {
@@ -350,10 +351,12 @@ function DrawerLoc({
         </div>
 
         <div className="flex shrink-0 justify-between gap-3 border-t-2 border-border bg-muted/40 px-6 py-4">
-          <Button variant="outline" size="lg" onClick={() => setTam(BO_LOC_RONG)}>
+          <Button
+            title="Xóa mọi điều kiện lọc đang đặt trong hộp thoại này." variant="outline" size="lg" onClick={() => setTam(BO_LOC_RONG)}>
             Bỏ hết lọc
           </Button>
-          <Button size="lg" onClick={() => onApDung(tam)}>
+          <Button
+            title="Áp dụng bộ lọc vừa chọn cho danh sách lệnh sản xuất." size="lg" onClick={() => onApDung(tam)}>
             <Filter className="size-5" aria-hidden />
             Áp dụng lọc
           </Button>
@@ -438,6 +441,7 @@ export default function ManLenhSX() {
           const active = t.value === tab;
           return (
             <button
+              title="Lọc danh sách lệnh theo trạng thái này."
               key={t.value}
               type="button"
               role="tab"
@@ -489,11 +493,13 @@ export default function ManLenhSX() {
             className="pl-12"
           />
         </div>
-        <Button variant="outline" onClick={() => setMoLoc(true)}>
+        <Button
+          title="Mở hộp lọc lệnh sản xuất theo dây chuyền, trạng thái, khoảng ngày." variant="outline" onClick={() => setMoLoc(true)}>
           <Filter className="size-5" aria-hidden />
           Lọc{soBoLoc > 0 ? ` (${soBoLoc})` : ""}
         </Button>
         <Button
+          title="Tải danh sách lệnh đang lọc ra file Excel (màn DEMO — chưa nối dữ liệu thật)."
           variant="outline"
           onClick={() =>
             notify.daLuu(`Đang xuất Excel · ${loc.length} lệnh theo bộ lọc`)
@@ -502,7 +508,8 @@ export default function ManLenhSX() {
           <FileSpreadsheet className="size-5" aria-hidden />
           Xuất Excel
         </Button>
-        <Button onClick={() => setTaoMoi(true)}>
+        <Button
+          title="Tạo một lệnh sản xuất mới (màn DEMO — chưa nối dữ liệu thật)." onClick={() => setTaoMoi(true)}>
           <Plus className="size-5" aria-hidden />
           Tạo LSX mới
         </Button>
@@ -516,6 +523,7 @@ export default function ManLenhSX() {
           </span>
           <span className="flex flex-wrap gap-2">
             <Button
+              title="In phiếu cho các lệnh đang tick."
               variant="outline"
               size="sm"
               onClick={() =>
@@ -525,7 +533,8 @@ export default function ManLenhSX() {
               <Printer className="size-5" aria-hidden />
               In phiếu
             </Button>
-            <Button variant="outline" size="sm" onClick={() => setChon([])}>
+            <Button
+              title="Bỏ tick toàn bộ lệnh đang chọn." variant="outline" size="sm" onClick={() => setChon([])}>
               Bỏ chọn
             </Button>
           </span>
@@ -540,6 +549,7 @@ export default function ManLenhSX() {
           moTa="Bỏ bớt bộ lọc hoặc đổi từ khóa tìm để thấy lệnh sản xuất."
           action={
             <Button
+              title="Xóa ô tìm và mọi bộ lọc, về lại danh sách đầy đủ."
               variant="outline"
               onClick={() => {
                 setQ("");
@@ -675,6 +685,7 @@ export default function ManLenhSX() {
         </p>
         <div className="flex items-center gap-2">
           <Button
+            title="Về trang trước của danh sách."
             variant="outline"
             size="sm"
             disabled={trangHienTai === 1}
@@ -684,6 +695,7 @@ export default function ManLenhSX() {
           </Button>
           {Array.from({ length: tongTrang }).map((_, k) => (
             <button
+              title="Sang trang này của danh sách."
               key={k}
               type="button"
               aria-current={k + 1 === trangHienTai ? "page" : undefined}
@@ -699,6 +711,7 @@ export default function ManLenhSX() {
             </button>
           ))}
           <Button
+            title="Sang trang sau của danh sách."
             variant="outline"
             size="sm"
             disabled={trangHienTai === tongTrang}
@@ -733,6 +746,7 @@ export default function ManLenhSX() {
             <>
               <NutDong>Đóng</NutDong>
               <Button
+                title="Mở form ghi tiến độ thực hiện cho lệnh này."
                 size="lg"
                 onClick={() => {
                   setCapNhat({ ...chiTiet });
@@ -790,7 +804,8 @@ export default function ManLenhSX() {
           chan={
             <>
               <NutDong>Đóng</NutDong>
-              <Button size="lg" onClick={luuTienDo}>
+              <Button
+                title="Ghi số lượng đã làm được và trạng thái mới của lệnh." size="lg" onClick={luuTienDo}>
                 <Check className="size-5" aria-hidden />
                 Ghi tiến độ
               </Button>
@@ -830,7 +845,8 @@ export default function ManLenhSX() {
               <Button variant="outline" size="lg" onClick={() => setTamDung(null)}>
                 Không dừng
               </Button>
-              <Button variant="destructive" size="lg" onClick={xacNhanTamDung}>
+              <Button
+                title="Tạm dừng lệnh sản xuất này — dây chuyền ngưng chạy cho tới khi mở lại." variant="destructive" size="lg" onClick={xacNhanTamDung}>
                 Tạm dừng lệnh
               </Button>
             </>
@@ -859,6 +875,7 @@ export default function ManLenhSX() {
             <>
               <NutDong>Đóng</NutDong>
               <Button
+                title="Tạo lệnh sản xuất với thông tin vừa khai."
                 size="lg"
                 onClick={() => {
                   setTaoMoi(false);

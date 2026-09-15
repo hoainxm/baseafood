@@ -167,10 +167,12 @@ function BanDaLuuBox({
           emptyText="Chưa có bản đối soát nào được lưu. Chạy đối soát rồi bấm Lưu."
           actions={(r) => (
             <>
-              <Button size="sm" onClick={() => onMo(r)}>
+              <Button
+                title="Mở lại bản đối soát đã lưu và chạy lại trên chính file gốc của nó." size="sm" onClick={() => onMo(r)}>
                 <FolderOpen /> Mở lại
               </Button>
-              <Button variant="outline" size="sm" onClick={() => onTai(r)}>
+              <Button
+                title="Tải kết quả của bản đối soát này ra file Excel." variant="outline" size="sm" onClick={() => onTai(r)}>
                 <Download /> Tải Excel
               </Button>
               <ConfirmDelete
@@ -364,7 +366,8 @@ function NghiVanBox({
                     {suaLog[k].viTri}: <span className="tnum">{suaLog[k].cu}</span> →{" "}
                     <span className="tnum font-medium">{suaLog[k].moi}</span>
                   </span>
-                  <Button variant="outline" size="sm" onClick={() => onHoanTac(k)}>
+                  <Button
+                    title="Bỏ thao tác gộp / sửa vừa làm cho dòng này, trả về như file gốc." variant="outline" size="sm" onClick={() => onHoanTac(k)}>
                     <Undo2 /> Hoàn tác
                   </Button>
                 </li>
@@ -385,11 +388,13 @@ function NghiVanBox({
                 actions={(r) =>
                   r.giaTriDung != null ? (
                     edits[keySua(r)] != null ? (
-                      <Button variant="outline" size="sm" onClick={() => onHoanTac(keySua(r))}>
+                      <Button
+                        title="Bỏ phần sửa tay ở dòng này, trả số về như trong file gốc." variant="outline" size="sm" onClick={() => onHoanTac(keySua(r))}>
                         <Undo2 /> Hoàn tác
                       </Button>
                     ) : (
-                      <Button size="sm" onClick={() => onSua(r)}>
+                      <Button
+                        title="Sửa tay số hoặc ký hiệu của dòng này để hai bên khớp nhau." size="sm" onClick={() => onSua(r)}>
                         <Wrench /> Sửa
                       </Button>
                     )
@@ -407,6 +412,7 @@ function NghiVanBox({
               return (
                 <div key={gk} className="rounded-xl border border-border p-3">
                   <button
+                    title="Mở / thu nhóm dòng này để xem chi tiết từng hóa đơn trong nhóm."
                     type="button"
                     className="flex w-full items-center justify-between gap-3 text-left"
                     onClick={() => setMoGop((m) => ({ ...m, [gk]: !m[gk] }))}
@@ -434,11 +440,13 @@ function NghiVanBox({
                           </span>
                           {nv.giaTriDung != null &&
                             (edits[keySua(nv)] != null ? (
-                              <Button variant="outline" size="sm" onClick={() => onHoanTac(keySua(nv))}>
+                              <Button
+                                title="Bỏ phần sửa tay ở dòng nghi vấn này." variant="outline" size="sm" onClick={() => onHoanTac(keySua(nv))}>
                                 <Undo2 /> Hoàn tác
                               </Button>
                             ) : (
-                              <Button size="sm" onClick={() => onSua(nv)}>
+                              <Button
+                                title="Sửa tay dòng nghi vấn này cho khớp." size="sm" onClick={() => onSua(nv)}>
                                 <Wrench /> Sửa
                               </Button>
                             ))}
@@ -497,7 +505,8 @@ function BangHoaDon({
     <div className="space-y-4">
       <div className="flex flex-wrap gap-2">
         {LOC_HD.map((l) => (
-          <Button key={l.id} variant={loc === l.id ? "default" : "outline"} size="sm" onClick={() => setLoc(l.id)}>
+          <Button
+            title="Lọc danh sách hóa đơn theo trạng thái khớp này." key={l.id} variant={loc === l.id ? "default" : "outline"} size="sm" onClick={() => setLoc(l.id)}>
             {l.nhan}
             {l.id !== "all" && <span className="tnum ml-1">({num(dem[l.id as TrangThaiHoaDon])})</span>}
           </Button>
@@ -557,10 +566,12 @@ function BangPhanMem({
         </div>
       )}
       <div className="flex flex-wrap gap-2">
-        <Button variant={!chiThieu ? "default" : "outline"} size="sm" onClick={() => setChiThieu(false)}>
+        <Button
+          title="Xem toàn bộ dòng của sổ phần mềm." variant={!chiThieu ? "default" : "outline"} size="sm" onClick={() => setChiThieu(false)}>
           Tất cả <span className="tnum ml-1">({num(sheet.dong.length)})</span>
         </Button>
-        <Button variant={chiThieu ? "default" : "outline"} size="sm" onClick={() => setChiThieu(true)}>
+        <Button
+          title="Chỉ xem các dòng phần mềm chưa tìm được hóa đơn tương ứng." variant={chiThieu ? "default" : "outline"} size="sm" onClick={() => setChiThieu(true)}>
           Chưa có hóa đơn <span className="tnum ml-1">({num(dem.thieu)})</span>
         </Button>
       </div>
@@ -826,11 +837,13 @@ export default function DoiSoatScreen() {
           </p>
           <input ref={fileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={napFile} />
           <div className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-end">
-            <Button variant="outline" onClick={chonFile} className="w-full md:w-auto">
+            <Button
+              title="Chọn file Excel hóa đơn điện tử để đối soát với sổ phần mềm." variant="outline" onClick={chonFile} className="w-full md:w-auto">
               <Upload />
               {file ? "Chọn file khác" : "Chọn file Excel"}
             </Button>
             <Button
+              title="Tải về file Excel mẫu đúng định dạng. Hệ thống vẫn đọc được file khác, đây chỉ là bản chuẩn cho dễ."
               variant="outline"
               onClick={() => {
                 xuatFileMau();
@@ -850,12 +863,14 @@ export default function DoiSoatScreen() {
                 hint="Chênh ≤ ngưỡng vẫn coi là khớp (nuốt sai số làm tròn)."
               />
             </div>
-            <Button onClick={chay} disabled={dangChay} className="w-full md:w-auto">
+            <Button
+              title="Chạy đối soát: so từng dòng sổ phần mềm với hóa đơn điện tử, gắn nhãn khớp / gần khớp / thiếu." onClick={chay} disabled={dangChay} className="w-full md:w-auto">
               <ScanSearch />
               {dangChay ? "Đang đối soát…" : "Đối soát"}
             </Button>
             {ketQua && (
-              <Button variant="outline" onClick={taiExcel} className="w-full md:w-auto">
+              <Button
+                title="Tải toàn bộ kết quả đối soát ra file Excel để gửi kế toán." variant="outline" onClick={taiExcel} className="w-full md:w-auto">
                 <Download />
                 Tải Excel kết quả
               </Button>
@@ -875,6 +890,7 @@ export default function DoiSoatScreen() {
               <div className="mt-2 flex flex-wrap gap-2">
                 {dsSoPm.map((s) => (
                   <Button
+                    title="Chọn sheet này làm sổ phần mềm chuẩn để đối chiếu."
                     key={s.ten}
                     size="sm"
                     variant={ketQua?.sheetPhanMem?.ten === s.ten ? "default" : "outline"}
@@ -900,10 +916,12 @@ export default function DoiSoatScreen() {
                     aria-label="Tên bản lưu"
                   />
                 </div>
-                <Button variant="outline" onClick={() => luuBan("draft")} className="w-full md:w-auto">
+                <Button
+                  title="Lưu lần đối soát này dưới dạng NHÁP — mở lại sửa tiếp được, số chưa đóng băng." variant="outline" onClick={() => luuBan("draft")} className="w-full md:w-auto">
                   <Save /> Lưu nháp
                 </Button>
-                <Button onClick={() => luuBan("official")} className="w-full md:w-auto">
+                <Button
+                  title="Lưu lần đối soát này thành bản CHÍNH THỨC — tóm tắt kết quả được đóng băng để đối chiếu về sau." onClick={() => luuBan("official")} className="w-full md:w-auto">
                   <Save /> Lưu chính thức
                 </Button>
               </div>
@@ -937,7 +955,8 @@ export default function DoiSoatScreen() {
           tieuDe="Chưa có kết quả đối soát"
           moTa="Chọn file Excel rồi bấm Đối soát. File cần có ít nhất một sheet hóa đơn điện tử và một sheet PHẦN MỀM."
           action={
-            <Button variant="outline" onClick={chonFile}>
+            <Button
+              title="Chọn file Excel hóa đơn điện tử để bắt đầu." variant="outline" onClick={chonFile}>
               <Upload /> Chọn file Excel
             </Button>
           }
@@ -1004,6 +1023,7 @@ export default function DoiSoatScreen() {
           {/* Kiểm tra chi tiết — gập cho gọn; tự mở khi có phép chưa đạt hoặc có cảnh báo */}
           <div className="space-y-4">
             <button
+              title="Mở / thu phần máy tự kiểm tra và đối chiếu số liệu."
               type="button"
               onClick={() => setMoKiemTra((v) => !v)}
               aria-expanded={moKiemTraHieuLuc}

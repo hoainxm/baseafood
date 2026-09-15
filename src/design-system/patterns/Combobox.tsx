@@ -140,6 +140,7 @@ export function Combobox({
             <Button
               id={id}
               aria-label={label}
+              title={`Mở danh sách ${label.toLowerCase()} — gõ để tìm nhanh, gõ tên chưa có để thêm mới ngay tại đây.`}
               data-slot="combobox-trigger"
               variant="outline"
               role="combobox"

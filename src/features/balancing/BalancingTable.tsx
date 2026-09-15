@@ -79,15 +79,18 @@ export default function BangCanDoi({
           <X className="size-4" /> Đóng
         </Button>
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={() => setAnNgay((v) => !v)}>
+          <Button
+            title="Ẩn / hiện các cột chia theo ngày trên bản in cho vừa khổ giấy." variant="outline" onClick={() => setAnNgay((v) => !v)}>
             <ChevronsLeftRight className="size-4" />
             {anNgay ? "Mở cột ngày" : "Thu cột ngày"}
           </Button>
-          <Button variant="outline" onClick={() => setAnTien((v) => !v)}>
+          <Button
+            title="Ẩn / hiện các cột tiền trên bản in." variant="outline" onClick={() => setAnTien((v) => !v)}>
             <Coins className="size-4" />
             {anTien ? "Mở cột tiền" : "Thu cột tiền"}
           </Button>
-          <Button onClick={() => window.print()}>
+          <Button
+            title="Mở hộp in của trình duyệt cho bảng cân đối này (in giấy hoặc lưu PDF)." onClick={() => window.print()}>
             <Printer className="size-4" /> In / Xuất PDF
           </Button>
         </div>

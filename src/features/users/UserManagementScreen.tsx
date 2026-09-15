@@ -46,6 +46,7 @@ function ChonVaiTro({
         const dangChon = chon.includes(r.value);
         return (
           <Button
+            title="Bật / tắt vai trò này cho tài khoản. Vai trò quyết định người dùng vào được những màn nào."
             key={r.value}
             type="button"
             variant={dangChon ? "default" : "outline"}
@@ -182,6 +183,7 @@ export default function QuanLyNguoiDungScreen({
           <h1 className="text-2xl font-semibold text-foreground">Người dùng</h1>
         </div>
         <Button
+          title="Tạo tài khoản đăng nhập mới và gán vai trò cho người đó."
           size="lg"
           onClick={() => {
             setTao({ ...TAO_RONG });
@@ -202,6 +204,7 @@ export default function QuanLyNguoiDungScreen({
           moTa="Bấm “Tạo tài khoản” để thêm người dùng đầu tiên, rồi gán vai trò."
           action={
             <Button
+              title="Tạo tài khoản đăng nhập đầu tiên."
               size="lg"
               onClick={() => {
                 setTao({ ...TAO_RONG });
@@ -222,6 +225,7 @@ export default function QuanLyNguoiDungScreen({
           nhanTimKiem="Tìm theo tên đăng nhập / họ tên…"
           actions={(r) => (
             <Button
+              title="Sửa họ tên hoặc vai trò của tài khoản này."
               variant="outline"
               size="sm"
               onClick={() => setDang({ ...r, roles: rolesList(r.roles) })}
@@ -301,7 +305,8 @@ export default function QuanLyNguoiDungScreen({
             <Button variant="outline" size="lg" onClick={() => setTao(null)}>
               Hủy
             </Button>
-            <Button size="lg" onClick={luuTao} disabled={dangTao}>
+            <Button
+              title="Tạo tài khoản với tên đăng nhập, mật khẩu và vai trò vừa khai." size="lg" onClick={luuTao} disabled={dangTao}>
               {dangTao ? "Đang tạo…" : "Tạo tài khoản"}
             </Button>
           </DialogFooter>
@@ -349,7 +354,8 @@ export default function QuanLyNguoiDungScreen({
             <Button variant="outline" size="lg" onClick={() => setDang(null)}>
               Hủy
             </Button>
-            <Button size="lg" onClick={luu}>
+            <Button
+              title="Ghi lại thay đổi cho tài khoản này. Vai trò mới có hiệu lực ở lần vào màn kế tiếp." size="lg" onClick={luu}>
               Lưu thay đổi
             </Button>
           </DialogFooter>

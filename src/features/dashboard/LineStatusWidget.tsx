@@ -23,6 +23,7 @@ export function TrangThaiLine({
       {lines.map((l) => (
         <li key={l.id}>
           <button
+            title="Xem chi tiết tình trạng dây chuyền này."
             type="button"
             onClick={() => onChon(l)}
             className="flex min-h-16 w-full items-center justify-between gap-3 rounded-lg border-2 border-border bg-background px-3.5 py-2.5 text-left transition-colors hover:bg-muted"

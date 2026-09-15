@@ -141,6 +141,7 @@ function NutLich({
           data-slot="date-trigger"
           variant="outline"
           aria-required={batBuoc ? true : undefined}
+          title="Mở lịch để chọn ngày. Có sẵn lối tắt Hôm nay / Hôm qua ở đầu lịch."
           className="h-10 w-full justify-start px-3 text-sm font-medium"
         >
           <CalendarDays className="shrink-0 text-muted-foreground" />
@@ -151,13 +152,14 @@ function NutLich({
       </PopoverTrigger>
       <PopoverContent className="w-auto gap-0 p-0" align="start">
         <div className="flex flex-wrap gap-2 border-b border-border p-3">
-          <Button variant="secondary" size="sm" onClick={() => dat(homNay())}>
+          <Button variant="secondary" size="sm" onClick={() => dat(homNay())} title="Điền ngay ngày hôm nay, khỏi dò trên lịch.">
             Hôm nay
           </Button>
           <Button
             variant="secondary"
             size="sm"
             onClick={() => dat(congNgay(homNay(), -1))}
+            title="Điền ngay ngày hôm qua — hay dùng khi ghi bù sổ của ngày trước."
           >
             Hôm qua
           </Button>
@@ -328,16 +330,16 @@ export function DateRangeField({
 
       {presets && (
         <div className="flex flex-wrap items-center gap-2 pt-1">
-          <Button variant="secondary" size="sm" onClick={() => nhanh(1)}>
+          <Button variant="secondary" size="sm" onClick={() => nhanh(1)} title="Đặt khoảng xem = riêng ngày hôm nay.">
             Hôm nay
           </Button>
-          <Button variant="secondary" size="sm" onClick={() => nhanh(5)}>
+          <Button variant="secondary" size="sm" onClick={() => nhanh(5)} title="Đặt khoảng xem = 5 ngày gần nhất tính tới hôm nay.">
             5 ngày
           </Button>
-          <Button variant="secondary" size="sm" onClick={() => nhanh(7)}>
+          <Button variant="secondary" size="sm" onClick={() => nhanh(7)} title="Đặt khoảng xem = 7 ngày gần nhất tính tới hôm nay.">
             7 ngày
           </Button>
-          <Button variant="secondary" size="sm" onClick={() => nhanh(30)}>
+          <Button variant="secondary" size="sm" onClick={() => nhanh(30)} title="Đặt khoảng xem = 30 ngày gần nhất tính tới hôm nay.">
             30 ngày
           </Button>
           {soNgay > 0 && (

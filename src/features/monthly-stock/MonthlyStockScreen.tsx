@@ -697,14 +697,16 @@ export default function MonthlyStockScreen() {
           </Button>
           {!laXemTruoc && (
             <>
-              <Button size="sm" variant="ghost" aria-label={`Sửa ${r.itemName}`} onClick={() => moSua(r)}>
+              <Button
+                title="Sửa phần mô tả của dòng: tên hàng · size · xuất xứ · kg mỗi kiện · đơn giá." size="sm" variant="ghost" aria-label={`Sửa ${r.itemName}`} onClick={() => moSua(r)}>
                 <Pencil className="size-4" />
               </Button>
               <ConfirmDelete
                 moTaBanGhi={`${r.itemName}${r.size ? " · " + r.size : ""}`}
                 onConfirm={() => xoaDong(r)}
                 trigger={
-                  <Button size="sm" variant="ghost" aria-label={`Xóa ${r.itemName}`}>
+                  <Button
+                    title="Xóa dòng này khỏi tháng. Có hỏi xác nhận, xóa xong vẫn còn nút Hoàn tác." size="sm" variant="ghost" aria-label={`Xóa ${r.itemName}`}>
                     <Trash2 className="size-4" />
                   </Button>
                 }
@@ -732,7 +734,8 @@ export default function MonthlyStockScreen() {
           moTaBanGhi={`${r.itemName}${r.size ? " · " + r.size : ""}`}
           onConfirm={() => xoaDong(r)}
           trigger={
-            <Button size="sm" variant="ghost" aria-label={`Xóa ${r.itemName}`}>
+            <Button
+              title="Xóa dòng này khỏi tháng. Có hỏi xác nhận, xóa xong vẫn còn nút Hoàn tác." size="sm" variant="ghost" aria-label={`Xóa ${r.itemName}`}>
               <Trash2 className="size-4" />
             </Button>
           }
@@ -767,19 +770,35 @@ export default function MonthlyStockScreen() {
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <input ref={fileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={napFile} />
-          <Button variant="outline" onClick={chonFile}>
+          <Button
+            variant="outline"
+            onClick={chonFile}
+            title="Đọc file Excel 'bảng kê kho' của kế toán — mỗi sheet một tháng. Nạp lại cùng file + cùng kho chỉ cập nhật, không nhân đôi dòng."
+          >
             <Upload className="mr-2 h-4 w-4" />
             Nhập Excel bảng kê
           </Button>
-          <Button variant="outline" onClick={moThem}>
+          <Button
+            variant="outline"
+            onClick={moThem}
+            title="Thêm tay một dòng hàng vào tháng đang xem (tên · size · xuất xứ · đơn giá · tồn đầu/nhập/xuất)."
+          >
             <Plus className="mr-2 h-4 w-4" />
             Thêm dòng
           </Button>
-          <Button variant="outline" onClick={moDongBoDialog}>
+          <Button
+            variant="outline"
+            onClick={moDongBoDialog}
+            title="Đối chiếu tên hàng trong sổ với danh mục Loại nguyên liệu và Mặt hàng, rồi ánh xạ từng tên về tên chuẩn. Không đụng 141 mã thành phẩm kế toán."
+          >
             <Library className="mr-2 h-4 w-4" />
             Đồng bộ danh mục{canDongBo.length ? ` (${canDongBo.length})` : ""}
           </Button>
-          <Button onClick={() => setMoIn(true)} disabled={!coDuLieu}>
+          <Button
+            onClick={() => setMoIn(true)}
+            disabled={!coDuLieu}
+            title="Xem trước bản in A4. Có tick dòng thì chỉ in đúng mấy dòng đó kèm tổng của chúng."
+          >
             <Printer className="mr-2 h-4 w-4" />
             In A4{rowsChon.length ? ` (${rowsChon.length} dòng chọn)` : ""}
           </Button>
@@ -790,6 +809,7 @@ export default function MonthlyStockScreen() {
       <div className="flex flex-wrap items-end gap-3">
         <div className="flex w-full items-end gap-1 sm:w-auto">
           <Button
+            title="Lùi về tháng liền trước."
             variant="outline"
             size="icon"
             aria-label="Tháng trước"
@@ -808,6 +828,7 @@ export default function MonthlyStockScreen() {
             />
           </div>
           <Button
+            title="Tới tháng liền sau."
             variant="outline"
             size="icon"
             aria-label="Tháng sau"
@@ -843,6 +864,11 @@ export default function MonthlyStockScreen() {
           {coDuLieu && !laXemTruoc && (
             <Button
               variant={ghiMode ? "default" : "outline"}
+              title={
+                ghiMode
+                  ? "Thoát chế độ ghi, quay về bảng xem theo nhóm."
+                  : "Bật lưới gõ tồn đầu / nhập / xuất từng mã (kiện & kg). Tồn cuối tự tính, dán được cả khối từ Excel."
+              }
               onClick={() => {
                 if (ghiMode) setLocMatHang("");
                 setGhiMode((v) => !v);
@@ -853,13 +879,21 @@ export default function MonthlyStockScreen() {
             </Button>
           )}
           {coDuLieu && !laXemTruoc && !ghiMode && (
-            <Button variant="outline" onClick={rowsChon.length ? boChon : chonTatCa}>
+            <Button
+              variant="outline"
+              onClick={rowsChon.length ? boChon : chonTatCa}
+              title={rowsChon.length ? "Bỏ tick toàn bộ dòng đang chọn." : "Tick hết các dòng đang hiện để xem tổng của cả tháng, hoặc in / xóa theo lô."}
+            >
               <ListChecks className="mr-2 h-4 w-4" />
               {rowsChon.length ? "Bỏ chọn hết" : "Chọn tất cả"}
             </Button>
           )}
           {coTonSang && (
-            <Button variant="outline" onClick={donSangThangSau}>
+            <Button
+              variant="outline"
+              onClick={donSangThangSau}
+              title="Lấy tồn cuối tháng này làm tồn đầu tháng sau, cho MỌI kho (bỏ qua bộ lọc kho). Chạy lại chỉ cập nhật, không nhân đôi dòng."
+            >
               <ArrowRightLeft className="mr-2 h-4 w-4" />
               Dồn sang {nhanThang(thangSau(thang))}
             </Button>
@@ -878,12 +912,15 @@ export default function MonthlyStockScreen() {
           }
           action={
             rowsTruoc.length ? (
-              <Button onClick={donTuThangTruoc}>
+              <Button
+                onClick={donTuThangTruoc}
+                title="Lấy tồn cuối tháng trước làm tồn đầu tháng này và GHI vào sổ. Chạy lại chỉ cập nhật, không nhân đôi dòng."
+              >
                 <ArrowDownToLine className="mr-2 h-4 w-4" />
                 Kế thừa tồn cuối {nhanThang(thangTr)}
               </Button>
             ) : (
-              <Button onClick={moThem}>
+              <Button onClick={moThem} title="Thêm tay dòng đầu tiên cho tháng này (tên hàng · tồn đầu · nhập · xuất).">
                 <Plus className="mr-2 h-4 w-4" />
                 Thêm dòng
               </Button>
@@ -907,7 +944,11 @@ export default function MonthlyStockScreen() {
                     được nhập/xuất); chạy lại chỉ cập nhật, không nhân đôi.
                   </p>
                   <div className="pt-1">
-                    <Button className="w-full sm:w-auto" onClick={donTuThangTruoc}>
+                    <Button
+                      className="w-full sm:w-auto"
+                      onClick={donTuThangTruoc}
+                      title="Ghi bảng xem trước này vào sổ làm tồn đầu tháng. Ghi xong mới gõ được nhập/xuất. Chạy lại chỉ cập nhật, không nhân đôi."
+                    >
                       <ArrowDownToLine className="mr-2 h-4 w-4" />
                       Kế thừa &amp; lưu vào sổ
                     </Button>
@@ -958,7 +999,7 @@ export default function MonthlyStockScreen() {
                 tiền còn lại {num(Math.round(tongChon.remainingValue))} đ
               </span>
               <div className="ml-auto flex flex-wrap items-center gap-2">
-                <Button size="sm" variant="outline" onClick={() => setMoIn(true)}>
+                <Button size="sm" variant="outline" onClick={() => setMoIn(true)} title="In riêng các dòng đang tick, kèm dòng tổng của đúng mấy dòng đó.">
                   <Printer className="mr-2 h-4 w-4" />
                   In {rowsChon.length} dòng
                 </Button>
@@ -967,14 +1008,14 @@ export default function MonthlyStockScreen() {
                     moTaBanGhi={`${rowsChon.length} dòng ${nhanThang(thang)}`}
                     onConfirm={xoaDaChon}
                     trigger={
-                      <Button size="sm" variant="ghost">
+                      <Button size="sm" variant="ghost" title="Xóa các dòng đang tick khỏi tháng này. Có hỏi xác nhận, và xóa xong vẫn còn nút Hoàn tác.">
                         <Trash2 className="mr-2 h-4 w-4" />
                         Xóa dòng đã chọn
                       </Button>
                     }
                   />
                 )}
-                <Button size="sm" variant="ghost" onClick={boChon}>
+                <Button size="sm" variant="ghost" onClick={boChon} title="Bỏ tick toàn bộ dòng đang chọn.">
                   Bỏ chọn
                 </Button>
               </div>
@@ -984,7 +1025,8 @@ export default function MonthlyStockScreen() {
           {timKhongRa && (
             <p className="rounded-lg border-2 border-dashed border-border p-6 text-center text-sm text-muted-foreground">
               Không có mặt hàng nào khớp "{timKiem}" trong {nhanThang(thang)}.{" "}
-              <button type="button" className="underline" onClick={() => setTimKiem("")}>
+              <button
+                title="Xóa ô tìm để hiện lại toàn bộ mặt hàng của tháng." type="button" className="underline" onClick={() => setTimKiem("")}>
                 Bỏ tìm
               </button>
             </p>
@@ -1021,7 +1063,7 @@ export default function MonthlyStockScreen() {
                     </ul>
                   )}
                   <div className="pt-1">
-                    <Button size="sm" onClick={() => setMoDoiChieu(true)}>
+                    <Button size="sm" onClick={() => setMoDoiChieu(true)} title="Liệt kê từng mặt hàng có tồn đầu tháng này lệch tồn cuối tháng trước, để tự sửa. Chỉ soi — không tự ghi đè số.">
                       <Wrench className="mr-2 h-4 w-4" />
                       Đối chiếu & sửa lệch ({dsDoiChieu.length} mặt hàng)
                     </Button>
@@ -1042,7 +1084,7 @@ export default function MonthlyStockScreen() {
                   <span>
                     Đang lọc mặt hàng: <span className="font-semibold text-foreground">{locMatHang}</span> ({rowsGrid.length} dòng)
                   </span>
-                  <Button size="sm" variant="ghost" onClick={() => setLocMatHang("")}>
+                  <Button size="sm" variant="ghost" onClick={() => setLocMatHang("")} title="Bỏ lọc một mặt hàng — hiện lại toàn bộ dòng của tháng trong lưới ghi.">
                     Bỏ lọc
                   </Button>
                 </div>
@@ -1176,7 +1218,7 @@ export default function MonthlyStockScreen() {
             <Button variant="outline" onClick={() => setForm(null)}>
               Hủy
             </Button>
-            <Button onClick={luuDong}>
+            <Button onClick={luuDong} title="Ghi dòng này vào sổ tháng đang xem. Tồn cuối và tiền còn lại tự tính, không phải gõ.">
               <Plus className="mr-1 h-4 w-4" />
               {form?.id ? "Lưu dòng" : "Thêm dòng"}
             </Button>
@@ -1251,7 +1293,7 @@ export default function MonthlyStockScreen() {
             <Button variant="outline" onClick={() => setNapForm(null)}>
               Hủy
             </Button>
-            <Button onClick={xacNhanNap} disabled={soDongNap === 0}>
+            <Button onClick={xacNhanNap} disabled={soDongNap === 0} title="Nạp các sheet đã xem trước vào sổ, theo đúng năm và kho đã chọn. Chọn nhầm kho sẽ tạo bản sao ở kho khác — kiểm lại trước khi bấm.">
               <Upload className="mr-1 h-4 w-4" />
               Nạp {soDongNap} dòng
             </Button>
@@ -1304,7 +1346,7 @@ export default function MonthlyStockScreen() {
                           {num(d.lechKg)}
                         </td>
                         <td className="px-3 py-2 text-right">
-                          <Button size="sm" variant="outline" onClick={() => suaTayMatHang(d)}>
+                          <Button size="sm" variant="outline" onClick={() => suaTayMatHang(d)} title="Mở lưới ghi đã lọc sẵn đúng mặt hàng này, để tự chỉnh tồn đầu / nhập / xuất cho khớp tháng trước.">
                             <Pencil className="mr-1 h-4 w-4" />
                             Sửa tay
                           </Button>
@@ -1359,16 +1401,16 @@ export default function MonthlyStockScreen() {
                     <ListChecks className="h-4 w-4" /> {canDongBo.length} mã khó — chọn ĐÍCH từng dòng
                   </h3>
                   <div className="flex flex-wrap gap-1">
-                    <Button size="sm" variant="ghost" onClick={() => datDich(canDongBo, "goiY")}>
+                    <Button size="sm" variant="ghost" onClick={() => datDich(canDongBo, "goiY")} title="Trả mọi mã khó về đích mà hệ thống gợi ý (đoán từ tên: có size/dấu chế biến → Mặt hàng, còn lại → Loại NL).">
                       Theo gợi ý
                     </Button>
-                    <Button size="sm" variant="ghost" onClick={() => datDich(canDongBo, "product")}>
+                    <Button size="sm" variant="ghost" onClick={() => datDich(canDongBo, "product")} title="Đặt toàn bộ mã khó về danh mục Mặt hàng.">
                       Tất cả → Mặt hàng
                     </Button>
-                    <Button size="sm" variant="ghost" onClick={() => datDich(canDongBo, "material")}>
+                    <Button size="sm" variant="ghost" onClick={() => datDich(canDongBo, "material")} title="Đặt toàn bộ mã khó về danh mục Loại nguyên liệu.">
                       Tất cả → Loại NL
                     </Button>
-                    <Button size="sm" variant="ghost" onClick={() => datDich(canDongBo, "skip")}>
+                    <Button size="sm" variant="ghost" onClick={() => datDich(canDongBo, "skip")} title="Bỏ qua toàn bộ mã khó lần này — không thêm vào danh mục nào.">
                       Bỏ qua hết
                     </Button>
                   </div>
@@ -1386,16 +1428,16 @@ export default function MonthlyStockScreen() {
                 </summary>
                 <div className="space-y-2 px-3 pb-3">
                   <div className="flex flex-wrap gap-1">
-                    <Button size="sm" variant="ghost" onClick={() => datDich(dsRoRang, "goiY")}>
+                    <Button size="sm" variant="ghost" onClick={() => datDich(dsRoRang, "goiY")} title="Trả các tên rõ ràng về đích hệ thống gợi ý.">
                       Theo gợi ý
                     </Button>
-                    <Button size="sm" variant="ghost" onClick={() => datDich(dsRoRang, "material")}>
+                    <Button size="sm" variant="ghost" onClick={() => datDich(dsRoRang, "material")} title="Đặt toàn bộ tên rõ ràng (cá, tôm, mực nguyên con…) về danh mục Loại nguyên liệu.">
                       Tất cả → Loại NL
                     </Button>
-                    <Button size="sm" variant="ghost" onClick={() => datDich(dsRoRang, "product")}>
+                    <Button size="sm" variant="ghost" onClick={() => datDich(dsRoRang, "product")} title="Đặt toàn bộ tên rõ ràng về danh mục Mặt hàng.">
                       Tất cả → Mặt hàng
                     </Button>
-                    <Button size="sm" variant="ghost" onClick={() => datDich(dsRoRang, "skip")}>
+                    <Button size="sm" variant="ghost" onClick={() => datDich(dsRoRang, "skip")} title="Bỏ qua toàn bộ tên rõ ràng lần này.">
                       Bỏ qua hết
                     </Button>
                   </div>
@@ -1407,7 +1449,7 @@ export default function MonthlyStockScreen() {
             )}
 
             {(canDongBo.length > 0 || dsRoRang.length > 0) && (
-              <Button onClick={apDongBo} disabled={soMH + soNL === 0}>
+              <Button onClick={apDongBo} disabled={soMH + soNL === 0} title="Thêm các tên chưa có vào danh mục đã chọn, và đổi tên các dòng sổ mang tên cũ sang tên chuẩn đã ánh xạ.">
                 <Library className="mr-2 h-4 w-4" />
                 Đồng bộ: {soMH} → Mặt hàng · {soNL} → Loại NL
               </Button>

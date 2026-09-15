@@ -222,7 +222,8 @@ export default function DashboardScreen() {
         moTa="Tồn cuối của kỳ mới nhất mỗi kho. Nguồn: báo cáo NXT nhập từ hệ thống xí nghiệp."
         hanhDong={
           khoTong.length > 0 && (
-            <Button variant="outline" onClick={() => navigate("/nxt-kho")}>
+            <Button
+              title="Mở màn Nhập xuất tồn kho để xem số chi tiết theo từng mã hàng." variant="outline" onClick={() => navigate("/nxt-kho")}>
               Mở báo cáo XNT kho
               <ArrowRight className="ml-1 h-4 w-4" />
             </Button>
@@ -260,7 +261,8 @@ export default function DashboardScreen() {
           tieuDe="Nhập hàng theo phân xưởng"
           moTa="Tổng khối lượng đã ghi ở sổ Nhập hàng, tách theo xưởng."
           hanhDong={
-            <Button variant="outline" onClick={() => navigate("/imports")}>
+            <Button
+              title="Mở màn Nhập hàng để ghi chuyến nguyên liệu hôm nay." variant="outline" onClick={() => navigate("/imports")}>
               Mở Nhập hàng
               <ArrowRight className="ml-1 h-4 w-4" />
             </Button>
@@ -293,7 +295,8 @@ export default function DashboardScreen() {
 
       <p className="text-sm text-muted-foreground">
         Cần con số theo dõi ({num(soDong)} dòng · {soKho} kho) chi tiết hơn? Mở{" "}
-        <button type="button" className="font-semibold text-primary underline-offset-2 hover:underline" onClick={() => navigate("/nxt-kho")}>
+        <button
+          title="Mở màn Nhập xuất tồn kho." type="button" className="font-semibold text-primary underline-offset-2 hover:underline" onClick={() => navigate("/nxt-kho")}>
           báo cáo Xuất–Nhập–Tồn kho
         </button>
         .

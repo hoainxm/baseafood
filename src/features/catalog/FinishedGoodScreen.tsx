@@ -97,7 +97,8 @@ export default function ThanhPhamScreen() {
           / {items.length} mã
         </p>
         {nhom && (
-          <Button variant="outline" className="mb-1" onClick={() => setNhom("")}>
+          <Button
+            title="Bỏ lọc theo nhóm — hiện lại toàn bộ 141 mã thành phẩm." variant="outline" className="mb-1" onClick={() => setNhom("")}>
             <X />
             Bỏ lọc nhóm
           </Button>
@@ -112,7 +113,8 @@ export default function ThanhPhamScreen() {
           tieuDe="Không có mã nào trong nhóm này"
           moTa="Bỏ lọc nhóm để xem lại toàn bộ danh mục."
           action={
-            <Button size="lg" onClick={() => setNhom("")}>
+            <Button
+              title="Bỏ lọc theo nhóm để xem lại toàn bộ danh mục." size="lg" onClick={() => setNhom("")}>
               Bỏ lọc nhóm
             </Button>
           }

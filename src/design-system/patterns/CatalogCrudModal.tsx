@@ -147,7 +147,11 @@ export function DanhMucCrud<T extends { id: string }>({
           <h2 className="text-xl font-semibold text-foreground">{tieuDe}</h2>
           {moTa && <p className="mt-1 text-sm text-muted-foreground">{moTa}</p>}
         </div>
-        <Button size="lg" onClick={moThem}>
+        <Button
+          size="lg"
+          onClick={moThem}
+          title={`Mở hộp thoại tạo một ${tenDonVi} mới. Lưu xong dùng được ngay ở mọi màn có ô chọn ${tenDonVi}.`}
+        >
           <Plus />
           Thêm {tenDonVi}
         </Button>
@@ -160,7 +164,11 @@ export function DanhMucCrud<T extends { id: string }>({
           tieuDe={`Chưa có ${tenDonVi} nào`}
           moTa={`Bấm "Thêm ${tenDonVi}" để tạo mục đầu tiên.`}
           action={
-            <Button size="lg" onClick={moThem}>
+            <Button
+              size="lg"
+              onClick={moThem}
+              title={`Mở hộp thoại tạo một ${tenDonVi} mới — mục đầu tiên của danh mục này.`}
+            >
               <Plus />
               Thêm {tenDonVi}
             </Button>
@@ -175,7 +183,12 @@ export function DanhMucCrud<T extends { id: string }>({
           nhanTimKiem={`Tìm ${tenDonVi}…`}
           actions={(r) => (
             <>
-              <Button variant="outline" size="sm" onClick={() => moSua(r)}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => moSua(r)}
+                title={`Sửa thông tin ${tenDonVi} "${moTaBanGhi(r)}". Sổ đã ghi trước đó giữ nguyên tên cũ — không hồi tố.`}
+              >
                 <Pencil />
                 Sửa
               </Button>

@@ -49,6 +49,7 @@ function Button({
   variant = "default",
   size = "default",
   asChild = false,
+  title,
   ...props
 }: React.ComponentProps<"button"> &
   VariantProps<typeof buttonVariants> & {
@@ -56,11 +57,18 @@ function Button({
   }) {
   const Comp = asChild ? Slot.Root : "button"
 
+  /* Rê chuột LUÔN có hướng dẫn (src/design-system/README.md §9). Nút chỉ-icon
+     buộc phải có `aria-label`; thiếu `title` thì mượn luôn nhãn đó làm gợi ý
+     hover — không nút icon nào bị câm, không phải gõ hai lần cùng một câu.
+     Câu giải thích ĐẦY ĐỦ ("để làm gì") vẫn nên viết ở `title`. */
+  const goiY = title ?? props["aria-label"]
+
   return (
     <Comp
       data-slot="button"
       data-variant={variant}
       data-size={size}
+      title={goiY}
       className={cn(buttonVariants({ variant, size, className }))}
       {...props}
     />

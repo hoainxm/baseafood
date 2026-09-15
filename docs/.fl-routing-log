@@ -25,3 +25,5 @@
 2026-09-14 | auth/phan-quyen-role + nav-access + db(check constraint) | docs/app-map/05-bao-mat-phan-quyen.md, docs/app-map/02-pages-navigation.md, docs/app-map/03-database.md, docs/app-map/04-tang-du-lieu.md
 2026-09-15 | kho/nxt-kho + ton-kho-thang + don-ky | 36-so-kho-thang.md, 03-database.md, 04-tang-du-lieu.md, 32-danh-muc.md, 02-pages-navigation.md
 2026-09-15 | doi-soat/ui-microcopy-drilldown | docs/app-map/37-doi-soat-hddt.md, src/design-system/noi-dung-va-label.md, src/design-system/README.md, docs/app-map/02-pages-navigation.md, docs/app-map/04-tang-du-lieu.md, docs/app-map/01-app-structure.md
+2026-09-15 | ui/design-system (quy tac tooltip nut) | src/design-system/README.md, CLAUDE.md, docs/app-map/01-app-structure.md
+2026-09-15 | ui/design-system (audit + backfill title cho moi nut) | src/design-system/README.md, CLAUDE.md, docs/app-map/02-pages-navigation.md

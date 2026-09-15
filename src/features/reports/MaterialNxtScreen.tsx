@@ -282,7 +282,8 @@ export default function MaterialNxtScreen() {
             xưởng, xem theo ngày.
           </p>
         </div>
-        <Button variant="outline" onClick={() => setMoTonDau(true)}>
+        <Button
+          title="Khai tồn đầu kho nguyên liệu cho các loại chưa có kỳ trước để kế thừa — không có số này thì kỳ đầu tiên tính thiếu." variant="outline" onClick={() => setMoTonDau(true)}>
           <PackagePlus className="mr-2 h-4 w-4" />
           Tồn đầu ({openingLoc.length})
         </Button>
@@ -435,7 +436,8 @@ export default function MaterialNxtScreen() {
                       moTaBanGhi={`${o.materialTypeName} — ${num(o.quantityKg)} kg (từ ${viDate(o.asOfDate)})`}
                       onConfirm={() => xoaTonDau(o.id)}
                       trigger={
-                        <Button size="sm" variant="ghost">
+                        <Button
+                          title="Xóa dòng tồn đầu này." size="sm" variant="ghost">
                           Xóa
                         </Button>
                       }
@@ -497,14 +499,16 @@ export default function MaterialNxtScreen() {
                   <Button variant="outline" onClick={() => setForm(null)}>
                     Hủy
                   </Button>
-                  <Button onClick={luuTonDau}>
+                  <Button
+                    title="Ghi số tồn đầu vừa khai vào sổ." onClick={luuTonDau}>
                     <PackagePlus className="mr-1 h-4 w-4" />
                     Lưu tồn đầu
                   </Button>
                 </div>
               </div>
             ) : (
-              <Button variant="outline" onClick={moThemTonDau}>
+              <Button
+                title="Khai thêm tồn đầu cho một loại nguyên liệu nữa." variant="outline" onClick={moThemTonDau}>
                 <PackagePlus className="mr-2 h-4 w-4" />
                 Thêm tồn đầu
               </Button>

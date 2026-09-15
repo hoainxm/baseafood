@@ -84,11 +84,13 @@ export default function QrTraCuuScreen() {
       <div className="space-y-4 rounded-xl border-2 border-border p-4">
         <div className="flex flex-wrap items-center gap-3">
           {dangQuet ? (
-            <Button variant="outline" size="lg" onClick={() => setDangQuet(false)}>
+            <Button
+              title="Tắt camera, quay về gõ mã lô bằng tay." variant="outline" size="lg" onClick={() => setDangQuet(false)}>
               <CameraOff aria-hidden /> Tắt camera
             </Button>
           ) : (
-            <Button variant="outline" size="lg" onClick={() => setDangQuet(true)}>
+            <Button
+              title="Bật camera quét mã QR trên tem lô để tra ngược nguồn gốc lô hàng." variant="outline" size="lg" onClick={() => setDangQuet(true)}>
               <Camera aria-hidden /> Quét bằng camera
             </Button>
           )}
@@ -130,7 +132,8 @@ export default function QrTraCuuScreen() {
                   <Badge variant="outline">Chưa có SSCC</Badge>
                 )}
               </div>
-              <Button variant="outline" size="lg" onClick={() => setInTem(true)}>
+              <Button
+                title="In lại tem QR của mã lô này để dán lên kiện hàng." variant="outline" size="lg" onClick={() => setInTem(true)}>
                 <Printer aria-hidden /> In tem QR
               </Button>
             </div>

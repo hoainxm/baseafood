@@ -48,7 +48,7 @@ Chi tiết + ranh giới import: [`01-app-structure.md`](docs/app-map/01-app-str
 2. Mọi khối lượng là **kg**; số hiển thị locale **vi-VN** qua `lib/format.ts`, class `tnum` (tabular-nums).
 3. **`src/features/**` chỉ import từ `@/design-system`.** Cấm `@/components/ui/*` trực tiếp; cấm viết class cỡ chữ/mã màu tay — sửa `tokens.css` thay vì đè cục bộ. *(hook pre-commit chặn)*
 4. Mọi đọc/ghi dữ liệu qua hook trong `lib/catalogRepo.ts` → `lib/repo.ts`. **Không** gọi `localStorage` hay `supabase` từ màn hình.
-5. Nhãn luôn hiện (không dùng placeholder thay nhãn); vùng chạm ≥ 44px; nút Lưu **không bao giờ** `disabled` (thiếu thì bắn `ErrorSummary`).
+5. Nhãn luôn hiện (không dùng placeholder thay nhãn); vùng chạm ≥ 44px; nút Lưu **không bao giờ** `disabled` (thiếu thì bắn `ErrorSummary`). **Mọi nút thao tác phải có `title` giải thích nút làm gì** khi rê chuột (trừ Hủy/Đóng) — luật + khuôn câu ở [`design-system/README.md` §9](src/design-system/README.md).
 6. Không xóa bản ghi nghiệp vụ theo kiểu lặng lẽ — dùng trạng thái; mọi xóa hiện tại qua `ConfirmDelete` + toast **Hoàn tác**.
 7. Danh mục thay nhập tự do: đại lý / loại NL / mặt hàng / khách hàng chọn qua `Combobox` (tạo mới tại chỗ, lưu ngay vào danh mục).
 8. Đặt tên DB: **tiếng Anh, snake_case, không tiền tố** (đã đổi từ tiếng Việt-không-dấu sang tiếng Anh ở migration `0016_rename_to_english.sql` — theo [`spec/routing-va-naming.md`](docs/spec/routing-va-naming.md)). Vẫn cấm tên có dấu (NFC/NFD trông giống hệt nhưng là 2 định danh). Bảng cũ tiếng Việt chỉ còn trong migration `0001…0015`.

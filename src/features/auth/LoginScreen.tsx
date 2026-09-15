@@ -76,7 +76,8 @@ export default function DangNhap({
             />
           </Field>
 
-          <Button type="submit" size="lg" className="w-full" disabled={dangGui}>
+          <Button
+            title="Đăng nhập bằng tên tài khoản và mật khẩu vừa nhập." type="submit" size="lg" className="w-full" disabled={dangGui}>
             <LogIn />
             {dangGui ? "Đang đăng nhập…" : "Đăng nhập"}
           </Button>

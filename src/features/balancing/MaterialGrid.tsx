@@ -366,28 +366,33 @@ export function LuoiNguyenLieu({
         </div>
         <div className="flex flex-wrap gap-2">
           {nhapChoHut.length > 0 && (
-            <Button size="lg" onClick={() => hutNhapHang()}>
+            <Button
+              title="Hút mọi dòng nhập nguyên liệu trong khoảng ngày của kỳ từ sổ nhập hàng vào lưới này." size="lg" onClick={() => hutNhapHang()}>
               <Download />
               Lấy {nhapChoHut.length} dòng từ sổ nhập
             </Button>
           )}
           {dongChonDuoc.length > 0 && (
-            <Button variant="outline" size="lg" onClick={() => setChonNhapMo(true)}>
+            <Button
+              title="Tự chọn từng dòng nhập muốn đưa vào kỳ, thay vì lấy hết." variant="outline" size="lg" onClick={() => setChonNhapMo(true)}>
               <ListChecks />
               Chọn dòng nhập ({dongChonDuoc.length})
             </Button>
           )}
           {!luoi.daChot && nhomGopDuoc.length > 0 && (
-            <Button variant="outline" size="lg" onClick={gopSize}>
+            <Button
+              title="Gộp các dòng cùng loại nguyên liệu lại thành một dòng cho gọn bảng." variant="outline" size="lg" onClick={gopSize}>
               <Combine />
               Gộp cùng loại ({nhomGopDuoc.reduce((s, g) => s + g.length, 0)})
             </Button>
           )}
-          <Button variant="outline" size="lg" onClick={onDoiAnNgay}>
+          <Button
+            title="Ẩn / hiện các cột chia theo ngày. Ẩn đi thì bảng gọn, chỉ còn cột tổng." variant="outline" size="lg" onClick={onDoiAnNgay}>
             <ChevronsLeftRight />
             {anNgay ? "Mở cột ngày" : "Thu cột ngày"}
           </Button>
-          <Button variant="outline" size="lg" onClick={() => setAnTien((v) => !v)}>
+          <Button
+            title="Ẩn / hiện các cột tiền. Ẩn đi khi chỉ cần soi số kg." variant="outline" size="lg" onClick={() => setAnTien((v) => !v)}>
             {anTien ? "Mở cột tiền" : "Thu cột tiền"}
           </Button>
         </div>
@@ -477,15 +482,18 @@ export function LuoiNguyenLieu({
       )}
 
       <div className="mt-4 flex flex-wrap gap-2">
-        <Button variant="outline" size="lg" onClick={() => setThemMo("Xả đông")}>
+        <Button
+          title="Thêm dòng nguyên liệu lấy từ kho đông ra dùng lại cho kỳ này." variant="outline" size="lg" onClick={() => setThemMo("Xả đông")}>
           <Plus />
           Thêm dòng xả đông
         </Button>
-        <Button variant="outline" size="lg" onClick={() => setThemMo("Bột phụ gia")}>
+        <Button
+          title="Thêm dòng bột / phụ gia dùng trong kỳ." variant="outline" size="lg" onClick={() => setThemMo("Bột phụ gia")}>
           <Plus />
           Thêm bột phụ gia
         </Button>
-        <Button variant="outline" size="lg" onClick={() => setThemMo("giam")}>
+        <Button
+          title="Thêm một dòng giảm trừ nguyên liệu (hao hụt, trả lại…)." variant="outline" size="lg" onClick={() => setThemMo("giam")}>
           <Plus />
           Thêm dòng giảm
         </Button>
@@ -517,7 +525,8 @@ export function LuoiNguyenLieu({
                     moTaBanGhi={`${h.ten} — ${num(h.tong)} kg`}
                     onConfirm={() => xoaDong(h.id)}
                     trigger={
-                      <Button variant="ghost" size="sm" aria-label={`Xóa dòng ${h.ten}`}>
+                      <Button
+                        title="Xóa dòng nguyên liệu này khỏi lưới của kỳ." variant="ghost" size="sm" aria-label={`Xóa dòng ${h.ten}`}>
                         <Trash2 />
                       </Button>
                     }

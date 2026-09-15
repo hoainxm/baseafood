@@ -247,7 +247,8 @@ export default function DongGoiScreen() {
       key: "xoa",
       header: "",
       render: (r) => (
-        <Button variant="outline" size="sm" onClick={() => xoa(r)}>
+        <Button
+          title="Xóa phiếu đóng gói này. Tồn bán thành phẩm và tồn thành phẩm sẽ được tính lại." variant="outline" size="sm" onClick={() => xoa(r)}>
           Xóa
         </Button>
       ),
@@ -263,7 +264,8 @@ export default function DongGoiScreen() {
             Bán thành phẩm (còn khuôn đá) → đóng gói thành thành phẩm sẵn bán. Đóng gói trừ tồn dự trữ, cộng tồn thành phẩm.
           </p>
         </div>
-        <Button size="lg" onClick={moThem}>
+        <Button
+          title="Ghi một phiếu đóng gói: trừ bán thành phẩm đem đóng, cộng thành phẩm ra, phần chênh là hao hụt." size="lg" onClick={moThem}>
           <Plus />
           Ghi phiếu đóng gói
         </Button>
@@ -461,7 +463,8 @@ export default function DongGoiScreen() {
             <Button variant="outline" size="lg" onClick={() => setForm(null)}>
               Hủy
             </Button>
-            <Button size="lg" onClick={ghi}>
+            <Button
+              title="Ghi phiếu này vào sổ — trừ tồn bán thành phẩm và cộng tồn thành phẩm ngay." size="lg" onClick={ghi}>
               <PackageCheck />
               Ghi đóng gói
             </Button>

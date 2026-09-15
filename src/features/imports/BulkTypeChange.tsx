@@ -134,10 +134,12 @@ export function HopDoiLoaiHangLoat({
         {dongKhop.length > 0 && (
           <>
             <div className="flex flex-wrap items-center gap-2">
-              <Button variant="outline" size="sm" onClick={tickHet}>
+              <Button
+                title="Tick hết các chuyến đang hiện trong danh sách." variant="outline" size="sm" onClick={tickHet}>
                 Tick hết ({dongKhop.length})
               </Button>
-              <Button variant="outline" size="sm" onClick={boHet}>
+              <Button
+                title="Bỏ tick toàn bộ chuyến đang chọn." variant="outline" size="sm" onClick={boHet}>
                 Bỏ tick
               </Button>
               <span className="text-base text-muted-foreground">
@@ -193,6 +195,7 @@ export function HopDoiLoaiHangLoat({
             Hủy
           </Button>
           <Button
+            title="Đổi loại nguyên liệu của mọi chuyến đang tick sang loại đích. Sổ ghi lại theo loại mới."
             size="lg"
             onClick={() => {
               if (!loaiDich.trim()) {

@@ -388,12 +388,12 @@ export default function DanhMucScreen() {
 
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList className="w-full overflow-x-auto">
-          <TabsTrigger value="mat-hang">Mặt hàng</TabsTrigger>
-          <TabsTrigger value="khach-hang">Khách hàng</TabsTrigger>
-          <TabsTrigger value="dai-ly">Đại lý</TabsTrigger>
-          <TabsTrigger value="loai-nl">Loại nguyên liệu</TabsTrigger>
-          <TabsTrigger value="kho-luu">Kho lưu trữ</TabsTrigger>
-          <TabsTrigger value="tp-141">Thành phẩm (141 mã)</TabsTrigger>
+          <TabsTrigger value="mat-hang" title="Danh mục mặt hàng thực tế của xưởng — dùng khi ghi sản lượng, đóng gói và bán hàng.">Mặt hàng</TabsTrigger>
+          <TabsTrigger value="khach-hang" title="Khách mua thành phẩm, kèm thị trường (Nhật, EU, nội địa…).">Khách hàng</TabsTrigger>
+          <TabsTrigger value="dai-ly" title="Đại lý cung cấp nguyên liệu — dùng khi ghi chuyến nhập hàng.">Đại lý</TabsTrigger>
+          <TabsTrigger value="loai-nl" title="Quy cách / size nguyên liệu, có gắn loài (bạch tuộc, mực, cá…).">Loại nguyên liệu</TabsTrigger>
+          <TabsTrigger value="kho-luu" title="Nơi hàng đang nằm: kho nhà và các kho lạnh thuê ngoài.">Kho lưu trữ</TabsTrigger>
+          <TabsTrigger value="tp-141" title="141 mã thành phẩm kế toán (TK 1551) — chỉ đọc, không sửa ở đây.">Thành phẩm (141 mã)</TabsTrigger>
         </TabsList>
 
         <TabsContent value="mat-hang" className="pt-6">

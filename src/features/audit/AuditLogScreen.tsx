@@ -212,11 +212,13 @@ export default function NhatKyScreen() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl font-semibold text-foreground">Nhật ký thao tác</h1>
         <div className="flex flex-wrap gap-2">
-          <Button size="lg" variant="outline" onClick={taiLai}>
+          <Button
+            title="Nạp lại nhật ký từ máy chủ để thấy thao tác vừa xảy ra." size="lg" variant="outline" onClick={taiLai}>
             <RefreshCw />
             Tải lại
           </Button>
-          <Button size="lg" variant="outline" onClick={xuatExcel} disabled={!view.length}>
+          <Button
+            title="Tải nhật ký đang lọc ra file Excel." size="lg" variant="outline" onClick={xuatExcel} disabled={!view.length}>
             <FileSpreadsheet />
             Xuất Excel
           </Button>
@@ -268,7 +270,8 @@ export default function NhatKyScreen() {
           timKiem={(r) => `${r.actorUsername} ${nhanBang(r.entity)} ${r.summary}`}
           nhanTimKiem="Tìm trong nhật ký…"
           actions={(r) => (
-            <Button variant="outline" size="sm" onClick={() => setChiTiet(r)}>
+            <Button
+              title="Xem đầy đủ những trường đã đổi trong thao tác này (giá trị trước → sau)." variant="outline" size="sm" onClick={() => setChiTiet(r)}>
               Chi tiết
             </Button>
           )}

@@ -395,7 +395,8 @@ export default function WarehouseNxtScreen() {
           moTaBanGhi={`${r.itemName} · ${r.itemCode}`}
           onConfirm={() => xoaDong(r.id, r.itemCode)}
           trigger={
-            <Button size="sm" variant="ghost" aria-label={`Xóa ${r.itemCode}`}>
+            <Button
+              title="Xóa mã hàng này khỏi kỳ đang xem." size="sm" variant="ghost" aria-label={`Xóa ${r.itemCode}`}>
               <Trash2 className="size-4" />
             </Button>
           }
@@ -534,15 +535,15 @@ export default function WarehouseNxtScreen() {
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <input ref={fileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={napFile} />
-          <Button variant="outline" onClick={chonFile}>
+          <Button variant="outline" onClick={chonFile} title="Đọc file Excel báo cáo Xuất–Nhập–Tồn xuất từ hệ thống xí nghiệp (mẫu 10 cột). Nạp lại cùng kho + cùng kỳ chỉ cập nhật, không nhân đôi dòng.">
             <Upload className="mr-2 h-4 w-4" />
             Nhập Excel báo cáo
           </Button>
-          <Button variant="outline" onClick={xuatExcel} disabled={!rows.length}>
+          <Button variant="outline" onClick={xuatExcel} disabled={!rows.length} title="Tải kỳ đang xem ra file Excel đúng mẫu báo cáo của xí nghiệp, để gửi kế toán hoặc lưu hồ sơ.">
             <Download className="mr-2 h-4 w-4" />
             Xuất Excel
           </Button>
-          <Button onClick={() => setMoIn(true)} disabled={!rows.length}>
+          <Button onClick={() => setMoIn(true)} disabled={!rows.length} title="Xem trước bản in A4 của kỳ đang xem, rồi in giấy hoặc lưu PDF.">
             <Printer className="mr-2 h-4 w-4" />
             In A4
           </Button>
@@ -594,12 +595,21 @@ export default function WarehouseNxtScreen() {
           </div>
           {rows.length > 0 && (
             <div className="flex flex-wrap items-center gap-3">
-              <Button variant={ghiMode ? "default" : "outline"} onClick={() => setGhiMode((v) => !v)}>
+              <Button
+                variant={ghiMode ? "default" : "outline"}
+                onClick={() => setGhiMode((v) => !v)}
+                title={
+                  ghiMode
+                    ? "Thoát chế độ ghi, quay về bảng xem."
+                    : "Bật lưới gõ tồn đầu / nhập / xuất từng mã. Tồn cuối tự tính, dán được cả khối từ Excel."
+                }
+              >
                 {ghiMode ? <Eye className="mr-2 h-4 w-4" /> : <Pencil className="mr-2 h-4 w-4" />}
                 {ghiMode ? "Xong · xem lại" : "Ghi nhập/xuất"}
               </Button>
               <Button
                 variant="outline"
+                title="Mở một kỳ báo cáo mới và lấy tồn cuối kỳ này làm tồn đầu kỳ đó (kèm cả kho lưu) — khỏi gõ lại từ đầu."
                 onClick={() => {
                   setKyForm({ from: denNgay, to: "" });
                   setLoiKy([]);
@@ -648,6 +658,7 @@ export default function WarehouseNxtScreen() {
               </span>
               {theoKhoLuu.map(([ten, g]) => (
                 <button
+                  title="Chỉ xem các mã đang nằm ở kho này. Bấm lần nữa để xem lại tất cả kho."
                   key={ten}
                   type="button"
                   onClick={() => {
@@ -664,7 +675,7 @@ export default function WarehouseNxtScreen() {
                 </button>
               ))}
               {khoLuuLoc !== TAT_CA && (
-                <Button size="sm" variant="ghost" onClick={() => setKhoLuuLoc(TAT_CA)}>
+                <Button size="sm" variant="ghost" onClick={() => setKhoLuuLoc(TAT_CA)} title="Bỏ lọc theo kho lưu — xem lại toàn bộ mã của kỳ này.">
                   Xem tất cả kho lưu
                 </Button>
               )}
@@ -680,11 +691,15 @@ export default function WarehouseNxtScreen() {
                 <span className="font-semibold text-foreground">tồn cuối {num(tongChon.tonCuoi)} kg</span>
               </span>
               <div className="ml-auto flex flex-wrap items-center gap-2">
-                <Button size="sm" onClick={() => setGanForm(khoLuuLoc === TAT_CA ? KHO_LUU_MAC_DINH : khoLuuLoc)}>
+                <Button
+                  size="sm"
+                  onClick={() => setGanForm(khoLuuLoc === TAT_CA ? KHO_LUU_MAC_DINH : khoLuuLoc)}
+                  title="Ghi lại các mã đang tick là đang nằm ở một kho khác (kho nhà hay kho lạnh thuê ngoài). Sửa danh sách kho ở Danh mục → Kho lưu trữ."
+                >
                   <PackageOpen className="mr-2 h-4 w-4" />
                   Gán kho lưu
                 </Button>
-                <Button size="sm" variant="ghost" onClick={() => setDaChon(new Set())}>
+                <Button size="sm" variant="ghost" onClick={() => setDaChon(new Set())} title="Bỏ tick toàn bộ các mã đang chọn.">
                   Bỏ chọn
                 </Button>
               </div>
@@ -699,6 +714,7 @@ export default function WarehouseNxtScreen() {
                 </p>
                 <Button
                   variant="outline"
+                  title="Thêm một mã hàng chưa có trong kỳ này (VD mã mới phát sinh giữa kỳ). Số liệu gõ ở lưới bên dưới."
                   onClick={() => {
                     setThemForm({ code: "", name: "" });
                     setLoiThem([]);
@@ -775,7 +791,7 @@ export default function WarehouseNxtScreen() {
             <Button variant="outline" onClick={() => setThemForm(null)}>
               Hủy
             </Button>
-            <Button onClick={luuThemMa}>
+            <Button onClick={luuThemMa} title="Thêm mã này vào kỳ đang xem với tồn đầu / nhập / xuất = 0.">
               <Plus className="mr-1 h-4 w-4" />
               Thêm mã
             </Button>
@@ -810,7 +826,7 @@ export default function WarehouseNxtScreen() {
             <Button variant="outline" onClick={() => setGanForm(null)}>
               Hủy
             </Button>
-            <Button onClick={ganKhoLuu}>
+            <Button onClick={ganKhoLuu} title="Ghi kho lưu vừa chọn cho tất cả mã đang tick.">
               <PackageOpen className="mr-1 h-4 w-4" />
               Gán {rowsChon.length} mã
             </Button>
@@ -846,7 +862,7 @@ export default function WarehouseNxtScreen() {
             <Button variant="outline" onClick={() => setKyForm(null)}>
               Hủy
             </Button>
-            <Button onClick={luuKyMoi}>
+            <Button onClick={luuKyMoi} title="Tạo kỳ mới và ghi tồn cuối kỳ hiện tại thành tồn đầu kỳ đó. Nhập/xuất để trống chờ ghi.">
               <CalendarPlus className="mr-1 h-4 w-4" />
               Tạo kỳ · kế thừa tồn
             </Button>

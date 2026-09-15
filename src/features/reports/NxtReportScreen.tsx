@@ -295,11 +295,13 @@ export default function BaoCaoNhapXuatTonScreen() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <Button variant="outline" onClick={() => setMoTonDau(true)}>
+          <Button
+            title="Khai tồn đầu kho thành phẩm cho các mã chưa có lịch sử giao dịch — không có số này thì kỳ đầu tiên tính thiếu." variant="outline" onClick={() => setMoTonDau(true)}>
             <PackagePlus className="mr-2 h-4 w-4" />
             Tồn đầu ({opening.length})
           </Button>
-          <Button onClick={xuatExcel} disabled={!rows.length}>
+          <Button
+            title="Tải báo cáo đang xem ra file Excel." onClick={xuatExcel} disabled={!rows.length}>
             <Download className="mr-2 h-4 w-4" />
             Xuất Excel
           </Button>
@@ -402,7 +404,8 @@ export default function BaoCaoNhapXuatTonScreen() {
                       moTaBanGhi={`${tenMH(o.productId)}${o.spec ? ` · ${o.spec}` : ""} — ${num(o.quantityKg)} kg`}
                       onConfirm={() => xoaTonDau(o.id)}
                       trigger={
-                        <Button size="sm" variant="ghost">
+                        <Button
+                          title="Xóa dòng tồn đầu này." size="sm" variant="ghost">
                           Xóa
                         </Button>
                       }
@@ -474,14 +477,16 @@ export default function BaoCaoNhapXuatTonScreen() {
                   <Button variant="outline" onClick={() => setForm(null)}>
                     Hủy
                   </Button>
-                  <Button onClick={luuTonDau}>
+                  <Button
+                    title="Ghi số tồn đầu vừa khai vào sổ." onClick={luuTonDau}>
                     <PackagePlus className="mr-1 h-4 w-4" />
                     Lưu tồn đầu
                   </Button>
                 </div>
               </div>
             ) : (
-              <Button variant="outline" onClick={moThemTonDau}>
+              <Button
+                title="Khai thêm tồn đầu cho một mã thành phẩm nữa." variant="outline" onClick={moThemTonDau}>
                 <PackagePlus className="mr-2 h-4 w-4" />
                 Thêm tồn đầu
               </Button>

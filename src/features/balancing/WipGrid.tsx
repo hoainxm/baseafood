@@ -242,22 +242,26 @@ export function LuoiBanThanhPham({
         </div>
         <div className="flex flex-wrap gap-2">
           {sanXuatChoHut.length > 0 && (
-            <Button size="lg" onClick={hutSanXuat}>
+            <Button
+              title="Hút mọi dòng sản lượng trong khoảng ngày của kỳ từ sổ sản xuất vào lưới này." size="lg" onClick={hutSanXuat}>
               <Download />
               Lấy {sanXuatChoHut.length} dòng từ sổ sản xuất
             </Button>
           )}
           {choHutBan.length > 0 && (
-            <Button variant="outline" size="lg" onClick={() => onHutBan(choHutBan)}>
+            <Button
+              title="Hút các dòng bán trong khoảng ngày của kỳ từ sổ bán hàng vào lưới này." variant="outline" size="lg" onClick={() => onHutBan(choHutBan)}>
               <Download />
               Lấy {choHutBan.length} dòng từ sổ bán
             </Button>
           )}
-          <Button variant="outline" size="lg" onClick={onDoiAnNgay}>
+          <Button
+            title="Ẩn / hiện các cột chia theo ngày. Ẩn đi thì bảng gọn, chỉ còn cột tổng." variant="outline" size="lg" onClick={onDoiAnNgay}>
             <ChevronsLeftRight />
             {anNgay ? "Mở cột ngày" : "Thu cột ngày"}
           </Button>
-          <Button variant="outline" size="lg" onClick={() => setThemMo(true)}>
+          <Button
+            title="Thêm tay một mặt hàng vào lưới thành phẩm của kỳ." variant="outline" size="lg" onClick={() => setThemMo(true)}>
             <Plus />
             Thêm mặt hàng
           </Button>

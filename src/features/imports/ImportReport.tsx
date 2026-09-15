@@ -309,6 +309,7 @@ export default function BaoCaoNhap() {
           </div>
         </div>
         <Button
+          title="Tải báo cáo nhập hàng đang xem (hàng mua + phế liệu) ra file Excel."
           size="lg"
           variant="outline"
           onClick={xuatExcel}

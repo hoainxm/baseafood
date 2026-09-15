@@ -15,7 +15,8 @@ export default function NotFound() {
         Đường dẫn bạn truy cập không tồn tại hoặc đã được thay đổi. Vui lòng kiểm tra lại.
       </p>
       <Link to="/imports" className="mt-6">
-        <Button size="lg">Quay lại trang chủ</Button>
+        <Button
+          title="Về trang chủ tương ứng với vai trò của bạn." size="lg">Quay lại trang chủ</Button>
       </Link>
     </div>
   );

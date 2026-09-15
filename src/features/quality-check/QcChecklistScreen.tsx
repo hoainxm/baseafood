@@ -228,11 +228,13 @@ export default function QcChecklistScreen() {
           )}
         </div>
         {dangKhoa ? (
-          <Button variant="outline" size="lg" onClick={moLai}>
+          <Button
+            title="Mở khóa lại ngày QC đã chốt để sửa hoặc chấm bù." variant="outline" size="lg" onClick={moLai}>
             Mở lại ngày
           </Button>
         ) : (
-          <Button variant="outline" size="lg" onClick={chotNgay}>
+          <Button
+            title="Khóa sổ QC ngày này. Sau khi chốt muốn sửa phải mở lại ngày." variant="outline" size="lg" onClick={chotNgay}>
             <Lock aria-hidden />
             Chốt ngày
           </Button>
@@ -317,7 +319,8 @@ export default function QcChecklistScreen() {
             placeholder="VD: Kiểm tra kim loại"
           />
         </Field>
-        <Button variant="outline" size="lg" onClick={themChiTieu}>
+        <Button
+          title="Thêm một chỉ tiêu chấm điểm nữa vào bảng kiểm của ngày." variant="outline" size="lg" onClick={themChiTieu}>
           <Plus aria-hidden />
           Thêm chỉ tiêu
         </Button>
@@ -325,7 +328,8 @@ export default function QcChecklistScreen() {
 
       {/* Lưu — không bao giờ disabled (thiếu thì báo qua toast) */}
       <div className="flex justify-end">
-        <Button size="lg" onClick={luu}>
+        <Button
+          title="Ghi điểm của toàn bộ chỉ tiêu vào sổ QC ngày đang chọn." size="lg" onClick={luu}>
           Lưu chấm điểm
         </Button>
       </div>
@@ -440,6 +444,7 @@ function AnhChiTieu({
             onChange={(e) => chon(e.target.files)}
           />
           <Button
+            title="Chọn ảnh minh chứng cho chỉ tiêu này (ảnh lưu trên máy chủ, xem lại được sau)."
             variant="outline"
             size="sm"
             onClick={() => inputRef.current?.click()}

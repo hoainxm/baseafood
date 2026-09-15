@@ -119,18 +119,19 @@ export function StepForm({
           onClick={lui}
           disabled={i === 0}
           className="sm:w-auto"
+          title="Về bước trước. Những gì đã gõ ở bước này vẫn được giữ."
         >
           <ArrowLeft />
           Quay lại
         </Button>
 
         {laXemLai ? (
-          <Button size="lg" onClick={onSubmit}>
+          <Button size="lg" onClick={onSubmit} title="Ghi toàn bộ những gì đã nhập ở các bước trên vào sổ.">
             <Check />
             {nhanHoanTat}
           </Button>
         ) : (
-          <Button size="lg" onClick={tien}>
+          <Button size="lg" onClick={tien} title="Sang bước kế tiếp. Thiếu ô bắt buộc sẽ được nhắc ngay tại đây.">
             Tiếp tục
             <ArrowRight />
           </Button>

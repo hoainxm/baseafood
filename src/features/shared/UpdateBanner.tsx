@@ -77,7 +77,8 @@ export function BangCapNhat() {
         <RefreshCw className="size-5 shrink-0" aria-hidden />
         Đã có bản cập nhật mới. Tải lại trang để dùng tính năng mới nhất.
       </span>
-      <Button size="lg" onClick={() => window.location.reload()}>
+      <Button
+        title="Tải lại trang để dùng bản mới vừa được đưa lên. Dữ liệu đang gõ dở có thể mất — lưu trước cho chắc." size="lg" onClick={() => window.location.reload()}>
         <RefreshCw />
         Tải lại ngay
       </Button>

@@ -104,6 +104,7 @@ export function ChoiceGroup({
               data-slot="choice-option"
               aria-pressed={chon}
               onClick={() => onChange(o.value)}
+              title={o.moTa ?? `Chọn "${o.label}" cho ${label.toLowerCase()}.`}
               className={cn(
                 /* 40px — bằng đúng chiều cao ô nhập, để hai cột cạnh nhau
                    (VD "Ngày nhập hàng" ↔ "Phân xưởng") thẳng hàng.

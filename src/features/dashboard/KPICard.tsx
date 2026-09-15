@@ -35,6 +35,7 @@ export function KPICard({
 }) {
   return (
     <button
+      title="Mở màn chi tiết đứng sau con số này."
       type="button"
       onClick={onClick}
       className={cn(

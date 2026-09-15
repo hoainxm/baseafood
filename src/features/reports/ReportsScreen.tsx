@@ -233,6 +233,7 @@ export default function ManBaoCao() {
         </div>
         <div className="flex flex-wrap gap-3">
           <Button
+            title="Dựng lại báo cáo tổng cho kỳ đang chọn (màn DEMO — chưa nối dữ liệu thật)."
             size="lg"
             onClick={() =>
               notify.daLuu("Đã tạo lại báo cáo · Kỳ 01/08 – 10/08/2026 · Baseafood 1 Bà Rịa")
@@ -242,6 +243,7 @@ export default function ManBaoCao() {
             Tạo báo cáo
           </Button>
           <Button
+            title="Xuất báo cáo ra PDF gồm biểu đồ và bảng chi tiết."
             variant="outline"
             size="lg"
             onClick={() =>
@@ -252,6 +254,7 @@ export default function ManBaoCao() {
             Xuất PDF
           </Button>
           <Button
+            title="Xuất báo cáo ra Excel, có cả chi tiết theo giờ của từng ca."
             variant="outline"
             size="lg"
             onClick={() =>

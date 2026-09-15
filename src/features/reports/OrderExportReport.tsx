@@ -200,11 +200,13 @@ export default function OrderExportReport() {
           Báo cáo đơn đặt được xuất hàng
         </h1>
         <div className="flex flex-wrap gap-2">
-          <Button size="lg" variant="outline" onClick={() => setInPrint(true)} disabled={!nhom.length}>
+          <Button
+            title="Xem trước bản in A4 báo cáo đơn xuất rồi in giấy hoặc lưu PDF." size="lg" variant="outline" onClick={() => setInPrint(true)} disabled={!nhom.length}>
             <Printer />
             In A4
           </Button>
-          <Button size="lg" variant="outline" onClick={xuatExcel} disabled={!nhom.length}>
+          <Button
+            title="Tải báo cáo đơn xuất đang xem ra file Excel." size="lg" variant="outline" onClick={xuatExcel} disabled={!nhom.length}>
             <FileSpreadsheet />
             Xuất Excel
           </Button>

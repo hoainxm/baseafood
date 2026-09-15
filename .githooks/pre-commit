@@ -8,7 +8,9 @@
 #
 # CHẶN  : lộ khóa/URL Supabase · features import thẳng primitive · features gọi
 #         localStorage/supabase · chữ nhỏ & IN HOA trong màn nghiệp vụ
-# CẢNH BÁO: doc app-map có `covers:` trỏ tới file vừa sửa mà doc đứng yên
+# CẢNH BÁO: doc app-map có `covers:` trỏ tới file vừa sửa mà doc đứng yên ·
+#         nút chỉ-icon thêm mới chưa có aria-label/title (nhắc, không chặn —
+#         mẫu dò theo DÒNG nên JSX xuống dòng có thể báo nhầm)
 #
 # Chỉ soi DÒNG THÊM MỚI — không bắt lỗi di sản đã có trong repo.
 
@@ -21,6 +23,7 @@ do_nhac() { printf '\033[33m▲ %s\033[0m\n' "$1"; canh_bao=1; }
 # Chuỗi ghép để chính file hook này không tự khớp mẫu của nó.
 MAU_JWT='eyJ[A-Za-z0-9_-]\{20,\}'
 MAU_URL='https://[a-z0-9]\{15,\}\.supabase''\.co'
+MAU_NUT_ICON='size="icon'
 
 dong_them() { git diff --cached -U0 -- "$1" | grep '^+' | grep -v '^+++'; }
 
@@ -31,6 +34,8 @@ if [ "$1" = "--self-test" ]; then
   echo 'https://abcdefghijklmnop.supabase.co' | grep -q "$MAU_URL" || { echo "self-test: mẫu URL hỏng"; ok=1; }
   echo 'import { Button } from "@/components/ui/button";' | grep -q '@/components/ui' || { echo "self-test: mẫu import hỏng"; ok=1; }
   echo 'class="text-xs uppercase"' | grep -q 'text-xs\|uppercase' || { echo "self-test: mẫu cỡ chữ hỏng"; ok=1; }
+  echo '<Button size="icon" onClick={x}>' | grep -q "$MAU_NUT_ICON" || { echo "self-test: mẫu nút icon hỏng"; ok=1; }
+  echo '<Button size="icon" aria-label="Tháng trước">' | grep -q 'aria-label\|title=' || { echo "self-test: mẫu nhãn nút hỏng"; ok=1; }
   [ -f docs/app-map/README.md ] || { echo "self-test: thiếu docs/app-map/README.md"; ok=1; }
   [ "$ok" = 0 ] && echo "self-test: OK"
   exit "$ok"
@@ -69,6 +74,16 @@ for f in $staged; do
   fi
   if printf '%s\n' "$them" | grep -q 'localStorage\.\|from "@/lib/supabase"\|from "@/lib/db"'; then
     do_hong "$f — features không gọi localStorage/supabase/db trực tiếp, đi qua @/lib/catalogRepo (CLAUDE.md §4)"
+  fi
+
+  # Nút chỉ-icon phải nói được nó làm gì khi rê chuột (README §9). Chỉ soi dòng
+  # thêm mới: một dòng `<Button size="icon…"` mà chính nó không mang aria-label
+  # / title thì gần như chắc là nút câm — mở ra xem rồi bổ sung.
+  if printf '%s\n' "$them" | grep -q "$MAU_NUT_ICON"; then
+    cam=$(printf '%s\n' "$them" | grep "$MAU_NUT_ICON" | grep -cv 'aria-label\|title=')
+    if [ "$cam" -gt 0 ] 2>/dev/null; then
+      do_nhac "$f — có $cam nút chỉ-icon thêm mới chưa thấy aria-label/title trên cùng dòng. Rê chuột phải ra hướng dẫn (src/design-system/README.md §9)"
+    fi
   fi
 
   # BalancingTable.tsx là bản in A4 — ngoại lệ có chủ đích.

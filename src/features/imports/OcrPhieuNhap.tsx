@@ -126,7 +126,8 @@ export function OcrPhieuNhap({
           )}
 
           {giaiDoan === "chon" && (
-            <Button size="lg" className="w-full" onClick={() => inputRef.current?.click()}>
+            <Button
+              title="Mở máy ảnh hoặc chọn ảnh phiếu nhập viết tay có sẵn trong máy." size="lg" className="w-full" onClick={() => inputRef.current?.click()}>
               <Camera />
               Chụp / chọn ảnh phiếu
             </Button>
@@ -153,7 +154,8 @@ export function OcrPhieuNhap({
                 Không đọc được ảnh (có thể mất mạng khi tải bộ nhận diện, hoặc ảnh
                 quá mờ). Ảnh phiếu vẫn được lưu kèm chuyến để đối chiếu tay.
               </p>
-              <Button variant="outline" size="lg" onClick={doiAnh}>
+              <Button
+                title="Bỏ ảnh này, chụp hoặc chọn ảnh khác rõ hơn." variant="outline" size="lg" onClick={doiAnh}>
                 <RefreshCw />
                 Thử ảnh khác
               </Button>
@@ -167,6 +169,7 @@ export function OcrPhieuNhap({
                 <div className="flex flex-wrap gap-2">
                   {kq.daiLy && (
                     <Button
+                      title="Điền tên đại lý máy đọc được vào form nhập hàng."
                       variant={daDaiLy ? "outline" : "default"}
                       onClick={() => {
                         onApDaiLy(kq.daiLy!);
@@ -179,6 +182,7 @@ export function OcrPhieuNhap({
                   )}
                   {kq.ngay && (
                     <Button
+                      title="Điền ngày máy đọc được vào form nhập hàng."
                       variant={daNgay ? "outline" : "default"}
                       onClick={() => {
                         onApNgay(kq.ngay!);
@@ -199,7 +203,8 @@ export function OcrPhieuNhap({
                     <span className="text-sm font-semibold">
                       Dòng nhận được ({kq.dong.length})
                     </span>
-                    <Button variant="outline" size="sm" onClick={themTatCa}>
+                    <Button
+                      title="Điền hết các dòng loại nguyên liệu + kg máy đọc được vào form. Vẫn soát lại từng dòng trước khi lưu." variant="outline" size="sm" onClick={themTatCa}>
                       <Plus />
                       Thêm tất cả
                     </Button>
@@ -214,6 +219,7 @@ export function OcrPhieuNhap({
                           {d.loaiNL} · <span className="tnum font-semibold">{fmtKg(d.kg)}</span>
                         </span>
                         <Button
+                          title="Điền riêng dòng này vào form nhập hàng."
                           variant={daDong.has(i) ? "outline" : "default"}
                           size="sm"
                           onClick={() => {
@@ -273,7 +279,8 @@ export function OcrPhieuNhap({
                 </details>
               )}
 
-              <Button variant="outline" size="sm" onClick={doiAnh}>
+              <Button
+                title="Chụp ảnh phiếu khác để đọc tiếp." variant="outline" size="sm" onClick={doiAnh}>
                 <RefreshCw />
                 Chụp ảnh khác
               </Button>
@@ -282,7 +289,8 @@ export function OcrPhieuNhap({
         </div>
 
         <DialogFooter>
-          <Button size="lg" onClick={onClose}>
+          <Button
+            title="Đóng cửa sổ nhận diện, quay về form nhập hàng." size="lg" onClick={onClose}>
             Xong
           </Button>
         </DialogFooter>

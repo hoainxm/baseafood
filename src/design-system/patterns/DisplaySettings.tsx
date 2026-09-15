@@ -298,7 +298,11 @@ export function CaiDatHienThi({ taiKhoan }: { taiKhoan?: string }) {
       />
 
       <div className="flex justify-end border-t border-border pt-5">
-        <Button variant="outline" onClick={c.datLai}>
+        <Button
+          variant="outline"
+          onClick={c.datLai}
+          title="Trả cỡ chữ, mật độ và giao diện sáng/tối về mức mặc định của hệ thống. Chỉ đổi trên máy này."
+        >
           <RotateCcw />
           Đặt lại mặc định
         </Button>

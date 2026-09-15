@@ -40,6 +40,7 @@ export function CanhBao({
         return (
           <li key={a.id}>
             <button
+              title="Xem chi tiết cảnh báo này và việc cần làm."
               type="button"
               onClick={() => onChon(a)}
               className={cn(

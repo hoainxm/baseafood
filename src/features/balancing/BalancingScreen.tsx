@@ -275,7 +275,8 @@ export default function CanDoiScreen() {
             Cân đối nguyên liệu
           </h1>
         </div>
-        <Button size="lg" onClick={moThem}>
+        <Button
+          title="Mở một kỳ cân đối mới (thường ~5 ngày một lô): khai khoảng ngày rồi hút số liệu nhập · sản xuất · bán vào." size="lg" onClick={moThem}>
           <Plus />
           Tạo kỳ cân đối
         </Button>
@@ -289,7 +290,8 @@ export default function CanDoiScreen() {
           tieuDe="Chưa có kỳ cân đối nào"
           moTa="Tạo kỳ đầu tiên: chọn loại nguyên liệu và khoảng ngày tiếp nhận."
           action={
-            <Button size="lg" onClick={moThem}>
+            <Button
+              title="Mở kỳ cân đối đầu tiên." size="lg" onClick={moThem}>
               <Plus />
               Tạo kỳ cân đối
             </Button>
@@ -304,10 +306,12 @@ export default function CanDoiScreen() {
           nhanTimKiem="Tìm kỳ theo loại nguyên liệu…"
           actions={(r) => (
             <>
-              <Button size="sm" onClick={() => setSelId(r.id)}>
+              <Button
+                title="Mở lưới cân đối của kỳ này để nhập số và xem định mức, lãi lỗ." size="sm" onClick={() => setSelId(r.id)}>
                 Mở kỳ
               </Button>
               <Button
+                title="Sửa thông tin kỳ (tên kỳ, khoảng ngày, loại nguyên liệu)."
                 variant="outline"
                 size="sm"
                 onClick={() => {
@@ -423,7 +427,8 @@ export default function CanDoiScreen() {
             <Button variant="outline" size="lg" onClick={() => setDang(null)}>
               Hủy
             </Button>
-            <Button size="lg" onClick={luuKy}>
+            <Button
+              title="Ghi kỳ cân đối này vào sổ." size="lg" onClick={luuKy}>
               {laThem ? "Tạo kỳ" : "Lưu thay đổi"}
             </Button>
           </DialogFooter>
@@ -527,7 +532,8 @@ function KyDetail({
 
   return (
     <div className="space-y-6">
-      <Button variant="ghost" onClick={onBack}>
+      <Button
+        title="Quay về danh sách các kỳ cân đối." variant="ghost" onClick={onBack}>
         <ChevronLeft />
         Danh sách kỳ
       </Button>
@@ -560,11 +566,13 @@ function KyDetail({
             <Redo2 />
             Làm lại
           </Button>
-          <Button variant="outline" size="lg" onClick={() => setXepNgang((v) => !v)}>
+          <Button
+            title="Xoay bảng ngang / dọc cho vừa màn hình — chỉ đổi cách nhìn, không đụng số." variant="outline" size="lg" onClick={() => setXepNgang((v) => !v)}>
             {xepNgang ? <Rows3 /> : <Columns2 />}
             {xepNgang ? "Xếp dọc" : "Xếp ngang"}
           </Button>
-          <Button variant="outline" size="lg" onClick={() => setShowBang(true)}>
+          <Button
+            title="Xem bảng cân đối đúng khổ in A4 rồi in giấy hoặc lưu PDF." variant="outline" size="lg" onClick={() => setShowBang(true)}>
             <FileText />
             Xem / in bảng
           </Button>
@@ -607,7 +615,8 @@ function KyDetail({
             {" "}(nhập {luoi.nhapChoHut.length} · sản xuất{" "}
             {luoi.sanXuatChoHut.length}).
           </p>
-          <Button size="lg" onClick={luoi.hutTatCaNguon}>
+          <Button
+            title="Hút toàn bộ dòng có sẵn từ sổ nhập hàng, sản xuất và bán hàng trong khoảng ngày của kỳ này vào lưới." size="lg" onClick={luoi.hutTatCaNguon}>
             <ArrowDownToLine />
             Lấy tất cả {soNguonChoHut} dòng
           </Button>
@@ -669,7 +678,8 @@ function KyDetail({
             <strong>{luoi.soDongChuyenKy}</strong> dòng đẩy sang kỳ này mà chưa kỳ nào
             nhận.
           </p>
-          <Button size="lg" onClick={luoi.nhanChuyenKy}>
+          <Button
+            title="Nhận phần tồn chuyển từ kỳ trước sang làm số đầu kỳ này." size="lg" onClick={luoi.nhanChuyenKy}>
             <ArrowRightLeft />
             Nhận {luoi.soDongChuyenKy} dòng chuyển kỳ
           </Button>
@@ -745,6 +755,7 @@ function KyDetail({
           )}
         </div>
         <Button
+          title="Khóa kỳ lại để chốt số, hoặc mở khóa nếu cần sửa. Kỳ đã chốt thì số không đổi nữa."
           variant={ky.isLocked ? "outline" : "default"}
           size="lg"
           onClick={() => setChotMo(true)}

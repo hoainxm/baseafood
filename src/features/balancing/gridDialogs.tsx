@@ -65,6 +65,7 @@ export function HopThemDongNL({
             Hủy
           </Button>
           <Button
+            title="Thêm dòng nguyên liệu vừa chọn vào lưới của kỳ."
             size="lg"
             onClick={() => {
               const t = ten.trim();
@@ -182,6 +183,7 @@ export function HopChonDongNhap({
             Hủy
           </Button>
           <Button
+            title="Đưa các dòng đang tick từ sổ nhập vào kỳ cân đối này."
             size="lg"
             onClick={() => {
               if (chon.size === 0) {
@@ -256,6 +258,7 @@ export function HopThemMatHang({
             Hủy
           </Button>
           <Button
+            title="Thêm mặt hàng vừa chọn vào lưới thành phẩm của kỳ."
             size="lg"
             onClick={() => {
               if (!matHangId) {
@@ -307,6 +310,7 @@ export function HopLyDoGhiBu({
             Hủy
           </Button>
           <Button
+            title="Ghi số vừa sửa kèm lý do. Lý do được lưu vết để đối chiếu về sau."
             size="lg"
             onClick={() => {
               if (!lyDo.trim()) {
@@ -363,6 +367,7 @@ export function HopChotKy({
             Hủy
           </Button>
           <Button
+            title="Khóa kỳ lại để chốt số, hoặc mở khóa nếu cần sửa. Mở lại BẮT BUỘC ghi lý do."
             size="lg"
             onClick={() => {
               /* Mở lại BẮT BUỘC có lý do — giống mở lại ngày đã chốt ở sổ nhập.

@@ -206,11 +206,13 @@ export default function DailyProductionReport() {
           Báo cáo thành phẩm hàng ngày
         </h1>
         <div className="flex flex-wrap gap-2">
-          <Button size="lg" variant="outline" onClick={() => setInPrint(true)} disabled={!groups.length}>
+          <Button
+            title="Xem trước bản in A4 báo cáo sản lượng ngày rồi in giấy hoặc lưu PDF." size="lg" variant="outline" onClick={() => setInPrint(true)} disabled={!groups.length}>
             <Printer />
             In A4
           </Button>
-          <Button size="lg" variant="outline" onClick={xuatExcel} disabled={!groups.length}>
+          <Button
+            title="Tải báo cáo sản lượng đang xem ra file Excel." size="lg" variant="outline" onClick={xuatExcel} disabled={!groups.length}>
             <FileSpreadsheet />
             Xuất Excel
           </Button>

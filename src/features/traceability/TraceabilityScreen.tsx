@@ -142,6 +142,7 @@ function NodeBuoc({ b, onClick }: { b: Buoc; onClick: () => void }) {
   const Icon = t.icon;
   return (
     <button
+      title="Xem chi tiết công đoạn này trong chuỗi truy xuất."
       type="button"
       onClick={onClick}
       className="grid w-44 shrink-0 justify-items-center gap-2 border-0 bg-transparent p-0 text-center"
@@ -239,7 +240,8 @@ export default function ManTruyXuat() {
               <ScanBarcode className="size-6" aria-hidden />
             </button>
           </div>
-          <Button size="lg" onClick={truyXuat}>
+          <Button
+            title="Tra ngược toàn bộ đường đi của mã lô vừa nhập: nhập nguyên liệu → sản xuất → đóng gói → bán." size="lg" onClick={truyXuat}>
             <Search className="size-6" aria-hidden />
             Truy xuất
           </Button>
@@ -248,6 +250,7 @@ export default function ManTruyXuat() {
           <p className="text-sm text-muted-foreground">
             Thử mã mẫu:{" "}
             <button
+              title="Điền sẵn mã lô mẫu để xem thử kết quả truy xuất."
               type="button"
               onClick={() => {
                 setQ(TX_LO.ma);
@@ -276,7 +279,8 @@ export default function ManTruyXuat() {
                 <p className="text-sm text-muted-foreground">Mã lô</p>
                 <div className="mt-1 flex flex-wrap items-center gap-3">
                   <span className="font-mono text-3xl font-bold">{ketQua.ma}</span>
-                  <Button variant="outline" size="sm" onClick={sao}>
+                  <Button
+                    title="Sao chép mã này vào bộ nhớ tạm." variant="outline" size="sm" onClick={sao}>
                     <Copy className="size-5" aria-hidden />
                     Sao chép
                   </Button>
@@ -403,6 +407,7 @@ export default function ManTruyXuat() {
                 const Icon = k.icon;
                 return (
                   <button
+                    title="Xem chi tiết điểm kiểm soát chất lượng này."
                     key={c.id}
                     type="button"
                     onClick={() => setQc(c)}
@@ -446,6 +451,7 @@ export default function ManTruyXuat() {
           {/* Footer hành động */}
           <div className="flex flex-wrap justify-end gap-3 border-t-2 border-border pt-5">
             <Button
+              title="In phiếu truy xuất nguồn gốc của lô này."
               variant="outline"
               size="lg"
               onClick={() => notify.daLuu(`Đã gửi lệnh in · Phiếu truy xuất ${ketQua.ma}`)}
@@ -454,6 +460,7 @@ export default function ManTruyXuat() {
               In phiếu truy xuất
             </Button>
             <Button
+              title="Xuất phiếu truy xuất ra PDF, kèm cả 4 checkpoint QC."
               variant="outline"
               size="lg"
               onClick={() => notify.daLuu(`Đang xuất PDF · ${ketQua.ma} — gồm cả 4 checkpoint QC`)}
@@ -461,7 +468,8 @@ export default function ManTruyXuat() {
               <FileText className="size-5" aria-hidden />
               Xuất PDF
             </Button>
-            <Button size="lg" onClick={() => setQr(true)}>
+            <Button
+              title="Tạo mã QR cho lô này để dán lên kiện hàng." size="lg" onClick={() => setQr(true)}>
               <QrCode className="size-5" aria-hidden />
               Tạo QR Code
             </Button>
@@ -497,6 +505,7 @@ export default function ManTruyXuat() {
             <>
               <NutDong>Đóng</NutDong>
               <Button
+                title="Mở phiếu kiểm chất lượng tương ứng với checkpoint này."
                 size="lg"
                 onClick={() => {
                   const c = qc;
@@ -537,6 +546,7 @@ export default function ManTruyXuat() {
             <>
               <NutDong>Đóng</NutDong>
               <Button
+                title="In tem QR của lô này."
                 size="lg"
                 onClick={() => {
                   setQr(false);

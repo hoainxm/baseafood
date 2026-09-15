@@ -156,7 +156,8 @@ export default function PhieuNLNgay({
           )}
         </div>
 
-        <Button onClick={() => window.print()}>
+        <Button
+          title="Mở hộp in của trình duyệt cho phiếu này. Chọn máy in để in giấy, hoặc 'Lưu thành PDF' để ra file." onClick={() => window.print()}>
           <Printer className="size-4" /> In / Xuất PDF
         </Button>
       </div>

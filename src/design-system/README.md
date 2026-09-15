@@ -30,6 +30,8 @@ src/features/*                 ← màn nghiệp vụ
    icon `size-tap` 40px. Cần to hơn → đổi mật độ **Thoáng** ở Cài đặt hiển thị.
 5. **Nút chỉ-icon được phép** nhưng PHẢI có `aria-label` + `title` (vd nút toàn
    cục header). Nút hành động chính trong form vẫn nên kèm chữ.
+5b. **Mọi nút THAO TÁC phải có hướng dẫn khi rê chuột** — `title` nói nút đó
+    **làm gì, đụng tới chức năng nào**, không phải chép lại nhãn. Xem §9.
 6. **Mọi ô nhập phải bọc `Field` / `NumberField` / `Combobox` / `DateField`.**
    Nhãn luôn hiện. Placeholder không bao giờ thay nhãn. Ô bắt buộc đánh dấu
    **`*` đỏ sau nhãn**; ô không bắt buộc không ghi gì. `*` là `aria-hidden`,
@@ -246,6 +248,8 @@ thứ tự DOM, tự bỏ ô ẩn của dòng chưa mở); Tab để trình duy�
 - [ ] Bảng dài đã ra thẻ trên điện thoại (hoặc có `cot-dau-dinh` nếu là báo cáo Excel)
 - [ ] Chỉ dùng `md:` cho bố cục khung; không thêm `sm:`
 - [ ] Màn mới đã vào `KIT_NAV` **và** `CAY_NAV`
+- [ ] **Mọi nút thao tác có `title` giải thích nút làm gì** (§9) — nút chỉ-icon
+      bắt buộc, kèm `aria-label`
 
 ## Bảng chọn component
 
@@ -388,11 +392,81 @@ ngược lên thư mục cha và đụng junction tương thích cũ bị khóa 
    bám token density qua `data-slot` (xem override trong `tokens.css`). Đừng để
    lẫn `h-8`/`h-9` lạc cỡ giữa các primitive.
 
+## 9. Hướng dẫn khi rê chuột (`title`) — BẮT BUỘC cho nút thao tác
+
+Người dùng là tổ trưởng / thủ kho / kế toán, phần lớn 45–60 tuổi, học phần mềm
+bằng cách **rê thử rồi mới dám bấm**. Một nút không nói gì khi rê là một nút họ
+né — rồi quay về ghi tay. Nên: **mọi nút THAO TÁC phải trả lời được câu "bấm
+cái này thì chuyện gì xảy ra, ăn vào đâu"** ngay khi rê chuột.
+
+### Viết `title` thế nào
+
+`title` là **câu giải thích**, KHÔNG phải chép lại nhãn nút:
+
+```tsx
+// ✘ chép nhãn — rê chuột xong vẫn không biết gì thêm
+<Button title="Dồn sang tháng sau">Dồn sang tháng sau</Button>
+
+// ✔ nói việc nó làm + đụng tới đâu
+<Button title="Lấy tồn cuối tháng này làm tồn đầu Tháng 10/2026. Chạy lại chỉ cập nhật, không nhân đôi dòng.">
+  Dồn sang Tháng 10/2026
+</Button>
+```
+
+Khuôn một câu: **{làm gì} + {ăn vào dữ liệu nào} + {lưu ý nếu có}**. Ngắn gọn,
+một–hai câu, tiếng Việt thường ngày (xem [noi-dung-va-label.md](./noi-dung-va-label.md)).
+Nút có hậu quả (chốt sổ, xóa, ghi đè, xuất file) thì **nói rõ hậu quả** ở đây —
+đừng để người dùng biết sau khi đã bấm.
+
+### Nút nào bắt buộc, nút nào không
+
+| Loại nút | `title` |
+|---|---|
+| Chỉ-icon (✎ 🗑 🕘 ◀ ▶ …) | **BẮT BUỘC** + `aria-label`. Không có chữ thì hover là lối duy nhất để hiểu. |
+| Thao tác nghiệp vụ (Lưu, Chốt ngày, Dồn kỳ, Gán, Đồng bộ, Nhập/Xuất Excel, In) | **BẮT BUỘC** |
+| Đổi chế độ / bộ lọc (Ghi nhập/xuất, Chọn tất cả, Xem trước) | **BẮT BUỘC** |
+| Hủy · Đóng · Quay lại trong hộp thoại | **Không** — thêm vào chỉ tổ nhiễu |
+| Nút điều hướng có chữ rõ nghĩa trong `EmptyState` | Tuỳ, không bắt buộc |
+
+### Cơ chế đỡ sẵn
+
+`Button` (`components/ui/button.tsx`) **tự lấy `aria-label` làm `title`** khi
+thiếu `title`. Nhờ vậy mọi nút chỉ-icon đã có `aria-label` đều có hover ngay,
+không phải gõ hai lần cùng một câu. Nhưng `aria-label` thường chỉ là tên thao
+tác ("Xóa 2 DA 250UP") — **câu giải thích đầy đủ vẫn nên viết vào `title`**.
+
+Các pattern dùng lại đã tự gắn `title`, màn hình KHÔNG phải làm gì thêm:
+
+| Pattern | Hover ra câu gì |
+|---|---|
+| `DanhMucCrud` | nút Thêm / Sửa từng bản ghi (ghép sẵn `tenDonVi` + mô tả bản ghi) |
+| `ConfirmDelete` | nút Xóa mặc định — nói rõ có xác nhận và có Hoàn tác |
+| `RecordTable` | tiêu đề cột sắp xếp (cả bản bảng lẫn nút sắp trên điện thoại) + nút bỏ lọc |
+| `ChoiceGroup` | từng lựa chọn — lấy `o.moTa`, không có thì ghép "Chọn X cho {nhãn}" |
+| `Combobox` · `DateField` · `NumberField` | nút mở danh sách / mở lịch / tăng giảm |
+| `StepForm` · `PrintSheet` · `InfoTip` · `DisplaySettings` | nút điều hướng bước, In / Xuất PDF, ⓘ, Đặt lại |
+
+Mục **điều hướng** lấy câu mô tả từ `KIT_NAV[].moTa` (`features/shared/AppShell.tsx`):
+rê lên tên màn là biết màn đó để làm gì. **Thêm màn mới thì viết luôn `moTa`** —
+xem [02-pages-navigation](../../docs/app-map/02-pages-navigation.md).
+
+⚠️ `title` là tooltip của trình duyệt: **không hiện trên điện thoại** (không có
+hover). Thông tin mà người dùng *bắt buộc* phải biết mới thao tác đúng thì đừng
+giấu trong `title` — cho ra chữ phụ dưới nút, `InfoTip` cạnh nhãn, hoặc câu mô
+tả trong hộp thoại xác nhận.
+
+### Cổng máy
+
+`.githooks/pre-commit` **chặn** nút chỉ-icon (`size="icon…"`) thêm mới mà không
+có `aria-label` / `title` — chỉ soi dòng THÊM MỚI, không bắt lỗi di sản.
+
 ## Kiểm tra trước khi giao
 
 - [ ] Không `uppercase` cho nội dung; `text-xs` chỉ cho chip/badge/phụ chú
 - [ ] Không còn `slate-400` / `slate-300` làm màu chữ
 - [ ] Nút bấm được thoải mái (~40px `size-tap`)
+- [ ] **Rê chuột lên từng nút thao tác đều ra câu hướng dẫn** (§9); không nút
+      chỉ-icon nào câm
 - [ ] Tab được hết màn bằng bàn phím, focus ring luôn thấy
 - [ ] Dropdown danh sách dài: cuộn được và THẤY thanh cuộn
 - [ ] **Chạy hết checklist ở § Quy chuẩn mobile · mục 7** (360px · thử 130% ·

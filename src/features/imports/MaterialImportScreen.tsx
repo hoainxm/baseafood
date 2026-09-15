@@ -875,6 +875,7 @@ export default function NhapNguyenLieuScreen() {
       {coOcr && (
         <div className="flex flex-wrap items-center gap-2">
           <Button
+            title="Chụp hoặc chọn ảnh phiếu nhập viết tay, máy tự đọc ra ngày · đại lý · các dòng loại NL và kg. Kết quả là NHÁP — soát lại rồi mới lưu."
             type="button"
             variant="outline"
             size="lg"
@@ -888,7 +889,8 @@ export default function NhapNguyenLieuScreen() {
             <span className="flex items-center gap-1">
               <Badge variant="secondary">Đã đính ảnh phiếu</Badge>
               {coLuuAnh && (
-                <Button type="button" variant="link" size="sm" onClick={xemAnhPhieu}>
+                <Button
+                  title="Mở lại ảnh phiếu tay đã lưu kèm chuyến này." type="button" variant="link" size="sm" onClick={xemAnhPhieu}>
                   Xem
                 </Button>
               )}
@@ -972,6 +974,7 @@ export default function NhapNguyenLieuScreen() {
 
       <div className="rounded-xl border-2 border-border">
         <button
+          title="Mở / thu phần ghi thêm về xe và ghi chú của chuyến (không bắt buộc)."
           type="button"
           onClick={() => setMoPhuPhien((v) => !v)}
           aria-expanded={moPhuPhien}
@@ -1093,12 +1096,14 @@ export default function NhapNguyenLieuScreen() {
               nhanNut="Xóa chuyến"
             />
           ) : (
-            <Button variant="outline" size="lg" onClick={luuThemChuyenKhac}>
+            <Button
+              title="Ghi chuyến đang gõ vào sổ rồi mở form trống nhập tiếp chuyến kế — khỏi bấm ra bấm vào." variant="outline" size="lg" onClick={luuThemChuyenKhac}>
               <Truck />
               Lưu &amp; thêm chuyến khác
             </Button>
           )}
-          <Button size="lg" onClick={xongChuyen}>
+          <Button
+            title="Ghi chuyến đang gõ vào sổ rồi quay về danh sách chuyến trong ngày." size="lg" onClick={xongChuyen}>
             {dangSuaChuyen ? "Lưu chuyến" : "Lưu vào sổ"}
           </Button>
         </div>
@@ -1117,6 +1122,7 @@ export default function NhapNguyenLieuScreen() {
         {/* Tách rõ NHẬP với TRA CỨU: một màn làm một việc. */}
         <div className="flex w-full overflow-hidden rounded-xl border-2 border-border sm:w-auto">
           <button
+            title="Sang chế độ Ghi nhập để gõ chuyến nguyên liệu mới."
             type="button"
             onClick={() => setCheDo("nhap")}
             className={cn(
@@ -1129,6 +1135,7 @@ export default function NhapNguyenLieuScreen() {
             📝 Ghi nhập
           </button>
           <button
+            title="Xem sổ các chuyến đã ghi trong ngày, sửa hoặc chốt ngày tại đây."
             type="button"
             onClick={() => setCheDo("so")}
             className={cn(
@@ -1141,6 +1148,7 @@ export default function NhapNguyenLieuScreen() {
             📖 Sổ ngày
           </button>
           <button
+            title="Xem báo cáo nhập hàng theo khoảng ngày, xuất Excel hoặc in."
             type="button"
             onClick={() => setCheDo("bao-cao")}
             className={cn(
@@ -1186,15 +1194,18 @@ export default function NhapNguyenLieuScreen() {
       {cheDo === "so" && (
         <>
       <div className="flex flex-wrap gap-2">
-        <Button variant="outline" size="lg" onClick={() => setXemPhieu(true)}>
+        <Button
+          title="Xem trước bản in A4 báo cáo nhập hàng của ngày đang chọn." variant="outline" size="lg" onClick={() => setXemPhieu(true)}>
           <FileText />
           Xem báo cáo
         </Button>
-        <Button variant="outline" size="lg" onClick={() => setInPhieuTrong(true)}>
+        <Button
+          title="In tờ phiếu trống để tổ trưởng ghi tay ngoài xưởng, tối về nhập lại vào máy." variant="outline" size="lg" onClick={() => setInPhieuTrong(true)}>
           <Printer />
           In phiếu trống
         </Button>
-        <Button variant="outline" size="lg" onClick={() => setDoiLoaiMo(true)}>
+        <Button
+          title="Đổi loại nguyên liệu cho nhiều chuyến cùng lúc — dùng khi gõ nhầm loại cho cả loạt dòng." variant="outline" size="lg" onClick={() => setDoiLoaiMo(true)}>
           <Replace />
           Đổi loại hàng loạt
         </Button>
@@ -1275,6 +1286,7 @@ export default function NhapNguyenLieuScreen() {
           />
 
           <Button
+            title="Mở thêm bộ lọc theo đại lý · loại nguyên liệu · đã có giá hay chưa."
             variant="outline"
             size="lg"
             aria-expanded={moLocThem}
@@ -1333,6 +1345,7 @@ export default function NhapNguyenLieuScreen() {
               phanXuong === "Tất cả") && (
               <div className="flex justify-end">
                 <Button
+                  title="Xóa hết bộ lọc đang đặt, về lại danh sách đầy đủ của xưởng Đông."
                   variant="outline"
                   onClick={() => {
                     setLocDaiLy("");
@@ -1365,7 +1378,8 @@ export default function NhapNguyenLieuScreen() {
                 : `Phân xưởng ${phanXuong}. Chuyển sang “Ghi nhập” để ghi chuyến.`
           }
           action={
-            <Button size="lg" onClick={() => setCheDo("nhap")}>
+            <Button
+              title="Chuyển sang chế độ Ghi để nhập chuyến mới cho ngày này." size="lg" onClick={() => setCheDo("nhap")}>
               <Plus />
               Sang Ghi nhập
             </Button>
@@ -1450,13 +1464,15 @@ export default function NhapNguyenLieuScreen() {
                         {kg(n.tongKg)}
                       </span>
                       {!khoaChuyen && (
-                        <Button variant="outline" onClick={() => moSuaChuyen(n)}>
+                        <Button
+                          title="Mở lại chuyến này để sửa dòng hàng, số kg hay giá. Ngày đã chốt thì phải mở khóa trước." variant="outline" onClick={() => moSuaChuyen(n)}>
                           <Pencil />
                           Sửa chuyến
                         </Button>
                       )}
                       {n.chuyen?.lotCode && (
                         <Button
+                          title="In tem QR mã lô của chuyến này để dán lên kiện hàng, sau quét tra ngược được nguồn gốc."
                           variant="outline"
                           onClick={() => setChuyenInTem(n.chuyen)}
                         >
@@ -1549,6 +1565,7 @@ export default function NhapNguyenLieuScreen() {
           </div>
           {dangKhoa ? (
             <Button
+              title="Mở khóa lại ngày đã chốt để sửa hoặc ghi bù. Phải ghi lý do, và việc mở khóa được lưu vết."
               variant="outline"
               size="lg"
               onClick={() => {
@@ -1562,6 +1579,7 @@ export default function NhapNguyenLieuScreen() {
             </Button>
           ) : (
             <Button
+              title="Khóa sổ ngày này lại: chốt tổng nhập trong ngày. Sau khi chốt muốn sửa phải Mở lại ngày và ghi lý do."
               size="lg"
               onClick={() =>
                 coDongChuaLuu ? setNhacLuu(true) : setHoiChot(true)
@@ -1610,13 +1628,15 @@ export default function NhapNguyenLieuScreen() {
 
           <DialogFooter>
             <Button
+              title="Chưa chốt vội — đóng hộp thoại, sổ ngày vẫn mở."
               variant="outline"
               size="lg"
               onClick={() => setHoiChot(false)}
             >
               Chưa chốt
             </Button>
-            <Button size="lg" onClick={chotNgay}>
+            <Button
+              title="Xác nhận khóa sổ ngày này." size="lg" onClick={chotNgay}>
               <Lock />
               Chốt ngày
             </Button>
@@ -1641,6 +1661,7 @@ export default function NhapNguyenLieuScreen() {
 
           <DialogFooter className="flex-wrap gap-2">
             <Button
+              title="Đóng nhắc nhở, về lại form để nhập nốt dòng đang gõ dở."
               variant="ghost"
               size="lg"
               onClick={() => setNhacLuu(false)}
@@ -1648,6 +1669,7 @@ export default function NhapNguyenLieuScreen() {
               Quay lại nhập tiếp
             </Button>
             <Button
+              title="Chốt ngày luôn và BỎ dòng đang gõ dở — dòng đó sẽ không vào sổ."
               variant="outline"
               size="lg"
               onClick={() => {
@@ -1658,6 +1680,7 @@ export default function NhapNguyenLieuScreen() {
               Vẫn chốt (bỏ dòng đang gõ)
             </Button>
             <Button
+              title="Ghi dòng đang gõ vào sổ trước, rồi mới chốt ngày — không mất dữ liệu."
               size="lg"
               onClick={() => {
                 if (luuPhien(false)) {
@@ -1699,13 +1722,15 @@ export default function NhapNguyenLieuScreen() {
 
           <DialogFooter>
             <Button
+              title="Giữ nguyên khóa — không mở lại ngày."
               variant="outline"
               size="lg"
               onClick={() => setHoiMoLai(false)}
             >
               Giữ khóa
             </Button>
-            <Button size="lg" onClick={moLaiNgay}>
+            <Button
+              title="Xác nhận mở khóa ngày này để sửa hoặc ghi bù." size="lg" onClick={moLaiNgay}>
               <LockOpen />
               Mở lại ngày
             </Button>
@@ -1812,6 +1837,7 @@ function BangDongHang({
           />
           {coTheBo ? (
             <Button
+              title="Bỏ dòng loại hàng này khỏi chuyến đang gõ (chưa lưu nên không đụng sổ)."
               variant="outline"
               aria-label="Bỏ dòng"
               className="justify-center sm:col-span-2 lg:col-span-1"
@@ -1827,6 +1853,7 @@ function BangDongHang({
       ))}
 
       <Button
+        title="Thêm một dòng loại hàng nữa cho chuyến này — một chuyến chở được nhiều loại."
         type="button"
         variant="outline"
         size="lg"
@@ -1987,6 +2014,7 @@ function KhoiPheLieuNgay({
           <Badge variant="outline">Ghi ở “Ghi nhập trong ngày”</Badge>
         ) : (
           <Button
+            title="Ghi một dòng phế liệu phát sinh trong ngày (đầu, da, vụn…) để kỳ cân đối hút sang."
             size="lg"
             onClick={() => {
               setDang({
@@ -2020,6 +2048,7 @@ function KhoiPheLieuNgay({
             : (r) => (
                 <>
                   <Button
+                    title="Sửa dòng phế liệu này (tên · số kg · giá bán)."
                     variant="outline"
                     size="sm"
                     onClick={() => {
@@ -2123,10 +2152,12 @@ function KhoiPheLieuNgay({
           )}
 
           <DialogFooter>
-            <Button variant="outline" size="lg" onClick={() => setDang(null)}>
+            <Button
+              title="Đóng hộp thoại, không ghi gì." variant="outline" size="lg" onClick={() => setDang(null)}>
               {laThem ? "Xong" : "Hủy"}
             </Button>
-            <Button size="lg" onClick={luu}>
+            <Button
+              title="Ghi dòng phế liệu này vào sổ của ngày đang chọn." size="lg" onClick={luu}>
               {laThem ? <Plus /> : null}
               {laThem ? "Thêm loại này" : "Lưu"}
             </Button>

@@ -855,7 +855,8 @@ export default function SanXuatBTPScreen() {
             )}
           </span>
         </span>
-        <Button size="lg" onClick={xongPhien} className="w-full sm:w-auto">
+        <Button
+          title="Ghi toàn bộ sản lượng đang gõ vào sổ sản xuất của ngày và xưởng đang chọn." size="lg" onClick={xongPhien} className="w-full sm:w-auto">
           <Plus />
           Lưu vào sổ
         </Button>
@@ -874,6 +875,7 @@ export default function SanXuatBTPScreen() {
         {/* Tách rõ NHẬP với TRA CỨU: một màn làm một việc. */}
         <div className="flex w-full overflow-hidden rounded-xl border-2 border-border sm:w-auto">
           <button
+            title="Sang chế độ Ghi nhập để gõ sản lượng thành phẩm."
             type="button"
             onClick={() => setCheDo("nhap")}
             className={cn(
@@ -886,6 +888,7 @@ export default function SanXuatBTPScreen() {
             📝 Ghi nhập
           </button>
           <button
+            title="Xem sổ sản lượng đã ghi trong ngày và báo cáo theo xưởng, chốt ngày tại đây."
             type="button"
             onClick={() => setCheDo("so")}
             className={cn(
@@ -910,7 +913,8 @@ export default function SanXuatBTPScreen() {
       {cheDo === "so" && (
         <>
       <div className="flex flex-wrap gap-2">
-        <Button variant="outline" size="lg" onClick={() => setInPhieuTrong(true)}>
+        <Button
+          title="In tờ phiếu trống để ghi tay sản lượng ngoài xưởng, tối về nhập lại vào máy." variant="outline" size="lg" onClick={() => setInPhieuTrong(true)}>
           <Printer />
           In phiếu trống
         </Button>
@@ -985,7 +989,8 @@ export default function SanXuatBTPScreen() {
           tieuDe={`Chưa ghi thành phẩm trong ${moTaPhamVi}`}
           moTa={`Phân xưởng ${phanXuong}. Chuyển sang "Ghi nhập" để ghi.`}
           action={
-            <Button size="lg" onClick={() => setCheDo("nhap")}>
+            <Button
+              title="Chuyển sang chế độ Ghi để nhập sản lượng cho ngày này." size="lg" onClick={() => setCheDo("nhap")}>
               <Plus />
               Sang Ghi nhập
             </Button>
@@ -1001,11 +1006,13 @@ export default function SanXuatBTPScreen() {
             nhanTimKiem="Tìm theo thành phẩm / khách…"
             actions={(r) => (
               <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={() => moSua(r)}>
+                <Button
+                  title="Mở lại dòng sản lượng này để sửa số kg hoặc mặt hàng." variant="outline" size="sm" onClick={() => moSua(r)}>
                   <Pencil />
                   Sửa
                 </Button>
-                <Button variant="outline" size="sm" onClick={() => xoa(r)}>
+                <Button
+                  title="Bỏ dòng sản lượng này khỏi sổ. Có hỏi xác nhận và còn nút Hoàn tác." variant="outline" size="sm" onClick={() => xoa(r)}>
                   Bỏ
                 </Button>
               </div>
@@ -1055,6 +1062,7 @@ export default function SanXuatBTPScreen() {
           </div>
           {dangKhoa ? (
             <Button
+              title="Mở khóa lại ngày sản xuất đã chốt để sửa hoặc ghi bù. Phải ghi lý do, và việc mở khóa được lưu vết."
               variant="outline"
               size="lg"
               onClick={() => {
@@ -1068,6 +1076,7 @@ export default function SanXuatBTPScreen() {
             </Button>
           ) : (
             <Button
+              title="Khóa sổ sản xuất ngày này và khai phần nguyên liệu CÒN DỞ tách theo từng loại. Số còn dở đó thành đông gửi ở sổ tồn kho nguyên liệu."
               size="lg"
               onClick={() => {
                 setGhiChuChot(chotHienTai?.note ?? "");
@@ -1106,7 +1115,8 @@ export default function SanXuatBTPScreen() {
               </p>
             </div>
             <div className="flex flex-col items-end gap-1">
-              <Button onClick={guiBaoCao}>
+              <Button
+                title="Gửi báo cáo sản lượng ngày (gom theo xưởng × người ghi) lên hệ thống. Khác với chốt ngày: gửi báo cáo không khóa sổ." onClick={guiBaoCao}>
                 <Send />
                 Gửi báo cáo lên hệ thống
               </Button>
@@ -1254,7 +1264,8 @@ export default function SanXuatBTPScreen() {
             <Button variant="outline" size="lg" onClick={() => setSua(null)}>
               Hủy
             </Button>
-            <Button size="lg" onClick={luuSua}>
+            <Button
+              title="Ghi đè dòng sản lượng này bằng số vừa sửa." size="lg" onClick={luuSua}>
               Lưu thay đổi
             </Button>
           </DialogFooter>
@@ -1339,6 +1350,7 @@ export default function SanXuatBTPScreen() {
                       />
                     </div>
                     <Button
+                      title="Bỏ dòng nguyên liệu còn dở này khỏi phần khai."
                       variant="ghost"
                       size="icon"
                       className="shrink-0"
@@ -1354,6 +1366,7 @@ export default function SanXuatBTPScreen() {
               </div>
             )}
             <Button
+              title="Thêm một loại nguyên liệu còn dở nữa. Khai tách theo loại thì sổ tồn kho nguyên liệu mới cộng đúng."
               variant="outline"
               size="sm"
               onClick={() =>
@@ -1369,7 +1382,8 @@ export default function SanXuatBTPScreen() {
             <Button variant="outline" size="lg" onClick={() => setHoiChot(false)}>
               Hủy
             </Button>
-            <Button size="lg" onClick={chotNgay}>
+            <Button
+              title="Xác nhận khóa sổ sản xuất ngày này kèm phần còn dở đã khai." size="lg" onClick={chotNgay}>
               <Lock />
               Chốt ngày
             </Button>
@@ -1399,7 +1413,8 @@ export default function SanXuatBTPScreen() {
             <Button variant="outline" size="lg" onClick={() => setHoiMoLai(false)}>
               Hủy
             </Button>
-            <Button size="lg" onClick={moLaiNgay}>
+            <Button
+              title="Xác nhận mở khóa ngày sản xuất này để sửa hoặc ghi bù." size="lg" onClick={moLaiNgay}>
               <LockOpen />
               Mở lại
             </Button>
@@ -1657,6 +1672,7 @@ function BangDongSX({
                           </td>
                           <td className={`${td} text-center`}>
                             <Button
+                              title="Bỏ dòng thành phẩm này khỏi phiên đang gõ (chưa lưu nên không đụng sổ)."
                               variant="outline"
                               size="icon"
                               aria-label="Bỏ dòng"
@@ -1718,6 +1734,7 @@ function BangDongSX({
             </div>
             <div className="p-2">
               <Button
+                title="Thêm một dòng thành phẩm nữa vào nhóm này (cùng kiểu chế biến và khách hàng)."
                 type="button"
                 variant="outline"
                 className="border-dashed"
@@ -1733,6 +1750,7 @@ function BangDongSX({
 
       {/* Thêm NHÓM mới — nhãn kiểu chế biến × khách đặt ngay ở đầu nhóm sau khi thêm */}
       <Button
+        title="Mở một nhóm mới cho kiểu chế biến / khách hàng khác — mỗi nhóm gõ sản lượng riêng."
         type="button"
         variant="outline"
         className="w-full border-dashed sm:w-auto"

@@ -217,6 +217,7 @@ function TheQC({
 }) {
   return (
     <button
+      title="Mở danh sách chi tiết đứng sau con số này."
       type="button"
       onClick={onClick}
       className={cn(
@@ -335,7 +336,8 @@ export default function ManChatLuong() {
           actions={(r) => {
             if (r.ket !== "vipham") {
               return (
-                <Button variant="outline" size="sm" onClick={() => setCcp(r)}>
+                <Button
+                  title="Xem chi tiết điểm kiểm soát tới hạn (CCP) này." variant="outline" size="sm" onClick={() => setCcp(r)}>
                   Xem
                 </Button>
               );
@@ -349,10 +351,12 @@ export default function ManChatLuong() {
             }
             return (
               <>
-                <Button variant="destructive" size="sm" onClick={() => setXuLy(r)}>
+                <Button
+                  title="Mở form xử lý điểm không đạt này." variant="destructive" size="sm" onClick={() => setXuLy(r)}>
                   Xử lý
                 </Button>
-                <Button variant="outline" size="sm" onClick={() => setKhacPhuc(r)}>
+                <Button
+                  title="Ghi lại hành động khắc phục đã làm cho điểm không đạt." variant="outline" size="sm" onClick={() => setKhacPhuc(r)}>
                   Ghi hành động khắc phục
                 </Button>
               </>
@@ -462,7 +466,8 @@ export default function ManChatLuong() {
                     <Clock className="size-5" aria-hidden />
                     Đã chờ {qcGio(l.cho)}
                   </p>
-                  <Button className="w-full" onClick={() => setKiem(l)}>
+                  <Button
+                    title="Bắt đầu kiểm chất lượng cho lô này." className="w-full" onClick={() => setKiem(l)}>
                     <ClipboardCheck className="size-5" aria-hidden />
                     Bắt đầu kiểm
                   </Button>
@@ -486,6 +491,7 @@ export default function ManChatLuong() {
             <>
               <NutDong>Đóng</NutDong>
               <Button
+                title="Chuyển thẳng sang form ghi hành động khắc phục."
                 variant="destructive"
                 size="lg"
                 onClick={() => {
@@ -533,6 +539,7 @@ export default function ManChatLuong() {
             <>
               <NutDong>Đóng</NutDong>
               <Button
+                title="Ghi hành động khắc phục vào hồ sơ, chờ KCS duyệt đóng."
                 size="lg"
                 onClick={() => {
                   const kp = khacPhuc;
@@ -621,6 +628,7 @@ export default function ManChatLuong() {
             <>
               <NutDong>Đóng</NutDong>
               <Button
+                title="Nhận lô này về để kiểm — lô rời khỏi hàng chờ, chuyển sang phiếu KCS."
                 size="lg"
                 onClick={() => {
                   const l = kiem;

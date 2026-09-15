@@ -73,37 +73,39 @@ export interface MucNavShell {
   id: string;
   label: string;
   icon: LucideIcon;
+  /** Câu hướng dẫn hiện khi rê chuột lên mục nav — màn này để làm gì (README §9). */
+  moTa?: string;
   /** Màn còn dùng dữ liệu mẫu (chỉ admin thấy) — hiện cờ "DEMO" trên nav. */
   demo?: boolean;
 }
 
 /** id = path route. Danh sách phẳng (icon/nhãn/cờ demo) — thứ tự & gom nhóm do CAY_NAV quyết định. */
 export const KIT_NAV: MucNavShell[] = [
-  { id: "dashboard", label: "Tổng quan", icon: LayoutDashboard },
-  { id: "production", label: "Lệnh sản xuất", icon: ClipboardList, demo: true },
-  { id: "wip", label: "Sản xuất thành phẩm", icon: Factory },
-  { id: "packaging", label: "Đóng gói", icon: Package },
-  { id: "quality", label: "Chất lượng", icon: ShieldCheck, demo: true },
-  { id: "qc", label: "Kiểm tra QC", icon: ClipboardCheck },
-  { id: "imports", label: "Nhập hàng", icon: Truck },
-  { id: "warehouse", label: "Kho dự trữ", icon: Snowflake },
-  { id: "cold-storage", label: "Kho lạnh", icon: ThermometerSnowflake, demo: true },
-  { id: "qr", label: "Quét mã lô", icon: QrCode },
-  { id: "sales", label: "Bán hàng", icon: ShoppingCart },
-  { id: "orders", label: "Đơn đặt", icon: PackageCheck },
-  { id: "balancing", label: "Cân đối kỳ", icon: Scale },
-  { id: "bc-thanh-pham", label: "Báo cáo thành phẩm", icon: CalendarCheck },
-  { id: "bc-don-xuat", label: "Báo cáo đơn xuất", icon: Ship },
-  { id: "nxt-nl", label: "Tồn kho nguyên liệu", icon: Boxes },
-  { id: "nxt", label: "Tồn kho thành phẩm", icon: FileSpreadsheet },
-  { id: "nxt-kho", label: "Nhập xuất tồn kho", icon: Warehouse },
-  { id: "ton-kho-thang", label: "Sổ kho theo tháng", icon: CalendarRange },
-  { id: "doi-soat", label: "Đối soát hóa đơn điện tử", icon: FileCheck2 },
-  { id: "reports", label: "Báo cáo tổng", icon: BarChart3, demo: true },
-  { id: "traceability", label: "Truy xuất nguồn gốc", icon: GitBranch, demo: true },
-  { id: "catalog", label: "Danh mục", icon: Library },
-  { id: "users", label: "Người dùng", icon: Users },
-  { id: "audit", label: "Nhật ký thao tác", icon: History },
+  { id: "dashboard", label: "Tổng quan", icon: LayoutDashboard , moTa: "Trang tổng quan: số liệu nổi bật trong ngày và lối tắt sang các màn hay dùng." },
+  { id: "production", label: "Lệnh sản xuất", icon: ClipboardList, demo: true , moTa: "Lệnh sản xuất theo dây chuyền (màn DEMO — đang dùng dữ liệu mẫu)." },
+  { id: "wip", label: "Sản xuất thành phẩm", icon: Factory , moTa: "Ghi sản lượng thành phẩm làm ra mỗi ngày theo xưởng, chốt ngày và gửi báo cáo." },
+  { id: "packaging", label: "Đóng gói", icon: Package , moTa: "Ghi phiếu đóng gói: trừ bán thành phẩm đem đóng, cộng thành phẩm ra, tính hao hụt." },
+  { id: "quality", label: "Chất lượng", icon: ShieldCheck, demo: true , moTa: "Theo dõi điểm kiểm soát chất lượng (màn DEMO — đang dùng dữ liệu mẫu)." },
+  { id: "qc", label: "Kiểm tra QC", icon: ClipboardCheck , moTa: "Bảng kiểm QC chấm điểm cuối ngày theo từng chỉ tiêu, có chốt ngày và ghi bù." },
+  { id: "imports", label: "Nhập hàng", icon: Truck , moTa: "Ghi chuyến nguyên liệu mua về mỗi ngày, ghi bù chờ hóa đơn và chốt sổ ngày." },
+  { id: "warehouse", label: "Kho dự trữ", icon: Snowflake , moTa: "Kho dự trữ: duyệt lô bán thành phẩm từ chờ sang đã nhập kho và xem tồn." },
+  { id: "cold-storage", label: "Kho lạnh", icon: ThermometerSnowflake, demo: true , moTa: "Theo dõi nhiệt độ kho lạnh (màn DEMO — đang dùng dữ liệu mẫu)." },
+  { id: "qr", label: "Quét mã lô", icon: QrCode , moTa: "Quét mã QR trên tem lô (hoặc gõ tay) để tra ngược nguồn gốc lô hàng." },
+  { id: "sales", label: "Bán hàng", icon: ShoppingCart , moTa: "Ghi phiếu bán hàng: khách, kênh bán, quy cách và các dòng mặt hàng." },
+  { id: "orders", label: "Đơn đặt", icon: PackageCheck , moTa: "Đơn đặt hàng xuất khẩu và lệnh xuất lấy hàng theo FIFO từ tồn kho." },
+  { id: "balancing", label: "Cân đối kỳ", icon: Scale , moTa: "Cân đối theo kỳ (~5 ngày): tính định mức nguyên liệu → thành phẩm và lãi lỗ." },
+  { id: "bc-thanh-pham", label: "Báo cáo thành phẩm", icon: CalendarCheck , moTa: "Báo cáo sản lượng thành phẩm theo ngày, in A4 hoặc xuất Excel." },
+  { id: "bc-don-xuat", label: "Báo cáo đơn xuất", icon: Ship , moTa: "Báo cáo các đơn đã xuất, in A4 hoặc xuất Excel." },
+  { id: "nxt-nl", label: "Tồn kho nguyên liệu", icon: Boxes , moTa: "Tồn kho nguyên liệu theo kỳ cân đối: tồn đầu, đông gửi, xả đông, tồn cuối." },
+  { id: "nxt", label: "Tồn kho thành phẩm", icon: FileSpreadsheet , moTa: "Tồn kho thành phẩm theo khoảng ngày: nhập, xuất, tồn từng mã." },
+  { id: "nxt-kho", label: "Nhập xuất tồn kho", icon: Warehouse , moTa: "Sổ Nhập–Xuất–Tồn theo báo cáo thật của xí nghiệp, kèm cột hàng đang nằm ở kho nào." },
+  { id: "ton-kho-thang", label: "Sổ kho theo tháng", icon: CalendarRange , moTa: "Sổ kho theo tháng dương lịch cho cả nguyên liệu, bán thành phẩm và thành phẩm — tồn cuối tháng này tự thành tồn đầu tháng sau." },
+  { id: "doi-soat", label: "Đối soát hóa đơn điện tử", icon: FileCheck2 , moTa: "Đối soát sổ phần mềm với hóa đơn điện tử, tìm dòng lệch và lưu bản đối soát." },
+  { id: "reports", label: "Báo cáo tổng", icon: BarChart3, demo: true , moTa: "Báo cáo tổng hợp (màn DEMO — đang dùng dữ liệu mẫu)." },
+  { id: "traceability", label: "Truy xuất nguồn gốc", icon: GitBranch, demo: true , moTa: "Truy xuất nguồn gốc lô hàng (màn DEMO — đang dùng dữ liệu mẫu)." },
+  { id: "catalog", label: "Danh mục", icon: Library , moTa: "Danh mục dùng chung: mặt hàng, khách hàng, đại lý, loại nguyên liệu, kho lưu trữ, thành phẩm." },
+  { id: "users", label: "Người dùng", icon: Users , moTa: "Quản lý tài khoản đăng nhập và vai trò của từng người." },
+  { id: "audit", label: "Nhật ký thao tác", icon: History , moTa: "Nhật ký thao tác: ai sửa gì, lúc nào, giá trị trước và sau." },
 ];
 
 /**
@@ -204,6 +206,7 @@ interface MucCon {
   key: string; // định danh so khớp active
   target: string; // path để điều hướng (id hoặc "catalog?tab=…")
   label: string;
+  moTa?: string;
   icon: LucideIcon;
   demo?: boolean;
   laDanhMuc: boolean; // deep-link danh mục (style phụ + ẩn khi thu gọn)
@@ -235,6 +238,7 @@ function gomCay(items: MucNavShell[]): NhomHienThi[] {
           key: m.id === "catalog" ? "catalog" : m.id,
           target: m.id,
           label: m.label,
+          moTa: m.moTa,
           icon: m.icon,
           demo: m.demo,
           laDanhMuc: false,
@@ -245,6 +249,7 @@ function gomCay(items: MucNavShell[]): NhomHienThi[] {
           key: c.to,
           target: c.to,
           label: c.label ?? "",
+          moTa: "Mở danh mục liên quan tới module này (cùng một trang Danh mục, chỉ nhảy đúng tab).",
           icon: c.icon ?? Library,
           laDanhMuc: true,
         });
@@ -267,6 +272,7 @@ function gomCay(items: MucNavShell[]): NhomHienThi[] {
         key: m.id,
         target: m.id,
         label: m.label,
+        moTa: m.moTa,
         icon: m.icon,
         demo: m.demo,
         laDanhMuc: false,
@@ -321,7 +327,7 @@ function MucNut({
       type="button"
       onClick={() => onSelect(m.target)}
       aria-current={chon ? "page" : undefined}
-      title={thuGon ? m.label : undefined}
+      title={thuGon ? [m.label, m.moTa].filter(Boolean).join(" — ") : m.moTa}
       className={cn(
         "flex min-h-10 w-full items-center gap-3 rounded-lg border text-left transition-colors",
         thuGon ? "justify-center px-0" : "px-3",
@@ -409,6 +415,7 @@ function CayNav({
             {/* Tiêu đề nhóm module = 1 LỚP: chữ hoa nhỏ + gạch dưới nhạt cho tách
                 lớp; đổi màu brand khi có màn con đang mở hoặc nhóm đang thu. */}
             <button
+              title="Gập / mở nhóm menu này. Máy nhớ trạng thái cho lần vào sau."
               type="button"
               onClick={() => onToggle(g.ten)}
               aria-expanded={mo}
@@ -631,6 +638,7 @@ export default function AppShell({
                 <NutGiaoDien taiKhoan={taiKhoan} />
                 {ca && (
                   <button
+                    title="Đổi ca làm việc đang chọn — số liệu trên màn lọc theo ca này."
                     type="button"
                     onClick={onDoiCa}
                     className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-input px-3.5 text-sm font-semibold text-foreground transition-colors hover:bg-muted"
@@ -641,6 +649,7 @@ export default function AppShell({
                 )}
                 {typeof soThongBao === "number" && (
                   <button
+                    title="Xem các thông báo và việc cần làm trong ngày."
                     type="button"
                     onClick={onThongBao}
                     className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-input px-3.5 text-sm font-semibold text-foreground transition-colors hover:bg-muted"
@@ -665,6 +674,7 @@ export default function AppShell({
                     onConfirm={onDangXuat}
                     trigger={
                       <button
+                        title="Thoát tài khoản và quay về màn đăng nhập."
                         type="button"
                         className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-input px-3.5 text-sm font-semibold text-foreground transition-colors hover:bg-muted hover:text-destructive"
                       >
@@ -711,6 +721,7 @@ export default function AppShell({
           <div className="flex shrink-0 items-center gap-2 md:gap-3">
             {ca && (
               <button
+                title="Đổi ca làm việc đang chọn — số liệu trên màn lọc theo ca này."
                 type="button"
                 onClick={onDoiCa}
                 className="hidden min-h-10 items-center gap-2 rounded-lg border border-input px-3.5 text-sm font-semibold text-foreground transition-colors hover:bg-muted xl:inline-flex"

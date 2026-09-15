@@ -127,6 +127,7 @@ export function RecordTable<T>({
               size="sm"
               onClick={() => doiSap(c.key)}
               className="max-w-full min-w-0"
+              title={`Sắp danh sách theo cột "${c.header}". Bấm lại để đảo tăng ↔ giảm.`}
             >
               <span className="truncate">{c.header}</span>
               {sapTheo === c.key ? (
@@ -144,6 +145,7 @@ export function RecordTable<T>({
         <Button
           variant="outline"
           size="sm"
+          title="Bỏ ô tìm và bỏ sắp xếp — về lại danh sách đầy đủ theo thứ tự gốc."
           onClick={() => {
             setQ("");
             setSapTheo(null);
@@ -205,6 +207,7 @@ export function RecordTable<T>({
                         <button
                           type="button"
                           onClick={() => doiSap(c.key)}
+                          title={`Sắp danh sách theo cột "${c.header}". Bấm lại để đảo tăng ↔ giảm.`}
                           className={cn(
                             "flex h-11 w-full items-center gap-2 px-4 text-sm font-semibold hover:bg-accent",
                             c.so && "justify-end"

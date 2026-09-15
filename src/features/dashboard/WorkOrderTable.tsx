@@ -64,7 +64,8 @@ export function BangLSX({
       timKiem={(r) => `${r.id} ${r.sp} ${r.kh}`}
       nhanTimKiem="Tìm theo mã lệnh / sản phẩm / khách hàng…"
       actions={(r) => (
-        <Button variant="outline" size="sm" onClick={() => onXem(r)}>
+        <Button
+          title="Xem chi tiết lệnh sản xuất này." variant="outline" size="sm" onClick={() => onXem(r)}>
           Xem lệnh
         </Button>
       )}

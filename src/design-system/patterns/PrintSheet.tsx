@@ -33,7 +33,10 @@ export function PhieuIn({
         <Button variant="outline" onClick={onClose}>
           <X className="size-4" /> Đóng
         </Button>
-        <Button onClick={() => window.print()}>
+        <Button
+          onClick={() => window.print()}
+          title="Mở hộp in của trình duyệt cho đúng trang đang xem. Chọn máy in để in giấy, hoặc 'Lưu thành PDF' để ra file."
+        >
           <Printer className="size-4" /> In / Xuất PDF
         </Button>
       </div>
@@ -106,7 +109,10 @@ export function PhieuInTem({
         <Button variant="outline" onClick={onClose}>
           <X className="size-4" /> Đóng
         </Button>
-        <Button onClick={() => window.print()}>
+        <Button
+          onClick={() => window.print()}
+          title="Mở hộp in của trình duyệt để in tem. Chọn khổ giấy tem trước khi in."
+        >
           <Printer className="size-4" /> In tem
         </Button>
       </div>

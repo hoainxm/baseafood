@@ -516,7 +516,8 @@ export default function BanHangScreen() {
           <h1 className="text-2xl font-semibold text-foreground">Bán hàng</h1>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button size="lg" onClick={moThem}>
+          <Button
+            title="Mở form ghi một phiếu bán mới: chọn khách, kênh bán, rồi thêm từng dòng mặt hàng." size="lg" onClick={moThem}>
             <Plus />
             Ghi phiếu bán
           </Button>
@@ -611,7 +612,8 @@ export default function BanHangScreen() {
               : `Phân xưởng ${phanXuong}. Bấm nút dưới để ghi phiếu bán đầu tiên.`
           }
           action={
-            <Button size="lg" onClick={moThem}>
+            <Button
+              title="Mở form ghi phiếu bán đầu tiên cho ngày này." size="lg" onClick={moThem}>
               <Plus />
               Ghi phiếu bán
             </Button>
@@ -665,7 +667,8 @@ export default function BanHangScreen() {
                     <span className="tnum text-xl font-semibold">
                       {kg(n.tongKg)}
                     </span>
-                    <Button variant="outline" onClick={() => moSuaPhieu(n)}>
+                    <Button
+                      title="Mở lại phiếu bán này để sửa khách hàng, kênh bán hay các dòng hàng." variant="outline" onClick={() => moSuaPhieu(n)}>
                       <Pencil />
                       Sửa phiếu
                     </Button>
@@ -826,6 +829,7 @@ export default function BanHangScreen() {
                         </span>
                         <div className="flex shrink-0 items-center gap-2">
                           <Button
+                            title="Sửa dòng bán này (mặt hàng · quy cách · số kg · đơn giá)."
                             variant="outline"
                             size="sm"
                             onClick={() => {
@@ -837,6 +841,7 @@ export default function BanHangScreen() {
                             Sửa
                           </Button>
                           <Button
+                            title="Bỏ dòng bán này khỏi phiếu đang gõ."
                             variant="outline"
                             size="sm"
                             onClick={() => boDongPhien(r)}
@@ -930,7 +935,8 @@ export default function BanHangScreen() {
                   </div>
                 ) : null}
 
-                <Button size="lg" className="w-full" onClick={themDong}>
+                <Button
+                  title="Thêm dòng hàng vừa chọn vào phiếu bán đang gõ. Một phiếu bán được nhiều mặt hàng." size="lg" className="w-full" onClick={themDong}>
                   <Plus />
                   Thêm mặt hàng vào sổ
                 </Button>
@@ -958,6 +964,7 @@ export default function BanHangScreen() {
               />
             ) : (
               <Button
+                title="Ghi phiếu đang gõ vào sổ rồi mở phiếu trống để bán tiếp cho khách khác."
                 variant="outline"
                 size="lg"
                 onClick={() => dongPhienLai("phieu-khac")}
@@ -966,7 +973,8 @@ export default function BanHangScreen() {
                 Lưu &amp; thêm phiếu khác
               </Button>
             )}
-            <Button size="lg" onClick={() => dongPhienLai("dong")}>
+            <Button
+              title="Ghi phiếu đang gõ vào sổ rồi quay về danh sách phiếu bán." size="lg" onClick={() => dongPhienLai("dong")}>
               {dangSuaPhieu ? "Xong" : "Xong phiếu"}
             </Button>
           </DialogFooter>
@@ -1039,7 +1047,8 @@ export default function BanHangScreen() {
             <Button variant="outline" size="lg" onClick={() => setDang(null)}>
               Hủy
             </Button>
-            <Button size="lg" onClick={luu}>
+            <Button
+              title="Ghi đè dòng bán này bằng số vừa sửa." size="lg" onClick={luu}>
               Lưu thay đổi
             </Button>
           </DialogFooter>

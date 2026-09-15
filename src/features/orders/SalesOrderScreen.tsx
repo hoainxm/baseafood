@@ -321,7 +321,8 @@ export default function DonDatScreen() {
           </h1>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button size="lg" onClick={moTao}>
+          <Button
+            title="Tạo một đơn đặt hàng xuất khẩu: khách, hạn giao, và các mặt hàng cần bao nhiêu kg." size="lg" onClick={moTao}>
             <Plus />
             Tạo đơn
           </Button>
@@ -345,7 +346,8 @@ export default function DonDatScreen() {
           tieuDe="Chưa có đơn đặt nào"
           moTa="Bấm Tạo đơn để khai đơn khách đặt (mặt hàng, quy cách, số lượng cần)."
           action={
-            <Button size="lg" onClick={moTao}>
+            <Button
+              title="Tạo đơn đặt đầu tiên." size="lg" onClick={moTao}>
               <Plus />
               Tạo đơn
             </Button>
@@ -360,10 +362,12 @@ export default function DonDatScreen() {
           nhanTimKiem="Tìm theo khách…"
           actions={(r) => (
             <div className="flex flex-wrap gap-2">
-              <Button variant="outline" size="sm" onClick={() => setChon(r.id)}>
+              <Button
+                title="Mở đơn này để xem chi tiết các mặt hàng cần và đối chiếu với tồn kho hiện có." variant="outline" size="sm" onClick={() => setChon(r.id)}>
                 Xem
               </Button>
-              <Button variant="outline" size="sm" onClick={() => xoaDon(r)}>
+              <Button
+                title="Xóa đơn đặt này. Có hỏi xác nhận trước." variant="outline" size="sm" onClick={() => xoaDon(r)}>
                 Bỏ
               </Button>
             </div>
@@ -386,7 +390,8 @@ export default function DonDatScreen() {
             <div className="flex flex-wrap gap-2">
               {donCuaChon.status !== "dong" && (
                 <>
-                  <Button variant="outline" onClick={() => xacNhanDu(donCuaChon)}>
+                  <Button
+                    title="Đánh dấu đơn này đã gom đủ hàng — chuyển trạng thái, chưa xuất kho." variant="outline" onClick={() => xacNhanDu(donCuaChon)}>
                     <PackageCheck />
                     Xác nhận đủ
                   </Button>
@@ -400,7 +405,8 @@ export default function DonDatScreen() {
                     icon={Truck}
                     onConfirm={() => taoLenhXuat(donCuaChon)}
                     trigger={
-                      <Button>
+                      <Button
+                        title="Tạo lệnh xuất lấy hàng theo FIFO từ tồn kho dự trữ, lấy được tới đâu xuất tới đó.">
                         <Truck />
                         Lệnh xuất (một phần được)
                       </Button>
@@ -519,6 +525,7 @@ export default function DonDatScreen() {
                     </div>
                     {tao.dong.length > 1 && (
                       <Button
+                        title="Bỏ dòng mặt hàng này khỏi đơn đang tạo."
                         variant="outline"
                         onClick={() =>
                           setTao((t) =>
@@ -532,6 +539,7 @@ export default function DonDatScreen() {
                   </div>
                 ))}
                 <Button
+                  title="Thêm một mặt hàng nữa mà khách đặt trong đơn này."
                   variant="outline"
                   size="lg"
                   className="w-full"
@@ -568,7 +576,8 @@ export default function DonDatScreen() {
             <Button variant="outline" size="lg" onClick={() => setTao(null)}>
               Hủy
             </Button>
-            <Button size="lg" onClick={luuTao}>
+            <Button
+              title="Ghi đơn đặt này vào sổ." size="lg" onClick={luuTao}>
               Tạo đơn
             </Button>
           </DialogFooter>

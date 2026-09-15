@@ -30,7 +30,10 @@ export type NhomNghiVan = 1 | 2 | 3 | 4 | 5 | 6 | 7;
 
 export interface NghiVan {
   nhom: NhomNghiVan;
+  /** Vị trí trong FILE NGƯỜI DÙNG TẢI LÊN (dùng trên màn hình). */
   viTri: string;
+  /** Cùng vị trí đó nhưng theo FILE XUẤT (đã chèn cột "KẾT QUẢ" ⇒ lệch 1 cột). */
+  viTriXuat?: string;
   soDangCo: string;
   soDoiChung: string; // "chưa xác định" nếu không suy được
   nguonDoiChung: string;
@@ -136,6 +139,9 @@ export interface DongPhanMem {
   mstBan: string;
   tenBan: string;
   tongCong: number;
+  /** Tiền hàng / tiền thuế trên sổ — để dựng bảng ĐỐI CHIẾU TỔNG đủ 3 cột. */
+  chuaThue: number;
+  thue: number;
   ngayHd: string;
   tkNo: string;
   tkCo: string;
@@ -157,6 +163,8 @@ export interface SheetPhanMem {
   ten: string;
   header: string[];
   dong: DongPhanMem[];
+  /** Tiêu đề thật của cặp cột "TK Nợ / TK Có" (sổ mã máy là "TS% / LOAI"). */
+  tenTk: string;
   laPhu?: boolean;
   goc: ToaDoGoc;
   hIdx: number;
@@ -316,9 +324,14 @@ export interface ToaDoGoc {
 export const cotExcel = (g: ToaDoGoc, c: number): number => g.c0 + (g.giuCot[c] ?? c);
 /** Dòng AOA (`soDong` = chỉ số + 1) → dòng Excel (1-based). */
 export const dongExcel = (g: ToaDoGoc, soDong: number): number => g.r0 + soDong;
-/** Địa chỉ ô Excel thật, ví dụ `K430`. */
-const oExcel = (g: ToaDoGoc, soDong: number, c: number): string =>
-  `${chuCaiCot(cotExcel(g, c))}${dongExcel(g, soDong)}`;
+/**
+ * Địa chỉ ô Excel thật, ví dụ `K430`. `dich` = số cột lệch của FILE XUẤT so với
+ * file vào (bản xuất chèn 1 cột "KẾT QUẢ" ở đầu nên mọi cột gốc dời sang phải 1).
+ */
+const oExcel = (g: ToaDoGoc, soDong: number, c: number, dich = 0): string =>
+  `${chuCaiCot(cotExcel(g, c) + dich)}${dongExcel(g, soDong)}`;
+/** Số cột mà file XUẤT dời dữ liệu gốc sang phải (cột "KẾT QUẢ" chèn ở đầu). */
+export const DICH_COT_XUAT = 1;
 
 // ---------- Dò cột theo tên (xử lý cột trùng — v3 §2.2) ----------
 
@@ -470,30 +483,47 @@ export function sheetsTuBase64(b64: string): SheetTho[] {
  * Trả rows đã sạch + cờ đã-gỡ. Chỉ bỏ CỘT (giữ số dòng để `soDong` không đổi).
  */
 const THEM_NORM = new Set([...HEADER_HD_THEM, ...HEADER_PM_THEM, "KẾT QUẢ"].map(chuan));
+/** Tiền tố của những cột engine tự thêm mà phần đuôi thay đổi theo file (tên sheet sổ…). */
+const THEM_PREFIX = ["so dong khop", "tong tt ben"].map(chuan);
+/** Ô tiêu đề này có phải cột do engine thêm ở lần chạy trước không. */
+const laCotThem = (h: unknown): boolean => {
+  const k = chuan(h);
+  return k !== "" && (THEM_NORM.has(k) || THEM_PREFIX.some((p) => k.startsWith(p)));
+};
 function goCotDoiSoatCu(
   rows: unknown[][]
 ): { rows: unknown[][]; daGo: boolean; giuCot: number[] } {
-  // Bản xuất CŨ để "KẾT QUẢ" ở cột đầu; bản mới ĐẶT SAU dữ liệu gốc ⇒ dò cả hàng.
+  // Dò hàng tiêu đề của lần chạy trước: có ô "KẾT QUẢ" + ít nhất 3 cột engine thêm.
   let hIdx = -1;
   for (let i = 0; i < Math.min(rows.length, 15); i++) {
     const h = rows[i] ?? [];
-    if (h.some((c) => chuan(c) === "ket qua") && h.filter((c) => THEM_NORM.has(chuan(c))).length >= 3) {
+    if (h.some((c) => chuan(c) === "ket qua") && h.filter((c) => laCotThem(c)).length >= 3) {
       hIdx = i;
       break;
     }
   }
   if (hIdx < 0) return { rows, daGo: false, giuCot: [] };
   const header = rows[hIdx] ?? [];
-  const drop = new Set<number>();
-  header.forEach((h, c) => {
-    if (THEM_NORM.has(chuan(h))) drop.add(c);
-  });
-  if (!drop.size) return { rows, daGo: false, giuCot: [] };
-  // Cột đệm trống ngay trước khối cột thêm → gỡ luôn, kẻo mỗi lần chạy lại đẻ thêm một cột.
-  const dem = Math.min(...drop) - 1;
-  if (dem >= 0 && !chuan(header[dem]) && rows.every((r) => (r ?? [])[dem] == null || (r ?? [])[dem] === ""))
-    drop.add(dem);
   const rong = Math.max(header.length, ...rows.map((r) => (r ?? []).length));
+  const drop = new Set<number>();
+  if (chuan(header[0]) === "ket qua") drop.add(0); // cột nhãn chèn ở đầu
+
+  // Khối cột thêm nằm LIỀN MẠCH ở cuối ⇒ gỡ từ cột thêm đầu tiên tới hết. Bền hơn
+  // dò từng tên, vì vài tên đổi theo file (tên sheet sổ, cặp cột TK/thuế suất).
+  let dau = -1;
+  for (let c = 1; c < rong; c++)
+    if (laCotThem(header[c])) {
+      dau = c;
+      break;
+    }
+  if (dau < 0 && drop.size === 0) return { rows, daGo: false, giuCot: [] };
+  if (dau > 0) {
+    // cột đệm trống ngay trước khối → gỡ luôn, kẻo mỗi lần chạy lại đẻ thêm một cột
+    const dem = dau - 1;
+    const demTrong =
+      dem > 0 && !chuan(header[dem]) && rows.every((r) => (r ?? [])[dem] == null || (r ?? [])[dem] === "");
+    for (let c = demTrong ? dem : dau; c < rong; c++) drop.add(c);
+  }
   const giuCot: number[] = [];
   for (let c = 0; c < rong; c++) if (!drop.has(c)) giuCot.push(c);
   const cleaned = rows.map((r) => (r ?? []).filter((_, c) => !drop.has(c)));
@@ -589,6 +619,10 @@ function nghiVanCong(
   const oTong = `${sheet} · ô ${oExcel(g, soDong, cot.tong)} (${cot.tenTong})`;
   const oChua = `${sheet} · ô ${oExcel(g, soDong, cot.chua)} (${cot.tenChua})`;
   const oThue = `${sheet} · ô ${oExcel(g, soDong, cot.thue)} (${cot.tenThue})`;
+  const D = DICH_COT_XUAT;
+  const xTong = `${sheet} · ô ${oExcel(g, soDong, cot.tong, D)} (${cot.tenTong})`;
+  const xChua = `${sheet} · ô ${oExcel(g, soDong, cot.chua, D)} (${cot.tenChua})`;
+  const xThue = `${sheet} · ô ${oExcel(g, soDong, cot.thue, D)} (${cot.tenThue})`;
   const coA = a != null, coB = b != null, coT = t != null;
   const soThieu = [coA, coB, coT].filter((x) => !x).length;
 
@@ -597,6 +631,7 @@ function nghiVanCong(
     return {
       nhom: 4,
       viTri: `${oChua} + ${oThue}`,
+      viTriXuat: `${xChua} + ${xThue}`,
       soDangCo: "(trống cả chưa thuế lẫn thuế)",
       soDoiChung: "chưa xác định",
       nguonDoiChung: "không đủ dữ liệu để tính ngược",
@@ -609,6 +644,7 @@ function nghiVanCong(
     return {
       nhom: 5,
       viTri: oTong,
+      viTriXuat: xTong,
       soDangCo: "(trống)",
       soDoiChung: num(dung),
       nguonDoiChung: `${cot.tenChua} + ${cot.tenThue}${ck ? " − chiết khấu" : ""}${phi ? " + phí" : ""} = ${num(a!)} + ${num(b!)}`,
@@ -622,7 +658,7 @@ function nghiVanCong(
     if (!coA) {
       const dung = t! - b! + ck - phi;
       return {
-        nhom: 2, viTri: oChua, soDangCo: "(trống)", soDoiChung: num(dung),
+        nhom: 2, viTri: oChua, viTriXuat: xChua, soDangCo: "(trống)", soDoiChung: num(dung),
         nguonDoiChung: `${cot.tenTong} − ${cot.tenThue}${ck ? " + chiết khấu" : ""}${phi ? " − phí" : ""} = ${num(t!)} − ${num(b!)}`,
         saiOCho: "thiếu ô chưa thuế, suy ngược từ tổng và thuế", anhHuong: "chỉ ô chưa thuế",
         sheet, soDong, cot: cot.chua, tenCot: cot.tenChua, giaTriCu: a, giaTriDung: dung,
@@ -630,7 +666,7 @@ function nghiVanCong(
     }
     const dung = t! - a! + ck - phi;
     return {
-      nhom: 2, viTri: oThue, soDangCo: "(trống)", soDoiChung: num(dung),
+      nhom: 2, viTri: oThue, viTriXuat: xThue, soDangCo: "(trống)", soDoiChung: num(dung),
       nguonDoiChung: `${cot.tenTong} − ${cot.tenChua} = ${num(t!)} − ${num(a!)}`,
       saiOCho: "thiếu ô thuế, suy ngược từ tổng và chưa thuế", anhHuong: "chỉ ô thuế",
       sheet, soDong, cot: cot.thue, tenCot: cot.tenThue, giaTriCu: b, giaTriDung: dung,
@@ -643,7 +679,7 @@ function nghiVanCong(
     if (e1 > tolCong && e2 > tolCong && b !== 0) {
       const dung = a! + b! - ck + phi;
       return {
-        nhom: 1, viTri: oTong, soDangCo: num(t!), soDoiChung: num(dung),
+        nhom: 1, viTri: oTong, viTriXuat: xTong, soDangCo: num(t!), soDoiChung: num(dung),
         nguonDoiChung: `${cot.tenChua} + ${cot.tenThue}${ck ? " − chiết khấu" : ""}${phi ? " + phí" : ""} = ${num(dung)} (giả định tổng sai)`,
         saiOCho: `cộng lệch cả hai cách: |${num(a!)}+${num(b!)}−${num(t!)}| = ${num(e1)} đ và tính cả chiết khấu/phí vẫn lệch ${num(e2)} đ`,
         anhHuong: "nếu sửa tổng: đổi ô tổng dòng này; các dòng khác không đổi",
@@ -720,6 +756,7 @@ function parseSheetHoaDon(
     nghiVan.push({
       nhom: 6,
       viTri: `${ten} · cột ${chuCaiCot(cotExcel(g, p))} (${header[p] ?? ""})`,
+      viTriXuat: `${ten} · cột ${chuCaiCot(cotExcel(g, p) + DICH_COT_XUAT)} (${header[p] ?? ""})`,
       soDangCo: "(cột phụ trùng tên cột gốc)",
       soDoiChung: "—",
       nguonDoiChung: "cột gốc đã chọn theo độ khớp với tổng thanh toán",
@@ -808,8 +845,10 @@ function parseSheetPhanMem(
   const cSo = cot1(headerRaw, "Số HĐ", "SO_HD");
   const cMst = cot1(headerRaw, "MASOTHUE", "RMST");
   const cNgayHd = cot1(headerRaw, "Ngày HĐ", "NGAY_HD");
-  const cTkNo = cot1(headerRaw, "TK Nợ");
-  const cTkCo = cot1(headerRaw, "TK Có");
+  // Sổ mã máy (PMEM) không có TK Nợ/Có mà có TS% + LOAI ⇒ nhận cả hai kiểu,
+  // tên cột ở file xuất lấy đúng theo tiêu đề tìm được (`tenTk`).
+  const cTkNo = cot1(headerRaw, "TK Nợ", "TS%", "Thuế suất");
+  const cTkCo = cot1(headerRaw, "TK Có", "LOAI", "Loại");
   const cDienGiai = cot1(headerRaw, "Tên mặt hàng", "MAT_HANG", "GHICHU");
   const cTenBan = cot1(headerRaw, "Tên người bán", "NGUOI_BAN");
 
@@ -817,6 +856,7 @@ function parseSheetPhanMem(
     nghiVan.push({
       nhom: 6,
       viTri: `${ten} · cột ${chuCaiCot(cotExcel(g, p))} (${header[p] ?? ""})`,
+      viTriXuat: `${ten} · cột ${chuCaiCot(cotExcel(g, p) + DICH_COT_XUAT)} (${header[p] ?? ""})`,
       soDangCo: "(cột phụ trùng tên)",
       soDoiChung: "—",
       nguonDoiChung: "cột gốc chọn theo độ khớp với tổng cộng",
@@ -847,6 +887,8 @@ function parseSheetPhanMem(
       ctgs: cellStr(row, cCtgs), phieu: cellStr(row, cPhieu),
       kyHieu, soHoaDon, soChuan, mstBan, tenBan: cellStr(row, cTenBan),
       tongCong: soVN(layO(row, cCot.tong, ten, soDong, edits)) ?? 0,
+      chuaThue: soVN(layO(row, cCot.chua, ten, soDong, edits)) ?? 0,
+      thue: soVN(layO(row, cCot.thue, ten, soDong, edits)) ?? 0,
       ngayHd: ngayHienThi(row[cNgayHd]),
       tkNo: cellStr(row, cTkNo), tkCo: cellStr(row, cTkCo), dienGiai: cellStr(row, cDienGiai),
       khoa: taoKhoa(mstBan, kyHieu, soChuan),
@@ -854,7 +896,14 @@ function parseSheetPhanMem(
       nguonHddt: "", dongHddt: null, ngayLapHd: "", tenBanHddt: "", tongTtHddt: null,
     });
   }
-  return { ten, header, dong, goc: g, hIdx, rong };
+  // Tiêu đề mã máy viết hoa trần (TS%, LOAI) — đổi sang chữ kế toán vẫn gọi.
+  const chuDep: Record<string, string> = { "ts%": "Thuế suất", loai: "Loại", ghichu: "Ghi chú" };
+  const nhan = (c: number, mac: string) => {
+    const t = String(header[c] ?? "").trim();
+    return t ? (chuDep[chuan(t)] ?? t) : mac;
+  };
+  const tenTk = `${nhan(cTkNo, "TK Nợ")} / ${nhan(cTkCo, "TK Có")}`;
+  return { ten, header, dong, goc: g, hIdx, rong, tenTk };
 }
 
 const uniq = (arr: string[]): string[] => [...new Set(arr.filter(Boolean))];
@@ -1064,6 +1113,7 @@ export function doiSoat(sheets: SheetTho[], opt: TuyChonDoiSoat): KetQuaDoiSoat 
       nghiVan.push({
         nhom: 3,
         viTri: `${d.sheet} · dòng ${d.dongFile} (Số hóa đơn ${d.soHoaDon})`,
+        viTriXuat: `${d.sheet} · dòng ${d.dongFile} (Số hóa đơn ${d.soHoaDon})`,
         soDangCo: d.soHoaDon,
         soDoiChung: cand.soHoaDon,
         nguonDoiChung: `sổ "${cand.sheet}" dòng ${cand.dongFile}, cùng MST ${d.mstBan} + số tiền ${num(d.tongTtVnd)} đ`,

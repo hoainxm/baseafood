@@ -1,7 +1,9 @@
 > Load khi: sửa màn `/doi-soat`, logic đối soát hóa đơn điện tử ⇄ phần mềm kế toán, đọc/ghi file Excel hóa đơn.
-covers: src/features/doi-soat/DoiSoatScreen.tsx, src/features/doi-soat/index.ts, src/lib/doiSoatHddt.ts, src/lib/doiSoatXuat.ts
+covers: src/features/doi-soat/DoiSoatScreen.tsx, src/features/doi-soat/index.ts, src/lib/doiSoatHddt.ts, src/lib/doiSoatXuat.ts, src/lib/doiSoatXuatShift.ts, src/lib/doiSoatXuatTongHop.ts
 last_verified: 2026-09-15
 ttl_days: 90
+<!-- updated: 2026-09-15 — v5.1 BÁM ĐÚNG FILE MẪU KẾ TOÁN. v5 mới chỉ giữ định dạng, bố cục vẫn khác mẫu ⇒ người dùng báo "vẫn không giống". Nay: (1) cột **"KẾT QUẢ" chèn làm cột A**, dữ liệu gốc dời phải 1 cột — kéo theo phải DỊCH THAM CHIẾU CÔNG THỨC (`doiSoatXuatShift.ts`: bộ dịch đi từng ký tự, chừa chuỗi trong nháy kép / tên sheet trong nháy đơn / tên hàm; xử cả `$A$1`, `A:A`, ref chéo sheet; gỡ ô gộp TRƯỚC khi dời kẻo mất giá trị ô master); (2) **3 sheet tổng hợp đứng đầu workbook** (`doiSoatXuatTongHop.ts`): `ĐỐI CHIẾU TỔNG` (4 mục A/B/C/D + bóc tách phần chênh) · `TỰ KIỂM TRA` (bảng phép thử + KẾT QUẢ CHUNG) · `NGHI VẤN SỐ LIỆU` (9 cột, vị trí trỏ theo FILE XUẤT); (3) tên cột bám cách gọi của kế toán: "Số dòng khớp ‹tên sheet sổ›" thay vì "PMKT", cặp cột TK lấy đúng tiêu đề nguồn (sổ mã máy → "Thuế suất / Loại"); (4) `NghiVan.viTriXuat` = vị trí theo file xuất (lệch 1 cột so với `viTri` trên màn); `DongPhanMem` thêm `chuaThue`/`thue` để bảng tổng đủ 3 cột tiền; `SheetPhanMem.tenTk`. Gỡ cột lần chạy trước nay **cắt cả khối đuôi** (`laCotThem` + xoá từ cột thêm đầu tiên tới hết) vì vài tên cột đổi theo file; file đã có sẵn cột A "KẾT QUẢ" thì GHI ĐÈ chứ không chèn thêm. Ép `fullCalcOnLoad` vì công thức vừa bị dịch. -->
+<!-- re-verified: 2026-09-15 — chạy trên bộ T6 THẬT rồi so từng ô với file mẫu "Tháng 6 - đã lọc.xlsx": (1) BỐ CỤC trùng khít — 7 sheet đúng thứ tự, số cột 38/42/36/27 y mẫu, tiêu đề trùng từng cột; (2) CÔNG THỨC dịch đúng từng cái (`K463=SUM(K7:K462)`→`L463=SUM(L7:L462)`, `R463=O463-L463`→`S463=P463-M463`, `O464=R463+'T6-KMA'!K144+'T6-MTTIEN'!O101`→`P464=S463+'T6-KMA'!L144+'T6-MTTIEN'!P101`) — trùng công thức mẫu 100%; ô gộp `B3:T3`/`B4:T4` + `C144:D144`… trùng mẫu; (3) ORACLE nhãn cột A: **1107/1107 dòng trùng** (685 hóa đơn + 422 dòng sổ), lệch 0; (4) ĐỐI CHIẾU TỔNG khớp mẫu tới từng đồng cả 4 mục A/B/C/D; (5) idempotent 3 vòng: số cột đứng yên 38/42/36/27, tổng không đổi; (6) trình duyệt thật: cả chuỗi engine→chèn cột→sheet tổng hợp→ghi file chạy sạch, không lỗi console. Khác mẫu CÓ CHỦ Ý: cột phân tích ghi GIÁ TRỊ (mẫu ghi công thức sống) — giá trị do engine tính, đã đối chiếu 1107/1107; và định dạng số giữ nguyên bản gốc `_(* #,##0_);…"-"??` trong khi mẫu bị LibreOffice làm rụng dấu nháy. -->
 <!-- updated: 2026-09-15 — v5 XUẤT FILE **GIỮ NGUYÊN ĐỊNH DẠNG GỐC** (bỏ lối dựng-mới). Nút "Tải Excel kết quả" nay nạp lại CHÍNH bytes file người dùng tải lên (`b64` vốn đã giữ sẵn để lưu bản) rồi sửa tại chỗ bằng **`exceljs`** (`src/lib/doiSoatXuat.ts`, nạp động) — `xlsx-js-style` khi ĐỌC chỉ lấy được màu nền, mất font/khung/canh lề nên không round-trip nổi. Luật: **CHỈ THÊM, KHÔNG DỜI** — khối cột đối soát đặt SAU vùng dữ liệu gốc (chừa 1 cột trống), KHÔNG chèn cột vào giữa ⇒ địa chỉ ô gốc giữ nguyên, ô gộp không lệch, công thức trong file không sai tham chiếu. Chỉ ghi đè màu nền dòng + ô người dùng bấm Sửa. "KẾT QUẢ" là cột ĐẦU của khối thêm; vùng autofilter nới sang hết khối. `xuatExcelDoiSoat` (dựng-mới) giữ lại làm ĐƯỜNG LÙI khi không có bytes gốc. Kèm theo: `SheetTho`/`SheetHoaDon`/`SheetPhanMem` mang `ToaDoGoc {r0,c0,giuCot}` + `hIdx` + `rong`; `DongHoaDon`/`DongPhanMem` thêm `dongFile` = **dòng Excel THẬT** (trước đây mọi chuỗi "ô L430 / dòng 428" dùng chỉ số AOA nên lệch đúng bằng r0 — sheet cổng thuế bắt đầu ở A3 ⇒ lệch 2 dòng). `soDong` GIỮ NGUYÊN nghĩa cũ vì là khóa Map `edits` đã lưu trong `reconciliation_runs`. `goCotDoiSoatCu` nay dò cột "KẾT QUẢ" ở BẤT KỲ vị trí nào (bản cũ để ở cột 0) + gỡ luôn cột đệm trống. -->
 <!-- re-verified: 2026-09-15 — chạy engine + xuất file trên bộ T6 THẬT (`DANH SÁCH HÓA ĐƠN T6.xlsx`, 4 sheet, 685 HĐ / 422 dòng sổ): (1) so 20.327 ô gốc giữa file vào và file ra — **lệch 0** về giá trị/numFmt/font/khung/canh lề, ô gộp + độ rộng cột + chiều cao dòng y nguyên, công thức trong file còn sống; (2) oracle nhãn với file mẫu "Tháng 6 - đã lọc.xlsx" (bản Claude chat) — **685/685 dòng hóa đơn + 422/422 dòng sổ trùng nhãn**, tổng 392 khớp / 1 lệch / 292 chưa có khớp tuyệt đối; (3) idempotent 3 vòng: số cột đứng yên 37/41/35/26, không đẻ cột, tổng không đổi; (4) thử trong trình duyệt thật: `import("exceljs")` qua Vite ra đúng `Workbook`, ghi được file. -->
 <!-- re-verified: 2026-09-15 — nhãn trạng thái (KHOP/LECH/THIEU/CO) + phép tự kiểm (mong/thuc) + kiểu CauNoi/NghiVan/PhepThu trong doiSoatHddt.ts khớp code khi làm lại UI. (task fix UI /doi-soat) -->
@@ -22,7 +24,7 @@ Công cụ **kế toán** (không phải nghiệp vụ MES). Đối chiếu hóa
 - **Vào:** 1 workbook `.xlsx` gồm:
   - **3 sheet hóa đơn điện tử** (cổng thuế): `CÓ MÃ HDDT`, `MÁY TÍNH TIỀN HDDT`, `KHÔNG MÃ HDDT`. Vị trí cột KHÁC nhau giữa 3 sheet (máy tính tiền có thêm "Địa chỉ người bán"/"CCCD", không mã có "Đơn vị tiền tệ"/"Tỷ giá" cho hóa đơn USD) ⇒ **dò cột theo TÊN tiêu đề, không hardcode chỉ số**. Tiêu đề nằm ở hàng ~6.
   - **1 sheet `PHẦN MỀM`:** bút toán kế toán, tiêu đề ở hàng 1. Một hóa đơn có thể bị tách nhiều dòng theo thuế suất.
-- **Ra:** (1) bảng đối soát trên màn (tab theo từng sheet + tab "Phần mềm kế toán"), (2) nút **Tải Excel kết quả** — trả về **chính file đã tải lên, giữ nguyên định dạng**, chỉ thêm khối cột đối soát ở bên phải và tô màu dòng (xem [v5](#v5--xuất-file-giữ-nguyên-định-dạng-gốc)).
+- **Ra:** (1) bảng đối soát trên màn (tab theo từng sheet + tab "Phần mềm kế toán"), (2) nút **Tải Excel kết quả** — trả về **chính file đã tải lên, giữ nguyên định dạng**, thêm cột `KẾT QUẢ` ở đầu + khối cột phân tích ở cuối + 3 sheet tổng hợp lên đầu workbook, đúng bố cục file mẫu kế toán đang dùng (xem [v5.1](#v51--bố-cục-bám-đúng-file-mẫu-kế-toán)).
 
 ## Khóa & so tiền (logic ở `lib/doiSoatHddt.ts`)
 
@@ -43,7 +45,35 @@ Công cụ **kế toán** (không phải nghiệp vụ MES). Đối chiếu hóa
 
 Màu chip lấy **token** `--status-*` (không viết mã màu tay); màu nền Excel là mã màu chuẩn Excel (file ngoài, độc lập token app). Mỗi dòng có cột **"Bằng chứng đối chiếu"** dạng văn xuôi (khớp phiếu nào, ngày, CTGS, TK, số tiền).
 
-## v5 — xuất file GIỮ NGUYÊN ĐỊNH DẠNG GỐC
+## v5.1 — bố cục bám đúng FILE MẪU kế toán
+
+Kế toán đối soát bằng một file mẫu có sẵn. "Giữ nguyên định dạng" (v5) chưa đủ —
+bố cục phải giống luôn, nếu không họ vẫn phải mò. Ba điểm bắt buộc:
+
+| Điểm | Phải làm |
+|---|---|
+| Cột **KẾT QUẢ** | chèn làm **cột A**, dữ liệu gốc dời sang phải 1 cột |
+| **3 sheet tổng hợp** | `ĐỐI CHIẾU TỔNG` · `TỰ KIỂM TRA` · `NGHI VẤN SỐ LIỆU` đứng **đầu** workbook |
+| Tên cột | gọi theo tên sheet sổ thật ("Số dòng khớp PMEM"), cặp cột TK lấy tiêu đề nguồn |
+
+**Chèn cột thì BẮT BUỘC dịch công thức** (`doiSoatXuatShift.ts`). File cổng thuế có
+công thức sống (`=SUM(K7:K462)`, `='T6-KMA'!K144`); chỉ dời ô mà không dịch ruột công
+thức là **số sai âm thầm** — nguy hiểm hơn hẳn việc sai định dạng. Bộ dịch đi từng ký
+tự, chừa chuỗi trong nháy kép (`"KHỚP"`), tên sheet trong nháy đơn, tên hàm; xử được
+`$A$1`, `A:A`, và ref chéo sheet (chỉ dịch khi sheet đích cũng bị chèn cột).
+
+Ba cái bẫy đã vấp, đừng vấp lại:
+
+1. **Công thức dùng chung** (shared formula) không chịu được việc dời ô — `exceljs` ném
+   *"Shared Formula master must exist above and or left of clone"*. Phải `boCongThucDungChung`
+   (tách mỗi ô thành công thức riêng) TRƯỚC mọi thao tác thêm/bớt cột.
+2. **Gỡ ô gộp phải làm TRƯỚC khi dời cột.** Gỡ sau thì vùng gộp cũ đã lệch chỗ, `exceljs`
+   xóa luôn giá trị ô đã dời sang (tiêu đề "DANH SÁCH HÓA ĐƠN" biến mất).
+3. **Chạy lại trên file đã xuất**: engine gỡ cột cũ khỏi *dữ liệu đọc vào* nhưng file vẫn
+   còn cột *vật lý* ⇒ phải `xoaCotDuoi` khối cũ trước; và nếu cột A đã là "KẾT QUẢ" thì
+   **ghi đè, KHÔNG chèn thêm** — nếu không mỗi lần xuất lại đẻ thêm một cột.
+
+## v5 — nền: xuất file GIỮ NGUYÊN ĐỊNH DẠNG GỐC
 
 Bản trước dựng workbook MỚI từ giá trị ⇒ font, khung, định dạng số kế toán, ô gộp,
 độ rộng cột của file cổng thuế bay hết. Kế toán mở ra thấy một file lạ, không đặt

@@ -101,7 +101,7 @@ Chưa rõ tier ⇒ coi là 🔴. Dữ liệu ở đây là **sổ sách thật c
 | `features/BalancingScreen.tsx`, `BalancingTable.tsx`, `lib/balancingCalc.ts` | [`31-can-doi-ky.md`](docs/app-map/31-can-doi-ky.md) |
 | `features/CatalogScreen.tsx`, `FinishedGoodScreen.tsx`, `data/thanh-pham.json` | [`32-danh-muc.md`](docs/app-map/32-danh-muc.md) |
 | `features/monthly-stock/**`, `lib/monthlyStock.ts`, `lib/monthlyStockExcel.ts` (sổ kho theo tháng, dồn kỳ, nhập Excel bảng kê) | [`36-so-kho-thang.md`](docs/app-map/36-so-kho-thang.md) |
-| `features/doi-soat/**`, `lib/doiSoatHddt.ts`, `lib/doiSoatXuat.ts` (đối soát hóa đơn điện tử ⇄ sổ kế toán, xuất Excel giữ định dạng gốc) | [`37-doi-soat-hddt.md`](docs/app-map/37-doi-soat-hddt.md) |
+| `features/doi-soat/**`, `lib/doiSoat*.ts` (đối soát hóa đơn điện tử ⇄ sổ kế toán; xuất Excel giữ định dạng gốc + bám bố cục file mẫu) | [`37-doi-soat-hddt.md`](docs/app-map/37-doi-soat-hddt.md) |
 | `supabase/migrations/**` | [`03-database.md`](docs/app-map/03-database.md) (+ [`04`](docs/app-map/04-tang-du-lieu.md) nếu đổi ánh xạ) |
 | `lib/repo.ts`, `db.ts`, `catalogRepo.ts`, `connectivity.ts` | [`04-tang-du-lieu.md`](docs/app-map/04-tang-du-lieu.md) |
 | `App.tsx` (thêm màn / đổi nav) | [`02-pages-navigation.md`](docs/app-map/02-pages-navigation.md) |

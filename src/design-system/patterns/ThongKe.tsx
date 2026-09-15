@@ -43,23 +43,44 @@ const COT_LG: Record<number, string> = {
   2: "lg:grid-cols-2",
   3: "lg:grid-cols-3",
   4: "lg:grid-cols-4",
+  // 5 thẻ: màn vừa chia 3+2, màn rộng gom ĐỦ 5 trên một hàng (không để 4+1 lẻ loi).
+  5: "lg:grid-cols-3 xl:grid-cols-5",
 };
+
+/**
+ * Số cột màn rộng tự suy theo SỐ THẺ để lưới cân: ≤4 thẻ một hàng; 5 thẻ một hàng
+ * (màn đủ rộng); 6 thẻ 3×2; nhiều hơn thì 4 cột. Tránh cảnh 4+1 hay 4+2 lệch.
+ */
+function cotTuDong(soThe: number): 2 | 3 | 4 | 5 {
+  if (soThe <= 2) return 2;
+  if (soThe === 3 || soThe === 6 || soThe === 9) return 3;
+  if (soThe === 5) return 5;
+  return 4;
+}
 
 export function ThongKe({
   the,
-  cot = 4,
+  cot,
   className,
 }: {
   the: TheThongTin[];
-  /** Số cột tối đa (màn rộng). Mặc định 4. */
-  cot?: 2 | 3 | 4;
+  /** Số cột tối đa (màn rộng). Bỏ trống ⇒ tự suy theo số thẻ (xem `cotTuDong`). */
+  cot?: 2 | 3 | 4 | 5;
   className?: string;
 }) {
+  const soCot = cot ?? cotTuDong(the.length);
+  // 5 cột trên màn rộng: thẻ hẹp ⇒ icon lên trên nhãn, số nhỏ một bậc, để số dài
+  // (1.478.897,83 kg · 29.535.327.023 đ) vẫn nằm trọn một dòng, không ngắt giữa số.
+  const hep = soCot === 5;
   return (
     <div
       className={cn(
-        "grid grid-cols-2 gap-3 md:gap-4",
-        COT_LG[cot] ?? "lg:grid-cols-4",
+        // Điện thoại: bề ngang tối thiểu mỗi thẻ tính theo rem ⇒ cỡ chữ thường 2 cột,
+        // phóng chữ 130% tự rơi về 1 cột (khỏi bẻ vụn số). Từ md giữ 2 cột như cũ.
+        "grid grid-cols-[repeat(auto-fit,minmax(min(100%,9.5rem),1fr))] gap-3 md:grid-cols-2 md:gap-4",
+        COT_LG[soCot] ?? "lg:grid-cols-4",
+        // Thẻ cuối lẻ trải hết hàng thay vì bỏ trống nửa hàng (1/-1 không đẻ cột ẩn).
+        "[&>*:last-child:nth-child(odd)]:col-[1/-1] lg:[&>*:last-child:nth-child(odd)]:col-auto",
         className
       )}
     >
@@ -72,7 +93,9 @@ export function ThongKe({
         // hẹp nhất (mobile 2 cột) — không bẻ dòng giữa số, không cắt mất năm.
         // Chuỗi thật dài (>12) mới cho ngắt từ; số (t.so) luôn to.
         const fontSizeClass = t.so
-          ? "text-xl md:text-2xl"
+          ? hep
+            ? "text-xl md:text-2xl xl:text-lg 2xl:text-xl"
+            : "text-xl md:text-2xl"
           : len > 12
             ? "text-sm font-semibold leading-snug lg:text-base"
             : len > 7
@@ -91,7 +114,7 @@ export function ThongKe({
                 <Icon className="size-5" aria-hidden />
               </span>
             )}
-            <div className="min-w-0 flex-1">
+            <div className="w-full min-w-0 flex-1">
               <p className="text-sm font-medium text-muted-foreground break-words">
                 {t.nhan}
               </p>
@@ -118,6 +141,7 @@ export function ThongKe({
         );
         const cls = cn(
           "flex items-center gap-2.5 rounded-xl border bg-card px-3 py-3",
+          hep && "xl:flex-col xl:items-start xl:gap-2",
           mau.vien
         );
         return t.onChon ? (

@@ -57,6 +57,7 @@ export function BangTong<T>({
   emptyText = "Chưa có số liệu trong kỳ này.",
   className,
   chon,
+  dinhDau,
 }: {
   rows: T[];
   cot: CotTong<T>[];
@@ -66,6 +67,12 @@ export function BangTong<T>({
   className?: string;
   /** Bật cột ô tick để chọn dòng (cộng tổng / thao tác theo lô). */
   chon?: ChonBang<T>;
+  /**
+   * Giữ hàng tên cột dính trên cùng khi cuộn dọc. Bảng dài tự cuộn trong khung
+   * cao tối đa ~70% màn hình (cần khung cuộn riêng vì bảng rộng đã cuộn ngang —
+   * sticky theo trang không chạy xuyên qua khung cuộn ngang).
+   */
+  dinhDau?: boolean;
 }) {
   if (rows.length === 0) {
     return (
@@ -81,7 +88,7 @@ export function BangTong<T>({
   const chonHet = soChon > 0 && soChon === khoa.length;
 
   return (
-    <div className={cn("scroll-nice-x overflow-x-auto", className)}>
+    <div className={cn(dinhDau ? "bang-dinh-dau" : "scroll-nice-x overflow-x-auto", className)}>
       <Table>
         <TableHeader>
           <TableRow>

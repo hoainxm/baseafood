@@ -441,6 +441,7 @@ export function donSangThang(nguon: MonthlyStockRow[], thangDich: string): Month
       size: r.size,
       origin: r.origin,
       importDate: r.importDate,
+      storageLocation: r.storageLocation,
       kgPerCtn: r.kgPerCtn,
       unitPrice: r.unitPrice,
       openCtn: r.closeCtn,

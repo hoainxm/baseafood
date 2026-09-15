@@ -5,8 +5,8 @@
 // ============================================================
 import { useMemo, useRef, useState } from "react";
 import type { MonthlyStockLine, MaterialType, Product } from "@/types";
-import { MONTHLY_STOCK_CATEGORIES, BSF1_WAREHOUSES } from "@/types";
-import { useMonthlyStock, useMaterialTypes, useProducts } from "@/lib/catalogRepo";
+import { MONTHLY_STOCK_CATEGORIES, BSF1_WAREHOUSES, STORAGE_KIND_LABELS } from "@/types";
+import { useMonthlyStock, useMaterialTypes, useProducts, useStorageLocations } from "@/lib/catalogRepo";
 import { uid } from "@/lib/db";
 import { num, viDate } from "@/lib/format";
 import { parseBangKeKhoFile, namTuTenFile, type BangKeKhoSheet } from "@/lib/monthlyStockExcel";
@@ -88,6 +88,7 @@ import {
   Wrench,
   Library,
   ListChecks,
+  MapPin,
   History,
   Sigma,
   Sparkles,
@@ -109,8 +110,9 @@ interface DongForm {
   warehouse: string;
   itemName: string;
   size: string;
-  origin: string;
+  origin: string; // số Invoice (cột DB `origin`)
   importDate: string;
+  storageLocation: string;
   kgPerCtn: number | null;
   unitPrice: number | null;
   openCtn: number | null;
@@ -129,6 +131,7 @@ const formRong = (category: string, warehouse: string): DongForm => ({
   size: "",
   origin: "",
   importDate: "",
+  storageLocation: "",
   kgPerCtn: null,
   unitPrice: null,
   openCtn: null,
@@ -152,6 +155,7 @@ export default function MonthlyStockScreen() {
   const [lines, ghiLines] = useMonthlyStock();
   const [mtypes, ghiMtypes] = useMaterialTypes();
   const [products, ghiProducts] = useProducts();
+  const [khoLuuDM, ghiKhoLuuDM] = useStorageLocations();
 
   const [thang, setThang] = useState(thangHienTai());
   const [kho, setKho] = useState(TAT_CA_KHO);
@@ -219,12 +223,12 @@ export default function MonthlyStockScreen() {
   /** Dòng đang HIỂN THỊ = dòng đã lưu, hoặc bản xem trước khi tháng còn trống. */
   const rowsGoc = laXemTruoc ? rowsXemTruoc : rowsLuu;
 
-  /** Ô tìm nhanh: tên · size · xuất xứ · nhóm (không phân biệt hoa thường/dấu cách). */
+  /** Ô tìm nhanh: tên · size · invoice · nhóm · kho · vị trí (không phân biệt hoa thường). */
   const rowsThang: MonthlyStockRow[] = useMemo(() => {
     const q = timKiem.trim().toLowerCase();
     if (!q) return rowsGoc;
     return rowsGoc.filter((r) =>
-      `${r.itemName} ${r.size} ${r.origin} ${r.category} ${r.warehouse}`.toLowerCase().includes(q)
+      `${r.itemName} ${r.size} ${r.origin} ${r.category} ${r.warehouse} ${r.storageLocation}`.toLowerCase().includes(q)
     );
   }, [rowsGoc, timKiem]);
 
@@ -309,6 +313,7 @@ export default function MonthlyStockScreen() {
       size: r.size,
       origin: r.origin,
       importDate: r.importDate,
+      storageLocation: r.storageLocation,
       kgPerCtn: r.kgPerCtn,
       unitPrice: r.unitPrice,
       openCtn: r.openCtn || null,
@@ -339,6 +344,7 @@ export default function MonthlyStockScreen() {
       size: form.size.trim(),
       origin: form.origin.trim(),
       importDate: form.importDate,
+      storageLocation: form.storageLocation.trim(),
       kgPerCtn: form.kgPerCtn,
       unitPrice: form.unitPrice,
       openCtn: form.openCtn ?? 0,
@@ -432,6 +438,39 @@ export default function MonthlyStockScreen() {
     ghiLines(lines.filter((l) => !ids.has(l.id)));
     boChon();
     notify.daXoa(`Đã xóa ${ids.size} dòng ${nhanThang(thang)}`, () => ghiLines(truoc));
+  };
+
+  // ---------- Vị trí hàng đang nằm (kho nhà + kho thuê ngoài) ----------
+  /** Kho hệ thống + danh mục kho lưu (`storage_locations`) + tên đã dùng trong sổ. */
+  const viTriOpts: MucChon[] = useMemo(() => {
+    const phu = new Map<string, string>(BSF1_WAREHOUSES.map((w) => [w.name, `Kho xí nghiệp · ${w.code}`]));
+    for (const k of khoLuuDM) if (k.name.trim() && !phu.has(k.name.trim())) phu.set(k.name.trim(), STORAGE_KIND_LABELS[k.kind]);
+    for (const l of lines) if (l.storageLocation && !phu.has(l.storageLocation)) phu.set(l.storageLocation, "");
+    return [...phu].map(([n, ghiChu]) => ({ value: n, label: n, phu: ghiChu || undefined }));
+  }, [khoLuuDM, lines]);
+
+  /** Gõ vị trí chưa có ⇒ lưu ngay vào danh mục kho lưu (mặc định kho thuê ngoài). */
+  const themViTri = (ten: string) => {
+    const name = ten.trim();
+    if (name && !viTriOpts.some((o) => o.value.toLowerCase() === name.toLowerCase())) {
+      ghiKhoLuuDM([...khoLuuDM, { id: uid(), code: "", name, kind: "thue-ngoai", address: "", phone: "", note: "Từ sổ kho theo tháng" }]);
+    }
+    return name;
+  };
+
+  const [ganViTri, setGanViTri] = useState<string | null>(null); // vị trí sắp gán cho dòng tick
+  /** Gán vị trí cho các dòng đang tick (một lần ghi, có Hoàn tác). */
+  const ganViTriDaChon = () => {
+    const dich = (ganViTri ?? "").trim();
+    const ids = new Set(rowsChon.map((r) => r.id));
+    if (!dich || !ids.size) {
+      notify.canhBao(!dich ? "Chưa chọn vị trí để gán." : "Chưa tick dòng nào.");
+      return;
+    }
+    const truoc = lines;
+    ghiLines(lines.map((l) => (ids.has(l.id) ? { ...l, storageLocation: dich } : l)));
+    setGanViTri(null);
+    notify.daLuu(`Đã chuyển ${ids.size} dòng về ${dich}`, () => ghiLines(truoc));
   };
 
   // ---------- Thẻ kho: lịch sử một mặt hàng qua các tháng ----------
@@ -588,12 +627,15 @@ export default function MonthlyStockScreen() {
       return;
     }
     const moi: MonthlyStockLine[] = [];
+    // File bảng kê không có cột vị trí ⇒ nạp lại GIỮ vị trí người dùng đã gán cho dòng cùng id.
+    const viTriCu = new Map(lines.map((l) => [l.id, l.storageLocation]));
     for (const sh of sheets) {
       if (sh.monthNum == null) continue;
       const period = `${nam}-${String(sh.monthNum).padStart(2, "0")}`;
       sh.rows.forEach((r, idx) => {
+        const id = `xlsx|${maKho(khoNap.trim())}|${sh.sheetName}|${nam}|${r.rowIndex}`;
         moi.push({
-          id: `xlsx|${maKho(khoNap.trim())}|${sh.sheetName}|${nam}|${r.rowIndex}`,
+          id,
           period,
           category: r.category,
           warehouse: khoNap.trim(),
@@ -601,6 +643,7 @@ export default function MonthlyStockScreen() {
           size: r.size,
           origin: r.origin,
           importDate: r.importDate,
+          storageLocation: viTriCu.get(id) ?? "",
           kgPerCtn: r.kgPerCtn,
           unitPrice: r.unitPrice,
           openCtn: r.openCtn,
@@ -639,42 +682,40 @@ export default function MonthlyStockScreen() {
     { nhan: "Tiền còn lại", giaTri: `${num(Math.round(tong.remainingValue))} đ`, so: true, icon: Coins, mau: "brand" },
   ];
 
-  // ---------- Cột bảng xem (đầy đủ như bảng kê) ----------
+  // ---------- Cột bảng xem (theo kg — kiện vẫn lưu nhưng không hiện) ----------
+  /** Vị trí hiển thị: đã gán thì tên kho lưu, chưa gán ⇒ hàng đang ở chính kho của sổ. */
+  const viTriCua = (r: MonthlyStockLine) => r.storageLocation || r.warehouse;
   const cot = (t: ReturnType<typeof tongDong>): CotTong<MonthlyStockRow>[] => [
+    {
+      key: "ngay",
+      header: "Ngày nhập",
+      render: (r) => <span className="tnum whitespace-nowrap">{r.importDate ? viDate(r.importDate) : "—"}</span>,
+    },
     {
       key: "ten",
       header: "Mặt hàng",
       render: (r) => (
         <div className="min-w-0">
           <div className="font-semibold text-foreground">{r.itemName}</div>
-          <div className="text-sm text-muted-foreground">
-            {[r.size, r.origin, r.importDate ? `nhập ${viDate(r.importDate)}` : ""].filter(Boolean).join(" · ") || "—"}
-          </div>
+          {r.size && <div className="text-sm text-muted-foreground">Size {r.size}</div>}
         </div>
       ),
     },
-    { key: "kgCtn", header: "KG/kiện", so: true, render: (r) => soHoacGach(r.kgPerCtn ?? 0) },
+    { key: "invoice", header: "Invoice", render: (r) => r.origin || "—" },
     { key: "gia", header: "Đơn giá (đ)", so: true, render: (r) => soHoacGach(r.unitPrice ?? 0) },
-    { key: "odCtn", header: "Tồn đầu (kiện)", so: true, render: (r) => soHoacGach(r.openCtn), tong: () => num(t.openCtn) },
-    { key: "odKg", header: "Tồn đầu (kg)", so: true, render: (r) => soHoacGach(r.openKg), tong: () => num(t.openKg) },
+    { key: "odKg", header: "Tồn đầu kỳ (kg)", so: true, render: (r) => soHoacGach(r.openKg), tong: () => num(t.openKg) },
     {
-      key: "inCtn", header: "Nhập (kiện)", so: true,
-      render: (r) => soHoacGach(r.inCtn), tong: () => num(t.inCtn),
-    },
-    {
-      key: "inKg", header: "Nhập (kg)", so: true,
+      key: "inKg", header: "Nhập trong kỳ (kg)", so: true,
       render: (r) => (r.inKg ? <span className="font-semibold text-success">+{num(r.inKg)}</span> : "—"),
       tong: () => num(t.inKg),
     },
-    { key: "outCtn", header: "Xuất (kiện)", so: true, render: (r) => soHoacGach(r.outCtn), tong: () => num(t.outCtn) },
     {
-      key: "outKg", header: "Xuất (kg)", so: true,
+      key: "outKg", header: "Xuất trong kỳ (kg)", so: true,
       render: (r) => (r.outKg ? <span className="font-semibold text-warning">−{num(r.outKg)}</span> : "—"),
       tong: () => num(t.outKg),
     },
-    { key: "ocCtn", header: "Tồn cuối (kiện)", so: true, render: (r) => soHoacGach(r.closeCtn), tong: () => num(t.closeCtn) },
     {
-      key: "ocKg", header: "Tồn cuối (kg)", so: true,
+      key: "ocKg", header: "Tồn cuối kỳ (kg)", so: true,
       render: (r) => <span className="tnum font-bold text-foreground">{num(r.closeKg)}</span>,
       tong: () => num(t.closeKg),
     },
@@ -682,6 +723,15 @@ export default function MonthlyStockScreen() {
       key: "tien", header: "Tiền còn lại (đ)", so: true,
       render: (r) => (r.remainingValue ? num(Math.round(r.remainingValue)) : "—"),
       tong: () => num(Math.round(t.remainingValue)),
+    },
+    {
+      key: "viTri",
+      header: "Vị trí",
+      render: (r) => (
+        <span className={r.storageLocation ? "whitespace-nowrap font-medium text-foreground" : "whitespace-nowrap text-muted-foreground"}>
+          {viTriCua(r) || "—"}
+        </span>
+      ),
     },
     {
       key: "thaotac", header: "", render: (r) => (
@@ -698,7 +748,7 @@ export default function MonthlyStockScreen() {
           {!laXemTruoc && (
             <>
               <Button
-                title="Sửa phần mô tả của dòng: tên hàng · size · xuất xứ · kg mỗi kiện · đơn giá." size="sm" variant="ghost" aria-label={`Sửa ${r.itemName}`} onClick={() => moSua(r)}>
+                title="Sửa dòng: ngày nhập · tên hàng · size · invoice · đơn giá · số kg · vị trí." size="sm" variant="ghost" aria-label={`Sửa ${r.itemName}`} onClick={() => moSua(r)}>
                 <Pencil className="size-4" />
               </Button>
               <ConfirmDelete
@@ -720,11 +770,8 @@ export default function MonthlyStockScreen() {
 
   // ---------- Lưới ghi (nhập/xuất từng mã) ----------
   const cotLuoi: CotLuoi<MonthlyStockRow>[] = [
-    { key: "openCtn", header: "Tồn đầu (kiện)", nhan: "Tồn đầu (kiện)", kieu: "so", lay: (r) => r.openCtn || null, rong: 110 },
     { key: "openKg", header: "Tồn đầu (kg)", nhan: "Tồn đầu (kg)", kieu: "so", lay: (r) => r.openKg || null, rong: 120 },
-    { key: "inCtn", header: "Nhập (kiện)", nhan: "Nhập (kiện)", kieu: "so", lay: (r) => r.inCtn || null, rong: 110 },
     { key: "inKg", header: "Nhập (kg)", nhan: "Nhập (kg)", kieu: "so", lay: (r) => r.inKg || null, rong: 120 },
-    { key: "outCtn", header: "Xuất (kiện)", nhan: "Xuất (kiện)", kieu: "so", lay: (r) => r.outCtn || null, rong: 110 },
     { key: "outKg", header: "Xuất (kg)", nhan: "Xuất (kg)", kieu: "so", lay: (r) => r.outKg || null, rong: 120 },
     { key: "ocKg", header: "Tồn cuối (kg)", nhan: "Tồn cuối (kg)", kieu: "tinh", lay: (r) => r.closeKg, rong: 130 },
     {
@@ -748,7 +795,11 @@ export default function MonthlyStockScreen() {
     id: r.id,
     du: r,
     ten: r.itemName,
-    phu: <span className="text-muted-foreground">{[r.category, r.size].filter(Boolean).join(" · ")}</span>,
+    phu: (
+      <span className="text-muted-foreground">
+        {[r.importDate ? viDate(r.importDate) : "", r.size, r.origin ? `Invoice ${r.origin}` : ""].filter(Boolean).join(" · ") || r.category}
+      </span>
+    ),
   }));
 
   const coDuLieu = rowsGoc.length > 0;
@@ -781,7 +832,7 @@ export default function MonthlyStockScreen() {
           <Button
             variant="outline"
             onClick={moThem}
-            title="Thêm tay một dòng hàng vào tháng đang xem (tên · size · xuất xứ · đơn giá · tồn đầu/nhập/xuất)."
+            title="Thêm tay một dòng hàng vào tháng đang xem (ngày nhập · tên · invoice · đơn giá · tồn đầu/nhập/xuất · vị trí)."
           >
             <Plus className="mr-2 h-4 w-4" />
             Thêm dòng
@@ -855,7 +906,7 @@ export default function MonthlyStockScreen() {
             <Input
               value={timKiem}
               onChange={(e) => setTimKiem(e.target.value)}
-              placeholder="Gõ tên · size · xuất xứ · nhóm"
+              placeholder="Gõ tên · size · invoice · vị trí"
               aria-label="Tìm mặt hàng trong tháng"
             />
           </Field>
@@ -867,7 +918,7 @@ export default function MonthlyStockScreen() {
               title={
                 ghiMode
                   ? "Thoát chế độ ghi, quay về bảng xem theo nhóm."
-                  : "Bật lưới gõ tồn đầu / nhập / xuất từng mã (kiện & kg). Tồn cuối tự tính, dán được cả khối từ Excel."
+                  : "Bật lưới gõ tồn đầu / nhập / xuất (kg) từng mã. Tồn cuối tự tính, dán được cả khối từ Excel."
               }
               onClick={() => {
                 if (ghiMode) setLocMatHang("");
@@ -984,21 +1035,27 @@ export default function MonthlyStockScreen() {
                 Đã chọn {rowsChon.length} dòng
               </span>
               <span className="tnum text-sm text-muted-foreground">
-                tồn đầu {num(tongChon.openCtn)} kiện / {num(tongChon.openKg)} kg
+                tồn đầu {num(tongChon.openKg)} kg
               </span>
               <span className="tnum text-sm text-muted-foreground">
-                nhập {num(tongChon.inCtn)} kiện / {num(tongChon.inKg)} kg
+                nhập {num(tongChon.inKg)} kg
               </span>
               <span className="tnum text-sm text-muted-foreground">
-                xuất {num(tongChon.outCtn)} kiện / {num(tongChon.outKg)} kg
+                xuất {num(tongChon.outKg)} kg
               </span>
               <span className="tnum text-sm font-semibold text-foreground">
-                tồn cuối {num(tongChon.closeCtn)} kiện / {num(tongChon.closeKg)} kg
+                tồn cuối {num(tongChon.closeKg)} kg
               </span>
               <span className="tnum text-sm text-muted-foreground">
                 tiền còn lại {num(Math.round(tongChon.remainingValue))} đ
               </span>
               <div className="ml-auto flex flex-wrap items-center gap-2">
+                {!laXemTruoc && (
+                  <Button size="sm" variant="outline" onClick={() => setGanViTri("")} title="Ghi vị trí hàng đang nằm (VD Kho Ánh Dương) cho tất cả dòng đang tick.">
+                    <MapPin className="mr-2 h-4 w-4" />
+                    Gán vị trí
+                  </Button>
+                )}
                 <Button size="sm" variant="outline" onClick={() => setMoIn(true)} title="In riêng các dòng đang tick, kèm dòng tổng của đúng mấy dòng đó.">
                   <Printer className="mr-2 h-4 w-4" />
                   In {rowsChon.length} dòng
@@ -1076,8 +1133,8 @@ export default function MonthlyStockScreen() {
           {ghiMode ? (
             <div className="space-y-3">
               <p className="text-sm text-muted-foreground">
-                Gõ tồn đầu / nhập / xuất từng mã (kiện & kg) — tồn cuối tự tính. Dán được cả khối từ Excel.
-                Enter/Tab sang ô. Sửa mô tả (tên, size, đơn giá) bằng nút ✎ ở chế độ xem.
+                Gõ tồn đầu / nhập / xuất (kg) từng mã — tồn cuối tự tính. Dán được cả khối từ Excel.
+                Enter/Tab sang ô. Sửa mô tả (ngày nhập, tên, invoice, đơn giá, vị trí) bằng nút ✎ ở chế độ xem.
               </p>
               {locMatHang && (
                 <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-muted/40 p-2 text-sm">
@@ -1112,6 +1169,7 @@ export default function MonthlyStockScreen() {
                     getKey={(r) => r.id}
                     nhanTong={`Cộng ${g.category}`}
                     chon={chonBang}
+                    dinhDau
                   />
                 </section>
               ))}
@@ -1132,7 +1190,7 @@ export default function MonthlyStockScreen() {
           <DialogHeader>
             <DialogTitle className="text-2xl">{form?.id ? "Sửa dòng kho" : "Thêm dòng kho"}</DialogTitle>
             <DialogDescription className="text-base">
-              {nhanThang(thang)} — nhập đủ tồn đầu · nhập · xuất (kiện & kg). Tồn cuối và tiền còn lại tự tính.
+              {nhanThang(thang)} — nhập tồn đầu · nhập · xuất theo kg. Tồn cuối và tiền còn lại tự tính.
             </DialogDescription>
           </DialogHeader>
           {form && (
@@ -1165,6 +1223,11 @@ export default function MonthlyStockScreen() {
                 />
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
+                <DateField
+                  label="Ngày nhập"
+                  value={form.importDate}
+                  onChange={(v) => setForm((f) => (f ? { ...f, importDate: v } : f))}
+                />
                 <Field label="Tên hàng" required>
                   <Input
                     value={form.itemName}
@@ -1179,38 +1242,32 @@ export default function MonthlyStockScreen() {
                     placeholder="VD: 80↑"
                   />
                 </Field>
-                <Field label="Xuất xứ">
+                <Field label="Invoice">
                   <Input
                     value={form.origin}
                     onChange={(e) => setForm((f) => (f ? { ...f, origin: e.target.value } : f))}
-                    placeholder="VD: SB"
+                    placeholder="Số invoice"
                   />
                 </Field>
-                <DateField
-                  label="Ngày nhập"
-                  value={form.importDate}
-                  onChange={(v) => setForm((f) => (f ? { ...f, importDate: v } : f))}
-                />
-                <NumberField
-                  label="KG/kiện"
-                  unit="kg"
-                  value={form.kgPerCtn}
-                  onChange={(v) => setForm((f) => (f ? { ...f, kgPerCtn: v } : f))}
-                />
                 <NumberField
                   label="Đơn giá"
                   unit="đ"
                   value={form.unitPrice}
                   onChange={(v) => setForm((f) => (f ? { ...f, unitPrice: v } : f))}
                 />
+                <Combobox
+                  label="Vị trí"
+                  value={form.storageLocation}
+                  onChange={(v) => setForm((f) => (f ? { ...f, storageLocation: v } : f))}
+                  options={viTriOpts}
+                  onCreate={themViTri}
+                  placeholder={form.warehouse ? `Để trống = ${form.warehouse}` : "Chọn kho đang giữ hàng"}
+                />
               </div>
               <div className="grid gap-4 sm:grid-cols-3">
-                <NumberField label="Tồn đầu (kiện)" unit="kiện" value={form.openCtn} onChange={(v) => setForm((f) => (f ? { ...f, openCtn: v } : f))} />
-                <NumberField label="Nhập (kiện)" unit="kiện" value={form.inCtn} onChange={(v) => setForm((f) => (f ? { ...f, inCtn: v } : f))} />
-                <NumberField label="Xuất (kiện)" unit="kiện" value={form.outCtn} onChange={(v) => setForm((f) => (f ? { ...f, outCtn: v } : f))} />
-                <NumberField label="Tồn đầu (kg)" unit="kg" value={form.openKg} onChange={(v) => setForm((f) => (f ? { ...f, openKg: v } : f))} />
-                <NumberField label="Nhập (kg)" unit="kg" value={form.inKg} onChange={(v) => setForm((f) => (f ? { ...f, inKg: v } : f))} />
-                <NumberField label="Xuất (kg)" unit="kg" value={form.outKg} onChange={(v) => setForm((f) => (f ? { ...f, outKg: v } : f))} />
+                <NumberField label="Tồn đầu kỳ" unit="kg" value={form.openKg} onChange={(v) => setForm((f) => (f ? { ...f, openKg: v } : f))} />
+                <NumberField label="Nhập trong kỳ" unit="kg" value={form.inKg} onChange={(v) => setForm((f) => (f ? { ...f, inKg: v } : f))} />
+                <NumberField label="Xuất trong kỳ" unit="kg" value={form.outKg} onChange={(v) => setForm((f) => (f ? { ...f, outKg: v } : f))} />
               </div>
             </div>
           )}
@@ -1226,13 +1283,48 @@ export default function MonthlyStockScreen() {
         </DialogContent>
       </Dialog>
 
+      {/* Dialog gán vị trí cho dòng đang tick */}
+      <Dialog open={ganViTri !== null} onOpenChange={(o) => !o && setGanViTri(null)}>
+        <DialogContent className="w-full sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-2xl">Gán vị trí · {rowsChon.length} dòng</DialogTitle>
+            <DialogDescription className="text-base">
+              Hàng của các dòng đang tick đang nằm ở kho nào. Chỉ đổi cột Vị trí, không đổi số kg hay sổ kho.
+            </DialogDescription>
+          </DialogHeader>
+          {ganViTri !== null && (
+            <div className="space-y-4 py-2">
+              <ChuThichBatBuoc />
+              <Combobox
+                label="Vị trí"
+                required
+                value={ganViTri}
+                onChange={(v) => setGanViTri(v)}
+                options={viTriOpts}
+                onCreate={themViTri}
+                choPhepXoa={false}
+              />
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setGanViTri(null)}>
+              Hủy
+            </Button>
+            <Button onClick={ganViTriDaChon} title="Ghi vị trí vừa chọn cho tất cả dòng đang tick. Có nút Hoàn tác sau khi lưu.">
+              <MapPin className="mr-1 h-4 w-4" />
+              Gán vị trí
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Dialog nhập Excel bảng kê */}
       <Dialog open={!!napForm} onOpenChange={(o) => !o && setNapForm(null)}>
         <DialogContent className="w-full sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle className="text-2xl">Nhập Excel bảng kê kho</DialogTitle>
             <DialogDescription className="text-base">
-              Mỗi sheet = một tháng. Nạp tồn đầu · nhập · xuất (kiện & kg) đúng theo file — tồn cuối &
+              Mỗi sheet = một tháng. Nạp tồn đầu · nhập · xuất đúng theo file — tồn cuối &
               tiền còn lại app tự suy. Nạp lại cùng file chỉ cập nhật, không nhân đôi.
             </DialogDescription>
           </DialogHeader>
@@ -1505,11 +1597,10 @@ export default function MonthlyStockScreen() {
                   Size: <span className="font-medium text-foreground">{xemThe.size || "—"}</span>
                 </div>
                 <div>
-                  Xuất xứ: <span className="font-medium text-foreground">{xemThe.origin || "—"}</span>
+                  Invoice: <span className="font-medium text-foreground">{xemThe.origin || "—"}</span>
                 </div>
                 <div>
-                  KG/kiện:{" "}
-                  <span className="tnum font-medium text-foreground">{soHoacGach(xemThe.kgPerCtn ?? 0)}</span>
+                  Vị trí: <span className="font-medium text-foreground">{viTriCua(xemThe) || "—"}</span>
                 </div>
                 <div>
                   Đơn giá:{" "}
@@ -1534,7 +1625,6 @@ export default function MonthlyStockScreen() {
                   <thead>
                     <tr className="bg-muted">
                       <th scope="col" className="border-b border-border px-3 py-2 text-left">Kỳ</th>
-                      <th scope="col" className="border-b border-border px-3 py-2 text-right">Tồn đầu (kiện)</th>
                       <th scope="col" className="border-b border-border px-3 py-2 text-right">Tồn đầu (kg)</th>
                       <th scope="col" className="border-b border-border px-3 py-2 text-right">Nhập (kg)</th>
                       <th scope="col" className="border-b border-border px-3 py-2 text-right">Xuất (kg)</th>
@@ -1548,7 +1638,6 @@ export default function MonthlyStockScreen() {
                         <td className="border-b border-border px-3 py-2 font-medium text-foreground">
                           {nhanThang(t.period)}
                         </td>
-                        <td className="tnum border-b border-border px-3 py-2 text-right">{soHoacGach(t.openCtn)}</td>
                         <td className="tnum border-b border-border px-3 py-2 text-right">{soHoacGach(t.openKg)}</td>
                         <td className="tnum border-b border-border px-3 py-2 text-right text-success">
                           {t.inKg ? `+${num(t.inKg)}` : "—"}

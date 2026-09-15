@@ -693,8 +693,10 @@ export interface MonthlyStockLine {
   warehouse: string; // kho, VD "Kho 1500T"
   itemName: string;
   size: string; // rỗng nếu không có
-  origin: string; // xuất xứ — rỗng nếu không rõ
+  origin: string; // số INVOICE (cột DB cũ `origin` — trước gọi "xuất xứ"), rỗng nếu không rõ
   importDate: string; // yyyy-mm-dd — ngày nhập (tham chiếu), rỗng nếu không rõ
+  /** VỊ TRÍ hàng đang nằm (TÊN kho, VD "Kho Ánh Dương"). Rỗng = ở chính kho của sổ (`warehouse`). Migration 0045. */
+  storageLocation: string;
   kgPerCtn: number | null; // KG/kiện (cột "KG/GS")
   unitPrice: number | null; // đơn giá VNĐ
   openCtn: number;

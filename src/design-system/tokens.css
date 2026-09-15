@@ -310,6 +310,36 @@
   }
 }
 
+/* Bảng dài: hàng tên cột DÍNH trên cùng khi cuộn dọc (BangTong `dinhDau`). Khung
+   bảng (data-slot="table-container") vừa cuộn ngang vừa cuộn dọc trong chiều cao
+   tối đa, vì sticky không bám theo trang khi tổ tiên đã overflow-x. Chân tổng
+   dính đáy để luôn thấy dòng cộng. Đặt lên thẻ bọc ngoài bảng. */
+@utility bang-dinh-dau {
+  & [data-slot="table-container"] {
+    max-height: min(70dvh, 48rem);
+    overflow: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+  & thead th {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    background: var(--muted);
+    box-shadow: inset 0 -1px 0 var(--border);
+  }
+  & tfoot td {
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    background: var(--muted);
+    box-shadow: inset 0 1px 0 var(--border);
+  }
+}
+
 /* Thanh cuộn gọn, bám màu token — dùng cho thân dialog/form cuộn dài. */
 @utility scroll-nice {
   scrollbar-width: thin;

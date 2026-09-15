@@ -13,6 +13,7 @@ import {
   Badge,
   ChuThichBatBuoc,
   Button,
+  Combobox,
   Dialog,
   DialogContent,
   DialogFooter,
@@ -27,10 +28,72 @@ import {
   notify,
   type Cot,
   type LoiNhap,
+  type MucChon,
 } from "@/design-system";
-import { Check, Pencil, Plus, Users } from "lucide-react";
+import {
+  Pencil,
+  Plus,
+  Users,
+  X,
+  Briefcase,
+  Calculator,
+  Factory,
+  Warehouse,
+  ShieldCheck,
+  UserRound,
+  Search,
+  type LucideIcon,
+} from "lucide-react";
 
-/** Chọn NHIỀU vai trò (chip bật/tắt). Người 45–60t: chip to, bấm là xong. */
+/**
+ * Phòng ban & cấp bậc — gom vai trò theo bộ phận để danh sách người dùng trực
+ * quan hơn (thay 1 list phẳng). Thứ tự trong `roles` = cấp bậc (cao → thấp).
+ * ĐỂ CỤC BỘ ở màn này (KHÔNG nhét vào types.ts) — đây là cách TRÌNH BÀY, không
+ * phải quy tắc phân quyền; phân quyền thật vẫn ở ROLES + lib/nav-access.ts.
+ */
+const PHONG_BAN: { id: string; ten: string; icon: LucideIcon; roles: Role[] }[] = [
+  { id: "giam-doc", ten: "Ban giám đốc", icon: Briefcase, roles: ["director", "vice-director"] },
+  { id: "ke-toan", ten: "Phòng kế toán", icon: Calculator, roles: ["chief-accountant", "accountant"] },
+  {
+    id: "san-xuat",
+    ten: "Phân xưởng sản xuất",
+    icon: Factory,
+    roles: ["manager-dong", "manager-ca", "manager-kho", "vice-manager", "team-leader"],
+  },
+  { id: "kho", ten: "Kho & nhập hàng", icon: Warehouse, roles: ["warehouse-keeper"] },
+  { id: "he-thong", ten: "Quản trị hệ thống", icon: ShieldCheck, roles: ["admin"] },
+];
+
+/** Tên phòng ban của một vai trò (dòng phụ trong dropdown chọn vai trò). */
+function phongBanCuaRole(v: Role): string {
+  return PHONG_BAN.find((pb) => pb.roles.includes(v))?.ten ?? "Khác";
+}
+
+/** Xếp một người vào 1 phòng ban theo vai trò cấp CAO NHẤT họ có (rank nhỏ = cao). */
+function xepPhongBan(roles: Role[]): { idx: number; rank: number } {
+  for (let i = 0; i < PHONG_BAN.length; i++) {
+    const hits = roles.map((r) => PHONG_BAN[i].roles.indexOf(r)).filter((x) => x >= 0);
+    if (hits.length) return { idx: i, rank: Math.min(...hits) };
+  }
+  return { idx: PHONG_BAN.length, rank: 0 }; // chưa gán vai trò
+}
+
+/** Sắp vai trò của một người theo cấp bậc (cao → thấp) để hiện chức vụ chính trước. */
+function sapTheoCap(roles: Role[]): Role[] {
+  const key = (r: Role) => {
+    for (let i = 0; i < PHONG_BAN.length; i++) {
+      const j = PHONG_BAN[i].roles.indexOf(r);
+      if (j >= 0) return i * 100 + j;
+    }
+    return 9999;
+  };
+  return [...roles].sort((a, b) => key(a) - key(b));
+}
+
+/**
+ * Chọn NHIỀU vai trò: vai trò đã chọn hiện thành CHIP có nút ✕ để bỏ; thêm mới
+ * qua DROPDOWN tìm-kiếm (gom theo phòng ban) — hợp khi danh sách vai trò dài dần.
+ */
 function ChonVaiTro({
   chon,
   onDoi,
@@ -38,26 +101,49 @@ function ChonVaiTro({
   chon: Role[];
   onDoi: (v: Role[]) => void;
 }) {
-  const bat = (v: Role) =>
-    onDoi(chon.includes(v) ? chon.filter((x) => x !== v) : [...chon, v]);
+  const conLai = ROLES.filter((r) => !chon.includes(r.value));
+  const options: MucChon[] = conLai.map((r) => ({
+    value: r.value,
+    label: r.label,
+    phu: phongBanCuaRole(r.value),
+  }));
   return (
-    <div className="flex flex-wrap gap-2">
-      {ROLES.map((r) => {
-        const dangChon = chon.includes(r.value);
-        return (
-          <Button
-            title="Bật / tắt vai trò này cho tài khoản. Vai trò quyết định người dùng vào được những màn nào."
-            key={r.value}
-            type="button"
-            variant={dangChon ? "default" : "outline"}
-            size="lg"
-            onClick={() => bat(r.value)}
-          >
-            {dangChon && <Check className="size-4" />}
-            {r.label}
-          </Button>
-        );
-      })}
+    <div className="space-y-3">
+      {chon.length > 0 ? (
+        <div className="flex flex-wrap gap-2">
+          {chon.map((v) => (
+            <span
+              key={v}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-muted py-1 pl-3 pr-1 font-medium"
+            >
+              {roleLabel([v])}
+              <button
+                type="button"
+                onClick={() => onDoi(chon.filter((x) => x !== v))}
+                aria-label={`Bỏ vai trò ${roleLabel([v])}`}
+                title={`Bỏ vai trò ${roleLabel([v])}`}
+                className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-background hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+              >
+                <X className="size-4" aria-hidden />
+              </button>
+            </span>
+          ))}
+        </div>
+      ) : (
+        <p className="text-muted-foreground">Chưa gán vai trò nào.</p>
+      )}
+      {conLai.length > 0 && (
+        <Combobox
+          label="Thêm vai trò"
+          anNhanBatBuoc
+          value=""
+          onChange={(v) => v && onDoi([...chon, v as Role])}
+          options={options}
+          placeholder="Gõ hoặc chọn vai trò để thêm…"
+          emptyText="Đã thêm hết vai trò."
+          choPhepXoa={false}
+        />
+      )}
     </div>
   );
 }
@@ -92,6 +178,7 @@ export default function QuanLyNguoiDungScreen({
   const [ds, ghi, { trangThai }] = useUserProfiles();
   const dangTai = trangThai === "dang-tai" && ds.length === 0;
   const [dang, setDang] = useState<UserProfile | null>(null);
+  const [q, setQ] = useState("");
 
   const [tao, setTao] = useState<TaoMoi | null>(null);
   const [loiTao, setLoiTao] = useState<LoiNhap[]>([]);
@@ -157,13 +244,13 @@ export default function QuanLyNguoiDungScreen({
     },
     {
       key: "vaiTro",
-      header: "Vai trò",
+      header: "Chức vụ",
       render: (r) => {
-        const vt = rolesList(r.roles);
+        const vt = sapTheoCap(rolesList(r.roles));
         return vt.length ? (
           <span className="flex flex-wrap gap-1">
-            {vt.map((v) => (
-              <Badge key={v} variant={v === "admin" ? "default" : "secondary"}>
+            {vt.map((v, i) => (
+              <Badge key={v} variant={i === 0 ? "default" : "secondary"}>
                 {roleLabel([v])}
               </Badge>
             ))}
@@ -176,11 +263,42 @@ export default function QuanLyNguoiDungScreen({
     },
   ];
 
+  // Gom người dùng theo phòng ban (+ sắp theo cấp bậc) để danh sách trực quan.
+  const loc = q.trim().toLowerCase();
+  const daLoc = loc
+    ? ds.filter((u) => `${u.username} ${u.fullName} ${roleLabel(u.roles)}`.toLowerCase().includes(loc))
+    : ds;
+  const tenNguoi = (u: UserProfile) => u.fullName || u.username || "";
+  const thung: { u: UserProfile; rank: number }[][] = PHONG_BAN.map(() => []);
+  const chuaGan: UserProfile[] = [];
+  for (const u of daLoc) {
+    const { idx, rank } = xepPhongBan(rolesList(u.roles));
+    if (idx < PHONG_BAN.length) thung[idx].push({ u, rank });
+    else chuaGan.push(u);
+  }
+  const nhomHienThi = [
+    ...PHONG_BAN.map((pb, i) => ({
+      id: pb.id,
+      ten: pb.ten,
+      icon: pb.icon,
+      users: thung[i]
+        .sort((a, b) => a.rank - b.rank || tenNguoi(a.u).localeCompare(tenNguoi(b.u), "vi"))
+        .map((x) => x.u),
+    })),
+    {
+      id: "chua",
+      ten: "Chưa phân công",
+      icon: UserRound,
+      users: [...chuaGan].sort((a, b) => tenNguoi(a).localeCompare(tenNguoi(b), "vi")),
+    },
+  ].filter((n) => n.users.length > 0);
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold text-foreground">Người dùng</h1>
+          <p className="text-muted-foreground">{ds.length} tài khoản · gom theo phòng ban &amp; cấp bậc</p>
         </div>
         <Button
           title="Tạo tài khoản đăng nhập mới và gán vai trò cho người đó."
@@ -217,24 +335,54 @@ export default function QuanLyNguoiDungScreen({
           }
         />
       ) : (
-        <RecordTable
-          columns={cols}
-          rows={ds}
-          getKey={(r) => r.id}
-          timKiem={(r) => `${r.username} ${r.fullName} ${roleLabel(r.roles)}`}
-          nhanTimKiem="Tìm theo tên đăng nhập / họ tên…"
-          actions={(r) => (
-            <Button
-              title="Sửa họ tên hoặc vai trò của tài khoản này."
-              variant="outline"
-              size="sm"
-              onClick={() => setDang({ ...r, roles: rolesList(r.roles) })}
-            >
-              <Pencil />
-              Sửa
-            </Button>
+        <div className="space-y-6">
+          <div className="relative max-w-md">
+            <Search
+              className="pointer-events-none absolute left-3 top-1/2 size-5 -translate-y-1/2 text-muted-foreground"
+              aria-hidden
+            />
+            <Input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Tìm theo tên đăng nhập / họ tên / vai trò…"
+              aria-label="Tìm người dùng"
+              className="pl-10"
+            />
+          </div>
+
+          {nhomHienThi.length === 0 ? (
+            <p className="text-muted-foreground">Không tìm thấy người dùng nào khớp “{q}”.</p>
+          ) : (
+            nhomHienThi.map((nhom) => {
+              const Icon = nhom.icon;
+              return (
+                <section key={nhom.id} className="space-y-3">
+                  <h2 className="flex items-center gap-2 text-lg font-semibold text-foreground">
+                    <Icon className="size-5 text-muted-foreground" aria-hidden />
+                    {nhom.ten}
+                    <Badge variant="secondary">{nhom.users.length}</Badge>
+                  </h2>
+                  <RecordTable
+                    columns={cols}
+                    rows={nhom.users}
+                    getKey={(r) => r.id}
+                    actions={(r) => (
+                      <Button
+                        title="Sửa họ tên hoặc vai trò của tài khoản này."
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setDang({ ...r, roles: rolesList(r.roles) })}
+                      >
+                        <Pencil />
+                        Sửa
+                      </Button>
+                    )}
+                  />
+                </section>
+              );
+            })
           )}
-        />
+        </div>
       )}
 
       {/* Tạo tài khoản (admin) */}
@@ -291,7 +439,7 @@ export default function QuanLyNguoiDungScreen({
               </Field>
               <Field
                 label="Vai trò"
-                hint="Chọn một hoặc nhiều. VD Phó giám đốc kiêm Quản đốc xưởng Đông = bấm cả hai. Bỏ trống cũng được, gán sau."
+                hint="Chọn một hoặc nhiều từ danh sách. VD Phó giám đốc kiêm Quản đốc xưởng Đông = thêm cả hai. Bỏ trống cũng được, gán sau."
               >
                 <ChonVaiTro
                   chon={tao.roles}
@@ -340,7 +488,7 @@ export default function QuanLyNguoiDungScreen({
               </Field>
               <Field
                 label="Vai trò"
-                hint="Chọn một hoặc nhiều. Bấm lại để bỏ. Bỏ hết = Chưa gán."
+                hint="Chọn từ danh sách để thêm; bấm ✕ trên vai trò để bỏ. Bỏ hết = Chưa gán."
               >
                 <ChonVaiTro
                   chon={dang.roles}

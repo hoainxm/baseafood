@@ -450,10 +450,35 @@ Mục **điều hướng** lấy câu mô tả từ `KIT_NAV[].moTa` (`features/
 rê lên tên màn là biết màn đó để làm gì. **Thêm màn mới thì viết luôn `moTa`** —
 xem [02-pages-navigation](../../docs/app-map/02-pages-navigation.md).
 
-⚠️ `title` là tooltip của trình duyệt: **không hiện trên điện thoại** (không có
-hover). Thông tin mà người dùng *bắt buộc* phải biết mới thao tác đúng thì đừng
-giấu trong `title` — cho ra chữ phụ dưới nút, `InfoTip` cạnh nhãn, hoặc câu mô
-tả trong hộp thoại xác nhận.
+### Tốc độ hiện: `GoiYHover` vẽ tooltip riêng, KHÔNG dùng của trình duyệt
+
+Tooltip mặc định của `title` có **độ trễ do trình duyệt/OS quyết — trang web
+không chỉnh được** (Chrome để ~1 giây). Chờ một giây mới thấy chữ thì người dùng
+đã bấm đại hoặc bỏ đi rồi, gắn `title` coi như công cốc. Nên `GoiYHover`
+(`patterns/HoverHint.tsx`) **gắn MỘT lần ở `AppShell`** và tự vẽ:
+
+- Trễ hiện = hằng **`TRE_HIEN_MS` (hiện tại 150ms)** — đổi một chỗ, cả app đổi theo.
+- Nghe ở cấp document, bắt **mọi phần tử có `title`** (cả `<button>` thường,
+  `TabsTrigger`, mục nav…). **Màn hình không phải import hay bọc gì** — cứ viết
+  `title` như luật §9, phần còn lại tự chạy.
+- Chống hiện HAI tooltip: lúc rê thì cất `title` sang `data-goi-y`, rời chuột trả
+  lại. Đi bằng **bàn phím thì KHÔNG cất** — trình duyệt không bật tooltip khi
+  focus, giữ `title` để trình đọc màn hình còn đọc được.
+- Máy cảm ứng (`(hover: hover)` = false) **tự tắt** — không có rê chuột thì đừng
+  bày tooltip nhảy lung tung. Nhắc lại cảnh báo ở trên: thông tin BẮT BUỘC mới
+  thao tác đúng thì đừng giấu trong hover.
+- Tự lật lên trên khi sát đáy, tự kéo vào trong khi sát mép.
+
+⚠️ **Cạm bẫy đã dính, đừng lặp lại:** đừng dùng `transform` để căn giữa / lật
+tooltip khi có class `animate-in` — keyframes của nó cũng đặt `transform` và đè
+mất, làm tooltip **tràn mép phải và đè lên chính cái nút**. Tính thẳng
+`left`/`top` bằng px trong `useLayoutEffect` (chạy trước khi vẽ nên không nhấp nháy).
+
+⚠️ Gợi ý hover **không hiện trên điện thoại** (không có rê chuột). Thông tin mà
+người dùng *bắt buộc* phải biết mới thao tác đúng thì đừng giấu trong `title` —
+cho ra chữ phụ dưới nút, `InfoTip` cạnh nhãn, hoặc câu mô tả trong hộp thoại xác
+nhận. Chữ vẫn viết vào `title`, nhưng app **không** để trình duyệt vẽ tooltip —
+xem § Tốc độ hiện bên dưới.
 
 ### Cổng máy
 

@@ -7,6 +7,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import {
   Badge,
+  GoiYHover,
   Logo,
   NutGiaoDien,
   NutHuongDan,
@@ -564,6 +565,8 @@ export default function AppShell({
        VÙNG NỘI DUNG cuộn RIÊNG — trước đây cuộn chung, kéo bảng dài là nav trôi
        mất. Điện thoại giữ cuộn trang tự nhiên (nav là drawer, có scroll riêng). */
     <div className="flex min-h-full flex-col bg-background md:h-dvh md:flex-row md:overflow-hidden">
+      {/* Gợi ý rê chuột cho MỌI phần tử có `title` — gắn một lần cho cả app. */}
+      <GoiYHover />
       {/* Sidebar dọc — chỉ desktop */}
       <aside
         className={cn(

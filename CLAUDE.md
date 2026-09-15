@@ -101,6 +101,7 @@ Chưa rõ tier ⇒ coi là 🔴. Dữ liệu ở đây là **sổ sách thật c
 | `features/BalancingScreen.tsx`, `BalancingTable.tsx`, `lib/balancingCalc.ts` | [`31-can-doi-ky.md`](docs/app-map/31-can-doi-ky.md) |
 | `features/CatalogScreen.tsx`, `FinishedGoodScreen.tsx`, `data/thanh-pham.json` | [`32-danh-muc.md`](docs/app-map/32-danh-muc.md) |
 | `features/monthly-stock/**`, `lib/monthlyStock.ts`, `lib/monthlyStockExcel.ts` (sổ kho theo tháng, dồn kỳ, nhập Excel bảng kê) | [`36-so-kho-thang.md`](docs/app-map/36-so-kho-thang.md) |
+| `features/doi-soat/**`, `lib/doiSoatHddt.ts`, `lib/doiSoatXuat.ts` (đối soát hóa đơn điện tử ⇄ sổ kế toán, xuất Excel giữ định dạng gốc) | [`37-doi-soat-hddt.md`](docs/app-map/37-doi-soat-hddt.md) |
 | `supabase/migrations/**` | [`03-database.md`](docs/app-map/03-database.md) (+ [`04`](docs/app-map/04-tang-du-lieu.md) nếu đổi ánh xạ) |
 | `lib/repo.ts`, `db.ts`, `catalogRepo.ts`, `connectivity.ts` | [`04-tang-du-lieu.md`](docs/app-map/04-tang-du-lieu.md) |
 | `App.tsx` (thêm màn / đổi nav) | [`02-pages-navigation.md`](docs/app-map/02-pages-navigation.md) |
@@ -146,6 +147,7 @@ Index đầy đủ + bảng định tuyến theo task: [`docs/app-map/README.md`
 | [`32-danh-muc`](docs/app-map/32-danh-muc.md) | danh mục, 141 mã thành phẩm |
 | [`34-btp-san-xuat-kho`](docs/app-map/34-btp-san-xuat-kho.ba-spec.md) · [`35-btp-ui`](docs/app-map/35-btp-ui.design-spec.md) | sản xuất BTP/WIP, **đóng gói BTP→TP** (`/packaging`), kho dự trữ, đơn/xuất, vòng đông gửi↔xả đông |
 | [`36-so-kho-thang`](docs/app-map/36-so-kho-thang.md) | **Sổ kho theo THÁNG** (`/ton-kho-thang`): dồn tồn cuối kỳ → đầu kỳ sau, đủ cột kiện+kg, mọi đối tượng NL/BTP/TP |
+| [`37-doi-soat-hddt`](docs/app-map/37-doi-soat-hddt.md) | **Đối soát HĐĐT** (`/doi-soat`): hóa đơn cổng thuế ⇄ sổ kế toán; **xuất Excel phải GIỮ NGUYÊN định dạng file vào** |
 | [`trien-khai/flow-end-to-end-2-bo-phan`](docs/trien-khai/flow-end-to-end-2-bo-phan.md) | nối luồng nhập→sản xuất→kho→bán, 2 giao diện bộ phận, daily-task (họp 2026-08-22) |
 
 Bản đồ tài liệu đầy đủ + luật "doc mới bỏ đâu": [`docs/README.md`](docs/README.md).

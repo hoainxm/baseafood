@@ -673,11 +673,37 @@ export default function DoiSoatScreen() {
     }
   };
 
+  /**
+   * Xuất Excel: ƯU TIÊN sửa tại chỗ trên chính file gốc (giữ nguyên font/khung/ô
+   * gộp/định dạng số để kế toán soi song song được). Không còn bytes file gốc
+   * hoặc thư viện nạp hụt thì mới lùi về bản dựng-mới.
+   */
+  const xuatFile = async (
+    kq: KetQuaDoiSoat,
+    ten: string,
+    fileGocB64: string,
+    editsCuaBan: Record<string, number> | undefined
+  ) => {
+    const tenFile = `${ten.replace(/\.xlsx?$/i, "")} - đã đối soát.xlsx`;
+    if (fileGocB64) {
+      try {
+        const { xuatExcelGiuDinhDang } = await import("@/lib/doiSoatXuat");
+        await xuatExcelGiuDinhDang(kq, fileGocB64, tenFile, editsCuaBan);
+        notify.daLuu("Đã xuất Excel — giữ nguyên định dạng file gốc, chỉ thêm cột đối soát và tô màu dòng.");
+        return;
+      } catch (err) {
+        notify.loi(
+          `Không giữ được định dạng gốc (${err instanceof Error ? err.message : String(err)}) — xuất bản dựng mới.`
+        );
+      }
+    }
+    xuatExcelDoiSoat(kq, tenFile);
+    notify.daLuu("Đã xuất Excel (tô màu + cột phân tích + nhật ký sửa nếu có).");
+  };
+
   const taiExcel = () => {
     if (!ketQua) return;
-    const ten = (file?.name ?? "doi-soat").replace(/\.xlsx?$/i, "");
-    xuatExcelDoiSoat(ketQua, `${ten} - đã đối soát.xlsx`);
-    notify.daLuu("Đã xuất Excel (tô màu + cột phân tích + nhật ký sửa nếu có).");
+    void xuatFile(ketQua, file?.name ?? "doi-soat", b64, edits);
   };
 
   const apDungSua = (nv: NghiVan) => {
@@ -783,8 +809,7 @@ export default function DoiSoatScreen() {
         edits: run.options?.edits,
         soChuanTen: run.options?.soChuanTen,
       });
-      xuatExcelDoiSoat(kq, `${(run.title || "doi-soat").replace(/\.xlsx?$/i, "")} - đã đối soát.xlsx`);
-      notify.daLuu("Đã xuất Excel từ bản đã lưu.");
+      void xuatFile(kq, run.title || "doi-soat", run.fileB64, run.options?.edits);
     } catch (err) {
       notify.loi(`Không xuất được: ${err instanceof Error ? err.message : String(err)}`);
     }

@@ -42,6 +42,7 @@ import type {
   MaterialOpeningStock,
   FinishedGoodsOpeningStock,
   NxtSnapshotLine,
+  StorageLocation,
   MonthlyStockLine,
   ReconciliationRun,
 } from "@/types";
@@ -926,6 +927,7 @@ export const BANG_NXT_SNAPSHOT: AnhXaBang<NxtSnapshotLine> = {
   toRow: (x) => ({
     id: x.id,
     warehouse_code: x.warehouseCode,
+    storage_location: x.storageLocation,
     period_from: x.periodFrom || null,
     period_to: x.periodTo || null,
     item_code: x.itemCode,
@@ -942,6 +944,7 @@ export const BANG_NXT_SNAPSHOT: AnhXaBang<NxtSnapshotLine> = {
   fromRow: (r) => ({
     id: s(r.id),
     warehouseCode: s(r.warehouse_code),
+    storageLocation: s(r.storage_location),
     periodFrom: s(r.period_from).slice(0, 10),
     periodTo: s(r.period_to).slice(0, 10),
     itemCode: s(r.item_code),
@@ -953,6 +956,33 @@ export const BANG_NXT_SNAPSHOT: AnhXaBang<NxtSnapshotLine> = {
     openingValue: Number(r.opening_value ?? 0),
     inValue: Number(r.in_value ?? 0),
     outValue: Number(r.out_value ?? 0),
+    note: s(r.note),
+  }),
+  // Dòng ghi trước 0044 chưa có chiều kho lưu → rỗng (hiểu là kho nhà).
+  vaDongCu: (x) => ({ ...x, storageLocation: x.storageLocation ?? "" }),
+};
+
+/** Danh mục kho LƯU hàng (kho nhà + kho lạnh thuê ngoài) — nối dữ liệu theo TÊN. */
+export const BANG_STORAGE_LOCATION: AnhXaBang<StorageLocation> = {
+  table: "storage_locations",
+  localKey: "bsf.storage-locations.v1",
+  layKhoa: theoId,
+  toRow: (x) => ({
+    id: x.id,
+    code: x.code,
+    name: x.name,
+    kind: x.kind,
+    address: x.address,
+    phone: x.phone,
+    note: x.note,
+  }),
+  fromRow: (r) => ({
+    id: s(r.id),
+    code: s(r.code),
+    name: s(r.name),
+    kind: (s(r.kind) === "thue-ngoai" ? "thue-ngoai" : "noi-bo") as StorageLocation["kind"],
+    address: s(r.address),
+    phone: s(r.phone),
     note: s(r.note),
   }),
 };
@@ -1188,6 +1218,7 @@ const NHAN_BANG: Record<string, string> = {
   material_opening_stock: "Tồn đầu nguyên liệu",
   finished_goods_opening_stock: "Tồn đầu thành phẩm",
   nxt_snapshots: "Xuất–Nhập–Tồn kho (báo cáo)",
+  storage_locations: "Kho lưu trữ (danh mục)",
   monthly_stock_ledger: "Sổ kho theo tháng",
   reconciliation_runs: "Bản đối soát hóa đơn",
 };

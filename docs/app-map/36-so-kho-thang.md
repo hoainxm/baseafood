@@ -1,9 +1,10 @@
 > Load khi: sửa màn Sổ kho theo tháng (/ton-kho-thang), logic dồn tồn cuối kỳ → đầu kỳ sau, hay công thức tồn cuối/tiền còn lại theo tháng.
 covers: src/features/monthly-stock/MonthlyStockScreen.tsx, src/features/monthly-stock/index.ts, src/lib/monthlyStock.ts, src/lib/monthlyStockExcel.ts
-last_verified: 2026-09-11
+last_verified: 2026-09-15
 ttl_days: 90
 <!-- re-verified: 2026-09-09 15:00 — id nhập `xlsx|<mã kho>|<sheet>|<năm>|<rowIndex>` (MonthlyStockScreen:419), khoaLo đối chiếu = kho·nhóm·tên name-level (monthlyStock.ts:199), migration 0041 create-if-not-exists idempotent — khớp code. -->
 <!-- re-verified: 2026-09-11 16:40 — parser cột 0/1/2/3/4/5/8-13 + nhóm "NHẬP KHẨU"/"MUA NGOÀI" + bỏ dòng "TỔNG" (monthlyStockExcel.ts:105-146), nhận sheet số tháng qua suyThang() "1".."12"/"T8"/"Tháng 8" (monthlyStockExcel.ts:94-103), id nạp `xlsx|${maKho}|${sheetName}|${nam}|${rowIndex}` + nạp lại thay-theo-id giuLai=filter(!idMoi) (MonthlyStockScreen.tsx:503,529-531), namTuTenFile year=/20\d{2}/ (monthlyStockExcel.ts:164-167) — khớp code. -->
+<!-- re-verified: 2026-09-15 15:30 — donSangThang(nguon, thangDich) + idDon `carry|<id-nguồn>` (monthlyStock.ts) và EmptyState "Kế thừa tồn cuối tháng trước" (MonthlyStockScreen) đúng như doc mô tả TRƯỚC đợt này; khoaLo = kho·nhóm·tên name-level (monthlyStock.ts:199) vẫn là khóa gộp — tái dùng cho thẻ kho. Đã kiểm trên DB thật: T9/2026 trống, T8 có 143 dòng / 1.478.897,83 kg. -->
 
 # Sổ kho theo THÁNG dương lịch (`/ton-kho-thang`)
 
@@ -49,13 +50,33 @@ Tiền còn lại    = Tồn cuối (kg) × đơn giá      // suyDong().remaini
 
 - **id tất định** `carry|<id-dòng-nguồn>` (`idDon`) ⇒ dồn lại nhiều lần chỉ **CẬP NHẬT**, KHÔNG nhân đôi. Ghi = `lines.filter(l => !idMoi.has(l.id))` rồi nối dòng carry → giữ nguyên dòng nhập tay ở tháng đích.
 - Chỉ mang sang dòng **còn tồn** (tồn cuối ≠ 0).
-- Hai chiều: nút **"Dồn sang tháng sau"** (đẩy, dùng TOÀN BỘ dòng của tháng — bỏ qua bộ lọc kho) và **"Kế thừa tồn cuối tháng trước"** (kéo, ở màn trống).
+- Hai chiều: nút **"Dồn sang tháng sau"** (đẩy, dùng TOÀN BỘ dòng của tháng — bỏ qua bộ lọc kho) và **"Kế thừa & lưu vào sổ"** (kéo, ở banner XEM TRƯỚC của tháng trống — xem § Màn hình).
 
 ## Màn hình
 
-- Chọn kỳ = tháng (Combobox + nút ◀ ▶), lọc theo kho (5 kho hệ thống `BSF1_WAREHOUSES` + kho lạ nếu có), hai chế độ: **xem** (nhóm × bảng đủ cột + dòng cộng nhóm) và **Ghi nhập/xuất** (`LuoiNhap` gõ kiện/kg từng mã, dán khối Excel). Mô tả (tên/size/đơn giá) sửa ở nút ✎ dialog.
+- Chọn kỳ = tháng (Combobox + nút ◀ ▶), lọc theo kho (5 kho hệ thống `BSF1_WAREHOUSES` + kho lạ nếu có), **ô "Tìm mặt hàng"** (lọc theo tên · size · xuất xứ · nhóm · kho), hai chế độ: **xem** (nhóm × bảng đủ cột + dòng cộng nhóm) và **Ghi nhập/xuất** (`LuoiNhap` gõ kiện/kg từng mã, dán khối Excel). Mô tả (tên/size/đơn giá) sửa ở nút ✎ dialog.
 - `gomNhom()` xếp theo `MONTHLY_STOCK_CATEGORIES` trước, nhóm lạ cuối; mỗi nhóm có tổng riêng, thẻ `ThongKe` tổng toàn tháng (gồm tiền còn lại). In A4 (`PhieuIn`).
-- Tháng mặc định = tháng hiện tại (`thangHienTai`). Tháng trống + có tháng trước ⇒ EmptyState mời "Kế thừa tồn cuối tháng trước".
+- Tháng mặc định = tháng hiện tại (`thangHienTai`).
+
+### Tick dòng → cộng tổng · in riêng · xóa theo lô
+
+Bảng bật cột ô tick qua prop `chon` của `BangTong` (`ChonBang` — xem [design-system README](../../src/design-system/README.md)); màn giữ `daChon: Set<id>`, **không sửa dữ liệu**. Tick vài dòng ⇒ hiện thanh cộng tổng của ĐÚNG mấy dòng đó (tồn đầu · nhập · xuất · tồn cuối, cả kiện lẫn kg, + tiền còn lại) — việc kế toán làm suốt mà trước phải bấm máy tính tay. Kèm:
+
+- **In {n} dòng** — `PhieuIn` in đúng dòng đã tick (`rowsIn = rowsChon.length ? rowsChon : rowsThang`, tổng + gom nhóm tính lại theo đó).
+- **Xóa dòng đã chọn** — qua `ConfirmDelete` + toast **Hoàn tác** (không xóa lặng lẽ). Ẩn khi đang xem trước dồn kỳ.
+- Ô tick ở đầu bảng mỗi nhóm = chọn/bỏ cả nhóm; nút "Chọn tất cả / Bỏ chọn hết" ở thanh công cụ. Đổi tháng/kho ⇒ bỏ chọn (tránh cộng nhầm dòng của kỳ khác).
+
+### Thẻ kho (sổ chi tiết vật tư) — nút 🕘 mỗi dòng
+
+`theKhoMatHang(lines, khoaLo(row))` dựng lịch sử **một mặt hàng** qua tối đa 24 tháng: mỗi tháng một dòng tồn đầu · nhập · xuất · tồn cuối (mới → cũ), tháng đang xem tô nền. Khóa gộp là **`khoaLo` (kho·nhóm·TÊN, bỏ size)** — CÙNG khóa với `doiChieuDonKy`, nên lô tách theo size cộng lại thành một dòng tháng thay vì đẻ ra mấy dòng rời. Hàm thuần, chỉ đọc. Đọc dọc cột tồn cuối ↔ tồn đầu dòng dưới là thấy ngay chỗ đứt vòng gối đầu.
+
+### Tháng trống ⇒ XEM TRƯỚC dồn kỳ (không còn "trống trơn")
+
+Tháng đang xem chưa có dòng nào **và** tháng trước còn tồn ⇒ màn dựng sẵn `donSangThang(tháng trước, tháng này).map(suyDong)` và hiển thị **y như bảng thật**, kèm banner "Xem trước tồn đầu … CHƯA LƯU" + nút **"Kế thừa & lưu vào sổ"**.
+
+- **Vì sao xem trước chứ không tự ghi:** dồn kỳ vẫn phải qua bước người duyệt — lô hay bị tách size / đổi mã lô giữa các tháng, tự ghi đè là đường thẳng tới **cộng đôi** (xem § Cờ lệch dồn kỳ). Xem trước cho thấy số ngay mà không chạm dữ liệu; một cú bấm mới ghi.
+- Trong chế độ xem trước: ẩn nút Ghi nhập/xuất, ẩn ✎ và 🗑 từng dòng, **tắt banner "Lệch dồn kỳ"** (lệch lúc này chính là phần chưa dồn — banner xem trước đã nói rồi, hiện thêm cảnh báo đỏ chỉ làm tưởng sai số).
+- Dòng xem trước lọc theo kho đang chọn; nút "Kế thừa & lưu" vẫn dồn **toàn bộ kho** (`donTuThangTruoc`, đúng quy tắc "dồn kỳ không bỏ sót kho nào").
 
 ## Nhập Excel bảng kê (seed số cũ)
 

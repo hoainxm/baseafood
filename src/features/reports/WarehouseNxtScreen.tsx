@@ -5,7 +5,8 @@
 // ============================================================
 import { useMemo, useRef, useState } from "react";
 import type { NxtSnapshotLine } from "@/types";
-import { useNxtSnapshots } from "@/lib/catalogRepo";
+import { KHO_LUU_MAC_DINH, STORAGE_KIND_LABELS } from "@/types";
+import { useNxtSnapshots, useStorageLocations } from "@/lib/catalogRepo";
 import {
   parseNxtExcelFile,
   exportNxtToExcel,
@@ -37,6 +38,7 @@ import {
   ThongKe,
   homNay,
   notify,
+  type ChonBang,
   type CotLuoi,
   type CotTong,
   type HangLuoi,
@@ -61,12 +63,15 @@ import {
   Trash2,
   Upload,
   Warehouse,
+  PackageOpen,
 } from "lucide-react";
 
 /** Dòng đã suy tồn cuối (đầu + nhập − xuất). */
 interface RowTinh extends NxtSnapshotLine {
   closingKg: number;
 }
+
+const TAT_CA = "__tat_ca__";
 
 const keyKy = (r: { periodFrom: string; periodTo: string }) => `${r.periodFrom}|${r.periodTo}`;
 const idDong = (kho: string, from: string, to: string, code: string) => `nxt|${kho}|${from}|${to}|${code}`;
@@ -92,6 +97,7 @@ function parseKho(text: string): string {
  */
 export default function WarehouseNxtScreen() {
   const [snapshots, ghiSnapshots] = useNxtSnapshots();
+  const [khoLuuDM] = useStorageLocations();
   const fileRef = useRef<HTMLInputElement>(null);
 
   const khoOpts: MucChon[] = useMemo(() => {
@@ -118,12 +124,49 @@ export default function WarehouseNxtScreen() {
   const kyChon = ky || kyOpts[0]?.value || "";
   const [tuNgay, denNgay] = kyChon.split("|");
 
-  const rows: RowTinh[] = useMemo(() => {
+  /** Dòng của kho/kỳ đang xem — TRƯỚC khi lọc theo kho lưu (để cộng theo kho lưu). */
+  const rowsKy: RowTinh[] = useMemo(() => {
     return snapshots
       .filter((r) => r.warehouseCode === khoChon && keyKy(r) === kyChon)
       .map((r) => ({ ...r, closingKg: r.openingKg + r.inKg - r.outKg }))
       .sort((a, b) => b.closingKg - a.closingKg);
   }, [snapshots, khoChon, kyChon]);
+
+  // ---------- Chiều KHO LƯU (kho nhà / kho lạnh thuê ngoài) ----------
+  /** Tên kho lưu hiển thị của một dòng — rỗng nghĩa là chưa gán ⇒ kho nhà. */
+  const khoLuuCua = (r: { storageLocation: string }) => r.storageLocation || KHO_LUU_MAC_DINH;
+
+  const khoLuuOpts: MucChon[] = useMemo(() => {
+    const set = new Set<string>([KHO_LUU_MAC_DINH]);
+    for (const k of khoLuuDM) if (k.name.trim()) set.add(k.name.trim());
+    for (const r of snapshots) if (r.storageLocation) set.add(r.storageLocation);
+    const loai = new Map(khoLuuDM.map((k) => [k.name.trim(), k.kind]));
+    return [...set].sort().map((n) => ({
+      value: n,
+      label: n,
+      phu: loai.has(n) ? STORAGE_KIND_LABELS[loai.get(n)!] : undefined,
+    }));
+  }, [khoLuuDM, snapshots]);
+
+  const [khoLuuLoc, setKhoLuuLoc] = useState(TAT_CA);
+
+  /** Cộng tồn cuối theo từng kho lưu (dải chip dưới thẻ số liệu). */
+  const theoKhoLuu = useMemo(() => {
+    const m = new Map<string, { tonCuoi: number; soMa: number }>();
+    for (const r of rowsKy) {
+      const k = khoLuuCua(r);
+      const g = m.get(k) ?? { tonCuoi: 0, soMa: 0 };
+      g.tonCuoi += r.closingKg;
+      g.soMa += 1;
+      m.set(k, g);
+    }
+    return [...m.entries()].sort((a, b) => b[1].tonCuoi - a[1].tonCuoi);
+  }, [rowsKy]);
+
+  const rows: RowTinh[] = useMemo(
+    () => (khoLuuLoc === TAT_CA ? rowsKy : rowsKy.filter((r) => khoLuuCua(r) === khoLuuLoc)),
+    [rowsKy, khoLuuLoc]
+  );
 
   const tong = useMemo(() => {
     const t = { tonDau: 0, nhap: 0, xuat: 0, tonCuoi: 0 };
@@ -150,6 +193,58 @@ export default function WarehouseNxtScreen() {
     notify.daXoa(`Đã xóa dòng ${ten}`);
   };
 
+  // ---------- Tick dòng: cộng tổng + gán kho lưu theo lô ----------
+  const [daChon, setDaChon] = useState<Set<string>>(new Set());
+  const chonBang: ChonBang<RowTinh> = {
+    daChon,
+    doi: (k) =>
+      setDaChon((cu) => {
+        const next = new Set(cu);
+        if (next.has(k)) next.delete(k);
+        else next.add(k);
+        return next;
+      }),
+    doiTatCa: (keys, bat) =>
+      setDaChon((cu) => {
+        const next = new Set(cu);
+        for (const k of keys) if (bat) next.add(k);
+          else next.delete(k);
+        return next;
+      }),
+    nhanDong: (r) => `${r.itemName} · ${r.itemCode}`,
+  };
+  const rowsChon = useMemo(() => rows.filter((r) => daChon.has(r.id)), [rows, daChon]);
+  const tongChon = useMemo(() => {
+    const t = { tonDau: 0, nhap: 0, xuat: 0, tonCuoi: 0 };
+    for (const r of rowsChon) {
+      t.tonDau += r.openingKg;
+      t.nhap += r.inKg;
+      t.xuat += r.outKg;
+      t.tonCuoi += r.closingKg;
+    }
+    return t;
+  }, [rowsChon]);
+
+  const [ganForm, setGanForm] = useState<string | null>(null); // kho lưu sắp gán
+
+  /** Gán kho lưu cho các dòng đang tick (một lần ghi, hoàn tác được bằng gán lại). */
+  const ganKhoLuu = () => {
+    const dich = (ganForm ?? "").trim();
+    if (!dich) {
+      notify.canhBao("Chưa chọn kho lưu để gán.");
+      return;
+    }
+    const ids = new Set(rowsChon.map((r) => r.id));
+    if (!ids.size) {
+      notify.canhBao("Chưa tick dòng nào.");
+      return;
+    }
+    ghiSnapshots(snapshots.map((l) => (ids.has(l.id) ? { ...l, storageLocation: dich } : l)));
+    setGanForm(null);
+    setDaChon(new Set());
+    notify.daLuu(`Đã gán ${ids.size} mã về ${dich}`);
+  };
+
   // ---------- Thêm mã ----------
   const [themForm, setThemForm] = useState<{ code: string; name: string } | null>(null);
   const [loiThem, setLoiThem] = useState<LoiNhap[]>([]);
@@ -168,6 +263,7 @@ export default function WarehouseNxtScreen() {
     const moi: NxtSnapshotLine = {
       id: idDong(khoChon, tuNgay, denNgay, code),
       warehouseCode: khoChon,
+      storageLocation: khoLuuLoc === TAT_CA ? KHO_LUU_MAC_DINH : khoLuuLoc,
       periodFrom: tuNgay,
       periodTo: denNgay,
       itemCode: code,
@@ -205,6 +301,7 @@ export default function WarehouseNxtScreen() {
     const carried: NxtSnapshotLine[] = rows.map((r) => ({
       id: idDong(khoChon, from, to, r.itemCode),
       warehouseCode: khoChon,
+      storageLocation: r.storageLocation,
       periodFrom: from,
       periodTo: to,
       itemCode: r.itemCode,
@@ -245,6 +342,15 @@ export default function WarehouseNxtScreen() {
           <div className="font-semibold text-foreground">{r.itemName}</div>
           <div className="font-mono text-sm text-muted-foreground">{r.itemCode}</div>
         </div>
+      ),
+    },
+    {
+      key: "khoLuu",
+      header: "Kho lưu",
+      render: (r) => (
+        <Badge variant={r.storageLocation && r.storageLocation !== KHO_LUU_MAC_DINH ? "default" : "outline"}>
+          {khoLuuCua(r)}
+        </Badge>
       ),
     },
     { key: "tonDau", header: "Tồn đầu (kg)", so: true, render: (r) => num(r.openingKg), tong: () => num(tong.tonDau) },
@@ -371,9 +477,12 @@ export default function WarehouseNxtScreen() {
       }
       const khoFile = parseKho(data.warehouseText) || "KHO (không rõ)";
       const [from, to] = range;
+      // Báo cáo của xí nghiệp KHÔNG có chiều kho lưu ⇒ nạp về kho nhà; gán lại
+      // các lô gửi kho thuê ngoài bằng nút "Gán kho lưu" (tick dòng rồi gán theo lô).
       const moi: NxtSnapshotLine[] = data.items.map((it) => ({
         id: idDong(khoFile, from, to, it.code),
         warehouseCode: khoFile,
+        storageLocation: KHO_LUU_MAC_DINH,
         periodFrom: from,
         periodTo: to,
         itemCode: it.code,
@@ -465,8 +574,22 @@ export default function WarehouseNxtScreen() {
               onChange={(v) => {
                 setKy(v);
                 setGhiMode(false);
+                setDaChon(new Set());
               }}
               options={kyOpts}
+            />
+          </div>
+          <div className="min-w-0 sm:min-w-[14rem]">
+            <Combobox
+              label="Kho lưu"
+              anNhanBatBuoc
+              choPhepXoa={false}
+              value={khoLuuLoc}
+              onChange={(v) => {
+                setKhoLuuLoc(v);
+                setDaChon(new Set());
+              }}
+              options={[{ value: TAT_CA, label: "Tất cả kho lưu" }, ...khoLuuOpts]}
             />
           </div>
           {rows.length > 0 && (
@@ -516,6 +639,58 @@ export default function WarehouseNxtScreen() {
             </Badge>
           </div>
 
+          {/* Tồn cuối theo từng KHO LƯU — trả lời "hàng đang nằm ở kho nào" */}
+          {theoKhoLuu.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border p-3">
+              <span className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                <PackageOpen className="h-4 w-4 text-primary" aria-hidden />
+                Tồn cuối theo kho lưu:
+              </span>
+              {theoKhoLuu.map(([ten, g]) => (
+                <button
+                  key={ten}
+                  type="button"
+                  onClick={() => {
+                    setKhoLuuLoc(khoLuuLoc === ten ? TAT_CA : ten);
+                    setDaChon(new Set());
+                  }}
+                  className="rounded-full border border-border px-3 py-1 text-sm hover:bg-muted"
+                  aria-pressed={khoLuuLoc === ten}
+                >
+                  <span className="font-medium text-foreground">{ten}</span>{" "}
+                  <span className="tnum text-muted-foreground">
+                    {num(g.tonCuoi)} kg · {g.soMa} mã
+                  </span>
+                </button>
+              ))}
+              {khoLuuLoc !== TAT_CA && (
+                <Button size="sm" variant="ghost" onClick={() => setKhoLuuLoc(TAT_CA)}>
+                  Xem tất cả kho lưu
+                </Button>
+              )}
+            </div>
+          )}
+
+          {/* Thanh dòng đã tick: cộng tổng + gán kho lưu theo lô */}
+          {rowsChon.length > 0 && (
+            <div className="flex flex-wrap items-center gap-3 rounded-xl border border-primary/40 bg-primary/5 p-3">
+              <span className="font-semibold text-foreground">Đã chọn {rowsChon.length} mã</span>
+              <span className="tnum text-sm text-muted-foreground">
+                tồn đầu {num(tongChon.tonDau)} · nhập {num(tongChon.nhap)} · xuất {num(tongChon.xuat)} ·{" "}
+                <span className="font-semibold text-foreground">tồn cuối {num(tongChon.tonCuoi)} kg</span>
+              </span>
+              <div className="ml-auto flex flex-wrap items-center gap-2">
+                <Button size="sm" onClick={() => setGanForm(khoLuuLoc === TAT_CA ? KHO_LUU_MAC_DINH : khoLuuLoc)}>
+                  <PackageOpen className="mr-2 h-4 w-4" />
+                  Gán kho lưu
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => setDaChon(new Set())}>
+                  Bỏ chọn
+                </Button>
+              </div>
+            </div>
+          )}
+
           {ghiMode ? (
             <div className="space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-3">
@@ -553,13 +728,15 @@ export default function WarehouseNxtScreen() {
               />
             </div>
           ) : (
-            <BangTong rows={rows} cot={cot} getKey={(r) => r.id} />
+            <BangTong rows={rows} cot={cot} getKey={(r) => r.id} chon={chonBang} />
           )}
 
           <p className="text-sm text-muted-foreground">
             Kho <span className="font-semibold text-foreground">{khoChon}</span> · kỳ {viDate(tuNgay)} –{" "}
-            {viDate(denNgay)}. "Tạo kỳ kế tiếp" kế thừa tồn cuối kỳ này thành tồn đầu kỳ sau. Nối tự động
-            với sổ nhập/SX/bán là bước sau (cần bảng ánh xạ mã).
+            {viDate(denNgay)}
+            {khoLuuLoc === TAT_CA ? " · tất cả kho lưu" : ` · kho lưu ${khoLuuLoc}`}. Tick dòng để cộng tổng
+            hoặc gán kho lưu theo lô. "Tạo kỳ kế tiếp" kế thừa tồn cuối kỳ này (kèm kho lưu) thành tồn đầu kỳ
+            sau. Nối tự động với sổ nhập/SX/bán là bước sau (cần bảng ánh xạ mã).
           </p>
         </>
       )}
@@ -606,6 +783,41 @@ export default function WarehouseNxtScreen() {
         </DialogContent>
       </Dialog>
 
+      {/* Dialog gán kho lưu cho các dòng đã tick */}
+      <Dialog open={ganForm !== null} onOpenChange={(o) => !o && setGanForm(null)}>
+        <DialogContent className="w-full sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-2xl">Gán kho lưu</DialogTitle>
+            <DialogDescription className="text-base">
+              {rowsChon.length} mã đang chọn ({num(tongChon.tonCuoi)} kg tồn cuối) sẽ được ghi là đang nằm ở
+              kho dưới đây. Sửa danh sách kho ở Danh mục → Kho lưu trữ.
+            </DialogDescription>
+          </DialogHeader>
+          {ganForm !== null && (
+            <div className="space-y-4 py-2">
+              <ChuThichBatBuoc />
+              <Combobox
+                label="Kho lưu"
+                required
+                value={ganForm}
+                onChange={(v) => setGanForm(v)}
+                options={khoLuuOpts}
+                choPhepXoa={false}
+              />
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setGanForm(null)}>
+              Hủy
+            </Button>
+            <Button onClick={ganKhoLuu}>
+              <PackageOpen className="mr-1 h-4 w-4" />
+              Gán {rowsChon.length} mã
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Dialog tạo kỳ kế tiếp */}
       <Dialog open={!!kyForm} onOpenChange={(o) => !o && setKyForm(null)}>
         <DialogContent className="w-full sm:max-w-2xl">
@@ -646,7 +858,9 @@ export default function WarehouseNxtScreen() {
       {moIn && rows.length > 0 && (
         <PhieuIn
           tieuDe="Báo cáo xuất nhập tồn"
-          phuDe={`${khoChon} · từ ${viDate(tuNgay)} đến ${viDate(denNgay)}`}
+          phuDe={`${khoChon} · từ ${viDate(tuNgay)} đến ${viDate(denNgay)}${
+            khoLuuLoc === TAT_CA ? "" : ` · kho lưu ${khoLuuLoc}`
+          }`}
           onClose={() => setMoIn(false)}
         >
           <div className="mb-2 flex items-center justify-between text-sm">
@@ -658,6 +872,7 @@ export default function WarehouseNxtScreen() {
               <tr>
                 <ThIn>Mã hàng</ThIn>
                 <ThIn>Tên hàng</ThIn>
+                <ThIn>Kho lưu</ThIn>
                 <ThIn right>Tồn đầu</ThIn>
                 <ThIn right>Nhập</ThIn>
                 <ThIn right>Xuất</ThIn>
@@ -666,7 +881,7 @@ export default function WarehouseNxtScreen() {
             </thead>
             <tbody>
               <tr>
-                <TdIn dam colSpan={2}>
+                <TdIn dam colSpan={3}>
                   Tổng cộng — {rows.length} mặt hàng
                 </TdIn>
                 <TdIn dam right>{num(tong.tonDau)}</TdIn>
@@ -678,6 +893,7 @@ export default function WarehouseNxtScreen() {
                 <tr key={r.id}>
                   <TdIn className="font-mono">{r.itemCode}</TdIn>
                   <TdIn>{r.itemName}</TdIn>
+                  <TdIn>{khoLuuCua(r)}</TdIn>
                   <TdIn right>{num(r.openingKg)}</TdIn>
                   <TdIn right>{r.inKg ? num(r.inKg) : ""}</TdIn>
                   <TdIn right>{r.outKg ? num(r.outKg) : ""}</TdIn>

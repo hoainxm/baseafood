@@ -1,8 +1,9 @@
 > Load khi: thêm/bớt màn hình, đổi điều hướng, header, hay tìm xem một màn được gắn vào đâu.
 covers: src/App.tsx, src/features/shared/AppShell.tsx, src/features/shared/NotFound.tsx, src/features/shared/guideContent.tsx, src/lib/nav-access.ts
-last_verified: 2026-09-14
+last_verified: 2026-09-15
 <!-- re-verified: 2026-09-14 12:00 — KIT_NAV labels (AppShell.tsx:82-106) + CAY_NAV nhóm (nav-access grouping) + tieuDe header lấy TỪ label (App.tsx:108 `tieuDe={current?.label}`) đối chiếu khớp code. -->
 <!-- updated: 2026-09-14 — FIX tên trang bị cắt ở sidebar: nhãn nav BỎ `truncate`, cho tự xuống dòng (`whitespace-normal break-words leading-tight` ở MucNut) → hiện ĐỦ tên. Sidebar mở rộng nới `w-64`→`w-72` để nhãn thường vẫn gọn 1 dòng. Nút nav là `min-h-10 items-center` nên 2 dòng không bị cụt. Thu gọn (`w-20`) icon-only không đổi. -->
+<!-- updated: 2026-09-15 — nhóm nav "Kho" thêm deep-link TRACUU("kho-luu") → `/catalog?tab=kho-luu` (tab danh mục MỚI "Kho lưu trữ": kho nhà + kho lạnh thuê ngoài, dùng cho cột "Kho lưu" ở /nxt-kho). KHÔNG thêm route mới — vẫn ~20 route, danh mục vẫn MỘT nguồn `/catalog`, gate theo gateId="catalog" như các TRACUU khác. Xem 32-danh-muc. -->
 <!-- updated: 2026-09-14 — CHUẨN HÓA NHÃN TRANG theo microcopy (src/design-system/noi-dung-va-label.md): bỏ viết tắt & qualifier kỹ thuật, nhất quán họ báo cáo. Đổi 11 nhãn KIT_NAV: balancing "Cân đối"→"Cân đối kỳ"; bc-thanh-pham "BC Thành phẩm"→"Báo cáo thành phẩm"; bc-don-xuat "BC Đơn xuất"→"Báo cáo đơn xuất"; nxt-nl "Tồn kho NL"→"Tồn kho nguyên liệu"; nxt "Báo cáo NXT"→"Tồn kho thành phẩm"; nxt-kho "XNT kho (số thật)"→"Nhập xuất tồn kho" (giữ "Nhập xuất tồn" cho sổ tổng hợp; 2 báo cáo NL/TP để "Tồn kho X" ngắn hơn, không cụt chữ phân biệt khi sidebar rút gọn); doi-soat "Đối soát HĐĐT"→"Đối soát hóa đơn điện tử"; qr "Quét lô (QR)"→"Quét mã lô"; reports(DEMO) "Báo cáo"→"Báo cáo tổng"; traceability(DEMO) "Truy xuất"→"Truy xuất nguồn gốc"; audit "Nhật ký"→"Nhật ký thao tác". Id/route KHÔNG đổi (deep-link, guideContent key giữ nguyên). guideContent tieuDe đồng bộ cho balancing/nxt/qr. FIX drift: bảng route cũ nhầm /production↔/wip. -->
 <!-- updated: 2026-09-10 — THÊM route `/doi-soat` "Đối soát HĐĐT" (features/doi-soat, màn THẬT — KHÔNG demoGuard, KHÔNG gate bộ phận nên kế toán/admin thấy): KIT_NAV icon FileCheck2 (AppShell), CAY_NAV nhóm "Báo cáo & Cân đối". Đối soát hóa đơn điện tử (cổng thuế) ⇄ phần mềm kế toán TỪ FILE EXCEL upload (không đọc DB/repo). Xem 37-doi-soat-hddt.md. ~21 route. -->
 <!-- re-verified: 2026-09-09 16:30 — AppShell.tsx là khung THẬT: <main> bọc children trong <div key={active}> fade khi đổi route (AppShell.tsx ~789) — khớp code. (task thêm animation) -->
@@ -49,7 +50,7 @@ Cả hai dùng CHUNG một cây nav (`CayNav`) dựng từ `KIT_NAV` (danh sách
 | Tổng quan | `dashboard` |
 | Nhập hàng | `imports` · `nxt-nl` · (**Tra cứu** → `catalog?tab=dai-ly`) |
 | Sản xuất | `wip` · `packaging` · `qc` · (**Tra cứu** → `catalog?tab=mat-hang`) · `production` · `quality` |
-| Kho | `warehouse` · `ton-kho-thang` · `qr` · `nxt-kho` · `cold-storage` |
+| Kho | `warehouse` · `ton-kho-thang` · `qr` · `nxt-kho` · `cold-storage` · (**Tra cứu** → `catalog?tab=kho-luu`) |
 | Kinh doanh | `sales` · `orders` · (**Tra cứu** → `catalog?tab=khach-hang`) |
 | Báo cáo & Cân đối | `balancing` · `bc-thanh-pham` · `bc-don-xuat` · `nxt` · `doi-soat` · `reports` · `traceability` |
 | Hệ thống | `catalog` (danh mục đầy đủ) · `users` (chỉ admin) · `audit` (chỉ admin) |

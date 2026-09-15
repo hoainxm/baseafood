@@ -32,11 +32,19 @@ import {
   BANG_OPENING_STOCK,
   BANG_FINISHED_OPENING_STOCK,
   BANG_NXT_SNAPSHOT,
+  BANG_STORAGE_LOCATION,
   BANG_MONTHLY_STOCK,
   BANG_RECONCILIATION_RUN,
   useBang,
 } from "@/lib/repo";
-import type { MaterialType, Product, FinishedGood, NxtSnapshotLine } from "@/types";
+import type {
+  MaterialType,
+  Product,
+  FinishedGood,
+  NxtSnapshotLine,
+  StorageLocation,
+} from "@/types";
+import { KHO_LUU_MAC_DINH } from "@/types";
 import fgSeed from "@/data/thanh-pham.json";
 import nxtBachTuoc from "@/data/nxt-bachtuoc-2026-07.json";
 
@@ -145,6 +153,40 @@ export const seedProducts = (): Product[] => [
  * 30 mã bạch tuộc). Số đã kiểm định khớp tổng của báo cáo gốc. `id` tất định
  * theo (kho × kỳ × mã) để nạp lại nhiều lần vẫn không đẻ dòng trùng.
  */
+/**
+ * Kho lưu mặc định — khớp seed của migration 0044 (id giống nhau nên chạy cả hai
+ * chế độ đều ra một danh sách, không nhân đôi khi cutover sang Supabase).
+ */
+export const seedStorageLocations = (): StorageLocation[] => [
+  {
+    id: "kho-baseafood",
+    code: "KBSF",
+    name: "Kho Baseafood",
+    kind: "noi-bo",
+    address: "",
+    phone: "",
+    note: "Kho của xí nghiệp — tổng hàng đang nằm trong kho nhà",
+  },
+  {
+    id: "kho-hong-phu",
+    code: "KHP",
+    name: "Kho Hồng Phú",
+    kind: "thue-ngoai",
+    address: "",
+    phone: "",
+    note: "Kho lạnh thuê ngoài",
+  },
+  {
+    id: "kho-anh-duong",
+    code: "KAD",
+    name: "Kho Ánh Dương",
+    kind: "thue-ngoai",
+    address: "",
+    phone: "",
+    note: "Kho lạnh thuê ngoài",
+  },
+];
+
 export const seedNxtSnapshots = (): NxtSnapshotLine[] => {
   const h = nxtBachTuoc as {
     warehouseCode: string;
@@ -156,6 +198,7 @@ export const seedNxtSnapshots = (): NxtSnapshotLine[] => {
   return h.items.map((it) => ({
     id: `nxt|${h.warehouseCode}|${h.periodFrom}|${h.periodTo}|${it.code}`,
     warehouseCode: h.warehouseCode,
+    storageLocation: KHO_LUU_MAC_DINH,
     periodFrom: h.periodFrom,
     periodTo: h.periodTo,
     itemCode: it.code,
@@ -211,6 +254,9 @@ export const useFinishedGoodsOpeningStock = () => useBang(BANG_FINISHED_OPENING_
 
 /* --- Xuất–Nhập–Tồn kho (snapshot từ báo cáo thật) --- */
 export const useNxtSnapshots = () => useBang(BANG_NXT_SNAPSHOT, seedNxtSnapshots);
+
+/* --- Danh mục kho LƯU hàng (kho nhà + kho lạnh thuê ngoài) --- */
+export const useStorageLocations = () => useBang(BANG_STORAGE_LOCATION, seedStorageLocations);
 
 /* --- Sổ kho theo tháng (dồn tồn cuối kỳ → đầu kỳ sau) --- */
 export const useMonthlyStock = () => useBang(BANG_MONTHLY_STOCK);

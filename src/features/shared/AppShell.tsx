@@ -171,6 +171,7 @@ export const CAY_NAV: NhomCay[] = [
       { ref: "qr" },
       { ref: "nxt-kho" },
       { ref: "cold-storage" },
+      TRACUU("kho-luu"),
     ],
   },
   {

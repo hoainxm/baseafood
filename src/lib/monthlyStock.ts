@@ -253,6 +253,57 @@ export function doiChieuDonKy(rowsTruoc: MonthlyStockRow[], rowsNay: MonthlyStoc
   return out.sort((a, b) => Math.abs(b.lechKg) - Math.abs(a.lechKg));
 }
 
+/* ---------- Thẻ kho: lịch sử một MẶT HÀNG qua các tháng ---------- */
+
+export interface ThangTheKho {
+  period: string;
+  openCtn: number;
+  openKg: number;
+  inCtn: number;
+  inKg: number;
+  outCtn: number;
+  outKg: number;
+  closeCtn: number;
+  closeKg: number;
+  soDong: number; // số dòng (lô/size) của mặt hàng trong tháng đó
+}
+
+/**
+ * "Thẻ kho" (sổ chi tiết vật tư) của MỘT mặt hàng: mỗi tháng một dòng tồn đầu ·
+ * nhập · xuất · tồn cuối, mới → cũ. Khóa gộp là `khoaLo` (kho·nhóm·TÊN, bỏ size)
+ * nên các lô tách theo size của cùng mặt hàng cộng lại thành một dòng tháng —
+ * đúng cách đối chiếu dồn kỳ (xem `doiChieuDonKy`), tránh báo động giả.
+ *
+ * Thuần đọc: chỉ cộng lại từ `lines`, KHÔNG sửa gì.
+ */
+export function theKhoMatHang(
+  lines: MonthlyStockLine[],
+  khoa: string,
+  soThangToiDa = 24
+): ThangTheKho[] {
+  const m = new Map<string, ThangTheKho>();
+  for (const l of lines) {
+    if (khoaLo(l) !== khoa) continue;
+    const g =
+      m.get(l.period) ??
+      {
+        period: l.period,
+        openCtn: 0, openKg: 0, inCtn: 0, inKg: 0, outCtn: 0, outKg: 0,
+        closeCtn: 0, closeKg: 0, soDong: 0,
+      };
+    const r = suyDong(l);
+    g.openCtn += r.openCtn; g.openKg += r.openKg;
+    g.inCtn += r.inCtn; g.inKg += r.inKg;
+    g.outCtn += r.outCtn; g.outKg += r.outKg;
+    g.closeCtn += r.closeCtn; g.closeKg += r.closeKg;
+    g.soDong += 1;
+    m.set(l.period, g);
+  }
+  return [...m.values()]
+    .sort((a, b) => b.period.localeCompare(a.period))
+    .slice(0, soThangToiDa);
+}
+
 /* ---------- Đồng bộ tên mặt hàng trong sổ với danh mục loại nguyên liệu ---------- */
 
 /** Chuẩn hoá để SO KHỚP với danh mục: bỏ khoảng trắng thừa + thường hoá. */

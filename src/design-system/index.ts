@@ -46,7 +46,7 @@ export { TrangThaiDuLieu, NutTrangThai } from "./patterns/DataStatusBadge";
 export { NutGiaoDien } from "./patterns/ThemeToggleButton";
 export { NutHuongDan } from "./patterns/GuideButton";
 export { FormDialog, NutDong } from "./patterns/FormDialog";
-export { BangTong, type CotTong } from "./patterns/SummaryTable";
+export { BangTong, type CotTong, type ChonBang } from "./patterns/SummaryTable";
 export { ThongKe, type TheThongTin } from "./patterns/ThongKe";
 export { BieuDoCot, type CotBieuDo } from "./patterns/BarChart";
 export { StatusChip, type TrangThaiSX } from "./patterns/StatusChip";

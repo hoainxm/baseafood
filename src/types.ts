@@ -553,6 +553,34 @@ export const BSF1_WAREHOUSES: WarehouseInfo[] = [
   },
 ];
 
+/* ---------- Danh mục KHO LƯU TRỮ (kho nhà + kho lạnh thuê ngoài) ---------- */
+
+export type StorageKind = "noi-bo" | "thue-ngoai";
+
+export const STORAGE_KIND_LABELS: Record<StorageKind, string> = {
+  "noi-bo": "Kho nhà",
+  "thue-ngoai": "Kho thuê ngoài",
+};
+
+/**
+ * Một kho LƯU hàng. Khác `WarehouseInfo` (5 kho vật lý BSF1 dùng cho sổ kho tháng
+ * và lưới cân đối): đây là danh mục MỞ, kế toán/thủ kho tự thêm khi xí nghiệp gửi
+ * hàng sang một kho lạnh thuê ngoài mới. Nối dữ liệu theo `name` (báo cáo và Excel
+ * của xí nghiệp đi theo tên kho).
+ */
+export interface StorageLocation {
+  id: string;
+  code: string; // mã số gõ nhanh (VD "KHP") — có thể trống
+  name: string;
+  kind: StorageKind;
+  address: string;
+  phone: string;
+  note: string;
+}
+
+/** Kho nhà — mặc định khi một dòng chưa gán kho lưu. */
+export const KHO_LUU_MAC_DINH = "Kho Baseafood";
+
 export interface NxtReportItem {
   productId: string;
   productCode: string;
@@ -577,6 +605,12 @@ export interface NxtReportItem {
 export interface NxtSnapshotLine {
   id: string;
   warehouseCode: string; // "KHO TP - KHO 1000" — đúng như in trên báo cáo
+  /**
+   * KHO LƯU thực tế của dòng hàng (TÊN trong danh mục `storage_locations`, migration
+   * 0044): "Kho Baseafood" = kho nhà, "Kho Hồng Phú"/"Kho Ánh Dương" = kho thuê ngoài.
+   * Rỗng = chưa gán ⇒ hiểu là kho nhà (dữ liệu nhập trước 0044 không bị ép sửa).
+   */
+  storageLocation: string;
   periodFrom: string; // yyyy-mm-dd
   periodTo: string; // yyyy-mm-dd
   itemCode: string; // "PXĐ.BTNL.TĐ 1001"

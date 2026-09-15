@@ -5,8 +5,8 @@
 // ============================================================
 import { useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
-import type { Supplier, Customer, MaterialType, Product } from "@/types";
-import { CATEGORIES, laCoTach, quyCachBlock } from "@/types";
+import type { Supplier, Customer, MaterialType, Product, StorageLocation } from "@/types";
+import { CATEGORIES, STORAGE_KIND_LABELS, laCoTach, quyCachBlock } from "@/types";
 import { uid } from "@/lib/db";
 import { num } from "@/lib/format";
 import {
@@ -15,6 +15,7 @@ import {
   useMaterialTypes,
   useProducts,
   useFinishedGoods,
+  useStorageLocations,
 } from "@/lib/catalogRepo";
 import {
   ChoiceGroup,
@@ -70,7 +71,7 @@ function trungMaSo<T extends { id: string; code: string }>(
 }
 
 /** Tab hợp lệ — deep-link từ nav module (VD /catalog?tab=dai-ly) mở đúng tab. */
-const TABS = ["mat-hang", "khach-hang", "dai-ly", "loai-nl", "tp-141"];
+const TABS = ["mat-hang", "khach-hang", "dai-ly", "loai-nl", "kho-luu", "tp-141"];
 
 export default function DanhMucScreen() {
   // Tab điều khiển bằng URL (?tab=) để deep-link từ nav module mở đúng tab —
@@ -94,12 +95,14 @@ export default function DanhMucScreen() {
   const [khachHang, setKhachHang, { trangThai: ttKH }] = useCustomers();
   const [daiLy, setDaiLy, { trangThai: ttDL }] = useSuppliers();
   const [loaiNL, setLoaiNL, { trangThai: ttNL }] = useMaterialTypes();
+  const [khoLuu, setKhoLuu, { trangThai: ttKL }] = useStorageLocations();
   const [thanhPham] = useFinishedGoods();
 
   const taiMH = ttMH === "dang-tai" && matHang.length === 0;
   const taiKH = ttKH === "dang-tai" && khachHang.length === 0;
   const taiDL = ttDL === "dang-tai" && daiLy.length === 0;
   const taiNL = ttNL === "dang-tai" && loaiNL.length === 0;
+  const taiKL = ttKL === "dang-tai" && khoLuu.length === 0;
 
   const optTP141 = useMemo(
     () =>
@@ -346,6 +349,37 @@ export default function DanhMucScreen() {
     { key: "note", nhan: "Ghi chú", anTrenDienThoai: true, viDu: "Ghi chú thêm" },
   ];
 
+  const fKhoLuu: TruongDanhMuc<StorageLocation>[] = [
+    { key: "code", nhan: "Mã số", viDu: "VD: KHP" },
+    {
+      key: "name",
+      nhan: "Tên kho",
+      batBuoc: true,
+      viDu: "VD: Kho Hồng Phú",
+      goiY: "Tên này là chỗ nối dữ liệu — đổi tên ở đây KHÔNG tự đổi các dòng đã gán.",
+    },
+    {
+      key: "kind",
+      nhan: "Loại kho",
+      render: (giaTri, doiGiaTri) => (
+        <Combobox
+          label="Loại kho"
+          hint="Kho nhà = kho của xí nghiệp; kho thuê ngoài = kho lạnh gửi hàng."
+          value={giaTri || "noi-bo"}
+          onChange={doiGiaTri}
+          choPhepXoa={false}
+          options={(Object.keys(STORAGE_KIND_LABELS) as (keyof typeof STORAGE_KIND_LABELS)[]).map(
+            (k) => ({ value: k, label: STORAGE_KIND_LABELS[k] })
+          )}
+        />
+      ),
+      hienThi: (r) => STORAGE_KIND_LABELS[r.kind] ?? r.kind,
+    },
+    { key: "address", nhan: "Địa chỉ", anTrenDienThoai: true, viDu: "VD: Hồng Phú, Bà Rịa" },
+    { key: "phone", nhan: "Điện thoại", anTrenDienThoai: true, viDu: "VD: 0254 123 456" },
+    { key: "note", nhan: "Ghi chú", anTrenDienThoai: true, viDu: "Ghi chú thêm" },
+  ];
+
   return (
     <div className="space-y-6">
       <div>
@@ -358,6 +392,7 @@ export default function DanhMucScreen() {
           <TabsTrigger value="khach-hang">Khách hàng</TabsTrigger>
           <TabsTrigger value="dai-ly">Đại lý</TabsTrigger>
           <TabsTrigger value="loai-nl">Loại nguyên liệu</TabsTrigger>
+          <TabsTrigger value="kho-luu">Kho lưu trữ</TabsTrigger>
           <TabsTrigger value="tp-141">Thành phẩm (141 mã)</TabsTrigger>
         </TabsList>
 
@@ -446,6 +481,44 @@ export default function DanhMucScreen() {
             taoMoi={() => ({ id: uid(), name: "", category: "", note: "" })}
             timTheo={(r) => `${r.name} ${r.category}`}
             moTaBanGhi={(r) => `${r.name}${r.category ? ` (${r.category})` : ""}`}
+          />
+        </TabsContent>
+
+        <TabsContent value="kho-luu" className="pt-6">
+          <DanhMucCrud
+            dangTai={taiKL}
+            tieuDe="Kho lưu trữ"
+            moTa="Nơi hàng đang nằm: kho nhà (Kho Baseafood — tổng trong kho) và các kho lạnh thuê ngoài (Kho Hồng Phú, Kho Ánh Dương…). Dùng ở cột 'Kho lưu' của báo cáo Xuất–Nhập–Tồn."
+            tenDonVi="kho lưu trữ"
+            rows={khoLuu}
+            onChange={setKhoLuu}
+            fields={fKhoLuu}
+            kiemTraThem={(dang, rows) => [
+              ...trungMaSo(dang, rows, "kho lưu trữ"),
+              ...(rows.some(
+                (r) =>
+                  r.id !== dang.id &&
+                  r.name.trim().toLowerCase() === (dang.name ?? "").trim().toLowerCase()
+              )
+                ? [
+                    {
+                      truong: "Tên kho",
+                      thongBao: `Tên "${dang.name}" đã có kho khác dùng — tên là chỗ nối dữ liệu nên không được trùng.`,
+                    },
+                  ]
+                : []),
+            ]}
+            taoMoi={(): StorageLocation => ({
+              id: uid(),
+              code: "",
+              name: "",
+              kind: "thue-ngoai",
+              address: "",
+              phone: "",
+              note: "",
+            })}
+            timTheo={(r) => `${r.code} ${r.name} ${r.address} ${r.phone}`}
+            moTaBanGhi={(r) => `${r.name} (${STORAGE_KIND_LABELS[r.kind] ?? r.kind})`}
           />
         </TabsContent>
 

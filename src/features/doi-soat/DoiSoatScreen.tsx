@@ -15,6 +15,7 @@ import {
   CardTitle,
   ConfirmDelete,
   EmptyState,
+  InfoTip,
   Input,
   NumberField,
   RecordTable,
@@ -74,7 +75,7 @@ const keySua = (nv: NghiVan) => `${nv.sheet}#${nv.soDong}#${nv.cot}`;
 function chipHoaDon(t: TrangThaiHoaDon) {
   if (t === "KHOP") return <StatusChip trangThai="running" nhan="Khớp" />;
   if (t === "LECH") return <StatusChip trangThai="idle" nhan="Lệch tiền" />;
-  return <StatusChip trangThai="stopped" nhan="Chưa có ở PM" />;
+  return <StatusChip trangThai="stopped" nhan="Chưa vào sổ" />;
 }
 
 /** Suy kỳ "T02-2026" / "T3" từ tên file. */
@@ -89,6 +90,13 @@ function dtHienThi(iso: string): string {
   if (Number.isNaN(d.getTime())) return "";
   const p = (n: number) => String(n).padStart(2, "0");
   return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+/** Cuộn mượt tới một khối theo id (drill-down từ thẻ tổng) — dùng DOM id, không ref. */
+function cuonToiId(id: string) {
+  requestAnimationFrame(() =>
+    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" })
+  );
 }
 
 // ---------- Bản đã lưu (theo tài khoản) ----------
@@ -188,10 +196,15 @@ function TuKiemBox({ phepThu }: { phepThu: PhepThu[] }) {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <ShieldCheck className="size-5" aria-hidden />
-          Tự kiểm{" "}
+          Máy tự kiểm tra lại{" "}
           <span className={tatCaDat ? "text-success" : "text-destructive"}>
             {tatCaDat ? `Đạt ${dat}/${phepThu.length}` : `Có ${phepThu.length - dat} phép không đạt`}
           </span>
+          <InfoTip label="Máy tự kiểm tra lại">
+            Máy tự chạy vài phép tính đối chứng để chắc chắn kết quả đối soát không sai.
+            <b> Đáng lẽ</b> = con số đúng phải ra; <b>Thực tế</b> = con số máy đang tính được.
+            Hai số bằng nhau ⇒ Đạt. Lệch nhau ⇒ có chỗ cần xem lại (bấm xuống bảng để dò).
+          </InfoTip>
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -210,8 +223,8 @@ function TuKiemBox({ phepThu }: { phepThu: PhepThu[] }) {
                 <p className="mt-1 text-sm text-muted-foreground">Bắt lỗi: {p.batLoiGi}</p>
               </div>
               <div className="shrink-0 text-sm sm:text-right">
-                <div>Mong: <span className="tnum font-medium">{p.mong}</span></div>
-                <div>Thực: <span className="tnum font-medium">{p.thuc}</span></div>
+                <div>Đáng lẽ: <span className="tnum font-medium">{p.mong}</span></div>
+                <div>Thực tế: <span className="tnum font-medium">{p.thuc}</span></div>
               </div>
             </li>
           ))}
@@ -228,38 +241,46 @@ function CauNoiBox({ cauNoi }: { cauNoi: CauNoi }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Cầu nối số liệu</CardTitle>
+        <CardTitle className="flex items-center gap-2">
+          Kiểm tra tổng số tiền chưa vào sổ
+          <InfoTip label="Kiểm tra tổng số tiền chưa vào sổ">
+            Tính số tiền hóa đơn <b>chưa có trong sổ kế toán</b> bằng hai cách khác nhau. Nếu
+            hai cách ra cùng một số ⇒ số liệu đáng tin. Đây chỉ là bước tự đối chứng, bạn không
+            cần thao tác gì.
+          </InfoTip>
+        </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid gap-3 md:grid-cols-2">
           <div className="rounded-xl border border-border p-3">
-            <p className="text-sm font-medium text-muted-foreground">Cách A — trừ theo số BÊN FILE</p>
+            <p className="text-sm font-medium text-muted-foreground">Cách 1 — lấy tổng hóa đơn trừ phần đã khớp</p>
             <p className="mt-1 text-sm">
-              Tổng file <span className="tnum">{num(cauNoi.tongFile)}</span> − khớp{" "}
-              <span className="tnum">{num(cauNoi.khopFile)}</span> − lệch{" "}
+              Tổng hóa đơn <span className="tnum">{num(cauNoi.tongFile)}</span> − đã khớp{" "}
+              <span className="tnum">{num(cauNoi.khopFile)}</span> − lệch tiền{" "}
               <span className="tnum">{num(cauNoi.lechFile)}</span>
             </p>
             <p className="mt-1 text-lg font-bold tnum">= {num(cauNoi.chuaCoBenSo)} đ</p>
           </div>
           <div className="rounded-xl border border-border p-3">
-            <p className="text-sm font-medium text-muted-foreground">Cách B — tổng trực tiếp nhóm CHƯA CÓ</p>
+            <p className="text-sm font-medium text-muted-foreground">Cách 2 — cộng thẳng các hóa đơn chưa vào sổ</p>
             <p className="mt-1 text-lg font-bold tnum">= {num(cauNoi.chuaCoBenSoTrucTiep)} đ</p>
             <p className="mt-2 text-sm">
-              Chênh A − B:{" "}
+              Hai cách lệch nhau:{" "}
               <span className={Math.abs(chenhAB) < 0.5 ? "text-success font-semibold" : "text-destructive font-semibold"}>
-                {num(chenhAB)} đ {Math.abs(chenhAB) < 0.5 ? "✓ phải bằng 0" : "✗ SAI"}
+                {num(chenhAB)} đ {Math.abs(chenhAB) < 0.5 ? "✓ bằng 0 — khớp" : "✗ đang lệch, cần soát"}
               </span>
             </p>
           </div>
         </div>
         <div className="rounded-xl border border-warning/30 bg-warning-surface p-3">
           <p className="text-sm font-medium">
-            Phần dư khi TRỪ CHÉO (file − sổ) của phần đã ghép:{" "}
+            Chênh nhỏ giữa hóa đơn và sổ ở các dòng đã khớp:{" "}
             <span className="tnum font-bold">{num(cauNoi.duTruCheo)} đ</span>
           </p>
           <p className="mt-1 text-sm text-muted-foreground">
-            <b>Đây KHÔNG phải giao dịch bị sót</b> — chỉ là chênh do hai bên tách cấu phần khác nhau,
-            bóc tách được về từng hóa đơn (tổng bóc tách <span className="tnum">{num(sumBoc)}</span> đ):
+            <b>Đây KHÔNG phải hóa đơn bị bỏ sót</b> — chỉ là chênh lệch nhỏ do hóa đơn và sổ tách
+            tiền hàng/thuế/chiết khấu khác nhau. Máy đã tách rõ theo từng hóa đơn (tổng cộng{" "}
+            <span className="tnum">{num(sumBoc)}</span> đ):
           </p>
           {cauNoi.bocTach.length > 0 && (
             <ul className="mt-2 space-y-1 text-sm">
@@ -329,7 +350,7 @@ function NghiVanBox({
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-warning">
           <AlertTriangle className="size-5" aria-hidden />
-          Nghi vấn cần soát — hệ thống KHÔNG tự sửa
+          Chỗ cần soát lại — máy KHÔNG tự sửa số của bạn
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-5">
@@ -440,11 +461,18 @@ const LOC_HD: { id: TrangThaiHoaDon | "all"; nhan: string }[] = [
   { id: "all", nhan: "Tất cả" },
   { id: "KHOP", nhan: "Khớp" },
   { id: "LECH", nhan: "Lệch tiền" },
-  { id: "THIEU", nhan: "Chưa có ở PM" },
+  { id: "THIEU", nhan: "Chưa vào sổ" },
 ];
 
-function BangHoaDon({ sheet }: { sheet: SheetHoaDon }) {
-  const [loc, setLoc] = useState<TrangThaiHoaDon | "all">("all");
+function BangHoaDon({
+  sheet,
+  loc,
+  setLoc,
+}: {
+  sheet: SheetHoaDon;
+  loc: TrangThaiHoaDon | "all";
+  setLoc: (v: TrangThaiHoaDon | "all") => void;
+}) {
   const dem = useMemo(() => {
     const d = { KHOP: 0, LECH: 0, THIEU: 0 } as Record<TrangThaiHoaDon, number>;
     for (const r of sheet.dong) d[r.trangThai]++;
@@ -461,7 +489,7 @@ function BangHoaDon({ sheet }: { sheet: SheetHoaDon }) {
     { key: "ngay", header: "Ngày lập", render: (r) => r.ngayLap, sapXep: (r) => r.ngayLap },
     { key: "ban", header: "Người bán", render: (r) => r.tenBan },
     { key: "tt", header: "Tổng TT (VND)", so: true, render: (r) => num(r.tongTtVnd), sapXep: (r) => r.tongTtVnd },
-    { key: "pm", header: "Tổng bên PM", so: true, render: (r) => (r.trangThai === "THIEU" ? "—" : num(r.tongTtPm)) },
+    { key: "pm", header: "Tổng trên sổ", so: true, render: (r) => (r.trangThai === "THIEU" ? "—" : num(r.tongTtPm)) },
     { key: "chenh", header: "Chênh", so: true, render: (r) => (r.chenh == null ? "—" : num(r.chenh)), sapXep: (r) => (r.chenh == null ? 0 : Math.abs(r.chenh)) },
     { key: "bc", header: "Bằng chứng đối chiếu", render: (r) => r.bangChung },
   ];
@@ -487,8 +515,15 @@ function BangHoaDon({ sheet }: { sheet: SheetHoaDon }) {
   );
 }
 
-function BangPhanMem({ sheet }: { sheet: SheetPhanMem }) {
-  const [chiThieu, setChiThieu] = useState(false);
+function BangPhanMem({
+  sheet,
+  chiThieu,
+  setChiThieu,
+}: {
+  sheet: SheetPhanMem;
+  chiThieu: boolean;
+  setChiThieu: (v: boolean) => void;
+}) {
   const dem = useMemo(() => {
     let thieu = 0;
     for (const r of sheet.dong) if (r.trangThai === "THIEU") thieu++;
@@ -504,7 +539,7 @@ function BangPhanMem({ sheet }: { sheet: SheetPhanMem }) {
       header: "Kết quả",
       chinh: true,
       render: (r) =>
-        r.trangThai === "CO" ? <StatusChip trangThai="running" nhan="Đã có HĐĐT" /> : <StatusChip trangThai="stopped" nhan="Chưa có HĐĐT" />,
+        r.trangThai === "CO" ? <StatusChip trangThai="running" nhan="Đã có hóa đơn" /> : <StatusChip trangThai="stopped" nhan="Chưa có hóa đơn" />,
     },
     { key: "phieu", header: "Phiếu", render: (r) => r.phieu },
     { key: "ctgs", header: "CTGS", render: (r) => r.ctgs },
@@ -518,7 +553,7 @@ function BangPhanMem({ sheet }: { sheet: SheetPhanMem }) {
     <div className="space-y-4">
       {sheet.laPhu && (
         <div className="rounded-xl border border-warning/30 bg-warning-surface p-3 text-sm">
-          Sheet phụ / tập con — <b>KHÔNG cộng vào tổng</b>, chỉ để tra cứu (tránh đếm hai lần).
+          Sheet sổ phụ (là một phần của sổ chính) — <b>KHÔNG cộng vào tổng</b>, chỉ để tra cứu (tránh đếm hai lần).
         </div>
       )}
       <div className="flex flex-wrap gap-2">
@@ -526,7 +561,7 @@ function BangPhanMem({ sheet }: { sheet: SheetPhanMem }) {
           Tất cả <span className="tnum ml-1">({num(sheet.dong.length)})</span>
         </Button>
         <Button variant={chiThieu ? "default" : "outline"} size="sm" onClick={() => setChiThieu(true)}>
-          Chưa có HĐĐT <span className="tnum ml-1">({num(dem.thieu)})</span>
+          Chưa có hóa đơn <span className="tnum ml-1">({num(dem.thieu)})</span>
         </Button>
       </div>
       <RecordTable
@@ -552,6 +587,9 @@ export default function DoiSoatScreen() {
   const [soChuanTen, setSoChuanTen] = useState<string | undefined>(undefined);
   const [dangChay, setDangChay] = useState(false);
   const [tab, setTab] = useState<string>("");
+  const [locHD, setLocHD] = useState<TrangThaiHoaDon | "all">("all"); // lọc bảng HĐĐT (điều khiển được từ thẻ tổng)
+  const [pmChiThieu, setPmChiThieu] = useState(false); // lọc bảng sổ: chỉ dòng chưa có hóa đơn
+  const [moKiemTra, setMoKiemTra] = useState(false); // mở khối "Kiểm tra chi tiết"
   // Lưu theo tài khoản (v4)
   const [b64, setB64] = useState<string>(""); // base64 file gốc hiện hành (để lưu / mở lại)
   const [tenHienThi, setTenHienThi] = useState<string>(""); // tên file / tên bản đang mở
@@ -612,8 +650,10 @@ export default function DoiSoatScreen() {
       setBanDangMo(null);
       setWb(raw);
       setTab(kq0.sheetsHoaDon[0]?.ten ?? (kq0.sheetPhanMem ? PM_TAB : ""));
+      setLocHD("all");
+      setPmChiThieu(false);
       notify.daLuu(
-        `Đối soát xong: ${kq0.tong.khop} khớp · ${kq0.tong.lech} lệch · ${kq0.tong.thieu} chưa có ở PM · ${baseline} nghi vấn.`
+        `Đối soát xong: ${kq0.tong.khop} khớp · ${kq0.tong.lech} lệch tiền · ${kq0.tong.thieu} chưa vào sổ · ${baseline} chỗ cần soát.`
       );
     } catch (err) {
       notify.loi(`Không đọc được file: ${err instanceof Error ? err.message : String(err)}`);
@@ -709,6 +749,8 @@ export default function DoiSoatScreen() {
       setBanDangMo(run.id);
       setWb(raw);
       setTab(kq0.sheetsHoaDon[0]?.ten ?? (kq0.sheetPhanMem ? PM_TAB : ""));
+      setLocHD("all");
+      setPmChiThieu(false);
       notify.daLuu(`Đã mở lại "${run.title}" (${run.status === "official" ? "chính thức" : "nháp"}).`);
     } catch (err) {
       notify.loi(`Không mở lại được: ${err instanceof Error ? err.message : String(err)}`);
@@ -737,23 +779,38 @@ export default function DoiSoatScreen() {
     }
   };
 
-  const the: TheThongTin[] = useMemo(() => {
-    if (!ketQua) return [];
+  // Drill-down: bấm thẻ tổng → nhảy xuống đúng bảng + lọc sẵn theo trạng thái đó.
+  const firstHdTab = ketQua?.sheetsHoaDon[0]?.ten ?? "";
+  const denHD = (loc: TrangThaiHoaDon | "all") => {
+    if (firstHdTab) setTab(firstHdTab);
+    setLocHD(loc);
+    cuonToiId("ds-bang");
+  };
+  const denPM = (chiThieu: boolean) => {
+    if (ketQua?.sheetPhanMem) setTab(PM_TAB);
+    setPmChiThieu(chiThieu);
+    cuonToiId("ds-bang");
+  };
+
+  const the: TheThongTin[] = [];
+  if (ketQua) {
     const t = ketQua.tong;
     const soNghi = ketQua.nghiVan.length + ketQua.nghiVanGop.reduce((s, g) => s + g.soDong, 0);
-    return [
-      { nhan: "Hóa đơn điện tử", giaTri: num(t.soHoaDon), so: true, mau: "brand", icon: FileSpreadsheet },
-      { nhan: "Khớp", giaTri: num(t.khop), so: true, mau: "success" },
-      { nhan: "Lệch tiền", giaTri: num(t.lech), so: true, mau: "warning" },
-      { nhan: "Chưa có ở PMKT", giaTri: num(t.thieu), so: true, mau: "danger", phu: t.ganKhop ? `${num(t.ganKhop)} gần khớp` : undefined },
-      { nhan: "Bút toán phần mềm", giaTri: num(t.soDongPm), so: true, mau: "brand" },
-      { nhan: "PM chưa có HĐĐT", giaTri: num(t.pmThieu), so: true, mau: "danger" },
-      { nhan: "Tổng chênh (đ)", giaTri: num(t.tongChenh), so: true, mau: "warning", phu: "các dòng lệch" },
-      { nhan: "Nghi vấn", giaTri: num(soNghi), so: true, mau: soNghi ? "warning" : "success" },
-    ];
-  }, [ketQua]);
+    the.push(
+      { nhan: "Hóa đơn điện tử", giaTri: num(t.soHoaDon), so: true, mau: "brand", icon: FileSpreadsheet, onChon: () => denHD("all"), moTaChon: "Xem tất cả hóa đơn điện tử" },
+      { nhan: "Khớp", giaTri: num(t.khop), so: true, mau: "success", onChon: () => denHD("KHOP"), moTaChon: "Xem hóa đơn đã khớp sổ" },
+      { nhan: "Lệch tiền", giaTri: num(t.lech), so: true, mau: "warning", onChon: () => denHD("LECH"), moTaChon: "Xem hóa đơn lệch tiền" },
+      { nhan: "Chưa vào sổ", giaTri: num(t.thieu), so: true, mau: "danger", phu: t.ganKhop ? `${num(t.ganKhop)} gần khớp` : undefined, onChon: () => denHD("THIEU"), moTaChon: "Xem hóa đơn chưa có trong sổ" },
+      { nhan: "Dòng sổ kế toán", giaTri: num(t.soDongPm), so: true, mau: "brand", onChon: () => denPM(false), moTaChon: "Xem tất cả dòng sổ kế toán" },
+      { nhan: "Dòng sổ thiếu hóa đơn", giaTri: num(t.pmThieu), so: true, mau: "danger", onChon: () => denPM(true), moTaChon: "Xem dòng sổ chưa có hóa đơn" },
+      { nhan: "Tổng tiền lệch", giaTri: num(t.tongChenh), so: true, mau: "warning", phu: "ở các hóa đơn lệch tiền", onChon: () => denHD("LECH"), moTaChon: "Xem hóa đơn lệch tiền" },
+      { nhan: "Cần soát lại", giaTri: num(soNghi), so: true, mau: soNghi ? "warning" : "success", onChon: soNghi ? () => cuonToiId("ds-nghivan") : undefined, moTaChon: soNghi ? "Xuống mục cần soát lại" : undefined }
+    );
+  }
 
   const dsSoPm = ketQua ? [ketQua.sheetPhanMem, ...ketQua.sheetsPhanMemPhu].filter(Boolean) as SheetPhanMem[] : [];
+  const tuKiemLoi = ketQua ? ketQua.phepThu.some((p) => !p.dat) : false;
+  const moKiemTraHieuLuc = moKiemTra || tuKiemLoi; // luôn mở khi có phép tự kiểm chưa đạt
 
   return (
     <div className="space-y-6">
@@ -888,6 +945,9 @@ export default function DoiSoatScreen() {
       ) : (
         <>
           <ThongKe the={the} cot={4} />
+          <p className="text-sm text-muted-foreground">
+            Bấm vào một thẻ số ở trên để nhảy thẳng xuống danh sách tương ứng bên dưới.
+          </p>
 
           {ketQua.daGoCotCu && (
             <p className="rounded-xl border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
@@ -895,72 +955,96 @@ export default function DoiSoatScreen() {
             </p>
           )}
 
-          <TuKiemBox phepThu={ketQua.phepThu} />
-
           {(ketQua.nghiVan.length > 0 || ketQua.nghiVanGop.length > 0 || Object.keys(suaLog).length > 0) && (
-            <NghiVanBox
-              nghiVan={ketQua.nghiVan}
-              nghiVanGop={ketQua.nghiVanGop}
-              edits={edits}
-              onSua={apDungSua}
-              onHoanTac={hoanTacSua}
-              suaLog={suaLog}
-            />
+            <div id="ds-nghivan">
+              <NghiVanBox
+                nghiVan={ketQua.nghiVan}
+                nghiVanGop={ketQua.nghiVanGop}
+                edits={edits}
+                onSua={apDungSua}
+                onHoanTac={hoanTacSua}
+                suaLog={suaLog}
+              />
+            </div>
           )}
 
-          <CauNoiBox cauNoi={ketQua.cauNoi} />
-
-          {ketQua.canhBao.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-warning">
-                  <AlertTriangle className="size-5" aria-hidden />
-                  Cảnh báo khác ({ketQua.canhBao.length})
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-1.5 text-sm">
-                  {ketQua.canhBao.slice(0, 40).map((c, i) => (
-                    <li key={i} className="flex gap-2">
-                      <span className="font-medium whitespace-nowrap text-muted-foreground">{c.loai}:</span>
-                      <span>{c.chiTiet}</span>
-                    </li>
-                  ))}
-                </ul>
-              </CardContent>
-            </Card>
-          )}
-
-          <Tabs value={tab} onValueChange={setTab}>
-            <TabsList className="flex-wrap">
+          <div id="ds-bang">
+            <Tabs value={tab} onValueChange={setTab}>
+              <TabsList className="flex-wrap">
+                {ketQua.sheetsHoaDon.map((s) => (
+                  <TabsTrigger key={s.ten} value={s.ten}>
+                    {s.ten}
+                  </TabsTrigger>
+                ))}
+                {ketQua.sheetPhanMem && <TabsTrigger value={PM_TAB}>{ketQua.sheetPhanMem.ten}</TabsTrigger>}
+                {ketQua.sheetsPhanMemPhu.map((s) => (
+                  <TabsTrigger key={s.ten} value={`phu-${s.ten}`}>
+                    {s.ten} (phụ)
+                  </TabsTrigger>
+                ))}
+              </TabsList>
               {ketQua.sheetsHoaDon.map((s) => (
-                <TabsTrigger key={s.ten} value={s.ten}>
-                  {s.ten}
-                </TabsTrigger>
+                <TabsContent key={s.ten} value={s.ten} className="mt-4">
+                  <BangHoaDon sheet={s} loc={locHD} setLoc={setLocHD} />
+                </TabsContent>
               ))}
-              {ketQua.sheetPhanMem && <TabsTrigger value={PM_TAB}>{ketQua.sheetPhanMem.ten}</TabsTrigger>}
+              {ketQua.sheetPhanMem && (
+                <TabsContent value={PM_TAB} className="mt-4">
+                  <BangPhanMem sheet={ketQua.sheetPhanMem} chiThieu={pmChiThieu} setChiThieu={setPmChiThieu} />
+                </TabsContent>
+              )}
               {ketQua.sheetsPhanMemPhu.map((s) => (
-                <TabsTrigger key={s.ten} value={`phu-${s.ten}`}>
-                  {s.ten} (phụ)
-                </TabsTrigger>
+                <TabsContent key={s.ten} value={`phu-${s.ten}`} className="mt-4">
+                  <BangPhanMem sheet={s} chiThieu={pmChiThieu} setChiThieu={setPmChiThieu} />
+                </TabsContent>
               ))}
-            </TabsList>
-            {ketQua.sheetsHoaDon.map((s) => (
-              <TabsContent key={s.ten} value={s.ten} className="mt-4">
-                <BangHoaDon sheet={s} />
-              </TabsContent>
-            ))}
-            {ketQua.sheetPhanMem && (
-              <TabsContent value={PM_TAB} className="mt-4">
-                <BangPhanMem sheet={ketQua.sheetPhanMem} />
-              </TabsContent>
+            </Tabs>
+          </div>
+
+          {/* Kiểm tra chi tiết — gập cho gọn; tự mở khi có phép chưa đạt hoặc có cảnh báo */}
+          <div className="space-y-4">
+            <button
+              type="button"
+              onClick={() => setMoKiemTra((v) => !v)}
+              aria-expanded={moKiemTraHieuLuc}
+              className="flex w-full items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-3 text-left transition-colors hover:bg-muted/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            >
+              <span className="flex items-center gap-2 font-semibold">
+                {moKiemTraHieuLuc ? <ChevronDown className="size-5" aria-hidden /> : <ChevronRight className="size-5" aria-hidden />}
+                <ShieldCheck className="size-5 text-muted-foreground" aria-hidden />
+                Máy tự kiểm tra &amp; đối chiếu số liệu
+              </span>
+              <span className={`shrink-0 text-sm font-medium ${tuKiemLoi ? "text-destructive" : "text-success"}`}>
+                {tuKiemLoi ? "⚠ có chỗ chưa đạt — mở xem" : "✓ đã tự kiểm, khớp"}
+              </span>
+            </button>
+            {moKiemTraHieuLuc && (
+              <>
+                <TuKiemBox phepThu={ketQua.phepThu} />
+                <CauNoiBox cauNoi={ketQua.cauNoi} />
+                {ketQua.canhBao.length > 0 && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2 text-warning">
+                        <AlertTriangle className="size-5" aria-hidden />
+                        Cảnh báo khác ({ketQua.canhBao.length})
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <ul className="space-y-1.5 text-sm">
+                        {ketQua.canhBao.slice(0, 40).map((c, i) => (
+                          <li key={i} className="flex gap-2">
+                            <span className="font-medium whitespace-nowrap text-muted-foreground">{c.loai}:</span>
+                            <span>{c.chiTiet}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </CardContent>
+                  </Card>
+                )}
+              </>
             )}
-            {ketQua.sheetsPhanMemPhu.map((s) => (
-              <TabsContent key={s.ten} value={`phu-${s.ten}`} className="mt-4">
-                <BangPhanMem sheet={s} />
-              </TabsContent>
-            ))}
-          </Tabs>
+          </div>
         </>
       )}
     </div>

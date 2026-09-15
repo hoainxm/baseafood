@@ -918,7 +918,7 @@ export function doiSoat(sheets: SheetTho[], opt: TuyChonDoiSoat): KetQuaDoiSoat 
       if (!pm.length) {
         d.trangThai = "THIEU";
         d.ketLuan = "CHƯA CÓ TRONG PMKT";
-        d.bangChung = "Không tìm thấy bút toán nào trong phần mềm kế toán có cùng MST người bán + ký hiệu + số hóa đơn.";
+        d.bangChung = "Không tìm thấy dòng ghi sổ nào trong phần mềm kế toán có cùng MST người bán + ký hiệu + số hóa đơn.";
         thieu++;
         continue;
       }
@@ -988,7 +988,7 @@ export function doiSoat(sheets: SheetTho[], opt: TuyChonDoiSoat): KetQuaDoiSoat 
       if (!cand) continue;
       pmDaGhep.add(cand);
       ganKhop++;
-      const moTaHd = `Gần khớp: cùng MST + số tiền ${num(d.tongTtVnd)} đ với bút toán ${cand.phieu || "(?)"} sheet "${cand.sheet}" dòng ${cand.soDong} (số HĐ sổ ${cand.soHoaDon} ≠ số HĐ ${d.soHoaDon}). Kiểm tra xem có phải một.`;
+      const moTaHd = `Gần khớp: cùng MST + số tiền ${num(d.tongTtVnd)} đ với dòng ghi sổ ${cand.phieu || "(?)"} sheet "${cand.sheet}" dòng ${cand.soDong} (số HĐ sổ ${cand.soHoaDon} ≠ số HĐ ${d.soHoaDon}). Kiểm tra xem có phải một.`;
       d.ganKhopMoTa = moTaHd;
       d.bangChung += " " + moTaHd;
       cand.ganKhopMoTa = `Gần khớp hóa đơn ${d.kyHieu}-${d.soHoaDon} sheet "${d.sheet}" dòng ${d.soDong} (cùng MST + số tiền).`;
@@ -1038,13 +1038,13 @@ export function doiSoat(sheets: SheetTho[], opt: TuyChonDoiSoat): KetQuaDoiSoat 
   const pmGkCount = pmDaGhep.size;
   const phepThu: PhepThu[] = [
     { ten: "Mỗi hóa đơn đúng 1 nhãn", batLoiGi: "một hóa đơn bị đếm 2 nhãn hoặc sót nhãn", mong: String(soHoaDon), thuc: String(khop + lech + thieu), dat: soHoaDon === khop + lech + thieu },
-    { ten: "Mỗi bút toán đúng 1 nhãn", batLoiGi: "dòng phần mềm bị sót/đếm trùng nhãn", mong: String(soDongPm), thuc: String(pmCo + pmThieu), dat: soDongPm === pmCo + pmThieu },
+    { ten: "Mỗi dòng ghi sổ đúng 1 nhãn", batLoiGi: "dòng phần mềm bị sót/đếm trùng nhãn", mong: String(soDongPm), thuc: String(pmCo + pmThieu), dat: soDongPm === pmCo + pmThieu },
     { ten: "Cột quy đổi = gốc × tỷ giá dòng đó", batLoiGi: "lấy nhầm cột tỷ giá / cột quy đổi", mong: "0 dòng lệch", thuc: `${countLechQuyDoi(hdActive)} dòng lệch`, dat: countLechQuyDoi(hdActive) === 0 },
     { ten: "Tổng file − các nhóm = 0", batLoiGi: "phân nhóm bỏ sót tiền", mong: "0 đ", thuc: `${num(round(tongFile - khopFile - lechFile - chuaTrucTiep))} đ`, dat: Math.abs(tongFile - khopFile - lechFile - chuaTrucTiep) < 0.5 },
     { ten: "Hai cách tính phần chưa kê bằng nhau", batLoiGi: "trừ chéo file/sổ khi tính phần còn thiếu", mong: "0 đ chênh", thuc: `${num(round(cauNoi.chuaCoBenSo - cauNoi.chuaCoBenSoTrucTiep))} đ`, dat: Math.abs(cauNoi.chuaCoBenSo - cauNoi.chuaCoBenSoTrucTiep) < 0.5 },
     { ten: "Phần dư trừ chéo giải thích được", batLoiGi: "phần dư không bóc tách về giao dịch", mong: `${num(round(cauNoi.duTruCheo))} đ`, thuc: `${num(round(sumChenhBoc))} đ (bóc tách)`, dat: Math.abs(cauNoi.duTruCheo - sumChenhBoc) < 0.5 },
     { ten: "Tổng cột Chênh lệch = phần dư trừ chéo", batLoiGi: "cột chênh lệch của bảng chính lệch phần dư", mong: `${num(round(cauNoi.duTruCheo))} đ`, thuc: `${num(round(tongChenhCoDau(hdActive)))} đ`, dat: Math.abs(cauNoi.duTruCheo - tongChenhCoDau(hdActive)) < 0.5 },
-    { ten: "Bằng chứng cộng = chỉ tiêu bảng chính", batLoiGi: "cột 'tổng bên PM' của HĐĐT lệch tổng bút toán khớp", mong: `${num(round(soKhopSo))} đ`, thuc: `${num(round(tongPmCo(sheetPhanMem)))} đ`, dat: Math.abs(soKhopSo - tongPmCo(sheetPhanMem)) < 0.5 },
+    { ten: "Bằng chứng cộng = chỉ tiêu bảng chính", batLoiGi: "cột 'Tổng trên sổ' của HĐĐT lệch tổng dòng ghi sổ đã khớp", mong: `${num(round(soKhopSo))} đ`, thuc: `${num(round(tongPmCo(sheetPhanMem)))} đ`, dat: Math.abs(soKhopSo - tongPmCo(sheetPhanMem)) < 0.5 },
     { ten: "Số nghi vấn = số đã liệt kê (baseline)", batLoiGi: "xuất hiện lỗi mới, hoặc người dùng vừa sửa xong 1 lỗi", mong: String(opt.nghiVanBanDau ?? soNghiVan), thuc: String(soNghiVan), dat: (opt.nghiVanBanDau ?? soNghiVan) === soNghiVan },
   ];
   void pmGkCount;

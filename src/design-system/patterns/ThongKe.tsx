@@ -19,6 +19,10 @@ export interface TheThongTin {
   mau?: MauThe;
   /** Số → tabular-nums cho thẳng cột. */
   so?: boolean;
+  /** Nếu có → thẻ bấm được (drill-down tới dữ liệu). Thêm con trỏ + viền nổi khi rê. */
+  onChon?: () => void;
+  /** Câu gợi ý khi rê chuột / cho screen-reader (dùng với onChon). */
+  moTaChon?: string;
 }
 
 const MAU: Record<MauThe, { chip: string; vien: string }> = {
@@ -75,14 +79,8 @@ export function ThongKe({
               ? "text-xs md:text-sm"
               : "text-base md:text-lg lg:text-xl";
 
-        return (
-          <div
-            key={t.nhan}
-            className={cn(
-              "flex items-center gap-2.5 rounded-xl border bg-card px-3 py-3",
-              mau.vien
-            )}
-          >
+        const noiDung = (
+          <>
             {Icon && (
               <span
                 className={cn(
@@ -116,6 +114,29 @@ export function ThongKe({
                 <p className="text-sm text-muted-foreground break-words">{t.phu}</p>
               )}
             </div>
+          </>
+        );
+        const cls = cn(
+          "flex items-center gap-2.5 rounded-xl border bg-card px-3 py-3",
+          mau.vien
+        );
+        return t.onChon ? (
+          <button
+            key={t.nhan}
+            type="button"
+            onClick={t.onChon}
+            title={t.moTaChon}
+            aria-label={t.moTaChon ?? `Xem chi tiết: ${t.nhan}`}
+            className={cn(
+              cls,
+              "cursor-pointer text-left transition-colors hover:border-primary hover:bg-muted/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            )}
+          >
+            {noiDung}
+          </button>
+        ) : (
+          <div key={t.nhan} className={cls}>
+            {noiDung}
           </div>
         );
       })}

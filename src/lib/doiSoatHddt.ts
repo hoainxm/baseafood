@@ -78,6 +78,15 @@ export interface CauNoi {
 
 export interface DongHoaDon {
   sheet: string;
+  /** Cột "Trạng thái hóa đơn" của cổng thuế, nguyên văn. */
+  trangThaiHd: string;
+  /**
+   * Hóa đơn **không cần vào sổ**: bản đã bị THAY THẾ, hoặc bị xóa bỏ/hủy. Kế toán
+   * cố ý không hạch toán bản này (hạch toán bản thay thế) ⇒ báo "chưa kê" là báo oan.
+   * LƯU Ý: "đã bị ĐIỀU CHỈNH" thì KHÁC — hóa đơn gốc vẫn có hiệu lực, vẫn phải vào
+   * sổ, hóa đơn điều chỉnh chỉ ghi thêm phần chênh. Đừng gộp hai loại này.
+   */
+  khongCanVaoSo: boolean;
   /** Chỉ số dòng trong AOA (+1) — KHÓA của Map `edits`, KHÔNG đổi kẻo hỏng bản đã lưu. */
   soDong: number;
   /** Dòng thật trong file Excel — dùng cho mọi chuỗi hiển thị cho người dùng. */
@@ -185,6 +194,8 @@ export interface KetQuaDoiSoat {
     khop: number;
     lech: number;
     thieu: number;
+    /** Trong số `thieu`: hóa đơn đã bị thay thế/hủy — ĐÚNG là không có trong sổ. */
+    thieuKhongCanVaoSo: number;
     ganKhop: number; // số dòng THIẾU có gợi ý gần khớp (là con của thieu)
     soDongPm: number;
     pmCo: number;
@@ -211,6 +222,16 @@ export interface TuyChonDoiSoat {
 }
 
 // ---------- Cột phân tích engine tự thêm (để nhận & GỠ khi chạy lại) ----------
+
+export /**
+ * Trạng thái khiến hóa đơn KHÔNG cần có mặt trong sổ (so khớp sau khi bỏ dấu).
+ * Chỉ gồm loại đã bị thay thế / xóa bỏ / hủy — KHÔNG gồm "đã bị điều chỉnh".
+ */
+const TRANG_THAI_KHONG_VAO_SO = ["da bi thay the", "bi xoa bo", "da bi huy", "bi huy"];
+const khongCanVaoSo = (tt: unknown): boolean => {
+  const k = chuan(tt);
+  return k !== "" && TRANG_THAI_KHONG_VAO_SO.some((x) => k.includes(x));
+};
 
 export const HEADER_HD_THEM = [
   "Tỷ giá áp dụng", "Số HĐ chuẩn", "KHÓA ĐỐI CHIẾU", "Chưa thuế (VND)", "Thuế (VND)",
@@ -456,12 +477,32 @@ function docSheetsTuBuffer(buf: ArrayBuffer | Uint8Array): SheetTho[] {
 }
 
 export async function docWorkbook(file: File): Promise<SheetTho[]> {
-  return docSheetsTuBuffer(await file.arrayBuffer());
+  return docSheetsTuBuffer(chuanHoaSangXlsx(new Uint8Array(await file.arrayBuffer())));
+}
+
+/**
+ * Chuẩn hoá bytes workbook về **`.xlsx`**.
+ *
+ * Cổng thuế còn gửi bản `.xls` (BIFF cũ, kiểu "Composite Document"). SheetJS đọc
+ * được nhưng `exceljs` — thứ lo phần xuất giữ định dạng — CHỈ đọc `.xlsx`; đưa
+ * thẳng `.xls` vào là nó trả về workbook rỗng, phần xuất rơi về bản dựng-mới và
+ * mất sạch bố cục. Nên đổi vỏ ngay từ lúc nạp, rồi MỌI khâu sau (đọc dữ liệu,
+ * lưu bản, xuất file) đều dùng đúng một bộ bytes — khỏi lệch toạ độ giữa hai lần đọc.
+ *
+ * Bản `.xls` cổng thuế xuất ra là dữ liệu trần (không font/khung/công thức) nên
+ * đổi vỏ không mất gì. `.xls` có định dạng thì định dạng sẽ rụng — không tránh được,
+ * thư viện chạy trong trình duyệt không có cái nào đọc nổi dáng của BIFF.
+ */
+export function chuanHoaSangXlsx(u: Uint8Array): Uint8Array {
+  // "PK" = đã là .xlsx (zip). Còn lại (D0CF11E0 = CFB/BIFF, hoặc .xlsb…) thì đổi vỏ.
+  if (u[0] === 0x50 && u[1] === 0x4b) return u;
+  const wb = XLSX.read(u, { type: "array", cellDates: true, cellNF: true });
+  return new Uint8Array(XLSX.write(wb, { bookType: "xlsx", type: "array" }) as ArrayBuffer);
 }
 
 /** File Excel → base64 (để LƯU file gốc theo tài khoản). Mã hoá theo khối, an toàn file lớn. */
 export async function fileSangBase64(file: File): Promise<string> {
-  const u = new Uint8Array(await file.arrayBuffer());
+  const u = chuanHoaSangXlsx(new Uint8Array(await file.arrayBuffer()));
   let bin = "";
   const CHUNK = 0x8000;
   for (let i = 0; i < u.length; i += CHUNK)
@@ -469,12 +510,21 @@ export async function fileSangBase64(file: File): Promise<string> {
   return btoa(bin);
 }
 
-/** base64 (bản đã lưu) → các sheet thô, để MỞ LẠI chạy lại đối soát. */
-export function sheetsTuBase64(b64: string): SheetTho[] {
+/** base64 → bytes workbook, đã chuẩn hoá về `.xlsx`. */
+export function base64SangXlsx(b64: string): Uint8Array {
   const bin = atob(b64);
   const u = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
-  return docSheetsTuBuffer(u);
+  return chuanHoaSangXlsx(u);
+}
+
+/**
+ * base64 (bản đã lưu) → các sheet thô, để MỞ LẠI chạy lại đối soát.
+ * Chuẩn hoá `.xls` ở đây luôn: bản lưu từ trước khi có bước đổi vỏ vẫn là BIFF,
+ * mà phần xuất thì đọc cùng bộ bytes này — hai bên phải thấy y hệt nhau.
+ */
+export function sheetsTuBase64(b64: string): SheetTho[] {
+  return docSheetsTuBuffer(base64SangXlsx(b64));
 }
 
 /**
@@ -751,6 +801,7 @@ function parseSheetHoaDon(
   const cTenBan = cot1(headerRaw, "Tên người bán/Tên người xuất hàng", "Tên người bán");
   const cDvt = cot1(headerRaw, "Đơn vị tiền tệ");
   const cTyGia = cot1(headerRaw, "Tỷ giá");
+  const cTrangThai = cot1(headerRaw, "Trạng thái hóa đơn");
 
   for (const p of sel.phu)
     nghiVan.push({
@@ -793,6 +844,8 @@ function parseSheetHoaDon(
     const mstBan = cellStr(row, cMstBan);
     dong.push({
       sheet: ten, soDong, dongFile: dongExcel(g, soDong),
+      trangThaiHd: cellStr(row, cTrangThai),
+      khongCanVaoSo: khongCanVaoSo(row[cTrangThai]),
       cells: apSuaVaoHang(row, header, ten, soDong, edits, nhatKy, g),
       kyHieu, soHoaDon, soChuan,
       ngayLap: ngayHienThi(row[cNgay]),
@@ -1027,15 +1080,26 @@ export function doiSoat(sheets: SheetTho[], opt: TuyChonDoiSoat): KetQuaDoiSoat 
       if (arr) arr.push(d); else hdTheoKhoa.set(d.khoa, [d]);
     }
 
-  let khop = 0, lech = 0, thieu = 0, soHoaDon = 0, tongChenh = 0;
+  let khop = 0, lech = 0, thieu = 0, soHoaDon = 0, tongChenh = 0, thieuKhongCanVaoSo = 0;
+  // Nhãn gọi thẳng tên sheet sổ (file mẫu kế toán ghi "CHƯA CÓ TRONG PMEM"), để
+  // bảng tổng và cột KẾT QUẢ nói cùng một thứ tiếng.
+  const nhanThieu = `CHƯA CÓ TRONG ${sheetPhanMem?.ten ?? "PMKT"}`;
   for (const sh of hdActive)
     for (const d of sh.dong) {
       soHoaDon++;
       const pm = pmTheoKhoa.get(d.khoa) ?? [];
       if (!pm.length) {
         d.trangThai = "THIEU";
-        d.ketLuan = "CHƯA CÓ TRONG PMKT";
-        d.bangChung = "Không tìm thấy dòng ghi sổ nào trong phần mềm kế toán có cùng MST người bán + ký hiệu + số hóa đơn.";
+        if (d.khongCanVaoSo) {
+          // Không đổi nhóm đếm (giữ nguyên các phép tự kiểm), chỉ tách nhãn ra để
+          // kế toán lọc bỏ khỏi danh sách phải đi hạch toán.
+          d.ketLuan = `${nhanThieu} — KHÔNG CẦN VÀO SỔ`;
+          d.bangChung = `Không có trong sổ, nhưng ĐÚNG: hóa đơn ở trạng thái "${d.trangThaiHd}" — bản này đã bị thay thế/hủy, kế toán hạch toán bản thay thế chứ không hạch toán bản này.`;
+          thieuKhongCanVaoSo++;
+        } else {
+          d.ketLuan = nhanThieu;
+          d.bangChung = "Không tìm thấy dòng ghi sổ nào trong phần mềm kế toán có cùng MST người bán + ký hiệu + số hóa đơn.";
+        }
         thieu++;
         continue;
       }
@@ -1122,6 +1186,12 @@ export function doiSoat(sheets: SheetTho[], opt: TuyChonDoiSoat): KetQuaDoiSoat 
       });
     }
 
+  if (thieuKhongCanVaoSo)
+    canhBao.push({
+      loai: "Hóa đơn không cần vào sổ",
+      chiTiet: `${thieuKhongCanVaoSo} hóa đơn nằm trong nhóm "chưa vào sổ" nhưng ở trạng thái đã bị thay thế/hủy — ĐÚNG là không phải hạch toán. Lọc cột KẾT QUẢ = "${nhanThieu} — KHÔNG CẦN VÀO SỔ" để bỏ chúng ra khỏi danh sách phải đi kê.`,
+    });
+
   for (const [k, arr] of hdTheoKhoa)
     if (arr.length > 1)
       canhBao.push({ loai: "Trùng khóa HĐĐT", chiTiet: `Khóa "${k}" xuất hiện ${arr.length} lần (${arr.map((x) => `${x.sheet}#${x.dongFile}`).join(", ")}).` });
@@ -1171,7 +1241,7 @@ export function doiSoat(sheets: SheetTho[], opt: TuyChonDoiSoat): KetQuaDoiSoat 
     sheetsHoaDon,
     sheetPhanMem,
     sheetsPhanMemPhu,
-    tong: { soHoaDon, khop, lech, thieu, ganKhop, soDongPm, pmCo, pmThieu, tongChenh, soLoiParse },
+    tong: { soHoaDon, khop, lech, thieu, thieuKhongCanVaoSo, ganKhop, soDongPm, pmCo, pmThieu, tongChenh, soLoiParse },
     nghiVan,
     nghiVanGop,
     cauNoi,

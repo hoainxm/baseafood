@@ -34,6 +34,7 @@ import {
   CHU_THICH_PM,
   DICH_COT_XUAT,
   HEADER_HD_THEM,
+  base64SangXlsx,
   HEADER_PM_THEM,
   cotExcel,
   ngayHienThi,
@@ -184,13 +185,6 @@ function suaTheoSheet(
   return ra;
 }
 
-function base64SangBytes(b64: string): Uint8Array {
-  const bin = atob(b64);
-  const u = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
-  return u;
-}
-
 function taiVe(bytes: ArrayBuffer, tenFile: string): void {
   const url = URL.createObjectURL(
     new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" })
@@ -218,7 +212,10 @@ export async function xuatExcelGiuDinhDang(
   const mod = (await import("exceljs")) as unknown as Record<string, unknown>;
   const ExcelJS = ((mod.default as Record<string, unknown> | undefined)?.Workbook ? mod.default : mod) as typeof import("exceljs");
   const wb = new ExcelJS.Workbook();
-  await wb.xlsx.load(base64SangBytes(fileGocB64).buffer as ArrayBuffer);
+  // `base64SangXlsx` đổi vỏ .xls → .xlsx: exceljs chỉ đọc được .xlsx, đưa .xls vào
+  // là nó trả workbook RỖNG (không ném lỗi) rồi ta báo "không tìm thấy sheet".
+  const bytes = base64SangXlsx(fileGocB64);
+  await wb.xlsx.load(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer);
 
   const timSheet = (ten: string): Worksheet | undefined =>
     wb.worksheets.find((w) => w.name === ten) ?? wb.getWorksheet(ten);

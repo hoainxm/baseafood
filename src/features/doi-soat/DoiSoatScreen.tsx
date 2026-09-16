@@ -648,16 +648,19 @@ export default function DoiSoatScreen() {
     }
     setDangChay(true);
     try {
-      const raw = await docWorkbook(file);
+      // MỘT bộ bytes cho cả đọc lẫn xuất (đã chuẩn hoá .xls → .xlsx): hai lần đọc
+      // riêng dễ lệch toạ độ dòng/cột, mà toạ độ là thứ cột "Vị trí" dựa vào.
+      const b64Goc = await fileSangBase64(file);
+      const raw = sheetsTuBase64(b64Goc);
       const kq0 = doiSoat(raw, { nguong: nguong ?? 0 });
       const baseline = kq0.nghiVan.length + kq0.nghiVanGop.reduce((s, g) => s + g.soDong, 0);
       setEdits({});
       setSuaLog({});
       setNghiVanBanDau(baseline);
       setSoChuanTen(undefined);
-      setB64(await fileSangBase64(file));
+      setB64(b64Goc);
       setTenHienThi(file.name);
-      setTenBanLuu(file.name.replace(/\.xlsx?$/i, ""));
+      setTenBanLuu(file.name.replace(/\.xls[xmb]?$/i, ""));
       setBanDangMo(null);
       setWb(raw);
       setTab(kq0.sheetsHoaDon[0]?.ten ?? (kq0.sheetPhanMem ? PM_TAB : ""));

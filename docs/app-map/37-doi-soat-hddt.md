@@ -1,7 +1,9 @@
 > Load khi: sửa màn `/doi-soat`, logic đối soát hóa đơn điện tử ⇄ phần mềm kế toán, đọc/ghi file Excel hóa đơn.
 covers: src/features/doi-soat/DoiSoatScreen.tsx, src/features/doi-soat/index.ts, src/lib/doiSoatHddt.ts, src/lib/doiSoatXuat.ts, src/lib/doiSoatXuatShift.ts, src/lib/doiSoatXuatTongHop.ts
-last_verified: 2026-09-15
+last_verified: 2026-09-16
 ttl_days: 90
+<!-- updated: 2026-09-16 — v5.2 NHẬN FILE .xls + SỔ GỘP NHIỀU THÁNG + QUY TẮC HÓA ĐƠN BỊ THAY THẾ. (1) `.xls` (BIFF, cổng thuế vẫn gửi): `chuanHoaSangXlsx` đổi vỏ sang .xlsx NGAY LÚC NẠP (dò magic "PK"), vì `exceljs` chỉ đọc .xlsx — đưa .xls vào nó trả workbook RỖNG, KHÔNG ném lỗi, phần xuất rơi về bản dựng-mới và mất bố cục. Đổi vỏ ở `fileSangBase64` + `sheetsTuBase64` + đầu `xuatExcelGiuDinhDang` ⇒ mọi khâu dùng CÙNG bộ bytes (màn hình nay nạp 1 lần: `fileSangBase64` → `sheetsTuBase64`, bỏ `docWorkbook` để khỏi 2 lần đọc lệch toạ độ). (2) **Sổ gộp NHIỀU THÁNG chạy được, không cần sửa gì** — engine ghép theo khóa nên không phụ thuộc kỳ; đã chạy thật 6 tháng (3551 HĐ ⇄ 2224 dòng sổ), tự kiểm 9/9. (3) **QUY TẮC MỚI — hóa đơn không cần vào sổ**: `DongHoaDon.trangThaiHd` + `khongCanVaoSo`; trạng thái "đã bị thay thế / bị xóa bỏ / đã bị hủy" ⇒ nhãn `"CHƯA CÓ TRONG ‹sổ› — KHÔNG CẦN VÀO SỔ"` + `tong.thieuKhongCanVaoSo` + `canhBao` + 2 dòng ở ĐỐI CHIẾU TỔNG ("trong đó…" và "⇒ CÒN LẠI THẬT SỰ PHẢI RÀ"). **KHÔNG đổi nhóm đếm** nên 9 phép tự kiểm giữ nguyên. ⚠️ "đã bị ĐIỀU CHỈNH" thì KHÁC: hóa đơn gốc vẫn hiệu lực, vẫn phải vào sổ — đừng gộp chung. (4) Nhãn nhóm thiếu nay gọi thẳng tên sheet sổ (`CHƯA CÓ TRONG PHẦN MỀM CTY`) thay vì "PMKT", khớp cách file mẫu kế toán gọi. -->
+<!-- re-verified: 2026-09-16 — chạy thật trên "DANH SÁCH HD THUẾ GỬI - đang làm.xls" (BIFF, 4 sheet: XXXX trống + HDDT 3043 HĐ + MTT 508 HĐ + PHẦN MỀM CTY 2224 dòng, dữ liệu T01–T06/2026): đọc + xuất chạy sạch, tự kiểm 9/9, bắt được 26 hóa đơn bị thay thế (6,8 tỷ đ) lẽ ra bị báo oan "chưa kê"; sheet trống XXXX không làm vỡ; tiêu đề ở hàng 2 (ref A2) vào đúng nhờ `ToaDoGoc`; tiền tệ USD/JPY/"VNĐ" quy đổi đúng. HỒI QUY file T6 cũ (.xlsx): tổng y nguyên 685/392/1/292, idempotent 3 vòng, ô gốc lệch 0, oracle nhãn 1105/1107 — 2 dòng lệch ĐÚNG CHỦ Ý (2 hóa đơn bị thay thế nay đổi nhãn, file mẫu gộp chung). Tỷ lệ "chưa vào sổ" 42% là BÌNH THƯỜNG ở công ty này (file T6 cũ 43%) — sổ phần mềm là bản trích, không phải toàn bộ bút toán. -->
 <!-- updated: 2026-09-15 — v5.1 BÁM ĐÚNG FILE MẪU KẾ TOÁN. v5 mới chỉ giữ định dạng, bố cục vẫn khác mẫu ⇒ người dùng báo "vẫn không giống". Nay: (1) cột **"KẾT QUẢ" chèn làm cột A**, dữ liệu gốc dời phải 1 cột — kéo theo phải DỊCH THAM CHIẾU CÔNG THỨC (`doiSoatXuatShift.ts`: bộ dịch đi từng ký tự, chừa chuỗi trong nháy kép / tên sheet trong nháy đơn / tên hàm; xử cả `$A$1`, `A:A`, ref chéo sheet; gỡ ô gộp TRƯỚC khi dời kẻo mất giá trị ô master); (2) **3 sheet tổng hợp đứng đầu workbook** (`doiSoatXuatTongHop.ts`): `ĐỐI CHIẾU TỔNG` (4 mục A/B/C/D + bóc tách phần chênh) · `TỰ KIỂM TRA` (bảng phép thử + KẾT QUẢ CHUNG) · `NGHI VẤN SỐ LIỆU` (9 cột, vị trí trỏ theo FILE XUẤT); (3) tên cột bám cách gọi của kế toán: "Số dòng khớp ‹tên sheet sổ›" thay vì "PMKT", cặp cột TK lấy đúng tiêu đề nguồn (sổ mã máy → "Thuế suất / Loại"); (4) `NghiVan.viTriXuat` = vị trí theo file xuất (lệch 1 cột so với `viTri` trên màn); `DongPhanMem` thêm `chuaThue`/`thue` để bảng tổng đủ 3 cột tiền; `SheetPhanMem.tenTk`. Gỡ cột lần chạy trước nay **cắt cả khối đuôi** (`laCotThem` + xoá từ cột thêm đầu tiên tới hết) vì vài tên cột đổi theo file; file đã có sẵn cột A "KẾT QUẢ" thì GHI ĐÈ chứ không chèn thêm. Ép `fullCalcOnLoad` vì công thức vừa bị dịch. -->
 <!-- re-verified: 2026-09-15 — chạy trên bộ T6 THẬT rồi so từng ô với file mẫu "Tháng 6 - đã lọc.xlsx": (1) BỐ CỤC trùng khít — 7 sheet đúng thứ tự, số cột 38/42/36/27 y mẫu, tiêu đề trùng từng cột; (2) CÔNG THỨC dịch đúng từng cái (`K463=SUM(K7:K462)`→`L463=SUM(L7:L462)`, `R463=O463-L463`→`S463=P463-M463`, `O464=R463+'T6-KMA'!K144+'T6-MTTIEN'!O101`→`P464=S463+'T6-KMA'!L144+'T6-MTTIEN'!P101`) — trùng công thức mẫu 100%; ô gộp `B3:T3`/`B4:T4` + `C144:D144`… trùng mẫu; (3) ORACLE nhãn cột A: **1107/1107 dòng trùng** (685 hóa đơn + 422 dòng sổ), lệch 0; (4) ĐỐI CHIẾU TỔNG khớp mẫu tới từng đồng cả 4 mục A/B/C/D; (5) idempotent 3 vòng: số cột đứng yên 38/42/36/27, tổng không đổi; (6) trình duyệt thật: cả chuỗi engine→chèn cột→sheet tổng hợp→ghi file chạy sạch, không lỗi console. Khác mẫu CÓ CHỦ Ý: cột phân tích ghi GIÁ TRỊ (mẫu ghi công thức sống) — giá trị do engine tính, đã đối chiếu 1107/1107; và định dạng số giữ nguyên bản gốc `_(* #,##0_);…"-"??` trong khi mẫu bị LibreOffice làm rụng dấu nháy. -->
 <!-- updated: 2026-09-15 — v5 XUẤT FILE **GIỮ NGUYÊN ĐỊNH DẠNG GỐC** (bỏ lối dựng-mới). Nút "Tải Excel kết quả" nay nạp lại CHÍNH bytes file người dùng tải lên (`b64` vốn đã giữ sẵn để lưu bản) rồi sửa tại chỗ bằng **`exceljs`** (`src/lib/doiSoatXuat.ts`, nạp động) — `xlsx-js-style` khi ĐỌC chỉ lấy được màu nền, mất font/khung/canh lề nên không round-trip nổi. Luật: **CHỈ THÊM, KHÔNG DỜI** — khối cột đối soát đặt SAU vùng dữ liệu gốc (chừa 1 cột trống), KHÔNG chèn cột vào giữa ⇒ địa chỉ ô gốc giữ nguyên, ô gộp không lệch, công thức trong file không sai tham chiếu. Chỉ ghi đè màu nền dòng + ô người dùng bấm Sửa. "KẾT QUẢ" là cột ĐẦU của khối thêm; vùng autofilter nới sang hết khối. `xuatExcelDoiSoat` (dựng-mới) giữ lại làm ĐƯỜNG LÙI khi không có bytes gốc. Kèm theo: `SheetTho`/`SheetHoaDon`/`SheetPhanMem` mang `ToaDoGoc {r0,c0,giuCot}` + `hIdx` + `rong`; `DongHoaDon`/`DongPhanMem` thêm `dongFile` = **dòng Excel THẬT** (trước đây mọi chuỗi "ô L430 / dòng 428" dùng chỉ số AOA nên lệch đúng bằng r0 — sheet cổng thuế bắt đầu ở A3 ⇒ lệch 2 dòng). `soDong` GIỮ NGUYÊN nghĩa cũ vì là khóa Map `edits` đã lưu trong `reconciliation_runs`. `goCotDoiSoatCu` nay dò cột "KẾT QUẢ" ở BẤT KỲ vị trí nào (bản cũ để ở cột 0) + gỡ luôn cột đệm trống. -->
@@ -44,6 +46,49 @@ Công cụ **kế toán** (không phải nghiệp vụ MES). Đối chiếu hóa
 | PM → HĐĐT | `THIEU` | không thấy hóa đơn điện tử | đỏ |
 
 Màu chip lấy **token** `--status-*` (không viết mã màu tay); màu nền Excel là mã màu chuẩn Excel (file ngoài, độc lập token app). Mỗi dòng có cột **"Bằng chứng đối chiếu"** dạng văn xuôi (khớp phiếu nào, ngày, CTGS, TK, số tiền).
+
+## v5.2 — file `.xls`, sổ gộp nhiều tháng, hóa đơn bị thay thế
+
+**Định dạng `.xls`** (BIFF cũ — cổng thuế vẫn gửi kiểu này). `xlsx-js-style` đọc được,
+nhưng `exceljs` (lo phần xuất) **chỉ đọc `.xlsx`** và khi đưa `.xls` vào nó **không ném
+lỗi** — trả về workbook RỖNG, ta báo "không tìm thấy sheet" rồi rơi về bản dựng-mới, mất
+sạch bố cục. Nên **đổi vỏ ngay lúc nạp**: `chuanHoaSangXlsx` dò magic `PK` (zip = đã
+xlsx), còn lại đọc bằng SheetJS rồi ghi lại thành `.xlsx`.
+
+> Một bộ bytes cho TẤT CẢ. Màn hình nạp 1 lần (`fileSangBase64` → `sheetsTuBase64`), bản
+> lưu và phần xuất dùng đúng bytes đó. Đọc file hai lần bằng hai đường khác nhau là toạ độ
+> dòng/cột có thể lệch, mà cột "Vị trí" trong NGHI VẤN SỐ LIỆU sống bằng toạ độ.
+>
+> Bản `.xls` cổng thuế là dữ liệu trần (0 font, 0 khung, 0 công thức) nên đổi vỏ không mất
+> gì. `.xls` CÓ định dạng thì định dạng sẽ rụng — không có thư viện chạy trong trình duyệt
+> nào đọc nổi dáng của BIFF.
+
+**Sổ gộp nhiều tháng**: không phải sửa gì. Engine ghép theo khóa `MST|ký hiệu|số HĐ`, không
+đụng tới kỳ. Đã chạy thật 6 tháng một lần (3551 hóa đơn ⇄ 2224 dòng sổ), tự kiểm 9/9. Dòng
+sổ thuộc tháng ngoài phạm vi bảng kê sẽ hiện "chưa có hóa đơn" — đúng, cứ để kế toán thấy.
+
+**Hóa đơn KHÔNG CẦN VÀO SỔ** *(quy tắc nghiệp vụ, chốt 2026-09-16)*
+
+| Trạng thái trên cổng thuế | Có phải vào sổ không |
+|---|---|
+| `Hóa đơn đã bị thay thế` · `bị xóa bỏ` · `đã bị hủy` | **KHÔNG** — kế toán hạch toán bản thay thế |
+| `Hóa đơn thay thế` (bản mới) | **CÓ** |
+| `Hóa đơn đã bị điều chỉnh` | **CÓ** — hóa đơn gốc vẫn hiệu lực |
+| `Hóa đơn điều chỉnh` | **CÓ** — ghi phần chênh |
+
+⚠️ **Đừng gộp "thay thế" với "điều chỉnh".** Thay thế = bản cũ chết, bản mới thay hẳn.
+Điều chỉnh = bản cũ vẫn sống, bản điều chỉnh chỉ ghi thêm phần chênh. Coi "đã bị điều
+chỉnh" là không-cần-vào-sổ sẽ làm hụt số liệu kê khai.
+
+Cách cài: `khongCanVaoSo` trên từng dòng → đổi **nhãn** (`"CHƯA CÓ TRONG ‹sổ› — KHÔNG CẦN
+VÀO SỔ"`) + `tong.thieuKhongCanVaoSo` + cảnh báo trên màn + 2 dòng ở ĐỐI CHIẾU TỔNG
+("trong đó…" và "⇒ CÒN LẠI THẬT SỰ PHẢI RÀ"). **KHÔNG tạo nhóm đếm mới** — giữ nguyên 4
+nhãn và 9 phép tự kiểm đã verify. Trên bộ 6 tháng: bắt được 26 hóa đơn, **6,8 tỷ đ** lẽ ra
+bị báo oan là "chưa kê".
+
+> 📌 Tỷ lệ "chưa vào sổ" cao (~42%) là **bình thường ở công ty này**, không phải lỗi ghép:
+> sheet phần mềm là bản TRÍCH, không phải toàn bộ bút toán. File T6 riêng lẻ cũng 43%.
+> Đừng thấy con số lớn mà đi sửa engine.
 
 ## v5.1 — bố cục bám đúng FILE MẪU kế toán
 

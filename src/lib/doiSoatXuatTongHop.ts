@@ -6,6 +6,8 @@
  * Số liệu lấy từ chính kết quả engine (`KetQuaDoiSoat`) nên luôn khớp với màn hình.
  */
 import type { KetQuaDoiSoat, NghiVan, SheetHoaDon } from "./doiSoatHddt";
+import type { KetQuaSoHaiBan, NhomCungNgay } from "./doiSoatHaiBan";
+import { gomCungMstCungNgay, soHaiBanHddt } from "./doiSoatHaiBan";
 
 type Workbook = import("exceljs").Workbook;
 type Worksheet = import("exceljs").Worksheet;
@@ -154,7 +156,9 @@ function sheetDoiChieuTong(wb: Workbook, kq: KetQuaDoiSoat): Worksheet {
   for (const sh of hd) for (const d of sh.dong) if (d.chenh != null) tongCotChenh += d.chenh;
 
   tieuDeTrang(ws, "ĐỐI CHIẾU TỔNG – HÓA ĐƠN ĐẦU VÀO", [
-    `Sổ kế toán dùng làm chuẩn: sheet "${tenSo}". Dữ liệu gốc KHÔNG bị sửa — mọi chỗ nghi sai liệt kê ở sheet NGHI VẤN SỐ LIỆU.`,
+    kq.sheetPhanMem
+      ? `Sổ kế toán dùng làm chuẩn: sheet "${tenSo}". Dữ liệu gốc KHÔNG bị sửa — mọi chỗ nghi sai liệt kê ở sheet NGHI VẤN SỐ LIỆU.`
+      : '⚠️ FILE NÀY KHÔNG CÓ SHEET SỔ KẾ TOÁN nên cả bảng dưới đây KHÔNG dùng được (mọi hóa đơn đều rơi vào nhóm "chưa vào sổ"). Xem sheet SO HAI BẢN HĐĐT — đó mới là kết quả của file này.',
     `Ngưỡng coi là khớp: ${kq.nguong.toLocaleString("vi-VN")} đ. Cột F cho biết số lấy từ đâu, cột G hướng dẫn tự kiểm lại bằng tay.`,
   ]);
   tieuDeBang(ws, 5, ["CHỈ TIÊU", "TRƯỚC THUẾ", "THUẾ", "TỔNG THANH TOÁN", "SỐ DÒNG", "NGUỒN SỐ LIỆU", "CÁCH TỰ KIỂM TRA LẠI"]);
@@ -295,15 +299,130 @@ function sheetNghiVan(wb: Workbook, kq: KetQuaDoiSoat): Worksheet {
   return ws;
 }
 
-/** Dựng 3 sheet tổng hợp và đẩy chúng lên ĐẦU workbook. */
+const NEN_NGHI = "FFFFEB9C";
+
+/** Sheet SO HAI BẢN — chỉ dựng khi file có cả bản thuế gửi lẫn bản tự tải. */
+function sheetSoHaiBan(wb: Workbook, so: KetQuaSoHaiBan): Worksheet {
+  const ws = wb.addWorksheet("SO HAI BẢN HĐĐT");
+  [26, 16, 16, 14, 40, 18, 18, 18, 16, 26, 26, 64].forEach((w, i) => (ws.getColumn(i + 1).width = w));
+  tieuDeTrang(ws, "SO HAI BẢN HÓA ĐƠN ĐIỆN TỬ — bản cơ quan thuế gửi ⇄ bản tự tải", [
+    `Bản THUẾ: ${so.sheetThue.join(" + ")} (${so.tong.soThue} hóa đơn)  ·  Bản TỰ TẢI: ${so.sheetTai.join(" + ")} (${so.tong.soTai} hóa đơn)`,
+    `Ghép theo khóa MST người bán | ký hiệu | số hóa đơn. Dòng xếp theo mức độ phải xử: thiếu ở bản tự tải lên trước.`,
+  ]);
+  const t = so.tong;
+  const tomTat: [string, string][] = [
+    ["CHỈ bản THUẾ có — bản tự tải THIẾU", `${t.chiThue} hóa đơn · ${Math.round(t.tienChiThue).toLocaleString("vi-VN")} đ`],
+    ["CHỈ bản TỰ TẢI có — thuế không gửi", `${t.chiTai} hóa đơn · ${Math.round(t.tienChiTai).toLocaleString("vi-VN")} đ`],
+    ["Có cả hai bản nhưng LỆCH TIỀN", `${t.lechTien} hóa đơn`],
+    ["Có cả hai bản, KHÔNG so được tiền (dòng lệch bố cục cột)", `${t.khongSoDuocTien} hóa đơn`],
+    ["Khớp cả hai bản", `${t.caHai - t.lechTien - t.khongSoDuocTien} hóa đơn`],
+    ["Tổng tiền hai bản", `thuế ${Math.round(t.tienThue).toLocaleString("vi-VN")} đ / tự tải ${Math.round(t.tienTai).toLocaleString("vi-VN")} đ / chênh ${Math.round(t.chenhTongTien).toLocaleString("vi-VN")} đ`],
+  ];
+  tomTat.forEach(([a, b], i) => {
+    ws.getCell(4 + i, 1).value = a;
+    ws.getCell(4 + i, 1).font = { bold: true };
+    ws.getCell(4 + i, 2).value = b;
+  });
+
+  const hang = 4 + tomTat.length + 1;
+  tieuDeBang(ws, hang, [
+    "KẾT QUẢ", "Ký hiệu", "Số hóa đơn", "Ngày lập", "Người bán", "MST người bán",
+    "Tổng TT bản THUẾ", "Tổng TT bản TỰ TẢI", "Chênh", "Vị trí bản THUẾ", "Vị trí bản TỰ TẢI", "PHẢI LÀM GÌ",
+  ]);
+  const nhan: Record<string, string> = {
+    CHI_THUE: "BẢN TỰ TẢI THIẾU", CHI_TAI: "THUẾ KHÔNG GỬI", CA_HAI: "CÓ CẢ HAI",
+  };
+  so.dong.forEach((d, i) => {
+    const r = hang + 1 + i;
+    const o = [
+      d.ben === "CA_HAI" ? (d.khongSoDuocTien ? "KHÔNG SO ĐƯỢC TIỀN" : d.lechTien ? "LỆCH TIỀN" : "KHỚP") : nhan[d.ben],
+      d.kyHieu, d.soHoaDon, d.ngayLap, d.tenBan, d.mstBan,
+      d.tongT, d.tongX, d.chenhTong, d.viTriT, d.viTriX, d.ghiChu,
+    ];
+    o.forEach((v, c) => {
+      const cell = ws.getCell(r, c + 1);
+      cell.value = (v ?? null) as never;
+      if (c >= 6 && c <= 8) cell.numFmt = "#,##0.00";
+      cell.alignment = { vertical: "top", wrapText: c === 4 || c >= 9 };
+    });
+    const nen =
+      d.ben === "CHI_THUE" ? NEN_TRUOT
+      : d.ben === "CHI_TAI" ? NEN_NGHI
+      : d.lechTien ? NEN_NGHI
+      : d.khongSoDuocTien ? "FFE7E6E6"
+      : NEN_DAT;
+    for (let c = 1; c <= 12; c++) ws.getCell(r, c).fill = to(nen);
+  });
+  ws.autoFilter = { from: { row: hang, column: 1 }, to: { row: hang, column: 12 } };
+  ws.views = [{ state: "frozen", ySplit: hang }];
+  return ws;
+}
+
+/** Sheet CÙNG MST + CÙNG NGÀY — lọc hóa đơn nghi trùng / nghi tách đơn. */
+function sheetCungNgay(wb: Workbook, nhom: readonly NhomCungNgay[]): Worksheet {
+  const ws = wb.addWorksheet("CÙNG MST CÙNG NGÀY");
+  [22, 14, 40, 20, 10, 20, 16, 18, 22, 40].forEach((w, i) => (ws.getColumn(i + 1).width = w));
+  const nghi = nhom.filter((g) => g.trungSoTien).length;
+  tieuDeTrang(ws, "HÓA ĐƠN CÙNG MỘT NHÀ CUNG CẤP, CÙNG MỘT NGÀY", [
+    `${nhom.length} nhóm · ${nhom.reduce((s, g) => s + g.soHoaDon, 0)} hóa đơn. Trong đó ${nghi} nhóm có hóa đơn TRÙNG KHÍT số tiền (tô vàng) — chỗ dễ kê hai lần nhất.`,
+    "Nhiều hóa đơn cùng nhà cung cấp trong một ngày KHÔNG có nghĩa là sai (xăng dầu, siêu thị…). Đây chỉ là danh sách để soát bằng mắt.",
+  ]);
+  tieuDeBang(ws, 5, [
+    "NGHI TRÙNG", "Ngày lập", "Người bán", "MST người bán", "Số HĐ trong ngày",
+    "Tổng tiền cả nhóm", "Ký hiệu", "Số hóa đơn", "Tổng thanh toán (VND)", "Vị trí · kết quả đối soát",
+  ]);
+  let r = 6;
+  for (const g of nhom) {
+    const dau = r;
+    g.dong.forEach((d, i) => {
+      const o = [
+        i === 0 ? (g.trungSoTien ? `CÓ — ${g.moTaTrung}` : "") : "",
+        i === 0 ? g.ngay : "", i === 0 ? g.tenBan : "", i === 0 ? g.mstBan : "",
+        i === 0 ? g.soHoaDon : "", i === 0 ? g.tongTien : "",
+        d.kyHieu, d.soHoaDon, d.tongTtVnd, `${d.sheet} dòng ${d.dongFile} · ${d.ketLuan}`,
+      ];
+      o.forEach((v, c) => {
+        const cell = ws.getCell(r, c + 1);
+        cell.value = (v === "" ? null : v) as never;
+        if (c === 5 || c === 8) cell.numFmt = "#,##0";
+        cell.alignment = { vertical: "top", wrapText: c === 0 || c === 2 || c === 9 };
+      });
+      if (g.trungSoTien) for (let c = 1; c <= 10; c++) ws.getCell(r, c).fill = to(NEN_NGHI);
+      r++;
+    });
+    // viền dưới cho hết một nhóm, nhìn ra ranh giới
+    for (let c = 1; c <= 10; c++) ws.getCell(r - 1, c).border = { bottom: { style: "thin" } };
+    if (dau === r) r++;
+  }
+  if (!nhom.length) {
+    ws.getCell(6, 1).value = "Không có nhà cung cấp nào xuất từ 2 hóa đơn trở lên trong cùng một ngày.";
+    ws.getCell(6, 1).font = { italic: true };
+  }
+  ws.views = [{ state: "frozen", ySplit: 5 }];
+  return ws;
+}
+
+/** Dựng các sheet tổng hợp và đẩy chúng lên ĐẦU workbook. */
 export function themSheetTongHop(wb: Workbook, kq: KetQuaDoiSoat): void {
   // Chạy lại trên file đã xuất: bỏ bản cũ đi rồi dựng lại, kẻo trùng tên.
-  for (const ten of ["ĐỐI CHIẾU TỔNG", "TỰ KIỂM TRA", "NGHI VẤN SỐ LIỆU"]) {
+  for (const ten of ["ĐỐI CHIẾU TỔNG", "TỰ KIỂM TRA", "NGHI VẤN SỐ LIỆU", "SO HAI BẢN HĐĐT", "CÙNG MST CÙNG NGÀY"]) {
     const cu = wb.worksheets.find((w) => w.name === ten);
     if (cu) wb.removeWorksheet(cu.id);
   }
   // Sheet gốc lùi về sau; 3 sheet tổng hợp chiếm 3 chỗ đầu.
   wb.worksheets.forEach((w, i) => ((w as unknown as ThuTu).orderNo = 10 + i));
-  const ds = [sheetDoiChieuTong(wb, kq), sheetTuKiemTra(wb, kq), sheetNghiVan(wb, kq)];
+  const soHaiBan = soHaiBanHddt(kq.sheetsHoaDon, kq.nguong);
+  const cungNgay = gomCungMstCungNgay(kq.sheetsHoaDon.filter((s) => !s.laPhu));
+  // Không có sheet sổ kế toán thì bảng "đối chiếu tổng" vô nghĩa (mọi hóa đơn sẽ
+  // rơi vào nhóm chưa vào sổ) — việc thật của file đó là SO HAI BẢN, cho lên đầu.
+  const khongCoSo = !kq.sheetPhanMem;
+  const ds = [
+    ...(soHaiBan && khongCoSo ? [sheetSoHaiBan(wb, soHaiBan)] : []),
+    sheetDoiChieuTong(wb, kq),
+    ...(soHaiBan && !khongCoSo ? [sheetSoHaiBan(wb, soHaiBan)] : []),
+    ...(cungNgay.length ? [sheetCungNgay(wb, cungNgay)] : []),
+    sheetTuKiemTra(wb, kq),
+    sheetNghiVan(wb, kq),
+  ];
   ds.forEach((w, i) => ((w as unknown as ThuTu).orderNo = i));
 }

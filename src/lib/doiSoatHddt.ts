@@ -81,6 +81,13 @@ export interface DongHoaDon {
   /** Cột "Trạng thái hóa đơn" của cổng thuế, nguyên văn. */
   trangThaiHd: string;
   /**
+   * Dòng RỘNG HƠN hàng tiêu đề ⇒ thuộc bố cục khác đã bị dán chung sheet. Cột tiền
+   * của nó KHÔNG đáng tin (bản "không mã" để tổng thanh toán ở cột khác, hóa đơn
+   * ngoại tệ còn để số gốc và số quy đổi ở hai cột khác hẳn). Chỉ khóa (ký hiệu ·
+   * số HĐ · MST) là tin được vì nằm trước chỗ lệch.
+   */
+  boCucLech: boolean;
+  /**
    * Hóa đơn **không cần vào sổ**: bản đã bị THAY THẾ, hoặc bị xóa bỏ/hủy. Kế toán
    * cố ý không hạch toán bản này (hạch toán bản thay thế) ⇒ báo "chưa kê" là báo oan.
    * LƯU Ý: "đã bị ĐIỀU CHỈNH" thì KHÁC — hóa đơn gốc vẫn có hiệu lực, vẫn phải vào
@@ -227,6 +234,36 @@ export /**
  * Trạng thái khiến hóa đơn KHÔNG cần có mặt trong sổ (so khớp sau khi bỏ dấu).
  * Chỉ gồm loại đã bị thay thế / xóa bỏ / hủy — KHÔNG gồm "đã bị điều chỉnh".
  */
+/**
+ * Đọc ô theo NỘI DUNG khi dò theo vị trí hụt.
+ *
+ * Bảng kê tải từ cổng hay bị TRỘN HAI BỐ CỤC trong cùng một sheet: phần "có mã"
+ * 19 cột, phần "không mã" 20 cột (dư một cột trống ở khúc đơn vị tiền tệ). Tiêu đề
+ * chỉ có một bộ ⇒ những dòng bố cục kia bị lệch ô từ chỗ đó trở đi: trạng thái hóa
+ * đơn rơi vào ô tỷ giá, tiền tệ rơi vào ô kế bên… Các cột TIỀN vẫn đúng chỗ.
+ *
+ * Nên chỉ vá đúng mấy ô chữ, và chỉ khi dò theo vị trí ra rỗng/sai kiểu — không
+ * đoán bừa đè lên giá trị đọc được.
+ */
+const laTrangThaiHd = (v: unknown): boolean => chuan(v).startsWith("hoa don ");
+/** Mã tiền tệ 3 chữ cái viết hoa (VND/USD/JPY…). */
+const laMaTienTe = (v: unknown): boolean => /^[A-Z]{3}$/.test(String(v ?? "").trim().toUpperCase()) ;
+
+/** Trạng thái hóa đơn: ưu tiên ô theo tiêu đề, hụt thì dò trong dòng. */
+function docTrangThaiHd(row: unknown[], cot: number): string {
+  if (cot >= 0 && laTrangThaiHd(row[cot])) return String(row[cot] ?? "").trim();
+  const v = row.find(laTrangThaiHd);
+  return v == null ? (cot >= 0 ? String(row[cot] ?? "").trim() : "") : String(v).trim();
+}
+
+/** Đơn vị tiền tệ + tỷ giá: hụt thì tìm mã tiền tệ trong dòng, tỷ giá là ô ngay sau. */
+function docTienTe(row: unknown[], cDvt: number, cTyGia: number): { dvt: string; tyGiaRaw: unknown } {
+  if (cDvt >= 0 && laMaTienTe(row[cDvt])) return { dvt: String(row[cDvt]).trim(), tyGiaRaw: row[cTyGia] };
+  const i = row.findIndex(laMaTienTe);
+  if (i < 0) return { dvt: cDvt >= 0 ? cellStr(row, cDvt) : "", tyGiaRaw: cTyGia >= 0 ? row[cTyGia] : null };
+  return { dvt: String(row[i]).trim(), tyGiaRaw: row[i + 1] };
+}
+
 const TRANG_THAI_KHONG_VAO_SO = ["da bi thay the", "bi xoa bo", "da bi huy", "bi huy"];
 const khongCanVaoSo = (tt: unknown): boolean => {
   const k = chuan(tt);
@@ -580,6 +617,44 @@ function goCotDoiSoatCu(
   return { rows: cleaned, daGo: true, giuCot };
 }
 
+/**
+ * Dò sheet bị TRỘN HAI BỐ CỤC CỘT: dán hai bản xuất khác nhau (VD "có mã" 19 cột
+ * + "không mã" 20 cột) vào cùng một sheet, trong khi chỉ có MỘT hàng tiêu đề.
+ *
+ * Hậu quả: những dòng thuộc bố cục kia lệch ô kể từ chỗ dư cột — trạng thái hóa
+ * đơn, đơn vị tiền tệ, tỷ giá đọc sang ô bên cạnh. Engine có vá bằng cách dò theo
+ * nội dung (`docTrangThaiHd`/`docTienTe`), nhưng vẫn phải BÁO: cách chữa đúng là
+ * tách ra hai sheet rồi chạy lại, đừng để máy đoán.
+ */
+function doTronBoCuc(
+  rows: unknown[][],
+  hIdx: number
+): { lech: number; binhThuong: number; cotHeader: number; cotLech: number } | null {
+  const cuoi = (r: unknown[]) => {
+    let k = -1;
+    for (let c = 0; c < r.length; c++) if (r[c] != null && r[c] !== "") k = c;
+    return k;
+  };
+  const cotHeader = cuoi(rows[hIdx] ?? []);
+  if (cotHeader < 0) return null;
+  const dem = new Map<number, number>();
+  for (let i = hIdx + 1; i < rows.length; i++) {
+    const r = rows[i] ?? [];
+    const k = cuoi(r);
+    if (k < 0) continue;
+    dem.set(k, (dem.get(k) ?? 0) + 1);
+  }
+  let lech = 0;
+  let cotLech = -1;
+  for (const [k, n] of dem)
+    if (k > cotHeader) {
+      lech += n;
+      cotLech = Math.max(cotLech, k);
+    }
+  if (!lech) return null;
+  return { lech, binhThuong: [...dem].reduce((s, [k, n]) => s + (k > cotHeader ? 0 : n), 0), cotHeader, cotLech };
+}
+
 // ---------- Nhận diện sheet ----------
 
 const hangTieuDeHoaDon = (rows: unknown[][]) =>
@@ -802,6 +877,15 @@ function parseSheetHoaDon(
   const cDvt = cot1(headerRaw, "Đơn vị tiền tệ");
   const cTyGia = cot1(headerRaw, "Tỷ giá");
   const cTrangThai = cot1(headerRaw, "Trạng thái hóa đơn");
+  const cotCuoiHeader = (() => {
+    let k = -1;
+    for (let c = 0; c < headerRaw.length; c++) if (headerRaw[c] != null && headerRaw[c] !== "") k = c;
+    return k;
+  })();
+  const dongRongHon = (r: unknown[]) => {
+    for (let c = r.length - 1; c > cotCuoiHeader; c--) if (r[c] != null && r[c] !== "") return true;
+    return false;
+  };
 
   for (const p of sel.phu)
     nghiVan.push({
@@ -825,9 +909,10 @@ function parseSheetHoaDon(
     const kyHieu = String(layO(row, cKyHieu, ten, soDong, edits) ?? "").trim();
     if (!soHoaDon && !kyHieu) continue;
 
-    const dvt = cellStr(row, cDvt) || "VND";
+    const tt = docTienTe(row, cDvt, cTyGia);
+    const dvt = tt.dvt || "VND";
     const laVnd = chuan(dvt) === "vnd" || chuan(dvt) === "";
-    const tyGiaRaw = soVN(row[cTyGia]);
+    const tyGiaRaw = soVN(tt.tyGiaRaw);
     const tyGia = laVnd ? 1 : tyGiaRaw && tyGiaRaw > 0 ? tyGiaRaw : 1;
     const chua = soVN(layO(row, cCot.chua, ten, soDong, edits));
     const thue = soVN(layO(row, cCot.thue, ten, soDong, edits));
@@ -842,10 +927,12 @@ function parseSheetHoaDon(
 
     const soChuan = soHoaDonChuan(soHoaDon);
     const mstBan = cellStr(row, cMstBan);
+    const trangThaiHd = docTrangThaiHd(row, cTrangThai);
     dong.push({
       sheet: ten, soDong, dongFile: dongExcel(g, soDong),
-      trangThaiHd: cellStr(row, cTrangThai),
-      khongCanVaoSo: khongCanVaoSo(row[cTrangThai]),
+      trangThaiHd: trangThaiHd,
+      khongCanVaoSo: khongCanVaoSo(trangThaiHd),
+      boCucLech: dongRongHon(row),
       cells: apSuaVaoHang(row, header, ten, soDong, edits, nhatKy, g),
       kyHieu, soHoaDon, soChuan,
       ngayLap: ngayHienThi(row[cNgay]),
@@ -984,6 +1071,12 @@ export function doiSoat(sheets: SheetTho[], opt: TuyChonDoiSoat): KetQuaDoiSoat 
     const rong = goi.daGo ? goi.giuCot.length : (s0.rong ?? 0);
     const hPm = hangTieuDePhanMem(rows);
     const hHd = hangTieuDeHoaDon(rows);
+    const tron = doTronBoCuc(rows, Math.max(hPm, hHd));
+    if (tron)
+      canhBao.push({
+        loai: "Sheet trộn hai bố cục cột",
+        chiTiet: `Sheet "${s0.ten}": ${tron.binhThuong} dòng rộng tới cột ${chuCaiCot(cotExcel(g, tron.cotHeader))} (đúng tiêu đề) nhưng ${tron.lech} dòng rộng tới cột ${chuCaiCot(cotExcel(g, tron.cotLech))} — nhiều khả năng dán hai bản xuất khác nhau (có mã / không mã) vào cùng một sheet. Cột TIỀN vẫn đúng chỗ; trạng thái · đơn vị tiền tệ · tỷ giá của ${tron.lech} dòng đó bị lệch ô nên engine phải dò theo nội dung. CHỮA ĐÚNG: tách thành hai sheet riêng rồi chạy lại.`,
+      });
     if (hPm >= 0) sheetsPmTatCa.push(parseSheetPhanMem(s0.ten, rows, hPm, edits, nghiVan, gopMap, nhatKySua, g, rong));
     else if (hHd >= 0) {
       const r = parseSheetHoaDon(s0.ten, rows, hHd, edits, nghiVan, gopMap, nhatKySua, g, rong);

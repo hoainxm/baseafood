@@ -1,7 +1,9 @@
 > Load khi: sửa màn `/doi-soat`, logic đối soát hóa đơn điện tử ⇄ phần mềm kế toán, đọc/ghi file Excel hóa đơn.
-covers: src/features/doi-soat/DoiSoatScreen.tsx, src/features/doi-soat/index.ts, src/lib/doiSoatHddt.ts, src/lib/doiSoatXuat.ts, src/lib/doiSoatXuatShift.ts, src/lib/doiSoatXuatTongHop.ts
-last_verified: 2026-09-16
+covers: src/features/doi-soat/DoiSoatScreen.tsx, src/features/doi-soat/index.ts, src/lib/doiSoatHddt.ts, src/lib/doiSoatHaiBan.ts, src/lib/doiSoatXuat.ts, src/lib/doiSoatXuatShift.ts, src/lib/doiSoatXuatTongHop.ts
+last_verified: 2026-09-17
 ttl_days: 90
+<!-- updated: 2026-09-17 — v6 HAI CHIỀU SOÁT MỚI (`src/lib/doiSoatHaiBan.ts`, hàm THUẦN trên `SheetHoaDon[]`, KHÔNG đụng engine ⇒ 9 phép tự kiểm giữ nguyên). (1) `soHaiBanHddt` — so BẢN THUẾ GỬI ⇄ BẢN TỰ TẢI: nhận diện bên thuế bằng tên sheet chứa chữ "thuế" (`laBenThue`), GỘP mọi sheet mỗi bên rồi so theo cùng khóa `MST|ký hiệu|số HĐ chuẩn` (không ghép đôi sheet theo tên — bản thuế gộp có-mã+không-mã trong khi bản tự tải tách ra). 3 nhãn: CHỈ THUẾ CÓ (bản tải thiếu) · CHỈ TẢI CÓ · CÓ CẢ HAI (khớp / lệch tiền / không-so-được). (2) `gomCungMstCungNgay` — gom hóa đơn cùng MST người bán + cùng ngày lập, giữ nhóm ≥2, đánh dấu riêng nhóm có hóa đơn TRÙNG KHÍT số tiền (`trungSoTien`) vì đó mới là dấu hiệu kê hai lần. (3) Xuất thêm 2 sheet "SO HAI BẢN HĐĐT" + "CÙNG MST CÙNG NGÀY"; file KHÔNG có sheet sổ thì SO HAI BẢN lên ĐẦU và ĐỐI CHIẾU TỔNG tự gắn cảnh báo không dùng được. (4) `doTronBoCuc` + `DongHoaDon.boCucLech` — bắt sheet bị DÁN HAI BẢN XUẤT khác số cột vào làm một. (5) `docTrangThaiHd`/`docTienTe` — dò theo NỘI DUNG khi dò theo vị trí hụt (trạng thái bắt đầu bằng "Hóa đơn ", tiền tệ là mã 3 chữ hoa), vá được trạng thái + tiền tệ + tỷ giá cho dòng lệch bố cục. -->
+<!-- re-verified: 2026-09-17 — chạy thật 2 file. "HDONDT 6 THÁNG.xlsx" (4 sheet = 2 cặp): bắt đúng 365 hóa đơn CHỈ bản thuế có (40,2 tỷ đ) + 1 chỉ bản tự tải; phát hiện sheet COMA-KMA trộn 2 bố cục (2400 dòng tới cột S + 286 dòng tới cột T — bản "không mã" để TỔNG THANH TOÁN ở cột P, hóa đơn ngoại tệ còn để số gốc và số quy đổi ở hai cột khác hẳn) ⇒ nhờ `boCucLech` mà số ca "lệch tiền" từ 229 (toàn nhiễu) còn 30. "DANH SÁCH HÓA ĐƠN T8.xlsx": 610 HĐ · 501 khớp · 4 lệch · 105 chưa vào sổ · 12 dòng sổ thiếu HĐ · tự kiểm 9/9; cùng-MST-cùng-ngày ra 79 nhóm/228 HĐ, 9 nhóm nghi trùng. HỒI QUY: T6 cũ y nguyên 685/392/1/292 idempotent 3 vòng; file .xls 6 tháng y nguyên 3551/2049/8/1494. Trình duyệt thật: cả 3 module nạp chạy sạch, xuất 250KB không lỗi. -->
 <!-- updated: 2026-09-16 — v5.2 NHẬN FILE .xls + SỔ GỘP NHIỀU THÁNG + QUY TẮC HÓA ĐƠN BỊ THAY THẾ. (1) `.xls` (BIFF, cổng thuế vẫn gửi): `chuanHoaSangXlsx` đổi vỏ sang .xlsx NGAY LÚC NẠP (dò magic "PK"), vì `exceljs` chỉ đọc .xlsx — đưa .xls vào nó trả workbook RỖNG, KHÔNG ném lỗi, phần xuất rơi về bản dựng-mới và mất bố cục. Đổi vỏ ở `fileSangBase64` + `sheetsTuBase64` + đầu `xuatExcelGiuDinhDang` ⇒ mọi khâu dùng CÙNG bộ bytes (màn hình nay nạp 1 lần: `fileSangBase64` → `sheetsTuBase64`, bỏ `docWorkbook` để khỏi 2 lần đọc lệch toạ độ). (2) **Sổ gộp NHIỀU THÁNG chạy được, không cần sửa gì** — engine ghép theo khóa nên không phụ thuộc kỳ; đã chạy thật 6 tháng (3551 HĐ ⇄ 2224 dòng sổ), tự kiểm 9/9. (3) **QUY TẮC MỚI — hóa đơn không cần vào sổ**: `DongHoaDon.trangThaiHd` + `khongCanVaoSo`; trạng thái "đã bị thay thế / bị xóa bỏ / đã bị hủy" ⇒ nhãn `"CHƯA CÓ TRONG ‹sổ› — KHÔNG CẦN VÀO SỔ"` + `tong.thieuKhongCanVaoSo` + `canhBao` + 2 dòng ở ĐỐI CHIẾU TỔNG ("trong đó…" và "⇒ CÒN LẠI THẬT SỰ PHẢI RÀ"). **KHÔNG đổi nhóm đếm** nên 9 phép tự kiểm giữ nguyên. ⚠️ "đã bị ĐIỀU CHỈNH" thì KHÁC: hóa đơn gốc vẫn hiệu lực, vẫn phải vào sổ — đừng gộp chung. (4) Nhãn nhóm thiếu nay gọi thẳng tên sheet sổ (`CHƯA CÓ TRONG PHẦN MỀM CTY`) thay vì "PMKT", khớp cách file mẫu kế toán gọi. -->
 <!-- re-verified: 2026-09-16 — chạy thật trên "DANH SÁCH HD THUẾ GỬI - đang làm.xls" (BIFF, 4 sheet: XXXX trống + HDDT 3043 HĐ + MTT 508 HĐ + PHẦN MỀM CTY 2224 dòng, dữ liệu T01–T06/2026): đọc + xuất chạy sạch, tự kiểm 9/9, bắt được 26 hóa đơn bị thay thế (6,8 tỷ đ) lẽ ra bị báo oan "chưa kê"; sheet trống XXXX không làm vỡ; tiêu đề ở hàng 2 (ref A2) vào đúng nhờ `ToaDoGoc`; tiền tệ USD/JPY/"VNĐ" quy đổi đúng. HỒI QUY file T6 cũ (.xlsx): tổng y nguyên 685/392/1/292, idempotent 3 vòng, ô gốc lệch 0, oracle nhãn 1105/1107 — 2 dòng lệch ĐÚNG CHỦ Ý (2 hóa đơn bị thay thế nay đổi nhãn, file mẫu gộp chung). Tỷ lệ "chưa vào sổ" 42% là BÌNH THƯỜNG ở công ty này (file T6 cũ 43%) — sổ phần mềm là bản trích, không phải toàn bộ bút toán. -->
 <!-- updated: 2026-09-15 — v5.1 BÁM ĐÚNG FILE MẪU KẾ TOÁN. v5 mới chỉ giữ định dạng, bố cục vẫn khác mẫu ⇒ người dùng báo "vẫn không giống". Nay: (1) cột **"KẾT QUẢ" chèn làm cột A**, dữ liệu gốc dời phải 1 cột — kéo theo phải DỊCH THAM CHIẾU CÔNG THỨC (`doiSoatXuatShift.ts`: bộ dịch đi từng ký tự, chừa chuỗi trong nháy kép / tên sheet trong nháy đơn / tên hàm; xử cả `$A$1`, `A:A`, ref chéo sheet; gỡ ô gộp TRƯỚC khi dời kẻo mất giá trị ô master); (2) **3 sheet tổng hợp đứng đầu workbook** (`doiSoatXuatTongHop.ts`): `ĐỐI CHIẾU TỔNG` (4 mục A/B/C/D + bóc tách phần chênh) · `TỰ KIỂM TRA` (bảng phép thử + KẾT QUẢ CHUNG) · `NGHI VẤN SỐ LIỆU` (9 cột, vị trí trỏ theo FILE XUẤT); (3) tên cột bám cách gọi của kế toán: "Số dòng khớp ‹tên sheet sổ›" thay vì "PMKT", cặp cột TK lấy đúng tiêu đề nguồn (sổ mã máy → "Thuế suất / Loại"); (4) `NghiVan.viTriXuat` = vị trí theo file xuất (lệch 1 cột so với `viTri` trên màn); `DongPhanMem` thêm `chuaThue`/`thue` để bảng tổng đủ 3 cột tiền; `SheetPhanMem.tenTk`. Gỡ cột lần chạy trước nay **cắt cả khối đuôi** (`laCotThem` + xoá từ cột thêm đầu tiên tới hết) vì vài tên cột đổi theo file; file đã có sẵn cột A "KẾT QUẢ" thì GHI ĐÈ chứ không chèn thêm. Ép `fullCalcOnLoad` vì công thức vừa bị dịch. -->
@@ -46,6 +48,55 @@ Công cụ **kế toán** (không phải nghiệp vụ MES). Đối chiếu hóa
 | PM → HĐĐT | `THIEU` | không thấy hóa đơn điện tử | đỏ |
 
 Màu chip lấy **token** `--status-*` (không viết mã màu tay); màu nền Excel là mã màu chuẩn Excel (file ngoài, độc lập token app). Mỗi dòng có cột **"Bằng chứng đối chiếu"** dạng văn xuôi (khớp phiếu nào, ngày, CTGS, TK, số tiền).
+
+## v6 — hai chiều soát ngoài "hóa đơn ⇄ sổ"
+
+Ở `src/lib/doiSoatHaiBan.ts` — hàm **thuần** trên `SheetHoaDon[]` đã parse, không đụng
+engine nên không ảnh hưởng 4 nhãn và 9 phép tự kiểm của chiều cũ.
+
+### 1. So HAI BẢN hóa đơn điện tử (`soHaiBanHddt`)
+
+Cơ quan thuế gửi một bảng kê, kế toán tự tải một bảng kê từ cổng — lẽ ra y hệt, thực tế lệch.
+
+- **Nhận bên nào là bên thuế**: tên sheet chứa chữ "thuế" (`laBenThue`). Phần còn lại là bản tự tải.
+- **GỘP mọi sheet của mỗi bên** rồi so theo đúng khóa cũ `MST | ký hiệu | số HĐ chuẩn`.
+  KHÔNG ghép đôi sheet theo tên: bản thuế hay gộp "có mã + không mã" vào một sheet trong
+  khi bản tự tải tách đôi ⇒ ghép theo tên là gãy.
+- Ba nhãn: `CHỈ THUẾ CÓ` (bản tải thiếu — việc phải làm ngay, xếp lên đầu) · `CHỈ TẢI CÓ`
+  · `CÓ CẢ HAI` (khớp / lệch tiền / **không so được tiền**).
+
+### 2. Hóa đơn cùng MST + cùng ngày (`gomCungMstCungNgay`)
+
+Gom theo **MST người bán + ngày lập**, giữ nhóm từ 2 hóa đơn.
+
+> Nhiều hóa đơn cùng nhà cung cấp trong một ngày **KHÔNG** có nghĩa là sai (xăng dầu, siêu
+> thị, phí ngân hàng…). Đừng kết luận thay người soát. Thứ đáng ngờ thật là nhóm có hóa đơn
+> **trùng khít số tiền** — cờ `trungSoTien`, tô vàng riêng.
+
+### 3. Sheet bị DÁN HAI BẢN XUẤT vào làm một (`doTronBoCuc`, `boCucLech`)
+
+Cạm bẫy khó thấy nhất của đợt này. Bảng kê tải từ cổng có thể là hai bản xuất khác số cột
+dán chung một sheet, mà chỉ có MỘT hàng tiêu đề:
+
+| | bản "có mã" | bản "không mã" |
+|---|---|---|
+| số cột | 19 (A…S) | 20 (A…T) |
+| Tổng thanh toán | cột **O** | cột **P** |
+| hóa đơn ngoại tệ | O = số tiền | K = số quy đổi VND, P = số gốc ngoại tệ |
+
+⚠️ **Đây là schema KHÁC, không phải lệch một cột — đừng viết code đoán rồi dịch ô.** Engine
+chỉ làm hai việc: (a) `doTronBoCuc` báo cảnh báo nêu đích danh sheet + số dòng mỗi bố cục,
+khuyên tách sheet rồi chạy lại; (b) đánh dấu `DongHoaDon.boCucLech` cho từng dòng rộng hơn
+tiêu đề, để chỗ nào so tiền thì **bỏ qua thay vì kết luận bừa**. Khóa (ký hiệu · số HĐ · MST)
+vẫn tin được vì nằm TRƯỚC chỗ lệch.
+
+Trên file thật: nhờ cờ này mà số ca "lệch tiền" từ **229 (gần như toàn nhiễu) còn 30**.
+
+### 4. Dò ô theo NỘI DUNG khi dò theo vị trí hụt
+
+`docTrangThaiHd` (trạng thái bắt đầu bằng "Hóa đơn ") và `docTienTe` (mã tiền tệ 3 chữ hoa,
+tỷ giá là ô ngay sau). Chỉ chạy khi ô theo tiêu đề rỗng/sai kiểu — **không đè lên giá trị đọc
+được**. Nhờ nó mà dòng lệch bố cục vẫn đọc đúng trạng thái + quy đổi ngoại tệ.
 
 ## v5.2 — file `.xls`, sổ gộp nhiều tháng, hóa đơn bị thay thế
 

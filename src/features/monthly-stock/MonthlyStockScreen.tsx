@@ -489,7 +489,7 @@ export default function MonthlyStockScreen() {
     const truoc = lines;
     ghiLines(lines.map((l) => (ids.has(l.id) ? { ...l, storageLocation: dich } : l)));
     setGanViTri(null);
-    notify.daLuu(`Đã chuyển ${ids.size} dòng về ${dich}`, () => ghiLines(truoc));
+    notify.daLuu(`Đã gửi ${ids.size} dòng tới ${dich}`, () => ghiLines(truoc));
   };
 
   // ---------- Thao tác một dòng: lấy ra dùng · nhập thêm · chuyển vị trí ----------
@@ -528,7 +528,7 @@ export default function MonthlyStockScreen() {
         ? `Lấy ra sử dụng ${num(kg)} kg`
         : kieu === "nhap"
           ? `Nhập thêm ${num(kg)} kg`
-          : `Chuyển ${num(kg)} kg từ ${viTriCua(row) || "(chưa rõ)"} sang ${viTri.trim()}`;
+          : `Gửi ${num(kg)} kg từ ${viTriCua(row) || "(chưa rõ)"} tới ${viTri.trim()}`;
     const ghiChu = `${viDate(ngay || homNay())}: ${viec}${lyDo.trim() ? ` — ${lyDo.trim()}` : ""}`;
     const goc = lines.find((l) => l.id === row.id);
     if (!goc) return;
@@ -755,6 +755,10 @@ export default function MonthlyStockScreen() {
   // ---------- Cột bảng xem (theo kg — kiện vẫn lưu nhưng không hiện) ----------
   /** Vị trí hiển thị: đã gán thì tên kho lưu, chưa gán ⇒ hàng đang ở chính kho của sổ. */
   const viTriCua = (r: MonthlyStockLine) => r.storageLocation || r.warehouse;
+  /** Vị trí là KHO NGOÀI (thuê ngoài, VD Ánh Dương/HP) — không phải 5 kho hệ thống. */
+  const laKhoNgoai = (loc: string) => !!loc.trim() && !MA_KHO.has(loc.trim());
+  /** Nhãn cột Vị trí: hàng gửi kho ngoài ghi rõ "Gửi: <kho>" cho kế toán thấy ngay. */
+  const nhanViTri = (r: MonthlyStockLine) => (laKhoNgoai(r.storageLocation) ? `Gửi: ${r.storageLocation}` : viTriCua(r));
   const cot = (t: ReturnType<typeof tongDong>): CotTong<MonthlyStockRow>[] => [
     {
       key: "ngay",
@@ -798,8 +802,16 @@ export default function MonthlyStockScreen() {
       key: "viTri",
       header: "Vị trí",
       render: (r) => (
-        <span className={r.storageLocation ? "whitespace-nowrap font-medium text-foreground" : "whitespace-nowrap text-muted-foreground"}>
-          {viTriCua(r) || "—"}
+        <span
+          className={
+            laKhoNgoai(r.storageLocation)
+              ? "whitespace-nowrap font-semibold text-primary"
+              : r.storageLocation
+                ? "whitespace-nowrap font-medium text-foreground"
+                : "whitespace-nowrap text-muted-foreground"
+          }
+        >
+          {nhanViTri(r) || "—"}
         </span>
       ),
     },
@@ -820,8 +832,8 @@ export default function MonthlyStockScreen() {
               <Button
                 size="sm"
                 variant="ghost"
-                aria-label={`Lấy ra / chuyển ${r.itemName}`}
-                title="Lấy hàng ra sử dụng, nhập thêm, hoặc chuyển sang kho khác — nhập số kg rồi lưu."
+                aria-label={`Lấy ra / gửi kho ${r.itemName}`}
+                title="Lấy hàng ra sử dụng, nhập thêm, hoặc gửi ra kho ngoài (Ánh Dương, HP…) — nhập số kg rồi lưu."
                 onClick={() => moThaoTac(r)}
               >
                 <PackageMinus className="size-4" />
@@ -907,14 +919,6 @@ export default function MonthlyStockScreen() {
           >
             <Upload className="mr-2 h-4 w-4" />
             Nhập Excel bảng kê
-          </Button>
-          <Button
-            variant="outline"
-            onClick={moThem}
-            title="Thêm tay một dòng hàng vào tháng đang xem (ngày nhập · tên · invoice · đơn giá · tồn đầu/nhập/xuất · vị trí)."
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            Thêm dòng
           </Button>
           <Button
             variant="outline"
@@ -1128,10 +1132,10 @@ export default function MonthlyStockScreen() {
             <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
               <span className="font-semibold text-foreground">Cách thao tác:</span>
               <span>
-                lấy hàng ra dùng · nhập thêm · chuyển kho một dòng → bấm{" "}
-                <PackageMinus className="inline size-4 align-text-bottom" aria-label="nút Lấy ra / chuyển" /> cuối dòng;
+                lấy hàng ra dùng · nhập thêm · gửi kho ngoài một dòng → bấm{" "}
+                <PackageMinus className="inline size-4 align-text-bottom" aria-label="nút Lấy ra / gửi kho" /> cuối dòng;
               </span>
-              <span>chuyển nhiều dòng một lúc → tick dòng rồi bấm "Gán vị trí";</span>
+              <span>gửi nhiều dòng một lúc → tick dòng rồi bấm "Gửi kho ngoài";</span>
               <span>gõ số cả bảng → "Ghi nhập/xuất". Hướng dẫn đầy đủ ở nút ? trên đầu trang.</span>
             </p>
           )}
@@ -1160,9 +1164,9 @@ export default function MonthlyStockScreen() {
               </span>
               <div className="ml-auto flex flex-wrap items-center gap-2">
                 {!laXemTruoc && (
-                  <Button size="sm" variant="outline" onClick={() => setGanViTri("")} title="Ghi vị trí hàng đang nằm (VD Kho Ánh Dương) cho tất cả dòng đang tick.">
+                  <Button size="sm" variant="outline" onClick={() => setGanViTri("")} title="Đánh dấu các dòng đang tick là GỬI ra kho ngoài (VD Kho Ánh Dương, HP). Chỉ ghi nơi để hàng, không đổi số kg.">
                     <MapPin className="mr-2 h-4 w-4" />
-                    Gán vị trí
+                    Gửi kho ngoài
                   </Button>
                 )}
                 <Button size="sm" variant="outline" onClick={() => setMoIn(true)} title="In riêng các dòng đang tick, kèm dòng tổng của đúng mấy dòng đó.">
@@ -1284,6 +1288,20 @@ export default function MonthlyStockScreen() {
                   />
                 </section>
               ))}
+            </div>
+          )}
+
+          {!laXemTruoc && (
+            <div className="flex">
+              <Button
+                variant="outline"
+                onClick={moThem}
+                className="w-full sm:w-auto"
+                title="Thêm tay một dòng hàng vào tháng đang xem (ngày nhập · tên · invoice · đơn giá · tồn đầu/nhập/xuất · vị trí)."
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Thêm dòng
+              </Button>
             </div>
           )}
 
@@ -1415,7 +1433,7 @@ export default function MonthlyStockScreen() {
                 {(
                   [
                     ["xuat", "Lấy ra sử dụng", "Xuất đi sản xuất / bán — trừ vào tồn."],
-                    ["chuyen", "Chuyển kho", "Đổi chỗ để hàng — tồn không đổi."],
+                    ["chuyen", "Gửi kho ngoài", "Gửi ra kho ngoài (Ánh Dương, HP…) hoặc đổi chỗ — tồn không đổi."],
                     ["nhap", "Nhập thêm", "Hàng về thêm cho đúng lô này."],
                   ] as const
                 ).map(([k, nhan, moTa]) => (
@@ -1454,7 +1472,7 @@ export default function MonthlyStockScreen() {
               </div>
               {thaoTac.kieu === "chuyen" && (
                 <Combobox
-                  label="Chuyển tới"
+                  label="Gửi tới kho (VD Kho Ánh Dương, HP)"
                   required
                   value={thaoTac.viTri}
                   onChange={(v) => setThaoTac((s) => (s ? { ...s, viTri: v } : s))}
@@ -1486,7 +1504,7 @@ export default function MonthlyStockScreen() {
                 {thaoTac.kieu === "nhap" &&
                   "Số kg được CỘNG vào cột Nhập trong kỳ. Hàng lô khác (ngày nhập / invoice khác) thì dùng nút Thêm dòng."}
                 {thaoTac.kieu === "chuyen" &&
-                  "Chuyển HẾT tồn cuối ⇒ chỉ đổi Vị trí của dòng. Chuyển MỘT PHẦN ⇒ tách thành dòng mới ở vị trí đích. Tổng nhập / xuất / tồn của tháng không đổi."}
+                  "Gửi HẾT tồn cuối ⇒ chỉ đổi Vị trí của dòng (cột Vị trí ghi \"Gửi: <kho>\"). Gửi MỘT PHẦN ⇒ tách thành dòng mới ở kho nhận. Tổng nhập / xuất / tồn của tháng không đổi."}
               </p>
             </div>
           )}
@@ -1506,16 +1524,16 @@ export default function MonthlyStockScreen() {
       <Dialog open={ganViTri !== null} onOpenChange={(o) => !o && setGanViTri(null)}>
         <DialogContent className="w-full sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle className="text-2xl">Gán vị trí · {rowsChon.length} dòng</DialogTitle>
+            <DialogTitle className="text-2xl">Gửi kho ngoài · {rowsChon.length} dòng</DialogTitle>
             <DialogDescription className="text-base">
-              Hàng của các dòng đang tick đang nằm ở kho nào. Chỉ đổi cột Vị trí, không đổi số kg hay sổ kho.
+              Chọn kho đang giữ hàng (VD Kho Ánh Dương, HP). Gõ tên mới sẽ tự lưu vào danh mục kho thuê ngoài. Chỉ ghi cột Vị trí, không đổi số kg hay sổ kho.
             </DialogDescription>
           </DialogHeader>
           {ganViTri !== null && (
             <div className="space-y-4 py-2">
               <ChuThichBatBuoc />
               <Combobox
-                label="Vị trí"
+                label="Kho nhận (VD Kho Ánh Dương, HP)"
                 required
                 value={ganViTri}
                 onChange={(v) => setGanViTri(v)}

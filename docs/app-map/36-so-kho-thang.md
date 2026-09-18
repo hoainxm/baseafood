@@ -62,6 +62,8 @@ Tiền còn lại    = Tồn cuối (kg) × đơn giá      // suyDong().remaini
 
 - Chọn kỳ = tháng (Combobox + nút ◀ ▶), lọc theo kho (5 kho hệ thống `BSF1_WAREHOUSES` + kho lạ nếu có), **ô "Tìm mặt hàng"** (lọc theo tên · size · invoice · nhóm · kho · vị trí), hai chế độ: **xem** (nhóm × bảng + dòng cộng nhóm) và **Ghi nhập/xuất** (`LuoiNhap` gõ kg từng mã, dán khối Excel). Mô tả (ngày nhập/tên/size/invoice/đơn giá/vị trí) sửa ở nút ✎ dialog.
 - **Thứ tự cột bảng xem:** Ngày nhập · Mặt hàng (size dòng phụ) · Invoice · Đơn giá · Tồn đầu kỳ (kg) · Nhập trong kỳ (kg) · Xuất trong kỳ (kg) · Tồn cuối kỳ (kg) · Tiền còn lại · **Vị trí** · thao tác. Bảng mỗi nhóm bật `BangTong dinhDau`: khung cuộn riêng cao ≤70dvh, hàng tên cột dính đỉnh + dòng cộng dính đáy.
+- **Cột Vị trí:** hàng gửi ra **kho ngoài** (kho thuê ngoài, không thuộc 5 kho hệ thống — `laKhoNgoai`) hiện **"Gửi: &lt;kho&gt;"** đậm màu primary (VD "Gửi: Kho Ánh Dương") để kế toán thấy ngay; vị trí trong kho hệ thống hiện tên thường, để trống ⇒ tên `warehouse` màu mờ.
+- **Nút "Thêm dòng"** đặt ở **CUỐI danh sách** (dưới bảng, full-width ở điện thoại) — không còn ở thanh công cụ trên. Ẩn khi đang xem trước dồn kỳ (bấm "Kế thừa & lưu vào sổ" trước).
 - 5 thẻ `ThongKe` tự xếp: màn rộng (xl) một hàng 5 thẻ, lg 3+2, điện thoại 2 cột (thẻ lẻ trải hàng; chữ 130% về 1 cột).
 - `gomNhom()` xếp theo `MONTHLY_STOCK_CATEGORIES` trước, nhóm lạ cuối; mỗi nhóm có tổng riêng, thẻ `ThongKe` tổng toàn tháng (gồm tiền còn lại). In A4 (`PhieuIn`).
 - Tháng mặc định = tháng hiện tại (`thangHienTai`).
@@ -72,7 +74,7 @@ Dialog 3 việc, số kg + ngày + ghi chú; mọi lần lưu nối một dòng 
 
 - **Lấy ra sử dụng** — CỘNG DỒN vào `outKg` (kiện theo `kgPerCtn` nếu có). Chặn vượt tồn cuối.
 - **Nhập thêm** — cộng dồn `inKg` cho đúng lô đó (lô khác ngày nhập/invoice ⇒ "Thêm dòng").
-- **Chuyển kho** — KHÔNG phải nhập/xuất ⇒ tổng tháng không đổi. Chuyển HẾT tồn cuối ⇒ chỉ đổi `storageLocation`. Chuyển MỘT PHẦN ⇒ tách dòng mới (id `msl|<tháng>|uid`, cùng mô tả, vị trí đích): kg lấy từ `openKg` trước rồi `inKg` (kiện chia cùng tỉ lệ), dòng gốc giữ `outKg` ⇒ tồn cuối gốc = cũ − X, dòng tách = X. Tổng theo tên (`khoaLo`) giữ nguyên ⇒ đối chiếu dồn kỳ không báo lệch giả. Dòng tách ghi note `(tách từ dòng <id>)`.
+- **Gửi kho ngoài** (nhãn UI của kiểu `chuyen`; mô tả nêu rõ "Ánh Dương, HP…") — KHÔNG phải nhập/xuất ⇒ tổng tháng không đổi. Gửi HẾT tồn cuối ⇒ chỉ đổi `storageLocation` (cột Vị trí ghi "Gửi: &lt;kho&gt;"). Gửi MỘT PHẦN ⇒ tách dòng mới (id `msl|<tháng>|uid`, cùng mô tả, vị trí đích): kg lấy từ `openKg` trước rồi `inKg` (kiện chia cùng tỉ lệ), dòng gốc giữ `outKg` ⇒ tồn cuối gốc = cũ − X, dòng tách = X. Tổng theo tên (`khoaLo`) giữ nguyên ⇒ đối chiếu dồn kỳ không báo lệch giả. Dòng tách ghi note `(tách từ dòng <id>)`.
 - ⚠ **Nạp lại Excel** tháng có dòng đã tách: dòng gốc (id `xlsx|…`) trở về số trong file ⇒ phần tách bị đếm 2 lần. `xacNhanNap` dò note `(tách từ dòng <id>)` và **cảnh báo** (không tự xoá).
 - Khác lưới **Ghi nhập/xuất**: ô lưới là tổng CẢ THÁNG (ghi đè), nút dòng là CỘNG THÊM từng lần.
 
@@ -84,7 +86,7 @@ Nút **Ẩn dòng trống (n)** (`aria-pressed`) lọc bỏ dòng `laDongTrong` 
 
 Bảng bật cột ô tick qua prop `chon` của `BangTong` (`ChonBang` — xem [design-system README](../../src/design-system/README.md)); màn giữ `daChon: Set<id>`, **không sửa dữ liệu**. Tick vài dòng ⇒ hiện thanh cộng tổng của ĐÚNG mấy dòng đó (tồn đầu · nhập · xuất · tồn cuối theo kg, + tiền còn lại) — việc kế toán làm suốt mà trước phải bấm máy tính tay. Kèm:
 
-- **Gán vị trí** — Combobox vị trí, ghi `storageLocation` cho mọi dòng tick (toast Hoàn tác). Ẩn khi đang xem trước dồn kỳ.
+- **Gửi kho ngoài** (nút bulk, trước tên "Gán vị trí") — Combobox "Kho nhận (VD Kho Ánh Dương, HP)", ghi `storageLocation` cho mọi dòng tick (toast Hoàn tác). Ẩn khi đang xem trước dồn kỳ.
 - **In {n} dòng** — `PhieuIn` in đúng dòng đã tick (`rowsIn = rowsChon.length ? rowsChon : rowsThang`, tổng + gom nhóm tính lại theo đó).
 - **Xóa dòng đã chọn** — qua `ConfirmDelete` + toast **Hoàn tác** (không xóa lặng lẽ). Ẩn khi đang xem trước dồn kỳ.
 - Ô tick ở đầu bảng mỗi nhóm = chọn/bỏ cả nhóm; nút "Chọn tất cả / Bỏ chọn hết" ở thanh công cụ. Đổi tháng/kho ⇒ bỏ chọn (tránh cộng nhầm dòng của kỳ khác).
@@ -99,7 +101,7 @@ Tháng đang xem chưa có dòng nào **và** tháng trước còn tồn ⇒ mà
 
 - **Vì sao xem trước chứ không tự ghi:** dồn kỳ vẫn phải qua bước người duyệt — lô hay bị tách size / đổi mã lô giữa các tháng, tự ghi đè là đường thẳng tới **cộng đôi** (xem § Cờ lệch dồn kỳ). Xem trước cho thấy số ngay mà không chạm dữ liệu; một cú bấm mới ghi.
 - Trong chế độ xem trước: ẩn nút Ghi nhập/xuất, ẩn ✎ và 🗑 từng dòng, ẩn 📦− (Chuyển kho/Lấy ra) + "Gán vị trí", **tắt banner "Lệch dồn kỳ"** (lệch lúc này chính là phần chưa dồn — banner xem trước đã nói rồi, hiện thêm cảnh báo đỏ chỉ làm tưởng sai số).
-- ⚠ **"Thêm dòng" bị chặn khi đang xem trước** (`moThem` → `notify.canhBao`, không mở form): thêm+lưu 1 dòng sẽ khiến `rowsLuu` ≠ rỗng ⇒ tắt xem trước ⇒ cả bảng kế thừa (chưa lưu) biến mất khỏi màn — dễ tưởng mất số liệu. Bắt bấm "Kế thừa & lưu vào sổ" trước. Muốn ghi hàng **đông gửi kho ngoài** (Ánh Dương/HP…) cũng vậy: lưu sổ trước, rồi tick dòng → "Gán vị trí", hoặc 📦− → "Chuyển kho" (dùng cột **Vị trí**, KHÔNG đẻ khái niệm dòng gửi riêng — chốt 2026-09-18).
+- ⚠ **"Thêm dòng" bị chặn khi đang xem trước** (`moThem` → `notify.canhBao`, không mở form): thêm+lưu 1 dòng sẽ khiến `rowsLuu` ≠ rỗng ⇒ tắt xem trước ⇒ cả bảng kế thừa (chưa lưu) biến mất khỏi màn — dễ tưởng mất số liệu. Bắt bấm "Kế thừa & lưu vào sổ" trước. Muốn ghi hàng **đông gửi kho ngoài** (Ánh Dương/HP…) cũng vậy: lưu sổ trước, rồi tick dòng → **"Gửi kho ngoài"**, hoặc 📦− → **"Gửi kho ngoài"** (dùng cột **Vị trí**, KHÔNG đẻ khái niệm dòng gửi riêng — chốt 2026-09-18).
 - Dòng xem trước lọc theo kho đang chọn; nút "Kế thừa & lưu" vẫn dồn **toàn bộ kho** (`donTuThangTruoc`, đúng quy tắc "dồn kỳ không bỏ sót kho nào").
 
 ## Nhập Excel bảng kê (seed số cũ)

@@ -161,6 +161,13 @@ function sheetDoiChieuTong(wb: Workbook, kq: KetQuaDoiSoat): Worksheet {
       : '⚠️ FILE NÀY KHÔNG CÓ SHEET SỔ KẾ TOÁN nên cả bảng dưới đây KHÔNG dùng được (mọi hóa đơn đều rơi vào nhóm "chưa vào sổ"). Xem sheet SO HAI BẢN HĐĐT — đó mới là kết quả của file này.',
     `Ngưỡng coi là khớp: ${kq.nguong.toLocaleString("vi-VN")} đ. Cột F cho biết số lấy từ đâu, cột G hướng dẫn tự kiểm lại bằng tay.`,
   ]);
+  if (kq.sheetPhanMem) {
+    // Chỉ đường thẳng tới danh sách đi hạch toán — kế toán từng phản ánh "không thấy lọc chưa kê".
+    const o = ws.getCell(4, 1);
+    const nghi = hd.reduce((n, sh) => n + sh.dong.filter((d) => d.trangThai === "THIEU" && !d.khongCanVaoSo && d.ganKhopMoTa).length, 0);
+    o.value = `→ DANH SÁCH HÓA ĐƠN CHƯA KÊ đã lọc sẵn ở sheet kế bên "HÓA ĐƠN CHƯA KÊ": ${T.n - Tkhong.n - nghi} hóa đơn phải kê${nghi ? ` + ${nghi} hóa đơn nghi đã kê nhưng gõ sai số ở sổ` : ""}.`;
+    o.font = { bold: true, color: { argb: "FF9C0006" } };
+  }
   tieuDeBang(ws, 5, ["CHỈ TIÊU", "TRƯỚC THUẾ", "THUẾ", "TỔNG THANH TOÁN", "SỐ DÒNG", "NGUỒN SỐ LIỆU", "CÁCH TỰ KIỂM TRA LẠI"]);
 
   let r = bangChiTieu(ws, 6, [
@@ -301,6 +308,145 @@ function sheetNghiVan(wb: Workbook, kq: KetQuaDoiSoat): Worksheet {
 
 const NEN_NGHI = "FFFFEB9C";
 
+/** "dd/mm/yyyy" → "yyyymmdd" để xếp theo ngày. */
+const khoaNgay = (s: string): string => {
+  const m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(s.trim());
+  return m ? `${m[3]}${m[2]!.padStart(2, "0")}${m[1]!.padStart(2, "0")}` : s;
+};
+
+/**
+ * Sheet HÓA ĐƠN CHƯA KÊ — danh sách LỌC SẴN, không bắt kế toán tự lọc cột A.
+ *
+ * Kế toán phản ánh "không thấy lọc chưa kê": nhãn có sẵn ở cột A từng sheet, nhưng
+ * phải biết mà lọc, lại rải qua nhiều sheet. Đây là thứ họ cần nhất — danh sách đi
+ * hạch toán — nên dựng riêng, xếp theo ngày lập, có dòng cộng.
+ *
+ * LOẠI hóa đơn `khongCanVaoSo` (đã bị thay thế/hủy — quy tắc 2026-09-16): liệt kê vào
+ * đây là bắt người ta đi kê oan. Chúng được nêu riêng ở cuối cho minh bạch.
+ * Phần 2: dòng sổ KHÔNG có hóa đơn điện tử (chiều ngược lại).
+ */
+function sheetChuaKe(wb: Workbook, kq: KetQuaDoiSoat): Worksheet {
+  const ws = wb.addWorksheet("HÓA ĐƠN CHƯA KÊ");
+  [6, 12, 14, 12, 18, 42, 18, 16, 18, 20, 20, 56].forEach((w, i) => (ws.getColumn(i + 1).width = w));
+  const hd = kq.sheetsHoaDon.filter((sh) => !sh.laPhu);
+  const tatCa = hd.flatMap((sh) => sh.dong.filter((d) => d.trangThai === "THIEU"));
+  const theoNgay = (a: (typeof tatCa)[number], b: (typeof tatCa)[number]) =>
+    khoaNgay(a.ngayLap).localeCompare(khoaNgay(b.ngayLap)) || a.tenBan.localeCompare(b.tenBan, "vi");
+  // Có "gần khớp" (cùng MST + cùng số tiền với một dòng sổ không ghép được) ⇒ nhiều
+  // khả năng ĐÃ KÊ, chỉ gõ sai số hóa đơn ở sổ. Tách riêng kẻo kế toán đi kê trùng.
+  // Vẫn để trong sheet này (chỉ là gợi ý của máy, người phải xác nhận).
+  const phaiKe = tatCa.filter((d) => !d.khongCanVaoSo && !d.ganKhopMoTa).sort(theoNgay);
+  const nghiSaiSo = tatCa.filter((d) => !d.khongCanVaoSo && d.ganKhopMoTa).sort(theoNgay);
+  const boQua = tatCa.filter((d) => d.khongCanVaoSo);
+  const tenSo = kq.sheetPhanMem?.ten ?? "sổ kế toán";
+  const tongKe = phaiKe.reduce((t, d) => t + d.tongTtVnd, 0);
+
+  tieuDeTrang(ws, `HÓA ĐƠN CHƯA KÊ — ${phaiKe.length} hóa đơn · ${Math.round(tongKe).toLocaleString("vi-VN")} đ`, [
+    `Hóa đơn có trên cổng thuế nhưng CHƯA có trong sheet "${tenSo}". Xếp theo ngày lập. Đây là danh sách đi hạch toán.`,
+    [
+      nghiSaiSo.length
+        ? `Tách riêng ${nghiSaiSo.length} hóa đơn NGHI ĐÃ KÊ NHƯNG GÕ SAI SỐ HÓA ĐƠN ở sổ (cùng MST + cùng số tiền) — xem mục ngay dưới bảng chính, xác nhận rồi sửa số ở sổ, đừng kê thêm.`
+        : "",
+      boQua.length ? `Loại ${boQua.length} hóa đơn đã bị thay thế/hủy (không cần kê) — nêu ở cuối sheet.` : "",
+    ].filter(Boolean).join(" ") || "Không có hóa đơn nào nghi gõ sai số hay bị thay thế/hủy trong nhóm này.",
+  ]);
+
+  const dauBang = 5;
+  const cot = [
+    "STT", "Ký hiệu", "Số hóa đơn", "Ngày lập", "MST người bán", "Tên người bán",
+    "Chưa thuế (VND)", "Thuế (VND)", "Tổng thanh toán (VND)", "Trạng thái hóa đơn",
+    "Vị trí trong file", "Ghi chú",
+  ];
+  tieuDeBang(ws, dauBang, cot);
+  let r = dauBang + 1;
+  const ghiDong = (d: (typeof tatCa)[number], stt: number, nen?: string) => {
+    const o = [
+      stt, d.kyHieu, d.soHoaDon, d.ngayLap, d.mstBan, d.tenBan,
+      d.chuaThueVnd, d.thueVnd, d.tongTtVnd, d.trangThaiHd,
+      `${d.sheet} dòng ${d.dongFile}`, d.ganKhopMoTa ?? "",
+    ];
+    o.forEach((v, c) => {
+      const cell = ws.getCell(r, c + 1);
+      cell.value = (v === "" ? null : v) as never;
+      if (c >= 6 && c <= 8) cell.numFmt = "#,##0";
+      cell.alignment = { vertical: "top", wrapText: c === 5 || c === 11 };
+      if (nen) cell.fill = to(nen);
+    });
+    r++;
+  };
+  phaiKe.forEach((d, i) => ghiDong(d, i + 1));
+
+  // dòng cộng
+  ws.getCell(r, 6).value = `CỘNG ${phaiKe.length} hóa đơn`;
+  const tongCot: [number, number][] = [
+    [7, phaiKe.reduce((t, d) => t + d.chuaThueVnd, 0)],
+    [8, phaiKe.reduce((t, d) => t + d.thueVnd, 0)],
+    [9, tongKe],
+  ];
+  for (const [c, v] of tongCot) {
+    ws.getCell(r, c).value = v;
+    ws.getCell(r, c).numFmt = "#,##0";
+  }
+  for (let c = 1; c <= cot.length; c++) {
+    ws.getCell(r, c).font = { bold: true };
+    ws.getCell(r, c).border = { top: { style: "thin" } };
+  }
+  if (!phaiKe.length) {
+    ws.getCell(dauBang + 1, 1).value = "Không có hóa đơn nào chưa kê.";
+    ws.getCell(dauBang + 1, 1).font = { italic: true };
+  }
+  ws.autoFilter = { from: { row: dauBang, column: 1 }, to: { row: dauBang, column: cot.length } };
+  r += 2;
+
+  if (nghiSaiSo.length) {
+    ws.getCell(r, 1).value = `NGHI ĐÃ KÊ NHƯNG GÕ SAI SỐ HÓA ĐƠN Ở SỔ — ${nghiSaiSo.length} hóa đơn (cùng MST + cùng số tiền với một dòng sổ ở mục cuối). Xác nhận rồi SỬA SỐ Ở SỔ, đừng kê thêm lần nữa.`;
+    ws.getCell(r, 1).font = { bold: true, color: { argb: "FF9C6500" } };
+    r++;
+    tieuDeBang(ws, r, cot);
+    r++;
+    nghiSaiSo.forEach((d, i) => ghiDong(d, i + 1, NEN_NGHI));
+    r += 1;
+  }
+
+  if (boQua.length) {
+    ws.getCell(r, 1).value = `KHÔNG CẦN KÊ — ${boQua.length} hóa đơn đã bị thay thế/hủy (kế toán hạch toán bản thay thế)`;
+    ws.getCell(r, 1).font = { bold: true };
+    r++;
+    tieuDeBang(ws, r, cot);
+    r++;
+    boQua.forEach((d, i) => ghiDong(d, i + 1, "FFE7E6E6"));
+    r += 1;
+  }
+
+  // Phần 2 — chiều ngược: dòng sổ không có hóa đơn điện tử
+  const soThieu = (kq.sheetPhanMem?.dong ?? []).filter((d) => d.trangThai === "THIEU");
+  ws.getCell(r, 1).value = `DÒNG SỔ KHÔNG CÓ HÓA ĐƠN ĐIỆN TỬ — ${soThieu.length} dòng (đã kê nhưng không tìm thấy hóa đơn trên cổng thuế)`;
+  ws.getCell(r, 1).font = { bold: true };
+  r++;
+  tieuDeBang(ws, r, [
+    "STT", "Ký hiệu", "Số hóa đơn", "Ngày HĐ", "MST người bán", "Tên người bán",
+    "Số phiếu", "CTGS", "Tổng cộng (VND)", "", "Vị trí trong file", "Ghi chú",
+  ]);
+  r++;
+  soThieu.forEach((d, i) => {
+    const o = [
+      i + 1, d.kyHieu, d.soHoaDon, d.ngayHd, d.mstBan, d.tenBan,
+      d.phieu, d.ctgs, d.tongCong, "", `${d.sheet} dòng ${d.dongFile}`, d.ganKhopMoTa ?? "",
+    ];
+    o.forEach((v, c) => {
+      const cell = ws.getCell(r, c + 1);
+      cell.value = (v === "" ? null : v) as never;
+      if (c === 8) cell.numFmt = "#,##0";
+      cell.alignment = { vertical: "top", wrapText: c === 5 || c === 11 };
+    });
+    r++;
+  });
+  if (!soThieu.length) ws.getCell(r, 1).value = "Không có — mọi dòng sổ đều tìm thấy hóa đơn điện tử.";
+
+  ws.views = [{ state: "frozen", ySplit: dauBang }];
+  return ws;
+}
+
 /** Sheet SO HAI BẢN — chỉ dựng khi file có cả bản thuế gửi lẫn bản tự tải. */
 function sheetSoHaiBan(wb: Workbook, so: KetQuaSoHaiBan): Worksheet {
   const ws = wb.addWorksheet("SO HAI BẢN HĐĐT");
@@ -405,7 +551,7 @@ function sheetCungNgay(wb: Workbook, nhom: readonly NhomCungNgay[]): Worksheet {
 /** Dựng các sheet tổng hợp và đẩy chúng lên ĐẦU workbook. */
 export function themSheetTongHop(wb: Workbook, kq: KetQuaDoiSoat): void {
   // Chạy lại trên file đã xuất: bỏ bản cũ đi rồi dựng lại, kẻo trùng tên.
-  for (const ten of ["ĐỐI CHIẾU TỔNG", "TỰ KIỂM TRA", "NGHI VẤN SỐ LIỆU", "SO HAI BẢN HĐĐT", "CÙNG MST CÙNG NGÀY"]) {
+  for (const ten of ["ĐỐI CHIẾU TỔNG", "HÓA ĐƠN CHƯA KÊ", "TỰ KIỂM TRA", "NGHI VẤN SỐ LIỆU", "SO HAI BẢN HĐĐT", "CÙNG MST CÙNG NGÀY"]) {
     const cu = wb.worksheets.find((w) => w.name === ten);
     if (cu) wb.removeWorksheet(cu.id);
   }
@@ -419,6 +565,8 @@ export function themSheetTongHop(wb: Workbook, kq: KetQuaDoiSoat): void {
   const ds = [
     ...(soHaiBan && khongCoSo ? [sheetSoHaiBan(wb, soHaiBan)] : []),
     sheetDoiChieuTong(wb, kq),
+    // Ngay sau bảng tổng: thứ kế toán cần nhất là danh sách đi hạch toán.
+    ...(khongCoSo ? [] : [sheetChuaKe(wb, kq)]),
     ...(soHaiBan && !khongCoSo ? [sheetSoHaiBan(wb, soHaiBan)] : []),
     ...(cungNgay.length ? [sheetCungNgay(wb, cungNgay)] : []),
     sheetTuKiemTra(wb, kq),

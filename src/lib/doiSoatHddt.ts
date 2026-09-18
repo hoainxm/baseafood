@@ -181,6 +181,8 @@ export interface SheetPhanMem {
   dong: DongPhanMem[];
   /** Tiêu đề thật của cặp cột "TK Nợ / TK Có" (sổ mã máy là "TS% / LOAI"). */
   tenTk: string;
+  /** false = bản xuất chi tiết mặt hàng, không có cột tổng — tổng tự cộng tiền hàng + thuế. */
+  coCotTong: boolean;
   laPhu?: boolean;
   goc: ToaDoGoc;
   hIdx: number;
@@ -660,14 +662,24 @@ function doTronBoCuc(
 const hangTieuDeHoaDon = (rows: unknown[][]) =>
   timHangTieuDe(rows, ["so hoa don", "ky hieu hoa don"]);
 
-/** Sheet SỔ: neo "so hd" + "tổng cộng" (HĐĐT không có) → không nhận nhầm. */
+/**
+ * Sheet SỔ: neo "so hd" (HĐĐT ghi "số hóa đơn" nên không nhận nhầm) + phần tiền.
+ *
+ * Phần tiền chấp nhận HAI kiểu xuất của phần mềm kế toán:
+ *  - có cột TỔNG CỘNG (`Tổng cộng` / `TONGCONG`) — bản cũ, 1 dòng / hóa đơn;
+ *  - KHÔNG có cột tổng, chỉ có tiền hàng + tiền thuế (`TIENHANG_CHUATHUE` +
+ *    `TIEN_THUE`) — bản xuất CHI TIẾT MẶT HÀNG, 1 dòng / mặt hàng. Tổng khi đó
+ *    phải tự cộng (`coCotTong = false` ở `parseSheetPhanMem`).
+ */
 function hangTieuDePhanMem(rows: unknown[][]): number {
   const gioiHan = Math.min(rows.length, 15);
   for (let i = 0; i < gioiHan; i++) {
     const cells = (rows[i] ?? []).map((c) => chuan(c));
     const coSoHd = cells.some((c) => c.includes("so hd"));
     const coTong = cells.some((c) => c === "tongcong" || c.includes("tong cong"));
-    if (coSoHd && coTong) return i;
+    const coTienHang = cells.some((c) => c.startsWith("tienhang") || c.startsWith("tien hang") || c.startsWith("st chua thue"));
+    const coTienThue = cells.some((c) => c === "tienthue" || c === "tien thue");
+    if (coSoHd && (coTong || (coTienHang && coTienThue))) return i;
   }
   return -1;
 }
@@ -968,8 +980,8 @@ function parseSheetPhanMem(
 
   const sel = chonCotDongNhat(
     rows, dataStart,
-    moiCot(headerRaw, "ST chưa thuế", "TIENHANG"),
-    moiCot(headerRaw, "Tiền thuế", "TIENTHUE"),
+    moiCot(headerRaw, "ST chưa thuế", "TIENHANG", "TIENHANG_CHUATHUE"),
+    moiCot(headerRaw, "Tiền thuế", "TIENTHUE", "TIEN_THUE"),
     moiCot(headerRaw, "Tổng cộng", "TONGCONG"),
     -1, -1
   );
@@ -981,16 +993,20 @@ function parseSheetPhanMem(
   };
   const cCtgs = cot1(headerRaw, "CTGS", "SCT_GHISO");
   const cPhieu = cot1(headerRaw, "Phiếu", "SO_PHIEU");
-  const cKyHieu = cot1(headerRaw, "KHHĐ", "KY_HIEU");
+  const cKyHieu = cot1(headerRaw, "KHHĐ", "KY_HIEU", "KH_HD");
   const cSo = cot1(headerRaw, "Số HĐ", "SO_HD");
-  const cMst = cot1(headerRaw, "MASOTHUE", "RMST");
+  const cMst = cot1(headerRaw, "MASOTHUE", "RMST", "MS_THUE");
   const cNgayHd = cot1(headerRaw, "Ngày HĐ", "NGAY_HD");
   // Sổ mã máy (PMEM) không có TK Nợ/Có mà có TS% + LOAI ⇒ nhận cả hai kiểu,
   // tên cột ở file xuất lấy đúng theo tiêu đề tìm được (`tenTk`).
   const cTkNo = cot1(headerRaw, "TK Nợ", "TS%", "Thuế suất");
   const cTkCo = cot1(headerRaw, "TK Có", "LOAI", "Loại");
-  const cDienGiai = cot1(headerRaw, "Tên mặt hàng", "MAT_HANG", "GHICHU");
-  const cTenBan = cot1(headerRaw, "Tên người bán", "NGUOI_BAN");
+  const cDienGiai = cot1(headerRaw, "Tên mặt hàng", "MAT_HANG", "NOIDUNG", "GHICHU");
+  const cTenBan = cot1(headerRaw, "Tên người bán", "NGUOI_BAN", "DONVIBAN");
+  // Bản xuất chi tiết mặt hàng KHÔNG có cột tổng ⇒ tổng = tiền hàng + tiền thuế,
+  // và KHÔNG được soi "cộng có khớp tổng không" (không có tổng để soi — soi là báo
+  // oan cả sổ thành "tổng bị xóa").
+  const coCotTong = cCot.tong >= 0;
 
   for (const p of sel.phu)
     nghiVan.push({
@@ -1013,7 +1029,7 @@ function parseSheetPhanMem(
     const kyHieu = String(layO(row, cKyHieu, ten, soDong, edits) ?? "").trim();
     if (!soHoaDon && !kyHieu) continue;
 
-    const nv = nghiVanCong(ten, soDong, row, cCot, edits, g);
+    const nv = coCotTong ? nghiVanCong(ten, soDong, row, cCot, edits, g) : null;
     if (nv) {
       if (nv.nhom === 4 || nv.nhom === 5) themGop(gopMap, nv, (nv.nhom === 4 ? soVN(row[cCot.tong]) : nv.giaTriDung) ?? 0, "pm");
       else nghiVan.push(nv);
@@ -1026,7 +1042,9 @@ function parseSheetPhanMem(
       cells: apSuaVaoHang(row, header, ten, soDong, edits, nhatKy, g),
       ctgs: cellStr(row, cCtgs), phieu: cellStr(row, cPhieu),
       kyHieu, soHoaDon, soChuan, mstBan, tenBan: cellStr(row, cTenBan),
-      tongCong: soVN(layO(row, cCot.tong, ten, soDong, edits)) ?? 0,
+      tongCong: coCotTong
+        ? soVN(layO(row, cCot.tong, ten, soDong, edits)) ?? 0
+        : (soVN(layO(row, cCot.chua, ten, soDong, edits)) ?? 0) + (soVN(layO(row, cCot.thue, ten, soDong, edits)) ?? 0),
       chuaThue: soVN(layO(row, cCot.chua, ten, soDong, edits)) ?? 0,
       thue: soVN(layO(row, cCot.thue, ten, soDong, edits)) ?? 0,
       ngayHd: ngayHienThi(row[cNgayHd]),
@@ -1043,7 +1061,7 @@ function parseSheetPhanMem(
     return t ? (chuDep[chuan(t)] ?? t) : mac;
   };
   const tenTk = `${nhan(cTkNo, "TK Nợ")} / ${nhan(cTkCo, "TK Có")}`;
-  return { ten, header, dong, goc: g, hIdx, rong, tenTk };
+  return { ten, header, dong, goc: g, hIdx, rong, tenTk, coCotTong };
 }
 
 const uniq = (arr: string[]): string[] => [...new Set(arr.filter(Boolean))];
@@ -1278,6 +1296,12 @@ export function doiSoat(sheets: SheetTho[], opt: TuyChonDoiSoat): KetQuaDoiSoat 
         anhHuong: "nếu đúng là một hóa đơn: chuyển từ CHƯA CÓ sang KHỚP",
       });
     }
+
+  if (sheetPhanMem && !sheetPhanMem.coCotTong)
+    canhBao.push({
+      loai: "Sổ không có cột tổng cộng",
+      chiTiet: `Sheet sổ "${sheetPhanMem.ten}" là bản xuất CHI TIẾT MẶT HÀNG (không có cột tổng cộng, mỗi mặt hàng một dòng). Máy tự lấy tổng = tiền hàng + tiền thuế, rồi cộng dồn các dòng mặt hàng cùng số hóa đơn trước khi so. Không soi được "cộng có khớp tổng không" vì sổ không có tổng để soi.`,
+    });
 
   if (thieuKhongCanVaoSo)
     canhBao.push({

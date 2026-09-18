@@ -308,7 +308,7 @@ export default function MonthlyStockScreen() {
   const [form, setForm] = useState<DongForm | null>(null);
   const [loi, setLoi] = useState<LoiNhap[]>([]);
 
-  const moThem = () => {
+  const moThem = (catChon?: string) => {
     // Đang XEM TRƯỚC (tháng chưa lưu dòng nào, đang hiện bản kế thừa từ tháng trước):
     // thêm rồi lưu 1 dòng sẽ khiến rowsLuu ≠ rỗng ⇒ tắt xem trước ⇒ cả bảng kế thừa
     // (chưa lưu) biến mất khỏi màn — dễ tưởng mất số liệu. Bắt kế thừa & lưu trước.
@@ -318,7 +318,8 @@ export default function MonthlyStockScreen() {
       );
       return;
     }
-    const catGoiY = nhomList[0]?.category || MONTHLY_STOCK_CATEGORIES[0];
+    // catChon = nhóm của bảng bấm nút (điền sẵn nhóm, khỏi chọn lại). Không có ⇒ nhóm đầu.
+    const catGoiY = catChon || nhomList[0]?.category || MONTHLY_STOCK_CATEGORIES[0];
     const khoGoiY = kho !== TAT_CA_KHO ? kho : KHO_MAC_DINH;
     setForm(formRong(catGoiY, khoGoiY));
     setLoi([]);
@@ -1072,7 +1073,7 @@ export default function MonthlyStockScreen() {
                 Kế thừa tồn cuối {nhanThang(thangTr)}
               </Button>
             ) : (
-              <Button onClick={moThem} title="Thêm tay dòng đầu tiên cho tháng này (tên hàng · tồn đầu · nhập · xuất).">
+              <Button onClick={() => moThem()} title="Thêm tay dòng đầu tiên cho tháng này (tên hàng · tồn đầu · nhập · xuất).">
                 <Plus className="mr-2 h-4 w-4" />
                 Thêm dòng
               </Button>
@@ -1286,16 +1287,31 @@ export default function MonthlyStockScreen() {
                     chon={chonBang}
                     dinhDau
                   />
+                  {!laXemTruoc && (
+                    <div className="flex">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => moThem(g.category)}
+                        className="w-full sm:w-auto"
+                        title={`Thêm tay một dòng vào nhóm "${g.category}" (đã điền sẵn nhóm — chỉ nhập tên hàng, số kg…).`}
+                      >
+                        <Plus className="mr-2 h-4 w-4" />
+                        Thêm dòng vào {g.category}
+                      </Button>
+                    </div>
+                  )}
                 </section>
               ))}
             </div>
           )}
 
-          {!laXemTruoc && (
+          {/* Chế độ Ghi là lưới phẳng (không tách nhóm) ⇒ giữ một nút chung ở cuối. */}
+          {!laXemTruoc && ghiMode && (
             <div className="flex">
               <Button
                 variant="outline"
-                onClick={moThem}
+                onClick={() => moThem()}
                 className="w-full sm:w-auto"
                 title="Thêm tay một dòng hàng vào tháng đang xem (ngày nhập · tên · invoice · đơn giá · tồn đầu/nhập/xuất · vị trí)."
               >

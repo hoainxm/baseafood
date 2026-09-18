@@ -19,6 +19,7 @@ import {
   useWipProductions,
   useCustomers,
   useMaterialTypes,
+  useLotInputs,
 } from "@/lib/catalogRepo";
 import {
   Badge,
@@ -51,13 +52,16 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
 import { ghiNhatKy } from "@/lib/audit";
 import { KY_OPT, phamViKy, type KyXem } from "@/lib/periodUtils";
-import { DailyTaskReminder, PhieuTrongTPNgay } from "@/features/shared";
+import { DailyTaskReminder, GanLoDauVao, PhieuTrongTPNgay, TemLoQr } from "@/features/shared";
+import { nhanLoBtp, nutLo } from "@/lib/truyXuatLo";
 import {
   CalendarRange,
   ChevronDown,
   ClipboardList,
   Factory,
   Hourglass,
+  Link2,
+  QrCode,
   Lock,
   LockOpen,
   Pencil,
@@ -193,6 +197,11 @@ export default function SanXuatBTPScreen() {
   /** Hai chế độ: "nhap" = form ghi (mặc định, form-first cho tổ xưởng); "so" = sổ + báo cáo. */
   const [cheDo, setCheDo] = useState<"nhap" | "so">("nhap");
   const [inPhieuTrong, setInPhieuTrong] = useState(false);
+  // Truy xuất lô (docs/spec/qr-truy-xuat-lo.md): gắn lô NL cho mẻ + in tem lô BTP.
+  const [lotInputs] = useLotInputs();
+  const [ganLo, setGanLo] = useState<WipProductionItem | null>(null);
+  const [temLo, setTemLo] = useState<WipProductionItem | null>(null);
+  const soLoGan = (id: string) => lotInputs.filter((l) => l.outputKind === "W" && l.outputId === id).length;
 
   const [hoiChot, setHoiChot] = useState(false);
   const [ghiChuChot, setGhiChuChot] = useState("");
@@ -1005,7 +1014,25 @@ export default function SanXuatBTPScreen() {
             timKiem={(r) => `${tenMH(r.productId)} ${r.customerName ?? ""}`}
             nhanTimKiem="Tìm theo thành phẩm / khách…"
             actions={(r) => (
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  title="Ghi mẻ này đã dùng lô nguyên liệu nào (quét tem, gõ mã, hoặc chọn). Có lô thì mới truy được nguồn của mẻ."
+                  variant={soLoGan(r.id) ? "outline" : "default"}
+                  size="sm"
+                  onClick={() => setGanLo(r)}
+                >
+                  <Link2 />
+                  {soLoGan(r.id) ? `Lô NL (${soLoGan(r.id)})` : "Gắn lô NL"}
+                </Button>
+                <Button
+                  title="In tem QR lô bán thành phẩm của mẻ này để dán lên block/thùng. Quét tem là ra nguồn gốc."
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setTemLo(r)}
+                >
+                  <QrCode />
+                  Tem
+                </Button>
                 <Button
                   title="Mở lại dòng sản lượng này để sửa số kg hoặc mặt hàng." variant="outline" size="sm" onClick={() => moSua(r)}>
                   <Pencil />
@@ -1422,6 +1449,25 @@ export default function SanXuatBTPScreen() {
         </DialogContent>
       </Dialog>
 
+      {ganLo && (
+        <GanLoDauVao
+          outputKind="W"
+          outputId={ganLo.id}
+          outputNhan={`mẻ ${nhanLoBtp(ganLo)} · ${tenMH(ganLo.productId)}`}
+          xuong={ganLo.workshop}
+          ngay={ganLo.productionDate}
+          onClose={() => setGanLo(null)}
+        />
+      )}
+      {temLo && (
+        <TemLoQr
+          nut={nutLo("W", temLo.id, {
+            shipments: [], imports: [], wips: rows, packagings: [], lotInputs,
+            exportItems: [], exportOrders: [], salesOrders: [], products: matHang, customers: [],
+          })}
+          onClose={() => setTemLo(null)}
+        />
+      )}
       {inPhieuTrong && (
         <PhieuTrongTPNgay onClose={() => setInPhieuTrong(false)} />
       )}

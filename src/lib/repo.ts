@@ -45,6 +45,7 @@ import type {
   StorageLocation,
   MonthlyStockLine,
   ReconciliationRun,
+  LotInput,
 } from "@/types";
 import { rolesFromCsv, rolesToCsv } from "@/types";
 import { ghiNhatKy, type NhatKyMoi } from "@/lib/audit";
@@ -1193,6 +1194,42 @@ export const BANG_RECONCILIATION_RUN: AnhXaBang<ReconciliationRun> = {
   }),
 };
 
+/**
+ * Sự kiện biến đổi lô (mig 0046) — "đầu ra đã dùng đầu vào này". Nối chuỗi truy
+ * xuất NL → BTP → TP. KHÔNG thêm cột vào production_wips/packagings (xem 0046).
+ */
+export const BANG_LOT_INPUT: AnhXaBang<LotInput> = {
+  table: "lot_inputs",
+  localKey: "bsf.lot-inputs.v1",
+  layKhoa: theoId,
+  toRow: (x) => ({
+    id: x.id,
+    output_kind: x.outputKind,
+    output_id: x.outputId,
+    input_kind: x.inputKind,
+    input_id: x.inputId,
+    input_label: x.inputLabel,
+    material: x.material,
+    quantity_kg: x.quantityKg,
+    method: x.method,
+    operator: x.operator,
+    recorded_at: x.recordedAt || undefined,
+  }),
+  fromRow: (r) => ({
+    id: s(r.id),
+    outputKind: s(r.output_kind) === "P" ? "P" : "W",
+    outputId: s(r.output_id),
+    inputKind: s(r.input_kind) === "W" ? "W" : "S",
+    inputId: s(r.input_id),
+    inputLabel: s(r.input_label),
+    material: s(r.material),
+    quantityKg: r.quantity_kg == null || r.quantity_kg === "" ? null : Number(r.quantity_kg),
+    method: s(r.method) === "quet" ? "quet" : s(r.method) === "go" ? "go" : "chon",
+    operator: s(r.operator),
+    recordedAt: s(r.recorded_at),
+  }),
+};
+
 /* ---------- Nhật ký thao tác (audit) ---------- */
 
 /** Nhãn tiếng Việt của bảng — cho câu tóm tắt nhật ký dễ đọc. */
@@ -1225,6 +1262,7 @@ const NHAN_BANG: Record<string, string> = {
   storage_locations: "Kho lưu trữ (danh mục)",
   monthly_stock_ledger: "Sổ kho theo tháng",
   reconciliation_runs: "Bản đối soát hóa đơn",
+  lot_inputs: "Gắn lô đầu vào (truy xuất)",
 };
 
 /** Trường đổi giữa hai bản ghi → { trường: [trước, sau] }. */

@@ -1,9 +1,10 @@
 > Load khi: thêm file mới, không biết đặt ở đâu, hay chuẩn bị import xuyên tầng.
 covers: src/**
-last_verified: 2026-09-14
+last_verified: 2026-09-18
 ttl_days: 90
 
 <!-- re-verified: 2026-09-14 12:00 — phân loại màn DEMO vs THẬT khớp code: DEMO_IDS = [production, quality, cold-storage, reports, traceability] (nav-access.ts:22). Dùng khi chuẩn hóa nhãn (giữ nhãn DEMO tách khỏi màn thật). (task đổi tên trang) -->
+<!-- updated: 2026-09-18 — truy xuất lô QR: `src/lib/truyXuatLo.ts` (hàm THUẦN: đọc mã QR 3 dạng, nhãn lô, tìm lô, truy ngược/xuôi, cân bằng kg, danh sách lô để chọn) · `src/features/shared/` thêm `GanLoDauVao.tsx` (hộp gắn lô đầu vào), `KhungQuetQr.tsx` (khung camera dùng chung, id riêng mỗi khung), `useDuLieuTruyXuat.ts` (gom 10 bảng), `QrTemLoIn.tsx` thêm `TemLoQr` (tem cho mọi loại lô). Spec: `docs/spec/qr-truy-xuat-lo.md`. Không dep mới. -->
 <!-- updated: 2026-09-10 — THÊM feature `src/features/doi-soat/` (DoiSoatScreen + index) — Đối soát hóa đơn điện tử ⇄ phần mềm kế toán, route `/doi-soat`. Chỉ import `@/design-system` + `lib/doiSoatHddt.ts` (logic thuần: parse workbook + đối soát + xuất Excel) + `lib/format`. Đọc dữ liệu TỪ FILE EXCEL upload, KHÔNG qua repo/DB. Dep mới: `xlsx-js-style` (ghi Excel có màu; `xlsx` bản free không ghi được style). Xem 37-doi-soat-hddt.md. -->
 <!-- re-verified: 2026-09-09 16:30 — ranh giới import (quy tắc 3): features/shared/AppShell.tsx + UpdateBanner.tsx chỉ import @/design-system + @/lib, KHÔNG @/components/ui — khớp. (task thêm animation) -->
 <!-- re-verified: 2026-09-09 15:00 — src/features/monthly-stock/MonthlyStockScreen.tsx KHÔNG import thẳng @/components/ui (chỉ @/design-system + @/lib) — khớp ranh giới import (quy tắc 3). -->

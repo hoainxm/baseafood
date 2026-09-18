@@ -716,6 +716,31 @@ export interface MonthlyStockLine {
  * `official` (chính thức) đóng băng `summary`. Logic đối soát ở `lib/doiSoatHddt.ts`
  * (không import ở đây để repo.ts không kéo xlsx vào bundle chính).
  */
+/** Loại lô: S = nguyên liệu (chuyến nhập) · W = bán thành phẩm (mẻ SX) · P = thành phẩm (phiếu đóng gói). */
+export type LotKind = "S" | "W" | "P";
+
+/**
+ * Sự kiện BIẾN ĐỔI lô (bảng `lot_inputs`, mig 0046): "đầu ra đã dùng đầu vào này".
+ * Tương đương Transformation Event của EPCIS. Thiết kế: docs/spec/qr-truy-xuat-lo.md.
+ */
+export interface LotInput {
+  id: string;
+  /** W = mẻ SX BTP · P = phiếu đóng gói TP */
+  outputKind: "W" | "P";
+  outputId: string;
+  /** S = lô NL (chuyến nhập) · W = lô BTP (mẻ SX) */
+  inputKind: "S" | "W";
+  inputId: string;
+  /** Nhãn lô lúc ghi — còn tra được kể cả khi bản ghi nguồn bị sửa/xóa. */
+  inputLabel: string;
+  material: string;
+  /** kg đã dùng; null = chưa cân. */
+  quantityKg: number | null;
+  method: "quet" | "go" | "chon";
+  operator: string;
+  recordedAt: string;
+}
+
 export interface ReconciliationSummary {
   soHoaDon: number;
   khop: number;

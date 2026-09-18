@@ -35,6 +35,7 @@ import {
   BANG_STORAGE_LOCATION,
   BANG_MONTHLY_STOCK,
   BANG_RECONCILIATION_RUN,
+  BANG_LOT_INPUT,
   useBang,
 } from "@/lib/repo";
 import type {
@@ -262,3 +263,5 @@ export const useStorageLocations = () => useBang(BANG_STORAGE_LOCATION, seedStor
 export const useMonthlyStock = () => useBang(BANG_MONTHLY_STOCK);
 /** Bản đối soát hóa đơn đã lưu (màn /doi-soat) — nháp/chính thức theo tài khoản. */
 export const useReconciliationRuns = () => useBang(BANG_RECONCILIATION_RUN);
+/** Sự kiện biến đổi lô — mẻ SX / đóng gói đã dùng lô nào (truy xuất QR, mig 0046). */
+export const useLotInputs = () => useBang(BANG_LOT_INPUT);

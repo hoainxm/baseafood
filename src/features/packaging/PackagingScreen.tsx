@@ -14,7 +14,10 @@ import {
   useExportItems,
   useSalesItems,
   useProducts,
+  useLotInputs,
 } from "@/lib/catalogRepo";
+import { GanLoDauVao, TemLoQr } from "@/features/shared";
+import { nhanLoTp, nutLo } from "@/lib/truyXuatLo";
 import {
   tinhTon,
   khaDung,
@@ -51,7 +54,7 @@ import {
 } from "@/design-system";
 import { kg, num, todayISO, viDate } from "@/lib/format";
 import { KY_OPT, phamViKy, type KyXem } from "@/lib/periodUtils";
-import { Boxes, CalendarRange, Package, PackageCheck, Plus, Scale } from "lucide-react";
+import { Boxes, CalendarRange, Link2, Package, PackageCheck, Plus, QrCode, Scale } from "lucide-react";
 
 const PHAN_XUONG: Workshop[] = ["Đông", "Cá", "Khô"];
 const KHO_TP_NAMES = BSF1_WAREHOUSES.map((w) => w.name);
@@ -87,6 +90,11 @@ export default function DongGoiScreen() {
 
   const [form, setForm] = useState<FormDG | null>(null);
   const [loi, setLoi] = useState<LoiNhap[]>([]);
+  // Truy xuất lô (docs/spec/qr-truy-xuat-lo.md): gắn lô BTP cho phiếu + in tem lô TP.
+  const [lotInputs] = useLotInputs();
+  const [ganLo, setGanLo] = useState<Packaging | null>(null);
+  const [temLo, setTemLo] = useState<Packaging | null>(null);
+  const soLoGan = (id: string) => lotInputs.filter((l) => l.outputKind === "P" && l.outputId === id).length;
 
   const [tuHieuLuc, denHieuLuc] = phamViKy(ky, ngay, tuNgay, denNgay);
   const laMotNgay = tuHieuLuc === denHieuLuc;
@@ -247,10 +255,30 @@ export default function DongGoiScreen() {
       key: "xoa",
       header: "",
       render: (r) => (
-        <Button
-          title="Xóa phiếu đóng gói này. Tồn bán thành phẩm và tồn thành phẩm sẽ được tính lại." variant="outline" size="sm" onClick={() => xoa(r)}>
-          Xóa
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            title="Ghi phiếu này đã đóng từ lô bán thành phẩm nào (quét tem, gõ mã, hoặc chọn). Có lô thì mới truy được nguồn của thành phẩm."
+            variant={soLoGan(r.id) ? "outline" : "default"}
+            size="sm"
+            onClick={() => setGanLo(r)}
+          >
+            <Link2 />
+            {soLoGan(r.id) ? `Lô BTP (${soLoGan(r.id)})` : "Gắn lô BTP"}
+          </Button>
+          <Button
+            title="In tem QR lô thành phẩm của phiếu này để dán lên thùng. Quét tem là ra nguồn gốc."
+            variant="outline"
+            size="sm"
+            onClick={() => setTemLo(r)}
+          >
+            <QrCode />
+            Tem
+          </Button>
+          <Button
+            title="Xóa phiếu đóng gói này. Tồn bán thành phẩm và tồn thành phẩm sẽ được tính lại." variant="outline" size="sm" onClick={() => xoa(r)}>
+            Xóa
+          </Button>
+        </div>
       ),
     },
   ];
@@ -471,6 +499,26 @@ export default function DongGoiScreen() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {ganLo && (
+        <GanLoDauVao
+          outputKind="P"
+          outputId={ganLo.id}
+          outputNhan={`phiếu ${nhanLoTp(ganLo)} · ${tenMH(ganLo.toProductId)}`}
+          xuong={ganLo.workshop}
+          ngay={ganLo.date}
+          matHangId={ganLo.fromProductId}
+          onClose={() => setGanLo(null)}
+        />
+      )}
+      {temLo && (
+        <TemLoQr
+          nut={nutLo("P", temLo.id, {
+            shipments: [], imports: [], wips: sanXuat, packagings: rows, lotInputs,
+            exportItems: [], exportOrders: [], salesOrders: [], products: matHang, customers: [],
+          })}
+          onClose={() => setTemLo(null)}
+        />
+      )}
     </div>
   );
 }

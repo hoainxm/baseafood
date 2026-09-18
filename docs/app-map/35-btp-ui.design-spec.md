@@ -1,8 +1,9 @@
 > Load khi: thiết kế/build 3 màn module WIP — Sản xuất BTP, Kho dự trữ, Đơn đặt.
 covers: src/features/production/WipProductionScreen.tsx, src/features/warehouse/ReserveWarehouseScreen.tsx, src/features/orders/SalesOrderScreen.tsx
-last_verified: 2026-09-07
+last_verified: 2026-09-18
 ttl_days: 90
 status: design-spec — ĐÃ BUILD v1 (còn thiếu: QA screenshot 3 viewport, một số AC tồn nâng cao)
+<!-- updated: 2026-09-18 — màn Sản xuất BTP (/wip), chế độ "Sổ ngày & báo cáo": cột thao tác mỗi dòng thêm 2 nút ĐỨNG TRƯỚC Sửa/Bỏ — "Gắn lô NL" (tô đậm khi CHƯA gắn lô nào, đổi thành "Lô NL (n)" viền khi đã gắn — nhìn là biết mẻ nào còn thiếu nguồn) mở hộp GanLoDauVao (quét/gõ/chọn, kg tùy chọn), và "Tem" in tem QR lô BTP. Cụm nút đổi `flex` → `flex flex-wrap` để không tràn ở điện thoại. Không đổi luồng ghi inline. Kiểm 360px + chữ 130%: không cuộn ngang. Thiết kế: ../spec/qr-truy-xuat-lo.md. -->
 <!-- re-verified: 2026-09-07 — màn Sản xuất BTP ghi INLINE form-first (không dialog),
      nhập bảng nhóm (chế biến × khách) + chốt ngày SX + ghi bù + báo cáo TP ngày;
      đã đối chiếu WipProductionScreen.tsx trước khi tối ưu thao tác. -->

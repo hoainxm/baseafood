@@ -1,6 +1,6 @@
 > Load khi: bắt đầu bất kỳ task nào trong repo này và chưa biết phải đọc file nào.
 covers: docs/app-map/**
-last_verified: 2026-09-15
+last_verified: 2026-09-18
 ttl_days: 90
 
 # App-map — Baseafood MES
@@ -21,6 +21,7 @@ Cửa vào là [`CLAUDE.md`](../../CLAUDE.md) ở root (quy tắc code, risk tie
 | Sửa Sản xuất BTP / Kho dự trữ / Đơn đặt · vòng đông gửi↔xả đông | [34-btp-san-xuat-kho](34-btp-san-xuat-kho.ba-spec.md) → [35-btp-ui](35-btp-ui.design-spec.md) → [31-can-doi-ky](31-can-doi-ky.md) |
 | Sổ kho theo THÁNG dương lịch, dồn tồn cuối kỳ → đầu kỳ sau | [36-so-kho-thang](36-so-kho-thang.md) → [04-tang-du-lieu](04-tang-du-lieu.md) |
 | Đối soát hóa đơn điện tử ⇄ phần mềm kế toán từ file Excel | [37-doi-soat-hddt](37-doi-soat-hddt.md) |
+| Truy xuất theo lô bằng QR (hộ chiếu lô `/qr`, gắn lô ở `/wip` + `/packaging`, tem QR) | [`spec/qr-truy-xuat-lo`](../spec/qr-truy-xuat-lo.md) → [34-btp-san-xuat-kho](34-btp-san-xuat-kho.ba-spec.md) · [30-nhap-hang](30-nhap-hang.md) |
 | Nối luồng nhập→sản xuất→kho→bán, tách giao diện bộ phận, daily-task | [`trien-khai/flow-end-to-end-2-bo-phan`](../trien-khai/flow-end-to-end-2-bo-phan.md) |
 | Thêm bảng / cột / migration | [03-database](03-database.md) → [04-tang-du-lieu](04-tang-du-lieu.md) |
 | Số liệu mất, không lên server, đèn đỏ, reload nuốt dòng | [04-tang-du-lieu](04-tang-du-lieu.md) |

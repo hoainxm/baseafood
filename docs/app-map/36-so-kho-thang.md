@@ -78,6 +78,12 @@ Dialog 3 việc, số kg + ngày + ghi chú; mọi lần lưu nối một dòng 
 - ⚠ **Nạp lại Excel** tháng có dòng đã tách: dòng gốc (id `xlsx|…`) trở về số trong file ⇒ phần tách bị đếm 2 lần. `xacNhanNap` dò note `(tách từ dòng <id>)` và **cảnh báo** (không tự xoá).
 - Khác lưới **Ghi nhập/xuất**: ô lưới là tổng CẢ THÁNG (ghi đè), nút dòng là CỘNG THÊM từng lần.
 
+### Lưới "Ghi nhập/xuất" = sửa TRỰC TIẾP trên dòng (không mở dialog)
+
+Chốt 2026-09-18: kế toán không phải mở nút ✎ cho từng dòng. Lưới `LuoiNhap` mở rộng cột: **Tồn đầu · Nhập · Xuất · Đơn giá** (ô số `kieu:"so"` — gõ trực tiếp + phím + dán Excel; đơn giá thêm vào `ghiO` map) · **Ngày nhập** (`<input type=date>`) · **Invoice** (`<input>`) · **Vị trí** (`Combobox`, tạo mới tại chỗ) — các ô mô tả là `oRieng`, ghi thẳng qua `suaSo`. Nút ✎ ở chế độ xem chỉ còn cho **tên · size · nhóm** (đổi tên/nhóm ảnh hưởng gộp — giữ ở dialog).
+- **Lưu vết (audit) đảm bảo cho MỌI đường sửa** — inline lẫn dialog: mọi `ghiLines` đi qua chốt `nhatKyThayDoi` ([repo.ts](../../src/lib/repo.ts)) → so cũ↔mới từng ô, ghi `audit_log` kèm người · thiết bị · thời điểm · giá trị cũ→mới; bảng **append-only** (RLS cấm UPDATE/DELETE, mig `0025`). Xem màn Nhật ký thao tác. Sửa trực tiếp KHÔNG làm yếu vết.
+- 🅿️ **Backlog bảo mật (ghi nhận 2026-09-18, CHƯA làm):** (1) **khóa tháng đã chốt** — tháng đóng sổ thì khóa, muốn sửa số phải mở khóa có ghi vết (chống sửa lén sổ cũ); (2) **siết RLS theo vai trò** cho `monthly_stock_ledger` ai được sửa (🔴 đụng RLS server) — nằm chung backlog RLS `0021` trong CLAUDE.md.
+
 ### Ẩn / hiện dòng trống
 
 Nút **Ẩn dòng trống (n)** (`aria-pressed`) lọc bỏ dòng `laDongTrong` (tồn đầu = nhập = xuất = 0, cả kg lẫn kiện) khỏi bảng xem, lưới Ghi, tổng, in, tick. Mặc định HIỆN (tránh tưởng mất dòng); không nhớ qua lần mở. Đổi trạng thái ⇒ bỏ chọn. Ẩn hết ⇒ ô báo + nút "Hiện tất cả".

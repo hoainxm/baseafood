@@ -293,6 +293,7 @@ export default function MonthlyStockScreen() {
       inKg: "inKg",
       outCtn: "outCtn",
       outKg: "outKg",
+      unitPrice: "unitPrice",
     };
     const field = map[colKey];
     if (field) suaSo(rowId, { [field]: v } as Partial<MonthlyStockLine>);
@@ -860,12 +861,56 @@ export default function MonthlyStockScreen() {
     },
   ];
 
-  // ---------- Lưới ghi (nhập/xuất từng mã) ----------
+  // ---------- Lưới ghi (nhập/xuất + sửa mô tả từng mã, không mở dialog) ----------
+  // Ô số (kieu "so") = gõ trực tiếp + phím + dán Excel. Ô mô tả (oRieng) ghi thẳng
+  // qua suaSo → vẫn đi qua chốt audit ở repo.ts (lưu vết cũ→mới, người sửa, thời điểm).
+  const oCham =
+    "h-11 w-full border-0 bg-transparent px-2 text-sm focus:ring-2 focus:ring-ring focus:ring-inset focus:outline-none";
   const cotLuoi: CotLuoi<MonthlyStockRow>[] = [
     { key: "openKg", header: "Tồn đầu (kg)", nhan: "Tồn đầu (kg)", kieu: "so", lay: (r) => r.openKg || null, rong: 120 },
     { key: "inKg", header: "Nhập (kg)", nhan: "Nhập (kg)", kieu: "so", lay: (r) => r.inKg || null, rong: 120 },
     { key: "outKg", header: "Xuất (kg)", nhan: "Xuất (kg)", kieu: "so", lay: (r) => r.outKg || null, rong: 120 },
     { key: "ocKg", header: "Tồn cuối (kg)", nhan: "Tồn cuối (kg)", kieu: "tinh", lay: (r) => r.closeKg, rong: 130 },
+    { key: "unitPrice", header: "Đơn giá (đ)", nhan: "Đơn giá (đ)", kieu: "so", lay: (r) => r.unitPrice || null, rong: 130 },
+    {
+      key: "ngay", header: "Ngày nhập", nhan: "Ngày nhập", kieu: "chu", lay: () => null, rong: 150,
+      oRieng: (r) => (
+        <input
+          type="date"
+          value={r.importDate || ""}
+          onChange={(e) => suaSo(r.id, { importDate: e.target.value })}
+          className={oCham}
+          aria-label={`Ngày nhập — ${r.itemName}`}
+        />
+      ),
+    },
+    {
+      key: "invoice", header: "Invoice", nhan: "Invoice", kieu: "chu", lay: () => null, rong: 140,
+      oRieng: (r) => (
+        <input
+          value={r.origin}
+          onChange={(e) => suaSo(r.id, { origin: e.target.value })}
+          placeholder="Invoice"
+          className={oCham}
+          aria-label={`Invoice — ${r.itemName}`}
+        />
+      ),
+    },
+    {
+      key: "viTri", header: "Vị trí", nhan: "Vị trí", kieu: "chu", lay: () => null, rong: 200,
+      oRieng: (r) => (
+        <Combobox
+          anNhan
+          label={`Vị trí — ${r.itemName}`}
+          value={r.storageLocation}
+          onChange={(v) => suaSo(r.id, { storageLocation: v })}
+          options={viTriOpts}
+          onCreate={themViTri}
+          choPhepXoa={false}
+          placeholder={r.warehouse ? `= ${r.warehouse}` : "Chọn kho"}
+        />
+      ),
+    },
     {
       key: "xoa", header: "", nhan: "Xóa dòng", kieu: "chu", lay: () => null, rong: 60,
       oRieng: (r) => (
@@ -1249,8 +1294,8 @@ export default function MonthlyStockScreen() {
           {ghiMode ? (
             <div className="space-y-3">
               <p className="text-sm text-muted-foreground">
-                Gõ tồn đầu / nhập / xuất (kg) từng mã — tồn cuối tự tính. Dán được cả khối từ Excel.
-                Enter/Tab sang ô. Sửa mô tả (ngày nhập, tên, invoice, đơn giá, vị trí) bằng nút ✎ ở chế độ xem.
+                Gõ tồn đầu / nhập / xuất / đơn giá (kg, đ) từng mã — tồn cuối tự tính. Dán được cả khối từ Excel.
+                Enter/Tab sang ô. Sửa thẳng ngày nhập · invoice · vị trí ngay trong lưới (không mở dialog). Đổi tên / size / nhóm dùng nút ✎ ở chế độ xem. Mọi sửa đều được lưu vết (người · thời điểm · cũ→mới) ở màn Nhật ký.
               </p>
               {locMatHang && (
                 <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-muted/40 p-2 text-sm">

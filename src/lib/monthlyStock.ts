@@ -455,3 +455,85 @@ export function donSangThang(nguon: MonthlyStockRow[], thangDich: string): Month
       note: "",
     }));
 }
+
+/* ---------- Thao tác trên MỘT dòng: lấy ra dùng · nhập thêm · chuyển vị trí ---------- */
+
+/** Dòng KHÔNG có số liệu: tồn đầu, nhập, xuất (kg lẫn kiện) đều bằng 0. */
+export function laDongTrong(l: MonthlyStockLine): boolean {
+  const z = (v: number) => Math.abs(v) < 1e-9;
+  return z(l.openKg) && z(l.inKg) && z(l.outKg) && z(l.openCtn) && z(l.inCtn) && z(l.outCtn);
+}
+
+export type KieuThaoTac = "xuat" | "nhap" | "chuyen";
+
+export interface KetQuaThaoTac {
+  /** Dòng gốc sau khi áp (thay đúng id). */
+  dong: MonthlyStockLine;
+  /** Dòng MỚI tách ra (chỉ khi chuyển MỘT PHẦN sang vị trí khác). */
+  dongTach: MonthlyStockLine | null;
+}
+
+/** Đổi kiện theo cùng tỉ lệ kg (kiện ẩn trên màn nhưng vẫn phải khớp với kg). */
+const tiLeKien = (ctn: number, kg: number, kgBot: number) => (kg > 1e-9 ? (ctn * kgBot) / kg : 0);
+
+/**
+ * Áp một thao tác kho lên một dòng — hàm thuần, màn chỉ việc ghi kết quả.
+ *
+ * - `xuat` (lấy ra sử dụng / xuất bán): CỘNG DỒN vào xuất trong kỳ. Không vượt tồn cuối.
+ * - `nhap` (nhập thêm cùng lô): cộng dồn vào nhập trong kỳ.
+ * - `chuyen` (đổi chỗ để hàng, VD sang Kho Ánh Dương): KHÔNG phải nhập/xuất ⇒ tổng
+ *   nhập, xuất, tồn của tháng không đổi. Chuyển HẾT tồn cuối ⇒ chỉ đổi Vị trí của
+ *   dòng. Chuyển MỘT PHẦN ⇒ tách dòng mới cùng mô tả ở vị trí đích, số kg lấy từ
+ *   tồn đầu trước rồi tới phần nhập trong kỳ (tổng theo mặt hàng giữ nguyên nên
+ *   đối chiếu dồn kỳ không báo lệch giả).
+ *
+ * `ghiChu` được nối vào `note` của dòng để còn vết (ngày · việc · kg).
+ */
+export function apThaoTacLo(
+  l: MonthlyStockLine,
+  kieu: KieuThaoTac,
+  kg: number,
+  opts: { viTriDich?: string; ghiChu: string; idMoi: string }
+): KetQuaThaoTac {
+  const note = (l.note ? l.note + "\n" : "") + opts.ghiChu;
+  if (kieu === "xuat") {
+    const ctn = l.kgPerCtn ? kg / l.kgPerCtn : 0;
+    return { dong: { ...l, outKg: l.outKg + kg, outCtn: l.outCtn + ctn, note }, dongTach: null };
+  }
+  if (kieu === "nhap") {
+    const ctn = l.kgPerCtn ? kg / l.kgPerCtn : 0;
+    return { dong: { ...l, inKg: l.inKg + kg, inCtn: l.inCtn + ctn, note }, dongTach: null };
+  }
+  const dich = (opts.viTriDich ?? "").trim();
+  const closeKg = l.openKg + l.inKg - l.outKg;
+  if (kg >= closeKg - 1e-9) {
+    return { dong: { ...l, storageLocation: dich, note }, dongTach: null };
+  }
+  const tuDau = Math.min(kg, l.openKg);
+  const tuNhap = kg - tuDau;
+  const ctnDau = tiLeKien(l.openCtn, l.openKg, tuDau);
+  const ctnNhap = tiLeKien(l.inCtn, l.inKg, tuNhap);
+  const dong: MonthlyStockLine = {
+    ...l,
+    openKg: l.openKg - tuDau,
+    openCtn: l.openCtn - ctnDau,
+    inKg: l.inKg - tuNhap,
+    inCtn: l.inCtn - ctnNhap,
+    note,
+  };
+  const dongTach: MonthlyStockLine = {
+    ...l,
+    id: opts.idMoi,
+    storageLocation: dich,
+    openKg: tuDau,
+    openCtn: ctnDau,
+    inKg: tuNhap,
+    inCtn: ctnNhap,
+    outKg: 0,
+    outCtn: 0,
+    carriedFromId: "",
+    sortOrder: l.sortOrder,
+    note: `${opts.ghiChu} (tách từ dòng ${l.id})`,
+  };
+  return { dong, dongTach };
+}

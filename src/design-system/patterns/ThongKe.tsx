@@ -94,7 +94,7 @@ export function ThongKe({
         // Chuỗi thật dài (>12) mới cho ngắt từ; số (t.so) luôn to.
         const fontSizeClass = t.so
           ? hep
-            ? "text-xl md:text-2xl xl:text-lg 2xl:text-xl"
+            ? "text-xl md:text-2xl lg:text-lg 2xl:text-xl"
             : "text-xl md:text-2xl"
           : len > 12
             ? "text-sm font-semibold leading-snug lg:text-base"
@@ -141,7 +141,7 @@ export function ThongKe({
         );
         const cls = cn(
           "flex items-center gap-2.5 rounded-xl border bg-card px-3 py-3",
-          hep && "xl:flex-col xl:items-start xl:gap-2",
+          hep && "lg:flex-col lg:items-start lg:gap-2",
           mau.vien
         );
         return t.onChon ? (

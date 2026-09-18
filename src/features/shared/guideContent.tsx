@@ -349,6 +349,90 @@ export const HUONG_DAN: Record<string, NoiDungHuongDan> = {
     ),
   },
 
+  "ton-kho-thang": {
+    tieuDe: "Sổ kho theo tháng",
+    moTa: "Theo dõi tồn đầu · nhập · xuất · tồn cuối (kg) từng lô hàng theo tháng.",
+    noiDung: (
+      <>
+        <Muc tieuDe="Đầu tháng: mở sổ">
+          <Buoc>
+            <li>Chọn <b>Kỳ (tháng)</b> ở ô trên cùng (hoặc bấm ◀ ▶).</li>
+            <li>
+              Tháng mới chưa có dòng nào thì màn hiện <b>bản xem trước</b> tồn đầu lấy
+              từ tồn cuối tháng trước. Soát lại rồi bấm <b>Kế thừa &amp; lưu vào sổ</b>.
+              Chưa bấm thì chưa ghi được gì.
+            </li>
+          </Buoc>
+        </Muc>
+        <Muc tieuDe="Lấy hàng ra sử dụng (xuất)">
+          <Buoc>
+            <li>Tìm dòng hàng (gõ tên / invoice / vị trí vào ô <b>Tìm mặt hàng</b>).</li>
+            <li>Bấm nút <b>hộp có dấu trừ</b> ở cuối dòng.</li>
+            <li>Chọn <b>Lấy ra sử dụng</b>, gõ <b>số kg</b>, chọn ngày, ghi chú nếu cần.</li>
+            <li>Bấm <b>Lưu thao tác</b>. Số kg cộng vào cột <b>Xuất trong kỳ</b>, tồn cuối tự giảm.</li>
+          </Buoc>
+          <p>Lấy nhiều lần trong tháng thì làm lại từng lần — số tự cộng dồn, không phải cộng tay.</p>
+        </Muc>
+        <Muc tieuDe="Chuyển kho (đổi chỗ để hàng)">
+          <Y>
+            <li>
+              <b>Một dòng:</b> bấm nút hộp cuối dòng → chọn <b>Chuyển kho</b> → gõ số kg →
+              chọn <b>Chuyển tới</b> (VD Kho Ánh Dương) → Lưu.
+            </li>
+            <li>
+              Chuyển <b>hết</b> tồn ⇒ dòng chỉ đổi cột <b>Vị trí</b>. Chuyển <b>một phần</b> ⇒ hệ
+              thống tách thành dòng mới ở kho đích. Tổng tồn của tháng <b>không đổi</b> vì chuyển
+              kho không phải nhập hay xuất.
+            </li>
+            <li>
+              <b>Nhiều dòng cùng lúc</b> (chuyển cả lô): tick ô đầu các dòng → bấm{" "}
+              <b>Gán vị trí</b> → chọn kho → Lưu.
+            </li>
+            <li>Kho chưa có trong danh sách thì gõ tên mới, hệ thống tự lưu vào danh mục.</li>
+          </Y>
+        </Muc>
+        <Muc tieuDe="Hàng mới về">
+          <Y>
+            <li>
+              <b>Lô mới</b> (ngày nhập / invoice khác): bấm <b>Thêm dòng</b>, điền ngày nhập, tên,
+              invoice, đơn giá, số kg ô <b>Nhập trong kỳ</b>, vị trí.
+            </li>
+            <li>
+              <b>Về thêm cho đúng lô đang có</b>: nút hộp cuối dòng → <b>Nhập thêm</b>.
+            </li>
+          </Y>
+        </Muc>
+        <Muc tieuDe="Gõ số hàng loạt, sửa, xóa">
+          <Y>
+            <li>
+              <b>Ghi nhập/xuất</b>: mở lưới gõ thẳng tồn đầu / nhập / xuất (kg) cho cả bảng, dán
+              được khối số từ Excel. Lưu ý: ô ở lưới là <b>tổng cả tháng</b> (ghi đè), còn nút hộp
+              cuối dòng là <b>cộng thêm</b> từng lần.
+            </li>
+            <li>Nút <b>bút chì</b>: sửa ngày nhập, tên, size, invoice, đơn giá, vị trí.</li>
+            <li>Nút <b>thùng rác</b>: xóa dòng (có hỏi lại, xóa nhầm bấm <b>Hoàn tác</b>).</li>
+            <li>Nút <b>đồng hồ</b>: thẻ kho — lịch sử mặt hàng qua các tháng + nhật ký thao tác.</li>
+          </Y>
+        </Muc>
+        <Muc tieuDe="Xem cho gọn">
+          <Y>
+            <li>
+              <b>Ẩn dòng trống</b>: giấu các dòng không có số (tồn đầu, nhập, xuất đều 0). Bấm lại
+              để hiện.
+            </li>
+            <li>Tick vài dòng ⇒ thấy ngay tổng của đúng mấy dòng đó, in riêng được.</li>
+          </Y>
+        </Muc>
+        <Muc tieuDe="Cuối tháng">
+          <p>
+            Soát xong bấm <b>Dồn sang tháng sau</b>: tồn cuối tháng này thành tồn đầu tháng sau
+            (mọi kho). Bấm lại chỉ cập nhật, không nhân đôi.
+          </p>
+        </Muc>
+      </>
+    ),
+  },
+
   qr: {
     tieuDe: "Quét mã lô",
     moTa: "Tạo mã lô, in tem QR dán lên hàng, và quét để tra lô.",

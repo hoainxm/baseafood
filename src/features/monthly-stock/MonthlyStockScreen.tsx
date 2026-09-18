@@ -27,6 +27,9 @@ import {
   suyNhomNguyenLieu,
   khoaLo,
   theKhoMatHang,
+  laDongTrong,
+  apThaoTacLo,
+  type KieuThaoTac,
   type MonthlyStockRow,
   type DoiChieuDong,
   type DichDanhMuc,
@@ -76,6 +79,8 @@ import {
   CheckCircle2,
   Coins,
   Eye,
+  EyeOff,
+  PackageMinus,
   FileSpreadsheet,
   Pencil,
   Plus,
@@ -165,6 +170,7 @@ export default function MonthlyStockScreen() {
   const [timKiem, setTimKiem] = useState(""); // tìm nhanh trong tháng (tên · size · xuất xứ · nhóm)
   const [daChon, setDaChon] = useState<Set<string>>(new Set()); // dòng đang tick (cộng tổng / thao tác lô)
   const [xemThe, setXemThe] = useState<MonthlyStockRow | null>(null); // thẻ kho của 1 mặt hàng
+  const [anDongTrong, setAnDongTrong] = useState(false); // ẩn dòng tồn đầu = nhập = xuất = 0
 
   // ---------- Nhập Excel bảng kê (seed số cũ) ----------
   const fileRef = useRef<HTMLInputElement>(null);
@@ -223,14 +229,18 @@ export default function MonthlyStockScreen() {
   /** Dòng đang HIỂN THỊ = dòng đã lưu, hoặc bản xem trước khi tháng còn trống. */
   const rowsGoc = laXemTruoc ? rowsXemTruoc : rowsLuu;
 
-  /** Ô tìm nhanh: tên · size · invoice · nhóm · kho · vị trí (không phân biệt hoa thường). */
+  /** Số dòng không có số liệu trong phạm vi đang xem (để ghi trên nút ẩn/hiện). */
+  const soDongTrong = useMemo(() => rowsGoc.filter(laDongTrong).length, [rowsGoc]);
+
+  /** Ô tìm nhanh: tên · size · invoice · nhóm · kho · vị trí (không phân biệt hoa thường) + ẩn dòng trống. */
   const rowsThang: MonthlyStockRow[] = useMemo(() => {
     const q = timKiem.trim().toLowerCase();
-    if (!q) return rowsGoc;
-    return rowsGoc.filter((r) =>
+    const nguon = anDongTrong ? rowsGoc.filter((r) => !laDongTrong(r)) : rowsGoc;
+    if (!q) return nguon;
+    return nguon.filter((r) =>
       `${r.itemName} ${r.size} ${r.origin} ${r.category} ${r.warehouse} ${r.storageLocation}`.toLowerCase().includes(q)
     );
-  }, [rowsGoc, timKiem]);
+  }, [rowsGoc, timKiem, anDongTrong]);
 
   const nhomList = useMemo(() => gomNhom(rowsThang), [rowsThang]);
   const tong = useMemo(() => tongDong(rowsThang), [rowsThang]);
@@ -299,6 +309,15 @@ export default function MonthlyStockScreen() {
   const [loi, setLoi] = useState<LoiNhap[]>([]);
 
   const moThem = () => {
+    // Đang XEM TRƯỚC (tháng chưa lưu dòng nào, đang hiện bản kế thừa từ tháng trước):
+    // thêm rồi lưu 1 dòng sẽ khiến rowsLuu ≠ rỗng ⇒ tắt xem trước ⇒ cả bảng kế thừa
+    // (chưa lưu) biến mất khỏi màn — dễ tưởng mất số liệu. Bắt kế thừa & lưu trước.
+    if (laXemTruoc) {
+      notify.canhBao(
+        `${nhanThang(thang)} đang XEM TRƯỚC (chưa lưu). Bấm "Kế thừa & lưu vào sổ" trước, rồi mới thêm dòng — kẻo bảng kế thừa đang xem bị trôi mất.`
+      );
+      return;
+    }
     const catGoiY = nhomList[0]?.category || MONTHLY_STOCK_CATEGORIES[0];
     const khoGoiY = kho !== TAT_CA_KHO ? kho : KHO_MAC_DINH;
     setForm(formRong(catGoiY, khoGoiY));
@@ -471,6 +490,54 @@ export default function MonthlyStockScreen() {
     ghiLines(lines.map((l) => (ids.has(l.id) ? { ...l, storageLocation: dich } : l)));
     setGanViTri(null);
     notify.daLuu(`Đã chuyển ${ids.size} dòng về ${dich}`, () => ghiLines(truoc));
+  };
+
+  // ---------- Thao tác một dòng: lấy ra dùng · nhập thêm · chuyển vị trí ----------
+  const [thaoTac, setThaoTac] = useState<{
+    row: MonthlyStockRow;
+    kieu: KieuThaoTac;
+    kg: number | null;
+    viTri: string;
+    ngay: string;
+    lyDo: string;
+  } | null>(null);
+  const [loiTT, setLoiTT] = useState<LoiNhap[]>([]);
+
+  const moThaoTac = (row: MonthlyStockRow, kieu: KieuThaoTac = "xuat") => {
+    setThaoTac({ row, kieu, kg: null, viTri: "", ngay: homNay(), lyDo: "" });
+    setLoiTT([]);
+  };
+
+  const luuThaoTac = () => {
+    if (!thaoTac) return;
+    const { row, kieu, kg, viTri, ngay, lyDo } = thaoTac;
+    const ls: LoiNhap[] = [];
+    const tonCuoi = row.closeKg;
+    if (!kg || kg <= 0) ls.push({ truong: "Số kg", thongBao: "Chưa nhập số kg (phải lớn hơn 0)" });
+    else if (kieu !== "nhap" && kg > tonCuoi + 1e-6)
+      ls.push({ truong: "Số kg", thongBao: `Vượt tồn cuối của dòng (${num(tonCuoi)} kg)` });
+    if (kieu === "chuyen") {
+      if (!viTri.trim()) ls.push({ truong: "Chuyển tới", thongBao: "Chưa chọn vị trí đích" });
+      else if (viTri.trim() === viTriCua(row)) ls.push({ truong: "Chuyển tới", thongBao: "Vị trí đích trùng vị trí hiện tại" });
+    }
+    setLoiTT(ls);
+    if (ls.length || !kg) return;
+
+    const viec =
+      kieu === "xuat"
+        ? `Lấy ra sử dụng ${num(kg)} kg`
+        : kieu === "nhap"
+          ? `Nhập thêm ${num(kg)} kg`
+          : `Chuyển ${num(kg)} kg từ ${viTriCua(row) || "(chưa rõ)"} sang ${viTri.trim()}`;
+    const ghiChu = `${viDate(ngay || homNay())}: ${viec}${lyDo.trim() ? ` — ${lyDo.trim()}` : ""}`;
+    const goc = lines.find((l) => l.id === row.id);
+    if (!goc) return;
+    const kq = apThaoTacLo(goc, kieu, kg, { viTriDich: viTri, ghiChu, idMoi: `msl|${thang}|${uid()}` });
+    const truoc = lines;
+    const sau = lines.map((l) => (l.id === kq.dong.id ? kq.dong : l));
+    ghiLines(kq.dongTach ? [...sau, kq.dongTach] : sau);
+    setThaoTac(null);
+    notify.daLuu(`${row.itemName}: ${viec}`, () => ghiLines(truoc));
   };
 
   // ---------- Thẻ kho: lịch sử một mặt hàng qua các tháng ----------
@@ -664,7 +731,10 @@ export default function MonthlyStockScreen() {
     }
     const idMoi = new Set(moi.map((x) => x.id));
     const giuLai = lines.filter((l) => !idMoi.has(l.id));
+    // Dòng đã TÁCH khi chuyển kho một phần: nạp lại trả dòng gốc về số trong file ⇒ phần tách bị đếm 2 lần.
+    const soTach = giuLai.filter((l) => [...idMoi].some((id) => l.note.includes(`(tách từ dòng ${id})`))).length;
     ghiLines([...giuLai, ...moi]);
+    if (soTach) notify.canhBao(`${soTach} dòng từng tách khi chuyển kho một phần vẫn còn — dòng gốc đã về số trong file, kiểm lại kẻo cộng đôi.`);
     const dauKy = [...new Set(moi.map((m) => m.period))].sort()[0];
     setThang(dauKy);
     setKho(TAT_CA_KHO);
@@ -747,6 +817,15 @@ export default function MonthlyStockScreen() {
           </Button>
           {!laXemTruoc && (
             <>
+              <Button
+                size="sm"
+                variant="ghost"
+                aria-label={`Lấy ra / chuyển ${r.itemName}`}
+                title="Lấy hàng ra sử dụng, nhập thêm, hoặc chuyển sang kho khác — nhập số kg rồi lưu."
+                onClick={() => moThaoTac(r)}
+              >
+                <PackageMinus className="size-4" />
+              </Button>
               <Button
                 title="Sửa dòng: ngày nhập · tên hàng · size · invoice · đơn giá · số kg · vị trí." size="sm" variant="ghost" aria-label={`Sửa ${r.itemName}`} onClick={() => moSua(r)}>
                 <Pencil className="size-4" />
@@ -939,6 +1018,24 @@ export default function MonthlyStockScreen() {
               {rowsChon.length ? "Bỏ chọn hết" : "Chọn tất cả"}
             </Button>
           )}
+          {coDuLieu && (soDongTrong > 0 || anDongTrong) && (
+            <Button
+              variant={anDongTrong ? "default" : "outline"}
+              aria-pressed={anDongTrong}
+              onClick={() => {
+                setAnDongTrong((v) => !v);
+                boChon();
+              }}
+              title={
+                anDongTrong
+                  ? "Đang ẩn các dòng không có số liệu. Bấm để hiện lại toàn bộ dòng."
+                  : "Ẩn các dòng không có số liệu (tồn đầu, nhập, xuất đều bằng 0) cho bảng gọn."
+              }
+            >
+              {anDongTrong ? <Eye className="mr-2 h-4 w-4" /> : <EyeOff className="mr-2 h-4 w-4" />}
+              {anDongTrong ? `Hiện dòng trống (${soDongTrong})` : `Ẩn dòng trống (${soDongTrong})`}
+            </Button>
+          )}
           {coTonSang && (
             <Button
               variant="outline"
@@ -1027,6 +1124,18 @@ export default function MonthlyStockScreen() {
             </Badge>
           </div>
 
+          {!laXemTruoc && !ghiMode && (
+            <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
+              <span className="font-semibold text-foreground">Cách thao tác:</span>
+              <span>
+                lấy hàng ra dùng · nhập thêm · chuyển kho một dòng → bấm{" "}
+                <PackageMinus className="inline size-4 align-text-bottom" aria-label="nút Lấy ra / chuyển" /> cuối dòng;
+              </span>
+              <span>chuyển nhiều dòng một lúc → tick dòng rồi bấm "Gán vị trí";</span>
+              <span>gõ số cả bảng → "Ghi nhập/xuất". Hướng dẫn đầy đủ ở nút ? trên đầu trang.</span>
+            </p>
+          )}
+
           {/* Cộng tổng các dòng đang tick — kiểu bảng kê kế toán */}
           {rowsChon.length > 0 && (
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-primary/40 bg-primary/5 p-3">
@@ -1081,10 +1190,12 @@ export default function MonthlyStockScreen() {
 
           {timKhongRa && (
             <p className="rounded-lg border-2 border-dashed border-border p-6 text-center text-sm text-muted-foreground">
-              Không có mặt hàng nào khớp "{timKiem}" trong {nhanThang(thang)}.{" "}
+              {timKiem.trim()
+                ? `Không có mặt hàng nào khớp "${timKiem}" trong ${nhanThang(thang)}.`
+                : `Mọi dòng của ${nhanThang(thang)} đều không có số liệu và đang bị ẩn.`}{" "}
               <button
-                title="Xóa ô tìm để hiện lại toàn bộ mặt hàng của tháng." type="button" className="underline" onClick={() => setTimKiem("")}>
-                Bỏ tìm
+                title="Xóa ô tìm và hiện lại dòng trống để thấy toàn bộ mặt hàng của tháng." type="button" className="underline" onClick={() => { setTimKiem(""); setAnDongTrong(false); }}>
+                Hiện tất cả
               </button>
             </p>
           )}
@@ -1278,6 +1389,114 @@ export default function MonthlyStockScreen() {
             <Button onClick={luuDong} title="Ghi dòng này vào sổ tháng đang xem. Tồn cuối và tiền còn lại tự tính, không phải gõ.">
               <Plus className="mr-1 h-4 w-4" />
               {form?.id ? "Lưu dòng" : "Thêm dòng"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog thao tác một dòng: lấy ra dùng · nhập thêm · chuyển vị trí */}
+      <Dialog open={!!thaoTac} onOpenChange={(o) => !o && setThaoTac(null)}>
+        <DialogContent className="w-full sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle className="text-2xl">
+              {thaoTac?.row.itemName}
+              {thaoTac?.row.size ? ` · ${thaoTac.row.size}` : ""}
+            </DialogTitle>
+            <DialogDescription className="text-base">
+              {thaoTac
+                ? `Đang ở ${viTriCua(thaoTac.row) || "(chưa rõ)"} · tồn cuối ${num(thaoTac.row.closeKg)} kg${thaoTac.row.origin ? ` · invoice ${thaoTac.row.origin}` : ""}.`
+                : ""}
+            </DialogDescription>
+          </DialogHeader>
+          {thaoTac && (
+            <div className="space-y-4 py-2">
+              <ErrorSummary loi={loiTT} />
+              <div role="radiogroup" aria-label="Việc cần làm" className="grid gap-2 sm:grid-cols-3">
+                {(
+                  [
+                    ["xuat", "Lấy ra sử dụng", "Xuất đi sản xuất / bán — trừ vào tồn."],
+                    ["chuyen", "Chuyển kho", "Đổi chỗ để hàng — tồn không đổi."],
+                    ["nhap", "Nhập thêm", "Hàng về thêm cho đúng lô này."],
+                  ] as const
+                ).map(([k, nhan, moTa]) => (
+                  <button
+                    key={k}
+                    type="button"
+                    role="radio"
+                    aria-checked={thaoTac.kieu === k}
+                    title={moTa}
+                    onClick={() => setThaoTac((s) => (s ? { ...s, kieu: k } : s))}
+                    className={
+                      thaoTac.kieu === k
+                        ? "min-h-11 rounded-lg border-2 border-primary bg-primary/10 px-3 py-2 text-left"
+                        : "min-h-11 rounded-lg border-2 border-border px-3 py-2 text-left hover:bg-muted"
+                    }
+                  >
+                    <div className="font-semibold text-foreground">{nhan}</div>
+                    <div className="text-sm text-muted-foreground">{moTa}</div>
+                  </button>
+                ))}
+              </div>
+              <ChuThichBatBuoc />
+              <div className="grid gap-4 sm:grid-cols-2">
+                <NumberField
+                  label="Số kg"
+                  required
+                  unit="kg"
+                  value={thaoTac.kg}
+                  onChange={(v) => setThaoTac((s) => (s ? { ...s, kg: v } : s))}
+                />
+                <DateField
+                  label="Ngày thực hiện"
+                  value={thaoTac.ngay}
+                  onChange={(v) => setThaoTac((s) => (s ? { ...s, ngay: v } : s))}
+                />
+              </div>
+              {thaoTac.kieu === "chuyen" && (
+                <Combobox
+                  label="Chuyển tới"
+                  required
+                  value={thaoTac.viTri}
+                  onChange={(v) => setThaoTac((s) => (s ? { ...s, viTri: v } : s))}
+                  options={viTriOpts}
+                  onCreate={themViTri}
+                  choPhepXoa={false}
+                />
+              )}
+              {thaoTac.kieu !== "nhap" && thaoTac.row.closeKg > 0 && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setThaoTac((s) => (s ? { ...s, kg: s.row.closeKg } : s))}
+                  title="Điền sẵn toàn bộ tồn cuối của dòng vào ô Số kg."
+                >
+                  Lấy hết {num(thaoTac.row.closeKg)} kg
+                </Button>
+              )}
+              <Field label="Ghi chú (không bắt buộc)">
+                <Input
+                  value={thaoTac.lyDo}
+                  onChange={(e) => setThaoTac((s) => (s ? { ...s, lyDo: e.target.value } : s))}
+                  placeholder="VD: xuất xưởng Cá, lệnh SX…"
+                />
+              </Field>
+              <p className="text-sm text-muted-foreground">
+                {thaoTac.kieu === "xuat" &&
+                  "Số kg được CỘNG vào cột Xuất trong kỳ của dòng này; tồn cuối tự giảm."}
+                {thaoTac.kieu === "nhap" &&
+                  "Số kg được CỘNG vào cột Nhập trong kỳ. Hàng lô khác (ngày nhập / invoice khác) thì dùng nút Thêm dòng."}
+                {thaoTac.kieu === "chuyen" &&
+                  "Chuyển HẾT tồn cuối ⇒ chỉ đổi Vị trí của dòng. Chuyển MỘT PHẦN ⇒ tách thành dòng mới ở vị trí đích. Tổng nhập / xuất / tồn của tháng không đổi."}
+              </p>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setThaoTac(null)}>
+              Hủy
+            </Button>
+            <Button onClick={luuThaoTac} title="Ghi thao tác này vào sổ tháng đang xem, kèm ghi chú ngày và số kg ở nhật ký dòng. Có nút Hoàn tác sau khi lưu.">
+              <PackageMinus className="mr-1 h-4 w-4" />
+              Lưu thao tác
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1614,6 +1833,12 @@ export default function MonthlyStockScreen() {
                     {xemThe.importDate ? viDate(xemThe.importDate) : "—"}
                   </span>
                 </div>
+                {xemThe.note && (
+                  <div className="sm:col-span-2">
+                    Nhật ký thao tác:
+                    <div className="mt-1 whitespace-pre-line font-medium text-foreground">{xemThe.note}</div>
+                  </div>
+                )}
                 <div>
                   Dòng này sinh ra do dồn kỳ:{" "}
                   <span className="font-medium text-foreground">{xemThe.carriedFromId ? "có" : "không"}</span>

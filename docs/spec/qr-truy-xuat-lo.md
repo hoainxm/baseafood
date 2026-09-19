@@ -2,7 +2,7 @@
 
 > **Trạng thái:** ĐỢT 1 ĐÃ BUILD (2026-09-18) · đợt 2–3 là đề xuất · §7 còn câu chờ xưởng chốt.
 > **Loại:** phân tích các hệ thống/chuẩn QR truy xuất + thiết kế áp dụng cho Baseafood.
-> **Code:** `src/lib/truyXuatLo.ts` · `src/features/qr/QrTraCuuScreen.tsx` (hộ chiếu lô) · `src/features/shared/{GanLoDauVao,KhungQuetQr,QrTemLoIn,useDuLieuTruyXuat}` · migration `0046_lot_inputs.sql`.
+> **Code:** `src/lib/truyXuatLo.ts` · `src/features/qr/QrTraCuuScreen.tsx` (hộ chiếu lô) · `src/features/shared/{GanLoDauVao,KhungQuetQr,QrTemLoIn,useDuLieuTruyXuat}` · migration `0046_lot_inputs.sql` (✅ đã chạy trên DB thật 2026-09-18).
 
 > Nối tiếp họp [2026-09-02](../trien-khai/hop-2026-09-02-form-nhap-trace-gia-qc.md) **QĐ-6** (định danh lô + QR)
 > và **NR-6** (đã build in tem + màn quét). Ăn khớp "cấp lô" ở [`import-xnt-kho-cutover.md`](import-xnt-kho-cutover.md)

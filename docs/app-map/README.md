@@ -1,7 +1,9 @@
 > Load khi: bắt đầu bất kỳ task nào trong repo này và chưa biết phải đọc file nào.
 covers: docs/app-map/**
-last_verified: 2026-09-18
+last_verified: 2026-09-21
 ttl_days: 90
+<!-- re-verified: 2026-09-21 — audit PO: cập nhật số liệu cột "Nội dung" đã cũ (02 "5 màn"→~20 route; 03 "16 bảng/7 migration"→46 migration; 05 "chờ 0003"→0021+0047). Số route/bảng/migration là dữ kiện suy được từ source, không phải invariant — bảng Index chỉ tóm tắt, chi tiết đọc từng file. -->
+
 
 # App-map — Baseafood MES
 
@@ -38,10 +40,10 @@ Cửa vào là [`CLAUDE.md`](../../CLAUDE.md) ở root (quy tắc code, risk tie
 | File | Nội dung | covers |
 |---|---|---|
 | [01-app-structure.md](01-app-structure.md) | Map thư mục `src/` thật, ranh giới import, file nào là ngoại lệ | `src/**` |
-| [02-pages-navigation.md](02-pages-navigation.md) | 5 màn + Người dùng (admin) + Bộ giao diện, gate đăng nhập, state điều hướng | `src/App.tsx`, `src/main.tsx` |
-| [03-database.md](03-database.md) | 16 bảng, quy ước đặt tên, `xi_nghiep_id`, 7 migration + thứ tự chạy, trigger | `supabase/migrations/**` |
+| [02-pages-navigation.md](02-pages-navigation.md) | ~20 route (React Router v7 HashRouter) + nav cây module-centric, gate đăng nhập theo vai trò, màn DEMO gate admin | `src/App.tsx`, `src/main.tsx` |
+| [03-database.md](03-database.md) | Bảng + quy ước đặt tên (English snake_case sau 0016), 46 migration (0001→0047) + thứ tự chạy, trigger updated_at | `supabase/migrations/**` |
 | [04-tang-du-lieu.md](04-tang-du-lieu.md) | `useBang`, hàng chờ đồng bộ, hoà server↔local, seed, `vaDongCu`, đèn kết nối | `src/lib/repo.ts`, `src/lib/db.ts`, `src/lib/catalogRepo.ts`, `src/lib/connectivity.ts`, `src/lib/supabase.ts` |
-| [05-bao-mat-phan-quyen.md](05-bao-mat-phan-quyen.md) | Đăng nhập Supabase Auth + `nguoi_dung`/vai trò, gate, thiết lập admin, RLS mở `anon` chờ `0003` | `src/lib/auth.ts`, `src/lib/username.ts`, `src/features/auth/LoginScreen.tsx`, `src/features/users/UserManagementScreen.tsx`, `supabase/migrations/0006_nguoi_dung.sql`, `0003_siet_rls.sql` |
+| [05-bao-mat-phan-quyen.md](05-bao-mat-phan-quyen.md) | Đăng nhập Supabase Auth + `user_profiles`/vai trò (nhiều/người), gate app-level + nav-access 2 bộ phận, thiết lập admin, siết RLS 0021 (+0047 cho 5 bảng post-0021) | `src/lib/auth.ts`, `src/lib/username.ts`, `src/features/auth/LoginScreen.tsx`, `src/features/users/UserManagementScreen.tsx`, `supabase/migrations/0006_nguoi_dung.sql`, `0003_siet_rls.sql` |
 | [30-nhap-hang.md](30-nhap-hang.md) | Sổ nhập ngày: chuyến, hai ngày + ghi bù, chốt ngày, phế liệu ngày | `src/features/imports/MaterialImportScreen.tsx`, `src/types.ts` |
 | [33-ban-hang.md](33-ban-hang.md) | Sổ bán ngày: phiếu bán, quy cách, hai ngày + ghi bù, kênh XK/NĐ, hút vào cân đối | `src/features/sales/SalesScreen.tsx`, `src/types.ts`, `src/lib/repo.ts` |
 | [31-can-doi-ky.md](31-can-doi-ky.md) | Kỳ theo lô, 3 khối, công thức, hút phế liệu + hút bán, bản in A4 | `src/features/balancing/BalancingScreen.tsx`, `src/features/balancing/BalancingTable.tsx`, `src/lib/balancingCalc.ts` |

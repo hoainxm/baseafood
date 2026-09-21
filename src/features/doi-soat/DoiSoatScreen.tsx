@@ -32,6 +32,7 @@ import {
 import {
   doiSoat,
   docWorkbook,
+  tenFileKetQua,
   xuatExcelDoiSoat,
   xuatFileMau,
   fileSangBase64,
@@ -687,7 +688,7 @@ export default function DoiSoatScreen() {
     fileGocB64: string,
     editsCuaBan: Record<string, number> | undefined
   ) => {
-    const tenFile = `${ten.replace(/\.xlsx?$/i, "")} - đã đối soát.xlsx`;
+    const tenFile = tenFileKetQua(ten);
     if (fileGocB64) {
       try {
         const { xuatExcelGiuDinhDang } = await import("@/lib/doiSoatXuat");

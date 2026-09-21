@@ -1687,6 +1687,24 @@ function dungSheet(aoa: unknown[][], fillTheoHang: Style[], hangTieuDe: number):
   return ws;
 }
 
+/**
+ * Tên file kết quả: tên file gốc + " - đã đối soát " + ngày giờ xuất (VD
+ * "DANH SÁCH HD THUẾ GỬI - đã đối soát 20260921-1012.xlsx").
+ *
+ * Có NGÀY GIỜ để mỗi lần xuất ra một file MỚI: tên cố định thì bản sau trùng tên bản
+ * trước, trình duyệt/Finder tự thêm "(1)" hoặc hỏi ghi đè — kế toán mở nhầm bản cũ
+ * (chủ dự án phản ánh 2026-09-21). File vào là file đã xuất thì bỏ đuôi cũ trước,
+ * kẻo tên dài dần qua mỗi lần xuất lại.
+ */
+export function tenFileKetQua(tenGoc: string, luc: Date = new Date()): string {
+  const goc = tenGoc
+    .replace(/\.xlsx?$/i, "")
+    .replace(/ - (đã đối soát|đã dò lệch)( \d{8}-\d{4})?$/i, "");
+  const hai = (n: number) => String(n).padStart(2, "0");
+  const moc = `${luc.getFullYear()}${hai(luc.getMonth() + 1)}${hai(luc.getDate())}-${hai(luc.getHours())}${hai(luc.getMinutes())}`;
+  return `${goc} - đã đối soát ${moc}.xlsx`;
+}
+
 export function xuatExcelDoiSoat(kq: KetQuaDoiSoat, tenFile = "doi-soat-hddt.xlsx"): void {
   const wb = XLSX.utils.book_new();
   const tenDung = new Set<string>();

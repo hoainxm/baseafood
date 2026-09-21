@@ -227,10 +227,18 @@ export interface NhomCungNgay {
  */
 export function gomCungMstCungNgay(sheets: readonly SheetHoaDon[]): NhomCungNgay[] {
   const m = new Map<string, { mst: string; ten: string; ngay: string; ds: DongHoaDon[] }>();
+  // File có HAI BẢN (thuế gửi + tự tải) thì mỗi hóa đơn hiện hai lần — một ở mỗi
+  // bản. Đếm cả hai là nhóm nào cũng "trùng khít số tiền" (HDONDT 6 tháng: 1790/1923
+  // nhóm), danh sách thành vô dụng. Cùng khóa mà KHÁC bên thì chỉ lấy một lần.
+  const benDaThay = new Map<string, boolean>();
   for (const sh of sheets)
     for (const d of sh.dong) {
       const mst = chuan(d.mstBan);
       if (!mst || !d.ngayLap) continue;
+      const ben = laBenThue(sh.ten);
+      const da = benDaThay.get(d.khoa);
+      if (da !== undefined && da !== ben) continue;
+      benDaThay.set(d.khoa, ben);
       const k = `${mst}#${d.ngayLap}`;
       const o = m.get(k);
       if (o) o.ds.push(d);

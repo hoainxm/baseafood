@@ -98,6 +98,8 @@ export interface DongHoaDon {
   soDong: number;
   /** Dòng thật trong file Excel — dùng cho mọi chuỗi hiển thị cho người dùng. */
   dongFile: number;
+  /** Kết quả kiểm "chưa thuế + thuế = tổng thanh toán" của CHÍNH dòng này. null = khớp. */
+  lechCong: { lech: number; loai: LoaiLechCong } | null;
   cells: unknown[];
   kyHieu: string;
   soHoaDon: string;
@@ -126,6 +128,43 @@ export interface DongHoaDon {
   ganKhopMoTa?: string; // v3 §5.4: gợi ý cặp gần khớp cho dòng THIẾU
 }
 
+/**
+ * CÂN ĐỐI CỘT của một sheet hóa đơn: kế toán hay cộng cột "chưa thuế" + cột "thuế"
+ * rồi so với cột "tổng thanh toán"; lệch thì phải chỉ ra lệch ở đâu. Bóc phần lệch
+ * thành 4 nguyên nhân để biết cái nào phải đi sửa, cái nào là bình thường.
+ */
+/** Nguyên nhân một dòng có chưa thuế + thuế ≠ tổng thanh toán. */
+export type LoaiLechCong = "phi" | "chietKhau" | "lamTron" | "that";
+
+export const NHAN_LECH_CONG: Record<LoaiLechCong, string> = {
+  phi: "có phí — bình thường",
+  chietKhau: "có chiết khấu — bình thường",
+  lamTron: "làm tròn ±1đ — bình thường",
+  that: "LỆCH THẬT — phải soát",
+};
+
+export interface CanDoiCot {
+  /** Chỉ số cột (trong AOA) của ba cột tiền — để dựng công thức kiểm ngay trên sheet. */
+  cotChua: number;
+  cotThue: number;
+  cotTong: number;
+  tenChua: string;
+  tenThue: string;
+  tenTong: string;
+  sumChua: number;
+  sumThue: number;
+  sumCk: number;
+  sumPhi: number;
+  sumTong: number;
+  /** sumTong − (sumChua + sumThue) — đúng con số kế toán nhìn thấy. */
+  lech: number;
+  /** Bóc `lech` theo nguyên nhân; bốn số này cộng lại đúng bằng `lech`. */
+  boc: { phi: number; chietKhau: number; lamTron: number; lechThat: number };
+  soDong: { phi: number; chietKhau: number; lamTron: number; lechThat: number };
+  /** Danh sách dòng lệch KHÔNG giải thích được — chỗ phải đi sửa. */
+  dongLechThat: { dongFile: number; ma: string; ngay: string; ban: string; lech: number }[];
+}
+
 export interface SheetHoaDon {
   ten: string;
   header: string[];
@@ -138,6 +177,8 @@ export interface SheetHoaDon {
   hIdx: number;
   /** Số cột dữ liệu gốc (sau khi gỡ cột đối soát lần trước). */
   rong: number;
+  /** Cộng cột chưa thuế + thuế có bằng cột tổng thanh toán không, lệch thì do đâu. */
+  canDoiCot: CanDoiCot;
 }
 
 export interface DongPhanMem {
@@ -266,11 +307,29 @@ function docTienTe(row: unknown[], cDvt: number, cTyGia: number): { dvt: string;
   return { dvt: String(row[i]).trim(), tyGiaRaw: row[i + 1] };
 }
 
+/** Lệch tới mức này coi là làm tròn, không phải sai (đồng). */
+export const TOL_LAM_TRON = 1;
+
 const TRANG_THAI_KHONG_VAO_SO = ["da bi thay the", "bi xoa bo", "da bi huy", "bi huy"];
 const khongCanVaoSo = (tt: unknown): boolean => {
   const k = chuan(tt);
   return k !== "" && TRANG_THAI_KHONG_VAO_SO.some((x) => k.includes(x));
 };
+
+/**
+ * Sheet do chính engine dựng ở file xuất (v6.4 + tên cũ trước đó). Đọc lại file đã
+ * xuất thì BỎ QUA hẳn các sheet này — chữ trong đó (số hóa đơn, tổng cộng…) dễ bị
+ * dò nhầm thành bảng kê/sổ; xuất lại thì xóa rồi dựng mới. Đổi/thêm tên sheet tự
+ * dựng nào PHẢI thêm vào đây, không là xuất lại đẻ thêm sheet.
+ */
+export const SHEET_TU_DUNG: ReadonlySet<string> = new Set([
+  "KẾT LUẬN CHUNG", "HÓA ĐƠN CHƯA KÊ", "SO HAI BẢN HĐĐT", "CÙNG MST CÙNG NGÀY", "NHẬT KÝ SỬA",
+  // tên cũ (≤ v6.3) — gộp vào KẾT LUẬN CHUNG từ v6.4
+  "ĐỐI CHIẾU TỔNG", "TỰ KIỂM TRA", "NGHI VẤN SỐ LIỆU",
+]);
+
+/** Ba cột KIỂM CỘNG dựng ngay trên sheet bảng kê (công thức sống trỏ ô gốc). */
+export const HEADER_KIEM = ["Chưa thuế + Thuế", "Lệch với tổng thanh toán", "Nguyên nhân lệch"] as const;
 
 export const HEADER_HD_THEM = [
   "Tỷ giá áp dụng", "Số HĐ chuẩn", "KHÓA ĐỐI CHIẾU", "Chưa thuế (VND)", "Thuế (VND)",
@@ -571,7 +630,9 @@ export function sheetsTuBase64(b64: string): SheetTho[] {
  * "KẾT QUẢ", bỏ cột KẾT QUẢ (0) + mọi cột có tiêu đề thuộc bộ cột engine tự thêm.
  * Trả rows đã sạch + cờ đã-gỡ. Chỉ bỏ CỘT (giữ số dòng để `soDong` không đổi).
  */
-const THEM_NORM = new Set([...HEADER_HD_THEM, ...HEADER_PM_THEM, "KẾT QUẢ"].map(chuan));
+const THEM_NORM = new Set(
+  [...HEADER_HD_THEM, ...HEADER_PM_THEM, ...HEADER_KIEM, "KẾT QUẢ", "KIỂM CỘNG"].map(chuan)
+);
 /** Tiền tố của những cột engine tự thêm mà phần đuôi thay đổi theo file (tên sheet sổ…). */
 const THEM_PREFIX = ["so dong khop", "tong tt ben"].map(chuan);
 /** Ô tiêu đề này có phải cột do engine thêm ở lần chạy trước không. */
@@ -586,7 +647,8 @@ function goCotDoiSoatCu(
   let hIdx = -1;
   for (let i = 0; i < Math.min(rows.length, 15); i++) {
     const h = rows[i] ?? [];
-    if (h.some((c) => chuan(c) === "ket qua") && h.filter((c) => laCotThem(c)).length >= 3) {
+    const coNhanA = ["ket qua", "kiem cong"].includes(chuan(h[0]));
+    if ((coNhanA || h.some((c) => chuan(c) === "ket qua")) && h.filter((c) => laCotThem(c)).length >= 3) {
       hIdx = i;
       break;
     }
@@ -595,7 +657,7 @@ function goCotDoiSoatCu(
   const header = rows[hIdx] ?? [];
   const rong = Math.max(header.length, ...rows.map((r) => (r ?? []).length));
   const drop = new Set<number>();
-  if (chuan(header[0]) === "ket qua") drop.add(0); // cột nhãn chèn ở đầu
+  if (["ket qua", "kiem cong"].includes(chuan(header[0]))) drop.add(0); // cột nhãn chèn ở đầu
 
   // Khối cột thêm nằm LIỀN MẠCH ở cuối ⇒ gỡ từ cột thêm đầu tiên tới hết. Bền hơn
   // dò từng tên, vì vài tên đổi theo file (tên sheet sổ, cặp cột TK/thuế suất).
@@ -729,6 +791,14 @@ function apSuaVaoHang(
 // ---------- Nghi vấn cộng/thiếu (nhóm 1,2,4,5) ----------
 
 interface CotCong {
+  /**
+   * Hóa đơn BÁN HÀNG (ký hiệu mẫu số = 2): không có thuế GTGT ⇒ ô thuế để TRỐNG là
+   * ĐÚNG, và chưa thuế phải bằng tổng thanh toán. Không có cờ này thì engine coi ô
+   * thuế trống là "thiếu", rồi suy ngược tổng − chưa thuế thành số thuế — sai nguy
+   * hiểm: kế toán bấm Sửa là khai khống thuế đầu vào cho hóa đơn vốn không có thuế.
+   * (Bắt trên file thuế 6 tháng: 302/328 nghi vấn là báo oan kiểu này.)
+   */
+  banHang: boolean;
   chua: number;
   thue: number;
   tong: number;
@@ -752,7 +822,10 @@ function nghiVanCong(
   const t = soVN(layO(row, cot.tong, sheet, soDong, edits));
   const ck = soVN(layO(row, cot.ck, sheet, soDong, edits)) ?? 0;
   const phi = soVN(layO(row, cot.phi, sheet, soDong, edits)) ?? 0;
-  const tolCong = 0.5;
+  // Lệch 1 đồng là LÀM TRÒN của bên phát hành, không phải sai sót — báo lên chỉ làm
+  // nhiễu (file thuế 6 tháng có 26 dòng lệch đúng ±1 đ). Phần này vẫn được cộng vào
+  // bảng cân đối cột để tổng luôn khớp.
+  const tolCong = TOL_LAM_TRON;
   const oTong = `${sheet} · ô ${oExcel(g, soDong, cot.tong)} (${cot.tenTong})`;
   const oChua = `${sheet} · ô ${oExcel(g, soDong, cot.chua)} (${cot.tenChua})`;
   const oThue = `${sheet} · ô ${oExcel(g, soDong, cot.thue)} (${cot.tenThue})`;
@@ -762,6 +835,28 @@ function nghiVanCong(
   const xThue = `${sheet} · ô ${oExcel(g, soDong, cot.thue, D)} (${cot.tenThue})`;
   const coA = a != null, coB = b != null, coT = t != null;
   const soThieu = [coA, coB, coT].filter((x) => !x).length;
+
+  // HÓA ĐƠN BÁN HÀNG (mẫu số 2) — không có thuế GTGT. Ô thuế trống/0 là ĐÚNG, đừng
+  // đòi điền; chỗ phải soi là ô CHƯA THUẾ: nó phải bằng tổng thanh toán (trừ chiết
+  // khấu, cộng phí). Sai thì chỉ vào ô chưa thuế, KHÔNG suy ngược thành số thuế.
+  // CHỈ xét khi ô chưa thuế CÓ SỐ: bỏ trống cả cụm thì để nhánh nhóm 4 gom thống kê
+  // như cũ (bung ra từng dòng là 60+ dòng nhiễu trên file thật, không giúp gì thêm).
+  if (cot.banHang && coA) {
+    if (!coT || (b ?? 0) !== 0) return null; // có thuế thật ⇒ không phải diện này
+    const dung = t! + ck - phi;
+    if (Math.abs(a! - dung) <= tolCong) return null;
+    return {
+      nhom: 1,
+      viTri: oChua,
+      viTriXuat: xChua,
+      soDangCo: num(a!),
+      soDoiChung: num(dung),
+      nguonDoiChung: `hóa đơn bán hàng (mẫu số 2) không có thuế GTGT ⇒ chưa thuế = ${cot.tenTong}${ck ? " + chiết khấu" : ""}${phi ? " − phí" : ""} = ${num(dung)}`,
+      saiOCho: `chưa thuế ${num(a!)} nhưng tổng thanh toán ${num(t!)}, lệch ${num(dung - a!)} đ; hóa đơn này không có thuế nên hai số phải bằng nhau`,
+      anhHuong: "sai cột chưa thuế khi lập tờ khai; KHÔNG được ghi phần lệch thành tiền thuế",
+      sheet, soDong, cot: cot.chua, tenCot: cot.tenChua, giaTriCu: a, giaTriDung: dung,
+    };
+  }
 
   // Nhóm 4: thiếu CẢ CỤM (không suy được) — chỉ còn tổng
   if (!coA && !coB && coT)
@@ -875,7 +970,11 @@ function parseSheetHoaDon(
     moiCot(headerRaw, "Tổng tiền thanh toán"),
     cCk, cPhi
   );
+  const cMauSo = cot1(headerRaw, "Ký hiệu mẫu số");
+  /** Mẫu số 2 = hóa đơn bán hàng (không có thuế GTGT). Đổi theo TỪNG DÒNG. */
+  const laBanHang = (row: unknown[]) => cMauSo >= 0 && String(row[cMauSo] ?? "").trim() === "2";
   const cCot: CotCong = {
+    banHang: false,
     chua: sel.chua, thue: sel.thue, tong: sel.tong, ck: cCk, phi: cPhi,
     tenChua: header[sel.chua] ?? "Tổng tiền chưa thuế",
     tenThue: header[sel.thue] ?? "Tổng tiền thuế",
@@ -913,6 +1012,15 @@ function parseSheetHoaDon(
 
   const dong: DongHoaDon[] = [];
   let loiParse = 0;
+  // --- cân đối cột: cộng đúng như kế toán cộng trên Excel (số THÔ, không quy tỷ giá) ---
+  const cd: CanDoiCot = {
+    cotChua: cCot.chua, cotThue: cCot.thue, cotTong: cCot.tong,
+    tenChua: cCot.tenChua, tenThue: cCot.tenThue, tenTong: cCot.tenTong,
+    sumChua: 0, sumThue: 0, sumCk: 0, sumPhi: 0, sumTong: 0, lech: 0,
+    boc: { phi: 0, chietKhau: 0, lamTron: 0, lechThat: 0 },
+    soDong: { phi: 0, chietKhau: 0, lamTron: 0, lechThat: 0 },
+    dongLechThat: [],
+  };
   for (let i = dataStart; i < rows.length; i++) {
     const row = rows[i] ?? [];
     if (laDongTong(row)) continue;
@@ -931,10 +1039,44 @@ function parseSheetHoaDon(
     const tong = soVN(layO(row, cCot.tong, ten, soDong, edits));
     if (tong == null) loiParse++;
 
-    const nv = nghiVanCong(ten, soDong, row, cCot, edits, g);
+    const nv = nghiVanCong(ten, soDong, row, { ...cCot, banHang: laBanHang(row) }, edits, g);
     if (nv) {
       if (nv.nhom === 4 || nv.nhom === 5) themGop(gopMap, nv, (nv.nhom === 4 ? tong : nv.giaTriDung) ?? 0, "hd");
       else nghiVan.push(nv);
+    }
+
+    // cộng cột + bóc nguyên nhân lệch của CHÍNH dòng này
+    let lechCongDong: DongHoaDon["lechCong"] = null;
+    {
+      const a = soVN(row[cCot.chua]) ?? 0, b = soVN(row[cCot.thue]) ?? 0;
+      const ck = cCot.ck >= 0 ? soVN(row[cCot.ck]) ?? 0 : 0;
+      const phi = cCot.phi >= 0 ? soVN(row[cCot.phi]) ?? 0 : 0;
+      const tg = soVN(row[cCot.tong]) ?? 0;
+      cd.sumChua += a; cd.sumThue += b; cd.sumCk += ck; cd.sumPhi += phi; cd.sumTong += tg;
+      const d = tg - (a + b);
+      if (Math.abs(d) > TOL_LAM_TRON / 2) {
+        lechCongDong =
+          Math.abs(d) <= TOL_LAM_TRON ? { lech: d, loai: "lamTron" as const }
+          : phi && Math.abs(d - phi) <= TOL_LAM_TRON ? { lech: d, loai: "phi" as const }
+          : ck && Math.abs(d + ck) <= TOL_LAM_TRON ? { lech: d, loai: "chietKhau" as const }
+          : { lech: d, loai: "that" as const };
+        // thứ tự xét: làm tròn → phí → chiết khấu → lệch thật (phí/chiết khấu là
+        // thành phần HỢP LỆ của tổng, không phải sai sót)
+        const vao = (k: keyof CanDoiCot["boc"]) => { cd.boc[k] += d; cd.soDong[k]++; };
+        if (Math.abs(d) <= TOL_LAM_TRON) vao("lamTron");
+        else if (phi && Math.abs(d - phi) <= TOL_LAM_TRON) vao("phi");
+        else if (ck && Math.abs(d + ck) <= TOL_LAM_TRON) vao("chietKhau");
+        else {
+          vao("lechThat");
+          cd.dongLechThat.push({
+            dongFile: dongExcel(g, soDong),
+            ma: `${kyHieu}-${soHoaDon}`,
+            ngay: ngayHienThi(row[cNgay]),
+            ban: cellStr(row, cTenBan),
+            lech: d,
+          });
+        }
+      }
     }
 
     const soChuan = soHoaDonChuan(soHoaDon);
@@ -942,6 +1084,7 @@ function parseSheetHoaDon(
     const trangThaiHd = docTrangThaiHd(row, cTrangThai);
     dong.push({
       sheet: ten, soDong, dongFile: dongExcel(g, soDong),
+      lechCong: lechCongDong,
       trangThaiHd: trangThaiHd,
       khongCanVaoSo: khongCanVaoSo(trangThaiHd),
       boCucLech: dongRongHon(row),
@@ -958,7 +1101,9 @@ function parseSheetHoaDon(
       tkNoCo: "", dienGiaiPm: "", soTienHachToan: null,
     });
   }
-  return { sheet: { ten, header, preRows, dong, goc: g, hIdx, rong }, loiParse };
+  cd.lech = cd.sumTong - (cd.sumChua + cd.sumThue);
+  cd.dongLechThat.sort((x, y) => Math.abs(y.lech) - Math.abs(x.lech));
+  return { sheet: { ten, header, preRows, dong, goc: g, hIdx, rong, canDoiCot: cd }, loiParse };
 }
 
 // ---------- Parse sheet PHẦN MỀM ----------
@@ -986,6 +1131,7 @@ function parseSheetPhanMem(
     -1, -1
   );
   const cCot: CotCong = {
+    banHang: false, // sổ kế toán không có khái niệm mẫu số hóa đơn
     chua: sel.chua, thue: sel.thue, tong: sel.tong, ck: -1, phi: -1,
     tenChua: header[sel.chua] ?? "ST chưa thuế",
     tenThue: header[sel.thue] ?? "Tiền thuế",
@@ -1082,6 +1228,7 @@ export function doiSoat(sheets: SheetTho[], opt: TuyChonDoiSoat): KetQuaDoiSoat 
   let daGoCotCu = false;
 
   for (const s0 of sheets) {
+    if (SHEET_TU_DUNG.has(s0.ten)) continue; // sheet tổng hợp của lần xuất trước
     const goi = goCotDoiSoatCu(s0.rows); // v3 §1.5 idempotent
     if (goi.daGo) daGoCotCu = true;
     const rows = goi.rows;

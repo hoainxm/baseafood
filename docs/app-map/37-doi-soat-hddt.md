@@ -1,7 +1,13 @@
 > Load khi: sửa màn `/doi-soat`, logic đối soát hóa đơn điện tử ⇄ phần mềm kế toán, đọc/ghi file Excel hóa đơn.
 covers: src/features/doi-soat/DoiSoatScreen.tsx, src/features/doi-soat/index.ts, src/lib/doiSoatHddt.ts, src/lib/doiSoatHaiBan.ts, src/lib/doiSoatXuat.ts, src/lib/doiSoatXuatShift.ts, src/lib/doiSoatXuatTongHop.ts
-last_verified: 2026-09-18
+last_verified: 2026-09-21
 ttl_days: 90
+<!-- updated: 2026-09-21 — v6.4 BỚT SHEET, MỘT CHỖ TRẢ LỜI (chủ dự án: "tạo quá nhiều sheet nhưng không xác định được trọng tâm"). (1) Sheet `KẾT LUẬN CHUNG` luôn đứng đầu, gộp 3 sheet cũ `ĐỐI CHIẾU TỔNG` + `TỰ KIỂM TRA` + `NGHI VẤN SỐ LIỆU` thành khối: bảng TRẢ LỜI (việc đã kiểm · kết luận · XEM Ở ĐÂU là link `HYPERLINK("#'Sheet'!A1")` · phải làm gì) → SỐ LIỆU ĐỐI CHIẾU VỚI SỔ (chỉ khi có sổ) → CỘNG CỘT (bảng xoay, mỗi sheet một cột) → CHỖ CẦN SOÁT LẠI (chỉ khi có) → TỰ KIỂM TRA cuối. (2) Sheet danh sách CHỈ dựng khi có dữ liệu: `HÓA ĐƠN CHƯA KÊ` (có sổ + có dòng thiếu một trong hai chiều) · `SO HAI BẢN HĐĐT` · `CÙNG MST CÙNG NGÀY` (xếp SAU sheet gốc — tham khảo, không phải kết quả). (3) Danh sách từng hóa đơn lệch cộng KHÔNG chép ra nữa — chỉ đường lọc cột "Nguyên nhân lệch"/cột A ngay trên sheet gốc (v6.3). (4) Câu trả lời cộng cột bóc từng sheet ra CẢ HAI con số kế toán có thể đang nhìn ở dòng tổng tự đặt (cộng trần / đã cộng phí). (5) `SHEET_TU_DUNG` (doiSoatHddt.ts) = tên sheet tự dựng mới + cũ: engine BỎ QUA khi đọc lại file đã xuất, lớp xuất XÓA rồi dựng lại ⇒ idempotent. (6) `gomCungMstCungNgay` không đếm một hóa đơn hai lần khi file có hai bản (cùng khóa, khác bên). (7) Cảnh báo lặp ý với bảng trả lời bị lọc: "không cần vào sổ" (đã ở dòng chưa kê), "thiếu sổ" khi không sổ, "trùng khóa" chỉ vì mỗi bản có một lần. -->
+<!-- re-verified: 2026-09-21 — hồi quy 5 file thật × 3 vòng xuất lại: tổng đối soát + tự kiểm 9/9 + cân đối cột TRÙNG KHÍT bản v6.3 (15/15 JSON); số sheet/cột đứng yên qua 3 vòng; sheet gốc so với bản v6.3 từng ô (cả công thức) 0 lệch (T6 34.926 · T8 38.736 · HDONDT 133.461 · đang làm 195.009 · (1) 73.373 ô); ô gốc vào↔ra 0 lệch trừ "đang làm.xls" 6.675 ô (ngày thêm <1 phút + chuỗi rỗng thành trống — có sẵn từ bước đổi .xls, bản v6.3 y vậy). File "(1).xls": ô R3049 (Q3049 gốc) vẫn = 9.268.400; bảng trả lời nói đúng 9.268.400 = lệch thật 9.360.068 (HDDT dòng 1685) + chiết khấu −91.666 + làm tròn −2. Sheet tổng hợp: T6 5→3 · T8 5→3 · HDONDT 5→3 · đang làm 5→3 · (1) 4→2. -->
+<!-- updated: 2026-09-21 — v6.3 DÒ NGAY TRONG SHEET, KHÔNG ĐỔI SỐ LIỆU (yêu cầu kế toán). (1) `DongHoaDon.lechCong` = kết quả kiểm "chưa thuế + thuế = tổng thanh toán" của CHÍNH dòng đó (null = khớp) + `CanDoiCot.cotChua/cotThue/cotTong` để dựng công thức. (2) File xuất thêm 3 cột `HEADER_KIEM` ("Chưa thuế + Thuế" · "Lệch với tổng thanh toán" · "Nguyên nhân lệch") NGAY TRONG sheet bảng kê, hai cột đầu là CÔNG THỨC SỐNG trỏ thẳng ô gốc (`N{r}+O{r}`, `R{r}-(N{r}+O{r})`) — bấm vào ô là thấy số được TÍNH ra, bằng chứng không sửa số của thuế. `ghiKhoiDoiSoat` nhận ô kiểu `{ct}` để ghi công thức (exceljs tự thêm dấu "=", đừng viết sẵn). (3) CHẾ ĐỘ KIỂM BẢNG KÊ khi file KHÔNG có sheet sổ: cột A đổi nhãn "KIỂM CỘNG" và mang kết quả kiểm cộng, màu dòng theo kiểm cộng (đỏ = lệch thật, vàng = phí/chiết khấu/làm tròn, xanh = khớp), khối thêm CHỈ 3 cột kiểm — thay vì 17 cột đối soát-với-sổ rỗng không. (4) File CÓ sổ: 3 cột kiểm nối ở CUỐI khối, giữ nguyên 38 cột đầu theo bố cục file mẫu kế toán. (5) `THEM_NORM` + nhận diện hàng tiêu đề nhận thêm `HEADER_KIEM` và nhãn cột A "KIỂM CỘNG" để xuất lại KHÔNG đẻ cột. -->
+<!-- re-verified: 2026-09-21 — file thuế "(1).xls": cột A đánh dấu 3007 khớp · 35 bình thường (phí/chiết khấu/làm tròn) · 1 LỆCH THẬT (HDDT dòng 1685); MTT 508 khớp, 0 lệch. Công thức ghi ra đúng `N3+O3` / `R3-(N3+O3)`. KHÔNG ĐỔI SỐ LIỆU: so 73.755 ô gốc giữa file vào và file ra — 0 ô lệch (ô MTT!Q514 vốn đã là công thức `Q511-Q513`, file ra giữ và dịch đúng thành `R511-R513`). Nối đúng ô tổng của kế toán: cuối sheet HDDT có `Q3048 = Σ chưa thuế + Σ thuế + Σ phí` và `Q3049 = Σ tổng TT − Q3048 = 9.268.400` — bảng cân đối thêm cột "LỆCH (đã cộng phí)" cho ra đúng 9.268.400 = lệch thật 9.360.068 − chiết khấu 91.666 − làm tròn 2; dòng tổng của kế toán được giữ nguyên và dịch công thức đúng cột. Xuất lại 3 vòng cho cả hai chế độ: số cột đứng yên (thuế 26/24 · T8 41/31). T6 so với file mẫu: 38 cột đầu khác 0. Hồi quy 3 file cũ: tổng đối soát + tự kiểm 9/9 y nguyên. -->
+<!-- updated: 2026-09-21 — v6.2 HÓA ĐƠN BÁN HÀNG (MẪU SỐ 2) + CÂN ĐỐI CỘT + NGƯỠNG LÀM TRÒN. (1) `CotCong.banHang` (tính THEO TỪNG DÒNG từ cột "Ký hiệu mẫu số" = 2): hóa đơn bán hàng KHÔNG có thuế GTGT ⇒ ô thuế trống/0 là ĐÚNG, và chưa thuế phải = tổng thanh toán (+chiết khấu −phí). Trước đó engine coi ô thuế trống là "thiếu" rồi suy ngược tổng − chưa thuế thành SỐ THUẾ — sai nguy hiểm: bấm Sửa là khai khống thuế đầu vào. Nhánh mới chỉ chạy khi ô chưa thuế CÓ SỐ (bỏ trống cả cụm vẫn để nhóm 4 gom thống kê, kẻo bung 60+ dòng nhiễu). (2) `TOL_LAM_TRON = 1` đ thay `tolCong = 0.5`: lệch 1 đồng là làm tròn của bên phát hành, không phải sai sót. (3) `SheetHoaDon.canDoiCot` (kiểu `CanDoiCot`): cộng cột chưa thuế + thuế so cột tổng thanh toán trên SỐ THÔ (không quy tỷ giá — kế toán cộng cột trên Excel là cộng thô), bóc phần lệch thành 4 nguyên nhân phí · chiết khấu · làm tròn ±1đ · LỆCH THẬT, bốn phần cộng lại ĐÚNG bằng phần lệch nên tự kiểm được. Hiện thành bảng ở ĐẦU sheet NGHI VẤN SỐ LIỆU kèm danh sách dòng lệch thật. -->
+<!-- re-verified: 2026-09-21 — chạy trên file thuế gửi "(1).xls" (HDDT 3.047 dòng + MTT 512): lệch cột 11.787.420 bóc ra = phí 2.519.020 (8 dòng) + chiết khấu −91.666 (1) + làm tròn −2 (26) + LỆCH THẬT 9.360.068 (1 dòng: HDDT 1685, C26TNS-324, Nhà sách Minh Đăng). Kiểm chéo quy tắc mẫu số 2 trên toàn file: 304 hóa đơn mẫu số 2, 303 cái có chưa thuế = tổng thanh toán, đúng 1 cái sai là dòng 1685. Nghi vấn giảm 328 → 1 lẻ + 1 gộp. HỒI QUY (đều GIẢM hoặc GIỮ, không phát sinh loại mới): T6 18→17 · .xls 6 tháng 6→5 · T8 70→70, tổng đối soát và tự kiểm 9/9 y nguyên cả 3 file. Xuất lại 3 vòng: sheet/cột đứng yên. Trình duyệt thật: bóc tách ra đúng số, xuất 719KB không lỗi. -->
 <!-- updated: 2026-09-18 — v6.1 SỔ XUẤT CHI TIẾT MẶT HÀNG + SHEET "HÓA ĐƠN CHƯA KÊ". (1) Kế toán gửi lại T8 với PMEM kiểu MỚI: 1 dòng/mặt hàng (DVT·SOLUONG·DONGIA), cột `KH_HD`·`MS_THUE`·`DONVIBAN`·`TIENHANG_CHUATHUE`·`TIEN_THUE`·`NOIDUNG`, KHÔNG có cột TONGCONG ⇒ `hangTieuDePhanMem` cũ đòi "tổng cộng" nên KHÔNG nhận ra sổ, cả 610 hóa đơn thành "chưa có". Nay nhận sổ khi có "số HĐ" + (cột tổng HOẶC đủ cặp tiền hàng + tiền thuế); thêm alias; `SheetPhanMem.coCotTong=false` ⇒ tổng = tiền hàng + thuế, BỎ `nghiVanCong` (không có tổng để soi — soi là báo oan cả sổ "tổng bị xóa"); cảnh báo "Sổ không có cột tổng cộng". Dòng mặt hàng cùng số HĐ vẫn cộng dồn như cũ. (2) Kế toán phản ánh "không thấy lọc chưa kê" ⇒ sheet "HÓA ĐƠN CHƯA KÊ" đứng thứ 2 (ngay sau ĐỐI CHIẾU TỔNG, có dòng chỉ đường ở ô A4): bảng chính = hóa đơn THIẾU trừ `khongCanVaoSo` trừ nghi-gõ-sai, xếp theo ngày lập, có dòng CỘNG; mục "NGHI ĐÃ KÊ NHƯNG GÕ SAI SỐ HÓA ĐƠN Ở SỔ" = hóa đơn có `ganKhopMoTa`; mục "KHÔNG CẦN KÊ" = đã bị thay thế/hủy; mục cuối "DÒNG SỔ KHÔNG CÓ HÓA ĐƠN ĐIỆN TỬ". -->
 <!-- re-verified: 2026-09-18 — T8 gửi lại (HDDTU 610 HĐ, PMEM 590 dòng mặt hàng): trước khi sửa KHÔNG nhận ra sổ; sau khi sửa 551 khớp · 3 lệch · 56 thiếu · 12 dòng sổ thiếu HĐ · 9 gần khớp · tự kiểm 9/9 (bản PMEM thiếu lần trước chỉ 501 khớp / 105 thiếu). 9/12 dòng sổ "không có hóa đơn" là GÕ SAI SỐ HĐ (352255 vs 35255, 159376 vs 154376, số phiếu "15/NHIU/08" gõ vào ô số HĐ…) ⇒ tách riêng: 47 phải kê thật (341,7 tr đ) + 9 nghi gõ sai. HỒI QUY y nguyên: T6 685/392/1/292 · .xls 6 tháng 3551/2049/8/1494 · HDONDT không nhận nhầm sheet HĐĐT thành sổ. Xuất lại 3 vòng (T8 + HDONDT): sheet/cột/tổng đứng yên. Trình duyệt thật: 551/56/9, xuất 282KB không lỗi. -->
 <!-- updated: 2026-09-17 — v6 HAI CHIỀU SOÁT MỚI (`src/lib/doiSoatHaiBan.ts`, hàm THUẦN trên `SheetHoaDon[]`, KHÔNG đụng engine ⇒ 9 phép tự kiểm giữ nguyên). (1) `soHaiBanHddt` — so BẢN THUẾ GỬI ⇄ BẢN TỰ TẢI: nhận diện bên thuế bằng tên sheet chứa chữ "thuế" (`laBenThue`), GỘP mọi sheet mỗi bên rồi so theo cùng khóa `MST|ký hiệu|số HĐ chuẩn` (không ghép đôi sheet theo tên — bản thuế gộp có-mã+không-mã trong khi bản tự tải tách ra). 3 nhãn: CHỈ THUẾ CÓ (bản tải thiếu) · CHỈ TẢI CÓ · CÓ CẢ HAI (khớp / lệch tiền / không-so-được). (2) `gomCungMstCungNgay` — gom hóa đơn cùng MST người bán + cùng ngày lập, giữ nhóm ≥2, đánh dấu riêng nhóm có hóa đơn TRÙNG KHÍT số tiền (`trungSoTien`) vì đó mới là dấu hiệu kê hai lần. (3) Xuất thêm 2 sheet "SO HAI BẢN HĐĐT" + "CÙNG MST CÙNG NGÀY"; file KHÔNG có sheet sổ thì SO HAI BẢN lên ĐẦU và ĐỐI CHIẾU TỔNG tự gắn cảnh báo không dùng được. (4) `doTronBoCuc` + `DongHoaDon.boCucLech` — bắt sheet bị DÁN HAI BẢN XUẤT khác số cột vào làm một. (5) `docTrangThaiHd`/`docTienTe` — dò theo NỘI DUNG khi dò theo vị trí hụt (trạng thái bắt đầu bằng "Hóa đơn ", tiền tệ là mã 3 chữ hoa), vá được trạng thái + tiền tệ + tỷ giá cho dòng lệch bố cục. -->
@@ -30,7 +36,7 @@ Công cụ **kế toán** (không phải nghiệp vụ MES). Đối chiếu hóa
 - **Vào:** 1 workbook `.xlsx` gồm:
   - **3 sheet hóa đơn điện tử** (cổng thuế): `CÓ MÃ HDDT`, `MÁY TÍNH TIỀN HDDT`, `KHÔNG MÃ HDDT`. Vị trí cột KHÁC nhau giữa 3 sheet (máy tính tiền có thêm "Địa chỉ người bán"/"CCCD", không mã có "Đơn vị tiền tệ"/"Tỷ giá" cho hóa đơn USD) ⇒ **dò cột theo TÊN tiêu đề, không hardcode chỉ số**. Tiêu đề nằm ở hàng ~6.
   - **1 sheet `PHẦN MỀM`:** bút toán kế toán, tiêu đề ở hàng 1. Một hóa đơn có thể bị tách nhiều dòng theo thuế suất.
-- **Ra:** (1) bảng đối soát trên màn (tab theo từng sheet + tab "Phần mềm kế toán"), (2) nút **Tải Excel kết quả** — trả về **chính file đã tải lên, giữ nguyên định dạng**, thêm cột `KẾT QUẢ` ở đầu + khối cột phân tích ở cuối + 3 sheet tổng hợp lên đầu workbook, đúng bố cục file mẫu kế toán đang dùng (xem [v5.1](#v51--bố-cục-bám-đúng-file-mẫu-kế-toán)).
+- **Ra:** (1) bảng đối soát trên màn (tab theo từng sheet + tab "Phần mềm kế toán"), (2) nút **Tải Excel kết quả** — trả về **chính file đã tải lên, giữ nguyên định dạng**, thêm cột `KẾT QUẢ` ở đầu + khối cột phân tích ở cuối + sheet `KẾT LUẬN CHUNG` lên đầu workbook (sheet danh sách chỉ khi có dữ liệu — [v6.4](#v64--một-sheet-kết-luận-chung-bớt-sheet)), đúng bố cục file mẫu kế toán đang dùng (xem [v5.1](#v51--bố-cục-bám-đúng-file-mẫu-kế-toán)).
 
 ## Khóa & so tiền (logic ở `lib/doiSoatHddt.ts`)
 
@@ -50,6 +56,169 @@ Công cụ **kế toán** (không phải nghiệp vụ MES). Đối chiếu hóa
 | PM → HĐĐT | `THIEU` | không thấy hóa đơn điện tử | đỏ |
 
 Màu chip lấy **token** `--status-*` (không viết mã màu tay); màu nền Excel là mã màu chuẩn Excel (file ngoài, độc lập token app). Mỗi dòng có cột **"Bằng chứng đối chiếu"** dạng văn xuôi (khớp phiếu nào, ngày, CTGS, TK, số tiền).
+
+## v6.4 — một sheet KẾT LUẬN CHUNG, bớt sheet
+
+Chủ dự án: *"tạo thêm quá nhiều sheet nhưng không xác định phân tích được trọng tâm"*. Kế toán
+gửi file kèm **một** câu hỏi mỗi lần ("lọc chưa kê", "cộng cột lệch 9 triệu ở đâu", "hai bản
+lệch chỗ nào"). Mở ra thấy 6 sheet lạ thì không biết nhìn đâu.
+
+### Quy tắc chọn sheet
+
+| Loại nội dung | Đặt ở đâu | Vì sao |
+|---|---|---|
+| Câu trả lời, số tổng, bằng chứng (đối chiếu tổng, cộng cột, chỗ nghi vấn, tự kiểm) | **khối** trong `KẾT LUẬN CHUNG` | đọc một mạch từ kết luận xuống bằng chứng, không lật tab |
+| Kết quả từng hóa đơn dò được trên chính sheet gốc (lệch cộng, khớp/lệch/thiếu) | **cột A + cột thêm ở cuối sheet gốc**, bảng trả lời chỉ đường lọc | kế toán đã xác nhận ở v6.3 là dễ dùng nhất |
+| Danh sách hóa đơn cần lọc/gửi đi | sheet riêng, **chỉ khi có dữ liệu** | là danh sách, không nhét chung được |
+
+Sheet ra và thứ tự:
+
+1. **`KẾT LUẬN CHUNG`** — luôn có. Hàng 1–3: chế độ kiểm của file (đối soát với sổ / so hai bản /
+   chỉ bảng kê) + cam kết không sửa ô gốc. Hàng 5: **bảng TRẢ LỜI** — `VIỆC ĐÃ KIỂM · KẾT LUẬN ·
+   XEM Ở ĐÂU · PHẢI LÀM GÌ`, nền đỏ/vàng/xanh theo mức phải xử. Dưới đó các khối: SỐ LIỆU ĐỐI
+   CHIẾU VỚI SỔ (chỉ khi có sổ) → CỘNG CỘT → CHỖ CẦN SOÁT LẠI (chỉ khi có) → TỰ KIỂM TRA (cuối).
+2. `HÓA ĐƠN CHƯA KÊ` — có sổ **và** có dòng thiếu ở một trong hai chiều.
+   *(Không sổ ⇒ `SO HAI BẢN HĐĐT` đứng chỗ này nếu file có hai bản.)*
+3. Các sheet gốc.
+4. `CÙNG MST CÙNG NGÀY` — **sau** sheet gốc: danh sách tham khảo, không phải kết quả đối soát.
+5. `NHẬT KÝ SỬA` — cuối, chỉ khi người dùng đã bấm Sửa.
+
+Thứ tự câu trả lời theo **việc chính của file**: có sổ ⇒ chưa kê trước; hai bản ⇒ so hai bản
+trước; chỉ bảng kê ⇒ cộng cột trước. Tự kiểm luôn cuối bảng.
+
+### Cột XEM Ở ĐÂU là link bấm được
+
+Viết bằng công thức `HYPERLINK("#'Sheet'!A55", "…")`, nhảy thẳng tới **đúng mục** (VD mục tô vàng
+"nghi gõ sai số" của sheet chưa kê, khối CỘNG CỘT ngay trong sheet).
+
+> ⚠️ Đừng dùng link kiểu `{ text, hyperlink: "#…" }` của exceljs: nó ghi LAI (một quan hệ
+> *External* trỏ tới `#…` + thuộc tính `location` vẫn dính dấu `#`) — không chắc mọi bản Excel /
+> LibreOffice hiểu là link nội bộ. Công thức HYPERLINK thì bản nào cũng chạy.
+
+### Cộng cột — nói đúng con số kế toán đang nhìn
+
+Dòng tổng kế toán tự gõ cuối sheet có người cộng trần, có người đã cộng phí (xem v6.3). Câu trả
+lời bóc **từng sheet** ra cả hai con số, để họ thấy đúng số trong ô của mình:
+
+```
+• Sheet HDDT: Σ tổng − (Σ chưa thuế + Σ thuế) = 11.787.420 = phí 2.519.020 + lệch thật 9.360.068
+  + chiết khấu -91.666 + làm tròn -2. Nếu dòng tổng tự đặt đã CỘNG PHÍ thì ra 9.268.400
+  = lệch thật 9.360.068 + chiết khấu -91.666 + làm tròn -2.
+```
+
+Lệch thật ≤ 5 hóa đơn thì nêu thẳng "HDDT dòng 1685"; nhiều hơn thì chỉ đường lọc cột.
+Danh sách từng hóa đơn lệch cộng **không chép ra** nữa (trước ở `NGHI VẤN SỐ LIỆU`) — dòng đó
+đã được đánh dấu ngay trên sheet gốc.
+
+### Idempotent — `SHEET_TU_DUNG`
+
+Hằng ở `doiSoatHddt.ts`, gồm tên sheet tự dựng hiện tại **và tên cũ** (`ĐỐI CHIẾU TỔNG`,
+`TỰ KIỂM TRA`, `NGHI VẤN SỐ LIỆU`). Dùng hai chỗ:
+
+- `doiSoat` **bỏ qua** các sheet này khi đọc lại file đã xuất — chữ trong đó ("số hóa đơn",
+  "tổng cộng"…) dễ bị dò nhầm thành bảng kê/sổ.
+- `themSheetTongHop` **xóa** chúng rồi dựng lại — file xuất từ bản cũ (6 sheet) xuất lại cũng
+  ra đúng bộ sheet mới.
+
+⚠️ Đổi/thêm tên sheet tự dựng nào **phải** thêm vào `SHEET_TU_DUNG`, không là xuất lại đẻ sheet.
+
+### Số sheet tổng hợp trước/sau (5 file thật)
+
+| File | Có | Trước | Sau |
+|---|---|---|---|
+| T6 | sổ PMEM, 3 bảng kê | 5 | 3 (kết luận · chưa kê · cùng ngày) |
+| T8 | sổ PMEM, 1 bảng kê | 5 | 3 |
+| HDONDT 6 tháng | hai bản, không sổ | 5 (có `ĐỐI CHIẾU TỔNG` vô nghĩa) | 3 (kết luận · so hai bản · cùng ngày) |
+| thuế gửi – đang làm | sổ, 2 bảng kê | 5 | 3 |
+| thuế gửi (1) | chỉ bảng kê | 4 | 2 (kết luận · cùng ngày ở cuối) |
+
+Số liệu engine (tổng, 9 phép tự kiểm, cân đối cột) **không đổi** — v6.4 chỉ đổi lớp xuất.
+
+## v6.3 — dò ngay trong sheet, không đổi số liệu
+
+Kế toán nói rõ: **"dò trực tiếp vào sheet, không thay đổi số liệu"**. Đặt kết quả ở một sheet
+tổng hợp riêng là chưa đúng ý — họ soi trên chính bảng kê của thuế.
+
+### Ba cột kiểm dựng bằng CÔNG THỨC SỐNG
+
+Thêm vào sheet bảng kê 3 cột: `Chưa thuế + Thuế` · `Lệch với tổng thanh toán` · `Nguyên nhân lệch`.
+Hai cột đầu là **công thức trỏ thẳng ô gốc** (`N{r}+O{r}` và `R{r}-(N{r}+O{r})`), không phải số chép ra.
+
+> Vì sao dùng công thức chứ không ghi số: bấm vào ô là thấy nó **được tính từ chính ô của thuế**.
+> Đó là bằng chứng file xuất không sửa số liệu, và nếu sau này sửa số gốc thì cột kiểm tự cập nhật.
+> `ghiKhoiDoiSoat` nhận ô kiểu `{ ct }`; **exceljs tự thêm dấu `=`** — viết sẵn là ra `==N3+O3`.
+
+### Chế độ KIỂM BẢNG KÊ (file không có sheet sổ)
+
+File thuế gửi thường chỉ có bảng kê, không kèm sổ kế toán. Khi đó 17 cột đối soát-với-sổ đều
+rỗng, in ra chỉ tổ rối. Engine tự chuyển chế độ:
+
+| | có sheet sổ | KHÔNG có sheet sổ |
+|---|---|---|
+| cột A | `KẾT QUẢ` (khớp / lệch / chưa vào sổ) | **`KIỂM CỘNG`** (khớp / nguyên nhân lệch) |
+| màu dòng | theo đối soát với sổ | **theo kiểm cộng**: đỏ = lệch thật · vàng = phí/chiết khấu/làm tròn · xanh = khớp |
+| khối cột thêm | 17 cột đối soát **+ 3 cột kiểm ở cuối** | **chỉ 3 cột kiểm** |
+
+⚠️ File có sổ thì 3 cột kiểm phải nối ở **CUỐI** khối, không chèn lên đầu — 38 cột đầu đã bám
+đúng bố cục file mẫu kế toán (v5.1), xê dịch là hỏng thứ đã chốt.
+
+### Nối với dòng tổng kế toán tự đặt ở cuối sheet
+
+Kế toán thường tự gõ dòng tổng ở cuối bảng kê. Trên file thuế tháng 9 là:
+`Q3048 = Σ chưa thuế + Σ thuế + Σ phí` rồi `Q3049 = Σ tổng thanh toán − Q3048` = **9.268.400**.
+
+Công thức đó **có cộng phí nhưng chưa trừ chiết khấu**, nên ra số khác với phép cộng trần
+(11.787.420). Bảng cân đối cột vì vậy có **hai cột lệch** cạnh nhau — `LỆCH (chưa thuế + thuế)`
+và `LỆCH (đã cộng phí)` — để họ nhìn thấy đúng con số trong ô của mình rồi lần ra phần phải sửa:
+
+```
+9.268.400  (ô của kế toán)
+ = 9.360.068  lệch thật, 1 hóa đơn
+ −    91.666  chiết khấu, công thức chưa trừ
+ −         2  làm tròn 26 dòng
+```
+
+⚠️ Đừng ép kế toán đổi công thức của họ. Việc của máy là **nối được số họ đang nhìn** với phần
+phải đi sửa; bắt họ sửa công thức trước rồi mới dò là đẩy việc ngược lại cho người dùng.
+
+⚠️ Tên 3 cột kiểm và nhãn cột A `KIỂM CỘNG` phải có trong `THEM_NORM` và trong phép dò hàng
+tiêu đề, nếu không xuất lại lần hai là **đẻ thêm cột**.
+
+## v6.2 — hóa đơn bán hàng (mẫu số 2), cân đối cột, ngưỡng làm tròn
+
+### Hóa đơn bán hàng không có thuế GTGT
+
+`Ký hiệu mẫu số = 2` là **hóa đơn bán hàng**: không có thuế GTGT. Với loại này:
+
+- ô **thuế trống hoặc 0 là ĐÚNG** — đừng báo "thiếu ô thuế";
+- **chưa thuế phải bằng tổng thanh toán** (cộng chiết khấu, trừ phí). Lệch thì chỗ sai
+  nằm ở ô **chưa thuế**, không phải ô thuế.
+
+⚠️ Bản trước suy ngược `tổng − chưa thuế` thành SỐ THUẾ cho loại hóa đơn này. Kế toán bấm
+Sửa theo là **khai khống thuế đầu vào**. Trên file thuế 6 tháng, 302/328 nghi vấn là báo oan
+kiểu đó, và một cái còn gợi ý ghi 9,36 triệu tiền thuế cho hóa đơn vốn không có thuế.
+
+> Nhánh này chỉ chạy khi ô chưa thuế **có số**. Bỏ trống cả cụm thì vẫn để nhóm 4 gom
+> thống kê như cũ — bung ra từng dòng là 60+ dòng nhiễu mà không thêm thông tin gì.
+
+### Cân đối cột — trả lời "cộng cột lệch mấy triệu, lệch ở đâu"
+
+Kế toán hay cộng cột *chưa thuế* + cột *thuế* rồi so với cột *tổng thanh toán*. Lệch thì
+phải chỉ ra lệch ở đâu, chứ nói "có lệch" là vô dụng. `SheetHoaDon.canDoiCot` bóc phần lệch
+thành **bốn nguyên nhân**, và bốn phần **cộng lại đúng bằng phần lệch** nên tự kiểm được:
+
+| Nguyên nhân | Có phải sai không |
+|---|---|
+| **Phí** (tổng = chưa + thuế + phí) | không — phí là thành phần hợp lệ của tổng |
+| **Chiết khấu** (tổng = chưa + thuế − chiết khấu) | không |
+| **Làm tròn ±1 đ** | không — làm tròn của bên phát hành |
+| **LỆCH THẬT** | **có** — danh sách dòng phải đi sửa |
+
+Cộng trên **số thô**, không quy tỷ giá, vì kế toán cộng cột trên Excel là cộng thô.
+Hiện thành khối **CỘNG CỘT** trong sheet `KẾT LUẬN CHUNG` (v6.4; trước đó ở đầu sheet `NGHI VẤN SỐ LIỆU`).
+
+> 📌 Chiết khấu KHÔNG phải lúc nào cũng trừ khỏi tổng: có hóa đơn đã trừ sẵn trong ô chưa
+> thuế rồi mới ghi thêm dòng chiết khấu. Nên phải thử cả hai cách, đừng áp cứng một công thức.
 
 ## v6.1 — sổ xuất chi tiết mặt hàng + sheet "HÓA ĐƠN CHƯA KÊ"
 
@@ -73,8 +242,9 @@ hàng cùng số hóa đơn thì cộng dồn trước khi so (engine vốn đã
 ### Sheet "HÓA ĐƠN CHƯA KÊ" — lọc sẵn, đừng bắt kế toán tự lọc
 
 Kế toán phản ánh "không thấy lọc chưa kê": nhãn nằm ở cột A từng sheet, phải biết mà lọc, lại
-rải qua nhiều sheet. Nay có sheet riêng, **đứng thứ 2** ngay sau ĐỐI CHIẾU TỔNG (ô A4 của bảng
-tổng có dòng chỉ đường tới nó). Bốn mục theo thứ tự:
+rải qua nhiều sheet. Nay có sheet riêng, **đứng thứ 2** ngay sau `KẾT LUẬN CHUNG` (dòng đầu bảng
+trả lời có link tới nó; v6.4 — trước là ô A4 của `ĐỐI CHIẾU TỔNG`). Không có dòng thiếu ở cả hai
+chiều thì **không dựng** sheet này. Bốn mục theo thứ tự:
 
 1. **Phải kê** — hóa đơn thiếu, trừ 2 loại dưới; xếp theo ngày lập; có dòng CỘNG.
 2. **Nghi ĐÃ KÊ nhưng gõ sai số hóa đơn ở sổ** — hóa đơn có gợi ý gần khớp (cùng MST + cùng
@@ -111,6 +281,10 @@ Gom theo **MST người bán + ngày lập**, giữ nhóm từ 2 hóa đơn.
 > Nhiều hóa đơn cùng nhà cung cấp trong một ngày **KHÔNG** có nghĩa là sai (xăng dầu, siêu
 > thị, phí ngân hàng…). Đừng kết luận thay người soát. Thứ đáng ngờ thật là nhóm có hóa đơn
 > **trùng khít số tiền** — cờ `trungSoTien`, tô vàng riêng.
+
+⚠️ File có **hai bản** (thuế gửi + tự tải) thì mỗi hóa đơn hiện hai lần. Đếm cả hai là nhóm
+nào cũng "trùng khít" (HDONDT 6 tháng: 1.790/1.923 nhóm) — danh sách vô dụng. Cùng khóa mà
+**khác bên** (`laBenThue`) thì chỉ lấy một lần (v6.4) ⇒ còn 544 nhóm, 82 nhóm trùng tiền.
 
 ### 3. Sheet bị DÁN HAI BẢN XUẤT vào làm một (`doTronBoCuc`, `boCucLech`)
 
@@ -188,7 +362,7 @@ bố cục phải giống luôn, nếu không họ vẫn phải mò. Ba điểm 
 | Điểm | Phải làm |
 |---|---|
 | Cột **KẾT QUẢ** | chèn làm **cột A**, dữ liệu gốc dời sang phải 1 cột |
-| **3 sheet tổng hợp** | `ĐỐI CHIẾU TỔNG` · `TỰ KIỂM TRA` · `NGHI VẤN SỐ LIỆU` đứng **đầu** workbook |
+| **Sheet tổng hợp** | ~~3 sheet `ĐỐI CHIẾU TỔNG` · `TỰ KIỂM TRA` · `NGHI VẤN SỐ LIỆU`~~ → từ v6.4 gộp thành **một** sheet `KẾT LUẬN CHUNG` đứng **đầu** workbook |
 | Tên cột | gọi theo tên sheet sổ thật ("Số dòng khớp PMEM"), cặp cột TK lấy tiêu đề nguồn |
 
 **Chèn cột thì BẮT BUỘC dịch công thức** (`doiSoatXuatShift.ts`). File cổng thuế có

@@ -12,7 +12,8 @@
  *
  * 1. **Bố cục bám đúng file mẫu kế toán đang dùng**: chèn cột `KẾT QUẢ` làm cột A,
  *    dữ liệu gốc dời sang phải 1 cột, khối cột phân tích nằm SAU vùng dữ liệu
- *    (chừa 1 cột trống ngăn cách), và 3 sheet tổng hợp đứng đầu workbook.
+ *    (chừa 1 cột trống ngăn cách), và sheet `KẾT LUẬN CHUNG` đứng đầu workbook
+ *    (+ sheet danh sách chỉ khi có dữ liệu — xem `doiSoatXuatTongHop.ts`).
  *    Chèn cột thì **bắt buộc phải dịch tham chiếu công thức** — xem `doiSoatXuatShift.ts`.
  * 2. Chỉ ghi đè hai thứ trong vùng dữ liệu: **màu nền dòng** (để nhìn ra khớp/lệch/
  *    thiếu) và **ô người dùng bấm Sửa**. Font, khung, canh lề, định dạng số, ô gộp,
@@ -34,6 +35,8 @@ import {
   CHU_THICH_PM,
   DICH_COT_XUAT,
   HEADER_HD_THEM,
+  HEADER_KIEM,
+  NHAN_LECH_CONG,
   base64SangXlsx,
   HEADER_PM_THEM,
   cotExcel,
@@ -59,6 +62,11 @@ const to = (argb: string) => ({ type: "pattern" as const, pattern: "solid" as co
 /** 1 cột trống ngăn giữa dữ liệu gốc và khối cột đối soát. */
 const COT_NGAN = 1;
 
+/** Ô là công thức sống: `{r}` thay bằng số dòng thật lúc ghi. */
+type OCongThuc = { ct: string };
+const laCongThuc = (v: unknown): v is OCongThuc =>
+  typeof v === "object" && v !== null && typeof (v as OCongThuc).ct === "string";
+
 function oXuat(v: unknown): string | number | null {
   if (v instanceof Date) return ngayHienThi(v);
   if (typeof v === "number" || typeof v === "string") return v;
@@ -78,7 +86,9 @@ function ghiKhoiDoiSoat(
   chuThich: string,
   headerThem: readonly string[],
   dong: readonly { dongFile: number; ketLuan: string; nen: string; them: readonly unknown[] }[],
-  cotSua: readonly { dongFile: number; cot: number; giaTri: number }[]
+  cotSua: readonly { dongFile: number; cot: number; giaTri: number }[],
+  /** Tiêu đề cột A. */
+  nhanCotA = "KẾT QUẢ"
 ): void {
   const D = DICH_COT_XUAT;
   // Dữ liệu gốc đã dời sang phải D cột ⇒ khối thêm bắt đầu sau nó, chừa 1 cột trống.
@@ -96,7 +106,7 @@ function ghiKhoiDoiSoat(
     o.alignment = { ...(mau.alignment ?? {}), vertical: "middle", wrapText: true };
     o.fill = to(NEN.tieuDe);
   };
-  dungTieuDe(ws.getCell(hangTieuDe, COT_KQ), "KẾT QUẢ");
+  dungTieuDe(ws.getCell(hangTieuDe, COT_KQ), nhanCotA);
   ws.getColumn(COT_KQ).width = 24;
   headerThem.forEach((ten, i) => {
     dungTieuDe(ws.getCell(hangTieuDe, cot1 + i), ten);
@@ -117,7 +127,11 @@ function ghiKhoiDoiSoat(
   for (const d of dong) {
     ws.getCell(d.dongFile, COT_KQ).value = d.ketLuan;
     d.them.forEach((v, i) => {
-      ws.getCell(d.dongFile, cot1 + i).value = oXuat(v);
+      const o = ws.getCell(d.dongFile, cot1 + i);
+      // Công thức sống trỏ thẳng ô gốc: bấm vào là thấy số được TÍNH ra, không phải
+      // số chép tay — bằng chứng file xuất không sửa số liệu của thuế.
+      if (laCongThuc(v)) o.value = { formula: v.ct.replaceAll("{r}", String(d.dongFile)) };
+      else o.value = oXuat(v);
     });
     const nen = to(d.nen);
     for (let c = COT_KQ; c <= cotCuoi; c++) ws.getCell(d.dongFile, c).fill = nen;
@@ -165,6 +179,36 @@ const headerHd = (tenSo: string, tenTk: string): string[] =>
     : h
   );
 const HEADER_PM = [...HEADER_PM_THEM];
+
+/** 0-based → chữ cái cột Excel. */
+const chuCot = (c0: number): string => {
+  let n = c0 + 1, s = "";
+  while (n > 0) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = (n - m - 1) / 26; }
+  return s;
+};
+
+/**
+ * Ba ô kiểm "chưa thuế + thuế = tổng thanh toán" cho một dòng, viết bằng CÔNG THỨC
+ * trỏ vào chính ô gốc (đã dời sang phải `DICH_COT_XUAT` cột). Kế toán dò TRỰC TIẾP
+ * trên sheet, không phải lật qua sheet tổng hợp.
+ */
+function oKiemCong(sh: SheetHoaDon, d: DongHoaDon): unknown[] {
+  const cd = sh.canDoiCot;
+  if (cd.cotChua < 0 || cd.cotTong < 0) return ["", "", ""];
+  const A = chuCot(cotExcel(sh.goc, cd.cotChua) + DICH_COT_XUAT);
+  const T = chuCot(cotExcel(sh.goc, cd.cotTong) + DICH_COT_XUAT);
+  const cong = cd.cotThue >= 0 ? `${A}{r}+${chuCot(cotExcel(sh.goc, cd.cotThue) + DICH_COT_XUAT)}{r}` : `${A}{r}`;
+  // exceljs tự thêm dấu "=" — đừng viết sẵn, không là ra "==N3+O3".
+  return [
+    { ct: cong },
+    { ct: `${T}{r}-(${cong})` },
+    d.lechCong ? NHAN_LECH_CONG[d.lechCong.loai] : "",
+  ];
+}
+
+/** Màu dòng khi file CHỈ có bảng kê (không có sổ): tô theo kết quả kiểm cộng. */
+const nenKiem = (d: DongHoaDon) =>
+  !d.lechCong ? NEN.xanh : d.lechCong.loai === "that" ? NEN.do : NEN.vang;
 
 /** Các ô người dùng bấm Sửa, gom theo sheet (key `edits` = `sheet#soDong#cot`). */
 function suaTheoSheet(
@@ -251,16 +295,30 @@ export async function xuatExcelGiuDinhDang(
   // --- B2. Ghi khối đối soát ---
   const tenSo = kq.sheetPhanMem?.ten ?? "PMKT";
   const tenTk = kq.sheetPhanMem?.tenTk ?? "TK Nợ / TK Có";
-  const HEADER_HD = headerHd(tenSo, tenTk);
+  // File CHỈ có bảng kê thuế, không có sheet sổ ⇒ mọi cột đối soát với sổ đều rỗng,
+  // in ra chỉ tổ rối. Khi đó chuyển sang CHẾ ĐỘ KIỂM BẢNG KÊ: cột A và màu dòng nói
+  // về phép kiểm "chưa thuế + thuế = tổng thanh toán", khối thêm chỉ 3 cột kiểm.
+  const kiemBangKe = !kq.sheetPhanMem;
+  // Có sổ: cột kiểm xuống CUỐI khối, giữ nguyên thứ tự cột theo file mẫu kế toán.
+  const HEADER_HD = kiemBangKe ? [...HEADER_KIEM] : [...headerHd(tenSo, tenTk), ...HEADER_KIEM];
 
   const ghiHd = (sh: SheetHoaDon) => {
     const ws = timSheet(sh.ten)!;
+    const chuThich = kiemBangKe
+      ? `CHÚ THÍCH: dòng ĐỎ = chưa thuế + thuế KHÔNG bằng tổng thanh toán, phải soát | dòng VÀNG = lệch do phí / chiết khấu / làm tròn, bình thường | dòng XANH = khớp. Ba cột kiểm ở cuối là CÔNG THỨC trỏ thẳng ô gốc — số liệu của thuế giữ nguyên, không sửa ô nào.`
+      : sh.laPhu
+        ? `${CHU_THICH} — (SHEET TRÙNG LẶP / TẬP CON: KHÔNG cộng vào tổng)`
+        : CHU_THICH;
     ghiKhoiDoiSoat(
-      ws, sh.goc, sh.hIdx, sh.rong,
-      sh.laPhu ? `${CHU_THICH} — (SHEET TRÙNG LẶP / TẬP CON: KHÔNG cộng vào tổng)` : CHU_THICH,
-      HEADER_HD,
-      sh.dong.map((d) => ({ dongFile: d.dongFile, ketLuan: d.ketLuan, nen: nenHd(d), them: themHd(d) })),
-      suaTheoSheet(edits, new Map(sh.dong.map((d) => [d.soDong, d.dongFile])), sh.ten)
+      ws, sh.goc, sh.hIdx, sh.rong, chuThich, HEADER_HD,
+      sh.dong.map((d) => ({
+        dongFile: d.dongFile,
+        ketLuan: kiemBangKe ? (d.lechCong ? NHAN_LECH_CONG[d.lechCong.loai] : "khớp") : d.ketLuan,
+        nen: kiemBangKe ? nenKiem(d) : nenHd(d),
+        them: kiemBangKe ? oKiemCong(sh, d) : [...themHd(d), ...oKiemCong(sh, d)],
+      })),
+      suaTheoSheet(edits, new Map(sh.dong.map((d) => [d.soDong, d.dongFile])), sh.ten),
+      kiemBangKe ? "KIỂM CỘNG" : "KẾT QUẢ"
     );
   };
 
@@ -284,7 +342,7 @@ export async function xuatExcelGiuDinhDang(
   if (kq.sheetPhanMem) ghiPm(kq.sheetPhanMem);
   for (const p of kq.sheetsPhanMemPhu) ghiPm(p);
 
-  // --- B3. Sheet phụ trợ: 3 sheet tổng hợp lên ĐẦU, nhật ký sửa xuống cuối ---
+  // --- B3. Sheet phụ trợ: KẾT LUẬN CHUNG (+ danh sách có dữ liệu) lên ĐẦU, nhật ký sửa xuống cuối ---
   if (kq.nhatKySua.length) {
     const ten = "NHẬT KÝ SỬA";
     const cu = timSheet(ten);

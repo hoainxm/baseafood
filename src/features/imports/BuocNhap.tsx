@@ -7,7 +7,7 @@ import type { ReactNode } from "react";
 import { Badge, Button } from "@/design-system";
 import { kg } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { Check, Pencil } from "lucide-react";
+import { Check, Pencil, QrCode } from "lucide-react";
 import type { NhomChuyen } from "./importHelpers";
 
 /**
@@ -141,6 +141,7 @@ export function ChuyenTrongNgay({
   khoa,
   dangSuaKhoa,
   onSua,
+  onInTem,
 }: {
   nhom: NhomChuyen[];
   /** Ngày đã chốt ⇒ không cho sửa. */
@@ -148,6 +149,8 @@ export function ChuyenTrongNgay({
   /** Khóa nhóm đang mở để sửa (tô nổi). */
   dangSuaKhoa: string | null;
   onSua: (n: NhomChuyen) => void;
+  /** Có thì chuyến có mã lô hiện nút in tem QR. */
+  onInTem?: (n: NhomChuyen) => void;
 }) {
   if (nhom.length === 0)
     return (
@@ -187,19 +190,32 @@ export function ChuyenTrongNgay({
                 "Không ghi xe"}{" "}
               · {n.dong.length} loại
             </p>
-            {!khoa && (
-              <Button
-                title="Mở lại chuyến này lên phiếu để sửa dòng hàng, số kg hay giá."
-                type="button"
-                variant="outline"
-                size="sm"
-                className="shrink-0"
-                onClick={() => onSua(n)}
-              >
-                <Pencil />
-                Sửa
-              </Button>
-            )}
+            <span className="flex shrink-0 gap-1">
+              {onInTem && n.chuyen?.lotCode && (
+                <Button
+                  title={`In tem QR mã lô ${n.chuyen.lotCode} để dán lên lô hàng — quét tem là ra hộ chiếu lô.`}
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onInTem(n)}
+                >
+                  <QrCode />
+                  Tem
+                </Button>
+              )}
+              {!khoa && (
+                <Button
+                  title="Mở lại chuyến này lên phiếu để sửa dòng hàng, số kg hay giá."
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onSua(n)}
+                >
+                  <Pencil />
+                  Sửa
+                </Button>
+              )}
+            </span>
           </div>
         </li>
       ))}

@@ -76,6 +76,9 @@ export interface DongBang {
    *  có kg thì coi như KHÔNG có dữ liệu: lưu tự bỏ qua, không nài lỗi. Người dùng
    *  tự sửa loại/giá thì cờ này tắt (thành dòng thường). */
   goiY?: boolean;
+  /** Ngày của lượt giao mà ĐƠN GIÁ điền sẵn lấy từ đó — hiện cạnh ô giá để người
+   *  nhập biết đây là giá cũ, không phải giá vừa gõ. Tự sửa giá thì xóa. */
+  giaNgay?: string;
 }
 
 export const LOAI_MAC_DINH: Category = "Bạch tuộc";
@@ -234,31 +237,37 @@ export function daiLyHayGiao(
     .map(([ten]) => ten);
 }
 
-/** Một xe (biển số + tài xế) từng chở cho đại lý. */
+/** Một biển số từng chở cho đại lý, kèm tài xế GẦN NHẤT lái xe đó. */
 export interface XeGoiY {
   licensePlate: string;
   driverName: string;
 }
 
-/** Xe từng chở cho đại lý này, mới nhất trước; gộp trùng theo biển số chuẩn hóa + tài xế. */
+/**
+ * Xe + tài xế từng chở cho đại lý — TÁCH hai danh sách vì thực tế tài xế đổi xe
+ * liên tục (gộp theo cặp thì vài thẻ không phủ hết tổ hợp). Chạm biển số ⇒ điền
+ * luôn tài xế gần nhất của xe đó; khác người thì chạm thêm tên tài xế.
+ * Biển số gộp theo dạng chuẩn hóa và hiển thị VIẾT HOA cho sổ sạch.
+ */
 export function xeCuaDaiLy(
   rows: MaterialImportItem[],
   supplierName: string,
-  toiDa = 4,
-): XeGoiY[] {
-  if (!supplierName) return [];
-  const ds = new Map<string, XeGoiY>();
-  for (const r of rows
-    .filter((x) => x.supplierName === supplierName)
-    .sort(moiTruoc)) {
-    const bien = r.licensePlate.trim();
-    const tx = r.driverName.trim();
-    if (!bien && !tx) continue;
-    const k = `${chuanBienSo(bien)}|${tx.toLowerCase()}`;
-    if (!ds.has(k)) ds.set(k, { licensePlate: bien, driverName: tx });
-    if (ds.size >= toiDa) break;
-  }
-  return [...ds.values()];
+  toiDa = 6,
+): { bienSo: XeGoiY[]; taiXe: string[] } {
+  const bienSo = new Map<string, XeGoiY>();
+  const taiXe = new Map<string, string>();
+  if (supplierName)
+    for (const r of rows
+      .filter((x) => x.supplierName === supplierName)
+      .sort(moiTruoc)) {
+      const bien = r.licensePlate.trim().toUpperCase();
+      const tx = r.driverName.trim();
+      if (bien && !bienSo.has(chuanBienSo(bien)) && bienSo.size < toiDa)
+        bienSo.set(chuanBienSo(bien), { licensePlate: bien, driverName: tx });
+      if (tx && !taiXe.has(tx.toLowerCase()) && taiXe.size < toiDa)
+        taiXe.set(tx.toLowerCase(), tx);
+    }
+  return { bienSo: [...bienSo.values()], taiXe: [...taiXe.values()] };
 }
 
 /**
@@ -297,10 +306,45 @@ export function mauDongCuaDaiLy(
           ...dongBangRong(r.category),
           materialTypeName: ten,
           unitPrice: r.unitPrice,
+          giaNgay: r.unitPrice != null ? r.deliveryDate : undefined,
           goiY: true,
         });
-      else if (co.unitPrice == null && r.unitPrice != null)
+      else if (co.unitPrice == null && r.unitPrice != null) {
         co.unitPrice = r.unitPrice;
+        co.giaNgay = r.deliveryDate;
+      }
     }
   return [...mau.values()].slice(0, toiDa);
 }
+
+/**
+ * ĐỔI ĐẠI LÝ giữa chừng: dựng lại bảng theo mẫu của đại lý MỚI nhưng GIỮ số kg đã
+ * gõ — giá điền sẵn của đại lý cũ KHÔNG được ở lại (sai tiền). Quy tắc:
+ *  - loại có trong mẫu mới ⇒ lấy giá + ngày giá của đại lý mới, kg giữ theo tên loại;
+ *  - dòng gợi ý cũ đã gõ kg mà đại lý mới chưa từng giao ⇒ giữ kg, GIÁ ĐỂ TRỐNG;
+ *  - dòng người dùng tự nhập (không phải gợi ý) ⇒ giữ nguyên, kể cả giá tự gõ.
+ */
+export function apMauDaiLyMoi(cu: DongBang[], mau: DongBang[]): DongBang[] {
+  const kgCu = new Map(
+    cu
+      .filter((d) => d.goiY && d.quantityKg > 0)
+      .map((d) => [d.materialTypeName, d.quantityKg]),
+  );
+  const tenMau = new Set(mau.map((d) => d.materialTypeName));
+  const tuMau = mau.map((d) => ({
+    ...d,
+    quantityKg: kgCu.get(d.materialTypeName) ?? 0,
+  }));
+  const goiYLac = cu
+    .filter(
+      (d) => d.goiY && d.quantityKg > 0 && !tenMau.has(d.materialTypeName),
+    )
+    .map((d) => ({ ...d, unitPrice: null, giaNgay: undefined }));
+  const tuNhap = cu.filter((d) => !d.goiY && dongCoData(d));
+  const kq = [...tuMau, ...goiYLac, ...tuNhap];
+  return kq.length ? kq : [dongBangRong()];
+}
+
+/** Dòng điền sẵn bị BỎ QUA khi lưu vì chưa gõ kg — để báo rõ, không bỏ im lặng. */
+export const dongGoiYBoQua = (ds: DongBang[]): DongBang[] =>
+  ds.filter((d) => d.goiY && !(d.quantityKg > 0));

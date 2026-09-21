@@ -8,6 +8,8 @@ import {
   daiLyHayGiao,
   xeCuaDaiLy,
   mauDongCuaDaiLy,
+  apMauDaiLyMoi,
+  dongGoiYBoQua,
   type DauChuyen,
   type DongBang,
 } from "./importHelpers";
@@ -255,21 +257,28 @@ describe("gợi ý theo đại lý", () => {
     expect(daiLyHayGiao(so, "Khô")).toEqual([]);
   });
 
-  it("xeCuaDaiLy: gộp biển số viết khác kiểu, giữ cách viết mới nhất", () => {
-    expect(xeCuaDaiLy(so, "Hồng Phú")).toEqual([
-      { licensePlate: "72c 16603", driverName: "toàn" },
-    ]);
-    expect(xeCuaDaiLy(so, "")).toEqual([]);
+  it("xeCuaDaiLy: biển số + tài xế TÁCH riêng; gộp biển viết khác kiểu, hiển thị viết hoa", () => {
+    expect(xeCuaDaiLy(so, "Hồng Phú")).toEqual({
+      bienSo: [{ licensePlate: "72C 16603", driverName: "toàn" }],
+      taiXe: ["toàn"],
+    });
+    expect(xeCuaDaiLy(so, "")).toEqual({ bienSo: [], taiXe: [] });
   });
 
   it("mauDongCuaDaiLy: loại của lượt mới nhất trước, giá gần nhất, kg trống, cờ goiY", () => {
     const m = mauDongCuaDaiLy(so, "Hồng Phú", "Đông");
     expect(
-      m.map((d) => [d.materialTypeName, d.unitPrice, d.quantityKg, d.goiY]),
+      m.map((d) => [
+        d.materialTypeName,
+        d.unitPrice,
+        d.giaNgay,
+        d.quantityKg,
+        d.goiY,
+      ]),
     ).toEqual([
-      ["BT 1 da", 158000, 0, true],
-      ["BT 2 da nhỏ", null, 0, true],
-      ["BT 2 da lớn", 134000, 0, true],
+      ["BT 1 da", 158000, "2026-09-03", 0, true],
+      ["BT 2 da nhỏ", null, undefined, 0, true],
+      ["BT 2 da lớn", 134000, "2026-09-01", 0, true],
     ]);
     expect(mauDongCuaDaiLy(so, "Đại lý lạ", "Đông")).toEqual([]);
   });
@@ -279,5 +288,37 @@ describe("gợi ý theo đại lý", () => {
     expect(dongCoData(d)).toBe(false);
     expect(dongCoData({ ...d, quantityKg: 5 })).toBe(true);
     expect(dongCoData({ ...d, goiY: false })).toBe(true); // người dùng tự sửa loại/giá ⇒ dòng thường
+  });
+
+  it("apMauDaiLyMoi: đổi đại lý giữ kg đã gõ nhưng KHÔNG giữ giá của đại lý cũ", () => {
+    const cu = mauDongCuaDaiLy(so, "Hồng Phú", "Đông").map((d, i) => ({
+      ...d,
+      quantityKg: i === 0 ? 1200 : i === 2 ? 300 : 0, // BT 1 da = 1200, BT 2 da lớn = 300
+    }));
+    const tuNhap: DongBang = {
+      key: "k",
+      id: null,
+      category: "Mực",
+      materialTypeName: "Mực ống",
+      quantityKg: 50,
+      unitPrice: 99000,
+    };
+    const kq = apMauDaiLyMoi(
+      [...cu, tuNhap],
+      mauDongCuaDaiLy(so, "Hương Pháp", "Đông"),
+    );
+    expect(
+      kq.map((d) => [d.materialTypeName, d.quantityKg, d.unitPrice]),
+    ).toEqual([
+      ["BT 1 da", 1200, 160000], // giá của Hương Pháp, kg giữ
+      ["BT 2 da lớn", 300, null], // Hương Pháp chưa từng giao ⇒ giá trống
+      ["Mực ống", 50, 99000], // tự nhập ⇒ giữ nguyên
+    ]);
+  });
+
+  it("dongGoiYBoQua: đếm dòng điền sẵn chưa gõ kg", () => {
+    const m = mauDongCuaDaiLy(so, "Hồng Phú", "Đông");
+    expect(dongGoiYBoQua(m)).toHaveLength(3);
+    expect(dongGoiYBoQua([{ ...m[0], quantityKg: 5 }, m[1]])).toHaveLength(1);
   });
 });

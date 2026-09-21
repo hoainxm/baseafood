@@ -8,6 +8,7 @@ import { CATEGORIES } from "@/types";
 import { Button, Combobox, NumberField, type MucChon } from "@/design-system";
 import { useState } from "react";
 import { Pencil, Plus, X } from "lucide-react";
+import { viDate } from "@/lib/format";
 import type { DongBang } from "./importHelpers";
 
 /* ---------- Bảng loại hàng của một chuyến (nhập nhiều dòng một lượt) ---------- */
@@ -26,6 +27,7 @@ export function BangDongHang({
   onThem,
   optLoaiTheoLoai,
   onTaoLoai,
+  onEnterCuoi,
 }: {
   dong: DongBang[];
   onSua: (key: string, patch: Partial<DongBang>) => void;
@@ -33,13 +35,26 @@ export function BangDongHang({
   onThem: () => void;
   optLoaiTheoLoai: (loai: string) => MucChon[];
   onTaoLoai: (ten: string, loai: string) => string;
+  /** Enter ở ô kg của dòng cuối — màn dùng để đưa con trỏ tới nút lưu. */
+  onEnterCuoi?: () => void;
 }) {
   const coTheBo = dong.length > 1;
   // Dòng ĐIỀN SẴN theo đại lý hiện GỌN (tên loại là chữ, chỉ còn ô kg + giá) —
   // bấm "Đổi loại" mới bung đủ ô chọn. Chỉ là trạng thái hiển thị, không đụng dữ liệu.
   const [bung, setBung] = useState<Set<string>>(new Set());
   return (
-    <div className="space-y-3" data-luoi-phim="dong-hang">
+    <div
+      className="space-y-3"
+      data-luoi-phim="dong-hang"
+      // Enter ở ô kg CUỐI (NumberField đã lo nhảy giữa các dòng) ⇒ báo ra ngoài để nhảy tới nút lưu.
+      onKeyDown={(e) => {
+        if (e.key !== "Enter") return;
+        const o = e.target as HTMLElement;
+        if (o.getAttribute("data-navcol") !== "kg") return;
+        const ds = e.currentTarget.querySelectorAll('[data-navcol="kg"]');
+        if (ds[ds.length - 1] === o) onEnterCuoi?.();
+      }}
+    >
       {dong.map((d) =>
         d.goiY && !bung.has(d.key) ? (
           <div
@@ -47,12 +62,22 @@ export function BangDongHang({
             className="grid grid-cols-2 gap-x-3 gap-y-2 rounded-lg border border-border bg-card p-3 lg:grid-cols-[1.6fr_0.9fr_0.9fr_auto] lg:items-end"
           >
             <div className="col-span-2 flex min-w-0 items-center justify-between gap-2 lg:col-span-1 lg:min-h-11">
-              <p className="min-w-0 font-semibold">
-                {d.materialTypeName}
-                <span className="ml-2 font-normal text-muted-foreground">
-                  {d.category}
-                </span>
-              </p>
+              <div className="min-w-0">
+                <p className="font-semibold">
+                  {d.materialTypeName}
+                  <span className="ml-2 font-normal text-muted-foreground">
+                    {d.category}
+                  </span>
+                </p>
+                {/* Giá điền sẵn là GIÁ CŨ — nói rõ của lượt nào để người nhập soát, khỏi lưu nhầm. */}
+                <p className="text-sm text-muted-foreground">
+                  {d.giaNgay
+                    ? `Giá theo lượt ${viDate(d.giaNgay).slice(0, 5)} — khác thì sửa ô đơn giá`
+                    : d.unitPrice == null
+                      ? "Chưa có giá lượt trước — để trống nếu chờ hóa đơn"
+                      : "Giá tự nhập"}
+                </p>
+              </div>
               <span className="flex shrink-0 gap-1 lg:hidden">
                 <NutDongGon
                   d={d}

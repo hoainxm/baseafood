@@ -83,10 +83,15 @@ import { cn } from "@/lib/utils";
 import { HopDoiLoaiHangLoat } from "./BulkTypeChange";
 
 import { BangDongHang } from "./BangDongHang";
+import { ChuyenTrongNgay, TheBuoc, TheChon } from "./BuocNhap";
 import { KhoiPheLieuNgay } from "./KhoiPheLieuNgay";
 import {
   LOAI_MAC_DINH,
   PHAN_XUONG,
+  daiLyHayGiao,
+  xeCuaDaiLy,
+  mauDongCuaDaiLy,
+  chuanBienSo,
   dongBangRong,
   dongCoData,
   dongDayDu,
@@ -139,6 +144,14 @@ export default function NhapNguyenLieuScreen() {
   const [loiPhien, setLoiPhien] = useState<LoiNhap[]>([]);
   // Khối "Xe và ghi chú" (tài xế/biển số) mở sẵn — hầu hết chuyến đều có.
   const [moPhuPhien, setMoPhuPhien] = useState(true);
+  /** Luồng theo bước: bước đang ÉP mở (bấm "Đổi" / đang gõ tay xe). null = tự suy theo dữ liệu. */
+  const [dangMo, setDangMo] = useState<"dai-ly" | "xe" | null>(null);
+  /** Người dùng chủ động bỏ qua bước xe (chuyến không ghi xe) ⇒ bước thu lại dù ô trống. */
+  const [boQuaXe, setBoQuaXe] = useState(false);
+  /** Mở hai ô gõ tay biển số / tài xế (xe chưa từng chở cho đại lý này). */
+  const [goXeTay, setGoXeTay] = useState(false);
+  /** Tách "ngày ghi sổ" khỏi "ngày hàng về" (ghi bù). Mặc định MỘT ô ngày cho ca thường. */
+  const [tachNgay, setTachNgay] = useState(false);
 
   /* Đang sửa một chuyến đã ghi: id các dòng của chuyến đó (null = đang tạo mới).
      Dùng id-set thay vì chỉ chuyenId để sửa được CẢ dữ liệu cũ (không có chuyenId). */
@@ -301,6 +314,31 @@ export default function NhapNguyenLieuScreen() {
 
   /* ---- Ghi chuyến ---- */
 
+  /** Bảng loại hàng MỞ ĐẦU cho một chuyến mới: đại lý đã có lịch sử ⇒ điền sẵn
+   *  loại + đơn giá gần nhất (chỉ còn gõ kg); chưa có ⇒ một dòng trống. */
+  const bangMoi = (dl: string, xuong: Workshop, cat: Category): DongBang[] => {
+    const mau = mauDongCuaDaiLy(rows, dl, xuong);
+    return mau.length ? mau : [dongBangRong(cat)];
+  };
+
+  /** Đưa con trỏ vào ô kg đầu tiên — bước kế tiếp tự nhiên sau khi chọn đại lý/xe. */
+  const vaoOKgDau = () =>
+    window.setTimeout(() => {
+      const o = document.querySelector<HTMLInputElement>(
+        '[data-luoi-phim="dong-hang"] [data-navcol="kg"]'
+      );
+      o?.focus();
+      o?.select();
+    }, 80);
+
+  /** Đưa luồng bước về đầu. `daCoXe`: mở chuyến cũ để sửa ⇒ coi bước xe đã xong. */
+  const datLaiBuoc = (daCoXe: boolean) => {
+    setDangMo(null);
+    setBoQuaXe(daCoXe);
+    setGoXeTay(false);
+    setTachNgay(false);
+  };
+
   const moThem = () => {
     setPhien({
       deliveryDate: ngayGhi,
@@ -317,10 +355,11 @@ export default function NhapNguyenLieuScreen() {
     });
     setChuyenIdPhien(null);
     setSuaRowIds(null);
-    setDongBang([dongBangRong(loaiGanNhat)]);
+    setDongBang(bangMoi(locDaiLy, xuongGhi, loaiGanNhat));
     setLoiPhien([]);
-    // Auto mở khối "Xe và ghi chú" — hầu hết chuyến đều có tài xế/biển số.
-    setMoPhuPhien(true);
+    // Ghi chú / SSCC / mã lô ít dùng → thu sẵn; tài xế + biển số đã đưa ra ngoài.
+    setMoPhuPhien(false);
+    datLaiBuoc(false);
   };
 
   // Form-first: vào "Ghi nhập" mà chưa có phiếu → tự mở phiếu trống (không modal).
@@ -369,6 +408,7 @@ export default function NhapNguyenLieuScreen() {
     );
     setLoiPhien([]);
     setMoPhuPhien(true);
+    datLaiBuoc(true);
     setCheDo("nhap"); // sửa chuyến mở trong form inline (chế độ Ghi nhập)
   };
 
@@ -384,8 +424,109 @@ export default function NhapNguyenLieuScreen() {
    *  đó thì ngày hàng về vẫn nhảy theo như thường. */
   const doiNgayVe = (v: string) => datPhien("deliveryDate", v);
 
+  /** Chọn ĐẠI LÝ kéo theo cả chuyến: bảng loại hàng điền sẵn theo lượt giao gần
+   *  nhất của đại lý (loại + giá), xe cũ hiện thành nút gợi ý. KHÔNG đè khi người
+   *  dùng đã gõ số vào bảng, và không đụng bảng khi đang sửa chuyến đã ghi. */
+  const chonDaiLy = (v: string) => {
+    if (!phien) return;
+    datPhien("supplierName", v);
+    if (v) setDangMo(null); // chọn xong ⇒ bước ① thu lại, bước ② (xe) tự mở
+    if (dangSuaChuyen || !v) return;
+    // Đổi đại lý ⇒ xe của đại lý cũ không còn đúng (chỉ xóa khi đang ghi chuyến MỚI).
+    setPhien((p) => (p ? { ...p, driverName: "", licensePlate: "" } : p));
+    setBoQuaXe(false);
+    setGoXeTay(false);
+    if (dongBang.some(dongCoData)) return;
+    const mau = mauDongCuaDaiLy(rows, v, phien.workshop);
+    if (mau.length > 0) setDongBang(mau);
+  };
+
+  /** Đổi xưởng: mẫu loại hàng tính theo (đại lý + xưởng) ⇒ dựng lại nếu bảng chưa có số. */
+  const chonXuong = (v: Workshop) => {
+    if (!phien) return;
+    datPhien("workshop", v);
+    if (dangSuaChuyen || dongBang.some(dongCoData)) return;
+    setDongBang(bangMoi(phien.supplierName, v, loaiGanNhat));
+  };
+
+  /** Một chạm điền cả biển số + tài xế theo xe từng chở cho đại lý này. */
+  const chonXe = (x: { licensePlate: string; driverName: string }) => {
+    setPhien((p) =>
+      p ? { ...p, licensePlate: x.licensePlate, driverName: x.driverName } : p
+    );
+    setDangMo(null);
+    setGoXeTay(false);
+    vaoOKgDau();
+  };
+
+  /** Gõ tay xong xe ⇒ thu bước ②, nhảy xuống ô kg. */
+  const xongBuocXe = () => {
+    setDangMo(null);
+    vaoOKgDau();
+  };
+
+  /** Chuyến không ghi xe ⇒ xóa 2 ô, thu bước ②, nhảy xuống ô kg. */
+  const boQuaBuocXe = () => {
+    setPhien((p) => (p ? { ...p, licensePlate: "", driverName: "" } : p));
+    setBoQuaXe(true);
+    setGoXeTay(false);
+    setDangMo(null);
+    vaoOKgDau();
+  };
+
   /** Đang sửa chuyến đã ghi (khác với tạo chuyến mới). */
   const dangSuaChuyen = suaRowIds !== null;
+  /** Gợi ý theo sổ đã ghi: đại lý hay giao cho xưởng đang chọn + xe của đại lý đang chọn. */
+  // Chỉ gợi ý đại lý CÒN trong danh mục — tên cũ đã đổi/xóa thì ô chọn không hiện được.
+  const dlHayGiao = useMemo(
+    () =>
+      phien
+        ? daiLyHayGiao(rows, phien.workshop, 8)
+            .filter((ten) => daiLy.some((d) => d.shortName === ten))
+            .slice(0, 4)
+        : [],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [rows, daiLy, phien?.workshop]
+  );
+  const xeGoiY = useMemo(
+    () => (phien ? xeCuaDaiLy(rows, phien.supplierName) : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [rows, phien?.supplierName]
+  );
+  /** Ngày giao gần nhất của từng đại lý — dòng phụ trên thẻ chọn. */
+  const ngayGanNhatDL = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const r of rows)
+      if ((m.get(r.supplierName) ?? "") < r.deliveryDate) m.set(r.supplierName, r.deliveryDate);
+    return m;
+  }, [rows]);
+  /** Các chuyến đã ghi của ĐÚNG ngày + xưởng trên phiếu (không phụ thuộc bộ lọc sổ). */
+  const nhomNgayPhien = useMemo(
+    () =>
+      phien
+        ? gomChuyen(
+            rows.filter(
+              (r) => r.deliveryDate === phien.deliveryDate && r.workshop === phien.workshop
+            ),
+            chuyen
+          )
+        : [],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [rows, chuyen, phien?.deliveryDate, phien?.workshop]
+  );
+  const coXe = !!phien && !!(phien.licensePlate.trim() || phien.driverName.trim());
+  /** Bước mở/thu SUY từ dữ liệu, `dangMo` chỉ để ép mở khi bấm "Đổi" / đang gõ tay. */
+  const moBuocDaiLy = dangMo === "dai-ly" || !phien?.supplierName;
+  const moBuocXe = !moBuocDaiLy && (dangMo === "xe" || (!coXe && !boQuaXe));
+  /** Hai ô ngày chỉ hiện khi ghi bù (hoặc người dùng chủ động tách). */
+  const haiNgay =
+    !!phien && (tachNgay || phien.postingDate !== phien.deliveryDate);
+  /** Mã lô của phiếu đang mở: chuyến đã ghi giữ mã cũ, chuyến mới xem trước mã sẽ sinh. */
+  const maLoPhien = !phien
+    ? ""
+    : chuyenIdPhien
+      ? chuyen.find((c) => c.id === chuyenIdPhien)?.lotCode || "— (dữ liệu cũ)"
+      : sinhMaLo(phien.deliveryDate, phien.workshop, chuyen);
   /** Các dòng trong bảng đủ để lưu (có loại + số lượng). */
   const dongHopLe = dongBang.filter(dongDayDu);
   const tongChuyen = dongHopLe.reduce((s, d) => s + d.quantityKg, 0);
@@ -419,7 +560,15 @@ export default function NhapNguyenLieuScreen() {
 
   /** Sửa một ô trong bảng (không tự sinh/xô dòng — thêm dòng bằng nút riêng). */
   const capNhatDong = (key: string, patch: Partial<DongBang>) =>
-    setDongBang((ds) => ds.map((d) => (d.key === key ? { ...d, ...patch } : d)));
+    setDongBang((ds) =>
+      ds.map((d) => {
+        if (d.key !== key) return d;
+        // Tự tay đổi loài/loại ⇒ thành dòng thường (thiếu kg sẽ bị nhắc khi lưu).
+        // Chỉ sửa GIÁ thì vẫn là dòng gợi ý: không gõ kg thì vẫn tự bỏ qua.
+        const tuSua = "category" in patch || "materialTypeName" in patch;
+        return { ...d, ...patch, goiY: tuSua ? false : d.goiY };
+      })
+    );
 
   /** Bỏ một dòng; luôn còn ít nhất một dòng để nhập. */
   const boDong = (key: string) =>
@@ -594,8 +743,9 @@ export default function NhapNguyenLieuScreen() {
     );
     setChuyenIdPhien(null);
     setSuaRowIds(null);
-    setDongBang([dongBangRong(catCuoi)]);
+    setDongBang(bangMoi(phien?.supplierName ?? "", phien?.workshop ?? xuongGhi, catCuoi));
     setLoiPhien([]);
+    datLaiBuoc(false);
   };
 
 
@@ -718,249 +868,419 @@ export default function NhapNguyenLieuScreen() {
       : []),
   ];
 
-  // FORM NHẬP (form-first) — trước đây trong Dialog, nay render INLINE ở chế độ
-  // "Ghi nhập": điền như tờ giấy (đầu chuyến · loại hàng · phế liệu), không modal.
+  // FORM NHẬP (form-first, INLINE) — LUỒNG THEO BƯỚC: thanh ngữ cảnh (ngày · xưởng)
+  // → ① Đại lý → ② Xe → ③ Loại hàng & kg → thanh LƯU dính đáy. Bước xong thì thu
+  // lại một dòng. Cột phải (desktop) / bên dưới (điện thoại): chuyến ĐÃ GHI trong
+  // ngày + phế liệu — khỏi đổi tab sang "Sổ ngày" để biết đã ghi gì.
   const formGhi = phien && (
-    <div className="space-y-6 rounded-xl border-2 border-border bg-card p-4 md:p-6">
-      <ErrorSummary loi={loiPhien} />
-      <ChuThichBatBuoc />
+    <div className="grid gap-5 xl:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)] xl:items-start">
+      <div className="min-w-0 space-y-4">
+        <ErrorSummary loi={loiPhien} />
 
-      {/* OCR: chụp ảnh phiếu tay → máy đọc chữ gợi ý điền (soát lại trước khi lưu). */}
-      {coOcr && (
-        <div className="flex flex-wrap items-center gap-2">
-          <Button
-            title="Chụp hoặc chọn ảnh phiếu nhập viết tay, máy tự đọc ra ngày · đại lý · các dòng loại NL và kg. Kết quả là NHÁP — soát lại rồi mới lưu."
-            type="button"
-            variant="outline"
-            size="lg"
-            className="w-full sm:w-auto"
-            onClick={() => setOcrMo(true)}
-          >
-            <Camera />
-            Nhận diện từ ảnh phiếu
-          </Button>
-          {phien.scanPath && (
-            <span className="flex items-center gap-1">
-              <Badge variant="secondary">Đã đính ảnh phiếu</Badge>
-              {coLuuAnh && (
-                <Button
-                  title="Mở lại ảnh phiếu tay đã lưu kèm chuyến này." type="button" variant="link" size="sm" onClick={xemAnhPhieu}>
-                  Xem
-                </Button>
-              )}
-            </span>
-          )}
-        </div>
-      )}
-
-      {chotPhien && (
-        <p className="flex items-start gap-3 rounded-lg bg-accent px-4 py-3 text-base text-accent-foreground">
-          <Lock className="mt-0.5 size-6 shrink-0" aria-hidden />
-          <span>
-            Ngày {viDate(phien.deliveryDate)} · xưởng {phien.workshop}{" "}
-            <strong>đã chốt</strong>. Vẫn ghi được nhưng là <strong>ghi bù</strong>{" "}
-            — bắt buộc ghi rõ lý do.
-          </span>
-        </p>
-      )}
-
-      {dangSuaChuyen && soDongDaLuu > 0 && (
-        <p className="flex items-start gap-3 rounded-lg bg-accent px-4 py-3 text-base text-accent-foreground">
-          <TriangleAlert className="mt-0.5 size-6 shrink-0" aria-hidden />
-          <span>
-            Sửa đầu chuyến sẽ áp cho <strong>{soDongDaLuu} dòng</strong> đã ghi
-            trong chuyến này.
-          </span>
-        </p>
-      )}
-
-      <div className="grid gap-6 sm:grid-cols-2">
-        <DateField
-          label="Ngày ghi sổ"
-          required
-          info="Ngày ghi vào hệ thống. Chọn ngày này thì ngày hàng về tự nhảy theo. Cần khác thì sửa ô ngày hàng về bên cạnh."
-          value={phien.postingDate}
-          onChange={doiNgayGhiSo}
-        />
-        <DateField
-          label="Ngày hàng về xưởng"
-          required
-          info="Ngày xe đổ hàng thật — mọi tổng hợp tính theo ngày này. Mặc định nhảy theo ngày ghi sổ; sửa tay ô này khi hàng về hôm khác (ghi bù)."
-          value={phien.deliveryDate}
-          onChange={doiNgayVe}
-        />
-      </div>
-
-      {(isBackdatedImport(phien) || chotPhien) && (
-        <Field
-          label="Lý do ghi bù"
-          required
-          hint="VD: đại lý chưa xuất hóa đơn, 31/7 mới có chứng từ."
-        >
-          <Input
-            value={phien.backdateReason}
-            onChange={(e) => datPhien("backdateReason", e.target.value)}
-            placeholder="Vì sao tới hôm nay mới ghi?"
-          />
-        </Field>
-      )}
-
-      {/* Đại lý lên đầu — khớp cột TÊN ĐẠI LÝ mở đầu tờ báo cáo giấy của chị Trúc. */}
-      <Combobox
-        label="Đại lý giao hàng"
-        required
-        hint="Chọn trong danh mục. Chưa có thì gõ tên rồi bấm Thêm mới."
-        value={phien.supplierName}
-        onChange={(v) => datPhien("supplierName", v)}
-        options={optDaiLy}
-        onCreate={themDaiLy}
-        emptyText="Chưa có đại lý nào trong danh mục."
-      />
-
-      <Combobox
-        label="Phân xưởng"
-        required
-        choPhepXoa={false}
-        value={phien.workshop}
-        onChange={(v) => datPhien("workshop", v as Workshop)}
-        options={PHAN_XUONG.map((p) => ({ value: p, label: p }))}
-      />
-
-      <div className="rounded-xl border-2 border-border">
-        <button
-          title="Mở / thu phần ghi thêm về xe và ghi chú của chuyến (không bắt buộc)."
-          type="button"
-          onClick={() => setMoPhuPhien((v) => !v)}
-          aria-expanded={moPhuPhien}
-          className="flex min-h-14 w-full items-center justify-between px-4 text-base font-semibold"
-        >
-          Xe và ghi chú của chuyến (không bắt buộc)
-          <ChevronDown
-            className={`size-6 transition-transform ${moPhuPhien ? "rotate-180" : ""}`}
-            aria-hidden
-          />
-        </button>
-        {moPhuPhien && (
-          <div className="space-y-5 border-t-2 border-border p-4">
-            <div className="grid gap-5 sm:grid-cols-2">
-              <Field label="Tài xế">
-                <Input
-                  value={phien.driverName}
-                  onChange={(e) => datPhien("driverName", e.target.value)}
-                  placeholder="Tên tài xế"
+        {/* THANH NGỮ CẢNH — ngày + xưởng của cả phiếu */}
+        <div className="space-y-3 rounded-xl border-2 border-border bg-card p-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            {haiNgay ? (
+              <>
+                <DateField
+                  label="Ngày ghi sổ"
+                  required
+                  info="Ngày ghi vào hệ thống. Chọn ngày này thì ngày hàng về tự nhảy theo. Cần khác thì sửa ô ngày hàng về bên cạnh."
+                  value={phien.postingDate}
+                  onChange={doiNgayGhiSo}
                 />
-              </Field>
+                <DateField
+                  label="Ngày hàng về xưởng"
+                  required
+                  info="Ngày xe đổ hàng thật — mọi tổng hợp tính theo ngày này. Sửa tay ô này khi hàng về hôm khác (ghi bù)."
+                  value={phien.deliveryDate}
+                  onChange={doiNgayVe}
+                />
+              </>
+            ) : (
+              <DateField
+                label="Ngày hàng về"
+                required
+                info="Ngày xe đổ hàng — cũng là ngày ghi sổ. Hàng về hôm trước mà nay mới ghi thì bấm “Ghi bù” bên dưới để tách hai ngày."
+                value={phien.deliveryDate}
+                onChange={doiNgayGhiSo}
+              />
+            )}
+            <ChoiceGroup
+              label="Phân xưởng"
+              required
+              cot={3}
+              className={haiNgay ? "sm:col-span-2" : undefined}
+              value={phien.workshop}
+              onChange={(v) => chonXuong(v as Workshop)}
+              options={PHAN_XUONG.map((p) => ({ value: p, label: p }))}
+            />
+          </div>
+
+          {(isBackdatedImport(phien) || chotPhien) && (
+            <Field
+              label="Lý do ghi bù"
+              required
+              hint="VD: đại lý chưa xuất hóa đơn, 31/7 mới có chứng từ."
+            >
+              <Input
+                value={phien.backdateReason}
+                onChange={(e) => datPhien("backdateReason", e.target.value)}
+                placeholder="Vì sao tới hôm nay mới ghi?"
+              />
+            </Field>
+          )}
+
+          <div className="flex flex-wrap items-center gap-2">
+            {!haiNgay ? (
+              <Button
+                title="Hàng về hôm trước mà nay mới ghi sổ (chờ hóa đơn…): tách thành hai ô ngày ghi sổ / ngày hàng về, kèm lý do."
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-auto min-h-9 max-w-full py-1 text-left whitespace-normal"
+                onClick={() => setTachNgay(true)}
+              >
+                <CalendarRange />
+                Ghi bù (hai ngày khác nhau)
+              </Button>
+            ) : (
+              !isBackdatedImport(phien) && (
+                <Button
+                  title="Hàng về đúng ngày ghi sổ: gộp lại còn một ô ngày."
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setTachNgay(false)}
+                >
+                  Gộp lại một ngày
+                </Button>
+              )
+            )}
+            {coOcr && (
+              <Button
+                title="Chụp hoặc chọn ảnh phiếu nhập viết tay, máy tự đọc ra ngày · đại lý · các dòng loại NL và kg. Kết quả là NHÁP — soát lại rồi mới lưu."
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-auto min-h-9 max-w-full py-1 text-left whitespace-normal"
+                onClick={() => setOcrMo(true)}
+              >
+                <Camera />
+                Nhận diện từ ảnh phiếu
+              </Button>
+            )}
+            {phien.scanPath && (
+              <span className="flex items-center gap-1">
+                <Badge variant="secondary">Đã đính ảnh phiếu</Badge>
+                {coLuuAnh && (
+                  <Button
+                    title="Mở lại ảnh phiếu tay đã lưu kèm chuyến này." type="button" variant="link" size="sm" onClick={xemAnhPhieu}>
+                    Xem
+                  </Button>
+                )}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {chotPhien && (
+          <p className="flex items-start gap-3 rounded-lg bg-accent px-4 py-3 text-base text-accent-foreground">
+            <Lock className="mt-0.5 size-6 shrink-0" aria-hidden />
+            <span>
+              Ngày {viDate(phien.deliveryDate)} · xưởng {phien.workshop}{" "}
+              <strong>đã chốt</strong>. Vẫn ghi được nhưng là <strong>ghi bù</strong>{" "}
+              — bắt buộc ghi rõ lý do.
+            </span>
+          </p>
+        )}
+
+        {dangSuaChuyen && (
+          <p className="flex items-start gap-3 rounded-lg bg-accent px-4 py-3 text-base text-accent-foreground">
+            <TriangleAlert className="mt-0.5 size-6 shrink-0" aria-hidden />
+            <span>
+              Đang <strong>sửa chuyến đã ghi</strong>
+              {soDongDaLuu > 0 && (
+                <>
+                  {" "}— đổi ngày / đại lý / xe sẽ áp cho <strong>{soDongDaLuu} dòng</strong> của chuyến
+                </>
+              )}
+              .
+            </span>
+          </p>
+        )}
+
+        {/* ① ĐẠI LÝ — chọn xong là thu lại, kéo theo xe gợi ý + bảng loại hàng điền sẵn */}
+        <TheBuoc
+          so={1}
+          tieuDe="Đại lý giao hàng"
+          xong={!!phien.supplierName}
+          mo={moBuocDaiLy}
+          tomTat={phien.supplierName}
+          onDoi={() => setDangMo("dai-ly")}
+        >
+          {!dangSuaChuyen && dlHayGiao.length > 0 && (
+            <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
+              {dlHayGiao.map((ten) => (
+                <TheChon
+                  key={ten}
+                  tieuDe={ten}
+                  phu={ngayGanNhatDL.get(ten) ? `Gần nhất ${viDate(ngayGanNhatDL.get(ten) ?? "")}` : undefined}
+                  dangChon={phien.supplierName === ten}
+                  title={`Chọn đại lý ${ten} — tự điền sẵn các loại hàng và đơn giá theo lượt giao gần nhất, chỉ còn gõ số kg.`}
+                  onClick={() => chonDaiLy(ten)}
+                />
+              ))}
+            </div>
+          )}
+          <Combobox
+            label={dlHayGiao.length > 0 && !dangSuaChuyen ? "Đại lý khác" : "Đại lý giao hàng"}
+            required
+            anNhanBatBuoc
+            value={phien.supplierName}
+            onChange={chonDaiLy}
+            options={optDaiLy}
+            onCreate={themDaiLy}
+            emptyText="Chưa có đại lý nào trong danh mục."
+          />
+        </TheBuoc>
+
+        {/* ② XE — xe cũ của đại lý bấm một chạm; xe lạ thì gõ tay; không có thì bỏ qua */}
+        <TheBuoc
+          so={2}
+          tieuDe="Xe chở hàng"
+          xong={coXe || boQuaXe}
+          mo={moBuocXe}
+          tomTat={
+            coXe
+              ? [phien.licensePlate, phien.driverName].filter(Boolean).join(" · ")
+              : phien.supplierName
+                ? "Không ghi xe"
+                : undefined
+          }
+          onDoi={phien.supplierName ? () => setDangMo("xe") : undefined}
+        >
+          {xeGoiY.length > 0 && (
+            <div className="grid gap-2 sm:grid-cols-2">
+              {xeGoiY.map((x) => (
+                <TheChon
+                  key={`${x.licensePlate}|${x.driverName}`}
+                  icon={<Truck />}
+                  tieuDe={x.licensePlate || "(không biển số)"}
+                  phu={x.driverName || undefined}
+                  dangChon={
+                    chuanBienSo(x.licensePlate) === chuanBienSo(phien.licensePlate) &&
+                    x.driverName.trim().toLowerCase() === phien.driverName.trim().toLowerCase()
+                  }
+                  title="Điền cả biển số và tài xế theo xe này — xe từng chở cho đại lý đang chọn."
+                  onClick={() => chonXe(x)}
+                />
+              ))}
+            </div>
+          )}
+          {(goXeTay || xeGoiY.length === 0 || coXe) && (
+            <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Biển số xe">
                 <Input
                   value={phien.licensePlate}
+                  onFocus={() => setDangMo("xe")}
                   onChange={(e) => datPhien("licensePlate", e.target.value)}
                   placeholder="VD: 86C 19555"
                 />
               </Field>
-            </div>
-            <Field label="Ghi chú">
-              <Input
-                value={phien.note}
-                onChange={(e) => datPhien("note", e.target.value)}
-                placeholder="Ghi chú thêm (nếu có)"
-              />
-            </Field>
-            <div className="grid gap-5 sm:grid-cols-2">
-              <Field
-                label="Mã SSCC (nhà nước)"
-                hint="Để trống nếu chưa được cấp — điền sau."
-              >
+              <Field label="Tài xế">
                 <Input
-                  value={phien.ssccCode}
-                  onChange={(e) => datPhien("ssccCode", e.target.value)}
-                  placeholder="Chưa có — điền sau"
+                  value={phien.driverName}
+                  onFocus={() => setDangMo("xe")}
+                  onChange={(e) => datPhien("driverName", e.target.value)}
+                  placeholder="Tên tài xế"
                 />
               </Field>
-              <Field label="Mã lô nội bộ" hint="Tự sinh, dùng để truy xuất.">
-                <div className="flex min-h-11 items-center tnum text-base text-muted-foreground">
-                  {chuyenIdPhien
-                    ? chuyen.find((c) => c.id === chuyenIdPhien)?.lotCode ||
-                      "— (dữ liệu cũ)"
-                    : sinhMaLo(phien.deliveryDate, phien.workshop, chuyen)}
-                </div>
-              </Field>
             </div>
-          </div>
-        )}
-      </div>
-
-      <div className="border-t-2 border-border pt-1" />
-
-      {/* Bảng loại hàng — nhập cả chuyến một lượt, lưu một lần */}
-      <div className="space-y-4 rounded-xl border-2 border-primary/40 bg-accent/40 p-4">
-        <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-          <p className="text-base font-semibold">Các loại hàng trong chuyến</p>
-          <p className="text-sm text-muted-foreground">
-            Mỗi loại một dòng. Cần thêm loại nữa thì bấm “Thêm loại hàng” ở cuối.
-            Đơn giá để trống nếu chưa có hóa đơn.
-          </p>
-        </div>
-
-        <BangDongHang
-          dong={dongBang}
-          onSua={capNhatDong}
-          onBo={boDong}
-          onThem={themDongMoi}
-          optLoaiTheoLoai={optLoaiNLTheoLoai}
-          onTaoLoai={themLoaiNL}
-        />
-
-        {dongHopLe.length > 0 && (
-          <div className="flex flex-wrap items-baseline justify-end gap-x-6 gap-y-1">
-            <span className="text-base text-muted-foreground">
-              {dongHopLe.length} loại · chuyến này
-            </span>
-            <span className="tnum text-lg font-semibold">{kg(tongChuyen)}</span>
-            {tienChuyen > 0 && (
-              <span className="tnum text-base text-muted-foreground">
-                {num(tienChuyen)} đ
-              </span>
+          )}
+          <div className="flex flex-wrap gap-2">
+            {!goXeTay && xeGoiY.length > 0 && !coXe && (
+              <Button
+                title="Xe chưa từng chở cho đại lý này: mở hai ô để gõ tay biển số và tên tài xế."
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setGoXeTay(true);
+                  setDangMo("xe");
+                }}
+              >
+                <Plus />
+                Xe khác — gõ tay
+              </Button>
+            )}
+            {coXe ? (
+              <Button
+                title="Xong phần xe — thu bước này lại và nhảy xuống gõ số kg."
+                type="button"
+                onClick={xongBuocXe}
+              >
+                Xong, sang gõ kg
+              </Button>
+            ) : (
+              <Button
+                title="Chuyến này không cần ghi xe / tài xế — bỏ qua bước này và nhảy xuống gõ số kg."
+                type="button"
+                variant="outline"
+                onClick={boQuaBuocXe}
+              >
+                Không ghi xe
+              </Button>
             )}
           </div>
-        )}
+        </TheBuoc>
+
+        {/* ③ LOẠI HÀNG & KG — bảng điền sẵn theo đại lý, chỉ còn gõ số */}
+        <TheBuoc
+          so={3}
+          tieuDe="Loại hàng và số kg"
+          xong={dongHopLe.length > 0}
+          mo
+        >
+          <p className="text-sm text-muted-foreground">
+            {dongBang.some((d) => d.goiY)
+              ? "Đã điền sẵn loại + giá theo lượt gần nhất — chỉ gõ số kg, Enter xuống dòng. Dòng không có kg tự bỏ qua."
+              : "Mỗi loại một dòng. Đơn giá để trống nếu chưa có hóa đơn."}
+          </p>
+          <BangDongHang
+            dong={dongBang}
+            onSua={capNhatDong}
+            onBo={boDong}
+            onThem={themDongMoi}
+            optLoaiTheoLoai={optLoaiNLTheoLoai}
+            onTaoLoai={themLoaiNL}
+          />
+        </TheBuoc>
+
+        <div className="rounded-xl border-2 border-border bg-card">
+          <button
+            title="Mở / thu phần ít dùng của chuyến: ghi chú, mã SSCC, mã lô nội bộ (không bắt buộc)."
+            type="button"
+            onClick={() => setMoPhuPhien((v) => !v)}
+            aria-expanded={moPhuPhien}
+            className="flex min-h-11 w-full items-center justify-between gap-3 px-4 text-left font-semibold"
+          >
+            <span>
+              Ghi chú · mã lô{" "}
+              <span className="tnum font-normal text-muted-foreground">{maLoPhien}</span>
+            </span>
+            <ChevronDown
+              className={`size-6 shrink-0 transition-transform ${moPhuPhien ? "rotate-180" : ""}`}
+              aria-hidden
+            />
+          </button>
+          {moPhuPhien && (
+            <div className="space-y-4 border-t-2 border-border p-4">
+              <Field label="Ghi chú">
+                <Input
+                  value={phien.note}
+                  onChange={(e) => datPhien("note", e.target.value)}
+                  placeholder="Ghi chú thêm (nếu có)"
+                />
+              </Field>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field
+                  label="Mã SSCC (nhà nước)"
+                  hint="Để trống nếu chưa được cấp — điền sau."
+                >
+                  <Input
+                    value={phien.ssccCode}
+                    onChange={(e) => datPhien("ssccCode", e.target.value)}
+                    placeholder="Chưa có — điền sau"
+                  />
+                </Field>
+                <Field label="Mã lô nội bộ" hint="Tự sinh, dùng để truy xuất.">
+                  <div className="flex min-h-11 items-center tnum text-base text-muted-foreground">
+                    {maLoPhien}
+                  </div>
+                </Field>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* THANH LƯU — dính đáy màn: luôn thấy tổng chuyến + nút lưu, khỏi cuộn tìm */}
+        <div
+          className={cn(
+            "flex flex-col gap-2 rounded-xl border-2 bg-card p-3 xl:flex-row xl:items-center xl:justify-between",
+            // Chỉ DÍNH ĐÁY khi đã có số để lưu — phiếu trống thì nằm yên, khỏi che các bước.
+            dongHopLe.length > 0 || dangSuaChuyen
+              ? "sticky bottom-2 z-10 border-primary/50 shadow-lg"
+              : "border-border"
+          )}
+        >
+          <p className="min-w-0">
+            <span className="text-muted-foreground">Chuyến này: </span>
+            <span className="tnum text-lg font-semibold">{kg(tongChuyen)}</span>
+            <span className="text-muted-foreground">
+              {" "}· {dongHopLe.length} loại
+              {tienChuyen > 0 && <> · <span className="tnum">{num(tienChuyen)} đ</span></>}
+            </span>
+          </p>
+          {/* Điện thoại: các nút chia đều MỘT hàng (chật thì tự xuống hàng); chữ dài tự xuống dòng. */}
+          <div className="flex w-full flex-wrap gap-2 xl:w-auto [&>*]:flex-1 xl:[&>*]:flex-none">
+            {dangSuaChuyen ? (
+              <>
+                <ConfirmDelete
+                  moTaBanGhi={`Chuyến ${phien?.supplierName || "(chưa có đại lý)"} — ${viDate(phien?.deliveryDate ?? "")} — ${soDongDaLuu} dòng — ${kg(tongChuyen)}`}
+                  onConfirm={xoaChuyenDangSua}
+                  tieuDe="Xóa cả chuyến này?"
+                  nhanNut="Xóa chuyến"
+                />
+                <Button variant="outline" className="min-h-11" onClick={datLaiPhien}>
+                  Hủy sửa
+                </Button>
+              </>
+            ) : (
+              <Button
+                title="Ghi chuyến đang gõ vào sổ rồi mở phiếu mới GIỮ ngày + xưởng + đại lý — cho đại lý giao nhiều lượt trong ngày." variant="outline" className="h-auto min-h-11 whitespace-normal" onClick={luuThemChuyenKhac}>
+                <Truck />
+                Lưu &amp; chuyến kế
+              </Button>
+            )}
+            <Button
+              title="Ghi chuyến đang gõ vào sổ. Chuyến hiện ngay ở khung “Đã ghi trong ngày”, phiếu trống sẵn cho chuyến kế." className="min-h-11" onClick={xongChuyen}>
+              <Save />
+              {dangSuaChuyen ? "Lưu chuyến" : "Lưu vào sổ"}
+            </Button>
+          </div>
+        </div>
       </div>
 
-      {/* Phế liệu cân trong ngày — GỘP CHUNG một chỗ với nguyên liệu */}
-      <KhoiPheLieuNgay
-        ngay={phien.deliveryDate}
-        phanXuong={phien.workshop}
-        rows={pheLieu}
-        onChange={persistPheLieu}
-        khoa={chotPhien}
-      />
-
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <span className="text-base text-muted-foreground">
-          Tổng ngày {viDate(phien.deliveryDate)} · xưởng {phien.workshop}:{" "}
-          <span className="tnum text-xl font-semibold text-foreground">
-            {kg(tongNgayPhien)}
-          </span>
-        </span>
-        <div className="flex flex-wrap gap-2">
-          {dangSuaChuyen ? (
-            <ConfirmDelete
-              moTaBanGhi={`Chuyến ${phien?.supplierName || "(chưa có đại lý)"} — ${viDate(phien?.deliveryDate ?? "")} — ${soDongDaLuu} dòng — ${kg(tongChuyen)}`}
-              onConfirm={xoaChuyenDangSua}
-              tieuDe="Xóa cả chuyến này?"
-              nhanNut="Xóa chuyến"
-            />
-          ) : (
-            <Button
-              title="Ghi chuyến đang gõ vào sổ rồi mở form trống nhập tiếp chuyến kế — khỏi bấm ra bấm vào." variant="outline" size="lg" onClick={luuThemChuyenKhac}>
-              <Truck />
-              Lưu &amp; thêm chuyến khác
-            </Button>
-          )}
-          <Button
-            title="Ghi chuyến đang gõ vào sổ rồi quay về danh sách chuyến trong ngày." size="lg" onClick={xongChuyen}>
-            {dangSuaChuyen ? "Lưu chuyến" : "Lưu vào sổ"}
-          </Button>
+      {/* CỘT NGÀY — đã ghi gì trong ngày này + phế liệu (chốt ngày ở strip cuối màn) */}
+      <div className="min-w-0 space-y-4">
+        <div className="space-y-3 rounded-xl border-2 border-border bg-card p-4">
+          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+            <p className="font-semibold">
+              Đã ghi ngày {viDate(phien.deliveryDate)} · xưởng {phien.workshop}
+            </p>
+            <p className="text-muted-foreground">
+              {nhomNgayPhien.length} chuyến ·{" "}
+              <span className="tnum text-lg font-semibold text-foreground">
+                {kg(tongNgayPhien)}
+              </span>
+            </p>
+          </div>
+          <ChuyenTrongNgay
+            nhom={nhomNgayPhien}
+            khoa={chotPhien}
+            dangSuaKhoa={chuyenIdPhien}
+            onSua={moSuaChuyen}
+          />
         </div>
+
+        {/* Phế liệu cân trong ngày — GỘP CHUNG một chỗ với nguyên liệu */}
+        <KhoiPheLieuNgay
+          ngay={phien.deliveryDate}
+          phanXuong={phien.workshop}
+          rows={pheLieu}
+          onChange={persistPheLieu}
+          khoa={chotPhien}
+        />
       </div>
     </div>
   );

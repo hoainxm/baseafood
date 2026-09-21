@@ -5,6 +5,9 @@ import {
   loiDauChuyen,
   dongCoData,
   dongDayDu,
+  daiLyHayGiao,
+  xeCuaDaiLy,
+  mauDongCuaDaiLy,
   type DauChuyen,
   type DongBang,
 } from "./importHelpers";
@@ -116,20 +119,32 @@ describe("loiDauChuyen", () => {
     ssccCode: "",
     scanPath: "",
   };
-  const truong = (ls: ReturnType<typeof loiDauChuyen>) => ls.map((l) => l.truong);
+  const truong = (ls: ReturnType<typeof loiDauChuyen>) =>
+    ls.map((l) => l.truong);
 
   it("đầu chuyến hợp lệ ⇒ không lỗi", () => {
     expect(loiDauChuyen(ok, false)).toEqual([]);
   });
   it("thiếu đại lý", () => {
-    expect(truong(loiDauChuyen({ ...ok, supplierName: "  " }, false))).toContain("Đại lý");
+    expect(
+      truong(loiDauChuyen({ ...ok, supplierName: "  " }, false)),
+    ).toContain("Đại lý");
   });
   it("ngày ghi sổ trước ngày hàng về ⇒ lỗi", () => {
-    expect(truong(loiDauChuyen({ ...ok, postingDate: "2026-09-01" }, false))).toContain("Ngày ghi sổ");
+    expect(
+      truong(loiDauChuyen({ ...ok, postingDate: "2026-09-01" }, false)),
+    ).toContain("Ngày ghi sổ");
   });
   it("ghi sổ SAU ngày về mà không có lý do ⇒ bắt lý do ghi bù", () => {
-    expect(truong(loiDauChuyen({ ...ok, postingDate: "2026-09-05" }, false))).toContain("Lý do ghi bù");
-    expect(loiDauChuyen({ ...ok, postingDate: "2026-09-05", backdateReason: "chờ hóa đơn" }, false)).toEqual([]);
+    expect(
+      truong(loiDauChuyen({ ...ok, postingDate: "2026-09-05" }, false)),
+    ).toContain("Lý do ghi bù");
+    expect(
+      loiDauChuyen(
+        { ...ok, postingDate: "2026-09-05", backdateReason: "chờ hóa đơn" },
+        false,
+      ),
+    ).toEqual([]);
   });
   it("ngày đã CHỐT ⇒ bắt lý do dù cùng ngày", () => {
     const ls = loiDauChuyen(ok, true);
@@ -139,7 +154,14 @@ describe("loiDauChuyen", () => {
 });
 
 describe("dongCoData / dongDayDu", () => {
-  const trong: DongBang = { key: "k", id: null, category: "Bạch tuộc", materialTypeName: "", quantityKg: 0, unitPrice: null };
+  const trong: DongBang = {
+    key: "k",
+    id: null,
+    category: "Bạch tuộc",
+    materialTypeName: "",
+    quantityKg: 0,
+    unitPrice: null,
+  };
   it("dòng trống: chưa có data, chưa đủ", () => {
     expect(dongCoData(trong)).toBe(false);
     expect(dongDayDu(trong)).toBe(false);
@@ -147,6 +169,115 @@ describe("dongCoData / dongDayDu", () => {
   it("chỉ có giá ⇒ có data nhưng chưa đủ; có loại + kg>0 ⇒ đủ", () => {
     expect(dongCoData({ ...trong, unitPrice: 1 })).toBe(true);
     expect(dongDayDu({ ...trong, unitPrice: 1 })).toBe(false);
-    expect(dongDayDu({ ...trong, materialTypeName: "Bạch tuộc 2 da", quantityKg: 10 })).toBe(true);
+    expect(
+      dongDayDu({
+        ...trong,
+        materialTypeName: "Bạch tuộc 2 da",
+        quantityKg: 10,
+      }),
+    ).toBe(true);
+  });
+});
+
+describe("gợi ý theo đại lý", () => {
+  const so: MaterialImportItem[] = [
+    dong({
+      id: "1",
+      shipmentId: "s1",
+      deliveryDate: "2026-09-01",
+      licensePlate: "72C-16603",
+      driverName: "Toàn",
+      materialTypeName: "BT 1 da",
+      category: "Bạch tuộc",
+      unitPrice: 150000,
+      quantityKg: 10,
+    }),
+    dong({
+      id: "2",
+      shipmentId: "s1",
+      deliveryDate: "2026-09-01",
+      licensePlate: "72C-16603",
+      driverName: "Toàn",
+      materialTypeName: "BT 2 da lớn",
+      category: "Bạch tuộc",
+      unitPrice: 134000,
+      quantityKg: 10,
+    }),
+    dong({
+      id: "3",
+      shipmentId: "s2",
+      deliveryDate: "2026-09-03",
+      licensePlate: "72c 16603",
+      driverName: "toàn",
+      materialTypeName: "BT 1 da",
+      category: "Bạch tuộc",
+      unitPrice: 158000,
+      quantityKg: 10,
+    }),
+    dong({
+      id: "4",
+      shipmentId: "s2",
+      deliveryDate: "2026-09-03",
+      licensePlate: "72c 16603",
+      driverName: "toàn",
+      materialTypeName: "BT 2 da nhỏ",
+      category: "Bạch tuộc",
+      unitPrice: null,
+      quantityKg: 10,
+    }),
+    dong({
+      id: "5",
+      shipmentId: "s3",
+      deliveryDate: "2026-09-02",
+      supplierName: "Hương Pháp",
+      licensePlate: "86C-19355",
+      driverName: "Phi",
+      materialTypeName: "BT 1 da",
+      category: "Bạch tuộc",
+      unitPrice: 160000,
+      quantityKg: 10,
+    }),
+    dong({
+      id: "6",
+      shipmentId: "s4",
+      deliveryDate: "2026-09-02",
+      workshop: "Cá",
+      supplierName: "Cá Ba",
+      materialTypeName: "Cá đổng",
+      category: "Cá",
+      quantityKg: 10,
+    }),
+  ];
+
+  it("daiLyHayGiao: theo xưởng, nhiều lượt đứng trước", () => {
+    expect(daiLyHayGiao(so, "Đông")).toEqual(["Hồng Phú", "Hương Pháp"]);
+    expect(daiLyHayGiao(so, "Cá")).toEqual(["Cá Ba"]);
+    expect(daiLyHayGiao(so, "Khô")).toEqual([]);
+  });
+
+  it("xeCuaDaiLy: gộp biển số viết khác kiểu, giữ cách viết mới nhất", () => {
+    expect(xeCuaDaiLy(so, "Hồng Phú")).toEqual([
+      { licensePlate: "72c 16603", driverName: "toàn" },
+    ]);
+    expect(xeCuaDaiLy(so, "")).toEqual([]);
+  });
+
+  it("mauDongCuaDaiLy: loại của lượt mới nhất trước, giá gần nhất, kg trống, cờ goiY", () => {
+    const m = mauDongCuaDaiLy(so, "Hồng Phú", "Đông");
+    expect(
+      m.map((d) => [d.materialTypeName, d.unitPrice, d.quantityKg, d.goiY]),
+    ).toEqual([
+      ["BT 1 da", 158000, 0, true],
+      ["BT 2 da nhỏ", null, 0, true],
+      ["BT 2 da lớn", 134000, 0, true],
+    ]);
+    expect(mauDongCuaDaiLy(so, "Đại lý lạ", "Đông")).toEqual([]);
+  });
+
+  it("dòng gợi ý chưa gõ kg KHÔNG tính là có dữ liệu (lưu tự bỏ qua, không nài lỗi)", () => {
+    const [d] = mauDongCuaDaiLy(so, "Hồng Phú", "Đông");
+    expect(dongCoData(d)).toBe(false);
+    expect(dongCoData({ ...d, quantityKg: 5 })).toBe(true);
+    expect(dongCoData({ ...d, goiY: false })).toBe(true); // người dùng tự sửa loại/giá ⇒ dòng thường
   });
 });

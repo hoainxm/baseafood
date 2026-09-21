@@ -31,7 +31,7 @@ src/
 ├── components/ui/            primitive shadcn — size mật độ web thường (token-driven)
 ├── design-system/            tokens.css · patterns/ · kit/ · index.ts (cửa import duy nhất)
 └── features/                 THẬT: imports · production/WipProductionScreen (/wip) · packaging (/packaging) · warehouse · orders · sales · balancing · catalog · reports/NXT · auth · users
-                              DEMO (dữ liệu mẫu): production/WorkOrderScreen (/production) · cold-storage · reports · dashboard · quality · traceability
+                              DEMO (dữ liệu mẫu): production/WorkOrderScreen (/production) · reports · quality · traceability · cold-storage (hybrid: tồn THẬT, nhiệt độ minh hoạ)
 supabase/migrations/          0001 … 0026
 docs/README.md                bản đồ tài liệu — doc nào ở đâu, doc mới bỏ đâu
 docs/app-map/                 bản đồ ngữ cảnh cho agent (đọc khi CODE)
@@ -165,7 +165,7 @@ Ngoài app-map: [`src/design-system/README.md`](src/design-system/README.md) (UI
 
 **Đã build (THẬT — nối dữ liệu):** nhập hàng (chuyến thật · 2 ngày + ghi bù · chốt ngày · phế liệu ngày · bộ lọc), **sản xuất BTP ngày `/wip`** (sản lượng theo ngày/xưởng/loại NL · chốt ngày SX · ghi bù), **kho dự trữ `/warehouse`** (duyệt BTP chờ→đã nhập · tồn), **đơn đặt `/orders`** (lệnh xuất FIFO từ tồn WIP), bán hàng (phiếu bán · quy cách · XK/NĐ · hút cân đối), cân đối + in A4 + chốt/chuyển kỳ, NXT + tồn NL, danh mục 5 tab, đăng nhập + vai trò `user_profiles` + màn Người dùng, **sổ kho theo tháng `/ton-kho-thang`** (dồn tồn cuối kỳ tháng N → tồn đầu kỳ N+1, đủ cột kiện+kg cho NL/BTP/TP — [36-so-kho-thang](docs/app-map/36-so-kho-thang.md)), bộ giao diện responsive, tầng dữ liệu Supabase↔localStorage. Điều hướng **react-router v7 (HashRouter)**, ~20 route, **nav CÂY module-centric** (`CAY_NAV`, gập/mở + deep-link danh mục trong module).
 
-**Màn DEMO (dữ liệu mẫu, chưa nối bảng — đừng coi là đã có):** Lệnh sản xuất `/production` · Kho lạnh `/cold-storage` · Báo cáo tổng `/reports` · Tổng quan `/dashboard` · Chất lượng `/quality` · Truy xuất `/traceability`.
+**Màn DEMO (dữ liệu mẫu, chưa nối bảng — đừng coi là đã có):** Lệnh sản xuất `/production` · Báo cáo tổng `/reports` · Chất lượng `/quality` · Truy xuất `/traceability` · Kho lạnh `/cold-storage` (**hybrid**: tồn hút số thật qua `tinhTon`, chỉ nhiệt độ/bố trí lô là minh hoạ). `/dashboard` **đã nối số thật** — không còn DEMO (không nằm trong `DEMO_IDS` ở `lib/nav-access.ts`).
 
 **Backlog (cập nhật 2026-08-22):**
 - ⚠️ Chạy đủ migration `0001…0026` trên DB thật; siết RLS `0021` **+ bổ sung `material_opening_stock`**; đổi mật khẩu admin (`0007` seed admin/admin) 🔴.

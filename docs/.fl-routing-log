@@ -33,3 +33,4 @@
 2026-09-18 | trace-lo-qr,nhap-hang,san-xuat,kho,ban-hang,database | docs/trien-khai/hop-2026-09-02-form-nhap-trace-gia-qc.md, docs/spec/import-xnt-kho-cutover.md, docs/trien-khai/flow-end-to-end-2-bo-phan.md, docs/app-map/30-nhap-hang.md, docs/app-map/34-btp-san-xuat-kho.ba-spec.md, docs/app-map/33-ban-hang.md, docs/app-map/03-database.md, docs/app-map/04-tang-du-lieu.md, docs/app-map/01-app-structure.md, docs/app-map/02-pages-navigation.md, docs/app-map/05-bao-mat-phan-quyen.md
 2026-09-21 | doi-soat | docs/app-map/37-doi-soat-hddt.md, docs/app-map/README.md
 2026-09-21 | doi-soat-hddt | docs/app-map/37-doi-soat-hddt.md,docs/app-map/README.md
+2026-09-21 | business-logic (doi-soat HDDT) | docs/app-map/37-doi-soat-hddt.md, docs/README.md

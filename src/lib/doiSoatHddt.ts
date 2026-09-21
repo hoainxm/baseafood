@@ -163,6 +163,46 @@ export interface CanDoiCot {
   soDong: { phi: number; chietKhau: number; lamTron: number; lechThat: number };
   /** Danh sách dòng lệch KHÔNG giải thích được — chỗ phải đi sửa. */
   dongLechThat: { dongFile: number; ma: string; ngay: string; ban: string; lech: number }[];
+  /** Cột phí / chiết khấu (chỉ số AOA, −1 = không có). */
+  cotPhi: number;
+  cotCk: number;
+  /**
+   * MỌI dòng có chưa thuế + thuế ≠ tổng thanh toán, kèm số thô từng ô — để kế toán
+   * cộng tay lại đúng bằng ô lệch của họ ("sót dòng nào mà tổng không ra").
+   */
+  dongLech: DongLechCong[];
+  /**
+   * Ô LỆCH kế toán tự đặt dưới bảng (VD Q3049 = Σ tổng − (Σ chưa thuế + Σ thuế + Σ phí)).
+   * Máy nhận ra bằng cách so giá trị ô với các cách tính quen thuộc; null = không thấy.
+   */
+  oTuDat: OTuDat | null;
+}
+
+export interface DongLechCong {
+  dongFile: number;
+  ma: string;
+  ngay: string;
+  ban: string;
+  chua: number;
+  thue: number;
+  phi: number;
+  ck: number;
+  tong: number;
+  /** tong − (chua + thue) */
+  lech: number;
+  loai: LoaiLechCong;
+}
+
+export interface OTuDat {
+  /** Dòng Excel + chỉ số cột AOA — lớp xuất tự quy ra địa chỉ trong file ra (VD "Q3049"). */
+  dongFile: number;
+  cot: number;
+  giaTri: number;
+  /** Công thức kế toán đã cộng phí / đã trừ chiết khấu chưa — suy từ giá trị ô. */
+  congPhi: boolean;
+  truCk: boolean;
+  /** −1 nếu ô tính ngược chiều: (chưa thuế + thuế) − tổng. */
+  dau: 1 | -1;
 }
 
 export interface SheetHoaDon {
@@ -648,7 +688,9 @@ function goCotDoiSoatCu(
   for (let i = 0; i < Math.min(rows.length, 15); i++) {
     const h = rows[i] ?? [];
     const coNhanA = ["ket qua", "kiem cong"].includes(chuan(h[0]));
-    if ((coNhanA || h.some((c) => chuan(c) === "ket qua")) && h.filter((c) => laCotThem(c)).length >= 3) {
+    // v6.5: file chỉ có bảng kê xuất KHÔNG chèn cột A — nhận ra bằng đủ 3 cột kiểm.
+    const coDuCotKiem = HEADER_KIEM.every((k) => h.some((c) => chuan(c) === chuan(k)));
+    if ((coNhanA || coDuCotKiem || h.some((c) => chuan(c) === "ket qua")) && h.filter((c) => laCotThem(c)).length >= 3) {
       hIdx = i;
       break;
     }
@@ -1020,6 +1062,7 @@ function parseSheetHoaDon(
     boc: { phi: 0, chietKhau: 0, lamTron: 0, lechThat: 0 },
     soDong: { phi: 0, chietKhau: 0, lamTron: 0, lechThat: 0 },
     dongLechThat: [],
+    cotPhi: cCot.phi, cotCk: cCot.ck, dongLech: [], oTuDat: null,
   };
   for (let i = dataStart; i < rows.length; i++) {
     const row = rows[i] ?? [];
@@ -1063,6 +1106,10 @@ function parseSheetHoaDon(
         // thứ tự xét: làm tròn → phí → chiết khấu → lệch thật (phí/chiết khấu là
         // thành phần HỢP LỆ của tổng, không phải sai sót)
         const vao = (k: keyof CanDoiCot["boc"]) => { cd.boc[k] += d; cd.soDong[k]++; };
+        cd.dongLech.push({
+          dongFile: dongExcel(g, soDong), ma: `${kyHieu}-${soHoaDon}`, ngay: ngayHienThi(row[cNgay]),
+          ban: cellStr(row, cTenBan), chua: a, thue: b, phi, ck, tong: tg, lech: d, loai: lechCongDong.loai,
+        });
         if (Math.abs(d) <= TOL_LAM_TRON) vao("lamTron");
         else if (phi && Math.abs(d - phi) <= TOL_LAM_TRON) vao("phi");
         else if (ck && Math.abs(d + ck) <= TOL_LAM_TRON) vao("chietKhau");
@@ -1103,7 +1150,54 @@ function parseSheetHoaDon(
   }
   cd.lech = cd.sumTong - (cd.sumChua + cd.sumThue);
   cd.dongLechThat.sort((x, y) => Math.abs(y.lech) - Math.abs(x.lech));
+  cd.oTuDat = timOTuDat(rows, dataStart, cd, g, (r) => !String(r[cSo] ?? "").trim() && !String(r[cKyHieu] ?? "").trim());
   return { sheet: { ten, header, preRows, dong, goc: g, hIdx, rong, canDoiCot: cd }, loiParse };
+}
+
+/**
+ * Tìm ô LỆCH kế toán tự đặt dưới bảng kê. Họ hay gõ: dòng SUM từng cột, một ô
+ * "chưa thuế + thuế (+ phí)", rồi một ô lấy tổng trừ đi — con số họ đang nhìn và
+ * hỏi "lệch ở đâu". Nhận ra ô đó để trả lời đúng CON SỐ CỦA HỌ, không bắt họ đổi
+ * công thức. Chỉ xét hàng không phải dòng hóa đơn; lấy ô khớp ở hàng thấp nhất.
+ */
+function timOTuDat(
+  rows: unknown[][],
+  dataStart: number,
+  cd: CanDoiCot,
+  g: ToaDoGoc,
+  laHangNgoai: (r: unknown[]) => boolean
+): OTuDat | null {
+  const cach: Omit<OTuDat, "dongFile" | "cot" | "giaTri" | "dau">[] = [
+    { congPhi: false, truCk: false },
+    { congPhi: true, truCk: false },
+    { congPhi: true, truCk: true },
+    { congPhi: false, truCk: true },
+  ];
+  const mong = (c: (typeof cach)[number]) => cd.lech - (c.congPhi ? cd.sumPhi : 0) + (c.truCk ? cd.sumCk : 0);
+  // Ô bằng đúng TỔNG MỘT CỘT là ô SUM của cột đó, không phải ô lệch (VD bảng kê khớp
+  // tuyệt đối, lệch 0 ⇒ "lệch + Σ chiết khấu" trùng ngay ô SUM cột chiết khấu).
+  const laTongCot = (x: number) =>
+    [cd.sumChua, cd.sumThue, cd.sumTong, cd.sumPhi, cd.sumCk].some((t) => t && Math.abs(Math.abs(x) - Math.abs(t)) <= 0.5);
+  let ra: OTuDat | null = null;
+  for (let i = dataStart; i < rows.length; i++) {
+    const r = rows[i] ?? [];
+    if (!laHangNgoai(r) && !laDongTong(r)) continue;
+    r.forEach((v, c) => {
+      const x = typeof v === "number" ? v : null;
+      if (x == null || Math.abs(x) <= 1 || laTongCot(x)) return;
+      for (const k of cach) {
+        // phí/chiết khấu bằng 0 thì các cách trùng nhau — lấy cách đơn giản nhất
+        if ((k.congPhi && !cd.sumPhi) || (k.truCk && !cd.sumCk)) continue;
+        const m = mong(k);
+        const dau = Math.abs(x - m) <= 0.5 ? 1 : Math.abs(x + m) <= 0.5 ? -1 : 0;
+        if (dau) {
+          ra = { ...k, dau, giaTri: x, dongFile: dongExcel(g, i + 1), cot: c };
+          break;
+        }
+      }
+    });
+  }
+  return ra;
 }
 
 // ---------- Parse sheet PHẦN MỀM ----------

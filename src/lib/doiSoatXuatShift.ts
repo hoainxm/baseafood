@@ -184,7 +184,9 @@ export function chenCotDau(ws: Worksheet, dich: number, sheetDaDich: ReadonlySet
     }
   }
 
-  ws.spliceColumns(1, 0, ...Array.from({ length: dich }, () => []));
+  // dich < 0: GỠ bớt cột đầu (file xuất từ bản cũ còn cột "KIỂM CỘNG" ở A — v6.5)
+  if (dich >= 0) ws.spliceColumns(1, 0, ...Array.from({ length: dich }, () => []));
+  else ws.spliceColumns(1, -dich);
 
   ws.eachRow({ includeEmpty: false }, (row) =>
     row.eachCell({ includeEmpty: false }, (cell) => {
@@ -196,6 +198,8 @@ export function chenCotDau(ws: Worksheet, dich: number, sheetDaDich: ReadonlySet
 
   for (const g of gop) {
     if (!g) continue;
+    // vùng gộp nằm (một phần) trong cột vừa gỡ thì bỏ, đừng dựng ra địa chỉ cột âm
+    if (dich < 0 && /(^|:)\$?A\d/.test(g)) continue;
     try {
       ws.mergeCells(dichVung(g, dich));
     } catch {

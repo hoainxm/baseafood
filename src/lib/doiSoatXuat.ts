@@ -85,17 +85,25 @@ function ghiKhoiDoiSoat(
   rong: number,
   chuThich: string,
   headerThem: readonly string[],
-  dong: readonly { dongFile: number; ketLuan: string; nen: string; them: readonly unknown[] }[],
+  dong: readonly { dongFile: number; ketLuan: string; nen: string | null; them: readonly unknown[] }[],
   cotSua: readonly { dongFile: number; cot: number; giaTri: number }[],
   /** Tiêu đề cột A. */
-  nhanCotA = "KẾT QUẢ"
+  nhanCotA = "KẾT QUẢ",
+  /**
+   * false = KHÔNG có cột A chèn thêm (file chỉ có bảng kê — v6.5): địa chỉ mọi ô giữ
+   * nguyên như file của kế toán, chỉ nối khối kiểm ở cuối.
+   */
+  coCotA = true,
+  /** Cột AOA → cột trong file ra lệch bao nhiêu (tính cả cột A cũ/mới) — để ghi ô Sửa đúng chỗ. */
+  dichCot: number = DICH_COT_XUAT
 ): void {
-  const D = DICH_COT_XUAT;
+  const D = coCotA ? DICH_COT_XUAT : 0;
   // Dữ liệu gốc đã dời sang phải D cột ⇒ khối thêm bắt đầu sau nó, chừa 1 cột trống.
   const cot1 = goc.c0 + rong + D + COT_NGAN + 1; // 1-based
   const cotCuoi = cot1 + headerThem.length - 1;
   const hangTieuDe = goc.r0 + hIdx + 1;
   const COT_KQ = 1; // cột "KẾT QUẢ" vừa chèn vào đầu sheet
+  const cotDauTo = coCotA ? COT_KQ : goc.c0 + 1; // tô nền từ cột này
 
   // --- tiêu đề: lấy dáng từ chính tiêu đề gốc để nhìn liền mạch ---
   const mau = ws.getCell(hangTieuDe, goc.c0 + D + 1);
@@ -106,8 +114,10 @@ function ghiKhoiDoiSoat(
     o.alignment = { ...(mau.alignment ?? {}), vertical: "middle", wrapText: true };
     o.fill = to(NEN.tieuDe);
   };
-  dungTieuDe(ws.getCell(hangTieuDe, COT_KQ), nhanCotA);
-  ws.getColumn(COT_KQ).width = 24;
+  if (coCotA) {
+    dungTieuDe(ws.getCell(hangTieuDe, COT_KQ), nhanCotA);
+    ws.getColumn(COT_KQ).width = 24;
+  }
   headerThem.forEach((ten, i) => {
     dungTieuDe(ws.getCell(hangTieuDe, cot1 + i), ten);
     const c = ws.getColumn(cot1 + i);
@@ -116,7 +126,7 @@ function ghiKhoiDoiSoat(
 
   // --- chú thích màu: ô A ngay trên hàng tiêu đề (đúng chỗ file mẫu đặt) ---
   if (hangTieuDe > 1) {
-    const oCt = ws.getCell(hangTieuDe - 1, COT_KQ);
+    const oCt = ws.getCell(hangTieuDe - 1, coCotA ? COT_KQ : cot1);
     if (oCt.value == null || oCt.value === "") {
       oCt.value = chuThich;
       oCt.font = { italic: true, size: 10 };
@@ -125,7 +135,7 @@ function ghiKhoiDoiSoat(
 
   // --- từng dòng: nhãn ở cột A + giá trị khối thêm + tô nền cả dòng ---
   for (const d of dong) {
-    ws.getCell(d.dongFile, COT_KQ).value = d.ketLuan;
+    if (coCotA) ws.getCell(d.dongFile, COT_KQ).value = d.ketLuan;
     d.them.forEach((v, i) => {
       const o = ws.getCell(d.dongFile, cot1 + i);
       // Công thức sống trỏ thẳng ô gốc: bấm vào là thấy số được TÍNH ra, không phải
@@ -133,13 +143,16 @@ function ghiKhoiDoiSoat(
       if (laCongThuc(v)) o.value = { formula: v.ct.replaceAll("{r}", String(d.dongFile)) };
       else o.value = oXuat(v);
     });
-    const nen = to(d.nen);
-    for (let c = COT_KQ; c <= cotCuoi; c++) ws.getCell(d.dongFile, c).fill = nen;
+    // nen null = dòng không có gì đáng nói ⇒ để nguyên màu gốc, mắt chỉ dừng ở dòng có vấn đề
+    if (d.nen) {
+      const nen = to(d.nen);
+      for (let c = cotDauTo; c <= cotCuoi; c++) ws.getCell(d.dongFile, c).fill = nen;
+    }
   }
 
   // --- ô người dùng đã bấm Sửa: ghi đè giá trị + đánh dấu vàng để soát lại ---
   for (const e of cotSua) {
-    const o = ws.getCell(e.dongFile, cotExcel(goc, e.cot) + D + 1);
+    const o = ws.getCell(e.dongFile, cotExcel(goc, e.cot) + dichCot + 1);
     o.value = e.giaTri;
     o.fill = to(NEN.sua);
   }
@@ -149,7 +162,7 @@ function ghiKhoiDoiSoat(
   const batDau =
     typeof loc === "object" && loc?.from?.row != null && loc.from.column != null
       ? { row: loc.from.row, column: loc.from.column }
-      : { row: hangTieuDe, column: COT_KQ };
+      : { row: hangTieuDe, column: cotDauTo };
   ws.autoFilter = { from: batDau, to: { row: hangTieuDe, column: cotCuoi } };
 }
 
@@ -192,12 +205,12 @@ const chuCot = (c0: number): string => {
  * trỏ vào chính ô gốc (đã dời sang phải `DICH_COT_XUAT` cột). Kế toán dò TRỰC TIẾP
  * trên sheet, không phải lật qua sheet tổng hợp.
  */
-function oKiemCong(sh: SheetHoaDon, d: DongHoaDon): unknown[] {
+function oKiemCong(sh: SheetHoaDon, d: DongHoaDon, dich: number): unknown[] {
   const cd = sh.canDoiCot;
   if (cd.cotChua < 0 || cd.cotTong < 0) return ["", "", ""];
-  const A = chuCot(cotExcel(sh.goc, cd.cotChua) + DICH_COT_XUAT);
-  const T = chuCot(cotExcel(sh.goc, cd.cotTong) + DICH_COT_XUAT);
-  const cong = cd.cotThue >= 0 ? `${A}{r}+${chuCot(cotExcel(sh.goc, cd.cotThue) + DICH_COT_XUAT)}{r}` : `${A}{r}`;
+  const A = chuCot(cotExcel(sh.goc, cd.cotChua) + dich);
+  const T = chuCot(cotExcel(sh.goc, cd.cotTong) + dich);
+  const cong = cd.cotThue >= 0 ? `${A}{r}+${chuCot(cotExcel(sh.goc, cd.cotThue) + dich)}{r}` : `${A}{r}`;
   // exceljs tự thêm dấu "=" — đừng viết sẵn, không là ra "==N3+O3".
   return [
     { ct: cong },
@@ -206,9 +219,12 @@ function oKiemCong(sh: SheetHoaDon, d: DongHoaDon): unknown[] {
   ];
 }
 
-/** Màu dòng khi file CHỈ có bảng kê (không có sổ): tô theo kết quả kiểm cộng. */
+/**
+ * Màu dòng khi file CHỈ có bảng kê: CHỈ tô dòng có lệch (đỏ = sai thật, vàng = phí /
+ * chiết khấu / làm tròn). Dòng khớp để nguyên — tô xanh 3.000 dòng thì mắt không biết dừng đâu.
+ */
 const nenKiem = (d: DongHoaDon) =>
-  !d.lechCong ? NEN.xanh : d.lechCong.loai === "that" ? NEN.do : NEN.vang;
+  !d.lechCong ? null : d.lechCong.loai === "that" ? NEN.do : NEN.vang;
 
 /** Các ô người dùng bấm Sửa, gom theo sheet (key `edits` = `sheet#soDong#cot`). */
 function suaTheoSheet(
@@ -279,8 +295,13 @@ export async function xuatExcelGiuDinhDang(
   // Trường hợp đó chỉ ghi đè cột A, KHÔNG chèn thêm — nếu không mỗi lần xuất lại
   // đẻ thêm một cột "KẾT QUẢ" nữa.
   const daCoCotKq = (sh: SheetHoaDon | SheetPhanMem) => cotExcel(sh.goc, 0) - sh.goc.c0 >= DICH_COT_XUAT;
-  const canChen = dsSheet.filter((sh) => !daCoCotKq(sh));
+  // File CHỈ có bảng kê (không sổ) thì KHÔNG chèn cột A (v6.5): kế toán dò theo địa
+  // chỉ ô của chính họ (VD Q3049) — dời sang R3049 là họ lạc. File xuất từ bản cũ
+  // đã có cột A thì GỠ nó ra để địa chỉ trở về như file gốc.
+  const khongCotA = !kq.sheetPhanMem;
+  const canChen = khongCotA ? [] : dsSheet.filter((sh) => !daCoCotKq(sh));
   const tenChen = new Set(canChen.map((sh) => sh.ten));
+  const tenBo = new Set(khongCotA ? dsSheet.filter(daCoCotKq).map((sh) => sh.ten) : []);
 
   for (const sh of dsSheet) {
     const ws = timSheet(sh.ten)!;
@@ -291,6 +312,13 @@ export async function xuatExcelGiuDinhDang(
   for (const ws of wb.worksheets)
     if (tenChen.has(ws.name)) chenCotDau(ws, DICH_COT_XUAT, tenChen);
     else if (tenChen.size) dichThamChieuCheoSheet(ws, DICH_COT_XUAT, tenChen);
+  for (const ws of wb.worksheets)
+    if (tenBo.has(ws.name)) chenCotDau(ws, -DICH_COT_XUAT, tenBo);
+    else if (tenBo.size) dichThamChieuCheoSheet(ws, -DICH_COT_XUAT, tenBo);
+  /** Cột (0-based) trong FILE RA của cột AOA `c` — cho công thức kiểm + địa chỉ ở sheet kết luận. */
+  const dichRa = (sh: SheetHoaDon | SheetPhanMem) =>
+    khongCotA ? (daCoCotKq(sh) ? -DICH_COT_XUAT : 0) : daCoCotKq(sh) ? 0 : DICH_COT_XUAT;
+  const cotRa = (sh: SheetHoaDon, c: number) => cotExcel(sh.goc, c) + dichRa(sh);
 
   // --- B2. Ghi khối đối soát ---
   const tenSo = kq.sheetPhanMem?.ten ?? "PMKT";
@@ -305,7 +333,7 @@ export async function xuatExcelGiuDinhDang(
   const ghiHd = (sh: SheetHoaDon) => {
     const ws = timSheet(sh.ten)!;
     const chuThich = kiemBangKe
-      ? `CHÚ THÍCH: dòng ĐỎ = chưa thuế + thuế KHÔNG bằng tổng thanh toán, phải soát | dòng VÀNG = lệch do phí / chiết khấu / làm tròn, bình thường | dòng XANH = khớp. Ba cột kiểm ở cuối là CÔNG THỨC trỏ thẳng ô gốc — số liệu của thuế giữ nguyên, không sửa ô nào.`
+      ? `Dòng ĐỎ = chưa thuế + thuế KHÁC tổng thanh toán, phải soát · dòng VÀNG = lệch do phí / chiết khấu / làm tròn, bình thường · dòng không tô = khớp. 3 cột này là công thức tính từ ô gốc, không ô gốc nào bị sửa.`
       : sh.laPhu
         ? `${CHU_THICH} — (SHEET TRÙNG LẶP / TẬP CON: KHÔNG cộng vào tổng)`
         : CHU_THICH;
@@ -315,10 +343,14 @@ export async function xuatExcelGiuDinhDang(
         dongFile: d.dongFile,
         ketLuan: kiemBangKe ? (d.lechCong ? NHAN_LECH_CONG[d.lechCong.loai] : "khớp") : d.ketLuan,
         nen: kiemBangKe ? nenKiem(d) : nenHd(d),
-        them: kiemBangKe ? oKiemCong(sh, d) : [...themHd(d), ...oKiemCong(sh, d)],
+        them: kiemBangKe
+          ? oKiemCong(sh, d, dichRa(sh))
+          : [...themHd(d), ...oKiemCong(sh, d, dichRa(sh))],
       })),
       suaTheoSheet(edits, new Map(sh.dong.map((d) => [d.soDong, d.dongFile])), sh.ten),
-      kiemBangKe ? "KIỂM CỘNG" : "KẾT QUẢ"
+      kiemBangKe ? "KIỂM CỘNG" : "KẾT QUẢ",
+      !khongCotA,
+      dichRa(sh)
     );
   };
 
@@ -334,7 +366,10 @@ export async function xuatExcelGiuDinhDang(
         nen: d.trangThai === "CO" ? NEN.xanh : NEN.do,
         them: themPm(d),
       })),
-      suaTheoSheet(edits, new Map(sh.dong.map((d) => [d.soDong, d.dongFile])), sh.ten)
+      suaTheoSheet(edits, new Map(sh.dong.map((d) => [d.soDong, d.dongFile])), sh.ten),
+      "KẾT QUẢ",
+      true,
+      dichRa(sh)
     );
   };
 
@@ -356,7 +391,7 @@ export async function xuatExcelGiuDinhDang(
     nk.columns.forEach((c, i) => (c.width = i === 0 ? 54 : 22));
     (nk as unknown as { orderNo: number }).orderNo = 99;
   }
-  themSheetTongHop(wb, kq);
+  themSheetTongHop(wb, kq, (sh, c) => cotRa(sh, c));
 
   // Công thức trong file đã bị dịch cột ⇒ ép Excel tính lại lúc mở, đừng tin
   // giá trị cache của lần lưu trước.

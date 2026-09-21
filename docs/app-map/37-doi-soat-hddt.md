@@ -2,6 +2,8 @@
 covers: src/features/doi-soat/DoiSoatScreen.tsx, src/features/doi-soat/index.ts, src/lib/doiSoatHddt.ts, src/lib/doiSoatHaiBan.ts, src/lib/doiSoatXuat.ts, src/lib/doiSoatXuatShift.ts, src/lib/doiSoatXuatTongHop.ts
 last_verified: 2026-09-21
 ttl_days: 90
+<!-- updated: 2026-09-21 — v6.5 DỄ HIỂU CHO KẾ TOÁN (chủ dự án review file v6.4: "xem không hiểu, không biết chỗ nào lệch, ô hay dòng nào"). (1) File KHÔNG có sổ ⇒ KHÔNG chèn cột A: mọi ô giữ đúng địa chỉ của kế toán (Q3049 vẫn là Q3049); khối 3 cột kiểm nối cuối; CHỈ tô dòng có lệch (đỏ sai thật / vàng phí·chiết khấu·làm tròn), dòng khớp để nguyên. File xuất từ bản cũ có cột A "KIỂM CỘNG" thì GỠ ra (`chenCotDau` nhận dịch âm). (2) Engine nhận ra Ô LỆCH KẾ TOÁN TỰ ĐẶT cuối sheet (`CanDoiCot.oTuDat`, `timOTuDat`: so giá trị ô với cộng trần / đã cộng phí / đã trừ chiết khấu; loại ô trùng tổng một cột). (3) `CanDoiCot.dongLech` = mọi dòng lệch kèm số thô từng ô. (4) KẾT LUẬN CHUNG viết lại: câu trả lời nói bằng ô của kế toán ("Ô Q3049 = 9.268.400 đ: do 1 hóa đơn ghi sai tiền ở dòng 1685…"), khối DÒ LỆCH mỗi sheet gồm bảng các phần CỘNG LẠI ĐÚNG BẰNG ô đó, bảng DÒNG PHẢI SỬA ghi rõ ô nào + số đúng theo hai giả thiết, bảng DÒNG LỆCH BÌNH THƯỜNG để cộng lại cho đủ; mọi dòng là link tới đúng ô. 8 cột, ô gộp tự đặt chiều cao. Bỏ bảng xoay CỘNG CỘT. (5) `ghiKhoiDoiSoat` nhận `dichCot` thật — sửa lỗi cũ ô "Sửa" ghi lệch 1 cột khi xuất lại file đã xuất. -->
+<!-- re-verified: 2026-09-21 — "(1).xls": Q3049 = Q3046−Q3048 = 9.268.400 giữ nguyên địa chỉ; KẾT LUẬN bóc 9.360.068 (dòng 1685) − 91.666 (dòng 2153) − 2 (26 dòng) = 9.268.400 khớp; dòng 1685 ghi "ô chưa thuế M1685 phải là 12.540.868"; MTT "Khớp" (trước nhận nhầm ô SUM P511). Hồi quy 5 file × 3 vòng: tổng + 9/9 + cân đối cột trùng bản gốc (HDONDT nay 3 vòng đều 370 nghi vấn — bản cũ trôi 370→369 khi xuất lại); số sheet/cột đứng yên; file có sổ sheet gốc y hệt bản trước từng ô; file không sổ ô gốc vào↔ra 0 lệch ở ĐÚNG địa chỉ cũ. Xuất lại file v6.4 (có cột A) ⇒ cột A được gỡ, Q3049 trở về. -->
 <!-- updated: 2026-09-21 — v6.4 BỚT SHEET, MỘT CHỖ TRẢ LỜI (chủ dự án: "tạo quá nhiều sheet nhưng không xác định được trọng tâm"). (1) Sheet `KẾT LUẬN CHUNG` luôn đứng đầu, gộp 3 sheet cũ `ĐỐI CHIẾU TỔNG` + `TỰ KIỂM TRA` + `NGHI VẤN SỐ LIỆU` thành khối: bảng TRẢ LỜI (việc đã kiểm · kết luận · XEM Ở ĐÂU là link `HYPERLINK("#'Sheet'!A1")` · phải làm gì) → SỐ LIỆU ĐỐI CHIẾU VỚI SỔ (chỉ khi có sổ) → CỘNG CỘT (bảng xoay, mỗi sheet một cột) → CHỖ CẦN SOÁT LẠI (chỉ khi có) → TỰ KIỂM TRA cuối. (2) Sheet danh sách CHỈ dựng khi có dữ liệu: `HÓA ĐƠN CHƯA KÊ` (có sổ + có dòng thiếu một trong hai chiều) · `SO HAI BẢN HĐĐT` · `CÙNG MST CÙNG NGÀY` (xếp SAU sheet gốc — tham khảo, không phải kết quả). (3) Danh sách từng hóa đơn lệch cộng KHÔNG chép ra nữa — chỉ đường lọc cột "Nguyên nhân lệch"/cột A ngay trên sheet gốc (v6.3). (4) Câu trả lời cộng cột bóc từng sheet ra CẢ HAI con số kế toán có thể đang nhìn ở dòng tổng tự đặt (cộng trần / đã cộng phí). (5) `SHEET_TU_DUNG` (doiSoatHddt.ts) = tên sheet tự dựng mới + cũ: engine BỎ QUA khi đọc lại file đã xuất, lớp xuất XÓA rồi dựng lại ⇒ idempotent. (6) `gomCungMstCungNgay` không đếm một hóa đơn hai lần khi file có hai bản (cùng khóa, khác bên). (7) Cảnh báo lặp ý với bảng trả lời bị lọc: "không cần vào sổ" (đã ở dòng chưa kê), "thiếu sổ" khi không sổ, "trùng khóa" chỉ vì mỗi bản có một lần. -->
 <!-- re-verified: 2026-09-21 — hồi quy 5 file thật × 3 vòng xuất lại: tổng đối soát + tự kiểm 9/9 + cân đối cột TRÙNG KHÍT bản v6.3 (15/15 JSON); số sheet/cột đứng yên qua 3 vòng; sheet gốc so với bản v6.3 từng ô (cả công thức) 0 lệch (T6 34.926 · T8 38.736 · HDONDT 133.461 · đang làm 195.009 · (1) 73.373 ô); ô gốc vào↔ra 0 lệch trừ "đang làm.xls" 6.675 ô (ngày thêm <1 phút + chuỗi rỗng thành trống — có sẵn từ bước đổi .xls, bản v6.3 y vậy). File "(1).xls": ô R3049 (Q3049 gốc) vẫn = 9.268.400; bảng trả lời nói đúng 9.268.400 = lệch thật 9.360.068 (HDDT dòng 1685) + chiết khấu −91.666 + làm tròn −2. Sheet tổng hợp: T6 5→3 · T8 5→3 · HDONDT 5→3 · đang làm 5→3 · (1) 4→2. -->
 <!-- updated: 2026-09-21 — v6.3 DÒ NGAY TRONG SHEET, KHÔNG ĐỔI SỐ LIỆU (yêu cầu kế toán). (1) `DongHoaDon.lechCong` = kết quả kiểm "chưa thuế + thuế = tổng thanh toán" của CHÍNH dòng đó (null = khớp) + `CanDoiCot.cotChua/cotThue/cotTong` để dựng công thức. (2) File xuất thêm 3 cột `HEADER_KIEM` ("Chưa thuế + Thuế" · "Lệch với tổng thanh toán" · "Nguyên nhân lệch") NGAY TRONG sheet bảng kê, hai cột đầu là CÔNG THỨC SỐNG trỏ thẳng ô gốc (`N{r}+O{r}`, `R{r}-(N{r}+O{r})`) — bấm vào ô là thấy số được TÍNH ra, bằng chứng không sửa số của thuế. `ghiKhoiDoiSoat` nhận ô kiểu `{ct}` để ghi công thức (exceljs tự thêm dấu "=", đừng viết sẵn). (3) CHẾ ĐỘ KIỂM BẢNG KÊ khi file KHÔNG có sheet sổ: cột A đổi nhãn "KIỂM CỘNG" và mang kết quả kiểm cộng, màu dòng theo kiểm cộng (đỏ = lệch thật, vàng = phí/chiết khấu/làm tròn, xanh = khớp), khối thêm CHỈ 3 cột kiểm — thay vì 17 cột đối soát-với-sổ rỗng không. (4) File CÓ sổ: 3 cột kiểm nối ở CUỐI khối, giữ nguyên 38 cột đầu theo bố cục file mẫu kế toán. (5) `THEM_NORM` + nhận diện hàng tiêu đề nhận thêm `HEADER_KIEM` và nhãn cột A "KIỂM CỘNG" để xuất lại KHÔNG đẻ cột. -->
@@ -56,6 +58,46 @@ Công cụ **kế toán** (không phải nghiệp vụ MES). Đối chiếu hóa
 | PM → HĐĐT | `THIEU` | không thấy hóa đơn điện tử | đỏ |
 
 Màu chip lấy **token** `--status-*` (không viết mã màu tay); màu nền Excel là mã màu chuẩn Excel (file ngoài, độc lập token app). Mỗi dòng có cột **"Bằng chứng đối chiếu"** dạng văn xuôi (khớp phiếu nào, ngày, CTGS, TK, số tiền).
+
+## v6.5 — dễ hiểu: nói bằng ô của kế toán, không dời ô
+
+Chủ dự án xem file v6.4: *"xem không hiểu, không biết chỗ nào lệch, ô hay dòng nào"*. Ba nguyên nhân:
+
+1. **Chèn cột A làm dời địa chỉ.** Kế toán hỏi về ô Q3049 của họ, file ra thành R3049 — lạc ngay từ đầu.
+2. **Câu chữ kiểu kỹ thuật** (Σ, "lệch thật", "bóc") và trộn việc họ không hỏi.
+3. **Không có danh sách "dòng nào góp bao nhiêu"** để tự cộng lại ra đúng con số của họ.
+
+### File không có sổ: KHÔNG chèn cột
+
+| | có sổ | không có sổ (từ v6.5) |
+|---|---|---|
+| cột A | chèn `KẾT QUẢ` (bố cục file mẫu v5.1 — giữ nguyên) | **không chèn** — mọi ô ở đúng địa chỉ cũ |
+| khối thêm ở cuối | 17 cột đối soát + 3 cột kiểm | 3 cột kiểm |
+| tô màu | mọi dòng theo đối soát | **chỉ dòng có lệch**: đỏ = sai thật, vàng = phí/chiết khấu/làm tròn |
+
+File đã xuất bằng bản ≤ v6.4 (còn cột A "KIỂM CỘNG") đưa vào lại thì cột A bị **gỡ** (`chenCotDau` với dịch âm, dịch ngược công thức) ⇒ địa chỉ trở về như file gốc. Nhận ra file xuất kiểu mới để gỡ khối cũ: hàng tiêu đề có đủ 3 cột `HEADER_KIEM` (`goCotDoiSoatCu`).
+
+Địa chỉ trong sheet kết luận quy về FILE RA qua `cotRa(sh, c)` (lớp xuất truyền vào `themSheetTongHop`) — đừng tự cộng `DICH_COT_XUAT`.
+
+### Máy nhận ra ô lệch kế toán tự đặt (`oTuDat`)
+
+Kế toán hay gõ dưới bảng: SUM từng cột, một ô "chưa thuế + thuế (+ phí)", rồi ô lấy tổng trừ đi. `timOTuDat` xét các hàng không phải hóa đơn, tìm ô có giá trị bằng một trong bốn cách tính: cộng trần · đã cộng phí · đã cộng phí và trừ chiết khấu · chỉ trừ chiết khấu (±0,5 đ, chấp nhận cả ngược dấu). Lấy ô ở hàng thấp nhất.
+
+⚠️ Loại ô có giá trị bằng **tổng một cột**. Sheet khớp tuyệt đối thì "lệch + Σ chiết khấu" chính là ô SUM của cột chiết khấu — MTT từng bị nhận nhầm P511 như thế.
+
+### Bố cục sheet KẾT LUẬN CHUNG (8 cột)
+
+1. Tiêu đề theo chế độ ("KẾT QUẢ DÒ: CHƯA THUẾ + THUẾ CÓ BẰNG TỔNG THANH TOÁN KHÔNG") + 2 câu: ô có dời không, không ô nào bị sửa, chữ xanh bấm được.
+2. **TRẢ LỜI** — mỗi sheet một dòng, nói bằng ô của họ: *"Ô Q3049 = 9.268.400 đ: do 1 hóa đơn ghi sai tiền ở dòng 1685 (9.360.068 đ), trừ chiết khấu 91.666 đ, trừ làm tròn 2 đ."* Rồi các kiểm tra khác (cùng MST, nghi vấn, tự kiểm).
+3. **SHEET X — ô Q3049 = …** (chỉ sheet có lệch):
+   - câu giải thích ô đó tính thế nào (cột nào trừ cột nào);
+   - bảng **các phần lệch cộng lại đúng bằng ô** — dòng CỘNG ghi "= đúng ô Q3049 ✓";
+   - **DÒNG PHẢI SỬA**: địa chỉ từng ô, và số đúng theo HAI giả thiết (tổng đúng ⇒ ô chưa thuế phải là…; chưa thuế đúng ⇒ ô tổng phải là…). Máy không đoán ô nào sai, người mở hóa đơn gốc quyết;
+   - **DÒNG LỆCH BÌNH THƯỜNG**: phí/chiết khấu/làm tròn, từng dòng, để cộng lại cho đủ.
+4. (có sổ) SỐ LIỆU ĐỐI CHIẾU VỚI SỔ, rồi mới tới khối dò lệch.
+5. CHỖ CẦN SOÁT LẠI → MÁY TỰ KIỂM TRA (cuối).
+
+Bảng xoay "CỘNG CỘT" (Σ chưa thuế / Σ thuế / …) **bỏ** — khối dò lệch nói cùng điều bằng lời thường.
 
 ## v6.4 — một sheet KẾT LUẬN CHUNG, bớt sheet
 

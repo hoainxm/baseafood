@@ -24,8 +24,8 @@
 
 ## 4. Backlog phát triển (ưu tiên gợi ý)
 1. **Ẩn/gắn nhãn màn DEMO** trước khi chạy thật: `/dashboard`, `/production` (WorkOrderScreen mock), `/quality`, `/reports` (mock), `/traceability` (mock); `/cold-storage` nay đã tồn thật một phần.
-2. **Server-side RLS theo vai trò** (hiện phân quyền chỉ ở app-level `nav-access.ts`; DB chưa ràng theo vai trò/`site_id`).
-3. **Audit Phase 2:** trigger DB trên bảng nhạy (cân đối, chốt sổ) làm backstop chống sửa vết bằng SQL.
+2. **Server-side RLS theo vai trò** — ⏸️ **HOÃN theo quyết định chủ dự án 2026-09-21** ("sẽ cấu hình khi cần thiết"; chỉ BSF1 nên không ràng `site_id`). Phân quyền vai trò giữ ở app-level `nav-access.ts`. Việc bắt buộc còn lại chỉ là chạy `0021` + `0047` (mọi người đã đăng nhập ≠ người ngoài).
+3. **Audit Phase 2:** ✅ **đã viết `0048_ghi_vet_sua_truc_tiep_sql.sql`** — trigger CHỈ GHI VẾT (không chặn, vì "vẫn có trường hợp mở ra sửa theo yêu cầu") mọi sửa/xóa đi thẳng SQL Editor vào `audit_log` (`device_id='sql-editor'`). Chạy tay sau `0025`.
 4. **Chốt ngày bán + phiếu bán in A4** (đối xứng chốt ngày nhập/SX).
 5. **Chuẩn hoá quy cách × chế biến (Chiều C)** — xem `docs/spec/bo-quy-cach-che-bien-thanh-pham.md`.
 6. **Cutover 01/09:** import baseline tồn 30/06 + nhập bù báo cáo T7–T8 → tồn đầu 01/09; xem `docs/trien-khai/ke-hoach-cutover-1-9-2026.md`. Import Excel + scan viết tay (tay trước).

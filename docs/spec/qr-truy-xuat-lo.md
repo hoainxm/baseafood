@@ -202,3 +202,7 @@ Quét hoặc gõ → một trang gồm:
 - GDST — [Standards 1.2 (PDF)](https://thegdst.org/wp-content/uploads/2024/01/GDST-1.2-Core-Normative-Standards-1.pdf) · [The Standard](https://thegdst.org/resources/standard/)
 - FDA FSMA 204 — [Final Rule](https://www.fda.gov/food/food-safety-modernization-act-fsma/fsma-final-rule-requirements-additional-traceability-records-certain-foods) · [lùi hạn tuân thủ (Federal Register, 08/2025)](https://www.federalregister.gov/documents/2025/08/07/2025-14967/requirements-for-additional-traceability-records-for-certain-foods-compliance-date-extension)
 - Việt Nam — [Thông tư 02/2024/TT-BKHCN](https://thuvienphapluat.vn/van-ban/Thuong-mai/Thong-tu-02-2024-TT-BKHCN-quan-ly-truy-xuat-nguon-goc-san-pham-hang-hoa-604359.aspx) · [TCVN 13274:2020](https://thuvienphapluat.vn/TCVN/Linh-vuc-khac/TCVN-13274-2020-Truy-xuat-nguon-goc-huong-dan-dinh-dang-ma-dung-cho-truy-vet-917656.aspx)
+
+---
+
+> **Ghi chú kỹ thuật 2026-09-21 (P2-8 audit):** `html5-qrcode` (quét camera, `features/shared/KhungQuetQr.tsx`) và `qrcode` (sinh ảnh tem, `lib/qr.ts`) nay **nạp động** lúc dùng, không còn nằm trong chunk chính — khung quét mount xong mới tải lib (vài trăm ms lần đầu). Hành vi quét/in không đổi. Đừng đổi lại import tĩnh: `features/shared` được mọi màn import nên sẽ kéo ~400 KB vào lần mở đầu.

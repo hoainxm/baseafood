@@ -3,7 +3,7 @@
 > **Load khi:** thiết kế/nối luồng nhập → sản xuất → kho → bán → cân đối; tách giao diện theo bộ phận; định nghĩa việc-hằng-ngày.
 > **Nguồn quyết định:** [`hop-2026-08-22-so-hoa-flow-2-bo-phan.md`](hop-2026-08-22-so-hoa-flow-2-bo-phan.md) (QĐ-1..6) · bổ sung [`hop-2026-09-02-form-nhap-trace-gia-qc.md`](hop-2026-09-02-form-nhap-trace-gia-qc.md) (form+OCR, ranh giới nhập→SX→kho QĐ-3, khung nhân sự QĐ-5).
 > **Đối chiếu code thật:** [`02-pages-navigation.md`](../app-map/02-pages-navigation.md) · [`34-btp-san-xuat-kho.ba-spec.md`](../app-map/34-btp-san-xuat-kho.ba-spec.md) · [`31-can-doi-ky.md`](../app-map/31-can-doi-ky.md).
-> **last_verified:** 2026-09-04
+> **last_verified:** 2026-09-21 *(audit PO: cập nhật trạng thái G1 — xem ghi chú ở §3; phần còn lại giữ nguyên)*
 
 File này mô tả **chuỗi giá trị end-to-end thật của xưởng**, chỉ đúng **chỗ đang đứt gãy**, và thiết kế **2 giao diện bộ phận** vận hành theo bước với **việc-hằng-ngày** rõ ràng. Danh sách hàm/màn cụ thể đọc thẳng ở app-map + source.
 
@@ -58,6 +58,8 @@ Phân loại: **THẬT** = nối kho dữ liệu, ghi/sửa/chốt thật · **D
 Đây là phần cốt lõi buổi họp. Bốn chỗ đứt, xếp theo mức chặn vòng lặp:
 
 ### G1 · Sản xuất KHÔNG nối ngược về nguyên liệu nhập 🔴 (đau nhất)
+
+> ✅ **Cập nhật 2026-09-21 (audit PO):** đoạn dưới mô tả hiện trạng lúc họp 22/08. Từ **2026-09-06** G1 đã **KHÉP VÒNG + HẾT CỘNG ĐÔI (hướng 1)**: chốt ngày SX ghi "còn dở" **tách theo loại NL** (`production_locks.leftover_by_material`, mig `0038`), sổ `/nxt-nl` lấy làm đông gửi chính (`dongGui = conDoSX>0 ? conDoSX : Chuyển-kỳ-âm`) ⇒ tồn cuối = tồn đầu + đông gửi − xả đông — xem CLAUDE.md § Trạng thái (G1) và [`36-so-kho-thang`](../app-map/36-so-kho-thang.md). **Còn hở:** SX vẫn chưa ghi lượng NL tiêu hao/yield theo *mẻ* (truy "mẻ nào ăn lô nào" mới ở QR đợt 1) — đó là phần P1-4 trong [`audit 2026-09-21`](../audit/2026-09-21-po-audit.md).
 `WipProductionItem` (kiểm chứng `src/types.ts:292`) có `productId`, **`spec` (quy cách)**, `quantityKg`, `blocksCount`, `warehouse`, `status` (`cho-nhap`/`da-nhap`) — nhưng **không** có tham chiếu lô nhập, **không** ghi lượng nguyên liệu tiêu hao, **không** có hiệu suất (yield). Màn `WipProductionScreen.tsx` chỉ dùng `useMaterialTypes` (chọn **loại** NL làm nhãn), **không** dùng `useMaterialImports` ⇒ không đọc lượng nhập thực trong ngày. Phép *"lượng nhập trong ngày → ra bao nhiêu thành phẩm, hao bao nhiêu"* hiện **chỉ tính gián tiếp ở màn Cân đối** theo kỳ 5 ngày (`Định mức = Tổng NL ÷ Tổng TP`, `yieldRate` ở `balancingCalc.ts`), **không** tính trực tiếp ở bước sản xuất.
 → Hệ quả: không truy được *mẻ nào ăn nguyên liệu nào*; daily-task "hôm nay nhập X kg, ra Y kg thành phẩm, còn Z kg dở" (QĐ-3) **chưa có chỗ ghi Z và chưa tự nhắc**.
 

@@ -24,6 +24,8 @@ do_nhac() { printf '\033[33m▲ %s\033[0m\n' "$1"; canh_bao=1; }
 MAU_JWT='eyJ[A-Za-z0-9_-]\{20,\}'
 MAU_URL='https://[a-z0-9]\{15,\}\.supabase''\.co'
 MAU_NUT_ICON='size="icon'
+# Policy RLS mở cho anon (giai đoạn chưa đăng nhập). Bảng mới KHÔNG được để lại.
+MAU_RLS_ANON='to anon, *authenticated'
 
 dong_them() { git diff --cached -U0 -- "$1" | grep '^+' | grep -v '^+++'; }
 
@@ -36,6 +38,7 @@ if [ "$1" = "--self-test" ]; then
   echo 'class="text-xs uppercase"' | grep -q 'text-xs\|uppercase' || { echo "self-test: mẫu cỡ chữ hỏng"; ok=1; }
   echo '<Button size="icon" onClick={x}>' | grep -q "$MAU_NUT_ICON" || { echo "self-test: mẫu nút icon hỏng"; ok=1; }
   echo '<Button size="icon" aria-label="Tháng trước">' | grep -q 'aria-label\|title=' || { echo "self-test: mẫu nhãn nút hỏng"; ok=1; }
+  echo '  for all to anon, authenticated' | grep -qE "$MAU_RLS_ANON" || { echo "self-test: mẫu RLS anon hỏng"; ok=1; }
   [ -f docs/app-map/README.md ] || { echo "self-test: thiếu docs/app-map/README.md"; ok=1; }
   [ "$ok" = 0 ] && echo "self-test: OK"
   exit "$ok"
@@ -110,6 +113,20 @@ for doc in docs/app-map/*.md; do
       esac
     done
   done
+done
+
+# ---------- 4. Migration mở RLS cho anon (CẢNH BÁO) ----------
+# Bảng mới để lại policy `for all to anon, authenticated using(true)` = lỗ hổng:
+# anon key nằm trong bundle, ai cũng đọc/ghi được. Nhắc đưa vào diện siết RLS
+# (0021 + 0047). Không CHẶN vì migration siết/rollback nhắc lại mẫu này có chủ đích.
+for f in $staged; do
+  case "$f" in supabase/migrations/*.sql) ;; *) continue ;; esac
+  case "$f" in */0021_*|*/0047_*) continue ;; esac   # chính các file siết/rollback
+  them=$(dong_them "$f")
+  [ -z "$them" ] && continue
+  if printf '%s\n' "$them" | grep -qE "$MAU_RLS_ANON"; then
+    do_nhac "$f — có policy mở 'to anon, authenticated'. Bảng mới phải kèm siết RLS: thêm tên bảng vào 0047 (hoặc viết policy 'to authenticated'). Xem docs/app-map/05-bao-mat-phan-quyen.md"
+  fi
 done
 
 [ "$canh_bao" = 1 ] && echo "  (cảnh báo không chặn commit)"

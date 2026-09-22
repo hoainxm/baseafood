@@ -590,6 +590,16 @@ function laDongTong(row: unknown[]): boolean {
   return /^(tong|cong)\b/.test(s);
 }
 
+/**
+ * MST người bán HỢP LỆ: đúng 10 hoặc 13 chữ số (bỏ mọi ký tự khác). Kế toán hay để
+ * khối GHI CHÚ TAY cuối sheet HĐĐT ("CHÊNH LỆCH THUẾ VAT", "HOÁ ĐƠN CTY KHÔNG SỬ
+ * DỤNG", "SỐ CỦA LINH 6 THÁNG"…) với con số 9–12 chữ số rơi vào ô MST — KHÔNG phải MST.
+ */
+function mstHopLe(v: unknown): boolean {
+  const so = String(v ?? "").replace(/\D/g, "");
+  return so.length === 10 || so.length === 13;
+}
+
 // ---------- Đọc workbook thô ----------
 
 interface SheetTho {
@@ -1079,7 +1089,11 @@ function parseSheetHoaDon(
     const soDong = i + 1;
     const soHoaDon = String(layO(row, cSo, ten, soDong, edits) ?? "").trim();
     const kyHieu = String(layO(row, cKyHieu, ten, soDong, edits) ?? "").trim();
-    if (!soHoaDon && !kyHieu) continue;
+    // Bỏ dòng GHI CHÚ TAY của kế toán ở CUỐI sheet (khối "chênh lệch / hoá đơn cty
+    // chưa kê khai / số của Linh…"): mọi hóa đơn thật đều có KÝ HIỆU hoặc MST người
+    // bán hợp lệ — dòng ghi chú không có cả hai nên KHÔNG cộng, KHÔNG báo "chưa có
+    // trong sổ", KHÔNG gắn "lệch thật" (số kế toán đang tự tính, đừng đụng vào).
+    if (!kyHieu && !mstHopLe(cellStr(row, cMstBan))) continue;
 
     const tt = docTienTe(row, cDvt, cTyGia);
     const dvt = tt.dvt || "VND";

@@ -18,7 +18,7 @@ npm run build    # tsc -b && vite build — cổng kiểu, phải xanh
 npm run lint     # oxlint
 ```
 
-**Không có test tự động** (không vitest/jest/CI). Cổng chất lượng hiện tại là `build` + `lint` + thử tay trên preview — xem bảng bên dưới.
+**Test tự động (từ 2026-09-21):** `vitest` — 35 test cho hàm thuần (`balancingCalc` · `inventory.tinhTon/locBanLe/khaDung` · `format` · `imports/importHelpers` gom chuyến/ghi bù · `production/wipHelpers` tách râu/bao tử); chạy `npm test`. **CI GitHub Actions** (`.github/workflows/ci.yml`) chạy lint + build + test mỗi push/PR. Màn hình vẫn thử tay trên preview — xem bảng bên dưới.
 
 ## Cấu trúc
 
@@ -32,7 +32,7 @@ src/
 ├── design-system/            tokens.css · patterns/ · kit/ · index.ts (cửa import duy nhất)
 └── features/                 THẬT: imports · production/WipProductionScreen (/wip) · packaging (/packaging) · warehouse · orders · sales · balancing · catalog · reports/NXT · auth · users
                               DEMO (dữ liệu mẫu): production/WorkOrderScreen (/production) · reports · quality · traceability · cold-storage (hybrid: tồn THẬT, nhiệt độ minh hoạ)
-supabase/migrations/          0001 … 0026
+supabase/migrations/          0001 … 0048 (đã chạy hết trên DB thật tới 0048 — xác nhận 2026-09-22)
 docs/README.md                bản đồ tài liệu — doc nào ở đâu, doc mới bỏ đâu
 docs/app-map/                 bản đồ ngữ cảnh cho agent (đọc khi CODE)
 docs/ops/                     vận hành: cutover Supabase · deploy Vercel · env
@@ -115,11 +115,12 @@ Sửa doc xong ⇒ cập nhật `last_verified:` trong frontmatter. Hook pre-com
 
 ## Code đổi → cổng kiểm bắt buộc
 
-Chưa có test tự động ⇒ cổng là những cái này, **chạy thật, không suy đoán**:
+Cổng là những cái này, **chạy thật, không suy đoán** (test mới viết cho hàm thuần; màn hình vẫn thử tay):
 
 | Đụng vào | Bắt buộc |
 |---|---|
-| Bất cứ file `.ts` / `.tsx` nào | `npm run build` + `npm run lint` |
+| Bất cứ file `.ts` / `.tsx` nào | `npm run build` + `npm run lint` + `npm test` (CI cũng chạy đủ 3) |
+| `lib/balancingCalc.ts`, `lib/inventory.ts`, `imports/importHelpers.ts`, `production/wipHelpers.ts` | **sửa test đi kèm** (`*.test.ts` cùng thư mục) — AC = test |
 | `lib/balancingCalc.ts` hay công thức | Mở một kỳ có số liệu, đối chiếu tay: định mức = NL÷TP; lãi/lỗ = giá trị xuất − giá thành |
 | `lib/repo.ts` / hàng chờ / `AnhXaBang` | Thử **cả hai chế độ** (có `.env` và không); ghi khi ngắt mạng rồi nối lại — dòng phải lên server, reload không nuốt dòng |
 | Màn Nhập hàng | Ghi 1 chuyến 2 dòng → chốt ngày → ghi bù (phải bắt lý do) → mở lại; kiểm tổng ngày + cảnh báo lệch |
@@ -130,7 +131,7 @@ Chưa có test tự động ⇒ cổng là những cái này, **chạy thật, k
 
 Preview chạy qua `preview_start` với cấu hình `baseafood-dev` (`.claude/launch.json`) — **không** chạy dev server bằng Bash.
 
-**Backlog đã biết:** thêm vitest cho `lib/balancingCalc.ts` + logic gom chuyến / chốt ngày (hàm thuần, dễ test nhất). Chưa cài package — đừng tự thêm nếu không được yêu cầu.
+**Đã làm (2026-09-21):** vitest cho `balancingCalc` + gom chuyến/ghi bù (`importHelpers`) + tồn kho + helper SX. Còn thiếu test: engine `doiSoat*` (oracle từ file thật), `inventoryMaterial.tinhTonNLTong`, `monthlyStock`. Thêm test khi đụng hàm thuần mới.
 
 ## App-map — đọc file nào khi nào
 

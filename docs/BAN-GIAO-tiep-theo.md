@@ -11,12 +11,14 @@
 - **Mô hình tồn kho: 2 KHO** (BTP dự trữ + TP đóng gói) ở `lib/inventory.ts` (`tinhTon` với `banLe = [...locBanLe(bán, KHO_BAN_LE), ...dongGoiTruTon(đóng gói)]`, `tinhTonTP` cho kho TP) + `lib/inventoryFinished.ts` (`tinhSoTonTP`). Đã kiểm chứng: Tồn Kho dự trữ == Tồn cuối NXT; handoff đơn đặt không đếm 2 lần; kho TP tách riêng.
 
 ## 2. Migration cần chạy trên Supabase (theo thứ tự)
+
+> ✅ **2026-09-22: ĐÃ CHẠY HẾT tới `0048`** (chủ dự án xác nhận; anon bị 42501 trên mọi bảng thử). Danh sách dưới giữ làm lịch sử/thứ tự cho DB mới.
 `0024_ton_dau_thanh_pham` → `0025_nhat_ky_thao_tac` → `0026_nl_vao_cho_phep_khong` → `0027_products_processing_type` → `0028_production_leftover` → `0029_dong_goi_thanh_pham` → `0030…0034` (customer/components, split/block, nxt snapshot, wip processing_type) → **`0035_shipment_lo_sscc`** (2 cột nullable mã lô + SSCC vào `import_shipments`) → **`0036_qc_checklist`** (2 bảng mới `qc_checklists` + `qc_locks`) → **`0037_production_operator`** (cột `production_wips.operator`) → **`0038_production_leftover_by_material`** (cột nullable jsonb `production_locks.leftover_by_material` — còn dở SX tách theo loại NL, khép vòng G1; `production_locks` đã trong RLS `0021`, không cần chạy lại `0021` cho riêng cột này) → **chạy lại `0021_siet_rls_tieng_anh`** (nay bao thêm `qc_checklists`,`qc_locks`; gồm 2 tồn đầu + `packagings`; `audit_log` giữ RLS riêng ở `0025`) → `0039…0046` (scan_path · monthly_stock_ledger · operator · reconciliation_runs · storage_locations · storage_location · lot_inputs — xem `03-database.md`) → **`0047_siet_rls_bo_sung`** 🔴 (siết 5 bảng tạo SAU 0021 còn mở `anon`: `nxt_snapshots` · `monthly_stock_ledger` · `reconciliation_runs` · `storage_locations` · `lot_inputs` — phát hiện ở [audit 2026-09-21](audit/2026-09-21-po-audit.md); tiền-kiểm như 0021).
 ⛔ **ĐỪNG chạy:** `0002` (phá SDFactory), `0003` (lỗi thời), `0023` (reset+seed demo cân đối).
 
 ## 3. Go-live — đưa vào chạy hằng ngày (người dùng làm, session hỗ trợ)
 1. **Deploy:** `git pull` → `git push` (remote 2 URL tự sync repo cá nhân → Vercel build). Kiểm Vercel xanh, Console không đỏ.
-2. **DB:** chạy migration ở §2. Kiểm `pg_policies` không còn dòng `anon`.
+2. **DB:** ✅ migration tới `0048` đã chạy (2026-09-22); anon bị chặn (kiểm chứng bằng client). Khi thêm migration mới: chạy rồi tick lại ở đây.
 3. **Tài khoản & vai trò:** admin tạo tài khoản thật + gán vai trò (thủ kho→`warehouse-keeper`; tổ trưởng/quản đốc→`team-leader`/`manager-dong|ca|kho`; kế toán→`accountant`; GĐ→`director`). Đổi mật khẩu admin. Xóa tài khoản test.
 4. **Supabase Auth:** Site URL + Redirect URLs = domain Vercel; tắt "Confirm email".
 5. **Tồn đầu:** khai tồn đầu NL (màn Tồn kho NL) + tồn đầu TP (màn NXT thành phẩm) cho số dư trước khi số hoá.

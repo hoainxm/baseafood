@@ -265,6 +265,7 @@ Làm A (import trung thực, có ngay tồn đầu 01/09), rồi **tuỳ chọn*
 **Pha 2 — Sổ tồn kho cấp lô realtime (feature chính của module, từ 01/09):**
 4. Nhập / xuất nguyên liệu **theo lô** hằng ngày, cập nhật tồn per lô × phân xưởng (kho XNT là canonical). Thiết kế lối nhập lô cho tổ trưởng/thủ kho.
    > ⏸️ **CHỜ CHỦ DỰ ÁN CHỐT (nhắc — 2026-08-26):** người dùng thao tác nhập/xuất **chi tiết tới từng lô** (chọn mã lô mỗi lần) — hướng là **CÓ** (bám phần mềm kế toán) nhưng **tạm HOLD**, chưa chốt cứng. **Phải xác nhận trước khi thiết kế màn nhập Pha 2.** Nếu người dùng thấy nặng tay → cân nhắc lối nhập rút gọn (gợi ý lô theo phân xưởng/loài).
+   > ✅ **CHỐT 2026-09-22 (phiên BA sổ tồn liên tục):** mặc định **theo họ NL, hệ phân bổ lô cũ trước, cho sửa** — chi tiết tới từng lô là chế độ phụ, bắt buộc khi tem QR phủ ≥ 90% chuyến. Mô hình nhập/xuất Pha 2 nay là **sổ sự kiện kho** ở [`app-map/38-so-ton-lien-tuc.ba-spec.md`](../app-map/38-so-ton-lien-tuc.ba-spec.md) (NV2/NV2b); câu 3 §9 (NL vs sơ chế) cũng chốt: **sơ chế = BTP theo mã kế toán**.
 5. Đối chiếu định kỳ kho XNT cấp lô ↔ engine họ-NL cũ (Cân đối) — 2 hệ song song, canh không lệch/không âm.
 6. Tài liệu: cập nhật [`03-database.md`](../app-map/03-database.md) + [`04-tang-du-lieu.md`](../app-map/04-tang-du-lieu.md) + **app-map mới cho module tồn kho cấp lô**.
 

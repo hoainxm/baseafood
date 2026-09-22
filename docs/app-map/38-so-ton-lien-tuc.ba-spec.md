@@ -5,7 +5,7 @@ covers: src/lib/inventoryMaterial.ts, src/lib/truyXuatLo.ts, src/features/report
 last_verified: 2026-09-22
 ttl_days: 90
 
-> **Mục đích**: oracle HÀNH VI cho sổ tồn NL liên tục — USER nào làm nghiệp vụ gì, flow vào/ra sao, đúng-sai đo bằng AC nào. KHÔNG mô tả giao diện (design-spec), KHÔNG chốt schema (03-database khi build). **Trạng thái: v2 — đã qua đủ team-agent B5 (Suggester · Domain-Specialist kho/kế toán: HỢP-LỆ CÓ ĐIỀU KIỆN đã ráp · Optimizer §6 · Cross-User-Integrity: 15 điểm gãy đã vá). Chờ chủ dự án duyệt mức tổng + chốt §11 Open. CHƯA chuyển sang design/build.**
+> **Mục đích**: oracle HÀNH VI cho sổ tồn NL liên tục — USER nào làm nghiệp vụ gì, flow vào/ra sao, đúng-sai đo bằng AC nào. KHÔNG mô tả giao diện (design-spec), KHÔNG chốt schema (03-database khi build). **Trạng thái: v2.1 — ba-spec ĐÃ DUYỆT mức tổng. Chủ dự án chốt Open-1/4/5/6 ngày 2026-09-22 (theo khuyến nghị); Open-2/3 giữ mặc định A1 (không đổi flow). Sẵn sàng sang `ui-design-logic` (design-spec) cho Pha 1; CHƯA build.**
 
 > **Nguồn quyết định kế thừa (không mở lại):** Phương án A cấp lô + "kho XNT cấp lô là sổ tồn NL CHÍNH, engine họ-NL cũ giữ song song" ([spec cutover §6, §9](../spec/import-xnt-kho-cutover.md)) · lô NL = chuyến nhập, `lot_inputs` là sự kiện "đầu ra dùng đầu vào" ([spec QR §4](../spec/qr-truy-xuat-lo.md)) · PA-a tồn theo NHẬP HÀNG, đông gửi/xả đông KHÔNG cộng thêm vào tổng ([31 §Tồn NL](31-can-doi-ky.md)) · baseline tồn đầu MỘT LẦN (2026-09-11) · không khóa cứng bản ghi đã chốt, role-RLS hoãn (chủ dự án 2026-09-21) · Nguyên tắc Long: đầu vào chỉ phân LƯỢNG theo lô, tiền dồn về kế toán ([họp 09-02 QĐ-7](../trien-khai/hop-2026-09-02-form-nhap-trace-gia-qc.md)) · tồn BTP/TP giữ nguyên mô hình [34](34-btp-san-xuat-kho.ba-spec.md).
 
@@ -393,7 +393,14 @@ Hệ quả: (a) "hôm nay xưởng còn bao nhiêu kg NL, ở đâu, lô nào" *
 - A8 Owner NV5 mặc định = thủ kho (giữ kiểm soát kho lạnh, hao hai chiều đo được) tới khi Open-4 chốt khác.
 - A9 `DIEU_CHINH` hiệu lực ngay; xác nhận kế toán là cờ, không chặn nghiệp vụ ngày.
 
-**Open (chủ dự án / xưởng chốt — ảnh hưởng flow NV2/NV4/NV5/NV10, R8/R9/R16):**
+**Open — trạng thái sau phiên duyệt 2026-09-22:**
+- ✅ **Open-1 CHỐT: mặc định theo họ NL, hệ phân bổ lô cũ trước trong kho tươi xưởng, cho sửa trước chốt ngày; chuyển bắt buộc quét khi tem phủ ≥ 90% chuyến.** (NV2 chế độ mặc định = 2B; 2A là chế độ phụ.)
+- ✅ **Open-4 CHỐT: thủ kho dự trữ ghi xả đông** (NV5 owner cố định; NV4 duyệt cấp đông vẫn thủ kho; 5C/3B đóng).
+- ✅ **Open-5 CHỐT: hàng đã luộc/chần/tẩm bột trong báo cáo XNT kho 1000 là BTP (sổ 34), suy theo mã kế toán có dấu hiệu sơ chế; kế toán xác nhận từng mã ở NV11.** Lô K chỉ chở NL (R16). Áp dụng TRƯỚC khi nạp file T8.
+- ✅ **Open-6 CHỐT: ưu tiên lô F (đã xả đông) trước lô tươi S** khi gợi ý phân bổ tiêu hao.
+- ⏸️ Open-2, Open-3: giữ mặc định A1 (sinh mã lô ngay cổng; lô = chuyến, sự kiện theo dòng) — không đổi flow; mở lại khi xưởng có ý kiến.
+
+*(Nội dung gốc các câu Open, giữ để truy vết:)*
 - **Open-1 (HOLD 2026-08-26):** mặc định ghi lấy NL **tới từng lô** (quét/chọn) hay **theo họ NL rồi hệ phân bổ FIFO, cho sửa**? Spec làm **cả hai**; câu này chốt mặc định. *Khuyến nghị:* mặc định họ NL + tự phân bổ; bắt buộc quét khi tem phủ ≥ 90% chuyến.
 - **Open-2 (QR §7.1):** sinh mã lô ngay cổng (đang làm) hay sau sơ chế+đông — nếu "sau", thêm 1 tầng biến đổi, cùng mô hình.
 - **Open-3 (QR §7.5):** lô = chuyến hay từng dòng NL — spec tạm lô = chuyến, sự kiện theo dòng.
@@ -402,6 +409,7 @@ Hệ quả: (a) "hôm nay xưởng còn bao nhiêu kg NL, ở đâu, lô nào" *
 - **Open-6:** thứ tự ưu tiên dùng **F (đã xả, trên sàn)** trước hay **S (tươi)** trước khi hệ gợi ý tiêu hao. *Khuyến nghị:* F trước (đã rã, không để lâu).
 
 ## History
+- v2.1 (2026-09-22): chủ dự án duyệt mức tổng; chốt Open-1 (họ NL + hệ phân bổ), Open-4 (thủ kho xả đông), Open-5 (sơ chế = BTP theo mã), Open-6 (F trước S). Đồng bộ HOLD ở spec cutover §10 + BAN-GIAO §4. Bước kế: design-spec Pha 1.
 - v2 (2026-09-22): B5 hoàn tất. Optimizer điền §6 (chọn 2A+2B hai chế độ/2D kênh nhập · 3A · 5B mặc định · 9A ghép 9C · 10A + kiểm chéo; loại 2C/3B/3C/5A/9B/10B/10C). Cross-User-Integrity 15 điểm gãy → vá: NV8 owner kế toán; `LAY_RA` chỉ kho tươi (R9); NV7a/7b; NV2c; NV9a/9b; H0/H2b/H7/H8/H9; nhắc quay vòng; Quản trị/owner-khi-hỏng; AC-24 = invariant. Thêm R20/R21, AC-8/11/21/22/23, metric kênh giấy, `actor`/`recorded_by`. Chờ chủ dự án duyệt + chốt Open 1–6.
 - v1 (2026-09-22): ráp điều kiện Domain-Specialist (6 veto → sàn SX là vị trí, `LAY_RA`≠`TIEU_HAO`, `CAP_DONG` = Nhập ở XNT kho, `effective_date` + chốt bị hở, cấm dồn âm, ánh xạ mã 2 tầng, phái sinh từ mốc; 8 ca thiếu; R11–R19). Thêm NV11.
 - v0 (2026-09-22): nháp B1–B4. Nguồn: 12 doc theo routing-log 2026-09-22 + memory `ton-nl-theo-ngay-gap`, `kho-module-huong-data-first`.

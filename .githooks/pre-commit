@@ -129,6 +129,17 @@ for f in $staged; do
   fi
 done
 
+# ---------- 5. ba-spec phải test được (CHẶN — skill ba-flow-logic) ----------
+# Cổng máy của skill BA: ba-spec staged thiếu frontmatter / 0 AC / AC thiếu Test:/Assert
+# / AC chứa component UI ⇒ chặn. Chỉ chạy khi máy có skill (máy khác/fresh clone: bỏ qua,
+# không gãy commit) — bản global, không copy vào repo để tránh drift.
+BA_VERIFY="$HOME/.claude/skills/ba-flow-logic/ba-verify.sh"
+if [ -f "$BA_VERIFY" ] && printf '%s\n' "$staged" | grep -qiE 'ba-spec.*\.md$'; then
+  if ! sh "$BA_VERIFY" --staged; then
+    do_hong "ba-spec staged không qua cổng ba-verify (thiếu Test:/Assert/frontmatter hoặc AC chứa từ UI)"
+  fi
+fi
+
 [ "$canh_bao" = 1 ] && echo "  (cảnh báo không chặn commit)"
 
 if [ "$loi" = 1 ]; then

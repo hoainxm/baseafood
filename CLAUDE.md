@@ -124,6 +124,7 @@ Chưa có test tự động ⇒ cổng là những cái này, **chạy thật, k
 | `lib/repo.ts` / hàng chờ / `AnhXaBang` | Thử **cả hai chế độ** (có `.env` và không); ghi khi ngắt mạng rồi nối lại — dòng phải lên server, reload không nuốt dòng |
 | Màn Nhập hàng | Ghi 1 chuyến 2 dòng → chốt ngày → ghi bù (phải bắt lý do) → mở lại; kiểm tổng ngày + cảnh báo lệch |
 | Màn Cân đối | Tạo kỳ → hút phế liệu → **xóa kỳ**: dòng phế liệu `nguon="Nhập hàng"` phải còn nguyên ở sổ nhập |
+| Đối soát HĐĐT — quy đổi ngoại tệ (`lib/doiSoatHddt.ts`) | ⚠️ Cổng thuế xuất tiền hóa đơn ngoại tệ **TÙY BẢN**: có bản để **nguyên tệ** (phải `×tỷ giá`), có bản **đã quy sẵn VND** (nhân nữa là đội gấp ~tỷ giá lần → tổng phình vài trăm tỉ thành vài chục **nghìn** tỉ). **KHÔNG mặc định nhân/không nhân** — engine tự dò qua đối chiếu sổ (`phatHienQuyUocNgoaiTe`). Đụng logic quy đổi ⇒ chạy engine trên file thật, kiểm **tổng khối A ≈ tổng cột tiền cộng thô** và hóa đơn ngoại tệ khớp sổ ở **số gốc**, không phải số ×tỷ giá |
 | Bất kỳ màn nghiệp vụ nào | Thu còn **360px** → giãn tới **desktop**: không cuộn ngang toàn trang, không đè chữ (bảng dài cuộn trong khung riêng). Thử thêm cỡ chữ **130%** vẫn không vỡ |
 | Migration | Chạy lại file **hai lần** trên DB thật vẫn không lỗi (idempotent) |
 

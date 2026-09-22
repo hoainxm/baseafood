@@ -26,6 +26,7 @@ type ThuTu = { orderNo: number };
 /** Tên các sheet tự dựng — phải nằm trong `SHEET_TU_DUNG` để đọc lại bỏ qua, xuất lại xóa đi. */
 const TEN = {
   ketLuan: "KẾT LUẬN CHUNG",
+  kiemChung: "KIỂM CHỨNG",
   chuaKe: "HÓA ĐƠN CHƯA KÊ",
   haiBan: "SO HAI BẢN HĐĐT",
   cungNgay: "CÙNG MST CÙNG NGÀY",
@@ -485,15 +486,43 @@ interface MocChuaKe {
 }
 
 /**
- * Sheet KẾT LUẬN CHUNG — luôn đứng đầu. Trả lời trước, số liệu sau, tự kiểm cuối.
- * `ds` cho biết sheet danh sách nào THẬT SỰ được dựng (để chỉ đường cho đúng).
+ * SO TỔNG 2 FILE (bản GỌN cho sheet KẾT LUẬN): chỉ 3 dòng — tổng hóa đơn điện tử,
+ * tổng sổ, chênh — đủ 3 cột trước thuế/thuế/tổng. Chi tiết cách tính + tự kiểm đẩy
+ * sang sheet KIỂM CHỨNG (khối `khoiDoiChieu`).
+ */
+function khoiSoTongGon(ws: Worksheet, r0: number, kq: KetQuaDoiSoat): number {
+  const hd = kq.sheetsHoaDon.filter((s) => !s.laPhu);
+  const A = cong(hd, () => true);
+  const B = { ...CONG_0 };
+  for (const d of kq.sheetPhanMem?.dong ?? []) {
+    B.chua += d.chuaThue;
+    B.thue += d.thue;
+    B.tong += d.tongCong;
+    B.n++;
+  }
+  const chenh = tru(A, B);
+  const tenSo = kq.sheetPhanMem?.ten ?? "PMEM";
+  const r = tieuDeKhoi(ws, r0, `SO TỔNG 2 FILE — HÓA ĐƠN ĐIỆN TỬ ⇄ SỔ "${tenSo}"`);
+  tieuDe8(ws, r, [["CHỈ TIÊU", 1], ["TRƯỚC THUẾ", 1], ["THUẾ", 1], ["TỔNG THANH TOÁN", 1], ["SỐ DÒNG", 1], ["NGUỒN SỐ LIỆU", 2], ["CÁCH TỰ KIỂM TRA LẠI", 1]]);
+  return bangChiTieu(ws, r + 1, [
+    [`A. Hóa đơn điện tử (${hd.map((s) => s.ten).join(" + ")})`, A, "Cộng 3 cột tiền của các sheet hóa đơn.", "Bôi đen cột, đọc ô Sum dưới thanh trạng thái.", true],
+    [`B. Sổ kế toán "${tenSo}"`, B, "Cộng tiền hàng + tiền thuế của mọi dòng sổ.", "Bôi đen cột tổng cộng của sổ.", true],
+    ["Chênh A − B", chenh, `Chủ yếu là hóa đơn CHƯA KÊ vào sổ — xem sheet ${TEN.chuaKe}.`, `Bóc tách đầy đủ + 9 phép tự kiểm ở sheet ${TEN.kiemChung}.`],
+  ]);
+}
+
+/**
+ * Dựng HAI sheet: KẾT LUẬN CHUNG (chỉ VIỆC PHẢI LÀM + SO TỔNG gọn) và KIỂM CHỨNG
+ * (số liệu đối chiếu đầy đủ, bóc tách, cân đối cột, ô nghi sai, 9 phép tự kiểm).
+ * Tách 2 sheet để kế toán mở KẾT LUẬN là thấy ngay việc phải làm, không bị chôn giữa
+ * phần chứng minh. `ds` cho biết sheet danh sách nào THẬT SỰ được dựng (để chỉ đường).
  */
 function sheetKetLuan(
   wb: Workbook,
   kq: KetQuaDoiSoat,
   ds: { chuaKe: MocChuaKe | null; haiBan: KetQuaSoHaiBan | null; cungNgay: readonly NhomCungNgay[] },
   cotRa: CotRa
-): Worksheet {
+): { ketLuan: Worksheet; kiemChung: Worksheet } {
   const ws = wb.addWorksheet(TEN.ketLuan);
   RONG.forEach((w, i) => (ws.getColumn(i + 1).width = w));
 
@@ -652,7 +681,7 @@ function sheetKetLuan(
     muc: dat === kq.phepThu.length ? "xanh" : "do",
   });
 
-  // --- Đầu trang ---
+  // --- Đầu trang (KẾT LUẬN CHUNG) ---
   const tieuDe = coSo
     ? `KẾT QUẢ ĐỐI SOÁT HÓA ĐƠN ĐIỆN TỬ VỚI SỔ "${tenSo}"`
     : ds.haiBan
@@ -665,47 +694,71 @@ function sheetKetLuan(
       : `File chỉ có bảng kê hóa đơn (${tenHd}), không có sổ kế toán. Mọi ô vẫn ở ĐÚNG ĐỊA CHỈ CŨ; kết quả kiểm từng dòng nằm ở 3 cột mới nối cuối mỗi sheet, dòng có lệch được tô màu.`;
   let r = cau(ws, 1, tieuDe, { bold: true, size: 14, color: { argb: "FFFFFFFF" } }, NEN_TITLE);
   r = cau(ws, r, `${cheDo}${phu.length ? ` Sheet ${phu.map((s) => `"${s.ten}"`).join(", ")} trùng lặp (tập con) nên không cộng vào tổng.` : ""}`, { italic: true });
-  r = cau(ws, r, "Không ô số liệu gốc nào bị sửa. Chữ xanh gạch chân bấm được — nhảy thẳng tới dòng/mục cần xem.", { italic: true });
+  r = cau(ws, r, `Sheet này chỉ ghi VIỆC PHẢI LÀM và SO TỔNG. Bóc tách, cân đối cột, tự kiểm nằm ở sheet "${TEN.kiemChung}". Không ô số liệu gốc nào bị sửa; chữ xanh gạch chân bấm được.`, { italic: true });
   r++;
 
-  // --- Bảng TRẢ LỜI ---
-  r = tieuDeKhoi(ws, r, "TRẢ LỜI");
-  tieuDe8(ws, r++, [["ĐÃ KIỂM GÌ", 1], ["KẾT LUẬN", 4], ["XEM Ở ĐÂU", 2], ["PHẢI LÀM GÌ", 1]]);
-  const hangTL = new Map<TraLoi, number>();
-  for (const t of traLoi) hangTL.set(t, r++);
-  r++;
+  // Chia câu trả lời: VIỆC PHẢI LÀM (kế toán hành động) ở KẾT LUẬN; GHI CHÚ / TỰ KIỂM
+  // (cân đối cột, cùng MST, cảnh báo, 9 phép thử) dồn sang KIỂM CHỨNG.
+  const laKiem = (t: TraLoi) =>
+    /chưa thuế \+ thuế/.test(t.viec) ||
+    t.viec === "Hóa đơn cùng MST cùng ngày" ||
+    t.viec.startsWith("⚠") ||
+    t.viec === "Máy tự kiểm lại kết quả";
+  const lamItems = traLoi.filter((t) => !laKiem(t));
+  const kiemItems = traLoi.filter(laKiem);
+  const hangTL = new Map<TraLoi, { ws: Worksheet; hang: number }>();
 
-  // --- Các khối phía dưới — ghi trước để biết hàng, rồi mới điền link ở bảng trả lời ---
+  r = tieuDeKhoi(ws, r, "VIỆC PHẢI LÀM");
+  tieuDe8(ws, r++, [["VIỆC", 1], ["KẾT LUẬN", 4], ["XEM Ở ĐÂU", 2], ["PHẢI LÀM GÌ", 1]]);
+  for (const t of lamItems) hangTL.set(t, { ws, hang: r++ });
+  r++;
+  if (coSo) khoiSoTongGon(ws, r, kq);
+
+  // --- Sheet KIỂM CHỨNG ---
+  const ws2 = wb.addWorksheet(TEN.kiemChung);
+  RONG.forEach((w, i) => (ws2.getColumn(i + 1).width = w));
+  let r2 = cau(ws2, 1, "KIỂM CHỨNG & CHI TIẾT — phần chứng minh máy làm đúng", { bold: true, size: 14, color: { argb: "FFFFFFFF" } }, NEN_TITLE);
+  r2 = cau(ws2, r2, `Số liệu đối chiếu đầy đủ, bóc tách phần chênh, cân đối cột, ô nghi sai và 9 phép máy tự kiểm. Mở khi cần đối chiếu sâu — việc phải làm đã tóm ở sheet "${TEN.ketLuan}".`, { italic: true });
+  r2++;
+  if (kiemItems.length) {
+    r2 = tieuDeKhoi(ws2, r2, "GHI CHÚ & TỰ KIỂM");
+    tieuDe8(ws2, r2++, [["MỤC", 1], ["KẾT LUẬN", 4], ["XEM Ở ĐÂU", 2], ["GHI CHÚ", 1]]);
+    for (const t of kiemItems) hangTL.set(t, { ws: ws2, hang: r2++ });
+    r2++;
+  }
+
+  // --- Khối chi tiết (đều nằm ở KIỂM CHỨNG) — ghi trước để biết hàng rồi điền link ---
   const moc = new Map<string, number>();
   for (const s of !coSo ? canDo : []) {
-    moc.set(`doLech:${s.ten}`, r);
-    r = khoiDoLech(ws, r, s, cotRa) + 1;
+    moc.set(`doLech:${s.ten}`, r2);
+    r2 = khoiDoLech(ws2, r2, s, cotRa) + 1;
   }
   if (coSo) {
-    r = khoiDoiChieu(ws, r, kq) + 2;
+    r2 = khoiDoiChieu(ws2, r2, kq) + 2;
     for (const s of canDo) {
-      moc.set(`doLech:${s.ten}`, r);
-      r = khoiDoLech(ws, r, s, cotRa) + 1;
+      moc.set(`doLech:${s.ten}`, r2);
+      r2 = khoiDoLech(ws2, r2, s, cotRa) + 1;
     }
   }
   if (soNghi) {
-    moc.set("nghiVan", r);
-    r = khoiNghiVan(ws, r, kq) + 2;
+    moc.set("nghiVan", r2);
+    r2 = khoiNghiVan(ws2, r2, kq) + 2;
   }
-  moc.set("tuKiem", r);
-  khoiTuKiem(ws, r, kq);
+  moc.set("tuKiem", r2);
+  khoiTuKiem(ws2, r2, kq);
 
+  // --- Điền link vào hai bảng trả lời (khối chi tiết đều ở KIỂM CHỨNG) ---
   const NEN_MUC = { do: NEN_TRUOT, vang: NEN_NGHI, xanh: NEN_DAT } as const;
-  for (const [t, hang] of hangTL) {
+  for (const [t, { ws: wsx, hang }] of hangTL) {
     let xem: GiaTriO = "";
     if (t.xem) {
-      const dich = t.xem.khoi ? (moc.has(t.xem.khoi) ? lienKet(TEN.ketLuan, `A${moc.get(t.xem.khoi)}`) : null) : lienKet(t.xem.sheet!, t.xem.o);
+      const dich = t.xem.khoi ? (moc.has(t.xem.khoi) ? lienKet(TEN.kiemChung, `A${moc.get(t.xem.khoi)}`) : null) : lienKet(t.xem.sheet!, t.xem.o);
       xem = dich ? oLink(dich, t.xem.chu) : t.xem.chu;
     }
-    hang8(ws, hang, [[t.viec, 1], [t.ketLuan, 4], [xem, 2], [t.lamGi, 1]], NEN_MUC[t.muc]);
-    ws.getCell(hang, 1).font = { bold: true };
+    hang8(wsx, hang, [[t.viec, 1], [t.ketLuan, 4], [xem, 2], [t.lamGi, 1]], NEN_MUC[t.muc]);
+    wsx.getCell(hang, 1).font = { bold: true };
   }
-  return ws;
+  return { ketLuan: ws, kiemChung: ws2 };
 }
 
 /** "dd/mm/yyyy" → "yyyymmdd" để xếp theo ngày. */
@@ -972,9 +1025,9 @@ export function themSheetTongHop(wb: Workbook, kq: KetQuaDoiSoat, cotRa: CotRa):
   const chuaKe = kq.sheetPhanMem ? sheetChuaKe(wb, kq) : null;
   const haiBan = soHaiBan ? sheetSoHaiBan(wb, soHaiBan) : null;
   const ngay = cungNgay.length ? sheetCungNgay(wb, cungNgay) : null;
-  const ketLuan = sheetKetLuan(wb, kq, { chuaKe: chuaKe?.moc ?? null, haiBan: soHaiBan, cungNgay }, cotRa);
+  const { ketLuan, kiemChung } = sheetKetLuan(wb, kq, { chuaKe: chuaKe?.moc ?? null, haiBan: soHaiBan, cungNgay }, cotRa);
 
-  [ketLuan, chuaKe?.ws, haiBan].forEach((w, i) => w && ((w as unknown as ThuTu).orderNo = i));
+  [ketLuan, chuaKe?.ws, kiemChung, haiBan].forEach((w, i) => w && ((w as unknown as ThuTu).orderNo = i));
   // CÙNG MST CÙNG NGÀY là danh sách THAM KHẢO (nhiều hóa đơn một ngày chưa chắc
   // sai), không phải kết quả đối soát ⇒ xếp sau các sheet gốc, trước nhật ký sửa.
   if (ngay) (ngay as unknown as ThuTu).orderNo = 1000;

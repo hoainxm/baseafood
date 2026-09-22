@@ -374,7 +374,7 @@ const khongCanVaoSo = (tt: unknown): boolean => {
  * dựng nào PHẢI thêm vào đây, không là xuất lại đẻ thêm sheet.
  */
 export const SHEET_TU_DUNG: ReadonlySet<string> = new Set([
-  "KẾT LUẬN CHUNG", "HÓA ĐƠN CHƯA KÊ", "SO HAI BẢN HĐĐT", "CÙNG MST CÙNG NGÀY", "NHẬT KÝ SỬA",
+  "KẾT LUẬN CHUNG", "KIỂM CHỨNG", "HÓA ĐƠN CHƯA KÊ", "SO HAI BẢN HĐĐT", "CÙNG MST CÙNG NGÀY", "NHẬT KÝ SỬA",
   // tên cũ (≤ v6.3) — gộp vào KẾT LUẬN CHUNG từ v6.4
   "ĐỐI CHIẾU TỔNG", "TỰ KIỂM TRA", "NGHI VẤN SỐ LIỆU",
 ]);

@@ -250,7 +250,7 @@ function khoiDoiChieu(ws: Worksheet, r0: number, kq: KetQuaDoiSoat): number {
   r = bangChiTieu(ws, r + 1, [
     ["A. Tổng các sheet hóa đơn điện tử", A, 'Cộng cột "Chưa thuế (VND)", "Thuế (VND)", "Tổng thanh toán (VND)" của các sheet hóa đơn.', "Mở từng sheet, bôi đen cột cần cộng từ dòng đầu dữ liệu tới dòng cuối, đọc ô Sum dưới thanh trạng thái.", true],
     ["   – nhóm KHỚP (số trên hóa đơn)", K, 'Cộng ba cột VND với điều kiện cột A (KẾT QUẢ) = "KHỚP".', "Lọc cột A = KHỚP rồi cộng cột VND tương ứng."],
-    ["   – nhóm LỆCH TIỀN (số trên hóa đơn)", L, 'Điều kiện cột A = "LỆCH TIỀN".', "Lọc cột A = LỆCH TIỀN, soát cột Chênh lệch."],
+    ["   – nhóm LỆCH (số trên hóa đơn)", L, 'Điều kiện cột A = "LỆCH TIỀN" hoặc "LỆCH THUẾ".', "Lọc cột A = LỆCH TIỀN / LỆCH THUẾ, soát cột Chênh lệch + Bằng chứng."],
     [`   – nhóm CHƯA CÓ TRONG ${tenSo}`, T, `Điều kiện cột A = "CHƯA CÓ TRONG ${tenSo}".`, "Lọc cột A = CHƯA CÓ. Đây là danh sách cần rà để hạch toán."],
     ["        trong đó: đã bị thay thế/hủy — ĐÚNG là không vào sổ", Tkhong, 'Trong nhóm CHƯA CÓ, lọc cột A = "…KHÔNG CẦN VÀO SỔ".', "Trừ dòng này ra khỏi danh sách phải đi hạch toán — hóa đơn đã bị thay thế thì kế toán ghi bản thay thế, không ghi bản này."],
     ["        ⇒ CÒN LẠI THẬT SỰ PHẢI RÀ", tru(T, Tkhong), "Nhóm CHƯA CÓ trừ dòng ngay trên.", "Đây mới là con số đi làm việc.", true],
@@ -545,18 +545,31 @@ function sheetKetLuan(
         lamGi: "Xác nhận rồi SỬA SỐ Ở SỔ — đừng kê thêm lần nữa.",
         muc: "vang",
       });
-    const lech = dong.filter((d) => d.trangThai === "LECH");
-    const sheetLech = hd.filter((s) => s.dong.some((d) => d.trangThai === "LECH"));
+    const lechTien = dong.filter((d) => d.ketLuan === "LỆCH TIỀN");
+    const sheetLechTien = hd.filter((s) => s.dong.some((d) => d.ketLuan === "LỆCH TIỀN"));
     traLoi.push({
-      viec: "Hóa đơn đã vào sổ nhưng LỆCH TIỀN",
-      ketLuan: lech.length
-        ? `${lech.length} hóa đơn · chênh ${vnd(lech.reduce((t, d) => t + (d.chenh ?? 0), 0))}.`
-        : "Không có — hóa đơn nào đã vào sổ đều khớp tiền.",
-      xem: sheetLech.length
-        ? { chu: `Lọc cột A = "LỆCH TIỀN" ở sheet ${sheetLech.map((s) => s.ten).join(", ")}`, sheet: sheetLech[0]!.ten }
+      viec: "Hóa đơn đã vào sổ nhưng LỆCH TIỀN (tổng thanh toán)",
+      ketLuan: lechTien.length
+        ? `${lechTien.length} hóa đơn · chênh ${vnd(lechTien.reduce((t, d) => t + (d.chenh ?? 0), 0))}.`
+        : "Không có — hóa đơn nào đã vào sổ đều khớp tổng thanh toán.",
+      xem: sheetLechTien.length
+        ? { chu: `Lọc cột A = "LỆCH TIỀN" ở sheet ${sheetLechTien.map((s) => s.ten).join(", ")}`, sheet: sheetLechTien[0]!.ten }
         : undefined,
-      lamGi: lech.length ? 'Soát cột "Chênh lệch" và "BẰNG CHỨNG ĐỐI CHIẾU" trên chính dòng đó.' : "",
-      muc: lech.length ? "do" : "xanh",
+      lamGi: lechTien.length ? 'Soát cột "Chênh lệch" và "BẰNG CHỨNG ĐỐI CHIẾU" trên chính dòng đó.' : "",
+      muc: lechTien.length ? "do" : "xanh",
+    });
+    const lechThue = dong.filter((d) => d.ketLuan === "LỆCH THUẾ");
+    const sheetLechThue = hd.filter((s) => s.dong.some((d) => d.ketLuan === "LỆCH THUẾ"));
+    traLoi.push({
+      viec: "Hóa đơn KHỚP tổng nhưng LỆCH THUẾ",
+      ketLuan: lechThue.length
+        ? `${lechThue.length} hóa đơn: tổng thanh toán đúng nhưng SỐ THUẾ ở sổ khác hóa đơn — nghi sai thuế suất / số thuế.`
+        : "Không có — số thuế trên sổ khớp hóa đơn ở mọi dòng đã kê.",
+      xem: sheetLechThue.length
+        ? { chu: `Lọc cột A = "LỆCH THUẾ" ở sheet ${sheetLechThue.map((s) => s.ten).join(", ")}`, sheet: sheetLechThue[0]!.ten }
+        : undefined,
+      lamGi: lechThue.length ? 'Soát cột "BẰNG CHỨNG ĐỐI CHIẾU" — sửa số thuế ở sổ cho khớp hóa đơn (tiền thanh toán vẫn đúng).' : "",
+      muc: lechThue.length ? "do" : "xanh",
     });
     const soThieu = (kq.sheetPhanMem?.dong ?? []).filter((d) => d.trangThai === "THIEU");
     traLoi.push({

@@ -292,6 +292,8 @@ export interface KetQuaDoiSoat {
     soHoaDon: number;
     khop: number;
     lech: number;
+    /** Hóa đơn KHỚP tổng thanh toán nhưng LỆCH THUẾ (nghi sai thuế suất/số thuế ở sổ). */
+    lechThue: number;
     thieu: number;
     /** Trong số `thieu`: hóa đơn đã bị thay thế/hủy — ĐÚNG là không có trong sổ. */
     thieuKhongCanVaoSo: number;
@@ -1527,7 +1529,7 @@ export function doiSoat(sheets: SheetTho[], opt: TuyChonDoiSoat): KetQuaDoiSoat 
   // dụng về 1 để không đội số (mọi tổng + so khớp bên dưới dùng lại chuaThueVnd/tongTtVnd).
   phatHienQuyUocNgoaiTe(hdActive, pmTheoKhoa, canhBao);
 
-  let khop = 0, lech = 0, thieu = 0, soHoaDon = 0, tongChenh = 0, thieuKhongCanVaoSo = 0;
+  let khop = 0, lech = 0, lechThue = 0, thieu = 0, soHoaDon = 0, tongChenh = 0, thieuKhongCanVaoSo = 0;
   // Nhãn gọi thẳng tên sheet sổ (file mẫu kế toán ghi "CHƯA CÓ TRONG PMEM"), để
   // bảng tổng và cột KẾT QUẢ nói cùng một thứ tiếng.
   const nhanThieu = `CHƯA CÓ TRONG ${sheetPhanMem?.ten ?? "PMKT"}`;
@@ -1551,7 +1553,11 @@ export function doiSoat(sheets: SheetTho[], opt: TuyChonDoiSoat): KetQuaDoiSoat 
         continue;
       }
       const tongPm = pm.reduce((s, x) => s + x.tongCong, 0);
+      const pmChua = pm.reduce((s, x) => s + x.chuaThue, 0);
+      const pmThue = pm.reduce((s, x) => s + x.thue, 0);
       const chenh = d.tongTtVnd - tongPm;
+      const chenhChua = d.chuaThueVnd - pmChua;
+      const chenhThue = d.thueVnd - pmThue;
       d.soDongKhopPm = pm.length;
       d.tongTtPm = tongPm;
       d.chenh = chenh;
@@ -1562,17 +1568,37 @@ export function doiSoat(sheets: SheetTho[], opt: TuyChonDoiSoat): KetQuaDoiSoat 
       d.dienGiaiPm = uniq(pm.map((x) => x.dienGiai)).join(" | ");
       d.soTienHachToan = tongPm;
       const phieuMoTa = d.phieuKe || "(không số phiếu)";
-      if (Math.abs(chenh) <= nguong) {
-        d.trangThai = "KHOP";
-        d.ketLuan = "KHỚP";
-        d.bangChung = `Khớp phiếu ${phieuMoTa} ngày ${d.ngayGhiSo} (CTGS ${d.ctgs}), TK ${d.tkNoCo}. Hóa đơn ${num(d.tongTtVnd)} đ / sổ ${num(tongPm)} đ - ${chenh === 0 ? "khớp số tiền." : `chênh ${num(Math.abs(chenh))} đ trong ngưỡng, coi như khớp.`}`;
-        khop++;
-      } else {
+      // So ĐỦ 3 cột (bổ sung TRƯỚC THUẾ + THUẾ, không chỉ tổng) — ghi tận nơi vào bằng chứng.
+      const baCap =
+        `HĐ: chưa ${num(d.chuaThueVnd)} · thuế ${num(d.thueVnd)} · tổng ${num(d.tongTtVnd)} | ` +
+        `sổ: chưa ${num(pmChua)} · thuế ${num(pmThue)} · tổng ${num(tongPm)} | ` +
+        `chênh: trước thuế ${num(chenhChua)} · thuế ${num(chenhThue)} · tổng ${num(chenh)}`;
+      const dauCau = `Khớp phiếu ${phieuMoTa} ngày ${d.ngayGhiSo} (CTGS ${d.ctgs}), TK ${d.tkNoCo}.`;
+      if (Math.abs(chenh) > nguong) {
+        // TỔNG lệch → tiền sai (nhãn cũ, giữ nguyên).
         d.trangThai = "LECH";
         d.ketLuan = "LỆCH TIỀN";
-        d.bangChung = `Khớp phiếu ${phieuMoTa} ngày ${d.ngayGhiSo} (CTGS ${d.ctgs}), TK ${d.tkNoCo}. Hóa đơn ${num(d.tongTtVnd)} đ / sổ ${num(tongPm)} đ - LỆCH ${num(chenh)} đ (HĐĐT − phần mềm).`;
+        d.bangChung = `${dauCau} LỆCH TIỀN ${num(chenh)} đ (HĐĐT − sổ). ${baCap}`;
         lech++;
         tongChenh += Math.abs(chenh);
+      } else if (Math.abs(chenhThue) > nguong) {
+        // TỔNG khớp nhưng THUẾ lệch → nghi sai thuế suất / số thuế ghi ở sổ (mất/thừa thuế
+        // đầu vào dù tiền thanh toán đúng). trangThai = LECH để vào nhóm L của bảng tổng.
+        d.trangThai = "LECH";
+        d.ketLuan = "LỆCH THUẾ";
+        d.bangChung = `${dauCau} Tổng thanh toán KHỚP nhưng THUẾ lệch ${num(chenhThue)} đ (HĐ ${num(d.thueVnd)} / sổ ${num(pmThue)}) — nghi sai thuế suất hoặc số thuế ghi ở sổ. ${baCap}`;
+        lechThue++;
+      } else {
+        d.trangThai = "KHOP";
+        d.ketLuan = "KHỚP";
+        // Chênh TRƯỚC THUẾ khi tổng + thuế đã khớp gần như luôn do sổ ghi trước thuế đã
+        // trừ chiết khấu / cộng phí (net) còn hóa đơn ghi gộp — KHÔNG phải sai.
+        const ghiChuChua =
+          Math.abs(chenhChua) > nguong
+            ? ` Trước thuế lệch ${num(chenhChua)} đ nhưng TỔNG + THUẾ khớp — thường do sổ ghi trước thuế đã trừ chiết khấu / cộng phí, không phải sai.`
+            : "";
+        d.bangChung = `${dauCau} ${chenh === 0 ? "Khớp số tiền." : `Chênh tổng ${num(Math.abs(chenh))} đ trong ngưỡng, coi như khớp.`}${ghiChuChua} ${baCap}`;
+        khop++;
       }
     }
 
@@ -1694,7 +1720,7 @@ export function doiSoat(sheets: SheetTho[], opt: TuyChonDoiSoat): KetQuaDoiSoat 
     sheetsHoaDon,
     sheetPhanMem,
     sheetsPhanMemPhu,
-    tong: { soHoaDon, khop, lech, thieu, thieuKhongCanVaoSo, ganKhop, soDongPm, pmCo, pmThieu, tongChenh, soLoiParse },
+    tong: { soHoaDon, khop, lech, lechThue, thieu, thieuKhongCanVaoSo, ganKhop, soDongPm, pmCo, pmThieu, tongChenh, soLoiParse },
     nghiVan,
     nghiVanGop,
     cauNoi,

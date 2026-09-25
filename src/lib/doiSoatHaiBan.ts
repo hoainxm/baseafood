@@ -22,6 +22,39 @@ const chuan = (s: unknown): string =>
 /** Sheet thuộc bản CƠ QUAN THUẾ gửi: tên sheet có chữ "thuế". */
 export const laBenThue = (tenSheet: string): boolean => chuan(tenSheet).includes("thue");
 
+/** Tên sheet đánh dấu bản KẾ TOÁN TỰ TẢI: có chữ "tải" đứng riêng (VD "HDDT-CTY TẢI", "TỰ TẢI"). */
+export const laBenTai = (tenSheet: string): boolean => /(^|[^a-z0-9])tai([^a-z0-9]|$)/.test(chuan(tenSheet));
+
+/** Cách máy chia hai bên — để màn hình nói rõ vì sao sheet nằm bên nào. */
+export type CachPhanBen = "chi-dinh" | "ten-thue" | "ten-tai" | "khong-ro";
+
+/**
+ * Chia các sheet hóa đơn thành bên THUẾ GỬI / bên TỰ TẢI.
+ *
+ * Thứ tự ưu tiên:
+ * 1. `chiDinh` — người dùng tự chọn trên màn (lưu theo bản đối soát).
+ * 2. Tên sheet có chữ "thuế" ⇒ bên thuế, còn lại là bản tự tải.
+ * 3. Không sheet nào có "thuế" nhưng có sheet mang chữ "tải" ⇒ sheet "tải" là bản tự
+ *    tải, còn lại là bên thuế. File thật hay đặt `HDDT` / `MTT` (thuế gửi) cạnh
+ *    `HDDT-CTY TẢI` — chỉ dò chữ "thuế" thì không nhận ra hai bản (memory 2026-09-21).
+ * 4. Không nhận ra ⇒ tập rỗng (không so hai bản được, màn hình mời người dùng chọn).
+ */
+export function phanBenThue(
+  tenSheets: readonly string[],
+  chiDinh?: readonly string[] | null
+): { benThue: Set<string>; cach: CachPhanBen } {
+  if (chiDinh) {
+    const co = new Set(tenSheets);
+    return { benThue: new Set(chiDinh.filter((t) => co.has(t))), cach: "chi-dinh" };
+  }
+  const theoThue = tenSheets.filter(laBenThue);
+  if (theoThue.length) return { benThue: new Set(theoThue), cach: "ten-thue" };
+  const theoTai = tenSheets.filter(laBenTai);
+  if (theoTai.length && theoTai.length < tenSheets.length)
+    return { benThue: new Set(tenSheets.filter((t) => !laBenTai(t))), cach: "ten-tai" };
+  return { benThue: new Set(), cach: "khong-ro" };
+}
+
 // ---------- 1. So hai bản hóa đơn điện tử ----------
 
 export type BenCo = "CA_HAI" | "CHI_THUE" | "CHI_TAI";
@@ -77,6 +110,13 @@ export interface KetQuaSoHaiBan {
 
 const viTri = (d: DongHoaDon): string => `${d.sheet} dòng ${d.dongFile}`;
 
+/** Chỉ số cột 0-based → chữ cột Excel (0 → A, 26 → AA). */
+export function chuCotExcel(c: number): string {
+  let s = "";
+  for (let n = c + 1; n > 0; n = Math.floor((n - 1) / 26)) s = String.fromCharCode(65 + ((n - 1) % 26)) + s;
+  return s;
+}
+
 /**
  * So bản THUẾ gửi với bản TỰ TẢI. Trả `null` nếu file không có đủ hai bên
  * (⇒ nơi gọi biết là không áp dụng chế độ này).
@@ -87,10 +127,11 @@ const viTri = (d: DongHoaDon): string => `${d.sheet} dòng ${d.dongFile}`;
  */
 export function soHaiBanHddt(
   sheets: readonly SheetHoaDon[],
-  nguong = 1
+  nguong = 1,
+  benThue: ReadonlySet<string> = phanBenThue(sheets.map((s) => s.ten)).benThue
 ): KetQuaSoHaiBan | null {
-  const benT = sheets.filter((s) => laBenThue(s.ten));
-  const benX = sheets.filter((s) => !laBenThue(s.ten));
+  const benT = sheets.filter((s) => benThue.has(s.ten));
+  const benX = sheets.filter((s) => !benThue.has(s.ten));
   if (!benT.length || !benX.length) return null;
 
   /** Gộp theo khóa: một khóa có thể xuất hiện nhiều dòng (hóa đơn bị kê hai lần). */
@@ -225,7 +266,10 @@ export interface NhomCungNgay {
  * siêu thị…), nên KHÔNG kết luận là sai. Việc của hàm này là lọc ra để người soát
  * nhìn, và đánh dấu riêng nhóm có hóa đơn **trùng khít số tiền** — chỗ dễ kê hai lần nhất.
  */
-export function gomCungMstCungNgay(sheets: readonly SheetHoaDon[]): NhomCungNgay[] {
+export function gomCungMstCungNgay(
+  sheets: readonly SheetHoaDon[],
+  benThue: ReadonlySet<string> = phanBenThue(sheets.map((s) => s.ten)).benThue
+): NhomCungNgay[] {
   const m = new Map<string, { mst: string; ten: string; ngay: string; ds: DongHoaDon[] }>();
   // File có HAI BẢN (thuế gửi + tự tải) thì mỗi hóa đơn hiện hai lần — một ở mỗi
   // bản. Đếm cả hai là nhóm nào cũng "trùng khít số tiền" (HDONDT 6 tháng: 1790/1923
@@ -235,7 +279,7 @@ export function gomCungMstCungNgay(sheets: readonly SheetHoaDon[]): NhomCungNgay
     for (const d of sh.dong) {
       const mst = chuan(d.mstBan);
       if (!mst || !d.ngayLap) continue;
-      const ben = laBenThue(sh.ten);
+      const ben = benThue.has(sh.ten);
       const da = benDaThay.get(d.khoa);
       if (da !== undefined && da !== ben) continue;
       benDaThay.set(d.khoa, ben);

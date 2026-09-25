@@ -765,7 +765,14 @@ export interface ReconciliationRun {
   threshold: number;
   fileName: string;
   fileB64: string; // file Excel gốc, base64
-  options: { soChuanTen?: string; edits?: Record<string, number> };
+  options: {
+    soChuanTen?: string;
+    edits?: Record<string, number>;
+    /** Sheet hóa đơn thuộc bản thuế gửi — người dùng chỉ định (thiếu = máy tự nhận). */
+    benThue?: string[];
+    /** Kiểu đối soát đang xem khi lưu (so · haiBan · kiemCong · cungNgay). */
+    cheDo?: string;
+  };
   summary: ReconciliationSummary;
   createdAt: string;
   updatedAt: string;

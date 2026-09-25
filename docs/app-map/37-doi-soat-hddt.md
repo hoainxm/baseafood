@@ -1,8 +1,9 @@
 > Load khi: sửa màn `/doi-soat`, logic đối soát hóa đơn điện tử ⇄ phần mềm kế toán, đọc/ghi file Excel hóa đơn.
-covers: src/features/doi-soat/DoiSoatScreen.tsx, src/features/doi-soat/index.ts, src/lib/doiSoatHddt.ts, src/lib/doiSoatHaiBan.ts, src/lib/doiSoatXuat.ts, src/lib/doiSoatXuatShift.ts, src/lib/doiSoatXuatTongHop.ts
-last_verified: 2026-09-22
+covers: src/features/doi-soat/DoiSoatScreen.tsx, src/features/doi-soat/CheDoDoiSoat.tsx, src/features/doi-soat/cheDo.ts, src/features/doi-soat/index.ts, src/lib/doiSoatHddt.ts, src/lib/doiSoatHaiBan.ts, src/lib/doiSoatXuat.ts, src/lib/doiSoatXuatShift.ts, src/lib/doiSoatXuatTongHop.ts
+last_verified: 2026-09-25
 ttl_days: 90
-<!-- re-verified: 2026-09-22 14:00 — claims checked vs code: khóa `MST|kýhiệu chuẩn|số chuẩn` (taoKhoa), gộp theo khóa + so tổng, ×tỷ giá cho ngoại tệ (doiSoatHddt.ts:1075-1144). Khớp code. -->
+<!-- re-verified: 2026-09-25 14:40 — /fl: claims checked vs code trước khi sửa: `laBenThue` chỉ dò chữ "thuế" (doiSoatHaiBan.ts) · `soHaiBanHddt`/`gomCungMstCungNgay` chỉ gọi ở lớp xuất (themSheetTongHop), KHÔNG hiện trên màn · `phatHienQuyUocNgoaiTe` chỉ dò theo sổ, soMau=0 ⇒ mặc định ×tỷ giá · `tong.lech` và `tong.lechThue` là HAI nhóm rời (cùng trangThai LECH). Khớp code. -->
+<!-- updated: 2026-09-25 — v7 NHIỀU KIỂU ĐỐI SOÁT TRÊN MÀN + dò ngoại tệ theo bản kia. Xem mục "v7" dưới. KIỂM THẬT trong trình duyệt: "Gửi lại.xls" (HDDT/MTT ⇄ *-CTY TẢI, không sổ) trước KHÔNG so hai bản được + bản thuế ~42,5 NGHÌN tỷ, 198 lệch tiền ⇒ nay tự chia hai bên theo chữ "tải", HDDT tự dò "đã VND" (190 phiếu / 0), CTY TẢI "nguyên tệ ×tỷ giá" (190/0), bản thuế 303 tỷ, lệch tiền 8 (đều lệch thật: bản tải ghi 0), file xuất có sheet SO HAI BẢN HĐĐT. HỒI QUY y nguyên: "SO SÁNH … 22_9" 2049/8/1494 (26 không cần vào sổ) · T8 56 chưa kê/9 gần khớp/12 dòng sổ thiếu (512 khớp + 39 lệch thuế) · "(1).xls" Q3049 = 9.268.400, lệch thật dòng 1685 = 9.360.068. 360px + 130%: không cuộn ngang ở cả 4 kiểu. build + lint + 48 test xanh. --><!-- re-verified: 2026-09-22 14:00 — claims checked vs code: khóa `MST|kýhiệu chuẩn|số chuẩn` (taoKhoa), gộp theo khóa + so tổng, ×tỷ giá cho ngoại tệ (doiSoatHddt.ts:1075-1144). Khớp code. -->
 <!-- updated: 2026-09-22 — v6.6 TỰ DÒ QUY ƯỚC NGOẠI TỆ (`phatHienQuyUocNgoaiTe`, gọi trong `doiSoat` sau khi gom khóa 2 bên, trước vòng ghép). BUG chủ dự án báo: file "SO SÁNH GHDON DTU VÀ PMEM" tổng trước thuế ra 41.919 tỷ (~42 NGHÌN tỷ) trong khi thật ~297 tỷ; nguyên nhân: bản xuất DTU này để tiền hóa đơn USD/JPY (271+18 dòng) ĐÃ quy sẵn VND, engine cũ vẫn `× Tỷ giá` (~26.000) → mỗi HĐ phình gấp ~26.000 lần (phí ngân hàng 143k đ thành 3,7 tỷ). CHỮA: `DongHoaDon` thêm `chuaThueRaw/thueRaw/tongTtRaw`; engine đối chiếu HĐ ngoại tệ đã khớp sổ (VND) — số gốc sát sổ hơn ⇒ hạ tỷ giá áp dụng về 1. KIỂM THẬT trên file gốc: 190 HĐ ngoại tệ khớp sổ → 190/190 có số GỐC = số sổ (vd raw 143.446 = sổ 143.445), 0 dòng sát khi ×tỷ giá ⇒ tự chọn "đã VND" chuẩn xác; 190 HĐ này trước bị gắn LỆCH TIỀN nay thành KHỚP; tổng A về ~297-300 tỷ. Convention NGƯỢC LẠI (nguyên tệ, số nhỏ) như file mẫu 02/2026 (dòng re-verified 2026-09-16 + ghi chú cuối doc "2 HĐ USD chênh 21-58đ") vẫn ×tỷ giá đúng vì saiNhan < saiGoc. build + lint xanh. -->
 <!-- CROSS-PLATFORM: chuyển file .xlsx Windows↔Mac KHÔNG đổi giá trị số trong ô — lỗi đội số là logic ×tỷ giá, không phải do đổi máy. Đối soát trên Mac gửi lại Windows an toàn (chỉ lưu ý dấu tiếng Việt trong TÊN file). -->
 <!-- updated: 2026-09-22 — v6.9 TÁCH 2 SHEET cho dễ đọc (chủ dự án: "KẾT LUẬN rối, 161 dòng trộn việc phải làm với chứng minh"). `sheetKetLuan` (doiSoatXuatTongHop.ts) nay trả `{ketLuan, kiemChung}` dựng HAI sheet: **KẾT LUẬN CHUNG** chỉ còn ~18 dòng = bảng VIỆC PHẢI LÀM (lọc mục hành động: chưa kê · nghi gõ sai số · lệch tiền · lệch thuế · dòng sổ không HĐ · ô nghi sai) + khối SO TỔNG gọn (`khoiSoTongGon`: A hóa đơn ĐT / B sổ / chênh, đủ 3 cột trước thuế·thuế·tổng); **KIỂM CHỨNG** (sheet mới, `TEN.kiemChung`, thêm vào `SHEET_TU_DUNG` để chạy lại idempotent) gom phần còn lại: bảng GHI CHÚ & TỰ KIỂM (cân đối cột · cùng MST · cảnh báo ngoại tệ · 9 phép thử) + `khoiDoiChieu` (A/B chi tiết + C + D + bóc tách) + `khoiDoLech` + `khoiNghiVan` + `khoiTuKiem`. Chia mục bằng `laKiem(t)`; link "chữ xanh" ở bảng trả lời trỏ cross-sheet sang KIỂM CHỨNG (`lienKet(TEN.kiemChung,…)`). Thứ tự sheet: KẾT LUẬN · HÓA ĐƠN CHƯA KÊ · KIỂM CHỨNG · (gốc) · CÙNG MST. KIỂM THẬT file 22_9: KẾT LUẬN 18 dòng, KIỂM CHỨNG 154 dòng, tự kiểm 9/9, chạy lại trên file đã xuất y hệt (2049/8/1494) — idempotent. build+lint xanh. -->
@@ -51,7 +52,7 @@ Công cụ **kế toán** (không phải nghiệp vụ MES). Đối chiếu hóa
 ## Khóa & so tiền (logic ở `lib/doiSoatHddt.ts`)
 
 - **Khóa đối chiếu** = `MST người bán | Ký hiệu hóa đơn | Số HĐ chuẩn` (chuẩn hóa: bỏ dấu, thường, gộp khoảng trắng). **Số HĐ chuẩn** = bỏ số 0 ở đầu (`00060568` → `60568`) vì phần mềm pad 0 còn cổng thuế thì không (`soHoaDonChuan`).
-- **Quy về VND — TỰ DÒ quy ước (`phatHienQuyUocNgoaiTe`):** cổng thuế xuất hóa đơn ngoại tệ theo **hai kiểu KHÁC nhau tùy bản xuất** — có bản để tiền ở **nguyên tệ** (phải `× Tỷ giá` ra VND), có bản đã **quy sẵn VND** ở cột tiền (nhân nữa là đội lên gấp ~tỷ giá lần → tổng phình từ vài trăm tỷ thành vài chục **nghìn** tỷ). Không cố định được nên engine **không đoán mò**: lấy hóa đơn ngoại tệ **đã khớp dòng sổ** (sổ luôn VND) làm mẫu, so **số gốc** vs **số ×tỷ giá** xem bên nào sát sổ hơn → đó là quy ước của file, áp cho MỌI dòng ngoại tệ. Mỗi dòng giữ `chuaThueRaw/thueRaw/tongTtRaw` (số gốc) để dò; khi kết luận "đã VND" thì hạ `tyGia` (áp dụng) về **1** và lấy lại số gốc. Không có mẫu khớp sổ ⇒ GIỮ mặc định `× Tỷ giá` + bắn cảnh báo soát tay. Cột nguồn "Tỷ giá" của file KHÔNG bị sửa; cột xuất "Tỷ giá áp dụng" = số thực đã nhân (1 khi không quy đổi).
+- **Quy về VND — TỰ DÒ quy ước (`phatHienQuyUocNgoaiTe`; không có sổ thì `doQuyUocTheoBanKia` — xem v7):** cổng thuế xuất hóa đơn ngoại tệ theo **hai kiểu KHÁC nhau tùy bản xuất** — có bản để tiền ở **nguyên tệ** (phải `× Tỷ giá` ra VND), có bản đã **quy sẵn VND** ở cột tiền (nhân nữa là đội lên gấp ~tỷ giá lần → tổng phình từ vài trăm tỷ thành vài chục **nghìn** tỷ). Không cố định được nên engine **không đoán mò**: lấy hóa đơn ngoại tệ **đã khớp dòng sổ** (sổ luôn VND) làm mẫu, so **số gốc** vs **số ×tỷ giá** xem bên nào sát sổ hơn → đó là quy ước của file, áp cho MỌI dòng ngoại tệ. Mỗi dòng giữ `chuaThueRaw/thueRaw/tongTtRaw` (số gốc) để dò; khi kết luận "đã VND" thì hạ `tyGia` (áp dụng) về **1** và lấy lại số gốc. Không có mẫu khớp sổ ⇒ GIỮ mặc định `× Tỷ giá` + bắn cảnh báo soát tay. Cột nguồn "Tỷ giá" của file KHÔNG bị sửa; cột xuất "Tỷ giá áp dụng" = số thực đã nhân (1 khi không quy đổi).
 - **Gộp theo khóa** cả 2 bên rồi so **tổng** (`Số dòng khớp PMKT` = số bút toán, `Tổng TT bên PMKT` = tổng `Tổng cộng`). Đây là lý do phải cộng dồn: 1 hóa đơn ↔ nhiều dòng thuế.
 - **Ngưỡng khớp** (`nguong`, mặc định **1.000đ**, chỉnh trên màn): `|chênh| ≤ ngưỡng` ⇒ vẫn **KHỚP** (nuốt sai số làm tròn tỷ giá). Chênh tính theo **HĐĐT − phần mềm**.
 
@@ -66,6 +67,53 @@ Công cụ **kế toán** (không phải nghiệp vụ MES). Đối chiếu hóa
 | PM → HĐĐT | `THIEU` | không thấy hóa đơn điện tử | đỏ |
 
 Màu chip lấy **token** `--status-*` (không viết mã màu tay); màu nền Excel là mã màu chuẩn Excel (file ngoài, độc lập token app). Mỗi dòng có cột **"Bằng chứng đối chiếu"** dạng văn xuôi (khớp phiếu nào, ngày, CTGS, TK, số tiền).
+
+## v7 — nhiều kiểu đối soát trên màn (2026-09-25)
+
+Kế toán gửi file kèm **một** câu hỏi mỗi lần (v6.4). Trước v7 màn chỉ trả lời chiều hóa đơn ⇄ sổ; ba chiều
+còn lại (so hai bản · kiểm cộng cột · cùng MST cùng ngày) **chỉ có trong file Excel xuất ra**. Nay engine vẫn
+chạy **một lần**, rồi người dùng chọn **"Bạn cần soát việc gì?"**:
+
+| Kiểu (`CheDo`, `features/doi-soat/cheDo.ts`) | Nguồn số | Khung xem |
+|---|---|---|
+| `so` — Hóa đơn ⇄ sổ kế toán | `doiSoat` (như cũ) | thẻ tổng · chỗ cần soát · bảng theo sheet · tự kiểm |
+| `haiBan` — So hai bản hóa đơn | `soHaiBanHddt` | chia bên từng sheet · thẻ · lọc chỉ-thuế-có / chỉ-tải-có / lệch / không so được |
+| `kiemCong` — Kiểm cộng cột bảng kê | `SheetHoaDon.canDoiCot` | mỗi sheet: phép cộng có chữ cột, ô tự đặt của kế toán, bảng bóc 4 nguyên nhân, danh sách dòng lệch |
+| `cungNgay` — Cùng MST cùng ngày | `gomCungMstCungNgay` | thẻ · lọc nhóm trùng khít số tiền |
+
+- **Màn không tự tính gì** — gọi đúng hàm thuần lớp xuất dùng ⇒ số trên màn = số trong file.
+- Kiểu **mặc định theo file** (`cheDoMacDinh`): có sổ → `so`; có hai bản → `haiBan`; còn lại → `kiemCong`.
+  Lưu bản: `options.cheDo` + `options.benThue` (jsonb, bản cũ thiếu trường ⇒ suy lại theo file).
+- Khối **"Quy tắc máy đang áp dụng"** (`QUY_TAC` ở `CheDoDoiSoat.tsx`) liệt kê các quy tắc đã chốt ở doc
+  này bằng lời thường + kết luận ngoại tệ của chính file. **Chốt quy tắc mới ⇒ thêm một dòng vào `QUY_TAC`.**
+- Thẻ "Lệch tiền / thuế" = `tong.lech + tong.lechThue` — hai nhóm **rời nhau** (cùng `trangThai = LECH`),
+  cộng lại mới khớp số ở bộ lọc bảng. Chip dòng: "Lệch thuế" (ketLuan `LỆCH THUẾ`), "Không cần vào sổ" (`khongCanVaoSo`).
+
+### Chia bản thuế gửi / bản tự tải — `phanBenThue`
+
+Bẫy cũ: `laBenThue` chỉ nhận sheet có chữ **"thuế"**. File thật hay đặt `HDDT` / `MTT` (thuế gửi) cạnh
+`HDDT-CTY TẢI` / `MTT-CTY TẢI` ⇒ không sheet nào có "thuế", so hai bản trả `null`, file xuất thiếu sheet
+SO HAI BẢN (trước phải đổi tên sheet bằng tay). Nay `phanBenThue(tenSheets, chiDinh?)` ưu tiên:
+
+1. `chiDinh` — người dùng bấm "Thuế gửi / Tự tải" từng sheet ở kiểu `haiBan` (nút "Để máy tự nhận" bỏ chọn);
+2. tên có "thuế" ⇒ bên thuế;
+3. không có "thuế" mà có sheet mang chữ **"tải"** đứng riêng (`laBenTai`) ⇒ sheet đó là bản tự tải, còn lại bên thuế;
+4. không nhận ra ⇒ rỗng.
+
+Cách chia đi sang lớp xuất qua `KetQuaDoiSoat.benThue` (engine không dùng, chỉ chở) ⇒ sheet SO HAI BẢN /
+CÙNG MST / lọc cảnh báo trùng khóa khác bên dùng **cùng** cách chia với màn. Test: `doiSoatHaiBan.test.ts`.
+
+### Ngoại tệ khi KHÔNG có sổ — dò theo bản kia (`doQuyUocTheoBanKia`)
+
+`phatHienQuyUocNgoaiTe` lấy sổ làm mốc. File so hai bản không có sổ ⇒ trước đây mặc định ×tỷ giá cho mọi
+dòng. Trên "Gửi lại.xls" bản thuế đã quy sẵn VND còn bản tự tải để USD ⇒ nhân cả hai: bản thuế ~42,5
+**nghìn** tỷ, 198 "lệch tiền" oan. Nay khi `soMau = 0`: với mỗi hóa đơn ngoại tệ có cùng khóa ở **sheet
+khác**, so số gốc và số ×tỷ giá với các giá trị có thể của dòng kia; một giả thiết sát (<5%) và giả thiết
+kia xa (>50%) mới tính phiếu; **quyết TỪNG SHEET** (hai bản có thể khác quy ước). Hai sheet cùng quy ước thì
+hai giả thiết hòa ⇒ không phiếu ⇒ giữ mặc định + cảnh báo soát tay như cũ. Nhánh có sổ **không đổi**.
+
+> ⚠️ Nhánh có sổ vẫn quyết **một quy ước cho cả file**. File vừa có sổ vừa có hai bản khác quy ước thì
+> bên thua phiếu sẽ bị quy sai — chưa gặp file thật như vậy; gặp thì chuyển nhánh sổ sang quyết theo sheet.
 
 ## v6.5 — dễ hiểu: nói bằng ô của kế toán, không dời ô
 

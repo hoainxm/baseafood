@@ -48,7 +48,16 @@ import {
   type SheetPhanMem,
   type TrangThaiHoaDon,
 } from "@/lib/doiSoatHddt";
+import { gomCungMstCungNgay, phanBenThue, soHaiBanHddt } from "@/lib/doiSoatHaiBan";
 import { num } from "@/lib/format";
+import {
+  ChonCheDo,
+  CungNgayView,
+  KiemCongView,
+  QuyTacBox,
+  SoHaiBanView,
+} from "./CheDoDoiSoat";
+import { DS_CHE_DO, cheDoMacDinh, type CheDo } from "./cheDo";
 import { useReconciliationRuns } from "@/lib/catalogRepo";
 import { useAuth } from "@/lib/auth";
 import type { ReconciliationRun } from "@/types";
@@ -73,9 +82,12 @@ type Workbook = Awaited<ReturnType<typeof docWorkbook>>;
 const PM_TAB = "__phan-mem__";
 const keySua = (nv: NghiVan) => `${nv.sheet}#${nv.soDong}#${nv.cot}`;
 
-function chipHoaDon(t: TrangThaiHoaDon) {
-  if (t === "KHOP") return <StatusChip trangThai="running" nhan="Khớp" />;
-  if (t === "LECH") return <StatusChip trangThai="idle" nhan="Lệch tiền" />;
+function chipHoaDon(r: DongHoaDon) {
+  if (r.trangThai === "KHOP") return <StatusChip trangThai="running" nhan="Khớp" />;
+  if (r.trangThai === "LECH")
+    return <StatusChip trangThai="idle" nhan={r.ketLuan === "LỆCH THUẾ" ? "Lệch thuế" : "Lệch tiền"} />;
+  // Hóa đơn đã bị thay thế / hủy: không có trong sổ là ĐÚNG — đừng tô đỏ như việc phải làm.
+  if (r.khongCanVaoSo) return <StatusChip trangThai="idle" nhan="Không cần vào sổ" />;
   return <StatusChip trangThai="stopped" nhan="Chưa vào sổ" />;
 }
 
@@ -469,7 +481,7 @@ function NghiVanBox({
 const LOC_HD: { id: TrangThaiHoaDon | "all"; nhan: string }[] = [
   { id: "all", nhan: "Tất cả" },
   { id: "KHOP", nhan: "Khớp" },
-  { id: "LECH", nhan: "Lệch tiền" },
+  { id: "LECH", nhan: "Lệch tiền / thuế" },
   { id: "THIEU", nhan: "Chưa vào sổ" },
 ];
 
@@ -492,7 +504,7 @@ function BangHoaDon({
     [sheet, loc]
   );
   const cot: Cot<DongHoaDon>[] = [
-    { key: "kq", header: "Kết quả", chinh: true, render: (r) => chipHoaDon(r.trangThai) },
+    { key: "kq", header: "Kết quả", chinh: true, render: (r) => chipHoaDon(r) },
     { key: "kh", header: "Ký hiệu", render: (r) => r.kyHieu, sapXep: (r) => r.kyHieu },
     { key: "so", header: "Số HĐ", render: (r) => r.soHoaDon, sapXep: (r) => r.soChuan },
     { key: "ngay", header: "Ngày lập", render: (r) => r.ngayLap, sapXep: (r) => r.ngayLap },
@@ -602,6 +614,9 @@ export default function DoiSoatScreen() {
   const [locHD, setLocHD] = useState<TrangThaiHoaDon | "all">("all"); // lọc bảng HĐĐT (điều khiển được từ thẻ tổng)
   const [pmChiThieu, setPmChiThieu] = useState(false); // lọc bảng sổ: chỉ dòng chưa có hóa đơn
   const [moKiemTra, setMoKiemTra] = useState(false); // mở khối "Kiểm tra chi tiết"
+  const [cheDo, setCheDo] = useState<CheDo>("so"); // kiểu đối soát đang xem
+  // Sheet thuộc bản thuế gửi do người dùng chỉ định; null = để máy tự nhận theo tên sheet.
+  const [benThueChon, setBenThueChon] = useState<string[] | null>(null);
   // Lưu theo tài khoản (v4)
   const [b64, setB64] = useState<string>(""); // base64 file gốc hiện hành (để lưu / mở lại)
   const [tenHienThi, setTenHienThi] = useState<string>(""); // tên file / tên bản đang mở
@@ -627,6 +642,30 @@ export default function DoiSoatScreen() {
     });
   }, [wb, nguong, edits, nghiVanBanDau, soChuanTen]);
 
+  // Ba chiều soát ngoài "hóa đơn ⇄ sổ" — cùng hàm thuần lớp xuất dùng, nên số trên màn = số trong file.
+  const tenSheetHd = useMemo(() => ketQua?.sheetsHoaDon.map((s) => s.ten) ?? [], [ketQua]);
+  const phanBen = useMemo(() => phanBenThue(tenSheetHd, benThueChon), [tenSheetHd, benThueChon]);
+  const soHaiBan = useMemo(
+    () => (ketQua ? soHaiBanHddt(ketQua.sheetsHoaDon, ketQua.nguong, phanBen.benThue) : null),
+    [ketQua, phanBen]
+  );
+  const cungNgay = useMemo(
+    () => (ketQua ? gomCungMstCungNgay(ketQua.sheetsHoaDon.filter((s) => !s.laPhu), phanBen.benThue) : []),
+    [ketQua, phanBen]
+  );
+  const doiBen = (ten: string, laThue: boolean) => {
+    const s = new Set(phanBen.benThue);
+    if (laThue) s.add(ten);
+    else s.delete(ten);
+    setBenThueChon(tenSheetHd.filter((t) => s.has(t)));
+  };
+  /** Kiểu mặc định theo nội dung file, tính trên kết quả vừa chạy. */
+  const cheDoTheoFile = (kq: KetQuaDoiSoat, benChon: string[] | null) =>
+    cheDoMacDinh(
+      !!kq.sheetPhanMem,
+      !!soHaiBanHddt(kq.sheetsHoaDon, kq.nguong, phanBenThue(kq.sheetsHoaDon.map((s) => s.ten), benChon).benThue)
+    );
+
   const chonFile = () => fileRef.current?.click();
   const napFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0] ?? null;
@@ -636,6 +675,7 @@ export default function DoiSoatScreen() {
     setSuaLog({});
     setNghiVanBanDau(null);
     setSoChuanTen(undefined);
+    setBenThueChon(null);
     setB64("");
     setTenHienThi(f?.name ?? "");
     setBanDangMo(null);
@@ -667,8 +707,12 @@ export default function DoiSoatScreen() {
       setTab(kq0.sheetsHoaDon[0]?.ten ?? (kq0.sheetPhanMem ? PM_TAB : ""));
       setLocHD("all");
       setPmChiThieu(false);
+      setBenThueChon(null);
+      setCheDo(cheDoTheoFile(kq0, null));
       notify.daLuu(
-        `Đối soát xong: ${kq0.tong.khop} khớp · ${kq0.tong.lech} lệch tiền · ${kq0.tong.thieu} chưa vào sổ · ${baseline} chỗ cần soát.`
+        kq0.sheetPhanMem
+          ? `Đối soát xong: ${kq0.tong.khop} khớp · ${kq0.tong.lech + kq0.tong.lechThue} lệch tiền/thuế · ${kq0.tong.thieu} chưa vào sổ · ${baseline} chỗ cần soát.`
+          : `Đã đọc ${kq0.tong.soHoaDon} hóa đơn ở ${kq0.sheetsHoaDon.length} sheet (file không có sổ kế toán) — chọn việc cần soát bên dưới.`
       );
     } catch (err) {
       notify.loi(`Không đọc được file: ${err instanceof Error ? err.message : String(err)}`);
@@ -707,7 +751,8 @@ export default function DoiSoatScreen() {
 
   const taiExcel = () => {
     if (!ketQua) return;
-    void xuatFile(ketQua, file?.name ?? "doi-soat", b64, edits);
+    // Chở cách chia bên thuế/tự tải sang lớp xuất để sheet SO HAI BẢN giống màn hình.
+    void xuatFile({ ...ketQua, benThue: benThueChon ?? undefined }, tenHienThi || file?.name || "doi-soat", b64, edits);
   };
 
   const apDungSua = (nv: NghiVan) => {
@@ -755,7 +800,7 @@ export default function DoiSoatScreen() {
       threshold: nguong ?? 1,
       fileName: tenHienThi,
       fileB64: b64,
-      options: { soChuanTen, edits },
+      options: { soChuanTen, edits, benThue: benThueChon ?? undefined, cheDo },
       summary: {
         soHoaDon: t.soHoaDon, khop: t.khop, lech: t.lech, thieu: t.thieu, ganKhop: t.ganKhop,
         soDongPm: t.soDongPm, pmCo: t.pmCo, pmThieu: t.pmThieu, tongChenh: t.tongChenh,
@@ -792,6 +837,10 @@ export default function DoiSoatScreen() {
       setTab(kq0.sheetsHoaDon[0]?.ten ?? (kq0.sheetPhanMem ? PM_TAB : ""));
       setLocHD("all");
       setPmChiThieu(false);
+      const benLuu = run.options?.benThue ?? null;
+      setBenThueChon(benLuu);
+      const cheDoLuu = run.options?.cheDo as CheDo | undefined;
+      setCheDo(cheDoLuu && DS_CHE_DO.includes(cheDoLuu) ? cheDoLuu : cheDoTheoFile(kq0, benLuu));
       notify.daLuu(`Đã mở lại "${run.title}" (${run.status === "official" ? "chính thức" : "nháp"}).`);
     } catch (err) {
       notify.loi(`Không mở lại được: ${err instanceof Error ? err.message : String(err)}`);
@@ -813,7 +862,7 @@ export default function DoiSoatScreen() {
         edits: run.options?.edits,
         soChuanTen: run.options?.soChuanTen,
       });
-      void xuatFile(kq, run.title || "doi-soat", run.fileB64, run.options?.edits);
+      void xuatFile({ ...kq, benThue: run.options?.benThue }, run.title || "doi-soat", run.fileB64, run.options?.edits);
     } catch (err) {
       notify.loi(`Không xuất được: ${err instanceof Error ? err.message : String(err)}`);
     }
@@ -839,14 +888,40 @@ export default function DoiSoatScreen() {
     the.push(
       { nhan: "Hóa đơn điện tử", giaTri: num(t.soHoaDon), so: true, mau: "brand", icon: FileSpreadsheet, onChon: () => denHD("all"), moTaChon: "Xem tất cả hóa đơn điện tử" },
       { nhan: "Khớp", giaTri: num(t.khop), so: true, mau: "success", onChon: () => denHD("KHOP"), moTaChon: "Xem hóa đơn đã khớp sổ" },
-      { nhan: "Lệch tiền", giaTri: num(t.lech), so: true, mau: "warning", onChon: () => denHD("LECH"), moTaChon: "Xem hóa đơn lệch tiền" },
-      { nhan: "Chưa vào sổ", giaTri: num(t.thieu), so: true, mau: "danger", phu: t.ganKhop ? `${num(t.ganKhop)} gần khớp` : undefined, onChon: () => denHD("THIEU"), moTaChon: "Xem hóa đơn chưa có trong sổ" },
+      // tong.lech và tong.lechThue là HAI nhóm rời (cùng trạng thái LECH) — thẻ cộng cả hai cho khớp số ở bộ lọc bảng.
+      { nhan: "Lệch tiền / thuế", giaTri: num(t.lech + t.lechThue), so: true, mau: "warning", phu: `${num(t.lech)} lệch tiền · ${num(t.lechThue)} lệch thuế`, onChon: () => denHD("LECH"), moTaChon: "Xem hóa đơn lệch tiền / lệch thuế" },
+      {
+        nhan: "Chưa vào sổ",
+        giaTri: num(t.thieu),
+        so: true,
+        mau: "danger",
+        phu: [t.thieuKhongCanVaoSo ? `${num(t.thieuKhongCanVaoSo)} không cần vào sổ` : "", t.ganKhop ? `${num(t.ganKhop)} gần khớp` : ""].filter(Boolean).join(" · ") || undefined,
+        onChon: () => denHD("THIEU"),
+        moTaChon: "Xem hóa đơn chưa có trong sổ",
+      },
       { nhan: "Dòng sổ kế toán", giaTri: num(t.soDongPm), so: true, mau: "brand", onChon: () => denPM(false), moTaChon: "Xem tất cả dòng sổ kế toán" },
       { nhan: "Dòng sổ thiếu hóa đơn", giaTri: num(t.pmThieu), so: true, mau: "danger", onChon: () => denPM(true), moTaChon: "Xem dòng sổ chưa có hóa đơn" },
       { nhan: "Tổng tiền lệch", giaTri: num(t.tongChenh), so: true, mau: "warning", phu: "ở các hóa đơn lệch tiền", onChon: () => denHD("LECH"), moTaChon: "Xem hóa đơn lệch tiền" },
       { nhan: "Cần soát lại", giaTri: num(soNghi), so: true, mau: soNghi ? "warning" : "success", onChon: soNghi ? () => cuonToiId("ds-nghivan") : undefined, moTaChon: soNghi ? "Xuống mục cần soát lại" : undefined }
     );
   }
+
+  const demCheDo: Record<CheDo, { chu: string; apDung: boolean }> = {
+    so: ketQua?.sheetPhanMem
+      ? { chu: `${num(ketQua.tong.thieu)} chưa vào sổ · ${num(ketQua.tong.lech)} lệch tiền · ${num(ketQua.tong.lechThue)} lệch thuế`, apDung: true }
+      : { chu: "File không có sheet sổ kế toán", apDung: false },
+    haiBan: soHaiBan
+      ? { chu: `${num(soHaiBan.tong.chiThue)} bản tự tải thiếu · ${num(soHaiBan.tong.lechTien)} lệch tiền`, apDung: true }
+      : { chu: tenSheetHd.length < 2 ? "Cần 2 sheet hóa đơn (thuế gửi + tự tải)" : "Chưa chia được hai bên — bấm để chọn", apDung: false },
+    kiemCong: (() => {
+      const ds = ketQua?.sheetsHoaDon.filter((s) => !s.laPhu) ?? [];
+      const that = ds.reduce((n, s) => n + s.canDoiCot.soDong.lechThat, 0);
+      return { chu: that ? `${num(that)} dòng lệch thật` : "Không có dòng lệch thật", apDung: ds.length > 0 };
+    })(),
+    cungNgay: cungNgay.length
+      ? { chu: `${num(cungNgay.length)} nhóm · ${num(cungNgay.filter((g) => g.trungSoTien).length)} trùng khít tiền`, apDung: true }
+      : { chu: "Không có nhóm nào", apDung: false },
+  };
 
   const dsSoPm = ketQua ? [ketQua.sheetPhanMem, ...ketQua.sheetsPhanMemPhu].filter(Boolean) as SheetPhanMem[] : [];
   const tuKiemLoi = ketQua ? ketQua.phepThu.some((p) => !p.dat) : false;
@@ -860,9 +935,10 @@ export default function DoiSoatScreen() {
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-muted-foreground">
-            Tải file Excel gồm các sheet hóa đơn điện tử (cổng thuế) và sheet PHẦN MỀM (kế toán). Đối
-            chiếu theo <b>MST người bán · ký hiệu · số hóa đơn</b>, quy về VND. Hệ thống <b>KHÔNG tự sửa
-            số liệu</b> — chỗ nghi sai chỉ được báo, bạn tự bấm Sửa từng dòng.
+            Tải một file Excel có các sheet hóa đơn điện tử (cổng thuế), kèm sheet sổ kế toán nếu có. Máy
+            chạy một lần rồi cho xem theo <b>việc bạn cần soát</b>: hóa đơn ⇄ sổ · so hai bản hóa đơn (thuế
+            gửi ⇄ tự tải) · kiểm cộng cột bảng kê · cùng MST cùng ngày. Ghép theo <b>MST người bán · ký hiệu ·
+            số hóa đơn</b>. Hệ thống <b>KHÔNG tự sửa số liệu</b> — chỗ nghi sai chỉ được báo, bạn tự bấm Sửa từng dòng.
           </p>
           <input ref={fileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={napFile} />
           <div className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-end">
@@ -893,7 +969,7 @@ export default function DoiSoatScreen() {
               />
             </div>
             <Button
-              title="Chạy đối soát: so từng dòng sổ phần mềm với hóa đơn điện tử, gắn nhãn khớp / gần khớp / thiếu." onClick={chay} disabled={dangChay} className="w-full md:w-auto">
+              title="Chạy đối soát trên file đã chọn — sau đó chọn việc cần soát: đối chiếu sổ, so hai bản, kiểm cộng cột, cùng MST cùng ngày." onClick={chay} disabled={dangChay} className="w-full md:w-auto">
               <ScanSearch />
               {dangChay ? "Đang đối soát…" : "Đối soát"}
             </Button>
@@ -982,7 +1058,7 @@ export default function DoiSoatScreen() {
         <EmptyState
           icon={FileSpreadsheet}
           tieuDe="Chưa có kết quả đối soát"
-          moTa="Chọn file Excel rồi bấm Đối soát. File cần có ít nhất một sheet hóa đơn điện tử và một sheet PHẦN MỀM."
+          moTa="Chọn file Excel rồi bấm Đối soát. File cần ít nhất một sheet hóa đơn điện tử; có thêm sheet sổ kế toán thì đối chiếu được với sổ, có hai bản hóa đơn thì so được hai bản."
           action={
             <Button
               title="Chọn file Excel hóa đơn điện tử để bắt đầu." variant="outline" onClick={chonFile}>
@@ -992,6 +1068,33 @@ export default function DoiSoatScreen() {
         />
       ) : (
         <>
+          <section className="space-y-3" aria-label="Việc cần soát">
+            <h2 className="font-semibold">Bạn cần soát việc gì?</h2>
+            <ChonCheDo cheDo={cheDo} setCheDo={setCheDo} dem={demCheDo} />
+            <QuyTacBox canhBao={ketQua.canhBao} />
+          </section>
+
+          {cheDo === "haiBan" && (
+            <SoHaiBanView
+              kq={soHaiBan}
+              tenSheets={tenSheetHd}
+              benThue={phanBen.benThue}
+              cach={phanBen.cach}
+              onDoiBen={doiBen}
+              onTuNhan={() => setBenThueChon(null)}
+            />
+          )}
+          {cheDo === "kiemCong" && <KiemCongView sheets={ketQua.sheetsHoaDon} />}
+          {cheDo === "cungNgay" && <CungNgayView nhom={cungNgay} />}
+
+          {cheDo === "so" && (
+          <>
+          {!ketQua.sheetPhanMem && (
+            <div className="rounded-xl border border-warning/30 bg-warning-surface p-3 text-sm">
+              File này <b>không có sheet sổ kế toán</b> (PHẦN MỀM / PMEM) nên mọi hóa đơn sẽ hiện “chưa vào sổ”.
+              Nếu bạn chỉ cần kiểm cộng cột hay so hai bản hóa đơn, chọn kiểu tương ứng ở trên.
+            </div>
+          )}
           <ThongKe the={the} cot={4} />
           <p className="text-sm text-muted-foreground">
             Bấm vào một thẻ số ở trên để nhảy thẳng xuống danh sách tương ứng bên dưới.
@@ -1094,6 +1197,8 @@ export default function DoiSoatScreen() {
               </>
             )}
           </div>
+          </>
+          )}
         </>
       )}
     </div>

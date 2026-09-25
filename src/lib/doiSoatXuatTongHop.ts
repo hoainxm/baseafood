@@ -16,7 +16,7 @@
 import type { KetQuaDoiSoat, SheetHoaDon } from "./doiSoatHddt";
 import { SHEET_TU_DUNG } from "./doiSoatHddt";
 import type { KetQuaSoHaiBan, NhomCungNgay } from "./doiSoatHaiBan";
-import { gomCungMstCungNgay, laBenThue, soHaiBanHddt } from "./doiSoatHaiBan";
+import { gomCungMstCungNgay, phanBenThue, soHaiBanHddt } from "./doiSoatHaiBan";
 
 type Workbook = import("exceljs").Workbook;
 type Worksheet = import("exceljs").Worksheet;
@@ -657,7 +657,8 @@ function sheetKetLuan(
     const m = /\(([^()]+)\)\.?$/.exec(c.chiTiet);
     if (!m) return false;
     // "(A#12, B#80, …)": trùng chỉ vì mỗi bên có một bản ⇒ mỗi bên đúng một lần.
-    const ben = m[1]!.split(", ").map((x) => laBenThue(x.replace(/#\d+$/, "")));
+    const benThue = new Set(ds.haiBan.sheetThue);
+    const ben = m[1]!.split(", ").map((x) => benThue.has(x.replace(/#\d+$/, "")));
     return ben.filter(Boolean).length === 1 && ben.length === 2;
   };
   const theoLoai = new Map<string, string[]>();
@@ -1020,8 +1021,9 @@ export function themSheetTongHop(wb: Workbook, kq: KetQuaDoiSoat, cotRa: CotRa):
   // Sheet gốc lùi về sau; sheet tổng hợp chiếm các chỗ đầu.
   wb.worksheets.forEach((w, i) => ((w as unknown as ThuTu).orderNo = 10 + i));
 
-  const soHaiBan = soHaiBanHddt(kq.sheetsHoaDon, kq.nguong);
-  const cungNgay = gomCungMstCungNgay(kq.sheetsHoaDon.filter((s) => !s.laPhu));
+  const { benThue } = phanBenThue(kq.sheetsHoaDon.map((s) => s.ten), kq.benThue);
+  const soHaiBan = soHaiBanHddt(kq.sheetsHoaDon, kq.nguong, benThue);
+  const cungNgay = gomCungMstCungNgay(kq.sheetsHoaDon.filter((s) => !s.laPhu), benThue);
   const chuaKe = kq.sheetPhanMem ? sheetChuaKe(wb, kq) : null;
   const haiBan = soHaiBan ? sheetSoHaiBan(wb, soHaiBan) : null;
   const ngay = cungNgay.length ? sheetCungNgay(wb, cungNgay) : null;

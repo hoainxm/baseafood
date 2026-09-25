@@ -18,7 +18,7 @@ npm run build    # tsc -b && vite build — cổng kiểu, phải xanh
 npm run lint     # oxlint
 ```
 
-**Test tự động (từ 2026-09-21):** `vitest` — 35 test cho hàm thuần (`balancingCalc` · `inventory.tinhTon/locBanLe/khaDung` · `format` · `imports/importHelpers` gom chuyến/ghi bù · `production/wipHelpers` tách râu/bao tử); chạy `npm test`. **CI GitHub Actions** (`.github/workflows/ci.yml`) chạy lint + build + test mỗi push/PR. Màn hình vẫn thử tay trên preview — xem bảng bên dưới.
+**Test tự động (từ 2026-09-21):** `vitest` — 48 test cho hàm thuần (`balancingCalc` · `inventory.tinhTon/locBanLe/khaDung` · `format` · `imports/importHelpers` gom chuyến/ghi bù · `production/wipHelpers` tách râu/bao tử · `doiSoatHaiBan.phanBenThue` chia bản thuế/tự tải); chạy `npm test`. **CI GitHub Actions** (`.github/workflows/ci.yml`) chạy lint + build + test mỗi push/PR. Màn hình vẫn thử tay trên preview — xem bảng bên dưới.
 
 ## Cấu trúc
 
@@ -101,7 +101,7 @@ Chưa rõ tier ⇒ coi là 🔴. Dữ liệu ở đây là **sổ sách thật c
 | `features/BalancingScreen.tsx`, `BalancingTable.tsx`, `lib/balancingCalc.ts` | [`31-can-doi-ky.md`](docs/app-map/31-can-doi-ky.md) |
 | `features/CatalogScreen.tsx`, `FinishedGoodScreen.tsx`, `data/thanh-pham.json` | [`32-danh-muc.md`](docs/app-map/32-danh-muc.md) |
 | `features/monthly-stock/**`, `lib/monthlyStock.ts`, `lib/monthlyStockExcel.ts` (sổ kho theo tháng, dồn kỳ, nhập Excel bảng kê) | [`36-so-kho-thang.md`](docs/app-map/36-so-kho-thang.md) |
-| `features/doi-soat/**`, `lib/doiSoat*.ts` (đối soát HĐĐT ⇄ sổ kế toán · so hai bản HĐĐT · lọc cùng MST cùng ngày; xuất Excel giữ định dạng gốc + bám bố cục file mẫu) | [`37-doi-soat-hddt.md`](docs/app-map/37-doi-soat-hddt.md) |
+| `features/doi-soat/**`, `lib/doiSoat*.ts` (đối soát HĐĐT ⇄ sổ kế toán · so hai bản HĐĐT · kiểm cộng cột · lọc cùng MST cùng ngày — 4 kiểu chọn trên màn; xuất Excel giữ định dạng gốc + bám bố cục file mẫu) | [`37-doi-soat-hddt.md`](docs/app-map/37-doi-soat-hddt.md) |
 | `lib/truyXuatLo.ts`, `features/qr/**`, `features/shared/{GanLoDauVao,KhungQuetQr,QrTemLoIn,useDuLieuTruyXuat}`, bảng `lot_inputs` (truy xuất lô bằng QR) | [`spec/qr-truy-xuat-lo.md`](docs/spec/qr-truy-xuat-lo.md) (+ [`34`](docs/app-map/34-btp-san-xuat-kho.ba-spec.md) nếu đổi luồng gắn lô ở SX/đóng gói) |
 | `supabase/migrations/**` | [`03-database.md`](docs/app-map/03-database.md) (+ [`04`](docs/app-map/04-tang-du-lieu.md) nếu đổi ánh xạ) |
 | `lib/repo.ts`, `db.ts`, `catalogRepo.ts`, `connectivity.ts` | [`04-tang-du-lieu.md`](docs/app-map/04-tang-du-lieu.md) |

@@ -313,6 +313,12 @@ export interface KetQuaDoiSoat {
   daGoCotCu: boolean; // v3 §1.5: đã gỡ cột đối soát của lần chạy trước
   nhatKySua: { viTri: string; cu: string; moi: string }[];
   nguong: number;
+  /**
+   * Sheet hóa đơn thuộc bản CƠ QUAN THUẾ gửi, do người dùng chỉ định trên màn
+   * (undefined = máy tự nhận theo tên sheet, xem `phanBenThue`). Engine KHÔNG dùng —
+   * chỉ chở sang lớp xuất để sheet SO HAI BẢN chia bên giống màn hình.
+   */
+  benThue?: string[];
 }
 
 export interface TuyChonDoiSoat {
@@ -1347,10 +1353,85 @@ const uniq = (arr: string[]): string[] => [...new Set(arr.filter(Boolean))];
  * Chỉ hạ tỷ giá về 1 (bỏ nhân) khi số GỐC sát sổ hơn hẳn; nếu không có mẫu đối chiếu thì
  * GIỮ NGUYÊN hành vi cũ (nhân tỷ giá) và bắn cảnh báo để kế toán soát tay.
  */
+/** Hạ các dòng ngoại tệ về SỐ GỐC (cổng đã quy sẵn VND) — tỷ giá áp dụng = 1. */
+function veSoGoc(ds: readonly DongHoaDon[]): void {
+  for (const d of ds) {
+    d.chuaThueVnd = d.chuaThueRaw;
+    d.thueVnd = d.thueRaw;
+    d.tongTtVnd = d.tongTtRaw;
+    d.tyGia = 1; // tỷ giá ÁP DỤNG = 1 (rate gốc vẫn còn ở cột "Tỷ giá" của file nguồn)
+  }
+}
+
+/**
+ * Dò quy ước ngoại tệ TỪNG SHEET bằng BẢN KIA khi không có sổ làm mốc.
+ *
+ * File so hai bản (thuế gửi ⇄ tự tải) thường không kèm sổ, và hai bản có thể để tiền
+ * ngoại tệ theo HAI quy ước khác nhau: file "Gửi lại.xls" (2026-09-25) bản thuế đã quy
+ * sẵn VND (~69 tr) trong khi bản tự tải để USD (×tỷ giá ra ~68,7 tr). Nhân cả hai ⇒ bản
+ * thuế phình thành ~42 NGHÌN tỷ, 198 hóa đơn báo "lệch tiền" oan.
+ *
+ * Cách dò: hóa đơn ngoại tệ có mặt ở một sheet KHÁC (cùng khóa) ⇒ so số gốc và số
+ * ×tỷ giá của nó với các giá trị có thể của dòng bên kia (số gốc, và ×tỷ giá nếu bên
+ * kia cũng ngoại tệ). Chỉ bỏ phiếu khi một giả thiết sát (<5%) còn giả thiết kia xa hẳn
+ * (>50%) — hai sheet cùng quy ước thì hai giả thiết HÒA nhau ⇒ không phiếu, giữ mặc định.
+ * Trả về các dòng ngoại tệ CHƯA kết luận được.
+ */
+function doQuyUocTheoBanKia(tatCa: readonly SheetHoaDon[], canhBao: CanhBao[]): DongHoaDon[] {
+  const theoKhoa = new Map<string, DongHoaDon[]>();
+  for (const sh of tatCa)
+    for (const d of sh.dong) {
+      if (d.boCucLech || !d.khoa) continue; // cột tiền lệch ô — không làm mốc được
+      const a = theoKhoa.get(d.khoa);
+      if (a) a.push(d);
+      else theoKhoa.set(d.khoa, [d]);
+    }
+  const phieu = new Map<string, { goc: number; nhan: number }>();
+  for (const ds of theoKhoa.values())
+    for (const d of ds) {
+      if (!(d.tyGia > 1) || !d.tongTtRaw) continue;
+      const moc: number[] = [];
+      for (const e of ds) {
+        if (e.sheet === d.sheet || !e.tongTtRaw) continue;
+        moc.push(e.tongTtRaw);
+        if (e.tyGia > 1) moc.push(e.tongTtRaw * e.tyGia);
+      }
+      if (!moc.length) continue;
+      const sai = (v: number) => Math.min(...moc.map((m) => Math.abs(v - m) / Math.max(Math.abs(v), Math.abs(m))));
+      const saiGoc = sai(d.tongTtRaw);
+      const saiNhan = sai(d.tongTtRaw * d.tyGia);
+      const p = phieu.get(d.sheet) ?? { goc: 0, nhan: 0 };
+      if (saiGoc < 0.05 && saiNhan > 0.5) p.goc++;
+      else if (saiNhan < 0.05 && saiGoc > 0.5) p.nhan++;
+      phieu.set(d.sheet, p);
+    }
+
+  const chuaRo: DongHoaDon[] = [];
+  for (const sh of tatCa) {
+    const nt = sh.dong.filter((d) => d.tyGia > 1);
+    if (!nt.length) continue;
+    const p = phieu.get(sh.ten);
+    if (p && p.goc > p.nhan) {
+      veSoGoc(nt);
+      canhBao.push({
+        loai: "Đơn vị tiền tệ ngoại tệ",
+        chiTiet: `Sheet "${sh.ten}": ${nt.length} hóa đơn ngoại tệ đã QUY SẴN ra VND ở cột tiền — KHÔNG nhân tỷ giá (không có sổ, đối chiếu với bản còn lại: ${p.goc} hóa đơn có số GỐC sát bản kia, ${p.nhan} hóa đơn sát khi ×tỷ giá).`,
+      });
+    } else if (p && p.nhan > p.goc) {
+      canhBao.push({
+        loai: "Đơn vị tiền tệ ngoại tệ",
+        chiTiet: `Sheet "${sh.ten}": ${nt.length} hóa đơn ngoại tệ để NGUYÊN TỆ — quy về VND bằng cách NHÂN tỷ giá (không có sổ, đối chiếu với bản còn lại: ${p.nhan} hóa đơn sát bản kia khi ×tỷ giá, ${p.goc} hóa đơn sát khi để nguyên).`,
+      });
+    } else chuaRo.push(...nt);
+  }
+  return chuaRo;
+}
+
 function phatHienQuyUocNgoaiTe(
   hdActive: SheetHoaDon[],
   pmTheoKhoa: Map<string, DongPhanMem[]>,
   canhBao: CanhBao[],
+  tatCaSheetHd: readonly SheetHoaDon[] = hdActive,
 ): void {
   const ngoaiTe: DongHoaDon[] = [];
   for (const sh of hdActive)
@@ -1374,21 +1455,19 @@ function phatHienQuyUocNgoaiTe(
   }
 
   if (soMau === 0) {
+    // Không có sổ làm mốc ⇒ thử lấy bản còn lại (file so hai bản) làm mốc, từng sheet.
+    const chuaRo = doQuyUocTheoBanKia(tatCaSheetHd, canhBao);
+    if (!chuaRo.length) return;
     canhBao.push({
       loai: "Đơn vị tiền tệ ngoại tệ",
-      chiTiet: `${ngoaiTe.length} hóa đơn ngoại tệ nhưng KHÔNG có hóa đơn nào khớp được dòng sổ để đối chiếu — engine tạm QUY VỀ VND bằng cách NHÂN tỷ giá (hành vi mặc định). Nếu cổng thuế đã ghi sẵn VND thì số sẽ bị đội lên; hãy soát tay vài dòng ngoại tệ rồi báo lại.`,
+      chiTiet: `${chuaRo.length} hóa đơn ngoại tệ nhưng KHÔNG có hóa đơn nào khớp được dòng sổ để đối chiếu — engine tạm QUY VỀ VND bằng cách NHÂN tỷ giá (hành vi mặc định). Nếu cổng thuế đã ghi sẵn VND thì số sẽ bị đội lên; hãy soát tay vài dòng ngoại tệ rồi báo lại.`,
     });
     return;
   }
 
   // Số gốc sát sổ hơn ở đa số mẫu ⇒ cổng đã quy sẵn VND ⇒ BỎ nhân tỷ giá.
   if (phieuRaw > phieuNhan) {
-    for (const d of ngoaiTe) {
-      d.chuaThueVnd = d.chuaThueRaw;
-      d.thueVnd = d.thueRaw;
-      d.tongTtVnd = d.tongTtRaw;
-      d.tyGia = 1; // tỷ giá ÁP DỤNG = 1 (rate gốc vẫn còn ở cột "Tỷ giá" của file nguồn)
-    }
+    veSoGoc(ngoaiTe);
     canhBao.push({
       loai: "Đơn vị tiền tệ ngoại tệ",
       chiTiet: `${ngoaiTe.length} hóa đơn ngoại tệ: cổng thuế đã QUY SẴN ra VND ở cột tiền — engine KHÔNG nhân tỷ giá (đối chiếu ${soMau} hóa đơn khớp sổ: ${phieuRaw} dòng có số GỐC sát sổ, chỉ ${phieuNhan} dòng sát khi ×tỷ giá). Nếu sai, đây là dấu hiệu bản xuất lần này để nguyên tệ — báo lại để chỉnh.`,
@@ -1527,7 +1606,7 @@ export function doiSoat(sheets: SheetTho[], opt: TuyChonDoiSoat): KetQuaDoiSoat 
 
   // Tự dò quy ước ngoại tệ TRƯỚC khi ghép: nếu cổng đã quy sẵn VND thì hạ tỷ giá áp
   // dụng về 1 để không đội số (mọi tổng + so khớp bên dưới dùng lại chuaThueVnd/tongTtVnd).
-  phatHienQuyUocNgoaiTe(hdActive, pmTheoKhoa, canhBao);
+  phatHienQuyUocNgoaiTe(hdActive, pmTheoKhoa, canhBao, sheetsHoaDon);
 
   let khop = 0, lech = 0, lechThue = 0, thieu = 0, soHoaDon = 0, tongChenh = 0, thieuKhongCanVaoSo = 0;
   // Nhãn gọi thẳng tên sheet sổ (file mẫu kế toán ghi "CHƯA CÓ TRONG PMEM"), để

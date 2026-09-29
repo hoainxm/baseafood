@@ -274,6 +274,135 @@ export function dungHangTP(
   });
 }
 
+/* ---------- Dòng mẫu khối 2 (bán thành phẩm) ---------- */
+
+/**
+ * Một dòng MẪU của khối 2: mặt hàng × quy cách × khách × kênh × giá, chép từ kỳ gần
+ * nhất cùng họ nguyên liệu. Bảng cân đối giấy in sẵn cả danh sách này (kể cả dòng
+ * không ra hàng) — người dùng chỉ điền số, không phải thêm từng dòng.
+ */
+export interface DongMauTP {
+  /** Định danh DUY NHẤT của dòng mẫu (khoa + thứ tự) — cùng mặt hàng + khách có thể có
+      nhiều dòng khác giá (bảng giấy: "2 da tẩm bột 9-12 · Seachemot" 7,95 và 9,2). */
+  id: string;
+  /** productId|spec|customerId */
+  khoa: string;
+  productId: string;
+  spec: string;
+  customerId: string;
+  channel: BalancingOutputItem["channel"];
+  unitPrice: number | null;
+}
+
+export const khoaDongTP = (productId: string, spec: string, customerId: string): string =>
+  `${productId}|${spec || ""}|${customerId || ""}`;
+
+type KyTomTat = Pick<BalancingPeriod, "id" | "materialTypeName" | "startDate" | "endDate">;
+const cuoiKy = (k: Pick<BalancingPeriod, "startDate" | "endDate">) => k.endDate || k.startDate || "";
+
+/**
+ * Kỳ làm MẪU cho khối 2: kỳ khác cùng họ NL có ít nhất một dòng bán thành phẩm.
+ * Ưu tiên kỳ KẾT THÚC TRƯỚC kỳ này (mới nhất trước); không có thì lấy kỳ mới nhất
+ * còn lại (VD kỳ đầu năm nhưng đã nhập kỳ sau trước).
+ */
+export function kyMauTP<K extends KyTomTat>(
+  ky: KyTomTat,
+  tatCaKy: K[],
+  tatCaTP: Pick<BalancingOutputItem, "periodId" | "productId">[]
+): K | null {
+  const coDong = new Set(tatCaTP.filter((r) => r.productId).map((r) => r.periodId));
+  const ung = tatCaKy
+    .filter((k) => k.id !== ky.id && coDong.has(k.id) && cungHoNguyenLieu(k.materialTypeName, ky.materialTypeName))
+    .sort((a, b) => cuoiKy(b).localeCompare(cuoiKy(a)));
+  const batDau = ky.startDate || "";
+  return ung.find((k) => batDau && cuoiKy(k) && cuoiKy(k) < batDau) ?? ung[0] ?? null;
+}
+
+/**
+ * Dòng mẫu từ các dòng khối 2 của kỳ mẫu, giữ thứ tự gốc. Cùng (mặt hàng, quy cách,
+ * khách) mà KHÁC giá ⇒ vẫn là hai dòng (như bảng giấy); trùng cả giá ⇒ một dòng.
+ */
+export function dungDongMauTP(dongKyMau: BalancingOutputItem[]): DongMauTP[] {
+  const ra = new Map<string, DongMauTP>();
+  const dem = new Map<string, number>();
+  for (const r of dongKyMau) {
+    if (!r.productId) continue;
+    const khoa = khoaDongTP(r.productId, r.spec ?? "", r.customerId);
+    const trungGia = `${khoa}|${r.unitPrice ?? ""}`;
+    if (ra.has(trungGia)) continue;
+    const thu = dem.get(khoa) ?? 0;
+    dem.set(khoa, thu + 1);
+    ra.set(trungGia, {
+      id: `${khoa}#${thu}`,
+      khoa,
+      productId: r.productId,
+      spec: r.spec ?? "",
+      customerId: r.customerId,
+      channel: r.channel,
+      unitPrice: r.unitPrice,
+    });
+  }
+  return [...ra.values()];
+}
+
+/**
+ * Dòng mẫu CHƯA có trong kỳ — đếm theo SỐ DÒNG: kỳ đã có m dòng cùng (mặt hàng, quy
+ * cách, khách) thì bỏ m dòng mẫu đầu của khoá đó (gõ vào dòng mẫu thứ nhất không làm
+ * dòng thứ hai biến mất). Kỳ có dòng cùng mặt hàng + quy cách mà CHƯA chọn khách (dòng
+ * hút từ sổ sản xuất cũ) ⇒ ẩn mọi dòng mẫu của mặt hàng đó: hiện thêm cạnh nó dễ khiến
+ * người dùng gõ số hai lần cho cùng một mặt hàng.
+ */
+export function dongMauConThieu(
+  mau: DongMauTP[],
+  tp: Pick<BalancingOutputItem, "productId" | "spec" | "customerId">[]
+): DongMauTP[] {
+  const daCo = new Map<string, number>();
+  for (const r of tp) {
+    const k = khoaDongTP(r.productId, r.spec ?? "", r.customerId);
+    daCo.set(k, (daCo.get(k) ?? 0) + 1);
+  }
+  const coChuaKhach = new Set(tp.filter((r) => !r.customerId).map((r) => khoaMatHang(r.productId, r.spec ?? "")));
+  const daBo = new Map<string, number>();
+  return mau.filter((m) => {
+    if (coChuaKhach.has(khoaMatHang(m.productId, m.spec))) return false;
+    const bo = daBo.get(m.khoa) ?? 0;
+    if (bo < (daCo.get(m.khoa) ?? 0)) {
+      daBo.set(m.khoa, bo + 1);
+      return false;
+    }
+    return true;
+  });
+}
+
+/**
+ * Gợi ý khách · kênh · đơn giá cho một mặt hàng (+ quy cách) mới vào kỳ:
+ * 1) dòng mẫu cùng mặt hàng + quy cách; 2) dòng mẫu cùng mặt hàng;
+ * 3) dòng GẦN NHẤT ở các kỳ khác (theo ngày cuối kỳ) cùng mặt hàng có đơn giá.
+ * Không có gì ⇒ null (để trống, không bịa).
+ */
+export function goiYKhachGia(
+  productId: string,
+  spec: string,
+  mau: DongMauTP[],
+  tatCaTP: BalancingOutputItem[],
+  tatCaKy: Pick<BalancingPeriod, "id" | "startDate" | "endDate">[],
+  kyHienTai: string
+): Pick<DongMauTP, "customerId" | "channel" | "unitPrice"> | null {
+  const m =
+    mau.find((x) => x.productId === productId && x.spec === (spec || "")) ??
+    mau.find((x) => x.productId === productId);
+  if (m) return { customerId: m.customerId, channel: m.channel, unitPrice: m.unitPrice };
+  const cuoi = new Map(tatCaKy.map((k) => [k.id, cuoiKy(k)]));
+  const ung = tatCaTP
+    .filter((r) => r.periodId !== kyHienTai && r.productId === productId && r.unitPrice != null)
+    .sort(
+      (a, b) =>
+        Number((b.spec ?? "") === (spec || "")) - Number((a.spec ?? "") === (spec || "")) ||
+        (cuoi.get(b.periodId) ?? "").localeCompare(cuoi.get(a.periodId) ?? "")
+    )[0];
+  return ung ? { customerId: ung.customerId, channel: ung.channel, unitPrice: ung.unitPrice } : null;
+}
+
 /* ---------- Ghi ngược ô ngày về sổ nguồn ---------- */
 
 export type KetQuaGhiNguoc =

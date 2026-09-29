@@ -29,6 +29,11 @@ import {
   cungHoNguyenLieu,
   kyLienTruoc,
   kyTrungNgayCungHo,
+  kyMauTP,
+  dungDongMauTP,
+  dongMauConThieu,
+  goiYKhachGia,
+  type DongMauTP,
   nhapHangHopLe,
   nhapTrongKhoangNgay,
   ngayTrongKy,
@@ -84,6 +89,14 @@ export interface PeriodGrid {
   sanXuatChoHut: WipProductionItem[];
   ghiTP: (rows: BalancingOutputItem[]) => void;
   hutSanXuat: () => void;
+  /** Kỳ làm mẫu cho khối 2 (kỳ gần nhất cùng họ NL có dòng) — null nếu chưa có. */
+  kyMau: BalancingPeriod | null;
+  /** Dòng mẫu CHƯA có trong kỳ — hiện ảo, gõ vào mới thành dòng thật. */
+  mauConThieu: DongMauTP[];
+  /** Toàn bộ dòng mẫu (để so "giá = kỳ trước"). */
+  mauTP: DongMauTP[];
+  /** Gợi ý khách · kênh · giá cho một mặt hàng mới vào kỳ (mẫu → kỳ gần nhất). */
+  goiY: (productId: string, spec: string) => Pick<DongMauTP, "customerId" | "channel" | "unitPrice"> | null;
   /** Hút cả sổ nhập + sổ sản xuất trong một chạm (KHÔNG đụng sổ bán). */
   hutTatCaNguon: () => void;
   ghiSanXuatNhieuNgay: (dsO: ONgay[], lyDoGhiBu: string) => boolean;
@@ -401,6 +414,18 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
     [ky, tatCaSanXuat]
   );
 
+  /* ---------- Dòng mẫu khối 2 (A) + gợi ý khách/giá (B) ---------- */
+  const kyMau = useMemo(() => (daChot ? null : kyMauTP(ky, tatCaKy, tatCaTP)), [daChot, ky, tatCaKy, tatCaTP]);
+  const mauTP = useMemo(
+    () => (kyMau ? dungDongMauTP(tatCaTP.filter((r) => r.periodId === kyMau.id)) : []),
+    [kyMau, tatCaTP]
+  );
+  const mauConThieu = useMemo(() => dongMauConThieu(mauTP, tp), [mauTP, tp]);
+  const goiY = useCallback(
+    (productId: string, spec: string) => goiYKhachGia(productId, spec, mauTP, tatCaTP, tatCaKy, ky.id),
+    [mauTP, tatCaTP, tatCaKy, ky.id]
+  );
+
   const hutSanXuat = useCallback(() => {
     if (sanXuatChoHut.length === 0) return;
     const truocSX = tatCaSanXuat;
@@ -419,14 +444,17 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
     for (const [khoa, o] of gomSanXuatTheoMatHang([...sanXuatDaGan, ...sanXuatChoHut])) {
       if (daCo.has(khoa)) continue;
       const [productId, spec] = khoa.split("|");
+      /* (B) Khách · kênh · giá lấy theo dòng mẫu / kỳ gần nhất — trước đây để trống
+         nên kỳ nào cũng phải chọn khách + gõ giá lại từ đầu. Không có gợi ý ⇒ trống. */
+      const g = goiY(productId, spec ?? "");
       them.push({
         id: uid(),
         periodId: ky.id,
         productId,
-        customerId: "",
-        channel: "Xuất khẩu",
+        customerId: g?.customerId ?? "",
+        channel: g?.channel ?? "Xuất khẩu",
         quantityKg: Object.values(o.theoNgay).reduce((s, v) => s + v, 0),
-        unitPrice: null,
+        unitPrice: g?.unitPrice ?? null,
         spec: spec ?? "",
         salesItemId: "",
         dailyQuantities: {},
@@ -451,6 +479,7 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
     ghiTP,
     luuMoc,
     ky.id,
+    goiY,
   ]);
 
   /* Một chạm kéo CẢ HAI nguồn tự động (nhập + sản xuất) vào kỳ. KHÔNG gộp sổ bán
@@ -690,6 +719,10 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
     sanXuatChoHut,
     ghiTP,
     hutSanXuat,
+    kyMau,
+    mauConThieu,
+    mauTP,
+    goiY,
     hutTatCaNguon,
     ghiSanXuatNhieuNgay,
     ngayDaChot,

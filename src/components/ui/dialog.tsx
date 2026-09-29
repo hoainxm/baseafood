@@ -63,8 +63,12 @@ function DialogContent({
         className={cn(
           /* items-start: KHÔNG kéo giãn dọc phần thân dialog. Nếu để mặc định
              (stretch), thân form một cột bị ép cao bằng cả dialog → Field dùng
-             h-full phình to, sinh khoảng trống lớn giữa nhãn và ô. */
-          "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 items-start gap-4 rounded-xl bg-popover p-5 text-sm text-popover-foreground ring-1 ring-foreground/10 duration-100 outline-none sm:max-w-sm data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
+             h-full phình to, sinh khoảng trống lớn giữa nhãn và ô.
+             max-h + overflow-y-auto: hộp dài hơn màn (VD Đồng bộ danh mục) tự cuộn
+             trong khung thay vì tràn ra ngoài làm khuất nút xác nhận ở chân.
+             grid-cols-[minmax(0,1fr)]: cột lưới co theo khung — mặc định (auto) nới theo
+             phần tử rộng nhất ⇒ ở 360px thân hộp tràn ngang. */
+          "fixed top-1/2 left-1/2 z-50 grid grid-cols-[minmax(0,1fr)] max-h-[calc(100dvh-2rem)] w-full max-w-[calc(100%-2rem)] overflow-y-auto overscroll-contain -translate-x-1/2 -translate-y-1/2 items-start gap-4 rounded-xl bg-popover p-5 text-sm text-popover-foreground ring-1 ring-foreground/10 duration-100 outline-none sm:max-w-sm data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
           className
         )}
         {...props}
@@ -115,7 +119,10 @@ function DialogFooter({
     <div
       data-slot="dialog-footer"
       className={cn(
-        "-mx-5 -mb-5 flex flex-col-reverse gap-2 rounded-b-xl border-t bg-muted/50 px-5 py-3.5 sm:flex-row sm:justify-end",
+        /* sticky -bottom-5 (= padding đáy của DialogContent): chân nút luôn DÍNH đáy khung
+           khi thân hộp cuộn — nút xác nhận không bao giờ bị cuộn mất. Nền đặc (không /50)
+           để chữ cuộn phía dưới không lộ qua. */
+        "sticky -bottom-5 z-10 -mx-5 -mb-5 flex flex-col-reverse gap-2 rounded-b-xl border-t bg-muted px-5 py-3.5 sm:flex-row sm:justify-end",
         className
       )}
       {...props}

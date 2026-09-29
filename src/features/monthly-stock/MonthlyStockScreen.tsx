@@ -667,7 +667,7 @@ export default function MonthlyStockScreen() {
           <option value="material">→ Loại NL</option>
           <option value="skip">Bỏ qua</option>
         </select>
-        <div className="w-64 shrink-0">
+        <div className="w-full min-w-0 sm:w-64 sm:shrink-0">
           <Combobox
             anNhan
             label={`Ánh xạ ${x.name} tới`}
@@ -1789,7 +1789,7 @@ export default function MonthlyStockScreen() {
             <Button variant="outline" onClick={() => setNapForm(null)}>
               Hủy
             </Button>
-            <Button onClick={xacNhanNap} disabled={soDongNap === 0} title="Nạp các sheet đã xem trước vào sổ, theo đúng năm và kho đã chọn. Chọn nhầm kho sẽ tạo bản sao ở kho khác — kiểm lại trước khi bấm.">
+            <Button onClick={xacNhanNap} title="Nạp các sheet đã xem trước vào sổ, theo đúng năm và kho đã chọn. Chọn nhầm kho sẽ tạo bản sao ở kho khác — kiểm lại trước khi bấm.">
               <Upload className="mr-1 h-4 w-4" />
               Nạp {soDongNap} dòng
             </Button>
@@ -1944,13 +1944,6 @@ export default function MonthlyStockScreen() {
               </details>
             )}
 
-            {(canDongBo.length > 0 || dsRoRang.length > 0) && (
-              <Button onClick={apDongBo} disabled={soMH + soNL === 0} title="Thêm các tên chưa có vào danh mục đã chọn, và đổi tên các dòng sổ mang tên cũ sang tên chuẩn đã ánh xạ.">
-                <Library className="mr-2 h-4 w-4" />
-                Đồng bộ: {soMH} → Mặt hàng · {soNL} → Loại NL
-              </Button>
-            )}
-
             {dongBo.nhomTrung.length > 0 && (
               <div className="space-y-2">
                 <h3 className="font-semibold text-foreground">Tên chỉ khác nhau cách ghi (nên gộp về một)</h3>
@@ -1975,10 +1968,18 @@ export default function MonthlyStockScreen() {
               </div>
             )}
           </div>
+          {/* Nút xác nhận ở CHÂN (dính đáy khi thân cuộn) — trước nằm giữa thân, dưới các danh sách
+              dài nên bị cuộn mất. Không disabled (luật §5): chưa chọn gì ⇒ apDongBo tự báo. */}
           <DialogFooter>
             <Button variant="outline" onClick={() => setMoDongBo(false)}>
               Đóng
             </Button>
+            {(canDongBo.length > 0 || dsRoRang.length > 0) && (
+              <Button onClick={apDongBo} className="h-auto min-h-11 whitespace-normal" title="Thêm các tên chưa có vào danh mục đã chọn, và đổi tên các dòng sổ mang tên cũ sang tên chuẩn đã ánh xạ.">
+                <Library className="mr-2 h-4 w-4" />
+                Đồng bộ: {soMH} → Mặt hàng · {soNL} → Loại NL
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -536,7 +536,7 @@ function KyDetail({
   return (
     <div className="space-y-6">
       <Button
-        title="Quay về danh sách các kỳ cân đối." variant="ghost" onClick={onBack}>
+        title="Quay về danh sách các kỳ cân đối." variant="ghost" size="lg" onClick={onBack}>
         <ChevronLeft />
         Danh sách kỳ
       </Button>
@@ -789,7 +789,9 @@ function GhiChuKetQua({
       aria-label="Ghi chú — kết quả cân đối"
     >
       <h2 className="mb-3 text-xl font-semibold">Ghi chú — kết quả cân đối</h2>
-      <div className="grid gap-x-8 gap-y-1 sm:grid-cols-2">
+      {/* Xếp ngang (2xl) ô này nằm ở cột trái hẹp (~500px) ⇒ về MỘT cột, không thì
+          nhãn + số gãy dòng và số tiền dài tràn khung ở chữ 130%. */}
+      <div className={`grid gap-x-8 gap-y-1 sm:grid-cols-2 ${xepNgang ? "2xl:grid-cols-1" : ""}`}>
         <div>
           <KV k="Tổng thành phẩm" v={`${num(kq.totalOutputKg)} kg`} />
           <KV k="Định mức chế biến" v={chuaCoTP ? "—" : num(kq.norm)} strong />
@@ -850,9 +852,9 @@ function GhiChuKetQua({
 function KV({ k, v, strong }: { k: string; v: string; strong?: boolean }) {
   return (
     <div className="flex items-baseline justify-between gap-4 border-b border-border py-2.5">
-      <span className="text-base text-muted-foreground">{k}</span>
+      <span className="min-w-0 text-base text-muted-foreground">{k}</span>
       <span
-        className={`tnum text-right ${
+        className={`tnum shrink-0 whitespace-nowrap text-right ${
           strong ? "text-xl font-semibold text-primary" : "text-base font-medium"
         }`}
       >

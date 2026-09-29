@@ -338,8 +338,12 @@ export function LuoiNguyenLieu({
       du: cua[0],
       ten: "",
       tieuDeNhom:
+        /* Chỉ nói "số từ sổ nhập" khi nhóm THẬT có dòng hút từ sổ — nhóm toàn dòng
+           nhập tay mà gắn nhãn đó thì người đọc tưởng số đã khớp sổ nhập. */
         nhom === "Thủy sản"
-          ? "Thủy sản — số từ sổ nhập hàng"
+          ? cua.some((h) => h.tuSoNhap)
+            ? "Thủy sản — số từ sổ nhập hàng"
+            : "Thủy sản"
           : nhom === "Xả đông"
             ? "Xả đông"
             : "Bột phụ gia",
@@ -396,8 +400,10 @@ export function LuoiNguyenLieu({
         <div>
           <h2 className="text-xl font-semibold">Khối 1 — Nguyên liệu vào</h2>
           <p className="text-base text-muted-foreground">
-            Hàng là loại nguyên liệu, cột là ngày trong kỳ. Sửa ô của dòng lấy từ sổ nhập sẽ
-            ghi thẳng vào sổ Nhập hàng.
+            {anNgay
+              ? "Như bảng cân đối giấy: mỗi dòng một loại hàng, gõ thẳng số lượng. Cần chia theo ngày thì bấm \"Mở cột ngày\"."
+              : "Hàng là loại nguyên liệu, cột là ngày trong kỳ."}{" "}
+            Sửa ô của dòng lấy từ sổ nhập sẽ ghi thẳng vào sổ Nhập hàng.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -565,7 +571,7 @@ export function LuoiNguyenLieu({
                     onConfirm={() => xoaDong(h.id)}
                     trigger={
                       <Button
-                        title="Xóa dòng nguyên liệu này khỏi lưới của kỳ." variant="ghost" size="sm" aria-label={`Xóa dòng ${h.ten}`}>
+                        title="Xóa dòng nguyên liệu này khỏi lưới của kỳ." variant="ghost" size="sm" className="min-h-11 min-w-11" aria-label={`Xóa dòng ${h.ten}`}>
                         <Trash2 />
                       </Button>
                     }

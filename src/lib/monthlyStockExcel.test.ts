@@ -32,6 +32,10 @@ async function docFile(): Promise<ReturnType<typeof parseBangKeKhoFile>> {
   const ws = XLSX.utils.aoa_to_sheet(aoa);
   ws["J8"] = { t: "n", v: 50, f: "SUM(J7:J7)" }; // cột kg khoanh hẹp…
   ws["P8"] = { t: "n", v: 50, f: "SUM(P5:P7)" }; // …cột tồn cuối khoanh rộng ⇒ lấy dòng nhỏ nhất
+  // Lô 2 DA: ngày nhập (serial 46193 = 20/06/2026) + invoice gộp dọc A5:A7 / E5:E7 (có dòng trống 6 giữa).
+  ws["A5"] = { t: "n", v: 46193 };
+  ws["E5"] = { t: "s", v: "IFE/07/2026" };
+  ws["!merges"] = [XLSX.utils.decode_range("A5:A7"), XLSX.utils.decode_range("E5:E7")];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "8");
   const buf = XLSX.write(wb, { type: "array", bookType: "xlsx" }) as ArrayBuffer;
@@ -49,6 +53,16 @@ describe("parseBangKeKhoFile", () => {
     expect(nhom["B.TUỘC  2 DA"]).toBe("Nguyên liệu mua ngoài");
     expect(nhom["CÁ TRÍCH DẠT"]).toBe("Hàng tạm");
     expect(khoTuTieuDe(sh.tieuDe)).toBe("1500");
+  });
+
+  test("ô gộp ngày nhập/invoice chép xuống cả lô, ngày không lùi 1 ngày, dòng trống giữ nguyên", async () => {
+    const [sh] = await docFile();
+    const by = Object.fromEntries(sh.rows.map((r) => [r.itemName, r]));
+    expect(by["2 DA RÂU NGẮN"]).toMatchObject({ importDate: "2026-06-20", origin: "IFE/07/2026" });
+    expect(by["4 DA RÂU NGẮN"]).toMatchObject({ importDate: "2026-06-20", origin: "IFE/07/2026" });
+    expect(by["SABA"].importDate).toBe("");
+    // dòng trống (dòng 6) không bị biến thành dòng dữ liệu ⇒ rowIndex không xê dịch
+    expect(by["4 DA RÂU NGẮN"].rowIndex).toBe(5);
   });
 
   test("cột R: kho gửi vs ghi chú thường", async () => {

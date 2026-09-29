@@ -644,7 +644,14 @@ export default function MonthlyStockScreen() {
   /** Một dòng: tên file · đích (Mặt hàng/Loại NL/Bỏ qua) · ánh xạ tới tên CHUẨN. */
   const dongRow = (x: DongBoDong) => {
     const d = dichCua(x);
-    const opts = d === "product" ? matHangOpts : loaiNLOpts;
+    const goc = d === "product" ? matHangOpts : loaiNLOpts;
+    // Tên đang ánh xạ (tên file, hoặc tên vừa gõ "thêm mới") chưa có trong danh mục ⇒ vẫn phải HIỆN
+    // trong ô, kèm nhãn "mới"; không thì Combobox rơi về placeholder, trông như chưa thêm được.
+    const ten = mapCua(x);
+    const opts =
+      ten && !goc.some((o) => chuan(o.value) === chuan(ten))
+        ? [{ value: ten, label: ten, phu: `mới — thêm vào ${d === "product" ? "Mặt hàng" : "Loại NL"} khi bấm Đồng bộ` }, ...goc]
+        : goc;
     return (
       <div key={x.name} className="flex flex-wrap items-center gap-2 rounded p-1 hover:bg-muted/50">
         <span className="min-w-0 flex-1 truncate text-foreground" title={x.name}>
@@ -834,13 +841,10 @@ export default function MonthlyStockScreen() {
     {
       key: "ten",
       header: "Mặt hàng",
-      render: (r) => (
-        <div className="min-w-0">
-          <div className="font-semibold text-foreground">{r.itemName}</div>
-          {r.size && <div className="text-sm text-muted-foreground">Size {r.size}</div>}
-        </div>
-      ),
+      render: (r) => <span className="font-semibold text-foreground">{r.itemName}</span>,
     },
+    // Size là CỘT RIÊNG (theo bảng kê của kế toán), không còn là dòng phụ dưới tên hàng.
+    { key: "size", header: "Size", render: (r) => <span className="whitespace-nowrap">{r.size || "—"}</span> },
     { key: "invoice", header: "Invoice", render: (r) => r.origin || "—" },
     { key: "gia", header: "Đơn giá (đ)", so: true, render: (r) => soHoacGach(r.unitPrice ?? 0) },
     { key: "odKg", header: "Tồn đầu kỳ (kg)", so: true, render: (r) => soHoacGach(r.openKg), tong: () => num(t.openKg) },
@@ -931,6 +935,18 @@ export default function MonthlyStockScreen() {
   const oCham =
     "h-11 w-full border-0 bg-transparent px-2 text-sm focus:ring-2 focus:ring-ring focus:ring-inset focus:outline-none";
   const cotLuoi: CotLuoi<MonthlyStockRow>[] = [
+    {
+      key: "size", header: "Size", nhan: "Size", kieu: "chu", lay: () => null, rong: 110,
+      oRieng: (r) => (
+        <input
+          value={r.size}
+          onChange={(e) => suaSo(r.id, { size: e.target.value })}
+          placeholder="Size"
+          className={oCham}
+          aria-label={`Size — ${r.itemName}`}
+        />
+      ),
+    },
     { key: "openKg", header: "Tồn đầu (kg)", nhan: "Tồn đầu (kg)", kieu: "so", lay: (r) => r.openKg || null, rong: 120 },
     { key: "inKg", header: "Nhập (kg)", nhan: "Nhập (kg)", kieu: "so", lay: (r) => r.inKg || null, rong: 120 },
     { key: "outKg", header: "Xuất (kg)", nhan: "Xuất (kg)", kieu: "so", lay: (r) => r.outKg || null, rong: 120 },
@@ -998,7 +1014,7 @@ export default function MonthlyStockScreen() {
     ten: r.itemName,
     phu: (
       <span className="text-muted-foreground">
-        {[r.importDate ? viDate(r.importDate) : "", r.size, r.origin ? `Invoice ${r.origin}` : ""].filter(Boolean).join(" · ") || r.category}
+        {[r.importDate ? viDate(r.importDate) : "", r.origin ? `Invoice ${r.origin}` : ""].filter(Boolean).join(" · ") || r.category}
       </span>
     ),
   }));
@@ -2084,6 +2100,7 @@ export default function MonthlyStockScreen() {
             <thead>
               <tr>
                 <ThIn>Nhóm · mặt hàng</ThIn>
+                <ThIn>Size</ThIn>
                 <ThIn right>Tồn đầu (kg)</ThIn>
                 <ThIn right>Nhập (kg)</ThIn>
                 <ThIn right>Xuất (kg)</ThIn>
@@ -2093,7 +2110,7 @@ export default function MonthlyStockScreen() {
             </thead>
             <tbody>
               <tr>
-                <TdIn dam>Tổng cộng — {rowsIn.length} mặt hàng</TdIn>
+                <TdIn dam colSpan={2}>Tổng cộng — {rowsIn.length} mặt hàng</TdIn>
                 <TdIn dam right>{num(tongIn.openKg)}</TdIn>
                 <TdIn dam right>{num(tongIn.inKg)}</TdIn>
                 <TdIn dam right>{num(tongIn.outKg)}</TdIn>
@@ -2116,14 +2133,12 @@ function FragmentGroup({ group }: { group: ReturnType<typeof gomNhom>[number] })
   return (
     <>
       <tr>
-        <TdIn dam colSpan={6}>{group.category}</TdIn>
+        <TdIn dam colSpan={7}>{group.category}</TdIn>
       </tr>
       {group.rows.map((r) => (
         <tr key={r.id}>
-          <TdIn>
-            {r.itemName}
-            {r.size ? ` · ${r.size}` : ""}
-          </TdIn>
+          <TdIn>{r.itemName}</TdIn>
+          <TdIn>{r.size}</TdIn>
           <TdIn right>{num(r.openKg)}</TdIn>
           <TdIn right>{r.inKg ? num(r.inKg) : ""}</TdIn>
           <TdIn right>{r.outKg ? num(r.outKg) : ""}</TdIn>
@@ -2132,7 +2147,7 @@ function FragmentGroup({ group }: { group: ReturnType<typeof gomNhom>[number] })
         </tr>
       ))}
       <tr>
-        <TdIn dam>Cộng {group.category}</TdIn>
+        <TdIn dam colSpan={2}>Cộng {group.category}</TdIn>
         <TdIn dam right>{num(group.tong.openKg)}</TdIn>
         <TdIn dam right>{num(group.tong.inKg)}</TdIn>
         <TdIn dam right>{num(group.tong.outKg)}</TdIn>

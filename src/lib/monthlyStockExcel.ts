@@ -65,10 +65,14 @@ const optNum = (v: unknown): number | null => {
 
 const pad2 = (n: number) => String(n).padStart(2, "0");
 
-/** Ô ngày nhập → ISO. Nhận Date (cellDates), số serial Excel, hoặc chuỗi dd/mm/yyyy. */
+/**
+ * Ô ngày nhập → ISO. Nhận số serial Excel (đọc KHÔNG bật cellDates — SheetJS dựng Date theo
+ * múi giờ lệch vài chục giây, ở VN ra 23:59:30 hôm TRƯỚC ⇒ lùi 1 ngày), Date, hoặc chuỗi dd/mm/yyyy.
+ */
 function toIsoDate(v: unknown): string {
   if (v instanceof Date && !Number.isNaN(v.getTime())) {
-    return `${v.getFullYear()}-${pad2(v.getMonth() + 1)}-${pad2(v.getDate())}`;
+    const d = new Date(v.getTime() + 12 * 3600 * 1000); // làm tròn về ngày gần nhất, chống lệch giây múi giờ
+    return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
   }
   if (typeof v === "number" && Number.isFinite(v)) {
     // Serial Excel (1900 system) → ngày. 25569 = số ngày từ 1899-12-30 tới epoch.
@@ -195,14 +199,41 @@ function parseSheet(sheetName: string, rows: unknown[][], timDauKhoi: TimDauKhoi
   };
 }
 
+/**
+ * Ô GỘP DỌC ở cột mô tả (0 ngày nhập … 5 size): kế toán gộp một ô ngày/invoice cho cả lô nhiều
+ * size — SheetJS chỉ giữ giá trị ở ô đầu ⇒ các dòng dưới mất ngày/invoice. Chép giá trị ô đầu
+ * xuống các ô còn lại, CHỈ vào dòng đã có dữ liệu (dòng trống mà thành có chữ sẽ lệch `rowIndex`
+ * — nằm trong id nạp).
+ */
+function donOGop(ws: XLSX.WorkSheet) {
+  const coDuLieu = (r: number) => {
+    for (let c = 0; c <= 16; c++) {
+      const v = (ws[XLSX.utils.encode_cell({ r, c })] as XLSX.CellObject | undefined)?.v;
+      if (v != null && v !== "") return true;
+    }
+    return false;
+  };
+  for (const m of ws["!merges"] ?? []) {
+    if (m.s.c !== m.e.c || m.s.c > 5 || m.e.r <= m.s.r) continue;
+    const dau = ws[XLSX.utils.encode_cell(m.s)] as XLSX.CellObject | undefined;
+    if (!dau || dau.v == null || dau.v === "") continue;
+    for (let r = m.s.r + 1; r <= m.e.r; r++) {
+      const dc = XLSX.utils.encode_cell({ r, c: m.s.c });
+      if (!ws[dc] && coDuLieu(r)) ws[dc] = { ...dau };
+    }
+  }
+}
+
 /** Đọc cả workbook: mỗi sheet → một tháng. Chỉ giữ sheet có ít nhất một dòng hàng. */
 export async function parseBangKeKhoFile(file: File): Promise<BangKeKhoSheet[]> {
   const buf = await file.arrayBuffer();
-  const wb = XLSX.read(buf, { type: "array", cellDates: true });
+  const wb = XLSX.read(buf, { type: "array" }); // KHÔNG cellDates — xem toIsoDate
+
   const sheets: BangKeKhoSheet[] = [];
   for (const name of wb.SheetNames) {
     const ws = wb.Sheets[name];
     if (!ws) continue;
+    donOGop(ws);
     // blankrows:false giữ chỉ số `rowIndex` cũ (nằm trong id nạp — KHÔNG được đổi); bản đủ dòng
     // chỉ để dịch chỉ số ⇄ số dòng Excel khi đọc công thức SUM của dòng cộng khối con.
     const rows = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, raw: true, blankrows: false });

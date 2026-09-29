@@ -440,9 +440,17 @@ export function soVN(v: unknown): number | null {
 
 const pad2 = (n: number) => String(n).padStart(2, "0");
 
+/** Làm tròn Date về 10 phút gần nhất — xem `ngayHienThi`. */
+const MUOI_PHUT = 10 * 60 * 1000;
+
 export function ngayHienThi(v: unknown): string {
-  if (v instanceof Date && !Number.isNaN(v.getTime()))
-    return `${pad2(v.getDate())}/${pad2(v.getMonth() + 1)}/${v.getFullYear()}`;
+  if (v instanceof Date && !Number.isNaN(v.getTime())) {
+    // SheetJS (cellDates) dựng Date lệch vài chục giây theo múi giờ: ô 01/08/2026 ở VN ra
+    // 31/07/2026 23:59:30 ⇒ lấy ngày thẳng là LÙI 1 NGÀY (gặp ở mọi ô ngày file cổng thuế).
+    // Làm tròn 10 phút khử độ lệch đó mà vẫn giữ ngày của ô có giờ thật (VD 14:00).
+    const d = new Date(Math.round(v.getTime() / MUOI_PHUT) * MUOI_PHUT);
+    return `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}/${d.getFullYear()}`;
+  }
   if (typeof v === "number" && Number.isFinite(v)) {
     const d = new Date(Math.round((v - 25569) * 86400 * 1000));
     if (!Number.isNaN(d.getTime()))

@@ -87,22 +87,34 @@ export function HopThemDongNL({
 /* ---------- Chọn tay dòng sổ nhập để hút ---------- */
 
 export function HopChonDongNhap({
-  dong,
+  dong: dongVao,
   kyDangGiu,
+  cungHo,
+  tenLoaiKy,
   onClose,
   onLuu,
 }: {
   dong: MaterialImportItem[];
   /** Id các dòng đang thuộc kỳ KHÁC — tick là kéo về kỳ đang mở. */
   kyDangGiu: Set<string>;
+  /** Dòng có cùng họ nguyên liệu với kỳ không. */
+  cungHo: (r: MaterialImportItem) => boolean;
+  /** Tên loại NL của kỳ (để nói rõ "khác loại" so với cái gì). */
+  tenLoaiKy: string;
   onClose: () => void;
   onLuu: (ids: string[]) => void;
 }) {
-  /* Mặc định tick sẵn dòng CHƯA kỳ nào giữ. Dòng đang thuộc kỳ khác thì để
-     người dùng tự tick — kéo về là lấy số ra khỏi một kỳ đang dùng. */
-  const [chon, setChon] = useState<Set<string>>(
-    () => new Set(dong.filter((r) => !kyDangGiu.has(r.id)).map((r) => r.id))
+  /* Dòng CÙNG loại lên trước, dòng khác loại xuống cuối — mắt đọc từ trên xuống. */
+  const dong = [...dongVao].sort(
+    (a, b) => Number(cungHo(b)) - Number(cungHo(a)) || a.deliveryDate.localeCompare(b.deliveryDate)
   );
+  /* Chỉ tick sẵn dòng CÙNG loại mà chưa kỳ nào giữ. Trước đây tick sẵn MỌI dòng chưa
+     gắn kỳ — kể cả khác loại — nên kỳ "Bạch tuộc 2 da" tạo trùng ngày bấm vào là kéo
+     luôn các chuyến 1 da. Dòng khác loại / đang thuộc kỳ khác: người dùng tự tick. */
+  const [chon, setChon] = useState<Set<string>>(
+    () => new Set(dong.filter((r) => !kyDangGiu.has(r.id) && cungHo(r)).map((r) => r.id))
+  );
+  const soKhacLoaiDaTick = dong.filter((r) => chon.has(r.id) && !cungHo(r)).length;
   const doi = (id: string) =>
     setChon((cu) => {
       const moi = new Set(cu);
@@ -120,9 +132,9 @@ export function HopChonDongNhap({
         <DialogHeader>
           <DialogTitle>Chọn dòng nhập hàng đưa vào kỳ</DialogTitle>
           <DialogDescription>
-            Các chuyến nhập trong khoảng ngày của kỳ nhưng khác tên loại nguyên liệu,
-            hoặc đang thuộc một kỳ khác. Sổ nhập ghi tên tự do nên lệch tên là chuyện
-            bình thường — tick dòng nào thuộc kỳ này. Dòng đang thuộc kỳ khác mà tick
+            Các chuyến nhập trong khoảng ngày của kỳ nhưng khác loại nguyên liệu, hoặc
+            đang thuộc một kỳ khác. Kỳ này là <strong>{tenLoaiKy}</strong> — dòng khác loại
+            chỉ tick khi chắc đó là chuyến ghi nhầm tên. Dòng đang thuộc kỳ khác mà tick
             thì sẽ được KÉO khỏi kỳ đó.
           </DialogDescription>
         </DialogHeader>
@@ -162,6 +174,9 @@ export function HopChonDongNhap({
                     {num(r.quantityKg)}
                   </td>
                   <td className="border-b border-border px-3 py-2">
+                    {!cungHo(r) && (
+                      <span className="block font-semibold text-destructive">Khác loại</span>
+                    )}
                     {kyDangGiu.has(r.id) ? (
                       <span className="text-warning">Đang thuộc kỳ khác</span>
                     ) : (
@@ -177,6 +192,12 @@ export function HopChonDongNhap({
         <p className="text-base text-muted-foreground">
           Đã chọn {chon.size} dòng — {num(tongKg)} kg
         </p>
+        {soKhacLoaiDaTick > 0 && (
+          <p className="rounded-lg bg-warning-surface px-4 py-2.5 text-base font-medium text-destructive">
+            ⚠ Đang tick {soKhacLoaiDaTick} dòng KHÁC loại {tenLoaiKy} — số của chúng sẽ cộng vào
+            nguyên liệu của kỳ này.
+          </p>
+        )}
 
         <DialogFooter>
           <Button variant="outline" size="lg" onClick={onClose}>

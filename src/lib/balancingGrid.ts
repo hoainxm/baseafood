@@ -67,6 +67,27 @@ export function cungHoNguyenLieu(a: string, b: string): boolean {
   return Boolean(x) && x === y;
 }
 
+/**
+ * Các kỳ KHÁC cùng họ nguyên liệu có khoảng ngày CHỒNG lên kỳ này. Tạo trùng kỳ là
+ * đường chính dẫn tới hút nhầm: kỳ trước đã giữ hết chuyến đúng loại, kỳ trùng chỉ
+ * còn thấy chuyến khác loại (VD 1 da khi kỳ là 2 da) trong hộp "Chọn dòng nhập".
+ */
+export function kyTrungNgayCungHo(
+  ky: Pick<BalancingPeriod, "id" | "materialTypeName" | "startDate" | "endDate">,
+  tatCa: Pick<BalancingPeriod, "id" | "materialTypeName" | "startDate" | "endDate">[]
+): typeof tatCa {
+  const tu = ky.startDate;
+  const den = ky.endDate || ky.startDate;
+  if (!tu || !den) return [];
+  return tatCa.filter((k) => {
+    if (k.id === ky.id || !cungHoNguyenLieu(k.materialTypeName, ky.materialTypeName)) return false;
+    const kTu = k.startDate;
+    const kDen = k.endDate || k.startDate;
+    if (!kTu || !kDen) return false;
+    return kTu <= den && tu <= kDen;
+  });
+}
+
 /* ---------- Hút số liệu vào kỳ ---------- */
 
 /**

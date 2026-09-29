@@ -26,7 +26,9 @@ import {
   khoaMatHang,
   chuyenKyChoNhan,
   chuyenNhapTheoNgay,
+  cungHoNguyenLieu,
   kyLienTruoc,
+  kyTrungNgayCungHo,
   nhapHangHopLe,
   nhapTrongKhoangNgay,
   ngayTrongKy,
@@ -63,6 +65,12 @@ export interface PeriodGrid {
   nhapKhacLoai: MaterialImportItem[];
   /** Dòng trong khoảng ngày nhưng ĐANG thuộc kỳ khác — giải thích + kéo về. */
   nhapKyKhac: MaterialImportItem[];
+  /** Tên loại NL của kỳ. */
+  tenLoaiKy: string;
+  /** Kỳ KHÁC cùng họ NL có khoảng ngày chồng lên kỳ này (tạo trùng kỳ). */
+  kyTrungNgay: BalancingPeriod[];
+  /** Dòng sổ nhập có cùng họ nguyên liệu với kỳ không (để hộp chọn tay chỉ tick sẵn dòng đúng loại). */
+  cungHoKy: (r: MaterialImportItem) => boolean;
   /** Đếm để màn hình nói được vì sao trống. */
   chanDoanNhap: { tongTrongKhoang: number; chuaGan: number; kyKhac: number; lechTen: number };
   ghiNL: (rows: BalancingInputItem[]) => void;
@@ -240,6 +248,15 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
         (r) => r.balancingPeriodId && r.balancingPeriodId !== ky.id
       ),
     [ky, tatCaNhap]
+  );
+
+  const kyTrungNgay = useMemo(
+    () => kyTrungNgayCungHo(ky, tatCaKy) as BalancingPeriod[],
+    [ky, tatCaKy]
+  );
+  const cungHoKy = useCallback(
+    (r: MaterialImportItem) => cungHoNguyenLieu(r.materialTypeName, ky.materialTypeName),
+    [ky.materialTypeName]
   );
 
   const chanDoanNhap = useMemo(() => {
@@ -660,6 +677,9 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
     nhapChoHut,
     nhapKhacLoai,
     nhapKyKhac,
+    tenLoaiKy: ky.materialTypeName,
+    kyTrungNgay,
+    cungHoKy,
     chanDoanNhap,
     ghiNL,
     hutNhapHang,

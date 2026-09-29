@@ -7,7 +7,7 @@ import { useMemo, useState } from "react";
 import type { BalancingInputItem, DailyQuantities, InputGroup, MaterialType } from "@/types";
 import { BSF1_WAREHOUSES, INPUT_GROUPS, sumGridRow } from "@/types";
 import { uid } from "@/lib/db";
-import { nhanNgay, type HangLuoiNL } from "@/lib/balancingGrid";
+import { hoNguyenLieu, nhanNgay, type HangLuoiNL } from "@/lib/balancingGrid";
 import type { ONgay, PeriodGrid } from "./usePeriodGrid";
 import { HopChonDongNhap, HopThemDongNL } from "./gridDialogs";
 import {
@@ -446,10 +446,26 @@ export function LuoiNguyenLieu({
       {chanDoanNhap.tongTrongKhoang > 0 && (
         <p className="mb-3 rounded-lg bg-muted px-4 py-3 text-base text-muted-foreground">
           Sổ nhập hàng có <strong>{chanDoanNhap.tongTrongKhoang}</strong> chuyến trong
-          khoảng ngày của kỳ: <strong>{chanDoanNhap.chuaGan}</strong> khớp loại nguyên
-          liệu của kỳ · <strong>{chanDoanNhap.lechTen}</strong> khác tên loại ·{" "}
+          khoảng ngày của kỳ: <strong>{luoi.nhapDaGan.length}</strong> đã ở kỳ này ·{" "}
+          <strong>{chanDoanNhap.chuaGan}</strong> đúng loại chờ lấy ·{" "}
+          <strong>{chanDoanNhap.lechTen}</strong> khác loại ·{" "}
           <strong>{chanDoanNhap.kyKhac}</strong> đang thuộc kỳ khác.
-          {chanDoanNhap.chuaGan === 0 && " Bấm “Chọn dòng nhập” để tự tick dòng thuộc kỳ này."}
+          {chanDoanNhap.chuaGan === 0 &&
+            (chanDoanNhap.kyKhac > 0
+              ? " Bấm “Chọn dòng nhập” nếu cần kéo chuyến từ kỳ khác về."
+              : chanDoanNhap.lechTen > 0
+                ? " Chuyến khác loại KHÔNG tự đưa vào — chỉ chọn tay nếu chắc là ghi nhầm tên."
+                : "")}
+        </p>
+      )}
+      {/* Tạo trùng kỳ cùng loại chồng ngày: kỳ kia đã giữ các chuyến đúng loại, kỳ này
+          chỉ còn thấy chuyến khác loại — nguồn gốc lỗi "kỳ 2 da lấy phải 1 da". */}
+      {luoi.kyTrungNgay.length > 0 && (
+        <p className="mb-3 rounded-lg bg-warning-surface px-4 py-3 text-base font-medium text-destructive">
+          ⚠ Trùng ngày với {luoi.kyTrungNgay.length} kỳ {hoNguyenLieu(luoi.tenLoaiKy)} khác:{" "}
+          {luoi.kyTrungNgay.map((k) => k.dateRangeDescription || `${k.startDate} – ${k.endDate}`).join("; ")}.
+          Chuyến nhập đúng loại trong những ngày chồng nhau đã thuộc kỳ kia — có thể kỳ này
+          tạo trùng; kiểm lại trước khi nhập số.
         </p>
       )}
       {/* Sổ nhập TRỐNG trong khoảng ngày ⇒ luôn nói rõ, KỂ CẢ khi kỳ đã có dòng
@@ -597,6 +613,8 @@ export function LuoiNguyenLieu({
         <HopChonDongNhap
           dong={dongChonDuoc}
           kyDangGiu={new Set(nhapKyKhac.map((r) => r.id))}
+          cungHo={luoi.cungHoKy}
+          tenLoaiKy={hoNguyenLieu(luoi.tenLoaiKy)}
           onClose={() => setChonNhapMo(false)}
           onLuu={(ids) => {
             hutNhapHang(ids);

@@ -9,7 +9,15 @@ import { MONTHLY_STOCK_CATEGORIES, BSF1_WAREHOUSES, STORAGE_KIND_LABELS } from "
 import { useMonthlyStock, useMaterialTypes, useProducts, useStorageLocations } from "@/lib/catalogRepo";
 import { uid } from "@/lib/db";
 import { num, viDate } from "@/lib/format";
-import { parseBangKeKhoFile, namTuTenFile, type BangKeKhoSheet } from "@/lib/monthlyStockExcel";
+import {
+  parseBangKeKhoFile,
+  namTuTenFile,
+  khoTuTieuDe,
+  timKhoTheoGhi,
+  tenKhoMoi,
+  khoaKho,
+  type BangKeKhoSheet,
+} from "@/lib/monthlyStockExcel";
 import {
   suyDong,
   tongDong,
@@ -680,7 +688,12 @@ export default function MonthlyStockScreen() {
         notify.canhBao("File không có sheet dữ liệu nào đọc được (mẫu 'bảng kê kho').");
         return;
       }
-      setNapForm({ sheets, nam: namTuTenFile(file.name), kho: KHO_MAC_DINH });
+      const nam = namTuTenFile(file.name);
+      // Kho mặc định: kho của bản đã nạp cùng năm (nạp lại chỉ CẬP NHẬT) → kho khớp số ở tiêu đề sheet → K1500T.
+      const daNap = lines.find((l) => l.id.startsWith("xlsx|") && l.id.split("|")[3] === String(nam));
+      const so = khoTuTieuDe(sheets[0]?.tieuDe ?? "");
+      const theoTieuDe = so ? BSF1_WAREHOUSES.find((w) => w.code.includes(so) || w.name.includes(so))?.name : undefined;
+      setNapForm({ sheets, nam, kho: daNap?.warehouse ?? theoTieuDe ?? KHO_MAC_DINH });
     } catch (err) {
       notify.loi(`Không đọc được file: ${err instanceof Error ? err.message : String(err)}`);
     }
@@ -688,6 +701,30 @@ export default function MonthlyStockScreen() {
   const soDongNap = napForm
     ? napForm.sheets.reduce((s, sh) => s + (sh.monthNum ? sh.rows.length : 0), 0)
     : 0;
+  /** Soát trước khi nạp: số kho ở tiêu đề sheet + bản nạp cũ của cùng năm ở kho KHÁC (nạp nhầm = cộng đôi). */
+  const soatNap = useMemo(() => {
+    if (!napForm) return null;
+    const soTieuDe = [...new Set(napForm.sheets.map((sh) => khoTuTieuDe(sh.tieuDe)).filter(Boolean))];
+    const ma = maKho(napForm.kho.trim());
+    const khacKho = new Map<string, number>();
+    for (const l of lines) {
+      const p = l.id.split("|");
+      if (p[0] === "xlsx" && p[3] === String(napForm.nam) && p[1] !== ma) khacKho.set(l.warehouse, (khacKho.get(l.warehouse) ?? 0) + 1);
+    }
+    const tieuDeLech = soTieuDe.length > 0 && !soTieuDe.some((so) => napForm.kho.includes(so) || ma.includes(so));
+    const nhom = new Map<string, number>();
+    const gui = new Map<string, number>();
+    for (const sh of napForm.sheets)
+      for (const r of sh.rows) {
+        nhom.set(r.category, (nhom.get(r.category) ?? 0) + 1);
+        if (r.khoGhi) {
+          const ten = timKhoTheoGhi(r.khoGhi, khoLuuDM) ?? `${tenKhoMoi(r.khoGhi)} (mới)`;
+          gui.set(ten, (gui.get(ten) ?? 0) + 1);
+        }
+      }
+    return { soTieuDe, tieuDeLech, khacKho: [...khacKho], nhom: [...nhom], gui: [...gui] };
+  }, [napForm, lines, khoLuuDM]);
+
   const xacNhanNap = () => {
     if (!napForm) return;
     const { sheets, nam, kho: khoNap } = napForm;
@@ -696,8 +733,20 @@ export default function MonthlyStockScreen() {
       return;
     }
     const moi: MonthlyStockLine[] = [];
-    // File bảng kê không có cột vị trí ⇒ nạp lại GIỮ vị trí người dùng đã gán cho dòng cùng id.
+    // Cột R "GỬI KHO HP / Á D…" ⇒ vị trí = kho trong danh mục kho lưu (khớp mã KHP/KAD hoặc tên);
+    // viết tắt lạ ⇒ tạo mục kho thuê ngoài mới. Dòng KHÔNG ghi kho ⇒ giữ vị trí đã gán tay (trống = kho của sổ).
     const viTriCu = new Map(lines.map((l) => [l.id, l.storageLocation]));
+    const noteCu = new Map(lines.map((l) => [l.id, l.note]));
+    const dmKho = [...khoLuuDM];
+    const khoThem: string[] = [];
+    const tenKho = (ghi: string) => {
+      const co = timKhoTheoGhi(ghi, dmKho);
+      if (co) return co;
+      const name = tenKhoMoi(ghi);
+      dmKho.push({ id: uid(), code: `K${khoaKho(ghi)}`, name, kind: "thue-ngoai", address: "", phone: "", note: "Từ bảng kê kho (cột ghi chú)" });
+      khoThem.push(name);
+      return name;
+    };
     for (const sh of sheets) {
       if (sh.monthNum == null) continue;
       const period = `${nam}-${String(sh.monthNum).padStart(2, "0")}`;
@@ -712,7 +761,7 @@ export default function MonthlyStockScreen() {
           size: r.size,
           origin: r.origin,
           importDate: r.importDate,
-          storageLocation: viTriCu.get(id) ?? "",
+          storageLocation: r.khoGhi ? tenKho(r.khoGhi) : (viTriCu.get(id) ?? ""),
           kgPerCtn: r.kgPerCtn,
           unitPrice: r.unitPrice,
           openCtn: r.openCtn,
@@ -723,7 +772,7 @@ export default function MonthlyStockScreen() {
           outKg: r.outKg,
           carriedFromId: "",
           sortOrder: idx,
-          note: "",
+          note: r.ghiChu ? `Bảng kê: ${r.ghiChu}` : (noteCu.get(id) ?? ""),
         });
       });
     }
@@ -732,17 +781,32 @@ export default function MonthlyStockScreen() {
       return;
     }
     const idMoi = new Set(moi.map((x) => x.id));
-    const giuLai = lines.filter((l) => !idMoi.has(l.id));
+    // Dòng của CÙNG sheet/kho/năm mà file mới không còn (VD dòng tiêu đề "HÀNG TẠM" parser cũ nạp nhầm
+    // thành mặt hàng): toàn số 0 ⇒ bỏ; còn số ⇒ giữ + cảnh báo (không xoá lặng lẽ số liệu).
+    const tienTo = new Set(sheets.filter((sh) => sh.monthNum != null).map((sh) => `xlsx|${maKho(khoNap.trim())}|${sh.sheetName}|${nam}|`));
+    const laCuCuaFile = (l: MonthlyStockLine) => !idMoi.has(l.id) && tienTo.has(l.id.slice(0, l.id.lastIndexOf("|") + 1));
+    const cuRong = lines.filter((l) => laCuCuaFile(l) && laDongTrong(l));
+    const cuConSo = lines.filter((l) => laCuCuaFile(l) && !laDongTrong(l));
+    const idBo = new Set(cuRong.map((l) => l.id));
+    const giuLai = lines.filter((l) => !idMoi.has(l.id) && !idBo.has(l.id));
     // Dòng đã TÁCH khi chuyển kho một phần: nạp lại trả dòng gốc về số trong file ⇒ phần tách bị đếm 2 lần.
     const soTach = giuLai.filter((l) => [...idMoi].some((id) => l.note.includes(`(tách từ dòng ${id})`))).length;
     ghiLines([...giuLai, ...moi]);
+    if (khoThem.length) ghiKhoLuuDM(dmKho);
+    if (cuConSo.length)
+      notify.canhBao(`${cuConSo.length} dòng nạp lần trước không còn trong file mới nhưng còn số — giữ nguyên, kiểm lại: ${cuConSo.slice(0, 5).map((l) => l.itemName).join(", ")}${cuConSo.length > 5 ? "…" : ""}`);
     if (soTach) notify.canhBao(`${soTach} dòng từng tách khi chuyển kho một phần vẫn còn — dòng gốc đã về số trong file, kiểm lại kẻo cộng đôi.`);
     const dauKy = [...new Set(moi.map((m) => m.period))].sort()[0];
     setThang(dauKy);
     setKho(TAT_CA_KHO);
     setGhiMode(false);
     setNapForm(null);
-    notify.daLuu(`Đã nạp ${moi.length} dòng · ${new Set(moi.map((m) => m.period)).size} tháng từ Excel bảng kê`);
+    const soGui = moi.filter((m) => m.storageLocation && m.storageLocation !== m.warehouse).length;
+    notify.daLuu(
+      `Đã nạp ${moi.length} dòng · ${new Set(moi.map((m) => m.period)).size} tháng từ Excel bảng kê` +
+        (soGui ? ` · ${soGui} dòng gửi kho ngoài` : "") +
+        (khoThem.length ? ` · thêm kho mới: ${khoThem.join(", ")}` : ""),
+    );
   };
 
   // ---------- Thẻ số liệu ----------
@@ -1673,6 +1737,32 @@ export default function MonthlyStockScreen() {
                   </tbody>
                 </table>
               </div>
+              {soatNap && (
+                <div className="space-y-2 text-sm">
+                  {soatNap.soTieuDe.length > 0 && (
+                    <p className={soatNap.tieuDeLech ? "font-semibold text-warning" : "text-muted-foreground"}>
+                      Tiêu đề sheet ghi: KHO {soatNap.soTieuDe.join(", ")}
+                      {soatNap.tieuDeLech && ` — khác kho đang chọn (${napForm.kho}). Kiểm lại trước khi nạp.`}
+                    </p>
+                  )}
+                  {soatNap.khacKho.length > 0 && (
+                    <p className="font-semibold text-destructive">
+                      Năm {napForm.nam} đã có bản nạp ở{" "}
+                      {soatNap.khacKho.map(([k, n]) => `${k} (${n} dòng)`).join(", ")}. Nạp vào {napForm.kho} sẽ
+                      tạo BẢN SAO ⇒ "Tất cả kho" cộng đôi. Muốn nạp lại cùng sổ thì chọn đúng kho cũ.
+                    </p>
+                  )}
+                  <p className="text-muted-foreground">
+                    Nhóm theo mục trong file: {soatNap.nhom.map(([c, n]) => `${c} (${n})`).join(" · ")}
+                  </p>
+                  {soatNap.gui.length > 0 && (
+                    <p className="text-muted-foreground">
+                      Vị trí đọc từ cột ghi chú kho: {soatNap.gui.map(([k, n]) => `${k} (${n})`).join(" · ")}. Dòng
+                      không ghi kho ⇒ nằm ở chính {napForm.kho}.
+                    </p>
+                  )}
+                </div>
+              )}
               <p className="text-sm text-muted-foreground">
                 Nạp trung thực theo sổ cũ (kể cả lệch dồn kỳ trong file). Sau khi nạp, mở tháng đầu rồi
                 bấm "Dồn sang tháng sau" lần lượt để chuẩn hóa tồn đầu các tháng kế.

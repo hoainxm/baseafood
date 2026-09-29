@@ -114,7 +114,8 @@ export interface NhomKho {
 
 /**
  * Gom dòng theo NHÓM (category). Nhóm mặc định lên trước theo thứ tự
- * MONTHLY_STOCK_CATEGORIES, nhóm lạ xếp cuối theo bảng chữ cái. Trong mỗi nhóm
+ * MONTHLY_STOCK_CATEGORIES (khối con "<nhóm> – <tên>" ngay sau nhóm cha), nhóm lạ
+ * xếp cuối theo bảng chữ cái. Trong mỗi nhóm
  * giữ `sortOrder` rồi tới tên.
  */
 export function gomNhom(rows: MonthlyStockRow[]): NhomKho[] {
@@ -130,7 +131,10 @@ export function gomNhom(rows: MonthlyStockRow[]): NhomKho[] {
   }
   const uuTien = (c: string) => {
     const i = MONTHLY_STOCK_CATEGORIES.indexOf(c);
-    return i === -1 ? MONTHLY_STOCK_CATEGORIES.length : i;
+    if (i !== -1) return i;
+    // Khối con của một nhóm ("Nguyên liệu nhập khẩu – 2 DA") đứng ngay sau nhóm cha.
+    const cha = MONTHLY_STOCK_CATEGORIES.findIndex((m) => c.startsWith(`${m} – `));
+    return cha === -1 ? MONTHLY_STOCK_CATEGORIES.length : cha + 0.5;
   };
   return [...map.entries()]
     .sort((a, b) => uuTien(a[0]) - uuTien(b[0]) || a[0].localeCompare(b[0]))

@@ -670,6 +670,7 @@ export interface FinishedGoodsOpeningStock {
 export const MONTHLY_STOCK_CATEGORIES: string[] = [
   "Nguyên liệu nhập khẩu",
   "Nguyên liệu mua ngoài",
+  "Hàng tạm",
   "Bán thành phẩm",
   "Thành phẩm đóng gói",
 ];

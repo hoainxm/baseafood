@@ -179,7 +179,19 @@ export function LuoiBanThanhPham({
         />
       ),
     },
-    { key: "donGia", header: "Giá USD", nhan: "Đơn giá", kieu: "so", nhom: "tien", rong: 112, lay: (h) => h.donGia },
+    /* Thứ tự theo bảng cân đối giấy: XUẤT KHẨU Lượng · Đơn giá · T.tiền đứng ngay sau
+       Khách, rồi mới tới chuyển kỳ + các ngày + Tổng. "Lượng" = Tổng (ô tính). */
+    { key: "luong", header: "Lượng (kg)", nhan: "Lượng", kieu: "tinh", rong: 110, lay: (h) => h.tong || null },
+    { key: "donGia", header: "Đơn giá (USD)", nhan: "Đơn giá", kieu: "so", nhom: "tien", rong: 112, lay: (h) => h.donGia },
+    {
+      key: "thanhTien",
+      header: "T.tiền (USD)",
+      nhan: "Thành tiền",
+      kieu: "tinh",
+      nhom: "tien",
+      rong: 148,
+      lay: (h) => h.tong * (h.donGia ?? 0) || null,
+    },
     {
       key: "chuyenKy",
       header: "Chuyển kỳ",
@@ -198,16 +210,8 @@ export function LuoiBanThanhPham({
       rong: 96,
       lay: (h) => h.theoNgay[iso] ?? null,
     })),
-    { key: "tong", header: "Tổng (kg)", nhan: "Tổng", kieu: "tinh", rong: 116, lay: (h) => h.tong || null },
-    {
-      key: "thanhTien",
-      header: "Thành tiền",
-      nhan: "Thành tiền",
-      kieu: "tinh",
-      nhom: "tien",
-      rong: 148,
-      lay: (h) => h.tong * (h.donGia ?? 0) || null,
-    },
+    /* Tổng cuối hàng (như cột W bảng giấy) — chỉ khi mở cột ngày; thu ngày thì đã có "Lượng". */
+    { key: "tong", header: "Tổng (kg)", nhan: "Tổng", kieu: "tinh", nhom: "ngay", rong: 116, lay: (h) => h.tong || null },
   ];
 
   /* Kỳ đã chốt ⇒ khoá TOÀN BỘ ô + gỡ ô điều khiển. Khoá ở một chỗ thay vì rải
@@ -296,7 +300,13 @@ export function LuoiBanThanhPham({
               </th>
               <td className="border-t-2 border-l border-border" />
               <td className="tnum border-t-2 border-l border-border px-3 py-3 text-right">
+                {num(tongKg)}
+              </td>
+              <td className="tnum border-t-2 border-l border-border px-3 py-3 text-right">
                 {tongKg > 0 ? num(Math.round((tongTien / tongKg) * 100) / 100) : "—"}
+              </td>
+              <td className="tnum border-t-2 border-l border-border px-3 py-3 text-right">
+                {num(Math.round(tongTien * 100) / 100)}
               </td>
               <td className="tnum border-t-2 border-l border-border bg-warning-surface px-3 py-3 text-right">
                 {num(hangTP.reduce((s, h) => s + h.chuyenKy, 0)) || "—"}
@@ -307,12 +317,11 @@ export function LuoiBanThanhPham({
                     {num(hangTP.reduce((s, h) => s + (h.theoNgay[iso] ?? 0), 0)) || "—"}
                   </td>
                 ))}
-              <td className="tnum border-t-2 border-l border-border px-3 py-3 text-right">
-                {num(tongKg)}
-              </td>
-              <td className="tnum border-t-2 border-l border-border px-3 py-3 text-right">
-                {num(tongTien)}
-              </td>
+              {!anNgay && (
+                <td className="tnum border-t-2 border-l border-border px-3 py-3 text-right">
+                  {num(tongKg)}
+                </td>
+              )}
             </tr>
           }
         />

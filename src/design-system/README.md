@@ -172,6 +172,8 @@ Combobox trên cùng một hộp thoại, đóng cái đầu, đếm `document.q
 
 ### 5b. `LuoiNhap` — lưới nhập kiểu bảng tính
 
+- Prop `tenCotDau` đổi tên cột đầu (cột tên dòng, dính trái) — mặc định "Mặt hàng"; VD khối NL ở Cân đối dùng "Loại hàng" theo bảng giấy kế toán.
+
 Dùng khi người dùng phải gõ **nhiều ô số cùng lúc** và đang có sẵn thói quen làm
 việc đó trên Excel (màn Cân đối kỳ). Mở hộp thoại cho từng ô thì Excel vẫn nhanh
 hơn và người dùng sẽ quay về Excel — đó là lý do primitive này tồn tại.

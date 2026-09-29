@@ -94,9 +94,40 @@ export function LuoiNguyenLieu({
     ghiDong(r.id, { dailyQuantities: daily });
   };
 
+  /**
+   * Gõ thẳng SỐ LƯỢNG (khi đang thu cột ngày — bố cục như bảng cân đối giấy, khối NL
+   * không chia ngày). Tổng vẫn là Σ ngày + chuyển kỳ, nên phần chênh được dồn vào
+   * NGÀY CUỐI đang có số (chưa có ngày nào ⇒ ngày đầu kỳ). Giữ nguyên các ngày khác
+   * ⇒ ai đã gõ theo ngày thì mở cột ngày ra vẫn thấy đúng số của mình.
+   */
+  const ghiSoLuong = (r: BalancingInputItem, h: HangLuoiNL, v: number | null) => {
+    if (!ngay.length) {
+      notify.loi("Kỳ chưa có ngày tiếp nhận — sửa ngày của kỳ trước khi nhập số lượng.");
+      return;
+    }
+    const muonTong = r.isReduction ? -Math.abs(v ?? 0) : (v ?? 0);
+    const coSo = ngay.filter((iso) => (h.theoNgay[iso] ?? 0) !== 0);
+    const iso = coSo.length ? coSo[coSo.length - 1] : ngay[0];
+    const moi = (h.theoNgay[iso] ?? 0) + (muonTong - h.tong);
+    /* Đã tính dấu ở trên ⇒ gọi thẳng, không qua lớp "dương → âm" của ghiONgay. */
+    if (r.autoSource === "imports") {
+      ghiNhapNhieuNgay([{ khoa: r.name, ngay: iso, kg: moi }]);
+      return;
+    }
+    const daily: DailyQuantities = { ...(r.dailyQuantities ?? {}) };
+    if (moi === 0) delete daily[iso];
+    else daily[iso] = moi;
+    ghiDong(r.id, { dailyQuantities: daily });
+  };
+
   const ghiO = (rowId: string, colKey: string, v: number | null) => {
     const r = theoId.get(rowId);
     if (!r) return;
+    if (colKey === "soLuong") {
+      const h = hangNL.find((x) => x.id === rowId);
+      if (h) ghiSoLuong(r, h, v);
+      return;
+    }
     if (colKey === "chuyenKy") return ghiDong(rowId, { carryOverKg: v ?? 0 });
     if (colKey === "donGia") return ghiDong(rowId, { unitPrice: v });
     if (colKey === "tyLe") return ghiDong(rowId, { ratioPercentage: v });
@@ -250,20 +281,25 @@ export function LuoiNguyenLieu({
       rong: 96,
       lay: (h) => h.theoNgay[iso] ?? null,
     })),
+    /* Chuyển kỳ đi cùng nhóm ngày: bảng cân đối giấy không có cột này ở khối NL. */
     {
       key: "chuyenKy",
       header: "Chuyển kỳ",
       nhan: "Chuyển kỳ",
       kieu: "so",
+      nhom: "ngay",
       toNen: "chuyen-ky",
       rong: 116,
       lay: (h) => h.chuyenKy || null,
     },
-    { key: "tong", header: "Tổng (kg)", nhan: "Tổng", kieu: "tinh", rong: 116, lay: (h) => h.tong || null },
-    { key: "donGia", header: "Đơn giá", nhan: "Đơn giá", kieu: "so", nhom: "tien", rong: 128, lay: (h) => h.donGia },
+    /* Hai cột "Số lượng" loại trừ nhau: đang MỞ ngày ⇒ ô tính (Σ ngày + chuyển kỳ,
+       gõ ở ô ngày); đang THU ngày (mặc định, như bảng giấy) ⇒ gõ thẳng (ghiSoLuong). */
+    { key: "tong", header: "Số lượng (kg)", nhan: "Số lượng", kieu: "tinh", nhom: "khi-mo-ngay", rong: 116, lay: (h) => h.tong || null },
+    { key: "soLuong", header: "Số lượng (kg)", nhan: "Số lượng", kieu: "so", nhom: "khi-thu-ngay", rong: 116, lay: (h) => (h.laGiam ? Math.abs(h.tong) : h.tong) || null },
+    { key: "donGia", header: "Đơn giá VNĐ", nhan: "Đơn giá", kieu: "so", nhom: "tien", rong: 128, lay: (h) => h.donGia },
     {
       key: "thanhTien",
-      header: "Thành tiền",
+      header: "T.tiền (đồng)",
       nhan: "Thành tiền",
       kieu: "tinh",
       nhom: "tien",
@@ -272,7 +308,7 @@ export function LuoiNguyenLieu({
     },
     {
       key: "tyLe",
-      header: "Tỷ lệ %",
+      header: "Tỷ lệ",
       nhan: "Tỷ lệ phần trăm",
       kieu: "so",
       nhom: "tien",
@@ -440,9 +476,10 @@ export function LuoiNguyenLieu({
       ) : (
         <LuoiNhap
           moTa="Lưới nguyên liệu vào theo ngày trong kỳ"
+          tenCotDau="Loại hàng"
           cot={cotHienThi}
           hang={hang}
-          nhomAn={[...(anNgay ? ["ngay"] : []), ...(anTien ? ["tien"] : [])]}
+          nhomAn={[...(anNgay ? ["ngay", "khi-mo-ngay"] : ["khi-thu-ngay"]), ...(anTien ? ["tien"] : [])]}
           onGhiO={ghiO}
           onDanKhoi={danKhoi}
           cuoiBang={
@@ -459,9 +496,11 @@ export function LuoiNguyenLieu({
                     {num(hangNL.reduce((s, h) => s + (h.theoNgay[iso] ?? 0), 0)) || "—"}
                   </td>
                 ))}
-              <td className="tnum border-t-2 border-l border-border bg-warning-surface px-3 py-3 text-right">
-                {num(hangNL.reduce((s, h) => s + h.chuyenKy, 0)) || "—"}
-              </td>
+              {!anNgay && (
+                <td className="tnum border-t-2 border-l border-border bg-warning-surface px-3 py-3 text-right">
+                  {num(hangNL.reduce((s, h) => s + h.chuyenKy, 0)) || "—"}
+                </td>
+              )}
               <td className="tnum border-t-2 border-l border-border px-3 py-3 text-right">
                 {num(tongKg)}
               </td>

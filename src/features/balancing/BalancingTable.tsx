@@ -56,6 +56,10 @@ export default function BangCanDoi({
   const [anNgay, setAnNgay] = useState(false);
   const [anTien, setAnTien] = useState(false);
   const cotNgay = anNgay ? [] : ngay;
+  /* Khối NL theo bảng cân đối giấy KHÔNG chia ngày (Loại hàng · Số lượng · Đơn giá ·
+     T.tiền · tỷ lệ) ⇒ mặc định thu, công tắc riêng. */
+  const [moNgayNL, setMoNgayNL] = useState(false);
+  const cotNgayNL = moNgayNL ? cotNgay : [];
 
   /* Khoá cuộn nền khi phiếu đang mở — xem ghi chú ở src/index.css. */
   useEffect(() => {
@@ -85,6 +89,11 @@ export default function BangCanDoi({
             {anNgay ? "Mở cột ngày" : "Thu cột ngày"}
           </Button>
           <Button
+            title="Khối nguyên liệu: in theo tổng như bảng cân đối giấy, hoặc chia thêm cột từng ngày." variant="outline" onClick={() => setMoNgayNL((v) => !v)}>
+            <ChevronsLeftRight className="size-4" />
+            {moNgayNL ? "NL: thu cột ngày" : "NL: mở cột ngày"}
+          </Button>
+          <Button
             title="Ẩn / hiện các cột tiền trên bản in." variant="outline" onClick={() => setAnTien((v) => !v)}>
             <Coins className="size-4" />
             {anTien ? "Mở cột tiền" : "Thu cột tiền"}
@@ -110,17 +119,17 @@ export default function BangCanDoi({
           <table className="w-full border-collapse text-sm">
             <thead>
               <Tr head>
-                <Th>Loại</Th>
-                {cotNgay.map((iso) => (
+                <Th>Loại hàng</Th>
+                {cotNgayNL.map((iso) => (
                   <Th key={iso} right>
                     {nhanNgay(iso)}
                   </Th>
                 ))}
-                <Th right>Chuyển kỳ</Th>
-                <Th right>SL (kg)</Th>
-                {!anTien && <Th right>Đơn giá</Th>}
-                {!anTien && <Th right>Thành tiền</Th>}
-                {!anTien && <Th right>Tỉ lệ</Th>}
+                {moNgayNL && <Th right>Chuyển kỳ</Th>}
+                <Th right>Số lượng</Th>
+                {!anTien && <Th right>Đơn giá VNĐ</Th>}
+                {!anTien && <Th right>T.tiền (đồng)</Th>}
+                {!anTien && <Th right>tỷ lệ</Th>}
               </Tr>
             </thead>
             <tbody>
@@ -132,12 +141,12 @@ export default function BangCanDoi({
                       ({r.laGiam ? "Giảm" : r.nhom})
                     </span>
                   </Td>
-                  {cotNgay.map((iso) => (
+                  {cotNgayNL.map((iso) => (
                     <Td key={iso} right>
                       {r.theoNgay[iso] ? num(r.theoNgay[iso]) : ""}
                     </Td>
                   ))}
-                  <Td right>{r.chuyenKy ? num(r.chuyenKy) : ""}</Td>
+                  {moNgayNL && <Td right>{r.chuyenKy ? num(r.chuyenKy) : ""}</Td>}
                   <Td right>{num(r.tong)}</Td>
                   {!anTien && <Td right>{num(r.donGia)}</Td>}
                   {/* Chưa khai đơn giá thì để trống — "-0" (dòng giảm × giá 0)
@@ -148,14 +157,16 @@ export default function BangCanDoi({
               ))}
               <Tr total>
                 <Td>T. CỘNG</Td>
-                {cotNgay.map((iso) => (
+                {cotNgayNL.map((iso) => (
                   <Td key={iso} right>
                     {num(hangNL.reduce((s, r) => s + (r.theoNgay[iso] ?? 0), 0))}
                   </Td>
                 ))}
-                <Td right>{num(hangNL.reduce((s, r) => s + r.chuyenKy, 0))}</Td>
+                {moNgayNL && <Td right>{num(hangNL.reduce((s, r) => s + r.chuyenKy, 0))}</Td>}
                 <Td right>{num(kq.totalInputKg)}</Td>
-                {!anTien && <Td right></Td>}
+                {!anTien && (
+                  <Td right>{kq.totalInputKg ? num(Math.round(kq.materialValue / kq.totalInputKg)) : ""}</Td>
+                )}
                 {!anTien && <Td right>{num(kq.materialValue)}</Td>}
                 {!anTien && <Td right></Td>}
               </Tr>
@@ -168,18 +179,20 @@ export default function BangCanDoi({
           <table className="w-full border-collapse text-sm">
             <thead>
               <Tr head>
+                {/* Thứ tự như bảng giấy: Mặt hàng · Khách · XUẤT KHẨU (Lượng · Đơn giá ·
+                    T.tiền) · chuyển kỳ · từng ngày · Tổng. Hàng nội địa: giá VND, không "$". */}
                 <Th>Mặt hàng</Th>
                 <Th>Khách</Th>
-                <Th>Kênh</Th>
+                <Th right>Lượng</Th>
+                {!anTien && <Th right>Đơn giá</Th>}
+                {!anTien && <Th right>T.tiền (usd)</Th>}
                 <Th right>Chuyển kỳ</Th>
                 {cotNgay.map((iso) => (
                   <Th key={iso} right>
                     {nhanNgay(iso)}
                   </Th>
                 ))}
-                <Th right>Lượng (kg)</Th>
-                {!anTien && <Th right>Đơn giá</Th>}
-                {!anTien && <Th right>Thành tiền</Th>}
+                {cotNgay.length > 0 && <Th right>Tổng</Th>}
               </Tr>
             </thead>
             <tbody>
@@ -194,14 +207,10 @@ export default function BangCanDoi({
                         <span className="ml-1 text-xs text-slate-500">{r.quyCach}</span>
                       )}
                     </Td>
-                    <Td>{tenKH(r.khachId)}</Td>
-                    <Td>{xk ? "XK" : "Nội địa"}</Td>
-                    <Td right>{r.chuyenKy ? num(r.chuyenKy) : ""}</Td>
-                    {cotNgay.map((iso) => (
-                      <Td key={iso} right>
-                        {r.theoNgay[iso] ? num(r.theoNgay[iso]) : ""}
-                      </Td>
-                    ))}
+                    <Td>
+                      {tenKH(r.khachId)}
+                      {!xk && <span className="ml-1 text-xs text-slate-500">(nội địa)</span>}
+                    </Td>
                     <Td right>{num(r.tong)}</Td>
                     {!anTien && (
                       <Td right>
@@ -215,44 +224,65 @@ export default function BangCanDoi({
                         {xk ? " $" : ""}
                       </Td>
                     )}
+                    <Td right>{r.chuyenKy ? num(r.chuyenKy) : ""}</Td>
+                    {cotNgay.map((iso) => (
+                      <Td key={iso} right>
+                        {r.theoNgay[iso] ? num(r.theoNgay[iso]) : ""}
+                      </Td>
+                    ))}
+                    {cotNgay.length > 0 && <Td right>{num(r.tong)}</Td>}
                   </Tr>
                 );
               })}
               <Tr total>
                 <Td>Tổng cộng</Td>
                 <Td></Td>
-                <Td></Td>
+                <Td right>{num(kq.totalOutputKg)}</Td>
+                {!anTien && (
+                  <Td right>
+                    {kq.totalOutputKg
+                      ? num(Math.round((hangTP.reduce((s, r) => s + r.tong * (r.donGia ?? 0), 0) / kq.totalOutputKg) * 100) / 100)
+                      : ""}
+                  </Td>
+                )}
+                {!anTien && (
+                  <Td right>{num(Math.round(hangTP.reduce((s, r) => s + r.tong * (r.donGia ?? 0), 0) * 100) / 100)}</Td>
+                )}
                 <Td right>{num(hangTP.reduce((s, r) => s + r.chuyenKy, 0))}</Td>
                 {cotNgay.map((iso) => (
                   <Td key={iso} right>
                     {num(hangTP.reduce((s, r) => s + (r.theoNgay[iso] ?? 0), 0))}
                   </Td>
                 ))}
-                <Td right>{num(kq.totalOutputKg)}</Td>
-                {!anTien && <Td right></Td>}
-                {!anTien && <Td right></Td>}
+                {cotNgay.length > 0 && <Td right>{num(kq.totalOutputKg)}</Td>}
               </Tr>
             </tbody>
           </table>
         </Section>
 
         {/* Ghi chú / tính toán */}
-        <Section title="Cân đối">
+        {/* Ô GHI CHÚ của bảng giấy — cột trái đúng thứ tự kế toán đọc, cột phải phần phụ. */}
+        <Section title="Ghi chú">
           <div className="grid grid-cols-2 gap-x-8 gap-y-1 text-sm">
-            <KV k="Tổng bán thành phẩm" v={`${num(kq.totalOutputKg)} kg`} />
-            <KV k="Tỉ giá (VND/USD)" v={num(ky.exchangeRate)} />
-            <KV k="Định mức chế biến" v={num(kq.norm)} strong />
-            <KV k="Chi phí chế biến / kg TP" v={num(ky.processingCostPerKg)} />
-            <KV k="Tỉ lệ thu hồi / tổng nhận" v={kq.yieldRate == null ? "—" : num(kq.yieldRate)} />
-            <KV k="Giá trị nguyên liệu" v={num(kq.materialValue)} />
-            <KV k="Giá thành" v={num(kq.costOfGoods)} />
-            <KV k="Giá trị xuất (VND)" v={num(kq.exportValue)} />
-            <KV k="Bình quân / kg NL" v={num(kq.avgProfitPerKgMaterial)} />
-            <KV
-              k={kq.profitOrLoss >= 0 ? "LÃI" : "LỖ"}
-              v={`${num(Math.abs(kq.profitOrLoss))} VND`}
-              strong
-            />
+            <div>
+              <KV k="Tổng thành phẩm" v={`${num(kq.totalOutputKg)} kg`} />
+              <KV k="Định mức chế biến" v={num(kq.norm)} strong />
+              <KV k="Chi phí CB /kg TP" v={num(ky.processingCostPerKg)} />
+              <KV k="Giá Thành" v={num(kq.costOfGoods)} />
+              <KV k="Giá trị xuất" v={num(kq.exportValue)} />
+              <KV
+                k={kq.profitOrLoss >= 0 ? "Lãi" : "Lỗ"}
+                v={num(Math.abs(kq.profitOrLoss))}
+                strong
+              />
+              <KV k="Bình quân /kg nl" v={num(kq.avgProfitPerKgMaterial)} />
+              <KV k="tỉ giá" v={num(ky.exchangeRate)} />
+            </div>
+            <div>
+              <KV k="Tổng nguyên liệu vào" v={`${num(kq.totalInputKg)} kg`} />
+              <KV k="Giá trị nguyên liệu" v={num(kq.materialValue)} />
+              <KV k="Tỉ lệ thu hồi / tổng nhận" v={kq.yieldRate == null ? "—" : num(kq.yieldRate)} />
+            </div>
           </div>
         </Section>
       </div>

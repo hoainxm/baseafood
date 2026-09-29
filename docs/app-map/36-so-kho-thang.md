@@ -2,6 +2,7 @@
 covers: src/features/monthly-stock/MonthlyStockScreen.tsx, src/features/monthly-stock/index.ts, src/lib/monthlyStock.ts, src/lib/monthlyStockExcel.ts
 last_verified: 2026-09-29
 ttl_days: 90
+<!-- updated: 2026-09-29 (3) — hộp Đồng bộ danh mục: nút xác nhận "Đồng bộ: n → Mặt hàng · m → Loại NL" chuyển xuống CHÂN hộp (dính đáy khi cuộn, không disabled); ô ánh xạ hiện tên vừa gõ "thêm mới" kèm nhãn "mới"; ô co giãn ở điện thoại. -->
 <!-- updated: 2026-09-29 (2) — Size thành CỘT RIÊNG (bảng xem · lưới Ghi sửa tại ô · phiếu in) thay dòng phụ dưới tên; parser điền ô GỘP dọc cột 0–5 (ngày nhập/invoice gộp cho cả lô nhiều size — trước chỉ dòng đầu có) và đọc KHÔNG cellDates (SheetJS dựng Date lệch giây múi giờ ⇒ ngày lùi 1 ngày ở VN); id nạp không đổi (kiểm file thật). -->
 <!-- updated: 2026-09-29 — parser đọc cột R (ghi chú kho → vị trí), mục III HÀNG TẠM + mục La Mã lạ, khối con "TỔNG 2 DA" theo vùng SUM; dialog soát tiêu đề kho + bản nạp ở kho khác; nạp lại bỏ dòng cũ toàn-0 không còn trong file. Kiểm trên file thật 8 sheet → 1.585 dòng, T8 khớp TỔNG HÀNG NỘI ĐỊA 77.950,53/76.824,63. -->
 <!-- re-verified: 2026-09-18 10:30 — apThaoTacLo "chuyển kho": full (kg>=closeKg) chỉ đổi storageLocation KHÔNG tách dòng, partial mới tách dòng mới id `msl|…` (monthlyStock.ts:507-538 + MonthlyStockScreen.tsx:502-532); XEM TRƯỚC ẩn nút Chuyển kho/Lấy ra/Gán vị trí (guard `!laXemTruoc`, MonthlyStockScreen.tsx:809,1153,1163) — khớp code. -->

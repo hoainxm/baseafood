@@ -29,6 +29,7 @@ import {
 import { usePeriodGrid } from "./usePeriodGrid";
 import { LuoiNguyenLieu } from "./MaterialGrid";
 import { hoNguyenLieu } from "@/lib/balancingGrid";
+import type { BalancingResult } from "@/lib/balancingCalc";
 import { LuoiBanThanhPham } from "./WipGrid";
 import {
   ChuThichBatBuoc,
@@ -459,12 +460,14 @@ function KyDetail({
   const [khach, setKhach] = useCustomers();
   const [loaiNLDanhMuc, setLoaiNLDanhMuc] = useMaterialTypes();
   const [showBang, setShowBang] = useState(false);
-  /* Một công tắc cho CẢ HAI lưới: hai khối nằm trên cùng một tờ, cột ngày phải
-     dóng thẳng nhau thì mới đối chiếu được NL vào ↔ BTP ra của cùng một ngày. */
-  const [anCotNgay, setAnCotNgay] = useState(false);
-  /* Xếp hai khối cạnh nhau (như file Excel gốc) — người dùng tự bật, không tự
-     đổi theo bề rộng: bố cục nhảy khi thu cột là thứ gây mất phương hướng nhất. */
-  const [xepNgang, setXepNgang] = useState(false);
+  /* Công tắc cột ngày RIÊNG từng khối, theo bảng cân đối giấy của kế toán: khối NL
+     chỉ có tổng (Loại hàng · Số lượng · Đơn giá · T.tiền · tỷ lệ) ⇒ mặc định THU ngày,
+     gõ thẳng Số lượng; khối BTP có cột từng ngày ⇒ mặc định MỞ. */
+  const [anNgayNL, setAnNgayNL] = useState(true);
+  const [anNgayTP, setAnNgayTP] = useState(false);
+  /* Mặc định xếp NGANG như bảng giấy (NL + ô GHI CHÚ bên trái, BTP bên phải — từ màn
+     2xl). Người dùng vẫn đổi tay được; không tự nhảy theo bề rộng. */
+  const [xepNgang, setXepNgang] = useState(true);
   const [chotMo, setChotMo] = useState(false);
 
   /* Ctrl+Z / Ctrl+Y — nghe ở cấp màn, bỏ qua khi con trỏ đang trong hộp thoại. */
@@ -540,7 +543,7 @@ function KyDetail({
 
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-foreground">{ky.materialTypeName}</h1>
+          <h1 className="text-2xl font-semibold text-foreground">Bảng cân đối {ky.materialTypeName}</h1>
           <p className="mt-2 text-base text-muted-foreground">
             Ngày tiếp nhận: {ky.dateRangeDescription || "chưa ghi"}
           </p>
@@ -625,18 +628,20 @@ function KyDetail({
 
       {/* Hai khối trong MỘT tờ: cùng khung, cùng công tắc cột ngày, chỉ ngăn nhau
           bằng một đường kẻ — đọc như một bảng cân đối liền mạch. */}
+      {/* Xếp ngang (mặc định, từ 2xl): cột trái = khối NL + ô GHI CHÚ kết quả, cột phải
+          = khối BTP — dóng theo bảng cân đối giấy. Màn hẹp hơn: NL → BTP → GHI CHÚ. */}
       <Card
         className={
           xepNgang
-            ? "grid grid-cols-1 overflow-hidden p-0 2xl:grid-cols-2"
+            ? "grid grid-cols-1 overflow-hidden p-0 2xl:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] 2xl:grid-rows-[auto_1fr]"
             : "overflow-hidden p-0"
         }
       >
         <LuoiNguyenLieu
           luoi={luoi}
           loaiNLDanhMuc={loaiNLDanhMuc}
-          anNgay={anCotNgay}
-          onDoiAnNgay={() => setAnCotNgay((v) => !v)}
+          anNgay={anNgayNL}
+          onDoiAnNgay={() => setAnNgayNL((v) => !v)}
           onThemLoaiNL={(ten) => {
             setLoaiNLDanhMuc([
               ...loaiNLDanhMuc,
@@ -646,27 +651,36 @@ function KyDetail({
             return ten;
           }}
         />
-        <LuoiBanThanhPham
-          luoi={luoi}
-          matHang={matHang}
-          khach={khach}
-          choHutBan={banChoHut}
-          onHutBan={hutBanVaoKy}
-          anNgay={anCotNgay}
-          onDoiAnNgay={() => setAnCotNgay((v) => !v)}
-          onThemMatHang={(ten) => {
-            const m: Product = { id: uid(), code: "", name: ten, finishedGoodCode: "" };
-            setMatHang([...matHang, m]);
-            notify.daLuu(`Đã thêm mặt hàng "${ten}" vào danh mục`);
-            return m.id;
-          }}
-          onThemKhach={(ten) => {
-            const k: Customer = { id: uid(), code: "", name: ten, market: "" };
-            setKhach([...khach, k]);
-            notify.daLuu(`Đã thêm khách hàng "${ten}" vào danh mục`);
-            return k.id;
-          }}
-        />
+        <div
+          className={
+            xepNgang
+              ? "2xl:col-start-2 2xl:row-span-2 2xl:row-start-1 2xl:border-l-2 2xl:border-border 2xl:[&>section]:border-t-0"
+              : undefined
+          }
+        >
+          <LuoiBanThanhPham
+            luoi={luoi}
+            matHang={matHang}
+            khach={khach}
+            choHutBan={banChoHut}
+            onHutBan={hutBanVaoKy}
+            anNgay={anNgayTP}
+            onDoiAnNgay={() => setAnNgayTP((v) => !v)}
+            onThemMatHang={(ten) => {
+              const m: Product = { id: uid(), code: "", name: ten, finishedGoodCode: "" };
+              setMatHang([...matHang, m]);
+              notify.daLuu(`Đã thêm mặt hàng "${ten}" vào danh mục`);
+              return m.id;
+            }}
+            onThemKhach={(ten) => {
+              const k: Customer = { id: uid(), code: "", name: ten, market: "" };
+              setKhach([...khach, k]);
+              notify.daLuu(`Đã thêm khách hàng "${ten}" vào danh mục`);
+              return k.id;
+            }}
+          />
+        </div>
+        <GhiChuKetQua ky={ky} kq={kq} chuaCoTP={chuaCoTP} lechNL={lechNL} xepNgang={xepNgang} />
       </Card>
 
       {/* Vòng gối đầu: phần kỳ trước đẩy sang được kéo vào đây bằng một nút, thay
@@ -685,56 +699,6 @@ function KyDetail({
           </Button>
         </Card>
       )}
-
-      <Card className="p-5">
-        <h2 className="mb-4 text-xl font-semibold">Kết quả cân đối</h2>
-        <div className="grid gap-x-8 gap-y-1 sm:grid-cols-2 lg:grid-cols-3">
-          <KV k="Tổng nguyên liệu vào" v={`${num(kq.totalInputKg)} kg`} />
-          <KV k="Tổng bán thành phẩm" v={`${num(kq.totalOutputKg)} kg`} />
-          <KV k="Định mức chế biến" v={chuaCoTP ? "—" : num(kq.norm)} strong />
-          <KV k="Tỉ lệ thu hồi" v={kq.yieldRate == null ? "—" : num(kq.yieldRate)} />
-          <KV k="Giá trị nguyên liệu" v={`${num(kq.materialValue)} đ`} />
-          <KV k="Giá thành" v={`${num(kq.costOfGoods)} đ`} />
-          <KV k="Giá trị xuất" v={`${num(kq.exportValue)} đ`} />
-          <KV
-            k="Bình quân / kg NL"
-            v={chuaCoTP ? "—" : `${num(kq.avgProfitPerKgMaterial)} đ`}
-          />
-        </div>
-        {/* Badge lệch: đối chiếu Tổng NL nhận (thông số) với NL vào lưới — bắt
-            nhanh chỗ vênh mà không phải nhẩm tay. */}
-        {lechNL != null &&
-          (lechNL === 0 ? (
-            <div className="mt-4 rounded-lg bg-success-surface px-4 py-2.5 text-base font-medium text-success">
-              ✓ Tổng NL nhận khớp NL vào lưới ({num(kq.totalInputKg)} kg)
-            </div>
-          ) : (
-            <div className="mt-4 rounded-lg bg-warning-surface px-4 py-2.5 text-base font-medium text-destructive">
-              ⚠ Lệch NL nhận − NL vào lưới:{" "}
-              <span className="tnum font-semibold">{num(lechNL)} kg</span>{" "}
-              (nhận {num(kq.totalInputKg + lechNL)} − vào {num(kq.totalInputKg)})
-            </div>
-          ))}
-        {/* Chưa nhập bán thành phẩm thì KHÔNG kết luận lãi/lỗ — nếu không màn sẽ
-            báo "Lỗ = toàn bộ tiền nguyên liệu" (đỏ, hù người dùng) dù kỳ mới nhập
-            được một nửa. */}
-        {chuaCoTP ? (
-          <div className="mt-5 rounded-lg bg-muted px-5 py-4 text-base font-medium text-muted-foreground">
-            Chưa có bán thành phẩm sản xuất — nhập khối 2 để tính được lãi/lỗ.
-          </div>
-        ) : (
-          <div
-            className={`mt-5 rounded-lg px-5 py-4 text-xl font-semibold ${
-              kq.profitOrLoss >= 0
-                ? "bg-success-surface text-success"
-                : "bg-warning-surface text-destructive"
-            }`}
-          >
-            {kq.profitOrLoss >= 0 ? "▲ Lãi" : "▼ Lỗ"}:{" "}
-            <span className="tnum">{num(Math.abs(kq.profitOrLoss))}</span> đ
-          </div>
-        )}
-      </Card>
 
       {/* Chốt kỳ đặt CUỐI màn — xem hết số rồi mới chốt, đúng chỗ của thanh chốt
           ngày ở sổ nhập hàng. */}
@@ -798,6 +762,88 @@ function KyDetail({
         />
       )}
     </div>
+  );
+}
+
+/**
+ * Ô "GHI CHÚ" của bảng cân đối giấy (cột K–L): kết quả xếp ĐÚNG thứ tự kế toán quen đọc —
+ * Tổng thành phẩm · Định mức chế biến · Chi phí CB/kg TP · Giá thành · Giá trị xuất ·
+ * Lãi/Lỗ · Bình quân/kg NL · tỉ giá. Phần phụ (NL vào, giá trị NL, thu hồi) để sau.
+ */
+function GhiChuKetQua({
+  ky,
+  kq,
+  chuaCoTP,
+  lechNL,
+  xepNgang,
+}: {
+  ky: BalancingPeriod;
+  kq: BalancingResult;
+  chuaCoTP: boolean;
+  lechNL: number | null;
+  xepNgang: boolean;
+}) {
+  return (
+    <section
+      className={`border-t-2 border-border p-5 ${xepNgang ? "2xl:col-start-1 2xl:row-start-2" : ""}`}
+      aria-label="Ghi chú — kết quả cân đối"
+    >
+      <h2 className="mb-3 text-xl font-semibold">Ghi chú — kết quả cân đối</h2>
+      <div className="grid gap-x-8 gap-y-1 sm:grid-cols-2">
+        <div>
+          <KV k="Tổng thành phẩm" v={`${num(kq.totalOutputKg)} kg`} />
+          <KV k="Định mức chế biến" v={chuaCoTP ? "—" : num(kq.norm)} strong />
+          <KV k="Chi phí CB / kg TP" v={ky.processingCostPerKg == null ? "—" : `${num(ky.processingCostPerKg)} đ`} />
+          <KV k="Giá thành" v={`${num(kq.costOfGoods)} đ`} />
+          <KV k="Giá trị xuất" v={`${num(kq.exportValue)} đ`} />
+          <KV
+            k={chuaCoTP ? "Lãi / Lỗ" : kq.profitOrLoss >= 0 ? "Lãi" : "Lỗ"}
+            v={chuaCoTP ? "—" : `${num(Math.abs(kq.profitOrLoss))} đ`}
+            strong
+          />
+          <KV k="Bình quân / kg NL" v={chuaCoTP ? "—" : `${num(kq.avgProfitPerKgMaterial)} đ`} />
+          <KV k="Tỉ giá" v={ky.exchangeRate == null ? "—" : `${num(ky.exchangeRate)} đ/USD`} />
+        </div>
+        <div>
+          <KV k="Tổng nguyên liệu vào" v={`${num(kq.totalInputKg)} kg`} />
+          <KV k="Giá trị nguyên liệu" v={`${num(kq.materialValue)} đ`} />
+          <KV k="Tỉ lệ thu hồi" v={kq.yieldRate == null ? "—" : num(kq.yieldRate)} />
+        </div>
+      </div>
+      {/* Badge lệch: đối chiếu Tổng NL nhận (thông số) với NL vào lưới — bắt
+          nhanh chỗ vênh mà không phải nhẩm tay. */}
+      {lechNL != null &&
+        (lechNL === 0 ? (
+          <div className="mt-4 rounded-lg bg-success-surface px-4 py-2.5 text-base font-medium text-success">
+            ✓ Tổng NL nhận khớp NL vào lưới ({num(kq.totalInputKg)} kg)
+          </div>
+        ) : (
+          <div className="mt-4 rounded-lg bg-warning-surface px-4 py-2.5 text-base font-medium text-destructive">
+            ⚠ Lệch NL nhận − NL vào lưới:{" "}
+            <span className="tnum font-semibold">{num(lechNL)} kg</span>{" "}
+            (nhận {num(kq.totalInputKg + lechNL)} − vào {num(kq.totalInputKg)})
+          </div>
+        ))}
+      {/* Chưa nhập bán thành phẩm thì KHÔNG kết luận lãi/lỗ — nếu không màn sẽ
+          báo "Lỗ = toàn bộ tiền nguyên liệu" (đỏ, hù người dùng) dù kỳ mới nhập
+          được một nửa. */}
+      {chuaCoTP ? (
+        <div className="mt-5 rounded-lg bg-muted px-5 py-4 text-base font-medium text-muted-foreground">
+          Chưa có bán thành phẩm sản xuất — nhập khối 2 để tính được lãi/lỗ.
+        </div>
+      ) : (
+        <div
+          className={`mt-5 rounded-lg px-5 py-4 text-xl font-semibold ${
+            kq.profitOrLoss >= 0
+              ? "bg-success-surface text-success"
+              : "bg-warning-surface text-destructive"
+          }`}
+        >
+          {kq.profitOrLoss >= 0 ? "▲ Lãi" : "▼ Lỗ"}:{" "}
+          <span className="tnum">{num(Math.abs(kq.profitOrLoss))}</span> đ
+        </div>
+      )}
+    </section>
   );
 }
 

@@ -80,6 +80,7 @@ export function LuoiNhap<R>({
   cuoiBang,
   className,
   moTa,
+  tenCotDau = "Mặt hàng",
 }: {
   cot: CotLuoi<R>[];
   hang: HangLuoi<R>[];
@@ -97,6 +98,8 @@ export function LuoiNhap<R>({
   className?: string;
   /** Câu mô tả cho trình đọc màn hình. */
   moTa: string;
+  /** Tên cột đầu (cột tên dòng, dính trái). Mặc định "Mặt hàng". */
+  tenCotDau?: string;
 }) {
   const oRef = React.useRef(new Map<string, HTMLInputElement>());
   const cotHien = React.useMemo(
@@ -221,7 +224,7 @@ export function LuoiNhap<R>({
               scope="col"
               className="sticky left-0 z-30 min-w-44 border-b-2 border-border bg-card px-4 py-3 text-left align-bottom text-sm font-semibold sm:min-w-60"
             >
-              Mặt hàng
+              {tenCotDau}
             </th>
             {cotHien.map((c) => (
               <th

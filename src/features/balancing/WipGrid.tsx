@@ -365,7 +365,8 @@ export function LuoiBanThanhPham({
         <div>
           <h2 className="text-xl font-semibold">Khối 2 — Bán thành phẩm sản xuất</h2>
           <p className="text-base text-muted-foreground">
-            Sản lượng từng ngày lấy từ sổ Sản xuất. Sửa ô ở đây ghi thẳng về sổ đó.
+            Dòng ghi “sổ sản xuất” lấy số từng ngày từ sổ Sản xuất — sửa ô ở đây ghi thẳng
+            về sổ đó. Các dòng còn lại (dòng mẫu, thêm tay) gõ số ngay tại lưới này.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -412,6 +413,13 @@ export function LuoiBanThanhPham({
         <p className="mb-3 rounded-lg bg-muted px-4 py-3 text-base text-muted-foreground">
           Đã dựng sẵn <strong>{hangMau.length}</strong> dòng theo kỳ {nhanKyMau} (mặt hàng · khách · giá).
           Chỉ cần gõ số — dòng không ra hàng cứ để trống, không tính vào cân đối.
+        </p>
+      )}
+
+      {anDongTrong && hangThat.length === 0 && hangTP.length + hangMau.length > 0 && (
+        <p className="mb-3 rounded-lg bg-muted px-4 py-3 text-base text-muted-foreground">
+          Chưa có dòng nào có số — đang ẩn {hangTP.length + hangMau.length} dòng trống. Bấm
+          “Hiện dòng chưa có số” để gõ số vào dòng mẫu.
         </p>
       )}
 

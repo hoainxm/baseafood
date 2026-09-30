@@ -423,6 +423,8 @@ export default function ManLenhSX() {
 
   return (
     <div className="grid gap-6">
+      {/* Tiêu đề cấp 1 cho trình đọc màn hình — thanh đầu AppShell không còn là h1. */}
+      <h1 className="sr-only">Lệnh sản xuất</h1>
       <DuLieuMau ghiChu="Lệnh sản xuất chưa số hóa." />
 
       {/* Tabs có số đếm */}

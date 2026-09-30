@@ -385,7 +385,7 @@ export default function DonDatScreen() {
                 Đặt {viDate(donCuaChon.orderDate)} · {NHAN_TT[donCuaChon.status]}
               </p>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex min-w-0 flex-wrap gap-2">
               {donCuaChon.status !== "dong" && (
                 <>
                   <Button
@@ -404,6 +404,7 @@ export default function DonDatScreen() {
                     onConfirm={() => taoLenhXuat(donCuaChon)}
                     trigger={
                       <Button
+                        className="h-auto min-h-10 max-w-full shrink whitespace-normal text-left"
                         title="Tạo lệnh xuất lấy hàng theo FIFO từ tồn kho dự trữ, lấy được tới đâu xuất tới đó.">
                         <Truck />
                         Lệnh xuất (một phần được)

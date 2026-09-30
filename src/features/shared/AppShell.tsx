@@ -714,9 +714,11 @@ export default function AppShell({
               <p className="truncate text-sm text-muted-foreground">
                 Baseafood MES{breadcrumb ? ` · ${breadcrumb}` : ""}
               </p>
-              <h1 className="truncate text-lg font-semibold text-foreground md:text-xl">
+              {/* KHÔNG phải h1: mỗi màn tự có một h1 trong nội dung (màn không hiện tiêu đề thì
+                  đặt h1 sr-only). Hai h1 ⇒ trình đọc màn hình đọc hai tiêu đề cấp 1 trùng nhau. */}
+              <p className="truncate text-lg font-semibold text-foreground md:text-xl">
                 {tieuDe}
-              </h1>
+              </p>
             </div>
           </div>
 

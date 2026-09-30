@@ -929,6 +929,8 @@ export default function DoiSoatScreen() {
 
   return (
     <div className="space-y-6">
+      {/* Tiêu đề cấp 1 cho trình đọc màn hình — thanh đầu AppShell không còn là h1. */}
+      <h1 className="sr-only">Đối soát hóa đơn điện tử</h1>
       <Card>
         <CardHeader>
           <CardTitle>Đối soát hóa đơn điện tử với phần mềm kế toán</CardTitle>

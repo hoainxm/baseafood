@@ -405,6 +405,8 @@ export default function ManKhoLanh() {
 
   return (
     <div className="grid gap-6">
+      {/* Tiêu đề cấp 1 cho trình đọc màn hình — thanh đầu AppShell không còn là h1. */}
+      <h1 className="sr-only">Kho lạnh</h1>
       <DuLieuMau ghiChu="Cảm biến nhiệt / tồn kho chưa nối." />
 
       {soLoi > 0 && (

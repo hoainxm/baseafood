@@ -198,6 +198,8 @@ export default function ManBaoCao() {
 
   return (
     <div className="grid gap-6">
+      {/* Tiêu đề cấp 1 cho trình đọc màn hình — thanh đầu AppShell không còn là h1. */}
+      <h1 className="sr-only">Báo cáo tổng</h1>
       <DuLieuMau ghiChu="Tổng hợp từ dữ liệu mẫu." />
 
       {/* Bộ lọc */}

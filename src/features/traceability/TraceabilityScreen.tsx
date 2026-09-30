@@ -193,6 +193,8 @@ export default function ManTruyXuat() {
 
   return (
     <div className="grid grid-cols-[minmax(0,1fr)] gap-6">
+      {/* Tiêu đề cấp 1 cho trình đọc màn hình — thanh đầu AppShell không còn là h1. */}
+      <h1 className="sr-only">Truy xuất nguồn gốc</h1>
       <DuLieuMau ghiChu="Truy xuất chưa nối dữ liệu thật." />
 
       {/* Ô truy xuất */}

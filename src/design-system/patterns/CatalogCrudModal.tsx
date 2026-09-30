@@ -250,7 +250,11 @@ export function DanhMucCrud<T extends { id: string }>({
             <Button variant="outline" size="lg" onClick={() => setDang(null)}>
               Hủy
             </Button>
-            <Button size="lg" onClick={luu}>
+            <Button
+              size="lg"
+              onClick={luu}
+              title={laThem ? `Lưu ${tenDonVi} mới vào danh mục.` : `Lưu các thay đổi của ${tenDonVi} này vào danh mục.`}
+            >
               {laThem ? `Thêm ${tenDonVi}` : "Lưu thay đổi"}
             </Button>
           </DialogFooter>

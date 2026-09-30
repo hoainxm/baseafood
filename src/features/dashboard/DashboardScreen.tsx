@@ -6,7 +6,8 @@
 import { useMemo, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  Badge,
+  Nhan,
+  sacXuong,
   BangTong,
   Button,
   EmptyState,
@@ -279,7 +280,7 @@ export default function DashboardScreen() {
               {nhapXuong.map((x) => (
                 <li key={x.xuong} className="flex items-center justify-between gap-3 p-3">
                   <span className="flex items-center gap-2 text-base font-semibold text-foreground">
-                    <Badge variant="outline">{x.xuong}</Badge>
+                    <Nhan loai="phan-loai" sac={sacXuong(x.xuong)}>{x.xuong}</Nhan>
                   </span>
                   <span className="tnum text-base font-semibold text-foreground">{num(x.kg)} kg</span>
                 </li>

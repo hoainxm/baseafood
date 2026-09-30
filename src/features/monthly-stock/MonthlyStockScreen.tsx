@@ -44,7 +44,6 @@ import {
   type DongBoDong,
 } from "@/lib/monthlyStock";
 import {
-  Badge,
   BangTong,
   Button,
   ChuThichBatBuoc,
@@ -62,6 +61,7 @@ import {
   Field,
   Input,
   LuoiNhap,
+  Nhan,
   NumberField,
   PhieuIn,
   TdIn,
@@ -872,17 +872,19 @@ export default function MonthlyStockScreen() {
       key: "viTri",
       header: "Vị trí",
       render: (r) => (
-        <span
-          className={
-            laKhoNgoai(r.storageLocation)
-              ? "whitespace-nowrap font-semibold text-primary"
-              : r.storageLocation
+        laKhoNgoai(r.storageLocation) ? (
+          <Nhan loai="vi-tri">{nhanViTri(r)}</Nhan>
+        ) : (
+          <span
+            className={
+              r.storageLocation
                 ? "whitespace-nowrap font-medium text-foreground"
                 : "whitespace-nowrap text-muted-foreground"
-          }
-        >
-          {nhanViTri(r) || "—"}
-        </span>
+            }
+          >
+            {nhanViTri(r) || "—"}
+          </span>
+        )
       ),
     },
     {
@@ -1169,6 +1171,7 @@ export default function MonthlyStockScreen() {
           {coTonSang && (
             <Button
               variant="outline"
+              className="h-auto min-h-10 max-w-full whitespace-normal text-left"
               onClick={donSangThangSau}
               title="Lấy tồn cuối tháng này làm tồn đầu tháng sau, cho MỌI kho (bỏ qua bộ lọc kho). Chạy lại chỉ cập nhật, không nhân đôi dòng."
             >
@@ -1249,9 +1252,9 @@ export default function MonthlyStockScreen() {
                 Lệch bất biến — kiểm lại số liệu (tồn đầu + nhập − xuất ≠ tồn cuối).
               </span>
             )}
-            <Badge variant="outline" className="ml-auto">
+            <Nhan loai="phu" className="ml-auto">
               {rowsThang.length} mặt hàng · {nhomList.length} nhóm
-            </Badge>
+            </Nhan>
           </div>
 
           {!laXemTruoc && !ghiMode && (
@@ -1400,9 +1403,9 @@ export default function MonthlyStockScreen() {
                 <section key={g.category} className="space-y-2">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <h2 className="text-lg font-semibold text-foreground">{g.category}</h2>
-                    <Badge variant="outline">
+                    <Nhan loai="phu">
                       Tồn cuối {num(g.tong.closeKg)} kg · {g.rows.length} mặt hàng
-                    </Badge>
+                    </Nhan>
                   </div>
                   <BangTong
                     rows={g.rows}
@@ -1744,7 +1747,7 @@ export default function MonthlyStockScreen() {
                           {sh.monthNum ? (
                             nhanThang(`${napForm.nam}-${String(sh.monthNum).padStart(2, "0")}`)
                           ) : (
-                            <span className="text-warning">bỏ (tên sheet không phải số tháng)</span>
+                            <Nhan loai="luu-y">bỏ (tên sheet không phải số tháng)</Nhan>
                           )}
                         </td>
                         <td className="tnum px-3 py-2 text-right">{sh.rows.length}</td>
@@ -1881,13 +1884,13 @@ export default function MonthlyStockScreen() {
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="flex flex-wrap gap-2 text-sm">
-              <Badge variant="outline">{dongBo.tongTen} tên trong sổ</Badge>
-              <Badge variant="outline">
+              <Nhan loai="phu">{dongBo.tongTen} tên trong sổ</Nhan>
+              <Nhan loai="phu">
                 đã có: {dongBo.daCoMH} mặt hàng · {dongBo.daCoNL} loại NL
-              </Badge>
-              <Badge variant="secondary">{canDongBo.length} mã khó cần đồng bộ</Badge>
-              <Badge variant="outline">{dsRoRang.length} tên rõ ràng</Badge>
-              <Badge variant="outline">{dongBo.nhomTrung.length} nhóm trùng cách ghi</Badge>
+              </Nhan>
+              <Nhan loai={canDongBo.length > 0 ? "loi" : "phu"}>{canDongBo.length} mã khó cần đồng bộ</Nhan>
+              <Nhan loai="phu">{dsRoRang.length} tên rõ ràng</Nhan>
+              <Nhan loai={dongBo.nhomTrung.length > 0 ? "loi" : "phu"}>{dongBo.nhomTrung.length} nhóm trùng cách ghi</Nhan>
             </div>
 
             {canDongBo.length > 0 && (

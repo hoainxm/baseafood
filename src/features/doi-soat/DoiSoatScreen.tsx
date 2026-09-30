@@ -7,7 +7,6 @@
 // ============================================================
 import { useMemo, useRef, useState } from "react";
 import {
-  Badge,
   Button,
   Card,
   CardContent,
@@ -19,13 +18,14 @@ import {
   Input,
   NumberField,
   RecordTable,
-  StatusChip,
+  Nhan,
   Tabs,
   TabsContent,
   TabsList,
   TabsTrigger,
   ThongKe,
   notify,
+  sacTheoTen,
   type Cot,
   type TheThongTin,
 } from "@/design-system";
@@ -83,12 +83,12 @@ const PM_TAB = "__phan-mem__";
 const keySua = (nv: NghiVan) => `${nv.sheet}#${nv.soDong}#${nv.cot}`;
 
 function chipHoaDon(r: DongHoaDon) {
-  if (r.trangThai === "KHOP") return <StatusChip trangThai="running" nhan="Khớp" />;
+  if (r.trangThai === "KHOP") return <Nhan loai="xong">Khớp</Nhan>;
   if (r.trangThai === "LECH")
-    return <StatusChip trangThai="idle" nhan={r.ketLuan === "LỆCH THUẾ" ? "Lệch thuế" : "Lệch tiền"} />;
+    return r.ketLuan === "LỆCH THUẾ" ? <Nhan loai="luu-y">Lệch thuế</Nhan> : <Nhan loai="loi">Lệch tiền</Nhan>;
   // Hóa đơn đã bị thay thế / hủy: không có trong sổ là ĐÚNG — đừng tô đỏ như việc phải làm.
-  if (r.khongCanVaoSo) return <StatusChip trangThai="idle" nhan="Không cần vào sổ" />;
-  return <StatusChip trangThai="stopped" nhan="Chưa vào sổ" />;
+  if (r.khongCanVaoSo) return <Nhan loai="luu-y">Không cần vào sổ</Nhan>;
+  return <Nhan loai="loi">Chưa vào sổ</Nhan>;
 }
 
 /** Suy kỳ "T02-2026" / "T3" từ tên file. */
@@ -145,9 +145,9 @@ function BanDaLuuBox({
       header: "Trạng thái",
       render: (r) =>
         r.status === "official" ? (
-          <Badge>Chính thức</Badge>
+          <Nhan loai="xong">Chính thức</Nhan>
         ) : (
-          <Badge variant="secondary">Nháp</Badge>
+          <Nhan loai="cho">Nháp</Nhan>
         ),
     },
     { key: "ky", header: "Kỳ", render: (r) => r.period || "—" },
@@ -229,9 +229,9 @@ function TuKiemBox({ phepThu }: { phepThu: PhepThu[] }) {
               <div className="min-w-0">
                 <div className="flex items-center gap-2 font-medium">
                   {p.dat ? (
-                    <StatusChip trangThai="running" nhan="Đạt" />
+                    <Nhan loai="xong">Đạt</Nhan>
                   ) : (
-                    <StatusChip trangThai="stopped" nhan="Không đạt" />
+                    <Nhan loai="loi">Không đạt</Nhan>
                   )}
                   <span>{p.ten}</span>
                 </div>
@@ -350,7 +350,7 @@ function NghiVanBox({
       key: "nhom",
       header: "Nhóm",
       chinh: true,
-      render: (r) => <Badge variant="outline">Nhóm {r.nhom} · {TEN_NHOM[r.nhom]}</Badge>,
+      render: (r) => <Nhan loai="phan-loai" sac={sacTheoTen(TEN_NHOM[r.nhom])}>Nhóm {r.nhom} · {TEN_NHOM[r.nhom]}</Nhan>,
     },
     { key: "vitri", header: "Vị trí", render: (r) => r.viTri },
     { key: "dangco", header: "Số đang có", so: true, render: (r) => r.soDangCo },
@@ -432,7 +432,7 @@ function NghiVanBox({
                   >
                     <span className="flex items-center gap-2 font-medium">
                       {mo ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
-                      <Badge variant="outline">Nhóm {g.nhom}</Badge>
+                      <Nhan loai="phan-loai" sac={sacTheoTen(TEN_NHOM[g.nhom])}>Nhóm {g.nhom}</Nhan>
                       {g.ten}
                     </span>
                     <span className="shrink-0 text-sm">
@@ -561,7 +561,7 @@ function BangPhanMem({
       header: "Kết quả",
       chinh: true,
       render: (r) =>
-        r.trangThai === "CO" ? <StatusChip trangThai="running" nhan="Đã có hóa đơn" /> : <StatusChip trangThai="stopped" nhan="Chưa có hóa đơn" />,
+        r.trangThai === "CO" ? <Nhan loai="xong">Đã có hóa đơn</Nhan> : <Nhan loai="loi">Chưa có hóa đơn</Nhan>,
     },
     { key: "phieu", header: "Phiếu", render: (r) => r.phieu },
     { key: "ctgs", header: "CTGS", render: (r) => r.ctgs },

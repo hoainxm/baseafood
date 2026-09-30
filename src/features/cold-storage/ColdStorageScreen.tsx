@@ -6,19 +6,20 @@
 // src/features/cold-storage/ManKhoLanh.tsx
 import { useMemo, useState } from "react";
 import {
-  Badge,
   Button,
   type Cot,
   DuLieuMau,
   EmptyState,
   Field,
   FormDialog,
+  Nhan,
   NutDong,
   RecordTable,
   Separator,
   Textarea,
   ThongKe,
   notify,
+  sacTheoTen,
 } from "@/design-system";
 import { cn } from "@/lib/utils";
 import { useExportItems, usePackagings, useSalesItems, useWipProductions } from "@/lib/catalogRepo";
@@ -152,7 +153,7 @@ const COT_TON: Cot<TonKho>[] = [
     key: "kho",
     header: "Kho",
     sapXep: (r) => r.kho,
-    render: (r) => <Badge variant="secondary">{r.kho}</Badge>,
+    render: (r) => <Nhan loai="phan-loai" sac={sacTheoTen(r.kho)}>{r.kho}</Nhan>,
   },
   { key: "sp", header: "Sản phẩm", sapXep: (r) => r.sp, render: (r) => r.sp },
   {
@@ -423,7 +424,7 @@ export default function ManKhoLanh() {
       <section className="grid gap-3 rounded-xl border-2 border-border bg-card p-5">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-lg font-semibold text-foreground">Tồn kho dự trữ (số thật)</h2>
-          <Badge variant="outline">Nguồn: màn Kho dự trữ</Badge>
+          <Nhan loai="nguon">Nguồn: màn Kho dự trữ</Nhan>
         </div>
         <p className="text-sm text-muted-foreground">
           Suy từ Sản xuất BTP đã nhập kho trừ lệnh xuất — cùng nguồn với màn{" "}

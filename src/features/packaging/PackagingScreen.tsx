@@ -27,7 +27,6 @@ import {
   KHO_TP,
 } from "@/lib/inventory";
 import {
-  Badge,
   Button,
   ChuThichBatBuoc,
   Combobox,
@@ -43,6 +42,7 @@ import {
   ErrorSummary,
   Field,
   Input,
+  Nhan,
   NumberField,
   RecordTable,
   SkeletonBang,
@@ -352,9 +352,9 @@ export default function DongGoiScreen() {
         <section className="grid gap-3 rounded-xl border-2 border-border bg-card p-5">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-lg font-semibold text-foreground">Tồn thành phẩm đóng gói</h2>
-            <Badge variant="outline">
-              <Boxes className="size-4" aria-hidden /> {kg(tongTonTP)}
-            </Badge>
+            <Nhan loai="phu" icon={Boxes}>
+              {kg(tongTonTP)}
+            </Nhan>
           </div>
           <div className="flex flex-wrap gap-2">
             {tonTP

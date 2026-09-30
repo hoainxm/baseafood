@@ -22,7 +22,6 @@ import {
   useLotInputs,
 } from "@/lib/catalogRepo";
 import {
-  Badge,
   ChuThichBatBuoc,
   Button,
   Combobox,
@@ -39,6 +38,7 @@ import {
   ErrorSummary,
   Field,
   Input,
+  Nhan,
   NumberField,
   RecordTable,
   ThongKe,
@@ -681,11 +681,11 @@ export default function SanXuatBTPScreen() {
       header: "Trạng thái",
       render: (r) =>
         r.status === "da-nhap" ? (
-          <Badge variant="secondary">
+          <Nhan loai="xong">
             Đã nhập kho{r.warehouse ? ` · ${r.warehouse}` : ""}
-          </Badge>
+          </Nhan>
         ) : (
-          <Badge variant="outline">Chờ nhập kho</Badge>
+          <Nhan loai="cho">Chờ nhập kho</Nhan>
         ),
       sapXep: (r) => r.status,
     },

@@ -253,6 +253,37 @@ thứ tự DOM, tự bỏ ô ẩn của dòng chưa mở); Tab để trình duy�
 - [ ] **Mọi nút thao tác có `title` giải thích nút làm gì** (§9) — nút chỉ-icon
       bắt buộc, kèm `aria-label`
 
+## 8. Nhãn theo CHỨC NĂNG — `Nhan` (từ 2026-09-30)
+
+Mọi chip/nhãn nhỏ trong màn nghiệp vụ dùng `Nhan`, **chọn theo Ý NGHĨA, không chọn
+màu**. Trước đây `Badge` chỉ có xám/xanh thương hiệu/đỏ nên "Đã chốt" và "Nháp" trông
+y hệt, cảnh báo "Chưa có giá" trông như nhãn thường. `Badge` giờ chỉ còn dùng cho
+chip đếm/điều khiển của primitive; màn nghiệp vụ **không** dùng `Badge` làm nhãn.
+
+| `loai` | Nghĩa | Màu | Ví dụ |
+|---|---|---|---|
+| `xong` | đã xong · đạt · khớp · chính thức · đủ | xanh lá | Đã chốt · Đã nhập kho · Đủ · Khớp · Đạt |
+| `cho` | đang chờ · chưa xong · nháp (viền **đứt**) | hổ phách | Chờ nhập kho · Chưa chốt · Đang gom · Nháp |
+| `luu-y` | lưu ý, KHÔNG phải lỗi | hổ phách đặc | Ghi bù · Giá = kỳ trước · Đang thuộc kỳ khác |
+| `loi` | cần xử lý · sai | đỏ | Tồn âm · Lệch · Khác loại · Chưa có giá · Chưa vào sổ |
+| `nguon` | nguồn dữ liệu | xanh thông tin (`--info`) | Sổ nhập · Sổ sản xuất · Nhập tay · Excel · Mẫu |
+| `vi-tri` | vị trí / kho ngoài | xanh thương hiệu nhạt | Gửi: Kho Hồng Phú |
+| `phan-loai` | phân loại nghiệp vụ, sắc theo `sac` | sắc nhạt | Kênh · nhóm NL · xưởng · kho · vai trò · ca |
+| `phu` | phụ chú · đếm · DEMO | xám | Lô … · SL mặt hàng · DEMO |
+
+- Sắc phân loại lấy từ hàm, **không tự chọn**: `sacKenh` (Xuất khẩu tím · Nội địa
+  ngọc) · `sacNhomNL` (Thủy sản biển · Xả đông băng · Bột phụ gia cát · Giảm hồng) ·
+  `sacXuong` (Đông biển · Cá ngọc · Khô cam) · `sacTheoTen` (phân loại mở — kho, nhóm
+  TP, vai trò, ca, dây chuyền: băm tên ⇒ cùng tên cùng màu ở mọi màn).
+- Luôn có chữ + chấm (hoặc `icon`, VD `Lock` cho "Đã chốt"): màu không bao giờ là tín
+  hiệu duy nhất. `className` chỉ để căn bố cục, không đè màu/cỡ.
+- Token: `--info*`, `--destructive-surface/-line`, `--success-line`, `--warning-line`,
+  `--tone-<sắc>` / `-surface` / `-line` trong `tokens.css`; chữ `-ink`/nền đều ≥ 4,5:1.
+- `StatusChip` CHỈ cho trạng thái máy/dây chuyền MES (chạy/chờ/dừng/bảo trì/chuyển mã).
+  Kết quả đối soát, QC, hóa đơn… dùng `Nhan` (`xong`/`luu-y`/`loi`).
+- Nhãn phụ dưới tên dòng trong `LuoiNhap` (`phu`) được đặt `Nhan` (VD nguồn "sổ sản
+  xuất", "mẫu · chưa có số", lưu ý "giá = kỳ trước").
+
 ## Bảng chọn component
 
 | Tình huống | Dùng |

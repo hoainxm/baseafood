@@ -23,7 +23,6 @@ import {
   useScraps,
 } from "@/lib/catalogRepo";
 import {
-  Badge,
   ChuThichBatBuoc,
   Button,
   ChoiceGroup,
@@ -42,9 +41,11 @@ import {
   ErrorSummary,
   Field,
   Input,
+  Nhan,
   RecordTable,
   ThongKe,
   notify,
+  sacTheoTen,
   type Cot,
   type LoiNhap,
   type MucChon,
@@ -869,7 +870,7 @@ export default function NhapNguyenLieuScreen() {
     {
       key: "category",
       header: "Loài",
-      render: (r) => <Badge>{r.category}</Badge>,
+      render: (r) => <Nhan loai="phan-loai" sac={sacTheoTen(r.category)}>{r.category}</Nhan>,
       sapXep: (r) => r.category,
     },
     {
@@ -887,7 +888,7 @@ export default function NhapNguyenLieuScreen() {
         r.unitPrice != null ? (
           num(r.unitPrice)
         ) : (
-          <Badge variant="outline">Chưa có giá</Badge>
+          <Nhan loai="loi">Chưa có giá</Nhan>
         ),
       sapXep: (r) => r.unitPrice ?? 0,
     },
@@ -903,7 +904,11 @@ export default function NhapNguyenLieuScreen() {
           {
             key: "khoa",
             header: "Trạng thái",
-            render: () => <Badge variant="secondary">Đã chốt</Badge>,
+            render: () => (
+              <Nhan loai="xong" icon={Lock}>
+                Đã chốt
+              </Nhan>
+            ),
           } as Cot<MaterialImportItem>,
         ]
       : []),
@@ -1082,7 +1087,7 @@ export default function NhapNguyenLieuScreen() {
             )}
             {phien.scanPath && (
               <span className="flex items-center gap-1">
-                <Badge variant="secondary">Đã đính ảnh phiếu</Badge>
+                <Nhan loai="xong">Đã đính ảnh phiếu</Nhan>
                 {coLuuAnh && (
                   <Button
                     title="Mở lại ảnh phiếu tay đã lưu kèm chuyến này." type="button" variant="link" size="sm" onClick={xemAnhPhieu}>
@@ -1749,28 +1754,27 @@ export default function NhapNguyenLieuScreen() {
                       </div>
                       <div className="flex flex-wrap items-center gap-2">
                         {n.ghiBu && (
-                          <Badge variant="outline">
+                          <Nhan loai="luu-y">
                             Ghi bù {viDate(n.postingDate)}
-                          </Badge>
+                          </Nhan>
                         )}
                         {khoaChuyen && (
-                          <Badge variant="secondary">
-                            <Lock aria-hidden />
+                          <Nhan loai="xong" icon={Lock}>
                             Đã chốt
-                          </Badge>
+                          </Nhan>
                         )}
                         {!n.chuyen && (
-                          <Badge variant="outline">Dữ liệu cũ</Badge>
+                          <Nhan loai="nguon">Dữ liệu cũ</Nhan>
                         )}
                         {n.chuyen?.lotCode && (
-                          <Badge variant="outline" className="tnum">
+                          <Nhan loai="phu" className="tnum">
                             Lô {n.chuyen.lotCode}
-                          </Badge>
+                          </Nhan>
                         )}
                         {n.chuyen?.ssccCode && (
-                          <Badge variant="outline" className="tnum">
+                          <Nhan loai="phu" className="tnum">
                             SSCC {n.chuyen.ssccCode}
-                          </Badge>
+                          </Nhan>
                         )}
                         {[n.driverName, n.licensePlate].filter(Boolean).length > 0 && (
                           <span className="text-base text-muted-foreground">

@@ -28,7 +28,6 @@ import {
   khaDungTP,
 } from "@/lib/inventory";
 import {
-  Badge,
   ChuThichBatBuoc,
   Button,
   ChoiceGroup,
@@ -47,8 +46,10 @@ import {
   ErrorSummary,
   Field,
   Input,
+  Nhan,
   NumberField,
   RecordTable,
+  sacKenh,
   ThongKe,
   notify,
   type Cot,
@@ -496,7 +497,7 @@ export default function BanHangScreen() {
         r.unitPrice != null ? (
           num(r.unitPrice)
         ) : (
-          <Badge variant="outline">Chưa có giá</Badge>
+          <Nhan loai="loi">Chưa có giá</Nhan>
         ),
       sapXep: (r) => r.unitPrice ?? 0,
     },
@@ -641,11 +642,13 @@ export default function BanHangScreen() {
                       </span>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
-                      <Badge>{n.phieu.channel}</Badge>
+                      <Nhan loai="phan-loai" sac={sacKenh(n.phieu.channel)}>
+                        {n.phieu.channel}
+                      </Nhan>
                       {n.ghiBu && (
-                        <Badge variant="outline">
+                        <Nhan loai="luu-y">
                           Ghi bù {viDate(n.phieu.postingDate)}
-                        </Badge>
+                        </Nhan>
                       )}
                     </div>
                     {n.ghiBu && n.phieu.backdateReason && (

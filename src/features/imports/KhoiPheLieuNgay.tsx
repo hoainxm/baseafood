@@ -7,7 +7,6 @@ import { useMemo, useState } from "react";
 import type { ScrapItem, Workshop } from "@/types";
 import { newId } from "@/lib/store";
 import {
-  Badge,
   Button,
   ChuThichBatBuoc,
   Combobox,
@@ -19,6 +18,7 @@ import {
   DialogHeader,
   DialogTitle,
   ErrorSummary,
+  Nhan,
   NumberField,
   RecordTable,
   notify,
@@ -130,7 +130,7 @@ export function KhoiPheLieuNgay({
         r.sellingPrice != null ? (
           num(r.sellingPrice)
         ) : (
-          <Badge variant="outline">Chưa có giá</Badge>
+          <Nhan loai="loi">Chưa có giá</Nhan>
         ),
       sapXep: (r) => r.sellingPrice ?? 0,
     },
@@ -146,9 +146,9 @@ export function KhoiPheLieuNgay({
       header: "Kỳ cân đối",
       render: (r) =>
         r.periodId ? (
-          <Badge variant="secondary">Đã vào kỳ</Badge>
+          <Nhan loai="xong">Đã vào kỳ</Nhan>
         ) : (
-          <Badge variant="outline">Chưa vào kỳ</Badge>
+          <Nhan loai="cho">Chưa vào kỳ</Nhan>
         ),
     },
   ];
@@ -169,12 +169,11 @@ export function KhoiPheLieuNgay({
           </div>
         </div>
         {khoa ? (
-          <Badge variant="secondary">
-            <Lock aria-hidden />
+          <Nhan loai="xong" icon={Lock}>
             Ngày đã chốt
-          </Badge>
+          </Nhan>
         ) : chiXem ? (
-          <Badge variant="outline">Ghi ở “Ghi nhập trong ngày”</Badge>
+          <Nhan loai="nguon">Ghi ở “Ghi nhập trong ngày”</Nhan>
         ) : (
           <Button
             title="Ghi một dòng phế liệu phát sinh trong ngày (đầu, da, vụn…) để kỳ cân đối hút sang."

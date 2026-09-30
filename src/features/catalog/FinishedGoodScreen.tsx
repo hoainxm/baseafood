@@ -7,12 +7,13 @@ import { useMemo, useState } from "react";
 import type { FinishedGood } from "@/types";
 import { useFinishedGoods } from "@/lib/catalogRepo";
 import {
-  Badge,
   Button,
   Combobox,
   EmptyState,
+  Nhan,
   RecordTable,
   SkeletonBang,
+  sacTheoTen,
   type Cot,
 } from "@/design-system";
 import { Search, X } from "lucide-react";
@@ -56,7 +57,7 @@ export default function ThanhPhamScreen() {
     {
       key: "groupName",
       header: "Nhóm",
-      render: (r) => <Badge>{r.groupName}</Badge>,
+      render: (r) => <Nhan loai="phan-loai" sac={sacTheoTen(r.groupName)}>{r.groupName}</Nhan>,
       sapXep: (r) => r.groupName,
     },
     {

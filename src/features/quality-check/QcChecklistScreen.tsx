@@ -19,7 +19,7 @@ import {
   DateField,
   Input,
   Button,
-  Badge,
+  Nhan,
   EmptyState,
   notify,
   type LuaChon,
@@ -213,12 +213,11 @@ export default function QcChecklistScreen() {
             {viDate(ngay)} · xưởng {xuong}
           </span>
           {dangKhoa ? (
-            <Badge variant="secondary">
-              <Lock aria-hidden />
+            <Nhan loai="xong" icon={Lock}>
               Đã chốt
-            </Badge>
+            </Nhan>
           ) : (
-            <Badge variant="outline">Chưa chốt</Badge>
+            <Nhan loai="cho">Chưa chốt</Nhan>
           )}
           {daCham.length > 0 && (
             <span className="text-base text-muted-foreground">

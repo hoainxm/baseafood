@@ -10,7 +10,8 @@ import { useUserProfiles } from "@/lib/catalogRepo";
 import { hoTenToUsername } from "@/lib/username";
 import type { KetQuaDangNhap } from "@/lib/auth";
 import {
-  Badge,
+  Nhan,
+  sacTheoTen,
   ChuThichBatBuoc,
   Button,
   Combobox,
@@ -249,14 +250,14 @@ export default function QuanLyNguoiDungScreen({
         const vt = sapTheoCap(rolesList(r.roles));
         return vt.length ? (
           <span className="flex flex-wrap gap-1">
-            {vt.map((v, i) => (
-              <Badge key={v} variant={i === 0 ? "default" : "secondary"}>
+            {vt.map((v) => (
+              <Nhan key={v} loai="phan-loai" sac={sacTheoTen(roleLabel([v]))}>
                 {roleLabel([v])}
-              </Badge>
+              </Nhan>
             ))}
           </span>
         ) : (
-          <Badge variant="outline">Chưa gán</Badge>
+          <Nhan loai="loi">Chưa gán</Nhan>
         );
       },
       sapXep: (r) => roleLabel(r.roles),
@@ -360,7 +361,7 @@ export default function QuanLyNguoiDungScreen({
                   <h2 className="flex items-center gap-2 text-lg font-semibold text-foreground">
                     <Icon className="size-5 text-muted-foreground" aria-hidden />
                     {nhom.ten}
-                    <Badge variant="secondary">{nhom.users.length}</Badge>
+                    <Nhan loai="phu">{nhom.users.length}</Nhan>
                   </h2>
                   <RecordTable
                     columns={cols}

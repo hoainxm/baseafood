@@ -13,8 +13,9 @@ import {
   Input,
   NutDong,
   Separator,
-  StatusChip,
+  Nhan,
   notify,
+  type LoaiNhan,
 } from "@/design-system";
 import { cn } from "@/lib/utils";
 import {
@@ -94,11 +95,11 @@ const TX_BUOC: Buoc[] = [
 
 const TX_BUOC_TRANG: Record<
   TrangBuoc,
-  { nhan: string; icon: LucideIcon; chu: string; nen: string }
+  { nhan: string; icon: LucideIcon; chu: string; nen: string; loai: LoaiNhan }
 > = {
-  xong: { nhan: "Hoàn thành", icon: CircleCheck, chu: "text-success", nen: "bg-success-surface" },
-  dang: { nhan: "Đang chạy", icon: Loader2, chu: "text-primary", nen: "bg-accent" },
-  cho: { nhan: "Chờ", icon: Clock, chu: "text-muted-foreground", nen: "bg-background" },
+  xong: { nhan: "Hoàn thành", icon: CircleCheck, chu: "text-success", nen: "bg-success-surface", loai: "xong" },
+  dang: { nhan: "Đang chạy", icon: Loader2, chu: "text-primary", nen: "bg-accent", loai: "cho" },
+  cho: { nhan: "Chờ", icon: Clock, chu: "text-muted-foreground", nen: "bg-background", loai: "cho" },
 };
 
 interface DongNL {
@@ -128,11 +129,11 @@ const TX_QC: QC[] = [
 
 const TX_QC_KET: Record<
   KetQC,
-  { nhan: string; icon: LucideIcon; chu: string; vien: string; nen: string }
+  { nhan: string; icon: LucideIcon; vien: string; nen: string; loai: LoaiNhan }
 > = {
-  dat: { nhan: "Đạt", icon: CircleCheck, chu: "text-success", vien: "border-success/35", nen: "bg-success-surface" },
-  dang: { nhan: "Đang kiểm", icon: Loader2, chu: "text-primary", vien: "border-primary/35", nen: "bg-accent" },
-  khong: { nhan: "Không đạt", icon: CircleX, chu: "text-destructive", vien: "border-destructive/35", nen: "bg-destructive/10" },
+  dat: { nhan: "Đạt", icon: CircleCheck, vien: "border-success/35", nen: "bg-success-surface", loai: "xong" },
+  dang: { nhan: "Đang kiểm", icon: Loader2, vien: "border-primary/35", nen: "bg-accent", loai: "cho" },
+  khong: { nhan: "Không đạt", icon: CircleX, vien: "border-destructive/35", nen: "bg-destructive/10", loai: "loi" },
 };
 
 const so = (n: number) => n.toLocaleString("vi-VN");
@@ -163,16 +164,7 @@ function NodeBuoc({ b, onClick }: { b: Buoc; onClick: () => void }) {
       <span className="text-base font-semibold leading-tight">{b.ten}</span>
       <span className="font-mono text-xs text-muted-foreground">{b.gio}</span>
       <span className="text-xs leading-snug text-muted-foreground">{b.ai}</span>
-      <span
-        className={cn(
-          "inline-flex h-6 items-center gap-1.5 rounded-full border px-2.5 text-xs font-semibold",
-          b.trang === "cho"
-            ? "border-border bg-muted text-muted-foreground"
-            : cn(t.nen, t.chu, "border-current")
-        )}
-      >
-        {t.nhan}
-      </span>
+      <Nhan loai={t.loai}>{t.nhan}</Nhan>
     </button>
   );
 }
@@ -286,7 +278,7 @@ export default function ManTruyXuat() {
                   </Button>
                 </div>
               </div>
-              <StatusChip trangThai="running" nhan="Đang sản xuất" />
+              <Nhan loai="cho">Đang sản xuất</Nhan>
             </div>
             <Separator />
             <dl className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
@@ -383,10 +375,9 @@ export default function ManTruyXuat() {
                       >
                         {r.v}
                         {r.dat && (
-                          <span className="ml-3 inline-flex items-center gap-1.5 rounded-full border border-success/40 bg-success-surface px-2.5 py-0.5 font-sans text-xs font-semibold text-success">
-                            <CircleCheck className="size-4" aria-hidden />
+                          <Nhan loai="xong" icon={CircleCheck} className="ml-3 align-middle font-sans">
                             {r.dat}
-                          </span>
+                          </Nhan>
                         )}
                       </td>
                     </tr>
@@ -404,7 +395,6 @@ export default function ManTruyXuat() {
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
               {TX_QC.map((c, i) => {
                 const k = TX_QC_KET[c.ket];
-                const Icon = k.icon;
                 return (
                   <button
                     title="Xem chi tiết điểm kiểm soát chất lượng này."
@@ -420,20 +410,9 @@ export default function ManTruyXuat() {
                       <span className="text-sm text-muted-foreground">
                         Checkpoint {i + 1}
                       </span>
-                      <span
-                        className={cn(
-                          "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-semibold",
-                          k.nen,
-                          k.chu,
-                          "border-current"
-                        )}
-                      >
-                        <Icon
-                          className={cn("size-5", c.ket === "dang" && "animate-spin")}
-                          aria-hidden
-                        />
+                      <Nhan loai={k.loai} icon={k.icon}>
                         {k.nhan}
-                      </span>
+                      </Nhan>
                     </span>
                     <span className="text-xl font-semibold">{c.ten}</span>
                     <span className="font-mono text-base font-semibold tnum">

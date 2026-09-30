@@ -22,6 +22,7 @@ import {
   Combobox,
   EmptyState,
   LuoiNhap,
+  Nhan,
   notify,
   type CotLuoi,
   type HangLuoi,
@@ -305,10 +306,15 @@ export function LuoiBanThanhPham({
       /* Giá còn nguyên như kỳ mẫu ⇒ ghi rõ để kế toán biết ô nào chưa soát giá kỳ này. */
       const gm = giaMau.get(khoaDongTP(h.matHangId, h.quyCach, h.khachId));
       const giaKyTruoc = h.donGia != null && Boolean(gm?.has(h.donGia));
-      const phu = [h.quyCach, h.tuSoSanXuat ? "sổ sản xuất" : "", giaKyTruoc ? "giá = kỳ trước" : ""]
-        .filter(Boolean)
-        .join(" · ");
-      return { id: h.id, du: h, ten: tenMatHang(h.matHangId), phu: phu || undefined };
+      const coPhu = Boolean(h.quyCach) || h.tuSoSanXuat || giaKyTruoc;
+      const phu = coPhu ? (
+        <span className="mt-0.5 inline-flex flex-wrap items-center gap-1">
+          {h.quyCach && <span>{h.quyCach}</span>}
+          {h.tuSoSanXuat && <Nhan loai="nguon">sổ sản xuất</Nhan>}
+          {giaKyTruoc && <Nhan loai="luu-y">giá = kỳ trước</Nhan>}
+        </span>
+      ) : undefined;
+      return { id: h.id, du: h, ten: tenMatHang(h.matHangId), phu };
     }),
     ...(anDongTrong || hangMau.length === 0
       ? []
@@ -323,7 +329,12 @@ export function LuoiBanThanhPham({
             id: h.id,
             du: h,
             ten: <span className="text-muted-foreground">{tenMatHang(h.matHangId)}</span>,
-            phu: [h.quyCach, "mẫu · chưa có số"].filter(Boolean).join(" · "),
+            phu: (
+              <span className="mt-0.5 inline-flex flex-wrap items-center gap-1">
+                {h.quyCach && <span>{h.quyCach}</span>}
+                <Nhan loai="nguon">mẫu · chưa có số</Nhan>
+              </span>
+            ),
           })),
         ]),
   ];

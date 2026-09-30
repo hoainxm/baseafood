@@ -16,7 +16,7 @@ import {
   CardTitle,
   EmptyState,
   RecordTable,
-  StatusChip,
+  Nhan,
   ThongKe,
   type Cot,
   type TheThongTin,
@@ -243,11 +243,11 @@ function PhanBenBox({
 type LocHaiBan = "all" | "CHI_THUE" | "CHI_TAI" | "LECH" | "KHONG_SO";
 
 function chipHaiBan(d: DongSoBan) {
-  if (d.ben === "CHI_THUE") return <StatusChip trangThai="stopped" nhan="Chỉ bản thuế có" />;
-  if (d.ben === "CHI_TAI") return <StatusChip trangThai="idle" nhan="Chỉ bản tự tải có" />;
-  if (d.khongSoDuocTien) return <StatusChip trangThai="idle" nhan="Không so được tiền" />;
-  if (d.lechTien) return <StatusChip trangThai="idle" nhan="Lệch tiền" />;
-  return <StatusChip trangThai="running" nhan="Khớp" />;
+  if (d.ben === "CHI_THUE") return <Nhan loai="loi">Chỉ bản thuế có</Nhan>;
+  if (d.ben === "CHI_TAI") return <Nhan loai="luu-y">Chỉ bản tự tải có</Nhan>;
+  if (d.khongSoDuocTien) return <Nhan loai="luu-y">Không so được tiền</Nhan>;
+  if (d.lechTien) return <Nhan loai="loi">Lệch tiền</Nhan>;
+  return <Nhan loai="xong">Khớp</Nhan>;
 }
 
 export function SoHaiBanView({
@@ -367,7 +367,7 @@ function KiemCongSheet({ sh }: { sh: SheetHoaDon }) {
   ];
   const cot: Cot<DongLechCong>[] = [
     { key: "d", header: "Dòng", chinh: true, render: (d) => `dòng ${d.dongFile}`, sapXep: (d) => d.dongFile },
-    { key: "loai", header: "Nguyên nhân", render: (d) => (d.loai === "that" ? <StatusChip trangThai="stopped" nhan="Lệch thật" /> : <StatusChip trangThai="idle" nhan={NHAN_LECH_CONG[d.loai]} />) },
+    { key: "loai", header: "Nguyên nhân", render: (d) => (d.loai === "that" ? <Nhan loai="loi">Lệch thật</Nhan> : <Nhan loai="luu-y">{NHAN_LECH_CONG[d.loai]}</Nhan>) },
     { key: "ma", header: "Hóa đơn", render: (d) => d.ma },
     { key: "ngay", header: "Ngày", render: (d) => d.ngay, anTrenDienThoai: true },
     { key: "ban", header: "Người bán", render: (d) => d.ban, anTrenDienThoai: true },
@@ -382,7 +382,7 @@ function KiemCongSheet({ sh }: { sh: SheetHoaDon }) {
       <CardHeader>
         <CardTitle className="flex flex-wrap items-center gap-2">
           Sheet {sh.ten}
-          {khop ? <StatusChip trangThai="running" nhan="Cộng khớp" /> : cd.soDong.lechThat ? <StatusChip trangThai="stopped" nhan={`${num(cd.soDong.lechThat)} dòng lệch thật`} /> : <StatusChip trangThai="idle" nhan="Lệch bình thường" />}
+          {khop ? <Nhan loai="xong">Cộng khớp</Nhan> : cd.soDong.lechThat ? <Nhan loai="loi">{`${num(cd.soDong.lechThat)} dòng lệch thật`}</Nhan> : <Nhan loai="luu-y">Lệch bình thường</Nhan>}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">

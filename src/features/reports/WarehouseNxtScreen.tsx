@@ -14,7 +14,7 @@ import {
   type NxtExcelRow,
 } from "@/lib/nxtExcel";
 import {
-  Badge,
+  Nhan,
   BangTong,
   Button,
   ChuThichBatBuoc,
@@ -348,9 +348,9 @@ export default function WarehouseNxtScreen() {
       key: "khoLuu",
       header: "Kho lưu",
       render: (r) => (
-        <Badge variant={r.storageLocation && r.storageLocation !== KHO_LUU_MAC_DINH ? "default" : "outline"}>
+        <Nhan loai={r.storageLocation && r.storageLocation !== KHO_LUU_MAC_DINH ? "vi-tri" : "phu"}>
           {khoLuuCua(r)}
-        </Badge>
+        </Nhan>
       ),
     },
     { key: "tonDau", header: "Tồn đầu (kg)", so: true, render: (r) => num(r.openingKg), tong: () => num(tong.tonDau) },
@@ -644,9 +644,9 @@ export default function WarehouseNxtScreen() {
                 Lệch bất biến — kiểm lại số liệu nguồn (đầu + nhập − xuất ≠ tồn cuối).
               </span>
             )}
-            <Badge variant="outline" className="ml-auto">
+            <Nhan loai="phu" className="ml-auto">
               SL mặt hàng: {rows.length}
-            </Badge>
+            </Nhan>
           </div>
 
           {/* Tồn cuối theo từng KHO LƯU — trả lời "hàng đang nằm ở kho nào" */}

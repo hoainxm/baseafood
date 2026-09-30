@@ -23,7 +23,7 @@ import {
   timLo,
   type NutLo,
 } from "@/lib/truyXuatLo";
-import { Badge, Button, EmptyState, Field, FormDialog, Input, NutDong, notify } from "@/design-system";
+import { Button, EmptyState, Field, FormDialog, Input, Nhan, NutDong, notify } from "@/design-system";
 import { Camera, CameraOff, Link2, Plus, Trash2 } from "lucide-react";
 import { KhungQuetQr } from "./KhungQuetQr";
 import { useDuLieuTruyXuat } from "./useDuLieuTruyXuat";
@@ -166,7 +166,7 @@ export function GanLoDauVao({
                 <li key={l.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-2">
                   <div className="min-w-0">
                     <span className="font-medium">{l.inputLabel}</span>{" "}
-                    <Badge variant="outline">{TEN_CACH[l.method]}</Badge>
+                    <Nhan loai="nguon">{TEN_CACH[l.method]}</Nhan>
                     <div className="text-muted-foreground">
                       {[l.material, l.quantityKg != null ? kgChu(l.quantityKg) : "chưa ghi kg", l.operator].filter(Boolean).join(" · ")}
                     </div>

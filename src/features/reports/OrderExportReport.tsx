@@ -14,7 +14,7 @@ import {
   useSalesOrders,
 } from "@/lib/catalogRepo";
 import {
-  Badge,
+  Nhan,
   Button,
   Combobox,
   DateField,
@@ -291,9 +291,9 @@ export default function OrderExportReport() {
                         <span className="font-normal text-muted-foreground">
                           · đặt {g.orderDate ? viDate(g.orderDate) : "—"}
                         </span>
-                        <Badge variant={g.status === "dong" ? "secondary" : "outline"}>
+                        <Nhan loai={g.status === "dang-gom" ? "cho" : "xong"}>
                           {NHAN_TT[g.status]}
-                        </Badge>
+                        </Nhan>
                         {g.requiredKg > 0 && (
                           <span className="font-normal text-muted-foreground">
                             · đã đặt <span className="tnum">{num(g.requiredKg)}</span> kg

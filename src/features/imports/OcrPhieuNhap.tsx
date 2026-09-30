@@ -5,7 +5,6 @@
 // ============================================================
 import { useRef, useState } from "react";
 import {
-  Badge,
   Button,
   Dialog,
   DialogContent,
@@ -13,7 +12,9 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  Nhan,
   notify,
+  sacTheoTen,
 } from "@/design-system";
 import { Camera, Check, Loader2, Plus, RefreshCw } from "lucide-react";
 import { nhanDienPhieu, type DanhMucOcr, type KetQuaOcr } from "@/lib/ocr";
@@ -248,9 +249,9 @@ export function OcrPhieuNhap({
                     <div className="flex flex-wrap items-center gap-1.5">
                       <span className="text-sm text-muted-foreground">Loại NL:</span>
                       {kq.loaiNL.map((l) => (
-                        <Badge key={l} variant="secondary">
+                        <Nhan key={l} loai="phan-loai" sac={sacTheoTen(l)}>
                           {l}
-                        </Badge>
+                        </Nhan>
                       ))}
                     </div>
                   )}
@@ -258,9 +259,9 @@ export function OcrPhieuNhap({
                     <div className="flex flex-wrap items-center gap-1.5">
                       <span className="text-sm text-muted-foreground">Số nhận được:</span>
                       {kq.soKg.map((n, i) => (
-                        <Badge key={i} variant="secondary" className="tnum">
+                        <Nhan key={i} loai="phu" className="tnum">
                           {fmtKg(n)}
-                        </Badge>
+                        </Nhan>
                       ))}
                     </div>
                   )}

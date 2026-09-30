@@ -24,7 +24,7 @@ import {
   type NhanhCay,
   type NutLo,
 } from "@/lib/truyXuatLo";
-import { Badge, Button, EmptyState, Field, Input, InfoTip, notify } from "@/design-system";
+import { Button, EmptyState, Field, Input, InfoTip, Nhan, notify, sacTheoTen } from "@/design-system";
 import { ArrowDownRight, ArrowUpLeft, Camera, CameraOff, Printer, Scale, Search } from "lucide-react";
 
 /** Dòng lô gọn: nhãn + mô tả; bấm vào là mở hộ chiếu của lô đó. */
@@ -32,7 +32,7 @@ function DongNut({ nut, kgNoi, onMo }: { nut: NutLo; kgNoi?: number | null; onMo
   const moDuoc = nut.kind !== "X" && !nut.mat;
   return (
     <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-      <Badge variant="outline">{TEN_LOAI[nut.kind]}</Badge>
+      <Nhan loai="phan-loai" sac={sacTheoTen(TEN_LOAI[nut.kind])}>{TEN_LOAI[nut.kind]}</Nhan>
       {moDuoc ? (
         <button
           type="button"
@@ -193,7 +193,7 @@ export default function QrTraCuuScreen() {
             <section className="space-y-3 rounded-xl border-2 border-border p-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex flex-wrap items-center gap-2">
-                  <Badge>{TEN_LOAI[dangXem.kind]}</Badge>
+                  <Nhan loai="phan-loai" sac={sacTheoTen(TEN_LOAI[dangXem.kind])}>{TEN_LOAI[dangXem.kind]}</Nhan>
                   <span className="text-xl font-semibold tnum">{dangXem.nhan}</span>
                 </div>
                 <Button title="In lại tem QR của lô này (tem cũ bong / mờ thì in cái mới)." variant="outline" onClick={() => setInTem(true)}>

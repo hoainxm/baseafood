@@ -8,7 +8,6 @@ import type { WipProductionItem } from "@/types";
 import { useExportItems, usePackagings, useProducts, useSalesItems, useWipProductions } from "@/lib/catalogRepo";
 import { tinhTon, locBanLe, dongGoiTruTon, type LoTon } from "@/lib/inventory";
 import {
-  Badge,
   ChuThichBatBuoc,
   Button,
   Combobox,
@@ -23,8 +22,11 @@ import {
   ErrorSummary,
   Field,
   Input,
+  Nhan,
   NumberField,
   RecordTable,
+  sacTheoTen,
+  sacXuong,
   ThongKe,
   notify,
   type Cot,
@@ -141,7 +143,7 @@ export default function KhoDuTruScreen() {
       render: (r) => tenMH(r.productId),
       sapXep: (r) => tenMH(r.productId),
     },
-    { key: "kho", header: "Kho", render: (r) => <Badge>{r.warehouse || "—"}</Badge>, sapXep: (r) => r.warehouse },
+    { key: "kho", header: "Kho", render: (r) => <Nhan loai="phan-loai" sac={sacTheoTen(r.warehouse)}>{r.warehouse || "—"}</Nhan>, sapXep: (r) => r.warehouse },
     {
       key: "lo",
       header: "Lô (ngày SX)",
@@ -202,9 +204,13 @@ export default function KhoDuTruScreen() {
               <div>
                 <div className="flex items-center justify-between">
                   <span className="font-semibold text-sm text-foreground">{item.warehouse.name}</span>
-                  <Badge variant={item.warehouse.type === "xi-nghiep" ? "default" : "outline"} className="text-xs">
-                    {item.warehouse.type === "xi-nghiep" ? "Kho lớn" : `Xưởng ${item.warehouse.workshop}`}
-                  </Badge>
+                  {item.warehouse.type === "xi-nghiep" ? (
+                    <Nhan loai="phan-loai" sac={sacTheoTen("Kho lớn")}>Kho lớn</Nhan>
+                  ) : (
+                    <Nhan loai="phan-loai" sac={sacXuong(item.warehouse.workshop)}>
+                      {`Xưởng ${item.warehouse.workshop}`}
+                    </Nhan>
+                  )}
                 </div>
                 <div className="text-xs text-muted-foreground mt-1">
                   Sức chứa: <span className="font-medium tnum">{num(item.warehouse.capacityKg / 1000)}</span> tấn

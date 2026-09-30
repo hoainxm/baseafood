@@ -6,7 +6,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { docNhatKy, type NhatKy } from "@/lib/audit";
 import {
-  Badge,
+  Nhan,
   Button,
   Combobox,
   DateField,
@@ -25,6 +25,7 @@ import {
   homNay,
   notify,
   type Cot,
+  type LoaiNhan,
   type MucChon,
   type TheThongTin,
 } from "@/design-system";
@@ -162,8 +163,8 @@ export default function NhatKyScreen() {
   ];
 
   const bienLoai = (a: string) => NHAN_LOAI[a] ?? a;
-  const mauLoai = (a: string): "secondary" | "outline" | "destructive" | "default" =>
-    a === "xoa" ? "destructive" : a === "them" ? "default" : a === "sua" ? "secondary" : "outline";
+  const loaiNhan = (a: string): LoaiNhan =>
+    a === "xoa" ? "loi" : a === "them" ? "xong" : a === "sua" ? "luu-y" : "phu";
 
   const cols: Cot<NhatKy>[] = [
     { key: "at", header: "Thời gian", chinh: true, render: (r) => bienNgay(r.at), sapXep: (r) => r.at },
@@ -171,7 +172,7 @@ export default function NhatKyScreen() {
     {
       key: "loai",
       header: "Thao tác",
-      render: (r) => <Badge variant={mauLoai(r.action)}>{bienLoai(r.action)}</Badge>,
+      render: (r) => <Nhan loai={loaiNhan(r.action)}>{bienLoai(r.action)}</Nhan>,
       sapXep: (r) => r.action,
     },
     { key: "doiTuong", header: "Đối tượng", render: (r) => nhanBang(r.entity), sapXep: (r) => r.entity },

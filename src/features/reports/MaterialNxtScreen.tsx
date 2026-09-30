@@ -5,7 +5,7 @@
 // ============================================================
 import { useMemo, useState } from "react";
 import {
-  Badge,
+  Nhan,
   BangTong,
   Button,
   ChuThichBatBuoc,
@@ -169,12 +169,11 @@ export default function MaterialNxtScreen() {
       render: (r) => (
         <div className="flex flex-wrap items-center gap-2">
           <span className="font-semibold text-foreground">{r.hoNL}</span>
-          {r.seedTonDau && <Badge variant="outline">Tồn đầu khai tay</Badge>}
+          {r.seedTonDau && <Nhan loai="nguon">Tồn đầu khai tay</Nhan>}
           {r.canhBaoAm && (
-            <Badge variant="destructive" className="gap-1">
-              <AlertTriangle className="size-icon-sm" aria-hidden />
+            <Nhan loai="loi" icon={AlertTriangle}>
               Tồn âm
-            </Badge>
+            </Nhan>
           )}
         </div>
       ),

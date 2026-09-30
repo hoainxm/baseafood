@@ -16,7 +16,9 @@ import {
   ConfirmDelete,
   EmptyState,
   LuoiNhap,
+  Nhan,
   notify,
+  sacTheoTen,
   type CotLuoi,
   type HangLuoi,
 } from "@/design-system";
@@ -353,7 +355,11 @@ export function LuoiNguyenLieu({
         id: h.id,
         du: h,
         ten: h.ten,
-        phu: h.tuSoNhap ? `${h.nguonIds.length} chuyến · sửa ô ghi thẳng vào sổ nhập` : undefined,
+        phu: h.tuSoNhap ? (
+          <Nhan loai="nguon" className="mt-0.5">
+            {h.nguonIds.length} chuyến · sửa ô ghi thẳng vào sổ nhập
+          </Nhan>
+        ) : undefined,
       });
     }
   }
@@ -371,7 +377,18 @@ export function LuoiNguyenLieu({
         du: h,
         ten: h.ten,
         kieu: "giam",
-        phu: KHO_XUONG.find((k) => k.id === h.khoGiam)?.name ?? "chưa chọn kho",
+        phu: (() => {
+          const tenKho = KHO_XUONG.find((k) => k.id === h.khoGiam)?.name;
+          return tenKho ? (
+            <Nhan loai="phan-loai" sac={sacTheoTen(tenKho)} className="mt-0.5">
+              {tenKho}
+            </Nhan>
+          ) : (
+            <Nhan loai="loi" className="mt-0.5">
+              chưa chọn kho
+            </Nhan>
+          );
+        })(),
       });
     }
   }

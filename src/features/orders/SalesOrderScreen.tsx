@@ -27,7 +27,6 @@ import {
 } from "@/lib/catalogRepo";
 import { loConHang, tinhTon, locBanLe, dongGoiTruTon } from "@/lib/inventory";
 import {
-  Badge,
   ChuThichBatBuoc,
   Button,
   Combobox,
@@ -42,6 +41,7 @@ import {
   ErrorSummary,
   Field,
   Input,
+  Nhan,
   NumberField,
   RecordTable,
   ThongKe,
@@ -304,9 +304,7 @@ export default function DonDatScreen() {
       key: "tt",
       header: "Trạng thái",
       render: (r) => (
-        <Badge variant={r.status === "dong" ? "secondary" : r.status === "du" ? "default" : "outline"}>
-          {NHAN_TT[r.status]}
-        </Badge>
+        <Nhan loai={r.status === "dang-gom" ? "cho" : "xong"}>{NHAN_TT[r.status]}</Nhan>
       ),
       sapXep: (r) => r.status,
     },
@@ -450,9 +448,9 @@ export default function DonDatScreen() {
                       Khả dụng <span className="tnum">{num(kd)}</span>
                     </span>
                     {du ? (
-                      <Badge variant="secondary">Đủ</Badge>
+                      <Nhan loai="xong">Đủ</Nhan>
                     ) : (
-                      <Badge variant="outline">Còn thiếu {num(con)} kg</Badge>
+                      <Nhan loai="luu-y">Còn thiếu {num(con)} kg</Nhan>
                     )}
                   </div>
                 </li>

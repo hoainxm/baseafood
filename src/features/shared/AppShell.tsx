@@ -6,7 +6,7 @@
 // src/features/shared/AppShell.tsx
 import { useEffect, useState, type ReactNode } from "react";
 import {
-  Badge,
+  Nhan,
   GoiYHover,
   Logo,
   NutGiaoDien,
@@ -345,9 +345,9 @@ function MucNut({
         <span className="min-w-0 whitespace-normal break-words leading-tight">{m.label}</span>
       )}
       {!thuGon && m.demo && (
-        <Badge variant="outline" className="ml-auto shrink-0">
+        <Nhan loai="phu" className="ml-auto">
           DEMO
-        </Badge>
+        </Nhan>
       )}
     </button>
   );

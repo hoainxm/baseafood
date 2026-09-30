@@ -4,7 +4,7 @@
 // Description: Work Order Overview Summary Table
 // ============================================================
 // src/features/dashboard/BangLSX.tsx
-import { RecordTable, Button, type Cot } from "@/design-system";
+import { RecordTable, Button, Nhan, type Cot } from "@/design-system";
 import { Clock } from "lucide-react";
 import { ThanhTienDo } from "./CommonWidget";
 import type { LenhSanXuat } from "./mockDashboardData";
@@ -45,10 +45,9 @@ export function BangLSX({
       header: "Hạn giao",
       render: (r) =>
         r.gap ? (
-          <span className="inline-flex items-center gap-2 rounded-lg border border-warning/40 bg-warning-surface px-2.5 py-1 font-semibold text-warning">
-            <Clock className="size-5" aria-hidden />
+          <Nhan loai="luu-y" icon={Clock} title="Lệnh gấp — hạn giao sát">
             {r.han}
-          </span>
+          </Nhan>
         ) : (
           r.han
         ),

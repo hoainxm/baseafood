@@ -133,6 +133,45 @@
   --status-stopped-ink: #b91c1c;
   --status-maintenance-ink: #6d28d9;
   --status-changeover-ink: #1d4ed8;
+
+  /* --- Nhãn theo CHỨC NĂNG (pattern `Nhan`) — mỗi chức năng một màu, màn hình gọi
+     theo Ý NGHĨA không gọi theo màu. Mỗi sắc có nền nhạt (-surface), viền (-line) và
+     chữ đậm (-ink) ≥ 4.5:1 trên nền nhạt. Nhãn LUÔN có chữ + chấm/icon. --- */
+  --info: #0369a1; /* nguồn dữ liệu (sổ nhập, sổ sản xuất, Excel, nhập tay) */
+  --info-surface: #f0f9ff;
+  --info-line: #7dd3fc;
+  --destructive-surface: #fef2f2;
+  --destructive-line: #fca5a5;
+  --success-line: #86efac;
+  --warning-line: #fcd34d;
+  /* Sắc PHÂN LOẠI nghiệp vụ (kênh, nhóm NL, xưởng…) — nhạt, không mang nghĩa tốt/xấu. */
+  --tone-tim: #6d28d9;
+  --tone-tim-surface: #f5f3ff;
+  --tone-tim-line: #c4b5fd;
+  --tone-ngoc: #0f766e;
+  --tone-ngoc-surface: #f0fdfa;
+  --tone-ngoc-line: #5eead4;
+  --tone-bien: #1d4ed8;
+  --tone-bien-surface: #eff6ff;
+  --tone-bien-line: #93c5fd;
+  --tone-bang: #0e7490;
+  --tone-bang-surface: #ecfeff;
+  --tone-bang-line: #67e8f9;
+  --tone-cat: #92400e;
+  --tone-cat-surface: #fefce8;
+  --tone-cat-line: #fde047;
+  --tone-hong: #be185d;
+  --tone-hong-surface: #fdf2f8;
+  --tone-hong-line: #f9a8d4;
+  --tone-la: #3f6212;
+  --tone-la-surface: #f7fee7;
+  --tone-la-line: #bef264;
+  --tone-cam: #c2410c;
+  --tone-cam-surface: #fff7ed;
+  --tone-cam-line: #fdba74;
+  --tone-xam: #334155;
+  --tone-xam-surface: #f8fafc;
+  --tone-xam-line: #cbd5e1;
 }
 
 @theme inline {
@@ -163,6 +202,41 @@
   --color-ring: var(--ring);
   --color-overlay: var(--overlay);
 
+  /* Nhãn theo chức năng → tiện ích Tailwind: bg-info-surface, text-tone-tim, border-tone-tim-line… */
+  --color-info: var(--info);
+  --color-info-surface: var(--info-surface);
+  --color-info-line: var(--info-line);
+  --color-destructive-surface: var(--destructive-surface);
+  --color-destructive-line: var(--destructive-line);
+  --color-success-line: var(--success-line);
+  --color-warning-line: var(--warning-line);
+  --color-tone-tim: var(--tone-tim);
+  --color-tone-tim-surface: var(--tone-tim-surface);
+  --color-tone-tim-line: var(--tone-tim-line);
+  --color-tone-ngoc: var(--tone-ngoc);
+  --color-tone-ngoc-surface: var(--tone-ngoc-surface);
+  --color-tone-ngoc-line: var(--tone-ngoc-line);
+  --color-tone-bien: var(--tone-bien);
+  --color-tone-bien-surface: var(--tone-bien-surface);
+  --color-tone-bien-line: var(--tone-bien-line);
+  --color-tone-bang: var(--tone-bang);
+  --color-tone-bang-surface: var(--tone-bang-surface);
+  --color-tone-bang-line: var(--tone-bang-line);
+  --color-tone-cat: var(--tone-cat);
+  --color-tone-cat-surface: var(--tone-cat-surface);
+  --color-tone-cat-line: var(--tone-cat-line);
+  --color-tone-hong: var(--tone-hong);
+  --color-tone-hong-surface: var(--tone-hong-surface);
+  --color-tone-hong-line: var(--tone-hong-line);
+  --color-tone-la: var(--tone-la);
+  --color-tone-la-surface: var(--tone-la-surface);
+  --color-tone-la-line: var(--tone-la-line);
+  --color-tone-cam: var(--tone-cam);
+  --color-tone-cam-surface: var(--tone-cam-surface);
+  --color-tone-cam-line: var(--tone-cam-line);
+  --color-tone-xam: var(--tone-xam);
+  --color-tone-xam-surface: var(--tone-xam-surface);
+  --color-tone-xam-line: var(--tone-xam-line);
   /* Trạng thái MES → tiện ích Tailwind: bg-status-running, text-status-stopped-ink… */
   --color-status-running: var(--status-running);
   --color-status-idle: var(--status-idle);

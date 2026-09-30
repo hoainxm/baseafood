@@ -6,7 +6,8 @@
 // src/features/reports/ManBaoCao.tsx
 import { Fragment, useState, type ReactNode } from "react";
 import {
-  Badge,
+  Nhan,
+  sacTheoTen,
   Button,
   Combobox,
   DateField,
@@ -463,7 +464,7 @@ export default function ManBaoCao() {
                       </td>
                       <td className="h-14 whitespace-nowrap px-4 font-mono">{r.ngay}</td>
                       <td className="h-14 whitespace-nowrap px-4">
-                        <Badge variant="secondary">Ca {r.ca}</Badge>
+                        <Nhan loai="phan-loai" sac={sacTheoTen(`Ca ${r.ca}`)}>Ca {r.ca}</Nhan>
                       </td>
                       <td className="h-14 whitespace-nowrap px-4">{r.line}</td>
                       <td className="h-14 whitespace-nowrap px-4 font-medium">{r.sp}</td>

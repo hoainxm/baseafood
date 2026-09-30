@@ -51,6 +51,7 @@ export { GoiYHover, TRE_HIEN_MS } from "./patterns/HoverHint";
 export { ThongKe, type TheThongTin } from "./patterns/ThongKe";
 export { BieuDoCot, type CotBieuDo } from "./patterns/BarChart";
 export { StatusChip, type TrangThaiSX } from "./patterns/StatusChip";
+export { Nhan, sacKenh, sacNhomNL, sacXuong, sacTheoTen, type LoaiNhan, type SacPhanLoai } from "./patterns/Nhan";
 export { DuLieuMau } from "./patterns/MockPatternData";
 export { BieuDoCotDoc, type CotBieuDoDoc } from "./patterns/VerticalBarChart";
 export { PhieuIn, PhieuInTem, ThIn, TdIn } from "./patterns/PrintSheet";

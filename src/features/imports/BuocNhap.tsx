@@ -4,7 +4,7 @@
 // Description: Presentational blocks for the guided import flow (no data access).
 // ============================================================
 import type { ReactNode } from "react";
-import { Badge, Button } from "@/design-system";
+import { Button, Nhan } from "@/design-system";
 import { kg } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { Check, Pencil, QrCode } from "lucide-react";
@@ -177,9 +177,9 @@ export function ChuyenTrongNgay({
               </span>
               {n.supplierName || "(chưa có đại lý)"}
               {n.ghiBu && (
-                <Badge variant="outline" className="ml-2">
+                <Nhan loai="luu-y" className="ml-2 align-middle">
                   Ghi bù
-                </Badge>
+                </Nhan>
               )}
             </p>
             <span className="tnum shrink-0 font-semibold">{kg(n.tongKg)}</span>

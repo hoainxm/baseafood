@@ -6,7 +6,6 @@
 // src/features/quality/ManChatLuong.tsx
 import { useMemo, useState, type ReactNode } from "react";
 import {
-  Badge,
   BieuDoCot,
   Button,
   Combobox,
@@ -16,10 +15,13 @@ import {
   Field,
   FormDialog,
   Input,
+  Nhan,
   NutDong,
   RecordTable,
   Textarea,
   notify,
+  sacTheoTen,
+  type LoaiNhan,
 } from "@/design-system";
 import { cn } from "@/lib/utils";
 import {
@@ -72,28 +74,19 @@ const QC_CCP: CCP[] = [
 
 const QC_KET: Record<
   KetQua,
-  { nhan: string; icon: LucideIcon; chu: string; nen: string; vien: string }
+  { nhan: string; icon: LucideIcon; loai: LoaiNhan }
 > = {
-  dat: { nhan: "Đạt", icon: CircleCheck, chu: "text-success", nen: "bg-success-surface", vien: "border-success/40" },
-  vipham: { nhan: "Vi phạm", icon: CircleX, chu: "text-destructive", nen: "bg-destructive/10", vien: "border-destructive/40" },
+  dat: { nhan: "Đạt", icon: CircleCheck, loai: "xong" },
+  vipham: { nhan: "Vi phạm", icon: CircleX, loai: "loi" },
 };
 
 /** Chip kết quả — dùng chung cho bảng desktop và thẻ điện thoại. */
 function ChipKetQua({ ket }: { ket: KetQua }) {
   const k = QC_KET[ket];
-  const Icon = k.icon;
   return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-semibold",
-        k.vien,
-        k.chu,
-        k.nen
-      )}
-    >
-      <Icon className="size-icon-sm" aria-hidden />
+    <Nhan loai={k.loai} icon={k.icon}>
       {k.nhan}
-    </span>
+    </Nhan>
   );
 }
 
@@ -286,9 +279,7 @@ export default function ManChatLuong() {
           vienClass="border-l-warning"
           icon={Hourglass}
           chip={
-            <Badge className="border-warning/40 bg-warning-surface text-warning">
-              Cần xếp lịch
-            </Badge>
+            <Nhan loai="cho">Cần xếp lịch</Nhan>
           }
           onClick={() =>
             notify.daLuu(`${sap.length} lô đang chờ kiểm · xem danh sách cuối trang`)
@@ -300,7 +291,7 @@ export default function ManChatLuong() {
           phu="CCP-05 — kho thành phẩm"
           vienClass="border-l-destructive"
           icon={TriangleAlert}
-          chip={<Badge variant="destructive">Chưa đóng</Badge>}
+          chip={<Nhan loai="loi">Chưa đóng</Nhan>}
           onClick={() => setXuLy(QC_CCP[4])}
         />
         <TheQC
@@ -344,9 +335,7 @@ export default function ManChatLuong() {
             }
             if (daXuLy.includes(r.id)) {
               return (
-                <Badge className="border-success/40 bg-success-surface text-success">
-                  Đã khắc phục
-                </Badge>
+                <Nhan loai="xong">Đã khắc phục</Nhan>
               );
             }
             return (
@@ -454,7 +443,7 @@ export default function ManChatLuong() {
                 >
                   <div className="flex items-center justify-between gap-3">
                     <span className="font-mono text-base font-bold">{l.id}</span>
-                    <Badge variant="secondary">{l.cd}</Badge>
+                    <Nhan loai="phan-loai" sac={sacTheoTen(l.cd)}>{l.cd}</Nhan>
                   </div>
                   <p className="text-base font-medium">{l.sp}</p>
                   <p

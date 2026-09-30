@@ -16,6 +16,7 @@ import {
   DialogTitle,
   Field,
   Input,
+  Nhan,
   Textarea,
   notify,
 } from "@/design-system";
@@ -174,14 +175,14 @@ export function HopChonDongNhap({
                     {num(r.quantityKg)}
                   </td>
                   <td className="border-b border-border px-3 py-2">
-                    {!cungHo(r) && (
-                      <span className="block font-semibold text-destructive">Khác loại</span>
-                    )}
-                    {kyDangGiu.has(r.id) ? (
-                      <span className="text-warning">Đang thuộc kỳ khác</span>
-                    ) : (
-                      <span className="text-muted-foreground">Chưa gắn kỳ</span>
-                    )}
+                    <span className="inline-flex flex-wrap gap-1">
+                      {!cungHo(r) && <Nhan loai="loi">Khác loại</Nhan>}
+                      {kyDangGiu.has(r.id) ? (
+                        <Nhan loai="luu-y">Đang thuộc kỳ khác</Nhan>
+                      ) : (
+                        <Nhan loai="cho">Chưa gắn kỳ</Nhan>
+                      )}
+                    </span>
                   </td>
                 </tr>
               ))}

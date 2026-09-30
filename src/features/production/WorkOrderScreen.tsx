@@ -6,7 +6,6 @@
 // src/features/production/ManLenhSX.tsx
 import { useMemo, useState, type ReactNode } from "react";
 import {
-  Badge,
   Button,
   Combobox,
   DateField,
@@ -21,10 +20,11 @@ import {
   PopoverContent,
   PopoverTrigger,
   Separator,
-  StatusChip,
   ThongKe,
   notify,
-  type TrangThaiSX,
+  Nhan,
+  sacTheoTen,
+  type LoaiNhan,
 } from "@/design-system";
 import { cn } from "@/lib/utils";
 import {
@@ -49,7 +49,7 @@ import {
  * drawer lọc · các dialog chi tiết/cập nhật/tạm dừng/tạo mới.
  *
  * Màn TRƯNG BÀY: số liệu là dữ liệu mẫu, chưa nối bảng thật. Không emoji: trạng
- * thái dùng StatusChip (chấm màu + nhãn chữ).
+ * thái dùng Nhan (chấm màu + nhãn chữ).
  */
 
 interface LenhSX {
@@ -79,11 +79,11 @@ const LSX_ROWS: LenhSX[] = [
   { id: "LSX-240808-002", sp: "Mực ống làm sạch đông block", kh: "Maruha Nichiro (JP)", ke: 6000, thuc: 5400, line: "Line 1", batDau: "03/08/2026", han: "13/08/2026", trang: "dang-chay" },
 ];
 
-const LSX_TRANG: Record<TrangLenh, { nhan: string; chip: TrangThaiSX }> = {
-  "dang-chay": { nhan: "Đang chạy", chip: "running" },
-  "cho-xu-ly": { nhan: "Chờ xử lý", chip: "idle" },
-  "hoan-thanh": { nhan: "Hoàn thành", chip: "running" },
-  "tam-dung": { nhan: "Tạm dừng", chip: "stopped" },
+const LSX_TRANG: Record<TrangLenh, { nhan: string; loai: LoaiNhan }> = {
+  "dang-chay": { nhan: "Đang chạy", loai: "cho" },
+  "cho-xu-ly": { nhan: "Chờ xử lý", loai: "cho" },
+  "hoan-thanh": { nhan: "Hoàn thành", loai: "xong" },
+  "tam-dung": { nhan: "Tạm dừng", loai: "luu-y" },
 };
 
 const LSX_TAB: { value: string; label: string; dem: number }[] = [
@@ -149,20 +149,9 @@ function OHanGiao({ han }: { han: string }) {
   const sap = con > 2 && con <= 5;
   if (!gap && !sap) return <span>{han}</span>;
   return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-2 whitespace-nowrap rounded-lg border px-2.5 py-1 font-semibold",
-        gap
-          ? "border-destructive/40 bg-destructive/10 text-destructive"
-          : "border-warning/40 bg-warning-surface text-warning"
-      )}
-    >
-      <Clock className="size-5" aria-hidden />
-      {han}
-      <span className="font-mono">
-        · {con < 0 ? `trễ ${-con}` : `còn ${con}`} ngày
-      </span>
-    </span>
+    <Nhan loai={gap ? "loi" : "luu-y"} icon={Clock}>
+      {han} · {con < 0 ? `trễ ${-con}` : `còn ${con}`} ngày
+    </Nhan>
   );
 }
 
@@ -635,7 +624,7 @@ export default function ManLenhSX() {
                     </Td>
                     <Td>
                       {r.line ? (
-                        <Badge variant="secondary">{r.line}</Badge>
+                        <Nhan loai="phan-loai" sac={sacTheoTen(r.line)}>{r.line}</Nhan>
                       ) : (
                         <span className="text-muted-foreground">Chưa phân</span>
                       )}
@@ -647,14 +636,9 @@ export default function ManLenhSX() {
                       <OHanGiao han={r.han} />
                     </Td>
                     <Td>
-                      {r.trang === "hoan-thanh" ? (
-                        <StatusChip trangThai="running" nhan="Hoàn thành" />
-                      ) : (
-                        <StatusChip
-                          trangThai={LSX_TRANG[r.trang].chip}
-                          nhan={LSX_TRANG[r.trang].nhan}
-                        />
-                      )}
+                      <Nhan loai={LSX_TRANG[r.trang].loai}>
+                        {LSX_TRANG[r.trang].nhan}
+                      </Nhan>
                     </Td>
                     <td
                       className={cn(

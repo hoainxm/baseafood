@@ -21,7 +21,7 @@ import {
 } from "@/lib/inventoryFinished";
 import { exportNxtToExcel, inferCategory, type NxtExcelRow } from "@/lib/nxtExcel";
 import {
-  Badge,
+  Nhan,
   BangTong,
   Button,
   ChuThichBatBuoc,
@@ -137,13 +137,12 @@ export default function BaoCaoNhapXuatTonScreen() {
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-semibold text-foreground">{r.productName}</span>
-            {r.spec && <Badge variant="outline">{r.spec}</Badge>}
-            {r.seedTonDau && <Badge variant="outline">Tồn đầu khai tay</Badge>}
+            {r.spec && <Nhan loai="phu">{r.spec}</Nhan>}
+            {r.seedTonDau && <Nhan loai="nguon">Tồn đầu khai tay</Nhan>}
             {r.canhBaoAm && (
-              <Badge variant="destructive" className="gap-1">
-                <AlertTriangle className="size-icon-sm" aria-hidden />
+              <Nhan loai="loi" icon={AlertTriangle}>
                 Tồn âm
-              </Badge>
+              </Nhan>
             )}
           </div>
           {r.productCode && (

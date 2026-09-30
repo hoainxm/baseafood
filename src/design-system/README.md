@@ -229,7 +229,7 @@ VD `WipProductionScreen › BangDongSX`): bọc bảng trong `[data-luoi-phim]`,
 thứ tự DOM, tự bỏ ô ẩn của dòng chưa mở); Tab để trình duyệt lo đi ngang. `LuoiNhap`
 đã có sẵn nav đầy đủ (§ 5b) — `navCol` chỉ dành cho bảng dựng tay.
 
-### 6. Ba cái bẫy làm vỡ trang ở cỡ chữ 130%
+### 6. Các bẫy làm vỡ trang ở cỡ chữ 130%
 
 1. **Ô lưới không co**: con của `grid`/`flex` mặc định `min-width:auto` = rộng
    theo chữ dài nhất. Thêm `min-w-0` (hoặc `[&>*]:min-w-0` trên lưới).
@@ -238,6 +238,19 @@ thứ tự DOM, tự bỏ ô ẩn của dòng chưa mở); Tab để trình duy�
 3. **Biểu đồ / SVG có bề rộng tối thiểu**: bọc `overflow-x-auto` và đặt
    `min-w` = đúng `W` của `viewBox`. Thu nhỏ SVG là thu nhỏ luôn chữ trục
    (680/900 → nhãn 16px còn 12px).
+4. **`min-w-0` + `flex-1` trong hàng `flex-wrap` = không bao giờ xuống dòng** (bẫy
+   ngược của mục 1): ô bị ép còn vài chục px, chữ bên trong tràn ra khỏi trang (đã
+   gặp ở ô "Ngày bất kỳ trong kỳ" 6 màn báo cáo). Ô cần chỗ ⇒ đặt sàn co theo khung:
+   `min-w-[min(12rem,100%)]` — đủ chỗ thì chung hàng, thiếu thì tự xuống dòng.
+5. **Lưới theo breakpoint MÀN HÌNH** (`lg:grid-cols-5`) mà nội dung đã trừ thanh
+   bên ⇒ thẻ bé tí, nhãn bị cắt. Lưới thẻ dùng
+   `grid-cols-[repeat(auto-fill,minmax(min(11rem,100%),1fr))]` (theo chỗ trống thật);
+   lưới một cột chứa khối rộng dùng `grid-cols-[minmax(0,1fr)]`.
+6. **Nút / nhãn chữ dài** (`whitespace-nowrap` mặc định): nhãn tên nhóm, tháng dài
+   ("Dồn sang Tháng 10/2026", "Thêm dòng vào <nhóm>") ⇒ thêm
+   `h-auto min-h-9 whitespace-normal text-left`; `Nhan` dài ⇒ tách 2 nhãn ngắn.
+7. **Kiểm đúng thứ tự người dùng**: đặt 130% TRƯỚC rồi mới mở màn (đổi cỡ chữ sau
+   khi trang đã dựng có lúc đo ra "không tràn" dù thật ra có).
 
 ### 7. Checklist màn mới PHẢI qua
 

@@ -1403,9 +1403,11 @@ export default function MonthlyStockScreen() {
                 <section key={g.category} className="space-y-2">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <h2 className="text-lg font-semibold text-foreground">{g.category}</h2>
-                    <Nhan loai="phu">
-                      Tồn cuối {num(g.tong.closeKg)} kg · {g.rows.length} mặt hàng
-                    </Nhan>
+                    {/* Hai nhãn ngắn thay một nhãn dài — điện thoại + chữ 130% tự xuống dòng, không bị cắt số. */}
+                    <span className="flex flex-wrap gap-1">
+                      <Nhan loai="phu">Tồn cuối {num(g.tong.closeKg)} kg</Nhan>
+                      <Nhan loai="phu">{g.rows.length} mặt hàng</Nhan>
+                    </span>
                   </div>
                   <BangTong
                     rows={g.rows}
@@ -1421,7 +1423,7 @@ export default function MonthlyStockScreen() {
                         variant="outline"
                         size="sm"
                         onClick={() => moThem(g.category)}
-                        className="w-full sm:w-auto"
+                        className="h-auto min-h-9 w-full whitespace-normal text-left sm:w-auto"
                         title={`Thêm tay một dòng vào nhóm "${g.category}" (đã điền sẵn nhóm — chỉ nhập tên hàng, số kg…).`}
                       >
                         <Plus className="mr-2 h-4 w-4" />

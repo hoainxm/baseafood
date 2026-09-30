@@ -300,7 +300,7 @@ export default function MaterialNxtScreen() {
             options={KY_OPT}
           />
         </div>
-        <div className="min-w-0 flex-1 sm:min-w-[16rem]">
+        <div className="min-w-[min(12rem,100%)] flex-1 sm:min-w-[16rem]">
           {ky === "tuy-chon" ? (
             <DateRangeField
               label="Khoảng ngày"

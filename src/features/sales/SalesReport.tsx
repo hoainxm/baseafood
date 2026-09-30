@@ -125,7 +125,7 @@ export default function BaoCaoBan() {
             options={KY_OPT}
           />
         </div>
-        <div className="min-w-0 sm:min-w-[16rem] flex-1">
+        <div className="min-w-[min(12rem,100%)] flex-1 sm:min-w-[16rem]">
           {ky === "tuy-chon" ? (
             <DateRangeField
               label="Khoảng ngày"

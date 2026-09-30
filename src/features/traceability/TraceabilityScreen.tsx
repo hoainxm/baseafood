@@ -192,7 +192,7 @@ export default function ManTruyXuat() {
   const pct = Math.round((TX_LO.thuc / TX_LO.ke) * 100);
 
   return (
-    <div className="grid gap-6">
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-6">
       <DuLieuMau ghiChu="Truy xuất chưa nối dữ liệu thật." />
 
       {/* Ô truy xuất */}

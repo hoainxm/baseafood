@@ -305,7 +305,7 @@ export default function QcChecklistScreen() {
 
       {/* Thêm chỉ tiêu tại chỗ */}
       <div className="flex flex-wrap items-end gap-3 rounded-xl border-2 border-dashed border-border p-4">
-        <Field label="Thêm chỉ tiêu khác" className="min-w-60 flex-1">
+        <Field label="Thêm chỉ tiêu khác" className="min-w-[min(15rem,100%)] flex-1">
           <Input
             value={themTen}
             onChange={(e) => setThemTen(e.target.value)}

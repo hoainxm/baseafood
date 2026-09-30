@@ -189,7 +189,9 @@ export default function KhoDuTruScreen() {
           <Warehouse className="w-5 h-5 text-primary" />
           Dung tích & Tải trọng Kho BSF1
         </h2>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        {/* auto-fill theo CHỖ TRỐNG thật (không theo bề rộng màn): trừ thanh bên, lg:grid-cols-5
+            từng ép 5 thẻ ~114px ⇒ nhãn xưởng bị cắt chữ. Mỗi thẻ tối thiểu 11rem. */}
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(min(11rem,100%),1fr))] gap-4">
           {dungTichKho.map((item) => (
             <div
               key={item.warehouse.id}
@@ -202,8 +204,9 @@ export default function KhoDuTruScreen() {
               }`}
             >
               <div>
-                <div className="flex items-center justify-between">
-                  <span className="font-semibold text-sm text-foreground">{item.warehouse.name}</span>
+                {/* flex-wrap: thẻ hẹp thì nhãn xưởng xuống dòng thay vì bị ép cắt chữ. */}
+                <div className="flex flex-wrap items-center justify-between gap-1">
+                  <span className="min-w-0 font-semibold text-sm text-foreground">{item.warehouse.name}</span>
                   {item.warehouse.type === "xi-nghiep" ? (
                     <Nhan loai="phan-loai" sac={sacTheoTen("Kho lớn")}>Kho lớn</Nhan>
                   ) : (

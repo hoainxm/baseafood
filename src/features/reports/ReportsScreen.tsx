@@ -452,6 +452,7 @@ export default function ManBaoCao() {
                           type="button"
                           aria-expanded={open}
                           aria-label={`${open ? "Thu" : "Mở"} chi tiết ca ${r.ca} ngày ${r.ngay}`}
+                          title={`${open ? "Thu gọn" : "Xem"} chi tiết sản lượng ca ${r.ca} ngày ${r.ngay}.`}
                           onClick={() => toggle(r.id)}
                           className="inline-flex size-11 items-center justify-center rounded-lg border-2 border-border bg-background transition-colors hover:bg-muted"
                         >

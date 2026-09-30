@@ -170,6 +170,7 @@ function MenuThaoTac({ onChon }: { onChon: (id: string) => void }) {
         <button
           type="button"
           aria-label="Thao tác với lệnh này"
+          title="Mở menu thao tác cho lệnh sản xuất này (xem chi tiết, đổi trạng thái…)."
           className="inline-flex size-11 items-center justify-center rounded-lg border-2 border-border bg-background transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
         >
           <MoreVertical className="size-5" aria-hidden />

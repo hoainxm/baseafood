@@ -32,7 +32,7 @@ src/
 ├── design-system/            tokens.css · patterns/ · kit/ · index.ts (cửa import duy nhất)
 └── features/                 THẬT: imports · production/WipProductionScreen (/wip) · packaging (/packaging) · warehouse · orders · sales · balancing · catalog · reports/NXT · auth · users
                               DEMO (dữ liệu mẫu): production/WorkOrderScreen (/production) · reports · quality · traceability · cold-storage (hybrid: tồn THẬT, nhiệt độ minh hoạ)
-supabase/migrations/          0001 … 0048 (đã chạy hết trên DB thật tới 0048 — xác nhận 2026-09-22)
+supabase/migrations/          0001 … 0048 (đã chạy hết trên DB thật tới 0048 — xác nhận 2026-09-22; RIÊNG `0029` bảng `packagings` bị sót, chạy bù 2026-09-30 kèm RLS mẫu `0021` + trigger `0048` — xem [03-database](docs/app-map/03-database.md))
 docs/README.md                bản đồ tài liệu — doc nào ở đâu, doc mới bỏ đâu
 docs/app-map/                 bản đồ ngữ cảnh cho agent (đọc khi CODE)
 docs/ops/                     vận hành: cutover Supabase · deploy Vercel · env

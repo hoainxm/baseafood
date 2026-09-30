@@ -665,7 +665,7 @@ export default function WarehouseNxtScreen() {
                     setKhoLuuLoc(khoLuuLoc === ten ? TAT_CA : ten);
                     setDaChon(new Set());
                   }}
-                  className="rounded-full border border-border px-3 py-1 text-sm hover:bg-muted"
+                  className="min-h-9 rounded-full border border-border px-3 py-1 text-sm hover:bg-muted"
                   aria-pressed={khoLuuLoc === ten}
                 >
                   <span className="font-medium text-foreground">{ten}</span>{" "}

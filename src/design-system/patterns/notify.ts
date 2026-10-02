@@ -11,10 +11,16 @@ import { toast } from "sonner";
 const THOI_GIAN = 8000;
 
 export const notify = {
-  daLuu(message: string, onUndo?: () => void) {
+  /**
+   * `thaoTac` = việc nên làm NGAY sau khi lưu (vd "In tem" cho lô vừa ghi). Có cả
+   * Hoàn tác thì Hoàn tác giữ nút chính, thao tác kia đứng cạnh.
+   */
+  daLuu(message: string, onUndo?: () => void, thaoTac?: { label: string; onClick: () => void }) {
+    const hoanTac = onUndo ? { label: "Hoàn tác", onClick: onUndo } : undefined;
     toast.success(message, {
       duration: THOI_GIAN,
-      action: onUndo ? { label: "Hoàn tác", onClick: onUndo } : undefined,
+      action: hoanTac ?? thaoTac,
+      cancel: hoanTac ? thaoTac : undefined,
     });
   },
 

@@ -742,8 +742,11 @@ export default function NhapNguyenLieuScreen() {
     persist([...rowsGiuLai, ...rowsChuyen]);
 
     const tongMoi = hopLe.reduce((s, d) => s + d.quantityKg, 0);
+    const chuyenDaLuu = idChuyen ? chuyenSau.find((c) => c.id === idChuyen) : undefined;
     notify.daLuu(
-      `Đã lưu chuyến ${phien.supplierName} — ${hopLe.length} loại · ${kg(tongMoi)}`
+      `Đã lưu chuyến ${phien.supplierName} — ${hopLe.length} loại · ${kg(tongMoi)}`,
+      undefined,
+      chuyenDaLuu ? { label: "In tem", onClick: () => setChuyenInTem(chuyenDaLuu) } : undefined
     );
     // Ngày đã chốt mà ghi thêm → báo ngay tổng ngày lệch bao nhiêu so với lúc chốt.
     const bg = banGhiChot(phien.deliveryDate, phien.workshop);

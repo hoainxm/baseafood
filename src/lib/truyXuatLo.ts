@@ -341,3 +341,37 @@ export function loBtpDeChon(dl: DuLieuTruyXuat, xuong: Workshop, denNgay: string
     )
     .map((w) => nutLo("W", w.id, dl));
 }
+
+// ---------- Danh sách lô để IN TEM hàng loạt ----------
+
+export interface LocLoDeIn {
+  /** yyyy-mm-dd, tính cả hai đầu. */
+  tu: string;
+  den: string;
+  /** "" = mọi xưởng. */
+  xuong: Workshop | "";
+  /** Loại lô cần in; rỗng ⇒ không lô nào. */
+  loai: readonly LotKind[];
+}
+
+const THU_TU_LOAI: Record<LotKind, number> = { S: 0, W: 1, P: 2 };
+
+/**
+ * Mọi lô (NL · BTP · TP) trong khoảng ngày để in tem một lượt — MỚI trước, cùng
+ * ngày thì theo chuỗi NL → BTP → TP. Ngày của lô: ngày hàng về · ngày SX · ngày đóng gói.
+ */
+export function dsLoDeIn(dl: DuLieuTruyXuat, loc: LocLoDeIn): NutLo[] {
+  const trong = (ngay: string, xuong: Workshop) =>
+    ngay >= loc.tu && ngay <= loc.den && (!loc.xuong || xuong === loc.xuong);
+  const co = (k: LotKind) => loc.loai.includes(k);
+  return [
+    ...(co("S") ? dl.shipments.filter((s) => trong(s.deliveryDate, s.workshop)).map((s) => nutLo("S", s.id, dl)) : []),
+    ...(co("W") ? dl.wips.filter((w) => trong(w.productionDate, w.workshop)).map((w) => nutLo("W", w.id, dl)) : []),
+    ...(co("P") ? dl.packagings.filter((p) => trong(p.date, p.workshop)).map((p) => nutLo("P", p.id, dl)) : []),
+  ].sort(
+    (a, b) =>
+      b.ngay.localeCompare(a.ngay) ||
+      THU_TU_LOAI[a.kind as LotKind] - THU_TU_LOAI[b.kind as LotKind] ||
+      a.nhan.localeCompare(b.nhan)
+  );
+}

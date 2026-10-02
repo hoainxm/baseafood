@@ -143,7 +143,7 @@ export default function SanXuatBTPScreen() {
   // Truy xuất lô (docs/spec/qr-truy-xuat-lo.md): gắn lô NL cho mẻ + in tem lô BTP.
   const [lotInputs] = useLotInputs();
   const [ganLo, setGanLo] = useState<WipProductionItem | null>(null);
-  const [temLo, setTemLo] = useState<WipProductionItem | null>(null);
+  const [temLo, setTemLo] = useState<WipProductionItem[] | null>(null);
   const soLoGan = (id: string) => lotInputs.filter((l) => l.outputKind === "W" && l.outputId === id).length;
 
   const [hoiChot, setHoiChot] = useState(false);
@@ -511,7 +511,10 @@ export default function SanXuatBTPScreen() {
       );
 
     const tongMoi = moi.reduce((s, r) => s + r.quantityKg, 0);
-    notify.daLuu(`Đã lưu ${moi.length} thành phẩm · ${kg(tongMoi)}`);
+    notify.daLuu(`Đã lưu ${moi.length} thành phẩm · ${kg(tongMoi)}`, undefined, {
+      label: moi.length > 1 ? `In ${moi.length} tem` : "In tem",
+      onClick: () => setTemLo(moi),
+    });
 
     const bg = banGhiChot(phien.productionDate, phien.workshop);
     if (bg?.isLocked)
@@ -1006,7 +1009,7 @@ export default function SanXuatBTPScreen() {
                   title="In tem QR lô bán thành phẩm của mẻ này để dán lên block/thùng. Quét tem là ra nguồn gốc."
                   variant="outline"
                   size="sm"
-                  onClick={() => setTemLo(r)}
+                  onClick={() => setTemLo([r])}
                 >
                   <QrCode />
                   Tem
@@ -1465,10 +1468,12 @@ export default function SanXuatBTPScreen() {
       )}
       {temLo && (
         <TemLoQr
-          nut={nutLo("W", temLo.id, {
-            shipments: [], imports: [], wips: rows, packagings: [], lotInputs,
-            exportItems: [], exportOrders: [], salesOrders: [], products: matHang, customers: [],
-          })}
+          nuts={temLo.map((w) =>
+            nutLo("W", w.id, {
+              shipments: [], imports: [], wips: [...rows, ...temLo.filter((t) => !rows.some((r) => r.id === t.id))],
+              packagings: [], lotInputs, exportItems: [], exportOrders: [], salesOrders: [], products: matHang, customers: [],
+            })
+          )}
           onClose={() => setTemLo(null)}
         />
       )}

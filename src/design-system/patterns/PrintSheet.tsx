@@ -4,6 +4,7 @@
 // Description: Reusable A4 print sheet overlay + print table cells
 // ============================================================
 import { type ReactNode, useState } from "react";
+import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { Printer, X } from "lucide-react";
 import { ONhapSo } from "./ONhapSo";
@@ -67,6 +68,68 @@ const CO_TEM = [
 ];
 const keo = (v: number) => Math.max(10, Math.min(200, Math.round(v) || 0));
 
+/** Một tem trong lượt in: mã lô (to, một dòng) + ảnh QR + các dòng phụ. */
+export interface TemIn {
+  maLo: string;
+  qrDataUrl: string;
+  dong?: string[];
+}
+
+/** Một tem — co giãn theo khổ nhờ container-query, dùng chung cho xem trước và bản in. */
+function KhoiTem({ tem, rong, cao, px }: { tem: TemIn; rong: number; cao: number; px: number }) {
+  const { maLo, qrDataUrl, dong = [] } = tem;
+  return (
+    <div
+      className="print-tem-box shrink-0 border border-slate-300 bg-white"
+      style={{ width: rong * px, height: cao * px, containerType: "size" }}
+    >
+      <div className="flex h-full w-full items-center" style={{ gap: "4cqw", padding: "6cqmin" }}>
+        {qrDataUrl ? (
+          <img
+            src={qrDataUrl}
+            alt={`QR mã lô ${maLo}`}
+            className="shrink-0"
+            style={{ height: "min(88cqh, 44cqw)", width: "min(88cqh, 44cqw)" }}
+          />
+        ) : (
+          <div
+            className="flex shrink-0 items-center justify-center border border-dashed border-slate-300 text-slate-400"
+            style={{ height: "min(88cqh, 44cqw)", width: "min(88cqh, 44cqw)", fontSize: "6cqh" }}
+          >
+            QR
+          </div>
+        )}
+        {/* Cột chữ = container riêng (inline-size): cỡ chữ theo BỀ RỘNG cột nên
+            mã lô luôn vừa MỘT dòng, chữ phụ xuống dòng hiện đủ, không bị cắt. */}
+        <div
+          className="flex min-w-0 flex-1 flex-col justify-center"
+          style={{ containerType: "inline-size", gap: "4cqh" }}
+        >
+          <div
+            className="tnum font-bold leading-none"
+            style={{ fontSize: "min(14cqw, 32cqh)", color: "#0f172a", whiteSpace: "nowrap" }}
+          >
+            {maLo || "—"}
+          </div>
+          {dong.map((d, i) => (
+            <div
+              key={i}
+              style={{
+                fontSize: i === 0 ? "8.5cqw" : "7.8cqw",
+                lineHeight: 1.2,
+                color: i === 0 ? "#1e293b" : "#475569",
+                overflowWrap: "anywhere",
+              }}
+            >
+              {d}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /**
  * PhieuInTem — bản in TEM NHÃN khổ nhỏ (khác PhieuIn khổ A4), cho mã lô + QR.
  *
@@ -76,33 +139,46 @@ const keo = (v: number) => Math.max(10, Math.min(200, Math.round(v) || 0));
  * in, không cần đổi kích thước tay. Hiện in qua hộp thoại in trình duyệt (chọn
  * máy in tem đã cài làm máy in); KẾT NỐI TRỰC TIẾP máy in tem (WebUSB/ESC-POS)
  * để sau. `dong` = các dòng phụ tùy ý (đại lý·xưởng, ngày về, SSCC…), giữ generic.
+ *
+ * In NHIỀU tem một lượt: truyền `tems` — mỗi tem ra MỘT trang đúng khổ (máy in
+ * tem cuộn coi mỗi trang là một nhãn). Khung được portal thẳng vào <body> để lúc
+ * in ẩn được toàn bộ app (không thì phần app ẩn vẫn chiếm chỗ ⇒ in thừa nhãn trắng).
  */
 export function PhieuInTem({
   onClose,
-  maLo,
-  qrDataUrl,
+  maLo = "",
+  qrDataUrl = "",
   dong = [],
+  tems,
   rongMacDinh = 50,
   caoMacDinh = 30,
 }: {
   onClose: () => void;
-  maLo: string;
-  qrDataUrl: string;
+  maLo?: string;
+  qrDataUrl?: string;
   dong?: string[];
+  tems?: TemIn[];
   rongMacDinh?: number;
   caoMacDinh?: number;
 }) {
   const [rong, setRong] = useState(rongMacDinh);
   const [cao, setCao] = useState(caoMacDinh);
-  const PX = 6; // px mỗi mm khi xem trước (chỉ ảnh hưởng màn, không ảnh hưởng bản in)
+  const ds: TemIn[] = tems ?? [{ maLo, qrDataUrl, dong }];
+  const nhieu = ds.length > 1;
+  const PX = nhieu ? 4 : 6; // px mỗi mm khi xem trước (chỉ ảnh hưởng màn, không ảnh hưởng bản in)
   const laChon = (r: number, c: number) => r === rong && c === cao;
   const printCss = `@media print {
-  @page { size: ${rong}mm ${cao}mm; margin: 2mm; }
+  @page { size: ${rong}mm ${cao}mm; margin: 0; }
   html, body { margin: 0 !important; background: #fff !important; }
-  .print-tem-box { width: 100% !important; height: 100% !important; border: 0 !important; margin: 0 !important; }
+  body > *:not(.print-tem) { display: none !important; }
+  .print-tem { position: static !important; overflow: visible !important; padding: 0 !important; }
+  .print-tem-list { display: block !important; }
+  .print-tem-box { width: ${rong}mm !important; height: ${cao}mm !important; padding: 2mm; box-sizing: border-box;
+    border: 0 !important; margin: 0 !important; break-after: page; break-inside: avoid; }
+  .print-tem-box:last-child { break-after: auto; }
 }`;
 
-  return (
+  return createPortal(
     <div className="print-root print-tem fixed inset-0 z-50 overflow-auto bg-white p-6 text-slate-900">
       <style dangerouslySetInnerHTML={{ __html: printCss }} />
 
@@ -112,9 +188,13 @@ export function PhieuInTem({
         </Button>
         <Button
           onClick={() => window.print()}
-          title="Mở hộp in của trình duyệt để in tem. Chọn khổ giấy tem trước khi in."
+          title={
+            nhieu
+              ? `Mở hộp in của trình duyệt để in ${ds.length} tem, mỗi tem một nhãn. Chọn khổ giấy tem trước khi in.`
+              : "Mở hộp in của trình duyệt để in tem. Chọn khổ giấy tem trước khi in."
+          }
         >
-          <Printer className="size-4" /> In tem
+          <Printer className="size-4" /> {nhieu ? `In ${ds.length} tem` : "In tem"}
         </Button>
       </div>
 
@@ -125,6 +205,7 @@ export function PhieuInTem({
             key={c.nhan}
             size="sm"
             variant={laChon(c.rong, c.cao) ? "default" : "outline"}
+            title={`Đổi khổ tem sang ${c.nhan} mm.`}
             onClick={() => {
               setRong(c.rong);
               setCao(c.cao);
@@ -157,58 +238,17 @@ export function PhieuInTem({
       </div>
 
       <p className="no-print mx-auto mb-3 max-w-3xl text-center text-sm text-slate-500">
-        Xem trước (đã phóng to). Khi in sẽ ra đúng khổ {rong}×{cao} mm — chọn máy in tem trong hộp thoại in.
+        {nhieu ? `${ds.length} tem — ` : ""}Xem trước (đã phóng to). Khi in sẽ ra đúng khổ {rong}×{cao} mm
+        {nhieu ? ", mỗi tem một nhãn" : ""} — chọn máy in tem trong hộp thoại in.
       </p>
 
-      <div
-        className="print-tem-box mx-auto border border-slate-300 bg-white"
-        style={{ width: rong * PX, height: cao * PX, containerType: "size" }}
-      >
-        <div className="flex h-full w-full items-center" style={{ gap: "4cqw", padding: "6cqmin" }}>
-          {qrDataUrl ? (
-            <img
-              src={qrDataUrl}
-              alt={`QR mã lô ${maLo}`}
-              className="shrink-0"
-              style={{ height: "min(88cqh, 44cqw)", width: "min(88cqh, 44cqw)" }}
-            />
-          ) : (
-            <div
-              className="flex shrink-0 items-center justify-center border border-dashed border-slate-300 text-slate-400"
-              style={{ height: "min(88cqh, 44cqw)", width: "min(88cqh, 44cqw)", fontSize: "6cqh" }}
-            >
-              QR
-            </div>
-          )}
-          {/* Cột chữ = container riêng (inline-size): cỡ chữ theo BỀ RỘNG cột nên
-              mã lô luôn vừa MỘT dòng, chữ phụ xuống dòng hiện đủ, không bị cắt. */}
-          <div
-            className="flex min-w-0 flex-1 flex-col justify-center"
-            style={{ containerType: "inline-size", gap: "4cqh" }}
-          >
-            <div
-              className="tnum font-bold leading-none"
-              style={{ fontSize: "min(14cqw, 32cqh)", color: "#0f172a", whiteSpace: "nowrap" }}
-            >
-              {maLo || "—"}
-            </div>
-            {dong.map((d, i) => (
-              <div
-                key={i}
-                style={{
-                  fontSize: i === 0 ? "8.5cqw" : "7.8cqw",
-                  lineHeight: 1.2,
-                  color: i === 0 ? "#1e293b" : "#475569",
-                  overflowWrap: "anywhere",
-                }}
-              >
-                {d}
-              </div>
-            ))}
-          </div>
-        </div>
+      <div className="print-tem-list mx-auto flex max-w-5xl flex-wrap justify-center gap-4">
+        {ds.map((t, i) => (
+          <KhoiTem key={i} tem={t} rong={rong} cao={cao} px={PX} />
+        ))}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 

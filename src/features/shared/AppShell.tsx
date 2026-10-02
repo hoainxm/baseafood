@@ -91,7 +91,7 @@ export const KIT_NAV: MucNavShell[] = [
   { id: "imports", label: "Nhập hàng", icon: Truck , moTa: "Ghi chuyến nguyên liệu mua về mỗi ngày, ghi bù chờ hóa đơn và chốt sổ ngày." },
   { id: "warehouse", label: "Kho dự trữ", icon: Snowflake , moTa: "Kho dự trữ: duyệt lô bán thành phẩm từ chờ sang đã nhập kho và xem tồn." },
   { id: "cold-storage", label: "Kho lạnh", icon: ThermometerSnowflake, demo: true , moTa: "Theo dõi nhiệt độ kho lạnh (màn DEMO — đang dùng dữ liệu mẫu)." },
-  { id: "qr", label: "Quét mã lô", icon: QrCode , moTa: "Quét mã QR trên tem lô (hoặc gõ tay) để tra ngược nguồn gốc lô hàng." },
+  { id: "qr", label: "Mã lô QR", icon: QrCode , moTa: "Quét tem lô (hoặc gõ mã) để tra nguồn gốc; in tem QR hàng loạt cho nguyên liệu, bán thành phẩm, thành phẩm." },
   { id: "sales", label: "Bán hàng", icon: ShoppingCart , moTa: "Ghi phiếu bán hàng: khách, kênh bán, quy cách và các dòng mặt hàng." },
   { id: "orders", label: "Đơn đặt", icon: PackageCheck , moTa: "Đơn đặt hàng xuất khẩu và lệnh xuất lấy hàng theo FIFO từ tồn kho." },
   { id: "balancing", label: "Cân đối kỳ", icon: Scale , moTa: "Cân đối theo kỳ (~5 ngày): tính định mức nguyên liệu → thành phẩm và lãi lỗ." },

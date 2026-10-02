@@ -1,6 +1,6 @@
 # Truy xuất theo lô bằng QR — phân tích & thiết kế
 
-> **Trạng thái:** ĐỢT 1 ĐÃ BUILD (2026-09-18) · đợt 2–3 là đề xuất · §7 còn câu chờ xưởng chốt.
+> **Trạng thái:** ĐỢT 1 ĐÃ BUILD (2026-09-18) · **đợt 1b in tem hàng loạt ĐÃ BUILD (2026-10-02, §6b)** · đợt 2–3 là đề xuất · §7 còn câu chờ xưởng chốt.
 > **Loại:** phân tích các hệ thống/chuẩn QR truy xuất + thiết kế áp dụng cho Baseafood.
 > **Code:** `src/lib/truyXuatLo.ts` · `src/features/qr/QrTraCuuScreen.tsx` (hộ chiếu lô) · `src/features/shared/{GanLoDauVao,KhungQuetQr,QrTemLoIn,useDuLieuTruyXuat}` · migration `0046_lot_inputs.sql` (✅ đã chạy trên DB thật 2026-09-18).
 
@@ -180,6 +180,27 @@ Quét hoặc gõ → một trang gồm:
 | **1 — nối chuỗi (build ngay)** | bảng `lot_inputs` · thư viện `truyXuatLo` · **hộ chiếu lô** truy ngược/xuôi + cân bằng kg · QR thành đường link (đọc được tem cũ) · **gắn lô NL cho mẻ SX** + **gắn lô BTP cho đóng gói** (quét / gõ / chọn) · in tem BTP/TP | 🟡 thêm 1 bảng |
 | 2 — vận hành kho | QR vị trí phòng đông (cất/chuyển bằng quét) · FIFO gợi ý lô cũ khi gắn lô · bán lẻ gắn lô · kiểm kê bằng quét | 🟡 thêm bảng sự kiện kho |
 | 3 — chuẩn hóa ra ngoài | mã quốc gia / SSCC khi được cấp · báo cáo thu hồi "một nút, 24 giờ" · xuất file GDST/EPCIS cho khách Mỹ/EU · dữ liệu khai thác (tàu, vùng) | 🟡 |
+
+## 6b. Đợt 1b — một chỗ in tem (build 2026-10-02)
+
+**Vì sao:** người dùng báo "không tìm thấy chỗ in QR". Kiểm 2026-10-02 ra ba nguyên nhân chồng nhau:
+(1) nút in tem ở Nhập hàng chỉ hiện khi chuyến có `lot_code`, mà cả 69 chuyến trên server đều `lot_code` NULL ⇒ ẩn sạch;
+(2) bỏ tab "Sổ ngày" 21/09 dời nút vào Báo cáo → Sổ chi tiết; (3) hướng dẫn "?" của `/qr` vẫn chỉ tab "Sổ ngày" đã bỏ.
+
+**Đã làm (không đụng DB):**
+
+| Việc | Ở đâu |
+|---|---|
+| Nút in tem NL hiện cho **mọi chuyến có đầu chuyến**; thiếu mã lô dùng nhãn suy `nhanLoNl` (`NĐ-yymmdd-xxxx`) | `imports/BuocNhap.tsx`, `MaterialImportScreen.tsx` |
+| `/qr` có 2 tab: **Tra lô** · **In tem hàng loạt** (`?tab=in`; link `?lo=` luôn mở Tra). Lọc khoảng ngày · xưởng · loại lô (NL/BTP/TP), mặc định chọn hết, bỏ tick lô không in, in một lượt | `features/qr/InTemHangLoat.tsx` + `dsLoDeIn` (`lib/truyXuatLo.ts`, test `truyXuatLo.test.ts`) |
+| `PhieuInTem` nhận `tems[]`: mỗi tem **một trang đúng khổ** (`break-after: page`), portal vào `<body>` để lúc in ẩn hết app (khỏi in thừa nhãn trắng) | `design-system/patterns/PrintSheet.tsx` |
+| `TemLoQr` nhận `nuts[]`; tem NL dựng qua `nutLo` ⇒ có **loại hàng + tổng kg** (trước chỉ "nguyên liệu", 0 kg) | `features/shared/QrTemLoIn.tsx` |
+| Lưu xong chuyến / mẻ SX (cả lượt) / phiếu đóng gói ⇒ toast có nút **In tem** (`notify.daLuu(msg, undo?, thaoTac?)`) | 3 màn + `design-system/patterns/notify.ts` |
+| Nhãn nav "Quét mã lô" → **"Mã lô QR"**; viết lại hướng dẫn "?" | `AppShell.tsx`, `guideContent.tsx` |
+
+**Còn lại cho đợt 2 (đề xuất, chờ chốt):** sổ in tem `label_prints` (biết lô nào đã in, đóng băng nhãn đã in, lọc "chưa in") · nhắc mẻ chưa gắn lô khi chốt ngày SX (§7 câu 4) · quét tem W khi duyệt nhập kho + khi lập lệnh xuất · `export_items.packaging_id` · QR vị trí kho.
+
+> ⚠️ Thực tế 2026-10-02: `lot_inputs` = 0 dòng, `packagings` = 0 dòng trên server — chuỗi truy xuất chưa được dùng. Chuyến nhập sau 26/08 chưa lên server (thiếu cột 0040) nên tab In tem hàng loạt trên máy khác chưa thấy các lô NL đó cho tới khi hàng chờ máy người nhập đẩy xong.
 
 ## 7. Còn treo — xưởng phải chốt (KHÔNG tự chốt thay)
 

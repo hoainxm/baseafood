@@ -11,53 +11,74 @@
 // ============================================================
 import { useEffect, useState } from "react";
 import type { ImportShipment, LotKind } from "@/types";
-import { PhieuInTem } from "@/design-system";
+import { PhieuInTem, type TemIn } from "@/design-system";
 import { viDate } from "@/lib/format";
 import { taoQrDataUrl } from "@/lib/qr";
-import { TEN_LOAI, nhanLoNl, noiDungQr, type NutLo } from "@/lib/truyXuatLo";
+import { TEN_LOAI, nhanLoNl, noiDungQr, nutLo, type NutLo } from "@/lib/truyXuatLo";
+import { useDuLieuTruyXuat } from "./useDuLieuTruyXuat";
 
-/** Tem cho một lô bất kỳ (nút đã dựng bằng `nutLo`). */
-export function TemLoQr({ nut, onClose }: { nut: NutLo; onClose: () => void }) {
-  const [qr, setQr] = useState("");
-  const laLo = nut.kind === "S" || nut.kind === "W" || nut.kind === "P";
-  useEffect(() => {
-    if (!laLo) return;
-    let huy = false;
-    // Tên miền lấy từ chính địa chỉ app đang chạy — không ghi cứng trong code.
-    taoQrDataUrl(noiDungQr(nut.kind as LotKind, nut.id, window.location.origin), 320).then((d) => {
-      if (!huy) setQr(d);
-    });
-    return () => {
-      huy = true;
-    };
-  }, [laLo, nut.kind, nut.id]);
+const laLo = (n: NutLo) => n.kind === "S" || n.kind === "W" || n.kind === "P";
 
-  const dong = [
+/** Các dòng chữ phụ in dưới mã lô. */
+function dongTem(nut: NutLo): string[] {
+  return [
     `${TEN_LOAI[nut.kind]} · ${nut.moTa}`,
     [nut.ngay && viDate(nut.ngay), nut.xuong && `xưởng ${nut.xuong}`, nut.kg ? `${Math.round(nut.kg * 10) / 10} kg` : ""]
       .filter(Boolean)
       .join(" · "),
     ...nut.chiTiet.filter((c) => c.nhan === "Đại lý" || c.nhan === "SSCC").map((c) => `${c.nhan}: ${c.giaTri}`),
   ].filter(Boolean);
-
-  return <PhieuInTem onClose={onClose} maLo={nut.nhan} qrDataUrl={qr} dong={dong} />;
 }
 
-/** Tem lô NL của một chuyến nhập — giữ API cũ cho màn Nhập hàng. */
+/**
+ * Tem cho MỘT hoặc NHIỀU lô (nút đã dựng bằng `nutLo`). Nhiều lô ⇒ in một lượt,
+ * mỗi tem một nhãn (dùng cho "In tem hàng loạt" và in tem cả mẻ vừa lưu).
+ */
+export function TemLoQr({ nut, nuts, onClose }: { nut?: NutLo; nuts?: NutLo[]; onClose: () => void }) {
+  const ds = (nuts ?? (nut ? [nut] : [])).filter(laLo);
+  const khoa = ds.map((n) => `${n.kind}:${n.id}`).join("|");
+  const [qr, setQr] = useState<Record<string, string>>({});
+  useEffect(() => {
+    let huy = false;
+    // Tên miền lấy từ chính địa chỉ app đang chạy — không ghi cứng trong code.
+    Promise.all(
+      ds.map(async (n) => [`${n.kind}:${n.id}`, await taoQrDataUrl(noiDungQr(n.kind as LotKind, n.id, window.location.origin), 320)] as const)
+    ).then((cap) => {
+      if (!huy) setQr(Object.fromEntries(cap));
+    });
+    return () => {
+      huy = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `khoa` đại diện đủ cho ds
+  }, [khoa]);
+
+  const tems: TemIn[] = ds.map((n) => ({ maLo: n.nhan, qrDataUrl: qr[`${n.kind}:${n.id}`] ?? "", dong: dongTem(n) }));
+  return <PhieuInTem onClose={onClose} tems={tems} />;
+}
+
+/**
+ * Tem lô NL của một chuyến nhập — giữ API cũ cho màn Nhập hàng. Dựng nút qua
+ * `nutLo` để tem ghi đúng LOẠI hàng + tổng kg của chuyến; chuyến chưa có trong
+ * dữ liệu chung (vừa lưu, chưa nạp lại) thì dựng tạm từ đầu chuyến.
+ */
 export function QrTemLoIn({ chuyen, onClose }: { chuyen: ImportShipment; onClose: () => void }) {
-  const nut: NutLo = {
-    kind: "S",
-    id: chuyen.id,
-    nhan: nhanLoNl(chuyen),
-    moTa: "nguyên liệu",
-    ngay: chuyen.deliveryDate,
-    xuong: chuyen.workshop,
-    kg: 0,
-    chiTiet: [
-      { nhan: "Đại lý", giaTri: chuyen.supplierName || "—" },
-      ...(chuyen.ssccCode ? [{ nhan: "SSCC", giaTri: chuyen.ssccCode }] : []),
-    ],
-    mat: false,
-  };
+  const { dl } = useDuLieuTruyXuat();
+  const daDung = nutLo("S", chuyen.id, dl);
+  const nut: NutLo = !daDung.mat
+    ? daDung
+    : {
+        kind: "S",
+        id: chuyen.id,
+        nhan: nhanLoNl(chuyen),
+        moTa: "nguyên liệu",
+        ngay: chuyen.deliveryDate,
+        xuong: chuyen.workshop,
+        kg: 0,
+        chiTiet: [
+          { nhan: "Đại lý", giaTri: chuyen.supplierName || "—" },
+          ...(chuyen.ssccCode ? [{ nhan: "SSCC", giaTri: chuyen.ssccCode }] : []),
+        ],
+        mat: false,
+      };
   return <TemLoQr nut={nut} onClose={onClose} />;
 }

@@ -11,6 +11,7 @@
 import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { KhungQuetQr, TemLoQr, useDuLieuTruyXuat } from "@/features/shared";
+import { InTemHangLoat } from "./InTemHangLoat";
 import { kg, viDate } from "@/lib/format";
 import {
   TEN_LOAI,
@@ -25,7 +26,8 @@ import {
   type NutLo,
 } from "@/lib/truyXuatLo";
 import { Button, EmptyState, Field, Input, InfoTip, Nhan, notify, sacTheoTen } from "@/design-system";
-import { ArrowDownRight, ArrowUpLeft, Camera, CameraOff, Printer, Scale, Search } from "lucide-react";
+import { ArrowDownRight, ArrowUpLeft, Camera, CameraOff, Printer, Scale, Search, Tags } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 /** Dòng lô gọn: nhãn + mô tả; bấm vào là mở hộ chiếu của lô đó. */
 function DongNut({ nut, kgNoi, onMo }: { nut: NutLo; kgNoi?: number | null; onMo: (n: NutLo) => void }) {
@@ -85,6 +87,8 @@ export default function QrTraCuuScreen() {
   // Mã đang tra nằm trên đường link (?lo=…) ⇒ camera điện thoại quét tem mở thẳng
   // màn này, và copy link gửi người khác là họ thấy đúng lô đó.
   const lo = params.get("lo") ?? "";
+  // Link quét tem (?lo=…) luôn mở tab Tra, kể cả khi lỡ kèm tab=in.
+  const tab = params.get("tab") === "in" && !lo ? "in" : "tra";
   const ketQua = useMemo(() => {
     const ma = docMaQr(lo);
     return ma ? timLo(ma, dl) : [];
@@ -120,11 +124,44 @@ export default function QrTraCuuScreen() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-foreground">Hộ chiếu lô — truy xuất bằng QR</h1>
+        <h1 className="text-2xl font-semibold text-foreground">Mã lô QR — tra cứu & in tem</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Quét tem QR (camera điện thoại quét cũng mở thẳng trang này) hoặc gõ mã lô, để xem lô đó làm từ đâu và đã đi đâu.
+          {tab === "in"
+            ? "In tem QR cho nhiều lô một lượt: nguyên liệu, bán thành phẩm, thành phẩm."
+            : "Quét tem QR (camera điện thoại quét cũng mở thẳng trang này) hoặc gõ mã lô, để xem lô đó làm từ đâu và đã đi đâu."}
         </p>
       </div>
+
+      {/* Hai việc của màn: TRA một lô ⇄ IN TEM nhiều lô. Tab nằm trên link (?tab=in) để gửi được. */}
+      <div className="flex w-full overflow-hidden rounded-xl border-2 border-border sm:w-fit">
+        {(
+          [
+            ["tra", "Tra lô", "Quét hoặc gõ mã lô để xem hộ chiếu: nguồn gốc, đã đi đâu, cân bằng kg.", Search],
+            ["in", "In tem hàng loạt", "Chọn nhiều lô theo ngày / xưởng / loại rồi in tem một lượt.", Tags],
+          ] as const
+        ).map(([id, nhan, moTa, Icon], i) => (
+          <button
+            key={id}
+            type="button"
+            title={moTa}
+            aria-pressed={tab === id}
+            onClick={() => setParams(id === "in" ? { tab: "in" } : {})}
+            className={cn(
+              "flex flex-1 items-center justify-center gap-2 px-4 py-2.5 font-semibold transition-colors sm:flex-none",
+              i > 0 && "border-l-2 border-border",
+              tab === id ? "bg-primary text-primary-foreground" : "bg-card text-muted-foreground hover:bg-muted"
+            )}
+          >
+            <Icon aria-hidden className="size-4" />
+            {nhan}
+          </button>
+        ))}
+      </div>
+
+      {tab === "in" ? (
+        <InTemHangLoat />
+      ) : (
+        <>
 
       {/* Quét + gõ */}
       <div className="space-y-4 rounded-xl border-2 border-border p-4">
@@ -273,6 +310,9 @@ export default function QrTraCuuScreen() {
             </section>
           </div>
         )
+      )}
+
+        </>
       )}
 
       {inTem && dangXem && dangXem.kind !== "X" && (

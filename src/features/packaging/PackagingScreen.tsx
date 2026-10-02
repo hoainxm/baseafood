@@ -205,7 +205,9 @@ export default function DongGoiScreen() {
     };
     persist([...rows, p]);
     notify.daLuu(
-      `Đã đóng gói: ${tenMH(p.fromProductId)} ${kg(p.inputKg)} → ${tenMH(p.toProductId)} ${kg(p.outputKg)}`
+      `Đã đóng gói: ${tenMH(p.fromProductId)} ${kg(p.inputKg)} → ${tenMH(p.toProductId)} ${kg(p.outputKg)}`,
+      undefined,
+      { label: "In tem", onClick: () => setTemLo(p) }
     );
     setForm(null);
   };
@@ -520,7 +522,8 @@ export default function DongGoiScreen() {
       {temLo && (
         <TemLoQr
           nut={nutLo("P", temLo.id, {
-            shipments: [], imports: [], wips: sanXuat, packagings: rows, lotInputs,
+            shipments: [], imports: [], wips: sanXuat,
+            packagings: rows.some((r) => r.id === temLo.id) ? rows : [...rows, temLo], lotInputs,
             exportItems: [], exportOrders: [], salesOrders: [], products: matHang, customers: [],
           })}
           onClose={() => setTemLo(null)}

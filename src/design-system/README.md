@@ -40,7 +40,9 @@ src/features/*                 ← màn nghiệp vụ
    bắt buộc"), không phải bật cờ tay.
 7. **Nút Lưu không bao giờ `disabled`.** Thiếu dữ liệu thì bấm ra `ErrorSummary`.
 8. **Mọi thao tác ghi dữ liệu phải bắn `notify`**, xóa phải qua `ConfirmDelete`
-   và có nút Hoàn tác.
+   và có nút Hoàn tác. Việc nên làm NGAY sau khi lưu (vd in tem lô vừa ghi) truyền
+   tham số thứ ba `notify.daLuu(msg, onUndo?, { label, onClick })` — nút hiện trên toast.
+   In tem nhãn: `PhieuInTem` nhận `tems[]` để in nhiều tem một lượt (mỗi tem một trang đúng khổ).
 8b. **Thao tác hệ trọng KHÔNG phải xóa đi qua `XacNhan`** — đúng ba nhóm:
     mất việc đang làm (đăng xuất, bỏ dữ liệu vừa nạp) · ghi đè dữ liệu đang có ·
     khóa sổ hay đổi trạng thái khó quay đầu (chốt ngày, lệnh xuất).

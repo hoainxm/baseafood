@@ -57,7 +57,7 @@ export { StatusChip, type TrangThaiSX } from "./patterns/StatusChip";
 export { Nhan, sacKenh, sacNhomNL, sacXuong, sacTheoTen, type LoaiNhan, type SacPhanLoai } from "./patterns/Nhan";
 export { DuLieuMau } from "./patterns/MockPatternData";
 export { BieuDoCotDoc, type CotBieuDoDoc } from "./patterns/VerticalBarChart";
-export { PhieuIn, PhieuInTem, ThIn, TdIn } from "./patterns/PrintSheet";
+export { PhieuIn, PhieuInTem, ThIn, TdIn, type TemIn } from "./patterns/PrintSheet";
 export { ThinkingDots, DangXuLy, SkeletonBang } from "./patterns/Loading";
 export { notify } from "./patterns/notify";
 

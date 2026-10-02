@@ -36,6 +36,8 @@ export function LuoiBanThanhPham({
   khach,
   onThemMatHang,
   onThemKhach,
+  onSuaMatHang,
+  onSuaKhach,
   choHutBan,
   onHutBan,
   anNgay,
@@ -46,6 +48,9 @@ export function LuoiBanThanhPham({
   khach: Customer[];
   onThemMatHang: (ten: string) => string;
   onThemKhach: (ten: string) => string;
+  /** Bút chì sửa nhanh bản ghi danh mục (value = id). */
+  onSuaMatHang?: (id: string) => void;
+  onSuaKhach?: (id: string) => void;
   /** Seam cũ: dòng sổ BÁN trong khoảng ngày, dùng khi output = hàng đã bán ra. */
   choHutBan: { ban: SalesItem; phieu: SalesInvoice }[];
   onHutBan: (items: { ban: SalesItem; phieu: SalesInvoice }[]) => void;
@@ -250,6 +255,8 @@ export function LuoiBanThanhPham({
           options={khach.map((k) => ({ value: k.id, label: k.name }))}
           onCreate={onThemKhach}
           placeholder="Chọn khách"
+          onSuaMuc={onSuaKhach}
+          nhanSua="Sửa thông tin khách hàng này — lưu thẳng vào Danh mục."
         />
       ),
     },
@@ -499,6 +506,8 @@ export function LuoiBanThanhPham({
             options={matHang.map((m) => ({ value: m.id, label: m.name }))}
             onCreate={(ten) => onThemMatHang(ten)}
             placeholder="Gõ tên mặt hàng để thêm dòng"
+            onSuaMuc={onSuaMatHang}
+            nhanSua="Sửa thông tin mặt hàng này — lưu thẳng vào Danh mục."
           />
         </div>
       )}
@@ -509,6 +518,8 @@ export function LuoiBanThanhPham({
           khach={khach}
           onThemMatHang={onThemMatHang}
           onThemKhach={onThemKhach}
+          onSuaMatHang={onSuaMatHang}
+          onSuaKhach={onSuaKhach}
           onClose={() => setThemMo(false)}
           onLuu={(matHangId, khachId, quyCach, kenh) => {
             const trung = tp.some(

@@ -53,6 +53,7 @@ import {
   type Cot,
   type LoiNhap,
 } from "@/design-system";
+import { useSuaDanhMuc } from "@/features/catalog/SuaDanhMucNhanh";
 import { num, viDate } from "@/lib/format";
 import {
   ChevronLeft,
@@ -458,6 +459,9 @@ function KyDetail({
   const luoi = usePeriodGrid(ky);
   const [matHang, setMatHang] = useProducts();
   const [khach, setKhach] = useCustomers();
+  /** Bút chì sửa nhanh mặt hàng / khách trong lưới bán thành phẩm (nối theo id). */
+  const suaMH = useSuaDanhMuc("matHang", matHang, setMatHang);
+  const suaKH = useSuaDanhMuc("khachHang", khach, setKhach);
   const [loaiNLDanhMuc, setLoaiNLDanhMuc] = useMaterialTypes();
   const [showBang, setShowBang] = useState(false);
   /* Công tắc cột ngày RIÊNG từng khối, theo bảng cân đối giấy của kế toán: khối NL
@@ -662,6 +666,8 @@ function KyDetail({
             luoi={luoi}
             matHang={matHang}
             khach={khach}
+            onSuaMatHang={suaMH.moSua}
+            onSuaKhach={suaKH.moSua}
             choHutBan={banChoHut}
             onHutBan={hutBanVaoKy}
             anNgay={anNgayTP}
@@ -761,6 +767,8 @@ function KyDetail({
           onClose={() => setShowBang(false)}
         />
       )}
+      {suaMH.hop}
+      {suaKH.hop}
     </div>
   );
 }

@@ -52,6 +52,7 @@ import {
   type LoiNhap,
   type MucChon,
 } from "@/design-system";
+import { useSuaDanhMuc } from "@/features/catalog/SuaDanhMucNhanh";
 import { kg, num, todayISO, viDate } from "@/lib/format";
 import { KY_OPT, phamViKy, type KyXem } from "@/lib/periodUtils";
 import { Boxes, CalendarRange, Link2, Package, PackageCheck, Plus, QrCode, Scale } from "lucide-react";
@@ -81,6 +82,8 @@ export default function DongGoiScreen() {
   const [dongLenh] = useExportItems();
   const [banHang] = useSalesItems();
   const [matHang, setMatHang] = useProducts();
+  /** Bút chì sửa nhanh danh mục ngay trong ô chọn. */
+  const suaMH = useSuaDanhMuc("matHang", matHang, setMatHang);
 
   const [ky, setKy] = useState<KyXem>("ngay");
   const [ngay, setNgay] = useState(todayISO());
@@ -420,6 +423,8 @@ export default function DongGoiScreen() {
                   value={form.fromProductId}
                   onChange={(v) => dat("fromProductId", v)}
                   options={optMatHang}
+                  onSuaMuc={suaMH.moSua}
+                  nhanSua={suaMH.nhanSua}
                   onCreate={themMatHang}
                   emptyText="Chưa có mặt hàng — gõ tên rồi Thêm mới."
                 />
@@ -453,6 +458,8 @@ export default function DongGoiScreen() {
                   value={form.toProductId}
                   onChange={(v) => dat("toProductId", v)}
                   options={optMatHang}
+                  onSuaMuc={suaMH.moSua}
+                  nhanSua={suaMH.nhanSua}
                   onCreate={themMatHang}
                   emptyText="Chưa có mặt hàng — gõ tên rồi Thêm mới."
                 />
@@ -519,6 +526,7 @@ export default function DongGoiScreen() {
           onClose={() => setTemLo(null)}
         />
       )}
+      {suaMH.hop}
     </div>
   );
 }

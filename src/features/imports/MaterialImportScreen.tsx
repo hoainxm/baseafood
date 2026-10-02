@@ -53,6 +53,7 @@ import {
 import { kg, num, todayISO, viDate } from "@/lib/format";
 import { useAuth } from "@/lib/auth";
 import { DailyTaskReminder, QrTemLoIn, PhieuTrongNhapNL } from "@/features/shared";
+import { useSuaDanhMuc } from "@/features/catalog/SuaDanhMucNhanh";
 import { OcrPhieuNhap } from "./OcrPhieuNhap";
 import { coOcr, type DanhMucOcr } from "@/lib/ocr";
 import { coLuuAnh, urlAnh } from "@/lib/storage";
@@ -270,6 +271,10 @@ export default function NhapNguyenLieuScreen() {
     label: d.code ? `${d.code} · ${d.shortName}` : d.shortName,
     phu: moTaDaiLy(d),
   }));
+
+  /** Sửa nhanh đại lý / loại NL tại chỗ — sổ nhập nối theo TÊN nên ô tên khoá. */
+  const suaDL = useSuaDanhMuc("daiLy", daiLy, setDaiLy, { theo: "ten" });
+  const suaNL = useSuaDanhMuc("loaiNL", loaiNL, setLoaiNL, { theo: "ten" });
 
   const themDaiLy = (ten: string) => {
     setDaiLy([
@@ -1157,6 +1162,8 @@ export default function NhapNguyenLieuScreen() {
             options={optDaiLy}
             onCreate={themDaiLy}
             emptyText="Chưa có đại lý nào trong danh mục."
+            onSuaMuc={suaDL.moSua}
+            nhanSua={suaDL.nhanSua}
           />
         </TheBuoc>
 
@@ -1286,6 +1293,7 @@ export default function NhapNguyenLieuScreen() {
             onThem={themDongMoi}
             optLoaiTheoLoai={optLoaiNLTheoLoai}
             onTaoLoai={themLoaiNL}
+            onSuaLoai={suaNL.moSua}
             onEnterCuoi={vaoNutLuu}
           />
         </TheBuoc>
@@ -2046,6 +2054,8 @@ export default function NhapNguyenLieuScreen() {
           onClose={() => setOcrMo(false)}
         />
       )}
+      {suaDL.hop}
+      {suaNL.hop}
     </div>
   );
 }

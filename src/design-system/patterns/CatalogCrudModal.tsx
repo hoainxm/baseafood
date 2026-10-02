@@ -203,63 +203,109 @@ export function DanhMucCrud<T extends { id: string }>({
         />
       )}
 
-      <Dialog
-        open={dang !== null}
-        onOpenChange={(o) => {
-          if (!o) setDang(null);
-        }}
-      >
-        <DialogContent className="max-h-[92vh] overflow-y-auto w-full sm:max-w-3xl lg:max-w-5xl">
-          <DialogHeader>
-            <DialogTitle className="text-xl">
-              {laThem ? `Thêm ${tenDonVi}` : `Sửa ${tenDonVi}`}
-            </DialogTitle>
-            <DialogDescription>
-              Ô có dấu * phải nhập mới lưu được.
-            </DialogDescription>
-          </DialogHeader>
+      <HopSuaDanhMuc
+        dang={dang}
+        laThem={laThem}
+        fields={fields}
+        tenDonVi={tenDonVi}
+        loi={loi}
+        onDoi={setDang}
+        onLuu={luu}
+        onClose={() => setDang(null)}
+      />
+    </div>
+  );
+}
 
-          {dang && (
-            <div className="space-y-5 py-2">
-              <ErrorSummary loi={loi} />
-              {fields.map((f) => {
-                const giaTri = String(dang[f.key] ?? "");
-                const doiGiaTri = (v: string) =>
-                  setDang((d) => (d ? { ...d, [f.key]: v } : d));
-                return f.render ? (
-                  <div key={f.key}>{f.render(giaTri, doiGiaTri, !laThem)}</div>
-                ) : (
-                  <Field
-                    key={f.key}
-                    label={f.nhan}
-                    required={f.batBuoc}
-                    hint={f.goiY}
-                  >
-                    <Input
-                      value={giaTri}
-                      onChange={(e) => doiGiaTri(e.target.value)}
-                      placeholder={f.viDu}
-                    />
+/**
+ * Hộp thoại Thêm / Sửa MỘT bản ghi danh mục theo bộ trường `fields` — cùng một
+ * dáng ở màn Danh mục (DanhMucCrud) và ở hộp SỬA NHANH mở từ bút chì trong ô
+ * chọn (`Combobox.onSuaMuc`). Kiểm tra + ghi do nơi gọi lo (`onLuu`), hộp chỉ
+ * hiện `loi`.
+ *
+ * `khoaTruong`: hiện một trường ở dạng CHỈ ĐỌC kèm lý do (VD tên là chỗ nối với
+ * sổ đã ghi nên không đổi tại chỗ được).
+ */
+export function HopSuaDanhMuc<T extends { id: string }>({
+  dang,
+  laThem,
+  fields,
+  tenDonVi,
+  loi,
+  onDoi,
+  onLuu,
+  onClose,
+  moTa,
+  khoaTruong,
+}: {
+  dang: T | null;
+  laThem: boolean;
+  fields: TruongDanhMuc<T>[];
+  tenDonVi: string;
+  loi: LoiNhap[];
+  onDoi: (fn: (d: T | null) => T | null) => void;
+  onLuu: () => void;
+  onClose: () => void;
+  /** Câu mô tả dưới tiêu đề. Mặc định nhắc ô dấu *. */
+  moTa?: React.ReactNode;
+  khoaTruong?: { key: keyof T & string; lyDo: string };
+}) {
+  return (
+    <Dialog
+      open={dang !== null}
+      onOpenChange={(o) => {
+        if (!o) onClose();
+      }}
+    >
+      <DialogContent className="max-h-[92vh] overflow-y-auto w-full sm:max-w-3xl lg:max-w-5xl">
+        <DialogHeader>
+          <DialogTitle className="text-xl">
+            {laThem ? `Thêm ${tenDonVi}` : `Sửa ${tenDonVi}`}
+          </DialogTitle>
+          <DialogDescription>{moTa ?? "Ô có dấu * phải nhập mới lưu được."}</DialogDescription>
+        </DialogHeader>
+
+        {dang && (
+          <div className="space-y-5 py-2">
+            <ErrorSummary loi={loi} />
+            {fields.map((f) => {
+              const giaTri = String(dang[f.key] ?? "");
+              if (khoaTruong?.key === f.key)
+                return (
+                  <Field key={f.key} label={f.nhan} hint={khoaTruong.lyDo}>
+                    <Input value={giaTri} readOnly aria-readonly className="bg-muted" />
                   </Field>
                 );
-              })}
-            </div>
-          )}
+              const doiGiaTri = (v: string) =>
+                onDoi((d) => (d ? { ...d, [f.key]: v } : d));
+              return f.render ? (
+                <div key={f.key}>{f.render(giaTri, doiGiaTri, !laThem)}</div>
+              ) : (
+                <Field key={f.key} label={f.nhan} required={f.batBuoc} hint={f.goiY}>
+                  <Input
+                    value={giaTri}
+                    onChange={(e) => doiGiaTri(e.target.value)}
+                    placeholder={f.viDu}
+                  />
+                </Field>
+              );
+            })}
+          </div>
+        )}
 
-          <DialogFooter>
-            <Button variant="outline" size="lg" onClick={() => setDang(null)}>
-              Hủy
-            </Button>
-            <Button
-              size="lg"
-              onClick={luu}
-              title={laThem ? `Lưu ${tenDonVi} mới vào danh mục.` : `Lưu các thay đổi của ${tenDonVi} này vào danh mục.`}
-            >
-              {laThem ? `Thêm ${tenDonVi}` : "Lưu thay đổi"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+        <DialogFooter>
+          <Button variant="outline" size="lg" onClick={onClose}>
+            Hủy
+          </Button>
+          <Button
+            size="lg"
+            onClick={onLuu}
+            title={laThem ? `Lưu ${tenDonVi} mới vào danh mục.` : `Lưu các thay đổi của ${tenDonVi} này vào danh mục.`}
+          >
+            {laThem ? `Thêm ${tenDonVi}` : "Lưu thay đổi"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

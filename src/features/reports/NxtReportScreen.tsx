@@ -48,6 +48,7 @@ import {
   type MucChon,
   type TheThongTin,
 } from "@/design-system";
+import { useSuaDanhMuc } from "@/features/catalog/SuaDanhMucNhanh";
 import { KY_OPT, phamViKy, dauThang, type KyXem } from "@/lib/periodUtils";
 import { num, viDate } from "@/lib/format";
 import { uid } from "@/lib/db";
@@ -84,7 +85,9 @@ export default function BaoCaoNhapXuatTonScreen() {
   const [exportOrders] = useExportOrders();
   const [salesItems] = useSalesItems();
   const [packagings] = usePackagings();
-  const [matHang] = useProducts();
+  const [matHang, setMatHang] = useProducts();
+  /** Bút chì sửa nhanh danh mục ngay trong ô chọn. */
+  const suaMH = useSuaDanhMuc("matHang", matHang, setMatHang);
   const [opening, ghiOpening] = useFinishedGoodsOpeningStock();
 
   const [ky, setKy] = useState<KyXem>("thang");
@@ -428,6 +431,8 @@ export default function BaoCaoNhapXuatTonScreen() {
                   value={form.productId}
                   onChange={(v) => setForm((f) => (f ? { ...f, productId: v } : f))}
                   options={optMatHang}
+                  onSuaMuc={suaMH.moSua}
+                  nhanSua={suaMH.nhanSua}
                   emptyText="Chưa có mặt hàng — thêm ở Danh mục."
                 />
                 <div className="grid gap-4 sm:grid-cols-2">
@@ -499,6 +504,7 @@ export default function BaoCaoNhapXuatTonScreen() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {suaMH.hop}
     </div>
   );
 }

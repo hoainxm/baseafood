@@ -27,6 +27,7 @@ export function BangDongHang({
   onThem,
   optLoaiTheoLoai,
   onTaoLoai,
+  onSuaLoai,
   onEnterCuoi,
 }: {
   dong: DongBang[];
@@ -35,6 +36,8 @@ export function BangDongHang({
   onThem: () => void;
   optLoaiTheoLoai: (loai: string) => MucChon[];
   onTaoLoai: (ten: string, loai: string) => string;
+  /** Bút chì sửa nhanh loại NL trong danh mục (value = tên). */
+  onSuaLoai?: (ten: string) => void;
   /** Enter ở ô kg của dòng cuối — màn dùng để đưa con trỏ tới nút lưu. */
   onEnterCuoi?: () => void;
 }) {
@@ -136,6 +139,8 @@ export function BangDongHang({
               onChange={(v) => onSua(d.key, { materialTypeName: v })}
               options={optLoaiTheoLoai(d.category)}
               onCreate={(ten) => onTaoLoai(ten, d.category)}
+              onSuaMuc={onSuaLoai}
+              nhanSua="Sửa thông tin loại nguyên liệu này — lưu thẳng vào Danh mục."
             />
             <NumberField
               label="Số lượng"

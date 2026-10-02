@@ -1,6 +1,7 @@
 > Load khi: sửa màn Bán hàng — phiếu bán, dòng bán, quy cách, ghi bù, hoặc hút bán vào cân đối.
 covers: src/features/sales/SalesScreen.tsx, src/features/sales/SalesReport.tsx, src/features/sales/SalesTab.tsx, src/types.ts, src/lib/repo.ts, src/lib/inventory.ts
-last_verified: 2026-08-23
+last_verified: 2026-10-02
+<!-- updated: 2026-10-02 — ô Khách hàng (phiếu) + Mặt hàng (dòng bán, sửa dòng) có bút chì sửa nhanh danh mục (`useSuaDanhMuc`, xem 32-danh-muc). Không đổi luồng bán. -->
 ttl_days: 90
 <!-- updated: 2026-08-23 — bán lẻ trừ tồn (G4): dòng bán set KHO_BAN_LE, trừ suy qua tinhTon(...,banLe) FIFO; warehouse/cold-storage/orders cùng truyền banLe -->
 <!-- re-verified: 2026-08-07 — phiếu multi-line (phieuId), 2 ngày, seam hút banHangId khớp SalesScreen.tsx + BalancingScreen.tsx:389 -->

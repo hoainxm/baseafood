@@ -56,6 +56,7 @@ import {
   type LoiNhap,
   type MucChon,
 } from "@/design-system";
+import { useSuaDanhMuc } from "@/features/catalog/SuaDanhMucNhanh";
 import { kg, num, todayISO, viDate } from "@/lib/format";
 import { KY_OPT, phamViKy, type KyXem } from "@/lib/periodUtils";
 import {
@@ -258,6 +259,10 @@ export default function BanHangScreen() {
     label: k.code ? `${k.code} · ${k.name}` : k.name,
     phu: [k.code, k.market].map((s) => s?.trim()).filter(Boolean).join(" – ") || undefined,
   }));
+
+  /** Sửa nhanh khách hàng / mặt hàng tại chỗ (cả hai nối theo id ở phiếu bán). */
+  const suaKH = useSuaDanhMuc("khachHang", khach, setKhach);
+  const suaMH = useSuaDanhMuc("matHang", matHang, setMatHang);
 
   const themMatHang = (ten: string) => {
     const m: Product = { id: uid(), code: "", name: ten, finishedGoodCode: "" };
@@ -787,6 +792,8 @@ export default function BanHangScreen() {
                 options={optKhach}
                 onCreate={themKhach}
                 emptyText="Chưa có khách hàng nào trong danh mục."
+                onSuaMuc={suaKH.moSua}
+                nhanSua={suaKH.nhanSua}
               />
 
               <Field label="Ghi chú phiếu">
@@ -872,6 +879,8 @@ export default function BanHangScreen() {
                   options={optMatHang}
                   onCreate={themMatHang}
                   emptyText="Chưa có mặt hàng nào trong danh mục."
+                  onSuaMuc={suaMH.moSua}
+                  nhanSua={suaMH.nhanSua}
                 />
 
                 <ChoiceGroup
@@ -1014,6 +1023,8 @@ export default function BanHangScreen() {
                 options={optMatHang}
                 onCreate={themMatHang}
                 emptyText="Chưa có mặt hàng nào trong danh mục."
+                onSuaMuc={suaMH.moSua}
+                nhanSua={suaMH.nhanSua}
               />
 
               <Field
@@ -1057,6 +1068,8 @@ export default function BanHangScreen() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {suaKH.hop}
+      {suaMH.hop}
     </div>
   );
 }

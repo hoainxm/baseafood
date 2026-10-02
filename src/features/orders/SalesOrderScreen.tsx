@@ -51,6 +51,7 @@ import {
   type LoiNhap,
   type MucChon,
 } from "@/design-system";
+import { useSuaDanhMuc } from "@/features/catalog/SuaDanhMucNhanh";
 import { kg, num, todayISO, viDate } from "@/lib/format";
 import { CheckCircle, ClipboardList, Package, PackageCheck, Plus, Truck } from "lucide-react";
 
@@ -81,7 +82,10 @@ export default function DonDatScreen() {
   const [dongLenh, persistDongLenh] = useExportItems();
   const [sanXuat] = useWipProductions();
   const [matHang, setMatHang] = useProducts();
-  const [khach] = useCustomers();
+  const [khach, setKhach] = useCustomers();
+  /** Bút chì sửa nhanh danh mục ngay trong ô chọn. */
+  const suaKH = useSuaDanhMuc("khachHang", khach, setKhach);
+  const suaMH = useSuaDanhMuc("matHang", matHang, setMatHang);
   const [phieuBan, persistPhieu] = useSalesInvoices();
   const [banHang, persistBan] = useSalesItems();
 
@@ -480,6 +484,8 @@ export default function DonDatScreen() {
                 value={tao.customerId}
                 onChange={(v) => setTao((t) => (t ? { ...t, customerId: v } : t))}
                 options={optKhach}
+                onSuaMuc={suaKH.moSua}
+                nhanSua={suaKH.nhanSua}
                 emptyText="Chưa có khách nào — thêm ở Danh mục."
               />
               <div className="space-y-4">
@@ -495,6 +501,8 @@ export default function DonDatScreen() {
                       value={dc.productId}
                       onChange={(v) => datDong(i, { productId: v })}
                       options={optMatHang}
+                      onSuaMuc={suaMH.moSua}
+                      nhanSua={suaMH.nhanSua}
                       onCreate={themMatHang}
                     />
                     <Field
@@ -582,6 +590,8 @@ export default function DonDatScreen() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {suaKH.hop}
+      {suaMH.hop}
     </div>
   );
 }

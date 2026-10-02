@@ -29,6 +29,7 @@ export function BangDongSX({
   onDoiNhom,
   onTaoMatHang,
   onSuaMatHang,
+  onSuaKhach,
   optKhach,
   onTaoKhach,
 }: {
@@ -49,6 +50,8 @@ export function BangDongSX({
   onTaoMatHang: (ten: string, processingType: string) => string;
   /** Mở hộp sửa nhanh thành phẩm đang chọn (tên, loài, kiểu chế biến…). */
   onSuaMatHang: (productId: string) => void;
+  /** Mở hộp sửa nhanh khách hàng (value = tên). */
+  onSuaKhach: (ten: string) => void;
   optKhach: MucChon[];
   onTaoKhach: (ten: string) => string;
 }) {
@@ -116,6 +119,8 @@ export function BangDongSX({
                   onChange={(v) => onDoiNhom(gid, { customerName: v })}
                   options={optKhach}
                   onCreate={(ten) => onTaoKhach(ten)}
+                  onSuaMuc={onSuaKhach}
+                  nhanSua="Sửa thông tin khách hàng này — lưu thẳng vào Danh mục."
                   placeholder="VD: Peacock…"
                   emptyText="Chưa có — gõ tên rồi Thêm mới."
                 />
@@ -186,7 +191,7 @@ export function BangDongSX({
                               onCreate={(ten) => onTaoMatHang(ten, info.pt)}
                               emptyText="Chưa có mặt hàng — gõ tên rồi Thêm mới."
                               onSuaMuc={onSuaMatHang}
-                              nhanSua="Sửa thành phẩm này (tên, mã số, loài, kiểu chế biến, quy cách) — lưu thẳng vào Danh mục."
+                              nhanSua="Sửa thông tin mặt hàng này — lưu thẳng vào Danh mục."
                             />
                             </div>
                             {d.productId && (

@@ -1,6 +1,7 @@
 > Load khi: thêm file mới, không biết đặt ở đâu, hay chuẩn bị import xuyên tầng.
 covers: src/**
-last_verified: 2026-09-18
+last_verified: 2026-10-02
+<!-- updated: 2026-10-02 — `src/features/catalog/` thêm `cauHinhDanhMuc.tsx` (cấu hình 5 danh mục, một nguồn) + `SuaDanhMucNhanh.tsx` (hook `useSuaDanhMuc` — bút chì sửa danh mục ở ô chọn). Feature khác import THẲNG file `@/features/catalog/SuaDanhMucNhanh` (KHÔNG qua index — index export màn Danh mục, kéo cả màn vào bundle). Design-system thêm `HopSuaDanhMuc` (CatalogCrudModal), `ONhapSo` + `useNhapSo` + `bieuThucSo` (ô số biểu thức). Bỏ `features/shared/SuaThanhPhamNhanh.tsx`. -->
 ttl_days: 90
 
 <!-- re-verified: 2026-09-14 12:00 — phân loại màn DEMO vs THẬT khớp code: DEMO_IDS = [production, quality, cold-storage, reports, traceability] (nav-access.ts:22). Dùng khi chuẩn hóa nhãn (giữ nhãn DEMO tách khỏi màn thật). (task đổi tên trang) -->

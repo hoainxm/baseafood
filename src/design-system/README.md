@@ -317,7 +317,7 @@ chip đếm/điều khiển của primitive; màn nghiệp vụ **không** dùng
 | Ô số (kg, tiền, %) | `NumberField` |
 | Chọn 1 trong ≤ 6 | `ChoiceGroup` (nút to) |
 | Chọn 1 trong danh mục dài / cần tạo mới | `Combobox` |
-| Chọn trong danh mục **và cho sửa bản ghi danh mục ngay tại chỗ** | `Combobox` + `onSuaMuc` (bút chì trên từng mục; máy có chuột: hiện khi rê/trỏ phím, cảm ứng: luôn hiện) — màn gọi tự mở hộp sửa. Nên kèm thêm nút bút chì cạnh ô cho mục đang chọn (VD `/wip` › Thành phẩm). |
+| Chọn trong danh mục **và cho sửa bản ghi danh mục ngay tại chỗ** | `Combobox` + `onSuaMuc` (bút chì trên từng mục; máy có chuột: hiện khi rê/trỏ phím, cảm ứng: luôn hiện) + `suaDuoc` (chỉ mục có trong danh mục). Màn nghiệp vụ KHÔNG tự viết hộp: dùng `useSuaDanhMuc` (`features/catalog/SuaDanhMucNhanh.tsx`) — hộp là `HopSuaDanhMuc`, chung với `DanhMucCrud`. Không gắn ở ô LỌC. |
 | Chọn ngày | `DateField` |
 | Chọn khoảng ngày | `DateRangeField` (hai ô riêng Từ / Đến) |
 | Danh sách bản ghi | `RecordTable` — truyền `sapXep` cho cột để bấm tiêu đề sắp xếp, truyền `timKiem` để hiện ô tìm |

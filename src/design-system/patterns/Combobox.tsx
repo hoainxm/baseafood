@@ -57,6 +57,7 @@ export function Combobox({
   anNhan = false,
   onSuaMuc,
   nhanSua,
+  suaDuoc,
   className,
 }: {
   label: string;
@@ -90,6 +91,8 @@ export function Combobox({
   onSuaMuc?: (value: string) => void;
   /** Câu `title` cho nút bút chì (mặc định "Sửa mục này trong danh mục."). */
   nhanSua?: string;
+  /** Mục nào có bút chì (VD chỉ mục CÓ trong danh mục). Bỏ trống ⇒ mọi mục. */
+  suaDuoc?: (value: string) => boolean;
   className?: string;
 }) {
   const [open, setOpen] = React.useState(false);
@@ -228,7 +231,7 @@ export function Combobox({
                           </span>
                         )}
                       </span>
-                      {onSuaMuc && (
+                      {onSuaMuc && (!suaDuoc || suaDuoc(o.value)) && (
                         <button
                           type="button"
                           aria-label={`Sửa ${o.label}`}

@@ -144,7 +144,7 @@ Khóa theo **(ngày + phân xưởng)**, một bản ghi duy nhất mỗi cặp 
 
 Cân **gộp cuối ngày** theo (ngày + phân xưởng), ngay lúc nhận hàng ⇒ nhập ở màn này, `nguon = "Nhập hàng"`, `kyId` rỗng.
 Màn Cân đối chỉ **hút** vào kỳ (gán `kyId`), không nhập lại lần hai. Xem [31-can-doi-ky](31-can-doi-ky.md).
-Hộp "Thêm phế liệu" (`KhoiPheLieuNgay.tsx`): loại **mặc định "Nội tạng"** (đa số phế liệu là nội tạng; cân dạt thì đổi sang "Dạt"). Ba nút: **Hủy** (đóng, không lưu) · **"Lưu, ghi tiếp loại khác"** (lưu + reset form, hộp thoại vẫn mở, tự gợi ý loại CHƯA ghi trong ngày — vừa ghi nội tạng ⇒ gợi ý Dạt) · **Lưu** (lưu rồi đóng). Đổi 2026-10-02: nhãn cũ "Thêm loại này"/"Xong" gây hiểu nhầm — "Xong" thực chất là đóng KHÔNG lưu.
+Hộp "Thêm phế liệu" (`KhoiPheLieuNgay.tsx`): loại **mặc định "Nội tạng"** (đa số phế liệu là nội tạng; cân dạt thì đổi sang "Dạt"). Ba nút: **Hủy** (đóng, không lưu) · **"Lưu, ghi tiếp loại khác"** (lưu + reset form, hộp thoại vẫn mở, tự gợi ý loại CHƯA ghi trong ngày — vừa ghi nội tạng ⇒ gợi ý Dạt) · **Lưu** (lưu rồi đóng). Đổi 2026-10-02: nhãn cũ "Thêm loại này"/"Xong" gây hiểu nhầm — "Xong" thực chất là đóng KHÔNG lưu. Ô Đại lý giao hàng + ô Loại NL ở bảng dòng hàng có **bút chì sửa nhanh danh mục** (2026-10-02, `useSuaDanhMuc` — tên khoá vì sổ nhập nối theo tên; xem [32-danh-muc](32-danh-muc.md)).
 
 ### 6. Phiếu báo cáo tổng hợp — in A4 NGANG, theo KỲ (`DailyImportInvoice.tsx`)
 

@@ -24,7 +24,7 @@ export {
   congNgay,
   homNay,
 } from "./patterns/DateField";
-export { DanhMucCrud, type TruongDanhMuc } from "./patterns/CatalogCrudModal";
+export { DanhMucCrud, HopSuaDanhMuc, type TruongDanhMuc } from "./patterns/CatalogCrudModal";
 export { Logo } from "./patterns/Logo";
 export { RecordTable, type Cot } from "./patterns/RecordTable";
 export {

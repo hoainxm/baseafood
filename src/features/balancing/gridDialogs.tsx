@@ -230,6 +230,8 @@ export function HopThemMatHang({
   khach,
   onThemMatHang,
   onThemKhach,
+  onSuaMatHang,
+  onSuaKhach,
   onClose,
   onLuu,
 }: {
@@ -237,6 +239,9 @@ export function HopThemMatHang({
   khach: Customer[];
   onThemMatHang: (ten: string) => string;
   onThemKhach: (ten: string) => string;
+  /** Bút chì sửa nhanh bản ghi danh mục (value = id). */
+  onSuaMatHang?: (id: string) => void;
+  onSuaKhach?: (id: string) => void;
   onClose: () => void;
   onLuu: (matHangId: string, khachId: string, quyCach: string, kenh: SalesChannel) => void;
 }) {
@@ -259,6 +264,8 @@ export function HopThemMatHang({
             onChange={setMatHangId}
             options={matHang.map((m) => ({ value: m.id, label: m.name }))}
             onCreate={onThemMatHang}
+            onSuaMuc={onSuaMatHang}
+            nhanSua="Sửa thông tin mặt hàng này — lưu thẳng vào Danh mục."
           />
           <Field label="Quy cách">
             <Input
@@ -273,6 +280,8 @@ export function HopThemMatHang({
             onChange={setKhachId}
             options={khach.map((k) => ({ value: k.id, label: k.name }))}
             onCreate={onThemKhach}
+            onSuaMuc={onSuaKhach}
+            nhanSua="Sửa thông tin khách hàng này — lưu thẳng vào Danh mục."
           />
         </div>
         <DialogFooter>

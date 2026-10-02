@@ -32,6 +32,7 @@ import {
   type MucChon,
   type TheThongTin,
 } from "@/design-system";
+import { useSuaDanhMuc } from "@/features/catalog/SuaDanhMucNhanh";
 import {
   useBalancingInputs,
   useBalancingPeriods,
@@ -90,7 +91,9 @@ export default function MaterialNxtScreen() {
   const [inputs] = useBalancingInputs();
   const [imports] = useMaterialImports();
   const [opening, ghiOpening] = useMaterialOpeningStock();
-  const [materialTypes] = useMaterialTypes();
+  const [materialTypes, setMaterialTypes] = useMaterialTypes();
+  /** Bút chì sửa nhanh danh mục ngay trong ô chọn. */
+  const suaNL = useSuaDanhMuc("loaiNL", materialTypes, setMaterialTypes, { theo: "ten" });
   const [locks] = useProductionLocks();
 
   const [ky, setKy] = useState<KyXem>("thang");
@@ -471,6 +474,9 @@ export default function MaterialNxtScreen() {
                     onChange={(v) => setForm((f) => (f ? { ...f, materialTypeName: v } : f))}
                     onCreate={(t) => t}
                     options={optLoaiNL}
+                    onSuaMuc={suaNL.moSua}
+                    nhanSua={suaNL.nhanSua}
+                    suaDuoc={suaNL.suaDuoc}
                     hint="Chọn hoặc gõ tên loại; gõ đúng tên trong sổ Nhập hàng để khớp họ."
                   />
                   <DateField
@@ -530,6 +536,7 @@ export default function MaterialNxtScreen() {
           ? "Đông gửi / Xả đông là số kho đông dự trữ (Cân đối) — chỉ để tham khảo, không vào tồn."
           : "Chưa có đông gửi / xả đông nào trong kỳ."}
       </p>
+      {suaNL.hop}
     </div>
   );
 }

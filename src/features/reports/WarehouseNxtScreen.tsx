@@ -46,6 +46,7 @@ import {
   type MucChon,
   type TheThongTin,
 } from "@/design-system";
+import { useSuaDanhMuc } from "@/features/catalog/SuaDanhMucNhanh";
 import { num, viDate } from "@/lib/format";
 import {
   ArrowDownToLine,
@@ -97,7 +98,9 @@ function parseKho(text: string): string {
  */
 export default function WarehouseNxtScreen() {
   const [snapshots, ghiSnapshots] = useNxtSnapshots();
-  const [khoLuuDM] = useStorageLocations();
+  const [khoLuuDM, setKhoLuuDM] = useStorageLocations();
+  /** Bút chì sửa nhanh danh mục ngay trong ô chọn. */
+  const suaKL = useSuaDanhMuc("khoLuu", khoLuuDM, setKhoLuuDM, { theo: "ten" });
   const fileRef = useRef<HTMLInputElement>(null);
 
   const khoOpts: MucChon[] = useMemo(() => {
@@ -818,6 +821,9 @@ export default function WarehouseNxtScreen() {
                 value={ganForm}
                 onChange={(v) => setGanForm(v)}
                 options={khoLuuOpts}
+                onSuaMuc={suaKL.moSua}
+                nhanSua={suaKL.nhanSua}
+                suaDuoc={suaKL.suaDuoc}
                 choPhepXoa={false}
               />
             </div>
@@ -920,6 +926,7 @@ export default function WarehouseNxtScreen() {
           </table>
         </PhieuIn>
       )}
+      {suaKL.hop}
     </div>
   );
 }

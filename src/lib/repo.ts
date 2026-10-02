@@ -188,10 +188,11 @@ export const BANG_PRODUCT: AnhXaBang<Product> = {
     id: x.id,
     code: x.code,
     name: x.name,
-    finished_good_code: x.finishedGoodCode,
-    category: x.category,
-    material_type_id: x.materialTypeId,
-    processing_type: x.processingType,
+    finished_good_code: x.finishedGoodCode ?? "",
+    // Trường tùy chọn ⇒ gửi chuỗi rỗng (cột NOT NULL default ''), không để undefined.
+    category: x.category ?? "",
+    material_type_id: x.materialTypeId ?? "",
+    processing_type: x.processingType ?? "",
     // Danh mục (CRUD) lưu chuỗi "1"/"" cho cờ tách; chuẩn hoá về boolean.
     split_components: x.splitComponents === true || x.splitComponents === "1",
     block_spec_kg:
@@ -1122,9 +1123,15 @@ async function dongBoCho<T>(
 
   try {
     if (capNhat.length > 0) {
+      /* defaultToNull: false ⇒ dòng THIẾU một cột (vd mặt hàng tạo nhanh ở /wip
+         không có materialTypeId) dùng DEFAULT của cột thay vì NULL. Mặc định của
+         supabase-js khi upsert NHIỀU dòng là điền NULL cho cột dòng khác có mà
+         dòng này thiếu ⇒ cột NOT NULL (material_type_id…) từ chối CẢ LƯỢT (23502)
+         ⇒ hàng chờ kẹt vĩnh viễn: products không lên máy chủ từ 28/08 tới
+         02/10/2026 (mọi máy). Đừng bỏ cờ này. */
       const { error } = await supabase
         .from(bang.table)
-        .upsert(capNhat, { onConflict: khoa });
+        .upsert(capNhat, { onConflict: khoa, defaultToNull: false });
       if (error) throw error;
     }
     if (cho.xoa.length > 0) {

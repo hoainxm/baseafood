@@ -32,7 +32,7 @@ src/
 ├── design-system/            tokens.css · patterns/ · kit/ · index.ts (cửa import duy nhất)
 └── features/                 THẬT: imports · production/WipProductionScreen (/wip) · packaging (/packaging) · warehouse · orders · sales · balancing · catalog · reports/NXT · auth · users
                               DEMO (dữ liệu mẫu): production/WorkOrderScreen (/production) · reports · quality · traceability · cold-storage (hybrid: tồn THẬT, nhiệt độ minh hoạ)
-supabase/migrations/          0001 … 0048 (đã chạy trên DB thật tới 0048 — xác nhận 2026-09-22, **TRỪ `0040`**: kiểm 2026-10-02 cột `import_shipments.scan_path` vẫn chưa có ⇒ đầu chuyến nhập từ 27/08 không lên máy chủ, xem [03-database](docs/app-map/03-database.md); RIÊNG `0029` bảng `packagings` bị sót, chạy bù 2026-09-30 kèm RLS mẫu `0021` + trigger `0048` — xem [03-database](docs/app-map/03-database.md))
+supabase/migrations/          0001 … 0048 (đã chạy trên DB thật tới 0049 — rà cột 2026-10-02: `0040` chạy bù 2026-10-02; `0028` chạy bù 2026-10-02 (trước đó thiếu `production_locks.leftover_kg` ⇒ mọi lần chốt ngày SX bị từ chối), xem [03-database](docs/app-map/03-database.md); RIÊNG `0029` bảng `packagings` bị sót, chạy bù 2026-09-30 kèm RLS mẫu `0021` + trigger `0048` — xem [03-database](docs/app-map/03-database.md))
 docs/README.md                bản đồ tài liệu — doc nào ở đâu, doc mới bỏ đâu
 docs/app-map/                 bản đồ ngữ cảnh cho agent (đọc khi CODE)
 docs/ops/                     vận hành: cutover Supabase · deploy Vercel · env

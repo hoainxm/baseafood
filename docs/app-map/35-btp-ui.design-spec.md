@@ -1,6 +1,7 @@
 > Load khi: thiết kế/build 3 màn module WIP — Sản xuất BTP, Kho dự trữ, Đơn đặt.
-covers: src/features/production/WipProductionScreen.tsx, src/features/warehouse/ReserveWarehouseScreen.tsx, src/features/orders/SalesOrderScreen.tsx, src/features/production/wipHelpers.ts, src/features/production/BangDongSX.tsx
+covers: src/features/production/WipProductionScreen.tsx, src/features/warehouse/ReserveWarehouseScreen.tsx, src/features/orders/SalesOrderScreen.tsx, src/features/orders/KiemLoXuat.tsx, src/features/production/wipHelpers.ts, src/features/production/BangDongSX.tsx
 last_verified: 2026-10-02
+<!-- updated: 2026-10-02 (b) — UI truy xuất QR đợt 1b + 2a (../spec/qr-truy-xuat-lo.md §6b–6c): (1) /wip toast "Đã lưu N thành phẩm" có nút "In tem"/"In N tem" (in tem cả lượt vừa lưu); hộp CHỐT NGÀY có khối cảnh báo vàng "Chưa gắn lô — N mẻ…" + nút "Gắn lô NL" từng mẻ (đóng hộp chốt, mở hộp gắn lô) — chỉ nhắc, không chặn. (2) /warehouse khối "chờ nhập kho": hàng quét/gõ mã (nút "Quét tem để duyệt" · ô "Hoặc gõ mã lô trên tem" · "Tìm lô"; điện thoại xếp dọc full-width) ⇒ mở thẳng dialog Duyệt; mỗi dòng chờ đứng đầu bằng mã lô BĐ-… (tnum, đậm). (3) /orders chi tiết đơn: mục "Lệnh xuất đã lập" (ngày · kg · số lô) + nút "Kiểm lô bằng quét" ⇒ dialog KiemLoXuat: quét/gõ, danh sách lô của lệnh với nhãn "Đã quét"/"Chưa quét", đếm "Đã kiểm a / b lô" + nhãn "Đủ lô"; sai lô ⇒ toast lỗi đỏ. Camera mặc định TẮT (bấm mới xin quyền). Đã thử preview: 800px; dialog kiểm lô thử bằng dữ liệu giả (DB chưa có lệnh xuất). -->
 <!-- updated: 2026-10-02 — SỬA NHANH THÀNH PHẨM tại /wip: cạnh ô chọn Thành phẩm (bảng BangDongSX + dialog Sửa dòng) có nút bút chì (chỉ hiện khi đã chọn) + bút chì trên TỪNG MỤC trong danh sách (`Combobox.onSuaMuc` — sửa được cả mục chưa chọn; bấm tên vẫn là chọn) cùng mở hộp sửa danh mục chung (`useSuaDanhMuc("matHang")`, xem 32-danh-muc — thay `SuaThanhPhamNhanh` cũ; khách hàng + loại NL còn dở cũng có bút chì, tên khoá vì nối theo tên) — sửa BẢN GHI MẶT HÀNG (tên · mã số · loài · kiểu chế biến · tách râu/bao tử · quy cách block · ÁNH XẠ mã TK 1551 — chỉ chọn, không sửa 141 mã). Dòng SX lưu productId nên đổi tên hiện đúng ở mọi dòng đã ghi; kiểm trùng tên (không phân hoa thường) + trùng mã số. Dòng đang gõ ăn theo cờ tách/quy cách mới (trừ dòng đã tự gõ quy cách khác). Không migration. -->
 <!-- updated: 2026-09-21 — TÁCH FILE (P2-7 audit PO), KHÔNG đổi giao diện/logic: WipProductionScreen.tsx 1810→~1470 dòng. Rút `wipHelpers.ts` (DauPhien, DongSX, dongSXRong, laTach/tongDong/dongDayDu/dongTrong — có vitest) và `BangDongSX.tsx` (bảng dòng TP theo nhóm kiểu chế biến × khách, tách râu/bao tử, block × quy cách). KEY_WIP_* + docXuongNho (localStorage, pref theo máy) vẫn ở màn chính. -->
 
@@ -71,6 +72,8 @@ Tablet/desktop: sidebar 4 nhóm collapse được. Mobile 390px: bottom tab 5 m�
 | 2 | **Kho dự trữ** | nav "Kho dự trữ" | duyệt lô chờ nhập + xem tồn từng kho | duyệt lô để tồn lên đúng | **Duyệt lô chờ nhập** | Khối "chờ nhập" (mời duyệt) · RecordTable tồn nhóm theo kho×mặt hàng×quy cách×lô | gọn 40px (tồn nhiều dòng) |
 | 2b | Duyệt lô (dialog) | nút Duyệt | đối chiếu kg/block thực, chọn kho, ghi lệch | tồn cộng vào kho đã chọn | **Xác nhận nhập kho** | Dialog + NumberField + Combobox kho | — |
 | 3 | **Đơn đặt & lệnh xuất** | nav "Đơn đặt" | xem đơn nào đủ, xác nhận đủ, ra lệnh xuất | ra lệnh xuất (toàn/một phần) | **Xác nhận đủ → lệnh xuất** | RecordTable đơn (badge đủ/đang gom) · chi tiết đơn: dòng cần vs khả dụng | vừa 44px |
+| 2c | Quét tem duyệt (khối chờ nhập) | khối "chờ nhập kho" | cầm block nào quét block đó | dialog Duyệt đúng mẻ | **Quét tem để duyệt** | KhungQuetQr + ô gõ mã | — |
+| 3c | Kiểm lô lệnh xuất (dialog) | "Kiểm lô bằng quét" ở mục Lệnh xuất đã lập | xếp container đúng lô FIFO | đủ lô ⇒ xếp xong | **Quét tem** | KhungQuetQr + danh sách lô của lệnh + nhãn Đã/Chưa quét | — |
 | 3b | Xuất kho (dialog) | nút trên lệnh xuất | thủ kho nhập kg/block thực xuất theo lô | đóng lệnh → sang Bán hàng | **Đóng lệnh xuất** | Dialog + dòng thực xuất + cảnh báo lệch | — |
 
 ## Component (tra bảng chọn — README design-system)
@@ -102,6 +105,9 @@ Tablet/desktop: sidebar 4 nhóm collapse được. Mobile 390px: bottom tab 5 m�
 | Xác nhận đủ | đơn badge "Đủ"; nút "Lệnh xuất" bật |
 | Đóng lệnh xuất | tồn giảm đúng kg thực; phiếu bán xuất hiện ở màn Bán hàng |
 | Xoá dòng | biến mất + toast **Hoàn tác** |
+| Lưu mẻ SX | toast có nút **In tem** — bấm ra bản in tem cả lượt |
+| Quét tem ở khối chờ nhập kho | mở dialog Duyệt đúng mẻ; mẻ đã nhập ⇒ toast cảnh báo |
+| Quét tem khi kiểm lệnh xuất | đúng lô ⇒ dòng sang "Đã quét" + toast xanh; sai lô ⇒ toast đỏ "KHÔNG thuộc lệnh" |
 
 ## Platform (3 design con)
 
@@ -114,5 +120,6 @@ Tablet/desktop: sidebar 4 nhóm collapse được. Mobile 390px: bottom tab 5 m�
 Sau khi code: preview → screenshot mỗi màn ở **3 viewport** (tablet 1024 · desktop 1280 · mobile 390) + bật **cỡ chữ 130% / mật độ Gọn**. Check: 1 primary/màn · badge ≤2 từ · touch ≥44px · dropdown thấy thanh cuộn · không `text-xs`/uppercase trong features · tồn nhiều lô không vỡ. Lỗi → sửa → chụp lại. *(Bằng chứng screenshot bổ sung khi build, chưa có ở pha design.)*
 
 ## History
+- 2026-10-02 — truy xuất QR: in tem ngay sau lưu (/wip), nhắc gắn lô trong hộp chốt ngày, quét tem duyệt nhập kho (/warehouse), kiểm lô lệnh xuất bằng quét (/orders, `KiemLoXuat.tsx`). Không đổi logic FIFO/trừ tồn.
 - 2026-09-07 — tối ưu thao tác ghi TP ngày (`/wip`): form-first inline · nhóm mở sẵn + dòng trống tự hiện · nhãn nhóm sửa tại chỗ (groupId ổn định) · nhớ phân xưởng theo máy + điền sẵn nhóm gần nhất. GIỮ schema/repo. Kèm fix scroll thanh bên/drawer không tràn (`overscroll-contain` ở `scroll-nice`). Đã verify preview: build xanh · 360px+130% không cuộn ngang · auto-row · lưu/điền lại nhóm.
 - 2026-08-07 — design-spec từ ba-spec 34 (ui-design-logic). Chưa code. Bước tiếp: build (bảng+migration+3 màn) → QA screenshot loop.

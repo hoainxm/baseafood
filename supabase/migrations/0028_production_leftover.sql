@@ -1,5 +1,7 @@
 -- ============================================================
--- Baseafood MES — 0025: Nguyên liệu còn dở khi chốt sản xuất
+-- Baseafood MES — 0028: Nguyên liệu còn dở khi chốt sản xuất
+-- (header cũ ghi nhầm "0025" — trùng 0025_audit_log; file này từng bị bỏ sót trên
+--  DB thật tới 2026-10-02 ⇒ production_locks không nhận được lần chốt nào.)
 --
 -- Vì sao: daily-task của bộ phận Sản xuất (họp 2026-08-22) là "từ lượng nhập
 -- trong ngày, sản xuất ra bao nhiêu thành phẩm và CÒN BAO NHIÊU đem lưu kho nếu
@@ -16,7 +18,7 @@ alter table public.production_locks
   add column if not exists leftover_kg numeric(14,3) not null default 0;
 
 -- ============================================================
--- ROLLBACK — chép ra, bỏ comment để lùi 0025
+-- ROLLBACK — chép ra, bỏ comment để lùi 0028
 --
 -- ALTER TABLE public.production_locks DROP COLUMN IF EXISTS leftover_kg;
 -- ============================================================

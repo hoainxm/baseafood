@@ -36,6 +36,7 @@ import {
   BANG_MONTHLY_STOCK,
   BANG_RECONCILIATION_RUN,
   BANG_LOT_INPUT,
+  BANG_LABEL_PRINT,
   useBang,
 } from "@/lib/repo";
 import type {
@@ -265,3 +266,5 @@ export const useMonthlyStock = () => useBang(BANG_MONTHLY_STOCK);
 export const useReconciliationRuns = () => useBang(BANG_RECONCILIATION_RUN);
 /** Sự kiện biến đổi lô — mẻ SX / đóng gói đã dùng lô nào (truy xuất QR, mig 0046). */
 export const useLotInputs = () => useBang(BANG_LOT_INPUT);
+/** Sổ in tem QR — lô nào đã in tem, nhãn in ra, ai in, lúc nào (mig 0049). */
+export const useLabelPrints = () => useBang(BANG_LABEL_PRINT);

@@ -755,6 +755,20 @@ export interface LotInput {
   recordedAt: string;
 }
 
+/**
+ * Một lần IN TEM QR cho một lô (bảng `label_prints`, mig 0049). `label` là nhãn
+ * in ra LÚC IN — đông cứng, để so với nhãn hiện tại (nhãn BTP/TP suy từ bản ghi).
+ */
+export interface LabelPrint {
+  id: string;
+  lotKind: LotKind;
+  lotId: string;
+  label: string;
+  copies: number;
+  operator: string;
+  printedAt: string;
+}
+
 export interface ReconciliationSummary {
   soHoaDon: number;
   khop: number;

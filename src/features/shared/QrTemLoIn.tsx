@@ -14,7 +14,10 @@ import type { ImportShipment, LotKind } from "@/types";
 import { PhieuInTem, type TemIn } from "@/design-system";
 import { viDate } from "@/lib/format";
 import { taoQrDataUrl } from "@/lib/qr";
-import { TEN_LOAI, nhanLoNl, noiDungQr, nutLo, type NutLo } from "@/lib/truyXuatLo";
+import { TEN_LOAI, banGhiIn, nhanLoNl, noiDungQr, nutLo, type NutLo } from "@/lib/truyXuatLo";
+import { useLabelPrints } from "@/lib/catalogRepo";
+import { useAuth } from "@/lib/auth";
+import { newId } from "@/lib/store";
 import { useDuLieuTruyXuat } from "./useDuLieuTruyXuat";
 
 const laLo = (n: NutLo) => n.kind === "S" || n.kind === "W" || n.kind === "P";
@@ -52,8 +55,17 @@ export function TemLoQr({ nut, nuts, onClose }: { nut?: NutLo; nuts?: NutLo[]; o
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `khoa` đại diện đủ cho ds
   }, [khoa]);
 
+  // Sổ in tem (mig 0049): bấm In là ghi mỗi lô một dòng — biết lô nào đã có tem,
+  // và nhãn in ra lúc đó (nhãn BTP/TP suy lại từ bản ghi có thể đổi về sau).
+  const [soIn, luuSoIn] = useLabelPrints();
+  const { nguoiDung } = useAuth();
+  const ghiSoIn = () => {
+    const moi = banGhiIn(ds, nguoiDung?.fullName || nguoiDung?.username || "", new Date().toISOString(), newId);
+    if (moi.length) luuSoIn([...soIn, ...moi]);
+  };
+
   const tems: TemIn[] = ds.map((n) => ({ maLo: n.nhan, qrDataUrl: qr[`${n.kind}:${n.id}`] ?? "", dong: dongTem(n) }));
-  return <PhieuInTem onClose={onClose} tems={tems} />;
+  return <PhieuInTem onClose={onClose} tems={tems} onIn={ghiSoIn} />;
 }
 
 /**

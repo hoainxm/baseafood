@@ -53,7 +53,8 @@ import {
 } from "@/design-system";
 import { useSuaDanhMuc } from "@/features/catalog/SuaDanhMucNhanh";
 import { kg, num, todayISO, viDate } from "@/lib/format";
-import { CheckCircle, ClipboardList, Package, PackageCheck, Plus, Truck } from "lucide-react";
+import { CheckCircle, ClipboardList, Package, PackageCheck, Plus, ScanLine, Truck } from "lucide-react";
+import { KiemLoXuat } from "./KiemLoXuat";
 
 interface DongCanMoi {
   productId: string;
@@ -92,6 +93,7 @@ export default function DonDatScreen() {
   const [chon, setChon] = useState<string | null>(null);
   const [tao, setTao] = useState<DonMoi | null>(null);
   const [loi, setLoi] = useState<LoiNhap[]>([]);
+  const [kiemLenh, setKiemLenh] = useState<ExportOrder | null>(null);
 
   const tenMH = (id: string) => matHang.find((m) => m.id === id)?.name || "—";
   const tenKH = (id: string) => khach.find((k) => k.id === id)?.name || "—";
@@ -462,7 +464,54 @@ export default function DonDatScreen() {
               );
             })}
           </ul>
+
+          {/* Lệnh xuất đã lập của đơn — kiểm lô bằng quét tem khi xếp container. */}
+          {(() => {
+            const dsLenh = lenh
+              .filter((l) => l.orderId === donCuaChon.id)
+              .sort((a, b) => b.exportDate.localeCompare(a.exportDate));
+            if (!dsLenh.length) return null;
+            return (
+              <div className="space-y-2 border-t-2 border-border pt-4">
+                <p className="font-semibold text-foreground">Lệnh xuất đã lập</p>
+                <ul className="divide-y divide-border">
+                  {dsLenh.map((l) => {
+                    const ds = dongLenh.filter((d) => d.exportId === l.id);
+                    const soLo = new Set(ds.map((d) => d.wipId)).size;
+                    return (
+                      <li key={l.id} className="flex flex-wrap items-center justify-between gap-3 py-2">
+                        <span className="min-w-0 text-base">
+                          {viDate(l.exportDate)} ·{" "}
+                          <span className="tnum font-semibold">{kg(ds.reduce((t, d) => t + (d.quantityKg || 0), 0))}</span>
+                          <span className="text-muted-foreground"> · {soLo} lô</span>
+                        </span>
+                        <Button
+                          title="Quét tem từng block khi xếp container: đúng lô của lệnh thì đánh dấu, sai lô thì báo ngay."
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setKiemLenh(l)}
+                        >
+                          <ScanLine />
+                          Kiểm lô bằng quét
+                        </Button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            );
+          })()}
         </div>
+      )}
+
+      {kiemLenh && (
+        <KiemLoXuat
+          lenh={kiemLenh}
+          dongLenh={dongLenh.filter((d) => d.exportId === kiemLenh.id)}
+          sanXuat={sanXuat}
+          matHang={matHang}
+          onClose={() => setKiemLenh(null)}
+        />
       )}
 
       {/* Dialog tạo đơn */}

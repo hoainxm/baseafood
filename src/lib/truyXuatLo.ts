@@ -13,6 +13,7 @@
 // ============================================================
 import type {
   Customer,
+  LabelPrint,
   ExportItem,
   ExportOrder,
   ImportShipment,
@@ -374,4 +375,46 @@ export function dsLoDeIn(dl: DuLieuTruyXuat, loc: LocLoDeIn): NutLo[] {
       THU_TU_LOAI[a.kind as LotKind] - THU_TU_LOAI[b.kind as LotKind] ||
       a.nhan.localeCompare(b.nhan)
   );
+}
+
+// ---------- Sổ in tem (mig 0049) ----------
+
+export const khoaLo = (kind: LotKind, id: string) => `${kind}:${id}`;
+
+export interface TomTatIn {
+  /** số lượt bấm In */
+  lan: number;
+  /** tổng số tem đã in */
+  tem: number;
+  /** lượt in gần nhất */
+  cuoi: LabelPrint;
+}
+
+/** Gom sổ in tem theo lô: khóa `loại:id` → số lượt, số tem, lần in gần nhất. */
+export function tomTatIn(prints: readonly LabelPrint[]): Map<string, TomTatIn> {
+  const m = new Map<string, TomTatIn>();
+  for (const p of prints) {
+    const k = khoaLo(p.lotKind, p.lotId);
+    const cu = m.get(k);
+    if (!cu) m.set(k, { lan: 1, tem: p.copies, cuoi: p });
+    else
+      m.set(k, {
+        lan: cu.lan + 1,
+        tem: cu.tem + p.copies,
+        cuoi: p.printedAt > cu.cuoi.printedAt ? p : cu.cuoi,
+      });
+  }
+  return m;
+}
+
+/** Dòng sổ in cho một lượt in (mỗi lô một dòng). Bỏ nút không phải lô (X) và lô đã mất. */
+export function banGhiIn(
+  nuts: readonly NutLo[],
+  nguoiIn: string,
+  luc: string,
+  taoId: () => string
+): LabelPrint[] {
+  return nuts
+    .filter((n): n is NutLo & { kind: LotKind } => n.kind !== "X" && !n.mat)
+    .map((n) => ({ id: taoId(), lotKind: n.kind, lotId: n.id, label: n.nhan, copies: 1, operator: nguoiIn, printedAt: luc }));
 }

@@ -34,7 +34,9 @@ import {
   type MucChon,
 } from "@/design-system";
 import { kg, num, viDate } from "@/lib/format";
-import { CalendarRange, ClipboardList, PackageCheck, Scale, Snowflake, Warehouse } from "lucide-react";
+import { CalendarRange, Camera, CameraOff, ClipboardList, PackageCheck, Scale, Search, Snowflake, Warehouse } from "lucide-react";
+import { KhungQuetQr } from "@/features/shared";
+import { docMaQr, nhanLoBtp, timLo } from "@/lib/truyXuatLo";
 
 import { BSF1_WAREHOUSES } from "@/types";
 import { tinhDungTichKho } from "@/lib/inventory";
@@ -64,6 +66,8 @@ export default function KhoDuTruScreen() {
   const [locKho, setLocKho] = useState("");
   const [duyet, setDuyet] = useState<DuyetForm | null>(null);
   const [loi, setLoi] = useState<LoiNhap[]>([]);
+  const [dangQuet, setDangQuet] = useState(false);
+  const [maGo, setMaGo] = useState("");
 
   const tenMH = (id: string) => matHang.find((m) => m.id === id)?.name || "—";
 
@@ -102,6 +106,36 @@ export default function KhoDuTruScreen() {
       note: "",
     });
     setLoi([]);
+  };
+
+  /**
+   * Quét / gõ tem lô BTP ⇒ mở thẳng hộp duyệt của đúng mẻ đó (đợt 2 truy xuất QR).
+   * Thủ kho cầm block nào quét block đó — khỏi dò danh sách, khỏi duyệt nhầm mẻ.
+   */
+  const duyetTheoTem = (text: string) => {
+    const ma = docMaQr(text);
+    if (!ma) return;
+    const ds = timLo(ma, {
+      shipments: [], imports: [], wips: sanXuat, packagings: [], lotInputs: [],
+      exportItems: [], exportOrders: [], salesOrders: [], products: matHang, customers: [],
+    }).filter((n) => n.kind === "W");
+    if (ds.length === 0) {
+      notify.canhBao(`"${text.trim()}" không phải tem lô bán thành phẩm nào.`);
+      return;
+    }
+    if (ds.length > 1) {
+      notify.canhBao(`Mã "${text.trim()}" trùng ${ds.length} lô — quét QR trên tem thay vì gõ mã.`);
+      return;
+    }
+    const wip = sanXuat.find((x) => x.id === ds[0]!.id);
+    if (!wip) return;
+    setMaGo("");
+    if (wip.status !== "cho-nhap") {
+      notify.canhBao(`Lô ${ds[0]!.nhan} đã nhập kho${wip.warehouse ? ` ${wip.warehouse}` : ""} rồi.`);
+      return;
+    }
+    setDangQuet(false);
+    moDuyet(wip);
   };
 
   const luuDuyet = () => {
@@ -250,6 +284,30 @@ export default function KhoDuTruScreen() {
           <p className="text-base font-semibold text-foreground">
             Có {choNhap.length} lô sản xuất chờ nhập kho — duyệt để tính vào tồn
           </p>
+          {/* Quét tem lô BTP trên block ⇒ mở đúng hộp duyệt. Gõ mã khi tem bong / không có camera. */}
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+            <Button
+              title={dangQuet ? "Tắt camera." : "Bật camera quét tem QR trên block để mở đúng lô cần duyệt nhập kho."}
+              variant="outline"
+              className="w-full sm:w-auto"
+              onClick={() => setDangQuet((v) => !v)}
+            >
+              {dangQuet ? <CameraOff /> : <Camera />}
+              {dangQuet ? "Tắt camera" : "Quét tem để duyệt"}
+            </Button>
+            <Field label="Hoặc gõ mã lô trên tem" className="min-w-0 flex-1">
+              <Input
+                value={maGo}
+                onChange={(e) => setMaGo(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && duyetTheoTem(maGo)}
+              />
+            </Field>
+            <Button title="Tìm lô theo mã vừa gõ rồi mở hộp duyệt nhập kho." variant="outline" className="w-full sm:w-auto" onClick={() => duyetTheoTem(maGo)}>
+              <Search />
+              Tìm lô
+            </Button>
+          </div>
+          {dangQuet && <KhungQuetQr onQuet={duyetTheoTem} />}
           <ul className="divide-y divide-border">
             {choNhap.map((s) => (
               <li
@@ -257,6 +315,7 @@ export default function KhoDuTruScreen() {
                 className="flex flex-wrap items-center justify-between gap-3 py-2"
               >
                 <span className="min-w-0 flex-1 text-base">
+                  <span className="tnum mr-2 font-semibold">{nhanLoBtp(s)}</span>
                   {tenMH(s.productId)}
                   {s.spec ? ` · ${s.spec}` : ""} —{" "}
                   <span className="tnum font-semibold">{num(s.quantityKg)}</span> kg

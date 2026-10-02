@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ImportShipment, MaterialImportItem, Packaging, WipProductionItem } from "@/types";
-import { dsLoDeIn, nhanLoNl, type DuLieuTruyXuat } from "./truyXuatLo";
+import { banGhiIn, dsLoDeIn, nhanLoNl, nutLo, tomTatIn, type DuLieuTruyXuat } from "./truyXuatLo";
+import type { LabelPrint } from "@/types";
 
 const chuyen = (id: string, ngay: string, xuong: ImportShipment["workshop"], lotCode = ""): ImportShipment => ({
   id, deliveryDate: ngay, postingDate: ngay, backdateReason: "", workshop: xuong,
@@ -45,5 +46,24 @@ describe("dsLoDeIn", () => {
 describe("nhanLoNl", () => {
   it("chuyến chưa có mã lô thì suy từ xưởng + ngày + đuôi id", () => {
     expect(nhanLoNl({ ...chuyen("1787820268862-288016", "2026-08-26", "Đông") })).toBe("NĐ-260826-8016");
+  });
+});
+
+describe("sổ in tem", () => {
+  it("banGhiIn: mỗi lô một dòng, nhãn đông cứng, bỏ lô đã mất", () => {
+    let i = 0;
+    const ds = banGhiIn([nutLo("S", "s1", dl), nutLo("W", "w1", dl), nutLo("W", "khong-co", dl)], "Trúc", "2026-10-02T08:00:00Z", () => `id${++i}`);
+    expect(ds).toEqual([
+      { id: "id1", lotKind: "S", lotId: "s1", label: "Đ-260901-01", copies: 1, operator: "Trúc", printedAt: "2026-10-02T08:00:00Z" },
+      { id: "id2", lotKind: "W", lotId: "w1", label: ds[1]!.label, copies: 1, operator: "Trúc", printedAt: "2026-10-02T08:00:00Z" },
+    ]);
+  });
+  it("tomTatIn: gom theo lô, lấy lần in gần nhất", () => {
+    const p = (id: string, lotId: string, luc: string, label = "A"): LabelPrint =>
+      ({ id, lotKind: "S", lotId, label, copies: 1, operator: "", printedAt: luc });
+    const m = tomTatIn([p("1", "s1", "2026-10-01", "cũ"), p("2", "s1", "2026-10-02", "mới"), p("3", "s2", "2026-10-01")]);
+    expect(m.get("S:s1")).toMatchObject({ lan: 2, tem: 2, cuoi: { label: "mới" } });
+    expect(m.get("S:s2")?.lan).toBe(1);
+    expect(m.has("W:s1")).toBe(false);
   });
 });

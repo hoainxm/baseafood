@@ -150,10 +150,13 @@ export function PhieuInTem({
   qrDataUrl = "",
   dong = [],
   tems,
+  onIn,
   rongMacDinh = 50,
   caoMacDinh = 30,
 }: {
   onClose: () => void;
+  /** Gọi ngay trước khi mở hộp in (vd ghi sổ in tem). */
+  onIn?: () => void;
   maLo?: string;
   qrDataUrl?: string;
   dong?: string[];
@@ -187,7 +190,10 @@ export function PhieuInTem({
           <X className="size-4" /> Đóng
         </Button>
         <Button
-          onClick={() => window.print()}
+          onClick={() => {
+            onIn?.();
+            window.print();
+          }}
           title={
             nhieu
               ? `Mở hộp in của trình duyệt để in ${ds.length} tem, mỗi tem một nhãn. Chọn khổ giấy tem trước khi in.`

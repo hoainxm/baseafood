@@ -1,6 +1,6 @@
 # Truy xuất theo lô bằng QR — phân tích & thiết kế
 
-> **Trạng thái:** ĐỢT 1 ĐÃ BUILD (2026-09-18) · **đợt 1b in tem hàng loạt ĐÃ BUILD (2026-10-02, §6b)** · đợt 2–3 là đề xuất · §7 còn câu chờ xưởng chốt.
+> **Trạng thái:** ĐỢT 1 ĐÃ BUILD (2026-09-18) · **đợt 1b in tem hàng loạt + 2a sổ in tem / nhắc gắn lô / quét ở kho & xuất ĐÃ BUILD (2026-10-02, §6b–6c)** · đợt 2–3 là đề xuất · §7 còn câu chờ xưởng chốt.
 > **Loại:** phân tích các hệ thống/chuẩn QR truy xuất + thiết kế áp dụng cho Baseafood.
 > **Code:** `src/lib/truyXuatLo.ts` · `src/features/qr/QrTraCuuScreen.tsx` (hộ chiếu lô) · `src/features/shared/{GanLoDauVao,KhungQuetQr,QrTemLoIn,useDuLieuTruyXuat}` · migration `0046_lot_inputs.sql` (✅ đã chạy trên DB thật 2026-09-18).
 
@@ -198,9 +198,22 @@ Quét hoặc gõ → một trang gồm:
 | Lưu xong chuyến / mẻ SX (cả lượt) / phiếu đóng gói ⇒ toast có nút **In tem** (`notify.daLuu(msg, undo?, thaoTac?)`) | 3 màn + `design-system/patterns/notify.ts` |
 | Nhãn nav "Quét mã lô" → **"Mã lô QR"**; viết lại hướng dẫn "?" | `AppShell.tsx`, `guideContent.tsx` |
 
-**Còn lại cho đợt 2 (đề xuất, chờ chốt):** sổ in tem `label_prints` (biết lô nào đã in, đóng băng nhãn đã in, lọc "chưa in") · nhắc mẻ chưa gắn lô khi chốt ngày SX (§7 câu 4) · quét tem W khi duyệt nhập kho + khi lập lệnh xuất · `export_items.packaging_id` · QR vị trí kho.
+**Đợt 2a đã build tiếp — xem §6c.**
 
 > ⚠️ Thực tế 2026-10-02: `lot_inputs` = 0 dòng, `packagings` = 0 dòng trên server — chuỗi truy xuất chưa được dùng. Chuyến nhập sau 26/08 chưa lên server (thiếu cột 0040) nên tab In tem hàng loạt trên máy khác chưa thấy các lô NL đó cho tới khi hàng chờ máy người nhập đẩy xong.
+
+## 6c. Đợt 2a — biết lô nào có tem, nhắc gắn lô, quét ở kho & khi xuất (build 2026-10-02)
+
+| Việc | Ở đâu | Đụng DB |
+|---|---|---|
+| **Sổ in tem** `label_prints` (mig `0049`): bấm In trong `PhieuInTem` (`onIn`) ⇒ mỗi lô một dòng `{lot_kind, lot_id, label đông cứng, copies, operator, printed_at}` | `TemLoQr` ghi qua `banGhiIn` · `BANG_LABEL_PRINT` · `useLabelPrints` | 🟡 thêm 1 bảng, RLS authenticated ngay từ đầu (bất biến 0047) + trigger ghi vết 0048 |
+| Tab In tem hàng loạt: nhãn **Đã in N tem · ngày / Chưa in tem** từng lô + ô **"Chỉ lô chưa in tem"** | `InTemHangLoat.tsx` + `tomTatIn` | — |
+| Hộ chiếu lô: "Đã in N tem, lần gần nhất … · người in" / "Chưa in tem"; **cảnh báo "Nhãn đã đổi"** khi nhãn in trên tem ≠ nhãn suy hiện tại (sửa ngày/xưởng sau khi in — QR vẫn đúng vì theo id) | `QrTraCuuScreen.tsx` | — |
+| **Nhắc gắn lô NL khi chốt ngày SX**: hộp chốt liệt kê mẻ của ngày·xưởng chưa có `lot_inputs`, nút "Gắn lô NL" từng mẻ. **CHỈ NHẮC, không chặn** (§7 câu 4 còn treo) | `WipProductionScreen.tsx` (`meChuaGanLo`) | — |
+| **Quét tem để duyệt nhập kho**: khối "chờ nhập kho" ở `/warehouse` có quét camera / gõ mã ⇒ mở thẳng hộp duyệt đúng mẻ; mẻ đã nhập thì báo; mỗi dòng hiện mã lô `BĐ-…` để đối chiếu tem | `ReserveWarehouseScreen.tsx` (`duyetTheoTem`) | — |
+| **Kiểm lô lệnh xuất bằng quét**: chi tiết đơn có mục "Lệnh xuất đã lập", nút "Kiểm lô bằng quét" ⇒ liệt kê lô FIFO của lệnh; quét đúng ⇒ "Đã quét", sai lô ⇒ báo đỏ "KHÔNG thuộc lệnh — đừng xếp lên xe". **Kiểm tại chỗ, không lưu, không đổi lệnh** (FIFO giữ nguyên) | `orders/KiemLoXuat.tsx` | — |
+
+**Chưa làm (đợt 2b, cần chốt):** ghi lại kết quả kiểm lô xuất (bảng sự kiện) · cho đổi lô FIFO bằng quét · `export_items.packaging_id` (xuất theo lô TP) · bán lẻ gắn lô · QR vị trí kho · bắt buộc gắn lô khi chốt (chờ §7 câu 4).
 
 ## 7. Còn treo — xưởng phải chốt (KHÔNG tự chốt thay)
 

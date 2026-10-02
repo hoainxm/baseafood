@@ -12,11 +12,14 @@ import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { KhungQuetQr, TemLoQr, useDuLieuTruyXuat } from "@/features/shared";
 import { InTemHangLoat } from "./InTemHangLoat";
+import { useLabelPrints } from "@/lib/catalogRepo";
 import { kg, viDate } from "@/lib/format";
 import {
   TEN_LOAI,
   canBangLo,
   docMaQr,
+  khoaLo,
+  tomTatIn,
   nutLo,
   timLo,
   truyNguoc,
@@ -83,6 +86,8 @@ export default function QrTraCuuScreen() {
   const [dangQuet, setDangQuet] = useState(false);
   const [maGo, setMaGo] = useState("");
   const [inTem, setInTem] = useState(false);
+  const [soIn] = useLabelPrints();
+  const daIn = useMemo(() => tomTatIn(soIn), [soIn]);
 
   // Mã đang tra nằm trên đường link (?lo=…) ⇒ camera điện thoại quét tem mở thẳng
   // màn này, và copy link gửi người khác là họ thấy đúng lô đó.
@@ -240,6 +245,37 @@ export default function QrTraCuuScreen() {
               <p className="text-muted-foreground">
                 {[dangXem.moTa, dangXem.xuong && `xưởng ${dangXem.xuong}`].filter(Boolean).join(" · ")}
               </p>
+              {dangXem.kind !== "X" &&
+                (() => {
+                  const t = daIn.get(khoaLo(dangXem.kind, dangXem.id));
+                  if (!t)
+                    return (
+                      <p className="flex flex-wrap items-center gap-2">
+                        <Nhan loai="cho">Chưa in tem</Nhan>
+                        <span className="text-muted-foreground">Lô này chưa có lần in tem nào được ghi lại.</span>
+                      </p>
+                    );
+                  return (
+                    <div className="space-y-1">
+                      <p className="flex flex-wrap items-center gap-2">
+                        <Nhan loai="xong">Đã in {t.tem} tem</Nhan>
+                        <span className="text-muted-foreground">
+                          Lần gần nhất {viDate(t.cuoi.printedAt.slice(0, 10))}
+                          {t.cuoi.operator ? ` · ${t.cuoi.operator}` : ""}
+                        </span>
+                      </p>
+                      {t.cuoi.label && t.cuoi.label !== dangXem.nhan && (
+                        <p className="flex flex-wrap items-center gap-2">
+                          <Nhan loai="luu-y">Nhãn đã đổi</Nhan>
+                          <span>
+                            Tem đang dán ghi <b className="tnum">{t.cuoi.label}</b>, nay là{" "}
+                            <b className="tnum">{dangXem.nhan}</b> (sửa ngày / xưởng sau khi in). Quét tem cũ vẫn ra đúng lô — in lại nếu cần chữ khớp.
+                          </span>
+                        </p>
+                      )}
+                    </div>
+                  );
+                })()}
               <dl className="grid gap-x-6 gap-y-2 sm:grid-cols-2">
                 {dangXem.chiTiet.map((c, i) => (
                   <div key={i} className="flex justify-between gap-3 border-b border-border pb-1">

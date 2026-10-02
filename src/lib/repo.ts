@@ -46,6 +46,7 @@ import type {
   MonthlyStockLine,
   ReconciliationRun,
   LotInput,
+  LabelPrint,
 } from "@/types";
 import { rolesFromCsv, rolesToCsv } from "@/types";
 import { ghiNhatKy, type NhatKyMoi } from "@/lib/audit";
@@ -1230,6 +1231,34 @@ export const BANG_LOT_INPUT: AnhXaBang<LotInput> = {
   }),
 };
 
+/**
+ * Sổ in tem QR (mig 0049) — mỗi lần bấm In ghi một dòng cho mỗi lô. Chỉ THÊM
+ * bảng; nhãn lô vẫn suy từ bản ghi, `label` ở đây là nhãn đã in (đông cứng).
+ */
+export const BANG_LABEL_PRINT: AnhXaBang<LabelPrint> = {
+  table: "label_prints",
+  localKey: "bsf.label-prints.v1",
+  layKhoa: theoId,
+  toRow: (x) => ({
+    id: x.id,
+    lot_kind: x.lotKind,
+    lot_id: x.lotId,
+    label: x.label,
+    copies: x.copies,
+    operator: x.operator,
+    printed_at: x.printedAt || undefined,
+  }),
+  fromRow: (r) => ({
+    id: s(r.id),
+    lotKind: s(r.lot_kind) === "W" ? "W" : s(r.lot_kind) === "P" ? "P" : "S",
+    lotId: s(r.lot_id),
+    label: s(r.label),
+    copies: Number(r.copies) || 1,
+    operator: s(r.operator),
+    printedAt: s(r.printed_at),
+  }),
+};
+
 /* ---------- Nhật ký thao tác (audit) ---------- */
 
 /** Nhãn tiếng Việt của bảng — cho câu tóm tắt nhật ký dễ đọc. */
@@ -1263,6 +1292,7 @@ const NHAN_BANG: Record<string, string> = {
   monthly_stock_ledger: "Sổ kho theo tháng",
   reconciliation_runs: "Bản đối soát hóa đơn",
   lot_inputs: "Gắn lô đầu vào (truy xuất)",
+  label_prints: "In tem QR",
 };
 
 /** Trường đổi giữa hai bản ghi → { trường: [trước, sau] }. */

@@ -9,7 +9,8 @@ import { useMemo, useState } from "react";
 import type { LotKind, Workshop } from "@/types";
 import { TemLoQr, useDuLieuTruyXuat } from "@/features/shared";
 import { kg, viDate } from "@/lib/format";
-import { TEN_LOAI, dsLoDeIn, type NutLo } from "@/lib/truyXuatLo";
+import { TEN_LOAI, dsLoDeIn, khoaLo, tomTatIn, type NutLo } from "@/lib/truyXuatLo";
+import { useLabelPrints } from "@/lib/catalogRepo";
 import { Button, ChoiceGroup, DateRangeField, EmptyState, Nhan, congNgay, homNay, notify, sacTheoTen } from "@/design-system";
 import { Printer } from "lucide-react";
 
@@ -29,8 +30,13 @@ export function InTemHangLoat() {
   // Lưu những lô người dùng BỎ chọn (mặc định chọn hết) — đổi bộ lọc thì lô mới vào vẫn được chọn.
   const [boChon, setBoChon] = useState<Set<string>>(new Set());
   const [dangIn, setDangIn] = useState<NutLo[] | null>(null);
+  const [chiChuaIn, setChiChuaIn] = useState(false);
+  const [soIn] = useLabelPrints();
+  const daIn = useMemo(() => tomTatIn(soIn), [soIn]);
 
-  const ds = useMemo(() => dsLoDeIn(dl, { tu, den, xuong, loai }), [dl, tu, den, xuong, loai]);
+  const tatCa = useMemo(() => dsLoDeIn(dl, { tu, den, xuong, loai }), [dl, tu, den, xuong, loai]);
+  const soChuaIn = tatCa.filter((n) => !daIn.has(khoaLo(n.kind as LotKind, n.id))).length;
+  const ds = chiChuaIn ? tatCa.filter((n) => !daIn.has(khoaLo(n.kind as LotKind, n.id))) : tatCa;
   const daChon = ds.filter((n) => !boChon.has(khoaNut(n)));
 
   const doiLoai = (k: LotKind) =>
@@ -87,12 +93,28 @@ export function InTemHangLoat() {
             ))}
           </div>
         </div>
+        <label className="flex cursor-pointer items-center gap-3">
+          <input
+            type="checkbox"
+            className="size-5 shrink-0"
+            checked={chiChuaIn}
+            onChange={(e) => setChiChuaIn(e.target.checked)}
+          />
+          <span>
+            Chỉ lô <b>chưa in tem</b>{" "}
+            <span className="tnum text-muted-foreground">({soChuaIn} / {tatCa.length} lô)</span>
+          </span>
+        </label>
       </div>
 
       {ds.length === 0 ? (
         <EmptyState
-          tieuDe="Không có lô nào trong khoảng này"
-          moTa="Nới khoảng ngày, chọn thêm loại lô hoặc đổi phân xưởng."
+          tieuDe={chiChuaIn && tatCa.length ? "Lô trong khoảng này đều đã in tem" : "Không có lô nào trong khoảng này"}
+          moTa={
+            chiChuaIn && tatCa.length
+              ? "Bỏ tick \"Chỉ lô chưa in tem\" nếu cần in lại."
+              : "Nới khoảng ngày, chọn thêm loại lô hoặc đổi phân xưởng."
+          }
         />
       ) : (
         <div className="space-y-3 rounded-xl border-2 border-border p-4">
@@ -138,6 +160,14 @@ export function InTemHangLoat() {
                       <span className="flex flex-wrap items-center gap-2">
                         <Nhan loai="phan-loai" sac={sacTheoTen(TEN_LOAI[n.kind])}>{TEN_LOAI[n.kind]}</Nhan>
                         <span className="tnum font-semibold">{n.nhan}</span>
+                        {(() => {
+                          const t = daIn.get(khoaLo(n.kind as LotKind, n.id));
+                          return t ? (
+                            <Nhan loai="xong">Đã in {t.tem} tem · {viDate(t.cuoi.printedAt.slice(0, 10))}</Nhan>
+                          ) : (
+                            <Nhan loai="cho">Chưa in tem</Nhan>
+                          );
+                        })()}
                       </span>
                       <span className="block text-muted-foreground">
                         {[n.moTa, viDate(n.ngay), n.xuong && `xưởng ${n.xuong}`, daiLy, n.kg ? kg(n.kg) : ""]

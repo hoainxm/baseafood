@@ -290,6 +290,10 @@ export default function SanXuatBTPScreen() {
     ? banGhiChot(tuHieuLuc, xuong)
     : undefined;
   const dangKhoa = Boolean(chotHienTai?.isLocked);
+  /** Mẻ của ngày đang chốt CHƯA gắn lô NL — nhắc khi chốt (không chặn: §7 câu 4 spec QR còn treo). */
+  const meChuaGanLo = xemMotNgayMotXuong
+    ? rows.filter((r) => r.productionDate === tuHieuLuc && r.workshop === xuong && !soLoGan(r.id))
+    : [];
   const tongNgayXuong = (n: string, x: Workshop) =>
     rows
       .filter((r) => r.productionDate === n && r.workshop === x)
@@ -1317,6 +1321,41 @@ export default function SanXuatBTPScreen() {
               placeholder="Ghi chú (nếu có)"
             />
           </Field>
+
+          {/* Nhắc gắn lô NL (đợt 2 truy xuất QR): mẻ chưa gắn lô thì quét tem thành phẩm
+              không truy ngược được về nguyên liệu. CHỈ NHẮC, không chặn chốt. */}
+          {meChuaGanLo.length > 0 && (
+            <div className="min-w-0 space-y-2 rounded-lg border-2 border-warning/60 bg-warning/10 p-3">
+              <p className="flex flex-wrap items-center gap-2 font-semibold text-foreground">
+                <Nhan loai="luu-y">Chưa gắn lô</Nhan>
+                {meChuaGanLo.length} mẻ chưa ghi đã dùng lô nguyên liệu nào
+              </p>
+              <p className="text-muted-foreground">
+                Không gắn thì quét tem thành phẩm sẽ không truy ngược được về nguyên liệu. Vẫn chốt được — gắn sau cũng được.
+              </p>
+              <ul className="space-y-1">
+                {meChuaGanLo.map((r) => (
+                  <li key={r.id} className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="min-w-0">
+                      {tenMH(r.productId)} · <span className="tnum">{kg(r.quantityKg || 0)}</span>
+                    </span>
+                    <Button
+                      title="Đóng hộp chốt và mở hộp gắn lô nguyên liệu cho mẻ này (quét tem, gõ mã hoặc chọn)."
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setHoiChot(false);
+                        setGanLo(r);
+                      }}
+                    >
+                      <Link2 />
+                      Gắn lô NL
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           {/* Còn dở cuối ngày (khép vòng G1): NL chưa chế biến hết đem lưu kho →
               sổ Tồn kho NL cộng vào "đông gửi" kỳ tương ứng. Tách theo loại NL. */}

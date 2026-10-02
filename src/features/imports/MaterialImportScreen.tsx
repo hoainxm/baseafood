@@ -51,6 +51,7 @@ import {
   type MucChon,
 } from "@/design-system";
 import { kg, num, todayISO, viDate } from "@/lib/format";
+import { nhanLoNl } from "@/lib/truyXuatLo";
 import { useAuth } from "@/lib/auth";
 import { DailyTaskReminder, QrTemLoIn, PhieuTrongNhapNL } from "@/features/shared";
 import { useSuaDanhMuc } from "@/features/catalog/SuaDanhMucNhanh";
@@ -562,7 +563,10 @@ export default function NhapNguyenLieuScreen() {
   const maLoPhien = !phien
     ? ""
     : chuyenIdPhien
-      ? chuyen.find((c) => c.id === chuyenIdPhien)?.lotCode || "— (dữ liệu cũ)"
+      ? (() => {
+          const c = chuyen.find((x) => x.id === chuyenIdPhien);
+          return c ? nhanLoNl(c) : "— (dữ liệu cũ)";
+        })()
       : sinhMaLo(phien.deliveryDate, phien.workshop, chuyen);
   /** Các dòng trong bảng đủ để lưu (có loại + số lượng). */
   const dongHopLe = dongBang.filter(dongDayDu);
@@ -1774,9 +1778,9 @@ export default function NhapNguyenLieuScreen() {
                         {!n.chuyen && (
                           <Nhan loai="nguon">Dữ liệu cũ</Nhan>
                         )}
-                        {n.chuyen?.lotCode && (
+                        {n.chuyen && (
                           <Nhan loai="phu" className="tnum">
-                            Lô {n.chuyen.lotCode}
+                            Lô {nhanLoNl(n.chuyen)}
                           </Nhan>
                         )}
                         {n.chuyen?.ssccCode && (
@@ -1821,7 +1825,7 @@ export default function NhapNguyenLieuScreen() {
                           Sửa chuyến
                         </Button>
                       )}
-                      {n.chuyen?.lotCode && (
+                      {n.chuyen && (
                         <Button
                           title="In tem QR mã lô của chuyến này để dán lên kiện hàng, sau quét tra ngược được nguồn gốc."
                           variant="outline"

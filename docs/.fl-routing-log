@@ -45,5 +45,6 @@
 2026-09-29 | so-kho-thang | CLAUDE.md, docs/app-map/36-so-kho-thang.md, src/design-system/README.md
 2026-09-29 | so-kho-thang/ui | CLAUDE.md, src/design-system/README.md, docs/app-map/36-so-kho-thang.md
 2026-09-29 | balancing/ui | CLAUDE.md, docs/app-map/31-can-doi-ky.md, docs/trien-khai/plan-flow-can-doi-5-ngay.md, docs/trien-khai/bang-cau-hoi-xac-nhan-truoc-plan.md, docs/demo/cach-doc-excel.md, src/design-system/README.md
+2026-10-02 | qr-truy-xuat,nhap-hang,san-xuat,kho,don,db,tang-du-lieu | docs/spec/qr-truy-xuat-lo.md,docs/app-map/30-nhap-hang.md,docs/app-map/34-btp-san-xuat-kho.ba-spec.md,docs/app-map/35-btp-ui.design-spec.md,docs/app-map/03-database.md,docs/app-map/04-tang-du-lieu.md,docs/app-map/02-pages-navigation.md,src/design-system/README.md
 2026-10-02 | ui-design-system,nhap-hang,san-xuat,danh-muc | src/design-system/README.md,docs/app-map/01-app-structure.md,docs/app-map/30-nhap-hang.md,docs/app-map/34-btp-san-xuat-kho.ba-spec.md,docs/app-map/35-btp-ui.design-spec.md,docs/app-map/32-danh-muc.md,docs/app-map/04-tang-du-lieu.md
 2026-10-02 | ui-design-system,danh-muc,tang-du-lieu,nhap-hang,ban-hang,san-xuat | src/design-system/README.md,docs/app-map/32-danh-muc.md,docs/app-map/04-tang-du-lieu.md,docs/app-map/01-app-structure.md,docs/app-map/03-database.md,docs/app-map/35-btp-ui.design-spec.md

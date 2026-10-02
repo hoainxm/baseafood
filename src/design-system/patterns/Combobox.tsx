@@ -16,7 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { InfoTip } from "./InfoTip";
 import { cn } from "@/lib/utils";
-import { Check, ChevronsUpDown, Plus, X } from "lucide-react";
+import { Check, ChevronsUpDown, Pencil, Plus, X } from "lucide-react";
 
 export interface MucChon {
   value: string;
@@ -37,6 +37,8 @@ export interface MucChon {
  *  - Danh sách CÓ THANH CUỘN NHÌN THẤY ĐƯỢC, dòng cao 48px.
  *  - Không tìm thấy → nút "Thêm mới «...»" ngay trong danh sách.
  *  - Đã chọn thì có dấu ✓ và nút xóa lựa chọn (không phải xóa bản ghi).
+ *  - Có `onSuaMuc` → mỗi mục có nút bút chì để SỬA bản ghi danh mục đó (mở hộp
+ *    sửa của màn gọi). Bấm tên vẫn là chọn; bút chì không chọn mục.
  */
 export function Combobox({
   label,
@@ -53,6 +55,8 @@ export function Combobox({
   choPhepXoa = true,
   anNhanBatBuoc = false,
   anNhan = false,
+  onSuaMuc,
+  nhanSua,
   className,
 }: {
   label: string;
@@ -78,6 +82,14 @@ export function Combobox({
    * nhãn phải luôn hiện — xem luật ở src/design-system/README.md.
    */
   anNhan?: boolean;
+  /**
+   * Có hàm này → mỗi mục trong danh sách có nút bút chì "Sửa". Bấm thì đóng
+   * danh sách và gọi hàm với value của mục — màn gọi tự mở hộp sửa của nó.
+   * Chỉ bật cho danh mục mà màn có hộp sửa (VD thành phẩm ở /wip).
+   */
+  onSuaMuc?: (value: string) => void;
+  /** Câu `title` cho nút bút chì (mặc định "Sửa mục này trong danh mục."). */
+  nhanSua?: string;
   className?: string;
 }) {
   const [open, setOpen] = React.useState(false);
@@ -200,6 +212,7 @@ export function Combobox({
                         setTim("");
                         setOpen(false);
                       }}
+                      className={onSuaMuc ? "group/muc" : undefined}
                     >
                       <Check
                         className={cn(
@@ -215,6 +228,33 @@ export function Combobox({
                           </span>
                         )}
                       </span>
+                      {onSuaMuc && (
+                        <button
+                          type="button"
+                          aria-label={`Sửa ${o.label}`}
+                          title={nhanSua ?? "Sửa mục này trong danh mục."}
+                          // Chặn cả pointerdown lẫn click để cmdk KHÔNG coi là chọn mục.
+                          onPointerDown={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                          }}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setTim("");
+                            setOpen(false);
+                            onSuaMuc(o.value);
+                          }}
+                          className={cn(
+                            "inline-flex size-9 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:opacity-100",
+                            // Máy có chuột: hiện khi rê / khi mục đang được chọn bằng phím.
+                            // Màn cảm ứng (không rê được): luôn hiện.
+                            "[@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/muc:opacity-100 [@media(hover:hover)]:group-data-[selected=true]/muc:opacity-100"
+                          )}
+                        >
+                          <Pencil className="size-4" />
+                        </button>
+                      )}
                     </CommandItem>
                   ))}
                 </CommandGroup>

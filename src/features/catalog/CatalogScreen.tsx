@@ -6,7 +6,7 @@
 import { useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import type { Supplier, Customer, MaterialType, Product, StorageLocation } from "@/types";
-import { CATEGORIES, STORAGE_KIND_LABELS, laCoTach, quyCachBlock } from "@/types";
+import { CATEGORIES, KIEU_CHE_BIEN, STORAGE_KIND_LABELS, laCoTach, quyCachBlock } from "@/types";
 import { uid } from "@/lib/db";
 import { num } from "@/lib/format";
 import {
@@ -32,17 +32,6 @@ import ThanhPham141 from "./FinishedGoodScreen";
 
 const THI_TRUONG = ["Nhật", "EU", "Mỹ", "Hàn Quốc", "Trung Quốc", "Nội địa"];
 
-/** Kiểu chế biến của thành phẩm — facet thứ 3 (migration 0027). Danh mục MỞ, thêm tại chỗ. */
-const KIEU_CHE_BIEN = [
-  "Nguyên con làm sạch",
-  "Luộc",
-  "Chần",
-  "Cắt",
-  "Cắt luộc",
-  "Cắt chần",
-  "Tẩm bột",
-  "Tẩm gia vị",
-];
 
 /**
  * Một trang "Danh mục" cho tất cả danh sách dùng chung.

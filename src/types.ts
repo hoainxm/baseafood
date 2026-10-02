@@ -116,6 +116,19 @@ export const CATEGORIES = [
 ] as const;
 export type Category = (typeof CATEGORIES)[number];
 
+/** Kiểu chế biến của thành phẩm — facet thứ 3 (migration 0027). Danh mục MỞ, thêm tại chỗ.
+ *  Dùng chung cho Danh mục mặt hàng và hộp sửa nhanh thành phẩm ở /wip. */
+export const KIEU_CHE_BIEN = [
+  "Nguyên con làm sạch",
+  "Luộc",
+  "Chần",
+  "Cắt",
+  "Cắt luộc",
+  "Cắt chần",
+  "Tẩm bột",
+  "Tẩm gia vị",
+];
+
 export interface ImportShipment {
   id: string;
   deliveryDate: string; // yyyy-mm-dd

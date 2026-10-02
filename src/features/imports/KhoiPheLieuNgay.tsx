@@ -67,12 +67,29 @@ export function KhoiPheLieuNgay({
     0
   );
 
+  /**
+   * Dòng phế liệu mới. Loại mặc định "Nội tạng" (đa số phế liệu là nội tạng);
+   * cân dạt thì người dùng đổi ở ô Loại. Riêng "ghi tiếp loại khác" truyền
+   * `daGhi` để gợi ý loại chưa ghi (vừa ghi nội tạng ⇒ gợi ý Dạt).
+   */
+  const dongMoi = (daGhi: string[] = []): ScrapItem => ({
+    id: newId(),
+    periodId: "",
+    name: PHE_LIEU_GOI_Y.find((t) => !daGhi.includes(t)) ?? PHE_LIEU_GOI_Y[0],
+    quantityKg: 0,
+    sellingPrice: null,
+    date: ngay,
+    workshop: phanXuong,
+    source: "Nhập hàng",
+  });
+
   const optLoai: MucChon[] = PHE_LIEU_GOI_Y.map((t) => ({
     value: t,
     label: t,
   }));
 
-  const luu = () => {
+  /** `ghiTiep`: lưu xong giữ hộp thoại mở để ghi loại khác (chỉ khi thêm mới). */
+  const luu = (ghiTiep = false) => {
     if (!dang) return;
     const ls: LoiNhap[] = [];
     if (!dang.name.trim())
@@ -89,18 +106,9 @@ export function KhoiPheLieuNgay({
         ? `Đã ghi phế liệu ${dang.name} — ${kg(dang.quantityKg)}`
         : "Đã lưu thay đổi"
     );
-    if (laThem) {
-      // Thêm được NHIỀU loại trong một lần: reset form, giữ hộp thoại mở.
-      setDang({
-        id: newId(),
-        periodId: "",
-        name: "",
-        quantityKg: 0,
-        sellingPrice: null,
-        date: ngay,
-        workshop: phanXuong,
-        source: "Nhập hàng",
-      });
+    if (laThem && ghiTiep) {
+      // Ghi thêm loại khác: reset form, giữ hộp thoại mở, gợi ý loại chưa ghi.
+      setDang(dongMoi([...cuaNgay.map((r) => r.name), dang.name]));
       setLoi([]);
     } else {
       setDang(null);
@@ -179,16 +187,7 @@ export function KhoiPheLieuNgay({
             title="Ghi một dòng phế liệu phát sinh trong ngày (đầu, da, vụn…) để kỳ cân đối hút sang."
             size="lg"
             onClick={() => {
-              setDang({
-                id: newId(),
-                periodId: "",
-                name: "",
-                quantityKg: 0,
-                sellingPrice: null,
-                date: ngay,
-                workshop: phanXuong,
-                source: "Nhập hàng",
-              });
+              setDang(dongMoi());
               setLaThem(true);
               setLoi([]);
             }}
@@ -270,7 +269,7 @@ export function KhoiPheLieuNgay({
             <DialogDescription className="text-base">
               Ngày {viDate(ngay)} · xưởng {phanXuong}.
               {laThem
-                ? " Thêm được nhiều loại — mỗi loại bấm “Thêm loại này”, xong bấm “Xong”."
+                ? " Có cả nội tạng lẫn dạt: bấm “Lưu, ghi tiếp loại khác” cho loại đầu."
                 : ""}
             </DialogDescription>
           </DialogHeader>
@@ -283,7 +282,7 @@ export function KhoiPheLieuNgay({
               <Combobox
                 label="Loại phế liệu"
                 required
-                hint="Chưa có trong danh sách thì gõ tên rồi bấm Thêm mới."
+                hint="Mặc định Nội tạng — cân hàng dạt thì đổi sang Dạt. Loại khác: gõ tên rồi bấm Thêm mới."
                 value={dang.name}
                 onChange={(v) => setDang((d) => (d ? { ...d, name: v } : d))}
                 options={optLoai}
@@ -315,13 +314,33 @@ export function KhoiPheLieuNgay({
 
           <DialogFooter>
             <Button
-              title="Đóng hộp thoại, không ghi gì." variant="outline" size="lg" onClick={() => setDang(null)}>
-              {laThem ? "Xong" : "Hủy"}
+              variant="outline"
+              size="lg"
+              onClick={() => setDang(null)}
+            >
+              Hủy
             </Button>
+            {laThem && (
+              <Button
+                title="Lưu dòng này rồi để hộp thoại mở để ghi tiếp loại phế liệu khác (VD vừa ghi nội tạng, giờ ghi dạt)."
+                variant="outline"
+                size="lg"
+                onClick={() => luu(true)}
+              >
+                <Plus />
+                Lưu, ghi tiếp loại khác
+              </Button>
+            )}
             <Button
-              title="Ghi dòng phế liệu này vào sổ của ngày đang chọn." size="lg" onClick={luu}>
-              {laThem ? <Plus /> : null}
-              {laThem ? "Thêm loại này" : "Lưu"}
+              title={
+                laThem
+                  ? "Lưu dòng phế liệu này vào sổ của ngày đang chọn rồi đóng hộp thoại."
+                  : "Lưu thay đổi của dòng phế liệu này."
+              }
+              size="lg"
+              onClick={() => luu(false)}
+            >
+              Lưu
             </Button>
           </DialogFooter>
         </DialogContent>

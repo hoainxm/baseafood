@@ -216,12 +216,24 @@ Luật khi dùng:
 
 ### 5d. Ô số: nhập biểu thức + điều hướng phím kiểu Excel
 
-**Biểu thức số học.** `NumberField` và ô lưới `LuoiNhap` hiểu cả biểu thức: gõ
-`250+300` ra `550`, `(3+4)*2` ra `14`, `1.000+250` ra `1250`. Chỉ `+ − * / ( )`;
-tính bằng `parseSoHoacBieuThuc` (trong `NumberField.tsx`) — tự tách token, **không
-`eval`**, chia 0 → bỏ. Số theo vi-VN như cũ (`.` phân nghìn, `,` thập phân), nên
-`-5` hay `1.234,5` vẫn là số thường. Đặt MỘT chỗ ở `NumberField`/`OLuoi` nên phủ
-mọi màn có ô số — màn KHÔNG cần tự parse.
+**Biểu thức số học kiểu Excel — áp cho MỌI ô số.** Một lõi chung, ba lớp:
+
+| Lớp | File | Vai trò |
+|---|---|---|
+| Hàm thuần | `patterns/bieuThucSo.ts` (+ `bieuThucSo.test.ts`) | `parseSo` · `dinhDangSo` · `laBieuThuc` · `tinhBieuThuc` · `parseSoHoacBieuThuc` |
+| Hành vi ô | `patterns/useNhapSo.ts` | ghi theo phím, Esc trả số cũ, rời ô định dạng lại, trả `xemTruoc` |
+| Ô dựng sẵn | `NumberField` (có nhãn) · ô lưới `LuoiNhap` · `ONhapSo` (ô trần, không nhãn) | cùng gọi `useNhapSo` + `XemTruocBieuThuc` |
+
+- Gõ được: `250+300`, `=250+300` (dấu `=` đầu như Excel), `(3+4)*2`, `12x5` / `12×5`
+  (`x` = nhân), `100:4` / `100÷4` (`:` = chia), `1000*5%` (`%` hậu tố = chia 100).
+  Số theo vi-VN như cũ (`.` phân nghìn, `,` thập phân) nên `-5`, `1.234,5` vẫn là số
+  thường. Tự tách token, **không `eval`**; chia 0 / ngoặc lệch ⇒ không tính.
+- Đang gõ biểu thức: nhãn nổi **"= 550 kg"** ngay dưới ô (portal ra `body`, nên không
+  bị khung cuộn bảng / hộp thoại cắt). Biểu thức **dở** ("250+") ⇒ **chưa ghi**, giữ số
+  cũ — không ghi tạm 0/null làm mất số thật. **Esc** trả về số lúc vào ô.
+- **Luật:** ô số mới **phải** là `NumberField` (có nhãn) hoặc `ONhapSo` (ô trần trong
+  bảng / thanh cấu hình) — **cấm** `<Input inputMode="decimal">` / `type="number"` tự
+  parse. Màn KHÔNG tự parse số. Ngoại lệ: ô **năm** (số nguyên không phân nghìn).
 
 **Điều hướng ↑/↓/Enter theo cột** cho **bảng số TỰ DỰNG** (không qua `LuoiNhap`,
 VD `WipProductionScreen › BangDongSX`): bọc bảng trong `[data-luoi-phim]`, mỗi
@@ -305,6 +317,7 @@ chip đếm/điều khiển của primitive; màn nghiệp vụ **không** dùng
 | Ô số (kg, tiền, %) | `NumberField` |
 | Chọn 1 trong ≤ 6 | `ChoiceGroup` (nút to) |
 | Chọn 1 trong danh mục dài / cần tạo mới | `Combobox` |
+| Chọn trong danh mục **và cho sửa bản ghi danh mục ngay tại chỗ** | `Combobox` + `onSuaMuc` (bút chì trên từng mục; máy có chuột: hiện khi rê/trỏ phím, cảm ứng: luôn hiện) — màn gọi tự mở hộp sửa. Nên kèm thêm nút bút chì cạnh ô cho mục đang chọn (VD `/wip` › Thành phẩm). |
 | Chọn ngày | `DateField` |
 | Chọn khoảng ngày | `DateRangeField` (hai ô riêng Từ / Đến) |
 | Danh sách bản ghi | `RecordTable` — truyền `sapXep` cho cột để bấm tiêu đề sắp xếp, truyền `timKiem` để hiện ô tìm |

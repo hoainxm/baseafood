@@ -23,7 +23,7 @@ import {
   timLo,
   type NutLo,
 } from "@/lib/truyXuatLo";
-import { Button, EmptyState, Field, FormDialog, Input, Nhan, NutDong, notify } from "@/design-system";
+import { Button, EmptyState, Field, FormDialog, Input, Nhan, NumberField, NutDong, notify } from "@/design-system";
 import { Camera, CameraOff, Link2, Plus, Trash2 } from "lucide-react";
 import { KhungQuetQr } from "./KhungQuetQr";
 import { useDuLieuTruyXuat } from "./useDuLieuTruyXuat";
@@ -58,7 +58,7 @@ export function GanLoDauVao({
 
   const [dangQuet, setDangQuet] = useState(false);
   const [maGo, setMaGo] = useState("");
-  const [kgNhap, setKgNhap] = useState("");
+  const [kgNhap, setKgNhap] = useState<number | null>(null);
   const [luaChon, setLuaChon] = useState<NutLo[]>([]); // mã trùng ⇒ cho người chọn
 
   const daGan = useMemo(
@@ -82,7 +82,7 @@ export function GanLoDauVao({
       notify.canhBao(`Lô ${nut.nhan} đã gắn rồi.`);
       return;
     }
-    const soKg = kgNhap.trim() === "" ? null : Number(kgNhap.replace(",", "."));
+    const soKg = kgNhap;
     if (soKg != null && !(soKg > 0)) {
       notify.canhBao("Số kg phải là số dương, hoặc để trống nếu chưa cân.");
       return;
@@ -102,7 +102,7 @@ export function GanLoDauVao({
     };
     luuLotInputs([...lotInputs, moi]);
     setMaGo("");
-    setKgNhap("");
+    setKgNhap(null);
     setLuaChon([]);
     notify.daLuu(`Đã gắn ${tenVao} ${nut.nhan}${soKg != null ? ` · ${kgChu(soKg)}` : ""}.`);
   };
@@ -189,9 +189,13 @@ export function GanLoDauVao({
 
         <section className="space-y-3">
           <h3 className="font-semibold">Thêm lô</h3>
-          <Field label="Số kg đã dùng" hint="Để trống nếu chưa cân — bổ sung sau cũng được." unit="kg">
-            <Input inputMode="decimal" value={kgNhap} onChange={(e) => setKgNhap(e.target.value)} />
-          </Field>
+          <NumberField
+            label="Số kg đã dùng"
+            hint="Để trống nếu chưa cân — bổ sung sau cũng được."
+            unit="kg"
+            value={kgNhap}
+            onChange={setKgNhap}
+          />
 
           <div className="flex flex-wrap gap-2">
             <Button

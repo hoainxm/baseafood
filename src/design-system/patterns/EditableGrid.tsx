@@ -5,7 +5,9 @@
 // ============================================================
 import * as React from "react";
 import { cn } from "@/lib/utils";
-import { dinhDangSo, parseSo, parseSoHoacBieuThuc } from "./NumberField";
+import { dinhDangSo, parseSo } from "./bieuThucSo";
+import { XemTruocBieuThuc } from "./ONhapSo";
+import { useNhapSo } from "./useNhapSo";
 
 /**
  * LuoiNhap — lưới nhập liệu thay cho "mở hộp thoại, điền, bấm lưu" từng dòng.
@@ -357,51 +359,34 @@ function OLuoi({
   onPhim: (e: React.KeyboardEvent<HTMLInputElement>) => void;
   onDan: (e: React.ClipboardEvent<HTMLInputElement>) => void;
 }) {
-  const [dangGo, setDangGo] = React.useState(false);
-  const [tho, setTho] = React.useState("");
-  const hienThi = dangGo ? tho : giaTri == null || giaTri === 0 ? "" : dinhDangSo(giaTri);
+  // Lõi chung với NumberField: gõ số / biểu thức ("250+300", "=12x5"), ra số hợp
+  // lệ mới ghi (ô lưới ghi THẲNG về sổ nguồn — biểu thức dở không được ghi tạm),
+  // Esc trả số cũ, đang gõ biểu thức hiện "= kết quả" dưới ô.
+  const { props: o, xemTruoc } = useNhapSo({ value: giaTri, onChange: onGhi, rong0: true });
 
   return (
+    <span className="relative block">
     <input
       ref={dangKy}
-      value={hienThi}
+      value={o.value}
       aria-label={nhan}
       inputMode="decimal"
-      onChange={(e) => {
-        setTho(e.target.value);
-        const s = e.target.value.trim();
-        if (s === "") {
-          onGhi(null); // xoá ô
-          return;
-        }
-        // Hiểu cả biểu thức "1+2" → 3, CẬP NHẬT NGAY khi biểu thức đã ra số.
-        // Biểu thức gõ dở ("250+") hay chuỗi chưa hợp lệ ⇒ CHƯA ghi: ô lưới ghi
-        // THẲNG về sổ nguồn nên ghi 0 tạm sẽ xoá số thật (thậm chí bắn lỗi ở ô
-        // nhiều chuyến). Giữ số cũ, chốt nốt khi rời ô (onBlur).
-        const v = parseSoHoacBieuThuc(s);
-        if (v != null) onGhi(v);
-      }}
-      onFocus={(e) => {
-        setTho(giaTri == null || giaTri === 0 ? "" : String(giaTri).replace(".", ","));
-        setDangGo(true);
-        e.currentTarget.select();
-      }}
-      onBlur={() => {
-        // Rời ô: chốt biểu thức nếu đã ra số (VD gõ "250+300" rồi Tab luôn).
-        const s = tho.trim();
-        if (s !== "") {
-          const v = parseSoHoacBieuThuc(s);
-          if (v != null) onGhi(v);
-        }
-        setDangGo(false);
-      }}
+      autoComplete="off"
+      onChange={o.onChange}
+      onFocus={o.onFocus}
+      onBlur={o.onBlur}
       onPaste={onDan}
-      onKeyDown={onPhim}
+      onKeyDown={(e) => {
+        o.onKeyDown(e);
+        if (!e.defaultPrevented) onPhim(e);
+      }}
       className={cn(
         "tnum h-11 w-full min-w-24 border-0 bg-transparent px-3 text-right text-sm",
         "focus:ring-2 focus:ring-ring focus:ring-inset focus:outline-none",
         giaTri != null && giaTri < 0 && "text-destructive"
       )}
     />
+    <XemTruocBieuThuc xemTruoc={xemTruoc} />
+    </span>
   );
 }

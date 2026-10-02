@@ -10,7 +10,7 @@ import type {
   Product,
   Workshop,
 } from "@/types";
-import { isBackdatedWip, quyCachBlock } from "@/types";
+import { isBackdatedWip, laCoTach, quyCachBlock } from "@/types";
 import { newId } from "@/lib/store";
 import { uid } from "@/lib/db";
 import {
@@ -52,7 +52,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
 import { ghiNhatKy } from "@/lib/audit";
 import { KY_OPT, phamViKy, type KyXem } from "@/lib/periodUtils";
-import { DailyTaskReminder, GanLoDauVao, PhieuTrongTPNgay, TemLoQr } from "@/features/shared";
+import { DailyTaskReminder, GanLoDauVao, PhieuTrongTPNgay, SuaThanhPhamNhanh, TemLoQr } from "@/features/shared";
 import { nhanLoBtp, nutLo } from "@/lib/truyXuatLo";
 import {
   CalendarRange,
@@ -194,6 +194,34 @@ export default function SanXuatBTPScreen() {
     setMatHang([...matHang, m]);
     notify.daLuu(`Đã thêm thành phẩm "${ten}"`);
     return m.id;
+  };
+
+  /** Sửa nhanh thành phẩm ngay tại màn (ghi thẳng Danh mục mặt hàng). */
+  const [suaTP, setSuaTP] = useState<Product | null>(null);
+  const moSuaTP = (id: string) => {
+    const m = matHang.find((x) => x.id === id);
+    if (m) setSuaTP(m);
+  };
+  const luuTP = (p: Product) => {
+    const cu = matHang.find((m) => m.id === p.id);
+    setMatHang(matHang.map((m) => (m.id === p.id ? p : m)));
+    // Dòng đang gõ dở cũng ăn theo cờ tách / quy cách mới — trừ dòng mà người
+    // dùng đã tự gõ quy cách khác với quy cách cũ của thành phẩm.
+    const qcCu = quyCachBlock(cu) ?? 0;
+    setDongBang((ds) =>
+      ds.map((d) =>
+        d.productId === p.id
+          ? {
+              ...d,
+              moRong: laCoTach(p) ? true : d.moRong,
+              blockSpecKg:
+                !d.blockSpecKg || d.blockSpecKg === qcCu
+                  ? quyCachBlock(p) ?? d.blockSpecKg
+                  : d.blockSpecKg,
+            }
+          : d
+      )
+    );
   };
 
   const themKhach = (ten: string): string => {
@@ -777,6 +805,7 @@ export default function SanXuatBTPScreen() {
           onThemNhom={themNhom}
           onDoiNhom={doiNhom}
           onTaoMatHang={themMatHang}
+          onSuaMatHang={moSuaTP}
           optKhach={optKhach}
           onTaoKhach={themKhach}
         />
@@ -1165,15 +1194,33 @@ export default function SanXuatBTPScreen() {
                 onChange={(v) => datSua({ workshop: v as Workshop })}
                 options={PHAN_XUONG.map((p) => ({ value: p, label: p }))}
               />
-              <Combobox
-                label="Thành phẩm"
-                required
-                value={sua.productId}
-                onChange={(v) => datSua({ productId: v })}
-                options={optMatHang}
-                onCreate={(ten) => themMatHang(ten)}
-                emptyText="Chưa có thành phẩm — gõ tên rồi Thêm mới."
-              />
+              <div className="flex items-end gap-2">
+                <div className="min-w-0 flex-1">
+                  <Combobox
+                    label="Thành phẩm"
+                    required
+                    value={sua.productId}
+                    onChange={(v) => datSua({ productId: v })}
+                    options={optMatHang}
+                    onCreate={(ten) => themMatHang(ten)}
+                    emptyText="Chưa có thành phẩm — gõ tên rồi Thêm mới."
+                    onSuaMuc={moSuaTP}
+                    nhanSua="Sửa thành phẩm này (tên, mã số, loài, kiểu chế biến, quy cách) — lưu thẳng vào Danh mục."
+                  />
+                </div>
+                {sua.productId && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    aria-label="Sửa thành phẩm này"
+                    title="Sửa thông tin thành phẩm đang chọn (tên, mã số, loài, kiểu chế biến, quy cách) — lưu thẳng vào Danh mục."
+                    onClick={() => moSuaTP(sua.productId)}
+                  >
+                    <Pencil />
+                  </Button>
+                )}
+              </div>
               <Combobox
                 label="Khách hàng"
                 value={sua.customerName ?? ""}
@@ -1391,6 +1438,15 @@ export default function SanXuatBTPScreen() {
         </DialogContent>
       </Dialog>
 
+      {suaTP && (
+        <SuaThanhPhamNhanh
+          thanhPham={suaTP}
+          tatCa={matHang}
+          soDongDaGhi={rows.filter((r) => r.productId === suaTP.id).length}
+          onLuu={luuTP}
+          onClose={() => setSuaTP(null)}
+        />
+      )}
       {ganLo && (
         <GanLoDauVao
           outputKind="W"

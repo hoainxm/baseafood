@@ -1,6 +1,6 @@
 > Load khi: sửa bất cứ thứ gì ở màn Nhập hàng — chuyến, ngày, ghi bù, chốt ngày, phế liệu ngày, phiếu báo cáo ngày.
 covers: src/features/imports/MaterialImportScreen.tsx, src/features/imports/BuocNhap.tsx, src/features/imports/DailyImportInvoice.tsx, src/features/imports/ImportReport.tsx, src/features/imports/OcrPhieuNhap.tsx, src/features/imports/importHelpers.ts, src/features/imports/BangDongHang.tsx, src/features/imports/KhoiPheLieuNgay.tsx, src/lib/ocr.ts, src/types.ts
-last_verified: 2026-09-21
+last_verified: 2026-10-02
 <!-- updated: 2026-09-21 — TÁCH FILE (P2-7 audit PO), KHÔNG đổi logic: MaterialImportScreen.tsx 2169→1630 dòng. Rút ra (1) `importHelpers.ts` — kiểu + hàm THUẦN: PHAN_XUONG, PHE_LIEU_GOI_Y, DauChuyen, CHU_XUONG, sinhMaLo, DongBang, LOAI_MAC_DINH, dongBangRong/dongCoData/dongDayDu, NhomChuyen, gomChuyen, loiDauChuyen — nay có vitest `importHelpers.test.ts` (mã lô, gom chuyến thật/ngầm, sắp thứ tự, luật ghi bù/chốt); (2) `BangDongHang.tsx` — bảng loại hàng của chuyến; (3) `KhoiPheLieuNgay.tsx` — khối phế liệu cân gộp cuối ngày. Màn chính vẫn là orchestrator; sửa luật gom/ghi bù thì vào importHelpers.ts (và sửa test). -->
 
 <!-- re-verified: 2026-09-21 18:20 — bỏ tab "Sổ ngày" (sổ chi tiết vào trong Báo cáo), khoiChot vào cột ngày + nút Báo cáo ngày/Phiếu trống/Tem; gợi ý: xeCuaDaiLy tách {bienSo,taiXe} + chonBienSo/chonTaiXe, DongBang.giaNgay, apMauDaiLyMoi, dongGoiYBoQua, vaoOKgDau focus đồng bộ, onEnterCuoi→#nut-luu-chuyen (vitest 17/17). Thử tay demo: biển số 1 chạm điền tài xế; đổi đại lý giữ 1.000 kg, giá 158.000→160.000; thanh lưu báo 2 loại không lưu; Enter cuối → nút lưu; chốt ngày từ cột phải (nhắc lưu → lưu rồi chốt → Đã chốt 12.100 kg, ẩn Sửa); 360px @100%/130% không tràn. -->
@@ -144,7 +144,7 @@ Khóa theo **(ngày + phân xưởng)**, một bản ghi duy nhất mỗi cặp 
 
 Cân **gộp cuối ngày** theo (ngày + phân xưởng), ngay lúc nhận hàng ⇒ nhập ở màn này, `nguon = "Nhập hàng"`, `kyId` rỗng.
 Màn Cân đối chỉ **hút** vào kỳ (gán `kyId`), không nhập lại lần hai. Xem [31-can-doi-ky](31-can-doi-ky.md).
-Hộp "Thêm phế liệu" cho **thêm nhiều loại trong một lần**: mỗi loại bấm *"Thêm loại này"* (lưu ngay + reset form, hộp thoại vẫn mở), xong bấm *"Xong"* — không phải mở lại hộp cho từng loại (nội tạng, dạt…).
+Hộp "Thêm phế liệu" (`KhoiPheLieuNgay.tsx`): loại **mặc định "Nội tạng"** (đa số phế liệu là nội tạng; cân dạt thì đổi sang "Dạt"). Ba nút: **Hủy** (đóng, không lưu) · **"Lưu, ghi tiếp loại khác"** (lưu + reset form, hộp thoại vẫn mở, tự gợi ý loại CHƯA ghi trong ngày — vừa ghi nội tạng ⇒ gợi ý Dạt) · **Lưu** (lưu rồi đóng). Đổi 2026-10-02: nhãn cũ "Thêm loại này"/"Xong" gây hiểu nhầm — "Xong" thực chất là đóng KHÔNG lưu.
 
 ### 6. Phiếu báo cáo tổng hợp — in A4 NGANG, theo KỲ (`DailyImportInvoice.tsx`)
 

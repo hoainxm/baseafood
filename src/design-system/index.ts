@@ -8,7 +8,10 @@
  */
 
 export { Field, ChuThichBatBuoc } from "./patterns/Field";
-export { NumberField, parseSo, dinhDangSo } from "./patterns/NumberField";
+export { NumberField } from "./patterns/NumberField";
+export { ONhapSo } from "./patterns/ONhapSo";
+export { useNhapSo } from "./patterns/useNhapSo";
+export { parseSo, dinhDangSo, parseSoHoacBieuThuc } from "./patterns/bieuThucSo";
 export { ChoiceGroup, type LuaChon } from "./patterns/ChoiceGroup";
 export { Combobox, type MucChon } from "./patterns/Combobox";
 export {

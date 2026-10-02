@@ -1,6 +1,6 @@
 > Load khi: sửa danh mục (đại lý, loại NL, mặt hàng, khách hàng) hay danh mục 141 mã thành phẩm.
 covers: src/features/catalog/CatalogScreen.tsx, src/features/catalog/FinishedGoodScreen.tsx, src/data/thanh-pham.json, src/design-system/patterns/CatalogCrudModal.tsx, src/lib/catalogRepo.ts
-last_verified: 2026-09-15
+last_verified: 2026-10-02
 ttl_days: 90
 <!-- updated: 2026-08-28 — SEED kiểu chế biến + bổ sung mặt hàng thiếu (đối chiếu file cân đối bạch tuộc 2 da). catalogRepo.seedProducts: (a) hàm suyKieuCheBien(tên) suy processing_type TỪ TÊN khi seed (bảo thủ — không rõ để '', khớp trước thắng; phủ 77/84 mã bạch tuộc, Cá/Mực phần lớn để '' vì từ vựng khác); (b) nối 8 mặt hàng thật thiếu hẳn ở 141 (finishedGoodCode='' = chưa ánh xạ, mức GỘP). Migration 0034 nhân bản cả hai bằng SQL cho bản đã deploy (backfill CHỈ dòng trống + INSERT id 'mh-bs-*' idempotent). KHÔNG đụng 141 mã kế toán (thanh-pham.json). 6 dòng "lệch tên" luộc↔cắt luộc = cùng thứ, giữ mã kế toán. -->
 <!-- updated: 2026-08-26 — tab Mặt hàng thêm 2 thuộc tính cho màn ghi thành phẩm /wip (migration 0031): split_components (ChoiceGroup "Có tách/Không tách" — mã cắt chần tách râu+bao tử cùng giá) + block_spec_kg (NumberField kg/khối). GỘP 1 danh sách LOÀI chuẩn: types.ts CATEGORIES thêm "Bào ngư", BỎ NHOM_TP — tab Mặt hàng + tab Loại NL dùng chung CATEGORIES (trước lệch: Mặt hàng có Bào ngư thiếu Ghẹ, Loại NL ngược lại). Màn /wip GOM THEO LOÀI (products.category có sẵn trên 141 mã), KHÔNG theo loại NL. Xem 34-btp-san-xuat-kho.ba-spec.md. -->
@@ -37,6 +37,7 @@ Gộp làm một vì ba mục điều hướng cũ có tên gần giống nhau �
 - **Kho lưu trữ ≠ 5 kho hệ thống `BSF1_WAREHOUSES`.** `BSF1_WAREHOUSES` (K1000T/K1500T/KX-DONG/KX-CA/KX-KHO, hằng trong `types.ts`) là các kho VẬT LÝ của xưởng, dùng làm khóa ở sổ kho tháng và lưới cân đối — **không sửa**. Danh mục `storage_locations` (tab Kho lưu trữ) là chiều KHÁC: hàng đang gửi ở đâu — kho nhà hay kho lạnh thuê ngoài — dùng cho cột "Kho lưu" của `/nxt-kho`. Đừng gộp hai thứ này.
 - Sổ nghiệp vụ lưu **TÊN** chứ không phải id của danh mục (xem [30-nhap-hang.md](30-nhap-hang.md)). ⇒ **Đổi tên một đại lý KHÔNG hồi tố** vào các dòng đã ghi. Đó là chủ ý (sổ giữ nguyên tên tại thời điểm nhập), không phải bug.
 - Mọi màn nghiệp vụ đều **tạo mới tại chỗ** được từ `Combobox` và phải lưu ngay vào danh mục — không để tên mồ côi ngoài danh mục.
+- **Sửa tại chỗ (2026-10-02):** màn `/wip` có nút bút chì cạnh ô Thành phẩm → `features/shared/SuaThanhPhamNhanh.tsx` sửa CÙNG bản ghi `products` như tab Mặt hàng (một nguồn, không bản sao); mã TK 1551 chỉ CHỌN để ánh xạ. `KIEU_CHE_BIEN` chuyển từ `CatalogScreen.tsx` sang `types.ts` để hai nơi dùng chung.
 - Quy ước ngầm của xưởng, giữ khi thiết kế: NL không ghi loài ⇒ mặc định **bạch tuộc**; "80 trên" = lớn, "80 dưới" = nhỏ (mốc ~80 g/con), định giá khác nhau.
 
 ## Edge cases

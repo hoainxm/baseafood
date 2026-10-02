@@ -83,9 +83,10 @@ export const HUONG_DAN: Record<string, NoiDungHuongDan> = {
         </Muc>
         <Muc tieuDe="Phế liệu (nội tạng, hàng dạt)">
           <p>
-            Cân gộp cuối ngày, nhập ở hộp <b>Thêm phế liệu</b>. Mỗi loại bấm
-            "Thêm loại này", xong bấm "Xong". Chỉ nhập một lần ở đây — màn Cân đối
-            sẽ hút sang, không nhập lại.
+            Cân gộp cuối ngày, nhập ở hộp <b>Thêm phế liệu</b>. Loại mặc định là
+            Nội tạng, cân hàng dạt thì đổi sang Dạt. Bấm <b>Lưu</b> là ghi rồi
+            đóng; có cả hai loại thì bấm <b>Lưu, ghi tiếp loại khác</b> cho loại
+            đầu. Chỉ nhập một lần ở đây — màn Cân đối sẽ hút sang, không nhập lại.
           </p>
         </Muc>
         <Muc tieuDe="Chốt ngày">

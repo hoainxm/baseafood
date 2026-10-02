@@ -8,7 +8,7 @@ import type { Product } from "@/types";
 import { laCoTach, quyCachBlock } from "@/types";
 import { Button, Combobox, NumberField, type MucChon } from "@/design-system";
 import { num } from "@/lib/format";
-import { ChevronDown, Plus, X } from "lucide-react";
+import { ChevronDown, Pencil, Plus, X } from "lucide-react";
 import { dongTrong, laTach, tongDong, type DongSX } from "./wipHelpers";
 
 /**
@@ -28,6 +28,7 @@ export function BangDongSX({
   onThemNhom,
   onDoiNhom,
   onTaoMatHang,
+  onSuaMatHang,
   optKhach,
   onTaoKhach,
 }: {
@@ -46,6 +47,8 @@ export function BangDongSX({
     patch: Partial<Pick<DongSX, "processingType" | "customerName">>
   ) => void;
   onTaoMatHang: (ten: string, processingType: string) => string;
+  /** Mở hộp sửa nhanh thành phẩm đang chọn (tên, loài, kiểu chế biến…). */
+  onSuaMatHang: (productId: string) => void;
   optKhach: MucChon[];
   onTaoKhach: (ten: string) => string;
 }) {
@@ -162,6 +165,8 @@ export function BangDongSX({
                             </button>
                           </td>
                           <td className={td}>
+                            <div className="flex items-center gap-1.5">
+                            <div className="min-w-0 flex-1">
                             <Combobox
                               anNhan
                               label="Thành phẩm"
@@ -180,7 +185,23 @@ export function BangDongSX({
                               options={optMatHangTatCa}
                               onCreate={(ten) => onTaoMatHang(ten, info.pt)}
                               emptyText="Chưa có mặt hàng — gõ tên rồi Thêm mới."
+                              onSuaMuc={onSuaMatHang}
+                              nhanSua="Sửa thành phẩm này (tên, mã số, loài, kiểu chế biến, quy cách) — lưu thẳng vào Danh mục."
                             />
+                            </div>
+                            {d.productId && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                aria-label="Sửa thành phẩm này"
+                                title="Sửa thông tin thành phẩm đang chọn (tên, mã số, loài, kiểu chế biến, quy cách) — lưu thẳng vào Danh mục."
+                                onClick={() => onSuaMatHang(d.productId)}
+                              >
+                                <Pencil />
+                              </Button>
+                            )}
+                            </div>
                           </td>
                           <td className={td}>
                             {tach ? (

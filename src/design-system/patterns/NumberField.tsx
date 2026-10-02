@@ -2,119 +2,13 @@ import * as React from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Field } from "./Field";
+import { XemTruocBieuThuc } from "./ONhapSo";
+import { useNhapSo } from "./useNhapSo";
 import { Minus, Plus } from "lucide-react";
 
-/** "1.234,5" | "1234.5" | "1 234,5" → 1234.5 ; rỗng/không hợp lệ → null */
-export function parseSo(raw: string): number | null {
-  const s = raw.replace(/[\s.]/g, "").replace(",", ".").trim();
-  if (!s) return null;
-  const n = Number(s);
-  return Number.isFinite(n) ? n : null;
-}
-
-/**
- * Tính biểu thức số học kiểu Excel trên chuỗi ĐÃ chuẩn hoá (chỉ còn số + toán tử
- * + - * / và ngoặc). Đệ quy giảm dần, tôn trọng ưu tiên nhân/chia và ngoặc.
- * KHÔNG dùng `eval`/`Function` — tự tách token nên an toàn với chuỗi bất kỳ.
- * Trả null khi chuỗi không hợp lệ (thừa ký tự, chia 0, ngoặc lệch).
- */
-function danhGiaBieuThuc(s: string): number | null {
-  let i = 0;
-  const xem = () => s[i];
-  const boQuaTrong = () => {
-    while (s[i] === " ") i++;
-  };
-
-  function bieuThuc(): number | null {
-    // cộng / trừ
-    let v = hang();
-    if (v == null) return null;
-    boQuaTrong();
-    while (xem() === "+" || xem() === "-") {
-      const op = s[i++];
-      const r = hang();
-      if (r == null) return null;
-      v = op === "+" ? v + r : v - r;
-      boQuaTrong();
-    }
-    return v;
-  }
-  function hang(): number | null {
-    // nhân / chia
-    let v = thua();
-    if (v == null) return null;
-    boQuaTrong();
-    while (xem() === "*" || xem() === "/") {
-      const op = s[i++];
-      const r = thua();
-      if (r == null) return null;
-      if (op === "/" && r === 0) return null; // chia 0
-      v = op === "*" ? v * r : v / r;
-      boQuaTrong();
-    }
-    return v;
-  }
-  function thua(): number | null {
-    // dấu đơn / ngoặc / số
-    boQuaTrong();
-    if (xem() === "+") {
-      i++;
-      return thua();
-    }
-    if (xem() === "-") {
-      i++;
-      const v = thua();
-      return v == null ? null : -v;
-    }
-    if (xem() === "(") {
-      i++;
-      const v = bieuThuc();
-      boQuaTrong();
-      if (xem() !== ")") return null;
-      i++;
-      return v;
-    }
-    let j = i;
-    while (j < s.length && /[0-9.]/.test(s[j])) j++;
-    if (j === i) return null;
-    const num = Number(s.slice(i, j));
-    i = j;
-    return Number.isFinite(num) ? num : null;
-  }
-
-  const kq = bieuThuc();
-  boQuaTrong();
-  return i === s.length && kq != null && Number.isFinite(kq) ? kq : null;
-}
-
-/**
- * "1+2" → 3 · "1.000+250" → 1250 · "250,5*2" → 501 · "(3+4)*2" → 14.
- * Chỉ nhận diện là biểu thức khi có TOÁN TỬ ngoài dấu đầu (để "-5" hay "1.234,5"
- * vẫn là số thường). Số vi-VN: "." phân nghìn (bỏ), "," thập phân (→ ".").
- * Trả null nếu KHÔNG phải biểu thức hợp lệ ⇒ nơi gọi rơi về `parseSo`.
- */
-export function tinhBieuThuc(raw: string): number | null {
-  const s = raw.replace(/\s/g, "").replace(/\./g, "").replace(/,/g, ".");
-  if (!s) return null;
-  if (!/[+\-*/()]/.test(s.slice(1))) return null; // không có toán tử ngoài dấu đầu
-  if (!/^[-+*/().\d]+$/.test(s)) return null; // lẫn ký tự lạ ⇒ không tính
-  return danhGiaBieuThuc(s);
-}
-
-/**
- * Ô số hiểu cả biểu thức: gõ "250+300" ra 550. Là biểu thức hợp lệ thì tính,
- * còn lại rơi về `parseSo` (số thường). Dùng cho `NumberField` và ô lưới.
- */
-export function parseSoHoacBieuThuc(raw: string): number | null {
-  const bt = tinhBieuThuc(raw);
-  return bt != null ? bt : parseSo(raw);
-}
-
-/** 1234.5 → "1.234,5" (vi-VN) */
-export function dinhDangSo(n: number | null): string {
-  if (n == null) return "";
-  return n.toLocaleString("vi-VN", { maximumFractionDigits: 3 });
-}
+// Lõi đọc số / tính biểu thức ở `bieuThucSo.ts` (hàm thuần, có test); hành vi
+// ô (ghi theo phím, Esc, xem trước "= kết quả") ở `ONhapSo.tsx` — dùng chung
+// với ô lưới `LuoiNhap`.
 
 /**
  * Điều hướng bàn phím kiểu Excel cho ô số trong BẢNG tự dựng (không qua
@@ -188,41 +82,30 @@ export function NumberField({
   navCol?: string;
   className?: string;
 }) {
-  const [raw, setRaw] = React.useState(() => dinhDangSo(value));
-  const [dangGo, setDangGo] = React.useState(false);
+  const { props: o, xemTruoc } = useNhapSo({ value, onChange });
 
-  // Đồng bộ khi giá trị bị đổi từ bên ngoài (reset form, nạp bản ghi để sửa).
-  React.useEffect(() => {
-    if (!dangGo) setRaw(dinhDangSo(value));
-  }, [value, dangGo]);
-
-  const buoc = (delta: number) => {
-    const next = Math.max(0, (value ?? 0) + delta);
-    onChange(next);
-    setRaw(dinhDangSo(next));
-  };
+  const buoc = (delta: number) => onChange(Math.max(0, (value ?? 0) + delta));
 
   const input = (
-    <Input
-      type="text"
-      inputMode="decimal"
-      autoComplete="off"
-      className="tnum text-right"
-      placeholder={placeholder}
-      value={raw}
-      data-navcol={navCol || undefined}
-      onKeyDown={navCol ? (e) => dieuHuongCotSo(e, navCol) : undefined}
-      onFocus={() => setDangGo(true)}
-      onChange={(e) => {
-        setRaw(e.target.value);
-        onChange(parseSoHoacBieuThuc(e.target.value));
-      }}
-      onBlur={() => {
-        setDangGo(false);
-        // Rời ô: chốt kết quả biểu thức ("250+300" → "550") rồi định dạng lại.
-        setRaw(dinhDangSo(parseSoHoacBieuThuc(raw)));
-      }}
-    />
+    <div className="relative">
+      <Input
+        type="text"
+        inputMode="decimal"
+        autoComplete="off"
+        className="tnum text-right"
+        placeholder={placeholder}
+        value={o.value}
+        data-navcol={navCol || undefined}
+        onKeyDown={(e) => {
+          o.onKeyDown(e);
+          if (navCol && !e.defaultPrevented) dieuHuongCotSo(e, navCol);
+        }}
+        onFocus={o.onFocus}
+        onChange={o.onChange}
+        onBlur={o.onBlur}
+      />
+      <XemTruocBieuThuc xemTruoc={xemTruoc} donVi={unit} />
+    </div>
   );
 
   return (

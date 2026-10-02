@@ -6,6 +6,7 @@
 import { type ReactNode, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Printer, X } from "lucide-react";
+import { ONhapSo } from "./ONhapSo";
 
 /**
  * PhieuIn — khung bản in A4 NGANG dùng chung cho các màn Báo cáo.
@@ -134,23 +135,21 @@ export function PhieuInTem({
         ))}
         <span className="ml-1 flex items-center gap-1 text-sm text-slate-600">
           <span className="ml-1">Tự chọn</span>
-          <input
-            type="number"
-            min={10}
-            max={200}
+          <ONhapSo
             value={rong}
-            onChange={(e) => setRong(keo(Number(e.target.value)))}
-            className="tnum w-16 rounded-md border border-slate-300 px-2 py-1 text-sm"
+            onChange={(v) => v != null && setRong(keo(v))}
+            donVi="mm"
+            khungClassName="inline-block"
+            className="w-16 rounded-md border border-slate-300 px-2 py-1 text-sm"
             aria-label="Chiều rộng tem (mm)"
           />
           <span aria-hidden>×</span>
-          <input
-            type="number"
-            min={10}
-            max={200}
+          <ONhapSo
             value={cao}
-            onChange={(e) => setCao(keo(Number(e.target.value)))}
-            className="tnum w-16 rounded-md border border-slate-300 px-2 py-1 text-sm"
+            onChange={(v) => v != null && setCao(keo(v))}
+            donVi="mm"
+            khungClassName="inline-block"
+            className="w-16 rounded-md border border-slate-300 px-2 py-1 text-sm"
             aria-label="Chiều cao tem (mm)"
           />
           <span>mm</span>

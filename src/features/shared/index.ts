@@ -7,3 +7,4 @@ export { KhungQuetQr } from "./KhungQuetQr";
 export { useDuLieuTruyXuat } from "./useDuLieuTruyXuat";
 export { PhieuTrongNhapNL, PhieuTrongTPNgay } from "./PhieuTrongIn";
 export { BangCapNhat } from "./UpdateBanner";
+export { SuaThanhPhamNhanh } from "./SuaThanhPhamNhanh";

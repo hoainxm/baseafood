@@ -238,11 +238,12 @@ export default function DashboardScreen() {
             moTa="Nạp báo cáo Xuất–Nhập–Tồn ở màn 'XNT kho (số thật)' để thấy tồn theo kho tại đây."
           />
         ) : (
-          <BangTong rows={khoTong} cot={cotKho} getKey={(r) => r.kho} />
+          <BangTong rows={khoTong} cot={cotKho} getKey={(r) => r.kho} className="cot-dau-dinh" />
         )}
       </Khoi>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      {/* Một cột: bảng biến động 4 cột số không lọt nửa màn laptop (đo 263% ở 1024px). */}
+      <div className="grid gap-6">
         <Khoi
           tieuDe="Biến động lớn trong kỳ"
           moTa="Mặt hàng nhập/xuất nhiều nhất kỳ mới nhất (từ báo cáo NXT)."
@@ -254,7 +255,7 @@ export default function DashboardScreen() {
               moTa="Các mặt hàng đang chỉ giữ tồn, chưa phát sinh nhập/xuất trong kỳ."
             />
           ) : (
-            <BangTong rows={bienDong} cot={cotBienDong} getKey={(r) => r.id} />
+            <BangTong rows={bienDong} cot={cotBienDong} getKey={(r) => r.id} className="cot-dau-dinh" />
           )}
         </Khoi>
 

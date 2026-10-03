@@ -122,6 +122,7 @@ export function taoTruongDanhMuc(loaiNL: MaterialType[], thanhPham: FinishedGood
     },
     {
       key: "materialTypeId",
+      anTrenBang: true,
       nhan: "Loại nguyên liệu",
       render: (giaTri, doiGiaTri) => (
         <Combobox
@@ -179,6 +180,7 @@ export function taoTruongDanhMuc(loaiNL: MaterialType[], thanhPham: FinishedGood
     },
     {
       key: "splitComponents",
+      anTrenBang: true,
       nhan: "Tách râu + bao tử",
       render: (giaTri, doiGiaTri) => {
         const on = giaTri === "1" || giaTri === "true";
@@ -206,6 +208,7 @@ export function taoTruongDanhMuc(loaiNL: MaterialType[], thanhPham: FinishedGood
     },
     {
       key: "blockSpecKg",
+      anTrenBang: true,
       nhan: "Quy cách block (kg/khối)",
       render: (giaTri, doiGiaTri) => (
         <NumberField
@@ -228,6 +231,7 @@ export function taoTruongDanhMuc(loaiNL: MaterialType[], thanhPham: FinishedGood
     },
     {
       key: "code",
+      anTrenBang: true,
       nhan: "Mã số",
       anTrenDienThoai: true,
       goiY: "Nhập số để gọi nhanh. Gõ số này khi chọn mặt hàng là ra tên.",
@@ -291,6 +295,7 @@ export function taoTruongDanhMuc(loaiNL: MaterialType[], thanhPham: FinishedGood
     },
     {
       key: "address",
+      anTrenBang: true,
       nhan: "Địa chỉ",
       anTrenDienThoai: true,
       viDu: "Số nhà, đường, phường, tỉnh",
@@ -301,15 +306,17 @@ export function taoTruongDanhMuc(loaiNL: MaterialType[], thanhPham: FinishedGood
       anTrenDienThoai: true,
       viDu: "VD: 3500424848",
     },
-    { key: "issuedDate", nhan: "Ngày cấp", anTrenDienThoai: true, viDu: "VD: 12/05/2015" },
+    { key: "issuedDate", anTrenBang: true, nhan: "Ngày cấp", anTrenDienThoai: true, viDu: "VD: 12/05/2015" },
     {
       key: "issuedPlace",
+      anTrenBang: true,
       nhan: "Nơi cấp",
       anTrenDienThoai: true,
       viDu: "VD: CA Bà Rịa - Vũng Tàu",
     },
     {
       key: "code",
+      anTrenBang: true,
       nhan: "Mã số",
       anTrenDienThoai: true,
       goiY: "Nhập số để gọi nhanh. Gõ số này ở màn Nhập hàng là ra tên.",
@@ -321,7 +328,7 @@ export function taoTruongDanhMuc(loaiNL: MaterialType[], thanhPham: FinishedGood
       anTrenDienThoai: true,
       viDu: "VD: 0913 xxx xxx",
     },
-    { key: "note", nhan: "Ghi chú", anTrenDienThoai: true, viDu: "Ghi chú thêm" },
+    { key: "note", anTrenBang: true, nhan: "Ghi chú", anTrenDienThoai: true, viDu: "Ghi chú thêm" },
   ];
 
   const fLoaiNL: TruongDanhMuc<MaterialType>[] = [
@@ -375,8 +382,8 @@ export function taoTruongDanhMuc(loaiNL: MaterialType[], thanhPham: FinishedGood
       hienThi: (r) => STORAGE_KIND_LABELS[r.kind] ?? r.kind,
     },
     { key: "address", nhan: "Địa chỉ", anTrenDienThoai: true, viDu: "VD: Hồng Phú, Bà Rịa" },
-    { key: "phone", nhan: "Điện thoại", anTrenDienThoai: true, viDu: "VD: 0254 123 456" },
-    { key: "note", nhan: "Ghi chú", anTrenDienThoai: true, viDu: "Ghi chú thêm" },
+    { key: "phone", anTrenBang: true, nhan: "Điện thoại", anTrenDienThoai: true, viDu: "VD: 0254 123 456" },
+    { key: "note", anTrenBang: true, nhan: "Ghi chú", anTrenDienThoai: true, viDu: "Ghi chú thêm" },
   ];
 
   return {

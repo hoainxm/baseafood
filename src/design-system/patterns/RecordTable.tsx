@@ -11,7 +11,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { ArrowDown, ArrowUp, ArrowUpDown, Search, X } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, Search, X } from "lucide-react";
 
 export interface Cot<T> {
   key: string;
@@ -21,8 +21,11 @@ export interface Cot<T> {
   so?: boolean;
   /** Trường chính, hiện làm tiêu đề thẻ trên điện thoại */
   chinh?: boolean;
-  /** Ẩn khỏi thẻ trên điện thoại (thông tin phụ) */
+  /** Ẩn khỏi thẻ trên điện thoại (thông tin phụ) — xem qua nút "Chi tiết". */
   anTrenDienThoai?: boolean;
+  /** Cột phụ: ẩn khỏi BẢNG (desktop) cho bảng gọn, xem qua nút "Chi tiết" ở
+   *  cuối dòng. Cột `chinh` không bao giờ bị ẩn. */
+  phu?: boolean;
   /** Giá trị dùng để sắp xếp. Không có → cột không sắp xếp được. */
   sapXep?: (row: T) => string | number;
 }
@@ -32,10 +35,17 @@ type Huong = "tang" | "giam";
 /**
  * RecordTable — một nguồn dữ liệu, hai hình thức.
  *
- *  Desktop  : bảng, dòng 56px, sọc xen kẽ, header không in hoa, bấm header
- *             để sắp xếp (mũi tên chỉ rõ đang sắp theo cột nào, chiều nào).
- *  Điện thoại: MỖI BẢN GHI MỘT THẺ, nhãn–giá trị xếp dọc; sắp xếp bằng
- *             danh sách nút thay cho header bảng.
+ *  Vùng chứa ≥ 48rem: bảng, sọc xen kẽ, header không in hoa, bấm header để
+ *             sắp xếp. Cột đầu ghim trái, cột Thao tác ghim phải (nút Sửa/Xóa
+ *             không bao giờ trôi khỏi tầm nhìn), chữ dài xuống dòng thay vì
+ *             kéo bảng rộng ra.
+ *  Vùng chứa hẹp hơn: MỖI BẢN GHI MỘT THẺ, nhãn–giá trị xếp dọc; sắp xếp
+ *             bằng danh sách nút thay cho header bảng.
+ *
+ * Mốc đổi thẻ ↔ bảng đo theo BỀ RỘNG VÙNG CHỨA (container query), không theo
+ * màn hình: laptop có thanh bên, bảng nằm trong lưới 2 cột… đều tự ra thẻ khi
+ * không đủ chỗ. Cột `phu` (bảng) / `anTrenDienThoai` (thẻ) gom vào nút
+ * "Chi tiết" — ẩn cho gọn nhưng không bao giờ mất đường xem.
  *
  * Không bao giờ bắt người dùng cuộn ngang để đọc số — cuộn ngang là chỗ hay
  * đọc nhầm dòng nhất.
@@ -66,8 +76,19 @@ export function RecordTable<T>({
   const [q, setQ] = React.useState("");
   const [sapTheo, setSapTheo] = React.useState<string | null>(null);
   const [huong, setHuong] = React.useState<Huong>("tang");
+  const [moRong, setMoRong] = React.useState<ReadonlySet<string>>(() => new Set());
+  const doiMoRong = (k: string) =>
+    setMoRong((s) => {
+      const n = new Set(s);
+      if (n.has(k)) n.delete(k);
+      else n.add(k);
+      return n;
+    });
 
   const cotSapDuoc = columns.filter((c) => c.sapXep);
+  // Chế độ thẻ: chỉ đưa nút sắp theo cột ĐANG HIỆN trên thẻ — 9 nút cho mọi
+  // trường (kể cả trường ẩn) rối hơn là giúp.
+  const cotSapThe = cotSapDuoc.filter((c) => !c.anTrenDienThoai);
 
   const daLoc = React.useMemo(() => {
     const kw = q.trim().toLowerCase();
@@ -100,7 +121,7 @@ export function RecordTable<T>({
   };
 
   const thanhCongCu = (timKiem || cotSapDuoc.length > 0) && rows.length > 0 && (
-    <div className="flex min-w-0 flex-col gap-3 md:flex-row md:items-center">
+    <div className="flex min-w-0 flex-col gap-3 @3xl:flex-row @3xl:items-center">
       {timKiem && (
         <div className="relative min-w-0 flex-1">
           <Search
@@ -117,10 +138,10 @@ export function RecordTable<T>({
         </div>
       )}
       {/* Sắp xếp trên điện thoại: header bảng không hiện nên cần nút riêng */}
-      {cotSapDuoc.length > 0 && (
-        <div className="flex min-w-0 flex-wrap items-center gap-2 md:hidden">
+      {cotSapThe.length > 0 && (
+        <div className="flex min-w-0 flex-wrap items-center gap-2 @3xl:hidden">
           <span className="text-sm text-muted-foreground">Sắp theo</span>
-          {cotSapDuoc.map((c) => (
+          {cotSapThe.map((c) => (
             <Button
               key={c.key}
               variant={sapTheo === c.key ? "default" : "outline"}
@@ -172,11 +193,50 @@ export function RecordTable<T>({
   }
 
   const cotChinh = columns.find((c) => c.chinh) ?? columns[0];
+  const cotBang = columns.filter((c) => !c.phu || c === cotChinh);
+  const cotAnBang = columns.filter((c) => c.phu && c !== cotChinh);
+  const cotThe = columns.filter((c) => c !== cotChinh && !c.anTrenDienThoai);
+  const cotAnThe = columns.filter((c) => c !== cotChinh && c.anTrenDienThoai);
+  const coCotThaoTac = Boolean(actions) || cotAnBang.length > 0;
+
+  const nutChiTiet = (k: string, coAn: boolean) =>
+    coAn && (
+      <Button
+        variant="ghost"
+        size="sm"
+        aria-expanded={moRong.has(k)}
+        onClick={() => doiMoRong(k)}
+        title={
+          moRong.has(k)
+            ? "Thu gọn phần thông tin thêm của dòng này."
+            : "Xem các thông tin còn lại của dòng này (đang ẩn cho bảng gọn)."
+        }
+      >
+        <ChevronDown
+          className={cn("transition-transform", moRong.has(k) && "rotate-180")}
+        />
+        {moRong.has(k) ? "Thu gọn" : "Chi tiết"}
+      </Button>
+    );
+
+  const chiTiet = (r: T, cot: Cot<T>[]) => (
+    <dl className="grid gap-x-8 gap-y-3 @3xl:grid-cols-2 @5xl:grid-cols-3">
+      {cot.map((c) => (
+        <div key={c.key} className="min-w-0">
+          <dt className="text-sm text-muted-foreground">{c.header}</dt>
+          <dd className={cn("text-sm font-medium break-words", c.so && "tnum")}>
+            {c.render(r)}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
 
   return (
     // min-w-0: khi RecordTable là con của lưới (VD dashboard 2 cột), không cho
     // bảng ép ô rộng theo nội-dung-tối-thiểu → tránh tràn đè khối bên cạnh.
-    <div className={cn("min-w-0 space-y-4", className)}>
+    // @container: mốc thẻ ↔ bảng đo theo bề rộng CHÍNH VÙNG NÀY.
+    <div className={cn("@container min-w-0 space-y-4", className)}>
       {thanhCongCu}
 
       {daSap.length === 0 ? (
@@ -187,14 +247,14 @@ export function RecordTable<T>({
         <>
           {/* Desktop — cuộn ngang khi ô chứa hẹp (VD nằm trong lưới 2 cột) để bảng
               KHÔNG tràn đè khối bên cạnh; đủ rộng thì không có thanh cuộn. */}
-          <div className="scroll-nice-x hidden overflow-x-auto rounded-xl ring-1 ring-foreground/10 md:block">
-            <Table>
+          <div className="scroll-nice-x hidden overflow-x-auto rounded-xl ring-1 ring-foreground/10 @3xl:block">
+            <Table className={cn("bang-ghim-dau", coCotThaoTac && "bang-ghim-cuoi")}>
               <TableHeader>
                 <TableRow>
-                  {columns.map((c) => (
+                  {cotBang.map((c) => (
                     <TableHead
                       key={c.key}
-                      className={cn(c.so && "text-right", "p-0")}
+                      className={cn(c.so && "text-right", "p-0 whitespace-normal")}
                       aria-sort={
                         sapTheo === c.key
                           ? huong === "tang"
@@ -209,25 +269,25 @@ export function RecordTable<T>({
                           onClick={() => doiSap(c.key)}
                           title={`Sắp danh sách theo cột "${c.header}". Bấm lại để đảo tăng ↔ giảm.`}
                           className={cn(
-                            "flex h-11 w-full items-center gap-2 px-4 text-sm font-semibold hover:bg-accent",
-                            c.so && "justify-end"
+                            "flex min-h-11 w-full items-center gap-2 px-4 py-1.5 text-left text-sm leading-snug font-semibold hover:bg-accent",
+                            c.so && "justify-end text-right"
                           )}
                         >
                           {c.header}
                           {sapTheo === c.key ? (
                             huong === "tang" ? (
-                              <ArrowUp className="size-5 text-primary" />
+                              <ArrowUp className="size-5 shrink-0 text-primary" />
                             ) : (
-                              <ArrowDown className="size-5 text-primary" />
+                              <ArrowDown className="size-5 shrink-0 text-primary" />
                             )
                           ) : (
-                            <ArrowUpDown className="size-5 text-muted-foreground/60" />
+                            <ArrowUpDown className="size-5 shrink-0 text-muted-foreground/60" />
                           )}
                         </button>
                       ) : (
                         <span
                           className={cn(
-                            "flex h-11 items-center px-4",
+                            "flex min-h-11 items-center px-4 py-1.5 leading-snug",
                             c.so && "justify-end"
                           )}
                         >
@@ -236,7 +296,7 @@ export function RecordTable<T>({
                       )}
                     </TableHead>
                   ))}
-                  {actions && (
+                  {coCotThaoTac && (
                     <TableHead className="text-right">Thao tác</TableHead>
                   )}
                 </TableRow>
@@ -246,44 +306,71 @@ export function RecordTable<T>({
                     Sắp/lọc giữ nguyên key → KHÔNG re-animate; thêm 1 dòng mới
                     (key mới) thì chỉ dòng đó chạy. Lần đầu/đổi trang thì cả bảng
                     hiện vào một lượt — nhẹ, nằm gọn trong page-fade của AppShell. */}
-                {daSap.map((r) => (
-                  <TableRow key={getKey(r)} className="hien-len">
-                    {columns.map((c) => (
-                      <TableCell
-                        key={c.key}
-                        className={c.so ? "tnum text-right" : undefined}
-                      >
-                        {c.render(r)}
-                      </TableCell>
-                    ))}
-                    {actions && (
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          {actions(r)}
-                        </div>
-                      </TableCell>
-                    )}
-                  </TableRow>
-                ))}
+                {daSap.map((r) => {
+                  const k = getKey(r);
+                  return (
+                    <React.Fragment key={k}>
+                      <TableRow className="hien-len">
+                        {cotBang.map((c) => (
+                          <TableCell
+                            key={c.key}
+                            className={c.so ? "tnum text-right" : undefined}
+                          >
+                            {c.so ? (
+                              c.render(r)
+                            ) : (
+                              // Chữ dài xuống dòng trong khung ≤ 18rem thay vì kéo
+                              // cả bảng rộng ra (ô gốc để whitespace-nowrap).
+                              <div className="max-w-72 break-words whitespace-normal">
+                                {c.render(r)}
+                              </div>
+                            )}
+                          </TableCell>
+                        ))}
+                        {coCotThaoTac && (
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-2">
+                              {nutChiTiet(k, cotAnBang.length > 0)}
+                              {actions?.(r)}
+                            </div>
+                          </TableCell>
+                        )}
+                      </TableRow>
+                      {moRong.has(k) && cotAnBang.length > 0 && (
+                        <TableRow
+                          data-chi-tiet=""
+                          className="odd:bg-muted/30 even:bg-muted/30 hover:bg-muted/30"
+                        >
+                          <TableCell
+                            colSpan={cotBang.length + 1}
+                            className="whitespace-normal"
+                          >
+                            {chiTiet(r, cotAnBang)}
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
               </TableBody>
               {footer && <TableFooter>{footer}</TableFooter>}
             </Table>
           </div>
 
-          {/* Điện thoại / tablet dọc */}
-          <ul className="space-y-3 md:hidden">
-            {daSap.map((r) => (
+          {/* Vùng chứa hẹp (điện thoại, laptop có thanh bên, lưới 2 cột) */}
+          <ul className="space-y-3 @3xl:hidden">
+            {daSap.map((r) => {
+              const k = getKey(r);
+              return (
               <li
-                key={getKey(r)}
+                key={k}
                 className="hien-len rounded-xl bg-card p-4 ring-1 ring-foreground/10"
               >
                 <div className="mb-3 text-lg font-semibold text-foreground">
                   {cotChinh.render(r)}
                 </div>
                 <dl className="space-y-2">
-                  {columns
-                    .filter((c) => c !== cotChinh && !c.anTrenDienThoai)
-                    .map((c) => (
+                  {cotThe.map((c) => (
                       <div
                         key={c.key}
                         className="flex items-baseline justify-between gap-4 border-b border-border/60 pb-2 last:border-0"
@@ -293,7 +380,7 @@ export function RecordTable<T>({
                         </dt>
                         <dd
                           className={cn(
-                            "text-right text-sm font-medium",
+                            "min-w-0 text-right text-sm font-medium break-words",
                             c.so && "tnum"
                           )}
                         >
@@ -302,11 +389,20 @@ export function RecordTable<T>({
                       </div>
                     ))}
                 </dl>
-                {actions && (
-                  <div className="mt-4 flex flex-wrap gap-2">{actions(r)}</div>
+                {moRong.has(k) && cotAnThe.length > 0 && (
+                  <div className="mt-3 rounded-lg bg-muted/40 p-3">
+                    {chiTiet(r, cotAnThe)}
+                  </div>
+                )}
+                {(actions || cotAnThe.length > 0) && (
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {nutChiTiet(k, cotAnThe.length > 0)}
+                    {actions?.(r)}
+                  </div>
                 )}
               </li>
-            ))}
+              );
+            })}
           </ul>
         </>
       )}

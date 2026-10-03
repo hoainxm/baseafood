@@ -747,7 +747,7 @@ export default function WarehouseNxtScreen() {
               />
             </div>
           ) : (
-            <BangTong rows={rows} cot={cot} getKey={(r) => r.id} chon={chonBang} />
+            <BangTong rows={rows} cot={cot} getKey={(r) => r.id} chon={chonBang} dinhDau />
           )}
 
           <p className="text-sm text-muted-foreground">

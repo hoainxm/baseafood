@@ -384,6 +384,55 @@
   }
 }
 
+/* RecordTable: ghim cột ĐẦU (trái) và cột THAO TÁC (phải) khi bảng vẫn phải
+   cuộn ngang — nút Sửa/Xóa không bao giờ trôi khỏi tầm nhìn. Nền ô ghim phải
+   ĐẶC và khớp sọc dòng (odd: background · even: muted/40 trộn sẵn) + hover/đang
+   mở, nếu không chữ cột bên dưới lộ qua. Dòng "Chi tiết" (data-chi-tiet) là MỘT
+   ô colSpan nên loại khỏi luật ghim. Đặt lên thẻ <table>. */
+@utility bang-ghim-dau {
+  & th:first-child,
+  & tbody tr:not([data-chi-tiet]) > td:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+  }
+  & th:first-child {
+    z-index: 2;
+  }
+  & tbody tr:not([data-chi-tiet]):nth-child(odd) > td:first-child {
+    background: var(--background);
+  }
+  & tbody tr:not([data-chi-tiet]):nth-child(even) > td:first-child {
+    background: color-mix(in oklab, var(--muted) 40%, var(--background));
+  }
+  & tbody tr:not([data-chi-tiet]):hover > td:first-child,
+  & tbody tr:not([data-chi-tiet]):has([aria-expanded="true"]) > td:first-child {
+    background: var(--accent);
+  }
+}
+@utility bang-ghim-cuoi {
+  & th:last-child,
+  & tbody tr:not([data-chi-tiet]) > td:last-child {
+    position: sticky;
+    right: 0;
+    z-index: 1;
+    box-shadow: inset 1px 0 0 var(--border);
+  }
+  & th:last-child {
+    z-index: 2;
+  }
+  & tbody tr:not([data-chi-tiet]):nth-child(odd) > td:last-child {
+    background: var(--background);
+  }
+  & tbody tr:not([data-chi-tiet]):nth-child(even) > td:last-child {
+    background: color-mix(in oklab, var(--muted) 40%, var(--background));
+  }
+  & tbody tr:not([data-chi-tiet]):hover > td:last-child,
+  & tbody tr:not([data-chi-tiet]):has([aria-expanded="true"]) > td:last-child {
+    background: var(--accent);
+  }
+}
+
 /* Bảng dài: hàng tên cột DÍNH trên cùng khi cuộn dọc (BangTong `dinhDau`). Khung
    bảng (data-slot="table-container") vừa cuộn ngang vừa cuộn dọc trong chiều cao
    tối đa, vì sticky không bám theo trang khi tổ tiên đã overflow-x. Chân tổng

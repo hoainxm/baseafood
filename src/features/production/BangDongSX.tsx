@@ -129,8 +129,10 @@ export function BangDongSX({
                 {soThat} thành phẩm
               </span>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[840px] border-collapse text-sm">
+            {/* Bề rộng tối thiểu do min-w (rem) của từng cột quyết định — co giãn
+                theo cỡ chữ; không ép cứng px cho cả bảng. */}
+            <div className="scroll-nice-x overflow-x-auto">
+              <table className="w-full border-collapse text-sm">
                 <thead>
                   <tr>
                     <th className={`${th} w-10`} aria-label="Mở tách" />

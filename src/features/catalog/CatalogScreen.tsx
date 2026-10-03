@@ -53,7 +53,8 @@ export default function DanhMucScreen() {
       </div>
 
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList className="w-full overflow-x-auto">
+        {/* 6 tab: hẹp thì XUỐNG HÀNG thay vì cuộn ngang khuất tab cuối. */}
+        <TabsList className="w-full flex-wrap justify-start group-data-horizontal/tabs:h-auto">
           <TabsTrigger value="mat-hang" title="Danh mục mặt hàng thực tế của xưởng — dùng khi ghi sản lượng, đóng gói và bán hàng.">Mặt hàng</TabsTrigger>
           <TabsTrigger value="khach-hang" title="Khách mua thành phẩm, kèm thị trường (Nhật, EU, nội địa…).">Khách hàng</TabsTrigger>
           <TabsTrigger value="dai-ly" title="Đại lý cung cấp nguyên liệu — dùng khi ghi chuyến nhập hàng.">Đại lý</TabsTrigger>

@@ -126,13 +126,40 @@ ngoài màn mà người dùng không biết là còn.
 
 | Loại bảng | Cách làm |
 |---|---|
-| Danh sách bản ghi (mặc định) | `RecordTable` — desktop ra bảng, điện thoại ra thẻ. Đánh dấu `chinh` cho cột tiêu đề thẻ, `anTrenDienThoai` cho cột phụ |
+| Danh sách bản ghi (mặc định) | `RecordTable` — vùng chứa đủ rộng ra bảng, hẹp ra thẻ (xem **5a**). Đánh dấu `chinh` cho cột tiêu đề thẻ, `anTrenDienThoai` cho cột ẩn trên thẻ, **`phu`** cho cột ẩn khỏi bảng — cả hai xem qua nút **Chi tiết** |
 | Báo cáo kiểu Excel, phải đối chiếu nhiều cột số | Giữ bảng rộng + `overflow-x-auto` + **`cot-dau-dinh`** trên `<table>` để khoá cột đầu |
 | **Nhập số hàng loạt kiểu bảng tính** (hàng = mặt hàng, cột = ngày) | `LuoiNhap` — xem mục 5b |
 | Bản in A4 | Ngoại lệ, giữ nguyên bố cục giấy — không responsive hoá |
 
 **Cấm** viết `<table className="min-w-[1120px]">` tay trong màn mới rồi bọc
 `overflow-x-auto` và coi là xong.
+
+### 5a. `RecordTable` — không bắt người dùng cuộn ngang để tìm nút
+
+Bài học 2026-10-03: tab Đại lý (10 cột) ở laptop 1024px rộng ~2.400px, nút
+Sửa nằm cách mép khung 1.400px, thanh cuộn ngang ở đáy bảng cao 1.559px ⇒
+người dùng phải cuộn xuống tận đáy rồi kéo ngang mới bấm được Sửa. Luật:
+
+- **Mốc thẻ ↔ bảng theo VÙNG CHỨA, không theo màn hình.** Gốc `RecordTable` là
+  `@container`; bảng hiện khi vùng chứa ≥ `@3xl` (48rem), hẹp hơn ra thẻ. Laptop có
+  thanh bên, bảng trong lưới 2 cột, chữ phóng 130%… tự ra thẻ khi không đủ chỗ.
+  Thanh tìm/sắp xếp cũng đổi theo `@3xl:` (đừng trộn `md:` với `@3xl:` trong
+  cùng khối — dính lỗi ô tìm bị bóp còn icon).
+- **Bảng tối đa ~4–5 cột dữ liệu.** Cột còn lại đánh `phu` (với `DanhMucCrud`:
+  `anTrenBang`) ⇒ ẩn khỏi bảng, xem qua nút **Chi tiết** (mở một dòng con
+  `data-chi-tiet` ngay dưới). Thẻ cũng có nút Chi tiết cho cột `anTrenDienThoai`
+  — ẩn cho gọn nhưng không bao giờ mất đường xem.
+- **Cột đầu ghim trái, cột Thao tác ghim phải** (utility `bang-ghim-dau` /
+  `bang-ghim-cuoi` trong `tokens.css`, nền ô ghim khớp sọc + hover). Nếu bảng
+  vẫn phải cuộn ngang thì nút Sửa/Xóa vẫn luôn trong tầm nhìn.
+- **Chữ dài xuống dòng** trong khung ≤ 18rem (ô dữ liệu không phải số), tiêu đề
+  cột cũng được xuống dòng — không để một ô địa chỉ kéo cả bảng rộng ra.
+- Cột số (`so`) giữ một dòng, căn phải `tnum`.
+
+Bảng **báo cáo** nhiều cột số (`BangTong`) vẫn giữ dạng bảng: dài thì `dinhDau`
+(khung cuộn riêng ≤70dvh ⇒ thanh cuộn ngang luôn trong tầm nhìn), cần dò ngang
+thì `className="cot-dau-dinh"`. Không nhét bảng báo cáo nhiều cột vào nửa màn
+(`lg:grid-cols-2`) — Tổng quan từng tràn 263% vì thế.
 
 ### 5c. Vùng cuộn không được TRÀN ra ngoài (`overscroll-contain`)
 

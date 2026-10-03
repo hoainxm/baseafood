@@ -37,8 +37,10 @@ export interface TruongDanhMuc<T> {
   ) => React.ReactNode;
   /** Hiện thế nào trong bảng. Mặc định in nguyên văn. */
   hienThi?: (row: T) => React.ReactNode;
-  /** Ẩn cột này trên thẻ điện thoại */
+  /** Ẩn cột này trên thẻ điện thoại (xem qua nút "Chi tiết") */
   anTrenDienThoai?: boolean;
+  /** Cột phụ — ẩn khỏi BẢNG desktop cho gọn, xem qua nút "Chi tiết" cuối dòng */
+  anTrenBang?: boolean;
 }
 
 /**
@@ -128,6 +130,7 @@ export function DanhMucCrud<T extends { id: string }>({
       header: f.nhan,
       chinh: f === fields.find((x) => x.batBuoc) || undefined,
       anTrenDienThoai: f.anTrenDienThoai,
+      phu: f.anTrenBang,
       sapXep: (r) => String(r[f.key] ?? ""),
       render: (r) =>
         f.hienThi ? (

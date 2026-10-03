@@ -158,9 +158,14 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
      phím là một bước lùi và Ctrl+Z thành vô dụng. */
   const lui = useRef<MocLichSu[]>([]);
   const tien = useRef<MocLichSu[]>([]);
-  /* `lui`/`tien` là ref (không gây render), nên cần một biến state để nút
-     Hoàn tác / Làm lại bật-tắt đúng lúc. Chỉ dùng làm cờ vẽ lại. */
-  const [, setDemLichSu] = useState(0);
+  /* `lui`/`tien` là ref (không gây render, không được đọc lúc render), nên
+     số mốc được chép sang state sau mỗi lần đổi để nút Hoàn tác / Làm lại
+     bật-tắt đúng lúc. */
+  const [demLichSu, setDemLichSu] = useState({ lui: 0, tien: 0 });
+  const capNhatDem = useCallback(
+    () => setDemLichSu({ lui: lui.current.length, tien: tien.current.length }),
+    []
+  );
 
   const chupHienTai = useCallback(
     (nhom: string): MocLichSu => ({
@@ -182,9 +187,9 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
       lui.current.push(chupHienTai(nhom));
       if (lui.current.length > SO_MOC_TOI_DA) lui.current.shift();
       tien.current = [];
-      setDemLichSu((n) => n + 1);
+      capNhatDem();
     },
-    [chupHienTai]
+    [chupHienTai, capNhatDem]
   );
 
   const apMoc = useCallback(
@@ -202,18 +207,18 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
     if (!m) return;
     tien.current.push(chupHienTai(m.nhom));
     apMoc(m);
-    setDemLichSu((n) => n + 1);
+    capNhatDem();
     notify.daLuu("Đã hoàn tác");
-  }, [apMoc, chupHienTai]);
+  }, [apMoc, chupHienTai, capNhatDem]);
 
   const lamLai = useCallback(() => {
     const m = tien.current.pop();
     if (!m) return;
     lui.current.push(chupHienTai(m.nhom));
     apMoc(m);
-    setDemLichSu((n) => n + 1);
+    capNhatDem();
     notify.daLuu("Đã làm lại");
-  }, [apMoc, chupHienTai]);
+  }, [apMoc, chupHienTai, capNhatDem]);
 
   /* Repo trả về dòng của MỌI kỳ. Ghi mà quên ghép lại với kỳ khác = xoá sạch
      các kỳ đó (xem 04-tang-du-lieu.md). Bọc một lần ở đây. */
@@ -730,8 +735,8 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
     soDongChuyenKy: chuyenKyNL.length + chuyenKyTP.length,
     nhanChuyenKy,
     daChot,
-    hoanTacDuoc: lui.current.length > 0,
-    lamLaiDuoc: tien.current.length > 0,
+    hoanTacDuoc: demLichSu.lui > 0,
+    lamLaiDuoc: demLichSu.tien > 0,
     hoanTac,
     lamLai,
     kq,

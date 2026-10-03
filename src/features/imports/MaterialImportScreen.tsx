@@ -389,13 +389,16 @@ export default function NhapNguyenLieuScreen() {
 
   // Trong "Ghi nhập", ngày+xưởng của PHIẾU là ngữ cảnh → đồng bộ về bộ lọc để
   // sổ/phế liệu/chốt/tổng ngày bám đúng ngày đang ghi.
+  // Chỉ bám ngày + xưởng (không bám cả phiếu) để gõ các ô khác không kéo bộ lọc.
+  const ngayPhien = phien?.deliveryDate;
+  const xuongPhien = phien?.workshop;
   useEffect(() => {
-    if (cheDo === "nhap" && phien) {
+    if (cheDo === "nhap" && ngayPhien !== undefined && xuongPhien !== undefined) {
       setKy("ngay");
-      setNgay(phien.deliveryDate);
-      setPhanXuong(phien.workshop);
+      setNgay(ngayPhien);
+      setPhanXuong(xuongPhien);
     }
-  }, [cheDo, phien?.deliveryDate, phien?.workshop]);
+  }, [cheDo, ngayPhien, xuongPhien]);
 
   /** Mở lại một chuyến đã ghi để sửa — dùng CHUNG dialog với ghi chuyến mới. */
   const moSuaChuyen = (n: NhomChuyen) => {

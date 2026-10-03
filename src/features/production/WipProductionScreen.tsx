@@ -355,13 +355,16 @@ export default function SanXuatBTPScreen() {
 
   // Trong "Ghi nhập", ngày+xưởng của PHIẾU là ngữ cảnh: đồng bộ về bộ lọc để
   // "đã ghi hôm nay", tổng ngày, chốt ngày, báo cáo A4 bám đúng ngày đang ghi.
+  // Chỉ bám ngày + xưởng (không bám cả phiếu) để gõ các ô khác không kéo bộ lọc.
+  const ngayPhien = phien?.productionDate;
+  const xuongPhien = phien?.workshop;
   useEffect(() => {
-    if (cheDo === "nhap" && phien) {
+    if (cheDo === "nhap" && ngayPhien !== undefined && xuongPhien !== undefined) {
       setKy("ngay");
-      setNgay(phien.productionDate);
-      setPhanXuong(phien.workshop);
+      setNgay(ngayPhien);
+      setPhanXuong(xuongPhien);
     }
-  }, [cheDo, phien?.productionDate, phien?.workshop]);
+  }, [cheDo, ngayPhien, xuongPhien]);
 
   // Nhớ phân xưởng đang chọn theo MÁY → reload khỏi phải chọn lại (device pref).
   useEffect(() => {

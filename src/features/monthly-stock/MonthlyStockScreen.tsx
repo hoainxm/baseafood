@@ -345,11 +345,30 @@ export default function MonthlyStockScreen() {
   // ---------- Ghi THẲNG trên bảng ----------
   /* Sửa một dòng ngay tại ô — đi qua chốt audit của repo.ts như mọi đường ghi (lưu vết
      người · thiết bị · thời điểm · cũ→mới). `nhom` = ô đang gõ ⇒ một bước Ctrl+Z. */
+  /**
+   * Sổ làm nền cho một lần gõ trên bảng. Tháng đang XEM TRƯỚC (chưa có dòng nào) ⇒ gõ
+   * vào ô nào là tự KẾ THỪA tồn cuối tháng trước (mọi kho — y nút "Kế thừa & lưu vào
+   * sổ") rồi ghi số vừa gõ, CÙNG một lần ghi ⇒ Ctrl+Z lùi cả hai. id dòng kế thừa
+   * `carry|<id nguồn>` = đúng id dòng đang xem trước ⇒ ô đang gõ không mất con trỏ.
+   * Cùng quy tắc "tháng chưa mở thì tự kế thừa" của Cân đối (chốt 2026-10-06).
+   */
+  const soNenDeGhi = (): { nen: MonthlyStockLine[]; keThua: number } => {
+    if (!laXemTruoc) return { nen: lines, keThua: 0 };
+    const carried = donSangThang(rowsTruoc, thang);
+    const idMoi = new Set(carried.map((c) => c.id));
+    return { nen: [...lines.filter((l) => !idMoi.has(l.id)), ...carried], keThua: carried.length };
+  };
+  const baoKeThua = (n: number) => {
+    if (n) notify.daLuu(`Đã kế thừa ${n} dòng tồn cuối ${nhanThang(thangTr)} vào sổ ${nhanThang(thang)} rồi ghi số vừa gõ`);
+  };
+
   const suaSo = (id: string, patch: Partial<MonthlyStockLine>, nhom?: string) => {
+    const { nen, keThua } = soNenDeGhi();
     ghiLines(
-      lines.map((l) => (l.id === id ? { ...l, ...patch } : l)),
+      nen.map((l) => (l.id === id ? { ...l, ...patch } : l)),
       nhom ?? `${id}|${Object.keys(patch).join(",")}`
     );
+    baoKeThua(keThua);
   };
 
   /** Cột số gõ được trên bảng — đúng thứ tự cột hiển thị (để dán khối từ Excel). */
@@ -398,7 +417,9 @@ export default function MonthlyStockScreen() {
       })
     );
     if (!soO) return;
-    ghiLines(lines.map((l) => (doi.has(l.id) ? { ...l, ...doi.get(l.id) } : l)));
+    const { nen, keThua } = soNenDeGhi();
+    ghiLines(nen.map((l) => (doi.has(l.id) ? { ...l, ...doi.get(l.id) } : l)));
+    baoKeThua(keThua);
     notify.daLuu(`Đã dán ${soO} ô vào ${doi.size} dòng — Ctrl+Z để hoàn tác`);
   };
 
@@ -982,9 +1003,9 @@ export default function MonthlyStockScreen() {
   const nhanViTri = (r: MonthlyStockLine) => (laKhoNgoai(r.storageLocation) ? `Gửi: ${r.storageLocation}` : viTriCua(r));
   /* Ô gõ thẳng trên bảng (quy tắc bảng tự dựng — design-system README §5d): ô số là
      `ONhapSo` (gõ biểu thức, Esc trả số cũ, ghi theo phím) có `navCol` ⇒ ↑/↓/Enter đi
-     dọc cột trong khung `[data-luoi-phim]`; Tab đi ngang. Bản XEM TRƯỚC dồn kỳ chưa lưu
-     ⇒ chỉ hiện số. Tên · nhóm đổi ở nút ✎ (ảnh hưởng cách gộp lô khi dồn kỳ). */
-  const sua = !laXemTruoc;
+     dọc cột trong khung `[data-luoi-phim]`; Tab đi ngang. Bản XEM TRƯỚC dồn kỳ cũng gõ
+     được: lần gõ đầu tự kế thừa & lưu (xem `soNenDeGhi`). Tên · nhóm đổi ở nút ✎. */
+  const sua = true;
   const oChu =
     "h-9 rounded-md border border-input bg-background px-2 text-sm focus:border-ring focus:ring-2 focus:ring-ring/40 focus:outline-none";
   const oSo = (r: MonthlyStockRow, c: (typeof COT_SO)[number], nhan: string, mau?: string) => (
@@ -1381,9 +1402,9 @@ export default function MonthlyStockScreen() {
                     {rowsXemTruoc.length} dòng · {num(tong.closeKg)} kg). CHƯA LƯU.
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    Tháng này chưa có dòng nào trong sổ nên số dưới đây là tồn đầu DỰ KIẾN, tính ngay từ
-                    tháng trước để không phải nhìn trang trống. Bấm "Kế thừa & lưu" để ghi vào sổ (rồi mới ghi
-                    được nhập/xuất); chạy lại chỉ cập nhật, không nhân đôi.
+                    Tháng này chưa có dòng nào nên số dưới đây là tồn đầu DỰ KIẾN tính từ tháng trước.
+                    Gõ thẳng vào bảng là tự kế thừa &amp; lưu rồi ghi số vừa gõ (Ctrl+Z lùi cả hai), hoặc bấm
+                    "Kế thừa &amp; lưu vào sổ". Chạy lại chỉ cập nhật, không nhân đôi.
                   </p>
                   <div className="pt-1">
                     <Button
@@ -1418,7 +1439,7 @@ export default function MonthlyStockScreen() {
             </Nhan>
           </div>
 
-          {!laXemTruoc && (
+          {coDuLieu && (
             <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
               <span className="font-semibold text-foreground">Cách thao tác:</span>
               <span>gõ thẳng vào ô trên bảng (Enter / ↑ / ↓ đi dọc cột, dán được khối từ Excel, Ctrl+Z hoàn tác);</span>

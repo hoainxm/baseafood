@@ -412,6 +412,11 @@ export const HUONG_DAN: Record<string, NoiDungHuongDan> = {
               trên bảng là <b>tổng cả tháng</b> (ghi đè), còn nút hộp cuối dòng là <b>cộng thêm</b>
               từng lần.
             </li>
+            <li>
+              <b>Dòng mới</b> (cuối mỗi bảng nhóm): gõ hoặc chọn tên hàng là dòng hiện luôn trong
+              bảng, con trỏ nhảy sang ô Nhập để gõ số tiếp. Cần điền nhiều ô một lần thì bấm{" "}
+              <b>Thêm đủ thông tin…</b>.
+            </li>
             <li>Nút <b>bút chì</b>: đổi tên hàng, nhóm (và mọi ô khác trong một hộp).</li>
             <li>Nút <b>thùng rác</b>: xóa dòng (có hỏi lại, xóa nhầm bấm <b>Hoàn tác</b>).</li>
             <li>Nút <b>đồng hồ</b>: thẻ kho — lịch sử mặt hàng qua các tháng + nhật ký thao tác.</li>

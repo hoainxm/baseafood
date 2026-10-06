@@ -58,6 +58,7 @@ export function BangTong<T>({
   className,
   chon,
   dinhDau,
+  dongThem,
 }: {
   rows: T[];
   cot: CotTong<T>[];
@@ -73,8 +74,14 @@ export function BangTong<T>({
    * sticky theo trang không chạy xuyên qua khung cuộn ngang).
    */
   dinhDau?: boolean;
+  /**
+   * Dòng THÊM MỚI cuối thân bảng (trước hàng tổng), trải hết bề ngang — VD ô gõ tên
+   * hàng để ghi dòng mới ngay trên bảng. Có `dongThem` thì bảng rỗng vẫn hiện (để
+   * còn chỗ thêm dòng đầu tiên).
+   */
+  dongThem?: React.ReactNode;
 }) {
-  if (rows.length === 0) {
+  if (rows.length === 0 && !dongThem) {
     return (
       <p className="rounded-lg border-2 border-dashed border-border p-6 text-center text-sm text-muted-foreground">
         {emptyText}
@@ -138,6 +145,13 @@ export function BangTong<T>({
               </TableRow>
             );
           })}
+          {dongThem && (
+            <TableRow className="hover:bg-transparent">
+              <TableCell colSpan={cot.length + (chon ? 1 : 0)} className="bg-muted/30">
+                {dongThem}
+              </TableCell>
+            </TableRow>
+          )}
         </TableBody>
         {coTong && (
           <TableFooter>

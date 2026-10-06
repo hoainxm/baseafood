@@ -371,6 +371,73 @@ export default function MonthlyStockScreen() {
     baoKeThua(keThua);
   };
 
+  /* ---------- Ghi DÒNG MỚI ngay trên bảng ----------
+     Cuối mỗi bảng nhóm có ô "Dòng mới": gõ / chọn tên hàng là dòng hiện luôn trong bảng
+     (nhóm của bảng, tháng đang xem, kho đang lọc — "Tất cả kho" thì kho mặc định), con
+     trỏ nhảy sang ô Nhập của dòng đó để gõ số tiếp. Tháng đang xem trước ⇒ tự kế thừa
+     & lưu trước (soNenDeGhi). Cần điền nhiều ô một lần thì vẫn có hộp "Thêm đủ thông tin". */
+  const tenHangOpts = (category: string): MucChon[] => {
+    const cungNhom = new Set<string>();
+    const khac = new Set<string>();
+    for (const l of lines) (l.category === category ? cungNhom : khac).add(l.itemName);
+    for (const m of mtypes) khac.add(m.name);
+    for (const sp of products) khac.add(sp.name);
+    const ra: MucChon[] = [];
+    const daCo = new Set<string>();
+    for (const [ds, phu] of [
+      [cungNhom, category],
+      [khac, undefined],
+    ] as const) {
+      for (const t of [...ds].filter(Boolean).sort((a, b) => a.localeCompare(b, "vi"))) {
+        const k = t.trim().toLowerCase();
+        if (daCo.has(k)) continue;
+        daCo.add(k);
+        ra.push({ value: t, label: t, phu });
+      }
+    }
+    return ra;
+  };
+  const themDongNhanh = (category: string, ten: string) => {
+    const t = ten.trim();
+    if (!t) return;
+    const { nen, keThua } = soNenDeGhi();
+    const dong: MonthlyStockLine = {
+      id: `msl|${thang}|${uid()}`,
+      period: thang,
+      category,
+      warehouse: kho !== TAT_CA_KHO ? kho : KHO_MAC_DINH,
+      itemName: t,
+      size: "",
+      origin: "",
+      importDate: "",
+      storageLocation: "",
+      kgPerCtn: null,
+      unitPrice: null,
+      openCtn: 0,
+      openKg: 0,
+      inCtn: 0,
+      inKg: 0,
+      outCtn: 0,
+      outKg: 0,
+      carriedFromId: "",
+      sortOrder: nen.filter((l) => l.period === thang).length,
+      note: "",
+    };
+    ghiLines([...nen, dong]);
+    baoKeThua(keThua);
+    notify.daLuu(`Đã thêm dòng ${t} vào ${category} — gõ số ngay trên bảng`);
+    /* Dòng mới đang ẩn vì ô tìm / ẩn dòng trống ⇒ bỏ lọc để thấy nó. */
+    if (timKiem.trim() && !`${t} ${category}`.toLowerCase().includes(timKiem.trim().toLowerCase())) setTimKiem("");
+    if (anDongTrong) setAnDongTrong(false);
+    setTimeout(() => {
+      const o = document.querySelector<HTMLInputElement>(
+        `input[data-dong="${CSS.escape(dong.id)}"][data-navcol="inKg"]`
+      );
+      o?.focus();
+      o?.select();
+    }, 60);
+  };
+
   /** Cột số gõ được trên bảng — đúng thứ tự cột hiển thị (để dán khối từ Excel). */
   const COT_SO: (keyof Pick<MonthlyStockLine, "unitPrice" | "openKg" | "inKg" | "outKg">)[] = [
     "unitPrice",
@@ -434,15 +501,8 @@ export default function MonthlyStockScreen() {
   const [loi, setLoi] = useState<LoiNhap[]>([]);
 
   const moThem = (catChon?: string) => {
-    // Đang XEM TRƯỚC (tháng chưa lưu dòng nào, đang hiện bản kế thừa từ tháng trước):
-    // thêm rồi lưu 1 dòng sẽ khiến rowsLuu ≠ rỗng ⇒ tắt xem trước ⇒ cả bảng kế thừa
-    // (chưa lưu) biến mất khỏi màn — dễ tưởng mất số liệu. Bắt kế thừa & lưu trước.
-    if (laXemTruoc) {
-      notify.canhBao(
-        `${nhanThang(thang)} đang XEM TRƯỚC (chưa lưu). Bấm "Kế thừa & lưu vào sổ" trước, rồi mới thêm dòng — kẻo bảng kế thừa đang xem bị trôi mất.`
-      );
-      return;
-    }
+    // Đang XEM TRƯỚC: lưu dòng mới sẽ TỰ kế thừa & lưu bảng kế thừa trước (luuDong →
+    // soNenDeGhi) — trước đây chặn vì lưu riêng 1 dòng làm bảng kế thừa chưa lưu trôi mất.
     // catChon = nhóm của bảng bấm nút (điền sẵn nhóm, khỏi chọn lại). Không có ⇒ nhóm đầu.
     const catGoiY = catChon || nhomList[0]?.category || MONTHLY_STOCK_CATEGORIES[0];
     const khoGoiY = kho !== TAT_CA_KHO ? kho : KHO_MAC_DINH;
@@ -502,7 +562,9 @@ export default function MonthlyStockScreen() {
       sortOrder: cu?.sortOrder ?? lines.filter((l) => l.period === thang).length,
       note: cu?.note ?? "",
     };
-    ghiLines(form.id ? lines.map((l) => (l.id === dong.id ? dong : l)) : [...lines, dong]);
+    const { nen, keThua } = form.id ? { nen: lines, keThua: 0 } : soNenDeGhi();
+    ghiLines(form.id ? lines.map((l) => (l.id === dong.id ? dong : l)) : [...nen, dong]);
+    baoKeThua(keThua);
     setForm(null);
     notify.daLuu(form.id ? `Đã sửa dòng ${dong.itemName}` : `Đã thêm dòng ${dong.itemName}`);
   };
@@ -1014,6 +1076,7 @@ export default function MonthlyStockScreen() {
       onChange={(v) => suaSo(r.id, { [c]: v ?? 0 } as Partial<MonthlyStockLine>)}
       rong0
       navCol={c}
+      data-dong={r.id}
       onPaste={(e) => danKhoi(e, r.id, c)}
       aria-label={`${nhan} — ${r.itemName}${r.size ? " " + r.size : ""}`}
       title={`${nhan}: gõ số hoặc phép tính (VD 1200+350). Enter / ↑ / ↓ sang dòng khác, dán được cả khối từ Excel.`}
@@ -1442,7 +1505,7 @@ export default function MonthlyStockScreen() {
           {coDuLieu && (
             <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
               <span className="font-semibold text-foreground">Cách thao tác:</span>
-              <span>gõ thẳng vào ô trên bảng (Enter / ↑ / ↓ đi dọc cột, dán được khối từ Excel, Ctrl+Z hoàn tác);</span>
+              <span>gõ thẳng vào ô trên bảng (Enter / ↑ / ↓ đi dọc cột, dán được khối từ Excel, Ctrl+Z hoàn tác); thêm dòng ở ô "Dòng mới" cuối mỗi bảng;</span>
               <span>
                 lấy ra dùng · nhập thêm · gửi kho ngoài theo số kg → bấm{" "}
                 <PackageMinus className="inline size-4 align-text-bottom" aria-label="nút Lấy ra / gửi kho" /> cuối dòng;
@@ -1575,21 +1638,35 @@ export default function MonthlyStockScreen() {
                   nhanTong={`Cộng ${g.category}`}
                   chon={chonBang}
                   dinhDau
+                  dongThem={
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="flex items-center gap-1 text-sm font-medium text-foreground">
+                        <Plus className="size-4" aria-hidden />
+                        Dòng mới
+                      </span>
+                      <div className="w-full sm:w-72">
+                        <Combobox
+                          anNhan
+                          label={`Tên hàng — dòng mới vào ${g.category}`}
+                          value=""
+                          onChange={(v) => themDongNhanh(g.category, v)}
+                          onCreate={(t) => t}
+                          options={tenHangOpts(g.category)}
+                          placeholder="Gõ / chọn tên hàng để thêm dòng"
+                          choPhepXoa={false}
+                        />
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => moThem(g.category)}
+                        title={`Mở hộp thêm dòng vào nhóm "${g.category}" để điền nhiều ô một lần (ngày nhập · size · invoice · đơn giá · số kg · vị trí).`}
+                      >
+                        Thêm đủ thông tin…
+                      </Button>
+                    </div>
+                  }
                 />
-                {!laXemTruoc && (
-                  <div className="flex">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => moThem(g.category)}
-                      className="h-auto min-h-9 w-full whitespace-normal text-left sm:w-auto"
-                      title={`Thêm tay một dòng vào nhóm "${g.category}" (đã điền sẵn nhóm — chỉ nhập tên hàng, số kg…).`}
-                    >
-                      <Plus className="mr-2 h-4 w-4" />
-                      Thêm dòng vào {g.category}
-                    </Button>
-                  </div>
-                )}
               </section>
             ))}
           </div>

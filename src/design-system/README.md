@@ -499,6 +499,12 @@ chữ phụ / chữ màu về màu chữ thường.
 `BangTong` mà màn đã truyền `chon` riêng (VD Sổ kho tháng, Nhập xuất tồn kho — có
 thanh "Đã chọn" với cộng tổng / in / gán kho) thì bảng KHÔNG tự hiện thanh; màn đặt
 `<NutToMauChon to={useToMau("<khoá>")} khoa={idsDangTick} />` vào thanh của nó.
+**Thanh "Đã chọn" riêng của màn phải đặt SAU bảng và dính đáy từ desktop**
+(`md:sticky md:bottom-8 md:z-30 md:shadow-lg`, nền đặc `bg-card`) — đặt trên đầu
+trang thì tick dòng cuối bảng phải lăn ngược lên mới bấm được (người dùng than
+2026-10-06). Điện thoại KHÔNG dính khi thanh nhiều nút + số tổng (cao tới ~3/4
+màn ở 360px chữ 130%) — nằm ngay dưới bảng là đủ gần. `ThanhToMau` mặc định của
+bảng chỉ 4 nút nên dính đáy cả trên điện thoại (~1/5 màn).
 
 **Luật:**
 
@@ -561,7 +567,7 @@ const chonDong = useChonDong();
 - [ ] Đặt khoá bảng mới (kebab-case, chưa trùng khoá nào — `grep -rn 'toMau=' src/features`).
 - [ ] `getKey` / `HangLuoi.id` là id bản ghi, không phải chỉ số dòng.
 - [ ] Dòng là dòng GỘP theo kỳ/bộ lọc ⇒ ghép kỳ + bộ lọc vào khoá bảng.
-- [ ] Màn đã có thanh "Đã chọn" riêng ⇒ thêm `NutToMauChon` vào đó.
+- [ ] Màn đã có thanh "Đã chọn" riêng ⇒ thêm `NutToMauChon` vào đó, đặt thanh SAU bảng + `md:sticky md:bottom-8`.
 - [ ] Bảng tự dựng ⇒ ô tick `useChonDong` + `{...to.thuocTinh(k)}` lên `<tr>` + `ThanhToMau`.
 - [ ] Thử: tick 3 dòng (Shift) → In đậm → Tô màu → Hoàn tác; sắp xếp/lọc lại ⇒ dấu vẫn đúng dòng; 360px + 130% không tràn.
 

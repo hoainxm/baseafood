@@ -45,6 +45,8 @@ import {
   type LoiNhap,
   type MucChon,
   type TheThongTin,
+  NutToMauChon,
+  useToMau,
 } from "@/design-system";
 import { useSuaDanhMuc } from "@/features/catalog/SuaDanhMucNhanh";
 import { num, viDate } from "@/lib/format";
@@ -244,6 +246,8 @@ export default function WarehouseNxtScreen() {
     nhanDong: (r) => `${r.itemName} · ${r.itemCode}`,
   };
   const rowsChon = useMemo(() => rows.filter((r) => daChon.has(r.id)), [rows, daChon]);
+  // Tô màu dòng đang tick — cùng khoá với BangTong/LuoiNhap toMau="nxt-kho".
+  const toMau = useToMau("nxt-kho");
   const tongChon = useMemo(() => {
     const t = { tonDau: 0, nhap: 0, xuat: 0, tonCuoi: 0 };
     for (const r of rowsChon) {
@@ -712,30 +716,6 @@ export default function WarehouseNxtScreen() {
             </div>
           )}
 
-          {/* Thanh dòng đã tick: cộng tổng + gán kho lưu theo lô */}
-          {rowsChon.length > 0 && (
-            <div className="flex flex-wrap items-center gap-3 rounded-xl border border-primary/40 bg-primary/5 p-3">
-              <span className="font-semibold text-foreground">Đã chọn {rowsChon.length} mã</span>
-              <span className="tnum text-sm text-muted-foreground">
-                tồn đầu {num(tongChon.tonDau)} · nhập {num(tongChon.nhap)} · xuất {num(tongChon.xuat)} ·{" "}
-                <span className="font-semibold text-foreground">tồn cuối {num(tongChon.tonCuoi)} kg</span>
-              </span>
-              <div className="ml-auto flex flex-wrap items-center gap-2">
-                <Button
-                  size="sm"
-                  onClick={() => setGanForm(khoLuuLoc === TAT_CA ? KHO_LUU_MAC_DINH : khoLuuLoc)}
-                  title="Ghi lại các mã đang tick là đang nằm ở một kho khác (kho nhà hay kho lạnh thuê ngoài). Sửa danh sách kho ở Danh mục → Kho lưu trữ."
-                >
-                  <PackageOpen className="mr-2 h-4 w-4" />
-                  Gán kho lưu
-                </Button>
-                <Button size="sm" variant="ghost" onClick={() => setDaChon(new Set())} title="Bỏ tick toàn bộ các mã đang chọn.">
-                  Bỏ chọn
-                </Button>
-              </div>
-            </div>
-          )}
-
           {ghiMode ? (
             <div className="space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-3">
@@ -776,6 +756,33 @@ export default function WarehouseNxtScreen() {
             </div>
           ) : (
             <BangTong rows={rows} cot={cot} getKey={(r) => r.id} chon={chonBang} dinhDau toMau="nxt-kho" />
+          )}
+
+          {/* Thanh dòng đã tick: cộng tổng + tô màu + gán kho lưu theo lô. Đặt SAU bảng và
+              DÍNH ĐÁY màn hình từ md: tick dòng cuối bảng vẫn thấy nút, khỏi lăn ngược lên
+              (điện thoại không dính — thanh nhiều nút sẽ che gần hết màn). */}
+          {rowsChon.length > 0 && (
+            <div className="flex flex-wrap items-center gap-3 rounded-xl border border-primary/40 bg-card p-3 print:hidden md:sticky md:bottom-3 md:z-30 md:shadow-lg">
+              <span className="font-semibold text-foreground">Đã chọn {rowsChon.length} mã</span>
+              <span className="tnum text-sm text-muted-foreground">
+                tồn đầu {num(tongChon.tonDau)} · nhập {num(tongChon.nhap)} · xuất {num(tongChon.xuat)} ·{" "}
+                <span className="font-semibold text-foreground">tồn cuối {num(tongChon.tonCuoi)} kg</span>
+              </span>
+              <div className="ml-auto flex flex-wrap items-center gap-2">
+                <NutToMauChon to={toMau} khoa={rowsChon.map((r) => r.id)} />
+                <Button
+                  size="sm"
+                  onClick={() => setGanForm(khoLuuLoc === TAT_CA ? KHO_LUU_MAC_DINH : khoLuuLoc)}
+                  title="Ghi lại các mã đang tick là đang nằm ở một kho khác (kho nhà hay kho lạnh thuê ngoài). Sửa danh sách kho ở Danh mục → Kho lưu trữ."
+                >
+                  <PackageOpen className="mr-2 h-4 w-4" />
+                  Gán kho lưu
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => setDaChon(new Set())} title="Bỏ tick toàn bộ các mã đang chọn.">
+                  Bỏ chọn
+                </Button>
+              </div>
+            </div>
           )}
 
           <p className="text-sm text-muted-foreground">

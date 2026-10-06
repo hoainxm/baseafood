@@ -1522,59 +1522,6 @@ export default function MonthlyStockScreen() {
             </p>
           )}
 
-          {/* Cộng tổng các dòng đang tick — kiểu bảng kê kế toán */}
-          {rowsChon.length > 0 && (
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-primary/40 bg-primary/5 p-3">
-              <span className="flex items-center gap-2 font-semibold text-foreground">
-                <Sigma className="h-5 w-5 text-primary" aria-hidden />
-                Đã chọn {rowsChon.length} dòng
-              </span>
-              <span className="tnum text-sm text-muted-foreground">
-                tồn đầu {num(tongChon.openKg)} kg
-              </span>
-              <span className="tnum text-sm text-muted-foreground">
-                nhập {num(tongChon.inKg)} kg
-              </span>
-              <span className="tnum text-sm text-muted-foreground">
-                xuất {num(tongChon.outKg)} kg
-              </span>
-              <span className="tnum text-sm font-semibold text-foreground">
-                tồn cuối {num(tongChon.closeKg)} kg
-              </span>
-              <span className="tnum text-sm text-muted-foreground">
-                tiền còn lại {num(Math.round(tongChon.remainingValue))} đ
-              </span>
-              <div className="ml-auto flex flex-wrap items-center gap-2">
-                {!laXemTruoc && (
-                  <Button size="sm" variant="outline" onClick={() => setGanViTri("")} title="Đánh dấu các dòng đang tick là GỬI ra kho ngoài (VD Kho Ánh Dương, HP). Chỉ ghi nơi để hàng, không đổi số kg.">
-                    <MapPin className="mr-2 h-4 w-4" />
-                    Gửi kho ngoài
-                  </Button>
-                )}
-                <NutToMauChon to={toMau} khoa={rowsChon.map((r) => r.id)} />
-                <Button size="sm" variant="outline" onClick={() => setMoIn(true)} title="In riêng các dòng đang tick, kèm dòng tổng của đúng mấy dòng đó.">
-                  <Printer className="mr-2 h-4 w-4" />
-                  In {rowsChon.length} dòng
-                </Button>
-                {!laXemTruoc && (
-                  <ConfirmDelete
-                    moTaBanGhi={`${rowsChon.length} dòng ${nhanThang(thang)}`}
-                    onConfirm={xoaDaChon}
-                    trigger={
-                      <Button size="sm" variant="ghost" title="Xóa các dòng đang tick khỏi tháng này. Có hỏi xác nhận, và xóa xong vẫn còn nút Hoàn tác.">
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Xóa dòng đã chọn
-                      </Button>
-                    }
-                  />
-                )}
-                <Button size="sm" variant="ghost" onClick={boChon} title="Bỏ tick toàn bộ dòng đang chọn.">
-                  Bỏ chọn
-                </Button>
-              </div>
-            </div>
-          )}
-
           {timKhongRa && (
             <p className="rounded-lg border-2 border-dashed border-border p-6 text-center text-sm text-muted-foreground">
               {timKiem.trim()
@@ -1680,6 +1627,63 @@ export default function MonthlyStockScreen() {
               </section>
             ))}
           </div>
+
+          {/* Cộng tổng + tô màu các dòng đang tick — kiểu bảng kê kế toán. Đặt SAU các
+              bảng và DÍNH ĐÁY màn hình từ md (bottom-8: nằm trên thanh cuộn ngang dính đáy
+              của bảng xổ): tick dòng cuối bảng vẫn thấy nút, khỏi lăn ngược lên đầu trang.
+              Điện thoại KHÔNG dính — đủ nút + số tổng thì thanh cao ~3/4 màn (360px, chữ
+              130%); thanh nằm ngay dưới bảng nên kéo xuống chút là tới. */}
+          {rowsChon.length > 0 && (
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-primary/40 bg-card p-3 print:hidden md:sticky md:bottom-8 md:z-30 md:shadow-lg">
+              <span className="flex items-center gap-2 font-semibold text-foreground">
+                <Sigma className="h-5 w-5 text-primary" aria-hidden />
+                Đã chọn {rowsChon.length} dòng
+              </span>
+              <span className="tnum text-sm text-muted-foreground">
+                tồn đầu {num(tongChon.openKg)} kg
+              </span>
+              <span className="tnum text-sm text-muted-foreground">
+                nhập {num(tongChon.inKg)} kg
+              </span>
+              <span className="tnum text-sm text-muted-foreground">
+                xuất {num(tongChon.outKg)} kg
+              </span>
+              <span className="tnum text-sm font-semibold text-foreground">
+                tồn cuối {num(tongChon.closeKg)} kg
+              </span>
+              <span className="tnum text-sm text-muted-foreground">
+                tiền còn lại {num(Math.round(tongChon.remainingValue))} đ
+              </span>
+              <div className="ml-auto flex flex-wrap items-center gap-2">
+                {!laXemTruoc && (
+                  <Button size="sm" variant="outline" onClick={() => setGanViTri("")} title="Đánh dấu các dòng đang tick là GỬI ra kho ngoài (VD Kho Ánh Dương, HP). Chỉ ghi nơi để hàng, không đổi số kg.">
+                    <MapPin className="mr-2 h-4 w-4" />
+                    Gửi kho ngoài
+                  </Button>
+                )}
+                <NutToMauChon to={toMau} khoa={rowsChon.map((r) => r.id)} />
+                <Button size="sm" variant="outline" onClick={() => setMoIn(true)} title="In riêng các dòng đang tick, kèm dòng tổng của đúng mấy dòng đó.">
+                  <Printer className="mr-2 h-4 w-4" />
+                  In {rowsChon.length} dòng
+                </Button>
+                {!laXemTruoc && (
+                  <ConfirmDelete
+                    moTaBanGhi={`${rowsChon.length} dòng ${nhanThang(thang)}`}
+                    onConfirm={xoaDaChon}
+                    trigger={
+                      <Button size="sm" variant="ghost" title="Xóa các dòng đang tick khỏi tháng này. Có hỏi xác nhận, và xóa xong vẫn còn nút Hoàn tác.">
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Xóa dòng đã chọn
+                      </Button>
+                    }
+                  />
+                )}
+                <Button size="sm" variant="ghost" onClick={boChon} title="Bỏ tick toàn bộ dòng đang chọn.">
+                  Bỏ chọn
+                </Button>
+              </div>
+            </div>
+          )}
 
           <p className="text-sm text-muted-foreground">
             {nhanThang(thang)}

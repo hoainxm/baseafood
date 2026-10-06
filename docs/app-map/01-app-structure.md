@@ -1,7 +1,7 @@
 > Load khi: thêm file mới, không biết đặt ở đâu, hay chuẩn bị import xuyên tầng.
 covers: src/**
 last_verified: 2026-10-06
-<!-- updated: 2026-10-06 — TÔ MÀU DÒNG (mig 0055): design-system thêm `patterns/toMauNguon.ts` (hợp đồng `NguonToMau` + `ToMauContext` + hook `useToMau` — KHÔNG gọi repo) và `patterns/ToMauDong.tsx` (`NutToMau`, `NutToMauNhieu`); `features/shared/ToMauProvider.tsx` (gắn MỘT lần ở ShellLayout, gọi `useRowMarks()` duy nhất); `lib/toMau.ts` (hàm thuần + test). Ranh giới giữ nguyên: features chỉ dùng prop `toMau` / `useToMau` từ `@/design-system`, không gọi `useRowMarks()`. -->
+<!-- updated: 2026-10-06 — TÔ MÀU DÒNG (mig 0055): design-system thêm `patterns/toMauNguon.ts` (hợp đồng `NguonToMau` + `ToMauContext` + hook `useToMau` — KHÔNG gọi repo) và `patterns/ToMauDong.tsx` (`ThanhToMau`, `NutToMauChon` — tick dòng → Tô màu / In đậm / Bỏ tô); `features/shared/ToMauProvider.tsx` (gắn MỘT lần ở ShellLayout, gọi `useRowMarks()` duy nhất); `lib/toMau.ts` (hàm thuần + test). Ranh giới giữ nguyên: features chỉ dùng prop `toMau` / `useToMau` từ `@/design-system`, không gọi `useRowMarks()`. -->
 <!-- updated: 2026-10-02 — `src/features/catalog/` thêm `cauHinhDanhMuc.tsx` (cấu hình 5 danh mục, một nguồn) + `SuaDanhMucNhanh.tsx` (hook `useSuaDanhMuc` — bút chì sửa danh mục ở ô chọn). Feature khác import THẲNG file `@/features/catalog/SuaDanhMucNhanh` (KHÔNG qua index — index export màn Danh mục, kéo cả màn vào bundle). Design-system thêm `HopSuaDanhMuc` (CatalogCrudModal), `ONhapSo` + `useNhapSo` + `bieuThucSo` (ô số biểu thức). Bỏ `features/shared/SuaThanhPhamNhanh.tsx`. -->
 ttl_days: 90
 

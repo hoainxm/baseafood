@@ -8,8 +8,8 @@ import { cn } from "@/lib/utils";
 import { dinhDangSo, parseSo } from "./bieuThucSo";
 import { XemTruocBieuThuc } from "./ONhapSo";
 import { useNhapSo } from "./useNhapSo";
-import { NutButTo, NutToMau } from "./ToMauDong";
-import { useButToBang, useToMau } from "./toMauNguon";
+import { ThanhToMau } from "./ToMauDong";
+import { useChonDong, useToMau } from "./toMauNguon";
 
 /**
  * LuoiNhap — lưới nhập liệu thay cho "mở hộp thoại, điền, bấm lưu" từng dòng.
@@ -113,7 +113,8 @@ export function LuoiNhap<R>({
   toMau?: string;
 }) {
   const to = useToMau(toMau);
-  const khungRef = React.useRef<HTMLDivElement>(null);
+  // Tick dòng để tô màu / in đậm nhiều dòng một lúc (chỉ khi bật toMau).
+  const chonDong = useChonDong();
   const oRef = React.useRef(new Map<string, HTMLInputElement>());
   const cotHien = React.useMemo(
     () => cot.filter((c) => !c.nhom || !nhomAn.includes(c.nhom)),
@@ -121,10 +122,9 @@ export function LuoiNhap<R>({
   );
   /** Chỉ ô gõ được mới nằm trong đường đi của phím mũi tên. */
   const hangNhap = React.useMemo(() => hang.filter((h) => !h.tieuDeNhom), [hang]);
-  const mocBut = useButToBang(to, khungRef, () => ({
-    dong: hangNhap.map((h) => h.id),
-    cot: cotHien.map((c) => c.key),
-  }));
+  const khoaHien = hangNhap.map((h) => h.id);
+  const daTick = khoaHien.filter((k) => chonDong.daChon.has(k));
+  const chonHet = daTick.length > 0 && daTick.length === khoaHien.length;
 
   /**
    * Nhảy sang ô gõ được kế tiếp theo hướng (dRow, dCol). Ô khoá bị bỏ qua chứ
@@ -224,9 +224,8 @@ export function LuoiNhap<R>({
   };
 
   return (
+    <>
     <div
-      ref={khungRef}
-      {...mocBut}
       className={cn(
         "scroll-nice-x overflow-x-auto rounded-xl ring-1 ring-foreground/10",
         className
@@ -244,8 +243,17 @@ export function LuoiNhap<R>({
               className="sticky left-0 z-30 min-w-40 border-b-2 border-border bg-card px-3 py-3 text-left align-bottom text-sm font-semibold sm:min-w-52"
             >
               <span className="flex items-center gap-1">
+                {to.bat && (
+                  <input
+                    type="checkbox"
+                    className="size-5 shrink-0"
+                    checked={chonHet}
+                    onChange={() => chonDong.doiTatCa(khoaHien, !chonHet)}
+                    aria-label={chonHet ? "Bỏ chọn tất cả dòng" : "Chọn tất cả dòng"}
+                    title={chonHet ? "Bỏ tick mọi dòng." : "Tick mọi dòng (để tô màu / in đậm cùng lúc)."}
+                  />
+                )}
                 <span className="min-w-0 flex-1">{tenCotDau}</span>
-                {toMau && <NutButTo to={to} maBang={toMau} />}
               </span>
             </th>
             {cotHien.map((c) => (
@@ -285,26 +293,30 @@ export function LuoiNhap<R>({
               >
                 <th
                   scope="row"
-                  {...to.thuocTinhO(h.id, "*")}
                   className={cn(
                     "sticky left-0 z-10 border-r-2 border-b border-border px-3 py-2 text-left align-middle font-normal",
                     h.kieu === "tong" ? "bg-muted font-semibold" : "bg-card",
                     h.kieu === "giam" && "bg-warning-surface/40"
                   )}
                 >
-                  <div className="flex items-start gap-1">
+                  <div className="flex items-start gap-2">
+                    {to.bat && (
+                      <input
+                        type="checkbox"
+                        className="mt-0.5 size-5 shrink-0"
+                        checked={chonDong.daChon.has(h.id)}
+                        onChange={() => {}}
+                        onClick={(e) => chonDong.doi(h.id, e.shiftKey, khoaHien)}
+                        aria-label={`Chọn dòng ${typeof h.ten === "string" ? h.ten : h.id}`}
+                        title="Tick để tô màu / in đậm dòng này (Shift+tick chọn cả khoảng)."
+                      />
+                    )}
                     <div className="min-w-0 flex-1">
                       <span className="block leading-tight">{h.ten}</span>
                       {h.phu && (
                         <span className="block text-sm text-muted-foreground">{h.phu}</span>
                       )}
                     </div>
-                    <NutToMau
-                      to={to}
-                      khoa={h.id}
-                      nhan={typeof h.ten === "string" ? h.ten : undefined}
-                      className="-my-1 shrink-0"
-                    />
                   </div>
                 </th>
                 {cotHien.map((c) => {
@@ -315,7 +327,6 @@ export function LuoiNhap<R>({
                   return (
                     <td
                       key={c.key}
-                      {...to.thuocTinhO(h.id, c.key)}
                       className={cn(
                         "border-b border-l border-border p-0 text-right align-middle",
                         nen,
@@ -363,6 +374,8 @@ export function LuoiNhap<R>({
         </tbody>
       </table>
     </div>
+    <ThanhToMau to={to} khoa={daTick} onBoChon={chonDong.boChon} />
+    </>
   );
 }
 

@@ -29,7 +29,8 @@ import {
   notify,
   type CotBieuDoDoc,
   type TheThongTin,
-  NutToMau,
+  ThanhToMau,
+  useChonDong,
   useToMau,
 } from "@/design-system";
 import { KY_OPT, phamViKy, type KyXem } from "@/lib/periodUtils";
@@ -91,6 +92,7 @@ export default function DailyProductionReport() {
   // Dòng là dòng GỘP (xưởng × mặt hàng × quy cách) ⇒ ghép kỳ + xưởng vào khoá
   // bảng để "đã dò" kỳ này không lan sang kỳ khác.
   const to = useToMau(`bao-cao-sx-ngay|${tu}|${den}|${xuong}`);
+  const chonDong = useChonDong();
 
   const { days, groups, tongNgayTong, tongKgTong, tongBlockTong, soMatHang } =
     useMemo(() => {
@@ -163,6 +165,8 @@ export default function DailyProductionReport() {
         soMatHang: allRows.length,
       };
     }, [rows, matHang, tu, den, xuong]);
+  /** Khoá các dòng mặt hàng đang hiện — thứ tự cho Shift+tick chọn khoảng. */
+  const khoaDong = groups.flatMap((g) => g.rows.map((r) => `${r.workshop}|||${r.productId}|||${r.spec}`));
 
   const chart: CotBieuDoDoc[] = days.map((d) => ({
     nhan: viDate(d).slice(0, 5),
@@ -319,8 +323,18 @@ export default function DailyProductionReport() {
                       return (
                       <TableRow key={k} {...to.thuocTinh(k)}>
                         <TableCell className="font-medium">
-                          <span className="flex items-center gap-1">
-                            <NutToMau to={to} khoa={k} nhan={`${r.productName} ${r.spec}`} />
+                          <span className="flex items-center gap-2">
+                            {to.bat && (
+                              <input
+                                type="checkbox"
+                                className="size-5 shrink-0"
+                                checked={chonDong.daChon.has(k)}
+                                onChange={() => {}}
+                                onClick={(e) => chonDong.doi(k, e.shiftKey, khoaDong)}
+                                aria-label={`Chọn dòng ${r.productName} ${r.spec}`}
+                                title="Tick để tô màu / in đậm dòng này (Shift+tick chọn cả khoảng)."
+                              />
+                            )}
                             {r.productName}
                           </span>
                         </TableCell>
@@ -366,6 +380,7 @@ export default function DailyProductionReport() {
               </TableFooter>
             </Table>
           </div>
+          <ThanhToMau to={to} khoa={khoaDong.filter((k) => chonDong.daChon.has(k))} onBoChon={chonDong.boChon} />
         </>
       )}
 

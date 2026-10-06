@@ -14,8 +14,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
-import { NutButTo, NutToMau } from "./ToMauDong";
-import { useButToBang, useToMau } from "./toMauNguon";
+import { ThanhToMau } from "./ToMauDong";
+import { useChonDong, useToMau } from "./toMauNguon";
 
 /**
  * Tick chọn dòng (tuỳ chọn). Bật lên thì BangTong thêm một cột ô tick ở đầu bảng;
@@ -99,11 +99,10 @@ export function BangTong<T>({
   dongThem?: React.ReactNode;
 }) {
   const to = useToMau(toMau);
-  const gocRef = React.useRef<HTMLDivElement>(null);
-  const mocBut = useButToBang(to, gocRef, () => ({
-    dong: rows.map((r, i) => getKey(r, i)),
-    cot: cot.map((c) => c.key),
-  }));
+  // Tick dòng: màn truyền `chon` thì dùng của màn (màn tự đặt nút tô vào thanh
+  // "Đã chọn" riêng); không thì bảng tự giữ + tự hiện thanh tô màu khi bật toMau.
+  const chonTrong = useChonDong();
+  const neoTick = React.useRef<string | null>(null);
   // Bảng rỗng không có dòng thêm thì không vẽ bảng ⇒ khỏi đo.
   const { bangRef, dauNoiRef, thanhRef, rongCot, rongBang, rongCuon, tran, hienDau } = useXoRa(
     Boolean(xoRa) && (rows.length > 0 || Boolean(dongThem))
@@ -119,10 +118,25 @@ export function BangTong<T>({
 
   const coTong = cot.some((c) => c.tong);
   const khoa = rows.map((r, i) => getKey(r, i));
-  const soChon = chon ? khoa.filter((k) => chon.daChon.has(k)).length : 0;
-  const chonHet = soChon > 0 && soChon === khoa.length;
+  const chonDung: ChonBang<T> | undefined =
+    chon ??
+    (to.bat
+      ? { daChon: chonTrong.daChon as Set<string>, doi: (k) => chonTrong.doi(k), doiTatCa: chonTrong.doiTatCa }
+      : undefined);
+  const daTick = chonDung ? khoa.filter((k) => chonDung.daChon.has(k)) : [];
+  const chonHet = daTick.length > 0 && daTick.length === khoa.length;
+  /** Bấm ô tick; Shift ⇒ cả khoảng từ dòng bấm trước (như Shift+bấm ở Excel). */
+  const bamTick = (k: string, shift: boolean) => {
+    if (!chonDung) return;
+    const a = neoTick.current ? khoa.indexOf(neoTick.current) : -1;
+    const b = khoa.indexOf(k);
+    if (shift && a >= 0 && b >= 0) {
+      chonDung.doiTatCa(khoa.slice(Math.min(a, b), Math.max(a, b) + 1), !chonDung.daChon.has(k));
+    } else chonDung.doi(k);
+    neoTick.current = k;
+  };
 
-  const coCotDau = Boolean(chon) || to.bat;
+  const coCotDau = Boolean(chonDung);
   const soCot = cot.length + (coCotDau ? 1 : 0);
   /* Chữ "Cộng …" ở dòng tổng trải qua cột đầu dòng + các cột đầu KHÔNG có tổng —
      để trong một ô riêng thì chữ dài ("Cộng Nguyên liệu mua ngoài") đẩy cột đầu
@@ -133,21 +147,17 @@ export function BangTong<T>({
   /** Hàng tên cột — vẽ ở bảng thật và (chế độ xoRa) ở hàng tên cột nổi. */
   const hangDau = (noi: boolean) => (
     <TableRow>
-      {coCotDau && (
-        <TableHead className="w-12">
-          <div className="flex items-center gap-1">
-            {chon && (
-              <input
-                type="checkbox"
-                className="size-5"
-                checked={chonHet}
-                tabIndex={noi ? -1 : undefined}
-                onChange={() => chon.doiTatCa(khoa, !chonHet)}
-                aria-label={chonHet ? "Bỏ chọn tất cả dòng" : "Chọn tất cả dòng"}
-              />
-            )}
-            {!noi && toMau && <NutButTo to={to} maBang={toMau} />}
-          </div>
+      {chonDung && (
+        <TableHead className="w-10">
+          <input
+            type="checkbox"
+            className="size-5"
+            checked={chonHet}
+            tabIndex={noi ? -1 : undefined}
+            onChange={() => chonDung.doiTatCa(khoa, !chonHet)}
+            aria-label={chonHet ? "Bỏ chọn tất cả dòng" : "Chọn tất cả dòng"}
+            title={chonHet ? "Bỏ tick mọi dòng của bảng này." : "Tick mọi dòng của bảng này (để tô màu / in đậm / in / xử lý cùng lúc)."}
+          />
         </TableHead>
       )}
       {/* Tên cột XUỐNG DÒNG ("Nhập trong kỳ (kg)" thành 2 dòng): cột số rộng theo
@@ -161,9 +171,8 @@ export function BangTong<T>({
   );
 
   return (
+    <>
     <div
-      ref={gocRef}
-      {...mocBut}
       className={cn(
         // xoRa: gốc KHÔNG được là khung cuộn (sticky của hàng tên cột nổi và thanh
         // cuộn đáy bám theo khung cuộn của trang); cuộn ngang do khung của primitive.
@@ -202,7 +211,7 @@ export function BangTong<T>({
         <TableBody>
           {rows.map((r, i) => {
             const k = getKey(r, i);
-            const tick = !!chon?.daChon.has(k);
+            const tick = !!chonDung?.daChon.has(k);
             return (
               <TableRow
                 key={k}
@@ -210,27 +219,22 @@ export function BangTong<T>({
                 className={cn(tick && "bg-primary/5")}
                 {...to.thuocTinh(k)}
               >
-                {coCotDau && (
-                  <TableCell {...to.thuocTinhO(k, "*")}>
-                    <div className="flex items-center gap-1">
-                      {chon && (
-                        <input
-                          type="checkbox"
-                          className="size-5"
-                          checked={tick}
-                          onChange={() => chon.doi(k)}
-                          aria-label={`Chọn dòng ${chon.nhanDong ? chon.nhanDong(r) : k}`}
-                        />
-                      )}
-                      <NutToMau to={to} khoa={k} nhan={chon?.nhanDong?.(r)} />
-                    </div>
+                {chonDung && (
+                  <TableCell>
+                    <input
+                      type="checkbox"
+                      className="size-5"
+                      checked={tick}
+                      onChange={() => {}}
+                      onClick={(e) => bamTick(k, e.shiftKey)}
+                      aria-label={`Chọn dòng ${chon?.nhanDong ? chon.nhanDong(r) : k}`}
+                    />
                   </TableCell>
                 )}
                 {cot.map((c) => (
                   <TableCell
                     key={c.key}
                     className={cn(c.so && "text-right tnum")}
-                    {...to.thuocTinhO(k, c.key)}
                   >
                     {c.render(r)}
                   </TableCell>
@@ -277,6 +281,17 @@ export function BangTong<T>({
         </div>
       )}
     </div>
+    {/* Thanh tô màu cho dòng đang tick — chỉ khi BẢNG tự giữ tick (màn có `chon`
+        riêng thì tự đặt NutToMauChon vào thanh "Đã chọn" của màn). */}
+    {!chon && (
+      <ThanhToMau
+        to={to}
+        khoa={daTick}
+        onBoChon={chonTrong.boChon}
+        className={xoRa ? "bottom-8" : undefined}
+      />
+    )}
+    </>
   );
 }
 

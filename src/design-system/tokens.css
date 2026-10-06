@@ -178,8 +178,8 @@
      của Excel. SINH BẰNG SCRIPT có kiểm tương phản: mọi ô giữ chữ thường
      (#0f172a) ≥ 4,5:1 (mức đậm nhất bị chặn ở độ chói 0,25). Ô "tối" (độ chói
      < 0,68, danh sách MAU_TOI ở patterns/toMauNguon.ts) ⇒ chữ phụ + chữ màu trong
-     ô đổi về màu chữ thường (khối [data-to-toi] cuối file). `-line` = vạch đậm
-     mép trái dòng tô. Sửa/thêm màu: sửa cả SAC_TO (toMauNguon.ts) + SAC_TO_LIB
+     ô đổi về màu chữ thường (khối [data-to-toi] cuối file). `-line` = sắc đậm
+     (dự phòng, test canh đủ token). Sửa/thêm màu: sửa cả SAC_TO (toMauNguon.ts) + SAC_TO_LIB
      (lib/toMau.ts) + MAU_TOI. App chưa có giao diện tối ⇒ chỉ bản sáng. */
   /* xám */
   --to-xam-1: #ececec; --to-xam-2: #d9d9d9; --to-xam-3: #c1c1c1; --to-xam-4: #a5a5a5; --to-xam-5: #898989;
@@ -617,19 +617,16 @@
 }
 
 /* ============================================================
-   TÔ MÀU DÒNG / Ô "ĐÃ DÒ" — gắn qua useToMau().thuocTinh(khoá) (dòng: <tr>,
-   thẻ <li> của RecordTable trên điện thoại) và thuocTinhO(khoá, cột) (từng ô).
-   Thuộc tính mang `data-to-mau` + style `--to-nen` (màu nền) / `--to-vach` (vạch
-   trái); màn hình không tự viết class màu. Luật: README design-system § Tô màu dòng.
+   TÔ MÀU DÒNG "ĐÃ DÒ" — gắn qua useToMau().thuocTinh(khoá) lên <tr> (hoặc thẻ
+   <li> của RecordTable trên điện thoại). Thuộc tính mang `data-to-mau` + style
+   `--to-nen` (màu nền); màn hình không tự viết class màu. Luật: README
+   design-system § Tô màu dòng.
    KHÔNG bọc @layer: khối này phải THẮNG sọc dòng, hover, nền ô ghim/ô dính
    (bang-ghim-*, cot-dau-dinh, cột tính của LuoiNhap) — utility nằm trong layer
-   nên CSS ngoài layer luôn thắng, khỏi cần !important. Ô tô riêng đè màu dòng vì
-   style của <td> đặt lại --to-nen (biến CSS kế thừa từ <tr> nếu ô không có).
+   nên CSS ngoài layer luôn thắng, khỏi cần !important.
    ============================================================ */
 tr[data-to-mau] > td,
 tr[data-to-mau] > th,
-td[data-to-mau],
-th[data-to-mau],
 li[data-to-mau] {
   background-color: var(--to-nen);
 }
@@ -650,37 +647,22 @@ li[data-to-mau] {
 }
 /* Rê chuột vẫn thấy đang đứng dòng nào — phủ một lớp mờ lên màu tô. */
 tr[data-to-mau]:hover > td,
-tr[data-to-mau]:hover > th,
-tr:hover > td[data-to-mau],
-tr:hover > th[data-to-mau] {
+tr[data-to-mau]:hover > th {
   background-image: linear-gradient(rgb(15 23 42 / 0.05), rgb(15 23 42 / 0.05));
 }
-/* Vạch đậm mép trái DÒNG tô: màu không phải tín hiệu duy nhất (nút tô ở dòng
-   còn nói rõ màu gì bằng chữ cho trình đọc màn hình / rê chuột). */
+/* Vạch đậm mép trái dòng tô (màu không phải tín hiệu duy nhất) — đậm hơn nền
+   cùng sắc: trộn màu nền với chữ thường. */
 tr[data-to-mau] > :first-child,
 li[data-to-mau] {
-  box-shadow: inset 4px 0 0 var(--to-vach);
+  box-shadow: inset 4px 0 0 color-mix(in oklab, var(--to-nen), var(--foreground) 45%);
 }
 tr[data-dam] > td,
 tr[data-dam] > th,
 tr[data-dam] > td *,
 tr[data-dam] > th *,
-td[data-dam],
-td[data-dam] *,
-th[data-dam],
-th[data-dam] *,
 li[data-dam],
 li[data-dam] * {
   font-weight: 700;
-}
-/* Đang cầm BÚT TÔ (BangTong/RecordTable/LuoiNhap gắn data-but-to lên khung bảng):
-   con trỏ chữ thập, chạm-kéo trên máy cảm ứng là TÔ chứ không cuộn trang. */
-[data-but-to] [data-o-dong] {
-  cursor: crosshair;
-  touch-action: none;
-}
-[data-but-to] [data-o-dong] :is(input, button, textarea, select, a) {
-  pointer-events: none;
 }
 
 /* ============================================================

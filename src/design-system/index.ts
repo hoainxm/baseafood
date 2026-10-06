@@ -51,20 +51,17 @@ export { NutGiaoDien } from "./patterns/ThemeToggleButton";
 export { NutHuongDan } from "./patterns/GuideButton";
 export { FormDialog, NutDong } from "./patterns/FormDialog";
 export { BangTong, type CotTong, type ChonBang } from "./patterns/SummaryTable";
-export { NutToMau, NutToMauNhieu, NutButTo, GoiYButTo } from "./patterns/ToMauDong";
+export { NutToMauChon, ThanhToMau } from "./patterns/ToMauDong";
 export {
   ToMauContext,
   useToMau,
-  useButToBang,
+  useChonDong,
   SAC_TO,
   MUC_TO,
   LUOI_MAU,
   tenMau,
-  moTaDau,
   type MauTo,
   type DauDong,
-  type DauBang,
-  type DichTo,
   type VaDau,
   type NguonToMau,
   type ToMauBang,

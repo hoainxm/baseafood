@@ -35,7 +35,8 @@ import {
   homNay,
   notify,
   type TheThongTin,
-  NutToMau,
+  ThanhToMau,
+  useChonDong,
   useToMau,
 } from "@/design-system";
 import { KY_OPT, phamViKy, type KyXem } from "@/lib/periodUtils";
@@ -99,6 +100,7 @@ export default function OrderExportReport() {
   const [tu, den] = phamViKy(ky, moc, tuTC, denTC);
   // Mỗi dòng là một dòng lệnh xuất (id bản ghi) ⇒ dấu "đã dò" khỏi ghép kỳ.
   const to = useToMau("bao-cao-xuat-don");
+  const chonDong = useChonDong();
 
   const optKhach = [
     { value: "Tất cả", label: "Tất cả khách" },
@@ -167,6 +169,8 @@ export default function OrderExportReport() {
       tongBlock: nhom.reduce((s, g) => s + g.tongBlock, 0),
     };
   }, [lenh, dongLenh, don, dongDon, khach, matHang, tu, den, khachLoc]);
+  /** Khoá dòng lệnh xuất đang hiện — thứ tự cho Shift+tick chọn khoảng. */
+  const khoaDong = nhom.flatMap((g) => g.lines.map((l) => l.id));
 
   const the: TheThongTin[] = [
     { nhan: "Kỳ báo cáo", giaTri: `${viDate(tu)} – ${viDate(den)}`, icon: CalendarRange, mau: "trung-tinh" },
@@ -312,8 +316,18 @@ export default function OrderExportReport() {
                   {g.lines.map((l) => (
                     <TableRow key={l.id} {...to.thuocTinh(l.id)}>
                       <TableCell className="whitespace-nowrap">
-                        <span className="flex items-center gap-1">
-                          <NutToMau to={to} khoa={l.id} nhan={`${l.productName} ${viDate(l.exportDate)}`} />
+                        <span className="flex items-center gap-2">
+                          {to.bat && (
+                            <input
+                              type="checkbox"
+                              className="size-5 shrink-0"
+                              checked={chonDong.daChon.has(l.id)}
+                              onChange={() => {}}
+                              onClick={(e) => chonDong.doi(l.id, e.shiftKey, khoaDong)}
+                              aria-label={`Chọn dòng ${l.productName} ${viDate(l.exportDate)}`}
+                              title="Tick để tô màu / in đậm dòng này (Shift+tick chọn cả khoảng)."
+                            />
+                          )}
                           {viDate(l.exportDate)}
                         </span>
                       </TableCell>
@@ -343,6 +357,7 @@ export default function OrderExportReport() {
           </Table>
         </div>
       )}
+      <ThanhToMau to={to} khoa={khoaDong.filter((k) => chonDong.daChon.has(k))} onBoChon={chonDong.boChon} />
 
       {inPrint && (
         <PhieuIn

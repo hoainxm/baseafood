@@ -12,8 +12,8 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, Search, X } from "lucide-react";
-import { NutButTo, NutToMau } from "./ToMauDong";
-import { useButToBang, useToMau } from "./toMauNguon";
+import { ThanhToMau } from "./ToMauDong";
+import { useChonDong, useToMau } from "./toMauNguon";
 
 export interface Cot<T> {
   key: string;
@@ -83,7 +83,8 @@ export function RecordTable<T>({
   toMau?: string;
 }) {
   const to = useToMau(toMau);
-  const khungBangRef = React.useRef<HTMLDivElement>(null);
+  // Tick dòng để tô màu / in đậm nhiều dòng một lúc (chỉ khi bật toMau).
+  const chonDong = useChonDong();
   const [q, setQ] = React.useState("");
   const [sapTheo, setSapTheo] = React.useState<string | null>(null);
   const [huong, setHuong] = React.useState<Huong>("tang");
@@ -121,12 +122,6 @@ export function RecordTable<T>({
       return huong === "tang" ? cmp : -cmp;
     });
   }, [daLoc, columns, sapTheo, huong]);
-
-  // Bút tô (bảng desktop): thứ tự dòng = đang sắp/lọc, cột = cột đang hiện trên bảng.
-  const mocBut = useButToBang(to, khungBangRef, () => ({
-    dong: daSap.map((r) => getKey(r)),
-    cot: columns.filter((c) => !c.phu || c.chinh).map((c) => c.key),
-  }));
 
   const doiSap = (key: string) => {
     if (sapTheo === key) {
@@ -214,11 +209,28 @@ export function RecordTable<T>({
   const cotAnBang = columns.filter((c) => c.phu && c !== cotChinh);
   const cotThe = columns.filter((c) => c !== cotChinh && !c.anTrenDienThoai);
   const cotAnThe = columns.filter((c) => c !== cotChinh && c.anTrenDienThoai);
-  const coCotThaoTac = Boolean(actions) || cotAnBang.length > 0 || to.bat;
-  /** Nhãn dòng cho trình đọc màn hình của nút tô (chữ của cột chính nếu là chữ). */
+  const coCotThaoTac = Boolean(actions) || cotAnBang.length > 0;
+  /** Nhãn dòng cho trình đọc màn hình của ô tick (chữ của cột chính nếu là chữ). */
   const nhanDong = (r: T) => {
     const v = cotChinh.render(r);
-    return typeof v === "string" || typeof v === "number" ? String(v) : undefined;
+    return typeof v === "string" || typeof v === "number" ? String(v) : getKey(r);
+  };
+  const khoaHien = daSap.map((r) => getKey(r));
+  const daTick = khoaHien.filter((k) => chonDong.daChon.has(k));
+  const chonHet = daTick.length > 0 && daTick.length === khoaHien.length;
+  const oTick = (r: T) => {
+    const k = getKey(r);
+    return (
+      <input
+        type="checkbox"
+        className="mt-0.5 size-5 shrink-0"
+        checked={chonDong.daChon.has(k)}
+        onChange={() => {}}
+        onClick={(e) => chonDong.doi(k, e.shiftKey, khoaHien)}
+        aria-label={`Chọn dòng ${nhanDong(r)}`}
+        title="Tick để tô màu / in đậm dòng này (Shift+tick chọn cả khoảng)."
+      />
+    );
   };
 
   const nutChiTiet = (k: string, coAn: boolean) =>
@@ -269,15 +281,11 @@ export function RecordTable<T>({
         <>
           {/* Desktop — cuộn ngang khi ô chứa hẹp (VD nằm trong lưới 2 cột) để bảng
               KHÔNG tràn đè khối bên cạnh; đủ rộng thì không có thanh cuộn. */}
-          <div
-            ref={khungBangRef}
-            {...mocBut}
-            className="scroll-nice-x hidden overflow-x-auto rounded-xl ring-1 ring-foreground/10 @3xl:block"
-          >
+          <div className="scroll-nice-x hidden overflow-x-auto rounded-xl ring-1 ring-foreground/10 @3xl:block">
             <Table className={cn("bang-ghim-dau", coCotThaoTac && "bang-ghim-cuoi")}>
               <TableHeader>
                 <TableRow>
-                  {cotBang.map((c) => (
+                  {cotBang.map((c, ci) => (
                     <TableHead
                       key={c.key}
                       className={cn(c.so && "text-right", "p-0 whitespace-normal")}
@@ -289,6 +297,17 @@ export function RecordTable<T>({
                           : undefined
                       }
                     >
+                      <div className="flex items-center">
+                      {to.bat && ci === 0 && (
+                        <input
+                          type="checkbox"
+                          className="ml-(--pad-o,0.75rem) size-5 shrink-0"
+                          checked={chonHet}
+                          onChange={() => chonDong.doiTatCa(khoaHien, !chonHet)}
+                          aria-label={chonHet ? "Bỏ chọn tất cả dòng" : "Chọn tất cả dòng"}
+                          title={chonHet ? "Bỏ tick mọi dòng đang hiện." : "Tick mọi dòng đang hiện (để tô màu / in đậm cùng lúc)."}
+                        />
+                      )}
                       {c.sapXep ? (
                         <button
                           type="button"
@@ -320,15 +339,11 @@ export function RecordTable<T>({
                           {c.header}
                         </span>
                       )}
+                      </div>
                     </TableHead>
                   ))}
                   {coCotThaoTac && (
-                    <TableHead className="text-right">
-                      <span className="flex items-center justify-end gap-1">
-                        {toMau && <NutButTo to={to} maBang={toMau} />}
-                        Thao tác
-                      </span>
-                    </TableHead>
+                    <TableHead className="text-right">Thao tác</TableHead>
                   )}
                 </TableRow>
               </TableHeader>
@@ -342,27 +357,28 @@ export function RecordTable<T>({
                   return (
                     <React.Fragment key={k}>
                       <TableRow className="hien-len" {...to.thuocTinh(k)}>
-                        {cotBang.map((c) => (
+                        {cotBang.map((c, ci) => (
                           <TableCell
                             key={c.key}
                             className={c.so ? "tnum text-right" : undefined}
-                            {...to.thuocTinhO(k, c.key)}
                           >
-                            {c.so ? (
-                              c.render(r)
-                            ) : (
-                              // Chữ dài xuống dòng trong khung ≤ 18rem thay vì kéo
-                              // cả bảng rộng ra (ô gốc để whitespace-nowrap).
-                              <div className="max-w-72 break-words whitespace-normal">
-                                {c.render(r)}
-                              </div>
-                            )}
+                            <div className={cn(to.bat && ci === 0 && "flex items-start gap-2")}>
+                              {to.bat && ci === 0 && oTick(r)}
+                              {c.so ? (
+                                c.render(r)
+                              ) : (
+                                // Chữ dài xuống dòng trong khung ≤ 18rem thay vì kéo
+                                // cả bảng rộng ra (ô gốc để whitespace-nowrap).
+                                <div className="max-w-72 break-words whitespace-normal">
+                                  {c.render(r)}
+                                </div>
+                              )}
+                            </div>
                           </TableCell>
                         ))}
                         {coCotThaoTac && (
-                          <TableCell className="text-right" {...to.thuocTinhO(k, "*")}>
+                          <TableCell className="text-right">
                             <div className="flex items-center justify-end gap-2">
-                              <NutToMau to={to} khoa={k} nhan={nhanDong(r)} />
                               {nutChiTiet(k, cotAnBang.length > 0)}
                               {actions?.(r)}
                             </div>
@@ -400,8 +416,9 @@ export function RecordTable<T>({
                 className="hien-len rounded-xl bg-card p-4 ring-1 ring-foreground/10"
                 {...to.thuocTinh(k)}
               >
-                <div className="mb-3 text-lg font-semibold text-foreground">
-                  {cotChinh.render(r)}
+                <div className="mb-3 flex items-start gap-2 text-lg font-semibold text-foreground">
+                  {to.bat && oTick(r)}
+                  <div className="min-w-0">{cotChinh.render(r)}</div>
                 </div>
                 <dl className="space-y-2">
                   {cotThe.map((c) => (
@@ -428,9 +445,8 @@ export function RecordTable<T>({
                     {chiTiet(r, cotAnThe)}
                   </div>
                 )}
-                {(actions || cotAnThe.length > 0 || to.bat) && (
+                {(actions || cotAnThe.length > 0) && (
                   <div className="mt-4 flex flex-wrap items-center gap-2">
-                    <NutToMau to={to} khoa={k} nhan={nhanDong(r)} />
                     {nutChiTiet(k, cotAnThe.length > 0)}
                     {actions?.(r)}
                   </div>
@@ -439,6 +455,7 @@ export function RecordTable<T>({
               );
             })}
           </ul>
+          <ThanhToMau to={to} khoa={daTick} onBoChon={chonDong.boChon} />
         </>
       )}
     </div>

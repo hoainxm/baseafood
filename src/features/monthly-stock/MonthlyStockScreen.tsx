@@ -44,6 +44,7 @@ import {
   type DongBoDong,
 } from "@/lib/monthlyStock";
 import {
+  KhungCuonNgang,
   BangTong,
   Button,
   ChuThichBatBuoc,
@@ -2279,7 +2280,7 @@ export default function MonthlyStockScreen() {
                 </div>
               </div>
 
-              <div className="scroll-nice-x overflow-x-auto">
+              <KhungCuonNgang>
                 <table className="w-full border-collapse text-sm">
                   <thead>
                     <tr className="bg-muted">
@@ -2312,7 +2313,7 @@ export default function MonthlyStockScreen() {
                     ))}
                   </tbody>
                 </table>
-              </div>
+              </KhungCuonNgang>
               {dsTheKho.length === 0 && (
                 <p className="text-sm text-muted-foreground">
                   Mặt hàng này chưa có dòng nào đã LƯU trong sổ (đang xem trước dồn kỳ).

@@ -24,6 +24,7 @@ import {
 } from "@/lib/banNoiDia";
 import type { ONgay, PeriodGrid } from "./usePeriodGrid";
 import { HopChonDongNhap, HopDongNhapTay, HopThemDongNL } from "./gridDialogs";
+import { ChuyenTheoNgay } from "./ChuyenTheoNgay";
 import {
   Button,
   Combobox,
@@ -75,6 +76,15 @@ export function LuoiNguyenLieu({
     banNoiDiaSX,
   } = luoi;
   const [suaTayMo, setSuaTayMo] = useState(false);
+  /** Ngày đang xem ở khối "Chuyến nhập theo ngày" (null = ngày đầu có chuyến). */
+  const [ngayXem, setNgayXem] = useState<string | null>(null);
+  /** Bấm tên ngày ở đầu cột lưới ⇒ chọn ngày đó + cuộn tới khối chuyến. */
+  const xemNgay = (iso: string) => {
+    setNgayXem(iso);
+    requestAnimationFrame(() =>
+      document.getElementById("chuyen-theo-ngay")?.scrollIntoView({ behavior: "smooth", block: "start" })
+    );
+  };
   const [themMo, setThemMo] = useState<InputGroup | "giam" | null>(null);
   const [chonNhapMo, setChonNhapMo] = useState(false);
   /** id dòng kho ẢO (chưa lưu) — dòng thật tạo ra DÙNG LẠI đúng id này, nên ô đang gõ
@@ -462,7 +472,16 @@ export function LuoiNguyenLieu({
     { key: "tyLe", header: "Tỷ lệ", nhan: "Tỷ lệ phần trăm", kieu: "so", rong: 72, lay: (h) => h.tyLe },
     ...ngay.map<CotLuoi<HangLuoiNL>>((iso) => ({
       key: `ngay:${iso}`,
-      header: nhanNgay(iso),
+      header: (
+        <button
+          type="button"
+          onClick={() => xemNgay(iso)}
+          title={`Xem đại lý nào giao, mấy chuyến, bao nhiêu kg ngày ${viDate(iso)} (khối "Chuyến nhập theo ngày" dưới lưới).`}
+          className="underline decoration-dotted underline-offset-4 hover:text-primary"
+        >
+          {nhanNgay(iso)}
+        </button>
+      ),
       nhan: `Ngày ${viDate(iso)}`,
       kieu: "so",
       nhom: "ngay",
@@ -802,6 +821,9 @@ export function LuoiNguyenLieu({
           )}
         </div>
       )}
+
+      {/* Đại lý nào giao chuyến nào, theo từng ngày — chỉ đọc (README cân đối 31). */}
+      <ChuyenTheoNgay ngay={ngay} nhap={luoi.nhapDaGan} ngayXem={ngayXem} onChonNgay={setNgayXem} />
 
       {suaTayMo && (
         <HopDongNhapTay

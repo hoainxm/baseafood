@@ -14,6 +14,7 @@ import {
   useSalesOrders,
 } from "@/lib/catalogRepo";
 import {
+  KhungCuonNgang,
   Nhan,
   Button,
   Combobox,
@@ -281,7 +282,7 @@ export default function OrderExportReport() {
           moTa="Tạo lệnh xuất ở màn Đơn đặt, số liệu xuất sẽ tổng hợp về đây."
         />
       ) : (
-        <div className="scroll-nice-x overflow-x-auto rounded-xl border-2 border-border">
+        <KhungCuonNgang classNameKhung="rounded-xl border-2 border-border">
           <Table>
             <TableHeader>
               <TableRow>
@@ -355,7 +356,7 @@ export default function OrderExportReport() {
               </TableRow>
             </TableFooter>
           </Table>
-        </div>
+        </KhungCuonNgang>
       )}
       <ThanhToMau to={to} khoa={khoaDong.filter((k) => chonDong.daChon.has(k))} onBoChon={chonDong.boChon} />
 

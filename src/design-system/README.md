@@ -188,6 +188,20 @@ chỉ khi bảng nằm giữa nội dung khác cần thấy cùng lúc), cần d
 `className="cot-dau-dinh"`. Người dùng sổ dài **than "bọc"** với `dinhDau` (cuộn
 lồng cuộn, khó nhìn tổng quát — Sổ kho tháng 2026-10-06) ⇒ sổ dài mặc định `xoRa`.
 
+**Bảng tràn ngang ⇒ thanh cuộn ngang ở CẢ TRÊN lẫn DƯỚI (2026-10-06).** Thanh cuộn
+thật nằm ở đáy bảng — bảng dài thì phải cuộn xuống tận đáy mới kéo ngang được. Nay
+mọi bảng tràn ngang có thêm thanh cuộn TRÊN đầu bảng, chạy đồng bộ hai chiều với
+thanh dưới, CHỈ hiện khi bảng thật sự tràn:
+
+| Bảng | Cách có |
+|---|---|
+| `BangTong` (mặc định · `dinhDau` · `xoRa`), `RecordTable` dạng bảng, `LuoiNhap` | Tự có — không phải làm gì (`xoRa` còn giữ thanh dưới DÍNH ĐÁY màn hình) |
+| Bảng TỰ DỰNG ở features | Bọc bằng **`<KhungCuonNgang classNameKhung="viền/bo góc">`** thay cho `<div className="overflow-x-auto">` — cấm tự viết `overflow-x-auto` cho bảng mới |
+| Pattern mới tự quản khung cuộn | `const thanh = useThanhCuonTren(() => phầnTửĐangCuộn)` rồi đặt `{thanh}` ngay trên khung (`patterns/thanhCuonTren.tsx`) |
+
+Thanh trên dùng utility `bang-thanh-cuon` (luôn hiện, kể cả Mac "chỉ hiện khi cuộn").
+Ngoại lệ: bảng in A4, bảng trong hộp thoại hẹp đã có khung cuộn riêng, biểu đồ.
+
 **Bớt khoảng trắng ngang (2026-10-06, người dùng than "thừa khoảng trắng, phải kéo
 ngang nhiều"):** đệm ngang ô bảng theo **mật độ** — token `--pad-o` (Gọn 10px ·
 Vừa 12px · Thoáng 16px; trước cứng 16px) ở `TableHead`/`TableCell` + tiêu đề cột
@@ -274,7 +288,8 @@ Luật khi dùng:
 - **Bảng nhập tự dựng (không qua `LuoiNhap`):** `Field` / `NumberField` cũng nhận
   `anNhan` (giấu nhãn nhìn thấy, giữ `aria-label`) — dùng khi bảng có **hàng tiêu
   đề cột**. Ngoài bảng thì KHÔNG dùng, nhãn phải luôn hiện. Bảng phải cuộn ngang
-  trong khung riêng (`overflow-x-auto`), không để cuộn ngang cả trang. VD: bảng
+  trong khung riêng — bọc `KhungCuonNgang` (có sẵn thanh cuộn trên + dưới), không
+  để cuộn ngang cả trang. VD: bảng
   ghi thành phẩm ngày (`WipProductionScreen` › `BangDongSX`).
 - **Cấm `sr-only` cho nhãn nằm trong hộp cuộn.** `sr-only` là `position:absolute`;
   gặp tổ tiên không định vị thì rơi ra toạ độ trang, đội chiều cao trang lên và
@@ -341,6 +356,7 @@ thứ tự DOM, tự bỏ ô ẩn của dòng chưa mở); Tab để trình duy�
 - [ ] Thân chữ ≥ **`text-sm`** (14px); `text-xs` (12px) CHỈ cho chip/badge/phụ chú
       (đo bằng TOKEN, không bằng px tuyệt đối). Không `fontSize` cứng < 12 trong SVG
 - [ ] Bảng dài đã ra thẻ trên điện thoại (hoặc có `cot-dau-dinh` nếu là báo cáo Excel)
+- [ ] Bảng tràn ngang có thanh cuộn TRÊN + DƯỚI (pattern dùng chung tự có; bảng tự dựng bọc `KhungCuonNgang`)
 - [ ] Chỉ dùng `md:` cho bố cục khung; không thêm `sm:`
 - [ ] Màn mới đã vào `KIT_NAV` **và** `CAY_NAV`
 - [ ] **Mọi nút thao tác có `title` giải thích nút làm gì** (§9) — nút chỉ-icon

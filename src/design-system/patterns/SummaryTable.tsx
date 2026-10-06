@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { ThanhToMau } from "./ToMauDong";
+import { useThanhCuonTren } from "./thanhCuonTren";
 import { useChonDong, useToMau } from "./toMauNguon";
 
 /**
@@ -103,6 +104,11 @@ export function BangTong<T>({
   // "Đã chọn" riêng); không thì bảng tự giữ + tự hiện thanh tô màu khi bật toMau.
   const chonTrong = useChonDong();
   const neoTick = React.useRef<string | null>(null);
+  // Thanh cuộn ngang TRÊN đầu bảng (README § 5a) — vùng cuộn thật là table-container.
+  const gocRef = React.useRef<HTMLDivElement>(null);
+  const thanhTren = useThanhCuonTren(
+    () => gocRef.current?.querySelector<HTMLElement>('[data-slot="table-container"]') ?? null
+  );
   // Bảng rỗng không có dòng thêm thì không vẽ bảng ⇒ khỏi đo.
   const { bangRef, dauNoiRef, thanhRef, rongCot, rongBang, rongCuon, tran, hienDau } = useXoRa(
     Boolean(xoRa) && (rows.length > 0 || Boolean(dongThem))
@@ -173,6 +179,7 @@ export function BangTong<T>({
   return (
     <>
     <div
+      ref={gocRef}
       className={cn(
         // xoRa: gốc KHÔNG được là khung cuộn (sticky của hàng tên cột nổi và thanh
         // cuộn đáy bám theo khung cuộn của trang); cuộn ngang do khung của primitive.
@@ -180,6 +187,7 @@ export function BangTong<T>({
         className
       )}
     >
+      {thanhTren}
       {xoRa && (
         // Hàng tên cột NỔI: hộp cao 0 dính dưới header trang (h-16 ở AppShell —
         // đổi chiều cao header thì đổi cả top-16 này). Chỉ hiện khi hàng tên cột

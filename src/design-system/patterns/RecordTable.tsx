@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, Search, X } from "lucide-react";
 import { ThanhToMau } from "./ToMauDong";
+import { useThanhCuonTren } from "./thanhCuonTren";
 import { useChonDong, useToMau } from "./toMauNguon";
 
 export interface Cot<T> {
@@ -85,6 +86,12 @@ export function RecordTable<T>({
   const to = useToMau(toMau);
   // Tick dòng để tô màu / in đậm nhiều dòng một lúc (chỉ khi bật toMau).
   const chonDong = useChonDong();
+  // Thanh cuộn ngang TRÊN đầu bảng (README § 5a) — vùng cuộn thật là table-container.
+  const khungBangRef = React.useRef<HTMLDivElement>(null);
+  const thanhTren = useThanhCuonTren(
+    () => khungBangRef.current?.querySelector<HTMLElement>('[data-slot="table-container"]') ?? null,
+    "mx-2 mt-2"
+  );
   const [q, setQ] = React.useState("");
   const [sapTheo, setSapTheo] = React.useState<string | null>(null);
   const [huong, setHuong] = React.useState<Huong>("tang");
@@ -281,7 +288,11 @@ export function RecordTable<T>({
         <>
           {/* Desktop — cuộn ngang khi ô chứa hẹp (VD nằm trong lưới 2 cột) để bảng
               KHÔNG tràn đè khối bên cạnh; đủ rộng thì không có thanh cuộn. */}
-          <div className="scroll-nice-x hidden overflow-x-auto rounded-xl ring-1 ring-foreground/10 @3xl:block">
+          <div
+            ref={khungBangRef}
+            className="scroll-nice-x hidden overflow-x-auto rounded-xl ring-1 ring-foreground/10 @3xl:block"
+          >
+            {thanhTren}
             <Table className={cn("bang-ghim-dau", coCotThaoTac && "bang-ghim-cuoi")}>
               <TableHeader>
                 <TableRow>

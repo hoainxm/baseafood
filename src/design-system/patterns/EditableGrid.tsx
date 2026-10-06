@@ -9,6 +9,7 @@ import { dinhDangSo, parseSo } from "./bieuThucSo";
 import { XemTruocBieuThuc } from "./ONhapSo";
 import { useNhapSo } from "./useNhapSo";
 import { ThanhToMau } from "./ToMauDong";
+import { useThanhCuonTren } from "./thanhCuonTren";
 import { useChonDong, useToMau } from "./toMauNguon";
 
 /**
@@ -115,6 +116,9 @@ export function LuoiNhap<R>({
   const to = useToMau(toMau);
   // Tick dòng để tô màu / in đậm nhiều dòng một lúc (chỉ khi bật toMau).
   const chonDong = useChonDong();
+  // Thanh cuộn ngang TRÊN đầu lưới (README § 5a) — lưới ngày của Cân đối rất rộng.
+  const khungRef = React.useRef<HTMLDivElement>(null);
+  const thanhTren = useThanhCuonTren(() => khungRef.current);
   const oRef = React.useRef(new Map<string, HTMLInputElement>());
   const cotHien = React.useMemo(
     () => cot.filter((c) => !c.nhom || !nhomAn.includes(c.nhom)),
@@ -225,7 +229,9 @@ export function LuoiNhap<R>({
 
   return (
     <>
+    {thanhTren}
     <div
+      ref={khungRef}
       className={cn(
         "scroll-nice-x overflow-x-auto rounded-xl ring-1 ring-foreground/10",
         className

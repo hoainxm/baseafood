@@ -35,6 +35,7 @@ import {
   tongBot,
 } from "@/lib/botTam";
 import {
+  KhungCuonNgang,
   ChuThichBatBuoc,
   Button,
   ConfirmDelete,
@@ -1351,7 +1352,7 @@ export default function SanXuatBTPScreen() {
                   Cân đối.
                 </p>
               </div>
-              <div className="overflow-x-auto rounded-lg border border-border">
+              <KhungCuonNgang classNameKhung="rounded-lg border border-border">
                 <table className="w-full border-collapse text-base">
                   <thead>
                     <tr className="border-b border-border bg-muted/50 text-left">
@@ -1378,7 +1379,7 @@ export default function SanXuatBTPScreen() {
                     </tr>
                   </tfoot>
                 </table>
-              </div>
+              </KhungCuonNgang>
             </div>
           )}
         </>
@@ -1533,7 +1534,7 @@ export default function SanXuatBTPScreen() {
             </div>
           </div>
 
-          <div className="overflow-x-auto rounded-lg border border-border">
+          <KhungCuonNgang classNameKhung="rounded-lg border border-border">
             <table className="w-full border-collapse text-base">
               <thead>
                 <tr className="border-b border-border bg-muted/50 text-left">
@@ -1563,7 +1564,7 @@ export default function SanXuatBTPScreen() {
                 </tr>
               </tfoot>
             </table>
-          </div>
+          </KhungCuonNgang>
         </div>
       )}
 

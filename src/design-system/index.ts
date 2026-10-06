@@ -52,6 +52,8 @@ export { NutHuongDan } from "./patterns/GuideButton";
 export { FormDialog, NutDong } from "./patterns/FormDialog";
 export { BangTong, type CotTong, type ChonBang } from "./patterns/SummaryTable";
 export { NutToMauChon, ThanhToMau } from "./patterns/ToMauDong";
+export { KhungCuonNgang } from "./patterns/CuonNgang";
+export { useThanhCuonTren } from "./patterns/thanhCuonTren";
 export {
   ToMauContext,
   useToMau,

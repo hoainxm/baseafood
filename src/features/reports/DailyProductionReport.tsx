@@ -7,6 +7,7 @@ import { Fragment, useMemo, useState } from "react";
 import type { Workshop } from "@/types";
 import { useProducts, useWipProductions } from "@/lib/catalogRepo";
 import {
+  KhungCuonNgang,
   BieuDoCotDoc,
   Button,
   Combobox,
@@ -295,7 +296,7 @@ export default function DailyProductionReport() {
             </section>
           )}
 
-          <div className="scroll-nice-x overflow-x-auto rounded-xl border-2 border-border">
+          <KhungCuonNgang classNameKhung="rounded-xl border-2 border-border">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -379,7 +380,7 @@ export default function DailyProductionReport() {
                 </TableRow>
               </TableFooter>
             </Table>
-          </div>
+          </KhungCuonNgang>
           <ThanhToMau to={to} khoa={khoaDong.filter((k) => chonDong.daChon.has(k))} onBoChon={chonDong.boChon} />
         </>
       )}

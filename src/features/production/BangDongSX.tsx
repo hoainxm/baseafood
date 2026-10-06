@@ -6,7 +6,8 @@
 import { Fragment } from "react";
 import type { BatterType, Product } from "@/types";
 import { laCoTach, quyCachBlock } from "@/types";
-import { Button, Combobox, NumberField, type MucChon } from "@/design-system";
+import {
+  KhungCuonNgang, Button, Combobox, NumberField, type MucChon } from "@/design-system";
 import { num } from "@/lib/format";
 import { laMatHangTamBot, tenBotDiKem } from "@/lib/botTam";
 import { ChevronDown, Pencil, Plus, X } from "lucide-react";
@@ -145,7 +146,7 @@ export function BangDongSX({
             </div>
             {/* Bề rộng tối thiểu do min-w (rem) của từng cột quyết định — co giãn
                 theo cỡ chữ; không ép cứng px cho cả bảng. */}
-            <div className="scroll-nice-x overflow-x-auto">
+            <KhungCuonNgang>
               <table className="w-full border-collapse text-sm">
                 <thead>
                   <tr>
@@ -387,7 +388,7 @@ export function BangDongSX({
                   })}
                 </tbody>
               </table>
-            </div>
+            </KhungCuonNgang>
             <div className="p-2">
               <Button
                 title="Thêm một dòng thành phẩm nữa vào nhóm này (cùng kiểu chế biến và khách hàng)."

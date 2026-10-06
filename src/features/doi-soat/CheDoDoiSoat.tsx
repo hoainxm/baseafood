@@ -9,6 +9,7 @@
 // ============================================================
 import { useMemo, useState } from "react";
 import {
+  KhungCuonNgang,
   Button,
   Card,
   CardContent,
@@ -401,7 +402,7 @@ function KiemCongSheet({ sh }: { sh: SheetHoaDon }) {
           </p>
         )}
         {!khop && (
-          <div className="overflow-x-auto">
+          <KhungCuonNgang>
             <table className="w-full min-w-80 text-sm">
               <thead>
                 <tr className="border-b border-border text-left text-muted-foreground">
@@ -425,7 +426,7 @@ function KiemCongSheet({ sh }: { sh: SheetHoaDon }) {
                 </tr>
               </tbody>
             </table>
-          </div>
+          </KhungCuonNgang>
         )}
         {cd.dongLech.length > 0 && (
           <>

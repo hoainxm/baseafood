@@ -72,9 +72,10 @@ src/features/*                 ← màn nghiệp vụ
 13. **Mọi chữ hiển thị theo chuẩn label.** Sentence case; nhãn field = danh từ
     trần (không "Chỉ xem…", không "… dòng", không `:`); nút = động từ đứng đầu.
     Chi tiết + before→after: [`noi-dung-va-label.md`](noi-dung-va-label.md).
-14. **Mọi bảng nghiệp vụ tô màu dòng được** ("đánh dấu đã dò" kiểu Excel — màu +
-    in đậm, lưu chung mọi máy). Bảng dùng chung bật bằng MỘT prop `toMau="<khoá
-    bảng>"`; bảng tự dựng dùng `useToMau` + `NutToMau`. Luật + ngoại lệ + mẫu:
+14. **Mọi bảng nghiệp vụ tô màu được** ("đánh dấu đã dò" kiểu Excel — bảng màu
+    10 sắc × 5 mức + in đậm, tô cả dòng hoặc từng ô, bút tô kéo qua nhiều ô; lưu
+    chung mọi máy). Bảng dùng chung bật bằng MỘT prop `toMau="<khoá bảng>"`; bảng
+    tự dựng dùng `useToMau` + `NutToMau` (+ `useButToBang`). Luật + ngoại lệ + mẫu:
     mục [Tô màu dòng](#tô-màu-dòng-đã-dò-kiểu-excel).
 
 **Ngoại lệ luật (bản in theo mẫu giấy):** `src/features/balancing/BalancingTable.tsx` và
@@ -174,7 +175,17 @@ Bảng **báo cáo** nhiều cột số (`BangTong`) vẫn giữ dạng bảng: 
 trang, thanh cuộn ngang dính đáy màn hình) hoặc `dinhDau` (khung cuộn riêng ≤70dvh —
 chỉ khi bảng nằm giữa nội dung khác cần thấy cùng lúc), cần dò ngang thì
 `className="cot-dau-dinh"`. Người dùng sổ dài **than "bọc"** với `dinhDau` (cuộn
-lồng cuộn, khó nhìn tổng quát — Sổ kho tháng 2026-10-06) ⇒ sổ dài mặc định `xoRa`. Không nhét bảng báo cáo nhiều cột vào nửa màn
+lồng cuộn, khó nhìn tổng quát — Sổ kho tháng 2026-10-06) ⇒ sổ dài mặc định `xoRa`.
+
+**Bớt khoảng trắng ngang (2026-10-06, người dùng than "thừa khoảng trắng, phải kéo
+ngang nhiều"):** đệm ngang ô bảng theo **mật độ** — token `--pad-o` (Gọn 10px ·
+Vừa 12px · Thoáng 16px; trước cứng 16px) ở `TableHead`/`TableCell` + tiêu đề cột
+sắp xếp của `RecordTable`. `BangTong`: tên cột **xuống dòng** (cột số rộng theo con
+số, không theo tên cột dài) và chữ "Cộng …" ở dòng tổng **trải qua các cột đầu
+không có tổng** (để chung ô với cột đầu thì nó đẩy cột đó rộng gấp rưỡi). Ô nhập
+trong bảng đặt bề rộng vừa đủ số (`w-24` cho số tới hàng triệu), chữ dài (tên hàng)
+xuống dòng trong khung `max-w-52`, cụm nút cuối dòng dùng `size="icon-sm"`. Sổ kho
+tháng: 2.081px → 1.623px (−22%). Không nhét bảng báo cáo nhiều cột vào nửa màn
 (`lg:grid-cols-2`) — Tổng quan từng tràn 263% vì thế.
 
 ### 5c. Vùng cuộn không được TRÀN ra ngoài (`overscroll-contain`)
@@ -230,7 +241,8 @@ Cho sẵn:
   người dùng biết vì sao không gõ được (đừng để ô câm).
 - **Dán khối từ Excel** (TSV). Hiểu cả `(2.000)` = −2.000 kiểu kế toán. Ô rỗng
   trong khối dán **giữ nguyên** số cũ, không xoá về 0.
-- Cột dính bên trái, `min-w-44` trên máy nhỏ → `sm:min-w-60`.
+- Cột dính bên trái, `min-w-40` trên máy nhỏ → `sm:min-w-52` (thu từ 44/60 ngày
+  2026-10-06 cho bớt kéo ngang); ô số `min-w-20`, đệm ngang 8px.
 - Ô cao ≥ 44px, `tabular-nums`, số âm tô `text-destructive`.
 
 Luật khi dùng:
@@ -455,21 +467,43 @@ const themKhach = (ten: string) => {
 
 ## Tô màu dòng "đã dò" kiểu Excel
 
-(Chốt 2026-10-06, theo kế toán: "tô màu lên những ô c dò rồi… tô dòng đó, rồi in
-đậm cái dòng lên".) **Mọi bảng nghiệp vụ** — kể cả bảng thêm về sau — phải cho tô
-màu + in đậm từng dòng để đánh dấu đã dò. Dấu **lưu chung vào CSDL** (bảng
-`row_marks`, mig 0055): mọi máy, mọi người cùng thấy; đổi máy / xoá trình duyệt
-không mất. Chỉ là dấu trình bày — **không đụng số sổ sách**.
+(Chốt 2026-10-06, theo kế toán: "tô màu lên những ô c dò rồi… tô giống excel…
+tô dòng đó, rồi in đậm cái dòng lên"; chiều cùng ngày: "tăng số lượng màu và mức
+độ đậm nhạt giống như excel, cho phép tô màu nhiều ô một lúc".) **Mọi bảng
+nghiệp vụ** — kể cả bảng thêm về sau — phải cho tô màu + in đậm **từng dòng và
+từng ô** để đánh dấu đã dò. Dấu **lưu chung vào CSDL** (bảng `row_marks`, mig
+0055): mọi máy, mọi người cùng thấy; đổi máy / xoá trình duyệt không mất. Chỉ là
+dấu trình bày — **không đụng số sổ sách**.
+
+**Người dùng thấy gì:**
+
+- **Bảng màu kiểu Excel:** lưới 10 sắc (xám · đỏ · cam · vàng · xanh nõn chuối ·
+  xanh lá · xanh da trời · xanh dương · tím · hồng) × 5 mức (hàng trên rất nhạt →
+  hàng dưới rất đậm). Ô màu KHÔNG ghi chữ (như Excel); tên màu nằm ở `title` +
+  `aria-label` ("Tô vàng rất đậm").
+- **Nút 🪣 ở mỗi dòng** (ô đầu dòng / cột Thao tác / ô tên dính trái): tô cả dòng,
+  In đậm, Bỏ tô.
+- **Bút tô ✎ ở đầu bảng** — tô NHIỀU Ô một lúc: chọn màu (± In đậm, hoặc Cục tẩy)
+  là cầm bút; rồi **bấm** một ô, **kéo** qua nhiều ô (chuột lẫn cảm ứng), **bấm ô
+  đầu dòng** = tô cả dòng, **Shift+bấm** = tô cả VÙNG chữ nhật từ ô bấm trước. Một
+  nét = MỘT lần ghi (màu chạy theo tay khi kéo, nhả tay mới ghi); nét ≥ 2 ô có
+  toast + Hoàn tác. Dải "Đang cầm bút" nổi ở đáy màn có nút **Thả bút**; **Esc**
+  cũng thả. Đang cầm bút thì ô nhập/nút trong ô không nhận bấm (tô chứ không gõ);
+  thả bút là gõ lại bình thường. Bút dùng chung cho mọi bảng CÙNG khoá (3 bảng
+  nhóm của Sổ kho tháng).
+- **Tô hàng loạt dòng đang tick** (`NutToMauNhieu`, thanh "Đã chọn N dòng").
+- Ô tô riêng **đè** màu dòng. Nền mức đậm vẫn giữ chữ đen (như Excel): ô "tối"
+  (độ chói < 0,68) tự đổi chữ phụ / chữ màu về màu chữ thường.
 
 **Cách chạy (một lần cho cả app):**
 
 | Tầng | Thứ | Vai trò |
 |---|---|---|
-| design-system | `patterns/toMauNguon.ts` | hợp đồng `NguonToMau` + `ToMauContext` + hook `useToMau(maBang)` + `MAU_TO` — KHÔNG gọi repo |
-| design-system | `patterns/ToMauDong.tsx` | `NutToMau` (nút 🪣 một dòng) · `NutToMauNhieu` (tô hàng loạt dòng đang tick) |
-| design-system | `BangTong` · `RecordTable` · `LuoiNhap` · `DanhMucCrud` | prop `toMau="<khoá bảng>"` ⇒ tự vẽ nút + nền dòng |
-| tokens | `--to-vang/-xanh-la/-xanh-duong/-do` (+ `-line`) · khối `[data-to-mau]`/`[data-dam]` | nền dòng phủ cả ô ghim/ô dính, vạch đậm mép trái, chữ xanh/hổ phách đổi bản đậm cho đủ 4,5:1 |
-| app | `features/shared/ToMauProvider.tsx` (gắn MỘT lần ở `ShellLayout`) | nối `useRowMarks()` → `row_marks`; hàm thuần `lib/toMau.ts` (+ test) |
+| design-system | `patterns/toMauNguon.ts` | hợp đồng `NguonToMau` (dấu dòng + dấu ô) + `ToMauContext` + `useToMau(maBang)` + bảng màu `SAC_TO`/`MUC_TO`/`LUOI_MAU` + kho bút tô + `useButToBang` — KHÔNG gọi repo |
+| design-system | `patterns/ToMauDong.tsx` | `NutToMau` (🪣 một dòng) · `NutToMauNhieu` (dòng đang tick) · `NutButTo` (✎ đầu bảng) · `GoiYButTo` (dải nổi "Đang cầm bút") |
+| design-system | `BangTong` · `RecordTable` (dạng bảng) · `LuoiNhap` · `DanhMucCrud` | prop `toMau="<khoá bảng>"` ⇒ tự vẽ nút 🪣 + bút ✎ + nền dòng/ô + bắt nét bút |
+| tokens | `--to-<sắc>-<1..5>` + `--to-<sắc>-line` (SINH BẰNG SCRIPT, có kiểm tương phản) · khối `[data-to-mau]`/`[data-to-toi]`/`[data-dam]`/`[data-but-to]` | nền phủ cả ô ghim/ô dính, vạch đậm mép trái dòng, chữ đổi bản đậm trên nền đậm, con trỏ chữ thập khi cầm bút |
+| app | `features/shared/ToMauProvider.tsx` (gắn MỘT lần ở `ShellLayout`, kèm `<GoiYButTo />`) | nối `useRowMarks()` → `row_marks`; hàm thuần `lib/toMau.ts` (+ test) |
 
 **Luật:**
 
@@ -477,20 +511,24 @@ không mất. Chỉ là dấu trình bày — **không đụng số sổ sách**
    dấu cũ. Một khoá cho một bảng; hai chế độ xem CÙNG bản ghi (VD bảng xem + lưới
    Ghi của `/nxt-kho`) dùng chung khoá để dấu không mất khi đổi chế độ.
 2. **Khoá dòng = id BẢN GHI** (`getKey` / `HangLuoi.id`), **cấm chỉ số dòng** —
-   sắp xếp / lọc / thêm dòng sẽ làm dấu nhảy sang dòng khác.
+   sắp xếp / lọc / thêm dòng sẽ làm dấu nhảy sang dòng khác. **Khoá ô = khoá cột**
+   (`Cot.key` / `CotTong.key` / `CotLuoi.key`) — đổi khoá cột là mất dấu ô cột đó.
 3. **Bảng dòng GỘP theo kỳ/bộ lọc** (báo cáo: đại lý × loại, khách × kênh, mặt
    hàng × quy cách…) — khoá dòng là khoá nhóm, lặp lại ở mọi kỳ ⇒ **ghép kỳ + bộ
    lọc vào khoá bảng**: `` toMau={`bao-cao-nhap|${tu}|${den}|${xuong}`} ``. Không
    ghép thì "đã dò tháng 9" hiện luôn ở tháng 10.
-4. Màn hình **không** tự viết class màu dòng, **không** gọi `useRowMarks()` (mỗi
-   `useBang` giữ state riêng — nhiều instance đè mất dấu nhau). Chỉ provider gọi.
-5. Tô một dòng **lặng lẽ** (màu dòng đổi ngay là phản hồi; tô 100 dòng không được
-   bắn 100 toast). Tô **hàng loạt** (`NutToMauNhieu` / `sua(khoa, va, true)`) mới
-   bắn toast + **Hoàn tác** (trả đúng dấu cũ từng dòng). Đổi màu giữ in đậm riêng
-   từng dòng và ngược lại (vá, không ghi đè).
-6. Chuột lẫn cảm ứng: nút 🪣 trên dòng (không dựa vào chuột phải). Nút có `title`
-   + `aria-label` nói rõ dòng đang tô màu gì.
+4. Màn hình **không** tự viết class/mã màu dòng, **không** gọi `useRowMarks()`
+   (mỗi `useBang` giữ state riêng — nhiều instance đè mất dấu nhau). Chỉ provider gọi.
+5. Tô một dòng/ô **lặng lẽ** (màu đổi ngay là phản hồi; tô 100 dòng không được bắn
+   100 toast). Tô **hàng loạt** (tick nhiều dòng, nét bút ≥ 2 ô, Shift+vùng) mới
+   bắn toast + **Hoàn tác** (trả đúng dấu cũ từng đích). Đổi màu giữ in đậm riêng
+   từng đích và ngược lại (vá, không ghi đè).
+6. Chuột lẫn cảm ứng: nút trên dòng + bút tô (không dựa vào chuột phải). Mọi nút có
+   `title` + `aria-label` nói rõ đang tô màu gì. Ô màu 24px là ngoại lệ có chủ đích
+   của vùng chạm (bảng màu 50 ô phải vừa màn 360px như Excel).
 7. Không có provider (trang `/kit`, test) ⇒ bảng chạy như cũ, không hiện nút.
+8. `RecordTable` dạng THẺ (vùng chứa hẹp) chỉ có nút 🪣 tô cả thẻ — bút tô cần ô,
+   chỉ chạy ở dạng bảng.
 
 **Ngoại lệ — không tô:**
 
@@ -503,10 +541,13 @@ không mất. Chỉ là dấu trình bày — **không đụng số sổ sách**
 | Bảng tóm tắt nhỏ trong thẻ (bột theo loại, báo cáo TP gom theo người ghi ở `/wip`) · tồn theo kho ở Tổng quan | Vài dòng gộp, số đổi liên tục — dấu "đã dò" không còn nghĩa |
 | Bảng KẾT QUẢ đối soát HĐĐT (`/doi-soat`) | Khoá dòng `<sheet>#<dòng>` của file đang mở — đổi file là trùng khoá. Đợt sau: khoá theo id bản đối soát đã lưu. Danh sách "Bản đã lưu" thì có tô |
 
+Bảng tự dựng (Sản xuất theo ngày, Xuất theo đơn) hiện chỉ tô theo DÒNG (nút 🪣);
+muốn bút tô từng ô thì gắn `thuocTinhO` + `useButToBang` như mẫu dưới.
+
 **Mẫu:**
 
 ```tsx
-// Bảng dùng chung — MỘT prop:
+// Bảng dùng chung — MỘT prop (tự có nút 🪣, bút ✎, tô ô):
 <RecordTable columns={cot} rows={rows} getKey={(r) => r.id} toMau="ban-hang" />
 <BangTong rows={rows} cot={cot} getKey={(r) => r.id} xoRa toMau="ton-kho-thang" />
 <LuoiNhap cot={cot} hang={hang} onGhiO={ghiO} moTa="…" toMau="can-doi-nl" />
@@ -518,7 +559,7 @@ không mất. Chỉ là dấu trình bày — **không đụng số sổ sách**
 const to = useToMau("ton-kho-thang"); // CÙNG khoá với bảng
 <NutToMauNhieu to={to} khoa={rowsChon.map((r) => r.id)} />
 
-// Bảng TỰ DỰNG (<Table> tay):
+// Bảng TỰ DỰNG (<Table> tay) — tô dòng:
 const to = useToMau(`bao-cao-sx-ngay|${tu}|${den}|${xuong}`);
 <TableRow key={k} {...to.thuocTinh(k)}>
   <TableCell>
@@ -529,23 +570,31 @@ const to = useToMau(`bao-cao-sx-ngay|${tu}|${den}|${xuong}`);
   </TableCell>
   …
 </TableRow>
+// … muốn thêm bút tô từng ô:
+const khungRef = useRef<HTMLDivElement>(null);
+const moc = useButToBang(to, khungRef, () => ({ dong: dsKhoa, cot: dsCot }));
+<div ref={khungRef} {...moc}> … <TableCell {...to.thuocTinhO(k, "kg")}> …
+// ô đầu dòng: {...to.thuocTinhO(k, "*")} · đầu bảng: <NutButTo to={to} maBang="…" />
 ```
 
 **Checklist khi thêm một bảng mới:**
 
 - [ ] Bảng có trong bảng ngoại lệ? Có ⇒ dừng. Không ⇒ phải tô được.
 - [ ] Đặt khoá bảng mới (kebab-case, chưa trùng khoá nào — `grep -rn 'toMau=' src/features`).
-- [ ] `getKey` / `HangLuoi.id` là id bản ghi, không phải chỉ số dòng.
+- [ ] `getKey` / `HangLuoi.id` là id bản ghi, không phải chỉ số dòng; khoá cột ổn định.
 - [ ] Dòng là dòng GỘP theo kỳ/bộ lọc ⇒ ghép kỳ + bộ lọc vào khoá bảng.
 - [ ] Bảng có tick chọn dòng ⇒ thêm `NutToMauNhieu` vào thanh thao tác hàng loạt.
-- [ ] Bảng tự dựng ⇒ `{...to.thuocTinh(k)}` lên `<tr>` + `NutToMau` trong ô đầu.
-- [ ] Thử: tô 1 dòng + in đậm, sắp xếp/lọc lại ⇒ dấu vẫn đúng dòng; 360px + 130% không tràn.
+- [ ] Bảng tự dựng ⇒ `{...to.thuocTinh(k)}` lên `<tr>` + `NutToMau` trong ô đầu (+ bút tô nếu là sổ để dò từng ô).
+- [ ] Thử: tô 1 dòng + in đậm; cầm bút kéo qua 3 ô, Shift+vùng, Esc; sắp xếp/lọc lại ⇒ dấu vẫn đúng chỗ; 360px + 130% không tràn.
 
-**Thêm màu:** cặp token `--to-<mã>` + `--to-<mã>-line` (tokens.css, kiểm chữ
-`muted`/`destructive` ≥ 4,5:1 trên nền) + khối `[data-to-mau="<mã>"]` + mã ở
-`MAU_TO` (`toMauNguon.ts`) và `MA_MAU_TO` (`lib/toMau.ts`). Không cần migration —
-cột `color` không có CHECK. **Tô ô lẻ** để sau: dữ liệu đã chừa (`column_key`,
-`idDauTo(bang, dong, cot)`), UI chưa làm.
+**Sửa/thêm màu:** mỗi mức = trộn sắc gốc với trắng (tỉ lệ 0,16 · 0,32 · 0,52 ·
+0,76 · 1 của mức đậm nhất; mức đậm nhất chặn ở độ chói ≥ 0,25 để chữ đen ≥ 4,5:1).
+Sửa token `--to-<sắc>-<mức>` / `--to-<sắc>-line` ở `tokens.css` + `SAC_TO`
+(`toMauNguon.ts`) + `SAC_TO_LIB` (`lib/toMau.ts`) + `MAU_TOI` (ô độ chói < 0,68).
+**Test `patterns/toMauNguon.test.ts` canh hết:** đủ token, hai danh sách sắc khớp,
+chữ thường ≥ 4,5:1 trên mọi ô, `MAU_TOI` đúng, chữ phụ/chữ đỏ ≥ 4,5:1 trên ô sáng.
+Không cần migration — cột `color` không có CHECK; mã lạ bị bỏ qua. 4 mã của bản
+đầu (`vang`, `xanh-la`, `xanh-duong`, `do`) vẫn đọc được (ra mức 2).
 
 ## Animation & Loading → "Thinking"
 
@@ -629,7 +678,7 @@ trên header. Áp ngay và **nhớ theo từng tài khoản**:
 | Cấu hình | Cách áp | Giá trị |
 |---|---|---|
 | Cỡ chữ | `--app-font-scale` trên `<html>` | 90 / **100 (mặc định)** / 110 / 120 / 130 % (nền token 16px) |
-| Mật độ | `data-density` trên `<html>` | thoáng 44px · vừa 40px · **gọn 36px (mặc định)** |
+| Mật độ | `data-density` trên `<html>` | thoáng 44px · vừa 40px · **gọn 36px (mặc định)** — kèm đệm ngang ô bảng `--pad-o` 16 · 12 · 10px |
 | Bề rộng nội dung | `--app-content-width` | 64rem / 80rem / 100% |
 
 Khóa localStorage theo username: `bsf.<username>.<coChu|matDo|beRong>`; chưa đăng
@@ -713,7 +762,7 @@ Các pattern dùng lại đã tự gắn `title`, màn hình KHÔNG phải làm 
 | `ChoiceGroup` | từng lựa chọn — lấy `o.moTa`, không có thì ghép "Chọn X cho {nhãn}" |
 | `Combobox` · `DateField` · `NumberField` | nút mở danh sách / mở lịch / tăng giảm |
 | `StepForm` · `PrintSheet` · `InfoTip` · `DisplaySettings` | nút điều hướng bước, In / Xuất PDF, ⓘ, Đặt lại |
-| `NutToMau` · `NutToMauNhieu` (prop `toMau` của bảng) | nút 🪣 — dòng đang tô gì + bấm để làm gì; từng ô màu / In đậm / Bỏ tô |
+| `NutToMau` · `NutToMauNhieu` · `NutButTo` (prop `toMau` của bảng) | nút 🪣 / bút ✎ — đang tô gì + bấm để làm gì; từng ô màu ("Tô vàng rất đậm") / In đậm / Bỏ tô / Cục tẩy / Thả bút |
 
 Mục **điều hướng** lấy câu mô tả từ `KIT_NAV[].moTa` (`features/shared/AppShell.tsx`):
 rê lên tên màn là biết màn đó để làm gì. **Thêm màn mới thì viết luôn `moTa`** —

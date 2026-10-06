@@ -12,8 +12,8 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, Search, X } from "lucide-react";
-import { NutToMau } from "./ToMauDong";
-import { useToMau } from "./toMauNguon";
+import { NutButTo, NutToMau } from "./ToMauDong";
+import { useButToBang, useToMau } from "./toMauNguon";
 
 export interface Cot<T> {
   key: string;
@@ -83,6 +83,7 @@ export function RecordTable<T>({
   toMau?: string;
 }) {
   const to = useToMau(toMau);
+  const khungBangRef = React.useRef<HTMLDivElement>(null);
   const [q, setQ] = React.useState("");
   const [sapTheo, setSapTheo] = React.useState<string | null>(null);
   const [huong, setHuong] = React.useState<Huong>("tang");
@@ -120,6 +121,12 @@ export function RecordTable<T>({
       return huong === "tang" ? cmp : -cmp;
     });
   }, [daLoc, columns, sapTheo, huong]);
+
+  // Bút tô (bảng desktop): thứ tự dòng = đang sắp/lọc, cột = cột đang hiện trên bảng.
+  const mocBut = useButToBang(to, khungBangRef, () => ({
+    dong: daSap.map((r) => getKey(r)),
+    cot: columns.filter((c) => !c.phu || c.chinh).map((c) => c.key),
+  }));
 
   const doiSap = (key: string) => {
     if (sapTheo === key) {
@@ -262,7 +269,11 @@ export function RecordTable<T>({
         <>
           {/* Desktop — cuộn ngang khi ô chứa hẹp (VD nằm trong lưới 2 cột) để bảng
               KHÔNG tràn đè khối bên cạnh; đủ rộng thì không có thanh cuộn. */}
-          <div className="scroll-nice-x hidden overflow-x-auto rounded-xl ring-1 ring-foreground/10 @3xl:block">
+          <div
+            ref={khungBangRef}
+            {...mocBut}
+            className="scroll-nice-x hidden overflow-x-auto rounded-xl ring-1 ring-foreground/10 @3xl:block"
+          >
             <Table className={cn("bang-ghim-dau", coCotThaoTac && "bang-ghim-cuoi")}>
               <TableHeader>
                 <TableRow>
@@ -284,7 +295,7 @@ export function RecordTable<T>({
                           onClick={() => doiSap(c.key)}
                           title={`Sắp danh sách theo cột "${c.header}". Bấm lại để đảo tăng ↔ giảm.`}
                           className={cn(
-                            "flex min-h-11 w-full items-center gap-2 px-4 py-1.5 text-left text-sm leading-snug font-semibold hover:bg-accent",
+                            "flex min-h-11 w-full items-center gap-2 px-(--pad-o,0.75rem) py-1.5 text-left text-sm leading-snug font-semibold hover:bg-accent",
                             c.so && "justify-end text-right"
                           )}
                         >
@@ -302,7 +313,7 @@ export function RecordTable<T>({
                       ) : (
                         <span
                           className={cn(
-                            "flex min-h-11 items-center px-4 py-1.5 leading-snug",
+                            "flex min-h-11 items-center px-(--pad-o,0.75rem) py-1.5 leading-snug",
                             c.so && "justify-end"
                           )}
                         >
@@ -312,7 +323,12 @@ export function RecordTable<T>({
                     </TableHead>
                   ))}
                   {coCotThaoTac && (
-                    <TableHead className="text-right">Thao tác</TableHead>
+                    <TableHead className="text-right">
+                      <span className="flex items-center justify-end gap-1">
+                        {toMau && <NutButTo to={to} maBang={toMau} />}
+                        Thao tác
+                      </span>
+                    </TableHead>
                   )}
                 </TableRow>
               </TableHeader>
@@ -330,6 +346,7 @@ export function RecordTable<T>({
                           <TableCell
                             key={c.key}
                             className={c.so ? "tnum text-right" : undefined}
+                            {...to.thuocTinhO(k, c.key)}
                           >
                             {c.so ? (
                               c.render(r)
@@ -343,7 +360,7 @@ export function RecordTable<T>({
                           </TableCell>
                         ))}
                         {coCotThaoTac && (
-                          <TableCell className="text-right">
+                          <TableCell className="text-right" {...to.thuocTinhO(k, "*")}>
                             <div className="flex items-center justify-end gap-2">
                               <NutToMau to={to} khoa={k} nhan={nhanDong(r)} />
                               {nutChiTiet(k, cotAnBang.length > 0)}

@@ -71,7 +71,8 @@ function TableHead({ className, ...props }: React.ComponentProps<"th">) {
       data-slot="table-head"
       className={cn(
         /* Header bảng: KHÔNG in hoa — chữ hoa làm chậm đọc ~15% */
-        "h-11 bg-muted px-4 text-left align-middle text-sm font-semibold whitespace-nowrap text-foreground [&:has([role=checkbox])]:pr-0",
+        /* Đệm ngang theo mật độ (--pad-o ở tokens.css: gọn 10px · vừa 12px · thoáng 16px) */
+        "h-11 bg-muted px-(--pad-o,0.75rem) text-left align-middle text-sm font-semibold whitespace-nowrap text-foreground [&:has([role=checkbox])]:pr-0",
         className
       )}
       {...props}
@@ -85,7 +86,7 @@ function TableCell({ className, ...props }: React.ComponentProps<"td">) {
       data-slot="table-cell"
       className={cn(
         /* Dòng cao 44px — đủ để dò ngang bảng cân đối, gọn hơn cho web */
-        "h-11 px-4 py-2.5 align-middle whitespace-nowrap [&:has([role=checkbox])]:pr-0",
+        "h-11 px-(--pad-o,0.75rem) py-2.5 align-middle whitespace-nowrap [&:has([role=checkbox])]:pr-0",
         className
       )}
       {...props}

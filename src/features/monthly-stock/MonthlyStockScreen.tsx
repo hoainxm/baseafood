@@ -1085,7 +1085,7 @@ export default function MonthlyStockScreen() {
       onPaste={(e) => danKhoi(e, r.id, c)}
       aria-label={`${nhan} — ${r.itemName}${r.size ? " " + r.size : ""}`}
       title={`${nhan}: gõ số hoặc phép tính (VD 1200+350). Enter / ↑ / ↓ sang dòng khác, dán được cả khối từ Excel.`}
-      khungClassName="ml-auto w-28"
+      khungClassName="ml-auto w-24"
       className={`${oChu} w-full ${mau ?? ""}`}
     />
   );
@@ -1110,7 +1110,10 @@ export default function MonthlyStockScreen() {
     {
       key: "ten",
       header: "Mặt hàng",
-      render: (r) => <span className="font-semibold text-foreground">{r.itemName}</span>,
+      // Tên dài xuống dòng trong khung ≤ 13rem thay vì kéo cả bảng rộng ra.
+      render: (r) => (
+        <span className="block max-w-52 min-w-28 font-semibold whitespace-normal text-foreground">{r.itemName}</span>
+      ),
     },
     // Size là CỘT RIÊNG (theo bảng kê của kế toán), không còn là dòng phụ dưới tên hàng.
     {
@@ -1123,7 +1126,7 @@ export default function MonthlyStockScreen() {
             onChange={(e) => suaSo(r.id, { size: e.target.value })}
             aria-label={`Size — ${r.itemName}`}
             title="Size — sửa thẳng tại đây."
-            className={`${oChu} w-24`}
+            className={`${oChu} w-20`}
           />
         ) : (
           <span className="whitespace-nowrap">{r.size || "—"}</span>
@@ -1139,7 +1142,7 @@ export default function MonthlyStockScreen() {
             onChange={(e) => suaSo(r.id, { origin: e.target.value })}
             aria-label={`Invoice — ${r.itemName}`}
             title="Số invoice của lô — sửa thẳng tại đây."
-            className={`${oChu} w-32`}
+            className={`${oChu} w-28`}
           />
         ) : (
           r.origin || "—"
@@ -1193,7 +1196,7 @@ export default function MonthlyStockScreen() {
       header: "Vị trí",
       render: (r) =>
         sua ? (
-          <div className="w-52">
+          <div className="w-40">
             <Combobox
               anNhan
               label={`Vị trí — ${r.itemName}`}
@@ -1224,9 +1227,9 @@ export default function MonthlyStockScreen() {
     },
     {
       key: "thaotac", header: "", render: (r) => (
-        <div className="flex items-center justify-end gap-1">
+        <div className="flex items-center justify-end gap-0.5">
           <Button
-            size="sm"
+            size="icon-sm"
             variant="ghost"
             aria-label={`Thẻ kho ${r.itemName}`}
             title="Thẻ kho — lịch sử mặt hàng này qua các tháng"
@@ -1237,7 +1240,7 @@ export default function MonthlyStockScreen() {
           {!laXemTruoc && (
             <>
               <Button
-                size="sm"
+                size="icon-sm"
                 variant="ghost"
                 aria-label={`Lấy ra / gửi kho ${r.itemName}`}
                 title="Lấy hàng ra sử dụng, nhập thêm, hoặc gửi ra kho ngoài (Ánh Dương, HP…) — nhập số kg rồi lưu."
@@ -1246,7 +1249,7 @@ export default function MonthlyStockScreen() {
                 <PackageMinus className="size-4" />
               </Button>
               <Button
-                title="Sửa dòng: ngày nhập · tên hàng · size · invoice · đơn giá · số kg · vị trí." size="sm" variant="ghost" aria-label={`Sửa ${r.itemName}`} onClick={() => moSua(r)}>
+                title="Sửa dòng: ngày nhập · tên hàng · size · invoice · đơn giá · số kg · vị trí." size="icon-sm" variant="ghost" aria-label={`Sửa ${r.itemName}`} onClick={() => moSua(r)}>
                 <Pencil className="size-4" />
               </Button>
               <ConfirmDelete
@@ -1254,7 +1257,7 @@ export default function MonthlyStockScreen() {
                 onConfirm={() => xoaDong(r)}
                 trigger={
                   <Button
-                    title="Xóa dòng này khỏi tháng. Có hỏi xác nhận, xóa xong vẫn còn nút Hoàn tác." size="sm" variant="ghost" aria-label={`Xóa ${r.itemName}`}>
+                    title="Xóa dòng này khỏi tháng. Có hỏi xác nhận, xóa xong vẫn còn nút Hoàn tác." size="icon-sm" variant="ghost" aria-label={`Xóa ${r.itemName}`}>
                     <Trash2 className="size-4" />
                   </Button>
                 }

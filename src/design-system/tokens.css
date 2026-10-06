@@ -173,20 +173,44 @@
   --tone-xam-surface: #f8fafc;
   --tone-xam-line: #cbd5e1;
 
-  /* --- Tô màu dòng "đã dò" (bảng row_marks, mig 0055) — bảng màu kiểu Excel ---
-     Nền đủ sáng để chữ thường, chữ phụ (muted) và chữ đỏ (destructive) đều
-     ≥ 4,5:1. Chữ xanh lá / hổ phách trong dòng tô đổi sang bản đậm hơn (khối
-     [data-to-mau] cuối file). `-line` = vạch đậm ở mép trái dòng + ô màu trên nút.
-     Thêm màu: thêm cặp token ở đây + mã ở MAU_TO (patterns/toMauNguon.ts) +
-     MA_MAU_TO (lib/toMau.ts). App chưa có giao diện tối ⇒ chỉ bản sáng. */
-  --to-vang: #fef08a;
-  --to-vang-line: #ca8a04;
-  --to-xanh-la: #c6efce;
-  --to-xanh-la-line: #16a34a;
-  --to-xanh-duong: #cfe2f3;
-  --to-xanh-duong-line: #2563eb;
-  --to-do: #fddede;
-  --to-do-line: #dc2626;
+  /* --- Tô màu dòng/ô "đã dò" (bảng row_marks, mig 0055) — bảng màu kiểu Excel ---
+     10 sắc × 5 mức (1 rất nhạt → 5 rất đậm) = trộn sắc gốc với trắng như "tint"
+     của Excel. SINH BẰNG SCRIPT có kiểm tương phản: mọi ô giữ chữ thường
+     (#0f172a) ≥ 4,5:1 (mức đậm nhất bị chặn ở độ chói 0,25). Ô "tối" (độ chói
+     < 0,68, danh sách MAU_TOI ở patterns/toMauNguon.ts) ⇒ chữ phụ + chữ màu trong
+     ô đổi về màu chữ thường (khối [data-to-toi] cuối file). `-line` = vạch đậm
+     mép trái dòng tô. Sửa/thêm màu: sửa cả SAC_TO (toMauNguon.ts) + SAC_TO_LIB
+     (lib/toMau.ts) + MAU_TOI. App chưa có giao diện tối ⇒ chỉ bản sáng. */
+  /* xám */
+  --to-xam-1: #ececec; --to-xam-2: #d9d9d9; --to-xam-3: #c1c1c1; --to-xam-4: #a5a5a5; --to-xam-5: #898989;
+  --to-xam-line: #5c5c5c;
+  /* đỏ */
+  --to-do-1: #ffe0e0; --to-do-2: #ffc1c1; --to-do-3: #ff9a9a; --to-do-4: #ff6c6c; --to-do-5: #ff3e3e;
+  --to-do-line: #b80000;
+  /* cam */
+  --to-cam-1: #ffedd6; --to-cam-2: #ffdaad; --to-cam-3: #ffc37a; --to-cam-4: #ffa83d; --to-cam-5: #ff8c00;
+  --to-cam-line: #b86500;
+  /* vàng */
+  --to-vang-1: #ffffd6; --to-vang-2: #ffffad; --to-vang-3: #ffff7a; --to-vang-4: #ffff3d; --to-vang-5: #ffff00;
+  --to-vang-line: #b8b800;
+  /* xanh nõn chuối */
+  --to-chuoi-1: #eef7e3; --to-chuoi-2: #dcf0c7; --to-chuoi-3: #c6e7a4; --to-chuoi-4: #acdb7a; --to-chuoi-5: #92d050;
+  --to-chuoi-line: #69963a;
+  /* xanh lá */
+  --to-la-1: #d6f2e3; --to-la-2: #ade6c7; --to-la-3: #7ad6a4; --to-la-4: #3dc37a; --to-la-5: #00b050;
+  --to-la-line: #007f3a;
+  /* xanh da trời */
+  --to-troi-1: #d6f2fd; --to-troi-2: #ade6fa; --to-troi-3: #7ad6f7; --to-troi-4: #3dc3f4; --to-troi-5: #00b0f0;
+  --to-troi-line: #007fad;
+  /* xanh dương */
+  --to-duong-1: #dfedf7; --to-duong-2: #bfdbef; --to-duong-3: #98c5e5; --to-duong-4: #68aada; --to-duong-5: #3890ce;
+  --to-duong-line: #00518a;
+  /* tím */
+  --to-tim-1: #f0e9f5; --to-tim-2: #e1d4eb; --to-tim-3: #cfb9df; --to-tim-4: #b899d0; --to-tim-5: #a279c1;
+  --to-tim-line: #512373;
+  /* hồng */
+  --to-hong-1: #ffe7f7; --to-hong-2: #ffceef; --to-hong-3: #ffafe4; --to-hong-4: #ff8bd8; --to-hong-5: #ff66cc;
+  --to-hong-line: #b84993;
 }
 
 @theme inline {
@@ -252,15 +276,6 @@
   --color-tone-xam: var(--tone-xam);
   --color-tone-xam-surface: var(--tone-xam-surface);
   --color-tone-xam-line: var(--tone-xam-line);
-  /* Tô màu dòng → bg-to-vang, text-to-vang-line… (ô màu trên nút tô) */
-  --color-to-vang: var(--to-vang);
-  --color-to-vang-line: var(--to-vang-line);
-  --color-to-xanh-la: var(--to-xanh-la);
-  --color-to-xanh-la-line: var(--to-xanh-la-line);
-  --color-to-xanh-duong: var(--to-xanh-duong);
-  --color-to-xanh-duong-line: var(--to-xanh-duong-line);
-  --color-to-do: var(--to-do);
-  --color-to-do-line: var(--to-do-line);
   /* Trạng thái MES → tiện ích Tailwind: bg-status-running, text-status-stopped-ink… */
   --color-status-running: var(--status-running);
   --color-status-idle: var(--status-idle);
@@ -288,14 +303,20 @@
 :root[data-density="thoang"] {
   --h-control: 2.75rem;
   --h-row: 3rem;
+  --pad-o: 1rem;
 }
 :root[data-density="vua"] {
   --h-control: 2.5rem;
   --h-row: 2.75rem;
+  --pad-o: 0.75rem;
 }
+/* --pad-o = đệm NGANG mỗi ô bảng (TableHead/TableCell, tiêu đề cột sắp xếp của
+   RecordTable). Gọn 10px: bảng 13 cột như Sổ kho tháng hẹp đi ~150px so với 16px
+   cứng trước 2026-10-06 — đỡ kéo ngang, mắt vẫn tách được cột nhờ vạch kẻ. */
 :root[data-density="gon"] {
   --h-control: 2.25rem;
   --h-row: 2.5rem;
+  --pad-o: 0.625rem;
 }
 
 :root[data-density="thoang"],
@@ -596,47 +617,46 @@
 }
 
 /* ============================================================
-   TÔ MÀU DÒNG "ĐÃ DÒ" — data-to-mau / data-dam trên <tr> (hoặc thẻ <li>
-   của RecordTable trên điện thoại). Gắn qua useToMau().thuocTinh(khoá) — màn
-   hình không tự viết class màu. Luật: src/design-system/README.md § Tô màu dòng.
+   TÔ MÀU DÒNG / Ô "ĐÃ DÒ" — gắn qua useToMau().thuocTinh(khoá) (dòng: <tr>,
+   thẻ <li> của RecordTable trên điện thoại) và thuocTinhO(khoá, cột) (từng ô).
+   Thuộc tính mang `data-to-mau` + style `--to-nen` (màu nền) / `--to-vach` (vạch
+   trái); màn hình không tự viết class màu. Luật: README design-system § Tô màu dòng.
    KHÔNG bọc @layer: khối này phải THẮNG sọc dòng, hover, nền ô ghim/ô dính
    (bang-ghim-*, cot-dau-dinh, cột tính của LuoiNhap) — utility nằm trong layer
-   nên CSS ngoài layer luôn thắng, khỏi cần !important.
+   nên CSS ngoài layer luôn thắng, khỏi cần !important. Ô tô riêng đè màu dòng vì
+   style của <td> đặt lại --to-nen (biến CSS kế thừa từ <tr> nếu ô không có).
    ============================================================ */
-[data-to-mau="vang"] {
-  --to-nen: var(--to-vang);
-  --to-vach: var(--to-vang-line);
+tr[data-to-mau] > td,
+tr[data-to-mau] > th,
+td[data-to-mau],
+th[data-to-mau],
+li[data-to-mau] {
+  background-color: var(--to-nen);
 }
-[data-to-mau="xanh-la"] {
-  --to-nen: var(--to-xanh-la);
-  --to-vach: var(--to-xanh-la-line);
-}
-[data-to-mau="xanh-duong"] {
-  --to-nen: var(--to-xanh-duong);
-  --to-vach: var(--to-xanh-duong-line);
-}
-[data-to-mau="do"] {
-  --to-nen: var(--to-do);
-  --to-vach: var(--to-do-line);
-}
-/* Chữ xanh lá / hổ phách (nhập +, xuất −) trên nền tô: bản đậm hơn cho đủ 4,5:1.
-   @theme inline ⇒ text-success đọc thẳng var(--success) nên đè biến ở đây là ăn. */
+/* Chữ xanh lá / hổ phách (nhập +, xuất −) trên nền tô nhạt: bản đậm hơn cho đủ
+   4,5:1. @theme inline ⇒ text-success đọc thẳng var(--success) nên đè biến ở đây là ăn. */
 [data-to-mau] {
   --success: #166534;
   --warning: #92400e;
 }
-tr[data-to-mau] > td,
-tr[data-to-mau] > th,
-li[data-to-mau] {
-  background-color: var(--to-nen);
+/* Nền "tối" (mức đậm): chữ phụ + chữ màu về màu chữ thường — như Excel, chữ
+   vẫn đen trên ô tô đậm. Ô nhập trong ô (nền trắng riêng) không bị ảnh hưởng. */
+[data-to-toi] {
+  --muted-foreground: var(--foreground);
+  --success: var(--foreground);
+  --warning: var(--foreground);
+  --destructive: var(--foreground);
+  --primary: var(--foreground);
 }
 /* Rê chuột vẫn thấy đang đứng dòng nào — phủ một lớp mờ lên màu tô. */
 tr[data-to-mau]:hover > td,
-tr[data-to-mau]:hover > th {
+tr[data-to-mau]:hover > th,
+tr:hover > td[data-to-mau],
+tr:hover > th[data-to-mau] {
   background-image: linear-gradient(rgb(15 23 42 / 0.05), rgb(15 23 42 / 0.05));
 }
-/* Vạch đậm mép trái: màu không phải tín hiệu duy nhất (người khó phân biệt
-   màu vẫn thấy dòng có dấu; nút tô ở dòng còn nói rõ màu gì bằng chữ). */
+/* Vạch đậm mép trái DÒNG tô: màu không phải tín hiệu duy nhất (nút tô ở dòng
+   còn nói rõ màu gì bằng chữ cho trình đọc màn hình / rê chuột). */
 tr[data-to-mau] > :first-child,
 li[data-to-mau] {
   box-shadow: inset 4px 0 0 var(--to-vach);
@@ -645,9 +665,22 @@ tr[data-dam] > td,
 tr[data-dam] > th,
 tr[data-dam] > td *,
 tr[data-dam] > th *,
+td[data-dam],
+td[data-dam] *,
+th[data-dam],
+th[data-dam] *,
 li[data-dam],
 li[data-dam] * {
   font-weight: 700;
+}
+/* Đang cầm BÚT TÔ (BangTong/RecordTable/LuoiNhap gắn data-but-to lên khung bảng):
+   con trỏ chữ thập, chạm-kéo trên máy cảm ứng là TÔ chứ không cuộn trang. */
+[data-but-to] [data-o-dong] {
+  cursor: crosshair;
+  touch-action: none;
+}
+[data-but-to] [data-o-dong] :is(input, button, textarea, select, a) {
+  pointer-events: none;
 }
 
 /* ============================================================

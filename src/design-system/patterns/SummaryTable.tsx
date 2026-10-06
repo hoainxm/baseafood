@@ -14,8 +14,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
-import { NutToMau } from "./ToMauDong";
-import { useToMau } from "./toMauNguon";
+import { NutButTo, NutToMau } from "./ToMauDong";
+import { useButToBang, useToMau } from "./toMauNguon";
 
 /**
  * Tick chọn dòng (tuỳ chọn). Bật lên thì BangTong thêm một cột ô tick ở đầu bảng;
@@ -99,6 +99,11 @@ export function BangTong<T>({
   dongThem?: React.ReactNode;
 }) {
   const to = useToMau(toMau);
+  const gocRef = React.useRef<HTMLDivElement>(null);
+  const mocBut = useButToBang(to, gocRef, () => ({
+    dong: rows.map((r, i) => getKey(r, i)),
+    cot: cot.map((c) => c.key),
+  }));
   // Bảng rỗng không có dòng thêm thì không vẽ bảng ⇒ khỏi đo.
   const { bangRef, dauNoiRef, thanhRef, rongCot, rongBang, rongCuon, tran, hienDau } = useXoRa(
     Boolean(xoRa) && (rows.length > 0 || Boolean(dongThem))
@@ -119,26 +124,36 @@ export function BangTong<T>({
 
   const coCotDau = Boolean(chon) || to.bat;
   const soCot = cot.length + (coCotDau ? 1 : 0);
+  /* Chữ "Cộng …" ở dòng tổng trải qua cột đầu dòng + các cột đầu KHÔNG có tổng —
+     để trong một ô riêng thì chữ dài ("Cộng Nguyên liệu mua ngoài") đẩy cột đầu
+     (VD Ngày nhập) rộng gấp rưỡi, cả bảng phải kéo ngang thêm. */
+  const kTongDau = Math.max(0, cot.findIndex((c) => c.tong));
+  const soCotNhan = cot.some((c) => c.tong) ? kTongDau : cot.length;
 
   /** Hàng tên cột — vẽ ở bảng thật và (chế độ xoRa) ở hàng tên cột nổi. */
   const hangDau = (noi: boolean) => (
     <TableRow>
       {coCotDau && (
         <TableHead className="w-12">
-          {chon && (
-            <input
-              type="checkbox"
-              className="size-5"
-              checked={chonHet}
-              tabIndex={noi ? -1 : undefined}
-              onChange={() => chon.doiTatCa(khoa, !chonHet)}
-              aria-label={chonHet ? "Bỏ chọn tất cả dòng" : "Chọn tất cả dòng"}
-            />
-          )}
+          <div className="flex items-center gap-1">
+            {chon && (
+              <input
+                type="checkbox"
+                className="size-5"
+                checked={chonHet}
+                tabIndex={noi ? -1 : undefined}
+                onChange={() => chon.doiTatCa(khoa, !chonHet)}
+                aria-label={chonHet ? "Bỏ chọn tất cả dòng" : "Chọn tất cả dòng"}
+              />
+            )}
+            {!noi && toMau && <NutButTo to={to} maBang={toMau} />}
+          </div>
         </TableHead>
       )}
+      {/* Tên cột XUỐNG DÒNG ("Nhập trong kỳ (kg)" thành 2 dòng): cột số rộng theo
+          con số, không theo tên cột dài — bớt kéo ngang. */}
       {cot.map((c) => (
-        <TableHead key={c.key} className={cn(c.so && "text-right")}>
+        <TableHead key={c.key} className={cn("leading-tight whitespace-normal", c.so && "text-right")}>
           {c.header}
         </TableHead>
       ))}
@@ -147,6 +162,8 @@ export function BangTong<T>({
 
   return (
     <div
+      ref={gocRef}
+      {...mocBut}
       className={cn(
         // xoRa: gốc KHÔNG được là khung cuộn (sticky của hàng tên cột nổi và thanh
         // cuộn đáy bám theo khung cuộn của trang); cuộn ngang do khung của primitive.
@@ -194,7 +211,7 @@ export function BangTong<T>({
                 {...to.thuocTinh(k)}
               >
                 {coCotDau && (
-                  <TableCell>
+                  <TableCell {...to.thuocTinhO(k, "*")}>
                     <div className="flex items-center gap-1">
                       {chon && (
                         <input
@@ -213,6 +230,7 @@ export function BangTong<T>({
                   <TableCell
                     key={c.key}
                     className={cn(c.so && "text-right tnum")}
+                    {...to.thuocTinhO(k, c.key)}
                   >
                     {c.render(r)}
                   </TableCell>
@@ -231,13 +249,17 @@ export function BangTong<T>({
         {coTong && (
           <TableFooter>
             <TableRow>
-              {coCotDau && <TableCell />}
-              {cot.map((c, i) => (
+              {(coCotDau ? 1 : 0) + soCotNhan > 0 && (
+                <TableCell colSpan={(coCotDau ? 1 : 0) + soCotNhan} className="font-bold whitespace-normal">
+                  {nhanTong}
+                </TableCell>
+              )}
+              {cot.slice(soCotNhan).map((c) => (
                 <TableCell
                   key={c.key}
                   className={cn("font-bold", c.so && "text-right tnum")}
                 >
-                  {c.tong ? c.tong(rows) : i === 0 ? nhanTong : null}
+                  {c.tong ? c.tong(rows) : null}
                 </TableCell>
               ))}
             </TableRow>

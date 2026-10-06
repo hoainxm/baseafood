@@ -1,14 +1,14 @@
 // ============================================================
 // Tên file: src/features/shared/ToMauProvider.tsx
-// Tên tiếng Việt: Nguồn dữ liệu tô màu dòng (row_marks) cho cả app
-// Description: Provides shared row marks to every design-system table
+// Tên tiếng Việt: Nguồn dữ liệu tô màu dòng/ô (row_marks) cho cả app
+// Description: Provides shared row/cell marks to every design-system table
 // ============================================================
 import { useLayoutEffect, useMemo, useRef, type ReactNode } from "react";
-import { ToMauContext, type DauDong, type NguonToMau } from "@/design-system";
+import { GoiYButTo, ToMauContext, type DauBang, type NguonToMau } from "@/design-system";
 import { useRowMarks } from "@/lib/catalogRepo";
 import { datDau, dauCuaBang } from "@/lib/toMau";
 
-const RONG: ReadonlyMap<string, DauDong> = new Map();
+const RONG: DauBang = { dong: new Map(), o: new Map() };
 
 /**
  * Gắn MỘT lần ở ShellLayout (App.tsx). Cả app dùng chung một instance
@@ -27,7 +27,7 @@ export function ToMauProvider({ nguoi, children }: { nguoi: string; children: Re
   }, [marks]);
 
   const theoBang = useMemo(() => {
-    const ra = new Map<string, ReadonlyMap<string, DauDong>>();
+    const ra = new Map<string, DauBang>();
     for (const k of new Set(marks.map((m) => m.tableKey))) ra.set(k, dauCuaBang(marks, k));
     return ra;
   }, [marks]);
@@ -35,8 +35,8 @@ export function ToMauProvider({ nguoi, children }: { nguoi: string; children: Re
   const nguon = useMemo<NguonToMau>(
     () => ({
       dauCuaBang: (maBang) => theoBang.get(maBang) ?? RONG,
-      dat: (maBang, khoaDong, dau) => {
-        const next = datDau(moiNhat.current, maBang, khoaDong, dau, nguoi);
+      dat: (maBang, dich, dau) => {
+        const next = datDau(moiNhat.current, maBang, dich, dau, nguoi);
         moiNhat.current = next;
         ghi(next);
       },
@@ -44,5 +44,11 @@ export function ToMauProvider({ nguoi, children }: { nguoi: string; children: Re
     [theoBang, ghi, nguoi]
   );
 
-  return <ToMauContext.Provider value={nguon}>{children}</ToMauContext.Provider>;
+  return (
+    <ToMauContext.Provider value={nguon}>
+      {children}
+      {/* Dải "Đang cầm bút tô" nổi ở đáy màn — một cái cho cả app. */}
+      <GoiYButTo />
+    </ToMauContext.Provider>
+  );
 }

@@ -8,8 +8,8 @@ import { cn } from "@/lib/utils";
 import { dinhDangSo, parseSo } from "./bieuThucSo";
 import { XemTruocBieuThuc } from "./ONhapSo";
 import { useNhapSo } from "./useNhapSo";
-import { NutToMau } from "./ToMauDong";
-import { useToMau } from "./toMauNguon";
+import { NutButTo, NutToMau } from "./ToMauDong";
+import { useButToBang, useToMau } from "./toMauNguon";
 
 /**
  * LuoiNhap — lưới nhập liệu thay cho "mở hộp thoại, điền, bấm lưu" từng dòng.
@@ -113,6 +113,7 @@ export function LuoiNhap<R>({
   toMau?: string;
 }) {
   const to = useToMau(toMau);
+  const khungRef = React.useRef<HTMLDivElement>(null);
   const oRef = React.useRef(new Map<string, HTMLInputElement>());
   const cotHien = React.useMemo(
     () => cot.filter((c) => !c.nhom || !nhomAn.includes(c.nhom)),
@@ -120,6 +121,10 @@ export function LuoiNhap<R>({
   );
   /** Chỉ ô gõ được mới nằm trong đường đi của phím mũi tên. */
   const hangNhap = React.useMemo(() => hang.filter((h) => !h.tieuDeNhom), [hang]);
+  const mocBut = useButToBang(to, khungRef, () => ({
+    dong: hangNhap.map((h) => h.id),
+    cot: cotHien.map((c) => c.key),
+  }));
 
   /**
    * Nhảy sang ô gõ được kế tiếp theo hướng (dRow, dCol). Ô khoá bị bỏ qua chứ
@@ -220,6 +225,8 @@ export function LuoiNhap<R>({
 
   return (
     <div
+      ref={khungRef}
+      {...mocBut}
       className={cn(
         "scroll-nice-x overflow-x-auto rounded-xl ring-1 ring-foreground/10",
         className
@@ -234,9 +241,12 @@ export function LuoiNhap<R>({
           <tr>
             <th
               scope="col"
-              className="sticky left-0 z-30 min-w-44 border-b-2 border-border bg-card px-4 py-3 text-left align-bottom text-sm font-semibold sm:min-w-60"
+              className="sticky left-0 z-30 min-w-40 border-b-2 border-border bg-card px-3 py-3 text-left align-bottom text-sm font-semibold sm:min-w-52"
             >
-              {tenCotDau}
+              <span className="flex items-center gap-1">
+                <span className="min-w-0 flex-1">{tenCotDau}</span>
+                {toMau && <NutButTo to={to} maBang={toMau} />}
+              </span>
             </th>
             {cotHien.map((c) => (
               <th
@@ -244,7 +254,7 @@ export function LuoiNhap<R>({
                 scope="col"
                 style={c.rong ? { minWidth: c.rong } : undefined}
                 className={cn(
-                  "border-b-2 border-l border-border bg-card px-3 py-3 text-right align-bottom text-sm font-semibold whitespace-nowrap",
+                  "border-b-2 border-l border-border bg-card px-2 py-3 text-right align-bottom text-sm font-semibold whitespace-nowrap",
                   c.toNen === "chuyen-ky" && "text-warning"
                 )}
               >
@@ -275,8 +285,9 @@ export function LuoiNhap<R>({
               >
                 <th
                   scope="row"
+                  {...to.thuocTinhO(h.id, "*")}
                   className={cn(
-                    "sticky left-0 z-10 border-r-2 border-b border-border px-4 py-2 text-left align-middle font-normal",
+                    "sticky left-0 z-10 border-r-2 border-b border-border px-3 py-2 text-left align-middle font-normal",
                     h.kieu === "tong" ? "bg-muted font-semibold" : "bg-card",
                     h.kieu === "giam" && "bg-warning-surface/40"
                   )}
@@ -304,6 +315,7 @@ export function LuoiNhap<R>({
                   return (
                     <td
                       key={c.key}
+                      {...to.thuocTinhO(h.id, c.key)}
                       className={cn(
                         "border-b border-l border-border p-0 text-right align-middle",
                         nen,
@@ -316,7 +328,7 @@ export function LuoiNhap<R>({
                         <span
                           title={c.lyDoKhoa?.(h.du)}
                           className={cn(
-                            "tnum flex min-h-11 items-center justify-end px-3 py-2",
+                            "tnum flex min-h-11 items-center justify-end px-2 py-2",
                             c.kieu === "tinh" && "font-semibold",
                             gt != null && gt < 0 && "text-destructive"
                           )}
@@ -402,7 +414,7 @@ function OLuoi({
         if (!e.defaultPrevented) onPhim(e);
       }}
       className={cn(
-        "tnum h-11 w-full min-w-24 border-0 bg-transparent px-3 text-right text-sm",
+        "tnum h-11 w-full min-w-20 border-0 bg-transparent px-2 text-right text-sm",
         "focus:ring-2 focus:ring-ring focus:ring-inset focus:outline-none",
         giaTri != null && giaTri < 0 && "text-destructive"
       )}

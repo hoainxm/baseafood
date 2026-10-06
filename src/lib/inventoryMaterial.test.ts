@@ -1,6 +1,13 @@
 import { describe, expect, test } from "vitest";
-import type { BalancingInputItem, BalancingPeriod, DailyLock } from "@/types";
-import { conDoTheoNgay, tinhSoTonNL } from "./inventoryMaterial";
+import type {
+  BalancingInputItem,
+  BalancingPeriod,
+  DailyLock,
+  DomesticSaleItem,
+  MaterialImportItem,
+  MaterialOpeningStock,
+} from "@/types";
+import { conDoTheoNgay, tinhSoTonNL, tinhTonNLTong } from "./inventoryMaterial";
 
 const ky = (id: string, startDate: string, endDate: string): BalancingPeriod =>
   ({ id, materialTypeName: "Bạch tuộc 2 da", startDate, endDate }) as BalancingPeriod;
@@ -101,5 +108,79 @@ describe("conDoTheoNgay", () => {
       chot("2026-09-09", { "Bạch tuộc 2 da": 70 }),
     ];
     expect(conDoTheoNgay(locks, K1)).toEqual({ "2026-09-01": 150 });
+  });
+});
+
+describe("tinhTonNLTong — bán nội địa là khoản XUẤT, trừ tồn NL", () => {
+  const nhap = (deliveryDate: string, kg: number, ten = "Bạch tuộc 2 da lớn (80↑)"): MaterialImportItem =>
+    ({
+      id: `n${deliveryDate}${kg}`,
+      shipmentId: "",
+      deliveryDate,
+      workshop: "Đông",
+      category: "Bạch tuộc",
+      supplierName: "",
+      materialTypeName: ten,
+      quantityKg: kg,
+      unitPrice: null,
+      driverName: "",
+      licensePlate: "",
+      note: "",
+    }) as MaterialImportItem;
+  const ban = (saleDate: string, kg: number, ten = "Bạch tuộc 2 da nhỏ (80↓)"): DomesticSaleItem => ({
+    id: `b${saleDate}${kg}`,
+    saleDate,
+    postingDate: saleDate,
+    backdateReason: "",
+    workshop: "Đông",
+    materialTypeName: ten,
+    quantityKg: kg,
+    unitPrice: 145000,
+    customerName: "",
+    note: "",
+    operator: "",
+  });
+  const range = { tuNgay: "2026-10-05", denNgay: "2026-10-07" };
+
+  test("trong kỳ: tồn cuối = tồn đầu + nhập − bán nội địa; cùng HỌ gộp lớn/nhỏ", () => {
+    const kq = tinhTonNLTong([], [], [nhap("2026-10-05", 5000)], [], [], range, [ban("2026-10-06", 987)]);
+    expect(kq.theoHo).toHaveLength(1);
+    const h = kq.theoHo[0];
+    expect(h.banNoiDia).toBe(987);
+    expect(h.tonCuoi).toBe(5000 - 987);
+    expect(kq.tongBanNoiDia).toBe(987);
+    expect(kq.tongTonCuoi).toBe(4013);
+  });
+
+  test("bán TRƯỚC kỳ trừ vào tồn đầu; bán ngoài kỳ (sau) không tính", () => {
+    const kq = tinhTonNLTong(
+      [], [], [nhap("2026-10-01", 3000)], [], [], range,
+      [ban("2026-10-02", 500), ban("2026-10-09", 70)],
+    );
+    expect(kq.theoHo[0].tonDau).toBe(2500);
+    expect(kq.theoHo[0].banNoiDia).toBe(0);
+    expect(kq.tongTonCuoi).toBe(2500);
+  });
+
+  test("bán TRƯỚC mốc khai tồn đầu đã nằm trong số khai tay ⇒ không trừ lại", () => {
+    const opening: MaterialOpeningStock[] = [
+      { id: "o1", workshop: "Đông", materialTypeName: "Bạch tuộc 2 da", asOfDate: "2026-10-03", quantityKg: 1000, note: "" },
+    ];
+    const kq = tinhTonNLTong([], [], [], opening, [], range, [ban("2026-10-01", 400), ban("2026-10-04", 100)]);
+    expect(kq.theoHo[0].tonDau).toBe(900); // chỉ trừ phần bán từ mốc
+  });
+
+  test("bảng theo ngày: ngày chỉ có bán nội địa cũng thành dòng, tồn giảm dần", () => {
+    const kq = tinhTonNLTong([], [], [nhap("2026-10-05", 2000)], [], [], range, [ban("2026-10-06", 300)]);
+    expect(kq.theoNgay.map((d) => [d.date, d.nhap, d.banNoiDia, d.tonCuoi])).toEqual([
+      ["2026-10-05", 2000, 0, 2000],
+      ["2026-10-06", 0, 300, 1700],
+    ]);
+  });
+
+  test("không truyền sổ bán nội địa ⇒ kết quả y như trước", () => {
+    const kq = tinhTonNLTong([], [], [nhap("2026-10-05", 1234)], [], [], range);
+    expect(kq.tongTonCuoi).toBe(1234);
+    expect(kq.tongBanNoiDia).toBe(0);
   });
 });

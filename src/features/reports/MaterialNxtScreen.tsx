@@ -36,6 +36,7 @@ import { useSuaDanhMuc } from "@/features/catalog/SuaDanhMucNhanh";
 import {
   useBalancingInputs,
   useBalancingPeriods,
+  useDomesticSales,
   useMaterialImports,
   useMaterialOpeningStock,
   useMaterialTypes,
@@ -58,6 +59,7 @@ import {
   PackagePlus,
   Scale,
   Snowflake,
+  Store,
   Truck,
 } from "lucide-react";
 
@@ -79,7 +81,9 @@ interface OpeningForm {
 /**
  * Báo cáo Nhập–Xuất–Tồn nguyên liệu. Tồn suy THẲNG từ sổ Nhập hàng (material_imports):
  *
- *   Tồn cuối = Tồn đầu + Nhập hàng − Xuất SX
+ *   Tồn cuối = Tồn đầu + Nhập hàng − Xuất SX − Bán nội địa
+ *
+ * Bán nội địa (NL bán thẳng, sổ domestic_sales mig 0054 — ghi ở /wip) là khoản XUẤT thật.
  *
  * Xuất SX ("NL lấy ra sản xuất") CHƯA được ghi ở màn Sản xuất nên = 0 (cột chờ) —
  * tồn hiện là "chưa trừ xuất". Đông gửi / xả đông (vòng gối đầu ở Cân đối) chỉ hiện
@@ -95,6 +99,8 @@ export default function MaterialNxtScreen() {
   /** Bút chì sửa nhanh danh mục ngay trong ô chọn. */
   const suaNL = useSuaDanhMuc("loaiNL", materialTypes, setMaterialTypes, { theo: "ten" });
   const [locks] = useProductionLocks();
+  /** Sổ bán nội địa (mig 0054) — NL bán thẳng ghi ở /wip, là khoản XUẤT trừ tồn. */
+  const [banNoiDia] = useDomesticSales();
 
   const [ky, setKy] = useState<KyXem>("thang");
   const [moc, setMoc] = useState(homNay());
@@ -112,12 +118,16 @@ export default function MaterialNxtScreen() {
 
   const data = useMemo(
     () =>
-      tinhTonNLTong(periods, inputs, imports, opening, locks, {
-        tuNgay: tu,
-        denNgay: den,
-        workshop,
-      }),
-    [periods, inputs, imports, opening, locks, tu, den, workshop],
+      tinhTonNLTong(
+        periods,
+        inputs,
+        imports,
+        opening,
+        locks,
+        { tuNgay: tu, denNgay: den, workshop },
+        banNoiDia,
+      ),
+    [periods, inputs, imports, opening, locks, tu, den, workshop, banNoiDia],
   );
 
   const coDongXa = data.tongDongGui > 0 || data.tongXaDong > 0;
@@ -132,6 +142,7 @@ export default function MaterialNxtScreen() {
     { nhan: "Tồn đầu kỳ", giaTri: `${num(data.tongTonDau)} kg`, so: true, icon: Snowflake, mau: "trung-tinh" },
     { nhan: "Nhập trong kỳ", giaTri: `${num(data.tongNhap)} kg`, so: true, icon: ArrowDownToLine, mau: "brand" },
     { nhan: "Xuất SX (chờ)", giaTri: "0 kg", so: true, icon: Truck, mau: "trung-tinh" },
+    { nhan: "Bán nội địa", giaTri: `${num(data.tongBanNoiDia)} kg`, so: true, icon: Store, mau: "warning" },
     { nhan: "Tồn cuối (chưa trừ SX)", giaTri: `${num(data.tongTonCuoi)} kg`, so: true, icon: Scale, mau: "success" },
   ];
 
@@ -155,6 +166,18 @@ export default function MaterialNxtScreen() {
       so: true,
       render: () => <span className="text-muted-foreground">—</span>,
       tong: () => "—",
+    },
+    {
+      key: "banNoiDia",
+      header: "Bán nội địa (kg)",
+      so: true,
+      render: (r) =>
+        r.banNoiDia > 0 ? (
+          <span className="font-semibold text-warning">−{num(r.banNoiDia)}</span>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        ),
+      tong: () => (data.tongBanNoiDia > 0 ? `−${num(data.tongBanNoiDia)}` : "—"),
     },
     {
       key: "tonCuoi",
@@ -195,6 +218,18 @@ export default function MaterialNxtScreen() {
       so: true,
       render: () => <span className="text-muted-foreground">—</span>,
       tong: () => "—",
+    },
+    {
+      key: "banNoiDia",
+      header: "Bán nội địa (kg)",
+      so: true,
+      render: (r) =>
+        r.banNoiDia > 0 ? (
+          <span className="font-semibold text-warning">−{num(r.banNoiDia)}</span>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        ),
+      tong: () => (data.tongBanNoiDia > 0 ? `−${num(data.tongBanNoiDia)}` : "—"),
     },
     {
       key: "tonCuoi",
@@ -280,7 +315,7 @@ export default function MaterialNxtScreen() {
             Tồn kho nguyên liệu (Nhập – Xuất – Tồn)
           </h1>
           <p className="mt-1 text-muted-foreground">
-            Tồn suy thẳng từ sổ Nhập hàng: <b>Tồn cuối = Tồn đầu + Nhập − Xuất SX</b>. Cả 3 phân
+            Tồn suy thẳng từ sổ Nhập hàng: <b>Tồn cuối = Tồn đầu + Nhập − Xuất SX − Bán nội địa</b>. Cả 3 phân
             xưởng, xem theo ngày.
           </p>
         </div>

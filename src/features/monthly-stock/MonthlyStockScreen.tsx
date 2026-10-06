@@ -669,6 +669,30 @@ export default function MonthlyStockScreen() {
     });
   };
 
+  /**
+   * Gõ tên chưa có trong ô "Ánh xạ … tới" ⇒ LƯU NGAY vào danh mục đích của dòng (luật
+   * ô chọn danh mục — chốt 2026-10-06; trước đây chờ bấm Đồng bộ mới thêm). Trùng tên
+   * (không phân hoa thường) ⇒ dùng lại bản có sẵn. Trả về TÊN (value của ô).
+   */
+  const themTenChuan = (d: DichDanhMuc, t: string): string => {
+    const ten = t.trim();
+    if (d === "product") {
+      const co = products.find((p) => chuan(p.name) === chuan(ten));
+      if (co) return co.name;
+      ghiProducts([
+        ...products,
+        { id: uid(), code: "", name: ten, finishedGoodCode: "", category: suyNhomNguyenLieu(ten), processingType: "" },
+      ]);
+      notify.daLuu(`Đã thêm mặt hàng "${ten}" vào danh mục`);
+    } else if (d === "material") {
+      const co = mtypes.find((m) => chuan(m.name) === chuan(ten));
+      if (co) return co.name;
+      ghiMtypes([...mtypes, { id: uid(), name: ten, category: suyNhomNguyenLieu(ten), note: "Từ sổ kho theo tháng" }]);
+      notify.daLuu(`Đã thêm loại nguyên liệu "${ten}" vào danh mục`);
+    }
+    return ten;
+  };
+
   /** Một dòng: tên file · đích (Mặt hàng/Loại NL/Bỏ qua) · ánh xạ tới tên CHUẨN. */
   const dongRow = (x: DongBoDong) => {
     const d = dichCua(x);
@@ -703,7 +727,7 @@ export default function MonthlyStockScreen() {
             value={mapCua(x)}
             onChange={(v) => setMapDB((m) => ({ ...m, [x.name]: v }))}
             options={opts}
-            onCreate={(t) => t}
+            onCreate={d === "skip" ? undefined : (t) => themTenChuan(d, t)}
             onSuaMuc={sua?.moSua}
             nhanSua={sua?.nhanSua}
             suaDuoc={sua?.suaDuoc}

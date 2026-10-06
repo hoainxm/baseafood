@@ -3,6 +3,7 @@ covers: src/features/monthly-stock/MonthlyStockScreen.tsx, src/features/monthly-
 last_verified: 2026-10-06
 <!-- updated: 2026-10-06 — CÂN ĐỐI GHI VÀO SỔ (lib/khoCanDoi.ts): dòng Lấy xả đông ở khối NL Cân đối chọn ĐÍCH DANH một dòng (lô) của sổ ⇒ cột Xuất của lô + dòng vết `⟦CĐ:<id dòng cân đối>:<kg>⟧` trong ghi chú; dòng Gửi đông ⇒ lô RIÊNG id `cd|<id dòng>|<ngày>` nhóm "Nguyên liệu gửi đông" (invoice GĐ-yyyymmdd). Tháng chưa mở ⇒ Cân đối tự kế thừa như nút "Kế thừa & lưu vào sổ". Xem § "Dòng do Cân đối ghi". -->
 ttl_days: 90
+<!-- updated: 2026-10-06 (e) — ô "Ánh xạ … tới" (hộp Đồng bộ danh mục): gõ tên chưa có ⇒ LƯU NGAY vào danh mục đích của dòng (`themTenChuan` — Mặt hàng hoặc Loại NL theo select đích; trùng tên không phân hoa thường ⇒ dùng lại; đích "Bỏ qua" ⇒ không cho tạo), theo luật ô chọn danh mục (design-system README). Trước đây `onCreate={(t)=>t}` chỉ giữ tên tới khi bấm Đồng bộ. Tên GỐC từ file (chưa ai chọn) vẫn hiện nhãn "mới — thêm … khi bấm Đồng bộ" và `apDongBo` vẫn thêm như cũ (không trùng vì dò `chuan`). -->
 <!-- updated: 2026-09-29 (3) — hộp Đồng bộ danh mục: nút xác nhận "Đồng bộ: n → Mặt hàng · m → Loại NL" chuyển xuống CHÂN hộp (dính đáy khi cuộn, không disabled); ô ánh xạ hiện tên vừa gõ "thêm mới" kèm nhãn "mới"; ô co giãn ở điện thoại. -->
 <!-- updated: 2026-09-29 (2) — Size thành CỘT RIÊNG (bảng xem · lưới Ghi sửa tại ô · phiếu in) thay dòng phụ dưới tên; parser điền ô GỘP dọc cột 0–5 (ngày nhập/invoice gộp cho cả lô nhiều size — trước chỉ dòng đầu có) và đọc KHÔNG cellDates (SheetJS dựng Date lệch giây múi giờ ⇒ ngày lùi 1 ngày ở VN); id nạp không đổi (kiểm file thật). -->
 <!-- updated: 2026-09-29 — parser đọc cột R (ghi chú kho → vị trí), mục III HÀNG TẠM + mục La Mã lạ, khối con "TỔNG 2 DA" theo vùng SUM; dialog soát tiêu đề kho + bản nạp ở kho khác; nạp lại bỏ dòng cũ toàn-0 không còn trong file. Kiểm trên file thật 8 sheet → 1.585 dòng, T8 khớp TỔNG HÀNG NỘI ĐỊA 77.950,53/76.824,63. -->
@@ -172,7 +173,7 @@ loại → `product`; còn lại → `material`) + **nhóm gợi ý** (`suyNhomN
 **Đồng bộ = ÁNH XẠ, không chỉ thêm mới** (chốt với chủ dự án). MỖI dòng có: (1) **select
 đích** (Mặt hàng / Loại NL / Bỏ qua); (2) **Combobox ánh xạ tới TÊN CHUẨN CÓ SẴN** —
 options = toàn bộ `products` (171) khi đích = Mặt hàng, hoặc `material_types` khi đích =
-Loại NL — gõ tìm chọn tên chuẩn mà mã khó thuộc về, hoặc gõ thêm mới nếu chưa có. Mã khó
+Loại NL — gõ tìm chọn tên chuẩn mà mã khó thuộc về, hoặc gõ thêm mới nếu chưa có (**lưu NGAY vào danh mục đích**, 2026-10-06; bút chì sửa bản ghi đang chọn). Mã khó
 ở list CHÍNH; tên rõ ràng (CÁ THU…) trong `<details>` thu gọn (mặc định đích → Loại NL,
 đổi được). Bulk theo section (Theo gợi ý / Tất cả→MH / Tất cả→NL / Bỏ hết).
 

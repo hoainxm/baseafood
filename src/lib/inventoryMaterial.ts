@@ -10,6 +10,7 @@ import type {
   MaterialOpeningStock,
   DailyLock,
   DailyQuantities,
+  DomesticSaleItem,
   Workshop,
 } from "@/types";
 import { sumGridRow } from "@/types";
@@ -325,7 +326,9 @@ export interface TonNLTongHo {
   tonDau: number; // opening(≤ đầu kỳ) + Σ nhập trước kỳ
   nhapKy: number; // Σ nhập hàng trong kỳ
   xuatSX: number; // 0 — chờ capture "NL lấy ra sản xuất"
-  tonCuoi: number; // tonDau + nhapKy − xuatSX
+  /** Bán nội địa trong kỳ (NL bán thẳng, sổ domestic_sales mig 0054) — XUẤT, trừ tồn. */
+  banNoiDia: number;
+  tonCuoi: number; // tonDau + nhapKy − xuatSX − banNoiDia
   dongGui: number; // THÔNG TIN (kho đông) — KHÔNG vào tonCuoi
   xaDong: number; // THÔNG TIN — KHÔNG vào tonCuoi
   seedTonDau: boolean; // tồn đầu có phần khai tay
@@ -337,7 +340,8 @@ export interface TonNLTongNgay {
   date: string;
   nhap: number;
   xuatSX: number; // 0
-  tonCuoi: number; // tồn tổng cuối ngày = tồn đầu tổng + Σ nhập ≤ ngày
+  banNoiDia: number; // NL bán thẳng trong ngày — trừ tồn
+  tonCuoi: number; // tồn tổng cuối ngày = tồn đầu tổng + Σ (nhập − bán nội địa) ≤ ngày
 }
 
 export interface TonNLTong {
@@ -345,6 +349,7 @@ export interface TonNLTong {
   theoNgay: TonNLTongNgay[];
   tongTonDau: number;
   tongNhap: number;
+  tongBanNoiDia: number;
   tongTonCuoi: number;
   tongDongGui: number;
   tongXaDong: number;
@@ -364,6 +369,8 @@ export function tinhTonNLTong(
   opening: MaterialOpeningStock[],
   locks: DailyLock[],
   range?: { tuNgay?: string; denNgay?: string; workshop?: Workshop },
+  /** Sổ BÁN NỘI ĐỊA (mig 0054) — NL bán thẳng là khoản XUẤT, trừ tồn như nhập là cộng. */
+  banNoiDia: DomesticSaleItem[] = [],
 ): TonNLTong {
   const workshop = range?.workshop;
   const tu = range?.tuNgay ?? "0000-01-01";
@@ -427,6 +434,28 @@ export function tinhTonNLTong(
     nhapByHo.set(k, cur);
   }
 
+  // Bán nội địa theo họ — cùng luật baseline với nhập (bán TRƯỚC mốc khai tồn đầu đã
+  // nằm trong số khai tay ⇒ không trừ lại); trước kỳ trừ vào tồn đầu, trong kỳ là cột xuất.
+  const banByHo = new Map<string, { truoc: number; ky: number }>();
+  const banNgay = new Map<string, number>();
+  for (const r of banNoiDia) {
+    if (!dungXuong(r.workshop)) continue;
+    const kg = r.quantityKg || 0;
+    if (kg <= 0) continue;
+    const ho = themHo(r.materialTypeName);
+    if (!ho) continue;
+    const k = ho.toLowerCase();
+    const moc = openByHo.get(k)?.moc ?? "";
+    if (moc && r.saleDate < moc) continue;
+    const cur = banByHo.get(k) ?? { truoc: 0, ky: 0 };
+    if (r.saleDate < tu) cur.truoc += kg;
+    else if (r.saleDate <= den) {
+      cur.ky += kg;
+      banNgay.set(r.saleDate, (banNgay.get(r.saleDate) ?? 0) + kg);
+    }
+    banByHo.set(k, cur);
+  }
+
   // Họ chỉ có ở kỳ (đông gửi/xả đông) cũng phải hiện.
   for (const r of kyRows) dsHo.set(r.hoNL.toLowerCase(), r.hoNL);
 
@@ -434,17 +463,22 @@ export function tinhTonNLTong(
   for (const [k, hoNL] of dsHo) {
     const openTruoc = openByHo.get(k)?.open ?? 0;
     const nh = nhapByHo.get(k) ?? { truoc: 0, ky: 0 };
+    const ban = banByHo.get(k) ?? { truoc: 0, ky: 0 };
     const info = dongXa.get(k) ?? { dongGui: 0, xaDong: 0 };
-    // Bỏ họ trống trơn (không tồn đầu, không nhập, không đông/xả) khỏi bảng.
-    if (openTruoc === 0 && nh.truoc === 0 && nh.ky === 0 && info.dongGui === 0 && info.xaDong === 0)
+    // Bỏ họ trống trơn (không tồn đầu, không nhập/bán, không đông/xả) khỏi bảng.
+    if (
+      openTruoc === 0 && nh.truoc === 0 && nh.ky === 0 && ban.truoc === 0 && ban.ky === 0 &&
+      info.dongGui === 0 && info.xaDong === 0
+    )
       continue;
-    const tonDau = openTruoc + nh.truoc;
-    const tonCuoi = tonDau + nh.ky; // − xuất SX(0)
+    const tonDau = openTruoc + nh.truoc - ban.truoc;
+    const tonCuoi = tonDau + nh.ky - ban.ky; // − xuất SX(0)
     theoHo.push({
       hoNL,
       tonDau,
       nhapKy: nh.ky,
       xuatSX: 0,
+      banNoiDia: ban.ky,
       tonCuoi,
       dongGui: info.dongGui,
       xaDong: info.xaDong,
@@ -456,22 +490,24 @@ export function tinhTonNLTong(
 
   const tongTonDau = theoHo.reduce((s, r) => s + r.tonDau, 0);
 
-  // Tồn tổng theo NGÀY: tồn cuối ngày = tồn đầu tổng + Σ nhập (đã qua baseline) ≤ ngày.
-  const theoNgay: TonNLTongNgay[] = [...nhapNgay.keys()].sort().reduce<TonNLTongNgay[]>(
-    (acc, date) => {
-      const nhap = nhapNgay.get(date)!;
+  // Tồn tổng theo NGÀY: tồn cuối ngày = tồn đầu tổng + Σ (nhập − bán nội địa) (đã qua
+  // baseline) ≤ ngày. Ngày chỉ có bán nội địa cũng thành một dòng.
+  const theoNgay: TonNLTongNgay[] = [...new Set([...nhapNgay.keys(), ...banNgay.keys()])]
+    .sort()
+    .reduce<TonNLTongNgay[]>((acc, date) => {
+      const nhap = nhapNgay.get(date) ?? 0;
+      const banND = banNgay.get(date) ?? 0;
       const truoc = acc.length ? acc[acc.length - 1].tonCuoi : tongTonDau;
-      acc.push({ date, nhap, xuatSX: 0, tonCuoi: truoc + nhap });
+      acc.push({ date, nhap, xuatSX: 0, banNoiDia: banND, tonCuoi: truoc + nhap - banND });
       return acc;
-    },
-    [],
-  );
+    }, []);
 
   return {
     theoHo,
     theoNgay,
     tongTonDau,
     tongNhap: theoHo.reduce((s, r) => s + r.nhapKy, 0),
+    tongBanNoiDia: theoHo.reduce((s, r) => s + r.banNoiDia, 0),
     tongTonCuoi: theoHo.reduce((s, r) => s + r.tonCuoi, 0),
     tongDongGui: theoHo.reduce((s, r) => s + r.dongGui, 0),
     tongXaDong: theoHo.reduce((s, r) => s + r.xaDong, 0),

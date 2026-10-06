@@ -227,6 +227,8 @@ export function NutToMauNhieu({ to, khoa }: { to: ToMauBang; khoa: string[] }) {
 /** Mô tả bút đang cầm: "vàng rất đậm", "vàng rất đậm + in đậm", "cục tẩy". */
 function moTaBut(va: VaDau | null): string {
   if (!va) return "cục tẩy (bỏ tô)";
+  if (!va.mau && va.dam === false) return "bỏ in đậm (giữ màu)";
+  if (!va.mau && va.dam) return "chỉ in đậm (giữ màu)";
   return [va.mau ? tenMau(va.mau) : "", va.dam ? "in đậm" : ""].filter(Boolean).join(" + ");
 }
 
@@ -267,7 +269,8 @@ export function NutButTo({ to, maBang }: { to: ToMauBang; maBang: string }) {
         <div className="space-y-3">
           <p className="text-sm font-semibold text-foreground">Bút tô nhiều ô</p>
           <p className="max-w-[17.5rem] text-sm text-muted-foreground">
-            Chọn màu rồi bấm hoặc kéo qua các ô. Bấm ô đầu dòng để tô cả dòng, Shift+bấm để tô cả vùng.
+            Chọn màu (hoặc bút in đậm) rồi bấm hoặc kéo qua các ô. Bấm ô đầu dòng để tô cả dòng,
+            Shift+bấm để tô cả vùng.
           </p>
           <LuoiChonMau
             dang={but?.va?.mau}
@@ -280,11 +283,39 @@ export function NutButTo({ to, maBang }: { to: ToMauBang; maBang: string }) {
               size="sm"
               variant={dam ? "default" : "outline"}
               aria-pressed={dam}
-              title={dam ? "Bút tô không in đậm nữa (chỉ tô nền)." : "Bút tô kèm IN ĐẬM ô được tô."}
-              onClick={() => setDam((v) => !v)}
+              title={dam ? "Bút màu thôi in đậm (chỉ tô nền)." : "Bút màu tô kèm IN ĐẬM ô được tô."}
+              onClick={() => {
+                const moi = !dam;
+                setDam(moi);
+                // Đang cầm bút màu ⇒ áp ngay cho bút đó, khỏi phải chọn lại màu.
+                if (but?.va?.mau) datBut({ maBang, va: { mau: but.va.mau, ...(moi ? { dam: true } : {}) } });
+              }}
             >
               <Bold />
-              In đậm
+              Kèm in đậm
+            </Button>
+          </div>
+          {/* In đậm / bỏ in đậm NHIỀU dòng/ô mà giữ nguyên màu đang có. */}
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant={but?.va && !but.va.mau && but.va.dam ? "default" : "outline"}
+              title="Cầm bút IN ĐẬM: bấm/kéo qua ô hoặc ô đầu dòng để in đậm nhiều dòng/ô một lượt — màu đang tô giữ nguyên."
+              onClick={() => cam({ dam: true })}
+            >
+              <Bold />
+              Chỉ in đậm
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={but?.va && !but.va.mau && but.va.dam === false ? "default" : "outline"}
+              title="Cầm bút BỎ IN ĐẬM: bấm/kéo qua ô hoặc ô đầu dòng để thôi in đậm nhiều dòng/ô — màu đang tô giữ nguyên."
+              onClick={() => cam({ dam: false })}
+            >
+              <Bold />
+              Bỏ in đậm
             </Button>
             <Button
               type="button"

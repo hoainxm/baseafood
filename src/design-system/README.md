@@ -483,8 +483,9 @@ dấu trình bày — **không đụng số sổ sách**.
   `aria-label` ("Tô vàng rất đậm").
 - **Nút 🪣 ở mỗi dòng** (ô đầu dòng / cột Thao tác / ô tên dính trái): tô cả dòng,
   In đậm, Bỏ tô.
-- **Bút tô ✎ ở đầu bảng** — tô NHIỀU Ô một lúc: chọn màu (± In đậm, hoặc Cục tẩy)
-  là cầm bút; rồi **bấm** một ô, **kéo** qua nhiều ô (chuột lẫn cảm ứng), **bấm ô
+- **Bút tô ✎ ở đầu bảng** — tô NHIỀU Ô một lúc: chọn màu (± Kèm in đậm), hoặc bút
+  **Chỉ in đậm** / **Bỏ in đậm** (in đậm / thôi đậm nhiều dòng-ô mà GIỮ màu đang
+  có), hoặc Cục tẩy, là cầm bút; rồi **bấm** một ô, **kéo** qua nhiều ô (chuột lẫn cảm ứng), **bấm ô
   đầu dòng** = tô cả dòng, **Shift+bấm** = tô cả VÙNG chữ nhật từ ô bấm trước. Một
   nét = MỘT lần ghi (màu chạy theo tay khi kéo, nhả tay mới ghi); nét ≥ 2 ô có
   toast + Hoàn tác. Dải "Đang cầm bút" nổi ở đáy màn có nút **Thả bút**; **Esc**

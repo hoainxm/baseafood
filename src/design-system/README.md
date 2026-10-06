@@ -39,9 +39,20 @@ src/features/*                 ← màn nghiệp vụ
    `StepForm` dò thuộc tính này để tự hiện `ChuThichBatBuoc` ("Ô có dấu * là
    bắt buộc"), không phải bật cờ tay.
 7. **Nút Lưu không bao giờ `disabled`.** Thiếu dữ liệu thì bấm ra `ErrorSummary`.
-8. **Mọi thao tác ghi dữ liệu phải bắn `notify`**, xóa phải qua `ConfirmDelete`
-   và có nút Hoàn tác. Việc nên làm NGAY sau khi lưu (vd in tem lô vừa ghi) truyền
-   tham số thứ ba `notify.daLuu(msg, onUndo?, { label, onClick })` — nút hiện trên toast.
+8. **Thông báo theo MỨC ĐỘ thao tác** (chốt 2026-10-06 — người dùng than toast "Đã
+   bỏ in đậm 3 dòng" làm phiền). Tự xếp thao tác vào một trong bốn mức:
+
+   | Mức | Thao tác | Phản hồi |
+   |---|---|---|
+   | 0 · trình bày | KHÔNG đổi số sổ sách: tô màu / in đậm dòng, tick chọn, lọc, sắp xếp, gập/mở, đổi chế độ xem, lưu cài đặt giao diện, **xuất Excel / In / tải file** (trình duyệt đã báo tải xong) | **Không toast** — thay đổi trên màn là phản hồi |
+   | 1 · ghi dữ liệu | Lưu / sửa sổ sách hay danh mục: ghi chuyến, phiếu bán, mẻ SX, thêm vào danh mục, dồn kỳ, gán kho, nạp Excel vào sổ, dán khối, Hoàn tác/Làm lại số liệu | `notify.daLuu` ngắn; ghi HÀNG LOẠT / ghi đè thì kèm **Hoàn tác** (tham số 2) |
+   | 2 · xóa / hệ trọng | Xóa bản ghi · chốt sổ · ghi đè · lệnh xuất | `ConfirmDelete` / `XacNhan` (8b) **trước**, rồi toast + **Hoàn tác** |
+   | — · lỗi, cảnh báo, kết quả kiểm | Ghi hụt, thiếu dữ liệu, kiểm lô đúng/sai, quét tem | `notify.loi` / `canhBao` / `daLuu` — LUÔN báo |
+
+   Xuất file mà nội dung cần giải thích (VD đối soát: "giữ nguyên định dạng gốc, chỉ
+   thêm cột…") được giữ toast — vì câu đó là hướng dẫn, không phải "đã xong". Việc
+   nên làm NGAY sau khi lưu (vd in tem lô vừa ghi) truyền tham số thứ ba
+   `notify.daLuu(msg, onUndo?, { label, onClick })` — nút hiện trên toast.
    In tem nhãn: `PhieuInTem` nhận `tems[]` để in nhiều tem một lượt (mỗi tem một trang đúng khổ).
 8b. **Thao tác hệ trọng KHÔNG phải xóa đi qua `XacNhan`** — đúng ba nhóm:
     mất việc đang làm (đăng xuất, bỏ dữ liệu vừa nạp) · ghi đè dữ liệu đang có ·
@@ -480,8 +491,9 @@ người dùng thấy rối):
 2. Hiện **thanh "Đã chọn N dòng"** (dính đáy màn khi bảng dài): **Tô màu ▾** (bảng
    màu 10 sắc × 5 mức nhạt → đậm, ô màu không chữ như Excel) · **In đậm** (mọi dòng
    đã đậm ⇒ nút thành **Bỏ in đậm**) · **Bỏ tô** · **Bỏ chọn**.
-3. Bấm nút nào là áp cho **tất cả dòng đang tick**; từ 2 dòng có toast + **Hoàn tác**.
-   Đổi màu giữ in đậm riêng từng dòng và ngược lại.
+3. Bấm nút nào là áp cho **tất cả dòng đang tick** — **không toast** (mức 0 của luật
+   8: dấu trình bày, màu đổi ngay là phản hồi; muốn gỡ thì **Bỏ tô**). Đổi màu giữ in
+   đậm riêng từng dòng và ngược lại.
 
 Nền mức đậm vẫn giữ chữ đen (như Excel): dòng nền "tối" (độ chói < 0,68) tự đổi
 chữ phụ / chữ màu về màu chữ thường.
@@ -569,7 +581,7 @@ const chonDong = useChonDong();
 - [ ] Dòng là dòng GỘP theo kỳ/bộ lọc ⇒ ghép kỳ + bộ lọc vào khoá bảng.
 - [ ] Màn đã có thanh "Đã chọn" riêng ⇒ thêm `NutToMauChon` vào đó, đặt thanh SAU bảng + `md:sticky md:bottom-8`.
 - [ ] Bảng tự dựng ⇒ ô tick `useChonDong` + `{...to.thuocTinh(k)}` lên `<tr>` + `ThanhToMau`.
-- [ ] Thử: tick 3 dòng (Shift) → In đậm → Tô màu → Hoàn tác; sắp xếp/lọc lại ⇒ dấu vẫn đúng dòng; 360px + 130% không tràn.
+- [ ] Thử: tick 3 dòng (Shift) → In đậm → Tô màu → Bỏ tô (không toast nào hiện); sắp xếp/lọc lại ⇒ dấu vẫn đúng dòng; 360px + 130% không tràn.
 
 **Sửa/thêm màu:** mỗi mức = trộn sắc gốc với trắng (tỉ lệ 0,16 · 0,32 · 0,52 ·
 0,76 · 1 của mức đậm nhất; mức đậm nhất chặn ở độ chói ≥ 0,25 để chữ đen ≥ 4,5:1).

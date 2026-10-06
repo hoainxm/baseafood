@@ -4,7 +4,6 @@
 // Description: Row highlight context, palette, hooks (components in ToMauDong.tsx)
 // ============================================================
 import * as React from "react";
-import { notify } from "./notify";
 
 /*
  * MỘT cách dùng, giống Excel: tick các dòng → thanh "Đã chọn N dòng" → Tô màu ▾ /
@@ -88,7 +87,7 @@ export interface ToMauBang {
   lay: (khoa: string) => DauDong | undefined;
   /**
    * Vá dấu các dòng. `null` = bỏ tô. Đổi màu giữ nguyên in đậm của TỪNG dòng (và
-   * ngược lại). Từ 2 dòng trở lên có toast + Hoàn tác (trả đúng dấu cũ từng dòng).
+   * ngược lại). Không bắn thông báo — thao tác trình bày (README luật 8).
    */
   sua: (khoa: string[], va: VaDau | null) => void;
   /** Thuộc tính gắn lên `<tr>` / thẻ để nền + chữ đậm ăn theo dấu. */
@@ -122,18 +121,9 @@ export function useToMau(maBang?: string): ToMauBang {
       if (!nguon || !maBang || ds.length === 0) return;
       const cu = ds.map((k) => [k, map.get(k) ?? null] as [string, DauDong | null]);
       const moi = cu.map(([k, d]) => [k, apVa(d, va)] as [string, DauDong | null]);
+      // KHÔNG toast (README luật 8): tô màu / in đậm là dấu trình bày, không đổi số
+      // sổ sách — màu dòng đổi ngay trước mắt đã là phản hồi; muốn gỡ thì Bỏ tô.
       for (const g of gomTheoDau(moi)) nguon.dat(maBang, g.khoa, g.dau);
-      if (ds.length < 2) return; // một dòng: màu đổi ngay đã là phản hồi
-      const viec = !va
-        ? "Đã bỏ tô"
-        : va.mau
-          ? `Đã tô ${tenMau(va.mau)}`
-          : va.dam
-            ? "Đã in đậm"
-            : "Đã bỏ in đậm";
-      notify.daLuu(`${viec} ${ds.length} dòng`, () => {
-        for (const g of gomTheoDau(cu)) nguon.dat(maBang, g.khoa, g.dau);
-      });
     };
     return {
       bat,

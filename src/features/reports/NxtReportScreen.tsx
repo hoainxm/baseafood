@@ -236,7 +236,7 @@ export default function BaoCaoNhapXuatTonScreen() {
       },
       `Bao-Cao-NXT-Thanh-Pham-${tu}-${den}.xlsx`
     );
-    notify.daLuu("Đã xuất Excel báo cáo NXT thành phẩm");
+    // Không toast: trình duyệt đã tự báo tải file xong (README luật 8 — xuất file là thao tác không đổi số).
   };
 
   // ----- Tồn đầu: thêm / xóa -----

@@ -203,7 +203,7 @@ export default function DailyProductionReport() {
       colWidths: [12, 30, 12, ...days.map(() => 11), 12, 10],
       fileName: `bao-cao-thanh-pham-ngay_${tu}_${den}.xlsx`,
     });
-    notify.daLuu("Đã xuất Excel báo cáo thành phẩm ngày");
+    // Không toast: trình duyệt đã tự báo tải file xong (README luật 8 — xuất file là thao tác không đổi số).
   };
 
   const soCot = days.length + 4;

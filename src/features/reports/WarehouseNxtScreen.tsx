@@ -494,7 +494,7 @@ export default function WarehouseNxtScreen() {
       },
       `Bao-Cao-NXT-Kho-${tuNgay}-${denNgay}.xlsx`
     );
-    notify.daLuu("Đã xuất Excel báo cáo Xuất–Nhập–Tồn");
+    // Không toast: trình duyệt đã tự báo tải file xong (README luật 8 — xuất file là thao tác không đổi số).
   };
 
   const chonFile = () => fileRef.current?.click();

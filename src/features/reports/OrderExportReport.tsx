@@ -201,7 +201,7 @@ export default function OrderExportReport() {
       colWidths: [24, 12, 12, 30, 12, 12, 10, 12],
       fileName: `bao-cao-don-xuat_${tu}_${den}.xlsx`,
     });
-    notify.daLuu("Đã xuất Excel báo cáo đơn xuất");
+    // Không toast: trình duyệt đã tự báo tải file xong (README luật 8 — xuất file là thao tác không đổi số).
   };
 
   return (

@@ -14,7 +14,6 @@ import {
   ghiCaiDatHienThi,
   type AnhCaiDat,
 } from "./DisplaySettings";
-import { notify } from "./notify";
 
 /**
  * NutGiaoDien — nút icon ở header mở hộp "Tùy chỉnh giao diện" (cỡ chữ, mật độ,
@@ -48,7 +47,7 @@ export function NutGiaoDien({
   const luu = () => {
     snap.current = null; // đã đồng ý → không hoàn tác nữa
     setMo(false);
-    notify.daLuu("Đã lưu giao diện của bạn");
+    // Không toast: giao diện đổi ngay trước mắt là phản hồi (README luật 8 — cài đặt hiển thị).
   };
 
   const huy = () => setMo(false); // onOpenChange(false) sẽ khôi phục snap

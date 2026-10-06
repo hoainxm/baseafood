@@ -205,7 +205,7 @@ export default function NhatKyScreen() {
       colWidths: [20, 16, 12, 24, 22, 30, 50],
       fileName: `nhat-ky-thao-tac_${tu}_${den}.xlsx`,
     });
-    notify.daLuu("Đã xuất Excel nhật ký thao tác");
+    // Không toast: trình duyệt đã tự báo tải file xong (README luật 8 — xuất file là thao tác không đổi số).
   };
 
   return (

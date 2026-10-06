@@ -2,8 +2,9 @@
 
 > Load khi: task chạm hành vi / nghiệp vụ / flow / acceptance của tồn kho NGUYÊN LIỆU theo thời gian thực (sổ sự kiện kho, lô NL, lấy NL ra sàn sản xuất, tiêu hao, cấp đông dự trữ, xả đông, tồn theo ngày, đối chiếu XNT), hoặc khi định thay/nối các sổ tồn đang có (`/nxt-nl`, `/nxt-kho`, `/ton-kho-thang`).
 covers: src/lib/inventoryMaterial.ts, src/lib/truyXuatLo.ts, src/features/reports/MaterialNxtScreen.tsx, src/features/reports/WarehouseNxtScreen.tsx, src/features/production/WipProductionScreen.tsx
-last_verified: 2026-09-22
+last_verified: 2026-10-06
 ttl_days: 90
+<!-- updated: 2026-10-06 — tô màu dòng "đã dò" (mig 0055): /nxt-nl `ton-nl-ngay|<xưởng>` + `ton-nl-ho|<từ>|<đến>|<xưởng>`, /nxt-kho `nxt-kho` (cả bảng xem lẫn lưới Ghi — cùng id snapshot nên dấu giữ khi đổi chế độ). Chỉ là dấu trình bày, không đổi hành vi/AC tồn. -->
 
 > **Mục đích**: oracle HÀNH VI cho sổ tồn NL liên tục — USER nào làm nghiệp vụ gì, flow vào/ra sao, đúng-sai đo bằng AC nào. KHÔNG mô tả giao diện (design-spec), KHÔNG chốt schema (03-database khi build). **Trạng thái: v2.1 — ba-spec ĐÃ DUYỆT mức tổng. Chủ dự án chốt Open-1/4/5/6 ngày 2026-09-22 (theo khuyến nghị); Open-2/3 giữ mặc định A1 (không đổi flow). Sẵn sàng sang `ui-design-logic` (design-spec) cho Pha 1; CHƯA build.**
 

@@ -693,6 +693,7 @@ export default function BanHangScreen() {
                   columns={cotDong(n.phieu.channel)}
                   rows={n.dong}
                   getKey={(r) => r.id}
+                  toMau="ban-hang"
                 />
               </section>
             ))}

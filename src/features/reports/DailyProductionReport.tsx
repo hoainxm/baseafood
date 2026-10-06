@@ -29,6 +29,8 @@ import {
   notify,
   type CotBieuDoDoc,
   type TheThongTin,
+  NutToMau,
+  useToMau,
 } from "@/design-system";
 import { KY_OPT, phamViKy, type KyXem } from "@/lib/periodUtils";
 import { num, viDate } from "@/lib/format";
@@ -86,6 +88,9 @@ export default function DailyProductionReport() {
   const [xuong, setXuong] = useState("Tất cả");
   const [inPrint, setInPrint] = useState(false);
   const [tu, den] = phamViKy(ky, moc, tuTC, denTC);
+  // Dòng là dòng GỘP (xưởng × mặt hàng × quy cách) ⇒ ghép kỳ + xưởng vào khoá
+  // bảng để "đã dò" kỳ này không lan sang kỳ khác.
+  const to = useToMau(`bao-cao-sx-ngay|${tu}|${den}|${xuong}`);
 
   const { days, groups, tongNgayTong, tongKgTong, tongBlockTong, soMatHang } =
     useMemo(() => {
@@ -309,9 +314,16 @@ export default function DailyProductionReport() {
                         Phân xưởng {g.workshop}
                       </TableCell>
                     </TableRow>
-                    {g.rows.map((r) => (
-                      <TableRow key={`${r.workshop}|||${r.productId}|||${r.spec}`}>
-                        <TableCell className="font-medium">{r.productName}</TableCell>
+                    {g.rows.map((r) => {
+                      const k = `${r.workshop}|||${r.productId}|||${r.spec}`;
+                      return (
+                      <TableRow key={k} {...to.thuocTinh(k)}>
+                        <TableCell className="font-medium">
+                          <span className="flex items-center gap-1">
+                            <NutToMau to={to} khoa={k} nhan={`${r.productName} ${r.spec}`} />
+                            {r.productName}
+                          </span>
+                        </TableCell>
                         <TableCell>{r.spec || "—"}</TableCell>
                         {days.map((d) => (
                           <TableCell key={d} className="tnum text-right">
@@ -321,7 +333,8 @@ export default function DailyProductionReport() {
                         <TableCell className="tnum text-right font-semibold">{num(r.tongKg)}</TableCell>
                         <TableCell className="tnum text-right">{num(r.tongBlock)}</TableCell>
                       </TableRow>
-                    ))}
+                      );
+                    })}
                     <TableRow>
                       <TableCell className="font-semibold text-muted-foreground">
                         Cộng xưởng {g.workshop}

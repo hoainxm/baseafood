@@ -367,6 +367,7 @@ export default function QuanLyNguoiDungScreen({
                     columns={cols}
                     rows={nhom.users}
                     getKey={(r) => r.id}
+                    toMau="nguoi-dung"
                     actions={(r) => (
                       <Button
                         title="Sửa họ tên hoặc vai trò của tài khoản này."

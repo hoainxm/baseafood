@@ -1856,6 +1856,7 @@ export default function NhapNguyenLieuScreen() {
                     columns={cotDong(khoaChuyen)}
                     rows={n.dong}
                     getKey={(r) => r.id}
+                    toMau="nhap-hang"
                   />
                 </section>
               );

@@ -479,6 +479,22 @@ export interface DomesticSaleItem {
   operator: string;
 }
 
+/**
+ * TÔ MÀU DÒNG (migration 0055) — dấu "đã dò" kiểu Excel, MỘT bảng dùng chung cho
+ * mọi bảng trên app. Chỉ là dấu trình bày: không đụng số sổ sách. `rowId` là id
+ * BẢN GHI (không phải chỉ số dòng) để sắp xếp/lọc không làm lệch dấu.
+ */
+export interface RowMark {
+  id: string; // tất định: xem lib/toMau.ts#idDauTo
+  tableKey: string; // khoá ổn định của bảng/màn — VD "ton-kho-thang"
+  rowId: string;
+  columnKey: string | null; // null = cả dòng (chừa cho tô ô lẻ)
+  color: string; // "vang" | "xanh-la" | "xanh-duong" | "do" | "" (chỉ in đậm)
+  bold: boolean;
+  markedBy: string;
+  markedAt: string; // ISO
+}
+
 export function isBackdatedWip(c: Pick<WipProductionItem, "productionDate" | "postingDate">): boolean {
   return Boolean(c.postingDate) && c.postingDate > c.productionDate;
 }

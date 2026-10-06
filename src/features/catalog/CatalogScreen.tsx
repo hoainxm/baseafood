@@ -65,27 +65,27 @@ export default function DanhMucScreen() {
         </TabsList>
 
         <TabsContent value="mat-hang" className="pt-6">
-          <DanhMucCrudTheo cfg={c.matHang} />
+          <DanhMucCrudTheo cfg={c.matHang} toMau="danh-muc-mat-hang" />
         </TabsContent>
 
         <TabsContent value="khach-hang" className="pt-6">
-          <DanhMucCrudTheo cfg={c.khachHang} />
+          <DanhMucCrudTheo cfg={c.khachHang} toMau="danh-muc-khach-hang" />
         </TabsContent>
 
         <TabsContent value="dai-ly" className="pt-6">
-          <DanhMucCrudTheo cfg={c.daiLy} />
+          <DanhMucCrudTheo cfg={c.daiLy} toMau="danh-muc-dai-ly" />
         </TabsContent>
 
         <TabsContent value="loai-nl" className="pt-6">
-          <DanhMucCrudTheo cfg={c.loaiNL} />
+          <DanhMucCrudTheo cfg={c.loaiNL} toMau="danh-muc-loai-nl" />
         </TabsContent>
 
         <TabsContent value="bot-tam" className="pt-6">
-          <DanhMucCrudTheo cfg={c.botTam} />
+          <DanhMucCrudTheo cfg={c.botTam} toMau="danh-muc-bot-tam" />
         </TabsContent>
 
         <TabsContent value="kho-luu" className="pt-6">
-          <DanhMucCrudTheo cfg={c.khoLuu} />
+          <DanhMucCrudTheo cfg={c.khoLuu} toMau="danh-muc-kho-luu" />
         </TabsContent>
 
         <TabsContent value="tp-141" className="pt-6">
@@ -97,9 +97,17 @@ export default function DanhMucScreen() {
 }
 
 /** Dựng DanhMucCrud từ một cấu hình danh mục (giữ nguyên mọi prop cũ). */
-function DanhMucCrudTheo<T extends { id: string }>({ cfg }: { cfg: CauHinhDanhMuc<T> }) {
+function DanhMucCrudTheo<T extends { id: string }>({
+  cfg,
+  toMau,
+}: {
+  cfg: CauHinhDanhMuc<T>;
+  /** Khoá bảng tô màu dòng — một khoá cho mỗi tab, đừng đổi (mất dấu cũ). */
+  toMau: string;
+}) {
   return (
     <DanhMucCrud
+      toMau={toMau}
       dangTai={cfg.dangTai}
       tieuDe={cfg.tieuDe}
       moTa={cfg.moTa}

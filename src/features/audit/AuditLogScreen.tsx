@@ -268,6 +268,7 @@ export default function NhatKyScreen() {
           columns={cols}
           rows={view}
           getKey={(r) => r.id}
+          toMau="nhat-ky"
           timKiem={(r) => `${r.actorUsername} ${nhanBang(r.entity)} ${r.summary}`}
           nhanTimKiem="Tìm trong nhật ký…"
           actions={(r) => (

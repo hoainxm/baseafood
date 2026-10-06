@@ -51,6 +51,18 @@ export { NutGiaoDien } from "./patterns/ThemeToggleButton";
 export { NutHuongDan } from "./patterns/GuideButton";
 export { FormDialog, NutDong } from "./patterns/FormDialog";
 export { BangTong, type CotTong, type ChonBang } from "./patterns/SummaryTable";
+export { NutToMau, NutToMauNhieu } from "./patterns/ToMauDong";
+export {
+  ToMauContext,
+  useToMau,
+  MAU_TO,
+  moTaDau,
+  type MauTo,
+  type DauDong,
+  type VaDau,
+  type NguonToMau,
+  type ToMauBang,
+} from "./patterns/toMauNguon";
 export { GoiYHover, TRE_HIEN_MS } from "./patterns/HoverHint";
 export { ThongKe, type TheThongTin } from "./patterns/ThongKe";
 export { BieuDoCot, type CotBieuDo } from "./patterns/BarChart";

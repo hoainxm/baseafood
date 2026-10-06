@@ -1,6 +1,7 @@
 > Load khi: thêm/bớt màn hình, đổi điều hướng, header, hay tìm xem một màn được gắn vào đâu.
 covers: src/App.tsx, src/features/shared/AppShell.tsx, src/features/shared/NotFound.tsx, src/features/shared/guideContent.tsx, src/lib/nav-access.ts
-last_verified: 2026-10-02
+last_verified: 2026-10-06
+<!-- updated: 2026-10-06 — `ShellLayout` (App.tsx) bọc `<Outlet>` trong `ToMauProvider` (features/shared): một nguồn dấu tô màu dòng `row_marks` (mig 0055) cho mọi bảng trên mọi màn. Không đổi route/nav. -->
 <!-- re-verified: 2026-09-14 12:00 — KIT_NAV labels (AppShell.tsx:82-106) + CAY_NAV nhóm (nav-access grouping) + tieuDe header lấy TỪ label (App.tsx:108 `tieuDe={current?.label}`) đối chiếu khớp code. -->
 <!-- updated: 2026-10-02 — `/qr`: nhãn nav "Quét mã lô" → **"Mã lô QR"** (id/route/gate KHÔNG đổi); màn có 2 tab Tra lô · In tem hàng loạt (`?tab=in`, `?lo=` luôn mở Tra); guideContent.qr viết lại (bỏ chỉ dẫn tab "Sổ ngày" đã xóa 21/09). Chi tiết: ../spec/qr-truy-xuat-lo.md §6b. -->
 <!-- updated: 2026-09-18 — `/qr` nâng thành HỘ CHIẾU LÔ (truy xuất trọn chuỗi): nhận `?lo=<mã>` trên URL (useSearchParams) ⇒ camera điện thoại quét tem QR (nay là đường link `…/#/qr?lo=W:<id>`) mở THẲNG màn này; link chia sẻ được. Hiện: lô là gì · cân bằng khối lượng · truy NGƯỢC (TP→BTP→NL→đại lý) · truy XUÔI (NL→mẻ→đóng gói/lệnh xuất→khách) · in lại tem. Nhãn nav giữ "Quét mã lô", route/gate KHÔNG đổi. Nút mới ở /wip (Gắn lô NL · Tem) và /packaging (Gắn lô BTP · Tem). Thiết kế: ../spec/qr-truy-xuat-lo.md. -->

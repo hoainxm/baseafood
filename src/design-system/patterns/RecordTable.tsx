@@ -12,6 +12,8 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, Search, X } from "lucide-react";
+import { NutToMau } from "./ToMauDong";
+import { useToMau } from "./toMauNguon";
 
 export interface Cot<T> {
   key: string;
@@ -60,6 +62,7 @@ export function RecordTable<T>({
   timKiem,
   nhanTimKiem = "Tìm trong bảng…",
   className,
+  toMau,
 }: {
   columns: Cot<T>[];
   rows: T[];
@@ -72,7 +75,14 @@ export function RecordTable<T>({
   timKiem?: (row: T) => string;
   nhanTimKiem?: string;
   className?: string;
+  /**
+   * Tô màu dòng "đã dò" (lưu chung, mọi máy thấy): khoá ỔN ĐỊNH của bảng, VD
+   * "nhap-hang". Bật ⇒ nút tô ở cột Thao tác (bảng) / hàng nút (thẻ). `getKey`
+   * phải là id bản ghi. Luật: README § Tô màu dòng.
+   */
+  toMau?: string;
 }) {
+  const to = useToMau(toMau);
   const [q, setQ] = React.useState("");
   const [sapTheo, setSapTheo] = React.useState<string | null>(null);
   const [huong, setHuong] = React.useState<Huong>("tang");
@@ -197,7 +207,12 @@ export function RecordTable<T>({
   const cotAnBang = columns.filter((c) => c.phu && c !== cotChinh);
   const cotThe = columns.filter((c) => c !== cotChinh && !c.anTrenDienThoai);
   const cotAnThe = columns.filter((c) => c !== cotChinh && c.anTrenDienThoai);
-  const coCotThaoTac = Boolean(actions) || cotAnBang.length > 0;
+  const coCotThaoTac = Boolean(actions) || cotAnBang.length > 0 || to.bat;
+  /** Nhãn dòng cho trình đọc màn hình của nút tô (chữ của cột chính nếu là chữ). */
+  const nhanDong = (r: T) => {
+    const v = cotChinh.render(r);
+    return typeof v === "string" || typeof v === "number" ? String(v) : undefined;
+  };
 
   const nutChiTiet = (k: string, coAn: boolean) =>
     coAn && (
@@ -310,7 +325,7 @@ export function RecordTable<T>({
                   const k = getKey(r);
                   return (
                     <React.Fragment key={k}>
-                      <TableRow className="hien-len">
+                      <TableRow className="hien-len" {...to.thuocTinh(k)}>
                         {cotBang.map((c) => (
                           <TableCell
                             key={c.key}
@@ -329,7 +344,8 @@ export function RecordTable<T>({
                         ))}
                         {coCotThaoTac && (
                           <TableCell className="text-right">
-                            <div className="flex justify-end gap-2">
+                            <div className="flex items-center justify-end gap-2">
+                              <NutToMau to={to} khoa={k} nhan={nhanDong(r)} />
                               {nutChiTiet(k, cotAnBang.length > 0)}
                               {actions?.(r)}
                             </div>
@@ -365,6 +381,7 @@ export function RecordTable<T>({
               <li
                 key={k}
                 className="hien-len rounded-xl bg-card p-4 ring-1 ring-foreground/10"
+                {...to.thuocTinh(k)}
               >
                 <div className="mb-3 text-lg font-semibold text-foreground">
                   {cotChinh.render(r)}
@@ -394,8 +411,9 @@ export function RecordTable<T>({
                     {chiTiet(r, cotAnThe)}
                   </div>
                 )}
-                {(actions || cotAnThe.length > 0) && (
-                  <div className="mt-4 flex flex-wrap gap-2">
+                {(actions || cotAnThe.length > 0 || to.bat) && (
+                  <div className="mt-4 flex flex-wrap items-center gap-2">
+                    <NutToMau to={to} khoa={k} nhan={nhanDong(r)} />
                     {nutChiTiet(k, cotAnThe.length > 0)}
                     {actions?.(r)}
                   </div>

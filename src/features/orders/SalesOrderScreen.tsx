@@ -374,6 +374,7 @@ export default function DonDatScreen() {
           columns={colsDon}
           rows={don}
           getKey={(r) => r.id}
+          toMau="don-dat"
           timKiem={(r) => tenKH(r.customerId)}
           nhanTimKiem="Tìm theo khách…"
           actions={(r) => (

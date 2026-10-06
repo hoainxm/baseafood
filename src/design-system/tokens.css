@@ -172,6 +172,21 @@
   --tone-xam: #334155;
   --tone-xam-surface: #f8fafc;
   --tone-xam-line: #cbd5e1;
+
+  /* --- Tô màu dòng "đã dò" (bảng row_marks, mig 0055) — bảng màu kiểu Excel ---
+     Nền đủ sáng để chữ thường, chữ phụ (muted) và chữ đỏ (destructive) đều
+     ≥ 4,5:1. Chữ xanh lá / hổ phách trong dòng tô đổi sang bản đậm hơn (khối
+     [data-to-mau] cuối file). `-line` = vạch đậm ở mép trái dòng + ô màu trên nút.
+     Thêm màu: thêm cặp token ở đây + mã ở MAU_TO (patterns/toMauNguon.ts) +
+     MA_MAU_TO (lib/toMau.ts). App chưa có giao diện tối ⇒ chỉ bản sáng. */
+  --to-vang: #fef08a;
+  --to-vang-line: #ca8a04;
+  --to-xanh-la: #c6efce;
+  --to-xanh-la-line: #16a34a;
+  --to-xanh-duong: #cfe2f3;
+  --to-xanh-duong-line: #2563eb;
+  --to-do: #fddede;
+  --to-do-line: #dc2626;
 }
 
 @theme inline {
@@ -237,6 +252,15 @@
   --color-tone-xam: var(--tone-xam);
   --color-tone-xam-surface: var(--tone-xam-surface);
   --color-tone-xam-line: var(--tone-xam-line);
+  /* Tô màu dòng → bg-to-vang, text-to-vang-line… (ô màu trên nút tô) */
+  --color-to-vang: var(--to-vang);
+  --color-to-vang-line: var(--to-vang-line);
+  --color-to-xanh-la: var(--to-xanh-la);
+  --color-to-xanh-la-line: var(--to-xanh-la-line);
+  --color-to-xanh-duong: var(--to-xanh-duong);
+  --color-to-xanh-duong-line: var(--to-xanh-duong-line);
+  --color-to-do: var(--to-do);
+  --color-to-do-line: var(--to-do-line);
   /* Trạng thái MES → tiện ích Tailwind: bg-status-running, text-status-stopped-ink… */
   --color-status-running: var(--status-running);
   --color-status-idle: var(--status-idle);
@@ -570,3 +594,97 @@
     transform: translateY(-8px);
   }
 }
+
+/* ============================================================
+   TÔ MÀU DÒNG "ĐÃ DÒ" — data-to-mau / data-dam trên <tr> (hoặc thẻ <li>
+   của RecordTable trên điện thoại). Gắn qua useToMau().thuocTinh(khoá) — màn
+   hình không tự viết class màu. Luật: src/design-system/README.md § Tô màu dòng.
+   KHÔNG bọc @layer: khối này phải THẮNG sọc dòng, hover, nền ô ghim/ô dính
+   (bang-ghim-*, cot-dau-dinh, cột tính của LuoiNhap) — utility nằm trong layer
+   nên CSS ngoài layer luôn thắng, khỏi cần !important.
+   ============================================================ */
+[data-to-mau="vang"] {
+  --to-nen: var(--to-vang);
+  --to-vach: var(--to-vang-line);
+}
+[data-to-mau="xanh-la"] {
+  --to-nen: var(--to-xanh-la);
+  --to-vach: var(--to-xanh-la-line);
+}
+[data-to-mau="xanh-duong"] {
+  --to-nen: var(--to-xanh-duong);
+  --to-vach: var(--to-xanh-duong-line);
+}
+[data-to-mau="do"] {
+  --to-nen: var(--to-do);
+  --to-vach: var(--to-do-line);
+}
+/* Chữ xanh lá / hổ phách (nhập +, xuất −) trên nền tô: bản đậm hơn cho đủ 4,5:1.
+   @theme inline ⇒ text-success đọc thẳng var(--success) nên đè biến ở đây là ăn. */
+[data-to-mau] {
+  --success: #166534;
+  --warning: #92400e;
+}
+tr[data-to-mau] > td,
+tr[data-to-mau] > th,
+li[data-to-mau] {
+  background-color: var(--to-nen);
+}
+/* Rê chuột vẫn thấy đang đứng dòng nào — phủ một lớp mờ lên màu tô. */
+tr[data-to-mau]:hover > td,
+tr[data-to-mau]:hover > th {
+  background-image: linear-gradient(rgb(15 23 42 / 0.05), rgb(15 23 42 / 0.05));
+}
+/* Vạch đậm mép trái: màu không phải tín hiệu duy nhất (người khó phân biệt
+   màu vẫn thấy dòng có dấu; nút tô ở dòng còn nói rõ màu gì bằng chữ). */
+tr[data-to-mau] > :first-child,
+li[data-to-mau] {
+  box-shadow: inset 4px 0 0 var(--to-vach);
+}
+tr[data-dam] > td,
+tr[data-dam] > th,
+tr[data-dam] > td *,
+tr[data-dam] > th *,
+li[data-dam],
+li[data-dam] * {
+  font-weight: 700;
+}
+
+/* ============================================================
+   BẢNG XỔ RA — BangTong `xoRa`: bảng dài trải hết, trang cuộn một mạch (không
+   khung cuộn riêng như dinhDau). Thanh cuộn ngang THẬT của bảng ẩn đi; thay
+   bằng thanh cuộn DÍNH ĐÁY màn hình (bang-thanh-cuon) — bảng dài cả nghìn px
+   vẫn kéo ngang được mà không phải cuộn xuống tận đáy bảng (bài học §5a).
+   ============================================================ */
+@utility bang-xo-ra {
+  & [data-slot="table-container"] {
+    scrollbar-width: none;
+  }
+  & [data-slot="table-container"]::-webkit-scrollbar {
+    display: none;
+  }
+}
+/* Thanh cuộn ngang dính đáy: tạo kiểu bằng ::-webkit-scrollbar để thanh LUÔN
+   HIỆN, kể cả máy Mac đặt "chỉ hiện khi cuộn". Chrome bỏ qua kiểu webkit khi
+   scrollbar-width/-color khác `auto` — mà scrollbar-color KẾ THỪA từ khung
+   `scroll-nice` (cột nội dung) ⇒ phải đặt lại `auto` ở đây, nếu không thanh cao 0. */
+@utility bang-thanh-cuon {
+  scrollbar-color: auto;
+  scrollbar-width: auto;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  &::-webkit-scrollbar {
+    height: 0.75rem;
+  }
+  &::-webkit-scrollbar-track {
+    background: var(--muted);
+    border-radius: 9999px;
+  }
+  &::-webkit-scrollbar-thumb {
+    background: var(--input);
+    border-radius: 9999px;
+    border: 2px solid var(--muted);
+  }
+}
+

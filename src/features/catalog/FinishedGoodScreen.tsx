@@ -125,6 +125,7 @@ export default function ThanhPhamScreen() {
           columns={cols}
           rows={rows}
           getKey={(r) => r.code}
+          toMau="danh-muc-tp-141"
           timKiem={(r) => `${r.code} ${r.name} ${r.groupName}`}
           nhanTimKiem="Tìm theo tên hoặc mã thành phẩm…"
         />

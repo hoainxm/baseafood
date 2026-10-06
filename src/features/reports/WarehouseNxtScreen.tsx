@@ -758,6 +758,7 @@ export default function WarehouseNxtScreen() {
                 moTa={`Sổ Xuất–Nhập–Tồn ${khoChon} kỳ ${viDate(tuNgay)}–${viDate(denNgay)}`}
                 cot={cotLuoi}
                 hang={hangLuoi}
+                toMau="nxt-kho"
                 onGhiO={ghiO}
                 cuoiBang={
                   <tr className="bg-muted font-semibold">
@@ -774,7 +775,7 @@ export default function WarehouseNxtScreen() {
               />
             </div>
           ) : (
-            <BangTong rows={rows} cot={cot} getKey={(r) => r.id} chon={chonBang} dinhDau />
+            <BangTong rows={rows} cot={cot} getKey={(r) => r.id} chon={chonBang} dinhDau toMau="nxt-kho" />
           )}
 
           <p className="text-sm text-muted-foreground">

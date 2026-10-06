@@ -722,6 +722,7 @@ export function LuoiNguyenLieu({
         tenCotDau="Loại hàng"
         cot={cotHienThi}
         hang={hang}
+        toMau="can-doi-nl"
         nhomAn={anNgay ? ["ngay", "khi-mo-ngay"] : ["khi-thu-ngay"]}
         onGhiO={ghiO}
         onDanKhoi={danKhoi}

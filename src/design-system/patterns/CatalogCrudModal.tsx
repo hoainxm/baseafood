@@ -63,6 +63,7 @@ export function DanhMucCrud<T extends { id: string }>({
   tenDonVi,
   dangTai = false,
   kiemTraThem,
+  toMau,
 }: {
   tieuDe: string;
   moTa?: string;
@@ -81,6 +82,8 @@ export function DanhMucCrud<T extends { id: string }>({
   dangTai?: boolean;
   /** Kiểm tra thêm (ngoài ô bắt buộc) — vd trùng mã số. Trả về danh sách lỗi. */
   kiemTraThem?: (dang: T, rows: T[], laThem: boolean) => LoiNhap[];
+  /** Tô màu dòng "đã dò" — khoá ổn định của bảng danh mục (VD "danh-muc-khach-hang"). */
+  toMau?: string;
 }) {
   const [dang, setDang] = React.useState<T | null>(null);
   const [laThem, setLaThem] = React.useState(false);
@@ -184,6 +187,7 @@ export function DanhMucCrud<T extends { id: string }>({
           getKey={(r) => r.id}
           timKiem={timTheo}
           nhanTimKiem={`Tìm ${tenDonVi}…`}
+          toMau={toMau}
           actions={(r) => (
             <>
               <Button

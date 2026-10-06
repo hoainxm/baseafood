@@ -49,6 +49,7 @@ import type {
   LabelPrint,
   BatterType,
   DomesticSaleItem,
+  RowMark,
 } from "@/types";
 import { rolesFromCsv, rolesToCsv } from "@/types";
 import { botDiKemIds, lamSachBot } from "@/lib/botTam";
@@ -1046,6 +1047,33 @@ export const BANG_DOMESTIC_SALE: AnhXaBang<DomesticSaleItem> = {
   }),
 };
 
+/** TÔ MÀU DÒNG (migration 0055) — dấu "đã dò" kiểu Excel, dùng chung mọi bảng. */
+export const BANG_ROW_MARK: AnhXaBang<RowMark> = {
+  table: "row_marks",
+  localKey: "bsf.row-marks.v1",
+  layKhoa: theoId,
+  toRow: (x) => ({
+    id: x.id,
+    table_key: x.tableKey,
+    row_id: x.rowId,
+    column_key: x.columnKey ?? null,
+    color: x.color ?? "",
+    bold: Boolean(x.bold),
+    marked_by: x.markedBy ?? "",
+    marked_at: x.markedAt || new Date().toISOString(),
+  }),
+  fromRow: (r) => ({
+    id: s(r.id),
+    tableKey: s(r.table_key),
+    rowId: s(r.row_id),
+    columnKey: r.column_key == null || r.column_key === "" ? null : s(r.column_key),
+    color: s(r.color),
+    bold: Boolean(r.bold),
+    markedBy: s(r.marked_by),
+    markedAt: s(r.marked_at),
+  }),
+};
+
 /** Danh mục LOẠI BỘT TẨM (migration 0051) — sổ sản lượng nối theo TÊN. */
 export const BANG_BATTER_TYPE: AnhXaBang<BatterType> = {
   table: "batter_types",
@@ -1370,6 +1398,7 @@ const NHAN_BANG: Record<string, string> = {
   reconciliation_runs: "Bản đối soát hóa đơn",
   lot_inputs: "Gắn lô đầu vào (truy xuất)",
   label_prints: "In tem QR",
+  row_marks: "Tô màu dòng",
 };
 
 /** Trường đổi giữa hai bản ghi → { trường: [trước, sau] }. */
@@ -1386,6 +1415,9 @@ function khacBiet(a: unknown, b: unknown): Record<string, [unknown, unknown]> {
 /** So danh sách cũ↔mới của một bảng, phát entry nhật ký thêm/sửa/xóa. */
 function nhatKyThayDoi<T>(bang: AnhXaBang<T>, cu: T[], next: T[]): void {
   if (bang.table === "audit_log") return; // không tự lưu vết chính mình
+  // Tô màu dòng chỉ là dấu trình bày (đã có marked_by/marked_at) — kế toán dò cả
+  // trăm dòng một buổi, ghi nhật ký từng cú tô chỉ làm ngập /audit.
+  if (bang.table === "row_marks") return;
   const nhan = NHAN_BANG[bang.table] ?? bang.table;
   const cuMap = new Map(cu.map((x) => [bang.layKhoa(x), x]));
   const nextMap = new Map(next.map((x) => [bang.layKhoa(x), x]));

@@ -35,6 +35,8 @@ import {
   homNay,
   notify,
   type TheThongTin,
+  NutToMau,
+  useToMau,
 } from "@/design-system";
 import { KY_OPT, phamViKy, type KyXem } from "@/lib/periodUtils";
 import { num, viDate } from "@/lib/format";
@@ -55,6 +57,8 @@ const NHAN_TT: Record<SalesOrderStatus, string> = {
 };
 
 interface DongXuat {
+  /** id dòng lệnh xuất (export_items) — khoá ổn định cho tô màu dòng. */
+  id: string;
   exportDate: string;
   productName: string;
   spec: string;
@@ -93,6 +97,8 @@ export default function OrderExportReport() {
   const [khachLoc, setKhachLoc] = useState("Tất cả");
   const [inPrint, setInPrint] = useState(false);
   const [tu, den] = phamViKy(ky, moc, tuTC, denTC);
+  // Mỗi dòng là một dòng lệnh xuất (id bản ghi) ⇒ dấu "đã dò" khỏi ghép kỳ.
+  const to = useToMau("bao-cao-xuat-don");
 
   const optKhach = [
     { value: "Tất cả", label: "Tất cả khách" },
@@ -129,6 +135,7 @@ export default function OrderExportReport() {
       }
       for (const dl of dongLenh.filter((x) => x.exportId === l.id)) {
         g.lines.push({
+          id: dl.id,
           exportDate: l.exportDate,
           productName: tenMH(dl.productId),
           spec: dl.spec,
@@ -302,9 +309,14 @@ export default function OrderExportReport() {
                       </span>
                     </TableCell>
                   </TableRow>
-                  {g.lines.map((l, i) => (
-                    <TableRow key={`${g.orderId}-${i}`}>
-                      <TableCell className="whitespace-nowrap">{viDate(l.exportDate)}</TableCell>
+                  {g.lines.map((l) => (
+                    <TableRow key={l.id} {...to.thuocTinh(l.id)}>
+                      <TableCell className="whitespace-nowrap">
+                        <span className="flex items-center gap-1">
+                          <NutToMau to={to} khoa={l.id} nhan={`${l.productName} ${viDate(l.exportDate)}`} />
+                          {viDate(l.exportDate)}
+                        </span>
+                      </TableCell>
                       <TableCell className="font-medium">{l.productName}</TableCell>
                       <TableCell>{l.spec || "—"}</TableCell>
                       <TableCell className="tnum text-right">{num(l.quantityKg)}</TableCell>

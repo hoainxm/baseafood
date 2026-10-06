@@ -1288,6 +1288,7 @@ export default function SanXuatBTPScreen() {
             columns={cols}
             rows={view}
             getKey={(r) => r.id}
+            toMau="san-xuat-tp"
             timKiem={(r) => `${tenMH(r.productId)} ${r.customerName ?? ""}`}
             nhanTimKiem="Tìm theo thành phẩm / khách…"
             actions={(r) => (
@@ -1400,6 +1401,7 @@ export default function SanXuatBTPScreen() {
             columns={cotBND}
             rows={bndView}
             getKey={(r) => r.id}
+            toMau="ban-noi-dia"
             actions={(r) => (
               <div className="flex flex-wrap gap-2">
                 <Button

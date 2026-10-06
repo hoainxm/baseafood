@@ -324,6 +324,7 @@ export default function CanDoiScreen() {
           columns={cols}
           rows={kyList}
           getKey={(r) => r.id}
+          toMau="can-doi-ky"
           timKiem={(r) => `${r.materialTypeName} ${r.dateRangeDescription}`}
           nhanTimKiem="Tìm kỳ theo loại nguyên liệu…"
           actions={(r) => (

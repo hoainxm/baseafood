@@ -365,6 +365,7 @@ export default function KhoDuTruScreen() {
             columns={colsTon}
             rows={tonLoc}
             getKey={(r) => r.wipId}
+            toMau="kho-du-tru"
             timKiem={(r) => `${tenMH(r.productId)} ${r.spec} ${r.warehouse}`}
             nhanTimKiem="Tìm theo mặt hàng / quy cách / kho…"
           />

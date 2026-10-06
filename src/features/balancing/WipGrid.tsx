@@ -434,6 +434,7 @@ export function LuoiBanThanhPham({
           moTa="Lưới bán thành phẩm sản xuất theo ngày trong kỳ"
           cot={cotHienThi}
           hang={hang}
+          toMau="can-doi-tp"
           nhomAn={anNgay ? ["ngay"] : []}
           onGhiO={ghiO}
           onDanKhoi={danKhoi}

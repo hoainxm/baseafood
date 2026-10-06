@@ -18,6 +18,7 @@ import {
 import DangNhap from "@/features/auth";
 import { NotFound } from "@/features/shared";
 import AppShell, { KIT_NAV } from "@/features/shared/AppShell";
+import { ToMauProvider } from "@/features/shared/ToMauProvider";
 import { HUONG_DAN } from "@/features/shared/guideContent";
 import { Toaster, apDungCaiDatHienThi, DangXuLy } from "@/design-system";
 import { useAuth } from "@/lib/auth";
@@ -123,9 +124,12 @@ function ShellLayout() {
       }
       items={items}
     >
-      <Suspense fallback={<DangXuLy chu="Đang mở màn hình…" />}>
-        <Outlet />
-      </Suspense>
+      {/* Tô màu dòng "đã dò" — một nguồn row_marks cho mọi bảng (prop `toMau`). */}
+      <ToMauProvider nguoi={username ?? ""}>
+        <Suspense fallback={<DangXuLy chu="Đang mở màn hình…" />}>
+          <Outlet />
+        </Suspense>
+      </ToMauProvider>
     </AppShell>
   );
 }

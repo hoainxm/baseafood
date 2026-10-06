@@ -391,7 +391,7 @@ export default function DongGoiScreen() {
           moTa="Bấm “Ghi phiếu đóng gói” để chuyển bán thành phẩm thành thành phẩm đóng gói."
         />
       ) : (
-        <RecordTable columns={cot} rows={view} getKey={(r) => r.id} />
+        <RecordTable columns={cot} rows={view} getKey={(r) => r.id} toMau="dong-goi" />
       )}
 
       {/* Dialog ghi phiếu */}

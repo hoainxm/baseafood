@@ -165,6 +165,7 @@ export default function BaoCaoBan() {
         rows={dong}
         cot={cot}
         getKey={(r) => `${r.customerName}|||${r.channel}`}
+        toMau={`bao-cao-ban|${tu}|${den}`}
         emptyText="Không có phiếu bán trong kỳ này."
       />
     </div>

@@ -67,6 +67,8 @@ import {
   TdIn,
   ThIn,
   ThongKe,
+  NutToMauNhieu,
+  useToMau,
   homNay,
   notify,
   parseSo,
@@ -625,6 +627,9 @@ export default function MonthlyStockScreen() {
     nhanDong: (r) => `${r.itemName}${r.size ? " · " + r.size : ""}`,
   };
   const rowsChon = useMemo(() => rowsThang.filter((r) => daChon.has(r.id)), [rowsThang, daChon]);
+  // Tô màu dòng "đã dò" — cùng khoá với BangTong toMau="ton-kho-thang" bên dưới,
+  // dùng cho nút tô HÀNG LOẠT các dòng đang tick.
+  const toMau = useToMau("ton-kho-thang");
   const tongChon = useMemo(() => tongDong(rowsChon), [rowsChon]);
   const boChon = () => setDaChon(new Set());
 
@@ -1543,6 +1548,7 @@ export default function MonthlyStockScreen() {
                     Gửi kho ngoài
                   </Button>
                 )}
+                <NutToMauNhieu to={toMau} khoa={rowsChon.map((r) => r.id)} />
                 <Button size="sm" variant="outline" onClick={() => setMoIn(true)} title="In riêng các dòng đang tick, kèm dòng tổng của đúng mấy dòng đó.">
                   <Printer className="mr-2 h-4 w-4" />
                   In {rowsChon.length} dòng
@@ -1637,7 +1643,8 @@ export default function MonthlyStockScreen() {
                   getKey={(r) => r.id}
                   nhanTong={`Cộng ${g.category}`}
                   chon={chonBang}
-                  dinhDau
+                  xoRa
+                  toMau="ton-kho-thang"
                   dongThem={
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="flex items-center gap-1 text-sm font-medium text-foreground">

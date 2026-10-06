@@ -375,7 +375,7 @@ export default function BaoCaoNhapXuatTonScreen() {
           moTa="Ghi sản lượng ở Sản xuất BTP, duyệt vào Kho dự trữ, rồi xuất theo Đơn đặt / Bán hàng — số sẽ tổng hợp về đây. Có số dư đông trước khi số hoá thì khai ở nút Tồn đầu."
         />
       ) : (
-        <BangTong rows={rows} cot={cot} getKey={(r) => `${r.productId}|||${r.spec}`} />
+        <BangTong rows={rows} cot={cot} getKey={(r) => `${r.productId}|||${r.spec}`} toMau={`nxt-tp|${tu}|${den}`} />
       )}
 
       <p className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">

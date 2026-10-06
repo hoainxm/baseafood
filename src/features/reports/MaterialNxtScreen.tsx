@@ -423,6 +423,7 @@ export default function MaterialNxtScreen() {
                 rows={data.theoNgay}
                 cot={cotNgay}
                 getKey={(r) => r.date}
+                toMau={`ton-nl-ngay|${xuong}`}
                 emptyText="Không có ngày nào có nhập."
               />
             </section>
@@ -435,6 +436,7 @@ export default function MaterialNxtScreen() {
               rows={data.theoHo}
               cot={cotHo}
               getKey={(r) => r.hoNL}
+              toMau={`ton-nl-ho|${tu}|${den}|${xuong}`}
               emptyText="Chưa có loại nguyên liệu nào."
             />
           </section>

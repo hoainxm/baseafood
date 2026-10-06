@@ -2,6 +2,8 @@
 covers: src/lib/repo.ts, src/lib/db.ts, src/lib/catalogRepo.ts, src/lib/botTam.ts, src/lib/banNoiDia.ts, src/lib/connectivity.ts, src/lib/supabase.ts, src/lib/store.ts, src/lib/audit.ts, src/lib/storage.ts, src/design-system/patterns/DataStatusBadge.tsx
 last_verified: 2026-10-06
 ttl_days: 90
+<!-- updated: 2026-10-06 (d) — THÊM BANG_ROW_MARK (row_marks, mig 0055, localKey bsf.row-marks.v1) + hook useRowMarks(): TÔ MÀU DÒNG "đã dò" kiểu Excel, MỘT bảng dùng chung mọi bảng. Màn hình KHÔNG gọi hook này: `features/shared/ToMauProvider.tsx` gọi MỘT lần ở ShellLayout (App.tsx) rồi cấp qua `ToMauContext` của design-system — mỗi useBang giữ state riêng, nhiều instance thì bảng này ghi đè mất dấu bảng kia trong bản sao dưới máy. Hàm thuần lib/toMau.ts (idDauTo tất định · dauCuaBang · datDau ghép lại dấu bảng khác) + test. `nhatKyThayDoi` BỎ QUA row_marks (dấu trình bày, đã có marked_by/marked_at — tô cả trăm dòng không được làm ngập /audit). Bảng mới ⇒ chưa chạy 0055 thì chỉ dấu tô nằm hàng chờ. -->
+<!-- re-verified: 2026-10-06 15:20 — khuôn AnhXaBang{table,localKey,layKhoa,toRow,fromRow} + useBang (ghi so cũ↔mới, hàng chờ `.cho`) + NHAN_BANG khớp code khi thêm BANG_ROW_MARK. -->
 <!-- updated: 2026-10-06 (c) — THÊM BANG_DOMESTIC_SALE (domestic_sales, mig 0054, localKey bsf.domestic-sales.v1) + hook useDomesticSales(): sổ bán nội địa (NL bán thẳng) ghi ở /wip; usePeriodGrid đọc để điền dòng giảm "Bán nội địa" (lib/banNoiDia.ts thuần, có test). Bảng mới nên chưa chạy 0054 thì chỉ sổ bán nội địa nằm hàng chờ — bảng khác không ảnh hưởng. -->
 <!-- re-verified: 2026-10-06 10:35 — khuôn thêm bảng (AnhXaBang{table,localKey,layKhoa,toRow,fromRow,vaDongCu?}) + useBang(seed) đẩy seed khi bảng server rỗng + dongBoCho upsert defaultToNull:false + luật "cột mới gửi LUÔN để xoá được về rỗng" (leftover_by_material/photo_paths) — khớp code khi thêm BANG_BATTER_TYPE. -->
 <!-- updated: 2026-10-06 (c) — BANG_BALANCING_INPUT map `stockLineId` ↔ `stock_line_id`, `stockLocation` ↔ `stock_location` (mig 0053), toRow CHỈ gửi khi trường != null (fromRow ra `undefined` khi DB chưa có cột) — khuôn 0052. Cân đối giờ GHI cả `monthly_stock_ledger` (useMonthlyStock) qua chốt `usePeriodGrid.ghiNL` → `lib/khoCanDoi.dongBoSoKho`; ảnh chụp hoàn tác của kỳ thêm bảng thứ 5 (`kho`). -->
@@ -74,6 +76,8 @@ Hệ quả cho người vận hành: chưa chạy migration mới ⇒ số liệ
 ## `vaDongCu` — vá dòng cũ, một chỗ
 
 Bản sao localStorage được đọc thẳng bằng `JSON.parse`, **không đi qua `fromRow`** ⇒ dòng ghi từ bản app trước sẽ thiếu trường mới thêm. Vá ở `vaDongCu` (một chỗ) thay vì rải `?? ""` khắp màn hình. Ví dụ đang có: `chuyenId` (dòng trước khi có chuyến thật), `nguon`/`ngay`/`phanXuong` của `phe_lieu`, `quyCach`/`banHangId` của `thanh_pham_ra` (dòng trước khi có sổ bán).
+
+**Tô màu dòng** (`useRowMarks()` → `BANG_ROW_MARK` → `row_marks`, mig 0055) là ngoại lệ có chủ đích của "màn gọi hook": chỉ `ToMauProvider` (features/shared, gắn một lần ở `ShellLayout`) gọi hook, rồi cấp cho mọi bảng qua `ToMauContext` của design-system — bảng bật bằng prop `toMau="<khoá bảng>"`. Lý do: `useBang` giữ state theo instance, mỗi bảng tự gọi thì lần ghi của bảng này đè mất dấu bảng kia trong bản sao localStorage. Không ghi nhật ký (`nhatKyThayDoi` bỏ qua `row_marks`). Luật dùng: [README design-system § Tô màu dòng](../../src/design-system/README.md#tô-màu-dòng-đã-dò-kiểu-excel).
 
 Bán thành phẩm dùng `usePhieuBan()` / `useBanHang()` (`BANG_PHIEU_BAN` / `BANG_BAN_HANG`) — cùng khuôn `useBang`, xem [33-ban-hang.md](33-ban-hang.md).
 

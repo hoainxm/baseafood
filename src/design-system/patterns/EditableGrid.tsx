@@ -8,6 +8,8 @@ import { cn } from "@/lib/utils";
 import { dinhDangSo, parseSo } from "./bieuThucSo";
 import { XemTruocBieuThuc } from "./ONhapSo";
 import { useNhapSo } from "./useNhapSo";
+import { NutToMau } from "./ToMauDong";
+import { useToMau } from "./toMauNguon";
 
 /**
  * LuoiNhap — lưới nhập liệu thay cho "mở hộp thoại, điền, bấm lưu" từng dòng.
@@ -83,6 +85,7 @@ export function LuoiNhap<R>({
   className,
   moTa,
   tenCotDau = "Mặt hàng",
+  toMau,
 }: {
   cot: CotLuoi<R>[];
   hang: HangLuoi<R>[];
@@ -102,7 +105,14 @@ export function LuoiNhap<R>({
   moTa: string;
   /** Tên cột đầu (cột tên dòng, dính trái). Mặc định "Mặt hàng". */
   tenCotDau?: string;
+  /**
+   * Tô màu dòng "đã dò" (lưu chung, mọi máy thấy): khoá ỔN ĐỊNH của lưới, VD
+   * "can-doi-nl". Nút tô nằm trong ô tên dính trái; khoá dòng = `HangLuoi.id`
+   * (phải là id bản ghi). Dòng tiêu đề nhóm không tô. Luật: README § Tô màu dòng.
+   */
+  toMau?: string;
 }) {
+  const to = useToMau(toMau);
   const oRef = React.useRef(new Map<string, HTMLInputElement>());
   const cotHien = React.useMemo(
     () => cot.filter((c) => !c.nhom || !nhomAn.includes(c.nhom)),
@@ -261,6 +271,7 @@ export function LuoiNhap<R>({
                   h.kieu === "giam" && "bg-warning-surface/40",
                   h.kieu === "tong" && "bg-muted font-semibold"
                 )}
+                {...to.thuocTinh(h.id)}
               >
                 <th
                   scope="row"
@@ -270,10 +281,20 @@ export function LuoiNhap<R>({
                     h.kieu === "giam" && "bg-warning-surface/40"
                   )}
                 >
-                  <span className="block leading-tight">{h.ten}</span>
-                  {h.phu && (
-                    <span className="block text-sm text-muted-foreground">{h.phu}</span>
-                  )}
+                  <div className="flex items-start gap-1">
+                    <div className="min-w-0 flex-1">
+                      <span className="block leading-tight">{h.ten}</span>
+                      {h.phu && (
+                        <span className="block text-sm text-muted-foreground">{h.phu}</span>
+                      )}
+                    </div>
+                    <NutToMau
+                      to={to}
+                      khoa={h.id}
+                      nhan={typeof h.ten === "string" ? h.ten : undefined}
+                      className="-my-1 shrink-0"
+                    />
+                  </div>
                 </th>
                 {cotHien.map((c) => {
                   const oRieng = h.kieu === "tong" ? undefined : c.oRieng?.(h.du);

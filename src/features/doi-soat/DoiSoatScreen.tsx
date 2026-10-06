@@ -175,6 +175,7 @@ function BanDaLuuBox({
           columns={cot}
           rows={runs}
           getKey={(r) => r.id}
+          toMau="doi-soat-ban-luu"
           timKiem={(r) => `${r.title} ${r.period} ${r.ownerName}`}
           nhanTimKiem="Tìm theo tên / kỳ…"
           emptyText="Chưa có bản đối soát nào được lưu. Chạy đối soát rồi bấm Lưu."

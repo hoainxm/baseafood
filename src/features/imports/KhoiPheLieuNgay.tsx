@@ -202,6 +202,7 @@ export function KhoiPheLieuNgay({
         columns={cols}
         rows={cuaNgay}
         getKey={(r) => r.id}
+        toMau="phe-lieu-ngay"
         emptyText="Chưa cân phế liệu cho ngày này."
         actions={
           khoa || chiXem

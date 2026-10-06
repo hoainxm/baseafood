@@ -340,6 +340,7 @@ export default function BaoCaoNhap() {
         rows={dongMua}
         cot={cotMua}
         getKey={(r) => `${r.supplierName}|||${r.materialTypeName}`}
+        toMau={`bao-cao-nhap|${tu}|${den}|${xuong}`}
         emptyText="Không có nguyên liệu mua trong kỳ này."
       />
 
@@ -355,6 +356,7 @@ export default function BaoCaoNhap() {
             rows={dongPhe}
             cot={cotPhe}
             getKey={(r) => r.name}
+            toMau={`bao-cao-nhap-phe-lieu|${tu}|${den}|${xuong}`}
             emptyText="Không có phế liệu trong kỳ này."
           />
         </section>

@@ -255,7 +255,7 @@ export default function DashboardScreen() {
               moTa="Các mặt hàng đang chỉ giữ tồn, chưa phát sinh nhập/xuất trong kỳ."
             />
           ) : (
-            <BangTong rows={bienDong} cot={cotBienDong} getKey={(r) => r.id} className="cot-dau-dinh" />
+            <BangTong rows={bienDong} cot={cotBienDong} getKey={(r) => r.id} className="cot-dau-dinh" toMau="tong-quan-bien-dong" />
           )}
         </Khoi>
 

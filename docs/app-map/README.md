@@ -1,6 +1,6 @@
 > Load khi: bắt đầu bất kỳ task nào trong repo này và chưa biết phải đọc file nào.
 covers: docs/app-map/**
-last_verified: 2026-09-21
+last_verified: 2026-10-06
 ttl_days: 90
 <!-- re-verified: 2026-09-21 — audit PO: cập nhật số liệu cột "Nội dung" đã cũ (02 "5 màn"→~20 route; 03 "16 bảng/7 migration"→46 migration; 05 "chờ 0003"→0021+0047). Số route/bảng/migration là dữ kiện suy được từ source, không phải invariant — bảng Index chỉ tóm tắt, chi tiết đọc từng file. -->
 
@@ -27,6 +27,7 @@ Cửa vào là [`CLAUDE.md`](../../CLAUDE.md) ở root (quy tắc code, risk tie
 | Truy xuất theo lô bằng QR (hộ chiếu lô `/qr`, gắn lô ở `/wip` + `/packaging`, tem QR) | [`spec/qr-truy-xuat-lo`](../spec/qr-truy-xuat-lo.md) → [34-btp-san-xuat-kho](34-btp-san-xuat-kho.ba-spec.md) · [30-nhap-hang](30-nhap-hang.md) |
 | Nối luồng nhập→sản xuất→kho→bán, tách giao diện bộ phận, daily-task | [`trien-khai/flow-end-to-end-2-bo-phan`](../trien-khai/flow-end-to-end-2-bo-phan.md) |
 | Thêm bảng / cột / migration | [03-database](03-database.md) → [04-tang-du-lieu](04-tang-du-lieu.md) |
+| Thêm BẢNG HIỂN THỊ mới (bảng dữ liệu trên màn) / tô màu dòng "đã dò" / xổ bảng dài | [README design-system § Tô màu dòng](../../src/design-system/README.md#tô-màu-dòng-đã-dò-kiểu-excel) (prop `toMau`, `BangTong xoRa`) → [04-tang-du-lieu](04-tang-du-lieu.md) |
 | Số liệu mất, không lên server, đèn đỏ, reload nuốt dòng | [04-tang-du-lieu](04-tang-du-lieu.md) |
 | Thêm màn hình / đổi điều hướng | [02-pages-navigation](02-pages-navigation.md) → [01-app-structure](01-app-structure.md) |
 | Đăng nhập, phân quyền, tạo tài khoản, vai trò | [05-bao-mat-phan-quyen](05-bao-mat-phan-quyen.md) 🔴 |
@@ -42,7 +43,7 @@ Cửa vào là [`CLAUDE.md`](../../CLAUDE.md) ở root (quy tắc code, risk tie
 |---|---|---|
 | [01-app-structure.md](01-app-structure.md) | Map thư mục `src/` thật, ranh giới import, file nào là ngoại lệ | `src/**` |
 | [02-pages-navigation.md](02-pages-navigation.md) | ~20 route (React Router v7 HashRouter) + nav cây module-centric, gate đăng nhập theo vai trò, màn DEMO gate admin | `src/App.tsx`, `src/main.tsx` |
-| [03-database.md](03-database.md) | Bảng + quy ước đặt tên (English snake_case sau 0016), 46 migration (0001→0047) + thứ tự chạy, trigger updated_at | `supabase/migrations/**` |
+| [03-database.md](03-database.md) | Bảng + quy ước đặt tên (English snake_case sau 0016), 55 migration (0001→0055) + thứ tự chạy, trigger updated_at | `supabase/migrations/**` |
 | [04-tang-du-lieu.md](04-tang-du-lieu.md) | `useBang`, hàng chờ đồng bộ, hoà server↔local, seed, `vaDongCu`, đèn kết nối | `src/lib/repo.ts`, `src/lib/db.ts`, `src/lib/catalogRepo.ts`, `src/lib/connectivity.ts`, `src/lib/supabase.ts` |
 | [05-bao-mat-phan-quyen.md](05-bao-mat-phan-quyen.md) | Đăng nhập Supabase Auth + `user_profiles`/vai trò (nhiều/người), gate app-level + nav-access 2 bộ phận, thiết lập admin, siết RLS 0021 (+0047 cho 5 bảng post-0021) | `src/lib/auth.ts`, `src/lib/username.ts`, `src/features/auth/LoginScreen.tsx`, `src/features/users/UserManagementScreen.tsx`, `supabase/migrations/0006_nguoi_dung.sql`, `0003_siet_rls.sql` |
 | [30-nhap-hang.md](30-nhap-hang.md) | Sổ nhập ngày: chuyến, hai ngày + ghi bù, chốt ngày, phế liệu ngày | `src/features/imports/MaterialImportScreen.tsx`, `src/types.ts` |

@@ -1,6 +1,7 @@
 > Load khi: sửa màn Sổ kho theo tháng (/ton-kho-thang), logic dồn tồn cuối kỳ → đầu kỳ sau, hay công thức tồn cuối/tiền còn lại theo tháng.
 covers: src/features/monthly-stock/MonthlyStockScreen.tsx, src/features/monthly-stock/index.ts, src/lib/monthlyStock.ts, src/lib/monthlyStockExcel.ts
-last_verified: 2026-09-29
+last_verified: 2026-10-06
+<!-- updated: 2026-10-06 — CÂN ĐỐI GHI VÀO SỔ (lib/khoCanDoi.ts): dòng Lấy xả đông ở khối NL Cân đối chọn ĐÍCH DANH một dòng (lô) của sổ ⇒ cột Xuất của lô + dòng vết `⟦CĐ:<id dòng cân đối>:<kg>⟧` trong ghi chú; dòng Gửi đông ⇒ lô RIÊNG id `cd|<id dòng>|<ngày>` nhóm "Nguyên liệu gửi đông" (invoice GĐ-yyyymmdd). Tháng chưa mở ⇒ Cân đối tự kế thừa như nút "Kế thừa & lưu vào sổ". Xem § "Dòng do Cân đối ghi". -->
 ttl_days: 90
 <!-- updated: 2026-09-29 (3) — hộp Đồng bộ danh mục: nút xác nhận "Đồng bộ: n → Mặt hàng · m → Loại NL" chuyển xuống CHÂN hộp (dính đáy khi cuộn, không disabled); ô ánh xạ hiện tên vừa gõ "thêm mới" kèm nhãn "mới"; ô co giãn ở điện thoại. -->
 <!-- updated: 2026-09-29 (2) — Size thành CỘT RIÊNG (bảng xem · lưới Ghi sửa tại ô · phiếu in) thay dòng phụ dưới tên; parser điền ô GỘP dọc cột 0–5 (ngày nhập/invoice gộp cho cả lô nhiều size — trước chỉ dòng đầu có) và đọc KHÔNG cellDates (SheetJS dựng Date lệch giây múi giờ ⇒ ngày lùi 1 ngày ở VN); id nạp không đổi (kiểm file thật). -->
@@ -189,6 +190,15 @@ kê 171 mặt hàng, gõ tìm map "4 DA RÂU NGẮN" vào tên chuẩn (VD "…c
 Kiểm thật (`kho 1000 năm 2026.xlsx`): 144 tên · 2 đã có · **142 chưa có** · 2 nhóm trùng
 cách ghi. ⚠ Tên trong sổ nhiều size/grade (mịn hơn "loại NL" gốc) — cân nhắc bỏ chọn
 bớt + chuẩn hoá trùng-cách-ghi TRƯỚC khi thêm để danh mục khỏi phình/lặp.
+
+## Dòng do Cân đối ghi (2026-10-06)
+
+Khối nguyên liệu của Cân đối có hai dòng kho ghi THẲNG vào sổ này (chi tiết [31-can-doi-ky](31-can-doi-ky.md) § Khối 1: hai dòng kho; hàm thuần `src/lib/khoCanDoi.ts`):
+
+- **Lấy xả đông** = cột **Xuất** của lô được chọn đích danh, theo tháng của ngày lấy. Ghi chú lô có một dòng vết mỗi dòng cân đối: `⟦CĐ:<id dòng>:<kg>⟧ Cân đối <kỳ>: lấy xả đông X kg` — **đừng sửa tay dòng vết**: nó là sổ phân bổ để Cân đối đặt lại số (đọc phần cũ, cộng phần chênh). Sửa tay cột Xuất của lô vẫn được (phần ngoài cân đối).
+- **Gửi đông** = lô riêng `cd|<id dòng>|<ngày>`, nhóm **"Nguyên liệu gửi đông"**, invoice `GĐ-yyyymmdd`, ngày nhập = ngày gửi. Lô này THUỘC dòng cân đối: sửa số ở Cân đối là `inKg` đổi; xoá dòng/xoá kỳ ở Cân đối là lô bị gỡ (lô đã dồn sang tháng sau thì dòng `carry|…` còn lại như mọi dòng dồn kỳ ⇒ cờ lệch dồn kỳ sẽ báo).
+- Tháng chưa mở ⇒ Cân đối tự **kế thừa** tồn cuối tháng trước (`damBaoThang`, cùng `donSangThang`, id `carry|…`) — như bấm "Kế thừa & lưu vào sổ".
+- ⚠ **Nạp lại Excel** tháng có lô bị Cân đối lấy ⇒ cột Xuất + vết trở về số trong file. Cân đối thấy lệch ("Sổ kho tháng lệch n chỗ") và có nút **Ghi lại vào sổ kho** — chỉ bấm khi file Excel CHƯA tính phần lấy xả đông đó (không thì cộng đôi).
 
 ## Cạm bẫy
 

@@ -36,6 +36,7 @@ export default function BangCanDoi({
   kq,
   nhapDaGan,
   sanXuatDaGan,
+  moTaDongKho,
   onClose,
 }: {
   ky: BalancingPeriod;
@@ -47,6 +48,8 @@ export default function BangCanDoi({
   /** So nguon da gan ky — de ban in co cot tung ngay nhu bang giay. */
   nhapDaGan: MaterialImportItem[];
   sanXuatDaGan: WipProductionItem[];
+  /** Lô / kho của dòng Lấy xả đông · Gửi đông (từ Sổ kho tháng). */
+  moTaDongKho?: (r: BalancingInputItem) => string;
   onClose: () => void;
 }) {
   const tenMH = (id: string) => matHang.find((m) => m.id === id)?.name || "—";
@@ -58,6 +61,13 @@ export default function BangCanDoi({
   const hangNL = dungHangNL(nlVao, nhapDaGan).sort((a, b) => thuTu(a) - thuTu(b));
   /* Cột chuyển kỳ đã bỏ ở khối NL — chỉ in khi kỳ cũ lỡ có số. */
   const coChuyenKyCu = hangNL.some((r) => r.chuyenKy !== 0);
+  const nlTheoId = new Map(nlVao.map((r) => [r.id, r]));
+  const tenDongKho = (r: HangLuoiNL) => {
+    const goc = nlTheoId.get(r.id);
+    const mt = goc && moTaDongKho ? moTaDongKho(goc) : "";
+    const ten = r.loaiKho && r.ten !== TEN_DONG_KHO[r.loaiKho] ? `${TEN_DONG_KHO[r.loaiKho]} · ${r.ten}` : r.ten;
+    return mt ? `${ten} — ${mt}` : ten;
+  };
   const hangTP = dungHangTP(tp, sanXuatDaGan);
   /* Nhieu cot ngay ⇒ in NGANG, neu khong bang bi cat mat cot cuoi. */
   const inNgang = ngay.length > 3;
@@ -131,17 +141,18 @@ export default function BangCanDoi({
           <table className="w-full border-collapse text-sm">
             <thead>
               <Tr head>
+                {/* Như file cân đối (cột A–E): số chính sát tên, chia ngày (nếu mở) ra sau. */}
                 <Th>Loại hàng</Th>
+                <Th right>Số lượng</Th>
+                {!anTien && <Th right>Đơn giá VNĐ</Th>}
+                {!anTien && <Th right>T.tiền (đồng)</Th>}
+                {!anTien && <Th right>tỷ lệ</Th>}
                 {cotNgayNL.map((iso) => (
                   <Th key={iso} right>
                     {nhanNgay(iso)}
                   </Th>
                 ))}
                 {moNgayNL && coChuyenKyCu && <Th right>Chuyển kỳ (cũ)</Th>}
-                <Th right>Số lượng</Th>
-                {!anTien && <Th right>Đơn giá VNĐ</Th>}
-                {!anTien && <Th right>T.tiền (đồng)</Th>}
-                {!anTien && <Th right>tỷ lệ</Th>}
               </Tr>
             </thead>
             <tbody>
@@ -149,7 +160,7 @@ export default function BangCanDoi({
                 <Tr key={r.id}>
                   <Td>
                     {r.loaiKho ? (
-                      <strong>{r.ten === TEN_DONG_KHO[r.loaiKho] ? r.ten : `${TEN_DONG_KHO[r.loaiKho]} · ${r.ten}`}</strong>
+                      <strong>{tenDongKho(r)}</strong>
                     ) : (
                       <>
                         {r.ten}
@@ -159,34 +170,34 @@ export default function BangCanDoi({
                       </>
                     )}
                   </Td>
-                  {cotNgayNL.map((iso) => (
-                    <Td key={iso} right>
-                      {r.theoNgay[iso] ? num(r.theoNgay[iso]) : ""}
-                    </Td>
-                  ))}
-                  {moNgayNL && coChuyenKyCu && <Td right>{r.chuyenKy ? num(r.chuyenKy) : ""}</Td>}
                   <Td right>{num(r.tong)}</Td>
                   {!anTien && <Td right>{num(r.donGia)}</Td>}
                   {/* Chưa khai đơn giá thì để trống — "-0" (dòng giảm × giá 0)
                       đọc như một con số thật, người xem bảng in sẽ tưởng lỗi. */}
                   {!anTien && <Td right>{r.donGia ? num(r.tong * r.donGia) : ""}</Td>}
                   {!anTien && <Td right>{r.tyLe != null ? `${num(r.tyLe)}%` : ""}</Td>}
+                  {cotNgayNL.map((iso) => (
+                    <Td key={iso} right>
+                      {r.theoNgay[iso] ? num(r.theoNgay[iso]) : ""}
+                    </Td>
+                  ))}
+                  {moNgayNL && coChuyenKyCu && <Td right>{r.chuyenKy ? num(r.chuyenKy) : ""}</Td>}
                 </Tr>
               ))}
               <Tr total>
                 <Td>T. CỘNG</Td>
-                {cotNgayNL.map((iso) => (
-                  <Td key={iso} right>
-                    {num(hangNL.reduce((s, r) => s + (r.theoNgay[iso] ?? 0), 0))}
-                  </Td>
-                ))}
-                {moNgayNL && coChuyenKyCu && <Td right>{num(hangNL.reduce((s, r) => s + r.chuyenKy, 0))}</Td>}
                 <Td right>{num(kq.totalInputKg)}</Td>
                 {!anTien && (
                   <Td right>{kq.totalInputKg ? num(Math.round(kq.materialValue / kq.totalInputKg) || 0) : ""}</Td>
                 )}
                 {!anTien && <Td right>{num(kq.materialValue)}</Td>}
                 {!anTien && <Td right></Td>}
+                {cotNgayNL.map((iso) => (
+                  <Td key={iso} right>
+                    {num(hangNL.reduce((s, r) => s + (r.theoNgay[iso] ?? 0), 0))}
+                  </Td>
+                ))}
+                {moNgayNL && coChuyenKyCu && <Td right>{num(hangNL.reduce((s, r) => s + r.chuyenKy, 0))}</Td>}
               </Tr>
             </tbody>
           </table>

@@ -24,8 +24,10 @@ import {
   useSalesInvoices,
   useBalancingOutputs,
   useMaterialImports,
+  useMonthlyStock,
   useWipProductions,
 } from "@/lib/catalogRepo";
+import { dongBoSoKho } from "@/lib/khoCanDoi";
 import { usePeriodGrid } from "./usePeriodGrid";
 import { LuoiNguyenLieu } from "./MaterialGrid";
 import { hoNguyenLieu } from "@/lib/balancingGrid";
@@ -103,6 +105,8 @@ export default function CanDoiScreen() {
   /* Hai sổ nguồn: kỳ chỉ MƯỢN dòng của chúng bằng `balancingPeriodId`. */
   const [tatCaNhap, ghiNhap] = useMaterialImports();
   const [tatCaSanXuat, ghiSanXuat] = useWipProductions();
+  /* Sổ kho tháng: dòng Lấy xả đông / Gửi đông của kỳ đã ghi thẳng vào đây. */
+  const [soKho, ghiSoKho] = useMonthlyStock();
 
   /** Gõ loại mới trong ô chọn → LƯU LUÔN vào danh mục (rule 7), không để mồ côi. */
   const themLoaiNL = (ten: string) => {
@@ -186,6 +190,19 @@ export default function CanDoiScreen() {
     const truocTP = tatCaTP;
     const truocNhap = tatCaNhap;
     const truocSanXuat = tatCaSanXuat;
+    const truocKho = soKho;
+    /* Trả lại Sổ kho tháng phần kỳ này đã lấy xả đông (cột xuất của lô) / gửi đông (lô
+       gửi theo ngày) — xoá kỳ mà để nguyên thì tồn kho lệch vĩnh viễn. */
+    const traKho = dongBoSoKho(
+      soKho,
+      tatCaNL.filter((r) => r.periodId === k.id),
+      [],
+      {
+        nhanKy: `${k.materialTypeName} ${k.dateRangeDescription ?? ""}`.trim(),
+        hoNL: hoNguyenLieu(k.materialTypeName),
+      }
+    );
+    if (traKho.doi) ghiSoKho(traKho.lines);
     persistKy(kyList.filter((x) => x.id !== k.id));
     ghiNL(tatCaNL.filter((r) => r.periodId !== k.id));
     /* Phế liệu cân ở màn Nhập hàng chỉ MƯỢN kỳ này — xóa kỳ thì gỡ liên kết,
@@ -221,6 +238,7 @@ export default function CanDoiScreen() {
         ghiTP(truocTP);
         ghiNhap(truocNhap);
         ghiSanXuat(truocSanXuat);
+        if (traKho.doi) ghiSoKho(truocKho);
       }
     );
   };
@@ -597,41 +615,16 @@ function KyDetail({
         </div>
       </div>
 
-      <Card className="p-5">
-        <h2 className="mb-4 text-xl font-semibold">Thông số kỳ</h2>
-        <div className="grid gap-6 sm:grid-cols-3">
-          <NumberField
-            label="Tổng NL nhận cả kỳ"
-            unit="kg"
-            anNhanBatBuoc
-            value={ky.totalInputKg}
-            onChange={(v) => onChangeKy({ totalInputKg: v })}
-          />
-          <NumberField
-            label="Chi phí chế biến / kg TP"
-            unit="đ"
-            anNhanBatBuoc
-            value={ky.processingCostPerKg}
-            onChange={(v) => onChangeKy({ processingCostPerKg: v })}
-          />
-          <NumberField
-            label="Tỉ giá"
-            unit="đ/USD"
-            anNhanBatBuoc
-            value={ky.exchangeRate}
-            onChange={(v) => onChangeKy({ exchangeRate: v })}
-          />
-        </div>
-      </Card>
-
       {/* Hai khối trong MỘT tờ: cùng khung, cùng công tắc cột ngày, chỉ ngăn nhau
           bằng một đường kẻ — đọc như một bảng cân đối liền mạch. */}
-      {/* Xếp ngang (mặc định, từ 2xl): cột trái = khối NL + ô GHI CHÚ kết quả, cột phải
-          = khối BTP — dóng theo bảng cân đối giấy. Màn hẹp hơn: NL → BTP → GHI CHÚ. */}
+      {/* Xếp ngang (mặc định, từ 2xl) theo file cân đối của kế toán: hàng trên = khối NL
+          (cột A–E) cạnh ô GHI CHÚ (cột K–L) — hai khối hẹp, đứng chung thì THẤY HẾT,
+          không cắt cột tiền như khi NL chia đôi hàng với khối BTP; hàng dưới = khối BTP
+          trải hết bề ngang (nhiều cột: khách, giá, ngày, Trả, Nợ). Màn hẹp: NL → GHI CHÚ → BTP. */}
       <Card
         className={
           xepNgang
-            ? "grid grid-cols-1 overflow-hidden p-0 2xl:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] 2xl:grid-rows-[auto_1fr]"
+            ? "grid grid-cols-1 overflow-hidden p-0 2xl:grid-cols-[minmax(0,1fr)_minmax(20rem,24rem)]"
             : "overflow-hidden p-0"
         }
       >
@@ -649,13 +642,17 @@ function KyDetail({
             return ten;
           }}
         />
-        <div
-          className={
-            xepNgang
-              ? "2xl:col-start-2 2xl:row-span-2 2xl:row-start-1 2xl:border-l-2 2xl:border-border 2xl:[&>section]:border-t-0"
-              : undefined
-          }
-        >
+        <GhiChuKetQua
+          ky={ky}
+          kyTruoc={luoi.kyTruoc}
+          kq={kq}
+          chuaCoTP={chuaCoTP}
+          lechNL={lechNL}
+          xepNgang={xepNgang}
+          daChot={luoi.daChot}
+          onChangeKy={onChangeKy}
+        />
+        <div className={xepNgang ? "2xl:col-span-2" : undefined}>
           <LuoiBanThanhPham
             luoi={luoi}
             matHang={matHang}
@@ -680,7 +677,6 @@ function KyDetail({
             }}
           />
         </div>
-        <GhiChuKetQua ky={ky} kq={kq} chuaCoTP={chuaCoTP} lechNL={lechNL} xepNgang={xepNgang} />
       </Card>
 
       {/* Vòng gối đầu: phần kỳ trước đẩy sang được kéo vào đây bằng một nút, thay
@@ -756,6 +752,7 @@ function KyDetail({
           kq={kq}
           nhapDaGan={luoi.nhapDaGan}
           sanXuatDaGan={luoi.sanXuatDaGan}
+          moTaDongKho={luoi.moTaDongKho}
           onClose={() => setShowBang(false)}
         />
       )}
@@ -766,98 +763,174 @@ function KyDetail({
 }
 
 /**
- * Ô "GHI CHÚ" của bảng cân đối giấy (cột K–L): kết quả xếp ĐÚNG thứ tự kế toán quen đọc —
- * Tổng thành phẩm · Định mức chế biến · Chi phí CB/kg TP · Giá thành · Giá trị xuất ·
- * Lãi/Lỗ · Bình quân/kg NL · tỉ giá. Phần phụ (NL vào, giá trị NL, thu hồi) để sau.
+ * Ô "GHI CHÚ" của file cân đối kế toán (cột K–L): đúng thứ tự kế toán đọc — Tổng thành
+ * phẩm · Định mức chế biến · Chi phí CB/kg TP · Giá thành · Giá trị xuất · Lãi/Lỗ ·
+ * Bình quân/kg NL · tỉ giá; phần phụ: NL vào · giá trị NL · NL nhận · thu hồi.
+ *
+ * Số ĐẦU VÀO của kỳ (chi phí CB, tỉ giá, NL nhận) sửa NGAY TẠI CHỖ hiển thị — bỏ thẻ
+ * "Thông số kỳ" riêng (trước đây một chỗ sửa, một chỗ xem). Ô sửa được trông như ô
+ * nhập; khác kỳ trước cùng họ NL thì ghi "kỳ trước …" để biết số đã đổi.
  */
 function GhiChuKetQua({
   ky,
+  kyTruoc,
   kq,
   chuaCoTP,
   lechNL,
   xepNgang,
+  daChot,
+  onChangeKy,
 }: {
   ky: BalancingPeriod;
+  kyTruoc: BalancingPeriod | null;
   kq: BalancingResult;
   chuaCoTP: boolean;
   lechNL: number | null;
   xepNgang: boolean;
+  daChot: boolean;
+  onChangeKy: (patch: Partial<BalancingPeriod>) => void;
 }) {
+  const lai = kq.profitOrLoss >= 0;
   return (
     <section
-      className={`border-t-2 border-border p-5 ${xepNgang ? "2xl:col-start-1 2xl:row-start-2" : ""}`}
+      className={`border-t-2 border-border p-5 ${xepNgang ? "2xl:border-t-0 2xl:border-l-2" : ""}`}
       aria-label="Ghi chú — kết quả cân đối"
     >
-      <h2 className="mb-3 text-xl font-semibold">Ghi chú</h2>
-      {/* Xếp ngang (2xl) ô này nằm ở cột trái hẹp (~500px) ⇒ về MỘT cột, không thì
-          nhãn + số gãy dòng và số tiền dài tràn khung ở chữ 130%. */}
-      <div className={`grid gap-x-8 gap-y-1 sm:grid-cols-2 ${xepNgang ? "2xl:grid-cols-1" : ""}`}>
+      <h2 className="mb-2 text-xl font-semibold">Ghi chú</h2>
+      {/* Xếp ngang (2xl) ô này là cột phải hẹp (20–24rem) ⇒ về MỘT cột, không thì nhãn +
+          số gãy dòng và số tiền dài tràn khung ở chữ 130%. */}
+      <div className={`grid gap-x-8 sm:grid-cols-2 ${xepNgang ? "2xl:grid-cols-1" : ""}`}>
         <div>
           <KV k="Tổng thành phẩm" v={`${num(kq.totalOutputKg)} kg`} />
           <KV k="Định mức chế biến" v={chuaCoTP ? "—" : num(kq.norm)} strong />
-          <KV k="Chi phí CB / kg TP" v={ky.processingCostPerKg == null ? "—" : `${num(ky.processingCostPerKg)} đ`} />
+          <KVNhap
+            k="Chi phí CB / kg TP"
+            unit="đ"
+            value={ky.processingCostPerKg}
+            truoc={kyTruoc?.processingCostPerKg}
+            khoa={daChot}
+            onChange={(v) => onChangeKy({ processingCostPerKg: v })}
+          />
           <KV k="Giá thành" v={`${num(kq.costOfGoods)} đ`} />
           <KV k="Giá trị xuất" v={`${num(kq.exportValue)} đ`} />
           <KV
-            k={chuaCoTP ? "Lãi / Lỗ" : kq.profitOrLoss >= 0 ? "Lãi" : "Lỗ"}
+            k={chuaCoTP ? "Lãi / Lỗ" : lai ? "Lãi" : "Lỗ"}
             v={chuaCoTP ? "—" : `${num(Math.abs(kq.profitOrLoss))} đ`}
+            mau={chuaCoTP ? undefined : lai ? "lai" : "lo"}
             strong
           />
           <KV k="Bình quân / kg NL" v={chuaCoTP ? "—" : `${num(kq.avgProfitPerKgMaterial)} đ`} />
-          <KV k="Tỉ giá" v={ky.exchangeRate == null ? "—" : `${num(ky.exchangeRate)} đ/USD`} />
+          <KVNhap
+            k="Tỉ giá"
+            unit="đ/USD"
+            value={ky.exchangeRate}
+            truoc={kyTruoc?.exchangeRate}
+            khoa={daChot}
+            onChange={(v) => onChangeKy({ exchangeRate: v })}
+          />
         </div>
         <div>
-          <KV k="Tổng nguyên liệu vào" v={`${num(kq.totalInputKg)} kg`} />
-          <KV k="Giá trị nguyên liệu" v={`${num(kq.materialValue)} đ`} />
+          <KV k="Tổng NL vào" v={`${num(kq.totalInputKg)} kg`} />
+          <KV k="Giá trị NL" v={`${num(kq.materialValue)} đ`} />
+          <KVNhap
+            k="Tổng NL nhận cả kỳ"
+            unit="kg"
+            value={ky.totalInputKg}
+            khoa={daChot}
+            onChange={(v) => onChangeKy({ totalInputKg: v })}
+            ghiChu={
+              /* Đối chiếu NL nhận (bảng phụ) với NL vào lưới — bắt chỗ vênh khỏi nhẩm tay. */
+              lechNL == null ? undefined : lechNL === 0 ? (
+                <span className="text-success">✓ khớp NL vào</span>
+              ) : (
+                <span className="text-destructive">⚠ lệch NL vào {num(lechNL)} kg</span>
+              )
+            }
+          />
           <KV k="Tỉ lệ thu hồi" v={kq.yieldRate == null ? "—" : num(kq.yieldRate)} />
         </div>
       </div>
-      {/* Badge lệch: đối chiếu Tổng NL nhận (thông số) với NL vào lưới — bắt
-          nhanh chỗ vênh mà không phải nhẩm tay. */}
-      {lechNL != null &&
-        (lechNL === 0 ? (
-          <div className="mt-4 rounded-lg bg-success-surface px-4 py-2.5 text-base font-medium text-success">
-            ✓ NL nhận khớp NL vào
-          </div>
-        ) : (
-          <div className="mt-4 rounded-lg bg-warning-surface px-4 py-2.5 text-base font-medium text-destructive">
-            ⚠ Lệch NL nhận − NL vào: <span className="tnum font-semibold">{num(lechNL)} kg</span>
-          </div>
-        ))}
-      {/* Chưa nhập bán thành phẩm thì KHÔNG kết luận lãi/lỗ — nếu không màn sẽ
-          báo "Lỗ = toàn bộ tiền nguyên liệu" (đỏ, hù người dùng) dù kỳ mới nhập
-          được một nửa. */}
-      {chuaCoTP ? (
-        <div className="mt-5 rounded-lg bg-muted px-5 py-4 text-base font-medium text-muted-foreground">
-          Chưa có bán thành phẩm — chưa tính lãi/lỗ.
-        </div>
-      ) : (
-        <div
-          className={`mt-5 rounded-lg px-5 py-4 text-xl font-semibold ${
-            kq.profitOrLoss >= 0
-              ? "bg-success-surface text-success"
-              : "bg-warning-surface text-destructive"
-          }`}
-        >
-          {kq.profitOrLoss >= 0 ? "▲ Lãi" : "▼ Lỗ"}:{" "}
-          <span className="tnum">{num(Math.abs(kq.profitOrLoss))}</span> đ
-        </div>
-      )}
     </section>
   );
 }
 
-function KV({ k, v, strong }: { k: string; v: string; strong?: boolean }) {
+function KV({
+  k,
+  v,
+  strong,
+  mau,
+}: {
+  k: string;
+  v: string;
+  strong?: boolean;
+  mau?: "lai" | "lo";
+}) {
   return (
-    <div className="flex items-baseline justify-between gap-4 border-b border-border py-2.5">
-      <span className="min-w-0 text-base text-muted-foreground">{k}</span>
+    <div className="flex items-baseline justify-between gap-4 border-b border-border py-1.5">
+      <span className="min-w-0 text-sm text-muted-foreground">{k}</span>
       <span
-        className={`tnum shrink-0 whitespace-nowrap text-right ${
-          strong ? "text-xl font-semibold text-primary" : "text-base font-medium"
-        }`}
+        className={`tnum shrink-0 whitespace-nowrap text-right text-base ${
+          strong ? "font-semibold" : "font-medium"
+        } ${mau === "lai" ? "text-success" : mau === "lo" ? "text-destructive" : strong ? "text-primary" : ""}`}
       >
         {v}
       </span>
+    </div>
+  );
+}
+
+/**
+ * Dòng GHI CHÚ là số ĐẦU VÀO: nhãn nhìn thấy (gắn với ô) + ô nhập ngay bên phải, sửa
+ * là kết quả tính lại tức thì. Kỳ đã chốt ⇒ chỉ hiện số.
+ */
+function KVNhap({
+  k,
+  unit,
+  value,
+  truoc,
+  khoa,
+  onChange,
+  ghiChu,
+}: {
+  k: string;
+  unit: string;
+  value: number | null;
+  /** Giá trị kỳ trước cùng họ NL — khác thì báo để người dùng biết số đã đổi. */
+  truoc?: number | null;
+  khoa: boolean;
+  onChange: (v: number | null) => void;
+  ghiChu?: React.ReactNode;
+}) {
+  const doi = truoc != null && value != null && truoc !== value;
+  return (
+    <div className="border-b border-border py-1.5">
+      {khoa ? (
+        <KVKhung k={k} v={value == null ? "—" : `${num(value)} ${unit}`} />
+      ) : (
+        <NumberField
+          label={k}
+          anNhanBatBuoc
+          unit={unit}
+          value={value}
+          onChange={onChange}
+          className="flex-row flex-wrap items-center justify-between gap-x-4 gap-y-1 [&>div:last-child]:w-44"
+        />
+      )}
+      {(doi || ghiChu) && (
+        <p className="mt-0.5 flex flex-wrap justify-end gap-x-3 text-right text-sm text-muted-foreground">
+          {doi && <span>kỳ trước {num(truoc)} {unit}</span>}
+          {ghiChu}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function KVKhung({ k, v }: { k: string; v: string }) {
+  return (
+    <div className="flex items-baseline justify-between gap-4">
+      <span className="min-w-0 text-sm text-muted-foreground">{k}</span>
+      <span className="tnum shrink-0 whitespace-nowrap text-right text-base font-medium">{v}</span>
     </div>
   );
 }

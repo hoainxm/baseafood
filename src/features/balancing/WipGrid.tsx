@@ -377,20 +377,20 @@ export function LuoiBanThanhPham({
         <div className="flex flex-wrap gap-2">
           {sanXuatChoHut.length > 0 && (
             <Button
-              title="Hút mọi dòng sản lượng trong khoảng ngày của kỳ từ sổ sản xuất vào lưới này." size="lg" onClick={hutSanXuat}>
+              title="Hút mọi dòng sản lượng trong khoảng ngày của kỳ từ sổ sản xuất vào lưới này." onClick={hutSanXuat}>
               <Download />
               Lấy {sanXuatChoHut.length} dòng từ sổ sản xuất
             </Button>
           )}
           {choHutBan.length > 0 && (
             <Button
-              title="Hút các dòng bán trong khoảng ngày của kỳ từ sổ bán hàng vào lưới này." variant="outline" size="lg" onClick={() => onHutBan(choHutBan)}>
+              title="Hút các dòng bán trong khoảng ngày của kỳ từ sổ bán hàng vào lưới này." variant="outline" onClick={() => onHutBan(choHutBan)}>
               <Download />
               Lấy {choHutBan.length} dòng từ sổ bán
             </Button>
           )}
           <Button
-            title="Ẩn / hiện các cột chia theo ngày. Ẩn đi thì bảng gọn, chỉ còn cột tổng." variant="outline" size="lg" onClick={onDoiAnNgay}>
+            title="Ẩn / hiện các cột chia theo ngày. Ẩn đi thì bảng gọn, chỉ còn cột tổng." variant="outline" onClick={onDoiAnNgay}>
             <ChevronsLeftRight />
             {anNgay ? "Mở cột ngày" : "Thu cột ngày"}
           </Button>
@@ -398,7 +398,6 @@ export function LuoiBanThanhPham({
             <Button
               title="Ẩn / hiện các dòng chưa có số (dòng mẫu và dòng 0 kg) để xem gọn như bản in."
               variant="outline"
-              size="lg"
               aria-pressed={anDongTrong}
               onClick={() => setAnDongTrong((v) => !v)}
             >
@@ -407,7 +406,7 @@ export function LuoiBanThanhPham({
             </Button>
           )}
           <Button
-            title="Thêm tay một mặt hàng vào lưới thành phẩm của kỳ." variant="outline" size="lg" onClick={() => setThemMo(true)}>
+            title="Thêm tay một mặt hàng vào lưới thành phẩm của kỳ." variant="outline" onClick={() => setThemMo(true)}>
             <Plus />
             Thêm mặt hàng
           </Button>

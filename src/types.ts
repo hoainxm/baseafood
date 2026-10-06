@@ -334,6 +334,13 @@ export interface BalancingInputItem {
   isReduction?: boolean;
   reductionWarehouseId?: string;
   autoSource?: GridAutoSource;
+  /**
+   * Dòng LẤY XẢ ĐÔNG: id dòng Sổ kho tháng (LÔ) chọn đích danh để lấy (mig 0053).
+   * Tháng sau của cùng lô theo chuỗi dồn kỳ `carry|<id>` — xem lib/khoCanDoi.ts.
+   */
+  stockLineId?: string;
+  /** Dòng GỬI ĐÔNG: kho nhận `"<sổ kho>|<vị trí>"` (mig 0053), VD "Kho 1500 tấn|Kho Hồng Phú". */
+  stockLocation?: string;
 }
 
 export type ScrapSource = "Nhập hàng" | "Cân đối";

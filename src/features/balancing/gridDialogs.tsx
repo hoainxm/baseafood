@@ -8,6 +8,7 @@ import type { Customer, MaterialImportItem, Product, SalesChannel } from "@/type
 import {
   Button,
   Combobox,
+  ConfirmDelete,
   Dialog,
   DialogContent,
   DialogDescription,
@@ -21,7 +22,8 @@ import {
   notify,
 } from "@/design-system";
 import { num, viDate } from "@/lib/format";
-import { KHACH_KHAC } from "@/lib/balancingGrid";
+import { KHACH_KHAC, type HangLuoiNL } from "@/lib/balancingGrid";
+import { Trash2 } from "lucide-react";
 
 /* ---------- Thêm dòng nguyên liệu / dòng giảm ---------- */
 
@@ -217,6 +219,83 @@ export function HopChonDongNhap({
             }}
           >
             Đưa {chon.size} dòng vào kỳ
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/* ---------- Sửa / xoá dòng nhập tay của khối nguyên liệu ---------- */
+
+/**
+ * Gom việc ít làm (xoá dòng tay, đổi kho nhận của dòng giảm) vào MỘT hộp — trước
+ * đây là một dải thẻ dưới lưới lặp lại tên mọi dòng, làm khối nguyên liệu rối mắt.
+ */
+export function HopDongNhapTay({
+  dong,
+  tenDong,
+  khoXuong,
+  onDoiKho,
+  onXoa,
+  onClose,
+}: {
+  dong: HangLuoiNL[];
+  tenDong: (h: HangLuoiNL) => string;
+  khoXuong: { value: string; label: string }[];
+  onDoiKho: (id: string, kho: string) => void;
+  onXoa: (id: string) => void;
+  onClose: () => void;
+}) {
+  return (
+    <Dialog open onOpenChange={(v) => !v && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Dòng nhập tay</DialogTitle>
+          <DialogDescription>
+            Dòng lấy từ sổ nhập hàng không xoá ở đây — sửa ở màn Nhập hàng.
+          </DialogDescription>
+        </DialogHeader>
+        <ul className="divide-y divide-border">
+          {dong.map((h) => (
+            <li key={h.id} className="flex flex-wrap items-center gap-3 py-2">
+              <span className="min-w-0 flex-1">
+                {tenDong(h)}
+                <span className="tnum ml-2 text-sm text-muted-foreground">{num(h.tong)} kg</span>
+              </span>
+              {h.laGiam && !h.loaiKho && (
+                <Combobox
+                  label={`Kho nhận — ${tenDong(h)}`}
+                  anNhan
+                  value={h.khoGiam}
+                  onChange={(v) => onDoiKho(h.id, v)}
+                  options={khoXuong}
+                  placeholder="Chọn kho nhận"
+                  choPhepXoa={false}
+                  className="w-48"
+                />
+              )}
+              <ConfirmDelete
+                moTaBanGhi={`${tenDong(h)} — ${num(h.tong)} kg`}
+                onConfirm={() => onXoa(h.id)}
+                trigger={
+                  <Button
+                    title="Xoá dòng này khỏi lưới của kỳ (có Hoàn tác)."
+                    variant="ghost"
+                    size="sm"
+                    className="min-h-11 min-w-11"
+                    aria-label={`Xoá dòng ${tenDong(h)}`}
+                  >
+                    <Trash2 />
+                  </Button>
+                }
+              />
+            </li>
+          ))}
+        </ul>
+        <DialogFooter>
+          <Button variant="outline" size="lg" onClick={onClose}>
+            Đóng
           </Button>
         </DialogFooter>
       </DialogContent>

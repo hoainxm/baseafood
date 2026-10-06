@@ -32,7 +32,7 @@ src/
 ├── design-system/            tokens.css · patterns/ · kit/ · index.ts (cửa import duy nhất)
 └── features/                 THẬT: imports · production/WipProductionScreen (/wip) · packaging (/packaging) · warehouse · orders · sales · balancing · catalog · reports/NXT · auth · users
                               DEMO (dữ liệu mẫu): production/WorkOrderScreen (/production) · reports · quality · traceability · cold-storage (hybrid: tồn THẬT, nhiệt độ minh hoạ)
-supabase/migrations/          0001 … 0052 (đã chạy trên DB thật tới 0052 — `0052` cột Nợ cân đối (`balancing_outputs.debt_kg`) chạy 2026-10-06 (2 lần); `0051` bột tẩm chạy 2026-10-06 (2 lần, idempotent); rà cột 2026-10-02: `0040` chạy bù 2026-10-02; `0028` chạy bù 2026-10-02 (trước đó thiếu `production_locks.leftover_kg` ⇒ mọi lần chốt ngày SX bị từ chối), xem [03-database](docs/app-map/03-database.md); RIÊNG `0029` bảng `packagings` bị sót, chạy bù 2026-09-30 kèm RLS mẫu `0021` + trigger `0048` — xem [03-database](docs/app-map/03-database.md))
+supabase/migrations/          0001 … 0053 (đã chạy trên DB thật tới 0053 — `0053` lô/kho của 2 dòng kho cân đối (`balancing_inputs.stock_line_id`, `stock_location`) + `0052` cột Nợ cân đối (`balancing_outputs.debt_kg`) chạy 2026-10-06 (2 lần); `0051` bột tẩm chạy 2026-10-06 (2 lần, idempotent); rà cột 2026-10-02: `0040` chạy bù 2026-10-02; `0028` chạy bù 2026-10-02 (trước đó thiếu `production_locks.leftover_kg` ⇒ mọi lần chốt ngày SX bị từ chối), xem [03-database](docs/app-map/03-database.md); RIÊNG `0029` bảng `packagings` bị sót, chạy bù 2026-09-30 kèm RLS mẫu `0021` + trigger `0048` — xem [03-database](docs/app-map/03-database.md))
 docs/README.md                bản đồ tài liệu — doc nào ở đâu, doc mới bỏ đâu
 docs/app-map/                 bản đồ ngữ cảnh cho agent (đọc khi CODE)
 docs/ops/                     vận hành: cutover Supabase · deploy Vercel · env
@@ -98,7 +98,7 @@ Chưa rõ tier ⇒ coi là 🔴. Dữ liệu ở đây là **sổ sách thật c
 |---|---|
 | `features/MaterialImportScreen.tsx`, quy tắc chuyến / chốt ngày | [`30-nhap-hang.md`](docs/app-map/30-nhap-hang.md) |
 | `features/SalesScreen.tsx`, phiếu bán / quy cách / hút bán | [`33-ban-hang.md`](docs/app-map/33-ban-hang.md) |
-| `features/BalancingScreen.tsx`, `BalancingTable.tsx`, `lib/balancingCalc.ts` | [`31-can-doi-ky.md`](docs/app-map/31-can-doi-ky.md) |
+| `features/BalancingScreen.tsx`, `BalancingTable.tsx`, `lib/balancingCalc.ts`, `lib/khoCanDoi.ts` (2 dòng kho ghi Sổ kho tháng) | [`31-can-doi-ky.md`](docs/app-map/31-can-doi-ky.md) (+ [`36`](docs/app-map/36-so-kho-thang.md)) |
 | `features/CatalogScreen.tsx`, `FinishedGoodScreen.tsx`, `data/thanh-pham.json` | [`32-danh-muc.md`](docs/app-map/32-danh-muc.md) |
 | `features/monthly-stock/**`, `lib/monthlyStock.ts`, `lib/monthlyStockExcel.ts` (sổ kho theo tháng, dồn kỳ, nhập Excel bảng kê) | [`36-so-kho-thang.md`](docs/app-map/36-so-kho-thang.md) |
 | `features/doi-soat/**`, `lib/doiSoat*.ts` (đối soát HĐĐT ⇄ sổ kế toán · so hai bản HĐĐT · kiểm cộng cột · lọc cùng MST cùng ngày — 4 kiểu chọn trên màn; xuất Excel giữ định dạng gốc + bám bố cục file mẫu) | [`37-doi-soat-hddt.md`](docs/app-map/37-doi-soat-hddt.md) |
@@ -120,7 +120,7 @@ Cổng là những cái này, **chạy thật, không suy đoán** (test mới v
 | Đụng vào | Bắt buộc |
 |---|---|
 | Bất cứ file `.ts` / `.tsx` nào | `npm run build` + `npm run lint` + `npm test` (CI cũng chạy đủ 3) |
-| `lib/balancingCalc.ts`, `lib/inventory.ts`, `lib/botTam.ts`, `imports/importHelpers.ts`, `production/wipHelpers.ts` | **sửa test đi kèm** (`*.test.ts` cùng thư mục) — AC = test |
+| `lib/balancingCalc.ts`, `lib/inventory.ts`, `lib/botTam.ts`, `lib/khoCanDoi.ts`, `imports/importHelpers.ts`, `production/wipHelpers.ts` | **sửa test đi kèm** (`*.test.ts` cùng thư mục) — AC = test |
 | `lib/balancingCalc.ts` hay công thức | Mở một kỳ có số liệu, đối chiếu tay: định mức = NL÷TP; lãi/lỗ = giá trị xuất − giá thành |
 | `lib/repo.ts` / hàng chờ / `AnhXaBang` | Thử **cả hai chế độ** (có `.env` và không); ghi khi ngắt mạng rồi nối lại — dòng phải lên server, reload không nuốt dòng |
 | Màn Nhập hàng | Ghi 1 chuyến 2 dòng → chốt ngày → ghi bù (phải bắt lý do) → mở lại; kiểm tổng ngày + cảnh báo lệch |

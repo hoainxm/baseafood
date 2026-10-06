@@ -417,6 +417,10 @@ export const BANG_BALANCING_INPUT: AnhXaBang<BalancingInputItem> = {
     is_reduction: x.isReduction ?? false,
     reduction_warehouse_id: x.reductionWarehouseId ?? "",
     auto_source: x.autoSource ?? "",
+    // Cột 0053 (lô lấy / kho gửi của 2 dòng kho): CHỈ gửi khi trường có giá trị —
+    // DB chưa chạy 0053 thì dòng cũ vẫn lên máy chủ (khuôn 0052 / nguon_kho 0008).
+    ...(x.stockLineId != null ? { stock_line_id: x.stockLineId } : {}),
+    ...(x.stockLocation != null ? { stock_location: x.stockLocation } : {}),
   }),
   fromRow: (r) => ({
     id: s(r.id),
@@ -433,6 +437,8 @@ export const BANG_BALANCING_INPUT: AnhXaBang<BalancingInputItem> = {
     isReduction: Boolean(r.is_reduction),
     reductionWarehouseId: s(r.reduction_warehouse_id),
     autoSource: s(r.auto_source) as GridAutoSource,
+    stockLineId: r.stock_line_id == null ? undefined : s(r.stock_line_id),
+    stockLocation: r.stock_location == null ? undefined : s(r.stock_location),
   }),
   // Dòng ghi trước 0019 chưa có cột lưới ngày → mặc định rỗng, không vỡ tổng.
   vaDongCu: (x) => ({

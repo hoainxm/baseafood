@@ -10,8 +10,10 @@ import type {
   BalancingPeriod,
   DailyQuantities,
   MaterialImportItem,
+  MonthlyStockLine,
   WipProductionItem,
 } from "@/types";
+import { BSF1_WAREHOUSES } from "@/types";
 import { uid } from "@/lib/db";
 import { num, todayISO, viDate } from "@/lib/format";
 import { notify } from "@/design-system";
@@ -49,9 +51,20 @@ import {
   useBalancingPeriods,
   useMaterialImports,
   useMaterialOpeningStock,
+  useMonthlyStock,
   useProductionLocks,
+  useStorageLocations,
   useWipProductions,
 } from "@/lib/catalogRepo";
+import {
+  danhSachKhoGui,
+  danhSachLo,
+  dongBoSoKho,
+  soChoLechSoKho,
+  tachKhoGui,
+  thangCuaNgay,
+  type LuaChonLo,
+} from "@/lib/khoCanDoi";
 import { conDoTheoNgay, tinhSoTonNL, type SoTonNLKy } from "@/lib/inventoryMaterial";
 
 /** Một ô ngày cần ghi về sổ nguồn. */
@@ -82,7 +95,8 @@ export interface PeriodGrid {
   cungHoKy: (r: MaterialImportItem) => boolean;
   /** Đếm để màn hình nói được vì sao trống. */
   chanDoanNhap: { tongTrongKhoang: number; chuaGan: number; kyKhac: number; lechTen: number };
-  ghiNL: (rows: BalancingInputItem[]) => void;
+  /** Ghi khối NL (kèm đồng bộ Sổ kho tháng cho 2 dòng kho). false = bị chặn (đã báo lỗi). */
+  ghiNL: (rows: BalancingInputItem[]) => boolean;
   hutNhapHang: (ids?: string[]) => void;
   /** Ghi nhiều ô ngày về sổ Nhập hàng. Trả về false nếu bị từ chối. */
   ghiNhapNhieuNgay: (dsO: ONgay[]) => boolean;
@@ -92,6 +106,16 @@ export interface PeriodGrid {
   conDoSXTheoNgay: DailyQuantities;
   /** Đơn giá dòng Gửi đông gần nhất (kỳ trước, cùng họ) — gợi ý giá cho Lấy xả đông. */
   giaGuiDongTruoc: number | null;
+  /** Lô (Sổ kho tháng) để chọn ĐÍCH DANH cho dòng Lấy xả đông — tháng của ngày đầu kỳ. */
+  luaChonLo: (dangChon: string[]) => LuaChonLo[];
+  /** Kho nhận cho dòng Gửi đông: "<sổ kho>|<vị trí>". */
+  luaChonKhoGui: { value: string; label: string; phu?: string }[];
+  /** Mô tả lô / kho của một dòng kho (bản in, nhãn). */
+  moTaDongKho: (r: BalancingInputItem) => string;
+  /** Số chỗ Sổ kho tháng lệch phần kho của kỳ (VD sổ bị nạp lại đè) — 0 là khớp. */
+  lechSoKho: number;
+  /** Ghi lại toàn bộ phần kho của kỳ vào Sổ kho tháng (sửa lệch). */
+  ghiLaiSoKho: () => void;
   /* --- khối 2 --- */
   tp: BalancingOutputItem[];
   hangTP: HangLuoiTP[];
@@ -133,6 +157,8 @@ interface MocLichSu {
   tp: BalancingOutputItem[];
   nhap: MaterialImportItem[];
   sanXuat: WipProductionItem[];
+  /** Sổ kho tháng — hai dòng kho ghi thẳng vào đây nên hoàn tác phải trả cả sổ. */
+  kho: MonthlyStockLine[];
 }
 
 /** Giữ tối đa ngần này bước lùi — đủ cho một ca nhập, không phình bộ nhớ. */
@@ -154,6 +180,8 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
   const [chotSanXuat] = useProductionLocks();
   const [tatCaKy] = useBalancingPeriods();
   const [tonDauKhaiTay] = useMaterialOpeningStock();
+  const [soKho, ghiSoKho] = useMonthlyStock();
+  const [khoLuu] = useStorageLocations();
 
   /** Kỳ đã chốt ⇒ mọi ô khoá, mọi nút ghi ẩn. Mở lại ở thanh cuối màn. */
   const daChot = Boolean(ky.isLocked);
@@ -185,8 +213,9 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
       tp: tatCaTP,
       nhap: tatCaNhap,
       sanXuat: tatCaSanXuat,
+      kho: soKho,
     }),
-    [tatCaNL, tatCaTP, tatCaNhap, tatCaSanXuat]
+    [tatCaNL, tatCaTP, tatCaNhap, tatCaSanXuat, soKho]
   );
 
   /** Đánh dấu "trước khi đổi" — gọi TRƯỚC mọi lần ghi. */
@@ -209,8 +238,9 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
       ghiTatCaTP(m.tp);
       ghiTatCaNhap(m.nhap);
       ghiTatCaSanXuat(m.sanXuat);
+      if (m.kho !== soKho) ghiSoKho(m.kho);
     },
-    [ghiTatCaNL, ghiTatCaTP, ghiTatCaNhap, ghiTatCaSanXuat]
+    [ghiTatCaNL, ghiTatCaTP, ghiTatCaNhap, ghiTatCaSanXuat, ghiSoKho, soKho]
   );
 
   const hoanTac = useCallback(() => {
@@ -236,12 +266,33 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
   const nlVao = useMemo(() => tatCaNL.filter((r) => r.periodId === ky.id), [tatCaNL, ky.id]);
   const tp = useMemo(() => tatCaTP.filter((r) => r.periodId === ky.id), [tatCaTP, ky.id]);
 
+  /* Nhãn kỳ + họ NL để ghi vết / đặt tên lô gửi đông trong Sổ kho tháng. */
+  const ngucanh = useMemo(
+    () => ({
+      nhanKy: `${ky.materialTypeName} ${ky.dateRangeDescription ?? ""}`.trim(),
+      hoNL: hoNguyenLieu(ky.materialTypeName),
+    }),
+    [ky.materialTypeName, ky.dateRangeDescription]
+  );
+
+  /* MỘT chốt cho mọi lần ghi khối NL (gõ ô, dán khối, xoá dòng, gộp…): hai dòng kho
+     (Lấy xả đông / Gửi đông) ghi THẲNG vào Sổ kho tháng theo kiểu đặt giá trị — xem
+     lib/khoCanDoi.ts. Sổ kho từ chối (vượt tồn lô, chưa chọn lô/kho) ⇒ KHÔNG ghi gì. */
   const ghiNL = useCallback(
-    (rows: BalancingInputItem[], nhom = "nl") => {
+    (rows: BalancingInputItem[], nhom = "nl"): boolean => {
+      const kq = dongBoSoKho(soKho, nlVao, rows, ngucanh);
+      if (kq.loi) {
+        notify.loi(kq.loi);
+        return false;
+      }
       luuMoc(nhom);
       ghiTatCaNL([...tatCaNL.filter((r) => r.periodId !== ky.id), ...rows]);
+      if (kq.doi) ghiSoKho(kq.lines);
+      if (kq.keThua > 0)
+        notify.daLuu(`Sổ kho tháng: đã tự kế thừa ${kq.keThua} dòng tồn sang tháng mới`);
+      return true;
     },
-    [ghiTatCaNL, tatCaNL, ky.id, luuMoc]
+    [ghiTatCaNL, tatCaNL, ky.id, luuMoc, soKho, nlVao, ngucanh, ghiSoKho]
   );
   const ghiTP = useCallback(
     (rows: BalancingOutputItem[], nhom = "tp") => {
@@ -652,6 +703,52 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
     return ganNhat?.gia ?? null;
   }, [tatCaNL, tatCaKy, ky.id, ky.materialTypeName, ky.startDate]);
 
+  /* Sổ kho tháng: lô để Lấy xả đông (tháng của ngày đầu kỳ; tháng chưa mở ⇒ xem trước
+     phần kế thừa) + kho nhận để Gửi đông + kiểm khớp. */
+  const thangKy = thangCuaNgay(ngay[0] ?? ky.startDate ?? "");
+  const luaChonLo = useCallback(
+    (dangChon: string[]) => (thangKy ? danhSachLo(soKho, thangKy, ngucanh.hoNL, dangChon) : []),
+    [soKho, thangKy, ngucanh.hoNL]
+  );
+  const luaChonKhoGui = useMemo(
+    () =>
+      danhSachKhoGui(
+        soKho,
+        BSF1_WAREHOUSES.filter((w) => w.type === "xi-nghiep").map((w) => w.name),
+        khoLuu.map((k) => k.name)
+      ),
+    [soKho, khoLuu]
+  );
+  const moTaDongKho = useCallback(
+    (r: BalancingInputItem) => {
+      if (r.stockLineId) {
+        const lo = luaChonLo([r.stockLineId]).find((x) => x.value === r.stockLineId);
+        return lo ? lo.label : "lô đã chọn không còn trong sổ kho";
+      }
+      if (r.stockLocation) {
+        const { warehouse, storageLocation } = tachKhoGui(r.stockLocation);
+        return storageLocation || warehouse;
+      }
+      return "";
+    },
+    [luaChonLo]
+  );
+  const lechSoKho = useMemo(() => soChoLechSoKho(soKho, nlVao), [soKho, nlVao]);
+  const ghiLaiSoKho = useCallback(() => {
+    const truoc = soKho;
+    const kq = dongBoSoKho(soKho, [], nlVao, ngucanh);
+    if (kq.loi) {
+      notify.loi(kq.loi);
+      return;
+    }
+    if (!kq.doi) return;
+    luuMoc(`ghi-lai-so-kho:${ky.id}`);
+    ghiSoKho(kq.lines);
+    notify.daLuu("Đã ghi lại phần lấy xả đông / gửi đông của kỳ vào Sổ kho tháng", () =>
+      ghiSoKho(truoc)
+    );
+  }, [soKho, nlVao, ngucanh, luuMoc, ky.id, ghiSoKho]);
+
   /* ---------- Chuyển kỳ từ kỳ liền trước ---------- */
 
   const kyTruoc = useMemo(() => kyLienTruoc(ky, tatCaKy), [ky, tatCaKy]);
@@ -760,6 +857,11 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
     tonKhoDong,
     conDoSXTheoNgay,
     giaGuiDongTruoc,
+    luaChonLo,
+    luaChonKhoGui,
+    moTaDongKho,
+    lechSoKho,
+    ghiLaiSoKho,
     tp,
     hangTP,
     sanXuatDaGan,

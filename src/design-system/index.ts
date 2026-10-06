@@ -8,6 +8,7 @@
  */
 
 export { Field, ChuThichBatBuoc } from "./patterns/Field";
+export { useONhapCuaField, type ThuocTinhONhap } from "./patterns/oNhapCuaField";
 export { NumberField } from "./patterns/NumberField";
 export { ONhapSo } from "./patterns/ONhapSo";
 export { useNhapSo } from "./patterns/useNhapSo";

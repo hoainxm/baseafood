@@ -1,6 +1,7 @@
 import * as React from "react";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { ONhapCuaField, type ThuocTinhONhap } from "./oNhapCuaField";
 
 /**
  * Field — bọc mọi ô nhập.
@@ -63,6 +64,7 @@ export function Field({
   unit,
   anNhanBatBuoc = false,
   anNhan = false,
+  oNhapLong = false,
   className,
   children,
 }: {
@@ -80,6 +82,11 @@ export function Field({
    * `Combobox anNhan`. Ngoài bảng thì nhãn phải luôn hiện.
    */
   anNhan?: boolean;
+  /**
+   * Con KHÔNG phải ô nhập mà là thẻ bọc có ô nhập bên trong ⇒ `Field` không gắn gì
+   * lên thẻ bọc; ô nhập tự lấy qua `useONhapCuaField()`.
+   */
+  oNhapLong?: boolean;
   className?: string;
   children: React.ReactElement;
 }) {
@@ -111,24 +118,28 @@ export function Field({
     return () => ro.disconnect();
   }, [unit]);
 
-  const child = React.cloneElement(
-    children as React.ReactElement<Record<string, unknown>>,
-    {
-      id,
-      // anNhan: nhãn nhìn thấy bị giấu → chuyển tên ô cho trình đọc màn hình.
-      "aria-label": anNhan ? label : undefined,
-      "aria-describedby": describedBy,
-      "aria-invalid": error ? true : undefined,
-      // Dấu * chỉ là tín hiệu THỊ GIÁC (aria-hidden). Trình đọc màn hình lấy
-      // thông tin bắt buộc từ đây.
-      "aria-required": required && !anNhanBatBuoc ? true : undefined,
-      className: (children.props as { className?: string }).className,
-      style: {
-        ...((children.props as { style?: React.CSSProperties }).style ?? {}),
-        ...(chuaCho ? { paddingRight: chuaCho } : {}),
-      },
-    }
-  );
+  const thuocTinh: ThuocTinhONhap = {
+    id,
+    // anNhan: nhãn nhìn thấy bị giấu → chuyển tên ô cho trình đọc màn hình.
+    "aria-label": anNhan ? label : undefined,
+    "aria-describedby": describedBy,
+    "aria-invalid": error ? true : undefined,
+    // Dấu * chỉ là tín hiệu THỊ GIÁC (aria-hidden). Trình đọc màn hình lấy
+    // thông tin bắt buộc từ đây.
+    "aria-required": required && !anNhanBatBuoc ? true : undefined,
+    style: chuaCho ? { paddingRight: chuaCho } : undefined,
+  };
+
+  const child = oNhapLong
+    ? children
+    : React.cloneElement(children as React.ReactElement<Record<string, unknown>>, {
+        ...thuocTinh,
+        className: (children.props as { className?: string }).className,
+        style: {
+          ...((children.props as { style?: React.CSSProperties }).style ?? {}),
+          ...thuocTinh.style,
+        },
+      });
 
   return (
     /* flex-col + h-full + mt-auto ở ô nhập: nhãn LUÔN thẳng hàng trên cùng,
@@ -165,7 +176,7 @@ export function Field({
       )}
 
       <div className="relative mt-auto">
-        {child}
+        <ONhapCuaField.Provider value={oNhapLong ? thuocTinh : null}>{child}</ONhapCuaField.Provider>
         {unit && (
           <span
             ref={unitRef}

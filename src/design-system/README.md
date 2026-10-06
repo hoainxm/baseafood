@@ -62,6 +62,13 @@ src/features/*                 ← màn nghiệp vụ
     dùng tưởng danh sách đã hết.
 12. **Đơn vị trong ô nhập không dùng padding cố định.** `Field` đo bề rộng chữ
     đơn vị rồi chừa đúng chỗ — `pr-14` cứng làm "26.000" đè lên "đ/USD".
+    **`Field` gắn `id` (cho `<label for>`), `aria-*` và khoảng chừa đơn vị lên CHÍNH
+    `<input>`.** Con trực tiếp là ô nhập (`Input`, `Textarea`) ⇒ gắn thẳng. Con là
+    THẺ BỌC có ô nhập bên trong (VD `NumberField`: `<div>` + dòng xem trước biểu
+    thức) ⇒ khai `oNhapLong` và ô bên trong trải `useONhapCuaField()` lên `<input>`.
+    Quên `oNhapLong` thì thẻ div nhận id: nhãn không trỏ tới ô nào (trình đọc màn
+    hình đọc "ô không tên", bấm nhãn không vào ô) và đơn vị lòi ra NGOÀI viền ô —
+    đúng lỗi `NumberField` dính tới 2026-10-06 (test: `NumberField.test.tsx`).
 13. **Mọi chữ hiển thị theo chuẩn label.** Sentence case; nhãn field = danh từ
     trần (không "Chỉ xem…", không "… dòng", không `:`); nút = động từ đứng đầu.
     Chi tiết + before→after: [`noi-dung-va-label.md`](noi-dung-va-label.md).

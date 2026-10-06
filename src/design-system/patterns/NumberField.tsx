@@ -2,6 +2,8 @@ import * as React from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Field } from "./Field";
+import { useONhapCuaField } from "./oNhapCuaField";
+import { dieuHuongCotSo } from "./dieuHuongCotSo";
 import { XemTruocBieuThuc } from "./ONhapSo";
 import { useNhapSo } from "./useNhapSo";
 import { Minus, Plus } from "lucide-react";
@@ -11,29 +13,13 @@ import { Minus, Plus } from "lucide-react";
 // với ô lưới `LuoiNhap`.
 
 /**
- * Điều hướng bàn phím kiểu Excel cho ô số trong BẢNG tự dựng (không qua
- * `LuoiNhap`): ↑ / ↓ / Enter nhảy DỌC trong cùng một CỘT (`navCol`), Tab để
- * trình duyệt lo đi NGANG. "Cùng cột" = mọi input mang `data-navcol` giống nhau
- * trong khung `[data-luoi-phim]` gần nhất, theo THỨ TỰ DOM (= thứ tự dòng nhìn
- * thấy) nên không cần khai toạ độ (hàng,cột) — hợp bảng dòng động, có dòng tách.
+ * Ô `<input>` của NumberField. Tách component riêng để đọc thuộc tính của `Field`
+ * (id cho nhãn, aria-*, khoảng chừa đơn vị) qua context và trải lên CHÍNH ô nhập —
+ * con trực tiếp của `Field` là thẻ bọc (`<div>` + dòng xem trước biểu thức).
  */
-function dieuHuongCotSo(e: React.KeyboardEvent<HTMLInputElement>, col: string) {
-  const k = e.key;
-  if (k !== "ArrowDown" && k !== "ArrowUp" && k !== "Enter") return;
-  const el = e.currentTarget;
-  if (k === "Enter") e.preventDefault(); // đừng để Enter submit form khi đang nhập bảng
-  const khung: ParentNode = el.closest("[data-luoi-phim]") ?? document;
-  const dsO = Array.from(
-    khung.querySelectorAll<HTMLInputElement>(`[data-navcol="${CSS.escape(col)}"]`)
-  ).filter((o) => !o.disabled && o.offsetParent !== null); // bỏ ô ẩn (dòng tách chưa mở)
-  const i = dsO.indexOf(el);
-  if (i < 0) return;
-  const dich = dsO[k === "ArrowUp" ? i - 1 : i + 1];
-  if (dich) {
-    e.preventDefault();
-    dich.focus();
-    dich.select();
-  }
+function OSoTrongField(props: React.ComponentProps<typeof Input>) {
+  const tt = useONhapCuaField();
+  return <Input {...tt} {...props} style={{ ...tt?.style, ...props.style }} />;
 }
 
 /**
@@ -88,7 +74,7 @@ export function NumberField({
 
   const input = (
     <div className="relative">
-      <Input
+      <OSoTrongField
         type="text"
         inputMode="decimal"
         autoComplete="off"
@@ -117,6 +103,7 @@ export function NumberField({
       unit={step ? undefined : unit}
       anNhanBatBuoc={anNhanBatBuoc}
       anNhan={anNhan}
+      oNhapLong
       className={className}
     >
       {step ? (

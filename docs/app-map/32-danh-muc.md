@@ -1,9 +1,11 @@
 > Load khi: sửa danh mục (đại lý, loại NL, mặt hàng, khách hàng) hay danh mục 141 mã thành phẩm.
-covers: src/features/catalog/CatalogScreen.tsx, src/features/catalog/FinishedGoodScreen.tsx, src/data/thanh-pham.json, src/design-system/patterns/CatalogCrudModal.tsx, src/lib/catalogRepo.ts
-last_verified: 2026-10-03
+covers: src/features/catalog/CatalogScreen.tsx, src/features/catalog/FinishedGoodScreen.tsx, src/data/thanh-pham.json, src/design-system/patterns/CatalogCrudModal.tsx, src/lib/catalogRepo.ts, src/features/catalog/cauHinhDanhMuc.tsx, src/features/catalog/ChonBotDiKem.tsx
+last_verified: 2026-10-06
 ttl_days: 90
 <!-- re-verified: 2026-10-03 — tên bảng/cột đại lý + cột sổ nối tên đối chiếu DB thật (suppliers, supplier_name) và repo.ts BANG_SUPPLIER -->
 <!-- updated: 2026-10-03 — BẢNG DANH MỤC KHÔNG CÒN CUỘN NGANG: `TruongDanhMuc.anTrenBang` (→ `Cot.phu` của RecordTable) ẩn cột phụ khỏi bảng, xem qua nút "Chi tiết" cuối dòng. Bảng giữ: Mặt hàng = Tên · Loài · Kiểu chế biến · Mã thành phẩm (phụ: Loại NL, Tách râu+bao tử, Quy cách block, Mã số); Đại lý = Tên gọi tắt · Tên ghi phiếu · CMND/CCCD/MST · Điện thoại (phụ: Địa chỉ, Ngày cấp, Nơi cấp, Mã số, Ghi chú); Kho lưu = Mã số · Tên · Loại · Địa chỉ (phụ: Điện thoại, Ghi chú). Vùng chứa < 48rem ra thẻ; cột Thao tác ghim phải. 6 tab xuống hàng khi hẹp. Luật chung: design-system README §5a. -->
+<!-- re-verified: 2026-10-06 10:35 — luật "Thêm trường cho một danh mục: types.ts → AnhXaBang toRow/fromRow (+vaDongCu) → migration → TruongDanhMuc" + cấu hình một nguồn ở cauHinhDanhMuc.tsx (taoTruongDanhMuc/taoCauHinhDanhMuc/useCauHinhDanhMuc) + useSuaDanhMuc(rows của màn gọi) — khớp code khi thêm danh mục Bột tẩm. -->
+<!-- updated: 2026-10-06 — BỘT TẨM (mig 0051, yêu cầu chủ dự án): thêm TAB THỨ 7 "Bột tẩm" (`batter_types`, deep-link `/catalog?tab=bot-tam`, khuôn DanhMucCrud, kiểm trùng mã số + trùng tên; nối sổ theo TÊN ⇒ hộp sửa nhanh khoá ô tên) + trường "Bột đi kèm" của MẶT HÀNG (`products.batter_ids`, ô chọn nhiều `ChonBotDiKem`: thẻ có nút bỏ + Combobox thêm, tạo loại bột mới tại chỗ). Mỗi mặt hàng tẩm bột một BỘ bột riêng — VD tẩm bột nước tương = 24V+18V+220H; tẩm bột 5-10 = 232+20802; tổ hợp khác gắn tay. Màn /wip đọc bộ này để hiện ô kg từng loại (xem 34-btp). taoHoacLayBot (lib/botTam) chống đẻ trùng: gõ "20802" ≡ "Bột 20802" (khớp tên/mã/tên ngắn). KHÔNG đụng 141 mã kế toán. -->
 <!-- updated: 2026-08-28 — SEED kiểu chế biến + bổ sung mặt hàng thiếu (đối chiếu file cân đối bạch tuộc 2 da). catalogRepo.seedProducts: (a) hàm suyKieuCheBien(tên) suy processing_type TỪ TÊN khi seed (bảo thủ — không rõ để '', khớp trước thắng; phủ 77/84 mã bạch tuộc, Cá/Mực phần lớn để '' vì từ vựng khác); (b) nối 8 mặt hàng thật thiếu hẳn ở 141 (finishedGoodCode='' = chưa ánh xạ, mức GỘP). Migration 0034 nhân bản cả hai bằng SQL cho bản đã deploy (backfill CHỈ dòng trống + INSERT id 'mh-bs-*' idempotent). KHÔNG đụng 141 mã kế toán (thanh-pham.json). 6 dòng "lệch tên" luộc↔cắt luộc = cùng thứ, giữ mã kế toán. -->
 <!-- updated: 2026-08-26 — tab Mặt hàng thêm 2 thuộc tính cho màn ghi thành phẩm /wip (migration 0031): split_components (ChoiceGroup "Có tách/Không tách" — mã cắt chần tách râu+bao tử cùng giá) + block_spec_kg (NumberField kg/khối). GỘP 1 danh sách LOÀI chuẩn: types.ts CATEGORIES thêm "Bào ngư", BỎ NHOM_TP — tab Mặt hàng + tab Loại NL dùng chung CATEGORIES (trước lệch: Mặt hàng có Bào ngư thiếu Ghẹ, Loại NL ngược lại). Màn /wip GOM THEO LOÀI (products.category có sẵn trên 141 mã), KHÔNG theo loại NL. Xem 34-btp-san-xuat-kho.ba-spec.md. -->
 <!-- updated: 2026-08-23 — mat_hang thêm facet processing_type (kiểu chế biến, 0024); combobox "Kiểu chế biến" ở tab Mặt hàng -->
@@ -20,12 +22,12 @@ ttl_days: 90
 
 # Danh mục (master data)
 
-Một màn, **6 tab**: Mặt hàng · Khách hàng · Đại lý · Loại nguyên liệu · **Kho lưu trữ** · Thành phẩm (141 mã).
+Một màn, **7 tab**: Mặt hàng · Khách hàng · Đại lý · Loại nguyên liệu · **Bột tẩm** · **Kho lưu trữ** · Thành phẩm (141 mã).
 Gộp làm một vì ba mục điều hướng cũ có tên gần giống nhau — người dùng 45–60 tuổi phải nhớ cái nào ở đâu.
 
 ## State hiện tại
 
-5 tab đầu dùng chung pattern `DanhMucCrud` (thêm/sửa/xóa/tìm). Tab cuối (`FinishedGoodScreen.tsx`) **chỉ đọc** — 141 mã kế toán TK 1551.
+6 tab đầu dùng chung pattern `DanhMucCrud` (thêm/sửa/xóa/tìm). Tab cuối (`FinishedGoodScreen.tsx`) **chỉ đọc** — 141 mã kế toán TK 1551.
 
 ## Logic / Rules
 
@@ -42,7 +44,8 @@ Gộp làm một vì ba mục điều hướng cũ có tên gần giống nhau �
 - **Sửa tại chỗ (2026-10-02) — bút chì ở mọi ô chọn danh mục.** Cấu hình 5 danh mục (trường · kiểm tra · bản ghi rỗng · trường tên · `noiTheoTen`) tách khỏi `CatalogScreen.tsx` sang **`features/catalog/cauHinhDanhMuc.tsx`** (`taoTruongDanhMuc` + `taoCauHinhDanhMuc` thuần, `useCauHinhDanhMuc` cho màn Danh mục) — MỘT nguồn. Màn nghiệp vụ gọi **`useSuaDanhMuc(loai, rows, setRows, { theo })`** (`features/catalog/SuaDanhMucNhanh.tsx`) rồi gắn `onSuaMuc / nhanSua / suaDuoc` vào `Combobox` + render `{sua.hop}`. Hộp sửa = `HopSuaDanhMuc` (design-system, cũng là hộp của `DanhMucCrud`).
   - ⚠️ Phải truyền **đúng `rows`/`setRows` của màn** — mỗi `useBang` giữ state riêng; hộp tự gọi `useCustomers()` thì màn không thấy thay đổi và lần ghi sau đè bản cũ.
   - **Đổi tên:** danh mục nối với sổ đã ghi bằng TÊN (`noiTheoTen`: đại lý `supplierName`, loại NL `materialTypeName`, khách hàng `/wip customerName`, kho lưu `storageLocation`) ⇒ ô tên **chỉ đọc** ở hộp sửa nhanh (đổi tên sẽ tách dòng cũ khỏi danh mục). Mặt hàng nối theo `productId` ⇒ sửa tên được. Màn Danh mục giữ hành vi cũ (cho đổi tên, sổ cũ giữ tên cũ). Mặt hàng thêm kiểm **trùng tên** (chỉ khi tên mới/vừa đổi).
-  - Đã gắn: `/imports` (đại lý, loại NL dòng hàng) · `/wip` (thành phẩm, khách, loại NL còn dở) · `/sales` (khách, mặt hàng) · `/orders` (khách, mặt hàng) · `/packaging` (mặt hàng) · `/balancing` lưới bán TP (mặt hàng, khách) · `/nxt-nl` form tồn đầu (loại NL) · NXT TP form (mặt hàng) · `/nxt-kho` gán kho lưu. KHÔNG gắn ở ô LỌC. `KIEU_CHE_BIEN` ở `types.ts`.
+  - Đã gắn: `/imports` (đại lý, loại NL dòng hàng) · `/wip` (thành phẩm, khách, loại NL còn dở, loại bột tẩm) · `/sales` (khách, mặt hàng) · `/orders` (khách, mặt hàng) · `/packaging` (mặt hàng) · `/balancing` lưới bán TP (mặt hàng, khách) · `/nxt-nl` form tồn đầu (loại NL) · NXT TP form (mặt hàng) · `/nxt-kho` gán kho lưu. KHÔNG gắn ở ô LỌC. `KIEU_CHE_BIEN` ở `types.ts`.
+- **Bột tẩm (mig 0051) — mỗi mặt hàng tẩm bột đi kèm một BỘ loại bột riêng.** Danh mục `batter_types` (tab Bột tẩm: tên "Bột 24V", mã "24V") là danh mục MỞ. Mặt hàng giữ `batterIds` (**id** loại bột ⇒ đổi tên bột không đứt cấu hình); dòng sản lượng `/wip` giữ `batterKg = { "<TÊN bột>": kg }` (sổ lưu TÊN lúc ghi, đổi tên danh mục không hồi tố — như còn-dở 0038). Bột là **phụ gia** (Khối 1 "Bột phụ gia" ở Cân đối), **không** phải thành phẩm và **không** cộng vào kg thành phẩm. Đã nạp sẵn: "tẩm bột nước tương" → 24V + 18V + 220H; "tẩm bột 5-10" → 232 + 20802 (`suyBotDiKem`, chỉ khi mặt hàng chưa gắn). Mặt hàng tẩm bột chưa gắn bộ bột: ghi lần đầu ở `/wip` với các loại bột nào thì mặt hàng **tự nhớ** bộ đó (lưu ngược như quy cách block).
 - Quy ước ngầm của xưởng, giữ khi thiết kế: NL không ghi loài ⇒ mặc định **bạch tuộc**; "80 trên" = lớn, "80 dưới" = nhỏ (mốc ~80 g/con), định giá khác nhau.
 
 ## Edge cases

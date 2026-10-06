@@ -14,6 +14,7 @@ import { isBackdatedWip, laCoTach, quyCachBlock } from "@/types";
 import { newId } from "@/lib/store";
 import { uid } from "@/lib/db";
 import {
+  useBatterTypes,
   useProductionLocks,
   useProducts,
   useWipProductions,
@@ -21,6 +22,16 @@ import {
   useMaterialTypes,
   useLotInputs,
 } from "@/lib/catalogRepo";
+import {
+  botDiKemIds,
+  congBotTheoLoai,
+  lamSachBot,
+  laMatHangTamBot,
+  nhanBotNgan,
+  taoHoacLayBot,
+  tenBotDiKem,
+  tongBot,
+} from "@/lib/botTam";
 import {
   ChuThichBatBuoc,
   Button,
@@ -73,8 +84,10 @@ import {
   TriangleAlert,
   Users,
   Warehouse,
+  Wheat,
 } from "lucide-react";
 import { BangDongSX } from "./BangDongSX";
+import { KhoiBotTam } from "./KhoiBotTam";
 import {
   PHAN_XUONG,
   dongDayDu,
@@ -107,6 +120,7 @@ export default function SanXuatBTPScreen() {
   const [matHang, setMatHang] = useProducts();
   const [khach, setKhach] = useCustomers();
   const [loaiNL, setLoaiNL] = useMaterialTypes();
+  const [botTam, setBotTam] = useBatterTypes();
 
   // Người thao tác = tài khoản đang đăng nhập — gắn vào dòng khi lưu để lưu vết ai gửi.
   const { nguoiDung } = useAuth();
@@ -199,6 +213,8 @@ export default function SanXuatBTPScreen() {
 
   /** Sửa nhanh thành phẩm ngay tại màn (ghi thẳng Danh mục mặt hàng). */
   const suaMH = useSuaDanhMuc("matHang", matHang, setMatHang, {
+    // Ô "Bột đi kèm" trong hộp sửa thấy + tạo loại bột qua đúng danh mục của màn.
+    nguonBot: { rows: botTam, them: (ten) => themBotBanGhi(ten).id },
     moTa: (m) => {
       const n = rows.filter((r) => r.productId === m.id).length;
       return n > 0
@@ -236,6 +252,35 @@ export default function SanXuatBTPScreen() {
     return ten;
   };
 
+  /* ---- Bột tẩm (mig 0051): danh mục loại bột — dòng sản lượng lưu theo TÊN ---- */
+  const optBot: MucChon[] = botTam.map((b) => ({
+    value: b.name,
+    label: b.name,
+    phu: [b.code && `Mã ${b.code}`, b.note].filter(Boolean).join(" · ") || undefined,
+  }));
+  /** Tạo loại bột tại chỗ (trùng tên ⇒ dùng lại loại có sẵn). Trả về bản ghi. */
+  const themBotBanGhi = (ten: string) => {
+    const kq = taoHoacLayBot(botTam, ten);
+    if (kq.moi) {
+      setBotTam(kq.rows);
+      notify.daLuu(`Đã thêm loại bột "${kq.bot.name}" vào danh mục`);
+    }
+    return kq.bot;
+  };
+  const themBot = (ten: string): string => themBotBanGhi(ten).name;
+  const suaBot = useSuaDanhMuc("botTam", botTam, setBotTam, { theo: "ten" });
+  /** Tên bột đi kèm của một mặt hàng (theo danh mục bột hiện có). */
+  const diKemCua = (productId: string) =>
+    tenBotDiKem(
+      matHang.find((m) => m.id === productId),
+      botTam
+    );
+  /** "24V 12 · 18V 30" — nhãn gọn cho ô hẹp. */
+  const moTaBot = (m: Record<string, number> | undefined) =>
+    Object.entries(lamSachBot(m))
+      .map(([ten, v]) => `${nhanBotNgan(ten)} ${num(v)}`)
+      .join(" · ");
+
   const view = useMemo(
     () =>
       rows
@@ -256,6 +301,9 @@ export default function SanXuatBTPScreen() {
   const tong = view.reduce((s, r) => s + (r.quantityKg || 0), 0);
   const tongBlock = view.reduce((s, r) => s + (r.blocksCount || 0), 0);
   const soChoNhap = view.filter((r) => r.status === "cho-nhap").length;
+  /** Bột tẩm đã dùng trong phạm vi đang xem, cộng theo loại (mig 0051). */
+  const botTheoLoai = useMemo(() => congBotTheoLoai(view.map((r) => r.batterKg)), [view]);
+  const tongBotView = botTheoLoai.reduce((s, b) => s + b.kg, 0);
 
   /* ---- A4: gom báo cáo TP ngày theo (xưởng × người thao tác) ---- */
   const baoCaoNguoi = useMemo(() => {
@@ -399,6 +447,7 @@ export default function SanXuatBTPScreen() {
 
   const dongHopLe = dongBang.filter(dongDayDu);
   const tongPhien = dongHopLe.reduce((s, d) => s + tongDong(d), 0);
+  const botPhien = dongHopLe.reduce((s, d) => s + tongBot(d.botKg), 0);
   const chotDangGhi = phien
     ? daChot(phien.productionDate, phien.workshop)
     : false;
@@ -499,29 +548,44 @@ export default function SanXuatBTPScreen() {
       componentRauKg: laTach(d) ? d.rauKg || 0 : null,
       componentBaoTuKg: laTach(d) ? d.baoTuKg || 0 : null,
       operator: nguoiThaoTac,
+      batterKg: lamSachBot(d.botKg),
     }));
     persist([...rows, ...moi]);
 
-    // Nhớ quy cách block về MẶT HÀNG (đúng ý "gắn trên mặt hàng") — lần sau tự điền.
-    const qcMoi = new Map<string, number>();
-    for (const d of hopLe)
-      if (d.productId && d.blockSpecKg > 0) {
-        const p = matHang.find((m) => m.id === d.productId);
-        if (p && quyCachBlock(p) !== d.blockSpecKg)
-          qcMoi.set(d.productId, d.blockSpecKg);
-      }
-    if (qcMoi.size > 0)
-      setMatHang(
-        matHang.map((m) =>
-          qcMoi.has(m.id) ? { ...m, blockSpecKg: qcMoi.get(m.id)! } : m
-        )
-      );
+    // Nhớ về MẶT HÀNG (đúng ý "gắn trên mặt hàng") — lần sau tự điền:
+    //  - quy cách block (kg/khối) vừa nhập;
+    //  - bộ BỘT ĐI KÈM: mã CHƯA gắn bột mà dòng có ghi bột ⇒ gắn các loại vừa dùng.
+    //    Mã đã gắn thì KHÔNG đổi (bột nhập thêm tại chỗ chỉ là của dòng đó).
+    // Gộp vào MỘT lần setMatHang — gọi hai lần sẽ lấy cùng `matHang` cũ, lần sau đè lần trước.
+    const idBotTheoTen = new Map(botTam.map((b) => [b.name.trim(), b.id]));
+    const vaMH = new Map<string, Partial<Product>>();
+    for (const d of hopLe) {
+      const p = matHang.find((m) => m.id === d.productId);
+      if (!p) continue;
+      const va: Partial<Product> = { ...vaMH.get(p.id) };
+      if (d.blockSpecKg > 0 && quyCachBlock(p) !== d.blockSpecKg)
+        va.blockSpecKg = d.blockSpecKg;
+      const idsBot = Object.keys(lamSachBot(d.botKg))
+        .map((ten) => idBotTheoTen.get(ten) ?? "")
+        .filter(Boolean);
+      if (botDiKemIds(p).length === 0 && idsBot.length > 0 && !va.batterIds)
+        va.batterIds = idsBot;
+      if (Object.keys(va).length > 0) vaMH.set(p.id, va);
+    }
+    if (vaMH.size > 0)
+      setMatHang(matHang.map((m) => (vaMH.has(m.id) ? { ...m, ...vaMH.get(m.id) } : m)));
 
     const tongMoi = moi.reduce((s, r) => s + r.quantityKg, 0);
-    notify.daLuu(`Đã lưu ${moi.length} thành phẩm · ${kg(tongMoi)}`, undefined, {
-      label: moi.length > 1 ? `In ${moi.length} tem` : "In tem",
-      onClick: () => setTemLo(moi),
-    });
+    const botMoi = moi.reduce((s, r) => s + tongBot(r.batterKg), 0);
+    notify.daLuu(
+      `Đã lưu ${moi.length} thành phẩm · ${kg(tongMoi)}` +
+        (botMoi > 0 ? ` · bột tẩm ${kg(botMoi)}` : ""),
+      undefined,
+      {
+        label: moi.length > 1 ? `In ${moi.length} tem` : "In tem",
+        onClick: () => setTemLo(moi),
+      }
+    );
 
     const bg = banGhiChot(phien.productionDate, phien.workshop);
     if (bg?.isLocked)
@@ -582,6 +646,7 @@ export default function SanXuatBTPScreen() {
       quantityKg: tong,
       componentRauKg: suaTach ? sua.componentRauKg ?? 0 : null,
       componentBaoTuKg: suaTach ? sua.componentBaoTuKg ?? 0 : null,
+      batterKg: lamSachBot(sua.batterKg),
     };
     persist(rows.map((r) => (r.id === sua.id ? banGhi : r)));
     notify.daLuu("Đã lưu thay đổi");
@@ -607,7 +672,7 @@ export default function SanXuatBTPScreen() {
         entity: "production_report",
         entityKey: baoCaoKey,
         summary: `Gửi báo cáo thành phẩm ${moTaPhamVi} · ${phanXuong} — tổng ${kg(tong)} (${view.length} dòng). ${dong}`,
-        diff: { nguoiGui: nguoiThaoTac, tong, theoNguoi: baoCaoNguoi },
+        diff: { nguoiGui: nguoiThaoTac, tong, theoNguoi: baoCaoNguoi, botTam: botTheoLoai },
       },
     ]);
     const luc = new Date().toLocaleString("vi-VN");
@@ -707,6 +772,23 @@ export default function SanXuatBTPScreen() {
       render: (r) =>
         r.blocksCount ? num(r.blocksCount) : <span className="text-muted-foreground">—</span>,
       sapXep: (r) => r.blocksCount,
+    },
+    {
+      key: "bot",
+      header: "Bột tẩm (kg)",
+      anTrenDienThoai: true,
+      render: (r) => {
+        const t = tongBot(r.batterKg);
+        return t > 0 ? (
+          <span>
+            <span className="tnum">{num(t)}</span>
+            <span className="block text-sm text-muted-foreground">{moTaBot(r.batterKg)}</span>
+          </span>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        );
+      },
+      sapXep: (r) => tongBot(r.batterKg),
     },
     {
       key: "cb",
@@ -825,6 +907,10 @@ export default function SanXuatBTPScreen() {
           onSuaKhach={suaKH.moSua}
           optKhach={optKhach}
           onTaoKhach={themKhach}
+          botTam={botTam}
+          optBot={optBot}
+          onTaoBot={themBot}
+          onSuaBot={suaBot.moSua}
         />
 
         {dongHopLe.length > 0 && (
@@ -832,6 +918,11 @@ export default function SanXuatBTPScreen() {
             <span className="text-base text-muted-foreground">
               {dongHopLe.length} thành phẩm · phiên này
             </span>
+            {botPhien > 0 && (
+              <span className="text-base text-muted-foreground">
+                Bột tẩm <span className="tnum font-semibold text-foreground">{kg(botPhien)}</span>
+              </span>
+            )}
             <span className="tnum text-lg font-semibold">{kg(tongPhien)}</span>
           </div>
         )}
@@ -1045,6 +1136,52 @@ export default function SanXuatBTPScreen() {
               <span className="tnum text-xl font-semibold">{kg(tong)}</span>
             </div>
           </div>
+
+          {/* Bột tẩm đã dùng (mig 0051) — cộng theo loại cho phạm vi đang xem; là số
+              kế toán điền nhóm "Bột phụ gia" (Khối 1) ở Cân đối. */}
+          {botTheoLoai.length > 0 && (
+            <div className="space-y-3 rounded-xl border-2 border-border p-4">
+              <div>
+                <h2 className="flex items-center gap-2 text-lg font-semibold text-foreground">
+                  <Wheat className="size-icon shrink-0" aria-hidden />
+                  Bột tẩm đã dùng
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  Cộng theo loại bột cho {moTaPhamVi} · {phanXuong}. Bột là phụ gia —
+                  không nằm trong tổng sản lượng; dùng số này cho nhóm "Bột phụ gia" ở
+                  Cân đối.
+                </p>
+              </div>
+              <div className="overflow-x-auto rounded-lg border border-border">
+                <table className="w-full border-collapse text-base">
+                  <thead>
+                    <tr className="border-b border-border bg-muted/50 text-left">
+                      <th className="px-3 py-2 font-semibold">Loại bột</th>
+                      <th className="px-3 py-2 text-right font-semibold">Số dòng TP</th>
+                      <th className="px-3 py-2 text-right font-semibold">Tổng kg</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {botTheoLoai.map((b) => (
+                      <tr key={b.ten} className="border-b border-border last:border-0">
+                        <td className="px-3 py-2">{b.ten}</td>
+                        <td className="tnum px-3 py-2 text-right">{num(b.soDong)}</td>
+                        <td className="tnum px-3 py-2 text-right font-semibold">{kg(b.kg)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="bg-muted/50 font-semibold">
+                      <td className="px-3 py-2" colSpan={2}>
+                        Tổng bột tẩm
+                      </td>
+                      <td className="tnum px-3 py-2 text-right">{kg(tongBotView)}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+          )}
         </>
       )}
         </>
@@ -1287,6 +1424,23 @@ export default function SanXuatBTPScreen() {
                 </div>
               </div>
 
+              {(laMatHangTamBot(matHang.find((m) => m.id === sua.productId)) ||
+                /bột/i.test(sua.processingType ?? "") ||
+                tongBot(sua.batterKg) > 0) && (
+                <div className="rounded-lg border border-border p-3">
+                  <p className="mb-2 text-base font-semibold">Bột tẩm</p>
+                  <KhoiBotTam
+                    diKem={diKemCua(sua.productId)}
+                    botKg={sua.batterKg ?? {}}
+                    onDoi={(batterKg) => datSua({ batterKg })}
+                    optBot={optBot}
+                    onTaoBot={themBot}
+                    onSuaBot={suaBot.moSua}
+                    kgThanhPham={suaTong}
+                  />
+                </div>
+              )}
+
               <NumberField
                 label="Số block"
                 unit="block"
@@ -1498,6 +1652,7 @@ export default function SanXuatBTPScreen() {
       {suaMH.hop}
       {suaKH.hop}
       {suaNL.hop}
+      {suaBot.hop}
       {ganLo && (
         <GanLoDauVao
           outputKind="W"

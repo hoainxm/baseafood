@@ -1,7 +1,7 @@
 # Đặc tả: Bộ quy cách × kiểu chế biến × nguyên liệu
 
-- **Trạng thái:** Chiều B (kiểu chế biến) **ĐÃ BUILD v1** (`0024` + UI danh mục); Chiều C (quy cách chuẩn hoá) còn dự thảo — chờ chốt với xí nghiệp
-- **Ngày lập:** 2026-08-22 · **Cập nhật:** 2026-08-23
+- **Trạng thái:** Chiều B (kiểu chế biến) **ĐÃ BUILD v1** (`0024` + UI danh mục); Chiều C (quy cách chuẩn hoá) còn dự thảo — chờ chốt với xí nghiệp; **Chiều D (bột đi kèm) ĐÃ BUILD** (`0051`, 2026-10-06 — §2.4)
+- **Ngày lập:** 2026-08-22 · **Cập nhật:** 2026-10-06
 - **Nguồn quyết định:** [`hop-2026-08-22-so-hoa-flow-2-bo-phan.md`](../trien-khai/hop-2026-08-22-so-hoa-flow-2-bo-phan.md) (QĐ-1, QĐ-7)
 - **Đối chiếu:** [`32-danh-muc.md`](../app-map/32-danh-muc.md) (141 mã) · [`34-btp-san-xuat-kho.ba-spec.md`](../app-map/34-btp-san-xuat-kho.ba-spec.md) (quy cách là chiều khóa tồn) · `src/data/thanh-pham.json`
 
@@ -61,6 +61,20 @@ Tập giá trị (chuẩn hóa từ 141 mã hiện có — **cần xí nghiệp 
 
 ### 2.3 Chiều C — Quy cách (`spec` / size)
 Chuỗi size hoặc khoảng size, **là chiều khóa cứng của tồn** (doc `34`): `5-10`, `230-250`, `1,2-1,8`, `18-20`, grade… Có thể kèm **đơn vị đếm** (g/con, con/kg) tùy loài.
+
+### 2.4 Chiều D — Bột đi kèm (mặt hàng TẨM BỘT) — ✅ ĐÃ BUILD 2026-10-06
+Thành phẩm tẩm bột không dùng một thứ bột chung: **mỗi mặt hàng đi kèm một BỘ loại bột**, khi ghi thành phẩm nhập **kg riêng cho từng loại** (chốt với chủ dự án 2026-10-06):
+
+| Mặt hàng | Bột đi kèm |
+|---|---|
+| tẩm bột nước tương | Bột 24V + Bột 18V + Bột 220H |
+| tẩm bột 5-10 | Bột 232 + Bột 20802 |
+| … tổ hợp khác | gắn tay ở Danh mục, hoặc tự nhớ lần ghi đầu ở `/wip` |
+
+- Danh mục **loại bột** riêng (`batter_types`, tab "Bột tẩm") — danh mục MỞ; mặt hàng giữ **id** loại bột (`products.batter_ids`).
+- Dòng sản lượng giữ `production_wips.batter_kg = { "<tên bột>": kg }` — theo TÊN như sổ khác.
+- Bột là **phụ gia** (Khối 1 "Bột phụ gia" ở Cân đối) — **không** cộng vào kg thành phẩm; tỷ lệ % = bột ÷ thành phẩm.
+- Không phải chiều khoá tồn (tồn BTP/TP vẫn theo mặt hàng × quy cách × lô…). Chi tiết: [`32-danh-muc`](../app-map/32-danh-muc.md) · [`34-btp`](../app-map/34-btp-san-xuat-kho.ba-spec.md).
 
 ---
 

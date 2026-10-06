@@ -4,13 +4,25 @@
 // Dùng chung cho màn Danh mục (DanhMucCrud) và hộp SỬA NHANH ở các màn nghiệp vụ
 // (bút chì trong ô chọn — xem SuaDanhMucNhanh.tsx). Tách khỏi CatalogScreen.tsx
 // ngày 2026-10-02, KHÔNG đổi trường / luật kiểm tra của màn Danh mục.
+// 2026-10-06: thêm danh mục thứ 6 "Bột tẩm" (batter_types, mig 0051) + trường
+// "Bột đi kèm" của mặt hàng.
 // ============================================================
 import { useMemo } from "react";
-import type { FinishedGood, Supplier, Customer, MaterialType, Product, StorageLocation } from "@/types";
+import type {
+  BatterType,
+  FinishedGood,
+  Supplier,
+  Customer,
+  MaterialType,
+  Product,
+  StorageLocation,
+} from "@/types";
 import { CATEGORIES, KIEU_CHE_BIEN, STORAGE_KIND_LABELS, laCoTach, quyCachBlock } from "@/types";
 import { newId as uid } from "@/lib/store";
 import { num } from "@/lib/format";
+import { taoHoacLayBot, tenBotDiKem } from "@/lib/botTam";
 import {
+  useBatterTypes,
   useSuppliers,
   useCustomers,
   useMaterialTypes,
@@ -22,13 +34,15 @@ import {
   ChoiceGroup,
   Combobox,
   NumberField,
+  notify,
   type LoiNhap,
   type TruongDanhMuc,
 } from "@/design-system";
+import { ChonBotDiKem } from "./ChonBotDiKem";
 
 const THI_TRUONG = ["Nhật", "EU", "Mỹ", "Hàn Quốc", "Trung Quốc", "Nội địa"];
 
-export type LoaiDanhMuc = "matHang" | "khachHang" | "daiLy" | "loaiNL" | "khoLuu";
+export type LoaiDanhMuc = "matHang" | "khachHang" | "daiLy" | "loaiNL" | "khoLuu" | "botTam";
 
 /** Đủ thứ để dựng màn CRUD một danh mục HOẶC hộp sửa nhanh một bản ghi. */
 export interface CauHinhDanhMuc<T extends { id: string }> {
@@ -59,6 +73,7 @@ export interface BoCauHinhDanhMuc {
   daiLy: CauHinhDanhMuc<Supplier>;
   loaiNL: CauHinhDanhMuc<MaterialType>;
   khoLuu: CauHinhDanhMuc<StorageLocation>;
+  botTam: CauHinhDanhMuc<BatterType>;
 }
 
 /** Cảnh báo khi mã số trùng với bản ghi khác (khách hàng / đại lý). Mã trống thì bỏ qua. */
@@ -103,10 +118,16 @@ function trungTen<T extends { id: string }>(
 }
 
 /**
- * Bộ trường của 5 danh mục — hàm THUẦN (không hook): cần danh sách loại NL và
- * 141 mã TK 1551 để dựng ô chọn trong form mặt hàng.
+ * Bộ trường của 6 danh mục — hàm THUẦN (không hook): cần danh sách loại NL,
+ * 141 mã TK 1551 và loại bột tẩm để dựng ô chọn trong form mặt hàng.
+ * `themBot` có ⇒ ô "Bột đi kèm" cho tạo loại bột mới tại chỗ (trả về id).
  */
-export function taoTruongDanhMuc(loaiNL: MaterialType[], thanhPham: FinishedGood[]) {
+export function taoTruongDanhMuc(
+  loaiNL: MaterialType[],
+  thanhPham: FinishedGood[],
+  botTam: BatterType[] = [],
+  themBot?: (ten: string) => string
+) {
   const optTP141 = thanhPham.map((t) => ({
     value: t.code,
     label: t.name,
@@ -176,6 +197,27 @@ export function taoTruongDanhMuc(loaiNL: MaterialType[], thanhPham: FinishedGood
       ),
       hienThi: (r) =>
         r.processingType || <span className="text-muted-foreground">—</span>,
+      anTrenDienThoai: true,
+    },
+    {
+      key: "batterIds",
+      nhan: "Bột đi kèm",
+      render: (giaTri, doiGiaTri) => (
+        <ChonBotDiKem
+          value={giaTri}
+          onChange={doiGiaTri}
+          botTam={botTam}
+          onTaoBot={themBot}
+        />
+      ),
+      hienThi: (r) => {
+        const ten = tenBotDiKem(r, botTam);
+        return ten.length > 0 ? (
+          ten.join(" + ")
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        );
+      },
       anTrenDienThoai: true,
     },
     {
@@ -386,12 +428,30 @@ export function taoTruongDanhMuc(loaiNL: MaterialType[], thanhPham: FinishedGood
     { key: "note", anTrenBang: true, nhan: "Ghi chú", anTrenDienThoai: true, viDu: "Ghi chú thêm" },
   ];
 
+  const fBotTam: TruongDanhMuc<BatterType>[] = [
+    {
+      key: "name",
+      nhan: "Tên loại bột",
+      batBuoc: true,
+      viDu: "VD: Bột 24V",
+      goiY: "Tên này là chỗ nối với sổ sản lượng — đổi tên ở đây KHÔNG tự đổi các dòng đã ghi.",
+    },
+    {
+      key: "code",
+      nhan: "Mã số",
+      goiY: "Mã in trên bao bột để gọi nhanh. Gõ mã này khi chọn bột là ra tên.",
+      viDu: "VD: 24V",
+    },
+    { key: "note", nhan: "Ghi chú", anTrenDienThoai: true, viDu: "VD: Bột tẩm nước tương" },
+  ];
+
   return {
     matHang: fMatHang,
     khachHang: fKhachHang,
     daiLy: fDaiLy,
     loaiNL: fLoaiNL,
     khoLuu: fKhoLuu,
+    botTam: fBotTam,
   };
 }
 
@@ -411,6 +471,7 @@ export function taoCauHinhDanhMuc(
     daiLy: NguonDanhMuc<Supplier>;
     loaiNL: NguonDanhMuc<MaterialType>;
     khoLuu: NguonDanhMuc<StorageLocation>;
+    botTam: NguonDanhMuc<BatterType>;
   }
 ): BoCauHinhDanhMuc {
   return {
@@ -436,6 +497,7 @@ export function taoCauHinhDanhMuc(
         processingType: "",
         splitComponents: false,
         blockSpecKg: null,
+        batterIds: [],
       }),
       timTheo: (r) => `${r.code} ${r.name} ${r.finishedGoodCode}`,
       moTaBanGhi: (r) => `${r.name}${r.code ? ` (mã ${r.code})` : ""}`,
@@ -535,16 +597,35 @@ export function taoCauHinhDanhMuc(
       truongTen: "name",
       noiTheoTen: true, // storageLocation lưu theo tên
     },
+    botTam: {
+      tieuDe: "Bột tẩm",
+      moTa: "Các loại bột dùng để tẩm thành phẩm (24V, 18V, 220H, 232, 20802…). Gắn bột đi kèm cho từng mặt hàng ở tab Mặt hàng — màn ghi thành phẩm sẽ hiện ô kg cho từng loại.",
+      tenDonVi: "loại bột",
+      rows: n.botTam.rows,
+      onChange: n.botTam.onChange,
+      fields: truong.botTam,
+      dangTai: n.botTam.dangTai,
+      kiemTraThem: (dang, rows) => [
+        ...trungMaSo(dang, rows, "loại bột"),
+        ...trungTen(dang, rows, "name", "Tên loại bột", "loại bột"),
+      ],
+      taoMoi: (): BatterType => ({ id: uid(), code: "", name: "", note: "" }),
+      timTheo: (r) => `${r.code} ${r.name} ${r.note}`,
+      moTaBanGhi: (r) => `${r.name}${r.code ? ` (mã ${r.code})` : ""}`,
+      truongTen: "name",
+      noiTheoTen: true, // production_wips.batter_kg lưu theo TÊN loại bột
+    },
   };
 }
 
-/** Cấu hình 5 danh mục cho màn Danh mục — gọi trong component (dùng hook catalogRepo). */
+/** Cấu hình 6 danh mục cho màn Danh mục — gọi trong component (dùng hook catalogRepo). */
 export function useCauHinhDanhMuc(): BoCauHinhDanhMuc {
   const [matHang, setMatHang, { trangThai: ttMH }] = useProducts();
   const [khachHang, setKhachHang, { trangThai: ttKH }] = useCustomers();
   const [daiLy, setDaiLy, { trangThai: ttDL }] = useSuppliers();
   const [loaiNL, setLoaiNL, { trangThai: ttNL }] = useMaterialTypes();
   const [khoLuu, setKhoLuu, { trangThai: ttKL }] = useStorageLocations();
+  const [botTam, setBotTam, { trangThai: ttBT }] = useBatterTypes();
   const [thanhPham] = useFinishedGoods();
 
   const taiMH = ttMH === "dang-tai" && matHang.length === 0;
@@ -552,13 +633,26 @@ export function useCauHinhDanhMuc(): BoCauHinhDanhMuc {
   const taiDL = ttDL === "dang-tai" && daiLy.length === 0;
   const taiNL = ttNL === "dang-tai" && loaiNL.length === 0;
   const taiKL = ttKL === "dang-tai" && khoLuu.length === 0;
+  const taiBT = ttBT === "dang-tai" && botTam.length === 0;
 
-  const truong = useMemo(() => taoTruongDanhMuc(loaiNL, thanhPham), [loaiNL, thanhPham]);
+  const truong = useMemo(() => {
+    // Tạo loại bột tại chỗ từ ô "Bột đi kèm" — ghi qua ĐÚNG instance của tab Bột tẩm.
+    const themBot = (ten: string): string => {
+      const kq = taoHoacLayBot(botTam, ten);
+      if (kq.moi) {
+        setBotTam(kq.rows);
+        notify.daLuu(`Đã thêm loại bột "${kq.bot.name}" vào danh mục`);
+      }
+      return kq.bot.id;
+    };
+    return taoTruongDanhMuc(loaiNL, thanhPham, botTam, themBot);
+  }, [loaiNL, thanhPham, botTam, setBotTam]);
   return taoCauHinhDanhMuc(truong, {
     matHang: { rows: matHang, onChange: setMatHang, dangTai: taiMH },
     khachHang: { rows: khachHang, onChange: setKhachHang, dangTai: taiKH },
     daiLy: { rows: daiLy, onChange: setDaiLy, dangTai: taiDL },
     loaiNL: { rows: loaiNL, onChange: setLoaiNL, dangTai: taiNL },
     khoLuu: { rows: khoLuu, onChange: setKhoLuu, dangTai: taiKL },
+    botTam: { rows: botTam, onChange: setBotTam, dangTai: taiBT },
   });
 }

@@ -9,11 +9,18 @@
 // mỗi `useBang` giữ state riêng, tự gọi useCustomers() ở đây thì màn không thấy
 // thay đổi và lần ghi kế tiếp của màn sẽ đè bản cũ lên.
 //
-// Danh mục nối với sổ đã ghi bằng TÊN (đại lý, loại NL, khách hàng, kho lưu):
-// ô tên CHỈ ĐỌC ở đây — đổi tên sẽ tách các dòng đã ghi khỏi danh mục.
+// Danh mục nối với sổ đã ghi bằng TÊN (đại lý, loại NL, khách hàng, kho lưu, bột
+// tẩm): ô tên CHỈ ĐỌC ở đây — đổi tên sẽ tách các dòng đã ghi khỏi danh mục.
 import { useMemo, useState, type ReactNode } from "react";
-import type { Customer, MaterialType, Product, StorageLocation, Supplier } from "@/types";
-import { useFinishedGoods, useMaterialTypes } from "@/lib/catalogRepo";
+import type {
+  BatterType,
+  Customer,
+  MaterialType,
+  Product,
+  StorageLocation,
+  Supplier,
+} from "@/types";
+import { useBatterTypes, useFinishedGoods, useMaterialTypes } from "@/lib/catalogRepo";
 import { HopSuaDanhMuc, notify, type LoiNhap } from "@/design-system";
 import {
   taoCauHinhDanhMuc,
@@ -29,6 +36,16 @@ export interface BanGhiDanhMuc {
   daiLy: Supplier;
   loaiNL: MaterialType;
   khoLuu: StorageLocation;
+  botTam: BatterType;
+}
+
+/**
+ * Danh mục bột tẩm CỦA MÀN GỌI — để ô "Bột đi kèm" trong hộp sửa mặt hàng thấy
+ * ngay loại bột vừa tạo tại màn, và tạo mới qua đúng instance `useBang` của màn.
+ */
+export interface NguonBotTam {
+  rows: BatterType[];
+  them: (ten: string) => string; // trả về id loại bột (mới hoặc có sẵn)
 }
 
 /** Nguồn rỗng cho các danh mục không sửa trong hộp này (chỉ để ráp cấu hình). */
@@ -42,6 +59,7 @@ function HopSuaNhanh<K extends LoaiDanhMuc>({
   onClose,
   onDaLuu,
   moTa,
+  nguonBot,
 }: {
   loai: K;
   id: string;
@@ -50,22 +68,27 @@ function HopSuaNhanh<K extends LoaiDanhMuc>({
   onClose: () => void;
   onDaLuu?: (moi: BanGhiDanhMuc[K], cu: BanGhiDanhMuc[K]) => void;
   moTa?: (r: BanGhiDanhMuc[K]) => ReactNode;
+  nguonBot?: NguonBotTam;
 }) {
   type T = BanGhiDanhMuc[K];
-  // Chỉ ĐỌC để dựng ô chọn trong form mặt hàng — không ghi qua hai instance này.
+  // Chỉ ĐỌC để dựng ô chọn trong form mặt hàng — không ghi qua các instance này.
   const [loaiNL] = useMaterialTypes();
   const [thanhPham] = useFinishedGoods();
+  const [botTamDoc] = useBatterTypes();
+  const botTam = nguonBot?.rows ?? botTamDoc;
+  const themBot = nguonBot?.them;
   const cfg = useMemo(() => {
-    const truong = taoTruongDanhMuc(loaiNL, thanhPham);
+    const truong = taoTruongDanhMuc(loaiNL, thanhPham, botTam, themBot);
     const bo = taoCauHinhDanhMuc(truong, {
       matHang: rong(),
       khachHang: rong(),
       daiLy: rong(),
       loaiNL: rong(),
       khoLuu: rong(),
+      botTam: rong(),
     });
     return bo[loai] as unknown as CauHinhDanhMuc<T>;
-  }, [loai, loaiNL, thanhPham]);
+  }, [loai, loaiNL, thanhPham, botTam, themBot]);
 
   const goc = rows.find((r) => r.id === id);
   const [dang, setDang] = useState<T | null>(goc ? { ...goc } : null);
@@ -131,6 +154,8 @@ export function useSuaDanhMuc<K extends LoaiDanhMuc>(
     theo?: "id" | "ten";
     onDaLuu?: (moi: BanGhiDanhMuc[K], cu: BanGhiDanhMuc[K]) => void;
     moTa?: (r: BanGhiDanhMuc[K]) => ReactNode;
+    /** Hộp sửa MẶT HÀNG: danh mục bột của màn (thấy + tạo loại bột tại chỗ). */
+    nguonBot?: NguonBotTam;
   } = {}
 ) {
   const [id, setId] = useState<string | null>(null);
@@ -140,6 +165,7 @@ export function useSuaDanhMuc<K extends LoaiDanhMuc>(
     daiLy: "đại lý",
     loaiNL: "loại nguyên liệu",
     khoLuu: "kho lưu trữ",
+    botTam: "loại bột",
   };
 
   const moSua = (value: string) => {
@@ -162,6 +188,7 @@ export function useSuaDanhMuc<K extends LoaiDanhMuc>(
       onClose={() => setId(null)}
       onDaLuu={opts.onDaLuu}
       moTa={opts.moTa}
+      nguonBot={opts.nguonBot}
     />
   ) : null;
 

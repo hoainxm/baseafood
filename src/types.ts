@@ -233,6 +233,18 @@ export interface Product {
   splitComponents?: boolean | string;
   /** Quy cách MỖI block (kg/khối). Migration 0031. Danh mục lưu chuỗi. */
   blockSpecKg?: number | string | null;
+  /** BỘT ĐI KÈM (migration 0051): id các loại bột tẩm của mặt hàng — VD tẩm bột
+   *  nước tương = [24V, 18V, 220H]. Màn /wip tự hiện ô kg cho từng loại. Danh mục
+   *  (CRUD lưu chuỗi) giữ dạng "id1,id2" — đọc bằng `botDiKemIds()` (lib/botTam). */
+  batterIds?: string[] | string;
+}
+
+/** Loại BỘT TẨM (migration 0051) — danh mục mở, VD "Bột 24V". Sổ nối theo TÊN. */
+export interface BatterType {
+  id: string;
+  code: string; // mã số gõ nhanh, VD "24V"
+  name: string;
+  note: string;
 }
 
 /** Mặt hàng có tách râu/bao tử không (chịu cả boolean lẫn chuỗi "1"/"true"). */
@@ -429,6 +441,9 @@ export interface WipProductionItem {
   /** Người thao tác ghi dòng này (họ tên tài khoản đăng nhập) — lưu vết ai gửi
    *  báo cáo thành phẩm ngày lên hệ thống (migration 0037). */
   operator?: string;
+  /** Bột tẩm ĐÃ DÙNG cho dòng này theo loại `{ "<tên loại bột>": kg }` (migration
+   *  0051). Phụ gia — KHÔNG cộng vào quantityKg. Lưu theo TÊN như còn-dở 0038. */
+  batterKg?: Record<string, number>;
 }
 
 export function isBackdatedWip(c: Pick<WipProductionItem, "productionDate" | "postingDate">): boolean {

@@ -37,9 +37,11 @@ import {
   BANG_RECONCILIATION_RUN,
   BANG_LOT_INPUT,
   BANG_LABEL_PRINT,
+  BANG_BATTER_TYPE,
   useBang,
 } from "@/lib/repo";
 import type {
+  BatterType,
   MaterialType,
   Product,
   FinishedGood,
@@ -47,6 +49,7 @@ import type {
   StorageLocation,
 } from "@/types";
 import { KHO_LUU_MAC_DINH } from "@/types";
+import { BOT_TAM_SEED, suyBotDiKem } from "@/lib/botTam";
 import fgSeed from "@/data/thanh-pham.json";
 import nxtBachTuoc from "@/data/nxt-bachtuoc-2026-07.json";
 
@@ -130,7 +133,8 @@ const MAT_HANG_BO_SUNG: { id: string; name: string }[] = [
 
 /** Mặt hàng nạp sẵn TỪ 141 thành phẩm (mỗi cái gắn loài = nhóm + kiểu chế biến suy
  *  từ tên) + các mặt hàng thật còn thiếu. Để lần đầu mở đã có cái mà chọn, lọc theo
- *  loài. `finishedGoodCode` trỏ về mã 141; `category` = nhóm; `processingType` = facet B. */
+ *  loài. `finishedGoodCode` trỏ về mã 141; `category` = nhóm; `processingType` = facet B;
+ *  `batterIds` = bột đi kèm suy từ tên (chỉ 2 nhóm đã chốt — `suyBotDiKem`, khớp 0051). */
 export const seedProducts = (): Product[] => [
   ...(fgSeed as any[]).map((t) => ({
     id: uid(),
@@ -139,6 +143,7 @@ export const seedProducts = (): Product[] => [
     finishedGoodCode: t.ma,
     category: t.nhom,
     processingType: suyKieuCheBien(t.ten),
+    batterIds: suyBotDiKem(t.ten),
   })),
   ...MAT_HANG_BO_SUNG.map((m) => ({
     id: uid(),
@@ -147,6 +152,7 @@ export const seedProducts = (): Product[] => [
     finishedGoodCode: "",
     category: "Bạch tuộc",
     processingType: suyKieuCheBien(m.name),
+    batterIds: suyBotDiKem(m.name),
   })),
 ];
 
@@ -256,6 +262,10 @@ export const useFinishedGoodsOpeningStock = () => useBang(BANG_FINISHED_OPENING_
 
 /* --- Xuất–Nhập–Tồn kho (snapshot từ báo cáo thật) --- */
 export const useNxtSnapshots = () => useBang(BANG_NXT_SNAPSHOT, seedNxtSnapshots);
+
+/* --- Danh mục LOẠI BỘT TẨM (mig 0051) — seed id tất định, khớp migration --- */
+export const seedBatterTypes = (): BatterType[] => BOT_TAM_SEED.map((b) => ({ ...b }));
+export const useBatterTypes = () => useBang(BANG_BATTER_TYPE, seedBatterTypes);
 
 /* --- Danh mục kho LƯU hàng (kho nhà + kho lạnh thuê ngoài) --- */
 export const useStorageLocations = () => useBang(BANG_STORAGE_LOCATION, seedStorageLocations);

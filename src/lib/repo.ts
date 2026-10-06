@@ -47,8 +47,10 @@ import type {
   ReconciliationRun,
   LotInput,
   LabelPrint,
+  BatterType,
 } from "@/types";
 import { rolesFromCsv, rolesToCsv } from "@/types";
+import { botDiKemIds, lamSachBot } from "@/lib/botTam";
 import { ghiNhatKy, type NhatKyMoi } from "@/lib/audit";
 
 /**
@@ -199,6 +201,9 @@ export const BANG_PRODUCT: AnhXaBang<Product> = {
       x.blockSpecKg == null || x.blockSpecKg === "" || Number(x.blockSpecKg) <= 0
         ? null
         : Number(x.blockSpecKg),
+    // Migration 0051 → gửi LUÔN (form danh mục lưu chuỗi "id1,id2" ⇒ chuẩn hoá về
+    // mảng). Gửi có điều kiện sẽ KHÔNG xoá được về rỗng (upsert giữ giá trị cũ).
+    batter_ids: botDiKemIds(x),
   }),
   fromRow: (r) => ({
     id: s(r.id),
@@ -210,12 +215,14 @@ export const BANG_PRODUCT: AnhXaBang<Product> = {
     processingType: r.processing_type == null ? "" : s(r.processing_type),
     splitComponents: Boolean(r.split_components),
     blockSpecKg: r.block_spec_kg == null ? null : Number(r.block_spec_kg),
+    batterIds: Array.isArray(r.batter_ids) ? (r.batter_ids as string[]) : [],
   }),
-  // Dòng ghi trước 0031 chưa có cờ tách / quy cách block → mặc định trống.
+  // Dòng ghi trước 0031/0051 chưa có cờ tách / quy cách block / bột đi kèm → mặc định trống.
   vaDongCu: (x) => ({
     ...x,
     splitComponents: x.splitComponents ?? false,
     blockSpecKg: x.blockSpecKg ?? null,
+    batterIds: x.batterIds ?? [],
   }),
 };
 
@@ -617,6 +624,9 @@ export const BANG_WIP_PRODUCTION: AnhXaBang<WipProductionItem> = {
     component_bao_tu_kg: x.componentBaoTuKg ?? null,
     balancing_period_id: x.balancingPeriodId ?? "",
     operator: x.operator ?? "",
+    // Migration 0051 → gửi LUÔN (như leftover_by_material 0038): gửi có điều kiện
+    // sẽ KHÔNG xoá được lượng bột khi sửa về rỗng.
+    batter_kg: lamSachBot(x.batterKg),
   }),
   fromRow: (r) => ({
     id: s(r.id),
@@ -638,8 +648,9 @@ export const BANG_WIP_PRODUCTION: AnhXaBang<WipProductionItem> = {
       r.component_bao_tu_kg == null ? null : Number(r.component_bao_tu_kg),
     balancingPeriodId: s(r.balancing_period_id),
     operator: s(r.operator),
+    batterKg: lamSachBot(r.batter_kg),
   }),
-  // Dòng ghi trước 0019/0030/0033/0037 chưa có cột kỳ / khách / chế biến / thành phần / người thao tác → mặc định trống.
+  // Dòng ghi trước 0019/0030/0033/0037/0051 chưa có cột kỳ / khách / chế biến / thành phần / người thao tác / bột → mặc định trống.
   vaDongCu: (x) => ({
     ...x,
     customerName: x.customerName ?? "",
@@ -648,6 +659,7 @@ export const BANG_WIP_PRODUCTION: AnhXaBang<WipProductionItem> = {
     componentBaoTuKg: x.componentBaoTuKg ?? null,
     balancingPeriodId: x.balancingPeriodId ?? "",
     operator: x.operator ?? "",
+    batterKg: x.batterKg ?? {},
   }),
 };
 
@@ -986,6 +998,20 @@ export const BANG_STORAGE_LOCATION: AnhXaBang<StorageLocation> = {
     kind: (s(r.kind) === "thue-ngoai" ? "thue-ngoai" : "noi-bo") as StorageLocation["kind"],
     address: s(r.address),
     phone: s(r.phone),
+    note: s(r.note),
+  }),
+};
+
+/** Danh mục LOẠI BỘT TẨM (migration 0051) — sổ sản lượng nối theo TÊN. */
+export const BANG_BATTER_TYPE: AnhXaBang<BatterType> = {
+  table: "batter_types",
+  localKey: "bsf.batter-types.v1",
+  layKhoa: theoId,
+  toRow: (x) => ({ id: x.id, code: x.code, name: x.name, note: x.note }),
+  fromRow: (r) => ({
+    id: s(r.id),
+    code: s(r.code),
+    name: s(r.name),
     note: s(r.note),
   }),
 };

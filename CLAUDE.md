@@ -18,7 +18,7 @@ npm run build    # tsc -b && vite build — cổng kiểu, phải xanh
 npm run lint     # oxlint
 ```
 
-**Test tự động (từ 2026-09-21):** `vitest` — 48 test cho hàm thuần (`balancingCalc` · `inventory.tinhTon/locBanLe/khaDung` · `format` · `imports/importHelpers` gom chuyến/ghi bù · `production/wipHelpers` tách râu/bao tử · `doiSoatHaiBan.phanBenThue` chia bản thuế/tự tải); chạy `npm test`. **CI GitHub Actions** (`.github/workflows/ci.yml`) chạy lint + build + test mỗi push/PR. Màn hình vẫn thử tay trên preview — xem bảng bên dưới.
+**Test tự động (từ 2026-09-21):** `vitest` — 100 test cho hàm thuần (`balancingCalc` · `inventory.tinhTon/locBanLe/khaDung` · `format` · `imports/importHelpers` gom chuyến/ghi bù · `production/wipHelpers` tách râu/bao tử · `lib/botTam` bột đi kèm/lượng bột theo loại · `doiSoatHaiBan.phanBenThue` chia bản thuế/tự tải · …); chạy `npm test`. **CI GitHub Actions** (`.github/workflows/ci.yml`) chạy lint + build + test mỗi push/PR. Màn hình vẫn thử tay trên preview — xem bảng bên dưới.
 
 ## Cấu trúc
 
@@ -32,7 +32,7 @@ src/
 ├── design-system/            tokens.css · patterns/ · kit/ · index.ts (cửa import duy nhất)
 └── features/                 THẬT: imports · production/WipProductionScreen (/wip) · packaging (/packaging) · warehouse · orders · sales · balancing · catalog · reports/NXT · auth · users
                               DEMO (dữ liệu mẫu): production/WorkOrderScreen (/production) · reports · quality · traceability · cold-storage (hybrid: tồn THẬT, nhiệt độ minh hoạ)
-supabase/migrations/          0001 … 0048 (đã chạy trên DB thật tới 0049 — rà cột 2026-10-02: `0040` chạy bù 2026-10-02; `0028` chạy bù 2026-10-02 (trước đó thiếu `production_locks.leftover_kg` ⇒ mọi lần chốt ngày SX bị từ chối), xem [03-database](docs/app-map/03-database.md); RIÊNG `0029` bảng `packagings` bị sót, chạy bù 2026-09-30 kèm RLS mẫu `0021` + trigger `0048` — xem [03-database](docs/app-map/03-database.md))
+supabase/migrations/          0001 … 0051 (đã chạy trên DB thật tới 0051 — `0051` bột tẩm chạy 2026-10-06 (2 lần, idempotent); rà cột 2026-10-02: `0040` chạy bù 2026-10-02; `0028` chạy bù 2026-10-02 (trước đó thiếu `production_locks.leftover_kg` ⇒ mọi lần chốt ngày SX bị từ chối), xem [03-database](docs/app-map/03-database.md); RIÊNG `0029` bảng `packagings` bị sót, chạy bù 2026-09-30 kèm RLS mẫu `0021` + trigger `0048` — xem [03-database](docs/app-map/03-database.md))
 docs/README.md                bản đồ tài liệu — doc nào ở đâu, doc mới bỏ đâu
 docs/app-map/                 bản đồ ngữ cảnh cho agent (đọc khi CODE)
 docs/ops/                     vận hành: cutover Supabase · deploy Vercel · env
@@ -120,7 +120,7 @@ Cổng là những cái này, **chạy thật, không suy đoán** (test mới v
 | Đụng vào | Bắt buộc |
 |---|---|
 | Bất cứ file `.ts` / `.tsx` nào | `npm run build` + `npm run lint` + `npm test` (CI cũng chạy đủ 3) |
-| `lib/balancingCalc.ts`, `lib/inventory.ts`, `imports/importHelpers.ts`, `production/wipHelpers.ts` | **sửa test đi kèm** (`*.test.ts` cùng thư mục) — AC = test |
+| `lib/balancingCalc.ts`, `lib/inventory.ts`, `lib/botTam.ts`, `imports/importHelpers.ts`, `production/wipHelpers.ts` | **sửa test đi kèm** (`*.test.ts` cùng thư mục) — AC = test |
 | `lib/balancingCalc.ts` hay công thức | Mở một kỳ có số liệu, đối chiếu tay: định mức = NL÷TP; lãi/lỗ = giá trị xuất − giá thành |
 | `lib/repo.ts` / hàng chờ / `AnhXaBang` | Thử **cả hai chế độ** (có `.env` và không); ghi khi ngắt mạng rồi nối lại — dòng phải lên server, reload không nuốt dòng |
 | Màn Nhập hàng | Ghi 1 chuyến 2 dòng → chốt ngày → ghi bù (phải bắt lý do) → mở lại; kiểm tổng ngày + cảnh báo lệch |
@@ -165,7 +165,7 @@ Ngoài app-map: [`src/design-system/README.md`](src/design-system/README.md) (UI
 
 > **Bổ sung — họp 2026-09-02:** chốt số chạy realtime **từ tháng 9**; định hướng lớn cho vận hành: **một form nhập chuẩn + chụp ảnh phiếu tay → OCR** (giảm gõ tay ở xưởng), **định danh lô + QR** (trace nội bộ; SSCC nhà nước chừa ô trống làm sau), **giá & bình quân gia quyền theo ngày** (đang chốt PA), **QC chấm điểm + ảnh**, **khung nhân sự gắn từng khâu**. Cửa vào: [`trien-khai/hop-2026-09-02-form-nhap-trace-gia-qc.md`](docs/trien-khai/hop-2026-09-02-form-nhap-trace-gia-qc.md).
 
-**Đã build (THẬT — nối dữ liệu):** nhập hàng (chuyến thật · 2 ngày + ghi bù · chốt ngày · phế liệu ngày · bộ lọc), **sản xuất BTP ngày `/wip`** (sản lượng theo ngày/xưởng/loại NL · chốt ngày SX · ghi bù), **kho dự trữ `/warehouse`** (duyệt BTP chờ→đã nhập · tồn), **đơn đặt `/orders`** (lệnh xuất FIFO từ tồn WIP), bán hàng (phiếu bán · quy cách · XK/NĐ · hút cân đối), cân đối + in A4 + chốt/chuyển kỳ, NXT + tồn NL, danh mục 5 tab, đăng nhập + vai trò `user_profiles` + màn Người dùng, **sổ kho theo tháng `/ton-kho-thang`** (dồn tồn cuối kỳ tháng N → tồn đầu kỳ N+1, đủ cột kiện+kg cho NL/BTP/TP — [36-so-kho-thang](docs/app-map/36-so-kho-thang.md)), bộ giao diện responsive, tầng dữ liệu Supabase↔localStorage. Điều hướng **react-router v7 (HashRouter)**, ~20 route, **nav CÂY module-centric** (`CAY_NAV`, gập/mở + deep-link danh mục trong module).
+**Đã build (THẬT — nối dữ liệu):** **bột tẩm theo loại** (2026-10-06, `0051`: danh mục "Bột tẩm" + bột đi kèm từng mặt hàng tẩm bột, `/wip` ghi kg từng loại bột — phụ gia, không cộng vào thành phẩm — [32](docs/app-map/32-danh-muc.md) · [34](docs/app-map/34-btp-san-xuat-kho.ba-spec.md)), nhập hàng (chuyến thật · 2 ngày + ghi bù · chốt ngày · phế liệu ngày · bộ lọc), **sản xuất BTP ngày `/wip`** (sản lượng theo ngày/xưởng/loại NL · chốt ngày SX · ghi bù), **kho dự trữ `/warehouse`** (duyệt BTP chờ→đã nhập · tồn), **đơn đặt `/orders`** (lệnh xuất FIFO từ tồn WIP), bán hàng (phiếu bán · quy cách · XK/NĐ · hút cân đối), cân đối + in A4 + chốt/chuyển kỳ, NXT + tồn NL, danh mục 5 tab, đăng nhập + vai trò `user_profiles` + màn Người dùng, **sổ kho theo tháng `/ton-kho-thang`** (dồn tồn cuối kỳ tháng N → tồn đầu kỳ N+1, đủ cột kiện+kg cho NL/BTP/TP — [36-so-kho-thang](docs/app-map/36-so-kho-thang.md)), bộ giao diện responsive, tầng dữ liệu Supabase↔localStorage. Điều hướng **react-router v7 (HashRouter)**, ~20 route, **nav CÂY module-centric** (`CAY_NAV`, gập/mở + deep-link danh mục trong module).
 
 **Màn DEMO (dữ liệu mẫu, chưa nối bảng — đừng coi là đã có):** Lệnh sản xuất `/production` · Báo cáo tổng `/reports` · Chất lượng `/quality` · Truy xuất `/traceability` · Kho lạnh `/cold-storage` (**hybrid**: tồn hút số thật qua `tinhTon`, chỉ nhiệt độ/bố trí lô là minh hoạ). `/dashboard` **đã nối số thật** — không còn DEMO (không nằm trong `DEMO_IDS` ở `lib/nav-access.ts`).
 

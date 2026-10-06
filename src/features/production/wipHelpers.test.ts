@@ -13,6 +13,7 @@ describe("dongSXRong", () => {
     expect(r.processingType).toBe("luộc");
     expect(r.customerName).toBe("Peacock");
     expect(r.productId).toBe("");
+    expect(r.botKg).toEqual({});
     expect(tongDong(r)).toBe(0);
     expect(r.key).not.toBe(dongSXRong("g1").key); // key React ổn định, khác nhau mỗi dòng
   });
@@ -28,6 +29,13 @@ describe("laTach / tongDong", () => {
     expect(tongDong(d({ rauKg: 30, baoTuKg: 0, quantityKg: 999 }))).toBe(30);
     expect(tongDong(d({ rauKg: 30, baoTuKg: 20, quantityKg: 999 }))).toBe(50);
     expect(laTach(d({ baoTuKg: 5 }))).toBe(true);
+  });
+});
+
+describe("bột tẩm không cộng vào thành phẩm", () => {
+  it("tổng dòng chỉ tính thành phẩm, bỏ qua kg bột", () => {
+    expect(tongDong(d({ productId: "p", quantityKg: 470, botKg: { "Bột 24V": 47 } }))).toBe(470);
+    expect(dongDayDu(d({ productId: "p", botKg: { "Bột 24V": 5 } }))).toBe(false); // chỉ có bột, chưa có TP
   });
 });
 

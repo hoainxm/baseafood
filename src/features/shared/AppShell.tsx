@@ -104,7 +104,7 @@ export const KIT_NAV: MucNavShell[] = [
   { id: "doi-soat", label: "Đối soát hóa đơn điện tử", icon: FileCheck2 , moTa: "Đối soát sổ phần mềm với hóa đơn điện tử, tìm dòng lệch và lưu bản đối soát." },
   { id: "reports", label: "Báo cáo tổng", icon: BarChart3, demo: true , moTa: "Báo cáo tổng hợp (màn DEMO — đang dùng dữ liệu mẫu)." },
   { id: "traceability", label: "Truy xuất nguồn gốc", icon: GitBranch, demo: true , moTa: "Truy xuất nguồn gốc lô hàng (màn DEMO — đang dùng dữ liệu mẫu)." },
-  { id: "catalog", label: "Danh mục", icon: Library , moTa: "Danh mục dùng chung: mặt hàng, khách hàng, đại lý, loại nguyên liệu, kho lưu trữ, thành phẩm." },
+  { id: "catalog", label: "Danh mục", icon: Library , moTa: "Danh mục dùng chung: mặt hàng, khách hàng, đại lý, loại nguyên liệu, bột tẩm, kho lưu trữ, thành phẩm." },
   { id: "users", label: "Người dùng", icon: Users , moTa: "Quản lý tài khoản đăng nhập và vai trò của từng người." },
   { id: "audit", label: "Nhật ký thao tác", icon: History , moTa: "Nhật ký thao tác: ai sửa gì, lúc nào, giá trị trước và sau." },
 ];

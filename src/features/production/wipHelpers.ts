@@ -26,6 +26,9 @@ export interface DauPhien {
  *    customerName trên TỪNG dòng như cũ.
  *  - `tach`: thành phẩm cắt chần tách 2 thành phần cùng giá (râu + bao tử);
  *    khi bật, tổng khối lượng = râu + bao tử (khoá, tự cộng).
+ *  - `botKg`: bột tẩm đã dùng theo loại `{ tên bột: kg }` (mig 0051) — phụ gia,
+ *    KHÔNG cộng vào tổng thành phẩm. Giữ cả loại đang để 0 (ô vẫn hiện); khi lưu
+ *    `lamSachBot` (lib/botTam) bỏ ô ≤ 0.
  */
 export interface DongSX {
   key: string;
@@ -39,6 +42,7 @@ export interface DongSX {
   baoTuKg: number;
   blocksCount: number;
   blockSpecKg: number; // quy cách kg/khối — nhập ngay trên dòng, nhớ về mặt hàng
+  botKg: Record<string, number>; // bột tẩm theo loại — không cộng vào tổng TP
 }
 
 export const dongSXRong = (
@@ -57,6 +61,7 @@ export const dongSXRong = (
   baoTuKg: 0,
   blocksCount: 0,
   blockSpecKg: 0,
+  botKg: {},
 });
 
 /** Dòng có tách râu/bao tử = đã nhập ít nhất một trong hai thành phần. */

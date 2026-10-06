@@ -4,12 +4,14 @@
 // Tách khỏi WipProductionScreen.tsx ngày 2026-09-21 — KHÔNG đổi logic.
 // ============================================================
 import { Fragment } from "react";
-import type { Product } from "@/types";
+import type { BatterType, Product } from "@/types";
 import { laCoTach, quyCachBlock } from "@/types";
 import { Button, Combobox, NumberField, type MucChon } from "@/design-system";
 import { num } from "@/lib/format";
+import { laMatHangTamBot, tenBotDiKem } from "@/lib/botTam";
 import { ChevronDown, Pencil, Plus, X } from "lucide-react";
 import { dongTrong, laTach, tongDong, type DongSX } from "./wipHelpers";
+import { KhoiBotTam } from "./KhoiBotTam";
 
 /**
  * BẢNG nhập NHÓM THEO LOÀI: mỗi loài một cụm (Bạch tuộc, Mực, Cá…), dưới là bảng
@@ -18,6 +20,8 @@ import { dongTrong, laTach, tongDong, type DongSX } from "./wipHelpers";
  * nhiên — "Bạch tuộc 2 da lớn/nhỏ" đều là loài Bạch tuộc. Mã có cờ "tách râu/bao
  * tử" (Danh mục) mới hiện mũi tên đầu dòng để mở ô râu + bao tử. Mã có "quy cách
  * block" thì nhập số block tự tính kg gợi ý. Thêm nhóm bằng ô "Thêm loài" ở cuối.
+ * Mã TẨM BỘT (đã gắn bột đi kèm / kiểu chế biến có "bột") tự hiện dòng con "Bột
+ * tẩm": một ô kg cho từng loại bột đi kèm (mig 0051) — không cộng vào kg thành phẩm.
  */
 export function BangDongSX({
   dong,
@@ -32,6 +36,10 @@ export function BangDongSX({
   onSuaKhach,
   optKhach,
   onTaoKhach,
+  botTam,
+  optBot,
+  onTaoBot,
+  onSuaBot,
 }: {
   dong: DongSX[];
   matHang: Product[];
@@ -54,6 +62,12 @@ export function BangDongSX({
   onSuaKhach: (ten: string) => void;
   optKhach: MucChon[];
   onTaoKhach: (ten: string) => string;
+  /** Danh mục loại bột (để ra TÊN bột đi kèm của mặt hàng). */
+  botTam: BatterType[];
+  /** Ô chọn loại bột — value = TÊN. */
+  optBot: MucChon[];
+  onTaoBot: (ten: string) => string;
+  onSuaBot: (ten: string) => void;
 }) {
   const th =
     "border-b-2 border-border bg-card px-2 py-2 text-left text-sm font-semibold whitespace-nowrap";
@@ -153,6 +167,15 @@ export function BangDongSX({
                     // Mũi tên tách hiện ở MỌI dòng; tách "tính" khi đã nhập
                     // râu/bao tử. Mã đánh dấu "Có tách" chỉ để tự mở sẵn.
                     const tach = laTach(d);
+                    const p = d.productId
+                      ? matHang.find((m) => m.id === d.productId)
+                      : undefined;
+                    // Khối bột: mã tẩm bột, nhóm chế biến có "bột", hoặc dòng đã nhập bột.
+                    const hienBot =
+                      Boolean(d.productId) &&
+                      (laMatHangTamBot(p) ||
+                        /bột/i.test(d.processingType) ||
+                        Object.keys(d.botKg).length > 0);
                     return (
                       <Fragment key={d.key}>
                         <tr>
@@ -330,6 +353,31 @@ export function BangDongSX({
                                   </span>{" "}
                                   kg
                                 </div>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+
+                        {hienBot && (
+                          <tr className="bg-accent/30">
+                            <td
+                              className="border-b border-border px-2 pt-2 pb-3"
+                              colSpan={5}
+                            >
+                              {/* Bảng rộng 840px cuộn ngang trong khung: ghim khối bột ở
+                                  mép trái + giới hạn theo bề rộng màn ⇒ trên điện thoại các
+                                  ô bột xếp dọc trong vùng nhìn thấy, không phải vuốt ngang. */}
+                              <div className="sticky left-2 max-w-[calc(100vw-8.5rem)] sm:pl-10">
+                                <KhoiBotTam
+                                  diKem={tenBotDiKem(p, botTam)}
+                                  botKg={d.botKg}
+                                  onDoi={(botKg) => onSua(d.key, { botKg })}
+                                  optBot={optBot}
+                                  onTaoBot={onTaoBot}
+                                  onSuaBot={onSuaBot}
+                                  kgThanhPham={tongDong(d)}
+                                  dieuHuongCot
+                                />
                               </div>
                             </td>
                           </tr>

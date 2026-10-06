@@ -252,6 +252,7 @@ Quy tắc gộp (báo cáo ngày → mặt hàng cân đối):
 - **Dạt**: **là thành phẩm**, GIỮ theo **từng size** (dạt 80, dạt 100) — thêm mặt hàng vào danh mục (không phải phụ phẩm).
 - **Mặt hàng mới đúng tên phiếu** khi mẫu chưa có grade đó: VD `cổ luộc 1-2`, `cắt chần 1000` (danh mục mặt hàng là danh mục MỞ).
 - **Bột tẩm** (mã `22601`, `27102`, `24v`, `18v`, `2204`…) = **Bột phụ gia → Khối 1**, KHÔNG phải BTP ra. Số **trong ngoặc** trên phiếu = kế toán cộng tổng ⇒ **bỏ**, chỉ lấy lượng bột.
+  - *(2026-10-06, mig `0051`)* Lượng bột nay **ghi ngay ở `/wip` theo từng loại** trên dòng thành phẩm tẩm bột (`production_wips.batter_kg`; bộ bột đi kèm ở Danh mục — VD nước tương = 24V+18V+220H, 5-10 = 232+20802). Sổ ngày `/wip` có khối **"Bột tẩm đã dùng"** cộng theo loại cho khoảng ngày — kế toán lấy số đó điền nhóm `Bột phụ gia`. **Chưa tự hút** vào Khối 1 (công thức / `balancingCalc.ts` không đổi).
 
 - **Bao tử tách dòng riêng trên phiếu = phần bao tử của tẩm bột cùng grade** (báo cáo tách râu/bao tử để kiểm soát ngày; cân đối GỘP). Ví dụ chốt: *2 da tẩm bột 9-12 = râu 1.390 + bao tử 940 = **2.330 kg*** — đúng số `(2.330)` cô Hạnh ghi trong ngoặc (tổng SAU gộp, không phải rác).
 

@@ -24,7 +24,7 @@ import ThanhPham141 from "./FinishedGoodScreen";
  * Gộp lại: điều hướng còn 3 mục, mỗi mục là MỘT VIỆC rõ ràng.
  */
 /** Tab hợp lệ — deep-link từ nav module (VD /catalog?tab=dai-ly) mở đúng tab. */
-const TABS = ["mat-hang", "khach-hang", "dai-ly", "loai-nl", "kho-luu", "tp-141"];
+const TABS = ["mat-hang", "khach-hang", "dai-ly", "loai-nl", "bot-tam", "kho-luu", "tp-141"];
 
 export default function DanhMucScreen() {
   // Tab điều khiển bằng URL (?tab=) để deep-link từ nav module mở đúng tab —
@@ -59,6 +59,7 @@ export default function DanhMucScreen() {
           <TabsTrigger value="khach-hang" title="Khách mua thành phẩm, kèm thị trường (Nhật, EU, nội địa…).">Khách hàng</TabsTrigger>
           <TabsTrigger value="dai-ly" title="Đại lý cung cấp nguyên liệu — dùng khi ghi chuyến nhập hàng.">Đại lý</TabsTrigger>
           <TabsTrigger value="loai-nl" title="Quy cách / size nguyên liệu, có gắn loài (bạch tuộc, mực, cá…).">Loại nguyên liệu</TabsTrigger>
+          <TabsTrigger value="bot-tam" title="Các loại bột tẩm (24V, 18V, 220H, 232, 20802…) — gắn vào mặt hàng tẩm bột để ghi kg bột theo từng loại.">Bột tẩm</TabsTrigger>
           <TabsTrigger value="kho-luu" title="Nơi hàng đang nằm: kho nhà và các kho lạnh thuê ngoài.">Kho lưu trữ</TabsTrigger>
           <TabsTrigger value="tp-141" title="141 mã thành phẩm kế toán (TK 1551) — chỉ đọc, không sửa ở đây.">Thành phẩm (141 mã)</TabsTrigger>
         </TabsList>
@@ -77,6 +78,10 @@ export default function DanhMucScreen() {
 
         <TabsContent value="loai-nl" className="pt-6">
           <DanhMucCrudTheo cfg={c.loaiNL} />
+        </TabsContent>
+
+        <TabsContent value="bot-tam" className="pt-6">
+          <DanhMucCrudTheo cfg={c.botTam} />
         </TabsContent>
 
         <TabsContent value="kho-luu" className="pt-6">

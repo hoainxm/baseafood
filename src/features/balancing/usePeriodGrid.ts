@@ -8,6 +8,7 @@ import type {
   BalancingInputItem,
   BalancingOutputItem,
   BalancingPeriod,
+  DailyQuantities,
   MaterialImportItem,
   WipProductionItem,
 } from "@/types";
@@ -30,6 +31,7 @@ import {
   kyLienTruoc,
   kyTrungNgayCungHo,
   kyMauTP,
+  loaiDongKho,
   dungDongMauTP,
   dongMauConThieu,
   goiYKhachGia,
@@ -46,9 +48,11 @@ import {
   useBalancingOutputs,
   useBalancingPeriods,
   useMaterialImports,
+  useMaterialOpeningStock,
   useProductionLocks,
   useWipProductions,
 } from "@/lib/catalogRepo";
+import { conDoTheoNgay, tinhSoTonNL, type SoTonNLKy } from "@/lib/inventoryMaterial";
 
 /** Một ô ngày cần ghi về sổ nguồn. */
 export interface ONgay {
@@ -82,6 +86,12 @@ export interface PeriodGrid {
   hutNhapHang: (ids?: string[]) => void;
   /** Ghi nhiều ô ngày về sổ Nhập hàng. Trả về false nếu bị từ chối. */
   ghiNhapNhieuNgay: (dsO: ONgay[]) => boolean;
+  /** Tồn kho đông của họ NL này qua kỳ (tồn đầu · gửi đông · xả đông · tồn cuối) — sống theo từng phím gõ. */
+  tonKhoDong: SoTonNLKy | null;
+  /** Còn dở SX theo ngày chốt trong kỳ (cùng họ) — đối chiếu / điền nhanh dòng Gửi đông. */
+  conDoSXTheoNgay: DailyQuantities;
+  /** Đơn giá dòng Gửi đông gần nhất (kỳ trước, cùng họ) — gợi ý giá cho Lấy xả đông. */
+  giaGuiDongTruoc: number | null;
   /* --- khối 2 --- */
   tp: BalancingOutputItem[];
   hangTP: HangLuoiTP[];
@@ -143,6 +153,7 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
   const [tatCaSanXuat, ghiTatCaSanXuat] = useWipProductions();
   const [chotSanXuat] = useProductionLocks();
   const [tatCaKy] = useBalancingPeriods();
+  const [tonDauKhaiTay] = useMaterialOpeningStock();
 
   /** Kỳ đã chốt ⇒ mọi ô khoá, mọi nút ghi ẩn. Mở lại ở thanh cuối màn. */
   const daChot = Boolean(ky.isLocked);
@@ -613,6 +624,34 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
     [ky, nlChoTinh, tpChoTinh]
   );
 
+  /* ---------- Kho đông: dòng Lấy xả đông / Gửi đông ---------- */
+
+  /* Cùng engine với sổ /nxt-nl (tinhSoTonNL) — gõ vào hai dòng kho là tồn đổi
+     ngay, không có bản sao số nào phải đồng bộ. Nhập tươi không cần ở đây ⇒ []. */
+  const tonKhoDong = useMemo(
+    () =>
+      tinhSoTonNL(tatCaKy, tatCaNL, [], tonDauKhaiTay, chotSanXuat).find(
+        (r) => r.periodId === ky.id
+      ) ?? null,
+    [tatCaKy, tatCaNL, tonDauKhaiTay, chotSanXuat, ky.id]
+  );
+  const conDoSXTheoNgay = useMemo(() => conDoTheoNgay(chotSanXuat, ky), [chotSanXuat, ky]);
+
+  const giaGuiDongTruoc = useMemo(() => {
+    const ho = hoNguyenLieu(ky.materialTypeName);
+    const kyTheoId = new Map(tatCaKy.map((k) => [k.id, k]));
+    let ganNhat: { ngay: string; gia: number } | null = null;
+    for (const r of tatCaNL) {
+      if (r.periodId === ky.id || r.unitPrice == null || loaiDongKho(r) !== "gui-dong") continue;
+      const k = kyTheoId.get(r.periodId);
+      if (!k || hoNguyenLieu(k.materialTypeName) !== ho) continue;
+      const d = k.endDate || k.startDate || "";
+      if (ky.startDate && d >= ky.startDate) continue;
+      if (!ganNhat || d > ganNhat.ngay) ganNhat = { ngay: d, gia: r.unitPrice };
+    }
+    return ganNhat?.gia ?? null;
+  }, [tatCaNL, tatCaKy, ky.id, ky.materialTypeName, ky.startDate]);
+
   /* ---------- Chuyển kỳ từ kỳ liền trước ---------- */
 
   const kyTruoc = useMemo(() => kyLienTruoc(ky, tatCaKy), [ky, tatCaKy]);
@@ -718,6 +757,9 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
     ghiNL,
     hutNhapHang,
     ghiNhapNhieuNgay,
+    tonKhoDong,
+    conDoSXTheoNgay,
+    giaGuiDongTruoc,
     tp,
     hangTP,
     sanXuatDaGan,

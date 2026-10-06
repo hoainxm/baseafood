@@ -14,7 +14,15 @@ import type {
 } from "@/types";
 import type { BalancingResult } from "@/lib/balancingCalc";
 import type { MaterialImportItem, WipProductionItem } from "@/types";
-import { dungHangNL, dungHangTP, nhanNgay, ngayTrongKy } from "@/lib/balancingGrid";
+import {
+  TEN_DONG_KHO,
+  dungHangNL,
+  dungHangTP,
+  nhanNgay,
+  ngayTrongKy,
+  tenKhachCanDoi,
+  type HangLuoiNL,
+} from "@/lib/balancingGrid";
 import { Button } from "@/design-system";
 import { num } from "@/lib/format";
 import { ChevronsLeftRight, Coins, Printer, X } from "lucide-react";
@@ -42,10 +50,14 @@ export default function BangCanDoi({
   onClose: () => void;
 }) {
   const tenMH = (id: string) => matHang.find((m) => m.id === id)?.name || "—";
-  const tenKH = (id: string) => khach.find((k) => k.id === id)?.name || "—";
+  const tenKH = (id: string) => tenKhachCanDoi(id, khach);
 
   const ngay = ngayTrongKy(ky);
-  const hangNL = dungHangNL(nlVao, nhapDaGan);
+  /* Cùng thứ tự với lưới: Lấy xả đông đầu bảng, Gửi đông cuối bảng. */
+  const thuTu = (h: HangLuoiNL) => (h.loaiKho === "lay-xa-dong" ? 0 : h.loaiKho === "gui-dong" ? 2 : 1);
+  const hangNL = dungHangNL(nlVao, nhapDaGan).sort((a, b) => thuTu(a) - thuTu(b));
+  /* Cột chuyển kỳ đã bỏ ở khối NL — chỉ in khi kỳ cũ lỡ có số. */
+  const coChuyenKyCu = hangNL.some((r) => r.chuyenKy !== 0);
   const hangTP = dungHangTP(tp, sanXuatDaGan);
   /* Nhieu cot ngay ⇒ in NGANG, neu khong bang bi cat mat cot cuoi. */
   const inNgang = ngay.length > 3;
@@ -56,9 +68,9 @@ export default function BangCanDoi({
   const [anNgay, setAnNgay] = useState(false);
   const [anTien, setAnTien] = useState(false);
   const cotNgay = anNgay ? [] : ngay;
-  /* Khối NL theo bảng cân đối giấy KHÔNG chia ngày (Loại hàng · Số lượng · Đơn giá ·
-     T.tiền · tỷ lệ) ⇒ mặc định thu, công tắc riêng. */
-  const [moNgayNL, setMoNgayNL] = useState(false);
+  /* Khối NL: công tắc ngày riêng — mặc định MỞ như màn (chốt 2026-10-06); thu lại thì
+     in đúng bảng giấy (Loại hàng · Số lượng · Đơn giá · T.tiền · tỷ lệ). */
+  const [moNgayNL, setMoNgayNL] = useState(true);
   const cotNgayNL = moNgayNL ? cotNgay : [];
 
   /* Khoá cuộn nền khi phiếu đang mở — xem ghi chú ở src/index.css. */
@@ -125,7 +137,7 @@ export default function BangCanDoi({
                     {nhanNgay(iso)}
                   </Th>
                 ))}
-                {moNgayNL && <Th right>Chuyển kỳ</Th>}
+                {moNgayNL && coChuyenKyCu && <Th right>Chuyển kỳ (cũ)</Th>}
                 <Th right>Số lượng</Th>
                 {!anTien && <Th right>Đơn giá VNĐ</Th>}
                 {!anTien && <Th right>T.tiền (đồng)</Th>}
@@ -136,17 +148,23 @@ export default function BangCanDoi({
               {hangNL.map((r) => (
                 <Tr key={r.id}>
                   <Td>
-                    {r.ten}
-                    <span className="ml-1 text-xs text-slate-500">
-                      ({r.laGiam ? "Giảm" : r.nhom})
-                    </span>
+                    {r.loaiKho ? (
+                      <strong>{r.ten === TEN_DONG_KHO[r.loaiKho] ? r.ten : `${TEN_DONG_KHO[r.loaiKho]} · ${r.ten}`}</strong>
+                    ) : (
+                      <>
+                        {r.ten}
+                        <span className="ml-1 text-xs text-slate-500">
+                          ({r.laGiam ? "Giảm" : r.nhom})
+                        </span>
+                      </>
+                    )}
                   </Td>
                   {cotNgayNL.map((iso) => (
                     <Td key={iso} right>
                       {r.theoNgay[iso] ? num(r.theoNgay[iso]) : ""}
                     </Td>
                   ))}
-                  {moNgayNL && <Td right>{r.chuyenKy ? num(r.chuyenKy) : ""}</Td>}
+                  {moNgayNL && coChuyenKyCu && <Td right>{r.chuyenKy ? num(r.chuyenKy) : ""}</Td>}
                   <Td right>{num(r.tong)}</Td>
                   {!anTien && <Td right>{num(r.donGia)}</Td>}
                   {/* Chưa khai đơn giá thì để trống — "-0" (dòng giảm × giá 0)
@@ -162,10 +180,10 @@ export default function BangCanDoi({
                     {num(hangNL.reduce((s, r) => s + (r.theoNgay[iso] ?? 0), 0))}
                   </Td>
                 ))}
-                {moNgayNL && <Td right>{num(hangNL.reduce((s, r) => s + r.chuyenKy, 0))}</Td>}
+                {moNgayNL && coChuyenKyCu && <Td right>{num(hangNL.reduce((s, r) => s + r.chuyenKy, 0))}</Td>}
                 <Td right>{num(kq.totalInputKg)}</Td>
                 {!anTien && (
-                  <Td right>{kq.totalInputKg ? num(Math.round(kq.materialValue / kq.totalInputKg)) : ""}</Td>
+                  <Td right>{kq.totalInputKg ? num(Math.round(kq.materialValue / kq.totalInputKg) || 0) : ""}</Td>
                 )}
                 {!anTien && <Td right>{num(kq.materialValue)}</Td>}
                 {!anTien && <Td right></Td>}
@@ -179,20 +197,21 @@ export default function BangCanDoi({
           <table className="w-full border-collapse text-sm">
             <thead>
               <Tr head>
-                {/* Thứ tự như bảng giấy: Mặt hàng · Khách · XUẤT KHẨU (Lượng · Đơn giá ·
-                    T.tiền) · chuyển kỳ · từng ngày · Tổng. Hàng nội địa: giá VND, không "$". */}
+                {/* Thứ tự như lưới: Mặt hàng · Khách · XUẤT KHẨU (Lượng · Đơn giá · T.tiền) ·
+                    từng ngày · Tổng · Trả · Nợ. Hàng nội địa: giá VND, không "$". */}
                 <Th>Mặt hàng</Th>
                 <Th>Khách</Th>
                 <Th right>Lượng</Th>
                 {!anTien && <Th right>Đơn giá</Th>}
                 {!anTien && <Th right>T.tiền (usd)</Th>}
-                <Th right>Chuyển kỳ</Th>
                 {cotNgay.map((iso) => (
                   <Th key={iso} right>
                     {nhanNgay(iso)}
                   </Th>
                 ))}
                 {cotNgay.length > 0 && <Th right>Tổng</Th>}
+                <Th right>Trả</Th>
+                <Th right>Nợ</Th>
               </Tr>
             </thead>
             <tbody>
@@ -224,13 +243,14 @@ export default function BangCanDoi({
                         {xk ? " $" : ""}
                       </Td>
                     )}
-                    <Td right>{r.chuyenKy ? num(r.chuyenKy) : ""}</Td>
                     {cotNgay.map((iso) => (
                       <Td key={iso} right>
                         {r.theoNgay[iso] ? num(r.theoNgay[iso]) : ""}
                       </Td>
                     ))}
                     {cotNgay.length > 0 && <Td right>{num(r.tong)}</Td>}
+                    <Td right>{r.tra ? num(r.tra) : ""}</Td>
+                    <Td right>{r.no ? num(r.no) : ""}</Td>
                   </Tr>
                 );
               })}
@@ -248,13 +268,14 @@ export default function BangCanDoi({
                 {!anTien && (
                   <Td right>{num(Math.round(hangTP.reduce((s, r) => s + r.tong * (r.donGia ?? 0), 0) * 100) / 100)}</Td>
                 )}
-                <Td right>{num(hangTP.reduce((s, r) => s + r.chuyenKy, 0))}</Td>
                 {cotNgay.map((iso) => (
                   <Td key={iso} right>
                     {num(hangTP.reduce((s, r) => s + (r.theoNgay[iso] ?? 0), 0))}
                   </Td>
                 ))}
                 {cotNgay.length > 0 && <Td right>{num(kq.totalOutputKg)}</Td>}
+                <Td right>{num(hangTP.reduce((s, r) => s + r.tra, 0))}</Td>
+                <Td right>{num(hangTP.reduce((s, r) => s + r.no, 0))}</Td>
               </Tr>
             </tbody>
           </table>

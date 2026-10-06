@@ -1,6 +1,11 @@
 import { describe, expect, test } from "vitest";
 import type { BalancingOutputItem, BalancingPeriod, MaterialImportItem } from "@/types";
 import {
+  KHACH_KHAC,
+  ghiTraNo,
+  loaiDongKho,
+  tachTraNo,
+  tenKhachCanDoi,
   dongMauConThieu,
   dungDongMauTP,
   goiYKhachGia,
@@ -147,5 +152,41 @@ describe("dòng mẫu khối 2", () => {
     expect(goiYKhachGia("tambot", "", mau, tatCaTP, dsKy, "K3")).toEqual({ customerId: "jfda", channel: "Xuất khẩu", unitPrice: 9.3 });
     expect(goiYKhachGia("luoc230", "", [], tatCaTP, dsKy, "K3")?.unitPrice).toBe(10.43);
     expect(goiYKhachGia("moi", "", mau, tatCaTP, dsKy, "K3")).toBeNull();
+  });
+});
+
+describe("dòng kho khối NL — loaiDongKho", () => {
+  const base = { groupName: "Xả đông" as const, sourceWarehouse: "Kho mình", isReduction: false };
+  test("Xả đông · Kho mình = lấy xả đông; thêm cờ giảm = gửi đông", () => {
+    expect(loaiDongKho(base)).toBe("lay-xa-dong");
+    expect(loaiDongKho({ ...base, isReduction: true })).toBe("gui-dong");
+  });
+  test("xả đông mua về / dòng thủy sản / dòng giảm thường KHÔNG phải dòng kho", () => {
+    expect(loaiDongKho({ ...base, sourceWarehouse: "Mua về" })).toBeNull();
+    expect(loaiDongKho({ ...base, sourceWarehouse: "" })).toBeNull();
+    expect(loaiDongKho({ ...base, groupName: "Thủy sản", isReduction: true })).toBeNull();
+  });
+});
+
+describe("Trả · Nợ — tachTraNo / ghiTraNo", () => {
+  test("chuyển kỳ cũ (chưa có debtKg) hiện ở Trả", () => {
+    expect(tachTraNo({ carryOverKg: -2000 })).toEqual({ tra: -2000, no: 0 });
+  });
+  test("ghi một cột giữ cột kia, tổng chuyển kỳ = Trả + Nợ (có dấu)", () => {
+    const sau = ghiTraNo({ carryOverKg: -2000 }, { no: 258 });
+    expect(sau).toEqual({ carryOverKg: -1742, debtKg: 258 });
+    expect(tachTraNo(sau)).toEqual({ tra: -2000, no: 258 });
+    expect(ghiTraNo(sau, { tra: 0 })).toEqual({ carryOverKg: 258, debtKg: 258 });
+  });
+  test("số lẻ không trôi dấu phẩy động", () => {
+    expect(tachTraNo(ghiTraNo({ carryOverKg: 0.3 }, { no: 0.1 }))).toEqual({ tra: 0.3, no: 0.1 });
+  });
+});
+
+describe("khách Khác", () => {
+  test("mục cố định ngoài danh mục", () => {
+    expect(tenKhachCanDoi(KHACH_KHAC, [])).toBe("Khác");
+    expect(tenKhachCanDoi("k1", [{ id: "k1", name: "Hanwa" }])).toBe("Hanwa");
+    expect(tenKhachCanDoi("", [])).toBe("—");
   });
 });

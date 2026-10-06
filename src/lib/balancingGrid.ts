@@ -127,12 +127,84 @@ export function sanXuatHopLe(
   );
 }
 
+/* ---------- Dòng ra/vào KHO ĐÔNG của khối nguyên liệu ---------- */
+
+/** Cờ nguồn kho (`source_warehouse`) của hàng kho đông chính xưởng. */
+export const KHO_MINH = "Kho mình";
+
+/**
+ * Hai dòng cố định của khối NL: LẤY XẢ ĐÔNG (đầu bảng — lấy NL đông từ kho ra
+ * chế biến, cộng vào NL vào, TRỪ tồn kho đông) và GỬI ĐÔNG (cuối bảng — NL không
+ * chế biến, cấp đông cất kho, trừ khỏi NL vào, CỘNG tồn kho đông).
+ *
+ * Không thêm cột: nhận ra bằng nhóm "Xả đông" + nguồn kho "Kho mình" (đúng nghĩa
+ * cờ 0008), chiều theo `isReduction` (gửi đông là dòng giảm — gõ dương, lưu âm).
+ * Dòng "nhận chuyển kỳ" cũ (Xả đông · Kho mình · chuyển kỳ dương) tự là lấy xả đông.
+ */
+export type LoaiDongKho = "lay-xa-dong" | "gui-dong";
+
+export function loaiDongKho(
+  r: Pick<BalancingInputItem, "groupName" | "sourceWarehouse" | "isReduction">
+): LoaiDongKho | null {
+  if (r.groupName !== "Xả đông" || r.sourceWarehouse !== KHO_MINH) return null;
+  return r.isReduction ? "gui-dong" : "lay-xa-dong";
+}
+
+export const TEN_DONG_KHO: Record<LoaiDongKho, string> = {
+  "lay-xa-dong": "Lấy xả đông",
+  "gui-dong": "Gửi đông",
+};
+
+/* ---------- Trả · Nợ (khối bán thành phẩm) ---------- */
+
+const tron3 = (x: number) => Math.round(x * 1000) / 1000;
+
+/**
+ * Hai cột Trả · Nợ thay cột Chuyển kỳ. Kế toán gõ số CÓ DẤU, Tổng dòng = Σ ngày +
+ * Trả + Nợ (quy tắc chuyển kỳ cũ, chưa gán nghĩa riêng cho từng cột). Lưu: tổng ở
+ * `carryOverKg` (mọi công thức cũ đọc trường này), phần Nợ ở `debtKg`; số chuyển kỳ
+ * cũ (chưa có `debtKg`) hiện ở cột Trả.
+ */
+export function tachTraNo(r: Pick<BalancingOutputItem, "carryOverKg" | "debtKg">): {
+  tra: number;
+  no: number;
+} {
+  const no = r.debtKg ?? 0;
+  return { tra: tron3((r.carryOverKg ?? 0) - no), no };
+}
+
+/** Patch ghi một trong hai cột, giữ nguyên cột kia. */
+export function ghiTraNo(
+  r: Pick<BalancingOutputItem, "carryOverKg" | "debtKg">,
+  sua: { tra?: number; no?: number }
+): Pick<BalancingOutputItem, "carryOverKg" | "debtKg"> {
+  const cu = tachTraNo(r);
+  const tra = sua.tra ?? cu.tra;
+  const no = sua.no ?? cu.no;
+  return { carryOverKg: tron3(tra + no), debtKg: no };
+}
+
+/* ---------- Khách "Khác" ---------- */
+
+/**
+ * Dòng bán thành phẩm BẮT BUỘC có khách — chưa biết khách thật thì chọn "Khác".
+ * Là mục cố định (không nằm trong danh mục khách) để danh mục không lẫn khách ảo.
+ */
+export const KHACH_KHAC = "khac";
+
+export function tenKhachCanDoi(id: string, khach: { id: string; name: string }[]): string {
+  if (id === KHACH_KHAC) return "Khác";
+  return khach.find((k) => k.id === id)?.name || "—";
+}
+
 /* ---------- Dựng dòng lưới ---------- */
 
 export interface HangLuoiNL {
   /** id của dòng balancing_inputs */
   id: string;
   ten: string;
+  /** Dòng lấy xả đông / gửi đông (ra/vào kho đông) — null nếu là dòng thường. */
+  loaiKho: LoaiDongKho | null;
   nhom: BalancingInputItem["groupName"];
   theoNgay: DailyQuantities;
   chuyenKy: number;
@@ -189,7 +261,10 @@ export interface HangLuoiTP {
   kenh: BalancingOutputItem["channel"];
   donGia: number | null;
   theoNgay: DailyQuantities;
+  /** Trả + Nợ — phần cộng thêm vào Tổng ngoài các ngày. */
   chuyenKy: number;
+  tra: number;
+  no: number;
   tong: number;
   tuSoSanXuat: boolean;
   nguonIds: string[];
@@ -234,6 +309,7 @@ export function dungHangNL(
     return {
       id: r.id,
       ten: r.name,
+      loaiKho: loaiDongKho(r),
       nhom: r.groupName,
       theoNgay,
       chuyenKy,
@@ -267,6 +343,7 @@ export function dungHangTP(
       donGia: r.unitPrice,
       theoNgay,
       chuyenKy,
+      ...tachTraNo(r),
       tong: sumGridRow(theoNgay, chuyenKy),
       tuSoSanXuat,
       nguonIds: nguon?.ids ?? [],

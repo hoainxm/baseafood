@@ -21,6 +21,7 @@ import {
   notify,
 } from "@/design-system";
 import { num, viDate } from "@/lib/format";
+import { KHACH_KHAC } from "@/lib/balancingGrid";
 
 /* ---------- Thêm dòng nguyên liệu / dòng giảm ---------- */
 
@@ -276,11 +277,15 @@ export function HopThemMatHang({
           </Field>
           <Combobox
             label="Khách hàng"
+            required
+            hint="Chưa rõ khách thì chọn “Khác”."
             value={khachId}
             onChange={setKhachId}
-            options={khach.map((k) => ({ value: k.id, label: k.name }))}
+            options={[...khach.map((k) => ({ value: k.id, label: k.name })), { value: KHACH_KHAC, label: "Khác" }]}
             onCreate={onThemKhach}
+            choPhepXoa={false}
             onSuaMuc={onSuaKhach}
+            suaDuoc={(v) => v !== KHACH_KHAC}
             nhanSua="Sửa thông tin khách hàng này — lưu thẳng vào Danh mục."
           />
         </div>
@@ -294,6 +299,10 @@ export function HopThemMatHang({
             onClick={() => {
               if (!matHangId) {
                 notify.loi("Chưa chọn mặt hàng");
+                return;
+              }
+              if (!khachId) {
+                notify.loi("Chưa chọn khách hàng — chưa rõ thì chọn “Khác”");
                 return;
               }
               onLuu(matHangId, khachId, quyCach.trim(), "Xuất khẩu");

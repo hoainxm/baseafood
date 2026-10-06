@@ -1,6 +1,7 @@
 > Load khi: sửa màn Cân đối, lưới theo ngày, công thức định mức/lãi lỗ, hay bảng in A4.
 covers: src/features/balancing/BalancingScreen.tsx, src/features/balancing/usePeriodGrid.ts, src/features/balancing/MaterialGrid.tsx, src/features/balancing/WipGrid.tsx, src/features/balancing/gridDialogs.tsx, src/features/balancing/BalancingTable.tsx, src/lib/balancingCalc.ts, src/lib/balancingGrid.ts, src/design-system/patterns/EditableGrid.tsx
-last_verified: 2026-10-02
+last_verified: 2026-10-06
+<!-- updated: 2026-10-06 (giao diện gọn + Trả·Nợ + 2 dòng kho) — (1) MẶC ĐỊNH: cả hai khối MỞ cột ngày (`anNgayNL`=`anNgayTP`=false), khối 2 ẨN dòng chưa có số (`anDongTrong`=true; dòng vừa thêm trong phiên vẫn hiện — `vuaThem`); bản in khối NL cũng mặc định mở ngày. (2) BỚT CHỮ: bỏ đoạn mô tả dưới tiêu đề hai khối, nhãn "N chuyến · sửa ô ghi thẳng vào sổ nhập", "sổ sản xuất", "giá = kỳ trước", "mẫu · chưa có số", đoạn "Đã dựng sẵn N dòng…"; tiêu đề nhóm (Thủy sản/Xả đông/Bột/Giảm) chỉ hiện khi ≥2 nhóm; chẩn đoán sổ nhập chỉ nói khi còn chuyến khác loại / thuộc kỳ khác (số "chờ lấy" nằm trên nút); thẻ "Còn N dòng chờ hút" → nút "Lấy N dòng từ sổ" trên thanh công cụ. (3) KHÁCH BẮT BUỘC: ô Khách không còn nút bỏ chọn, thêm mục cố định "Khác" (`KHACH_KHAC`="khac", ngoài danh mục — `tenKhachCanDoi`); hộp Thêm mặt hàng bắt chọn khách. (4) KHỐI 2: bỏ cột Chuyển kỳ → hai cột **Trả · Nợ** CUỐI bảng (sau Tổng), gõ số có dấu, Tổng = Σ ngày + Trả + Nợ; lưu `carryOverKg` = Trả+Nợ (công thức cũ giữ nguyên) + `debtKg` = Nợ (mig 0052) — `tachTraNo`/`ghiTraNo`. Nghĩa riêng Trả/Nợ: kế toán CHỐT SAU. (5) KHỐI 1: bỏ cột Chuyển kỳ (chỉ còn hiện "Chuyển kỳ (cũ)" khi kỳ cũ lỡ có số), thêm 2 dòng cố định **Lấy xả đông** (đầu bảng, + NL vào, − tồn kho đông) và **Gửi đông** (cuối bảng, dòng giảm gõ dương lưu âm, + tồn kho đông) — `loaiDongKho`; dòng ảo id `<kỳ>-lay-xa-dong`/`<kỳ>-gui-dong` (giữ con trỏ khi phím đầu biến thành dòng thật). Chip tồn: "kho X kg" (tồn đầu kỳ) · "vượt tồn" · "tồn sau kỳ"; Gửi đông ĐỐI CHIẾU còn dở SX (nút "Lấy X kg còn dở SX" điền đúng từng ngày chốt / "khớp" / "lệch"). Engine `tinhSoTonNL`: xả đông = dòng Lấy xả đông + chuyển kỳ dương cũ; đông gửi ưu tiên Gửi đông Cân đối › còn dở SX › chuyển kỳ âm cũ (`nguonDongGui`), có test `inventoryMaterial.test.ts`. Dán khối theo THỨ TỰ TRÊN MÀN. (6) Khối 1 bố cục theo ẢNH MẪU: CHƯA làm — chờ người dùng gửi lại ảnh. balancingCalc.ts KHÔNG đổi. -->
 <!-- updated: 2026-10-02 — lưới bán TP: ô Khách / Thêm nhanh mặt hàng / hộp Thêm mặt hàng có bút chì sửa nhanh danh mục (`useSuaDanhMuc`, truyền từ BalancingScreen qua `onSuaMatHang`/`onSuaKhach`). Ô lưới số dùng lõi `useNhapSo` (biểu thức "=", x, :, %). Không đổi công thức. -->
 ttl_days: 90
 <!-- updated: 2026-09-29 (audit khối 2) — mô tả khối 2 chỉ nói "sửa ô ghi thẳng về sổ" cho dòng ghi "sổ sản xuất" (dòng mẫu/thêm tay gõ tại lưới); bật "Ẩn dòng chưa có số" mà chưa dòng nào có số ⇒ hiện câu giải thích thay vì lưới trơ dòng Tổng. Ô chọn 36px trong lưới = mật độ "gọn" mặc định của design-system (README §4, không phải lỗi 44px). -->
@@ -81,9 +82,9 @@ Bản trước bắt mở hộp thoại cho từng dòng NL và từng dòng th�
 
 **Xếp ngang (mặc định từ 2026-09-29).** Hai khối đặt cạnh nhau như file cân đối của kế toán từ breakpoint `2xl` (trái: NL + ô GHI CHÚ; phải: BTP). Nút "Xếp dọc/Xếp ngang" vẫn đổi tay; không tự đổi theo bề rộng màn: bố cục tự nhảy khi thu cột là thứ gây mất phương hướng nhất trên tablet.
 
-**Hai khối, một tờ.** Khối 1 (nguyên liệu) và khối 2 (bán thành phẩm) không thể chung một bảng — cột khác hẳn nhau (NL có đơn giá VNĐ + tỷ lệ bột; BTP có khách + giá USD). Nhưng chúng nằm trong **cùng một thẻ**, chỉ ngăn nhau bằng một đường kẻ, và mỗi khối có **công tắc cột ngày RIÊNG** (`anNgayNL` mặc định thu · `anNgayTP` mặc định mở — state ở `KyDetail`). Trước 2026-09-29 dùng chung một công tắc để hai khối dóng ngày; bỏ vì bảng cân đối giấy của kế toán không chia ngày ở khối NL.
+**Hai khối, một tờ.** Khối 1 (nguyên liệu) và khối 2 (bán thành phẩm) không thể chung một bảng — cột khác hẳn nhau (NL có đơn giá VNĐ + tỷ lệ bột; BTP có khách + giá USD). Nhưng chúng nằm trong **cùng một thẻ**, chỉ ngăn nhau bằng một đường kẻ, và mỗi khối có **công tắc cột ngày RIÊNG** (`anNgayNL` · `anNgayTP`, **cả hai mặc định MỞ** từ 2026-10-06 — state ở `KyDetail`). Trước 2026-09-29 dùng chung một công tắc để hai khối dóng ngày; bỏ vì bảng cân đối giấy của kế toán không chia ngày ở khối NL.
 
-**Cột Khách** là `Combobox` ngay trong ô (`CotLuoi.oRieng`): chọn trong danh mục, gõ tên lạ thì tạo mới tại chỗ. Không bao giờ để nhập tự do — "Hanwa" / "hanwa" / "Han wa" sẽ thành ba khách khi tổng hợp cuối kỳ.
+**Cột Khách** là `Combobox` ngay trong ô (`CotLuoi.oRieng`): chọn trong danh mục, gõ tên lạ thì tạo mới tại chỗ. Không bao giờ để nhập tự do — "Hanwa" / "hanwa" / "Han wa" sẽ thành ba khách khi tổng hợp cuối kỳ. **Khách BẮT BUỘC** (2026-10-06): không có nút bỏ chọn; chưa rõ khách thì chọn mục cố định **"Khác"** (`KHACH_KHAC = "khac"`, KHÔNG nằm trong danh mục khách để danh mục không lẫn khách ảo; hiện tên qua `tenKhachCanDoi`).
 
 **Ô tính lại theo TỪNG PHÍM.** `LuoiNhap` ghi ngay khi gõ (giống `NumberField`), không đợi rời ô: cột Tổng, dòng T.CỘNG và khối Kết quả nhúc nhích theo con số đang gõ. Đợi blur mới tính nghĩa là gõ hết cả bảng rồi mới biết đúng sai — đúng cái khiến người dùng quay về Excel.
 
@@ -163,14 +164,31 @@ Nguyên liệu nhập nhưng không chế biến hết thành BTP. Tên dòng **
 - Vì là dòng NL kg âm nên `calculateBalancing` trừ đúng mà **không sửa một dòng công thức nào** (dòng âm đã hợp lệ từ `0018`).
 - Khớp dòng `Bán nội địa −987` của bảng giấy.
 
-### Cột "Chuyển kỳ" (cột N của bảng giấy)
+### Khối 2: cột "Trả" · "Nợ" (thay cột Chuyển kỳ — cột N của bảng giấy, 2026-10-06)
 
-Một cột, hai chiều — **đọc theo dấu**:
+Cột Chuyển kỳ cũ đọc theo dấu: **âm** (bảng giấy ghi trong ngoặc, VD `(2.000)`) = đẩy sang kỳ sau; **dương** (VD `258`) = lấy từ kỳ trước. Kiểm chứng trên bảng thật: dòng *2 da luộc 230-250* `258+261+1.785+3.384+5.749+154 = 11.591` khớp cột Lượng.
 
-- **Âm** (bảng giấy ghi trong ngoặc, VD `(2.000)`) = phần đẩy sang kỳ sau, cất kho.
-- **Dương** (VD `2.000`, `258`) = phần lấy từ kỳ trước đưa vào kỳ này.
+Từ 2026-10-06 khối 2 tách thành **hai cột Trả · Nợ đặt CUỐI bảng** (sau Tổng). Kế toán gõ **số có dấu**, `Tổng = Σ ngày + Trả + Nợ` — đúng quy tắc chuyển kỳ cũ; **nghĩa riêng của Trả / Nợ kế toán chốt sau** (chưa gắn luật). Lưu:
 
-Cộng vào Tổng của dòng (`sumGridRow = Σ ngày + chuyển kỳ`) — kiểm chứng trên bảng thật: dòng *2 da luộc 230-250* `258+261+1.785+3.384+5.749+154 = 11.591` khớp cột Lượng.
+- `carryOverKg` = **Trả + Nợ** (giữ nghĩa TỔNG chuyển kỳ ⇒ `sumGridRow`, `quantityKg`, bản in, "Nhận chuyển kỳ", engine tồn KHÔNG đổi).
+- `debtKg` (cột `debt_kg`, mig `0052`) = phần **Nợ**; Trả = `carryOverKg − debtKg`. Số chuyển kỳ cũ (chưa có `debtKg`) hiện ở cột **Trả**.
+- Hàm thuần `tachTraNo` / `ghiTraNo` (`balancingGrid.ts`, có test, làm tròn 3 số lẻ chống trôi dấu phẩy động).
+
+### Khối 1: hai dòng kho "Lấy xả đông" · "Gửi đông" (thay cột Chuyển kỳ, 2026-10-06)
+
+Khối NL **bỏ cột Chuyển kỳ** (bảng giấy vốn không có). Ra/vào kho đông đi bằng **hai dòng cố định**:
+
+| Dòng | Vị trí | Vào NL của kỳ | Tồn kho đông |
+|---|---|---|---|
+| **Lấy xả đông** | đầu bảng | **+** (NL đông lấy ra chế biến) | **−** |
+| **Gửi đông** | cuối bảng (trước T.CỘNG) | **−** (dòng giảm: gõ dương, lưu âm) | **+** |
+
+- Nhận ra bằng dữ liệu sẵn có, **không thêm cột**: nhóm `Xả đông` + nguồn kho `Kho mình` (cờ `0008`), chiều theo `isReduction` — `loaiDongKho()`. Dòng "Nhận chuyển kỳ" cũ (Xả đông · Kho mình · chuyển kỳ dương) tự thành Lấy xả đông. "Xả đông mua về" (kho khác bán về) vẫn là dòng nhóm Xả đông thường.
+- Chưa có dòng ⇒ hiện **dòng ảo** (id `<kỳ>-lay-xa-dong` / `<kỳ>-gui-dong`); gõ số / giá là thành dòng thật **giữ nguyên id** — đổi id làm ô đang gõ bị dựng lại, mất con trỏ, rơi các phím sau (đã dính khi thử). Giá gợi ý: Lấy xả đông = giá dòng Gửi đông gần nhất kỳ trước cùng họ; Gửi đông = bình quân NL thủy sản của kỳ.
+- **Tồn kho đông sống theo từng phím**: `usePeriodGrid.tonKhoDong` gọi CÙNG engine `tinhSoTonNL` với sổ `/nxt-nl`. Chip dưới tên dòng: Lấy xả đông "kho X kg" (tồn đầu kỳ) + "vượt tồn" khi tồn cuối < 0; Gửi đông "tồn sau kỳ X kg".
+- **Đối chiếu Gửi đông ⇄ còn dở SX** (chốt với người dùng: "cả hai cùng ghi, đối chiếu"): tổ trưởng vẫn khai còn dở khi chốt ngày SX (`0038`), kế toán ghi Gửi đông ở Cân đối. Gửi đông chưa có số ⇒ nút **"Lấy X kg còn dở SX"** điền đúng từng ngày chốt (`conDoTheoNgay`); có số ⇒ chip "khớp còn dở SX" hoặc "SX còn dở X · lệch Y".
+- Dữ liệu cũ có chuyển kỳ ở khối NL ⇒ cột **"Chuyển kỳ (cũ)"** tự hiện lại (giấu đi thì Số lượng ≠ Σ ngày mà không ai hiểu vì sao). DB thật lúc đổi: 0 dòng.
+- Dán khối từ Excel tính dòng theo **thứ tự trên màn** (Lấy xả đông → nhóm → Giảm → Gửi đông), không theo thứ tự lưu.
 
 ### Tồn kho nguyên liệu (sổ NXT) — tồn theo NHẬP HÀNG (PA-a, 2026-09-11)
 
@@ -180,7 +198,8 @@ Màn **Tồn kho NL** (`/nxt-nl`, [`features/reports/MaterialNxtScreen.tsx`](../
   - **Tồn đầu kỳ** = `material_opening_stock` (khai tay, mốc `asOfDate` ≤ đầu kỳ, mig `0022`) **+ Σ nhập hàng TỪ mốc baseline tới trước kỳ**. **BASELINE MỘT LẦN (chốt 2026-09-11):** nhập TRƯỚC mốc `asOfDate` coi như đã nằm trong số khai tay ⇒ KHÔNG cộng lại (chống đếm đôi). Khai "Tồn đầu" với `asOfDate` = ngày ĐẦU TIÊN app tính nhập (VD 01/07 cho tồn cuối 30/06). Không khai baseline ⇒ cộng mọi nhập trước kỳ.
   - **Nhập** = Σ nhập hàng trong kỳ (mọi chuyến).
   - **Xuất SX = 0** (cột chờ) — "NL lấy ra sản xuất" CHƯA capture ở màn Sản xuất (quyết định giản lược `/wip` 2026-08-25). Tồn hiện là "tồn theo nhập, chưa trừ xuất"; màn có banner nói rõ. Khi có capture NL-xuất → cột này ra số, tồn thành tồn thật.
-- **Đông gửi / Xả đông = CỘT THÔNG TIN, KHÔNG vào tổng** (PA-a — tránh đếm đôi: leftover cấp đông vốn đã nằm trong nhập hàng; xả đông kho mình cũng đã đếm khi nhập). Số này đọc lại từ engine kỳ `tinhSoTonNL` (đông gửi = `conDoSX>0 ? conDoSX : tongCarryAm`; xả đông = `tongCarryDuong`, `carryOverKg>0`) và chỉ hiển thị bên cạnh làm tham khảo vòng gối đầu.
+- **Engine kỳ đọc hai dòng kho (2026-10-06):** xả đông = cả dòng **Lấy xả đông** (ngày + chuyển kỳ) + chuyển kỳ dương của dòng thường (cách cũ); đông gửi lấy MỘT nguồn theo ưu tiên **Gửi đông ở Cân đối › còn dở SX › chuyển kỳ âm cũ** (`nguonDongGui`; vẫn trả `guiDongCanDoi` + `conDoSX` để màn Cân đối đối chiếu). Test: `src/lib/inventoryMaterial.test.ts`.
+- **Đông gửi / Xả đông = CỘT THÔNG TIN, KHÔNG vào tổng** (PA-a — tránh đếm đôi: leftover cấp đông vốn đã nằm trong nhập hàng; xả đông kho mình cũng đã đếm khi nhập). Số này đọc lại từ engine kỳ `tinhSoTonNL` (đông gửi / xả đông theo luật hai dòng kho ở dòng trên) và chỉ hiển thị bên cạnh làm tham khảo vòng gối đầu.
 - **Tồn cuối < 0** = badge "Tồn âm" + banner (sai ghi chép), đúng luật "màn tự giải thích".
 - ⚠️ Engine kỳ cũ `tinhSoTonNL` (`Tồn cuối = Tồn đầu + Đông gửi − Xả đông`, theo KỲ × họ NL, chỉ xưởng Đông) **VẪN CÒN** — nay chỉ dùng làm nguồn 2 cột thông tin đông gửi/xả đông cho `tinhTonNLTong`, không còn là công thức tồn chính. `conDoChuaKhopKy` không còn hiển thị.
 
@@ -229,7 +248,7 @@ Giá trị phế liệu= Σ kg × đơn giá bán
 
 ### Hai khối
 
-1. **NL vào** — nhóm `Thủy sản` / `Xả đông` / `Bột phụ gia`. "Bột" là **phụ gia tẩm** (có cột tỷ lệ %), không phải phụ phẩm.
+1. **NL vào** — dòng **Lấy xả đông** (đầu) · nhóm `Thủy sản` / `Xả đông` (mua về) / `Bột phụ gia` · Giảm · dòng **Gửi đông** (cuối). "Bột" là **phụ gia tẩm** (có cột tỷ lệ %), không phải phụ phẩm.
    - **Số lượng có thể ÂM** — dòng điều chỉnh giảm (VD "Bán nội địa −987": NL bán thẳng nội địa, không chế biến ⇒ trừ khỏi pool NL đưa vào sản xuất). Validate chỉ chặn `= 0`, không chặn âm. Tổng NL vào cộng cả dòng âm ⇒ khớp T.CỘNG của báo cáo gốc.
    - **Cờ nguồn kho** (`nguonKho`, chỉ hiện khi nhóm = `Xả đông`): `"Mua về"` (hàng cấp đông kho KHÁC bán về) / `"Kho mình"` (xả đông hàng kho mình) / `""` (chưa rõ). **Seam** cho quản lý tồn kho / vòng lặp đông gửi ↔ xả đông sau này — chưa dùng vào công thức. Lưu qua cột `nguon_kho` (migration `0008`); `repo.ts` chỉ gửi khi có giá trị ⇒ ghi NL vào chạy được **kể cả khi chưa chạy 0008**.
 2. **Bán thành phẩm sản xuất** (nhãn cũ "TP ra") — **bán thành phẩm LÀM RA trong kỳ** (cấp đông, cất kho lưu trữ, **CHƯA bán** — gom đủ đơn đặt mới xuất container). ≠ hàng đã bán ra ở màn Bán hàng. Mặt hàng (danh mục mở, ánh xạ lỏng sang 141 mã) × quy cách/size × khách (đơn đặt) × kênh. **Nhập tay** là đường chính cho báo cáo sản lượng. Seam **HÚT từ sổ bán** vẫn còn (dòng bán trong khoảng ngày → bản sao `thanh_pham_ra`, gắn `banHangId` chống trùng; bỏ kỳ = xóa bản sao, số gốc ở sổ bán) — dùng cho tình huống output=bán ra, sẽ tổ chức lại khi có module kho + bán hàng. Xem [33-ban-hang.md](33-ban-hang.md).

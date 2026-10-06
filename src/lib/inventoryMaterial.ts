@@ -12,7 +12,8 @@ import type {
   DailyQuantities,
   Workshop,
 } from "@/types";
-import { hoNguyenLieu, cungHoNguyenLieu, ngayTrongKy } from "@/lib/balancingGrid";
+import { sumGridRow } from "@/types";
+import { hoNguyenLieu, cungHoNguyenLieu, loaiDongKho, ngayTrongKy } from "@/lib/balancingGrid";
 
 /**
  * VÌ SAO CÓ FILE NÀY — điểm đau số 1: "tồn nguyên liệu cuối kỳ sai do ghi chép
@@ -29,6 +30,11 @@ import { hoNguyenLieu, cungHoNguyenLieu, ngayTrongKy } from "@/lib/balancingGrid
  *   - carryOverKg > 0  = XẢ ĐÔNG   → phần lấy từ kỳ trước ra dùng, −khỏi kho tồn.
  * Nên tồn cuối kỳ này = phần "nhận chuyển kỳ" mà kỳ sau lấy về — khép vòng mà
  * không ai phải mở file kỳ cũ chép tay.
+ *
+ * HAI DÒNG KHO Ở CÂN ĐỐI (2026-10-06): khối NL có dòng cố định "Lấy xả đông"
+ * (đầu bảng) và "Gửi đông" (cuối bảng) — xem `loaiDongKho`. Lấy xả đông = TRỪ
+ * tồn (cả dòng: ngày + chuyển kỳ), Gửi đông = CỘNG tồn. Chuyển kỳ ở các dòng
+ * thường vẫn đọc như cũ (dữ liệu trước khi bỏ cột).
  *
  * CÒN DỞ SẢN XUẤT (khép vòng G1, migration 0038): khi chốt ngày SX, tổ trưởng
  * ghi NL chưa chế biến hết đem lưu kho, TÁCH THEO loại NL (production_locks
@@ -58,9 +64,12 @@ export interface SoTonNLKy {
   startDate: string;
   endDate: string;
   tonDau: number; // kho đông đầu kỳ (kế thừa kỳ trước / tồn đầu khai tay)
-  dongGui: number; // + vào kho tồn: ĐÔNG GỬI hoà giải (SX là chính, fallback Chuyển kỳ âm)
-  conDoSX: number; // còn dở khai ở SX (0038); >0 nghĩa dongGui lấy từ SX (nguồn chính hướng 1)
-  xaDong: number; // − khỏi kho tồn (Σ carryOverKg>0)
+  dongGui: number; // + vào kho tồn: ĐÔNG GỬI hoà giải (xem nguonDongGui)
+  /** Đông gửi lấy từ đâu: dòng Gửi đông ở Cân đối › còn dở SX › chuyển kỳ âm (cũ). */
+  nguonDongGui: "can-doi" | "san-xuat" | "chuyen-ky" | "";
+  guiDongCanDoi: number; // Σ dòng "Gửi đông" ở Cân đối (kg dương) — để đối chiếu với conDoSX
+  conDoSX: number; // còn dở khai ở SX (0038) — luôn tính để đối chiếu
+  xaDong: number; // − khỏi kho tồn (dòng Lấy xả đông + chuyển kỳ dương cũ)
   tonCuoi: number; // tonDau + dongGui − xaDong
   nhapTuoi: number; // Σ nhập tươi trong kỳ (bối cảnh, không vào kho tồn)
   theoNgayNhap: DailyQuantities; // nhập tươi theo ngày (cho báo cáo theo ngày)
@@ -68,15 +77,32 @@ export interface SoTonNLKy {
   seedTonDau: boolean; // tonDau lấy từ tồn đầu khai tay (kỳ đầu tiên của họ)
 }
 
-function tongCarryDuong(inputs: BalancingInputItem[], periodId: string): number {
-  return inputs
-    .filter((r) => r.periodId === periodId && (r.carryOverKg ?? 0) > 0)
-    .reduce((s, r) => s + (r.carryOverKg ?? 0), 0);
+/**
+ * XẢ ĐÔNG của kỳ (− kho): cả dòng "Lấy xả đông" (ngày + chuyển kỳ) + chuyển kỳ
+ * DƯƠNG của dòng thường (cách ghi cũ trước khi bỏ cột chuyển kỳ ở khối NL).
+ */
+function tongXaDong(inputs: BalancingInputItem[], periodId: string): number {
+  let tong = 0;
+  for (const r of inputs) {
+    if (r.periodId !== periodId) continue;
+    const loai = loaiDongKho(r);
+    if (loai === "lay-xa-dong") tong += sumGridRow(r.dailyQuantities, r.carryOverKg);
+    else if (!loai && (r.carryOverKg ?? 0) > 0) tong += r.carryOverKg ?? 0;
+  }
+  return tong;
 }
 
+/** Σ dòng "Gửi đông" ở Cân đối (lưu âm như dòng giảm) — trả kg DƯƠNG. */
+function tongGuiDongCanDoi(inputs: BalancingInputItem[], periodId: string): number {
+  return inputs
+    .filter((r) => r.periodId === periodId && loaiDongKho(r) === "gui-dong")
+    .reduce((s, r) => s + Math.abs(sumGridRow(r.dailyQuantities, r.carryOverKg)), 0);
+}
+
+/** Chuyển kỳ ÂM của dòng thường (cách ghi đông gửi cũ) — kg dương. */
 function tongCarryAm(inputs: BalancingInputItem[], periodId: string): number {
   return inputs
-    .filter((r) => r.periodId === periodId && (r.carryOverKg ?? 0) < 0)
+    .filter((r) => r.periodId === periodId && !loaiDongKho(r) && (r.carryOverKg ?? 0) < 0)
     .reduce((s, r) => s + Math.abs(r.carryOverKg ?? 0), 0);
 }
 
@@ -99,26 +125,37 @@ function tonDauKhaiTay(
 
 /**
  * Còn dở SX (0038) rơi vào một kỳ: các lần chốt ngày SX có ngày chốt trong kỳ,
- * cộng phần leftover của loại NL cùng họ với kỳ. Xưởng lọc như nhập tươi.
+ * cộng phần leftover của loại NL cùng họ với kỳ, THEO NGÀY CHỐT (để Cân đối điền
+ * dòng Gửi đông đúng từng ngày). Xưởng lọc như nhập tươi.
  */
-function conDoTrongKy(
+export function conDoTheoNgay(
   locks: DailyLock[],
-  ky: BalancingPeriod,
+  ky: Pick<BalancingPeriod, "startDate" | "endDate" | "materialTypeName">,
   workshop?: Workshop,
-): number {
+): DailyQuantities {
   const ngay = new Set(ngayTrongKy(ky));
-  if (ngay.size === 0) return 0;
-  let tong = 0;
+  const ra: DailyQuantities = {};
+  if (ngay.size === 0) return ra;
   for (const lk of locks) {
     if (workshop && lk.workshop !== workshop) continue;
     if (!ngay.has(lk.lockDate)) continue;
     const lb = lk.leftoverByMaterial;
     if (!lb) continue;
     for (const [ten, v] of Object.entries(lb)) {
-      if (cungHoNguyenLieu(ten, ky.materialTypeName)) tong += Number(v) || 0;
+      const kg = Number(v) || 0;
+      if (kg && cungHoNguyenLieu(ten, ky.materialTypeName))
+        ra[lk.lockDate] = (ra[lk.lockDate] ?? 0) + kg;
     }
   }
-  return tong;
+  return ra;
+}
+
+function conDoTrongKy(
+  locks: DailyLock[],
+  ky: BalancingPeriod,
+  workshop?: Workshop,
+): number {
+  return Object.values(conDoTheoNgay(locks, ky, workshop)).reduce((s, v) => s + v, 0);
 }
 
 /**
@@ -209,15 +246,19 @@ export function tinhSoTonNL(
       seedTonDau = tonDau !== 0;
     }
 
-    // Đông gửi có 2 nguồn: (a) còn dở khai ở SẢN XUẤT (production_locks), (b)
-    // Chuyển kỳ âm khai tay ở Cân đối. HƯỚNG 1 (chốt 2026-09-06): "ghi ở Sản
-    // xuất là CHÍNH" ⇒ đông gửi = còn dở SX nếu có; chưa có (dữ liệu cũ / kỳ
-    // chưa dùng SX còn dở) thì mới dùng Chuyển kỳ âm. KHÔNG cộng cả hai → hết
-    // cộng đôi. (Kế toán khỏi khai Chuyển kỳ âm nữa; xả đông vẫn khai bình thường.)
+    // Đông gửi có 3 nguồn, LẤY MỘT (không cộng — hết cộng đôi), ưu tiên:
+    // (a) dòng "Gửi đông" ở Cân đối (2026-10-06: kế toán chốt số cất kho ở đây),
+    // (b) còn dở khai ở SẢN XUẤT (production_locks, hướng 1 chốt 2026-09-06),
+    // (c) Chuyển kỳ âm khai tay (cách cũ). Cả (a) lẫn (b) vẫn được trả ra để màn
+    // Cân đối ĐỐI CHIẾU hai bên — tổ trưởng ghi ở SX, kế toán ghi ở Cân đối.
     const conDoSX = conDoTrongKy(locks, ky, workshop);
+    const guiDongCanDoi = tongGuiDongCanDoi(inputs, ky.id);
     const dongGuiKhaiTay = tongCarryAm(inputs, ky.id);
-    const dongGui = conDoSX > 0 ? conDoSX : dongGuiKhaiTay;
-    const xaDong = tongCarryDuong(inputs, ky.id);
+    const nguonDongGui: SoTonNLKy["nguonDongGui"] =
+      guiDongCanDoi > 0 ? "can-doi" : conDoSX > 0 ? "san-xuat" : dongGuiKhaiTay > 0 ? "chuyen-ky" : "";
+    const dongGui =
+      nguonDongGui === "can-doi" ? guiDongCanDoi : nguonDongGui === "san-xuat" ? conDoSX : dongGuiKhaiTay;
+    const xaDong = tongXaDong(inputs, ky.id);
     const tonCuoi = tonDau + dongGui - xaDong;
     tonChay.set(khoa, tonCuoi);
 
@@ -232,6 +273,8 @@ export function tinhSoTonNL(
       endDate: ky.endDate || ky.startDate || "",
       tonDau,
       dongGui,
+      nguonDongGui,
+      guiDongCanDoi,
       conDoSX,
       xaDong,
       tonCuoi,

@@ -361,8 +361,14 @@ export interface BalancingOutputItem {
   salesItemId?: string;
   /** Chỉ dùng cho dòng nhập tay — dòng hút lấy ngày từ sổ sản xuất. */
   dailyQuantities?: DailyQuantities;
-  /** Chuyển kỳ: âm = đẩy sang kỳ sau, dương = lấy từ kỳ trước. */
+  /**
+   * Chuyển kỳ: âm = đẩy sang kỳ sau, dương = lấy từ kỳ trước. Từ 2026-10-06 lưới
+   * tách thành hai cột Trả · Nợ, trường này giữ TỔNG (Trả + Nợ) để mọi công thức
+   * đang đọc nó (Tổng dòng, nhận chuyển kỳ, bản in) không đổi.
+   */
   carryOverKg?: number;
+  /** Phần "Nợ" của chuyển kỳ (mig 0052). Trả = carryOverKg − debtKg. Chưa có ⇒ 0. */
+  debtKg?: number;
   /** Kỳ nhận phần chuyển kỳ âm (dựng dòng đối ứng ở kỳ sau). */
   carryOverPeriodId?: string;
   autoSource?: GridAutoSource;

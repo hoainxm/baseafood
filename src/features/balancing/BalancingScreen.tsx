@@ -464,10 +464,9 @@ function KyDetail({
   const suaKH = useSuaDanhMuc("khachHang", khach, setKhach);
   const [loaiNLDanhMuc, setLoaiNLDanhMuc] = useMaterialTypes();
   const [showBang, setShowBang] = useState(false);
-  /* Công tắc cột ngày RIÊNG từng khối, theo bảng cân đối giấy của kế toán: khối NL
-     chỉ có tổng (Loại hàng · Số lượng · Đơn giá · T.tiền · tỷ lệ) ⇒ mặc định THU ngày,
-     gõ thẳng Số lượng; khối BTP có cột từng ngày ⇒ mặc định MỞ. */
-  const [anNgayNL, setAnNgayNL] = useState(true);
+  /* Công tắc cột ngày RIÊNG từng khối — cả hai MẶC ĐỊNH MỞ (chốt 2026-10-06: kế
+     toán đối chiếu theo ngày). Thu lại thì khối NL gõ thẳng Số lượng như bảng giấy. */
+  const [anNgayNL, setAnNgayNL] = useState(false);
   const [anNgayTP, setAnNgayTP] = useState(false);
   /* Mặc định xếp NGANG như bảng giấy (NL + ô GHI CHÚ bên trái, BTP bên phải — từ màn
      2xl). Người dùng vẫn đổi tay được; không tự nhảy theo bề rộng. */
@@ -548,11 +547,23 @@ function KyDetail({
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold text-foreground">Bảng cân đối {ky.materialTypeName}</h1>
-          <p className="mt-2 text-base text-muted-foreground">
-            Ngày tiếp nhận: {ky.dateRangeDescription || "chưa ghi"}
+          <p className="mt-1 text-base text-muted-foreground">
+            {ky.dateRangeDescription || "Chưa ghi ngày tiếp nhận"}
+            {ky.isLocked && " · đã chốt"}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          {/* Một chạm kéo cả hai sổ nguồn tự động (nhập + sản xuất) vào kỳ. Không gộp sổ bán. */}
+          {!luoi.daChot && soNguonChoHut > 0 && (
+            <Button
+              title={`Hút ${luoi.nhapChoHut.length} dòng sổ nhập hàng và ${luoi.sanXuatChoHut.length} dòng sổ sản xuất trong khoảng ngày của kỳ vào lưới.`}
+              size="lg"
+              onClick={luoi.hutTatCaNguon}
+            >
+              <ArrowDownToLine />
+              Lấy {soNguonChoHut} dòng từ sổ
+            </Button>
+          )}
           <Button
             variant="outline"
             size="lg"
@@ -612,23 +623,6 @@ function KyDetail({
           />
         </div>
       </Card>
-
-      {/* Một chạm kéo cả hai sổ nguồn tự động vào kỳ, thay cho bấm rời từng nút
-          "lấy từ sổ nhập" + "lấy từ sổ sản xuất". Không gộp sổ bán. */}
-      {!luoi.daChot && soNguonChoHut > 0 && (
-        <Card className="flex flex-wrap items-center justify-between gap-3 p-5">
-          <p className="text-base">
-            Còn <strong>{soNguonChoHut}</strong> dòng ở sổ nguồn chờ hút vào kỳ
-            {" "}(nhập {luoi.nhapChoHut.length} · sản xuất{" "}
-            {luoi.sanXuatChoHut.length}).
-          </p>
-          <Button
-            title="Hút toàn bộ dòng có sẵn từ sổ nhập hàng, sản xuất và bán hàng trong khoảng ngày của kỳ này vào lưới." size="lg" onClick={luoi.hutTatCaNguon}>
-            <ArrowDownToLine />
-            Lấy tất cả {soNguonChoHut} dòng
-          </Button>
-        </Card>
-      )}
 
       {/* Hai khối trong MỘT tờ: cùng khung, cùng công tắc cột ngày, chỉ ngăn nhau
           bằng một đường kẻ — đọc như một bảng cân đối liền mạch. */}
@@ -692,11 +686,10 @@ function KyDetail({
       {/* Vòng gối đầu: phần kỳ trước đẩy sang được kéo vào đây bằng một nút, thay
           cho việc mở file kỳ cũ ra chép tay. */}
       {luoi.soDongChuyenKy > 0 && !luoi.daChot && (
-        <Card className="flex flex-wrap items-center justify-between gap-3 p-5">
+        <Card className="flex flex-wrap items-center justify-between gap-3 p-4">
           <p className="text-base">
             Kỳ trước ({luoi.kyTruoc?.dateRangeDescription || "…"}) có{" "}
-            <strong>{luoi.soDongChuyenKy}</strong> dòng đẩy sang kỳ này mà chưa kỳ nào
-            nhận.
+            <strong>{luoi.soDongChuyenKy}</strong> dòng chuyển sang chưa nhận.
           </p>
           <Button
             title="Nhận phần tồn chuyển từ kỳ trước sang làm số đầu kỳ này." size="lg" onClick={luoi.nhanChuyenKy}>
@@ -708,24 +701,23 @@ function KyDetail({
 
       {/* Chốt kỳ đặt CUỐI màn — xem hết số rồi mới chốt, đúng chỗ của thanh chốt
           ngày ở sổ nhập hàng. */}
-      <Card className="flex flex-wrap items-center justify-between gap-3 p-5">
+      <Card className="flex flex-wrap items-center justify-between gap-3 p-4">
         <div>
           <p className="text-lg font-semibold">
             {ky.isLocked ? "Kỳ đã chốt" : "Kỳ đang mở"}
           </p>
-          <p className="text-base text-muted-foreground">
-            {ky.isLocked
-              ? `Khoá lúc ${ky.lockedAt ? new Date(ky.lockedAt).toLocaleString("vi-VN") : "—"}${
-                  ky.lockNote ? ` · ${ky.lockNote}` : ""
-                }`
-              : "Chốt khi đã đối chiếu xong và gửi kế toán — sau đó mọi ô trong lưới khoá lại."}
-          </p>
+          {ky.isLocked && (
+            <p className="text-base text-muted-foreground">
+              Khoá lúc {ky.lockedAt ? new Date(ky.lockedAt).toLocaleString("vi-VN") : "—"}
+              {ky.lockNote ? ` · ${ky.lockNote}` : ""}
+            </p>
+          )}
           {ky.reopenReason && (
             <p className="text-base text-warning">Lần mở lại gần nhất: {ky.reopenReason}</p>
           )}
         </div>
         <Button
-          title="Khóa kỳ lại để chốt số, hoặc mở khóa nếu cần sửa. Kỳ đã chốt thì số không đổi nữa."
+          title="Chốt khi đã đối chiếu xong và gửi kế toán — mọi ô trong lưới khoá lại. Kỳ đã chốt thì bấm để mở lại (phải ghi lý do)."
           variant={ky.isLocked ? "outline" : "default"}
           size="lg"
           onClick={() => setChotMo(true)}
@@ -796,7 +788,7 @@ function GhiChuKetQua({
       className={`border-t-2 border-border p-5 ${xepNgang ? "2xl:col-start-1 2xl:row-start-2" : ""}`}
       aria-label="Ghi chú — kết quả cân đối"
     >
-      <h2 className="mb-3 text-xl font-semibold">Ghi chú — kết quả cân đối</h2>
+      <h2 className="mb-3 text-xl font-semibold">Ghi chú</h2>
       {/* Xếp ngang (2xl) ô này nằm ở cột trái hẹp (~500px) ⇒ về MỘT cột, không thì
           nhãn + số gãy dòng và số tiền dài tràn khung ở chữ 130%. */}
       <div className={`grid gap-x-8 gap-y-1 sm:grid-cols-2 ${xepNgang ? "2xl:grid-cols-1" : ""}`}>
@@ -825,13 +817,11 @@ function GhiChuKetQua({
       {lechNL != null &&
         (lechNL === 0 ? (
           <div className="mt-4 rounded-lg bg-success-surface px-4 py-2.5 text-base font-medium text-success">
-            ✓ Tổng NL nhận khớp NL vào lưới ({num(kq.totalInputKg)} kg)
+            ✓ NL nhận khớp NL vào
           </div>
         ) : (
           <div className="mt-4 rounded-lg bg-warning-surface px-4 py-2.5 text-base font-medium text-destructive">
-            ⚠ Lệch NL nhận − NL vào lưới:{" "}
-            <span className="tnum font-semibold">{num(lechNL)} kg</span>{" "}
-            (nhận {num(kq.totalInputKg + lechNL)} − vào {num(kq.totalInputKg)})
+            ⚠ Lệch NL nhận − NL vào: <span className="tnum font-semibold">{num(lechNL)} kg</span>
           </div>
         ))}
       {/* Chưa nhập bán thành phẩm thì KHÔNG kết luận lãi/lỗ — nếu không màn sẽ
@@ -839,7 +829,7 @@ function GhiChuKetQua({
           được một nửa. */}
       {chuaCoTP ? (
         <div className="mt-5 rounded-lg bg-muted px-5 py-4 text-base font-medium text-muted-foreground">
-          Chưa có bán thành phẩm sản xuất — nhập khối 2 để tính được lãi/lỗ.
+          Chưa có bán thành phẩm — chưa tính lãi/lỗ.
         </div>
       ) : (
         <div

@@ -494,6 +494,9 @@ export const BANG_BALANCING_OUTPUT: AnhXaBang<BalancingOutputItem> = {
     sales_item_id: x.salesItemId ?? "",
     daily_quantities: x.dailyQuantities ?? {},
     carry_over_kg: x.carryOverKg ?? 0,
+    // Cột 0052: CHỈ gửi khi dòng đã có phần Nợ — DB chưa chạy 0052 thì dòng cũ
+    // vẫn lên máy chủ được (cùng cách nguon_kho với 0008).
+    ...(x.debtKg != null ? { debt_kg: x.debtKg } : {}),
     carry_over_period_id: x.carryOverPeriodId ?? "",
     auto_source: x.autoSource ?? "",
   }),
@@ -509,6 +512,7 @@ export const BANG_BALANCING_OUTPUT: AnhXaBang<BalancingOutputItem> = {
     salesItemId: s(r.sales_item_id),
     dailyQuantities: doiSanLuongNgay(r.daily_quantities),
     carryOverKg: Number(r.carry_over_kg ?? 0),
+    debtKg: r.debt_kg == null ? undefined : Number(r.debt_kg),
     carryOverPeriodId: s(r.carry_over_period_id),
     autoSource: s(r.auto_source) as GridAutoSource,
   }),

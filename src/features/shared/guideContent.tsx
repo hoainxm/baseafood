@@ -406,11 +406,13 @@ export const HUONG_DAN: Record<string, NoiDungHuongDan> = {
         <Muc tieuDe="Gõ số hàng loạt, sửa, xóa">
           <Y>
             <li>
-              <b>Ghi nhập/xuất</b>: mở lưới gõ thẳng tồn đầu / nhập / xuất (kg) cho cả bảng, dán
-              được khối số từ Excel. Lưu ý: ô ở lưới là <b>tổng cả tháng</b> (ghi đè), còn nút hộp
-              cuối dòng là <b>cộng thêm</b> từng lần.
+              <b>Gõ thẳng trên bảng</b>: ngày nhập, size, invoice, đơn giá, tồn đầu / nhập / xuất
+              (kg), vị trí — gõ là ghi ngay, tồn cuối + tiền còn lại tự tính. Enter / ↑ / ↓ đi dọc
+              cột, dán được khối số từ Excel, <b>Ctrl+Z</b> hoàn tác, <b>Ctrl+Y</b> làm lại. Lưu ý: ô
+              trên bảng là <b>tổng cả tháng</b> (ghi đè), còn nút hộp cuối dòng là <b>cộng thêm</b>
+              từng lần.
             </li>
-            <li>Nút <b>bút chì</b>: sửa ngày nhập, tên, size, invoice, đơn giá, vị trí.</li>
+            <li>Nút <b>bút chì</b>: đổi tên hàng, nhóm (và mọi ô khác trong một hộp).</li>
             <li>Nút <b>thùng rác</b>: xóa dòng (có hỏi lại, xóa nhầm bấm <b>Hoàn tác</b>).</li>
             <li>Nút <b>đồng hồ</b>: thẻ kho — lịch sử mặt hàng qua các tháng + nhật ký thao tác.</li>
           </Y>

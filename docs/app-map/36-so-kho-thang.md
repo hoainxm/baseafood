@@ -1,7 +1,7 @@
 > Load khi: sửa màn Sổ kho theo tháng (/ton-kho-thang), logic dồn tồn cuối kỳ → đầu kỳ sau, hay công thức tồn cuối/tiền còn lại theo tháng.
 covers: src/features/monthly-stock/MonthlyStockScreen.tsx, src/features/monthly-stock/index.ts, src/lib/monthlyStock.ts, src/lib/monthlyStockExcel.ts
 last_verified: 2026-10-06
-<!-- updated: 2026-10-06 — CÂN ĐỐI GHI VÀO SỔ (lib/khoCanDoi.ts): dòng Lấy xả đông ở khối NL Cân đối chọn ĐÍCH DANH một dòng (lô) của sổ ⇒ cột Xuất của lô + dòng vết `⟦CĐ:<id dòng cân đối>:<kg>⟧` trong ghi chú; dòng Gửi đông ⇒ lô RIÊNG id `cd|<id dòng>|<ngày>` nhóm "Nguyên liệu gửi đông" (invoice GĐ-yyyymmdd). Tháng chưa mở ⇒ Cân đối tự kế thừa như nút "Kế thừa & lưu vào sổ". Xem § "Dòng do Cân đối ghi". -->
+<!-- updated: 2026-10-06 (b) — GÕ THẲNG TRÊN BẢNG, BỎ CHẾ ĐỘ "Ghi nhập/xuất" RIÊNG: bảng theo nhóm (BangTong, giữ tick dòng · tổng nhóm · nút thao tác) nay là bảng nhập luôn — Ngày nhập (date) · Size · Invoice (input) · Đơn giá · Tồn đầu · Nhập · Xuất (`ONhapSo` + `navCol` trong khung `[data-luoi-phim]`: gõ số/biểu thức, Esc trả số cũ, ghi theo phím, Enter/↑/↓ đi dọc cột qua cả các nhóm) · Vị trí (Combobox); Tồn cuối · Tiền còn lại vẫn là ô TÍNH; Tên · nhóm đổi ở ✎. Dán khối TSV từ Excel (`danKhoi`, cột theo thứ tự Đơn giá·Tồn đầu·Nhập·Xuất, `(2.000)`=−2.000, ô rỗng giữ số cũ, MỘT lần ghi). Hoàn tác/Làm lại (nút + Ctrl+Z/Ctrl+Y, bỏ qua khi gõ trong hộp thoại) cho MỌI lần ghi sổ của màn: `ghiLines` bọc lại chụp sổ trước khi ghi, gõ liên tiếp cùng ô = một bước (khuôn Cân đối). "Sửa tay" ở đối chiếu lệch nay lọc bảng bằng ô Tìm. Xem trước dồn kỳ: chỉ hiện số. Kiểm demo: 1200+300 ⇒ 1.500, Enter xuống dòng nhóm kế; Ctrl+Z một bước; dán 2×3 đúng; 360px + 130% không tràn. --><!-- updated: 2026-10-06 — CÂN ĐỐI GHI VÀO SỔ (lib/khoCanDoi.ts): dòng Lấy xả đông ở khối NL Cân đối chọn ĐÍCH DANH một dòng (lô) của sổ ⇒ cột Xuất của lô + dòng vết `⟦CĐ:<id dòng cân đối>:<kg>⟧` trong ghi chú; dòng Gửi đông ⇒ lô RIÊNG id `cd|<id dòng>|<ngày>` nhóm "Nguyên liệu gửi đông" (invoice GĐ-yyyymmdd). Tháng chưa mở ⇒ Cân đối tự kế thừa như nút "Kế thừa & lưu vào sổ". Xem § "Dòng do Cân đối ghi". -->
 ttl_days: 90
 <!-- updated: 2026-10-06 (e) — ô "Ánh xạ … tới" (hộp Đồng bộ danh mục): gõ tên chưa có ⇒ LƯU NGAY vào danh mục đích của dòng (`themTenChuan` — Mặt hàng hoặc Loại NL theo select đích; trùng tên không phân hoa thường ⇒ dùng lại; đích "Bỏ qua" ⇒ không cho tạo), theo luật ô chọn danh mục (design-system README). Trước đây `onCreate={(t)=>t}` chỉ giữ tên tới khi bấm Đồng bộ. Tên GỐC từ file (chưa ai chọn) vẫn hiện nhãn "mới — thêm … khi bấm Đồng bộ" và `apDongBo` vẫn thêm như cũ (không trùng vì dò `chuan`). -->
 <!-- updated: 2026-09-29 (3) — hộp Đồng bộ danh mục: nút xác nhận "Đồng bộ: n → Mặt hàng · m → Loại NL" chuyển xuống CHÂN hộp (dính đáy khi cuộn, không disabled); ô ánh xạ hiện tên vừa gõ "thêm mới" kèm nhãn "mới"; ô co giãn ở điện thoại. -->
@@ -65,7 +65,7 @@ Tiền còn lại    = Tồn cuối (kg) × đơn giá      // suyDong().remaini
 
 ## Màn hình
 
-- Chọn kỳ = tháng (Combobox + nút ◀ ▶), lọc theo kho (5 kho hệ thống `BSF1_WAREHOUSES` + kho lạ nếu có), **ô "Tìm mặt hàng"** (lọc theo tên · size · invoice · nhóm · kho · vị trí), hai chế độ: **xem** (nhóm × bảng + dòng cộng nhóm) và **Ghi nhập/xuất** (`LuoiNhap` gõ kg từng mã, dán khối Excel). Mô tả (ngày nhập/tên/size/invoice/đơn giá/vị trí) sửa ở nút ✎ dialog.
+- Chọn kỳ = tháng (Combobox + nút ◀ ▶), lọc theo kho (5 kho hệ thống `BSF1_WAREHOUSES` + kho lạ nếu có), **ô "Tìm mặt hàng"** (lọc theo tên · size · invoice · nhóm · kho · vị trí), MỘT bảng theo nhóm (nhóm × bảng + dòng cộng nhóm) **gõ thẳng được** — xem § Gõ THẲNG trên bảng. Tên · nhóm sửa ở nút ✎ dialog.
 - **Thứ tự cột bảng xem:** Ngày nhập · Mặt hàng · **Size** (cột riêng theo bảng kê kế toán, từ 2026-09-29) · Invoice · Đơn giá · Tồn đầu kỳ (kg) · Nhập trong kỳ (kg) · Xuất trong kỳ (kg) · Tồn cuối kỳ (kg) · Tiền còn lại · **Vị trí** · thao tác. Bảng mỗi nhóm bật `BangTong dinhDau`: khung cuộn riêng cao ≤70dvh, hàng tên cột dính đỉnh + dòng cộng dính đáy.
 - **Cột Vị trí:** hàng gửi ra **kho ngoài** (kho thuê ngoài, không thuộc 5 kho hệ thống — `laKhoNgoai`) hiện **"Gửi: &lt;kho&gt;"** đậm màu primary (VD "Gửi: Kho Ánh Dương") để kế toán thấy ngay; vị trí trong kho hệ thống hiện tên thường, để trống ⇒ tên `warehouse` màu mờ.
 - **Nút "Thêm dòng" theo TỪNG NHÓM:** mỗi bảng nhóm có nút "Thêm dòng vào &lt;nhóm&gt;" ngay dưới bảng (`moThem(g.category)` điền sẵn Nhóm hàng ⇒ khỏi chọn lại, đỡ thao tác). Chế độ Ghi (lưới phẳng, không tách nhóm) giữ MỘT nút "Thêm dòng" chung ở cuối. Không còn nút ở thanh công cụ trên. Tất cả ẩn khi đang xem trước dồn kỳ (bấm "Kế thừa & lưu vào sổ" trước). ⚠ `moThem` nhận optional `catChon` ⇒ KHÔNG gán trực tiếp `onClick={moThem}` (event lọt vào tham số) — luôn bọc `onClick={() => moThem(...)}`.
@@ -81,17 +81,24 @@ Dialog 3 việc, số kg + ngày + ghi chú; mọi lần lưu nối một dòng 
 - **Nhập thêm** — cộng dồn `inKg` cho đúng lô đó (lô khác ngày nhập/invoice ⇒ "Thêm dòng").
 - **Gửi kho ngoài** (nhãn UI của kiểu `chuyen`; mô tả nêu rõ "Ánh Dương, HP…") — KHÔNG phải nhập/xuất ⇒ tổng tháng không đổi. Gửi HẾT tồn cuối ⇒ chỉ đổi `storageLocation` (cột Vị trí ghi "Gửi: &lt;kho&gt;"). Gửi MỘT PHẦN ⇒ tách dòng mới (id `msl|<tháng>|uid`, cùng mô tả, vị trí đích): kg lấy từ `openKg` trước rồi `inKg` (kiện chia cùng tỉ lệ), dòng gốc giữ `outKg` ⇒ tồn cuối gốc = cũ − X, dòng tách = X. Tổng theo tên (`khoaLo`) giữ nguyên ⇒ đối chiếu dồn kỳ không báo lệch giả. Dòng tách ghi note `(tách từ dòng <id>)`.
 - ⚠ **Nạp lại Excel** tháng có dòng đã tách: dòng gốc (id `xlsx|…`) trở về số trong file ⇒ phần tách bị đếm 2 lần. `xacNhanNap` dò note `(tách từ dòng <id>)` và **cảnh báo** (không tự xoá).
-- Khác lưới **Ghi nhập/xuất**: ô lưới là tổng CẢ THÁNG (ghi đè), nút dòng là CỘNG THÊM từng lần.
+- Khác ô gõ trên bảng: ô là tổng CẢ THÁNG (ghi đè), nút dòng là CỘNG THÊM từng lần.
 
-### Lưới "Ghi nhập/xuất" = sửa TRỰC TIẾP trên dòng (không mở dialog)
+### Gõ THẲNG trên bảng (không còn chế độ "Ghi nhập/xuất" riêng — 2026-10-06)
 
-Chốt 2026-09-18: kế toán không phải mở nút ✎ cho từng dòng. Lưới `LuoiNhap` mở rộng cột: **Tồn đầu · Nhập · Xuất · Đơn giá** (ô số `kieu:"so"` — gõ trực tiếp + phím + dán Excel; đơn giá thêm vào `ghiO` map) · **Ngày nhập** (`<input type=date>`) · **Invoice** (`<input>`) · **Vị trí** (`Combobox`, tạo mới tại chỗ) — các ô mô tả là `oRieng`, ghi thẳng qua `suaSo`. Nút ✎ ở chế độ xem chỉ còn cho **tên · size · nhóm** (đổi tên/nhóm ảnh hưởng gộp — giữ ở dialog).
+Chốt 2026-09-18: kế toán không phải mở nút ✎ cho từng dòng. Từ 2026-10-06 bỏ hẳn lưới Ghi tách riêng: **bảng theo nhóm chính là bảng nhập** (giữ tick dòng, tổng nhóm, nút thao tác cuối dòng), theo quy tắc bảng tự dựng của design-system (README §5d):
+
+- Ô gõ: **Ngày nhập** (`<input type=date>`) · **Size** · **Invoice** (`<input>`) · **Đơn giá · Tồn đầu · Nhập · Xuất** (`ONhapSo` — gõ số hoặc phép tính, Esc trả số cũ, ghi theo phím) · **Vị trí** (`Combobox`, tạo mới tại chỗ). **Tồn cuối · Tiền còn lại** vẫn là ô TÍNH. Đổi **tên · nhóm** ở nút ✎ (ảnh hưởng cách gộp lô khi dồn kỳ).
+- Phím: ô số khai `navCol`, cả các nhóm bọc chung một `[data-luoi-phim]` ⇒ Enter / ↑ / ↓ đi dọc cột, dòng cuối nhóm trên xuống thẳng dòng đầu nhóm dưới; Tab đi ngang.
+- **Dán khối từ Excel** (`danKhoi`): bắt đầu từ ô đang đứng, dòng theo thứ tự đang hiện (qua các nhóm), cột theo thứ tự Đơn giá · Tồn đầu · Nhập · Xuất; hiểu `(2.000)` = −2.000; ô rỗng giữ số cũ; gom MỘT lần ghi.
+- **Hoàn tác / Làm lại** (nút trên thanh công cụ + Ctrl+Z / Ctrl+Y, bỏ qua khi đang gõ trong hộp thoại): MỌI lần ghi sổ của màn (gõ ô, dán, thao tác dòng, dồn kỳ, nạp Excel…) đi qua `ghiLines` bọc lại — chụp sổ TRƯỚC khi ghi, gõ liên tiếp vào CÙNG một ô = một bước lùi (cùng khuôn lưới Cân đối). Lịch sử theo phiên mở màn.
+- Bản XEM TRƯỚC dồn kỳ (tháng trống) chỉ hiện số — bấm "Kế thừa & lưu vào sổ" mới gõ được.
+- "Sửa tay" trong hộp **Đối chiếu & sửa lệch** lọc bảng về đúng mặt hàng (ô Tìm) để sửa ngay trên bảng.
 - **Lưu vết (audit) đảm bảo cho MỌI đường sửa** — inline lẫn dialog: mọi `ghiLines` đi qua chốt `nhatKyThayDoi` ([repo.ts](../../src/lib/repo.ts)) → so cũ↔mới từng ô, ghi `audit_log` kèm người · thiết bị · thời điểm · giá trị cũ→mới; bảng **append-only** (RLS cấm UPDATE/DELETE, mig `0025`). Xem màn Nhật ký thao tác. Sửa trực tiếp KHÔNG làm yếu vết.
 - 🅿️ **Backlog bảo mật (ghi nhận 2026-09-18, CHƯA làm):** (1) **khóa tháng đã chốt** — tháng đóng sổ thì khóa, muốn sửa số phải mở khóa có ghi vết (chống sửa lén sổ cũ); (2) **siết RLS theo vai trò** cho `monthly_stock_ledger` ai được sửa (🔴 đụng RLS server) — nằm chung backlog RLS `0021` trong CLAUDE.md.
 
 ### Ẩn / hiện dòng trống
 
-Nút **Ẩn dòng trống (n)** (`aria-pressed`) lọc bỏ dòng `laDongTrong` (tồn đầu = nhập = xuất = 0, cả kg lẫn kiện) khỏi bảng xem, lưới Ghi, tổng, in, tick. Mặc định HIỆN (tránh tưởng mất dòng); không nhớ qua lần mở. Đổi trạng thái ⇒ bỏ chọn. Ẩn hết ⇒ ô báo + nút "Hiện tất cả".
+Nút **Ẩn dòng trống (n)** (`aria-pressed`) lọc bỏ dòng `laDongTrong` (tồn đầu = nhập = xuất = 0, cả kg lẫn kiện) khỏi bảng, tổng, in, tick. Mặc định HIỆN (tránh tưởng mất dòng); không nhớ qua lần mở. Đổi trạng thái ⇒ bỏ chọn. Ẩn hết ⇒ ô báo + nút "Hiện tất cả".
 
 ### Tick dòng → cộng tổng · in riêng · xóa theo lô
 
@@ -111,7 +118,7 @@ Bảng bật cột ô tick qua prop `chon` của `BangTong` (`ChonBang` — xem 
 Tháng đang xem chưa có dòng nào **và** tháng trước còn tồn ⇒ màn dựng sẵn `donSangThang(tháng trước, tháng này).map(suyDong)` và hiển thị **y như bảng thật**, kèm banner "Xem trước tồn đầu … CHƯA LƯU" + nút **"Kế thừa & lưu vào sổ"**.
 
 - **Vì sao xem trước chứ không tự ghi:** dồn kỳ vẫn phải qua bước người duyệt — lô hay bị tách size / đổi mã lô giữa các tháng, tự ghi đè là đường thẳng tới **cộng đôi** (xem § Cờ lệch dồn kỳ). Xem trước cho thấy số ngay mà không chạm dữ liệu; một cú bấm mới ghi.
-- Trong chế độ xem trước: ẩn nút Ghi nhập/xuất, ẩn ✎ và 🗑 từng dòng, ẩn 📦− (Chuyển kho/Lấy ra) + "Gán vị trí", **tắt banner "Lệch dồn kỳ"** (lệch lúc này chính là phần chưa dồn — banner xem trước đã nói rồi, hiện thêm cảnh báo đỏ chỉ làm tưởng sai số).
+- Trong chế độ xem trước: bảng chỉ hiện số (không ô gõ), ẩn Hoàn tác/Làm lại, ẩn ✎ và 🗑 từng dòng, ẩn 📦− (Chuyển kho/Lấy ra) + "Gán vị trí", **tắt banner "Lệch dồn kỳ"** (lệch lúc này chính là phần chưa dồn — banner xem trước đã nói rồi, hiện thêm cảnh báo đỏ chỉ làm tưởng sai số).
 - ⚠ **"Thêm dòng" bị chặn khi đang xem trước** (`moThem` → `notify.canhBao`, không mở form): thêm+lưu 1 dòng sẽ khiến `rowsLuu` ≠ rỗng ⇒ tắt xem trước ⇒ cả bảng kế thừa (chưa lưu) biến mất khỏi màn — dễ tưởng mất số liệu. Bắt bấm "Kế thừa & lưu vào sổ" trước. Muốn ghi hàng **đông gửi kho ngoài** (Ánh Dương/HP…) cũng vậy: lưu sổ trước, rồi tick dòng → **"Gửi kho ngoài"**, hoặc 📦− → **"Gửi kho ngoài"** (dùng cột **Vị trí**, KHÔNG đẻ khái niệm dòng gửi riêng — chốt 2026-09-18).
 - Dòng xem trước lọc theo kho đang chọn; nút "Kế thừa & lưu" vẫn dồn **toàn bộ kho** (`donTuThangTruoc`, đúng quy tắc "dồn kỳ không bỏ sót kho nào").
 
@@ -148,7 +155,7 @@ chỉ còn lệch THẬT. Kiểm thật T5→T6: lot-level 28 dòng (có SANMA g
 mặt hàng, SANMA biến mất** ✓.
 
 **Không tự sửa** — dialog chỉ liệt kê mặt hàng lệch (tồn cuối T-1 ↔ tồn đầu T này +
-Δ), mỗi dòng có **"Sửa tay"** → mở lưới Ghi **lọc đúng mặt hàng đó** (`locMatHang`) để
+Δ), mỗi dòng có **"Sửa tay"** → **lọc bảng về đúng mặt hàng đó** (ô Tìm, từ 2026-10-06 — trước là lưới Ghi `locMatHang`) để
 người dùng chỉnh tồn đầu/nhập/xuất theo phán đoán (con người quyết, tránh cộng đôi khi
 lô tách/đổi mã). Tháng **trống** thì dùng "Dồn sang tháng sau" từ tháng trước.
 

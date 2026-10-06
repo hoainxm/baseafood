@@ -3,7 +3,7 @@
 // Tên tiếng Việt: Sổ kho theo THÁNG — dồn tồn cuối kỳ → đầu kỳ sau
 // Description: Monthly stock ledger — carry closing balance into next month
 // ============================================================
-import { useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { MonthlyStockLine, MaterialType, Product } from "@/types";
 import { MONTHLY_STOCK_CATEGORIES, BSF1_WAREHOUSES, STORAGE_KIND_LABELS } from "@/types";
 import { useMonthlyStock, useMaterialTypes, useProducts, useStorageLocations } from "@/lib/catalogRepo";
@@ -60,19 +60,18 @@ import {
   ErrorSummary,
   Field,
   Input,
-  LuoiNhap,
   Nhan,
   NumberField,
+  ONhapSo,
   PhieuIn,
   TdIn,
   ThIn,
   ThongKe,
   homNay,
   notify,
+  parseSo,
   type ChonBang,
-  type CotLuoi,
   type CotTong,
-  type HangLuoi,
   type LoiNhap,
   type MucChon,
   type TheThongTin,
@@ -94,10 +93,12 @@ import {
   Pencil,
   Plus,
   Printer,
+  Redo2,
   Scale,
   Ship,
   Snowflake,
   Trash2,
+  Undo2,
   Upload,
   Wrench,
   Library,
@@ -166,15 +167,13 @@ const soHoacGach = (v: number) => (v ? num(v) : "—");
  * tháng sau" tự chuyển tồn cuối → tồn đầu kỳ sau; hết chép tay chỗ hay sai số.
  */
 export default function MonthlyStockScreen() {
-  const [lines, ghiLines] = useMonthlyStock();
+  const [lines, ghiLinesGoc] = useMonthlyStock();
   const [mtypes, ghiMtypes] = useMaterialTypes();
   const [products, ghiProducts] = useProducts();
   const [khoLuuDM, ghiKhoLuuDM] = useStorageLocations();
 
   const [thang, setThang] = useState(thangHienTai());
   const [kho, setKho] = useState(TAT_CA_KHO);
-  const [ghiMode, setGhiMode] = useState(false);
-  const [locMatHang, setLocMatHang] = useState(""); // lọc lưới Ghi theo 1 mặt hàng (từ đối chiếu)
   const [moIn, setMoIn] = useState(false);
   const [timKiem, setTimKiem] = useState(""); // tìm nhanh trong tháng (tên · size · xuất xứ · nhóm)
   const [daChon, setDaChon] = useState<Set<string>>(new Set()); // dòng đang tick (cộng tổng / thao tác lô)
@@ -270,7 +269,7 @@ export default function MonthlyStockScreen() {
   // hiện thêm cảnh báo đỏ chỉ làm người dùng tưởng sai số liệu.
   const canhBaoLech = rowsTruoc.length > 0 && coLechDonKy(lech) && !laXemTruoc;
 
-  // Đối chiếu lệch theo MẶT HÀNG (chẩn đoán — người dùng tự sửa ở lưới Ghi).
+  // Đối chiếu lệch theo MẶT HÀNG (chẩn đoán — người dùng tự sửa thẳng trên bảng).
   const dsDoiChieu = useMemo(() => doiChieuDonKy(rowsTruoc, rowsThangDayDu), [rowsTruoc, rowsThangDayDu]);
   const [moDoiChieu, setMoDoiChieu] = useState(false);
 
@@ -289,23 +288,118 @@ export default function MonthlyStockScreen() {
   const [dichDB, setDichDB] = useState<Record<string, DichDanhMuc>>({}); // đích từng dòng (đè gợi ý)
   const [mapDB, setMapDB] = useState<Record<string, string>>({}); // ánh xạ tên file → tên chuẩn trong danh mục
 
-  // ---------- Ghi ô lưới ----------
-  const suaSo = (id: string, patch: Partial<MonthlyStockLine>) => {
-    ghiLines(lines.map((l) => (l.id === id ? { ...l, ...patch } : l)));
+  // ---------- Hoàn tác / làm lại (Ctrl+Z / Ctrl+Y) — như lưới Cân đối ----------
+  /* Người dùng quen Excel: Ctrl+Z lùi MỌI thứ vừa ghi vào sổ, không riêng ô số. Mỗi
+     lần ghi chụp lại sổ TRƯỚC khi ghi; gõ liên tiếp vào CÙNG một ô (cùng `nhom`) chỉ
+     là MỘT bước lùi. Lịch sử theo phiên mở màn — rời màn là mất. */
+  const lui = useRef<{ nhom: string; lines: MonthlyStockLine[] }[]>([]);
+  const tien = useRef<{ nhom: string; lines: MonthlyStockLine[] }[]>([]);
+  const [lichSu, setLichSu] = useState({ lui: 0, tien: 0 });
+  const demLichSu = () => setLichSu({ lui: lui.current.length, tien: tien.current.length });
+
+  /** MỌI lần ghi sổ của màn đi qua đây (thao tác dòng, dồn kỳ, nạp Excel, gõ ô…). */
+  const ghiLines = (next: MonthlyStockLine[], nhom?: string) => {
+    const dinh = lui.current[lui.current.length - 1];
+    if (!nhom || !dinh || dinh.nhom !== nhom) {
+      lui.current.push({ nhom: nhom ?? uid(), lines });
+      if (lui.current.length > 100) lui.current.shift();
+    }
+    tien.current = [];
+    demLichSu();
+    ghiLinesGoc(next);
   };
-  const ghiO = (rowId: string, colKey: string, giaTri: number | null) => {
-    const v = giaTri == null ? 0 : giaTri;
-    const map: Record<string, keyof MonthlyStockLine> = {
-      openCtn: "openCtn",
-      openKg: "openKg",
-      inCtn: "inCtn",
-      inKg: "inKg",
-      outCtn: "outCtn",
-      outKg: "outKg",
-      unitPrice: "unitPrice",
+  const hoanTac = useCallback(() => {
+    const m = lui.current.pop();
+    if (!m) return;
+    tien.current.push({ nhom: m.nhom, lines });
+    ghiLinesGoc(m.lines);
+    setLichSu({ lui: lui.current.length, tien: tien.current.length });
+    notify.daLuu("Đã hoàn tác");
+  }, [lines, ghiLinesGoc]);
+  const lamLai = useCallback(() => {
+    const m = tien.current.pop();
+    if (!m) return;
+    lui.current.push({ nhom: m.nhom, lines });
+    ghiLinesGoc(m.lines);
+    setLichSu({ lui: lui.current.length, tien: tien.current.length });
+    notify.daLuu("Đã làm lại");
+  }, [lines, ghiLinesGoc]);
+  useEffect(() => {
+    const nghe = (e: KeyboardEvent) => {
+      if (!e.ctrlKey && !e.metaKey) return;
+      // Đang gõ trong hộp thoại (thêm/sửa dòng…) ⇒ để ô tự hoàn tác chữ của nó.
+      if ((e.target as HTMLElement | null)?.closest?.('[role="dialog"]')) return;
+      const k = e.key.toLowerCase();
+      if (k === "z" && !e.shiftKey) {
+        e.preventDefault();
+        hoanTac();
+      } else if (k === "y" || (k === "z" && e.shiftKey)) {
+        e.preventDefault();
+        lamLai();
+      }
     };
-    const field = map[colKey];
-    if (field) suaSo(rowId, { [field]: v } as Partial<MonthlyStockLine>);
+    window.addEventListener("keydown", nghe);
+    return () => window.removeEventListener("keydown", nghe);
+  }, [hoanTac, lamLai]);
+
+  // ---------- Ghi THẲNG trên bảng ----------
+  /* Sửa một dòng ngay tại ô — đi qua chốt audit của repo.ts như mọi đường ghi (lưu vết
+     người · thiết bị · thời điểm · cũ→mới). `nhom` = ô đang gõ ⇒ một bước Ctrl+Z. */
+  const suaSo = (id: string, patch: Partial<MonthlyStockLine>, nhom?: string) => {
+    ghiLines(
+      lines.map((l) => (l.id === id ? { ...l, ...patch } : l)),
+      nhom ?? `${id}|${Object.keys(patch).join(",")}`
+    );
+  };
+
+  /** Cột số gõ được trên bảng — đúng thứ tự cột hiển thị (để dán khối từ Excel). */
+  const COT_SO: (keyof Pick<MonthlyStockLine, "unitPrice" | "openKg" | "inKg" | "outKg">)[] = [
+    "unitPrice",
+    "openKg",
+    "inKg",
+    "outKg",
+  ];
+
+  /**
+   * Dán một KHỐI số từ Excel (TSV) vào bảng, bắt đầu từ ô đang đứng: dòng theo thứ tự
+   * đang hiện (qua các nhóm), cột theo `COT_SO`. Hiểu `(2.000)` = −2.000 kiểu kế toán;
+   * ô rỗng giữ nguyên số cũ. Gom MỘT lần ghi (dán 5×10 ô không thành 50 lần ghi đè).
+   */
+  const danKhoi = (e: React.ClipboardEvent<HTMLInputElement>, rowId: string, cot: (typeof COT_SO)[number]) => {
+    const text = e.clipboardData.getData("text/plain");
+    if (!text || !/[\t\n\r]/.test(text)) return; // một ô — để ô tự xử lý
+    e.preventDefault();
+    const khoi = text
+      .replace(/\r\n?/g, "\n")
+      .replace(/\n+$/, "")
+      .split("\n")
+      .map((dong) =>
+        dong.split("\t").map((o) => {
+          const t = o.trim();
+          if (!t) return null;
+          const am = /^\(.*\)$/.test(t);
+          const so = parseSo(am ? t.slice(1, -1) : t);
+          return so == null ? null : am ? -so : so;
+        })
+      );
+    const dsDong = nhomList.flatMap((g) => g.rows);
+    const iH = dsDong.findIndex((r) => r.id === rowId);
+    const iC = COT_SO.indexOf(cot);
+    if (iH < 0 || iC < 0) return;
+    const doi = new Map<string, Partial<MonthlyStockLine>>();
+    let soO = 0;
+    khoi.forEach((dong, i) =>
+      dong.forEach((v, j) => {
+        const r = dsDong[iH + i];
+        const c = COT_SO[iC + j];
+        if (v == null || !r || !c) return;
+        doi.set(r.id, { ...(doi.get(r.id) ?? {}), [c]: v });
+        soO++;
+      })
+    );
+    if (!soO) return;
+    ghiLines(lines.map((l) => (doi.has(l.id) ? { ...l, ...doi.get(l.id) } : l)));
+    notify.daLuu(`Đã dán ${soO} ô vào ${doi.size} dòng — Ctrl+Z để hoàn tác`);
   };
 
   const xoaDong = (r: MonthlyStockRow) => {
@@ -418,7 +512,6 @@ export default function MonthlyStockScreen() {
     ghiLines([...giuLai, ...carried]);
     setThang(dich);
     setKho(TAT_CA_KHO);
-    setGhiMode(false);
     notify.daLuu(`Đã dồn tồn cuối sang ${nhanThang(dich)} · ${carried.length} dòng`);
   };
 
@@ -565,11 +658,11 @@ export default function MonthlyStockScreen() {
     [lines, xemThe]
   );
 
-  // Mở lưới Ghi lọc theo một mặt hàng để sửa tay lệch dồn kỳ.
+  // Lọc bảng về đúng mặt hàng lệch (ô Tìm) để sửa tay ngay trên bảng.
   const suaTayMatHang = (d: DoiChieuDong) => {
     setKho(d.warehouse);
-    setLocMatHang(d.itemName);
-    setGhiMode(true);
+    setTimKiem(d.itemName);
+    setAnDongTrong(false);
     setMoDoiChieu(false);
   };
 
@@ -862,7 +955,6 @@ export default function MonthlyStockScreen() {
     const dauKy = [...new Set(moi.map((m) => m.period))].sort()[0];
     setThang(dauKy);
     setKho(TAT_CA_KHO);
-    setGhiMode(false);
     setNapForm(null);
     const soGui = moi.filter((m) => m.storageLocation && m.storageLocation !== m.warehouse).length;
     notify.daLuu(
@@ -888,11 +980,43 @@ export default function MonthlyStockScreen() {
   const laKhoNgoai = (loc: string) => !!loc.trim() && !MA_KHO.has(loc.trim());
   /** Nhãn cột Vị trí: hàng gửi kho ngoài ghi rõ "Gửi: <kho>" cho kế toán thấy ngay. */
   const nhanViTri = (r: MonthlyStockLine) => (laKhoNgoai(r.storageLocation) ? `Gửi: ${r.storageLocation}` : viTriCua(r));
+  /* Ô gõ thẳng trên bảng (quy tắc bảng tự dựng — design-system README §5d): ô số là
+     `ONhapSo` (gõ biểu thức, Esc trả số cũ, ghi theo phím) có `navCol` ⇒ ↑/↓/Enter đi
+     dọc cột trong khung `[data-luoi-phim]`; Tab đi ngang. Bản XEM TRƯỚC dồn kỳ chưa lưu
+     ⇒ chỉ hiện số. Tên · nhóm đổi ở nút ✎ (ảnh hưởng cách gộp lô khi dồn kỳ). */
+  const sua = !laXemTruoc;
+  const oChu =
+    "h-9 rounded-md border border-input bg-background px-2 text-sm focus:border-ring focus:ring-2 focus:ring-ring/40 focus:outline-none";
+  const oSo = (r: MonthlyStockRow, c: (typeof COT_SO)[number], nhan: string, mau?: string) => (
+    <ONhapSo
+      value={r[c] || null}
+      onChange={(v) => suaSo(r.id, { [c]: v ?? 0 } as Partial<MonthlyStockLine>)}
+      rong0
+      navCol={c}
+      onPaste={(e) => danKhoi(e, r.id, c)}
+      aria-label={`${nhan} — ${r.itemName}${r.size ? " " + r.size : ""}`}
+      title={`${nhan}: gõ số hoặc phép tính (VD 1200+350). Enter / ↑ / ↓ sang dòng khác, dán được cả khối từ Excel.`}
+      khungClassName="ml-auto w-28"
+      className={`${oChu} w-full ${mau ?? ""}`}
+    />
+  );
   const cot = (t: ReturnType<typeof tongDong>): CotTong<MonthlyStockRow>[] => [
     {
       key: "ngay",
       header: "Ngày nhập",
-      render: (r) => <span className="tnum whitespace-nowrap">{r.importDate ? viDate(r.importDate) : "—"}</span>,
+      render: (r) =>
+        sua ? (
+          <input
+            type="date"
+            value={r.importDate || ""}
+            onChange={(e) => suaSo(r.id, { importDate: e.target.value })}
+            aria-label={`Ngày nhập — ${r.itemName}`}
+            title="Ngày nhập lô — sửa thẳng tại đây."
+            className={`${oChu} w-36`}
+          />
+        ) : (
+          <span className="tnum whitespace-nowrap">{r.importDate ? viDate(r.importDate) : "—"}</span>
+        ),
     },
     {
       key: "ten",
@@ -900,18 +1024,69 @@ export default function MonthlyStockScreen() {
       render: (r) => <span className="font-semibold text-foreground">{r.itemName}</span>,
     },
     // Size là CỘT RIÊNG (theo bảng kê của kế toán), không còn là dòng phụ dưới tên hàng.
-    { key: "size", header: "Size", render: (r) => <span className="whitespace-nowrap">{r.size || "—"}</span> },
-    { key: "invoice", header: "Invoice", render: (r) => r.origin || "—" },
-    { key: "gia", header: "Đơn giá (đ)", so: true, render: (r) => soHoacGach(r.unitPrice ?? 0) },
-    { key: "odKg", header: "Tồn đầu kỳ (kg)", so: true, render: (r) => soHoacGach(r.openKg), tong: () => num(t.openKg) },
+    {
+      key: "size",
+      header: "Size",
+      render: (r) =>
+        sua ? (
+          <input
+            value={r.size}
+            onChange={(e) => suaSo(r.id, { size: e.target.value })}
+            aria-label={`Size — ${r.itemName}`}
+            title="Size — sửa thẳng tại đây."
+            className={`${oChu} w-24`}
+          />
+        ) : (
+          <span className="whitespace-nowrap">{r.size || "—"}</span>
+        ),
+    },
+    {
+      key: "invoice",
+      header: "Invoice",
+      render: (r) =>
+        sua ? (
+          <input
+            value={r.origin}
+            onChange={(e) => suaSo(r.id, { origin: e.target.value })}
+            aria-label={`Invoice — ${r.itemName}`}
+            title="Số invoice của lô — sửa thẳng tại đây."
+            className={`${oChu} w-32`}
+          />
+        ) : (
+          r.origin || "—"
+        ),
+    },
+    {
+      key: "gia", header: "Đơn giá (đ)", so: true,
+      render: (r) => (sua ? oSo(r, "unitPrice", "Đơn giá") : soHoacGach(r.unitPrice ?? 0)),
+    },
+    {
+      key: "odKg", header: "Tồn đầu kỳ (kg)", so: true,
+      render: (r) => (sua ? oSo(r, "openKg", "Tồn đầu kỳ") : soHoacGach(r.openKg)),
+      tong: () => num(t.openKg),
+    },
     {
       key: "inKg", header: "Nhập trong kỳ (kg)", so: true,
-      render: (r) => (r.inKg ? <span className="font-semibold text-success">+{num(r.inKg)}</span> : "—"),
+      render: (r) =>
+        sua ? (
+          oSo(r, "inKg", "Nhập trong kỳ", r.inKg ? "font-semibold text-success" : "")
+        ) : r.inKg ? (
+          <span className="font-semibold text-success">+{num(r.inKg)}</span>
+        ) : (
+          "—"
+        ),
       tong: () => num(t.inKg),
     },
     {
       key: "outKg", header: "Xuất trong kỳ (kg)", so: true,
-      render: (r) => (r.outKg ? <span className="font-semibold text-warning">−{num(r.outKg)}</span> : "—"),
+      render: (r) =>
+        sua ? (
+          oSo(r, "outKg", "Xuất trong kỳ", r.outKg ? "font-semibold text-warning" : "")
+        ) : r.outKg ? (
+          <span className="font-semibold text-warning">−{num(r.outKg)}</span>
+        ) : (
+          "—"
+        ),
       tong: () => num(t.outKg),
     },
     {
@@ -927,8 +1102,24 @@ export default function MonthlyStockScreen() {
     {
       key: "viTri",
       header: "Vị trí",
-      render: (r) => (
-        laKhoNgoai(r.storageLocation) ? (
+      render: (r) =>
+        sua ? (
+          <div className="w-52">
+            <Combobox
+              anNhan
+              label={`Vị trí — ${r.itemName}`}
+              value={r.storageLocation}
+              onChange={(v) => suaSo(r.id, { storageLocation: v })}
+              options={viTriOpts}
+              onCreate={themViTri}
+              onSuaMuc={suaKL.moSua}
+              nhanSua={suaKL.nhanSua}
+              suaDuoc={suaKL.suaDuoc}
+              choPhepXoa={false}
+              placeholder={r.warehouse ? `= ${r.warehouse}` : "Chọn kho"}
+            />
+          </div>
+        ) : laKhoNgoai(r.storageLocation) ? (
           <Nhan loai="vi-tri">{nhanViTri(r)}</Nhan>
         ) : (
           <span
@@ -940,8 +1131,7 @@ export default function MonthlyStockScreen() {
           >
             {nhanViTri(r) || "—"}
           </span>
-        )
-      ),
+        ),
     },
     {
       key: "thaotac", header: "", render: (r) => (
@@ -986,99 +1176,6 @@ export default function MonthlyStockScreen() {
       ),
     },
   ];
-
-  // ---------- Lưới ghi (nhập/xuất + sửa mô tả từng mã, không mở dialog) ----------
-  // Ô số (kieu "so") = gõ trực tiếp + phím + dán Excel. Ô mô tả (oRieng) ghi thẳng
-  // qua suaSo → vẫn đi qua chốt audit ở repo.ts (lưu vết cũ→mới, người sửa, thời điểm).
-  const oCham =
-    "h-11 w-full border-0 bg-transparent px-2 text-sm focus:ring-2 focus:ring-ring focus:ring-inset focus:outline-none";
-  const cotLuoi: CotLuoi<MonthlyStockRow>[] = [
-    {
-      key: "size", header: "Size", nhan: "Size", kieu: "chu", lay: () => null, rong: 110,
-      oRieng: (r) => (
-        <input
-          value={r.size}
-          onChange={(e) => suaSo(r.id, { size: e.target.value })}
-          placeholder="Size"
-          className={oCham}
-          aria-label={`Size — ${r.itemName}`}
-        />
-      ),
-    },
-    { key: "openKg", header: "Tồn đầu (kg)", nhan: "Tồn đầu (kg)", kieu: "so", lay: (r) => r.openKg || null, rong: 120 },
-    { key: "inKg", header: "Nhập (kg)", nhan: "Nhập (kg)", kieu: "so", lay: (r) => r.inKg || null, rong: 120 },
-    { key: "outKg", header: "Xuất (kg)", nhan: "Xuất (kg)", kieu: "so", lay: (r) => r.outKg || null, rong: 120 },
-    { key: "ocKg", header: "Tồn cuối (kg)", nhan: "Tồn cuối (kg)", kieu: "tinh", lay: (r) => r.closeKg, rong: 130 },
-    { key: "unitPrice", header: "Đơn giá (đ)", nhan: "Đơn giá (đ)", kieu: "so", lay: (r) => r.unitPrice || null, rong: 130 },
-    {
-      key: "ngay", header: "Ngày nhập", nhan: "Ngày nhập", kieu: "chu", lay: () => null, rong: 150,
-      oRieng: (r) => (
-        <input
-          type="date"
-          value={r.importDate || ""}
-          onChange={(e) => suaSo(r.id, { importDate: e.target.value })}
-          className={oCham}
-          aria-label={`Ngày nhập — ${r.itemName}`}
-        />
-      ),
-    },
-    {
-      key: "invoice", header: "Invoice", nhan: "Invoice", kieu: "chu", lay: () => null, rong: 140,
-      oRieng: (r) => (
-        <input
-          value={r.origin}
-          onChange={(e) => suaSo(r.id, { origin: e.target.value })}
-          placeholder="Invoice"
-          className={oCham}
-          aria-label={`Invoice — ${r.itemName}`}
-        />
-      ),
-    },
-    {
-      key: "viTri", header: "Vị trí", nhan: "Vị trí", kieu: "chu", lay: () => null, rong: 200,
-      oRieng: (r) => (
-        <Combobox
-          anNhan
-          label={`Vị trí — ${r.itemName}`}
-          value={r.storageLocation}
-          onChange={(v) => suaSo(r.id, { storageLocation: v })}
-          options={viTriOpts}
-          onCreate={themViTri}
-          onSuaMuc={suaKL.moSua}
-          nhanSua={suaKL.nhanSua}
-          suaDuoc={suaKL.suaDuoc}
-          choPhepXoa={false}
-          placeholder={r.warehouse ? `= ${r.warehouse}` : "Chọn kho"}
-        />
-      ),
-    },
-    {
-      key: "xoa", header: "", nhan: "Xóa dòng", kieu: "chu", lay: () => null, rong: 60,
-      oRieng: (r) => (
-        <ConfirmDelete
-          moTaBanGhi={`${r.itemName}${r.size ? " · " + r.size : ""}`}
-          onConfirm={() => xoaDong(r)}
-          trigger={
-            <Button
-              title="Xóa dòng này khỏi tháng. Có hỏi xác nhận, xóa xong vẫn còn nút Hoàn tác." size="sm" variant="ghost" aria-label={`Xóa ${r.itemName}`}>
-              <Trash2 className="size-4" />
-            </Button>
-          }
-        />
-      ),
-    },
-  ];
-  const rowsGrid = locMatHang ? rowsThang.filter((r) => r.itemName === locMatHang) : rowsThang;
-  const hangLuoi: HangLuoi<MonthlyStockRow>[] = rowsGrid.map((r) => ({
-    id: r.id,
-    du: r,
-    ten: r.itemName,
-    phu: (
-      <span className="text-muted-foreground">
-        {[r.importDate ? viDate(r.importDate) : "", r.origin ? `Invoice ${r.origin}` : ""].filter(Boolean).join(" · ") || r.category}
-      </span>
-    ),
-  }));
 
   const coDuLieu = rowsGoc.length > 0;
   /** Có dòng gốc nhưng ô tìm không khớp gì — phân biệt với "tháng chưa có số liệu". */
@@ -1183,23 +1280,28 @@ export default function MonthlyStockScreen() {
         </div>
         <div className="flex flex-wrap items-center gap-3">
           {coDuLieu && !laXemTruoc && (
-            <Button
-              variant={ghiMode ? "default" : "outline"}
-              title={
-                ghiMode
-                  ? "Thoát chế độ ghi, quay về bảng xem theo nhóm."
-                  : "Bật lưới gõ tồn đầu / nhập / xuất (kg) từng mã. Tồn cuối tự tính, dán được cả khối từ Excel."
-              }
-              onClick={() => {
-                if (ghiMode) setLocMatHang("");
-                setGhiMode((v) => !v);
-              }}
-            >
-              {ghiMode ? <Eye className="mr-2 h-4 w-4" /> : <Pencil className="mr-2 h-4 w-4" />}
-              {ghiMode ? "Xong · xem lại" : "Ghi nhập/xuất"}
-            </Button>
+            <>
+              <Button
+                variant="outline"
+                onClick={hoanTac}
+                disabled={!lichSu.lui}
+                title="Hoàn tác lần ghi vừa rồi trên sổ (Ctrl+Z)."
+              >
+                <Undo2 className="mr-2 h-4 w-4" />
+                Hoàn tác
+              </Button>
+              <Button
+                variant="outline"
+                onClick={lamLai}
+                disabled={!lichSu.tien}
+                title="Làm lại thao tác vừa hoàn tác (Ctrl+Y)."
+              >
+                <Redo2 className="mr-2 h-4 w-4" />
+                Làm lại
+              </Button>
+            </>
           )}
-          {coDuLieu && !laXemTruoc && !ghiMode && (
+          {coDuLieu && !laXemTruoc && (
             <Button
               variant="outline"
               onClick={rowsChon.length ? boChon : chonTatCa}
@@ -1316,15 +1418,15 @@ export default function MonthlyStockScreen() {
             </Nhan>
           </div>
 
-          {!laXemTruoc && !ghiMode && (
+          {!laXemTruoc && (
             <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
               <span className="font-semibold text-foreground">Cách thao tác:</span>
+              <span>gõ thẳng vào ô trên bảng (Enter / ↑ / ↓ đi dọc cột, dán được khối từ Excel, Ctrl+Z hoàn tác);</span>
               <span>
-                lấy hàng ra dùng · nhập thêm · gửi kho ngoài một dòng → bấm{" "}
+                lấy ra dùng · nhập thêm · gửi kho ngoài theo số kg → bấm{" "}
                 <PackageMinus className="inline size-4 align-text-bottom" aria-label="nút Lấy ra / gửi kho" /> cuối dòng;
               </span>
-              <span>gửi nhiều dòng một lúc → tick dòng rồi bấm "Gửi kho ngoài";</span>
-              <span>gõ số cả bảng → "Ghi nhập/xuất". Hướng dẫn đầy đủ ở nút ? trên đầu trang.</span>
+              <span>đổi tên · nhóm → nút ✎.</span>
             </p>
           )}
 
@@ -1433,82 +1535,43 @@ export default function MonthlyStockScreen() {
             </div>
           )}
 
-          {ghiMode ? (
-            <div className="space-y-3">
-              <p className="text-sm text-muted-foreground">
-                Gõ tồn đầu / nhập / xuất / đơn giá (kg, đ) từng mã — tồn cuối tự tính. Dán được cả khối từ Excel.
-                Enter/Tab sang ô. Sửa thẳng ngày nhập · invoice · vị trí ngay trong lưới (không mở dialog). Đổi tên / size / nhóm dùng nút ✎ ở chế độ xem. Mọi sửa đều được lưu vết (người · thời điểm · cũ→mới) ở màn Nhật ký.
-              </p>
-              {locMatHang && (
-                <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-muted/40 p-2 text-sm">
-                  <span>
-                    Đang lọc mặt hàng: <span className="font-semibold text-foreground">{locMatHang}</span> ({rowsGrid.length} dòng)
+          {/* Một khung phím cho mọi nhóm: ↓ ở dòng cuối nhóm trên nhảy sang dòng đầu nhóm dưới. */}
+          <div className="space-y-8" data-luoi-phim>
+            {nhomList.map((g) => (
+              <section key={g.category} className="space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h2 className="text-lg font-semibold text-foreground">{g.category}</h2>
+                  {/* Hai nhãn ngắn thay một nhãn dài — điện thoại + chữ 130% tự xuống dòng, không bị cắt số. */}
+                  <span className="flex flex-wrap gap-1">
+                    <Nhan loai="phu">Tồn cuối {num(g.tong.closeKg)} kg</Nhan>
+                    <Nhan loai="phu">{g.rows.length} mặt hàng</Nhan>
                   </span>
-                  <Button size="sm" variant="ghost" onClick={() => setLocMatHang("")} title="Bỏ lọc một mặt hàng — hiện lại toàn bộ dòng của tháng trong lưới ghi.">
-                    Bỏ lọc
-                  </Button>
                 </div>
-              )}
-              <LuoiNhap
-                moTa={`Sổ kho ${nhanThang(thang)}`}
-                cot={cotLuoi}
-                hang={hangLuoi}
-                onGhiO={ghiO}
-              />
-            </div>
-          ) : (
-            <div className="space-y-8">
-              {nhomList.map((g) => (
-                <section key={g.category} className="space-y-2">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <h2 className="text-lg font-semibold text-foreground">{g.category}</h2>
-                    {/* Hai nhãn ngắn thay một nhãn dài — điện thoại + chữ 130% tự xuống dòng, không bị cắt số. */}
-                    <span className="flex flex-wrap gap-1">
-                      <Nhan loai="phu">Tồn cuối {num(g.tong.closeKg)} kg</Nhan>
-                      <Nhan loai="phu">{g.rows.length} mặt hàng</Nhan>
-                    </span>
+                <BangTong
+                  rows={g.rows}
+                  cot={cot(g.tong)}
+                  getKey={(r) => r.id}
+                  nhanTong={`Cộng ${g.category}`}
+                  chon={chonBang}
+                  dinhDau
+                />
+                {!laXemTruoc && (
+                  <div className="flex">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => moThem(g.category)}
+                      className="h-auto min-h-9 w-full whitespace-normal text-left sm:w-auto"
+                      title={`Thêm tay một dòng vào nhóm "${g.category}" (đã điền sẵn nhóm — chỉ nhập tên hàng, số kg…).`}
+                    >
+                      <Plus className="mr-2 h-4 w-4" />
+                      Thêm dòng vào {g.category}
+                    </Button>
                   </div>
-                  <BangTong
-                    rows={g.rows}
-                    cot={cot(g.tong)}
-                    getKey={(r) => r.id}
-                    nhanTong={`Cộng ${g.category}`}
-                    chon={chonBang}
-                    dinhDau
-                  />
-                  {!laXemTruoc && (
-                    <div className="flex">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => moThem(g.category)}
-                        className="h-auto min-h-9 w-full whitespace-normal text-left sm:w-auto"
-                        title={`Thêm tay một dòng vào nhóm "${g.category}" (đã điền sẵn nhóm — chỉ nhập tên hàng, số kg…).`}
-                      >
-                        <Plus className="mr-2 h-4 w-4" />
-                        Thêm dòng vào {g.category}
-                      </Button>
-                    </div>
-                  )}
-                </section>
-              ))}
-            </div>
-          )}
-
-          {/* Chế độ Ghi là lưới phẳng (không tách nhóm) ⇒ giữ một nút chung ở cuối. */}
-          {!laXemTruoc && ghiMode && (
-            <div className="flex">
-              <Button
-                variant="outline"
-                onClick={() => moThem()}
-                className="w-full sm:w-auto"
-                title="Thêm tay một dòng hàng vào tháng đang xem (ngày nhập · tên · invoice · đơn giá · tồn đầu/nhập/xuất · vị trí)."
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                Thêm dòng
-              </Button>
-            </div>
-          )}
+                )}
+              </section>
+            ))}
+          </div>
 
           <p className="text-sm text-muted-foreground">
             {nhanThang(thang)}
@@ -1877,8 +1940,8 @@ export default function MonthlyStockScreen() {
             <DialogTitle className="text-2xl">Đối chiếu lệch dồn kỳ theo mặt hàng</DialogTitle>
             <DialogDescription className="text-base">
               So tồn cuối {nhanThang(thangTr)} ↔ tồn đầu {nhanThang(thang)} theo MẶT HÀNG (đã gộp các
-              tách size để bỏ báo động giả). Đây là chẩn đoán — bấm "Sửa tay" để mở lưới Ghi lọc đúng mặt
-              hàng đó rồi chỉnh số theo phán đoán (không tự sửa để tránh cộng đôi khi lô bị tách/đổi mã).
+              tách size để bỏ báo động giả). Đây là chẩn đoán — bấm "Sửa tay" để lọc bảng về đúng mặt
+              hàng đó rồi gõ số thẳng trên bảng theo phán đoán (không tự sửa để tránh cộng đôi khi lô bị tách/đổi mã).
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-2">
@@ -1927,8 +1990,8 @@ export default function MonthlyStockScreen() {
               </div>
             )}
             <p className="text-sm text-muted-foreground">
-              Lệch = ghi chép dồn kỳ chưa khớp (tồn đầu tháng này ≠ tồn cuối tháng trước). "Sửa tay" mở
-              lưới Ghi đã lọc mặt hàng để bạn chỉnh tồn đầu/nhập/xuất; hoặc dùng "Dồn sang tháng sau" từ
+              Lệch = ghi chép dồn kỳ chưa khớp (tồn đầu tháng này ≠ tồn cuối tháng trước). "Sửa tay" lọc
+              bảng về đúng mặt hàng để bạn gõ thẳng tồn đầu/nhập/xuất; hoặc dùng "Dồn sang tháng sau" từ
               tháng trước cho tháng còn TRỐNG.
             </p>
           </div>
@@ -2028,8 +2091,8 @@ export default function MonthlyStockScreen() {
                   ))}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Các tên trên bị đếm THÀNH NHIỀU mặt hàng khi tổng hợp. Sửa về một cách ghi ở lưới Ghi
-                  (nút ✎) để sổ gộp đúng.
+                  Các tên trên bị đếm THÀNH NHIỀU mặt hàng khi tổng hợp. Sửa về một cách ghi bằng nút ✎
+                  ở bảng để sổ gộp đúng.
                 </p>
               </div>
             )}

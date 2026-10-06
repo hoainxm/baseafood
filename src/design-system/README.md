@@ -275,7 +275,7 @@ Luật khi dùng:
 
 **Điều hướng ↑/↓/Enter theo cột** cho **bảng số TỰ DỰNG** (không qua `LuoiNhap`,
 VD `WipProductionScreen › BangDongSX`): bọc bảng trong `[data-luoi-phim]`, mỗi
-`NumberField` khai `navCol="<tên cột>"`. ↑/↓/Enter nhảy dọc trong cùng cột (theo
+`NumberField` (hoặc ô trần `ONhapSo`) khai `navCol="<tên cột>"` (hàm chung `patterns/dieuHuongCotSo.ts`). ↑/↓/Enter nhảy dọc trong cùng cột (theo
 thứ tự DOM, tự bỏ ô ẩn của dòng chưa mở); Tab để trình duyệt lo đi ngang. `LuoiNhap`
 đã có sẵn nav đầy đủ (§ 5b) — `navCol` chỉ dành cho bảng dựng tay.
 

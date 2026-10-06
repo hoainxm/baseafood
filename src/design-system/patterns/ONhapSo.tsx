@@ -8,6 +8,7 @@ import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 import { dinhDangSo } from "./bieuThucSo";
 import { useNhapSo } from "./useNhapSo";
+import { dieuHuongCotSo } from "./dieuHuongCotSo";
 
 /**
  * Nhãn nổi "= 550" ngay dưới ô khi đang gõ biểu thức. Đưa ra `document.body`
@@ -84,12 +85,17 @@ export const ONhapSo = React.forwardRef<
     rong0?: boolean;
     className?: string;
     khungClassName?: string;
+    /**
+     * ↑ / ↓ / Enter nhảy dọc trong CỘT cùng tên (bảng số tự dựng bọc `[data-luoi-phim]`)
+     * — như `NumberField navCol`. Bỏ trống ⇒ không đổi hành vi.
+     */
+    navCol?: string;
   } & Omit<
     React.InputHTMLAttributes<HTMLInputElement>,
     "value" | "onChange" | "type" | "defaultValue"
   >
 >(function ONhapSo(
-  { value, onChange, donVi, rong0, className, khungClassName, onKeyDown, onFocus, onBlur, ...rest },
+  { value, onChange, donVi, rong0, className, khungClassName, navCol, onKeyDown, onFocus, onBlur, ...rest },
   ref
 ) {
   const { props, xemTruoc } = useNhapSo({ value, onChange, rong0 });
@@ -101,6 +107,7 @@ export const ONhapSo = React.forwardRef<
         inputMode="decimal"
         autoComplete="off"
         {...rest}
+        data-navcol={navCol || undefined}
         value={props.value}
         onChange={props.onChange}
         onFocus={(e) => {
@@ -114,6 +121,7 @@ export const ONhapSo = React.forwardRef<
         onKeyDown={(e) => {
           props.onKeyDown(e);
           if (!e.defaultPrevented) onKeyDown?.(e);
+          if (navCol && !e.defaultPrevented) dieuHuongCotSo(e, navCol);
         }}
         className={cn("tnum text-right", className)}
       />

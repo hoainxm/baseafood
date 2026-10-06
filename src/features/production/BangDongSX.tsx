@@ -409,7 +409,7 @@ export function BangDongSX({
         title="Mở một nhóm mới cho kiểu chế biến / khách hàng khác — mỗi nhóm gõ sản lượng riêng."
         type="button"
         variant="outline"
-        className="w-full border-dashed sm:w-auto"
+        className="h-auto min-h-10 w-full border-dashed py-2 whitespace-normal sm:w-auto"
         onClick={() => onThemNhom()}
       >
         <Plus />

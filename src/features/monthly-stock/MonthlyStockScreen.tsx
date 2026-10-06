@@ -77,6 +77,7 @@ import {
   type MucChon,
   type TheThongTin,
 } from "@/design-system";
+import { useSuaDanhMuc } from "@/features/catalog/SuaDanhMucNhanh";
 import {
   AlertTriangle,
   ArrowDownToLine,
@@ -478,14 +479,22 @@ export default function MonthlyStockScreen() {
     return [...phu].map(([n, ghiChu]) => ({ value: n, label: n, phu: ghiChu || undefined }));
   }, [khoLuuDM, lines]);
 
-  /** Gõ vị trí chưa có ⇒ lưu ngay vào danh mục kho lưu (mặc định kho thuê ngoài). */
+  /**
+   * Gõ vị trí chưa có ⇒ lưu ngay vào danh mục kho lưu (mặc định kho thuê ngoài).
+   * Trùng tên (không phân hoa thường) với kho đã có ⇒ dùng lại tên có sẵn.
+   */
   const themViTri = (ten: string) => {
     const name = ten.trim();
-    if (name && !viTriOpts.some((o) => o.value.toLowerCase() === name.toLowerCase())) {
+    const co = viTriOpts.find((o) => o.value.toLowerCase() === name.toLowerCase());
+    if (co) return co.value;
+    if (name) {
       ghiKhoLuuDM([...khoLuuDM, { id: uid(), code: "", name, kind: "thue-ngoai", address: "", phone: "", note: "Từ sổ kho theo tháng" }]);
+      notify.daLuu(`Đã thêm kho lưu "${name}" vào danh mục`);
     }
     return name;
   };
+  /** Bút chì sửa nhanh kho lưu ngay trong ô Vị trí — chỉ kho CÓ trong danh mục (kho hệ thống thì không). */
+  const suaKL = useSuaDanhMuc("khoLuu", khoLuuDM, ghiKhoLuuDM, { theo: "ten" });
 
   const [ganViTri, setGanViTri] = useState<string | null>(null); // vị trí sắp gán cho dòng tick
   /** Gán vị trí cho các dòng đang tick (một lần ghi, có Hoàn tác). */
@@ -575,6 +584,25 @@ export default function MonthlyStockScreen() {
     [mtypes]
   );
 
+  /**
+   * Bút chì sửa nhanh mặt hàng / loại NL trong ô "Ánh xạ … tới" (value là TÊN).
+   * Đổi tên mặt hàng ở hộp sửa ⇒ dời luôn các ánh xạ đang trỏ tên cũ sang tên mới,
+   * kẻo bấm Đồng bộ lại đẻ ra một mặt hàng mang tên cũ. (Loại NL khoá ô tên.)
+   */
+  const suaMH = useSuaDanhMuc("matHang", products, ghiProducts, {
+    theo: "ten",
+    onDaLuu: (moi, cu) => {
+      const tenCu = cu.name.trim().toLowerCase();
+      if (moi.name.trim().toLowerCase() === tenCu) return;
+      setMapDB((m) =>
+        Object.fromEntries(
+          Object.entries(m).map(([k, v]) => [k, v.trim().toLowerCase() === tenCu ? moi.name.trim() : v])
+        )
+      );
+    },
+  });
+  const suaNL = useSuaDanhMuc("loaiNL", mtypes, ghiMtypes, { theo: "ten" });
+
   const moDongBoDialog = () => {
     setDichDB({}); // rỗng = dùng đích GỢI Ý mỗi dòng
     setMapDB({}); // rỗng = giữ nguyên tên file (chưa ánh xạ)
@@ -645,6 +673,7 @@ export default function MonthlyStockScreen() {
   const dongRow = (x: DongBoDong) => {
     const d = dichCua(x);
     const goc = d === "product" ? matHangOpts : loaiNLOpts;
+    const sua = d === "product" ? suaMH : d === "material" ? suaNL : null;
     // Tên đang ánh xạ (tên file, hoặc tên vừa gõ "thêm mới") chưa có trong danh mục ⇒ vẫn phải HIỆN
     // trong ô, kèm nhãn "mới"; không thì Combobox rơi về placeholder, trông như chưa thêm được.
     const ten = mapCua(x);
@@ -675,6 +704,9 @@ export default function MonthlyStockScreen() {
             onChange={(v) => setMapDB((m) => ({ ...m, [x.name]: v }))}
             options={opts}
             onCreate={(t) => t}
+            onSuaMuc={sua?.moSua}
+            nhanSua={sua?.nhanSua}
+            suaDuoc={sua?.suaDuoc}
             choPhepXoa={false}
             placeholder={d === "skip" ? "— bỏ qua —" : "Gõ tìm tên chuẩn / thêm mới"}
           />
@@ -988,6 +1020,9 @@ export default function MonthlyStockScreen() {
           onChange={(v) => suaSo(r.id, { storageLocation: v })}
           options={viTriOpts}
           onCreate={themViTri}
+          onSuaMuc={suaKL.moSua}
+          nhanSua={suaKL.nhanSua}
+          suaDuoc={suaKL.suaDuoc}
           choPhepXoa={false}
           placeholder={r.warehouse ? `= ${r.warehouse}` : "Chọn kho"}
         />
@@ -1536,6 +1571,9 @@ export default function MonthlyStockScreen() {
                   onChange={(v) => setForm((f) => (f ? { ...f, storageLocation: v } : f))}
                   options={viTriOpts}
                   onCreate={themViTri}
+                  onSuaMuc={suaKL.moSua}
+                  nhanSua={suaKL.nhanSua}
+                  suaDuoc={suaKL.suaDuoc}
                   placeholder={form.warehouse ? `Để trống = ${form.warehouse}` : "Chọn kho đang giữ hàng"}
                 />
               </div>
@@ -1624,6 +1662,9 @@ export default function MonthlyStockScreen() {
                   onChange={(v) => setThaoTac((s) => (s ? { ...s, viTri: v } : s))}
                   options={viTriOpts}
                   onCreate={themViTri}
+                  onSuaMuc={suaKL.moSua}
+                  nhanSua={suaKL.nhanSua}
+                  suaDuoc={suaKL.suaDuoc}
                   choPhepXoa={false}
                 />
               )}
@@ -1685,6 +1726,9 @@ export default function MonthlyStockScreen() {
                 onChange={(v) => setGanViTri(v)}
                 options={viTriOpts}
                 onCreate={themViTri}
+                onSuaMuc={suaKL.moSua}
+                nhanSua={suaKL.nhanSua}
+                suaDuoc={suaKL.suaDuoc}
                 choPhepXoa={false}
               />
             </div>
@@ -2130,6 +2174,10 @@ export default function MonthlyStockScreen() {
           </table>
         </PhieuIn>
       )}
+
+      {suaKL.hop}
+      {suaMH.hop}
+      {suaNL.hop}
     </div>
   );
 }

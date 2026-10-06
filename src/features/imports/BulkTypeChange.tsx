@@ -35,12 +35,19 @@ export function HopDoiLoaiHangLoat({
   rows,
   loaiNL,
   onThemLoaiNL,
+  suaLoai,
   onClose,
   onLuu,
 }: {
   rows: MaterialImportItem[];
   loaiNL: MaterialType[];
   onThemLoaiNL: (ten: string) => string;
+  /** Bút chì sửa nhanh loại NL (từ `useSuaDanhMuc("loaiNL", …, { theo: "ten" })` của màn gọi). */
+  suaLoai?: {
+    moSua: (value: string) => void;
+    suaDuoc: (value: string) => boolean;
+    nhanSua: string;
+  };
   onClose: () => void;
   onLuu: (ids: string[], loaiDich: string) => void;
 }) {
@@ -109,6 +116,9 @@ export function HopDoiLoaiHangLoat({
             onChange={setLoaiDich}
             options={optLoai}
             onCreate={onThemLoaiNL}
+            onSuaMuc={suaLoai?.moSua}
+            nhanSua={suaLoai?.nhanSua}
+            suaDuoc={suaLoai?.suaDuoc}
           />
         </div>
         <DateRangeField

@@ -6,6 +6,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type {
   DailyLock,
+  DomesticSaleItem,
   WipProductionItem,
   Product,
   Workshop,
@@ -15,6 +16,7 @@ import { newId } from "@/lib/store";
 import { uid } from "@/lib/db";
 import {
   useBatterTypes,
+  useDomesticSales,
   useProductionLocks,
   useProducts,
   useWipProductions,
@@ -35,6 +37,7 @@ import {
 import {
   ChuThichBatBuoc,
   Button,
+  ConfirmDelete,
   Combobox,
   DateField,
   DateRangeField,
@@ -85,17 +88,23 @@ import {
   Users,
   Warehouse,
   Wheat,
+  Store,
 } from "lucide-react";
 import { BangDongSX } from "./BangDongSX";
 import { KhoiBotTam } from "./KhoiBotTam";
+import { KhoiBanNoiDia } from "./KhoiBanNoiDia";
 import {
   PHAN_XUONG,
+  banNoiDiaDayDu,
+  banNoiDiaTrong,
+  dongBanNoiDiaRong,
   dongDayDu,
   dongSXRong,
   dongTrong,
   laTach,
   tongDong,
   type DauPhien,
+  type DongBanNoiDia,
   type DongSX,
 } from "./wipHelpers";
 
@@ -121,6 +130,8 @@ export default function SanXuatBTPScreen() {
   const [khach, setKhach] = useCustomers();
   const [loaiNL, setLoaiNL] = useMaterialTypes();
   const [botTam, setBotTam] = useBatterTypes();
+  /** Sổ BÁN NỘI ĐỊA (mig 0054) — NL bán thẳng, sổ riêng (không lẫn sản lượng TP). */
+  const [banNoiDia, persistBanNoiDia] = useDomesticSales();
 
   // Người thao tác = tài khoản đang đăng nhập — gắn vào dòng khi lưu để lưu vết ai gửi.
   const { nguoiDung } = useAuth();
@@ -136,6 +147,8 @@ export default function SanXuatBTPScreen() {
   const [phien, setPhien] = useState<DauPhien | null>(null);
   const [ngayLienNhau, setNgayLienNhau] = useState(true);
   const [dongBang, setDongBang] = useState<DongSX[]>([]);
+  /** Dòng bán nội địa của phiên đang gõ — mặc định trống, bấm "Thêm dòng" mới hiện. */
+  const [dongBND, setDongBND] = useState<DongBanNoiDia[]>([]);
   const [loiPhien, setLoiPhien] = useState<LoiNhap[]>([]);
   /** Nhóm (kiểu chế biến × khách) của phiên trước → phiếu mới tự điền sẵn nhóm
    *  đầu, gõ thành phẩm ngay, khỏi tạo nhóm lại. Chỉ sống trong phiên làm việc. */
@@ -146,6 +159,9 @@ export default function SanXuatBTPScreen() {
 
   /* Sửa một dòng đã ghi (từ bảng sổ). */
   const [sua, setSua] = useState<WipProductionItem | null>(null);
+  /* Sửa một dòng BÁN NỘI ĐỊA đã ghi. */
+  const [suaBND, setSuaBND] = useState<DomesticSaleItem | null>(null);
+  const [loiSuaBND, setLoiSuaBND] = useState<LoiNhap[]>([]);
   const [loiSua, setLoiSua] = useState<LoiNhap[]>([]);
   /** Dòng đang sửa có tách không = đã nhập râu/bao tử (ô tách luôn có sẵn). */
   const suaTach =
@@ -252,6 +268,30 @@ export default function SanXuatBTPScreen() {
     return ten;
   };
 
+  /* ---- Ô chọn danh mục cho khối Bán nội địa: value = TÊN, thêm mới + bút chì ---- */
+  const themLoaiNLTen = (ten: string): string => {
+    const sach = ten.trim();
+    const co = loaiNL.find((l) => l.name.trim().toLowerCase() === sach.toLowerCase());
+    if (co) return co.name;
+    setLoaiNL([...loaiNL, { id: uid(), name: sach, category: "", note: "" }]);
+    notify.daLuu(`Đã thêm loại nguyên liệu "${sach}"`);
+    return sach;
+  };
+  const oLoaiNL = {
+    options: loaiNL.map((l) => ({ value: l.name, label: l.name, phu: l.category || undefined })),
+    onCreate: themLoaiNLTen,
+    onSuaMuc: suaNL.moSua,
+    suaDuoc: suaNL.suaDuoc,
+    nhanSua: suaNL.nhanSua,
+  };
+  const oKhach = {
+    options: optKhach,
+    onCreate: themKhach,
+    onSuaMuc: suaKH.moSua,
+    suaDuoc: suaKH.suaDuoc,
+    nhanSua: suaKH.nhanSua,
+  };
+
   /* ---- Bột tẩm (mig 0051): danh mục loại bột — dòng sản lượng lưu theo TÊN ---- */
   const optBot: MucChon[] = botTam.map((b) => ({
     value: b.name,
@@ -304,6 +344,20 @@ export default function SanXuatBTPScreen() {
   /** Bột tẩm đã dùng trong phạm vi đang xem, cộng theo loại (mig 0051). */
   const botTheoLoai = useMemo(() => congBotTheoLoai(view.map((r) => r.batterKg)), [view]);
   const tongBotView = botTheoLoai.reduce((s, b) => s + b.kg, 0);
+  /** Bán nội địa (mig 0054) trong phạm vi đang xem — sổ riêng, không vào tổng sản lượng. */
+  const bndView = useMemo(
+    () =>
+      banNoiDia
+        .filter(
+          (r) =>
+            r.saleDate >= tuHieuLuc &&
+            r.saleDate <= denHieuLuc &&
+            (phanXuong === "Tất cả" || r.workshop === phanXuong)
+        )
+        .sort((a, b) => a.saleDate.localeCompare(b.saleDate) || a.id.localeCompare(b.id)),
+    [banNoiDia, tuHieuLuc, denHieuLuc, phanXuong]
+  );
+  const tongBNDView = bndView.reduce((s, r) => s + (r.quantityKg || 0), 0);
 
   /* ---- A4: gom báo cáo TP ngày theo (xưởng × người thao tác) ---- */
   const baoCaoNguoi = useMemo(() => {
@@ -509,11 +563,22 @@ export default function SanXuatBTPScreen() {
   const luuPhien = (imLang: boolean): boolean => {
     if (!phien) return true;
     const hopLe = dongBang.filter(dongDayDu);
+    const bndHopLe = dongBND.filter(banNoiDiaDayDu);
     const ls: LoiNhap[] = [...loiDauPhien(phien)];
-    if (hopLe.length === 0)
+    if (hopLe.length === 0 && bndHopLe.length === 0)
       ls.push({
         truong: "Thành phẩm",
-        thongBao: "Thêm ít nhất một thành phẩm vào phiên",
+        thongBao: "Thêm ít nhất một thành phẩm (hoặc một dòng bán nội địa) vào phiên",
+      });
+    if (!imLang)
+      dongBND.forEach((d, i) => {
+        if (!banNoiDiaTrong(d) && !banNoiDiaDayDu(d))
+          ls.push({
+            truong: `Bán nội địa dòng ${i + 1}`,
+            thongBao: !d.materialTypeName.trim()
+              ? "Chưa chọn loại nguyên liệu"
+              : "Số lượng phải lớn hơn 0 kg",
+          });
       });
     if (!imLang)
       dongBang.forEach((d, i) => {
@@ -550,7 +615,23 @@ export default function SanXuatBTPScreen() {
       operator: nguoiThaoTac,
       batterKg: lamSachBot(d.botKg),
     }));
-    persist([...rows, ...moi]);
+    if (moi.length > 0) persist([...rows, ...moi]);
+
+    // Bán nội địa → sổ riêng (cùng ngày / xưởng / lý do ghi bù của phiên).
+    const moiBND: DomesticSaleItem[] = bndHopLe.map((d) => ({
+      id: newId(),
+      saleDate: phien.productionDate,
+      postingDate: phien.postingDate,
+      backdateReason: phien.backdateReason,
+      workshop: phien.workshop,
+      materialTypeName: d.materialTypeName.trim(),
+      quantityKg: d.quantityKg,
+      unitPrice: d.unitPrice,
+      customerName: d.customerName.trim(),
+      note: "",
+      operator: nguoiThaoTac,
+    }));
+    if (moiBND.length > 0) persistBanNoiDia([...banNoiDia, ...moiBND]);
 
     // Nhớ về MẶT HÀNG (đúng ý "gắn trên mặt hàng") — lần sau tự điền:
     //  - quy cách block (kg/khối) vừa nhập;
@@ -577,18 +658,27 @@ export default function SanXuatBTPScreen() {
 
     const tongMoi = moi.reduce((s, r) => s + r.quantityKg, 0);
     const botMoi = moi.reduce((s, r) => s + tongBot(r.batterKg), 0);
+    const bndMoi = moiBND.reduce((s, r) => s + r.quantityKg, 0);
     notify.daLuu(
-      `Đã lưu ${moi.length} thành phẩm · ${kg(tongMoi)}` +
-        (botMoi > 0 ? ` · bột tẩm ${kg(botMoi)}` : ""),
+      [
+        moi.length > 0 && `Đã lưu ${moi.length} thành phẩm · ${kg(tongMoi)}`,
+        botMoi > 0 && `bột tẩm ${kg(botMoi)}`,
+        moiBND.length > 0 &&
+          `${moi.length > 0 ? "bán nội địa" : "Đã lưu bán nội địa"} ${kg(bndMoi)}`,
+      ]
+        .filter(Boolean)
+        .join(" · "),
       undefined,
-      {
-        label: moi.length > 1 ? `In ${moi.length} tem` : "In tem",
-        onClick: () => setTemLo(moi),
-      }
+      moi.length > 0
+        ? {
+            label: moi.length > 1 ? `In ${moi.length} tem` : "In tem",
+            onClick: () => setTemLo(moi),
+          }
+        : undefined
     );
 
     const bg = banGhiChot(phien.productionDate, phien.workshop);
-    if (bg?.isLocked)
+    if (bg?.isLocked && moi.length > 0)
       notify.canhBao(
         `Ngày ${viDate(phien.productionDate)} đã chốt ${kg(bg.totalKgAtLock)} — sau khi ghi bù thành ${kg(tongNgayXuong(phien.productionDate, phien.workshop) + tongMoi)}`
       );
@@ -609,6 +699,7 @@ export default function SanXuatBTPScreen() {
   const datLaiPhien = () => {
     setPhien(null);
     setDongBang([]);
+    setDongBND([]);
     setLoiPhien([]);
   };
   const xongPhien = () => {
@@ -660,6 +751,95 @@ export default function SanXuatBTPScreen() {
     );
   };
 
+  /* ---- Sửa / bỏ một dòng BÁN NỘI ĐỊA đã ghi ---- */
+  const moSuaBND = (r: DomesticSaleItem) => {
+    setSuaBND({ ...r });
+    setLoiSuaBND([]);
+  };
+  const datSuaBND = (patch: Partial<DomesticSaleItem>) =>
+    setSuaBND((d) => (d ? { ...d, ...patch } : d));
+  const luuSuaBND = () => {
+    if (!suaBND) return;
+    const ls: LoiNhap[] = [];
+    if (!suaBND.materialTypeName.trim())
+      ls.push({ truong: "Loại nguyên liệu", thongBao: "Chưa chọn loại nguyên liệu" });
+    if (!(suaBND.quantityKg > 0))
+      ls.push({ truong: "Số lượng", thongBao: "Phải lớn hơn 0 kg" });
+    setLoiSuaBND(ls);
+    if (ls.length > 0) return;
+    const banGhi: DomesticSaleItem = {
+      ...suaBND,
+      materialTypeName: suaBND.materialTypeName.trim(),
+      customerName: suaBND.customerName.trim(),
+    };
+    persistBanNoiDia(banNoiDia.map((r) => (r.id === banGhi.id ? banGhi : r)));
+    notify.daLuu("Đã lưu thay đổi bán nội địa");
+    setSuaBND(null);
+  };
+  const xoaBND = (r: DomesticSaleItem) => {
+    const truoc = banNoiDia;
+    persistBanNoiDia(banNoiDia.filter((x) => x.id !== r.id));
+    notify.daXoa(`Đã bỏ bán nội địa ${r.materialTypeName} — ${kg(r.quantityKg)}`, () =>
+      persistBanNoiDia(truoc)
+    );
+  };
+  const cotBND: Cot<DomesticSaleItem>[] = [
+    {
+      key: "ngay",
+      header: "Ngày",
+      render: (r) => viDate(r.saleDate),
+      sapXep: (r) => r.saleDate,
+    },
+    {
+      key: "loai",
+      header: "Loại nguyên liệu",
+      chinh: true,
+      render: (r) => r.materialTypeName,
+      sapXep: (r) => r.materialTypeName,
+    },
+    {
+      key: "kg",
+      header: "Số lượng (kg)",
+      so: true,
+      render: (r) => num(r.quantityKg),
+      sapXep: (r) => r.quantityKg,
+    },
+    {
+      key: "gia",
+      header: "Đơn giá (đ/kg)",
+      so: true,
+      render: (r) =>
+        r.unitPrice != null ? num(r.unitPrice) : <span className="text-muted-foreground">—</span>,
+      sapXep: (r) => r.unitPrice ?? 0,
+    },
+    {
+      key: "tien",
+      header: "Thành tiền (đ)",
+      so: true,
+      anTrenDienThoai: true,
+      render: (r) =>
+        r.unitPrice != null ? (
+          num(r.quantityKg * r.unitPrice)
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        ),
+      sapXep: (r) => r.quantityKg * (r.unitPrice ?? 0),
+    },
+    {
+      key: "kh",
+      header: "Khách hàng",
+      render: (r) => r.customerName || <span className="text-muted-foreground">—</span>,
+      sapXep: (r) => r.customerName,
+    },
+    {
+      key: "nguoi",
+      header: "Người ghi",
+      anTrenDienThoai: true,
+      render: (r) => r.operator || <span className="text-muted-foreground">—</span>,
+      sapXep: (r) => r.operator,
+    },
+  ];
+
   /* ---- A4: gửi báo cáo TP lên hệ thống (tách khỏi chốt ngày) ---- */
   const baoCaoKey = `${tuHieuLuc}${laMotNgay ? "" : `..${denHieuLuc}`}·${phanXuong}`;
   const guiBaoCao = () => {
@@ -672,7 +852,13 @@ export default function SanXuatBTPScreen() {
         entity: "production_report",
         entityKey: baoCaoKey,
         summary: `Gửi báo cáo thành phẩm ${moTaPhamVi} · ${phanXuong} — tổng ${kg(tong)} (${view.length} dòng). ${dong}`,
-        diff: { nguoiGui: nguoiThaoTac, tong, theoNguoi: baoCaoNguoi, botTam: botTheoLoai },
+        diff: {
+          nguoiGui: nguoiThaoTac,
+          tong,
+          theoNguoi: baoCaoNguoi,
+          botTam: botTheoLoai,
+          banNoiDia: { kg: tongBNDView, soDong: bndView.length },
+        },
       },
     ]);
     const luc = new Date().toLocaleString("vi-VN");
@@ -927,6 +1113,18 @@ export default function SanXuatBTPScreen() {
           </div>
         )}
       </div>
+
+      {/* Bán nội địa (mig 0054): NL bán thẳng — sổ riêng, không cộng vào thành phẩm. */}
+      <KhoiBanNoiDia
+        dong={dongBND}
+        onSua={(key, patch) =>
+          setDongBND((ds) => ds.map((d) => (d.key === key ? { ...d, ...patch } : d)))
+        }
+        onBo={(key) => setDongBND((ds) => ds.filter((d) => d.key !== key))}
+        onThem={() => setDongBND((ds) => [...ds, dongBanNoiDiaRong(ds.at(-1)?.materialTypeName ?? "")])}
+        loaiNL={oLoaiNL}
+        khach={oKhach}
+      />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <span className="text-base text-muted-foreground">
@@ -1183,6 +1381,59 @@ export default function SanXuatBTPScreen() {
             </div>
           )}
         </>
+      )}
+
+      {/* Bán nội địa (mig 0054) — sổ riêng; hiện cả khi ngày không có thành phẩm. */}
+      {bndView.length > 0 && (
+        <div className="space-y-3 rounded-xl border-2 border-border p-4">
+          <div>
+            <h2 className="flex items-center gap-2 text-lg font-semibold text-foreground">
+              <Store className="size-icon shrink-0" aria-hidden />
+              Bán nội địa
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Nguyên liệu bán thẳng cho khách trong nước — {moTaPhamVi} · {phanXuong}. Không
+              nằm trong tổng sản lượng; Cân đối lấy số này cho dòng “Bán nội địa”.
+            </p>
+          </div>
+          <RecordTable
+            columns={cotBND}
+            rows={bndView}
+            getKey={(r) => r.id}
+            actions={(r) => (
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  title="Mở lại dòng bán nội địa này để sửa ngày, loại nguyên liệu, số lượng, giá hoặc khách."
+                  variant="outline"
+                  size="sm"
+                  onClick={() => moSuaBND(r)}
+                >
+                  <Pencil />
+                  Sửa
+                </Button>
+                <ConfirmDelete
+                  moTaBanGhi={`Bán nội địa ${r.materialTypeName} — ${kg(r.quantityKg)} (${viDate(r.saleDate)})`}
+                  onConfirm={() => xoaBND(r)}
+                  trigger={
+                    <Button
+                      title="Bỏ dòng bán nội địa này khỏi sổ. Có hỏi xác nhận và còn nút Hoàn tác."
+                      variant="outline"
+                      size="sm"
+                    >
+                      Bỏ
+                    </Button>
+                  }
+                />
+              </div>
+            )}
+          />
+          <div className="flex flex-wrap justify-end gap-x-10 gap-y-2 rounded-xl bg-muted px-5 py-4">
+            <div className="flex items-baseline gap-3">
+              <span className="text-base text-muted-foreground">Tổng bán nội địa</span>
+              <span className="tnum text-xl font-semibold">{kg(tongBNDView)}</span>
+            </div>
+          </div>
+        </div>
       )}
         </>
       )}
@@ -1455,6 +1706,94 @@ export default function SanXuatBTPScreen() {
             </Button>
             <Button
               title="Ghi đè dòng sản lượng này bằng số vừa sửa." size="lg" onClick={luuSua}>
+              Lưu thay đổi
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog sửa một dòng bán nội địa */}
+      <Dialog open={suaBND !== null} onOpenChange={(o) => !o && setSuaBND(null)}>
+        <DialogContent className="max-h-[92vh] w-full overflow-y-auto sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-2xl">Sửa dòng bán nội địa</DialogTitle>
+            <DialogDescription>
+              Nguyên liệu bán thẳng cho khách trong nước — không cộng vào sản lượng thành phẩm.
+            </DialogDescription>
+          </DialogHeader>
+          {suaBND && (
+            <div className="space-y-6 py-2">
+              <ErrorSummary loi={loiSuaBND} />
+              <ChuThichBatBuoc />
+              <div className="grid gap-6 sm:grid-cols-2">
+                <DateField
+                  label="Ngày bán"
+                  required
+                  value={suaBND.saleDate}
+                  onChange={(v) => datSuaBND({ saleDate: v })}
+                />
+                <Combobox
+                  label="Phân xưởng"
+                  required
+                  choPhepXoa={false}
+                  value={suaBND.workshop}
+                  onChange={(v) => datSuaBND({ workshop: v as Workshop })}
+                  options={PHAN_XUONG.map((p) => ({ value: p, label: p }))}
+                />
+              </div>
+              <Combobox
+                label="Loại nguyên liệu"
+                required
+                value={suaBND.materialTypeName}
+                onChange={(v) => datSuaBND({ materialTypeName: v })}
+                options={oLoaiNL.options}
+                onCreate={oLoaiNL.onCreate}
+                onSuaMuc={oLoaiNL.onSuaMuc}
+                suaDuoc={oLoaiNL.suaDuoc}
+                nhanSua={oLoaiNL.nhanSua}
+                placeholder="— Chọn loại NL —"
+                emptyText="Chưa có loại này — gõ tên rồi Thêm mới."
+              />
+              <div className="grid gap-6 sm:grid-cols-2">
+                <NumberField
+                  label="Số lượng"
+                  required
+                  unit="kg"
+                  value={suaBND.quantityKg || null}
+                  onChange={(v) => datSuaBND({ quantityKg: v ?? 0 })}
+                />
+                <NumberField
+                  label="Đơn giá"
+                  unit="đ/kg"
+                  value={suaBND.unitPrice}
+                  onChange={(v) => datSuaBND({ unitPrice: v })}
+                />
+              </div>
+              <Combobox
+                label="Khách hàng"
+                value={suaBND.customerName}
+                onChange={(v) => datSuaBND({ customerName: v })}
+                options={oKhach.options}
+                onCreate={oKhach.onCreate}
+                onSuaMuc={oKhach.onSuaMuc}
+                suaDuoc={oKhach.suaDuoc}
+                nhanSua={oKhach.nhanSua}
+                placeholder="— Chọn khách (nếu có) —"
+                emptyText="Chưa có khách này — gõ tên rồi Thêm mới."
+              />
+              <Field label="Ghi chú">
+                <Input
+                  value={suaBND.note}
+                  onChange={(e) => datSuaBND({ note: e.target.value })}
+                />
+              </Field>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" size="lg" onClick={() => setSuaBND(null)}>
+              Hủy
+            </Button>
+            <Button title="Ghi đè dòng bán nội địa này bằng số vừa sửa." size="lg" onClick={luuSuaBND}>
               Lưu thay đổi
             </Button>
           </DialogFooter>

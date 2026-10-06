@@ -278,6 +278,9 @@ export default function NhapNguyenLieuScreen() {
   const suaNL = useSuaDanhMuc("loaiNL", loaiNL, setLoaiNL, { theo: "ten" });
 
   const themDaiLy = (ten: string) => {
+    // Nhãn có mã số ("1 · Hồng Phú") nên ô chọn không tự nhận ra tên trùng ⇒ tự dò.
+    const co = daiLy.find((d) => d.shortName.trim().toLowerCase() === ten.trim().toLowerCase());
+    if (co) return co.shortName;
     setDaiLy([
       ...daiLy,
       {
@@ -316,6 +319,10 @@ export default function NhapNguyenLieuScreen() {
       }));
 
   const themLoaiNL = (ten: string, loai = "") => {
+    // Trùng tên (không phân hoa thường — kể cả loại đang gán loài khác nên không
+    // hiện trong ô) ⇒ dùng lại bản có sẵn, không đẻ bản trùng.
+    const co = loaiNL.find((l) => l.name.trim().toLowerCase() === ten.trim().toLowerCase());
+    if (co) return co.name;
     setLoaiNL([...loaiNL, { id: uid(), name: ten, category: loai, note: "" }]);
     notify.daLuu(`Đã thêm loại nguyên liệu "${ten}" vào danh mục`);
     return ten;
@@ -1532,6 +1539,7 @@ export default function NhapNguyenLieuScreen() {
           rows={rows}
           loaiNL={loaiNL}
           onThemLoaiNL={themLoaiNL}
+          suaLoai={suaNL}
           onClose={() => setDoiLoaiMo(false)}
           onLuu={(ids, loaiDich) => {
             const bo = new Set(ids);

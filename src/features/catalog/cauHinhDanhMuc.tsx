@@ -121,12 +121,16 @@ function trungTen<T extends { id: string }>(
  * Bộ trường của 6 danh mục — hàm THUẦN (không hook): cần danh sách loại NL,
  * 141 mã TK 1551 và loại bột tẩm để dựng ô chọn trong form mặt hàng.
  * `themBot` có ⇒ ô "Bột đi kèm" cho tạo loại bột mới tại chỗ (trả về id).
+ * `themLoaiNL` có ⇒ ô "Loại nguyên liệu" cho tạo loại NL mới tại chỗ (trả về id).
+ * Cả hai PHẢI ghi qua đúng instance `useBang` của màn đang mở — không có thì ô
+ * chỉ cho chọn (VD hộp sửa nhanh ở màn nghiệp vụ không nắm danh mục loại NL).
  */
 export function taoTruongDanhMuc(
   loaiNL: MaterialType[],
   thanhPham: FinishedGood[],
   botTam: BatterType[] = [],
-  themBot?: (ten: string) => string
+  themBot?: (ten: string) => string,
+  themLoaiNL?: (ten: string) => string
 ) {
   const optTP141 = thanhPham.map((t) => ({
     value: t.code,
@@ -156,8 +160,13 @@ export function taoTruongDanhMuc(
             label: l.name,
             phu: l.category || undefined,
           }))}
+          onCreate={themLoaiNL}
           placeholder="— Chọn loại nguyên liệu —"
-          emptyText="Chưa có loại NL — thêm ở tab Loại nguyên liệu."
+          emptyText={
+            themLoaiNL
+              ? "Chưa có loại NL — gõ tên rồi bấm Thêm mới."
+              : "Chưa có loại NL — thêm ở tab Loại nguyên liệu."
+          }
         />
       ),
       hienThi: (r) =>
@@ -645,8 +654,19 @@ export function useCauHinhDanhMuc(): BoCauHinhDanhMuc {
       }
       return kq.bot.id;
     };
-    return taoTruongDanhMuc(loaiNL, thanhPham, botTam, themBot);
-  }, [loaiNL, thanhPham, botTam, setBotTam]);
+    // Tạo loại NL tại chỗ từ ô "Loại nguyên liệu" của form mặt hàng — ghi qua ĐÚNG
+    // instance của tab Loại nguyên liệu. Trùng tên (không phân hoa thường) ⇒ dùng lại.
+    const themLoaiNL = (ten: string): string => {
+      const sach = ten.trim();
+      const co = loaiNL.find((l) => l.name.trim().toLowerCase() === sach.toLowerCase());
+      if (co) return co.id;
+      const moi: MaterialType = { id: uid(), name: sach, category: "", note: "" };
+      setLoaiNL([...loaiNL, moi]);
+      notify.daLuu(`Đã thêm loại nguyên liệu "${sach}" vào danh mục`);
+      return moi.id;
+    };
+    return taoTruongDanhMuc(loaiNL, thanhPham, botTam, themBot, themLoaiNL);
+  }, [loaiNL, setLoaiNL, thanhPham, botTam, setBotTam]);
   return taoCauHinhDanhMuc(truong, {
     matHang: { rows: matHang, onChange: setMatHang, dangTai: taiMH },
     khachHang: { rows: khachHang, onChange: setKhachHang, dangTai: taiKH },

@@ -16,6 +16,12 @@ import {
   type HangLuoiNL,
   type LoaiDongKho,
 } from "@/lib/balancingGrid";
+import {
+  TEN_DONG_BAN_NOI_DIA,
+  amTheoNgay,
+  doiChieuBanNoiDia,
+  laDongBanNoiDia,
+} from "@/lib/banNoiDia";
 import type { ONgay, PeriodGrid } from "./usePeriodGrid";
 import { HopChonDongNhap, HopDongNhapTay, HopThemDongNL } from "./gridDialogs";
 import {
@@ -41,12 +47,15 @@ export function LuoiNguyenLieu({
   luoi,
   loaiNLDanhMuc,
   onThemLoaiNL,
+  suaLoaiNL,
   anNgay,
   onDoiAnNgay,
 }: {
   luoi: PeriodGrid;
   loaiNLDanhMuc: MaterialType[];
   onThemLoaiNL: (ten: string) => string;
+  /** Bút chì sửa nhanh loại NL ở hộp thêm dòng (useSuaDanhMuc của màn, theo TÊN). */
+  suaLoaiNL?: { moSua: (v: string) => void; suaDuoc: (v: string) => boolean; nhanSua: string };
   anNgay: boolean;
   onDoiAnNgay: () => void;
 }) {
@@ -63,6 +72,7 @@ export function LuoiNguyenLieu({
     ghiNhapNhieuNgay,
     tonKhoDong,
     conDoSXTheoNgay,
+    banNoiDiaSX,
   } = luoi;
   const [suaTayMo, setSuaTayMo] = useState(false);
   const [themMo, setThemMo] = useState<InputGroup | "giam" | null>(null);
@@ -193,6 +203,68 @@ export function LuoiNguyenLieu({
     if (moi === 0) delete daily[iso];
     else daily[iso] = moi;
     ghiDong(r.id, { dailyQuantities: daily });
+  };
+
+  /* ---------- Bán nội địa (mig 0054): dòng GIẢM "Bán nội địa" ⇄ sổ /wip ----------
+     NL bán thẳng cho khách trong nước (bảng giấy: −987). Tổ trưởng ghi ở Sản xuất;
+     ở đây chỉ điền / đối chiếu theo từng ngày — dòng giảm âm sẵn đúng công thức. */
+  const laBanNoiDia = (h: HangLuoiNL) => h.laGiam && laDongBanNoiDia({ name: h.ten });
+  const dongBanNoiDia = nlVao.find((r) => laDongBanNoiDia(r));
+  const dienBanNoiDia = () => {
+    const daily = amTheoNgay(banNoiDiaSX.theoNgay);
+    if (dongBanNoiDia) {
+      // Dòng cũ (Thủy sản kg âm thường) chuyển luôn thành dòng giảm — một dòng, không trừ đôi.
+      ghiDong(dongBanNoiDia.id, {
+        dailyQuantities: daily,
+        unitPrice: banNoiDiaSX.giaBinhQuan ?? dongBanNoiDia.unitPrice,
+        isReduction: true,
+        reductionWarehouseId: "",
+      });
+    } else {
+      ghiNL([
+        ...nlVao,
+        {
+          id: uid(),
+          periodId: luoi.kyId,
+          groupName: "Thủy sản",
+          name: TEN_DONG_BAN_NOI_DIA,
+          quantityKg: sumGridRow(daily, 0),
+          unitPrice: banNoiDiaSX.giaBinhQuan,
+          ratioPercentage: null,
+          sourceWarehouse: "",
+          dailyQuantities: daily,
+          carryOverKg: 0,
+          isReduction: true,
+          reductionWarehouseId: "", // bán đi, không vào kho nào
+          autoSource: "",
+        },
+      ]);
+    }
+    notify.daLuu(`Đã ghi Bán nội địa ${num(banNoiDiaSX.tongKg)} kg theo sổ Sản xuất`);
+  };
+  const phuBanNoiDia = (h: HangLuoiNL) => {
+    if (banNoiDiaSX.tongKg <= 0) return undefined;
+    const kq = doiChieuBanNoiDia(h.theoNgay, banNoiDiaSX.theoNgay);
+    if (kq === "khop") return <Nhan loai="xong" className="mt-0.5">khớp sổ SX</Nhan>;
+    return (
+      <span className="mt-0.5 inline-flex flex-wrap items-center gap-1">
+        {kq === "lech" && (
+          <Nhan loai="luu-y">
+            SX ghi {num(banNoiDiaSX.tongKg)} · lệch {num(Math.abs(h.tong) - banNoiDiaSX.tongKg)}
+          </Nhan>
+        )}
+        {!luoi.daChot && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={dienBanNoiDia}
+            title="Điền dòng Bán nội địa đúng từng ngày bằng số tổ trưởng ghi ở màn Sản xuất thành phẩm (ghi đè số đang có của dòng này)."
+          >
+            {kq === "lech" ? "Lấy lại từ SX" : `Lấy ${num(banNoiDiaSX.tongKg)} kg từ SX`}
+          </Button>
+        )}
+      </span>
+    );
   };
 
   /* ---------- Thứ tự dòng trên màn = thứ tự dán khối ----------
@@ -531,7 +603,7 @@ export function LuoiNguyenLieu({
         du: h,
         ten: h.ten,
         kieu: "giam",
-        phu: KHO_XUONG.some((k) => k.id === h.khoGiam) ? undefined : (
+        phu: laBanNoiDia(h) ? phuBanNoiDia(h) : KHO_XUONG.some((k) => k.id === h.khoGiam) ? undefined : (
           <Nhan loai="loi" className="mt-0.5">
             chưa chọn kho
           </Nhan>
@@ -576,6 +648,17 @@ export function LuoiNguyenLieu({
               title="Hút mọi dòng nhập nguyên liệu trong khoảng ngày của kỳ từ sổ nhập hàng vào lưới này." onClick={() => hutNhapHang()}>
               <Download />
               Lấy {nhapChoHut.length} dòng từ sổ nhập
+            </Button>
+          )}
+          {!luoi.daChot && !dongBanNoiDia?.isReduction && banNoiDiaSX.tongKg > 0 && (
+            <Button
+              title="Tạo dòng giảm Bán nội địa và điền đúng từng ngày bằng số tổ trưởng ghi ở màn Sản xuất thành phẩm (NL bán thẳng, không chế biến)."
+              variant="outline"
+              size="lg"
+              onClick={dienBanNoiDia}
+            >
+              <Download />
+              Lấy bán nội địa từ SX ({num(banNoiDiaSX.tongKg)} kg)
             </Button>
           )}
           {dongChonDuoc.length > 0 && (
@@ -724,6 +807,7 @@ export function LuoiNguyenLieu({
           dong={hangNL.filter((h) => !h.tuSoNhap)}
           tenDong={(h) => (h.loaiKho ? TEN_DONG_KHO[h.loaiKho] : h.ten)}
           khoXuong={KHO_XUONG.map((k) => ({ value: k.id, label: k.name }))}
+          coKho={(h) => !laBanNoiDia(h)}
           onDoiKho={(id, kho) => ghiDong(id, { reductionWarehouseId: kho })}
           onXoa={xoaDong}
           onClose={() => setSuaTayMo(false)}
@@ -734,8 +818,13 @@ export function LuoiNguyenLieu({
         <HopThemDongNL
           laGiam={themMo === "giam"}
           tieuDe={themMo === "giam" ? "Thêm dòng giảm" : `Thêm dòng ${themMo}`}
-          goiY={goiYLoai}
+          goiY={
+            themMo === "giam" && !dongBanNoiDia
+              ? [{ value: TEN_DONG_BAN_NOI_DIA, label: TEN_DONG_BAN_NOI_DIA }, ...goiYLoai]
+              : goiYLoai
+          }
           onThemLoaiNL={onThemLoaiNL}
+          suaLoai={suaLoaiNL}
           onClose={() => setThemMo(null)}
           onLuu={(ten) => themDong(themMo, ten)}
         />

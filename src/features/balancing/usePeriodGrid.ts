@@ -49,6 +49,7 @@ import {
   useBalancingInputs,
   useBalancingOutputs,
   useBalancingPeriods,
+  useDomesticSales,
   useMaterialImports,
   useMaterialOpeningStock,
   useMonthlyStock,
@@ -66,6 +67,7 @@ import {
   type LuaChonLo,
 } from "@/lib/khoCanDoi";
 import { conDoTheoNgay, tinhSoTonNL, type SoTonNLKy } from "@/lib/inventoryMaterial";
+import { banNoiDiaTheoKy, type BanNoiDiaKy } from "@/lib/banNoiDia";
 
 /** Một ô ngày cần ghi về sổ nguồn. */
 export interface ONgay {
@@ -116,6 +118,9 @@ export interface PeriodGrid {
   lechSoKho: number;
   /** Ghi lại toàn bộ phần kho của kỳ vào Sổ kho tháng (sửa lệch). */
   ghiLaiSoKho: () => void;
+  /** Bán nội địa tổ trưởng ghi ở /wip (sổ domestic_sales, mig 0054) trong kỳ, cùng họ —
+   *  điền / đối chiếu dòng giảm "Bán nội địa". kg DƯƠNG theo ngày. */
+  banNoiDiaSX: BanNoiDiaKy;
   /* --- khối 2 --- */
   tp: BalancingOutputItem[];
   hangTP: HangLuoiTP[];
@@ -178,6 +183,7 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
   const [tatCaNhap, ghiTatCaNhap] = useMaterialImports();
   const [tatCaSanXuat, ghiTatCaSanXuat] = useWipProductions();
   const [chotSanXuat] = useProductionLocks();
+  const [banNoiDia] = useDomesticSales();
   const [tatCaKy] = useBalancingPeriods();
   const [tonDauKhaiTay] = useMaterialOpeningStock();
   const [soKho, ghiSoKho] = useMonthlyStock();
@@ -687,6 +693,7 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
     [tatCaKy, tatCaNL, tonDauKhaiTay, chotSanXuat, ky.id]
   );
   const conDoSXTheoNgay = useMemo(() => conDoTheoNgay(chotSanXuat, ky), [chotSanXuat, ky]);
+  const banNoiDiaSX = useMemo(() => banNoiDiaTheoKy(banNoiDia, ky), [banNoiDia, ky]);
 
   const giaGuiDongTruoc = useMemo(() => {
     const ho = hoNguyenLieu(ky.materialTypeName);
@@ -862,6 +869,7 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
     moTaDongKho,
     lechSoKho,
     ghiLaiSoKho,
+    banNoiDiaSX,
     tp,
     hangTP,
     sanXuatDaGan,

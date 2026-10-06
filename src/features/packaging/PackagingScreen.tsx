@@ -146,6 +146,10 @@ export default function DongGoiScreen() {
   const xuongGhi: Workshop = phanXuong === "Tất cả" ? "Đông" : phanXuong;
 
   const themMatHang = (ten: string): string => {
+    // Nhãn có mã số nên ô chọn không tự nhận ra tên trùng ⇒ trùng tên (không phân
+    // hoa thường) thì dùng lại bản có sẵn.
+    const co = matHang.find((x) => x.name.trim().toLowerCase() === ten.trim().toLowerCase());
+    if (co) return co.id;
     const m: Product = { id: uid(), code: "", name: ten, finishedGoodCode: "", category: "", materialTypeId: "" };
     setMatHang([...matHang, m]);
     notify.daLuu(`Đã thêm mặt hàng "${ten}"`);

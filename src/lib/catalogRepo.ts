@@ -38,6 +38,7 @@ import {
   BANG_LOT_INPUT,
   BANG_LABEL_PRINT,
   BANG_BATTER_TYPE,
+  BANG_DOMESTIC_SALE,
   useBang,
 } from "@/lib/repo";
 import type {
@@ -262,6 +263,9 @@ export const useFinishedGoodsOpeningStock = () => useBang(BANG_FINISHED_OPENING_
 
 /* --- Xuất–Nhập–Tồn kho (snapshot từ báo cáo thật) --- */
 export const useNxtSnapshots = () => useBang(BANG_NXT_SNAPSHOT, seedNxtSnapshots);
+
+/* --- Sổ BÁN NỘI ĐỊA (mig 0054) — NL bán thẳng, ghi ở /wip, Cân đối lấy làm dòng giảm --- */
+export const useDomesticSales = () => useBang(BANG_DOMESTIC_SALE);
 
 /* --- Danh mục LOẠI BỘT TẨM (mig 0051) — seed id tất định, khớp migration --- */
 export const seedBatterTypes = (): BatterType[] => BOT_TAM_SEED.map((b) => ({ ...b }));

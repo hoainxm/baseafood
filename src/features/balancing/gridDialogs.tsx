@@ -32,6 +32,7 @@ export function HopThemDongNL({
   tieuDe,
   goiY,
   onThemLoaiNL,
+  suaLoai,
   onClose,
   onLuu,
 }: {
@@ -40,6 +41,8 @@ export function HopThemDongNL({
   /** Danh mục loại NL + tên các dòng đã có trong kỳ. */
   goiY: { value: string; label: string }[];
   onThemLoaiNL: (ten: string) => string;
+  /** Bút chì sửa nhanh loại NL (useSuaDanhMuc của màn, theo TÊN) — mục không có trong danh mục thì không có bút. */
+  suaLoai?: { moSua: (v: string) => void; suaDuoc: (v: string) => boolean; nhanSua: string };
   onClose: () => void;
   onLuu: (ten: string) => void;
 }) {
@@ -63,6 +66,9 @@ export function HopThemDongNL({
           onChange={setTen}
           options={goiY}
           onCreate={onThemLoaiNL}
+          onSuaMuc={suaLoai?.moSua}
+          suaDuoc={suaLoai?.suaDuoc}
+          nhanSua={suaLoai?.nhanSua}
         />
         <DialogFooter>
           <Button variant="outline" size="lg" onClick={onClose}>
@@ -236,6 +242,7 @@ export function HopDongNhapTay({
   dong,
   tenDong,
   khoXuong,
+  coKho,
   onDoiKho,
   onXoa,
   onClose,
@@ -243,6 +250,8 @@ export function HopDongNhapTay({
   dong: HangLuoiNL[];
   tenDong: (h: HangLuoiNL) => string;
   khoXuong: { value: string; label: string }[];
+  /** Dòng giảm nào có ô "Kho nhận" — mặc định mọi dòng giảm (Bán nội địa: bán đi, không vào kho). */
+  coKho?: (h: HangLuoiNL) => boolean;
   onDoiKho: (id: string, kho: string) => void;
   onXoa: (id: string) => void;
   onClose: () => void;
@@ -263,7 +272,7 @@ export function HopDongNhapTay({
                 {tenDong(h)}
                 <span className="tnum ml-2 text-sm text-muted-foreground">{num(h.tong)} kg</span>
               </span>
-              {h.laGiam && !h.loaiKho && (
+              {h.laGiam && !h.loaiKho && (coKho?.(h) ?? true) && (
                 <Combobox
                   label={`Kho nhận — ${tenDong(h)}`}
                   anNhan

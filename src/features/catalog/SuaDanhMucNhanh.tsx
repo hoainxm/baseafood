@@ -78,6 +78,10 @@ function HopSuaNhanh<K extends LoaiDanhMuc>({
   const botTam = nguonBot?.rows ?? botTamDoc;
   const themBot = nguonBot?.them;
   const cfg = useMemo(() => {
+    // KHÔNG truyền `themLoaiNL`: danh mục loại NL ở đây chỉ là bản ĐỌC (không phải
+    // instance của màn gọi) — ghi qua nó thì màn không thấy và lần ghi kế tiếp của
+    // màn sẽ đè mất loại vừa tạo. Ô "Loại nguyên liệu" trong hộp sửa nhanh mặt hàng
+    // vì vậy chỉ cho CHỌN; thêm loại mới ở ô loại NL của màn hoặc tab Danh mục.
     const truong = taoTruongDanhMuc(loaiNL, thanhPham, botTam, themBot);
     const bo = taoCauHinhDanhMuc(truong, {
       matHang: rong(),

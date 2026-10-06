@@ -114,6 +114,8 @@ export default function CanDoiScreen() {
     notify.daLuu(`Đã thêm loại nguyên liệu "${ten}" vào danh mục`);
     return ten;
   };
+  /** Bút chì sửa nhanh loại NL (value là TÊN; mục gộp họ không trùng tên danh mục thì không có bút chì). */
+  const suaNL = useSuaDanhMuc("loaiNL", loaiNLDanhMuc, setLoaiNLDanhMuc, { theo: "ten" });
 
   /* Chọn loại NL cho kỳ: GỘP biến thể size về HỌ — "Bạch tuộc 2 da lớn (80↑)" +
      "… nhỏ (80↓)" chỉ hiện MỘT mục "Bạch tuộc 2 da" (cân đối không tách size, chốt
@@ -402,6 +404,9 @@ export default function CanDoiScreen() {
                 }
                 options={optLoaiNL}
                 onCreate={themLoaiNL}
+                onSuaMuc={suaNL.moSua}
+                nhanSua={suaNL.nhanSua}
+                suaDuoc={suaNL.suaDuoc}
               />
 
               <DateRangeField
@@ -454,6 +459,7 @@ export default function CanDoiScreen() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {suaNL.hop}
     </div>
   );
 }
@@ -481,6 +487,8 @@ function KyDetail({
   const suaMH = useSuaDanhMuc("matHang", matHang, setMatHang);
   const suaKH = useSuaDanhMuc("khachHang", khach, setKhach);
   const [loaiNLDanhMuc, setLoaiNLDanhMuc] = useMaterialTypes();
+  /** Bút chì loại NL ở hộp thêm dòng khối 1 (theo TÊN) — instance danh mục của KyDetail. */
+  const suaNLKy = useSuaDanhMuc("loaiNL", loaiNLDanhMuc, setLoaiNLDanhMuc, { theo: "ten" });
   const [showBang, setShowBang] = useState(false);
   /* Công tắc cột ngày RIÊNG từng khối — cả hai MẶC ĐỊNH MỞ (chốt 2026-10-06: kế
      toán đối chiếu theo ngày). Thu lại thì khối NL gõ thẳng Số lượng như bảng giấy. */
@@ -631,6 +639,7 @@ function KyDetail({
         <LuoiNguyenLieu
           luoi={luoi}
           loaiNLDanhMuc={loaiNLDanhMuc}
+          suaLoaiNL={suaNLKy}
           anNgay={anNgayNL}
           onDoiAnNgay={() => setAnNgayNL((v) => !v)}
           onThemLoaiNL={(ten) => {
@@ -758,6 +767,7 @@ function KyDetail({
       )}
       {suaMH.hop}
       {suaKH.hop}
+      {suaNLKy.hop}
     </div>
   );
 }

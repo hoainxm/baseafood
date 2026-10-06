@@ -459,6 +459,26 @@ export interface WipProductionItem {
   batterKg?: Record<string, number>;
 }
 
+/**
+ * BÁN NỘI ĐỊA (migration 0054) — nguyên liệu bán THẲNG cho khách trong nước, không
+ * qua chế biến. Tổ trưởng ghi ở màn Sản xuất thành phẩm; Cân đối lấy làm dòng
+ * "Bán nội địa" (dòng giảm khối 1). Sổ RIÊNG, không trộn vào production_wips (sổ
+ * BTP — tồn kho đọc nó). Lưu TÊN loại NL / khách như các sổ khác.
+ */
+export interface DomesticSaleItem {
+  id: string;
+  saleDate: string; // yyyy-mm-dd — ngày bán (= ngày sản xuất của phiên ghi)
+  postingDate: string;
+  backdateReason: string;
+  workshop: Workshop;
+  materialTypeName: string;
+  quantityKg: number;
+  unitPrice: number | null; // VND/kg
+  customerName: string;
+  note: string;
+  operator: string;
+}
+
 export function isBackdatedWip(c: Pick<WipProductionItem, "productionDate" | "postingDate">): boolean {
   return Boolean(c.postingDate) && c.postingDate > c.productionDate;
 }

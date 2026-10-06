@@ -264,13 +264,19 @@ export default function BanHangScreen() {
   const suaKH = useSuaDanhMuc("khachHang", khach, setKhach);
   const suaMH = useSuaDanhMuc("matHang", matHang, setMatHang);
 
+  // Nhãn có mã số ("12 · tên") nên ô chọn không tự nhận ra tên trùng ⇒ tự dò,
+  // trùng tên (không phân hoa thường) thì dùng lại bản có sẵn.
   const themMatHang = (ten: string) => {
+    const co = matHang.find((m) => m.name.trim().toLowerCase() === ten.trim().toLowerCase());
+    if (co) return co.id;
     const m: Product = { id: uid(), code: "", name: ten, finishedGoodCode: "" };
     setMatHang([...matHang, m]);
     notify.daLuu(`Đã thêm mặt hàng "${ten}" vào danh mục`);
     return m.id;
   };
   const themKhach = (ten: string) => {
+    const co = khach.find((k) => k.name.trim().toLowerCase() === ten.trim().toLowerCase());
+    if (co) return co.id;
     const k: Customer = { id: uid(), code: "", name: ten, market: "" };
     setKhach([...khach, k]);
     notify.daLuu(`Đã thêm khách hàng "${ten}" vào danh mục`);

@@ -80,3 +80,32 @@ export const dongDayDu = (d: DongSX): boolean => Boolean(d.productId) && tongDon
  * đã mang nhãn nhóm chế biến/khách) — đây là "dòng trống chờ gõ" của bảng.
  */
 export const dongTrong = (d: DongSX): boolean => !d.productId && tongDong(d) <= 0;
+
+/**
+ * Một dòng BÁN NỘI ĐỊA trong phiên ghi (mig 0054) — nguyên liệu bán THẲNG cho khách
+ * trong nước, không chế biến. Lưu sang sổ riêng `domestic_sales` (KHÔNG phải dòng
+ * thành phẩm — không cộng vào tổng sản lượng). Cân đối lấy làm dòng giảm "Bán nội địa".
+ */
+export interface DongBanNoiDia {
+  key: string;
+  materialTypeName: string; // TÊN loại NL (sổ lưu tên)
+  quantityKg: number;
+  unitPrice: number | null; // VND/kg
+  customerName: string;
+}
+
+export const dongBanNoiDiaRong = (materialTypeName = ""): DongBanNoiDia => ({
+  key: newId(),
+  materialTypeName,
+  quantityKg: 0,
+  unitPrice: null,
+  customerName: "",
+});
+
+/** Đủ để lưu: có loại NL + kg > 0. */
+export const banNoiDiaDayDu = (d: DongBanNoiDia): boolean =>
+  Boolean(d.materialTypeName.trim()) && (d.quantityKg || 0) > 0;
+
+/** Còn trống hẳn (chưa chọn loại, chưa gõ kg/giá/khách) — bỏ qua khi lưu. */
+export const banNoiDiaTrong = (d: DongBanNoiDia): boolean =>
+  !d.materialTypeName.trim() && !(d.quantityKg > 0) && d.unitPrice == null && !d.customerName.trim();

@@ -48,6 +48,7 @@ import type {
   LotInput,
   LabelPrint,
   BatterType,
+  DomesticSaleItem,
 } from "@/types";
 import { rolesFromCsv, rolesToCsv } from "@/types";
 import { botDiKemIds, lamSachBot } from "@/lib/botTam";
@@ -1009,6 +1010,39 @@ export const BANG_STORAGE_LOCATION: AnhXaBang<StorageLocation> = {
     address: s(r.address),
     phone: s(r.phone),
     note: s(r.note),
+  }),
+};
+
+/** Sổ BÁN NỘI ĐỊA (migration 0054) — NL bán thẳng, ghi ở /wip, Cân đối lấy làm dòng giảm. */
+export const BANG_DOMESTIC_SALE: AnhXaBang<DomesticSaleItem> = {
+  table: "domestic_sales",
+  localKey: "bsf.domestic-sales.v1",
+  layKhoa: theoId,
+  toRow: (x) => ({
+    id: x.id,
+    sale_date: x.saleDate,
+    posting_date: x.postingDate || null,
+    backdate_reason: x.backdateReason ?? "",
+    workshop: x.workshop,
+    material_type_name: x.materialTypeName,
+    quantity_kg: x.quantityKg,
+    unit_price: x.unitPrice ?? null,
+    customer_name: x.customerName ?? "",
+    note: x.note ?? "",
+    operator: x.operator ?? "",
+  }),
+  fromRow: (r) => ({
+    id: s(r.id),
+    saleDate: s(r.sale_date).slice(0, 10),
+    postingDate: s(r.posting_date).slice(0, 10),
+    backdateReason: s(r.backdate_reason),
+    workshop: (s(r.workshop) || "Đông") as Workshop,
+    materialTypeName: s(r.material_type_name),
+    quantityKg: Number(r.quantity_kg ?? 0),
+    unitPrice: n(r.unit_price),
+    customerName: s(r.customer_name),
+    note: s(r.note),
+    operator: s(r.operator),
   }),
 };
 

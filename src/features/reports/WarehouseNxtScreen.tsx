@@ -4,7 +4,7 @@
 // Description: Warehouse Import-Export-Inventory — live ledger from real data
 // ============================================================
 import { useMemo, useRef, useState } from "react";
-import type { NxtSnapshotLine } from "@/types";
+import type { NxtSnapshotLine, StorageLocation } from "@/types";
 import { KHO_LUU_MAC_DINH, STORAGE_KIND_LABELS } from "@/types";
 import { useNxtSnapshots, useStorageLocations } from "@/lib/catalogRepo";
 import {
@@ -48,6 +48,7 @@ import {
 } from "@/design-system";
 import { useSuaDanhMuc } from "@/features/catalog/SuaDanhMucNhanh";
 import { num, viDate } from "@/lib/format";
+import { newId } from "@/lib/store";
 import {
   ArrowDownToLine,
   CalendarPlus,
@@ -150,6 +151,32 @@ export default function WarehouseNxtScreen() {
       phu: loai.has(n) ? STORAGE_KIND_LABELS[loai.get(n)!] : undefined,
     }));
   }, [khoLuuDM, snapshots]);
+
+  /**
+   * Thêm kho lưu tại chỗ (ô "Kho lưu" ở hộp Gán) — lưu ngay vào Danh mục → Kho lưu
+   * trữ, mặc định loại "thuê ngoài" (kho nhà đã có sẵn). Value của ô là TÊN.
+   * Trùng tên (không phân hoa thường) ⇒ dùng lại kho có sẵn.
+   */
+  const themKhoLuu = (ten: string) => {
+    const sach = ten.trim();
+    const khoa = sach.toLowerCase();
+    const co =
+      khoLuuDM.find((k) => k.name.trim().toLowerCase() === khoa)?.name.trim() ??
+      khoLuuOpts.find((o) => o.value.toLowerCase() === khoa)?.value;
+    if (co) return co;
+    const k: StorageLocation = {
+      id: newId(),
+      code: "",
+      name: sach,
+      kind: "thue-ngoai",
+      address: "",
+      phone: "",
+      note: "",
+    };
+    setKhoLuuDM([...khoLuuDM, k]);
+    notify.daLuu(`Đã thêm kho lưu "${sach}" vào danh mục`);
+    return sach;
+  };
 
   const [khoLuuLoc, setKhoLuuLoc] = useState(TAT_CA);
 
@@ -809,7 +836,7 @@ export default function WarehouseNxtScreen() {
             <DialogTitle className="text-2xl">Gán kho lưu</DialogTitle>
             <DialogDescription className="text-base">
               {rowsChon.length} mã đang chọn ({num(tongChon.tonCuoi)} kg tồn cuối) sẽ được ghi là đang nằm ở
-              kho dưới đây. Sửa danh sách kho ở Danh mục → Kho lưu trữ.
+              kho dưới đây. Chưa có kho thì gõ tên rồi bấm Thêm mới; bút chì để sửa thông tin kho.
             </DialogDescription>
           </DialogHeader>
           {ganForm !== null && (
@@ -821,6 +848,7 @@ export default function WarehouseNxtScreen() {
                 value={ganForm}
                 onChange={(v) => setGanForm(v)}
                 options={khoLuuOpts}
+                onCreate={themKhoLuu}
                 onSuaMuc={suaKL.moSua}
                 nhanSua={suaKL.nhanSua}
                 suaDuoc={suaKL.suaDuoc}

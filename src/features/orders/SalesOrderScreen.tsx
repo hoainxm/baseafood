@@ -145,10 +145,22 @@ export default function DonDatScreen() {
     setLoi([]);
   };
   const themMatHang = (ten: string) => {
-    const m = { id: newId(), code: "", name: ten, finishedGoodCode: "" };
+    const sach = ten.trim();
+    const co = matHang.find((m) => m.name.trim().toLowerCase() === sach.toLowerCase());
+    if (co) return co.id; // trùng tên (không phân hoa thường) ⇒ dùng lại bản có sẵn
+    const m = { id: newId(), code: "", name: sach, finishedGoodCode: "" };
     setMatHang([...matHang, m]);
-    notify.daLuu(`Đã thêm mặt hàng "${ten}"`);
+    notify.daLuu(`Đã thêm mặt hàng "${sach}" vào danh mục`);
     return m.id;
+  };
+  const themKhach = (ten: string) => {
+    const sach = ten.trim();
+    const co = khach.find((k) => k.name.trim().toLowerCase() === sach.toLowerCase());
+    if (co) return co.id; // trùng tên (không phân hoa thường) ⇒ dùng lại bản có sẵn
+    const k = { id: newId(), code: "", name: sach, market: "" };
+    setKhach([...khach, k]);
+    notify.daLuu(`Đã thêm khách hàng "${sach}" vào danh mục`);
+    return k.id;
   };
   const datDong = (i: number, patch: Partial<DongCanMoi>) =>
     setTao((t) =>
@@ -533,9 +545,10 @@ export default function DonDatScreen() {
                 value={tao.customerId}
                 onChange={(v) => setTao((t) => (t ? { ...t, customerId: v } : t))}
                 options={optKhach}
+                onCreate={themKhach}
                 onSuaMuc={suaKH.moSua}
                 nhanSua={suaKH.nhanSua}
-                emptyText="Chưa có khách nào — thêm ở Danh mục."
+                emptyText="Chưa có khách nào — gõ tên rồi bấm Thêm mới."
               />
               <div className="space-y-4">
                 <p className="text-base font-semibold">Mặt hàng cần</p>

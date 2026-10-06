@@ -50,8 +50,10 @@ src/features/*                 ← màn nghiệp vụ
     hỏi thì họ bấm Đồng ý theo phản xạ, hộp xác nhận mất tác dụng đúng lúc cần.
     Lưu thường dùng toast + Hoàn tác.
 9. **Màu không bao giờ là tín hiệu duy nhất.** Luôn kèm icon hoặc chữ.
-10. **Danh mục thay nhập tự do.** Đại lý / loại NL / mặt hàng / khách hàng đều
-    chọn qua `Combobox` (có tạo mới tại chỗ), không gõ tay.
+10. **Danh mục thay nhập tự do.** Đại lý / loại NL / mặt hàng / khách hàng / kho
+    lưu / bột tẩm đều chọn qua `Combobox` — có **cả** tạo mới tại chỗ **lẫn** bút
+    chì sửa nhanh ở MỌI ô nhập liệu dùng danh mục, không gõ tay. Luật + ngoại lệ +
+    mẫu code: mục [Ô chọn danh mục](#ô-chọn-danh-mục-luôn-có-thêm-mới--bút-chì-sửa-nhanh).
 11. **Mọi dropdown phải cuộn được và THẤY thanh cuộn.** Luật đặt ở tầng
     primitive, không lặp ở chỗ gọi: `PopoverContent` giới hạn
     `max-h-(--radix-popover-content-available-height)`, `CommandList` /
@@ -346,7 +348,7 @@ chip đếm/điều khiển của primitive; màn nghiệp vụ **không** dùng
 | Ô số (kg, tiền, %) | `NumberField` |
 | Chọn 1 trong ≤ 6 | `ChoiceGroup` (nút to) |
 | Chọn 1 trong danh mục dài / cần tạo mới | `Combobox` |
-| Chọn trong danh mục **và cho sửa bản ghi danh mục ngay tại chỗ** | `Combobox` + `onSuaMuc` (bút chì trên từng mục; máy có chuột: hiện khi rê/trỏ phím, cảm ứng: luôn hiện) + `suaDuoc` (chỉ mục có trong danh mục). Màn nghiệp vụ KHÔNG tự viết hộp: dùng `useSuaDanhMuc` (`features/catalog/SuaDanhMucNhanh.tsx`) — hộp là `HopSuaDanhMuc`, chung với `DanhMucCrud`. Không gắn ở ô LỌC. |
+| Chọn trong danh mục **và cho sửa bản ghi danh mục ngay tại chỗ** | `Combobox` + `onSuaMuc` (bút chì trên từng mục; máy có chuột: hiện khi rê/trỏ phím, cảm ứng: luôn hiện) + `suaDuoc` (chỉ mục có trong danh mục). Màn nghiệp vụ KHÔNG tự viết hộp: dùng `useSuaDanhMuc` (`features/catalog/SuaDanhMucNhanh.tsx`) — hộp là `HopSuaDanhMuc`, chung với `DanhMucCrud`. Không gắn ở ô LỌC. **Bắt buộc ở mọi ô nhập liệu dùng danh mục, đi cùng `onCreate`** — xem mục "Ô chọn danh mục" ngay dưới bảng. |
 | Chọn ngày | `DateField` |
 | Chọn khoảng ngày | `DateRangeField` (hai ô riêng Từ / Đến) |
 | Danh sách bản ghi | `RecordTable` — truyền `sapXep` cho cột để bấm tiêu đề sắp xếp, truyền `timKiem` để hiện ô tìm |
@@ -369,6 +371,71 @@ chip đếm/điều khiển của primitive; màn nghiệp vụ **không** dùng
 | **Đang xử lý cả màn / tác vụ dài** | `DangXuLy` (chấm suy nghĩ + chữ). Fallback `Suspense` khi mở màn lazy cũng dùng cái này (thay "Đang tải…"). |
 | **Chấm "đang suy nghĩ" nội tuyến** | `ThinkingDots` — ba chấm nhấp nháy so le, bám màu chữ hiện tại. |
 | **Khối xương tuỳ biến** | `Skeleton` (primitive) — `<Skeleton className="h-4 w-32" />`. Ghép nên khung tải riêng khi `SkeletonBang` không hợp. |
+
+## Ô chọn danh mục: luôn có Thêm mới + Bút chì sửa nhanh
+
+(Chốt 2026-10-06.) **Mọi `Combobox` ĐỂ NHẬP LIỆU mà nguồn là một DANH MỤC có
+CRUD ở `/catalog`** — mặt hàng · khách hàng · đại lý · loại NL · kho lưu trữ ·
+bột tẩm — phải có **đủ hai thứ**, kể cả ô thêm về sau:
+
+1. **Thêm mới tại chỗ — `onCreate`.** Lưu NGAY vào danh mục qua setter của màn
+   (đúng instance `useBang` đang mở), báo `notify.daLuu("Đã thêm … vào danh mục")`,
+   trả về value của mục đúng kiểu value của ô (id hay tên). **Trùng tên không phân
+   hoa thường ⇒ trả lại bản có sẵn**, không đẻ bản trùng. `Combobox` tự ẩn nút
+   "Thêm mới" khi NHÃN trùng chữ gõ, nhưng nhãn dạng `"12 · tên"` hay danh sách
+   đã lọc (theo loài, gộp họ) thì không nhận ra ⇒ handler phải tự dò.
+2. **Bút chì sửa nhanh — `useSuaDanhMuc`.** `onSuaMuc={sua.moSua}` +
+   `nhanSua={sua.nhanSua}` + `suaDuoc={sua.suaDuoc}`, và render `{sua.hop}` đúng
+   một lần trong màn. Hộp là `HopSuaDanhMuc` dùng chung bộ trường + luật kiểm tra
+   với màn Danh mục — màn nghiệp vụ KHÔNG tự viết hộp.
+
+**Ngoại lệ — không gắn:**
+
+| Ô | Vì sao |
+|---|---|
+| Ô LỌC / bộ lọc xem sổ ("Tất cả …", `anNhanBatBuoc`) | Không nhập liệu |
+| Danh sách cố định không phải danh mục: Phân xưởng, Loài (`CATEGORIES`), Kiểu chế biến, Thị trường, Loại kho, kho hệ thống (`BSF1_WAREHOUSES`, `KHO_TP_NAMES`, `KHO_XUONG`), vai trò, kỳ báo cáo, loại phế liệu gợi ý (`PHE_LIEU_GOI_Y`), nhóm hàng sổ kho | Không có bảng CRUD. Ô nào đang có `onCreate={(t) => t}` (gõ tự do) thì **để nguyên** |
+| 141 mã kế toán TK 1551 (`thanh-pham.json`) | Chỉ CHỌN — không thêm, không sửa |
+| Màn DEMO (`WorkOrderScreen`, `QualityScreen`, `ReportsScreen`) | Dữ liệu mẫu |
+| Ô chọn NẰM TRONG form danh mục (`DanhMucCrud` / `HopSuaDanhMuc`) | Chỉ `onCreate` — không bút chì (tránh hộp lồng hộp). Hộp sửa nhanh ở màn nghiệp vụ không nắm instance danh mục con của màn ⇒ ô đó chỉ cho chọn (VD "Loại nguyên liệu" trong hộp sửa nhanh mặt hàng) |
+| Ô chọn giá trị ĐANG CÓ trong sổ để tìm (VD "Đang ghi là loại" ở Đổi loại hàng loạt) | Không ghi danh mục |
+
+**Mẫu:**
+
+```tsx
+import { useSuaDanhMuc } from "@/features/catalog/SuaDanhMucNhanh";
+
+const [khach, setKhach] = useCustomers(); // ĐÚNG instance của màn
+const suaKH = useSuaDanhMuc("khachHang", khach, setKhach); // value là TÊN ⇒ { theo: "ten" }
+const themKhach = (ten: string) => {
+  const co = khach.find((k) => k.name.trim().toLowerCase() === ten.trim().toLowerCase());
+  if (co) return co.id; // trùng tên ⇒ dùng lại bản có sẵn
+  const k: Customer = { id: newId(), code: "", name: ten.trim(), market: "" };
+  setKhach([...khach, k]);
+  notify.daLuu(`Đã thêm khách hàng "${k.name}" vào danh mục`);
+  return k.id;
+};
+// <Combobox … options={optKhach} onCreate={themKhach}
+//   onSuaMuc={suaKH.moSua} nhanSua={suaKH.nhanSua} suaDuoc={suaKH.suaDuoc} />
+// {suaKH.hop}
+```
+
+**Checklist khi thêm một ô chọn mới:**
+
+- [ ] Nguồn có phải danh mục ở `/catalog`? Không ⇒ xem bảng ngoại lệ, dừng.
+- [ ] `rows` / `setRows` là của hook `catalogRepo` **CỦA MÀN NÀY**. Component con
+      KHÔNG tự gọi `useCustomers()`… rồi ghi (mỗi `useBang` giữ state riêng — màn
+      không thấy, lần ghi kế tiếp của màn đè mất) ⇒ nhận qua prop (VD
+      `onThemLoaiNL`, `suaLoai={suaNL}` ở `BulkTypeChange`).
+- [ ] `theo: "ten"` khi value của ô là TÊN (đại lý, loại NL, kho lưu, bột tẩm —
+      và khách hàng ở `/wip`); mặc định là id.
+- [ ] Options có mục ngoài danh mục (tên lấy từ sổ, kho hệ thống, mục gộp họ) ⇒
+      bắt buộc `suaDuoc` để mục đó không có bút chì.
+- [ ] `onCreate` dò trùng tên không phân hoa thường + `notify.daLuu`.
+- [ ] Hook gọi trước mọi `return` sớm; `{sua.hop}` render một lần (thường cuối JSX).
+- [ ] Danh mục nối theo TÊN ⇒ hộp tự khoá ô tên (`noiTheoTen`). Mặt hàng nối id
+      nên đổi được tên — màn nào giữ TÊN mặt hàng trong state thì dời theo qua
+      `onDaLuu(moi, cu)` (VD ô "Ánh xạ … tới" ở Sổ kho tháng).
 
 ## Animation & Loading → "Thinking"
 

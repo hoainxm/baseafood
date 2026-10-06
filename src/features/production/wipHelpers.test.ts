@@ -1,5 +1,15 @@
 import { describe, it, expect } from "vitest";
-import { dongSXRong, laTach, tongDong, dongDayDu, dongTrong, type DongSX } from "./wipHelpers";
+import {
+  banNoiDiaDayDu,
+  banNoiDiaTrong,
+  dongBanNoiDiaRong,
+  dongSXRong,
+  laTach,
+  tongDong,
+  dongDayDu,
+  dongTrong,
+  type DongSX,
+} from "./wipHelpers";
 
 // Luật "tách râu + bao tử (cùng giá)": đã nhập một trong hai thành phần thì
 // tổng dòng = râu + bao tử (bỏ qua ô Số lượng); chưa tách thì tổng = Số lượng.
@@ -50,5 +60,19 @@ describe("dongDayDu / dongTrong", () => {
     expect(dongTrong(d({ processingType: "luộc", customerName: "A" }))).toBe(true);
     expect(dongTrong(d({ productId: "p" }))).toBe(false);
     expect(dongTrong(d({ quantityKg: 1 }))).toBe(false);
+  });
+});
+
+describe("dòng bán nội địa (NL bán thẳng — sổ riêng, không cộng vào thành phẩm)", () => {
+  it("đủ để lưu = có loại NL + kg > 0", () => {
+    expect(banNoiDiaDayDu({ ...dongBanNoiDiaRong("Bạch tuộc 2 da"), quantityKg: 987 })).toBe(true);
+    expect(banNoiDiaDayDu({ ...dongBanNoiDiaRong(" "), quantityKg: 987 })).toBe(false);
+    expect(banNoiDiaDayDu(dongBanNoiDiaRong("Bạch tuộc 2 da"))).toBe(false);
+  });
+  it("trống hẳn = chưa gõ gì — có giá hay khách là không còn trống", () => {
+    expect(banNoiDiaTrong(dongBanNoiDiaRong())).toBe(true);
+    expect(banNoiDiaTrong({ ...dongBanNoiDiaRong(), unitPrice: 145000 })).toBe(false);
+    expect(banNoiDiaTrong({ ...dongBanNoiDiaRong(), customerName: "Chợ Bà Rịa" })).toBe(false);
+    expect(banNoiDiaTrong(dongBanNoiDiaRong("Bạch tuộc 2 da"))).toBe(false);
   });
 });

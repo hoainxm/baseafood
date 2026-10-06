@@ -241,6 +241,16 @@ export default function BaoCaoNhapXuatTonScreen() {
 
   // ----- Tồn đầu: thêm / xóa -----
   const optMatHang: MucChon[] = matHang.map((m) => ({ value: m.id, label: m.name, phu: m.code || undefined }));
+  /** Thêm mặt hàng tại chỗ — lưu ngay vào danh mục; trùng tên (không phân hoa thường) ⇒ dùng lại. */
+  const themMatHang = (ten: string) => {
+    const sach = ten.trim();
+    const co = matHang.find((m) => m.name.trim().toLowerCase() === sach.toLowerCase());
+    if (co) return co.id;
+    const m = { id: uid(), code: "", name: sach, finishedGoodCode: "" };
+    setMatHang([...matHang, m]);
+    notify.daLuu(`Đã thêm mặt hàng "${sach}" vào danh mục`);
+    return m.id;
+  };
 
   const moThemTonDau = () => {
     setForm({
@@ -431,9 +441,10 @@ export default function BaoCaoNhapXuatTonScreen() {
                   value={form.productId}
                   onChange={(v) => setForm((f) => (f ? { ...f, productId: v } : f))}
                   options={optMatHang}
+                  onCreate={themMatHang}
                   onSuaMuc={suaMH.moSua}
                   nhanSua={suaMH.nhanSua}
-                  emptyText="Chưa có mặt hàng — thêm ở Danh mục."
+                  emptyText="Chưa có mặt hàng — gõ tên rồi bấm Thêm mới."
                 />
                 <div className="grid gap-4 sm:grid-cols-2">
                   <Field label="Quy cách" hint="Khớp size hàng trong kho (để trống nếu không tách).">

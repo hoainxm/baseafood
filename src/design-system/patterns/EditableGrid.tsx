@@ -42,6 +42,11 @@ export interface CotLuoi<R> {
    * TƯƠNG TÁC được: ô không bọc lớp căn phải cứng và không bị coi là ô số.
    */
   oRieng?: (row: R) => React.ReactNode;
+  /**
+   * Phần PHỤ dưới giá trị của ô (ô gõ được hay ô khoá đều có) — VD nút "2 chuyến"
+   * mở danh sách đại lý/chuyến của ngày đó. Trả `null` thì ô như cũ.
+   */
+  phuO?: (row: R) => React.ReactNode;
   /** Ô này có khoá không (dòng hút từ sổ khác, dòng tổng…). */
   khoa?: (row: R) => boolean;
   /** Lý do khoá — hiện thành tooltip, đừng để người dùng gõ vào ô câm. */
@@ -60,7 +65,7 @@ export interface HangLuoi<R> {
   /** Dòng tiêu đề nhóm — chỉ hiện chữ, không có ô nhập. */
   tieuDeNhom?: string;
   /** Kiểu dòng: dòng giảm tô đỏ nhạt, dòng tổng in đậm. */
-  kieu?: "thuong" | "giam" | "tong";
+  kieu?: "thuong" | "giam" | "tong" | "con";
   /** Tên hiện ở cột dính bên trái. */
   ten: React.ReactNode;
   /** Chú thích nhỏ dưới tên (VD "hút từ sổ nhập hàng"). */
@@ -126,7 +131,8 @@ export function LuoiNhap<R>({
   );
   /** Chỉ ô gõ được mới nằm trong đường đi của phím mũi tên. */
   const hangNhap = React.useMemo(() => hang.filter((h) => !h.tieuDeNhom), [hang]);
-  const khoaHien = hangNhap.map((h) => h.id);
+  // Dòng con (chỉ đọc, VD tách theo đại lý) không tick tô màu — tô ở dòng cha.
+  const khoaHien = hangNhap.filter((h) => h.kieu !== "con").map((h) => h.id);
   const daTick = khoaHien.filter((k) => chonDong.daChon.has(k));
   const chonHet = daTick.length > 0 && daTick.length === khoaHien.length;
 
@@ -293,20 +299,23 @@ export function LuoiNhap<R>({
                 key={h.id}
                 className={cn(
                   h.kieu === "giam" && "bg-warning-surface/40",
-                  h.kieu === "tong" && "bg-muted font-semibold"
+                  h.kieu === "tong" && "bg-muted font-semibold",
+                  h.kieu === "con" && "text-muted-foreground"
                 )}
-                {...to.thuocTinh(h.id)}
+                {...(h.kieu === "con" ? {} : to.thuocTinh(h.id))}
               >
                 <th
                   scope="row"
                   className={cn(
                     "sticky left-0 z-10 border-r-2 border-b border-border px-3 py-2 text-left align-middle font-normal",
-                    h.kieu === "tong" ? "bg-muted font-semibold" : "bg-card",
-                    h.kieu === "giam" && "bg-warning-surface/40"
+                    h.kieu === "tong" ? "bg-muted font-semibold" : h.kieu === "con" ? "bg-muted" : "bg-card",
+                    h.kieu === "giam" && "bg-warning-surface/40",
+                    // Dòng con: thụt vào + vạch trái nhạt ⇒ đọc ra "thuộc dòng trên".
+                    h.kieu === "con" && "pl-10 text-sm shadow-[inset_3px_0_0_var(--border)]"
                   )}
                 >
                   <div className="flex items-start gap-2">
-                    {to.bat && (
+                    {to.bat && h.kieu !== "con" && (
                       <input
                         type="checkbox"
                         className="mt-0.5 size-5 shrink-0"
@@ -326,8 +335,10 @@ export function LuoiNhap<R>({
                   </div>
                 </th>
                 {cotHien.map((c) => {
-                  const oRieng = h.kieu === "tong" ? undefined : c.oRieng?.(h.du);
-                  const bikhoa = c.kieu !== "so" || Boolean(c.khoa?.(h.du)) || h.kieu === "tong";
+                  const chiDoc = h.kieu === "tong" || h.kieu === "con";
+                  const oRieng = chiDoc ? undefined : c.oRieng?.(h.du);
+                  const bikhoa = c.kieu !== "so" || Boolean(c.khoa?.(h.du)) || chiDoc;
+                  const phu = c.phuO?.(h.du);
                   const gt = c.lay(h.du);
                   const nen = c.toNen ? NEN[c.toNen] : undefined;
                   return (
@@ -336,7 +347,8 @@ export function LuoiNhap<R>({
                       className={cn(
                         "border-b border-l border-border p-0 text-right align-middle",
                         nen,
-                        c.kieu === "tinh" && !nen && "bg-muted"
+                        c.kieu === "tinh" && !nen && "bg-muted",
+                        h.kieu === "con" && "bg-muted/40 text-sm"
                       )}
                     >
                       {oRieng ? (
@@ -370,6 +382,7 @@ export function LuoiNhap<R>({
                           onDan={(e) => xuLyDan(e, h.id, c.key)}
                         />
                       )}
+                      {phu && <div className="flex justify-end px-1 pb-1">{phu}</div>}
                     </td>
                   );
                 })}

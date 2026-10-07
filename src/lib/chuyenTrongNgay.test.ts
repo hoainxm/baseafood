@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { MaterialImportItem } from "@/types";
-import { chuyenTrongNgay, tomTatTheoNgay } from "./chuyenTrongNgay";
+import { chuyenTrongNgay, daiLyTrongKy, soChuyenNgay, tomTatTheoNgay } from "./chuyenTrongNgay";
 
 const dong = (p: Partial<MaterialImportItem> & Pick<MaterialImportItem, "id">): MaterialImportItem => ({
   shipmentId: "",
@@ -66,5 +66,37 @@ describe("chuyenTrongNgay", () => {
 
   it("ngày không có chuyến ⇒ rỗng", () => {
     expect(chuyenTrongNgay(nhap, "2026-09-10")).toEqual([]);
+  });
+});
+
+describe("daiLyTrongKy", () => {
+  it("gom theo đại lý, kg theo ngày, tổng các đại lý = tổng dòng cha", () => {
+    const nhap = [
+      dong({ id: "1", shipmentId: "s1", supplierName: "A", quantityKg: 100 }),
+      dong({ id: "2", shipmentId: "s1", supplierName: "A", quantityKg: 40, unitPrice: 30000 }),
+      dong({ id: "3", shipmentId: "s2", supplierName: "A", quantityKg: 60, deliveryDate: "2026-09-03" }),
+      dong({ id: "4", shipmentId: "s3", supplierName: "B", quantityKg: 500, unitPrice: null }),
+    ];
+    const r = daiLyTrongKy(nhap);
+    expect(r.map((d) => [d.daiLy, d.kg, d.theoNgay, d.ids])).toEqual([
+      ["B", 500, { "2026-09-02": 500 }, ["4"]],
+      ["A", 200, { "2026-09-02": 140, "2026-09-03": 60 }, ["1", "2", "3"]],
+    ]);
+    expect(r[1].tien).toBe(100 * 50000 + 40 * 30000 + 60 * 50000);
+    expect(r.reduce((s, d) => s + d.kg, 0)).toBe(nhap.reduce((s, x) => s + x.quantityKg, 0));
+  });
+});
+
+describe("soChuyenNgay", () => {
+  it("đếm chuyến khác nhau trong ngày; dòng không chuyến tính riêng", () => {
+    const nhap = [
+      dong({ id: "1", shipmentId: "s1" }),
+      dong({ id: "2", shipmentId: "s1" }),
+      dong({ id: "3", shipmentId: "" }),
+      dong({ id: "4", shipmentId: "s2", deliveryDate: "2026-09-03" }),
+    ];
+    expect(soChuyenNgay(nhap, "2026-09-02")).toBe(2);
+    expect(soChuyenNgay(nhap, "2026-09-03")).toBe(1);
+    expect(soChuyenNgay(nhap, "2026-09-09")).toBe(0);
   });
 });

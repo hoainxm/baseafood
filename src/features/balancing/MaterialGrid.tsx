@@ -4,7 +4,7 @@
 // Description: Balancing block 1 — material input day grid
 // ============================================================
 import { useMemo, useState } from "react";
-import type { BalancingInputItem, DailyQuantities, InputGroup, MaterialType } from "@/types";
+import type { BalancingInputItem, DailyQuantities, InputGroup, MaterialImportItem, MaterialType } from "@/types";
 import { BSF1_WAREHOUSES, INPUT_GROUPS, sumGridRow } from "@/types";
 import { uid } from "@/lib/db";
 import {
@@ -24,7 +24,9 @@ import {
 } from "@/lib/banNoiDia";
 import type { ONgay, PeriodGrid } from "./usePeriodGrid";
 import { HopChonDongNhap, HopDongNhapTay, HopThemDongNL } from "./gridDialogs";
-import { ChuyenTheoNgay } from "./ChuyenTheoNgay";
+import { ChuyenTrongO } from "./ChuyenTrongO";
+import { useImportShipments } from "@/lib/catalogRepo";
+import { daiLyTrongKy } from "@/lib/chuyenTrongNgay";
 import {
   Button,
   Combobox,
@@ -35,7 +37,7 @@ import {
   type HangLuoi,
 } from "@/design-system";
 import { num, viDate } from "@/lib/format";
-import { ChevronsLeftRight, Combine, Download, ListChecks, Pencil, Plus } from "lucide-react";
+import { ChevronDown, ChevronsLeftRight, Combine, Download, ListChecks, Pencil, Plus, Users } from "lucide-react";
 
 const KHO_XUONG = BSF1_WAREHOUSES.filter((w) => w.type === "phan-xuong");
 
@@ -76,15 +78,33 @@ export function LuoiNguyenLieu({
     banNoiDiaSX,
   } = luoi;
   const [suaTayMo, setSuaTayMo] = useState(false);
-  /** Ngày đang xem ở khối "Chuyến nhập theo ngày" (null = ngày đầu có chuyến). */
-  const [ngayXem, setNgayXem] = useState<string | null>(null);
-  /** Bấm tên ngày ở đầu cột lưới ⇒ chọn ngày đó + cuộn tới khối chuyến. */
-  const xemNgay = (iso: string) => {
-    setNgayXem(iso);
-    requestAnimationFrame(() =>
-      document.getElementById("chuyen-theo-ngay")?.scrollIntoView({ behavior: "smooth", block: "start" })
-    );
-  };
+  /* ---------- Chuyến nhập NGAY TRONG lưới (chỉ đọc) ----------
+     Ô ngày của dòng lấy từ sổ nhập có nút "n chuyến" (đại lý → chuyến của ô đó);
+     dòng loại NL mở ra dòng con theo ĐẠI LÝ (kg theo ngày, cộng lại = dòng cha).
+     Không đi qua đường ghi: dữ liệu là chính các dòng sổ nhập đã lấy vào kỳ. */
+  const [chuyenSo] = useImportShipments();
+  const maLo = useMemo(
+    () => new Map(chuyenSo.filter((c) => c.lotCode).map((c) => [c.id, c.lotCode ?? ""])),
+    [chuyenSo]
+  );
+  const nhapTheoId = useMemo(() => new Map(luoi.nhapDaGan.map((r) => [r.id, r])), [luoi.nhapDaGan]);
+  const dongNhapCua = (h: HangLuoiNL): MaterialImportItem[] =>
+    h.tuSoNhap ? h.nguonIds.flatMap((id) => nhapTheoId.get(id) ?? []) : [];
+  /** Thành tiền thật của từng dòng con đại lý (id dòng con → đ). */
+  const tienDongCon = new Map<string, number>();
+  /** Dòng loại NL đang mở dòng con theo đại lý. */
+  const [moDaiLy, setMoDaiLy] = useState<ReadonlySet<string>>(() => new Set());
+  /** Dòng loại NL có dòng sổ nhập (mở được theo đại lý) — cho nút mở/gập tất cả. */
+  const idsCoDaiLy = hangNL.filter((h) => h.tuSoNhap && h.nguonIds.length > 0).map((h) => h.id);
+  const coDongDaiLy = idsCoDaiLy.length > 0;
+  const moHetDaiLy = coDongDaiLy && idsCoDaiLy.every((id) => moDaiLy.has(id));
+  const doiMoDaiLy = (id: string) =>
+    setMoDaiLy((cu) => {
+      const n = new Set(cu);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
   const [themMo, setThemMo] = useState<InputGroup | "giam" | null>(null);
   const [chonNhapMo, setChonNhapMo] = useState(false);
   /** id dòng kho ẢO (chưa lưu) — dòng thật tạo ra DÙNG LẠI đúng id này, nên ô đang gõ
@@ -313,7 +333,10 @@ export function LuoiNguyenLieu({
   const danKhoi = (rowId: string, colKey: string, khoi: (number | null)[][]) => {
     if (!colKey.startsWith("ngay:")) return;
     const cotNgay = ngay.map((iso) => `ngay:${iso}`);
-    const iH = hangHien.findIndex((h) => h.id === rowId);
+    /* Dòng theo THỨ TỰ TRÊN MÀN kể cả dòng con đại lý đang mở — dán đè lên dòng con
+       (chỉ đọc) thì bỏ qua ô đó, không trượt số sang dòng dưới. */
+    const thuTu = hang.map((x) => x.id);
+    const iH = thuTu.indexOf(rowId);
     const iC = cotNgay.indexOf(colKey);
     if (iH < 0 || iC < 0) return;
 
@@ -322,7 +345,7 @@ export function LuoiNguyenLieu({
     khoi.forEach((dong, i) =>
       dong.forEach((v, j) => {
         if (v == null) return;
-        const h = hangHien[iH + i];
+        const h = hangHien.find((x) => x.id === thuTu[iH + i]);
         const cot = cotNgay[iC + j];
         if (!h || !cot) return;
         const goc = layGoc(h.id);
@@ -467,26 +490,20 @@ export function LuoiNguyenLieu({
       nhan: "Thành tiền",
       kieu: "tinh",
       rong: 136,
-      lay: (h) => h.tong * (h.donGia ?? 0) || null,
+      // Dòng con đại lý: tiền THẬT của các chuyến (đơn giá hiện đã làm tròn).
+      lay: (h) => tienDongCon.get(h.id) ?? (h.tong * (h.donGia ?? 0) || null),
     },
     { key: "tyLe", header: "Tỷ lệ", nhan: "Tỷ lệ phần trăm", kieu: "so", rong: 72, lay: (h) => h.tyLe },
     ...ngay.map<CotLuoi<HangLuoiNL>>((iso) => ({
       key: `ngay:${iso}`,
-      header: (
-        <button
-          type="button"
-          onClick={() => xemNgay(iso)}
-          title={`Xem đại lý nào giao, mấy chuyến, bao nhiêu kg ngày ${viDate(iso)} (khối "Chuyến nhập theo ngày" dưới lưới).`}
-          className="underline decoration-dotted underline-offset-4 hover:text-primary"
-        >
-          {nhanNgay(iso)}
-        </button>
-      ),
+      header: nhanNgay(iso),
       nhan: `Ngày ${viDate(iso)}`,
       kieu: "so",
       nhom: "ngay",
       rong: 88,
       lay: (h) => h.theoNgay[iso] ?? null,
+      // Ngay dưới số kg: "n chuyến" → đại lý/chuyến làm nên đúng ô này.
+      phuO: (h) => <ChuyenTrongO dong={dongNhapCua(h)} ngay={iso} maLo={maLo} />,
     })),
     ...(coChuyenKyCu
       ? [
@@ -613,7 +630,49 @@ export function LuoiNguyenLieu({
      ("x.đ Cò May", "Bột 24v"), dòng Giảm tô đỏ nhạt. Thứ tự vẫn theo nhóm. */
   const hang: HangLuoi<HangLuoiNL>[] = [...dongKho(hangLay)];
   for (const g of nhomCoDong) {
-    for (const h of g.dong) hang.push({ id: h.id, du: h, ten: h.ten });
+    for (const h of g.dong) {
+      const daiLy = h.tuSoNhap ? daiLyTrongKy(dongNhapCua(h)) : [];
+      const mo = moDaiLy.has(h.id);
+      hang.push({
+        id: h.id,
+        du: h,
+        ten: h.ten,
+        phu:
+          daiLy.length > 0 ? (
+            <button
+              type="button"
+              aria-expanded={mo}
+              onClick={() => doiMoDaiLy(h.id)}
+              title={
+                mo
+                  ? "Thu gọn các dòng đại lý của loại này."
+                  : `Tách dòng này theo ${daiLy.length} đại lý — mỗi đại lý một dòng, kg theo từng ngày (chỉ xem).`
+              }
+              className="mt-0.5 inline-flex items-center gap-1 text-sm text-primary hover:underline"
+            >
+              <ChevronDown className={`size-4 transition-transform ${mo ? "" : "-rotate-90"}`} aria-hidden />
+              {daiLy.length} đại lý
+            </button>
+          ) : undefined,
+      });
+      if (!mo) continue;
+      for (const d of daiLy) {
+        const con: HangLuoiNL = {
+          ...h,
+          id: `${h.id}::dl::${d.daiLy}`,
+          ten: d.daiLy,
+          theoNgay: d.theoNgay,
+          tong: d.kg,
+          // Giá bình quân của đại lý trong kỳ, làm tròn đồng; thành tiền lấy số thật.
+          donGia: d.kg > 0 && d.tien > 0 ? Math.round(d.tien / d.kg) : null,
+          tyLe: null,
+          chuyenKy: 0,
+          nguonIds: d.ids,
+        };
+        tienDongCon.set(con.id, d.tien);
+        hang.push({ id: con.id, du: con, ten: d.daiLy, kieu: "con" });
+      }
+    }
   }
   if (dongGiam.length > 0) {
     for (const h of dongGiam) {
@@ -699,6 +758,21 @@ export function LuoiNguyenLieu({
             <ChevronsLeftRight />
             {anNgay ? "Mở cột ngày" : "Thu cột ngày"}
           </Button>
+          {coDongDaiLy && (
+            <Button
+              variant="outline"
+              aria-pressed={moHetDaiLy}
+              title={
+                moHetDaiLy
+                  ? "Thu gọn mọi dòng đại lý — lưới về lại mỗi loại nguyên liệu một dòng."
+                  : "Tách mọi loại nguyên liệu lấy từ sổ nhập theo đại lý — mỗi đại lý một dòng, kg theo từng ngày (chỉ xem)."
+              }
+              onClick={() => setMoDaiLy(moHetDaiLy ? new Set() : new Set(idsCoDaiLy))}
+            >
+              <Users />
+              {moHetDaiLy ? "Gộp đại lý" : "Tách theo đại lý"}
+            </Button>
+          )}
         </div>
       </div>
 
@@ -822,8 +896,6 @@ export function LuoiNguyenLieu({
         </div>
       )}
 
-      {/* Đại lý nào giao chuyến nào, theo từng ngày — chỉ đọc (README cân đối 31). */}
-      <ChuyenTheoNgay ngay={ngay} nhap={luoi.nhapDaGan} ngayXem={ngayXem} onChonNgay={setNgayXem} />
 
       {suaTayMo && (
         <HopDongNhapTay

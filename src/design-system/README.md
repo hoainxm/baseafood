@@ -296,6 +296,13 @@ Luật khi dùng:
   sinh thêm một thanh cuộn dọc + mảng trắng dưới cùng. Dùng `aria-label`.
 - Dòng tiêu đề nhóm: `HangLuoi.tieuDeNhom`. Dòng tổng cuối bảng tự dựng ở màn
   gọi qua `cuoiBang` (số cột phải khớp, kể cả khi nhóm cột đang thu).
+- **Phần phụ dưới ô — `CotLuoi.phuO(row)`**: nội dung nhỏ ngay dưới giá trị ô (ô gõ
+  được hay ô khoá đều có), VD nút "🚚 3 chuyến" mở chi tiết nguồn của ô (Cân đối).
+  Nút trong `phuO` để `tabIndex={-1}` — phím Enter/↑↓ của lưới không nhảy vào.
+- **Dòng con chỉ đọc — `HangLuoi.kieu = "con"`**: thụt vào, nền xám, mọi ô khoá, không
+  ô tick tô màu (tô ở dòng cha). Màn tự chèn dòng con ngay dưới dòng cha khi người
+  dùng mở (VD tách theo đại lý). Có dòng con thì `onDanKhoi` phải tính dòng theo
+  THỨ TỰ TRÊN MÀN (kể cả dòng con) và bỏ qua ô dòng con — kẻo dán trượt số.
 
 ### 5d. Ô số: nhập biểu thức + điều hướng phím kiểu Excel
 

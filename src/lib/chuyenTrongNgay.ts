@@ -103,3 +103,37 @@ export function chuyenTrongNgay(
   }
   return ra.sort((a, b) => b.kg - a.kg || a.daiLy.localeCompare(b.daiLy, "vi"));
 }
+
+/** Một đại lý trong CẢ KỲ — cho dòng con theo đại lý dưới dòng loại NL của lưới. */
+export interface DaiLyKy {
+  daiLy: string;
+  /** kg theo ngày hàng về. */
+  theoNgay: Record<string, number>;
+  kg: number;
+  tien: number;
+  /** id các dòng sổ nhập của đại lý (để mở chuyến trong ô). */
+  ids: string[];
+}
+
+/**
+ * Gom dòng sổ nhập (thường là các dòng làm nên MỘT dòng loại NL của lưới) theo đại
+ * lý, kg theo ngày — tổng các đại lý đúng bằng dòng cha. Đại lý nhiều kg đứng trước.
+ */
+export function daiLyTrongKy(nhap: MaterialImportItem[]): DaiLyKy[] {
+  const m = new Map<string, DaiLyKy>();
+  for (const r of nhap) {
+    const dl = r.supplierName.trim() || "(chưa ghi đại lý)";
+    const o = m.get(dl) ?? { daiLy: dl, theoNgay: {}, kg: 0, tien: 0, ids: [] };
+    o.theoNgay[r.deliveryDate] = (o.theoNgay[r.deliveryDate] ?? 0) + r.quantityKg;
+    o.kg += r.quantityKg;
+    o.tien += tienDong(r);
+    o.ids.push(r.id);
+    m.set(dl, o);
+  }
+  return [...m.values()].sort((a, b) => b.kg - a.kg || a.daiLy.localeCompare(b.daiLy, "vi"));
+}
+
+/** Số chuyến (shipmentId khác nhau) của các dòng trong một ngày — cho nhãn "n chuyến" ở ô. */
+export function soChuyenNgay(nhap: MaterialImportItem[], ngay: string): number {
+  return new Set(nhap.filter((r) => r.deliveryDate === ngay).map((r) => r.shipmentId || r.id)).size;
+}

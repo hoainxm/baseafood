@@ -1,6 +1,7 @@
 > Load khi: sửa danh mục (đại lý, loại NL, mặt hàng, khách hàng) hay danh mục 141 mã thành phẩm.
 covers: src/features/catalog/CatalogScreen.tsx, src/features/catalog/FinishedGoodScreen.tsx, src/data/thanh-pham.json, src/design-system/patterns/CatalogCrudModal.tsx, src/lib/catalogRepo.ts, src/features/catalog/cauHinhDanhMuc.tsx, src/features/catalog/ChonBotDiKem.tsx
-last_verified: 2026-10-06
+last_verified: 2026-10-08
+<!-- re-verified: 2026-10-08 10:20 — catalogRepo.ts chỉ thêm `useLotDispatches` / `useLotWaivers` (truy xuất QR, mig 0056); hook danh mục, seed mặt hàng, 141 mã TK 1551 KHÔNG đổi — doc này không cần sửa nội dung. -->
 ttl_days: 90
 <!-- updated: 2026-10-06 — tô màu dòng "đã dò" (mig 0055): `DanhMucCrud` nhận prop `toMau`; 6 tab danh mục bật `danh-muc-<tab>` (mat-hang · khach-hang · dai-ly · loai-nl · bot-tam · kho-luu), tab 141 mã bật `danh-muc-tp-141` (chỉ đánh dấu, vẫn không sửa mã). Không đổi dữ liệu danh mục. -->
 <!-- updated: 2026-10-06 (c) — LUẬT "ô chọn danh mục luôn có Thêm mới + Bút chì sửa nhanh" (README design-system + CLAUDE.md quy tắc 7). Gắn bổ sung: /orders khách (onCreate) · NXT TP mặt hàng (onCreate) · /nxt-kho kho lưu (onCreate) · /imports Đổi loại hàng loạt (bút chì) · /balancing hộp kỳ loại NL (bút chì) · /ton-kho-thang vị trí/kho nhận + ánh xạ (bút chì, themViTri báo daLuu + dùng lại tên trùng) · tab Mặt hàng ô Loại NL (onCreate qua tham số `themLoaiNL` của taoTruongDanhMuc). onCreate ở /imports, /sales, /packaging dò trùng tên không phân hoa thường. Còn thiếu: gridDialogs HopThemDongNL (chờ MaterialGrid truyền suaNL). -->

@@ -7,15 +7,22 @@
 // ============================================================
 import { useMemo, useState } from "react";
 import { kg, viDate } from "@/lib/format";
-import { TEN_LOAI, danhSachThuHoi, tonKhoCuaLo, type DuLieuTruyXuat, type NutLo } from "@/lib/truyXuatLo";
+import { TEN_LOAI, danhSachThuHoi, danhSachThuHoiNhieu, tonKhoCuaLo, type DuLieuTruyXuat, type NutLo } from "@/lib/truyXuatLo";
 import { Button, InfoTip, KhungCuonNgang, PhieuIn, TdIn, ThIn } from "@/design-system";
 import { FileSpreadsheet, Printer, ShieldAlert } from "lucide-react";
 
 const kgHoacTrong = (v: number | null) => (v == null ? "chưa ghi kg" : kg(v));
 
-export function ThuHoiLo({ nut, dl }: { nut: NutLo; dl: DuLieuTruyXuat }) {
+export function ThuHoiLo({ nut, dl, cungChuyen = [] }: { nut: NutLo; dl: DuLieuTruyXuat; cungChuyen?: NutLo[] }) {
   const [dangIn, setDangIn] = useState(false);
-  const { hangRa, loTrongXuong } = useMemo(() => danhSachThuHoi(nut.kind, nut.id, dl), [nut, dl]);
+  /** Lô NL có nhiều loại cùng chuyến ⇒ cho thu hồi GỘP cả chuyến (nghi cả xe hàng của đại lý). */
+  const [caChuyen, setCaChuyen] = useState(false);
+  const gopChuyen = caChuyen && cungChuyen.length > 1;
+  const { hangRa, loTrongXuong } = useMemo(
+    () => (gopChuyen ? danhSachThuHoiNhieu(cungChuyen, dl) : danhSachThuHoi(nut.kind, nut.id, dl)),
+    [gopChuyen, cungChuyen, nut, dl]
+  );
+  const phamVi = gopChuyen ? `chuyến ${nut.nhan} (${cungChuyen.length} loại NL)` : `lô ${nut.nhan}${nut.kind === "S" ? ` · ${nut.moTa}` : ""}`;
   const tonTrong = useMemo(
     () => loTrongXuong.map((n) => ({ n, ton: tonKhoCuaLo(n.kind, n.id, dl) })),
     [loTrongXuong, dl]
@@ -30,7 +37,7 @@ export function ThuHoiLo({ nut, dl }: { nut: NutLo; dl: DuLieuTruyXuat }) {
       fileName: `thu-hoi-${nut.nhan}-${new Date().toISOString().slice(0, 16).replace(/[:T]/g, "")}.xlsx`,
       colWidths: [14, 28, 12, 26, 32, 12, 22],
       aoa: [
-        [`Danh sách thu hồi — lô ${nut.nhan} (${TEN_LOAI[nut.kind]} · ${nut.moTa})`],
+        [`Danh sách thu hồi — ${phamVi} (${TEN_LOAI[nut.kind]})`],
         [],
         ["Ngả ra", "Khách", "Ngày", "Chứng từ", "Mặt hàng", "Kg", "Từ lô"],
         ...hangRa.map((r) => [TEN_LOAI[r.loai], r.khach, r.ngay, r.chungTu, r.matHang, r.kg, r.tuLo]),
@@ -59,6 +66,15 @@ export function ThuHoiLo({ nut, dl }: { nut: NutLo; dl: DuLieuTruyXuat }) {
           </Button>
         </div>
       </div>
+
+      {cungChuyen.length > 1 && (
+        <label className="flex cursor-pointer items-center gap-3">
+          <input type="checkbox" className="size-5 shrink-0" checked={caChuyen} onChange={(e) => setCaChuyen(e.target.checked)} />
+          <span>
+            Thu hồi <b>cả chuyến</b> ({cungChuyen.length} loại nguyên liệu cùng xe, cùng đại lý)
+          </span>
+        </label>
+      )}
 
       <p className="tnum">
         {hangRa.length
@@ -113,7 +129,7 @@ export function ThuHoiLo({ nut, dl }: { nut: NutLo; dl: DuLieuTruyXuat }) {
       {dangIn && (
         <PhieuIn
           tieuDe="Danh sách thu hồi theo lô"
-          phuDe={`Lô ${nut.nhan} · ${TEN_LOAI[nut.kind]} · ${nut.moTa}${nut.ngay ? ` · ${viDate(nut.ngay)}` : ""}`}
+          phuDe={`${gopChuyen ? `Chuyến ${nut.nhan} · ${cungChuyen.length} loại NL` : `Lô ${nut.nhan} · ${TEN_LOAI[nut.kind]} · ${nut.moTa}`}${nut.ngay ? ` · ${viDate(nut.ngay)}` : ""}`}
           onClose={() => setDangIn(false)}
         >
           <table className="w-full border-collapse">

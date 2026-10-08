@@ -19,6 +19,7 @@ import {
   TEN_LOAI,
   canBangLo,
   docMaQr,
+  lyDoNhieuLo,
   loBtpDeChon,
   loNlDeChon,
   nutLo,
@@ -79,7 +80,8 @@ function HopGanLo({
   const [dangQuet, setDangQuet] = useState(false);
   const [maGo, setMaGo] = useState("");
   const [kgNhap, setKgNhap] = useState<number | null>(null);
-  const [luaChon, setLuaChon] = useState<NutLo[]>([]); // mã trùng ⇒ cho người chọn
+  const [luaChon, setLuaChon] = useState<NutLo[]>([]); // một mã nhiều lô ⇒ cho người chọn
+  const [cauChon, setCauChon] = useState("");
 
   const them = (nut: NutLo, cach: LotInput["method"]) => {
     if (nut.kind !== loaiVao) {
@@ -112,8 +114,11 @@ function HopGanLo({
     }
     if (kq.length === 1) them(kq[0]!, cach);
     else {
+      // Mã chuyến ⇒ các loại NL của chuyến (việc thường ngày, không toast); mã cũ trùng thật ⇒ cảnh báo.
+      const ld = lyDoNhieuLo(text, kq, dl);
       setLuaChon(kq);
-      notify.canhBao(`Mã "${text}" trùng ${kq.length} lô — chọn đúng lô bên dưới.`);
+      setCauChon(ld.cau);
+      if (!ld.cungChuyen) notify.canhBao(`${ld.cau} bên dưới.`);
     }
   };
 
@@ -196,7 +201,7 @@ function HopGanLo({
 
           {luaChon.length > 0 && (
             <div className="space-y-2">
-              <p className="font-medium">Mã trùng nhiều lô — chọn đúng lô:</p>
+              <p className="font-medium">{cauChon}:</p>
               <ul className="space-y-2">
                 {luaChon.map((n) =>
                   dongLo(

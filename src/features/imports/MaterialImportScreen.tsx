@@ -1841,7 +1841,7 @@ export default function NhapNguyenLieuScreen() {
                       )}
                       {n.chuyen && (
                         <Button
-                          title="In tem QR mã lô của chuyến này để dán lên kiện hàng, sau quét tra ngược được nguồn gốc."
+                          title="In tem QR cho chuyến này — mỗi loại nguyên liệu một tem (loại + kg) để dán đúng sọt, sau quét tra ngược được nguồn gốc."
                           variant="outline"
                           onClick={() => setChuyenInTem(n.chuyen)}
                         >

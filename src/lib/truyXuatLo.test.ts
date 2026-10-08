@@ -20,26 +20,32 @@ const phieu = (id: string, ngay: string): Packaging => ({
 
 const dl: DuLieuTruyXuat = {
   shipments: [chuyen("s1", "2026-09-01", "Đông", "Đ-260901-01"), chuyen("s2", "2026-09-03", "Cá"), chuyen("s3", "2026-08-20", "Đông")],
-  imports: [dong("s1", "2026-09-01", 1000, "Mực ống"), dong("s1", "2026-09-01", 200, "Bạch tuộc")],
+  imports: [
+    dong("s1", "2026-09-01", 1000, "Mực ống"), dong("s1", "2026-09-01", 200, "Bạch tuộc"),
+    dong("s2", "2026-09-03", 300, "Cá thu"), dong("s3", "2026-08-20", 400, "Bạch tuộc"),
+  ],
   wips: [me("w1", "2026-09-02", "Đông")],
   packagings: [phieu("p1", "2026-09-02")],
   lotInputs: [], exportItems: [], exportOrders: [], salesOrders: [], products: [], customers: [],
 };
 
 describe("dsLoDeIn", () => {
-  it("lọc theo khoảng ngày + loại, mới trước, cùng ngày theo NL→BTP→TP", () => {
+  it("lọc theo khoảng ngày + loại, mới trước, cùng ngày theo NL→BTP→TP; mỗi loại NL một lô", () => {
     const ds = dsLoDeIn(dl, { tu: "2026-09-01", den: "2026-09-30", xuong: "", loai: ["S", "W", "P"] });
-    expect(ds.map((n) => `${n.kind}:${n.id}`)).toEqual(["S:s2", "W:w1", "P:p1", "S:s1"]);
+    expect(ds.map((n) => `${n.kind}:${n.id}`)).toEqual(["S:s2-Cá thu", "W:w1", "P:p1", "S:s1-Bạch tuộc", "S:s1-Mực ống"]);
   });
   it("lọc theo xưởng và loại", () => {
-    expect(dsLoDeIn(dl, { tu: "2026-08-01", den: "2026-09-30", xuong: "Đông", loai: ["S"] }).map((n) => n.id)).toEqual(["s1", "s3"]);
+    expect(dsLoDeIn(dl, { tu: "2026-08-01", den: "2026-09-30", xuong: "Đông", loai: ["S"] }).map((n) => n.id)).toEqual([
+      "s1-Bạch tuộc", "s1-Mực ống", "s3-Bạch tuộc",
+    ]);
     expect(dsLoDeIn(dl, { tu: "2026-08-01", den: "2026-09-30", xuong: "", loai: [] })).toEqual([]);
   });
-  it("tem NL mang loại hàng + tổng kg của chuyến", () => {
-    const [s1] = dsLoDeIn(dl, { tu: "2026-09-01", den: "2026-09-01", xuong: "", loai: ["S"] });
-    expect(s1!.nhan).toBe("Đ-260901-01");
-    expect(s1!.kg).toBe(1200);
-    expect(s1!.moTa).toBe("Mực ống, Bạch tuộc");
+  it("tem NL: mã lô chuyến + MỘT loại hàng + kg của loại đó", () => {
+    const ds = dsLoDeIn(dl, { tu: "2026-09-01", den: "2026-09-01", xuong: "", loai: ["S"] });
+    expect(ds.map((n) => [n.nhan, n.moTa, n.kg])).toEqual([
+      ["Đ-260901-01", "Bạch tuộc", 200],
+      ["Đ-260901-01", "Mực ống", 1000],
+    ]);
   });
 });
 
@@ -77,12 +83,12 @@ describe("đợt 2b — chọn lô, chốt ngày, tem, gắn phiên", () => {
       ...dl,
       shipments: [chuyen("moi", "2026-10-01", "Đông"), chuyen("dong", "2026-07-10", "Đông"), chuyen("xua", "2026-06-01", "Đông")],
       imports: [dong("moi", "2026-10-01", 100, "Bạch tuộc"), dong("dong", "2026-07-10", 500, "Bạch tuộc"), dong("xua", "2026-06-01", 300, "Bạch tuộc")],
-      lotInputs: [vao("a", "w1", "dong", 200, "2026-07-11T08:00:00Z")],
+      lotInputs: [vao("a", "w1", "dong-Bạch tuộc", 200, "2026-07-11T08:00:00Z")],
     };
-    expect(loNlDeChon(d, "Đông", "2026-10-05").map((n) => n.id)).toEqual(["moi", "dong"]);
+    expect(loNlDeChon(d, "Đông", "2026-10-05").map((n) => n.id)).toEqual(["moi-Bạch tuộc", "dong-Bạch tuộc"]);
     // dùng hết lô đông ⇒ thôi gợi ý
-    const het = { ...d, lotInputs: [...d.lotInputs, vao("b", "w2", "dong", 300, "2026-08-01T08:00:00Z")] };
-    expect(loNlDeChon(het, "Đông", "2026-10-05").map((n) => n.id)).toEqual(["moi"]);
+    const het = { ...d, lotInputs: [...d.lotInputs, vao("b", "w2", "dong-Bạch tuộc", 300, "2026-08-01T08:00:00Z")] };
+    expect(loNlDeChon(het, "Đông", "2026-10-05").map((n) => n.id)).toEqual(["moi-Bạch tuộc"]);
   });
 
   it("meThieuLo: mẻ có lô hoặc có lý do thì không còn thiếu", () => {
@@ -105,11 +111,11 @@ describe("đợt 2b — chọn lô, chốt ngày, tem, gắn phiên", () => {
   });
 
   it("ganLoChoPhien: không rõ loài vẫn gắn (chiều an toàn), không gắn trùng, báo dòng không khớp", () => {
-    const d: DuLieuTruyXuat = { ...dl, products: [{ id: "mh1", code: "", name: "Hàng lạ", finishedGoodCode: "" }], lotInputs: [vao("cu", "w1", "s1", null, "")] };
+    const d: DuLieuTruyXuat = { ...dl, products: [{ id: "mh1", code: "", name: "Hàng lạ", finishedGoodCode: "" }], lotInputs: [vao("cu", "w1", "s1-Mực ống", null, "")] };
     const kq = ganLoChoPhien({
       mes: [{ id: "w1", productId: "mh1" }, { id: "w2", productId: "mh1" }],
-      banNoiDia: [{ id: "n1", materialTypeName: "Cá thu" }],
-      loNl: [{ nut: nutLo("S", "s1", d), cach: "go" }],
+      banNoiDia: [{ id: "n1", materialTypeName: "Cá ngừ" }],
+      loNl: [{ nut: nutLo("S", "s1-Mực ống", d), cach: "go" }],
       dl: d, nguoiGhi: "", luc: "", taoId: () => "g",
     });
     expect(kq.lotInputs.map((l) => l.outputId)).toEqual(["w2"]); // w1 đã gắn s1 rồi

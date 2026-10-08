@@ -194,7 +194,7 @@ export function ChuyenTrongNgay({
             <span className="flex shrink-0 gap-1">
               {onInTem && n.chuyen && (
                 <Button
-                  title={`In tem QR mã lô ${nhanLoNl(n.chuyen)} để dán lên lô hàng — quét tem là ra hộ chiếu lô.`}
+                  title={`In tem QR lô ${nhanLoNl(n.chuyen)} — mỗi loại nguyên liệu của chuyến một tem (loại + kg của loại đó) để dán đúng sọt. Quét tem là ra hộ chiếu lô.`}
                   type="button"
                   variant="outline"
                   size="sm"

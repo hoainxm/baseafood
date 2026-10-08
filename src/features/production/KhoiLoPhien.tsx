@@ -4,16 +4,17 @@
 // ============================================================
 // Tổ trưởng khai MỘT lần các lô NL đem ra chế biến trong phiên (quét tem / gõ mã /
 // chọn), thay vì gắn từng mẻ sau khi lưu. Lưu phiên ⇒ `ganLoChoPhien` (lib/truyXuatLo)
-// gắn lô cho mọi thành phẩm CÙNG LOÀI và dòng bán nội địa cùng loại NL, kg để trống.
+// gắn lô cho thành phẩm đúng LOẠI NL (mặt hàng đã gắn loại NL ở Danh mục), không thì cùng
+// LOÀI, và dòng bán nội địa đúng loại NL; kg để trống. Mỗi loại NL của chuyến là một lô.
 // Mẻ nào cần sửa riêng vẫn mở "Gắn lô NL" ở sổ. Lô ở đây chỉ là danh sách chọn
 // (không phải danh mục) ⇒ không có thêm mới / bút chì (CLAUDE.md quy tắc 7 ngoại lệ).
 import { useMemo, useState } from "react";
 import type { LotInput, Workshop } from "@/types";
-import { TEN_LOAI, docMaQr, loNlDeChon, nutLo, timLo, type DuLieuTruyXuat, type NutLo } from "@/lib/truyXuatLo";
+import { TEN_LOAI, docMaQr, loNlDeChon, lyDoNhieuLo, nutLo, timLo, type DuLieuTruyXuat, type NutLo } from "@/lib/truyXuatLo";
 import { Button, Combobox, Field, Input, Nhan, notify } from "@/design-system";
 import { KhungQuetQr } from "@/features/shared";
 import { Camera, CameraOff, Link2, Plus, X } from "lucide-react";
-import { viDate } from "@/lib/format";
+import { kg, viDate } from "@/lib/format";
 
 export interface LoPhien {
   nut: NutLo;
@@ -37,13 +38,14 @@ export function KhoiLoPhien({
   const [dangQuet, setDangQuet] = useState(false);
   const [maGo, setMaGo] = useState("");
   const [luaChon, setLuaChon] = useState<NutLo[]>([]);
+  const [cauChon, setCauChon] = useState("");
 
   const ungVien = useMemo(
     () => loNlDeChon(dl, xuong, ngay).filter((n) => !loPhien.some((l) => l.nut.id === n.id)),
     [dl, xuong, ngay, loPhien]
   );
   const moTaLo = (n: NutLo) =>
-    [n.moTa, n.ngay && viDate(n.ngay), n.chiTiet.find((c) => c.nhan === "Đại lý")?.giaTri].filter(Boolean).join(" · ");
+    [n.moTa, n.ngay && viDate(n.ngay), n.chiTiet.find((c) => c.nhan === "Đại lý")?.giaTri, n.kg ? kg(n.kg) : ""].filter(Boolean).join(" · ");
 
   const them = (n: NutLo, cach: LotInput["method"]) => {
     if (n.kind !== "S") {
@@ -74,8 +76,12 @@ export function KhoiLoPhien({
     }
     if (kq.length === 1) them(kq[0]!, cach);
     else {
+      // Gõ mã chuyến ⇒ ra các loại NL của chuyến: việc thường ngày, chọn ở danh sách dưới,
+      // không cần toast. Chỉ mã cũ trùng thật mới cảnh báo.
+      const ld = lyDoNhieuLo(text, kq, dl);
       setLuaChon(kq);
-      notify.canhBao(`Mã "${text}" trùng ${kq.length} lô — chọn đúng lô bên dưới.`);
+      setCauChon(ld.cau);
+      if (!ld.cungChuyen) notify.canhBao(`${ld.cau} bên dưới.`);
     }
   };
 
@@ -87,8 +93,8 @@ export function KhoiLoPhien({
           Lô nguyên liệu dùng cho phiên này
         </p>
         <p className="text-sm text-muted-foreground">
-          Quét tem các chuyến nguyên liệu đem ra chế biến. Lưu vào sổ là tự gắn lô cho mọi thành phẩm cùng loài
-          và dòng bán nội địa cùng loại NL — khỏi gắn từng mẻ.
+          Quét tem các loại nguyên liệu đem ra chế biến (mỗi loại của chuyến một tem). Lưu vào sổ là tự gắn lô
+          cho thành phẩm đúng loại NL (chưa gắn loại thì theo loài) và dòng bán nội địa cùng loại — khỏi gắn từng mẻ.
         </p>
       </div>
 
@@ -143,6 +149,9 @@ export function KhoiLoPhien({
       )}
 
       {luaChon.length > 0 && (
+        <p className="font-medium">{cauChon}:</p>
+      )}
+      {luaChon.length > 0 && (
         <ul className="space-y-1">
           {luaChon.map((n) => (
             <li key={n.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-2">
@@ -159,13 +168,18 @@ export function KhoiLoPhien({
 
       <Combobox
         label="Hoặc chọn lô nguyên liệu"
-        hint={`Lô về gần đây của xưởng ${xuong} (mới trước), sau đó lô cũ còn dở — NL cấp đông đem xả.`}
+        hint={`Mỗi loại NL của chuyến là một lô. Lô về gần đây của xưởng ${xuong} (mới trước), sau đó lô cũ còn dở — NL cấp đông đem xả.`}
         value=""
         onChange={(id) => {
           const n = ungVien.find((u) => u.id === id) ?? (id ? nutLo("S", id, dl) : undefined);
           if (n) them(n, "chon");
         }}
-        options={ungVien.map((n) => ({ value: n.id, label: n.nhan, phu: moTaLo(n) || undefined }))}
+        // Mỗi loại NL của chuyến là một lô cùng mã chuyến ⇒ nhãn ghép loại NL cho phân biệt được.
+        options={ungVien.map((n) => ({
+          value: n.id,
+          label: `${n.nhan} · ${n.moTa}`,
+          phu: [n.ngay && viDate(n.ngay), n.chiTiet.find((c) => c.nhan === "Đại lý")?.giaTri, n.kg ? kg(n.kg) : ""].filter(Boolean).join(" · ") || undefined,
+        }))}
         placeholder={ungVien.length ? "— Chọn lô —" : "Không có lô gợi ý"}
         emptyText="Không thấy lô này — quét tem hoặc gõ mã lô ở trên."
       />

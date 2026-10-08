@@ -2,8 +2,10 @@
 
 covers: src/lib/truyXuatLo.ts, src/lib/inventory.ts, src/features/qr/**, src/features/shared/GanLoDauVao.tsx, src/features/shared/KhungQuetQr.tsx, src/features/shared/QrTemLoIn.tsx, src/features/shared/useDuLieuTruyXuat.ts, src/features/production/KhoiLoPhien.tsx, src/features/orders/KiemLoXuat.tsx, supabase/migrations/0046_lot_inputs.sql, supabase/migrations/0049_label_prints.sql, supabase/migrations/0056_lot_dispatches.sql
 last_verified: 2026-10-08
+<!-- updated: 2026-10-08 (c) — lô NL = một dòng loại NL của chuyến (§6e); §4.1 + §7.5 cập nhật. -->
 <!-- re-verified: 2026-10-08 10:05 — §4.1 ba loại lô S/W/P (truyXuatLo.nutLo/nhanLo*), §6c (meChuaGanLo · duyetTheoTem · KiemLoXuat · label_prints) khớp code trước khi build đợt 2b; §8 dòng RLS đã LỆCH (sửa, xem .escaped-drift.log). -->
 
+> **Trạng thái (2026-10-08 chiều):** lô NL đổi thành **mỗi loại NL của chuyến một lô** (§6e, §7 câu 5 đã chốt).
 > **Trạng thái:** ĐỢT 1 ĐÃ BUILD (2026-09-18) · **đợt 1b in tem hàng loạt + 2a sổ in tem / nhắc gắn lô / quét ở kho & xuất ĐÃ BUILD (2026-10-02, §6b–6c)** · **đợt 2b khép vòng tới khách ĐÃ BUILD (2026-10-08, §6d) — mig `0056` ✅ đã chạy trên DB thật 2026-10-08** · đợt 3 là đề xuất · §7 câu 4 đã chốt, còn 4 câu chờ xưởng.
 > **Loại:** phân tích các hệ thống/chuẩn QR truy xuất + thiết kế áp dụng cho Baseafood.
 > **Code:** `src/lib/truyXuatLo.ts` (+ `truyXuatLo.e2e.test.ts` kịch bản mẫu §9) · `src/lib/inventory.ts` (trừ tồn theo lô gắn) · `src/features/qr/{QrTraCuuScreen,InTemHangLoat,GiaiDoanTruyXuat,ThuHoiLo}.tsx` · `src/features/shared/{GanLoDauVao,KhungQuetQr,QrTemLoIn,useDuLieuTruyXuat}` · `src/features/production/KhoiLoPhien.tsx` · `src/features/orders/KiemLoXuat.tsx` · migration `0046_lot_inputs.sql` (✅ đã chạy 2026-09-18) · `0049_label_prints.sql` (✅ 2026-10-02) · `0056_lot_dispatches.sql` (✅ 2026-10-08).
@@ -118,7 +120,7 @@ FDA **không quy định định dạng** TLC — chỉ cần đủ để nối 
 
 | Loại | Là bản ghi nào | Mã trong QR | Nhãn in cho người |
 |---|---|---|---|
-| **NL** (nguyên liệu) | một chuyến nhập `import_shipments` | `S:<id chuyến>` | `lot_code` hiện có, vd `Đ-260902-01` |
+| **NL** (nguyên liệu) | **một dòng loại NL của chuyến** `material_imports` (chốt 2026-10-08, §6e) — trước đó là cả chuyến | `S:<id dòng nhập>` (QR cũ `S:<id chuyến>` vẫn đọc: ra các loại để chọn) | `lot_code` của CHUYẾN, vd `Đ-260902-01` (mọi loại cùng chuyến cùng mã; loại NL in ở dòng dưới) |
 | **BTP** (bán thành phẩm) | một dòng sản xuất `production_wips` | `W:<id>` | suy ra: `BĐ-260918-7F3A` |
 | **TP** (thành phẩm) | một phiếu đóng gói `packagings` | `P:<id>` | suy ra: `TĐ-260918-C21B` |
 
@@ -241,6 +243,24 @@ Quét hoặc gõ → một trang gồm:
 
 **Thứ tự triển khai:** chạy `0056` trên DB thật TRƯỚC (2 lần, idempotent) rồi mới đẩy code — ✅ đã chạy 2026-10-08 (kiểm 2026-10-08 qua Supabase, chỉ đọc: 2 bảng có, RLS bật, policy `_nguoi_dung` authenticated, anon không đọc được, đủ trigger `*_sua` + `ghi_vet_sql_tg`, cột khớp toRow) — không thì các màn có hook lô đi ra báo lỗi máy chủ (404 `lot_dispatches`) cho tới khi chạy.
 
+## 6e. Lô NL theo loại — mỗi tem một loại + kg của loại đó (build 2026-10-08)
+
+**Vì sao:** tem chuyến `Đ-261002-01` (Hồng Phú) in gộp 3 loại (1 da 5.100 · 2 da lớn 1.038 · 2 da nhỏ 1.704) và tổng 7.842 kg — dán lên sọt nào cũng sai một phần; mẻ gắn "chuyến Hồng Phú" không biết dùng loại nào; cân bằng kg trộn 3 loại. Chủ dự án chọn **Cách 1** trong 3 cách (1: mỗi loại một lô · 2: mỗi kiện một tem kiểu LPN · 3: giữ lô chuyến, chỉ tách tem). Luật chọn: tem khớp đơn vị xưởng ĐANG cân và ĐANG bốc ra dùng.
+
+| Việc | Ở đâu |
+|---|---|
+| Lô NL `S:<id dòng nhập>`: kg = kg của loại; chi tiết có "Loại NL", "Khối lượng", "Cùng chuyến: n loại · tổng kg". Nhãn = mã lô chuyến | `nutLo` · `dongCuaChuyen` |
+| Nút **Tem** / **In tem QR** của chuyến ở Nhập hàng in **mỗi loại một tem** (cùng mã chuyến in to, loại + kg dòng dưới, QR đúng lô loại đó) | `QrTemLoIn` |
+| Gõ mã chuyến / quét **QR cũ** `S:<id chuyến>` ⇒ ra các loại của chuyến để chọn, câu "Chuyến … có n loại nguyên liệu, mỗi loại là một lô — chọn đúng loại" (không toast — việc thường ngày); mã cũ trùng thật vẫn cảnh báo | `timLo` · `lyDoNhieuLo` |
+| Gắn lô cả phiên: mặt hàng đã gắn **loại NL** (Danh mục) ⇒ chỉ nhận lô đúng loại; chưa gắn ⇒ theo loài như cũ. Bán nội địa: đúng loại trước, không có mới theo loài | `ganLoChoPhien` · `tenNlCuaMe` |
+| Hộ chiếu lô NL: mục **Cùng chuyến** (các loại khác, bấm sang được) · Thu hồi có ô **"Thu hồi cả chuyến"** (gộp các loại, mỗi dòng hàng ra một lần) | `QrTraCuuScreen` · `ThuHoiLo` · `loCungChuyen` · `danhSachThuHoiNhieu` |
+| Chọn lô NL (gắn cho mẻ / phiên / bán nội địa), In tem hàng loạt, tab Theo giai đoạn: đều liệt kê theo loại | `loNlDeChon` · `dsLoDeIn` · `theoGiaiDoan` |
+| Số kg trên tem + hộ chiếu theo locale vi-VN (`7.842 kg`, trước in `7842 kg`) | `kgChu` · `QrTemLoIn.dongTem` |
+
+**Không cần migration, không chuyển dữ liệu:** lúc đổi, server có `lot_inputs` = `label_prints` = `lot_dispatches` = 0 dòng. Dây lô / tem ghi theo chuyến (nếu có ở máy nào) vẫn đọc được: `nutLo("S", <id chuyến>)` dựng nút cả chuyến như trước. Test: nhóm "lô NL theo loại" trong `truyXuatLo.e2e.test.ts` dựng đúng chuyến Hồng Phú 3 loại.
+
+**Thử tay (preview demo, 2026-10-08):** chuyến Bê 3 (2 loại) ⇒ "In tem QR" ra 2 tem `5.298 kg` / `1.391 kg` · gõ mã chuyến ở khối lô phiên ⇒ câu chọn loại, không toast, chip đúng loại · hộ chiếu có Cùng chuyến + Thu hồi cả chuyến · QR cũ theo chuyến ⇒ danh sách 2 loại.
+
 ## 7. Còn treo — xưởng phải chốt (KHÔNG tự chốt thay)
 
 1. **Sinh mã lô lúc nào** (treo từ họp 02/09): ngay cổng lúc nhập, hay sau sơ chế + đông?
@@ -248,7 +268,7 @@ Quét hoặc gõ → một trang gồm:
 2. **Loại tem**: giấy in tại chỗ hay mã nhựa tái dùng. Mô hình chạy được cả hai; mã nhựa sẽ cần thêm bảng "gán thẻ ↔ lô" (đợt 2).
 3. **Ai quét, lúc nào**: tổ trưởng quét khi lấy NL ra chế biến, hay thủ kho quét khi xuất khỏi kho.
 4. ~~**Có bắt buộc gắn lô khi ghi sản lượng không.**~~ ✅ **Chốt 2026-10-08 (chủ dự án):** ghi sản lượng vẫn tùy chọn, nhưng **chốt ngày SX phải gắn lô NL cho mọi mẻ, hoặc ghi lý do** (lưu `lot_waivers`). Tab **Theo giai đoạn** ở `/qr` cho thấy mẻ nào còn thiếu lô để xưởng theo dõi.
-5. **Lô NL nên chi tiết đến đâu**: một chuyến (một đại lý / một xe) hay từng dòng NL trong chuyến. Đợt 1 theo chuyến; bảng có sẵn cột `material` để ghi rõ loại.
+5. ~~**Lô NL nên chi tiết đến đâu**~~ ✅ **Chốt 2026-10-08 (chủ dự án):** **mỗi loại NL của chuyến là một lô** (một dòng `material_imports`) — khớp đơn vị xưởng đang cân + ghi sổ (chuyến × loại) và đơn vị lấy ra chế biến (theo loại). Không làm tem theo từng kiện (LPN/SSCC) — để đợt 3 khi khách / đoàn kiểm tra đòi. Xem §6e.
 
 ## 8. Không làm (vùng đỏ)
 

@@ -154,7 +154,7 @@ export function InTemHangLoat() {
                       className="mt-1 size-5 shrink-0"
                       checked={chon}
                       onChange={() => doiChon(n)}
-                      aria-label={`In tem lô ${n.nhan}`}
+                      aria-label={`In tem lô ${n.nhan} · ${n.moTa}`}
                     />
                     <span className="min-w-0 flex-1 space-y-1">
                       <span className="flex flex-wrap items-center gap-2">

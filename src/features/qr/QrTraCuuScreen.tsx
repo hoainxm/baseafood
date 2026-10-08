@@ -6,7 +6,8 @@
 //   • TRUY XUÔI : lô này đã đi vào đâu, xuất cho ai — phạm vi khi phải THU HỒI
 // kèm CÂN BẰNG KHỐI LƯỢNG theo lô, tồn còn trong kho, DANH SÁCH THU HỒI và in lại tem.
 // Tab "Theo giai đoạn" kiểm QR từng khâu ở một chỗ, làm ngay tại chỗ (đợt 2b).
-// Đọc được cả tem CŨ (QR chỉ chứa mã lô trần). Mã trùng ⇒ liệt kê cho người chọn.
+// Đọc được cả tem CŨ (QR chỉ chứa mã lô trần). Một mã ra nhiều lô (mã chuyến ⇒ các loại
+// NL của chuyến, hoặc mã cũ trùng) ⇒ liệt kê cho người chọn.
 // Thiết kế + căn cứ chuẩn: docs/spec/qr-truy-xuat-lo.md
 // ============================================================
 import { useMemo, useState } from "react";
@@ -23,6 +24,8 @@ import {
   docMaQr,
   khoaLo,
   laHangRa,
+  loCungChuyen,
+  lyDoNhieuLo,
   tomTatIn,
   nutLo,
   timLo,
@@ -125,6 +128,8 @@ export default function QrTraCuuScreen() {
   const xuoi = useMemo(() => (dangXem ? truyXuoi(dangXem.kind, dangXem.id, dl) : []), [dangXem, dl]);
   const canBang = useMemo(() => (dangXem ? canBangLo(dangXem.kind, dangXem.id, dl) : null), [dangXem, dl]);
   const tonKho = useMemo(() => (dangXem ? tonKhoCuaLo(dangXem.kind, dangXem.id, dl) : null), [dangXem, dl]);
+  /** Lô NL: các loại NL khác của CÙNG CHUYẾN (mỗi loại một lô, chốt 2026-10-08). */
+  const cungChuyen = useMemo(() => (dangXem?.kind === "S" ? loCungChuyen(dangXem.id, dl) : []), [dangXem, dl]);
 
   const loiNguoc: Partial<Record<LoaiNut, string>> = {
     S: "Lô nguyên liệu là đầu chuỗi — nguồn gốc là đại lý / chuyến nhập ghi ở trên.",
@@ -235,7 +240,10 @@ export default function QrTraCuuScreen() {
       ) : ketQua.length > 1 ? (
         <div className="space-y-3 rounded-xl border-2 border-border p-4">
           <p className="font-medium">
-            Mã "{lo}" trùng {ketQua.length} lô (tem in trước đợt nâng cấp không đảm bảo mã duy nhất). Chọn đúng lô:
+            {(() => {
+              const ld = lyDoNhieuLo(lo, ketQua, dl);
+              return ld.cungChuyen ? `${ld.cau}:` : `${ld.cau} (tem in trước đợt nâng cấp không đảm bảo mã duy nhất):`;
+            })()}
           </p>
           <ul className="space-y-2">
             {ketQua.map((n) => (
@@ -301,6 +309,31 @@ export default function QrTraCuuScreen() {
                   </div>
                 ))}
               </dl>
+              {cungChuyen.length > 1 && (
+                <div className="space-y-1">
+                  <p className="font-medium">Cùng chuyến — mỗi loại nguyên liệu là một lô</p>
+                  <ul className="space-y-1">
+                    {cungChuyen.map((n) => (
+                      <li key={n.id} className="flex flex-wrap items-center gap-2">
+                        {n.id === dangXem.id ? (
+                          <span className="font-medium">{n.moTa}</span>
+                        ) : (
+                          <button
+                            type="button"
+                            className="font-medium text-primary underline-offset-4 hover:underline"
+                            title={`Mở hộ chiếu lô ${n.moTa} của cùng chuyến.`}
+                            onClick={() => moLo(n)}
+                          >
+                            {n.moTa}
+                          </button>
+                        )}
+                        <span className="tnum text-muted-foreground">{kg(n.kg)}</span>
+                        {n.id === dangXem.id && <Nhan loai="xong">Đang xem</Nhan>}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </section>
 
             {/* 2. Cân bằng khối lượng */}
@@ -368,7 +401,7 @@ export default function QrTraCuuScreen() {
             </section>
 
             {/* 5. Thu hồi */}
-            {laLo(dangXem.kind) && <ThuHoiLo nut={dangXem} dl={dl} />}
+            {laLo(dangXem.kind) && <ThuHoiLo nut={dangXem} dl={dl} cungChuyen={cungChuyen} />}
           </div>
         )
       )}

@@ -1,6 +1,7 @@
 > Load khi: bắt đầu bất kỳ task nào trong repo này và chưa biết phải đọc file nào.
 covers: docs/app-map/**
 last_verified: 2026-10-08
+<!-- re-verified: 2026-10-08 14:30 — dòng định tuyến QR vẫn đúng sau khi lô NL tách theo loại (chi tiết ở spec §6e, doc 30 · 34 · 38 đã ghi); không thêm doc mới. -->
 <!-- updated: 2026-10-08 — dòng định tuyến "Truy xuất theo lô bằng QR" mở rộng theo đợt 2b (bán hàng, đơn đặt, chốt ngày bắt gắn lô, trừ tồn theo lô) + thêm trỏ 33-ban-hang. -->
 ttl_days: 90
 <!-- re-verified: 2026-09-21 — audit PO: cập nhật số liệu cột "Nội dung" đã cũ (02 "5 màn"→~20 route; 03 "16 bảng/7 migration"→46 migration; 05 "chờ 0003"→0021+0047). Số route/bảng/migration là dữ kiện suy được từ source, không phải invariant — bảng Index chỉ tóm tắt, chi tiết đọc từng file. -->

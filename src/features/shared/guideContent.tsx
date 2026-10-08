@@ -449,8 +449,9 @@ export const HUONG_DAN: Record<string, NoiDungHuongDan> = {
         <Muc tieuDe="Mã lô là gì">
           <Y>
             <li>
-              Có <b>3 loại lô</b>: <b>nguyên liệu</b> (mỗi chuyến nhập, vd{" "}
-              <b>Đ-260912-01</b>), <b>bán thành phẩm</b> (mỗi mẻ sản xuất, vd{" "}
+              Có <b>3 loại lô</b>: <b>nguyên liệu</b> (mỗi <b>loại nguyên liệu</b> của một
+              chuyến là một lô — chuyến 3 loại thì 3 lô, 3 tem cùng mã chuyến vd{" "}
+              <b>Đ-260912-01</b>, mỗi tem ghi đúng loại + kg), <b>bán thành phẩm</b> (mỗi mẻ sản xuất, vd{" "}
               <b>BĐ-260912-7F3A</b>), <b>thành phẩm</b> (mỗi phiếu đóng gói, vd{" "}
               <b>TĐ-260912-C21B</b>). Mã tự có, <b>không phải gõ</b>.
             </li>

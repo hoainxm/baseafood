@@ -12,9 +12,9 @@
 import { useEffect, useState } from "react";
 import type { ImportShipment, LotKind } from "@/types";
 import { PhieuInTem, type TemIn } from "@/design-system";
-import { viDate } from "@/lib/format";
+import { kg, viDate } from "@/lib/format";
 import { taoQrDataUrl } from "@/lib/qr";
-import { TEN_LOAI, banGhiIn, nhanLoNl, noiDungQr, nutLo, soTemMacDinh, type NutLo } from "@/lib/truyXuatLo";
+import { TEN_LOAI, banGhiIn, dongCuaChuyen, nhanLoNl, noiDungQr, nutLo, soTemMacDinh, type NutLo } from "@/lib/truyXuatLo";
 import { useLabelPrints, usePackagings, useWipProductions } from "@/lib/catalogRepo";
 import { useAuth } from "@/lib/auth";
 import { newId } from "@/lib/store";
@@ -26,7 +26,7 @@ const laLo = (n: NutLo) => n.kind === "S" || n.kind === "W" || n.kind === "P";
 function dongTem(nut: NutLo): string[] {
   return [
     `${TEN_LOAI[nut.kind]} · ${nut.moTa}`,
-    [nut.ngay && viDate(nut.ngay), nut.xuong && `xưởng ${nut.xuong}`, nut.kg ? `${Math.round(nut.kg * 10) / 10} kg` : ""]
+    [nut.ngay && viDate(nut.ngay), nut.xuong && `xưởng ${nut.xuong}`, nut.kg ? kg(Math.round(nut.kg * 10) / 10) : ""]
       .filter(Boolean)
       .join(" · "),
     ...nut.chiTiet.filter((c) => c.nhan === "Đại lý" || c.nhan === "SSCC").map((c) => `${c.nhan}: ${c.giaTri}`),
@@ -77,28 +77,29 @@ export function TemLoQr({ nut, nuts, onClose }: { nut?: NutLo; nuts?: NutLo[]; o
 }
 
 /**
- * Tem lô NL của một chuyến nhập — giữ API cũ cho màn Nhập hàng. Dựng nút qua
- * `nutLo` để tem ghi đúng LOẠI hàng + tổng kg của chuyến; chuyến chưa có trong
- * dữ liệu chung (vừa lưu, chưa nạp lại) thì dựng tạm từ đầu chuyến.
+ * Tem lô NL của một chuyến nhập — giữ API cũ cho màn Nhập hàng. Lô NL = MỖI LOẠI NL
+ * của chuyến (chốt 2026-10-08) ⇒ in mỗi loại một tem: cùng mã lô chuyến in to, dòng
+ * dưới là loại NL + kg của loại đó, QR trỏ đúng lô loại đó (`S:<id dòng nhập>`).
+ * Chuyến chưa có dòng nào trong dữ liệu chung (vừa lưu, chưa nạp) thì dựng tạm một
+ * tem theo đầu chuyến như trước.
  */
 export function QrTemLoIn({ chuyen, onClose }: { chuyen: ImportShipment; onClose: () => void }) {
   const { dl } = useDuLieuTruyXuat();
-  const daDung = nutLo("S", chuyen.id, dl);
-  const nut: NutLo = !daDung.mat
-    ? daDung
-    : {
-        kind: "S",
-        id: chuyen.id,
-        nhan: nhanLoNl(chuyen),
-        moTa: "nguyên liệu",
-        ngay: chuyen.deliveryDate,
-        xuong: chuyen.workshop,
-        kg: 0,
-        chiTiet: [
-          { nhan: "Đại lý", giaTri: chuyen.supplierName || "—" },
-          ...(chuyen.ssccCode ? [{ nhan: "SSCC", giaTri: chuyen.ssccCode }] : []),
-        ],
-        mat: false,
-      };
-  return <TemLoQr nut={nut} onClose={onClose} />;
+  const theoLoai = dongCuaChuyen(dl, chuyen.id).map((m) => nutLo("S", m.id, dl));
+  if (theoLoai.length) return <TemLoQr nuts={theoLoai} onClose={onClose} />;
+  const tam: NutLo = {
+    kind: "S",
+    id: chuyen.id,
+    nhan: nhanLoNl(chuyen),
+    moTa: "nguyên liệu",
+    ngay: chuyen.deliveryDate,
+    xuong: chuyen.workshop,
+    kg: 0,
+    chiTiet: [
+      { nhan: "Đại lý", giaTri: chuyen.supplierName || "—" },
+      ...(chuyen.ssccCode ? [{ nhan: "SSCC", giaTri: chuyen.ssccCode }] : []),
+    ],
+    mat: false,
+  };
+  return <TemLoQr nut={tam} onClose={onClose} />;
 }

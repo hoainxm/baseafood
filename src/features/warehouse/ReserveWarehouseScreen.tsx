@@ -3,7 +3,8 @@
 // Tên tiếng Việt: Màn hình Kho cấp đông dự trữ BSF1
 // Description: Cold Storage Reserve Warehouse Management Screen
 // ============================================================
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import type { WipProductionItem } from "@/types";
 import { useExportItems, useLotDispatches, useLotInputs, usePackagings, useProducts, useSalesItems, useWipProductions } from "@/lib/catalogRepo";
 import { tinhTon, truTonBTP, type LoTon } from "@/lib/inventory";
@@ -140,6 +141,17 @@ export default function KhoDuTruScreen() {
     setDangQuet(false);
     moDuyet(wip);
   };
+
+  // Link từ /qr "Theo giai đoạn" (`?duyet=W:<id>`) ⇒ mở thẳng hộp duyệt của đúng mẻ,
+  // như quét tem. Xử lý một lần khi dữ liệu đã nạp rồi gỡ tham số khỏi link.
+  const [thamSo, datThamSo] = useSearchParams();
+  const maDuyet = thamSo.get("duyet");
+  useEffect(() => {
+    if (!maDuyet || sanXuat.length === 0) return;
+    duyetTheoTem(maDuyet);
+    datThamSo({}, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ chạy khi link mang mã và sổ SX đã nạp
+  }, [maDuyet, sanXuat.length]);
 
   const luuDuyet = () => {
     if (!duyet) return;

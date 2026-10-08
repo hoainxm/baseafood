@@ -3,7 +3,8 @@
 // Tên tiếng Việt: Màn hình Quản lý Đơn đặt hàng & Gom hàng
 // Description: Sales Order Management & Consolidation Screen
 // ============================================================
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import type {
   OrderItem,
   ExportItem,
@@ -96,6 +97,19 @@ export default function DonDatScreen() {
   const [tao, setTao] = useState<DonMoi | null>(null);
   const [loi, setLoi] = useState<LoiNhap[]>([]);
   const [kiemLenh, setKiemLenh] = useState<ExportOrder | null>(null);
+
+  // Link từ /qr "Theo giai đoạn" (`?don=<id>&kiem=<id lệnh xuất>`) ⇒ mở đơn và hộp kiểm
+  // lô của lệnh đó. Chờ dữ liệu nạp xong mới xử lý, xong gỡ tham số khỏi link.
+  const [thamSo, datThamSo] = useSearchParams();
+  const donUrl = thamSo.get("don");
+  const kiemUrl = thamSo.get("kiem");
+  useEffect(() => {
+    if (!donUrl || !don.some((d) => d.id === donUrl)) return;
+    setChon(donUrl);
+    const l = kiemUrl ? lenh.find((x) => x.id === kiemUrl) : undefined;
+    if (l) setKiemLenh(l);
+    datThamSo({}, { replace: true });
+  }, [donUrl, kiemUrl, don, lenh, datThamSo]);
 
   const tenMH = (id: string) => matHang.find((m) => m.id === id)?.name || "—";
   const tenKH = (id: string) => khach.find((k) => k.id === id)?.name || "—";

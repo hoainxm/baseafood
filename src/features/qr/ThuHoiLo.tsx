@@ -47,7 +47,7 @@ export function ThuHoiLo({ nut, dl }: { nut: NutLo; dl: DuLieuTruyXuat }) {
         <h2 className="flex items-center gap-2 font-semibold">
           <ShieldAlert aria-hidden /> Thu hồi — ai đã nhận hàng từ lô này
           <InfoTip label="thu hồi">
-            Đi hết cây truy xuôi: mọi lệnh xuất, dòng bán lẻ, bán nội địa có dùng lô này, kể cả qua mẻ sản xuất / đóng gói trung gian. Chỉ tính các mối nối ĐÃ GẮN LÔ — hàng bán mà chưa gắn lô thì không hiện ở đây (xem tab Độ phủ).
+            Đi hết cây truy xuôi: mọi lệnh xuất, dòng bán lẻ, bán nội địa có dùng lô này, kể cả qua mẻ sản xuất / đóng gói trung gian. Chỉ tính các mối nối ĐÃ GẮN LÔ — hàng bán mà chưa gắn lô thì không hiện ở đây (xem tab Theo giai đoạn).
           </InfoTip>
         </h2>
         <div className="flex flex-wrap gap-2">

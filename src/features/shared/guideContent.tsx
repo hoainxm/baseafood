@@ -512,13 +512,22 @@ export const HUONG_DAN: Record<string, NoiDungHuongDan> = {
             </li>
           </Buoc>
         </Muc>
-        <Muc tieuDe="Xem chỗ còn thiếu lô (tab Độ phủ)">
-          <Y>
+        <Muc tieuDe="Kiểm QR từng khâu (tab Theo giai đoạn)">
+          <Buoc>
             <li>
-              Chọn khoảng ngày + xưởng: thấy bao nhiêu mẻ, phiếu đóng gói, dòng bán đã
-              gắn lô, lô nào chưa in tem. Bấm <b>Còn thiếu</b> để ra danh sách và chỗ sửa.
+              Bấm tab <b>Theo giai đoạn</b>, chọn khoảng ngày + xưởng. Màn xếp 5 khâu theo
+              thứ tự: <b>Nhập nguyên liệu → Sản xuất → Nhập kho → Đóng gói → Xuất & bán</b>.
             </li>
-          </Y>
+            <li>
+              Mỗi dòng có nhãn trạng thái: đã in tem chưa, đã gắn lô chưa, chờ duyệt kho,
+              đã quét kiểm chưa. Khâu nào còn thiếu thì hiện <b>Còn thiếu N</b>.
+            </li>
+            <li>
+              Bấm nút ngay ở dòng: <b>In tem</b>, <b>Gắn lô NL / BTP</b>, <b>Gắn lô</b> (dòng
+              bán), <b>Duyệt nhập kho</b> (mở thẳng hộp duyệt ở Kho dự trữ), <b>Kiểm lô</b>{" "}
+              (mở thẳng hộp kiểm ở Đơn đặt). Tick <b>Chỉ hiện mục còn thiếu</b> để lọc.
+            </li>
+          </Buoc>
         </Muc>
         <Muc tieuDe="Lưu ý">
           <Y>

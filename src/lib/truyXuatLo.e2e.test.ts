@@ -12,7 +12,7 @@ import type {
 } from "@/types";
 import { KHO_BAN_LE, KHO_TP, tinhTon, truTonBTP } from "./inventory";
 import {
-  canBangLo, danhSachThuHoi, docMaQr, doPhuTruyXuat, ganLoChoPhien, nutLo, timLo, tonKhoCuaLo, truyNguoc,
+  canBangLo, danhSachThuHoi, docMaQr, ganLoChoPhien, theoGiaiDoan, nutLo, timLo, tonKhoCuaLo, truyNguoc,
   truyXuoi, type DuLieuTruyXuat, type NhanhCay,
 } from "./truyXuatLo";
 
@@ -165,21 +165,32 @@ describe("kịch bản mẫu: nhập → SX → kho → đóng gói / xuất / b
     expect(timLo(docMaQr("đ-261001-01")!, dl).map((n) => n.id)).toEqual(["S1"]);
   });
 
-  it("độ phủ 29/09–05/10: mẻ cũ W0 là lỗ duy nhất; ghi lý do thì hết thiếu", () => {
+  it("theo giai đoạn 29/09–05/10: mỗi khâu đủ mục, chỉ ra đúng việc còn thiếu", () => {
     const loc = { tu: "2026-09-29", den: "2026-10-05", xuong: "Đông" as const };
-    const m = Object.fromEntries(doPhuTruyXuat(dl, loc).map((x) => [x.khoa, x]));
-    expect(m.me).toMatchObject({ tong: 3, co: 2, coLyDo: 0 });
-    expect(m.me!.thieu.map((n) => n.id)).toEqual(["W0"]);
-    expect(m["dong-goi"]).toMatchObject({ tong: 1, co: 1 });
-    expect(m["ban-le"]).toMatchObject({ tong: 2, co: 2 });
-    expect(m["ban-nd"]).toMatchObject({ tong: 1, co: 1 });
-    expect(m.xuat).toMatchObject({ tong: 1, co: 1 });
-    expect(m.tem).toMatchObject({ tong: 7, co: 5 });
-    expect(m.tem!.thieu.map((n) => n.id).sort()).toEqual(["S3", "W0"]);
+    const gd = Object.fromEntries(theoGiaiDoan(dl, loc).map((g) => [g.khoa, g]));
+    const thieu = (k: string) => Object.fromEntries(gd[k]!.muc.map((m) => [m.nut.id, m.thieu.join(",")]));
+    expect(Object.keys(gd)).toEqual(["nhap", "san-xuat", "kho", "dong-goi", "xuat-ban"]);
+    // Nhập NL: S3 chưa in tem; S1 đã vào 2 mẻ, S2 vào 1 mẻ + 1 dòng bán nội địa
+    expect(thieu("nhap")).toEqual({ S1: "", S2: "", S3: "tem" });
+    expect(gd.nhap!.muc.find((m) => m.nut.id === "S2")!.daDung).toBe(2);
+    // Sản xuất: mẻ cũ W0 thiếu cả lô NL lẫn tem
+    expect(thieu("san-xuat")).toEqual({ W0: "lo,tem", W1: "", W2: "" });
+    // Kho: cả 3 đã nhập, tồn theo đúng lô gắn
+    expect(gd.kho!.muc.map((m) => [m.nut.id, m.kho, m.ton])).toEqual(
+      expect.arrayContaining([["W0", "da-nhap", 100], ["W1", "da-nhap", 200], ["W2", "da-nhap", 100]])
+    );
+    expect(gd["dong-goi"]!.muc.map((m) => [m.nut.id, m.soLo, m.ton, m.thieu.length])).toEqual([["P1", 1, 140, 0]]);
+    // Xuất & bán: lệnh x1 đã quét, b1/b2/n1 đã gắn lô; handoff Đơn đặt (b3) không tính là bán lẻ
+    expect(gd["xuat-ban"]!.muc.map((m) => `${m.nut.kind}:${m.nut.id}:${m.thieu.join(",")}`).sort()).toEqual(["B:b1:", "B:b2:", "N:n1:", "X:x1:"]);
+    expect(gd["xuat-ban"]!.muc.find((m) => m.nut.id === "x1")).toMatchObject({ daQuet: true, lenhId: "e1", donId: "o1" });
+    expect(gd["xuat-ban"]!.muc.find((m) => m.nut.id === "b1")!.loaiLoBan).toBe("P");
 
+    // Ghi lý do cho W0 ⇒ chỉ còn thiếu tem
     const lyDo: LotWaiver = { id: "z1", outputKind: "W", outputId: "W0", reason: "Mẻ trước ngày áp dụng QR", operator: "", recordedAt: "" };
-    const m2 = Object.fromEntries(doPhuTruyXuat({ ...dl, lotWaivers: [lyDo] }, loc).map((x) => [x.khoa, x]));
-    expect(m2.me).toMatchObject({ co: 2, coLyDo: 1, thieu: [] });
+    const w0 = theoGiaiDoan({ ...dl, lotWaivers: [lyDo] }, loc)[1]!.muc.find((m) => m.nut.id === "W0")!;
+    expect(w0).toMatchObject({ thieu: ["tem"], lyDo: "Mẻ trước ngày áp dụng QR" });
+    // Lọc xưởng khác ⇒ trống
+    expect(theoGiaiDoan(dl, { ...loc, xuong: "Cá" }).every((g) => g.muc.length === 0)).toBe(true);
   });
 
   it("gắn lô cả phiên: lô bạch tuộc vào mẻ bạch tuộc, lô mực không dính", () => {

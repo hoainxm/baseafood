@@ -658,69 +658,136 @@ export function meThieuLo<T extends Pick<WipProductionItem, "id">>(
   );
 }
 
-// ---------- Độ phủ truy xuất (đợt 2b) ----------
+// ---------- Theo giai đoạn (đợt 2b) ----------
 
-export interface MucDoPhu {
-  khoa: "me" | "dong-goi" | "tem" | "ban-le" | "ban-nd" | "xuat";
+export type KhoaGiaiDoan = "nhap" | "san-xuat" | "kho" | "dong-goi" | "xuat-ban";
+
+/** Việc còn thiếu ở một mục: in tem · gắn lô · duyệt nhập kho · quét kiểm khi xếp xe. */
+export type ViecThieu = "tem" | "lo" | "duyet" | "quet";
+
+export interface MucGiaiDoan {
+  /** Lô (S/W/P) hoặc dòng hàng ra (X lệnh xuất · B bán lẻ · N bán nội địa). */
+  nut: NutLo;
+  /** Số tem đã in (lô S/W/P); undefined = không áp dụng. */
+  daIn?: number;
+  /** Số lô đầu vào đã gắn (W: lô NL · P: lô BTP) hoặc lô đã gắn cho hàng ra (B/N). */
+  soLo?: number;
+  /** W/P chưa gắn lô nhưng đã ghi lý do khi chốt ngày. */
+  lyDo?: string;
+  /** S: số mẻ / dòng bán nội địa đã dùng lô này. */
+  daDung?: number;
+  /** W: trạng thái kho. */
+  kho?: "cho-nhap" | "da-nhap";
+  /** Tồn trong kho theo sổ tồn (W đã nhập, P). */
+  ton?: number | null;
+  /** X: đã quét kiểm khi xếp xe. */
+  daQuet?: boolean;
+  /** X: lệnh xuất + đơn của dòng — để mở thẳng hộp kiểm lô. */
+  lenhId?: string;
+  donId?: string;
+  /** B: lô gắn cho dòng bán lẻ là BTP (block thô) hay TP (đóng gói). */
+  loaiLoBan?: "W" | "P";
+  thieu: ViecThieu[];
+}
+
+export interface GiaiDoan {
+  khoa: KhoaGiaiDoan;
   ten: string;
-  tong: number;
-  /** có gắn lô / có tem / đã quét */
-  co: number;
-  /** không gắn nhưng đã ghi lý do (chỉ mẻ SX + đóng gói) */
-  coLyDo: number;
-  /** danh sách còn thiếu — bấm vào để xử lý */
-  thieu: NutLo[];
+  muc: MucGiaiDoan[];
 }
 
 /**
- * Đo xem chuỗi truy xuất đang thủng ở đâu trong một khoảng ngày × xưởng:
- * bao nhiêu mẻ đã có lô NL, phiếu đóng gói có lô BTP, lô đã in tem, dòng bán có
- * lô, dòng lệnh xuất đã quét kiểm. Số này để xưởng quyết khi nào siết chặt hơn.
+ * Chuỗi truy xuất xếp theo GIAI ĐOẠN (nhập NL → sản xuất → kho → đóng gói → xuất/bán)
+ * cho một khoảng ngày × xưởng: mỗi lô / dòng hàng ra kèm trạng thái (tem, lô đã gắn,
+ * kho, quét kiểm) và VIỆC CÒN THIẾU — để kiểm QR từng khâu ở MỘT chỗ thay vì đi 7 màn.
+ * Ngày của mục: ngày hàng về · ngày SX · ngày đóng gói · ngày xuất / bán.
  */
-export function doPhuTruyXuat(dl: DuLieuTruyXuat, loc: { tu: string; den: string; xuong: Workshop | "" }): MucDoPhu[] {
+export function theoGiaiDoan(dl: DuLieuTruyXuat, loc: { tu: string; den: string; xuong: Workshop | "" }): GiaiDoan[] {
   const trong = (ngay: string, xuong: Workshop | "" | undefined) =>
     !!ngay && ngay >= loc.tu && ngay <= loc.den && (!loc.xuong || xuong === loc.xuong);
-  const waivers = dl.lotWaivers ?? [];
   const disp = dl.lotDispatches ?? [];
-  const muc = (khoa: MucDoPhu["khoa"], ten: string, ds: { nut: NutLo; co: boolean; lyDo?: boolean }[]): MucDoPhu => ({
-    khoa, ten, tong: ds.length,
-    co: ds.filter((d) => d.co).length,
-    coLyDo: ds.filter((d) => !d.co && d.lyDo).length,
-    thieu: ds.filter((d) => !d.co && !d.lyDo).map((d) => d.nut),
-  });
+  const waivers = dl.lotWaivers ?? [];
+  const daIn = tomTatIn(dl.labelPrints ?? []);
+  const soTem = (k: LotKind, id: string) => daIn.get(khoaLo(k, id))?.tem ?? 0;
+  const lyDo = (k: "W" | "P", id: string) => waivers.find((x) => x.outputKind === k && x.outputId === id)?.reason;
+  const soLoVao = (k: "W" | "P", id: string) => dl.lotInputs.filter((l) => l.outputKind === k && l.outputId === id).length;
+  const soLoRa = (doc: LotDispatch["docKind"], id: string) => disp.filter((d) => d.docKind === doc && d.docId === id).length;
+  const thieuTemLo = (tem: number, lo: number, coLyDo: boolean): ViecThieu[] => [
+    ...(lo === 0 && !coLyDo ? (["lo"] as const) : []),
+    ...(tem === 0 ? (["tem"] as const) : []),
+  ];
+  const moiTruoc = <T extends { nut: NutLo }>(a: T, b: T) => b.nut.ngay.localeCompare(a.nut.ngay) || a.nut.nhan.localeCompare(b.nut.nhan);
+
+  const nhap: MucGiaiDoan[] = dl.shipments
+    .filter((s) => trong(s.deliveryDate, s.workshop))
+    .map((s) => {
+      const tem = soTem("S", s.id);
+      const dung =
+        new Set(dl.lotInputs.filter((l) => l.inputKind === "S" && l.inputId === s.id).map((l) => l.outputId)).size +
+        disp.filter((d) => d.lotKind === "S" && d.lotId === s.id && d.docKind === "domestic_sale").length;
+      return { nut: nutLo("S", s.id, dl), daIn: tem, daDung: dung, thieu: tem === 0 ? (["tem"] as ViecThieu[]) : [] };
+    })
+    .sort(moiTruoc);
 
   const mes = dl.wips.filter((w) => trong(w.productionDate, w.workshop));
-  const phieus = dl.packagings.filter((p) => trong(p.date, p.workshop));
-  const chuyens = dl.shipments.filter((s) => trong(s.deliveryDate, s.workshop));
-  const daIn = new Set((dl.labelPrints ?? []).map((p) => khoaLo(p.lotKind, p.lotId)));
-  const phieuBan = new Map((dl.salesInvoices ?? []).map((v) => [v.id, v]));
-  const banLe = (dl.salesItems ?? []).filter(
-    (b) => (b.sourceWarehouse === KHO_BAN_LE || b.sourceWarehouse === KHO_TP) && trong(b.deliveryDate, phieuBan.get(b.invoiceId)?.workshop)
-  );
-  const banNd = (dl.domesticSales ?? []).filter((n) => trong(n.saleDate, n.workshop));
+  const sanXuat: MucGiaiDoan[] = mes
+    .map((w) => {
+      const tem = soTem("W", w.id);
+      const lo = soLoVao("W", w.id);
+      const ld = lyDo("W", w.id);
+      return { nut: nutLo("W", w.id, dl), daIn: tem, soLo: lo, lyDo: ld, kho: w.status, thieu: thieuTemLo(tem, lo, !!ld) };
+    })
+    .sort(moiTruoc);
+
+  const kho: MucGiaiDoan[] = mes
+    .map((w) => ({
+      nut: nutLo("W", w.id, dl),
+      kho: w.status,
+      ton: w.status === "da-nhap" ? tonKhoCuaLo("W", w.id, dl) : null,
+      daIn: soTem("W", w.id),
+      thieu: w.status === "cho-nhap" ? (["duyet"] as ViecThieu[]) : [],
+    }))
+    .sort((a, b) => Number(b.kho === "cho-nhap") - Number(a.kho === "cho-nhap") || moiTruoc(a, b));
+
+  const dongGoi: MucGiaiDoan[] = dl.packagings
+    .filter((p) => trong(p.date, p.workshop))
+    .map((p) => {
+      const tem = soTem("P", p.id);
+      const lo = soLoVao("P", p.id);
+      const ld = lyDo("P", p.id);
+      return { nut: nutLo("P", p.id, dl), daIn: tem, soLo: lo, lyDo: ld, ton: tonKhoCuaLo("P", p.id, dl), thieu: thieuTemLo(tem, lo, !!ld) };
+    })
+    .sort(moiTruoc);
+
   const lenh = new Map(dl.exportOrders.map((o) => [o.id, o]));
-  const xuat = dl.exportItems.filter((x) => trong(lenh.get(x.exportId)?.exportDate ?? "", dl.wips.find((w) => w.id === x.wipId)?.workshop));
-  const coDisp = (doc: LotDispatch["docKind"], id: string) => disp.some((d) => d.docKind === doc && d.docId === id);
+  const phieuBan = new Map((dl.salesInvoices ?? []).map((v) => [v.id, v]));
+  const xuatBan: MucGiaiDoan[] = [
+    ...dl.exportItems
+      .filter((x) => trong(lenh.get(x.exportId)?.exportDate ?? "", dl.wips.find((w) => w.id === x.wipId)?.workshop))
+      .map((x) => {
+        const quet = soLoRa("export_item", x.id) > 0;
+        return { nut: nutLo("X", x.id, dl), daQuet: quet, lenhId: x.exportId, donId: lenh.get(x.exportId)?.orderId, thieu: quet ? [] : (["quet"] as ViecThieu[]) };
+      }),
+    ...(dl.salesItems ?? [])
+      .filter((b) => (b.sourceWarehouse === KHO_BAN_LE || b.sourceWarehouse === KHO_TP) && trong(b.deliveryDate, phieuBan.get(b.invoiceId)?.workshop))
+      .map((b) => {
+        const lo = soLoRa("sales_item", b.id);
+        return { nut: nutLo("B", b.id, dl), soLo: lo, loaiLoBan: (b.sourceWarehouse === KHO_TP ? "P" : "W") as "W" | "P", thieu: lo ? [] : (["lo"] as ViecThieu[]) };
+      }),
+    ...(dl.domesticSales ?? [])
+      .filter((n) => trong(n.saleDate, n.workshop))
+      .map((n) => {
+        const lo = soLoRa("domestic_sale", n.id);
+        return { nut: nutLo("N", n.id, dl), soLo: lo, thieu: lo ? [] : (["lo"] as ViecThieu[]) };
+      }),
+  ].sort(moiTruoc);
 
   return [
-    muc("me", "Mẻ sản xuất có lô NL", mes.map((w) => ({
-      nut: nutLo("W", w.id, dl),
-      co: dl.lotInputs.some((l) => l.outputKind === "W" && l.outputId === w.id),
-      lyDo: waivers.some((x) => x.outputKind === "W" && x.outputId === w.id),
-    }))),
-    muc("dong-goi", "Phiếu đóng gói có lô BTP", phieus.map((p) => ({
-      nut: nutLo("P", p.id, dl),
-      co: dl.lotInputs.some((l) => l.outputKind === "P" && l.outputId === p.id),
-      lyDo: waivers.some((x) => x.outputKind === "P" && x.outputId === p.id),
-    }))),
-    muc("tem", "Lô đã in tem", [
-      ...chuyens.map((s) => ({ nut: nutLo("S", s.id, dl), co: daIn.has(khoaLo("S", s.id)) })),
-      ...mes.map((w) => ({ nut: nutLo("W", w.id, dl), co: daIn.has(khoaLo("W", w.id)) })),
-      ...phieus.map((p) => ({ nut: nutLo("P", p.id, dl), co: daIn.has(khoaLo("P", p.id)) })),
-    ]),
-    muc("ban-le", "Dòng bán lẻ có lô", banLe.map((b) => ({ nut: nutLo("B", b.id, dl), co: coDisp("sales_item", b.id) }))),
-    muc("ban-nd", "Bán nội địa có lô NL", banNd.map((n) => ({ nut: nutLo("N", n.id, dl), co: coDisp("domestic_sale", n.id) }))),
-    muc("xuat", "Dòng lệnh xuất đã quét kiểm", xuat.map((x) => ({ nut: nutLo("X", x.id, dl), co: coDisp("export_item", x.id) }))),
+    { khoa: "nhap", ten: "Nhập nguyên liệu", muc: nhap },
+    { khoa: "san-xuat", ten: "Sản xuất bán thành phẩm", muc: sanXuat },
+    { khoa: "kho", ten: "Nhập kho dự trữ", muc: kho },
+    { khoa: "dong-goi", ten: "Đóng gói thành phẩm", muc: dongGoi },
+    { khoa: "xuat-ban", ten: "Xuất theo đơn & bán", muc: xuatBan },
   ];
 }
 

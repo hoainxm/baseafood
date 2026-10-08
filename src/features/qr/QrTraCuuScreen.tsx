@@ -5,7 +5,7 @@
 //   • TRUY NGƯỢC: lô này làm từ lô nào, của đại lý nào, ngày nào (TP → BTP → NL)
 //   • TRUY XUÔI : lô này đã đi vào đâu, xuất cho ai — phạm vi khi phải THU HỒI
 // kèm CÂN BẰNG KHỐI LƯỢNG theo lô, tồn còn trong kho, DANH SÁCH THU HỒI và in lại tem.
-// Tab "Độ phủ" đo chuỗi đang thủng ở đâu (đợt 2b).
+// Tab "Theo giai đoạn" kiểm QR từng khâu ở một chỗ, làm ngay tại chỗ (đợt 2b).
 // Đọc được cả tem CŨ (QR chỉ chứa mã lô trần). Mã trùng ⇒ liệt kê cho người chọn.
 // Thiết kế + căn cứ chuẩn: docs/spec/qr-truy-xuat-lo.md
 // ============================================================
@@ -13,7 +13,7 @@ import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { KhungQuetQr, TemLoQr, useDuLieuTruyXuat } from "@/features/shared";
 import { InTemHangLoat } from "./InTemHangLoat";
-import { DoPhuTruyXuat } from "./DoPhuTruyXuat";
+import { GiaiDoanTruyXuat } from "./GiaiDoanTruyXuat";
 import { ThuHoiLo } from "./ThuHoiLo";
 import { useLabelPrints } from "@/lib/catalogRepo";
 import { kg, viDate } from "@/lib/format";
@@ -34,7 +34,7 @@ import {
   type NutLo,
 } from "@/lib/truyXuatLo";
 import { Button, EmptyState, Field, Input, InfoTip, Nhan, sacTheoTen } from "@/design-system";
-import { ArrowDownRight, ArrowUpLeft, Camera, CameraOff, Gauge, Printer, Scale, Search, Tags } from "lucide-react";
+import { ArrowDownRight, ArrowUpLeft, Camera, CameraOff, ListChecks, Printer, Scale, Search, Tags } from "lucide-react";
 import type { LotKind } from "@/types";
 import { cn } from "@/lib/utils";
 
@@ -102,7 +102,8 @@ export default function QrTraCuuScreen() {
   const lo = params.get("lo") ?? "";
   // Link quét tem (?lo=…) luôn mở tab Tra, kể cả khi lỡ kèm tab=…
   const tabUrl = params.get("tab");
-  const tab = lo ? "tra" : tabUrl === "in" ? "in" : tabUrl === "do-phu" ? "do-phu" : "tra";
+  // "do-phu" là link cũ của tab Độ phủ — nay gộp vào "Theo giai đoạn".
+  const tab = lo ? "tra" : tabUrl === "in" ? "in" : tabUrl === "giai-doan" || tabUrl === "do-phu" ? "giai-doan" : "tra";
   const ketQua = useMemo(() => {
     const ma = docMaQr(lo);
     return ma ? timLo(ma, dl) : [];
@@ -143,8 +144,8 @@ export default function QrTraCuuScreen() {
         <p className="mt-1 text-sm text-muted-foreground">
           {tab === "in"
             ? "In tem QR cho nhiều lô một lượt: nguyên liệu, bán thành phẩm, thành phẩm."
-            : tab === "do-phu"
-              ? "Chuỗi truy xuất đang thủng ở đâu: bao nhiêu mẻ, phiếu đóng gói, dòng bán đã gắn lô."
+            : tab === "giai-doan"
+              ? "Kiểm QR từng khâu: nhập nguyên liệu → sản xuất → nhập kho → đóng gói → xuất / bán. Chỗ nào thiếu thì bấm làm ngay."
               : "Quét tem QR (camera điện thoại quét cũng mở thẳng trang này) hoặc gõ mã lô, để xem lô đó làm từ đâu và đã đi đâu."}
         </p>
       </div>
@@ -153,11 +154,11 @@ export default function QrTraCuuScreen() {
       <div className="flex w-full overflow-hidden rounded-xl border-2 border-border sm:w-fit">
         {(
           [
-            ["tra", "Tra lô", "Quét hoặc gõ mã lô để xem hộ chiếu: nguồn gốc, đã đi đâu, cân bằng kg.", Search],
-            ["in", "In tem hàng loạt", "Chọn nhiều lô theo ngày / xưởng / loại rồi in tem một lượt.", Tags],
-            ["do-phu", "Độ phủ", "Đo xem mẻ, phiếu đóng gói, dòng bán nào chưa gắn lô — chuỗi truy xuất thủng ở đâu.", Gauge],
+            ["tra", "Tra lô", "Tra lô", "Quét hoặc gõ mã lô để xem hộ chiếu: nguồn gốc, đã đi đâu, cân bằng kg.", Search],
+            ["giai-doan", "Theo giai đoạn", "Giai đoạn", "Kiểm QR từng khâu nhập → sản xuất → kho → đóng gói → xuất/bán: lô nào chưa in tem, chưa gắn lô, chờ duyệt, chưa quét kiểm.", ListChecks],
+            ["in", "In tem hàng loạt", "In tem", "Chọn nhiều lô theo ngày / xưởng / loại rồi in tem một lượt.", Tags],
           ] as const
-        ).map(([id, nhan, moTa, Icon], i) => (
+        ).map(([id, nhan, nhanNgan, moTa, Icon], i) => (
           <button
             key={id}
             type="button"
@@ -165,21 +166,23 @@ export default function QrTraCuuScreen() {
             aria-pressed={tab === id}
             onClick={() => setParams(id === "tra" ? {} : { tab: id })}
             className={cn(
-              "flex flex-1 items-center justify-center gap-2 px-4 py-2.5 font-semibold transition-colors sm:flex-none",
+              "flex flex-1 items-center justify-center gap-2 px-2 py-2.5 text-center font-semibold leading-tight transition-colors sm:flex-none sm:px-4",
               i > 0 && "border-l-2 border-border",
               tab === id ? "bg-primary text-primary-foreground" : "bg-card text-muted-foreground hover:bg-muted"
             )}
           >
-            <Icon aria-hidden className="size-4" />
-            {nhan}
+            {/* Điện thoại: nhãn ngắn, bỏ icon — 3 nút chia 360px không bẻ chữ thành nhiều dòng. */}
+            <Icon aria-hidden className="hidden size-4 sm:block" />
+            <span className="sm:hidden">{nhanNgan}</span>
+            <span className="hidden sm:inline">{nhan}</span>
           </button>
         ))}
       </div>
 
       {tab === "in" ? (
         <InTemHangLoat />
-      ) : tab === "do-phu" ? (
-        <DoPhuTruyXuat />
+      ) : tab === "giai-doan" ? (
+        <GiaiDoanTruyXuat />
       ) : (
         <>
 

@@ -2,7 +2,8 @@
 
 > Load khi: task chạm hành vi / nghiệp vụ / flow / acceptance của tồn kho NGUYÊN LIỆU theo thời gian thực (sổ sự kiện kho, lô NL, lấy NL ra sàn sản xuất, tiêu hao, cấp đông dự trữ, xả đông, tồn theo ngày, đối chiếu XNT), hoặc khi định thay/nối các sổ tồn đang có (`/nxt-nl`, `/nxt-kho`, `/ton-kho-thang`).
 covers: src/lib/inventoryMaterial.ts, src/lib/truyXuatLo.ts, src/features/reports/MaterialNxtScreen.tsx, src/features/reports/WarehouseNxtScreen.tsx, src/features/production/WipProductionScreen.tsx
-last_verified: 2026-10-06
+last_verified: 2026-10-08
+<!-- updated: 2026-10-08 — `lib/truyXuatLo.ts` (covers) mở rộng ở QR đợt 2b: lá B/N (bán lẻ / bán nội địa) qua `lot_dispatches` (mig 0056), `canBangLo` cho cả lô TP + bán nội địa, `loNlDeChon` thêm lô NL cũ còn kg (NL cấp đông đem xả) — là cầu tạm trước khi có lô đông `F:` của doc này. Lưu ý khi build `F:`/`K:`: `docMaQr` hiện chỉ nhận mã `S|W|P:<id>` — phải mở regex. KHÔNG đổi hành vi / AC sổ tồn NL. -->
 ttl_days: 90
 <!-- updated: 2026-10-06 (b) — /nxt-kho: thanh "Đã chọn N mã" (cộng tổng + Gán kho lưu) dời xuống SAU bảng, dính đáy màn từ desktop (`md:sticky`), thêm cụm Tô màu ▾ · In đậm · Bỏ tô (`NutToMauChon`, khoá `nxt-kho`) — trước đây bảng xem có tick nhưng KHÔNG có nút tô. Chỉ trình bày, không đổi hành vi tồn. -->
 <!-- updated: 2026-10-06 — tô màu dòng "đã dò" (mig 0055): /nxt-nl `ton-nl-ngay|<xưởng>` + `ton-nl-ho|<từ>|<đến>|<xưởng>`, /nxt-kho `nxt-kho` (cả bảng xem lẫn lưới Ghi — cùng id snapshot nên dấu giữ khi đổi chế độ). Chỉ là dấu trình bày, không đổi hành vi/AC tồn. -->

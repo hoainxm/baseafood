@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ImportShipment, MaterialImportItem, Packaging, WipProductionItem } from "@/types";
-import { banGhiIn, dsLoDeIn, nhanLoNl, nutLo, tomTatIn, type DuLieuTruyXuat } from "./truyXuatLo";
-import type { LabelPrint } from "@/types";
+import { banGhiIn, dsLoDeIn, ganLoChoPhien, loNlDeChon, meThieuLo, nhanLoNl, nutLo, soTemMacDinh, tomTatIn, type DuLieuTruyXuat } from "./truyXuatLo";
+import type { LabelPrint, LotInput, LotWaiver } from "@/types";
 
 const chuyen = (id: string, ngay: string, xuong: ImportShipment["workshop"], lotCode = ""): ImportShipment => ({
   id, deliveryDate: ngay, postingDate: ngay, backdateReason: "", workshop: xuong,
@@ -65,5 +65,55 @@ describe("sổ in tem", () => {
     expect(m.get("S:s1")).toMatchObject({ lan: 2, tem: 2, cuoi: { label: "mới" } });
     expect(m.get("S:s2")?.lan).toBe(1);
     expect(m.has("W:s1")).toBe(false);
+  });
+});
+
+describe("đợt 2b — chọn lô, chốt ngày, tem, gắn phiên", () => {
+  const vao = (id: string, outputId: string, inputId: string, kg: number | null, luc: string) =>
+    ({ id, outputKind: "W", outputId, inputKind: "S", inputId, inputLabel: "", material: "", quantityKg: kg, method: "chon", operator: "", recordedAt: luc }) as LotInput;
+
+  it("loNlDeChon: lô cũ quá 45 ngày vẫn hiện nếu còn kg và đã vào thời truy xuất; lô cũ chưa từng theo dõi thì không", () => {
+    const d: DuLieuTruyXuat = {
+      ...dl,
+      shipments: [chuyen("moi", "2026-10-01", "Đông"), chuyen("dong", "2026-07-10", "Đông"), chuyen("xua", "2026-06-01", "Đông")],
+      imports: [dong("moi", "2026-10-01", 100, "Bạch tuộc"), dong("dong", "2026-07-10", 500, "Bạch tuộc"), dong("xua", "2026-06-01", 300, "Bạch tuộc")],
+      lotInputs: [vao("a", "w1", "dong", 200, "2026-07-11T08:00:00Z")],
+    };
+    expect(loNlDeChon(d, "Đông", "2026-10-05").map((n) => n.id)).toEqual(["moi", "dong"]);
+    // dùng hết lô đông ⇒ thôi gợi ý
+    const het = { ...d, lotInputs: [...d.lotInputs, vao("b", "w2", "dong", 300, "2026-08-01T08:00:00Z")] };
+    expect(loNlDeChon(het, "Đông", "2026-10-05").map((n) => n.id)).toEqual(["moi"]);
+  });
+
+  it("meThieuLo: mẻ có lô hoặc có lý do thì không còn thiếu", () => {
+    const lyDo = [{ outputKind: "W", outputId: "b" } as LotWaiver];
+    const ds = meThieuLo([{ id: "a" }, { id: "b" }, { id: "c" }], [vao("x", "a", "s1", null, "")], lyDo);
+    expect(ds.map((m) => m.id)).toEqual(["c"]);
+  });
+
+  it("soTemMacDinh: BTP theo số block, TP theo số thùng, NL 1 tem", () => {
+    const d = { wips: [{ ...me("w9", "2026-09-02", "Đông"), blocksCount: 24 }], packagings: [phieu("p9", "2026-09-02")] };
+    expect(soTemMacDinh({ kind: "W", id: "w9" }, d)).toBe(24);
+    expect(soTemMacDinh({ kind: "P", id: "p9" }, d)).toBe(4);
+    expect(soTemMacDinh({ kind: "S", id: "s1" }, d)).toBe(1);
+    expect(soTemMacDinh({ kind: "W", id: "khong" }, d)).toBe(1);
+  });
+
+  it("banGhiIn ghi đúng số tem từng lô", () => {
+    const ds = banGhiIn([nutLo("W", "w1", dl)], "", "", () => "i", () => 12);
+    expect(ds[0]!.copies).toBe(12);
+  });
+
+  it("ganLoChoPhien: không rõ loài vẫn gắn (chiều an toàn), không gắn trùng, báo dòng không khớp", () => {
+    const d: DuLieuTruyXuat = { ...dl, products: [{ id: "mh1", code: "", name: "Hàng lạ", finishedGoodCode: "" }], lotInputs: [vao("cu", "w1", "s1", null, "")] };
+    const kq = ganLoChoPhien({
+      mes: [{ id: "w1", productId: "mh1" }, { id: "w2", productId: "mh1" }],
+      banNoiDia: [{ id: "n1", materialTypeName: "Cá thu" }],
+      loNl: [{ nut: nutLo("S", "s1", d), cach: "go" }],
+      dl: d, nguoiGhi: "", luc: "", taoId: () => "g",
+    });
+    expect(kq.lotInputs.map((l) => l.outputId)).toEqual(["w2"]); // w1 đã gắn s1 rồi
+    expect(kq.lotInputs[0]!.method).toBe("go");
+    expect(kq.khongKhop).toEqual([{ kind: "N", id: "n1" }]);
   });
 });

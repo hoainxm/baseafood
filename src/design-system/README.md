@@ -54,6 +54,10 @@ src/features/*                 ← màn nghiệp vụ
    nên làm NGAY sau khi lưu (vd in tem lô vừa ghi) truyền tham số thứ ba
    `notify.daLuu(msg, onUndo?, { label, onClick })` — nút hiện trên toast.
    In tem nhãn: `PhieuInTem` nhận `tems[]` để in nhiều tem một lượt (mỗi tem một trang đúng khổ).
+   Mỗi tem có `soBan` (số bản in, VD mỗi block một tem — mặc định 1): xem trước hiện MỘT tem
+   kèm ô "Số tem" sửa được, bản sao ẩn trên màn (`.print-tem-sao`) chỉ hiện khi in; tem in
+   cuối cùng mang `.print-tem-cuoi` để không thừa trang trắng. `onIn(soBan[])` trả số bản
+   từng tem để màn ghi sổ in (`label_prints.copies`).
 8b. **Thao tác hệ trọng KHÔNG phải xóa đi qua `XacNhan`** — đúng ba nhóm:
     mất việc đang làm (đăng xuất, bỏ dữ liệu vừa nạp) · ghi đè dữ liệu đang có ·
     khóa sổ hay đổi trạng thái khó quay đầu (chốt ngày, lệnh xuất).

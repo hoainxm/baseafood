@@ -37,6 +37,8 @@ import {
   BANG_RECONCILIATION_RUN,
   BANG_LOT_INPUT,
   BANG_LABEL_PRINT,
+  BANG_LOT_DISPATCH,
+  BANG_LOT_WAIVER,
   BANG_BATTER_TYPE,
   BANG_ROW_MARK,
   BANG_DOMESTIC_SALE,
@@ -283,6 +285,10 @@ export const useReconciliationRuns = () => useBang(BANG_RECONCILIATION_RUN);
 export const useLotInputs = () => useBang(BANG_LOT_INPUT);
 /** Sổ in tem QR — lô nào đã in tem, nhãn in ra, ai in, lúc nào (mig 0049). */
 export const useLabelPrints = () => useBang(BANG_LABEL_PRINT);
+/** Lô đi ra — dòng bán lẻ / bán nội địa / quét kiểm lệnh xuất lấy từ lô nào (mig 0056). */
+export const useLotDispatches = () => useBang(BANG_LOT_DISPATCH);
+/** Lý do chưa gắn lô khi chốt ngày SX (mig 0056). */
+export const useLotWaivers = () => useBang(BANG_LOT_WAIVER);
 /** Tô màu dòng "đã dò" kiểu Excel — MỘT bảng dùng chung mọi bảng (mig 0055).
  *  Màn hình KHÔNG gọi thẳng: đi qua `ToMauProvider` (features/shared) gắn một lần
  *  ở ShellLayout, bảng bật bằng prop `toMau` của design-system. */

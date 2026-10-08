@@ -23,6 +23,10 @@ import {
   useCustomers,
   useMaterialTypes,
   useLotInputs,
+  useLotDispatches,
+  useLotWaivers,
+  useImportShipments,
+  useMaterialImports,
 } from "@/lib/catalogRepo";
 import {
   botDiKemIds,
@@ -67,9 +71,9 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
 import { ghiNhatKy } from "@/lib/audit";
 import { KY_OPT, phamViKy, type KyXem } from "@/lib/periodUtils";
-import { DailyTaskReminder, GanLoDauVao, PhieuTrongTPNgay, TemLoQr } from "@/features/shared";
+import { DailyTaskReminder, GanLoDauVao, GanLoXuat, PhieuTrongTPNgay, TemLoQr } from "@/features/shared";
 import { useSuaDanhMuc } from "@/features/catalog/SuaDanhMucNhanh";
-import { nhanLoBtp, nutLo } from "@/lib/truyXuatLo";
+import { ganLoChoPhien, meThieuLo, nhanLoBtp, nutLo, type DuLieuTruyXuat } from "@/lib/truyXuatLo";
 import {
   CalendarRange,
   ClipboardList,
@@ -94,6 +98,7 @@ import {
 import { BangDongSX } from "./BangDongSX";
 import { KhoiBotTam } from "./KhoiBotTam";
 import { KhoiBanNoiDia } from "./KhoiBanNoiDia";
+import { KhoiLoPhien, type LoPhien } from "./KhoiLoPhien";
 import {
   PHAN_XUONG,
   banNoiDiaDayDu,
@@ -172,10 +177,32 @@ export default function SanXuatBTPScreen() {
   const [cheDo, setCheDo] = useState<"nhap" | "so">("nhap");
   const [inPhieuTrong, setInPhieuTrong] = useState(false);
   // Truy xuất lô (docs/spec/qr-truy-xuat-lo.md): gắn lô NL cho mẻ + in tem lô BTP.
-  const [lotInputs] = useLotInputs();
+  const [lotInputs, luuLotInputs] = useLotInputs();
+  const [lotDispatches, luuLotDispatches] = useLotDispatches();
+  const [lotWaivers, luuLotWaivers] = useLotWaivers();
+  const [shipments] = useImportShipments();
+  const [imports] = useMaterialImports();
   const [ganLo, setGanLo] = useState<WipProductionItem | null>(null);
+  const [ganLoBND, setGanLoBND] = useState<DomesticSaleItem | null>(null);
   const [temLo, setTemLo] = useState<WipProductionItem[] | null>(null);
   const soLoGan = (id: string) => lotInputs.filter((l) => l.outputKind === "W" && l.outputId === id).length;
+  const soLoBND = (id: string) => lotDispatches.filter((d) => d.docKind === "domestic_sale" && d.docId === id).length;
+  /** Lô NL khai cho phiên (đợt 2b) — giữ cho các phiên sau CÙNG ngày · xưởng, đổi thì thôi. */
+  const [loPhienKhai, setLoPhienKhai] = useState<{ ngay: string; xuong: Workshop; ds: LoPhien[] }>({
+    ngay: "",
+    xuong: "Đông",
+    ds: [],
+  });
+  /** Lý do chưa gắn lô cho các mẻ còn thiếu — bắt buộc khi chốt ngày (chốt 2026-10-08). */
+  const [lyDoKhongLo, setLyDoKhongLo] = useState("");
+  /** Dữ liệu tối thiểu cho truy xuất ở màn này (không nạp cả 17 bảng như hộ chiếu lô). */
+  const dlNhe: DuLieuTruyXuat = useMemo(
+    () => ({
+      shipments, imports, wips: rows, packagings: [], lotInputs, exportItems: [], exportOrders: [],
+      salesOrders: [], products: matHang, customers: khach, lotDispatches, lotWaivers, materialTypes: loaiNL,
+    }),
+    [shipments, imports, rows, lotInputs, matHang, khach, lotDispatches, lotWaivers, loaiNL]
+  );
 
   const [hoiChot, setHoiChot] = useState(false);
   const [ghiChuChot, setGhiChuChot] = useState("");
@@ -393,9 +420,10 @@ export default function SanXuatBTPScreen() {
     ? banGhiChot(tuHieuLuc, xuong)
     : undefined;
   const dangKhoa = Boolean(chotHienTai?.isLocked);
-  /** Mẻ của ngày đang chốt CHƯA gắn lô NL — nhắc khi chốt (không chặn: §7 câu 4 spec QR còn treo). */
+  /** Mẻ của ngày đang chốt CHƯA gắn lô NL và CHƯA ghi lý do — chốt phải xử lý hết
+   *  (chủ dự án chốt 2026-10-08: "chốt ngày phải gắn lô hoặc ghi lý do"). */
   const meChuaGanLo = xemMotNgayMotXuong
-    ? rows.filter((r) => r.productionDate === tuHieuLuc && r.workshop === xuong && !soLoGan(r.id))
+    ? meThieuLo(rows.filter((r) => r.productionDate === tuHieuLuc && r.workshop === xuong), lotInputs, lotWaivers)
     : [];
   const tongNgayXuong = (n: string, x: Workshop) =>
     rows
@@ -557,6 +585,10 @@ export default function SanXuatBTPScreen() {
     return ls;
   };
 
+  /** Lô NL đã khai cho đúng ngày · xưởng của phiên (khai cho ngày khác thì không tính). */
+  const loPhienCua = (p: DauPhien | null): LoPhien[] =>
+    p && loPhienKhai.ngay === p.productionDate && loPhienKhai.xuong === p.workshop ? loPhienKhai.ds : [];
+
   /**
    * Lưu cả phiên MỘT LẦN: mọi dòng hợp lệ trong bảng thành một dòng sản lượng.
    * `imLang` (đóng bằng X): đủ thì vẫn lưu, chưa đủ thì bỏ qua, không nài lỗi.
@@ -634,6 +666,20 @@ export default function SanXuatBTPScreen() {
     }));
     if (moiBND.length > 0) persistBanNoiDia([...banNoiDia, ...moiBND]);
 
+    // Lô NL khai cho phiên ⇒ gắn cho mẻ cùng loài + bán nội địa cùng loại NL (kg để trống).
+    const ganPhien = ganLoChoPhien({
+      mes: moi,
+      banNoiDia: moiBND,
+      loNl: loPhienCua(phien),
+      dl: dlNhe,
+      nguoiGhi: nguoiThaoTac,
+      luc: new Date().toISOString(),
+      taoId: newId,
+    });
+    if (ganPhien.lotInputs.length > 0) luuLotInputs([...lotInputs, ...ganPhien.lotInputs]);
+    if (ganPhien.dispatches.length > 0) luuLotDispatches([...lotDispatches, ...ganPhien.dispatches]);
+    const meDaGan = new Set(ganPhien.lotInputs.map((l) => l.outputId)).size;
+
     // Nhớ về MẶT HÀNG (đúng ý "gắn trên mặt hàng") — lần sau tự điền:
     //  - quy cách block (kg/khối) vừa nhập;
     //  - bộ BỘT ĐI KÈM: mã CHƯA gắn bột mà dòng có ghi bột ⇒ gắn các loại vừa dùng.
@@ -666,6 +712,7 @@ export default function SanXuatBTPScreen() {
         botMoi > 0 && `bột tẩm ${kg(botMoi)}`,
         moiBND.length > 0 &&
           `${moi.length > 0 ? "bán nội địa" : "Đã lưu bán nội địa"} ${kg(bndMoi)}`,
+        meDaGan > 0 && `gắn lô NL cho ${meDaGan} mẻ`,
       ]
         .filter(Boolean)
         .join(" · "),
@@ -677,6 +724,11 @@ export default function SanXuatBTPScreen() {
           }
         : undefined
     );
+
+    if (ganPhien.khongKhop.length > 0)
+      notify.canhBao(
+        `${ganPhien.khongKhop.length} dòng không cùng loài với lô NL đã khai — chưa gắn lô. Gắn riêng ở sổ ngày ("Gắn lô NL").`
+      );
 
     const bg = banGhiChot(phien.productionDate, phien.workshop);
     if (bg?.isLocked && moi.length > 0)
@@ -877,6 +929,30 @@ export default function SanXuatBTPScreen() {
 
   /* ---- Chốt / mở lại ngày ---- */
   const chotNgay = () => {
+    // Mẻ chưa gắn lô NL: phải gắn, hoặc ghi lý do (lưu `lot_waivers` cho từng mẻ còn thiếu).
+    if (meChuaGanLo.length > 0 && !lyDoKhongLo.trim()) {
+      setLoiChot([
+        {
+          truong: "Lý do chưa gắn lô",
+          thongBao: `Còn ${meChuaGanLo.length} mẻ chưa gắn lô nguyên liệu — bấm "Gắn lô NL" ở từng mẻ, hoặc ghi lý do chưa gắn`,
+        },
+      ]);
+      return;
+    }
+    if (meChuaGanLo.length > 0) {
+      const luc = new Date().toISOString();
+      luuLotWaivers([
+        ...lotWaivers,
+        ...meChuaGanLo.map((r) => ({
+          id: newId(),
+          outputKind: "W" as const,
+          outputId: r.id,
+          reason: lyDoKhongLo.trim(),
+          operator: nguoiThaoTac,
+          recordedAt: luc,
+        })),
+      ]);
+    }
     const bg = banGhiChot(tuHieuLuc, xuong);
     // Gom còn dở theo tên loại NL (cộng dồn trùng, bỏ dòng trống / ≤ 0).
     const leftoverByMaterial: Record<string, number> = {};
@@ -902,11 +978,14 @@ export default function SanXuatBTPScreen() {
     persistChot(bg ? chot.map((c) => (c.id === bg.id ? ban : c)) : [...chot, ban]);
     notify.daLuu(
       `Đã chốt SX ${viDate(tuHieuLuc)} · xưởng ${xuong} — ${kg(tongThucTe)}` +
-        (tongConDo > 0 ? ` · còn dở ${kg(tongConDo)}` : "")
+        (tongConDo > 0 ? ` · còn dở ${kg(tongConDo)}` : "") +
+        (meChuaGanLo.length > 0 ? ` · ${meChuaGanLo.length} mẻ chưa gắn lô (có lý do)` : "")
     );
     setHoiChot(false);
     setGhiChuChot("");
     setConDo([]);
+    setLyDoKhongLo("");
+    setLoiChot([]);
   };
   const moLaiNgay = () => {
     const bg = banGhiChot(tuHieuLuc, xuong);
@@ -1070,6 +1149,15 @@ export default function SanXuatBTPScreen() {
       />
 
       <div className="border-t-2 border-border pt-1" />
+
+      {/* Lô NL dùng cho phiên (truy xuất QR đợt 2b) — khai một lần, lưu là gắn cho mọi mẻ cùng loài. */}
+      <KhoiLoPhien
+        dl={dlNhe}
+        xuong={phien.workshop}
+        ngay={phien.productionDate}
+        loPhien={loPhienCua(phien)}
+        onDoi={(ds) => setLoPhienKhai({ ngay: phien.productionDate, xuong: phien.workshop, ds })}
+      />
 
       {/* Bảng thành phẩm — nhập cả phiên một lượt, lưu một lần */}
       <div className="space-y-4 rounded-xl border-2 border-primary/40 bg-accent/40 p-4">
@@ -1406,6 +1494,15 @@ export default function SanXuatBTPScreen() {
             actions={(r) => (
               <div className="flex flex-wrap gap-2">
                 <Button
+                  title="Ghi nguyên liệu bán này lấy từ lô NL nào (quét tem, gõ mã, hoặc chọn) — để thu hồi tới được khách."
+                  variant={soLoBND(r.id) ? "outline" : "default"}
+                  size="sm"
+                  onClick={() => setGanLoBND(r)}
+                >
+                  <Link2 />
+                  {soLoBND(r.id) ? `Lô NL (${soLoBND(r.id)})` : "Gắn lô NL"}
+                </Button>
+                <Button
                   title="Mở lại dòng bán nội địa này để sửa ngày, loại nguyên liệu, số lượng, giá hoặc khách."
                   variant="outline"
                   size="sm"
@@ -1494,6 +1591,7 @@ export default function SanXuatBTPScreen() {
                     kg: Number(v) || null,
                   }))
                 );
+                setLoiChot([]);
                 setHoiChot(true);
               }}
             >
@@ -1813,6 +1911,7 @@ export default function SanXuatBTPScreen() {
               thêm sau khi chốt phải ghi bù.
             </DialogDescription>
           </DialogHeader>
+          <ErrorSummary loi={loiChot} />
           <Field label="Ghi chú chốt">
             <Input
               value={ghiChuChot}
@@ -1821,8 +1920,8 @@ export default function SanXuatBTPScreen() {
             />
           </Field>
 
-          {/* Nhắc gắn lô NL (đợt 2 truy xuất QR): mẻ chưa gắn lô thì quét tem thành phẩm
-              không truy ngược được về nguyên liệu. CHỈ NHẮC, không chặn chốt. */}
+          {/* Gắn lô NL (truy xuất QR): mẻ chưa gắn lô thì quét tem thành phẩm không truy
+              ngược được về nguyên liệu. Chốt phải gắn hết, hoặc ghi lý do (lot_waivers). */}
           {meChuaGanLo.length > 0 && (
             <div className="min-w-0 space-y-2 rounded-lg border-2 border-warning/60 bg-warning/10 p-3">
               <p className="flex flex-wrap items-center gap-2 font-semibold text-foreground">
@@ -1830,7 +1929,8 @@ export default function SanXuatBTPScreen() {
                 {meChuaGanLo.length} mẻ chưa ghi đã dùng lô nguyên liệu nào
               </p>
               <p className="text-muted-foreground">
-                Không gắn thì quét tem thành phẩm sẽ không truy ngược được về nguyên liệu. Vẫn chốt được — gắn sau cũng được.
+                Không gắn thì quét tem thành phẩm sẽ không truy ngược được về nguyên liệu. Gắn lô cho từng mẻ, hoặc
+                ghi lý do chưa gắn bên dưới (áp cho các mẻ còn lại) rồi mới chốt được.
               </p>
               <ul className="space-y-1">
                 {meChuaGanLo.map((r) => (
@@ -1853,6 +1953,13 @@ export default function SanXuatBTPScreen() {
                   </li>
                 ))}
               </ul>
+              <Field
+                label="Lý do chưa gắn lô"
+                required
+                hint="VD: NL tồn từ trước khi dùng tem QR · tem bong không còn mã. Lý do được lưu theo từng mẻ."
+              >
+                <Input value={lyDoKhongLo} onChange={(e) => setLyDoKhongLo(e.target.value)} />
+              </Field>
             </div>
           )}
 
@@ -2003,6 +2110,17 @@ export default function SanXuatBTPScreen() {
           xuong={ganLo.workshop}
           ngay={ganLo.productionDate}
           onClose={() => setGanLo(null)}
+        />
+      )}
+      {ganLoBND && (
+        <GanLoXuat
+          docKind="domestic_sale"
+          docId={ganLoBND.id}
+          docNhan={`bán nội địa ${ganLoBND.materialTypeName} · ${kg(ganLoBND.quantityKg)} · ${viDate(ganLoBND.saleDate)}`}
+          loaiLo="S"
+          xuong={ganLoBND.workshop}
+          ngay={ganLoBND.saleDate}
+          onClose={() => setGanLoBND(null)}
         />
       )}
       {temLo && (

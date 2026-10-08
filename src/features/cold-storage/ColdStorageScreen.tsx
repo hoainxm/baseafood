@@ -22,8 +22,8 @@ import {
   sacTheoTen,
 } from "@/design-system";
 import { cn } from "@/lib/utils";
-import { useExportItems, usePackagings, useSalesItems, useWipProductions } from "@/lib/catalogRepo";
-import { tinhTon, tinhDungTichKho, locBanLe, dongGoiTruTon } from "@/lib/inventory";
+import { useExportItems, useLotDispatches, useLotInputs, usePackagings, useSalesItems, useWipProductions } from "@/lib/catalogRepo";
+import { tinhTon, tinhDungTichKho, truTonBTP } from "@/lib/inventory";
 import { kg } from "@/lib/format";
 import {
   Check,
@@ -385,9 +385,11 @@ export default function ManKhoLanh() {
   const [dongLenh] = useExportItems();
   const [banHang] = useSalesItems();
   const [packagings] = usePackagings();
+  const [lotInputs] = useLotInputs();
+  const [lotDispatches] = useLotDispatches();
   const banLe = useMemo(
-    () => [...locBanLe(banHang), ...dongGoiTruTon(packagings)],
-    [banHang, packagings]
+    () => truTonBTP(banHang, packagings, lotInputs, lotDispatches),
+    [banHang, packagings, lotInputs, lotDispatches]
   );
   const tonThat = useMemo(() => tinhTon(sanXuat, dongLenh, banLe), [sanXuat, dongLenh, banLe]);
   const tongTonThat = tonThat.reduce((s, t) => s + Math.max(0, t.conLai), 0);

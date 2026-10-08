@@ -476,7 +476,9 @@ export const HUONG_DAN: Record<string, NoiDungHuongDan> = {
             </li>
             <li>
               Bấm <b>In … tem</b> → chọn <b>khổ tem</b> (vd 50×30 mm) → <b>In</b> →
-              chọn <b>máy in tem</b> trong hộp thoại in. Mỗi lô ra một tem.
+              chọn <b>máy in tem</b> trong hộp thoại in. Mặc định mỗi <b>block</b> (bán
+              thành phẩm) / mỗi <b>thùng</b> (thành phẩm) một tem — sửa ô <b>Số tem</b> dưới
+              từng tem nếu cần.
             </li>
           </Buoc>
         </Muc>
@@ -501,16 +503,30 @@ export const HUONG_DAN: Record<string, NoiDungHuongDan> = {
             </li>
             <li>
               Màn hiện lô là gì, <b>cân bằng kg</b>, <b>truy ngược</b> (làm từ lô
-              nào, đại lý nào) và <b>truy xuôi</b> (đã vào mẻ nào, xuất cho ai). Tem
+              nào, đại lý nào) và <b>truy xuôi</b> (đã vào mẻ nào, xuất / bán cho ai). Tem
               mờ / bong thì bấm <b>In tem</b> ngay đây.
             </li>
+            <li>
+              Lô nghi có vấn đề: xuống mục <b>Thu hồi</b> — danh sách khách đã nhận hàng
+              từ lô này + lô còn trong xưởng. Bấm <b>In danh sách</b> hoặc <b>Tải Excel</b>.
+            </li>
           </Buoc>
+        </Muc>
+        <Muc tieuDe="Xem chỗ còn thiếu lô (tab Độ phủ)">
+          <Y>
+            <li>
+              Chọn khoảng ngày + xưởng: thấy bao nhiêu mẻ, phiếu đóng gói, dòng bán đã
+              gắn lô, lô nào chưa in tem. Bấm <b>Còn thiếu</b> để ra danh sách và chỗ sửa.
+            </li>
+          </Y>
         </Muc>
         <Muc tieuDe="Lưu ý">
           <Y>
             <li>
-              Muốn truy ngược được, lúc sản xuất phải bấm <b>Gắn lô NL</b> cho mẻ, lúc
-              đóng gói bấm <b>Gắn lô BTP</b> (quét tem là nhanh nhất).
+              Muốn truy được trọn chuỗi: lúc ghi sản xuất quét tem các chuyến NL vào khối{" "}
+              <b>Lô nguyên liệu dùng cho phiên này</b> (lưu là tự gắn cho mọi mẻ cùng loài);
+              đóng gói bấm <b>Gắn lô BTP</b>; bán hàng bấm <b>Gắn lô</b> ở từng dòng bán.
+              Chốt ngày sản xuất phải gắn lô cho mọi mẻ, hoặc ghi lý do chưa gắn.
             </li>
             <li>
               Chuyến hiện nhãn <b>"Dữ liệu cũ"</b> (thiếu đầu chuyến) thì chưa in tem

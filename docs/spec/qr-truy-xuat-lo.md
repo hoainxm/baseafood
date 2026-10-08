@@ -1,8 +1,12 @@
 # Truy xuất theo lô bằng QR — phân tích & thiết kế
 
-> **Trạng thái:** ĐỢT 1 ĐÃ BUILD (2026-09-18) · **đợt 1b in tem hàng loạt + 2a sổ in tem / nhắc gắn lô / quét ở kho & xuất ĐÃ BUILD (2026-10-02, §6b–6c)** · đợt 2–3 là đề xuất · §7 còn câu chờ xưởng chốt.
+covers: src/lib/truyXuatLo.ts, src/lib/inventory.ts, src/features/qr/**, src/features/shared/GanLoDauVao.tsx, src/features/shared/KhungQuetQr.tsx, src/features/shared/QrTemLoIn.tsx, src/features/shared/useDuLieuTruyXuat.ts, src/features/production/KhoiLoPhien.tsx, src/features/orders/KiemLoXuat.tsx, supabase/migrations/0046_lot_inputs.sql, supabase/migrations/0049_label_prints.sql, supabase/migrations/0056_lot_dispatches.sql
+last_verified: 2026-10-08
+<!-- re-verified: 2026-10-08 10:05 — §4.1 ba loại lô S/W/P (truyXuatLo.nutLo/nhanLo*), §6c (meChuaGanLo · duyetTheoTem · KiemLoXuat · label_prints) khớp code trước khi build đợt 2b; §8 dòng RLS đã LỆCH (sửa, xem .escaped-drift.log). -->
+
+> **Trạng thái:** ĐỢT 1 ĐÃ BUILD (2026-09-18) · **đợt 1b in tem hàng loạt + 2a sổ in tem / nhắc gắn lô / quét ở kho & xuất ĐÃ BUILD (2026-10-02, §6b–6c)** · **đợt 2b khép vòng tới khách ĐÃ BUILD (2026-10-08, §6d) — mig `0056` ✅ đã chạy trên DB thật 2026-10-08** · đợt 3 là đề xuất · §7 câu 4 đã chốt, còn 4 câu chờ xưởng.
 > **Loại:** phân tích các hệ thống/chuẩn QR truy xuất + thiết kế áp dụng cho Baseafood.
-> **Code:** `src/lib/truyXuatLo.ts` · `src/features/qr/QrTraCuuScreen.tsx` (hộ chiếu lô) · `src/features/shared/{GanLoDauVao,KhungQuetQr,QrTemLoIn,useDuLieuTruyXuat}` · migration `0046_lot_inputs.sql` (✅ đã chạy trên DB thật 2026-09-18).
+> **Code:** `src/lib/truyXuatLo.ts` (+ `truyXuatLo.e2e.test.ts` kịch bản mẫu §9) · `src/lib/inventory.ts` (trừ tồn theo lô gắn) · `src/features/qr/{QrTraCuuScreen,InTemHangLoat,DoPhuTruyXuat,ThuHoiLo}.tsx` · `src/features/shared/{GanLoDauVao,KhungQuetQr,QrTemLoIn,useDuLieuTruyXuat}` · `src/features/production/KhoiLoPhien.tsx` · `src/features/orders/KiemLoXuat.tsx` · migration `0046_lot_inputs.sql` (✅ đã chạy 2026-09-18) · `0049_label_prints.sql` (✅ 2026-10-02) · `0056_lot_dispatches.sql` (✅ 2026-10-08).
 
 > Nối tiếp họp [2026-09-02](../trien-khai/hop-2026-09-02-form-nhap-trace-gia-qc.md) **QĐ-6** (định danh lô + QR)
 > và **NR-6** (đã build in tem + màn quét). Ăn khớp "cấp lô" ở [`import-xnt-kho-cutover.md`](import-xnt-kho-cutover.md)
@@ -170,8 +174,8 @@ Quét hoặc gõ → một trang gồm:
 | **Tiếp nhận NL** | mã lô · loài/loại · kg · đại lý · ngày về · xe · xưởng · người ghi | ✅ đủ | vùng khai thác, tàu, ngày đánh bắt (GDST — hỏi đại lý, đợt 3) |
 | **Chế biến (SX BTP)** | mã lô đầu ra · **mã lô đầu vào + kg** · mặt hàng · ngày · xưởng · người | mọi thứ trừ đầu vào | **lô đầu vào ← đợt này** |
 | **Đóng gói TP** | lô ra · **lô BTP vào** · quy cách · kg · số thùng | mọi thứ trừ đầu vào | **lô đầu vào ← đợt này** |
-| Lưu kho | lô · vị trí · ngày vào · trạng thái đông | một phần (duyệt "chờ nhập") | vị trí quét QR (đợt 2) |
-| **Xuất / bán** | lô · khách · ngày · kg · chứng từ | xuất đơn ✅ (`wip_id`) | bán lẻ chưa gắn lô (đợt 2) |
+| Lưu kho | lô · vị trí · ngày vào · trạng thái đông | một phần (duyệt "chờ nhập") | vị trí quét QR (đợt 3) |
+| **Xuất / bán** | lô · khách · ngày · kg · chứng từ | xuất đơn ✅ (`wip_id` + quét kiểm lưu ở `lot_dispatches`) · bán lẻ + bán nội địa ✅ (`lot_dispatches`, đợt 2b) | — |
 
 ## 6. Lộ trình
 
@@ -213,7 +217,29 @@ Quét hoặc gõ → một trang gồm:
 | **Quét tem để duyệt nhập kho**: khối "chờ nhập kho" ở `/warehouse` có quét camera / gõ mã ⇒ mở thẳng hộp duyệt đúng mẻ; mẻ đã nhập thì báo; mỗi dòng hiện mã lô `BĐ-…` để đối chiếu tem | `ReserveWarehouseScreen.tsx` (`duyetTheoTem`) | — |
 | **Kiểm lô lệnh xuất bằng quét**: chi tiết đơn có mục "Lệnh xuất đã lập", nút "Kiểm lô bằng quét" ⇒ liệt kê lô FIFO của lệnh; quét đúng ⇒ "Đã quét", sai lô ⇒ báo đỏ "KHÔNG thuộc lệnh — đừng xếp lên xe". **Kiểm tại chỗ, không lưu, không đổi lệnh** (FIFO giữ nguyên) | `orders/KiemLoXuat.tsx` | — |
 
-**Chưa làm (đợt 2b, cần chốt):** ghi lại kết quả kiểm lô xuất (bảng sự kiện) · cho đổi lô FIFO bằng quét · `export_items.packaging_id` (xuất theo lô TP) · bán lẻ gắn lô · QR vị trí kho · bắt buộc gắn lô khi chốt (chờ §7 câu 4).
+**Đợt 2b đã build tiếp — xem §6d.** Còn để sau: `export_items.packaging_id` (xuất theo lô TP qua đơn đặt) · QR vị trí kho.
+
+## 6d. Đợt 2b — khép vòng tới khách, sổ tồn theo đúng lô (build 2026-10-08)
+
+**Vì sao (phân tích 2026-10-08):** chuỗi đứt ở 4 chỗ — (1) lô TP là ngõ cụt: bán lẻ / bán nội địa không gắn lô, truy xuôi dừng ở đóng gói; (2) hộ chiếu và sổ tồn nói HAI lô khác nhau: đóng gói / bán lẻ gắn lô W1 nhưng `inventory` vẫn trừ FIFO lô cũ nhất ⇒ quét kiểm xuất báo đỏ đúng lô thật trên xe; (3) gắn lô từng mẻ sau khi lưu ⇒ nặng tay, dễ bỏ (`lot_inputs` = 0 dòng trên server 02/10); (4) vòng đông không có lô, danh sách chọn lô NL chỉ lùi 45 ngày.
+
+**Chủ dự án chốt (2026-10-08):** làm A + B · trừ tồn THEO LÔ GẮN · lô của hàng ra lưu BẢNG RIÊNG · **chốt ngày SX phải gắn lô hoặc ghi lý do** (§7 câu 4).
+
+| Việc | Ở đâu | Đụng DB |
+|---|---|---|
+| **Lô đi ra** `lot_dispatches` {lot_kind S/W/P, lot_id, lot_label, doc_kind `sales_item`/`export_item`/`domestic_sale`, doc_id, quantity_kg NULL=chưa cân, method quet/go/chon/fifo, operator, recorded_at} + **lý do chưa gắn lô** `lot_waivers` {output_kind W/P, output_id, reason, operator} | mig `0056` · `BANG_LOT_DISPATCH` / `BANG_LOT_WAIVER` · `useLotDispatches` / `useLotWaivers` | 🟡 thêm 2 bảng, KHÔNG thêm cột bảng cũ (deploy trước migration thì chỉ phần gắn lô nằm hàng chờ) |
+| **Trừ tồn theo lô gắn**: dòng trừ tồn có `lo` ⇒ (1) lô gắn có kg trừ đúng kg · (2) gắn chưa cân ⇒ FIFO trong các lô đã gắn · (3) phần còn lại FIFO như cũ. Không gắn lô ⇒ y kết quả cũ. Lô gắn khác mặt hàng bị bỏ qua. MỘT chỗ dựng `truTonBTP(sales, packagings, lotInputs, lotDispatches)` cho 5 màn (kho dự trữ · kho lạnh · đơn đặt · đóng gói · bán hàng). Tồn TP theo lô: `tinhTonTPTheoLo` | `lib/inventory.ts` (+ test) | — |
+| **Gắn lô NL cho cả phiên** ở `/wip`: khối "Lô nguyên liệu dùng cho phiên này" (quét / gõ / chọn nhiều lô), lưu phiên ⇒ `ganLoChoPhien` gắn cho mẻ CÙNG LOÀI + dòng bán nội địa cùng loại NL, kg trống. Không rõ loài ⇒ vẫn gắn (thu hồi rộng hơn, không hẹp hơn). Lô khai giữ cho các phiên sau cùng ngày · xưởng | `production/KhoiLoPhien.tsx` · `WipProductionScreen.luuPhien` | — |
+| **Chốt ngày SX bắt buộc**: còn mẻ chưa gắn lô và chưa có lý do ⇒ `ErrorSummary` chặn chốt; ghi "Lý do chưa gắn lô" ⇒ mỗi mẻ còn thiếu một dòng `lot_waivers`. Nút Lưu/Chốt không bao giờ disabled | `WipProductionScreen.chotNgay` · `meThieuLo` | — |
+| **Gắn lô cho hàng ra**: dòng bán lẻ (block thô ⇒ lô BTP, đóng gói ⇒ lô TP) ngay trong phiếu đang gõ + ở sổ; dòng bán nội địa (⇒ lô NL) ở sổ `/wip`. Lô phải cùng mặt hàng với dòng bán. Gợi ý lô còn tồn, cũ trước | `shared/GanLoDauVao.tsx` (`HopGanLo` lõi chung · `GanLoXuat`) | — |
+| **Kiểm lô xuất có lưu**: quét đúng ⇒ ghi `lot_dispatches` doc `export_item` (đóng mở lại vẫn "Đã quét"). Quét lô ngoài lệnh CÙNG mặt hàng × quy cách, đủ tồn ⇒ hộp **Thay lô** (xác nhận + Hoàn tác) sửa `export_items.wip_id` sang lô đang xếp lên xe | `orders/KiemLoXuat.tsx` | — |
+| **Hộ chiếu**: truy xuôi tới khách (lá B = bán lẻ, N = bán nội địa), cân bằng kg cho cả lô TP, "Tồn trong kho (sổ tồn)" cạnh "Còn lại theo hồ sơ lô", mục **Thu hồi** (khách · ngày · chứng từ · kg · từ lô + lô còn trong xưởng; In A4 + Excel) | `qr/QrTraCuuScreen.tsx` · `qr/ThuHoiLo.tsx` · `danhSachThuHoi` · `tonKhoCuaLo` | — |
+| **Tab Độ phủ** (`/qr?tab=do-phu`): theo khoảng ngày × xưởng — % mẻ có lô NL (tách "có lý do"), phiếu đóng gói có lô BTP, lô đã in tem, dòng bán lẻ có lô, bán nội địa có lô, dòng lệnh xuất đã quét kiểm; bấm ra danh sách thiếu + chỉ chỗ sửa | `qr/DoPhuTruyXuat.tsx` · `doPhuTruyXuat` | — |
+| **Chọn lô NL còn dở**: ngoài lô 45 ngày gần đây, thêm lô cũ (≤ 1 năm) còn kg theo hồ sơ — chỉ lô đã từng gắn hoặc về từ ngày bắt đầu truy xuất (NL cấp đông đem xả) | `loNlDeChon` | — |
+| **Số tem theo block / thùng**: mặc định BTP = số block, TP = số thùng, NL = 1; sửa được ở xem trước; sổ in ghi đúng `copies` | `PhieuInTem` (`TemIn.soBan`, `onIn(soBan[])`) · `soTemMacDinh` · `banGhiIn` | — |
+| **Đồng bộ cùng tab** giữa các lần gọi `useBang` cùng bảng — trước đây hộp gắn lô (con) ghi xong mà màn cha cầm bản cũ, lần ghi kế tiếp của màn cha sẽ XÓA dòng con vừa thêm | `lib/repo.ts` (`SU_KIEN_BANG`) | — |
+
+**Thứ tự triển khai:** chạy `0056` trên DB thật TRƯỚC (2 lần, idempotent) rồi mới đẩy code — ✅ đã chạy 2026-10-08 (kiểm 2026-10-08 qua Supabase, chỉ đọc: 2 bảng có, RLS bật, policy `_nguoi_dung` authenticated, anon không đọc được, đủ trigger `*_sua` + `ghi_vet_sql_tg`, cột khớp toRow) — không thì các màn có hook lô đi ra báo lỗi máy chủ (404 `lot_dispatches`) cho tới khi chạy.
 
 ## 7. Còn treo — xưởng phải chốt (KHÔNG tự chốt thay)
 
@@ -221,14 +247,38 @@ Quét hoặc gõ → một trang gồm:
    → Thiết kế này đang coi **lô NL = chuyến nhập** (gieo lúc nhập — khớp FSMA "tiếp nhận đầu tiên"). Nếu xưởng chốt "sau sơ chế" thì lô sơ chế sẽ là một tầng biến đổi nữa, **cùng bảng `lot_inputs`**, không phải đổi mô hình.
 2. **Loại tem**: giấy in tại chỗ hay mã nhựa tái dùng. Mô hình chạy được cả hai; mã nhựa sẽ cần thêm bảng "gán thẻ ↔ lô" (đợt 2).
 3. **Ai quét, lúc nào**: tổ trưởng quét khi lấy NL ra chế biến, hay thủ kho quét khi xuất khỏi kho.
-4. **Có bắt buộc gắn lô khi ghi sản lượng không.** Đợt 1 để **tùy chọn**. Khi đã quen thì có thể chuyển thành bắt buộc (nhắc ở chốt ngày SX).
+4. ~~**Có bắt buộc gắn lô khi ghi sản lượng không.**~~ ✅ **Chốt 2026-10-08 (chủ dự án):** ghi sản lượng vẫn tùy chọn, nhưng **chốt ngày SX phải gắn lô NL cho mọi mẻ, hoặc ghi lý do** (lưu `lot_waivers`). Tab Độ phủ đo tỷ lệ để xưởng theo dõi.
 5. **Lô NL nên chi tiết đến đâu**: một chuyến (một đại lý / một xe) hay từng dòng NL trong chuyến. Đợt 1 theo chuyến; bảng có sẵn cột `material` để ghi rõ loại.
 
 ## 8. Không làm (vùng đỏ)
 
 - **Không gắn lô ngược cho dữ liệu cũ** (nhập / sản xuất / đóng gói đã ghi). Đây là sổ thật: sai là không dựng lại được, và gắn "đoán" thì hồ sơ truy xuất thành giả. Truy xuất tính **từ ngày áp dụng**.
-- **Không đổi RLS** bảng cũ. Bảng mới dùng đúng khuôn RLS mở như `0041`/`0043`, siết cùng nhánh `0021`.
+- **Không đổi RLS** bảng cũ. Bảng mới siết RLS NGAY TỪ ĐẦU theo khuôn `0049`/`0054`/`0056` (policy `_nguoi_dung` cho authenticated + `revoke all … from anon`) — bất biến từ `0047`. *(Bản trước ghi "RLS mở như 0041/0043" — đã lỗi thời sau 0047, sửa 2026-10-08.)*
 - **Không đụng giá** — PA giá bình quân gia quyền (QĐ-7) chưa chốt. Truy xuất lô và định giá lô là hai việc; khung này không phụ thuộc giá.
+
+## 9. Kịch bản nghiệm thu đầu-cuối (oracle)
+
+Mã hóa thành test tự động `src/lib/truyXuatLo.e2e.test.ts` — đỏ là chuỗi truy xuất đã gãy.
+
+| Ngày | Thao tác |
+|---|---|
+| 29/09 | W0: bạch tuộc 2 da chần 100 kg / 10 block, duyệt kho, **không gắn lô NL** (giả lập mẻ cũ) |
+| 01/10 | S1: Đại lý A, bạch tuộc 1.000 kg · S2: Đại lý B, 600 kg · S3: Đại lý C, mực 400 kg |
+| 02/10 | W1: 2 da chần 500 kg, ăn S1 600 kg · W2: cắt 300 kg, ăn S1 250 + S2 150 · duyệt kho · bán nội địa 30 kg từ S2 cho Chợ Bà Rịa |
+| 03/10 | P1: đóng gói từ W1 200 kg → túi 1 kg 190 kg / 190 túi, gắn W1 200 |
+| 04/10 | Đơn khách X: cắt 200 kg → lệnh lấy W2 200, quét kiểm đúng lô |
+| 05/10 | Bán lẻ P1 50 kg cho khách Y (đóng gói) · W1 100 kg block thô cho khách Z |
+
+**Phải ra:**
+- Truy ngược P1 → W1 → S1 → Đại lý A, 01/10. Truy xuôi P1 → khách Y (không còn ngõ cụt).
+- Thu hồi S1 → khách **X, Y, Z**. Thu hồi S2 → **chỉ X + Chợ Bà Rịa** (không kéo theo Y, Z).
+- Cân bằng theo hồ sơ lô: S1 còn 150 · S2 còn 420 · W1 còn 200 · W2 còn 100 · P1 còn 140.
+- Sổ tồn khớp hộ chiếu: W0 **100** (không bị đụng), W1 200, W2 100, P1 140. *(Trừ FIFO kiểu cũ ra W0 = 0, W1 = 300 — đối chứng.)*
+- Quét kiểm lệnh xuất không đẻ thêm ngả ra (không đếm hai lần).
+- Độ phủ 29/09–05/10: mẻ 2/3 (lỗ duy nhất W0; ghi lý do ⇒ hết thiếu) · đóng gói 1/1 · bán lẻ 2/2 · bán nội địa 1/1 · xuất 1/1 · tem 5/7.
+- Gắn lô cả phiên: lô bạch tuộc vào mẻ bạch tuộc, lô mực vào mẻ mực, không chéo.
+
+**Thử tay trên preview (2026-10-08, `baseafood-demo` — localStorage, không đụng DB thật, đã khôi phục sandbox sau khi thử):** khai 2 lô NL cho phiên (gõ mã + chọn) → lưu 2 thành phẩm + 1 bán nội địa ⇒ toast "gắn lô NL cho 2 mẻ", mỗi mẻ 2 lô, bán nội địa 2 lô · In tem: mặc định 30 + 50 = 80 tem, sửa còn 52 · chốt ngày 06/10 có 2 mẻ thiếu lô ⇒ bị chặn; gắn lô 1 mẻ từ hộp chốt ⇒ mở lại còn 1; ghi lý do ⇒ chốt được, `lot_waivers` đúng mẻ · quét tem duyệt kho 2 mẻ · đóng gói gắn nhầm lô khác mặt hàng ⇒ chặn; gắn đúng lô 200 kg · đơn đặt → lệnh FIFO → quét lô sai ⇒ báo đỏ, quét đúng ⇒ ghi kiểm, mở lại vẫn "Đủ lô" · quét lô cùng mặt hàng ngoài lệnh ⇒ hộp Thay lô ⇒ lệnh trỏ lô mới, Hoàn tác trả lại · bán lẻ gắn lô TP + BTP ngay trong phiếu · hộ chiếu NL ra đủ chuỗi tới 3 khách, thu hồi 4 ngả ra · lô TP: 190 ra − 50 bán = 140 = sổ tồn · tab Độ phủ khớp · 360 px và chữ 130%: không cuộn ngang toàn trang. **Chưa thử:** chế độ có `.env` (Supabase) với phiên đăng nhập — `0056` đã chạy, nên thử 1 chuyến thật ngày đầu; quét bằng camera máy thật.
 
 ## Nguồn
 

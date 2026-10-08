@@ -15,6 +15,7 @@ import {
   useSalesItems,
   useProducts,
   useLotInputs,
+  useLotDispatches,
 } from "@/lib/catalogRepo";
 import { GanLoDauVao, TemLoQr } from "@/features/shared";
 import { nhanLoTp, nutLo } from "@/lib/truyXuatLo";
@@ -22,7 +23,7 @@ import {
   tinhTon,
   khaDung,
   locBanLe,
-  dongGoiTruTon,
+  truTonBTP,
   tinhTonTP,
   KHO_TP,
 } from "@/lib/inventory";
@@ -95,6 +96,7 @@ export default function DongGoiScreen() {
   const [loi, setLoi] = useState<LoiNhap[]>([]);
   // Truy xuất lô (docs/spec/qr-truy-xuat-lo.md): gắn lô BTP cho phiếu + in tem lô TP.
   const [lotInputs] = useLotInputs();
+  const [lotDispatches] = useLotDispatches();
   const [ganLo, setGanLo] = useState<Packaging | null>(null);
   const [temLo, setTemLo] = useState<Packaging | null>(null);
   const soLoGan = (id: string) => lotInputs.filter((l) => l.outputKind === "P" && l.outputId === id).length;
@@ -114,8 +116,8 @@ export default function DongGoiScreen() {
 
   /* Tồn BTP khả dụng: sản xuất − xuất − bán lẻ block thô − ĐÃ đóng gói. */
   const truBTP = useMemo(
-    () => [...locBanLe(banHang), ...dongGoiTruTon(rows)],
-    [banHang, rows]
+    () => truTonBTP(banHang, rows, lotInputs, lotDispatches),
+    [banHang, rows, lotInputs, lotDispatches]
   );
   const tonBTP = useMemo(
     () => tinhTon(sanXuat, dongLenh, truBTP),

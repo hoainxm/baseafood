@@ -14,8 +14,8 @@ import type { ImportShipment, LotKind } from "@/types";
 import { PhieuInTem, type TemIn } from "@/design-system";
 import { viDate } from "@/lib/format";
 import { taoQrDataUrl } from "@/lib/qr";
-import { TEN_LOAI, banGhiIn, nhanLoNl, noiDungQr, nutLo, type NutLo } from "@/lib/truyXuatLo";
-import { useLabelPrints } from "@/lib/catalogRepo";
+import { TEN_LOAI, banGhiIn, nhanLoNl, noiDungQr, nutLo, soTemMacDinh, type NutLo } from "@/lib/truyXuatLo";
+import { useLabelPrints, usePackagings, useWipProductions } from "@/lib/catalogRepo";
 import { useAuth } from "@/lib/auth";
 import { newId } from "@/lib/store";
 import { useDuLieuTruyXuat } from "./useDuLieuTruyXuat";
@@ -59,12 +59,20 @@ export function TemLoQr({ nut, nuts, onClose }: { nut?: NutLo; nuts?: NutLo[]; o
   // và nhãn in ra lúc đó (nhãn BTP/TP suy lại từ bản ghi có thể đổi về sau).
   const [soIn, luuSoIn] = useLabelPrints();
   const { nguoiDung } = useAuth();
-  const ghiSoIn = () => {
-    const moi = banGhiIn(ds, nguoiDung?.fullName || nguoiDung?.username || "", new Date().toISOString(), newId);
+  const ghiSoIn = (soBan: number[]) => {
+    const moi = banGhiIn(ds, nguoiDung?.fullName || nguoiDung?.username || "", new Date().toISOString(), newId, (n) => soBan[ds.indexOf(n)] ?? 1);
     if (moi.length) luuSoIn([...soIn, ...moi]);
   };
 
-  const tems: TemIn[] = ds.map((n) => ({ maLo: n.nhan, qrDataUrl: qr[`${n.kind}:${n.id}`] ?? "", dong: dongTem(n) }));
+  // Mặc định mỗi block (BTP) / mỗi thùng-gói (TP) một tem; người in sửa được ở xem trước.
+  const [wips] = useWipProductions();
+  const [packagings] = usePackagings();
+  const tems: TemIn[] = ds.map((n) => ({
+    maLo: n.nhan,
+    qrDataUrl: qr[`${n.kind}:${n.id}`] ?? "",
+    dong: dongTem(n),
+    soBan: soTemMacDinh(n, { wips, packagings }),
+  }));
   return <PhieuInTem onClose={onClose} tems={tems} onIn={ghiSoIn} />;
 }
 

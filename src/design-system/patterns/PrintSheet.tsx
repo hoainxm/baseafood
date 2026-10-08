@@ -67,20 +67,23 @@ const CO_TEM = [
   { rong: 100, cao: 50, nhan: "100×50" },
 ];
 const keo = (v: number) => Math.max(10, Math.min(200, Math.round(v) || 0));
+const keoBan = (v: number) => Math.max(1, Math.min(500, Math.round(v) || 1));
 
 /** Một tem trong lượt in: mã lô (to, một dòng) + ảnh QR + các dòng phụ. */
 export interface TemIn {
   maLo: string;
   qrDataUrl: string;
   dong?: string[];
+  /** Số bản in của tem này (VD mỗi block một tem). Mặc định 1, sửa được ở xem trước. */
+  soBan?: number;
 }
 
 /** Một tem — co giãn theo khổ nhờ container-query, dùng chung cho xem trước và bản in. */
-function KhoiTem({ tem, rong, cao, px }: { tem: TemIn; rong: number; cao: number; px: number }) {
+function KhoiTem({ tem, rong, cao, px, cuoi }: { tem: TemIn; rong: number; cao: number; px: number; cuoi?: boolean }) {
   const { maLo, qrDataUrl, dong = [] } = tem;
   return (
     <div
-      className="print-tem-box shrink-0 border border-slate-300 bg-white"
+      className={`print-tem-box shrink-0 border border-slate-300 bg-white${cuoi ? " print-tem-cuoi" : ""}`}
       style={{ width: rong * px, height: cao * px, containerType: "size" }}
     >
       <div className="flex h-full w-full items-center" style={{ gap: "4cqw", padding: "6cqmin" }}>
@@ -155,8 +158,8 @@ export function PhieuInTem({
   caoMacDinh = 30,
 }: {
   onClose: () => void;
-  /** Gọi ngay trước khi mở hộp in (vd ghi sổ in tem). */
-  onIn?: () => void;
+  /** Gọi ngay trước khi mở hộp in (vd ghi sổ in tem) — kèm số bản của từng tem. */
+  onIn?: (soBan: number[]) => void;
   maLo?: string;
   qrDataUrl?: string;
   dong?: string[];
@@ -167,7 +170,10 @@ export function PhieuInTem({
   const [rong, setRong] = useState(rongMacDinh);
   const [cao, setCao] = useState(caoMacDinh);
   const ds: TemIn[] = tems ?? [{ maLo, qrDataUrl, dong }];
-  const nhieu = ds.length > 1;
+  const [soBan, setSoBan] = useState<number[]>(() => ds.map((t) => keoBan(t.soBan ?? 1)));
+  const banCua = (i: number) => soBan[i] ?? 1;
+  const tongTem = ds.reduce((s, _, i) => s + banCua(i), 0);
+  const nhieu = tongTem > 1;
   const PX = nhieu ? 4 : 6; // px mỗi mm khi xem trước (chỉ ảnh hưởng màn, không ảnh hưởng bản in)
   const laChon = (r: number, c: number) => r === rong && c === cao;
   const printCss = `@media print {
@@ -178,7 +184,8 @@ export function PhieuInTem({
   .print-tem-list { display: block !important; }
   .print-tem-box { width: ${rong}mm !important; height: ${cao}mm !important; padding: 2mm; box-sizing: border-box;
     border: 0 !important; margin: 0 !important; break-after: page; break-inside: avoid; }
-  .print-tem-box:last-child { break-after: auto; }
+  .print-tem-box.print-tem-cuoi { break-after: auto; }
+  .print-tem-sao { display: block !important; }
 }`;
 
   return createPortal(
@@ -191,16 +198,16 @@ export function PhieuInTem({
         </Button>
         <Button
           onClick={() => {
-            onIn?.();
+            onIn?.(ds.map((_, i) => banCua(i)));
             window.print();
           }}
           title={
             nhieu
-              ? `Mở hộp in của trình duyệt để in ${ds.length} tem, mỗi tem một nhãn. Chọn khổ giấy tem trước khi in.`
+              ? `Mở hộp in của trình duyệt để in ${tongTem} tem, mỗi tem một nhãn. Chọn khổ giấy tem trước khi in.`
               : "Mở hộp in của trình duyệt để in tem. Chọn khổ giấy tem trước khi in."
           }
         >
-          <Printer className="size-4" /> {nhieu ? `In ${ds.length} tem` : "In tem"}
+          <Printer className="size-4" /> {nhieu ? `In ${tongTem} tem` : "In tem"}
         </Button>
       </div>
 
@@ -244,13 +251,31 @@ export function PhieuInTem({
       </div>
 
       <p className="no-print mx-auto mb-3 max-w-3xl text-center text-sm text-slate-500">
-        {nhieu ? `${ds.length} tem — ` : ""}Xem trước (đã phóng to). Khi in sẽ ra đúng khổ {rong}×{cao} mm
+        {nhieu ? `${tongTem} tem — ` : ""}Xem trước (đã phóng to, mỗi lô hiện một tem). Khi in sẽ ra đúng khổ {rong}×{cao} mm
         {nhieu ? ", mỗi tem một nhãn" : ""} — chọn máy in tem trong hộp thoại in.
       </p>
 
       <div className="print-tem-list mx-auto flex max-w-5xl flex-wrap justify-center gap-4">
         {ds.map((t, i) => (
-          <KhoiTem key={i} tem={t} rong={rong} cao={cao} px={PX} />
+          <div key={i} className="flex flex-col items-center gap-1">
+            <KhoiTem tem={t} rong={rong} cao={cao} px={PX} cuoi={i === ds.length - 1 && banCua(i) === 1} />
+            {/* Bản sao: ẩn trên màn, chỉ hiện khi in (.print-tem-sao trong printCss). */}
+            {Array.from({ length: banCua(i) - 1 }, (_, k) => (
+              <div key={k} className="print-tem-sao" style={{ display: "none" }}>
+                <KhoiTem tem={t} rong={rong} cao={cao} px={PX} cuoi={i === ds.length - 1 && k === banCua(i) - 2} />
+              </div>
+            ))}
+            <label className="no-print flex items-center gap-1 text-sm text-slate-600">
+              Số tem
+              <ONhapSo
+                value={banCua(i)}
+                onChange={(v) => v != null && setSoBan((cu) => ds.map((_, j) => (j === i ? keoBan(v) : (cu[j] ?? 1))))}
+                khungClassName="inline-block"
+                className="w-16 rounded-md border border-slate-300 px-2 py-1 text-sm"
+                aria-label={`Số tem in cho lô ${t.maLo}`}
+              />
+            </label>
+          </div>
         ))}
       </div>
     </div>,

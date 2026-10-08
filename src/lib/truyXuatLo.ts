@@ -9,23 +9,32 @@
 //   S = lô NL  = một chuyến nhập (import_shipments), nhãn = lot_code
 //   W = lô BTP = một dòng sản xuất (production_wips), nhãn SUY RA
 //   P = lô TP  = một phiếu đóng gói (packagings),     nhãn SUY RA
-// Mối nối giữa các tầng: bảng lot_inputs (mig 0046) + export_items.wip_id (đã có).
+// Mối nối giữa các tầng: bảng lot_inputs (mig 0046) + export_items.wip_id (đã có)
+// + lot_dispatches (mig 0056: lô đi ra — bán lẻ, bán nội địa, quét kiểm lệnh xuất).
 // ============================================================
 import type {
   Customer,
+  DomesticSaleItem,
   LabelPrint,
   ExportItem,
   ExportOrder,
   ImportShipment,
+  LotDispatch,
   LotInput,
   LotKind,
+  LotWaiver,
   MaterialImportItem,
+  MaterialType,
   Packaging,
   Product,
+  SalesInvoice,
+  SalesItem,
   SalesOrder,
   WipProductionItem,
   Workshop,
 } from "@/types";
+import { KHO_BAN_LE, KHO_TP, locBanLe, tinhTon, tinhTonTPTheoLo, truTonBTP } from "./inventory";
+import { viDate } from "./format";
 
 export interface DuLieuTruyXuat {
   shipments: readonly ImportShipment[];
@@ -38,10 +47,24 @@ export interface DuLieuTruyXuat {
   salesOrders: readonly SalesOrder[];
   products: readonly Product[];
   customers: readonly Customer[];
+  // --- Đợt 2b (mig 0056) — tùy chọn để chỗ chỉ cần tra nhanh khỏi phải nạp hết ---
+  salesItems?: readonly SalesItem[];
+  salesInvoices?: readonly SalesInvoice[];
+  domesticSales?: readonly DomesticSaleItem[];
+  lotDispatches?: readonly LotDispatch[];
+  lotWaivers?: readonly LotWaiver[];
+  labelPrints?: readonly LabelPrint[];
+  materialTypes?: readonly MaterialType[];
 }
 
-/** X = một dòng lệnh xuất (lá cuối của cây truy xuôi — hàng đã rời xưởng). */
-export type LoaiNut = LotKind | "X";
+/**
+ * Lá cuối của cây truy xuôi — hàng đã rời xưởng:
+ *   X = một dòng lệnh xuất theo đơn · B = một dòng bán lẻ · N = một dòng bán nội địa NL.
+ */
+export type LoaiNut = LotKind | "X" | "B" | "N";
+
+/** Lá "hàng đã ra khỏi xưởng" — dùng cho danh sách thu hồi. */
+export const laHangRa = (k: LoaiNut): k is "X" | "B" | "N" => k === "X" || k === "B" || k === "N";
 
 export interface NutLo {
   kind: LoaiNut;
@@ -65,7 +88,9 @@ export const TEN_LOAI: Record<LoaiNut, string> = {
   S: "Nguyên liệu",
   W: "Bán thành phẩm",
   P: "Thành phẩm",
-  X: "Xuất đi",
+  X: "Xuất theo đơn",
+  B: "Bán lẻ",
+  N: "Bán nội địa",
 };
 
 const CHU_XUONG: Record<Workshop, string> = { Đông: "Đ", Cá: "C", Khô: "K" };
@@ -124,15 +149,27 @@ const tenMatHang = (dl: DuLieuTruyXuat, id: string) => {
 };
 
 const kgChu = (v: number) => `${Math.round(v * 100) / 100} kg`;
+/** Ngày hiển thị dd/mm/yyyy (quy tắc 2 — locale vi-VN); trống thì "—". */
+const ngayVi = (iso: string | undefined) => (iso ? viDate(iso) : "—");
 
-/** Dựng một nút lô từ loại + id. Bản ghi đã mất thì trả nút `mat` với nhãn từ lot_inputs. */
+/** Nhãn lô đã CHỤP lúc gắn / in (lot_inputs · lot_dispatches · label_prints) — cho lô đã bị xóa. */
+function nhanChup(dl: DuLieuTruyXuat, kind: LotKind, id: string): string {
+  return (
+    dl.lotInputs.find((l) => l.inputKind === kind && l.inputId === id)?.inputLabel ||
+    (dl.lotDispatches ?? []).find((d) => d.lotKind === kind && d.lotId === id)?.lotLabel ||
+    (dl.labelPrints ?? []).find((p) => p.lotKind === kind && p.lotId === id)?.label ||
+    id
+  );
+}
+
+/** Dựng một nút lô từ loại + id. Bản ghi đã mất thì trả nút `mat` với nhãn đã chụp. */
 export function nutLo(kind: LoaiNut, id: string, dl: DuLieuTruyXuat): NutLo {
   const mat = (nhan: string): NutLo => ({
     kind, id, nhan, moTa: "(bản ghi không còn)", ngay: "", xuong: "", kg: 0, chiTiet: [], mat: true,
   });
   if (kind === "S") {
     const s = dl.shipments.find((x) => x.id === id);
-    if (!s) return mat(dl.lotInputs.find((l) => l.inputKind === "S" && l.inputId === id)?.inputLabel || id);
+    if (!s) return mat(nhanChup(dl, "S", id));
     const dong = dl.imports.filter((m) => m.shipmentId === id);
     const loai = [...new Set(dong.map((m) => m.materialTypeName || m.category).filter(Boolean))];
     const kg = dong.reduce((t, m) => t + (m.quantityKg || 0), 0);
@@ -141,7 +178,7 @@ export function nutLo(kind: LoaiNut, id: string, dl: DuLieuTruyXuat): NutLo {
       ngay: s.deliveryDate, xuong: s.workshop, kg, mat: false,
       chiTiet: [
         { nhan: "Đại lý", giaTri: s.supplierName || "—" },
-        { nhan: "Ngày về", giaTri: s.deliveryDate },
+        { nhan: "Ngày về", giaTri: ngayVi(s.deliveryDate) },
         { nhan: "Xe · tài xế", giaTri: [s.licensePlate, s.driverName].filter(Boolean).join(" · ") || "—" },
         ...dong.map((m) => ({ nhan: m.materialTypeName || m.category, giaTri: kgChu(m.quantityKg || 0) })),
         ...(s.ssccCode ? [{ nhan: "SSCC", giaTri: s.ssccCode }] : []),
@@ -151,14 +188,14 @@ export function nutLo(kind: LoaiNut, id: string, dl: DuLieuTruyXuat): NutLo {
   }
   if (kind === "W") {
     const w = dl.wips.find((x) => x.id === id);
-    if (!w) return mat(dl.lotInputs.find((l) => l.inputKind === "W" && l.inputId === id)?.inputLabel || id);
+    if (!w) return mat(nhanChup(dl, "W", id));
     return {
       kind, id, nhan: nhanLoBtp(w), moTa: tenMatHang(dl, w.productId),
       ngay: w.productionDate, xuong: w.workshop, kg: w.quantityKg || 0, mat: false,
       chiTiet: [
         { nhan: "Mặt hàng", giaTri: tenMatHang(dl, w.productId) },
         ...(w.spec ? [{ nhan: "Quy cách", giaTri: w.spec }] : []),
-        { nhan: "Ngày sản xuất", giaTri: w.productionDate },
+        { nhan: "Ngày sản xuất", giaTri: ngayVi(w.productionDate) },
         { nhan: "Sản lượng", giaTri: `${kgChu(w.quantityKg || 0)}${w.blocksCount ? ` · ${w.blocksCount} block` : ""}` },
         ...(w.warehouse ? [{ nhan: "Kho", giaTri: w.warehouse }] : []),
         ...(w.processingType ? [{ nhan: "Kiểu chế biến", giaTri: w.processingType }] : []),
@@ -168,17 +205,51 @@ export function nutLo(kind: LoaiNut, id: string, dl: DuLieuTruyXuat): NutLo {
   }
   if (kind === "P") {
     const p = dl.packagings.find((x) => x.id === id);
-    if (!p) return mat(id);
+    if (!p) return mat(nhanChup(dl, "P", id));
     return {
       kind, id, nhan: nhanLoTp(p), moTa: tenMatHang(dl, p.toProductId),
       ngay: p.date, xuong: p.workshop, kg: p.outputKg || 0, mat: false,
       chiTiet: [
         { nhan: "Thành phẩm", giaTri: tenMatHang(dl, p.toProductId) },
         ...(p.toSpec ? [{ nhan: "Quy cách", giaTri: p.toSpec }] : []),
-        { nhan: "Ngày đóng gói", giaTri: p.date },
+        { nhan: "Ngày đóng gói", giaTri: ngayVi(p.date) },
         { nhan: "Ra", giaTri: `${kgChu(p.outputKg || 0)}${p.outputUnits ? ` · ${p.outputUnits} đơn vị` : ""}` },
         { nhan: "Từ BTP", giaTri: `${tenMatHang(dl, p.fromProductId)} · ${kgChu(p.inputKg || 0)}` },
         ...(p.warehouse ? [{ nhan: "Kho", giaTri: p.warehouse }] : []),
+      ],
+    };
+  }
+  if (kind === "B") {
+    const b = (dl.salesItems ?? []).find((r) => r.id === id);
+    if (!b) return mat(id);
+    const phieu = (dl.salesInvoices ?? []).find((v) => v.id === b.invoiceId);
+    const khach = phieu ? dl.customers.find((c) => c.id === phieu.customerId) : undefined;
+    const nguon = b.sourceWarehouse === KHO_TP ? "đóng gói" : b.sourceWarehouse === KHO_BAN_LE ? "block thô" : b.sourceWarehouse;
+    return {
+      kind, id, nhan: `Bán ${ngayVi(b.deliveryDate)} → ${khach?.name ?? "khách ?"}`,
+      moTa: tenMatHang(dl, b.productId), ngay: b.deliveryDate, xuong: phieu?.workshop ?? "", kg: b.quantityKg || 0, mat: false,
+      chiTiet: [
+        { nhan: "Khách", giaTri: khach ? `${khach.name}${khach.market ? ` (${khach.market})` : ""}` : "—" },
+        { nhan: "Ngày giao", giaTri: ngayVi(b.deliveryDate) },
+        { nhan: "Mặt hàng", giaTri: `${tenMatHang(dl, b.productId)}${b.spec ? ` · ${b.spec}` : ""}` },
+        { nhan: "Khối lượng", giaTri: kgChu(b.quantityKg || 0) },
+        ...(nguon ? [{ nhan: "Nguồn", giaTri: nguon }] : []),
+        ...(phieu?.channel ? [{ nhan: "Kênh", giaTri: phieu.channel }] : []),
+      ],
+    };
+  }
+  if (kind === "N") {
+    const n = (dl.domesticSales ?? []).find((r) => r.id === id);
+    if (!n) return mat(id);
+    return {
+      kind, id, nhan: `Bán NĐ ${ngayVi(n.saleDate)} → ${n.customerName || "khách ?"}`,
+      moTa: n.materialTypeName || "nguyên liệu", ngay: n.saleDate, xuong: n.workshop, kg: n.quantityKg || 0, mat: false,
+      chiTiet: [
+        { nhan: "Khách", giaTri: n.customerName || "—" },
+        { nhan: "Ngày bán", giaTri: ngayVi(n.saleDate) },
+        { nhan: "Loại NL", giaTri: n.materialTypeName || "—" },
+        { nhan: "Khối lượng", giaTri: kgChu(n.quantityKg || 0) },
+        ...(n.operator ? [{ nhan: "Người ghi", giaTri: n.operator }] : []),
       ],
     };
   }
@@ -189,11 +260,11 @@ export function nutLo(kind: LoaiNut, id: string, dl: DuLieuTruyXuat): NutLo {
   const don = lenh ? dl.salesOrders.find((o) => o.id === lenh.orderId) : undefined;
   const khach = don ? dl.customers.find((c) => c.id === don.customerId) : undefined;
   return {
-    kind, id, nhan: `Xuất ${lenh?.exportDate ?? ""} → ${khach?.name ?? "khách ?"}`,
+    kind, id, nhan: `Xuất ${ngayVi(lenh?.exportDate)} → ${khach?.name ?? "khách ?"}`,
     moTa: tenMatHang(dl, x.productId), ngay: lenh?.exportDate ?? "", xuong: "", kg: x.quantityKg || 0, mat: false,
     chiTiet: [
       { nhan: "Khách", giaTri: khach ? `${khach.name}${khach.market ? ` (${khach.market})` : ""}` : "—" },
-      { nhan: "Ngày xuất", giaTri: lenh?.exportDate ?? "—" },
+      { nhan: "Ngày xuất", giaTri: ngayVi(lenh?.exportDate) },
       { nhan: "Khối lượng", giaTri: `${kgChu(x.quantityKg || 0)}${x.blocksCount ? ` · ${x.blocksCount} block` : ""}` },
     ],
   };
@@ -211,7 +282,10 @@ const chuanMa = (s: string) => s.normalize("NFC").trim().toUpperCase();
 export function timLo(ma: MaDaDoc, dl: DuLieuTruyXuat): NutLo[] {
   if ("kind" in ma) {
     const n = nutLo(ma.kind, ma.id, dl);
-    return n.mat && !dl.lotInputs.some((l) => l.inputId === ma.id || l.outputId === ma.id) ? [] : [n];
+    const coDau =
+      dl.lotInputs.some((l) => l.inputId === ma.id || l.outputId === ma.id) ||
+      (dl.lotDispatches ?? []).some((d) => d.lotKind === ma.kind && d.lotId === ma.id);
+    return n.mat && !coDau ? [] : [n];
   }
   const k = chuanMa(ma.ma);
   return [
@@ -248,12 +322,18 @@ export function truyNguoc(kind: LoaiNut, id: string, dl: DuLieuTruyXuat, sau = 5
     }));
 }
 
+/** Dòng lô đi ra có nghĩa "hàng đã rời xưởng" (không gồm dấu quét kiểm lệnh xuất — trùng export_items). */
+const raKhoiXuong = (d: LotDispatch) => d.docKind === "sales_item" || d.docKind === "domestic_sale";
+
 /**
- * Truy XUÔI: lô này đã đi vào những đâu (NL → mẻ SX → đóng gói / lệnh xuất → khách).
+ * Truy XUÔI: lô này đã đi vào những đâu (NL → mẻ SX → đóng gói / lệnh xuất / bán → khách).
  * Cây này là thứ cần khi THU HỒI: chỉ ra đúng phạm vi hàng bị ảnh hưởng.
+ * Ngả ra khỏi xưởng: lệnh xuất theo đơn (BTP, `export_items.wip_id`) · bán lẻ
+ * (BTP block thô / TP đóng gói) · bán nội địa (NL bán thẳng) — hai ngả sau qua
+ * `lot_dispatches` (mig 0056).
  */
 export function truyXuoi(kind: LoaiNut, id: string, dl: DuLieuTruyXuat, sau = 5, daQua = new Set<string>()): NhanhCay[] {
-  if (sau <= 0 || kind === "X") return [];
+  if (sau <= 0 || laHangRa(kind)) return [];
   const khoa = `${kind}:${id}`;
   if (daQua.has(khoa)) return [];
   daQua.add(khoa);
@@ -273,7 +353,10 @@ export function truyXuoi(kind: LoaiNut, id: string, dl: DuLieuTruyXuat, sau = 5,
           .filter((x) => x.wipId === id)
           .map((x) => ({ nut: nutLo("X", x.id, dl), kg: x.quantityKg || 0, con: [] }))
       : [];
-  return [...quaBienDoi, ...quaXuat];
+  const quaBan: NhanhCay[] = (dl.lotDispatches ?? [])
+    .filter((d) => raKhoiXuong(d) && d.lotKind === kind && d.lotId === id)
+    .map((d) => ({ nut: nutLo(d.docKind === "domestic_sale" ? "N" : "B", d.docId, dl), kg: d.quantityKg, con: [] }));
+  return [...quaBienDoi, ...quaXuat, ...quaBan];
 }
 
 // ---------- Cân bằng khối lượng ----------
@@ -289,25 +372,58 @@ export interface CanBang {
   con: number;
 }
 
-/** Cân bằng khối lượng theo lô (NL: nhận ↔ đã đưa vào SX · BTP: sản xuất ↔ đóng gói + xuất). */
+/**
+ * Cân bằng khối lượng theo lô (theo HỒ SƠ LÔ — chỉ cộng các mối nối có kg):
+ *   NL : nhận ↔ đưa vào SX + bán nội địa
+ *   BTP: sản xuất ↔ đóng gói + xuất theo lệnh + bán lẻ block thô
+ *   TP : đóng gói ra ↔ bán lẻ
+ */
 export function canBangLo(kind: LoaiNut, id: string, dl: DuLieuTruyXuat): CanBang | null {
-  if (kind !== "S" && kind !== "W") return null;
+  if (kind !== "S" && kind !== "W" && kind !== "P") return null;
   const n = nutLo(kind, id, dl);
   if (n.mat) return null;
-  const dung = dl.lotInputs.filter((l) => l.inputKind === kind && l.inputId === id);
   const ra: CanBang["ra"] = [];
-  const coKg = dung.filter((l) => l.quantityKg != null);
-  if (coKg.length)
-    ra.push({
-      nhan: kind === "S" ? "Đã đưa vào sản xuất" : "Đã đóng gói",
-      kg: coKg.reduce((t, l) => t + (l.quantityKg ?? 0), 0),
-    });
+  let chuaCan = 0;
+  const cong = (nhan: string, kgs: (number | null)[]) => {
+    const co = kgs.filter((k): k is number => k != null);
+    chuaCan += kgs.length - co.length;
+    if (co.length) ra.push({ nhan, kg: co.reduce((s, k) => s + k, 0) });
+  };
+  if (kind !== "P") {
+    cong(
+      kind === "S" ? "Đã đưa vào sản xuất" : "Đã đóng gói",
+      dl.lotInputs.filter((l) => l.inputKind === kind && l.inputId === id).map((l) => l.quantityKg)
+    );
+  }
   if (kind === "W") {
     const xuat = dl.exportItems.filter((x) => x.wipId === id);
     if (xuat.length) ra.push({ nhan: "Đã xuất theo lệnh", kg: xuat.reduce((t, x) => t + (x.quantityKg || 0), 0) });
   }
+  const ban = (dl.lotDispatches ?? []).filter((d) => raKhoiXuong(d) && d.lotKind === kind && d.lotId === id);
+  cong(kind === "S" ? "Bán nội địa" : kind === "W" ? "Bán lẻ block thô" : "Bán lẻ", ban.map((d) => d.quantityKg));
   const tongRa = ra.reduce((t, r) => t + r.kg, 0);
-  return { vao: n.kg, ra, chuaCan: dung.length - coKg.length, con: n.kg - tongRa };
+  return { vao: n.kg, ra, chuaCan, con: n.kg - tongRa };
+}
+
+/**
+ * Kg CÒN TRONG KHO của lô theo SỔ TỒN (khác cân bằng theo hồ sơ lô: sổ tồn trừ cả
+ * dòng bán/đóng gói CHƯA gắn lô theo FIFO). BTP chưa duyệt nhập kho ⇒ null.
+ * NL ⇒ null (tồn NL theo lô chưa có — doc 38).
+ */
+export function tonKhoCuaLo(kind: LoaiNut, id: string, dl: DuLieuTruyXuat): number | null {
+  if (kind === "W") {
+    const ton = tinhTon(
+      [...dl.wips],
+      [...dl.exportItems],
+      truTonBTP([...(dl.salesItems ?? [])], [...dl.packagings], dl.lotInputs, dl.lotDispatches ?? [])
+    );
+    return ton.find((l) => l.wipId === id)?.conLai ?? null;
+  }
+  if (kind === "P") {
+    const ton = tinhTonTPTheoLo([...dl.packagings], locBanLe([...(dl.salesItems ?? [])], KHO_TP, dl.lotDispatches ?? []));
+    return ton.find((l) => l.wipId === id)?.conLai ?? null;
+  }
+  return null;
 }
 
 // ---------- Danh sách lô để CHỌN khi gắn ----------
@@ -319,15 +435,32 @@ const lui = (iso: string, ngay: number) => {
 };
 
 /**
- * Lô NL gần đây để chọn khi gắn cho mẻ SX: cùng xưởng, về trong `soNgay` ngày tính
- * tới ngày SX, MỚI trước. (FIFO gợi ý lô CŨ trước là đợt 2 — cần tồn theo lô.)
+ * Lô NL để chọn khi gắn cho mẻ SX, cùng xưởng:
+ *  1. về trong `soNgay` ngày tính tới ngày SX — MỚI trước (NL tươi vừa về);
+ *  2. CỘNG lô cũ hơn (tới 1 năm) mà theo hồ sơ còn kg — CŨ trước (FIFO gợi ý):
+ *     NL cấp đông kỳ trước đem xả đông. Chỉ lấy lô đã từng gắn, hoặc về từ ngày
+ *     bắt đầu truy xuất (lần gắn lô đầu tiên) — lô trước đó chưa ai theo dõi,
+ *     liệt kê ra chỉ làm rối.
  */
 export function loNlDeChon(dl: DuLieuTruyXuat, xuong: Workshop, denNgay: string, soNgay = 45): NutLo[] {
   const tu = lui(denNgay, soNgay);
-  return dl.shipments
+  const ganDay = dl.shipments
     .filter((s) => s.workshop === xuong && s.deliveryDate >= tu && s.deliveryDate <= denNgay)
-    .sort((a, b) => b.deliveryDate.localeCompare(a.deliveryDate))
-    .map((s) => nutLo("S", s.id, dl));
+    .sort((a, b) => b.deliveryDate.localeCompare(a.deliveryDate));
+  const batDau = dl.lotInputs.reduce<string>((m, l) => (!m || (l.recordedAt && l.recordedAt < m) ? l.recordedAt : m), "").slice(0, 10);
+  const daGan = new Set(dl.lotInputs.filter((l) => l.inputKind === "S").map((l) => l.inputId));
+  const motNam = lui(denNgay, 365);
+  const cuConDo = dl.shipments
+    .filter(
+      (s) =>
+        s.workshop === xuong &&
+        s.deliveryDate < tu &&
+        s.deliveryDate >= motNam &&
+        (daGan.has(s.id) || (!!batDau && s.deliveryDate >= batDau))
+    )
+    .filter((s) => (canBangLo("S", s.id, dl)?.con ?? 0) > 0)
+    .sort((a, b) => a.deliveryDate.localeCompare(b.deliveryDate));
+  return [...ganDay, ...cuConDo].map((s) => nutLo("S", s.id, dl));
 }
 
 /** Lô BTP gần đây để chọn khi gắn cho phiếu đóng gói: cùng xưởng (hàng đông trữ lâu ⇒ cửa sổ rộng). */
@@ -407,14 +540,253 @@ export function tomTatIn(prints: readonly LabelPrint[]): Map<string, TomTatIn> {
   return m;
 }
 
-/** Dòng sổ in cho một lượt in (mỗi lô một dòng). Bỏ nút không phải lô (X) và lô đã mất. */
+/**
+ * Dòng sổ in cho một lượt in (mỗi lô một dòng). Bỏ nút không phải lô (hàng đã ra)
+ * và lô đã mất. `soTem` = số tem đã in của từng lô (mặc định 1).
+ */
 export function banGhiIn(
   nuts: readonly NutLo[],
   nguoiIn: string,
   luc: string,
-  taoId: () => string
+  taoId: () => string,
+  soTem: (n: NutLo) => number = () => 1
 ): LabelPrint[] {
   return nuts
-    .filter((n): n is NutLo & { kind: LotKind } => n.kind !== "X" && !n.mat)
-    .map((n) => ({ id: taoId(), lotKind: n.kind, lotId: n.id, label: n.nhan, copies: 1, operator: nguoiIn, printedAt: luc }));
+    .filter((n): n is NutLo & { kind: LotKind } => !laHangRa(n.kind) && !n.mat)
+    .map((n) => ({
+      id: taoId(), lotKind: n.kind, lotId: n.id, label: n.nhan,
+      copies: Math.max(1, Math.round(soTem(n) || 1)), operator: nguoiIn, printedAt: luc,
+    }));
+}
+
+// ---------- Gắn lô NL cho CẢ PHIÊN ghi sản xuất (đợt 2b) ----------
+
+const chuan = (s: string | undefined) => (s ?? "").normalize("NFC").trim().toLowerCase();
+
+/** Họ NL của một lô NL: các loài (category) + tên loại NL có trong chuyến. */
+function hoCuaLoNl(dl: DuLieuTruyXuat, shipmentId: string) {
+  const dong = dl.imports.filter((m) => m.shipmentId === shipmentId);
+  const ten = new Set(dong.map((m) => chuan(m.materialTypeName)).filter(Boolean));
+  const loai = new Set(
+    dong
+      .flatMap((m) => [m.category, (dl.materialTypes ?? []).find((t) => chuan(t.name) === chuan(m.materialTypeName))?.category])
+      .map((x) => chuan(x))
+      .filter(Boolean)
+  );
+  return { ten, loai };
+}
+
+/** Loài của mặt hàng một mẻ ("" = không rõ): category mặt hàng, rồi tới loài của loại NL gắn trên mặt hàng. */
+function loaiCuaMe(dl: DuLieuTruyXuat, w: Pick<WipProductionItem, "productId">): string {
+  const p = dl.products.find((x) => x.id === w.productId);
+  if (!p) return "";
+  return chuan(p.category) || chuan((dl.materialTypes ?? []).find((t) => t.id === p.materialTypeId)?.category);
+}
+
+export interface KetQuaGanPhien {
+  lotInputs: LotInput[];
+  dispatches: LotDispatch[];
+  /** Mẻ / dòng bán nội địa không khớp họ NL với lô nào của phiên — để người ghi tự gắn. */
+  khongKhop: { kind: "W" | "N"; id: string }[];
+}
+
+/**
+ * Tổ trưởng khai MỘT lần "phiên này dùng lô NL nào" ⇒ gắn cho từng mẻ vừa lưu
+ * (lot_inputs) và từng dòng bán nội địa (lot_dispatches), kg để trống (chưa cân).
+ *
+ * Chỉ gắn khi KHỚP HỌ NL, để mẻ bạch tuộc không dính lô mực:
+ *  - mẻ: loài mặt hàng có trong lô; không rõ loài (mặt hàng chưa gắn loài / chuyến
+ *    không ghi loài) ⇒ VẪN gắn — gắn thừa chỉ làm phạm vi thu hồi rộng ra, không
+ *    bao giờ hẹp lại (chiều an toàn);
+ *  - bán nội địa: lô có đúng loại NL đó, hoặc cùng loài.
+ * Cặp đã gắn rồi thì bỏ qua (không nhân đôi).
+ */
+export function ganLoChoPhien(a: {
+  mes: readonly Pick<WipProductionItem, "id" | "productId">[];
+  banNoiDia: readonly Pick<DomesticSaleItem, "id" | "materialTypeName">[];
+  loNl: readonly { nut: NutLo; cach: LotInput["method"] }[];
+  dl: DuLieuTruyXuat;
+  nguoiGhi: string;
+  luc: string;
+  taoId: () => string;
+}): KetQuaGanPhien {
+  const lots = a.loNl.filter((l) => l.nut.kind === "S" && !l.nut.mat).map((l) => ({ ...l, ho: hoCuaLoNl(a.dl, l.nut.id) }));
+  const lotInputs: LotInput[] = [];
+  const dispatches: LotDispatch[] = [];
+  const khongKhop: KetQuaGanPhien["khongKhop"] = [];
+  if (!lots.length) return { lotInputs, dispatches, khongKhop };
+
+  for (const me of a.mes) {
+    const loai = loaiCuaMe(a.dl, me);
+    const hop = lots.filter((l) => !loai || l.ho.loai.size === 0 || l.ho.loai.has(loai));
+    if (!hop.length) khongKhop.push({ kind: "W", id: me.id });
+    for (const l of hop) {
+      if (a.dl.lotInputs.some((x) => x.outputKind === "W" && x.outputId === me.id && x.inputKind === "S" && x.inputId === l.nut.id)) continue;
+      lotInputs.push({
+        id: a.taoId(), outputKind: "W", outputId: me.id, inputKind: "S", inputId: l.nut.id,
+        inputLabel: l.nut.nhan, material: l.nut.moTa, quantityKg: null, method: l.cach,
+        operator: a.nguoiGhi, recordedAt: a.luc,
+      });
+    }
+  }
+  for (const b of a.banNoiDia) {
+    const ten = chuan(b.materialTypeName);
+    const loai = chuan((a.dl.materialTypes ?? []).find((t) => chuan(t.name) === ten)?.category);
+    const hop = lots.filter((l) => l.ho.ten.has(ten) || (!!loai && l.ho.loai.has(loai)));
+    if (!hop.length) khongKhop.push({ kind: "N", id: b.id });
+    for (const l of hop) {
+      if ((a.dl.lotDispatches ?? []).some((x) => x.docKind === "domestic_sale" && x.docId === b.id && x.lotId === l.nut.id)) continue;
+      dispatches.push({
+        id: a.taoId(), lotKind: "S", lotId: l.nut.id, lotLabel: l.nut.nhan, docKind: "domestic_sale", docId: b.id,
+        quantityKg: null, method: l.cach, operator: a.nguoiGhi, recordedAt: a.luc,
+      });
+    }
+  }
+  return { lotInputs, dispatches, khongKhop };
+}
+
+/** Mẻ SX CHƯA gắn lô NL và CHƯA ghi lý do bỏ qua — chốt ngày phải xử lý hết. */
+export function meThieuLo<T extends Pick<WipProductionItem, "id">>(
+  mes: readonly T[],
+  lotInputs: readonly LotInput[],
+  lotWaivers: readonly LotWaiver[]
+): T[] {
+  return mes.filter(
+    (w) =>
+      !lotInputs.some((l) => l.outputKind === "W" && l.outputId === w.id) &&
+      !lotWaivers.some((x) => x.outputKind === "W" && x.outputId === w.id)
+  );
+}
+
+// ---------- Độ phủ truy xuất (đợt 2b) ----------
+
+export interface MucDoPhu {
+  khoa: "me" | "dong-goi" | "tem" | "ban-le" | "ban-nd" | "xuat";
+  ten: string;
+  tong: number;
+  /** có gắn lô / có tem / đã quét */
+  co: number;
+  /** không gắn nhưng đã ghi lý do (chỉ mẻ SX + đóng gói) */
+  coLyDo: number;
+  /** danh sách còn thiếu — bấm vào để xử lý */
+  thieu: NutLo[];
+}
+
+/**
+ * Đo xem chuỗi truy xuất đang thủng ở đâu trong một khoảng ngày × xưởng:
+ * bao nhiêu mẻ đã có lô NL, phiếu đóng gói có lô BTP, lô đã in tem, dòng bán có
+ * lô, dòng lệnh xuất đã quét kiểm. Số này để xưởng quyết khi nào siết chặt hơn.
+ */
+export function doPhuTruyXuat(dl: DuLieuTruyXuat, loc: { tu: string; den: string; xuong: Workshop | "" }): MucDoPhu[] {
+  const trong = (ngay: string, xuong: Workshop | "" | undefined) =>
+    !!ngay && ngay >= loc.tu && ngay <= loc.den && (!loc.xuong || xuong === loc.xuong);
+  const waivers = dl.lotWaivers ?? [];
+  const disp = dl.lotDispatches ?? [];
+  const muc = (khoa: MucDoPhu["khoa"], ten: string, ds: { nut: NutLo; co: boolean; lyDo?: boolean }[]): MucDoPhu => ({
+    khoa, ten, tong: ds.length,
+    co: ds.filter((d) => d.co).length,
+    coLyDo: ds.filter((d) => !d.co && d.lyDo).length,
+    thieu: ds.filter((d) => !d.co && !d.lyDo).map((d) => d.nut),
+  });
+
+  const mes = dl.wips.filter((w) => trong(w.productionDate, w.workshop));
+  const phieus = dl.packagings.filter((p) => trong(p.date, p.workshop));
+  const chuyens = dl.shipments.filter((s) => trong(s.deliveryDate, s.workshop));
+  const daIn = new Set((dl.labelPrints ?? []).map((p) => khoaLo(p.lotKind, p.lotId)));
+  const phieuBan = new Map((dl.salesInvoices ?? []).map((v) => [v.id, v]));
+  const banLe = (dl.salesItems ?? []).filter(
+    (b) => (b.sourceWarehouse === KHO_BAN_LE || b.sourceWarehouse === KHO_TP) && trong(b.deliveryDate, phieuBan.get(b.invoiceId)?.workshop)
+  );
+  const banNd = (dl.domesticSales ?? []).filter((n) => trong(n.saleDate, n.workshop));
+  const lenh = new Map(dl.exportOrders.map((o) => [o.id, o]));
+  const xuat = dl.exportItems.filter((x) => trong(lenh.get(x.exportId)?.exportDate ?? "", dl.wips.find((w) => w.id === x.wipId)?.workshop));
+  const coDisp = (doc: LotDispatch["docKind"], id: string) => disp.some((d) => d.docKind === doc && d.docId === id);
+
+  return [
+    muc("me", "Mẻ sản xuất có lô NL", mes.map((w) => ({
+      nut: nutLo("W", w.id, dl),
+      co: dl.lotInputs.some((l) => l.outputKind === "W" && l.outputId === w.id),
+      lyDo: waivers.some((x) => x.outputKind === "W" && x.outputId === w.id),
+    }))),
+    muc("dong-goi", "Phiếu đóng gói có lô BTP", phieus.map((p) => ({
+      nut: nutLo("P", p.id, dl),
+      co: dl.lotInputs.some((l) => l.outputKind === "P" && l.outputId === p.id),
+      lyDo: waivers.some((x) => x.outputKind === "P" && x.outputId === p.id),
+    }))),
+    muc("tem", "Lô đã in tem", [
+      ...chuyens.map((s) => ({ nut: nutLo("S", s.id, dl), co: daIn.has(khoaLo("S", s.id)) })),
+      ...mes.map((w) => ({ nut: nutLo("W", w.id, dl), co: daIn.has(khoaLo("W", w.id)) })),
+      ...phieus.map((p) => ({ nut: nutLo("P", p.id, dl), co: daIn.has(khoaLo("P", p.id)) })),
+    ]),
+    muc("ban-le", "Dòng bán lẻ có lô", banLe.map((b) => ({ nut: nutLo("B", b.id, dl), co: coDisp("sales_item", b.id) }))),
+    muc("ban-nd", "Bán nội địa có lô NL", banNd.map((n) => ({ nut: nutLo("N", n.id, dl), co: coDisp("domestic_sale", n.id) }))),
+    muc("xuat", "Dòng lệnh xuất đã quét kiểm", xuat.map((x) => ({ nut: nutLo("X", x.id, dl), co: coDisp("export_item", x.id) }))),
+  ];
+}
+
+// ---------- Danh sách thu hồi (đợt 2b) ----------
+
+export interface DongThuHoi {
+  loai: "X" | "B" | "N";
+  khach: string;
+  ngay: string;
+  chungTu: string;
+  matHang: string;
+  /** kg của mối nối (đi ra từ lô liền trước); null = chưa cân. */
+  kg: number | null;
+  /** nhãn lô liền trước — hàng rời xưởng từ lô này */
+  tuLo: string;
+}
+
+/**
+ * Lô này nghi có vấn đề ⇒ ai đã nhận hàng (khách · ngày · chứng từ · kg) và
+ * những lô BTP/TP còn trong xưởng cần khoanh lại. Đi hết cây truy xuôi.
+ */
+export function danhSachThuHoi(kind: LoaiNut, id: string, dl: DuLieuTruyXuat): { hangRa: DongThuHoi[]; loTrongXuong: NutLo[] } {
+  const hangRa: DongThuHoi[] = [];
+  const loTrongXuong: NutLo[] = [];
+  const goc = nutLo(kind, id, dl);
+  if (goc.kind === "W" || goc.kind === "P") loTrongXuong.push(goc);
+  const khachX = (xId: string) => {
+    const x = dl.exportItems.find((e) => e.id === xId);
+    const lenh = x ? dl.exportOrders.find((o) => o.id === x.exportId) : undefined;
+    const don = lenh ? dl.salesOrders.find((o) => o.id === lenh.orderId) : undefined;
+    return { khach: dl.customers.find((c) => c.id === don?.customerId)?.name ?? "", ngay: lenh?.exportDate ?? "" };
+  };
+  const khachB = (bId: string) => {
+    const b = (dl.salesItems ?? []).find((r) => r.id === bId);
+    const phieu = b ? (dl.salesInvoices ?? []).find((v) => v.id === b.invoiceId) : undefined;
+    return dl.customers.find((c) => c.id === phieu?.customerId)?.name ?? "";
+  };
+  const di = (cay: NhanhCay[], cha: NutLo) => {
+    for (const nh of cay) {
+      const n = nh.nut;
+      if (n.kind === "X") {
+        const k = khachX(n.id);
+        hangRa.push({ loai: "X", khach: k.khach, ngay: k.ngay, chungTu: `Lệnh xuất ${ngayVi(k.ngay)}`, matHang: n.moTa, kg: nh.kg, tuLo: cha.nhan });
+      } else if (n.kind === "B") {
+        hangRa.push({ loai: "B", khach: khachB(n.id), ngay: n.ngay, chungTu: `Phiếu bán ${ngayVi(n.ngay)}`, matHang: n.moTa, kg: nh.kg, tuLo: cha.nhan });
+      } else if (n.kind === "N") {
+        const r = (dl.domesticSales ?? []).find((x) => x.id === n.id);
+        hangRa.push({ loai: "N", khach: r?.customerName ?? "", ngay: n.ngay, chungTu: `Bán nội địa ${ngayVi(n.ngay)}`, matHang: n.moTa, kg: nh.kg, tuLo: cha.nhan });
+      } else {
+        if ((n.kind === "W" || n.kind === "P") && !loTrongXuong.some((l) => l.kind === n.kind && l.id === n.id)) loTrongXuong.push(n);
+        di(nh.con, n);
+      }
+    }
+  };
+  di(truyXuoi(kind, id, dl), goc);
+  hangRa.sort((a, b) => a.ngay.localeCompare(b.ngay) || a.khach.localeCompare(b.khach));
+  return { hangRa, loTrongXuong };
+}
+
+// ---------- Số tem mặc định (đợt 2b) ----------
+
+/** Mỗi block (BTP) / mỗi thùng-gói (TP) một tem; NL một tem cho chuyến. Sửa được khi in. */
+export function soTemMacDinh(n: Pick<NutLo, "kind" | "id">, dl: Pick<DuLieuTruyXuat, "wips" | "packagings">): number {
+  const so =
+    n.kind === "W" ? dl.wips.find((w) => w.id === n.id)?.blocksCount :
+    n.kind === "P" ? dl.packagings.find((p) => p.id === n.id)?.outputUnits :
+    1;
+  return Math.min(500, Math.max(1, Math.round(so || 1)));
 }

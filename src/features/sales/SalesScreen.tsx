@@ -16,6 +16,8 @@ import {
   useWipProductions,
   useExportItems,
   usePackagings,
+  useLotInputs,
+  useLotDispatches,
 } from "@/lib/catalogRepo";
 import {
   tinhTon,
@@ -23,7 +25,7 @@ import {
   KHO_BAN_LE,
   KHO_TP,
   locBanLe,
-  dongGoiTruTon,
+  truTonBTP,
   tinhTonTP,
   khaDungTP,
 } from "@/lib/inventory";
@@ -57,12 +59,14 @@ import {
   type MucChon,
 } from "@/design-system";
 import { useSuaDanhMuc } from "@/features/catalog/SuaDanhMucNhanh";
+import { GanLoXuat } from "@/features/shared";
 import { kg, num, todayISO, viDate } from "@/lib/format";
 import { KY_OPT, phamViKy, type KyXem } from "@/lib/periodUtils";
 import {
   CalendarRange,
   CircleCheck,
   FileText,
+  Link2,
   Pencil,
   Plus,
   Scale,
@@ -167,9 +171,28 @@ export default function BanHangScreen() {
   const [sanXuat] = useWipProductions();
   const [dongLenh] = useExportItems();
   const [packagings] = usePackagings();
+  const [lotInputs] = useLotInputs();
+  const [lotDispatches] = useLotDispatches();
+  // Truy xuất lô (đợt 2b): dòng bán lẻ ghi lấy từ lô nào ⇒ hộ chiếu lô thấy được khách,
+  // sổ tồn trừ đúng lô đó. Block thô ⇒ lô BTP (W) · đóng gói ⇒ lô TP (P).
+  const [ganLoBan, setGanLoBan] = useState<SalesItem | null>(null);
+  const loaiLoBan = (r: SalesItem) => (r.sourceWarehouse === KHO_TP ? "P" : r.sourceWarehouse === KHO_BAN_LE ? "W" : null);
+  const soLoBan = (id: string) => lotDispatches.filter((d) => d.docKind === "sales_item" && d.docId === id).length;
+  const nutGanLo = (r: SalesItem) =>
+    loaiLoBan(r) ? (
+      <Button
+        title={`Ghi dòng bán này lấy từ ${loaiLoBan(r) === "P" ? "lô thành phẩm" : "lô bán thành phẩm"} nào (quét tem thùng, gõ mã, hoặc chọn lô còn tồn). Có lô thì thu hồi mới tới được khách.`}
+        variant={soLoBan(r.id) ? "outline" : "default"}
+        size="sm"
+        onClick={() => setGanLoBan(r)}
+      >
+        <Link2 />
+        {soLoBan(r.id) ? `Lô (${soLoBan(r.id)})` : "Gắn lô"}
+      </Button>
+    ) : null;
   const truBTP = useMemo(
-    () => [...locBanLe(rows), ...dongGoiTruTon(packagings)],
-    [rows, packagings]
+    () => truTonBTP(rows, packagings, lotInputs, lotDispatches),
+    [rows, packagings, lotInputs, lotDispatches]
   );
   const tonBTP = useMemo(
     () => tinhTon(sanXuat, dongLenh, truBTP),
@@ -694,6 +717,7 @@ export default function BanHangScreen() {
                   rows={n.dong}
                   getKey={(r) => r.id}
                   toMau="ban-hang"
+                  actions={(r) => nutGanLo(r)}
                 />
               </section>
             ))}
@@ -844,7 +868,8 @@ export default function BanHangScreen() {
                           </span>{" "}
                           kg
                         </span>
-                        <div className="flex shrink-0 items-center gap-2">
+                        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+                          {nutGanLo(r)}
                           <Button
                             title="Sửa dòng bán này (mặt hàng · quy cách · số kg · đơn giá)."
                             variant="outline"
@@ -1077,6 +1102,18 @@ export default function BanHangScreen() {
       </Dialog>
       {suaKH.hop}
       {suaMH.hop}
+      {ganLoBan && loaiLoBan(ganLoBan) && (
+        <GanLoXuat
+          docKind="sales_item"
+          docId={ganLoBan.id}
+          docNhan={`${tenMatHang(ganLoBan.productId)} · ${kg(ganLoBan.quantityKg)} · ${viDate(ganLoBan.deliveryDate)}`}
+          loaiLo={loaiLoBan(ganLoBan)!}
+          xuong={phieu.find((p) => p.id === ganLoBan.invoiceId)?.workshop ?? "Đông"}
+          ngay={ganLoBan.deliveryDate}
+          matHangId={ganLoBan.productId}
+          onClose={() => setGanLoBan(null)}
+        />
+      )}
     </div>
   );
 }

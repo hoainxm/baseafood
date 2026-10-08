@@ -1,6 +1,7 @@
 > Load khi: thêm/bớt màn hình, đổi điều hướng, header, hay tìm xem một màn được gắn vào đâu.
 covers: src/App.tsx, src/features/shared/AppShell.tsx, src/features/shared/NotFound.tsx, src/features/shared/guideContent.tsx, src/lib/nav-access.ts
-last_verified: 2026-10-06
+last_verified: 2026-10-08
+<!-- updated: 2026-10-08 — `/qr` thêm tab thứ 3 **"Độ phủ"** (`?tab=do-phu`, DoPhuTruyXuat): đo % mẻ / phiếu đóng gói / dòng bán đã gắn lô, lô đã in tem, lệnh xuất đã quét kiểm. `?lo=` vẫn luôn mở tab Tra. Hộ chiếu lô thêm mục Thu hồi (ThuHoiLo). Route / nhãn nav / gate KHÔNG đổi. Chi tiết: ../spec/qr-truy-xuat-lo.md §6d. -->
 <!-- updated: 2026-10-06 — `ShellLayout` (App.tsx) bọc `<Outlet>` trong `ToMauProvider` (features/shared): một nguồn dấu tô màu dòng `row_marks` (mig 0055) cho mọi bảng trên mọi màn. Không đổi route/nav. -->
 <!-- re-verified: 2026-09-14 12:00 — KIT_NAV labels (AppShell.tsx:82-106) + CAY_NAV nhóm (nav-access grouping) + tieuDe header lấy TỪ label (App.tsx:108 `tieuDe={current?.label}`) đối chiếu khớp code. -->
 <!-- updated: 2026-10-02 — `/qr`: nhãn nav "Quét mã lô" → **"Mã lô QR"** (id/route/gate KHÔNG đổi); màn có 2 tab Tra lô · In tem hàng loạt (`?tab=in`, `?lo=` luôn mở Tra); guideContent.qr viết lại (bỏ chỉ dẫn tab "Sổ ngày" đã xóa 21/09). Chi tiết: ../spec/qr-truy-xuat-lo.md §6b. -->

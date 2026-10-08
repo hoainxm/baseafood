@@ -820,6 +820,42 @@ export interface LotInput {
 }
 
 /**
+ * LÔ ĐI RA (bảng `lot_dispatches`, mig 0056): "chứng từ ra này lấy từ lô này".
+ * Nối truy xuôi tới khách ở các ngả bán lẻ / bán nội địa, và lưu kết quả quét
+ * kiểm lô khi xếp xe theo lệnh xuất. Tương đương Object/Transaction Event (EPCIS).
+ */
+export type LotDispatchDoc = "sales_item" | "export_item" | "domestic_sale";
+
+export interface LotDispatch {
+  id: string;
+  lotKind: LotKind;
+  lotId: string;
+  /** Nhãn lô lúc gắn — còn tra được kể cả khi bản ghi lô bị sửa/xóa. */
+  lotLabel: string;
+  /** sales_item = dòng bán lẻ · export_item = dòng lệnh xuất (quét kiểm) · domestic_sale = bán nội địa NL */
+  docKind: LotDispatchDoc;
+  docId: string;
+  /** kg lấy từ lô; null = chưa cân. */
+  quantityKg: number | null;
+  method: "quet" | "go" | "chon" | "fifo";
+  operator: string;
+  recordedAt: string;
+}
+
+/**
+ * LÝ DO CHƯA GẮN LÔ (bảng `lot_waivers`, mig 0056): chốt ngày SX bắt mỗi mẻ phải
+ * có lô NL hoặc ghi lý do (chốt chủ dự án 2026-10-08). Biết lỗ nào là có chủ ý.
+ */
+export interface LotWaiver {
+  id: string;
+  outputKind: "W" | "P";
+  outputId: string;
+  reason: string;
+  operator: string;
+  recordedAt: string;
+}
+
+/**
  * Một lần IN TEM QR cho một lô (bảng `label_prints`, mig 0049). `label` là nhãn
  * in ra LÚC IN — đông cứng, để so với nhãn hiện tại (nhãn BTP/TP suy từ bản ghi).
  */

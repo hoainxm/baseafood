@@ -4,7 +4,8 @@
 // hoặc gõ mã lô → một trang trả lời hai câu của truy xuất:
 //   • TRUY NGƯỢC: lô này làm từ lô nào, của đại lý nào, ngày nào (TP → BTP → NL)
 //   • TRUY XUÔI : lô này đã đi vào đâu, xuất cho ai — phạm vi khi phải THU HỒI
-// kèm CÂN BẰNG KHỐI LƯỢNG theo lô và in lại tem.
+// kèm CÂN BẰNG KHỐI LƯỢNG theo lô, tồn còn trong kho, DANH SÁCH THU HỒI và in lại tem.
+// Tab "Độ phủ" đo chuỗi đang thủng ở đâu (đợt 2b).
 // Đọc được cả tem CŨ (QR chỉ chứa mã lô trần). Mã trùng ⇒ liệt kê cho người chọn.
 // Thiết kế + căn cứ chuẩn: docs/spec/qr-truy-xuat-lo.md
 // ============================================================
@@ -12,6 +13,8 @@ import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { KhungQuetQr, TemLoQr, useDuLieuTruyXuat } from "@/features/shared";
 import { InTemHangLoat } from "./InTemHangLoat";
+import { DoPhuTruyXuat } from "./DoPhuTruyXuat";
+import { ThuHoiLo } from "./ThuHoiLo";
 import { useLabelPrints } from "@/lib/catalogRepo";
 import { kg, viDate } from "@/lib/format";
 import {
@@ -19,22 +22,27 @@ import {
   canBangLo,
   docMaQr,
   khoaLo,
+  laHangRa,
   tomTatIn,
   nutLo,
   timLo,
+  tonKhoCuaLo,
   truyNguoc,
   truyXuoi,
   type LoaiNut,
   type NhanhCay,
   type NutLo,
 } from "@/lib/truyXuatLo";
-import { Button, EmptyState, Field, Input, InfoTip, Nhan, notify, sacTheoTen } from "@/design-system";
-import { ArrowDownRight, ArrowUpLeft, Camera, CameraOff, Printer, Scale, Search, Tags } from "lucide-react";
+import { Button, EmptyState, Field, Input, InfoTip, Nhan, sacTheoTen } from "@/design-system";
+import { ArrowDownRight, ArrowUpLeft, Camera, CameraOff, Gauge, Printer, Scale, Search, Tags } from "lucide-react";
+import type { LotKind } from "@/types";
 import { cn } from "@/lib/utils";
+
+const laLo = (k: LoaiNut): k is LotKind => !laHangRa(k);
 
 /** Dòng lô gọn: nhãn + mô tả; bấm vào là mở hộ chiếu của lô đó. */
 function DongNut({ nut, kgNoi, onMo }: { nut: NutLo; kgNoi?: number | null; onMo: (n: NutLo) => void }) {
-  const moDuoc = nut.kind !== "X" && !nut.mat;
+  const moDuoc = laLo(nut.kind) && !nut.mat;
   return (
     <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
       <Nhan loai="phan-loai" sac={sacTheoTen(TEN_LOAI[nut.kind])}>{TEN_LOAI[nut.kind]}</Nhan>
@@ -92,8 +100,9 @@ export default function QrTraCuuScreen() {
   // Mã đang tra nằm trên đường link (?lo=…) ⇒ camera điện thoại quét tem mở thẳng
   // màn này, và copy link gửi người khác là họ thấy đúng lô đó.
   const lo = params.get("lo") ?? "";
-  // Link quét tem (?lo=…) luôn mở tab Tra, kể cả khi lỡ kèm tab=in.
-  const tab = params.get("tab") === "in" && !lo ? "in" : "tra";
+  // Link quét tem (?lo=…) luôn mở tab Tra, kể cả khi lỡ kèm tab=…
+  const tabUrl = params.get("tab");
+  const tab = lo ? "tra" : tabUrl === "in" ? "in" : tabUrl === "do-phu" ? "do-phu" : "tra";
   const ketQua = useMemo(() => {
     const ma = docMaQr(lo);
     return ma ? timLo(ma, dl) : [];
@@ -106,7 +115,7 @@ export default function QrTraCuuScreen() {
     setParams("kind" in ma ? { lo: `${ma.kind}:${ma.id}` } : { lo: ma.ma });
   };
   const moLo = (n: NutLo) => {
-    if (n.kind === "X") return;
+    if (!laLo(n.kind)) return;
     setParams({ lo: `${n.kind}:${n.id}` });
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -114,6 +123,7 @@ export default function QrTraCuuScreen() {
   const nguoc = useMemo(() => (dangXem ? truyNguoc(dangXem.kind, dangXem.id, dl) : []), [dangXem, dl]);
   const xuoi = useMemo(() => (dangXem ? truyXuoi(dangXem.kind, dangXem.id, dl) : []), [dangXem, dl]);
   const canBang = useMemo(() => (dangXem ? canBangLo(dangXem.kind, dangXem.id, dl) : null), [dangXem, dl]);
+  const tonKho = useMemo(() => (dangXem ? tonKhoCuaLo(dangXem.kind, dangXem.id, dl) : null), [dangXem, dl]);
 
   const loiNguoc: Partial<Record<LoaiNut, string>> = {
     S: "Lô nguyên liệu là đầu chuỗi — nguồn gốc là đại lý / chuyến nhập ghi ở trên.",
@@ -123,7 +133,7 @@ export default function QrTraCuuScreen() {
   const loiXuoi: Partial<Record<LoaiNut, string>> = {
     S: "Lô này chưa được gắn vào mẻ sản xuất nào.",
     W: "Mẻ này chưa được gắn vào phiếu đóng gói hay lệnh xuất nào.",
-    P: "Chưa ghi nhận thành phẩm này xuất đi đâu (bán lẻ gắn lô là đợt sau).",
+    P: "Chưa ghi nhận thành phẩm này bán cho ai. Ở Bán hàng, bấm \"Gắn lô\" ở dòng bán đóng gói.",
   };
 
   return (
@@ -133,7 +143,9 @@ export default function QrTraCuuScreen() {
         <p className="mt-1 text-sm text-muted-foreground">
           {tab === "in"
             ? "In tem QR cho nhiều lô một lượt: nguyên liệu, bán thành phẩm, thành phẩm."
-            : "Quét tem QR (camera điện thoại quét cũng mở thẳng trang này) hoặc gõ mã lô, để xem lô đó làm từ đâu và đã đi đâu."}
+            : tab === "do-phu"
+              ? "Chuỗi truy xuất đang thủng ở đâu: bao nhiêu mẻ, phiếu đóng gói, dòng bán đã gắn lô."
+              : "Quét tem QR (camera điện thoại quét cũng mở thẳng trang này) hoặc gõ mã lô, để xem lô đó làm từ đâu và đã đi đâu."}
         </p>
       </div>
 
@@ -143,6 +155,7 @@ export default function QrTraCuuScreen() {
           [
             ["tra", "Tra lô", "Quét hoặc gõ mã lô để xem hộ chiếu: nguồn gốc, đã đi đâu, cân bằng kg.", Search],
             ["in", "In tem hàng loạt", "Chọn nhiều lô theo ngày / xưởng / loại rồi in tem một lượt.", Tags],
+            ["do-phu", "Độ phủ", "Đo xem mẻ, phiếu đóng gói, dòng bán nào chưa gắn lô — chuỗi truy xuất thủng ở đâu.", Gauge],
           ] as const
         ).map(([id, nhan, moTa, Icon], i) => (
           <button
@@ -150,7 +163,7 @@ export default function QrTraCuuScreen() {
             type="button"
             title={moTa}
             aria-pressed={tab === id}
-            onClick={() => setParams(id === "in" ? { tab: "in" } : {})}
+            onClick={() => setParams(id === "tra" ? {} : { tab: id })}
             className={cn(
               "flex flex-1 items-center justify-center gap-2 px-4 py-2.5 font-semibold transition-colors sm:flex-none",
               i > 0 && "border-l-2 border-border",
@@ -165,6 +178,8 @@ export default function QrTraCuuScreen() {
 
       {tab === "in" ? (
         <InTemHangLoat />
+      ) : tab === "do-phu" ? (
+        <DoPhuTruyXuat />
       ) : (
         <>
 
@@ -187,8 +202,7 @@ export default function QrTraCuuScreen() {
           <KhungQuetQr
             onQuet={(t) => {
               setDangQuet(false);
-              notify.daLuu("Đã quét tem.");
-              tra(t);
+              tra(t); // tra cứu = thao tác trình bày ⇒ không toast (CLAUDE.md luật 13)
             }}
           />
         )}
@@ -245,9 +259,9 @@ export default function QrTraCuuScreen() {
               <p className="text-muted-foreground">
                 {[dangXem.moTa, dangXem.xuong && `xưởng ${dangXem.xuong}`].filter(Boolean).join(" · ")}
               </p>
-              {dangXem.kind !== "X" &&
+              {laLo(dangXem.kind) &&
                 (() => {
-                  const t = daIn.get(khoaLo(dangXem.kind, dangXem.id));
+                  const t = daIn.get(khoaLo(dangXem.kind as LotKind, dangXem.id));
                   if (!t)
                     return (
                       <p className="flex flex-wrap items-center gap-2">
@@ -292,12 +306,12 @@ export default function QrTraCuuScreen() {
                 <h2 className="flex items-center gap-2 font-semibold">
                   <Scale aria-hidden /> Cân bằng khối lượng
                   <InfoTip label="cân bằng khối lượng">
-                    Số kg của lô trừ đi các ngả đã đi (đưa vào sản xuất, đóng gói, xuất). Còn lại âm nghĩa là dùng quá số có — nghi gõ sai kg hoặc gắn nhầm lô.
+                    Số kg của lô trừ đi các ngả đã gắn lô (đưa vào sản xuất, đóng gói, xuất, bán). Còn lại âm nghĩa là dùng quá số có — nghi gõ sai kg hoặc gắn nhầm lô. "Tồn trong kho" là số của sổ tồn: trừ thêm cả hàng đã bán / đóng gói mà chưa gắn lô (máy trừ lô cũ trước).
                   </InfoTip>
                 </h2>
                 <div className="grid gap-2 sm:grid-cols-3">
                   <div>
-                    <div className="text-muted-foreground">{dangXem.kind === "S" ? "Nhận vào" : "Sản xuất"}</div>
+                    <div className="text-muted-foreground">{dangXem.kind === "S" ? "Nhận vào" : dangXem.kind === "P" ? "Đóng gói ra" : "Sản xuất"}</div>
                     <div className="tnum text-lg font-semibold">{kg(canBang.vao)}</div>
                   </div>
                   <div>
@@ -313,8 +327,13 @@ export default function QrTraCuuScreen() {
                     )}
                   </div>
                   <div>
-                    <div className="text-muted-foreground">Còn lại</div>
+                    <div className="text-muted-foreground">Còn lại (theo hồ sơ lô)</div>
                     <div className={`tnum text-lg font-semibold ${canBang.con < 0 ? "text-destructive" : ""}`}>{kg(canBang.con)}</div>
+                    {tonKho != null && (
+                      <div className="tnum text-muted-foreground">
+                        Tồn trong kho (sổ tồn): <span className="font-semibold text-foreground">{kg(tonKho)}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
                 {canBang.chuaCan > 0 && (
@@ -344,6 +363,9 @@ export default function QrTraCuuScreen() {
               </h2>
               {xuoi.length ? <Cay nhanh={xuoi} onMo={moLo} /> : <p className="text-muted-foreground">{loiXuoi[dangXem.kind]}</p>}
             </section>
+
+            {/* 5. Thu hồi */}
+            {laLo(dangXem.kind) && <ThuHoiLo nut={dangXem} dl={dl} />}
           </div>
         )
       )}
@@ -351,7 +373,7 @@ export default function QrTraCuuScreen() {
         </>
       )}
 
-      {inTem && dangXem && dangXem.kind !== "X" && (
+      {inTem && dangXem && laLo(dangXem.kind) && (
         <TemLoQr nut={nutLo(dangXem.kind, dangXem.id, dl)} onClose={() => setInTem(false)} />
       )}
     </div>

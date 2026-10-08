@@ -47,6 +47,8 @@ import type {
   ReconciliationRun,
   LotInput,
   LabelPrint,
+  LotDispatch,
+  LotWaiver,
   BatterType,
   DomesticSaleItem,
   RowMark,
@@ -1364,6 +1366,63 @@ export const BANG_LABEL_PRINT: AnhXaBang<LabelPrint> = {
   }),
 };
 
+/**
+ * Lô đi ra (mig 0056) — dòng bán lẻ / bán nội địa / quét kiểm lệnh xuất lấy từ
+ * lô nào. Bảng RIÊNG, không thêm cột vào sales_items/domestic_sales/export_items.
+ */
+export const BANG_LOT_DISPATCH: AnhXaBang<LotDispatch> = {
+  table: "lot_dispatches",
+  localKey: "bsf.lot-dispatches.v1",
+  layKhoa: theoId,
+  toRow: (x) => ({
+    id: x.id,
+    lot_kind: x.lotKind,
+    lot_id: x.lotId,
+    lot_label: x.lotLabel,
+    doc_kind: x.docKind,
+    doc_id: x.docId,
+    quantity_kg: x.quantityKg,
+    method: x.method,
+    operator: x.operator,
+    recorded_at: x.recordedAt || undefined,
+  }),
+  fromRow: (r) => ({
+    id: s(r.id),
+    lotKind: s(r.lot_kind) === "W" ? "W" : s(r.lot_kind) === "P" ? "P" : "S",
+    lotId: s(r.lot_id),
+    lotLabel: s(r.lot_label),
+    docKind: s(r.doc_kind) === "export_item" ? "export_item" : s(r.doc_kind) === "domestic_sale" ? "domestic_sale" : "sales_item",
+    docId: s(r.doc_id),
+    quantityKg: r.quantity_kg == null || r.quantity_kg === "" ? null : Number(r.quantity_kg),
+    method: s(r.method) === "quet" ? "quet" : s(r.method) === "go" ? "go" : s(r.method) === "fifo" ? "fifo" : "chon",
+    operator: s(r.operator),
+    recordedAt: s(r.recorded_at),
+  }),
+};
+
+/** Lý do chưa gắn lô khi chốt ngày (mig 0056). */
+export const BANG_LOT_WAIVER: AnhXaBang<LotWaiver> = {
+  table: "lot_waivers",
+  localKey: "bsf.lot-waivers.v1",
+  layKhoa: theoId,
+  toRow: (x) => ({
+    id: x.id,
+    output_kind: x.outputKind,
+    output_id: x.outputId,
+    reason: x.reason,
+    operator: x.operator,
+    recorded_at: x.recordedAt || undefined,
+  }),
+  fromRow: (r) => ({
+    id: s(r.id),
+    outputKind: s(r.output_kind) === "P" ? "P" : "W",
+    outputId: s(r.output_id),
+    reason: s(r.reason),
+    operator: s(r.operator),
+    recordedAt: s(r.recorded_at),
+  }),
+};
+
 /* ---------- Nhật ký thao tác (audit) ---------- */
 
 /** Nhãn tiếng Việt của bảng — cho câu tóm tắt nhật ký dễ đọc. */
@@ -1398,6 +1457,8 @@ const NHAN_BANG: Record<string, string> = {
   reconciliation_runs: "Bản đối soát hóa đơn",
   lot_inputs: "Gắn lô đầu vào (truy xuất)",
   label_prints: "In tem QR",
+  lot_dispatches: "Gắn lô cho hàng ra (truy xuất)",
+  lot_waivers: "Lý do chưa gắn lô",
   row_marks: "Tô màu dòng",
 };
 
@@ -1440,6 +1501,16 @@ function nhatKyThayDoi<T>(bang: AnhXaBang<T>, cu: T[], next: T[]): void {
 
 export type TrangThai = "dang-tai" | "san-sang" | "loi";
 
+/**
+ * Đồng bộ CÙNG TAB giữa các lần gọi `useBang` của cùng một bảng. Mỗi lần gọi giữ
+ * `rows` riêng: hộp con (VD gắn lô) ghi xong mà màn cha vẫn cầm bản cũ thì lần
+ * ghi kế tiếp của màn cha sẽ coi dòng con vừa thêm là "đã xóa" và xóa luôn trên
+ * máy chủ. Ghi xong phát sự kiện này để các bản khác nhận đúng `rows` mới — chỉ
+ * cập nhật trạng thái, KHÔNG ghi lại, không đụng hàng chờ.
+ */
+const SU_KIEN_BANG = "bsf:bang-doi";
+type SuKienBang = { localKey: string; tu: string; rows: unknown[] };
+
 export function useBang<T>(bang: AnhXaBang<T>, seed: () => T[] = () => []) {
   const khoa = bang.khoaChinh ?? "id";
   const va = bang.vaDongCu;
@@ -1461,6 +1532,19 @@ export function useBang<T>(bang: AnhXaBang<T>, seed: () => T[] = () => []) {
   const [loi, setLoi] = useState<string | null>(null);
   const truoc = useRef<T[]>(rows);
   truoc.current = rows;
+  const [maBan] = useState(() => Math.random().toString(36).slice(2));
+
+  /* Nhận bản mới từ lần gọi khác của cùng bảng (xem SU_KIEN_BANG). */
+  useEffect(() => {
+    const nhan = (e: Event) => {
+      const d = (e as CustomEvent<SuKienBang>).detail;
+      if (!d || d.localKey !== bang.localKey || d.tu === maBan) return;
+      truoc.current = d.rows as T[];
+      setRows(d.rows as T[]);
+    };
+    window.addEventListener(SU_KIEN_BANG, nhan);
+    return () => window.removeEventListener(SU_KIEN_BANG, nhan);
+  }, [bang.localKey, maBan]);
 
   /* Nạp từ máy chủ */
   useEffect(() => {
@@ -1560,8 +1644,12 @@ export function useBang<T>(bang: AnhXaBang<T>, seed: () => T[] = () => []) {
   const ghi = useCallback(
     (next: T[]) => {
       const cu = truoc.current;
+      truoc.current = next; // hai lần ghi liền trong cùng thao tác vẫn so đúng bản trước
       setRows(next);
       save(bang.localKey, next); // luôn có bản sao dưới máy
+      window.dispatchEvent(
+        new CustomEvent<SuKienBang>(SU_KIEN_BANG, { detail: { localKey: bang.localKey, tu: maBan, rows: next } })
+      );
 
       // Nhật ký thao tác — chạy cả hai chế độ (server + localStorage).
       nhatKyThayDoi(bang, cu, next);
@@ -1604,7 +1692,7 @@ export function useBang<T>(bang: AnhXaBang<T>, seed: () => T[] = () => []) {
         }
       })();
     },
-    [bang, khoa]
+    [bang, khoa, maBan]
   );
 
   return [rows, ghi, { trangThai, loi }] as const;

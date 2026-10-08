@@ -24,8 +24,10 @@ import {
   useSalesInvoices,
   useWipProductions,
   usePackagings,
+  useLotInputs,
+  useLotDispatches,
 } from "@/lib/catalogRepo";
-import { loConHang, tinhTon, locBanLe, dongGoiTruTon } from "@/lib/inventory";
+import { loConHang, tinhTon, truTonBTP } from "@/lib/inventory";
 import {
   ChuThichBatBuoc,
   Button,
@@ -99,9 +101,12 @@ export default function DonDatScreen() {
   const tenKH = (id: string) => khach.find((k) => k.id === id)?.name || "—";
 
   const [packagings] = usePackagings();
+  const [lotInputs] = useLotInputs();
+  const [lotDispatches] = useLotDispatches();
+  // Trừ đúng lô đã gắn (truy xuất QR) trước khi lập lệnh FIFO — lệnh không lấy lô đã đi.
   const banLe = useMemo(
-    () => [...locBanLe(banHang), ...dongGoiTruTon(packagings)],
-    [banHang, packagings]
+    () => truTonBTP(banHang, packagings, lotInputs, lotDispatches),
+    [banHang, packagings, lotInputs, lotDispatches]
   );
   const ton = useMemo(() => tinhTon(sanXuat, dongLenh, banLe), [sanXuat, dongLenh, banLe]);
 
@@ -521,6 +526,9 @@ export default function DonDatScreen() {
         <KiemLoXuat
           lenh={kiemLenh}
           dongLenh={dongLenh.filter((d) => d.exportId === kiemLenh.id)}
+          tatCaDongLenh={dongLenh}
+          onLuuDongLenh={persistDongLenh}
+          ton={ton}
           sanXuat={sanXuat}
           matHang={matHang}
           onClose={() => setKiemLenh(null)}

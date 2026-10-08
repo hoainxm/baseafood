@@ -5,8 +5,8 @@
 // ============================================================
 import { useMemo, useState } from "react";
 import type { WipProductionItem } from "@/types";
-import { useExportItems, usePackagings, useProducts, useSalesItems, useWipProductions } from "@/lib/catalogRepo";
-import { tinhTon, locBanLe, dongGoiTruTon, type LoTon } from "@/lib/inventory";
+import { useExportItems, useLotDispatches, useLotInputs, usePackagings, useProducts, useSalesItems, useWipProductions } from "@/lib/catalogRepo";
+import { tinhTon, truTonBTP, type LoTon } from "@/lib/inventory";
 import {
   ChuThichBatBuoc,
   Button,
@@ -58,9 +58,12 @@ export default function KhoDuTruScreen() {
   const [matHang] = useProducts();
   const [banHang] = useSalesItems();
   const [packagings] = usePackagings();
+  const [lotInputs] = useLotInputs();
+  const [lotDispatches] = useLotDispatches();
+  // Trừ đúng lô đã gắn (truy xuất QR), phần còn lại FIFO — cùng con số với hộ chiếu lô.
   const banLe = useMemo(
-    () => [...locBanLe(banHang), ...dongGoiTruTon(packagings)],
-    [banHang, packagings]
+    () => truTonBTP(banHang, packagings, lotInputs, lotDispatches),
+    [banHang, packagings, lotInputs, lotDispatches]
   );
 
   const [locKho, setLocKho] = useState("");

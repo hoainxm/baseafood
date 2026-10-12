@@ -123,16 +123,16 @@ export function ChonCheDo({
 // ---------- Quy tắc máy đang áp dụng ----------
 /** Quy tắc đã chốt qua các đợt đối soát thật (doc 37). Giữ câu ngắn, lời thường. */
 const QUY_TAC: { ten: string; noiDung: string }[] = [
-  { ten: "Khóa ghép", noiDung: "MST người bán + ký hiệu + số hóa đơn. Số hóa đơn bỏ số 0 ở đầu (00060568 = 60568); ký hiệu bỏ chữ số mẫu số gộp đầu (1C26TTN = C26TTN)." },
+  { ten: "Khóa ghép", noiDung: "MST người bán + ký hiệu + số hóa đơn. MST chỉ so phần chữ số (0301234567-001 = 0301234567001), MST mất số 0 đầu được bù lại; số hóa đơn bỏ số 0 ở đầu (00060568 = 60568); ký hiệu bỏ chữ số mẫu số gộp đầu (1C26TTN = C26TTN)." },
   { ten: "Cộng dồn", noiDung: "Một hóa đơn tách nhiều dòng sổ (theo thuế suất / theo mặt hàng) được cộng lại rồi mới so." },
   { ten: "So đủ 3 cột", noiDung: "So trước thuế, thuế và tổng ở từng hóa đơn. Tổng lệch ⇒ LỆCH TIỀN; tổng khớp mà thuế lệch ⇒ LỆCH THUẾ; chỉ trước thuế lệch ⇒ vẫn khớp (thường do chiết khấu / phí)." },
-  { ten: "Ngoại tệ", noiDung: "Máy tự dò bản xuất để tiền ở nguyên tệ (phải nhân tỷ giá) hay đã quy sẵn VND, bằng cách so với các hóa đơn đã khớp sổ. Không mặc định nhân." },
+  { ten: "Ngoại tệ", noiDung: "Máy tự dò bản xuất để tiền ở nguyên tệ (phải nhân tỷ giá) hay đã quy sẵn VND, bằng cách so với các hóa đơn đã khớp sổ. Không mặc định nhân. Ngoại tệ thiếu tỷ giá thì máy báo, không tự coi là VND." },
   { ten: "Không cần vào sổ", noiDung: "Hóa đơn đã bị thay thế / xóa bỏ / hủy không phải kê. Hóa đơn đã bị ĐIỀU CHỈNH vẫn phải kê — không gộp chung." },
   { ten: "Hóa đơn bán hàng (mẫu số 2)", noiDung: "Không có thuế GTGT: ô thuế trống là đúng, chưa thuế phải bằng tổng thanh toán." },
-  { ten: "Làm tròn", noiDung: "Lệch ±1 đ là làm tròn của bên phát hành, không phải sai." },
+  { ten: "Làm tròn", noiDung: "Lệch ±1 đ là làm tròn của bên phát hành, không phải sai. Hóa đơn để nguyên tệ thì chỉ ±1 xu (0,01) mới là làm tròn — lệch 1 USD là lệch thật." },
   { ten: "Gần khớp", noiDung: "Hóa đơn chưa vào sổ nhưng sổ có dòng cùng MST + cùng số tiền ⇒ nghi gõ sai số hóa đơn ở sổ, tách riêng để khỏi kê hai lần." },
   { ten: "Ghi chú tay", noiDung: "Dòng ghi chú kế toán gõ dưới bảng (không có ký hiệu, không có MST hợp lệ) bị bỏ qua, không bị coi là hóa đơn." },
-  { ten: "Hai bản", noiDung: "Sheet có chữ “thuế” trong tên là bản thuế gửi; không có thì sheet mang chữ “tải” là bản tự tải. Nhận sai thì chọn lại ở mục So hai bản." },
+  { ten: "Hai bản", noiDung: "Sheet có chữ “thuế” trong tên là bản thuế gửi; không có thì sheet mang chữ “tải” là bản tự tải. Nhận sai thì chọn lại ở mục So hai bản. File có sổ mà hai bản gối nhau thì chỉ bản thuế gửi được đối chiếu sổ (khỏi đếm hai lần)." },
   { ten: "Không sửa số", noiDung: "Máy chỉ báo. Số chỉ đổi khi bạn bấm Sửa từng dòng; file xuất giữ nguyên định dạng và địa chỉ ô của file gốc." },
 ];
 

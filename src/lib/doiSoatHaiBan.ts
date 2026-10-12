@@ -14,10 +14,9 @@
  * engine đối soát, nên bật/tắt không ảnh hưởng các phép tự kiểm đã verify.
  */
 import type { DongHoaDon, SheetHoaDon } from "./doiSoatHddt";
-import { boDau } from "./username";
+import { chuanChu as chuan } from "./doiSoatChung";
 
-const chuan = (s: unknown): string =>
-  boDau(String(s ?? "")).toLowerCase().trim().replace(/[_\s]+/g, " ");
+export { chuCotExcel } from "./doiSoatChung";
 
 /** Sheet thuộc bản CƠ QUAN THUẾ gửi: tên sheet có chữ "thuế". */
 export const laBenThue = (tenSheet: string): boolean => chuan(tenSheet).includes("thue");
@@ -109,13 +108,6 @@ export interface KetQuaSoHaiBan {
 }
 
 const viTri = (d: DongHoaDon): string => `${d.sheet} dòng ${d.dongFile}`;
-
-/** Chỉ số cột 0-based → chữ cột Excel (0 → A, 26 → AA). */
-export function chuCotExcel(c: number): string {
-  let s = "";
-  for (let n = c + 1; n > 0; n = Math.floor((n - 1) / 26)) s = String.fromCharCode(65 + ((n - 1) % 26)) + s;
-  return s;
-}
 
 /**
  * So bản THUẾ gửi với bản TỰ TẢI. Trả `null` nếu file không có đủ hai bên

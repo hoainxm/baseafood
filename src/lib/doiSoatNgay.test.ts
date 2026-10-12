@@ -10,6 +10,8 @@ describe("ngayHienThi", () => {
     expect(ngayHienThi(new Date(2026, 7, 1, 0, 0, 0))).toBe("01/08/2026");
     expect(ngayHienThi(new Date(2026, 7, 1, 14, 0, 0))).toBe("01/08/2026");
     expect(ngayHienThi(new Date(2026, 7, 1, 23, 50, 0))).toBe("01/08/2026");
+    // giờ thật sát nửa đêm (23:56) KHÔNG được nhảy sang hôm sau
+    expect(ngayHienThi(new Date(2026, 7, 1, 23, 56, 0))).toBe("01/08/2026");
   });
   test("số serial + chuỗi", () => {
     expect(ngayHienThi(46235)).toBe("01/08/2026");

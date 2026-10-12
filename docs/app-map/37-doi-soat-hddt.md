@@ -1,7 +1,8 @@
 > Load khi: sửa màn `/doi-soat`, logic đối soát hóa đơn điện tử ⇄ phần mềm kế toán, đọc/ghi file Excel hóa đơn.
-covers: src/features/doi-soat/DoiSoatScreen.tsx, src/features/doi-soat/CheDoDoiSoat.tsx, src/features/doi-soat/cheDo.ts, src/features/doi-soat/index.ts, src/lib/doiSoatHddt.ts, src/lib/doiSoatHaiBan.ts, src/lib/doiSoatXuat.ts, src/lib/doiSoatXuatShift.ts, src/lib/doiSoatXuatTongHop.ts
-last_verified: 2026-10-06
+covers: src/features/doi-soat/DoiSoatScreen.tsx, src/features/doi-soat/CheDoDoiSoat.tsx, src/features/doi-soat/cheDo.ts, src/features/doi-soat/index.ts, src/lib/doiSoatHddt.ts, src/lib/doiSoatHaiBan.ts, src/lib/doiSoatXuat.ts, src/lib/doiSoatXuatShift.ts, src/lib/doiSoatXuatTongHop.ts, src/lib/doiSoatChung.ts
+last_verified: 2026-10-12
 ttl_days: 90
+<!-- updated: 2026-10-12 — sửa đợt audit (xem mục "v7.1 — sửa sau audit"): dịch công thức vùng có tên sheet · ngoại tệ của sheet tập con/bản tự tải · có sổ + hai bản gối nhau không đếm đôi · MST chuẩn hóa · soVN · ngoại tệ thiếu tỷ giá + dung sai nguyên tệ · lưu ngưỡng · phép kiểm quy đổi · chữ hướng dẫn · ngày sát nửa đêm · gom tiện ích về `doiSoatChung.ts`. Test: `doiSoatHddt.test.ts`, `doiSoatXuatShift.test.ts`. CHƯA chạy trên file thật. -->
 <!-- updated: 2026-10-06 — tô màu dòng (mig 0055): CHỈ danh sách "Bản đã lưu" bật `toMau="doi-soat-ban-luu"`. Các bảng KẾT QUẢ đối soát chưa tô: khoá dòng là `<sheet>#<dòng>` của file đang mở — đổi file là trùng khoá, dấu nhảy sang dòng khác. Đợt sau: khoá theo id bản đối soát đã lưu (`doi-soat|<runId>|…`), chỉ bật khi đang mở bản đã lưu. -->
 <!-- updated: 2026-09-29 — sửa NGÀY LÙI 1 NGÀY: `ngayHienThi(Date)` làm tròn 10 phút trước khi lấy ngày (SheetJS cellDates dựng Date lệch ~30 giây theo múi giờ ⇒ ở VN ô 01/08 ra 31/07 23:59:30). Kiểm thật TZ VN: "DANH SÁCH HÓA ĐƠN T8" 1.180/1.180 ô ngày lệch → 0; "SO SÁNH GHDON DTU VÀ PMEM" 4.448/4.448 → 0. Chỉ sai ngày HIỂN THỊ/XUẤT — khớp theo ký hiệu+số nên kết quả so không đổi; "cùng MST cùng ngày" cả file cùng lùi nên gom vẫn đúng, chỉ nhãn ngày sai. Giữ cellDates (phần xuất giữ định dạng dựa vào nó). Test `doiSoatNgay.test.ts`. -->
 <!-- re-verified: 2026-09-25 14:40 — /fl: claims checked vs code trước khi sửa: `laBenThue` chỉ dò chữ "thuế" (doiSoatHaiBan.ts) · `soHaiBanHddt`/`gomCungMstCungNgay` chỉ gọi ở lớp xuất (themSheetTongHop), KHÔNG hiện trên màn · `phatHienQuyUocNgoaiTe` chỉ dò theo sổ, soMau=0 ⇒ mặc định ×tỷ giá · `tong.lech` và `tong.lechThue` là HAI nhóm rời (cùng trangThai LECH). Khớp code. -->
@@ -53,10 +54,10 @@ Công cụ **kế toán** (không phải nghiệp vụ MES). Đối chiếu hóa
 
 ## Khóa & so tiền (logic ở `lib/doiSoatHddt.ts`)
 
-- **Khóa đối chiếu** = `MST người bán | Ký hiệu hóa đơn | Số HĐ chuẩn` (chuẩn hóa: bỏ dấu, thường, gộp khoảng trắng). **Số HĐ chuẩn** = bỏ số 0 ở đầu (`00060568` → `60568`) vì phần mềm pad 0 còn cổng thuế thì không (`soHoaDonChuan`).
+- **Khóa đối chiếu** = `MST người bán | Ký hiệu hóa đơn | Số HĐ chuẩn` (chuẩn hóa: bỏ dấu, thường, gộp khoảng trắng). **MST** qua `mstChuan`: chỉ giữ chữ số (`0301234567-001` = `0301234567001`), còn 9/12 số thì bù `0` đầu (Excel nuốt số 0 khi ô MST kiểu số). **Số HĐ chuẩn** = bỏ số 0 ở đầu (`00060568` → `60568`) vì phần mềm pad 0 còn cổng thuế thì không (`soHoaDonChuan`).
 - **Quy về VND — TỰ DÒ quy ước (`phatHienQuyUocNgoaiTe`; không có sổ thì `doQuyUocTheoBanKia` — xem v7):** cổng thuế xuất hóa đơn ngoại tệ theo **hai kiểu KHÁC nhau tùy bản xuất** — có bản để tiền ở **nguyên tệ** (phải `× Tỷ giá` ra VND), có bản đã **quy sẵn VND** ở cột tiền (nhân nữa là đội lên gấp ~tỷ giá lần → tổng phình từ vài trăm tỷ thành vài chục **nghìn** tỷ). Không cố định được nên engine **không đoán mò**: lấy hóa đơn ngoại tệ **đã khớp dòng sổ** (sổ luôn VND) làm mẫu, so **số gốc** vs **số ×tỷ giá** xem bên nào sát sổ hơn → đó là quy ước của file, áp cho MỌI dòng ngoại tệ. Mỗi dòng giữ `chuaThueRaw/thueRaw/tongTtRaw` (số gốc) để dò; khi kết luận "đã VND" thì hạ `tyGia` (áp dụng) về **1** và lấy lại số gốc. Không có mẫu khớp sổ ⇒ GIỮ mặc định `× Tỷ giá` + bắn cảnh báo soát tay. Cột nguồn "Tỷ giá" của file KHÔNG bị sửa; cột xuất "Tỷ giá áp dụng" = số thực đã nhân (1 khi không quy đổi).
 - **Gộp theo khóa** cả 2 bên rồi so **tổng** (`Số dòng khớp PMKT` = số bút toán, `Tổng TT bên PMKT` = tổng `Tổng cộng`). Đây là lý do phải cộng dồn: 1 hóa đơn ↔ nhiều dòng thuế.
-- **Ngưỡng khớp** (`nguong`, mặc định **1.000đ**, chỉnh trên màn): `|chênh| ≤ ngưỡng` ⇒ vẫn **KHỚP** (nuốt sai số làm tròn tỷ giá). Chênh tính theo **HĐĐT − phần mềm**.
+- **Ngưỡng khớp** (`nguong`, mặc định **1đ**, chỉnh trên màn; ô để trống = 0đ; lưu bản ghi đúng `ketQua.nguong` đã tính): `|chênh| ≤ ngưỡng` ⇒ vẫn **KHỚP** (nuốt sai số làm tròn tỷ giá). Chênh tính theo **HĐĐT − phần mềm**.
 
 ## Nhãn kết quả
 
@@ -114,8 +115,9 @@ khác**, so số gốc và số ×tỷ giá với các giá trị có thể củ
 kia xa (>50%) mới tính phiếu; **quyết TỪNG SHEET** (hai bản có thể khác quy ước). Hai sheet cùng quy ước thì
 hai giả thiết hòa ⇒ không phiếu ⇒ giữ mặc định + cảnh báo soát tay như cũ. Nhánh có sổ **không đổi**.
 
-> ⚠️ Nhánh có sổ vẫn quyết **một quy ước cho cả file**. File vừa có sổ vừa có hai bản khác quy ước thì
-> bên thua phiếu sẽ bị quy sai — chưa gặp file thật như vậy; gặp thì chuyển nhánh sổ sang quyết theo sheet.
+> ⚠️ Nhánh có sổ quyết **một quy ước cho các sheet đối soát với sổ** (`hdActive`). Sheet KHÔNG đối soát
+> với sổ (tập con `laPhu`, bản tự tải) từ 2026-10-12 được dò riêng theo bản kia (`doQuyUocTheoBanKia(…, chiXet)`),
+> không dò được thì theo quy ước vừa chốt bằng sổ — trước đó chúng giữ ×tỷ giá nên "So hai bản" báo lệch oan.
 
 ## v6.5 — dễ hiểu: nói bằng ô của kế toán, không dời ô
 
@@ -547,7 +549,7 @@ tải khi mở màn, `exceljs` chỉ tải khi bấm nút xuất.
 
 ## Cạm bẫy / đã kiểm
 
-- ⚠ **Ngày từ ô Excel dạng date**: đọc bằng `cellDates` ra Date lệch vài chục giây theo múi giờ (VN: 23:59:30 hôm trước). MỌI chỗ đổi ô ngày → chuỗi phải đi qua `ngayHienThi` (đã làm tròn 10 phút) — đừng tự `getDate()` trên Date từ sheet.
+- ⚠ **Ngày từ ô Excel dạng date**: đọc bằng `cellDates` ra Date lệch vài chục giây theo múi giờ (VN: 23:59:30 hôm trước). MỌI chỗ đổi ô ngày → chuỗi phải đi qua `ngayHienThi` (chỉ đẩy sang hôm sau khi giờ đọc được trong 2 phút trước nửa đêm — bản cũ làm tròn 10 phút làm ô 23:56 nhảy ngày) — đừng tự `getDate()` trên Date từ sheet.
 
 - Dòng PHẦN MỀM **không có** số HĐ/ký hiệu (bút toán nội bộ) → bỏ qua, không đối soát.
 - Cặp **bút toán đảo** (một dòng dương + một dòng âm cùng số tiền) của hóa đơn không nằm trong file → gắn `CHƯA CÓ HĐĐT` (nêu ra để kế toán soát).
@@ -573,9 +575,28 @@ tải khi mở màn, `exceljs` chỉ tải khi bấm nút xuất.
 - **9 phép tự kiểm** (thêm "tổng cột Chênh lệch = phần dư trừ chéo").
 - **Ngưỡng KHỚP mặc định 1đ** (spec §5.3) — vẫn có ô chỉnh trên màn.
 - **Xuất file mẫu** (`xuatFileMau`): 3 sheet HĐĐT (tiêu đề hàng 6) + PMEM (mã máy) + HƯỚNG DẪN, kèm dòng ví dụ. Engine vẫn đọc mọi biến thể tên sheet/cột — file mẫu chỉ để đỡ sai định dạng.
-- **Locale**: `soVN` tự suy dấu thập phân theo dấu cuối, lỗi → null (không mặc định 0/1).
+- **Locale**: `soVN` tự suy dấu thập phân theo dấu cuối, lỗi → null (không mặc định 0/1). Từ 2026-10-12: nhiều dấu cùng loại = ngăn nghìn (`1,234,567`); MỘT dấu theo sau đúng 3 chữ số + phần nguyên 1–3 chữ số khác 0 = ngăn nghìn (`25.420`, `123,456`), còn lại là thập phân (`1.5`, `0,25`, `0.250`); trong ngoặc = âm (`(1.234)` = −1234).
 
 > ⚠️ **Verify**: mới chạy thật trên **T02** (khớp spec §12 T2 = 264/4/155, sổ 291/5; tự kiểm 9/9; idempotent). GẦN KHỚP, strip mẫu số, gộp sheet HĐĐT trùng CHƯA có dữ liệu thật để chạy (T2 không dính) — cần file T1/T3–T6 để đóng bộ hồi quy §12.
+
+## v7.1 — sửa sau audit (2026-10-12)
+
+| # | Lỗi | Sửa |
+|---|---|---|
+| 18 | `dichCongThuc`: `SUM(HDDT!Q3:Q3047)` dịch thành `R3:Q3047` (nửa sau vùng mất tên sheet) | sau ô đầu vùng, gặp `:` thì GIỮ sheet của ô đầu. Áp cả chiều gỡ cột (−1). |
+| 19 | Sheet tập con / bản tự tải giữ ×tỷ giá trong khi bản chính đã hạ về VND ⇒ "So hai bản" lệch oan hàng trăm tỉ | xem ⚠️ ở mục v7 — sheet ngoài `hdActive` dò theo bản kia, không dò được thì theo quy ước của sổ. Phiếu dò bằng sổ vẫn chỉ lấy từ `hdActive`. |
+| 20 | Có sổ + hai bản gối nhau một phần (không bản nào tập con) ⇒ hóa đơn đếm hai lần, lớp xuất còn giấu cảnh báo "Trùng khóa HĐĐT" | có sổ + chia được hai bên (`phanBenThue`, nhận `TuyChonDoiSoat.benThue` từ màn) + hai bên chung ≥ nửa bản nhỏ ⇒ bản tự tải thành `laPhu` (nhóm 7 "Bản tự tải"), chỉ bản thuế gửi đối soát sổ; cảnh báo "Hai bản hóa đơn điện tử" nói số hóa đơn CHỈ có ở bản tự tải (không vào đối soát sổ — soát ở "So hai bản"). Trùng khóa: có sổ ⇒ luôn báo; không sổ ⇒ chỉ báo lặp TRONG cùng một bản. Bỏ bộ lọc `trungKhacBen` ở `doiSoatXuatTongHop.ts` (file = màn). |
+| 21 | MST không chuẩn hóa; sổ có cột "MST" / "Mã số thuế" / "MST người bán" không nhận ⇒ 0 khớp mà không báo | `mstChuan` (khóa + gần khớp); thêm 3 tiêu đề; sổ không có cột MST ⇒ cảnh báo "Sổ không có cột MST". |
+| 22 | `soVN("1,234,567")` = null, `"123.456"` = 123,456, `"(1.234)"` mất âm, tỷ giá chữ `"25.420"` = 25,42 | luật mới ở mục Locale (v3). |
+| 23 | Ngoại tệ thiếu/0 tỷ giá lặng lẽ coi như VND; dung sai làm tròn 1 áp lên số NGUYÊN TỆ (lệch 1 USD ≈ 25.000đ coi là làm tròn) | `DongHoaDon.thieuTyGia` + cảnh báo "Ngoại tệ thiếu tỷ giá". Dòng ngoại tệ để nguyên tệ: dung sai `TOL_NGUYEN_TE` = 0,01 (±1 xu) cho cân đối cột + nghi vấn cộng. Quy ước chỉ biết sau khi ghép sổ ⇒ `doiSoat` chạy `doiSoatMotLan` lần hai cho file có sheet nguyên tệ (phần dò quy ước không phụ thuộc dung sai nên ra y hệt). Dòng đã quy sẵn VND vẫn ±1đ. |
+| 24 | Màn tính với `nguong ?? 0` nhưng lưu `nguong ?? 1` ⇒ mở lại bản chính thức ra kết quả khác | lưu `ketQua.nguong`. |
+| 25a | Phép tự kiểm "Cột quy đổi = gốc × tỷ giá" tính `(v/t)×t − v` luôn ≈ 0 | định nghĩa lại (vẫn 9 phép): đếm dòng ngoại tệ THIẾU tỷ giá + dòng có cột VND ≠ số gốc × tỷ giá ÁP DỤNG, trên MỌI sheet hóa đơn. |
+| 25b | KIỂM CHỨNG hướng dẫn lọc `"KHÔNG CÓ TRÊN HĐĐT"` (engine ghi `"CHƯA CÓ HĐĐT"`); "trừ nhóm LỆCH TIỀN" mà nhóm gồm cả LỆCH THUẾ | sửa chữ khớp nhãn engine. |
+| — | `ngayHienThi(23:56)` nhảy sang hôm sau | xem Cạm bẫy. |
+
+Gọn: `doiSoatChung.ts` gom chữ cột Excel (`chuCotExcel`/`soCotExcel`), bảng màu nền (`MAU_NEN` + `nenDac`), khóa ô Sửa (`khoaSua`/`tachKhoaSua`), `chuanChu`. Gộp phân loại lệch cộng (viết 2 lần), `congSo` ở lớp xuất, vòng viết lại công thức ở `doiSoatXuatShift.ts`; bỏ code chết `docVaDoiSoat`, `pmGkCount`. Hai bản `oXuat` (engine / lớp xuất) KHÔNG gộp vì khác hành vi (bản xuất ép về chuỗi/số cho exceljs).
+
+> ⚠️ Mục 19–23 mới kiểm bằng test dựng tay — **chưa chạy engine trên file thật** (cổng kiểm CLAUDE.md: tổng khối A ≈ tổng cột tiền cộng thô, hóa đơn ngoại tệ khớp sổ ở số gốc).
 
 ## v4 — lưu & mở lại theo tài khoản
 

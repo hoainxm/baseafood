@@ -17,6 +17,7 @@ import type { KetQuaDoiSoat, SheetHoaDon } from "./doiSoatHddt";
 import { SHEET_TU_DUNG } from "./doiSoatHddt";
 import type { KetQuaSoHaiBan, NhomCungNgay } from "./doiSoatHaiBan";
 import { gomCungMstCungNgay, phanBenThue, soHaiBanHddt } from "./doiSoatHaiBan";
+import { MAU_NEN, chuCotExcel as chuCot, nenDac as to } from "./doiSoatChung";
 
 type Workbook = import("exceljs").Workbook;
 type Worksheet = import("exceljs").Worksheet;
@@ -42,13 +43,12 @@ const TEN_NHOM: Record<number, string> = {
   7: "SHEET TRÙNG LẶP",
 };
 
-const NEN_TIEU_DE = "FFD9E1F2";
-const NEN_TITLE = "FF17529C";
-const NEN_DAT = "FFC6EFCE";
-const NEN_TRUOT = "FFFFC7CE";
-const NEN_NGHI = "FFFFEB9C";
+const NEN_TIEU_DE = MAU_NEN.tieuDe;
+const NEN_TITLE = MAU_NEN.title;
+const NEN_DAT = MAU_NEN.xanh;
+const NEN_TRUOT = MAU_NEN.do;
+const NEN_NGHI = MAU_NEN.vang;
 
-const to = (argb: string) => ({ type: "pattern" as const, pattern: "solid" as const, fgColor: { argb } });
 const vnd = (n: number) => `${Math.round(n).toLocaleString("vi-VN")} đ`;
 /** Địa chỉ nội bộ tới một ô, dạng `#'Sheet'!A1` — đích của hàm HYPERLINK. */
 const lienKet = (sheet: string, o = "A1") => `#'${sheet.replace(/'/g, "''")}'!${o}`;
@@ -79,6 +79,19 @@ function cong(sheets: readonly SheetHoaDon[], loc: (d: SheetHoaDon["dong"][numbe
         r.tong += d.tongTtVnd;
         r.n++;
       }
+  return r;
+}
+
+/** Cộng ba cột tiền + đếm dòng cho các dòng SỔ thỏa điều kiện. */
+function congSo(kq: KetQuaDoiSoat, loc: (d: NonNullable<KetQuaDoiSoat["sheetPhanMem"]>["dong"][number]) => boolean = () => true): Cong {
+  const r = { ...CONG_0 };
+  for (const d of kq.sheetPhanMem?.dong ?? [])
+    if (loc(d)) {
+      r.chua += d.chuaThue;
+      r.thue += d.thue;
+      r.tong += d.tongCong;
+      r.n++;
+    }
   return r;
 }
 
@@ -124,13 +137,6 @@ function tieuDeTrang(ws: Worksheet, tieuDe: string, moTa: readonly string[]): vo
 // ---------------------------------------------------------------------------
 const RONG = [36, 17, 17, 17, 17, 17, 17, 58] as const;
 const HET = RONG.length;
-
-/** 0-based → chữ cái cột Excel. */
-const chuCot = (c0: number): string => {
-  let n = c0 + 1, s = "";
-  while (n > 0) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = (n - m - 1) / 26; }
-  return s;
-};
 
 type GiaTriO = string | number | null | { formula: string; result: string };
 type Font = { bold?: boolean; italic?: boolean; size?: number; color?: { argb: string }; underline?: boolean };
@@ -221,21 +227,9 @@ function khoiDoiChieu(ws: Worksheet, r0: number, kq: KetQuaDoiSoat): number {
   const Tkhong = cong(hd, (d) => d.trangThai === "THIEU" && d.khongCanVaoSo);
   const kiemTra = tru(A, { chua: K.chua + L.chua + T.chua, thue: K.thue + L.thue + T.thue, tong: K.tong + L.tong + T.tong, n: K.n + L.n + T.n });
 
-  const pm = kq.sheetPhanMem;
-  const congPm = (loc: (d: NonNullable<typeof pm>["dong"][number]) => boolean): Cong => {
-    const r = { ...CONG_0 };
-    for (const d of pm?.dong ?? [])
-      if (loc(d)) {
-        r.chua += d.chuaThue;
-        r.thue += d.thue;
-        r.tong += d.tongCong;
-        r.n++;
-      }
-    return r;
-  };
-  const B = congPm(() => true);
-  const Bco = congPm((d) => d.trangThai === "CO");
-  const Bthieu = congPm((d) => d.trangThai === "THIEU");
+  const B = congSo(kq);
+  const Bco = congSo(kq, (d) => d.trangThai === "CO");
+  const Bthieu = congSo(kq, (d) => d.trangThai === "THIEU");
 
   const chuaKe = tru(tru(A, K), L);
   const chenhCachTinh = tru(chuaKe, T);
@@ -259,12 +253,12 @@ function khoiDoiChieu(ws: Worksheet, r0: number, kq: KetQuaDoiSoat): number {
     ["", null, "", ""],
     [`B. Sổ kế toán (sheet "${tenSo}")`, B, "Cộng cột tổng cộng của sổ.", "Bôi đen cột tổng cộng và đọc ô Sum.", true],
     ["   – dòng sổ ĐÃ CÓ hóa đơn điện tử", Bco, 'Điều kiện cột A của sổ = "ĐÃ CÓ HĐĐT".', "Mỗi dòng có cột BẰNG CHỨNG ĐỐI CHIẾU ghi rõ khớp hóa đơn nào, sheet nào."],
-    ["   – dòng sổ KHÔNG CÓ trên hóa đơn điện tử", Bthieu, 'Điều kiện cột A của sổ = "KHÔNG CÓ TRÊN HĐĐT".', "Lọc cột A của sổ để ra danh sách đầy đủ."],
+    ["   – dòng sổ CHƯA CÓ hóa đơn điện tử", Bthieu, 'Điều kiện cột A của sổ = "CHƯA CÓ HĐĐT".', "Lọc cột A của sổ để ra danh sách đầy đủ."],
     ["", null, "", ""],
     ["C. CÁCH TÍNH ĐÚNG PHẦN CHƯA KÊ", null, "", "Phải trừ SỐ TRÊN HÓA ĐƠN của các nhóm đã đối chiếu được, không trừ số bên sổ.", true],
     ["   Tổng các sheet", khongDem(A), "Lấy lại dòng A.", ""],
     ["   trừ nhóm KHỚP (số trên hóa đơn)", khongDem(am(K)), "Đổi dấu dòng nhóm KHỚP.", ""],
-    ["   trừ nhóm LỆCH TIỀN (số trên hóa đơn)", khongDem(am(L)), "Đổi dấu dòng nhóm LỆCH TIỀN.", ""],
+    ["   trừ nhóm LỆCH (tiền / thuế — số trên hóa đơn)", khongDem(am(L)), "Đổi dấu dòng nhóm LỆCH.", ""],
     ["   = PHẦN CHƯA KÊ", khongDem(chuaKe), "Cộng ba dòng trên.", "", true],
     ["   Đối chiếu với tổng nhóm CHƯA CÓ", khongDem(T), "Lấy lại dòng nhóm CHƯA CÓ.", ""],
     ["   CHÊNH LỆCH – phải bằng 0", khongDem(chenhCachTinh), "Hai cách tính phải cho cùng một số.", "Bằng 0 thì con số phần chưa kê là đáng tin.", true],
@@ -493,13 +487,7 @@ interface MocChuaKe {
 function khoiSoTongGon(ws: Worksheet, r0: number, kq: KetQuaDoiSoat): number {
   const hd = kq.sheetsHoaDon.filter((s) => !s.laPhu);
   const A = cong(hd, () => true);
-  const B = { ...CONG_0 };
-  for (const d of kq.sheetPhanMem?.dong ?? []) {
-    B.chua += d.chuaThue;
-    B.thue += d.thue;
-    B.tong += d.tongCong;
-    B.n++;
-  }
+  const B = congSo(kq);
   const chenh = tru(A, B);
   const tenSo = kq.sheetPhanMem?.ten ?? "PMEM";
   const r = tieuDeKhoi(ws, r0, `SO TỔNG 2 FILE — HÓA ĐƠN ĐIỆN TỬ ⇄ SỔ "${tenSo}"`);
@@ -649,21 +637,12 @@ function sheetKetLuan(
   });
 
   // "Không cần vào sổ" đã nói ở dòng chưa kê; không có sổ thì "thiếu sổ" đã nói ở
-  // đầu trang. Có hai bản thì cùng một hóa đơn hiện ở cả hai bên là chuyện đương
-  // nhiên — chỉ giữ trùng khóa CÙNG một bên.
+  // đầu trang. Trùng khóa KHÔNG lọc ở đây: engine đã chỉ báo trùng thật (cùng một bản,
+  // hoặc có sổ mà bị cộng hai lần) — giấu đi là giấu đúng dấu hiệu đếm đôi.
   const daNoi = new Set(coSo ? ["Hóa đơn không cần vào sổ"] : ["Thiếu dữ liệu", "Hóa đơn không cần vào sổ"]);
-  const trungKhacBen = (c: { loai: string; chiTiet: string }) => {
-    if (!ds.haiBan || c.loai !== "Trùng khóa HĐĐT") return false;
-    const m = /\(([^()]+)\)\.?$/.exec(c.chiTiet);
-    if (!m) return false;
-    // "(A#12, B#80, …)": trùng chỉ vì mỗi bên có một bản ⇒ mỗi bên đúng một lần.
-    const benThue = new Set(ds.haiBan.sheetThue);
-    const ben = m[1]!.split(", ").map((x) => benThue.has(x.replace(/#\d+$/, "")));
-    return ben.filter(Boolean).length === 1 && ben.length === 2;
-  };
   const theoLoai = new Map<string, string[]>();
   for (const c of kq.canhBao)
-    if (!daNoi.has(c.loai) && !trungKhacBen(c))
+    if (!daNoi.has(c.loai))
       theoLoai.set(c.loai, [...(theoLoai.get(c.loai) ?? []), c.chiTiet]);
   for (const [loai, ct] of theoLoai)
     traLoi.push({

@@ -42,22 +42,12 @@ import {
   cotExcel,
   ngayHienThi,
 } from "./doiSoatHddt";
+import { MAU_NEN as NEN, chuCotExcel as chuCot, nenDac as to, tachKhoaSua } from "./doiSoatChung";
 import { chenCotDau, dichThamChieuCheoSheet, xoaCotDuoi } from "./doiSoatXuatShift";
 import { themSheetTongHop } from "./doiSoatXuatTongHop";
 
 // exceljs nạp động: chunk /doi-soat đã nặng, không kéo thêm vào bundle chính.
 type Worksheet = import("exceljs").Worksheet;
-
-/** Màu nền theo nhãn — trùng bảng màu ở `doiSoatHddt.ts` (ARGB cho exceljs). */
-const NEN = {
-  xanh: "FFC6EFCE",
-  vang: "FFFFEB9C",
-  do: "FFFFC7CE",
-  tieuDe: "FFD9E1F2",
-  sua: "FFFFD966",
-} as const;
-
-const to = (argb: string) => ({ type: "pattern" as const, pattern: "solid" as const, fgColor: { argb } });
 
 /** 1 cột trống ngăn giữa dữ liệu gốc và khối cột đối soát. */
 const COT_NGAN = 1;
@@ -193,13 +183,6 @@ const headerHd = (tenSo: string, tenTk: string): string[] =>
   );
 const HEADER_PM = [...HEADER_PM_THEM];
 
-/** 0-based → chữ cái cột Excel. */
-const chuCot = (c0: number): string => {
-  let n = c0 + 1, s = "";
-  while (n > 0) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = (n - m - 1) / 26; }
-  return s;
-};
-
 /**
  * Ba ô kiểm "chưa thuế + thuế = tổng thanh toán" cho một dòng, viết bằng CÔNG THỨC
  * trỏ vào chính ô gốc (đã dời sang phải `DICH_COT_XUAT` cột). Kế toán dò TRỰC TIẾP
@@ -235,10 +218,8 @@ function suaTheoSheet(
   if (!edits) return [];
   const ra: { dongFile: number; cot: number; giaTri: number }[] = [];
   for (const [k, v] of Object.entries(edits)) {
-    const phan = k.split("#");
-    const cot = Number(phan.pop());
-    const soDong = Number(phan.pop());
-    if (phan.join("#") !== ten) continue;
+    const { sheet, soDong, cot } = tachKhoaSua(k);
+    if (sheet !== ten) continue;
     const dongFile = dongTheoSoDong.get(soDong);
     if (dongFile != null && Number.isFinite(cot)) ra.push({ dongFile, cot, giaTri: v });
   }

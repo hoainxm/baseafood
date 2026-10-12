@@ -640,8 +640,10 @@ export default function DoiSoatScreen() {
       edits,
       nghiVanBanDau: nghiVanBanDau ?? undefined,
       soChuanTen,
+      // Có sổ + hai bản gối nhau thì engine chỉ đối soát bản thuế gửi ⇒ phải biết bên nào.
+      benThue: benThueChon ?? undefined,
     });
-  }, [wb, nguong, edits, nghiVanBanDau, soChuanTen]);
+  }, [wb, nguong, edits, nghiVanBanDau, soChuanTen, benThueChon]);
 
   // Ba chiều soát ngoài "hóa đơn ⇄ sổ" — cùng hàm thuần lớp xuất dùng, nên số trên màn = số trong file.
   const tenSheetHd = useMemo(() => ketQua?.sheetsHoaDon.map((s) => s.ten) ?? [], [ketQua]);
@@ -798,7 +800,8 @@ export default function DoiSoatScreen() {
       title: tenBanLuu.trim() || tenHienThi || "Bản đối soát",
       period: suyKy(tenHienThi),
       status,
-      threshold: nguong ?? 1,
+      // Đúng ngưỡng đã tính ra kết quả đang thấy (ô trống = 0), mở lại không đổi kết quả.
+      threshold: ketQua.nguong,
       fileName: tenHienThi,
       fileB64: b64,
       options: { soChuanTen, edits, benThue: benThueChon ?? undefined, cheDo },
@@ -822,6 +825,7 @@ export default function DoiSoatScreen() {
         nguong: run.threshold,
         edits: run.options?.edits,
         soChuanTen: run.options?.soChuanTen,
+        benThue: run.options?.benThue,
       });
       const baseline = kq0.nghiVan.length + kq0.nghiVanGop.reduce((s, g) => s + g.soDong, 0);
       setFile(null);
@@ -862,6 +866,7 @@ export default function DoiSoatScreen() {
         nguong: run.threshold,
         edits: run.options?.edits,
         soChuanTen: run.options?.soChuanTen,
+        benThue: run.options?.benThue,
       });
       void xuatFile({ ...kq, benThue: run.options?.benThue }, run.title || "doi-soat", run.fileB64, run.options?.edits);
     } catch (err) {

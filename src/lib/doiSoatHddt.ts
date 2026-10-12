@@ -18,8 +18,9 @@
 // Toàn bộ dữ liệu nằm trong file Excel upload — KHÔNG đọc DB / repo (tier GREEN).
 
 import * as XLSX from "xlsx-js-style";
-import { boDau } from "@/lib/username";
 import { num } from "@/lib/format";
+import { MAU_NEN, chuCotExcel, chuanChu as chuan, khoaSua, tachKhoaSua } from "./doiSoatChung";
+import { phanBenThue } from "./doiSoatHaiBan";
 
 // ---------- Kiểu dữ liệu ----------
 
@@ -114,6 +115,8 @@ export interface DongHoaDon {
    * `phatHienQuyUocNgoaiTe`). Cột "Tỷ giá áp dụng" khi xuất lấy đúng số này.
    */
   tyGia: number;
+  /** Tiền tệ khác VND mà ô tỷ giá trống/0 ⇒ KHÔNG quy đổi được (đang để nguyên số trên hóa đơn). */
+  thieuTyGia?: boolean;
   /** Số tiền GỐC trên hóa đơn (CHƯA nhân tỷ giá) — giữ để tự dò quy ước ngoại tệ. */
   chuaThueRaw: number;
   thueRaw: number;
@@ -273,6 +276,8 @@ export interface SheetPhanMem {
   tenTk: string;
   /** false = bản xuất chi tiết mặt hàng, không có cột tổng — tổng tự cộng tiền hàng + thuế. */
   coCotTong: boolean;
+  /** false = sổ không có cột MST người bán ⇒ khóa ghép thiếu MST, gần như không khớp được. */
+  coCotMst: boolean;
   laPhu?: boolean;
   goc: ToaDoGoc;
   hIdx: number;
@@ -326,6 +331,8 @@ export interface TuyChonDoiSoat {
   edits?: Record<string, number>;
   nghiVanBanDau?: number;
   soChuanTen?: string;
+  /** Sheet thuộc bản THUẾ GỬI do người dùng chỉ định (undefined = máy tự nhận, xem `phanBenThue`). */
+  benThue?: string[];
 }
 
 // ---------- Cột phân tích engine tự thêm (để nhận & GỠ khi chạy lại) ----------
@@ -366,6 +373,13 @@ function docTienTe(row: unknown[], cDvt: number, cTyGia: number): { dvt: string;
 
 /** Lệch tới mức này coi là làm tròn, không phải sai (đồng). */
 export const TOL_LAM_TRON = 1;
+/**
+ * Dung sai làm tròn của dòng ngoại tệ để NGUYÊN TỆ (đơn vị ô là USD…, không phải đồng):
+ * ±1 xu. Dùng `TOL_LAM_TRON` ở đây là coi lệch 1 USD (~25.000 đ) là "làm tròn".
+ */
+export const TOL_NGUYEN_TE = 0.01;
+/** |x| ≤ dung sai (chừa sai số dấu phẩy động khi cộng số lẻ ngoại tệ). */
+const trongDungSai = (x: number, tol: number): boolean => Math.abs(x) <= tol + 1e-9;
 
 const TRANG_THAI_KHONG_VAO_SO = ["da bi thay the", "bi xoa bo", "da bi huy", "bi huy"];
 const khongCanVaoSo = (tt: unknown): boolean => {
@@ -402,53 +416,53 @@ export const HEADER_PM_THEM = [
 
 // ---------- Tiện ích parse ----------
 
-function chuan(s: unknown): string {
-  return boDau(String(s ?? ""))
-    .toLowerCase()
-    .trim()
-    .replace(/[_\s]+/g, " "); // coi "_" như khoảng trắng: "SO_HD" → "so hd"
-}
-
-const chuCaiCot = (i: number): string => (i < 0 ? "?" : XLSX.utils.encode_col(i));
+const chuCaiCot = (i: number): string => (i < 0 ? "?" : chuCotExcel(i));
 
 /**
- * Parse số kiểu Việt/US KHÔNG phụ thuộc locale (v3 §3.1). number→giữ; chuỗi tách
- * dấu thập phân theo dấu ở VỊ TRÍ CUỐI; nhiều "." không "," → ngăn nghìn. Lỗi →
- * null (TUYỆT ĐỐI không mặc định 0/1).
+ * Parse số kiểu Việt/US KHÔNG phụ thuộc locale (v3 §3.1). number→giữ. Chuỗi:
+ *  - có cả "." lẫn "," ⇒ dấu ở VỊ TRÍ CUỐI là thập phân, dấu kia ngăn nghìn ("27.500,75", "1,234.56");
+ *  - một loại dấu, xuất hiện NHIỀU lần ⇒ ngăn nghìn ("1.234.567", "1,234,567");
+ *  - một dấu DUY NHẤT theo sau đúng 3 chữ số, phần nguyên 1–3 chữ số khác 0 ⇒ ngăn nghìn
+ *    ("25.420" tỷ giá gõ kiểu VN, "123,456"); còn lại là thập phân ("1.5", "0,25", "0.250");
+ *  - trong ngoặc ⇒ số âm ("(1.234)" = −1234, cách kế toán ghi số âm).
+ * Lỗi → null (TUYỆT ĐỐI không mặc định 0/1).
  */
 export function soVN(v: unknown): number | null {
   if (typeof v === "number") return Number.isFinite(v) ? v : null;
   if (typeof v !== "string") return null;
   let s = v.trim();
-  if (!s) return null;
+  const ngoac = /^\(.*\)$/.test(s);
   s = s.replace(/[^\d.,-]/g, "");
-  if (!s || s === "-" || s === "." || s === ",") return null;
+  if (!/\d/.test(s)) return null;
+  const am = ngoac || s.startsWith("-");
+  s = s.replace(/^-/, "");
   const coCham = s.includes(".");
   const coPhay = s.includes(",");
   if (coCham && coPhay) {
     const decimal = s.lastIndexOf(".") > s.lastIndexOf(",") ? "." : ",";
     const thousand = decimal === "." ? "," : ".";
     s = s.split(thousand).join("").replace(decimal, ".");
-  } else if (coPhay) {
-    s = s.replace(",", ".");
-  } else if (coCham) {
-    if ((s.match(/\./g) ?? []).length > 1) s = s.split(".").join("");
+  } else if (coCham || coPhay) {
+    const phan = s.split(coCham ? "." : ",");
+    const nganNghin = phan.length > 2 || (phan[1]!.length === 3 && /^[1-9]\d{0,2}$/.test(phan[0]!));
+    s = phan.join(nganNghin ? "" : ".");
   }
   const n = Number(s);
-  return Number.isFinite(n) ? n : null;
+  return Number.isFinite(n) ? (am ? -n : n) : null;
 }
 
 const pad2 = (n: number) => String(n).padStart(2, "0");
 
-/** Làm tròn Date về 10 phút gần nhất — xem `ngayHienThi`. */
-const MUOI_PHUT = 10 * 60 * 1000;
+/** Độ lệch tối đa của Date SheetJS dựng ra (thực tế vài chục giây) — xem `ngayHienThi`. */
+const SAT_NUA_DEM = 2 * 60 * 1000;
 
 export function ngayHienThi(v: unknown): string {
   if (v instanceof Date && !Number.isNaN(v.getTime())) {
     // SheetJS (cellDates) dựng Date lệch vài chục giây theo múi giờ: ô 01/08/2026 ở VN ra
     // 31/07/2026 23:59:30 ⇒ lấy ngày thẳng là LÙI 1 NGÀY (gặp ở mọi ô ngày file cổng thuế).
-    // Làm tròn 10 phút khử độ lệch đó mà vẫn giữ ngày của ô có giờ thật (VD 14:00).
-    const d = new Date(Math.round(v.getTime() / MUOI_PHUT) * MUOI_PHUT);
+    // Chỉ đẩy sang ngày sau khi giờ đọc được SÁT nửa đêm (≤ 2 phút) — làm tròn rộng hơn
+    // (bản cũ 10 phút) thì ô có giờ thật 23:56 bị nhảy sang hôm sau.
+    const d = new Date(v.getTime() + SAT_NUA_DEM);
     return `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}/${d.getFullYear()}`;
   }
   if (typeof v === "number" && Number.isFinite(v)) {
@@ -484,14 +498,24 @@ export function kyHieuChuan(v: unknown): string {
   return cat || s; // toàn số (hiếm) → giữ nguyên
 }
 
+/**
+ * MST để so khớp: CHỈ giữ chữ số (`0301234567-001` = `0301234567001`), và bù số 0 đầu
+ * khi còn 9 / 12 số — Excel nuốt số 0 đầu khi ô MST là kiểu số (`301234567`). Ô không có
+ * chữ số nào thì giữ chữ đã chuẩn hóa.
+ */
+export function mstChuan(v: unknown): string {
+  const so = String(v ?? "").replace(/\D/g, "");
+  if (!so) return chuan(v);
+  return so.length === 9 || so.length === 12 ? `0${so}` : so;
+}
+
 function taoKhoa(mstBan: string, kyHieu: string, soChuan: string): string {
-  return `${chuan(mstBan)}|${chuan(kyHieuChuan(kyHieu))}|${soChuan.toLowerCase()}`;
+  return `${mstChuan(mstBan)}|${chuan(kyHieuChuan(kyHieu))}|${soChuan.toLowerCase()}`;
 }
 
 const cellStr = (row: unknown[], i: number): string =>
   i < 0 ? "" : String(row[i] ?? "").trim();
 
-const keyEdit = (sheet: string, soDong: number, cot: number) => `${sheet}#${soDong}#${cot}`;
 
 /**
  * Tọa độ gốc của một sheet: đổi chỉ số trong mảng AOA sang **ô Excel thật**.
@@ -831,7 +855,7 @@ function layO(
   edits?: Record<string, number>
 ): unknown {
   if (cot < 0) return null;
-  const k = keyEdit(sheet, soDong, cot);
+  const k = khoaSua(sheet, soDong, cot);
   if (edits && k in edits) return edits[k];
   return row[cot];
 }
@@ -848,11 +872,8 @@ function apSuaVaoHang(
   if (!edits) return row;
   let clone: unknown[] | null = null;
   for (const [k, v] of Object.entries(edits)) {
-    const parts = k.split("#");
-    const ct = parts.pop();
-    const sd = parts.pop();
-    if (parts.join("#") !== sheet || Number(sd) !== soDong) continue;
-    const c = Number(ct);
+    const { sheet: sh, soDong: sd, cot: c } = tachKhoaSua(k);
+    if (sh !== sheet || sd !== soDong) continue;
     if (!clone) clone = [...row];
     const cu = row[c];
     clone[c] = v;
@@ -892,7 +913,9 @@ function nghiVanCong(
   row: unknown[],
   cot: CotCong,
   edits: Record<string, number> | undefined,
-  g: ToaDoGoc
+  g: ToaDoGoc,
+  /** Dung sai làm tròn theo ĐƠN VỊ của ô (đồng, hoặc nguyên tệ — `TOL_NGUYEN_TE`). */
+  tolCong = TOL_LAM_TRON
 ): NghiVan | null {
   const a = soVN(layO(row, cot.chua, sheet, soDong, edits));
   const b = soVN(layO(row, cot.thue, sheet, soDong, edits));
@@ -902,7 +925,6 @@ function nghiVanCong(
   // Lệch 1 đồng là LÀM TRÒN của bên phát hành, không phải sai sót — báo lên chỉ làm
   // nhiễu (file thuế 6 tháng có 26 dòng lệch đúng ±1 đ). Phần này vẫn được cộng vào
   // bảng cân đối cột để tổng luôn khớp.
-  const tolCong = TOL_LAM_TRON;
   const oTong = `${sheet} · ô ${oExcel(g, soDong, cot.tong)} (${cot.tenTong})`;
   const oChua = `${sheet} · ô ${oExcel(g, soDong, cot.chua)} (${cot.tenChua})`;
   const oThue = `${sheet} · ô ${oExcel(g, soDong, cot.thue)} (${cot.tenThue})`;
@@ -921,7 +943,7 @@ function nghiVanCong(
   if (cot.banHang && coA) {
     if (!coT || (b ?? 0) !== 0) return null; // có thuế thật ⇒ không phải diện này
     const dung = t! + ck - phi;
-    if (Math.abs(a! - dung) <= tolCong) return null;
+    if (trongDungSai(a! - dung, tolCong)) return null;
     return {
       nhom: 1,
       viTri: oChua,
@@ -985,7 +1007,7 @@ function nghiVanCong(
   if (coA && coB && coT) {
     const e1 = Math.abs(a! + b! - t!);
     const e2 = Math.abs(a! + b! - ck + phi - t!);
-    if (e1 > tolCong && e2 > tolCong && b !== 0) {
+    if (!trongDungSai(e1, tolCong) && !trongDungSai(e2, tolCong) && b !== 0) {
       const dung = a! + b! - ck + phi;
       return {
         nhom: 1, viTri: oTong, viTriXuat: xTong, soDangCo: num(t!), soDoiChung: num(dung),
@@ -1031,7 +1053,9 @@ function parseSheetHoaDon(
   gopMap: Map<string, NghiVanGop>,
   nhatKy: { viTri: string; cu: string; moi: string }[],
   g: ToaDoGoc,
-  rong: number
+  rong: number,
+  /** Dòng ngoại tệ của sheet này để NGUYÊN TỆ (đã dò quy ước) ⇒ dung sai làm tròn theo xu, không theo đồng. */
+  nguyenTe = false
 ): { sheet: SheetHoaDon; loiParse: number } {
   const headerRaw = rows[hIdx] ?? [];
   const header = headerRaw.map((c) => String(c ?? ""));
@@ -1115,13 +1139,15 @@ function parseSheetHoaDon(
     const dvt = tt.dvt || "VND";
     const laVnd = chuan(dvt) === "vnd" || chuan(dvt) === "";
     const tyGiaRaw = soVN(tt.tyGiaRaw);
-    const tyGia = laVnd ? 1 : tyGiaRaw && tyGiaRaw > 0 ? tyGiaRaw : 1;
+    const thieuTyGia = !laVnd && !(tyGiaRaw && tyGiaRaw > 0);
+    const tyGia = laVnd || thieuTyGia ? 1 : tyGiaRaw!;
+    const tol = nguyenTe && tyGia > 1 ? TOL_NGUYEN_TE : TOL_LAM_TRON;
     const chua = soVN(layO(row, cCot.chua, ten, soDong, edits));
     const thue = soVN(layO(row, cCot.thue, ten, soDong, edits));
     const tong = soVN(layO(row, cCot.tong, ten, soDong, edits));
     if (tong == null) loiParse++;
 
-    const nv = nghiVanCong(ten, soDong, row, { ...cCot, banHang: laBanHang(row) }, edits, g);
+    const nv = nghiVanCong(ten, soDong, row, { ...cCot, banHang: laBanHang(row) }, edits, g, tol);
     if (nv) {
       if (nv.nhom === 4 || nv.nhom === 5) themGop(gopMap, nv, (nv.nhom === 4 ? tong : nv.giaTriDung) ?? 0, "hd");
       else nghiVan.push(nv);
@@ -1136,32 +1162,23 @@ function parseSheetHoaDon(
       const tg = soVN(row[cCot.tong]) ?? 0;
       cd.sumChua += a; cd.sumThue += b; cd.sumCk += ck; cd.sumPhi += phi; cd.sumTong += tg;
       const d = tg - (a + b);
-      if (Math.abs(d) > TOL_LAM_TRON / 2) {
-        lechCongDong =
-          Math.abs(d) <= TOL_LAM_TRON ? { lech: d, loai: "lamTron" as const }
-          : phi && Math.abs(d - phi) <= TOL_LAM_TRON ? { lech: d, loai: "phi" as const }
-          : ck && Math.abs(d + ck) <= TOL_LAM_TRON ? { lech: d, loai: "chietKhau" as const }
-          : { lech: d, loai: "that" as const };
+      if (Math.abs(d) > tol / 2) {
         // thứ tự xét: làm tròn → phí → chiết khấu → lệch thật (phí/chiết khấu là
         // thành phần HỢP LỆ của tổng, không phải sai sót)
-        const vao = (k: keyof CanDoiCot["boc"]) => { cd.boc[k] += d; cd.soDong[k]++; };
-        cd.dongLech.push({
-          dongFile: dongExcel(g, soDong), ma: `${kyHieu}-${soHoaDon}`, ngay: ngayHienThi(row[cNgay]),
-          ban: cellStr(row, cTenBan), chua: a, thue: b, phi, ck, tong: tg, lech: d, loai: lechCongDong.loai,
-        });
-        if (Math.abs(d) <= TOL_LAM_TRON) vao("lamTron");
-        else if (phi && Math.abs(d - phi) <= TOL_LAM_TRON) vao("phi");
-        else if (ck && Math.abs(d + ck) <= TOL_LAM_TRON) vao("chietKhau");
-        else {
-          vao("lechThat");
-          cd.dongLechThat.push({
-            dongFile: dongExcel(g, soDong),
-            ma: `${kyHieu}-${soHoaDon}`,
-            ngay: ngayHienThi(row[cNgay]),
-            ban: cellStr(row, cTenBan),
-            lech: d,
-          });
-        }
+        const loai: LoaiLechCong =
+          trongDungSai(d, tol) ? "lamTron"
+          : phi && trongDungSai(d - phi, tol) ? "phi"
+          : ck && trongDungSai(d + ck, tol) ? "chietKhau"
+          : "that";
+        lechCongDong = { lech: d, loai };
+        const k = loai === "that" ? "lechThat" : loai;
+        cd.boc[k] += d;
+        cd.soDong[k]++;
+        const ma = `${kyHieu}-${soHoaDon}`;
+        const ngay = ngayHienThi(row[cNgay]);
+        const ban = cellStr(row, cTenBan);
+        cd.dongLech.push({ dongFile: dongExcel(g, soDong), ma, ngay, ban, chua: a, thue: b, phi, ck, tong: tg, lech: d, loai });
+        if (loai === "that") cd.dongLechThat.push({ dongFile: dongExcel(g, soDong), ma, ngay, ban, lech: d });
       }
     }
 
@@ -1178,6 +1195,7 @@ function parseSheetHoaDon(
       kyHieu, soHoaDon, soChuan,
       ngayLap: ngayHienThi(row[cNgay]),
       mstBan, tenBan: cellStr(row, cTenBan), dvt, tyGia,
+      ...(thieuTyGia ? { thieuTyGia } : {}),
       chuaThueRaw: chua ?? 0,
       thueRaw: thue ?? 0,
       tongTtRaw: tong ?? 0,
@@ -1277,7 +1295,8 @@ function parseSheetPhanMem(
   const cPhieu = cot1(headerRaw, "Phiếu", "SO_PHIEU");
   const cKyHieu = cot1(headerRaw, "KHHĐ", "KY_HIEU", "KH_HD");
   const cSo = cot1(headerRaw, "Số HĐ", "SO_HD");
-  const cMst = cot1(headerRaw, "MASOTHUE", "RMST", "MS_THUE");
+  // "MST người bán" đứng trước "MST" để bước khớp-đầu-chữ không vớ nhầm "MST người mua".
+  const cMst = cot1(headerRaw, "MASOTHUE", "RMST", "MS_THUE", "MST người bán", "Mã số thuế", "MST");
   const cNgayHd = cot1(headerRaw, "Ngày HĐ", "NGAY_HD");
   // Sổ mã máy (PMEM) không có TK Nợ/Có mà có TS% + LOAI ⇒ nhận cả hai kiểu,
   // tên cột ở file xuất lấy đúng theo tiêu đề tìm được (`tenTk`).
@@ -1343,7 +1362,7 @@ function parseSheetPhanMem(
     return t ? (chuDep[chuan(t)] ?? t) : mac;
   };
   const tenTk = `${nhan(cTkNo, "TK Nợ")} / ${nhan(cTkCo, "TK Có")}`;
-  return { ten, header, dong, goc: g, hIdx, rong, tenTk, coCotTong };
+  return { ten, header, dong, goc: g, hIdx, rong, tenTk, coCotTong, coCotMst: cMst >= 0 };
 }
 
 const uniq = (arr: string[]): string[] => [...new Set(arr.filter(Boolean))];
@@ -1385,7 +1404,12 @@ function veSoGoc(ds: readonly DongHoaDon[]): void {
  * (>50%) — hai sheet cùng quy ước thì hai giả thiết HÒA nhau ⇒ không phiếu, giữ mặc định.
  * Trả về các dòng ngoại tệ CHƯA kết luận được.
  */
-function doQuyUocTheoBanKia(tatCa: readonly SheetHoaDon[], canhBao: CanhBao[]): DongHoaDon[] {
+function doQuyUocTheoBanKia(
+  tatCa: readonly SheetHoaDon[],
+  canhBao: CanhBao[],
+  /** Chỉ KẾT LUẬN cho các sheet này (mốc vẫn lấy từ mọi sheet). */
+  chiXet: readonly SheetHoaDon[] = tatCa
+): DongHoaDon[] {
   const theoKhoa = new Map<string, DongHoaDon[]>();
   for (const sh of tatCa)
     for (const d of sh.dong) {
@@ -1415,7 +1439,7 @@ function doQuyUocTheoBanKia(tatCa: readonly SheetHoaDon[], canhBao: CanhBao[]): 
     }
 
   const chuaRo: DongHoaDon[] = [];
-  for (const sh of tatCa) {
+  for (const sh of chiXet) {
     const nt = sh.dong.filter((d) => d.tyGia > 1);
     if (!nt.length) continue;
     const p = phieu.get(sh.ten);
@@ -1441,10 +1465,10 @@ function phatHienQuyUocNgoaiTe(
   canhBao: CanhBao[],
   tatCaSheetHd: readonly SheetHoaDon[] = hdActive,
 ): void {
+  if (!tatCaSheetHd.some((sh) => sh.dong.some((d) => d.tyGia > 1))) return; // file toàn VND — không có gì để dò
   const ngoaiTe: DongHoaDon[] = [];
   for (const sh of hdActive)
     for (const d of sh.dong) if (d.tyGia > 1) ngoaiTe.push(d);
-  if (!ngoaiTe.length) return; // file toàn VND — không có gì để dò
 
   // Mẫu: hóa đơn ngoại tệ có dòng sổ cùng khóa. So sai số tương đối với sổ.
   let phieuRaw = 0; // số mẫu mà SỐ GỐC sát sổ hơn (⇒ cổng đã quy sẵn VND)
@@ -1474,7 +1498,8 @@ function phatHienQuyUocNgoaiTe(
   }
 
   // Số gốc sát sổ hơn ở đa số mẫu ⇒ cổng đã quy sẵn VND ⇒ BỎ nhân tỷ giá.
-  if (phieuRaw > phieuNhan) {
+  const daVnd = phieuRaw > phieuNhan;
+  if (daVnd) {
     veSoGoc(ngoaiTe);
     canhBao.push({
       loai: "Đơn vị tiền tệ ngoại tệ",
@@ -1486,9 +1511,27 @@ function phatHienQuyUocNgoaiTe(
       chiTiet: `${ngoaiTe.length} hóa đơn ngoại tệ: engine QUY về VND bằng cách NHÂN tỷ giá (đối chiếu ${soMau} hóa đơn khớp sổ: ${phieuNhan} dòng sát sổ khi ×tỷ giá, ${phieuRaw} dòng sát khi để nguyên). Cột tiền của cổng thuế đang ở nguyên tệ.`,
     });
   }
+
+  // Sheet KHÔNG đối soát với sổ (tập con / bản tự tải) vẫn hiện ở "So hai bản" ⇒ phải
+  // cùng đơn vị. Dò theo bản kia (hai bản có thể khác quy ước); không dò được thì theo
+  // quy ước vừa chốt bằng sổ — để nguyên ×tỷ giá là lệch oan cả trăm tỉ khi so hai bản.
+  const ngoai = tatCaSheetHd.filter((sh) => !hdActive.includes(sh));
+  if (ngoai.length) {
+    const chuaRo = doQuyUocTheoBanKia(tatCaSheetHd, canhBao, ngoai);
+    if (daVnd) veSoGoc(chuaRo);
+  }
 }
 
 export function doiSoat(sheets: SheetTho[], opt: TuyChonDoiSoat): KetQuaDoiSoat {
+  const kq = doiSoatMotLan(sheets, opt, new Set());
+  // Dung sai làm tròn tính theo ĐƠN VỊ của ô. Sheet nào để tiền ngoại tệ ở NGUYÊN TỆ thì
+  // chỉ biết SAU khi dò quy ước (cần ghép sổ) ⇒ chạy lại một lần với dung sai theo xu cho
+  // các sheet đó. Phần dò quy ước không phụ thuộc dung sai nên lần hai ra y hệt.
+  const nguyenTe = new Set(kq.sheetsHoaDon.filter((s) => s.dong.some((d) => d.tyGia > 1)).map((s) => s.ten));
+  return nguyenTe.size ? doiSoatMotLan(sheets, opt, nguyenTe) : kq;
+}
+
+function doiSoatMotLan(sheets: SheetTho[], opt: TuyChonDoiSoat, sheetNguyenTe: ReadonlySet<string>): KetQuaDoiSoat {
   const nguong = Math.max(0, opt.nguong ?? 1);
   const edits = opt.edits;
   const nghiVan: NghiVan[] = [];
@@ -1518,7 +1561,7 @@ export function doiSoat(sheets: SheetTho[], opt: TuyChonDoiSoat): KetQuaDoiSoat 
       });
     if (hPm >= 0) sheetsPmTatCa.push(parseSheetPhanMem(s0.ten, rows, hPm, edits, nghiVan, gopMap, nhatKySua, g, rong));
     else if (hHd >= 0) {
-      const r = parseSheetHoaDon(s0.ten, rows, hHd, edits, nghiVan, gopMap, nhatKySua, g, rong);
+      const r = parseSheetHoaDon(s0.ten, rows, hHd, edits, nghiVan, gopMap, nhatKySua, g, rong, sheetNguyenTe.has(s0.ten));
       sheetsHoaDon.push(r.sheet);
       soLoiParse += r.loiParse;
     }
@@ -1543,6 +1586,37 @@ export function doiSoat(sheets: SheetTho[], opt: TuyChonDoiSoat): KetQuaDoiSoat 
         });
         break;
       }
+    }
+  }
+  // --- Có sổ + HAI BẢN HĐĐT (thuế gửi ⇄ tự tải) gối nhau: chỉ đối soát bản THUẾ GỬI ---
+  // Không bản nào là tập con của bản kia thì khối trên giữ cả hai ⇒ hóa đơn có ở cả hai
+  // bản bị đếm hai lần, "chưa kê" nhân đôi. So hai bản với nhau là việc của `soHaiBanHddt`.
+  const benThue = phanBenThue(sheetsHoaDon.map((s) => s.ten), opt.benThue).benThue;
+  {
+    const conThue = sheetsHoaDon.filter((s) => !s.laPhu && benThue.has(s.ten));
+    const conTai = sheetsHoaDon.filter((s) => !s.laPhu && !benThue.has(s.ten));
+    const kThue = new Set(conThue.flatMap((s) => s.dong.map((d) => d.khoa)));
+    const kTai = new Set(conTai.flatMap((s) => s.dong.map((d) => d.khoa)));
+    const chung = [...kTai].filter((k) => kThue.has(k)).length;
+    // Gối ≥ nửa bản nhỏ hơn mới là HAI BẢN của cùng một kỳ — tên có chữ "thuế" mà hóa
+    // đơn khác hẳn nhau (VD sheet "THUẾ SUẤT 8%") thì vẫn là các sheet riêng, giữ nguyên.
+    if (sheetsPmTatCa.length && chung > 0 && chung * 2 >= Math.min(kThue.size, kTai.size)) {
+      const tenThue = conThue.map((s) => `"${s.ten}"`).join(", ");
+      for (const s of conTai) {
+        s.laPhu = true;
+        gopMap.set(`sheetHD-${s.ten}`, {
+          nhom: 7,
+          ten: `Bản tự tải: "${s.ten}"`,
+          soDong: s.dong.length,
+          tongTien: s.dong.reduce((t, d) => t + d.tongTtVnd, 0),
+          canhBao: `"${s.ten}" là bản TỰ TẢI của cùng kỳ với bản thuế gửi (${tenThue}). Chỉ đối soát bản thuế gửi với sổ để KHỎI đếm hai lần; so hai bản xem kiểu "So hai bản".`,
+          chiTiet: [],
+        });
+      }
+      canhBao.push({
+        loai: "Hai bản hóa đơn điện tử",
+        chiTiet: `File có cả bản thuế gửi (${tenThue}) lẫn bản tự tải (${conTai.map((s) => `"${s.ten}"`).join(", ")}): ${chung} hóa đơn có ở cả hai bản. Chỉ bản thuế gửi được đối soát với sổ. ${kTai.size - chung} hóa đơn chỉ có ở bản tự tải — KHÔNG được đối soát với sổ; soát chúng ở kiểu "So hai bản".`,
+      });
     }
   }
   const hdActive = sheetsHoaDon.filter((s) => !s.laPhu);
@@ -1593,6 +1667,17 @@ export function doiSoat(sheets: SheetTho[], opt: TuyChonDoiSoat): KetQuaDoiSoat 
     }
   }
 
+  if (sheetPhanMem && !sheetPhanMem.coCotMst)
+    canhBao.push({
+      loai: "Sổ không có cột MST",
+      chiTiet: `Sheet sổ "${sheetPhanMem.ten}" không có cột MST người bán (tìm theo tiêu đề MASOTHUE / RMST / MS_THUE / MST / Mã số thuế). Khóa ghép là MST + ký hiệu + số hóa đơn nên gần như mọi hóa đơn sẽ báo chưa có trong sổ. Thêm cột MST người bán vào sổ rồi chạy lại.`,
+    });
+  const thieuTyGia = sheetsHoaDon.flatMap((s) => s.dong.filter((d) => d.thieuTyGia));
+  if (thieuTyGia.length)
+    canhBao.push({
+      loai: "Ngoại tệ thiếu tỷ giá",
+      chiTiet: `${thieuTyGia.length} hóa đơn ghi tiền tệ khác VND (${uniq(thieuTyGia.map((d) => d.dvt)).join(", ")}) nhưng ô tỷ giá trống/0 — máy KHÔNG quy đổi được, đang để nguyên số trên hóa đơn nên dễ lệch sổ oan. Ở: ${thieuTyGia.slice(0, 10).map((d) => `${d.sheet} dòng ${d.dongFile}`).join("; ")}${thieuTyGia.length > 10 ? "; …" : ""}. Điền tỷ giá rồi chạy lại.`,
+    });
   if (!hdActive.length)
     canhBao.push({ loai: "Thiếu dữ liệu", chiTiet: "Không tìm thấy sheet HÓA ĐƠN ĐIỆN TỬ (cần cột Ký hiệu hóa đơn + Số hóa đơn)." });
   if (!sheetPhanMem)
@@ -1724,7 +1809,7 @@ export function doiSoat(sheets: SheetTho[], opt: TuyChonDoiSoat): KetQuaDoiSoat 
     for (const d of sh.dong) {
       if (d.trangThai !== "THIEU") continue;
       const cand = pmThieuList.find(
-        (p) => !pmDaGhep.has(p) && chuan(p.mstBan) === chuan(d.mstBan) && Math.abs(p.tongCong - d.tongTtVnd) <= NG_GK
+        (p) => !pmDaGhep.has(p) && mstChuan(p.mstBan) === mstChuan(d.mstBan) && Math.abs(p.tongCong - d.tongTtVnd) <= NG_GK
       );
       if (!cand) continue;
       pmDaGhep.add(cand);
@@ -1758,9 +1843,13 @@ export function doiSoat(sheets: SheetTho[], opt: TuyChonDoiSoat): KetQuaDoiSoat 
       chiTiet: `${thieuKhongCanVaoSo} hóa đơn nằm trong nhóm "chưa vào sổ" nhưng ở trạng thái đã bị thay thế/hủy — ĐÚNG là không phải hạch toán. Lọc cột KẾT QUẢ = "${nhanThieu} — KHÔNG CẦN VÀO SỔ" để bỏ chúng ra khỏi danh sách phải đi kê.`,
     });
 
-  for (const [k, arr] of hdTheoKhoa)
-    if (arr.length > 1)
+  // Có sổ: khóa lặp nghĩa là cộng hai lần vào đối soát ⇒ luôn báo. Không sổ (so hai bản):
+  // mỗi bên một dòng là đương nhiên, chỉ báo khi lặp TRONG cùng một bản.
+  for (const [k, arr] of hdTheoKhoa) {
+    const nThue = arr.filter((x) => benThue.has(x.sheet)).length;
+    if (sheetPhanMem ? arr.length > 1 : nThue > 1 || arr.length - nThue > 1)
       canhBao.push({ loai: "Trùng khóa HĐĐT", chiTiet: `Khóa "${k}" xuất hiện ${arr.length} lần (${arr.map((x) => `${x.sheet}#${x.dongFile}`).join(", ")}).` });
+  }
 
   // --- Cầu nối số liệu (v3 §7) ---
   let tongFile = 0, khopFile = 0, lechFile = 0, soKhopSo = 0, chuaTrucTiep = 0;
@@ -1789,11 +1878,11 @@ export function doiSoat(sheets: SheetTho[], opt: TuyChonDoiSoat): KetQuaDoiSoat 
   // --- Khối tự kiểm (v3 §8) — 9 phép ---
   const round = (n: number) => Math.round(n * 100) / 100;
   const sumChenhBoc = bocTach.reduce((s, x) => s + x.tien, 0);
-  const pmGkCount = pmDaGhep.size;
+  const lechQuyDoi = countLechQuyDoi(sheetsHoaDon);
   const phepThu: PhepThu[] = [
     { ten: "Mỗi hóa đơn đúng 1 nhãn", batLoiGi: "một hóa đơn bị đếm 2 nhãn hoặc sót nhãn", mong: String(soHoaDon), thuc: String(khop + lech + thieu), dat: soHoaDon === khop + lech + thieu },
     { ten: "Mỗi dòng ghi sổ đúng 1 nhãn", batLoiGi: "dòng phần mềm bị sót/đếm trùng nhãn", mong: String(soDongPm), thuc: String(pmCo + pmThieu), dat: soDongPm === pmCo + pmThieu },
-    { ten: "Cột quy đổi = gốc × tỷ giá dòng đó", batLoiGi: "lấy nhầm cột tỷ giá / cột quy đổi", mong: "0 dòng lệch", thuc: `${countLechQuyDoi(hdActive)} dòng lệch`, dat: countLechQuyDoi(hdActive) === 0 },
+    { ten: "Cột quy đổi = gốc × tỷ giá áp dụng", batLoiGi: "dòng ngoại tệ thiếu tỷ giá (không quy đổi được), hoặc số VND không khớp số gốc × tỷ giá áp dụng", mong: "0 dòng lệch", thuc: `${lechQuyDoi} dòng lệch`, dat: lechQuyDoi === 0 },
     { ten: "Tổng file − các nhóm = 0", batLoiGi: "phân nhóm bỏ sót tiền", mong: "0 đ", thuc: `${num(round(tongFile - khopFile - lechFile - chuaTrucTiep))} đ`, dat: Math.abs(tongFile - khopFile - lechFile - chuaTrucTiep) < 0.5 },
     { ten: "Hai cách tính phần chưa kê bằng nhau", batLoiGi: "trừ chéo file/sổ khi tính phần còn thiếu", mong: "0 đ chênh", thuc: `${num(round(cauNoi.chuaCoBenSo - cauNoi.chuaCoBenSoTrucTiep))} đ`, dat: Math.abs(cauNoi.chuaCoBenSo - cauNoi.chuaCoBenSoTrucTiep) < 0.5 },
     { ten: "Phần dư trừ chéo giải thích được", batLoiGi: "phần dư không bóc tách về giao dịch", mong: `${num(round(cauNoi.duTruCheo))} đ`, thuc: `${num(round(sumChenhBoc))} đ (bóc tách)`, dat: Math.abs(cauNoi.duTruCheo - sumChenhBoc) < 0.5 },
@@ -1801,7 +1890,6 @@ export function doiSoat(sheets: SheetTho[], opt: TuyChonDoiSoat): KetQuaDoiSoat 
     { ten: "Bằng chứng cộng = chỉ tiêu bảng chính", batLoiGi: "cột 'Tổng trên sổ' của HĐĐT lệch tổng dòng ghi sổ đã khớp", mong: `${num(round(soKhopSo))} đ`, thuc: `${num(round(tongPmCo(sheetPhanMem)))} đ`, dat: Math.abs(soKhopSo - tongPmCo(sheetPhanMem)) < 0.5 },
     { ten: "Số nghi vấn = số đã liệt kê (baseline)", batLoiGi: "xuất hiện lỗi mới, hoặc người dùng vừa sửa xong 1 lỗi", mong: String(opt.nghiVanBanDau ?? soNghiVan), thuc: String(soNghiVan), dat: (opt.nghiVanBanDau ?? soNghiVan) === soNghiVan },
   ];
-  void pmGkCount;
 
   return {
     sheetsHoaDon,
@@ -1817,15 +1905,20 @@ export function doiSoat(sheets: SheetTho[], opt: TuyChonDoiSoat): KetQuaDoiSoat 
     daGoCotCu,
     nhatKySua,
     nguong,
+    ...(opt.benThue ? { benThue: opt.benThue } : {}),
   };
 }
 
-function countLechQuyDoi(sheets: SheetHoaDon[]): number {
+/**
+ * Dòng KHÔNG quy đổi đúng: ngoại tệ thiếu tỷ giá, hoặc một trong ba cột VND khác số gốc ×
+ * tỷ giá ÁP DỤNG (bắt lỗi hạ tỷ giá mà quên tính lại cột VND, hay ngược lại).
+ */
+function countLechQuyDoi(sheets: readonly SheetHoaDon[]): number {
   let n = 0;
   for (const sh of sheets)
     for (const d of sh.dong) {
-      const goc = d.tyGia ? d.tongTtVnd / d.tyGia : d.tongTtVnd;
-      if (Math.abs(goc * d.tyGia - d.tongTtVnd) > 0.01) n++;
+      const lech = (goc: number, vnd: number) => Math.abs(goc * d.tyGia - vnd) > 0.01;
+      if (d.thieuTyGia || lech(d.chuaThueRaw, d.chuaThueVnd) || lech(d.thueRaw, d.thueVnd) || lech(d.tongTtRaw, d.tongTtVnd)) n++;
     }
   return n;
 }
@@ -1839,11 +1932,6 @@ function tongPmCo(pm: SheetPhanMem | null): number {
   return pm.dong.filter((d) => d.trangThai === "CO").reduce((s, d) => s + d.tongCong, 0);
 }
 
-export async function docVaDoiSoat(file: File, opt: TuyChonDoiSoat): Promise<KetQuaDoiSoat> {
-  const sheets = await docWorkbook(file);
-  return doiSoat(sheets, opt);
-}
-
 // ---------- Xuất Excel tô màu + chuẩn hóa hiển thị (v3 §9) ----------
 
 export const CHU_THICH =
@@ -1851,12 +1939,14 @@ export const CHU_THICH =
 export const CHU_THICH_PM =
   'CHÚ THÍCH: dòng XANH = bút toán đã có hóa đơn điện tử | dòng ĐỎ = chưa tìm thấy hóa đơn điện tử.';
 
+/** Nền đặc kiểu xlsx-js-style (RGB không kênh alpha) từ bảng màu chung. */
+const nenXlsx = (argb: string) => ({ patternType: "solid", fgColor: { rgb: argb.slice(2) } }) as const;
 const FILL = {
-  xanh: { fill: { patternType: "solid", fgColor: { rgb: "C6EFCE" } }, font: { color: { rgb: "006100" } } },
-  vang: { fill: { patternType: "solid", fgColor: { rgb: "FFEB9C" } }, font: { color: { rgb: "9C6500" } } },
-  do: { fill: { patternType: "solid", fgColor: { rgb: "FFC7CE" } }, font: { color: { rgb: "9C0006" } } },
+  xanh: { fill: nenXlsx(MAU_NEN.xanh), font: { color: { rgb: "006100" } } },
+  vang: { fill: nenXlsx(MAU_NEN.vang), font: { color: { rgb: "9C6500" } } },
+  do: { fill: nenXlsx(MAU_NEN.do), font: { color: { rgb: "9C0006" } } },
 } as const;
-const HEADER_STYLE = { font: { bold: true }, fill: { patternType: "solid", fgColor: { rgb: "D9E1F2" } } } as const;
+const HEADER_STYLE = { font: { bold: true }, fill: nenXlsx(MAU_NEN.tieuDe) } as const;
 type Style = { fill?: unknown; font?: unknown } | null;
 
 function oXuat(v: unknown): unknown {

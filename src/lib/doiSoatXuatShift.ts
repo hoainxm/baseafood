@@ -7,22 +7,10 @@
  * cũ ⇒ **số sai âm thầm**. Nên ở đây dời ô XONG là dịch luôn mọi tham chiếu.
  */
 
-/** "AB" → 28 */
-const soCot = (s: string): number => {
-  let n = 0;
-  for (const ch of s) n = n * 26 + (ch.charCodeAt(0) - 64);
-  return n;
-};
-/** 28 → "AB" */
-const tenCot = (n: number): string => {
-  let s = "";
-  while (n > 0) {
-    const m = (n - 1) % 26;
-    s = String.fromCharCode(65 + m) + s;
-    n = (n - m - 1) / 26;
-  }
-  return s;
-};
+import { chuCotExcel, soCotExcel } from "./doiSoatChung";
+
+/** Dời chữ cột `c` sang phải `dich` cột ("Q", 1 → "R"). */
+const dichChuCot = (c: string, dich: number): string => chuCotExcel(soCotExcel(c) + dich - 1);
 
 /**
  * Dịch mọi tham chiếu ô trong một công thức sang phải `dich` cột.
@@ -98,15 +86,17 @@ export function dichCongThuc(
       }
       const o = /^(\$?)([A-Z]{1,3})(\$?)(\d+)(?![A-Za-z0-9_])/.exec(ct.slice(i));
       if (o) {
-        ra += o[1]! + (sheetNay ? tenCot(soCot(o[2]!) + dich) : o[2]!) + o[3]! + o[4]!;
+        ra += o[1]! + (sheetNay ? dichChuCot(o[2]!, dich) : o[2]!) + o[3]! + o[4]!;
         i += o[0].length;
-        sheetNay = sheetChuaCongThucCoDich;
+        // Ô ĐẦU của vùng `Sheet!A1:B9`: nửa sau vẫn thuộc sheet đó — giữ `sheetNay`,
+        // reset ngay là `HDDT!Q3:Q3047` dịch thành `R3:Q3047` (lệch vùng âm thầm).
+        if (ct[i] !== ":") sheetNay = sheetChuaCongThucCoDich;
         continue;
       }
       const cot = /^(\$?)([A-Z]{1,3}):(\$?)([A-Z]{1,3})(?![A-Za-z0-9_])/.exec(ct.slice(i));
       if (cot) {
-        const a = sheetNay ? tenCot(soCot(cot[2]!) + dich) : cot[2]!;
-        const b = sheetNay ? tenCot(soCot(cot[4]!) + dich) : cot[4]!;
+        const a = sheetNay ? dichChuCot(cot[2]!, dich) : cot[2]!;
+        const b = sheetNay ? dichChuCot(cot[4]!, dich) : cot[4]!;
         ra += `${cot[1]!}${a}:${cot[3]!}${b}`;
         i += cot[0].length;
         sheetNay = sheetChuaCongThucCoDich;
@@ -125,7 +115,7 @@ export function dichCongThuc(
 
 /** Dịch một vùng kiểu `B3:T3` sang phải `dich` cột. */
 export const dichVung = (ref: string, dich: number): string =>
-  ref.replace(/([A-Z]+)(\d+)/g, (_m, c: string, r: string) => `${tenCot(soCot(c) + dich)}${r}`);
+  ref.replace(/([A-Z]+)(\d+)/g, (_m, c: string, r: string) => `${dichChuCot(c, dich)}${r}`);
 
 type Worksheet = import("exceljs").Worksheet;
 
@@ -188,13 +178,7 @@ export function chenCotDau(ws: Worksheet, dich: number, sheetDaDich: ReadonlySet
   if (dich >= 0) ws.spliceColumns(1, 0, ...Array.from({ length: dich }, () => []));
   else ws.spliceColumns(1, -dich);
 
-  ws.eachRow({ includeEmpty: false }, (row) =>
-    row.eachCell({ includeEmpty: false }, (cell) => {
-      const v = cell.value as { formula?: string; result?: unknown } | null;
-      if (v && typeof v === "object" && typeof v.formula === "string")
-        cell.value = { formula: dichCongThuc(v.formula, dich, sheetDaDich), result: v.result as never };
-    })
-  );
+  vietLaiCongThuc(ws, (ct) => dichCongThuc(ct, dich, sheetDaDich));
 
   for (const g of gop) {
     if (!g) continue;
@@ -218,14 +202,16 @@ export function dichThamChieuCheoSheet(
   dich: number,
   sheetDaDich: ReadonlySet<string>
 ): void {
+  vietLaiCongThuc(ws, (ct) => dichCongThuc(ct, dich, sheetDaDich, false));
+}
+
+/** Viết lại mọi ô công thức của sheet (giữ kết quả cache). */
+function vietLaiCongThuc(ws: Worksheet, doi: (ct: string) => string): void {
   ws.eachRow({ includeEmpty: false }, (row) =>
     row.eachCell({ includeEmpty: false }, (cell) => {
       const v = cell.value as { formula?: string; result?: unknown } | null;
-      if (!v || typeof v !== "object" || typeof v.formula !== "string") return;
-      cell.value = {
-        formula: dichCongThuc(v.formula, dich, sheetDaDich, false),
-        result: v.result as never,
-      };
+      if (v && typeof v === "object" && typeof v.formula === "string")
+        cell.value = { formula: doi(v.formula), result: v.result as never };
     })
   );
 }

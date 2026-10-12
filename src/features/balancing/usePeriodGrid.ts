@@ -178,15 +178,15 @@ const SO_MOC_TOI_DA = 100;
  * Để rải trong component thì mỗi lần thêm một cột lại phải nhớ lại cả ba.
  */
 export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
-  const [tatCaNL, ghiTatCaNL] = useBalancingInputs();
-  const [tatCaTP, ghiTatCaTP] = useBalancingOutputs();
-  const [tatCaNhap, ghiTatCaNhap] = useMaterialImports();
-  const [tatCaSanXuat, ghiTatCaSanXuat] = useWipProductions();
+  const [tatCaNL, ghiTatCaNL, { trangThai: ttNL }] = useBalancingInputs();
+  const [tatCaTP, ghiTatCaTP, { trangThai: ttTP }] = useBalancingOutputs();
+  const [tatCaNhap, ghiTatCaNhap, { trangThai: ttNhap }] = useMaterialImports();
+  const [tatCaSanXuat, ghiTatCaSanXuat, { trangThai: ttSanXuat }] = useWipProductions();
   const [chotSanXuat] = useProductionLocks();
   const [banNoiDia] = useDomesticSales();
   const [tatCaKy] = useBalancingPeriods();
   const [tonDauKhaiTay] = useMaterialOpeningStock();
-  const [soKho, ghiSoKho] = useMonthlyStock();
+  const [soKho, ghiSoKho, { trangThai: ttSoKho }] = useMonthlyStock();
   const [khoLuu] = useStorageLocations();
 
   /** Kỳ đã chốt ⇒ mọi ô khoá, mọi nút ghi ẩn. Mở lại ở thanh cuối màn. */
@@ -667,13 +667,27 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
 
   /* …và ghi con số đã đồng bộ xuống kho để bản in và màn khác đọc đúng. Chạy
      trong effect (không phải lúc render) và chỉ ghi khi thật sự lệch nên hội tụ
-     sau đúng một vòng. */
+     sau đúng một vòng.
+
+     HAI CỔNG trước khi ghi ngược (đây là ghi TỰ ĐỘNG, người dùng không bấm gì):
+     1. MỌI bảng nguồn + bảng đích đã nạp xong từ máy chủ ("san-sang"). Máy mới
+        (localStorage trống) mở kỳ: balancing_inputs về trước, material_imports
+        chưa về ⇒ tổng = 0 ⇒ trước đây ghi quantityKg = 0 lên máy chủ + nhật ký
+        "Sửa"; sổ nhập nạp lỗi thì số 0 ở lại luôn. Bảng đích chưa nạp thì
+        `ghiNL` ghép với bản local cũ ⇒ có thể xoá dòng kỳ khác trên máy chủ.
+     2. Kỳ CHƯA chốt. Sổ nhập / sổ SX sửa sau khi kỳ chốt thì màn vẫn TÍNH theo
+        sổ, nhưng không được lặng lẽ đổi số đã lưu của kỳ đã chốt — muốn nhận số
+        mới thì mở lại kỳ (bắt lý do), effect sẽ tự ghi. */
+  const nguonNLSanSang = ttNL === "san-sang" && ttNhap === "san-sang" && ttSoKho === "san-sang";
+  const nguonTPSanSang = ttTP === "san-sang" && ttSanXuat === "san-sang";
   useEffect(() => {
+    if (daChot || !nguonNLSanSang) return;
     if (nlChoTinh.some((r, i) => r !== nlVao[i])) ghiNL(nlChoTinh, "");
-  }, [nlChoTinh, nlVao, ghiNL]);
+  }, [nlChoTinh, nlVao, ghiNL, daChot, nguonNLSanSang]);
   useEffect(() => {
+    if (daChot || !nguonTPSanSang) return;
     if (tpChoTinh.some((r, i) => r !== tp[i])) ghiTP(tpChoTinh, "");
-  }, [tpChoTinh, tp, ghiTP]);
+  }, [tpChoTinh, tp, ghiTP, daChot, nguonTPSanSang]);
 
   /* Phế liệu không còn là đầu vào của kỳ (xem 31-can-doi-ky.md) — truyền []. */
   const kq = useMemo(

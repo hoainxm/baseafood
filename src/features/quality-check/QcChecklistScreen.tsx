@@ -63,7 +63,7 @@ interface Dong {
 
 export default function QcChecklistScreen() {
   const [rows, persist] = useQcChecklists();
-  const [locks, persistLocks] = useQcLocks();
+  const [locks, persistLocks, { trangThai: ttKhoa }] = useQcLocks();
 
   const [ngay, setNgay] = useState(todayISO());
   const [xuong, setXuong] = useState<Workshop>("Đông");
@@ -162,9 +162,15 @@ export default function QcChecklistScreen() {
       notify.canhBao("Chưa có chỉ tiêu nào đã lưu để chốt");
       return;
     }
+    // Chưa nạp xong sổ chốt ⇒ chưa biết máy chủ đã có bản ghi (ngày, xưởng) chưa.
+    if (ttKhoa === "dang-tai") {
+      notify.loi("Đang tải sổ chốt QC từ máy chủ — đợi vài giây rồi bấm chốt lại");
+      return;
+    }
     const cu = locks.find((l) => l.lockDate === ngay && l.workshop === xuong);
     const banGhi = {
-      id: cu?.id ?? newId(),
+      // Id cố định theo (ngày|xưởng): hai máy cùng chốt ghi CÙNG một dòng, không sinh bản trùng.
+      id: cu?.id ?? `${ngay}|${xuong}`,
       lockDate: ngay,
       workshop: xuong,
       isLocked: true,

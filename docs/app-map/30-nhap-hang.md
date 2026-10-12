@@ -1,6 +1,7 @@
 > Load khi: sửa bất cứ thứ gì ở màn Nhập hàng — chuyến, ngày, ghi bù, chốt ngày, phế liệu ngày, phiếu báo cáo ngày.
 covers: src/features/imports/MaterialImportScreen.tsx, src/features/imports/BuocNhap.tsx, src/features/imports/DailyImportInvoice.tsx, src/features/imports/ImportReport.tsx, src/features/imports/OcrPhieuNhap.tsx, src/features/imports/importHelpers.ts, src/features/imports/BangDongHang.tsx, src/features/imports/KhoiPheLieuNgay.tsx, src/lib/ocr.ts, src/types.ts
-last_verified: 2026-10-08
+last_verified: 2026-10-12
+<!-- updated: 2026-10-12 — chốt ngày: bản ghi mới dùng id cố định `<ngày>|<xưởng>` (chống 23505 khi hai máy cùng chốt), chặn chốt khi sổ chốt còn đang nạp. -->
 <!-- updated: 2026-10-08 (b) — LÔ NL THEO LOẠI (chủ dự án chốt, ../spec/qr-truy-xuat-lo.md §6e): mỗi dòng loại NL của chuyến là một lô (`S:<id dòng nhập>`). Nút **Tem** ở cột ngày + **In tem QR** ở Báo cáo → Sổ chi tiết các chuyến nay in MỖI LOẠI MỘT TEM (cùng mã lô chuyến `nhanLoNl` in to; dòng dưới loại NL + kg của loại đó, định dạng vi-VN). Mã lô chuyến (`lot_code` / `sinhMaLo`) KHÔNG đổi; badge "Lô …" ở header phiên giữ nguyên. Màn Nhập hàng không đổi cách ghi. -->
 <!-- re-verified: 2026-10-08 09:20 — lô NL = một chuyến (`S:<id>`), nhãn `nhanLoNl` (lot_code hoặc N‹xưởng›-yymmdd-xxxx), nút Tem ở cột ngày + Sổ chi tiết — khớp code. Màn Nhập hàng KHÔNG đổi ở đợt 2b; lô NL được gắn ở /wip (theo phiên) và bán nội địa (xem ../spec/qr-truy-xuat-lo.md §6d). -->
 <!-- updated: 2026-10-06 — tô màu dòng "đã dò" (mig 0055, lưu chung): bảng dòng hàng mỗi chuyến `toMau="nhap-hang"`, phế liệu ngày `phe-lieu-ngay`, báo cáo nhập `bao-cao-nhap|<từ>|<đến>|<xưởng>` (dòng GỘP đại lý×loại ⇒ ghép kỳ vào khoá để dấu kỳ này không lan sang kỳ khác) + `bao-cao-nhap-phe-lieu|…`. Bản in hóa đơn ngày (DailyImportInvoice) KHÔNG tô. Không đổi luồng chuyến/chốt ngày. -->
@@ -134,6 +135,8 @@ Tình huống thật: hàng về 29/7, 31/7 mới có hóa đơn → `ngayGiao =
 ### 4. Chốt ngày
 
 Khóa theo **(ngày + phân xưởng)**, một bản ghi duy nhất mỗi cặp (unique index).
+
+- **id bản ghi chốt (2026-10-12):** đã có bản ghi (kể cả đã mở lại) ⇒ dùng lại `id` đó; chưa có ⇒ id **cố định `<ngày>|<xưởng>`** (VD `2026-10-12|Đông`), KHÔNG `newId()`. Lý do: chỉ mục duy nhất `(site_id, lock_date, workshop)` (mig `0004`); hai máy cùng chốt một ngày với hai id ngẫu nhiên ⇒ upsert theo `id` đụng 23505 ⇒ hàng chờ kẹt. Id cố định ⇒ hai máy ghi cùng một dòng. Sổ chốt còn đang nạp (`trangThai = "dang-tai"`) ⇒ bấm chốt bị từ chối kèm lỗi "đợi vài giây" (chưa biết máy chủ đã có bản ghi id cũ chưa). Cột `id` là `text` nên id chuỗi hợp lệ; bản ghi cũ id ngẫu nhiên giữ nguyên.
 
 - Chốt xong: khóa sửa/xóa/thêm chuyến thường **và** khóa khối phế liệu của ngày đó.
 - **Còn dòng nhập chưa lưu → nhắc trước khi chốt:** ở "Ghi nhập", nếu còn dòng hợp lệ chưa bấm "Lưu vào sổ" (`coDongChuaLuu = cheDo==="nhap" && dongHopLe.some(d=>!d.id)`), nút "Chốt ngày" mở hộp `nhacLuu` (Lưu vào sổ rồi chốt / Vẫn chốt bỏ dòng đang gõ / Quay lại) thay vì chốt thẳng — kẻo số vừa gõ chưa tính vào tổng chốt (`tongThucTe` chỉ tính dòng đã lưu).

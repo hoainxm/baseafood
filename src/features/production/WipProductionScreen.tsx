@@ -131,7 +131,7 @@ const docXuongNho = (): Workshop => {
 export default function SanXuatBTPScreen() {
   const [rows, persist, { trangThai }] = useWipProductions();
   const dangTai = trangThai === "dang-tai" && rows.length === 0;
-  const [chot, persistChot] = useProductionLocks();
+  const [chot, persistChot, { trangThai: ttChot }] = useProductionLocks();
   const [matHang, setMatHang] = useProducts();
   const [khach, setKhach] = useCustomers();
   const [loaiNL, setLoaiNL] = useMaterialTypes();
@@ -929,6 +929,12 @@ export default function SanXuatBTPScreen() {
 
   /* ---- Chốt / mở lại ngày ---- */
   const chotNgay = () => {
+    /* Sổ chốt SX chưa nạp xong ⇒ chưa biết máy chủ đã có bản ghi (ngày, xưởng)
+       chưa; tạo bản mới lúc này có thể trùng chỉ mục duy nhất ⇒ 23505. */
+    if (ttChot === "dang-tai") {
+      notify.loi("Đang tải sổ chốt sản xuất từ máy chủ — đợi vài giây rồi bấm chốt lại");
+      return;
+    }
     // Mẻ chưa gắn lô NL: phải gắn, hoặc ghi lý do (lưu `lot_waivers` cho từng mẻ còn thiếu).
     if (meChuaGanLo.length > 0 && !lyDoKhongLo.trim()) {
       setLoiChot([
@@ -964,7 +970,10 @@ export default function SanXuatBTPScreen() {
     }
     const tongConDo = Object.values(leftoverByMaterial).reduce((s, v) => s + v, 0);
     const ban: DailyLock = {
-      id: bg?.id ?? newId(),
+      /* Có bản ghi ⇒ dùng lại id; chưa có ⇒ id CỐ ĐỊNH ngày|xưởng (không newId()):
+         hai máy cùng chốt ghi CÙNG một dòng, không đụng chỉ mục duy nhất
+         (site, ngày, xưởng) rồi kẹt hàng chờ. */
+      id: bg?.id ?? `${tuHieuLuc}|${xuong}`,
       lockDate: tuHieuLuc,
       workshop: xuong,
       isLocked: true,

@@ -116,7 +116,7 @@ export default function NhapNguyenLieuScreen() {
   const [rows, persist, { trangThai }] = useMaterialImports();
   const dangTai = trangThai === "dang-tai" && rows.length === 0;
   const [chuyen, persistChuyen] = useImportShipments();
-  const [chot, persistChot] = useDailyLocks();
+  const [chot, persistChot, { trangThai: ttChot }] = useDailyLocks();
   const [pheLieu, persistPheLieu] = useScraps();
 
   const [ky, setKy] = useState<KyXem>("ngay");
@@ -836,9 +836,18 @@ export default function NhapNguyenLieuScreen() {
   /* ---- Chốt / mở lại ngày ---- */
 
   const chotNgay = () => {
+    /* Sổ chốt chưa nạp xong ⇒ chưa biết máy chủ đã có bản ghi (ngày, xưởng) chưa;
+       tạo bản mới lúc này có thể trùng chỉ mục duy nhất (site, ngày, xưởng) ⇒ 23505. */
+    if (ttChot === "dang-tai") {
+      notify.loi("Đang tải sổ chốt ngày từ máy chủ — đợi vài giây rồi bấm chốt lại");
+      return;
+    }
     const bg = banGhiChot(tuHieuLuc, xuongDangXem);
     const ban: DailyLock = {
-      id: bg?.id ?? newId(),
+      /* Có bản ghi (kể cả đã mở lại) ⇒ dùng lại id. Chưa có ⇒ id CỐ ĐỊNH theo khoá
+         nghiệp vụ (ngày|xưởng), không newId(): hai máy cùng chốt một ngày sẽ ghi
+         CÙNG một dòng thay vì hai id đụng chỉ mục duy nhất và kẹt hàng chờ. */
+      id: bg?.id ?? `${tuHieuLuc}|${xuongDangXem}`,
       lockDate: tuHieuLuc,
       workshop: xuongDangXem,
       isLocked: true,

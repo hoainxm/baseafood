@@ -1729,7 +1729,7 @@ export default function MonthlyStockScreen() {
             </DialogDescription>
           </DialogHeader>
           {form && (
-            <div className="max-h-[70vh] space-y-4 overflow-y-auto py-2 pr-1">
+            <div className="max-h-[70dvh] space-y-4 overflow-y-auto py-2 pr-1">
               <ErrorSummary loi={loi} />
               <ChuThichBatBuoc />
               <div className="grid gap-4 sm:grid-cols-2">
@@ -2089,7 +2089,7 @@ export default function MonthlyStockScreen() {
                 <span className="font-semibold">Khớp — không còn mặt hàng lệch giữa hai tháng.</span>
               </div>
             ) : (
-              <div className="max-h-[55vh] overflow-auto rounded-lg border border-border">
+              <div className="max-h-[55dvh] overflow-auto rounded-lg border border-border">
                 <table className="w-full text-sm">
                   <thead className="sticky top-0 bg-muted">
                     <tr className="text-left">
@@ -2185,7 +2185,7 @@ export default function MonthlyStockScreen() {
                     </Button>
                   </div>
                 </div>
-                <div className="max-h-[38vh] space-y-1 overflow-auto rounded-lg border border-border p-2">
+                <div className="max-h-[38dvh] space-y-1 overflow-auto rounded-lg border border-border p-2">
                   {canDongBo.map(dongRow)}
                 </div>
               </div>
@@ -2211,7 +2211,7 @@ export default function MonthlyStockScreen() {
                       Bỏ qua hết
                     </Button>
                   </div>
-                  <div className="max-h-[30vh] space-y-1 overflow-auto rounded-lg border border-border p-2">
+                  <div className="max-h-[30dvh] space-y-1 overflow-auto rounded-lg border border-border p-2">
                     {dsRoRang.map(dongRow)}
                   </div>
                 </div>
@@ -2221,7 +2221,7 @@ export default function MonthlyStockScreen() {
             {dongBo.nhomTrung.length > 0 && (
               <div className="space-y-2">
                 <h3 className="font-semibold text-foreground">Tên chỉ khác nhau cách ghi (nên gộp về một)</h3>
-                <div className="max-h-[28vh] space-y-1 overflow-auto rounded-lg border border-warning/40 bg-warning/5 p-2 text-sm">
+                <div className="max-h-[28dvh] space-y-1 overflow-auto rounded-lg border border-warning/40 bg-warning/5 p-2 text-sm">
                   {dongBo.nhomTrung.map((g) => (
                     <div key={g.variants.join("|")} className="text-muted-foreground">
                       • {g.variants.map((v) => `"${v}"`).join("  ·  ")}
@@ -2270,7 +2270,7 @@ export default function MonthlyStockScreen() {
             </DialogDescription>
           </DialogHeader>
           {xemThe && (
-            <div className="max-h-[70vh] space-y-4 overflow-y-auto py-2 pr-1">
+            <div className="max-h-[70dvh] space-y-4 overflow-y-auto py-2 pr-1">
               <div className="grid gap-2 rounded-lg border border-border bg-muted/40 p-3 text-sm sm:grid-cols-2">
                 <div>
                   Size: <span className="font-medium text-foreground">{xemThe.size || "—"}</span>

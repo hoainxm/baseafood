@@ -398,7 +398,7 @@ export default function DongGoiScreen() {
 
       {/* Dialog ghi phiếu */}
       <Dialog open={form !== null} onOpenChange={(o) => !o && setForm(null)}>
-        <DialogContent className="max-h-[92vh] w-full overflow-y-auto sm:max-w-2xl">
+        <DialogContent className="max-h-[92dvh] w-full overflow-y-auto sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle className="text-2xl">Ghi phiếu đóng gói</DialogTitle>
             <DialogDescription className="text-base">

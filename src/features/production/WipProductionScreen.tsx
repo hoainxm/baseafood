@@ -1679,7 +1679,7 @@ export default function SanXuatBTPScreen() {
 
       {/* Dialog sửa một dòng */}
       <Dialog open={sua !== null} onOpenChange={(o) => !o && setSua(null)}>
-        <DialogContent className="max-h-[92vh] w-full overflow-y-auto sm:max-w-2xl">
+        <DialogContent className="max-h-[92dvh] w-full overflow-y-auto sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle className="text-2xl">Sửa dòng thành phẩm</DialogTitle>
           </DialogHeader>
@@ -1824,7 +1824,7 @@ export default function SanXuatBTPScreen() {
 
       {/* Dialog sửa một dòng bán nội địa */}
       <Dialog open={suaBND !== null} onOpenChange={(o) => !o && setSuaBND(null)}>
-        <DialogContent className="max-h-[92vh] w-full overflow-y-auto sm:max-w-2xl">
+        <DialogContent className="max-h-[92dvh] w-full overflow-y-auto sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle className="text-2xl">Sửa dòng bán nội địa</DialogTitle>
             <DialogDescription>

@@ -9,10 +9,12 @@ import {
   Nhan,
   GoiYHover,
   Logo,
+  MEDIA_THANH_BEN_HEP,
   NutGiaoDien,
   NutHuongDan,
   NutTrangThai,
   XacNhan,
+  useKhopMedia,
 } from "@/design-system";
 import { cn } from "@/lib/utils";
 import { BangCapNhat } from "./UpdateBanner";
@@ -284,7 +286,7 @@ function gomCay(items: MucNavShell[]): NhomHienThi[] {
 }
 
 const CN_NUT_ICON =
-  "inline-flex size-tap shrink-0 items-center justify-center rounded-lg border border-input text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
+  "nhan-an inline-flex size-tap shrink-0 items-center justify-center rounded-lg border border-input text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
 
 function HeaderNut({
   label,
@@ -330,7 +332,7 @@ function MucNut({
       aria-current={chon ? "page" : undefined}
       title={thuGon ? [m.label, m.moTa].filter(Boolean).join(" — ") : m.moTa}
       className={cn(
-        "flex min-h-10 w-full items-center gap-3 rounded-lg border text-left transition-colors",
+        "nhan-an flex min-h-10 w-full items-center gap-3 rounded-lg border text-left",
         thuGon ? "justify-center px-0" : "px-3",
         m.laDanhMuc ? "text-sm font-medium" : "text-sm font-semibold",
         chon
@@ -421,6 +423,7 @@ function CayNav({
               onClick={() => onToggle(g.ten)}
               aria-expanded={mo}
               className={cn(
+                "nhan-an",
                 "flex min-h-9 w-full items-center gap-2 rounded-lg px-3 text-left text-xs font-bold uppercase tracking-wide transition-colors hover:bg-muted",
                 coActive ? "text-primary" : "text-muted-foreground"
               )}
@@ -429,7 +432,7 @@ function CayNav({
               <span className="min-w-0 flex-1 truncate">{g.ten}</span>
               <ChevronDown
                 className={cn(
-                  "size-icon-sm shrink-0 transition-transform",
+                  "size-icon-sm shrink-0 transition-transform duration-base ease-soft",
                   mo ? "" : "-rotate-90"
                 )}
                 aria-hidden
@@ -518,7 +521,13 @@ export default function AppShell({
   items = KIT_NAV,
   children,
 }: AppShellProps) {
-  const [thuGon, setThuGon] = useState(false);
+  // Thanh bên thu về dải icon: TỰ ĐỘNG ở màn hẹp (iPhone ngang, iPad dọc) để
+  // nhường chỗ cho tiêu đề + bảng; người dùng bấm nút thu/mở thì theo ý họ —
+  // nhưng chỉ trong cùng một cỡ màn: xoay máy sang cỡ khác là về lại mặc định.
+  const thanhBenHep = useKhopMedia(MEDIA_THANH_BEN_HEP);
+  const [thuGonChon, setThuGonChon] = useState<{ hep: boolean; thuGon: boolean } | null>(null);
+  const thuGon =
+    thuGonChon && thuGonChon.hep === thanhBenHep ? thuGonChon.thuGon : thanhBenHep;
   const [moNav, setMoNav] = useState(false);
   const nhom = gomCay(items);
 
@@ -564,19 +573,19 @@ export default function AppShell({
     /* Desktop: khoá chiều cao khung (h-dvh + overflow-hidden) để THANH BÊN và
        VÙNG NỘI DUNG cuộn RIÊNG — trước đây cuộn chung, kéo bảng dài là nav trôi
        mất. Điện thoại giữ cuộn trang tự nhiên (nav là drawer, có scroll riêng). */
-    <div className="flex min-h-full flex-col bg-background md:h-dvh md:flex-row md:overflow-hidden">
+    <div className="px-an-toan flex min-h-full flex-col bg-background md:h-dvh md:flex-row md:overflow-hidden">
       {/* Gợi ý rê chuột cho MỌI phần tử có `title` — gắn một lần cho cả app. */}
       <GoiYHover />
       {/* Sidebar dọc — chỉ desktop */}
       <aside
         className={cn(
-          "hidden shrink-0 flex-col border-r border-border bg-card transition-[width] duration-base md:flex md:h-full md:overflow-hidden",
+          "pb-an-toan hidden shrink-0 flex-col border-r border-border bg-card transition-[width] duration-base ease-soft md:flex md:h-full md:overflow-hidden",
           thuGon ? "w-20" : "w-72"
         )}
       >
         <div
           className={cn(
-            "flex h-16 shrink-0 items-center border-b border-border",
+            "flex h-header shrink-0 items-center border-b border-border",
             thuGon ? "justify-center px-2" : "px-4"
           )}
         >
@@ -605,9 +614,9 @@ export default function AppShell({
             role="dialog"
             aria-modal="true"
             aria-label="Điều hướng"
-            className="absolute inset-y-0 left-0 flex w-80 max-w-[85vw] flex-col border-r border-border bg-card shadow-xl duration-base animate-in slide-in-from-left"
+            className="pl-an-toan pb-an-toan absolute inset-y-0 left-0 flex w-80 max-w-[85vw] flex-col border-r border-border bg-card shadow-xl duration-base ease-soft animate-in slide-in-from-left"
           >
-            <div className="flex h-16 shrink-0 items-center justify-between gap-2 border-b border-border px-4">
+            <div className="flex h-header shrink-0 items-center justify-between gap-2 border-b border-border px-4">
               <Logo cao="h-9" phuDe="Xí nghiệp BSF1" />
               <HeaderNut label="Đóng menu" icon={X} onClick={() => setMoNav(false)} />
             </div>
@@ -620,9 +629,11 @@ export default function AppShell({
               onToggle={toggleNhom}
             />
 
-            {/* Chân drawer: những gì KHÔNG còn chỗ trên header điện thoại */}
-            <div className="shrink-0 space-y-3 border-t border-border p-3">
-              <div className="flex items-center gap-3">
+            {/* Chân drawer: những gì KHÔNG còn chỗ trên header điện thoại. Máy xoay
+                ngang thấp: bỏ dòng tên người dùng để menu còn chỗ (chân không được
+                ăn quá nửa chiều cao drawer). */}
+            <div className="shrink-0 space-y-3 border-t border-border p-3 ngang-thap:p-2">
+              <div className="flex items-center gap-3 ngang-thap:hidden">
                 <span
                   aria-hidden
                   className="flex size-tap shrink-0 items-center justify-center rounded-full bg-accent text-sm font-bold text-accent-foreground"
@@ -644,7 +655,7 @@ export default function AppShell({
                     title="Đổi ca làm việc đang chọn — số liệu trên màn lọc theo ca này."
                     type="button"
                     onClick={onDoiCa}
-                    className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-input px-3.5 text-sm font-semibold text-foreground transition-colors hover:bg-muted"
+                    className="nhan-an inline-flex min-h-10 items-center gap-2 rounded-lg border border-input px-3.5 text-sm font-semibold text-foreground hover:bg-muted"
                   >
                     <RefreshCw className="size-icon-sm" aria-hidden />
                     {ca}
@@ -655,7 +666,7 @@ export default function AppShell({
                     title="Xem các thông báo và việc cần làm trong ngày."
                     type="button"
                     onClick={onThongBao}
-                    className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-input px-3.5 text-sm font-semibold text-foreground transition-colors hover:bg-muted"
+                    className="nhan-an inline-flex min-h-10 items-center gap-2 rounded-lg border border-input px-3.5 text-sm font-semibold text-foreground hover:bg-muted"
                   >
                     <Bell className="size-icon-sm" aria-hidden />
                     Thông báo
@@ -679,7 +690,7 @@ export default function AppShell({
                       <button
                         title="Thoát tài khoản và quay về màn đăng nhập."
                         type="button"
-                        className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-input px-3.5 text-sm font-semibold text-foreground transition-colors hover:bg-muted hover:text-destructive"
+                        className="nhan-an inline-flex min-h-10 items-center gap-2 rounded-lg border border-input px-3.5 text-sm font-semibold text-foreground hover:bg-muted hover:text-destructive"
                       >
                         <LogOut className="size-icon-sm" aria-hidden />
                         Đăng xuất
@@ -694,8 +705,8 @@ export default function AppShell({
       )}
 
       {/* Cột nội dung — cuộn riêng trên desktop */}
-      <div className="scroll-nice flex min-w-0 flex-1 flex-col md:h-full md:overflow-y-auto">
-        <header className="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-2 border-b border-border bg-card px-4 md:gap-3 md:px-6">
+      <div className="scroll-nice pb-an-toan flex min-w-0 flex-1 flex-col md:h-full md:overflow-y-auto">
+        <header className="sticky top-0 z-40 flex h-header shrink-0 items-center gap-2 border-b border-border bg-card px-4 md:gap-3 md:px-6">
           {/* Trái — ĐƯỢC ƯU TIÊN ngân sách ngang (flex-1, không shrink-0) */}
           <div className="flex min-w-0 flex-1 items-center gap-2 md:gap-3">
             <HeaderNut
@@ -707,11 +718,11 @@ export default function AppShell({
             <HeaderNut
               label={thuGon ? "Mở thanh bên" : "Thu thanh bên"}
               icon={thuGon ? PanelLeftOpen : PanelLeftClose}
-              onClick={() => setThuGon((v) => !v)}
+              onClick={() => setThuGonChon({ hep: thanhBenHep, thuGon: !thuGon })}
               className="hidden md:inline-flex"
             />
             <div className="min-w-0">
-              <p className="truncate text-sm text-muted-foreground">
+              <p className="truncate text-sm text-muted-foreground ngang-thap:hidden">
                 Baseafood MES{breadcrumb ? ` · ${breadcrumb}` : ""}
               </p>
               {/* KHÔNG phải h1: mỗi màn tự có một h1 trong nội dung (màn không hiện tiêu đề thì
@@ -729,7 +740,7 @@ export default function AppShell({
                 title="Đổi ca làm việc đang chọn — số liệu trên màn lọc theo ca này."
                 type="button"
                 onClick={onDoiCa}
-                className="hidden min-h-10 items-center gap-2 rounded-lg border border-input px-3.5 text-sm font-semibold text-foreground transition-colors hover:bg-muted xl:inline-flex"
+                className="nhan-an hidden min-h-10 items-center gap-2 rounded-lg border border-input px-3.5 text-sm font-semibold text-foreground hover:bg-muted xl:inline-flex"
               >
                 <RefreshCw className="size-icon-sm" aria-hidden />
                 {ca}
@@ -802,7 +813,7 @@ export default function AppShell({
           </div>
         </header>
 
-        <main className="w-full flex-1 p-5 md:p-8">
+        <main className="w-full flex-1 p-5 md:p-8 ngang-thap:p-4">
           {/* Nhắc tải lại khi có bản deploy mới — ĐẶT NGOÀI khối đổi-trang để
               không bị mất/khởi tạo lại mỗi lần chuyển màn. */}
           <div className="mx-auto w-full max-w-(--app-content-width)">
@@ -811,7 +822,7 @@ export default function AppShell({
           {/* key theo màn đang mở → fade nhẹ mỗi lần đổi trang (reduced-motion tắt) */}
           <div
             key={active}
-            className="mx-auto w-full max-w-(--app-content-width) duration-fast animate-in fade-in-0"
+            className="hien-mo mx-auto w-full max-w-(--app-content-width)"
           >
             {children}
           </div>

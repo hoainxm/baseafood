@@ -749,7 +749,7 @@ export default function BanHangScreen() {
           if (!o) dongPhienLai("dong");
         }}
       >
-        <DialogContent className="max-h-[92vh] w-full overflow-y-auto sm:max-w-3xl lg:max-w-5xl">
+        <DialogContent className="max-h-[92dvh] w-full overflow-y-auto sm:max-w-3xl lg:max-w-5xl">
           <DialogHeader>
             <DialogTitle className="text-2xl">
               {dangSuaPhieu ? "Sửa phiếu bán" : "Ghi phiếu bán"}
@@ -1032,7 +1032,7 @@ export default function BanHangScreen() {
           if (!o) setDang(null);
         }}
       >
-        <DialogContent className="max-h-[92vh] w-full overflow-y-auto sm:max-w-3xl">
+        <DialogContent className="max-h-[92dvh] w-full overflow-y-auto sm:max-w-3xl">
           <DialogHeader>
             <DialogTitle className="text-2xl">Sửa dòng mặt hàng</DialogTitle>
             <DialogDescription className="text-base">

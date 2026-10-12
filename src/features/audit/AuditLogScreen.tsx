@@ -282,7 +282,7 @@ export default function NhatKyScreen() {
 
       {/* Hộp chi tiết trước → sau */}
       <Dialog open={chiTiet !== null} onOpenChange={(o) => !o && setChiTiet(null)}>
-        <DialogContent className="max-h-[92vh] w-full overflow-y-auto sm:max-w-2xl">
+        <DialogContent className="max-h-[92dvh] w-full overflow-y-auto sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle className="text-2xl">Chi tiết thao tác</DialogTitle>
             {chiTiet && (

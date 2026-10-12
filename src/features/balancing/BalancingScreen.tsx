@@ -363,7 +363,7 @@ export default function CanDoiScreen() {
           if (!o) setDang(null);
         }}
       >
-        <DialogContent className="max-h-[92vh] overflow-y-auto w-full sm:max-w-3xl lg:max-w-5xl">
+        <DialogContent className="max-h-[92dvh] overflow-y-auto w-full sm:max-w-3xl lg:max-w-5xl">
           <DialogHeader>
             <DialogTitle className="text-xl">
               {laThem ? "Tạo kỳ cân đối" : "Sửa kỳ cân đối"}

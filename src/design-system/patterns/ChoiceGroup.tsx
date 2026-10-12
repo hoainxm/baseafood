@@ -109,7 +109,7 @@ export function ChoiceGroup({
                 /* 40px — bằng đúng chiều cao ô nhập, để hai cột cạnh nhau
                    (VD "Ngày nhập hàng" ↔ "Phân xưởng") thẳng hàng.
                    Giữ border-2: viền dày là tín hiệu CHỌN (không chỉ dựa màu). */
-                "flex min-h-10 w-full items-center justify-between gap-4 rounded-lg border-2 px-4 py-2 text-left text-sm font-semibold transition-colors",
+                "flex min-h-10 w-full items-center justify-between gap-4 rounded-lg border-2 px-4 py-2 text-left text-sm font-semibold nhan-an",
                 chon
                   ? "border-primary bg-accent text-accent-foreground"
                   : "border-input bg-background text-foreground hover:bg-muted"

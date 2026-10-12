@@ -115,6 +115,29 @@ riêng cho tablet — vùng 768–1024px ăn luật desktop.
 `lg:` / `xl:` chỉ dùng để **chia thêm cột** trong lưới đã chạy tốt ở cả hai mốc
 (`grid gap-4 md:grid-cols-2 lg:grid-cols-4`).
 
+### 1b. Xoay ngang: iPhone ngang · iPad (2026-10-12)
+
+iPhone xoay ngang rộng 812–932px nên **ăn bố cục desktop** (`md:`) nhưng chỉ cao
+320–440px. iPad ngang 1024–1366px là desktop thật. Không đẻ mốc bề rộng mới; khung
+tự thích nghi ở ba chỗ, màn nghiệp vụ **không phải làm gì**:
+
+| Tình huống | Khung tự làm | Ở đâu |
+|---|---|---|
+| Bề rộng 768–1023px (iPhone ngang, iPad dọc) | Thanh bên **tự thu về dải icon** (w-20) — tiêu đề + bảng có thêm ~200px. Nút thu/mở vẫn theo ý người dùng | `AppShell` + `useKhopMedia(MEDIA_THANH_BEN_HEP)` |
+| Cao ≤ 500px khi nằm ngang (biến thể **`ngang-thap:`**) | Header 4rem→**3rem** (token `--spacing-header`), ẩn dòng breadcrumb, đệm trang 16px, hộp thoại cao `100dvh−1rem` + đệm đầu/chân gọn, chân drawer bỏ dòng tên | `tokens.css` · `AppShell` · `dialog.tsx` · `FormDialog` |
+| Tai thỏ / Dynamic Island hai bên, thanh Home ở đáy | Đẩy nội dung vào trong bằng `env(safe-area-inset-*)` (`viewport-fit=cover` ở `index.html`) | `px-an-toan` (khung app) · `pb-an-toan` (cột nội dung, thanh bên, drawer) · `pl-an-toan` (drawer) |
+
+- **`ngang-thap:` KHÔNG phải mốc bố cục** — chỉ để thu chrome DỌC (đệm, ẩn dòng phụ).
+  Đừng dùng nó để đổi số cột hay ẩn nội dung nghiệp vụ.
+- **Chiều cao theo màn: dùng `dvh`, cấm `vh`** (`max-h-[92dvh]`, không `max-h-[92vh]`).
+  Safari iOS tính `vh` theo màn KHI ẨN thanh địa chỉ ⇒ hộp `92vh` cao hơn phần nhìn
+  thấy lúc xoay ngang, nút Lưu ở chân lọt xuống dưới mép (đã vá 19 chỗ 2026-10-12).
+- Phần tử `fixed` mới bám mép màn (thanh dính đáy, nút nổi) ⇒ cộng `env(safe-area-inset-*)`
+  hoặc dùng tiện ích `*-an-toan`, không thì nằm dưới tai thỏ/thanh Home.
+- Kiểm: 844×390 và 932×430 (iPhone ngang, thêm cỡ chữ 130%) · 667×375 (iPhone SE
+  ngang — bố cục điện thoại + drawer) · 820×1180 (iPad dọc) · 1024×768 / 1180×820 /
+  1366×1024 (iPad ngang).
+
 ### 2. Thang chạm và icon — một nguồn
 
 | Dùng cho | Class | Giá trị |
@@ -363,6 +386,7 @@ thứ tự DOM, tự bỏ ô ẩn của dòng chưa mở); Tab để trình duy�
 - [ ] 360px: `document.documentElement.scrollWidth === clientWidth` — trang
       **không** cuộn ngang (chỉ vùng bảng/biểu đồ được cuộn, có chủ đích)
 - [ ] Thử thêm cỡ chữ **130%** (lối phóng to): vẫn không cuộn ngang, không đè chữ
+- [ ] Xoay ngang **844×390** (iPhone) + **1024×768** (iPad): không cuộn ngang, hộp thoại thấy nút ở chân; chiều cao theo màn dùng `dvh`, không `vh` (§1b)
 - [ ] Nút / ô tick chạm được thoải mái (~40px `size-tap`; ô tick nhỏ bọc `<label>`)
 - [ ] Thân chữ ≥ **`text-sm`** (14px); `text-xs` (12px) CHỈ cho chip/badge/phụ chú
       (đo bằng TOKEN, không bằng px tuyệt đối). Không `fontSize` cứng < 12 trong SVG
@@ -428,7 +452,7 @@ chip đếm/điều khiển của primitive; màn nghiệp vụ **không** dùng
 | Cho biết đang làm cho ngày/xưởng nào | `ContextBar` |
 | Danh sách rỗng | `EmptyState` (phải nói việc tiếp theo) |
 | Câu diễn giải dài cạnh nhãn | `InfoTip` (nút ⓘ + popover). `DateField` **và** `Combobox` có sẵn prop `info` — dùng thay `hint` khi câu dài khiến hai ô cùng hàng lệch chiều cao. Nhãn tiêu đề vẫn luôn hiện. |
-| Bảng tổng hợp cho trang Báo cáo | `BangTong` — prop **`dinhDau`** (bảng dài): khung cuộn riêng cao ≤70dvh, hàng tên cột **dính đỉnh** + dòng tổng dính đáy (utility `bang-dinh-dau` trong `tokens.css`; sticky theo trang không chạy xuyên khung cuộn ngang nên phải cuộn trong khung). Cột số căn phải `tnum`, hàng TỔNG CỘNG ở chân tự cộng theo `tong` từng cột. Component cha lo gom nhóm; `BangTong` chỉ hiển thị. Prop **`chon?: ChonBang<T>`** bật thêm cột ô tick ở đầu bảng (`{daChon: Set<khóa>, doi(k), doiTatCa(keys, bat), nhanDong?(row)}`): ô tick ở header = chọn/bỏ mọi dòng ĐANG HIỆN của bảng đó, dòng đã tick tô `bg-primary/5`. `BangTong` **không giữ state** — màn hình giữ `Set` khóa và tự cộng tổng / in / xử theo lô (khuôn phần mềm kế toán kho). Nhiều bảng chia nhóm dùng CHUNG một `ChonBang` để tick xuyên nhóm. Prop **`dongThem?: ReactNode`**: dòng THÊM MỚI cuối thân bảng (trải hết bề ngang, trước hàng tổng) — chỗ gõ tên hàng để ghi dòng mới ngay trên bảng (VD Sổ kho tháng); có `dongThem` thì bảng rỗng vẫn hiện. Prop **`xoRa`** (thay `dinhDau` cho sổ dài): KHÔNG khung cuộn riêng — bảng trải hết, trang cuộn một mạch; hàng tên cột **nổi** (vẽ lại, đo bề rộng cột thật, đồng bộ cuộn ngang) dính dưới header trang (`top-16` = `h-16` của `AppShell` — đổi chiều cao header thì đổi cả đây) khi cuộn qua bảng; bảng rộng ⇒ thanh cuộn ngang **dính đáy màn hình** (`bang-thanh-cuon`), thanh cuộn thật của bảng ẩn đi (`bang-xo-ra`). Prop **`toMau`**: bật ô tick + thanh "Đã chọn N dòng" để tô màu / in đậm nhiều dòng — xem mục Tô màu dòng. |
+| Bảng tổng hợp cho trang Báo cáo | `BangTong` — prop **`dinhDau`** (bảng dài): khung cuộn riêng cao ≤70dvh, hàng tên cột **dính đỉnh** + dòng tổng dính đáy (utility `bang-dinh-dau` trong `tokens.css`; sticky theo trang không chạy xuyên khung cuộn ngang nên phải cuộn trong khung). Cột số căn phải `tnum`, hàng TỔNG CỘNG ở chân tự cộng theo `tong` từng cột. Component cha lo gom nhóm; `BangTong` chỉ hiển thị. Prop **`chon?: ChonBang<T>`** bật thêm cột ô tick ở đầu bảng (`{daChon: Set<khóa>, doi(k), doiTatCa(keys, bat), nhanDong?(row)}`): ô tick ở header = chọn/bỏ mọi dòng ĐANG HIỆN của bảng đó, dòng đã tick tô `bg-primary/5`. `BangTong` **không giữ state** — màn hình giữ `Set` khóa và tự cộng tổng / in / xử theo lô (khuôn phần mềm kế toán kho). Nhiều bảng chia nhóm dùng CHUNG một `ChonBang` để tick xuyên nhóm. Prop **`dongThem?: ReactNode`**: dòng THÊM MỚI cuối thân bảng (trải hết bề ngang, trước hàng tổng) — chỗ gõ tên hàng để ghi dòng mới ngay trên bảng (VD Sổ kho tháng); có `dongThem` thì bảng rỗng vẫn hiện. Prop **`xoRa`** (thay `dinhDau` cho sổ dài): KHÔNG khung cuộn riêng — bảng trải hết, trang cuộn một mạch; hàng tên cột **nổi** (vẽ lại, đo bề rộng cột thật, đồng bộ cuộn ngang) dính dưới header trang (`top-header` = cùng token `--spacing-header` với `h-header` của `AppShell`) khi cuộn qua bảng; bảng rộng ⇒ thanh cuộn ngang **dính đáy màn hình** (`bang-thanh-cuon`), thanh cuộn thật của bảng ẩn đi (`bang-xo-ra`). Prop **`toMau`**: bật ô tick + thanh "Đã chọn N dòng" để tô màu / in đậm nhiều dòng — xem mục Tô màu dòng. |
 | **Dialog/form thông tin hay thao tác** | `FormDialog` — khung CHUẨN: đầu cố định (icon + tiêu đề + mô tả) · thân cuộn `scroll-nice` · chân cố định chứa nút. `rong`: sm/vua/rong/xl. Điều khiển bằng `open`/`onOpenChange` hoặc `trigger`. Nút đóng tiện dụng: `NutDong`. |
 | **`Dialog` trần** (không qua `FormDialog`) | Khung gốc (`components/ui/dialog.tsx`, 2026-09-29) tự **giới hạn cao `100dvh−2rem` + cuộn trong khung**, cột lưới `minmax(0,1fr)` (không nới theo phần tử rộng nhất ⇒ hết tràn ngang ở 360px), và `DialogFooter` **dính đáy** (`sticky`) khi thân cuộn. ⇒ **Nút xác nhận LUÔN đặt trong `DialogFooter`**, không để giữa thân dưới danh sách dài (từng bị cuộn mất ở Đồng bộ danh mục). Nhãn nút dài ⇒ `h-auto min-h-11 whitespace-normal` cho xuống dòng. |
 | Các con số bối cảnh/tổng | `ThongKe` (lưới thẻ KPI: nhãn nhỏ + số TO + icon màu) — sinh động hơn nhồi một dòng. **Bỏ trống `cot` ⇒ tự suy theo số thẻ**: ≤4 một hàng · 5 thẻ một hàng ở xl (lg 3+2; từ lg thẻ hẹp: icon lên trên, số nhỏ một bậc) · 6 thẻ 3×2 · nhiều hơn 4 cột. Điện thoại: cột tối thiểu 9.5rem (chữ 130% tự về 1 cột), thẻ cuối lẻ trải hết hàng. Truyền `cot` chỉ khi cần ép. `ContextBar` chỉ dùng cho thanh dính "đang xem ngày/xưởng nào" trong màn nhập liệu. |
@@ -635,7 +659,12 @@ Mục tiêu: tinh tế, không phô — giao diện *mượt* chứ không *ồn
   toàn cục — nhưng đừng dựa vào animation để TRUYỀN THÔNG TIN (phải có trạng thái
   tĩnh tương đương).
 - Chuyển màn: `AppShell` bọc `children` trong `<div key={active}
-  className="duration-fast animate-in fade-in-0">` → đổi menu là fade nhẹ.
+  className="hien-mo …">` → đổi menu là fade nhẹ (chỉ opacity). Nội dung tab
+  (`TabsContent`) cũng `hien-mo`.
+- **Khối LỚN chứa con `fixed`/`sticky` (nội dung màn, nội dung tab) chỉ được fade
+  opacity** (`hien-mo`), cấm `animate-in`/`hien-len`: keyframe có `transform` biến
+  khối thành gốc toạ độ của con `fixed` ⇒ thanh cuộn dính đáy, hàng tên cột nổi
+  chạy sai chỗ trong lúc (hoặc sau khi, nếu fill-mode `both`) animation chạy.
 
 **Token & utility chuyển động — MỘT nguồn, gọi theo tên (đừng viết transition rời ở feature):**
 
@@ -658,6 +687,17 @@ fill-mode nên reduced-motion tắt vẫn dừng ở trạng thái HIỆN RÕ):
 | `hien-len` | mờ→rõ + `translateY(6px)→0` | `RecordTable` (dòng/thẻ mới, keyed nên chỉ dòng MỚI animate) · `DailyTaskReminder` · nhóm nav mở (`AppShell`) |
 | `hien-ngang` | mờ→rõ + `translateX(10px)→0` | nội dung mỗi bước `StepForm` (keyed theo `i`) |
 | `hien-xuong` | mờ→rõ + `translateY(-8px)→0` | `UpdateBanner` (băng nhắc tải lại) |
+| `hien-mo` | chỉ mờ→rõ, 150ms, không fill-mode | nội dung màn khi đổi route (`AppShell`) · `TabsContent` |
+
+**Phản hồi khi chạm — `nhan-an`** (2026-10-12): nút/mục tự dựng co nhẹ `scale(.97)`
+lúc đang nhấn + chuyển màu theo `--duration-fast`, bỏ ô xám nháy của Safari. Trên
+iPhone/iPad không có hover (Tailwind v4 gói `hover:` trong `@media (hover: hover)`)
+nên đây là phản hồi DUY NHẤT trước khi màn đổi — thiếu nó người dùng bấm lần hai.
+Dùng **thay** `transition-colors` cho nút tự dựng (không dựng trên `Button`; `Button`
+đã có `active:translate-y-px`). Đã gắn: mục nav · tiêu đề nhóm nav · nút icon header
+· nút chân drawer (`AppShell`) · `ChoiceGroup` · `InfoTip` · `NutHuongDan` ·
+`NutGiaoDien` · `NutTrangThai` · `CaiDatHienThi` · thẻ `ThongKe` bấm được. Nút tự
+dựng mới ⇒ gắn `nhan-an`.
 
 Drawer điện thoại (`AppShell`) dùng tw-animate-css `animate-in slide-in-from-left
 duration-base`, overlay `animate-in fade-in-0 duration-fast`. **Không** làm
@@ -712,10 +752,10 @@ nhập ⇒ bucket mặc định `bsf.coChu` (tương thích ngược). Đổi t�
 (`CoChuNhanh` — nút cỡ chữ nhanh cũ — vẫn còn trong file nhưng không còn gắn
 trên header.)
 
-> Đầu thanh bên và header nội dung cùng cao `h-16` trong `AppShell.tsx`. Đổi
-> chiều cao thì đổi CẢ HAI (3 chỗ: sidebar · drawer · header), lệch là trang vênh.
-> Hàng tên cột nổi của `BangTong xoRa` dính ở `top-16` (ngay dưới header) — đổi
-> chiều cao header thì đổi cả chỗ đó.
+> Đầu thanh bên, đầu drawer và header nội dung cùng cao **`h-header`** — token
+> `--spacing-header` trong `tokens.css` (4rem; máy xoay ngang thấp 3rem). Hàng tên
+> cột nổi của `BangTong xoRa` dính ở `top-header`. Đổi chiều cao ⇒ đổi MỘT token;
+> đừng gõ `h-16`/`top-16` rời (lệch là trang vênh).
 
 ## Thêm component shadcn mới
 

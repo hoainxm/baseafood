@@ -138,7 +138,7 @@ export function HopChonDongNhap({
 
   return (
     <Dialog open onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-3xl">
+      <DialogContent className="max-h-[85dvh] overflow-y-auto sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle>Chọn dòng nhập hàng đưa vào kỳ</DialogTitle>
           <DialogDescription>

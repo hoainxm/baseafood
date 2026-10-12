@@ -69,6 +69,7 @@ export {
   type ToMauBang,
 } from "./patterns/toMauNguon";
 export { GoiYHover, TRE_HIEN_MS } from "./patterns/HoverHint";
+export { useKhopMedia, MEDIA_THANH_BEN_HEP } from "./patterns/khopMedia";
 export { ThongKe, type TheThongTin } from "./patterns/ThongKe";
 export { BieuDoCot, type CotBieuDo } from "./patterns/BarChart";
 export { StatusChip, type TrangThaiSX } from "./patterns/StatusChip";

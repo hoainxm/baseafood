@@ -264,7 +264,7 @@ export function HopSuaDanhMuc<T extends { id: string }>({
         if (!o) onClose();
       }}
     >
-      <DialogContent className="max-h-[92vh] overflow-y-auto w-full sm:max-w-3xl lg:max-w-5xl">
+      <DialogContent className="max-h-[92dvh] overflow-y-auto w-full sm:max-w-3xl lg:max-w-5xl">
         <DialogHeader>
           <DialogTitle className="text-xl">
             {laThem ? `Thêm ${tenDonVi}` : `Sửa ${tenDonVi}`}

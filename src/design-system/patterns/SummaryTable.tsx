@@ -189,10 +189,10 @@ export function BangTong<T>({
     >
       {thanhTren}
       {xoRa && (
-        // Hàng tên cột NỔI: hộp cao 0 dính dưới header trang (h-16 ở AppShell —
-        // đổi chiều cao header thì đổi cả top-16 này). Chỉ hiện khi hàng tên cột
+        // Hàng tên cột NỔI: hộp cao 0 dính dưới header trang (`top-header` = cùng
+        // token `--spacing-header` với `h-header` của AppShell). Chỉ hiện khi hàng tên cột
         // thật đã trôi khỏi tầm nhìn mà bảng vẫn còn trên màn.
-        <div className="pointer-events-none sticky top-16 z-20 h-0 print:hidden" aria-hidden>
+        <div className="pointer-events-none sticky top-header z-20 h-0 print:hidden" aria-hidden>
           <div
             ref={dauNoiRef}
             className={cn(

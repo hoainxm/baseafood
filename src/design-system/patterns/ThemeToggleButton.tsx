@@ -74,7 +74,7 @@ export function NutGiaoDien({
           aria-label="Tùy chỉnh giao diện"
           title="Tùy chỉnh giao diện"
           className={cn(
-            "inline-flex size-11 shrink-0 items-center justify-center rounded-lg border-2 border-input text-foreground transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+            "inline-flex size-11 shrink-0 items-center justify-center rounded-lg border-2 border-input text-foreground nhan-an hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
             className
           )}
         >

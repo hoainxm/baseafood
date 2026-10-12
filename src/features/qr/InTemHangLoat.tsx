@@ -141,7 +141,7 @@ export function InTemHangLoat() {
             </div>
           </div>
 
-          <ul className="max-h-[60vh] divide-y divide-border overflow-y-auto rounded-lg border border-border">
+          <ul className="max-h-[60dvh] divide-y divide-border overflow-y-auto rounded-lg border border-border">
             {ds.map((n) => {
               const k = khoaNut(n);
               const chon = !boChon.has(k);

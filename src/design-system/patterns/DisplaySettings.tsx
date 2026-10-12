@@ -194,7 +194,7 @@ export function CoChuNhanh({
           title={m.moTa}
           onClick={() => doiCoChu(m.id)}
           className={cn(
-            "min-h-10 min-w-10 rounded-md px-2 font-semibold transition-colors",
+            "min-h-10 min-w-10 rounded-md px-2 font-semibold nhan-an",
             i === 0 && "text-xs",
             i === 1 && "text-sm",
             i === 2 && "text-base",
@@ -241,7 +241,7 @@ function NhomChon({
               aria-pressed={chon}
               onClick={() => onChange(m.id)}
               className={cn(
-                "min-h-14 rounded-lg border-2 px-4 py-3 text-left transition-colors",
+                "min-h-14 rounded-lg border-2 px-4 py-3 text-left nhan-an",
                 chon
                   ? "border-primary bg-accent text-accent-foreground"
                   : "border-input bg-background hover:bg-muted"

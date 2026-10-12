@@ -174,7 +174,7 @@ export function KiemLoXuat({
 
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-h-[92vh] w-full overflow-y-auto sm:max-w-2xl">
+      <DialogContent className="max-h-[92dvh] w-full overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle className="text-2xl">Kiểm lô bằng quét tem</DialogTitle>
           <DialogDescription className="text-base">

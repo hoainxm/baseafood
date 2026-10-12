@@ -153,7 +153,7 @@ export function ThongKe({
             aria-label={t.moTaChon ?? `Xem chi tiết: ${t.nhan}`}
             className={cn(
               cls,
-              "cursor-pointer text-left transition-colors hover:border-primary hover:bg-muted/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+              "cursor-pointer text-left nhan-an hover:border-primary hover:bg-muted/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
             )}
           >
             {noiDung}

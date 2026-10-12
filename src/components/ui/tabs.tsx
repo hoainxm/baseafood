@@ -81,7 +81,11 @@ function TabsContent({
   return (
     <TabsPrimitive.Content
       data-slot="tabs-content"
-      className={cn("flex-1 text-sm outline-none", className)}
+      className={cn(
+        // hien-mo: đổi tab là nội dung mờ→rõ nhẹ (chỉ opacity — xem tokens.css)
+        "hien-mo flex-1 text-sm outline-none",
+        className
+      )}
       {...props}
     />
   )

@@ -90,7 +90,7 @@ export function HopDoiLoaiHangLoat({
 
   return (
     <Dialog open onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-h-[88vh] overflow-y-auto sm:max-w-4xl">
+      <DialogContent className="max-h-[88dvh] overflow-y-auto sm:max-w-4xl">
         <DialogHeader>
           <DialogTitle>Đổi loại nguyên liệu hàng loạt</DialogTitle>
           <DialogDescription>

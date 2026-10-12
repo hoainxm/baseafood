@@ -68,12 +68,14 @@ export function FormDialog({
       {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
       <DialogContent
         className={cn(
-          "flex max-h-[88vh] flex-col items-stretch gap-0 overflow-hidden p-0",
+          // dvh, không vh: Safari iOS tính vh theo màn KHI ẨN thanh địa chỉ ⇒ 88vh cao
+          // hơn phần nhìn thấy lúc xoay ngang, chân hộp (nút Lưu) lọt xuống dưới mép.
+          "flex max-h-[min(88dvh,calc(100dvh-2rem))] flex-col items-stretch gap-0 overflow-hidden p-0 ngang-thap:max-h-[calc(100dvh-1rem)]",
           RONG[rong]
         )}
       >
         {/* Đầu — cố định */}
-        <div className="flex shrink-0 items-start gap-3 border-b border-border px-6 py-4">
+        <div className="flex shrink-0 items-start gap-3 border-b border-border px-6 py-4 ngang-thap:py-2.5">
           {Icon && (
             <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-accent text-accent-foreground">
               <Icon className="size-5" aria-hidden />
@@ -94,7 +96,7 @@ export function FormDialog({
         {/* Thân — cuộn riêng */}
         <div
           ref={thanRef}
-          className="scroll-nice min-h-0 flex-1 overflow-y-auto px-6 py-5"
+          className="scroll-nice min-h-0 flex-1 overflow-y-auto px-6 py-5 ngang-thap:py-3"
         >
           {(coOBatBuoc || doThayBatBuoc) && <ChuThichBatBuoc className="mb-4" />}
           {children}
@@ -102,7 +104,7 @@ export function FormDialog({
 
         {/* Chân — cố định */}
         {chan && (
-          <div className="flex shrink-0 flex-wrap items-center justify-end gap-3 border-t border-border bg-muted/40 px-6 py-3.5">
+          <div className="flex shrink-0 flex-wrap items-center justify-end gap-3 border-t border-border bg-muted/40 px-6 py-3.5 ngang-thap:py-2">
             {chan}
           </div>
         )}

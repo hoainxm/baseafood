@@ -551,7 +551,7 @@ export default function DonDatScreen() {
 
       {/* Dialog tạo đơn */}
       <Dialog open={tao !== null} onOpenChange={(o) => !o && setTao(null)}>
-        <DialogContent className="max-h-[92vh] w-full overflow-y-auto sm:max-w-3xl">
+        <DialogContent className="max-h-[92dvh] w-full overflow-y-auto sm:max-w-3xl">
           <DialogHeader>
             <DialogTitle className="text-2xl">Tạo đơn đặt</DialogTitle>
             <DialogDescription className="text-base">

@@ -1,6 +1,8 @@
 > Load khi: thêm/bớt màn hình, đổi điều hướng, header, hay tìm xem một màn được gắn vào đâu.
 covers: src/App.tsx, src/features/shared/AppShell.tsx, src/features/shared/NotFound.tsx, src/features/shared/guideContent.tsx, src/lib/nav-access.ts
-last_verified: 2026-10-08
+last_verified: 2026-10-12
+<!-- re-verified: 2026-10-12 15:20 — AppShell: thu/mở sidebar (thuGon), header/sidebar/drawer cùng chiều cao, drawer chân nút toàn cục; FIX drift `h-20` → thật là `h-16`, nay là token `h-header`. -->
+<!-- updated: 2026-10-12 — XOAY NGANG iPhone/iPad: thanh bên TỰ thu về dải icon ở 768–1023px (iPhone ngang, iPad dọc; `useKhopMedia(MEDIA_THANH_BEN_HEP)`), bấm nút thu/mở vẫn theo ý người dùng trong cùng cỡ màn. Chiều cao header = token `--spacing-header` (`h-header`/`top-header`), máy ngang thấp (cao ≤ 500px) thu 4rem→3rem + ẩn dòng breadcrumb + đệm trang 16px + chân drawer bỏ dòng tên. Khung có vùng an toàn tai thỏ/thanh Home (`px-an-toan`, `pb-an-toan`). Đổi màn: fade `hien-mo` (chỉ opacity). Không đổi route/nav/gate. -->
 <!-- re-verified: 2026-10-08 14:30 — guideContent.qr chỉ sửa câu "Mã lô là gì" (lô NL = mỗi loại NL của chuyến, mỗi tem một loại); route / nav / gate / tab `/qr` KHÔNG đổi. -->
 <!-- updated: 2026-10-08 (b) — `/qr` 3 tab: **Tra lô** · **Theo giai đoạn** (`?tab=giai-doan`, GiaiDoanTruyXuat: 5 khâu nhập NL → SX → nhập kho → đóng gói → xuất/bán, trạng thái từng lô + nút làm tại chỗ) · **In tem hàng loạt** (`?tab=in`). Tab "Độ phủ" (`?tab=do-phu`, có vài giờ) GỘP vào Theo giai đoạn — link cũ vẫn mở tab mới. Điện thoại (< sm) nhãn ngắn "Tra lô · Giai đoạn · In tem", bỏ icon. LINK MỞ THẲNG HỘP (deep-link, gỡ tham số sau khi xử lý): `/warehouse?duyet=W:<id mẻ>` ⇒ hộp Duyệt nhập kho đúng mẻ; `/orders?don=<id đơn>&kiem=<id lệnh xuất>` ⇒ mở đơn + hộp Kiểm lô. `?lo=` vẫn luôn mở tab Tra. Hộ chiếu lô có mục Thu hồi (ThuHoiLo). Route / nhãn nav / gate KHÔNG đổi. Chi tiết: ../spec/qr-truy-xuat-lo.md §6d. -->
 <!-- updated: 2026-10-06 — `ShellLayout` (App.tsx) bọc `<Outlet>` trong `ToMauProvider` (features/shared): một nguồn dấu tô màu dòng `row_marks` (mig 0055) cho mọi bảng trên mọi màn. Không đổi route/nav. -->
@@ -79,7 +81,7 @@ Cụm trái (`☰` · logo · tiêu đề) được ưu tiên ngân sách ngang 
 
 Cỡ chữ / trạng thái kết nối **không còn ở chân sidebar** (đã dời hết lên header). Đổi tài khoản → `ShellLayout` trong `App.tsx` gọi `apDungCaiDatHienThi(username)` nạp lại giao diện của người vừa đăng nhập.
 
-**Thu/mở sidebar** (chỉ desktop): nút `PanelLeft` bên trái header đổi `thuGon`. Thu ⇒ sidebar `w-20`, nav chỉ còn icon (nhãn vào `title`, tiêu đề nhóm thay bằng đường kẻ), logo icon-only. Chuẩn form: `FormDialog` (design-system) — mọi dialog thông tin/thao tác đi qua khung này.
+**Thu/mở sidebar** (chỉ desktop): nút `PanelLeft` bên trái header đổi `thuGon`. **Mặc định tự thu** ở bề rộng 768–1023px (iPhone xoay ngang, iPad dọc — `MEDIA_THANH_BEN_HEP`); ≥ 1024px mặc định mở. Người dùng bấm thu/mở thì giữ ý họ cho tới khi xoay sang cỡ màn khác. Thu ⇒ sidebar `w-20`, nav chỉ còn icon (nhãn vào `title`, tiêu đề nhóm thay bằng đường kẻ), logo icon-only. Chuẩn form: `FormDialog` (design-system) — mọi dialog thông tin/thao tác đi qua khung này.
 
 ## Các màn & Cấu trúc Route
 
@@ -112,7 +114,8 @@ Cụm báo cáo khép vòng (đọc dữ liệu thật, không mock): `/bc-thanh
 ## Cạm bẫy bố cục
 
 - id mục nav = path: `id: "warehouse"` phải khớp `Route path="/warehouse"`. (Bug cũ: id `kho` ≠ route `warehouse` ⇒ menu gãy — đã sửa.)
-- Đầu sidebar và header nội dung cùng `h-20`. Đặt chiều cao riêng từng bên ⇒ đường kẻ lệch, cả trang trông vênh.
+- Đầu sidebar, đầu drawer và header nội dung cùng `h-header` (token `--spacing-header` ở `tokens.css`: 4rem; máy xoay ngang thấp 3rem). Hàng tên cột nổi của `BangTong xoRa` dính ở `top-header`. Đổi chiều cao ⇒ đổi token, đừng gõ `h-16`/`top-16` rời (lệch là trang vênh).
+- **Máy xoay ngang thấp** (biến thể `ngang-thap:`, cao ≤ 500px): header ẩn dòng "Baseafood MES · …", `main` đệm 16px, chân drawer bỏ dòng tên người dùng.
 - **Đừng nhồi thêm nút icon vào header cho điện thoại.** Ở cỡ chữ 130%, mỗi nút là 57px — 6 nút đã vượt bề rộng màn 390px và bóp tiêu đề còn 0px. Thứ toàn cục mới thì cho xuống chân drawer.
 - Bề rộng nội dung là biến `--app-content-width`, người dùng đổi được trong Bộ giao diện — **đừng** hardcode `max-w-*` ở màn.
 - Luật responsive đầy đủ (breakpoint, thang chạm, bảng ra thẻ, checklist màn mới): [`src/design-system/README.md` § Quy chuẩn mobile](../../src/design-system/README.md).

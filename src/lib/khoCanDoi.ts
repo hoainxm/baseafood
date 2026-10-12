@@ -5,7 +5,7 @@
 // ============================================================
 import type { BalancingInputItem, MonthlyStockLine } from "@/types";
 import { loaiDongKho } from "@/lib/balancingGrid";
-import { donSangThang, suyDong, thangSau, type MonthlyStockRow } from "@/lib/monthlyStock";
+import { donKyVaoSo, suyDong, thangSau, type MonthlyStockRow } from "@/lib/monthlyStock";
 import { num, viDate } from "@/lib/format";
 
 /**
@@ -68,13 +68,10 @@ export function damBaoThang(
   for (let i = 0; i < 24 && nguon < thang; i++) {
     const dich = thangSau(nguon);
     if (!ds.some((l) => l.period === dich)) {
-      const carried = donSangThang(
-        ds.filter((l) => l.period === nguon).map(suyDong),
-        dich
-      );
-      const idMoi = new Set(carried.map((c) => c.id));
-      ds = [...ds.filter((l) => !idMoi.has(l.id)), ...carried];
-      keThua += carried.length;
+      // Cùng hàm ghi dồn kỳ của màn Sổ kho tháng (không thay cả dòng đã có).
+      const kq = donKyVaoSo(ds, dich);
+      ds = kq.lines;
+      keThua += kq.soDong;
     }
     nguon = dich;
   }

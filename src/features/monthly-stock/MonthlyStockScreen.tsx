@@ -8,7 +8,7 @@ import type { MonthlyStockLine, MaterialType, Product } from "@/types";
 import { MONTHLY_STOCK_CATEGORIES, BSF1_WAREHOUSES, STORAGE_KIND_LABELS } from "@/types";
 import { useMonthlyStock, useMaterialTypes, useProducts, useStorageLocations } from "@/lib/catalogRepo";
 import { uid } from "@/lib/db";
-import { num, viDate } from "@/lib/format";
+import { chuan0, num, viDate } from "@/lib/format";
 import {
   parseBangKeKhoFile,
   namTuTenFile,
@@ -16,6 +16,8 @@ import {
   timKhoTheoGhi,
   tenKhoMoi,
   khoaKho,
+  idDongNap,
+  ghepNapLai,
   type BangKeKhoSheet,
 } from "@/lib/monthlyStockExcel";
 import {
@@ -23,6 +25,7 @@ import {
   tongDong,
   gomNhom,
   donSangThang,
+  donKyVaoSo,
   danhSachThang,
   thangHienTai,
   thangTruoc,
@@ -160,7 +163,7 @@ const formRong = (category: string, warehouse: string): DongForm => ({
   outKg: null,
 });
 
-const soHoacGach = (v: number) => (v ? num(v) : "—");
+const soHoacGach = (v: number) => (chuan0(v) ? num(v) : "—");
 
 /**
  * Sổ kho theo THÁNG DƯƠNG LỊCH. Số hoá đúng "bảng kê kho" kế toán đang giữ trên
@@ -235,6 +238,8 @@ export default function MonthlyStockScreen() {
     return donSangThang(nguon, thang).map(suyDong);
   }, [rowsLuu.length, rowsTruoc, kho, thang]);
 
+  // Theo kho đang lọc (lọc một kho còn trống vẫn xem trước được); phần GHI chỉ dồn
+  // đúng phạm vi `khoDon` nên kho khác trong tháng không bị đặt lại.
   const laXemTruoc = rowsLuu.length === 0 && rowsXemTruoc.length > 0;
 
   /** Dòng đang HIỂN THỊ = dòng đã lưu, hoặc bản xem trước khi tháng còn trống. */
@@ -262,9 +267,13 @@ export default function MonthlyStockScreen() {
     () => lines.filter((l) => l.period === thang).map(suyDong),
     [lines, thang]
   );
-  const coTonSang = rowsThangDayDu.some(
-    (r) => Math.abs(r.closeKg) > 1e-9 || Math.abs(r.closeCtn) > 1e-9
-  );
+  // Theo KG (đơn vị ghi sổ) — cùng điều kiện lọc của `donSangThang`.
+  const coTonSang = rowsThangDayDu.some((r) => Math.abs(r.closeKg) > 1e-9);
+
+  /** Phạm vi kho khi kéo tồn tháng trước về (gõ ở xem trước / "Kế thừa"): tháng còn trống
+   *  hẳn ⇒ mọi kho (không bỏ sót kho nào); tháng đã có dòng ở kho KHÁC (đang lọc một kho
+   *  còn trống) ⇒ CHỈ kho đang lọc — không đặt lại dòng carry của kho kia. */
+  const khoDon = () => (rowsThangDayDu.length === 0 || kho === TAT_CA_KHO ? undefined : kho);
 
   // Cờ lệch dồn kỳ: tồn đầu tháng này (mọi kho) vs tồn cuối tháng trước.
   const lech = useMemo(() => soLechDonKy(rowsTruoc, rowsThangDayDu), [rowsTruoc, rowsThangDayDu]);
@@ -357,9 +366,8 @@ export default function MonthlyStockScreen() {
    */
   const soNenDeGhi = (): { nen: MonthlyStockLine[]; keThua: number } => {
     if (!laXemTruoc) return { nen: lines, keThua: 0 };
-    const carried = donSangThang(rowsTruoc, thang);
-    const idMoi = new Set(carried.map((c) => c.id));
-    return { nen: [...lines.filter((l) => !idMoi.has(l.id)), ...carried], keThua: carried.length };
+    const kq = donKyVaoSo(lines, thang, khoDon());
+    return { nen: kq.lines, keThua: kq.soDong };
   };
   const baoKeThua = (n: number) => {
     if (n) notify.daLuu(`Đã kế thừa ${n} dòng tồn cuối ${nhanThang(thangTr)} vào sổ ${nhanThang(thang)} rồi ghi số vừa gõ`);
@@ -573,32 +581,35 @@ export default function MonthlyStockScreen() {
   };
 
   // ---------- Dồn kỳ ----------
+  /* Ghi qua `donKyVaoSo` (hàm thuần): dòng carry đã có chỉ đổi tồn đầu, giữ nhập/xuất,
+     vị trí, ghi chú, vết Cân đối; dòng carry mất nguồn về tồn đầu 0. */
+  const viecVe0 = (kq: { veKhong: number; bo: number }) =>
+    (kq.veKhong ? ` · ${kq.veKhong} dòng về tồn đầu 0 (tháng trước đã hết)` : "") +
+    (kq.bo ? ` · bỏ ${kq.bo} dòng trống` : "");
+
   const donTuThangTruoc = () => {
-    const carried = donSangThang(rowsTruoc, thang);
-    if (!carried.length) {
+    const kq = donKyVaoSo(lines, thang, khoDon());
+    if (!kq.soDong && !kq.veKhong && !kq.bo) {
       notify.canhBao(`${nhanThang(thangTr)} không có tồn để dồn sang.`);
       return;
     }
-    const idMoi = new Set(carried.map((x) => x.id));
-    const giuLai = lines.filter((l) => !idMoi.has(l.id));
-    ghiLines([...giuLai, ...carried]);
-    const skg = carried.reduce((s, r) => s + r.openKg, 0);
-    notify.daLuu(`Đã kế thừa ${carried.length} dòng · ${num(skg)} kg từ ${nhanThang(thangTr)}`);
+    ghiLines(kq.lines);
+    notify.daLuu(`Đã kế thừa ${kq.soDong} dòng · ${num(kq.tongKg)} kg từ ${nhanThang(thangTr)}${viecVe0(kq)}`);
   };
 
   const donSangThangSau = () => {
     const dich = thangSau(thang);
-    const carried = donSangThang(rowsThangDayDu, dich);
-    if (!carried.length) {
+    const kq = donKyVaoSo(lines, dich);
+    if (!kq.soDong && !kq.veKhong && !kq.bo) {
       notify.canhBao("Tháng này không còn tồn cuối để dồn sang.");
       return;
     }
-    const idMoi = new Set(carried.map((x) => x.id));
-    const giuLai = lines.filter((l) => !idMoi.has(l.id));
-    ghiLines([...giuLai, ...carried]);
+    ghiLines(kq.lines);
     setThang(dich);
     setKho(TAT_CA_KHO);
-    notify.daLuu(`Đã dồn tồn cuối sang ${nhanThang(dich)} · ${carried.length} dòng`);
+    notify.daLuu(
+      `Đã dồn tồn cuối sang ${nhanThang(dich)} · ${kq.soDong} dòng (${kq.them} mới, ${kq.capNhat} cập nhật tồn đầu, giữ nguyên nhập/xuất đã ghi)${viecVe0(kq)}`
+    );
   };
 
   // ---------- Tick dòng: cộng tổng · in riêng · xóa theo lô ----------
@@ -977,11 +988,20 @@ export default function MonthlyStockScreen() {
       notify.canhBao("Năm không hợp lệ (2000–2100).");
       return;
     }
+    // Hai sheet cùng một tháng (VD "8" và "T8") ⇒ cùng id ⇒ không nạp được, bắt sửa file.
+    const thangTrung = sheets
+      .filter((sh) => sh.monthNum != null)
+      .map((sh) => sh.monthNum)
+      .filter((m, i, a) => a.indexOf(m) !== i);
+    if (thangTrung.length) {
+      notify.canhBao(`File có nhiều sheet cùng tháng ${[...new Set(thangTrung)].join(", ")} — giữ một sheet mỗi tháng rồi nạp lại.`);
+      return;
+    }
+    const maNap = maKho(khoNap.trim());
     const moi: MonthlyStockLine[] = [];
     // Cột R "GỬI KHO HP / Á D…" ⇒ vị trí = kho trong danh mục kho lưu (khớp mã KHP/KAD hoặc tên);
-    // viết tắt lạ ⇒ tạo mục kho thuê ngoài mới. Dòng KHÔNG ghi kho ⇒ giữ vị trí đã gán tay (trống = kho của sổ).
-    const viTriCu = new Map(lines.map((l) => [l.id, l.storageLocation]));
-    const noteCu = new Map(lines.map((l) => [l.id, l.note]));
+    // viết tắt lạ ⇒ tạo mục kho thuê ngoài mới. Dòng KHÔNG ghi kho ⇒ để "" — `ghepNapLai` giữ vị trí
+    // đã gán tay của dòng cũ khớp (cùng tên hàng), trống = kho của sổ.
     const dmKho = [...khoLuuDM];
     const khoThem: string[] = [];
     const tenKho = (ghi: string) => {
@@ -993,10 +1013,12 @@ export default function MonthlyStockScreen() {
       return name;
     };
     for (const sh of sheets) {
-      if (sh.monthNum == null) continue;
-      const period = `${nam}-${String(sh.monthNum).padStart(2, "0")}`;
+      const thangSo = sh.monthNum;
+      if (thangSo == null) continue;
+      const period = `${nam}-${String(thangSo).padStart(2, "0")}`;
       sh.rows.forEach((r, idx) => {
-        const id = `xlsx|${maKho(khoNap.trim())}|${sh.sheetName}|${nam}|${r.rowIndex}`;
+        // id theo SỐ tháng, không theo tên sheet (đổi "8" → "T8" vẫn cùng id) — xem idDongNap.
+        const id = idDongNap(maNap, thangSo, nam, r.rowIndex);
         moi.push({
           id,
           period,
@@ -1006,7 +1028,7 @@ export default function MonthlyStockScreen() {
           size: r.size,
           origin: r.origin,
           importDate: r.importDate,
-          storageLocation: r.khoGhi ? tenKho(r.khoGhi) : (viTriCu.get(id) ?? ""),
+          storageLocation: r.khoGhi ? tenKho(r.khoGhi) : "",
           kgPerCtn: r.kgPerCtn,
           unitPrice: r.unitPrice,
           openCtn: r.openCtn,
@@ -1017,7 +1039,7 @@ export default function MonthlyStockScreen() {
           outKg: r.outKg,
           carriedFromId: "",
           sortOrder: idx,
-          note: r.ghiChu ? `Bảng kê: ${r.ghiChu}` : (noteCu.get(id) ?? ""),
+          note: r.ghiChu ? `Bảng kê: ${r.ghiChu}` : "",
         });
       });
     }
@@ -1025,19 +1047,20 @@ export default function MonthlyStockScreen() {
       notify.canhBao("Không nạp được tháng nào — tên sheet phải là số tháng (1–12).");
       return;
     }
-    const idMoi = new Set(moi.map((x) => x.id));
-    // Dòng của CÙNG sheet/kho/năm mà file mới không còn (VD dòng tiêu đề "HÀNG TẠM" parser cũ nạp nhầm
-    // thành mặt hàng): toàn số 0 ⇒ bỏ; còn số ⇒ giữ + cảnh báo (không xoá lặng lẽ số liệu).
-    const tienTo = new Set(sheets.filter((sh) => sh.monthNum != null).map((sh) => `xlsx|${maKho(khoNap.trim())}|${sh.sheetName}|${nam}|`));
-    const laCuCuaFile = (l: MonthlyStockLine) => !idMoi.has(l.id) && tienTo.has(l.id.slice(0, l.id.lastIndexOf("|") + 1));
-    const cuRong = lines.filter((l) => laCuCuaFile(l) && laDongTrong(l));
-    const cuConSo = lines.filter((l) => laCuCuaFile(l) && !laDongTrong(l));
-    const idBo = new Set(cuRong.map((l) => l.id));
-    const giuLai = lines.filter((l) => !idMoi.has(l.id) && !idBo.has(l.id));
-    // Dòng đã TÁCH khi chuyển kho một phần: nạp lại trả dòng gốc về số trong file ⇒ phần tách bị đếm 2 lần.
-    const soTach = giuLai.filter((l) => [...idMoi].some((id) => l.note.includes(`(tách từ dòng ${id})`))).length;
-    ghiLines([...giuLai, ...moi]);
+    // Dòng nạp lần trước của CÙNG kho + tháng (theo `period` của dòng, nhận cả id dạng cũ theo tên
+    // sheet) mà file mới không còn: toàn số 0 ⇒ bỏ; còn số ⇒ giữ + cảnh báo (không xoá lặng lẽ).
+    // Dòng đã TÁCH khi chuyển kho một phần: nạp lại trả dòng gốc về số trong file ⇒ phần tách đếm 2 lần.
+    const kq = ghepNapLai(lines, moi, maNap);
+    const { cuConSo, soTach, lechTen } = kq;
+    ghiLines(kq.lines);
     if (khoThem.length) ghiKhoLuuDM(dmKho);
+    if (lechTen.length)
+      notify.canhBao(
+        `${lechTen.length} dòng đổi tên hàng so với lần nạp trước (file chèn/xoá dòng?) — không giữ vị trí/ghi chú cũ cho các dòng này: ${lechTen
+          .slice(0, 3)
+          .map((x) => `${x.cu.itemName} → ${x.moi.itemName}`)
+          .join(", ")}${lechTen.length > 3 ? "…" : ""}`
+      );
     if (cuConSo.length)
       notify.canhBao(`${cuConSo.length} dòng nạp lần trước không còn trong file mới nhưng còn số — giữ nguyên, kiểm lại: ${cuConSo.slice(0, 5).map((l) => l.itemName).join(", ")}${cuConSo.length > 5 ? "…" : ""}`);
     if (soTach) notify.canhBao(`${soTach} dòng từng tách khi chuyển kho một phần vẫn còn — dòng gốc đã về số trong file, kiểm lại kẻo cộng đôi.`);
@@ -1045,10 +1068,12 @@ export default function MonthlyStockScreen() {
     setThang(dauKy);
     setKho(TAT_CA_KHO);
     setNapForm(null);
-    const soGui = moi.filter((m) => m.storageLocation && m.storageLocation !== m.warehouse).length;
+    const idNap = new Set(moi.map((m) => m.id));
+    const soGui = kq.lines.filter((m) => idNap.has(m.id) && m.storageLocation && m.storageLocation !== m.warehouse).length;
     notify.daLuu(
       `Đã nạp ${moi.length} dòng · ${new Set(moi.map((m) => m.period)).size} tháng từ Excel bảng kê` +
         (soGui ? ` · ${soGui} dòng gửi kho ngoài` : "") +
+        (kq.thayIdCu ? ` · thay ${kq.thayIdCu} dòng nạp cũ (tên sheet cũ)` : "") +
         (khoThem.length ? ` · thêm kho mới: ${khoThem.join(", ")}` : ""),
     );
   };

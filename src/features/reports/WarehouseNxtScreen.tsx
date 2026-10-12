@@ -79,6 +79,13 @@ const TAT_CA = "__tat_ca__";
 
 const keyKy = (r: { periodFrom: string; periodTo: string }) => `${r.periodFrom}|${r.periodTo}`;
 const idDong = (kho: string, from: string, to: string, code: string) => `nxt|${kho}|${from}|${to}|${code}`;
+/** yyyy-mm-dd → ngày hôm sau (tính theo UTC, không lệch múi giờ). */
+const ngayHomSau = (iso: string) => {
+  const d = new Date(`${iso}T00:00:00Z`);
+  if (Number.isNaN(d.getTime())) return "";
+  d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString().slice(0, 10);
+};
 
 /** "Từ ngày 01/07/2026 đến ngày 31/07/2026" → ["2026-07-01","2026-07-31"]. */
 function parseKhoangNgay(text: string): [string, string] | null {
@@ -331,8 +338,10 @@ export default function WarehouseNxtScreen() {
     setLoiKy(ls);
     if (ls.length) return;
     const { from, to } = kyForm;
-    // Kế thừa: tồn cuối kỳ đang xem → tồn đầu kỳ mới. Nhập/xuất = 0 (chờ ghi).
-    const carried: NxtSnapshotLine[] = rows.map((r) => ({
+    // Kế thừa: tồn cuối kỳ đang xem → tồn đầu kỳ mới. Nhập/xuất = 0 (chờ ghi). Lấy MỌI dòng
+    // của kỳ (`rowsKy`), KHÔNG theo chip kho lưu đang lọc — lọc chỉ để xem, dồn mà thiếu dòng
+    // là mất tồn. Giá trị đầu kỳ mới = giá trị cuối kỳ này (đầu + nhập − xuất).
+    const carried: NxtSnapshotLine[] = rowsKy.map((r) => ({
       id: idDong(khoChon, from, to, r.itemCode),
       warehouseCode: khoChon,
       storageLocation: r.storageLocation,
@@ -344,20 +353,32 @@ export default function WarehouseNxtScreen() {
       openingKg: r.closingKg,
       inKg: 0,
       outKg: 0,
-      openingValue: 0,
+      openingValue: (r.openingValue ?? 0) + (r.inValue ?? 0) - (r.outValue ?? 0),
       inValue: 0,
       outValue: 0,
       note: "",
     }));
-    const idMoi = new Set(carried.map((x) => x.id));
-    const giuLai = snapshots.filter(
-      (r) => !(r.warehouseCode === khoChon && r.periodFrom === from && r.periodTo === to) && !idMoi.has(r.id)
-    );
-    ghiSnapshots([...giuLai, ...carried]);
+    // Kỳ đích đã có dòng (tạo lại / đã gõ nhập-xuất): CHỈ đổi tồn đầu của đúng mã đang dồn,
+    // giữ nhập/xuất, kho lưu, ghi chú; dòng khác của kỳ đích (thêm tay) để nguyên — trước đây
+    // xoá cả kỳ đích ⇒ mất số đã gõ (cùng tinh thần dồn kỳ Sổ kho tháng).
+    const theoId = new Map(carried.map((c) => [c.id, c]));
+    const daCo = new Set<string>();
+    const capNhat = snapshots.map((l) => {
+      const c = theoId.get(l.id);
+      if (!c) return l;
+      daCo.add(l.id);
+      return { ...l, openingKg: c.openingKg, openingValue: c.openingValue };
+    });
+    ghiSnapshots([...capNhat, ...carried.filter((c) => !daCo.has(c.id))]);
     setKyForm(null);
     setKy(`${from}|${to}`);
+    setKhoLuuLoc(TAT_CA);
     setGhiMode(true);
-    notify.daLuu(`Đã tạo kỳ ${viDate(from)}–${viDate(to)} · kế thừa tồn đầu ${num(tong.tonCuoi)} kg`);
+    const tongKg = carried.reduce((t, c) => t + c.openingKg, 0);
+    notify.daLuu(
+      `Đã tạo kỳ ${viDate(from)}–${viDate(to)} · kế thừa tồn đầu ${num(tongKg)} kg · ${carried.length} mã` +
+        (daCo.size ? ` (${daCo.size} mã đã có: chỉ cập nhật tồn đầu, giữ nhập/xuất)` : "")
+    );
   };
 
   const the: TheThongTin[] = [
@@ -645,7 +666,7 @@ export default function WarehouseNxtScreen() {
                 variant="outline"
                 title="Mở một kỳ báo cáo mới và lấy tồn cuối kỳ này làm tồn đầu kỳ đó (kèm cả kho lưu) — khỏi gõ lại từ đầu."
                 onClick={() => {
-                  setKyForm({ from: denNgay, to: "" });
+                  setKyForm({ from: ngayHomSau(denNgay), to: "" });
                   setLoiKy([]);
                 }}
               >
@@ -882,8 +903,9 @@ export default function WarehouseNxtScreen() {
           <DialogHeader>
             <DialogTitle className="text-2xl">Tạo kỳ kế tiếp (kế thừa tồn)</DialogTitle>
             <DialogDescription className="text-base">
-              Kho {khoChon}. Tồn cuối kỳ đang xem ({num(tong.tonCuoi)} kg · {rows.length} mặt hàng) sẽ thành
-              tồn đầu kỳ mới; nhập/xuất để trống chờ ghi.
+              Kho {khoChon}. Tồn cuối kỳ đang xem ({num(rowsKy.reduce((t, r) => t + r.closingKg, 0))} kg ·{" "}
+              {rowsKy.length} mặt hàng, mọi kho lưu — không theo chip đang lọc) sẽ thành tồn đầu kỳ mới; nhập/xuất
+              để trống chờ ghi. Kỳ mới đã có mã nào thì chỉ cập nhật tồn đầu mã đó, giữ số đã ghi.
             </DialogDescription>
           </DialogHeader>
           {kyForm && (

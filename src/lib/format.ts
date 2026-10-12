@@ -5,16 +5,22 @@
 // ============================================================
 const nf = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 2 });
 
+/**
+ * Số làm tròn 2 số lẻ ra 0 (kể cả −0 và sai số cộng trừ số thực như −5,55e−17) ⇒ 0,
+ * kẻo Intl in "-0" (tồn cuối = đầu + nhập − xuất hay dư một vụn âm cực nhỏ).
+ */
+export const chuan0 = (v: number) => (Math.abs(v) < 0.005 ? 0 : v);
+
 /** Số khối lượng/tiền theo locale vi-VN, cắt tối đa 2 số lẻ. */
 export function num(v: number | null | undefined): string {
   if (v == null || Number.isNaN(v)) return "";
-  return nf.format(v);
+  return nf.format(chuan0(v));
 }
 
 /** kg hiển thị kèm đơn vị. */
 export function kg(v: number | null | undefined): string {
   if (v == null || Number.isNaN(v)) return "";
-  return `${nf.format(v)} kg`;
+  return `${nf.format(chuan0(v))} kg`;
 }
 
 /** yyyy-mm-dd hôm nay theo giờ máy. */

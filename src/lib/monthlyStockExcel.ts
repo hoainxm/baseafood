@@ -4,6 +4,8 @@
 // Description: Parse the monthly "bảng kê kho" workbook into ledger rows
 // ============================================================
 import * as XLSX from "xlsx";
+import type { MonthlyStockLine } from "@/types";
+import { laDongTrong } from "@/lib/monthlyStock";
 
 /**
  * Đọc đúng bố cục "BẢNG KÊ NGUYÊN LIỆU KHO 1500 T" (file kho ... năm ....xlsx):
@@ -240,8 +242,10 @@ export async function parseBangKeKhoFile(file: File): Promise<BangKeKhoSheet[]> 
     const du = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, raw: true, blankrows: true });
     const r0 = ws["!ref"] ? XLSX.utils.decode_range(ws["!ref"]).s.r : 0;
     const dongExcel: number[] = []; // chỉ số trong `rows` → dòng Excel 0-based
+    // Phải là ĐÚNG điều kiện giữ dòng của SheetJS blankrows:false (ô có v != null — ô chuỗi
+    // rỗng "" vẫn tính là có), không thì chỉ số lệch và dòng cộng khối con đọc SUM sai dòng.
     du.forEach((row, k) => {
-      if (row.some((v) => v != null && v !== "")) dongExcel.push(k + r0);
+      if (row.some((v) => v != null)) dongExcel.push(k + r0);
     });
     const timDauKhoi: TimDauKhoi = (i) => {
       const r = dongExcel[i];
@@ -302,4 +306,91 @@ export const tenKhoMoi = (khoGhi: string) =>
 export function namTuTenFile(fileName: string): number {
   const m = fileName.match(/(20\d{2})/);
   return m ? Number(m[1]) : new Date().getFullYear();
+}
+
+/* ---------- id dòng nạp + nạp lại (thuần) ---------- */
+
+/**
+ * id tất định của dòng nạp: `xlsx|<mã kho>|<số tháng>|<năm>|<rowIndex>`. Đoạn tháng là SỐ
+ * tháng (không phải tên sheet) ⇒ đổi tên sheet "8" → "T8"/"08" rồi nạp lại vẫn ra đúng id
+ * cũ, không đẻ bản sao. Sổ thật nạp từ sheet tên "1".."8" ⇒ id cũ giữ nguyên.
+ */
+export const idDongNap = (maKho: string, monthNum: number, nam: number, rowIndex: number) =>
+  `xlsx|${maKho}|${monthNum}|${nam}|${rowIndex}`;
+
+/** Tách id dòng nạp (dạng mới lẫn cũ `xlsx|<kho>|<tên sheet>|<năm>|<rowIndex>`); không phải ⇒ null. */
+export function tachIdNap(id: string): { maKho: string; nam: string; rowIndex: string } | null {
+  const p = id.split("|");
+  if (p[0] !== "xlsx" || p.length < 5) return null;
+  return { maKho: p[1], nam: p[p.length - 2], rowIndex: p[p.length - 1] };
+}
+
+const chuanTen = (s: string) => (s || "").trim().toLowerCase().replace(/\s+/g, " ");
+
+export interface KetQuaNapLai {
+  lines: MonthlyStockLine[];
+  /** Dòng nạp lần trước (cùng kho + tháng) mà file mới không còn, vẫn còn số ⇒ GIỮ, cảnh báo. */
+  cuConSo: MonthlyStockLine[];
+  /** Dòng cũ trống hẳn không còn trong file ⇒ bỏ. */
+  boRong: number;
+  /** Dòng cũ cùng kho·tháng·vị trí dòng nhưng id dạng cũ (tên sheet khác) ⇒ thay bằng dòng mới. */
+  thayIdCu: number;
+  /** Cùng vị trí dòng mà TÊN HÀNG khác (file chèn/xoá dòng ⇒ rowIndex trượt): không thừa kế vị trí/ghi chú. */
+  lechTen: { cu: MonthlyStockLine; moi: MonthlyStockLine }[];
+  /** Dòng từng tách (chuyển kho một phần) từ dòng vừa nạp lại ⇒ có thể cộng đôi. */
+  soTach: number;
+}
+
+/**
+ * Ghép bản nạp `moi` (MỘT kho `maKho`) vào sổ. `moi[].storageLocation` / `note` để "" khi
+ * file không ghi ⇒ thừa kế từ dòng cũ khớp. Dòng cũ khớp = cùng id, hoặc (dữ liệu id dạng
+ * cũ theo tên sheet) cùng kho · THÁNG (`period` của dòng) · rowIndex. Dọn dòng cũ theo
+ * `period` của dòng chứ không theo tiền tố id ⇒ đổi tên sheet không làm tháng nhân đôi.
+ */
+export function ghepNapLai(lines: MonthlyStockLine[], moi: MonthlyStockLine[], maKho: string): KetQuaNapLai {
+  const idMoi = new Set(moi.map((m) => m.id));
+  const thang = new Set(moi.map((m) => m.period));
+  const khoaViTri = (period: string, rowIndex: string) => `${period}|${rowIndex}`;
+  const theoId = new Map<string, MonthlyStockLine>();
+  const theoViTri = new Map<string, MonthlyStockLine>();
+  for (const l of lines) {
+    const t = tachIdNap(l.id);
+    if (!t || t.maKho !== maKho || !thang.has(l.period)) continue;
+    theoId.set(l.id, l);
+    if (!idMoi.has(l.id)) theoViTri.set(khoaViTri(l.period, t.rowIndex), l);
+  }
+  const idThay = new Set<string>();
+  const lechTen: KetQuaNapLai["lechTen"] = [];
+  const daGhep = moi.map((m) => {
+    const t = tachIdNap(m.id);
+    const cu = theoId.get(m.id) ?? (t ? theoViTri.get(khoaViTri(m.period, t.rowIndex)) : undefined);
+    if (!cu) return m;
+    if (cu.id !== m.id) idThay.add(cu.id);
+    if (chuanTen(cu.itemName) !== chuanTen(m.itemName)) {
+      lechTen.push({ cu, moi: m });
+      return m;
+    }
+    return {
+      ...m,
+      storageLocation: m.storageLocation || cu.storageLocation || "",
+      note: m.note || cu.note || "",
+    };
+  });
+  const cuConSo: MonthlyStockLine[] = [];
+  let boRong = 0;
+  const giuLai = lines.filter((l) => {
+    if (idMoi.has(l.id) || idThay.has(l.id)) return false;
+    if (!theoId.has(l.id)) return true; // ngoài phạm vi bản nạp (kho / tháng khác, dòng tay, carry…)
+    if (laDongTrong(l)) {
+      boRong++;
+      return false;
+    }
+    cuConSo.push(l);
+    return true;
+  });
+  const idNap = new Set([...idMoi, ...idThay]);
+  const soTach = giuLai.filter((l) =>
+    [...(l.note ?? "").matchAll(/\(tách từ dòng ([^)]+)\)/g)].some((m) => idNap.has(m[1]))
+  ).length;
+  return { lines: [...giuLai, ...daGhep], cuConSo, boRong, thayIdCu: idThay.size, lechTen, soTach };
 }

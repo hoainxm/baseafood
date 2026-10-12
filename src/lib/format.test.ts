@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { num, kg, viDate, todayISO } from "@/lib/format";
+import { num, kg, viDate, todayISO, chuan0 } from "@/lib/format";
 
 describe("num", () => {
   it("null/undefined/NaN ⇒ chuỗi rỗng (không phải '0')", () => {
@@ -10,6 +10,17 @@ describe("num", () => {
   it("nhóm hàng nghìn theo locale vi-VN", () => {
     expect(num(1000)).toBe("1.000");
     expect(num(1234567)).toBe("1.234.567");
+  });
+});
+
+describe("không in -0", () => {
+  it("vụn âm cực nhỏ / −0 / làm tròn ra 0 ⇒ '0'", () => {
+    expect(num(-5.55e-17)).toBe("0");
+    expect(num(-0)).toBe("0");
+    expect(num(-0.004)).toBe("0");
+    expect(kg(-1e-12)).toBe("0 kg");
+    expect(num(-0.01)).toBe("-0,01");
+    expect(chuan0(-1e-9)).toBe(0);
   });
 });
 

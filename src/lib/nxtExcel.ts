@@ -63,6 +63,7 @@ export async function parseNxtExcelFile(file: File): Promise<NxtExcelReportData>
   let dateRangeText = "";
   let warehouseText = "";
   const items: NxtExcelRow[] = [];
+  let quaTieuDeCot = false; // đã qua hàng tên cột "Mã hàng" ⇒ hết phần đầu trang
 
   for (let r = 0; r < rows.length; r++) {
     const row = rows[r];
@@ -76,14 +77,18 @@ export async function parseNxtExcelFile(file: File): Promise<NxtExcelReportData>
       title = cellA;
     } else if (cellA.startsWith("Từ ngày")) {
       dateRangeText = cellA;
-    } else if (cellA.startsWith("Chi nhánh:") || cellA.startsWith("KHO")) {
-      warehouseText = cellA;
+    } else if ((cellA.startsWith("Chi nhánh:") || cellA.startsWith("KHO")) && (!quaTieuDeCot || row.length <= 1)) {
+      // Dòng kho CHỈ nhận ở phần đầu trang, lần đầu. Chân file ("Chi nhánh: …: Bà Rịa…" — chính
+      // exportNxtToExcel ghi ra) cũng bắt đầu y vậy: nhận nó thì xuất rồi nhập lại đẻ kho rác.
+      if (!warehouseText && !quaTieuDeCot) warehouseText = cellA;
+      continue;
     } else if (
       cellA.startsWith("Mã hàng") ||
       cellA.startsWith("SL mặt hàng:") ||
       r < 5
     ) {
       // Tiêu đề hoặc dòng tổng hợp của file gốc -> bỏ qua dòng dữ liệu
+      if (cellA.startsWith("Mã hàng")) quaTieuDeCot = true;
       continue;
     } else {
       // Dòng dữ liệu sản phẩm
@@ -146,6 +151,30 @@ export async function parseNxtExcelFile(file: File): Promise<NxtExcelReportData>
 
 /** Xuất báo cáo Nhập Xuất Tồn ra file .xlsx khớp 100% mẫu mau-bao-cao-nhap-xuat-ton.xlsx */
 export function exportNxtToExcel(data: NxtExcelReportData, fileName = "Bao-Cao-Nhap-Xuat-Ton.xlsx") {
+  const worksheet = XLSX.utils.aoa_to_sheet(nxtSangMang(data));
+
+  // Đặt độ rộng cột phù hợp
+  worksheet["!cols"] = [
+    { wch: 24 }, // Mã hàng
+    { wch: 45 }, // Tên hàng
+    { wch: 14 }, // Tồn đầu kỳ
+    { wch: 15 }, // Giá trị đầu
+    { wch: 14 }, // SL Nhập
+    { wch: 15 }, // Giá trị nhập
+    { wch: 14 }, // SL Xuất
+    { wch: 15 }, // Giá trị xuất
+    { wch: 14 }, // Tồn cuối kỳ
+    { wch: 15 }, // Giá trị cuối
+  ];
+
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Báo Cáo Xuất Nhập Tồn");
+
+  XLSX.writeFile(workbook, fileName);
+}
+
+/** Bố cục ô của file xuất (tách riêng để kiểm xuất → nhập lại bằng test). */
+export function nxtSangMang(data: NxtExcelReportData): any[][] {
   const wsData: any[][] = [];
 
   // Row 1: Ngày lập
@@ -208,25 +237,5 @@ export function exportNxtToExcel(data: NxtExcelReportData, fileName = "Bao-Cao-N
       ? `${data.warehouseText}: Bà Rịa - Phường Phước Trung - Thành phố Bà Rịa - Vũng Tàu`
       : "KHO Thành Phẩm - KHO 1000: Bà Rịa - Phường Phước Trung - Thành phố Bà Rịa - Vũng Tàu",
   ]);
-
-  const worksheet = XLSX.utils.aoa_to_sheet(wsData);
-
-  // Đặt độ rộng cột phù hợp
-  worksheet["!cols"] = [
-    { wch: 24 }, // Mã hàng
-    { wch: 45 }, // Tên hàng
-    { wch: 14 }, // Tồn đầu kỳ
-    { wch: 15 }, // Giá trị đầu
-    { wch: 14 }, // SL Nhập
-    { wch: 15 }, // Giá trị nhập
-    { wch: 14 }, // SL Xuất
-    { wch: 15 }, // Giá trị xuất
-    { wch: 14 }, // Tồn cuối kỳ
-    { wch: 15 }, // Giá trị cuối
-  ];
-
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, "Báo Cáo Xuất Nhập Tồn");
-
-  XLSX.writeFile(workbook, fileName);
+  return wsData;
 }

@@ -431,11 +431,16 @@ export const idDon = (srcId: string) => `carry|${srcId}`;
  * mô tả (nhóm, kho, tên, size, xuất xứ, đơn giá, kg/kiện). id tất định theo dòng
  * nguồn ⇒ dồn lại nhiều lần chỉ CẬP NHẬT, không nhân đôi.
  *
- * Chỉ mang sang dòng còn tồn (tồn cuối ≠ 0) — dòng đã hết không cần đầu kỳ mới.
+ * Chỉ mang sang dòng còn tồn THEO KG (tồn cuối kg ≠ 0) — kg là đơn vị ghi sổ từ
+ * 2026-09-15, kiện chỉ đi kèm. Dòng hết kg mà còn lẻ kiện (sai số chia kiện) không dồn,
+ * kẻo dồn mãi một dòng màn hình hiện toàn số 0.
+ *
+ * ⚠ Hàm này chỉ DỰNG dòng (xem trước). GHI vào sổ thì dùng `donKyVaoSo` — nó giữ số
+ * người dùng đã gõ ở tháng đích, không thay cả dòng.
  */
 export function donSangThang(nguon: MonthlyStockRow[], thangDich: string): MonthlyStockLine[] {
   return nguon
-    .filter((r) => Math.abs(r.closeKg) > 1e-9 || Math.abs(r.closeCtn) > 1e-9)
+    .filter((r) => Math.abs(r.closeKg) > 1e-9)
     .map((r) => ({
       id: idDon(r.id),
       period: thangDich,
@@ -458,6 +463,84 @@ export function donSangThang(nguon: MonthlyStockRow[], thangDich: string): Month
       sortOrder: r.sortOrder,
       note: "",
     }));
+}
+
+export interface KetQuaDonKy {
+  lines: MonthlyStockLine[];
+  /** Số dòng tháng đích đang mang tồn kế thừa (thêm mới + cập nhật). */
+  soDong: number;
+  them: number;
+  capNhat: number;
+  /** Dòng `carry|…` có nguồn đã hết tồn / bị xoá ⇒ tồn đầu đặt về 0 (giữ dòng vì còn số). */
+  veKhong: number;
+  /** Dòng `carry|…` về 0 mà trống hẳn (không nhập/xuất, không ghi chú) ⇒ bỏ. */
+  bo: number;
+  /** Tổng kg tồn đầu kế thừa. */
+  tongKg: number;
+}
+
+/**
+ * GHI dồn kỳ vào sổ: tồn cuối tháng liền trước `thangDich` → tồn đầu `thangDich`.
+ * MỘT chỗ dùng chung cho mọi đường dồn (gõ ở xem trước, "Kế thừa & lưu", "Dồn sang
+ * tháng sau", Cân đối tự mở tháng). `kho` (tuỳ chọn) = chỉ dồn dòng của kho đó.
+ *
+ * Vì sao không thay cả dòng như trước: dồn LẠI sau khi tháng đích đã có số (nhập/xuất,
+ * vị trí, ghi chú, vết ⟦CĐ:…⟧ của Cân đối) sẽ xoá trắng những thứ đó. Quy tắc:
+ *  - id `carry|<nguồn>` đã có ⇒ CHỈ cập nhật `openKg/openCtn`, mọi cột khác giữ nguyên.
+ *  - chưa có ⇒ thêm dòng mới (`donSangThang`).
+ *  - dòng `carry|…` ở tháng đích mà nguồn (trong phạm vi kho) đã hết tồn hay bị xoá ⇒
+ *    tồn đầu về 0; trống hẳn (không số, không ghi chú) thì bỏ, còn số thì GIỮ.
+ */
+export function donKyVaoSo(lines: MonthlyStockLine[], thangDich: string, kho?: string): KetQuaDonKy {
+  const thangNguon = thangTruoc(thangDich);
+  const trongKho = (l: MonthlyStockLine) => !kho || l.warehouse === kho;
+  const carried = donSangThang(
+    lines.filter((l) => l.period === thangNguon && trongKho(l)).map(suyDong),
+    thangDich
+  );
+  const theoId = new Map(carried.map((c) => [c.id, c]));
+  const nguonTheoId = new Map(lines.filter((l) => l.period === thangNguon).map((l) => [l.id, l]));
+  let capNhat = 0;
+  let veKhong = 0;
+  let bo = 0;
+  const daCo = new Set<string>();
+  const ra: MonthlyStockLine[] = [];
+  for (const l of lines) {
+    const c = theoId.get(l.id);
+    if (c) {
+      daCo.add(l.id);
+      capNhat++;
+      ra.push(l.openKg === c.openKg && l.openCtn === c.openCtn ? l : { ...l, openKg: c.openKg, openCtn: c.openCtn });
+      continue;
+    }
+    if (l.period !== thangDich || !l.id.startsWith("carry|")) {
+      ra.push(l);
+      continue;
+    }
+    // Dòng dồn cũ không còn nguồn mang tồn. Nguồn còn ⇒ xét kho của nguồn; mất ⇒ kho của dòng.
+    const nguon = nguonTheoId.get(l.carriedFromId || l.id.slice("carry|".length));
+    if (!(nguon ? trongKho(nguon) : trongKho(l)) || (l.openKg === 0 && l.openCtn === 0)) {
+      ra.push(l);
+      continue;
+    }
+    const z = { ...l, openKg: 0, openCtn: 0 };
+    if (laDongTrong(z) && !(z.note ?? "").trim()) {
+      bo++;
+      continue;
+    }
+    veKhong++;
+    ra.push(z);
+  }
+  const moi = carried.filter((c) => !daCo.has(c.id));
+  return {
+    lines: [...ra, ...moi],
+    soDong: carried.length,
+    them: moi.length,
+    capNhat,
+    veKhong,
+    bo,
+    tongKg: carried.reduce((s, c) => s + c.openKg, 0),
+  };
 }
 
 /* ---------- Thao tác trên MỘT dòng: lấy ra dùng · nhập thêm · chuyển vị trí ---------- */

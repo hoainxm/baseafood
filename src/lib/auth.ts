@@ -47,10 +47,17 @@ async function layHoacTaoHoSo(session: Session): Promise<UserProfile | null> {
     .select("*")
     .eq("id", id)
     .maybeSingle();
-  if (!error && data) return hoSoTuRow(data as Record<string, unknown>);
+  // Đọc LỖI (hết hạn token, rớt mạng, timeout) ≠ "chưa có hồ sơ": đừng ghi gì —
+  // trước đây nhánh này upsert roles:"" đè mất vai trò thật của tài khoản.
+  if (error) return null;
+  if (data) return hoSoTuRow(data as Record<string, unknown>);
 
+  // Chưa có hồ sơ thật sự ⇒ tạo mới; ignoreDuplicates: dòng đã có (máy khác vừa
+  // tạo / select hụt) thì GIỮ NGUYÊN, không bao giờ đè vai trò.
   const row = { id, site_id: SITE_ID, full_name: fullName, username, roles: "" };
-  await supabase.from("user_profiles").upsert(row, { onConflict: "id" });
+  await supabase
+    .from("user_profiles")
+    .upsert(row, { onConflict: "id", ignoreDuplicates: true });
   return { id, fullName, username, roles: [] };
 }
 

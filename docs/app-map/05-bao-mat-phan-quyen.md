@@ -1,7 +1,8 @@
 > Load khi: đụng auth, đăng nhập, RLS, `.env`, key, hay có ý định cho app chạy ngoài mạng nội bộ. 🔴
 covers: src/lib/auth.ts, src/lib/username.ts, src/features/auth/LoginScreen.tsx, src/features/users/UserManagementScreen.tsx, supabase/migrations/0006_nguoi_dung.sql, supabase/migrations/0007_seed_admin.sql, supabase/migrations/0010_email_domain_vn.sql, supabase/migrations/0003_siet_rls.sql, src/lib/supabase.ts, .env.example, .gitignore
-last_verified: 2026-10-06
+last_verified: 2026-10-12
 ttl_days: 90
+<!-- updated: 2026-10-12 — LỖ HỔNG (audit ponytail): màn Người dùng tạo tài khoản bằng `signUp` từ trình duyệt ⇒ Supabase phải mở đăng ký ⇒ người lạ có link app tự đăng ký được, mà RLS chỉ kiểm `auth.uid() is not null` ⇒ đọc/ghi mọi bảng + tự sửa `roles` thành admin. VÁ: `0057_chan_tu_dang_ky.sql` — bảng nghiệp vụ chỉ mở cho người có vai trò KHÁC RỖNG (`co_vai_tro()`), cột vai trò chỉ admin sửa (`la_admin()`). KHÔNG phải role-RLS (quyết định 2026-09-21 vẫn giữ: mọi người có vai trò cùng quyền DB). ⚠️ Hệ quả: người dùng thật vai trò rỗng — app vẫn cho "xem đầy đủ" — sẽ bị khóa ở DB sau khi chạy ⇒ gán vai trò trước. ✅ Chủ dự án đã chạy trên DB thật 2026-10-12 — kiểm 2026-10-12: 0 policy kiểu cũ, 40 policy `co_vai_tro()`, `user_profiles` 4 policy, Storage siết đủ, 0 hồ sơ vai trò rỗng. Cùng đợt: `layHoacTaoHoSo` thôi ghi đè vai trò rỗng khi select lỗi. -->
 <!-- updated: 2026-10-06 — bảng mới `row_marks` (0055, tô màu dòng) siết RLS ngay từ đầu (authenticated, revoke anon) — đã kiểm DB thật: anon không có quyền select. Màn Người dùng bật tô màu dòng (`toMau="nguoi-dung"`), không đổi phân quyền. -->
 <!-- updated: 2026-09-21 — QUYẾT ĐỊNH CHỦ DỰ ÁN (chốt phạm vi Sprint 2 audit PO, ĐỪNG HỎI LẠI): (1) phân quyền theo VAI TRÒ ở tầng DB — HOÃN, "sẽ cấu hình khi cần thiết" ⇒ mọi người đã đăng nhập vẫn cùng quyền DB, gate vai trò tiếp tục ở app (nav-access.ts); (2) chỉ BSF1 ⇒ KHÔNG ràng site_id ở RLS; (3) bản ghi đã chốt KHÔNG khóa cứng ở DB — "vẫn có trường hợp mở ra sửa theo yêu cầu" ⇒ giữ luồng ghi bù/mở lại có lý do; backstop là `0048` trigger CHỈ GHI VẾT sửa/xóa đi thẳng SQL vào audit_log (device_id='sql-editor'), không chặn. Muốn siết thật (khóa/role) ⇒ mở lại quyết định này với chủ dự án trước. -->
 <!-- updated: 2026-09-21 — LỖ HỔNG + VÁ (audit PO): `0021` liệt kê CỨNG 26 bảng ⇒ 5 bảng tạo SAU vẫn `for all to anon, authenticated using(true)`: nxt_snapshots (0032), monthly_stock_ledger (0041), reconciliation_runs (0043 — CHỨA file HĐĐT base64), storage_locations (0044), lot_inputs (0046). Anon key nằm trong bundle ⇒ dù đã chạy 0021, 5 bảng này vẫn đọc/ghi được. VÁ: `0047_siet_rls_bo_sung.sql` siết đúng 5 bảng về mô hình 0021 (idempotent, ROLLBACK, kèm comment policy chỉ-chủ+admin cho reconciliation_runs). 🔴 CHẠY TAY như 0021. BẤT BIẾN MỚI: bảng mới PHẢI kèm siết RLS — hook pre-commit CẢNH BÁO khi migration mới có `to anon, authenticated` (trừ 0021/0047). Phân quyền theo VAI TRÒ/site_id vẫn chưa làm ở tầng DB (mục dưới). -->
@@ -57,6 +58,15 @@ ttl_days: 90
 5. Chỉ sau đó mới mở ra ngoài mạng nội bộ.
 
 Chạy `0021` **trước** khi đăng nhập chạy ổn ⇒ app ngừng đọc/ghi ngay (401). Không mất dữ liệu, nhưng cả xưởng đứng — khối `ROLLBACK` trong file mở lại được cho anon, và mở xong **phải siết lại**.
+
+### `0057` — chặn người tự đăng ký (đã chạy trên DB thật 2026-10-12) 🔴
+
+Đăng ký Supabase phải để mở vì màn Người dùng tạo tài khoản bằng `signUp` từ trình duyệt. `0057` không tắt đăng ký mà làm cho tài khoản tự đăng ký vô dụng:
+- Bảng nghiệp vụ (mọi policy đang kiểm `auth.uid() is not null`) chỉ mở cho người có hồ sơ với `roles` khác rỗng — hàm `co_vai_tro()`.
+- `user_profiles`: chỉ admin (`la_admin()`) sửa/xóa; người thường chỉ tự tạo được hồ sơ của mình với vai trò rỗng.
+- Storage: policy của `authenticated` thêm điều kiện `co_vai_tro()`.
+
+**Trước khi chạy:** hai câu tiền kiểm ở đầu file phải rỗng (hồ sơ vai trò rỗng · tài khoản Auth chưa có hồ sơ). Ai là người dùng thật thì gán vai trò trước, không thì họ bị khóa ngoài. Muốn tắt hẳn đăng ký thì phải chuyển tạo tài khoản sang Edge Function dùng service role — chưa làm.
 
 ### Sau `0021` vẫn CHƯA có phân quyền theo vai trò
 

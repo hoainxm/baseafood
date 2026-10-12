@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { tinhTon, locBanLe, khaDung, KHO_BAN_LE, KHO_TP, truTonBTP, tinhTonTPTheoLo, dongGoiTruTon } from "@/lib/inventory";
+import { tinhTon, tinhTonChiTiet, locBanLe, khaDung, KHO_BAN_LE, KHO_TP, truTonBTP, tinhTonTP, tinhTonTPTheoLo, tinhTonTPTheoLoChiTiet, dongGoiTruTon } from "@/lib/inventory";
 import type { WipProductionItem, ExportItem, LotDispatch, LotInput, Packaging } from "@/types";
 
 const lo = (
@@ -166,5 +166,47 @@ describe("trừ tồn theo lô đã gắn (truy xuất QR)", () => {
     );
     expect(los.find((l) => l.wipId === "pk1")!.conLai).toBe(70);
     expect(los.find((l) => l.wipId === "pk2")!.conLai).toBe(140);
+  });
+});
+
+describe("bán vượt tồn — phần trừ không phân được vào lô nào", () => {
+  const w0 = lo("w0", "2026-09-29", 100, 10);
+  it("BTP: bán 120 trên lô 100 ⇒ lô về 0, bán vượt 20 (không nuốt mất)", () => {
+    const kq = tinhTonChiTiet([w0], [], [{ productId: "p1", spec: "s1", quantityKg: 120 }]);
+    expect(kq.los[0]!.conLai).toBe(0);
+    expect(kq.banVuot).toEqual([{ productId: "p1", spec: "s1", kg: 20 }]);
+    expect(kq.tongBanVuot).toBe(20);
+    // tinhTon giữ nguyên API cũ: chỉ trả danh sách lô.
+    expect(tinhTon([w0], [], [{ productId: "p1", spec: "s1", quantityKg: 120 }])[0]!.conLai).toBe(0);
+  });
+
+  it("BTP: bán mặt hàng không có lô nào trong kho ⇒ cả dòng là bán vượt", () => {
+    const kq = tinhTonChiTiet([w0], [], [{ productId: "p2", spec: "s1", quantityKg: 30 }]);
+    expect(kq.los[0]!.conLai).toBe(100);
+    expect(kq.tongBanVuot).toBe(30);
+  });
+
+  it("BTP: lô gắn có kg vượt phần lô còn, FIFO cũng hết ⇒ phần dư thành bán vượt", () => {
+    const kq = tinhTonChiTiet([w0], [], [{ productId: "p1", spec: "s1", quantityKg: 150, lo: [{ id: "w0", kg: 150 }] }]);
+    expect(kq.los[0]!.conLai).toBe(0);
+    expect(kq.tongBanVuot).toBe(50);
+  });
+
+  it("không bán vượt ⇒ danh sách rỗng, tổng 0", () => {
+    const kq = tinhTonChiTiet([w0], [], [{ productId: "p1", spec: "s1", quantityKg: 60 }]);
+    expect(kq.banVuot).toEqual([]);
+    expect(kq.tongBanVuot).toBe(0);
+  });
+
+  it("TP: đóng gói 100, bán 120 ⇒ tinhTonTP −20 = Σ tồn theo lô (0) − bán vượt (20)", () => {
+    const pk = { id: "pk1", date: "2026-10-01", toProductId: "tp", toSpec: "1kg", outputKg: 100, outputUnits: 100, warehouse: "" } as Packaging;
+    const ban = [{ productId: "tp", spec: "1kg", quantityKg: 120 }];
+    const tong = tinhTonTP([pk], ban)[0]!.conLai;
+    const theoLo = tinhTonTPTheoLoChiTiet([pk], ban);
+    expect(tong).toBe(-20);
+    expect(theoLo.los[0]!.conLai).toBe(0);
+    expect(theoLo.tongBanVuot).toBe(20);
+    expect(theoLo.los.reduce((s, l) => s + l.conLai, 0) - theoLo.tongBanVuot).toBe(tong);
+    expect(tinhTonTPTheoLo([pk], ban)[0]!.conLai).toBe(0);
   });
 });

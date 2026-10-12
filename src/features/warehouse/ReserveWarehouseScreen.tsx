@@ -7,7 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import type { WipProductionItem } from "@/types";
 import { useExportItems, useLotDispatches, useLotInputs, usePackagings, useProducts, useSalesItems, useWipProductions } from "@/lib/catalogRepo";
-import { tinhTon, truTonBTP, type LoTon } from "@/lib/inventory";
+import { tinhTonChiTiet, truTonBTP, type LoTon } from "@/lib/inventory";
 import {
   ChuThichBatBuoc,
   Button,
@@ -35,7 +35,7 @@ import {
   type MucChon,
 } from "@/design-system";
 import { kg, num, viDate } from "@/lib/format";
-import { CalendarRange, Camera, CameraOff, ClipboardList, PackageCheck, Scale, Search, Snowflake, Warehouse } from "lucide-react";
+import { AlertTriangle, CalendarRange, Camera, CameraOff, ClipboardList, PackageCheck, Scale, Search, Snowflake, Warehouse } from "lucide-react";
 import { KhungQuetQr } from "@/features/shared";
 import { docMaQr, nhanLoBtp, timLo } from "@/lib/truyXuatLo";
 
@@ -79,7 +79,12 @@ export default function KhoDuTruScreen() {
     () => sanXuat.filter((s) => s.status === "cho-nhap"),
     [sanXuat]
   );
-  const ton = useMemo(() => tinhTon(sanXuat, dongLenh, banLe), [sanXuat, dongLenh, banLe]);
+  // Bán lẻ / đóng gói vượt số đang trữ: lô không xuống âm nên phần vượt không nằm
+  // trong "Tổng tồn" — phải gọi tên ra, không được nuốt (lỗi ghi chép cần dò).
+  const { los: ton, banVuot, tongBanVuot } = useMemo(
+    () => tinhTonChiTiet(sanXuat, dongLenh, banLe),
+    [sanXuat, dongLenh, banLe]
+  );
   const dungTichKho = useMemo(() => tinhDungTichKho(ton), [ton]);
 
   const dsKho = useMemo(() => {
@@ -231,6 +236,19 @@ export default function KhoDuTruScreen() {
           { nhan: "Tổng tồn", giaTri: kg(tongTon), so: true, icon: Scale, mau: "success" },
         ]}
       />
+
+      {tongBanVuot > 0 && (
+        <div role="status" className="flex items-start gap-3 rounded-lg bg-warning-surface px-4 py-3 text-base text-warning">
+          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" aria-hidden />
+          <span>
+            Bán vượt <span className="tnum font-semibold">{kg(tongBanVuot)}</span> so với tồn —{" "}
+            {banVuot
+              .map((v) => `${tenMH(v.productId)}${v.spec ? ` (${v.spec})` : ""} ${kg(v.kg)}`)
+              .join(" · ")}
+            . Kiểm lại phiếu bán / đóng gói, hoặc duyệt nhập kho mẻ còn chờ.
+          </span>
+        </div>
+      )}
 
       {/* Dung tích & Tải trọng 5 Kho BSF1 */}
       <div className="rounded-xl border-2 border-border p-4 bg-card space-y-3">

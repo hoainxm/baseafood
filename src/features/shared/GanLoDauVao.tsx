@@ -17,6 +17,7 @@ import { useAuth } from "@/lib/auth";
 import { kg as kgChu, viDate } from "@/lib/format";
 import {
   TEN_LOAI,
+  bangTonKhoLo,
   canBangLo,
   docMaQr,
   lyDoNhieuLo,
@@ -82,6 +83,8 @@ function HopGanLo({
   const [kgNhap, setKgNhap] = useState<number | null>(null);
   const [luaChon, setLuaChon] = useState<NutLo[]>([]); // một mã nhiều lô ⇒ cho người chọn
   const [cauChon, setCauChon] = useState("");
+  // Sổ tồn theo lô dựng MỘT lần cho cả danh sách — tính lại từng dòng là O(n²).
+  const bangTon = useMemo(() => bangTonKhoLo(dl), [dl]);
 
   const them = (nut: NutLo, cach: LotInput["method"]) => {
     if (nut.kind !== loaiVao) {
@@ -124,7 +127,7 @@ function HopGanLo({
 
   const dongLo = (n: NutLo, nut: ReactNode) => {
     const cb = canBangLo(n.kind, n.id, dl);
-    const ton = tonKhoCuaLo(n.kind, n.id, dl);
+    const ton = tonKhoCuaLo(n.kind, n.id, dl, bangTon);
     return (
       <li key={`${n.kind}:${n.id}`} className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-2">
         <div className="min-w-0">
@@ -370,12 +373,13 @@ export function GanLoXuat({
   const ungVien = useMemo(() => {
     const chuaGan = (n: NutLo) => !daGan.some((d) => d.lotId === n.id);
     if (loaiLo === "S") return loNlDeChon(dl, xuong, ngay).filter(chuaGan);
+    const bangTon = bangTonKhoLo(dl); // một lượt cho mọi lô ứng viên
     const ds =
       loaiLo === "W"
         ? dl.wips.filter((w) => w.status === "da-nhap" && (!matHangId || w.productId === matHangId)).map((w) => nutLo("W", w.id, dl))
         : dl.packagings.filter((p) => !matHangId || p.toProductId === matHangId).map((p) => nutLo("P", p.id, dl));
     return ds
-      .filter((n) => chuaGan(n) && (tonKhoCuaLo(n.kind, n.id, dl) ?? 0) > 0)
+      .filter((n) => chuaGan(n) && (tonKhoCuaLo(n.kind, n.id, dl, bangTon) ?? 0) > 0)
       .sort((a, b) => a.ngay.localeCompare(b.ngay));
   }, [dl, loaiLo, xuong, ngay, matHangId, daGan]);
 

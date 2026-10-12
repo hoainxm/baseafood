@@ -459,32 +459,45 @@ export function canBangLo(kind: LoaiNut, id: string, dl: DuLieuTruyXuat): CanBan
   return { vao: n.kg, ra, chuaCan, con: n.kg - tongRa };
 }
 
+/** Sổ tồn theo lô dựng MỘT lần: id lô → kg còn (W: mẻ đã duyệt nhập kho · P: phiếu đóng gói). */
+export interface BangTonLo {
+  W: ReadonlyMap<string, number>;
+  P: ReadonlyMap<string, number>;
+}
+
+/**
+ * Dựng sổ tồn BTP + TP theo lô một lượt. Màn / hàm cần tồn của NHIỀU lô (danh sách
+ * gắn lô, tab Theo giai đoạn, thu hồi) dựng bảng này một lần rồi truyền vào
+ * `tonKhoCuaLo` — gọi `tinhTon` cho từng lô là O(n²), ~3.000 mẻ/năm treo vài giây.
+ */
+export function bangTonKhoLo(dl: DuLieuTruyXuat): BangTonLo {
+  const btp = tinhTon(
+    [...dl.wips],
+    [...dl.exportItems],
+    truTonBTP([...(dl.salesItems ?? [])], [...dl.packagings], dl.lotInputs, dl.lotDispatches ?? [])
+  );
+  const tp = tinhTonTPTheoLo([...dl.packagings], locBanLe([...(dl.salesItems ?? [])], KHO_TP, dl.lotDispatches ?? []));
+  return { W: new Map(btp.map((l) => [l.wipId, l.conLai])), P: new Map(tp.map((l) => [l.wipId, l.conLai])) };
+}
+
 /**
  * Kg CÒN TRONG KHO của lô theo SỔ TỒN (khác cân bằng theo hồ sơ lô: sổ tồn trừ cả
  * dòng bán/đóng gói CHƯA gắn lô theo FIFO). BTP chưa duyệt nhập kho ⇒ null.
  * NL ⇒ null (tồn NL theo lô chưa có — doc 38).
+ * Tra nhiều lô ⇒ truyền `bang` dựng sẵn bằng `bangTonKhoLo(dl)` (không thì dựng lại mỗi lần).
  */
-export function tonKhoCuaLo(kind: LoaiNut, id: string, dl: DuLieuTruyXuat): number | null {
-  if (kind === "W") {
-    const ton = tinhTon(
-      [...dl.wips],
-      [...dl.exportItems],
-      truTonBTP([...(dl.salesItems ?? [])], [...dl.packagings], dl.lotInputs, dl.lotDispatches ?? [])
-    );
-    return ton.find((l) => l.wipId === id)?.conLai ?? null;
-  }
-  if (kind === "P") {
-    const ton = tinhTonTPTheoLo([...dl.packagings], locBanLe([...(dl.salesItems ?? [])], KHO_TP, dl.lotDispatches ?? []));
-    return ton.find((l) => l.wipId === id)?.conLai ?? null;
-  }
-  return null;
+export function tonKhoCuaLo(kind: LoaiNut, id: string, dl: DuLieuTruyXuat, bang?: BangTonLo): number | null {
+  if (kind !== "W" && kind !== "P") return null;
+  return (bang ?? bangTonKhoLo(dl))[kind].get(id) ?? null;
 }
 
 // ---------- Danh sách lô để CHỌN khi gắn ----------
 
+/** Lùi `ngay` ngày lịch. Tính hết bằng UTC (như `ngayTrongKy`) — giờ máy +07 mà đọc
+ *  nửa đêm địa phương rồi `toISOString` sẽ lùi thêm một ngày. */
 const lui = (iso: string, ngay: number) => {
-  const d = new Date(`${iso}T00:00:00`);
-  d.setDate(d.getDate() - ngay);
+  const d = new Date(`${iso}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - ngay);
   return d.toISOString().slice(0, 10);
 };
 
@@ -785,6 +798,7 @@ export function theoGiaiDoan(dl: DuLieuTruyXuat, loc: { tu: string; den: string;
     ...(tem === 0 ? (["tem"] as const) : []),
   ];
   const moiTruoc = <T extends { nut: NutLo }>(a: T, b: T) => b.nut.ngay.localeCompare(a.nut.ngay) || a.nut.nhan.localeCompare(b.nut.nhan);
+  const bangTon = bangTonKhoLo(dl); // một lượt cho mọi lô — không tính lại sổ tồn từng dòng
 
   const nhap: MucGiaiDoan[] = dl.shipments
     .filter((s) => trong(s.deliveryDate, s.workshop))
@@ -812,7 +826,7 @@ export function theoGiaiDoan(dl: DuLieuTruyXuat, loc: { tu: string; den: string;
     .map((w) => ({
       nut: nutLo("W", w.id, dl),
       kho: w.status,
-      ton: w.status === "da-nhap" ? tonKhoCuaLo("W", w.id, dl) : null,
+      ton: w.status === "da-nhap" ? tonKhoCuaLo("W", w.id, dl, bangTon) : null,
       daIn: soTem("W", w.id),
       thieu: w.status === "cho-nhap" ? (["duyet"] as ViecThieu[]) : [],
     }))
@@ -824,15 +838,16 @@ export function theoGiaiDoan(dl: DuLieuTruyXuat, loc: { tu: string; den: string;
       const tem = soTem("P", p.id);
       const lo = soLoVao("P", p.id);
       const ld = lyDo("P", p.id);
-      return { nut: nutLo("P", p.id, dl), daIn: tem, soLo: lo, lyDo: ld, ton: tonKhoCuaLo("P", p.id, dl), thieu: thieuTemLo(tem, lo, !!ld) };
+      return { nut: nutLo("P", p.id, dl), daIn: tem, soLo: lo, lyDo: ld, ton: tonKhoCuaLo("P", p.id, dl, bangTon), thieu: thieuTemLo(tem, lo, !!ld) };
     })
     .sort(moiTruoc);
 
   const lenh = new Map(dl.exportOrders.map((o) => [o.id, o]));
+  const xuongMe = new Map(dl.wips.map((w) => [w.id, w.workshop]));
   const phieuBan = new Map((dl.salesInvoices ?? []).map((v) => [v.id, v]));
   const xuatBan: MucGiaiDoan[] = [
     ...dl.exportItems
-      .filter((x) => trong(lenh.get(x.exportId)?.exportDate ?? "", dl.wips.find((w) => w.id === x.wipId)?.workshop))
+      .filter((x) => trong(lenh.get(x.exportId)?.exportDate ?? "", xuongMe.get(x.wipId)))
       .map((x) => {
         const quet = soLoRa("export_item", x.id) > 0;
         return { nut: nutLo("X", x.id, dl), daQuet: quet, lenhId: x.exportId, donId: lenh.get(x.exportId)?.orderId, thieu: quet ? [] : (["quet"] as ViecThieu[]) };

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { ImportShipment, MaterialImportItem, Packaging, WipProductionItem } from "@/types";
-import { banGhiIn, dsLoDeIn, ganLoChoPhien, loNlDeChon, meThieuLo, nhanLoNl, nutLo, soTemMacDinh, tomTatIn, type DuLieuTruyXuat } from "./truyXuatLo";
+import type { ImportShipment, MaterialImportItem, Packaging, SalesItem, WipProductionItem } from "@/types";
+import { banGhiIn, dsLoDeIn, theoGiaiDoan, ganLoChoPhien, loNlDeChon, meThieuLo, nhanLoNl, nutLo, soTemMacDinh, tomTatIn, type DuLieuTruyXuat } from "./truyXuatLo";
 import type { LabelPrint, LotInput, LotWaiver } from "@/types";
 
 const chuyen = (id: string, ngay: string, xuong: ImportShipment["workshop"], lotCode = ""): ImportShipment => ({
@@ -91,6 +91,23 @@ describe("đợt 2b — chọn lô, chốt ngày, tem, gắn phiên", () => {
     expect(loNlDeChon(het, "Đông", "2026-10-05").map((n) => n.id)).toEqual(["moi-Bạch tuộc"]);
   });
 
+  it("loNlDeChon: cửa sổ 45 ngày tính theo NGÀY LỊCH, không lệch theo múi giờ máy (+07)", () => {
+    const tzCu = process.env.TZ;
+    process.env.TZ = "Asia/Ho_Chi_Minh";
+    try {
+      const d: DuLieuTruyXuat = {
+        ...dl,
+        shipments: [chuyen("bien", "2026-08-24", "Đông"), chuyen("ngoai", "2026-08-23", "Đông")],
+        imports: [dong("bien", "2026-08-24", 100, "Bạch tuộc"), dong("ngoai", "2026-08-23", 100, "Bạch tuộc")],
+      };
+      // 08/10 lùi 45 ngày = 24/08: chuyến 24/08 nằm trong cửa sổ, 23/08 thì không.
+      expect(loNlDeChon(d, "Đông", "2026-10-08").map((n) => n.id)).toEqual(["bien-Bạch tuộc"]);
+    } finally {
+      if (tzCu === undefined) delete process.env.TZ;
+      else process.env.TZ = tzCu;
+    }
+  });
+
   it("meThieuLo: mẻ có lô hoặc có lý do thì không còn thiếu", () => {
     const lyDo = [{ outputKind: "W", outputId: "b" } as LotWaiver];
     const ds = meThieuLo([{ id: "a" }, { id: "b" }, { id: "c" }], [vao("x", "a", "s1", null, "")], lyDo);
@@ -121,5 +138,22 @@ describe("đợt 2b — chọn lô, chốt ngày, tem, gắn phiên", () => {
     expect(kq.lotInputs.map((l) => l.outputId)).toEqual(["w2"]); // w1 đã gắn s1 rồi
     expect(kq.lotInputs[0]!.method).toBe("go");
     expect(kq.khongKhop).toEqual([{ kind: "N", id: "n1" }]);
+  });
+});
+
+describe("theoGiaiDoan — quy mô một năm", () => {
+  it("~3.000 mẻ + 3.000 dòng bán: sổ tồn dựng MỘT lần, không tính lại từng lô (trước đây vài giây)", () => {
+    const N = 3000;
+    const wips = Array.from({ length: N }, (_, i) => ({
+      ...me(`w${i}`, `2026-${String(1 + (i % 12)).padStart(2, "0")}-10`, "Đông"), productId: `p${i % 50}`, status: "da-nhap" as const,
+    }));
+    const salesItems = Array.from({ length: N }, (_, i) =>
+      ({ id: `b${i}`, productId: `p${i % 50}`, spec: "", quantityKg: 30, sourceWarehouse: "Kho dự trữ", deliveryDate: "2026-06-01", invoiceId: "" }) as SalesItem);
+    const t = performance.now();
+    const gd = theoGiaiDoan({ ...dl, wips, salesItems, packagings: [] }, { tu: "2026-01-01", den: "2026-12-31", xuong: "" });
+    const ms = performance.now() - t;
+    expect(gd[2]!.muc).toHaveLength(N);
+    expect(gd[2]!.muc.reduce((s, m) => s + (m.ton ?? 0), 0)).toBe(N * 100 - N * 30);
+    expect(ms).toBeLessThan(1500); // máy dev ~80 ms; cách cũ (tinhTon mỗi lô) ~3 s
   });
 });

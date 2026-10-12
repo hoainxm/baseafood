@@ -184,3 +184,31 @@ describe("tinhTonNLTong — bán nội địa là khoản XUẤT, trừ tồn NL
     expect(kq.tongBanNoiDia).toBe(0);
   });
 });
+
+describe("tinhTonNLTong — tồn đầu khai tay có mốc NẰM GIỮA khoảng xem", () => {
+  const nhap = (id: string, deliveryDate: string, kg: number): MaterialImportItem =>
+    ({ id, shipmentId: "", deliveryDate, workshop: "Đông", category: "Bạch tuộc", materialTypeName: "Bạch tuộc 2 da", quantityKg: kg }) as MaterialImportItem;
+  const opening: MaterialOpeningStock[] = [
+    { id: "o1", workshop: "Đông", materialTypeName: "Bạch tuộc 2 da", asOfDate: "2026-07-01", quantityKg: 1000, note: "" },
+  ];
+  const nhapDs = [nhap("a", "2026-06-20", 50), nhap("b", "2026-07-10", 300)];
+  const cuoi = (tuNgay: string, denNgay: string) => tinhTonNLTong([], [], nhapDs, opening, [], { tuNgay, denNgay }).tongTonCuoi;
+
+  test("xem tháng 7 (mốc = đầu khoảng): 1000 + 300", () => {
+    expect(cuoi("2026-07-01", "2026-07-31")).toBe(1300);
+  });
+  test("xem 01/06–31/07 hoặc cả năm: tồn đầu vẫn áp ⇒ cùng 1300 (không rơi về 300/350)", () => {
+    expect(cuoi("2026-06-01", "2026-07-31")).toBe(1300);
+    expect(cuoi("2026-01-01", "2026-12-31")).toBe(1300);
+  });
+  test("mốc giữa khoảng: nhập TRƯỚC mốc đã nằm trong số khai tay ⇒ không cộng; nhập từ mốc vào cột nhập", () => {
+    const kq = tinhTonNLTong([], [], nhapDs, opening, [], { tuNgay: "2026-06-01", denNgay: "2026-07-31" });
+    expect(kq.theoHo[0]!.tonDau).toBe(1000);
+    expect(kq.theoHo[0]!.nhapKy).toBe(300);
+    expect(kq.theoHo[0]!.seedTonDau).toBe(true);
+    expect(kq.theoNgay.at(-1)!.tonCuoi).toBe(1300);
+  });
+  test("xem TRƯỚC mốc (tháng 6): chưa có khai tay ⇒ chỉ nhập tháng 6", () => {
+    expect(cuoi("2026-06-01", "2026-06-30")).toBe(50);
+  });
+});

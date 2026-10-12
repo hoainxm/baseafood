@@ -27,13 +27,24 @@ import { KHO_BAN_LE } from "@/lib/inventory";
  *                          (sourceWarehouse === KHO_BAN_LE), theo ngày bán.
  *       • Xuất đóng gói  = BTP tiêu hao để đóng gói ra thành phẩm G3 (inputKg),
  *                          theo ngày đóng gói.
- *   - Tồn đầu = khai tay (≤ tuNgay) + (nhập − xuất) mọi ngày TRƯỚC kỳ (suy lịch sử).
+ *   - Tồn đầu = khai tay + (nhập − xuất) từ MỐC khai tay tới TRƯỚC kỳ (suy lịch sử).
+ *     QUY TẮC MỐC — chung với sổ NL (`inventoryMaterial.tinhTonNLTong`): khai tay có
+ *     mốc asOfDate ≤ CUỐI khoảng xem đều áp (mốc giữa khoảng cũng áp — xem "Năm");
+ *     phát sinh TRƯỚC mốc coi như đã nằm trong số khai tay ⇒ bỏ (không cộng chồng);
+ *     mốc sau khoảng xem ⇒ chưa áp. Mốc tính theo (mặt hàng × quy cách), lấy mốc mới nhất.
  *
- * ĂN KHỚP: dùng ĐÚNG định nghĩa "xuất" như `inventory.tinhTon(... banLe = [
- *   ...locBanLe(banHang, KHO_BAN_LE), ...dongGoiTruTon(packagings) ])`, nên Tồn cuối
- *   ở đây == Tổng tồn ở màn Kho dự trữ / Kho lạnh. KHÔNG đếm hai lần: bán đóng gói
- *   (KHO_TP) rút từ kho THÀNH PHẨM riêng (tinhTonTP), không đụng kho này; handoff
- *   đơn đặt (KHO_TP/"Đơn đặt") cũng bỏ qua vì đã tính ở "xuất đơn".
+ * ĂN KHỚP với màn Kho dự trữ / Kho lạnh (`inventory.tinhTonChiTiet(... banLe = [
+ *   ...locBanLe(banHang, KHO_BAN_LE), ...dongGoiTruTon(packagings) ])`): cùng định
+ *   nghĩa "xuất", NHƯNG hai chỗ KHÔNG bằng nhau tuyệt đối:
+ *   • Tồn đầu khai tay (FinishedGoodsOpeningStock) CHỈ có ở sổ này — sổ tồn theo lô
+ *     không có lô cho số khai tay, và vẫn tính mọi mẻ kể cả trước mốc. Không khai tay
+ *     + không bán vượt ⇒ Tồn cuối (xem tới hôm nay) == Tổng tồn Kho dự trữ; có khai
+ *     tay ⇒ hai số lệch nhau đúng phần khai tay / phát sinh trước mốc.
+ *   • Bán/đóng gói VƯỢT tồn: lô không xuống âm ⇒ Kho dự trữ báo riêng "bán vượt X kg"
+ *     (`tongBanVuot`), còn ở đây trừ thẳng nên tồn cuối âm (canhBaoAm).
+ *   KHÔNG đếm hai lần: bán đóng gói (KHO_TP) rút từ kho THÀNH PHẨM riêng (tinhTonTP),
+ *   không đụng kho này; handoff đơn đặt (KHO_TP/"Đơn đặt") cũng bỏ qua vì đã tính ở
+ *   "xuất đơn".
  *
  * BỘ DÒ LỖI: tồn cuối < 0 = xuất nhiều hơn số đang trữ → sai ghi chép, màn gọi tên.
  * ⚠️ v1 — đối chiếu tay với một mặt hàng có số thật trước khi tin con số.
@@ -77,6 +88,8 @@ interface Acc {
   xuatGoiTruocKg: number;
   xuatGoiKyKg: number;
   seed: boolean;
+  /** Mốc khai tay mới nhất (yyyy-mm-dd) — phát sinh trước mốc đã nằm trong số khai. */
+  moc: string;
 }
 
 function khoaMH(productId: string, spec: string): string {
@@ -105,6 +118,7 @@ function layAcc(map: Map<string, Acc>, productId: string, spec: string): Acc {
       xuatGoiTruocKg: 0,
       xuatGoiKyKg: 0,
       seed: false,
+      moc: "",
     };
     map.set(k, a);
   }
@@ -125,7 +139,8 @@ export interface NxtTPArgs {
 
 /**
  * Dựng sổ NXT kho BTP dự trữ theo (mặt hàng × quy cách) cho khoảng [tuNgay, denNgay].
- * Tồn đầu = khai tay (≤ tuNgay) + lịch sử nhập−xuất TRƯỚC tuNgay ⇒ chuyển kỳ tự động.
+ * Tồn đầu = khai tay (mốc ≤ denNgay) + lịch sử nhập−xuất từ mốc tới TRƯỚC tuNgay
+ * ⇒ chuyển kỳ tự động.
  */
 export function tinhSoTonTP(args: NxtTPArgs): SoTonTPRow[] {
   const { sanXuat, exportOrders, exportItems, salesItems, packagings, opening, products, tuNgay, denNgay } = args;
@@ -135,20 +150,24 @@ export function tinhSoTonTP(args: NxtTPArgs): SoTonTPRow[] {
   const ngayLenh = new Map<string, string>();
   for (const l of exportOrders) ngayLenh.set(l.id, l.exportDate);
 
-  // Tồn đầu khai tay (áp cho mốc ≤ tuNgay)
+  // Tồn đầu khai tay: áp khi mốc ≤ CUỐI khoảng xem (mốc giữa khoảng cũng áp).
   for (const o of opening) {
-    if (o.asOfDate && o.asOfDate > tuNgay) continue;
+    if (o.asOfDate && o.asOfDate > denNgay) continue;
     const a = layAcc(map, o.productId, o.spec);
     a.openKg += o.quantityKg || 0;
     a.openBlock += o.blocksCount || 0;
     a.seed = true;
+    if (o.asOfDate && o.asOfDate > a.moc) a.moc = o.asOfDate;
   }
+  /** Phát sinh trước mốc khai tay đã nằm trong số khai ⇒ bỏ, không cộng chồng. */
+  const truocMoc = (a: Acc, ngay: string) => !!a.moc && ngay < a.moc;
 
   // Nhập kho = BTP đã duyệt (da-nhap), theo ngày SX
   for (const s of sanXuat) {
     if (s.status !== "da-nhap") continue;
     if (s.productionDate > denNgay) continue;
     const a = layAcc(map, s.productId, s.spec);
+    if (truocMoc(a, s.productionDate)) continue;
     if (s.productionDate < tuNgay) {
       a.nhapTruocKg += s.quantityKg || 0;
       a.nhapTruocBlock += s.blocksCount || 0;
@@ -163,6 +182,7 @@ export function tinhSoTonTP(args: NxtTPArgs): SoTonTPRow[] {
     const ngay = ngayLenh.get(d.exportId);
     if (!ngay || ngay > denNgay) continue;
     const a = layAcc(map, d.productId, d.spec);
+    if (truocMoc(a, ngay)) continue;
     if (ngay < tuNgay) {
       a.xuatDonTruocKg += d.quantityKg || 0;
       a.xuatDonTruocBlock += d.blocksCount || 0;
@@ -177,6 +197,7 @@ export function tinhSoTonTP(args: NxtTPArgs): SoTonTPRow[] {
     if (b.sourceWarehouse !== KHO_BAN_LE) continue; // chỉ bán lẻ rút kho dự trữ mới trừ tồn BTP
     if (b.deliveryDate > denNgay) continue;
     const a = layAcc(map, b.productId, b.spec);
+    if (truocMoc(a, b.deliveryDate)) continue;
     if (b.deliveryDate < tuNgay) a.xuatBanTruocKg += b.quantityKg || 0;
     else a.xuatBanKyKg += b.quantityKg || 0;
   }
@@ -185,6 +206,7 @@ export function tinhSoTonTP(args: NxtTPArgs): SoTonTPRow[] {
   for (const p of packagings) {
     if (p.date > denNgay) continue;
     const a = layAcc(map, p.fromProductId, p.fromSpec);
+    if (truocMoc(a, p.date)) continue;
     if (p.date < tuNgay) a.xuatGoiTruocKg += p.inputKg || 0;
     else a.xuatGoiKyKg += p.inputKg || 0;
   }

@@ -7,7 +7,7 @@
 // ============================================================
 import { useMemo, useState } from "react";
 import { kg, viDate } from "@/lib/format";
-import { TEN_LOAI, danhSachThuHoi, danhSachThuHoiNhieu, tonKhoCuaLo, type DuLieuTruyXuat, type NutLo } from "@/lib/truyXuatLo";
+import { TEN_LOAI, bangTonKhoLo, danhSachThuHoi, danhSachThuHoiNhieu, tonKhoCuaLo, type DuLieuTruyXuat, type NutLo } from "@/lib/truyXuatLo";
 import { Button, InfoTip, KhungCuonNgang, PhieuIn, TdIn, ThIn } from "@/design-system";
 import { FileSpreadsheet, Printer, ShieldAlert } from "lucide-react";
 
@@ -24,7 +24,10 @@ export function ThuHoiLo({ nut, dl, cungChuyen = [] }: { nut: NutLo; dl: DuLieuT
   );
   const phamVi = gopChuyen ? `chuyến ${nut.nhan} (${cungChuyen.length} loại NL)` : `lô ${nut.nhan}${nut.kind === "S" ? ` · ${nut.moTa}` : ""}`;
   const tonTrong = useMemo(
-    () => loTrongXuong.map((n) => ({ n, ton: tonKhoCuaLo(n.kind, n.id, dl) })),
+    () => {
+      const bang = bangTonKhoLo(dl); // một lượt cho mọi lô cần khoanh
+      return loTrongXuong.map((n) => ({ n, ton: tonKhoCuaLo(n.kind, n.id, dl, bang) }));
+    },
     [loTrongXuong, dl]
   );
   const soKhach = new Set(hangRa.map((r) => r.khach || "khách ?")).size;

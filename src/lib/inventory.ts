@@ -62,6 +62,43 @@ export function tinhTon(
   dongLenh: ExportItem[],
   banLe: BanLeTruTon[] = []
 ): LoTon[] {
+  return tinhTonChiTiet(sanXuat, dongLenh, banLe).los;
+}
+
+/**
+ * Phần dòng trừ tồn KHÔNG phân được vào lô nào (mọi lô cùng mặt hàng × quy cách
+ * đã về 0, hoặc không có lô) — tức bán/đóng gói VƯỢT số đang trữ. Lô không bao
+ * giờ âm vì bán lẻ, nên phần này phải trả ra ngoài để màn gọi tên, không được nuốt.
+ */
+export interface BanVuot {
+  productId: string;
+  spec: string;
+  kg: number;
+}
+
+export interface KetQuaTon {
+  los: LoTon[];
+  /** Bán vượt theo (mặt hàng × quy cách); rỗng khi không vượt. */
+  banVuot: BanVuot[];
+  tongBanVuot: number;
+}
+
+const ketQua = (los: LoTon[], banVuot: BanVuot[]): KetQuaTon => ({
+  los,
+  banVuot,
+  tongBanVuot: banVuot.reduce((s, v) => s + v.kg, 0),
+});
+
+/**
+ * Như `tinhTon`, kèm phần BÁN VƯỢT (dòng trừ tồn không còn lô nào để trừ).
+ * Bất biến: Σ conLai các lô − tongBanVuot = nhập − xuất lệnh − mọi dòng `banLe`
+ * (cùng con số sổ NXT `inventoryFinished` khi không có tồn đầu khai tay).
+ */
+export function tinhTonChiTiet(
+  sanXuat: WipProductionItem[],
+  dongLenh: ExportItem[],
+  banLe: readonly BanLeTruTon[] = []
+): KetQuaTon {
   const xuatTheoLo = new Map<string, { kg: number; block: number }>();
   for (const d of dongLenh) {
     const cur = xuatTheoLo.get(d.wipId) ?? { kg: 0, block: 0 };
@@ -88,8 +125,7 @@ export function tinhTon(
       };
     });
 
-  if (banLe.length) truTheoLo(los, banLe);
-  return los;
+  return ketQua(los, banLe.length ? truTheoLo(los, banLe) : []);
 }
 
 /**
@@ -97,8 +133,9 @@ export function tinhTon(
  * `tinhTon`: lô gắn có kg → lô gắn chưa cân (FIFO trong lô gắn) → FIFO theo
  * (mặt hàng × quy cách). Dùng chung cho tồn BTP (mẻ SX) và tồn TP theo lô (phiếu
  * đóng gói) — `LoTon.wipId` khi đó là id phiếu đóng gói.
+ * Trả về phần KHÔNG trừ được vào lô nào (bán vượt) theo (mặt hàng × quy cách).
  */
-function truTheoLo(los: LoTon[], banLe: readonly BanLeTruTon[]): void {
+function truTheoLo(los: LoTon[], banLe: readonly BanLeTruTon[]): BanVuot[] {
   /** Trừ tối đa `kg` khỏi một lô (không vượt phần lô còn). Trả kg đã trừ. */
   const tru = (lo: LoTon, kg: number): number => {
     const lay = Math.min(kg, Math.max(0, lo.conLai));
@@ -139,11 +176,13 @@ function truTheoLo(los: LoTon[], banLe: readonly BanLeTruTon[]): void {
     }
   });
   // 3. Phần còn lại — FIFO theo (mặt hàng × quy cách) như trước.
-  const canTru = new Map<string, number>();
+  const canTru = new Map<string, BanVuot>();
   banLe.forEach((b, i) => {
     if (con[i]! <= 0) return;
     const k = `${b.productId}|${b.spec}`;
-    canTru.set(k, (canTru.get(k) ?? 0) + con[i]!);
+    const cur = canTru.get(k);
+    if (cur) cur.kg += con[i]!;
+    else canTru.set(k, { productId: b.productId, spec: b.spec, kg: con[i]! });
   });
   const theoKey = new Map<string, LoTon[]>();
   for (const lo of los) {
@@ -152,15 +191,19 @@ function truTheoLo(los: LoTon[], banLe: readonly BanLeTruTon[]): void {
     if (arr) arr.push(lo);
     else theoKey.set(k, [lo]);
   }
-  for (const [k, arr] of theoKey) {
-    let conKey = canTru.get(k) ?? 0;
-    if (conKey <= 0) continue;
+  const banVuot: BanVuot[] = [];
+  for (const [k, can] of canTru) {
+    let conKey = can.kg;
+    const arr = theoKey.get(k) ?? [];
     arr.sort(fifo);
     for (const lo of arr) {
       if (conKey <= 0) break;
       conKey -= tru(lo, conKey);
     }
+    // Sai số dấu phẩy động (0.1 + 0.2…) không phải bán vượt.
+    if (conKey > 1e-6) banVuot.push({ productId: can.productId, spec: can.spec, kg: conKey });
   }
+  return banVuot;
 }
 
 /** Marker `sales_items.sourceWarehouse`: bán block thô ⇒ trừ tồn BTP dự trữ. */
@@ -351,13 +394,21 @@ export function khaDungTP(tonTP: TonTP[], productId: string, spec: string): numb
 }
 
 /**
- * Tồn TP THEO LÔ (mỗi phiếu đóng gói là một lô TP `P:<id>`). Cùng tổng với
- * `tinhTonTP` cho mỗi (mặt hàng × quy cách), nhưng tách được lô nào còn bao nhiêu
- * — cho hộ chiếu lô và gắn lô khi bán. `banLeTP` = `locBanLe(sales, KHO_TP, loGan)`:
- * dòng đã gắn lô TP trừ đúng lô, còn lại FIFO (phiếu đóng gói sớm trước).
- * Ở kết quả, `wipId` là id PHIẾU ĐÓNG GÓI, `blockNhap` là số thùng/gói ra.
+ * Tồn TP THEO LÔ (mỗi phiếu đóng gói là một lô TP `P:<id>`) — tách được lô nào
+ * còn bao nhiêu, cho hộ chiếu lô và gắn lô khi bán. `banLeTP` = `locBanLe(sales,
+ * KHO_TP, loGan)`: dòng đã gắn lô TP trừ đúng lô, còn lại FIFO (phiếu đóng gói sớm
+ * trước). Ở kết quả, `wipId` là id PHIẾU ĐÓNG GÓI, `blockNhap` là số thùng/gói ra.
+ *
+ * KHÔNG phải lúc nào cũng cùng tổng với `tinhTonTP`: lô không xuống âm, nên khi bán
+ * vượt số đã đóng gói thì `tinhTonTP` âm còn Σ theo lô dừng ở 0. Cần phần vượt ⇒
+ * dùng `tinhTonTPTheoLoChiTiet` (Σ conLai − tongBanVuot = tổng `tinhTonTP`).
  */
 export function tinhTonTPTheoLo(packagings: Packaging[], banLeTP: readonly BanLeTruTon[] = []): LoTon[] {
+  return tinhTonTPTheoLoChiTiet(packagings, banLeTP).los;
+}
+
+/** Như `tinhTonTPTheoLo`, kèm phần bán vượt (bán TP không còn phiếu đóng gói nào để trừ). */
+export function tinhTonTPTheoLoChiTiet(packagings: Packaging[], banLeTP: readonly BanLeTruTon[] = []): KetQuaTon {
   const los: LoTon[] = packagings.map((p) => ({
     wipId: p.id,
     productId: p.toProductId,
@@ -371,6 +422,5 @@ export function tinhTonTPTheoLo(packagings: Packaging[], banLeTP: readonly BanLe
     conLai: p.outputKg || 0,
     blockConLai: p.outputUnits || 0,
   }));
-  if (banLeTP.length) truTheoLo(los, banLeTP);
-  return los;
+  return ketQua(los, banLeTP.length ? truTheoLo(los, banLeTP) : []);
 }

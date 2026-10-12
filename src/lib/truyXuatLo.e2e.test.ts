@@ -12,7 +12,7 @@ import type {
 } from "@/types";
 import { KHO_BAN_LE, KHO_TP, tinhTon, truTonBTP } from "./inventory";
 import {
-  canBangLo, danhSachThuHoi, danhSachThuHoiNhieu, docMaQr, dsLoDeIn, ganLoChoPhien, loCungChuyen, theoGiaiDoan, nutLo, timLo, tonKhoCuaLo, truyNguoc,
+  bangTonKhoLo, canBangLo, danhSachThuHoi, danhSachThuHoiNhieu, docMaQr, dsLoDeIn, ganLoChoPhien, loCungChuyen, theoGiaiDoan, nutLo, timLo, tonKhoCuaLo, truyNguoc,
   truyXuoi, type DuLieuTruyXuat, type NhanhCay,
 } from "./truyXuatLo";
 
@@ -152,6 +152,10 @@ describe("kịch bản mẫu: nhập → SX → kho → đóng gói / xuất / b
     expect(tonKhoCuaLo("W", "W1", dl)).toBe(200);
     expect(tonKhoCuaLo("W", "W2", dl)).toBe(100);
     expect(tonKhoCuaLo("P", "P1", dl)).toBe(140);
+    // Bảng tồn dựng một lần (cho danh sách nhiều lô) ra đúng cùng con số.
+    const bang = bangTonKhoLo(dl);
+    for (const [k, id] of [["W", "W0"], ["W", "W1"], ["W", "W2"], ["P", "P1"], ["S", "x"]] as const)
+      expect(tonKhoCuaLo(k, id, dl, bang)).toBe(tonKhoCuaLo(k, id, dl));
   });
 
   it("(đối chứng) trừ FIFO kiểu cũ thì sổ tồn nói lô khác hộ chiếu", () => {

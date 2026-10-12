@@ -318,12 +318,18 @@ export function tinhSoTonNL(
  * như đã nằm trong số khai tay (không cộng đôi). Không khai baseline ⇒ cộng mọi nhập
  * trước kỳ. ⇒ khai "Tồn đầu" với asOfDate = ngày ĐẦU TIÊN app bắt đầu tính nhập (VD
  * 01/07 cho baseline tồn cuối 30/06).
+ *
+ * QUY TẮC MỐC (dùng CHUNG với sổ BTP `inventoryFinished.tinhSoTonTP`): khai tay có
+ * mốc ≤ CUỐI khoảng xem đều áp — kể cả mốc nằm GIỮA khoảng (xem "Năm" khi baseline
+ * 01/07). Mốc giữa khoảng ⇒ số khai tay vào cột Tồn đầu (trước mốc app không theo
+ * dõi, phát sinh trước mốc bị bỏ), phát sinh từ mốc vào cột trong kỳ. Mốc SAU cuối
+ * khoảng ⇒ chưa áp, cộng mọi phát sinh như chưa khai.
  * ============================================================ */
 
 /** Một dòng tồn NL "tổng" cho MỘT họ nguyên liệu, trong khoảng ngày đang xem. */
 export interface TonNLTongHo {
   hoNL: string;
-  tonDau: number; // opening(≤ đầu kỳ) + Σ nhập trước kỳ
+  tonDau: number; // opening(mốc ≤ cuối kỳ) + Σ nhập từ mốc tới trước kỳ
   nhapKy: number; // Σ nhập hàng trong kỳ
   xuatSX: number; // 0 — chờ capture "NL lấy ra sản xuất"
   /** Bán nội địa trong kỳ (NL bán thẳng, sổ domestic_sales mig 0054) — XUẤT, trừ tồn. */
@@ -398,14 +404,15 @@ export function tinhTonNLTong(
     return h;
   };
 
-  // Baseline-MỘT-LẦN theo họ: openTruoc (tồn đầu khai tay ≤ đầu kỳ) + mốc asOfDate
-  // mới nhất. Nhập TRƯỚC mốc coi như đã nằm trong tồn đầu ⇒ không cộng lại.
+  // Baseline-MỘT-LẦN theo họ: openTruoc (tồn đầu khai tay, mốc ≤ CUỐI khoảng xem —
+  // mốc giữa khoảng vẫn áp, xem QUY TẮC MỐC ở trên) + mốc asOfDate mới nhất. Nhập
+  // TRƯỚC mốc coi như đã nằm trong tồn đầu ⇒ không cộng lại.
   const openByHo = new Map<string, { open: number; moc: string }>();
   for (const o of opening) {
     if (!dungXuong(o.workshop)) continue;
     const ho = themHo(o.materialTypeName);
     if (!ho) continue;
-    if (o.asOfDate && o.asOfDate > tu) continue; // chỉ baseline ≤ đầu kỳ
+    if (o.asOfDate && o.asOfDate > den) continue; // mốc sau khoảng xem ⇒ chưa áp
     const k = ho.toLowerCase();
     const cur = openByHo.get(k) ?? { open: 0, moc: "" };
     cur.open += o.quantityKg || 0;

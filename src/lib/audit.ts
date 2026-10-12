@@ -160,15 +160,33 @@ export interface LocNhatKy {
   gioiHan?: number;
 }
 
+/**
+ * Biên lọc ngày theo GIỜ VIỆT NAM (UTC+7) → mốc ISO UTC để so với `at`
+ * (`toISOString`, luôn `…Z`). Lọc "từ 12/10" phải tính từ 00:00 giờ VN = 17:00Z
+ * ngày 11/10 — so thẳng `yyyy-mm-dd` với chuỗi UTC lệch 7 tiếng (thao tác 0h–7h
+ * sáng VN rơi sang ngày hôm trước).
+ */
+export function bienNgayVN(tu?: string, den?: string): { tu?: string; den?: string } {
+  const iso = (s: string) => {
+    const t = Date.parse(s);
+    return Number.isFinite(t) ? new Date(t).toISOString() : undefined;
+  };
+  return {
+    tu: tu ? iso(`${tu}T00:00:00+07:00`) : undefined,
+    den: den ? iso(`${den}T23:59:59.999+07:00`) : undefined,
+  };
+}
+
 /** Đọc nhật ký cho màn Nhật ký (admin). Server: query audit_log; local: đọc buffer. */
 export async function docNhatKy(loc: LocNhatKy = {}): Promise<NhatKy[]> {
   const gioiHan = loc.gioiHan ?? 500;
+  const bien = bienNgayVN(loc.tu, loc.den);
   const khop = (r: NhatKy) => {
     if (loc.nguoi && r.actorUsername !== loc.nguoi) return false;
     if (loc.bang && r.entity !== loc.bang) return false;
     if (loc.loai && r.action !== loc.loai) return false;
-    if (loc.tu && r.at < loc.tu) return false;
-    if (loc.den && r.at > `${loc.den}T23:59:59.999Z`) return false;
+    if (bien.tu && r.at < bien.tu) return false;
+    if (bien.den && r.at > bien.den) return false;
     if (loc.timKiem) {
       const t = loc.timKiem.toLowerCase();
       const hay = `${r.actorUsername} ${r.entity} ${r.entityKey} ${r.summary}`.toLowerCase();
@@ -187,8 +205,8 @@ export async function docNhatKy(loc: LocNhatKy = {}): Promise<NhatKy[]> {
     if (loc.nguoi) q = q.eq("actor_username", loc.nguoi);
     if (loc.bang) q = q.eq("entity", loc.bang);
     if (loc.loai) q = q.eq("action", loc.loai);
-    if (loc.tu) q = q.gte("at", loc.tu);
-    if (loc.den) q = q.lte("at", `${loc.den}T23:59:59.999Z`);
+    if (bien.tu) q = q.gte("at", bien.tu);
+    if (bien.den) q = q.lte("at", bien.den);
     const { data, error } = await q;
     if (error) return [];
     let rows = (data ?? []).map((r) => fromRow(r as Record<string, unknown>));

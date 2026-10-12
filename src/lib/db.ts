@@ -16,16 +16,49 @@ export function load<T>(key: string): T[] {
   }
 }
 
-export function save<T>(key: string, rows: T[]): void {
+/**
+ * Ghi bản sao xuống localStorage. Trả `false` khi KHÔNG ghi được (hết dung lượng
+ * ~5MB / chế độ riêng tư) — người gọi (repo.ts) phải BÁO lên đèn kết nối, đừng
+ * nuốt: mất bản sao = mất lưới an toàn khi rớt mạng.
+ */
+export function save<T>(key: string, rows: T[]): boolean {
   try {
     localStorage.setItem(key, JSON.stringify(rows));
+    return true;
   } catch {
-    // Hết dung lượng / chế độ riêng tư: bỏ qua, máy chủ vẫn là nguồn chính.
+    return false;
   }
 }
 
+/** 16 byte ngẫu nhiên dạng UUID v4. `crypto.randomUUID` chỉ có ở ngữ cảnh an toàn
+ *  (https/localhost) — mở app qua http IP mạng nội bộ thì dựng từ getRandomValues. */
+function uuidNgauNhien(): string {
+  const c = globalThis.crypto;
+  if (typeof c?.randomUUID === "function") return c.randomUUID();
+  const b = c.getRandomValues(new Uint8Array(16));
+  b[6] = (b[6] & 0x0f) | 0x40;
+  b[8] = (b[8] & 0x3f) | 0x80;
+  const h = [...b].map((x) => x.toString(16).padStart(2, "0")).join("");
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+}
+
+let msTruoc = 0;
+
+/**
+ * Sinh id bản ghi mới: `<mốc ms tăng dần>-<uuid>`.
+ *
+ * - Phần UUID chống TRÙNG: bản cũ `Date.now()-random(1e6)` tạo hàng loạt trong
+ *   1ms (~2% với 200 dòng) ra id trùng ⇒ upsert "ON CONFLICT cannot affect row a
+ *   second time" ⇒ kẹt cả hàng chờ của bảng.
+ * - Tiền tố mốc ms (tăng ngặt trong một tab) giữ THỨ TỰ GHI khi sắp theo id: nhiều
+ *   chỗ lấy id làm khóa phụ "cùng ngày thì cái ghi trước/sau" (importHelpers,
+ *   truyXuatLo.dongCuaChuyen, /wip…) — id cũ dạng `ms-số` vẫn so đúng với id mới.
+ * - Đuôi 4 ký tự của id làm hậu tố nhãn lô (truyXuatLo.duoiId) — UUID cho hex.
+ */
 export function uid(): string {
-  return `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+  const ms = Math.max(Date.now(), msTruoc + 1);
+  msTruoc = ms;
+  return `${ms}-${uuidNgauNhien()}`;
 }
 
 /**

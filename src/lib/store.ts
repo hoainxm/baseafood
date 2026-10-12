@@ -7,6 +7,5 @@
 // Đọc/ghi dữ liệu đi qua src/lib/repo.ts (Supabase hoặc localStorage) —
 // không truy cập localStorage trực tiếp từ màn hình nữa.
 
-export function newId(): string {
-  return `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
-}
+// MỘT hàm sinh id cho cả app — xem `uid` ở db.ts (mốc ms + UUID, không trùng).
+export { uid as newId } from "@/lib/db";

@@ -141,6 +141,12 @@ function stagedViolations() {
   const out = [];
   const lines = git(["diff", "--cached", "--name-status", "-M", "--diff-filter=ACMR"]).trim();
   if (!lines) return out;
+  // File thêm mới cùng lúc với file bị xóa = thường là đổi tên mà git không nhận ra (file nhỏ,
+  // sửa nhiều ⇒ dưới ngưỡng giống). Tên có sẵn trong các file bị xóa không tính là "mới".
+  const deleted = git(["diff", "--cached", "--name-only", "--diff-filter=D"]).trim().split("\n").filter(Boolean);
+  const namesDeleted = new Set(
+    deleted.filter((d) => /\.(ts|tsx|css)$/.test(d)).flatMap((d) => Object.values(namesOf(d, headVersion(d))).flat())
+  );
   const migrations = [];
   for (const line of lines.split("\n")) {
     const cols = line.split("\t");
@@ -157,8 +163,11 @@ function stagedViolations() {
     }
     if (!/\.(ts|tsx|css)$/.test(file)) continue;
 
-    const before = namesOf(file, headVersion(file));
-    const known = new Set(Object.values(before).flat());
+    // File đổi tên (git mv): tên cũ nằm ở HEAD dưới đường dẫn CŨ — không thì mọi tên Việt
+    // sẵn có trong file bị coi là "mới" (đã dính khi Đợt 2 đổi tên 30 file lib).
+    const headPath = status.startsWith("R") ? cols[1] : file;
+    const before = namesOf(file, headVersion(headPath));
+    const known = new Set([...Object.values(before).flat(), ...(status.startsWith("A") ? namesDeleted : [])]);
     const added = git(["diff", "--cached", "-U0", "--", file])
       .split("\n")
       .filter((l) => l.startsWith("+") && !l.startsWith("+++"))

@@ -1,6 +1,7 @@
 > Load khi: thêm file mới, không biết đặt ở đâu, hay chuẩn bị import xuyên tầng.
 covers: src/**
-last_verified: 2026-10-12
+last_verified: 2026-10-13
+<!-- re-verified: 2026-10-13 09:40 — danh sách thư mục features đối chiếu `ls src/features` (FIX drift: còn ghi tên Việt cũ nhap-hang/san-xuat/… dù thư mục thật tiếng Anh); THÊM thư mục scripts/ (cổng đặt tên, Đợt 0). -->
 <!-- updated: 2026-10-12 (b) — GỠ thư mục `features/quality/`, `features/traceability/`, `features/cold-storage/` + file `production/WorkOrderScreen.tsx`, `reports/ReportsScreen.tsx` (5 màn DEMO), `design-system/patterns/StatusChip.tsx` + `MockPatternData.tsx` (chỉ màn DEMO dùng); `patterns/SankeyChart*` + dep `d3-sankey` đã gỡ (thay bằng `ProportionBar.tsx` — `ThanhChiaPhan`). THÊM `lib/cheDo.ts` (chế độ demo — cờ + khóa/site, test), `lib/sinhDemo.ts` (bộ sinh demo, test; lib → lib: balancingCalc, inventory, dongChay), `features/shared/CheDoDemo.tsx` (DaiDemo · NapGoiDemo · KhoiCheDoDemo — App.tsx gắn 2 cái đầu ở ShellLayout, Tổng quan gắn cái cuối). `lib/db.ts` + `lib/supabase.ts` nay import `lib/cheDo.ts` (cheDo không import gì của app — tránh vòng). -->
 <!-- updated: 2026-10-12 — Tổng quan "dòng chảy số liệu": THÊM `src/lib/dongChay.ts` (hàm THUẦN + test: sankey kg, băng chuyền 5 khâu, tồn theo ngày, định mức theo mặt hàng, cảnh báo chuỗi — lib → lib: inventory, inventoryFinished, truyXuatLo, balancingCalc) · design-system thêm `patterns/ProportionBar.tsx` (`ThanhChiaPhan`), `PipelineStages.tsx`, `TimeSeriesChart.tsx`, `useBeRongKhung.ts`. `features/dashboard/` XOÁ 6 file mock chết (AlertPanel, CommonWidget, KPICard, LineStatusWidget, WorkOrderTable, mockDashboardData); `DashboardScreen` import `@/features/shared/useDuLieuTruyXuat`. KHÔNG dep mới (bản đầu dùng `d3-sankey` cho sơ đồ dòng chảy — người dùng thấy khó hiểu, đã gỡ cùng ngày, thay bằng `ThanhChiaPhan`). Spec: ../spec/che-do-demo.md §5b. -->
 <!-- updated: 2026-10-08 — truy xuất QR đợt 2b, KHÔNG thêm thư mục / đổi ranh giới import: `src/features/qr/` thêm `GiaiDoanTruyXuat.tsx` (tab Theo giai đoạn — thay `DoPhuTruyXuat.tsx` đã xóa) + `ThuHoiLo.tsx` (mục Thu hồi, nạp động `lib/reportXlsx` để xlsx không vào chunk chính); `src/features/production/KhoiLoPhien.tsx` (khối lô NL dùng cho phiên); `src/features/shared/GanLoDauVao.tsx` nay có lõi `HopGanLo` + export thêm `GanLoXuat` (gắn lô cho hàng ra); `useDuLieuTruyXuat` gom 17 bảng; `src/lib/truyXuatLo.e2e.test.ts` (kịch bản oracle đầu-cuối). `ReserveWarehouseScreen` / `SalesOrderScreen` đọc `useSearchParams` cho link mở thẳng hộp (`?duyet=` · `?don=&kiem=`). `lib/truyXuatLo.ts` import `lib/inventory.ts` + `lib/format.ts` (lib → lib, đúng ranh giới). Không dep mới. -->
@@ -47,8 +48,15 @@ src/
 │   ├── patterns/            Field, NumberField, Combobox, DateField, RecordTable, DanhMucCrud…
 │   ├── kit/KitPage.tsx      trang duyệt bộ giao diện (đưa người dùng thật bấm thử)
 │   └── index.ts             cửa import DUY NHẤT cho features
-└── features/                thư mục chức năng chia theo route (auth, nhap-hang, san-xuat, ban-hang, kho, don-dat, can-doi, danh-muc, nguoi-dung, shared)
+└── features/                thư mục chức năng chia theo route (.DS_Store, audit, auth, balancing, catalog, dashboard, doi-soat, imports, monthly-stock, orders, packaging, production, qr, quality-check, reports, sales, shared, users, warehouse)
+
+scripts/                     công cụ dev chạy bằng node, KHÔNG vào bundle app
+├── check-naming.mjs         cổng quy ước đặt tên (pre-commit --staged · CI --check ratchet) — ../spec/quy-uoc-dat-ten.md
+├── naming-baseline.json     số tên tiếng Việt còn nợ theo lớp; chỉ được giảm (`npm run naming:update` sau mỗi đợt dọn)
+└── naming/lexicon.mjs       bộ nhận diện tên Việt không dấu (hàm thuần + lexicon.test.mjs)
 ```
+
+**Đặt tên file / thư mục / định danh mới:** tiếng Anh theo [`spec/quy-uoc-dat-ten.md`](../spec/quy-uoc-dat-ten.md) §2 (component `PascalCase.tsx`, module `camelCase.ts`, thư mục `kebab-case`). Tên Việt có sẵn trong cây trên là nợ đang dọn theo đợt, không phải mẫu — pre-commit chặn tên Việt MỚI.
 
 ## Ranh giới import (cứng)
 

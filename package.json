@@ -9,7 +9,10 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "naming": "node scripts/check-naming.mjs",
+    "naming:check": "node scripts/check-naming.mjs --check",
+    "naming:update": "node scripts/check-naming.mjs --update"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.112.0",

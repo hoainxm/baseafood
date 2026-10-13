@@ -1,8 +1,8 @@
 > Load khi: thêm/sửa bảng, cột, migration, hay đọc lỗi Postgres lạ.
 covers: supabase/migrations/**, docs/ops/supabase-setup.md
-last_verified: 2026-10-12
+last_verified: 2026-10-13
 <!-- updated: 2026-10-12 (demo) — THÊM `0058_site_demo.sql` 🟡 chỉ chèn dòng `sites.id = 'site-demo'` (dò cột mã `ma`/`code`, idempotent; lùi = `delete from sites where id='site-demo'` khi không còn dòng nào trỏ tới). **ĐÃ chạy trên DB thật 2026-10-13** (chủ dự án). Thiếu dòng này ⇒ mọi ghi ở chế độ demo bị FK từ chối (23503), số demo nằm chờ dưới máy, KHÔNG hỏng gì. Từ nay DB có 2 site: truy vấn SQL tay để báo cáo số THẬT phải `where site_id = '<site thật>'` (dòng demo có khóa tiền tố `demo:`). Rà 0001…0058: không UNIQUE nào ngoài khóa chính + `sites.ma`; khóa ngoại giữa bảng nghiệp vụ: ĐÚNG 3 cái — `period_id → balancing_periods.id ON DELETE CASCADE` ở `balancing_inputs`, `balancing_outputs`, `scraps` (0001 tạo tên `ky_can_doi`; bản đầu ghi nhầm "không có FK", sửa 2026-10-13) — chế độ demo thêm tiền tố cả cột này (`AnhXaBang.cotThamChieu`, test `lib/khoaNgoaiDemo.test.ts`). -->
-<!-- re-verified: 2026-10-12 16:10 — FIX drift: mục Quy ước đặt tên còn ghi Việt không dấu + cấm tiếng Anh, ngược thực tế 0016 (22 bảng đã đổi sang tiếng Anh) và CLAUDE.md luật 8; bảng 15 bảng vẫn tên cũ (đã gắn cảnh báo). -->
+<!-- re-verified: 2026-10-13 09:30 — viết lại mục bảng: 40 bảng tên thật (dò create/rename trong migration), cột site_id/finished_goods.code/period_id đối chiếu 0016 + repo.ts. Trước đó 2026-10-12 16:10 — FIX drift: mục Quy ước đặt tên còn ghi Việt không dấu + cấm tiếng Anh, ngược thực tế 0016 (22 bảng đã đổi sang tiếng Anh) và CLAUDE.md luật 8; bảng 15 bảng vẫn tên cũ (đã gắn cảnh báo). -->
 <!-- updated: 2026-10-08 — thêm 0056 (`lot_dispatches` + `lot_waivers`, truy xuất QR đợt 2b): (1) `lot_dispatches` = LÔ ĐI RA {lot_kind S|W|P, lot_id, lot_label (nhãn lúc gắn), doc_kind sales_item|export_item|domestic_sale, doc_id, quantity_kg NULL=chưa cân (check >0), method quet|go|chon|fifo, operator, recorded_at} — dòng bán lẻ / bán nội địa lấy từ lô nào + dấu QUÉT KIỂM lệnh xuất; index (site, lot_kind, lot_id) + (site, doc_kind, doc_id). (2) `lot_waivers` = LÝ DO CHƯA GẮN LÔ khi chốt ngày SX {output_kind W|P, output_id, reason (không rỗng), operator, recorded_at}. CHỈ-THÊM 2 BẢNG — KHÔNG thêm cột vào sales_items / domestic_sales / export_items / production_locks (thêm cột mà deploy trước migration là mọi lần lưu phiếu bán / chốt ngày lỗi, bài học 0040+0028). RLS ngay từ đầu (policy `_nguoi_dung` authenticated + revoke anon), trigger cap_nhat_thoi_diem_sua + ghi_vet_sql_tg (0048, khi hàm có). Idempotent, có ROLLBACK (drop 2 bảng — mất dây lô bán/kiểm/lý do, KHÔNG mất sổ sách; tồn quay về FIFO). ✅ ĐÃ CHẠY trên DB thật 2026-10-08 (chủ dự án chạy; kiểm 2026-10-08 qua Supabase, chỉ đọc: 2 bảng có, RLS bật, policy `_nguoi_dung` authenticated, anon không đọc được, đủ trigger `*_sua` + `ghi_vet_sql_tg`, cột khớp toRow). Thứ tự bắt buộc: chạy migration TRƯỚC khi deploy code đợt 2b (không thì /wip /sales /warehouse /orders /packaging /cold-storage /qr báo lỗi 404 lot_dispatches). Migration cao nhất nay = 0056. Thiết kế: ../spec/qr-truy-xuat-lo.md §6d. -->
 ttl_days: 90
 <!-- updated: 2026-10-12 — viết 0057 (chặn người tự đăng ký đọc/ghi sổ; khóa cột roles chỉ admin sửa). ✅ chủ dự án đã chạy trên DB thật 2026-10-12 (đã kiểm: 0 policy kiểu cũ, 40 policy co_vai_tro, Storage siết đủ). Migration cao nhất nay = 0057. -->
@@ -52,7 +52,7 @@ ttl_days: 90
 
 # Cơ sở dữ liệu & migration
 
-Postgres qua Supabase. **16 bảng**, không có view, không có RPC, không có edge function, không có cron.
+Postgres qua Supabase. **40 bảng**, không có view, không có edge function, không có cron. Có hàm SQL: trigger `cap_nhat_thoi_diem_sua()` (tự set `updated_at`), `ghi_vet_sua_truc_tiep()` (0048, ghi vết sửa tay bằng SQL), `la_admin()` / `co_vai_tro()` (dùng trong policy RLS). Tên các hàm này là nợ tiếng Việt CŨ — hàm mới đặt tiếng Anh.
 Automation duy nhất: trigger `cap_nhat_thoi_diem_sua()` gắn cho mọi bảng nghiệp vụ để tự set `updated_at` — app không tự ghi cột này.
 
 ## Quy ước đặt tên — không thương lượng
@@ -64,31 +64,35 @@ Automation duy nhất: trigger `cap_nhat_thoi_diem_sua()` gắn cho mọi bảng
 - ❌ Tiền tố `mes_`: đã bỏ từ `0001` (bảng SDFactory dọn ở `0002`).
 - Tên file migration: `NNNN_<english_snake>.sql` cho file MỚI. File cũ `0001…0057` giữ nguyên tên + nội dung (lịch sử, đã chạy trên DB thật).
 
-> ⚠️ Bảng liệt kê "15 bảng" ngay dưới vẫn là tên TRƯỚC `0016` (nay 40 bảng tiếng Anh, có hàm SQL + trigger). Tên thật xem `0016_rename_to_english.sql` + các migration sau; viết lại bảng này là việc của Đợt 0 trong spec đặt tên.
-
 App dùng camelCase, DB dùng snake_case — cầu nối là `AnhXaBang.toRow/fromRow` trong `src/lib/repo.ts`. Thêm cột ⇒ phải sửa **cả hai chiều**, xem [04-tang-du-lieu.md](04-tang-du-lieu.md).
 
-## 15 bảng
+## 40 bảng (tên thật sau `0016`)
+
+Tên trong ngoặc là tên tiếng Việt CŨ trước `0016` — chỉ còn gặp trong migration `0001…0015`.
 
 | Nhóm | Bảng | Khóa chính | Ghi chú |
 |---|---|---|---|
-| Site | `xi_nghiep` | `id` (`'bsf1'`) | multi-site; mọi bảng khác có `xi_nghiep_id` |
-| Danh mục | `suppliers` (đại lý) · `material_types` (loại NL) · `products` (mặt hàng) · `customers` (khách hàng) | `id` text | id sinh ở client |
-| Danh mục | `thanh_pham` | **`ma`** | 141 mã kế toán TK 1551 — khóa chính là MÃ, không phải id |
-| Nhập hàng | `chuyen_nhap` · `nhap_nguyen_lieu` · `chot_ngay` | `id` text | xem [30-nhap-hang.md](30-nhap-hang.md) |
-| Bán hàng | `phieu_ban` · `ban_hang` | `id` text | phiếu bán TP ngày; xem [33-ban-hang.md](33-ban-hang.md) |
-| Cân đối | `ky_can_doi` · `nguyen_lieu_vao` · `phe_lieu` · `thanh_pham_ra` | `id` text | xem [31-can-doi-ky.md](31-can-doi-ky.md) |
-| Người dùng | `nguoi_dung` | `id` = auth user id | hồ sơ + vai trò; xem [05-bao-mat-phan-quyen.md](05-bao-mat-phan-quyen.md) |
+| Site | `sites` (`xi_nghiep`) | `id` (`'bsf1'`, demo `'site-demo'`) | multi-site; mọi bảng nghiệp vụ có `site_id` |
+| Danh mục | `suppliers` (`dai_ly`) · `material_types` (`loai_nguyen_lieu`) · `products` (`mat_hang`) · `customers` (`khach_hang`) · `storage_locations` · `batter_types` · `warehouses` | `id` text | id sinh ở client; xem [32-danh-muc.md](32-danh-muc.md) |
+| Danh mục | `finished_goods` (`thanh_pham`) | **`code`** | 141 mã kế toán TK 1551 — khóa chính là MÃ, không phải id |
+| Nhập hàng | `import_shipments` (`chuyen_nhap`) · `material_imports` (`nhap_nguyen_lieu`) · `daily_locks` (`chot_ngay`) | `id` text | xem [30-nhap-hang.md](30-nhap-hang.md) |
+| Bán hàng | `sales_invoices` (`phieu_ban`) · `sales_items` (`ban_hang`) · `domestic_sales` | `id` text | xem [33-ban-hang.md](33-ban-hang.md) |
+| Cân đối | `balancing_periods` (`ky_can_doi`) · `balancing_inputs` (`nguyen_lieu_vao`) · `scraps` (`phe_lieu`) · `balancing_outputs` (`thanh_pham_ra`) | `id` text | xem [31-can-doi-ky.md](31-can-doi-ky.md) |
+| Sản xuất · kho · đơn | `production_wips` (`san_xuat_btp`) · `production_locks` (`chot_san_xuat`) · `packagings` · `sales_orders` (`don_dat`) · `order_items` (`dong_don`) · `export_orders` (`lenh_xuat`) · `export_items` (`dong_lenh`) | `id` text | xem [34](34-btp-san-xuat-kho.ba-spec.md) |
+| Tồn kho | `material_opening_stock` · `finished_goods_opening_stock` · `nxt_snapshots` · `monthly_stock_ledger` | `id` text | xem [36-so-kho-thang.md](36-so-kho-thang.md) |
+| Truy xuất lô | `lot_inputs` · `lot_dispatches` · `lot_waivers` · `label_prints` | `id` text | xem [spec/qr-truy-xuat-lo.md](../spec/qr-truy-xuat-lo.md) |
+| QC | `qc_checklists` · `qc_locks` | `id` text | màn `/qc` |
+| Hệ thống | `user_profiles` (`nguoi_dung`) · `audit_log` · `row_marks` · `reconciliation_runs` | `user_profiles.id` = auth user id | vai trò: [05-bao-mat-phan-quyen.md](05-bao-mat-phan-quyen.md) |
 
-`thanh_pham_ra` có thêm `quy_cach` + `ban_hang_id` (từ `0005`) để nhận dòng hút từ sổ bán, chống hút trùng.
+`balancing_outputs` có `spec` + `sales_item_id` (từ `0005`, tên cũ `quy_cach`/`ban_hang_id`) để nhận dòng hút từ sổ bán, chống hút trùng.
 
 **Bất biến dữ liệu:**
 
-- Mọi truy vấn của app lọc `.eq("xi_nghiep_id", SITE_ID)`. Bảng mới **phải** có cột này (`default 'bsf1'` + FK về `xi_nghiep`), nếu không dữ liệu xí nghiệp khác lẫn vào nhau.
+- Mọi truy vấn của app lọc `.eq("site_id", SITE_ID)`. Bảng mới **phải** có cột này (`default 'bsf1'` + FK về `sites`), nếu không dữ liệu xí nghiệp khác lẫn vào nhau.
 - Khóa chính là **`text` sinh ở client** (`Date.now()-random`), không phải `uuid`/`serial` — vì app phải ghi được khi mất mạng rồi đẩy lên sau.
-- Sổ nhập lưu **TÊN** đại lý / loại NL (`supplier_name`, `material_type_name` — tên cột thật trên DB; tên tiếng Việt cũ `ten_dai_ly`… đã đổi), **không phải khóa ngoại**: sổ sách giữ nguyên tên tại thời điểm nhập; đại lý đổi tên sau này không được làm sai bản ghi đã chốt.
-- `nguyen_lieu_vao` / `thanh_pham_ra` FK `ky_id` **on delete cascade**. `phe_lieu.ky_id` thì **nullable, không cascade theo ý nghĩa nghiệp vụ** — xóa kỳ chỉ gỡ liên kết (app tự làm), số gốc thuộc về sổ nhập hàng.
-- `phe_lieu.ky_id` rỗng phải ghi xuống DB là **NULL**, chuỗi rỗng vi phạm FK (`repo.ts` đã xử lý: `x.kyId || null`).
+- Sổ nhập lưu **TÊN** đại lý / loại NL (`supplier_name`, `material_type_name`), **không phải khóa ngoại**: sổ sách giữ nguyên tên tại thời điểm nhập; đại lý đổi tên sau này không được làm sai bản ghi đã chốt.
+- `balancing_inputs` / `balancing_outputs` FK `period_id` **on delete cascade**. `scraps.period_id` thì **nullable, không cascade theo ý nghĩa nghiệp vụ** — xóa kỳ chỉ gỡ liên kết (app tự làm), số gốc thuộc về sổ nhập hàng.
+- `scraps.period_id` rỗng phải ghi xuống DB là **NULL**, chuỗi rỗng vi phạm FK (`repo.ts` đã xử lý: `x.periodId || null`).
 
 ## 18 migration — thứ tự & rủi ro
 
@@ -139,10 +143,10 @@ App dùng camelCase, DB dùng snake_case — cầu nối là `AnhXaBang.toRow/fr
 
 ## Viết migration mới
 
-1. Đánh số tiếp (`0005_…`), tên tiếng Việt không dấu mô tả việc.
+1. Đánh số tiếp, tên file **tiếng Anh** `NNNN_<english_snake>.sql` mô tả việc. Mọi bảng/cột/hàm/policy/index trong file cũng tiếng Anh — CI (`npm run naming:check`) + pre-commit chặn migration > `0057` tạo định danh tiếng Việt.
 2. Mở đầu bằng comment: **vì sao** đổi, chạy sau file nào, có phá hủy không.
 3. Chỉ dùng `create table if not exists` / `add column if not exists` — file phải chạy lại được nhiều lần (không có công cụ migrate tự động, người ta dán tay vào SQL Editor).
-4. Bảng mới: thêm `xi_nghiep_id`, `created_at`, `updated_at`, đăng ký trigger `cap_nhat_thoi_diem_sua`, bật RLS + policy (đang là mở cho `anon` — thêm luôn vào danh sách trong `0003` để sau này không sót).
+4. Bảng mới: thêm `site_id`, `created_at`, `updated_at`, đăng ký trigger `cap_nhat_thoi_diem_sua`, bật RLS **ngay từ đầu** với policy `to authenticated` theo mẫu hiện hành (0047 + 0057, xem [05-bao-mat-phan-quyen.md](05-bao-mat-phan-quyen.md)) + `revoke` anon. Đặt tên policy tiếng Anh (`<table>_authenticated`), không bắt chước `_nguoi_dung` / `_toan_quyen` cũ.
 5. Sửa `AnhXaBang` tương ứng trong `repo.ts` **cùng commit**, kèm `vaDongCu` nếu cột mới cần giá trị cho dòng cũ.
 6. `numeric(14,3)` cho kg, `numeric(14,2)` cho tiền — giữ nguyên chuẩn này.
 

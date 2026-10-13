@@ -32,3 +32,9 @@ jobs:
 
       - name: Test (vitest)
         run: npm test
+
+      # Ratchet quy ước đặt tên (docs/spec/quy-uoc-dat-ten.md): số tên tiếng Việt
+      # không dấu chỉ được GIẢM so với scripts/naming-baseline.json; migration mới
+      # không được tạo định danh tiếng Việt.
+      - name: Quy ước đặt tên (ratchet)
+        run: npm run naming:check

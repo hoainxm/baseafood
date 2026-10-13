@@ -7,7 +7,8 @@
 # Bỏ qua 1 lần (chỉ khi thật sự cần):  git commit --no-verify
 #
 # CHẶN  : lộ khóa/URL Supabase · features import thẳng primitive · features gọi
-#         localStorage/supabase · chữ nhỏ & IN HOA trong màn nghiệp vụ
+#         localStorage/supabase · chữ nhỏ & IN HOA trong màn nghiệp vụ ·
+#         tên tiếng Việt không dấu MỚI (scripts/check-naming.mjs --staged)
 # CẢNH BÁO: doc app-map có `covers:` trỏ tới file vừa sửa mà doc đứng yên ·
 #         nút chỉ-icon thêm mới chưa có aria-label/title (nhắc, không chặn —
 #         mẫu dò theo DÒNG nên JSX xuống dòng có thể báo nhầm)
@@ -137,6 +138,16 @@ BA_VERIFY="$HOME/.claude/skills/ba-flow-logic/ba-verify.sh"
 if [ -f "$BA_VERIFY" ] && printf '%s\n' "$staged" | grep -qiE 'ba-spec.*\.md$'; then
   if ! sh "$BA_VERIFY" --staged; then
     do_hong "ba-spec staged không qua cổng ba-verify (thiếu Test:/Assert/frontmatter hoặc AC chứa từ UI)"
+  fi
+fi
+
+# ---------- 6. Tên tiếng Việt không dấu MỚI (CHẶN — docs/spec/quy-uoc-dat-ten.md) ----------
+# Khai báo / file / thư mục / route / CSS utility MỚI phải tiếng Anh; migration > 0057 không
+# được tạo định danh tiếng Việt. Tên cũ có sẵn ở HEAD không bị bắt (nợ dọn theo đợt, đếm
+# bằng ratchet ở CI). Ngoại lệ có chủ đích: comment `naming-ok: <lý do>` trên cùng dòng.
+if command -v node >/dev/null 2>&1 && [ -f scripts/check-naming.mjs ]; then
+  if ! node scripts/check-naming.mjs --staged; then
+    do_hong "đặt tên tiếng Anh theo từ điển §2b của docs/spec/quy-uoc-dat-ten.md"
   fi
 fi
 

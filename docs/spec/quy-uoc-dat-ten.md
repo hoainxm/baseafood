@@ -1,7 +1,7 @@
 # Quy ước đặt tên + kế hoạch dọn tên tiếng Việt không dấu
 
 - **Ngày lập:** 2026-10-12
-- **Trạng thái:** CHỐT 2026-10-12 (chủ dự án duyệt 4 câu ở §6). §2 Luật áp dụng NGAY cho mọi thứ MỚI. §5 chạy theo đợt có lịch, đợt kế tiếp: **Đợt 0**.
+- **Trạng thái:** CHỐT 2026-10-12 (chủ dự án duyệt 4 câu ở §6). §2 Luật áp dụng NGAY cho mọi thứ MỚI. §5 chạy theo đợt có lịch, **Đợt 0 xong 2026-10-13**; đợt kế tiếp: **Đợt 1**.
 - **Thay cho:** Phần B của [`routing-va-naming.md`](routing-va-naming.md) (dự thảo 2026-08-07; nửa DB + route của nó đã làm xong ở `0016` và đợt react-router).
 - **Liên quan:** [`CLAUDE.md`](../../CLAUDE.md) luật 8 · [`app-map/03-database.md`](../app-map/03-database.md) · [`app-map/04-tang-du-lieu.md`](../app-map/04-tang-du-lieu.md) · [`src/design-system/README.md`](../../src/design-system/README.md)
 
@@ -78,7 +78,7 @@ Thuật ngữ mới ⇒ thêm vào bảng này **trước** khi đặt tên.
 | DB: policy RLS | — | ~25 | `*_toan_quyen`, `*_nguoi_dung`, `*_cua_toi`, `user_profiles_them/sua/xoa` |
 | DB: giá trị enum lưu | 6 họ slug | **6** | `result` dat/tam/khong-dat · `status` cho-nhap/da-nhap · đơn dang-gom/du/dong · lệnh mo/dong · `kind` noi-bo/thue-ngoai · `method` quet/go/chon (enum chỉ sống trong code như `WarehouseType` xi-nghiep/phan-xuong thuộc Đợt 1–2) |
 | File migration | 57 | 27 | lịch sử, **giữ nguyên** |
-| Route | 27 | 7 | `/doi-soat` `/ton-kho-thang` `/nxt` `/nxt-nl` `/nxt-kho` `/bc-thanh-pham` `/bc-don-xuat` |
+| Route | 27 | 6 | `/doi-soat` `/ton-kho-thang` `/nxt-nl` `/nxt-kho` `/bc-thanh-pham` `/bc-don-xuat` (`/nxt` hợp lệ — từ viết tắt được phép) |
 | Khóa localStorage | ~70 | ~20 | khóa `.v1` cũ (đọc để chuyển dữ liệu) + `bsf.coChu/matDo/beRong` + `bsf1:nav-nhom` |
 | Khóa bảng `toMau` (lưu `row_marks`) | 31 | **31** | `ban-hang`, `can-doi-ky`… đổi = mất dấu tô |
 | Export TS (hàm + hằng + type) | 820 | **527** (64%) | `BangTong`, `tinhTon`, `DongBanNoiDia`… |
@@ -104,7 +104,7 @@ Phân bố khai báo tên Việt theo khu: `lib` 1.129 · `design-system` 301 ·
 
 | Đợt | Việc | Tier | Ước lượng | Cổng xong |
 |---|---|---|---|---|
-| **0 · Chặn tái phát** | (a) Chốt §2 vào CLAUDE.md luật 8 + sửa doc mâu thuẫn (✅ một phần 2026-10-12: `03-database`, `supabase-setup`, `BAN-GIAO`). (b) Viết lại bảng "15 bảng" ở `03-database` theo tên thật. (c) `scripts/check-naming.mjs`: đếm định danh tên Việt, ghi `naming-baseline.json`. (d) Pre-commit: chặn **khai báo MỚI** (dòng thêm) có tên Việt. CI: số đếm chỉ được giảm (ratchet). | 🟢 | 0,5–1 ngày | Thêm `const tinhTon2` ⇒ commit bị chặn |
+| **0 · Chặn tái phát** ✅ 2026-10-13 | (a) Chốt §2 vào CLAUDE.md luật 8 + sửa doc mâu thuẫn (✅ một phần 2026-10-12: `03-database`, `supabase-setup`, `BAN-GIAO`). (b) Viết lại bảng "15 bảng" ở `03-database` theo tên thật. (c) `scripts/check-naming.mjs`: đếm định danh tên Việt, ghi `naming-baseline.json`. (d) Pre-commit: chặn **khai báo MỚI** (dòng thêm) có tên Việt. CI: số đếm chỉ được giảm (ratchet). | 🟢 | 0,5–1 ngày | Thêm `const tinhTon2` ⇒ commit bị chặn |
 | **1 · Cục bộ** | Biến/hàm không export, theo từng khu: `lib` → `design-system` → mỗi `features/*` | 🟢 | 3–5 ngày, chia nhiều phiên | ratchet giảm, 3 cổng xanh |
 | **2 · API lib + file** | Export của `lib/*` + `types.ts` + test đi kèm; đổi tên file `lib` (`doiSoatHddt.ts` → `einvoiceReconciliation.ts`…) bằng `git mv`; sửa `covers:` app-map, bảng "Code đổi → doc" ở CLAUDE.md, đường dẫn trong hook | 🟡 | 2–3 ngày | 3 cổng + hook doc không cảnh báo sót |
 | **3 · API design-system** | `BangTong` → `SummaryTable`, `LuoiNhap` → `GridInput`, `KhungCuonNgang` → `HorizontalScroll`, prop `nhan/moTa/tieuDe` → `label/description/title`; CSS utility + `data-*`. Giai đoạn chuyển: export cả hai tên, tên cũ gắn `@deprecated` (editor gạch ngang), codemod `features/*`, rồi gỡ alias | 🟡 lan rộng | 2–3 ngày | README design-system cập nhật, không còn import tên cũ |
@@ -124,6 +124,18 @@ Phân bố khai báo tên Việt theo khu: `lib` 1.129 · `design-system` 301 ·
 | Q3 | Scope commit | **Tên khu tiếng Anh trùng thư mục** (`imports`, `balancing`, `design-system`, `docs`). Mô tả commit vẫn tiếng Việt có dấu. Áp từ 2026-10-12 (CLAUDE.md § Commit). |
 | Q4 | Cổng chặn | **Chặn cứng ở pre-commit** (khai báo mới trên dòng thêm có âm tiết Việt ⇒ chặn) **+ ratchet ở CI** (tổng số tên Việt chỉ được giảm). |
 
-## 7. Đo tiến độ
+## 7. Đo tiến độ + công cụ (Đợt 0)
+
+| Lệnh | Làm gì |
+|---|---|
+| `npm run naming` | In nợ theo lớp (`declarations` · `fields` · `routes` · `css` · `files`) và theo khu |
+| `npm run naming:check` | Ratchet (chạy trong CI): số nào **tăng** so với `scripts/naming-baseline.json` ⇒ đỏ; migration > `0057` có định danh tiếng Việt ⇒ đỏ |
+| `npm run naming:update` | Ghi lại baseline — chạy ở cuối MỖI đợt dọn, commit cùng đợt đó |
+| `node scripts/check-naming.mjs --staged` | Pre-commit (hook mục 6) gọi: chặn khai báo / route / CSS utility / file / thư mục **MỚI** mang tên Việt. Tên có sẵn ở `HEAD` không bị bắt; prop/khóa object không bị chặn (API design-system còn khóa Việt tới Đợt 3) |
+
+- Ngoại lệ có chủ đích: comment `naming-ok: <lý do>` trên cùng dòng (VD tên phải khớp cột file Excel kế toán).
+- Bộ nhận diện: `scripts/naming/lexicon.mjs` (+ test). Âm tiết Việt "mạnh" ⇒ bắt ngay; âm tiết trùng tiếng Anh chỉ bắt khi đi cặp; từ tiếng Anh rất hay gặp (`to`, `map`, `day`, `can`, `lot`…) không tính — **chặn nhầm tên tiếng Anh tệ hơn bỏ sót**, nên số đếm là cận dưới.
+- Baseline 2026-10-13: `declarations` 2769 · `fields` 1105 · `routes` 6 · `css` 27 · `files` 66.
+
 
 `node scripts/check-naming.mjs` (Đợt 0) in bảng §3 theo lớp và theo khu, ghi `naming-baseline.json`. CI so số mới với baseline: tăng thì đỏ, giảm thì cập nhật baseline. Bảng §3 cập nhật sau mỗi đợt.

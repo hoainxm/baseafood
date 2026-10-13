@@ -126,7 +126,7 @@ Cổng là những cái này, **chạy thật, không suy đoán** (test mới v
 
 | Đụng vào | Bắt buộc |
 |---|---|
-| Bất cứ file `.ts` / `.tsx` nào | `npm run build` + `npm run lint` + `npm test` (CI cũng chạy đủ 3) |
+| Bất cứ file `.ts` / `.tsx` nào | `npm run build` + `npm run lint` + `npm test` + `npm run naming:check` (CI chạy đủ 4; pre-commit chặn tên tiếng Việt MỚI — [`spec/quy-uoc-dat-ten.md`](docs/spec/quy-uoc-dat-ten.md)) |
 | `lib/balancingCalc.ts`, `lib/inventory.ts`, `lib/truyXuatLo.ts` (+ `truyXuatLo.e2e.test.ts` kịch bản oracle), `lib/botTam.ts`, `lib/khoCanDoi.ts`, `lib/banNoiDia.ts`, `lib/toMau.ts` (+ `design-system/patterns/toMauNguon.test.ts` khi đổi bảng màu), `lib/chuyenTrongNgay.ts`, `lib/dongChay.ts` (bất biến cân bằng kg của sơ đồ dòng chảy), `lib/cheDo.ts` (tách số demo — khóa/site), `lib/sinhDemo.ts` (bộ sinh demo: bất biến trên nhiều hạt), `imports/importHelpers.ts`, `production/wipHelpers.ts` | **sửa test đi kèm** (`*.test.ts` cùng thư mục) — AC = test |
 | `lib/balancingCalc.ts` hay công thức | Mở một kỳ có số liệu, đối chiếu tay: định mức = NL÷TP; lãi/lỗ = giá trị xuất − giá thành |
 | `lib/repo.ts` / hàng chờ / `AnhXaBang` | Thử **cả hai chế độ** (có `.env` và không); ghi khi ngắt mạng rồi nối lại — dòng phải lên server, reload không nuốt dòng |
@@ -135,7 +135,7 @@ Cổng là những cái này, **chạy thật, không suy đoán** (test mới v
 | Màn Cân đối | Tạo kỳ → hút phế liệu → **xóa kỳ**: dòng phế liệu `nguon="Nhập hàng"` phải còn nguyên ở sổ nhập |
 | Đối soát HĐĐT — quy đổi ngoại tệ (`lib/doiSoatHddt.ts`) | ⚠️ Cổng thuế xuất tiền hóa đơn ngoại tệ **TÙY BẢN**: có bản để **nguyên tệ** (phải `×tỷ giá`), có bản **đã quy sẵn VND** (nhân nữa là đội gấp ~tỷ giá lần → tổng phình vài trăm tỉ thành vài chục **nghìn** tỉ). **KHÔNG mặc định nhân/không nhân** — engine tự dò qua đối chiếu sổ (`phatHienQuyUocNgoaiTe`). Đụng logic quy đổi ⇒ chạy engine trên file thật, kiểm **tổng khối A ≈ tổng cột tiền cộng thô** và hóa đơn ngoại tệ khớp sổ ở **số gốc**, không phải số ×tỷ giá |
 | Bất kỳ màn nghiệp vụ nào | Thu còn **360px** → giãn tới **desktop**: không cuộn ngang toàn trang, không đè chữ (bảng dài cuộn trong khung riêng). Thử thêm cỡ chữ **130%** vẫn không vỡ |
-| Migration | Chạy lại file **hai lần** trên DB thật vẫn không lỗi (idempotent) |
+| Migration | Chạy lại file **hai lần** trên DB thật vẫn không lỗi (idempotent). Tên file + mọi định danh tiếng Anh (CI chặn migration > `0057` tạo tên Việt) |
 
 Preview chạy qua `preview_start` với cấu hình `baseafood-dev` (`.claude/launch.json`) — **không** chạy dev server bằng Bash.
 

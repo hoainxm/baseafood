@@ -1,7 +1,7 @@
 # Quy ước đặt tên + kế hoạch dọn tên tiếng Việt không dấu
 
 - **Ngày lập:** 2026-10-12
-- **Trạng thái:** CHỐT 2026-10-12 (chủ dự án duyệt 4 câu ở §6). §2 Luật áp dụng NGAY cho mọi thứ MỚI. §5 chạy theo đợt có lịch, **Đợt 0 → 4 xong 2026-10-13**; **Đợt 5 (5a + 5f) code xong 2026-10-13, chờ chủ dự án chạy `0059` + `0060` rồi mới deploy** (xem Kết quả Đợt 5); còn lại: tên TRƯỜNG dữ liệu trong `lib` + literal loại danh mục (xem Kết quả Đợt 4).
+- **Trạng thái:** CHỐT 2026-10-12 (chủ dự án duyệt 4 câu ở §6). §2 Luật áp dụng NGAY cho mọi thứ MỚI. §5 chạy theo đợt có lịch, **Đợt 0 → 4 xong 2026-10-13**; **Đợt 5 (5a + 5f) xong 2026-10-13** (`0059` + `0060` đã chạy trên DB thật, code đã deploy) (xem Kết quả Đợt 5); còn lại: tên TRƯỜNG dữ liệu trong `lib` + literal loại danh mục (xem Kết quả Đợt 4).
 - **Thay cho:** Phần B của [`routing-va-naming.md`](routing-va-naming.md) (dự thảo 2026-08-07; nửa DB + route của nó đã làm xong ở `0016` và đợt react-router).
 - **Liên quan:** [`CLAUDE.md`](../../CLAUDE.md) luật 8 · [`app-map/03-database.md`](../app-map/03-database.md) · [`app-map/04-tang-du-lieu.md`](../app-map/04-tang-du-lieu.md) · [`src/design-system/README.md`](../../src/design-system/README.md)
 
@@ -183,7 +183,7 @@ Phân bố khai báo tên Việt theo khu: `lib` 1.129 · `design-system` 301 ·
 
 ### Kết quả Đợt 5 (2026-10-13)
 
-Chủ dự án duyệt cả 5a + 5f, **tự chạy migration ở SQL Editor**, code commit nhưng CHỈ push sau khi migration đã chạy.
+Chủ dự án duyệt cả 5a + 5f, **tự chạy migration ở SQL Editor** (✅ 0059 rồi 0060, 2026-10-13), code chỉ push sau khi migration đã chạy.
 
 - **5a — giá trị enum lưu DB** (7 họ): `production_wips.status` `cho-nhap/da-nhap` → `pending/stocked` · `sales_orders.status` `dang-gom/du/dong` → `collecting/complete/closed` · `export_orders.status` `mo/dong` → `open/closed` · `storage_locations.kind` `noi-bo/thue-ngoai` → `internal/external` · `qc_checklists.result` `dat/tam/khong-dat` → `pass/conditional/fail` · `lot_inputs.method` + `lot_dispatches.method` `quet/go/chon` → `scan/typed/picked` (`fifo` giữ) · `audit_log.action` `them/sua/xoa/dang-nhap/dang-xuat/gui` → `create/update/delete/login/logout/submit`.
 - **Một nguồn cũ → mới:** `src/lib/legacyValues.ts` (`LEGACY_VALUES` + `normalize*`, có test). Code **ghi giá trị mới, đọc cả hai**: `fromRow` (dòng máy chủ chưa đổi) + `patchLegacy` (bộ đệm máy, hàng chờ offline) đi qua `normalize*`. Mặc định khi rỗng giữ như cũ.

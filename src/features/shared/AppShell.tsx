@@ -17,6 +17,7 @@ import {
   useKhopMedia,
 } from "@/design-system";
 import { cn } from "@/lib/utils";
+import { readDevicePrefJson, writeDevicePrefJson } from "@/lib/devicePrefs";
 import { BangCapNhat } from "./UpdateBanner";
 import {
   LayoutDashboard,
@@ -488,6 +489,8 @@ export interface AppShellProps {
 }
 
 const KEY_NAV_NHOM = "bsf1:nav-nhom";
+const isGroupFlags = (v: unknown): v is Record<string, boolean> =>
+  typeof v === "object" && v !== null && !Array.isArray(v);
 
 export default function AppShell({
   active,
@@ -522,21 +525,13 @@ export default function AppShell({
     active === "catalog" ? (activeTab ? `catalog?tab=${activeTab}` : "catalog") : active;
 
   // Trạng thái gập/mở từng nhóm (mặc định mở), nhớ theo máy.
-  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
-    try {
-      return JSON.parse(localStorage.getItem(KEY_NAV_NHOM) || "{}");
-    } catch {
-      return {};
-    }
-  });
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() =>
+    readDevicePrefJson(KEY_NAV_NHOM, {}, isGroupFlags),
+  );
   const toggleNhom = (ten: string) =>
     setOpenGroups((m) => {
       const next = { ...m, [ten]: m[ten] === false };
-      try {
-        localStorage.setItem(KEY_NAV_NHOM, JSON.stringify(next));
-      } catch {
-        /* bộ nhớ đầy / chặn cookie — bỏ qua, mặc định mở */
-      }
+      writeDevicePrefJson(KEY_NAV_NHOM, next);
       return next;
     });
 

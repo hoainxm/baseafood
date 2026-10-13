@@ -40,7 +40,7 @@ src/
 │   ├── auth.ts              useAuth + Supabase Auth — 05-bao-mat-phan-quyen.md
 │   ├── username.ts          họ tên → username + email tổng hợp
 │   ├── format.ts            num/kg/todayISO/viDate (locale vi-VN)
-│   ├── devicePrefs.ts       readDevicePref/writeDevicePref — cài đặt giao diện THEO MÁY (không phải số liệu); màn hình dùng cái này thay vì gọi localStorage (luật 4)
+│   ├── devicePrefs.ts       readDevicePref/writeDevicePref (+ `…Json`) — cài đặt giao diện THEO MÁY (không phải số liệu); màn hình dùng cái này thay vì gọi localStorage (luật 4)
 │   ├── store.ts             newId()
 │   └── utils.ts             cn()
 ├── components/ui/           primitive shadcn (style radix-nova), ĐÃ đè size cho người lớn tuổi

@@ -3,7 +3,7 @@
 // Tên tiếng Việt: Kiểu & hàm thuần của màn Sản xuất BTP (đầu phiên, dòng SX, tách râu/bao tử)
 // Description: Pure types/helpers for the WIP production screen — no React, unit-testable.
 // Tách khỏi WipProductionScreen.tsx (1810 dòng) ngày 2026-09-21 — KHÔNG đổi logic.
-// (KEY_WIP_* + docXuongNho đọc localStorage nên vẫn ở màn chính — luật §4.)
+// (KEY_WIP_* + đọc xưởng đã nhớ dùng lib/devicePrefs nên ở màn chính, giữ file này thuần.)
 // ============================================================
 import type { Workshop } from "@/types";
 import { newId } from "@/lib/store";

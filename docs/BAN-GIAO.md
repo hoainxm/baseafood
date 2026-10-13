@@ -96,7 +96,7 @@ src/
 - Chưa điền `.env` → chạy **localStorage** (số liệu nằm trên đúng 1 máy/trình duyệt, xóa lịch sử = mất sạch, không backup).
 - Điền `.env` → chạy **Supabase**, đồng thời ghi bản sao xuống localStorage (mất mạng giữa ca vẫn đối chiếu được).
 
-**Quy ước đặt tên DB: tiếng Việt KHÔNG DẤU, snake_case, không tiền tố** (`nhap_nguyen_lieu`, `so_luong_kg`). Cấm tên có dấu — Postgres bắt bọc nháy kép + dấu tiếng Việt có 2 dạng Unicode NFC/NFD trông giống hệt nhưng là 2 định danh khác nhau.
+**Quy ước đặt tên: tiếng ANH, snake_case ở DB / camelCase ở code, không tiền tố** (`material_imports`, `quantity_kg`) — đổi từ tiếng Việt không dấu ở `0016` (2026-08). Cấm tên có dấu. Luật mọi lớp + từ điển: [`spec/quy-uoc-dat-ten.md`](spec/quy-uoc-dat-ten.md). *(Danh sách 13 bảng dưới là tên trước `0016` — tên thật xem [`app-map/03-database.md`](app-map/03-database.md).)*
 
 **13 bảng:** `xi_nghiep` · `dai_ly` · `loai_nguyen_lieu` · `thanh_pham` (khóa chính = `ma`) · `mat_hang` · `khach_hang` · `chuyen_nhap` · `nhap_nguyen_lieu` · `chot_ngay` · `ky_can_doi` · `nguyen_lieu_vao` · `phe_lieu` · `thanh_pham_ra`.
 

@@ -2,7 +2,7 @@
 
 - **Tác giả:** AI Architect (Antigravity)
 - **Ngày lập:** 2026-08-07
-- **Trạng thái:** DỰ THẢO (Chờ phê duyệt)
+- **Trạng thái:** ĐÃ THỰC HIỆN một phần, LỊCH SỬ. Phần A (react-router v7, route tiếng Anh) đã build. Phần B: DB đổi sang tiếng Anh ở `0016`; luật đặt tên đủ mọi lớp + kế hoạch dọn lớp code nay ở [`quy-uoc-dat-ten.md`](quy-uoc-dat-ten.md) (2026-10-12). **Đừng lấy ví dụ route `/nhap-hang`, `/can-doi` dưới đây làm chuẩn.**
 - **Tài liệu liên quan:** 
   - [`CLAUDE.md`](../../CLAUDE.md)
   - [`docs/app-map/02-pages-navigation.md`](../app-map/02-pages-navigation.md)

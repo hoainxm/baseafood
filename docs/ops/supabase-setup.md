@@ -36,17 +36,11 @@ lấy ở Dashboard → Project Settings → API — **không ghi vào file nào
 | Policy | 6 | đọc/ghi cho 3 bảng trên |
 | Index | 5 | trên `events` |
 
-## Quy ước đặt tên: tiếng Việt KHÔNG DẤU
+## Quy ước đặt tên: tiếng ANH, snake_case
 
-**Có nên đặt tên bảng bằng tiếng Việt không?** Có — nhưng **bỏ dấu**.
-
-| Kiểu | Ví dụ | Kết luận |
-|---|---|---|
-| Tiếng Việt không dấu ✔ | `nhap_nguyen_lieu`, `so_luong_kg` | **Chọn cái này.** Người đọc sổ hiểu ngay, SQL viết trần không cần nháy |
-| Tiếng Việt có dấu ✘ | `"nhập_nguyên_liệu"` | Postgres cho phép nhưng phải bọc `"…"` ở **mọi** câu lệnh. Nguy hiểm hơn: dấu tiếng Việt có 2 cách mã hóa Unicode (NFC/NFD) trông y hệt nhau nhưng là **hai định danh khác nhau** — copy từ Word/Chrome về là gặp `relation does not exist` không hiểu vì sao. Công cụ migration, export CSV, log lỗi đều rối theo |
-| Tiếng Anh ✘ | `raw_materials` | Mất nghĩa nghiệp vụ với người dùng và kế toán |
-
-Cũng **bỏ tiền tố `mes_`** vì project này giờ chỉ phục vụ MES.
+> Mục này từng chọn "tiếng Việt không dấu". Quy ước đó **đã bỏ** từ `0016_rename_to_english.sql` (2026-08): mọi bảng/cột nay tiếng Anh snake_case, không tiền tố, cấm tên có dấu (Postgres bắt bọc nháy kép + dấu tiếng Việt có 2 dạng Unicode NFC/NFD trông giống hệt nhưng là 2 định danh khác nhau).
+>
+> Luật đầy đủ cho mọi lớp + từ điển thuật ngữ: [`spec/quy-uoc-dat-ten.md`](../spec/quy-uoc-dat-ten.md). Chi tiết DB: [`app-map/03-database.md`](../app-map/03-database.md).
 
 ## Schema mới — 11 bảng
 

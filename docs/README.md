@@ -9,7 +9,7 @@ File này trả lời **một câu**: *doc nào ở đâu, và doc mới bỏ v�
 |---|---|---|
 | [`app-map/`](app-map/README.md) | **viết code** — cần ngữ cảnh 1 chủ đề | Kiến trúc, invariant nghiệp vụ, cạm bẫy — *cái không suy được từ code* |
 | [`ops/`](ops/README.md) | **đưa app lên chạy** — cài đặt, deploy, cấu hình | Cutover Supabase, deploy Vercel, env, vận hành |
-| [`spec/`](spec/) | **trước khi build** — chốt kiến trúc/đặc tả | ADR, đặc tả kỹ thuật (vd routing, naming) |
+| [`spec/`](spec/) | **trước khi build** — chốt kiến trúc/đặc tả | ADR, đặc tả kỹ thuật (vd routing; **đặt tên: [`quy-uoc-dat-ten.md`](spec/quy-uoc-dat-ten.md)** — luật mọi lớp + từ điển thuật ngữ) |
 | [`trien-khai/`](trien-khai/README.md) | hiểu **vì sao nghiệp vụ vậy** | Phân tích gốc, 28 câu hỏi đã chốt, thiết kế flow, kế hoạch |
 | [`BAN-GIAO.md`](BAN-GIAO.md) | **tiếp nhận dự án** | Bối cảnh công ty, đầu mối liên hệ, câu treo với xí nghiệp |
 

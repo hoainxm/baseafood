@@ -51,7 +51,7 @@ Chi tiết + ranh giới import: [`01-app-structure.md`](docs/app-map/01-app-str
 5. Nhãn luôn hiện (không dùng placeholder thay nhãn); vùng chạm **theo mật độ của design-system** — mặc định "gọn" 36px, "vừa" 40px, "Thoáng" 44px chọn ở Cài đặt hiển thị (đừng ép cứng 44px; riêng ô số `LuoiNhap` ≥ 44px — [`README` §4 + §5b](src/design-system/README.md)); nút Lưu **không bao giờ** `disabled` (thiếu thì bắn `ErrorSummary`). **Mọi nút thao tác phải có `title` giải thích nút làm gì** khi rê chuột (trừ Hủy/Đóng) — luật + khuôn câu ở [`design-system/README.md` §9](src/design-system/README.md).
 6. Không xóa bản ghi nghiệp vụ theo kiểu lặng lẽ — dùng trạng thái; mọi xóa hiện tại qua `ConfirmDelete` + toast **Hoàn tác**.
 7. Danh mục thay nhập tự do: đại lý / loại NL / mặt hàng / khách hàng / kho lưu / bột tẩm chọn qua `Combobox` có **CẢ** tạo mới tại chỗ (`onCreate` — lưu ngay vào danh mục, trùng tên không phân hoa thường thì dùng lại bản có sẵn) **LẪN** bút chì sửa nhanh (`useSuaDanhMuc` → `onSuaMuc` + `nhanSua` + `suaDuoc` + `{sua.hop}`, truyền **đúng rows/setRows của màn**) ở **MỌI** ô nhập liệu dùng danh mục — kể cả ô mới thêm về sau. Ngoại lệ: ô lọc; danh sách cố định không phải danh mục (phân xưởng, loài, kho hệ thống, vai trò, kỳ…); 141 mã TK 1551 (chỉ chọn); màn DEMO; ô nằm trong form danh mục chỉ cần `onCreate`. Luật + mẫu + checklist: [`design-system/README.md` § Ô chọn danh mục](src/design-system/README.md#ô-chọn-danh-mục-luôn-có-thêm-mới--bút-chì-sửa-nhanh).
-8. Đặt tên DB: **tiếng Anh, snake_case, không tiền tố** (đã đổi từ tiếng Việt-không-dấu sang tiếng Anh ở migration `0016_rename_to_english.sql` — theo [`spec/routing-va-naming.md`](docs/spec/routing-va-naming.md)). Vẫn cấm tên có dấu (NFC/NFD trông giống hệt nhưng là 2 định danh). Bảng cũ tiếng Việt chỉ còn trong migration `0001…0015`.
+8. **Định danh kỹ thuật = tiếng Anh, chữ người dùng đọc = tiếng Việt có dấu** (chốt 2026-10-12, [`spec/quy-uoc-dat-ten.md`](docs/spec/quy-uoc-dat-ten.md)). Áp cho MỌI lớp: bảng/cột/hàm/policy DB (`snake_case`), giá trị enum lưu DB, biến/hàm/prop (`camelCase`), component/type (`PascalCase`), file, thư mục, route, `?tab=`, khóa localStorage, khóa `toMau`, CSS utility/`data-*` (`kebab-case`). **Cấm tiếng Việt không dấu cho mọi thứ MỚI** (`tinhTon`, `BangTong`, `_nguoi_dung`, `/ton-kho-thang`) — kể cả khi file xung quanh còn tên cũ; tên cũ là nợ có kế hoạch dọn (spec §5), không phải mẫu. Thuật ngữ dịch theo **từ điển §2b** của spec, không tự dịch. Cấm tên có dấu (NFC/NFD trông giống hệt nhưng là 2 định danh). Migration cũ `0001…0057` giữ nguyên.
 9. Brand `#17529c` (từ `public/baseafood-logo.png`).
 10. `npx shadcn add` **không chạy được trên Windows** (CLI quét ngược thư mục cha, đụng junction bị khóa quyền) — lấy component thủ công theo `src/design-system/README.md`.
 11. 🔒 Không ghi project ref / URL / key vào bất kỳ file nào trong repo.
@@ -62,11 +62,11 @@ Chi tiết + ranh giới import: [`01-app-structure.md`](docs/app-map/01-app-str
 
 ## Commit
 
-Conventional Commits, scope **tiếng Việt không dấu**, mô tả tiếng Việt có dấu:
+Conventional Commits, scope = **tên khu tiếng Anh trùng thư mục** (`imports`, `balancing`, `design-system`, `docs`… — đổi từ scope tiếng Việt không dấu ngày 2026-10-12, [`spec/quy-uoc-dat-ten.md`](docs/spec/quy-uoc-dat-ten.md) §6), mô tả tiếng Việt có dấu:
 
 ```
-feat(nhap-hang): chuyến thật, ghi bù chờ hóa đơn, chốt ngày
-fix(dong-bo): hàng chờ chống mất số liệu khi ghi máy chủ hụt
+feat(imports): chuyến thật, ghi bù chờ hóa đơn, chốt ngày
+fix(sync): hàng chờ chống mất số liệu khi ghi máy chủ hụt
 docs(app-map): bổ sung invariant phế liệu
 ```
 

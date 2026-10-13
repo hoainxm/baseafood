@@ -5,7 +5,8 @@
 // ============================================================
 import { useCallback, useEffect, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
-import { supabase, hasSupabase, SITE_ID, taoClientTam } from "@/lib/supabase";
+// Hồ sơ đăng nhập luôn ở site THẬT — kể cả khi đang chế độ demo (SITE_ID = site-demo).
+import { supabase, hasSupabase, SITE_ID_THAT as SITE_ID, taoClientTam } from "@/lib/supabase";
 import type { UserProfile, Role } from "@/types";
 import { rolesFromCsv, rolesToCsv, rolesList } from "@/types";
 import { emailToUsername, usernameToEmail } from "@/lib/username";

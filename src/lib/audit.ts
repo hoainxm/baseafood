@@ -4,6 +4,7 @@
 // Description: Append-only user action audit trail — capture + buffer + flush
 // ============================================================
 import { supabase, SITE_ID } from "@/lib/supabase";
+import { khoaLocal } from "@/lib/cheDo";
 import { uid } from "@/lib/db";
 
 /**
@@ -59,7 +60,8 @@ function layDeviceId(): string {
   }
 }
 
-const KEY_BUF = "bsf.audit.buffer";
+/** Buffer nhật ký — chế độ demo dùng vùng `bsf-demo.*` riêng (lib/cheDo.ts). */
+const KEY_BUF = khoaLocal("bsf.audit.buffer");
 const CAP = 3000; // giới hạn buffer để không nuốt hết quota localStorage
 
 function docBuffer(): NhatKy[] {

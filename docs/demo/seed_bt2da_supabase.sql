@@ -1,3 +1,4 @@
+-- ⛔ LỖI THỜI + CẤM CHẠY LÊN DB THẬT (2026-10-12) — từng là reset phá hủy. Dùng chế độ demo trong app (docs/demo/kich-ban-che-do-demo.md).
 -- ============================================================
 -- seed_bt2da_supabase.sql — Cân đối Bạch tuộc 2 da (kỳ 21–25/07/2026) LÊN SUPABASE
 -- ------------------------------------------------------------

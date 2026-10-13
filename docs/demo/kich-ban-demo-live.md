@@ -1,3 +1,5 @@
+> ⛔ **LỖI THỜI (2026-10-12)** — dùng **chế độ demo** trong app: [`kich-ban-che-do-demo.md`](kich-ban-che-do-demo.md). Giữ file này để tra cứu lịch sử; đừng làm theo.
+
 # Kịch bản demo LIVE — Cân đối Bạch tuộc 2 da (hệ thật Supabase)
 
 > Mục tiêu: khán giả thấy **hệ thống tính toán trực tiếp** khi thao tác — cao trào là nhập nốt vài dòng trên sân khấu để bảng cân đối **lật từ Lỗ sang Lãi** và **khớp đúng file giấy** (kỳ 21–25/07, các khách hàng thật).

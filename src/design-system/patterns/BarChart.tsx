@@ -36,6 +36,7 @@ export function BieuDoCot({
   duongTrungBinh = true,
   soDongToiDa = 12,
   giuThuTu = false,
+  giaTriTrungBinh,
   className,
 }: {
   data: CotBieuDo[];
@@ -50,6 +51,11 @@ export function BieuDoCot({
    * dần theo giá trị. Khi bật, `soDongToiDa` cắt từ đầu danh sách.
    */
   giuThuTu?: boolean;
+  /**
+   * Mốc vạch trung bình truyền sẵn (VD bình quân GIA QUYỀN của định mức) thay cho
+   * trung bình cộng các thanh. Có giá trị này thì nhãn TB không làm tròn.
+   */
+  giaTriTrungBinh?: number;
   className?: string;
 }) {
   const sap = giuThuTu ? [...data] : [...data].sort((a, b) => b.giaTri - a.giaTri);
@@ -58,9 +64,10 @@ export function BieuDoCot({
 
   const max = Math.max(1, ...hienThi.map((d) => d.giaTri));
   const tb =
-    data.length > 0
+    giaTriTrungBinh ??
+    (data.length > 0
       ? data.reduce((s, d) => s + d.giaTri, 0) / data.length
-      : 0;
+      : 0);
   const tbPct = Math.min(100, (tb / max) * 100);
 
   // Thanh "mọc" từ 0 → giá trị thật khi vào màn (và mượt theo khi số đổi).
@@ -143,7 +150,7 @@ export function BieuDoCot({
               aria-hidden
             >
               <span className="absolute -top-0.5 left-1 whitespace-nowrap rounded bg-warning px-1.5 py-0.5 text-xs font-semibold text-warning-foreground">
-                TB {dinhDang(Math.round(tb))}
+                TB {dinhDang(giaTriTrungBinh != null ? tb : Math.round(tb))}
                 {donViChu}
               </span>
             </div>

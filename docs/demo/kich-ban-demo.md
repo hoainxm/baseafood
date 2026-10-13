@@ -1,3 +1,5 @@
+> ⛔ **LỖI THỜI (2026-10-12)** — dùng **chế độ demo** trong app: [`kich-ban-che-do-demo.md`](kich-ban-che-do-demo.md). Giữ file này để tra cứu lịch sử; đừng làm theo.
+
 # Kịch bản demo — Nhập nguyên liệu → Cân đối kỳ (Baseafood MES)
 
 > Giao cho dev trình diễn báo cáo. Dữ liệu mẫu trích từ **2 file Excel thật**: *Bảng cân đối bạch tuộc 2 da* và *Báo cáo Nguyên Liệu–Bán Thành Phẩm 2025*. Mục tiêu buổi demo: chứng minh **dữ liệu nhập tay → hệ thống tự tính ra cân đối/lãi–lỗ**, không còn bấm máy tính tay.

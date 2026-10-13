@@ -293,3 +293,6 @@ export const useLotWaivers = () => useBang(BANG_LOT_WAIVER);
  *  Màn hình KHÔNG gọi thẳng: đi qua `ToMauProvider` (features/shared) gắn một lần
  *  ở ShellLayout, bảng bật bằng prop `toMau` của design-system. */
 export const useRowMarks = () => useBang(BANG_ROW_MARK);
+
+/** Nạp bộ demo hàng loạt không ghi nhật ký (lib/repo.ts) — chỉ NapGoiDemo dùng. */
+export { datTamTatNhatKy } from "@/lib/repo";

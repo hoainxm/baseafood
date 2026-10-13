@@ -1,5 +1,6 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
+import type { SacPhanLoai } from "./Nhan";
 
 /**
  * Thẻ thông tin (KPI card) — thay cho việc nhồi mọi số vào một dòng chữ.
@@ -17,6 +18,13 @@ export interface TheThongTin {
   phu?: React.ReactNode;
   icon?: React.ComponentType<{ className?: string; "aria-hidden"?: boolean }>;
   mau?: MauThe;
+  /**
+   * SẮC THEO LOẠI SỐ (bảng tone dùng chung với `Nhan`) — thẻ tô nền nhạt + viền trái
+   * đậm + số cùng màu, để mỗi loại (nhập · sản xuất · kho · bán…) nhận ra ngay và khớp
+   * màu với biểu đồ cùng màn. Có `sac` thì bỏ qua `mau` (trừ khi muốn báo tốt/xấu: khi
+   * đó dùng `mau`, đừng truyền `sac`).
+   */
+  sac?: SacPhanLoai;
   /** Số → tabular-nums cho thẳng cột. */
   so?: boolean;
   /** Nếu có → thẻ bấm được (drill-down tới dữ liệu). Thêm con trỏ + viền nổi khi rê. */
@@ -37,6 +45,19 @@ const MAU: Record<MauThe, { chip: string; vien: string }> = {
   },
   danger: { chip: "bg-destructive/10 text-destructive", vien: "border-destructive/30" },
   "trung-tinh": { chip: "bg-muted text-muted-foreground", vien: "border-border" },
+};
+
+/* Liệt kê TRỌN tên lớp (không ghép chuỗi) để Tailwind quét thấy. */
+const SAC_THE: Record<SacPhanLoai, { the: string; chip: string; so: string }> = {
+  tim: { the: "border-tone-tim-line bg-tone-tim-surface", chip: "bg-tone-tim text-white", so: "text-tone-tim" },
+  ngoc: { the: "border-tone-ngoc-line bg-tone-ngoc-surface", chip: "bg-tone-ngoc text-white", so: "text-tone-ngoc" },
+  bien: { the: "border-tone-bien-line bg-tone-bien-surface", chip: "bg-tone-bien text-white", so: "text-tone-bien" },
+  bang: { the: "border-tone-bang-line bg-tone-bang-surface", chip: "bg-tone-bang text-white", so: "text-tone-bang" },
+  cat: { the: "border-tone-cat-line bg-tone-cat-surface", chip: "bg-tone-cat text-white", so: "text-tone-cat" },
+  hong: { the: "border-tone-hong-line bg-tone-hong-surface", chip: "bg-tone-hong text-white", so: "text-tone-hong" },
+  la: { the: "border-tone-la-line bg-tone-la-surface", chip: "bg-tone-la text-white", so: "text-tone-la" },
+  cam: { the: "border-tone-cam-line bg-tone-cam-surface", chip: "bg-tone-cam text-white", so: "text-tone-cam" },
+  xam: { the: "border-tone-xam-line bg-tone-xam-surface", chip: "bg-tone-xam text-white", so: "text-tone-xam" },
 };
 
 const COT_LG: Record<number, string> = {
@@ -86,6 +107,7 @@ export function ThongKe({
     >
       {the.map((t) => {
         const mau = MAU[t.mau ?? "brand"];
+        const sac = t.sac ? SAC_THE[t.sac] : null;
         const Icon = t.icon;
         const isString = typeof t.giaTri === "string";
         const len = isString ? (t.giaTri as string).length : 0;
@@ -108,7 +130,7 @@ export function ThongKe({
               <span
                 className={cn(
                   "flex size-9 shrink-0 items-center justify-center rounded-lg",
-                  mau.chip
+                  sac ? sac.chip : mau.chip
                 )}
               >
                 <Icon className="size-5" aria-hidden />
@@ -120,7 +142,8 @@ export function ThongKe({
               </p>
               <p
                 className={cn(
-                  "min-w-0 text-foreground leading-tight",
+                  "min-w-0 leading-tight",
+                  sac ? sac.so : "text-foreground",
                   // Số & chuỗi ngắn để bold cho nổi; chuỗi vừa/dài (ngày…) chỉ
                   // semibold để hẹp hơn, vừa thẻ mà không cắt chữ.
                   t.so || len <= 7 ? "font-bold" : "font-semibold",
@@ -140,9 +163,10 @@ export function ThongKe({
           </>
         );
         const cls = cn(
-          "flex items-center gap-2.5 rounded-xl border bg-card px-3 py-3",
+          "flex items-center gap-2.5 rounded-xl border px-3 py-3",
+          sac ? cn("border-l-4", sac.the) : "bg-card",
           hep && "lg:flex-col lg:items-start lg:gap-2",
-          mau.vien
+          !sac && mau.vien
         );
         return t.onChon ? (
           <button

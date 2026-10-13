@@ -4,7 +4,7 @@
 // Description: Main Application Component & Router Setup
 // ============================================================
 // src/App.tsx
-import { lazy, Suspense, useEffect, type ReactElement } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import {
   HashRouter,
   Routes,
@@ -20,19 +20,17 @@ import { NotFound } from "@/features/shared";
 import AppShell, { KIT_NAV } from "@/features/shared/AppShell";
 import { ToMauProvider } from "@/features/shared/ToMauProvider";
 import { HUONG_DAN } from "@/features/shared/guideContent";
-import { Toaster, apDungCaiDatHienThi, DangXuLy } from "@/design-system";
+import { Toaster, apDungCaiDatHienThi, DangXuLy, EmptyState } from "@/design-system";
+import { Users } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { datNguoiThaoTac } from "@/lib/audit";
 import { roleLabel } from "@/types";
-import { allowedIds, homeFor, laDemo } from "@/lib/nav-access";
+import { allowedIds, homeFor } from "@/lib/nav-access";
+import { LA_DEMO, datCheDo } from "@/lib/cheDo";
+import { DaiDemo, NapGoiDemo } from "@/features/shared/CheDoDemo";
 
-// Module MES (màn trưng bày)
+// Tổng quan — dòng chảy số liệu
 const ManTongQuan = lazy(() => import("@/features/dashboard/DashboardScreen"));
-const ManLenhSX = lazy(() => import("@/features/production/WorkOrderScreen"));
-const ManChatLuong = lazy(() => import("@/features/quality/QualityScreen"));
-const ManTruyXuat = lazy(() => import("@/features/traceability/TraceabilityScreen"));
-const ManKhoLanh = lazy(() => import("@/features/cold-storage/ColdStorageScreen"));
-const ManBaoCao = lazy(() => import("@/features/reports/ReportsScreen"));
 
 // Màn nghiệp vụ gốc
 const NhapNguyenLieuScreen = lazy(() => import("@/features/imports"));
@@ -72,6 +70,13 @@ function ShellLayout() {
     apDungCaiDatHienThi(username);
   }, [username]);
 
+  // Chế độ demo CHỈ admin bật. Cờ nằm theo máy (localStorage) ⇒ người khác đăng nhập
+  // trên máy đó thì tự tắt, về số thật (không ai thấy số demo mà tưởng số xưởng).
+  const khongDuocDemo = LA_DEMO && auth.canDangNhap && !!auth.nguoiDung && !auth.laAdmin;
+  useEffect(() => {
+    if (khongDuocDemo) datCheDo(false);
+  }, [khongDuocDemo]);
+
   // Ai đang thao tác — cho nhật ký (audit) gắn đúng người.
   useEffect(() => {
     datNguoiThaoTac(
@@ -90,9 +95,7 @@ function ShellLayout() {
     : auth.laAdmin
       ? KIT_NAV
       : KIT_NAV.filter((n) => n.id !== "users" && n.id !== "audit");
-  // Màn demo (dữ liệu mẫu) chỉ admin thấy — người dùng thường không thấy để khỏi
-  // nhầm là số vận hành. Admin vẫn thấy, kèm cờ "DEMO" trong nav (AppShell).
-  const items = auth.laAdmin ? base : base.filter((n) => !laDemo(n.id));
+  const items = base;
 
   // Vào path ngoài bộ phận (gõ URL / link cũ) ⇒ đưa về trang chủ bộ phận.
   if (cacIdChoPhep && seg && !cacIdChoPhep.has(seg)) {
@@ -126,6 +129,8 @@ function ShellLayout() {
     >
       {/* Tô màu dòng "đã dò" — một nguồn row_marks cho mọi bảng (prop `toMau`). */}
       <ToMauProvider nguoi={username ?? ""}>
+        <DaiDemo />
+        <NapGoiDemo />
         <Suspense fallback={<DangXuLy chu="Đang mở màn hình…" />}>
           <Outlet />
         </Suspense>
@@ -137,10 +142,6 @@ function ShellLayout() {
 export default function App() {
   const auth = useAuth();
   const roles = auth.nguoiDung?.roles ?? [];
-
-  // Màn demo (dữ liệu mẫu) chỉ admin vào được; người khác gõ URL → về trang chủ.
-  const demoGuard = (el: ReactElement) =>
-    auth.laAdmin ? el : <Navigate to={`/${homeFor(roles)}`} replace />;
 
   // Đang lấy phiên đăng nhập từ máy chủ → tránh nháy màn login.
   if (auth.dangTai) {
@@ -170,12 +171,13 @@ export default function App() {
 
             {/* MES */}
             <Route path="/dashboard" element={<ManTongQuan />} />
-            {/* Màn DEMO (dữ liệu mẫu) — chỉ admin, xem lib/nav-access.ts DEMO_IDS */}
-            <Route path="/production" element={demoGuard(<ManLenhSX />)} />
-            <Route path="/quality" element={demoGuard(<ManChatLuong />)} />
-            <Route path="/cold-storage" element={demoGuard(<ManKhoLanh />)} />
-            <Route path="/reports" element={demoGuard(<ManBaoCao />)} />
-            <Route path="/traceability" element={demoGuard(<ManTruyXuat />)} />
+            {/* 5 màn DEMO dữ liệu mẫu đã GỠ (2026-10-12, spec che-do-demo) — link cũ
+                chuyển sang màn THẬT tương ứng. Trình diễn ⇒ chế độ demo, không màn mẫu. */}
+            <Route path="/production" element={<Navigate to="/wip" replace />} />
+            <Route path="/quality" element={<Navigate to="/qc" replace />} />
+            <Route path="/cold-storage" element={<Navigate to="/warehouse" replace />} />
+            <Route path="/reports" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/traceability" element={<Navigate to="/qr" replace />} />
 
             {/* Nghiệp vụ gốc */}
             <Route path="/imports" element={<NhapNguyenLieuScreen />} />
@@ -199,7 +201,15 @@ export default function App() {
             <Route
               path="/users"
               element={
-                auth.laAdmin ? (
+                auth.laAdmin && LA_DEMO ? (
+                  // Tài khoản + vai trò là THẬT (không thuộc bộ demo) — sửa ở đây dễ tưởng
+                  // đang sửa demo. Bắt thoát demo trước.
+                  <EmptyState
+                    icon={Users}
+                    tieuDe="Đang ở chế độ demo"
+                    moTa="Người dùng và vai trò là tài khoản thật, không thuộc bộ demo. Thoát demo (nút trên dải vàng) để quản lý người dùng."
+                  />
+                ) : auth.laAdmin ? (
                   <QuanLyNguoiDungScreen taoTaiKhoan={auth.taoTaiKhoan} />
                 ) : (
                   <Navigate to="/dashboard" replace />

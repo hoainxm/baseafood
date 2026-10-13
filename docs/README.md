@@ -13,7 +13,7 @@ File này trả lời **một câu**: *doc nào ở đâu, và doc mới bỏ v�
 | [`trien-khai/`](trien-khai/README.md) | hiểu **vì sao nghiệp vụ vậy** | Phân tích gốc, 28 câu hỏi đã chốt, thiết kế flow, kế hoạch |
 | [`BAN-GIAO.md`](BAN-GIAO.md) | **tiếp nhận dự án** | Bối cảnh công ty, đầu mối liên hệ, câu treo với xí nghiệp |
 
-> Ngoài 5 bucket trên: [`demo/`](demo/) chứa seed + kịch bản demo (**dữ liệu mẫu**, không phải tài liệu canonical); [`BAN-GIAO-tiep-theo.md`](BAN-GIAO-tiep-theo.md) = việc còn lại + go-live, đọc cùng [`BAN-GIAO.md`](BAN-GIAO.md).
+> Ngoài 5 bucket trên: [`demo/`](demo/) chứa kịch bản trình bày — dùng [`demo/kich-ban-che-do-demo.md`](demo/kich-ban-che-do-demo.md) (chế độ demo trong app); seed + kịch bản cũ trong đó **lỗi thời**, `seed_bt2da*.sql` cấm chạy lên DB thật; [`BAN-GIAO-tiep-theo.md`](BAN-GIAO-tiep-theo.md) = việc còn lại + go-live, đọc cùng [`BAN-GIAO.md`](BAN-GIAO.md).
 
 > Microcopy + luật UI **không** ở `docs/` — chúng nằm cạnh code tại
 > [`src/design-system/README.md`](../src/design-system/README.md) (luật giao diện) và

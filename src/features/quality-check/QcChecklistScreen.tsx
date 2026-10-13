@@ -10,6 +10,7 @@ import type { QcChecklistItem, QcResult, Workshop } from "@/types";
 import { isBackdatedQc } from "@/types";
 import { newId } from "@/lib/store";
 import { useQcChecklists, useQcLocks } from "@/lib/catalogRepo";
+import { luiNgay, qcTheoNgay } from "@/lib/dongChay";
 import { taiAnhLen, urlAnh, xoaAnh, coLuuAnh } from "@/lib/storage";
 import { todayISO, viDate } from "@/lib/format";
 import {
@@ -23,6 +24,7 @@ import {
   EmptyState,
   notify,
   type LuaChon,
+  BieuDoTheoNgay,
 } from "@/design-system";
 import { Camera, Lock, Plus, X } from "lucide-react";
 
@@ -121,6 +123,10 @@ export default function QcChecklistScreen() {
     ]);
     setThemTen("");
   };
+
+  // 30 ngày tới ngày đang xem — xu hướng chất lượng của xưởng.
+  const qc30 = useMemo(() => qcTheoNgay(rows, xuong, luiNgay(ngay, 29), ngay), [rows, xuong, ngay]);
+  const coQc30 = qc30.some((x) => x.dat + x.tam + x.khongDat > 0);
 
   const daCham = dongs.filter((d) => d.result);
   const soDat = daCham.filter((d) => d.result === "dat").length;
@@ -245,6 +251,24 @@ export default function QcChecklistScreen() {
           </Button>
         )}
       </div>
+
+      {/* Xu hướng 30 ngày — số chỉ tiêu đạt / tạm / không đạt mỗi ngày */}
+      {coQc30 && (
+        <section className="space-y-3 rounded-xl border-2 border-border p-4">
+          <h2 className="text-lg font-semibold text-foreground">30 ngày gần đây · xưởng {xuong}</h2>
+          <BieuDoTheoNgay
+            nhan={qc30.map((x) => `${x.ngay.slice(8, 10)}/${x.ngay.slice(5, 7)}`)}
+            donVi="chỉ tiêu"
+            cao={220}
+            moTa={`Số chỉ tiêu QC đạt, tạm, không đạt mỗi ngày — xưởng ${xuong}`}
+            chuoi={[
+              { khoa: "dat", ten: "Đạt", mau: "la", dang: "cot", giaTri: qc30.map((x) => x.dat) },
+              { khoa: "tam", ten: "Tạm (cần khắc phục)", mau: "cat", dang: "cot", giaTri: qc30.map((x) => x.tam) },
+              { khoa: "kd", ten: "Không đạt", mau: "hong", dang: "cot", giaTri: qc30.map((x) => x.khongDat) },
+            ]}
+          />
+        </section>
+      )}
 
       {/* Ghi bù: ngày cũ hoặc ngày đã chốt → bắt lý do */}
       {ghiBu && (

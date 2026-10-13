@@ -1,6 +1,7 @@
 > Load khi: bắt đầu bất kỳ task nào trong repo này và chưa biết phải đọc file nào.
 covers: docs/app-map/**
-last_verified: 2026-10-08
+last_verified: 2026-10-13
+<!-- re-verified: 2026-10-13 09:00 — index không thêm file app-map mới; 01–05 cập nhật cho chế độ demo + gỡ 5 màn DEMO (spec ../spec/che-do-demo.md). -->
 <!-- re-verified: 2026-10-08 14:30 — dòng định tuyến QR vẫn đúng sau khi lô NL tách theo loại (chi tiết ở spec §6e, doc 30 · 34 · 38 đã ghi); không thêm doc mới. -->
 <!-- updated: 2026-10-08 — dòng định tuyến "Truy xuất theo lô bằng QR" mở rộng theo đợt 2b (bán hàng, đơn đặt, chốt ngày bắt gắn lô, trừ tồn theo lô) + thêm trỏ 33-ban-hang. -->
 ttl_days: 90

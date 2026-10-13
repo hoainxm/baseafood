@@ -11,20 +11,10 @@ import type { Role } from "@/types";
  * admin) = xem đầy đủ — chỉ 2 bộ phận thao tác theo bước bị giới hạn nav cho gọn.
  */
 const DEPT_NHAP_HANG = ["imports", "warehouse", "nxt-nl", "ton-kho-thang", "qr", "catalog"];
-const DEPT_SAN_XUAT = ["wip", "packaging", "warehouse", "quality", "qc", "qr", "catalog"];
+const DEPT_SAN_XUAT = ["wip", "packaging", "warehouse", "qc", "qr", "catalog"];
 
-/**
- * Màn DEMO — còn dùng DỮ LIỆU MẪU, chưa nối bảng thật. Tạm CHỈ admin thấy (để
- * còn vào kiểm/hoàn thiện), gắn cờ "DEMO" trên nav. Người dùng thường không thấy
- * để khỏi nhầm là số liệu vận hành. Gỡ id khỏi đây khi màn đã nối dữ liệu thật.
- * (Tổng quan /dashboard KHÔNG nằm đây — đang được tổ chức lại bằng số thật.)
- */
-export const DEMO_IDS = ["production", "quality", "cold-storage", "reports", "traceability"];
-
-/** Màn này còn là demo (dữ liệu mẫu)? */
-export function laDemo(id: string): boolean {
-  return DEMO_IDS.includes(id);
-}
+// Màn DEMO dữ liệu mẫu (DEMO_IDS / laDemo) đã GỠ 2026-10-12 — trình diễn dùng chế độ
+// demo (docs/spec/che-do-demo.md, CLAUDE.md quy tắc 15), không thêm màn mẫu nữa.
 
 /** Vai trò bị giới hạn → tập nav id được phép thấy. */
 export const ALLOWED_NAV: Partial<Record<Role, string[]>> = {

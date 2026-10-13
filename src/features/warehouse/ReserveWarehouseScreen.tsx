@@ -8,6 +8,7 @@ import { useSearchParams } from "react-router-dom";
 import type { WipProductionItem } from "@/types";
 import { useExportItems, useLotDispatches, useLotInputs, usePackagings, useProducts, useSalesItems, useWipProductions } from "@/lib/catalogRepo";
 import { tinhTonChiTiet, truTonBTP, type LoTon } from "@/lib/inventory";
+import { tuoiTon } from "@/lib/dongChay";
 import {
   ChuThichBatBuoc,
   Button,
@@ -33,6 +34,8 @@ import {
   type Cot,
   type LoiNhap,
   type MucChon,
+  ThanhChiaPhan,
+  homNay,
 } from "@/design-system";
 import { kg, num, viDate } from "@/lib/format";
 import { AlertTriangle, CalendarRange, Camera, CameraOff, ClipboardList, PackageCheck, Scale, Search, Snowflake, Warehouse } from "lucide-react";
@@ -105,6 +108,7 @@ export default function KhoDuTruScreen() {
     [ton, locKho]
   );
   const tongTon = tonLoc.reduce((s, t) => s + t.conLai, 0);
+  const nhomTuoi = useMemo(() => tuoiTon(tonLoc, homNay()), [tonLoc]);
 
   const moDuyet = (s: WipProductionItem) => {
     setDuyet({
@@ -248,6 +252,26 @@ export default function KhoDuTruScreen() {
             . Kiểm lại phiếu bán / đóng gói, hoặc duyệt nhập kho mẻ còn chờ.
           </span>
         </div>
+      )}
+
+      {/* Hàng nằm kho bao lâu — đẩy lô cũ trước (FIFO). */}
+      {tongTon > 0 && (
+        <section className="space-y-3 rounded-xl border-2 border-border bg-card p-4">
+          <h2 className="text-lg font-semibold text-foreground">Hàng nằm kho bao lâu</h2>
+          <p className="text-sm text-muted-foreground">
+            Tồn {locKho ? `kho ${locKho}` : "mọi kho"} chia theo số ngày từ ngày sản xuất tới hôm nay. Phần nằm lâu nên xuất trước.
+          </p>
+          <ThanhChiaPhan
+            moTa="Tồn kho chia theo số ngày nằm kho"
+            phan={nhomTuoi.map((g) => ({
+              khoa: g.khoa,
+              nhan: g.nhan,
+              moTa: `${num(g.soLo)} lô`,
+              giaTri: g.kg,
+              sac: ({ "duoi-30": "la", "30-60": "cat", "60-90": "cam", "tren-90": "hong" } as const)[g.khoa],
+            }))}
+          />
+        </section>
       )}
 
       {/* Dung tích & Tải trọng 5 Kho BSF1 */}

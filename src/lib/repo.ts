@@ -5,6 +5,7 @@
 // ============================================================
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase, hasSupabase, SITE_ID } from "@/lib/supabase";
+import { dongLenMay, dongTuMay, khoaLenMay, khoaLocal } from "@/lib/cheDo";
 import { ketNoi } from "@/lib/connectivity";
 import { load, save } from "@/lib/db";
 import type {
@@ -1209,7 +1210,7 @@ export function docCho(raw: string | null): ChoDongBo {
 
 function napCho(localKey: string): ChoDongBo {
   try {
-    return docCho(localStorage.getItem(`${localKey}.cho`));
+    return docCho(localStorage.getItem(`${khoaLocal(localKey)}.cho`));
   } catch {
     return { them: [], xoa: [] };
   }
@@ -1218,9 +1219,9 @@ function napCho(localKey: string): ChoDongBo {
 /** Ghi hàng chờ. `false` = không ghi được (hết dung lượng) — người gọi phải báo. */
 function luuCho(localKey: string, cho: ChoDongBo): boolean {
   try {
-    if (cho.them.length === 0 && cho.xoa.length === 0)
-      localStorage.removeItem(`${localKey}.cho`);
-    else localStorage.setItem(`${localKey}.cho`, JSON.stringify(cho));
+    const k = `${khoaLocal(localKey)}.cho`;
+    if (cho.them.length === 0 && cho.xoa.length === 0) localStorage.removeItem(k);
+    else localStorage.setItem(k, JSON.stringify(cho));
     return true;
   } catch {
     return false;
@@ -1445,11 +1446,20 @@ async function dongBoMotLuot<T>(
         db
           .from(bang.table)
           .upsert(
-            ds.map((r) => ({ ...r, site_id: SITE_ID })),
+            // Khóa chính theo chế độ (demo ⇒ tiền tố `demo:`) + site — rào R1 (lib/cheDo.ts).
+            ds.map((r) => dongLenMay(r, khoa, SITE_ID)),
             { onConflict: khoa, defaultToNull: false },
           ),
       ),
-    xoa: (keys) => bocLoi(db.from(bang.table).delete().in(khoa, keys)),
+    // Xóa luôn lọc site (rào R2) + khóa theo chế độ: không lệnh xóa nào chạm được site khác.
+    xoa: (keys) =>
+      bocLoi(
+        db
+          .from(bang.table)
+          .delete()
+          .eq("site_id", SITE_ID)
+          .in(khoa, keys.map((k) => khoaLenMay(k))),
+      ),
   };
   const kq = await guiHangCho(bang, cho, dongHienTai(bang, rows, cho.them), cong);
 
@@ -1746,8 +1756,16 @@ export function gonChoNhatKy(v: unknown, truong = ""): unknown {
   return v;
 }
 
+/** Tạm tắt nhật ký thao tác — CHỈ khi nạp hàng loạt bộ demo (hàng nghìn dòng, không
+ *  phải thao tác của người dùng). Bật lại ngay sau khi nạp xong. */
+let tamTatNhatKy = false;
+export function datTamTatNhatKy(tat: boolean): void {
+  tamTatNhatKy = tat;
+}
+
 /** So danh sách cũ↔mới của một bảng, phát entry nhật ký thêm/sửa/xóa. */
 function nhatKyThayDoi<T>(bang: AnhXaBang<T>, cu: T[], next: T[]): void {
+  if (tamTatNhatKy) return;
   if (bang.table === "audit_log") return; // không tự lưu vết chính mình
   // Tô màu dòng chỉ là dấu trình bày (đã có marked_by/marked_at) — kế toán dò cả
   // trăm dòng một buổi, ghi nhật ký từng cú tô chỉ làm ngập /audit.
@@ -1874,7 +1892,11 @@ export function useBang<T>(bang: AnhXaBang<T>, seed: () => T[] = () => []) {
             for (const r of trang) thoRaw.push(r as Record<string, unknown>);
             if (trang.length < CO_TRANG) break;
           }
-          const may = thoRaw.map((r) => bang.fromRow(r));
+          // Bỏ tiền tố khóa demo; dòng không thuộc chế độ này (null) bỏ qua.
+          const may = thoRaw
+            .map((r) => dongTuMay(r, khoa))
+            .filter((r): r is Record<string, unknown> => r != null)
+            .map((r) => bang.fromRow(r));
 
           // Bảng rỗng lần đầu + máy này cũng chưa có gì → đẩy seed lên danh mục.
           if (laLanDau && may.length === 0) {
@@ -1888,7 +1910,7 @@ export function useBang<T>(bang: AnhXaBang<T>, seed: () => T[] = () => []) {
                 const { error: e2 } = await db
                   .from(bang.table)
                   .upsert(
-                    s0.map((x) => ({ ...bang.toRow(x), site_id: SITE_ID })),
+                    s0.map((x) => dongLenMay(bang.toRow(x), khoa, SITE_ID)),
                     { onConflict: khoa }
                   );
                 if (huy) return;

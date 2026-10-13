@@ -12,6 +12,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev", "--", "--mode", "demolocal", "--port", "5174"],
       "port": 5174
+    },
+    {
+      "name": "baseafood-demo-2",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--", "--mode", "demolocal", "--port", "5175", "--strictPort"],
+      "port": 5175
     }
   ]
 }

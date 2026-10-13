@@ -5,11 +5,13 @@
 // ============================================================
 // Bộ đệm localStorage cấp thấp. Màn hình KHÔNG gọi trực tiếp — đi qua
 // src/lib/repo.ts để chạy được cả hai chế độ (Supabase / chỉ máy này).
-// Khóa localStorage khai báo trong repo.ts (AnhXaBang.localKey).
+// Khóa localStorage khai báo trong repo.ts (AnhXaBang.localKey). Chế độ demo đổi
+// `bsf.*` → `bsf-demo.*` NGAY TẠI ĐÂY (lib/cheDo.ts) — bản sao thật không bị đụng.
+import { khoaLocal } from "@/lib/cheDo";
 
 export function load<T>(key: string): T[] {
   try {
-    const raw = localStorage.getItem(key);
+    const raw = localStorage.getItem(khoaLocal(key));
     return raw ? (JSON.parse(raw) as T[]) : [];
   } catch {
     return [];
@@ -23,7 +25,7 @@ export function load<T>(key: string): T[] {
  */
 export function save<T>(key: string, rows: T[]): boolean {
   try {
-    localStorage.setItem(key, JSON.stringify(rows));
+    localStorage.setItem(khoaLocal(key), JSON.stringify(rows));
     return true;
   } catch {
     return false;

@@ -54,6 +54,8 @@ import {
   notify,
   type Cot,
   type LoiNhap,
+  BieuDoCot,
+  ThanhChiaPhan,
 } from "@/design-system";
 import { useSuaDanhMuc } from "@/features/catalog/SuaDanhMucNhanh";
 import { num, viDate } from "@/lib/format";
@@ -861,6 +863,36 @@ function GhiChuKetQua({
           <KV k="Tỉ lệ thu hồi" v={kq.yieldRate == null ? "—" : num(kq.yieldRate)} />
         </div>
       </div>
+      {/* Lãi/lỗ đến từ đâu — hai thanh dễ đọc: tiền bán được vs tiền bỏ ra, và tiền bỏ
+          ra chia NL / chế biến. Cùng số calculateBalancing ở trên, không tính lại. */}
+      {!chuaCoTP && kq.costOfGoods > 0 && (
+        <div className="mt-5 grid gap-3 border-t-2 border-border pt-4">
+          <h3 className="text-base font-semibold text-foreground">
+            Lãi/lỗ đến từ đâu:{" "}
+            <span className={lai ? "text-success" : "text-destructive"}>
+              {lai ? "bán được nhiều hơn tiền bỏ ra" : "tiền bỏ ra nhiều hơn bán được"} {num(Math.abs(kq.profitOrLoss))} đ
+            </span>
+          </h3>
+          <BieuDoCot
+            data={[
+              { nhan: "Tiền bán được", phu: "giá trị xuất", giaTri: kq.exportValue },
+              { nhan: "Tiền bỏ ra", phu: "nguyên liệu + chế biến", giaTri: kq.costOfGoods },
+            ]}
+            giuThuTu
+            duongTrungBinh={false}
+            donVi="đ"
+          />
+          <p className="text-sm font-semibold text-foreground">Tiền bỏ ra gồm:</p>
+          <ThanhChiaPhan
+            donVi="đ"
+            moTa="Giá thành chia theo tiền nguyên liệu và chi phí chế biến"
+            phan={[
+              { khoa: "nl", nhan: "Tiền nguyên liệu", giaTri: kq.materialValue, sac: "bien" },
+              { khoa: "cb", nhan: "Chi phí chế biến", giaTri: kq.costOfGoods - kq.materialValue, sac: "tim" },
+            ]}
+          />
+        </div>
+      )}
     </section>
   );
 }

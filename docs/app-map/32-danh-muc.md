@@ -1,6 +1,7 @@
 > Load khi: sửa danh mục (đại lý, loại NL, mặt hàng, khách hàng) hay danh mục 141 mã thành phẩm.
 covers: src/features/catalog/CatalogScreen.tsx, src/features/catalog/FinishedGoodScreen.tsx, src/data/thanh-pham.json, src/design-system/patterns/CatalogCrudModal.tsx, src/lib/catalogRepo.ts, src/features/catalog/cauHinhDanhMuc.tsx, src/features/catalog/ChonBotDiKem.tsx
-last_verified: 2026-10-08
+last_verified: 2026-10-13
+<!-- re-verified: 2026-10-13 09:00 — catalogRepo chỉ thêm re-export `datTamTatNhatKy` (nạp bộ demo không ghi nhật ký); hook danh mục, seed 141 mã TK không đổi. Chế độ demo: danh mục của site-demo chép từ danh mục thật lúc sinh bộ (đại lý/khách ẩn tên tùy chọn). -->
 <!-- re-verified: 2026-10-08 10:20 — catalogRepo.ts chỉ thêm `useLotDispatches` / `useLotWaivers` (truy xuất QR, mig 0056); hook danh mục, seed mặt hàng, 141 mã TK 1551 KHÔNG đổi — doc này không cần sửa nội dung. -->
 ttl_days: 90
 <!-- updated: 2026-10-06 — tô màu dòng "đã dò" (mig 0055): `DanhMucCrud` nhận prop `toMau`; 6 tab danh mục bật `danh-muc-<tab>` (mat-hang · khach-hang · dai-ly · loai-nl · bot-tam · kho-luu), tab 141 mã bật `danh-muc-tp-141` (chỉ đánh dấu, vẫn không sửa mã). Không đổi dữ liệu danh mục. -->

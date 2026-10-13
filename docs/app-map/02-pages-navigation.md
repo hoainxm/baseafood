@@ -3,6 +3,8 @@ covers: src/App.tsx, src/features/shared/AppShell.tsx, src/features/shared/NotFo
 last_verified: 2026-10-12
 <!-- re-verified: 2026-10-12 15:20 — AppShell: thu/mở sidebar (thuGon), header/sidebar/drawer cùng chiều cao, drawer chân nút toàn cục; FIX drift `h-20` → thật là `h-16`, nay là token `h-header`. -->
 <!-- updated: 2026-10-12 — XOAY NGANG iPhone/iPad: thanh bên TỰ thu về dải icon ở 768–1023px (iPhone ngang, iPad dọc; `useKhopMedia(MEDIA_THANH_BEN_HEP)`), bấm nút thu/mở vẫn theo ý người dùng trong cùng cỡ màn. Chiều cao header = token `--spacing-header` (`h-header`/`top-header`), máy ngang thấp (cao ≤ 500px) thu 4rem→3rem + ẩn dòng breadcrumb + đệm trang 16px + chân drawer bỏ dòng tên. Khung có vùng an toàn tai thỏ/thanh Home (`px-an-toan`, `pb-an-toan`). Đổi màn: fade `hien-mo` (chỉ opacity). Không đổi route/nav/gate. -->
+<!-- updated: 2026-10-12 (b) — GỠ 5 màn DEMO (`/production`, `/quality`, `/cold-storage`, `/reports`, `/traceability`): xóa khỏi KIT_NAV + CAY_NAV, route giữ lại chỉ để CHUYỂN HƯỚNG link cũ (→ `/wip`, `/qc`, `/warehouse`, `/dashboard`, `/qr`). `DEMO_IDS` / `laDemo` / `demoGuard` đã bỏ (cờ `demo` trên mục nav còn trong code nhưng không mục nào dùng). CHẾ ĐỘ DEMO thay thế: `ShellLayout` gắn `DaiDemo` (dải vàng dính dưới header, luôn hiện khi demo) + `NapGoiDemo`; `/users` khi đang demo hiện thông báo "thoát demo để quản lý người dùng"; người không phải admin bật cờ demo trên máy ⇒ tự tắt. Tổng quan có khối "Chế độ demo" (admin). Spec: ../spec/che-do-demo.md. -->
+<!-- updated: 2026-10-12 — `/dashboard` (Tổng quan) dựng lại thành "dòng chảy số liệu" (spec ../spec/che-do-demo.md §5b): bộ lọc kỳ + xưởng, 8 thẻ KPI, thanh lọc gọn một hàng (kỳ bấm nhanh · lùi/tiến · xưởng), thẻ tô màu theo loại số, băng chuyền 5 khâu, hai thanh chia phần "nguyên liệu đi đâu" (thay sankey), việc cần đốc (mở đúng màn sửa), nhập/SX + tồn theo ngày, kết quả các kỳ cân đối, định mức theo mặt hàng, tồn theo kho NXT. Bỏ bảng "Biến động lớn trong kỳ". Route / nhãn nav / gate KHÔNG đổi. -->
 <!-- re-verified: 2026-10-08 14:30 — guideContent.qr chỉ sửa câu "Mã lô là gì" (lô NL = mỗi loại NL của chuyến, mỗi tem một loại); route / nav / gate / tab `/qr` KHÔNG đổi. -->
 <!-- updated: 2026-10-08 (b) — `/qr` 3 tab: **Tra lô** · **Theo giai đoạn** (`?tab=giai-doan`, GiaiDoanTruyXuat: 5 khâu nhập NL → SX → nhập kho → đóng gói → xuất/bán, trạng thái từng lô + nút làm tại chỗ) · **In tem hàng loạt** (`?tab=in`). Tab "Độ phủ" (`?tab=do-phu`, có vài giờ) GỘP vào Theo giai đoạn — link cũ vẫn mở tab mới. Điện thoại (< sm) nhãn ngắn "Tra lô · Giai đoạn · In tem", bỏ icon. LINK MỞ THẲNG HỘP (deep-link, gỡ tham số sau khi xử lý): `/warehouse?duyet=W:<id mẻ>` ⇒ hộp Duyệt nhập kho đúng mẻ; `/orders?don=<id đơn>&kiem=<id lệnh xuất>` ⇒ mở đơn + hộp Kiểm lô. `?lo=` vẫn luôn mở tab Tra. Hộ chiếu lô có mục Thu hồi (ThuHoiLo). Route / nhãn nav / gate KHÔNG đổi. Chi tiết: ../spec/qr-truy-xuat-lo.md §6d. -->
 <!-- updated: 2026-10-06 — `ShellLayout` (App.tsx) bọc `<Outlet>` trong `ToMauProvider` (features/shared): một nguồn dấu tô màu dòng `row_marks` (mig 0055) cho mọi bảng trên mọi màn. Không đổi route/nav. -->
@@ -57,10 +59,10 @@ Cả hai dùng CHUNG một cây nav (`CayNav`) dựng từ `KIT_NAV` (danh sách
 |---|---|
 | Tổng quan | `dashboard` |
 | Nhập hàng | `imports` · `nxt-nl` · (**Tra cứu** → `catalog?tab=dai-ly`) |
-| Sản xuất | `wip` · `packaging` · `qc` · (**Tra cứu** → `catalog?tab=mat-hang`) · `production` · `quality` |
-| Kho | `warehouse` · `ton-kho-thang` · `qr` · `nxt-kho` · `cold-storage` · (**Tra cứu** → `catalog?tab=kho-luu`) |
+| Sản xuất | `wip` · `packaging` · `qc` · (**Tra cứu** → `catalog?tab=mat-hang`) |
+| Kho | `warehouse` · `ton-kho-thang` · `qr` · `nxt-kho` · (**Tra cứu** → `catalog?tab=kho-luu`) |
 | Kinh doanh | `sales` · `orders` · (**Tra cứu** → `catalog?tab=khach-hang`) |
-| Báo cáo & Cân đối | `balancing` · `bc-thanh-pham` · `bc-don-xuat` · `nxt` · `doi-soat` · `reports` · `traceability` |
+| Báo cáo & Cân đối | `balancing` · `bc-thanh-pham` · `bc-don-xuat` · `nxt` · `doi-soat` |
 | Hệ thống | `catalog` (danh mục đầy đủ) · `users` (chỉ admin) · `audit` (chỉ admin) |
 
 - **Gập/mở**: mỗi nhóm là nút gập/mở (chevron), nhớ trạng thái theo máy (`localStorage bsf1:nav-nhom`, mặc định MỞ). Nhóm chỉ 1 màn (Tổng quan) hiện thẳng, không có tiêu đề gập.
@@ -90,7 +92,6 @@ Cỡ chữ / trạng thái kết nối **không còn ở chân sidebar** (đã d
 | — | — | Đăng nhập | `features/auth/LoginScreen.tsx` | Màn chặn đăng nhập toàn app (không có route, gate ở `App.tsx`) |
 | `/imports` | `imports` | Nhập hàng | `features/imports/ImportTab.tsx` | Mặc định khi mở app. Bọc 2 tab: **Sổ** (`MaterialImportScreen`) + **Báo cáo** (`ImportReport`) |
 | `/wip` | `wip` | Sản xuất thành phẩm | `features/production/WipProductionScreen.tsx` | Màn THẬT — ghi sản lượng thành phẩm ngày (WIP). Nhãn dùng "thành phẩm" khớp copy trong màn |
-| `/production` | `production` | Lệnh sản xuất | `features/production/WorkOrderScreen.tsx` | 🔶 DEMO (dữ liệu mẫu, admin-only + badge). ĐỪNG nhầm với `/wip` |
 | `/sales` | `sales` | Bán hàng | `features/sales/SalesTab.tsx` | Bọc 2 tab: **Sổ** (`SalesScreen`) + **Báo cáo** (`SalesReport`) |
 | `/warehouse` | `warehouse` | Kho dự trữ | `features/warehouse/ReserveWarehouseScreen.tsx` | Duyệt nhập kho, theo dõi tồn đông |
 | `/orders` | `orders` | Đơn đặt | `features/orders/SalesOrderScreen.tsx` | Gom đơn và lệnh xuất |
@@ -101,11 +102,11 @@ Cỡ chữ / trạng thái kết nối **không còn ở chân sidebar** (đã d
 | `/audit` | `audit` | Nhật ký thao tác | `features/audit/AuditLogScreen.tsx` | **Chỉ Admin** — đọc `audit_log` (nhật ký thao tác); lọc + xuất Excel. Xem [04-tang-du-lieu.md](04-tang-du-lieu.md) §Nhật ký |
 | `/kit` | — | Bộ giao diện | `design-system/kit/KitPage.tsx` | Trang demo component. **Đã gỡ khỏi sidebar** — vào bằng URL, desktop-only |
 
-Ngoài bảng trên, khung còn các màn MES: `/dashboard` (Tổng quan) · `/quality` (Chất lượng, DEMO) · `/cold-storage` (Kho lạnh, DEMO) · `/reports` (Báo cáo tổng, DEMO) · `/traceability` (Truy xuất nguồn gốc, DEMO).
+Ngoài bảng trên: `/dashboard` (Tổng quan — **dòng chảy số liệu**, `features/dashboard/DashboardScreen.tsx`, số từ `lib/dongChay.ts`; có khối "Chế độ demo" cho admin). Năm màn DEMO dữ liệu mẫu cũ (`/production`, `/quality`, `/cold-storage`, `/reports`, `/traceability`) **đã gỡ** — route chỉ còn để chuyển link cũ sang màn thật.
 
 Sổ kho theo THÁNG dương lịch: `/ton-kho-thang` (`features/monthly-stock/MonthlyStockScreen.tsx` — dồn tồn cuối kỳ tháng N → tồn đầu kỳ N+1, cho mọi đối tượng NL/BTP/TP, đủ cột kiện+kg như bảng kê kho; xem [36-so-kho-thang.md](36-so-kho-thang.md)).
 
-Cụm báo cáo khép vòng (đọc dữ liệu thật, không mock): `/bc-thanh-pham` (`features/reports/DailyProductionReport.tsx` — tổng hợp thành phẩm SX hàng ngày, lưới mặt hàng×ngày + Excel) · `/bc-don-xuat` (`features/reports/OrderExportReport.tsx` — đơn đặt được xuất theo kỳ + Excel) · `/nxt-nl` (`features/reports/MaterialNxtScreen.tsx` — NXT nguyên liệu) · `/nxt` (`features/reports/NxtReportScreen.tsx` — NXT thành phẩm, suy từ SX/đơn/bán + tồn đầu). Lưu ý: `/production` là màn TRƯNG BÀY (WorkOrderScreen, mock); màn ghi sản lượng thật là `/wip`.
+Cụm báo cáo khép vòng (đọc dữ liệu thật, không mock): `/bc-thanh-pham` (`features/reports/DailyProductionReport.tsx` — tổng hợp thành phẩm SX hàng ngày, lưới mặt hàng×ngày + Excel) · `/bc-don-xuat` (`features/reports/OrderExportReport.tsx` — đơn đặt được xuất theo kỳ + Excel) · `/nxt-nl` (`features/reports/MaterialNxtScreen.tsx` — NXT nguyên liệu) · `/nxt` (`features/reports/NxtReportScreen.tsx` — NXT thành phẩm, suy từ SX/đơn/bán + tồn đầu). Màn ghi sản lượng là `/wip` (`/production` cũ chuyển về đây).
 
 Đối soát hóa đơn điện tử: `/doi-soat` (`features/doi-soat/DoiSoatScreen.tsx` — upload 1 file Excel gồm các sheet HĐĐT cổng thuế + sheet PHẦN MỀM kế toán, đối chiếu theo `MST bán · ký hiệu · số HĐ chuẩn`, quy về VND, ngưỡng khớp chỉnh được; xuất lại Excel tô màu. Công cụ kế toán, KHÔNG đọc DB/`repo.ts`; logic thuần ở `lib/doiSoatHddt.ts`. Xem [37-doi-soat-hddt.md](37-doi-soat-hddt.md)).
 

@@ -5,6 +5,7 @@
 // ============================================================
 import { supabase } from "./supabase";
 import { uid } from "./db";
+import { LA_DEMO, SITE_DEMO } from "./cheDo";
 
 /**
  * Lưu ảnh sổ sách (ảnh QC chấm điểm, sau này ảnh phiếu tay OCR) trên **Supabase
@@ -23,12 +24,13 @@ const BUCKET = "qc";
 /** true khi có Supabase → mới hiện nút chụp/chọn ảnh. */
 export const coLuuAnh = Boolean(supabase);
 
-/** Path khóa file trong bucket: bsf1/qc/<yyyy>/<mm>/<uid>.jpg (chia tháng cho đỡ phình). */
+/** Path khóa file trong bucket: bsf1/qc/<yyyy>/<mm>/<uid>.jpg (chia tháng cho đỡ phình).
+ *  Chế độ demo ⇒ thư mục `site-demo/…` riêng (rào R5), ảnh demo không lẫn ảnh thật. */
 function duongDanAnh(): string {
   const d = new Date();
   const yyyy = d.getFullYear();
   const mm = String(d.getMonth() + 1).padStart(2, "0");
-  return `bsf1/qc/${yyyy}/${mm}/${uid()}.jpg`;
+  return `${LA_DEMO ? SITE_DEMO : "bsf1"}/qc/${yyyy}/${mm}/${uid()}.jpg`;
 }
 
 /**

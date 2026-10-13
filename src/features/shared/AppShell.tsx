@@ -20,13 +20,9 @@ import { cn } from "@/lib/utils";
 import { BangCapNhat } from "./UpdateBanner";
 import {
   LayoutDashboard,
-  ClipboardList,
   ClipboardCheck,
   QrCode,
-  ShieldCheck,
-  ThermometerSnowflake,
   BarChart3,
-  GitBranch,
   Truck,
   ShoppingCart,
   Snowflake,
@@ -85,14 +81,11 @@ export interface MucNavShell {
 /** id = path route. Danh sách phẳng (icon/nhãn/cờ demo) — thứ tự & gom nhóm do CAY_NAV quyết định. */
 export const KIT_NAV: MucNavShell[] = [
   { id: "dashboard", label: "Tổng quan", icon: LayoutDashboard , moTa: "Trang tổng quan: số liệu nổi bật trong ngày và lối tắt sang các màn hay dùng." },
-  { id: "production", label: "Lệnh sản xuất", icon: ClipboardList, demo: true , moTa: "Lệnh sản xuất theo dây chuyền (màn DEMO — đang dùng dữ liệu mẫu)." },
   { id: "wip", label: "Sản xuất thành phẩm", icon: Factory , moTa: "Ghi sản lượng thành phẩm làm ra mỗi ngày theo xưởng, chốt ngày và gửi báo cáo." },
   { id: "packaging", label: "Đóng gói", icon: Package , moTa: "Ghi phiếu đóng gói: trừ bán thành phẩm đem đóng, cộng thành phẩm ra, tính hao hụt." },
-  { id: "quality", label: "Chất lượng", icon: ShieldCheck, demo: true , moTa: "Theo dõi điểm kiểm soát chất lượng (màn DEMO — đang dùng dữ liệu mẫu)." },
   { id: "qc", label: "Kiểm tra QC", icon: ClipboardCheck , moTa: "Bảng kiểm QC chấm điểm cuối ngày theo từng chỉ tiêu, có chốt ngày và ghi bù." },
   { id: "imports", label: "Nhập hàng", icon: Truck , moTa: "Ghi chuyến nguyên liệu mua về mỗi ngày, ghi bù chờ hóa đơn và chốt sổ ngày." },
   { id: "warehouse", label: "Kho dự trữ", icon: Snowflake , moTa: "Kho dự trữ: duyệt lô bán thành phẩm từ chờ sang đã nhập kho và xem tồn." },
-  { id: "cold-storage", label: "Kho lạnh", icon: ThermometerSnowflake, demo: true , moTa: "Theo dõi nhiệt độ kho lạnh (màn DEMO — đang dùng dữ liệu mẫu)." },
   { id: "qr", label: "Mã lô QR", icon: QrCode , moTa: "Quét tem lô (hoặc gõ mã) để tra nguồn gốc; in tem QR hàng loạt cho nguyên liệu, bán thành phẩm, thành phẩm." },
   { id: "sales", label: "Bán hàng", icon: ShoppingCart , moTa: "Ghi phiếu bán hàng: khách, kênh bán, quy cách và các dòng mặt hàng." },
   { id: "orders", label: "Đơn đặt", icon: PackageCheck , moTa: "Đơn đặt hàng xuất khẩu và lệnh xuất lấy hàng theo FIFO từ tồn kho." },
@@ -104,8 +97,6 @@ export const KIT_NAV: MucNavShell[] = [
   { id: "nxt-kho", label: "Nhập xuất tồn kho", icon: Warehouse , moTa: "Sổ Nhập–Xuất–Tồn theo báo cáo thật của xí nghiệp, kèm cột hàng đang nằm ở kho nào." },
   { id: "ton-kho-thang", label: "Sổ kho theo tháng", icon: CalendarRange , moTa: "Sổ kho theo tháng dương lịch cho cả nguyên liệu, bán thành phẩm và thành phẩm — tồn cuối tháng này tự thành tồn đầu tháng sau." },
   { id: "doi-soat", label: "Đối soát hóa đơn điện tử", icon: FileCheck2 , moTa: "Đối soát sổ phần mềm với hóa đơn điện tử, tìm dòng lệch và lưu bản đối soát." },
-  { id: "reports", label: "Báo cáo tổng", icon: BarChart3, demo: true , moTa: "Báo cáo tổng hợp (màn DEMO — đang dùng dữ liệu mẫu)." },
-  { id: "traceability", label: "Truy xuất nguồn gốc", icon: GitBranch, demo: true , moTa: "Truy xuất nguồn gốc lô hàng (màn DEMO — đang dùng dữ liệu mẫu)." },
   { id: "catalog", label: "Danh mục", icon: Library , moTa: "Danh mục dùng chung: mặt hàng, khách hàng, đại lý, loại nguyên liệu, bột tẩm, kho lưu trữ, thành phẩm." },
   { id: "users", label: "Người dùng", icon: Users , moTa: "Quản lý tài khoản đăng nhập và vai trò của từng người." },
   { id: "audit", label: "Nhật ký thao tác", icon: History , moTa: "Nhật ký thao tác: ai sửa gì, lúc nào, giá trị trước và sau." },
@@ -163,8 +154,6 @@ export const CAY_NAV: NhomCay[] = [
       { ref: "packaging" },
       { ref: "qc" },
       TRACUU("mat-hang"),
-      { ref: "production" },
-      { ref: "quality" },
     ],
   },
   {
@@ -175,7 +164,6 @@ export const CAY_NAV: NhomCay[] = [
       { ref: "ton-kho-thang" },
       { ref: "qr" },
       { ref: "nxt-kho" },
-      { ref: "cold-storage" },
       TRACUU("kho-luu"),
     ],
   },
@@ -193,8 +181,6 @@ export const CAY_NAV: NhomCay[] = [
       { ref: "bc-don-xuat" },
       { ref: "nxt" },
       { ref: "doi-soat" },
-      { ref: "reports" },
-      { ref: "traceability" },
     ],
   },
   {

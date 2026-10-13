@@ -1,3 +1,4 @@
+// ⛔ LỖI THỜI (2026-10-12) — ghi đè khóa bsf.* (vùng số THẬT của trình duyệt). Dùng chế độ demo trong app (docs/demo/kich-ban-che-do-demo.md).
 // ============================================================
 // demo-seed.js — Nạp dữ liệu mẫu DEMO cho Baseafood MES (chế độ localStorage)
 // ------------------------------------------------------------

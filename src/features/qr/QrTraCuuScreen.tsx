@@ -36,7 +36,7 @@ import {
   type NhanhCay,
   type NutLo,
 } from "@/lib/truyXuatLo";
-import { Button, EmptyState, Field, Input, InfoTip, Nhan, sacTheoTen } from "@/design-system";
+import { Button, EmptyState, Field, Input, InfoTip, Nhan, sacTheoTen, ThanhChiaPhan } from "@/design-system";
 import { ArrowDownRight, ArrowUpLeft, Camera, CameraOff, ListChecks, Printer, Scale, Search, Tags } from "lucide-react";
 import type { LotKind } from "@/types";
 import { cn } from "@/lib/utils";
@@ -372,6 +372,21 @@ export default function QrTraCuuScreen() {
                     )}
                   </div>
                 </div>
+                {/* Lô này đi đâu — một thanh 100% kg của lô, chia theo ngả đã đi + phần còn. */}
+                {canBang.vao > 0 && canBang.ra.length > 0 && (
+                  <ThanhChiaPhan
+                    moTa="Khối lượng của lô chia theo nơi đã đi tới"
+                    phan={[
+                      ...canBang.ra.map((r, i) => ({
+                        khoa: `ra-${i}`,
+                        nhan: r.nhan,
+                        giaTri: r.kg,
+                        sac: (["tim", "la", "bang", "hong", "cam", "bien"] as const)[i % 6],
+                      })),
+                      ...(canBang.con > 0 ? [{ khoa: "con", nhan: "Còn lại (theo hồ sơ lô)", giaTri: canBang.con, sac: "ngoc" as const }] : []),
+                    ]}
+                  />
+                )}
                 {canBang.chuaCan > 0 && (
                   <p className="text-muted-foreground">
                     Có {canBang.chuaCan} lần gắn lô chưa ghi kg — số "còn lại" chưa trừ phần đó.

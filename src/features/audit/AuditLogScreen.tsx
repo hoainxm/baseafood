@@ -33,7 +33,7 @@ import { exportAoaToXlsx, type OExcel } from "@/lib/reportXlsx";
 import { FileSpreadsheet, History, RefreshCw, Users } from "lucide-react";
 
 /** Nhãn tiếng Việt của bảng (đối tượng bị tác động). */
-const NHAN_BANG: Record<string, string> = {
+const TABLE_LABELS: Record<string, string> = {
   material_imports: "Nhập nguyên liệu",
   import_shipments: "Chuyến nhập",
   daily_locks: "Chốt ngày nhập",
@@ -60,16 +60,16 @@ const NHAN_BANG: Record<string, string> = {
   finished_goods_opening_stock: "Tồn đầu thành phẩm",
   auth: "Đăng nhập / xuất",
 };
-const nhanBang = (e: string) => NHAN_BANG[e] ?? e;
+const tableLabel = (e: string) => TABLE_LABELS[e] ?? e;
 
-const NHAN_LOAI: Record<string, string> = {
+const ACTION_LABELS: Record<string, string> = {
   them: "Thêm",
   sua: "Sửa",
   xoa: "Xóa",
   "dang-nhap": "Đăng nhập",
   "dang-xuat": "Đăng xuất",
 };
-const LOAI_OPT: MucChon[] = [
+const ACTION_OPTIONS: MucChon[] = [
   { value: "", label: "Tất cả thao tác" },
   { value: "them", label: "Thêm" },
   { value: "sua", label: "Sửa" },
@@ -78,13 +78,13 @@ const LOAI_OPT: MucChon[] = [
   { value: "dang-xuat", label: "Đăng xuất" },
 ];
 
-function bienNgay(iso: string): string {
+function formatDate(iso: string): string {
   if (!iso) return "";
   const d = new Date(iso);
   return Number.isNaN(d.getTime()) ? iso : d.toLocaleString("vi-VN");
 }
 
-function batDauThang(): string {
+function monthStart(): string {
   const t = homNay();
   return `${t.slice(0, 7)}-01`;
 }
@@ -95,41 +95,41 @@ function batDauThang(): string {
  * client. Xem chi tiết trước→sau trong hộp thoại. Xuất Excel.
  */
 export default function NhatKyScreen() {
-  const [tu, setTu] = useState(batDauThang());
+  const [tu, setTu] = useState(monthStart());
   const [den, setDen] = useState(homNay());
-  const [loai, setLoai] = useState("");
+  const [actionFilter, setActionFilter] = useState("");
   const [bang, setBang] = useState("");
-  const [nguoi, setNguoi] = useState("");
-  const [timKiem, setTimKiem] = useState("");
+  const [user, setUser] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
 
   const [rows, setRows] = useState<NhatKy[]>([]);
-  const [dangTai, setDangTai] = useState(true);
-  const [chiTiet, setChiTiet] = useState<NhatKy | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [detail, setDetail] = useState<NhatKy | null>(null);
 
   useEffect(() => {
     let huy = false;
-    setDangTai(true);
-    docNhatKy({ tu, den, loai: loai || undefined, bang: bang || undefined, gioiHan: 1000 })
+    setIsLoading(true);
+    docNhatKy({ tu, den, loai: actionFilter || undefined, bang: bang || undefined, gioiHan: 1000 })
       .then((r) => {
         if (!huy) setRows(r);
       })
       .finally(() => {
-        if (!huy) setDangTai(false);
+        if (!huy) setIsLoading(false);
       });
     return () => {
       huy = true;
     };
-  }, [tu, den, loai, bang]);
+  }, [tu, den, actionFilter, bang]);
 
-  const taiLai = () => {
-    setDangTai(true);
-    docNhatKy({ tu, den, loai: loai || undefined, bang: bang || undefined, gioiHan: 1000 })
+  const reload = () => {
+    setIsLoading(true);
+    docNhatKy({ tu, den, loai: actionFilter || undefined, bang: bang || undefined, gioiHan: 1000 })
       .then(setRows)
-      .finally(() => setDangTai(false));
+      .finally(() => setIsLoading(false));
   };
 
   // Tùy chọn người + bảng suy từ dữ liệu đang có.
-  const optNguoi: MucChon[] = useMemo(() => {
+  const userOptions: MucChon[] = useMemo(() => {
     const set = new Set(rows.map((r) => r.actorUsername).filter(Boolean));
     return [{ value: "", label: "Tất cả người" }, ...[...set].sort().map((u) => ({ value: u, label: u }))];
   }, [rows]);
@@ -138,48 +138,48 @@ export default function NhatKyScreen() {
     const set = new Set(rows.map((r) => r.entity).filter(Boolean));
     return [
       { value: "", label: "Tất cả đối tượng" },
-      ...[...set].sort().map((e) => ({ value: e, label: nhanBang(e) })),
+      ...[...set].sort().map((e) => ({ value: e, label: tableLabel(e) })),
     ];
   }, [rows]);
 
   const view = useMemo(() => {
-    const t = timKiem.trim().toLowerCase();
+    const t = searchQuery.trim().toLowerCase();
     return rows.filter((r) => {
-      if (nguoi && r.actorUsername !== nguoi) return false;
+      if (user && r.actorUsername !== user) return false;
       if (t) {
-        const hay = `${r.actorUsername} ${nhanBang(r.entity)} ${r.entityKey} ${r.summary}`.toLowerCase();
+        const hay = `${r.actorUsername} ${tableLabel(r.entity)} ${r.entityKey} ${r.summary}`.toLowerCase();
         if (!hay.includes(t)) return false;
       }
       return true;
     });
-  }, [rows, nguoi, timKiem]);
+  }, [rows, user, searchQuery]);
 
-  const soNguoi = useMemo(() => new Set(view.map((r) => r.actorUsername).filter(Boolean)).size, [view]);
+  const userCount = useMemo(() => new Set(view.map((r) => r.actorUsername).filter(Boolean)).size, [view]);
 
   const the: TheThongTin[] = [
     { nhan: "Khoảng ngày", giaTri: `${tu} → ${den}`, icon: History, mau: "trung-tinh" },
     { nhan: "Số thao tác", giaTri: view.length, so: true, icon: History, mau: "brand" },
-    { nhan: "Số người", giaTri: soNguoi, so: true, icon: Users, mau: "success" },
+    { nhan: "Số người", giaTri: userCount, so: true, icon: Users, mau: "success" },
   ];
 
-  const bienLoai = (a: string) => NHAN_LOAI[a] ?? a;
-  const loaiNhan = (a: string): LoaiNhan =>
+  const actionLabel = (a: string) => ACTION_LABELS[a] ?? a;
+  const badgeKind = (a: string): LoaiNhan =>
     a === "xoa" ? "loi" : a === "them" ? "xong" : a === "sua" ? "luu-y" : "phu";
 
   const cols: Cot<NhatKy>[] = [
-    { key: "at", header: "Thời gian", chinh: true, render: (r) => bienNgay(r.at), sapXep: (r) => r.at },
+    { key: "at", header: "Thời gian", chinh: true, render: (r) => formatDate(r.at), sapXep: (r) => r.at },
     { key: "nguoi", header: "Người", render: (r) => r.actorUsername || "—", sapXep: (r) => r.actorUsername },
     {
       key: "loai",
       header: "Thao tác",
-      render: (r) => <Nhan loai={loaiNhan(r.action)}>{bienLoai(r.action)}</Nhan>,
+      render: (r) => <Nhan loai={badgeKind(r.action)}>{actionLabel(r.action)}</Nhan>,
       sapXep: (r) => r.action,
     },
-    { key: "doiTuong", header: "Đối tượng", render: (r) => nhanBang(r.entity), sapXep: (r) => r.entity },
+    { key: "doiTuong", header: "Đối tượng", render: (r) => tableLabel(r.entity), sapXep: (r) => r.entity },
     { key: "tomTat", header: "Tóm tắt", render: (r) => r.summary },
   ];
 
-  const xuatExcel = () => {
+  const exportExcel = () => {
     if (!view.length) {
       notify.canhBao("Không có nhật ký để xuất");
       return;
@@ -191,10 +191,10 @@ export default function NhatKyScreen() {
     aoa.push(["Thời gian", "Người", "Thao tác", "Đối tượng", "Khóa bản ghi", "Tóm tắt", "Chi tiết"]);
     for (const r of view)
       aoa.push([
-        bienNgay(r.at),
+        formatDate(r.at),
         r.actorUsername,
-        bienLoai(r.action),
-        nhanBang(r.entity),
+        actionLabel(r.action),
+        tableLabel(r.entity),
         r.entityKey,
         r.summary,
         r.diff ? JSON.stringify(r.diff) : "",
@@ -214,12 +214,12 @@ export default function NhatKyScreen() {
         <h1 className="text-2xl font-semibold text-foreground">Nhật ký thao tác</h1>
         <div className="flex flex-wrap gap-2">
           <Button
-            title="Nạp lại nhật ký từ máy chủ để thấy thao tác vừa xảy ra." size="lg" variant="outline" onClick={taiLai}>
+            title="Nạp lại nhật ký từ máy chủ để thấy thao tác vừa xảy ra." size="lg" variant="outline" onClick={reload}>
             <RefreshCw />
             Tải lại
           </Button>
           <Button
-            title="Tải nhật ký đang lọc ra file Excel." size="lg" variant="outline" onClick={xuatExcel} disabled={!view.length}>
+            title="Tải nhật ký đang lọc ra file Excel." size="lg" variant="outline" onClick={exportExcel} disabled={!view.length}>
             <FileSpreadsheet />
             Xuất Excel
           </Button>
@@ -236,26 +236,26 @@ export default function NhatKyScreen() {
           <DateField label="Đến ngày" anNhanBatBuoc value={den} onChange={setDen} />
         </div>
         <div className="min-w-[12rem]">
-          <Combobox label="Thao tác" anNhanBatBuoc choPhepXoa={false} value={loai} onChange={setLoai} options={LOAI_OPT} />
+          <Combobox label="Thao tác" anNhanBatBuoc choPhepXoa={false} value={actionFilter} onChange={setActionFilter} options={ACTION_OPTIONS} />
         </div>
         <div className="min-w-[12rem]">
           <Combobox label="Đối tượng" anNhanBatBuoc choPhepXoa={false} value={bang} onChange={setBang} options={optBang} />
         </div>
         <div className="min-w-[12rem]">
-          <Combobox label="Người" anNhanBatBuoc choPhepXoa={false} value={nguoi} onChange={setNguoi} options={optNguoi} />
+          <Combobox label="Người" anNhanBatBuoc choPhepXoa={false} value={user} onChange={setUser} options={userOptions} />
         </div>
         <div className="min-w-[12rem] flex-1">
           <Field label="Tìm nhanh">
             <Input
-              value={timKiem}
-              onChange={(e) => setTimKiem(e.target.value)}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Tìm theo người, đối tượng, khóa, tóm tắt…"
             />
           </Field>
         </div>
       </div>
 
-      {dangTai ? (
+      {isLoading ? (
         <SkeletonBang />
       ) : view.length === 0 ? (
         <EmptyState
@@ -269,11 +269,11 @@ export default function NhatKyScreen() {
           rows={view}
           getKey={(r) => r.id}
           toMau="nhat-ky"
-          timKiem={(r) => `${r.actorUsername} ${nhanBang(r.entity)} ${r.summary}`}
+          timKiem={(r) => `${r.actorUsername} ${tableLabel(r.entity)} ${r.summary}`}
           nhanTimKiem="Tìm trong nhật ký…"
           actions={(r) => (
             <Button
-              title="Xem đầy đủ những trường đã đổi trong thao tác này (giá trị trước → sau)." variant="outline" size="sm" onClick={() => setChiTiet(r)}>
+              title="Xem đầy đủ những trường đã đổi trong thao tác này (giá trị trước → sau)." variant="outline" size="sm" onClick={() => setDetail(r)}>
               Chi tiết
             </Button>
           )}
@@ -281,20 +281,20 @@ export default function NhatKyScreen() {
       )}
 
       {/* Hộp chi tiết trước → sau */}
-      <Dialog open={chiTiet !== null} onOpenChange={(o) => !o && setChiTiet(null)}>
+      <Dialog open={detail !== null} onOpenChange={(o) => !o && setDetail(null)}>
         <DialogContent className="max-h-[92dvh] w-full overflow-y-auto sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle className="text-2xl">Chi tiết thao tác</DialogTitle>
-            {chiTiet && (
+            {detail && (
               <DialogDescription className="text-base">
-                {bienNgay(chiTiet.at)} · {chiTiet.actorUsername || "—"} · {bienLoai(chiTiet.action)}{" "}
-                {nhanBang(chiTiet.entity)}
+                {formatDate(detail.at)} · {detail.actorUsername || "—"} · {actionLabel(detail.action)}{" "}
+                {tableLabel(detail.entity)}
               </DialogDescription>
             )}
           </DialogHeader>
-          {chiTiet && <ChiTietDiff r={chiTiet} />}
+          {detail && <DiffDetail r={detail} />}
           <DialogFooter>
-            <Button variant="outline" size="lg" onClick={() => setChiTiet(null)}>
+            <Button variant="outline" size="lg" onClick={() => setDetail(null)}>
               Đóng
             </Button>
           </DialogFooter>
@@ -305,7 +305,7 @@ export default function NhatKyScreen() {
 }
 
 /** Hiển thị diff: bản ghi mới ({_new}) hoặc các trường đổi ({field:[trước,sau]}). */
-function ChiTietDiff({ r }: { r: NhatKy }) {
+function DiffDetail({ r }: { r: NhatKy }) {
   const val = (v: unknown) =>
     v == null || v === "" ? "(trống)" : typeof v === "object" ? JSON.stringify(v) : String(v);
   const diff = r.diff as Record<string, unknown> | undefined;

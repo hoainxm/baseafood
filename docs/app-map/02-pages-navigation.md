@@ -102,13 +102,13 @@ Cỡ chữ / trạng thái kết nối **không còn ở chân sidebar** (đã d
 | `/audit` | `audit` | Nhật ký thao tác | `features/audit/AuditLogScreen.tsx` | **Chỉ Admin** — đọc `audit_log` (nhật ký thao tác); lọc + xuất Excel. Xem [04-tang-du-lieu.md](04-tang-du-lieu.md) §Nhật ký |
 | `/kit` | — | Bộ giao diện | `design-system/kit/KitPage.tsx` | Trang demo component. **Đã gỡ khỏi sidebar** — vào bằng URL, desktop-only |
 
-Ngoài bảng trên: `/dashboard` (Tổng quan — **dòng chảy số liệu**, `features/dashboard/DashboardScreen.tsx`, số từ `lib/dongChay.ts`; có khối "Chế độ demo" cho admin). Năm màn DEMO dữ liệu mẫu cũ (`/production`, `/quality`, `/cold-storage`, `/reports`, `/traceability`) **đã gỡ** — route chỉ còn để chuyển link cũ sang màn thật.
+Ngoài bảng trên: `/dashboard` (Tổng quan — **dòng chảy số liệu**, `features/dashboard/DashboardScreen.tsx`, số từ `lib/dataFlow.ts`; có khối "Chế độ demo" cho admin). Năm màn DEMO dữ liệu mẫu cũ (`/production`, `/quality`, `/cold-storage`, `/reports`, `/traceability`) **đã gỡ** — route chỉ còn để chuyển link cũ sang màn thật.
 
 Sổ kho theo THÁNG dương lịch: `/ton-kho-thang` (`features/monthly-stock/MonthlyStockScreen.tsx` — dồn tồn cuối kỳ tháng N → tồn đầu kỳ N+1, cho mọi đối tượng NL/BTP/TP, đủ cột kiện+kg như bảng kê kho; xem [36-so-kho-thang.md](36-so-kho-thang.md)).
 
 Cụm báo cáo khép vòng (đọc dữ liệu thật, không mock): `/bc-thanh-pham` (`features/reports/DailyProductionReport.tsx` — tổng hợp thành phẩm SX hàng ngày, lưới mặt hàng×ngày + Excel) · `/bc-don-xuat` (`features/reports/OrderExportReport.tsx` — đơn đặt được xuất theo kỳ + Excel) · `/nxt-nl` (`features/reports/MaterialNxtScreen.tsx` — NXT nguyên liệu) · `/nxt` (`features/reports/NxtReportScreen.tsx` — NXT thành phẩm, suy từ SX/đơn/bán + tồn đầu). Màn ghi sản lượng là `/wip` (`/production` cũ chuyển về đây).
 
-Đối soát hóa đơn điện tử: `/doi-soat` (`features/doi-soat/DoiSoatScreen.tsx` — upload 1 file Excel gồm các sheet HĐĐT cổng thuế + sheet PHẦN MỀM kế toán, đối chiếu theo `MST bán · ký hiệu · số HĐ chuẩn`, quy về VND, ngưỡng khớp chỉnh được; xuất lại Excel tô màu. Công cụ kế toán, KHÔNG đọc DB/`repo.ts`; logic thuần ở `lib/doiSoatHddt.ts`. Xem [37-doi-soat-hddt.md](37-doi-soat-hddt.md)).
+Đối soát hóa đơn điện tử: `/doi-soat` (`features/doi-soat/DoiSoatScreen.tsx` — upload 1 file Excel gồm các sheet HĐĐT cổng thuế + sheet PHẦN MỀM kế toán, đối chiếu theo `MST bán · ký hiệu · số HĐ chuẩn`, quy về VND, ngưỡng khớp chỉnh được; xuất lại Excel tô màu. Công cụ kế toán, KHÔNG đọc DB/`repo.ts`; logic thuần ở `lib/einvoiceReconciliation.ts`. Xem [37-doi-soat-hddt.md](37-doi-soat-hddt.md)).
 
 `App.tsx` lọc `KIT_NAV` theo vai trò (bỏ `users` nếu không phải admin) rồi truyền vào `AppShell` qua prop `items`.
 

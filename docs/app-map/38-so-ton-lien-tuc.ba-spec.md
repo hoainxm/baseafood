@@ -1,12 +1,12 @@
 # 38 — ba-spec: Sổ tồn nguyên liệu LIÊN TỤC theo lô × vị trí × phân xưởng
 
 > Load khi: task chạm hành vi / nghiệp vụ / flow / acceptance của tồn kho NGUYÊN LIỆU theo thời gian thực (sổ sự kiện kho, lô NL, lấy NL ra sàn sản xuất, tiêu hao, cấp đông dự trữ, xả đông, tồn theo ngày, đối chiếu XNT), hoặc khi định thay/nối các sổ tồn đang có (`/nxt-nl`, `/nxt-kho`, `/ton-kho-thang`).
-covers: src/lib/inventoryMaterial.ts, src/lib/truyXuatLo.ts, src/features/reports/MaterialNxtScreen.tsx, src/features/reports/WarehouseNxtScreen.tsx, src/features/production/WipProductionScreen.tsx
+covers: src/lib/inventoryMaterial.ts, src/lib/lotTraceability.ts, src/features/reports/MaterialNxtScreen.tsx, src/features/reports/WarehouseNxtScreen.tsx, src/features/production/WipProductionScreen.tsx
 last_verified: 2026-10-12
-<!-- updated: 2026-10-12 — `tinhTonNLTong` (/nxt-nl): tồn đầu khai tay có mốc GIỮA khoảng xem nay vẫn áp (trước: xem "Năm"/01-06…31-07 với baseline 01/07 mất khai tay); quy tắc mốc chung với sổ BTP — xem 31 §Tồn kho NL. `truyXuatLo`: `bangTonKhoLo` (tồn W/P dựng một lần), `lui` theo UTC. Không đổi AC sổ liên tục. -->
-<!-- updated: 2026-10-08 (c) — ĐỊNH NGHĨA LÔ NL ĐỔI ở truyXuatLo.ts (chủ dự án chốt, ../spec/qr-truy-xuat-lo.md §6e): `S:<id DÒNG nhập>` = một loại NL của chuyến (trước: `S:<id chuyến>`). Khớp ý "sự kiện theo dòng loại NL" của doc này ở mục Lô; khi build sổ tồn liên tục, khóa lô tươi `S:` dùng id dòng nhập. `S:<id chuyến>` cũ vẫn đọc được (nút cả chuyến). Không đổi AC sổ tồn NL. -->
-<!-- re-verified: 2026-10-08 11:10 — truyXuatLo.ts thêm `theoGiaiDoan` (tab /qr "Theo giai đoạn", thay `doPhuTruyXuat`): chỉ ĐỌC lô S/W/P + lot_inputs / lot_dispatches / lot_waivers / label_prints để xếp theo khâu; không đổi `canBangLo` / `loNlDeChon` / định nghĩa lô — hành vi và AC sổ tồn NL của doc này giữ nguyên. -->
-<!-- updated: 2026-10-08 — `lib/truyXuatLo.ts` (covers) mở rộng ở QR đợt 2b: lá B/N (bán lẻ / bán nội địa) qua `lot_dispatches` (mig 0056), `canBangLo` cho cả lô TP + bán nội địa, `loNlDeChon` thêm lô NL cũ còn kg (NL cấp đông đem xả) — là cầu tạm trước khi có lô đông `F:` của doc này. Lưu ý khi build `F:`/`K:`: `docMaQr` hiện chỉ nhận mã `S|W|P:<id>` — phải mở regex. KHÔNG đổi hành vi / AC sổ tồn NL. -->
+<!-- updated: 2026-10-12 — `computeMaterialTotalStock` (/nxt-nl): tồn đầu khai tay có mốc GIỮA khoảng xem nay vẫn áp (trước: xem "Năm"/01-06…31-07 với baseline 01/07 mất khai tay); quy tắc mốc chung với sổ BTP — xem 31 §Tồn kho NL. `lotTraceability`: `buildLotStockIndex` (tồn W/P dựng một lần), `lui` theo UTC. Không đổi AC sổ liên tục. -->
+<!-- updated: 2026-10-08 (c) — ĐỊNH NGHĨA LÔ NL ĐỔI ở lotTraceability.ts (chủ dự án chốt, ../spec/qr-truy-xuat-lo.md §6e): `S:<id DÒNG nhập>` = một loại NL của chuyến (trước: `S:<id chuyến>`). Khớp ý "sự kiện theo dòng loại NL" của doc này ở mục Lô; khi build sổ tồn liên tục, khóa lô tươi `S:` dùng id dòng nhập. `S:<id chuyến>` cũ vẫn đọc được (nút cả chuyến). Không đổi AC sổ tồn NL. -->
+<!-- re-verified: 2026-10-08 11:10 — lotTraceability.ts thêm `groupByTraceStage` (tab /qr "Theo giai đoạn", thay `doPhuTruyXuat`): chỉ ĐỌC lô S/W/P + lot_inputs / lot_dispatches / lot_waivers / label_prints để xếp theo khâu; không đổi `computeLotMassBalance` / `listSelectableMaterialLots` / định nghĩa lô — hành vi và AC sổ tồn NL của doc này giữ nguyên. -->
+<!-- updated: 2026-10-08 — `lib/lotTraceability.ts` (covers) mở rộng ở QR đợt 2b: lá B/N (bán lẻ / bán nội địa) qua `lot_dispatches` (mig 0056), `computeLotMassBalance` cho cả lô TP + bán nội địa, `listSelectableMaterialLots` thêm lô NL cũ còn kg (NL cấp đông đem xả) — là cầu tạm trước khi có lô đông `F:` của doc này. Lưu ý khi build `F:`/`K:`: `docMaQr` hiện chỉ nhận mã `S|W|P:<id>` — phải mở regex. KHÔNG đổi hành vi / AC sổ tồn NL. -->
 ttl_days: 90
 <!-- updated: 2026-10-06 (b) — /nxt-kho: thanh "Đã chọn N mã" (cộng tổng + Gán kho lưu) dời xuống SAU bảng, dính đáy màn từ desktop (`md:sticky`), thêm cụm Tô màu ▾ · In đậm · Bỏ tô (`NutToMauChon`, khoá `nxt-kho`) — trước đây bảng xem có tick nhưng KHÔNG có nút tô. Chỉ trình bày, không đổi hành vi tồn. -->
 <!-- updated: 2026-10-06 — tô màu dòng "đã dò" (mig 0055): /nxt-nl `ton-nl-ngay|<xưởng>` + `ton-nl-ho|<từ>|<đến>|<xưởng>`, /nxt-kho `nxt-kho` (cả bảng xem lẫn lưới Ghi — cùng id snapshot nên dấu giữ khi đổi chế độ). Chỉ là dấu trình bày, không đổi hành vi/AC tồn. -->
@@ -23,11 +23,11 @@ Hôm nay có **năm nguồn tồn nguyên liệu chạy song song, không nguồ
 
 | Nguồn | Hạt | Cách ra số | Thiếu gì |
 |---|---|---|---|
-| `/nxt-nl` — `tinhTonNLTong` (PA-a) | họ NL × ngày, 3 xưởng | tồn = tồn đầu + Σ nhập hàng − **xuất SX (= 0, cột chờ)** | **không biết NL đã lấy ra chế biến** ⇒ "tồn theo nhập", không phải tồn thật |
-| engine kỳ cũ `tinhSoTonNL` | họ NL × kỳ 5 ngày, chỉ Đông | tồn đầu + đông gửi − xả đông (từ Cân đối) | chỉ còn nuôi 2 cột thông tin |
+| `/nxt-nl` — `computeMaterialTotalStock` (PA-a) | họ NL × ngày, 3 xưởng | tồn = tồn đầu + Σ nhập hàng − **xuất SX (= 0, cột chờ)** | **không biết NL đã lấy ra chế biến** ⇒ "tồn theo nhập", không phải tồn thật |
+| engine kỳ cũ `computeMaterialNxt` | họ NL × kỳ 5 ngày, chỉ Đông | tồn đầu + đông gửi − xả đông (từ Cân đối) | chỉ còn nuôi 2 cột thông tin |
 | `/nxt-kho` — `nxt_snapshots` (0032) | (kho × mã kế toán `PXĐ.BTNL.TĐ…` × kỳ) | ảnh chụp báo cáo XNT kế toán, ghi tay nhập/xuất từng mã; đã có nhập Excel XNT | **trục mã riêng, không nối giao dịch** (P5-B bế tắc) |
 | `/ton-kho-thang` — `monthly_stock_ledger` (0041) | tháng × nhóm × mặt hàng × size × invoice, theo kho | bảng kê Excel kế toán, dồn kỳ có duyệt | tổng tháng, không theo ngày; nhập/xuất gõ tay |
-| `tinhTon`/`tinhTonTP` (`inventory.ts`) | lô BTP/TP (mẻ SX, phiếu đóng gói) | suy từ giao dịch — **đúng mô hình mong muốn**, chỉ cho BTP/TP | không phủ nguyên liệu |
+| `computeWipStock`/`computeFinishedGoodStock` (`inventory.ts`) | lô BTP/TP (mẻ SX, phiếu đóng gói) | suy từ giao dịch — **đúng mô hình mong muốn**, chỉ cho BTP/TP | không phủ nguyên liệu |
 
 Hệ quả: (a) "hôm nay xưởng còn bao nhiêu kg NL, ở đâu, lô nào" **không trả lời được**; (b) G1 hở — không truy "mẻ nào ăn lô nào bao nhiêu kg" (`lot_inputs.quantity_kg` có cột nhưng chưa là nguồn tồn); (c) kế toán chốt tháng **gõ lại** nhập/xuất vào 2 sổ tay — đúng cái đau gốc.
 
@@ -225,7 +225,7 @@ Hệ quả: (a) "hôm nay xưởng còn bao nhiêu kg NL, ở đâu, lô nào" *
 | R4 | **Sửa = `DAO` + mới, kèm lý do; bản gốc giữ** (append-only; khớp ghi bù + `audit_log`/0048). | Xóa lô = đảo toàn bộ sự kiện của lô, có lý do. |
 | R5 | **Mọi sự kiện có `actor` (người thao tác gốc) · `recorded_by` (người nhập, nếu khác) · `recorded_at` · `effective_date` · nguồn · xưởng.** Phái sinh: actor = người thao tác bản gốc. | Nhập giấy: actor = người ghi giấy, recorded_by = người gõ. |
 | R6 | **Kg-first; đơn giá chỉ mang theo** từ chuyến; sổ không tính giá vốn/BQGQ. | Kế toán ráp tiền ở lớp báo cáo. |
-| R7 | **Sổ không đụng Cân đối** (`balancingCalc.ts`) và tồn BTP/TP (`tinhTon`); chỉ nối một chiều để **đối chiếu** (metric NV2). | |
+| R7 | **Sổ không đụng Cân đối** (`balancingCalc.ts`) và tồn BTP/TP (`computeWipStock`); chỉ nối một chiều để **đối chiếu** (metric NV2). | |
 | R8 | **Lô S = chuyến, sự kiện theo dòng loại NL** (Open-3); lô F sinh khi duyệt cấp đông (n gốc); lô K chỉ từ cutover, tự đóng khi về 0. Nhãn người đọc = `lot_code`/suy ra (QR §4.1). | Chuyến 1 dòng ⇒ 1 sự kiện. |
 | R9 | **`LAY_RA` chỉ từ `kho tươi xưởng`; mọi chuyển động khỏi kho dự trữ là `XA_DONG` (hoặc `CHUYEN_KHO`/`XUAT_NGOAI`).** Một hành vi vật lý = một loại sự kiện = một owner. | Open-4 = tổ trưởng ⇒ tổ trưởng ghi `XA_DONG` (không đổi loại sự kiện). |
 | R10 | **NXT kỳ & sổ tháng = cách nhìn của sổ sự kiện** (pha 3). Song song: **sổ tay là chân lý**; sổ sự kiện chỉ cờ lệch + gợi ý điền có xác nhận, không ghi đè. | Δ đã giải thích được ghi nhớ, không cờ lại. |
@@ -382,7 +382,7 @@ Hệ quả: (a) "hôm nay xưởng còn bao nhiêu kg NL, ở đâu, lô nào" *
 - **Assert** NHAP_MUA.coNguon == "mua về" && tồn(*,K1000T) == 1300 && count(XA_DONG mới) == 0
 
 ### AC-24 — Không đụng Cân đối và tồn BTP/TP · Maps to: invariant R7 (không gắn flow) · Test: unit
-- **Given** bộ test hồi quy hiện có (`balancingCalc`, `inventory.tinhTon`)
+- **Given** bộ test hồi quy hiện có (`balancingCalc`, `inventory.computeWipStock`)
 - **When** sổ sự kiện ghi bất kỳ loại nào
 - **Then** kết quả các hàm đó không đổi
 - **Assert** test hồi quy pass == 100% && Δ(calculateBalancing(...)) == 0 && Δ(tinhTon(...)) == 0

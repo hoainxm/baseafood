@@ -341,7 +341,7 @@ function migrateLocalStorageData() {
 
 ##### Giai đoạn 4: Refactor Frontend Code & Deploy
 1. Thay đổi toàn bộ các interface trong `src/types.ts` sang tiếng Anh.
-2. Cập nhật `AnhXaBang` trong `src/lib/repo.ts` để trỏ tới bảng và cột mới.
+2. Cập nhật `TableMapping` trong `src/lib/repo.ts` để trỏ tới bảng và cột mới.
 3. Sửa đổi các component màn hình để sử dụng biến/prop mới.
 4. Chạy `npm run lint` + `npm run build` để kiểm tra lỗi kiểu dữ liệu toàn hệ thống.
 5. Deploy ứng dụng mới và xóa các view DB tiếng Việt cũ sau khi toàn bộ tablet đã được nâng cấp lên bản mới.
@@ -359,7 +359,7 @@ Nếu phê duyệt phương án chuyển đổi sang Tiếng Anh, các file sau 
    * Tạo tệp migration mới (ví dụ: `supabase/migrations/0016_rename_tables_to_english.sql`) chứa toàn bộ câu lệnh rename bảng, cột, RLS policies, trigger.
 3. **Mã nguồn Frontend:**
    * `src/types.ts`: Đổi tên toàn bộ các kiểu dữ liệu nghiệp vụ (`ChuyenNhap` -> `ImportShipment`, `DongNhapNL` -> `MaterialImportItem`,...).
-   * `src/lib/repo.ts`: Cập nhật toàn bộ các cấu hình `AnhXaBang` (đổi tên bảng, đổi `localKey`, cấu hình `toRow`/`fromRow` sang trường tiếng Anh).
+   * `src/lib/repo.ts`: Cập nhật toàn bộ các cấu hình `TableMapping` (đổi tên bảng, đổi `localKey`, cấu hình `toRow`/`fromRow` sang trường tiếng Anh).
    * `src/lib/catalogRepo.ts`: Đổi tên các hook xuất ra cho các màn hình (ví dụ: `useNhapNL` -> `useMaterialImports`).
    * `src/lib/balancingCalc.ts`: Đổi tên các biến tính toán định mức và cân đối kỳ.
    * **Toàn bộ 11 màn hình chức năng** trong `src/features/`: Cập nhật các biến hiển thị, gọi hook và gán dữ liệu sang trường tiếng Anh mới.

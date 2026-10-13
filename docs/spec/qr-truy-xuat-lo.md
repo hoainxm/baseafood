@@ -1,15 +1,15 @@
 # Truy xuất theo lô bằng QR — phân tích & thiết kế
 
-covers: src/lib/truyXuatLo.ts, src/lib/inventory.ts, src/features/qr/**, src/features/shared/GanLoDauVao.tsx, src/features/shared/KhungQuetQr.tsx, src/features/shared/QrTemLoIn.tsx, src/features/shared/useDuLieuTruyXuat.ts, src/features/production/KhoiLoPhien.tsx, src/features/orders/KiemLoXuat.tsx, supabase/migrations/0046_lot_inputs.sql, supabase/migrations/0049_label_prints.sql, supabase/migrations/0056_lot_dispatches.sql
+covers: src/lib/lotTraceability.ts, src/lib/inventory.ts, src/features/qr/**, src/features/shared/GanLoDauVao.tsx, src/features/shared/KhungQuetQr.tsx, src/features/shared/QrTemLoIn.tsx, src/features/shared/useDuLieuTruyXuat.ts, src/features/production/KhoiLoPhien.tsx, src/features/orders/KiemLoXuat.tsx, supabase/migrations/0046_lot_inputs.sql, supabase/migrations/0049_label_prints.sql, supabase/migrations/0056_lot_dispatches.sql
 last_verified: 2026-10-12
-<!-- updated: 2026-10-12 — sổ tồn theo lô: phần BÁN VƯỢT (không lô nào để trừ) trả ra `banVuot`/`tongBanVuot` (`tinhTonChiTiet`, `tinhTonTPTheoLoChiTiet`) + cảnh báo ở /warehouse; `bangTonKhoLo` dựng tồn W/P một lần cho danh sách nhiều lô (GanLoDauVao, theoGiaiDoan, ThuHoiLo) thay vì tinhTon từng lô; `lui` (cửa sổ chọn lô NL 45 ngày / BTP 120 ngày) tính theo UTC — giờ máy +07 trước đây lùi dư 1 ngày. -->
+<!-- updated: 2026-10-12 — sổ tồn theo lô: phần BÁN VƯỢT (không lô nào để trừ) trả ra `banVuot`/`tongBanVuot` (`computeWipStockDetail`, `computeFinishedGoodLotStockDetail`) + cảnh báo ở /warehouse; `buildLotStockIndex` dựng tồn W/P một lần cho danh sách nhiều lô (GanLoDauVao, theoGiaiDoan, ThuHoiLo) thay vì tinhTon từng lô; `lui` (cửa sổ chọn lô NL 45 ngày / BTP 120 ngày) tính theo UTC — giờ máy +07 trước đây lùi dư 1 ngày. -->
 <!-- updated: 2026-10-08 (c) — lô NL = một dòng loại NL của chuyến (§6e); §4.1 + §7.5 cập nhật. -->
-<!-- re-verified: 2026-10-08 10:05 — §4.1 ba loại lô S/W/P (truyXuatLo.nutLo/nhanLo*), §6c (meChuaGanLo · duyetTheoTem · KiemLoXuat · label_prints) khớp code trước khi build đợt 2b; §8 dòng RLS đã LỆCH (sửa, xem .escaped-drift.log). -->
+<!-- re-verified: 2026-10-08 10:05 — §4.1 ba loại lô S/W/P (lotTraceability.buildLotNode/nhanLo*), §6c (meChuaGanLo · duyetTheoTem · KiemLoXuat · label_prints) khớp code trước khi build đợt 2b; §8 dòng RLS đã LỆCH (sửa, xem .escaped-drift.log). -->
 
 > **Trạng thái (2026-10-08 chiều):** lô NL đổi thành **mỗi loại NL của chuyến một lô** (§6e, §7 câu 5 đã chốt).
 > **Trạng thái:** ĐỢT 1 ĐÃ BUILD (2026-09-18) · **đợt 1b in tem hàng loạt + 2a sổ in tem / nhắc gắn lô / quét ở kho & xuất ĐÃ BUILD (2026-10-02, §6b–6c)** · **đợt 2b khép vòng tới khách ĐÃ BUILD (2026-10-08, §6d) — mig `0056` ✅ đã chạy trên DB thật 2026-10-08** · đợt 3 là đề xuất · §7 câu 4 đã chốt, còn 4 câu chờ xưởng.
 > **Loại:** phân tích các hệ thống/chuẩn QR truy xuất + thiết kế áp dụng cho Baseafood.
-> **Code:** `src/lib/truyXuatLo.ts` (+ `truyXuatLo.e2e.test.ts` kịch bản mẫu §9) · `src/lib/inventory.ts` (trừ tồn theo lô gắn) · `src/features/qr/{QrTraCuuScreen,InTemHangLoat,GiaiDoanTruyXuat,ThuHoiLo}.tsx` · `src/features/shared/{GanLoDauVao,KhungQuetQr,QrTemLoIn,useDuLieuTruyXuat}` · `src/features/production/KhoiLoPhien.tsx` · `src/features/orders/KiemLoXuat.tsx` · migration `0046_lot_inputs.sql` (✅ đã chạy 2026-09-18) · `0049_label_prints.sql` (✅ 2026-10-02) · `0056_lot_dispatches.sql` (✅ 2026-10-08).
+> **Code:** `src/lib/lotTraceability.ts` (+ `lotTraceability.e2e.test.ts` kịch bản mẫu §9) · `src/lib/inventory.ts` (trừ tồn theo lô gắn) · `src/features/qr/{QrTraCuuScreen,InTemHangLoat,GiaiDoanTruyXuat,ThuHoiLo}.tsx` · `src/features/shared/{GanLoDauVao,KhungQuetQr,QrTemLoIn,useDuLieuTruyXuat}` · `src/features/production/KhoiLoPhien.tsx` · `src/features/orders/KiemLoXuat.tsx` · migration `0046_lot_inputs.sql` (✅ đã chạy 2026-09-18) · `0049_label_prints.sql` (✅ 2026-10-02) · `0056_lot_dispatches.sql` (✅ 2026-10-08).
 
 > Nối tiếp họp [2026-09-02](../trien-khai/hop-2026-09-02-form-nhap-trace-gia-qc.md) **QĐ-6** (định danh lô + QR)
 > và **NR-6** (đã build in tem + màn quét). Ăn khớp "cấp lô" ở [`import-xnt-kho-cutover.md`](import-xnt-kho-cutover.md)
@@ -184,7 +184,7 @@ Quét hoặc gõ → một trang gồm:
 
 | Đợt | Nội dung | Đụng DB |
 |---|---|---|
-| **1 — nối chuỗi (build ngay)** | bảng `lot_inputs` · thư viện `truyXuatLo` · **hộ chiếu lô** truy ngược/xuôi + cân bằng kg · QR thành đường link (đọc được tem cũ) · **gắn lô NL cho mẻ SX** + **gắn lô BTP cho đóng gói** (quét / gõ / chọn) · in tem BTP/TP | 🟡 thêm 1 bảng |
+| **1 — nối chuỗi (build ngay)** | bảng `lot_inputs` · thư viện `lotTraceability` · **hộ chiếu lô** truy ngược/xuôi + cân bằng kg · QR thành đường link (đọc được tem cũ) · **gắn lô NL cho mẻ SX** + **gắn lô BTP cho đóng gói** (quét / gõ / chọn) · in tem BTP/TP | 🟡 thêm 1 bảng |
 | 2 — vận hành kho | QR vị trí phòng đông (cất/chuyển bằng quét) · FIFO gợi ý lô cũ khi gắn lô · bán lẻ gắn lô · kiểm kê bằng quét | 🟡 thêm bảng sự kiện kho |
 | 3 — chuẩn hóa ra ngoài | mã quốc gia / SSCC khi được cấp · báo cáo thu hồi "một nút, 24 giờ" · xuất file GDST/EPCIS cho khách Mỹ/EU · dữ liệu khai thác (tàu, vùng) | 🟡 |
 
@@ -198,10 +198,10 @@ Quét hoặc gõ → một trang gồm:
 
 | Việc | Ở đâu |
 |---|---|
-| Nút in tem NL hiện cho **mọi chuyến có đầu chuyến**; thiếu mã lô dùng nhãn suy `nhanLoNl` (`NĐ-yymmdd-xxxx`) | `imports/BuocNhap.tsx`, `MaterialImportScreen.tsx` |
-| `/qr` có 2 tab: **Tra lô** · **In tem hàng loạt** (`?tab=in`; link `?lo=` luôn mở Tra). Lọc khoảng ngày · xưởng · loại lô (NL/BTP/TP), mặc định chọn hết, bỏ tick lô không in, in một lượt | `features/qr/InTemHangLoat.tsx` + `dsLoDeIn` (`lib/truyXuatLo.ts`, test `truyXuatLo.test.ts`) |
+| Nút in tem NL hiện cho **mọi chuyến có đầu chuyến**; thiếu mã lô dùng nhãn suy `formatMaterialLotLabel` (`NĐ-yymmdd-xxxx`) | `imports/BuocNhap.tsx`, `MaterialImportScreen.tsx` |
+| `/qr` có 2 tab: **Tra lô** · **In tem hàng loạt** (`?tab=in`; link `?lo=` luôn mở Tra). Lọc khoảng ngày · xưởng · loại lô (NL/BTP/TP), mặc định chọn hết, bỏ tick lô không in, in một lượt | `features/qr/InTemHangLoat.tsx` + `listLotsToPrint` (`lib/lotTraceability.ts`, test `lotTraceability.test.ts`) |
 | `PhieuInTem` nhận `tems[]`: mỗi tem **một trang đúng khổ** (`break-after: page`), portal vào `<body>` để lúc in ẩn hết app (khỏi in thừa nhãn trắng) | `design-system/patterns/PrintSheet.tsx` |
-| `TemLoQr` nhận `nuts[]`; tem NL dựng qua `nutLo` ⇒ có **loại hàng + tổng kg** (trước chỉ "nguyên liệu", 0 kg) | `features/shared/QrTemLoIn.tsx` |
+| `TemLoQr` nhận `nuts[]`; tem NL dựng qua `buildLotNode` ⇒ có **loại hàng + tổng kg** (trước chỉ "nguyên liệu", 0 kg) | `features/shared/QrTemLoIn.tsx` |
 | Lưu xong chuyến / mẻ SX (cả lượt) / phiếu đóng gói ⇒ toast có nút **In tem** (`notify.daLuu(msg, undo?, thaoTac?)`) | 3 màn + `design-system/patterns/notify.ts` |
 | Nhãn nav "Quét mã lô" → **"Mã lô QR"**; viết lại hướng dẫn "?" | `AppShell.tsx`, `guideContent.tsx` |
 
@@ -213,8 +213,8 @@ Quét hoặc gõ → một trang gồm:
 
 | Việc | Ở đâu | Đụng DB |
 |---|---|---|
-| **Sổ in tem** `label_prints` (mig `0049`): bấm In trong `PhieuInTem` (`onIn`) ⇒ mỗi lô một dòng `{lot_kind, lot_id, label đông cứng, copies, operator, printed_at}` | `TemLoQr` ghi qua `banGhiIn` · `BANG_LABEL_PRINT` · `useLabelPrints` | 🟡 thêm 1 bảng, RLS authenticated ngay từ đầu (bất biến 0047) + trigger ghi vết 0048 |
-| Tab In tem hàng loạt: nhãn **Đã in N tem · ngày / Chưa in tem** từng lô + ô **"Chỉ lô chưa in tem"** | `InTemHangLoat.tsx` + `tomTatIn` | — |
+| **Sổ in tem** `label_prints` (mig `0049`): bấm In trong `PhieuInTem` (`onIn`) ⇒ mỗi lô một dòng `{lot_kind, lot_id, label đông cứng, copies, operator, printed_at}` | `TemLoQr` ghi qua `buildLabelPrintRecords` · `BANG_LABEL_PRINT` · `useLabelPrints` | 🟡 thêm 1 bảng, RLS authenticated ngay từ đầu (bất biến 0047) + trigger ghi vết 0048 |
+| Tab In tem hàng loạt: nhãn **Đã in N tem · ngày / Chưa in tem** từng lô + ô **"Chỉ lô chưa in tem"** | `InTemHangLoat.tsx` + `summarizeLabelPrints` | — |
 | Hộ chiếu lô: "Đã in N tem, lần gần nhất … · người in" / "Chưa in tem"; **cảnh báo "Nhãn đã đổi"** khi nhãn in trên tem ≠ nhãn suy hiện tại (sửa ngày/xưởng sau khi in — QR vẫn đúng vì theo id) | `QrTraCuuScreen.tsx` | — |
 | **Nhắc gắn lô NL khi chốt ngày SX**: hộp chốt liệt kê mẻ của ngày·xưởng chưa có `lot_inputs`, nút "Gắn lô NL" từng mẻ. **CHỈ NHẮC, không chặn** (§7 câu 4 còn treo) | `WipProductionScreen.tsx` (`meChuaGanLo`) | — |
 | **Quét tem để duyệt nhập kho**: khối "chờ nhập kho" ở `/warehouse` có quét camera / gõ mã ⇒ mở thẳng hộp duyệt đúng mẻ; mẻ đã nhập thì báo; mỗi dòng hiện mã lô `BĐ-…` để đối chiếu tem | `ReserveWarehouseScreen.tsx` (`approveByLabel`) | — |
@@ -231,15 +231,15 @@ Quét hoặc gõ → một trang gồm:
 | Việc | Ở đâu | Đụng DB |
 |---|---|---|
 | **Lô đi ra** `lot_dispatches` {lot_kind S/W/P, lot_id, lot_label, doc_kind `sales_item`/`export_item`/`domestic_sale`, doc_id, quantity_kg NULL=chưa cân, method quet/go/chon/fifo, operator, recorded_at} + **lý do chưa gắn lô** `lot_waivers` {output_kind W/P, output_id, reason, operator} | mig `0056` · `BANG_LOT_DISPATCH` / `BANG_LOT_WAIVER` · `useLotDispatches` / `useLotWaivers` | 🟡 thêm 2 bảng, KHÔNG thêm cột bảng cũ (deploy trước migration thì chỉ phần gắn lô nằm hàng chờ) |
-| **Trừ tồn theo lô gắn**: dòng trừ tồn có `lo` ⇒ (1) lô gắn có kg trừ đúng kg · (2) gắn chưa cân ⇒ FIFO trong các lô đã gắn · (3) phần còn lại FIFO như cũ. Không gắn lô ⇒ y kết quả cũ. Lô gắn khác mặt hàng bị bỏ qua. MỘT chỗ dựng `truTonBTP(sales, packagings, lotInputs, lotDispatches)` cho 5 màn (kho dự trữ · kho lạnh · đơn đặt · đóng gói · bán hàng). Tồn TP theo lô: `tinhTonTPTheoLo` **Bán vượt (2026-10-12):** lô không xuống âm vì bán lẻ / đóng gói ⇒ phần trừ không còn lô nào để trừ trả ra ngoài (`tinhTonChiTiet` / `tinhTonTPTheoLoChiTiet` → `banVuot`, `tongBanVuot`), màn Kho dự trữ hiện dòng cảnh báo "Bán vượt X kg" thay vì nuốt mất. Σ tồn theo lô − bán vượt = tổng `tinhTonTP` (trước đây chú thích nói "cùng tổng" — sai khi bán vượt). Tra tồn nhiều lô (hộp gắn lô, tab Theo giai đoạn, thu hồi): dựng `bangTonKhoLo(dl)` MỘT lần rồi `tonKhoCuaLo(kind, id, dl, bang)` — gọi `tinhTon` cho từng lô là O(n²), ~3.000 mẻ/năm treo vài giây. | `lib/inventory.ts` (+ test) | — |
-| **Gắn lô NL cho cả phiên** ở `/wip`: khối "Lô nguyên liệu dùng cho phiên này" (quét / gõ / chọn nhiều lô), lưu phiên ⇒ `ganLoChoPhien` gắn cho mẻ CÙNG LOÀI + dòng bán nội địa cùng loại NL, kg trống. Không rõ loài ⇒ vẫn gắn (thu hồi rộng hơn, không hẹp hơn). Lô khai giữ cho các phiên sau cùng ngày · xưởng | `production/KhoiLoPhien.tsx` · `WipProductionScreen.saveSession` | — |
-| **Chốt ngày SX bắt buộc**: còn mẻ chưa gắn lô và chưa có lý do ⇒ `ErrorSummary` chặn chốt; ghi "Lý do chưa gắn lô" ⇒ mỗi mẻ còn thiếu một dòng `lot_waivers`. Nút Lưu/Chốt không bao giờ disabled | `WipProductionScreen.lockDay` · `meThieuLo` | — |
+| **Trừ tồn theo lô gắn**: dòng trừ tồn có `lo` ⇒ (1) lô gắn có kg trừ đúng kg · (2) gắn chưa cân ⇒ FIFO trong các lô đã gắn · (3) phần còn lại FIFO như cũ. Không gắn lô ⇒ y kết quả cũ. Lô gắn khác mặt hàng bị bỏ qua. MỘT chỗ dựng `collectWipDeductions(sales, packagings, lotInputs, lotDispatches)` cho 5 màn (kho dự trữ · kho lạnh · đơn đặt · đóng gói · bán hàng). Tồn TP theo lô: `computeFinishedGoodLotStock` **Bán vượt (2026-10-12):** lô không xuống âm vì bán lẻ / đóng gói ⇒ phần trừ không còn lô nào để trừ trả ra ngoài (`computeWipStockDetail` / `computeFinishedGoodLotStockDetail` → `banVuot`, `tongBanVuot`), màn Kho dự trữ hiện dòng cảnh báo "Bán vượt X kg" thay vì nuốt mất. Σ tồn theo lô − bán vượt = tổng `computeFinishedGoodStock` (trước đây chú thích nói "cùng tổng" — sai khi bán vượt). Tra tồn nhiều lô (hộp gắn lô, tab Theo giai đoạn, thu hồi): dựng `buildLotStockIndex(dl)` MỘT lần rồi `getLotStockKg(kind, id, dl, bang)` — gọi `computeWipStock` cho từng lô là O(n²), ~3.000 mẻ/năm treo vài giây. | `lib/inventory.ts` (+ test) | — |
+| **Gắn lô NL cho cả phiên** ở `/wip`: khối "Lô nguyên liệu dùng cho phiên này" (quét / gõ / chọn nhiều lô), lưu phiên ⇒ `assignSessionLots` gắn cho mẻ CÙNG LOÀI + dòng bán nội địa cùng loại NL, kg trống. Không rõ loài ⇒ vẫn gắn (thu hồi rộng hơn, không hẹp hơn). Lô khai giữ cho các phiên sau cùng ngày · xưởng | `production/KhoiLoPhien.tsx` · `WipProductionScreen.saveSession` | — |
+| **Chốt ngày SX bắt buộc**: còn mẻ chưa gắn lô và chưa có lý do ⇒ `ErrorSummary` chặn chốt; ghi "Lý do chưa gắn lô" ⇒ mỗi mẻ còn thiếu một dòng `lot_waivers`. Nút Lưu/Chốt không bao giờ disabled | `WipProductionScreen.lockDay` · `findBatchesWithoutLot` | — |
 | **Gắn lô cho hàng ra**: dòng bán lẻ (block thô ⇒ lô BTP, đóng gói ⇒ lô TP) ngay trong phiếu đang gõ + ở sổ; dòng bán nội địa (⇒ lô NL) ở sổ `/wip`. Lô phải cùng mặt hàng với dòng bán. Gợi ý lô còn tồn, cũ trước | `shared/GanLoDauVao.tsx` (`LotInputDialog` lõi chung · `GanLoXuat`) | — |
 | **Kiểm lô xuất có lưu**: quét đúng ⇒ ghi `lot_dispatches` doc `export_item` (đóng mở lại vẫn "Đã quét"). Quét lô ngoài lệnh CÙNG mặt hàng × quy cách, đủ tồn ⇒ hộp **Thay lô** (xác nhận + Hoàn tác) sửa `export_items.wip_id` sang lô đang xếp lên xe | `orders/KiemLoXuat.tsx` | — |
-| **Hộ chiếu**: truy xuôi tới khách (lá B = bán lẻ, N = bán nội địa), cân bằng kg cho cả lô TP, "Tồn trong kho (sổ tồn)" cạnh "Còn lại theo hồ sơ lô", mục **Thu hồi** (khách · ngày · chứng từ · kg · từ lô + lô còn trong xưởng; In A4 + Excel) | `qr/QrTraCuuScreen.tsx` · `qr/ThuHoiLo.tsx` · `danhSachThuHoi` · `tonKhoCuaLo` | — |
-| **Tab Theo giai đoạn** (`/qr?tab=giai-doan`, thay tab "Độ phủ" — link cũ `?tab=do-phu` vẫn mở): theo khoảng ngày × xưởng, 5 khâu đúng thứ tự chuỗi — **Nhập NL** (tem · đã dùng cho bao nhiêu mẻ) · **Sản xuất** (lô NL · tem) · **Nhập kho** (chờ duyệt / đã nhập + tồn) · **Đóng gói** (lô BTP · tem · tồn) · **Xuất & bán** (lệnh xuất đã quét kiểm · dòng bán lẻ / bán nội địa đã gắn lô). Mỗi khâu đếm "Còn thiếu N"; lọc "Chỉ hiện mục còn thiếu". Nút làm NGAY tại dòng: In tem · Gắn lô NL/BTP · Gắn lô (dòng bán) · **Duyệt nhập kho** (mở `/warehouse?duyet=W:<id>` ⇒ hộp duyệt đúng mẻ) · **Kiểm lô** (mở `/orders?don=<id>&kiem=<lệnh>` ⇒ đơn + hộp kiểm). Bấm mã lô ⇒ hộ chiếu. Lý do làm (2026-10-08): người dùng không tìm thấy nút QR rải ở 7 màn | `qr/GiaiDoanTruyXuat.tsx` · `theoGiaiDoan` (thay `doPhuTruyXuat`) | — |
-| **Chọn lô NL còn dở**: ngoài lô 45 ngày gần đây, thêm lô cũ (≤ 1 năm) còn kg theo hồ sơ — chỉ lô đã từng gắn hoặc về từ ngày bắt đầu truy xuất (NL cấp đông đem xả) | `loNlDeChon` | — |
-| **Số tem theo block / thùng**: mặc định BTP = số block, TP = số thùng, NL = 1; sửa được ở xem trước; sổ in ghi đúng `copies` | `PhieuInTem` (`TemIn.soBan`, `onIn(soBan[])`) · `soTemMacDinh` · `banGhiIn` | — |
+| **Hộ chiếu**: truy xuôi tới khách (lá B = bán lẻ, N = bán nội địa), cân bằng kg cho cả lô TP, "Tồn trong kho (sổ tồn)" cạnh "Còn lại theo hồ sơ lô", mục **Thu hồi** (khách · ngày · chứng từ · kg · từ lô + lô còn trong xưởng; In A4 + Excel) | `qr/QrTraCuuScreen.tsx` · `qr/ThuHoiLo.tsx` · `buildRecallList` · `getLotStockKg` | — |
+| **Tab Theo giai đoạn** (`/qr?tab=giai-doan`, thay tab "Độ phủ" — link cũ `?tab=do-phu` vẫn mở): theo khoảng ngày × xưởng, 5 khâu đúng thứ tự chuỗi — **Nhập NL** (tem · đã dùng cho bao nhiêu mẻ) · **Sản xuất** (lô NL · tem) · **Nhập kho** (chờ duyệt / đã nhập + tồn) · **Đóng gói** (lô BTP · tem · tồn) · **Xuất & bán** (lệnh xuất đã quét kiểm · dòng bán lẻ / bán nội địa đã gắn lô). Mỗi khâu đếm "Còn thiếu N"; lọc "Chỉ hiện mục còn thiếu". Nút làm NGAY tại dòng: In tem · Gắn lô NL/BTP · Gắn lô (dòng bán) · **Duyệt nhập kho** (mở `/warehouse?duyet=W:<id>` ⇒ hộp duyệt đúng mẻ) · **Kiểm lô** (mở `/orders?don=<id>&kiem=<lệnh>` ⇒ đơn + hộp kiểm). Bấm mã lô ⇒ hộ chiếu. Lý do làm (2026-10-08): người dùng không tìm thấy nút QR rải ở 7 màn | `qr/GiaiDoanTruyXuat.tsx` · `groupByTraceStage` (thay `doPhuTruyXuat`) | — |
+| **Chọn lô NL còn dở**: ngoài lô 45 ngày gần đây, thêm lô cũ (≤ 1 năm) còn kg theo hồ sơ — chỉ lô đã từng gắn hoặc về từ ngày bắt đầu truy xuất (NL cấp đông đem xả) | `listSelectableMaterialLots` | — |
+| **Số tem theo block / thùng**: mặc định BTP = số block, TP = số thùng, NL = 1; sửa được ở xem trước; sổ in ghi đúng `copies` | `PhieuInTem` (`TemIn.soBan`, `onIn(soBan[])`) · `getDefaultLabelCount` · `buildLabelPrintRecords` | — |
 | **Đồng bộ cùng tab** giữa các lần gọi `useBang` cùng bảng — trước đây hộp gắn lô (con) ghi xong mà màn cha cầm bản cũ, lần ghi kế tiếp của màn cha sẽ XÓA dòng con vừa thêm | `lib/repo.ts` (`SU_KIEN_BANG`) | — |
 
 **Thứ tự triển khai:** chạy `0056` trên DB thật TRƯỚC (2 lần, idempotent) rồi mới đẩy code — ✅ đã chạy 2026-10-08 (kiểm 2026-10-08 qua Supabase, chỉ đọc: 2 bảng có, RLS bật, policy `_nguoi_dung` authenticated, anon không đọc được, đủ trigger `*_sua` + `ghi_vet_sql_tg`, cột khớp toRow) — không thì các màn có hook lô đi ra báo lỗi máy chủ (404 `lot_dispatches`) cho tới khi chạy.
@@ -250,15 +250,15 @@ Quét hoặc gõ → một trang gồm:
 
 | Việc | Ở đâu |
 |---|---|
-| Lô NL `S:<id dòng nhập>`: kg = kg của loại; chi tiết có "Loại NL", "Khối lượng", "Cùng chuyến: n loại · tổng kg". Nhãn = mã lô chuyến | `nutLo` · `dongCuaChuyen` |
+| Lô NL `S:<id dòng nhập>`: kg = kg của loại; chi tiết có "Loại NL", "Khối lượng", "Cùng chuyến: n loại · tổng kg". Nhãn = mã lô chuyến | `buildLotNode` · `getShipmentLines` |
 | Nút **Tem** / **In tem QR** của chuyến ở Nhập hàng in **mỗi loại một tem** (cùng mã chuyến in to, loại + kg dòng dưới, QR đúng lô loại đó) | `QrTemLoIn` |
-| Gõ mã chuyến / quét **QR cũ** `S:<id chuyến>` ⇒ ra các loại của chuyến để chọn, câu "Chuyến … có n loại nguyên liệu, mỗi loại là một lô — chọn đúng loại" (không toast — việc thường ngày); mã cũ trùng thật vẫn cảnh báo | `timLo` · `lyDoNhieuLo` |
-| Gắn lô cả phiên: mặt hàng đã gắn **loại NL** (Danh mục) ⇒ chỉ nhận lô đúng loại; chưa gắn ⇒ theo loài như cũ. Bán nội địa: đúng loại trước, không có mới theo loài | `ganLoChoPhien` · `batchMaterialName` |
-| Hộ chiếu lô NL: mục **Cùng chuyến** (các loại khác, bấm sang được) · Thu hồi có ô **"Thu hồi cả chuyến"** (gộp các loại, mỗi dòng hàng ra một lần) | `QrTraCuuScreen` · `ThuHoiLo` · `loCungChuyen` · `danhSachThuHoiNhieu` |
-| Chọn lô NL (gắn cho mẻ / phiên / bán nội địa), In tem hàng loạt, tab Theo giai đoạn: đều liệt kê theo loại | `loNlDeChon` · `dsLoDeIn` · `theoGiaiDoan` |
+| Gõ mã chuyến / quét **QR cũ** `S:<id chuyến>` ⇒ ra các loại của chuyến để chọn, câu "Chuyến … có n loại nguyên liệu, mỗi loại là một lô — chọn đúng loại" (không toast — việc thường ngày); mã cũ trùng thật vẫn cảnh báo | `findLots` · `explainMultipleLots` |
+| Gắn lô cả phiên: mặt hàng đã gắn **loại NL** (Danh mục) ⇒ chỉ nhận lô đúng loại; chưa gắn ⇒ theo loài như cũ. Bán nội địa: đúng loại trước, không có mới theo loài | `assignSessionLots` · `batchMaterialName` |
+| Hộ chiếu lô NL: mục **Cùng chuyến** (các loại khác, bấm sang được) · Thu hồi có ô **"Thu hồi cả chuyến"** (gộp các loại, mỗi dòng hàng ra một lần) | `QrTraCuuScreen` · `ThuHoiLo` · `findSameShipmentLots` · `buildRecallListForLots` |
+| Chọn lô NL (gắn cho mẻ / phiên / bán nội địa), In tem hàng loạt, tab Theo giai đoạn: đều liệt kê theo loại | `listSelectableMaterialLots` · `listLotsToPrint` · `groupByTraceStage` |
 | Số kg trên tem + hộ chiếu theo locale vi-VN (`7.842 kg`, trước in `7842 kg`) | `kgChu` · `QrTemLoIn.labelLines` |
 
-**Không cần migration, không chuyển dữ liệu:** lúc đổi, server có `lot_inputs` = `label_prints` = `lot_dispatches` = 0 dòng. Dây lô / tem ghi theo chuyến (nếu có ở máy nào) vẫn đọc được: `nutLo("S", <id chuyến>)` dựng nút cả chuyến như trước. Test: nhóm "lô NL theo loại" trong `truyXuatLo.e2e.test.ts` dựng đúng chuyến Hồng Phú 3 loại.
+**Không cần migration, không chuyển dữ liệu:** lúc đổi, server có `lot_inputs` = `label_prints` = `lot_dispatches` = 0 dòng. Dây lô / tem ghi theo chuyến (nếu có ở máy nào) vẫn đọc được: `buildLotNode("S", <id chuyến>)` dựng nút cả chuyến như trước. Test: nhóm "lô NL theo loại" trong `lotTraceability.e2e.test.ts` dựng đúng chuyến Hồng Phú 3 loại.
 
 **Thử tay (preview demo, 2026-10-08):** chuyến Bê 3 (2 loại) ⇒ "In tem QR" ra 2 tem `5.298 kg` / `1.391 kg` · gõ mã chuyến ở khối lô phiên ⇒ câu chọn loại, không toast, chip đúng loại · hộ chiếu có Cùng chuyến + Thu hồi cả chuyến · QR cũ theo chuyến ⇒ danh sách 2 loại.
 
@@ -279,7 +279,7 @@ Quét hoặc gõ → một trang gồm:
 
 ## 9. Kịch bản nghiệm thu đầu-cuối (oracle)
 
-Mã hóa thành test tự động `src/lib/truyXuatLo.e2e.test.ts` — đỏ là chuỗi truy xuất đã gãy.
+Mã hóa thành test tự động `src/lib/lotTraceability.e2e.test.ts` — đỏ là chuỗi truy xuất đã gãy.
 
 | Ngày | Thao tác |
 |---|---|

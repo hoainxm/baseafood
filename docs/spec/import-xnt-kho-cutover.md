@@ -139,8 +139,8 @@ Hằng `BSF1_WAREHOUSES` ([src/types.ts:463-507](../../src/types.ts)) + seed b�
 
 ### 4.2 Tồn = suy tính, đã có công thức NXT + tồn đầu khai tay
 - Tồn **không lưu snapshot** — suy từ giao dịch.
-- NXT nguyên liệu theo kỳ: `tinhSoTonNL()` ([src/lib/inventoryMaterial.ts](../../src/lib/inventoryMaterial.ts)) — `tồn cuối = tồn đầu + đông gửi − xả đông`, tồn đầu kỳ đầu lấy từ `material_opening_stock` ([0022](../../supabase/migrations/0022_ton_dau_nguyen_lieu.sql)), kỳ sau kế thừa.
-- NXT thành phẩm/BTP theo khoảng ngày: `tinhSoTonTP()` ([src/lib/inventoryFinished.ts:130-233](../../src/lib/inventoryFinished.ts)) — tồn đầu = `finished_goods_opening_stock` ([0024](../../supabase/migrations/0024_ton_dau_thanh_pham.sql)) + lịch sử trước kỳ.
+- NXT nguyên liệu theo kỳ: `computeMaterialNxt()` ([src/lib/inventoryMaterial.ts](../../src/lib/inventoryMaterial.ts)) — `tồn cuối = tồn đầu + đông gửi − xả đông`, tồn đầu kỳ đầu lấy từ `material_opening_stock` ([0022](../../supabase/migrations/0022_ton_dau_nguyen_lieu.sql)), kỳ sau kế thừa.
+- NXT thành phẩm/BTP theo khoảng ngày: `computeFinishedGoodNxt()` ([src/lib/inventoryFinished.ts:130-233](../../src/lib/inventoryFinished.ts)) — tồn đầu = `finished_goods_opening_stock` ([0024](../../supabase/migrations/0024_ton_dau_thanh_pham.sql)) + lịch sử trước kỳ.
 - **Khác biệt cốt lõi:** engine NL dựa trên **đông gửi/xả đông của Cân đối** theo **họ NL**, KHÔNG có kênh "nhập/xuất theo lô theo kho" như báo cáo XNT này.
 
 ### 4.3 Parser Excel đã có sẵn — khớp đúng mẫu, chưa đấu UI/DB

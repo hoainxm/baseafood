@@ -8,7 +8,7 @@
 - **Cụm báo cáo khép vòng:** 3 báo cáo mới — BC thành phẩm ngày (`/bc-thanh-pham`), BC đơn đặt được xuất (`/bc-don-xuat`), hoàn thiện BC nhập hàng (tách phế liệu + Excel); NXT thành phẩm (`/nxt`) suy từ dữ liệu + tồn đầu (`finished_goods_opening_stock`); quy cách/size xuyên suốt SX/Đơn đặt; bản in A4 (primitive `PhieuIn`).
 - **Nhật ký thao tác (audit):** bắt tại chốt `useBang.ghi` → `audit_log` append-only; màn `/audit` (chỉ admin). Xem `lib/audit.ts`.
 - **Gộp nhánh docs-flow:** đóng gói BTP→TP (`/packaging`, G3), bán lẻ block trừ tồn, phân quyền 2 giao diện bộ phận (`lib/nav-access.ts`), cold-storage tồn thật, đối chiếu Nhập↔SX trong ngày, cột `processing_type` + `leftover_kg`, `DailyTaskReminder`.
-- **Mô hình tồn kho: 2 KHO** (BTP dự trữ + TP đóng gói) ở `lib/inventory.ts` (`tinhTon` với `banLe = [...locBanLe(bán, KHO_BAN_LE), ...dongGoiTruTon(đóng gói)]`, `tinhTonTP` cho kho TP) + `lib/inventoryFinished.ts` (`tinhSoTonTP`). Đã kiểm chứng: Tồn Kho dự trữ == Tồn cuối NXT; handoff đơn đặt không đếm 2 lần; kho TP tách riêng.
+- **Mô hình tồn kho: 2 KHO** (BTP dự trữ + TP đóng gói) ở `lib/inventory.ts` (`computeWipStock` với `banLe = [...filterRetailSales(bán, RETAIL_WAREHOUSE), ...collectPackagingDeductions(đóng gói)]`, `computeFinishedGoodStock` cho kho TP) + `lib/inventoryFinished.ts` (`computeFinishedGoodNxt`). Đã kiểm chứng: Tồn Kho dự trữ == Tồn cuối NXT; handoff đơn đặt không đếm 2 lần; kho TP tách riêng.
 
 ## 2. Migration cần chạy trên Supabase (theo thứ tự)
 

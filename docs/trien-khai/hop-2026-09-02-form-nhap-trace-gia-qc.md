@@ -166,7 +166,7 @@ Sau khi build xong đợt 1 (QĐ-4/6-lite/8) và chạy migration, chủ dự á
 
 ### NR-1 · Biểu mẫu nhập (phiếu giấy in được) 🧭 — nâng QĐ-1
 Thiết kế **phiếu giấy chuẩn (in A4)** để xưởng ghi tay hằng ngày, đúng bố cục để: ghi tay thống nhất → chụp ảnh OCR (sau) → hoặc gõ vào app web theo đúng thứ tự ô. Hai mẫu: **phiếu nhập nguyên liệu** (bám màn `/imports`) + **phiếu báo cáo thành phẩm ngày** (bám `/wip`). Bám "form các tờ của chị Trúc".
-- Tái dùng được: primitive `PhieuIn` (in A4) để render mẫu trống.
+- Tái dùng được: primitive `PrintSheet` (in A4) để render mẫu trống.
 - **Cần chốt:** bố cục cột chính xác (xin ảnh/bản mẫu tờ giấy của chị Trúc).
 
 ### NR-2 · App web nhập cho xưởng 🧭/✅ — làm rõ QĐ-1/QĐ-2/QĐ-5

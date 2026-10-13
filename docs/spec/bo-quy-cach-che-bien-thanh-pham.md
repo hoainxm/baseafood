@@ -88,7 +88,7 @@ Bảng `products` (`mat_hang`) đã có sẵn đường bám (đối chiếu cod
 
 `finished_goods` (141 mã TK 1551) **giữ nguyên làm mã kế toán** (khóa `code`); 3 facet là **lớp phủ phân loại** trên `products`, ánh xạ **lỏng** sang 141 mã (được phép "chưa ánh xạ") — đúng nguyên tắc [`32-danh-muc.md`](../app-map/32-danh-muc.md).
 
-> **Rủi ro (🟡 YELLOW):** thêm 3 facet là *đổi hình dạng master data*. Làm theo tier YELLOW: migration **chỉ-thêm-cột**, viết sẵn câu `drop` để lùi, vá dòng cũ `vaDongCu` (facet rỗng = "chưa phân loại"). Không đổi khóa `finished_goods.code`.
+> **Rủi ro (🟡 YELLOW):** thêm 3 facet là *đổi hình dạng master data*. Làm theo tier YELLOW: migration **chỉ-thêm-cột**, viết sẵn câu `drop` để lùi, vá dòng cũ `patchLegacy` (facet rỗng = "chưa phân loại"). Không đổi khóa `finished_goods.code`.
 
 ---
 

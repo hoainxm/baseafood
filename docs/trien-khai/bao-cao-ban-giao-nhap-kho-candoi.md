@@ -32,7 +32,7 @@ Ba module **Nhập hàng → Cân đối → Tồn kho NL** đã **chạy khép 
 
 ## 3. Tầng dữ liệu & migration
 
-- Một API `useBang` cho cả hai chế độ **Supabase ↔ localStorage** (env-gated); hàng chờ chống mất số liệu, hoà server↔local, `vaDongCu` vá dòng cũ. Vững — dùng chung cho cả 3 module.
+- Một API `useBang` cho cả hai chế độ **Supabase ↔ localStorage** (env-gated); hàng chờ chống mất số liệu, hoà server↔local, `patchLegacy` vá dòng cũ. Vững — dùng chung cho cả 3 module.
 - Bảng: 23 bảng nghiệp vụ (tên tiếng Anh sau `0016`) + **`material_opening_stock` mới (0022)**. Migration `0001`–`0022`.
 - **Cần chạy trên DB thật:** `0022` (đã báo chạy); `0021` siết RLS **phải bổ sung** `material_opening_stock` vào danh sách trước khi mở ra ngoài mạng nội bộ.
 

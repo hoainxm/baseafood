@@ -73,7 +73,7 @@ src/
 ├── components/ui/           primitive shadcn — ĐÃ đè size cho người lớn tuổi
 ├── design-system/
 │   ├── tokens.css           NƠI DUY NHẤT định cỡ chữ / màu / chiều cao ô
-│   ├── patterns/            Field, NumberField, Combobox, DateField, RecordTable, DanhMucCrud, ConfirmDelete…
+│   ├── patterns/            Field, NumberField, Combobox, DateField, RecordTable, CatalogCrud, ConfirmDelete…
 │   └── index.ts             cửa import DUY NHẤT cho features
 ├── features/                5 màn nghiệp vụ
 └── App.tsx

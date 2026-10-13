@@ -106,7 +106,7 @@ alter table public.qc_checklists
 Tương tự cho phiếu nhập (OCR) khi tới đó: `import_shipments.scan_path text`.
 
 > Chỉ **thêm cột nullable** — dòng cũ không đổi (theo mẫu `0037`/`0038`). Map thêm
-> ở `repo.ts` (`BANG_QC_CHECKLIST`) cùng commit.
+> ở `repo.ts` (`QC_CHECKLIST_TABLE`) cùng commit.
 
 ---
 

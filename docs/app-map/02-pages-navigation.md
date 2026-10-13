@@ -2,7 +2,7 @@
 covers: src/App.tsx, src/features/shared/AppShell.tsx, src/features/shared/NotFound.tsx, src/features/shared/guideContent.tsx, src/lib/nav-access.ts
 last_verified: 2026-10-12
 <!-- re-verified: 2026-10-12 15:20 — AppShell: thu/mở sidebar (thuGon), header/sidebar/drawer cùng chiều cao, drawer chân nút toàn cục; FIX drift `h-20` → thật là `h-16`, nay là token `h-header`. -->
-<!-- updated: 2026-10-12 — XOAY NGANG iPhone/iPad: thanh bên TỰ thu về dải icon ở 768–1023px (iPhone ngang, iPad dọc; `useKhopMedia(MEDIA_THANH_BEN_HEP)`), bấm nút thu/mở vẫn theo ý người dùng trong cùng cỡ màn. Chiều cao header = token `--spacing-header` (`h-header`/`top-header`), máy ngang thấp (cao ≤ 500px) thu 4rem→3rem + ẩn dòng breadcrumb + đệm trang 16px + chân drawer bỏ dòng tên. Khung có vùng an toàn tai thỏ/thanh Home (`px-an-toan`, `pb-an-toan`). Đổi màn: fade `hien-mo` (chỉ opacity). Không đổi route/nav/gate. -->
+<!-- updated: 2026-10-12 — XOAY NGANG iPhone/iPad: thanh bên TỰ thu về dải icon ở 768–1023px (iPhone ngang, iPad dọc; `useMediaQuery(MEDIA_NARROW_SIDEBAR)`), bấm nút thu/mở vẫn theo ý người dùng trong cùng cỡ màn. Chiều cao header = token `--spacing-header` (`h-header`/`top-header`), máy ngang thấp (cao ≤ 500px) thu 4rem→3rem + ẩn dòng breadcrumb + đệm trang 16px + chân drawer bỏ dòng tên. Khung có vùng an toàn tai thỏ/thanh Home (`px-safe`, `pb-safe`). Đổi màn: fade `enter-fade` (chỉ opacity). Không đổi route/nav/gate. -->
 <!-- updated: 2026-10-12 (b) — GỠ 5 màn DEMO (`/production`, `/quality`, `/cold-storage`, `/reports`, `/traceability`): xóa khỏi KIT_NAV + CAY_NAV, route giữ lại chỉ để CHUYỂN HƯỚNG link cũ (→ `/wip`, `/qc`, `/warehouse`, `/dashboard`, `/qr`). `DEMO_IDS` / `laDemo` / `demoGuard` đã bỏ (cờ `demo` trên mục nav còn trong code nhưng không mục nào dùng). CHẾ ĐỘ DEMO thay thế: `ShellLayout` gắn `DaiDemo` (dải vàng dính dưới header, luôn hiện khi demo) + `NapGoiDemo`; `/users` khi đang demo hiện thông báo "thoát demo để quản lý người dùng"; người không phải admin bật cờ demo trên máy ⇒ tự tắt. Tổng quan có khối "Chế độ demo" (admin). Spec: ../spec/che-do-demo.md. -->
 <!-- updated: 2026-10-12 — `/dashboard` (Tổng quan) dựng lại thành "dòng chảy số liệu" (spec ../spec/che-do-demo.md §5b): bộ lọc kỳ + xưởng, 8 thẻ KPI, thanh lọc gọn một hàng (kỳ bấm nhanh · lùi/tiến · xưởng), thẻ tô màu theo loại số, băng chuyền 5 khâu, hai thanh chia phần "nguyên liệu đi đâu" (thay sankey), việc cần đốc (mở đúng màn sửa), nhập/SX + tồn theo ngày, kết quả các kỳ cân đối, định mức theo mặt hàng, tồn theo kho NXT. Bỏ bảng "Biến động lớn trong kỳ". Route / nhãn nav / gate KHÔNG đổi. -->
 <!-- re-verified: 2026-10-08 14:30 — guideContent.qr chỉ sửa câu "Mã lô là gì" (lô NL = mỗi loại NL của chuyến, mỗi tem một loại); route / nav / gate / tab `/qr` KHÔNG đổi. -->
@@ -28,8 +28,8 @@ ttl_days: 90
 <!-- updated: 2026-08-24 — thêm 2 màn báo cáo khép vòng: /bc-thanh-pham (DailyProductionReport) + /bc-don-xuat (OrderExportReport), xếp nhóm Báo cáo cùng nxt-nl/nxt -->
 <!-- updated: 2026-08-23 — phân quyền nav theo vai trò (2 giao diện bộ phận): ShellLayout lọc KIT_NAV + guard theo allowedIds(), route "/" → homeFor(roles), đều ở src/lib/nav-access.ts -->
 <!-- updated: 2026-08-23 — thêm route /packaging (Đóng gói BTP→TP, G3) + mục nav "Đóng gói" nhóm Sản xuất -->
-<!-- re-verified: 2026-08-10 14:00 — AppLayout header (NutGiaoDien/NutTrangThai/NutHuongDan) + thu/mở sidebar (KEY_THU_GON) + fix logo đè khớp source -->
-<!-- re-verified: 2026-08-14 — đồng bộ tên file sau rename eadc360: guideContent.tsx, ImportTab/SalesTab, MaterialImportScreen/ImportReport/SalesScreen/SalesReport/BalancingTable/FinishedGoodScreen, @/lib/catalogRepo (symbol NutHuongDan/NutGiaoDien/CaiDatHienThi giữ nguyên) -->
+<!-- re-verified: 2026-08-10 14:00 — AppLayout header (DisplaySettingsButton/NutTrangThai/NutHuongDan) + thu/mở sidebar (KEY_THU_GON) + fix logo đè khớp source -->
+<!-- re-verified: 2026-08-14 — đồng bộ tên file sau rename eadc360: guideContent.tsx, ImportTab/SalesTab, MaterialImportScreen/ImportReport/SalesScreen/SalesReport/BalancingTable/FinishedGoodScreen, @/lib/catalogRepo (symbol GuideButton/NutGiaoDien/CaiDatHienThi giữ nguyên) -->
 <!-- re-verified: 2026-08-17 — khung THẬT là AppShell.tsx (AppLayout.tsx đã XOÁ, là khung chết không ai import); nav dọc gom 6 nhóm (KIT_NAV + NHOM_NAV) dùng chung sidebar/drawer; bottom-tab điện thoại đã bỏ -->
 
 <!-- updated: 2026-09-05 — (họp 2026-09-02 QĐ-8) THÊM route `/qc` "Kiểm tra QC" (features/quality-check, màn THẬT — KHÔNG demoGuard): KIT_NAV icon ClipboardCheck, nhóm nav "Sản xuất", gate qua DEPT_SAN_XUAT (nav-access.ts). ~18 route. -->
@@ -72,18 +72,18 @@ Cả hai dùng CHUNG một cây nav (`CayNav`) dựng từ `KIT_NAV` (danh sách
 
 ### Header
 
-Cụm trái (`☰` · logo · tiêu đề) được ưu tiên ngân sách ngang (`min-w-0 flex-1`). Cụm phải `shrink-0` nhưng **trên điện thoại chỉ giữ `NutTrangThai` + `NutHuongDan`**; đổi ca · thông báo · giao diện · tài khoản · đăng xuất dời xuống **chân drawer**. Trên desktop hiện đủ:
+Cụm trái (`☰` · logo · tiêu đề) được ưu tiên ngân sách ngang (`min-w-0 flex-1`). Cụm phải `shrink-0` nhưng **trên điện thoại chỉ giữ `DataSyncStatusButton` + `GuideButton`**; đổi ca · thông báo · giao diện · tài khoản · đăng xuất dời xuống **chân drawer**. Trên desktop hiện đủ:
 
 | Nút | Component (design-system) | Hành vi |
 |---|---|---|
-| Hướng dẫn "?" | `NutHuongDan` | Chỉ hiện ở trang có trong `guideContent.tsx` (registry route→nội dung). Mở hộp hướng dẫn dùng trang đó. |
-| Tùy chỉnh giao diện 🎨 | `NutGiaoDien` | Mở `CaiDatHienThi` (cỡ chữ · mật độ · bề rộng). Lưu **theo username** (`taiKhoan` prop). |
-| Trạng thái máy chủ | `NutTrangThai` | Màu theo store `ketNoi`. Hover/bấm mở popover chi tiết + **Thử kết nối lại** (`probeKetNoi`). |
+| Hướng dẫn "?" | `GuideButton` | Chỉ hiện ở trang có trong `guideContent.tsx` (registry route→nội dung). Mở hộp hướng dẫn dùng trang đó. |
+| Tùy chỉnh giao diện 🎨 | `DisplaySettingsButton` | Mở `DisplaySettingsPanel` (cỡ chữ · mật độ · bề rộng). Lưu **theo username** (`taiKhoan` prop). |
+| Trạng thái máy chủ | `DataSyncStatusButton` | Màu theo store `ketNoi`. Hover/bấm mở popover chi tiết + **Thử kết nối lại** (`probeKetNoi`). |
 | Tài khoản + Đăng xuất | (trong `AppShell`) | Tên + vai trò (ẩn text < xl) và nút Đăng xuất, sát phải. Điện thoại: ở chân drawer. |
 
-Cỡ chữ / trạng thái kết nối **không còn ở chân sidebar** (đã dời hết lên header). Đổi tài khoản → `ShellLayout` trong `App.tsx` gọi `apDungCaiDatHienThi(username)` nạp lại giao diện của người vừa đăng nhập.
+Cỡ chữ / trạng thái kết nối **không còn ở chân sidebar** (đã dời hết lên header). Đổi tài khoản → `ShellLayout` trong `App.tsx` gọi `applyDisplaySettings(username)` nạp lại giao diện của người vừa đăng nhập.
 
-**Thu/mở sidebar** (chỉ desktop): nút `PanelLeft` bên trái header đổi `thuGon`. **Mặc định tự thu** ở bề rộng 768–1023px (iPhone xoay ngang, iPad dọc — `MEDIA_THANH_BEN_HEP`); ≥ 1024px mặc định mở. Người dùng bấm thu/mở thì giữ ý họ cho tới khi xoay sang cỡ màn khác. Thu ⇒ sidebar `w-20`, nav chỉ còn icon (nhãn vào `title`, tiêu đề nhóm thay bằng đường kẻ), logo icon-only. Chuẩn form: `FormDialog` (design-system) — mọi dialog thông tin/thao tác đi qua khung này.
+**Thu/mở sidebar** (chỉ desktop): nút `PanelLeft` bên trái header đổi `thuGon`. **Mặc định tự thu** ở bề rộng 768–1023px (iPhone xoay ngang, iPad dọc — `MEDIA_NARROW_SIDEBAR`); ≥ 1024px mặc định mở. Người dùng bấm thu/mở thì giữ ý họ cho tới khi xoay sang cỡ màn khác. Thu ⇒ sidebar `w-20`, nav chỉ còn icon (nhãn vào `title`, tiêu đề nhóm thay bằng đường kẻ), logo icon-only. Chuẩn form: `FormDialog` (design-system) — mọi dialog thông tin/thao tác đi qua khung này.
 
 ## Các màn & Cấu trúc Route
 
@@ -115,8 +115,8 @@ Cụm báo cáo khép vòng (đọc dữ liệu thật, không mock): `/bc-thanh
 ## Cạm bẫy bố cục
 
 - id mục nav = path: `id: "warehouse"` phải khớp `Route path="/warehouse"`. (Bug cũ: id `kho` ≠ route `warehouse` ⇒ menu gãy — đã sửa.)
-- Đầu sidebar, đầu drawer và header nội dung cùng `h-header` (token `--spacing-header` ở `tokens.css`: 4rem; máy xoay ngang thấp 3rem). Hàng tên cột nổi của `BangTong xoRa` dính ở `top-header`. Đổi chiều cao ⇒ đổi token, đừng gõ `h-16`/`top-16` rời (lệch là trang vênh).
-- **Máy xoay ngang thấp** (biến thể `ngang-thap:`, cao ≤ 500px): header ẩn dòng "Baseafood MES · …", `main` đệm 16px, chân drawer bỏ dòng tên người dùng.
+- Đầu sidebar, đầu drawer và header nội dung cùng `h-header` (token `--spacing-header` ở `tokens.css`: 4rem; máy xoay ngang thấp 3rem). Hàng tên cột nổi của `SummaryTable fullHeight` dính ở `top-header`. Đổi chiều cao ⇒ đổi token, đừng gõ `h-16`/`top-16` rời (lệch là trang vênh).
+- **Máy xoay ngang thấp** (biến thể `short-landscape:`, cao ≤ 500px): header ẩn dòng "Baseafood MES · …", `main` đệm 16px, chân drawer bỏ dòng tên người dùng.
 - **Đừng nhồi thêm nút icon vào header cho điện thoại.** Ở cỡ chữ 130%, mỗi nút là 57px — 6 nút đã vượt bề rộng màn 390px và bóp tiêu đề còn 0px. Thứ toàn cục mới thì cho xuống chân drawer.
 - Bề rộng nội dung là biến `--app-content-width`, người dùng đổi được trong Bộ giao diện — **đừng** hardcode `max-w-*` ở màn.
 - Luật responsive đầy đủ (breakpoint, thang chạm, bảng ra thẻ, checklist màn mới): [`src/design-system/README.md` § Quy chuẩn mobile](../../src/design-system/README.md).

@@ -5,7 +5,7 @@
 > Cổng kiểm: `npm run build` + `npm run lint` phải xanh trước khi commit. Không ghi URL/ref/key Supabase vào bất kỳ file nào trong repo.
 
 ## 1. Đã xong (đang ở `main`)
-- **Cụm báo cáo khép vòng:** 3 báo cáo mới — BC thành phẩm ngày (`/bc-thanh-pham`), BC đơn đặt được xuất (`/bc-don-xuat`), hoàn thiện BC nhập hàng (tách phế liệu + Excel); NXT thành phẩm (`/nxt`) suy từ dữ liệu + tồn đầu (`finished_goods_opening_stock`); quy cách/size xuyên suốt SX/Đơn đặt; bản in A4 (primitive `PhieuIn`).
+- **Cụm báo cáo khép vòng:** 3 báo cáo mới — BC thành phẩm ngày (`/bc-thanh-pham`), BC đơn đặt được xuất (`/bc-don-xuat`), hoàn thiện BC nhập hàng (tách phế liệu + Excel); NXT thành phẩm (`/nxt`) suy từ dữ liệu + tồn đầu (`finished_goods_opening_stock`); quy cách/size xuyên suốt SX/Đơn đặt; bản in A4 (primitive `PrintSheet`).
 - **Nhật ký thao tác (audit):** bắt tại chốt `useBang.ghi` → `audit_log` append-only; màn `/audit` (chỉ admin). Xem `lib/audit.ts`.
 - **Gộp nhánh docs-flow:** đóng gói BTP→TP (`/packaging`, G3), bán lẻ block trừ tồn, phân quyền 2 giao diện bộ phận (`lib/nav-access.ts`), cold-storage tồn thật, đối chiếu Nhập↔SX trong ngày, cột `processing_type` + `leftover_kg`, `DailyTaskReminder`.
 - **Mô hình tồn kho: 2 KHO** (BTP dự trữ + TP đóng gói) ở `lib/inventory.ts` (`computeWipStock` với `banLe = [...filterRetailSales(bán, RETAIL_WAREHOUSE), ...collectPackagingDeductions(đóng gói)]`, `computeFinishedGoodStock` cho kho TP) + `lib/inventoryFinished.ts` (`computeFinishedGoodNxt`). Đã kiểm chứng: Tồn Kho dự trữ == Tồn cuối NXT; handoff đơn đặt không đếm 2 lần; kho TP tách riêng.
@@ -39,6 +39,6 @@
 8. **Định hướng họp 2026-09-02** (canonical: [`docs/trien-khai/hop-2026-09-02-form-nhap-trace-gia-qc.md`](trien-khai/hop-2026-09-02-form-nhap-trace-gia-qc.md)) — chốt số chạy realtime **từ tháng 9**; ưu tiên: (a) 🟩 **form nhập chuẩn + chụp ảnh phiếu tay → OCR** (giảm gõ tay ở xưởng; viết tay song song app ~1 tháng); (b) 🟨 **giá & bình quân gia quyền theo ngày** — **chốt PA trước khi sửa `balancingCalc.ts`**; (c) 🟨 **định danh lô + QR** trace nội bộ (khớp SPEC cấp lô; SSCC chừa ô trống, làm sau); (d) 🟩 **mã KH/đại lý bằng số**; (e) 🟨 **QC checklist chấm điểm + ảnh**; (f) 🟩 **khung nhân sự gắn từng khâu** (Dung/Trúc/Luyên/Hạnh/Lan; Nam soạn biểu mẫu → 4 người xuống xưởng ~2h). Để sau (🅿️): lương/BHXH/nghỉ phép qua app; điện thoại trong xưởng.
 
 ## 5. Cạm bẫy cần nhớ
-- `useBang` ghi CẢ LÔ, offline có hàng chờ — sửa `repo.ts` phải giữ `vaDongCu` + không nuốt dòng chưa đẩy.
+- `useBang` ghi CẢ LÔ, offline có hàng chờ — sửa `repo.ts` phải giữ `patchLegacy` + không nuốt dòng chưa đẩy.
 - Migration mới: `if not exists`, idempotent, kèm rollback; đăng ký trigger `updated_at` + RLS (thêm vào `0021` nếu là bảng cần siết).
 - Handoff đơn đặt dùng marker `sourceWarehouse = "Đơn đặt"` — đừng đổi (NXT + tồn kho dựa vào nó để không đếm 2 lần).

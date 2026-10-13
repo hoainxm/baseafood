@@ -1,7 +1,7 @@
 # Quy ước đặt tên + kế hoạch dọn tên tiếng Việt không dấu
 
 - **Ngày lập:** 2026-10-12
-- **Trạng thái:** CHỐT 2026-10-12 (chủ dự án duyệt 4 câu ở §6). §2 Luật áp dụng NGAY cho mọi thứ MỚI. §5 chạy theo đợt có lịch, **Đợt 0 + 1 + 2 xong 2026-10-13**; đợt kế tiếp: **Đợt 3** (API design-system).
+- **Trạng thái:** CHỐT 2026-10-12 (chủ dự án duyệt 4 câu ở §6). §2 Luật áp dụng NGAY cho mọi thứ MỚI. §5 chạy theo đợt có lịch, **Đợt 0 → 3 xong 2026-10-13**; đợt kế tiếp: **Đợt 4** (file/thư mục feature + route).
 - **Thay cho:** Phần B của [`routing-va-naming.md`](routing-va-naming.md) (dự thảo 2026-08-07; nửa DB + route của nó đã làm xong ở `0016` và đợt react-router).
 - **Liên quan:** [`CLAUDE.md`](../../CLAUDE.md) luật 8 · [`app-map/03-database.md`](../app-map/03-database.md) · [`app-map/04-tang-du-lieu.md`](../app-map/04-tang-du-lieu.md) · [`src/design-system/README.md`](../../src/design-system/README.md)
 
@@ -107,7 +107,7 @@ Phân bố khai báo tên Việt theo khu: `lib` 1.129 · `design-system` 301 ·
 | **0 · Chặn tái phát** ✅ 2026-10-13 | (a) Chốt §2 vào CLAUDE.md luật 8 + sửa doc mâu thuẫn (✅ một phần 2026-10-12: `03-database`, `supabase-setup`, `BAN-GIAO`). (b) Viết lại bảng "15 bảng" ở `03-database` theo tên thật. (c) `scripts/check-naming.mjs`: đếm định danh tên Việt, ghi `naming-baseline.json`. (d) Pre-commit: chặn **khai báo MỚI** (dòng thêm) có tên Việt. CI: số đếm chỉ được giảm (ratchet). | 🟢 | 0,5–1 ngày | Thêm `const tinhTon2` ⇒ commit bị chặn |
 | **1 · Cục bộ** ✅ 2026-10-13 | Biến/hàm không export, theo từng khu: `lib` → `design-system` → mỗi `features/*` | 🟢 | 3–5 ngày, chia nhiều phiên | ratchet giảm, 3 cổng xanh |
 | **2 · API lib + file** ✅ 2026-10-13 | Export của `lib/*` + `types.ts` + test đi kèm; đổi tên file `lib` (`doiSoatHddt.ts` → `einvoiceReconciliation.ts`…) bằng `git mv`; sửa `covers:` app-map, bảng "Code đổi → doc" ở CLAUDE.md, đường dẫn trong hook | 🟡 | 2–3 ngày | 3 cổng + hook doc không cảnh báo sót |
-| **3 · API design-system** | `BangTong` → `SummaryTable`, `LuoiNhap` → `GridInput`, `KhungCuonNgang` → `HorizontalScroll`, prop `nhan/moTa/tieuDe` → `label/description/title`; CSS utility + `data-*`. Giai đoạn chuyển: export cả hai tên, tên cũ gắn `@deprecated` (editor gạch ngang), codemod `features/*`, rồi gỡ alias | 🟡 lan rộng | 2–3 ngày | README design-system cập nhật, không còn import tên cũ |
+| **3 · API design-system** ✅ 2026-10-13 | `BangTong` → `SummaryTable`, `LuoiNhap` → `GridInput`, `KhungCuonNgang` → `HorizontalScroll`, prop `nhan/moTa/tieuDe` → `label/description/title`; CSS utility + `data-*`. Giai đoạn chuyển: export cả hai tên, tên cũ gắn `@deprecated` (editor gạch ngang), codemod `features/*`, rồi gỡ alias | 🟡 lan rộng | 2–3 ngày | README design-system cập nhật, không còn import tên cũ |
 | **4 · Route + thư mục feature** | 7 route Việt → tiếng Anh (`/doi-soat` → `/reconciliation`, `/ton-kho-thang` → `/monthly-stock`…), **giữ redirect route cũ vĩnh viễn** (bookmark, link đã gửi Zalo); `?tab=` dùng giá trị mới + đọc cả giá trị cũ; `features/doi-soat` → `features/reconciliation`. **Không đổi id dùng cho phân quyền** trong `nav-access.ts`; nếu đổi thì có bảng ánh xạ | 🟡→🔴 nếu đụng gate vai trò | 0,5–1 ngày | Link cũ mở đúng màn; gate 2 bộ phận không đổi |
 | **5 · Dữ liệu đã lưu** | (a) 6 họ enum slug: đọc cả cũ + mới, ghi mới, rồi migration `UPDATE` idempotent. (b) 31 khóa `toMau`: migration đổi `row_marks.table_key` cùng lúc deploy code. (c) Khóa localStorage cũ: bộ chuyển một lần, giữ khóa cũ tới khi chắc. (d) 2 cột `component_*_kg`: thêm cột mới, ghi cả hai, rồi bỏ cột cũ. (e) Hàm SQL: tạo tên mới, tên cũ thành vỏ gọi sang. (f) Policy: `ALTER POLICY … RENAME TO` | 🔴 | 2–3 ngày + kiểm 2 chế độ (có / không `.env`, ngắt mạng rồi nối lại) | Backup trước; chạy migration 2 lần không lỗi; số liệu sổ không đổi một dòng |
 
@@ -153,11 +153,23 @@ Phân bố khai báo tên Việt theo khu: `lib` 1.129 · `design-system` 301 ·
 - Doc / `covers:` / bảng cổng kiểm của CLAUDE.md / comment + tiêu đề test đổi theo (chỉ khi tên cũ đã biến khỏi `src`; tên trùng symbol khác còn sống — `tongDong`, `NutDong`, `DauDong`… — giữ cho Đợt 3/4).
 - Sau Đợt 2: `declarations` **731** · `fields` 1229 · `routes` 6 · `css` 27 · `files` **45**. Còn lại chủ yếu: API design-system (Đợt 3), file/thư mục features + route (Đợt 4), tên trường (`fields` — props design-system ở Đợt 3; thuộc tính kiểu lưu DB thì KHÔNG đổi).
 
+### Kết quả Đợt 3 (2026-10-13)
+
+- **API design-system sang tiếng Anh:** 102 export (`BangTong` → `SummaryTable`, `LuoiNhap` → `EditableGrid`, `KhungCuonNgang` → `HorizontalScroll`, `Nhan` → `Tag`, `NutToMauChon` → `RowMarkActions`, `useToMau` → `useRowMarkTools`…), ~260 prop (`nhan` → `label`, `moTa` → `description`, `tieuDe` → `title`, `toMau` → `rowMarkKey`, `xoRa` → `fullHeight`, `dinhDau` → `stickyHeader`, `onSuaMuc`/`nhanSua`/`suaDuoc` → `onEditItem`/`editLabel`/`canEdit`, `chinh` → `primary`, `anTrenDienThoai` → `hideOnMobile`…), `notify.daLuu/daXoa/loi/canhBao` → `notify.saved/deleted/error/warning`, 16 file pattern (`ThongKe.tsx` → `StatCardGrid.tsx`, `toMauNguon.ts` → `rowMarkSource.ts`…).
+- **CSS:** utility `hien-*` → `enter-*`, `nhan-an` → `press-feedback`, `*-an-toan` → `*-safe`, `bang-*` → `table-*`, `cot-dau-dinh` → `sticky-first-col`; variant `ngang-thap:` → `short-landscape:`; `data-to-mau` → `data-marked` (+ 9 `data-*` khác); biến `--pad-o` → `--cell-pad`, `--to-nen` → `--mark-bg`. **Giữ nguyên** bảng màu `--to-<sắc>-<mức>` + `--tone-*` vì mã sắc (`vang-3`…) là GIÁ TRỊ đã lưu trong `row_marks`; giữ giá trị mật độ `thoang/vua/gon` (khóa cài đặt đã lưu).
+- **Kèm (sót từ Đợt 2):** `TableMapping` (`layKhoa` → `getKey`, `vaDongCu` → `patchLegacy`, `truongKhongCache` → `uncachedFields`, `cotThamChieu` → `refColumns`, `khoaChinh` → `primaryKey`), `BANG_X` → `X_TABLE`, `connectivity.baoLoi/baoOK/laySnapshot` → `reportError/reportOk/getSnapshot`.
+- **Bài học 1 — đổi tên prop có lỗi ÂM THẦM mà `tsc` không bắt:** object có spread (`{ ...c, oRieng: undefined, khoa: () => true }`) hoặc dựng trong callback `.map` của hàm generic KHÔNG bị kiểm thuộc tính thừa ⇒ khóa cũ bị bỏ qua lặng lẽ. Đã dính: **khóa ô kỳ cân đối đã chốt** (MaterialGrid/WipGrid) và dòng phụ của lựa chọn Combobox ở 15 chỗ. Bắt bằng script dò "khóa object còn tên cũ trong khi kiểu đích (spread / kiểu khai báo / kiểu ngữ cảnh) không có khóa đó" — PHẢI chạy sau mọi đợt đổi tên prop.
+- **Bài học 2 — file test KHÔNG được kiểm kiểu** (`tsconfig.app.json` loại `*.test.ts`): test dựng object bằng khóa cũ chỉ lộ khi chạy (`rowMarks.test`, `repo.test` — hàng chờ đồng bộ). Cần cổng `tsc` riêng cho test.
+- **Bài học 3 — re-export qua barrel:** language service giữ tên công khai bằng bí danh (`SummaryTable as BangTong` ở `design-system/index.ts`) ⇒ phải đổi tiếp chính bí danh rồi gộp `X as X`.
+- Sau Đợt 3: `declarations` **484** · `fields` **934** · `routes` 6 · `css` **0** · `files` **29**.
+
 ### Cách chạy lại codemod
 
 ```bash
 node scripts/naming/rename.mjs collect <out.json> src/lib/   # liệt kê ứng viên (khai báo không export)
-node scripts/naming/rename.mjs apply <mapping.json> src/lib/ # mapping {"cu":"new","file::cu":"override"}
+node scripts/naming/rename.mjs apply <mapping.json> src/lib/ # mapping {"cu":"new","file::cu":"override","file::Chu.cu":"theo chủ"}
+node scripts/naming/rename.mjs collect --props <out.json> src/design-system/  # tên thuộc tính trong interface / type literal
+node scripts/naming/rename.mjs apply --props <mapping.json> src/design-system/
 ```
 Đợt 2 (export) cần mở rộng `collect` sang khai báo CÓ export — rename của language service tự sửa mọi nơi import.
 

@@ -115,14 +115,14 @@ import {
   Sparkles,
 } from "lucide-react";
 
-const TAT_CA_KHO = "__tat_ca__";
+const ALL_WAREHOUSES = "__tat_ca__";
 
 /** 5 kho hệ thống (BSF1_WAREHOUSES) — chọn chuẩn, không gõ tự do. Lưu theo TÊN kho. */
-const KHO_HE_THONG: MucChon[] = BSF1_WAREHOUSES.map((w) => ({ value: w.name, label: `${w.name} · ${w.code}` }));
-const MA_KHO = new Map(BSF1_WAREHOUSES.map((w) => [w.name, w.code]));
+const SYSTEM_WAREHOUSES: MucChon[] = BSF1_WAREHOUSES.map((w) => ({ value: w.name, label: `${w.name} · ${w.code}` }));
+const WAREHOUSE_CODES = new Map(BSF1_WAREHOUSES.map((w) => [w.name, w.code]));
 /** Token ASCII ổn định của kho cho id nhập (mã kho nếu là kho hệ thống). */
-const maKho = (ten: string) => MA_KHO.get(ten) ?? ten.replace(/[|\s]+/g, "-");
-const KHO_MAC_DINH = BSF1_WAREHOUSES.find((w) => w.code === "K1500T")?.name ?? BSF1_WAREHOUSES[0].name;
+const warehouseCode = (ten: string) => WAREHOUSE_CODES.get(ten) ?? ten.replace(/[|\s]+/g, "-");
+const DEFAULT_WAREHOUSE = BSF1_WAREHOUSES.find((w) => w.code === "K1500T")?.name ?? BSF1_WAREHOUSES[0].name;
 
 /** Form thêm/sửa một dòng (phần mô tả + số liệu đầy đủ). */
 interface DongForm {
@@ -144,7 +144,7 @@ interface DongForm {
   outKg: number | null;
 }
 
-const formRong = (category: string, warehouse: string): DongForm => ({
+const emptyForm = (category: string, warehouse: string): DongForm => ({
   id: null,
   category,
   warehouse,
@@ -173,56 +173,56 @@ const soHoacGach = (v: number) => (chuan0(v) ? num(v) : "—");
  * tháng sau" tự chuyển tồn cuối → tồn đầu kỳ sau; hết chép tay chỗ hay sai số.
  */
 export default function MonthlyStockScreen() {
-  const [lines, ghiLinesGoc] = useMonthlyStock();
-  const [mtypes, ghiMtypes] = useMaterialTypes();
-  const [products, ghiProducts] = useProducts();
-  const [khoLuuDM, ghiKhoLuuDM] = useStorageLocations();
+  const [lines, writeLinesRaw] = useMonthlyStock();
+  const [mtypes, setMtypes] = useMaterialTypes();
+  const [products, setProducts] = useProducts();
+  const [storageLocationCatalog, setStorageLocationCatalog] = useStorageLocations();
 
-  const [thang, setThang] = useState(thangHienTai());
-  const [kho, setKho] = useState(TAT_CA_KHO);
+  const [month, setMonth] = useState(thangHienTai());
+  const [warehouse, setWarehouse] = useState(ALL_WAREHOUSES);
   const [moIn, setMoIn] = useState(false);
-  const [timKiem, setTimKiem] = useState(""); // tìm nhanh trong tháng (tên · size · xuất xứ · nhóm)
-  const [daChon, setDaChon] = useState<Set<string>>(new Set()); // dòng đang tick (cộng tổng / thao tác lô)
-  const [xemThe, setXemThe] = useState<MonthlyStockRow | null>(null); // thẻ kho của 1 mặt hàng
-  const [anDongTrong, setAnDongTrong] = useState(false); // ẩn dòng tồn đầu = nhập = xuất = 0
+  const [searchQuery, setSearchQuery] = useState(""); // tìm nhanh trong tháng (tên · size · xuất xứ · nhóm)
+  const [selected, setSelected] = useState<Set<string>>(new Set()); // dòng đang tick (cộng tổng / thao tác lô)
+  const [viewedCard, setViewedCard] = useState<MonthlyStockRow | null>(null); // thẻ kho của 1 mặt hàng
+  const [hideEmptyRows, setHideEmptyRows] = useState(false); // ẩn dòng tồn đầu = nhập = xuất = 0
 
   // ---------- Nhập Excel bảng kê (seed số cũ) ----------
   const fileRef = useRef<HTMLInputElement>(null);
   const [napForm, setNapForm] = useState<{ sheets: BangKeKhoSheet[]; nam: number; kho: string } | null>(null);
 
   // ---------- Tuỳ chọn tháng / kho ----------
-  const thangCoData = useMemo(
+  const monthsWithData = useMemo(
     () => [...new Set(lines.map((l) => l.period).filter(Boolean))],
     [lines]
   );
-  const thangOpts: MucChon[] = useMemo(
-    () => danhSachThang([...thangCoData, thang]).map((p) => ({ value: p, label: nhanThang(p) })),
-    [thangCoData, thang]
+  const monthOptions: MucChon[] = useMemo(
+    () => danhSachThang([...monthsWithData, month]).map((p) => ({ value: p, label: nhanThang(p) })),
+    [monthsWithData, month]
   );
 
-  const khoOpts: MucChon[] = useMemo(() => {
+  const warehouseOpts: MucChon[] = useMemo(() => {
     // 5 kho hệ thống luôn chọn được + kho lạ đã có trong dữ liệu (nếu import tự tạo).
     const set = new Set<string>(BSF1_WAREHOUSES.map((w) => w.name));
     for (const l of lines) if (l.warehouse) set.add(l.warehouse);
     return [
-      { value: TAT_CA_KHO, label: "Tất cả kho" },
-      ...[...set].sort().map((k) => ({ value: k, label: MA_KHO.has(k) ? `${k} · ${MA_KHO.get(k)}` : k })),
+      { value: ALL_WAREHOUSES, label: "Tất cả kho" },
+      ...[...set].sort().map((k) => ({ value: k, label: WAREHOUSE_CODES.has(k) ? `${k} · ${WAREHOUSE_CODES.get(k)}` : k })),
     ];
   }, [lines]);
 
   // ---------- Dòng của tháng đang xem ----------
   /** Dòng ĐÃ LƯU của tháng + kho đang chọn (chưa lọc theo ô tìm). */
-  const rowsLuu: MonthlyStockRow[] = useMemo(() => {
+  const savedRows: MonthlyStockRow[] = useMemo(() => {
     return lines
-      .filter((l) => l.period === thang && (kho === TAT_CA_KHO || l.warehouse === kho))
+      .filter((l) => l.period === month && (warehouse === ALL_WAREHOUSES || l.warehouse === warehouse))
       .map(suyDong);
-  }, [lines, thang, kho]);
+  }, [lines, month, warehouse]);
 
   // Tháng liền trước (mọi kho — dồn kỳ không bỏ sót kho nào).
-  const thangTr = thangTruoc(thang);
-  const rowsTruoc = useMemo(
-    () => lines.filter((l) => l.period === thangTr).map(suyDong),
-    [lines, thangTr]
+  const prevMonth = thangTruoc(month);
+  const priorRows = useMemo(
+    () => lines.filter((l) => l.period === prevMonth).map(suyDong),
+    [lines, prevMonth]
   );
 
   /**
@@ -232,62 +232,62 @@ export default function MonthlyStockScreen() {
    * mới ghi. Cố ý không tự ghi: dồn kỳ phải đi qua bước đối chiếu khi lô tách/đổi
    * mã (xem `doiChieuDonKy`), tự ghi đè dễ cộng đôi.
    */
-  const rowsXemTruoc: MonthlyStockRow[] = useMemo(() => {
-    if (rowsLuu.length > 0) return [];
-    const nguon = rowsTruoc.filter((r) => kho === TAT_CA_KHO || r.warehouse === kho);
-    return donSangThang(nguon, thang).map(suyDong);
-  }, [rowsLuu.length, rowsTruoc, kho, thang]);
+  const previewRows: MonthlyStockRow[] = useMemo(() => {
+    if (savedRows.length > 0) return [];
+    const source = priorRows.filter((r) => warehouse === ALL_WAREHOUSES || r.warehouse === warehouse);
+    return donSangThang(source, month).map(suyDong);
+  }, [savedRows.length, priorRows, warehouse, month]);
 
   // Theo kho đang lọc (lọc một kho còn trống vẫn xem trước được); phần GHI chỉ dồn
   // đúng phạm vi `khoDon` nên kho khác trong tháng không bị đặt lại.
-  const laXemTruoc = rowsLuu.length === 0 && rowsXemTruoc.length > 0;
+  const isPreview = savedRows.length === 0 && previewRows.length > 0;
 
   /** Dòng đang HIỂN THỊ = dòng đã lưu, hoặc bản xem trước khi tháng còn trống. */
-  const rowsGoc = laXemTruoc ? rowsXemTruoc : rowsLuu;
+  const rowsGoc = isPreview ? previewRows : savedRows;
 
   /** Số dòng không có số liệu trong phạm vi đang xem (để ghi trên nút ẩn/hiện). */
-  const soDongTrong = useMemo(() => rowsGoc.filter(laDongTrong).length, [rowsGoc]);
+  const emptyRowCount = useMemo(() => rowsGoc.filter(laDongTrong).length, [rowsGoc]);
 
   /** Ô tìm nhanh: tên · size · invoice · nhóm · kho · vị trí (không phân biệt hoa thường) + ẩn dòng trống. */
-  const rowsThang: MonthlyStockRow[] = useMemo(() => {
-    const q = timKiem.trim().toLowerCase();
-    const nguon = anDongTrong ? rowsGoc.filter((r) => !laDongTrong(r)) : rowsGoc;
-    if (!q) return nguon;
-    return nguon.filter((r) =>
+  const monthRows: MonthlyStockRow[] = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    const source = hideEmptyRows ? rowsGoc.filter((r) => !laDongTrong(r)) : rowsGoc;
+    if (!q) return source;
+    return source.filter((r) =>
       `${r.itemName} ${r.size} ${r.origin} ${r.category} ${r.warehouse} ${r.storageLocation}`.toLowerCase().includes(q)
     );
-  }, [rowsGoc, timKiem, anDongTrong]);
+  }, [rowsGoc, searchQuery, hideEmptyRows]);
 
-  const nhomList = useMemo(() => gomNhom(rowsThang), [rowsThang]);
-  const tong = useMemo(() => tongDong(rowsThang), [rowsThang]);
-  const batBienDung = Math.abs(tong.openKg + tong.inKg - tong.outKg - tong.closeKg) < 0.001;
+  const nhomList = useMemo(() => gomNhom(monthRows), [monthRows]);
+  const total = useMemo(() => tongDong(monthRows), [monthRows]);
+  const invariantHolds = Math.abs(total.openKg + total.inKg - total.outKg - total.closeKg) < 0.001;
 
   // Dồn sang tháng sau dùng TOÀN BỘ dòng của tháng (mọi kho), không theo bộ lọc.
-  const rowsThangDayDu = useMemo(
-    () => lines.filter((l) => l.period === thang).map(suyDong),
-    [lines, thang]
+  const fullMonthRows = useMemo(
+    () => lines.filter((l) => l.period === month).map(suyDong),
+    [lines, month]
   );
   // Theo KG (đơn vị ghi sổ) — cùng điều kiện lọc của `donSangThang`.
-  const coTonSang = rowsThangDayDu.some((r) => Math.abs(r.closeKg) > 1e-9);
+  const hasCarryForward = fullMonthRows.some((r) => Math.abs(r.closeKg) > 1e-9);
 
   /** Phạm vi kho khi kéo tồn tháng trước về (gõ ở xem trước / "Kế thừa"): tháng còn trống
    *  hẳn ⇒ mọi kho (không bỏ sót kho nào); tháng đã có dòng ở kho KHÁC (đang lọc một kho
    *  còn trống) ⇒ CHỈ kho đang lọc — không đặt lại dòng carry của kho kia. */
-  const khoDon = () => (rowsThangDayDu.length === 0 || kho === TAT_CA_KHO ? undefined : kho);
+  const carryWarehouse = () => (fullMonthRows.length === 0 || warehouse === ALL_WAREHOUSES ? undefined : warehouse);
 
   // Cờ lệch dồn kỳ: tồn đầu tháng này (mọi kho) vs tồn cuối tháng trước.
-  const lech = useMemo(() => soLechDonKy(rowsTruoc, rowsThangDayDu), [rowsTruoc, rowsThangDayDu]);
+  const lech = useMemo(() => soLechDonKy(priorRows, fullMonthRows), [priorRows, fullMonthRows]);
   // Đang XEM TRƯỚC thì "lệch" chính là phần chưa dồn — banner xem trước đã nói rồi,
   // hiện thêm cảnh báo đỏ chỉ làm người dùng tưởng sai số liệu.
-  const canhBaoLech = rowsTruoc.length > 0 && coLechDonKy(lech) && !laXemTruoc;
+  const showDiffWarning = priorRows.length > 0 && coLechDonKy(lech) && !isPreview;
 
   // Đối chiếu lệch theo MẶT HÀNG (chẩn đoán — người dùng tự sửa thẳng trên bảng).
-  const dsDoiChieu = useMemo(() => doiChieuDonKy(rowsTruoc, rowsThangDayDu), [rowsTruoc, rowsThangDayDu]);
-  const [moDoiChieu, setMoDoiChieu] = useState(false);
+  const dsDoiChieu = useMemo(() => doiChieuDonKy(priorRows, fullMonthRows), [priorRows, fullMonthRows]);
+  const [isCompareOpen, setIsCompareOpen] = useState(false);
 
   // Đồng bộ tên trong sổ ↔ CẢ HAI danh mục (loại NL + mặt hàng), định tuyến TỪNG DÒNG.
   // Thành phẩm (141 mã kế toán) CỐ ĐỊNH — không thêm ở đây.
-  const dongBo = useMemo(
+  const catalogSync = useMemo(
     () =>
       phanTichDongBoDanhMuc(
         [...new Set(lines.map((l) => l.itemName))],
@@ -296,8 +296,8 @@ export default function MonthlyStockScreen() {
       ),
     [lines, mtypes, products]
   );
-  const [moDongBo, setMoDongBo] = useState(false);
-  const [dichDB, setDichDB] = useState<Record<string, DichDanhMuc>>({}); // đích từng dòng (đè gợi ý)
+  const [isSyncOpen, setIsSyncOpen] = useState(false);
+  const [savedTargets, setSavedTargets] = useState<Record<string, DichDanhMuc>>({}); // đích từng dòng (đè gợi ý)
   const [mapDB, setMapDB] = useState<Record<string, string>>({}); // ánh xạ tên file → tên chuẩn trong danh mục
 
   // ---------- Hoàn tác / làm lại (Ctrl+Z / Ctrl+Y) — như lưới Cân đối ----------
@@ -305,37 +305,37 @@ export default function MonthlyStockScreen() {
      lần ghi chụp lại sổ TRƯỚC khi ghi; gõ liên tiếp vào CÙNG một ô (cùng `nhom`) chỉ
      là MỘT bước lùi. Lịch sử theo phiên mở màn — rời màn là mất. */
   const lui = useRef<{ nhom: string; lines: MonthlyStockLine[] }[]>([]);
-  const tien = useRef<{ nhom: string; lines: MonthlyStockLine[] }[]>([]);
+  const amount = useRef<{ nhom: string; lines: MonthlyStockLine[] }[]>([]);
   const [lichSu, setLichSu] = useState({ lui: 0, tien: 0 });
-  const demLichSu = () => setLichSu({ lui: lui.current.length, tien: tien.current.length });
+  const demLichSu = () => setLichSu({ lui: lui.current.length, tien: amount.current.length });
 
   /** MỌI lần ghi sổ của màn đi qua đây (thao tác dòng, dồn kỳ, nạp Excel, gõ ô…). */
-  const ghiLines = (next: MonthlyStockLine[], nhom?: string) => {
-    const dinh = lui.current[lui.current.length - 1];
-    if (!nhom || !dinh || dinh.nhom !== nhom) {
+  const writeLines = (next: MonthlyStockLine[], nhom?: string) => {
+    const topSnapshot = lui.current[lui.current.length - 1];
+    if (!nhom || !topSnapshot || topSnapshot.nhom !== nhom) {
       lui.current.push({ nhom: nhom ?? uid(), lines });
       if (lui.current.length > 100) lui.current.shift();
     }
-    tien.current = [];
+    amount.current = [];
     demLichSu();
-    ghiLinesGoc(next);
+    writeLinesRaw(next);
   };
-  const hoanTac = useCallback(() => {
+  const undo = useCallback(() => {
     const m = lui.current.pop();
     if (!m) return;
-    tien.current.push({ nhom: m.nhom, lines });
-    ghiLinesGoc(m.lines);
-    setLichSu({ lui: lui.current.length, tien: tien.current.length });
+    amount.current.push({ nhom: m.nhom, lines });
+    writeLinesRaw(m.lines);
+    setLichSu({ lui: lui.current.length, tien: amount.current.length });
     notify.daLuu("Đã hoàn tác");
-  }, [lines, ghiLinesGoc]);
-  const lamLai = useCallback(() => {
-    const m = tien.current.pop();
+  }, [lines, writeLinesRaw]);
+  const redo = useCallback(() => {
+    const m = amount.current.pop();
     if (!m) return;
     lui.current.push({ nhom: m.nhom, lines });
-    ghiLinesGoc(m.lines);
-    setLichSu({ lui: lui.current.length, tien: tien.current.length });
+    writeLinesRaw(m.lines);
+    setLichSu({ lui: lui.current.length, tien: amount.current.length });
     notify.daLuu("Đã làm lại");
-  }, [lines, ghiLinesGoc]);
+  }, [lines, writeLinesRaw]);
   useEffect(() => {
     const nghe = (e: KeyboardEvent) => {
       if (!e.ctrlKey && !e.metaKey) return;
@@ -344,15 +344,15 @@ export default function MonthlyStockScreen() {
       const k = e.key.toLowerCase();
       if (k === "z" && !e.shiftKey) {
         e.preventDefault();
-        hoanTac();
+        undo();
       } else if (k === "y" || (k === "z" && e.shiftKey)) {
         e.preventDefault();
-        lamLai();
+        redo();
       }
     };
     window.addEventListener("keydown", nghe);
     return () => window.removeEventListener("keydown", nghe);
-  }, [hoanTac, lamLai]);
+  }, [undo, redo]);
 
   // ---------- Ghi THẲNG trên bảng ----------
   /* Sửa một dòng ngay tại ô — đi qua chốt audit của repo.ts như mọi đường ghi (lưu vết
@@ -364,18 +364,18 @@ export default function MonthlyStockScreen() {
    * `carry|<id nguồn>` = đúng id dòng đang xem trước ⇒ ô đang gõ không mất con trỏ.
    * Cùng quy tắc "tháng chưa mở thì tự kế thừa" của Cân đối (chốt 2026-10-06).
    */
-  const soNenDeGhi = (): { nen: MonthlyStockLine[]; keThua: number } => {
-    if (!laXemTruoc) return { nen: lines, keThua: 0 };
-    const kq = donKyVaoSo(lines, thang, khoDon());
+  const baseLinesForWrite = (): { nen: MonthlyStockLine[]; keThua: number } => {
+    if (!isPreview) return { nen: lines, keThua: 0 };
+    const kq = donKyVaoSo(lines, month, carryWarehouse());
     return { nen: kq.lines, keThua: kq.soDong };
   };
   const baoKeThua = (n: number) => {
-    if (n) notify.daLuu(`Đã kế thừa ${n} dòng tồn cuối ${nhanThang(thangTr)} vào sổ ${nhanThang(thang)} rồi ghi số vừa gõ`);
+    if (n) notify.daLuu(`Đã kế thừa ${n} dòng tồn cuối ${nhanThang(prevMonth)} vào sổ ${nhanThang(month)} rồi ghi số vừa gõ`);
   };
 
-  const suaSo = (id: string, patch: Partial<MonthlyStockLine>, nhom?: string) => {
-    const { nen, keThua } = soNenDeGhi();
-    ghiLines(
+  const editLedger = (id: string, patch: Partial<MonthlyStockLine>, nhom?: string) => {
+    const { nen, keThua } = baseLinesForWrite();
+    writeLines(
       nen.map((l) => (l.id === id ? { ...l, ...patch } : l)),
       nhom ?? `${id}|${Object.keys(patch).join(",")}`
     );
@@ -387,36 +387,36 @@ export default function MonthlyStockScreen() {
      (nhóm của bảng, tháng đang xem, kho đang lọc — "Tất cả kho" thì kho mặc định), con
      trỏ nhảy sang ô Nhập của dòng đó để gõ số tiếp. Tháng đang xem trước ⇒ tự kế thừa
      & lưu trước (soNenDeGhi). Cần điền nhiều ô một lần thì vẫn có hộp "Thêm đủ thông tin". */
-  const tenHangOpts = (category: string): MucChon[] => {
+  const productNameOptions = (category: string): MucChon[] => {
     const cungNhom = new Set<string>();
     const khac = new Set<string>();
     for (const l of lines) (l.category === category ? cungNhom : khac).add(l.itemName);
     for (const m of mtypes) khac.add(m.name);
     for (const sp of products) khac.add(sp.name);
     const ra: MucChon[] = [];
-    const daCo = new Set<string>();
+    const existing = new Set<string>();
     for (const [ds, phu] of [
       [cungNhom, category],
       [khac, undefined],
     ] as const) {
       for (const t of [...ds].filter(Boolean).sort((a, b) => a.localeCompare(b, "vi"))) {
         const k = t.trim().toLowerCase();
-        if (daCo.has(k)) continue;
-        daCo.add(k);
+        if (existing.has(k)) continue;
+        existing.add(k);
         ra.push({ value: t, label: t, phu });
       }
     }
     return ra;
   };
-  const themDongNhanh = (category: string, ten: string) => {
+  const quickAddRow = (category: string, ten: string) => {
     const t = ten.trim();
     if (!t) return;
-    const { nen, keThua } = soNenDeGhi();
+    const { nen, keThua } = baseLinesForWrite();
     const dong: MonthlyStockLine = {
-      id: `msl|${thang}|${uid()}`,
-      period: thang,
+      id: `msl|${month}|${uid()}`,
+      period: month,
       category,
-      warehouse: kho !== TAT_CA_KHO ? kho : KHO_MAC_DINH,
+      warehouse: warehouse !== ALL_WAREHOUSES ? warehouse : DEFAULT_WAREHOUSE,
       itemName: t,
       size: "",
       origin: "",
@@ -431,15 +431,15 @@ export default function MonthlyStockScreen() {
       outCtn: 0,
       outKg: 0,
       carriedFromId: "",
-      sortOrder: nen.filter((l) => l.period === thang).length,
+      sortOrder: nen.filter((l) => l.period === month).length,
       note: "",
     };
-    ghiLines([...nen, dong]);
+    writeLines([...nen, dong]);
     baoKeThua(keThua);
     notify.daLuu(`Đã thêm dòng ${t} vào ${category} — gõ số ngay trên bảng`);
     /* Dòng mới đang ẩn vì ô tìm / ẩn dòng trống ⇒ bỏ lọc để thấy nó. */
-    if (timKiem.trim() && !`${t} ${category}`.toLowerCase().includes(timKiem.trim().toLowerCase())) setTimKiem("");
-    if (anDongTrong) setAnDongTrong(false);
+    if (searchQuery.trim() && !`${t} ${category}`.toLowerCase().includes(searchQuery.trim().toLowerCase())) setSearchQuery("");
+    if (hideEmptyRows) setHideEmptyRows(false);
     setTimeout(() => {
       const o = document.querySelector<HTMLInputElement>(
         `input[data-dong="${CSS.escape(dong.id)}"][data-navcol="inKg"]`
@@ -450,7 +450,7 @@ export default function MonthlyStockScreen() {
   };
 
   /** Cột số gõ được trên bảng — đúng thứ tự cột hiển thị (để dán khối từ Excel). */
-  const COT_SO: (keyof Pick<MonthlyStockLine, "unitPrice" | "openKg" | "inKg" | "outKg">)[] = [
+  const NUMERIC_COLS: (keyof Pick<MonthlyStockLine, "unitPrice" | "openKg" | "inKg" | "outKg">)[] = [
     "unitPrice",
     "openKg",
     "inKg",
@@ -462,11 +462,11 @@ export default function MonthlyStockScreen() {
    * đang hiện (qua các nhóm), cột theo `COT_SO`. Hiểu `(2.000)` = −2.000 kiểu kế toán;
    * ô rỗng giữ nguyên số cũ. Gom MỘT lần ghi (dán 5×10 ô không thành 50 lần ghi đè).
    */
-  const danKhoi = (e: React.ClipboardEvent<HTMLInputElement>, rowId: string, cot: (typeof COT_SO)[number]) => {
+  const pasteBlock = (e: React.ClipboardEvent<HTMLInputElement>, rowId: string, columns: (typeof NUMERIC_COLS)[number]) => {
     const text = e.clipboardData.getData("text/plain");
     if (!text || !/[\t\n\r]/.test(text)) return; // một ô — để ô tự xử lý
     e.preventDefault();
-    const khoi = text
+    const block = text
       .replace(/\r\n?/g, "\n")
       .replace(/\n+$/, "")
       .split("\n")
@@ -481,46 +481,46 @@ export default function MonthlyStockScreen() {
       );
     const dsDong = nhomList.flatMap((g) => g.rows);
     const iH = dsDong.findIndex((r) => r.id === rowId);
-    const iC = COT_SO.indexOf(cot);
+    const iC = NUMERIC_COLS.indexOf(columns);
     if (iH < 0 || iC < 0) return;
     const doi = new Map<string, Partial<MonthlyStockLine>>();
     let soO = 0;
-    khoi.forEach((dong, i) =>
+    block.forEach((dong, i) =>
       dong.forEach((v, j) => {
         const r = dsDong[iH + i];
-        const c = COT_SO[iC + j];
+        const c = NUMERIC_COLS[iC + j];
         if (v == null || !r || !c) return;
         doi.set(r.id, { ...(doi.get(r.id) ?? {}), [c]: v });
         soO++;
       })
     );
     if (!soO) return;
-    const { nen, keThua } = soNenDeGhi();
-    ghiLines(nen.map((l) => (doi.has(l.id) ? { ...l, ...doi.get(l.id) } : l)));
+    const { nen, keThua } = baseLinesForWrite();
+    writeLines(nen.map((l) => (doi.has(l.id) ? { ...l, ...doi.get(l.id) } : l)));
     baoKeThua(keThua);
     notify.daLuu(`Đã dán ${soO} ô vào ${doi.size} dòng — Ctrl+Z để hoàn tác`);
   };
 
-  const xoaDong = (r: MonthlyStockRow) => {
-    const truoc = lines;
-    ghiLines(lines.filter((l) => l.id !== r.id));
-    notify.daXoa(`Đã xóa dòng ${r.itemName}`, () => ghiLines(truoc));
+  const removeRow = (r: MonthlyStockRow) => {
+    const prevRows = lines;
+    writeLines(lines.filter((l) => l.id !== r.id));
+    notify.daXoa(`Đã xóa dòng ${r.itemName}`, () => writeLines(prevRows));
   };
 
   // ---------- Thêm / sửa dòng ----------
   const [form, setForm] = useState<DongForm | null>(null);
   const [loi, setLoi] = useState<LoiNhap[]>([]);
 
-  const moThem = (catChon?: string) => {
+  const openAdd = (pickedCategory?: string) => {
     // Đang XEM TRƯỚC: lưu dòng mới sẽ TỰ kế thừa & lưu bảng kế thừa trước (luuDong →
     // soNenDeGhi) — trước đây chặn vì lưu riêng 1 dòng làm bảng kế thừa chưa lưu trôi mất.
     // catChon = nhóm của bảng bấm nút (điền sẵn nhóm, khỏi chọn lại). Không có ⇒ nhóm đầu.
-    const catGoiY = catChon || nhomList[0]?.category || MONTHLY_STOCK_CATEGORIES[0];
-    const khoGoiY = kho !== TAT_CA_KHO ? kho : KHO_MAC_DINH;
-    setForm(formRong(catGoiY, khoGoiY));
+    const suggestedCategory = pickedCategory || nhomList[0]?.category || MONTHLY_STOCK_CATEGORIES[0];
+    const suggestedWarehouse = warehouse !== ALL_WAREHOUSES ? warehouse : DEFAULT_WAREHOUSE;
+    setForm(emptyForm(suggestedCategory, suggestedWarehouse));
     setLoi([]);
   };
-  const moSua = (r: MonthlyStockRow) => {
+  const openEdit = (r: MonthlyStockRow) => {
     setForm({
       id: r.id,
       category: r.category,
@@ -542,7 +542,7 @@ export default function MonthlyStockScreen() {
     setLoi([]);
   };
 
-  const luuDong = () => {
+  const saveRow = () => {
     if (!form) return;
     const ls: LoiNhap[] = [];
     if (!form.category.trim()) ls.push({ truong: "Nhóm hàng", thongBao: "Chưa chọn nhóm" });
@@ -550,10 +550,10 @@ export default function MonthlyStockScreen() {
     setLoi(ls);
     if (ls.length) return;
 
-    const cu = form.id ? lines.find((l) => l.id === form.id) : undefined;
+    const prev = form.id ? lines.find((l) => l.id === form.id) : undefined;
     const dong: MonthlyStockLine = {
-      id: form.id ?? `msl|${thang}|${uid()}`,
-      period: cu?.period ?? thang,
+      id: form.id ?? `msl|${month}|${uid()}`,
+      period: prev?.period ?? month,
       category: form.category.trim(),
       warehouse: form.warehouse.trim(),
       itemName: form.itemName.trim(),
@@ -569,12 +569,12 @@ export default function MonthlyStockScreen() {
       inKg: form.inKg ?? 0,
       outCtn: form.outCtn ?? 0,
       outKg: form.outKg ?? 0,
-      carriedFromId: cu?.carriedFromId ?? "",
-      sortOrder: cu?.sortOrder ?? lines.filter((l) => l.period === thang).length,
-      note: cu?.note ?? "",
+      carriedFromId: prev?.carriedFromId ?? "",
+      sortOrder: prev?.sortOrder ?? lines.filter((l) => l.period === month).length,
+      note: prev?.note ?? "",
     };
-    const { nen, keThua } = form.id ? { nen: lines, keThua: 0 } : soNenDeGhi();
-    ghiLines(form.id ? lines.map((l) => (l.id === dong.id ? dong : l)) : [...nen, dong]);
+    const { nen, keThua } = form.id ? { nen: lines, keThua: 0 } : baseLinesForWrite();
+    writeLines(form.id ? lines.map((l) => (l.id === dong.id ? dong : l)) : [...nen, dong]);
     baoKeThua(keThua);
     setForm(null);
     notify.daLuu(form.id ? `Đã sửa dòng ${dong.itemName}` : `Đã thêm dòng ${dong.itemName}`);
@@ -587,28 +587,28 @@ export default function MonthlyStockScreen() {
     (kq.veKhong ? ` · ${kq.veKhong} dòng về tồn đầu 0 (tháng trước đã hết)` : "") +
     (kq.bo ? ` · bỏ ${kq.bo} dòng trống` : "");
 
-  const donTuThangTruoc = () => {
-    const kq = donKyVaoSo(lines, thang, khoDon());
+  const carryFromPrevMonth = () => {
+    const kq = donKyVaoSo(lines, month, carryWarehouse());
     if (!kq.soDong && !kq.veKhong && !kq.bo) {
-      notify.canhBao(`${nhanThang(thangTr)} không có tồn để dồn sang.`);
+      notify.canhBao(`${nhanThang(prevMonth)} không có tồn để dồn sang.`);
       return;
     }
-    ghiLines(kq.lines);
-    notify.daLuu(`Đã kế thừa ${kq.soDong} dòng · ${num(kq.tongKg)} kg từ ${nhanThang(thangTr)}${viecVe0(kq)}`);
+    writeLines(kq.lines);
+    notify.daLuu(`Đã kế thừa ${kq.soDong} dòng · ${num(kq.tongKg)} kg từ ${nhanThang(prevMonth)}${viecVe0(kq)}`);
   };
 
-  const donSangThangSau = () => {
-    const dich = thangSau(thang);
-    const kq = donKyVaoSo(lines, dich);
+  const carryToNextMonth = () => {
+    const target = thangSau(month);
+    const kq = donKyVaoSo(lines, target);
     if (!kq.soDong && !kq.veKhong && !kq.bo) {
       notify.canhBao("Tháng này không còn tồn cuối để dồn sang.");
       return;
     }
-    ghiLines(kq.lines);
-    setThang(dich);
-    setKho(TAT_CA_KHO);
+    writeLines(kq.lines);
+    setMonth(target);
+    setWarehouse(ALL_WAREHOUSES);
     notify.daLuu(
-      `Đã dồn tồn cuối sang ${nhanThang(dich)} · ${kq.soDong} dòng (${kq.them} mới, ${kq.capNhat} cập nhật tồn đầu, giữ nguyên nhập/xuất đã ghi)${viecVe0(kq)}`
+      `Đã dồn tồn cuối sang ${nhanThang(target)} · ${kq.soDong} dòng (${kq.them} mới, ${kq.capNhat} cập nhật tồn đầu, giữ nguyên nhập/xuất đã ghi)${viecVe0(kq)}`
     );
   };
 
@@ -618,18 +618,18 @@ export default function MonthlyStockScreen() {
    * dòng đó (không phải tổng cả tháng), rồi in riêng / xử theo lô. Chỉ giữ tập KHÓA
    * dòng ở state — không sửa dữ liệu.
    */
-  const chonBang: ChonBang<MonthlyStockRow> = {
-    daChon,
+  const tableSelection: ChonBang<MonthlyStockRow> = {
+    daChon: selected,
     doi: (k) =>
-      setDaChon((cu) => {
-        const next = new Set(cu);
+      setSelected((prev) => {
+        const next = new Set(prev);
         if (next.has(k)) next.delete(k);
         else next.add(k);
         return next;
       }),
     doiTatCa: (keys, bat) =>
-      setDaChon((cu) => {
-        const next = new Set(cu);
+      setSelected((prev) => {
+        const next = new Set(prev);
         for (const k of keys) {
           if (bat) next.add(k);
           else next.delete(k);
@@ -638,74 +638,74 @@ export default function MonthlyStockScreen() {
       }),
     nhanDong: (r) => `${r.itemName}${r.size ? " · " + r.size : ""}`,
   };
-  const rowsChon = useMemo(() => rowsThang.filter((r) => daChon.has(r.id)), [rowsThang, daChon]);
+  const selectedRows = useMemo(() => monthRows.filter((r) => selected.has(r.id)), [monthRows, selected]);
   // Tô màu dòng "đã dò" — cùng khoá với BangTong toMau="ton-kho-thang" bên dưới:
   // tick dòng → nút Tô màu / In đậm / Bỏ tô ở thanh "Đã chọn N dòng".
-  const toMau = useToMau("ton-kho-thang");
-  const tongChon = useMemo(() => tongDong(rowsChon), [rowsChon]);
-  const boChon = () => setDaChon(new Set());
+  const rowMark = useToMau("ton-kho-thang");
+  const selectedTotal = useMemo(() => tongDong(selectedRows), [selectedRows]);
+  const clearSelection = () => setSelected(new Set());
 
   /** Bản in: có tick thì in đúng mấy dòng đó, không thì in cả tháng đang xem. */
-  const rowsIn = rowsChon.length ? rowsChon : rowsThang;
+  const rowsIn = selectedRows.length ? selectedRows : monthRows;
   const nhomIn = useMemo(() => gomNhom(rowsIn), [rowsIn]);
-  const tongIn = useMemo(() => tongDong(rowsIn), [rowsIn]);
+  const printTotal = useMemo(() => tongDong(rowsIn), [rowsIn]);
 
   /** Chọn hết các dòng đang hiện (mọi nhóm) — nút ở thanh công cụ. */
-  const chonTatCa = () => setDaChon(new Set(rowsThang.map((r) => r.id)));
+  const selectAll = () => setSelected(new Set(monthRows.map((r) => r.id)));
 
   /** Xóa các dòng đã tick — có xác nhận + hoàn tác (không xóa lặng lẽ). */
-  const xoaDaChon = () => {
-    const ids = new Set(rowsChon.map((r) => r.id));
+  const deleteSelected = () => {
+    const ids = new Set(selectedRows.map((r) => r.id));
     if (!ids.size) return;
-    const truoc = lines;
-    ghiLines(lines.filter((l) => !ids.has(l.id)));
-    boChon();
-    notify.daXoa(`Đã xóa ${ids.size} dòng ${nhanThang(thang)}`, () => ghiLines(truoc));
+    const prevRows = lines;
+    writeLines(lines.filter((l) => !ids.has(l.id)));
+    clearSelection();
+    notify.daXoa(`Đã xóa ${ids.size} dòng ${nhanThang(month)}`, () => writeLines(prevRows));
   };
 
   // ---------- Vị trí hàng đang nằm (kho nhà + kho thuê ngoài) ----------
   /** Kho hệ thống + danh mục kho lưu (`storage_locations`) + tên đã dùng trong sổ. */
-  const viTriOpts: MucChon[] = useMemo(() => {
+  const locationOptions: MucChon[] = useMemo(() => {
     const phu = new Map<string, string>(BSF1_WAREHOUSES.map((w) => [w.name, `Kho xí nghiệp · ${w.code}`]));
-    for (const k of khoLuuDM) if (k.name.trim() && !phu.has(k.name.trim())) phu.set(k.name.trim(), STORAGE_KIND_LABELS[k.kind]);
+    for (const k of storageLocationCatalog) if (k.name.trim() && !phu.has(k.name.trim())) phu.set(k.name.trim(), STORAGE_KIND_LABELS[k.kind]);
     for (const l of lines) if (l.storageLocation && !phu.has(l.storageLocation)) phu.set(l.storageLocation, "");
-    return [...phu].map(([n, ghiChu]) => ({ value: n, label: n, phu: ghiChu || undefined }));
-  }, [khoLuuDM, lines]);
+    return [...phu].map(([n, note]) => ({ value: n, label: n, phu: note || undefined }));
+  }, [storageLocationCatalog, lines]);
 
   /**
    * Gõ vị trí chưa có ⇒ lưu ngay vào danh mục kho lưu (mặc định kho thuê ngoài).
    * Trùng tên (không phân hoa thường) với kho đã có ⇒ dùng lại tên có sẵn.
    */
-  const themViTri = (ten: string) => {
+  const addLocation = (ten: string) => {
     const name = ten.trim();
-    const co = viTriOpts.find((o) => o.value.toLowerCase() === name.toLowerCase());
+    const co = locationOptions.find((o) => o.value.toLowerCase() === name.toLowerCase());
     if (co) return co.value;
     if (name) {
-      ghiKhoLuuDM([...khoLuuDM, { id: uid(), code: "", name, kind: "thue-ngoai", address: "", phone: "", note: "Từ sổ kho theo tháng" }]);
+      setStorageLocationCatalog([...storageLocationCatalog, { id: uid(), code: "", name, kind: "thue-ngoai", address: "", phone: "", note: "Từ sổ kho theo tháng" }]);
       notify.daLuu(`Đã thêm kho lưu "${name}" vào danh mục`);
     }
     return name;
   };
   /** Bút chì sửa nhanh kho lưu ngay trong ô Vị trí — chỉ kho CÓ trong danh mục (kho hệ thống thì không). */
-  const suaKL = useSuaDanhMuc("khoLuu", khoLuuDM, ghiKhoLuuDM, { theo: "ten" });
+  const storageLocationEditor = useSuaDanhMuc("khoLuu", storageLocationCatalog, setStorageLocationCatalog, { theo: "ten" });
 
-  const [ganViTri, setGanViTri] = useState<string | null>(null); // vị trí sắp gán cho dòng tick
+  const [assignLocation, setAssignLocation] = useState<string | null>(null); // vị trí sắp gán cho dòng tick
   /** Gán vị trí cho các dòng đang tick (một lần ghi, có Hoàn tác). */
-  const ganViTriDaChon = () => {
-    const dich = (ganViTri ?? "").trim();
-    const ids = new Set(rowsChon.map((r) => r.id));
-    if (!dich || !ids.size) {
-      notify.canhBao(!dich ? "Chưa chọn vị trí để gán." : "Chưa tick dòng nào.");
+  const assignLocationToSelected = () => {
+    const target = (assignLocation ?? "").trim();
+    const ids = new Set(selectedRows.map((r) => r.id));
+    if (!target || !ids.size) {
+      notify.canhBao(!target ? "Chưa chọn vị trí để gán." : "Chưa tick dòng nào.");
       return;
     }
-    const truoc = lines;
-    ghiLines(lines.map((l) => (ids.has(l.id) ? { ...l, storageLocation: dich } : l)));
-    setGanViTri(null);
-    notify.daLuu(`Đã gửi ${ids.size} dòng tới ${dich}`, () => ghiLines(truoc));
+    const prevRows = lines;
+    writeLines(lines.map((l) => (ids.has(l.id) ? { ...l, storageLocation: target } : l)));
+    setAssignLocation(null);
+    notify.daLuu(`Đã gửi ${ids.size} dòng tới ${target}`, () => writeLines(prevRows));
   };
 
   // ---------- Thao tác một dòng: lấy ra dùng · nhập thêm · chuyển vị trí ----------
-  const [thaoTac, setThaoTac] = useState<{
+  const [action, setAction] = useState<{
     row: MonthlyStockRow;
     kieu: KieuThaoTac;
     kg: number | null;
@@ -715,22 +715,22 @@ export default function MonthlyStockScreen() {
   } | null>(null);
   const [loiTT, setLoiTT] = useState<LoiNhap[]>([]);
 
-  const moThaoTac = (row: MonthlyStockRow, kieu: KieuThaoTac = "xuat") => {
-    setThaoTac({ row, kieu, kg: null, viTri: "", ngay: homNay(), lyDo: "" });
+  const openAction = (row: MonthlyStockRow, kieu: KieuThaoTac = "xuat") => {
+    setAction({ row, kieu, kg: null, viTri: "", ngay: homNay(), lyDo: "" });
     setLoiTT([]);
   };
 
-  const luuThaoTac = () => {
-    if (!thaoTac) return;
-    const { row, kieu, kg, viTri, ngay, lyDo } = thaoTac;
+  const saveAction = () => {
+    if (!action) return;
+    const { row, kieu, kg, viTri, ngay, lyDo } = action;
     const ls: LoiNhap[] = [];
-    const tonCuoi = row.closeKg;
+    const closingKg = row.closeKg;
     if (!kg || kg <= 0) ls.push({ truong: "Số kg", thongBao: "Chưa nhập số kg (phải lớn hơn 0)" });
-    else if (kieu !== "nhap" && kg > tonCuoi + 1e-6)
-      ls.push({ truong: "Số kg", thongBao: `Vượt tồn cuối của dòng (${num(tonCuoi)} kg)` });
+    else if (kieu !== "nhap" && kg > closingKg + 1e-6)
+      ls.push({ truong: "Số kg", thongBao: `Vượt tồn cuối của dòng (${num(closingKg)} kg)` });
     if (kieu === "chuyen") {
       if (!viTri.trim()) ls.push({ truong: "Chuyển tới", thongBao: "Chưa chọn vị trí đích" });
-      else if (viTri.trim() === viTriCua(row)) ls.push({ truong: "Chuyển tới", thongBao: "Vị trí đích trùng vị trí hiện tại" });
+      else if (viTri.trim() === locationOf(row)) ls.push({ truong: "Chuyển tới", thongBao: "Vị trí đích trùng vị trí hiện tại" });
     }
     setLoiTT(ls);
     if (ls.length || !kg) return;
@@ -740,39 +740,39 @@ export default function MonthlyStockScreen() {
         ? `Lấy ra sử dụng ${num(kg)} kg`
         : kieu === "nhap"
           ? `Nhập thêm ${num(kg)} kg`
-          : `Gửi ${num(kg)} kg từ ${viTriCua(row) || "(chưa rõ)"} tới ${viTri.trim()}`;
-    const ghiChu = `${viDate(ngay || homNay())}: ${viec}${lyDo.trim() ? ` — ${lyDo.trim()}` : ""}`;
+          : `Gửi ${num(kg)} kg từ ${locationOf(row) || "(chưa rõ)"} tới ${viTri.trim()}`;
+    const note = `${viDate(ngay || homNay())}: ${viec}${lyDo.trim() ? ` — ${lyDo.trim()}` : ""}`;
     const goc = lines.find((l) => l.id === row.id);
     if (!goc) return;
-    const kq = apThaoTacLo(goc, kieu, kg, { viTriDich: viTri, ghiChu, idMoi: `msl|${thang}|${uid()}` });
-    const truoc = lines;
-    const sau = lines.map((l) => (l.id === kq.dong.id ? kq.dong : l));
-    ghiLines(kq.dongTach ? [...sau, kq.dongTach] : sau);
-    setThaoTac(null);
-    notify.daLuu(`${row.itemName}: ${viec}`, () => ghiLines(truoc));
+    const kq = apThaoTacLo(goc, kieu, kg, { viTriDich: viTri, ghiChu: note, idMoi: `msl|${month}|${uid()}` });
+    const prevRows = lines;
+    const updatedLines = lines.map((l) => (l.id === kq.dong.id ? kq.dong : l));
+    writeLines(kq.dongTach ? [...updatedLines, kq.dongTach] : updatedLines);
+    setAction(null);
+    notify.daLuu(`${row.itemName}: ${viec}`, () => writeLines(prevRows));
   };
 
   // ---------- Thẻ kho: lịch sử một mặt hàng qua các tháng ----------
-  const dsTheKho = useMemo(
-    () => (xemThe ? theKhoMatHang(lines, khoaLo(xemThe)) : []),
-    [lines, xemThe]
+  const stockCardList = useMemo(
+    () => (viewedCard ? theKhoMatHang(lines, khoaLo(viewedCard)) : []),
+    [lines, viewedCard]
   );
 
   // Lọc bảng về đúng mặt hàng lệch (ô Tìm) để sửa tay ngay trên bảng.
-  const suaTayMatHang = (d: DoiChieuDong) => {
-    setKho(d.warehouse);
-    setTimKiem(d.itemName);
-    setAnDongTrong(false);
-    setMoDoiChieu(false);
+  const manualFixProduct = (d: DoiChieuDong) => {
+    setWarehouse(d.warehouse);
+    setSearchQuery(d.itemName);
+    setHideEmptyRows(false);
+    setIsCompareOpen(false);
   };
 
   // ---------- Đồng bộ danh mục loại nguyên liệu ----------
   // Danh sách tên CHUẨN để ánh xạ tới (gõ tìm / thêm mới).
-  const matHangOpts: MucChon[] = useMemo(
+  const productOpts: MucChon[] = useMemo(
     () => [...products].map((p) => p.name).sort((a, b) => a.localeCompare(b)).map((n) => ({ value: n, label: n })),
     [products]
   );
-  const loaiNLOpts: MucChon[] = useMemo(
+  const materialTypeOpts: MucChon[] = useMemo(
     () => [...mtypes].map((m) => m.name).sort((a, b) => a.localeCompare(b)).map((n) => ({ value: n, label: n })),
     [mtypes]
   );
@@ -782,77 +782,77 @@ export default function MonthlyStockScreen() {
    * Đổi tên mặt hàng ở hộp sửa ⇒ dời luôn các ánh xạ đang trỏ tên cũ sang tên mới,
    * kẻo bấm Đồng bộ lại đẻ ra một mặt hàng mang tên cũ. (Loại NL khoá ô tên.)
    */
-  const suaMH = useSuaDanhMuc("matHang", products, ghiProducts, {
+  const productEditor = useSuaDanhMuc("matHang", products, setProducts, {
     theo: "ten",
-    onDaLuu: (moi, cu) => {
-      const tenCu = cu.name.trim().toLowerCase();
-      if (moi.name.trim().toLowerCase() === tenCu) return;
+    onDaLuu: (newLines, prev) => {
+      const oldName = prev.name.trim().toLowerCase();
+      if (newLines.name.trim().toLowerCase() === oldName) return;
       setMapDB((m) =>
         Object.fromEntries(
-          Object.entries(m).map(([k, v]) => [k, v.trim().toLowerCase() === tenCu ? moi.name.trim() : v])
+          Object.entries(m).map(([k, v]) => [k, v.trim().toLowerCase() === oldName ? newLines.name.trim() : v])
         )
       );
     },
   });
-  const suaNL = useSuaDanhMuc("loaiNL", mtypes, ghiMtypes, { theo: "ten" });
+  const materialTypeEditor = useSuaDanhMuc("loaiNL", mtypes, setMtypes, { theo: "ten" });
 
-  const moDongBoDialog = () => {
-    setDichDB({}); // rỗng = dùng đích GỢI Ý mỗi dòng
+  const openSyncDialog = () => {
+    setSavedTargets({}); // rỗng = dùng đích GỢI Ý mỗi dòng
     setMapDB({}); // rỗng = giữ nguyên tên file (chưa ánh xạ)
-    setMoDongBo(true);
+    setIsSyncOpen(true);
   };
   // Tách: MÃ KHÓ cần người quyết vs tên RÕ RÀNG (tự nhận loài, khỏi bận tâm).
-  const canDongBo = dongBo.chuaCo.filter((x) => !x.roRang);
-  const dsRoRang = dongBo.chuaCo.filter((x) => x.roRang);
-  const dichCua = (x: { name: string; dichGoiY: DichDanhMuc }): DichDanhMuc => dichDB[x.name] ?? x.dichGoiY;
+  const needsSync = catalogSync.chuaCo.filter((x) => !x.roRang);
+  const dsRoRang = catalogSync.chuaCo.filter((x) => x.roRang);
+  const targetOf = (x: { name: string; dichGoiY: DichDanhMuc }): DichDanhMuc => savedTargets[x.name] ?? x.dichGoiY;
   // Tên chuẩn được ánh xạ tới (mặc định = tên file nếu chưa chọn).
   const mapCua = (x: { name: string }) => (mapDB[x.name] ?? x.name).trim();
   const chuan = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " ");
   // Đếm trên TOÀN BỘ (cả mã khó lẫn rõ ràng) — mỗi dòng tự chọn đích.
-  const soMH = dongBo.chuaCo.filter((x) => dichCua(x) === "product").length;
-  const soNL = dongBo.chuaCo.filter((x) => dichCua(x) === "material").length;
+  const soMH = catalogSync.chuaCo.filter((x) => targetOf(x) === "product").length;
+  const materialCount = catalogSync.chuaCo.filter((x) => targetOf(x) === "material").length;
 
   /**
    * Áp đồng bộ: mỗi mã (đích ≠ bỏ qua) NỐI vào tên chuẩn (mapCua). Tên chuẩn chưa
    * có trong danh mục đích ⇒ thêm mới; và ĐỔI TÊN mọi dòng sổ mang tên file cũ
    * sang tên chuẩn (đồng bộ sổ + gộp trùng cách ghi).
    */
-  const apDongBo = () => {
-    const coNL = new Set(mtypes.map((m) => chuan(m.name)));
+  const applySync = () => {
+    const materialNames = new Set(mtypes.map((m) => chuan(m.name)));
     const coMH = new Set(products.map((p) => chuan(p.name)));
-    const themNL: MaterialType[] = [];
-    const themMH: Product[] = [];
-    const doiTen = new Map<string, string>(); // tên file → tên chuẩn (khi khác nhau)
-    for (const x of dongBo.chuaCo) {
-      const d = dichCua(x);
+    const materialsToAdd: MaterialType[] = [];
+    const productsToAdd: Product[] = [];
+    const renames = new Map<string, string>(); // tên file → tên chuẩn (khi khác nhau)
+    for (const x of catalogSync.chuaCo) {
+      const d = targetOf(x);
       if (d === "skip") continue;
       const canon = mapCua(x);
       if (!canon) continue;
-      if (d === "material" && !coNL.has(chuan(canon))) {
-        themNL.push({ id: uid(), name: canon, category: suyNhomNguyenLieu(canon), note: "Từ sổ kho theo tháng" });
-        coNL.add(chuan(canon));
+      if (d === "material" && !materialNames.has(chuan(canon))) {
+        materialsToAdd.push({ id: uid(), name: canon, category: suyNhomNguyenLieu(canon), note: "Từ sổ kho theo tháng" });
+        materialNames.add(chuan(canon));
       } else if (d === "product" && !coMH.has(chuan(canon))) {
-        themMH.push({ id: uid(), code: "", name: canon, finishedGoodCode: "", category: suyNhomNguyenLieu(canon), processingType: "" });
+        productsToAdd.push({ id: uid(), code: "", name: canon, finishedGoodCode: "", category: suyNhomNguyenLieu(canon), processingType: "" });
         coMH.add(chuan(canon));
       }
-      if (chuan(canon) !== chuan(x.name)) doiTen.set(x.name, canon);
+      if (chuan(canon) !== chuan(x.name)) renames.set(x.name, canon);
     }
-    if (!themNL.length && !themMH.length && !doiTen.size) {
+    if (!materialsToAdd.length && !productsToAdd.length && !renames.size) {
       notify.canhBao("Chưa ánh xạ/chọn đích dòng nào.");
       return;
     }
-    if (themNL.length) ghiMtypes([...mtypes, ...themNL]);
-    if (themMH.length) ghiProducts([...products, ...themMH]);
-    if (doiTen.size) ghiLines(lines.map((l) => (doiTen.has(l.itemName) ? { ...l, itemName: doiTen.get(l.itemName)! } : l)));
-    setMoDongBo(false);
+    if (materialsToAdd.length) setMtypes([...mtypes, ...materialsToAdd]);
+    if (productsToAdd.length) setProducts([...products, ...productsToAdd]);
+    if (renames.size) writeLines(lines.map((l) => (renames.has(l.itemName) ? { ...l, itemName: renames.get(l.itemName)! } : l)));
+    setIsSyncOpen(false);
     notify.daLuu(
-      `Đồng bộ: +${themMH.length} mặt hàng · +${themNL.length} loại NL · đổi tên ${doiTen.size} mã trong sổ`
+      `Đồng bộ: +${productsToAdd.length} mặt hàng · +${materialsToAdd.length} loại NL · đổi tên ${renames.size} mã trong sổ`
     );
   };
 
   /** Đặt đích cho một NHÓM dòng (bulk theo section). */
-  const datDich = (list: DongBoDong[], d: DichDanhMuc | "goiY") => {
-    setDichDB((m) => {
+  const setTarget = (list: DongBoDong[], d: DichDanhMuc | "goiY") => {
+    setSavedTargets((m) => {
       const next = { ...m };
       for (const x of list) {
         if (d === "goiY") delete next[x.name];
@@ -867,12 +867,12 @@ export default function MonthlyStockScreen() {
    * ô chọn danh mục — chốt 2026-10-06; trước đây chờ bấm Đồng bộ mới thêm). Trùng tên
    * (không phân hoa thường) ⇒ dùng lại bản có sẵn. Trả về TÊN (value của ô).
    */
-  const themTenChuan = (d: DichDanhMuc, t: string): string => {
+  const addCanonicalName = (d: DichDanhMuc, t: string): string => {
     const ten = t.trim();
     if (d === "product") {
       const co = products.find((p) => chuan(p.name) === chuan(ten));
       if (co) return co.name;
-      ghiProducts([
+      setProducts([
         ...products,
         { id: uid(), code: "", name: ten, finishedGoodCode: "", category: suyNhomNguyenLieu(ten), processingType: "" },
       ]);
@@ -880,7 +880,7 @@ export default function MonthlyStockScreen() {
     } else if (d === "material") {
       const co = mtypes.find((m) => chuan(m.name) === chuan(ten));
       if (co) return co.name;
-      ghiMtypes([...mtypes, { id: uid(), name: ten, category: suyNhomNguyenLieu(ten), note: "Từ sổ kho theo tháng" }]);
+      setMtypes([...mtypes, { id: uid(), name: ten, category: suyNhomNguyenLieu(ten), note: "Từ sổ kho theo tháng" }]);
       notify.daLuu(`Đã thêm loại nguyên liệu "${ten}" vào danh mục`);
     }
     return ten;
@@ -888,9 +888,9 @@ export default function MonthlyStockScreen() {
 
   /** Một dòng: tên file · đích (Mặt hàng/Loại NL/Bỏ qua) · ánh xạ tới tên CHUẨN. */
   const dongRow = (x: DongBoDong) => {
-    const d = dichCua(x);
-    const goc = d === "product" ? matHangOpts : loaiNLOpts;
-    const sua = d === "product" ? suaMH : d === "material" ? suaNL : null;
+    const d = targetOf(x);
+    const goc = d === "product" ? productOpts : materialTypeOpts;
+    const edit = d === "product" ? productEditor : d === "material" ? materialTypeEditor : null;
     // Tên đang ánh xạ (tên file, hoặc tên vừa gõ "thêm mới") chưa có trong danh mục ⇒ vẫn phải HIỆN
     // trong ô, kèm nhãn "mới"; không thì Combobox rơi về placeholder, trông như chưa thêm được.
     const ten = mapCua(x);
@@ -906,7 +906,7 @@ export default function MonthlyStockScreen() {
         <select
           className="h-9 shrink-0 rounded-md border border-border bg-background px-2"
           value={d}
-          onChange={(e) => setDichDB((m) => ({ ...m, [x.name]: e.target.value as DichDanhMuc }))}
+          onChange={(e) => setSavedTargets((m) => ({ ...m, [x.name]: e.target.value as DichDanhMuc }))}
           aria-label={`Đích ${x.name}`}
         >
           <option value="product">→ Mặt hàng</option>
@@ -920,10 +920,10 @@ export default function MonthlyStockScreen() {
             value={mapCua(x)}
             onChange={(v) => setMapDB((m) => ({ ...m, [x.name]: v }))}
             options={opts}
-            onCreate={d === "skip" ? undefined : (t) => themTenChuan(d, t)}
-            onSuaMuc={sua?.moSua}
-            nhanSua={sua?.nhanSua}
-            suaDuoc={sua?.suaDuoc}
+            onCreate={d === "skip" ? undefined : (t) => addCanonicalName(d, t)}
+            onSuaMuc={edit?.moSua}
+            nhanSua={edit?.nhanSua}
+            suaDuoc={edit?.suaDuoc}
             choPhepXoa={false}
             placeholder={d === "skip" ? "— bỏ qua —" : "Gõ tìm tên chuẩn / thêm mới"}
           />
@@ -933,7 +933,7 @@ export default function MonthlyStockScreen() {
   };
 
   // ---------- Nhập Excel bảng kê ----------
-  const chonFile = () => fileRef.current?.click();
+  const pickFile = () => fileRef.current?.click();
   const napFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = "";
@@ -948,40 +948,40 @@ export default function MonthlyStockScreen() {
       // Kho mặc định: kho của bản đã nạp cùng năm (nạp lại chỉ CẬP NHẬT) → kho khớp số ở tiêu đề sheet → K1500T.
       const daNap = lines.find((l) => l.id.startsWith("xlsx|") && l.id.split("|")[3] === String(nam));
       const so = khoTuTieuDe(sheets[0]?.tieuDe ?? "");
-      const theoTieuDe = so ? BSF1_WAREHOUSES.find((w) => w.code.includes(so) || w.name.includes(so))?.name : undefined;
-      setNapForm({ sheets, nam, kho: daNap?.warehouse ?? theoTieuDe ?? KHO_MAC_DINH });
+      const titleWarehouse = so ? BSF1_WAREHOUSES.find((w) => w.code.includes(so) || w.name.includes(so))?.name : undefined;
+      setNapForm({ sheets, nam, kho: daNap?.warehouse ?? titleWarehouse ?? DEFAULT_WAREHOUSE });
     } catch (err) {
       notify.loi(`Không đọc được file: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
-  const soDongNap = napForm
+  const importRowCount = napForm
     ? napForm.sheets.reduce((s, sh) => s + (sh.monthNum ? sh.rows.length : 0), 0)
     : 0;
   /** Soát trước khi nạp: số kho ở tiêu đề sheet + bản nạp cũ của cùng năm ở kho KHÁC (nạp nhầm = cộng đôi). */
-  const soatNap = useMemo(() => {
+  const importCheck = useMemo(() => {
     if (!napForm) return null;
-    const soTieuDe = [...new Set(napForm.sheets.map((sh) => khoTuTieuDe(sh.tieuDe)).filter(Boolean))];
-    const ma = maKho(napForm.kho.trim());
-    const khacKho = new Map<string, number>();
+    const titleWarehouses = [...new Set(napForm.sheets.map((sh) => khoTuTieuDe(sh.tieuDe)).filter(Boolean))];
+    const ma = warehouseCode(napForm.kho.trim());
+    const otherWarehouses = new Map<string, number>();
     for (const l of lines) {
       const p = l.id.split("|");
-      if (p[0] === "xlsx" && p[3] === String(napForm.nam) && p[1] !== ma) khacKho.set(l.warehouse, (khacKho.get(l.warehouse) ?? 0) + 1);
+      if (p[0] === "xlsx" && p[3] === String(napForm.nam) && p[1] !== ma) otherWarehouses.set(l.warehouse, (otherWarehouses.get(l.warehouse) ?? 0) + 1);
     }
-    const tieuDeLech = soTieuDe.length > 0 && !soTieuDe.some((so) => napForm.kho.includes(so) || ma.includes(so));
+    const titleMismatch = titleWarehouses.length > 0 && !titleWarehouses.some((so) => napForm.kho.includes(so) || ma.includes(so));
     const nhom = new Map<string, number>();
     const gui = new Map<string, number>();
     for (const sh of napForm.sheets)
       for (const r of sh.rows) {
         nhom.set(r.category, (nhom.get(r.category) ?? 0) + 1);
         if (r.khoGhi) {
-          const ten = timKhoTheoGhi(r.khoGhi, khoLuuDM) ?? `${tenKhoMoi(r.khoGhi)} (mới)`;
+          const ten = timKhoTheoGhi(r.khoGhi, storageLocationCatalog) ?? `${tenKhoMoi(r.khoGhi)} (mới)`;
           gui.set(ten, (gui.get(ten) ?? 0) + 1);
         }
       }
-    return { soTieuDe, tieuDeLech, khacKho: [...khacKho], nhom: [...nhom], gui: [...gui] };
-  }, [napForm, lines, khoLuuDM]);
+    return { soTieuDe: titleWarehouses, tieuDeLech: titleMismatch, khacKho: [...otherWarehouses], nhom: [...nhom], gui: [...gui] };
+  }, [napForm, lines, storageLocationCatalog]);
 
-  const xacNhanNap = () => {
+  const confirmImport = () => {
     if (!napForm) return;
     const { sheets, nam, kho: khoNap } = napForm;
     if (nam < 2000 || nam > 2100) {
@@ -989,37 +989,37 @@ export default function MonthlyStockScreen() {
       return;
     }
     // Hai sheet cùng một tháng (VD "8" và "T8") ⇒ cùng id ⇒ không nạp được, bắt sửa file.
-    const thangTrung = sheets
+    const duplicateMonths = sheets
       .filter((sh) => sh.monthNum != null)
       .map((sh) => sh.monthNum)
       .filter((m, i, a) => a.indexOf(m) !== i);
-    if (thangTrung.length) {
-      notify.canhBao(`File có nhiều sheet cùng tháng ${[...new Set(thangTrung)].join(", ")} — giữ một sheet mỗi tháng rồi nạp lại.`);
+    if (duplicateMonths.length) {
+      notify.canhBao(`File có nhiều sheet cùng tháng ${[...new Set(duplicateMonths)].join(", ")} — giữ một sheet mỗi tháng rồi nạp lại.`);
       return;
     }
-    const maNap = maKho(khoNap.trim());
-    const moi: MonthlyStockLine[] = [];
+    const maNap = warehouseCode(khoNap.trim());
+    const newLines: MonthlyStockLine[] = [];
     // Cột R "GỬI KHO HP / Á D…" ⇒ vị trí = kho trong danh mục kho lưu (khớp mã KHP/KAD hoặc tên);
     // viết tắt lạ ⇒ tạo mục kho thuê ngoài mới. Dòng KHÔNG ghi kho ⇒ để "" — `ghepNapLai` giữ vị trí
     // đã gán tay của dòng cũ khớp (cùng tên hàng), trống = kho của sổ.
-    const dmKho = [...khoLuuDM];
-    const khoThem: string[] = [];
-    const tenKho = (ghi: string) => {
-      const co = timKhoTheoGhi(ghi, dmKho);
+    const warehouseCatalog = [...storageLocationCatalog];
+    const addedWarehouses: string[] = [];
+    const resolveWarehouse = (rawText: string) => {
+      const co = timKhoTheoGhi(rawText, warehouseCatalog);
       if (co) return co;
-      const name = tenKhoMoi(ghi);
-      dmKho.push({ id: uid(), code: `K${khoaKho(ghi)}`, name, kind: "thue-ngoai", address: "", phone: "", note: "Từ bảng kê kho (cột ghi chú)" });
-      khoThem.push(name);
+      const name = tenKhoMoi(rawText);
+      warehouseCatalog.push({ id: uid(), code: `K${khoaKho(rawText)}`, name, kind: "thue-ngoai", address: "", phone: "", note: "Từ bảng kê kho (cột ghi chú)" });
+      addedWarehouses.push(name);
       return name;
     };
     for (const sh of sheets) {
-      const thangSo = sh.monthNum;
-      if (thangSo == null) continue;
-      const period = `${nam}-${String(thangSo).padStart(2, "0")}`;
+      const monthNum = sh.monthNum;
+      if (monthNum == null) continue;
+      const period = `${nam}-${String(monthNum).padStart(2, "0")}`;
       sh.rows.forEach((r, idx) => {
         // id theo SỐ tháng, không theo tên sheet (đổi "8" → "T8" vẫn cùng id) — xem idDongNap.
-        const id = idDongNap(maNap, thangSo, nam, r.rowIndex);
-        moi.push({
+        const id = idDongNap(maNap, monthNum, nam, r.rowIndex);
+        newLines.push({
           id,
           period,
           category: r.category,
@@ -1028,7 +1028,7 @@ export default function MonthlyStockScreen() {
           size: r.size,
           origin: r.origin,
           importDate: r.importDate,
-          storageLocation: r.khoGhi ? tenKho(r.khoGhi) : "",
+          storageLocation: r.khoGhi ? resolveWarehouse(r.khoGhi) : "",
           kgPerCtn: r.kgPerCtn,
           unitPrice: r.unitPrice,
           openCtn: r.openCtn,
@@ -1043,17 +1043,17 @@ export default function MonthlyStockScreen() {
         });
       });
     }
-    if (!moi.length) {
+    if (!newLines.length) {
       notify.canhBao("Không nạp được tháng nào — tên sheet phải là số tháng (1–12).");
       return;
     }
     // Dòng nạp lần trước của CÙNG kho + tháng (theo `period` của dòng, nhận cả id dạng cũ theo tên
     // sheet) mà file mới không còn: toàn số 0 ⇒ bỏ; còn số ⇒ giữ + cảnh báo (không xoá lặng lẽ).
     // Dòng đã TÁCH khi chuyển kho một phần: nạp lại trả dòng gốc về số trong file ⇒ phần tách đếm 2 lần.
-    const kq = ghepNapLai(lines, moi, maNap);
+    const kq = ghepNapLai(lines, newLines, maNap);
     const { cuConSo, soTach, lechTen } = kq;
-    ghiLines(kq.lines);
-    if (khoThem.length) ghiKhoLuuDM(dmKho);
+    writeLines(kq.lines);
+    if (addedWarehouses.length) setStorageLocationCatalog(warehouseCatalog);
     if (lechTen.length)
       notify.canhBao(
         `${lechTen.length} dòng đổi tên hàng so với lần nạp trước (file chèn/xoá dòng?) — không giữ vị trí/ghi chú cũ cho các dòng này: ${lechTen
@@ -1064,67 +1064,67 @@ export default function MonthlyStockScreen() {
     if (cuConSo.length)
       notify.canhBao(`${cuConSo.length} dòng nạp lần trước không còn trong file mới nhưng còn số — giữ nguyên, kiểm lại: ${cuConSo.slice(0, 5).map((l) => l.itemName).join(", ")}${cuConSo.length > 5 ? "…" : ""}`);
     if (soTach) notify.canhBao(`${soTach} dòng từng tách khi chuyển kho một phần vẫn còn — dòng gốc đã về số trong file, kiểm lại kẻo cộng đôi.`);
-    const dauKy = [...new Set(moi.map((m) => m.period))].sort()[0];
-    setThang(dauKy);
-    setKho(TAT_CA_KHO);
+    const firstPeriod = [...new Set(newLines.map((m) => m.period))].sort()[0];
+    setMonth(firstPeriod);
+    setWarehouse(ALL_WAREHOUSES);
     setNapForm(null);
-    const idNap = new Set(moi.map((m) => m.id));
+    const idNap = new Set(newLines.map((m) => m.id));
     const soGui = kq.lines.filter((m) => idNap.has(m.id) && m.storageLocation && m.storageLocation !== m.warehouse).length;
     notify.daLuu(
-      `Đã nạp ${moi.length} dòng · ${new Set(moi.map((m) => m.period)).size} tháng từ Excel bảng kê` +
+      `Đã nạp ${newLines.length} dòng · ${new Set(newLines.map((m) => m.period)).size} tháng từ Excel bảng kê` +
         (soGui ? ` · ${soGui} dòng gửi kho ngoài` : "") +
         (kq.thayIdCu ? ` · thay ${kq.thayIdCu} dòng nạp cũ (tên sheet cũ)` : "") +
-        (khoThem.length ? ` · thêm kho mới: ${khoThem.join(", ")}` : ""),
+        (addedWarehouses.length ? ` · thêm kho mới: ${addedWarehouses.join(", ")}` : ""),
     );
   };
 
   // ---------- Thẻ số liệu ----------
   const the: TheThongTin[] = [
-    { nhan: "Tồn đầu kỳ", giaTri: `${num(tong.openKg)} kg`, so: true, icon: Snowflake, mau: "trung-tinh" },
-    { nhan: "Nhập trong kỳ", giaTri: `${num(tong.inKg)} kg`, so: true, icon: ArrowDownToLine, mau: "brand" },
-    { nhan: "Xuất trong kỳ", giaTri: `${num(tong.outKg)} kg`, so: true, icon: Ship, mau: "warning" },
-    { nhan: "Tồn cuối kỳ", giaTri: `${num(tong.closeKg)} kg`, so: true, icon: Scale, mau: "success" },
-    { nhan: "Tiền còn lại", giaTri: `${num(Math.round(tong.remainingValue))} đ`, so: true, icon: Coins, mau: "brand" },
+    { nhan: "Tồn đầu kỳ", giaTri: `${num(total.openKg)} kg`, so: true, icon: Snowflake, mau: "trung-tinh" },
+    { nhan: "Nhập trong kỳ", giaTri: `${num(total.inKg)} kg`, so: true, icon: ArrowDownToLine, mau: "brand" },
+    { nhan: "Xuất trong kỳ", giaTri: `${num(total.outKg)} kg`, so: true, icon: Ship, mau: "warning" },
+    { nhan: "Tồn cuối kỳ", giaTri: `${num(total.closeKg)} kg`, so: true, icon: Scale, mau: "success" },
+    { nhan: "Tiền còn lại", giaTri: `${num(Math.round(total.remainingValue))} đ`, so: true, icon: Coins, mau: "brand" },
   ];
 
   // ---------- Cột bảng xem (theo kg — kiện vẫn lưu nhưng không hiện) ----------
   /** Vị trí hiển thị: đã gán thì tên kho lưu, chưa gán ⇒ hàng đang ở chính kho của sổ. */
-  const viTriCua = (r: MonthlyStockLine) => r.storageLocation || r.warehouse;
+  const locationOf = (r: MonthlyStockLine) => r.storageLocation || r.warehouse;
   /** Vị trí là KHO NGOÀI (thuê ngoài, VD Ánh Dương/HP) — không phải 5 kho hệ thống. */
-  const laKhoNgoai = (loc: string) => !!loc.trim() && !MA_KHO.has(loc.trim());
+  const isExternalStorage = (location: string) => !!location.trim() && !WAREHOUSE_CODES.has(location.trim());
   /** Nhãn cột Vị trí: hàng gửi kho ngoài ghi rõ "Gửi: <kho>" cho kế toán thấy ngay. */
-  const nhanViTri = (r: MonthlyStockLine) => (laKhoNgoai(r.storageLocation) ? `Gửi: ${r.storageLocation}` : viTriCua(r));
+  const locationLabel = (r: MonthlyStockLine) => (isExternalStorage(r.storageLocation) ? `Gửi: ${r.storageLocation}` : locationOf(r));
   /* Ô gõ thẳng trên bảng (quy tắc bảng tự dựng — design-system README §5d): ô số là
      `ONhapSo` (gõ biểu thức, Esc trả số cũ, ghi theo phím) có `navCol` ⇒ ↑/↓/Enter đi
      dọc cột trong khung `[data-luoi-phim]`; Tab đi ngang. Bản XEM TRƯỚC dồn kỳ cũng gõ
      được: lần gõ đầu tự kế thừa & lưu (xem `soNenDeGhi`). Tên · nhóm đổi ở nút ✎. */
-  const sua = true;
+  const canEdit = true;
   const oChu =
     "h-9 rounded-md border border-input bg-background px-2 text-sm focus:border-ring focus:ring-2 focus:ring-ring/40 focus:outline-none";
-  const oSo = (r: MonthlyStockRow, c: (typeof COT_SO)[number], nhan: string, mau?: string) => (
+  const oSo = (r: MonthlyStockRow, c: (typeof NUMERIC_COLS)[number], label: string, template?: string) => (
     <ONhapSo
       value={r[c] || null}
-      onChange={(v) => suaSo(r.id, { [c]: v ?? 0 } as Partial<MonthlyStockLine>)}
+      onChange={(v) => editLedger(r.id, { [c]: v ?? 0 } as Partial<MonthlyStockLine>)}
       rong0
       navCol={c}
       data-dong={r.id}
-      onPaste={(e) => danKhoi(e, r.id, c)}
-      aria-label={`${nhan} — ${r.itemName}${r.size ? " " + r.size : ""}`}
-      title={`${nhan}: gõ số hoặc phép tính (VD 1200+350). Enter / ↑ / ↓ sang dòng khác, dán được cả khối từ Excel.`}
+      onPaste={(e) => pasteBlock(e, r.id, c)}
+      aria-label={`${label} — ${r.itemName}${r.size ? " " + r.size : ""}`}
+      title={`${label}: gõ số hoặc phép tính (VD 1200+350). Enter / ↑ / ↓ sang dòng khác, dán được cả khối từ Excel.`}
       khungClassName="ml-auto w-24"
-      className={`${oChu} w-full ${mau ?? ""}`}
+      className={`${oChu} w-full ${template ?? ""}`}
     />
   );
-  const cot = (t: ReturnType<typeof tongDong>): CotTong<MonthlyStockRow>[] => [
+  const summaryColumns = (t: ReturnType<typeof tongDong>): CotTong<MonthlyStockRow>[] => [
     {
       key: "ngay",
       header: "Ngày nhập",
       render: (r) =>
-        sua ? (
+        canEdit ? (
           <input
             type="date"
             value={r.importDate || ""}
-            onChange={(e) => suaSo(r.id, { importDate: e.target.value })}
+            onChange={(e) => editLedger(r.id, { importDate: e.target.value })}
             aria-label={`Ngày nhập — ${r.itemName}`}
             title="Ngày nhập lô — sửa thẳng tại đây."
             className={`${oChu} w-36`}
@@ -1146,10 +1146,10 @@ export default function MonthlyStockScreen() {
       key: "size",
       header: "Size",
       render: (r) =>
-        sua ? (
+        canEdit ? (
           <input
             value={r.size}
-            onChange={(e) => suaSo(r.id, { size: e.target.value })}
+            onChange={(e) => editLedger(r.id, { size: e.target.value })}
             aria-label={`Size — ${r.itemName}`}
             title="Size — sửa thẳng tại đây."
             className={`${oChu} w-20`}
@@ -1162,10 +1162,10 @@ export default function MonthlyStockScreen() {
       key: "invoice",
       header: "Invoice",
       render: (r) =>
-        sua ? (
+        canEdit ? (
           <input
             value={r.origin}
-            onChange={(e) => suaSo(r.id, { origin: e.target.value })}
+            onChange={(e) => editLedger(r.id, { origin: e.target.value })}
             aria-label={`Invoice — ${r.itemName}`}
             title="Số invoice của lô — sửa thẳng tại đây."
             className={`${oChu} w-28`}
@@ -1176,17 +1176,17 @@ export default function MonthlyStockScreen() {
     },
     {
       key: "gia", header: "Đơn giá (đ)", so: true,
-      render: (r) => (sua ? oSo(r, "unitPrice", "Đơn giá") : soHoacGach(r.unitPrice ?? 0)),
+      render: (r) => (canEdit ? oSo(r, "unitPrice", "Đơn giá") : soHoacGach(r.unitPrice ?? 0)),
     },
     {
       key: "odKg", header: "Tồn đầu kỳ (kg)", so: true,
-      render: (r) => (sua ? oSo(r, "openKg", "Tồn đầu kỳ") : soHoacGach(r.openKg)),
+      render: (r) => (canEdit ? oSo(r, "openKg", "Tồn đầu kỳ") : soHoacGach(r.openKg)),
       tong: () => num(t.openKg),
     },
     {
       key: "inKg", header: "Nhập trong kỳ (kg)", so: true,
       render: (r) =>
-        sua ? (
+        canEdit ? (
           oSo(r, "inKg", "Nhập trong kỳ", r.inKg ? "font-semibold text-success" : "")
         ) : r.inKg ? (
           <span className="font-semibold text-success">+{num(r.inKg)}</span>
@@ -1198,7 +1198,7 @@ export default function MonthlyStockScreen() {
     {
       key: "outKg", header: "Xuất trong kỳ (kg)", so: true,
       render: (r) =>
-        sua ? (
+        canEdit ? (
           oSo(r, "outKg", "Xuất trong kỳ", r.outKg ? "font-semibold text-warning" : "")
         ) : r.outKg ? (
           <span className="font-semibold text-warning">−{num(r.outKg)}</span>
@@ -1221,24 +1221,24 @@ export default function MonthlyStockScreen() {
       key: "viTri",
       header: "Vị trí",
       render: (r) =>
-        sua ? (
+        canEdit ? (
           <div className="w-40">
             <Combobox
               anNhan
               label={`Vị trí — ${r.itemName}`}
               value={r.storageLocation}
-              onChange={(v) => suaSo(r.id, { storageLocation: v })}
-              options={viTriOpts}
-              onCreate={themViTri}
-              onSuaMuc={suaKL.moSua}
-              nhanSua={suaKL.nhanSua}
-              suaDuoc={suaKL.suaDuoc}
+              onChange={(v) => editLedger(r.id, { storageLocation: v })}
+              options={locationOptions}
+              onCreate={addLocation}
+              onSuaMuc={storageLocationEditor.moSua}
+              nhanSua={storageLocationEditor.nhanSua}
+              suaDuoc={storageLocationEditor.suaDuoc}
               choPhepXoa={false}
               placeholder={r.warehouse ? `= ${r.warehouse}` : "Chọn kho"}
             />
           </div>
-        ) : laKhoNgoai(r.storageLocation) ? (
-          <Nhan loai="vi-tri">{nhanViTri(r)}</Nhan>
+        ) : isExternalStorage(r.storageLocation) ? (
+          <Nhan loai="vi-tri">{locationLabel(r)}</Nhan>
         ) : (
           <span
             className={
@@ -1247,7 +1247,7 @@ export default function MonthlyStockScreen() {
                 : "whitespace-nowrap text-muted-foreground"
             }
           >
-            {nhanViTri(r) || "—"}
+            {locationLabel(r) || "—"}
           </span>
         ),
     },
@@ -1259,28 +1259,28 @@ export default function MonthlyStockScreen() {
             variant="ghost"
             aria-label={`Thẻ kho ${r.itemName}`}
             title="Thẻ kho — lịch sử mặt hàng này qua các tháng"
-            onClick={() => setXemThe(r)}
+            onClick={() => setViewedCard(r)}
           >
             <History className="size-4" />
           </Button>
-          {!laXemTruoc && (
+          {!isPreview && (
             <>
               <Button
                 size="icon-sm"
                 variant="ghost"
                 aria-label={`Lấy ra / gửi kho ${r.itemName}`}
                 title="Lấy hàng ra sử dụng, nhập thêm, hoặc gửi ra kho ngoài (Ánh Dương, HP…) — nhập số kg rồi lưu."
-                onClick={() => moThaoTac(r)}
+                onClick={() => openAction(r)}
               >
                 <PackageMinus className="size-4" />
               </Button>
               <Button
-                title="Sửa dòng: ngày nhập · tên hàng · size · invoice · đơn giá · số kg · vị trí." size="icon-sm" variant="ghost" aria-label={`Sửa ${r.itemName}`} onClick={() => moSua(r)}>
+                title="Sửa dòng: ngày nhập · tên hàng · size · invoice · đơn giá · số kg · vị trí." size="icon-sm" variant="ghost" aria-label={`Sửa ${r.itemName}`} onClick={() => openEdit(r)}>
                 <Pencil className="size-4" />
               </Button>
               <ConfirmDelete
                 moTaBanGhi={`${r.itemName}${r.size ? " · " + r.size : ""}`}
-                onConfirm={() => xoaDong(r)}
+                onConfirm={() => removeRow(r)}
                 trigger={
                   <Button
                     title="Xóa dòng này khỏi tháng. Có hỏi xác nhận, xóa xong vẫn còn nút Hoàn tác." size="icon-sm" variant="ghost" aria-label={`Xóa ${r.itemName}`}>
@@ -1295,9 +1295,9 @@ export default function MonthlyStockScreen() {
     },
   ];
 
-  const coDuLieu = rowsGoc.length > 0;
+  const hasData = rowsGoc.length > 0;
   /** Có dòng gốc nhưng ô tìm không khớp gì — phân biệt với "tháng chưa có số liệu". */
-  const timKhongRa = coDuLieu && rowsThang.length === 0;
+  const noSearchMatch = hasData && monthRows.length === 0;
 
   return (
     <div className="space-y-6">
@@ -1316,7 +1316,7 @@ export default function MonthlyStockScreen() {
           <input ref={fileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={napFile} />
           <Button
             variant="outline"
-            onClick={chonFile}
+            onClick={pickFile}
             title="Đọc file Excel 'bảng kê kho' của kế toán — mỗi sheet một tháng. Nạp lại cùng file + cùng kho chỉ cập nhật, không nhân đôi dòng."
           >
             <Upload className="mr-2 h-4 w-4" />
@@ -1324,19 +1324,19 @@ export default function MonthlyStockScreen() {
           </Button>
           <Button
             variant="outline"
-            onClick={moDongBoDialog}
+            onClick={openSyncDialog}
             title="Đối chiếu tên hàng trong sổ với danh mục Loại nguyên liệu và Mặt hàng, rồi ánh xạ từng tên về tên chuẩn. Không đụng 141 mã thành phẩm kế toán."
           >
             <Library className="mr-2 h-4 w-4" />
-            Đồng bộ danh mục{canDongBo.length ? ` (${canDongBo.length})` : ""}
+            Đồng bộ danh mục{needsSync.length ? ` (${needsSync.length})` : ""}
           </Button>
           <Button
             onClick={() => setMoIn(true)}
-            disabled={!coDuLieu}
+            disabled={!hasData}
             title="Xem trước bản in A4. Có tick dòng thì chỉ in đúng mấy dòng đó kèm tổng của chúng."
           >
             <Printer className="mr-2 h-4 w-4" />
-            In A4{rowsChon.length ? ` (${rowsChon.length} dòng chọn)` : ""}
+            In A4{selectedRows.length ? ` (${selectedRows.length} dòng chọn)` : ""}
           </Button>
         </div>
       </div>
@@ -1349,7 +1349,7 @@ export default function MonthlyStockScreen() {
             variant="outline"
             size="icon"
             aria-label="Tháng trước"
-            onClick={() => setThang(thangTruoc(thang))}
+            onClick={() => setMonth(thangTruoc(month))}
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
@@ -1358,9 +1358,9 @@ export default function MonthlyStockScreen() {
               label="Kỳ (tháng)"
               anNhanBatBuoc
               choPhepXoa={false}
-              value={thang}
-              onChange={setThang}
-              options={thangOpts}
+              value={month}
+              onChange={setMonth}
+              options={monthOptions}
             />
           </div>
           <Button
@@ -1368,7 +1368,7 @@ export default function MonthlyStockScreen() {
             variant="outline"
             size="icon"
             aria-label="Tháng sau"
-            onClick={() => setThang(thangSau(thang))}
+            onClick={() => setMonth(thangSau(month))}
           >
             <ChevronRight className="h-4 w-4" />
           </Button>
@@ -1378,30 +1378,30 @@ export default function MonthlyStockScreen() {
             label="Kho"
             anNhanBatBuoc
             choPhepXoa={false}
-            value={kho}
+            value={warehouse}
             onChange={(v) => {
-              setKho(v);
-              boChon();
+              setWarehouse(v);
+              clearSelection();
             }}
-            options={khoOpts}
+            options={warehouseOpts}
           />
         </div>
         <div className="min-w-0 flex-1 sm:min-w-[16rem] sm:flex-none">
           <Field label="Tìm mặt hàng">
             <Input
-              value={timKiem}
-              onChange={(e) => setTimKiem(e.target.value)}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Gõ tên · size · invoice · vị trí"
               aria-label="Tìm mặt hàng trong tháng"
             />
           </Field>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          {coDuLieu && !laXemTruoc && (
+          {hasData && !isPreview && (
             <>
               <Button
                 variant="outline"
-                onClick={hoanTac}
+                onClick={undo}
                 disabled={!lichSu.lui}
                 title="Hoàn tác lần ghi vừa rồi trên sổ (Ctrl+Z)."
               >
@@ -1410,7 +1410,7 @@ export default function MonthlyStockScreen() {
               </Button>
               <Button
                 variant="outline"
-                onClick={lamLai}
+                onClick={redo}
                 disabled={!lichSu.tien}
                 title="Làm lại thao tác vừa hoàn tác (Ctrl+Y)."
               >
@@ -1419,68 +1419,68 @@ export default function MonthlyStockScreen() {
               </Button>
             </>
           )}
-          {coDuLieu && !laXemTruoc && (
+          {hasData && !isPreview && (
             <Button
               variant="outline"
-              onClick={rowsChon.length ? boChon : chonTatCa}
-              title={rowsChon.length ? "Bỏ tick toàn bộ dòng đang chọn." : "Tick hết các dòng đang hiện để xem tổng của cả tháng, hoặc in / xóa theo lô."}
+              onClick={selectedRows.length ? clearSelection : selectAll}
+              title={selectedRows.length ? "Bỏ tick toàn bộ dòng đang chọn." : "Tick hết các dòng đang hiện để xem tổng của cả tháng, hoặc in / xóa theo lô."}
             >
               <ListChecks className="mr-2 h-4 w-4" />
-              {rowsChon.length ? "Bỏ chọn hết" : "Chọn tất cả"}
+              {selectedRows.length ? "Bỏ chọn hết" : "Chọn tất cả"}
             </Button>
           )}
-          {coDuLieu && (soDongTrong > 0 || anDongTrong) && (
+          {hasData && (emptyRowCount > 0 || hideEmptyRows) && (
             <Button
-              variant={anDongTrong ? "default" : "outline"}
-              aria-pressed={anDongTrong}
+              variant={hideEmptyRows ? "default" : "outline"}
+              aria-pressed={hideEmptyRows}
               onClick={() => {
-                setAnDongTrong((v) => !v);
-                boChon();
+                setHideEmptyRows((v) => !v);
+                clearSelection();
               }}
               title={
-                anDongTrong
+                hideEmptyRows
                   ? "Đang ẩn các dòng không có số liệu. Bấm để hiện lại toàn bộ dòng."
                   : "Ẩn các dòng không có số liệu (tồn đầu, nhập, xuất đều bằng 0) cho bảng gọn."
               }
             >
-              {anDongTrong ? <Eye className="mr-2 h-4 w-4" /> : <EyeOff className="mr-2 h-4 w-4" />}
-              {anDongTrong ? `Hiện dòng trống (${soDongTrong})` : `Ẩn dòng trống (${soDongTrong})`}
+              {hideEmptyRows ? <Eye className="mr-2 h-4 w-4" /> : <EyeOff className="mr-2 h-4 w-4" />}
+              {hideEmptyRows ? `Hiện dòng trống (${emptyRowCount})` : `Ẩn dòng trống (${emptyRowCount})`}
             </Button>
           )}
-          {coTonSang && (
+          {hasCarryForward && (
             <Button
               variant="outline"
               className="h-auto min-h-10 max-w-full whitespace-normal text-left"
-              onClick={donSangThangSau}
+              onClick={carryToNextMonth}
               title="Lấy tồn cuối tháng này làm tồn đầu tháng sau, cho MỌI kho (bỏ qua bộ lọc kho). Chạy lại chỉ cập nhật, không nhân đôi dòng."
             >
               <ArrowRightLeft className="mr-2 h-4 w-4" />
-              Dồn sang {nhanThang(thangSau(thang))}
+              Dồn sang {nhanThang(thangSau(month))}
             </Button>
           )}
         </div>
       </div>
 
-      {!coDuLieu ? (
+      {!hasData ? (
         <EmptyState
           icon={FileSpreadsheet}
-          tieuDe={`${nhanThang(thang)} chưa có số liệu`}
+          tieuDe={`${nhanThang(month)} chưa có số liệu`}
           moTa={
-            rowsTruoc.length
-              ? `Bấm "Kế thừa tồn cuối ${nhanThang(thangTr)}" để dồn tồn cuối tháng trước thành tồn đầu tháng này, hoặc "Thêm dòng" để nhập tay.`
-              : `Bấm "Thêm dòng" để nhập bảng kê kho của ${nhanThang(thang)} (tồn đầu · nhập · xuất theo từng mặt hàng).`
+            priorRows.length
+              ? `Bấm "Kế thừa tồn cuối ${nhanThang(prevMonth)}" để dồn tồn cuối tháng trước thành tồn đầu tháng này, hoặc "Thêm dòng" để nhập tay.`
+              : `Bấm "Thêm dòng" để nhập bảng kê kho của ${nhanThang(month)} (tồn đầu · nhập · xuất theo từng mặt hàng).`
           }
           action={
-            rowsTruoc.length ? (
+            priorRows.length ? (
               <Button
-                onClick={donTuThangTruoc}
+                onClick={carryFromPrevMonth}
                 title="Lấy tồn cuối tháng trước làm tồn đầu tháng này và GHI vào sổ. Chạy lại chỉ cập nhật, không nhân đôi dòng."
               >
                 <ArrowDownToLine className="mr-2 h-4 w-4" />
-                Kế thừa tồn cuối {nhanThang(thangTr)}
+                Kế thừa tồn cuối {nhanThang(prevMonth)}
               </Button>
             ) : (
-              <Button onClick={() => moThem()} title="Thêm tay dòng đầu tiên cho tháng này (tên hàng · tồn đầu · nhập · xuất).">
+              <Button onClick={() => openAdd()} title="Thêm tay dòng đầu tiên cho tháng này (tên hàng · tồn đầu · nhập · xuất).">
                 <Plus className="mr-2 h-4 w-4" />
                 Thêm dòng
               </Button>
@@ -1489,14 +1489,14 @@ export default function MonthlyStockScreen() {
         />
       ) : (
         <>
-          {laXemTruoc && (
+          {isPreview && (
             <div className="space-y-2 rounded-xl border border-primary/50 bg-primary/5 p-3">
               <div className="flex items-start gap-2">
                 <Sparkles className="mt-0.5 h-5 w-5 shrink-0 text-primary" aria-hidden />
                 <div className="min-w-0 space-y-1">
                   <p className="font-semibold text-foreground">
-                    Xem trước tồn đầu {nhanThang(thang)} — kế thừa từ tồn cuối {nhanThang(thangTr)} (
-                    {rowsXemTruoc.length} dòng · {num(tong.closeKg)} kg). CHƯA LƯU.
+                    Xem trước tồn đầu {nhanThang(month)} — kế thừa từ tồn cuối {nhanThang(prevMonth)} (
+                    {previewRows.length} dòng · {num(total.closeKg)} kg). CHƯA LƯU.
                   </p>
                   <p className="text-sm text-muted-foreground">
                     Tháng này chưa có dòng nào nên số dưới đây là tồn đầu DỰ KIẾN tính từ tháng trước.
@@ -1506,7 +1506,7 @@ export default function MonthlyStockScreen() {
                   <div className="pt-1">
                     <Button
                       className="w-full sm:w-auto"
-                      onClick={donTuThangTruoc}
+                      onClick={carryFromPrevMonth}
                       title="Ghi bảng xem trước này vào sổ làm tồn đầu tháng. Ghi xong mới gõ được nhập/xuất. Chạy lại chỉ cập nhật, không nhân đôi."
                     >
                       <ArrowDownToLine className="mr-2 h-4 w-4" />
@@ -1521,10 +1521,10 @@ export default function MonthlyStockScreen() {
           <ThongKe the={the} />
 
           <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-muted/40 p-3">
-            {batBienDung ? (
+            {invariantHolds ? (
               <span className="flex items-center gap-2 text-base font-semibold text-success">
                 <CheckCircle2 className="h-5 w-5" aria-hidden />
-                Khớp bất biến: {num(tong.openKg)} + {num(tong.inKg)} − {num(tong.outKg)} = {num(tong.closeKg)} kg
+                Khớp bất biến: {num(total.openKg)} + {num(total.inKg)} − {num(total.outKg)} = {num(total.closeKg)} kg
               </span>
             ) : (
               <span className="text-base font-semibold text-destructive">
@@ -1532,11 +1532,11 @@ export default function MonthlyStockScreen() {
               </span>
             )}
             <Nhan loai="phu" className="ml-auto">
-              {rowsThang.length} mặt hàng · {nhomList.length} nhóm
+              {monthRows.length} mặt hàng · {nhomList.length} nhóm
             </Nhan>
           </div>
 
-          {coDuLieu && (
+          {hasData && (
             <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
               <span className="font-semibold text-foreground">Cách thao tác:</span>
               <span>gõ thẳng vào ô trên bảng (Enter / ↑ / ↓ đi dọc cột, dán được khối từ Excel, Ctrl+Z hoàn tác); thêm dòng ở ô "Dòng mới" cuối mỗi bảng;</span>
@@ -1548,26 +1548,26 @@ export default function MonthlyStockScreen() {
             </p>
           )}
 
-          {timKhongRa && (
+          {noSearchMatch && (
             <p className="rounded-lg border-2 border-dashed border-border p-6 text-center text-sm text-muted-foreground">
-              {timKiem.trim()
-                ? `Không có mặt hàng nào khớp "${timKiem}" trong ${nhanThang(thang)}.`
-                : `Mọi dòng của ${nhanThang(thang)} đều không có số liệu và đang bị ẩn.`}{" "}
+              {searchQuery.trim()
+                ? `Không có mặt hàng nào khớp "${searchQuery}" trong ${nhanThang(month)}.`
+                : `Mọi dòng của ${nhanThang(month)} đều không có số liệu và đang bị ẩn.`}{" "}
               <button
-                title="Xóa ô tìm và hiện lại dòng trống để thấy toàn bộ mặt hàng của tháng." type="button" className="underline" onClick={() => { setTimKiem(""); setAnDongTrong(false); }}>
+                title="Xóa ô tìm và hiện lại dòng trống để thấy toàn bộ mặt hàng của tháng." type="button" className="underline" onClick={() => { setSearchQuery(""); setHideEmptyRows(false); }}>
                 Hiện tất cả
               </button>
             </p>
           )}
 
-          {canhBaoLech && (
+          {showDiffWarning && (
             <div className="space-y-2 rounded-xl border border-warning/50 bg-warning/10 p-3">
               <div className="flex items-start gap-2">
                 <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-warning" aria-hidden />
                 <div className="min-w-0 space-y-1">
                   <p className="font-semibold text-foreground">
-                    Lệch dồn kỳ: tồn đầu {nhanThang(thang)} ({num(lech.openNay)} kg) ≠ tồn cuối{" "}
-                    {nhanThang(thangTr)} ({num(lech.closeTruoc)} kg) — lệch{" "}
+                    Lệch dồn kỳ: tồn đầu {nhanThang(month)} ({num(lech.openNay)} kg) ≠ tồn cuối{" "}
+                    {nhanThang(prevMonth)} ({num(lech.closeTruoc)} kg) — lệch{" "}
                     <span className="text-warning">
                       {lech.lech > 0 ? "+" : ""}
                       {num(lech.lech)} kg
@@ -1591,7 +1591,7 @@ export default function MonthlyStockScreen() {
                     </ul>
                   )}
                   <div className="pt-1">
-                    <Button size="sm" onClick={() => setMoDoiChieu(true)} title="Liệt kê từng mặt hàng có tồn đầu tháng này lệch tồn cuối tháng trước, để tự sửa. Chỉ soi — không tự ghi đè số.">
+                    <Button size="sm" onClick={() => setIsCompareOpen(true)} title="Liệt kê từng mặt hàng có tồn đầu tháng này lệch tồn cuối tháng trước, để tự sửa. Chỉ soi — không tự ghi đè số.">
                       <Wrench className="mr-2 h-4 w-4" />
                       Đối chiếu & sửa lệch ({dsDoiChieu.length} mặt hàng)
                     </Button>
@@ -1615,10 +1615,10 @@ export default function MonthlyStockScreen() {
                 </div>
                 <BangTong
                   rows={g.rows}
-                  cot={cot(g.tong)}
+                  cot={summaryColumns(g.tong)}
                   getKey={(r) => r.id}
                   nhanTong={`Cộng ${g.category}`}
-                  chon={chonBang}
+                  chon={tableSelection}
                   xoRa
                   toMau="ton-kho-thang"
                   dongThem={
@@ -1632,9 +1632,9 @@ export default function MonthlyStockScreen() {
                           anNhan
                           label={`Tên hàng — dòng mới vào ${g.category}`}
                           value=""
-                          onChange={(v) => themDongNhanh(g.category, v)}
+                          onChange={(v) => quickAddRow(g.category, v)}
                           onCreate={(t) => t}
-                          options={tenHangOpts(g.category)}
+                          options={productNameOptions(g.category)}
                           placeholder="Gõ / chọn tên hàng để thêm dòng"
                           choPhepXoa={false}
                         />
@@ -1642,7 +1642,7 @@ export default function MonthlyStockScreen() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => moThem(g.category)}
+                        onClick={() => openAdd(g.category)}
                         title={`Mở hộp thêm dòng vào nhóm "${g.category}" để điền nhiều ô một lần (ngày nhập · size · invoice · đơn giá · số kg · vị trí).`}
                       >
                         Thêm đủ thông tin…
@@ -1659,43 +1659,43 @@ export default function MonthlyStockScreen() {
               của bảng xổ): tick dòng cuối bảng vẫn thấy nút, khỏi lăn ngược lên đầu trang.
               Điện thoại KHÔNG dính — đủ nút + số tổng thì thanh cao ~3/4 màn (360px, chữ
               130%); thanh nằm ngay dưới bảng nên kéo xuống chút là tới. */}
-          {rowsChon.length > 0 && (
+          {selectedRows.length > 0 && (
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-primary/40 bg-card p-3 print:hidden md:sticky md:bottom-8 md:z-30 md:shadow-lg">
               <span className="flex items-center gap-2 font-semibold text-foreground">
                 <Sigma className="h-5 w-5 text-primary" aria-hidden />
-                Đã chọn {rowsChon.length} dòng
+                Đã chọn {selectedRows.length} dòng
               </span>
               <span className="tnum text-sm text-muted-foreground">
-                tồn đầu {num(tongChon.openKg)} kg
+                tồn đầu {num(selectedTotal.openKg)} kg
               </span>
               <span className="tnum text-sm text-muted-foreground">
-                nhập {num(tongChon.inKg)} kg
+                nhập {num(selectedTotal.inKg)} kg
               </span>
               <span className="tnum text-sm text-muted-foreground">
-                xuất {num(tongChon.outKg)} kg
+                xuất {num(selectedTotal.outKg)} kg
               </span>
               <span className="tnum text-sm font-semibold text-foreground">
-                tồn cuối {num(tongChon.closeKg)} kg
+                tồn cuối {num(selectedTotal.closeKg)} kg
               </span>
               <span className="tnum text-sm text-muted-foreground">
-                tiền còn lại {num(Math.round(tongChon.remainingValue))} đ
+                tiền còn lại {num(Math.round(selectedTotal.remainingValue))} đ
               </span>
               <div className="ml-auto flex flex-wrap items-center gap-2">
-                {!laXemTruoc && (
-                  <Button size="sm" variant="outline" onClick={() => setGanViTri("")} title="Đánh dấu các dòng đang tick là GỬI ra kho ngoài (VD Kho Ánh Dương, HP). Chỉ ghi nơi để hàng, không đổi số kg.">
+                {!isPreview && (
+                  <Button size="sm" variant="outline" onClick={() => setAssignLocation("")} title="Đánh dấu các dòng đang tick là GỬI ra kho ngoài (VD Kho Ánh Dương, HP). Chỉ ghi nơi để hàng, không đổi số kg.">
                     <MapPin className="mr-2 h-4 w-4" />
                     Gửi kho ngoài
                   </Button>
                 )}
-                <NutToMauChon to={toMau} khoa={rowsChon.map((r) => r.id)} />
+                <NutToMauChon to={rowMark} khoa={selectedRows.map((r) => r.id)} />
                 <Button size="sm" variant="outline" onClick={() => setMoIn(true)} title="In riêng các dòng đang tick, kèm dòng tổng của đúng mấy dòng đó.">
                   <Printer className="mr-2 h-4 w-4" />
-                  In {rowsChon.length} dòng
+                  In {selectedRows.length} dòng
                 </Button>
-                {!laXemTruoc && (
+                {!isPreview && (
                   <ConfirmDelete
-                    moTaBanGhi={`${rowsChon.length} dòng ${nhanThang(thang)}`}
-                    onConfirm={xoaDaChon}
+                    moTaBanGhi={`${selectedRows.length} dòng ${nhanThang(month)}`}
+                    onConfirm={deleteSelected}
                     trigger={
                       <Button size="sm" variant="ghost" title="Xóa các dòng đang tick khỏi tháng này. Có hỏi xác nhận, và xóa xong vẫn còn nút Hoàn tác.">
                         <Trash2 className="mr-2 h-4 w-4" />
@@ -1704,7 +1704,7 @@ export default function MonthlyStockScreen() {
                     }
                   />
                 )}
-                <Button size="sm" variant="ghost" onClick={boChon} title="Bỏ tick toàn bộ dòng đang chọn.">
+                <Button size="sm" variant="ghost" onClick={clearSelection} title="Bỏ tick toàn bộ dòng đang chọn.">
                   Bỏ chọn
                 </Button>
               </div>
@@ -1712,8 +1712,8 @@ export default function MonthlyStockScreen() {
           )}
 
           <p className="text-sm text-muted-foreground">
-            {nhanThang(thang)}
-            {kho !== TAT_CA_KHO ? ` · kho ${kho}` : " · tất cả kho"}. "Dồn sang tháng sau" kế thừa tồn cuối
+            {nhanThang(month)}
+            {warehouse !== ALL_WAREHOUSES ? ` · kho ${warehouse}` : " · tất cả kho"}. "Dồn sang tháng sau" kế thừa tồn cuối
             (mọi kho) thành tồn đầu kỳ sau; chạy lại chỉ cập nhật, không nhân đôi.
           </p>
         </>
@@ -1725,7 +1725,7 @@ export default function MonthlyStockScreen() {
           <DialogHeader>
             <DialogTitle className="text-2xl">{form?.id ? "Sửa dòng kho" : "Thêm dòng kho"}</DialogTitle>
             <DialogDescription className="text-base">
-              {nhanThang(thang)} — nhập tồn đầu · nhập · xuất theo kg. Tồn cuối và tiền còn lại tự tính.
+              {nhanThang(month)} — nhập tồn đầu · nhập · xuất theo kg. Tồn cuối và tiền còn lại tự tính.
             </DialogDescription>
           </DialogHeader>
           {form && (
@@ -1753,7 +1753,7 @@ export default function MonthlyStockScreen() {
                   label="Kho"
                   value={form.warehouse}
                   onChange={(v) => setForm((f) => (f ? { ...f, warehouse: v } : f))}
-                  options={KHO_HE_THONG}
+                  options={SYSTEM_WAREHOUSES}
                   onCreate={(t) => t}
                 />
               </div>
@@ -1794,11 +1794,11 @@ export default function MonthlyStockScreen() {
                   label="Vị trí"
                   value={form.storageLocation}
                   onChange={(v) => setForm((f) => (f ? { ...f, storageLocation: v } : f))}
-                  options={viTriOpts}
-                  onCreate={themViTri}
-                  onSuaMuc={suaKL.moSua}
-                  nhanSua={suaKL.nhanSua}
-                  suaDuoc={suaKL.suaDuoc}
+                  options={locationOptions}
+                  onCreate={addLocation}
+                  onSuaMuc={storageLocationEditor.moSua}
+                  nhanSua={storageLocationEditor.nhanSua}
+                  suaDuoc={storageLocationEditor.suaDuoc}
                   placeholder={form.warehouse ? `Để trống = ${form.warehouse}` : "Chọn kho đang giữ hàng"}
                 />
               </div>
@@ -1813,7 +1813,7 @@ export default function MonthlyStockScreen() {
             <Button variant="outline" onClick={() => setForm(null)}>
               Hủy
             </Button>
-            <Button onClick={luuDong} title="Ghi dòng này vào sổ tháng đang xem. Tồn cuối và tiền còn lại tự tính, không phải gõ.">
+            <Button onClick={saveRow} title="Ghi dòng này vào sổ tháng đang xem. Tồn cuối và tiền còn lại tự tính, không phải gõ.">
               <Plus className="mr-1 h-4 w-4" />
               {form?.id ? "Lưu dòng" : "Thêm dòng"}
             </Button>
@@ -1822,20 +1822,20 @@ export default function MonthlyStockScreen() {
       </Dialog>
 
       {/* Dialog thao tác một dòng: lấy ra dùng · nhập thêm · chuyển vị trí */}
-      <Dialog open={!!thaoTac} onOpenChange={(o) => !o && setThaoTac(null)}>
+      <Dialog open={!!action} onOpenChange={(o) => !o && setAction(null)}>
         <DialogContent className="w-full sm:max-w-xl">
           <DialogHeader>
             <DialogTitle className="text-2xl">
-              {thaoTac?.row.itemName}
-              {thaoTac?.row.size ? ` · ${thaoTac.row.size}` : ""}
+              {action?.row.itemName}
+              {action?.row.size ? ` · ${action.row.size}` : ""}
             </DialogTitle>
             <DialogDescription className="text-base">
-              {thaoTac
-                ? `Đang ở ${viTriCua(thaoTac.row) || "(chưa rõ)"} · tồn cuối ${num(thaoTac.row.closeKg)} kg${thaoTac.row.origin ? ` · invoice ${thaoTac.row.origin}` : ""}.`
+              {action
+                ? `Đang ở ${locationOf(action.row) || "(chưa rõ)"} · tồn cuối ${num(action.row.closeKg)} kg${action.row.origin ? ` · invoice ${action.row.origin}` : ""}.`
                 : ""}
             </DialogDescription>
           </DialogHeader>
-          {thaoTac && (
+          {action && (
             <div className="space-y-4 py-2">
               <ErrorSummary loi={loiTT} />
               <div role="radiogroup" aria-label="Việc cần làm" className="grid gap-2 sm:grid-cols-3">
@@ -1845,22 +1845,22 @@ export default function MonthlyStockScreen() {
                     ["chuyen", "Gửi kho ngoài", "Gửi ra kho ngoài (Ánh Dương, HP…) hoặc đổi chỗ — tồn không đổi."],
                     ["nhap", "Nhập thêm", "Hàng về thêm cho đúng lô này."],
                   ] as const
-                ).map(([k, nhan, moTa]) => (
+                ).map(([k, label, description]) => (
                   <button
                     key={k}
                     type="button"
                     role="radio"
-                    aria-checked={thaoTac.kieu === k}
-                    title={moTa}
-                    onClick={() => setThaoTac((s) => (s ? { ...s, kieu: k } : s))}
+                    aria-checked={action.kieu === k}
+                    title={description}
+                    onClick={() => setAction((s) => (s ? { ...s, kieu: k } : s))}
                     className={
-                      thaoTac.kieu === k
+                      action.kieu === k
                         ? "min-h-11 rounded-lg border-2 border-primary bg-primary/10 px-3 py-2 text-left"
                         : "min-h-11 rounded-lg border-2 border-border px-3 py-2 text-left hover:bg-muted"
                     }
                   >
-                    <div className="font-semibold text-foreground">{nhan}</div>
-                    <div className="text-sm text-muted-foreground">{moTa}</div>
+                    <div className="font-semibold text-foreground">{label}</div>
+                    <div className="text-sm text-muted-foreground">{description}</div>
                   </button>
                 ))}
               </div>
@@ -1870,61 +1870,61 @@ export default function MonthlyStockScreen() {
                   label="Số kg"
                   required
                   unit="kg"
-                  value={thaoTac.kg}
-                  onChange={(v) => setThaoTac((s) => (s ? { ...s, kg: v } : s))}
+                  value={action.kg}
+                  onChange={(v) => setAction((s) => (s ? { ...s, kg: v } : s))}
                 />
                 <DateField
                   label="Ngày thực hiện"
-                  value={thaoTac.ngay}
-                  onChange={(v) => setThaoTac((s) => (s ? { ...s, ngay: v } : s))}
+                  value={action.ngay}
+                  onChange={(v) => setAction((s) => (s ? { ...s, ngay: v } : s))}
                 />
               </div>
-              {thaoTac.kieu === "chuyen" && (
+              {action.kieu === "chuyen" && (
                 <Combobox
                   label="Gửi tới kho (VD Kho Ánh Dương, HP)"
                   required
-                  value={thaoTac.viTri}
-                  onChange={(v) => setThaoTac((s) => (s ? { ...s, viTri: v } : s))}
-                  options={viTriOpts}
-                  onCreate={themViTri}
-                  onSuaMuc={suaKL.moSua}
-                  nhanSua={suaKL.nhanSua}
-                  suaDuoc={suaKL.suaDuoc}
+                  value={action.viTri}
+                  onChange={(v) => setAction((s) => (s ? { ...s, viTri: v } : s))}
+                  options={locationOptions}
+                  onCreate={addLocation}
+                  onSuaMuc={storageLocationEditor.moSua}
+                  nhanSua={storageLocationEditor.nhanSua}
+                  suaDuoc={storageLocationEditor.suaDuoc}
                   choPhepXoa={false}
                 />
               )}
-              {thaoTac.kieu !== "nhap" && thaoTac.row.closeKg > 0 && (
+              {action.kieu !== "nhap" && action.row.closeKg > 0 && (
                 <Button
                   size="sm"
                   variant="ghost"
-                  onClick={() => setThaoTac((s) => (s ? { ...s, kg: s.row.closeKg } : s))}
+                  onClick={() => setAction((s) => (s ? { ...s, kg: s.row.closeKg } : s))}
                   title="Điền sẵn toàn bộ tồn cuối của dòng vào ô Số kg."
                 >
-                  Lấy hết {num(thaoTac.row.closeKg)} kg
+                  Lấy hết {num(action.row.closeKg)} kg
                 </Button>
               )}
               <Field label="Ghi chú (không bắt buộc)">
                 <Input
-                  value={thaoTac.lyDo}
-                  onChange={(e) => setThaoTac((s) => (s ? { ...s, lyDo: e.target.value } : s))}
+                  value={action.lyDo}
+                  onChange={(e) => setAction((s) => (s ? { ...s, lyDo: e.target.value } : s))}
                   placeholder="VD: xuất xưởng Cá, lệnh SX…"
                 />
               </Field>
               <p className="text-sm text-muted-foreground">
-                {thaoTac.kieu === "xuat" &&
+                {action.kieu === "xuat" &&
                   "Số kg được CỘNG vào cột Xuất trong kỳ của dòng này; tồn cuối tự giảm."}
-                {thaoTac.kieu === "nhap" &&
+                {action.kieu === "nhap" &&
                   "Số kg được CỘNG vào cột Nhập trong kỳ. Hàng lô khác (ngày nhập / invoice khác) thì dùng nút Thêm dòng."}
-                {thaoTac.kieu === "chuyen" &&
+                {action.kieu === "chuyen" &&
                   "Gửi HẾT tồn cuối ⇒ chỉ đổi Vị trí của dòng (cột Vị trí ghi \"Gửi: <kho>\"). Gửi MỘT PHẦN ⇒ tách thành dòng mới ở kho nhận. Tổng nhập / xuất / tồn của tháng không đổi."}
               </p>
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setThaoTac(null)}>
+            <Button variant="outline" onClick={() => setAction(null)}>
               Hủy
             </Button>
-            <Button onClick={luuThaoTac} title="Ghi thao tác này vào sổ tháng đang xem, kèm ghi chú ngày và số kg ở nhật ký dòng. Có nút Hoàn tác sau khi lưu.">
+            <Button onClick={saveAction} title="Ghi thao tác này vào sổ tháng đang xem, kèm ghi chú ngày và số kg ở nhật ký dòng. Có nút Hoàn tác sau khi lưu.">
               <PackageMinus className="mr-1 h-4 w-4" />
               Lưu thao tác
             </Button>
@@ -1933,36 +1933,36 @@ export default function MonthlyStockScreen() {
       </Dialog>
 
       {/* Dialog gán vị trí cho dòng đang tick */}
-      <Dialog open={ganViTri !== null} onOpenChange={(o) => !o && setGanViTri(null)}>
+      <Dialog open={assignLocation !== null} onOpenChange={(o) => !o && setAssignLocation(null)}>
         <DialogContent className="w-full sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle className="text-2xl">Gửi kho ngoài · {rowsChon.length} dòng</DialogTitle>
+            <DialogTitle className="text-2xl">Gửi kho ngoài · {selectedRows.length} dòng</DialogTitle>
             <DialogDescription className="text-base">
               Chọn kho đang giữ hàng (VD Kho Ánh Dương, HP). Gõ tên mới sẽ tự lưu vào danh mục kho thuê ngoài. Chỉ ghi cột Vị trí, không đổi số kg hay sổ kho.
             </DialogDescription>
           </DialogHeader>
-          {ganViTri !== null && (
+          {assignLocation !== null && (
             <div className="space-y-4 py-2">
               <ChuThichBatBuoc />
               <Combobox
                 label="Kho nhận (VD Kho Ánh Dương, HP)"
                 required
-                value={ganViTri}
-                onChange={(v) => setGanViTri(v)}
-                options={viTriOpts}
-                onCreate={themViTri}
-                onSuaMuc={suaKL.moSua}
-                nhanSua={suaKL.nhanSua}
-                suaDuoc={suaKL.suaDuoc}
+                value={assignLocation}
+                onChange={(v) => setAssignLocation(v)}
+                options={locationOptions}
+                onCreate={addLocation}
+                onSuaMuc={storageLocationEditor.moSua}
+                nhanSua={storageLocationEditor.nhanSua}
+                suaDuoc={storageLocationEditor.suaDuoc}
                 choPhepXoa={false}
               />
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setGanViTri(null)}>
+            <Button variant="outline" onClick={() => setAssignLocation(null)}>
               Hủy
             </Button>
-            <Button onClick={ganViTriDaChon} title="Ghi vị trí vừa chọn cho tất cả dòng đang tick. Có nút Hoàn tác sau khi lưu.">
+            <Button onClick={assignLocationToSelected} title="Ghi vị trí vừa chọn cho tất cả dòng đang tick. Có nút Hoàn tác sau khi lưu.">
               <MapPin className="mr-1 h-4 w-4" />
               Gán vị trí
             </Button>
@@ -1997,7 +1997,7 @@ export default function MonthlyStockScreen() {
                   label="Kho (chọn đúng kho cho cả file)"
                   value={napForm.kho}
                   onChange={(v) => setNapForm((f) => (f ? { ...f, kho: v } : f))}
-                  options={KHO_HE_THONG}
+                  options={SYSTEM_WAREHOUSES}
                   onCreate={(t) => t}
                 />
               </div>
@@ -2027,27 +2027,27 @@ export default function MonthlyStockScreen() {
                   </tbody>
                 </table>
               </div>
-              {soatNap && (
+              {importCheck && (
                 <div className="space-y-2 text-sm">
-                  {soatNap.soTieuDe.length > 0 && (
-                    <p className={soatNap.tieuDeLech ? "font-semibold text-warning" : "text-muted-foreground"}>
-                      Tiêu đề sheet ghi: KHO {soatNap.soTieuDe.join(", ")}
-                      {soatNap.tieuDeLech && ` — khác kho đang chọn (${napForm.kho}). Kiểm lại trước khi nạp.`}
+                  {importCheck.soTieuDe.length > 0 && (
+                    <p className={importCheck.tieuDeLech ? "font-semibold text-warning" : "text-muted-foreground"}>
+                      Tiêu đề sheet ghi: KHO {importCheck.soTieuDe.join(", ")}
+                      {importCheck.tieuDeLech && ` — khác kho đang chọn (${napForm.kho}). Kiểm lại trước khi nạp.`}
                     </p>
                   )}
-                  {soatNap.khacKho.length > 0 && (
+                  {importCheck.khacKho.length > 0 && (
                     <p className="font-semibold text-destructive">
                       Năm {napForm.nam} đã có bản nạp ở{" "}
-                      {soatNap.khacKho.map(([k, n]) => `${k} (${n} dòng)`).join(", ")}. Nạp vào {napForm.kho} sẽ
+                      {importCheck.khacKho.map(([k, n]) => `${k} (${n} dòng)`).join(", ")}. Nạp vào {napForm.kho} sẽ
                       tạo BẢN SAO ⇒ "Tất cả kho" cộng đôi. Muốn nạp lại cùng sổ thì chọn đúng kho cũ.
                     </p>
                   )}
                   <p className="text-muted-foreground">
-                    Nhóm theo mục trong file: {soatNap.nhom.map(([c, n]) => `${c} (${n})`).join(" · ")}
+                    Nhóm theo mục trong file: {importCheck.nhom.map(([c, n]) => `${c} (${n})`).join(" · ")}
                   </p>
-                  {soatNap.gui.length > 0 && (
+                  {importCheck.gui.length > 0 && (
                     <p className="text-muted-foreground">
-                      Vị trí đọc từ cột ghi chú kho: {soatNap.gui.map(([k, n]) => `${k} (${n})`).join(" · ")}. Dòng
+                      Vị trí đọc từ cột ghi chú kho: {importCheck.gui.map(([k, n]) => `${k} (${n})`).join(" · ")}. Dòng
                       không ghi kho ⇒ nằm ở chính {napForm.kho}.
                     </p>
                   )}
@@ -2063,21 +2063,21 @@ export default function MonthlyStockScreen() {
             <Button variant="outline" onClick={() => setNapForm(null)}>
               Hủy
             </Button>
-            <Button onClick={xacNhanNap} title="Nạp các sheet đã xem trước vào sổ, theo đúng năm và kho đã chọn. Chọn nhầm kho sẽ tạo bản sao ở kho khác — kiểm lại trước khi bấm.">
+            <Button onClick={confirmImport} title="Nạp các sheet đã xem trước vào sổ, theo đúng năm và kho đã chọn. Chọn nhầm kho sẽ tạo bản sao ở kho khác — kiểm lại trước khi bấm.">
               <Upload className="mr-1 h-4 w-4" />
-              Nạp {soDongNap} dòng
+              Nạp {importRowCount} dòng
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Dialog đối chiếu lệch dồn kỳ (chẩn đoán theo mặt hàng) */}
-      <Dialog open={moDoiChieu} onOpenChange={setMoDoiChieu}>
+      <Dialog open={isCompareOpen} onOpenChange={setIsCompareOpen}>
         <DialogContent className="w-full sm:max-w-3xl">
           <DialogHeader>
             <DialogTitle className="text-2xl">Đối chiếu lệch dồn kỳ theo mặt hàng</DialogTitle>
             <DialogDescription className="text-base">
-              So tồn cuối {nhanThang(thangTr)} ↔ tồn đầu {nhanThang(thang)} theo MẶT HÀNG (đã gộp các
+              So tồn cuối {nhanThang(prevMonth)} ↔ tồn đầu {nhanThang(month)} theo MẶT HÀNG (đã gộp các
               tách size để bỏ báo động giả). Đây là chẩn đoán — bấm "Sửa tay" để lọc bảng về đúng mặt
               hàng đó rồi gõ số thẳng trên bảng theo phán đoán (không tự sửa để tránh cộng đôi khi lô bị tách/đổi mã).
             </DialogDescription>
@@ -2094,8 +2094,8 @@ export default function MonthlyStockScreen() {
                   <thead className="sticky top-0 bg-muted">
                     <tr className="text-left">
                       <th className="px-3 py-2">Mặt hàng · kho · nhóm</th>
-                      <th className="px-3 py-2 text-right">Cuối {nhanThang(thangTr).replace("Tháng ", "T")}</th>
-                      <th className="px-3 py-2 text-right">Đầu {nhanThang(thang).replace("Tháng ", "T")}</th>
+                      <th className="px-3 py-2 text-right">Cuối {nhanThang(prevMonth).replace("Tháng ", "T")}</th>
+                      <th className="px-3 py-2 text-right">Đầu {nhanThang(month).replace("Tháng ", "T")}</th>
                       <th className="px-3 py-2 text-right">Lệch (kg)</th>
                       <th className="px-3 py-2 text-right">Sửa</th>
                     </tr>
@@ -2116,7 +2116,7 @@ export default function MonthlyStockScreen() {
                           {num(d.lechKg)}
                         </td>
                         <td className="px-3 py-2 text-right">
-                          <Button size="sm" variant="outline" onClick={() => suaTayMatHang(d)} title="Mở lưới ghi đã lọc sẵn đúng mặt hàng này, để tự chỉnh tồn đầu / nhập / xuất cho khớp tháng trước.">
+                          <Button size="sm" variant="outline" onClick={() => manualFixProduct(d)} title="Mở lưới ghi đã lọc sẵn đúng mặt hàng này, để tự chỉnh tồn đầu / nhập / xuất cho khớp tháng trước.">
                             <Pencil className="mr-1 h-4 w-4" />
                             Sửa tay
                           </Button>
@@ -2134,7 +2134,7 @@ export default function MonthlyStockScreen() {
             </p>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setMoDoiChieu(false)}>
+            <Button variant="outline" onClick={() => setIsCompareOpen(false)}>
               Đóng
             </Button>
           </DialogFooter>
@@ -2142,7 +2142,7 @@ export default function MonthlyStockScreen() {
       </Dialog>
 
       {/* Dialog đồng bộ danh mục loại nguyên liệu */}
-      <Dialog open={moDongBo} onOpenChange={setMoDongBo}>
+      <Dialog open={isSyncOpen} onOpenChange={setIsSyncOpen}>
         <DialogContent className="w-full sm:max-w-3xl">
           <DialogHeader>
             <DialogTitle className="text-2xl">Đồng bộ danh mục</DialogTitle>
@@ -2155,38 +2155,38 @@ export default function MonthlyStockScreen() {
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="flex flex-wrap gap-2 text-sm">
-              <Nhan loai="phu">{dongBo.tongTen} tên trong sổ</Nhan>
+              <Nhan loai="phu">{catalogSync.tongTen} tên trong sổ</Nhan>
               <Nhan loai="phu">
-                đã có: {dongBo.daCoMH} mặt hàng · {dongBo.daCoNL} loại NL
+                đã có: {catalogSync.daCoMH} mặt hàng · {catalogSync.daCoNL} loại NL
               </Nhan>
-              <Nhan loai={canDongBo.length > 0 ? "loi" : "phu"}>{canDongBo.length} mã khó cần đồng bộ</Nhan>
+              <Nhan loai={needsSync.length > 0 ? "loi" : "phu"}>{needsSync.length} mã khó cần đồng bộ</Nhan>
               <Nhan loai="phu">{dsRoRang.length} tên rõ ràng</Nhan>
-              <Nhan loai={dongBo.nhomTrung.length > 0 ? "loi" : "phu"}>{dongBo.nhomTrung.length} nhóm trùng cách ghi</Nhan>
+              <Nhan loai={catalogSync.nhomTrung.length > 0 ? "loi" : "phu"}>{catalogSync.nhomTrung.length} nhóm trùng cách ghi</Nhan>
             </div>
 
-            {canDongBo.length > 0 && (
+            {needsSync.length > 0 && (
               <div className="space-y-2">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <h3 className="flex items-center gap-2 font-semibold text-foreground">
-                    <ListChecks className="h-4 w-4" /> {canDongBo.length} mã khó — chọn ĐÍCH từng dòng
+                    <ListChecks className="h-4 w-4" /> {needsSync.length} mã khó — chọn ĐÍCH từng dòng
                   </h3>
                   <div className="flex flex-wrap gap-1">
-                    <Button size="sm" variant="ghost" onClick={() => datDich(canDongBo, "goiY")} title="Trả mọi mã khó về đích mà hệ thống gợi ý (đoán từ tên: có size/dấu chế biến → Mặt hàng, còn lại → Loại NL).">
+                    <Button size="sm" variant="ghost" onClick={() => setTarget(needsSync, "goiY")} title="Trả mọi mã khó về đích mà hệ thống gợi ý (đoán từ tên: có size/dấu chế biến → Mặt hàng, còn lại → Loại NL).">
                       Theo gợi ý
                     </Button>
-                    <Button size="sm" variant="ghost" onClick={() => datDich(canDongBo, "product")} title="Đặt toàn bộ mã khó về danh mục Mặt hàng.">
+                    <Button size="sm" variant="ghost" onClick={() => setTarget(needsSync, "product")} title="Đặt toàn bộ mã khó về danh mục Mặt hàng.">
                       Tất cả → Mặt hàng
                     </Button>
-                    <Button size="sm" variant="ghost" onClick={() => datDich(canDongBo, "material")} title="Đặt toàn bộ mã khó về danh mục Loại nguyên liệu.">
+                    <Button size="sm" variant="ghost" onClick={() => setTarget(needsSync, "material")} title="Đặt toàn bộ mã khó về danh mục Loại nguyên liệu.">
                       Tất cả → Loại NL
                     </Button>
-                    <Button size="sm" variant="ghost" onClick={() => datDich(canDongBo, "skip")} title="Bỏ qua toàn bộ mã khó lần này — không thêm vào danh mục nào.">
+                    <Button size="sm" variant="ghost" onClick={() => setTarget(needsSync, "skip")} title="Bỏ qua toàn bộ mã khó lần này — không thêm vào danh mục nào.">
                       Bỏ qua hết
                     </Button>
                   </div>
                 </div>
                 <div className="max-h-[38dvh] space-y-1 overflow-auto rounded-lg border border-border p-2">
-                  {canDongBo.map(dongRow)}
+                  {needsSync.map(dongRow)}
                 </div>
               </div>
             )}
@@ -2198,16 +2198,16 @@ export default function MonthlyStockScreen() {
                 </summary>
                 <div className="space-y-2 px-3 pb-3">
                   <div className="flex flex-wrap gap-1">
-                    <Button size="sm" variant="ghost" onClick={() => datDich(dsRoRang, "goiY")} title="Trả các tên rõ ràng về đích hệ thống gợi ý.">
+                    <Button size="sm" variant="ghost" onClick={() => setTarget(dsRoRang, "goiY")} title="Trả các tên rõ ràng về đích hệ thống gợi ý.">
                       Theo gợi ý
                     </Button>
-                    <Button size="sm" variant="ghost" onClick={() => datDich(dsRoRang, "material")} title="Đặt toàn bộ tên rõ ràng (cá, tôm, mực nguyên con…) về danh mục Loại nguyên liệu.">
+                    <Button size="sm" variant="ghost" onClick={() => setTarget(dsRoRang, "material")} title="Đặt toàn bộ tên rõ ràng (cá, tôm, mực nguyên con…) về danh mục Loại nguyên liệu.">
                       Tất cả → Loại NL
                     </Button>
-                    <Button size="sm" variant="ghost" onClick={() => datDich(dsRoRang, "product")} title="Đặt toàn bộ tên rõ ràng về danh mục Mặt hàng.">
+                    <Button size="sm" variant="ghost" onClick={() => setTarget(dsRoRang, "product")} title="Đặt toàn bộ tên rõ ràng về danh mục Mặt hàng.">
                       Tất cả → Mặt hàng
                     </Button>
-                    <Button size="sm" variant="ghost" onClick={() => datDich(dsRoRang, "skip")} title="Bỏ qua toàn bộ tên rõ ràng lần này.">
+                    <Button size="sm" variant="ghost" onClick={() => setTarget(dsRoRang, "skip")} title="Bỏ qua toàn bộ tên rõ ràng lần này.">
                       Bỏ qua hết
                     </Button>
                   </div>
@@ -2218,11 +2218,11 @@ export default function MonthlyStockScreen() {
               </details>
             )}
 
-            {dongBo.nhomTrung.length > 0 && (
+            {catalogSync.nhomTrung.length > 0 && (
               <div className="space-y-2">
                 <h3 className="font-semibold text-foreground">Tên chỉ khác nhau cách ghi (nên gộp về một)</h3>
                 <div className="max-h-[28dvh] space-y-1 overflow-auto rounded-lg border border-warning/40 bg-warning/5 p-2 text-sm">
-                  {dongBo.nhomTrung.map((g) => (
+                  {catalogSync.nhomTrung.map((g) => (
                     <div key={g.variants.join("|")} className="text-muted-foreground">
                       • {g.variants.map((v) => `"${v}"`).join("  ·  ")}
                     </div>
@@ -2235,7 +2235,7 @@ export default function MonthlyStockScreen() {
               </div>
             )}
 
-            {dongBo.chuaCo.length === 0 && dongBo.nhomTrung.length === 0 && (
+            {catalogSync.chuaCo.length === 0 && catalogSync.nhomTrung.length === 0 && (
               <div className="flex items-center gap-2 rounded-lg border border-success/50 bg-success/10 p-3 text-success">
                 <CheckCircle2 className="h-5 w-5" aria-hidden />
                 <span className="font-semibold">Tên trong sổ đã khớp danh mục, không có tên trùng cách ghi.</span>
@@ -2245,13 +2245,13 @@ export default function MonthlyStockScreen() {
           {/* Nút xác nhận ở CHÂN (dính đáy khi thân cuộn) — trước nằm giữa thân, dưới các danh sách
               dài nên bị cuộn mất. Không disabled (luật §5): chưa chọn gì ⇒ apDongBo tự báo. */}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setMoDongBo(false)}>
+            <Button variant="outline" onClick={() => setIsSyncOpen(false)}>
               Đóng
             </Button>
-            {(canDongBo.length > 0 || dsRoRang.length > 0) && (
-              <Button onClick={apDongBo} className="h-auto min-h-11 whitespace-normal" title="Thêm các tên chưa có vào danh mục đã chọn, và đổi tên các dòng sổ mang tên cũ sang tên chuẩn đã ánh xạ.">
+            {(needsSync.length > 0 || dsRoRang.length > 0) && (
+              <Button onClick={applySync} className="h-auto min-h-11 whitespace-normal" title="Thêm các tên chưa có vào danh mục đã chọn, và đổi tên các dòng sổ mang tên cũ sang tên chuẩn đã ánh xạ.">
                 <Library className="mr-2 h-4 w-4" />
-                Đồng bộ: {soMH} → Mặt hàng · {soNL} → Loại NL
+                Đồng bộ: {soMH} → Mặt hàng · {materialCount} → Loại NL
               </Button>
             )}
           </DialogFooter>
@@ -2259,49 +2259,49 @@ export default function MonthlyStockScreen() {
       </Dialog>
 
       {/* Thẻ kho: lịch sử một mặt hàng qua các tháng (sổ chi tiết vật tư) */}
-      <Dialog open={!!xemThe} onOpenChange={(o) => !o && setXemThe(null)}>
+      <Dialog open={!!viewedCard} onOpenChange={(o) => !o && setViewedCard(null)}>
         <DialogContent className="w-full sm:max-w-3xl">
           <DialogHeader>
-            <DialogTitle className="text-2xl">Thẻ kho — {xemThe?.itemName}</DialogTitle>
+            <DialogTitle className="text-2xl">Thẻ kho — {viewedCard?.itemName}</DialogTitle>
             <DialogDescription className="text-base">
-              {xemThe
-                ? `${xemThe.warehouse || "(chưa rõ kho)"} · nhóm ${xemThe.category || "(chưa phân nhóm)"}. Gộp mọi lô/size của mặt hàng này (cùng cách đối chiếu dồn kỳ) — mỗi tháng một dòng, mới nhất trước.`
+              {viewedCard
+                ? `${viewedCard.warehouse || "(chưa rõ kho)"} · nhóm ${viewedCard.category || "(chưa phân nhóm)"}. Gộp mọi lô/size của mặt hàng này (cùng cách đối chiếu dồn kỳ) — mỗi tháng một dòng, mới nhất trước.`
                 : ""}
             </DialogDescription>
           </DialogHeader>
-          {xemThe && (
+          {viewedCard && (
             <div className="max-h-[70dvh] space-y-4 overflow-y-auto py-2 pr-1">
               <div className="grid gap-2 rounded-lg border border-border bg-muted/40 p-3 text-sm sm:grid-cols-2">
                 <div>
-                  Size: <span className="font-medium text-foreground">{xemThe.size || "—"}</span>
+                  Size: <span className="font-medium text-foreground">{viewedCard.size || "—"}</span>
                 </div>
                 <div>
-                  Invoice: <span className="font-medium text-foreground">{xemThe.origin || "—"}</span>
+                  Invoice: <span className="font-medium text-foreground">{viewedCard.origin || "—"}</span>
                 </div>
                 <div>
-                  Vị trí: <span className="font-medium text-foreground">{viTriCua(xemThe) || "—"}</span>
+                  Vị trí: <span className="font-medium text-foreground">{locationOf(viewedCard) || "—"}</span>
                 </div>
                 <div>
                   Đơn giá:{" "}
                   <span className="tnum font-medium text-foreground">
-                    {soHoacGach(xemThe.unitPrice ?? 0)} đ
+                    {soHoacGach(viewedCard.unitPrice ?? 0)} đ
                   </span>
                 </div>
                 <div>
                   Ngày nhập:{" "}
                   <span className="font-medium text-foreground">
-                    {xemThe.importDate ? viDate(xemThe.importDate) : "—"}
+                    {viewedCard.importDate ? viDate(viewedCard.importDate) : "—"}
                   </span>
                 </div>
-                {xemThe.note && (
+                {viewedCard.note && (
                   <div className="sm:col-span-2">
                     Nhật ký thao tác:
-                    <div className="mt-1 whitespace-pre-line font-medium text-foreground">{xemThe.note}</div>
+                    <div className="mt-1 whitespace-pre-line font-medium text-foreground">{viewedCard.note}</div>
                   </div>
                 )}
                 <div>
                   Dòng này sinh ra do dồn kỳ:{" "}
-                  <span className="font-medium text-foreground">{xemThe.carriedFromId ? "có" : "không"}</span>
+                  <span className="font-medium text-foreground">{viewedCard.carriedFromId ? "có" : "không"}</span>
                 </div>
               </div>
 
@@ -2318,8 +2318,8 @@ export default function MonthlyStockScreen() {
                     </tr>
                   </thead>
                   <tbody>
-                    {dsTheKho.map((t) => (
-                      <tr key={t.period} className={t.period === thang ? "bg-primary/5" : undefined}>
+                    {stockCardList.map((t) => (
+                      <tr key={t.period} className={t.period === month ? "bg-primary/5" : undefined}>
                         <td className="border-b border-border px-3 py-2 font-medium text-foreground">
                           {nhanThang(t.period)}
                         </td>
@@ -2339,7 +2339,7 @@ export default function MonthlyStockScreen() {
                   </tbody>
                 </table>
               </KhungCuonNgang>
-              {dsTheKho.length === 0 && (
+              {stockCardList.length === 0 && (
                 <p className="text-sm text-muted-foreground">
                   Mặt hàng này chưa có dòng nào đã LƯU trong sổ (đang xem trước dồn kỳ).
                 </p>
@@ -2351,7 +2351,7 @@ export default function MonthlyStockScreen() {
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setXemThe(null)}>
+            <Button variant="outline" onClick={() => setViewedCard(null)}>
               Đóng
             </Button>
           </DialogFooter>
@@ -2359,12 +2359,12 @@ export default function MonthlyStockScreen() {
       </Dialog>
 
       {/* In A4 — có tick dòng thì in ĐÚNG mấy dòng đó (kèm tổng của chúng) */}
-      {moIn && coDuLieu && (
+      {moIn && hasData && (
         <PhieuIn
           tieuDe="Bảng kê kho theo tháng"
-          phuDe={`${nhanThang(thang)}${kho !== TAT_CA_KHO ? ` · kho ${kho}` : ""}${
-            rowsChon.length ? ` · ${rowsChon.length} dòng đã chọn` : ""
-          }${laXemTruoc ? " · XEM TRƯỚC (chưa lưu)" : ""}`}
+          phuDe={`${nhanThang(month)}${warehouse !== ALL_WAREHOUSES ? ` · kho ${warehouse}` : ""}${
+            selectedRows.length ? ` · ${selectedRows.length} dòng đã chọn` : ""
+          }${isPreview ? " · XEM TRƯỚC (chưa lưu)" : ""}`}
           onClose={() => setMoIn(false)}
         >
           <div className="mb-2 flex items-center justify-between text-sm">
@@ -2386,11 +2386,11 @@ export default function MonthlyStockScreen() {
             <tbody>
               <tr>
                 <TdIn dam colSpan={2}>Tổng cộng — {rowsIn.length} mặt hàng</TdIn>
-                <TdIn dam right>{num(tongIn.openKg)}</TdIn>
-                <TdIn dam right>{num(tongIn.inKg)}</TdIn>
-                <TdIn dam right>{num(tongIn.outKg)}</TdIn>
-                <TdIn dam right>{num(tongIn.closeKg)}</TdIn>
-                <TdIn dam right>{num(Math.round(tongIn.remainingValue))}</TdIn>
+                <TdIn dam right>{num(printTotal.openKg)}</TdIn>
+                <TdIn dam right>{num(printTotal.inKg)}</TdIn>
+                <TdIn dam right>{num(printTotal.outKg)}</TdIn>
+                <TdIn dam right>{num(printTotal.closeKg)}</TdIn>
+                <TdIn dam right>{num(Math.round(printTotal.remainingValue))}</TdIn>
               </tr>
               {nhomIn.map((g) => (
                 <FragmentGroup key={g.category} group={g} />
@@ -2400,9 +2400,9 @@ export default function MonthlyStockScreen() {
         </PhieuIn>
       )}
 
-      {suaKL.hop}
-      {suaMH.hop}
-      {suaNL.hop}
+      {storageLocationEditor.hop}
+      {productEditor.hop}
+      {materialTypeEditor.hop}
     </div>
   );
 }

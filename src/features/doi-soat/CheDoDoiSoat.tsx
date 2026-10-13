@@ -90,24 +90,24 @@ export function ChonCheDo({
   return (
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" role="radiogroup" aria-label="Việc cần soát">
       {CHE_DO.map((c) => {
-        const chon = cheDo === c.id;
+        const isSelected = cheDo === c.id;
         const Icon = c.icon;
         return (
           <button
             key={c.id}
             type="button"
             role="radio"
-            aria-checked={chon}
+            aria-checked={isSelected}
             title={`Xem kết quả kiểu "${c.nhan}": ${c.moTa}`}
             onClick={() => setCheDo(c.id)}
             className={`flex min-h-11 flex-col gap-1 rounded-xl border p-3 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring ${
-              chon ? "border-primary bg-accent" : "border-border bg-card hover:bg-muted/40"
+              isSelected ? "border-primary bg-accent" : "border-border bg-card hover:bg-muted/40"
             }`}
           >
             <span className="flex items-center gap-2 font-semibold">
               <Icon className="size-5 shrink-0 text-primary" aria-hidden />
               {c.nhan}
-              {chon && <span className="ml-auto shrink-0 text-sm font-medium text-primary">Đang xem</span>}
+              {isSelected && <span className="ml-auto shrink-0 text-sm font-medium text-primary">Đang xem</span>}
             </span>
             <span className="text-sm text-muted-foreground">{c.moTa}</span>
             <span className={`text-sm font-medium ${dem[c.id].apDung ? "text-foreground" : "text-muted-foreground"}`}>
@@ -122,7 +122,7 @@ export function ChonCheDo({
 
 // ---------- Quy tắc máy đang áp dụng ----------
 /** Quy tắc đã chốt qua các đợt đối soát thật (doc 37). Giữ câu ngắn, lời thường. */
-const QUY_TAC: { ten: string; noiDung: string }[] = [
+const RULES: { ten: string; noiDung: string }[] = [
   { ten: "Khóa ghép", noiDung: "MST người bán + ký hiệu + số hóa đơn. MST chỉ so phần chữ số (0301234567-001 = 0301234567001), MST mất số 0 đầu được bù lại; số hóa đơn bỏ số 0 ở đầu (00060568 = 60568); ký hiệu bỏ chữ số mẫu số gộp đầu (1C26TTN = C26TTN)." },
   { ten: "Cộng dồn", noiDung: "Một hóa đơn tách nhiều dòng sổ (theo thuế suất / theo mặt hàng) được cộng lại rồi mới so." },
   { ten: "So đủ 3 cột", noiDung: "So trước thuế, thuế và tổng ở từng hóa đơn. Tổng lệch ⇒ LỆCH TIỀN; tổng khớp mà thuế lệch ⇒ LỆCH THUẾ; chỉ trước thuế lệch ⇒ vẫn khớp (thường do chiết khấu / phí)." },
@@ -138,7 +138,7 @@ const QUY_TAC: { ten: string; noiDung: string }[] = [
 
 export function QuyTacBox({ canhBao }: { canhBao: CanhBao[] }) {
   const [mo, setMo] = useState(false);
-  const ngoaiTe = canhBao.filter((c) => c.loai === "Đơn vị tiền tệ ngoại tệ");
+  const fxWarnings = canhBao.filter((c) => c.loai === "Đơn vị tiền tệ ngoại tệ");
   return (
     <div className="rounded-xl border border-border">
       <button
@@ -150,21 +150,21 @@ export function QuyTacBox({ canhBao }: { canhBao: CanhBao[] }) {
       >
         {mo ? <ChevronDown className="size-4" aria-hidden /> : <ChevronRight className="size-4" aria-hidden />}
         <ListChecks className="size-4 text-muted-foreground" aria-hidden />
-        Quy tắc máy đang áp dụng ({QUY_TAC.length})
+        Quy tắc máy đang áp dụng ({RULES.length})
       </button>
       {mo && (
         <div className="space-y-3 border-t border-border px-3 py-3">
           <ul className="space-y-2 text-sm">
-            {QUY_TAC.map((q) => (
+            {RULES.map((q) => (
               <li key={q.ten}>
                 <span className="font-medium">{q.ten}: </span>
                 <span className="text-muted-foreground">{q.noiDung}</span>
               </li>
             ))}
           </ul>
-          {ngoaiTe.length > 0 && (
+          {fxWarnings.length > 0 && (
             <p className="rounded-lg border border-warning/30 bg-warning-surface p-2 text-sm">
-              <b>Ngoại tệ ở file này:</b> {ngoaiTe.map((c) => c.chiTiet).join(" ")}
+              <b>Ngoại tệ ở file này:</b> {fxWarnings.map((c) => c.chiTiet).join(" ")}
             </p>
           )}
         </div>
@@ -174,14 +174,14 @@ export function QuyTacBox({ canhBao }: { canhBao: CanhBao[] }) {
 }
 
 // ---------- Chia bên thuế gửi / tự tải ----------
-const NHAN_CACH: Record<CachPhanBen, string> = {
+const METHOD_LABELS: Record<CachPhanBen, string> = {
   "chi-dinh": "bạn đã tự chọn",
   "ten-thue": "máy nhận theo chữ “thuế” trong tên sheet",
   "ten-tai": "máy nhận theo chữ “tải” trong tên sheet",
   "khong-ro": "máy chưa nhận ra — hãy chọn",
 };
 
-function PhanBenBox({
+function SideSplitBox({
   tenSheets,
   benThue,
   cach,
@@ -198,7 +198,7 @@ function PhanBenBox({
     <div className="rounded-xl border border-border p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm font-medium">
-          Sheet nào là bản nào? <span className="font-normal text-muted-foreground">({NHAN_CACH[cach]})</span>
+          Sheet nào là bản nào? <span className="font-normal text-muted-foreground">({METHOD_LABELS[cach]})</span>
         </p>
         {cach === "chi-dinh" && (
           <Button title="Bỏ lựa chọn tay, để máy tự nhận bản thuế / bản tự tải theo tên sheet." variant="outline" size="sm" onClick={onTuNhan}>
@@ -241,9 +241,9 @@ function PhanBenBox({
 }
 
 // ---------- 1. So hai bản ----------
-type LocHaiBan = "all" | "CHI_THUE" | "CHI_TAI" | "LECH" | "KHONG_SO";
+type TwoVersionFilter = "all" | "CHI_THUE" | "CHI_TAI" | "LECH" | "KHONG_SO";
 
-function chipHaiBan(d: DongSoBan) {
+function twoVersionChip(d: DongSoBan) {
   if (d.ben === "CHI_THUE") return <Nhan loai="loi">Chỉ bản thuế có</Nhan>;
   if (d.ben === "CHI_TAI") return <Nhan loai="luu-y">Chỉ bản tự tải có</Nhan>;
   if (d.khongSoDuocTien) return <Nhan loai="luu-y">Không so được tiền</Nhan>;
@@ -266,17 +266,17 @@ export function SoHaiBanView({
   onDoiBen: (ten: string, laThue: boolean) => void;
   onTuNhan: () => void;
 }) {
-  const [loc, setLoc] = useState<LocHaiBan>("all");
+  const [filter, setFilter] = useState<TwoVersionFilter>("all");
   const rows = useMemo(() => {
     if (!kq) return [];
-    if (loc === "all") return kq.dong;
-    if (loc === "LECH") return kq.dong.filter((d) => d.lechTien);
-    if (loc === "KHONG_SO") return kq.dong.filter((d) => d.khongSoDuocTien);
-    return kq.dong.filter((d) => d.ben === loc);
-  }, [kq, loc]);
+    if (filter === "all") return kq.dong;
+    if (filter === "LECH") return kq.dong.filter((d) => d.lechTien);
+    if (filter === "KHONG_SO") return kq.dong.filter((d) => d.khongSoDuocTien);
+    return kq.dong.filter((d) => d.ben === filter);
+  }, [kq, filter]);
 
-  const phanBen = (
-    <PhanBenBox tenSheets={tenSheets} benThue={benThue} cach={cach} onDoi={onDoiBen} onTuNhan={onTuNhan} />
+  const sideSplitBox = (
+    <SideSplitBox tenSheets={tenSheets} benThue={benThue} cach={cach} onDoi={onDoiBen} onTuNhan={onTuNhan} />
   );
 
   if (tenSheets.length < 2)
@@ -290,7 +290,7 @@ export function SoHaiBanView({
   if (!kq)
     return (
       <div className="space-y-4">
-        {phanBen}
+        {sideSplitBox}
         <EmptyState
           icon={Files}
           tieuDe="Chưa chia được hai bên"
@@ -301,22 +301,22 @@ export function SoHaiBanView({
 
   const t = kq.tong;
   const the: TheThongTin[] = [
-    { nhan: "Bản thuế gửi", giaTri: num(t.soThue), so: true, mau: "brand", phu: `${num(t.tienThue)} đ`, onChon: () => setLoc("all"), moTaChon: "Xem tất cả hóa đơn" },
-    { nhan: "Bản tự tải", giaTri: num(t.soTai), so: true, mau: "brand", phu: `${num(t.tienTai)} đ`, onChon: () => setLoc("all"), moTaChon: "Xem tất cả hóa đơn" },
-    { nhan: "Chỉ bản thuế có", giaTri: num(t.chiThue), so: true, mau: t.chiThue ? "danger" : "success", phu: `${num(t.tienChiThue)} đ — bản tự tải thiếu`, onChon: () => setLoc("CHI_THUE"), moTaChon: "Xem hóa đơn bản tự tải thiếu" },
-    { nhan: "Chỉ bản tự tải có", giaTri: num(t.chiTai), so: true, mau: t.chiTai ? "warning" : "success", phu: `${num(t.tienChiTai)} đ`, onChon: () => setLoc("CHI_TAI"), moTaChon: "Xem hóa đơn bản thuế không có" },
-    { nhan: "Có cả hai, lệch tiền", giaTri: num(t.lechTien), so: true, mau: t.lechTien ? "warning" : "success", onChon: () => setLoc("LECH"), moTaChon: "Xem hóa đơn lệch tiền giữa hai bản" },
-    { nhan: "Không so được tiền", giaTri: num(t.khongSoDuocTien), so: true, mau: "trung-tinh", phu: "sheet trộn hai bố cục cột", onChon: () => setLoc("KHONG_SO"), moTaChon: "Xem hóa đơn không so được tiền" },
+    { nhan: "Bản thuế gửi", giaTri: num(t.soThue), so: true, mau: "brand", phu: `${num(t.tienThue)} đ`, onChon: () => setFilter("all"), moTaChon: "Xem tất cả hóa đơn" },
+    { nhan: "Bản tự tải", giaTri: num(t.soTai), so: true, mau: "brand", phu: `${num(t.tienTai)} đ`, onChon: () => setFilter("all"), moTaChon: "Xem tất cả hóa đơn" },
+    { nhan: "Chỉ bản thuế có", giaTri: num(t.chiThue), so: true, mau: t.chiThue ? "danger" : "success", phu: `${num(t.tienChiThue)} đ — bản tự tải thiếu`, onChon: () => setFilter("CHI_THUE"), moTaChon: "Xem hóa đơn bản tự tải thiếu" },
+    { nhan: "Chỉ bản tự tải có", giaTri: num(t.chiTai), so: true, mau: t.chiTai ? "warning" : "success", phu: `${num(t.tienChiTai)} đ`, onChon: () => setFilter("CHI_TAI"), moTaChon: "Xem hóa đơn bản thuế không có" },
+    { nhan: "Có cả hai, lệch tiền", giaTri: num(t.lechTien), so: true, mau: t.lechTien ? "warning" : "success", onChon: () => setFilter("LECH"), moTaChon: "Xem hóa đơn lệch tiền giữa hai bản" },
+    { nhan: "Không so được tiền", giaTri: num(t.khongSoDuocTien), so: true, mau: "trung-tinh", phu: "sheet trộn hai bố cục cột", onChon: () => setFilter("KHONG_SO"), moTaChon: "Xem hóa đơn không so được tiền" },
   ];
-  const LOC: { id: LocHaiBan; nhan: string; n: number }[] = [
+  const TWO_VERSION_FILTERS: { id: TwoVersionFilter; nhan: string; n: number }[] = [
     { id: "all", nhan: "Tất cả", n: kq.dong.length },
     { id: "CHI_THUE", nhan: "Chỉ bản thuế có", n: t.chiThue },
     { id: "CHI_TAI", nhan: "Chỉ bản tự tải có", n: t.chiTai },
     { id: "LECH", nhan: "Lệch tiền", n: t.lechTien },
     { id: "KHONG_SO", nhan: "Không so được", n: t.khongSoDuocTien },
   ];
-  const cot: Cot<DongSoBan>[] = [
-    { key: "kq", header: "Kết quả", chinh: true, render: chipHaiBan },
+  const columns: Cot<DongSoBan>[] = [
+    { key: "kq", header: "Kết quả", chinh: true, render: twoVersionChip },
     { key: "kh", header: "Ký hiệu", render: (d) => d.kyHieu, sapXep: (d) => d.kyHieu },
     { key: "so", header: "Số HĐ", render: (d) => d.soHoaDon },
     { key: "ngay", header: "Ngày lập", render: (d) => d.ngayLap, sapXep: (d) => d.ngayLap },
@@ -329,17 +329,17 @@ export function SoHaiBanView({
   ];
   return (
     <div className="space-y-4">
-      {phanBen}
+      {sideSplitBox}
       <ThongKe the={the} />
       <div className="flex flex-wrap gap-2">
-        {LOC.map((l) => (
-          <Button key={l.id} title={`Lọc danh sách: ${l.nhan}.`} size="sm" variant={loc === l.id ? "default" : "outline"} onClick={() => setLoc(l.id)}>
+        {TWO_VERSION_FILTERS.map((l) => (
+          <Button key={l.id} title={`Lọc danh sách: ${l.nhan}.`} size="sm" variant={filter === l.id ? "default" : "outline"} onClick={() => setFilter(l.id)}>
             {l.nhan} <span className="tnum ml-1">({num(l.n)})</span>
           </Button>
         ))}
       </div>
       <RecordTable
-        columns={cot}
+        columns={columns}
         rows={rows}
         getKey={(d) => d.khoa}
         timKiem={(d) => `${d.kyHieu} ${d.soHoaDon} ${d.tenBan} ${d.mstBan}`}
@@ -351,13 +351,13 @@ export function SoHaiBanView({
 }
 
 // ---------- 2. Kiểm cộng cột bảng kê ----------
-function KiemCongSheet({ sh }: { sh: SheetHoaDon }) {
+function SheetSumCheck({ sh }: { sh: SheetHoaDon }) {
   const cd = sh.canDoiCot;
-  const [chiThat, setChiThat] = useState(cd.soDong.lechThat > 0);
-  const rows = useMemo(() => (chiThat ? cd.dongLech.filter((d) => d.loai === "that") : cd.dongLech), [cd, chiThat]);
-  const oCot = (c: number) => (c >= 0 ? chuCotExcel(cotExcel(sh.goc, c)) : "");
-  const tenCot = (c: number, ten: string) => (c >= 0 ? `${ten} (cột ${oCot(c)})` : ten);
-  const khop = Math.abs(cd.lech) < 0.5;
+  const [onlyReal, setOnlyReal] = useState(cd.soDong.lechThat > 0);
+  const rows = useMemo(() => (onlyReal ? cd.dongLech.filter((d) => d.loai === "that") : cd.dongLech), [cd, onlyReal]);
+  const columnLetter = (c: number) => (c >= 0 ? chuCotExcel(cotExcel(sh.goc, c)) : "");
+  const columnName = (c: number, ten: string) => (c >= 0 ? `${ten} (cột ${columnLetter(c)})` : ten);
+  const isMatch = Math.abs(cd.lech) < 0.5;
   const o = cd.oTuDat;
 
   const bang: [string, number, number | null][] = [
@@ -366,7 +366,7 @@ function KiemCongSheet({ sh }: { sh: SheetHoaDon }) {
     ["Làm tròn ±1 đ", cd.boc.lamTron, cd.soDong.lamTron],
     ["LỆCH THẬT — phải sửa", cd.boc.lechThat, cd.soDong.lechThat],
   ];
-  const cot: Cot<DongLechCong>[] = [
+  const columns: Cot<DongLechCong>[] = [
     { key: "d", header: "Dòng", chinh: true, render: (d) => `dòng ${d.dongFile}`, sapXep: (d) => d.dongFile },
     { key: "loai", header: "Nguyên nhân", render: (d) => (d.loai === "that" ? <Nhan loai="loi">Lệch thật</Nhan> : <Nhan loai="luu-y">{NHAN_LECH_CONG[d.loai]}</Nhan>) },
     { key: "ma", header: "Hóa đơn", render: (d) => d.ma },
@@ -383,15 +383,15 @@ function KiemCongSheet({ sh }: { sh: SheetHoaDon }) {
       <CardHeader>
         <CardTitle className="flex flex-wrap items-center gap-2">
           Sheet {sh.ten}
-          {khop ? <Nhan loai="xong">Cộng khớp</Nhan> : cd.soDong.lechThat ? <Nhan loai="loi">{`${num(cd.soDong.lechThat)} dòng lệch thật`}</Nhan> : <Nhan loai="luu-y">Lệch bình thường</Nhan>}
+          {isMatch ? <Nhan loai="xong">Cộng khớp</Nhan> : cd.soDong.lechThat ? <Nhan loai="loi">{`${num(cd.soDong.lechThat)} dòng lệch thật`}</Nhan> : <Nhan loai="luu-y">Lệch bình thường</Nhan>}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <p className="text-sm">
-          Tổng {tenCot(cd.cotTong, cd.tenTong || "tổng thanh toán")} <span className="tnum font-medium">{num(cd.sumTong)}</span> − (
-          {tenCot(cd.cotChua, cd.tenChua || "chưa thuế")} <span className="tnum font-medium">{num(cd.sumChua)}</span> +{" "}
-          {tenCot(cd.cotThue, cd.tenThue || "thuế")} <span className="tnum font-medium">{num(cd.sumThue)}</span>) ={" "}
-          <span className={`tnum font-bold ${khop ? "text-success" : "text-foreground"}`}>{num(cd.lech)} đ</span>
+          Tổng {columnName(cd.cotTong, cd.tenTong || "tổng thanh toán")} <span className="tnum font-medium">{num(cd.sumTong)}</span> − (
+          {columnName(cd.cotChua, cd.tenChua || "chưa thuế")} <span className="tnum font-medium">{num(cd.sumChua)}</span> +{" "}
+          {columnName(cd.cotThue, cd.tenThue || "thuế")} <span className="tnum font-medium">{num(cd.sumThue)}</span>) ={" "}
+          <span className={`tnum font-bold ${isMatch ? "text-success" : "text-foreground"}`}>{num(cd.lech)} đ</span>
         </p>
         {o && (
           <p className="rounded-lg border border-border bg-muted/40 p-2 text-sm">
@@ -401,7 +401,7 @@ function KiemCongSheet({ sh }: { sh: SheetHoaDon }) {
             {o.truCk ? ", đã trừ chiết khấu" : ""}. File xuất sẽ chỉ ra ô này gồm những dòng nào.
           </p>
         )}
-        {!khop && (
+        {!isMatch && (
           <KhungCuonNgang>
             <table className="w-full min-w-80 text-sm">
               <thead>
@@ -412,11 +412,11 @@ function KiemCongSheet({ sh }: { sh: SheetHoaDon }) {
                 </tr>
               </thead>
               <tbody>
-                {bang.map(([ten, tien, n]) => (
+                {bang.map(([ten, amount, n]) => (
                   <tr key={ten} className="border-b border-border/60">
                     <td className="py-1.5 pr-3">{ten}</td>
                     <td className="tnum py-1.5 pr-3 text-right">{num(n ?? 0)}</td>
-                    <td className="tnum py-1.5 text-right">{num(tien)}</td>
+                    <td className="tnum py-1.5 text-right">{num(amount)}</td>
                   </tr>
                 ))}
                 <tr className="font-semibold">
@@ -431,15 +431,15 @@ function KiemCongSheet({ sh }: { sh: SheetHoaDon }) {
         {cd.dongLech.length > 0 && (
           <>
             <div className="flex flex-wrap gap-2">
-              <Button title="Chỉ xem dòng lệch không giải thích được — chỗ phải mở hóa đơn gốc ra sửa." size="sm" variant={chiThat ? "default" : "outline"} onClick={() => setChiThat(true)}>
+              <Button title="Chỉ xem dòng lệch không giải thích được — chỗ phải mở hóa đơn gốc ra sửa." size="sm" variant={onlyReal ? "default" : "outline"} onClick={() => setOnlyReal(true)}>
                 Chỉ lệch thật <span className="tnum ml-1">({num(cd.soDong.lechThat)})</span>
               </Button>
-              <Button title="Xem mọi dòng có chưa thuế + thuế khác tổng thanh toán, kể cả phí / chiết khấu / làm tròn." size="sm" variant={!chiThat ? "default" : "outline"} onClick={() => setChiThat(false)}>
+              <Button title="Xem mọi dòng có chưa thuế + thuế khác tổng thanh toán, kể cả phí / chiết khấu / làm tròn." size="sm" variant={!onlyReal ? "default" : "outline"} onClick={() => setOnlyReal(false)}>
                 Mọi dòng lệch <span className="tnum ml-1">({num(cd.dongLech.length)})</span>
               </Button>
             </div>
             <RecordTable
-              columns={cot}
+              columns={columns}
               rows={rows}
               getKey={(d) => `${d.dongFile}`}
               timKiem={(d) => `${d.ma} ${d.ban} ${d.dongFile}`}
@@ -465,20 +465,20 @@ export function KiemCongView({ sheets }: { sheets: SheetHoaDon[] }) {
     );
   const the: TheThongTin[] = ds.map((s) => {
     const cd = s.canDoiCot;
-    const khop = Math.abs(cd.lech) < 0.5;
+    const isMatch = Math.abs(cd.lech) < 0.5;
     return {
       nhan: s.ten,
       giaTri: `${num(cd.lech)} đ`,
       so: true,
-      mau: khop ? "success" : cd.soDong.lechThat ? "danger" : "warning",
-      phu: khop ? "cộng khớp" : cd.soDong.lechThat ? `${num(cd.soDong.lechThat)} dòng lệch thật · ${num(cd.boc.lechThat)} đ` : "chỉ phí / chiết khấu / làm tròn",
+      mau: isMatch ? "success" : cd.soDong.lechThat ? "danger" : "warning",
+      phu: isMatch ? "cộng khớp" : cd.soDong.lechThat ? `${num(cd.soDong.lechThat)} dòng lệch thật · ${num(cd.boc.lechThat)} đ` : "chỉ phí / chiết khấu / làm tròn",
     };
   });
   return (
     <div className="space-y-4">
       <ThongKe the={the} />
       {ds.map((s) => (
-        <KiemCongSheet key={s.ten} sh={s} />
+        <SheetSumCheck key={s.ten} sh={s} />
       ))}
     </div>
   );
@@ -487,8 +487,8 @@ export function KiemCongView({ sheets }: { sheets: SheetHoaDon[] }) {
 // ---------- 3. Cùng MST cùng ngày ----------
 export function CungNgayView({ nhom }: { nhom: NhomCungNgay[] }) {
   const soTrung = nhom.filter((g) => g.trungSoTien).length;
-  const [chiTrung, setChiTrung] = useState(soTrung > 0);
-  const rows = useMemo(() => (chiTrung ? nhom.filter((g) => g.trungSoTien) : nhom), [nhom, chiTrung]);
+  const [onlyDuplicates, setOnlyDuplicates] = useState(soTrung > 0);
+  const rows = useMemo(() => (onlyDuplicates ? nhom.filter((g) => g.trungSoTien) : nhom), [nhom, onlyDuplicates]);
   if (!nhom.length)
     return (
       <EmptyState
@@ -498,11 +498,11 @@ export function CungNgayView({ nhom }: { nhom: NhomCungNgay[] }) {
       />
     );
   const the: TheThongTin[] = [
-    { nhan: "Nhóm cùng MST cùng ngày", giaTri: num(nhom.length), so: true, mau: "brand", onChon: () => setChiTrung(false), moTaChon: "Xem mọi nhóm" },
+    { nhan: "Nhóm cùng MST cùng ngày", giaTri: num(nhom.length), so: true, mau: "brand", onChon: () => setOnlyDuplicates(false), moTaChon: "Xem mọi nhóm" },
     { nhan: "Hóa đơn trong các nhóm", giaTri: num(nhom.reduce((s, g) => s + g.soHoaDon, 0)), so: true, mau: "trung-tinh" },
-    { nhan: "Nhóm trùng khít số tiền", giaTri: num(soTrung), so: true, mau: soTrung ? "warning" : "success", phu: "dễ kê hai lần — soát trước", onChon: () => setChiTrung(true), moTaChon: "Xem nhóm trùng khít số tiền" },
+    { nhan: "Nhóm trùng khít số tiền", giaTri: num(soTrung), so: true, mau: soTrung ? "warning" : "success", phu: "dễ kê hai lần — soát trước", onChon: () => setOnlyDuplicates(true), moTaChon: "Xem nhóm trùng khít số tiền" },
   ];
-  const cot: Cot<NhomCungNgay>[] = [
+  const columns: Cot<NhomCungNgay>[] = [
     { key: "ban", header: "Người bán", chinh: true, render: (g) => g.tenBan || g.mstBan, sapXep: (g) => g.tenBan },
     { key: "mst", header: "MST", render: (g) => g.mstBan, anTrenDienThoai: true },
     { key: "ngay", header: "Ngày", render: (g) => g.ngay, sapXep: (g) => g.ngay },
@@ -523,15 +523,15 @@ export function CungNgayView({ nhom }: { nhom: NhomCungNgay[] }) {
       </p>
       <ThongKe the={the} />
       <div className="flex flex-wrap gap-2">
-        <Button title="Chỉ xem nhóm có hóa đơn trùng khít số tiền." size="sm" variant={chiTrung ? "default" : "outline"} onClick={() => setChiTrung(true)}>
+        <Button title="Chỉ xem nhóm có hóa đơn trùng khít số tiền." size="sm" variant={onlyDuplicates ? "default" : "outline"} onClick={() => setOnlyDuplicates(true)}>
           Trùng khít số tiền <span className="tnum ml-1">({num(soTrung)})</span>
         </Button>
-        <Button title="Xem mọi nhóm cùng người bán cùng ngày." size="sm" variant={!chiTrung ? "default" : "outline"} onClick={() => setChiTrung(false)}>
+        <Button title="Xem mọi nhóm cùng người bán cùng ngày." size="sm" variant={!onlyDuplicates ? "default" : "outline"} onClick={() => setOnlyDuplicates(false)}>
           Tất cả <span className="tnum ml-1">({num(nhom.length)})</span>
         </Button>
       </div>
       <RecordTable
-        columns={cot}
+        columns={columns}
         rows={rows}
         getKey={(g) => `${g.mstBan}#${g.ngay}`}
         timKiem={(g) => `${g.tenBan} ${g.mstBan} ${g.ngay} ${g.dong.map((d) => d.soHoaDon).join(" ")}`}

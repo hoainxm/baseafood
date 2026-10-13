@@ -1,8 +1,8 @@
 // ============================================================
-// Tên file: src/features/production/KhoiBotTam.tsx
+// Tên file: src/features/production/BatterSection.tsx
 // Tên tiếng Việt: Khối nhập BỘT TẨM theo loại cho một dòng thành phẩm (mig 0051)
 // ============================================================
-// Dùng chung cho bảng ghi phiên (BangDongSX — dòng con dưới thành phẩm) và hộp
+// Dùng chung cho bảng ghi phiên (ProductionLinesTable — dòng con dưới thành phẩm) và hộp
 // Sửa dòng ở /wip. Mỗi loại bột đi kèm của mặt hàng một ô kg (VD tẩm bột nước
 // tương: 24V · 18V · 220H); thiếu loại nào thì "Thêm loại bột khác" tại chỗ.
 // Bột là PHỤ GIA — không cộng vào số lượng thành phẩm; hiện tổng bột + tỷ lệ %.
@@ -11,15 +11,15 @@ import { num } from "@/lib/format";
 import { listVisibleBatters, sanitizeBatterKg, sumBatterKg, computeBatterRatio } from "@/lib/batter";
 import { X } from "lucide-react";
 
-export function KhoiBotTam({
+export function BatterSection({
   diKem,
   botKg,
   onDoi,
   optBot,
-  onTaoBot,
-  onSuaBot,
-  kgThanhPham,
-  dieuHuongCot = false,
+  onCreateBatter,
+  onEditBatter,
+  productKg: finishedGoodKg,
+  columnNavigation: hasColumnNav = false,
 }: {
   /** Tên các loại bột đi kèm của mặt hàng (đúng thứ tự gắn ở Danh mục). */
   diKem: string[];
@@ -28,16 +28,16 @@ export function KhoiBotTam({
   /** Danh mục loại bột — value = TÊN (sổ lưu theo tên). */
   optBot: ComboboxOption[];
   /** Tạo loại bột mới tại chỗ (lưu ngay vào danh mục) — trả về TÊN. */
-  onTaoBot: (ten: string) => string;
+  onCreateBatter: (ten: string) => string;
   /** Mở hộp sửa nhanh loại bột (value = tên). */
-  onSuaBot?: (ten: string) => void;
-  kgThanhPham: number;
+  onEditBatter?: (ten: string) => void;
+  productKg: number;
   /** Ô số nhảy ↑/↓ theo cột trong bảng ghi (khung `[data-grid-nav]`). */
-  dieuHuongCot?: boolean;
+  columnNavigation?: boolean;
 }) {
   const visibleBatters = listVisibleBatters(diKem, botKg);
   const total = sumBatterKg(botKg);
-  const tyLe = computeBatterRatio(total, kgThanhPham);
+  const tyLe = computeBatterRatio(total, finishedGoodKg);
   const batterTypeCount = Object.keys(sanitizeBatterKg(botKg)).length;
 
   const bo = (ten: string) => {
@@ -69,7 +69,7 @@ export function KhoiBotTam({
                 label={ten}
                 hideRequiredMark
                 unit="kg"
-                navCol={dieuHuongCot ? `bot:${ten}` : undefined}
+                navCol={hasColumnNav ? `bot:${ten}` : undefined}
                 className="min-w-0 flex-1"
                 value={botKg[ten] || null}
                 onChange={(v) => onDoi({ ...botKg, [ten]: v ?? 0 })}
@@ -97,8 +97,8 @@ export function KhoiBotTam({
             value=""
             onChange={(ten) => ten && onDoi({ ...botKg, [ten]: botKg[ten] ?? 0 })}
             options={optBot.filter((o) => !visibleBatters.includes(o.value))}
-            onCreate={onTaoBot}
-            onEditItem={onSuaBot}
+            onCreate={onCreateBatter}
+            onEditItem={onEditBatter}
             editLabel="Sửa thông tin loại bột này — lưu thẳng vào Danh mục."
             placeholder="— Chọn loại bột —"
             emptyText="Chưa có loại bột này — gõ tên rồi Thêm mới."

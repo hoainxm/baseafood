@@ -118,11 +118,11 @@ async function flush(): Promise<void> {
   if (buf.length === 0) return;
   isFlushing = true;
   try {
-    const guiIds = new Set(buf.map((r) => r.id));
+    const sentIds = new Set(buf.map((r) => r.id));
     const { error } = await supabase.from("audit_log").insert(buf.map(toRow));
     if (!error) {
       // Chỉ xóa đúng dòng đã gửi — dòng mới thêm lúc đang gửi vẫn giữ.
-      saveBuffer(docBuffer().filter((r) => !guiIds.has(r.id)));
+      saveBuffer(docBuffer().filter((r) => !sentIds.has(r.id)));
     }
   } catch {
     /* giữ buffer, thử lại lần sau — im lặng */

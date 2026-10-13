@@ -54,10 +54,11 @@ import {
   type FieldError,
   type ComboboxOption,
 } from "@/design-system";
-import { useSuaDanhMuc } from "@/features/catalog/SuaDanhMucNhanh";
+import { useQuickCatalogEdit } from "@/features/catalog/QuickCatalogEdit";
 import { kg, num, todayISO, formatDateVN } from "@/lib/format";
 import { CheckCircle, ClipboardList, Package, PackageCheck, Plus, ScanLine, Truck } from "lucide-react";
-import { KiemLoXuat } from "./KiemLoXuat";
+import { ExportLotCheck } from "./ExportLotCheck";
+import { readParam } from "@/lib/legacyUrls";
 
 interface NewWeighRow {
   productId: string;
@@ -78,9 +79,9 @@ const STATUS_LABELS: Record<SalesOrder["status"], string> = {
   dong: "Đã xuất",
 };
 
-export default function DonDatScreen() {
-  const [don, persistDon, { trangThai }] = useSalesOrders();
-  const isLoading = trangThai === "dang-tai" && don.length === 0;
+export default function SalesOrderScreen() {
+  const [don, persistDon, { trangThai: status }] = useSalesOrders();
+  const isLoading = status === "dang-tai" && don.length === 0;
   const [dongDon, persistDongDon] = useOrderItems();
   const [exportOrders, persistExportOrders] = useExportOrders();
   const [exportItems, persistExportItems] = useExportItems();
@@ -88,8 +89,8 @@ export default function DonDatScreen() {
   const [products, setProducts] = useProducts();
   const [customers, setCustomers] = useCustomers();
   /** Bút chì sửa nhanh danh mục ngay trong ô chọn. */
-  const customerEditor = useSuaDanhMuc("khachHang", customers, setCustomers);
-  const productEditor = useSuaDanhMuc("matHang", products, setProducts);
+  const customerEditor = useQuickCatalogEdit("khachHang", customers, setCustomers);
+  const productEditor = useQuickCatalogEdit("matHang", products, setProducts);
   const [salesInvoices, persistSalesInvoices] = useSalesInvoices();
   const [salesItems, persistBan] = useSalesItems();
 
@@ -98,11 +99,11 @@ export default function DonDatScreen() {
   const [loi, setLoi] = useState<FieldError[]>([]);
   const [lotCheckOrder, setLotCheckOrder] = useState<ExportOrder | null>(null);
 
-  // Link từ /qr "Theo giai đoạn" (`?don=<id>&kiem=<id lệnh xuất>`) ⇒ mở đơn và hộp kiểm
+  // Link từ /qr "Theo giai đoạn" (`?order=<id>&check=<id lệnh xuất>`; link cũ `?don=&kiem=`) ⇒ mở đơn và hộp kiểm
   // lô của lệnh đó. Chờ dữ liệu nạp xong mới xử lý, xong gỡ tham số khỏi link.
   const [searchParams, setSearchParams] = useSearchParams();
-  const donUrl = searchParams.get("don");
-  const checkParam = searchParams.get("kiem");
+  const donUrl = readParam(searchParams, "order");
+  const checkParam = readParam(searchParams, "check");
   useEffect(() => {
     if (!donUrl || !don.some((d) => d.id === donUrl)) return;
     setSelectedId(donUrl);
@@ -111,7 +112,7 @@ export default function DonDatScreen() {
     setSearchParams({}, { replace: true });
   }, [donUrl, checkParam, don, exportOrders, setSearchParams]);
 
-  const tenMH = (id: string) => products.find((m) => m.id === id)?.name || "—";
+  const productNameOf = (id: string) => products.find((m) => m.id === id)?.name || "—";
   const tenKH = (id: string) => customers.find((k) => k.id === id)?.name || "—";
 
   const [packagings] = usePackagings();
@@ -135,14 +136,14 @@ export default function DonDatScreen() {
     subLabel: k.market || undefined,
   }));
   /** kg đã xuất cho (đơn × mặt hàng × quy cách) — gom dòng lệnh của lệnh thuộc đơn. */
-  const exportedKg = (orderId: string, mh: string, qc: string) => {
+  const exportedKg = (orderId: string, productId: string, qc: string) => {
     const orderExportIds = new Set(
       exportOrders.filter((l) => l.orderId === orderId).map((l) => l.id)
     );
     return exportItems
       .filter(
         (d) =>
-          orderExportIds.has(d.exportId) && d.productId === mh && d.spec === qc
+          orderExportIds.has(d.exportId) && d.productId === productId && d.spec === qc
       )
       .reduce((s, d) => s + (d.quantityKg || 0), 0);
   };
@@ -164,21 +165,21 @@ export default function DonDatScreen() {
     setLoi([]);
   };
   const addProduct = (ten: string) => {
-    const sach = ten.trim();
-    const co = products.find((m) => m.name.trim().toLowerCase() === sach.toLowerCase());
+    const trimmedName = ten.trim();
+    const co = products.find((m) => m.name.trim().toLowerCase() === trimmedName.toLowerCase());
     if (co) return co.id; // trùng tên (không phân hoa thường) ⇒ dùng lại bản có sẵn
-    const m = { id: newId(), code: "", name: sach, finishedGoodCode: "" };
+    const m = { id: newId(), code: "", name: trimmedName, finishedGoodCode: "" };
     setProducts([...products, m]);
-    notify.saved(`Đã thêm mặt hàng "${sach}" vào danh mục`);
+    notify.saved(`Đã thêm mặt hàng "${trimmedName}" vào danh mục`);
     return m.id;
   };
   const addCustomer = (ten: string) => {
-    const sach = ten.trim();
-    const co = customers.find((k) => k.name.trim().toLowerCase() === sach.toLowerCase());
+    const trimmedName = ten.trim();
+    const co = customers.find((k) => k.name.trim().toLowerCase() === trimmedName.toLowerCase());
     if (co) return co.id; // trùng tên (không phân hoa thường) ⇒ dùng lại bản có sẵn
-    const k = { id: newId(), code: "", name: sach, market: "" };
+    const k = { id: newId(), code: "", name: trimmedName, market: "" };
     setCustomers([...customers, k]);
-    notify.saved(`Đã thêm khách hàng "${sach}" vào danh mục`);
+    notify.saved(`Đã thêm khách hàng "${trimmedName}" vào danh mục`);
     return k.id;
   };
   const updateRow = (i: number, patch: Partial<NewWeighRow>) =>
@@ -222,11 +223,11 @@ export default function DonDatScreen() {
 
   /* ---- Tạo lệnh xuất (FIFO, cho xuất một phần) + handoff sổ Bán hàng ---- */
   const createExportOrder = (d: SalesOrder) => {
-    const dsDong = dongDon.filter((x) => x.orderId === d.id);
+    const orderLines = dongDon.filter((x) => x.orderId === d.id);
     const currentStock = computeWipStock(wips, exportItems, retailSales);
     const exportOrderId = newId();
     const newExportItems: ExportItem[] = [];
-    for (const dc of dsDong) {
+    for (const dc of orderLines) {
       let conCan = dc.requiredQuantityKg - exportedKg(d.id, dc.productId, dc.spec);
       if (conCan <= 0) continue;
       const los = listLotsWithStock(currentStock, dc.productId, dc.spec);
@@ -288,7 +289,7 @@ export default function DonDatScreen() {
     persistBan([...salesItems, ...newSalesItems]);
 
     // Cập nhật trạng thái đơn: đủ hết → "dong", còn thiếu → "dang-gom".
-    const conThieu = dsDong.some(
+    const hasMissing = orderLines.some(
       (dc) =>
         dc.requiredQuantityKg -
           (exportedKg(d.id, dc.productId, dc.spec) +
@@ -301,13 +302,13 @@ export default function DonDatScreen() {
     );
     persistDon(
       don.map((x) =>
-        x.id === d.id ? { ...x, status: conThieu ? "dang-gom" : "dong" } : x
+        x.id === d.id ? { ...x, status: hasMissing ? "dang-gom" : "dong" } : x
       )
     );
     const totalOut = newExportItems.reduce((s, dl) => s + dl.quantityKg, 0);
     notify.saved(
       `Đã xuất ${kg(totalOut)} → sổ Bán hàng (phiếu ${tenKH(d.customerId)})` +
-        (conThieu ? " · đơn còn thiếu, vẫn mở" : " · đơn đóng")
+        (hasMissing ? " · đơn còn thiếu, vẫn mở" : " · đơn đóng")
     );
   };
 
@@ -473,7 +474,7 @@ export default function DonDatScreen() {
                   className="flex flex-wrap items-center justify-between gap-3 py-3"
                 >
                   <span className="min-w-0 flex-1 text-base">
-                    {tenMH(dc.productId)}
+                    {productNameOf(dc.productId)}
                     {dc.spec ? ` · ${dc.spec}` : ""}
                   </span>
                   <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-base">
@@ -508,13 +509,13 @@ export default function DonDatScreen() {
                 <p className="font-semibold text-foreground">Lệnh xuất đã lập</p>
                 <ul className="divide-y divide-border">
                   {exportOrderList.map((l) => {
-                    const ds = exportItems.filter((d) => d.exportId === l.id);
-                    const lotCount = new Set(ds.map((d) => d.wipId)).size;
+                    const items = exportItems.filter((d) => d.exportId === l.id);
+                    const lotCount = new Set(items.map((d) => d.wipId)).size;
                     return (
                       <li key={l.id} className="flex flex-wrap items-center justify-between gap-3 py-2">
                         <span className="min-w-0 text-base">
                           {formatDateVN(l.exportDate)} ·{" "}
-                          <span className="tnum font-semibold">{kg(ds.reduce((t, d) => t + (d.quantityKg || 0), 0))}</span>
+                          <span className="tnum font-semibold">{kg(items.reduce((t, d) => t + (d.quantityKg || 0), 0))}</span>
                           <span className="text-muted-foreground"> · {lotCount} lô</span>
                         </span>
                         <Button
@@ -537,13 +538,13 @@ export default function DonDatScreen() {
       )}
 
       {lotCheckOrder && (
-        <KiemLoXuat
-          lenh={lotCheckOrder}
-          dongLenh={exportItems.filter((d) => d.exportId === lotCheckOrder.id)}
-          tatCaDongLenh={exportItems}
-          onLuuDongLenh={persistExportItems}
-          ton={stock}
-          sanXuat={wips}
+        <ExportLotCheck
+          exportOrder={lotCheckOrder}
+          orderItems={exportItems.filter((d) => d.exportId === lotCheckOrder.id)}
+          allOrderItems={exportItems}
+          onSaveOrderItems={persistExportItems}
+          lotStock={stock}
+          wips={wips}
           matHang={products}
           onClose={() => setLotCheckOrder(null)}
         />
@@ -569,8 +570,8 @@ export default function DonDatScreen() {
                 onChange={(v) => setCreating((t) => (t ? { ...t, customerId: v } : t))}
                 options={customerOptions}
                 onCreate={addCustomer}
-                onEditItem={customerEditor.moSua}
-                editLabel={customerEditor.nhanSua}
+                onEditItem={customerEditor.openEdit}
+                editLabel={customerEditor.editLabel}
                 emptyText="Chưa có khách nào — gõ tên rồi bấm Thêm mới."
               />
               <div className="space-y-4">
@@ -586,8 +587,8 @@ export default function DonDatScreen() {
                       value={dc.productId}
                       onChange={(v) => updateRow(i, { productId: v })}
                       options={productOptions}
-                      onEditItem={productEditor.moSua}
-                      editLabel={productEditor.nhanSua}
+                      onEditItem={productEditor.openEdit}
+                      editLabel={productEditor.editLabel}
                       onCreate={addProduct}
                     />
                     <Field
@@ -675,8 +676,8 @@ export default function DonDatScreen() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      {customerEditor.hop}
-      {productEditor.hop}
+      {customerEditor.dialog}
+      {productEditor.dialog}
     </div>
   );
 }

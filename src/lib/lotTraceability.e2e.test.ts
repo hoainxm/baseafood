@@ -12,18 +12,18 @@ import type {
 } from "@/types";
 import { RETAIL_WAREHOUSE, FG_WAREHOUSE, computeWipStock, collectWipDeductions } from "./inventory";
 import {
-  buildLotStockIndex, computeLotMassBalance, buildRecallList, buildRecallListForLots, docMaQr, listLotsToPrint, assignSessionLots, findSameShipmentLots, groupByTraceStage, buildLotNode, findLots, getLotStockKg, traceBackward,
+  buildLotStockIndex, computeLotMassBalance, buildRecallList, buildRecallListForLots, parseQrCode, listLotsToPrint, assignSessionLots, findSameShipmentLots, groupByTraceStage, buildLotNode, findLots, getLotStockKg, traceBackward,
   traceForward, type TraceData, type TraceBranch,
 } from "./lotTraceability";
 
 // ---------- Dữ liệu ----------
-const mh = (id: string, name: string, category: string): Product =>
+const makeProduct = (id: string, name: string, category: string): Product =>
   ({ id, code: "", name, finishedGoodCode: "", category, materialTypeId: "" });
 const products = [
-  mh("mh2da", "Bạch tuộc 2 da chần", "Bạch tuộc"),
-  mh("mhCat", "Bạch tuộc cắt", "Bạch tuộc"),
-  mh("tpTui", "Bạch tuộc 2 da chần túi 1 kg", "Bạch tuộc"),
-  mh("mhMuc", "Mực ống cắt", "Mực"),
+  makeProduct("mh2da", "Bạch tuộc 2 da chần", "Bạch tuộc"),
+  makeProduct("mhCat", "Bạch tuộc cắt", "Bạch tuộc"),
+  makeProduct("tpTui", "Bạch tuộc 2 da chần túi 1 kg", "Bạch tuộc"),
+  makeProduct("mhMuc", "Mực ống cắt", "Mực"),
 ];
 const materialTypes: MaterialType[] = [
   { id: "mt1", name: "Bạch tuộc", category: "Bạch tuộc", note: "" },
@@ -123,10 +123,10 @@ describe("kịch bản mẫu: nhập → SX → kho → đóng gói / xuất / b
   });
 
   it("thu hồi lô S1 tới đúng khách X, Y, Z", () => {
-    const { hangRa, loTrongXuong } = buildRecallList("S", "S1-1", dl);
-    expect([...new Set(hangRa.map((r) => r.khach))].sort()).toEqual(["Khách X", "Khách Y", "Khách Z"]);
-    expect(hangRa.find((r) => r.khach === "Khách Y")).toMatchObject({ loai: "B", kg: 50, tuLo: buildLotNode("P", "P1", dl).nhan });
-    expect(loTrongXuong.map((n) => n.id).sort()).toEqual(["P1", "W1", "W2"]);
+    const { hangRa: outboundItems, loTrongXuong: lotsInPlant } = buildRecallList("S", "S1-1", dl);
+    expect([...new Set(outboundItems.map((r) => r.khach))].sort()).toEqual(["Khách X", "Khách Y", "Khách Z"]);
+    expect(outboundItems.find((r) => r.khach === "Khách Y")).toMatchObject({ loai: "B", kg: 50, tuLo: buildLotNode("P", "P1", dl).nhan });
+    expect(lotsInPlant.map((n) => n.id).sort()).toEqual(["P1", "W1", "W2"]);
   });
 
   it("thu hồi lô S2 CHỈ tới khách X + chợ (bán nội địa) — không kéo theo Y, Z", () => {
@@ -165,22 +165,22 @@ describe("kịch bản mẫu: nhập → SX → kho → đóng gói / xuất / b
   });
 
   it("quét tem: link QR và mã lô in trên tem đều ra đúng lô", () => {
-    expect(findLots(docMaQr("https://app.example/#/qr?lo=W:W1")!, dl).map((n) => n.id)).toEqual(["W1"]);
-    expect(findLots(docMaQr("đ-261001-01")!, dl).map((n) => n.id)).toEqual(["S1-1"]);
+    expect(findLots(parseQrCode("https://app.example/#/qr?lo=W:W1")!, dl).map((n) => n.id)).toEqual(["W1"]);
+    expect(findLots(parseQrCode("đ-261001-01")!, dl).map((n) => n.id)).toEqual(["S1-1"]);
     // QR cũ trỏ cả chuyến (trước khi tách lô theo loại) ⇒ ra các lô loại NL của chuyến
-    expect(findLots(docMaQr("S:S1")!, dl).map((n) => n.id)).toEqual(["S1-1"]);
+    expect(findLots(parseQrCode("S:S1")!, dl).map((n) => n.id)).toEqual(["S1-1"]);
   });
 
   it("theo giai đoạn 29/09–05/10: mỗi khâu đủ mục, chỉ ra đúng việc còn thiếu", () => {
     const filter = { tu: "2026-09-29", den: "2026-10-05", xuong: "Đông" as const };
     const gd = Object.fromEntries(groupByTraceStage(dl, filter).map((g) => [g.khoa, g]));
-    const thieu = (k: string) => Object.fromEntries(gd[k]!.muc.map((m) => [m.nut.id, m.thieu.join(",")]));
+    const missingTasksOf = (k: string) => Object.fromEntries(gd[k]!.muc.map((m) => [m.nut.id, m.thieu.join(",")]));
     expect(Object.keys(gd)).toEqual(["nhap", "san-xuat", "kho", "dong-goi", "xuat-ban"]);
     // Nhập NL: S3 chưa in tem; S1 đã vào 2 mẻ, S2 vào 1 mẻ + 1 dòng bán nội địa
-    expect(thieu("nhap")).toEqual({ "S1-1": "", "S2-1": "", "S3-1": "tem" });
+    expect(missingTasksOf("nhap")).toEqual({ "S1-1": "", "S2-1": "", "S3-1": "tem" });
     expect(gd.nhap!.muc.find((m) => m.nut.id === "S2-1")!.daDung).toBe(2);
     // Sản xuất: mẻ cũ W0 thiếu cả lô NL lẫn tem
-    expect(thieu("san-xuat")).toEqual({ W0: "lo,tem", W1: "", W2: "" });
+    expect(missingTasksOf("san-xuat")).toEqual({ W0: "lo,tem", W1: "", W2: "" });
     // Kho: cả 3 đã nhập, tồn theo đúng lô gắn
     expect(gd.kho!.muc.map((m) => [m.nut.id, m.kho, m.ton])).toEqual(
       expect.arrayContaining([["W0", "da-nhap", 100], ["W1", "da-nhap", 200], ["W2", "da-nhap", 100]])
@@ -201,16 +201,16 @@ describe("kịch bản mẫu: nhập → SX → kho → đóng gói / xuất / b
 
   it("gắn lô cả phiên: lô bạch tuộc vào mẻ bạch tuộc, lô mực không dính", () => {
     let i = 0;
-    const kq = assignSessionLots({
+    const result = assignSessionLots({
       mes: [{ id: "Wmoi", productId: "mh2da" }, { id: "Wmuc", productId: "mhMuc" }],
       banNoiDia: [{ id: "n2", materialTypeName: "Bạch tuộc" }],
       loNl: [{ nut: buildLotNode("S", "S1-1", dl), cach: "quet" }, { nut: buildLotNode("S", "S3-1", dl), cach: "chon" }],
       dl, nguoiGhi: "Trúc", luc: "2026-10-06T07:00:00Z", taoId: () => `g${++i}`,
     });
-    expect(kq.lotInputs.map((l) => `${l.outputId}<${l.inputId}`)).toEqual(["Wmoi<S1-1", "Wmuc<S3-1"]);
-    expect(kq.lotInputs.every((l) => l.quantityKg === null)).toBe(true);
-    expect(kq.dispatches.map((d) => `${d.docId}<${d.lotId}`)).toEqual(["n2<S1-1"]);
-    expect(kq.khongKhop).toEqual([]);
+    expect(result.lotInputs.map((l) => `${l.outputId}<${l.inputId}`)).toEqual(["Wmoi<S1-1", "Wmuc<S3-1"]);
+    expect(result.lotInputs.every((l) => l.quantityKg === null)).toBe(true);
+    expect(result.dispatches.map((d) => `${d.docId}<${d.lotId}`)).toEqual(["n2<S1-1"]);
+    expect(result.khongKhop).toEqual([]);
   });
 });
 
@@ -230,45 +230,45 @@ describe("lô NL theo loại: một chuyến 3 loại ⇒ 3 lô, 3 tem", () => {
     shipments: [hp],
     imports: [dongHP("HP-a", "Bạch tuộc 1 da", 5100), dongHP("HP-b", "Bạch tuộc 2 da lớn (80↑)", 1038), dongHP("HP-c", "Bạch tuộc 2 da nhỏ (80↓)", 1704)],
     products: [
-      { ...mh("mhLon", "Bạch tuộc 2 da lớn chần", "Bạch tuộc"), materialTypeId: "t2" }, // đã gắn loại NL ở Danh mục
-      mh("mhChung", "Bạch tuộc cắt", "Bạch tuộc"), // chỉ biết loài
+      { ...makeProduct("mhLon", "Bạch tuộc 2 da lớn chần", "Bạch tuộc"), materialTypeId: "t2" }, // đã gắn loại NL ở Danh mục
+      makeProduct("mhChung", "Bạch tuộc cắt", "Bạch tuộc"), // chỉ biết loài
     ],
     materialTypes: testMaterialTypes,
     lotInputs: [], lotDispatches: [], labelPrints: [],
   };
 
   it("in tem chuyến ra 3 tem: cùng mã chuyến, mỗi tem một loại + kg của loại đó (định dạng vi-VN)", () => {
-    const ds = listLotsToPrint(d2, { tu: "2026-10-02", den: "2026-10-02", xuong: "", loai: ["S"] });
-    expect(ds.map((n) => [n.nhan, n.moTa, n.kg])).toEqual([
+    const items = listLotsToPrint(d2, { tu: "2026-10-02", den: "2026-10-02", xuong: "", loai: ["S"] });
+    expect(items.map((n) => [n.nhan, n.moTa, n.kg])).toEqual([
       ["Đ-261002-01", "Bạch tuộc 1 da", 5100],
       ["Đ-261002-01", "Bạch tuộc 2 da lớn (80↑)", 1038],
       ["Đ-261002-01", "Bạch tuộc 2 da nhỏ (80↓)", 1704],
     ]);
-    expect(ds[0]!.chiTiet).toContainEqual({ nhan: "Khối lượng", giaTri: "5.100 kg" });
-    expect(ds[0]!.chiTiet).toContainEqual({ nhan: "Cùng chuyến", giaTri: "3 loại · 7.842 kg" });
+    expect(items[0]!.chiTiet).toContainEqual({ nhan: "Khối lượng", giaTri: "5.100 kg" });
+    expect(items[0]!.chiTiet).toContainEqual({ nhan: "Cùng chuyến", giaTri: "3 loại · 7.842 kg" });
   });
 
   it("gõ mã chuyến hay quét QR cũ theo chuyến ⇒ hiện 3 lô để chọn; QR mới ⇒ đúng 1 lô", () => {
-    expect(findLots(docMaQr("Đ-261002-01")!, d2).map((n) => n.id)).toEqual(["HP-a", "HP-b", "HP-c"]);
-    expect(findLots(docMaQr("S:HP")!, d2).map((n) => n.id)).toEqual(["HP-a", "HP-b", "HP-c"]);
-    expect(findLots(docMaQr("https://app.example/#/qr?lo=S:HP-b")!, d2).map((n) => n.moTa)).toEqual(["Bạch tuộc 2 da lớn (80↑)"]);
+    expect(findLots(parseQrCode("Đ-261002-01")!, d2).map((n) => n.id)).toEqual(["HP-a", "HP-b", "HP-c"]);
+    expect(findLots(parseQrCode("S:HP")!, d2).map((n) => n.id)).toEqual(["HP-a", "HP-b", "HP-c"]);
+    expect(findLots(parseQrCode("https://app.example/#/qr?lo=S:HP-b")!, d2).map((n) => n.moTa)).toEqual(["Bạch tuộc 2 da lớn (80↑)"]);
     // nút cả chuyến vẫn dựng được cho dây lô ghi trước ngày tách
     expect(buildLotNode("S", "HP", d2)).toMatchObject({ kg: 7842, nhan: "Đ-261002-01" });
   });
 
   it("gắn lô cả phiên: mẻ đã gắn loại NL chỉ nhận đúng lô loại đó; mẻ chỉ biết loài nhận cả 3", () => {
     let i = 0;
-    const kq = assignSessionLots({
+    const result = assignSessionLots({
       mes: [{ id: "mLon", productId: "mhLon" }, { id: "mChung", productId: "mhChung" }],
       banNoiDia: [{ id: "nd", materialTypeName: "Bạch tuộc 1 da" }],
       loNl: ["HP-a", "HP-b", "HP-c"].map((id) => ({ nut: buildLotNode("S", id, d2), cach: "quet" as const })),
       dl: d2, nguoiGhi: "", luc: "", taoId: () => `g${++i}`,
     });
-    expect(kq.lotInputs.filter((l) => l.outputId === "mLon").map((l) => l.inputId)).toEqual(["HP-b"]);
-    expect(kq.lotInputs.filter((l) => l.outputId === "mChung").map((l) => l.inputId)).toEqual(["HP-a", "HP-b", "HP-c"]);
-    expect(kq.dispatches.map((d) => d.lotId)).toEqual(["HP-a"]);
+    expect(result.lotInputs.filter((l) => l.outputId === "mLon").map((l) => l.inputId)).toEqual(["HP-b"]);
+    expect(result.lotInputs.filter((l) => l.outputId === "mChung").map((l) => l.inputId)).toEqual(["HP-a", "HP-b", "HP-c"]);
+    expect(result.dispatches.map((d) => d.lotId)).toEqual(["HP-a"]);
     // dây lô ghi rõ loại NL của lô (cột material)
-    expect(kq.lotInputs.filter((l) => l.outputId === "mLon").map((l) => l.material)).toEqual(["Bạch tuộc 2 da lớn (80↑)"]);
+    expect(result.lotInputs.filter((l) => l.outputId === "mLon").map((l) => l.material)).toEqual(["Bạch tuộc 2 da lớn (80↑)"]);
   });
 
   it("cân bằng kg theo từng loại, không trộn 3 loại", () => {
@@ -278,17 +278,17 @@ describe("lô NL theo loại: một chuyến 3 loại ⇒ 3 lô, 3 tem", () => {
   });
 
   it("thu hồi cả chuyến gộp các loại, mỗi dòng hàng ra một lần", () => {
-    const wipChung: WipProductionItem = { ...me("WC", "2026-10-03", "mhChung", 500, 50) };
+    const sharedWip: WipProductionItem = { ...me("WC", "2026-10-03", "mhChung", 500, 50) };
     const d4: TraceData = {
       ...d2,
-      wips: [wipChung],
+      wips: [sharedWip],
       lotInputs: ["HP-a", "HP-c"].map((id, k) => ({ id: `li${k}`, outputKind: "W", outputId: "WC", inputKind: "S", inputId: id, inputLabel: "", material: "", quantityKg: null, method: "chon", operator: "", recordedAt: "" }) as LotInput),
       exportItems: [{ id: "xC", exportId: "e1", wipId: "WC", productId: "mhChung", spec: "", quantityKg: 100, blocksCount: 10 }],
     };
     expect(findSameShipmentLots("HP-b", d4).map((n) => n.id)).toEqual(["HP-a", "HP-b", "HP-c"]);
     expect(buildRecallList("S", "HP-b", d4).hangRa).toEqual([]); // loại 2 da lớn chưa đi đâu
-    const gop = buildRecallListForLots(findSameShipmentLots("HP-b", d4), d4);
-    expect(gop.hangRa.map((r) => `${r.loai}:${r.id}:${r.khach}`)).toEqual(["X:xC:Khách X"]); // qua 2 loại nhưng chỉ 1 dòng
-    expect(gop.loTrongXuong.map((n) => n.id)).toEqual(["WC"]);
+    const mergedRecall = buildRecallListForLots(findSameShipmentLots("HP-b", d4), d4);
+    expect(mergedRecall.hangRa.map((r) => `${r.loai}:${r.id}:${r.khach}`)).toEqual(["X:xC:Khách X"]); // qua 2 loại nhưng chỉ 1 dòng
+    expect(mergedRecall.loTrongXuong.map((n) => n.id)).toEqual(["WC"]);
   });
 });

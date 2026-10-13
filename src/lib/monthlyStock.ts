@@ -160,7 +160,7 @@ export interface CarryOverMismatch {
   theoNhom: GroupMismatch[]; // các nhóm có chênh (|lech| > NGUONG)
 }
 
-const NGUONG_LECH = 1; // < 1 kg coi như khớp (làm tròn số lẻ)
+const DIFF_THRESHOLD = 1; // < 1 kg coi như khớp (làm tròn số lẻ)
 
 const sumByGroup = (rows: MonthlyStockRow[], lay: (r: MonthlyStockRow) => number) => {
   const m = new Map<string, number>();
@@ -183,14 +183,14 @@ export function measureCarryForwardGap(priorRows: MonthlyStockRow[], currentRows
   for (const c of cats) {
     const ct = mClose.get(c) ?? 0;
     const on = mOpen.get(c) ?? 0;
-    if (Math.abs(on - ct) > NGUONG_LECH) theoNhom.push({ category: c, closeTruoc: ct, openNay: on, lech: on - ct });
+    if (Math.abs(on - ct) > DIFF_THRESHOLD) theoNhom.push({ category: c, closeTruoc: ct, openNay: on, lech: on - ct });
   }
   theoNhom.sort((a, b) => Math.abs(b.lech) - Math.abs(a.lech));
   return { closeTruoc: prevClose, openNay: currentOpening, lech: currentOpening - prevClose, theoNhom };
 }
 
 /** Có đáng gắn cờ lệch không (có tháng trước + tổng lệch quá ngưỡng). */
-export const hasCarryForwardGap = (l: CarryOverMismatch | null) => !!l && Math.abs(l.lech) > NGUONG_LECH;
+export const hasCarryForwardGap = (l: CarryOverMismatch | null) => !!l && Math.abs(l.lech) > DIFF_THRESHOLD;
 
 /* ---------- Đối chiếu lệch theo MẶT HÀNG (chẩn đoán, không tự sửa) ---------- */
 
@@ -241,7 +241,7 @@ export function compareCarryForward(priorRows: MonthlyStockRow[], currentRows: M
     const n = openByName.get(k);
     const closeKg = t?.kg ?? 0;
     const openKg = n?.kg ?? 0;
-    if (Math.abs(openKg - closeKg) <= NGUONG_LECH) continue;
+    if (Math.abs(openKg - closeKg) <= DIFF_THRESHOLD) continue;
     const g = (t ?? n)!;
     out.push({
       key: k,
@@ -282,12 +282,12 @@ export interface StockCardMonth {
  */
 export function buildProductStockCard(
   lines: MonthlyStockLine[],
-  khoa: string,
+  key: string,
   maxMonths = 24
 ): StockCardMonth[] {
   const m = new Map<string, StockCardMonth>();
   for (const l of lines) {
-    if (stockLineKey(l) !== khoa) continue;
+    if (stockLineKey(l) !== key) continue;
     const g =
       m.get(l.period) ??
       {
@@ -313,7 +313,7 @@ export function buildProductStockCard(
 /** Chuẩn hoá để SO KHỚP với danh mục: bỏ khoảng trắng thừa + thường hoá. */
 const normalizeForMatch = (s: string) => (s || "").trim().toLowerCase().replace(/\s+/g, " ");
 /** Chuẩn hoá NGẶT để dò TRÙNG CÁCH GHI: bỏ hết khoảng trắng + dấu câu (250UP≡250 UP). */
-const chuanNgat = (s: string) => (s || "").toLowerCase().replace(/[\s.,\-()/]+/g, "");
+const normalizeCompact = (s: string) => (s || "").toLowerCase().replace(/[\s.,\-()/]+/g, "");
 
 /** Đoán nhóm (category, loài) từ tên — chỉ gợi ý, người dùng sửa được. */
 export function inferMaterialCategory(name: string): string {
@@ -338,10 +338,10 @@ export type CatalogTarget = "product" | "material" | "skip";
  */
 export function inferCatalogTarget(name: string): CatalogTarget {
   const coSize = /(\d+\s*[-/]\s*\d+|\d+\s*up\b|\bup\b|<\s*\d+|>\s*\d+|\d+\s*gr?\b)/i.test(name);
-  const cheBien = /(r[âa]u|c[ắa]t|lu[ộo]c|ch[ầa]n|t[ẩa]m|b[ộo]t|d[aạ]t|\bc[ổo]\b|bao\s*t[ửu]|mada|vòi|\bda\b)/i.test(
+  const isProcessed = /(r[âa]u|c[ắa]t|lu[ộo]c|ch[ầa]n|t[ẩa]m|b[ộo]t|d[aạ]t|\bc[ổo]\b|bao\s*t[ửu]|mada|vòi|\bda\b)/i.test(
     name.toLowerCase()
   );
-  return coSize || cheBien ? "product" : "material";
+  return coSize || isProcessed ? "product" : "material";
 }
 
 /**
@@ -383,7 +383,7 @@ export function analyzeCatalogSync(
   productNames: string[]
 ): CatalogSyncReport {
   const materialNameSet = new Set(materialTypeNames.map(normalizeForMatch));
-  const setMH = new Set(productNames.map(normalizeForMatch));
+  const productNameSet = new Set(productNames.map(normalizeForMatch));
   const distinctNames = [...new Set(ledgerNames.map((t) => t.trim()).filter(Boolean))];
   let existingMaterialCount = 0;
   let existingProductCount = 0;
@@ -391,23 +391,23 @@ export function analyzeCatalogSync(
   for (const name of distinctNames) {
     const k = normalizeForMatch(name);
     const isMaterial = materialNameSet.has(k);
-    const oMH = setMH.has(k);
+    const isProductName = productNameSet.has(k);
     if (isMaterial) existingMaterialCount++;
-    if (oMH) existingProductCount++;
-    if (isMaterial || oMH) continue;
+    if (isProductName) existingProductCount++;
+    if (isMaterial || isProductName) continue;
     missing.push({ name, nhomGoiY: inferMaterialCategory(name), dichGoiY: inferCatalogTarget(name), roRang: laRoRang(name) });
   }
 
   // Gom trùng-cách-ghi trong chính danh sách tên của sổ.
   const grouped = new Map<string, Set<string>>();
   for (const t of distinctNames) {
-    const k = chuanNgat(t);
+    const k = normalizeCompact(t);
     if (!k) continue;
     const set = grouped.get(k) ?? new Set<string>();
     set.add(t);
     grouped.set(k, set);
   }
-  const nhomTrung = [...grouped.values()]
+  const duplicateGroups = [...grouped.values()]
     .filter((s) => s.size > 1)
     .map((s) => ({ variants: [...s].sort() }));
 
@@ -416,7 +416,7 @@ export function analyzeCatalogSync(
     daCoNL: existingMaterialCount,
     daCoMH: existingProductCount,
     chuaCo: missing,
-    nhomTrung,
+    nhomTrung: duplicateGroups,
   };
 }
 
@@ -578,16 +578,16 @@ const tiLeKien = (ctn: number, kg: number, kgBot: number) => (kg > 1e-9 ? (ctn *
  */
 export function applyLotAction(
   l: MonthlyStockLine,
-  kieu: LotActionKind,
+  kind: LotActionKind,
   kg: number,
   opts: { viTriDich?: string; ghiChu: string; idMoi: string }
 ): LotActionResult {
   const note = (l.note ? l.note + "\n" : "") + opts.ghiChu;
-  if (kieu === "xuat") {
+  if (kind === "xuat") {
     const ctn = l.kgPerCtn ? kg / l.kgPerCtn : 0;
     return { dong: { ...l, outKg: l.outKg + kg, outCtn: l.outCtn + ctn, note }, dongTach: null };
   }
-  if (kieu === "nhap") {
+  if (kind === "nhap") {
     const ctn = l.kgPerCtn ? kg / l.kgPerCtn : 0;
     return { dong: { ...l, inKg: l.inKg + kg, inCtn: l.inCtn + ctn, note }, dongTach: null };
   }

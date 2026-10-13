@@ -93,9 +93,10 @@ src/features/*                 ← màn nghiệp vụ
     tự dựng dùng `useRowMarkTools` + `useRowSelection` + `RowMarkToolbar`. Luật + ngoại lệ + mẫu:
     mục [Tô màu dòng](#tô-màu-dòng-đã-dò-kiểu-excel).
 
-**Ngoại lệ luật (bản in theo mẫu giấy):** `src/features/balancing/BalancingTable.tsx` và
-`src/features/imports/DailyImportInvoice.tsx` cố tình dùng chữ nhỏ, chữ hoa, màu slate cứng để
-khớp khổ A4. Đừng áp luật cỡ chữ / màu / sentence case vào hai file đó, và cũng
+**Ngoại lệ luật (bản in theo mẫu giấy):** `src/features/balancing/BalancingTable.tsx`,
+`src/features/imports/DailyImportInvoice.tsx` và `src/features/shared/BlankSlipPrint.tsx` (biểu mẫu
+trống để xưởng ghi tay, cùng cột với hai bản in kia) cố tình dùng chữ nhỏ, chữ hoa, màu slate cứng để
+khớp khổ A4. Đừng áp luật cỡ chữ / màu / sentence case vào các file đó (hook pre-commit miễn đúng ba file này), và cũng
 đừng lấy chúng làm mẫu cho màn mới.
 
 ## Quy chuẩn mobile
@@ -438,7 +439,7 @@ chip đếm/điều khiển của primitive; màn nghiệp vụ **không** dùng
 | Ô số (kg, tiền, %) | `NumberField` |
 | Chọn 1 trong ≤ 6 | `ChoiceGroup` (nút to) |
 | Chọn 1 trong danh mục dài / cần tạo mới | `Combobox` |
-| Chọn trong danh mục **và cho sửa bản ghi danh mục ngay tại chỗ** | `Combobox` + `onEditItem` (bút chì trên từng mục; máy có chuột: hiện khi rê/trỏ phím, cảm ứng: luôn hiện) + `canEdit` (chỉ mục có trong danh mục). Màn nghiệp vụ KHÔNG tự viết hộp: dùng `useSuaDanhMuc` (`features/catalog/SuaDanhMucNhanh.tsx`) — hộp là `CatalogEditDialog`, chung với `CatalogCrud`. Không gắn ở ô LỌC. **Bắt buộc ở mọi ô nhập liệu dùng danh mục, đi cùng `onCreate`** — xem mục "Ô chọn danh mục" ngay dưới bảng. |
+| Chọn trong danh mục **và cho sửa bản ghi danh mục ngay tại chỗ** | `Combobox` + `onEditItem` (bút chì trên từng mục; máy có chuột: hiện khi rê/trỏ phím, cảm ứng: luôn hiện) + `canEdit` (chỉ mục có trong danh mục). Màn nghiệp vụ KHÔNG tự viết hộp: dùng `useQuickCatalogEdit` (`features/catalog/QuickCatalogEdit.tsx`) — hộp là `CatalogEditDialog`, chung với `CatalogCrud`. Không gắn ở ô LỌC. **Bắt buộc ở mọi ô nhập liệu dùng danh mục, đi cùng `onCreate`** — xem mục "Ô chọn danh mục" ngay dưới bảng. |
 | Chọn ngày | `DateField` |
 | Chọn khoảng ngày | `DateRangeField` (hai ô riêng Từ / Đến) |
 | Danh sách bản ghi | `RecordTable` — truyền `getSortValue` cho cột để bấm tiêu đề sắp xếp, truyền `getSearchText` để hiện ô tìm |
@@ -478,8 +479,8 @@ bột tẩm — phải có **đủ hai thứ**, kể cả ô thêm về sau:
    hoa thường ⇒ trả lại bản có sẵn**, không đẻ bản trùng. `Combobox` tự ẩn nút
    "Thêm mới" khi NHÃN trùng chữ gõ, nhưng nhãn dạng `"12 · tên"` hay danh sách
    đã lọc (theo loài, gộp họ) thì không nhận ra ⇒ handler phải tự dò.
-2. **Bút chì sửa nhanh — `useSuaDanhMuc`.** `onEditItem={patch.moSua}` +
-   `editLabel={patch.editLabel}` + `canEdit={patch.canEdit}`, và render `{patch.hop}` đúng
+2. **Bút chì sửa nhanh — `useQuickCatalogEdit`.** `onEditItem={editor.openEdit}` +
+   `editLabel={editor.editLabel}` + `canEdit={editor.canEdit}`, và render `{editor.dialog}` đúng
    một lần trong màn. Hộp là `CatalogEditDialog` dùng chung bộ trường + luật kiểm tra
    với màn Danh mục — màn nghiệp vụ KHÔNG tự viết hộp.
 
@@ -488,8 +489,8 @@ bột tẩm — phải có **đủ hai thứ**, kể cả ô thêm về sau:
 | Ô | Vì sao |
 |---|---|
 | Ô LỌC / bộ lọc xem sổ ("Tất cả …", `hideRequiredMark`) | Không nhập liệu |
-| Danh sách cố định không phải danh mục: Phân xưởng, Loài (`CATEGORIES`), Kiểu chế biến, Thị trường, Loại kho, kho hệ thống (`BSF1_WAREHOUSES`, `KHO_TP_NAMES`, `KHO_XUONG`), vai trò, kỳ báo cáo, loại phế liệu gợi ý (`PHE_LIEU_GOI_Y`), nhóm hàng sổ kho | Không có bảng CRUD. Ô nào đang có `onCreate={(t) => t}` (gõ tự do) thì **để nguyên** |
-| 141 mã kế toán TK 1551 (`thanh-pham.json`) | Chỉ CHỌN — không thêm, không sửa |
+| Danh sách cố định không phải danh mục: Phân xưởng, Loài (`CATEGORIES`), Kiểu chế biến, Thị trường, Loại kho, kho hệ thống (`BSF1_WAREHOUSES`, `KHO_TP_NAMES`, `KHO_XUONG`), vai trò, kỳ báo cáo, loại phế liệu gợi ý (`SCRAP_SUGGESTIONS`), nhóm hàng sổ kho | Không có bảng CRUD. Ô nào đang có `onCreate={(t) => t}` (gõ tự do) thì **để nguyên** |
+| 141 mã kế toán TK 1551 (`finished-goods.json`) | Chỉ CHỌN — không thêm, không sửa |
 | Màn DEMO (`WorkOrderScreen`, `QualityScreen`, `ReportsScreen`) | Dữ liệu mẫu |
 | Ô chọn NẰM TRONG form danh mục (`CatalogCrud` / `CatalogEditDialog`) | Chỉ `onCreate` — không bút chì (tránh hộp lồng hộp). Hộp sửa nhanh ở màn nghiệp vụ không nắm instance danh mục con của màn ⇒ ô đó chỉ cho chọn (VD "Loại nguyên liệu" trong hộp sửa nhanh mặt hàng) |
 | Ô chọn giá trị ĐANG CÓ trong sổ để tìm (VD "Đang ghi là loại" ở Đổi loại hàng loạt) | Không ghi danh mục |
@@ -497,21 +498,22 @@ bột tẩm — phải có **đủ hai thứ**, kể cả ô thêm về sau:
 **Mẫu:**
 
 ```tsx
-import { useSuaDanhMuc } from "@/features/catalog/SuaDanhMucNhanh";
+import { useQuickCatalogEdit } from "@/features/catalog/QuickCatalogEdit";
 
-const [khach, setKhach] = useCustomers(); // ĐÚNG instance của màn
-const suaKH = useSuaDanhMuc("khachHang", khach, setKhach); // value là TÊN ⇒ { theo: "ten" }
-const themKhach = (ten: string) => {
-  const co = khach.find((k) => k.name.trim().toLowerCase() === ten.trim().toLowerCase());
-  if (co) return co.id; // trùng tên ⇒ dùng lại bản có sẵn
-  const k: Customer = { id: newId(), code: "", name: ten.trim(), market: "" };
-  setKhach([...khach, k]);
+const [customers, setCustomers] = useCustomers(); // ĐÚNG instance của màn
+const customerEditor = useQuickCatalogEdit("khachHang", customers, setCustomers); // value là TÊN ⇒ { theo: "ten" }
+const addCustomer = (name: string) => {
+  const existing = customers.find((k) => k.name.trim().toLowerCase() === name.trim().toLowerCase());
+  if (existing) return existing.id; // trùng tên ⇒ dùng lại bản có sẵn
+  const k: Customer = { id: newId(), code: "", name: name.trim(), market: "" };
+  setCustomers([...customers, k]);
   notify.saved(`Đã thêm khách hàng "${k.name}" vào danh mục`);
   return k.id;
 };
-// <Combobox … options={optKhach} onCreate={themKhach}
-//   onSuaMuc={suaKH.moSua} nhanSua={suaKH.nhanSua} suaDuoc={suaKH.suaDuoc} />
-// {suaKH.hop}
+// <Combobox … options={customerOptions} onCreate={addCustomer}
+//   onEditItem={customerEditor.openEdit} editLabel={customerEditor.editLabel} canEdit={customerEditor.canEdit} />
+// {customerEditor.dialog}
+// Loại danh mục ("khachHang", "daiLy"…) + tùy chọn `theo` vẫn là chuỗi tiếng Việt cũ — chờ đợt đổi literal (spec đặt tên §5).
 ```
 
 **Checklist khi thêm một ô chọn mới:**
@@ -526,7 +528,7 @@ const themKhach = (ten: string) => {
 - [ ] Options có mục ngoài danh mục (tên lấy từ sổ, kho hệ thống, mục gộp họ) ⇒
       bắt buộc `canEdit` để mục đó không có bút chì.
 - [ ] `onCreate` dò trùng tên không phân hoa thường + `notify.saved`.
-- [ ] Hook gọi trước mọi `return` sớm; `{patch.hop}` render một lần (thường cuối JSX).
+- [ ] Hook gọi trước mọi `return` sớm; `{patch.dialog}` render một lần (thường cuối JSX).
 - [ ] Danh mục nối theo TÊN ⇒ hộp tự khoá ô tên (`noiTheoTen`). Mặt hàng nối id
       nên đổi được tên — màn nào giữ TÊN mặt hàng trong state thì dời theo qua
       `onDaLuu(moi, cu)` (VD ô "Ánh xạ … tới" ở Sổ kho tháng).
@@ -561,7 +563,7 @@ chữ phụ / chữ màu về màu chữ thường.
 | design-system | `patterns/RowMarkToolbar.tsx` | `RowMarkToolbar` (thanh "Đã chọn N dòng") · `RowMarkActions` (cụm Tô màu ▾ / In đậm / Bỏ tô — cho màn tự đặt vào thanh "Đã chọn" riêng) |
 | design-system | `SummaryTable` · `RecordTable` · `EditableGrid` · `CatalogCrud` | prop `rowMarkKey="<khoá bảng>"` ⇒ tự có ô tick + thanh + nền dòng |
 | tokens | `--to-<sắc>-<1..5>` (+ `-line`) · khối `[data-marked]`/`[data-mark-dark]`/`[data-bold]` | nền phủ cả ô ghim/ô dính, vạch đậm mép trái, chữ đổi bản đậm trên nền đậm |
-| app | `features/shared/ToMauProvider.tsx` (gắn MỘT lần ở `ShellLayout`) | nối `useRowMarks()` → `row_marks`; hàm thuần `lib/rowMarks.ts` (+ test) |
+| app | `features/shared/RowMarkProvider.tsx` (gắn MỘT lần ở `ShellLayout`) | nối `useRowMarks()` → `row_marks`; hàm thuần `lib/rowMarks.ts` (+ test) |
 
 `SummaryTable` mà màn đã truyền `selection` riêng (VD Sổ kho tháng, Nhập xuất tồn kho — có
 thanh "Đã chọn" với cộng tổng / in / gán kho) thì bảng KHÔNG tự hiện thanh; màn đặt
@@ -577,7 +579,7 @@ bảng chỉ 4 nút nên dính đáy cả trên điện thoại (~1/5 màn).
 
 1. **Khoá bảng (`rowMarks`) ổn định, kebab-case, đặt một lần** — đổi khoá là mất
    dấu cũ. Một khoá cho một bảng; hai chế độ xem CÙNG bản ghi (VD bảng xem + lưới
-   Ghi của `/nxt-kho`) dùng chung khoá để dấu không mất khi đổi chế độ.
+   Ghi của `/nxt-warehouse`) dùng chung khoá để dấu không mất khi đổi chế độ.
 2. **Khoá dòng = id BẢN GHI** (`getKey` / `GridRow.id`), **cấm chỉ số dòng** —
    sắp xếp / lọc / thêm dòng sẽ làm dấu nhảy sang dòng khác.
 3. **Bảng dòng GỘP theo kỳ/bộ lọc** (báo cáo: đại lý × loại, khách × kênh, mặt
@@ -597,7 +599,7 @@ bảng chỉ 4 nút nên dính đáy cả trên điện thoại (~1/5 màn).
 | Bảng NHÁP đang gõ, chưa lưu (`BangDongSX` ở `/wip`) | Dòng chưa có id bản ghi; lưu xong dòng hiện ở sổ có tô |
 | Bảng trong hộp thoại / xem trước (chọn dòng nhập vào kỳ, đổi loại hàng loạt, đối chiếu lệch, xem trước nạp Excel) | Bảng tạm để chọn, không phải sổ để dò |
 | Bảng tóm tắt nhỏ trong thẻ (bột theo loại, báo cáo TP gom theo người ghi ở `/wip`) · tồn theo kho ở Tổng quan | Vài dòng gộp, số đổi liên tục — dấu "đã dò" không còn nghĩa |
-| Bảng KẾT QUẢ đối soát HĐĐT (`/doi-soat`) | Khoá dòng `<sheet>#<dòng>` của file đang mở — đổi file là trùng khoá. Đợt sau: khoá theo id bản đối soát đã lưu. Danh sách "Bản đã lưu" thì có tô |
+| Bảng KẾT QUẢ đối soát HĐĐT (`/reconciliation`) | Khoá dòng `<sheet>#<dòng>` của file đang mở — đổi file là trùng khoá. Đợt sau: khoá theo id bản đối soát đã lưu. Danh sách "Bản đã lưu" thì có tô |
 
 **Mẫu:**
 

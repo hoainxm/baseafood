@@ -24,7 +24,7 @@ import {
 } from "@/lib/catalogRepo";
 import type { TraceData } from "@/lib/lotTraceability";
 
-export function useDuLieuTruyXuat() {
+export function useTraceData() {
   const [shipments] = useImportShipments();
   const [imports] = useMaterialImports();
   const [wips] = useWipProductions();

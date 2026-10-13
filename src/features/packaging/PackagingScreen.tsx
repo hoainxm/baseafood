@@ -17,7 +17,7 @@ import {
   useLotInputs,
   useLotDispatches,
 } from "@/lib/catalogRepo";
-import { GanLoDauVao, TemLoQr } from "@/features/shared";
+import { LotInputPicker, LotQrLabels } from "@/features/shared";
 import { formatFinishedGoodLotLabel, buildLotNode } from "@/lib/lotTraceability";
 import {
   computeWipStock,
@@ -53,7 +53,7 @@ import {
   type FieldError,
   type ComboboxOption,
 } from "@/design-system";
-import { useSuaDanhMuc } from "@/features/catalog/SuaDanhMucNhanh";
+import { useQuickCatalogEdit } from "@/features/catalog/QuickCatalogEdit";
 import { kg, num, todayISO, formatDateVN } from "@/lib/format";
 import { KY_OPT, getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
 import { Boxes, CalendarRange, Link2, Package, PackageCheck, Plus, QrCode, Scale } from "lucide-react";
@@ -76,15 +76,15 @@ interface FormDG {
   note: string;
 }
 
-export default function DongGoiScreen() {
-  const [rows, persist, { trangThai }] = usePackagings();
-  const isLoading = trangThai === "dang-tai" && rows.length === 0;
+export default function PackagingScreen() {
+  const [rows, persist, { trangThai: status }] = usePackagings();
+  const isLoading = status === "dang-tai" && rows.length === 0;
   const [wips] = useWipProductions();
   const [exportItems] = useExportItems();
   const [salesItems] = useSalesItems();
   const [products, setProducts] = useProducts();
   /** Bút chì sửa nhanh danh mục ngay trong ô chọn. */
-  const productEditor = useSuaDanhMuc("matHang", products, setProducts);
+  const productEditor = useQuickCatalogEdit("matHang", products, setProducts);
 
   const [ky, setKy] = useState<ViewPeriod>("ngay");
   const [date, setDate] = useState(todayISO());
@@ -101,13 +101,13 @@ export default function DongGoiScreen() {
   const [lotLabel, setLotLabel] = useState<Packaging | null>(null);
   const countLotInputs = (id: string) => lotInputs.filter((l) => l.outputKind === "P" && l.outputId === id).length;
 
-  const [tuHieuLuc, denHieuLuc] = getViewPeriodRange(ky, date, fromDate, toDate);
-  const isSingleDay = tuHieuLuc === denHieuLuc;
+  const [effectiveFrom, effectiveTo] = getViewPeriodRange(ky, date, fromDate, toDate);
+  const isSingleDay = effectiveFrom === effectiveTo;
   const rangeDescription = isSingleDay
-    ? formatDateVN(tuHieuLuc)
-    : `${formatDateVN(tuHieuLuc)} – ${formatDateVN(denHieuLuc)}`;
+    ? formatDateVN(effectiveFrom)
+    : `${formatDateVN(effectiveFrom)} – ${formatDateVN(effectiveTo)}`;
 
-  const tenMH = (id: string) => products.find((m) => m.id === id)?.name || "—";
+  const productNameOf = (id: string) => products.find((m) => m.id === id)?.name || "—";
   const productOptions: ComboboxOption[] = products.map((m) => ({
     value: m.id,
     label: m.code ? `${m.code} · ${m.name}` : m.name,
@@ -131,12 +131,12 @@ export default function DongGoiScreen() {
       rows
         .filter(
           (r) =>
-            r.date >= tuHieuLuc &&
-            r.date <= denHieuLuc &&
+            r.date >= effectiveFrom &&
+            r.date <= effectiveTo &&
             (workshop === "Tất cả" || r.workshop === workshop)
         )
         .sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id)),
-    [rows, tuHieuLuc, denHieuLuc, workshop]
+    [rows, effectiveFrom, effectiveTo, workshop]
   );
 
   const totalIn = view.reduce((s, r) => s + (r.inputKg || 0), 0);
@@ -144,7 +144,7 @@ export default function DongGoiScreen() {
   const totalLoss = totalIn - totalOut;
   const totalFinishedGoodStock = finishedGoodStock.reduce((s, t) => s + Math.max(0, t.conLai), 0);
 
-  const postingDate = isSingleDay ? tuHieuLuc : denHieuLuc;
+  const postingDate = isSingleDay ? effectiveFrom : effectiveTo;
   const recordWorkshop: Workshop = workshop === "Tất cả" ? "Đông" : workshop;
 
   const addProduct = (ten: string): string => {
@@ -211,7 +211,7 @@ export default function DongGoiScreen() {
     };
     persist([...rows, p]);
     notify.saved(
-      `Đã đóng gói: ${tenMH(p.fromProductId)} ${kg(p.inputKg)} → ${tenMH(p.toProductId)} ${kg(p.outputKg)}`,
+      `Đã đóng gói: ${productNameOf(p.fromProductId)} ${kg(p.inputKg)} → ${productNameOf(p.toProductId)} ${kg(p.outputKg)}`,
       undefined,
       { label: "In tem", onClick: () => setLotLabel(p) }
     );
@@ -221,7 +221,7 @@ export default function DongGoiScreen() {
   const remove = (r: Packaging) => {
     const prevRows = rows;
     persist(rows.filter((x) => x.id !== r.id));
-    notify.deleted(`Đã xóa phiếu đóng gói ${tenMH(r.toProductId)}`, () => persist(prevRows));
+    notify.deleted(`Đã xóa phiếu đóng gói ${productNameOf(r.toProductId)}`, () => persist(prevRows));
   };
 
   const columns: RecordTableColumn<Packaging>[] = [
@@ -232,7 +232,7 @@ export default function DongGoiScreen() {
       header: "BTP tiêu hao",
       render: (r) => (
         <span>
-          {tenMH(r.fromProductId)}
+          {productNameOf(r.fromProductId)}
           {r.fromSpec ? <span className="text-muted-foreground"> · {r.fromSpec}</span> : null}
           <span className="tnum"> — {num(r.inputKg)} kg</span>
           {r.inputBlocks ? <span className="text-muted-foreground"> · {num(r.inputBlocks)} block</span> : null}
@@ -244,7 +244,7 @@ export default function DongGoiScreen() {
       header: "Thành phẩm ra",
       render: (r) => (
         <span>
-          {tenMH(r.toProductId)}
+          {productNameOf(r.toProductId)}
           {r.toSpec ? <span className="text-muted-foreground"> · {r.toSpec}</span> : null}
           <span className="tnum"> — {num(r.outputKg)} kg</span>
           {r.outputUnits ? <span className="text-muted-foreground"> · {num(r.outputUnits)} thùng</span> : null}
@@ -375,7 +375,7 @@ export default function DongGoiScreen() {
                   key={`${t.productId}|${t.spec}`}
                   className="rounded-lg border-2 border-border px-3 py-1.5 text-sm"
                 >
-                  {tenMH(t.productId)}
+                  {productNameOf(t.productId)}
                   {t.spec ? <span className="text-muted-foreground"> · {t.spec}</span> : null}:{" "}
                   <span className="tnum font-semibold text-foreground">{kg(t.conLai)}</span>
                 </span>
@@ -431,8 +431,8 @@ export default function DongGoiScreen() {
                   value={form.fromProductId}
                   onChange={(v) => setField("fromProductId", v)}
                   options={productOptions}
-                  onEditItem={productEditor.moSua}
-                  editLabel={productEditor.nhanSua}
+                  onEditItem={productEditor.openEdit}
+                  editLabel={productEditor.editLabel}
                   onCreate={addProduct}
                   emptyText="Chưa có mặt hàng — gõ tên rồi Thêm mới."
                 />
@@ -466,8 +466,8 @@ export default function DongGoiScreen() {
                   value={form.toProductId}
                   onChange={(v) => setField("toProductId", v)}
                   options={productOptions}
-                  onEditItem={productEditor.moSua}
-                  editLabel={productEditor.nhanSua}
+                  onEditItem={productEditor.openEdit}
+                  editLabel={productEditor.editLabel}
                   onCreate={addProduct}
                   emptyText="Chưa có mặt hàng — gõ tên rồi Thêm mới."
                 />
@@ -515,19 +515,19 @@ export default function DongGoiScreen() {
         </DialogContent>
       </Dialog>
       {lotTarget && (
-        <GanLoDauVao
+        <LotInputPicker
           outputKind="P"
           outputId={lotTarget.id}
-          outputNhan={`phiếu ${formatFinishedGoodLotLabel(lotTarget)} · ${tenMH(lotTarget.toProductId)}`}
-          xuong={lotTarget.workshop}
-          ngay={lotTarget.date}
-          matHangId={lotTarget.fromProductId}
+          outputLabel={`phiếu ${formatFinishedGoodLotLabel(lotTarget)} · ${productNameOf(lotTarget.toProductId)}`}
+          workshop={lotTarget.workshop}
+          date={lotTarget.date}
+          productId={lotTarget.fromProductId}
           onClose={() => setLotTarget(null)}
         />
       )}
       {lotLabel && (
-        <TemLoQr
-          nut={buildLotNode("P", lotLabel.id, {
+        <LotQrLabels
+          node={buildLotNode("P", lotLabel.id, {
             shipments: [], imports: [], wips,
             packagings: rows.some((r) => r.id === lotLabel.id) ? rows : [...rows, lotLabel], lotInputs,
             exportItems: [], exportOrders: [], salesOrders: [], products, customers: [],
@@ -535,7 +535,7 @@ export default function DongGoiScreen() {
           onClose={() => setLotLabel(null)}
         />
       )}
-      {productEditor.hop}
+      {productEditor.dialog}
     </div>
   );
 }

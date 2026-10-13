@@ -1,5 +1,5 @@
 // ============================================================
-// Tên file: src/features/shared/CheDoDemo.tsx
+// Tên file: src/features/shared/DemoMode.tsx
 // Tên tiếng Việt: Chế độ demo — dải cảnh báo, nạp bộ demo, nút bật/tắt (admin)
 // Description: Demo-mode UI (spec docs/spec/che-do-demo.md §4)
 // ============================================================
@@ -52,13 +52,13 @@ import { num } from "@/lib/format";
  * (quy tắc 15: không bao giờ để người xem nhầm số demo là số thật). Tiêu đề tab có
  * tiền tố "[DEMO]".
  */
-export function DaiDemo() {
+export function DemoModeBanner() {
   useEffect(() => {
     if (!LA_DEMO) return;
-    const goc = document.title;
-    if (!goc.startsWith("[DEMO]")) document.title = `[DEMO] ${goc}`;
+    const originalTitle = document.title;
+    if (!originalTitle.startsWith("[DEMO]")) document.title = `[DEMO] ${originalTitle}`;
     return () => {
-      document.title = goc;
+      document.title = originalTitle;
     };
   }, []);
   if (!LA_DEMO) return null;
@@ -92,7 +92,7 @@ export function DaiDemo() {
  * có tiền tố `demo:`). Chỉ gắn khi đang demo VÀ có gói chờ. Chờ mọi bảng nạp xong rồi
  * mới ghi, kẻo diff với bản rỗng làm sót dòng cũ.
  */
-export function NapGoiDemo() {
+export function DemoPackLoader() {
   const [goi] = useState(() => docGoiDemo<GoiDemo>());
   if (!LA_DEMO || !goi) return null;
   return <NapGoiDemoThat goi={goi} />;
@@ -151,7 +151,7 @@ function NapGoiDemoThat({ goi }: { goi: GoiDemo }) {
       setAuditPaused(false);
     }
     clearDemoBundle();
-    const total = Object.values(goi).reduce((s, ds) => s + (ds as unknown[]).length, 0);
+    const total = Object.values(goi).reduce((s, items) => s + (items as unknown[]).length, 0);
     notify.saved(`Đã nạp bộ demo: ${num(total)} dòng số trình diễn.`);
     setIsWritten(true);
     // Chạy MỘT lần khi mọi bảng nạp xong (daNap chặn lần hai); `bang` đổi mỗi lần vẽ.
@@ -171,7 +171,7 @@ function NapGoiDemoThat({ goi }: { goi: GoiDemo }) {
  * thật rồi vào demo, hoặc vào demo giữ bộ đang có. Chế độ demo: làm mới bộ demo (tải
  * lại về chế độ thật để quét, rồi tự vào lại) hoặc thoát.
  */
-export function KhoiCheDoDemo() {
+export function DemoModeSection() {
   return LA_DEMO ? <DemoActiveSection /> : <DemoGeneratorSection />;
 }
 
@@ -232,7 +232,7 @@ function DemoGeneratorSection() {
     () => ({ products, materialTypes, suppliers, customers, batterTypes, storageLocations, imports, wips, periods, balancingInputs, balancingOutputs, nxtSnapshots, monthlyStock }),
     [products, materialTypes, suppliers, customers, batterTypes, storageLocations, imports, wips, periods, balancingInputs, balancingOutputs, nxtSnapshots, monthlyStock],
   );
-  const thamSo = useMemo(() => scanDemoParams(source), [source]);
+  const demoParams = useMemo(() => scanDemoParams(source), [source]);
 
   const createAndEnter = () => {
     setIsCreating(true);
@@ -270,8 +270,8 @@ function DemoGeneratorSection() {
           <h2 className="text-base font-semibold text-foreground">Chế độ demo (chỉ quản trị thấy)</h2>
           <p className="text-sm text-muted-foreground">
             Trình bày bằng bộ số đầy đủ chuỗi (nhập → sản xuất → kho → đóng gói → bán → lô QR), sinh từ số thật đã
-            nhập: {num(thamSo.soDongNhapThat)} dòng nhập, {thamSo.daiLy.length} đại lý, {thamSo.xuong.length} xưởng, tỉ lệ
-            ra thành phẩm {num(thamSo.tiLeTP * 100)}%. Bộ demo nằm riêng — số thật không bị đụng.
+            nhập: {num(demoParams.soDongNhapThat)} dòng nhập, {demoParams.daiLy.length} đại lý, {demoParams.xuong.length} xưởng, tỉ lệ
+            ra thành phẩm {num(demoParams.tiLeTP * 100)}%. Bộ demo nằm riêng — số thật không bị đụng.
           </p>
         </div>
       </div>

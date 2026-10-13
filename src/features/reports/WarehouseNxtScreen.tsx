@@ -48,7 +48,7 @@ import {
   RowMarkActions,
   useRowMarkTools,
 } from "@/design-system";
-import { useSuaDanhMuc } from "@/features/catalog/SuaDanhMucNhanh";
+import { useQuickCatalogEdit } from "@/features/catalog/QuickCatalogEdit";
 import { num, formatDateVN } from "@/lib/format";
 import { newId } from "@/lib/store";
 import {
@@ -110,7 +110,7 @@ export default function WarehouseNxtScreen() {
   const [snapshots, setSnapshots] = useNxtSnapshots();
   const [storageLocationCatalog, setStorageLocationCatalog] = useStorageLocations();
   /** Bút chì sửa nhanh danh mục ngay trong ô chọn. */
-  const storageLocationEditor = useSuaDanhMuc("khoLuu", storageLocationCatalog, setStorageLocationCatalog, { theo: "ten" });
+  const storageLocationEditor = useQuickCatalogEdit("khoLuu", storageLocationCatalog, setStorageLocationCatalog, { theo: "ten" });
   const fileRef = useRef<HTMLInputElement>(null);
 
   const warehouseOpts: ComboboxOption[] = useMemo(() => {
@@ -167,39 +167,39 @@ export default function WarehouseNxtScreen() {
    * Trùng tên (không phân hoa thường) ⇒ dùng lại kho có sẵn.
    */
   const addStorageLocation = (ten: string) => {
-    const sach = ten.trim();
-    const khoa = sach.toLowerCase();
+    const trimmedName = ten.trim();
+    const nameKey = trimmedName.toLowerCase();
     const co =
-      storageLocationCatalog.find((k) => k.name.trim().toLowerCase() === khoa)?.name.trim() ??
-      storageLocationOpts.find((o) => o.value.toLowerCase() === khoa)?.value;
+      storageLocationCatalog.find((k) => k.name.trim().toLowerCase() === nameKey)?.name.trim() ??
+      storageLocationOpts.find((o) => o.value.toLowerCase() === nameKey)?.value;
     if (co) return co;
     const k: StorageLocation = {
       id: newId(),
       code: "",
-      name: sach,
+      name: trimmedName,
       kind: "thue-ngoai",
       address: "",
       phone: "",
       note: "",
     };
     setStorageLocationCatalog([...storageLocationCatalog, k]);
-    notify.saved(`Đã thêm kho lưu "${sach}" vào danh mục`);
-    return sach;
+    notify.saved(`Đã thêm kho lưu "${trimmedName}" vào danh mục`);
+    return trimmedName;
   };
 
   const [storageLocationFilter, setStorageLocationFilter] = useState(ALL);
 
   /** Cộng tồn cuối theo từng kho lưu (dải chip dưới thẻ số liệu). */
   const byStorageLocation = useMemo(() => {
-    const m = new Map<string, { tonCuoi: number; soMa: number }>();
+    const m = new Map<string, { closingKg: number; itemCount: number }>();
     for (const r of rowsKy) {
       const k = storageLocationOf(r);
-      const g = m.get(k) ?? { tonCuoi: 0, soMa: 0 };
-      g.tonCuoi += r.closingKg;
-      g.soMa += 1;
+      const g = m.get(k) ?? { closingKg: 0, itemCount: 0 };
+      g.closingKg += r.closingKg;
+      g.itemCount += 1;
       m.set(k, g);
     }
-    return [...m.entries()].sort((a, b) => b[1].tonCuoi - a[1].tonCuoi);
+    return [...m.entries()].sort((a, b) => b[1].closingKg - a[1].closingKg);
   }, [rowsKy]);
 
   const rows: ComputedRow[] = useMemo(
@@ -557,10 +557,10 @@ export default function WarehouseNxtScreen() {
         return;
       }
       const newIds = new Set(newLines.map((x) => x.id));
-      const giuLai = snapshots.filter(
+      const kept = snapshots.filter(
         (r) => !(r.warehouseCode === fileWarehouse && r.periodFrom === from && r.periodTo === to) && !newIds.has(r.id)
       );
-      setSnapshots([...giuLai, ...newLines]);
+      setSnapshots([...kept, ...newLines]);
       setWarehouse(fileWarehouse);
       setKy(`${from}|${to}`);
       const sd = newLines.reduce((s, r) => s + r.openingKg, 0);
@@ -725,7 +725,7 @@ export default function WarehouseNxtScreen() {
                 >
                   <span className="font-medium text-foreground">{ten}</span>{" "}
                   <span className="tnum text-muted-foreground">
-                    {num(g.tonCuoi)} kg · {g.soMa} mã
+                    {num(g.closingKg)} kg · {g.itemCount} mã
                   </span>
                 </button>
               ))}
@@ -878,9 +878,9 @@ export default function WarehouseNxtScreen() {
                 onChange={(v) => setAssignLocation(v)}
                 options={storageLocationOpts}
                 onCreate={addStorageLocation}
-                onEditItem={storageLocationEditor.moSua}
-                editLabel={storageLocationEditor.nhanSua}
-                canEdit={storageLocationEditor.suaDuoc}
+                onEditItem={storageLocationEditor.openEdit}
+                editLabel={storageLocationEditor.editLabel}
+                canEdit={storageLocationEditor.canEdit}
                 clearable={false}
               />
             </div>
@@ -984,7 +984,7 @@ export default function WarehouseNxtScreen() {
           </table>
         </PrintSheet>
       )}
-      {storageLocationEditor.hop}
+      {storageLocationEditor.dialog}
     </div>
   );
 }

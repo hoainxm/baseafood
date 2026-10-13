@@ -1,5 +1,5 @@
 // ============================================================
-// Tên file: src/features/doi-soat/CheDoDoiSoat.tsx
+// Tên file: src/features/reconciliation/ReconciliationModeView.tsx
 // Tên tiếng Việt tương đương: Các kiểu đối soát trên màn /doi-soat
 // Description: Bộ chọn "việc cần soát" + 3 khung xem ngoài chiều hóa đơn ⇄ sổ:
 //   so hai bản HĐĐT · kiểm cộng cột bảng kê · hóa đơn cùng MST cùng ngày.
@@ -37,7 +37,7 @@ import {
   type SameDayGroup,
 } from "@/lib/twoVersionReconciliation";
 import { num } from "@/lib/format";
-import type { CheDo } from "./cheDo";
+import type { ReconciliationMode } from "./reconciliationMode";
 import {
   BookOpenCheck,
   Calculator,
@@ -49,48 +49,48 @@ import {
   RotateCcw,
 } from "lucide-react";
 
-const CHE_DO: { id: CheDo; nhan: string; moTa: string; icon: typeof Files }[] = [
+const MODES: { id: ReconciliationMode; label: string; description: string; icon: typeof Files }[] = [
   {
     id: "so",
-    nhan: "Hóa đơn ⇄ sổ kế toán",
-    moTa: "Hóa đơn nào chưa vào sổ, lệch tiền, lệch thuế; dòng sổ nào không có hóa đơn.",
+    label: "Hóa đơn ⇄ sổ kế toán",
+    description: "Hóa đơn nào chưa vào sổ, lệch tiền, lệch thuế; dòng sổ nào không có hóa đơn.",
     icon: BookOpenCheck,
   },
   {
     id: "haiBan",
-    nhan: "So hai bản hóa đơn",
-    moTa: "Bản cơ quan thuế gửi ⇄ bản kế toán tự tải: hóa đơn chỉ một bên có, hóa đơn lệch tiền.",
+    label: "So hai bản hóa đơn",
+    description: "Bản cơ quan thuế gửi ⇄ bản kế toán tự tải: hóa đơn chỉ một bên có, hóa đơn lệch tiền.",
     icon: Files,
   },
   {
     id: "kiemCong",
-    nhan: "Kiểm cộng cột bảng kê",
-    moTa: "Chưa thuế + thuế có bằng tổng thanh toán không; lệch ở dòng nào, do phí / chiết khấu / làm tròn hay sai thật.",
+    label: "Kiểm cộng cột bảng kê",
+    description: "Chưa thuế + thuế có bằng tổng thanh toán không; lệch ở dòng nào, do phí / chiết khấu / làm tròn hay sai thật.",
     icon: Calculator,
   },
   {
     id: "cungNgay",
-    nhan: "Cùng MST cùng ngày",
-    moTa: "Một người bán xuất nhiều hóa đơn trong một ngày — lọc ra nhóm trùng khít số tiền (dễ kê hai lần).",
+    label: "Cùng MST cùng ngày",
+    description: "Một người bán xuất nhiều hóa đơn trong một ngày — lọc ra nhóm trùng khít số tiền (dễ kê hai lần).",
     icon: CalendarSearch,
   },
 ];
 
 // ---------- Bộ chọn kiểu đối soát ----------
-export function ChonCheDo({
-  cheDo,
-  setCheDo,
+export function ReconciliationModePicker({
+  mode,
+  setMode,
   dem,
 }: {
-  cheDo: CheDo;
-  setCheDo: (c: CheDo) => void;
+  mode: ReconciliationMode;
+  setMode: (c: ReconciliationMode) => void;
   /** Dòng tóm tắt dưới mỗi nút (VD "56 chưa vào sổ"), hoặc lý do chưa áp dụng được. */
-  dem: Record<CheDo, { chu: string; apDung: boolean }>;
+  dem: Record<ReconciliationMode, { chu: string; applicable: boolean }>;
 }) {
   return (
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" role="radiogroup" aria-label="Việc cần soát">
-      {CHE_DO.map((c) => {
-        const isSelected = cheDo === c.id;
+      {MODES.map((c) => {
+        const isSelected = mode === c.id;
         const Icon = c.icon;
         return (
           <button
@@ -98,19 +98,19 @@ export function ChonCheDo({
             type="button"
             role="radio"
             aria-checked={isSelected}
-            title={`Xem kết quả kiểu "${c.nhan}": ${c.moTa}`}
-            onClick={() => setCheDo(c.id)}
+            title={`Xem kết quả kiểu "${c.label}": ${c.description}`}
+            onClick={() => setMode(c.id)}
             className={`flex min-h-11 flex-col gap-1 rounded-xl border p-3 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring ${
               isSelected ? "border-primary bg-accent" : "border-border bg-card hover:bg-muted/40"
             }`}
           >
             <span className="flex items-center gap-2 font-semibold">
               <Icon className="size-5 shrink-0 text-primary" aria-hidden />
-              {c.nhan}
+              {c.label}
               {isSelected && <span className="ml-auto shrink-0 text-sm font-medium text-primary">Đang xem</span>}
             </span>
-            <span className="text-sm text-muted-foreground">{c.moTa}</span>
-            <span className={`text-sm font-medium ${dem[c.id].apDung ? "text-foreground" : "text-muted-foreground"}`}>
+            <span className="text-sm text-muted-foreground">{c.description}</span>
+            <span className={`text-sm font-medium ${dem[c.id].applicable ? "text-foreground" : "text-muted-foreground"}`}>
               {dem[c.id].chu}
             </span>
           </button>
@@ -122,23 +122,23 @@ export function ChonCheDo({
 
 // ---------- Quy tắc máy đang áp dụng ----------
 /** Quy tắc đã chốt qua các đợt đối soát thật (doc 37). Giữ câu ngắn, lời thường. */
-const RULES: { ten: string; noiDung: string }[] = [
-  { ten: "Khóa ghép", noiDung: "MST người bán + ký hiệu + số hóa đơn. MST chỉ so phần chữ số (0301234567-001 = 0301234567001), MST mất số 0 đầu được bù lại; số hóa đơn bỏ số 0 ở đầu (00060568 = 60568); ký hiệu bỏ chữ số mẫu số gộp đầu (1C26TTN = C26TTN)." },
-  { ten: "Cộng dồn", noiDung: "Một hóa đơn tách nhiều dòng sổ (theo thuế suất / theo mặt hàng) được cộng lại rồi mới so." },
-  { ten: "So đủ 3 cột", noiDung: "So trước thuế, thuế và tổng ở từng hóa đơn. Tổng lệch ⇒ LỆCH TIỀN; tổng khớp mà thuế lệch ⇒ LỆCH THUẾ; chỉ trước thuế lệch ⇒ vẫn khớp (thường do chiết khấu / phí)." },
-  { ten: "Ngoại tệ", noiDung: "Máy tự dò bản xuất để tiền ở nguyên tệ (phải nhân tỷ giá) hay đã quy sẵn VND, bằng cách so với các hóa đơn đã khớp sổ. Không mặc định nhân. Ngoại tệ thiếu tỷ giá thì máy báo, không tự coi là VND." },
-  { ten: "Không cần vào sổ", noiDung: "Hóa đơn đã bị thay thế / xóa bỏ / hủy không phải kê. Hóa đơn đã bị ĐIỀU CHỈNH vẫn phải kê — không gộp chung." },
-  { ten: "Hóa đơn bán hàng (mẫu số 2)", noiDung: "Không có thuế GTGT: ô thuế trống là đúng, chưa thuế phải bằng tổng thanh toán." },
-  { ten: "Làm tròn", noiDung: "Lệch ±1 đ là làm tròn của bên phát hành, không phải sai. Hóa đơn để nguyên tệ thì chỉ ±1 xu (0,01) mới là làm tròn — lệch 1 USD là lệch thật." },
-  { ten: "Gần khớp", noiDung: "Hóa đơn chưa vào sổ nhưng sổ có dòng cùng MST + cùng số tiền ⇒ nghi gõ sai số hóa đơn ở sổ, tách riêng để khỏi kê hai lần." },
-  { ten: "Ghi chú tay", noiDung: "Dòng ghi chú kế toán gõ dưới bảng (không có ký hiệu, không có MST hợp lệ) bị bỏ qua, không bị coi là hóa đơn." },
-  { ten: "Hai bản", noiDung: "Sheet có chữ “thuế” trong tên là bản thuế gửi; không có thì sheet mang chữ “tải” là bản tự tải. Nhận sai thì chọn lại ở mục So hai bản. File có sổ mà hai bản gối nhau thì chỉ bản thuế gửi được đối chiếu sổ (khỏi đếm hai lần)." },
-  { ten: "Không sửa số", noiDung: "Máy chỉ báo. Số chỉ đổi khi bạn bấm Sửa từng dòng; file xuất giữ nguyên định dạng và địa chỉ ô của file gốc." },
+const RULES: { ten: string; content: string }[] = [
+  { ten: "Khóa ghép", content: "MST người bán + ký hiệu + số hóa đơn. MST chỉ so phần chữ số (0301234567-001 = 0301234567001), MST mất số 0 đầu được bù lại; số hóa đơn bỏ số 0 ở đầu (00060568 = 60568); ký hiệu bỏ chữ số mẫu số gộp đầu (1C26TTN = C26TTN)." },
+  { ten: "Cộng dồn", content: "Một hóa đơn tách nhiều dòng sổ (theo thuế suất / theo mặt hàng) được cộng lại rồi mới so." },
+  { ten: "So đủ 3 cột", content: "So trước thuế, thuế và tổng ở từng hóa đơn. Tổng lệch ⇒ LỆCH TIỀN; tổng khớp mà thuế lệch ⇒ LỆCH THUẾ; chỉ trước thuế lệch ⇒ vẫn khớp (thường do chiết khấu / phí)." },
+  { ten: "Ngoại tệ", content: "Máy tự dò bản xuất để tiền ở nguyên tệ (phải nhân tỷ giá) hay đã quy sẵn VND, bằng cách so với các hóa đơn đã khớp sổ. Không mặc định nhân. Ngoại tệ thiếu tỷ giá thì máy báo, không tự coi là VND." },
+  { ten: "Không cần vào sổ", content: "Hóa đơn đã bị thay thế / xóa bỏ / hủy không phải kê. Hóa đơn đã bị ĐIỀU CHỈNH vẫn phải kê — không gộp chung." },
+  { ten: "Hóa đơn bán hàng (mẫu số 2)", content: "Không có thuế GTGT: ô thuế trống là đúng, chưa thuế phải bằng tổng thanh toán." },
+  { ten: "Làm tròn", content: "Lệch ±1 đ là làm tròn của bên phát hành, không phải sai. Hóa đơn để nguyên tệ thì chỉ ±1 xu (0,01) mới là làm tròn — lệch 1 USD là lệch thật." },
+  { ten: "Gần khớp", content: "Hóa đơn chưa vào sổ nhưng sổ có dòng cùng MST + cùng số tiền ⇒ nghi gõ sai số hóa đơn ở sổ, tách riêng để khỏi kê hai lần." },
+  { ten: "Ghi chú tay", content: "Dòng ghi chú kế toán gõ dưới bảng (không có ký hiệu, không có MST hợp lệ) bị bỏ qua, không bị coi là hóa đơn." },
+  { ten: "Hai bản", content: "Sheet có chữ “thuế” trong tên là bản thuế gửi; không có thì sheet mang chữ “tải” là bản tự tải. Nhận sai thì chọn lại ở mục So hai bản. File có sổ mà hai bản gối nhau thì chỉ bản thuế gửi được đối chiếu sổ (khỏi đếm hai lần)." },
+  { ten: "Không sửa số", content: "Máy chỉ báo. Số chỉ đổi khi bạn bấm Sửa từng dòng; file xuất giữ nguyên định dạng và địa chỉ ô của file gốc." },
 ];
 
-export function QuyTacBox({ canhBao }: { canhBao: FlowWarning[] }) {
+export function ReconciliationRulesBox({ warnings }: { warnings: FlowWarning[] }) {
   const [mo, setMo] = useState(false);
-  const fxWarnings = canhBao.filter((c) => c.loai === "Đơn vị tiền tệ ngoại tệ");
+  const fxWarnings = warnings.filter((c) => c.loai === "Đơn vị tiền tệ ngoại tệ");
   return (
     <div className="rounded-xl border border-border">
       <button
@@ -158,7 +158,7 @@ export function QuyTacBox({ canhBao }: { canhBao: FlowWarning[] }) {
             {RULES.map((q) => (
               <li key={q.ten}>
                 <span className="font-medium">{q.ten}: </span>
-                <span className="text-muted-foreground">{q.noiDung}</span>
+                <span className="text-muted-foreground">{q.content}</span>
               </li>
             ))}
           </ul>
@@ -183,32 +183,32 @@ const METHOD_LABELS: Record<SideSplitMethod, string> = {
 
 function SideSplitBox({
   tenSheets,
-  benThue,
-  cach,
+  taxSheets: taxSides,
+  method,
   onDoi,
-  onTuNhan,
+  onAutoDetect,
 }: {
   tenSheets: string[];
-  benThue: ReadonlySet<string>;
-  cach: SideSplitMethod;
-  onDoi: (ten: string, laThue: boolean) => void;
-  onTuNhan: () => void;
+  taxSheets: ReadonlySet<string>;
+  method: SideSplitMethod;
+  onDoi: (ten: string, isTaxSide: boolean) => void;
+  onAutoDetect: () => void;
 }) {
   return (
     <div className="rounded-xl border border-border p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm font-medium">
-          Sheet nào là bản nào? <span className="font-normal text-muted-foreground">({METHOD_LABELS[cach]})</span>
+          Sheet nào là bản nào? <span className="font-normal text-muted-foreground">({METHOD_LABELS[method]})</span>
         </p>
-        {cach === "chi-dinh" && (
-          <Button title="Bỏ lựa chọn tay, để máy tự nhận bản thuế / bản tự tải theo tên sheet." variant="outline" size="sm" onClick={onTuNhan}>
+        {method === "chi-dinh" && (
+          <Button title="Bỏ lựa chọn tay, để máy tự nhận bản thuế / bản tự tải theo tên sheet." variant="outline" size="sm" onClick={onAutoDetect}>
             <RotateCcw /> Để máy tự nhận
           </Button>
         )}
       </div>
       <ul className="mt-2 space-y-2">
         {tenSheets.map((t) => {
-          const thue = benThue.has(t);
+          const isTaxSide = taxSides.has(t);
           return (
             <li key={t} className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <span className="min-w-0 break-words font-medium">{t}</span>
@@ -216,8 +216,8 @@ function SideSplitBox({
                 <Button
                   title={`Đánh dấu sheet "${t}" là bản CƠ QUAN THUẾ gửi.`}
                   size="sm"
-                  variant={thue ? "default" : "outline"}
-                  aria-pressed={thue}
+                  variant={isTaxSide ? "default" : "outline"}
+                  aria-pressed={isTaxSide}
                   onClick={() => onDoi(t, true)}
                 >
                   Thuế gửi
@@ -225,8 +225,8 @@ function SideSplitBox({
                 <Button
                   title={`Đánh dấu sheet "${t}" là bản kế toán TỰ TẢI từ cổng.`}
                   size="sm"
-                  variant={!thue ? "default" : "outline"}
-                  aria-pressed={!thue}
+                  variant={!isTaxSide ? "default" : "outline"}
+                  aria-pressed={!isTaxSide}
                   onClick={() => onDoi(t, false)}
                 >
                   Tự tải
@@ -251,32 +251,32 @@ function twoVersionChip(d: TwoVersionRow) {
   return <Tag variant="xong">Khớp</Tag>;
 }
 
-export function SoHaiBanView({
-  kq,
+export function TwoVersionView({
+  result,
   tenSheets,
-  benThue,
-  cach,
+  taxSheets: taxSides,
+  method,
   onDoiBen,
-  onTuNhan,
+  onAutoDetect,
 }: {
-  kq: TwoVersionResult | null;
+  result: TwoVersionResult | null;
   tenSheets: string[];
-  benThue: ReadonlySet<string>;
-  cach: SideSplitMethod;
-  onDoiBen: (ten: string, laThue: boolean) => void;
-  onTuNhan: () => void;
+  taxSheets: ReadonlySet<string>;
+  method: SideSplitMethod;
+  onDoiBen: (ten: string, isTaxSide: boolean) => void;
+  onAutoDetect: () => void;
 }) {
   const [filter, setFilter] = useState<TwoVersionFilter>("all");
   const rows = useMemo(() => {
-    if (!kq) return [];
-    if (filter === "all") return kq.dong;
-    if (filter === "LECH") return kq.dong.filter((d) => d.lechTien);
-    if (filter === "KHONG_SO") return kq.dong.filter((d) => d.khongSoDuocTien);
-    return kq.dong.filter((d) => d.ben === filter);
-  }, [kq, filter]);
+    if (!result) return [];
+    if (filter === "all") return result.dong;
+    if (filter === "LECH") return result.dong.filter((d) => d.lechTien);
+    if (filter === "KHONG_SO") return result.dong.filter((d) => d.khongSoDuocTien);
+    return result.dong.filter((d) => d.ben === filter);
+  }, [result, filter]);
 
   const sideSplitBox = (
-    <SideSplitBox tenSheets={tenSheets} benThue={benThue} cach={cach} onDoi={onDoiBen} onTuNhan={onTuNhan} />
+    <SideSplitBox tenSheets={tenSheets} taxSheets={taxSides} method={method} onDoi={onDoiBen} onAutoDetect={onAutoDetect} />
   );
 
   if (tenSheets.length < 2)
@@ -287,7 +287,7 @@ export function SoHaiBanView({
         description="So hai bản cần ít nhất hai sheet hóa đơn: một bản cơ quan thuế gửi và một bản kế toán tự tải. Dán hai bản vào hai sheet của cùng một file rồi chạy lại."
       />
     );
-  if (!kq)
+  if (!result)
     return (
       <div className="space-y-4">
         {sideSplitBox}
@@ -299,7 +299,7 @@ export function SoHaiBanView({
       </div>
     );
 
-  const t = kq.tong;
+  const t = result.tong;
   const the: StatCardData[] = [
     { label: "Bản thuế gửi", value: num(t.soThue), numeric: true, color: "brand", subtext: `${num(t.tienThue)} đ`, onSelect: () => setFilter("all"), selectHint: "Xem tất cả hóa đơn" },
     { label: "Bản tự tải", value: num(t.soTai), numeric: true, color: "brand", subtext: `${num(t.tienTai)} đ`, onSelect: () => setFilter("all"), selectHint: "Xem tất cả hóa đơn" },
@@ -308,12 +308,12 @@ export function SoHaiBanView({
     { label: "Có cả hai, lệch tiền", value: num(t.lechTien), numeric: true, color: t.lechTien ? "warning" : "success", onSelect: () => setFilter("LECH"), selectHint: "Xem hóa đơn lệch tiền giữa hai bản" },
     { label: "Không so được tiền", value: num(t.khongSoDuocTien), numeric: true, color: "trung-tinh", subtext: "sheet trộn hai bố cục cột", onSelect: () => setFilter("KHONG_SO"), selectHint: "Xem hóa đơn không so được tiền" },
   ];
-  const TWO_VERSION_FILTERS: { id: TwoVersionFilter; nhan: string; n: number }[] = [
-    { id: "all", nhan: "Tất cả", n: kq.dong.length },
-    { id: "CHI_THUE", nhan: "Chỉ bản thuế có", n: t.chiThue },
-    { id: "CHI_TAI", nhan: "Chỉ bản tự tải có", n: t.chiTai },
-    { id: "LECH", nhan: "Lệch tiền", n: t.lechTien },
-    { id: "KHONG_SO", nhan: "Không so được", n: t.khongSoDuocTien },
+  const TWO_VERSION_FILTERS: { id: TwoVersionFilter; label: string; n: number }[] = [
+    { id: "all", label: "Tất cả", n: result.dong.length },
+    { id: "CHI_THUE", label: "Chỉ bản thuế có", n: t.chiThue },
+    { id: "CHI_TAI", label: "Chỉ bản tự tải có", n: t.chiTai },
+    { id: "LECH", label: "Lệch tiền", n: t.lechTien },
+    { id: "KHONG_SO", label: "Không so được", n: t.khongSoDuocTien },
   ];
   const columns: RecordTableColumn<TwoVersionRow>[] = [
     { key: "kq", header: "Kết quả", primary: true, render: twoVersionChip },
@@ -333,8 +333,8 @@ export function SoHaiBanView({
       <StatCardGrid cards={the} />
       <div className="flex flex-wrap gap-2">
         {TWO_VERSION_FILTERS.map((l) => (
-          <Button key={l.id} title={`Lọc danh sách: ${l.nhan}.`} size="sm" variant={filter === l.id ? "default" : "outline"} onClick={() => setFilter(l.id)}>
-            {l.nhan} <span className="tnum ml-1">({num(l.n)})</span>
+          <Button key={l.id} title={`Lọc danh sách: ${l.label}.`} size="sm" variant={filter === l.id ? "default" : "outline"} onClick={() => setFilter(l.id)}>
+            {l.label} <span className="tnum ml-1">({num(l.n)})</span>
           </Button>
         ))}
       </div>
@@ -453,9 +453,9 @@ function SheetSumCheck({ sh }: { sh: InvoiceSheet }) {
   );
 }
 
-export function KiemCongView({ sheets }: { sheets: InvoiceSheet[] }) {
-  const ds = sheets.filter((s) => !s.laPhu && s.canDoiCot.cotTong >= 0);
-  if (!ds.length)
+export function ColumnSumCheckView({ sheets }: { sheets: InvoiceSheet[] }) {
+  const items = sheets.filter((s) => !s.laPhu && s.canDoiCot.cotTong >= 0);
+  if (!items.length)
     return (
       <EmptyState
         icon={Calculator}
@@ -463,7 +463,7 @@ export function KiemCongView({ sheets }: { sheets: InvoiceSheet[] }) {
         description="Cần sheet hóa đơn có cột chưa thuế, thuế và tổng thanh toán."
       />
     );
-  const the: StatCardData[] = ds.map((s) => {
+  const the: StatCardData[] = items.map((s) => {
     const cd = s.canDoiCot;
     const isMatch = Math.abs(cd.lech) < 0.5;
     return {
@@ -477,7 +477,7 @@ export function KiemCongView({ sheets }: { sheets: InvoiceSheet[] }) {
   return (
     <div className="space-y-4">
       <StatCardGrid cards={the} />
-      {ds.map((s) => (
+      {items.map((s) => (
         <SheetSumCheck key={s.ten} sh={s} />
       ))}
     </div>
@@ -485,9 +485,9 @@ export function KiemCongView({ sheets }: { sheets: InvoiceSheet[] }) {
 }
 
 // ---------- 3. Cùng MST cùng ngày ----------
-export function CungNgayView({ nhom }: { nhom: SameDayGroup[] }) {
-  const soTrung = nhom.filter((g) => g.trungSoTien).length;
-  const [onlyDuplicates, setOnlyDuplicates] = useState(soTrung > 0);
+export function SameDayView({ nhom }: { nhom: SameDayGroup[] }) {
+  const sameAmountCount = nhom.filter((g) => g.trungSoTien).length;
+  const [onlyDuplicates, setOnlyDuplicates] = useState(sameAmountCount > 0);
   const rows = useMemo(() => (onlyDuplicates ? nhom.filter((g) => g.trungSoTien) : nhom), [nhom, onlyDuplicates]);
   if (!nhom.length)
     return (
@@ -500,7 +500,7 @@ export function CungNgayView({ nhom }: { nhom: SameDayGroup[] }) {
   const the: StatCardData[] = [
     { label: "Nhóm cùng MST cùng ngày", value: num(nhom.length), numeric: true, color: "brand", onSelect: () => setOnlyDuplicates(false), selectHint: "Xem mọi nhóm" },
     { label: "Hóa đơn trong các nhóm", value: num(nhom.reduce((s, g) => s + g.soHoaDon, 0)), numeric: true, color: "trung-tinh" },
-    { label: "Nhóm trùng khít số tiền", value: num(soTrung), numeric: true, color: soTrung ? "warning" : "success", subtext: "dễ kê hai lần — soát trước", onSelect: () => setOnlyDuplicates(true), selectHint: "Xem nhóm trùng khít số tiền" },
+    { label: "Nhóm trùng khít số tiền", value: num(sameAmountCount), numeric: true, color: sameAmountCount ? "warning" : "success", subtext: "dễ kê hai lần — soát trước", onSelect: () => setOnlyDuplicates(true), selectHint: "Xem nhóm trùng khít số tiền" },
   ];
   const columns: RecordTableColumn<SameDayGroup>[] = [
     { key: "ban", header: "Người bán", primary: true, render: (g) => g.tenBan || g.mstBan, getSortValue: (g) => g.tenBan },
@@ -524,7 +524,7 @@ export function CungNgayView({ nhom }: { nhom: SameDayGroup[] }) {
       <StatCardGrid cards={the} />
       <div className="flex flex-wrap gap-2">
         <Button title="Chỉ xem nhóm có hóa đơn trùng khít số tiền." size="sm" variant={onlyDuplicates ? "default" : "outline"} onClick={() => setOnlyDuplicates(true)}>
-          Trùng khít số tiền <span className="tnum ml-1">({num(soTrung)})</span>
+          Trùng khít số tiền <span className="tnum ml-1">({num(sameAmountCount)})</span>
         </Button>
         <Button title="Xem mọi nhóm cùng người bán cùng ngày." size="sm" variant={!onlyDuplicates ? "default" : "outline"} onClick={() => setOnlyDuplicates(false)}>
           Tất cả <span className="tnum ml-1">({num(nhom.length)})</span>

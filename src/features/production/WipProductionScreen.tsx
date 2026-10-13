@@ -71,8 +71,8 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
 import { appendAuditEntries } from "@/lib/audit";
 import { KY_OPT, getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
-import { DailyTaskReminder, GanLoDauVao, GanLoXuat, PhieuTrongTPNgay, TemLoQr } from "@/features/shared";
-import { useSuaDanhMuc } from "@/features/catalog/SuaDanhMucNhanh";
+import { DailyTaskReminder, LotInputPicker, LotDispatchPicker, BlankDailyWipSlip, LotQrLabels } from "@/features/shared";
+import { useQuickCatalogEdit } from "@/features/catalog/QuickCatalogEdit";
 import { assignSessionLots, findBatchesWithoutLot, formatWipLotLabel, buildLotNode, type TraceData } from "@/lib/lotTraceability";
 import {
   CalendarRange,
@@ -95,24 +95,24 @@ import {
   Wheat,
   Store,
 } from "lucide-react";
-import { BangDongSX } from "./BangDongSX";
-import { KhoiBotTam } from "./KhoiBotTam";
-import { KhoiBanNoiDia } from "./KhoiBanNoiDia";
+import { ProductionLinesTable } from "./ProductionLinesTable";
+import { BatterSection } from "./BatterSection";
+import { DomesticSaleSection } from "./DomesticSaleSection";
 import { readDevicePref, writeDevicePref } from "@/lib/devicePrefs";
-import { KhoiLoPhien, type LoPhien } from "./KhoiLoPhien";
+import { SessionLotsSection, type SessionLot } from "./SessionLotsSection";
 import {
-  PHAN_XUONG,
-  banNoiDiaDayDu,
-  banNoiDiaTrong,
-  dongBanNoiDiaRong,
-  dongDayDu,
-  dongSXRong,
-  dongTrong,
-  laTach,
-  tongDong,
-  type DauPhien,
-  type DongBanNoiDia,
-  type DongSX,
+  WORKSHOPS,
+  isDomesticSaleLineComplete,
+  isDomesticSaleLineEmpty,
+  createEmptyDomesticSaleLine,
+  isLineComplete,
+  createEmptyProductionLine,
+  isLineEmpty,
+  isSplitLine,
+  getLineTotalKg,
+  type SessionHeader,
+  type DomesticSaleLine,
+  type ProductionLine,
 } from "./wipHelpers";
 
 const KEY_WIP_REPORT = "bsf.wip-report-sent.v1";
@@ -121,14 +121,14 @@ const KEY_WIP_REPORT = "bsf.wip-report-sent.v1";
 const KEY_WIP_WORKSHOP = "bsf.wip-xuong.v1";
 const readSavedWorkshop = (): Workshop => {
   const v = readDevicePref(KEY_WIP_WORKSHOP);
-  if (v && (PHAN_XUONG as string[]).includes(v)) return v as Workshop;
+  if (v && (WORKSHOPS as string[]).includes(v)) return v as Workshop;
   return "Đông";
 };
 
-export default function SanXuatBTPScreen() {
-  const [rows, persist, { trangThai }] = useWipProductions();
-  const isLoading = trangThai === "dang-tai" && rows.length === 0;
-  const [locks, persistLocks, { trangThai: ttChot }] = useProductionLocks();
+export default function WipProductionScreen() {
+  const [rows, persist, { trangThai: status }] = useWipProductions();
+  const isLoading = status === "dang-tai" && rows.length === 0;
+  const [locks, persistLocks, { trangThai: lockStatus }] = useProductionLocks();
   const [products, setProducts] = useProducts();
   const [customers, setCustomers] = useCustomers();
   const [materialTypes, setMaterialTypes] = useMaterialTypes();
@@ -137,8 +137,8 @@ export default function SanXuatBTPScreen() {
   const [domesticSales, persistDomesticSales] = useDomesticSales();
 
   // Người thao tác = tài khoản đang đăng nhập — gắn vào dòng khi lưu để lưu vết ai gửi.
-  const { nguoiDung } = useAuth();
-  const operator = nguoiDung?.fullName || nguoiDung?.username || "";
+  const { nguoiDung: profile } = useAuth();
+  const operator = profile?.fullName || profile?.username || "";
 
   const [ky, setKy] = useState<ViewPeriod>("ngay");
   const [date, setDate] = useState(todayISO());
@@ -147,12 +147,12 @@ export default function SanXuatBTPScreen() {
   const [workshop, setWorkshop] = useState<Workshop | "Tất cả">(readSavedWorkshop);
 
   /* Ghi cả bảng một lượt: đầu phiên chọn 1 lần, đổ nhiều thành phẩm. */
-  const [phien, setPhien] = useState<DauPhien | null>(null);
+  const [session, setSession] = useState<SessionHeader | null>(null);
   const [isConsecutiveDays, setIsConsecutiveDays] = useState(true);
-  const [tableRows, setTableRows] = useState<DongSX[]>([]);
+  const [tableRows, setTableRows] = useState<ProductionLine[]>([]);
   /** Dòng bán nội địa của phiên đang gõ — mặc định trống, bấm "Thêm dòng" mới hiện. */
-  const [dongBND, setDongBND] = useState<DongBanNoiDia[]>([]);
-  const [loiPhien, setLoiPhien] = useState<FieldError[]>([]);
+  const [dongBND, setDongBND] = useState<DomesticSaleLine[]>([]);
+  const [sessionErrors, setSessionErrors] = useState<FieldError[]>([]);
   /** Nhóm (kiểu chế biến × khách) của phiên trước → phiếu mới tự điền sẵn nhóm
    *  đầu, gõ thành phẩm ngay, khỏi tạo nhóm lại. Chỉ sống trong phiên làm việc. */
   const [lastGroup, setLastGroup] = useState<{ pt: string; cust: string }>({
@@ -171,7 +171,7 @@ export default function SanXuatBTPScreen() {
     (edit?.componentRauKg ?? 0) > 0 || (edit?.componentBaoTuKg ?? 0) > 0;
 
   /** Hai chế độ: "nhap" = form ghi (mặc định, form-first cho tổ xưởng); "so" = sổ + báo cáo. */
-  const [cheDo, setCheDo] = useState<"nhap" | "so">("nhap");
+  const [mode, setMode] = useState<"nhap" | "so">("nhap");
   const [isPrintingBlank, setIsPrintingBlank] = useState(false);
   // Truy xuất lô (docs/spec/qr-truy-xuat-lo.md): gắn lô NL cho mẻ + in tem lô BTP.
   const [lotInputs, saveLotInputs] = useLotInputs();
@@ -185,10 +185,10 @@ export default function SanXuatBTPScreen() {
   const countLotInputs = (id: string) => lotInputs.filter((l) => l.outputKind === "W" && l.outputId === id).length;
   const countDomesticSaleLots = (id: string) => lotDispatches.filter((d) => d.docKind === "domestic_sale" && d.docId === id).length;
   /** Lô NL khai cho phiên (đợt 2b) — giữ cho các phiên sau CÙNG ngày · xưởng, đổi thì thôi. */
-  const [loPhienKhai, setLoPhienKhai] = useState<{ ngay: string; xuong: Workshop; ds: LoPhien[] }>({
-    ngay: "",
-    xuong: "Đông",
-    ds: [],
+  const [declaredSessionLots, setDeclaredSessionLots] = useState<{ date: string; workshop: Workshop; lots: SessionLot[] }>({
+    date: "",
+    workshop: "Đông",
+    lots: [],
   });
   /** Lý do chưa gắn lô cho các mẻ còn thiếu — bắt buộc khi chốt ngày (chốt 2026-10-08). */
   const [waiverReason, setWaiverReason] = useState("");
@@ -208,7 +208,7 @@ export default function SanXuatBTPScreen() {
   const leftoverDraftTotal = leftover.reduce((s, d) => s + (d.kg ?? 0), 0);
 
   /** A4: mốc "đã gửi báo cáo" theo (phạm vi·xưởng), lưu theo máy để phản hồi tại chỗ. */
-  const [daGui, setDaGui] = useState<Record<string, string>>(() => {
+  const [sentReports, setSentReports] = useState<Record<string, string>>(() => {
     try {
       return JSON.parse(readDevicePref(KEY_WIP_REPORT) || "{}");
     } catch {
@@ -219,10 +219,10 @@ export default function SanXuatBTPScreen() {
   const [reopenReason, setReopenReason] = useState("");
   const [lockErrors, setLockErrors] = useState<FieldError[]>([]);
 
-  const [tuHieuLuc, denHieuLuc] = getViewPeriodRange(ky, date, fromDate, toDate);
-  const isSingleDay = tuHieuLuc === denHieuLuc;
+  const [effectiveFrom, effectiveTo] = getViewPeriodRange(ky, date, fromDate, toDate);
+  const isSingleDay = effectiveFrom === effectiveTo;
 
-  const tenMH = (id: string) => products.find((m) => m.id === id)?.name || "—";
+  const productNameOf = (id: string) => products.find((m) => m.id === id)?.name || "—";
 
   /** Danh mục thành phẩm — gõ để tìm, thêm mới tại chỗ. */
   const productOptions: ComboboxOption[] = products.map((m) => ({
@@ -253,10 +253,10 @@ export default function SanXuatBTPScreen() {
   };
 
   /** Sửa nhanh thành phẩm ngay tại màn (ghi thẳng Danh mục mặt hàng). */
-  const productEditor = useSuaDanhMuc("matHang", products, setProducts, {
+  const productEditor = useQuickCatalogEdit("matHang", products, setProducts, {
     // Ô "Bột đi kèm" trong hộp sửa thấy + tạo loại bột qua đúng danh mục của màn.
-    nguonBot: { rows: batterTypes, them: (ten) => addBatterRecord(ten).id },
-    moTa: (m) => {
+    batterSource: { rows: batterTypes, create: (ten) => addBatterRecord(ten).id },
+    getDescription: (m) => {
       const n = rows.filter((r) => r.productId === m.id).length;
       return n > 0
         ? `Sửa ở đây là sửa trong Danh mục — ${n} dòng sản lượng đã ghi với thành phẩm này sẽ hiện theo thông tin mới.`
@@ -264,14 +264,14 @@ export default function SanXuatBTPScreen() {
     },
     // Dòng đang gõ dở cũng ăn theo cờ tách / quy cách mới — trừ dòng mà người
     // dùng đã tự gõ quy cách khác với quy cách cũ của thành phẩm.
-    onDaLuu: (p, prev) => {
+    onSaved: (p, prev) => {
       const oldPackSpec = blockSpec(prev) ?? 0;
-      setTableRows((ds) =>
-        ds.map((d) =>
+      setTableRows((items) =>
+        items.map((d) =>
           d.productId === p.id
             ? {
                 ...d,
-                moRong: hasSplitComponents(p) ? true : d.moRong,
+                expanded: hasSplitComponents(p) ? true : d.expanded,
                 blockSpecKg:
                   !d.blockSpecKg || d.blockSpecKg === oldPackSpec
                     ? blockSpec(p) ?? d.blockSpecKg
@@ -282,10 +282,10 @@ export default function SanXuatBTPScreen() {
       );
     },
   });
-  const openProductEdit = productEditor.moSua;
+  const openProductEdit = productEditor.openEdit;
   /** Ô khách ở /wip lưu theo TÊN (customerName). */
-  const customerEditor = useSuaDanhMuc("khachHang", customers, setCustomers, { theo: "ten" });
-  const materialTypeEditor = useSuaDanhMuc("loaiNL", materialTypes, setMaterialTypes, { theo: "ten" });
+  const customerEditor = useQuickCatalogEdit("khachHang", customers, setCustomers, { theo: "ten" });
+  const materialTypeEditor = useQuickCatalogEdit("loaiNL", materialTypes, setMaterialTypes, { theo: "ten" });
 
   const addCustomer = (ten: string): string => {
     setCustomers([...customers, { id: uid(), code: "", name: ten, market: "" }]);
@@ -295,26 +295,26 @@ export default function SanXuatBTPScreen() {
 
   /* ---- Ô chọn danh mục cho khối Bán nội địa: value = TÊN, thêm mới + bút chì ---- */
   const addMaterialTypeName = (ten: string): string => {
-    const sach = ten.trim();
-    const co = materialTypes.find((l) => l.name.trim().toLowerCase() === sach.toLowerCase());
+    const trimmedName = ten.trim();
+    const co = materialTypes.find((l) => l.name.trim().toLowerCase() === trimmedName.toLowerCase());
     if (co) return co.name;
-    setMaterialTypes([...materialTypes, { id: uid(), name: sach, category: "", note: "" }]);
-    notify.saved(`Đã thêm loại nguyên liệu "${sach}"`);
-    return sach;
+    setMaterialTypes([...materialTypes, { id: uid(), name: trimmedName, category: "", note: "" }]);
+    notify.saved(`Đã thêm loại nguyên liệu "${trimmedName}"`);
+    return trimmedName;
   };
   const materialTypeFieldProps = {
-    options: materialTypes.map((l) => ({ value: l.name, label: l.name, phu: l.category || undefined })),
+    options: materialTypes.map((l) => ({ value: l.name, label: l.name, subLabel: l.category || undefined })),
     onCreate: addMaterialTypeName,
-    onSuaMuc: materialTypeEditor.moSua,
-    suaDuoc: materialTypeEditor.suaDuoc,
-    nhanSua: materialTypeEditor.nhanSua,
+    onEditItem: materialTypeEditor.openEdit,
+    canEdit: materialTypeEditor.canEdit,
+    editLabel: materialTypeEditor.editLabel,
   };
   const customerFieldProps = {
     options: customerOptions,
     onCreate: addCustomer,
-    onSuaMuc: customerEditor.moSua,
-    suaDuoc: customerEditor.suaDuoc,
-    nhanSua: customerEditor.nhanSua,
+    onEditItem: customerEditor.openEdit,
+    canEdit: customerEditor.canEdit,
+    editLabel: customerEditor.editLabel,
   };
 
   /* ---- Bột tẩm (mig 0051): danh mục loại bột — dòng sản lượng lưu theo TÊN ---- */
@@ -325,17 +325,17 @@ export default function SanXuatBTPScreen() {
   }));
   /** Tạo loại bột tại chỗ (trùng tên ⇒ dùng lại loại có sẵn). Trả về bản ghi. */
   const addBatterRecord = (ten: string) => {
-    const kq = findOrCreateBatter(batterTypes, ten);
-    if (kq.moi) {
-      setBatterTypes(kq.rows);
-      notify.saved(`Đã thêm loại bột "${kq.bot.name}" vào danh mục`);
+    const result = findOrCreateBatter(batterTypes, ten);
+    if (result.moi) {
+      setBatterTypes(result.rows);
+      notify.saved(`Đã thêm loại bột "${result.bot.name}" vào danh mục`);
     }
-    return kq.bot;
+    return result.bot;
   };
   const addBatter = (ten: string): string => addBatterRecord(ten).name;
-  const batterEditor = useSuaDanhMuc("botTam", batterTypes, setBatterTypes, { theo: "ten" });
+  const batterEditor = useQuickCatalogEdit("botTam", batterTypes, setBatterTypes, { theo: "ten" });
   /** Tên bột đi kèm của một mặt hàng (theo danh mục bột hiện có). */
-  const diKemCua = (productId: string) =>
+  const batterNamesOf = (productId: string) =>
     getProductBatterNames(
       products.find((m) => m.id === productId),
       batterTypes
@@ -351,8 +351,8 @@ export default function SanXuatBTPScreen() {
       rows
         .filter(
           (r) =>
-            r.productionDate >= tuHieuLuc &&
-            r.productionDate <= denHieuLuc &&
+            r.productionDate >= effectiveFrom &&
+            r.productionDate <= effectiveTo &&
             (workshop === "Tất cả" || r.workshop === workshop)
         )
         .sort(
@@ -360,7 +360,7 @@ export default function SanXuatBTPScreen() {
             a.productionDate.localeCompare(b.productionDate) ||
             a.id.localeCompare(b.id)
         ),
-    [rows, tuHieuLuc, denHieuLuc, workshop]
+    [rows, effectiveFrom, effectiveTo, workshop]
   );
 
   const total = view.reduce((s, r) => s + (r.quantityKg || 0), 0);
@@ -375,12 +375,12 @@ export default function SanXuatBTPScreen() {
       domesticSales
         .filter(
           (r) =>
-            r.saleDate >= tuHieuLuc &&
-            r.saleDate <= denHieuLuc &&
+            r.saleDate >= effectiveFrom &&
+            r.saleDate <= effectiveTo &&
             (workshop === "Tất cả" || r.workshop === workshop)
         )
         .sort((a, b) => a.saleDate.localeCompare(b.saleDate) || a.id.localeCompare(b.id)),
-    [domesticSales, tuHieuLuc, denHieuLuc, workshop]
+    [domesticSales, effectiveFrom, effectiveTo, workshop]
   );
   const domesticSaleViewTotal = bndView.reduce((s, r) => s + (r.quantityKg || 0), 0);
 
@@ -388,13 +388,13 @@ export default function SanXuatBTPScreen() {
   const operatorReport = useMemo(() => {
     const m = new Map<
       string,
-      { workshop: Workshop; operator: string; soDong: number; kg: number }
+      { workshop: Workshop; operator: string; rowCount: number; kg: number }
     >();
     for (const r of view) {
       const op = (r.operator ?? "").trim() || "(không rõ)";
       const k = `${r.workshop}·${op}`;
-      const cur = m.get(k) ?? { workshop: r.workshop, operator: op, soDong: 0, kg: 0 };
-      cur.soDong += 1;
+      const cur = m.get(k) ?? { workshop: r.workshop, operator: op, rowCount: 0, kg: 0 };
+      cur.rowCount += 1;
       cur.kg += r.quantityKg || 0;
       m.set(k, cur);
     }
@@ -405,8 +405,8 @@ export default function SanXuatBTPScreen() {
   }, [view]);
 
   const rangeDescription = isSingleDay
-    ? formatDateVN(tuHieuLuc)
-    : `${formatDateVN(tuHieuLuc)} – ${formatDateVN(denHieuLuc)}`;
+    ? formatDateVN(effectiveFrom)
+    : `${formatDateVN(effectiveFrom)} – ${formatDateVN(effectiveTo)}`;
 
   /* ---- Chốt ngày SX ---- */
   const isSingleDayWorkshop = isSingleDay && workshop !== "Tất cả";
@@ -414,26 +414,26 @@ export default function SanXuatBTPScreen() {
   const lockRecordOf = (n: string, x: Workshop): DailyLock | undefined =>
     locks.find((c) => c.lockDate === n && c.workshop === x);
   const currentLock = isSingleDayWorkshop
-    ? lockRecordOf(tuHieuLuc, activeWorkshop)
+    ? lockRecordOf(effectiveFrom, activeWorkshop)
     : undefined;
   const isLocked = Boolean(currentLock?.isLocked);
   /** Mẻ của ngày đang chốt CHƯA gắn lô NL và CHƯA ghi lý do — chốt phải xử lý hết
    *  (chủ dự án chốt 2026-10-08: "chốt ngày phải gắn lô hoặc ghi lý do"). */
   const batchesWithoutLot = isSingleDayWorkshop
-    ? findBatchesWithoutLot(rows.filter((r) => r.productionDate === tuHieuLuc && r.workshop === activeWorkshop), lotInputs, lotWaivers)
+    ? findBatchesWithoutLot(rows.filter((r) => r.productionDate === effectiveFrom && r.workshop === activeWorkshop), lotInputs, lotWaivers)
     : [];
   const dayWorkshopTotal = (n: string, x: Workshop) =>
     rows
       .filter((r) => r.productionDate === n && r.workshop === x)
       .reduce((s, r) => s + (r.quantityKg || 0), 0);
-  const actualTotal = isSingleDayWorkshop ? dayWorkshopTotal(tuHieuLuc, activeWorkshop) : 0;
+  const actualTotal = isSingleDayWorkshop ? dayWorkshopTotal(effectiveFrom, activeWorkshop) : 0;
   const postLockDiff =
     currentLock?.isLocked && actualTotal !== currentLock.totalKgAtLock
       ? actualTotal - currentLock.totalKgAtLock
       : 0;
   const isLockedOn = (n: string, x: Workshop) => Boolean(lockRecordOf(n, x)?.isLocked);
 
-  const postingDate = isSingleDay ? tuHieuLuc : denHieuLuc;
+  const postingDate = isSingleDay ? effectiveFrom : effectiveTo;
   const recordWorkshop: Workshop = workshop === "Tất cả" ? "Đông" : workshop;
 
   /* Nhắc daily-task: hôm nay (xưởng đang chọn) đã chốt sản xuất chưa. */
@@ -443,7 +443,7 @@ export default function SanXuatBTPScreen() {
 
   /* ---- Phiên ghi cả bảng ---- */
   const openAdd = () => {
-    setPhien({
+    setSession({
       productionDate: postingDate,
       postingDate: todayISO(),
       backdateReason: "",
@@ -452,15 +452,15 @@ export default function SanXuatBTPScreen() {
     setIsConsecutiveDays(postingDate === todayISO());
     // Mở sẵn MỘT nhóm + một dòng trống (điền sẵn nhóm gần nhất) để gõ thành phẩm
     // ngay, khỏi phải bấm "Thêm nhóm" trước.
-    setTableRows([dongSXRong(newId(), lastGroup.pt, lastGroup.cust)]);
-    setLoiPhien([]);
+    setTableRows([createEmptyProductionLine(newId(), lastGroup.pt, lastGroup.cust)]);
+    setSessionErrors([]);
   };
-  const setSessionField = <K extends keyof DauPhien>(k: K, v: DauPhien[K]) =>
-    setPhien((p) => (p ? { ...p, [k]: v } : p));
+  const setSessionField = <K extends keyof SessionHeader>(k: K, v: SessionHeader[K]) =>
+    setSession((p) => (p ? { ...p, [k]: v } : p));
 
   /** Đổi ngày ghi sổ: kéo ngày sản xuất theo khi hai ngày đang đi liền. */
   const changePostingDate = (v: string) =>
-    setPhien((p) =>
+    setSession((p) =>
       !p
         ? p
         : isConsecutiveDays
@@ -476,23 +476,23 @@ export default function SanXuatBTPScreen() {
   // Form-first: vào chế độ "Ghi nhập" mà chưa có phiếu → tự mở một phiếu trống
   // (không cần bấm nút, không modal). Lưu xong phiếu về null → tự mở phiếu mới.
   useEffect(() => {
-    if (cheDo === "nhap" && phien === null && !isLoading) openAdd();
+    if (mode === "nhap" && session === null && !isLoading) openAdd();
     // moThem đọc bộ lọc hiện tại; guard theo phien===null nên không lặp.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cheDo, phien, isLoading]);
+  }, [mode, session, isLoading]);
 
   // Trong "Ghi nhập", ngày+xưởng của PHIẾU là ngữ cảnh: đồng bộ về bộ lọc để
   // "đã ghi hôm nay", tổng ngày, chốt ngày, báo cáo A4 bám đúng ngày đang ghi.
   // Chỉ bám ngày + xưởng (không bám cả phiếu) để gõ các ô khác không kéo bộ lọc.
-  const sessionDate = phien?.productionDate;
-  const sessionWorkshop = phien?.workshop;
+  const sessionDate = session?.productionDate;
+  const sessionWorkshop = session?.workshop;
   useEffect(() => {
-    if (cheDo === "nhap" && sessionDate !== undefined && sessionWorkshop !== undefined) {
+    if (mode === "nhap" && sessionDate !== undefined && sessionWorkshop !== undefined) {
       setKy("ngay");
       setDate(sessionDate);
       setWorkshop(sessionWorkshop);
     }
-  }, [cheDo, sessionDate, sessionWorkshop]);
+  }, [mode, sessionDate, sessionWorkshop]);
 
   // Nhớ phân xưởng đang chọn theo MÁY → reload khỏi phải chọn lại (device pref).
   useEffect(() => {
@@ -505,60 +505,60 @@ export default function SanXuatBTPScreen() {
   // "Thêm thành phẩm" từng dòng. "Trống" = chưa có SP lẫn kg (nhãn nhóm không
   // tính). Sau khi thêm, nhóm có dòng trống → lần chạy sau không thêm nữa (ổn định).
   useEffect(() => {
-    if (cheDo !== "nhap" || !phien) return;
-    const theoNhom = new Map<string, DongSX[]>();
+    if (mode !== "nhap" || !session) return;
+    const theoNhom = new Map<string, ProductionLine[]>();
     for (const d of tableRows) {
       const g = theoNhom.get(d.groupId) ?? [];
       g.push(d);
       theoNhom.set(d.groupId, g);
     }
-    const toAdd: DongSX[] = [];
-    for (const [gid, ds] of theoNhom)
+    const toAdd: ProductionLine[] = [];
+    for (const [gid, items] of theoNhom)
       // Nhóm ĐÃ ĐỦ hết (mọi dòng có SP + kg) → chừa thêm một dòng trống để gõ tiếp.
       // Dòng đang gõ dở (mới chọn mã, chưa có kg) chưa tính → không nhảy dòng non.
-      if (ds.length > 0 && ds.every((d) => dongDayDu(d)))
-        toAdd.push(dongSXRong(gid, ds[0].processingType, ds[0].customerName));
-    if (toAdd.length) setTableRows((ds) => [...ds, ...toAdd]);
-  }, [tableRows, cheDo, phien]);
+      if (items.length > 0 && items.every((d) => isLineComplete(d)))
+        toAdd.push(createEmptyProductionLine(gid, items[0].processingType, items[0].customerName));
+    if (toAdd.length) setTableRows((items) => [...items, ...toAdd]);
+  }, [tableRows, mode, session]);
 
-  const validRows = tableRows.filter(dongDayDu);
-  const sessionTotal = validRows.reduce((s, d) => s + tongDong(d), 0);
-  const botPhien = validRows.reduce((s, d) => s + sumBatterKg(d.botKg), 0);
-  const isSessionLocked = phien
-    ? isLockedOn(phien.productionDate, phien.workshop)
+  const validRows = tableRows.filter(isLineComplete);
+  const sessionTotal = validRows.reduce((s, d) => s + getLineTotalKg(d), 0);
+  const sessionBatterKg = validRows.reduce((s, d) => s + sumBatterKg(d.botKg), 0);
+  const isSessionLocked = session
+    ? isLockedOn(session.productionDate, session.workshop)
     : false;
   const sessionNeedsReason =
-    phien &&
+    session &&
     (isBackdatedWip({
-      productionDate: phien.productionDate,
-      postingDate: phien.postingDate,
+      productionDate: session.productionDate,
+      postingDate: session.postingDate,
     }) ||
       isSessionLocked);
 
-  const updateRow = (key: string, patch: Partial<DongSX>) =>
-    setTableRows((ds) => ds.map((d) => (d.key === key ? { ...d, ...patch } : d)));
+  const updateRow = (key: string, patch: Partial<ProductionLine>) =>
+    setTableRows((items) => items.map((d) => (d.key === key ? { ...d, ...patch } : d)));
   const removeRow = (key: string) =>
-    setTableRows((ds) => ds.filter((d) => d.key !== key));
+    setTableRows((items) => items.filter((d) => d.key !== key));
   /** Thêm một dòng thành phẩm vào NHÓM đang có (giữ nhãn chế biến × khách). */
   const addRow = (
     groupId: string,
     processingType: string,
     customerName: string
-  ) => setTableRows((ds) => [...ds, dongSXRong(groupId, processingType, customerName)]);
+  ) => setTableRows((items) => [...items, createEmptyProductionLine(groupId, processingType, customerName)]);
   /** Thêm một NHÓM mới (groupId mới) kèm một dòng trống để nhập ngay. */
   const addGroup = (processingType = "", customerName = "") =>
-    setTableRows((ds) => [...ds, dongSXRong(newId(), processingType, customerName)]);
+    setTableRows((items) => [...items, createEmptyProductionLine(newId(), processingType, customerName)]);
   /** Sửa nhãn (kiểu chế biến / khách) của cả một nhóm — mọi dòng cùng groupId. */
   const changeGroup = (
     groupId: string,
-    patch: Partial<Pick<DongSX, "processingType" | "customerName">>
+    patch: Partial<Pick<ProductionLine, "processingType" | "customerName">>
   ) =>
-    setTableRows((ds) =>
-      ds.map((d) => (d.groupId === groupId ? { ...d, ...patch } : d))
+    setTableRows((items) =>
+      items.map((d) => (d.groupId === groupId ? { ...d, ...patch } : d))
     );
 
   /** Kiểm đầu phiên (ngày + lý do ghi bù). */
-  const sessionHeaderErrors = (p: DauPhien): FieldError[] => {
+  const sessionHeaderErrors = (p: SessionHeader): FieldError[] => {
     const ls: FieldError[] = [];
     if (p.postingDate < p.productionDate)
       ls.push({
@@ -579,18 +579,18 @@ export default function SanXuatBTPScreen() {
   };
 
   /** Lô NL đã khai cho đúng ngày · xưởng của phiên (khai cho ngày khác thì không tính). */
-  const loPhienCua = (p: DauPhien | null): LoPhien[] =>
-    p && loPhienKhai.ngay === p.productionDate && loPhienKhai.xuong === p.workshop ? loPhienKhai.ds : [];
+  const sessionLotsOf = (p: SessionHeader | null): SessionLot[] =>
+    p && declaredSessionLots.date === p.productionDate && declaredSessionLots.workshop === p.workshop ? declaredSessionLots.lots : [];
 
   /**
    * Lưu cả phiên MỘT LẦN: mọi dòng hợp lệ trong bảng thành một dòng sản lượng.
    * `imLang` (đóng bằng X): đủ thì vẫn lưu, chưa đủ thì bỏ qua, không nài lỗi.
    */
   const saveSession = (imLang: boolean): boolean => {
-    if (!phien) return true;
-    const validRows = tableRows.filter(dongDayDu);
-    const validDomesticRows = dongBND.filter(banNoiDiaDayDu);
-    const ls: FieldError[] = [...sessionHeaderErrors(phien)];
+    if (!session) return true;
+    const validRows = tableRows.filter(isLineComplete);
+    const validDomesticRows = dongBND.filter(isDomesticSaleLineComplete);
+    const ls: FieldError[] = [...sessionHeaderErrors(session)];
     if (validRows.length === 0 && validDomesticRows.length === 0)
       ls.push({
         field: "Thành phẩm",
@@ -598,7 +598,7 @@ export default function SanXuatBTPScreen() {
       });
     if (!imLang)
       dongBND.forEach((d, i) => {
-        if (!banNoiDiaTrong(d) && !banNoiDiaDayDu(d))
+        if (!isDomesticSaleLineEmpty(d) && !isDomesticSaleLineComplete(d))
           ls.push({
             field: `Bán nội địa dòng ${i + 1}`,
             message: !d.materialTypeName.trim()
@@ -608,7 +608,7 @@ export default function SanXuatBTPScreen() {
       });
     if (!imLang)
       tableRows.forEach((d, i) => {
-        if (!dongTrong(d) && !dongDayDu(d))
+        if (!isLineEmpty(d) && !isLineComplete(d))
           ls.push({
             field: `Dòng ${i + 1}`,
             message: !d.productId
@@ -617,27 +617,27 @@ export default function SanXuatBTPScreen() {
           });
       });
     if (ls.length > 0) {
-      if (!imLang) setLoiPhien(ls);
+      if (!imLang) setSessionErrors(ls);
       return false;
     }
 
     const newWips: WipProductionItem[] = validRows.map((d) => ({
       id: newId(),
-      productionDate: phien.productionDate,
-      postingDate: phien.postingDate,
-      backdateReason: phien.backdateReason,
-      workshop: phien.workshop,
+      productionDate: session.productionDate,
+      postingDate: session.postingDate,
+      backdateReason: session.backdateReason,
+      workshop: session.workshop,
       productId: d.productId,
       spec: "",
-      quantityKg: tongDong(d),
+      quantityKg: getLineTotalKg(d),
       blocksCount: d.blocksCount || 0,
       warehouse: "",
       status: "cho-nhap",
       note: "",
       customerName: d.customerName.trim(),
       processingType: d.processingType.trim(),
-      componentRauKg: laTach(d) ? d.rauKg || 0 : null,
-      componentBaoTuKg: laTach(d) ? d.baoTuKg || 0 : null,
+      componentRauKg: isSplitLine(d) ? d.tentacleKg || 0 : null,
+      componentBaoTuKg: isSplitLine(d) ? d.stomachKg || 0 : null,
       operator,
       batterKg: sanitizeBatterKg(d.botKg),
     }));
@@ -646,10 +646,10 @@ export default function SanXuatBTPScreen() {
     // Bán nội địa → sổ riêng (cùng ngày / xưởng / lý do ghi bù của phiên).
     const newDomesticSales: DomesticSaleItem[] = validDomesticRows.map((d) => ({
       id: newId(),
-      saleDate: phien.productionDate,
-      postingDate: phien.postingDate,
-      backdateReason: phien.backdateReason,
-      workshop: phien.workshop,
+      saleDate: session.productionDate,
+      postingDate: session.postingDate,
+      backdateReason: session.backdateReason,
+      workshop: session.workshop,
       materialTypeName: d.materialTypeName.trim(),
       quantityKg: d.quantityKg,
       unitPrice: d.unitPrice,
@@ -663,7 +663,7 @@ export default function SanXuatBTPScreen() {
     const sessionLotResult = assignSessionLots({
       mes: newWips,
       banNoiDia: newDomesticSales,
-      loNl: loPhienCua(phien),
+      loNl: sessionLotsOf(session),
       dl: dlNhe,
       nguoiGhi: operator,
       luc: new Date().toISOString(),
@@ -679,11 +679,11 @@ export default function SanXuatBTPScreen() {
     //    Mã đã gắn thì KHÔNG đổi (bột nhập thêm tại chỗ chỉ là của dòng đó).
     // Gộp vào MỘT lần setMatHang — gọi hai lần sẽ lấy cùng `matHang` cũ, lần sau đè lần trước.
     const batterIdByName = new Map(batterTypes.map((b) => [b.name.trim(), b.id]));
-    const vaMH = new Map<string, Partial<Product>>();
+    const productPatches = new Map<string, Partial<Product>>();
     for (const d of validRows) {
       const p = products.find((m) => m.id === d.productId);
       if (!p) continue;
-      const va: Partial<Product> = { ...vaMH.get(p.id) };
+      const va: Partial<Product> = { ...productPatches.get(p.id) };
       if (d.blockSpecKg > 0 && blockSpec(p) !== d.blockSpecKg)
         va.blockSpecKg = d.blockSpecKg;
       const idsBot = Object.keys(sanitizeBatterKg(d.botKg))
@@ -691,10 +691,10 @@ export default function SanXuatBTPScreen() {
         .filter(Boolean);
       if (getProductBatterIds(p).length === 0 && idsBot.length > 0 && !va.batterIds)
         va.batterIds = idsBot;
-      if (Object.keys(va).length > 0) vaMH.set(p.id, va);
+      if (Object.keys(va).length > 0) productPatches.set(p.id, va);
     }
-    if (vaMH.size > 0)
-      setProducts(products.map((m) => (vaMH.has(m.id) ? { ...m, ...vaMH.get(m.id) } : m)));
+    if (productPatches.size > 0)
+      setProducts(products.map((m) => (productPatches.has(m.id) ? { ...m, ...productPatches.get(m.id) } : m)));
 
     const newTotal = newWips.reduce((s, r) => s + r.quantityKg, 0);
     const newBatterKg = newWips.reduce((s, r) => s + sumBatterKg(r.batterKg), 0);
@@ -723,34 +723,34 @@ export default function SanXuatBTPScreen() {
         `${sessionLotResult.khongKhop.length} dòng không cùng loài với lô NL đã khai — chưa gắn lô. Gắn riêng ở sổ ngày ("Gắn lô NL").`
       );
 
-    const bg = lockRecordOf(phien.productionDate, phien.workshop);
+    const bg = lockRecordOf(session.productionDate, session.workshop);
     if (bg?.isLocked && newWips.length > 0)
       notify.warning(
-        `Ngày ${formatDateVN(phien.productionDate)} đã chốt ${kg(bg.totalKgAtLock)} — sau khi ghi bù thành ${kg(dayWorkshopTotal(phien.productionDate, phien.workshop) + newTotal)}`
+        `Ngày ${formatDateVN(session.productionDate)} đã chốt ${kg(bg.totalKgAtLock)} — sau khi ghi bù thành ${kg(dayWorkshopTotal(session.productionDate, session.workshop) + newTotal)}`
       );
 
     // Ghi ngày ngoài kỳ đang lọc → kéo bộ lọc về đúng phiên vừa ghi.
     if (
-      phien.productionDate < tuHieuLuc ||
-      phien.productionDate > denHieuLuc
+      session.productionDate < effectiveFrom ||
+      session.productionDate > effectiveTo
     ) {
       setKy("ngay");
-      setDate(phien.productionDate);
+      setDate(session.productionDate);
     }
-    if (workshop !== "Tất cả" && workshop !== phien.workshop)
-      setWorkshop(phien.workshop);
+    if (workshop !== "Tất cả" && workshop !== session.workshop)
+      setWorkshop(session.workshop);
     return true;
   };
 
   const resetSession = () => {
-    setPhien(null);
+    setSession(null);
     setTableRows([]);
     setDongBND([]);
-    setLoiPhien([]);
+    setSessionErrors([]);
   };
-  const xongPhien = () => {
+  const finishSession = () => {
     // Nhớ nhóm cuối để phiếu mới điền sẵn (lặp cùng chế biến/khách = 0 thao tác).
-    const last = tableRows.filter(dongDayDu).at(-1);
+    const last = tableRows.filter(isLineComplete).at(-1);
     // Lưu xong → reset phiếu; effect form-first tự mở phiếu trống mới.
     if (saveSession(false)) {
       if (last)
@@ -792,7 +792,7 @@ export default function SanXuatBTPScreen() {
   const remove = (r: WipProductionItem) => {
     const prevRows = rows;
     persist(rows.filter((x) => x.id !== r.id));
-    notify.deleted(`Đã xóa ${tenMH(r.productId)} — ${kg(r.quantityKg)}`, () =>
+    notify.deleted(`Đã xóa ${productNameOf(r.productId)} — ${kg(r.quantityKg)}`, () =>
       persist(prevRows)
     );
   };
@@ -887,10 +887,10 @@ export default function SanXuatBTPScreen() {
   ];
 
   /* ---- A4: gửi báo cáo TP lên hệ thống (tách khỏi chốt ngày) ---- */
-  const reportKey = `${tuHieuLuc}${isSingleDay ? "" : `..${denHieuLuc}`}·${workshop}`;
+  const reportKey = `${effectiveFrom}${isSingleDay ? "" : `..${effectiveTo}`}·${workshop}`;
   const submitReport = () => {
     const dong = operatorReport
-      .map((b) => `${b.workshop}/${b.operator}: ${b.soDong} dòng · ${kg(b.kg)}`)
+      .map((b) => `${b.workshop}/${b.operator}: ${b.rowCount} dòng · ${kg(b.kg)}`)
       .join("; ");
     appendAuditEntries([
       {
@@ -908,8 +908,8 @@ export default function SanXuatBTPScreen() {
       },
     ]);
     const luc = new Date().toLocaleString("vi-VN");
-    const next = { ...daGui, [reportKey]: luc };
-    setDaGui(next);
+    const next = { ...sentReports, [reportKey]: luc };
+    setSentReports(next);
     // mốc "đã gửi" chỉ là phản hồi tại chỗ — lưu hụt (chặn cookie) thì thôi
     writeDevicePref(KEY_WIP_REPORT, JSON.stringify(next));
     notify.saved(
@@ -921,7 +921,7 @@ export default function SanXuatBTPScreen() {
   const lockDay = () => {
     /* Sổ chốt SX chưa nạp xong ⇒ chưa biết máy chủ đã có bản ghi (ngày, xưởng)
        chưa; tạo bản mới lúc này có thể trùng chỉ mục duy nhất ⇒ 23505. */
-    if (ttChot === "dang-tai") {
+    if (lockStatus === "dang-tai") {
       notify.error("Đang tải sổ chốt sản xuất từ máy chủ — đợi vài giây rồi bấm chốt lại");
       return;
     }
@@ -949,7 +949,7 @@ export default function SanXuatBTPScreen() {
         })),
       ]);
     }
-    const bg = lockRecordOf(tuHieuLuc, activeWorkshop);
+    const bg = lockRecordOf(effectiveFrom, activeWorkshop);
     // Gom còn dở theo tên loại NL (cộng dồn trùng, bỏ dòng trống / ≤ 0).
     const leftoverByMaterial: Record<string, number> = {};
     for (const d of leftover) {
@@ -963,8 +963,8 @@ export default function SanXuatBTPScreen() {
       /* Có bản ghi ⇒ dùng lại id; chưa có ⇒ id CỐ ĐỊNH ngày|xưởng (không newId()):
          hai máy cùng chốt ghi CÙNG một dòng, không đụng chỉ mục duy nhất
          (site, ngày, xưởng) rồi kẹt hàng chờ. */
-      id: bg?.id ?? `${tuHieuLuc}|${activeWorkshop}`,
-      lockDate: tuHieuLuc,
+      id: bg?.id ?? `${effectiveFrom}|${activeWorkshop}`,
+      lockDate: effectiveFrom,
       workshop: activeWorkshop,
       isLocked: true,
       lockedAt: todayISO(),
@@ -976,7 +976,7 @@ export default function SanXuatBTPScreen() {
     };
     persistLocks(bg ? locks.map((c) => (c.id === bg.id ? ban : c)) : [...locks, ban]);
     notify.saved(
-      `Đã chốt SX ${formatDateVN(tuHieuLuc)} · xưởng ${activeWorkshop} — ${kg(actualTotal)}` +
+      `Đã chốt SX ${formatDateVN(effectiveFrom)} · xưởng ${activeWorkshop} — ${kg(actualTotal)}` +
         (leftoverTotal > 0 ? ` · còn dở ${kg(leftoverTotal)}` : "") +
         (batchesWithoutLot.length > 0 ? ` · ${batchesWithoutLot.length} mẻ chưa gắn lô (có lý do)` : "")
     );
@@ -987,7 +987,7 @@ export default function SanXuatBTPScreen() {
     setLockErrors([]);
   };
   const reopenDay = () => {
-    const bg = lockRecordOf(tuHieuLuc, activeWorkshop);
+    const bg = lockRecordOf(effectiveFrom, activeWorkshop);
     if (!bg) return;
     if (!reopenReason.trim()) {
       setLockErrors([{ field: "Lý do mở lại", message: "Ghi rõ vì sao mở lại" }]);
@@ -998,7 +998,7 @@ export default function SanXuatBTPScreen() {
         c.id === bg.id ? { ...c, isLocked: false, reopenReason } : c
       )
     );
-    notify.warning(`Đã mở lại SX ${formatDateVN(tuHieuLuc)} · xưởng ${activeWorkshop}`);
+    notify.warning(`Đã mở lại SX ${formatDateVN(effectiveFrom)} · xưởng ${activeWorkshop}`);
     setIsConfirmingReopen(false);
     setReopenReason("");
     setLockErrors([]);
@@ -1009,8 +1009,8 @@ export default function SanXuatBTPScreen() {
       key: "mh",
       header: "Thành phẩm",
       primary: true,
-      render: (r) => tenMH(r.productId),
-      getSortValue: (r) => tenMH(r.productId),
+      render: (r) => productNameOf(r.productId),
+      getSortValue: (r) => productNameOf(r.productId),
     },
     {
       key: "kg",
@@ -1095,16 +1095,16 @@ export default function SanXuatBTPScreen() {
 
   // FORM NHẬP (form-first) — trước đây nằm trong Dialog, nay render INLINE ở chế độ
   // "Ghi nhập": điền như tờ giấy, không phải mở modal trong trang quản lý.
-  const entryForm = phien && (
+  const entryForm = session && (
     <div className="space-y-6 rounded-xl border-2 border-border bg-card p-4 md:p-6">
-      <ErrorSummary errors={loiPhien} />
+      <ErrorSummary errors={sessionErrors} />
       <RequiredLegend />
 
       {isSessionLocked && (
         <p className="flex items-start gap-3 rounded-lg bg-accent px-4 py-3 text-base text-accent-foreground">
           <Lock className="mt-0.5 size-6 shrink-0" aria-hidden />
           <span>
-            Ngày {formatDateVN(phien.productionDate)} · xưởng {phien.workshop}{" "}
+            Ngày {formatDateVN(session.productionDate)} · xưởng {session.workshop}{" "}
             <strong>đã chốt</strong> — ghi thêm là <strong>ghi bù</strong>, bắt
             buộc lý do.
           </span>
@@ -1116,14 +1116,14 @@ export default function SanXuatBTPScreen() {
           label="Ngày ghi sổ"
           required
           info="Ngày ghi vào hệ thống. Chọn ngày này thì ngày SX tự nhảy theo (tới khi bạn tự sửa)."
-          value={phien.postingDate}
+          value={session.postingDate}
           onChange={changePostingDate}
         />
         <DateField
           label="Ngày sản xuất"
           required
           info="Ngày làm ra thật — mọi tổng hợp tính theo ngày này. Sửa tay khi làm hôm khác (ghi bù)."
-          value={phien.productionDate}
+          value={session.productionDate}
           onChange={changeProductionDate}
         />
       </div>
@@ -1131,7 +1131,7 @@ export default function SanXuatBTPScreen() {
       {sessionNeedsReason && (
         <Field label="Lý do ghi bù" required hint="VD: cuối ca mới cân xong.">
           <Input
-            value={phien.backdateReason}
+            value={session.backdateReason}
             onChange={(e) => setSessionField("backdateReason", e.target.value)}
             placeholder="Vì sao ghi sau ngày SX?"
           />
@@ -1142,20 +1142,20 @@ export default function SanXuatBTPScreen() {
         label="Phân xưởng"
         required
         clearable={false}
-        value={phien.workshop}
+        value={session.workshop}
         onChange={(v) => setSessionField("workshop", v as Workshop)}
-        options={PHAN_XUONG.map((p) => ({ value: p, label: p }))}
+        options={WORKSHOPS.map((p) => ({ value: p, label: p }))}
       />
 
       <div className="border-t-2 border-border pt-1" />
 
       {/* Lô NL dùng cho phiên (truy xuất QR đợt 2b) — khai một lần, lưu là gắn cho mọi mẻ cùng loài. */}
-      <KhoiLoPhien
+      <SessionLotsSection
         dl={dlNhe}
-        xuong={phien.workshop}
-        ngay={phien.productionDate}
-        loPhien={loPhienCua(phien)}
-        onDoi={(ds) => setLoPhienKhai({ ngay: phien.productionDate, xuong: phien.workshop, ds })}
+        workshop={session.workshop}
+        date={session.productionDate}
+        sessionLots={sessionLotsOf(session)}
+        onDoi={(items) => setDeclaredSessionLots({ date: session.productionDate, workshop: session.workshop, lots: items })}
       />
 
       {/* Bảng thành phẩm — nhập cả phiên một lượt, lưu một lần */}
@@ -1168,23 +1168,23 @@ export default function SanXuatBTPScreen() {
           </p>
         </div>
 
-        <BangDongSX
+        <ProductionLinesTable
           dong={tableRows}
           matHang={products}
-          onSua={updateRow}
+          onUpdateRow={updateRow}
           onBo={removeRow}
-          onThemDong={addRow}
-          onThemNhom={addGroup}
-          onDoiNhom={changeGroup}
-          onTaoMatHang={addProduct}
-          onSuaMatHang={openProductEdit}
-          onSuaKhach={customerEditor.moSua}
-          optKhach={customerOptions}
-          onTaoKhach={addCustomer}
+          onAddRow={addRow}
+          onAddGroup={addGroup}
+          onChangeGroup={changeGroup}
+          onCreateProduct={addProduct}
+          onEditProduct={openProductEdit}
+          onEditCustomer={customerEditor.openEdit}
+          customerOptions={customerOptions}
+          onCreateCustomer={addCustomer}
           botTam={batterTypes}
           optBot={optBot}
-          onTaoBot={addBatter}
-          onSuaBot={batterEditor.moSua}
+          onCreateBatter={addBatter}
+          onEditBatter={batterEditor.openEdit}
         />
 
         {validRows.length > 0 && (
@@ -1192,9 +1192,9 @@ export default function SanXuatBTPScreen() {
             <span className="text-base text-muted-foreground">
               {validRows.length} thành phẩm · phiên này
             </span>
-            {botPhien > 0 && (
+            {sessionBatterKg > 0 && (
               <span className="text-base text-muted-foreground">
-                Bột tẩm <span className="tnum font-semibold text-foreground">{kg(botPhien)}</span>
+                Bột tẩm <span className="tnum font-semibold text-foreground">{kg(sessionBatterKg)}</span>
               </span>
             )}
             <span className="tnum text-lg font-semibold">{kg(sessionTotal)}</span>
@@ -1203,34 +1203,34 @@ export default function SanXuatBTPScreen() {
       </div>
 
       {/* Bán nội địa (mig 0054): NL bán thẳng — sổ riêng, không cộng vào thành phẩm. */}
-      <KhoiBanNoiDia
+      <DomesticSaleSection
         dong={dongBND}
-        onSua={(key, patch) =>
-          setDongBND((ds) => ds.map((d) => (d.key === key ? { ...d, ...patch } : d)))
+        onUpdateRow={(key, patch) =>
+          setDongBND((items) => items.map((d) => (d.key === key ? { ...d, ...patch } : d)))
         }
-        onBo={(key) => setDongBND((ds) => ds.filter((d) => d.key !== key))}
-        onThem={() => setDongBND((ds) => [...ds, dongBanNoiDiaRong(ds.at(-1)?.materialTypeName ?? "")])}
+        onBo={(key) => setDongBND((items) => items.filter((d) => d.key !== key))}
+        onAddRow={() => setDongBND((items) => [...items, createEmptyDomesticSaleLine(items.at(-1)?.materialTypeName ?? "")])}
         loaiNL={materialTypeFieldProps}
-        khach={customerFieldProps}
+        customerField={customerFieldProps}
       />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <span className="text-base text-muted-foreground">
-          Tổng ngày {formatDateVN(phien.productionDate)} · xưởng {phien.workshop}:{" "}
+          Tổng ngày {formatDateVN(session.productionDate)} · xưởng {session.workshop}:{" "}
           <span className="tnum text-xl font-semibold text-foreground">
             {kg(
               rows
                 .filter(
                   (r) =>
-                    r.productionDate === phien.productionDate &&
-                    r.workshop === phien.workshop
+                    r.productionDate === session.productionDate &&
+                    r.workshop === session.workshop
                 )
                 .reduce((s, r) => s + (r.quantityKg || 0), 0) + sessionTotal
             )}
           </span>
         </span>
         <Button
-          title="Ghi toàn bộ sản lượng đang gõ vào sổ sản xuất của ngày và xưởng đang chọn." size="lg" onClick={xongPhien} className="w-full sm:w-auto">
+          title="Ghi toàn bộ sản lượng đang gõ vào sổ sản xuất của ngày và xưởng đang chọn." size="lg" onClick={finishSession} className="w-full sm:w-auto">
           <Plus />
           Lưu vào sổ
         </Button>
@@ -1251,10 +1251,10 @@ export default function SanXuatBTPScreen() {
           <button
             title="Sang chế độ Ghi nhập để gõ sản lượng thành phẩm."
             type="button"
-            onClick={() => setCheDo("nhap")}
+            onClick={() => setMode("nhap")}
             className={cn(
               "flex-1 px-4 py-2.5 text-base font-semibold transition-colors sm:flex-none",
-              cheDo === "nhap"
+              mode === "nhap"
                 ? "bg-primary text-primary-foreground"
                 : "bg-card text-muted-foreground hover:bg-muted"
             )}
@@ -1264,10 +1264,10 @@ export default function SanXuatBTPScreen() {
           <button
             title="Xem sổ sản lượng đã ghi trong ngày và báo cáo theo xưởng, chốt ngày tại đây."
             type="button"
-            onClick={() => setCheDo("so")}
+            onClick={() => setMode("so")}
             className={cn(
               "flex-1 border-l-2 border-border px-4 py-2.5 text-base font-semibold transition-colors sm:flex-none",
-              cheDo === "so"
+              mode === "so"
                 ? "bg-primary text-primary-foreground"
                 : "bg-card text-muted-foreground hover:bg-muted"
             )}
@@ -1278,13 +1278,13 @@ export default function SanXuatBTPScreen() {
       </div>
 
       <DailyTaskReminder
-        daChot={isProductionLockedToday}
-        viec={`thành phẩm làm ra hôm nay — xưởng ${recordWorkshop}`}
+        isLocked={isProductionLockedToday}
+        task={`thành phẩm làm ra hôm nay — xưởng ${recordWorkshop}`}
       />
 
-      {cheDo === "nhap" && entryForm}
+      {mode === "nhap" && entryForm}
 
-      {cheDo === "so" && (
+      {mode === "so" && (
         <>
       <div className="flex flex-wrap gap-2">
         <Button
@@ -1334,7 +1334,7 @@ export default function SanXuatBTPScreen() {
               hint={
                 ky === "ngay"
                   ? undefined
-                  : `Kỳ: ${formatDateVN(tuHieuLuc)} – ${formatDateVN(denHieuLuc)}`
+                  : `Kỳ: ${formatDateVN(effectiveFrom)} – ${formatDateVN(effectiveTo)}`
               }
               value={date}
               onChange={setDate}
@@ -1348,7 +1348,7 @@ export default function SanXuatBTPScreen() {
           value={workshop}
           onChange={(v) => setWorkshop(v as Workshop | "Tất cả")}
           options={[
-            ...PHAN_XUONG.map((p) => ({ value: p, label: p })),
+            ...WORKSHOPS.map((p) => ({ value: p, label: p })),
             { value: "Tất cả", label: "Tất cả" },
           ]}
           className="min-w-[220px] flex-1"
@@ -1364,7 +1364,7 @@ export default function SanXuatBTPScreen() {
           description={`Phân xưởng ${workshop}. Chuyển sang "Ghi nhập" để ghi.`}
           action={
             <Button
-              title="Chuyển sang chế độ Ghi để nhập sản lượng cho ngày này." size="lg" onClick={() => setCheDo("nhap")}>
+              title="Chuyển sang chế độ Ghi để nhập sản lượng cho ngày này." size="lg" onClick={() => setMode("nhap")}>
               <Plus />
               Sang Ghi nhập
             </Button>
@@ -1377,7 +1377,7 @@ export default function SanXuatBTPScreen() {
             rows={view}
             getKey={(r) => r.id}
             rowMarkKey="san-xuat-tp"
-            getSearchText={(r) => `${tenMH(r.productId)} ${r.customerName ?? ""}`}
+            getSearchText={(r) => `${productNameOf(r.productId)} ${r.customerName ?? ""}`}
             searchLabel="Tìm theo thành phẩm / khách…"
             actions={(r) => (
               <div className="flex flex-wrap gap-2">
@@ -1546,7 +1546,7 @@ export default function SanXuatBTPScreen() {
               <LockOpen className="size-6 shrink-0 text-muted-foreground" aria-hidden />
             )}
             <span className="text-lg font-semibold text-foreground">
-              {isLocked ? "Đã chốt" : "Chưa chốt"} {formatDateVN(tuHieuLuc)} · xưởng {activeWorkshop}
+              {isLocked ? "Đã chốt" : "Chưa chốt"} {formatDateVN(effectiveFrom)} · xưởng {activeWorkshop}
             </span>
             <span className="text-base text-muted-foreground">
               Tổng{" "}
@@ -1623,9 +1623,9 @@ export default function SanXuatBTPScreen() {
                 <Send />
                 Gửi báo cáo lên hệ thống
               </Button>
-              {daGui[reportKey] && (
+              {sentReports[reportKey] && (
                 <span className="text-sm text-success">
-                  Đã gửi lúc {daGui[reportKey]}
+                  Đã gửi lúc {sentReports[reportKey]}
                 </span>
               )}
             </div>
@@ -1646,7 +1646,7 @@ export default function SanXuatBTPScreen() {
                   <tr key={`${b.workshop}·${b.operator}`} className="border-b border-border last:border-0">
                     <td className="px-3 py-2">{b.workshop}</td>
                     <td className="px-3 py-2">{b.operator}</td>
-                    <td className="tnum px-3 py-2 text-right">{num(b.soDong)}</td>
+                    <td className="tnum px-3 py-2 text-right">{num(b.rowCount)}</td>
                     <td className="tnum px-3 py-2 text-right font-semibold">{kg(b.kg)}</td>
                   </tr>
                 ))}
@@ -1697,7 +1697,7 @@ export default function SanXuatBTPScreen() {
                 clearable={false}
                 value={edit.workshop}
                 onChange={(v) => patchEdit({ workshop: v as Workshop })}
-                options={PHAN_XUONG.map((p) => ({ value: p, label: p }))}
+                options={WORKSHOPS.map((p) => ({ value: p, label: p }))}
               />
               <div className="flex items-end gap-2">
                 <div className="min-w-0 flex-1">
@@ -1710,7 +1710,7 @@ export default function SanXuatBTPScreen() {
                     onCreate={(ten) => addProduct(ten)}
                     emptyText="Chưa có thành phẩm — gõ tên rồi Thêm mới."
                     onEditItem={openProductEdit}
-                    editLabel={productEditor.nhanSua}
+                    editLabel={productEditor.editLabel}
                   />
                 </div>
                 {edit.productId && (
@@ -1734,8 +1734,8 @@ export default function SanXuatBTPScreen() {
                 onCreate={(ten) => addCustomer(ten)}
                 placeholder="Chọn khách hàng (nếu có)"
                 emptyText="Chưa có khách — gõ tên rồi Thêm mới."
-                onEditItem={customerEditor.moSua}
-                editLabel={customerEditor.nhanSua}
+                onEditItem={customerEditor.openEdit}
+                editLabel={customerEditor.editLabel}
               />
 
               {isEditSplit ? (
@@ -1780,14 +1780,14 @@ export default function SanXuatBTPScreen() {
                 sumBatterKg(edit.batterKg) > 0) && (
                 <div className="rounded-lg border border-border p-3">
                   <p className="mb-2 text-base font-semibold">Bột tẩm</p>
-                  <KhoiBotTam
-                    diKem={diKemCua(edit.productId)}
+                  <BatterSection
+                    diKem={batterNamesOf(edit.productId)}
                     botKg={edit.batterKg ?? {}}
                     onDoi={(batterKg) => patchEdit({ batterKg })}
                     optBot={optBot}
-                    onTaoBot={addBatter}
-                    onSuaBot={batterEditor.moSua}
-                    kgThanhPham={editTotal}
+                    onCreateBatter={addBatter}
+                    onEditBatter={batterEditor.openEdit}
+                    productKg={editTotal}
                   />
                 </div>
               )}
@@ -1838,7 +1838,7 @@ export default function SanXuatBTPScreen() {
                   clearable={false}
                   value={editingDomesticSale.workshop}
                   onChange={(v) => patchDomesticSaleEdit({ workshop: v as Workshop })}
-                  options={PHAN_XUONG.map((p) => ({ value: p, label: p }))}
+                  options={WORKSHOPS.map((p) => ({ value: p, label: p }))}
                 />
               </div>
               <Combobox
@@ -1848,9 +1848,9 @@ export default function SanXuatBTPScreen() {
                 onChange={(v) => patchDomesticSaleEdit({ materialTypeName: v })}
                 options={materialTypeFieldProps.options}
                 onCreate={materialTypeFieldProps.onCreate}
-                onEditItem={materialTypeFieldProps.onSuaMuc}
-                canEdit={materialTypeFieldProps.suaDuoc}
-                editLabel={materialTypeFieldProps.nhanSua}
+                onEditItem={materialTypeFieldProps.onEditItem}
+                canEdit={materialTypeFieldProps.canEdit}
+                editLabel={materialTypeFieldProps.editLabel}
                 placeholder="— Chọn loại NL —"
                 emptyText="Chưa có loại này — gõ tên rồi Thêm mới."
               />
@@ -1875,9 +1875,9 @@ export default function SanXuatBTPScreen() {
                 onChange={(v) => patchDomesticSaleEdit({ customerName: v })}
                 options={customerFieldProps.options}
                 onCreate={customerFieldProps.onCreate}
-                onEditItem={customerFieldProps.onSuaMuc}
-                canEdit={customerFieldProps.suaDuoc}
-                editLabel={customerFieldProps.nhanSua}
+                onEditItem={customerFieldProps.onEditItem}
+                canEdit={customerFieldProps.canEdit}
+                editLabel={customerFieldProps.editLabel}
                 placeholder="— Chọn khách (nếu có) —"
                 emptyText="Chưa có khách này — gõ tên rồi Thêm mới."
               />
@@ -1906,7 +1906,7 @@ export default function SanXuatBTPScreen() {
           <DialogHeader>
             <DialogTitle className="text-2xl">Chốt ngày sản xuất</DialogTitle>
             <DialogDescription className="text-base">
-              Khoá {formatDateVN(tuHieuLuc)} · xưởng {activeWorkshop} — tổng {kg(actualTotal)}. Ghi
+              Khoá {formatDateVN(effectiveFrom)} · xưởng {activeWorkshop} — tổng {kg(actualTotal)}. Ghi
               thêm sau khi chốt phải ghi bù.
             </DialogDescription>
           </DialogHeader>
@@ -1935,7 +1935,7 @@ export default function SanXuatBTPScreen() {
                 {batchesWithoutLot.map((r) => (
                   <li key={r.id} className="flex flex-wrap items-center justify-between gap-2">
                     <span className="min-w-0">
-                      {tenMH(r.productId)} · <span className="tnum">{kg(r.quantityKg || 0)}</span>
+                      {productNameOf(r.productId)} · <span className="tnum">{kg(r.quantityKg || 0)}</span>
                     </span>
                     <Button
                       title="Đóng hộp chốt và mở hộp gắn lô nguyên liệu cho mẻ này (quét tem, gõ mã hoặc chọn)."
@@ -1998,9 +1998,9 @@ export default function SanXuatBTPScreen() {
                           label: l.name,
                           phu: l.category || undefined,
                         }))}
-                        onEditItem={materialTypeEditor.moSua}
-                        editLabel={materialTypeEditor.nhanSua}
-                        canEdit={materialTypeEditor.suaDuoc}
+                        onEditItem={materialTypeEditor.openEdit}
+                        editLabel={materialTypeEditor.editLabel}
+                        canEdit={materialTypeEditor.canEdit}
                         onCreate={(ten) => {
                           setMaterialTypes([
                             ...materialTypes,
@@ -2072,7 +2072,7 @@ export default function SanXuatBTPScreen() {
           <DialogHeader>
             <DialogTitle className="text-2xl">Mở lại ngày đã chốt</DialogTitle>
             <DialogDescription className="text-base">
-              {formatDateVN(tuHieuLuc)} · xưởng {activeWorkshop}. Sửa xong nhớ chốt lại.
+              {formatDateVN(effectiveFrom)} · xưởng {activeWorkshop}. Sửa xong nhớ chốt lại.
             </DialogDescription>
           </DialogHeader>
           <ErrorSummary errors={lockErrors} />
@@ -2097,33 +2097,33 @@ export default function SanXuatBTPScreen() {
         </DialogContent>
       </Dialog>
 
-      {productEditor.hop}
-      {customerEditor.hop}
-      {materialTypeEditor.hop}
-      {batterEditor.hop}
+      {productEditor.dialog}
+      {customerEditor.dialog}
+      {materialTypeEditor.dialog}
+      {batterEditor.dialog}
       {lotTarget && (
-        <GanLoDauVao
+        <LotInputPicker
           outputKind="W"
           outputId={lotTarget.id}
-          outputNhan={`mẻ ${formatWipLotLabel(lotTarget)} · ${tenMH(lotTarget.productId)}`}
-          xuong={lotTarget.workshop}
-          ngay={lotTarget.productionDate}
+          outputLabel={`mẻ ${formatWipLotLabel(lotTarget)} · ${productNameOf(lotTarget.productId)}`}
+          workshop={lotTarget.workshop}
+          date={lotTarget.productionDate}
           onClose={() => setLotTarget(null)}
         />
       )}
       {lotDomesticSale && (
-        <GanLoXuat
+        <LotDispatchPicker
           docKind="domestic_sale"
           docId={lotDomesticSale.id}
-          docNhan={`bán nội địa ${lotDomesticSale.materialTypeName} · ${kg(lotDomesticSale.quantityKg)} · ${formatDateVN(lotDomesticSale.saleDate)}`}
-          loaiLo="S"
-          xuong={lotDomesticSale.workshop}
-          ngay={lotDomesticSale.saleDate}
+          docLabel={`bán nội địa ${lotDomesticSale.materialTypeName} · ${kg(lotDomesticSale.quantityKg)} · ${formatDateVN(lotDomesticSale.saleDate)}`}
+          lotKind="S"
+          workshop={lotDomesticSale.workshop}
+          date={lotDomesticSale.saleDate}
           onClose={() => setLotDomesticSale(null)}
         />
       )}
       {lotLabel && (
-        <TemLoQr
+        <LotQrLabels
           nuts={lotLabel.map((w) =>
             buildLotNode("W", w.id, {
               shipments: [], imports: [], wips: [...rows, ...lotLabel.filter((t) => !rows.some((r) => r.id === t.id))],
@@ -2134,7 +2134,7 @@ export default function SanXuatBTPScreen() {
         />
       )}
       {isPrintingBlank && (
-        <PhieuTrongTPNgay onClose={() => setIsPrintingBlank(false)} />
+        <BlankDailyWipSlip onClose={() => setIsPrintingBlank(false)} />
       )}
     </div>
   );

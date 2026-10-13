@@ -16,10 +16,10 @@ import type { ReactNode } from "react";
  * 32-danh-muc. Cập nhật hướng dẫn ở đây khi luồng màn đổi.
  */
 
-export interface NoiDungHuongDan {
-  tieuDe: string;
-  moTa?: string;
-  noiDung: ReactNode;
+export interface PageGuide {
+  title: string;
+  description?: string;
+  content: ReactNode;
 }
 
 function Step({ children }: { children: ReactNode }) {
@@ -30,22 +30,22 @@ function Y({ children }: { children: ReactNode }) {
   return <ul className="list-disc space-y-2 pl-6">{children}</ul>;
 }
 
-function Section({ tieuDe, children }: { tieuDe: string; children: ReactNode }) {
+function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="space-y-2">
-      <h3 className="text-lg font-semibold text-foreground">{tieuDe}</h3>
+      <h3 className="text-lg font-semibold text-foreground">{title}</h3>
       {children}
     </section>
   );
 }
 
-export const HUONG_DAN: Record<string, NoiDungHuongDan> = {
+export const PAGE_GUIDES: Record<string, PageGuide> = {
   imports: {
-    tieuDe: "Nhập hàng",
-    moTa: "Ghi sổ nguyên liệu về xưởng mỗi ngày.",
-    noiDung: (
+    title: "Nhập hàng",
+    description: "Ghi sổ nguyên liệu về xưởng mỗi ngày.",
+    content: (
       <>
-        <Section tieuDe="Ghi một chuyến hàng">
+        <Section title="Ghi một chuyến hàng">
           <Step>
             <li>
               Bấm <b>Ghi chuyến</b>. Một chuyến là <b>một đại lý giao một lượt</b>
@@ -69,7 +69,7 @@ export const HUONG_DAN: Record<string, NoiDungHuongDan> = {
             </li>
           </Step>
         </Section>
-        <Section tieuDe="Hai ô ngày">
+        <Section title="Hai ô ngày">
           <Y>
             <li>
               <b>Ngày hàng về xưởng</b>: ngày hàng thật về — dùng cho mọi con số
@@ -81,7 +81,7 @@ export const HUONG_DAN: Record<string, NoiDungHuongDan> = {
             </li>
           </Y>
         </Section>
-        <Section tieuDe="Phế liệu (nội tạng, hàng dạt)">
+        <Section title="Phế liệu (nội tạng, hàng dạt)">
           <p>
             Cân gộp cuối ngày, nhập ở hộp <b>Thêm phế liệu</b>. Loại mặc định là
             Nội tạng, cân hàng dạt thì đổi sang Dạt. Bấm <b>Lưu</b> là ghi rồi
@@ -89,20 +89,20 @@ export const HUONG_DAN: Record<string, NoiDungHuongDan> = {
             đầu. Chỉ nhập một lần ở đây — màn Cân đối sẽ hút sang, không nhập lại.
           </p>
         </Section>
-        <Section tieuDe="Chốt ngày">
+        <Section title="Chốt ngày">
           <p>
             Xem hết số trong ngày rồi kéo xuống cuối màn bấm <b>Chốt ngày</b>
             (theo ngày + phân xưởng). Chốt xong khóa sửa. Cần sửa thêm thì{" "}
             <b>ghi bù</b> hoặc <b>mở lại ngày</b> — cả hai đều bắt ghi lý do.
           </p>
         </Section>
-        <Section tieuDe="Xem báo cáo">
+        <Section title="Xem báo cáo">
           <p>
             Bấm <b>Xem báo cáo</b> để in tờ tổng hợp nguyên liệu (A4 ngang), hoặc
             mở tab <b>Báo cáo</b> để xem tổng nhập theo đại lý và loại nguyên liệu.
           </p>
         </Section>
-        <Section tieuDe="Mã lô & in tem QR">
+        <Section title="Mã lô & in tem QR">
           <Y>
             <li>
               Khi chọn <b>ngày về</b> và <b>phân xưởng</b>, ô <b>Mã lô nội bộ</b>{" "}
@@ -127,11 +127,11 @@ export const HUONG_DAN: Record<string, NoiDungHuongDan> = {
   },
 
   sales: {
-    tieuDe: "Bán hàng",
-    moTa: "Ghi phiếu bán thành phẩm ra cho khách mỗi ngày.",
-    noiDung: (
+    title: "Bán hàng",
+    description: "Ghi phiếu bán thành phẩm ra cho khách mỗi ngày.",
+    content: (
       <>
-        <Section tieuDe="Ghi một phiếu bán">
+        <Section title="Ghi một phiếu bán">
           <Step>
             <li>
               Bấm <b>Ghi phiếu</b>. Một phiếu là <b>một khách nhận hàng một lượt
@@ -147,13 +147,13 @@ export const HUONG_DAN: Record<string, NoiDungHuongDan> = {
             </li>
           </Step>
         </Section>
-        <Section tieuDe="Hai ô ngày & ghi bù">
+        <Section title="Hai ô ngày & ghi bù">
           <p>
             Giống Nhập hàng: <b>ngày xuất bán</b> dùng cho tổng hợp;{" "}
             <b>ngày ghi sổ</b> muộn hơn là ghi bù, phải ghi lý do.
           </p>
         </Section>
-        <Section tieuDe="Xem báo cáo">
+        <Section title="Xem báo cáo">
           <p>
             Mở tab <b>Báo cáo</b> để xem tổng bán theo khách và theo kênh (Xuất
             khẩu / Nội địa) trong kỳ đang xem.
@@ -164,9 +164,9 @@ export const HUONG_DAN: Record<string, NoiDungHuongDan> = {
   },
 
   warehouse: {
-    tieuDe: "Kho dự trữ",
-    moTa: "Duyệt nhập kho và theo dõi tồn hàng cấp đông.",
-    noiDung: (
+    title: "Kho dự trữ",
+    description: "Duyệt nhập kho và theo dõi tồn hàng cấp đông.",
+    content: (
       <>
         <p>
           Trang theo dõi hàng bán thành phẩm đã cấp đông cất trong kho dự trữ, chờ
@@ -181,9 +181,9 @@ export const HUONG_DAN: Record<string, NoiDungHuongDan> = {
   },
 
   orders: {
-    tieuDe: "Đơn đặt",
-    moTa: "Gom hàng theo đơn khách đặt và lập lệnh xuất.",
-    noiDung: (
+    title: "Đơn đặt",
+    description: "Gom hàng theo đơn khách đặt và lập lệnh xuất.",
+    content: (
       <>
         <p>
           Đơn đặt là đơn xuất khẩu số lượng lớn. Trang giúp gom đủ hàng từ kho dự
@@ -198,11 +198,11 @@ export const HUONG_DAN: Record<string, NoiDungHuongDan> = {
   },
 
   balancing: {
-    tieuDe: "Cân đối kỳ",
-    moTa: "Cân đối một lô nguyên liệu ra thành phẩm, tính định mức và lãi/lỗ.",
-    noiDung: (
+    title: "Cân đối kỳ",
+    description: "Cân đối một lô nguyên liệu ra thành phẩm, tính định mức và lãi/lỗ.",
+    content: (
       <>
-        <Section tieuDe="Tạo một kỳ cân đối">
+        <Section title="Tạo một kỳ cân đối">
           <Step>
             <li>
               Bấm tạo kỳ. Một kỳ = <b>một loại nguyên liệu</b> + các ngày nhận của
@@ -214,7 +214,7 @@ export const HUONG_DAN: Record<string, NoiDungHuongDan> = {
             </li>
           </Step>
         </Section>
-        <Section tieuDe="Ba khối số liệu">
+        <Section title="Ba khối số liệu">
           <Y>
             <li>
               <b>Nguyên liệu vào</b>: hàng đưa vào chế biến. Dòng điều chỉnh giảm
@@ -229,7 +229,7 @@ export const HUONG_DAN: Record<string, NoiDungHuongDan> = {
             </li>
           </Y>
         </Section>
-        <Section tieuDe="Kết quả & in">
+        <Section title="Kết quả & in">
           <p>
             Có đủ nguyên liệu và thành phẩm, hệ thống tự tính <b>định mức</b>{" "}
             (nguyên liệu ÷ thành phẩm), <b>tỉ lệ thu hồi</b> và <b>lãi/lỗ</b>. Bấm
@@ -241,9 +241,9 @@ export const HUONG_DAN: Record<string, NoiDungHuongDan> = {
   },
 
   catalog: {
-    tieuDe: "Danh mục",
-    moTa: "Quản lý mặt hàng, khách, đại lý, loại nguyên liệu.",
-    noiDung: (
+    title: "Danh mục",
+    description: "Quản lý mặt hàng, khách, đại lý, loại nguyên liệu.",
+    content: (
       <>
         <p>
           Năm tab: <b>Mặt hàng · Khách hàng · Đại lý · Loại nguyên liệu · Thành
@@ -271,12 +271,12 @@ export const HUONG_DAN: Record<string, NoiDungHuongDan> = {
     ),
   },
 
-  "bc-thanh-pham": {
-    tieuDe: "Báo cáo thành phẩm hàng ngày",
-    moTa: "Tổng hợp thành phẩm sản xuất theo ngày, gom theo phân xưởng.",
-    noiDung: (
+  "production-report": {
+    title: "Báo cáo thành phẩm hàng ngày",
+    description: "Tổng hợp thành phẩm sản xuất theo ngày, gom theo phân xưởng.",
+    content: (
       <>
-        <Section tieuDe="Cách xem">
+        <Section title="Cách xem">
           <Step>
             <li>Chọn <b>kỳ</b> (ngày / tuần / tháng / khoảng tự chọn) và <b>phân xưởng</b>.</li>
             <li>
@@ -285,7 +285,7 @@ export const HUONG_DAN: Record<string, NoiDungHuongDan> = {
             </li>
           </Step>
         </Section>
-        <Section tieuDe="Xuất Excel">
+        <Section title="Xuất Excel">
           <p>
             Bấm <b>Xuất Excel</b> để tải file cho kế toán đối chiếu — giữ đúng lưới
             ngày, cộng xưởng và tổng.
@@ -299,12 +299,12 @@ export const HUONG_DAN: Record<string, NoiDungHuongDan> = {
     ),
   },
 
-  "bc-don-xuat": {
-    tieuDe: "Báo cáo đơn đặt được xuất hàng",
-    moTa: "Những ngày này đơn nào được xuất, xuất bao nhiêu.",
-    noiDung: (
+  "export-report": {
+    title: "Báo cáo đơn đặt được xuất hàng",
+    description: "Những ngày này đơn nào được xuất, xuất bao nhiêu.",
+    content: (
       <>
-        <Section tieuDe="Cách xem">
+        <Section title="Cách xem">
           <Step>
             <li>Chọn <b>khoảng ngày xuất</b> và (tùy chọn) <b>khách hàng</b>.</li>
             <li>
@@ -322,11 +322,11 @@ export const HUONG_DAN: Record<string, NoiDungHuongDan> = {
   },
 
   nxt: {
-    tieuDe: "Tồn kho thành phẩm",
-    moTa: "Nhập – Xuất – Tồn kho thành phẩm cấp đông.",
-    noiDung: (
+    title: "Tồn kho thành phẩm",
+    description: "Nhập – Xuất – Tồn kho thành phẩm cấp đông.",
+    content: (
       <>
-        <Section tieuDe="Đọc bảng">
+        <Section title="Đọc bảng">
           <Y>
             <li><b>Nhập</b>: bán thành phẩm đã duyệt vào kho (màn Kho dự trữ).</li>
             <li><b>Xuất đơn</b>: xuất container theo Đơn đặt.</li>
@@ -334,13 +334,13 @@ export const HUONG_DAN: Record<string, NoiDungHuongDan> = {
             <li><b>Tồn cuối</b> = Tồn đầu + Nhập − Xuất. Khớp với Tổng tồn ở màn Kho dự trữ.</li>
           </Y>
         </Section>
-        <Section tieuDe="Tồn đầu">
+        <Section title="Tồn đầu">
           <p>
             Có bán thành phẩm cấp đông <b>trước khi dùng app</b> thì bấm <b>Tồn đầu</b>,
             khai một lần theo mặt hàng × quy cách. Các kỳ sau tự kế thừa.
           </p>
         </Section>
-        <Section tieuDe="Tồn âm">
+        <Section title="Tồn âm">
           <p>
             Dòng báo <b>Tồn âm</b> = xuất nhiều hơn số đang trữ → kiểm lại sản xuất /
             đơn / bán, hoặc thiếu khai tồn đầu. Không được bỏ qua.
@@ -350,12 +350,12 @@ export const HUONG_DAN: Record<string, NoiDungHuongDan> = {
     ),
   },
 
-  "ton-kho-thang": {
-    tieuDe: "Sổ kho theo tháng",
-    moTa: "Theo dõi tồn đầu · nhập · xuất · tồn cuối (kg) từng lô hàng theo tháng.",
-    noiDung: (
+  "monthly-stock": {
+    title: "Sổ kho theo tháng",
+    description: "Theo dõi tồn đầu · nhập · xuất · tồn cuối (kg) từng lô hàng theo tháng.",
+    content: (
       <>
-        <Section tieuDe="Đầu tháng: mở sổ">
+        <Section title="Đầu tháng: mở sổ">
           <Step>
             <li>Chọn <b>Kỳ (tháng)</b> ở ô trên cùng (hoặc bấm ◀ ▶).</li>
             <li>
@@ -365,7 +365,7 @@ export const HUONG_DAN: Record<string, NoiDungHuongDan> = {
             </li>
           </Step>
         </Section>
-        <Section tieuDe="Lấy hàng ra sử dụng (xuất)">
+        <Section title="Lấy hàng ra sử dụng (xuất)">
           <Step>
             <li>Tìm dòng hàng (gõ tên / invoice / vị trí vào ô <b>Tìm mặt hàng</b>).</li>
             <li>Bấm nút <b>hộp có dấu trừ</b> ở cuối dòng.</li>
@@ -374,7 +374,7 @@ export const HUONG_DAN: Record<string, NoiDungHuongDan> = {
           </Step>
           <p>Lấy nhiều lần trong tháng thì làm lại từng lần — số tự cộng dồn, không phải cộng tay.</p>
         </Section>
-        <Section tieuDe="Chuyển kho (đổi chỗ để hàng)">
+        <Section title="Chuyển kho (đổi chỗ để hàng)">
           <Y>
             <li>
               <b>Một dòng:</b> bấm nút hộp cuối dòng → chọn <b>Chuyển kho</b> → gõ số kg →
@@ -392,7 +392,7 @@ export const HUONG_DAN: Record<string, NoiDungHuongDan> = {
             <li>Kho chưa có trong danh sách thì gõ tên mới, hệ thống tự lưu vào danh mục.</li>
           </Y>
         </Section>
-        <Section tieuDe="Hàng mới về">
+        <Section title="Hàng mới về">
           <Y>
             <li>
               <b>Lô mới</b> (ngày nhập / invoice khác): bấm <b>Thêm dòng</b>, điền ngày nhập, tên,
@@ -403,7 +403,7 @@ export const HUONG_DAN: Record<string, NoiDungHuongDan> = {
             </li>
           </Y>
         </Section>
-        <Section tieuDe="Gõ số hàng loạt, sửa, xóa">
+        <Section title="Gõ số hàng loạt, sửa, xóa">
           <Y>
             <li>
               <b>Gõ thẳng trên bảng</b>: ngày nhập, size, invoice, đơn giá, tồn đầu / nhập / xuất
@@ -422,7 +422,7 @@ export const HUONG_DAN: Record<string, NoiDungHuongDan> = {
             <li>Nút <b>đồng hồ</b>: thẻ kho — lịch sử mặt hàng qua các tháng + nhật ký thao tác.</li>
           </Y>
         </Section>
-        <Section tieuDe="Xem cho gọn">
+        <Section title="Xem cho gọn">
           <Y>
             <li>
               <b>Ẩn dòng trống</b>: giấu các dòng không có số (tồn đầu, nhập, xuất đều 0). Bấm lại
@@ -431,7 +431,7 @@ export const HUONG_DAN: Record<string, NoiDungHuongDan> = {
             <li>Tick vài dòng ⇒ thấy ngay tổng của đúng mấy dòng đó, in riêng được.</li>
           </Y>
         </Section>
-        <Section tieuDe="Cuối tháng">
+        <Section title="Cuối tháng">
           <p>
             Soát xong bấm <b>Dồn sang tháng sau</b>: tồn cuối tháng này thành tồn đầu tháng sau
             (mọi kho). Bấm lại chỉ cập nhật, không nhân đôi.
@@ -442,11 +442,11 @@ export const HUONG_DAN: Record<string, NoiDungHuongDan> = {
   },
 
   qr: {
-    tieuDe: "Mã lô QR",
-    moTa: "In tem QR dán lên hàng, và quét tem để tra lô làm từ đâu, đã đi đâu.",
-    noiDung: (
+    title: "Mã lô QR",
+    description: "In tem QR dán lên hàng, và quét tem để tra lô làm từ đâu, đã đi đâu.",
+    content: (
       <>
-        <Section tieuDe="Mã lô là gì">
+        <Section title="Mã lô là gì">
           <Y>
             <li>
               Có <b>3 loại lô</b>: <b>nguyên liệu</b> (mỗi <b>loại nguyên liệu</b> của một
@@ -465,7 +465,7 @@ export const HUONG_DAN: Record<string, NoiDungHuongDan> = {
             </li>
           </Y>
         </Section>
-        <Section tieuDe="In tem nhiều lô một lượt (tab In tem hàng loạt)">
+        <Section title="In tem nhiều lô một lượt (tab In tem hàng loạt)">
           <Step>
             <li>
               Ở màn này bấm tab <b>In tem hàng loạt</b>.
@@ -483,7 +483,7 @@ export const HUONG_DAN: Record<string, NoiDungHuongDan> = {
             </li>
           </Step>
         </Section>
-        <Section tieuDe="In tem ngay lúc ghi">
+        <Section title="In tem ngay lúc ghi">
           <Y>
             <li>
               Lưu xong chuyến nhập, mẻ sản xuất hay phiếu đóng gói, thông báo góc
@@ -496,7 +496,7 @@ export const HUONG_DAN: Record<string, NoiDungHuongDan> = {
             </li>
           </Y>
         </Section>
-        <Section tieuDe="Quét / tra lô (tab Tra lô)">
+        <Section title="Quét / tra lô (tab Tra lô)">
           <Step>
             <li>
               Bấm <b>Quét bằng camera</b> rồi đưa tem QR vào khung; hoặc <b>gõ tay
@@ -513,7 +513,7 @@ export const HUONG_DAN: Record<string, NoiDungHuongDan> = {
             </li>
           </Step>
         </Section>
-        <Section tieuDe="Kiểm QR từng khâu (tab Theo giai đoạn)">
+        <Section title="Kiểm QR từng khâu (tab Theo giai đoạn)">
           <Step>
             <li>
               Bấm tab <b>Theo giai đoạn</b>, chọn khoảng ngày + xưởng. Màn xếp 5 khâu theo
@@ -530,7 +530,7 @@ export const HUONG_DAN: Record<string, NoiDungHuongDan> = {
             </li>
           </Step>
         </Section>
-        <Section tieuDe="Lưu ý">
+        <Section title="Lưu ý">
           <Y>
             <li>
               Muốn truy được trọn chuỗi: lúc ghi sản xuất quét tem các chuyến NL vào khối{" "}

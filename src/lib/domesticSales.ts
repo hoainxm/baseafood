@@ -40,7 +40,7 @@ export interface PeriodDomesticSales {
  * với kỳ (kỳ dùng tên họ — "2 da lớn/nhỏ" đều thuộc "Bạch tuộc 2 da"). Bỏ dòng ≤ 0.
  */
 export function getPeriodDomesticSales(
-  ds: DomesticSaleItem[],
+  items: DomesticSaleItem[],
   ky: Pick<BalancingPeriod, "startDate" | "endDate" | "materialTypeName">
 ): PeriodDomesticSales {
   const dates = new Set(getPeriodDates(ky));
@@ -49,7 +49,7 @@ export function getPeriodDomesticSales(
   let pricedKg = 0;
   let amount = 0;
   let rowCount = 0;
-  for (const d of ds) {
+  for (const d of items) {
     const kg = Number(d.quantityKg) || 0;
     if (kg <= 0 || !dates.has(d.saleDate)) continue;
     if (!isSameMaterialFamily(d.materialTypeName, ky.materialTypeName)) continue;

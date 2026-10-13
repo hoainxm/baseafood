@@ -29,10 +29,10 @@ import {
 } from "@/lib/catalogRepo";
 import { syncMonthlyStockLedger } from "@/lib/balancingStockLines";
 import { usePeriodGrid } from "./usePeriodGrid";
-import { LuoiNguyenLieu } from "./MaterialGrid";
+import { MaterialGrid } from "./MaterialGrid";
 import { getMaterialFamily } from "@/lib/balancingGrid";
 import type { BalancingResult } from "@/lib/balancingCalc";
-import { LuoiBanThanhPham } from "./WipGrid";
+import { WipGrid } from "./WipGrid";
 import {
   RequiredLegend,
   Button,
@@ -57,7 +57,7 @@ import {
   BarChart,
   ProportionBar,
 } from "@/design-system";
-import { useSuaDanhMuc } from "@/features/catalog/SuaDanhMucNhanh";
+import { useQuickCatalogEdit } from "@/features/catalog/QuickCatalogEdit";
 import { num, formatDateVN } from "@/lib/format";
 import {
   ChevronLeft,
@@ -74,8 +74,8 @@ import {
   ArrowDownToLine,
   Undo2,
 } from "lucide-react";
-import { HopChotKy } from "./gridDialogs";
-import BangCanDoi from "./BalancingTable";
+import { PeriodLockDialog } from "./gridDialogs";
+import BalancingTable from "./BalancingTable";
 
 /** Chuỗi ngày để in trên bảng, sinh từ khoảng ngày đã chọn. */
 function describeRange(tu?: string, den?: string): string {
@@ -84,7 +84,7 @@ function describeRange(tu?: string, den?: string): string {
   return `${formatDateVN(tu)} – ${formatDateVN(den)}`;
 }
 
-export default function CanDoiScreen() {
+export default function BalancingScreen() {
   const [kyList, persistKy, { trangThai: ttKy }] = useBalancingPeriods();
   const isLoadingPeriods = ttKy === "dang-tai" && kyList.length === 0;
   const { periodId } = useParams<{ periodId?: string }>();
@@ -117,7 +117,7 @@ export default function CanDoiScreen() {
     return ten;
   };
   /** Bút chì sửa nhanh loại NL (value là TÊN; mục gộp họ không trùng tên danh mục thì không có bút chì). */
-  const materialTypeEditor = useSuaDanhMuc("loaiNL", catalogMaterialTypes, setCatalogMaterialTypes, { theo: "ten" });
+  const materialTypeEditor = useQuickCatalogEdit("loaiNL", catalogMaterialTypes, setCatalogMaterialTypes, { theo: "ten" });
 
   /* Chọn loại NL cho kỳ: GỘP biến thể size về HỌ — "Bạch tuộc 2 da lớn (80↑)" +
      "… nhỏ (80↓)" chỉ hiện MỘT mục "Bạch tuộc 2 da" (cân đối không tách size, chốt
@@ -128,9 +128,9 @@ export default function CanDoiScreen() {
     const ra: { value: string; label: string; phu?: string }[] = [];
     for (const l of catalogMaterialTypes) {
       const ho = getMaterialFamily(l.name) || l.name;
-      const khoa = ho.toLowerCase();
-      if (existing.has(khoa)) continue;
-      existing.add(khoa);
+      const key = ho.toLowerCase();
+      if (existing.has(key)) continue;
+      existing.add(key);
       ra.push({ value: ho, label: ho, phu: l.category || undefined });
     }
     return ra;
@@ -407,9 +407,9 @@ export default function CanDoiScreen() {
                 }
                 options={materialTypeOptions}
                 onCreate={addMaterialType}
-                onEditItem={materialTypeEditor.moSua}
-                editLabel={materialTypeEditor.nhanSua}
-                canEdit={materialTypeEditor.suaDuoc}
+                onEditItem={materialTypeEditor.openEdit}
+                editLabel={materialTypeEditor.editLabel}
+                canEdit={materialTypeEditor.canEdit}
               />
 
               <DateRangeField
@@ -462,7 +462,7 @@ export default function CanDoiScreen() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      {materialTypeEditor.hop}
+      {materialTypeEditor.dialog}
     </div>
   );
 }
@@ -487,11 +487,11 @@ function KyDetail({
   const [products, setProducts] = useProducts();
   const [customers, setCustomers] = useCustomers();
   /** Bút chì sửa nhanh mặt hàng / khách trong lưới bán thành phẩm (nối theo id). */
-  const productEditor = useSuaDanhMuc("matHang", products, setProducts);
-  const customerEditor = useSuaDanhMuc("khachHang", customers, setCustomers);
+  const productEditor = useQuickCatalogEdit("matHang", products, setProducts);
+  const customerEditor = useQuickCatalogEdit("khachHang", customers, setCustomers);
   const [catalogMaterialTypes, setCatalogMaterialTypes] = useMaterialTypes();
   /** Bút chì loại NL ở hộp thêm dòng khối 1 (theo TÊN) — instance danh mục của KyDetail. */
-  const periodMaterialTypeEditor = useSuaDanhMuc("loaiNL", catalogMaterialTypes, setCatalogMaterialTypes, { theo: "ten" });
+  const periodMaterialTypeEditor = useQuickCatalogEdit("loaiNL", catalogMaterialTypes, setCatalogMaterialTypes, { theo: "ten" });
   const [showBang, setShowBang] = useState(false);
   /* Công tắc cột ngày RIÊNG từng khối — cả hai MẶC ĐỊNH MỞ (chốt 2026-10-06: kế
      toán đối chiếu theo ngày). Thu lại thì khối NL gõ thẳng Số lượng như bảng giấy. */
@@ -499,7 +499,7 @@ function KyDetail({
   const [hideFinishedGoodDays, setHideFinishedGoodDays] = useState(false);
   /* Mặc định xếp NGANG như bảng giấy (NL + ô GHI CHÚ bên trái, BTP bên phải — từ màn
      2xl). Người dùng vẫn đổi tay được; không tự nhảy theo bề rộng. */
-  const [xepNgang, setXepNgang] = useState(true);
+  const [isHorizontal, setIsHorizontal] = useState(true);
   const [isLockOpen, setIsLockOpen] = useState(false);
 
   /* Ctrl+Z / Ctrl+Y — nghe ở cấp màn, bỏ qua khi con trỏ đang trong hộp thoại. */
@@ -509,10 +509,10 @@ function KyDetail({
       const k = e.key.toLowerCase();
       if (k === "z" && !e.shiftKey) {
         e.preventDefault();
-        grid.hoanTac();
+        grid.undo();
       } else if (k === "y" || (k === "z" && e.shiftKey)) {
         e.preventDefault();
-        grid.lamLai();
+        grid.redo();
       }
     };
     window.addEventListener("keydown", nghe);
@@ -524,7 +524,7 @@ function KyDetail({
   const [salesInvoices] = useSalesInvoices();
   const banChoHut = useMemo(() => {
     const salesInvoiceById = new Map(salesInvoices.map((p) => [p.id, p]));
-    const daHut = new Set(grid.tp.map((t) => t.salesItemId).filter(Boolean));
+    const daHut = new Set(grid.outputs.map((t) => t.salesItemId).filter(Boolean));
     return allSalesItems
       .filter((b) => {
         const p = salesInvoiceById.get(b.invoiceId);
@@ -535,18 +535,18 @@ function KyDetail({
           (p.deliveryDate >= ky.startDate && p.deliveryDate <= ky.endDate)
         );
       })
-      .map((b) => ({ ban: b, phieu: salesInvoiceById.get(b.invoiceId)! }));
-  }, [allSalesItems, salesInvoices, grid.tp, ky.startDate, ky.endDate]);
+      .map((b) => ({ ban: b, invoice: salesInvoiceById.get(b.invoiceId)! }));
+  }, [allSalesItems, salesInvoices, grid.outputs, ky.startDate, ky.endDate]);
 
-  const pullSalesIntoPeriod = (items: { ban: SalesItem; phieu: SalesInvoice }[]) => {
-    grid.ghiTP([
-      ...grid.tp,
-      ...items.map(({ ban, phieu }) => ({
+  const pullSalesIntoPeriod = (items: { ban: SalesItem; invoice: SalesInvoice }[]) => {
+    grid.saveOutputs([
+      ...grid.outputs,
+      ...items.map(({ ban, invoice: salesInvoice }) => ({
         id: uid(),
         periodId: ky.id,
         productId: ban.productId,
-        customerId: phieu.customerId,
-        channel: phieu.channel,
+        customerId: salesInvoice.customerId,
+        channel: salesInvoice.channel,
         quantityKg: ban.quantityKg,
         unitPrice: ban.unitPrice,
         spec: ban.spec,
@@ -556,14 +556,14 @@ function KyDetail({
     notify.saved(`Đã hút ${items.length} dòng bán vào kỳ này`);
   };
 
-  const { kq } = grid;
+  const { result } = grid;
   /** Chưa có bán thành phẩm → định mức + lãi/lỗ chưa có nghĩa. */
-  const hasNoFinishedGood = kq.totalOutputKg <= 0;
+  const hasNoFinishedGood = result.totalOutputKg <= 0;
   /** Lệch giữa Tổng NL nhận (thông số kỳ) và Tổng NL vào lưới (khối 1) — hiện
    *  sẵn để khỏi nhẩm tay khi đối chiếu. */
-  const materialDiff = ky.totalInputKg != null ? ky.totalInputKg - kq.totalInputKg : null;
+  const materialDiff = ky.totalInputKg != null ? ky.totalInputKg - result.totalInputKg : null;
   /** Số dòng ở hai sổ nguồn tự động còn chờ hút vào kỳ. */
-  const pendingSourceCount = grid.nhapChoHut.length + grid.sanXuatChoHut.length;
+  const pendingSourceCount = grid.pendingImports.length + grid.pendingWips.length;
 
   return (
     <div className="space-y-6">
@@ -583,11 +583,11 @@ function KyDetail({
         </div>
         <div className="flex flex-wrap gap-2">
           {/* Một chạm kéo cả hai sổ nguồn tự động (nhập + sản xuất) vào kỳ. Không gộp sổ bán. */}
-          {!grid.daChot && pendingSourceCount > 0 && (
+          {!grid.isLocked && pendingSourceCount > 0 && (
             <Button
-              title={`Hút ${grid.nhapChoHut.length} dòng sổ nhập hàng và ${grid.sanXuatChoHut.length} dòng sổ sản xuất trong khoảng ngày của kỳ vào lưới.`}
+              title={`Hút ${grid.pendingImports.length} dòng sổ nhập hàng và ${grid.pendingWips.length} dòng sổ sản xuất trong khoảng ngày của kỳ vào lưới.`}
               size="lg"
-              onClick={grid.hutTatCaNguon}
+              onClick={grid.pullAllSources}
             >
               <ArrowDownToLine />
               Lấy {pendingSourceCount} dòng từ sổ
@@ -596,8 +596,8 @@ function KyDetail({
           <Button
             variant="outline"
             size="lg"
-            onClick={grid.hoanTac}
-            disabled={!grid.hoanTacDuoc}
+            onClick={grid.undo}
+            disabled={!grid.canUndo}
             title="Ctrl+Z"
           >
             <Undo2 />
@@ -606,17 +606,17 @@ function KyDetail({
           <Button
             variant="outline"
             size="lg"
-            onClick={grid.lamLai}
-            disabled={!grid.lamLaiDuoc}
+            onClick={grid.redo}
+            disabled={!grid.canRedo}
             title="Ctrl+Y"
           >
             <Redo2 />
             Làm lại
           </Button>
           <Button
-            title="Xoay bảng ngang / dọc cho vừa màn hình — chỉ đổi cách nhìn, không đụng số." variant="outline" size="lg" onClick={() => setXepNgang((v) => !v)}>
-            {xepNgang ? <Rows3 /> : <Columns2 />}
-            {xepNgang ? "Xếp dọc" : "Xếp ngang"}
+            title="Xoay bảng ngang / dọc cho vừa màn hình — chỉ đổi cách nhìn, không đụng số." variant="outline" size="lg" onClick={() => setIsHorizontal((v) => !v)}>
+            {isHorizontal ? <Rows3 /> : <Columns2 />}
+            {isHorizontal ? "Xếp dọc" : "Xếp ngang"}
           </Button>
           <Button
             title="Xem bảng cân đối đúng khổ in A4 rồi in giấy hoặc lưu PDF." variant="outline" size="lg" onClick={() => setShowBang(true)}>
@@ -634,18 +634,18 @@ function KyDetail({
           trải hết bề ngang (nhiều cột: khách, giá, ngày, Trả, Nợ). Màn hẹp: NL → GHI CHÚ → BTP. */}
       <Card
         className={
-          xepNgang
+          isHorizontal
             ? "grid grid-cols-1 overflow-hidden p-0 2xl:grid-cols-[minmax(0,1fr)_minmax(20rem,24rem)]"
             : "overflow-hidden p-0"
         }
       >
-        <LuoiNguyenLieu
-          luoi={grid}
-          loaiNLDanhMuc={catalogMaterialTypes}
-          suaLoaiNL={periodMaterialTypeEditor}
-          anNgay={hideMaterialDays}
-          onDoiAnNgay={() => setHideMaterialDays((v) => !v)}
-          onThemLoaiNL={(ten) => {
+        <MaterialGrid
+          grid={grid}
+          materialTypeCatalog={catalogMaterialTypes}
+          materialTypeEdit={periodMaterialTypeEditor}
+          daysCollapsed={hideMaterialDays}
+          onToggleDays={() => setHideMaterialDays((v) => !v)}
+          onCreateMaterialType={(ten) => {
             setCatalogMaterialTypes([
               ...catalogMaterialTypes,
               { id: uid(), name: ten, category: "", note: "" },
@@ -656,32 +656,32 @@ function KyDetail({
         />
         <ResultNote
           ky={ky}
-          kyTruoc={grid.kyTruoc}
-          kq={kq}
-          chuaCoTP={hasNoFinishedGood}
-          lechNL={materialDiff}
-          xepNgang={xepNgang}
-          daChot={grid.daChot}
+          previousPeriod={grid.previousPeriod}
+          result={result}
+          hasNoFinishedGood={hasNoFinishedGood}
+          materialDiff={materialDiff}
+          sideBySide={isHorizontal}
+          isLocked={grid.isLocked}
           onChangeKy={onChangeKy}
         />
-        <div className={xepNgang ? "2xl:col-span-2" : undefined}>
-          <LuoiBanThanhPham
-            luoi={grid}
+        <div className={isHorizontal ? "2xl:col-span-2" : undefined}>
+          <WipGrid
+            grid={grid}
             matHang={products}
-            khach={customers}
-            onSuaMatHang={productEditor.moSua}
-            onSuaKhach={customerEditor.moSua}
+            customers={customers}
+            onEditProduct={productEditor.openEdit}
+            onEditCustomer={customerEditor.openEdit}
             choHutBan={banChoHut}
             onHutBan={pullSalesIntoPeriod}
-            anNgay={hideFinishedGoodDays}
-            onDoiAnNgay={() => setHideFinishedGoodDays((v) => !v)}
-            onThemMatHang={(ten) => {
+            daysCollapsed={hideFinishedGoodDays}
+            onToggleDays={() => setHideFinishedGoodDays((v) => !v)}
+            onCreateProduct={(ten) => {
               const m: Product = { id: uid(), code: "", name: ten, finishedGoodCode: "" };
               setProducts([...products, m]);
               notify.saved(`Đã thêm mặt hàng "${ten}" vào danh mục`);
               return m.id;
             }}
-            onThemKhach={(ten) => {
+            onCreateCustomer={(ten) => {
               const k: Customer = { id: uid(), code: "", name: ten, market: "" };
               setCustomers([...customers, k]);
               notify.saved(`Đã thêm khách hàng "${ten}" vào danh mục`);
@@ -693,16 +693,16 @@ function KyDetail({
 
       {/* Vòng gối đầu: phần kỳ trước đẩy sang được kéo vào đây bằng một nút, thay
           cho việc mở file kỳ cũ ra chép tay. */}
-      {grid.soDongChuyenKy > 0 && !grid.daChot && (
+      {grid.carryOverRowCount > 0 && !grid.isLocked && (
         <Card className="flex flex-wrap items-center justify-between gap-3 p-4">
           <p className="text-base">
-            Kỳ trước ({grid.kyTruoc?.dateRangeDescription || "…"}) có{" "}
-            <strong>{grid.soDongChuyenKy}</strong> dòng chuyển sang chưa nhận.
+            Kỳ trước ({grid.previousPeriod?.dateRangeDescription || "…"}) có{" "}
+            <strong>{grid.carryOverRowCount}</strong> dòng chuyển sang chưa nhận.
           </p>
           <Button
-            title="Nhận phần tồn chuyển từ kỳ trước sang làm số đầu kỳ này." size="lg" onClick={grid.nhanChuyenKy}>
+            title="Nhận phần tồn chuyển từ kỳ trước sang làm số đầu kỳ này." size="lg" onClick={grid.applyCarryOver}>
             <ArrowRightLeft />
-            Nhận {grid.soDongChuyenKy} dòng chuyển kỳ
+            Nhận {grid.carryOverRowCount} dòng chuyển kỳ
           </Button>
         </Card>
       )}
@@ -736,12 +736,12 @@ function KyDetail({
       </Card>
 
       {isLockOpen && (
-        <HopChotKy
-          daChot={Boolean(ky.isLocked)}
-          tenKy={`${ky.materialTypeName} · ${ky.dateRangeDescription}`}
-          tongTP={`${num(kq.totalOutputKg)} kg bán thành phẩm`}
+        <PeriodLockDialog
+          isLocked={Boolean(ky.isLocked)}
+          periodName={`${ky.materialTypeName} · ${ky.dateRangeDescription}`}
+          outputTotal={`${num(result.totalOutputKg)} kg bán thành phẩm`}
           onClose={() => setIsLockOpen(false)}
-          onLuu={(note) => {
+          onSave={(note) => {
             /* Mở lại KHÔNG xoá dấu đã chốt — chỉ hạ cờ và ghi lý do, giữ vết. */
             onChangeKy(
               ky.isLocked
@@ -755,22 +755,22 @@ function KyDetail({
       )}
 
       {showBang && (
-        <BangCanDoi
+        <BalancingTable
           ky={ky}
-          nlVao={grid.nlVao}
-          tp={grid.tp}
+          inputs={grid.inputs}
+          outputs={grid.outputs}
           matHang={products}
-          khach={customers}
-          kq={kq}
-          nhapDaGan={grid.nhapDaGan}
-          sanXuatDaGan={grid.sanXuatDaGan}
-          moTaDongKho={grid.moTaDongKho}
+          customers={customers}
+          result={result}
+          assignedImports={grid.assignedImports}
+          assignedWips={grid.assignedWips}
+          describeStockLine={grid.describeStockLine}
           onClose={() => setShowBang(false)}
         />
       )}
-      {productEditor.hop}
-      {customerEditor.hop}
-      {periodMaterialTypeEditor.hop}
+      {productEditor.dialog}
+      {customerEditor.dialog}
+      {periodMaterialTypeEditor.dialog}
     </div>
   );
 }
@@ -786,97 +786,97 @@ function KyDetail({
  */
 function ResultNote({
   ky,
-  kyTruoc,
-  kq,
-  chuaCoTP,
-  lechNL,
-  xepNgang,
-  daChot,
+  previousPeriod,
+  result,
+  hasNoFinishedGood,
+  materialDiff,
+  sideBySide: isHorizontal,
+  isLocked,
   onChangeKy,
 }: {
   ky: BalancingPeriod;
-  kyTruoc: BalancingPeriod | null;
-  kq: BalancingResult;
-  chuaCoTP: boolean;
-  lechNL: number | null;
-  xepNgang: boolean;
-  daChot: boolean;
+  previousPeriod: BalancingPeriod | null;
+  result: BalancingResult;
+  hasNoFinishedGood: boolean;
+  materialDiff: number | null;
+  sideBySide: boolean;
+  isLocked: boolean;
   onChangeKy: (patch: Partial<BalancingPeriod>) => void;
 }) {
-  const lai = kq.profitOrLoss >= 0;
+  const lai = result.profitOrLoss >= 0;
   return (
     <section
-      className={`border-t-2 border-border p-5 ${xepNgang ? "2xl:border-t-0 2xl:border-l-2" : ""}`}
+      className={`border-t-2 border-border p-5 ${isHorizontal ? "2xl:border-t-0 2xl:border-l-2" : ""}`}
       aria-label="Ghi chú — kết quả cân đối"
     >
       <h2 className="mb-2 text-xl font-semibold">Ghi chú</h2>
       {/* Xếp ngang (2xl) ô này là cột phải hẹp (20–24rem) ⇒ về MỘT cột, không thì nhãn +
           số gãy dòng và số tiền dài tràn khung ở chữ 130%. */}
-      <div className={`grid gap-x-8 sm:grid-cols-2 ${xepNgang ? "2xl:grid-cols-1" : ""}`}>
+      <div className={`grid gap-x-8 sm:grid-cols-2 ${isHorizontal ? "2xl:grid-cols-1" : ""}`}>
         <div>
-          <KV k="Tổng thành phẩm" v={`${num(kq.totalOutputKg)} kg`} />
-          <KV k="Định mức chế biến" v={chuaCoTP ? "—" : num(kq.norm)} strong />
+          <KV k="Tổng thành phẩm" v={`${num(result.totalOutputKg)} kg`} />
+          <KV k="Định mức chế biến" v={hasNoFinishedGood ? "—" : num(result.norm)} strong />
           <KeyValueInput
             k="Chi phí CB / kg TP"
             unit="đ"
             value={ky.processingCostPerKg}
-            truoc={kyTruoc?.processingCostPerKg}
-            khoa={daChot}
+            previous={previousPeriod?.processingCostPerKg}
+            isLocked={isLocked}
             onChange={(v) => onChangeKy({ processingCostPerKg: v })}
           />
-          <KV k="Giá thành" v={`${num(kq.costOfGoods)} đ`} />
-          <KV k="Giá trị xuất" v={`${num(kq.exportValue)} đ`} />
+          <KV k="Giá thành" v={`${num(result.costOfGoods)} đ`} />
+          <KV k="Giá trị xuất" v={`${num(result.exportValue)} đ`} />
           <KV
-            k={chuaCoTP ? "Lãi / Lỗ" : lai ? "Lãi" : "Lỗ"}
-            v={chuaCoTP ? "—" : `${num(Math.abs(kq.profitOrLoss))} đ`}
-            mau={chuaCoTP ? undefined : lai ? "lai" : "lo"}
+            k={hasNoFinishedGood ? "Lãi / Lỗ" : lai ? "Lãi" : "Lỗ"}
+            v={hasNoFinishedGood ? "—" : `${num(Math.abs(result.profitOrLoss))} đ`}
+            tone={hasNoFinishedGood ? undefined : lai ? "lai" : "lo"}
             strong
           />
-          <KV k="Bình quân / kg NL" v={chuaCoTP ? "—" : `${num(kq.avgProfitPerKgMaterial)} đ`} />
+          <KV k="Bình quân / kg NL" v={hasNoFinishedGood ? "—" : `${num(result.avgProfitPerKgMaterial)} đ`} />
           <KeyValueInput
             k="Tỉ giá"
             unit="đ/USD"
             value={ky.exchangeRate}
-            truoc={kyTruoc?.exchangeRate}
-            khoa={daChot}
+            previous={previousPeriod?.exchangeRate}
+            isLocked={isLocked}
             onChange={(v) => onChangeKy({ exchangeRate: v })}
           />
         </div>
         <div>
-          <KV k="Tổng NL vào" v={`${num(kq.totalInputKg)} kg`} />
-          <KV k="Giá trị NL" v={`${num(kq.materialValue)} đ`} />
+          <KV k="Tổng NL vào" v={`${num(result.totalInputKg)} kg`} />
+          <KV k="Giá trị NL" v={`${num(result.materialValue)} đ`} />
           <KeyValueInput
             k="Tổng NL nhận cả kỳ"
             unit="kg"
             value={ky.totalInputKg}
-            khoa={daChot}
+            isLocked={isLocked}
             onChange={(v) => onChangeKy({ totalInputKg: v })}
-            ghiChu={
+            note={
               /* Đối chiếu NL nhận (bảng phụ) với NL vào lưới — bắt chỗ vênh khỏi nhẩm tay. */
-              lechNL == null ? undefined : lechNL === 0 ? (
+              materialDiff == null ? undefined : materialDiff === 0 ? (
                 <span className="text-success">✓ khớp NL vào</span>
               ) : (
-                <span className="text-destructive">⚠ lệch NL vào {num(lechNL)} kg</span>
+                <span className="text-destructive">⚠ lệch NL vào {num(materialDiff)} kg</span>
               )
             }
           />
-          <KV k="Tỉ lệ thu hồi" v={kq.yieldRate == null ? "—" : num(kq.yieldRate)} />
+          <KV k="Tỉ lệ thu hồi" v={result.yieldRate == null ? "—" : num(result.yieldRate)} />
         </div>
       </div>
       {/* Lãi/lỗ đến từ đâu — hai thanh dễ đọc: tiền bán được vs tiền bỏ ra, và tiền bỏ
           ra chia NL / chế biến. Cùng số calculateBalancing ở trên, không tính lại. */}
-      {!chuaCoTP && kq.costOfGoods > 0 && (
+      {!hasNoFinishedGood && result.costOfGoods > 0 && (
         <div className="mt-5 grid gap-3 border-t-2 border-border pt-4">
           <h3 className="text-base font-semibold text-foreground">
             Lãi/lỗ đến từ đâu:{" "}
             <span className={lai ? "text-success" : "text-destructive"}>
-              {lai ? "bán được nhiều hơn tiền bỏ ra" : "tiền bỏ ra nhiều hơn bán được"} {num(Math.abs(kq.profitOrLoss))} đ
+              {lai ? "bán được nhiều hơn tiền bỏ ra" : "tiền bỏ ra nhiều hơn bán được"} {num(Math.abs(result.profitOrLoss))} đ
             </span>
           </h3>
           <BarChart
             data={[
-              { label: "Tiền bán được", subLabel: "giá trị xuất", value: kq.exportValue },
-              { label: "Tiền bỏ ra", subLabel: "nguyên liệu + chế biến", value: kq.costOfGoods },
+              { label: "Tiền bán được", subLabel: "giá trị xuất", value: result.exportValue },
+              { label: "Tiền bỏ ra", subLabel: "nguyên liệu + chế biến", value: result.costOfGoods },
             ]}
             preserveOrder
             showAverageLine={false}
@@ -887,8 +887,8 @@ function ResultNote({
             unit="đ"
             description="Giá thành chia theo tiền nguyên liệu và chi phí chế biến"
             segments={[
-              { id: "nl", label: "Tiền nguyên liệu", value: kq.materialValue, tone: "bien" },
-              { id: "cb", label: "Chi phí chế biến", value: kq.costOfGoods - kq.materialValue, tone: "tim" },
+              { id: "nl", label: "Tiền nguyên liệu", value: result.materialValue, tone: "bien" },
+              { id: "cb", label: "Chi phí chế biến", value: result.costOfGoods - result.materialValue, tone: "tim" },
             ]}
           />
         </div>
@@ -901,12 +901,12 @@ function KV({
   k,
   v,
   strong,
-  mau,
+  tone,
 }: {
   k: string;
   v: string;
   strong?: boolean;
-  mau?: "lai" | "lo";
+  tone?: "lai" | "lo";
 }) {
   return (
     <div className="flex items-baseline justify-between gap-4 border-b border-border py-1.5">
@@ -914,7 +914,7 @@ function KV({
       <span
         className={`tnum shrink-0 whitespace-nowrap text-right text-base ${
           strong ? "font-semibold" : "font-medium"
-        } ${mau === "lai" ? "text-success" : mau === "lo" ? "text-destructive" : strong ? "text-primary" : ""}`}
+        } ${tone === "lai" ? "text-success" : tone === "lo" ? "text-destructive" : strong ? "text-primary" : ""}`}
       >
         {v}
       </span>
@@ -930,24 +930,24 @@ function KeyValueInput({
   k,
   unit,
   value,
-  truoc,
-  khoa,
+  previous: previousValue,
+  isLocked,
   onChange,
-  ghiChu,
+  note,
 }: {
   k: string;
   unit: string;
   value: number | null;
   /** Giá trị kỳ trước cùng họ NL — khác thì báo để người dùng biết số đã đổi. */
-  truoc?: number | null;
-  khoa: boolean;
+  previous?: number | null;
+  isLocked: boolean;
   onChange: (v: number | null) => void;
-  ghiChu?: React.ReactNode;
+  note?: React.ReactNode;
 }) {
-  const doi = truoc != null && value != null && truoc !== value;
+  const doi = previousValue != null && value != null && previousValue !== value;
   return (
     <div className="border-b border-border py-1.5">
-      {khoa ? (
+      {isLocked ? (
         <KeyValueFrame k={k} v={value == null ? "—" : `${num(value)} ${unit}`} />
       ) : (
         <NumberField
@@ -959,10 +959,10 @@ function KeyValueInput({
           className="flex-row flex-wrap items-center justify-between gap-x-4 gap-y-1 [&>div:last-child]:w-44"
         />
       )}
-      {(doi || ghiChu) && (
+      {(doi || note) && (
         <p className="mt-0.5 flex flex-wrap justify-end gap-x-3 text-right text-sm text-muted-foreground">
-          {doi && <span>kỳ trước {num(truoc)} {unit}</span>}
-          {ghiChu}
+          {doi && <span>kỳ trước {num(previousValue)} {unit}</span>}
+          {note}
         </p>
       )}
     </div>

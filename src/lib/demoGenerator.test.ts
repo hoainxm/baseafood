@@ -6,7 +6,7 @@ import { buildFlowStages, buildChainWarnings, buildDataFlow, computeAllPeriodRes
 import { computeWipStockDetail, collectWipDeductions } from "./inventory";
 import { sumGridRow } from "@/types";
 
-const mh = (id: string, materialTypeId: string): Product => ({ id, code: id, name: `Mặt hàng ${id}`, finishedGoodCode: "", materialTypeId });
+const makeProduct = (id: string, materialTypeId: string): Product => ({ id, code: id, name: `Mặt hàng ${id}`, finishedGoodCode: "", materialTypeId });
 const makeImport = (i: number, workshop: MaterialImportItem["workshop"], material: string, dl: string, kg: number): MaterialImportItem => ({
   id: `n${i}`, shipmentId: `c${i}`, deliveryDate: "2026-09-01", workshop, category: "Mực", supplierName: dl,
   materialTypeName: material, quantityKg: kg, unitPrice: 55_000, driverName: "", licensePlate: "", note: "",
@@ -14,7 +14,7 @@ const makeImport = (i: number, workshop: MaterialImportItem["workshop"], materia
 const makeSupplier = (ten: string): Supplier => ({ id: `s-${ten}`, code: "", shortName: ten, billingName: `Cơ sở ${ten}`, address: "12 Lê Lợi", nationalId: "0123", issuedDate: "", issuedPlace: "", phone: "0909555111", note: "" });
 
 const SOURCE: DemoSource = {
-  products: [mh("p1", "m1"), mh("p2", "m1"), mh("p3", "m2"), mh("p4", "m2")],
+  products: [makeProduct("p1", "m1"), makeProduct("p2", "m1"), makeProduct("p3", "m2"), makeProduct("p4", "m2")],
   materialTypes: [
     { id: "m1", name: "Mực ống", category: "Mực", note: "" },
     { id: "m2", name: "Bạch tuộc 2 da", category: "Bạch tuộc", note: "" },
@@ -111,16 +111,16 @@ describe("generateDemoBundle", () => {
   });
 
   it("id không trùng trong từng bảng", () => {
-    for (const [bang, ds] of Object.entries(goi) as [string, { id?: string; code?: string }[]][]) {
-      const khoa = ds.map((x) => x.id ?? x.code);
-      expect(new Set(khoa).size, bang).toBe(khoa.length);
+    for (const [bang, items] of Object.entries(goi) as [string, { id?: string; code?: string }[]][]) {
+      const keys = items.map((x) => x.id ?? x.code);
+      expect(new Set(keys).size, bang).toBe(keys.length);
     }
   });
 
   it("chỉ đúng MỘT ca bán vượt tồn (cài sẵn), còn lại tồn không âm", () => {
-    const kq = computeWipStockDetail(goi.wips, goi.exportItems, collectWipDeductions(goi.salesItems, goi.packagings, goi.lotInputs, goi.lotDispatches));
-    expect(kq.banVuot.length).toBe(1);
-    expect(kq.los.every((l) => l.conLai >= -1e-6)).toBe(true);
+    const result = computeWipStockDetail(goi.wips, goi.exportItems, collectWipDeductions(goi.salesItems, goi.packagings, goi.lotInputs, goi.lotDispatches));
+    expect(result.banVuot.length).toBe(1);
+    expect(result.los.every((l) => l.conLai >= -1e-6)).toBe(true);
   });
 
   it("hộ chiếu lô: không lô nào bị dùng quá số kg (cân bằng lô không âm)", () => {

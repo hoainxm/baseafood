@@ -436,14 +436,14 @@ export function soVN(v: unknown): number | null {
   if (!/\d/.test(s)) return null;
   const am = ngoac || s.startsWith("-");
   s = s.replace(/^-/, "");
-  const coCham = s.includes(".");
+  const hasDot = s.includes(".");
   const coPhay = s.includes(",");
-  if (coCham && coPhay) {
+  if (hasDot && coPhay) {
     const decimal = s.lastIndexOf(".") > s.lastIndexOf(",") ? "." : ",";
     const thousand = decimal === "." ? "," : ".";
     s = s.split(thousand).join("").replace(decimal, ".");
-  } else if (coCham || coPhay) {
-    const parts = s.split(coCham ? "." : ",");
+  } else if (hasDot || coPhay) {
+    const parts = s.split(hasDot ? "." : ",");
     const hasThousandsSep = parts.length > 2 || (parts[1]!.length === 3 && /^[1-9]\d{0,2}$/.test(parts[0]!));
     s = parts.join(hasThousandsSep ? "" : ".");
   }
@@ -509,8 +509,8 @@ export function normalizeTaxCode(v: unknown): string {
   return so.length === 9 || so.length === 12 ? `0${so}` : so;
 }
 
-function makeKey(mstBan: string, kyHieu: string, soChuan: string): string {
-  return `${normalizeTaxCode(mstBan)}|${chuan(normalizeInvoiceSymbol(kyHieu))}|${soChuan.toLowerCase()}`;
+function makeKey(sellerTaxCode: string, series: string, normalizedNo: string): string {
+  return `${normalizeTaxCode(sellerTaxCode)}|${chuan(normalizeInvoiceSymbol(series))}|${normalizedNo.toLowerCase()}`;
 }
 
 const cellStr = (row: unknown[], i: number): string =>
@@ -572,7 +572,7 @@ function pickConsistentColumns(
   rows: unknown[][],
   dataStart: number,
   preTaxCandidates: number[],
-  ucThue: number[],
+  taxCandidates: number[],
   totalCandidates: number[],
   cCk: number,
   cPhi: number
@@ -581,14 +581,14 @@ function pickConsistentColumns(
   let best: { chua: number; thue: number; tong: number } | null = null;
   let bestErr = Infinity;
   for (const preTax of list(preTaxCandidates))
-    for (const thue of list(ucThue))
+    for (const tax of list(taxCandidates))
       for (const total of list(totalCandidates)) {
         let err = 0;
         let n = 0;
         for (let i = dataStart; i < rows.length; i++) {
           const r = rows[i] ?? [];
           const a = soVN(r[preTax]);
-          const b = soVN(r[thue]);
+          const b = soVN(r[tax]);
           const t = soVN(r[total]);
           if (a == null || b == null || t == null) continue;
           const ck = soVN(r[cCk]) ?? 0;
@@ -599,24 +599,24 @@ function pickConsistentColumns(
         if (n === 0) continue;
         if (err < bestErr) {
           bestErr = err;
-          best = { chua: preTax, thue, tong: total };
+          best = { chua: preTax, thue: tax, tong: total };
         }
       }
-  const chosen = best ?? { chua: preTaxCandidates[0] ?? -1, thue: ucThue[0] ?? -1, tong: totalCandidates[0] ?? -1 };
-  const phu = [...preTaxCandidates, ...ucThue, ...totalCandidates].filter(
+  const chosen = best ?? { chua: preTaxCandidates[0] ?? -1, thue: taxCandidates[0] ?? -1, tong: totalCandidates[0] ?? -1 };
+  const phu = [...preTaxCandidates, ...taxCandidates, ...totalCandidates].filter(
     (c) => c !== chosen.chua && c !== chosen.thue && c !== chosen.tong
   );
   return { ...chosen, phu: [...new Set(phu)] };
 }
 
-function findHeaderRow(rows: unknown[][], tuKhoa: string[]): number {
+function findHeaderRow(rows: unknown[][], keywords: string[]): number {
   let best = -1;
   let bestScore = 0;
   const gioiHan = Math.min(rows.length, 15);
   for (let i = 0; i < gioiHan; i++) {
     const cells = (rows[i] ?? []).map((c) => chuan(c));
     let score = 0;
-    for (const k of tuKhoa) if (cells.some((c) => c.includes(k))) score++;
+    for (const k of keywords) if (cells.some((c) => c.includes(k))) score++;
     if (score > bestScore) {
       bestScore = score;
       best = i;
@@ -772,9 +772,9 @@ function stripOldReconcileCols(
   if (dau > 0) {
     // cột đệm trống ngay trước khối → gỡ luôn, kẻo mỗi lần chạy lại đẻ thêm một cột
     const dem = dau - 1;
-    const demTrong =
+    const emptyCount =
       dem > 0 && !chuan(header[dem]) && rows.every((r) => (r ?? [])[dem] == null || (r ?? [])[dem] === "");
-    for (let c = demTrong ? dem : dau; c < width; c++) drop.add(c);
+    for (let c = emptyCount ? dem : dau; c < width; c++) drop.add(c);
   }
   const keptColumns: number[] = [];
   for (let c = 0; c < width; c++) if (!drop.has(c)) keptColumns.push(c);
@@ -809,15 +809,15 @@ function detectMixedLayout(
     if (k < 0) continue;
     dem.set(k, (dem.get(k) ?? 0) + 1);
   }
-  let lech = 0;
+  let mismatch = 0;
   let diffColumn = -1;
   for (const [k, n] of dem)
     if (k > headerLastColumn) {
-      lech += n;
+      mismatch += n;
       diffColumn = Math.max(diffColumn, k);
     }
-  if (!lech) return null;
-  return { lech, binhThuong: [...dem].reduce((s, [k, n]) => s + (k > headerLastColumn ? 0 : n), 0), cotHeader: headerLastColumn, cotLech: diffColumn };
+  if (!mismatch) return null;
+  return { lech: mismatch, binhThuong: [...dem].reduce((s, [k, n]) => s + (k > headerLastColumn ? 0 : n), 0), cotHeader: headerLastColumn, cotLech: diffColumn };
 }
 
 // ---------- Nhận diện sheet ----------
@@ -927,13 +927,13 @@ function suspectColumnSum(
   // bảng cân đối cột để tổng luôn khớp.
   const totalCellRef = `${sheet} · ô ${oExcel(g, rowNo, columns.tong)} (${columns.tenTong})`;
   const preTaxCellRef = `${sheet} · ô ${oExcel(g, rowNo, columns.chua)} (${columns.tenChua})`;
-  const oThue = `${sheet} · ô ${oExcel(g, rowNo, columns.thue)} (${columns.tenThue})`;
+  const taxCellRef = `${sheet} · ô ${oExcel(g, rowNo, columns.thue)} (${columns.tenThue})`;
   const D = EXPORT_COLUMN_SHIFT;
   const exportTotalCellRef = `${sheet} · ô ${oExcel(g, rowNo, columns.tong, D)} (${columns.tenTong})`;
   const exportPreTaxCellRef = `${sheet} · ô ${oExcel(g, rowNo, columns.chua, D)} (${columns.tenChua})`;
-  const xThue = `${sheet} · ô ${oExcel(g, rowNo, columns.thue, D)} (${columns.tenThue})`;
+  const exportTaxCellRef = `${sheet} · ô ${oExcel(g, rowNo, columns.thue, D)} (${columns.tenThue})`;
   const coA = a != null, coB = b != null, coT = t != null;
-  const soThieu = [coA, coB, coT].filter((x) => !x).length;
+  const missingCount = [coA, coB, coT].filter((x) => !x).length;
 
   // HÓA ĐƠN BÁN HÀNG (mẫu số 2) — không có thuế GTGT. Ô thuế trống/0 là ĐÚNG, đừng
   // đòi điền; chỗ phải soi là ô CHƯA THUẾ: nó phải bằng tổng thanh toán (trừ chiết
@@ -961,8 +961,8 @@ function suspectColumnSum(
   if (!coA && !coB && coT)
     return {
       nhom: 4,
-      viTri: `${preTaxCellRef} + ${oThue}`,
-      viTriXuat: `${exportPreTaxCellRef} + ${xThue}`,
+      viTri: `${preTaxCellRef} + ${taxCellRef}`,
+      viTriXuat: `${exportPreTaxCellRef} + ${exportTaxCellRef}`,
       soDangCo: "(trống cả chưa thuế lẫn thuế)",
       soDoiChung: "chưa xác định",
       nguonDoiChung: "không đủ dữ liệu để tính ngược",
@@ -985,7 +985,7 @@ function suspectColumnSum(
     };
   }
   // Nhóm 2: thiếu ĐÚNG MỘT thành phần, tổng còn → suy được
-  if (coT && soThieu === 1 && (!coA || !coB)) {
+  if (coT && missingCount === 1 && (!coA || !coB)) {
     if (!coA) {
       const expected = t! - b! + ck - phi;
       return {
@@ -997,7 +997,7 @@ function suspectColumnSum(
     }
     const expectedTax = t! - a! + ck - phi;
     return {
-      nhom: 2, viTri: oThue, viTriXuat: xThue, soDangCo: "(trống)", soDoiChung: num(expectedTax),
+      nhom: 2, viTri: taxCellRef, viTriXuat: exportTaxCellRef, soDangCo: "(trống)", soDoiChung: num(expectedTax),
       nguonDoiChung: `${columns.tenTong} − ${columns.tenChua} = ${num(t!)} − ${num(a!)}`,
       saiOCho: "thiếu ô thuế, suy ngược từ tổng và chưa thuế", anhHuong: "chỉ ô thuế",
       sheet, soDong: rowNo, cot: columns.thue, tenCot: columns.tenThue, giaTriCu: b, giaTriDung: expectedTax,
@@ -1021,9 +1021,9 @@ function suspectColumnSum(
   return null;
 }
 
-function addToGroup(gopMap: Map<string, MergedSuspect>, nv: SuspectItem, amount: number, ben: "hd" | "pm") {
+function addToGroup(mergeMap: Map<string, MergedSuspect>, nv: SuspectItem, amount: number, ben: "hd" | "pm") {
   const gk = `${ben}${nv.nhom}`;
-  const g = gopMap.get(gk) ?? {
+  const g = mergeMap.get(gk) ?? {
     nhom: nv.nhom,
     ten:
       (nv.nhom === 4 ? "Thiếu cả cụm (chỉ còn tổng)" : "Tổng bị xóa (thành phần còn)") +
@@ -1039,7 +1039,7 @@ function addToGroup(gopMap: Map<string, MergedSuspect>, nv: SuspectItem, amount:
   g.soDong++;
   g.tongTien += amount;
   g.chiTiet.push(nv);
-  gopMap.set(gk, g);
+  mergeMap.set(gk, g);
 }
 
 // ---------- Parse sheet HĐĐT ----------
@@ -1049,8 +1049,8 @@ function parseInvoiceSheet(
   rows: unknown[][],
   hIdx: number,
   edits: Record<string, number> | undefined,
-  nghiVan: SuspectItem[],
-  gopMap: Map<string, MergedSuspect>,
+  suspects: SuspectItem[],
+  mergeMap: Map<string, MergedSuspect>,
   changeLog: { viTri: string; cu: string; moi: string }[],
   g: SourceCellCoord,
   width: number,
@@ -1081,10 +1081,10 @@ function parseInvoiceSheet(
     tenThue: header[sel.thue] ?? "Tổng tiền thuế",
     tenTong: header[sel.tong] ?? "Tổng tiền thanh toán",
   };
-  const cKyHieu = cot1(headerRaw, "Ký hiệu hóa đơn");
+  const colSeries = cot1(headerRaw, "Ký hiệu hóa đơn");
   const cSo = cot1(headerRaw, "Số hóa đơn");
   const cDate = cot1(headerRaw, "Ngày lập");
-  const cMstBan = cot1(headerRaw, "MST người bán/MST người xuất hàng", "MST người bán");
+  const colSellerTaxCode = cot1(headerRaw, "MST người bán/MST người xuất hàng", "MST người bán");
   const cSellerName = cot1(headerRaw, "Tên người bán/Tên người xuất hàng", "Tên người bán");
   const cDvt = cot1(headerRaw, "Đơn vị tiền tệ");
   const cExchangeRate = cot1(headerRaw, "Tỷ giá");
@@ -1100,7 +1100,7 @@ function parseInvoiceSheet(
   };
 
   for (const p of sel.phu)
-    nghiVan.push({
+    suspects.push({
       nhom: 6,
       viTri: `${ten} · cột ${columnLetter(aoaToExcelColumn(g, p))} (${header[p] ?? ""})`,
       viTriXuat: `${ten} · cột ${columnLetter(aoaToExcelColumn(g, p) + EXPORT_COLUMN_SHIFT)} (${header[p] ?? ""})`,
@@ -1128,12 +1128,12 @@ function parseInvoiceSheet(
     if (isTotalRow(row)) continue;
     const rowNo = i + 1;
     const invoiceNo = String(layO(row, cSo, ten, rowNo, edits) ?? "").trim();
-    const kyHieu = String(layO(row, cKyHieu, ten, rowNo, edits) ?? "").trim();
+    const series = String(layO(row, colSeries, ten, rowNo, edits) ?? "").trim();
     // Bỏ dòng GHI CHÚ TAY của kế toán ở CUỐI sheet (khối "chênh lệch / hoá đơn cty
     // chưa kê khai / số của Linh…"): mọi hóa đơn thật đều có KÝ HIỆU hoặc MST người
     // bán hợp lệ — dòng ghi chú không có cả hai nên KHÔNG cộng, KHÔNG báo "chưa có
     // trong sổ", KHÔNG gắn "lệch thật" (số kế toán đang tự tính, đừng đụng vào).
-    if (!kyHieu && !isValidTaxCode(cellStr(row, cMstBan))) continue;
+    if (!series && !isValidTaxCode(cellStr(row, colSellerTaxCode))) continue;
 
     const tt = readCurrency(row, cDvt, cExchangeRate);
     const dvt = tt.dvt || "VND";
@@ -1143,14 +1143,14 @@ function parseInvoiceSheet(
     const exchangeRate = laVnd || missingExchangeRate ? 1 : rawExchangeRate!;
     const tol = originalCurrency && exchangeRate > 1 ? FOREIGN_CURRENCY_TOLERANCE : ROUNDING_TOLERANCE;
     const preTax = soVN(layO(row, cCols.chua, ten, rowNo, edits));
-    const thue = soVN(layO(row, cCols.thue, ten, rowNo, edits));
+    const tax = soVN(layO(row, cCols.thue, ten, rowNo, edits));
     const total = soVN(layO(row, cCols.tong, ten, rowNo, edits));
     if (total == null) loiParse++;
 
     const nv = suspectColumnSum(ten, rowNo, row, { ...cCols, banHang: isSalesRow(row) }, edits, g, tol);
     if (nv) {
-      if (nv.nhom === 4 || nv.nhom === 5) addToGroup(gopMap, nv, (nv.nhom === 4 ? total : nv.giaTriDung) ?? 0, "hd");
-      else nghiVan.push(nv);
+      if (nv.nhom === 4 || nv.nhom === 5) addToGroup(mergeMap, nv, (nv.nhom === 4 ? total : nv.giaTriDung) ?? 0, "hd");
+      else suspects.push(nv);
     }
 
     // cộng cột + bóc nguyên nhân lệch của CHÍNH dòng này
@@ -1174,7 +1174,7 @@ function parseInvoiceSheet(
         const k = mismatchKind === "that" ? "lechThat" : mismatchKind;
         cd.boc[k] += d;
         cd.soDong[k]++;
-        const ma = `${kyHieu}-${invoiceNo}`;
+        const ma = `${series}-${invoiceNo}`;
         const date = formatDisplayDate(row[cDate]);
         const ban = cellStr(row, cSellerName);
         cd.dongLech.push({ dongFile: dongExcel(g, rowNo), ma, ngay: date, ban, chua: a, thue: b, phi, ck, tong: tg, lech: d, loai: mismatchKind });
@@ -1182,8 +1182,8 @@ function parseInvoiceSheet(
       }
     }
 
-    const soChuan = normalizeInvoiceNumber(invoiceNo);
-    const mstBan = cellStr(row, cMstBan);
+    const normalizedNo = normalizeInvoiceNumber(invoiceNo);
+    const sellerTaxCode = cellStr(row, colSellerTaxCode);
     const invoiceStatus = readInvoiceStatus(row, cStatus);
     dong.push({
       sheet: ten, soDong: rowNo, dongFile: dongExcel(g, rowNo),
@@ -1192,17 +1192,17 @@ function parseInvoiceSheet(
       khongCanVaoSo: isNotBookable(invoiceStatus),
       boCucLech: isRowWider(row),
       cells: applyFixToRow(row, header, ten, rowNo, edits, changeLog, g),
-      kyHieu, soHoaDon: invoiceNo, soChuan,
+      kyHieu: series, soHoaDon: invoiceNo, soChuan: normalizedNo,
       ngayLap: formatDisplayDate(row[cDate]),
-      mstBan, tenBan: cellStr(row, cSellerName), dvt, tyGia: exchangeRate,
+      mstBan: sellerTaxCode, tenBan: cellStr(row, cSellerName), dvt, tyGia: exchangeRate,
       ...(missingExchangeRate ? { thieuTyGia: missingExchangeRate } : {}),
       chuaThueRaw: preTax ?? 0,
-      thueRaw: thue ?? 0,
+      thueRaw: tax ?? 0,
       tongTtRaw: total ?? 0,
       chuaThueVnd: (preTax ?? 0) * exchangeRate,
-      thueVnd: (thue ?? 0) * exchangeRate,
+      thueVnd: (tax ?? 0) * exchangeRate,
       tongTtVnd: (total ?? 0) * exchangeRate,
-      khoa: makeKey(mstBan, kyHieu, soChuan),
+      khoa: makeKey(sellerTaxCode, series, normalizedNo),
       soDongKhopPm: 0, tongTtPm: 0, chenh: null, trangThai: "THIEU",
       ketLuan: "", bangChung: "", phieuKe: "", ctgs: "", ngayGhiSo: "",
       tkNoCo: "", dienGiaiPm: "", soTienHachToan: null,
@@ -1210,7 +1210,7 @@ function parseInvoiceSheet(
   }
   cd.lech = cd.sumTong - (cd.sumChua + cd.sumThue);
   cd.dongLechThat.sort((x, y) => Math.abs(y.lech) - Math.abs(x.lech));
-  cd.oTuDat = findCustomTotalCell(rows, dataStart, cd, g, (r) => !String(r[cSo] ?? "").trim() && !String(r[cKyHieu] ?? "").trim());
+  cd.oTuDat = findCustomTotalCell(rows, dataStart, cd, g, (r) => !String(r[cSo] ?? "").trim() && !String(r[colSeries] ?? "").trim());
   return { sheet: { ten, header, preRows, dong, goc: g, hIdx, rong: width, canDoiCot: cd }, loiParse };
 }
 
@@ -1227,13 +1227,13 @@ function findCustomTotalCell(
   g: SourceCellCoord,
   isOutsideRow: (r: unknown[]) => boolean
 ): UserDiffCell | null {
-  const cach: Omit<UserDiffCell, "dongFile" | "cot" | "giaTri" | "dau">[] = [
+  const method: Omit<UserDiffCell, "dongFile" | "cot" | "giaTri" | "dau">[] = [
     { congPhi: false, truCk: false },
     { congPhi: true, truCk: false },
     { congPhi: true, truCk: true },
     { congPhi: false, truCk: true },
   ];
-  const mong = (c: (typeof cach)[number]) => cd.lech - (c.congPhi ? cd.sumPhi : 0) + (c.truCk ? cd.sumCk : 0);
+  const mong = (c: (typeof method)[number]) => cd.lech - (c.congPhi ? cd.sumPhi : 0) + (c.truCk ? cd.sumCk : 0);
   // Ô bằng đúng TỔNG MỘT CỘT là ô SUM của cột đó, không phải ô lệch (VD bảng kê khớp
   // tuyệt đối, lệch 0 ⇒ "lệch + Σ chiết khấu" trùng ngay ô SUM cột chiết khấu).
   const isColumnTotal = (x: number) =>
@@ -1245,7 +1245,7 @@ function findCustomTotalCell(
     r.forEach((v, c) => {
       const x = typeof v === "number" ? v : null;
       if (x == null || Math.abs(x) <= 1 || isColumnTotal(x)) return;
-      for (const k of cach) {
+      for (const k of method) {
         // phí/chiết khấu bằng 0 thì các cách trùng nhau — lấy cách đơn giản nhất
         if ((k.congPhi && !cd.sumPhi) || (k.truCk && !cd.sumCk)) continue;
         const m = mong(k);
@@ -1267,8 +1267,8 @@ function parseLedgerSheet(
   rows: unknown[][],
   hIdx: number,
   edits: Record<string, number> | undefined,
-  nghiVan: SuspectItem[],
-  gopMap: Map<string, MergedSuspect>,
+  suspects: SuspectItem[],
+  mergeMap: Map<string, MergedSuspect>,
   changeLog: { viTri: string; cu: string; moi: string }[],
   g: SourceCellCoord,
   width: number
@@ -1293,10 +1293,10 @@ function parseLedgerSheet(
   };
   const cCtgs = cot1(headerRaw, "CTGS", "SCT_GHISO");
   const cVoucher = cot1(headerRaw, "Phiếu", "SO_PHIEU");
-  const cKyHieu = cot1(headerRaw, "KHHĐ", "KY_HIEU", "KH_HD");
+  const colSeries = cot1(headerRaw, "KHHĐ", "KY_HIEU", "KH_HD");
   const cSo = cot1(headerRaw, "Số HĐ", "SO_HD");
   // "MST người bán" đứng trước "MST" để bước khớp-đầu-chữ không vớ nhầm "MST người mua".
-  const cMst = cot1(headerRaw, "MASOTHUE", "RMST", "MS_THUE", "MST người bán", "Mã số thuế", "MST");
+  const colTaxCode = cot1(headerRaw, "MASOTHUE", "RMST", "MS_THUE", "MST người bán", "Mã số thuế", "MST");
   const cInvoiceDate = cot1(headerRaw, "Ngày HĐ", "NGAY_HD");
   // Sổ mã máy (PMEM) không có TK Nợ/Có mà có TS% + LOAI ⇒ nhận cả hai kiểu,
   // tên cột ở file xuất lấy đúng theo tiêu đề tìm được (`tenTk`).
@@ -1310,7 +1310,7 @@ function parseLedgerSheet(
   const hasTotalColumn = cCols.tong >= 0;
 
   for (const p of sel.phu)
-    nghiVan.push({
+    suspects.push({
       nhom: 6,
       viTri: `${ten} · cột ${columnLetter(aoaToExcelColumn(g, p))} (${header[p] ?? ""})`,
       viTriXuat: `${ten} · cột ${columnLetter(aoaToExcelColumn(g, p) + EXPORT_COLUMN_SHIFT)} (${header[p] ?? ""})`,
@@ -1327,22 +1327,22 @@ function parseLedgerSheet(
     if (isTotalRow(row)) continue;
     const rowNo = i + 1;
     const invoiceNo = String(layO(row, cSo, ten, rowNo, edits) ?? "").trim();
-    const kyHieu = String(layO(row, cKyHieu, ten, rowNo, edits) ?? "").trim();
-    if (!invoiceNo && !kyHieu) continue;
+    const series = String(layO(row, colSeries, ten, rowNo, edits) ?? "").trim();
+    if (!invoiceNo && !series) continue;
 
     const nv = hasTotalColumn ? suspectColumnSum(ten, rowNo, row, cCols, edits, g) : null;
     if (nv) {
-      if (nv.nhom === 4 || nv.nhom === 5) addToGroup(gopMap, nv, (nv.nhom === 4 ? soVN(row[cCols.tong]) : nv.giaTriDung) ?? 0, "pm");
-      else nghiVan.push(nv);
+      if (nv.nhom === 4 || nv.nhom === 5) addToGroup(mergeMap, nv, (nv.nhom === 4 ? soVN(row[cCols.tong]) : nv.giaTriDung) ?? 0, "pm");
+      else suspects.push(nv);
     }
 
-    const soChuan = normalizeInvoiceNumber(invoiceNo);
-    const mstBan = cellStr(row, cMst);
+    const normalizedNo = normalizeInvoiceNumber(invoiceNo);
+    const sellerTaxCode = cellStr(row, colTaxCode);
     dong.push({
       sheet: ten, soDong: rowNo, dongFile: dongExcel(g, rowNo),
       cells: applyFixToRow(row, header, ten, rowNo, edits, changeLog, g),
       ctgs: cellStr(row, cCtgs), phieu: cellStr(row, cVoucher),
-      kyHieu, soHoaDon: invoiceNo, soChuan, mstBan, tenBan: cellStr(row, cSellerName),
+      kyHieu: series, soHoaDon: invoiceNo, soChuan: normalizedNo, mstBan: sellerTaxCode, tenBan: cellStr(row, cSellerName),
       tongCong: hasTotalColumn
         ? soVN(layO(row, cCols.tong, ten, rowNo, edits)) ?? 0
         : (soVN(layO(row, cCols.chua, ten, rowNo, edits)) ?? 0) + (soVN(layO(row, cCols.thue, ten, rowNo, edits)) ?? 0),
@@ -1350,7 +1350,7 @@ function parseLedgerSheet(
       thue: soVN(layO(row, cCols.thue, ten, rowNo, edits)) ?? 0,
       ngayHd: formatDisplayDate(row[cInvoiceDate]),
       tkNo: cellStr(row, cTkNo), tkCo: cellStr(row, cTkCo), dienGiai: cellStr(row, cDescription),
-      khoa: makeKey(mstBan, kyHieu, soChuan),
+      khoa: makeKey(sellerTaxCode, series, normalizedNo),
       soHddtKhop: 0, trangThai: "THIEU", ketLuan: "", bangChung: "",
       nguonHddt: "", dongHddt: null, ngayLapHd: "", tenBanHddt: "", tongTtHddt: null,
     });
@@ -1362,7 +1362,7 @@ function parseLedgerSheet(
     return t ? (chuDep[chuan(t)] ?? t) : mac;
   };
   const tenTk = `${label(cTkNo, "TK Nợ")} / ${label(cTkCo, "TK Có")}`;
-  return { ten, header, dong, goc: g, hIdx, rong: width, tenTk, coCotTong: hasTotalColumn, coCotMst: cMst >= 0 };
+  return { ten, header, dong, goc: g, hIdx, rong: width, tenTk, coCotTong: hasTotalColumn, coCotMst: colTaxCode >= 0 };
 }
 
 const uniq = (arr: string[]): string[] => [...new Set(arr.filter(Boolean))];
@@ -1381,8 +1381,8 @@ const uniq = (arr: string[]): string[] => [...new Set(arr.filter(Boolean))];
  * GIỮ NGUYÊN hành vi cũ (nhân tỷ giá) và bắn cảnh báo để kế toán soát tay.
  */
 /** Hạ các dòng ngoại tệ về SỐ GỐC (cổng đã quy sẵn VND) — tỷ giá áp dụng = 1. */
-function revertToOriginal(ds: readonly InvoiceRow[]): void {
-  for (const d of ds) {
+function revertToOriginal(items: readonly InvoiceRow[]): void {
+  for (const d of items) {
     d.chuaThueVnd = d.chuaThueRaw;
     d.thueVnd = d.thueRaw;
     d.tongTtVnd = d.tongTtRaw;
@@ -1410,20 +1410,20 @@ function detectConventionFromPeer(
   /** Chỉ KẾT LUẬN cho các sheet này (mốc vẫn lấy từ mọi sheet). */
   onlyCheck: readonly InvoiceSheet[] = all
 ): InvoiceRow[] {
-  const theoKhoa = new Map<string, InvoiceRow[]>();
+  const byKey = new Map<string, InvoiceRow[]>();
   for (const sh of all)
     for (const d of sh.dong) {
       if (d.boCucLech || !d.khoa) continue; // cột tiền lệch ô — không làm mốc được
-      const a = theoKhoa.get(d.khoa);
+      const a = byKey.get(d.khoa);
       if (a) a.push(d);
-      else theoKhoa.set(d.khoa, [d]);
+      else byKey.set(d.khoa, [d]);
     }
   const salesInvoice = new Map<string, { goc: number; nhan: number }>();
-  for (const ds of theoKhoa.values())
-    for (const d of ds) {
+  for (const items of byKey.values())
+    for (const d of items) {
       if (!(d.tyGia > 1) || !d.tongTtRaw) continue;
       const moc: number[] = [];
-      for (const e of ds) {
+      for (const e of items) {
         if (e.sheet === d.sheet || !e.tongTtRaw) continue;
         moc.push(e.tongTtRaw);
         if (e.tyGia > 1) moc.push(e.tongTtRaw * e.tyGia);
@@ -1460,14 +1460,14 @@ function detectConventionFromPeer(
 }
 
 function detectForeignCurrencyMode(
-  hdActive: InvoiceSheet[],
-  pmTheoKhoa: Map<string, LedgerRow[]>,
+  activeInvoiceSheets: InvoiceSheet[],
+  ledgerByKey: Map<string, LedgerRow[]>,
   warnings: FlowWarning[],
-  allInvoiceSheets: readonly InvoiceSheet[] = hdActive,
+  allInvoiceSheets: readonly InvoiceSheet[] = activeInvoiceSheets,
 ): void {
   if (!allInvoiceSheets.some((sh) => sh.dong.some((d) => d.tyGia > 1))) return; // file toàn VND — không có gì để dò
   const fxRows: InvoiceRow[] = [];
-  for (const sh of hdActive)
+  for (const sh of activeInvoiceSheets)
     for (const d of sh.dong) if (d.tyGia > 1) fxRows.push(d);
 
   // Mẫu: hóa đơn ngoại tệ có dòng sổ cùng khóa. So sai số tương đối với sổ.
@@ -1475,7 +1475,7 @@ function detectForeignCurrencyMode(
   let multipliedCloserCount = 0; // số mẫu mà SỐ ×TỶ GIÁ sát sổ hơn (⇒ để nguyên tệ, phải nhân)
   let sampleCount = 0;
   for (const d of fxRows) {
-    const pm = pmTheoKhoa.get(d.khoa);
+    const pm = ledgerByKey.get(d.khoa);
     if (!pm?.length) continue;
     const so = pm.reduce((s, x) => s + x.tongCong, 0);
     if (!(so > 0)) continue;
@@ -1515,7 +1515,7 @@ function detectForeignCurrencyMode(
   // Sheet KHÔNG đối soát với sổ (tập con / bản tự tải) vẫn hiện ở "So hai bản" ⇒ phải
   // cùng đơn vị. Dò theo bản kia (hai bản có thể khác quy ước); không dò được thì theo
   // quy ước vừa chốt bằng sổ — để nguyên ×tỷ giá là lệch oan cả trăm tỉ khi so hai bản.
-  const inactiveSheets = allInvoiceSheets.filter((sh) => !hdActive.includes(sh));
+  const inactiveSheets = allInvoiceSheets.filter((sh) => !activeInvoiceSheets.includes(sh));
   if (inactiveSheets.length) {
     const unresolved = detectConventionFromPeer(allInvoiceSheets, warnings, inactiveSheets);
     if (daVnd) revertToOriginal(unresolved);
@@ -1523,19 +1523,19 @@ function detectForeignCurrencyMode(
 }
 
 export function reconcile(sheets: SheetTho[], opt: ReconciliationOptions): ReconciliationResult {
-  const kq = reconcileOnce(sheets, opt, new Set());
+  const result = reconcileOnce(sheets, opt, new Set());
   // Dung sai làm tròn tính theo ĐƠN VỊ của ô. Sheet nào để tiền ngoại tệ ở NGUYÊN TỆ thì
   // chỉ biết SAU khi dò quy ước (cần ghép sổ) ⇒ chạy lại một lần với dung sai theo xu cho
   // các sheet đó. Phần dò quy ước không phụ thuộc dung sai nên lần hai ra y hệt.
-  const originalCurrency = new Set(kq.sheetsHoaDon.filter((s) => s.dong.some((d) => d.tyGia > 1)).map((s) => s.ten));
-  return originalCurrency.size ? reconcileOnce(sheets, opt, originalCurrency) : kq;
+  const originalCurrency = new Set(result.sheetsHoaDon.filter((s) => s.dong.some((d) => d.tyGia > 1)).map((s) => s.ten));
+  return originalCurrency.size ? reconcileOnce(sheets, opt, originalCurrency) : result;
 }
 
 function reconcileOnce(sheets: SheetTho[], opt: ReconciliationOptions, foreignCurrencySheets: ReadonlySet<string>): ReconciliationResult {
-  const nguong = Math.max(0, opt.nguong ?? 1);
+  const threshold = Math.max(0, opt.nguong ?? 1);
   const edits = opt.edits;
-  const nghiVan: SuspectItem[] = [];
-  const gopMap = new Map<string, MergedSuspect>();
+  const suspects: SuspectItem[] = [];
+  const mergeMap = new Map<string, MergedSuspect>();
   const warnings: FlowWarning[] = [];
   const editLog: { viTri: string; cu: string; moi: string }[] = [];
 
@@ -1552,16 +1552,16 @@ function reconcileOnce(sheets: SheetTho[], opt: ReconciliationOptions, foreignCu
     const g: SourceCellCoord = { r0: s0.r0 ?? 0, c0: s0.c0 ?? 0, giuCot: goi.giuCot };
     const width = goi.daGo ? goi.giuCot.length : (s0.rong ?? 0);
     const hPm = ledgerHeaderRow(rows);
-    const hHd = invoiceHeaderRow(rows);
-    const tron = detectMixedLayout(rows, Math.max(hPm, hHd));
+    const invoiceHeaderIdx = invoiceHeaderRow(rows);
+    const tron = detectMixedLayout(rows, Math.max(hPm, invoiceHeaderIdx));
     if (tron)
       warnings.push({
         loai: "Sheet trộn hai bố cục cột",
         chiTiet: `Sheet "${s0.ten}": ${tron.binhThuong} dòng rộng tới cột ${columnLetter(aoaToExcelColumn(g, tron.cotHeader))} (đúng tiêu đề) nhưng ${tron.lech} dòng rộng tới cột ${columnLetter(aoaToExcelColumn(g, tron.cotLech))} — nhiều khả năng dán hai bản xuất khác nhau (có mã / không mã) vào cùng một sheet. Cột TIỀN vẫn đúng chỗ; trạng thái · đơn vị tiền tệ · tỷ giá của ${tron.lech} dòng đó bị lệch ô nên engine phải dò theo nội dung. CHỮA ĐÚNG: tách thành hai sheet riêng rồi chạy lại.`,
       });
-    if (hPm >= 0) allLedgerSheets.push(parseLedgerSheet(s0.ten, rows, hPm, edits, nghiVan, gopMap, editLog, g, width));
-    else if (hHd >= 0) {
-      const r = parseInvoiceSheet(s0.ten, rows, hHd, edits, nghiVan, gopMap, editLog, g, width, foreignCurrencySheets.has(s0.ten));
+    if (hPm >= 0) allLedgerSheets.push(parseLedgerSheet(s0.ten, rows, hPm, edits, suspects, mergeMap, editLog, g, width));
+    else if (invoiceHeaderIdx >= 0) {
+      const r = parseInvoiceSheet(s0.ten, rows, invoiceHeaderIdx, edits, suspects, mergeMap, editLog, g, width, foreignCurrencySheets.has(s0.ten));
       invoiceSheets.push(r.sheet);
       parseErrorCount += r.loiParse;
     }
@@ -1576,7 +1576,7 @@ function reconcileOnce(sheets: SheetTho[], opt: ReconciliationOptions, foreignCu
       const kb = new Set(b.dong.map((d) => d.khoa));
       if (kb.size >= ka.size && [...ka].every((k) => kb.has(k)) && kb.size > ka.size) {
         a.laPhu = true;
-        gopMap.set(`sheetHD-${a.ten}`, {
+        mergeMap.set(`sheetHD-${a.ten}`, {
           nhom: 7,
           ten: `Sheet HĐĐT trùng lặp: "${a.ten}"`,
           soDong: a.dong.length,
@@ -1591,35 +1591,35 @@ function reconcileOnce(sheets: SheetTho[], opt: ReconciliationOptions, foreignCu
   // --- Có sổ + HAI BẢN HĐĐT (thuế gửi ⇄ tự tải) gối nhau: chỉ đối soát bản THUẾ GỬI ---
   // Không bản nào là tập con của bản kia thì khối trên giữ cả hai ⇒ hóa đơn có ở cả hai
   // bản bị đếm hai lần, "chưa kê" nhân đôi. So hai bản với nhau là việc của `compareTwoInvoiceVersions`.
-  const benThue = resolveTaxSideSheets(invoiceSheets.map((s) => s.ten), opt.benThue).benThue;
+  const taxSides = resolveTaxSideSheets(invoiceSheets.map((s) => s.ten), opt.benThue).benThue;
   {
-    const conThue = invoiceSheets.filter((s) => !s.laPhu && benThue.has(s.ten));
-    const selfLoadSheets = invoiceSheets.filter((s) => !s.laPhu && !benThue.has(s.ten));
-    const kThue = new Set(conThue.flatMap((s) => s.dong.map((d) => d.khoa)));
+    const taxSheets = invoiceSheets.filter((s) => !s.laPhu && taxSides.has(s.ten));
+    const selfLoadSheets = invoiceSheets.filter((s) => !s.laPhu && !taxSides.has(s.ten));
+    const taxKeys = new Set(taxSheets.flatMap((s) => s.dong.map((d) => d.khoa)));
     const selfLoadedKeys = new Set(selfLoadSheets.flatMap((s) => s.dong.map((d) => d.khoa)));
-    const chung = [...selfLoadedKeys].filter((k) => kThue.has(k)).length;
+    const sharedKeyCount = [...selfLoadedKeys].filter((k) => taxKeys.has(k)).length;
     // Gối ≥ nửa bản nhỏ hơn mới là HAI BẢN của cùng một kỳ — tên có chữ "thuế" mà hóa
     // đơn khác hẳn nhau (VD sheet "THUẾ SUẤT 8%") thì vẫn là các sheet riêng, giữ nguyên.
-    if (allLedgerSheets.length && chung > 0 && chung * 2 >= Math.min(kThue.size, selfLoadedKeys.size)) {
-      const tenThue = conThue.map((s) => `"${s.ten}"`).join(", ");
+    if (allLedgerSheets.length && sharedKeyCount > 0 && sharedKeyCount * 2 >= Math.min(taxKeys.size, selfLoadedKeys.size)) {
+      const taxSheetNames = taxSheets.map((s) => `"${s.ten}"`).join(", ");
       for (const s of selfLoadSheets) {
         s.laPhu = true;
-        gopMap.set(`sheetHD-${s.ten}`, {
+        mergeMap.set(`sheetHD-${s.ten}`, {
           nhom: 7,
           ten: `Bản tự tải: "${s.ten}"`,
           soDong: s.dong.length,
           tongTien: s.dong.reduce((t, d) => t + d.tongTtVnd, 0),
-          canhBao: `"${s.ten}" là bản TỰ TẢI của cùng kỳ với bản thuế gửi (${tenThue}). Chỉ đối soát bản thuế gửi với sổ để KHỎI đếm hai lần; so hai bản xem kiểu "So hai bản".`,
+          canhBao: `"${s.ten}" là bản TỰ TẢI của cùng kỳ với bản thuế gửi (${taxSheetNames}). Chỉ đối soát bản thuế gửi với sổ để KHỎI đếm hai lần; so hai bản xem kiểu "So hai bản".`,
           chiTiet: [],
         });
       }
       warnings.push({
         loai: "Hai bản hóa đơn điện tử",
-        chiTiet: `File có cả bản thuế gửi (${tenThue}) lẫn bản tự tải (${selfLoadSheets.map((s) => `"${s.ten}"`).join(", ")}): ${chung} hóa đơn có ở cả hai bản. Chỉ bản thuế gửi được đối soát với sổ. ${selfLoadedKeys.size - chung} hóa đơn chỉ có ở bản tự tải — KHÔNG được đối soát với sổ; soát chúng ở kiểu "So hai bản".`,
+        chiTiet: `File có cả bản thuế gửi (${taxSheetNames}) lẫn bản tự tải (${selfLoadSheets.map((s) => `"${s.ten}"`).join(", ")}): ${sharedKeyCount} hóa đơn có ở cả hai bản. Chỉ bản thuế gửi được đối soát với sổ. ${selfLoadedKeys.size - sharedKeyCount} hóa đơn chỉ có ở bản tự tải — KHÔNG được đối soát với sổ; soát chúng ở kiểu "So hai bản".`,
       });
     }
   }
-  const hdActive = invoiceSheets.filter((s) => !s.laPhu);
+  const activeInvoiceSheets = invoiceSheets.filter((s) => !s.laPhu);
 
   // --- Chọn sổ CHUẨN khi có nhiều sheet phần mềm — v3 §1.1, §1.4 ---
   let ledgerSheet: LedgerSheet | null = null;
@@ -1630,18 +1630,18 @@ function reconcileOnce(sheets: SheetTho[], opt: ReconciliationOptions, foreignCu
     const theoTen = opt.soChuanTen ? allLedgerSheets.find((s) => s.ten === opt.soChuanTen) : null;
     // "mới": sau khi bỏ dấu, tên chứa "moi" (bắt mới / moi / mơii1)
     const newLedgerSheets = allLedgerSheets.filter((s) => chuan(s.ten).includes("moi"));
-    let chuanSheet = theoTen ?? (newLedgerSheets.length === 1 ? newLedgerSheets[0] : null);
-    if (!chuanSheet) {
-      chuanSheet = [...allLedgerSheets].sort((a, b) => b.dong.length - a.dong.length)[0];
+    let mainSheet = theoTen ?? (newLedgerSheets.length === 1 ? newLedgerSheets[0] : null);
+    if (!mainSheet) {
+      mainSheet = [...allLedgerSheets].sort((a, b) => b.dong.length - a.dong.length)[0];
       needsLedgerPick = true;
       warnings.push({
         loai: "Chọn sổ chuẩn",
-        chiTiet: `Có ${allLedgerSheets.length} sheet sổ (${allLedgerSheets.map((s) => s.ten).join(", ")}). Chưa phân biệt được bản chốt — tạm dùng "${chuanSheet.ten}". Hãy chọn lại nếu sai.`,
+        chiTiet: `Có ${allLedgerSheets.length} sheet sổ (${allLedgerSheets.map((s) => s.ten).join(", ")}). Chưa phân biệt được bản chốt — tạm dùng "${mainSheet.ten}". Hãy chọn lại nếu sai.`,
       });
     }
-    ledgerSheet = chuanSheet;
+    ledgerSheet = mainSheet;
     for (const s of allLedgerSheets)
-      if (s !== chuanSheet) {
+      if (s !== mainSheet) {
         s.laPhu = true;
         extraLedgerSheets.push(s);
       }
@@ -1649,19 +1649,19 @@ function reconcileOnce(sheets: SheetTho[], opt: ReconciliationOptions, foreignCu
 
   // Sheet sổ phụ tập con
   if (ledgerSheet) {
-    const khoaChuan = new Set(ledgerSheet.dong.map((d) => d.khoa));
+    const mainKeys = new Set(ledgerSheet.dong.map((d) => d.khoa));
     for (const phu of extraLedgerSheets) {
-      const khoaPhu = new Set(phu.dong.map((d) => d.khoa));
-      const laTapCon = [...khoaPhu].every((k) => khoaChuan.has(k));
-      const chenhSo = [...khoaChuan].filter((k) => !khoaPhu.has(k)).length;
-      gopMap.set(`sheet-${phu.ten}`, {
+      const secondaryKeys = new Set(phu.dong.map((d) => d.khoa));
+      const laTapCon = [...secondaryKeys].every((k) => mainKeys.has(k));
+      const missingKeyCount = [...mainKeys].filter((k) => !secondaryKeys.has(k)).length;
+      mergeMap.set(`sheet-${phu.ten}`, {
         nhom: 7,
         ten: `Sheet sổ trùng lặp: "${phu.ten}"`,
         soDong: phu.dong.length,
         tongTien: phu.dong.reduce((s, d) => s + d.tongCong, 0),
         canhBao: laTapCon
-          ? `"${phu.ten}" là TẬP CON của "${ledgerSheet.ten}" (lệch ${chenhSo} hóa đơn). Chỉ cộng "${ledgerSheet.ten}" — bỏ sheet này để KHỎI đếm hai lần.`
-          : `"${phu.ten}" khác "${ledgerSheet.ten}" (${chenhSo} khóa chỉ có ở bản chuẩn). KHÔNG cộng vào tổng; xác nhận bản chốt.`,
+          ? `"${phu.ten}" là TẬP CON của "${ledgerSheet.ten}" (lệch ${missingKeyCount} hóa đơn). Chỉ cộng "${ledgerSheet.ten}" — bỏ sheet này để KHỎI đếm hai lần.`
+          : `"${phu.ten}" khác "${ledgerSheet.ten}" (${missingKeyCount} khóa chỉ có ở bản chuẩn). KHÔNG cộng vào tổng; xác nhận bản chốt.`,
         chiTiet: [],
       });
     }
@@ -1678,37 +1678,37 @@ function reconcileOnce(sheets: SheetTho[], opt: ReconciliationOptions, foreignCu
       loai: "Ngoại tệ thiếu tỷ giá",
       chiTiet: `${missingExchangeRate.length} hóa đơn ghi tiền tệ khác VND (${uniq(missingExchangeRate.map((d) => d.dvt)).join(", ")}) nhưng ô tỷ giá trống/0 — máy KHÔNG quy đổi được, đang để nguyên số trên hóa đơn nên dễ lệch sổ oan. Ở: ${missingExchangeRate.slice(0, 10).map((d) => `${d.sheet} dòng ${d.dongFile}`).join("; ")}${missingExchangeRate.length > 10 ? "; …" : ""}. Điền tỷ giá rồi chạy lại.`,
     });
-  if (!hdActive.length)
+  if (!activeInvoiceSheets.length)
     warnings.push({ loai: "Thiếu dữ liệu", chiTiet: "Không tìm thấy sheet HÓA ĐƠN ĐIỆN TỬ (cần cột Ký hiệu hóa đơn + Số hóa đơn)." });
   if (!ledgerSheet)
     warnings.push({ loai: "Thiếu dữ liệu", chiTiet: "Không tìm thấy sheet SỔ/PHẦN MỀM (cần cột KHHĐ/KY_HIEU + Số HĐ/SO_HD + Tổng cộng/TONGCONG). Mọi hóa đơn sẽ báo CHƯA CÓ TRONG PMKT." });
 
   // --- Gom theo khóa ---
-  const pmTheoKhoa = new Map<string, LedgerRow[]>();
+  const ledgerByKey = new Map<string, LedgerRow[]>();
   if (ledgerSheet)
     for (const d of ledgerSheet.dong) {
-      const arr = pmTheoKhoa.get(d.khoa);
-      if (arr) arr.push(d); else pmTheoKhoa.set(d.khoa, [d]);
+      const arr = ledgerByKey.get(d.khoa);
+      if (arr) arr.push(d); else ledgerByKey.set(d.khoa, [d]);
     }
-  const hdTheoKhoa = new Map<string, InvoiceRow[]>();
-  for (const sh of hdActive)
+  const invoicesByKey = new Map<string, InvoiceRow[]>();
+  for (const sh of activeInvoiceSheets)
     for (const d of sh.dong) {
-      const arr = hdTheoKhoa.get(d.khoa);
-      if (arr) arr.push(d); else hdTheoKhoa.set(d.khoa, [d]);
+      const arr = invoicesByKey.get(d.khoa);
+      if (arr) arr.push(d); else invoicesByKey.set(d.khoa, [d]);
     }
 
   // Tự dò quy ước ngoại tệ TRƯỚC khi ghép: nếu cổng đã quy sẵn VND thì hạ tỷ giá áp
   // dụng về 1 để không đội số (mọi tổng + so khớp bên dưới dùng lại chuaThueVnd/tongTtVnd).
-  detectForeignCurrencyMode(hdActive, pmTheoKhoa, warnings, invoiceSheets);
+  detectForeignCurrencyMode(activeInvoiceSheets, ledgerByKey, warnings, invoiceSheets);
 
-  let isMatch = 0, lech = 0, lechThue = 0, thieu = 0, invoiceNo = 0, totalDiff = 0, missingNotRequired = 0;
+  let isMatch = 0, mismatch = 0, taxMismatchCount = 0, missingCount = 0, invoiceNo = 0, totalDiff = 0, missingNotRequired = 0;
   // Nhãn gọi thẳng tên sheet sổ (file mẫu kế toán ghi "CHƯA CÓ TRONG PMEM"), để
   // bảng tổng và cột KẾT QUẢ nói cùng một thứ tiếng.
   const missingLabel = `CHƯA CÓ TRONG ${ledgerSheet?.ten ?? "PMKT"}`;
-  for (const sh of hdActive)
+  for (const sh of activeInvoiceSheets)
     for (const d of sh.dong) {
       invoiceNo++;
-      const pm = pmTheoKhoa.get(d.khoa) ?? [];
+      const pm = ledgerByKey.get(d.khoa) ?? [];
       if (!pm.length) {
         d.trangThai = "THIEU";
         if (d.khongCanVaoSo) {
@@ -1721,18 +1721,18 @@ function reconcileOnce(sheets: SheetTho[], opt: ReconciliationOptions, foreignCu
           d.ketLuan = missingLabel;
           d.bangChung = "Không tìm thấy dòng ghi sổ nào trong phần mềm kế toán có cùng MST người bán + ký hiệu + số hóa đơn.";
         }
-        thieu++;
+        missingCount++;
         continue;
       }
       const ledgerTotal = pm.reduce((s, x) => s + x.tongCong, 0);
       const ledgerPreTax = pm.reduce((s, x) => s + x.chuaThue, 0);
-      const pmThue = pm.reduce((s, x) => s + x.thue, 0);
-      const chenh = d.tongTtVnd - ledgerTotal;
+      const ledgerTaxTotal = pm.reduce((s, x) => s + x.thue, 0);
+      const diff = d.tongTtVnd - ledgerTotal;
       const preTaxDiff = d.chuaThueVnd - ledgerPreTax;
-      const chenhThue = d.thueVnd - pmThue;
+      const taxDiff = d.thueVnd - ledgerTaxTotal;
       d.soDongKhopPm = pm.length;
       d.tongTtPm = ledgerTotal;
-      d.chenh = chenh;
+      d.chenh = diff;
       d.phieuKe = uniq(pm.map((x) => x.phieu)).join(", ");
       d.ctgs = uniq(pm.map((x) => x.ctgs)).join(", ");
       d.ngayGhiSo = uniq(pm.map((x) => x.ngayHd)).join(", ");
@@ -1743,83 +1743,83 @@ function reconcileOnce(sheets: SheetTho[], opt: ReconciliationOptions, foreignCu
       // So ĐỦ 3 cột (bổ sung TRƯỚC THUẾ + THUẾ, không chỉ tổng) — ghi tận nơi vào bằng chứng.
       const baCap =
         `HĐ: chưa ${num(d.chuaThueVnd)} · thuế ${num(d.thueVnd)} · tổng ${num(d.tongTtVnd)} | ` +
-        `sổ: chưa ${num(ledgerPreTax)} · thuế ${num(pmThue)} · tổng ${num(ledgerTotal)} | ` +
-        `chênh: trước thuế ${num(preTaxDiff)} · thuế ${num(chenhThue)} · tổng ${num(chenh)}`;
-      const dauCau = `Khớp phiếu ${voucherLabel} ngày ${d.ngayGhiSo} (CTGS ${d.ctgs}), TK ${d.tkNoCo}.`;
-      if (Math.abs(chenh) > nguong) {
+        `sổ: chưa ${num(ledgerPreTax)} · thuế ${num(ledgerTaxTotal)} · tổng ${num(ledgerTotal)} | ` +
+        `chênh: trước thuế ${num(preTaxDiff)} · thuế ${num(taxDiff)} · tổng ${num(diff)}`;
+      const leadSentence = `Khớp phiếu ${voucherLabel} ngày ${d.ngayGhiSo} (CTGS ${d.ctgs}), TK ${d.tkNoCo}.`;
+      if (Math.abs(diff) > threshold) {
         // TỔNG lệch → tiền sai (nhãn cũ, giữ nguyên).
         d.trangThai = "LECH";
         d.ketLuan = "LỆCH TIỀN";
-        d.bangChung = `${dauCau} LỆCH TIỀN ${num(chenh)} đ (HĐĐT − sổ). ${baCap}`;
-        lech++;
-        totalDiff += Math.abs(chenh);
-      } else if (Math.abs(chenhThue) > nguong) {
+        d.bangChung = `${leadSentence} LỆCH TIỀN ${num(diff)} đ (HĐĐT − sổ). ${baCap}`;
+        mismatch++;
+        totalDiff += Math.abs(diff);
+      } else if (Math.abs(taxDiff) > threshold) {
         // TỔNG khớp nhưng THUẾ lệch → nghi sai thuế suất / số thuế ghi ở sổ (mất/thừa thuế
         // đầu vào dù tiền thanh toán đúng). trangThai = LECH để vào nhóm L của bảng tổng.
         d.trangThai = "LECH";
         d.ketLuan = "LỆCH THUẾ";
-        d.bangChung = `${dauCau} Tổng thanh toán KHỚP nhưng THUẾ lệch ${num(chenhThue)} đ (HĐ ${num(d.thueVnd)} / sổ ${num(pmThue)}) — nghi sai thuế suất hoặc số thuế ghi ở sổ. ${baCap}`;
-        lechThue++;
+        d.bangChung = `${leadSentence} Tổng thanh toán KHỚP nhưng THUẾ lệch ${num(taxDiff)} đ (HĐ ${num(d.thueVnd)} / sổ ${num(ledgerTaxTotal)}) — nghi sai thuế suất hoặc số thuế ghi ở sổ. ${baCap}`;
+        taxMismatchCount++;
       } else {
         d.trangThai = "KHOP";
         d.ketLuan = "KHỚP";
         // Chênh TRƯỚC THUẾ khi tổng + thuế đã khớp gần như luôn do sổ ghi trước thuế đã
         // trừ chiết khấu / cộng phí (net) còn hóa đơn ghi gộp — KHÔNG phải sai.
         const preTaxNote =
-          Math.abs(preTaxDiff) > nguong
+          Math.abs(preTaxDiff) > threshold
             ? ` Trước thuế lệch ${num(preTaxDiff)} đ nhưng TỔNG + THUẾ khớp — thường do sổ ghi trước thuế đã trừ chiết khấu / cộng phí, không phải sai.`
             : "";
-        d.bangChung = `${dauCau} ${chenh === 0 ? "Khớp số tiền." : `Chênh tổng ${num(Math.abs(chenh))} đ trong ngưỡng, coi như khớp.`}${preTaxNote} ${baCap}`;
+        d.bangChung = `${leadSentence} ${diff === 0 ? "Khớp số tiền." : `Chênh tổng ${num(Math.abs(diff))} đ trong ngưỡng, coi như khớp.`}${preTaxNote} ${baCap}`;
         isMatch++;
       }
     }
 
-  let pmCo = 0, pmThieu = 0, ledgerRowCount = 0;
+  let ledgerMatchedCount = 0, ledgerMissingCount = 0, ledgerRowCount = 0;
   if (ledgerSheet)
     for (const d of ledgerSheet.dong) {
       ledgerRowCount++;
-      const hd = hdTheoKhoa.get(d.khoa) ?? [];
-      if (!hd.length) {
+      const invoices = invoicesByKey.get(d.khoa) ?? [];
+      if (!invoices.length) {
         d.trangThai = "THIEU";
         d.ketLuan = "CHƯA CÓ HĐĐT";
         d.bangChung = "Không tìm thấy hóa đơn điện tử nào có cùng MST người bán + ký hiệu + số hóa đơn.";
-        pmThieu++;
+        ledgerMissingCount++;
         continue;
       }
-      const first = hd[0];
-      const invoiceTotal = hd.reduce((s, x) => s + x.tongTtVnd, 0);
+      const first = invoices[0];
+      const invoiceTotal = invoices.reduce((s, x) => s + x.tongTtVnd, 0);
       d.trangThai = "CO";
       d.ketLuan = "ĐÃ CÓ HĐĐT";
-      d.soHddtKhop = hd.length;
+      d.soHddtKhop = invoices.length;
       d.nguonHddt = first.sheet;
       d.dongHddt = first.dongFile;
       d.ngayLapHd = first.ngayLap;
       d.tenBanHddt = first.tenBan;
       d.tongTtHddt = invoiceTotal;
       d.bangChung = `Khớp hóa đơn ${first.kyHieu}-${first.soChuan} ngày ${first.ngayLap} của ${first.tenBan} (sheet ${first.sheet}, dòng ${first.dongFile}). Hóa đơn ${num(invoiceTotal)} đ.`;
-      pmCo++;
+      ledgerMatchedCount++;
     }
 
   // --- GẦN KHỚP (v3 §5.4): dòng THIẾU hai bên, cùng MST + cùng số tiền ±1đ ---
   const NG_GK = 1;
-  const pmThieuList = ledgerSheet ? ledgerSheet.dong.filter((d) => d.trangThai === "THIEU") : [];
-  const pmDaGhep = new Set<LedgerRow>();
+  const missingLedgerRows = ledgerSheet ? ledgerSheet.dong.filter((d) => d.trangThai === "THIEU") : [];
+  const matchedLedgerRows = new Set<LedgerRow>();
   let nearMatchCount = 0;
-  for (const sh of hdActive)
+  for (const sh of activeInvoiceSheets)
     for (const d of sh.dong) {
       if (d.trangThai !== "THIEU") continue;
-      const cand = pmThieuList.find(
-        (p) => !pmDaGhep.has(p) && normalizeTaxCode(p.mstBan) === normalizeTaxCode(d.mstBan) && Math.abs(p.tongCong - d.tongTtVnd) <= NG_GK
+      const cand = missingLedgerRows.find(
+        (p) => !matchedLedgerRows.has(p) && normalizeTaxCode(p.mstBan) === normalizeTaxCode(d.mstBan) && Math.abs(p.tongCong - d.tongTtVnd) <= NG_GK
       );
       if (!cand) continue;
-      pmDaGhep.add(cand);
+      matchedLedgerRows.add(cand);
       nearMatchCount++;
       const invoiceDescription = `Gần khớp: cùng MST + số tiền ${num(d.tongTtVnd)} đ với dòng ghi sổ ${cand.phieu || "(?)"} sheet "${cand.sheet}" dòng ${cand.dongFile} (số HĐ sổ ${cand.soHoaDon} ≠ số HĐ ${d.soHoaDon}). Kiểm tra xem có phải một.`;
       d.ganKhopMoTa = invoiceDescription;
       d.bangChung += " " + invoiceDescription;
       cand.ganKhopMoTa = `Gần khớp hóa đơn ${d.kyHieu}-${d.soHoaDon} sheet "${d.sheet}" dòng ${d.dongFile} (cùng MST + số tiền).`;
       cand.bangChung += " " + cand.ganKhopMoTa;
-      nghiVan.push({
+      suspects.push({
         nhom: 3,
         viTri: `${d.sheet} · dòng ${d.dongFile} (Số hóa đơn ${d.soHoaDon})`,
         viTriXuat: `${d.sheet} · dòng ${d.dongFile} (Số hóa đơn ${d.soHoaDon})`,
@@ -1845,66 +1845,66 @@ function reconcileOnce(sheets: SheetTho[], opt: ReconciliationOptions, foreignCu
 
   // Có sổ: khóa lặp nghĩa là cộng hai lần vào đối soát ⇒ luôn báo. Không sổ (so hai bản):
   // mỗi bên một dòng là đương nhiên, chỉ báo khi lặp TRONG cùng một bản.
-  for (const [k, arr] of hdTheoKhoa) {
-    const nThue = arr.filter((x) => benThue.has(x.sheet)).length;
-    if (ledgerSheet ? arr.length > 1 : nThue > 1 || arr.length - nThue > 1)
+  for (const [k, arr] of invoicesByKey) {
+    const taxSideCount = arr.filter((x) => taxSides.has(x.sheet)).length;
+    if (ledgerSheet ? arr.length > 1 : taxSideCount > 1 || arr.length - taxSideCount > 1)
       warnings.push({ loai: "Trùng khóa HĐĐT", chiTiet: `Khóa "${k}" xuất hiện ${arr.length} lần (${arr.map((x) => `${x.sheet}#${x.dongFile}`).join(", ")}).` });
   }
 
   // --- Cầu nối số liệu (v3 §7) ---
-  let fileTotal = 0, fileMatched = 0, lechFile = 0, matchedLedgerTotal = 0, unmatchedDirect = 0;
+  let fileTotal = 0, fileMatched = 0, fileMismatchCount = 0, matchedLedgerTotal = 0, unmatchedDirect = 0;
   const breakdown: { mo: string; tien: number }[] = [];
-  for (const sh of hdActive)
+  for (const sh of activeInvoiceSheets)
     for (const d of sh.dong) {
       fileTotal += d.tongTtVnd;
       if (d.trangThai === "KHOP") { fileMatched += d.tongTtVnd; matchedLedgerTotal += d.tongTtPm; }
-      else if (d.trangThai === "LECH") { lechFile += d.tongTtVnd; matchedLedgerTotal += d.tongTtPm; }
+      else if (d.trangThai === "LECH") { fileMismatchCount += d.tongTtVnd; matchedLedgerTotal += d.tongTtPm; }
       else unmatchedDirect += d.tongTtVnd;
       if (d.chenh != null && Math.abs(d.chenh) > 0.005)
         breakdown.push({ mo: `${d.kyHieu}-${d.soChuan} (${d.sheet})`, tien: d.chenh });
     }
   const bridge: ReconciliationBridge = {
-    tongFile: fileTotal, khopFile: fileMatched, lechFile,
-    chuaCoBenSo: fileTotal - fileMatched - lechFile,
+    tongFile: fileTotal, khopFile: fileMatched, lechFile: fileMismatchCount,
+    chuaCoBenSo: fileTotal - fileMatched - fileMismatchCount,
     chuaCoBenSoTrucTiep: unmatchedDirect,
     soKhopSo: matchedLedgerTotal,
-    duTruCheo: fileMatched + lechFile - matchedLedgerTotal,
+    duTruCheo: fileMatched + fileMismatchCount - matchedLedgerTotal,
     bocTach: breakdown.sort((a, b) => Math.abs(b.tien) - Math.abs(a.tien)).slice(0, 100),
   };
 
-  const nghiVanGop = [...gopMap.values()];
-  const soNghiVan = nghiVan.length + nghiVanGop.reduce((s, g) => s + g.soDong, 0);
+  const groupedSuspects = [...mergeMap.values()];
+  const suspectCount = suspects.length + groupedSuspects.reduce((s, g) => s + g.soDong, 0);
 
   // --- Khối tự kiểm (v3 §8) — 9 phép ---
   const round = (n: number) => Math.round(n * 100) / 100;
-  const sumChenhBoc = breakdown.reduce((s, x) => s + x.tien, 0);
-  const lechQuyDoi = countLechQuyDoi(invoiceSheets);
-  const phepThu: TrialCheck[] = [
-    { ten: "Mỗi hóa đơn đúng 1 nhãn", batLoiGi: "một hóa đơn bị đếm 2 nhãn hoặc sót nhãn", mong: String(invoiceNo), thuc: String(isMatch + lech + thieu), dat: invoiceNo === isMatch + lech + thieu },
-    { ten: "Mỗi dòng ghi sổ đúng 1 nhãn", batLoiGi: "dòng phần mềm bị sót/đếm trùng nhãn", mong: String(ledgerRowCount), thuc: String(pmCo + pmThieu), dat: ledgerRowCount === pmCo + pmThieu },
-    { ten: "Cột quy đổi = gốc × tỷ giá áp dụng", batLoiGi: "dòng ngoại tệ thiếu tỷ giá (không quy đổi được), hoặc số VND không khớp số gốc × tỷ giá áp dụng", mong: "0 dòng lệch", thuc: `${lechQuyDoi} dòng lệch`, dat: lechQuyDoi === 0 },
-    { ten: "Tổng file − các nhóm = 0", batLoiGi: "phân nhóm bỏ sót tiền", mong: "0 đ", thuc: `${num(round(fileTotal - fileMatched - lechFile - unmatchedDirect))} đ`, dat: Math.abs(fileTotal - fileMatched - lechFile - unmatchedDirect) < 0.5 },
+  const breakdownDiffSum = breakdown.reduce((s, x) => s + x.tien, 0);
+  const conversionMismatchCount = countConversionMismatches(invoiceSheets);
+  const trialChecks: TrialCheck[] = [
+    { ten: "Mỗi hóa đơn đúng 1 nhãn", batLoiGi: "một hóa đơn bị đếm 2 nhãn hoặc sót nhãn", mong: String(invoiceNo), thuc: String(isMatch + mismatch + missingCount), dat: invoiceNo === isMatch + mismatch + missingCount },
+    { ten: "Mỗi dòng ghi sổ đúng 1 nhãn", batLoiGi: "dòng phần mềm bị sót/đếm trùng nhãn", mong: String(ledgerRowCount), thuc: String(ledgerMatchedCount + ledgerMissingCount), dat: ledgerRowCount === ledgerMatchedCount + ledgerMissingCount },
+    { ten: "Cột quy đổi = gốc × tỷ giá áp dụng", batLoiGi: "dòng ngoại tệ thiếu tỷ giá (không quy đổi được), hoặc số VND không khớp số gốc × tỷ giá áp dụng", mong: "0 dòng lệch", thuc: `${conversionMismatchCount} dòng lệch`, dat: conversionMismatchCount === 0 },
+    { ten: "Tổng file − các nhóm = 0", batLoiGi: "phân nhóm bỏ sót tiền", mong: "0 đ", thuc: `${num(round(fileTotal - fileMatched - fileMismatchCount - unmatchedDirect))} đ`, dat: Math.abs(fileTotal - fileMatched - fileMismatchCount - unmatchedDirect) < 0.5 },
     { ten: "Hai cách tính phần chưa kê bằng nhau", batLoiGi: "trừ chéo file/sổ khi tính phần còn thiếu", mong: "0 đ chênh", thuc: `${num(round(bridge.chuaCoBenSo - bridge.chuaCoBenSoTrucTiep))} đ`, dat: Math.abs(bridge.chuaCoBenSo - bridge.chuaCoBenSoTrucTiep) < 0.5 },
-    { ten: "Phần dư trừ chéo giải thích được", batLoiGi: "phần dư không bóc tách về giao dịch", mong: `${num(round(bridge.duTruCheo))} đ`, thuc: `${num(round(sumChenhBoc))} đ (bóc tách)`, dat: Math.abs(bridge.duTruCheo - sumChenhBoc) < 0.5 },
-    { ten: "Tổng cột Chênh lệch = phần dư trừ chéo", batLoiGi: "cột chênh lệch của bảng chính lệch phần dư", mong: `${num(round(bridge.duTruCheo))} đ`, thuc: `${num(round(signedDiffTotal(hdActive)))} đ`, dat: Math.abs(bridge.duTruCheo - signedDiffTotal(hdActive)) < 0.5 },
+    { ten: "Phần dư trừ chéo giải thích được", batLoiGi: "phần dư không bóc tách về giao dịch", mong: `${num(round(bridge.duTruCheo))} đ`, thuc: `${num(round(breakdownDiffSum))} đ (bóc tách)`, dat: Math.abs(bridge.duTruCheo - breakdownDiffSum) < 0.5 },
+    { ten: "Tổng cột Chênh lệch = phần dư trừ chéo", batLoiGi: "cột chênh lệch của bảng chính lệch phần dư", mong: `${num(round(bridge.duTruCheo))} đ`, thuc: `${num(round(signedDiffTotal(activeInvoiceSheets)))} đ`, dat: Math.abs(bridge.duTruCheo - signedDiffTotal(activeInvoiceSheets)) < 0.5 },
     { ten: "Bằng chứng cộng = chỉ tiêu bảng chính", batLoiGi: "cột 'Tổng trên sổ' của HĐĐT lệch tổng dòng ghi sổ đã khớp", mong: `${num(round(matchedLedgerTotal))} đ`, thuc: `${num(round(ledgerTotalOf(ledgerSheet)))} đ`, dat: Math.abs(matchedLedgerTotal - ledgerTotalOf(ledgerSheet)) < 0.5 },
-    { ten: "Số nghi vấn = số đã liệt kê (baseline)", batLoiGi: "xuất hiện lỗi mới, hoặc người dùng vừa sửa xong 1 lỗi", mong: String(opt.nghiVanBanDau ?? soNghiVan), thuc: String(soNghiVan), dat: (opt.nghiVanBanDau ?? soNghiVan) === soNghiVan },
+    { ten: "Số nghi vấn = số đã liệt kê (baseline)", batLoiGi: "xuất hiện lỗi mới, hoặc người dùng vừa sửa xong 1 lỗi", mong: String(opt.nghiVanBanDau ?? suspectCount), thuc: String(suspectCount), dat: (opt.nghiVanBanDau ?? suspectCount) === suspectCount },
   ];
 
   return {
     sheetsHoaDon: invoiceSheets,
     sheetPhanMem: ledgerSheet,
     sheetsPhanMemPhu: extraLedgerSheets,
-    tong: { soHoaDon: invoiceNo, khop: isMatch, lech, lechThue, thieu, thieuKhongCanVaoSo: missingNotRequired, ganKhop: nearMatchCount, soDongPm: ledgerRowCount, pmCo, pmThieu, tongChenh: totalDiff, soLoiParse: parseErrorCount },
-    nghiVan,
-    nghiVanGop,
+    tong: { soHoaDon: invoiceNo, khop: isMatch, lech: mismatch, lechThue: taxMismatchCount, thieu: missingCount, thieuKhongCanVaoSo: missingNotRequired, ganKhop: nearMatchCount, soDongPm: ledgerRowCount, pmCo: ledgerMatchedCount, pmThieu: ledgerMissingCount, tongChenh: totalDiff, soLoiParse: parseErrorCount },
+    nghiVan: suspects,
+    nghiVanGop: groupedSuspects,
     cauNoi: bridge,
-    phepThu,
+    phepThu: trialChecks,
     canhBao: warnings,
     canChonSo: needsLedgerPick,
     daGoCotCu: removedOldColumn,
     nhatKySua: editLog,
-    nguong,
+    nguong: threshold,
     ...(opt.benThue ? { benThue: opt.benThue } : {}),
   };
 }
@@ -1913,12 +1913,12 @@ function reconcileOnce(sheets: SheetTho[], opt: ReconciliationOptions, foreignCu
  * Dòng KHÔNG quy đổi đúng: ngoại tệ thiếu tỷ giá, hoặc một trong ba cột VND khác số gốc ×
  * tỷ giá ÁP DỤNG (bắt lỗi hạ tỷ giá mà quên tính lại cột VND, hay ngược lại).
  */
-function countLechQuyDoi(sheets: readonly InvoiceSheet[]): number {
+function countConversionMismatches(sheets: readonly InvoiceSheet[]): number {
   let n = 0;
   for (const sh of sheets)
     for (const d of sh.dong) {
-      const lech = (goc: number, vnd: number) => Math.abs(goc * d.tyGia - vnd) > 0.01;
-      if (d.thieuTyGia || lech(d.chuaThueRaw, d.chuaThueVnd) || lech(d.thueRaw, d.thueVnd) || lech(d.tongTtRaw, d.tongTtVnd)) n++;
+      const mismatch = (original: number, vnd: number) => Math.abs(original * d.tyGia - vnd) > 0.01;
+      if (d.thieuTyGia || mismatch(d.chuaThueRaw, d.chuaThueVnd) || mismatch(d.thueRaw, d.thueVnd) || mismatch(d.tongTtRaw, d.tongTtVnd)) n++;
     }
   return n;
 }
@@ -1940,13 +1940,13 @@ export const LEDGER_NOTE =
   'CHÚ THÍCH: dòng XANH = bút toán đã có hóa đơn điện tử | dòng ĐỎ = chưa tìm thấy hóa đơn điện tử.';
 
 /** Nền đặc kiểu xlsx-js-style (RGB không kênh alpha) từ bảng màu chung. */
-const nenXlsx = (argb: string) => ({ patternType: "solid", fgColor: { rgb: argb.slice(2) } }) as const;
+const xlsxFill = (argb: string) => ({ patternType: "solid", fgColor: { rgb: argb.slice(2) } }) as const;
 const FILL = {
-  xanh: { fill: nenXlsx(FILL_COLORS.xanh), font: { color: { rgb: "006100" } } },
-  vang: { fill: nenXlsx(FILL_COLORS.vang), font: { color: { rgb: "9C6500" } } },
-  do: { fill: nenXlsx(FILL_COLORS.do), font: { color: { rgb: "9C0006" } } },
+  xanh: { fill: xlsxFill(FILL_COLORS.xanh), font: { color: { rgb: "006100" } } },
+  vang: { fill: xlsxFill(FILL_COLORS.vang), font: { color: { rgb: "9C6500" } } },
+  do: { fill: xlsxFill(FILL_COLORS.do), font: { color: { rgb: "9C0006" } } },
 } as const;
-const HEADER_STYLE = { font: { bold: true }, fill: nenXlsx(FILL_COLORS.tieuDe) } as const;
+const HEADER_STYLE = { font: { bold: true }, fill: xlsxFill(FILL_COLORS.tieuDe) } as const;
 type Style = { fill?: unknown; font?: unknown } | null;
 
 function toExportCell(v: unknown): unknown {
@@ -1994,16 +1994,16 @@ function buildSheet(aoa: unknown[][], fillTheoHang: Style[], headerRow: number):
  * (chủ dự án phản ánh 2026-09-21). File vào là file đã xuất thì bỏ đuôi cũ trước,
  * kẻo tên dài dần qua mỗi lần xuất lại.
  */
-export function buildResultFileName(tenGoc: string, luc: Date = new Date()): string {
-  const goc = tenGoc
+export function buildResultFileName(originalFileName: string, luc: Date = new Date()): string {
+  const original = originalFileName
     .replace(/\.xlsx?$/i, "")
     .replace(/ - (đã đối soát|đã dò lệch)( \d{8}-\d{4})?$/i, "");
   const pad2 = (n: number) => String(n).padStart(2, "0");
   const moc = `${luc.getFullYear()}${pad2(luc.getMonth() + 1)}${pad2(luc.getDate())}-${pad2(luc.getHours())}${pad2(luc.getMinutes())}`;
-  return `${goc} - đã đối soát ${moc}.xlsx`;
+  return `${original} - đã đối soát ${moc}.xlsx`;
 }
 
-export function exportReconciliationExcel(kq: ReconciliationResult, tenFile = "doi-soat-hddt.xlsx"): void {
+export function exportReconciliationExcel(result: ReconciliationResult, tenFile = "doi-soat-hddt.xlsx"): void {
   const wb = XLSX.utils.book_new();
   const usedNames = new Set<string>();
   const addSheet = (ws: XLSX.WorkSheet, ten: string) => {
@@ -2014,7 +2014,7 @@ export function exportReconciliationExcel(kq: ReconciliationResult, tenFile = "d
     XLSX.utils.book_append_sheet(wb, ws, t);
   };
 
-  for (const sh of kq.sheetsHoaDon) {
+  for (const sh of result.sheetsHoaDon) {
     const aoa: unknown[][] = [];
     const fills: Style[] = [];
     sh.preRows.forEach((r) => { aoa.push([null, ...r.map(toExportCell)]); fills.push(null); });
@@ -2051,14 +2051,14 @@ export function exportReconciliationExcel(kq: ReconciliationResult, tenFile = "d
     }
     addSheet(buildSheet(aoa, fills, hIdx), sh.laPhu ? `PHỤ ${sh.ten}` : sh.ten);
   };
-  if (kq.sheetPhanMem) buildLedgerSheet(kq.sheetPhanMem);
-  for (const p of kq.sheetsPhanMemPhu) buildLedgerSheet(p);
+  if (result.sheetPhanMem) buildLedgerSheet(result.sheetPhanMem);
+  for (const p of result.sheetsPhanMemPhu) buildLedgerSheet(p);
 
-  if (kq.nhatKySua.length) {
+  if (result.nhatKySua.length) {
     const aoa: unknown[][] = [
       ["NHẬT KÝ SỬA — do người dùng xác nhận, giữ lại giá trị cũ"],
       ["Vị trí", "Giá trị cũ", "Giá trị mới"],
-      ...kq.nhatKySua.map((n) => [n.viTri, n.cu, n.moi]),
+      ...result.nhatKySua.map((n) => [n.viTri, n.cu, n.moi]),
     ];
     addSheet(buildSheet(aoa, aoa.map(() => null), 1), "NHẬT KÝ SỬA");
   }
@@ -2075,37 +2075,37 @@ export function exportReconciliationExcel(kq: ReconciliationResult, tenFile = "d
  */
 export function exportReconciliationTemplate(tenFile = "mau-doi-soat-hoa-don.xlsx"): void {
   const wb = XLSX.utils.book_new();
-  const HDR_HD = [
+  const INVOICE_HEADER = [
     "STT", "Ký hiệu mẫu số", "Ký hiệu hóa đơn", "Số hóa đơn", "Ngày lập",
     "MST người bán/MST người xuất hàng", "Tên người bán/Tên người xuất hàng",
     "MST người mua/MST người nhận hàng", "Tên người mua/Tên người nhận hàng", "Địa chỉ người mua",
     "Tổng tiền chưa thuế", "Tổng tiền thuế", "Tổng tiền chiết khấu thương mại", "Tổng tiền phí",
     "Tổng tiền thanh toán", "Đơn vị tiền tệ", "Tỷ giá", "Trạng thái hóa đơn", "Kết quả kiểm tra hóa đơn",
   ];
-  const sampleInvoiceRow = (stt: number, kh: string, so: string, preTax: number, thue: number, dvt = "VND", exchangeRate = "1.0"): unknown[] => [
+  const sampleInvoiceRow = (stt: number, kh: string, so: string, preTax: number, tax: number, dvt = "VND", exchangeRate = "1.0"): unknown[] => [
     stt, "1", kh, so, "05/02/2026", "0300514849", "CÔNG TY MẪU ABC", "3502297423", "CÔNG TY TNHH BASEAFOOD 1",
-    "Số 321 Trần Xuân Độ, Bà Rịa", preTax, thue, 0, null, preTax + thue, dvt, exchangeRate, "Hóa đơn mới", "Đã cấp mã",
+    "Số 321 Trần Xuân Độ, Bà Rịa", preTax, tax, 0, null, preTax + tax, dvt, exchangeRate, "Hóa đơn mới", "Đã cấp mã",
   ];
-  const sheetHd = (note: string, rows: unknown[][]) => {
+  const invoiceSheet = (note: string, rows: unknown[][]) => {
     const aoa: unknown[][] = [
-      [note], ["DANH SÁCH HÓA ĐƠN"], ["Từ ngày 01/02/2026 đến ngày 28/02/2026"], [], [], HDR_HD, ...rows,
+      [note], ["DANH SÁCH HÓA ĐƠN"], ["Từ ngày 01/02/2026 đến ngày 28/02/2026"], [], [], INVOICE_HEADER, ...rows,
     ];
     const ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws["!cols"] = HDR_HD.map((h) => ({ wch: Math.min(Math.max(h.length + 1, 12), 40) }));
+    ws["!cols"] = INVOICE_HEADER.map((h) => ({ wch: Math.min(Math.max(h.length + 1, 12), 40) }));
     (ws[XLSX.utils.encode_cell({ r: 5, c: 0 })] as { s?: unknown }).s = HEADER_STYLE;
     return ws;
   };
-  XLSX.utils.book_append_sheet(wb, sheetHd("Hóa đơn CÓ MÃ cơ quan thuế — mẫu; giữ tiêu đề ở hàng 6",
+  XLSX.utils.book_append_sheet(wb, invoiceSheet("Hóa đơn CÓ MÃ cơ quan thuế — mẫu; giữ tiêu đề ở hàng 6",
     [sampleInvoiceRow(1, "C26TCT", "1812", 4800000, 384000), sampleInvoiceRow(2, "C26TSD", "10183", 2830000, 226400)]), "CÓ MÃ");
-  XLSX.utils.book_append_sheet(wb, sheetHd("Hóa đơn MÁY TÍNH TIỀN — mẫu",
+  XLSX.utils.book_append_sheet(wb, invoiceSheet("Hóa đơn MÁY TÍNH TIỀN — mẫu",
     [sampleInvoiceRow(1, "C26MCM", "36582", 297407, 23793)]), "MÁY TÍNH TIỀN");
-  XLSX.utils.book_append_sheet(wb, sheetHd("Hóa đơn KHÔNG MÃ (gồm ngoại tệ USD) — mẫu",
+  XLSX.utils.book_append_sheet(wb, invoiceSheet("Hóa đơn KHÔNG MÃ (gồm ngoại tệ USD) — mẫu",
     [sampleInvoiceRow(1, "K26TVT", "1392", 5300600, 530060), sampleInvoiceRow(2, "K26TAB", "10161", 217.2, 21.72, "USD", "25795.0")]), "KHÔNG MÃ");
 
   // Sheet sổ (PMEM) — tiêu đề ở hàng 1, hỗ trợ mã máy
   const HDR_PM = ["SCT_GHISO", "NGAY_GS", "SO_PHIEU", "KY_HIEU", "NGAY_HD", "SO_HD", "NGUOI_BAN", "RMST", "MAT_HANG", "TIENHANG", "TIENTHUE", "TONGCONG", "TS%", "GHICHU", "LOAI"];
-  const sampleLedgerRow = (salesInvoice: string, kh: string, so: string, hang: number, thue: number): unknown[] =>
-    ["NHI", "01/02/2026", salesInvoice, kh, "05/02/2026", so, "CÔNG TY MẪU ABC", "0300514849", "Mua hàng - HĐ " + so, hang, thue, hang + thue, "10%", null, "1A"];
+  const sampleLedgerRow = (salesInvoice: string, kh: string, so: string, hang: number, tax: number): unknown[] =>
+    ["NHI", "01/02/2026", salesInvoice, kh, "05/02/2026", so, "CÔNG TY MẪU ABC", "0300514849", "Mua hàng - HĐ " + so, hang, tax, hang + tax, "10%", null, "1A"];
   const aoaPm: unknown[][] = [
     HDR_PM,
     sampleLedgerRow("01/NHI/02", "C26TCT", "00001812", 4800000, 384000),
@@ -2128,9 +2128,9 @@ export function exportReconciliationTemplate(tenFile = "mau-doi-soat-hoa-don.xls
     ["5. Đối chiếu theo: MST người bán + Ký hiệu (bỏ chữ số mẫu số đầu) + Số hóa đơn (bỏ số 0 đầu)."],
     ["6. KHÔNG bắt buộc theo mẫu này — hệ thống vẫn đọc file có tên sheet/cột khác, miễn còn các cột bắt buộc trên."],
   ];
-  const wsHd = XLSX.utils.aoa_to_sheet(instructions);
-  wsHd["!cols"] = [{ wch: 110 }];
-  XLSX.utils.book_append_sheet(wb, wsHd, "HƯỚNG DẪN");
+  const guideSheet = XLSX.utils.aoa_to_sheet(instructions);
+  guideSheet["!cols"] = [{ wch: 110 }];
+  XLSX.utils.book_append_sheet(wb, guideSheet, "HƯỚNG DẪN");
 
   XLSX.writeFile(wb, tenFile, { bookType: "xlsx" });
 }

@@ -141,7 +141,7 @@ function createRandom(hat: number) {
     r,
     tu: (a0: number, b0: number) => a0 + (b0 - a0) * r(),
     nguyen: (a0: number, b0: number) => Math.floor(a0 + (b0 - a0 + 1) * r()),
-    chon: <T>(ds: readonly T[]) => ds[Math.floor(r() * ds.length)],
+    chon: <T>(items: readonly T[]) => items[Math.floor(r() * items.length)],
   };
 }
 
@@ -178,8 +178,8 @@ export function scanDemoParams(n: DemoSource): DemoParams {
   for (const x of workshopList) {
     const dem = new Map<string, number>();
     for (const r of n.imports) if (r.workshop === x && r.materialTypeName) dem.set(r.materialTypeName, (dem.get(r.materialTypeName) ?? 0) + (r.quantityKg || 0));
-    const ds = [...dem.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([t]) => t);
-    materialsByWorkshop[x] = ds.length ? ds : n.materialTypes.slice(0, 2).map((m) => m.name).filter(Boolean);
+    const items = [...dem.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([t]) => t);
+    materialsByWorkshop[x] = items.length ? items : n.materialTypes.slice(0, 2).map((m) => m.name).filter(Boolean);
     if (materialsByWorkshop[x].length === 0) materialsByWorkshop[x] = [`Nguyên liệu ${x}`];
   }
   const supplierKg = new Map<string, number>();
@@ -203,13 +203,13 @@ export function scanDemoParams(n: DemoSource): DemoParams {
   const tenNLtheoId = new Map(n.materialTypes.map((m) => [m.id, m.name]));
   const productsByMaterial: Record<string, string[]> = {};
   for (const ten of new Set(Object.values(materialsByWorkshop).flat())) {
-    let ds = n.products.filter((p) => p.materialTypeId && tenNLtheoId.get(p.materialTypeId) === ten);
-    if (ds.length === 0) {
+    let items = n.products.filter((p) => p.materialTypeId && tenNLtheoId.get(p.materialTypeId) === ten);
+    if (items.length === 0) {
       const category = n.materialTypes.find((m) => m.name === ten)?.category;
-      ds = n.products.filter((p) => category && p.category === category);
+      items = n.products.filter((p) => category && p.category === category);
     }
-    if (ds.length === 0) ds = n.products.slice(0, 6);
-    productsByMaterial[ten] = ds.slice(0, 5).map((p) => p.id);
+    if (items.length === 0) items = n.products.slice(0, 6);
+    productsByMaterial[ten] = items.slice(0, 5).map((p) => p.id);
   }
   return {
     xuong: workshopList,
@@ -240,24 +240,24 @@ export function generateDemoBundle(n: DemoSource, tc: DemoOptions): GoiDemo {
 
   // ---- Danh mục ----
   const suppliers: Supplier[] = ts.daiLy.map((t, i) => {
-    const goc = n.suppliers.find((s0) => s0.shortName === t);
+    const original = n.suppliers.find((s0) => s0.shortName === t);
     return {
       id: `dm-dl-${i}`, // id mới: id thật có thể chứa tên đối tác
       code: String(i + 1),
       shortName: supplierNames.get(t) as string,
-      billingName: anonymize ? (supplierNames.get(t) as string) : goc?.billingName || t,
-      address: anonymize ? "" : goc?.address ?? "",
-      nationalId: anonymize ? "" : goc?.nationalId ?? "",
+      billingName: anonymize ? (supplierNames.get(t) as string) : original?.billingName || t,
+      address: anonymize ? "" : original?.address ?? "",
+      nationalId: anonymize ? "" : original?.nationalId ?? "",
       issuedDate: "",
       issuedPlace: "",
-      phone: anonymize ? "" : goc?.phone ?? "",
+      phone: anonymize ? "" : original?.phone ?? "",
       note: "Dữ liệu demo",
     };
   });
-  const khGoc = n.customers.length
+  const baseCustomers = n.customers.length
     ? n.customers.slice(0, 8)
     : (Array.from({ length: 6 }, (_, i) => ({ id: `dm-kh-${i}`, code: "", name: `KH ${i}`, market: i % 2 ? "Nội địa" : "Nhật Bản" })) as Customer[]);
-  const customers: Customer[] = khGoc.map((c, i) => ({ ...c, id: `dm-kh-${i}`, code: String(i + 1), name: anonymize ? ten("kh", i) : c.name }));
+  const customers: Customer[] = baseCustomers.map((c, i) => ({ ...c, id: `dm-kh-${i}`, code: String(i + 1), name: anonymize ? ten("kh", i) : c.name }));
 
   // ---- Tồn đầu (mốc = ngày đầu) ----
   const firstDate = ngays[0];
@@ -282,7 +282,7 @@ export function generateDemoBundle(n: DemoSource, tc: DemoOptions): GoiDemo {
   }));
 
   // Mặt hàng "lệch định mức" cố ý (cảnh báo định mức) — mặt hàng thứ 2 của xưởng đầu.
-  const mhLech = ts.matHangTheoNL[ts.nlTheoXuong[ts.xuong[0]][0]][1] ?? allProducts[1];
+  const offYieldProduct = ts.matHangTheoNL[ts.nlTheoXuong[ts.xuong[0]][0]][1] ?? allProducts[1];
 
   const shipments: ImportShipment[] = [];
   const imports: MaterialImportItem[] = [];
@@ -307,14 +307,14 @@ export function generateDemoBundle(n: DemoSource, tc: DemoOptions): GoiDemo {
     const total = dong.reduce((s0, d) => s0 + (remainingMaterial.get(d.id) ?? 0), 0);
     if (can <= 0 || total < can) return [];
     const ra: { dong: MaterialImportItem; kg: number }[] = [];
-    let thieu = can;
+    let shortfall = can;
     for (const d of [...dong].sort((a0, b0) => (remainingMaterial.get(b0.id) ?? 0) - (remainingMaterial.get(a0.id) ?? 0))) {
-      if (thieu <= 0) break;
-      const k = Math.min(remainingMaterial.get(d.id) ?? 0, thieu);
+      if (shortfall <= 0) break;
+      const k = Math.min(remainingMaterial.get(d.id) ?? 0, shortfall);
       if (k <= 0) continue;
       remainingMaterial.set(d.id, (remainingMaterial.get(d.id) ?? 0) - k);
       ra.push({ dong: d, kg: k });
-      thieu -= k;
+      shortfall -= k;
     }
     return ra;
   };
@@ -406,9 +406,9 @@ export function generateDemoBundle(n: DemoSource, tc: DemoOptions): GoiDemo {
       // của ngày đủ để gắn lô cho các mẻ, kể cả mặt hàng "lệch định mức" (+13%).
       const totalFinishedGood = totalIn * ts.tiLeTP * ng.tu(0.8, 0.9);
       const batchCount = ng.r() < 0.5 ? 3 : 2;
-      const dsMH = ts.matHangTheoNL[todayRows[0].materialTypeName] ?? allProducts;
+      const productList = ts.matHangTheoNL[todayRows[0].materialTypeName] ?? allProducts;
       for (let m = 0; m < batchCount; m++) {
-        const pid = dsMH[(i + m) % dsMH.length];
+        const pid = productList[(i + m) % productList.length];
         const kg = tron(totalFinishedGood / batchCount, 1);
         // Chờ duyệt: 2 ngày gần nhất (ca "chờ duyệt lâu" cài sau vòng sinh).
         const isPending = date >= subtractDays(tc.homNay, 1);
@@ -431,7 +431,7 @@ export function generateDemoBundle(n: DemoSource, tc: DemoOptions): GoiDemo {
         };
         wips.push(w);
         // Gắn lô NL: tỉ lệ tăng dần theo thời gian (kể chuyện "từ khi dùng QR").
-        const heSo = pid === mhLech ? 1.13 : ng.tu(0.98, 1.02);
+        const heSo = pid === offYieldProduct ? 1.13 : ng.tu(0.98, 1.02);
         const materialParts = ng.r() < 0.45 + 0.5 * progress ? takeMaterial(todayRows, tron((kg / ts.tiLeTP) * heSo, 1)) : [];
         if (materialParts.length > 0) {
           for (const p0 of materialParts)
@@ -449,8 +449,8 @@ export function generateDemoBundle(n: DemoSource, tc: DemoOptions): GoiDemo {
       // QC cuối ngày
       for (const criterion of QC_CRITERIA) {
         const r0 = ng.r();
-        const kq: QcResult = r0 < 0.85 ? "dat" : r0 < 0.97 ? "tam" : "khong-dat";
-        qcChecklists.push({ id: id("qc"), date, workshop: x, criterion, result: kq, score: kq === "dat" ? ng.nguyen(8, 10) : kq === "tam" ? ng.nguyen(6, 7) : ng.nguyen(3, 5), note: kq === "dat" ? "" : "Đã nhắc tổ khắc phục", backdateReason: "" });
+        const result: QcResult = r0 < 0.85 ? "dat" : r0 < 0.97 ? "tam" : "khong-dat";
+        qcChecklists.push({ id: id("qc"), date, workshop: x, criterion, result, score: result === "dat" ? ng.nguyen(8, 10) : result === "tam" ? ng.nguyen(6, 7) : ng.nguyen(3, 5), note: result === "dat" ? "" : "Đã nhắc tổ khắc phục", backdateReason: "" });
       }
       if (isPast) qcLocks.push({ id: `${date}|${x}`, lockDate: date, workshop: x, isLocked: true, lockedAt: `${date}T18:00:00.000Z`, totalKgAtLock: 0, reopenReason: "", note: "" });
     });
@@ -511,9 +511,9 @@ export function generateDemoBundle(n: DemoSource, tc: DemoOptions): GoiDemo {
   const soDon = Math.max(3, Math.floor(days / 12));
   // Đơn chọn mặt hàng ĐÃ có trong kho (sản xuất nhiều nhất trước) — đơn hàng chưa từng
   // làm thì lệnh xuất rỗng, demo không có gì để kể.
-  const kgTheoMH = new Map<string, number>();
-  for (const w of wips) if (w.status === "da-nhap") kgTheoMH.set(w.productId, (kgTheoMH.get(w.productId) ?? 0) + w.quantityKg);
-  const productsWithStock = [...kgTheoMH.entries()].sort((a0, b0) => b0[1] - a0[1]).map(([k]) => k);
+  const kgByProduct = new Map<string, number>();
+  for (const w of wips) if (w.status === "da-nhap") kgByProduct.set(w.productId, (kgByProduct.get(w.productId) ?? 0) + w.quantityKg);
+  const productsWithStock = [...kgByProduct.entries()].sort((a0, b0) => b0[1] - a0[1]).map(([k]) => k);
   for (let d = 0; d < soDon; d++) {
     const orderDate = ngays[Math.floor(((d + 0.5) * ngays.length) / soDon) - 3] ?? ngays[0];
     const exportDate = subtractDays(orderDate, -4) <= tc.homNay ? subtractDays(orderDate, -4) : tc.homNay;
@@ -569,16 +569,16 @@ export function generateDemoBundle(n: DemoSource, tc: DemoOptions): GoiDemo {
     if (salesItems.some((x) => x.invoiceId === salesInvoice.id)) salesInvoices.push(salesInvoice);
   });
   // Cố ý: một dòng bán block thô VƯỢT tồn (cảnh báo "bán vượt tồn") hôm qua.
-  const mhVuot = allProducts[allProducts.length - 1];
-  const productStock = wips.filter((w) => w.productId === mhVuot && w.status === "da-nhap").reduce((s0, w) => s0 + (con.get(w.id) ?? 0), 0);
-  const fo = finishedOpening.filter((o) => o.productId === mhVuot).reduce((s0, o) => s0 + o.quantityKg, 0);
+  const oversoldProduct = allProducts[allProducts.length - 1];
+  const productStock = wips.filter((w) => w.productId === oversoldProduct && w.status === "da-nhap").reduce((s0, w) => s0 + (con.get(w.id) ?? 0), 0);
+  const fo = finishedOpening.filter((o) => o.productId === oversoldProduct).reduce((s0, o) => s0 + o.quantityKg, 0);
   const overSoldInvoice: SalesInvoice = { id: id("phieu"), deliveryDate: yesterday, postingDate: yesterday, backdateReason: "", workshop: ts.xuong[0], customerId: customers[0]?.id ?? "", channel: "Nội địa", note: "" };
   salesInvoices.push(overSoldInvoice);
-  salesItems.push({ id: id("ban"), invoiceId: overSoldInvoice.id, deliveryDate: yesterday, productId: mhVuot, spec: "", quantityKg: tron(productStock + fo + 45, 1), unitPrice: tron(120_000 * priceFactor, 1_000), sourceWarehouse: RETAIL_WAREHOUSE });
+  salesItems.push({ id: id("ban"), invoiceId: overSoldInvoice.id, deliveryDate: yesterday, productId: oversoldProduct, spec: "", quantityKg: tron(productStock + fo + 45, 1), unitPrice: tron(120_000 * priceFactor, 1_000), sourceWarehouse: RETAIL_WAREHOUSE });
 
   // ---- Kỳ cân đối: 4 kỳ × 5 ngày của NL chính xưởng đầu, có kỳ lãi + kỳ lỗ ----
   const mainMaterial = ts.nlTheoXuong[ts.xuong[0]][0];
-  const xChinh = ts.xuong[0];
+  const mainWorkshop = ts.xuong[0];
   const periods: BalancingPeriod[] = [];
   const balancingInputs: BalancingInputItem[] = [];
   const balancingOutputs: BalancingOutputItem[] = [];
@@ -587,8 +587,8 @@ export function generateDemoBundle(n: DemoSource, tc: DemoOptions): GoiDemo {
     const den = subtractDays(tc.homNay, 1 + k * 6);
     const tu = subtractDays(den, 4);
     const pid = id("ky");
-    const periodImports = imports.filter((r) => r.workshop === xChinh && r.materialTypeName === mainMaterial && r.deliveryDate >= tu && r.deliveryDate <= den);
-    const periodBatches = wips.filter((w) => w.workshop === xChinh && w.productionDate >= tu && w.productionDate <= den);
+    const periodImports = imports.filter((r) => r.workshop === mainWorkshop && r.materialTypeName === mainMaterial && r.deliveryDate >= tu && r.deliveryDate <= den);
+    const periodBatches = wips.filter((w) => w.workshop === mainWorkshop && w.productionDate >= tu && w.productionDate <= den);
     if (periodImports.length === 0 || periodBatches.length === 0) return;
     const materialKg = periodImports.reduce((s0, r) => s0 + r.quantityKg, 0);
     const avgPrice = periodImports.reduce((s0, r) => s0 + r.quantityKg * (r.unitPrice ?? 0), 0) / materialKg;

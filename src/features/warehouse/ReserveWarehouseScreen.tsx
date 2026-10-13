@@ -39,25 +39,26 @@ import {
 } from "@/design-system";
 import { kg, num, formatDateVN } from "@/lib/format";
 import { AlertTriangle, CalendarRange, Camera, CameraOff, ClipboardList, PackageCheck, Scale, Search, Snowflake, Warehouse } from "lucide-react";
-import { KhungQuetQr } from "@/features/shared";
-import { docMaQr, formatWipLotLabel, findLots } from "@/lib/lotTraceability";
+import { QrScanner } from "@/features/shared";
+import { parseQrCode, formatWipLotLabel, findLots } from "@/lib/lotTraceability";
 
 import { BSF1_WAREHOUSES } from "@/types";
 import { computeWarehouseOccupancy } from "@/lib/inventory";
+import { readParam } from "@/lib/legacyUrls";
 
 const BSF1_WAREHOUSE_NAMES = BSF1_WAREHOUSES.map((w) => w.name);
 
 interface ApprovalForm {
   wipId: string;
   warehouse: string;
-  luongThuc: number;
-  blockThuc: number;
+  actualKg: number;
+  actualBlocks: number;
   note: string;
 }
 
-export default function KhoDuTruScreen() {
-  const [wips, persistWips, { trangThai }] = useWipProductions();
-  const isLoading = trangThai === "dang-tai" && wips.length === 0;
+export default function ReserveWarehouseScreen() {
+  const [wips, persistWips, { trangThai: status }] = useWipProductions();
+  const isLoading = status === "dang-tai" && wips.length === 0;
   const [exportItems] = useExportItems();
   const [products] = useProducts();
   const [salesItems] = useSalesItems();
@@ -76,7 +77,7 @@ export default function KhoDuTruScreen() {
   const [isScanning, setIsScanning] = useState(false);
   const [typedCode, setTypedCode] = useState("");
 
-  const tenMH = (id: string) => products.find((m) => m.id === id)?.name || "—";
+  const productNameOf = (id: string) => products.find((m) => m.id === id)?.name || "—";
 
   const pendingIntake = useMemo(
     () => wips.filter((s) => s.status === "cho-nhap"),
@@ -84,11 +85,11 @@ export default function KhoDuTruScreen() {
   );
   // Bán lẻ / đóng gói vượt số đang trữ: lô không xuống âm nên phần vượt không nằm
   // trong "Tổng tồn" — phải gọi tên ra, không được nuốt (lỗi ghi chép cần dò).
-  const { los: ton, banVuot, tongBanVuot } = useMemo(
+  const { los: lotStock, banVuot: oversales, tongBanVuot: totalOversold } = useMemo(
     () => computeWipStockDetail(wips, exportItems, retailSales),
     [wips, exportItems, retailSales]
   );
-  const warehouseCapacity = useMemo(() => computeWarehouseOccupancy(ton), [ton]);
+  const warehouseCapacity = useMemo(() => computeWarehouseOccupancy(lotStock), [lotStock]);
 
   const warehouseList = useMemo(() => {
     const set = new Set<string>(BSF1_WAREHOUSE_NAMES);
@@ -104,8 +105,8 @@ export default function KhoDuTruScreen() {
   });
 
   const filteredStock = useMemo(
-    () => ton.filter((t) => (!warehouseFilter || t.warehouse === warehouseFilter) && t.conLai > 0),
-    [ton, warehouseFilter]
+    () => lotStock.filter((t) => (!warehouseFilter || t.warehouse === warehouseFilter) && t.conLai > 0),
+    [lotStock, warehouseFilter]
   );
   const totalStock = filteredStock.reduce((s, t) => s + t.conLai, 0);
   const nhomTuoi = useMemo(() => bucketStockByAge(filteredStock, todayIso()), [filteredStock]);
@@ -114,8 +115,8 @@ export default function KhoDuTruScreen() {
     setApproval({
       wipId: s.id,
       warehouse: s.warehouse || BSF1_WAREHOUSE_NAMES[0],
-      luongThuc: s.quantityKg,
-      blockThuc: s.blocksCount,
+      actualKg: s.quantityKg,
+      actualBlocks: s.blocksCount,
       note: "",
     });
     setLoi([]);
@@ -126,35 +127,35 @@ export default function KhoDuTruScreen() {
    * Thủ kho cầm block nào quét block đó — khỏi dò danh sách, khỏi duyệt nhầm mẻ.
    */
   const approveByLabel = (text: string) => {
-    const ma = docMaQr(text);
+    const ma = parseQrCode(text);
     if (!ma) return;
-    const ds = findLots(ma, {
+    const items = findLots(ma, {
       shipments: [], imports: [], wips, packagings: [], lotInputs: [],
       exportItems: [], exportOrders: [], salesOrders: [], products, customers: [],
     }).filter((n) => n.kind === "W");
-    if (ds.length === 0) {
+    if (items.length === 0) {
       notify.warning(`"${text.trim()}" không phải tem lô bán thành phẩm nào.`);
       return;
     }
-    if (ds.length > 1) {
-      notify.warning(`Mã "${text.trim()}" trùng ${ds.length} lô — quét QR trên tem thay vì gõ mã.`);
+    if (items.length > 1) {
+      notify.warning(`Mã "${text.trim()}" trùng ${items.length} lô — quét QR trên tem thay vì gõ mã.`);
       return;
     }
-    const wip = wips.find((x) => x.id === ds[0]!.id);
+    const wip = wips.find((x) => x.id === items[0]!.id);
     if (!wip) return;
     setTypedCode("");
     if (wip.status !== "cho-nhap") {
-      notify.warning(`Lô ${ds[0]!.nhan} đã nhập kho${wip.warehouse ? ` ${wip.warehouse}` : ""} rồi.`);
+      notify.warning(`Lô ${items[0]!.nhan} đã nhập kho${wip.warehouse ? ` ${wip.warehouse}` : ""} rồi.`);
       return;
     }
     setIsScanning(false);
     openApprove(wip);
   };
 
-  // Link từ /qr "Theo giai đoạn" (`?duyet=W:<id>`) ⇒ mở thẳng hộp duyệt của đúng mẻ,
+  // Link từ /qr "Theo giai đoạn" (`?approve=W:<id>`; link cũ `?duyet=`) ⇒ mở thẳng hộp duyệt của đúng mẻ,
   // như quét tem. Xử lý một lần khi dữ liệu đã nạp rồi gỡ tham số khỏi link.
   const [searchParams, setSearchParams] = useSearchParams();
-  const approveParam = searchParams.get("duyet");
+  const approveParam = readParam(searchParams, "approve");
   useEffect(() => {
     if (!approveParam || wips.length === 0) return;
     approveByLabel(approveParam);
@@ -166,20 +167,20 @@ export default function KhoDuTruScreen() {
     if (!approval) return;
     const ls: FieldError[] = [];
     if (!approval.warehouse.trim()) ls.push({ field: "Kho", message: "Chưa chọn kho" });
-    if (!(approval.luongThuc > 0))
+    if (!(approval.actualKg > 0))
       ls.push({ field: "Lượng thực", message: "Phải lớn hơn 0 kg" });
     setLoi(ls);
     if (ls.length > 0) return;
-    const goc = wips.find((s) => s.id === approval.wipId);
-    const lech = goc ? approval.luongThuc - goc.quantityKg : 0;
+    const original = wips.find((s) => s.id === approval.wipId);
+    const diff = original ? approval.actualKg - original.quantityKg : 0;
     persistWips(
       wips.map((s) =>
         s.id === approval.wipId
           ? {
               ...s,
               warehouse: approval.warehouse,
-              quantityKg: approval.luongThuc,
-              blocksCount: approval.blockThuc,
+              quantityKg: approval.actualKg,
+              blocksCount: approval.actualBlocks,
               status: "da-nhap",
               note: approval.note || s.note,
             }
@@ -187,8 +188,8 @@ export default function KhoDuTruScreen() {
       )
     );
     notify.saved(
-      `Đã nhập kho ${approval.warehouse} — ${kg(approval.luongThuc)}` +
-        (lech ? ` (lệch ${lech > 0 ? "+" : ""}${num(lech)} kg)` : "")
+      `Đã nhập kho ${approval.warehouse} — ${kg(approval.actualKg)}` +
+        (diff ? ` (lệch ${diff > 0 ? "+" : ""}${num(diff)} kg)` : "")
     );
     setApproval(null);
   };
@@ -198,8 +199,8 @@ export default function KhoDuTruScreen() {
       key: "mh",
       header: "Mặt hàng",
       primary: true,
-      render: (r) => tenMH(r.productId),
-      getSortValue: (r) => tenMH(r.productId),
+      render: (r) => productNameOf(r.productId),
+      getSortValue: (r) => productNameOf(r.productId),
     },
     { key: "kho", header: "Kho", render: (r) => <Tag variant="phan-loai" tone={toneByName(r.warehouse)}>{r.warehouse || "—"}</Tag>, getSortValue: (r) => r.warehouse },
     {
@@ -241,13 +242,13 @@ export default function KhoDuTruScreen() {
         ]}
       />
 
-      {tongBanVuot > 0 && (
+      {totalOversold > 0 && (
         <div role="status" className="flex items-start gap-3 rounded-lg bg-warning-surface px-4 py-3 text-base text-warning">
           <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" aria-hidden />
           <span>
-            Bán vượt <span className="tnum font-semibold">{kg(tongBanVuot)}</span> so với tồn —{" "}
-            {banVuot
-              .map((v) => `${tenMH(v.productId)}${v.spec ? ` (${v.spec})` : ""} ${kg(v.kg)}`)
+            Bán vượt <span className="tnum font-semibold">{kg(totalOversold)}</span> so với tồn —{" "}
+            {oversales
+              .map((v) => `${productNameOf(v.productId)}${v.spec ? ` (${v.spec})` : ""} ${kg(v.kg)}`)
               .join(" · ")}
             . Kiểm lại phiếu bán / đóng gói, hoặc duyệt nhập kho mẻ còn chờ.
           </span>
@@ -364,7 +365,7 @@ export default function KhoDuTruScreen() {
               Tìm lô
             </Button>
           </div>
-          {isScanning && <KhungQuetQr onQuet={approveByLabel} />}
+          {isScanning && <QrScanner onScan={approveByLabel} />}
           <ul className="divide-y divide-border">
             {pendingIntake.map((s) => (
               <li
@@ -373,7 +374,7 @@ export default function KhoDuTruScreen() {
               >
                 <span className="min-w-0 flex-1 text-base">
                   <span className="tnum mr-2 font-semibold">{formatWipLotLabel(s)}</span>
-                  {tenMH(s.productId)}
+                  {productNameOf(s.productId)}
                   {s.spec ? ` · ${s.spec}` : ""} —{" "}
                   <span className="tnum font-semibold">{num(s.quantityKg)}</span> kg
                   <span className="text-muted-foreground">
@@ -423,7 +424,7 @@ export default function KhoDuTruScreen() {
             rows={filteredStock}
             getKey={(r) => r.wipId}
             rowMarkKey="kho-du-tru"
-            getSearchText={(r) => `${tenMH(r.productId)} ${r.spec} ${r.warehouse}`}
+            getSearchText={(r) => `${productNameOf(r.productId)} ${r.spec} ${r.warehouse}`}
             searchLabel="Tìm theo mặt hàng / quy cách / kho…"
           />
           <div className="flex justify-end rounded-xl bg-muted px-5 py-4">
@@ -442,7 +443,7 @@ export default function KhoDuTruScreen() {
             <DialogTitle className="text-2xl">Duyệt nhập kho</DialogTitle>
             <DialogDescription className="text-base">
               {approvalSource
-                ? `${tenMH(approvalSource.productId)}${approvalSource.spec ? ` · ${approvalSource.spec}` : ""} — SX ${formatDateVN(approvalSource.productionDate)}. Đối chiếu kg/block thực, chọn kho.`
+                ? `${productNameOf(approvalSource.productId)}${approvalSource.spec ? ` · ${approvalSource.spec}` : ""} — SX ${formatDateVN(approvalSource.productionDate)}. Đối chiếu kg/block thực, chọn kho.`
                 : ""}
             </DialogDescription>
           </DialogHeader>
@@ -464,26 +465,26 @@ export default function KhoDuTruScreen() {
                   label="Khối lượng thực"
                   required
                   unit="kg"
-                  value={approval.luongThuc || null}
+                  value={approval.actualKg || null}
                   onChange={(v) =>
-                    setApproval((d) => (d ? { ...d, luongThuc: v ?? 0 } : d))
+                    setApproval((d) => (d ? { ...d, actualKg: v ?? 0 } : d))
                   }
                 />
                 <NumberField
                   label="Block thực"
                   unit="block"
-                  value={approval.blockThuc || null}
+                  value={approval.actualBlocks || null}
                   onChange={(v) =>
-                    setApproval((d) => (d ? { ...d, blockThuc: v ?? 0 } : d))
+                    setApproval((d) => (d ? { ...d, actualBlocks: v ?? 0 } : d))
                   }
                 />
               </div>
-              {approvalSource && approval.luongThuc !== approvalSource.quantityKg && (
+              {approvalSource && approval.actualKg !== approvalSource.quantityKg && (
                 <p className="rounded-lg bg-accent px-4 py-3 text-base text-accent-foreground">
                   Lệch so ghi sản lượng:{" "}
                   <span className="tnum font-semibold">
-                    {approval.luongThuc - approvalSource.quantityKg > 0 ? "+" : ""}
-                    {num(approval.luongThuc - approvalSource.quantityKg)} kg
+                    {approval.actualKg - approvalSource.quantityKg > 0 ? "+" : ""}
+                    {num(approval.actualKg - approvalSource.quantityKg)} kg
                   </span>{" "}
                   — ghi rõ lý do ở ghi chú.
                 </p>

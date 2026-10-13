@@ -112,7 +112,7 @@ export function setDemoMode(demo: boolean): void {
    localStorage trực tiếp (CLAUDE.md quy tắc 4), đi qua mấy hàm này. */
 
 /** Việc chờ làm sau khi tải lại: "tao" = quét số thật, sinh gói rồi vào demo. */
-const KHOA_VIEC_DEMO = "bsf1:demo-viec";
+const DEMO_TASK_KEY = "bsf1:demo-viec";
 
 /** Gói demo đang chờ nạp (null = không có / hỏng). */
 export function docGoiDemo<T>(): T | null {
@@ -144,17 +144,17 @@ export function clearDemoBundle(): void {
 
 export function readDemoJob(): string | null {
   try {
-    return localStorage.getItem(KHOA_VIEC_DEMO);
+    return localStorage.getItem(DEMO_TASK_KEY);
   } catch {
     return null;
   }
 }
 
 /** Đặt / xóa (null) việc chờ sau khi tải lại. */
-export function setPendingDemoTask(viec: "tao" | null): void {
+export function setPendingDemoTask(task: "tao" | null): void {
   try {
-    if (viec) localStorage.setItem(KHOA_VIEC_DEMO, viec);
-    else localStorage.removeItem(KHOA_VIEC_DEMO);
+    if (task) localStorage.setItem(DEMO_TASK_KEY, task);
+    else localStorage.removeItem(DEMO_TASK_KEY);
   } catch {
     /* bỏ qua */
   }

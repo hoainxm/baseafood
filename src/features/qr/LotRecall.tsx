@@ -11,42 +11,42 @@ import { TRACE_KIND_LABELS, buildLotStockIndex, buildRecallList, buildRecallList
 import { Button, InfoTip, HorizontalScroll, PrintSheet, PrintTd, PrintTh } from "@/design-system";
 import { FileSpreadsheet, Printer, ShieldAlert } from "lucide-react";
 
-const kgHoacTrong = (v: number | null) => (v == null ? "chưa ghi kg" : kg(v));
+const kgOrBlank = (v: number | null) => (v == null ? "chưa ghi kg" : kg(v));
 
-export function ThuHoiLo({ nut, dl, cungChuyen = [] }: { nut: LotNode; dl: TraceData; cungChuyen?: LotNode[] }) {
+export function LotRecall({ node, dl, sameShipmentLots = [] }: { node: LotNode; dl: TraceData; sameShipmentLots?: LotNode[] }) {
   const [isPrinting, setIsPrinting] = useState(false);
   /** Lô NL có nhiều loại cùng chuyến ⇒ cho thu hồi GỘP cả chuyến (nghi cả xe hàng của đại lý). */
   const [wholeShipment, setWholeShipment] = useState(false);
-  const isMergedShipment = wholeShipment && cungChuyen.length > 1;
-  const { hangRa, loTrongXuong } = useMemo(
-    () => (isMergedShipment ? buildRecallListForLots(cungChuyen, dl) : buildRecallList(nut.kind, nut.id, dl)),
-    [isMergedShipment, cungChuyen, nut, dl]
+  const isMergedShipment = wholeShipment && sameShipmentLots.length > 1;
+  const { hangRa: outboundItems, loTrongXuong: lotsInPlant } = useMemo(
+    () => (isMergedShipment ? buildRecallListForLots(sameShipmentLots, dl) : buildRecallList(node.kind, node.id, dl)),
+    [isMergedShipment, sameShipmentLots, node, dl]
   );
-  const scope = isMergedShipment ? `chuyến ${nut.nhan} (${cungChuyen.length} loại NL)` : `lô ${nut.nhan}${nut.kind === "S" ? ` · ${nut.moTa}` : ""}`;
+  const scope = isMergedShipment ? `chuyến ${node.nhan} (${sameShipmentLots.length} loại NL)` : `lô ${node.nhan}${node.kind === "S" ? ` · ${node.moTa}` : ""}`;
   const lotStockNow = useMemo(
     () => {
       const bang = buildLotStockIndex(dl); // một lượt cho mọi lô cần khoanh
-      return loTrongXuong.map((n) => ({ n, ton: getLotStockKg(n.kind, n.id, dl, bang) }));
+      return lotsInPlant.map((n) => ({ n, ton: getLotStockKg(n.kind, n.id, dl, bang) }));
     },
-    [loTrongXuong, dl]
+    [lotsInPlant, dl]
   );
-  const customerCount = new Set(hangRa.map((r) => r.khach || "khách ?")).size;
-  const totalKg = hangRa.reduce((s, r) => s + (r.kg ?? 0), 0);
+  const customerCount = new Set(outboundItems.map((r) => r.khach || "khách ?")).size;
+  const totalKg = outboundItems.reduce((s, r) => s + (r.kg ?? 0), 0);
 
   const downloadExcel = async () => {
     const { exportAoaToXlsx } = await import("@/lib/reportXlsx"); // nạp động — xlsx không vào chunk chính
     exportAoaToXlsx({
       sheetName: "Thu hồi",
-      fileName: `thu-hoi-${nut.nhan}-${new Date().toISOString().slice(0, 16).replace(/[:T]/g, "")}.xlsx`,
+      fileName: `thu-hoi-${node.nhan}-${new Date().toISOString().slice(0, 16).replace(/[:T]/g, "")}.xlsx`,
       colWidths: [14, 28, 12, 26, 32, 12, 22],
       aoa: [
-        [`Danh sách thu hồi — ${scope} (${TRACE_KIND_LABELS[nut.kind]})`],
+        [`Danh sách thu hồi — ${scope} (${TRACE_KIND_LABELS[node.kind]})`],
         [],
         ["Ngả ra", "Khách", "Ngày", "Chứng từ", "Mặt hàng", "Kg", "Từ lô"],
-        ...hangRa.map((r) => [TRACE_KIND_LABELS[r.loai], r.khach, r.ngay, r.chungTu, r.matHang, r.kg, r.tuLo]),
+        ...outboundItems.map((r) => [TRACE_KIND_LABELS[r.loai], r.khach, r.ngay, r.chungTu, r.matHang, r.kg, r.tuLo]),
         [],
         ["Lô còn trong xưởng", "Mặt hàng", "Ngày", "Tồn trong kho (kg)"],
-        ...lotStockNow.map(({ n, ton }) => [`${TRACE_KIND_LABELS[n.kind]} ${n.nhan}`, n.moTa, n.ngay, ton]),
+        ...lotStockNow.map(({ n, ton: stockKg }) => [`${TRACE_KIND_LABELS[n.kind]} ${n.nhan}`, n.moTa, n.ngay, stockKg]),
       ],
     });
   };
@@ -70,23 +70,23 @@ export function ThuHoiLo({ nut, dl, cungChuyen = [] }: { nut: LotNode; dl: Trace
         </div>
       </div>
 
-      {cungChuyen.length > 1 && (
+      {sameShipmentLots.length > 1 && (
         <label className="flex cursor-pointer items-center gap-3">
           <input type="checkbox" className="size-5 shrink-0" checked={wholeShipment} onChange={(e) => setWholeShipment(e.target.checked)} />
           <span>
-            Thu hồi <b>cả chuyến</b> ({cungChuyen.length} loại nguyên liệu cùng xe, cùng đại lý)
+            Thu hồi <b>cả chuyến</b> ({sameShipmentLots.length} loại nguyên liệu cùng xe, cùng đại lý)
           </span>
         </label>
       )}
 
       <p className="tnum">
-        {hangRa.length
-          ? `${hangRa.length} ngả ra · ${customerCount} khách · ${kg(totalKg)} đã ghi kg`
+        {outboundItems.length
+          ? `${outboundItems.length} ngả ra · ${customerCount} khách · ${kg(totalKg)} đã ghi kg`
           : "Chưa ghi nhận hàng nào từ lô này ra khỏi xưởng."}
-        {loTrongXuong.length > 0 && ` · ${loTrongXuong.length} lô còn trong xưởng cần khoanh lại`}
+        {lotsInPlant.length > 0 && ` · ${lotsInPlant.length} lô còn trong xưởng cần khoanh lại`}
       </p>
 
-      {hangRa.length > 0 && (
+      {outboundItems.length > 0 && (
         <HorizontalScroll>
           <table className="w-full min-w-[40rem] border-collapse">
             <thead>
@@ -100,13 +100,13 @@ export function ThuHoiLo({ nut, dl, cungChuyen = [] }: { nut: LotNode; dl: Trace
               </tr>
             </thead>
             <tbody>
-              {hangRa.map((r, i) => (
+              {outboundItems.map((r, i) => (
                 <tr key={i} className="border-b border-border">
                   <td className="py-1 pr-3 font-medium">{r.khach || "khách ?"}</td>
                   <td className="tnum py-1 pr-3">{r.ngay ? formatDateVN(r.ngay) : "—"}</td>
                   <td className="py-1 pr-3">{r.chungTu}</td>
                   <td className="py-1 pr-3">{r.matHang}</td>
-                  <td className="tnum py-1 pr-3 text-right">{kgHoacTrong(r.kg)}</td>
+                  <td className="tnum py-1 pr-3 text-right">{kgOrBlank(r.kg)}</td>
                   <td className="tnum py-1">{r.tuLo}</td>
                 </tr>
               ))}
@@ -119,10 +119,10 @@ export function ThuHoiLo({ nut, dl, cungChuyen = [] }: { nut: LotNode; dl: Trace
         <div className="space-y-1">
           <p className="font-medium">Lô còn trong xưởng</p>
           <ul className="space-y-1">
-            {lotStockNow.map(({ n, ton }) => (
+            {lotStockNow.map(({ n, ton: stockKg }) => (
               <li key={`${n.kind}:${n.id}`} className="tnum text-muted-foreground">
                 {TRACE_KIND_LABELS[n.kind]} <span className="font-medium text-foreground">{n.nhan}</span> · {n.moTa}
-                {ton != null ? ` · tồn trong kho ${kg(ton)}` : ""}
+                {stockKg != null ? ` · tồn trong kho ${kg(stockKg)}` : ""}
               </li>
             ))}
           </ul>
@@ -132,7 +132,7 @@ export function ThuHoiLo({ nut, dl, cungChuyen = [] }: { nut: LotNode; dl: Trace
       {isPrinting && (
         <PrintSheet
           title="Danh sách thu hồi theo lô"
-          subtitle={`${isMergedShipment ? `Chuyến ${nut.nhan} · ${cungChuyen.length} loại NL` : `Lô ${nut.nhan} · ${TRACE_KIND_LABELS[nut.kind]} · ${nut.moTa}`}${nut.ngay ? ` · ${formatDateVN(nut.ngay)}` : ""}`}
+          subtitle={`${isMergedShipment ? `Chuyến ${node.nhan} · ${sameShipmentLots.length} loại NL` : `Lô ${node.nhan} · ${TRACE_KIND_LABELS[node.kind]} · ${node.moTa}`}${node.ngay ? ` · ${formatDateVN(node.ngay)}` : ""}`}
           onClose={() => setIsPrinting(false)}
         >
           <table className="w-full border-collapse">
@@ -148,15 +148,15 @@ export function ThuHoiLo({ nut, dl, cungChuyen = [] }: { nut: LotNode; dl: Trace
               </tr>
             </thead>
             <tbody>
-              {hangRa.length ? (
-                hangRa.map((r, i) => (
+              {outboundItems.length ? (
+                outboundItems.map((r, i) => (
                   <tr key={i}>
                     <PrintTd>{TRACE_KIND_LABELS[r.loai]}</PrintTd>
                     <PrintTd>{r.khach || "khách ?"}</PrintTd>
                     <PrintTd>{r.ngay ? formatDateVN(r.ngay) : "—"}</PrintTd>
                     <PrintTd>{r.chungTu}</PrintTd>
                     <PrintTd>{r.matHang}</PrintTd>
-                    <PrintTd right>{kgHoacTrong(r.kg)}</PrintTd>
+                    <PrintTd right>{kgOrBlank(r.kg)}</PrintTd>
                     <PrintTd>{r.tuLo}</PrintTd>
                   </tr>
                 ))
@@ -178,12 +178,12 @@ export function ThuHoiLo({ nut, dl, cungChuyen = [] }: { nut: LotNode; dl: Trace
                 </tr>
               </thead>
               <tbody>
-                {lotStockNow.map(({ n, ton }) => (
+                {lotStockNow.map(({ n, ton: stockKg }) => (
                   <tr key={`${n.kind}:${n.id}`}>
                     <PrintTd>{`${TRACE_KIND_LABELS[n.kind]} ${n.nhan}`}</PrintTd>
                     <PrintTd>{n.moTa}</PrintTd>
                     <PrintTd>{n.ngay ? formatDateVN(n.ngay) : "—"}</PrintTd>
-                    <PrintTd right>{ton != null ? kg(ton) : "—"}</PrintTd>
+                    <PrintTd right>{stockKg != null ? kg(stockKg) : "—"}</PrintTd>
                   </tr>
                 ))}
               </tbody>

@@ -62,20 +62,20 @@ export function ensureMonthOpened(
   const prevRows = [...new Set(lines.map((l) => l.period))].filter((p) => p < month).sort();
   const tu = prevRows[prevRows.length - 1];
   if (!tu) return { lines, keThua: 0 };
-  let ds = lines;
-  let keThua = 0;
+  let items = lines;
+  let carriedCount = 0;
   let source = tu;
   for (let i = 0; i < 24 && source < month; i++) {
     const nextMonth = getNextMonth(source);
-    if (!ds.some((l) => l.period === nextMonth)) {
+    if (!items.some((l) => l.period === nextMonth)) {
       // Cùng hàm ghi dồn kỳ của màn Sổ kho tháng (không thay cả dòng đã có).
-      const kq = carryForwardIntoLedger(ds, nextMonth);
-      ds = kq.lines;
-      keThua += kq.soDong;
+      const result = carryForwardIntoLedger(items, nextMonth);
+      items = result.lines;
+      carriedCount += result.soDong;
     }
     source = nextMonth;
   }
-  return { lines: ds, keThua };
+  return { lines: items, keThua: carriedCount };
 }
 
 /**
@@ -87,10 +87,10 @@ export function findLotLineInMonth(
   loId: string,
   month: string
 ): MonthlyStockLine | null {
-  const goc = lines.find((l) => l.id === loId);
-  if (!goc || goc.period > month) return null;
+  const original = lines.find((l) => l.id === loId);
+  if (!original || original.period > month) return null;
   let id = loId;
-  let p = goc.period;
+  let p = original.period;
   while (p < month) {
     id = `carry|${id}`;
     p = getNextMonth(p);
@@ -169,21 +169,21 @@ export function syncMonthlyStockLedger(
   const isStockLine = (r: BalancingInputItem) => getBalancingStockLineKind(r) != null;
   const prev = new Map(prevRows.filter(isStockLine).map((r) => [r.id, r]));
   const nextById = new Map(after.filter(isStockLine).map((r) => [r.id, r]));
-  let ds = lines;
-  let keThua = 0;
+  let items = lines;
+  let carriedCount = 0;
   let doi = false;
 
   const ensureMonth = (t: string) => {
-    const kq = ensureMonthOpened(ds, t);
-    if (kq.keThua) {
-      ds = kq.lines;
-      keThua += kq.keThua;
+    const result = ensureMonthOpened(items, t);
+    if (result.keThua) {
+      items = result.lines;
+      carriedCount += result.keThua;
       doi = true;
     }
   };
 
   /** Hai bảng phần (tháng/ngày → kg) có khác nhau không. */
-  const khac = (x: Map<string, number>, y: Map<string, number>) =>
+  const mapsDiffer = (x: Map<string, number>, y: Map<string, number>) =>
     [...new Set([...x.keys(), ...y.keys()])].some((k) => (x.get(k) ?? 0) !== (y.get(k) ?? 0));
 
   for (const id of new Set([...prev.keys(), ...nextById.keys()])) {
@@ -206,7 +206,7 @@ export function syncMonthlyStockLedger(
           if (a && prevStockLineId === nextStockLineId && (oldParts.get(t) ?? 0) === kg) continue;
           can.push({ lo: nextStockLineId, thang: t, kg });
         }
-      } else if (khac(oldParts, newParts) && [...newParts.values()].some((v) => v > 0)) {
+      } else if (mapsDiffer(oldParts, newParts) && [...newParts.values()].some((v) => v > 0)) {
         /* Chỉ chặn khi CHÍNH dòng này đổi số — dòng cũ có số mà chưa chọn lô (ghi trước khi
            nối sổ kho) không được làm kẹt mọi lần ghi khác của khối NL. */
         return { lines, doi: false, keThua: 0, loi: "Chọn lô (kho · invoice) trước khi ghi số Lấy xả đông." };
@@ -216,7 +216,7 @@ export function syncMonthlyStockLedger(
       can.sort((x, y) => x.thang.localeCompare(y.thang) || (x.kg === 0 ? -1 : 1));
       for (const c of can) {
         ensureMonth(c.thang);
-        const dong = findLotLineInMonth(ds, c.lo, c.thang);
+        const dong = findLotLineInMonth(items, c.lo, c.thang);
         if (!dong) {
           if (c.kg === 0) continue; // lô không còn ở tháng đó — không có gì để trả
           return {
@@ -227,9 +227,9 @@ export function syncMonthlyStockLedger(
           };
         }
         const existing = getBalancingShareInLot(dong, id);
-        const chenh = c.kg - existing;
-        if (Math.abs(chenh) < 1e-9) continue;
-        const outKg = dong.outKg + chenh;
+        const diff = c.kg - existing;
+        if (Math.abs(diff) < 1e-9) continue;
+        const outKg = dong.outKg + diff;
         const stock = dong.openKg + dong.inKg - outKg;
         if (stock < -1e-6) {
           return {
@@ -244,10 +244,10 @@ export function syncMonthlyStockLedger(
         const updatedLine: MonthlyStockLine = {
           ...dong,
           outKg,
-          outCtn: dong.outCtn + (dong.kgPerCtn ? chenh / dong.kgPerCtn : 0),
+          outCtn: dong.outCtn + (dong.kgPerCtn ? diff / dong.kgPerCtn : 0),
           note: appendTrace(dong.note, id, c.kg, `Cân đối ${ctx.nhanKy}: lấy xả đông ${num(c.kg)} kg`),
         };
-        ds = ds.map((l) => (l.id === dong.id ? updatedLine : l));
+        items = items.map((l) => (l.id === dong.id ? updatedLine : l));
         doi = true;
       }
       continue;
@@ -258,7 +258,7 @@ export function syncMonthlyStockLedger(
       const newParts = b ? freezeDepositByDay(b) : new Map<string, number>();
       const newLocation = b?.stockLocation ?? "";
       if (!newLocation) {
-        if (b && khac(oldParts, newParts) && [...newParts.values()].some((v) => v > 0))
+        if (b && mapsDiffer(oldParts, newParts) && [...newParts.values()].some((v) => v > 0))
           return { lines, doi: false, keThua: 0, loi: "Chọn kho gửi trước khi ghi số Gửi đông." };
         if (b) continue; // chưa chọn kho: chưa có gì trong sổ để đặt
       }
@@ -274,10 +274,10 @@ export function syncMonthlyStockLedger(
         )
           continue; // ngày này không đổi gì
         const did = freezeDepositRowId(id, date);
-        const coSan = ds.find((l) => l.id === did);
+        const coSan = items.find((l) => l.id === did);
         if (kg === 0) {
           if (coSan) {
-            ds = ds.filter((l) => l.id !== did);
+            items = items.filter((l) => l.id !== did);
             doi = true;
           }
           continue;
@@ -319,12 +319,12 @@ export function syncMonthlyStockLedger(
           coSan.itemName === dong.itemName &&
           coSan.note === dong.note;
         if (giong) continue;
-        ds = coSan ? ds.map((l) => (l.id === did ? dong : l)) : [...ds, dong];
+        items = coSan ? items.map((l) => (l.id === did ? dong : l)) : [...items, dong];
         doi = true;
       }
     }
   }
-  return { lines: ds, doi, loi: null, keThua };
+  return { lines: items, doi, loi: null, keThua: carriedCount };
 }
 
 /* ---------- Kiểm khớp Cân đối ⇄ sổ kho ---------- */
@@ -337,22 +337,22 @@ export function countMonthlyStockMismatches(
   lines: MonthlyStockLine[],
   rows: BalancingInputItem[]
 ): number {
-  let lech = 0;
+  let mismatchCount = 0;
   for (const r of rows) {
     const lineKind = getBalancingStockLineKind(r);
     if (lineKind === "lay-xa-dong" && r.stockLineId) {
       for (const [t, kg] of thawByMonth(r)) {
         const dong = findLotLineInMonth(lines, r.stockLineId, t);
-        if (!dong || Math.abs(getBalancingShareInLot(dong, r.id) - kg) > 1e-6) lech++;
+        if (!dong || Math.abs(getBalancingShareInLot(dong, r.id) - kg) > 1e-6) mismatchCount++;
       }
     } else if (lineKind === "gui-dong" && r.stockLocation) {
       for (const [date, kg] of freezeDepositByDay(r)) {
         const dong = lines.find((l) => l.id === freezeDepositRowId(r.id, date));
-        if (!dong || Math.abs(dong.inKg - kg) > 1e-6) lech++;
+        if (!dong || Math.abs(dong.inKg - kg) > 1e-6) mismatchCount++;
       }
     }
   }
-  return lech;
+  return mismatchCount;
 }
 
 /* ---------- Danh sách chọn ---------- */
@@ -398,12 +398,12 @@ export function listThawLotOptions(
   materialFamily: string,
   selected: string[] = []
 ): LotOption[] {
-  const { lines: ds } = ensureMonthOpened(lines, month);
-  const giu = new Set(selected);
-  return ds
+  const { lines: items } = ensureMonthOpened(lines, month);
+  const keepIds = new Set(selected);
+  return items
     .filter((l) => l.period === month)
     .map((l): MonthlyStockRow => suyDong(l))
-    .filter((r) => r.closeKg > 1e-9 || giu.has(r.id))
+    .filter((r) => r.closeKg > 1e-9 || keepIds.has(r.id))
     .sort(
       (a, b) =>
         scoreNameMatch(b.itemName, materialFamily) - scoreNameMatch(a.itemName, materialFamily) ||
@@ -436,7 +436,7 @@ export function listDepositLocationOptions(
     m.set(l.warehouse, (m.get(l.warehouse) ?? 0) + 1);
     qtyByLocation.set(l.storageLocation, m);
   }
-  const soChinh = (vt: string) => {
+  const mainWarehouseOf = (vt: string) => {
     const m = qtyByLocation.get(vt);
     if (!m) return DEFAULT_LEDGER_WAREHOUSE;
     return [...m.entries()].sort((a, b) => b[1] - a[1])[0][0];
@@ -451,7 +451,7 @@ export function listDepositLocationOptions(
   for (const vt of [...storageLocations, ...qtyByLocation.keys()]) {
     if (!vt || existing.has(vt)) continue;
     existing.add(vt);
-    const so = soChinh(vt);
+    const so = mainWarehouseOf(vt);
     ra.push({ value: joinDepositLocation(so, vt), label: vt, phu: `sổ ${so}` });
   }
   return ra;

@@ -83,10 +83,10 @@ export interface LotStockResult {
   tongBanVuot: number;
 }
 
-const ketQua = (los: LotStock[], banVuot: Oversale[]): LotStockResult => ({
+const ketQua = (los: LotStock[], oversales: Oversale[]): LotStockResult => ({
   los,
-  banVuot,
-  tongBanVuot: banVuot.reduce((s, v) => s + v.kg, 0),
+  banVuot: oversales,
+  tongBanVuot: oversales.reduce((s, v) => s + v.kg, 0),
 });
 
 /**
@@ -165,12 +165,12 @@ function deductByLot(los: LotStock[], retailSales: readonly StockDeduction[]): O
   // 2. Lô gắn chưa cân — FIFO trong các lô đã gắn của dòng.
   retailSales.forEach((b, i) => {
     if (con[i]! <= 0) return;
-    const ds = (b.lo ?? [])
+    const items = (b.lo ?? [])
       .filter((g) => g.kg == null)
       .map((g) => lotOfRow(b, g))
       .filter((lo): lo is LotStock => !!lo)
       .sort(fifo);
-    for (const lo of ds) {
+    for (const lo of items) {
       if (con[i]! <= 0) break;
       con[i]! -= deductFromLot(lo, con[i]!);
     }
@@ -191,7 +191,7 @@ function deductByLot(los: LotStock[], retailSales: readonly StockDeduction[]): O
     if (arr) arr.push(lo);
     else theoKey.set(k, [lo]);
   }
-  const banVuot: Oversale[] = [];
+  const oversales: Oversale[] = [];
   for (const [k, can] of pendingDeduct) {
     let conKey = can.kg;
     const arr = theoKey.get(k) ?? [];
@@ -201,9 +201,9 @@ function deductByLot(los: LotStock[], retailSales: readonly StockDeduction[]): O
       conKey -= deductFromLot(lo, conKey);
     }
     // Sai số dấu phẩy động (0.1 + 0.2…) không phải bán vượt.
-    if (conKey > 1e-6) banVuot.push({ productId: can.productId, spec: can.spec, kg: conKey });
+    if (conKey > 1e-6) oversales.push({ productId: can.productId, spec: can.spec, kg: conKey });
   }
-  return banVuot;
+  return oversales;
 }
 
 /** Marker `sales_items.sourceWarehouse`: bán block thô ⇒ trừ tồn BTP dự trữ. */

@@ -1,5 +1,5 @@
 // ============================================================
-// Tên file cũ: src/features/imports/BaoCaoNhap.tsx
+// Tên file cũ: src/features/imports/ImportReport.tsx
 // Tên tiếng Việt: Báo cáo tổng hợp Nhập Nguyên liệu
 // Description: Material Import Summary Report
 // ============================================================
@@ -25,12 +25,12 @@ import { calculateImportAmount } from "@/types";
 import { exportAoaToXlsx, type OExcel } from "@/lib/reportXlsx";
 import { CalendarRange, Coins, FileClock, FileSpreadsheet, Scale } from "lucide-react";
 
-const THU = ["Chủ nhật", "Thứ hai", "Thứ ba", "Thứ tư", "Thứ năm", "Thứ sáu", "Thứ bảy"];
+const WEEKDAYS = ["Chủ nhật", "Thứ hai", "Thứ ba", "Thứ tư", "Thứ năm", "Thứ sáu", "Thứ bảy"];
 /** Thứ trong tuần từ ngày ISO (yyyy-mm-dd) — tính theo UTC để không lệch múi giờ. */
 function dayOfWeek(iso: string): string {
   const [y, m, d] = iso.split("-").map(Number);
   if (!y || !m || !d) return "";
-  return THU[new Date(Date.UTC(y, m - 1, d)).getUTCDay()] ?? "";
+  return WEEKDAYS[new Date(Date.UTC(y, m - 1, d)).getUTCDay()] ?? "";
 }
 
 const WORKSHOP_OPTIONS = [
@@ -45,11 +45,11 @@ interface DongMua {
   supplierName: string;
   materialTypeName: string;
   quantityKg: number;
-  quantityChoGiaKg: number; // kg chưa có đơn giá (chờ hóa đơn)
+  unpricedKg: number; // kg chưa có đơn giá (chờ hóa đơn)
   amount: number; // giá trị theo đơn giá mua
 }
 /** Dòng phế liệu cân gộp trong kỳ — TÁCH RIÊNG, không cộng vào giá trị nhập mua. */
-interface DongPhe {
+interface ScrapRow {
   name: string;
   quantityKg: number;
   saleValue: number; // theo giá bán phế liệu
@@ -60,7 +60,7 @@ interface DongPhe {
  * Phế liệu cân trong kỳ để RIÊNG (giá bán ≠ giá mua, không trộn vào "Giá trị nhập").
  * Chỉ đọc sổ nhập; xuất được Excel để kế toán đối chiếu.
  */
-export default function BaoCaoNhap() {
+export default function ImportReport() {
   const [rows] = useMaterialImports();
   const [scraps] = useScraps();
 
@@ -73,13 +73,13 @@ export default function BaoCaoNhap() {
 
   const {
     dongMua,
-    dongPhe,
+    dongPhe: scrapRows,
     chart,
-    tongKg,
-    tongTien,
-    tongChoGia,
-    tongKgPhe,
-    tongTienPhe,
+    tongKg: totalKg,
+    tongTien: totalAmount,
+    tongChoGia: totalAwaitingPriceKg,
+    tongKgPhe: totalScrapKg,
+    tongTienPhe: totalScrapAmount,
   } = useMemo(() => {
     const filteredImports = rows.filter(
       (r) =>
@@ -103,11 +103,11 @@ export default function BaoCaoNhap() {
       const k = `${sup}|||${mt}`;
       let d = mua.get(k);
       if (!d) {
-        d = { supplierName: sup, materialTypeName: mt, quantityKg: 0, quantityChoGiaKg: 0, amount: 0 };
+        d = { supplierName: sup, materialTypeName: mt, quantityKg: 0, unpricedKg: 0, amount: 0 };
         mua.set(k, d);
       }
       d.quantityKg += r.quantityKg || 0;
-      if (r.unitPrice == null) d.quantityChoGiaKg += r.quantityKg || 0;
+      if (r.unitPrice == null) d.unpricedKg += r.quantityKg || 0;
       d.amount += calculateImportAmount(r);
     }
     const dongMua = [...mua.values()].sort(
@@ -117,45 +117,45 @@ export default function BaoCaoNhap() {
     );
 
     // Gom phế liệu RIÊNG
-    const phe = new Map<string, DongPhe>();
+    const scrapByKey = new Map<string, ScrapRow>();
     for (const r of filteredScraps) {
       const nm = r.name || "(chưa rõ loại phế liệu)";
-      let d = phe.get(nm);
+      let d = scrapByKey.get(nm);
       if (!d) {
         d = { name: nm, quantityKg: 0, saleValue: 0 };
-        phe.set(nm, d);
+        scrapByKey.set(nm, d);
       }
       d.quantityKg += r.quantityKg || 0;
       d.saleValue += (r.quantityKg || 0) * (r.sellingPrice ?? 0);
     }
-    const dongPhe = [...phe.values()].sort((a, b) => a.name.localeCompare(b.name, "vi"));
+    const scrapRows = [...scrapByKey.values()].sort((a, b) => a.name.localeCompare(b.name, "vi"));
 
     // Biểu đồ: nguyên liệu MUA theo ngày (không trộn phế liệu) + tóm tắt hover
-    interface CtNgay {
-      tongKg: number;
-      tongTien: number;
-      chuyen: Set<string>;
-      loai: Map<string, number>;
+    interface DayDetail {
+      totalKg: number;
+      totalAmount: number;
+      shipmentIds: Set<string>;
+      kgByMaterialType: Map<string, number>;
     }
-    const ct = new Map<string, CtNgay>();
+    const ct = new Map<string, DayDetail>();
     for (const r of filteredImports) {
       let d = ct.get(r.deliveryDate);
       if (!d) {
-        d = { tongKg: 0, tongTien: 0, chuyen: new Set(), loai: new Map() };
+        d = { totalKg: 0, totalAmount: 0, shipmentIds: new Set(), kgByMaterialType: new Map() };
         ct.set(r.deliveryDate, d);
       }
-      d.tongKg += r.quantityKg || 0;
-      d.tongTien += calculateImportAmount(r);
-      if (r.shipmentId) d.chuyen.add(r.shipmentId);
+      d.totalKg += r.quantityKg || 0;
+      d.totalAmount += calculateImportAmount(r);
+      if (r.shipmentId) d.shipmentIds.add(r.shipmentId);
       const nhomKey = `${r.supplierName || "(chưa có đại lý)"} · ${r.materialTypeName || "(chưa rõ loại)"}`;
-      d.loai.set(nhomKey, (d.loai.get(nhomKey) ?? 0) + (r.quantityKg || 0));
+      d.kgByMaterialType.set(nhomKey, (d.kgByMaterialType.get(nhomKey) ?? 0) + (r.quantityKg || 0));
     }
     const chart: BarChartItem[] = [...ct.keys()].sort().map((date) => {
       const d = ct.get(date)!;
-      const typeEntries = [...d.loai.entries()].sort((a, b) => b[1] - a[1]);
+      const typeEntries = [...d.kgByMaterialType.entries()].sort((a, b) => b[1] - a[1]);
       return {
         label: formatDateVN(date),
-        value: d.tongKg,
+        value: d.totalKg,
         detail: (
           <div className="space-y-2">
             <div className="border-b border-border pb-1.5">
@@ -164,9 +164,9 @@ export default function BaoCaoNhap() {
                 {dayOfWeek(date) ? ` · ${dayOfWeek(date)}` : ""}
               </div>
               <div className="text-muted-foreground">
-                {d.chuyen.size} chuyến ·{" "}
-                <span className="tnum font-semibold text-foreground">{num(d.tongKg)} kg</span>
-                {d.tongTien > 0 ? ` · ${num(d.tongTien)} đ` : ""}
+                {d.shipmentIds.size} chuyến ·{" "}
+                <span className="tnum font-semibold text-foreground">{num(d.totalKg)} kg</span>
+                {d.totalAmount > 0 ? ` · ${num(d.totalAmount)} đ` : ""}
               </div>
             </div>
             <ul className="space-y-1">
@@ -187,51 +187,51 @@ export default function BaoCaoNhap() {
 
     return {
       dongMua,
-      dongPhe,
+      dongPhe: scrapRows,
       chart,
       tongKg: dongMua.reduce((s, d) => s + d.quantityKg, 0),
       tongTien: dongMua.reduce((s, d) => s + d.amount, 0),
-      tongChoGia: dongMua.reduce((s, d) => s + d.quantityChoGiaKg, 0),
-      tongKgPhe: dongPhe.reduce((s, d) => s + d.quantityKg, 0),
-      tongTienPhe: dongPhe.reduce((s, d) => s + d.saleValue, 0),
+      tongChoGia: dongMua.reduce((s, d) => s + d.unpricedKg, 0),
+      tongKgPhe: scrapRows.reduce((s, d) => s + d.quantityKg, 0),
+      tongTienPhe: scrapRows.reduce((s, d) => s + d.saleValue, 0),
     };
   }, [rows, scraps, tu, den, workshop]);
 
   const the: StatCardData[] = [
     { label: "Kỳ báo cáo", value: `${formatDateVN(tu)} – ${formatDateVN(den)}`, icon: CalendarRange, color: "trung-tinh" },
-    { label: "Nhập mua", value: `${num(tongKg)} kg`, numeric: true, icon: Scale, color: "brand" },
-    { label: "Giá trị mua", value: `${num(tongTien)} đ`, numeric: true, icon: Coins, color: "success" },
+    { label: "Nhập mua", value: `${num(totalKg)} kg`, numeric: true, icon: Scale, color: "brand" },
+    { label: "Giá trị mua", value: `${num(totalAmount)} đ`, numeric: true, icon: Coins, color: "success" },
     {
       label: "Chờ hóa đơn",
-      value: `${num(tongChoGia)} kg`,
+      value: `${num(totalAwaitingPriceKg)} kg`,
       numeric: true,
       icon: FileClock,
-      color: tongChoGia > 0 ? "warning" : "trung-tinh",
+      color: totalAwaitingPriceKg > 0 ? "warning" : "trung-tinh",
     },
   ];
 
   const purchaseColumns: SummaryTableColumn<DongMua>[] = [
     { key: "dl", header: "Đại lý", render: (r) => r.supplierName },
     { key: "loai", header: "Loại nguyên liệu", render: (r) => r.materialTypeName },
-    { key: "kg", header: "Số cân (kg)", numeric: true, render: (r) => num(r.quantityKg), total: () => num(tongKg) },
+    { key: "kg", header: "Số cân (kg)", numeric: true, render: (r) => num(r.quantityKg), total: () => num(totalKg) },
     {
       key: "chogia",
       header: "Chờ giá (kg)",
       numeric: true,
-      render: (r) => (r.quantityChoGiaKg ? num(r.quantityChoGiaKg) : ""),
-      total: () => (tongChoGia ? num(tongChoGia) : ""),
+      render: (r) => (r.unpricedKg ? num(r.unpricedKg) : ""),
+      total: () => (totalAwaitingPriceKg ? num(totalAwaitingPriceKg) : ""),
     },
-    { key: "tien", header: "Giá trị (đ)", numeric: true, render: (r) => num(r.amount), total: () => num(tongTien) },
+    { key: "tien", header: "Giá trị (đ)", numeric: true, render: (r) => num(r.amount), total: () => num(totalAmount) },
   ];
 
-  const scrapColumns: SummaryTableColumn<DongPhe>[] = [
+  const scrapColumns: SummaryTableColumn<ScrapRow>[] = [
     { key: "loai", header: "Loại phế liệu", render: (r) => r.name },
-    { key: "kg", header: "Số cân (kg)", numeric: true, render: (r) => num(r.quantityKg), total: () => num(tongKgPhe) },
-    { key: "tien", header: "Giá trị bán (đ)", numeric: true, render: (r) => num(r.saleValue), total: () => num(tongTienPhe) },
+    { key: "kg", header: "Số cân (kg)", numeric: true, render: (r) => num(r.quantityKg), total: () => num(totalScrapKg) },
+    { key: "tien", header: "Giá trị bán (đ)", numeric: true, render: (r) => num(r.saleValue), total: () => num(totalScrapAmount) },
   ];
 
   const exportExcel = () => {
-    if (!dongMua.length && !dongPhe.length) {
+    if (!dongMua.length && !scrapRows.length) {
       notify.warning("Không có số liệu để xuất");
       return;
     }
@@ -242,14 +242,14 @@ export default function BaoCaoNhap() {
     aoa.push(["NGUYÊN LIỆU MUA"]);
     aoa.push(["Đại lý", "Loại nguyên liệu", "Số cân (kg)", "Chờ giá (kg)", "Giá trị (đ)"]);
     for (const r of dongMua)
-      aoa.push([r.supplierName, r.materialTypeName, r.quantityKg, r.quantityChoGiaKg, r.amount]);
-    aoa.push(["Tổng cộng", "", tongKg, tongChoGia, tongTien]);
-    if (dongPhe.length) {
+      aoa.push([r.supplierName, r.materialTypeName, r.quantityKg, r.unpricedKg, r.amount]);
+    aoa.push(["Tổng cộng", "", totalKg, totalAwaitingPriceKg, totalAmount]);
+    if (scrapRows.length) {
       aoa.push([]);
       aoa.push(["PHẾ LIỆU (giá bán, không tính vào giá trị nhập mua)"]);
       aoa.push(["Loại phế liệu", "Số cân (kg)", "Giá trị bán (đ)"]);
-      for (const r of dongPhe) aoa.push([r.name, r.quantityKg, r.saleValue]);
-      aoa.push(["Tổng cộng", tongKgPhe, tongTienPhe]);
+      for (const r of scrapRows) aoa.push([r.name, r.quantityKg, r.saleValue]);
+      aoa.push(["Tổng cộng", totalScrapKg, totalScrapAmount]);
     }
     exportAoaToXlsx({
       sheetName: "Nhập hàng",
@@ -313,7 +313,7 @@ export default function BaoCaoNhap() {
           size="lg"
           variant="outline"
           onClick={exportExcel}
-          disabled={!dongMua.length && !dongPhe.length}
+          disabled={!dongMua.length && !scrapRows.length}
         >
           <FileSpreadsheet />
           Xuất Excel
@@ -329,7 +329,7 @@ export default function BaoCaoNhap() {
               Nguyên liệu mua theo ngày
             </h3>
             <span className="text-sm text-muted-foreground">
-              {chart.length} ngày có nhập · tổng {num(tongKg)} kg
+              {chart.length} ngày có nhập · tổng {num(totalKg)} kg
             </span>
           </div>
           <BarChart data={chart} unit="kg" preserveOrder maxItems={62} />
@@ -344,7 +344,7 @@ export default function BaoCaoNhap() {
         emptyText="Không có nguyên liệu mua trong kỳ này."
       />
 
-      {dongPhe.length > 0 && (
+      {scrapRows.length > 0 && (
         <section className="space-y-3">
           <div className="flex items-baseline gap-3">
             <h3 className="text-lg font-semibold text-foreground">Phế liệu cân trong kỳ</h3>
@@ -353,7 +353,7 @@ export default function BaoCaoNhap() {
             </span>
           </div>
           <SummaryTable
-            rows={dongPhe}
+            rows={scrapRows}
             columns={scrapColumns}
             getKey={(r) => r.name}
             rowMarkKey={`bao-cao-nhap-phe-lieu|${tu}|${den}|${workshop}`}

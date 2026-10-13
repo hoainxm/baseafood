@@ -26,7 +26,7 @@ const dong = (id: string, period: string, p: Partial<MonthlyStockLine> = {}): Mo
   ...p,
 });
 
-const findLine = (ds: MonthlyStockLine[], id: string) => ds.find((l) => l.id === id);
+const findLine = (items: MonthlyStockLine[], id: string) => items.find((l) => l.id === id);
 
 describe("carryForwardIntoLedger — dồn lại không xoá trắng số tháng sau (#26)", () => {
   test("ca A: dồn T9→T10, ghi nhập/xuất/vị trí/ghi chú ở T10, sửa T9 rồi dồn lại ⇒ chỉ tồn đầu đổi", () => {
@@ -54,35 +54,35 @@ describe("carryForwardIntoLedger — dồn lại không xoá trắng số tháng
   });
 
   test("ca B: dòng T9 về 0 ⇒ carry ở T10 tồn đầu 0, còn nhập thì GIỮ dòng", () => {
-    const ds = [
+    const items = [
       dong("X", "2026-09", { outKg: 1000, outCtn: 100 }),
       dong("carry|X", "2026-10", { carriedFromId: "X", openKg: 1000, openCtn: 100, inKg: 50 }),
     ];
-    const kq = carryForwardIntoLedger(ds, "2026-10");
-    const c = findLine(kq.lines, "carry|X")!;
+    const result = carryForwardIntoLedger(items, "2026-10");
+    const c = findLine(result.lines, "carry|X")!;
     expect(c.openKg).toBe(0);
     expect(c.openCtn).toBe(0);
     expect(c.inKg).toBe(50);
-    expect(kq.veKhong).toBe(1);
+    expect(result.veKhong).toBe(1);
   });
 
   test("ca B: dòng T9 bị xoá, carry ở T10 không có số nào khác ⇒ bỏ dòng", () => {
-    const ds = [dong("carry|X", "2026-10", { carriedFromId: "X", openKg: 1000 })];
-    const kq = carryForwardIntoLedger(ds, "2026-10");
-    expect(findLine(kq.lines, "carry|X")).toBeUndefined();
-    expect(kq.bo).toBe(1);
+    const items = [dong("carry|X", "2026-10", { carriedFromId: "X", openKg: 1000 })];
+    const result = carryForwardIntoLedger(items, "2026-10");
+    expect(findLine(result.lines, "carry|X")).toBeUndefined();
+    expect(result.bo).toBe(1);
   });
 
   test("carry về 0 mà còn ghi chú ⇒ giữ (không xoá chữ người dùng gõ)", () => {
-    const ds = [dong("carry|X", "2026-10", { carriedFromId: "X", openKg: 1000, note: "đã kiểm" })];
-    const kq = carryForwardIntoLedger(ds, "2026-10");
-    expect(findLine(kq.lines, "carry|X")?.openKg).toBe(0);
+    const items = [dong("carry|X", "2026-10", { carriedFromId: "X", openKg: 1000, note: "đã kiểm" })];
+    const result = carryForwardIntoLedger(items, "2026-10");
+    expect(findLine(result.lines, "carry|X")?.openKg).toBe(0);
   });
 
   test("dòng nhập tay (không phải carry) ở tháng đích không bị đụng", () => {
     const tay = dong("msl|2026-10|a", "2026-10", { openKg: 77 });
-    const kq = carryForwardIntoLedger([dong("X", "2026-09"), tay], "2026-10");
-    expect(findLine(kq.lines, tay.id)).toBe(tay);
+    const result = carryForwardIntoLedger([dong("X", "2026-09"), tay], "2026-10");
+    expect(findLine(result.lines, tay.id)).toBe(tay);
   });
 
   test("chạy lại khi không đổi gì ⇒ giữ nguyên tham chiếu dòng (không ghi thừa)", () => {
@@ -95,21 +95,21 @@ describe("carryForwardIntoLedger — dồn lại không xoá trắng số tháng
 
 describe("carryForwardIntoLedger — phạm vi kho (#27)", () => {
   test("chỉ dồn kho đang lọc: carry của kho khác giữ nguyên dù tháng trước đã đổi", () => {
-    const ds = [
+    const items = [
       dong("A", "2026-09", { warehouse: "Kho 1500 tấn", outKg: 400 }),
       dong("B", "2026-09", { warehouse: "Kho 1000 tấn" }),
       dong("carry|A", "2026-10", { warehouse: "Kho 1500 tấn", carriedFromId: "A", openKg: 1000, inKg: 9 }),
     ];
-    const kq = carryForwardIntoLedger(ds, "2026-10", "Kho 1000 tấn");
-    expect(findLine(kq.lines, "carry|A")).toBe(ds[2]);
-    expect(findLine(kq.lines, "carry|B")?.openKg).toBe(1000);
-    expect(kq.soDong).toBe(1);
+    const result = carryForwardIntoLedger(items, "2026-10", "Kho 1000 tấn");
+    expect(findLine(result.lines, "carry|A")).toBe(items[2]);
+    expect(findLine(result.lines, "carry|B")?.openKg).toBe(1000);
+    expect(result.soDong).toBe(1);
   });
 
   test("carry mất nguồn ở kho khác phạm vi ⇒ không về 0", () => {
-    const giu = dong("carry|Z", "2026-10", { warehouse: "Kho 1500 tấn", carriedFromId: "Z", openKg: 5 });
-    const kq = carryForwardIntoLedger([giu], "2026-10", "Kho 1000 tấn");
-    expect(findLine(kq.lines, "carry|Z")).toBe(giu);
+    const keptLine = dong("carry|Z", "2026-10", { warehouse: "Kho 1500 tấn", carriedFromId: "Z", openKg: 5 });
+    const result = carryForwardIntoLedger([keptLine], "2026-10", "Kho 1000 tấn");
+    expect(findLine(result.lines, "carry|Z")).toBe(keptLine);
   });
 });
 

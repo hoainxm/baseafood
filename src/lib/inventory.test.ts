@@ -112,8 +112,8 @@ describe("trừ tồn theo lô đã gắn (truy xuất QR)", () => {
   });
 
   it("gắn nhầm lô khác mặt hàng ⇒ bỏ qua, trừ FIFO", () => {
-    const khac = { ...lo("wx", "2026-09-01", 80, 8), productId: "p9" } as WipProductionItem;
-    const los = computeWipStock([w0, w1, khac], [], [{ productId: "p1", spec: "s1", quantityKg: 60, lo: [{ id: "wx", kg: 60 }] }]);
+    const otherLot = { ...lo("wx", "2026-09-01", 80, 8), productId: "p9" } as WipProductionItem;
+    const los = computeWipStock([w0, w1, otherLot], [], [{ productId: "p1", spec: "s1", quantityKg: 60, lo: [{ id: "wx", kg: 60 }] }]);
     expect(remainingOf(los, "wx")).toBe(80);
     expect(remainingOf(los, "w0")).toBe(40);
   });
@@ -172,30 +172,30 @@ describe("trừ tồn theo lô đã gắn (truy xuất QR)", () => {
 describe("bán vượt tồn — phần trừ không phân được vào lô nào", () => {
   const w0 = lo("w0", "2026-09-29", 100, 10);
   it("BTP: bán 120 trên lô 100 ⇒ lô về 0, bán vượt 20 (không nuốt mất)", () => {
-    const kq = computeWipStockDetail([w0], [], [{ productId: "p1", spec: "s1", quantityKg: 120 }]);
-    expect(kq.los[0]!.conLai).toBe(0);
-    expect(kq.banVuot).toEqual([{ productId: "p1", spec: "s1", kg: 20 }]);
-    expect(kq.tongBanVuot).toBe(20);
+    const result = computeWipStockDetail([w0], [], [{ productId: "p1", spec: "s1", quantityKg: 120 }]);
+    expect(result.los[0]!.conLai).toBe(0);
+    expect(result.banVuot).toEqual([{ productId: "p1", spec: "s1", kg: 20 }]);
+    expect(result.tongBanVuot).toBe(20);
     // computeWipStock giữ nguyên API cũ: chỉ trả danh sách lô.
     expect(computeWipStock([w0], [], [{ productId: "p1", spec: "s1", quantityKg: 120 }])[0]!.conLai).toBe(0);
   });
 
   it("BTP: bán mặt hàng không có lô nào trong kho ⇒ cả dòng là bán vượt", () => {
-    const kq = computeWipStockDetail([w0], [], [{ productId: "p2", spec: "s1", quantityKg: 30 }]);
-    expect(kq.los[0]!.conLai).toBe(100);
-    expect(kq.tongBanVuot).toBe(30);
+    const result = computeWipStockDetail([w0], [], [{ productId: "p2", spec: "s1", quantityKg: 30 }]);
+    expect(result.los[0]!.conLai).toBe(100);
+    expect(result.tongBanVuot).toBe(30);
   });
 
   it("BTP: lô gắn có kg vượt phần lô còn, FIFO cũng hết ⇒ phần dư thành bán vượt", () => {
-    const kq = computeWipStockDetail([w0], [], [{ productId: "p1", spec: "s1", quantityKg: 150, lo: [{ id: "w0", kg: 150 }] }]);
-    expect(kq.los[0]!.conLai).toBe(0);
-    expect(kq.tongBanVuot).toBe(50);
+    const result = computeWipStockDetail([w0], [], [{ productId: "p1", spec: "s1", quantityKg: 150, lo: [{ id: "w0", kg: 150 }] }]);
+    expect(result.los[0]!.conLai).toBe(0);
+    expect(result.tongBanVuot).toBe(50);
   });
 
   it("không bán vượt ⇒ danh sách rỗng, tổng 0", () => {
-    const kq = computeWipStockDetail([w0], [], [{ productId: "p1", spec: "s1", quantityKg: 60 }]);
-    expect(kq.banVuot).toEqual([]);
-    expect(kq.tongBanVuot).toBe(0);
+    const result = computeWipStockDetail([w0], [], [{ productId: "p1", spec: "s1", quantityKg: 60 }]);
+    expect(result.banVuot).toEqual([]);
+    expect(result.tongBanVuot).toBe(0);
   });
 
   it("TP: đóng gói 100, bán 120 ⇒ computeFinishedGoodStock −20 = Σ tồn theo lô (0) − bán vượt (20)", () => {

@@ -1,17 +1,17 @@
 import { describe, it, expect } from "vitest";
 import {
-  sinhMaLo,
-  gomChuyen,
-  loiDauChuyen,
-  dongCoData,
-  dongDayDu,
-  daiLyHayGiao,
-  xeCuaDaiLy,
-  mauDongCuaDaiLy,
-  apMauDaiLyMoi,
-  dongGoiYBoQua,
-  type DauChuyen,
-  type DongBang,
+  generateLotCode,
+  groupShipments,
+  validateShipmentHeader,
+  importLineHasData,
+  isLineComplete,
+  getFrequentSuppliers,
+  getSupplierVehicles,
+  getSupplierLineTemplates,
+  applyNewSupplierTemplate,
+  getSkippedSuggestedLines,
+  type ShipmentHeader,
+  type ImportLine,
 } from "./importHelpers";
 import type { ImportShipment, MaterialImportItem } from "@/types";
 
@@ -47,35 +47,35 @@ const dong = (p: Partial<MaterialImportItem>): MaterialImportItem =>
     ...p,
   }) as MaterialImportItem;
 
-describe("sinhMaLo", () => {
+describe("generateLotCode", () => {
   it("‹chữ xưởng›-‹yymmdd›-‹stt trong ngày›, stt đếm theo cùng ngày + cùng xưởng", () => {
-    expect(sinhMaLo("2026-09-02", "Đông", [])).toBe("Đ-260902-01");
+    expect(generateLotCode("2026-09-02", "Đông", [])).toBe("Đ-260902-01");
     const existing = [
       makeShipment({ id: "a" }),
       makeShipment({ id: "b" }),
       makeShipment({ id: "c", workshop: "Cá" }), // xưởng khác — không đếm
       makeShipment({ id: "d", deliveryDate: "2026-09-01" }), // ngày khác — không đếm
     ];
-    expect(sinhMaLo("2026-09-02", "Đông", existing)).toBe("Đ-260902-03");
-    expect(sinhMaLo("2026-09-02", "Khô", existing)).toBe("K-260902-01");
+    expect(generateLotCode("2026-09-02", "Đông", existing)).toBe("Đ-260902-03");
+    expect(generateLotCode("2026-09-02", "Khô", existing)).toBe("K-260902-01");
   });
 });
 
-describe("gomChuyen", () => {
+describe("groupShipments", () => {
   it("gom dòng theo chuyến THẬT (shipmentId), cộng kg + tiền, cờ ghi bù theo chuyến", () => {
     const cs = [makeShipment({ id: "c1", postingDate: "2026-09-05" })]; // ghi sổ SAU ngày về ⇒ ghi bù
     const rows = [
       dong({ id: "r1", shipmentId: "c1", quantityKg: 100, unitPrice: 20 }),
       dong({ id: "r2", shipmentId: "c1", quantityKg: 50, unitPrice: null }),
     ];
-    const g = gomChuyen(rows, cs);
+    const g = groupShipments(rows, cs);
     expect(g).toHaveLength(1);
-    expect(g[0].khoa).toBe("c1");
-    expect(g[0].chuyen?.id).toBe("c1");
+    expect(g[0].groupKey).toBe("c1");
+    expect(g[0].shipment?.id).toBe("c1");
     expect(g[0].dong).toHaveLength(2);
-    expect(g[0].tongKg).toBe(150);
-    expect(g[0].tongTien).toBe(2000); // 100*20 + 50*0
-    expect(g[0].ghiBu).toBe(true);
+    expect(g[0].totalKg).toBe(150);
+    expect(g[0].totalAmount).toBe(2000); // 100*20 + 50*0
+    expect(g[0].isBackdated).toBe(true);
   });
 
   it("dòng CŨ không có shipmentId ⇒ gom ngầm theo (ngày|xưởng|đại lý|xe), chuyen=null, không ghi bù", () => {
@@ -84,13 +84,13 @@ describe("gomChuyen", () => {
       dong({ id: "r2", quantityKg: 20, licensePlate: "72C-1" }),
       dong({ id: "r3", quantityKg: 5, licensePlate: "72C-2" }), // xe khác ⇒ nhóm khác
     ];
-    const g = gomChuyen(rows, []);
+    const g = groupShipments(rows, []);
     expect(g).toHaveLength(2);
     const n1 = g.find((x) => x.licensePlate === "72C-1")!;
-    expect(n1.chuyen).toBeNull();
-    expect(n1.khoa.startsWith("ngam|")).toBe(true);
-    expect(n1.tongKg).toBe(30);
-    expect(n1.ghiBu).toBe(false);
+    expect(n1.shipment).toBeNull();
+    expect(n1.groupKey.startsWith("ngam|")).toBe(true);
+    expect(n1.totalKg).toBe(30);
+    expect(n1.isBackdated).toBe(false);
   });
 
   it("sắp theo ngày về rồi tên đại lý", () => {
@@ -99,7 +99,7 @@ describe("gomChuyen", () => {
       dong({ id: "b", deliveryDate: "2026-09-01", supplierName: "Hiếu Phấn" }),
       dong({ id: "c", deliveryDate: "2026-09-01", supplierName: "Bé Ba" }),
     ];
-    const g = gomChuyen(rows, []);
+    const g = groupShipments(rows, []);
     expect(g.map((x) => `${x.deliveryDate}|${x.supplierName}`)).toEqual([
       "2026-09-01|Bé Ba",
       "2026-09-01|Hiếu Phấn",
@@ -108,8 +108,8 @@ describe("gomChuyen", () => {
   });
 });
 
-describe("loiDauChuyen", () => {
-  const ok: DauChuyen = {
+describe("validateShipmentHeader", () => {
+  const ok: ShipmentHeader = {
     deliveryDate: "2026-09-02",
     postingDate: "2026-09-02",
     backdateReason: "",
@@ -121,42 +121,42 @@ describe("loiDauChuyen", () => {
     ssccCode: "",
     scanPath: "",
   };
-  const truong = (ls: ReturnType<typeof loiDauChuyen>) =>
+  const fieldsOf = (ls: ReturnType<typeof validateShipmentHeader>) =>
     ls.map((l) => l.field);
 
   it("đầu chuyến hợp lệ ⇒ không lỗi", () => {
-    expect(loiDauChuyen(ok, false)).toEqual([]);
+    expect(validateShipmentHeader(ok, false)).toEqual([]);
   });
   it("thiếu đại lý", () => {
     expect(
-      truong(loiDauChuyen({ ...ok, supplierName: "  " }, false)),
+      fieldsOf(validateShipmentHeader({ ...ok, supplierName: "  " }, false)),
     ).toContain("Đại lý");
   });
   it("ngày ghi sổ trước ngày hàng về ⇒ lỗi", () => {
     expect(
-      truong(loiDauChuyen({ ...ok, postingDate: "2026-09-01" }, false)),
+      fieldsOf(validateShipmentHeader({ ...ok, postingDate: "2026-09-01" }, false)),
     ).toContain("Ngày ghi sổ");
   });
   it("ghi sổ SAU ngày về mà không có lý do ⇒ bắt lý do ghi bù", () => {
     expect(
-      truong(loiDauChuyen({ ...ok, postingDate: "2026-09-05" }, false)),
+      fieldsOf(validateShipmentHeader({ ...ok, postingDate: "2026-09-05" }, false)),
     ).toContain("Lý do ghi bù");
     expect(
-      loiDauChuyen(
+      validateShipmentHeader(
         { ...ok, postingDate: "2026-09-05", backdateReason: "chờ hóa đơn" },
         false,
       ),
     ).toEqual([]);
   });
   it("ngày đã CHỐT ⇒ bắt lý do dù cùng ngày", () => {
-    const ls = loiDauChuyen(ok, true);
-    expect(truong(ls)).toContain("Lý do ghi bù");
+    const ls = validateShipmentHeader(ok, true);
+    expect(fieldsOf(ls)).toContain("Lý do ghi bù");
     expect(ls[0].message).toMatch(/đã chốt/);
   });
 });
 
-describe("dongCoData / dongDayDu", () => {
-  const trong: DongBang = {
+describe("importLineHasData / isLineComplete", () => {
+  const emptyRow: ImportLine = {
     key: "k",
     id: null,
     category: "Bạch tuộc",
@@ -165,15 +165,15 @@ describe("dongCoData / dongDayDu", () => {
     unitPrice: null,
   };
   it("dòng trống: chưa có data, chưa đủ", () => {
-    expect(dongCoData(trong)).toBe(false);
-    expect(dongDayDu(trong)).toBe(false);
+    expect(importLineHasData(emptyRow)).toBe(false);
+    expect(isLineComplete(emptyRow)).toBe(false);
   });
   it("chỉ có giá ⇒ có data nhưng chưa đủ; có loại + kg>0 ⇒ đủ", () => {
-    expect(dongCoData({ ...trong, unitPrice: 1 })).toBe(true);
-    expect(dongDayDu({ ...trong, unitPrice: 1 })).toBe(false);
+    expect(importLineHasData({ ...emptyRow, unitPrice: 1 })).toBe(true);
+    expect(isLineComplete({ ...emptyRow, unitPrice: 1 })).toBe(false);
     expect(
-      dongDayDu({
-        ...trong,
+      isLineComplete({
+        ...emptyRow,
         materialTypeName: "Bạch tuộc 2 da",
         quantityKg: 10,
       }),
@@ -251,27 +251,27 @@ describe("gợi ý theo đại lý", () => {
     }),
   ];
 
-  it("daiLyHayGiao: theo xưởng, nhiều lượt đứng trước", () => {
-    expect(daiLyHayGiao(so, "Đông")).toEqual(["Hồng Phú", "Hương Pháp"]);
-    expect(daiLyHayGiao(so, "Cá")).toEqual(["Cá Ba"]);
-    expect(daiLyHayGiao(so, "Khô")).toEqual([]);
+  it("getFrequentSuppliers: theo xưởng, nhiều lượt đứng trước", () => {
+    expect(getFrequentSuppliers(so, "Đông")).toEqual(["Hồng Phú", "Hương Pháp"]);
+    expect(getFrequentSuppliers(so, "Cá")).toEqual(["Cá Ba"]);
+    expect(getFrequentSuppliers(so, "Khô")).toEqual([]);
   });
 
-  it("xeCuaDaiLy: biển số + tài xế TÁCH riêng; gộp biển viết khác kiểu, hiển thị viết hoa", () => {
-    expect(xeCuaDaiLy(so, "Hồng Phú")).toEqual({
-      bienSo: [{ licensePlate: "72C 16603", driverName: "toàn" }],
-      taiXe: ["toàn"],
+  it("getSupplierVehicles: biển số + tài xế TÁCH riêng; gộp biển viết khác kiểu, hiển thị viết hoa", () => {
+    expect(getSupplierVehicles(so, "Hồng Phú")).toEqual({
+      plates: [{ licensePlate: "72C 16603", driverName: "toàn" }],
+      drivers: ["toàn"],
     });
-    expect(xeCuaDaiLy(so, "")).toEqual({ bienSo: [], taiXe: [] });
+    expect(getSupplierVehicles(so, "")).toEqual({ plates: [], drivers: [] });
   });
 
-  it("mauDongCuaDaiLy: loại của lượt mới nhất trước, giá gần nhất, kg trống, cờ goiY", () => {
-    const m = mauDongCuaDaiLy(so, "Hồng Phú", "Đông");
+  it("getSupplierLineTemplates: loại của lượt mới nhất trước, giá gần nhất, kg trống, cờ goiY", () => {
+    const m = getSupplierLineTemplates(so, "Hồng Phú", "Đông");
     expect(
       m.map((d) => [
         d.materialTypeName,
         d.unitPrice,
-        d.giaNgay,
+        d.priceDate,
         d.quantityKg,
         d.goiY,
       ]),
@@ -280,22 +280,22 @@ describe("gợi ý theo đại lý", () => {
       ["BT 2 da nhỏ", null, undefined, 0, true],
       ["BT 2 da lớn", 134000, "2026-09-01", 0, true],
     ]);
-    expect(mauDongCuaDaiLy(so, "Đại lý lạ", "Đông")).toEqual([]);
+    expect(getSupplierLineTemplates(so, "Đại lý lạ", "Đông")).toEqual([]);
   });
 
   it("dòng gợi ý chưa gõ kg KHÔNG tính là có dữ liệu (lưu tự bỏ qua, không nài lỗi)", () => {
-    const [d] = mauDongCuaDaiLy(so, "Hồng Phú", "Đông");
-    expect(dongCoData(d)).toBe(false);
-    expect(dongCoData({ ...d, quantityKg: 5 })).toBe(true);
-    expect(dongCoData({ ...d, goiY: false })).toBe(true); // người dùng tự sửa loại/giá ⇒ dòng thường
+    const [d] = getSupplierLineTemplates(so, "Hồng Phú", "Đông");
+    expect(importLineHasData(d)).toBe(false);
+    expect(importLineHasData({ ...d, quantityKg: 5 })).toBe(true);
+    expect(importLineHasData({ ...d, goiY: false })).toBe(true); // người dùng tự sửa loại/giá ⇒ dòng thường
   });
 
-  it("apMauDaiLyMoi: đổi đại lý giữ kg đã gõ nhưng KHÔNG giữ giá của đại lý cũ", () => {
-    const prev = mauDongCuaDaiLy(so, "Hồng Phú", "Đông").map((d, i) => ({
+  it("applyNewSupplierTemplate: đổi đại lý giữ kg đã gõ nhưng KHÔNG giữ giá của đại lý cũ", () => {
+    const prev = getSupplierLineTemplates(so, "Hồng Phú", "Đông").map((d, i) => ({
       ...d,
       quantityKg: i === 0 ? 1200 : i === 2 ? 300 : 0, // BT 1 da = 1200, BT 2 da lớn = 300
     }));
-    const userEntered: DongBang = {
+    const userEntered: ImportLine = {
       key: "k",
       id: null,
       category: "Mực",
@@ -303,12 +303,12 @@ describe("gợi ý theo đại lý", () => {
       quantityKg: 50,
       unitPrice: 99000,
     };
-    const kq = apMauDaiLyMoi(
+    const result = applyNewSupplierTemplate(
       [...prev, userEntered],
-      mauDongCuaDaiLy(so, "Hương Pháp", "Đông"),
+      getSupplierLineTemplates(so, "Hương Pháp", "Đông"),
     );
     expect(
-      kq.map((d) => [d.materialTypeName, d.quantityKg, d.unitPrice]),
+      result.map((d) => [d.materialTypeName, d.quantityKg, d.unitPrice]),
     ).toEqual([
       ["BT 1 da", 1200, 160000], // giá của Hương Pháp, kg giữ
       ["BT 2 da lớn", 300, null], // Hương Pháp chưa từng giao ⇒ giá trống
@@ -316,9 +316,9 @@ describe("gợi ý theo đại lý", () => {
     ]);
   });
 
-  it("dongGoiYBoQua: đếm dòng điền sẵn chưa gõ kg", () => {
-    const m = mauDongCuaDaiLy(so, "Hồng Phú", "Đông");
-    expect(dongGoiYBoQua(m)).toHaveLength(3);
-    expect(dongGoiYBoQua([{ ...m[0], quantityKg: 5 }, m[1]])).toHaveLength(1);
+  it("getSkippedSuggestedLines: đếm dòng điền sẵn chưa gõ kg", () => {
+    const m = getSupplierLineTemplates(so, "Hồng Phú", "Đông");
+    expect(getSkippedSuggestedLines(m)).toHaveLength(3);
+    expect(getSkippedSuggestedLines([{ ...m[0], quantityKg: 5 }, m[1]])).toHaveLength(1);
   });
 });

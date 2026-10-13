@@ -227,21 +227,21 @@ export function computeMaterialNxt(
   range?: { tuNgay?: string; denNgay?: string; workshop?: Workshop },
 ): MaterialPeriodNxtRow[] {
   const workshop = range?.workshop;
-  const sapXep = [...periods].sort((a, b) =>
+  const sortedPeriods = [...periods].sort((a, b) =>
     (a.startDate || "").localeCompare(b.startDate || ""),
   );
 
   const runningStock = new Map<string, number>(); // hoNL(lowercase) → tồn cuối gần nhất
   const allPeriods: MaterialPeriodNxtRow[] = [];
 
-  for (const ky of sapXep) {
+  for (const ky of sortedPeriods) {
     const materialFamily = getMaterialFamily(ky.materialTypeName);
-    const khoa = materialFamily.toLowerCase();
+    const key = materialFamily.toLowerCase();
 
     let openingKg: number;
     let isOpeningSeeded = false;
-    if (runningStock.has(khoa)) {
-      openingKg = runningStock.get(khoa)!;
+    if (runningStock.has(key)) {
+      openingKg = runningStock.get(key)!;
     } else {
       openingKg = manualOpeningStock(opening, ky.materialTypeName, ky.startDate || "9999-99-99", workshop);
       isOpeningSeeded = openingKg !== 0;
@@ -254,14 +254,14 @@ export function computeMaterialNxt(
     // Cân đối ĐỐI CHIẾU hai bên — tổ trưởng ghi ở SX, kế toán ghi ở Cân đối.
     const productionLeftover = leftoverInPeriod(locks, ky, workshop);
     const balancingFreezeDeposit = sumBalancingFreezeDeposit(inputs, ky.id);
-    const dongGuiKhaiTay = sumNegativeCarry(inputs, ky.id);
+    const manualFreezeDeposit = sumNegativeCarry(inputs, ky.id);
     const freezeDepositSource: MaterialPeriodNxtRow["nguonDongGui"] =
-      balancingFreezeDeposit > 0 ? "can-doi" : productionLeftover > 0 ? "san-xuat" : dongGuiKhaiTay > 0 ? "chuyen-ky" : "";
-    const dongGui =
-      freezeDepositSource === "can-doi" ? balancingFreezeDeposit : freezeDepositSource === "san-xuat" ? productionLeftover : dongGuiKhaiTay;
+      balancingFreezeDeposit > 0 ? "can-doi" : productionLeftover > 0 ? "san-xuat" : manualFreezeDeposit > 0 ? "chuyen-ky" : "";
+    const freezeDeposit =
+      freezeDepositSource === "can-doi" ? balancingFreezeDeposit : freezeDepositSource === "san-xuat" ? productionLeftover : manualFreezeDeposit;
     const xaDong = sumThaw(inputs, ky.id);
-    const closingKg = openingKg + dongGui - xaDong;
-    runningStock.set(khoa, closingKg);
+    const closingKg = openingKg + freezeDeposit - xaDong;
+    runningStock.set(key, closingKg);
 
     const importsByDate = freshInByDay(ky, imports, workshop);
     const freshInKg = Object.values(importsByDate).reduce((s, v) => s + v, 0);
@@ -273,7 +273,7 @@ export function computeMaterialNxt(
       startDate: ky.startDate || "",
       endDate: ky.endDate || ky.startDate || "",
       tonDau: openingKg,
-      dongGui,
+      dongGui: freezeDeposit,
       nguonDongGui: freezeDepositSource,
       guiDongCanDoi: balancingFreezeDeposit,
       conDoSX: productionLeftover,
@@ -397,10 +397,10 @@ export function computeMaterialTotalStock(
   // Gom theo HỌ NL bằng MỘT lượt qua opening + MỘT lượt qua imports (thay vì lọc
   // toàn bộ imports 3 lần/mỗi họ). Khoá gom = getMaterialFamily(tên).toLowerCase() —
   // đúng bằng cách `isSameMaterialFamily` so khớp trước đây.
-  const dsHo = new Map<string, string>(); // key(lower) → tên họ hiển thị
+  const familyNames = new Map<string, string>(); // key(lower) → tên họ hiển thị
   const addFamily = (ten: string): string => {
     const h = getMaterialFamily(ten);
-    if (h) dsHo.set(h.toLowerCase(), h);
+    if (h) familyNames.set(h.toLowerCase(), h);
     return h;
   };
 
@@ -464,10 +464,10 @@ export function computeMaterialTotalStock(
   }
 
   // Họ chỉ có ở kỳ (đông gửi/xả đông) cũng phải hiện.
-  for (const r of kyRows) dsHo.set(r.hoNL.toLowerCase(), r.hoNL);
+  for (const r of kyRows) familyNames.set(r.hoNL.toLowerCase(), r.hoNL);
 
   const theoHo: MaterialTotalStockFamily[] = [];
-  for (const [k, materialFamily] of dsHo) {
+  for (const [k, materialFamily] of familyNames) {
     const priorOpening = openByHo.get(k)?.open ?? 0;
     const nh = inByFamily.get(k) ?? { truoc: 0, ky: 0 };
     const ban = salesByFamily.get(k) ?? { truoc: 0, ky: 0 };

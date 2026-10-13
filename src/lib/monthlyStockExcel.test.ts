@@ -138,23 +138,23 @@ describe("idDongNap + ghepNapLai — nạp lại không nhân đôi (#28a)", () 
       dong("xlsx|K1000T|7|2026|5", { period: "2026-07" }), // tháng khác — không đụng
     ];
     const incoming = [dong(idDongNap("K1000T", 8, 2026, 5), { openKg: 120 }), dong(idDongNap("K1000T", 8, 2026, 6), { itemName: "SÒNG" })];
-    const kq = ghepNapLai(prev, incoming, "K1000T");
-    const t8 = kq.lines.filter((l) => l.period === "2026-08" && l.warehouse === "Kho 1000 tấn" && l.id.includes("K1000T"));
+    const result = ghepNapLai(prev, incoming, "K1000T");
+    const t8 = result.lines.filter((l) => l.period === "2026-08" && l.warehouse === "Kho 1000 tấn" && l.id.includes("K1000T"));
     expect(t8.map((l) => l.id).sort()).toEqual(["xlsx|K1000T|8|2026|5", "xlsx|K1000T|8|2026|6"]);
-    expect(kq.thayIdCu).toBe(2);
-    const saba = kq.lines.find((l) => l.id === "xlsx|K1000T|8|2026|5")!;
+    expect(result.thayIdCu).toBe(2);
+    const saba = result.lines.find((l) => l.id === "xlsx|K1000T|8|2026|5")!;
     expect(saba).toMatchObject({ openKg: 120, storageLocation: "Kho Ánh Dương", note: "đã kiểm" });
-    expect(kq.lines.some((l) => l.id === "xlsx|K1500T|08|2026|5")).toBe(true);
-    expect(kq.lines.some((l) => l.id === "xlsx|K1000T|7|2026|5")).toBe(true);
-    expect(kq.lines).toHaveLength(4);
+    expect(result.lines.some((l) => l.id === "xlsx|K1500T|08|2026|5")).toBe(true);
+    expect(result.lines.some((l) => l.id === "xlsx|K1000T|7|2026|5")).toBe(true);
+    expect(result.lines).toHaveLength(4);
   });
 
   test("cùng id mà tên hàng khác (rowIndex trượt) ⇒ không thừa kế vị trí/ghi chú + báo", () => {
     const prev = [dong("xlsx|K1000T|8|2026|5", { storageLocation: "Kho Hồng Phú", note: "x" })];
-    const kq = ghepNapLai(prev, [dong("xlsx|K1000T|8|2026|5", { itemName: "CÁ THU" })], "K1000T");
-    expect(kq.lines).toHaveLength(1);
-    expect(kq.lines[0]).toMatchObject({ itemName: "CÁ THU", storageLocation: "", note: "" });
-    expect(kq.lechTen).toHaveLength(1);
+    const result = ghepNapLai(prev, [dong("xlsx|K1000T|8|2026|5", { itemName: "CÁ THU" })], "K1000T");
+    expect(result.lines).toHaveLength(1);
+    expect(result.lines[0]).toMatchObject({ itemName: "CÁ THU", storageLocation: "", note: "" });
+    expect(result.lechTen).toHaveLength(1);
   });
 
   test("dòng cũ không còn trong file: trống ⇒ bỏ, còn số ⇒ giữ + báo; file có kho ở cột R thì file thắng", () => {
@@ -164,10 +164,10 @@ describe("idDongNap + ghepNapLai — nạp lại không nhân đôi (#28a)", () 
       dong("xlsx|K1000T|8|2026|10", { openKg: 7 }),
       dong("msl|2026-08|tach", { note: "Gửi kho (tách từ dòng xlsx|K1000T|8|2026|1)" }),
     ];
-    const kq = ghepNapLai(prev, [dong("xlsx|K1000T|8|2026|1", { storageLocation: "Kho B" })], "K1000T");
-    expect(kq.boRong).toBe(1);
-    expect(kq.cuConSo.map((l) => l.id)).toEqual(["xlsx|K1000T|8|2026|10"]);
-    expect(kq.lines.find((l) => l.id === "xlsx|K1000T|8|2026|1")?.storageLocation).toBe("Kho B");
-    expect(kq.soTach).toBe(1);
+    const result = ghepNapLai(prev, [dong("xlsx|K1000T|8|2026|1", { storageLocation: "Kho B" })], "K1000T");
+    expect(result.boRong).toBe(1);
+    expect(result.cuConSo.map((l) => l.id)).toEqual(["xlsx|K1000T|8|2026|10"]);
+    expect(result.lines.find((l) => l.id === "xlsx|K1000T|8|2026|1")?.storageLocation).toBe("Kho B");
+    expect(result.soTach).toBe(1);
   });
 });

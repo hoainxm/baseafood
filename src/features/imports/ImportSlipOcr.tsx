@@ -1,5 +1,5 @@
 // ============================================================
-// Tên file: src/features/imports/OcrPhieuNhap.tsx
+// Tên file: src/features/imports/ImportSlipOcr.tsx
 // Tên tiếng Việt: Nhận diện phiếu nhập (OCR) → gợi ý điền form
 // Description: Chụp/chọn ảnh phiếu tay → OCR → tap-áp vào form Ghi nhập
 // ============================================================
@@ -23,39 +23,39 @@ import { kg as fmtKg, formatDateVN } from "@/lib/format";
 
 interface Props {
   /** Danh mục để dò khớp tên trên phiếu (đại lý, loại NL). */
-  danhMuc: OcrCatalog;
+  catalog: OcrCatalog;
   /** Đã tải ảnh lên Storage → đường dẫn lưu kèm chuyến. */
-  onLuuAnh: (path: string) => void;
-  onApDaiLy: (name: string) => void;
-  onApNgay: (iso: string) => void;
-  onThemDong: (materialType: string, kg: number) => void;
+  onImageSaved: (path: string) => void;
+  onApplySupplier: (name: string) => void;
+  onApplyDate: (iso: string) => void;
+  onAddRow: (materialType: string, kg: number) => void;
   onClose: () => void;
 }
 
 type Phase = "chon" | "dang-nhan" | "xong" | "loi";
 
-export function OcrPhieuNhap({
-  danhMuc,
-  onLuuAnh,
-  onApDaiLy,
-  onApNgay,
-  onThemDong,
+export function ImportSlipOcr({
+  catalog,
+  onImageSaved: onSavePhoto,
+  onApplySupplier,
+  onApplyDate,
+  onAddRow,
   onClose,
 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [stage, setStage] = useState<Phase>("chon");
-  const [anhURL, setAnhURL] = useState<string | null>(null);
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [percent, setPercent] = useState(0);
-  const [kq, setKq] = useState<KetQuaOcr | null>(null);
+  const [result, setResult] = useState<KetQuaOcr | null>(null);
   const [isSupplierApplied, setIsSupplierApplied] = useState(false);
   const [isDateApplied, setIsDateApplied] = useState(false);
   const [appliedRows, setAppliedRows] = useState<Set<number>>(new Set());
 
   const pickImage = async (file: File) => {
-    setAnhURL(URL.createObjectURL(file));
+    setPhotoUrl(URL.createObjectURL(file));
     setStage("dang-nhan");
     setPercent(0);
-    setKq(null);
+    setResult(null);
     setIsSupplierApplied(false);
     setIsDateApplied(false);
     setAppliedRows(new Set());
@@ -64,14 +64,14 @@ export function OcrPhieuNhap({
     if (hasImageStorage)
       uploadImage(file).then((path) => {
         if (path) {
-          onLuuAnh(path);
+          onSavePhoto(path);
           notify.saved("Đã lưu ảnh phiếu kèm chuyến");
         }
       });
 
     try {
-      const r = await recognizeImportSlip(file, danhMuc, setPercent);
-      setKq(r);
+      const r = await recognizeImportSlip(file, catalog, setPercent);
+      setResult(r);
       setStage("xong");
     } catch {
       setStage("loi");
@@ -79,17 +79,17 @@ export function OcrPhieuNhap({
   };
 
   const addAll = () => {
-    kq?.dong.forEach((d, i) => {
-      if (!appliedRows.has(i)) onThemDong(d.loaiNL, d.kg);
+    result?.dong.forEach((d, i) => {
+      if (!appliedRows.has(i)) onAddRow(d.loaiNL, d.kg);
     });
-    setAppliedRows(new Set(kq?.dong.map((_, i) => i)));
+    setAppliedRows(new Set(result?.dong.map((_, i) => i)));
     notify.saved("Đã thêm các dòng nhận được — soát lại số trước khi lưu");
   };
 
-  const doiAnh = () => {
+  const changePhoto = () => {
     setStage("chon");
-    setAnhURL(null);
-    setKq(null);
+    setPhotoUrl(null);
+    setResult(null);
   };
 
   return (
@@ -118,9 +118,9 @@ export function OcrPhieuNhap({
           />
 
           {/* Ảnh xem trước */}
-          {anhURL && (
+          {photoUrl && (
             <img
-              src={anhURL}
+              src={photoUrl}
               alt="Ảnh phiếu"
               className="max-h-48 w-auto rounded-lg border border-border"
             />
@@ -156,53 +156,53 @@ export function OcrPhieuNhap({
                 quá mờ). Ảnh phiếu vẫn được lưu kèm chuyến để đối chiếu tay.
               </p>
               <Button
-                title="Bỏ ảnh này, chụp hoặc chọn ảnh khác rõ hơn." variant="outline" size="lg" onClick={doiAnh}>
+                title="Bỏ ảnh này, chụp hoặc chọn ảnh khác rõ hơn." variant="outline" size="lg" onClick={changePhoto}>
                 <RefreshCw />
                 Thử ảnh khác
               </Button>
             </div>
           )}
 
-          {stage === "xong" && kq && (
+          {stage === "xong" && result && (
             <div className="space-y-4">
               {/* Đầu chuyến: đại lý + ngày */}
-              {(kq.daiLy || kq.ngay) && (
+              {(result.daiLy || result.ngay) && (
                 <div className="flex flex-wrap gap-2">
-                  {kq.daiLy && (
+                  {result.daiLy && (
                     <Button
                       title="Điền tên đại lý máy đọc được vào form nhập hàng."
                       variant={isSupplierApplied ? "outline" : "default"}
                       onClick={() => {
-                        onApDaiLy(kq.daiLy!);
+                        onApplySupplier(result.daiLy!);
                         setIsSupplierApplied(true);
                       }}
                     >
                       {isSupplierApplied ? <Check /> : <Plus />}
-                      Đại lý: {kq.daiLy}
+                      Đại lý: {result.daiLy}
                     </Button>
                   )}
-                  {kq.ngay && (
+                  {result.ngay && (
                     <Button
                       title="Điền ngày máy đọc được vào form nhập hàng."
                       variant={isDateApplied ? "outline" : "default"}
                       onClick={() => {
-                        onApNgay(kq.ngay!);
+                        onApplyDate(result.ngay!);
                         setIsDateApplied(true);
                       }}
                     >
                       {isDateApplied ? <Check /> : <Plus />}
-                      Ngày: {formatDateVN(kq.ngay)}
+                      Ngày: {formatDateVN(result.ngay)}
                     </Button>
                   )}
                 </div>
               )}
 
               {/* Dòng loại NL + kg đoán được */}
-              {kq.dong.length > 0 ? (
+              {result.dong.length > 0 ? (
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-semibold">
-                      Dòng nhận được ({kq.dong.length})
+                      Dòng nhận được ({result.dong.length})
                     </span>
                     <Button
                       title="Điền hết các dòng loại nguyên liệu + kg máy đọc được vào form. Vẫn soát lại từng dòng trước khi lưu." variant="outline" size="sm" onClick={addAll}>
@@ -211,7 +211,7 @@ export function OcrPhieuNhap({
                     </Button>
                   </div>
                   <ul className="space-y-1.5">
-                    {kq.dong.map((d, i) => (
+                    {result.dong.map((d, i) => (
                       <li
                         key={i}
                         className="flex items-center justify-between gap-3 rounded-lg bg-muted px-3 py-2"
@@ -224,7 +224,7 @@ export function OcrPhieuNhap({
                           variant={appliedRows.has(i) ? "outline" : "default"}
                           size="sm"
                           onClick={() => {
-                            onThemDong(d.loaiNL, d.kg);
+                            onAddRow(d.loaiNL, d.kg);
                             setAppliedRows((s) => new Set(s).add(i));
                           }}
                         >
@@ -243,22 +243,22 @@ export function OcrPhieuNhap({
               )}
 
               {/* Tham khảo: số kg lẻ + loại NL lẻ */}
-              {(kq.soKg.length > 0 || kq.loaiNL.length > 0) && (
+              {(result.soKg.length > 0 || result.loaiNL.length > 0) && (
                 <div className="space-y-2 border-t border-border pt-3">
-                  {kq.loaiNL.length > 0 && (
+                  {result.loaiNL.length > 0 && (
                     <div className="flex flex-wrap items-center gap-1.5">
                       <span className="text-sm text-muted-foreground">Loại NL:</span>
-                      {kq.loaiNL.map((l) => (
+                      {result.loaiNL.map((l) => (
                         <Tag key={l} variant="phan-loai" tone={toneByName(l)}>
                           {l}
                         </Tag>
                       ))}
                     </div>
                   )}
-                  {kq.soKg.length > 0 && (
+                  {result.soKg.length > 0 && (
                     <div className="flex flex-wrap items-center gap-1.5">
                       <span className="text-sm text-muted-foreground">Số nhận được:</span>
-                      {kq.soKg.map((n, i) => (
+                      {result.soKg.map((n, i) => (
                         <Tag key={i} variant="phu" className="tnum">
                           {fmtKg(n)}
                         </Tag>
@@ -269,19 +269,19 @@ export function OcrPhieuNhap({
               )}
 
               {/* Toàn văn để đối chiếu */}
-              {kq.text.trim() && (
+              {result.text.trim() && (
                 <details className="text-sm text-muted-foreground">
                   <summary className="cursor-pointer select-none">
                     Xem toàn văn nhận diện
                   </summary>
                   <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap rounded-lg bg-muted p-3 text-xs">
-                    {kq.text}
+                    {result.text}
                   </pre>
                 </details>
               )}
 
               <Button
-                title="Chụp ảnh phiếu khác để đọc tiếp." variant="outline" size="sm" onClick={doiAnh}>
+                title="Chụp ảnh phiếu khác để đọc tiếp." variant="outline" size="sm" onClick={changePhoto}>
                 <RefreshCw />
                 Chụp ảnh khác
               </Button>

@@ -65,7 +65,7 @@ interface Dong {
 
 export default function QcChecklistScreen() {
   const [rows, persist] = useQcChecklists();
-  const [locks, persistLocks, { trangThai: ttKhoa }] = useQcLocks();
+  const [locks, persistLocks, { trangThai: lockStatus }] = useQcLocks();
 
   const [date, setDate] = useState(todayISO());
   const [workshop, setWorkshop] = useState<Workshop>("Đông");
@@ -77,11 +77,11 @@ export default function QcChecklistScreen() {
     () => rows.filter((r) => r.date === date && r.workshop === workshop),
     [rows, date, workshop]
   );
-  const khoa = useMemo(
+  const lock = useMemo(
     () => locks.find((l) => l.lockDate === date && l.workshop === workshop && l.isLocked),
     [locks, date, workshop]
   );
-  const isLocked = Boolean(khoa);
+  const isLocked = Boolean(lock);
   const isBackdate = isLocked || isBackdatedQc(date, todayISO());
 
   // Đổi (ngày × xưởng) hoặc dữ liệu tải xong → nạp lại bảng chấm điểm từ sổ.
@@ -108,7 +108,7 @@ export default function QcChecklistScreen() {
   }, [date, workshop, rows]);
 
   const updateRow = (i: number, patch: Partial<Dong>) =>
-    setDongs((ds) => ds.map((d, k) => (k === i ? { ...d, ...patch } : d)));
+    setDongs((items) => items.map((d, k) => (k === i ? { ...d, ...patch } : d)));
 
   const addCriterion = () => {
     const ten = newName.trim();
@@ -117,8 +117,8 @@ export default function QcChecklistScreen() {
       notify.warning("Chỉ tiêu này đã có trong danh sách");
       return;
     }
-    setDongs((ds) => [
-      ...ds,
+    setDongs((items) => [
+      ...items,
       { criterion: ten, result: "", score: null, note: "", photoPaths: [] },
     ]);
     setNewName("");
@@ -128,13 +128,13 @@ export default function QcChecklistScreen() {
   const qc30 = useMemo(() => countQcByDay(rows, workshop, subtractDays(date, 29), date), [rows, workshop, date]);
   const coQc30 = qc30.some((x) => x.dat + x.tam + x.khongDat > 0);
 
-  const daCham = dongs.filter((d) => d.result);
-  const passCount = daCham.filter((d) => d.result === "dat").length;
-  const failCount = daCham.filter((d) => d.result === "khong-dat").length;
+  const scoredRows = dongs.filter((d) => d.result);
+  const passCount = scoredRows.filter((d) => d.result === "dat").length;
+  const failCount = scoredRows.filter((d) => d.result === "khong-dat").length;
 
   const save = () => {
-    const cham = dongs.filter((d) => d.result);
-    if (cham.length === 0) {
+    const scored = dongs.filter((d) => d.result);
+    if (scored.length === 0) {
       notify.warning("Chưa chấm chỉ tiêu nào — chọn ít nhất một kết quả");
       return;
     }
@@ -147,7 +147,7 @@ export default function QcChecklistScreen() {
       return;
     }
     const idTheoTen = new Map(saved.map((r) => [r.criterion, r.id]));
-    const newRows: QcChecklistItem[] = cham.map((d) => ({
+    const newRows: QcChecklistItem[] = scored.map((d) => ({
       id: idTheoTen.get(d.criterion) ?? newId(),
       date,
       workshop,
@@ -158,9 +158,9 @@ export default function QcChecklistScreen() {
       backdateReason: isBackdate ? backdateReason.trim() : "",
       photoPaths: d.photoPaths,
     }));
-    const giuLai = rows.filter((r) => !(r.date === date && r.workshop === workshop));
-    persist([...giuLai, ...newRows]);
-    notify.saved(`Đã lưu QC ${formatDateVN(date)} · xưởng ${workshop} — ${cham.length} chỉ tiêu`);
+    const kept = rows.filter((r) => !(r.date === date && r.workshop === workshop));
+    persist([...kept, ...newRows]);
+    notify.saved(`Đã lưu QC ${formatDateVN(date)} · xưởng ${workshop} — ${scored.length} chỉ tiêu`);
   };
 
   const lockDay = () => {
@@ -169,7 +169,7 @@ export default function QcChecklistScreen() {
       return;
     }
     // Chưa nạp xong sổ chốt ⇒ chưa biết máy chủ đã có bản ghi (ngày, xưởng) chưa.
-    if (ttKhoa === "dang-tai") {
+    if (lockStatus === "dang-tai") {
       notify.error("Đang tải sổ chốt QC từ máy chủ — đợi vài giây rồi bấm chốt lại");
       return;
     }
@@ -190,8 +190,8 @@ export default function QcChecklistScreen() {
   };
 
   const reopen = () => {
-    if (!khoa) return;
-    persistLocks(locks.map((l) => (l.id === khoa.id ? { ...l, isLocked: false } : l)));
+    if (!lock) return;
+    persistLocks(locks.map((l) => (l.id === lock.id ? { ...l, isLocked: false } : l)));
     notify.warning(`Đã mở lại QC ${formatDateVN(date)} · xưởng ${workshop}`);
   };
 
@@ -231,9 +231,9 @@ export default function QcChecklistScreen() {
           ) : (
             <Tag variant="cho">Chưa chốt</Tag>
           )}
-          {daCham.length > 0 && (
+          {scoredRows.length > 0 && (
             <span className="text-base text-muted-foreground">
-              Đã chấm {daCham.length}/{dongs.length} · Đạt {passCount}
+              Đã chấm {scoredRows.length}/{dongs.length} · Đạt {passCount}
               {failCount > 0 && ` · Không đạt ${failCount}`}
             </span>
           )}
@@ -325,7 +325,7 @@ export default function QcChecklistScreen() {
                 <CriterionPhoto
                   paths={d.photoPaths}
                   onChange={(p) => updateRow(i, { photoPaths: p })}
-                  khoa={isLocked}
+                  isLocked={isLocked}
                 />
               )}
             </div>
@@ -369,7 +369,7 @@ export default function QcChecklistScreen() {
 /* ---------- Ảnh của một chỉ tiêu QC (chụp/chọn → tải Storage → xem signed URL) ---------- */
 
 /** Ô ảnh: tự lấy signed URL (có hạn) từ path rồi hiện; bấm mở ảnh lớn. */
-function AnhThumb({ path, onXoa }: { path: string; onXoa?: () => void }) {
+function PhotoThumb({ path, onDelete }: { path: string; onDelete?: () => void }) {
   const [url, setUrl] = useState<string | null>(null);
   useEffect(() => {
     let con = true;
@@ -393,10 +393,10 @@ function AnhThumb({ path, onXoa }: { path: string; onXoa?: () => void }) {
           …
         </div>
       )}
-      {onXoa && (
+      {onDelete && (
         <button
           type="button"
-          onClick={onXoa}
+          onClick={onDelete}
           aria-label="Bỏ ảnh"
           className="absolute -right-2 -top-2 flex size-6 items-center justify-center rounded-full bg-destructive text-destructive-foreground"
         >
@@ -411,11 +411,11 @@ function AnhThumb({ path, onXoa }: { path: string; onXoa?: () => void }) {
 function CriterionPhoto({
   paths,
   onChange,
-  khoa,
+  isLocked: lock,
 }: {
   paths: string[];
   onChange: (paths: string[]) => void;
-  khoa: boolean;
+  isLocked: boolean;
 }) {
   const [isLoading, setIsLoading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -440,17 +440,17 @@ function CriterionPhoto({
 
   return (
     <div className="space-y-2">
-      {(paths.length > 0 || !khoa) && (
+      {(paths.length > 0 || !lock) && (
         <p className="text-sm text-muted-foreground">Ảnh minh chứng (nếu có)</p>
       )}
       {paths.length > 0 && (
         <div className="flex flex-wrap gap-3">
           {paths.map((p) => (
-            <AnhThumb
+            <PhotoThumb
               key={p}
               path={p}
-              onXoa={
-                khoa
+              onDelete={
+                lock
                   ? undefined
                   : () => {
                       void deleteImage(p); // xóa file khỏi Storage; bỏ path khỏi dòng ngay
@@ -461,7 +461,7 @@ function CriterionPhoto({
           ))}
         </div>
       )}
-      {!khoa && (
+      {!lock && (
         <>
           <input
             ref={inputRef}

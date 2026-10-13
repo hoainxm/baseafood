@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ImportShipment, MaterialImportItem, Packaging, SalesItem, WipProductionItem } from "@/types";
-import { buildLabelPrintRecords, listLotsToPrint, groupByTraceStage, assignSessionLots, listSelectableMaterialLots, findBatchesWithoutLot, formatMaterialLotLabel, buildLotNode, getDefaultLabelCount, summarizeLabelPrints, type TraceData } from "./lotTraceability";
+import { buildLabelPrintRecords, buildLotQrUrl, parseQrCode, listLotsToPrint, groupByTraceStage, assignSessionLots, listSelectableMaterialLots, findBatchesWithoutLot, formatMaterialLotLabel, buildLotNode, getDefaultLabelCount, summarizeLabelPrints, type TraceData } from "./lotTraceability";
 import type { LabelPrint, LotInput, LotWaiver } from "@/types";
 
 const makeShipment = (id: string, date: string, workshop: ImportShipment["workshop"], lotCode = ""): ImportShipment => ({
@@ -31,8 +31,8 @@ const dl: TraceData = {
 
 describe("listLotsToPrint", () => {
   it("lọc theo khoảng ngày + loại, mới trước, cùng ngày theo NL→BTP→TP; mỗi loại NL một lô", () => {
-    const ds = listLotsToPrint(dl, { tu: "2026-09-01", den: "2026-09-30", xuong: "", loai: ["S", "W", "P"] });
-    expect(ds.map((n) => `${n.kind}:${n.id}`)).toEqual(["S:s2-Cá thu", "W:w1", "P:p1", "S:s1-Bạch tuộc", "S:s1-Mực ống"]);
+    const items = listLotsToPrint(dl, { tu: "2026-09-01", den: "2026-09-30", xuong: "", loai: ["S", "W", "P"] });
+    expect(items.map((n) => `${n.kind}:${n.id}`)).toEqual(["S:s2-Cá thu", "W:w1", "P:p1", "S:s1-Bạch tuộc", "S:s1-Mực ống"]);
   });
   it("lọc theo xưởng và loại", () => {
     expect(listLotsToPrint(dl, { tu: "2026-08-01", den: "2026-09-30", xuong: "Đông", loai: ["S"] }).map((n) => n.id)).toEqual([
@@ -41,8 +41,8 @@ describe("listLotsToPrint", () => {
     expect(listLotsToPrint(dl, { tu: "2026-08-01", den: "2026-09-30", xuong: "", loai: [] })).toEqual([]);
   });
   it("tem NL: mã lô chuyến + MỘT loại hàng + kg của loại đó", () => {
-    const ds = listLotsToPrint(dl, { tu: "2026-09-01", den: "2026-09-01", xuong: "", loai: ["S"] });
-    expect(ds.map((n) => [n.nhan, n.moTa, n.kg])).toEqual([
+    const items = listLotsToPrint(dl, { tu: "2026-09-01", den: "2026-09-01", xuong: "", loai: ["S"] });
+    expect(items.map((n) => [n.nhan, n.moTa, n.kg])).toEqual([
       ["Đ-260901-01", "Bạch tuộc", 200],
       ["Đ-260901-01", "Mực ống", 1000],
     ]);
@@ -58,10 +58,10 @@ describe("formatMaterialLotLabel", () => {
 describe("sổ in tem", () => {
   it("buildLabelPrintRecords: mỗi lô một dòng, nhãn đông cứng, bỏ lô đã mất", () => {
     let i = 0;
-    const ds = buildLabelPrintRecords([buildLotNode("S", "s1", dl), buildLotNode("W", "w1", dl), buildLotNode("W", "khong-co", dl)], "Trúc", "2026-10-02T08:00:00Z", () => `id${++i}`);
-    expect(ds).toEqual([
+    const items = buildLabelPrintRecords([buildLotNode("S", "s1", dl), buildLotNode("W", "w1", dl), buildLotNode("W", "khong-co", dl)], "Trúc", "2026-10-02T08:00:00Z", () => `id${++i}`);
+    expect(items).toEqual([
       { id: "id1", lotKind: "S", lotId: "s1", label: "Đ-260901-01", copies: 1, operator: "Trúc", printedAt: "2026-10-02T08:00:00Z" },
-      { id: "id2", lotKind: "W", lotId: "w1", label: ds[1]!.label, copies: 1, operator: "Trúc", printedAt: "2026-10-02T08:00:00Z" },
+      { id: "id2", lotKind: "W", lotId: "w1", label: items[1]!.label, copies: 1, operator: "Trúc", printedAt: "2026-10-02T08:00:00Z" },
     ]);
   });
   it("summarizeLabelPrints: gom theo lô, lấy lần in gần nhất", () => {
@@ -110,8 +110,8 @@ describe("đợt 2b — chọn lô, chốt ngày, tem, gắn phiên", () => {
 
   it("findBatchesWithoutLot: mẻ có lô hoặc có lý do thì không còn thiếu", () => {
     const waivers = [{ outputKind: "W", outputId: "b" } as LotWaiver];
-    const ds = findBatchesWithoutLot([{ id: "a" }, { id: "b" }, { id: "c" }], [inputKg("x", "a", "s1", null, "")], waivers);
-    expect(ds.map((m) => m.id)).toEqual(["c"]);
+    const items = findBatchesWithoutLot([{ id: "a" }, { id: "b" }, { id: "c" }], [inputKg("x", "a", "s1", null, "")], waivers);
+    expect(items.map((m) => m.id)).toEqual(["c"]);
   });
 
   it("getDefaultLabelCount: BTP theo số block, TP theo số thùng, NL 1 tem", () => {
@@ -123,21 +123,21 @@ describe("đợt 2b — chọn lô, chốt ngày, tem, gắn phiên", () => {
   });
 
   it("buildLabelPrintRecords ghi đúng số tem từng lô", () => {
-    const ds = buildLabelPrintRecords([buildLotNode("W", "w1", dl)], "", "", () => "i", () => 12);
-    expect(ds[0]!.copies).toBe(12);
+    const items = buildLabelPrintRecords([buildLotNode("W", "w1", dl)], "", "", () => "i", () => 12);
+    expect(items[0]!.copies).toBe(12);
   });
 
   it("assignSessionLots: không rõ loài vẫn gắn (chiều an toàn), không gắn trùng, báo dòng không khớp", () => {
     const d: TraceData = { ...dl, products: [{ id: "mh1", code: "", name: "Hàng lạ", finishedGoodCode: "" }], lotInputs: [inputKg("cu", "w1", "s1-Mực ống", null, "")] };
-    const kq = assignSessionLots({
+    const result = assignSessionLots({
       mes: [{ id: "w1", productId: "mh1" }, { id: "w2", productId: "mh1" }],
       banNoiDia: [{ id: "n1", materialTypeName: "Cá ngừ" }],
       loNl: [{ nut: buildLotNode("S", "s1-Mực ống", d), cach: "go" }],
       dl: d, nguoiGhi: "", luc: "", taoId: () => "g",
     });
-    expect(kq.lotInputs.map((l) => l.outputId)).toEqual(["w2"]); // w1 đã gắn s1 rồi
-    expect(kq.lotInputs[0]!.method).toBe("go");
-    expect(kq.khongKhop).toEqual([{ kind: "N", id: "n1" }]);
+    expect(result.lotInputs.map((l) => l.outputId)).toEqual(["w2"]); // w1 đã gắn s1 rồi
+    expect(result.lotInputs[0]!.method).toBe("go");
+    expect(result.khongKhop).toEqual([{ kind: "N", id: "n1" }]);
   });
 });
 
@@ -155,5 +155,16 @@ describe("groupByTraceStage — quy mô một năm", () => {
     expect(gd[2]!.muc).toHaveLength(N);
     expect(gd[2]!.muc.reduce((s, m) => s + (m.ton ?? 0), 0)).toBe(N * 100 - N * 30);
     expect(ms).toBeLessThan(1500); // máy dev ~80 ms; cách cũ (computeWipStock mỗi lô) ~3 s
+  });
+});
+
+describe("buildLotQrUrl + parseQrCode — đường link trên tem QR", () => {
+  it("tem MỚI mang ?lot=, đọc lại ra đúng lô", () => {
+    const url = buildLotQrUrl("W", "a b", "https://app.example");
+    expect(url).toBe("https://app.example/#/qr?lot=W:a%20b");
+    expect(parseQrCode(url)).toEqual({ kind: "W", id: "a b" });
+  });
+  it("tem ĐÃ IN trước 2026-10-13 (?lo=) vẫn đọc được", () => {
+    expect(parseQrCode("https://app.example/#/qr?lo=S:HP-1")).toEqual({ kind: "S", id: "HP-1" });
   });
 });

@@ -1,6 +1,6 @@
 // ============================================================
 // HỘ CHIẾU LÔ — màn /qr (nâng cấp NR-6 thành truy xuất trọn chuỗi).
-// Quét QR (camera điện thoại quét tem là mở thẳng màn này qua đường link ?lo=…),
+// Quét QR (camera điện thoại quét tem là mở thẳng màn này qua đường link ?lot=… — tem in trước 2026-10-13 mang ?lo=, vẫn đọc được),
 // hoặc gõ mã lô → một trang trả lời hai câu của truy xuất:
 //   • TRUY NGƯỢC: lô này làm từ lô nào, của đại lý nào, ngày nào (TP → BTP → NL)
 //   • TRUY XUÔI : lô này đã đi vào đâu, xuất cho ai — phạm vi khi phải THU HỒI
@@ -12,16 +12,16 @@
 // ============================================================
 import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { KhungQuetQr, TemLoQr, useDuLieuTruyXuat } from "@/features/shared";
-import { InTemHangLoat } from "./InTemHangLoat";
-import { GiaiDoanTruyXuat } from "./GiaiDoanTruyXuat";
-import { ThuHoiLo } from "./ThuHoiLo";
+import { QrScanner, LotQrLabels, useTraceData } from "@/features/shared";
+import { BulkLabelPrint } from "./BulkLabelPrint";
+import { TraceStagesView } from "./TraceStagesView";
+import { LotRecall } from "./LotRecall";
 import { useLabelPrints } from "@/lib/catalogRepo";
 import { kg, formatDateVN } from "@/lib/format";
 import {
   TRACE_KIND_LABELS,
   computeLotMassBalance,
-  docMaQr,
+  parseQrCode,
   lotKey,
   isOutboundKind,
   findSameShipmentLots,
@@ -40,49 +40,50 @@ import { Button, EmptyState, Field, Input, InfoTip, Tag, toneByName, ProportionB
 import { ArrowDownRight, ArrowUpLeft, Camera, CameraOff, ListChecks, Printer, Scale, Search, Tags } from "lucide-react";
 import type { LotKind } from "@/types";
 import { cn } from "@/lib/utils";
+import { normalizeQrTab, readParam } from "@/lib/legacyUrls";
 
 const laLo = (k: TraceNodeKind): k is LotKind => !isOutboundKind(k);
 
 /** Dòng lô gọn: nhãn + mô tả; bấm vào là mở hộ chiếu của lô đó. */
-function NodeRow({ nut, kgNoi, onMo }: { nut: LotNode; kgNoi?: number | null; onMo: (n: LotNode) => void }) {
-  const canOpen = laLo(nut.kind) && !nut.mat;
+function NodeRow({ node, edgeKg: linkKg, onMo }: { node: LotNode; edgeKg?: number | null; onMo: (n: LotNode) => void }) {
+  const canOpen = laLo(node.kind) && !node.mat;
   return (
     <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-      <Tag variant="phan-loai" tone={toneByName(TRACE_KIND_LABELS[nut.kind])}>{TRACE_KIND_LABELS[nut.kind]}</Tag>
+      <Tag variant="phan-loai" tone={toneByName(TRACE_KIND_LABELS[node.kind])}>{TRACE_KIND_LABELS[node.kind]}</Tag>
       {canOpen ? (
         <button
           type="button"
           className="font-medium text-primary underline-offset-4 hover:underline"
-          title={`Mở hộ chiếu của lô ${nut.nhan}.`}
-          onClick={() => onMo(nut)}
+          title={`Mở hộ chiếu của lô ${node.nhan}.`}
+          onClick={() => onMo(node)}
         >
-          {nut.nhan}
+          {node.nhan}
         </button>
       ) : (
-        <span className="font-medium">{nut.nhan}</span>
+        <span className="font-medium">{node.nhan}</span>
       )}
       <span className="text-muted-foreground">
-        {[nut.moTa, nut.ngay && formatDateVN(nut.ngay), nut.chiTiet.find((c) => c.nhan === "Đại lý")?.giaTri]
+        {[node.moTa, node.ngay && formatDateVN(node.ngay), node.chiTiet.find((c) => c.nhan === "Đại lý")?.giaTri]
           .filter(Boolean)
           .join(" · ")}
       </span>
-      {kgNoi !== undefined && (
-        <span className="tnum text-muted-foreground">{kgNoi == null ? "· chưa ghi kg" : `· ${kg(kgNoi)}`}</span>
+      {linkKg !== undefined && (
+        <span className="tnum text-muted-foreground">{linkKg == null ? "· chưa ghi kg" : `· ${kg(linkKg)}`}</span>
       )}
     </div>
   );
 }
 
 /** Cây gia phả lô, lồng nhiều tầng. */
-function Tree({ nhanh, onMo }: { nhanh: TraceBranch[]; onMo: (n: LotNode) => void }) {
+function Tree({ branches, onMo }: { branches: TraceBranch[]; onMo: (n: LotNode) => void }) {
   return (
     <ul className="space-y-2">
-      {nhanh.map((n, i) => (
+      {branches.map((n, i) => (
         <li key={`${n.nut.kind}:${n.nut.id}:${i}`} className="space-y-2">
-          <NodeRow nut={n.nut} kgNoi={n.kg} onMo={onMo} />
+          <NodeRow node={n.nut} edgeKg={n.kg} onMo={onMo} />
           {n.con.length > 0 && (
             <div className="ml-3 border-l-2 border-border pl-4">
-              <Tree nhanh={n.con} onMo={onMo} />
+              <Tree branches={n.con} onMo={onMo} />
             </div>
           )}
         </li>
@@ -91,8 +92,8 @@ function Tree({ nhanh, onMo }: { nhanh: TraceBranch[]; onMo: (n: LotNode) => voi
   );
 }
 
-export default function QrTraCuuScreen() {
-  const { dl } = useDuLieuTruyXuat();
+export default function QrLookupScreen() {
+  const { dl } = useTraceData();
   const [params, setParams] = useSearchParams();
   const [isScanning, setIsScanning] = useState(false);
   const [typedCode, setTypedCode] = useState("");
@@ -100,27 +101,26 @@ export default function QrTraCuuScreen() {
   const [soIn] = useLabelPrints();
   const daIn = useMemo(() => summarizeLabelPrints(soIn), [soIn]);
 
-  // Mã đang tra nằm trên đường link (?lo=…) ⇒ camera điện thoại quét tem mở thẳng
+  // Mã đang tra nằm trên đường link (?lot=…) ⇒ camera điện thoại quét tem mở thẳng
   // màn này, và copy link gửi người khác là họ thấy đúng lô đó.
-  const lo = params.get("lo") ?? "";
-  // Link quét tem (?lo=…) luôn mở tab Tra, kể cả khi lỡ kèm tab=…
+  const lo = readParam(params, "lot") ?? ""; // tem đã in mang ?lo= cũ — vẫn đọc được
+  // Link quét tem (?lot=…) luôn mở tab Tra, kể cả khi lỡ kèm tab=…
   const tabUrl = params.get("tab");
-  // "do-phu" là link cũ của tab Độ phủ — nay gộp vào "Theo giai đoạn".
-  const tab = lo ? "tra" : tabUrl === "in" ? "in" : tabUrl === "giai-doan" || tabUrl === "do-phu" ? "giai-doan" : "tra";
+    const tab = lo ? "lookup" : normalizeQrTab(tabUrl);
   const ketQua = useMemo(() => {
-    const ma = docMaQr(lo);
+    const ma = parseQrCode(lo);
     return ma ? findLots(ma, dl) : [];
   }, [lo, dl]);
   const viewing = ketQua.length === 1 ? ketQua[0]! : null;
 
   const tra = (text: string) => {
-    const ma = docMaQr(text);
+    const ma = parseQrCode(text);
     if (!ma) return;
-    setParams("kind" in ma ? { lo: `${ma.kind}:${ma.id}` } : { lo: ma.ma });
+    setParams("kind" in ma ? { lot: `${ma.kind}:${ma.id}` } : { lot: ma.ma });
   };
   const openLot = (n: LotNode) => {
     if (!laLo(n.kind)) return;
-    setParams({ lo: `${n.kind}:${n.id}` });
+    setParams({ lot: `${n.kind}:${n.id}` });
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -147,21 +147,21 @@ export default function QrTraCuuScreen() {
       <div>
         <h1 className="text-2xl font-semibold text-foreground">Mã lô QR — tra cứu & in tem</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          {tab === "in"
+          {tab === "print"
             ? "In tem QR cho nhiều lô một lượt: nguyên liệu, bán thành phẩm, thành phẩm."
-            : tab === "giai-doan"
+            : tab === "stages"
               ? "Kiểm QR từng khâu: nhập nguyên liệu → sản xuất → nhập kho → đóng gói → xuất / bán. Chỗ nào thiếu thì bấm làm ngay."
               : "Quét tem QR (camera điện thoại quét cũng mở thẳng trang này) hoặc gõ mã lô, để xem lô đó làm từ đâu và đã đi đâu."}
         </p>
       </div>
 
-      {/* Hai việc của màn: TRA một lô ⇄ IN TEM nhiều lô. Tab nằm trên link (?tab=in) để gửi được. */}
+      {/* Hai việc của màn: TRA một lô ⇄ IN TEM nhiều lô. Tab nằm trên link (?tab=print) để gửi được. */}
       <div className="flex w-full overflow-hidden rounded-xl border-2 border-border sm:w-fit">
         {(
           [
-            ["tra", "Tra lô", "Tra lô", "Quét hoặc gõ mã lô để xem hộ chiếu: nguồn gốc, đã đi đâu, cân bằng kg.", Search],
-            ["giai-doan", "Theo giai đoạn", "Giai đoạn", "Kiểm QR từng khâu nhập → sản xuất → kho → đóng gói → xuất/bán: lô nào chưa in tem, chưa gắn lô, chờ duyệt, chưa quét kiểm.", ListChecks],
-            ["in", "In tem hàng loạt", "In tem", "Chọn nhiều lô theo ngày / xưởng / loại rồi in tem một lượt.", Tags],
+            ["lookup", "Tra lô", "Tra lô", "Quét hoặc gõ mã lô để xem hộ chiếu: nguồn gốc, đã đi đâu, cân bằng kg.", Search],
+            ["stages", "Theo giai đoạn", "Giai đoạn", "Kiểm QR từng khâu nhập → sản xuất → kho → đóng gói → xuất/bán: lô nào chưa in tem, chưa gắn lô, chờ duyệt, chưa quét kiểm.", ListChecks],
+            ["print", "In tem hàng loạt", "In tem", "Chọn nhiều lô theo ngày / xưởng / loại rồi in tem một lượt.", Tags],
           ] as const
         ).map(([id, label, shortLabel, description, Icon], i) => (
           <button
@@ -169,7 +169,7 @@ export default function QrTraCuuScreen() {
             type="button"
             title={description}
             aria-pressed={tab === id}
-            onClick={() => setParams(id === "tra" ? {} : { tab: id })}
+            onClick={() => setParams(id === "lookup" ? {} : { tab: id })}
             className={cn(
               "flex flex-1 items-center justify-center gap-2 px-2 py-2.5 text-center font-semibold leading-tight transition-colors sm:flex-none sm:px-4",
               i > 0 && "border-l-2 border-border",
@@ -184,10 +184,10 @@ export default function QrTraCuuScreen() {
         ))}
       </div>
 
-      {tab === "in" ? (
-        <InTemHangLoat />
-      ) : tab === "giai-doan" ? (
-        <GiaiDoanTruyXuat />
+      {tab === "print" ? (
+        <BulkLabelPrint />
+      ) : tab === "stages" ? (
+        <TraceStagesView />
       ) : (
         <>
 
@@ -207,8 +207,8 @@ export default function QrTraCuuScreen() {
           <span className="text-sm text-muted-foreground">Không có camera? Gõ mã lô in trên tem.</span>
         </div>
         {isScanning && (
-          <KhungQuetQr
-            onQuet={(t) => {
+          <QrScanner
+            onScan={(t) => {
               setIsScanning(false);
               tra(t); // tra cứu = thao tác trình bày ⇒ không toast (CLAUDE.md luật 13)
             }}
@@ -248,7 +248,7 @@ export default function QrTraCuuScreen() {
           <ul className="space-y-2">
             {ketQua.map((n) => (
               <li key={`${n.kind}:${n.id}`}>
-                <NodeRow nut={n} onMo={openLot} />
+                <NodeRow node={n} onMo={openLot} />
               </li>
             ))}
           </ul>
@@ -403,7 +403,7 @@ export default function QrTraCuuScreen() {
               <h2 className="flex items-center gap-2 font-semibold">
                 <ArrowUpLeft aria-hidden /> Truy ngược — lô này làm từ đâu
               </h2>
-              {nguoc.length ? <Tree nhanh={nguoc} onMo={openLot} /> : <p className="text-muted-foreground">{loiNguoc[viewing.kind]}</p>}
+              {nguoc.length ? <Tree branches={nguoc} onMo={openLot} /> : <p className="text-muted-foreground">{loiNguoc[viewing.kind]}</p>}
             </section>
 
             {/* 4. Truy xuôi */}
@@ -412,11 +412,11 @@ export default function QrTraCuuScreen() {
                 <ArrowDownRight aria-hidden /> Truy xuôi — lô này đã đi đâu
                 <InfoTip label="truy xuôi">Đây là danh sách cần khi phải thu hồi: mọi mẻ, thành phẩm và lệnh xuất có dùng lô này.</InfoTip>
               </h2>
-              {xuoi.length ? <Tree nhanh={xuoi} onMo={openLot} /> : <p className="text-muted-foreground">{loiXuoi[viewing.kind]}</p>}
+              {xuoi.length ? <Tree branches={xuoi} onMo={openLot} /> : <p className="text-muted-foreground">{loiXuoi[viewing.kind]}</p>}
             </section>
 
             {/* 5. Thu hồi */}
-            {laLo(viewing.kind) && <ThuHoiLo nut={viewing} dl={dl} cungChuyen={sameShipmentLots} />}
+            {laLo(viewing.kind) && <LotRecall node={viewing} dl={dl} sameShipmentLots={sameShipmentLots} />}
           </div>
         )
       )}
@@ -425,7 +425,7 @@ export default function QrTraCuuScreen() {
       )}
 
       {isPrintingLabel && viewing && laLo(viewing.kind) && (
-        <TemLoQr nut={buildLotNode(viewing.kind, viewing.id, dl)} onClose={() => setIsPrintingLabel(false)} />
+        <LotQrLabels node={buildLotNode(viewing.kind, viewing.id, dl)} onClose={() => setIsPrintingLabel(false)} />
       )}
     </div>
   );

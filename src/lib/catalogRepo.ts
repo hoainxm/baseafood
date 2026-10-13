@@ -54,7 +54,7 @@ import type {
 } from "@/types";
 import { DEFAULT_STORAGE_LOCATION } from "@/types";
 import { BATTER_TYPE_SEED, inferBattersFromName } from "@/lib/batter";
-import fgSeed from "@/data/thanh-pham.json";
+import fgSeed from "@/data/finished-goods.json";
 import nxtBachTuoc from "@/data/nxt-bachtuoc-2026-07.json";
 
 /**
@@ -290,9 +290,9 @@ export const useLotDispatches = () => useBang(LOT_DISPATCH_TABLE);
 /** Lý do chưa gắn lô khi chốt ngày SX (mig 0056). */
 export const useLotWaivers = () => useBang(LOT_WAIVER_TABLE);
 /** Tô màu dòng "đã dò" kiểu Excel — MỘT bảng dùng chung mọi bảng (mig 0055).
- *  Màn hình KHÔNG gọi thẳng: đi qua `ToMauProvider` (features/shared) gắn một lần
+ *  Màn hình KHÔNG gọi thẳng: đi qua `RowMarkProvider` (features/shared) gắn một lần
  *  ở ShellLayout, bảng bật bằng prop `rowMarkKey` của design-system. */
 export const useRowMarks = () => useBang(ROW_MARK_TABLE);
 
-/** Nạp bộ demo hàng loạt không ghi nhật ký (lib/repo.ts) — chỉ NapGoiDemo dùng. */
+/** Nạp bộ demo hàng loạt không ghi nhật ký (lib/repo.ts) — chỉ DemoPackLoader dùng. */
 export { setAuditPaused } from "@/lib/repo";

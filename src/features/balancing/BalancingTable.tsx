@@ -1,5 +1,5 @@
 // ============================================================
-// Tên file cũ: src/features/balancing/BangCanDoi.tsx
+// Tên file cũ: src/features/balancing/BalancingTable.tsx
 // Tên tiếng Việt: Bảng tính cân đối chi tiết và in ấn
 // Description: Balancing Period Detail Table and Print Layout
 // ============================================================
@@ -27,48 +27,48 @@ import { Button } from "@/design-system";
 import { num } from "@/lib/format";
 import { ChevronsLeftRight, Coins, Printer, X } from "lucide-react";
 
-export default function BangCanDoi({
+export default function BalancingTable({
   ky,
-  nlVao,
-  tp,
-  matHang,
-  khach,
-  kq,
-  nhapDaGan,
-  sanXuatDaGan,
-  moTaDongKho,
+  inputs: materialInRows,
+  outputs: finishedGoods,
+  matHang: products,
+  customers,
+  result,
+  assignedImports,
+  assignedWips,
+  describeStockLine,
   onClose,
 }: {
   ky: BalancingPeriod;
-  nlVao: BalancingInputItem[];
-  tp: BalancingOutputItem[];
+  inputs: BalancingInputItem[];
+  outputs: BalancingOutputItem[];
   matHang: Product[];
-  khach: Customer[];
-  kq: BalancingResult;
+  customers: Customer[];
+  result: BalancingResult;
   /** So nguon da gan ky — de ban in co cot tung ngay nhu bang giay. */
-  nhapDaGan: MaterialImportItem[];
-  sanXuatDaGan: WipProductionItem[];
+  assignedImports: MaterialImportItem[];
+  assignedWips: WipProductionItem[];
   /** Lô / kho của dòng Lấy xả đông · Gửi đông (từ Sổ kho tháng). */
-  moTaDongKho?: (r: BalancingInputItem) => string;
+  describeStockLine?: (r: BalancingInputItem) => string;
   onClose: () => void;
 }) {
-  const tenMH = (id: string) => matHang.find((m) => m.id === id)?.name || "—";
-  const tenKH = (id: string) => getBalancingCustomerName(id, khach);
+  const productNameOf = (id: string) => products.find((m) => m.id === id)?.name || "—";
+  const tenKH = (id: string) => getBalancingCustomerName(id, customers);
 
   const dates = getPeriodDates(ky);
   /* Cùng thứ tự với lưới: Lấy xả đông đầu bảng, Gửi đông cuối bảng. */
-  const thuTu = (h: MaterialGridRow) => (h.loaiKho === "lay-xa-dong" ? 0 : h.loaiKho === "gui-dong" ? 2 : 1);
-  const materialRows = buildMaterialGridRows(nlVao, nhapDaGan).sort((a, b) => thuTu(a) - thuTu(b));
+  const sortRank = (h: MaterialGridRow) => (h.loaiKho === "lay-xa-dong" ? 0 : h.loaiKho === "gui-dong" ? 2 : 1);
+  const materialRows = buildMaterialGridRows(materialInRows, assignedImports).sort((a, b) => sortRank(a) - sortRank(b));
   /* Cột chuyển kỳ đã bỏ ở khối NL — chỉ in khi kỳ cũ lỡ có số. */
   const hasLegacyCarryOver = materialRows.some((r) => r.chuyenKy !== 0);
-  const materialById = new Map(nlVao.map((r) => [r.id, r]));
+  const materialById = new Map(materialInRows.map((r) => [r.id, r]));
   const stockRowName = (r: MaterialGridRow) => {
-    const goc = materialById.get(r.id);
-    const mt = goc && moTaDongKho ? moTaDongKho(goc) : "";
+    const original = materialById.get(r.id);
+    const mt = original && describeStockLine ? describeStockLine(original) : "";
     const ten = r.loaiKho && r.ten !== BALANCING_STOCK_LINE_NAMES[r.loaiKho] ? `${BALANCING_STOCK_LINE_NAMES[r.loaiKho]} · ${r.ten}` : r.ten;
     return mt ? `${ten} — ${mt}` : ten;
   };
-  const finishedGoodRows = buildFinishedGoodGridRows(tp, sanXuatDaGan);
+  const finishedGoodRows = buildFinishedGoodGridRows(finishedGoods, assignedWips);
   /* Nhieu cot ngay ⇒ in NGANG, neu khong bang bi cat mat cot cuoi. */
   const inNgang = dates.length > 3;
 
@@ -186,11 +186,11 @@ export default function BangCanDoi({
               ))}
               <Tr total>
                 <Td>T. CỘNG</Td>
-                <Td right>{num(kq.totalInputKg)}</Td>
+                <Td right>{num(result.totalInputKg)}</Td>
                 {!hideAmounts && (
-                  <Td right>{kq.totalInputKg ? num(Math.round(kq.materialValue / kq.totalInputKg) || 0) : ""}</Td>
+                  <Td right>{result.totalInputKg ? num(Math.round(result.materialValue / result.totalInputKg) || 0) : ""}</Td>
                 )}
-                {!hideAmounts && <Td right>{num(kq.materialValue)}</Td>}
+                {!hideAmounts && <Td right>{num(result.materialValue)}</Td>}
                 {!hideAmounts && <Td right></Td>}
                 {materialDateColumns.map((iso) => (
                   <Td key={iso} right>
@@ -232,7 +232,7 @@ export default function BangCanDoi({
                 return (
                   <Tr key={r.id}>
                     <Td>
-                      {tenMH(r.matHangId)}
+                      {productNameOf(r.matHangId)}
                       {r.quyCach && (
                         <span className="ml-1 text-xs text-slate-500">{r.quyCach}</span>
                       )}
@@ -268,11 +268,11 @@ export default function BangCanDoi({
               <Tr total>
                 <Td>Tổng cộng</Td>
                 <Td></Td>
-                <Td right>{num(kq.totalOutputKg)}</Td>
+                <Td right>{num(result.totalOutputKg)}</Td>
                 {!hideAmounts && (
                   <Td right>
-                    {kq.totalOutputKg
-                      ? num(Math.round((finishedGoodRows.reduce((s, r) => s + r.tong * (r.donGia ?? 0), 0) / kq.totalOutputKg) * 100) / 100)
+                    {result.totalOutputKg
+                      ? num(Math.round((finishedGoodRows.reduce((s, r) => s + r.tong * (r.donGia ?? 0), 0) / result.totalOutputKg) * 100) / 100)
                       : ""}
                   </Td>
                 )}
@@ -284,7 +284,7 @@ export default function BangCanDoi({
                     {num(finishedGoodRows.reduce((s, r) => s + (r.theoNgay[iso] ?? 0), 0))}
                   </Td>
                 ))}
-                {dateColumns.length > 0 && <Td right>{num(kq.totalOutputKg)}</Td>}
+                {dateColumns.length > 0 && <Td right>{num(result.totalOutputKg)}</Td>}
                 <Td right>{num(finishedGoodRows.reduce((s, r) => s + r.tra, 0))}</Td>
                 <Td right>{num(finishedGoodRows.reduce((s, r) => s + r.no, 0))}</Td>
               </Tr>
@@ -297,23 +297,23 @@ export default function BangCanDoi({
         <Section title="Ghi chú">
           <div className="grid grid-cols-2 gap-x-8 gap-y-1 text-sm">
             <div>
-              <KV k="Tổng thành phẩm" v={`${num(kq.totalOutputKg)} kg`} />
-              <KV k="Định mức chế biến" v={num(kq.norm)} strong />
+              <KV k="Tổng thành phẩm" v={`${num(result.totalOutputKg)} kg`} />
+              <KV k="Định mức chế biến" v={num(result.norm)} strong />
               <KV k="Chi phí CB /kg TP" v={num(ky.processingCostPerKg)} />
-              <KV k="Giá Thành" v={num(kq.costOfGoods)} />
-              <KV k="Giá trị xuất" v={num(kq.exportValue)} />
+              <KV k="Giá Thành" v={num(result.costOfGoods)} />
+              <KV k="Giá trị xuất" v={num(result.exportValue)} />
               <KV
-                k={kq.profitOrLoss >= 0 ? "Lãi" : "Lỗ"}
-                v={num(Math.abs(kq.profitOrLoss))}
+                k={result.profitOrLoss >= 0 ? "Lãi" : "Lỗ"}
+                v={num(Math.abs(result.profitOrLoss))}
                 strong
               />
-              <KV k="Bình quân /kg nl" v={num(kq.avgProfitPerKgMaterial)} />
+              <KV k="Bình quân /kg nl" v={num(result.avgProfitPerKgMaterial)} />
               <KV k="tỉ giá" v={num(ky.exchangeRate)} />
             </div>
             <div>
-              <KV k="Tổng nguyên liệu vào" v={`${num(kq.totalInputKg)} kg`} />
-              <KV k="Giá trị nguyên liệu" v={num(kq.materialValue)} />
-              <KV k="Tỉ lệ thu hồi / tổng nhận" v={kq.yieldRate == null ? "—" : num(kq.yieldRate)} />
+              <KV k="Tổng nguyên liệu vào" v={`${num(result.totalInputKg)} kg`} />
+              <KV k="Giá trị nguyên liệu" v={num(result.materialValue)} />
+              <KV k="Tỉ lệ thu hồi / tổng nhận" v={result.yieldRate == null ? "—" : num(result.yieldRate)} />
             </div>
           </div>
         </Section>

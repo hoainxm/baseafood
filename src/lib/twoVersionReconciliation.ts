@@ -46,8 +46,8 @@ export function resolveTaxSideSheets(
     const co = new Set(tenSheets);
     return { benThue: new Set(specified.filter((t) => co.has(t))), cach: "chi-dinh" };
   }
-  const theoThue = tenSheets.filter(isTaxSide);
-  if (theoThue.length) return { benThue: new Set(theoThue), cach: "ten-thue" };
+  const taxSheets = tenSheets.filter(isTaxSide);
+  if (taxSheets.length) return { benThue: new Set(taxSheets), cach: "ten-thue" };
   const downloadSheets = tenSheets.filter(isDownloadSide);
   if (downloadSheets.length && downloadSheets.length < tenSheets.length)
     return { benThue: new Set(tenSheets.filter((t) => !isDownloadSide(t))), cach: "ten-tai" };
@@ -119,17 +119,17 @@ const locationOf = (d: InvoiceRow): string => `${d.sheet} dòng ${d.dongFile}`;
  */
 export function compareTwoInvoiceVersions(
   sheets: readonly InvoiceSheet[],
-  nguong = 1,
-  benThue: ReadonlySet<string> = resolveTaxSideSheets(sheets.map((s) => s.ten)).benThue
+  threshold = 1,
+  taxSides: ReadonlySet<string> = resolveTaxSideSheets(sheets.map((s) => s.ten)).benThue
 ): TwoVersionResult | null {
-  const benT = sheets.filter((s) => benThue.has(s.ten));
-  const benX = sheets.filter((s) => !benThue.has(s.ten));
+  const benT = sheets.filter((s) => taxSides.has(s.ten));
+  const benX = sheets.filter((s) => !taxSides.has(s.ten));
   if (!benT.length || !benX.length) return null;
 
   /** Gộp theo khóa: một khóa có thể xuất hiện nhiều dòng (hóa đơn bị kê hai lần). */
-  const groupInvoices = (ds: readonly InvoiceSheet[]) => {
+  const groupInvoices = (items: readonly InvoiceSheet[]) => {
     const m = new Map<string, InvoiceRow[]>();
-    for (const sh of ds)
+    for (const sh of items)
       for (const d of sh.dong) {
         const a = m.get(d.khoa);
         if (a) a.push(d);
@@ -140,13 +140,13 @@ export function compareTwoInvoiceVersions(
   const mT = groupInvoices(benT);
   const mX = groupInvoices(benX);
 
-  const sum = (ds: InvoiceRow[] | undefined, lay: (d: InvoiceRow) => number) =>
-    ds?.length ? ds.reduce((s, d) => s + lay(d), 0) : null;
+  const sum = (items: InvoiceRow[] | undefined, lay: (d: InvoiceRow) => number) =>
+    items?.length ? items.reduce((s, d) => s + lay(d), 0) : null;
 
   const dong: TwoVersionRow[] = [];
-  for (const khoa of new Set([...mT.keys(), ...mX.keys()])) {
-    const t = mT.get(khoa);
-    const x = mX.get(khoa);
+  for (const key of new Set([...mT.keys(), ...mX.keys()])) {
+    const t = mT.get(key);
+    const x = mX.get(key);
     const sample = (t ?? x)![0]!;
     const taxSideTotal = sum(t, (d) => d.tongTtVnd);
     const downloadSideTotal = sum(x, (d) => d.tongTtVnd);
@@ -155,9 +155,9 @@ export function compareTwoInvoiceVersions(
     // Dòng lệch bố cục thì cột tiền đọc sai chỗ — so tiền là kết luận bừa.
     const isAmountIncomparable =
       ben === "CA_HAI" && [...(t ?? []), ...(x ?? [])].some((d) => d.boCucLech);
-    const hasAmountMismatch = !isAmountIncomparable && totalDiff != null && Math.abs(totalDiff) > nguong;
+    const hasAmountMismatch = !isAmountIncomparable && totalDiff != null && Math.abs(totalDiff) > threshold;
     dong.push({
-      khoa,
+      khoa: key,
       kyHieu: sample.kyHieu,
       soHoaDon: sample.soHoaDon,
       ngayLap: sample.ngayLap,
@@ -203,8 +203,8 @@ export function compareTwoInvoiceVersions(
   );
 
   const rowsOfSide = (b: BenCo) => dong.filter((d) => d.ben === b);
-  const sumAmount = (ds: TwoVersionRow[], lay: (d: TwoVersionRow) => number | null) =>
-    ds.reduce((s, d) => s + (lay(d) ?? 0), 0);
+  const sumAmount = (items: TwoVersionRow[], lay: (d: TwoVersionRow) => number | null) =>
+    items.reduce((s, d) => s + (lay(d) ?? 0), 0);
 
   return {
     sheetThue: benT.map((s) => s.ten),
@@ -260,7 +260,7 @@ export interface SameDayGroup {
  */
 export function groupSameTaxCodeSameDay(
   sheets: readonly InvoiceSheet[],
-  benThue: ReadonlySet<string> = resolveTaxSideSheets(sheets.map((s) => s.ten)).benThue
+  taxSides: ReadonlySet<string> = resolveTaxSideSheets(sheets.map((s) => s.ten)).benThue
 ): SameDayGroup[] {
   const m = new Map<string, { mst: string; ten: string; ngay: string; ds: InvoiceRow[] }>();
   // File có HAI BẢN (thuế gửi + tự tải) thì mỗi hóa đơn hiện hai lần — một ở mỗi
@@ -269,36 +269,36 @@ export function groupSameTaxCodeSameDay(
   const benDaThay = new Map<string, boolean>();
   for (const sh of sheets)
     for (const d of sh.dong) {
-      const mst = chuan(d.mstBan);
-      if (!mst || !d.ngayLap) continue;
-      const ben = benThue.has(sh.ten);
+      const taxCode = chuan(d.mstBan);
+      if (!taxCode || !d.ngayLap) continue;
+      const ben = taxSides.has(sh.ten);
       const da = benDaThay.get(d.khoa);
       if (da !== undefined && da !== ben) continue;
       benDaThay.set(d.khoa, ben);
-      const k = `${mst}#${d.ngayLap}`;
+      const k = `${taxCode}#${d.ngayLap}`;
       const o = m.get(k);
       if (o) o.ds.push(d);
       else m.set(k, { mst: d.mstBan, ten: d.tenBan, ngay: d.ngayLap, ds: [d] });
     }
 
   const ra: SameDayGroup[] = [];
-  for (const { mst, ten, ngay, ds } of m.values()) {
-    if (ds.length < 2) continue;
+  for (const { mst: taxCode, ten, ngay: date, ds: items } of m.values()) {
+    if (items.length < 2) continue;
     // cụm trùng khít số tiền trong cùng nhóm
     const byAmount = new Map<number, number>();
-    for (const d of ds) byAmount.set(d.tongTtVnd, (byAmount.get(d.tongTtVnd) ?? 0) + 1);
-    const trung = [...byAmount].filter(([, n]) => n > 1);
+    for (const d of items) byAmount.set(d.tongTtVnd, (byAmount.get(d.tongTtVnd) ?? 0) + 1);
+    const duplicateAmounts = [...byAmount].filter(([, n]) => n > 1);
     ra.push({
-      mstBan: mst,
+      mstBan: taxCode,
       tenBan: ten,
-      ngay,
-      soHoaDon: ds.length,
-      tongTien: ds.reduce((s, d) => s + d.tongTtVnd, 0),
-      trungSoTien: trung.length > 0,
-      moTaTrung: trung
+      ngay: date,
+      soHoaDon: items.length,
+      tongTien: items.reduce((s, d) => s + d.tongTtVnd, 0),
+      trungSoTien: duplicateAmounts.length > 0,
+      moTaTrung: duplicateAmounts
         .map(([amount, n]) => `${n} hóa đơn cùng ${Math.round(amount).toLocaleString("vi-VN")} đ`)
         .join("; "),
-      dong: ds.map((d) => ({
+      dong: items.map((d) => ({
         sheet: d.sheet,
         dongFile: d.dongFile,
         kyHieu: d.kyHieu,

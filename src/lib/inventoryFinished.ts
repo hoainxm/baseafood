@@ -92,12 +92,12 @@ interface Acc {
   moc: string;
 }
 
-function khoaMH(productId: string, spec: string): string {
+function productKey(productId: string, spec: string): string {
   return `${productId}|||${spec}`;
 }
 
 function layAcc(map: Map<string, Acc>, productId: string, spec: string): Acc {
-  const k = khoaMH(productId, spec);
+  const k = productKey(productId, spec);
   let a = map.get(k);
   if (!a) {
     a = {
@@ -143,7 +143,7 @@ export interface FinishedGoodNxtArgs {
  * ⇒ chuyển kỳ tự động.
  */
 export function computeFinishedGoodNxt(args: FinishedGoodNxtArgs): FinishedGoodNxtRow[] {
-  const { sanXuat, exportOrders, exportItems, salesItems, packagings, opening, products, tuNgay, denNgay } = args;
+  const { sanXuat: wips, exportOrders, exportItems, salesItems, packagings, opening, products, tuNgay: fromDate, denNgay: toDate } = args;
   const map = new Map<string, Acc>();
 
   // Ngày xuất của mỗi lệnh
@@ -152,7 +152,7 @@ export function computeFinishedGoodNxt(args: FinishedGoodNxtArgs): FinishedGoodN
 
   // Tồn đầu khai tay: áp khi mốc ≤ CUỐI khoảng xem (mốc giữa khoảng cũng áp).
   for (const o of opening) {
-    if (o.asOfDate && o.asOfDate > denNgay) continue;
+    if (o.asOfDate && o.asOfDate > toDate) continue;
     const a = layAcc(map, o.productId, o.spec);
     a.openKg += o.quantityKg || 0;
     a.openBlock += o.blocksCount || 0;
@@ -163,12 +163,12 @@ export function computeFinishedGoodNxt(args: FinishedGoodNxtArgs): FinishedGoodN
   const isBeforeCutoff = (a: Acc, date: string) => !!a.moc && date < a.moc;
 
   // Nhập kho = BTP đã duyệt (da-nhap), theo ngày SX
-  for (const s of sanXuat) {
+  for (const s of wips) {
     if (s.status !== "da-nhap") continue;
-    if (s.productionDate > denNgay) continue;
+    if (s.productionDate > toDate) continue;
     const a = layAcc(map, s.productId, s.spec);
     if (isBeforeCutoff(a, s.productionDate)) continue;
-    if (s.productionDate < tuNgay) {
+    if (s.productionDate < fromDate) {
       a.nhapTruocKg += s.quantityKg || 0;
       a.nhapTruocBlock += s.blocksCount || 0;
     } else {
@@ -180,10 +180,10 @@ export function computeFinishedGoodNxt(args: FinishedGoodNxtArgs): FinishedGoodN
   // Xuất đơn đặt = dòng lệnh, theo ngày lệnh xuất
   for (const d of exportItems) {
     const date = exportDateById.get(d.exportId);
-    if (!date || date > denNgay) continue;
+    if (!date || date > toDate) continue;
     const a = layAcc(map, d.productId, d.spec);
     if (isBeforeCutoff(a, date)) continue;
-    if (date < tuNgay) {
+    if (date < fromDate) {
       a.xuatDonTruocKg += d.quantityKg || 0;
       a.xuatDonTruocBlock += d.blocksCount || 0;
     } else {
@@ -195,23 +195,23 @@ export function computeFinishedGoodNxt(args: FinishedGoodNxtArgs): FinishedGoodN
   // Xuất bán lẻ = phiếu bán block thô rút KHO DỰ TRỮ (marker RETAIL_WAREHOUSE), theo ngày bán
   for (const b of salesItems) {
     if (b.sourceWarehouse !== RETAIL_WAREHOUSE) continue; // chỉ bán lẻ rút kho dự trữ mới trừ tồn BTP
-    if (b.deliveryDate > denNgay) continue;
+    if (b.deliveryDate > toDate) continue;
     const a = layAcc(map, b.productId, b.spec);
     if (isBeforeCutoff(a, b.deliveryDate)) continue;
-    if (b.deliveryDate < tuNgay) a.xuatBanTruocKg += b.quantityKg || 0;
+    if (b.deliveryDate < fromDate) a.xuatBanTruocKg += b.quantityKg || 0;
     else a.xuatBanKyKg += b.quantityKg || 0;
   }
 
   // Xuất đóng gói = BTP tiêu hao (inputKg) để đóng gói TP, theo ngày đóng gói
   for (const p of packagings) {
-    if (p.date > denNgay) continue;
+    if (p.date > toDate) continue;
     const a = layAcc(map, p.fromProductId, p.fromSpec);
     if (isBeforeCutoff(a, p.date)) continue;
-    if (p.date < tuNgay) a.xuatGoiTruocKg += p.inputKg || 0;
+    if (p.date < fromDate) a.xuatGoiTruocKg += p.inputKg || 0;
     else a.xuatGoiKyKg += p.inputKg || 0;
   }
 
-  const tenMH = (id: string) => products.find((m) => m.id === id);
+  const productNameOf = (id: string) => products.find((m) => m.id === id);
   const rows: FinishedGoodNxtRow[] = [];
   for (const a of map.values()) {
     const openingKg =
@@ -224,7 +224,7 @@ export function computeFinishedGoodNxt(args: FinishedGoodNxtArgs): FinishedGoodN
     // Bỏ dòng hoàn toàn trống (không tồn, không phát sinh trong kỳ)
     if (openingKg === 0 && a.nhapKyKg === 0 && outKg === 0 && closingKg === 0) continue;
 
-    const p = tenMH(a.productId);
+    const p = productNameOf(a.productId);
     rows.push({
       productId: a.productId,
       productCode: p?.code || "",

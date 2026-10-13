@@ -75,7 +75,7 @@ describe("hút sổ nhập vào kỳ cân đối", () => {
 });
 
 describe("findOverlappingFamilyPeriods", () => {
-  const dsKy = [
+  const periods = [
     ky("A", "2026-09-01", "2026-09-05"),
     ky("B", "2026-09-01", "2026-09-05"),
     ky("C", "2026-09-06", "2026-09-10"),
@@ -83,8 +83,8 @@ describe("findOverlappingFamilyPeriods", () => {
     ky("E", "2026-09-05", "2026-09-07", "Bạch tuộc 2 da lớn (80↑)"),
   ];
   test("bắt kỳ cùng họ chồng ngày; bỏ qua chính nó, kỳ liền kề không chồng, kỳ khác loại", () => {
-    expect(findOverlappingFamilyPeriods(dsKy[1], dsKy).map((k) => k.id).sort()).toEqual(["A", "E"]);
-    expect(findOverlappingFamilyPeriods(dsKy[2], dsKy).map((k) => k.id)).toEqual(["E"]);
+    expect(findOverlappingFamilyPeriods(periods[1], periods).map((k) => k.id).sort()).toEqual(["A", "E"]);
+    expect(findOverlappingFamilyPeriods(periods[2], periods).map((k) => k.id)).toEqual(["E"]);
   });
 });
 
@@ -100,7 +100,7 @@ const finishedGoodRow = (periodId: string, productId: string, customerId: string
 });
 
 describe("dòng mẫu khối 2", () => {
-  const dsKy = [
+  const periods = [
     ky("K1", "2026-08-20", "2026-08-25"),
     ky("K2", "2026-08-26", "2026-08-31"),
     ky("K3", "2026-09-01", "2026-09-05"),
@@ -117,11 +117,11 @@ describe("dòng mẫu khối 2", () => {
   ];
 
   test("kỳ mẫu = kỳ cùng họ gần nhất KẾT THÚC TRƯỚC, có dòng; không lấy kỳ khác loại", () => {
-    expect(pickTemplatePeriod(dsKy[2], dsKy, allOutputs)?.id).toBe("K2");
-    expect(pickTemplatePeriod(dsKy[3], dsKy, allOutputs)?.id).toBe("K2");
+    expect(pickTemplatePeriod(periods[2], periods, allOutputs)?.id).toBe("K2");
+    expect(pickTemplatePeriod(periods[3], periods, allOutputs)?.id).toBe("K2");
     // kỳ đầu tiên, không có kỳ trước có dòng ⇒ lấy kỳ mới nhất còn lại
-    expect(pickTemplatePeriod(ky("K0", "2026-08-01", "2026-08-05"), dsKy, allOutputs)?.id).toBe("K2");
-    expect(pickTemplatePeriod(ky("M", "2026-09-01", "2026-09-05", "Mực ống"), dsKy, allOutputs)).toBeNull();
+    expect(pickTemplatePeriod(ky("K0", "2026-08-01", "2026-08-05"), periods, allOutputs)?.id).toBe("K2");
+    expect(pickTemplatePeriod(ky("M", "2026-09-01", "2026-09-05", "Mực ống"), periods, allOutputs)).toBeNull();
   });
 
   test("mỗi mặt hàng × khách × GIÁ một dòng mẫu; khác khách hoặc khác giá vẫn tách", () => {
@@ -137,8 +137,8 @@ describe("dòng mẫu khối 2", () => {
 
   test("hai dòng mẫu cùng khoá: kỳ đã có 1 dòng ⇒ còn thiếu đúng 1 (không biến mất cả hai)", () => {
     const templates = buildFinishedGoodTemplateRows(allOutputs.filter((r) => r.periodId === "K2"));
-    const thieu = findMissingTemplateRows(templates, [{ productId: "tambot", spec: "", customerId: "jfda" }]);
-    expect(thieu.filter((m) => m.customerId === "jfda").map((m) => m.unitPrice)).toEqual([null]);
+    const missingRows = findMissingTemplateRows(templates, [{ productId: "tambot", spec: "", customerId: "jfda" }]);
+    expect(missingRows.filter((m) => m.customerId === "jfda").map((m) => m.unitPrice)).toEqual([null]);
   });
 
   test("dòng mẫu còn thiếu: bỏ dòng kỳ đã có (cùng khách, hoặc dòng hút chưa chọn khách)", () => {
@@ -149,9 +149,9 @@ describe("dòng mẫu khối 2", () => {
 
   test("gợi ý khách + giá: ưu tiên dòng mẫu, rồi kỳ gần nhất có giá, không có ⇒ null", () => {
     const templates = buildFinishedGoodTemplateRows(allOutputs.filter((r) => r.periodId === "K2"));
-    expect(suggestCustomerPrice("tambot", "", templates, allOutputs, dsKy, "K3")).toEqual({ customerId: "jfda", channel: "Xuất khẩu", unitPrice: 9.3 });
-    expect(suggestCustomerPrice("luoc230", "", [], allOutputs, dsKy, "K3")?.unitPrice).toBe(10.43);
-    expect(suggestCustomerPrice("moi", "", templates, allOutputs, dsKy, "K3")).toBeNull();
+    expect(suggestCustomerPrice("tambot", "", templates, allOutputs, periods, "K3")).toEqual({ customerId: "jfda", channel: "Xuất khẩu", unitPrice: 9.3 });
+    expect(suggestCustomerPrice("luoc230", "", [], allOutputs, periods, "K3")?.unitPrice).toBe(10.43);
+    expect(suggestCustomerPrice("moi", "", templates, allOutputs, periods, "K3")).toBeNull();
   });
 });
 

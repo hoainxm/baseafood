@@ -404,14 +404,14 @@ export function buildFinishedGoodTemplateRows(templatePeriodRows: BalancingOutpu
   const dem = new Map<string, number>();
   for (const r of templatePeriodRows) {
     if (!r.productId) continue;
-    const khoa = finishedGoodTemplateKey(r.productId, r.spec ?? "", r.customerId);
-    const priceKey = `${khoa}|${r.unitPrice ?? ""}`;
+    const key = finishedGoodTemplateKey(r.productId, r.spec ?? "", r.customerId);
+    const priceKey = `${key}|${r.unitPrice ?? ""}`;
     if (ra.has(priceKey)) continue;
-    const thu = dem.get(khoa) ?? 0;
-    dem.set(khoa, thu + 1);
+    const occurrence = dem.get(key) ?? 0;
+    dem.set(key, occurrence + 1);
     ra.set(priceKey, {
-      id: `${khoa}#${thu}`,
-      khoa,
+      id: `${key}#${occurrence}`,
+      khoa: key,
       productId: r.productId,
       spec: r.spec ?? "",
       customerId: r.customerId,

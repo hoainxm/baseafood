@@ -32,7 +32,7 @@ const dong = (periodId: string, p: Partial<BalancingInputItem>): BalancingInputI
 const thawRow = (periodId: string, daily: Record<string, number>) =>
   dong(periodId, { groupName: "Xả đông", sourceWarehouse: "Kho mình", name: "Lấy xả đông", dailyQuantities: daily });
 /** Gửi đông là dòng giảm: lưu ÂM. */
-const guiDong = (periodId: string, daily: Record<string, number>) =>
+const freezeDeposit = (periodId: string, daily: Record<string, number>) =>
   dong(periodId, {
     groupName: "Xả đông",
     sourceWarehouse: "Kho mình",
@@ -59,7 +59,7 @@ const K2 = ky("k2", "2026-09-04", "2026-09-06");
 describe("computeMaterialNxt — hai dòng kho ở Cân đối", () => {
   test("Gửi đông CỘNG tồn, Lấy xả đông kỳ sau TRỪ tồn — tồn chạy nối kỳ", () => {
     const inputs = [
-      guiDong("k1", { "2026-09-02": -1500, "2026-09-03": -500 }),
+      freezeDeposit("k1", { "2026-09-02": -1500, "2026-09-03": -500 }),
       thawRow("k2", { "2026-09-04": 1200 }),
     ];
     const [r1, r2] = computeMaterialNxt([K1, K2], inputs, [], [], []);
@@ -75,7 +75,7 @@ describe("computeMaterialNxt — hai dòng kho ở Cân đối", () => {
 
   test("Gửi đông ở Cân đối là số chuẩn, còn dở SX vẫn trả ra để đối chiếu (không cộng đôi)", () => {
     const locks = [makeLock("2026-09-02", { "Bạch tuộc 2 da lớn (80↑)": 700 })];
-    const [r] = computeMaterialNxt([K1], [guiDong("k1", { "2026-09-02": -650 })], [], [], locks);
+    const [r] = computeMaterialNxt([K1], [freezeDeposit("k1", { "2026-09-02": -650 })], [], [], locks);
     expect(r.dongGui).toBe(650);
     expect(r.guiDongCanDoi).toBe(650);
     expect(r.conDoSX).toBe(700);
@@ -143,45 +143,45 @@ describe("computeMaterialTotalStock — bán nội địa là khoản XUẤT, tr
   const range = { tuNgay: "2026-10-05", denNgay: "2026-10-07" };
 
   test("trong kỳ: tồn cuối = tồn đầu + nhập − bán nội địa; cùng HỌ gộp lớn/nhỏ", () => {
-    const kq = computeMaterialTotalStock([], [], [makeImport("2026-10-05", 5000)], [], [], range, [ban("2026-10-06", 987)]);
-    expect(kq.theoHo).toHaveLength(1);
-    const h = kq.theoHo[0];
+    const result = computeMaterialTotalStock([], [], [makeImport("2026-10-05", 5000)], [], [], range, [ban("2026-10-06", 987)]);
+    expect(result.theoHo).toHaveLength(1);
+    const h = result.theoHo[0];
     expect(h.banNoiDia).toBe(987);
     expect(h.tonCuoi).toBe(5000 - 987);
-    expect(kq.tongBanNoiDia).toBe(987);
-    expect(kq.tongTonCuoi).toBe(4013);
+    expect(result.tongBanNoiDia).toBe(987);
+    expect(result.tongTonCuoi).toBe(4013);
   });
 
   test("bán TRƯỚC kỳ trừ vào tồn đầu; bán ngoài kỳ (sau) không tính", () => {
-    const kq = computeMaterialTotalStock(
+    const result = computeMaterialTotalStock(
       [], [], [makeImport("2026-10-01", 3000)], [], [], range,
       [ban("2026-10-02", 500), ban("2026-10-09", 70)],
     );
-    expect(kq.theoHo[0].tonDau).toBe(2500);
-    expect(kq.theoHo[0].banNoiDia).toBe(0);
-    expect(kq.tongTonCuoi).toBe(2500);
+    expect(result.theoHo[0].tonDau).toBe(2500);
+    expect(result.theoHo[0].banNoiDia).toBe(0);
+    expect(result.tongTonCuoi).toBe(2500);
   });
 
   test("bán TRƯỚC mốc khai tồn đầu đã nằm trong số khai tay ⇒ không trừ lại", () => {
     const opening: MaterialOpeningStock[] = [
       { id: "o1", workshop: "Đông", materialTypeName: "Bạch tuộc 2 da", asOfDate: "2026-10-03", quantityKg: 1000, note: "" },
     ];
-    const kq = computeMaterialTotalStock([], [], [], opening, [], range, [ban("2026-10-01", 400), ban("2026-10-04", 100)]);
-    expect(kq.theoHo[0].tonDau).toBe(900); // chỉ trừ phần bán từ mốc
+    const result = computeMaterialTotalStock([], [], [], opening, [], range, [ban("2026-10-01", 400), ban("2026-10-04", 100)]);
+    expect(result.theoHo[0].tonDau).toBe(900); // chỉ trừ phần bán từ mốc
   });
 
   test("bảng theo ngày: ngày chỉ có bán nội địa cũng thành dòng, tồn giảm dần", () => {
-    const kq = computeMaterialTotalStock([], [], [makeImport("2026-10-05", 2000)], [], [], range, [ban("2026-10-06", 300)]);
-    expect(kq.theoNgay.map((d) => [d.date, d.nhap, d.banNoiDia, d.tonCuoi])).toEqual([
+    const result = computeMaterialTotalStock([], [], [makeImport("2026-10-05", 2000)], [], [], range, [ban("2026-10-06", 300)]);
+    expect(result.theoNgay.map((d) => [d.date, d.nhap, d.banNoiDia, d.tonCuoi])).toEqual([
       ["2026-10-05", 2000, 0, 2000],
       ["2026-10-06", 0, 300, 1700],
     ]);
   });
 
   test("không truyền sổ bán nội địa ⇒ kết quả y như trước", () => {
-    const kq = computeMaterialTotalStock([], [], [makeImport("2026-10-05", 1234)], [], [], range);
-    expect(kq.tongTonCuoi).toBe(1234);
-    expect(kq.tongBanNoiDia).toBe(0);
+    const result = computeMaterialTotalStock([], [], [makeImport("2026-10-05", 1234)], [], [], range);
+    expect(result.tongTonCuoi).toBe(1234);
+    expect(result.tongBanNoiDia).toBe(0);
   });
 });
 
@@ -202,11 +202,11 @@ describe("computeMaterialTotalStock — tồn đầu khai tay có mốc NẰM GI
     expect(last("2026-01-01", "2026-12-31")).toBe(1300);
   });
   test("mốc giữa khoảng: nhập TRƯỚC mốc đã nằm trong số khai tay ⇒ không cộng; nhập từ mốc vào cột nhập", () => {
-    const kq = computeMaterialTotalStock([], [], importList, opening, [], { tuNgay: "2026-06-01", denNgay: "2026-07-31" });
-    expect(kq.theoHo[0]!.tonDau).toBe(1000);
-    expect(kq.theoHo[0]!.nhapKy).toBe(300);
-    expect(kq.theoHo[0]!.seedTonDau).toBe(true);
-    expect(kq.theoNgay.at(-1)!.tonCuoi).toBe(1300);
+    const result = computeMaterialTotalStock([], [], importList, opening, [], { tuNgay: "2026-06-01", denNgay: "2026-07-31" });
+    expect(result.theoHo[0]!.tonDau).toBe(1000);
+    expect(result.theoHo[0]!.nhapKy).toBe(300);
+    expect(result.theoHo[0]!.seedTonDau).toBe(true);
+    expect(result.theoNgay.at(-1)!.tonCuoi).toBe(1300);
   });
   test("xem TRƯỚC mốc (tháng 6): chưa có khai tay ⇒ chỉ nhập tháng 6", () => {
     expect(last("2026-06-01", "2026-06-30")).toBe(50);

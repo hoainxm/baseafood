@@ -87,7 +87,7 @@ const K = { tu: "2026-09-01", den: "2026-09-30" };
 
 // Kịch bản chuỗi: 1.000 kg NL → 600 kg BTP (500 nhập kho, 100 chờ) + phế 50 + còn dở 100
 // → kho: đóng gói 300 (ra 290), xuất đơn 100, bán block 50 → TP: bán 200.
-const chuoi = makeFlowData({
+const flowScenario = makeFlowData({
   shipments: [makeShipment("c1", "2026-09-02", "Đông")],
   imports: [makeImport("n1", "c1", "2026-09-02", "Đông", 1000)],
   wips: [me("w1", "2026-09-02", "Đông", 500), me("w2", "2026-09-03", "Đông", 100, "cho-nhap")],
@@ -110,7 +110,7 @@ describe("listDatesInRange", () => {
 
 describe("buildDataFlow", () => {
   it("đi đủ chuỗi, cân bằng kg ở mọi nút, gọi tên phần hụt", () => {
-    const dc = buildDataFlow(chuoi, K);
+    const dc = buildDataFlow(flowScenario, K);
     checkBalance(dc);
     const kg = (tu: string, den: string) => dc.canh.find((c) => c.tu === tu && c.den === den)?.kg ?? 0;
     expect(dc.tongNhap).toBe(1000);
@@ -164,8 +164,8 @@ describe("buildDataFlow", () => {
   });
 
   it("gộp đại lý nhỏ thành 'Đại lý khác' khi quá 5", () => {
-    const ds = ["A", "B", "C", "D", "E", "F", "G"].map((t, i) => makeImport(`n${i}`, "c", "2026-09-02", "Đông", 100 - i, t));
-    const dc = buildDataFlow(makeFlowData({ imports: ds }), K);
+    const items = ["A", "B", "C", "D", "E", "F", "G"].map((t, i) => makeImport(`n${i}`, "c", "2026-09-02", "Đông", 100 - i, t));
+    const dc = buildDataFlow(makeFlowData({ imports: items }), K);
     expect(dc.nut.filter((n) => n.nhom === "nguon").map((n) => n.nhan)).toEqual(["A", "B", "C", "D", "E", "Đại lý khác"]);
     expect(dc.canh.find((c) => c.tu === "dl:*")?.kg).toBe(94 + 95);
   });
@@ -173,14 +173,14 @@ describe("buildDataFlow", () => {
 
 describe("splitOutflows", () => {
   it("chia phần ra của các xưởng: cộng đủ 100%, theo thứ tự cho trước", () => {
-    const ds = splitOutflows(buildDataFlow(chuoi, K), (id) => id.startsWith("x:"), ["btp", "pl", "cd", "hh"]);
-    expect(ds.map((x) => [x.id, x.kg])).toEqual([["btp", 600], ["pl", 50], ["cd", 100], ["hh", 250]]);
-    expect(ds.reduce((s, x) => s + x.tiLe, 0)).toBeCloseTo(1);
-    expect(ds[0].tiLe).toBeCloseTo(0.6);
+    const items = splitOutflows(buildDataFlow(flowScenario, K), (id) => id.startsWith("x:"), ["btp", "pl", "cd", "hh"]);
+    expect(items.map((x) => [x.id, x.kg])).toEqual([["btp", 600], ["pl", 50], ["cd", 100], ["hh", 250]]);
+    expect(items.reduce((s, x) => s + x.tiLe, 0)).toBeCloseTo(1);
+    expect(items[0].tiLe).toBeCloseTo(0.6);
   });
   it("phần ra của kho: id ngoài thứ tự xếp sau theo kg giảm dần", () => {
-    const ds = splitOutflows(buildDataFlow(chuoi, K), (id) => id === "kho", ["goi"]);
-    expect(ds.map((x) => x.id)).toEqual(["goi", "xd", "bb", "tonBtp"]);
+    const items = splitOutflows(buildDataFlow(flowScenario, K), (id) => id === "kho", ["goi"]);
+    expect(items.map((x) => x.id)).toEqual(["goi", "xd", "bb", "tonBtp"]);
   });
   it("không có dải nào ⇒ rỗng", () => {
     expect(splitOutflows({ nut: [], canh: [], tongNhap: 0 }, () => true)).toEqual([]);
@@ -189,7 +189,7 @@ describe("splitOutflows", () => {
 
 describe("buildFlowStages", () => {
   it("kg từng khâu, kg chờ duyệt, tỉ lệ chuyển tiếp", () => {
-    const conveyor = buildFlowStages(chuoi, K);
+    const conveyor = buildFlowStages(flowScenario, K);
     expect(conveyor.map((x) => x.khoa)).toEqual(["nhap", "san-xuat", "kho", "dong-goi", "xuat-ban"]);
     expect(conveyor.map((x) => x.kg)).toEqual([1000, 600, 500, 290, 350]);
     expect(conveyor[2].kgCho).toBe(100);
@@ -205,9 +205,9 @@ describe("buildFlowStages", () => {
 
 describe("buildDailyFlowSeries", () => {
   it("tồn BTP + TP cuối ngày theo đúng engine sổ tồn", () => {
-    const ds = buildDailyFlowSeries(chuoi, { tu: "2026-09-01", den: "2026-09-07" });
-    const date = (n: string) => ds.find((x) => x.ngay === n)!;
-    expect(ds).toHaveLength(7);
+    const items = buildDailyFlowSeries(flowScenario, { tu: "2026-09-01", den: "2026-09-07" });
+    const date = (n: string) => items.find((x) => x.ngay === n)!;
+    expect(items).toHaveLength(7);
     expect(date("2026-09-01").tonBtp).toBe(0);
     expect(date("2026-09-02")).toMatchObject({ nhap: 1000, sanXuat: 500, tonBtp: 500 });
     expect(date("2026-09-03")).toMatchObject({ sanXuat: 100, tonBtp: 500 }); // mẻ chờ duyệt chưa vào kho
@@ -232,16 +232,16 @@ describe("computeYieldByProduct", () => {
     expect(computeYieldByProduct(d, K, 0.1).dong.every((r) => !r.vuotNguong)).toBe(true);
   });
   it("chưa mẻ nào gắn lô ⇒ rỗng, không đoán", () => {
-    expect(computeYieldByProduct(chuoi, K)).toEqual({ dong: [], binhQuan: null });
+    expect(computeYieldByProduct(flowScenario, K)).toEqual({ dong: [], binhQuan: null });
   });
 });
 
 describe("buildChainWarnings", () => {
   it("bắt ngày chưa chốt, đổi sau chốt, ghi bù, chờ duyệt lâu, lô chưa gắn", () => {
     const d = makeFlowData({
-      ...chuoi,
-      shipments: [...chuoi.shipments, makeShipment("c9", "2026-09-10", "Cá", "Bê 3", "2026-09-12")],
-      imports: [...chuoi.imports, makeImport("n9", "c9", "2026-09-10", "Cá", 80, "Bê 3"), makeImport("n10", "c1", "2026-09-02", "Đông", 5)],
+      ...flowScenario,
+      shipments: [...flowScenario.shipments, makeShipment("c9", "2026-09-10", "Cá", "Bê 3", "2026-09-12")],
+      imports: [...flowScenario.imports, makeImport("n9", "c9", "2026-09-10", "Cá", 80, "Bê 3"), makeImport("n10", "c1", "2026-09-02", "Đông", 5)],
     });
     const cb = buildChainWarnings(d, K, "2026-09-20");
     const warningsOfKind = (l: string) => cb.filter((x) => x.loai === l);
@@ -249,11 +249,11 @@ describe("buildChainWarnings", () => {
     expect(warningsOfKind("chua-chot-nhap").map((x) => x.xuong)).toEqual(["Cá"]);
     expect(warningsOfKind("chua-chot-sx").map((x) => x.ngay)).toEqual(["2026-09-03"]);
     expect(warningsOfKind("ghi-bu").map((x) => x.id)).toEqual(["gbn|c9"]);
-    expect(warningsOfKind("cho-duyet-lau").map((x) => x.duongDan)).toEqual(["/warehouse?duyet=W:w2"]);
+    expect(warningsOfKind("cho-duyet-lau").map((x) => x.duongDan)).toEqual(["/warehouse?approve=W:w2"]);
     expect(warningsOfKind("lo-chua-gan").length).toBeGreaterThan(0);
     // Lỗi đứng trước nhắc, nhắc trước tin.
-    const thuTu = cb.map((x) => x.muc);
-    expect(thuTu.indexOf("tin")).toBeGreaterThan(thuTu.lastIndexOf("loi"));
+    const order = cb.map((x) => x.muc);
+    expect(order.indexOf("tin")).toBeGreaterThan(order.lastIndexOf("loi"));
   });
 
   it("hôm nay chưa chốt thì chưa nhắc", () => {
@@ -293,7 +293,7 @@ describe("buildChainWarnings", () => {
 
 describe("bucketStockByAge", () => {
   it("chia kg tồn theo số ngày nằm kho, bỏ lô hết hàng", () => {
-    const ds = bucketStockByAge(
+    const items = bucketStockByAge(
       [
         { ngaySX: "2026-10-01", conLai: 100 }, // 11 ngày
         { ngaySX: "2026-09-12", conLai: 50 }, // 30 ngày ⇒ nhóm 30–60
@@ -302,7 +302,7 @@ describe("bucketStockByAge", () => {
       ],
       "2026-10-12",
     );
-    expect(ds.map((x) => [x.khoa, x.kg, x.soLo])).toEqual([
+    expect(items.map((x) => [x.khoa, x.kg, x.soLo])).toEqual([
       ["duoi-30", 100, 1],
       ["30-60", 50, 1],
       ["60-90", 0, 0],
@@ -314,8 +314,8 @@ describe("bucketStockByAge", () => {
 describe("countQcByDay", () => {
   it("đếm theo ngày + xưởng, đủ ngày kể cả ngày trống", () => {
     const r = (date: string, workshop: Workshop, result: "dat" | "tam" | "khong-dat") => ({ date, workshop, result });
-    const ds = countQcByDay([r("2026-10-01", "Đông", "dat"), r("2026-10-01", "Đông", "khong-dat"), r("2026-10-01", "Cá", "dat"), r("2026-10-03", "Đông", "tam")], "Đông", "2026-10-01", "2026-10-03");
-    expect(ds).toEqual([
+    const items = countQcByDay([r("2026-10-01", "Đông", "dat"), r("2026-10-01", "Đông", "khong-dat"), r("2026-10-01", "Cá", "dat"), r("2026-10-03", "Đông", "tam")], "Đông", "2026-10-01", "2026-10-03");
+    expect(items).toEqual([
       { ngay: "2026-10-01", dat: 1, tam: 0, khongDat: 1 },
       { ngay: "2026-10-02", dat: 0, tam: 0, khongDat: 0 },
       { ngay: "2026-10-03", dat: 0, tam: 1, khongDat: 0 },

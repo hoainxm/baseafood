@@ -27,33 +27,33 @@ import { Trash2 } from "lucide-react";
 
 /* ---------- Thêm dòng nguyên liệu / dòng giảm ---------- */
 
-export function HopThemDongNL({
-  laGiam,
-  tieuDe,
+export function AddMaterialRowDialog({
+  isDecrease,
+  title,
   goiY,
-  onThemLoaiNL,
-  suaLoai,
+  onCreateMaterialType: onAddMaterialType,
+  materialTypeEdit: materialTypeEditor,
   onClose,
-  onLuu,
+  onSave,
 }: {
-  laGiam: boolean;
-  tieuDe: string;
+  isDecrease: boolean;
+  title: string;
   /** Danh mục loại NL + tên các dòng đã có trong kỳ. */
   goiY: { value: string; label: string }[];
-  onThemLoaiNL: (ten: string) => string;
-  /** Bút chì sửa nhanh loại NL (useSuaDanhMuc của màn, theo TÊN) — mục không có trong danh mục thì không có bút. */
-  suaLoai?: { moSua: (v: string) => void; suaDuoc: (v: string) => boolean; nhanSua: string };
+  onCreateMaterialType: (ten: string) => string;
+  /** Bút chì sửa nhanh loại NL (useQuickCatalogEdit của màn, theo TÊN) — mục không có trong danh mục thì không có bút. */
+  materialTypeEdit?: { openEdit: (v: string) => void; canEdit: (v: string) => boolean; editLabel: string };
   onClose: () => void;
-  onLuu: (ten: string) => void;
+  onSave: (ten: string) => void;
 }) {
   const [ten, setTen] = useState("");
   return (
     <Dialog open onOpenChange={(v) => !v && onClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{tieuDe}</DialogTitle>
+          <DialogTitle>{title}</DialogTitle>
           <DialogDescription>
-            {laGiam
+            {isDecrease
               ? "Chọn đúng loại nguyên liệu đang có trong kỳ. Số nhập vào lưới sẽ được TRỪ khỏi kỳ và nhập về kho xưởng để dùng cho kỳ sau."
               : "Chọn trong danh mục, chưa có thì thêm mới ngay tại đây."}
           </DialogDescription>
@@ -65,10 +65,10 @@ export function HopThemDongNL({
           value={ten}
           onChange={setTen}
           options={goiY}
-          onCreate={onThemLoaiNL}
-          onEditItem={suaLoai?.moSua}
-          canEdit={suaLoai?.suaDuoc}
-          editLabel={suaLoai?.nhanSua}
+          onCreate={onAddMaterialType}
+          onEditItem={materialTypeEditor?.openEdit}
+          canEdit={materialTypeEditor?.canEdit}
+          editLabel={materialTypeEditor?.editLabel}
         />
         <DialogFooter>
           <Button variant="outline" size="lg" onClick={onClose}>
@@ -83,7 +83,7 @@ export function HopThemDongNL({
                 notify.error("Chưa chọn loại nguyên liệu");
                 return;
               }
-              onLuu(t);
+              onSave(t);
             }}
           >
             Thêm dòng
@@ -96,35 +96,35 @@ export function HopThemDongNL({
 
 /* ---------- Chọn tay dòng sổ nhập để hút ---------- */
 
-export function HopChonDongNhap({
-  dong: dongVao,
-  kyDangGiu,
-  cungHo,
-  tenLoaiKy,
+export function PickImportRowsDialog({
+  dong: inputRows,
+  otherPeriodIds: heldIds,
+  isSameFamily,
+  periodMaterialType: periodMaterialTypeName,
   onClose,
-  onLuu,
+  onSave,
 }: {
   dong: MaterialImportItem[];
   /** Id các dòng đang thuộc kỳ KHÁC — tick là kéo về kỳ đang mở. */
-  kyDangGiu: Set<string>;
+  otherPeriodIds: Set<string>;
   /** Dòng có cùng họ nguyên liệu với kỳ không. */
-  cungHo: (r: MaterialImportItem) => boolean;
+  isSameFamily: (r: MaterialImportItem) => boolean;
   /** Tên loại NL của kỳ (để nói rõ "khác loại" so với cái gì). */
-  tenLoaiKy: string;
+  periodMaterialType: string;
   onClose: () => void;
-  onLuu: (ids: string[]) => void;
+  onSave: (ids: string[]) => void;
 }) {
   /* Dòng CÙNG loại lên trước, dòng khác loại xuống cuối — mắt đọc từ trên xuống. */
-  const dong = [...dongVao].sort(
-    (a, b) => Number(cungHo(b)) - Number(cungHo(a)) || a.deliveryDate.localeCompare(b.deliveryDate)
+  const dong = [...inputRows].sort(
+    (a, b) => Number(isSameFamily(b)) - Number(isSameFamily(a)) || a.deliveryDate.localeCompare(b.deliveryDate)
   );
   /* Chỉ tick sẵn dòng CÙNG loại mà chưa kỳ nào giữ. Trước đây tick sẵn MỌI dòng chưa
      gắn kỳ — kể cả khác loại — nên kỳ "Bạch tuộc 2 da" tạo trùng ngày bấm vào là kéo
      luôn các chuyến 1 da. Dòng khác loại / đang thuộc kỳ khác: người dùng tự tick. */
   const [selectedIds, setSelectedIds] = useState<Set<string>>(
-    () => new Set(dong.filter((r) => !kyDangGiu.has(r.id) && cungHo(r)).map((r) => r.id))
+    () => new Set(dong.filter((r) => !heldIds.has(r.id) && isSameFamily(r)).map((r) => r.id))
   );
-  const otherTypeCheckedCount = dong.filter((r) => selectedIds.has(r.id) && !cungHo(r)).length;
+  const otherTypeCheckedCount = dong.filter((r) => selectedIds.has(r.id) && !isSameFamily(r)).length;
   const doi = (id: string) =>
     setSelectedIds((prev) => {
       const nextSet = new Set(prev);
@@ -143,7 +143,7 @@ export function HopChonDongNhap({
           <DialogTitle>Chọn dòng nhập hàng đưa vào kỳ</DialogTitle>
           <DialogDescription>
             Các chuyến nhập trong khoảng ngày của kỳ nhưng khác loại nguyên liệu, hoặc
-            đang thuộc một kỳ khác. Kỳ này là <strong>{tenLoaiKy}</strong> — dòng khác loại
+            đang thuộc một kỳ khác. Kỳ này là <strong>{periodMaterialTypeName}</strong> — dòng khác loại
             chỉ tick khi chắc đó là chuyến ghi nhầm tên. Dòng đang thuộc kỳ khác mà tick
             thì sẽ được KÉO khỏi kỳ đó.
           </DialogDescription>
@@ -185,8 +185,8 @@ export function HopChonDongNhap({
                   </td>
                   <td className="border-b border-border px-3 py-2">
                     <span className="inline-flex flex-wrap gap-1">
-                      {!cungHo(r) && <Tag variant="loi">Khác loại</Tag>}
-                      {kyDangGiu.has(r.id) ? (
+                      {!isSameFamily(r) && <Tag variant="loi">Khác loại</Tag>}
+                      {heldIds.has(r.id) ? (
                         <Tag variant="luu-y">Đang thuộc kỳ khác</Tag>
                       ) : (
                         <Tag variant="cho">Chưa gắn kỳ</Tag>
@@ -204,7 +204,7 @@ export function HopChonDongNhap({
         </p>
         {otherTypeCheckedCount > 0 && (
           <p className="rounded-lg bg-warning-surface px-4 py-2.5 text-base font-medium text-destructive">
-            ⚠ Đang tick {otherTypeCheckedCount} dòng KHÁC loại {tenLoaiKy} — số của chúng sẽ cộng vào
+            ⚠ Đang tick {otherTypeCheckedCount} dòng KHÁC loại {periodMaterialTypeName} — số của chúng sẽ cộng vào
             nguyên liệu của kỳ này.
           </p>
         )}
@@ -221,7 +221,7 @@ export function HopChonDongNhap({
                 notify.error("Chưa tick dòng nào");
                 return;
               }
-              onLuu([...selectedIds]);
+              onSave([...selectedIds]);
             }}
           >
             Đưa {selectedIds.size} dòng vào kỳ
@@ -238,22 +238,22 @@ export function HopChonDongNhap({
  * Gom việc ít làm (xoá dòng tay, đổi kho nhận của dòng giảm) vào MỘT hộp — trước
  * đây là một dải thẻ dưới lưới lặp lại tên mọi dòng, làm khối nguyên liệu rối mắt.
  */
-export function HopDongNhapTay({
+export function ManualRowsDialog({
   dong,
-  tenDong,
-  khoXuong,
-  coKho,
-  onDoiKho,
-  onXoa,
+  getRowName: rowLabelOf,
+  workshopWarehouses: workshopWarehouseOptions,
+  hasWarehouse: hasStock,
+  onChangeWarehouse,
+  onDelete,
   onClose,
 }: {
   dong: MaterialGridRow[];
-  tenDong: (h: MaterialGridRow) => string;
-  khoXuong: { value: string; label: string }[];
+  getRowName: (h: MaterialGridRow) => string;
+  workshopWarehouses: { value: string; label: string }[];
   /** Dòng giảm nào có ô "Kho nhận" — mặc định mọi dòng giảm (Bán nội địa: bán đi, không vào kho). */
-  coKho?: (h: MaterialGridRow) => boolean;
-  onDoiKho: (id: string, warehouse: string) => void;
-  onXoa: (id: string) => void;
+  hasWarehouse?: (h: MaterialGridRow) => boolean;
+  onChangeWarehouse: (id: string, warehouse: string) => void;
+  onDelete: (id: string) => void;
   onClose: () => void;
 }) {
   return (
@@ -269,31 +269,31 @@ export function HopDongNhapTay({
           {dong.map((h) => (
             <li key={h.id} className="flex flex-wrap items-center gap-3 py-2">
               <span className="min-w-0 flex-1">
-                {tenDong(h)}
+                {rowLabelOf(h)}
                 <span className="tnum ml-2 text-sm text-muted-foreground">{num(h.tong)} kg</span>
               </span>
-              {h.laGiam && !h.loaiKho && (coKho?.(h) ?? true) && (
+              {h.laGiam && !h.loaiKho && (hasStock?.(h) ?? true) && (
                 <Combobox
-                  label={`Kho nhận — ${tenDong(h)}`}
+                  label={`Kho nhận — ${rowLabelOf(h)}`}
                   hideLabel
                   value={h.khoGiam}
-                  onChange={(v) => onDoiKho(h.id, v)}
-                  options={khoXuong}
+                  onChange={(v) => onChangeWarehouse(h.id, v)}
+                  options={workshopWarehouseOptions}
                   placeholder="Chọn kho nhận"
                   clearable={false}
                   className="w-48"
                 />
               )}
               <ConfirmDelete
-                recordDescription={`${tenDong(h)} — ${num(h.tong)} kg`}
-                onConfirm={() => onXoa(h.id)}
+                recordDescription={`${rowLabelOf(h)} — ${num(h.tong)} kg`}
+                onConfirm={() => onDelete(h.id)}
                 trigger={
                   <Button
                     title="Xoá dòng này khỏi lưới của kỳ (có Hoàn tác)."
                     variant="ghost"
                     size="sm"
                     className="min-h-11 min-w-11"
-                    aria-label={`Xoá dòng ${tenDong(h)}`}
+                    aria-label={`Xoá dòng ${rowLabelOf(h)}`}
                   >
                     <Trash2 />
                   </Button>
@@ -314,29 +314,29 @@ export function HopDongNhapTay({
 
 /* ---------- Thêm mặt hàng vào lưới bán thành phẩm ---------- */
 
-export function HopThemMatHang({
-  matHang,
-  khach,
-  onThemMatHang,
-  onThemKhach,
-  onSuaMatHang,
-  onSuaKhach,
+export function AddProductDialog({
+  matHang: products,
+  customers,
+  onCreateProduct: onAddProduct,
+  onCreateCustomer: onAddCustomer,
+  onEditProduct,
+  onEditCustomer,
   onClose,
-  onLuu,
+  onSave,
 }: {
   matHang: Product[];
-  khach: Customer[];
-  onThemMatHang: (ten: string) => string;
-  onThemKhach: (ten: string) => string;
+  customers: Customer[];
+  onCreateProduct: (ten: string) => string;
+  onCreateCustomer: (ten: string) => string;
   /** Bút chì sửa nhanh bản ghi danh mục (value = id). */
-  onSuaMatHang?: (id: string) => void;
-  onSuaKhach?: (id: string) => void;
+  onEditProduct?: (id: string) => void;
+  onEditCustomer?: (id: string) => void;
   onClose: () => void;
-  onLuu: (productId: string, customerId: string, quyCach: string, kenh: SalesChannel) => void;
+  onSave: (productId: string, customerId: string, spec: string, kenh: SalesChannel) => void;
 }) {
   const [productId, setProductId] = useState("");
   const [customerId, setCustomerId] = useState("");
-  const [quyCach, setQuyCach] = useState("");
+  const [spec, setSpec] = useState("");
   return (
     <Dialog open onOpenChange={(v) => !v && onClose()}>
       <DialogContent>
@@ -351,15 +351,15 @@ export function HopThemMatHang({
             label="Mặt hàng"
             value={productId}
             onChange={setProductId}
-            options={matHang.map((m) => ({ value: m.id, label: m.name }))}
-            onCreate={onThemMatHang}
-            onEditItem={onSuaMatHang}
+            options={products.map((m) => ({ value: m.id, label: m.name }))}
+            onCreate={onAddProduct}
+            onEditItem={onEditProduct}
             editLabel="Sửa thông tin mặt hàng này — lưu thẳng vào Danh mục."
           />
           <Field label="Quy cách">
             <Input
-              value={quyCach}
-              onChange={(e) => setQuyCach(e.target.value)}
+              value={spec}
+              onChange={(e) => setSpec(e.target.value)}
               placeholder="230-250"
             />
           </Field>
@@ -369,10 +369,10 @@ export function HopThemMatHang({
             hint="Chưa rõ khách thì chọn “Khác”."
             value={customerId}
             onChange={setCustomerId}
-            options={[...khach.map((k) => ({ value: k.id, label: k.name })), { value: OTHER_CUSTOMER_ID, label: "Khác" }]}
-            onCreate={onThemKhach}
+            options={[...customers.map((k) => ({ value: k.id, label: k.name })), { value: OTHER_CUSTOMER_ID, label: "Khác" }]}
+            onCreate={onAddCustomer}
             clearable={false}
-            onEditItem={onSuaKhach}
+            onEditItem={onEditCustomer}
             canEdit={(v) => v !== OTHER_CUSTOMER_ID}
             editLabel="Sửa thông tin khách hàng này — lưu thẳng vào Danh mục."
           />
@@ -393,7 +393,7 @@ export function HopThemMatHang({
                 notify.error("Chưa chọn khách hàng — chưa rõ thì chọn “Khác”");
                 return;
               }
-              onLuu(productId, customerId, quyCach.trim(), "Xuất khẩu");
+              onSave(productId, customerId, spec.trim(), "Xuất khẩu");
             }}
           >
             Thêm vào lưới
@@ -406,21 +406,21 @@ export function HopThemMatHang({
 
 /* ---------- Lý do ghi bù khi sửa ngày đã chốt ---------- */
 
-export function HopLyDoGhiBu({
-  ngay,
+export function BackdateReasonDialog({
+  date,
   onClose,
-  onLuu,
+  onSave,
 }: {
-  ngay: string;
+  date: string;
   onClose: () => void;
-  onLuu: (reason: string) => void;
+  onSave: (reason: string) => void;
 }) {
   const [reason, setReason] = useState("");
   return (
     <Dialog open onOpenChange={(v) => !v && onClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Ngày {formatDateVN(ngay)} đã chốt</DialogTitle>
+          <DialogTitle>Ngày {formatDateVN(date)} đã chốt</DialogTitle>
           <DialogDescription>
             Số của ngày này đã được chốt và có thể đã gửi đi. Sửa vẫn được, nhưng phải ghi
             lý do để sau này giải trình được.
@@ -445,7 +445,7 @@ export function HopLyDoGhiBu({
                 notify.error("Chưa ghi lý do");
                 return;
               }
-              onLuu(reason.trim());
+              onSave(reason.trim());
             }}
           >
             Lưu số mới
@@ -458,36 +458,36 @@ export function HopLyDoGhiBu({
 
 /* ---------- Chốt kỳ / mở lại kỳ ---------- */
 
-export function HopChotKy({
-  daChot,
-  tenKy,
-  tongTP,
+export function PeriodLockDialog({
+  isLocked,
+  periodName,
+  outputTotal: totalFinishedGood,
   onClose,
-  onLuu,
+  onSave,
 }: {
-  daChot: boolean;
-  tenKy: string;
-  tongTP: string;
+  isLocked: boolean;
+  periodName: string;
+  outputTotal: string;
   onClose: () => void;
-  onLuu: (note: string) => void;
+  onSave: (note: string) => void;
 }) {
   const [note, setNote] = useState("");
   return (
     <Dialog open onOpenChange={(v) => !v && onClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{daChot ? "Mở lại kỳ đã chốt?" : "Chốt kỳ này?"}</DialogTitle>
+          <DialogTitle>{isLocked ? "Mở lại kỳ đã chốt?" : "Chốt kỳ này?"}</DialogTitle>
           <DialogDescription>
-            {daChot
-              ? `Kỳ "${tenKy}" đang khoá. Mở lại để sửa số — hệ thống giữ vết ai mở và vì sao, không xoá dấu đã chốt.`
-              : `Chốt kỳ "${tenKy}" (${tongTP}). Sau khi chốt, mọi ô trong lưới khoá lại để số đã gửi kế toán không bị đổi âm thầm. Vẫn mở lại được.`}
+            {isLocked
+              ? `Kỳ "${periodName}" đang khoá. Mở lại để sửa số — hệ thống giữ vết ai mở và vì sao, không xoá dấu đã chốt.`
+              : `Chốt kỳ "${periodName}" (${totalFinishedGood}). Sau khi chốt, mọi ô trong lưới khoá lại để số đã gửi kế toán không bị đổi âm thầm. Vẫn mở lại được.`}
           </DialogDescription>
         </DialogHeader>
-        <Field label={daChot ? "Lý do mở lại" : "Ghi chú khi chốt"}>
+        <Field label={isLocked ? "Lý do mở lại" : "Ghi chú khi chốt"}>
           <Textarea
             value={note}
             onChange={(e) => setNote(e.target.value)}
-            placeholder={daChot ? "Kế toán báo lệch 12 kg mặt hàng luộc 230-250" : "Đã đối chiếu với bảng phụ, gửi kế toán"}
+            placeholder={isLocked ? "Kế toán báo lệch 12 kg mặt hàng luộc 230-250" : "Đã đối chiếu với bảng phụ, gửi kế toán"}
           />
         </Field>
         <DialogFooter>
@@ -500,14 +500,14 @@ export function HopChotKy({
             onClick={() => {
               /* Mở lại BẮT BUỘC có lý do — giống mở lại ngày đã chốt ở sổ nhập.
                  Chốt thì ghi chú không bắt buộc. */
-              if (daChot && !note.trim()) {
+              if (isLocked && !note.trim()) {
                 notify.error("Chưa ghi lý do mở lại");
                 return;
               }
-              onLuu(note.trim());
+              onSave(note.trim());
             }}
           >
-            {daChot ? "Mở lại kỳ" : "Chốt kỳ"}
+            {isLocked ? "Mở lại kỳ" : "Chốt kỳ"}
           </Button>
         </DialogFooter>
       </DialogContent>

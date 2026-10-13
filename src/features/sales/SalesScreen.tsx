@@ -58,8 +58,8 @@ import {
   type FieldError,
   type ComboboxOption,
 } from "@/design-system";
-import { useSuaDanhMuc } from "@/features/catalog/SuaDanhMucNhanh";
-import { GanLoXuat } from "@/features/shared";
+import { useQuickCatalogEdit } from "@/features/catalog/QuickCatalogEdit";
+import { LotDispatchPicker } from "@/features/shared";
 import { kg, num, todayISO, formatDateVN } from "@/lib/format";
 import { KY_OPT, getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
 import {
@@ -95,7 +95,7 @@ interface NewRow {
   spec: string;
   quantityKg: number;
   unitPrice: number | null;
-  nguon: string; // RETAIL_WAREHOUSE (block thô) | FG_WAREHOUSE (đóng gói)
+  source: string; // RETAIL_WAREHOUSE (block thô) | FG_WAREHOUSE (đóng gói)
 }
 
 const EMPTY_NEW_ROW: NewRow = {
@@ -103,16 +103,16 @@ const EMPTY_NEW_ROW: NewRow = {
   spec: "",
   quantityKg: 0,
   unitPrice: null,
-  nguon: RETAIL_WAREHOUSE,
+  source: RETAIL_WAREHOUSE,
 };
 
 /** Một phiếu bán hiện trên sổ, gom từ các dòng của nó. */
 interface InvoiceGroup {
-  phieu: SalesInvoice;
+  invoice: SalesInvoice;
   dong: SalesItem[];
-  tongKg: number;
-  tongTien: number;
-  ghiBu: boolean;
+  totalKg: number;
+  totalAmount: number;
+  isBackdated: boolean;
 }
 
 function groupByInvoice(rows: SalesItem[], salesInvoices: SalesInvoice[]): InvoiceGroup[] {
@@ -125,23 +125,23 @@ function groupByInvoice(rows: SalesItem[], salesInvoices: SalesInvoice[]): Invoi
     let nhom = nhoms.get(p.id);
     if (!nhom) {
       nhom = {
-        phieu: p,
+        invoice: p,
         dong: [],
-        tongKg: 0,
-        tongTien: 0,
-        ghiBu: isBackdatedSales(p),
+        totalKg: 0,
+        totalAmount: 0,
+        isBackdated: isBackdatedSales(p),
       };
       nhoms.set(p.id, nhom);
     }
     nhom.dong.push(r);
-    nhom.tongKg += r.quantityKg || 0;
-    nhom.tongTien += calculateSalesAmount(r);
+    nhom.totalKg += r.quantityKg || 0;
+    nhom.totalAmount += calculateSalesAmount(r);
   }
 
   return [...nhoms.values()].sort(
     (a, b) =>
-      a.phieu.deliveryDate.localeCompare(b.phieu.deliveryDate) ||
-      a.phieu.id.localeCompare(b.phieu.id)
+      a.invoice.deliveryDate.localeCompare(b.invoice.deliveryDate) ||
+      a.invoice.id.localeCompare(b.invoice.id)
   );
 }
 
@@ -161,9 +161,9 @@ function invoiceHeaderErrors(d: InvoiceHeader): FieldError[] {
   return ls;
 }
 
-export default function BanHangScreen() {
+export default function SalesScreen() {
   const [rows, persist] = useSalesItems();
-  const [salesInvoices, persistSalesInvoices, { trangThai }] = useSalesInvoices();
+  const [salesInvoices, persistSalesInvoices, { trangThai: status }] = useSalesInvoices();
 
   /* Tồn khả dụng để bán: trừ SUY từ chính các dòng bán (theo marker nguồn).
    * - Block thô (RETAIL_WAREHOUSE) trừ tồn BTP; đóng gói (FG_WAREHOUSE) trừ tồn TP.
@@ -202,7 +202,7 @@ export default function BanHangScreen() {
     () => computeFinishedGoodStock(packagings, filterRetailSales(rows, FG_WAREHOUSE)),
     [packagings, rows]
   );
-  const isLoading = trangThai === "dang-tai" && salesInvoices.length === 0;
+  const isLoading = status === "dang-tai" && salesInvoices.length === 0;
   const [products, setProducts] = useProducts();
   const [customers, setCustomers] = useCustomers();
 
@@ -214,12 +214,12 @@ export default function BanHangScreen() {
   const [workshop, setWorkshop] = useState<Workshop | "Tất cả">("Đông");
 
   /* Phiên ghi phiếu: đầu phiếu + đổ từng dòng mặt hàng. */
-  const [phien, setPhien] = useState<InvoiceHeader | null>(null);
+  const [session, setSession] = useState<InvoiceHeader | null>(null);
   const [sessionInvoiceId, setSessionInvoiceId] = useState<string | null>(null);
   const [editRowIds, setEditRowIds] = useState<string[] | null>(null);
   const [newRows, setNewRows] = useState<NewRow>(EMPTY_NEW_ROW);
   const newRowAvailable = newRows.productId
-    ? newRows.nguon === FG_WAREHOUSE
+    ? newRows.source === FG_WAREHOUSE
       ? getAvailableFinishedGoodKg(finishedGoodStock, newRows.productId, newRows.spec.trim())
       : getAvailableKg(wipStock, newRows.productId, newRows.spec.trim())
     : null;
@@ -227,14 +227,14 @@ export default function BanHangScreen() {
   /** Kênh bán dùng gần nhất trong phiên — làm mặc định cho phiếu mới thay vì
    *  luôn về "Xuất khẩu" (người bán Nội địa khỏi lật kênh mỗi phiếu). */
   const [lastChannel, setLastChannel] = useState<SalesChannel>("Xuất khẩu");
-  const [loiPhien, setLoiPhien] = useState<FieldError[]>([]);
+  const [sessionErrors, setSessionErrors] = useState<FieldError[]>([]);
 
   /* Sửa MỘT dòng mặt hàng — chỉ mặt hàng / quy cách / kg / giá. */
   const [editing, setEditing] = useState<SalesItem | null>(null);
   const [loi, setLoi] = useState<FieldError[]>([]);
 
-  const [tuHieuLuc, denHieuLuc] = getViewPeriodRange(ky, date, fromDate, toDate);
-  const isSingleDay = tuHieuLuc === denHieuLuc;
+  const [effectiveFrom, effectiveTo] = getViewPeriodRange(ky, date, fromDate, toDate);
+  const isSingleDay = effectiveFrom === effectiveTo;
 
   const productName = (id: string) =>
     products.find((m) => m.id === id)?.name || "—";
@@ -245,18 +245,18 @@ export default function BanHangScreen() {
       rows.filter((r) => {
         const p = salesInvoices.find((x) => x.id === r.invoiceId);
         if (!p) return false;
-        const matchesDate = p.deliveryDate >= tuHieuLuc && p.deliveryDate <= denHieuLuc;
+        const matchesDate = p.deliveryDate >= effectiveFrom && p.deliveryDate <= effectiveTo;
         const matchesWorkshop = workshop === "Tất cả" || p.workshop === workshop;
         return matchesDate && matchesWorkshop;
       }),
-    [rows, salesInvoices, tuHieuLuc, denHieuLuc, workshop]
+    [rows, salesInvoices, effectiveFrom, effectiveTo, workshop]
   );
 
   const nhomView = useMemo(() => groupByInvoice(view, salesInvoices), [view, salesInvoices]);
 
   const rangeDescription = isSingleDay
-    ? formatDateVN(tuHieuLuc)
-    : `${formatDateVN(tuHieuLuc)} – ${formatDateVN(denHieuLuc)}`;
+    ? formatDateVN(effectiveFrom)
+    : `${formatDateVN(effectiveFrom)} – ${formatDateVN(effectiveTo)}`;
 
   const total = useMemo(
     () => view.reduce((s, r) => s + (r.quantityKg || 0), 0),
@@ -267,7 +267,7 @@ export default function BanHangScreen() {
     [view]
   );
 
-  const postingDate = isSingleDay ? tuHieuLuc : denHieuLuc;
+  const postingDate = isSingleDay ? effectiveFrom : effectiveTo;
   const recordWorkshop: Workshop = workshop === "Tất cả" ? "Đông" : workshop;
 
   /* ---- Danh mục: chọn sẵn, thiếu thì tạo ngay tại chỗ ---- */
@@ -284,8 +284,8 @@ export default function BanHangScreen() {
   }));
 
   /** Sửa nhanh khách hàng / mặt hàng tại chỗ (cả hai nối theo id ở phiếu bán). */
-  const customerEditor = useSuaDanhMuc("khachHang", customers, setCustomers);
-  const productEditor = useSuaDanhMuc("matHang", products, setProducts);
+  const customerEditor = useQuickCatalogEdit("khachHang", customers, setCustomers);
+  const productEditor = useQuickCatalogEdit("matHang", products, setProducts);
 
   // Nhãn có mã số ("12 · tên") nên ô chọn không tự nhận ra tên trùng ⇒ tự dò,
   // trùng tên (không phân hoa thường) thì dùng lại bản có sẵn.
@@ -309,7 +309,7 @@ export default function BanHangScreen() {
   /* ---- Ghi phiếu ---- */
 
   const openAdd = () => {
-    setPhien({
+    setSession({
       deliveryDate: postingDate,
       postingDate: todayISO(),
       backdateReason: "",
@@ -321,49 +321,49 @@ export default function BanHangScreen() {
     setSessionInvoiceId(null);
     setEditRowIds(null);
     setNewRows(EMPTY_NEW_ROW);
-    setLoiPhien([]);
+    setSessionErrors([]);
   };
 
   const openInvoiceEdit = (n: InvoiceGroup) => {
-    setPhien({
-      deliveryDate: n.phieu.deliveryDate,
-      postingDate: n.phieu.postingDate || n.phieu.deliveryDate,
-      backdateReason: n.phieu.backdateReason,
-      workshop: n.phieu.workshop,
-      customerId: n.phieu.customerId,
-      channel: n.phieu.channel,
-      note: n.phieu.note,
+    setSession({
+      deliveryDate: n.invoice.deliveryDate,
+      postingDate: n.invoice.postingDate || n.invoice.deliveryDate,
+      backdateReason: n.invoice.backdateReason,
+      workshop: n.invoice.workshop,
+      customerId: n.invoice.customerId,
+      channel: n.invoice.channel,
+      note: n.invoice.note,
     });
-    setSessionInvoiceId(n.phieu.id);
+    setSessionInvoiceId(n.invoice.id);
     setEditRowIds(n.dong.map((r) => r.id));
     setNewRows(EMPTY_NEW_ROW);
-    setLoiPhien([]);
+    setSessionErrors([]);
   };
 
   const setSessionField = <K extends keyof InvoiceHeader>(k: K, v: InvoiceHeader[K]) =>
-    setPhien((p) => (p ? { ...p, [k]: v } : p));
+    setSession((p) => (p ? { ...p, [k]: v } : p));
 
-  const dongPhien = useMemo(() => {
+  const sessionRows = useMemo(() => {
     if (editRowIds) return rows.filter((r) => editRowIds.includes(r.id));
     if (sessionInvoiceId) return rows.filter((r) => r.invoiceId === sessionInvoiceId);
     return [];
   }, [rows, editRowIds, sessionInvoiceId]);
 
   const isEditingInvoice = editRowIds !== null;
-  const sessionTotal = dongPhien.reduce((s, r) => s + (r.quantityKg || 0), 0);
+  const sessionTotal = sessionRows.reduce((s, r) => s + (r.quantityKg || 0), 0);
 
   const setDong = <K extends keyof NewRow>(k: K, v: NewRow[K]) =>
     setNewRows((d) => ({ ...d, [k]: v }));
 
   /** Thêm một dòng mặt hàng — LƯU NGAY thành một dòng ban_hang. */
   const addRow = () => {
-    if (!phien) return;
-    const ls: FieldError[] = [...invoiceHeaderErrors(phien)];
+    if (!session) return;
+    const ls: FieldError[] = [...invoiceHeaderErrors(session)];
     if (!newRows.productId)
       ls.push({ field: "Mặt hàng", message: "Chưa chọn mặt hàng" });
     if (!(newRows.quantityKg > 0))
       ls.push({ field: "Lượng", message: "Phải lớn hơn 0 kg" });
-    setLoiPhien(ls);
+    setSessionErrors(ls);
     if (ls.length > 0) return;
 
     let invoiceId = sessionInvoiceId;
@@ -371,25 +371,25 @@ export default function BanHangScreen() {
       // Phiếu đang tạo dở hoặc đang sửa → áp đầu phiếu vào bản ghi.
       persistSalesInvoices(
         salesInvoices.map((p) =>
-          p.id === sessionInvoiceId ? { ...p, ...phien, id: p.id } : p
+          p.id === sessionInvoiceId ? { ...p, ...session, id: p.id } : p
         )
       );
     } else {
       // Phiếu mới: chỉ tạo khi có dòng đầu tiên — không để lại phiếu rỗng.
       invoiceId = newId();
-      persistSalesInvoices([...salesInvoices, { id: invoiceId, ...phien }]);
+      persistSalesInvoices([...salesInvoices, { id: invoiceId, ...session }]);
       setSessionInvoiceId(invoiceId);
     }
 
     const dong: SalesItem = {
       id: newId(),
       invoiceId: invoiceId ?? "",
-      deliveryDate: phien.deliveryDate,
+      deliveryDate: session.deliveryDate,
       productId: newRows.productId,
       spec: newRows.spec.trim(),
       quantityKg: newRows.quantityKg,
       unitPrice: newRows.unitPrice,
-      sourceWarehouse: newRows.nguon, // RETAIL_WAREHOUSE ⇒ trừ tồn BTP; FG_WAREHOUSE ⇒ trừ tồn TP đóng gói
+      sourceWarehouse: newRows.source, // RETAIL_WAREHOUSE ⇒ trừ tồn BTP; FG_WAREHOUSE ⇒ trừ tồn TP đóng gói
     };
     // Đồng bộ đầu phiếu cho MỌI dòng của phiếu (khách/ngày/kênh có thể vừa đổi
     // tại chỗ) rồi thêm dòng mới — giữ bất biến "đầu phiếu áp cả phiếu".
@@ -397,7 +397,7 @@ export default function BanHangScreen() {
       editRowIds ? editRowIds.includes(r.id) : r.invoiceId === invoiceId;
     persist([
       ...rows.map((r) =>
-        belongsToInvoice(r) ? { ...r, deliveryDate: phien.deliveryDate } : r
+        belongsToInvoice(r) ? { ...r, deliveryDate: session.deliveryDate } : r
       ),
       dong,
     ]);
@@ -405,10 +405,10 @@ export default function BanHangScreen() {
     notify.saved(`Đã vào sổ: ${productName(dong.productId)} — ${kg(dong.quantityKg)}`);
 
     // Nhớ kênh vừa bán để phiếu sau khỏi lật lại.
-    setLastChannel(phien.channel);
+    setLastChannel(session.channel);
     // Giữ quy cách cho dòng kế (một lô thường cùng size); xóa mặt hàng / kg / giá.
-    setNewRows((d) => ({ ...EMPTY_NEW_ROW, spec: d.spec, nguon: d.nguon }));
-    setLoiPhien([]);
+    setNewRows((d) => ({ ...EMPTY_NEW_ROW, spec: d.spec, source: d.source }));
+    setSessionErrors([]);
   };
 
   const removeSessionRow = (r: SalesItem) => {
@@ -424,11 +424,11 @@ export default function BanHangScreen() {
 
   /** Đóng phiếu: bỏ phiếu rỗng, áp đầu phiếu lần cuối, kéo bộ lọc về phiếu vừa ghi. */
   const closeSession = (mo: "dong" | "phieu-khac") => {
-    const p = phien;
-    if (p && sessionInvoiceId && dongPhien.length === 0) {
+    const p = session;
+    if (p && sessionInvoiceId && sessionRows.length === 0) {
       persistSalesInvoices(salesInvoices.filter((x) => x.id !== sessionInvoiceId));
     }
-    if (p && dongPhien.length > 0 && sessionInvoiceId) {
+    if (p && sessionRows.length > 0 && sessionInvoiceId) {
       persistSalesInvoices(
         salesInvoices.map((x) => (x.id === sessionInvoiceId ? { ...x, ...p, id: x.id } : x))
       );
@@ -436,8 +436,8 @@ export default function BanHangScreen() {
         editRowIds ? editRowIds.includes(r.id) : r.invoiceId === sessionInvoiceId;
       persist(rows.map((r) => (thuoc(r) ? { ...r, deliveryDate: p.deliveryDate } : r)));
     }
-    if (p && dongPhien.length > 0) {
-      if (p.deliveryDate < tuHieuLuc || p.deliveryDate > denHieuLuc) {
+    if (p && sessionRows.length > 0) {
+      if (p.deliveryDate < effectiveFrom || p.deliveryDate > effectiveTo) {
         setKy("ngay");
         setDate(p.deliveryDate);
       }
@@ -446,17 +446,17 @@ export default function BanHangScreen() {
     }
 
     if (mo === "dong") {
-      setPhien(null);
+      setSession(null);
       setSessionInvoiceId(null);
       setEditRowIds(null);
       return;
     }
     // Ghi phiếu khác: giữ ngày + xưởng, làm mới khách.
-    setPhien(p ? { ...p, customerId: "", note: "" } : null);
+    setSession(p ? { ...p, customerId: "", note: "" } : null);
     setSessionInvoiceId(null);
     setEditRowIds(null);
     setNewRows(EMPTY_NEW_ROW);
-    setLoiPhien([]);
+    setSessionErrors([]);
   };
 
   const deleteEditingInvoice = () => {
@@ -467,13 +467,13 @@ export default function BanHangScreen() {
     persist(rows.filter((r) => !ids.has(r.id)));
     if (sessionInvoiceId) persistSalesInvoices(salesInvoices.filter((x) => x.id !== sessionInvoiceId));
     notify.deleted(
-      `Đã xóa phiếu ${customerName(phien?.customerId ?? "") || "(chưa có khách)"} — ${editRowIds.length} dòng`,
+      `Đã xóa phiếu ${customerName(session?.customerId ?? "") || "(chưa có khách)"} — ${editRowIds.length} dòng`,
       () => {
         persist(prevRows);
         persistSalesInvoices(prevInvoices);
       }
     );
-    setPhien(null);
+    setSession(null);
     setSessionInvoiceId(null);
     setEditRowIds(null);
   };
@@ -498,7 +498,7 @@ export default function BanHangScreen() {
     setEditing((d) => (d ? { ...d, [k]: v } : d));
 
   /** Kênh của phiếu đang mở — quyết định đơn vị đơn giá. */
-  const priceUnit = phien?.channel === "Nội địa" ? "đ" : "USD";
+  const priceUnit = session?.channel === "Nội địa" ? "đ" : "USD";
   const priceUnitFor = (kenh: SalesChannel) => (kenh === "Nội địa" ? "đ" : "USD");
 
   const itemColumns = (kenh: SalesChannel): RecordTableColumn<SalesItem>[] => [
@@ -611,7 +611,7 @@ export default function BanHangScreen() {
                 hint={
                   ky === "ngay"
                     ? undefined
-                    : `Kỳ đang xem: ${formatDateVN(tuHieuLuc)} – ${formatDateVN(denHieuLuc)}`
+                    : `Kỳ đang xem: ${formatDateVN(effectiveFrom)} – ${formatDateVN(effectiveTo)}`
                 }
                 value={date}
                 onChange={setDate}
@@ -659,7 +659,7 @@ export default function BanHangScreen() {
           <div className="space-y-5">
             {nhomView.map((n, i) => (
               <section
-                key={n.phieu.id}
+                key={n.invoice.id}
                 className="space-y-4 rounded-xl border-2 border-border p-5"
               >
                 <div className="flex flex-wrap items-start justify-between gap-x-8 gap-y-3">
@@ -669,30 +669,30 @@ export default function BanHangScreen() {
                         Phiếu {i + 1}
                       </span>
                       <span className="text-xl font-semibold text-foreground">
-                        {customerName(n.phieu.customerId) || "(chưa có khách)"}
+                        {customerName(n.invoice.customerId) || "(chưa có khách)"}
                       </span>
                       <span className="text-base text-muted-foreground">
-                        {formatDateVN(n.phieu.deliveryDate)} · xưởng {n.phieu.workshop}
+                        {formatDateVN(n.invoice.deliveryDate)} · xưởng {n.invoice.workshop}
                       </span>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
-                      <Tag variant="phan-loai" tone={channelTone(n.phieu.channel)}>
-                        {n.phieu.channel}
+                      <Tag variant="phan-loai" tone={channelTone(n.invoice.channel)}>
+                        {n.invoice.channel}
                       </Tag>
-                      {n.ghiBu && (
+                      {n.isBackdated && (
                         <Tag variant="luu-y">
-                          Ghi bù {formatDateVN(n.phieu.postingDate)}
+                          Ghi bù {formatDateVN(n.invoice.postingDate)}
                         </Tag>
                       )}
                     </div>
-                    {n.ghiBu && n.phieu.backdateReason && (
+                    {n.isBackdated && n.invoice.backdateReason && (
                       <p className="text-base text-muted-foreground">
-                        Lý do ghi bù: {n.phieu.backdateReason}
+                        Lý do ghi bù: {n.invoice.backdateReason}
                       </p>
                     )}
-                    {n.phieu.note && (
+                    {n.invoice.note && (
                       <p className="text-base text-muted-foreground">
-                        Ghi chú: {n.phieu.note}
+                        Ghi chú: {n.invoice.note}
                       </p>
                     )}
                   </div>
@@ -702,7 +702,7 @@ export default function BanHangScreen() {
                       Phiếu này
                     </span>
                     <span className="tnum text-xl font-semibold">
-                      {kg(n.tongKg)}
+                      {kg(n.totalKg)}
                     </span>
                     <Button
                       title="Mở lại phiếu bán này để sửa khách hàng, kênh bán hay các dòng hàng." variant="outline" onClick={() => openInvoiceEdit(n)}>
@@ -713,7 +713,7 @@ export default function BanHangScreen() {
                 </div>
 
                 <RecordTable
-                  columns={itemColumns(n.phieu.channel)}
+                  columns={itemColumns(n.invoice.channel)}
                   rows={n.dong}
                   getKey={(r) => r.id}
                   rowMarkKey="ban-hang"
@@ -744,7 +744,7 @@ export default function BanHangScreen() {
 
       {/* ---- Hộp thoại: ghi phiếu bán ---- */}
       <Dialog
-        open={phien !== null}
+        open={session !== null}
         onOpenChange={(o) => {
           if (!o) closeSession("dong");
         }}
@@ -761,9 +761,9 @@ export default function BanHangScreen() {
             </DialogDescription>
           </DialogHeader>
 
-          {phien && (
+          {session && (
             <div className="space-y-6 py-2">
-              <ErrorSummary errors={loiPhien} />
+              <ErrorSummary errors={sessionErrors} />
               <RequiredLegend />
 
               <div className="grid gap-6 sm:grid-cols-2">
@@ -771,26 +771,26 @@ export default function BanHangScreen() {
                   label="Ngày ghi sổ"
                   required
                   info="Ngày ghi vào hệ thống. Khác ngày xuất bán ⇒ ghi bù."
-                  value={phien.postingDate}
+                  value={session.postingDate}
                   onChange={(v) => setSessionField("postingDate", v)}
                 />
                 <DateField
                   label="Ngày xuất bán"
                   required
                   info="Ngày hàng thực xuất bán — mọi tổng hợp tính theo ngày này."
-                  value={phien.deliveryDate}
+                  value={session.deliveryDate}
                   onChange={(v) => setSessionField("deliveryDate", v)}
                 />
               </div>
 
-              {isBackdatedSales(phien) && (
+              {isBackdatedSales(session) && (
                 <Field
                   label="Lý do ghi bù"
                   required
                   hint="VD: xuất bán 29/7, 31/7 mới ghi sổ."
                 >
                   <Input
-                    value={phien.backdateReason}
+                    value={session.backdateReason}
                     onChange={(e) => setSessionField("backdateReason", e.target.value)}
                     placeholder="Vì sao tới hôm nay mới ghi?"
                   />
@@ -802,13 +802,13 @@ export default function BanHangScreen() {
                   label="Phân xưởng"
                   required
                   clearable={false}
-                  value={phien.workshop}
+                  value={session.workshop}
                   onChange={(v) => setSessionField("workshop", v as Workshop)}
                   options={WORKSHOPS.map((p) => ({ value: p, label: p }))}
                 />
                 <ChoiceGroup
                   label="Kênh bán"
-                  value={phien.channel}
+                  value={session.channel}
                   onChange={(v) => setSessionField("channel", v as SalesChannel)}
                   options={SALES_CHANNELS.map((k) => ({ value: k, label: k }))}
                   columns={2}
@@ -818,18 +818,18 @@ export default function BanHangScreen() {
               <Combobox
                 label="Khách hàng"
                 hint="Chọn trong danh mục. Chưa có thì gõ tên rồi bấm Thêm mới. Bỏ trống nếu chưa xác định khách."
-                value={phien.customerId}
+                value={session.customerId}
                 onChange={(v) => setSessionField("customerId", v)}
                 options={customerOptions}
                 onCreate={addCustomer}
                 emptyText="Chưa có khách hàng nào trong danh mục."
-                onEditItem={customerEditor.moSua}
-                editLabel={customerEditor.nhanSua}
+                onEditItem={customerEditor.openEdit}
+                editLabel={customerEditor.editLabel}
               />
 
               <Field label="Ghi chú phiếu">
                 <Input
-                  value={phien.note}
+                  value={session.note}
                   onChange={(e) => setSessionField("note", e.target.value)}
                   placeholder="Ghi chú thêm (nếu có)"
                 />
@@ -838,15 +838,15 @@ export default function BanHangScreen() {
               <div className="border-t-2 border-border pt-1" />
 
               {/* Đã vào sổ */}
-              {dongPhien.length > 0 && (
+              {sessionRows.length > 0 && (
                 <div className="space-y-3 rounded-xl border-2 border-border p-4">
                   <p className="flex items-center gap-2 text-base font-semibold text-foreground">
                     <CircleCheck className="size-6 text-primary" aria-hidden />
-                    Đã vào sổ {dongPhien.length} mặt hàng — phiếu này{" "}
+                    Đã vào sổ {sessionRows.length} mặt hàng — phiếu này{" "}
                     <span className="tnum">{kg(sessionTotal)}</span>
                   </p>
                   <ul className="divide-y divide-border">
-                    {dongPhien.map((r, i) => (
+                    {sessionRows.map((r, i) => (
                       <li
                         key={r.id}
                         className="flex items-center justify-between gap-3 py-2"
@@ -911,14 +911,14 @@ export default function BanHangScreen() {
                   options={productOptions}
                   onCreate={addProduct}
                   emptyText="Chưa có mặt hàng nào trong danh mục."
-                  onEditItem={productEditor.moSua}
-                  editLabel={productEditor.nhanSua}
+                  onEditItem={productEditor.openEdit}
+                  editLabel={productEditor.editLabel}
                 />
 
                 <ChoiceGroup
                   label="Nguồn bán"
-                  value={newRows.nguon}
-                  onChange={(v) => setDong("nguon", v)}
+                  value={newRows.source}
+                  onChange={(v) => setDong("source", v)}
                   options={[
                     { value: RETAIL_WAREHOUSE, label: "Block thô (kho dự trữ)" },
                     { value: FG_WAREHOUSE, label: "Đóng gói (kho thành phẩm)" },
@@ -962,7 +962,7 @@ export default function BanHangScreen() {
                         : "rounded-lg bg-muted px-4 py-3 text-base text-muted-foreground"
                     }
                   >
-                    Tồn khả dụng ({newRows.nguon === FG_WAREHOUSE ? "kho thành phẩm" : "kho dự trữ"}):{" "}
+                    Tồn khả dụng ({newRows.source === FG_WAREHOUSE ? "kho thành phẩm" : "kho dự trữ"}):{" "}
                     <span className="tnum font-semibold">{kg(newRowAvailable)}</span>
                     {isOversold
                       ? " — bán vượt tồn, kiểm lại (vẫn ghi được, tồn sẽ báo âm)."
@@ -989,7 +989,7 @@ export default function BanHangScreen() {
               {/* Tổng phiếu */}
               <div className="flex flex-wrap items-baseline justify-end gap-x-8 gap-y-2 rounded-xl bg-muted px-5 py-4">
                 <span className="text-base text-muted-foreground">
-                  Tổng phiếu {formatDateVN(phien.deliveryDate)} · xưởng {phien.workshop}
+                  Tổng phiếu {formatDateVN(session.deliveryDate)} · xưởng {session.workshop}
                 </span>
                 <span className="tnum text-2xl font-semibold">
                   {kg(sessionTotal)}
@@ -1001,7 +1001,7 @@ export default function BanHangScreen() {
           <DialogFooter>
             {isEditingInvoice ? (
               <ConfirmDelete
-                recordDescription={`Phiếu ${customerName(phien?.customerId ?? "") || "(chưa có khách)"} — ${formatDateVN(phien?.deliveryDate ?? "")} — ${dongPhien.length} dòng — ${kg(sessionTotal)}`}
+                recordDescription={`Phiếu ${customerName(session?.customerId ?? "") || "(chưa có khách)"} — ${formatDateVN(session?.deliveryDate ?? "")} — ${sessionRows.length} dòng — ${kg(sessionTotal)}`}
                 onConfirm={deleteEditingInvoice}
                 title="Xóa cả phiếu này?"
                 confirmLabel="Xóa phiếu"
@@ -1055,8 +1055,8 @@ export default function BanHangScreen() {
                 options={productOptions}
                 onCreate={addProduct}
                 emptyText="Chưa có mặt hàng nào trong danh mục."
-                onEditItem={productEditor.moSua}
-                editLabel={productEditor.nhanSua}
+                onEditItem={productEditor.openEdit}
+                editLabel={productEditor.editLabel}
               />
 
               <Field
@@ -1100,17 +1100,17 @@ export default function BanHangScreen() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      {customerEditor.hop}
-      {productEditor.hop}
+      {customerEditor.dialog}
+      {productEditor.dialog}
       {lotSalesItem && saleLotKind(lotSalesItem) && (
-        <GanLoXuat
+        <LotDispatchPicker
           docKind="sales_item"
           docId={lotSalesItem.id}
-          docNhan={`${productName(lotSalesItem.productId)} · ${kg(lotSalesItem.quantityKg)} · ${formatDateVN(lotSalesItem.deliveryDate)}`}
-          loaiLo={saleLotKind(lotSalesItem)!}
-          xuong={salesInvoices.find((p) => p.id === lotSalesItem.invoiceId)?.workshop ?? "Đông"}
-          ngay={lotSalesItem.deliveryDate}
-          matHangId={lotSalesItem.productId}
+          docLabel={`${productName(lotSalesItem.productId)} · ${kg(lotSalesItem.quantityKg)} · ${formatDateVN(lotSalesItem.deliveryDate)}`}
+          lotKind={saleLotKind(lotSalesItem)!}
+          workshop={salesInvoices.find((p) => p.id === lotSalesItem.invoiceId)?.workshop ?? "Đông"}
+          date={lotSalesItem.deliveryDate}
+          productId={lotSalesItem.productId}
           onClose={() => setLotSalesItem(null)}
         />
       )}

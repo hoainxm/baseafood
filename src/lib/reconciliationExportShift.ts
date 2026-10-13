@@ -155,7 +155,7 @@ export function deleteTrailingColumns(ws: Worksheet, fromColumn: number): void {
 export function insertLeadingColumns(ws: Worksheet, shift: number, shiftedSheets: ReadonlySet<string>): void {
   unshareFormulas(ws);
 
-  const gop = Object.keys((ws as unknown as { _merges?: Record<string, unknown> })._merges ?? {}).map(
+  const merges = Object.keys((ws as unknown as { _merges?: Record<string, unknown> })._merges ?? {}).map(
     (k) => {
       const m = (ws as unknown as { _merges: Record<string, { range?: string }> })._merges[k];
       return m?.range ?? k;
@@ -165,7 +165,7 @@ export function insertLeadingColumns(ws: Worksheet, shift: number, shiftedSheets
 
   // Gỡ ô gộp TRƯỚC khi dời cột. Gỡ sau thì vùng gộp cũ đã lệch chỗ, exceljs xóa
   // luôn giá trị của ô đã dời sang (tiêu đề "DANH SÁCH HÓA ĐƠN" biến mất).
-  for (const g of gop) {
+  for (const g of merges) {
     if (!g) continue;
     try {
       ws.unMergeCells(g);
@@ -180,7 +180,7 @@ export function insertLeadingColumns(ws: Worksheet, shift: number, shiftedSheets
 
   rewriteFormulas(ws, (ct) => shiftFormula(ct, shift, shiftedSheets));
 
-  for (const g of gop) {
+  for (const g of merges) {
     if (!g) continue;
     // vùng gộp nằm (một phần) trong cột vừa gỡ thì bỏ, đừng dựng ra địa chỉ cột âm
     if (shift < 0 && /(^|:)\$?A\d/.test(g)) continue;

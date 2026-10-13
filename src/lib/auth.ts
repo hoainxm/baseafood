@@ -103,9 +103,9 @@ export function useAuth() {
 
   useEffect(() => {
     if (!supabase) return;
-    let huy = false;
+    let isCancelled = false;
     supabase.auth.getSession().then(({ data }) => {
-      if (huy) return;
+      if (isCancelled) return;
       setSession(data.session);
       setIsInitialized(true);
     });
@@ -116,7 +116,7 @@ export function useAuth() {
       setIsInitialized(true);
     });
     return () => {
-      huy = true;
+      isCancelled = true;
       sub.subscription.unsubscribe();
     };
   }, []);
@@ -128,25 +128,25 @@ export function useAuth() {
       setProfile(null);
       return;
     }
-    let huy = false;
+    let isCancelled = false;
     (async () => {
       const nd = await getOrCreateProfile(session);
-      if (!huy) setProfile(nd);
+      if (!isCancelled) setProfile(nd);
     })();
     return () => {
-      huy = true;
+      isCancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [uid]);
 
   const signIn = useCallback(
-    async (username: string, matKhau: string): Promise<AuthResult> => {
+    async (username: string, password: string): Promise<AuthResult> => {
       if (!supabase) return { ok: false, loi: "Chưa cấu hình máy chủ" };
-      if (!username.trim() || !matKhau)
+      if (!username.trim() || !password)
         return { ok: false, loi: "Nhập tên đăng nhập và mật khẩu" };
       const { error } = await supabase.auth.signInWithPassword({
         email: usernameToEmail(username),
-        password: matKhau,
+        password,
       });
       if (error) return { ok: false, loi: translateError(error.message) };
       const u = username.trim().toLowerCase();
@@ -166,29 +166,29 @@ export function useAuth() {
     async (
       fullName: string,
       username: string,
-      matKhau: string,
+      password: string,
       roles: Role[] = []
     ): Promise<AuthResult> => {
       if (!supabase) return { ok: false, loi: "Chưa cấu hình máy chủ" };
       const u = username.trim().toLowerCase();
       if (!fullName.trim()) return { ok: false, loi: "Nhập họ tên" };
       if (!u) return { ok: false, loi: "Nhập tên đăng nhập" };
-      if (matKhau.length < 6)
+      if (password.length < 6)
         return { ok: false, loi: "Mật khẩu tối thiểu 6 ký tự" };
 
       // Check trùng tên đăng nhập trước (thông báo rõ hơn lỗi Auth).
-      const { data: trung } = await supabase
+      const { data: isDuplicate } = await supabase
         .from("user_profiles")
         .select("id")
         .eq("username", u)
         .maybeSingle();
-      if (trung) return { ok: false, loi: "Tên đăng nhập đã tồn tại" };
+      if (isDuplicate) return { ok: false, loi: "Tên đăng nhập đã tồn tại" };
 
       const phu = createTempClient();
       if (!phu) return { ok: false, loi: "Chưa cấu hình máy chủ" };
       const { data, error } = await phu.auth.signUp({
         email: usernameToEmail(u),
-        password: matKhau,
+        password,
         options: { data: { ho_ten: fullName.trim(), username: u } },
       });
       if (error) return { ok: false, loi: translateSignUpError(error.message) };

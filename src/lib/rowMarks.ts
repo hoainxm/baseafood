@@ -81,8 +81,8 @@ export function setRowMarks(
   user: string,
   luc: string = new Date().toISOString()
 ): RowMark[] {
-  const ds = target.map((d) => (typeof d === "string" ? { dong: d, columns: null } : d));
-  const theoId = new Map(ds.map((d) => [idDauTo(tableKey, d.dong, d.columns), d]));
+  const items = target.map((d) => (typeof d === "string" ? { dong: d, columns: null } : d));
+  const theoId = new Map(items.map((d) => [idDauTo(tableKey, d.dong, d.columns), d]));
   const bo = !dau || (!dau.color && !dau.bold);
   const remaining = marks.filter((m) => !theoId.has(m.id));
   if (bo) return remaining;

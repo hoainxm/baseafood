@@ -1,5 +1,5 @@
 // ============================================================
-// Tên file: src/features/catalog/ChonBotDiKem.tsx
+// Tên file: src/features/catalog/BatterPicker.tsx
 // Tên tiếng Việt: Ô chọn NHIỀU loại bột đi kèm của một mặt hàng (migration 0051)
 // ============================================================
 // Mỗi mặt hàng tẩm bột đi kèm một BỘ loại bột riêng (VD tẩm bột nước tương =
@@ -12,25 +12,25 @@ import { getProductBatterIds } from "@/lib/batter";
 import { Combobox, Label } from "@/design-system";
 import { X } from "lucide-react";
 
-export function ChonBotDiKem({
+export function BatterPicker({
   value,
   onChange,
-  botTam,
-  onTaoBot,
+  botTam: batterTypes,
+  onCreateBatter,
 }: {
   /** Chuỗi id "id1,id2" (hoặc rỗng). */
   value: string;
   onChange: (v: string) => void;
   botTam: BatterType[];
   /** Có ⇒ cho tạo loại bột mới tại chỗ (lưu ngay vào danh mục), trả về id. */
-  onTaoBot?: (ten: string) => string;
+  onCreateBatter?: (ten: string) => string;
 }) {
   const hintId = useId();
   const ids = getProductBatterIds({ batterIds: value });
-  const theoId = new Map(botTam.map((b) => [b.id, b]));
+  const theoId = new Map(batterTypes.map((b) => [b.id, b]));
   const setIds = (next: string[]) => onChange(next.join(","));
 
-  const remainingOptions = botTam
+  const remainingOptions = batterTypes
     .filter((b) => !ids.includes(b.id))
     .map((b) => ({ value: b.id, label: b.name, phu: b.note || undefined }));
 
@@ -74,10 +74,10 @@ export function ChonBotDiKem({
         value=""
         onChange={(id) => id && setIds([...ids, id])}
         options={remainingOptions}
-        onCreate={onTaoBot}
+        onCreate={onCreateBatter}
         placeholder="— Chọn loại bột để thêm —"
         emptyText={
-          onTaoBot
+          onCreateBatter
             ? "Chưa có loại bột này — gõ tên rồi Thêm mới."
             : "Chưa có loại bột này — thêm ở tab Bột tẩm của Danh mục."
         }

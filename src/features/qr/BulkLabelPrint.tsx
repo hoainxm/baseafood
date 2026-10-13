@@ -7,22 +7,22 @@
 // ============================================================
 import { useMemo, useState } from "react";
 import type { LotKind, Workshop } from "@/types";
-import { TemLoQr, useDuLieuTruyXuat } from "@/features/shared";
+import { LotQrLabels, useTraceData } from "@/features/shared";
 import { kg, formatDateVN } from "@/lib/format";
 import { TRACE_KIND_LABELS, listLotsToPrint, lotKey, summarizeLabelPrints, type LotNode } from "@/lib/lotTraceability";
 import { useLabelPrints } from "@/lib/catalogRepo";
 import { Button, ChoiceGroup, DateRangeField, EmptyState, Tag, addDays, todayIso, notify, toneByName } from "@/design-system";
 import { Printer } from "lucide-react";
 
-const LOT_KINDS: { kind: LotKind; moTa: string }[] = [
-  { kind: "S", moTa: "chuyến nhập" },
-  { kind: "W", moTa: "mẻ sản xuất" },
-  { kind: "P", moTa: "phiếu đóng gói" },
+const LOT_KINDS: { kind: LotKind; description: string }[] = [
+  { kind: "S", description: "chuyến nhập" },
+  { kind: "W", description: "mẻ sản xuất" },
+  { kind: "P", description: "phiếu đóng gói" },
 ];
 const nodeKey = (n: LotNode) => `${n.kind}:${n.id}`;
 
-export function InTemHangLoat() {
-  const { dl } = useDuLieuTruyXuat();
+export function BulkLabelPrint() {
+  const { dl } = useTraceData();
   const [tu, setTu] = useState(() => addDays(todayIso(), -6));
   const [den, setDen] = useState(todayIso);
   const [workshop, setWorkshop] = useState<Workshop | "">("");
@@ -36,8 +36,8 @@ export function InTemHangLoat() {
 
   const allLots = useMemo(() => listLotsToPrint(dl, { tu, den, xuong: workshop, loai: lotKinds }), [dl, tu, den, workshop, lotKinds]);
   const unprintedCount = allLots.filter((n) => !daIn.has(lotKey(n.kind as LotKind, n.id))).length;
-  const ds = onlyUnprinted ? allLots.filter((n) => !daIn.has(lotKey(n.kind as LotKind, n.id))) : allLots;
-  const selected = ds.filter((n) => !deselected.has(nodeKey(n)));
+  const items = onlyUnprinted ? allLots.filter((n) => !daIn.has(lotKey(n.kind as LotKind, n.id))) : allLots;
+  const selected = items.filter((n) => !deselected.has(nodeKey(n)));
 
   const toggleKind = (k: LotKind) =>
     setLotKinds((prev) => (prev.includes(k) ? prev.filter((x) => x !== k) : [...prev, k]));
@@ -50,7 +50,7 @@ export function InTemHangLoat() {
       return nextSet;
     });
   const selectAll = (isSelected: boolean) =>
-    setDeselected(isSelected ? new Set() : new Set(ds.map(nodeKey)));
+    setDeselected(isSelected ? new Set() : new Set(items.map(nodeKey)));
 
   return (
     <div className="space-y-4">
@@ -79,12 +79,12 @@ export function InTemHangLoat() {
         <div className="space-y-2">
           <p className="font-medium">Loại lô</p>
           <div className="flex flex-wrap gap-2">
-            {LOT_KINDS.map(({ kind, moTa }) => (
+            {LOT_KINDS.map(({ kind, description }) => (
               <Button
                 key={kind}
                 type="button"
                 variant={lotKinds.includes(kind) ? "default" : "outline"}
-                title={`${lotKinds.includes(kind) ? "Bỏ" : "Thêm"} tem ${TRACE_KIND_LABELS[kind].toLowerCase()} (${moTa}) khỏi danh sách in.`}
+                title={`${lotKinds.includes(kind) ? "Bỏ" : "Thêm"} tem ${TRACE_KIND_LABELS[kind].toLowerCase()} (${description}) khỏi danh sách in.`}
                 aria-pressed={lotKinds.includes(kind)}
                 onClick={() => toggleKind(kind)}
               >
@@ -107,7 +107,7 @@ export function InTemHangLoat() {
         </label>
       </div>
 
-      {ds.length === 0 ? (
+      {items.length === 0 ? (
         <EmptyState
           title={onlyUnprinted && allLots.length ? "Lô trong khoảng này đều đã in tem" : "Không có lô nào trong khoảng này"}
           description={
@@ -120,16 +120,16 @@ export function InTemHangLoat() {
         <div className="space-y-3 rounded-xl border-2 border-border p-4">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-muted-foreground">
-              Đã chọn <span className="tnum font-semibold text-foreground">{selected.length}</span> / {ds.length} lô
+              Đã chọn <span className="tnum font-semibold text-foreground">{selected.length}</span> / {items.length} lô
             </p>
             <div className="flex flex-wrap gap-2 [&>*]:flex-1 sm:[&>*]:flex-none">
               <Button
                 type="button"
                 variant="outline"
-                title={selected.length === ds.length ? "Bỏ chọn mọi lô trong danh sách." : "Chọn mọi lô trong danh sách để in."}
-                onClick={() => selectAll(selected.length !== ds.length)}
+                title={selected.length === items.length ? "Bỏ chọn mọi lô trong danh sách." : "Chọn mọi lô trong danh sách để in."}
+                onClick={() => selectAll(selected.length !== items.length)}
               >
-                {selected.length === ds.length ? "Bỏ chọn hết" : "Chọn hết"}
+                {selected.length === items.length ? "Bỏ chọn hết" : "Chọn hết"}
               </Button>
               <Button
                 type="button"
@@ -142,7 +142,7 @@ export function InTemHangLoat() {
           </div>
 
           <ul className="max-h-[60dvh] divide-y divide-border overflow-y-auto rounded-lg border border-border">
-            {ds.map((n) => {
+            {items.map((n) => {
               const k = nodeKey(n);
               const isSelected = !deselected.has(k);
               const supplier = n.chiTiet.find((c) => c.nhan === "Đại lý")?.giaTri;
@@ -183,7 +183,7 @@ export function InTemHangLoat() {
         </div>
       )}
 
-      {printing && <TemLoQr nuts={printing} onClose={() => setPrinting(null)} />}
+      {printing && <LotQrLabels nuts={printing} onClose={() => setPrinting(null)} />}
     </div>
   );
 }

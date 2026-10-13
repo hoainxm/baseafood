@@ -13,19 +13,19 @@ import { useEffect, useId, useRef } from "react";
 
 type Scanner = import("html5-qrcode").Html5QrcodeScanner;
 
-export function KhungQuetQr({ onQuet }: { onQuet: (text: string) => void }) {
+export function QrScanner({ onScan }: { onScan: (text: string) => void }) {
   const id = `qr-${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
   // Giữ callback mới nhất mà không phải dựng lại camera mỗi lần render.
-  const callbackRef = useRef(onQuet);
+  const callbackRef = useRef(onScan);
   useEffect(() => {
-    callbackRef.current = onQuet;
+    callbackRef.current = onScan;
   });
 
   useEffect(() => {
     let scanner: Scanner | null = null;
-    let daHuy = false; // unmount trước khi lib tải xong ⇒ không dựng camera nữa
+    let isCancelled = false; // unmount trước khi lib tải xong ⇒ không dựng camera nữa
     import("html5-qrcode").then(({ Html5QrcodeScanner }) => {
-      if (daHuy) return;
+      if (isCancelled) return;
       scanner = new Html5QrcodeScanner(id, { fps: 10, qrbox: 250 }, false);
       scanner.render(
         (decoded: string) => callbackRef.current(decoded.trim()),
@@ -35,7 +35,7 @@ export function KhungQuetQr({ onQuet }: { onQuet: (text: string) => void }) {
       );
     });
     return () => {
-      daHuy = true;
+      isCancelled = true;
       scanner?.clear().catch(() => {});
     };
   }, [id]);

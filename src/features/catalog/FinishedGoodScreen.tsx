@@ -25,10 +25,10 @@ import { Search, X } from "lucide-react";
  * không có Thêm/Sửa/Xóa. Việc dùng thực tế là TRA CỨU và ÁNH XẠ sang mặt hàng
  * cân đối — nên màn tối ưu cho tìm kiếm và sắp xếp, không phải nhập liệu.
  */
-export default function ThanhPhamScreen() {
+export default function FinishedGoodScreen() {
   const [nhom, setNhom] = useState("");
-  const [items, , { trangThai }] = useFinishedGoods();
-  const isLoading = trangThai === "dang-tai" && items.length === 0;
+  const [items, , { trangThai: status }] = useFinishedGoods();
+  const isLoading = status === "dang-tai" && items.length === 0;
 
   const nhomList = useMemo(
     () => Array.from(new Set(items.map((i) => i.groupName))).sort(),

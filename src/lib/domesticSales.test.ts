@@ -38,7 +38,7 @@ describe("isDomesticSaleRow", () => {
 
 describe("getPeriodDomesticSales", () => {
   it("lọc ngày trong kỳ + cùng HỌ NL, cộng theo ngày, giá bình quân gia quyền", () => {
-    const kq = getPeriodDomesticSales(
+    const result = getPeriodDomesticSales(
       [
         d({ quantityKg: 600, unitPrice: 145000 }),
         d({ quantityKg: 387, unitPrice: 150000, materialTypeName: "Bạch tuộc 2 da nhỏ (80↓)" }),
@@ -49,11 +49,11 @@ describe("getPeriodDomesticSales", () => {
       ],
       ky
     );
-    expect(kq.theoNgay).toEqual({ "2026-07-21": 987, "2026-07-23": 100 });
-    expect(kq.tongKg).toBe(1087);
-    expect(kq.soDong).toBe(3);
+    expect(result.theoNgay).toEqual({ "2026-07-21": 987, "2026-07-23": 100 });
+    expect(result.tongKg).toBe(1087);
+    expect(result.soDong).toBe(3);
     // (600×145.000 + 387×150.000) / 987 = 146.960,49… ⇒ làm tròn
-    expect(kq.giaBinhQuan).toBe(146960);
+    expect(result.giaBinhQuan).toBe(146960);
   });
   it("không dòng nào có giá ⇒ giá null; kỳ thiếu ngày ⇒ rỗng", () => {
     expect(getPeriodDomesticSales([d({ quantityKg: 5 })], ky).giaBinhQuan).toBeNull();

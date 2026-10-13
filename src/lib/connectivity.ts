@@ -25,12 +25,12 @@ export interface ConnectionSnapshot {
 
 // Snapshot bất biến — đổi tham chiếu chỉ khi trạng thái đổi, để
 // useSyncExternalStore không render vô hạn.
-let anh: ConnectionSnapshot = { trang: "chua-ro", loi: "" };
+let snapshot: ConnectionSnapshot = { trang: "chua-ro", loi: "" };
 const listeners = new Set<() => void>();
 
 function setStatus(status: ConnectionStatus, loi: string) {
-  if (anh.trang === status && anh.loi === loi) return;
-  anh = { trang: status, loi };
+  if (snapshot.trang === status && snapshot.loi === loi) return;
+  snapshot = { trang: status, loi };
   listeners.forEach((f) => f());
 }
 
@@ -45,5 +45,5 @@ export const connectivity = {
       listeners.delete(f);
     };
   },
-  getSnapshot: (): ConnectionSnapshot => anh,
+  getSnapshot: (): ConnectionSnapshot => snapshot,
 };

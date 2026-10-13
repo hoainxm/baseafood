@@ -1,5 +1,5 @@
 // ============================================================
-// Tên file: src/features/balancing/ChuyenTrongO.tsx
+// Tên file: src/features/balancing/CellShipments.tsx
 // Tên tiếng Việt: Nút "n chuyến" trong ô ngày của lưới Nguyên liệu vào (Cân đối)
 // Description: In-cell trip count + popover (supplier → shipment) for a grid day cell
 // ============================================================
@@ -16,22 +16,22 @@ import { num, formatDateVN } from "@/lib/format";
  * loại NL · kg · giá của ĐÚNG các dòng sổ nhập làm nên ô đó. CHỈ XEM — sửa số vẫn
  * gõ thẳng vào ô (ghi về sổ nhập) hoặc ở màn Nhập hàng.
  */
-export function ChuyenTrongO({
+export function CellShipments({
   dong,
-  ngay,
-  maLo,
+  date,
+  lotCodes: lotCodeById,
 }: {
   /** Dòng sổ nhập làm nên dòng lưới (cả kỳ) — lọc theo ngày ở đây. */
   dong: MaterialImportItem[];
-  ngay: string;
+  date: string;
   /** shipmentId → mã lô (import_shipments.lot_code). */
-  maLo: Map<string, string>;
+  lotCodes: Map<string, string>;
 }) {
   const [mo, setMo] = useState(false);
-  const n = countDailyShipments(dong, ngay);
+  const n = countDailyShipments(dong, date);
   if (n === 0) return null;
   const suppliers = mo
-    ? groupDailyShipments(dong, ngay, [...maLo].map(([id, lotCode]) => ({ id, lotCode })))
+    ? groupDailyShipments(dong, date, [...lotCodeById].map(([id, lotCode]) => ({ id, lotCode })))
     : [];
   return (
     <Popover open={mo} onOpenChange={setMo}>
@@ -40,7 +40,7 @@ export function ChuyenTrongO({
           type="button"
           // Không để phím Enter/↑↓ của lưới nhảy vào đây — nút phụ, không phải ô số.
           tabIndex={-1}
-          title={`Xem ${n} chuyến nhập ngày ${formatDateVN(ngay)}: đại lý nào, chuyến nào, bao nhiêu kg, giá bao nhiêu.`}
+          title={`Xem ${n} chuyến nhập ngày ${formatDateVN(date)}: đại lý nào, chuyến nào, bao nhiêu kg, giá bao nhiêu.`}
           className="inline-flex items-center gap-1 rounded px-1 text-sm whitespace-nowrap text-primary underline decoration-dotted underline-offset-2 hover:bg-accent"
         >
           <Truck className="size-3.5" aria-hidden />
@@ -50,7 +50,7 @@ export function ChuyenTrongO({
       <PopoverContent align="end" className="w-auto max-w-[min(26rem,calc(100vw-1rem))] p-3">
         <div className="space-y-3">
           <p className="text-sm font-semibold text-foreground">
-            Ngày {formatDateVN(ngay)} · {n} chuyến · {num(suppliers.reduce((s, d) => s + d.kg, 0))} kg
+            Ngày {formatDateVN(date)} · {n} chuyến · {num(suppliers.reduce((s, d) => s + d.kg, 0))} kg
           </p>
           {suppliers.map((d) => (
             <div key={d.daiLy} className="space-y-1">

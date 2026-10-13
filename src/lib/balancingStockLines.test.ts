@@ -64,8 +64,8 @@ const stock = (l: MonthlyStockLine | null | undefined) => (l ? suyDong(l).closeK
 
 describe("ensureMonthOpened — tháng chưa mở tự kế thừa", () => {
   test("dồn qua từng tháng, id carry| tất định, chạy lại không nhân đôi", () => {
-    const goc = [lo("L1", "2026-08", { outKg: 200 })];
-    const a = ensureMonthOpened(goc, "2026-10");
+    const original = [lo("L1", "2026-08", { outKg: 200 })];
+    const a = ensureMonthOpened(original, "2026-10");
     expect(a.keThua).toBe(2); // 08 → 09 → 10
     const t10 = a.lines.find((l) => l.period === "2026-10")!;
     expect(t10.id).toBe("carry|carry|L1");
@@ -73,17 +73,17 @@ describe("ensureMonthOpened — tháng chưa mở tự kế thừa", () => {
     expect(ensureMonthOpened(a.lines, "2026-10")).toEqual({ lines: a.lines, keThua: 0 });
   });
   test("tháng đã có dòng thì để nguyên", () => {
-    const ds = [lo("L1", "2026-09"), lo("X", "2026-10")];
-    expect(ensureMonthOpened(ds, "2026-10").keThua).toBe(0);
+    const items = [lo("L1", "2026-09"), lo("X", "2026-10")];
+    expect(ensureMonthOpened(items, "2026-10").keThua).toBe(0);
   });
 });
 
 describe("findLotLineInMonth — theo chuỗi dồn kỳ", () => {
   test("tháng sau là carry|<id>", () => {
-    const ds = ensureMonthOpened([lo("L1", "2026-09")], "2026-10").lines;
-    expect(findLotLineInMonth(ds, "L1", "2026-10")?.id).toBe("carry|L1");
-    expect(findLotLineInMonth(ds, "L1", "2026-09")?.id).toBe("L1");
-    expect(findLotLineInMonth(ds, "L1", "2026-08")).toBeNull();
+    const items = ensureMonthOpened([lo("L1", "2026-09")], "2026-10").lines;
+    expect(findLotLineInMonth(items, "L1", "2026-10")?.id).toBe("carry|L1");
+    expect(findLotLineInMonth(items, "L1", "2026-09")?.id).toBe("L1");
+    expect(findLotLineInMonth(items, "L1", "2026-08")).toBeNull();
   });
 });
 
@@ -113,22 +113,22 @@ describe("syncMonthlyStockLedger — Lấy xả đông = cột Xuất của lô 
   test("vượt tồn lô ⇒ chặn, không ghi gì", () => {
     const s0 = [lo("L1", "2026-10", { openKg: 500 })];
     const r = stockRow("d1", "lay", { "2026-10-02": 600 }, { stockLineId: "L1" });
-    const kq = syncMonthlyStockLedger(s0, [], [r], ctx);
-    expect(kq.loi).toMatch(/chỉ còn 500 kg/);
-    expect(kq.lines).toBe(s0);
+    const result = syncMonthlyStockLedger(s0, [], [r], ctx);
+    expect(result.loi).toMatch(/chỉ còn 500 kg/);
+    expect(result.lines).toBe(s0);
   });
 
   test("chưa chọn lô mà có số ⇒ chặn", () => {
-    const kq = syncMonthlyStockLedger([], [], [stockRow("d1", "lay", { "2026-10-02": 5 })], ctx);
-    expect(kq.loi).toMatch(/Chọn lô/);
+    const result = syncMonthlyStockLedger([], [], [stockRow("d1", "lay", { "2026-10-02": 5 })], ctx);
+    expect(result.loi).toMatch(/Chọn lô/);
   });
 
   test("dòng cũ có số mà chưa chọn lô KHÔNG làm kẹt lần ghi khác; chọn lô thì ghi đủ", () => {
     const prev = stockRow("d1", "lay", { "2026-10-02": 5 });
-    const khac = stockRow("x", "lay", {}, { groupName: "Thủy sản", sourceWarehouse: "" });
-    const kq = syncMonthlyStockLedger([], [prev, khac], [prev, { ...khac, unitPrice: 1 }], ctx);
-    expect(kq.loi).toBeNull();
-    expect(kq.doi).toBe(false);
+    const otherRow = stockRow("x", "lay", {}, { groupName: "Thủy sản", sourceWarehouse: "" });
+    const result = syncMonthlyStockLedger([], [prev, otherRow], [prev, { ...otherRow, unitPrice: 1 }], ctx);
+    expect(result.loi).toBeNull();
+    expect(result.doi).toBe(false);
     const s0 = [lo("L1", "2026-10")];
     const synced = syncMonthlyStockLedger(s0, [prev], [{ ...prev, stockLineId: "L1" }], ctx);
     expect(synced.lines[0].outKg).toBe(5);
@@ -151,12 +151,12 @@ describe("syncMonthlyStockLedger — Lấy xả đông = cột Xuất của lô 
       { "2026-09-30": 100, "2026-10-01": 50 },
       { stockLineId: "L1" }
     );
-    const kq = syncMonthlyStockLedger(s0, [], [r], ctx);
-    expect(kq.loi).toBeNull();
-    expect(kq.keThua).toBeGreaterThan(0);
-    expect(kq.lines.find((l) => l.id === "L1")!.outKg).toBe(100);
+    const result = syncMonthlyStockLedger(s0, [], [r], ctx);
+    expect(result.loi).toBeNull();
+    expect(result.keThua).toBeGreaterThan(0);
+    expect(result.lines.find((l) => l.id === "L1")!.outKg).toBe(100);
     // Tháng 10 kế thừa tồn cuối tháng 9 SAU khi trừ 100 (= 900), rồi trừ 50 của tháng 10.
-    expect(stock(kq.lines.find((l) => l.id === "carry|L1"))).toBe(1000 - 100 - 50);
+    expect(stock(result.lines.find((l) => l.id === "carry|L1"))).toBe(1000 - 100 - 50);
     // Thứ tự ngày trong object không quyết định kết quả.
     const dao = { ...r, dailyQuantities: { "2026-10-01": 50, "2026-09-30": 100 } };
     expect(stock(syncMonthlyStockLedger(s0, [], [dao], ctx).lines.find((l) => l.id === "carry|L1"))).toBe(850);
@@ -210,10 +210,10 @@ describe("syncMonthlyStockLedger — Gửi đông = lô MỚI theo ngày gửi",
     const b = syncMonthlyStockLedger(a, [], [lay], ctx).lines;
     const g2 = { ...g, unitPrice: 142000 };
     const c = syncMonthlyStockLedger(b, [g], [g2], ctx).lines;
-    const dongGui = c.find((x) => x.id === freezeDepositRowId("g1", "2026-10-02"))!;
-    expect(dongGui.outKg).toBe(150);
-    expect(getBalancingShareInLot(dongGui, "d1")).toBe(150);
-    expect(stock(dongGui)).toBe(250);
+    const freezeDepositRow = c.find((x) => x.id === freezeDepositRowId("g1", "2026-10-02"))!;
+    expect(freezeDepositRow.outKg).toBe(150);
+    expect(getBalancingShareInLot(freezeDepositRow, "d1")).toBe(150);
+    expect(stock(freezeDepositRow)).toBe(250);
   });
 });
 
@@ -232,17 +232,17 @@ describe("countMonthlyStockMismatches — kiểm khớp, ghi lại sửa đượ
 
 describe("danh sách chọn", () => {
   test("lô: còn tồn, khớp tên họ NL lên đầu, nhãn có kho · tên · invoice · còn kg", () => {
-    const ds = [
+    const items = [
       lo("A", "2026-10", { itemName: "CÁ SÒNG", storageLocation: "Kho Ánh Dương" }),
       lo("B", "2026-10", { outKg: 1000 }), // hết hàng ⇒ ẩn
       lo("C", "2026-10"),
     ];
-    const ch = listThawLotOptions(ds, "2026-10", "Bạch tuộc 2 da");
+    const ch = listThawLotOptions(items, "2026-10", "Bạch tuộc 2 da");
     expect(ch.map((c) => c.value)).toEqual(["C", "A"]);
     expect(ch[0].label).toBe("Hồng Phú · B.TUỘC  2 DA · SBT001");
     expect(ch[0].phu).toMatch(/^còn 1\.000 kg · nhập 12\/08\/2026$/);
     // Lô đang chọn vẫn hiện dù đã hết.
-    expect(listThawLotOptions(ds, "2026-10", "Bạch tuộc 2 da", ["B"]).some((c) => c.value === "B")).toBe(true);
+    expect(listThawLotOptions(items, "2026-10", "Bạch tuộc 2 da", ["B"]).some((c) => c.value === "B")).toBe(true);
   });
   test("lô của tháng chưa mở: xem trước phần kế thừa (id carry|)", () => {
     expect(listThawLotOptions([lo("C", "2026-09")], "2026-10", "Bạch tuộc 2 da")[0].value).toBe("carry|C");

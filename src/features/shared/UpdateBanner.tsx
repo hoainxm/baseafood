@@ -24,7 +24,7 @@ function useUpdateCheck(): boolean {
   );
 
   useEffect(() => {
-    let huy = false;
+    let isCancelled = false;
     const url = `${import.meta.env.BASE_URL}version.json`;
 
     const checkForUpdate = async () => {
@@ -34,7 +34,7 @@ function useUpdateCheck(): boolean {
         const data = (await res.json()) as { buildId?: string };
         const newBuildId = String(data?.buildId ?? "");
         // Chỉ báo khi biết chắc cả hai mã và chúng khác nhau.
-        if (!huy && newBuildId && runningVersion.current && newBuildId !== runningVersion.current)
+        if (!isCancelled && newBuildId && runningVersion.current && newBuildId !== runningVersion.current)
           setHasNewVersion(true);
       } catch {
         /* mạng chập chờn / dev chưa có file → im lặng, không báo nhầm */
@@ -50,7 +50,7 @@ function useUpdateCheck(): boolean {
     window.addEventListener("focus", checkForUpdate);
 
     return () => {
-      huy = true;
+      isCancelled = true;
       window.clearInterval(id);
       document.removeEventListener("visibilitychange", onReturn);
       window.removeEventListener("focus", checkForUpdate);
@@ -61,10 +61,10 @@ function useUpdateCheck(): boolean {
 }
 
 /**
- * BangCapNhat — băng nhắc tải lại khi có bản mới. Đặt ở đầu vùng nội dung
+ * UpdateBanner — băng nhắc tải lại khi có bản mới. Đặt ở đầu vùng nội dung
  * (AppShell), ngoài khối đổi-trang nên không mất khi chuyển màn.
  */
-export function BangCapNhat() {
+export function UpdateBanner() {
   const hasNewVersion = useUpdateCheck();
   if (!hasNewVersion) return null;
 

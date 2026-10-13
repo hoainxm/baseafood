@@ -9,29 +9,29 @@ import { kg } from "@/lib/format";
 import { formatMaterialLotLabel } from "@/lib/lotTraceability";
 import { cn } from "@/lib/utils";
 import { Check, Pencil, QrCode } from "lucide-react";
-import type { NhomChuyen } from "./importHelpers";
+import type { ShipmentGroup } from "./importHelpers";
 
 /**
  * Một BƯỚC của phiếu nhập. Đang làm ⇒ mở, viền đậm. Làm xong ⇒ THU lại còn một dòng
  * tóm tắt + nút "Đổi" — màn ngắn lại, mắt chỉ còn nhìn bước đang làm.
  */
-export function TheBuoc({
+export function StepCard({
   so,
-  tieuDe,
+  title,
   xong,
   mo,
-  tomTat,
+  summary,
   onDoi,
   children,
 }: {
   so: number;
-  tieuDe: string;
+  title: string;
   /** Bước đã có dữ liệu (đổi số thành dấu ✓). */
   xong: boolean;
   /** Đang mở để thao tác. */
   mo: boolean;
   /** Dòng tóm tắt khi thu lại. */
-  tomTat?: ReactNode;
+  summary?: ReactNode;
   /** Có thì hiện nút "Đổi" lúc thu lại. */
   onDoi?: () => void;
   children: ReactNode;
@@ -57,15 +57,15 @@ export function TheBuoc({
         </span>
         <div className="min-w-0 flex-1">
           <p className={cn("font-semibold", !mo && "text-muted-foreground")}>
-            {tieuDe}
+            {title}
           </p>
-          {!mo && tomTat && (
-            <div className="min-w-0 font-semibold">{tomTat}</div>
+          {!mo && summary && (
+            <div className="min-w-0 font-semibold">{summary}</div>
           )}
         </div>
         {!mo && onDoi && (
           <Button
-            title={`Mở lại bước "${tieuDe}" để chọn lại.`}
+            title={`Mở lại bước "${title}" để chọn lại.`}
             type="button"
             variant="outline"
             size="sm"
@@ -84,17 +84,17 @@ export function TheBuoc({
 }
 
 /** Thẻ chọn LỚN — một chạm. Trạng thái chọn có ✓ + viền đậm, không chỉ báo bằng màu. */
-export function TheChon({
-  tieuDe,
+export function ChoiceCard({
+  label: cardLabel,
   phu,
-  dangChon,
+  isSelected,
   title,
   onClick,
   icon,
 }: {
-  tieuDe: string;
+  label: string;
   phu?: string;
-  dangChon?: boolean;
+  isSelected?: boolean;
   /** Câu giải thích khi rê chuột (luật nút thao tác). */
   title: string;
   onClick: () => void;
@@ -104,11 +104,11 @@ export function TheChon({
     <button
       type="button"
       title={title}
-      aria-pressed={dangChon}
+      aria-pressed={isSelected}
       onClick={onClick}
       className={cn(
         "flex min-h-14 w-full min-w-0 items-center gap-3 rounded-lg border-2 px-3 py-2 text-left transition-colors",
-        dangChon
+        isSelected
           ? "border-primary bg-accent"
           : "border-border bg-card hover:border-primary/50 hover:bg-muted",
       )}
@@ -122,14 +122,14 @@ export function TheChon({
         </span>
       )}
       <span className="min-w-0 flex-1">
-        <span className="block font-semibold break-words">{tieuDe}</span>
+        <span className="block font-semibold break-words">{cardLabel}</span>
         {phu && (
           <span className="block text-sm break-words text-muted-foreground">
             {phu}
           </span>
         )}
       </span>
-      {dangChon && (
+      {isSelected && (
         <Check className="size-5 shrink-0 text-primary" aria-hidden />
       )}
     </button>
@@ -137,21 +137,21 @@ export function TheChon({
 }
 
 /** Các chuyến ĐÃ GHI của ngày + xưởng đang nhập — nhìn ngay cạnh phiếu, khỏi đổi tab. */
-export function ChuyenTrongNgay({
+export function DayShipmentList({
   nhom,
-  khoa,
-  dangSuaKhoa,
-  onSua,
-  onInTem,
+  isLocked,
+  editingGroupKey: editingKey,
+  onEdit,
+  onPrintLabel,
 }: {
-  nhom: NhomChuyen[];
+  nhom: ShipmentGroup[];
   /** Ngày đã chốt ⇒ không cho sửa. */
-  khoa: boolean;
+  isLocked: boolean;
   /** Khóa nhóm đang mở để sửa (tô nổi). */
-  dangSuaKhoa: string | null;
-  onSua: (n: NhomChuyen) => void;
+  editingGroupKey: string | null;
+  onEdit: (n: ShipmentGroup) => void;
   /** Có thì chuyến có mã lô hiện nút in tem QR. */
-  onInTem?: (n: NhomChuyen) => void;
+  onPrintLabel?: (n: ShipmentGroup) => void;
 }) {
   if (nhom.length === 0)
     return (
@@ -163,10 +163,10 @@ export function ChuyenTrongNgay({
     <ul className="space-y-2">
       {nhom.map((n, i) => (
         <li
-          key={n.khoa}
+          key={n.groupKey}
           className={cn(
             "space-y-1 rounded-lg border-2 px-3 py-2",
-            dangSuaKhoa === n.khoa
+            editingKey === n.groupKey
               ? "border-primary bg-accent"
               : "border-border",
           )}
@@ -177,13 +177,13 @@ export function ChuyenTrongNgay({
                 {i + 1}.
               </span>
               {n.supplierName || "(chưa có đại lý)"}
-              {n.ghiBu && (
+              {n.isBackdated && (
                 <Tag variant="luu-y" className="ml-2 align-middle">
                   Ghi bù
                 </Tag>
               )}
             </p>
-            <span className="tnum shrink-0 font-semibold">{kg(n.tongKg)}</span>
+            <span className="tnum shrink-0 font-semibold">{kg(n.totalKg)}</span>
           </div>
           <div className="flex items-center justify-between gap-3">
             <p className="min-w-0 text-sm text-muted-foreground">
@@ -192,25 +192,25 @@ export function ChuyenTrongNgay({
               · {n.dong.length} loại
             </p>
             <span className="flex shrink-0 gap-1">
-              {onInTem && n.chuyen && (
+              {onPrintLabel && n.shipment && (
                 <Button
-                  title={`In tem QR lô ${formatMaterialLotLabel(n.chuyen)} — mỗi loại nguyên liệu của chuyến một tem (loại + kg của loại đó) để dán đúng sọt. Quét tem là ra hộ chiếu lô.`}
+                  title={`In tem QR lô ${formatMaterialLotLabel(n.shipment)} — mỗi loại nguyên liệu của chuyến một tem (loại + kg của loại đó) để dán đúng sọt. Quét tem là ra hộ chiếu lô.`}
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => onInTem(n)}
+                  onClick={() => onPrintLabel(n)}
                 >
                   <QrCode />
                   Tem
                 </Button>
               )}
-              {!khoa && (
+              {!isLocked && (
                 <Button
                   title="Mở lại chuyến này lên phiếu để sửa dòng hàng, số kg hay giá."
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => onSua(n)}
+                  onClick={() => onEdit(n)}
                 >
                   <Pencil />
                   Sửa

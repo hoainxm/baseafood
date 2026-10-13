@@ -74,16 +74,16 @@ export function groupDailyShipments(
   const ra: DailySupplierGroup[] = [];
   for (const [supplier, m] of bySupplier) {
     let i = 0;
-    const shipments: DailyShipment[] = [...m].map(([shipmentId, ds]) => {
+    const shipments: DailyShipment[] = [...m].map(([shipmentId, items]) => {
       i += 1;
-      const dong = ds.map((r) => ({
+      const dong = items.map((r) => ({
         id: r.id,
         loai: r.materialTypeName,
         kg: r.quantityKg,
         donGia: r.unitPrice,
         tien: rowAmount(r),
       }));
-      const dau = ds[0];
+      const dau = items[0];
       return {
         shipmentId,
         nhan: lotCodes.get(shipmentId) || `Chuyến ${i}`,

@@ -39,8 +39,8 @@ import {
   useProductionLocks,
   useScraps,
 } from "@/lib/catalogRepo";
-import { useDuLieuTruyXuat } from "@/features/shared/useDuLieuTruyXuat";
-import { KhoiCheDoDemo } from "@/features/shared/CheDoDemo";
+import { useTraceData } from "@/features/shared/useTraceData";
+import { DemoModeSection } from "@/features/shared/DemoMode";
 import { useAuth } from "@/lib/auth";
 import {
   buildFlowStages,
@@ -82,17 +82,17 @@ import {
  */
 
 interface WarehouseRow {
-  kho: string;
+  warehouse: string;
   periodFrom: string;
   periodTo: string;
-  tonDau: number;
-  nhap: number;
-  xuat: number;
-  tonCuoi: number;
-  soMH: number;
+  openingKg: number;
+  inKg: number;
+  outKg: number;
+  closingKg: number;
+  productCount: number;
 }
 
-const KY_NHANH: { value: ViewPeriod; label: string }[] = [
+const QUICK_PERIODS: { value: ViewPeriod; label: string }[] = [
   { value: "ngay", label: "Ngày" },
   { value: "tuan", label: "Tuần" },
   { value: "thang", label: "Tháng" },
@@ -119,7 +119,7 @@ const KIND_TONES = {
   ban: "la",
   lo: "bang",
 } as const satisfies Record<string, CategoryTone>;
-const SAC_KHAU: Record<string, CategoryTone> = {
+const STAGE_TONES: Record<string, CategoryTone> = {
   nhap: KIND_TONES.nhap,
   "san-xuat": KIND_TONES.sanXuat,
   kho: KIND_TONES.kho,
@@ -160,24 +160,24 @@ function periodLabel(ky: ViewPeriod, tu: string, den: string): string {
   return `${formatDateVN(tu)} – ${formatDateVN(den)}`;
 }
 
-const LEVEL_LABELS: Record<FlowWarning["muc"], { chu: string; loai: TagVariant }> = {
-  loi: { chu: "Sổ sai", loai: "loi" },
-  nhac: { chu: "Chưa làm", loai: "luu-y" },
-  tin: { chu: "Để biết", loai: "phu" },
+const LEVEL_LABELS: Record<FlowWarning["muc"], { chu: string; variant: TagVariant }> = {
+  loi: { chu: "Sổ sai", variant: "loi" },
+  nhac: { chu: "Chưa làm", variant: "luu-y" },
+  tin: { chu: "Để biết", variant: "phu" },
 };
 
 const formatMoney = (n: number) => `${n < 0 ? "−" : ""}${num(Math.abs(Math.round(n)))} đ`;
 const shortDate = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
 
 function Section({
-  tieuDe,
-  moTa,
+  title,
+  description,
   hanhDong,
   children,
   className,
 }: {
-  tieuDe: string;
-  moTa?: ReactNode;
+  title: string;
+  description?: ReactNode;
   hanhDong?: ReactNode;
   children: ReactNode;
   className?: string;
@@ -186,8 +186,8 @@ function Section({
     <section className={`grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-4 rounded-xl border-2 border-border bg-card p-5 ${className ?? ""}`}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="text-lg font-semibold text-foreground">{tieuDe}</h2>
-          {moTa && <p className="mt-1 text-sm text-muted-foreground">{moTa}</p>}
+          <h2 className="text-lg font-semibold text-foreground">{title}</h2>
+          {description && <p className="mt-1 text-sm text-muted-foreground">{description}</p>}
         </div>
         {hanhDong}
       </div>
@@ -198,18 +198,18 @@ function Section({
 
 export default function DashboardScreen() {
   const navigate = useNavigate();
-  const { laAdmin, canDangNhap } = useAuth();
+  const { laAdmin, canDangNhap: canSignIn } = useAuth();
   const [ky, setKy] = useState<ViewPeriod>("thang");
   const [moc, setMoc] = useState(todayIso());
   const [tuTC, setTuTC] = useState(todayIso());
   const [denTC, setDenTC] = useState(todayIso());
   const [workshop, setWorkshop] = useState<Workshop | "">("");
   const [tu, den] = getViewPeriodRange(ky, moc, tuTC, denTC);
-  const khoang: FlowRange = useMemo(() => ({ tu, den, xuong: workshop }), [tu, den, workshop]);
+  const range: FlowRange = useMemo(() => ({ tu, den, xuong: workshop }), [tu, den, workshop]);
   const warningsRef = useRef<HTMLDivElement>(null);
 
   // ---- Nạp sổ ----
-  const { dl } = useDuLieuTruyXuat();
+  const { dl } = useTraceData();
   const [scraps] = useScraps();
   const [dailyLocks] = useDailyLocks();
   const [productionLocks] = useProductionLocks();
@@ -226,24 +226,24 @@ export default function DashboardScreen() {
   );
 
   // ---- Gom số (lib/dataFlow) ----
-  const dataFlow = useMemo(() => buildDataFlow(d, khoang), [d, khoang]);
-  const khau = useMemo(() => buildFlowStages(d, khoang), [d, khoang]);
+  const dataFlow = useMemo(() => buildDataFlow(d, range), [d, range]);
+  const stages = useMemo(() => buildFlowStages(d, range), [d, range]);
   // Chuỗi theo ngày dừng ở hôm nay — ngày tương lai chưa có số, vẽ ra chỉ là đường phẳng.
   const byDate = useMemo(() => {
     const today = todayIso();
-    return buildDailyFlowSeries(d, { ...khoang, den: khoang.den < today ? khoang.den : today });
-  }, [d, khoang]);
-  const yieldRatio = useMemo(() => computeYieldByProduct(d, khoang), [d, khoang]);
-  const warnings = useMemo(() => buildChainWarnings(d, khoang, todayIso()), [d, khoang]);
+    return buildDailyFlowSeries(d, { ...range, den: range.den < today ? range.den : today });
+  }, [d, range]);
+  const yieldRatio = useMemo(() => computeYieldByProduct(d, range), [d, range]);
+  const warnings = useMemo(() => buildChainWarnings(d, range, todayIso()), [d, range]);
   const cacKy = useMemo(() => computeAllPeriodResults(d), [d]);
 
-  const kgKhau = (k: string) => khau.find((x) => x.khoa === k)?.kg ?? 0;
-  const inKg = kgKhau("nhap");
-  const productionKg = kgKhau("san-xuat");
-  const raKg = kgKhau("xuat-ban");
+  const stageKg = (k: string) => stages.find((x) => x.khoa === k)?.kg ?? 0;
+  const inKg = stageKg("nhap");
+  const productionKg = stageKg("san-xuat");
+  const raKg = stageKg("xuat-ban");
   const last = byDate[byDate.length - 1];
   const latestPeriod = cacKy.find((x) => x.coThanhPham);
-  const soViec = warnings.filter((c) => c.muc !== "tin").length;
+  const taskCount = warnings.filter((c) => c.muc !== "tin").length;
   const errorCount = warnings.filter((c) => c.muc === "loi").length;
 
   // % kg BTP trong khoảng đã có lô NL (hoặc lý do chưa gắn).
@@ -329,16 +329,16 @@ export default function DashboardScreen() {
       numeric: true,
       icon: QrCode,
       tone: KIND_TONES.lo,
-      onSelect: () => navigate("/qr?tab=giai-doan"),
+      onSelect: () => navigate("/qr?tab=stages"),
       selectHint: "Mở Mã lô QR — tab Theo giai đoạn để gắn lô còn thiếu.",
     },
     {
       label: "Việc cần đốc",
-      value: `${num(soViec)} việc`,
+      value: `${num(taskCount)} việc`,
       subtext: errorCount > 0 ? `${errorCount} chỗ sổ sai cần sửa` : "không có sổ sai",
       numeric: true,
       icon: AlertTriangle,
-      color: errorCount > 0 ? "danger" : soViec > 0 ? "warning" : "success",
+      color: errorCount > 0 ? "danger" : taskCount > 0 ? "warning" : "success",
       onSelect: () => warningsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
       selectHint: "Cuộn tới danh sách việc cần đốc.",
     },
@@ -349,8 +349,8 @@ export default function DashboardScreen() {
     () => Object.fromEntries(dataFlow.nut.filter((n) => n.duongDan).map((n) => [n.id, n.duongDan as string])),
     [dataFlow],
   );
-  const toShares = (ds: ReturnType<typeof splitOutflows>, ten: typeof MATERIAL_PARTS): ProportionSegment[] =>
-    ds.map((x) => ({ id: x.id, label: ten[x.id]?.label ?? x.nhan, tone: ten[x.id]?.tone ?? "xam", description: ten[x.id]?.description, value: x.kg }));
+  const toShares = (items: ReturnType<typeof splitOutflows>, ten: typeof MATERIAL_PARTS): ProportionSegment[] =>
+    items.map((x) => ({ id: x.id, label: ten[x.id]?.label ?? x.nhan, tone: ten[x.id]?.tone ?? "xam", description: ten[x.id]?.description, value: x.kg }));
   const materialOutflow = useMemo(
     () => splitOutflows(dataFlow, (id) => id.startsWith("x:"), Object.keys(MATERIAL_PARTS)),
     [dataFlow],
@@ -366,7 +366,7 @@ export default function DashboardScreen() {
       key: "muc",
       header: "Mức",
       render: (r) => (
-        <Tag variant={LEVEL_LABELS[r.muc].loai}>
+        <Tag variant={LEVEL_LABELS[r.muc].variant}>
           {LEVEL_LABELS[r.muc].chu}
         </Tag>
       ),
@@ -453,15 +453,15 @@ export default function DashboardScreen() {
       if (latest.get(r.warehouseCode) !== r.periodTo) continue;
       const cur =
         m.get(r.warehouseCode) ??
-        { kho: r.warehouseCode, periodFrom: r.periodFrom, periodTo: r.periodTo, tonDau: 0, nhap: 0, xuat: 0, tonCuoi: 0, soMH: 0 };
-      cur.tonDau += r.openingKg;
-      cur.nhap += r.inKg;
-      cur.xuat += r.outKg;
-      cur.tonCuoi += r.openingKg + r.inKg - r.outKg;
-      cur.soMH += 1;
+        { warehouse: r.warehouseCode, periodFrom: r.periodFrom, periodTo: r.periodTo, openingKg: 0, inKg: 0, outKg: 0, closingKg: 0, productCount: 0 };
+      cur.openingKg += r.openingKg;
+      cur.inKg += r.inKg;
+      cur.outKg += r.outKg;
+      cur.closingKg += r.openingKg + r.inKg - r.outKg;
+      cur.productCount += 1;
       m.set(r.warehouseCode, cur);
     }
-    return [...m.values()].sort((a, b) => b.tonCuoi - a.tonCuoi);
+    return [...m.values()].sort((a, b) => b.closingKg - a.closingKg);
   }, [snapshots]);
   const warehouseColumns: SummaryTableColumn<WarehouseRow>[] = [
     {
@@ -469,38 +469,38 @@ export default function DashboardScreen() {
       header: "Kho / chi nhánh",
       render: (r) => (
         <div className="min-w-0">
-          <div className="font-semibold text-foreground">{r.kho}</div>
+          <div className="font-semibold text-foreground">{r.warehouse}</div>
           <div className="text-sm text-muted-foreground">
-            kỳ {formatDateVN(r.periodFrom)} – {formatDateVN(r.periodTo)} · {r.soMH} mặt hàng
+            kỳ {formatDateVN(r.periodFrom)} – {formatDateVN(r.periodTo)} · {r.productCount} mặt hàng
           </div>
         </div>
       ),
     },
-    { key: "tonDau", header: "Tồn đầu (kg)", numeric: true, render: (r) => num(r.tonDau), total: () => num(warehouseTotals.reduce((s, k) => s + k.tonDau, 0)) },
-    { key: "nhap", header: "Nhập (kg)", numeric: true, render: (r) => (r.nhap ? `+${num(r.nhap)}` : "—"), total: () => num(warehouseTotals.reduce((s, k) => s + k.nhap, 0)) },
-    { key: "xuat", header: "Xuất (kg)", numeric: true, render: (r) => (r.xuat ? `−${num(r.xuat)}` : "—"), total: () => num(warehouseTotals.reduce((s, k) => s + k.xuat, 0)) },
+    { key: "tonDau", header: "Tồn đầu (kg)", numeric: true, render: (r) => num(r.openingKg), total: () => num(warehouseTotals.reduce((s, k) => s + k.openingKg, 0)) },
+    { key: "nhap", header: "Nhập (kg)", numeric: true, render: (r) => (r.inKg ? `+${num(r.inKg)}` : "—"), total: () => num(warehouseTotals.reduce((s, k) => s + k.inKg, 0)) },
+    { key: "xuat", header: "Xuất (kg)", numeric: true, render: (r) => (r.outKg ? `−${num(r.outKg)}` : "—"), total: () => num(warehouseTotals.reduce((s, k) => s + k.outKg, 0)) },
     {
       key: "tonCuoi",
       header: "Tồn cuối (kg)",
       numeric: true,
-      render: (r) => <span className="tnum font-bold text-foreground">{num(r.tonCuoi)}</span>,
-      total: () => num(warehouseTotals.reduce((s, k) => s + k.tonCuoi, 0)),
+      render: (r) => <span className="tnum font-bold text-foreground">{num(r.closingKg)}</span>,
+      total: () => num(warehouseTotals.reduce((s, k) => s + k.closingKg, 0)),
     },
   ];
 
   const dayLabels = byDate.map((x) => shortDate(x.ngay));
   const hasDailyFigures = byDate.some((x) => x.nhap > 0 || x.sanXuat > 0);
   const hasStock = byDate.some((x) => x.tonBtp !== 0 || x.tonTp !== 0);
-  const khoaKy = `${tu}|${den}|${workshop || "tat-ca"}`;
-  const duongKhau = Object.fromEntries(khau.map((k) => [k.khoa, k.duongDan]));
-  const coloredStages = khau.map((k) => ({
+  const periodKey = `${tu}|${den}|${workshop || "tat-ca"}`;
+  const stagePaths = Object.fromEntries(stages.map((k) => [k.khoa, k.duongDan]));
+  const coloredStages = stages.map((k) => ({
     id: k.khoa,
     name: k.ten,
     kg: k.kg,
     pendingKg: k.kgCho,
     pendingTasks: k.viecThieu,
     conversionRate: k.tiLeChuyen,
-    tone: SAC_KHAU[k.khoa],
+    tone: STAGE_TONES[k.khoa],
   }));
 
   return (
@@ -514,14 +514,14 @@ export default function DashboardScreen() {
       </div>
 
       {/* Chế độ demo — chỉ admin bật (hoặc máy chạy không đăng nhập: sandbox). */}
-      {(laAdmin || !canDangNhap) && <KhoiCheDoDemo />}
+      {(laAdmin || !canSignIn) && <DemoModeSection />}
 
       {/* Thanh lọc GỌN một hàng: kỳ (bấm nhanh) · lùi/tiến · xưởng. Tự chọn mới hiện ô ngày. */}
       <div className="grid gap-3 rounded-xl border bg-muted/30 p-3">
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
           <Tabs value={ky} onValueChange={(v) => setKy(v as ViewPeriod)}>
             <TabsList aria-label="Kỳ xem" className="flex-wrap group-data-horizontal/tabs:h-auto">
-              {KY_NHANH.map((k) => (
+              {QUICK_PERIODS.map((k) => (
                 <TabsTrigger key={k.value} value={k.value} title={`Xem số theo ${k.label.toLowerCase()}.`}>
                   {k.label}
                 </TabsTrigger>
@@ -569,15 +569,15 @@ export default function DashboardScreen() {
       <StatCardGrid cards={the} />
 
       <Section
-        tieuDe="Năm khâu của chuỗi"
-        moTa="kg đã qua từng khâu trong kỳ và số lô / dòng còn thiếu việc (tem, gắn lô, duyệt, quét kiểm). Phần trăm trên mũi tên so với khâu nguồn: SX so với NL nhập, nhập kho so với SX, đóng gói và xuất/bán so với nhập kho. Bấm một khâu để mở màn của khâu đó."
+        title="Năm khâu của chuỗi"
+        description="kg đã qua từng khâu trong kỳ và số lô / dòng còn thiếu việc (tem, gắn lô, duyệt, quét kiểm). Phần trăm trên mũi tên so với khâu nguồn: SX so với NL nhập, nhập kho so với SX, đóng gói và xuất/bán so với nhập kho. Bấm một khâu để mở màn của khâu đó."
       >
-        <PipelineStages stages={coloredStages} onSelect={(k) => navigate(duongKhau[k] ?? "/dashboard")} />
+        <PipelineStages stages={coloredStages} onSelect={(k) => navigate(stagePaths[k] ?? "/dashboard")} />
       </Section>
 
       <Section
-        tieuDe="Nguyên liệu đi đâu"
-        moTa="Mỗi thanh là 100% một khối hàng, chia theo nơi nó đi tới. Bấm một phần để mở màn liên quan."
+        title="Nguyên liệu đi đâu"
+        description="Mỗi thanh là 100% một khối hàng, chia theo nơi nó đi tới. Bấm một phần để mở màn liên quan."
       >
         {materialOutflow.length === 0 && outOfWarehouse.length === 0 ? (
           <EmptyState icon={Truck} title="Kỳ này chưa có số" description="Chưa ghi nhập hàng hay sản xuất nào trong kỳ đang xem." />
@@ -621,19 +621,19 @@ export default function DashboardScreen() {
 
       <div ref={warningsRef} className="scroll-mt-header">
         <Section
-          tieuDe={`Việc cần đốc (${warnings.length})`}
-          moTa="Sổ sai đứng trước, rồi việc chưa làm, cuối cùng là các ghi bù để biết. Bấm Mở để tới đúng chỗ sửa."
+          title={`Việc cần đốc (${warnings.length})`}
+          description="Sổ sai đứng trước, rồi việc chưa làm, cuối cùng là các ghi bù để biết. Bấm Mở để tới đúng chỗ sửa."
         >
           {warnings.length === 0 ? (
             <EmptyState icon={AlertTriangle} title="Không có việc tồn đọng" description="Các ngày đã chốt, lô đã gắn, không có bán vượt tồn trong kỳ này." />
           ) : (
-            <SummaryTable rows={warnings} columns={warningColumns} getKey={(r) => r.id} rowMarkKey={`tong-quan-canh-bao|${khoaKy}`} />
+            <SummaryTable rows={warnings} columns={warningColumns} getKey={(r) => r.id} rowMarkKey={`tong-quan-canh-bao|${periodKey}`} />
           )}
         </Section>
       </div>
 
       <div className="grid grid-cols-[minmax(0,1fr)] gap-6 2xl:grid-cols-2">
-        <Section tieuDe="Nhập và sản xuất theo ngày" moTa="Cột: kg nguyên liệu nhập và kg bán thành phẩm sản xuất mỗi ngày.">
+        <Section title="Nhập và sản xuất theo ngày" description="Cột: kg nguyên liệu nhập và kg bán thành phẩm sản xuất mỗi ngày.">
           {hasDailyFigures ? (
             <TimeSeriesChart
               labels={dayLabels}
@@ -648,8 +648,8 @@ export default function DashboardScreen() {
           )}
         </Section>
         <Section
-          tieuDe="Tồn kho theo ngày"
-          moTa="Tồn bán thành phẩm kho dự trữ và thành phẩm đóng gói cuối mỗi ngày. Tồn nguyên liệu chưa vẽ: sổ NL chưa trừ phần đưa vào sản xuất."
+          title="Tồn kho theo ngày"
+          description="Tồn bán thành phẩm kho dự trữ và thành phẩm đóng gói cuối mỗi ngày. Tồn nguyên liệu chưa vẽ: sổ NL chưa trừ phần đưa vào sản xuất."
         >
           {hasStock ? (
             <TimeSeriesChart
@@ -668,8 +668,8 @@ export default function DashboardScreen() {
 
       <div className="grid grid-cols-[minmax(0,1fr)] gap-6 2xl:grid-cols-2">
         <Section
-          tieuDe="Kết quả các kỳ cân đối"
-          moTa="Định mức = NL vào ÷ TP ra; lãi/lỗ = giá trị xuất − giá thành. Kỳ chưa có thành phẩm thì chưa tính."
+          title="Kết quả các kỳ cân đối"
+          description="Định mức = NL vào ÷ TP ra; lãi/lỗ = giá trị xuất − giá thành. Kỳ chưa có thành phẩm thì chưa tính."
         >
           {cacKy.length === 0 ? (
             <EmptyState icon={Scale} title="Chưa có kỳ cân đối" description="Tạo kỳ ở màn Cân đối kỳ để thấy định mức và lãi/lỗ." />
@@ -678,8 +678,8 @@ export default function DashboardScreen() {
           )}
         </Section>
         <Section
-          tieuDe="Định mức theo mặt hàng"
-          moTa={
+          title="Định mức theo mặt hàng"
+          description={
             yieldRatio.binhQuan != null
               ? `Chỉ tính mẻ đã gắn lô NL có cân kg. Bình quân ${num(yieldRatio.binhQuan)} — mặt hàng lệch quá ±${YIELD_RATIO_THRESHOLD * 100}% được ghi chú.`
               : "Chỉ tính mẻ đã gắn lô NL có cân kg."
@@ -702,11 +702,11 @@ export default function DashboardScreen() {
       </div>
 
       <Section
-        tieuDe="Tồn kho theo kho (báo cáo Xuất–Nhập–Tồn)"
-        moTa="Tồn cuối của kỳ mới nhất mỗi kho. Nguồn: báo cáo NXT nhập từ hệ thống xí nghiệp."
+        title="Tồn kho theo kho (báo cáo Xuất–Nhập–Tồn)"
+        description="Tồn cuối của kỳ mới nhất mỗi kho. Nguồn: báo cáo NXT nhập từ hệ thống xí nghiệp."
         hanhDong={
           warehouseTotals.length > 0 && (
-            <Button title="Mở màn Nhập xuất tồn kho để xem số chi tiết theo từng mã hàng." variant="outline" onClick={() => navigate("/nxt-kho")}>
+            <Button title="Mở màn Nhập xuất tồn kho để xem số chi tiết theo từng mã hàng." variant="outline" onClick={() => navigate("/nxt-warehouse")}>
               Mở báo cáo XNT kho
               <ArrowRight className="ml-1 h-4 w-4" />
             </Button>
@@ -716,7 +716,7 @@ export default function DashboardScreen() {
         {warehouseTotals.length === 0 ? (
           <EmptyState icon={FileSpreadsheet} title="Chưa có số liệu tồn kho" description="Nạp báo cáo Xuất–Nhập–Tồn ở màn Nhập xuất tồn kho để thấy tồn theo kho tại đây." />
         ) : (
-          <SummaryTable rows={warehouseTotals} columns={warehouseColumns} getKey={(r) => r.kho} className="sticky-first-col" />
+          <SummaryTable rows={warehouseTotals} columns={warehouseColumns} getKey={(r) => r.warehouse} className="sticky-first-col" />
         )}
       </Section>
     </div>

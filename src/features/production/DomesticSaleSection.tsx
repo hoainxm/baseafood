@@ -1,5 +1,5 @@
 // ============================================================
-// Tên file: src/features/production/KhoiBanNoiDia.tsx
+// Tên file: src/features/production/DomesticSaleSection.tsx
 // Tên tiếng Việt: Khối "Bán nội địa trong ngày" của phiên ghi thành phẩm (/wip, mig 0054)
 // ============================================================
 // Nguyên liệu bán THẲNG cho khách trong nước, không qua chế biến (bảng cân đối giấy:
@@ -9,34 +9,34 @@
 import { Button, Combobox, NumberField, type ComboboxOption } from "@/design-system";
 import { kg, num } from "@/lib/format";
 import { Plus, Store, X } from "lucide-react";
-import { banNoiDiaDayDu, type DongBanNoiDia } from "./wipHelpers";
+import { isDomesticSaleLineComplete, type DomesticSaleLine } from "./wipHelpers";
 
 interface CatalogCell {
   options: ComboboxOption[];
   onCreate: (ten: string) => string;
-  onSuaMuc: (value: string) => void;
-  suaDuoc: (value: string) => boolean;
-  nhanSua: string;
+  onEditItem: (value: string) => void;
+  canEdit: (value: string) => boolean;
+  editLabel: string;
 }
 
-export function KhoiBanNoiDia({
+export function DomesticSaleSection({
   dong,
-  onSua,
+  onUpdateRow: onEdit,
   onBo,
-  onThem,
-  loaiNL,
-  khach,
+  onAddRow: onAdd,
+  loaiNL: materialTypeCell,
+  customerField: customers,
 }: {
-  dong: DongBanNoiDia[];
-  onSua: (key: string, patch: Partial<DongBanNoiDia>) => void;
+  dong: DomesticSaleLine[];
+  onUpdateRow: (key: string, patch: Partial<DomesticSaleLine>) => void;
   onBo: (key: string) => void;
-  onThem: () => void;
+  onAddRow: () => void;
   /** Danh mục loại NL — value = TÊN. */
   loaiNL: CatalogCell;
   /** Danh mục khách hàng — value = TÊN. */
-  khach: CatalogCell;
+  customerField: CatalogCell;
 }) {
-  const validItems = dong.filter(banNoiDiaDayDu);
+  const validItems = dong.filter(isDomesticSaleLineComplete);
   const totalKg = validItems.reduce((s, d) => s + d.quantityKg, 0);
   const totalAmount = validItems.reduce((s, d) => s + d.quantityKg * (d.unitPrice ?? 0), 0);
 
@@ -57,7 +57,7 @@ export function KhoiBanNoiDia({
           type="button"
           variant="outline"
           className="h-auto min-h-10 w-full border-dashed py-2 whitespace-normal sm:w-auto"
-          onClick={onThem}
+          onClick={onAdd}
           title="Thêm một dòng nguyên liệu bán thẳng cho khách trong nước (không chế biến) trong ngày này."
         >
           <Plus />
@@ -75,12 +75,12 @@ export function KhoiBanNoiDia({
               label={`Loại nguyên liệu (dòng ${i + 1})`}
               required
               value={d.materialTypeName}
-              onChange={(v) => onSua(d.key, { materialTypeName: v })}
-              options={loaiNL.options}
-              onCreate={loaiNL.onCreate}
-              onEditItem={loaiNL.onSuaMuc}
-              canEdit={loaiNL.suaDuoc}
-              editLabel={loaiNL.nhanSua}
+              onChange={(v) => onEdit(d.key, { materialTypeName: v })}
+              options={materialTypeCell.options}
+              onCreate={materialTypeCell.onCreate}
+              onEditItem={materialTypeCell.onEditItem}
+              canEdit={materialTypeCell.canEdit}
+              editLabel={materialTypeCell.editLabel}
               placeholder="— Chọn loại NL —"
               emptyText="Chưa có loại này — gõ tên rồi Thêm mới."
             />
@@ -91,25 +91,25 @@ export function KhoiBanNoiDia({
             unit="kg"
             className="min-w-0 flex-[1_1_8rem] sm:max-w-[11rem]"
             value={d.quantityKg || null}
-            onChange={(v) => onSua(d.key, { quantityKg: v ?? 0 })}
+            onChange={(v) => onEdit(d.key, { quantityKg: v ?? 0 })}
           />
           <NumberField
             label="Đơn giá"
             unit="đ/kg"
             className="min-w-0 flex-[1_1_9rem] sm:max-w-[12rem]"
             value={d.unitPrice}
-            onChange={(v) => onSua(d.key, { unitPrice: v })}
+            onChange={(v) => onEdit(d.key, { unitPrice: v })}
           />
           <div className="min-w-0 flex-[1_1_11rem]">
             <Combobox
               label="Khách hàng"
               value={d.customerName}
-              onChange={(v) => onSua(d.key, { customerName: v })}
-              options={khach.options}
-              onCreate={khach.onCreate}
-              onEditItem={khach.onSuaMuc}
-              canEdit={khach.suaDuoc}
-              editLabel={khach.nhanSua}
+              onChange={(v) => onEdit(d.key, { customerName: v })}
+              options={customers.options}
+              onCreate={customers.onCreate}
+              onEditItem={customers.onEditItem}
+              canEdit={customers.canEdit}
+              editLabel={customers.editLabel}
               placeholder="— Chọn khách (nếu có) —"
               emptyText="Chưa có khách này — gõ tên rồi Thêm mới."
             />

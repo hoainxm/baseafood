@@ -109,10 +109,10 @@ export function computeBatterRatio(kgBot: number, finishedGoodKg: number): numbe
 
 /** Cộng dồn bột của nhiều dòng theo loại — kg + số dòng dùng; nhiều kg đứng trước. */
 export function sumBatterByType(
-  ds: (Record<string, number> | undefined)[]
+  items: (Record<string, number> | undefined)[]
 ): { ten: string; kg: number; soDong: number }[] {
   const m = new Map<string, { ten: string; kg: number; soDong: number }>();
-  for (const d of ds)
+  for (const d of items)
     for (const [ten, kg] of Object.entries(sanitizeBatterKg(d))) {
       const cur = m.get(ten) ?? { ten, kg: 0, soDong: 0 };
       cur.kg += kg;
@@ -148,19 +148,19 @@ export function findOrCreateBatter(
   rows: BatterType[],
   ten: string
 ): { bot: BatterType; rows: BatterType[]; moi: boolean } {
-  const sach = ten.trim();
-  const khoa = toShortBatterLabel(sach).toLowerCase();
+  const trimmedName = ten.trim();
+  const labelKey = toShortBatterLabel(trimmedName).toLowerCase();
   const co = rows.find(
     (b) =>
-      toShortBatterLabel(b.name.trim()).toLowerCase() === khoa ||
-      (b.code.trim() !== "" && b.code.trim().toLowerCase() === khoa)
+      toShortBatterLabel(b.name.trim()).toLowerCase() === labelKey ||
+      (b.code.trim() !== "" && b.code.trim().toLowerCase() === labelKey)
   );
   if (co) return { bot: co, rows, moi: false };
-  const hasPrefix = /^bột\s/i.test(sach);
+  const hasPrefix = /^bột\s/i.test(trimmedName);
   const bot: BatterType = {
     id: uid(),
-    code: hasPrefix ? "" : sach,
-    name: hasPrefix ? sach : `Bột ${sach}`,
+    code: hasPrefix ? "" : trimmedName,
+    name: hasPrefix ? trimmedName : `Bột ${trimmedName}`,
     note: "",
   };
   return { bot, rows: [...rows, bot], moi: true };

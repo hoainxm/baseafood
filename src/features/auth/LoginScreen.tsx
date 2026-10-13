@@ -1,5 +1,5 @@
 // ============================================================
-// Tên file cũ: src/features/auth/DangNhap.tsx
+// Tên file cũ: src/features/auth/LoginScreen.tsx
 // Tên tiếng Việt: Màn hình Đăng nhập hệ thống
 // Description: System Login Screen
 // ============================================================
@@ -14,23 +14,23 @@ import { LogIn, TriangleAlert } from "lucide-react";
  * chỉ gõ tên đăng nhập; app ghép đuôi `@bsf1.local` thành email tổng hợp cho
  * Supabase Auth (xem src/lib/auth.ts).
  */
-export default function DangNhap({
-  dangNhap,
+export default function LoginScreen({
+  login: signIn,
 }: {
-  dangNhap: (username: string, matKhau: string) => Promise<AuthResult>;
+  login: (username: string, password: string) => Promise<AuthResult>;
 }) {
   const [username, setUsername] = useState("");
-  const [matKhau, setMatKhau] = useState("");
+  const [password, setPassword] = useState("");
   const [loi, setLoi] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
 
-  const gui = async (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoi(null);
     setIsSending(true);
-    const kq = await dangNhap(username, matKhau);
+    const result = await signIn(username, password);
     setIsSending(false);
-    if (!kq.ok) setLoi(kq.loi ?? "Đăng nhập thất bại");
+    if (!result.ok) setLoi(result.loi ?? "Đăng nhập thất bại");
   };
 
   return (
@@ -44,7 +44,7 @@ export default function DangNhap({
           </p>
         </div>
 
-        <form onSubmit={gui} className="space-y-5">
+        <form onSubmit={submit} className="space-y-5">
           {loi && (
             <p
               role="alert"
@@ -70,8 +70,8 @@ export default function DangNhap({
           <Field label="Mật khẩu" required>
             <Input
               type="password"
-              value={matKhau}
-              onChange={(e) => setMatKhau(e.target.value)}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
               placeholder="Mật khẩu"
             />
           </Field>

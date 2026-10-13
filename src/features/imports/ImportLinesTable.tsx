@@ -1,5 +1,5 @@
 // ============================================================
-// Tên file: src/features/imports/BangDongHang.tsx
+// Tên file: src/features/imports/ImportLinesTable.tsx
 // Tên tiếng Việt: Bảng loại hàng của một chuyến (nhập nhiều dòng một lượt)
 // Tách khỏi MaterialImportScreen.tsx ngày 2026-09-21 — KHÔNG đổi logic.
 // ============================================================
@@ -9,7 +9,7 @@ import { Button, Combobox, NumberField, type ComboboxOption } from "@/design-sys
 import { useState } from "react";
 import { Pencil, Plus, X } from "lucide-react";
 import { formatDateVN } from "@/lib/format";
-import type { DongBang } from "./importHelpers";
+import type { ImportLine } from "./importHelpers";
 
 /* ---------- Bảng loại hàng của một chuyến (nhập nhiều dòng một lượt) ---------- */
 
@@ -20,26 +20,26 @@ import type { DongBang } from "./importHelpers";
  * (`navCol`) — bảng điền sẵn theo đại lý thì chỉ gõ kg rồi Enter. Nhãn luôn hiện để người lớn tuổi đọc rõ. Thêm loại bằng nút ở cuối,
  * dòng mới xuống CUỐI — không tự nhảy, không xô layout.
  */
-export function BangDongHang({
+export function ImportLinesTable({
   dong,
-  onSua,
+  onUpdateRow: onEdit,
   onBo,
-  onThem,
-  optLoaiTheoLoai,
-  onTaoLoai,
-  onSuaLoai,
-  onEnterCuoi,
+  onAddRow: onAdd,
+  getMaterialTypeOptions: materialTypeOptionsByCategory,
+  onCreateMaterialType,
+  onEditMaterialType,
+  onLastRowEnter: onEnterLast,
 }: {
-  dong: DongBang[];
-  onSua: (key: string, patch: Partial<DongBang>) => void;
+  dong: ImportLine[];
+  onUpdateRow: (key: string, patch: Partial<ImportLine>) => void;
   onBo: (key: string) => void;
-  onThem: () => void;
-  optLoaiTheoLoai: (category: string) => ComboboxOption[];
-  onTaoLoai: (ten: string, category: string) => string;
+  onAddRow: () => void;
+  getMaterialTypeOptions: (category: string) => ComboboxOption[];
+  onCreateMaterialType: (ten: string, category: string) => string;
   /** Bút chì sửa nhanh loại NL trong danh mục (value = tên). */
-  onSuaLoai?: (ten: string) => void;
+  onEditMaterialType?: (ten: string) => void;
   /** Enter ở ô kg của dòng cuối — màn dùng để đưa con trỏ tới nút lưu. */
-  onEnterCuoi?: () => void;
+  onLastRowEnter?: () => void;
 }) {
   const canRemove = dong.length > 1;
   // Dòng ĐIỀN SẴN theo đại lý hiện GỌN (tên loại là chữ, chỉ còn ô kg + giá) —
@@ -54,8 +54,8 @@ export function BangDongHang({
         if (e.key !== "Enter") return;
         const o = e.target as HTMLElement;
         if (o.getAttribute("data-navcol") !== "kg") return;
-        const ds = e.currentTarget.querySelectorAll('[data-navcol="kg"]');
-        if (ds[ds.length - 1] === o) onEnterCuoi?.();
+        const items = e.currentTarget.querySelectorAll('[data-navcol="kg"]');
+        if (items[items.length - 1] === o) onEnterLast?.();
       }}
     >
       {dong.map((d) =>
@@ -74,8 +74,8 @@ export function BangDongHang({
                 </p>
                 {/* Giá điền sẵn là GIÁ CŨ — nói rõ của lượt nào để người nhập soát, khỏi lưu nhầm. */}
                 <p className="text-sm text-muted-foreground">
-                  {d.giaNgay
-                    ? `Giá theo lượt ${formatDateVN(d.giaNgay).slice(0, 5)} — khác thì sửa ô đơn giá`
+                  {d.priceDate
+                    ? `Giá theo lượt ${formatDateVN(d.priceDate).slice(0, 5)} — khác thì sửa ô đơn giá`
                     : d.unitPrice == null
                       ? "Chưa có giá lượt trước — để trống nếu chờ hóa đơn"
                       : "Giá tự nhập"}
@@ -84,7 +84,7 @@ export function BangDongHang({
               <span className="flex shrink-0 gap-1 lg:hidden">
                 <CompactCloseButton
                   d={d}
-                  coTheBo={canRemove}
+                  canRemove={canRemove}
                   onBo={onBo}
                   onBung={() => setBung((b) => new Set(b).add(d.key))}
                 />
@@ -97,19 +97,19 @@ export function BangDongHang({
               unit="kg"
               navCol="kg"
               value={d.quantityKg || null}
-              onChange={(v) => onSua(d.key, { quantityKg: v ?? 0 })}
+              onChange={(v) => onEdit(d.key, { quantityKg: v ?? 0 })}
             />
             <NumberField
               label="Đơn giá"
               hideRequiredMark
               unit="đ"
               value={d.unitPrice}
-              onChange={(v) => onSua(d.key, { unitPrice: v })}
+              onChange={(v) => onEdit(d.key, { unitPrice: v })}
             />
             <span className="hidden gap-1 lg:flex">
               <CompactCloseButton
                 d={d}
-                coTheBo={canRemove}
+                canRemove={canRemove}
                 onBo={onBo}
                 onBung={() => setBung((b) => new Set(b).add(d.key))}
               />
@@ -127,7 +127,7 @@ export function BangDongHang({
               className="col-span-2 lg:col-span-1"
               value={d.category}
               onChange={(v) =>
-                onSua(d.key, { category: v as Category, materialTypeName: "" })
+                onEdit(d.key, { category: v as Category, materialTypeName: "" })
               }
               options={CATEGORIES.map((l) => ({ value: l, label: l }))}
             />
@@ -136,10 +136,10 @@ export function BangDongHang({
               required
               className="col-span-2 lg:col-span-1"
               value={d.materialTypeName}
-              onChange={(v) => onSua(d.key, { materialTypeName: v })}
-              options={optLoaiTheoLoai(d.category)}
-              onCreate={(ten) => onTaoLoai(ten, d.category)}
-              onEditItem={onSuaLoai}
+              onChange={(v) => onEdit(d.key, { materialTypeName: v })}
+              options={materialTypeOptionsByCategory(d.category)}
+              onCreate={(ten) => onCreateMaterialType(ten, d.category)}
+              onEditItem={onEditMaterialType}
               editLabel="Sửa thông tin loại nguyên liệu này — lưu thẳng vào Danh mục."
             />
             <NumberField
@@ -148,13 +148,13 @@ export function BangDongHang({
               unit="kg"
               navCol="kg"
               value={d.quantityKg || null}
-              onChange={(v) => onSua(d.key, { quantityKg: v ?? 0 })}
+              onChange={(v) => onEdit(d.key, { quantityKg: v ?? 0 })}
             />
             <NumberField
               label="Đơn giá"
               unit="đ"
               value={d.unitPrice}
-              onChange={(v) => onSua(d.key, { unitPrice: v })}
+              onChange={(v) => onEdit(d.key, { unitPrice: v })}
             />
             {canRemove ? (
               <Button
@@ -180,7 +180,7 @@ export function BangDongHang({
         variant="outline"
         size="lg"
         className="w-full border-dashed"
-        onClick={onThem}
+        onClick={onAdd}
       >
         <Plus />
         Thêm loại hàng
@@ -192,12 +192,12 @@ export function BangDongHang({
 /** Hai nút nhỏ của dòng gọn: đổi loại (bung đủ ô chọn) · bỏ dòng. */
 function CompactCloseButton({
   d,
-  coTheBo,
+  canRemove,
   onBo,
   onBung,
 }: {
-  d: DongBang;
-  coTheBo: boolean;
+  d: ImportLine;
+  canRemove: boolean;
   onBo: (key: string) => void;
   onBung: () => void;
 }) {
@@ -213,7 +213,7 @@ function CompactCloseButton({
       >
         <Pencil />
       </Button>
-      {coTheBo && (
+      {canRemove && (
         <Button
           title="Bỏ dòng loại hàng này khỏi chuyến đang gõ (chưa lưu nên không đụng sổ)."
           type="button"

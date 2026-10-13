@@ -36,8 +36,8 @@ function toIso(d: Date): string {
 
 export function startOfWeek(iso: string): string {
   const d = toDate(iso);
-  const thu = (d.getDay() + 6) % 7; // Thứ 2 = 0
-  d.setDate(d.getDate() - thu);
+  const weekday = (d.getDay() + 6) % 7; // Thứ 2 = 0
+  d.setDate(d.getDate() - weekday);
   return toIso(d);
 }
 export function endOfWeek(iso: string): string {

@@ -10,7 +10,7 @@ import type { Role } from "@/types";
  * Vai trò KHÔNG nằm trong bảng này (giám đốc, phó GĐ, kế toán, kế toán trưởng,
  * admin) = xem đầy đủ — chỉ 2 bộ phận thao tác theo bước bị giới hạn nav cho gọn.
  */
-const DEPT_IMPORT = ["imports", "warehouse", "nxt-nl", "ton-kho-thang", "qr", "catalog"];
+const DEPT_IMPORT = ["imports", "warehouse", "nxt-material", "monthly-stock", "qr", "catalog"];
 const DEPT_PRODUCTION = ["wip", "packaging", "warehouse", "qc", "qr", "catalog"];
 
 // Màn DEMO dữ liệu mẫu (DEMO_IDS / laDemo) đã GỠ 2026-10-12 — trình diễn dùng chế độ

@@ -48,7 +48,7 @@ import {
   type ComboboxOption,
   type StatCardData,
 } from "@/design-system";
-import { useSuaDanhMuc } from "@/features/catalog/SuaDanhMucNhanh";
+import { useQuickCatalogEdit } from "@/features/catalog/QuickCatalogEdit";
 import { KY_OPT, getViewPeriodRange, startOfMonth, type ViewPeriod } from "@/lib/periodUtils";
 import { num, formatDateVN } from "@/lib/format";
 import { uid } from "@/lib/db";
@@ -79,7 +79,7 @@ interface OpeningForm {
  * Tồn đầu = khai tay + lịch sử trước kỳ. Xem lib/inventoryFinished.ts.
  * Chỉ đọc; ô nhập tay duy nhất là "Tồn đầu" (số dư trước khi số hoá).
  */
-export default function BaoCaoNhapXuatTonScreen() {
+export default function NxtReportScreen() {
   const [wips] = useWipProductions();
   const [exportItems] = useExportItems();
   const [exportOrders] = useExportOrders();
@@ -87,7 +87,7 @@ export default function BaoCaoNhapXuatTonScreen() {
   const [packagings] = usePackagings();
   const [products, setProducts] = useProducts();
   /** Bút chì sửa nhanh danh mục ngay trong ô chọn. */
-  const productEditor = useSuaDanhMuc("matHang", products, setProducts);
+  const productEditor = useQuickCatalogEdit("matHang", products, setProducts);
   const [opening, writeOpening] = useFinishedGoodsOpeningStock();
 
   const [ky, setKy] = useState<ViewPeriod>("thang");
@@ -101,7 +101,7 @@ export default function BaoCaoNhapXuatTonScreen() {
   const [form, setForm] = useState<OpeningForm | null>(null);
   const [loi, setLoi] = useState<FieldError[]>([]);
 
-  const tenMH = (id: string) => products.find((m) => m.id === id)?.name || "—";
+  const productNameOf = (id: string) => products.find((m) => m.id === id)?.name || "—";
 
   const rows = useMemo(
     () =>
@@ -243,12 +243,12 @@ export default function BaoCaoNhapXuatTonScreen() {
   const productOptions: ComboboxOption[] = products.map((m) => ({ value: m.id, label: m.name, subLabel: m.code || undefined }));
   /** Thêm mặt hàng tại chỗ — lưu ngay vào danh mục; trùng tên (không phân hoa thường) ⇒ dùng lại. */
   const addProduct = (ten: string) => {
-    const sach = ten.trim();
-    const co = products.find((m) => m.name.trim().toLowerCase() === sach.toLowerCase());
+    const trimmedName = ten.trim();
+    const co = products.find((m) => m.name.trim().toLowerCase() === trimmedName.toLowerCase());
     if (co) return co.id;
-    const m = { id: uid(), code: "", name: sach, finishedGoodCode: "" };
+    const m = { id: uid(), code: "", name: trimmedName, finishedGoodCode: "" };
     setProducts([...products, m]);
-    notify.saved(`Đã thêm mặt hàng "${sach}" vào danh mục`);
+    notify.saved(`Đã thêm mặt hàng "${trimmedName}" vào danh mục`);
     return m.id;
   };
 
@@ -284,7 +284,7 @@ export default function BaoCaoNhapXuatTonScreen() {
       note: form.note.trim(),
     };
     writeOpening([...opening, newOpening]);
-    notify.saved(`Đã lưu tồn đầu ${num(newOpening.quantityKg)} kg — ${tenMH(newOpening.productId)}`);
+    notify.saved(`Đã lưu tồn đầu ${num(newOpening.quantityKg)} kg — ${productNameOf(newOpening.productId)}`);
     setForm(null);
   };
 
@@ -401,7 +401,7 @@ export default function BaoCaoNhapXuatTonScreen() {
                 {opening.map((o) => (
                   <li key={o.id} className="flex flex-wrap items-center justify-between gap-3 p-3">
                     <span className="min-w-0 flex-1 text-base">
-                      <span className="font-semibold">{tenMH(o.productId)}</span>
+                      <span className="font-semibold">{productNameOf(o.productId)}</span>
                       {o.spec ? <span className="text-muted-foreground"> · {o.spec}</span> : null}
                       {" — "}
                       <span className="tnum font-semibold">{num(o.quantityKg)}</span> kg
@@ -413,7 +413,7 @@ export default function BaoCaoNhapXuatTonScreen() {
                       </span>
                     </span>
                     <ConfirmDelete
-                      recordDescription={`${tenMH(o.productId)}${o.spec ? ` · ${o.spec}` : ""} — ${num(o.quantityKg)} kg`}
+                      recordDescription={`${productNameOf(o.productId)}${o.spec ? ` · ${o.spec}` : ""} — ${num(o.quantityKg)} kg`}
                       onConfirm={() => deleteOpening(o.id)}
                       trigger={
                         <Button
@@ -442,8 +442,8 @@ export default function BaoCaoNhapXuatTonScreen() {
                   onChange={(v) => setForm((f) => (f ? { ...f, productId: v } : f))}
                   options={productOptions}
                   onCreate={addProduct}
-                  onEditItem={productEditor.moSua}
-                  editLabel={productEditor.nhanSua}
+                  onEditItem={productEditor.openEdit}
+                  editLabel={productEditor.editLabel}
                   emptyText="Chưa có mặt hàng — gõ tên rồi bấm Thêm mới."
                 />
                 <div className="grid gap-4 sm:grid-cols-2">
@@ -515,7 +515,7 @@ export default function BaoCaoNhapXuatTonScreen() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      {productEditor.hop}
+      {productEditor.dialog}
     </div>
   );
 }

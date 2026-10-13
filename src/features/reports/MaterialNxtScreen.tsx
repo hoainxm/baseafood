@@ -32,7 +32,7 @@ import {
   type ComboboxOption,
   type StatCardData,
 } from "@/design-system";
-import { useSuaDanhMuc } from "@/features/catalog/SuaDanhMucNhanh";
+import { useQuickCatalogEdit } from "@/features/catalog/QuickCatalogEdit";
 import {
   useBalancingInputs,
   useBalancingPeriods,
@@ -97,7 +97,7 @@ export default function MaterialNxtScreen() {
   const [opening, writeOpening] = useMaterialOpeningStock();
   const [materialTypes, setMaterialTypes] = useMaterialTypes();
   /** Bút chì sửa nhanh danh mục ngay trong ô chọn. */
-  const materialTypeEditor = useSuaDanhMuc("loaiNL", materialTypes, setMaterialTypes, { theo: "ten" });
+  const materialTypeEditor = useQuickCatalogEdit("loaiNL", materialTypes, setMaterialTypes, { theo: "ten" });
   const [locks] = useProductionLocks();
   /** Sổ bán nội địa (mig 0054) — NL bán thẳng ghi ở /wip, là khoản XUẤT trừ tồn. */
   const [domesticSales] = useDomesticSales();
@@ -511,9 +511,9 @@ export default function MaterialNxtScreen() {
                     onChange={(v) => setForm((f) => (f ? { ...f, materialTypeName: v } : f))}
                     onCreate={(t) => t}
                     options={materialTypeOptions}
-                    onEditItem={materialTypeEditor.moSua}
-                    editLabel={materialTypeEditor.nhanSua}
-                    canEdit={materialTypeEditor.suaDuoc}
+                    onEditItem={materialTypeEditor.openEdit}
+                    editLabel={materialTypeEditor.editLabel}
+                    canEdit={materialTypeEditor.canEdit}
                     hint="Chọn hoặc gõ tên loại; gõ đúng tên trong sổ Nhập hàng để khớp họ."
                   />
                   <DateField
@@ -573,7 +573,7 @@ export default function MaterialNxtScreen() {
           ? "Đông gửi / Xả đông là số kho đông dự trữ (Cân đối) — chỉ để tham khảo, không vào tồn."
           : "Chưa có đông gửi / xả đông nào trong kỳ."}
       </p>
-      {materialTypeEditor.hop}
+      {materialTypeEditor.dialog}
     </div>
   );
 }

@@ -1,5 +1,5 @@
 // ============================================================
-// Tên file: src/features/shared/ToMauProvider.tsx
+// Tên file: src/features/shared/RowMarkProvider.tsx
 // Tên tiếng Việt: Nguồn dữ liệu tô màu dòng (row_marks) cho cả app
 // Description: Provides shared row marks to every design-system table
 // ============================================================
@@ -17,7 +17,7 @@ const EMPTY_MARKS: ReadonlyMap<string, MarkStyle> = new Map();
  *
  * `nguoi` = username đang đăng nhập — ghi vào `marked_by` (ai tô).
  */
-export function ToMauProvider({ nguoi, children }: { nguoi: string; children: ReactNode }) {
+export function RowMarkProvider({ username: user, children }: { username: string; children: ReactNode }) {
   const [marks, write] = useRowMarks();
   // Bản mới nhất ngay sau mỗi lần ghi — hai cú tô liền nhau trong cùng một nhịp
   // render không được dựng từ cùng một danh sách cũ (cú sau nuốt cú trước).
@@ -35,13 +35,13 @@ export function ToMauProvider({ nguoi, children }: { nguoi: string; children: Re
   const source = useMemo<RowMarkSource>(
     () => ({
       getTableMarks: (tableKey) => theoBang.get(tableKey) ?? EMPTY_MARKS,
-      setMarks: (tableKey, khoaDong, dau) => {
-        const next = setRowMarks(latest.current, tableKey, khoaDong, dau, nguoi);
+      setMarks: (tableKey, rowKeys, dau) => {
+        const next = setRowMarks(latest.current, tableKey, rowKeys, dau, user);
         latest.current = next;
         write(next);
       },
     }),
-    [theoBang, write, nguoi]
+    [theoBang, write, user]
   );
 
   return <RowMarkContext.Provider value={source}>{children}</RowMarkContext.Provider>;

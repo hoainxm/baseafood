@@ -1,5 +1,5 @@
 // ============================================================
-// Tên file: src/features/production/BangDongSX.tsx
+// Tên file: src/features/production/ProductionLinesTable.tsx
 // Tên tiếng Việt: Bảng dòng thành phẩm theo nhóm (kiểu chế biến × khách) của phiên ghi SX
 // Tách khỏi WipProductionScreen.tsx ngày 2026-09-21 — KHÔNG đổi logic.
 // ============================================================
@@ -11,8 +11,8 @@ import {
 import { num } from "@/lib/format";
 import { isBatteredProduct, getProductBatterNames } from "@/lib/batter";
 import { ChevronDown, Pencil, Plus, X } from "lucide-react";
-import { dongTrong, laTach, tongDong, type DongSX } from "./wipHelpers";
-import { KhoiBotTam } from "./KhoiBotTam";
+import { isLineEmpty, isSplitLine, getLineTotalKg, type ProductionLine } from "./wipHelpers";
+import { BatterSection } from "./BatterSection";
 
 /**
  * BẢNG nhập NHÓM THEO LOÀI: mỗi loài một cụm (Bạch tuộc, Mực, Cá…), dưới là bảng
@@ -24,51 +24,51 @@ import { KhoiBotTam } from "./KhoiBotTam";
  * Mã TẨM BỘT (đã gắn bột đi kèm / kiểu chế biến có "bột") tự hiện dòng con "Bột
  * tẩm": một ô kg cho từng loại bột đi kèm (mig 0051) — không cộng vào kg thành phẩm.
  */
-export function BangDongSX({
+export function ProductionLinesTable({
   dong,
-  matHang,
-  onSua,
+  matHang: products,
+  onUpdateRow: onEdit,
   onBo,
-  onThemDong,
-  onThemNhom,
-  onDoiNhom,
-  onTaoMatHang,
-  onSuaMatHang,
-  onSuaKhach,
-  optKhach,
-  onTaoKhach,
-  botTam,
+  onAddRow,
+  onAddGroup,
+  onChangeGroup,
+  onCreateProduct,
+  onEditProduct,
+  onEditCustomer,
+  customerOptions,
+  onCreateCustomer,
+  botTam: batterTypes,
   optBot,
-  onTaoBot,
-  onSuaBot,
+  onCreateBatter,
+  onEditBatter,
 }: {
-  dong: DongSX[];
+  dong: ProductionLine[];
   matHang: Product[];
-  onSua: (key: string, patch: Partial<DongSX>) => void;
+  onUpdateRow: (key: string, patch: Partial<ProductionLine>) => void;
   onBo: (key: string) => void;
-  onThemDong: (
+  onAddRow: (
     groupId: string,
     processingType: string,
     customerName: string
   ) => void;
-  onThemNhom: (processingType?: string, customerName?: string) => void;
-  onDoiNhom: (
+  onAddGroup: (processingType?: string, customerName?: string) => void;
+  onChangeGroup: (
     groupId: string,
-    patch: Partial<Pick<DongSX, "processingType" | "customerName">>
+    patch: Partial<Pick<ProductionLine, "processingType" | "customerName">>
   ) => void;
-  onTaoMatHang: (ten: string, processingType: string) => string;
+  onCreateProduct: (ten: string, processingType: string) => string;
   /** Mở hộp sửa nhanh thành phẩm đang chọn (tên, loài, kiểu chế biến…). */
-  onSuaMatHang: (productId: string) => void;
+  onEditProduct: (productId: string) => void;
   /** Mở hộp sửa nhanh khách hàng (value = tên). */
-  onSuaKhach: (ten: string) => void;
-  optKhach: ComboboxOption[];
-  onTaoKhach: (ten: string) => string;
+  onEditCustomer: (ten: string) => void;
+  customerOptions: ComboboxOption[];
+  onCreateCustomer: (ten: string) => string;
   /** Danh mục loại bột (để ra TÊN bột đi kèm của mặt hàng). */
   botTam: BatterType[];
   /** Ô chọn loại bột — value = TÊN. */
   optBot: ComboboxOption[];
-  onTaoBot: (ten: string) => string;
-  onSuaBot: (ten: string) => void;
+  onCreateBatter: (ten: string) => string;
+  onEditBatter: (ten: string) => void;
 }) {
   const th =
     "border-b-2 border-border bg-card px-2 py-2 text-left text-sm font-semibold whitespace-nowrap";
@@ -76,7 +76,7 @@ export function BangDongSX({
 
   // Nhóm theo groupId ỔN ĐỊNH (giữ thứ tự xuất hiện) — sửa nhãn không remount.
   const nhomKeys: string[] = [];
-  const nhomRows = new Map<string, DongSX[]>();
+  const nhomRows = new Map<string, ProductionLine[]>();
   for (const d of dong) {
     if (!nhomRows.has(d.groupId)) {
       nhomRows.set(d.groupId, []);
@@ -86,16 +86,16 @@ export function BangDongSX({
   }
 
   // Gợi ý kiểu chế biến = các giá trị đã có trên mặt hàng (thêm mới tại chỗ được).
-  const optCheBien: ComboboxOption[] = [
+  const processingTypeOptions: ComboboxOption[] = [
     ...new Set(
-      matHang.map((m) => (m.processingType || "").trim()).filter(Boolean)
+      products.map((m) => (m.processingType || "").trim()).filter(Boolean)
     ),
   ]
     .sort((a, b) => a.localeCompare(b, "vi"))
     .map((v) => ({ value: v, label: v }));
 
   // Mọi mặt hàng (gõ tên để tìm) — không giới hạn theo loài.
-  const allProductOptions: ComboboxOption[] = matHang.map((m) => ({
+  const allProductOptions: ComboboxOption[] = products.map((m) => ({
     value: m.id,
     label: m.code ? `${m.code} · ${m.name}` : m.name,
     subLabel: [m.code, m.processingType, m.category].filter(Boolean).join(" · ") || undefined,
@@ -107,7 +107,7 @@ export function BangDongSX({
       {nhomKeys.map((gid) => {
         const rows = nhomRows.get(gid)!;
         const info = { pt: rows[0].processingType, cust: rows[0].customerName };
-        const soThat = rows.filter((d) => !dongTrong(d)).length;
+        const soThat = rows.filter((d) => !isLineEmpty(d)).length;
         return (
           <div
             key={gid}
@@ -120,8 +120,8 @@ export function BangDongSX({
                 <Combobox
                   label="Kiểu chế biến"
                   value={info.pt}
-                  onChange={(v) => onDoiNhom(gid, { processingType: v })}
-                  options={optCheBien}
+                  onChange={(v) => onChangeGroup(gid, { processingType: v })}
+                  options={processingTypeOptions}
                   onCreate={(ten) => ten}
                   placeholder="VD: 2 da chần, luộc…"
                   emptyText="Chưa có — gõ tên rồi Thêm mới."
@@ -131,10 +131,10 @@ export function BangDongSX({
                 <Combobox
                   label="Khách hàng"
                   value={info.cust}
-                  onChange={(v) => onDoiNhom(gid, { customerName: v })}
-                  options={optKhach}
-                  onCreate={(ten) => onTaoKhach(ten)}
-                  onEditItem={onSuaKhach}
+                  onChange={(v) => onChangeGroup(gid, { customerName: v })}
+                  options={customerOptions}
+                  onCreate={(ten) => onCreateCustomer(ten)}
+                  onEditItem={onEditCustomer}
                   editLabel="Sửa thông tin khách hàng này — lưu thẳng vào Danh mục."
                   placeholder="VD: Peacock…"
                   emptyText="Chưa có — gõ tên rồi Thêm mới."
@@ -167,9 +167,9 @@ export function BangDongSX({
                   {rows.map((d) => {
                     // Mũi tên tách hiện ở MỌI dòng; tách "tính" khi đã nhập
                     // râu/bao tử. Mã đánh dấu "Có tách" chỉ để tự mở sẵn.
-                    const isSplit = laTach(d);
+                    const isSplit = isSplitLine(d);
                     const p = d.productId
-                      ? matHang.find((m) => m.id === d.productId)
+                      ? products.find((m) => m.id === d.productId)
                       : undefined;
                     // Khối bột: mã tẩm bột, nhóm chế biến có "bột", hoặc dòng đã nhập bột.
                     const showBatter =
@@ -183,14 +183,14 @@ export function BangDongSX({
                           <td className={`${td} text-center`}>
                             <button
                               type="button"
-                              onClick={() => onSua(d.key, { moRong: !d.moRong })}
-                              aria-expanded={d.moRong}
+                              onClick={() => onEdit(d.key, { expanded: !d.expanded })}
+                              aria-expanded={d.expanded}
                               aria-label="Mở/đóng ô râu + bao tử"
                               title="Tách râu + bao tử (cùng giá)"
                               className="inline-flex size-9 items-center justify-center rounded-md text-muted-foreground hover:bg-muted"
                             >
                               <ChevronDown
-                                className={`size-5 transition-transform ${d.moRong ? "" : "-rotate-90"}`}
+                                className={`size-5 transition-transform ${d.expanded ? "" : "-rotate-90"}`}
                                 aria-hidden
                               />
                             </button>
@@ -204,19 +204,19 @@ export function BangDongSX({
                               required
                               value={d.productId}
                               onChange={(v) => {
-                                const p = matHang.find((m) => m.id === v);
-                                onSua(d.key, {
+                                const p = products.find((m) => m.id === v);
+                                onEdit(d.key, {
                                   productId: v,
                                   // Mã đánh dấu "Có tách" → tự mở ô tách.
-                                  moRong: hasSplitComponents(p) ? true : d.moRong,
+                                  expanded: hasSplitComponents(p) ? true : d.expanded,
                                   // Có quy cách đã gắn ở mặt hàng → tự điền kg/khối.
                                   blockSpecKg: blockSpec(p) ?? d.blockSpecKg,
                                 });
                               }}
                               options={allProductOptions}
-                              onCreate={(ten) => onTaoMatHang(ten, info.pt)}
+                              onCreate={(ten) => onCreateProduct(ten, info.pt)}
                               emptyText="Chưa có mặt hàng — gõ tên rồi Thêm mới."
-                              onEditItem={onSuaMatHang}
+                              onEditItem={onEditProduct}
                               editLabel="Sửa thông tin mặt hàng này — lưu thẳng vào Danh mục."
                             />
                             </div>
@@ -227,7 +227,7 @@ export function BangDongSX({
                                 size="icon"
                                 aria-label="Sửa thành phẩm này"
                                 title="Sửa thông tin thành phẩm đang chọn (tên, mã số, loài, kiểu chế biến, quy cách) — lưu thẳng vào Danh mục."
-                                onClick={() => onSuaMatHang(d.productId)}
+                                onClick={() => onEditProduct(d.productId)}
                               >
                                 <Pencil />
                               </Button>
@@ -240,7 +240,7 @@ export function BangDongSX({
                                 className="tnum flex h-10 items-center rounded-md bg-muted px-3 font-semibold"
                                 title="Tổng = râu + bao tử"
                               >
-                                {num(tongDong(d))}
+                                {num(getLineTotalKg(d))}
                               </div>
                             ) : (
                               <NumberField
@@ -251,7 +251,7 @@ export function BangDongSX({
                                 unit="kg"
                                 value={d.quantityKg || null}
                                 onChange={(v) =>
-                                  onSua(d.key, { quantityKg: v ?? 0 })
+                                  onEdit(d.key, { quantityKg: v ?? 0 })
                                 }
                               />
                             )}
@@ -270,7 +270,7 @@ export function BangDongSX({
                                   const b = v ?? 0;
                                   const s = d.blockSpecKg || 0;
                                   // Có quy cách & chưa tách → tự tính kg = block × quy cách.
-                                  onSua(
+                                  onEdit(
                                     d.key,
                                     s > 0 && !isSplit
                                       ? { blocksCount: b, quantityKg: b * s }
@@ -292,7 +292,7 @@ export function BangDongSX({
                                 onChange={(v) => {
                                   const s = v ?? 0;
                                   const b = d.blocksCount || 0;
-                                  onSua(
+                                  onEdit(
                                     d.key,
                                     b > 0 && s > 0 && !isSplit
                                       ? { blockSpecKg: s, quantityKg: b * s }
@@ -315,7 +315,7 @@ export function BangDongSX({
                           </td>
                         </tr>
 
-                        {d.moRong && (
+                        {d.expanded && (
                           <tr className="bg-accent/30">
                             <td className="border-b border-border" />
                             <td
@@ -332,9 +332,9 @@ export function BangDongSX({
                                   unit="kg"
                                   navCol="rau"
                                   className="min-w-[8rem] flex-1"
-                                  value={d.rauKg || null}
+                                  value={d.tentacleKg || null}
                                   onChange={(v) =>
-                                    onSua(d.key, { rauKg: v ?? 0 })
+                                    onEdit(d.key, { tentacleKg: v ?? 0 })
                                   }
                                 />
                                 <NumberField
@@ -342,15 +342,15 @@ export function BangDongSX({
                                   unit="kg"
                                   navCol="baotu"
                                   className="min-w-[8rem] flex-1"
-                                  value={d.baoTuKg || null}
+                                  value={d.stomachKg || null}
                                   onChange={(v) =>
-                                    onSua(d.key, { baoTuKg: v ?? 0 })
+                                    onEdit(d.key, { stomachKg: v ?? 0 })
                                   }
                                 />
                                 <div className="pb-2 text-base text-muted-foreground">
                                   Tổng ={" "}
                                   <span className="tnum font-semibold text-foreground">
-                                    {num(tongDong(d))}
+                                    {num(getLineTotalKg(d))}
                                   </span>{" "}
                                   kg
                                 </div>
@@ -369,15 +369,15 @@ export function BangDongSX({
                                   mép trái + giới hạn theo bề rộng màn ⇒ trên điện thoại các
                                   ô bột xếp dọc trong vùng nhìn thấy, không phải vuốt ngang. */}
                               <div className="sticky left-2 max-w-[calc(100vw-8.5rem)] sm:pl-10">
-                                <KhoiBotTam
-                                  diKem={getProductBatterNames(p, botTam)}
+                                <BatterSection
+                                  diKem={getProductBatterNames(p, batterTypes)}
                                   botKg={d.botKg}
-                                  onDoi={(botKg) => onSua(d.key, { botKg })}
+                                  onDoi={(botKg) => onEdit(d.key, { botKg })}
                                   optBot={optBot}
-                                  onTaoBot={onTaoBot}
-                                  onSuaBot={onSuaBot}
-                                  kgThanhPham={tongDong(d)}
-                                  dieuHuongCot
+                                  onCreateBatter={onCreateBatter}
+                                  onEditBatter={onEditBatter}
+                                  productKg={getLineTotalKg(d)}
+                                  columnNavigation
                                 />
                               </div>
                             </td>
@@ -395,7 +395,7 @@ export function BangDongSX({
                 type="button"
                 variant="outline"
                 className="border-dashed"
-                onClick={() => onThemDong(gid, info.pt, info.cust)}
+                onClick={() => onAddRow(gid, info.pt, info.cust)}
               >
                 <Plus />
                 Thêm thành phẩm
@@ -411,7 +411,7 @@ export function BangDongSX({
         type="button"
         variant="outline"
         className="h-auto min-h-10 w-full border-dashed py-2 whitespace-normal sm:w-auto"
-        onClick={() => onThemNhom()}
+        onClick={() => onAddGroup()}
       >
         <Plus />
         Thêm nhóm (kiểu chế biến × khách)

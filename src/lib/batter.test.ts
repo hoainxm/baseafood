@@ -127,10 +127,10 @@ describe("toShortBatterLabel / listVisibleBatters", () => {
 describe("findOrCreateBatter — tạo loại bột tại chỗ, không đẻ bản trùng", () => {
   it("gõ trùng tên / mã / tên ngắn ⇒ dùng lại loại có sẵn", () => {
     for (const go of ["Bột 20802", "bột 20802", "20802", " 20802 "]) {
-      const kq = findOrCreateBatter(BATTER_TYPE_SEED, go);
-      expect(kq.moi).toBe(false);
-      expect(kq.bot.id).toBe("bot-20802");
-      expect(kq.rows).toBe(BATTER_TYPE_SEED);
+      const result = findOrCreateBatter(BATTER_TYPE_SEED, go);
+      expect(result.moi).toBe(false);
+      expect(result.bot.id).toBe("bot-20802");
+      expect(result.rows).toBe(BATTER_TYPE_SEED);
     }
   });
   it("gõ mã trơn mới ⇒ tạo 'Bột <mã>' kèm mã; gõ có tiền tố ⇒ giữ nguyên tên", () => {

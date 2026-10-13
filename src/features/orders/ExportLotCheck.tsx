@@ -13,13 +13,13 @@
 // ============================================================
 import { useMemo, useState } from "react";
 import type { ExportItem, ExportOrder, LotDispatch, Product, WipProductionItem } from "@/types";
-import { KhungQuetQr } from "@/features/shared";
+import { QrScanner } from "@/features/shared";
 import { useAuth } from "@/lib/auth";
 import { useLotDispatches } from "@/lib/catalogRepo";
 import type { LotStock } from "@/lib/inventory";
 import { newId } from "@/lib/store";
 import { kg, formatDateVN } from "@/lib/format";
-import { docMaQr, formatWipLotLabel, findLots, type LotNode } from "@/lib/lotTraceability";
+import { parseQrCode, formatWipLotLabel, findLots, type LotNode } from "@/lib/lotTraceability";
 import {
   Button,
   Dialog,
@@ -38,53 +38,53 @@ import { ArrowLeftRight, Camera, CameraOff, Search } from "lucide-react";
 
 interface OrderLot {
   wipId: string;
-  nhan: string;
+  label: string;
   productId: string;
   spec: string;
   kg: number;
   block: number;
 }
 
-export function KiemLoXuat({
-  lenh,
-  dongLenh,
-  tatCaDongLenh,
-  onLuuDongLenh,
-  ton,
-  sanXuat,
-  matHang,
+export function ExportLotCheck({
+  exportOrder: order,
+  orderItems,
+  allOrderItems: allExportItems,
+  onSaveOrderItems: onSaveExportItems,
+  lotStock: stock,
+  wips,
+  matHang: products,
   onClose,
 }: {
-  lenh: ExportOrder;
+  exportOrder: ExportOrder;
   /** Các dòng của RIÊNG lệnh này. */
-  dongLenh: readonly ExportItem[];
+  orderItems: readonly ExportItem[];
   /** Mọi dòng lệnh xuất (để ghi khi thay lô). */
-  tatCaDongLenh: readonly ExportItem[];
-  onLuuDongLenh: (rows: ExportItem[]) => void;
+  allOrderItems: readonly ExportItem[];
+  onSaveOrderItems: (rows: ExportItem[]) => void;
   /** Tồn từng lô hiện tại (đã trừ mọi lệnh xuất, kể cả lệnh này). */
-  ton: readonly LotStock[];
-  sanXuat: readonly WipProductionItem[];
+  lotStock: readonly LotStock[];
+  wips: readonly WipProductionItem[];
   matHang: readonly Product[];
   onClose: () => void;
 }) {
   const [isScanning, setIsScanning] = useState(false);
   const [typedCode, setTypedCode] = useState("");
   const [lotDispatches, saveLotDispatches] = useLotDispatches();
-  const { nguoiDung } = useAuth();
-  const recordedBy = nguoiDung?.fullName || nguoiDung?.username || "";
+  const { nguoiDung: profile } = useAuth();
+  const recordedBy = profile?.fullName || profile?.username || "";
   /** Đề nghị thay lô đang chờ xác nhận. */
-  const [deNghi, setDeNghi] = useState<{ cu: OrderLot; moi: LotNode } | null>(null);
+  const [proposal, setProposal] = useState<{ current: OrderLot; replacement: LotNode } | null>(null);
 
-  const tenMH = (id: string) => matHang.find((m) => m.id === id)?.name || "—";
+  const productNameOf = (id: string) => products.find((m) => m.id === id)?.name || "—";
   // Gom dòng lệnh theo lô (một lô có thể tách nhiều dòng).
   const lotsOfOrder = useMemo(() => {
     const m = new Map<string, OrderLot>();
-    for (const d of dongLenh) {
-      const w = sanXuat.find((x) => x.id === d.wipId);
+    for (const d of orderItems) {
+      const w = wips.find((x) => x.id === d.wipId);
       const prev = m.get(d.wipId);
       m.set(d.wipId, {
         wipId: d.wipId,
-        nhan: w ? formatWipLotLabel(w) : d.wipId,
+        label: w ? formatWipLotLabel(w) : d.wipId,
         productId: d.productId,
         spec: d.spec,
         kg: (prev?.kg ?? 0) + (d.quantityKg || 0),
@@ -92,55 +92,55 @@ export function KiemLoXuat({
       });
     }
     return [...m.values()];
-  }, [dongLenh, sanXuat]);
+  }, [orderItems, wips]);
 
   /** Lô đã quét kiểm = có dấu export_item cho mọi dòng của lô đó trong lệnh. */
   const checked = useMemo(() => {
     const s = new Set<string>();
     for (const l of lotsOfOrder) {
-      const dong = dongLenh.filter((d) => d.wipId === l.wipId);
+      const dong = orderItems.filter((d) => d.wipId === l.wipId);
       if (dong.every((d) => lotDispatches.some((x) => x.docKind === "export_item" && x.docId === d.id && x.lotId === l.wipId)))
         s.add(l.wipId);
     }
     return s;
-  }, [lotsOfOrder, dongLenh, lotDispatches]);
+  }, [lotsOfOrder, orderItems, lotDispatches]);
 
   /** Dấu "đã quét kiểm" cho mọi dòng lệnh của một lô. */
-  const makeCheckDispatches = (wipId: string, label: string, dong: readonly ExportItem[], cach: LotDispatch["method"]): LotDispatch[] => {
+  const makeCheckDispatches = (wipId: string, label: string, dong: readonly ExportItem[], method: LotDispatch["method"]): LotDispatch[] => {
     const luc = new Date().toISOString();
     return dong.map((d) => ({
       id: newId(), lotKind: "W", lotId: wipId, lotLabel: label, docKind: "export_item", docId: d.id,
-      quantityKg: d.quantityKg || null, method: cach, operator: recordedBy, recordedAt: luc,
+      quantityKg: d.quantityKg || null, method, operator: recordedBy, recordedAt: luc,
     }));
   };
 
-  const checkLot = (text: string, cach: "quet" | "go") => {
-    const ma = docMaQr(text);
+  const checkLot = (text: string, method: "quet" | "go") => {
+    const ma = parseQrCode(text);
     if (!ma) return;
-    const ds = findLots(ma, {
-      shipments: [], imports: [], wips: [...sanXuat], packagings: [], lotInputs: [],
-      exportItems: [], exportOrders: [], salesOrders: [], products: [...matHang], customers: [],
+    const items = findLots(ma, {
+      shipments: [], imports: [], wips: [...wips], packagings: [], lotInputs: [],
+      exportItems: [], exportOrders: [], salesOrders: [], products: [...products], customers: [],
     }).filter((n) => n.kind === "W");
     setTypedCode("");
-    if (ds.length === 0) {
+    if (items.length === 0) {
       notify.error(`"${text.trim()}" không phải tem lô bán thành phẩm.`);
       return;
     }
-    const trung = ds.find((n) => lotsOfOrder.some((l) => l.wipId === n.id));
-    if (trung) {
-      if (checked.has(trung.id)) {
-        notify.warning(`Lô ${trung.nhan} đã kiểm rồi.`);
+    const matchedLot = items.find((n) => lotsOfOrder.some((l) => l.wipId === n.id));
+    if (matchedLot) {
+      if (checked.has(matchedLot.id)) {
+        notify.warning(`Lô ${matchedLot.nhan} đã kiểm rồi.`);
         return;
       }
-      saveLotDispatches([...lotDispatches, ...makeCheckDispatches(trung.id, trung.nhan, dongLenh.filter((d) => d.wipId === trung.id), cach)]);
-      notify.saved(`Đúng lô ${trung.nhan} — đã ghi kiểm.`);
+      saveLotDispatches([...lotDispatches, ...makeCheckDispatches(matchedLot.id, matchedLot.nhan, orderItems.filter((d) => d.wipId === matchedLot.id), method)]);
+      notify.saved(`Đúng lô ${matchedLot.nhan} — đã ghi kiểm.`);
       return;
     }
     // Lô ngoài lệnh: cùng mặt hàng × quy cách với một lô CHƯA quét, đủ tồn ⇒ đề nghị thay.
-    const n = ds[0]!;
-    const w = sanXuat.find((x) => x.id === n.id);
+    const n = items[0]!;
+    const w = wips.find((x) => x.id === n.id);
     const cho = w ? lotsOfOrder.find((l) => !checked.has(l.wipId) && l.productId === w.productId && l.spec === w.spec) : undefined;
-    const remaining = ton.find((t) => t.wipId === n.id)?.conLai ?? 0;
+    const remaining = stock.find((t) => t.wipId === n.id)?.conLai ?? 0;
     if (!w || !cho) {
       notify.error(`Lô ${n.nhan} KHÔNG thuộc lệnh xuất này${w ? " và khác mặt hàng các lô còn chờ" : ""} — đừng xếp lên xe.`);
       return;
@@ -151,21 +151,21 @@ export function KiemLoXuat({
       );
       return;
     }
-    setDeNghi({ cu: cho, moi: n });
+    setProposal({ current: cho, replacement: n });
   };
 
   const thayLo = () => {
-    if (!deNghi) return;
-    const { cu, moi } = deNghi;
-    const prevRows = [...tatCaDongLenh];
+    if (!proposal) return;
+    const { current: oldLot, replacement: replacementLot } = proposal;
+    const prevRows = [...allExportItems];
     const prevDispatches = lotDispatches;
-    const doi = (d: ExportItem) => d.exportId === lenh.id && d.wipId === cu.wipId;
-    const updatedItems = tatCaDongLenh.map((d) => (doi(d) ? { ...d, wipId: moi.id } : d));
-    onLuuDongLenh(updatedItems);
-    saveLotDispatches([...lotDispatches, ...makeCheckDispatches(moi.id, moi.nhan, updatedItems.filter((d) => d.exportId === lenh.id && d.wipId === moi.id), "quet")]);
-    setDeNghi(null);
-    notify.saved(`Đã thay lô ${cu.nhan} bằng ${moi.nhan} trong lệnh xuất — đã ghi kiểm.`, () => {
-      onLuuDongLenh(prevRows);
+    const doi = (d: ExportItem) => d.exportId === order.id && d.wipId === oldLot.wipId;
+    const updatedItems = allExportItems.map((d) => (doi(d) ? { ...d, wipId: replacementLot.id } : d));
+    onSaveExportItems(updatedItems);
+    saveLotDispatches([...lotDispatches, ...makeCheckDispatches(replacementLot.id, replacementLot.nhan, updatedItems.filter((d) => d.exportId === order.id && d.wipId === replacementLot.id), "quet")]);
+    setProposal(null);
+    notify.saved(`Đã thay lô ${oldLot.label} bằng ${replacementLot.nhan} trong lệnh xuất — đã ghi kiểm.`, () => {
+      onSaveExportItems(prevRows);
       saveLotDispatches(prevDispatches);
     });
   };
@@ -178,7 +178,7 @@ export function KiemLoXuat({
         <DialogHeader>
           <DialogTitle className="text-2xl">Kiểm lô bằng quét tem</DialogTitle>
           <DialogDescription className="text-base">
-            Lệnh xuất {formatDateVN(lenh.exportDate)} · {lotsOfOrder.length} lô. Quét tem từng block khi xếp hàng — đúng lô thì ghi
+            Lệnh xuất {formatDateVN(order.exportDate)} · {lotsOfOrder.length} lô. Quét tem từng block khi xếp hàng — đúng lô thì ghi
             kiểm, sai lô app báo ngay.
           </DialogDescription>
         </DialogHeader>
@@ -202,7 +202,7 @@ export function KiemLoXuat({
               Kiểm
             </Button>
           </div>
-          {isScanning && <KhungQuetQr onQuet={(t) => checkLot(t, "quet")} />}
+          {isScanning && <QrScanner onScan={(t) => checkLot(t, "quet")} />}
 
           <p className="font-semibold">
             Đã kiểm <span className="tnum">{checked.size}</span> / {lotsOfOrder.length} lô{" "}
@@ -212,8 +212,8 @@ export function KiemLoXuat({
             {lotsOfOrder.map((l) => (
               <li key={l.wipId} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2">
                 <span className="min-w-0">
-                  <span className="tnum mr-2 font-semibold">{l.nhan}</span>
-                  {tenMH(l.productId)}
+                  <span className="tnum mr-2 font-semibold">{l.label}</span>
+                  {productNameOf(l.productId)}
                   <span className="text-muted-foreground">
                     {" "}
                     · <span className="tnum">{kg(l.kg)}</span>
@@ -237,11 +237,11 @@ export function KiemLoXuat({
       </DialogContent>
 
       <ConfirmAction
-        open={deNghi !== null}
-        onOpenChange={(o) => !o && setDeNghi(null)}
-        title={deNghi ? `Thay lô ${deNghi.cu.nhan} bằng ${deNghi.moi.nhan}?` : ""}
+        open={proposal !== null}
+        onOpenChange={(o) => !o && setProposal(null)}
+        title={proposal ? `Thay lô ${proposal.current.label} bằng ${proposal.replacement.nhan}?` : ""}
         description="Lô vừa quét không có trong lệnh nhưng cùng mặt hàng và quy cách với một lô chưa quét. Thay thì lệnh xuất trỏ sang lô đang xếp lên xe: tồn kho trừ lô mới, lô cũ trả về kho, hồ sơ thu hồi ghi đúng lô thật. Còn nút Hoàn tác."
-        detail={deNghi ? `${tenMH(deNghi.cu.productId)} · ${kg(deNghi.cu.kg)}${deNghi.cu.block ? ` · ${deNghi.cu.block} block` : ""}` : undefined}
+        detail={proposal ? `${productNameOf(proposal.current.productId)} · ${kg(proposal.current.kg)}${proposal.current.block ? ` · ${proposal.current.block} block` : ""}` : undefined}
         confirmLabel="Thay lô"
         icon={ArrowLeftRight}
         onConfirm={thayLo}

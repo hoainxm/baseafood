@@ -9,7 +9,7 @@ import * as React from "react";
  * MỘT cách dùng, giống Excel: tick các dòng → thanh "Đã chọn N dòng" → Tô màu ▾ /
  * In đậm / Bỏ tô áp cho mọi dòng đang tick. Design-system CHỈ định nghĩa hợp đồng
  * `RowMarkSource`; đọc/ghi dấu do app cấp qua `RowMarkContext` — provider ở
- * `features/shared/ToMauProvider.tsx` nối bảng `row_marks`. Luật: README § Tô màu dòng.
+ * `features/shared/RowMarkProvider.tsx` nối bảng `row_marks`. Luật: README § Tô màu dòng.
  */
 
 /* ---------- Bảng màu kiểu Excel: 10 sắc × 5 mức (1 rất nhạt → 5 rất đậm) ----------

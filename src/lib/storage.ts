@@ -38,7 +38,7 @@ function imagePath(): string {
  * px, JPEG chất lượng ~0.72. Trình duyệt cũ / lỗi giải mã → trả nguyên file gốc để
  * vẫn tải được (ảnh là phụ, ưu tiên không mất).
  */
-async function nenAnh(file: File, maxW = 1600, jpegQuality = 0.72): Promise<Blob> {
+async function compressImage(file: File, maxW = 1600, jpegQuality = 0.72): Promise<Blob> {
   try {
     if (typeof createImageBitmap !== "function" || typeof OffscreenCanvas !== "function")
       return file;
@@ -60,7 +60,7 @@ async function nenAnh(file: File, maxW = 1600, jpegQuality = 0.72): Promise<Blob
 export async function uploadImage(file: File): Promise<string | null> {
   if (!supabase) return null;
   const path = imagePath();
-  const blob = await nenAnh(file);
+  const blob = await compressImage(file);
   const { error } = await supabase.storage
     .from(BUCKET)
     .upload(path, blob, { contentType: "image/jpeg", upsert: false });

@@ -31,25 +31,25 @@ import { Layers } from "lucide-react";
  *
  * Chỉ đụng cột `materialTypeName` của sổ nhập. KHÔNG đụng kg, giá, ngày, chuyến.
  */
-export function HopDoiLoaiHangLoat({
+export function BulkTypeChangeDialog({
   rows,
-  loaiNL,
-  onThemLoaiNL,
-  suaLoai,
+  loaiNL: materialTypes,
+  onCreateMaterialType: onAddMaterialType,
+  materialTypeEdit: materialTypeEditor,
   onClose,
-  onLuu,
+  onSave,
 }: {
   rows: MaterialImportItem[];
   loaiNL: MaterialType[];
-  onThemLoaiNL: (ten: string) => string;
-  /** Bút chì sửa nhanh loại NL (từ `useSuaDanhMuc("loaiNL", …, { theo: "ten" })` của màn gọi). */
-  suaLoai?: {
-    moSua: (value: string) => void;
-    suaDuoc: (value: string) => boolean;
-    nhanSua: string;
+  onCreateMaterialType: (ten: string) => string;
+  /** Bút chì sửa nhanh loại NL (từ `useQuickCatalogEdit("loaiNL", …, { theo: "ten" })` của màn gọi). */
+  materialTypeEdit?: {
+    openEdit: (value: string) => void;
+    canEdit: (value: string) => boolean;
+    editLabel: string;
   };
   onClose: () => void;
-  onLuu: (ids: string[], targetType: string) => void;
+  onSave: (ids: string[], targetType: string) => void;
 }) {
   const [sourceType, setSourceType] = useState("");
   const [targetType, setTargetType] = useState("");
@@ -61,10 +61,10 @@ export function HopDoiLoaiHangLoat({
   const typeOptions = useMemo(() => {
     const ten = new Set<string>([
       ...rows.map((r) => r.materialTypeName).filter(Boolean),
-      ...loaiNL.map((l) => l.name),
+      ...materialTypes.map((l) => l.name),
     ]);
     return [...ten].sort((a, b) => a.localeCompare(b, "vi")).map((t) => ({ value: t, label: t }));
-  }, [rows, loaiNL]);
+  }, [rows, materialTypes]);
 
   const matchedRows = useMemo(() => {
     if (!sourceType) return [];
@@ -115,10 +115,10 @@ export function HopDoiLoaiHangLoat({
             value={targetType}
             onChange={setTargetType}
             options={typeOptions}
-            onCreate={onThemLoaiNL}
-            onEditItem={suaLoai?.moSua}
-            editLabel={suaLoai?.nhanSua}
-            canEdit={suaLoai?.suaDuoc}
+            onCreate={onAddMaterialType}
+            onEditItem={materialTypeEditor?.openEdit}
+            editLabel={materialTypeEditor?.editLabel}
+            canEdit={materialTypeEditor?.canEdit}
           />
         </div>
         <DateRangeField
@@ -220,7 +220,7 @@ export function HopDoiLoaiHangLoat({
                 notify.error("Chưa tick chuyến nào");
                 return;
               }
-              onLuu([...selectedIds], targetType.trim());
+              onSave([...selectedIds], targetType.trim());
             }}
           >
             Đổi {selectedIds.size} chuyến

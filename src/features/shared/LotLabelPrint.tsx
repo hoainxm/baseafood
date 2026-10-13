@@ -6,7 +6,7 @@
 // QR chứa một ĐƯỜNG LINK tới hộ chiếu lô (kiểu GS1 Digital Link): camera điện thoại
 // nào quét cũng mở thẳng app đúng lô, không cần mở app trước. Mã trong link là
 // "loại:id" — DUY NHẤT (TCVN 13274), còn nhãn đọc được chỉ in cho người xem.
-// Tem cũ (QR chỉ chứa mã lô trần) vẫn quét được: xem docMaQr ở lib/truyXuatLo.
+// Tem cũ (QR chỉ chứa mã lô trần) vẫn quét được: xem parseQrCode ở lib/truyXuatLo.
 // Thiết kế: docs/spec/qr-truy-xuat-lo.md
 // ============================================================
 import { useEffect, useState } from "react";
@@ -18,7 +18,7 @@ import { TRACE_KIND_LABELS, buildLabelPrintRecords, getShipmentLines, formatMate
 import { useLabelPrints, usePackagings, useWipProductions } from "@/lib/catalogRepo";
 import { useAuth } from "@/lib/auth";
 import { newId } from "@/lib/store";
-import { useDuLieuTruyXuat } from "./useDuLieuTruyXuat";
+import { useTraceData } from "./useTraceData";
 
 const laLo = (n: LotNode) => n.kind === "S" || n.kind === "W" || n.kind === "P";
 
@@ -37,37 +37,37 @@ function labelLines(node: LotNode): string[] {
  * Tem cho MỘT hoặc NHIỀU lô (nút đã dựng bằng `buildLotNode`). Nhiều lô ⇒ in một lượt,
  * mỗi tem một nhãn (dùng cho "In tem hàng loạt" và in tem cả mẻ vừa lưu).
  */
-export function TemLoQr({ nut, nuts, onClose }: { nut?: LotNode; nuts?: LotNode[]; onClose: () => void }) {
-  const ds = (nuts ?? (nut ? [nut] : [])).filter(laLo);
-  const khoa = ds.map((n) => `${n.kind}:${n.id}`).join("|");
+export function LotQrLabels({ node, nuts, onClose }: { node?: LotNode; nuts?: LotNode[]; onClose: () => void }) {
+  const items = (nuts ?? (node ? [node] : [])).filter(laLo);
+  const key = items.map((n) => `${n.kind}:${n.id}`).join("|");
   const [qr, setQr] = useState<Record<string, string>>({});
   useEffect(() => {
-    let huy = false;
+    let isCancelled = false;
     // Tên miền lấy từ chính địa chỉ app đang chạy — không ghi cứng trong code.
     Promise.all(
-      ds.map(async (n) => [`${n.kind}:${n.id}`, await createQrDataUrl(buildLotQrUrl(n.kind as LotKind, n.id, window.location.origin), 320)] as const)
+      items.map(async (n) => [`${n.kind}:${n.id}`, await createQrDataUrl(buildLotQrUrl(n.kind as LotKind, n.id, window.location.origin), 320)] as const)
     ).then((cap) => {
-      if (!huy) setQr(Object.fromEntries(cap));
+      if (!isCancelled) setQr(Object.fromEntries(cap));
     });
     return () => {
-      huy = true;
+      isCancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `khoa` đại diện đủ cho ds
-  }, [khoa]);
+  }, [key]);
 
   // Sổ in tem (mig 0049): bấm In là ghi mỗi lô một dòng — biết lô nào đã có tem,
   // và nhãn in ra lúc đó (nhãn BTP/TP suy lại từ bản ghi có thể đổi về sau).
   const [soIn, saveLabelPrints] = useLabelPrints();
-  const { nguoiDung } = useAuth();
+  const { nguoiDung: profile } = useAuth();
   const recordPrintCount = (copies: number[]) => {
-    const newPrints = buildLabelPrintRecords(ds, nguoiDung?.fullName || nguoiDung?.username || "", new Date().toISOString(), newId, (n) => copies[ds.indexOf(n)] ?? 1);
+    const newPrints = buildLabelPrintRecords(items, profile?.fullName || profile?.username || "", new Date().toISOString(), newId, (n) => copies[items.indexOf(n)] ?? 1);
     if (newPrints.length) saveLabelPrints([...soIn, ...newPrints]);
   };
 
   // Mặc định mỗi block (BTP) / mỗi thùng-gói (TP) một tem; người in sửa được ở xem trước.
   const [wips] = useWipProductions();
   const [packagings] = usePackagings();
-  const tems: PrintLabel[] = ds.map((n) => ({
+  const tems: PrintLabel[] = items.map((n) => ({
     lotCode: n.nhan,
     qrDataUrl: qr[`${n.kind}:${n.id}`] ?? "",
     lines: labelLines(n),
@@ -83,23 +83,23 @@ export function TemLoQr({ nut, nuts, onClose }: { nut?: LotNode; nuts?: LotNode[
  * Chuyến chưa có dòng nào trong dữ liệu chung (vừa lưu, chưa nạp) thì dựng tạm một
  * tem theo đầu chuyến như trước.
  */
-export function QrTemLoIn({ chuyen, onClose }: { chuyen: ImportShipment; onClose: () => void }) {
-  const { dl } = useDuLieuTruyXuat();
-  const byType = getShipmentLines(dl, chuyen.id).map((m) => buildLotNode("S", m.id, dl));
-  if (byType.length) return <TemLoQr nuts={byType} onClose={onClose} />;
+export function LotLabelPrint({ shipment, onClose }: { shipment: ImportShipment; onClose: () => void }) {
+  const { dl } = useTraceData();
+  const byType = getShipmentLines(dl, shipment.id).map((m) => buildLotNode("S", m.id, dl));
+  if (byType.length) return <LotQrLabels nuts={byType} onClose={onClose} />;
   const tam: LotNode = {
     kind: "S",
-    id: chuyen.id,
-    nhan: formatMaterialLotLabel(chuyen),
+    id: shipment.id,
+    nhan: formatMaterialLotLabel(shipment),
     moTa: "nguyên liệu",
-    ngay: chuyen.deliveryDate,
-    xuong: chuyen.workshop,
+    ngay: shipment.deliveryDate,
+    xuong: shipment.workshop,
     kg: 0,
     chiTiet: [
-      { nhan: "Đại lý", giaTri: chuyen.supplierName || "—" },
-      ...(chuyen.ssccCode ? [{ nhan: "SSCC", giaTri: chuyen.ssccCode }] : []),
+      { nhan: "Đại lý", giaTri: shipment.supplierName || "—" },
+      ...(shipment.ssccCode ? [{ nhan: "SSCC", giaTri: shipment.ssccCode }] : []),
     ],
     mat: false,
   };
-  return <TemLoQr nut={tam} onClose={onClose} />;
+  return <LotQrLabels node={tam} onClose={onClose} />;
 }

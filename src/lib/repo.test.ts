@@ -22,7 +22,7 @@ const bang = {
   getKey: (x: Dong) => x.id,
   toRow: (x: Dong) => ({ id: x.id, quantity_kg: x.kg, ...(x.file ? { file: x.file } : {}) }),
 };
-const jsonCua = (rows: Dong[]) =>
+const jsonOf = (rows: Dong[]) =>
   new Map(rows.map((x) => [x.id, JSON.stringify(bang.toRow(x))]));
 
 /** Cổng giả: ghi lại mọi lượt gửi; `tuChoi(row)` trả lỗi cho dòng hỏng. */
@@ -79,15 +79,15 @@ describe("kịch bản 1 — ghi chồng trong lúc đang gửi", () => {
     rows = [{ id: "A", kg: 10 }, { id: "C", kg: 3 }, { id: "B", kg: 2 }];
     const pendingAfterWrite = { them: ["A", "C", "B"], xoa: [] };
     mo();
-    const kq = await sendPromise;
+    const result = await sendPromise;
 
-    const remaining = dropSentKeys(pendingAfterWrite, kq, jsonCua(rows));
+    const remaining = dropSentKeys(pendingAfterWrite, result, jsonOf(rows));
     expect(remaining.them.sort()).toEqual(["A", "B"]); // C đã lên đúng bản ⇒ ra khỏi hàng chờ
   });
 
   it("khóa không còn dòng nào ⇒ bỏ; tab khác thêm lại dòng đó trong lúc gửi ⇒ giữ", () => {
-    const kq = { daGuiThem: new Map<string, string | null>([["X", null], ["Y", null]]), daXoa: [] };
-    const remaining = dropSentKeys({ them: ["X", "Y"], xoa: [] }, kq, jsonCua([{ id: "Y", kg: 1 }]));
+    const result = { daGuiThem: new Map<string, string | null>([["X", null], ["Y", null]]), daXoa: [] };
+    const remaining = dropSentKeys({ them: ["X", "Y"], xoa: [] }, result, jsonOf([{ id: "Y", kg: 1 }]));
     expect(remaining.them).toEqual(["Y"]);
   });
 
@@ -108,15 +108,15 @@ describe("kịch bản 2 — một dòng lỗi trong lô", () => {
       { id: "HONG", kg: 2 },
       { id: "C", kg: 3 },
     ];
-    const { cong, luotUpsert } = fakeGateway((r) =>
+    const { cong: gateway, luotUpsert } = fakeGateway((r) =>
       r.id === "HONG" ? { code: "23505", message: "duplicate key value" } : null,
     );
-    const kq = await pushQueue(bang, { them: ["A", "HONG", "C"], xoa: [] }, rows, cong);
+    const result = await pushQueue(bang, { them: ["A", "HONG", "C"], xoa: [] }, rows, gateway);
 
-    expect(kq.loiChung).toBeUndefined();
-    expect(kq.dongLoi).toEqual([{ khoa: "HONG", msg: "23505 duplicate key value" }]);
+    expect(result.loiChung).toBeUndefined();
+    expect(result.dongLoi).toEqual([{ khoa: "HONG", msg: "23505 duplicate key value" }]);
     expect(luotUpsert.length).toBe(4); // 1 lượt gộp + 3 lượt từng dòng
-    const remaining = dropSentKeys({ them: ["A", "HONG", "C"], xoa: [] }, kq, jsonCua(rows));
+    const remaining = dropSentKeys({ them: ["A", "HONG", "C"], xoa: [] }, result, jsonOf(rows));
     expect(remaining.them).toEqual(["HONG"]);
   });
 
@@ -125,11 +125,11 @@ describe("kịch bản 2 — một dòng lỗi trong lô", () => {
       { id: "A", kg: 1 },
       { id: "B", kg: 2 },
     ];
-    const { cong, luotUpsert } = fakeGateway(() => ({ message: "TypeError: Failed to fetch" }));
-    const kq = await pushQueue(bang, { them: ["A", "B"], xoa: ["Z"] }, rows, cong);
-    expect(kq.loiChung).toContain("Failed to fetch");
+    const { cong: gateway, luotUpsert } = fakeGateway(() => ({ message: "TypeError: Failed to fetch" }));
+    const result = await pushQueue(bang, { them: ["A", "B"], xoa: ["Z"] }, rows, gateway);
+    expect(result.loiChung).toContain("Failed to fetch");
     expect(luotUpsert.length).toBe(1);
-    const remaining = dropSentKeys({ them: ["A", "B"], xoa: ["Z"] }, kq, jsonCua(rows));
+    const remaining = dropSentKeys({ them: ["A", "B"], xoa: ["Z"] }, result, jsonOf(rows));
     expect(remaining).toEqual({ them: ["A", "B"], xoa: ["Z"] });
   });
 
@@ -138,8 +138,8 @@ describe("kịch bản 2 — một dòng lỗi trong lô", () => {
       { id: "A", kg: 1, file: "abc" },
       { id: "B", kg: 2 },
     ];
-    const { cong, luotUpsert } = fakeGateway();
-    await pushQueue(bang, { them: ["A", "B"], xoa: [] }, rows, cong);
+    const { cong: gateway, luotUpsert } = fakeGateway();
+    await pushQueue(bang, { them: ["A", "B"], xoa: [] }, rows, gateway);
     expect(luotUpsert.map((l) => l.map((r) => r.id))).toEqual([["A"], ["B"]]);
   });
 });
@@ -157,8 +157,8 @@ describe("kịch bản 3 — tải lại khi còn hàng chờ (mergeServerAndLoc
       { id: "C", kg: 3 }, // thêm dưới máy chưa lên
       { id: "D", kg: 4 }, // máy khác đã xóa trên server, không trong hàng chờ
     ];
-    const kq = mergeServerAndLocal(may, local, { them: ["A", "C"], xoa: ["B"] }, (x) => x.id);
-    expect(kq.sort((a, b) => a.id.localeCompare(b.id))).toEqual([
+    const result = mergeServerAndLocal(may, local, { them: ["A", "C"], xoa: ["B"] }, (x) => x.id);
+    expect(result.sort((a, b) => a.id.localeCompare(b.id))).toEqual([
       { id: "A", kg: 100 },
       { id: "C", kg: 3 },
       { id: "S", kg: 9 },
@@ -166,14 +166,14 @@ describe("kịch bản 3 — tải lại khi còn hàng chờ (mergeServerAndLoc
   });
 
   it("dòng chờ thiếu trường không-cache ⇒ lấy lại từ server", () => {
-    const kq = mergeServerAndLocal<Dong>(
+    const result = mergeServerAndLocal<Dong>(
       [{ id: "A", kg: 1, file: "FILE" }],
       [{ id: "A", kg: 2, file: "" }],
       { them: ["A"], xoa: [] },
       (x) => x.id,
       ["file"],
     );
-    expect(kq).toEqual([{ id: "A", kg: 2, file: "FILE" }]);
+    expect(result).toEqual([{ id: "A", kg: 2, file: "FILE" }]);
   });
 });
 

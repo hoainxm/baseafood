@@ -64,11 +64,11 @@ function stripAccents(x: string): string {
 function parseNumber(tok: string): number | null {
   let t = tok.trim();
   if (!t) return null;
-  const coCham = t.includes(".");
+  const hasDot = t.includes(".");
   const coPhay = t.includes(",");
-  if (coCham && coPhay) t = t.replace(/\./g, "").replace(",", ".");
+  if (hasDot && coPhay) t = t.replace(/\./g, "").replace(",", ".");
   else if (coPhay) t = t.replace(",", ".");
-  else if (coCham) {
+  else if (hasDot) {
     const after = t.split(".").pop() ?? "";
     if (after.length === 3) t = t.replace(/\./g, ""); // 1.234 → nghìn
   }

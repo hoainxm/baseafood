@@ -1,5 +1,5 @@
 // ============================================================
-// Tên file cũ: src/features/sales/BaoCaoBan.tsx
+// Tên file cũ: src/features/sales/SalesReport.tsx
 // Tên tiếng Việt: Báo cáo doanh số và sản lượng Bán hàng
 // Description: Sales Volume & Revenue Report
 // ============================================================
@@ -39,7 +39,7 @@ function unitOf(channel: SalesChannel): string {
  * địa). Giá trị để theo từng kênh vì hai kênh khác đơn vị tiền (USD ≠ VND) —
  * KHÔNG cộng thẳng. Chỉ đọc sổ bán.
  */
-export default function BaoCaoBan() {
+export default function SalesReport() {
   const [items] = useSalesItems();
   const [invoices] = useSalesInvoices();
   const [customers] = useCustomers();
@@ -50,7 +50,7 @@ export default function BaoCaoBan() {
   const [denTC, setDenTC] = useState(todayIso());
   const [tu, den] = getViewPeriodRange(ky, moc, tuTC, denTC);
 
-  const { dong, chart, soKhach, tongKg } = useMemo(() => {
+  const { dong, chart, soKhach: customerCount, tongKg: totalKg } = useMemo(() => {
     const invById = new Map(invoices.map((i) => [i.id, i]));
     const tenKH = new Map(customers.map((c) => [c.id, c.name]));
 
@@ -90,8 +90,8 @@ export default function BaoCaoBan() {
 
   const the: StatCardData[] = [
     { label: "Kỳ báo cáo", value: `${formatDateVN(tu)} – ${formatDateVN(den)}`, icon: CalendarRange, color: "trung-tinh" },
-    { label: "Tổng bán", value: `${num(tongKg)} kg`, numeric: true, icon: Scale, color: "brand" },
-    { label: "Số khách", value: num(soKhach), numeric: true, icon: Users, color: "trung-tinh" },
+    { label: "Tổng bán", value: `${num(totalKg)} kg`, numeric: true, icon: Scale, color: "brand" },
+    { label: "Số khách", value: num(customerCount), numeric: true, icon: Users, color: "trung-tinh" },
   ];
 
   const columns: SummaryTableColumn<TotalRow>[] = [
@@ -102,7 +102,7 @@ export default function BaoCaoBan() {
       header: "Số cân (kg)",
       numeric: true,
       render: (r) => num(r.quantityKg),
-      total: () => num(tongKg),
+      total: () => num(totalKg),
     },
     {
       key: "tien",

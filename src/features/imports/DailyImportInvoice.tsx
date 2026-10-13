@@ -1,5 +1,5 @@
 // ============================================================
-// Tên file cũ: src/features/imports/PhieuNLNgay.tsx
+// Tên file cũ: src/features/imports/DailyImportInvoice.tsx
 // Tên tiếng Việt: Phiếu nhập Nguyên liệu trong ngày
 // Description: Daily Material Import Entry Invoice
 // ============================================================
@@ -47,7 +47,7 @@ function groupBySupplier(rows: MaterialImportItem[]): SupplierGroup[] {
 }
 
 /**
- * PhieuNLNgay — "Báo cáo tổng hợp nguyên liệu", bản in A4 NGANG, theo KỲ.
+ * DailyImportInvoice — "Báo cáo tổng hợp nguyên liệu", bản in A4 NGANG, theo KỲ.
  *
  * Linh hoạt theo bộ lọc ngoài màn: một ngày ⇒ đúng tờ giấy của xí nghiệp; nhiều
  * ngày (tuần/tháng/năm/khoảng) ⇒ mỗi ngày một khối (sang trang khi in), cuối có
@@ -55,30 +55,30 @@ function groupBySupplier(rows: MaterialImportItem[]): SupplierGroup[] {
  *
  * Chỉ ĐỌC dữ liệu đã nhập — không tạo/sửa bản ghi nào.
  */
-export default function PhieuNLNgay({
-  ky: kyBanDau,
-  ngay: ngayBanDau,
+export default function DailyImportInvoice({
+  ky: initialPeriod,
+  date: initialDate,
   startDate,
   endDate,
   workshop,
   rows,
-  pheLieu,
+  scraps,
   onClose,
 }: {
   /** Kỳ + ngày neo + khoảng tự chọn — khởi tạo theo bộ lọc ngoài màn. */
   ky: ViewPeriod;
-  ngay: string;
+  date: string;
   startDate: string;
   endDate: string;
   /** Xưởng đang lọc; "Tất cả" ⇒ gộp cả ba xưởng như phiếu giấy. */
   workshop: Workshop | "Tất cả";
   rows: MaterialImportItem[];
-  pheLieu: ScrapItem[];
+  scraps: ScrapItem[];
   onClose: () => void;
 }) {
   // Bộ chọn kỳ NGAY trong phiếu — cùng cách với màn Nhập hàng.
-  const [ky, setKy] = useState<ViewPeriod>(kyBanDau);
-  const [moc, setMoc] = useState(ngayBanDau);
+  const [ky, setKy] = useState<ViewPeriod>(initialPeriod);
+  const [moc, setMoc] = useState(initialDate);
   const [tuTC, setTuTC] = useState(startDate);
   const [denTC, setDenTC] = useState(endDate);
   const [tu, den] = getViewPeriodRange(ky, moc, tuTC, denTC);
@@ -91,7 +91,7 @@ export default function PhieuNLNgay({
   const datesWithData = getDatesInRange(tu, den).filter(
     (d) =>
       rows.some((r) => r.deliveryDate === d && isInWorkshop(r.workshop)) ||
-      pheLieu.some(
+      scraps.some(
         (r) =>
           r.source === "Nhập hàng" && r.date === d && isInWorkshop(r.workshop)
       )
@@ -189,12 +189,12 @@ export default function PhieuNLNgay({
           datesWithData.map((d, i) => (
             <DaySection
               key={d}
-              ngay={d}
+              date={d}
               workshop={workshop}
               rows={rows}
-              pheLieu={pheLieu}
-              hienTieuDeNgay={!isSingleDay}
-              sangTrang={i > 0}
+              scraps={scraps}
+              showDayHeading={!isSingleDay}
+              pageBreak={i > 0}
             />
           ))
         )}
@@ -214,29 +214,29 @@ export default function PhieuNLNgay({
 
 /** Một ngày = một khối như tờ giấy: STT theo đại lý + tổng cộng + phụ phẩm. */
 function DaySection({
-  ngay,
+  date,
   workshop,
   rows,
-  pheLieu,
-  hienTieuDeNgay,
-  sangTrang,
+  scraps,
+  showDayHeading: showDateHeader,
+  pageBreak,
 }: {
-  ngay: string;
+  date: string;
   workshop: Workshop | "Tất cả";
   rows: MaterialImportItem[];
-  pheLieu: ScrapItem[];
-  hienTieuDeNgay: boolean;
-  sangTrang: boolean;
+  scraps: ScrapItem[];
+  showDayHeading: boolean;
+  pageBreak: boolean;
 }) {
   const isInWorkshop = (px: string) =>
     workshop === "Tất cả" || px === workshop;
 
   const dayRows = rows.filter(
-    (r) => r.deliveryDate === ngay && isInWorkshop(r.workshop)
+    (r) => r.deliveryDate === date && isInWorkshop(r.workshop)
   );
-  const dailyScraps = pheLieu.filter(
+  const dailyScraps = scraps.filter(
     (r) =>
-      r.source === "Nhập hàng" && r.date === ngay && isInWorkshop(r.workshop)
+      r.source === "Nhập hàng" && r.date === date && isInWorkshop(r.workshop)
   );
   const cum = groupBySupplier(dayRows);
   const totalKg = dayRows.reduce((s, r) => s + (r.quantityKg || 0), 0);
@@ -246,10 +246,10 @@ function DaySection({
   return (
     <section
       className="mt-5"
-      style={sangTrang ? { breakBefore: "page" } : undefined}
+      style={pageBreak ? { breakBefore: "page" } : undefined}
     >
-      {hienTieuDeNgay && (
-        <p className="mb-1 text-sm font-bold uppercase">Ngày {dateInWords(ngay)}</p>
+      {showDateHeader && (
+        <p className="mb-1 text-sm font-bold uppercase">Ngày {dateInWords(date)}</p>
       )}
 
       <table className="w-full border-collapse text-sm">

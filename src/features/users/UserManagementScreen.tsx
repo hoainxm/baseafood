@@ -66,12 +66,12 @@ const PHONG_BAN: { id: string; ten: string; icon: LucideIcon; roles: Role[] }[] 
 ];
 
 /** Tên phòng ban của một vai trò (dòng phụ trong dropdown chọn vai trò). */
-function phongBanCuaRole(v: Role): string {
+function departmentOfRole(v: Role): string {
   return PHONG_BAN.find((pb) => pb.roles.includes(v))?.ten ?? "Khác";
 }
 
 /** Xếp một người vào 1 phòng ban theo vai trò cấp CAO NHẤT họ có (rank nhỏ = cao). */
-function xepPhongBan(roles: Role[]): { idx: number; rank: number } {
+function rankDepartment(roles: Role[]): { idx: number; rank: number } {
   for (let i = 0; i < PHONG_BAN.length; i++) {
     const hits = roles.map((r) => PHONG_BAN[i].roles.indexOf(r)).filter((x) => x >= 0);
     if (hits.length) return { idx: i, rank: Math.min(...hits) };
@@ -96,23 +96,23 @@ function sapTheoCap(roles: Role[]): Role[] {
  * qua DROPDOWN tìm-kiếm (gom theo phòng ban) — hợp khi danh sách vai trò dài dần.
  */
 function RolePicker({
-  chon,
+  selected: selectedRoles,
   onDoi,
 }: {
-  chon: Role[];
+  selected: Role[];
   onDoi: (v: Role[]) => void;
 }) {
-  const remaining = ROLES.filter((r) => !chon.includes(r.value));
+  const remaining = ROLES.filter((r) => !selectedRoles.includes(r.value));
   const options: ComboboxOption[] = remaining.map((r) => ({
     value: r.value,
     label: r.label,
-    subLabel: phongBanCuaRole(r.value),
+    subLabel: departmentOfRole(r.value),
   }));
   return (
     <div className="space-y-3">
-      {chon.length > 0 ? (
+      {selectedRoles.length > 0 ? (
         <div className="flex flex-wrap gap-2">
-          {chon.map((v) => (
+          {selectedRoles.map((v) => (
             <span
               key={v}
               className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-muted py-1 pl-3 pr-1 font-medium"
@@ -120,7 +120,7 @@ function RolePicker({
               {roleLabel([v])}
               <button
                 type="button"
-                onClick={() => onDoi(chon.filter((x) => x !== v))}
+                onClick={() => onDoi(selectedRoles.filter((x) => x !== v))}
                 aria-label={`Bỏ vai trò ${roleLabel([v])}`}
                 title={`Bỏ vai trò ${roleLabel([v])}`}
                 className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-background hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
@@ -138,7 +138,7 @@ function RolePicker({
           label="Thêm vai trò"
           hideRequiredMark
           value=""
-          onChange={(v) => v && onDoi([...chon, v as Role])}
+          onChange={(v) => v && onDoi([...selectedRoles, v as Role])}
           options={options}
           placeholder="Gõ hoặc chọn vai trò để thêm…"
           emptyText="Đã thêm hết vai trò."
@@ -152,32 +152,32 @@ function RolePicker({
 interface NewUserForm {
   fullName: string;
   username: string;
-  usernameTuSua: boolean;
-  matKhau: string;
+  usernameEdited: boolean;
+  password: string;
   roles: Role[];
 }
 const EMPTY_CREATE: NewUserForm = {
   fullName: "",
   username: "",
-  usernameTuSua: false,
-  matKhau: "",
+  usernameEdited: false,
+  password: "",
   roles: [],
 };
 
 /** Màn quản lý người dùng — CHỈ admin. Đăng ký KHÔNG mở tự do: admin tạo tài
  * khoản ngay tại đây, và gán họ tên + vai trò. */
-export default function QuanLyNguoiDungScreen({
-  taoTaiKhoan,
+export default function UserManagementScreen({
+  createAccount,
 }: {
-  taoTaiKhoan: (
+  createAccount: (
     fullName: string,
     username: string,
-    matKhau: string,
+    password: string,
     roles: Role[]
   ) => Promise<AuthResult>;
 }) {
-  const [ds, write, { trangThai }] = useUserProfiles();
-  const isLoading = trangThai === "dang-tai" && ds.length === 0;
+  const [items, write, { trangThai: status }] = useUserProfiles();
+  const isLoading = status === "dang-tai" && items.length === 0;
   const [editing, setEditing] = useState<UserProfile | null>(null);
   const [q, setQ] = useState("");
 
@@ -187,7 +187,7 @@ export default function QuanLyNguoiDungScreen({
 
   const save = () => {
     if (!editing) return;
-    write(ds.map((n) => (n.id === editing.id ? editing : n)));
+    write(items.map((n) => (n.id === editing.id ? editing : n)));
     notify.saved(`Đã lưu người dùng ${editing.username || editing.id}`);
     setEditing(null);
   };
@@ -195,7 +195,7 @@ export default function QuanLyNguoiDungScreen({
   const changeNewFullName = (v: string) =>
     setCreating((t) =>
       t
-        ? { ...t, fullName: v, username: t.usernameTuSua ? t.username : fullNameToUsername(v) }
+        ? { ...t, fullName: v, username: t.usernameEdited ? t.username : fullNameToUsername(v) }
         : t
     );
 
@@ -205,24 +205,24 @@ export default function QuanLyNguoiDungScreen({
     if (!creating.fullName.trim()) ls.push({ field: "Họ tên", message: "Chưa nhập họ tên" });
     if (!creating.username.trim())
       ls.push({ field: "Tên đăng nhập", message: "Chưa nhập tên đăng nhập" });
-    if (creating.matKhau.length < 6)
+    if (creating.password.length < 6)
       ls.push({ field: "Mật khẩu", message: "Tối thiểu 6 ký tự" });
     setCreateErrors(ls);
     if (ls.length > 0) return;
 
     setIsCreating(true);
-    const kq = await taoTaiKhoan(
+    const result = await createAccount(
       creating.fullName,
       creating.username,
-      creating.matKhau,
+      creating.password,
       creating.roles
     );
     setIsCreating(false);
-    if (!kq.ok) {
-      setCreateErrors([{ field: "Tạo tài khoản", message: kq.loi ?? "Thất bại" }]);
+    if (!result.ok) {
+      setCreateErrors([{ field: "Tạo tài khoản", message: result.loi ?? "Thất bại" }]);
       return;
     }
-    if (kq.nguoiDung) write([...ds, kq.nguoiDung]);
+    if (result.nguoiDung) write([...items, result.nguoiDung]);
     notify.saved(`Đã tạo tài khoản ${creating.username}`);
     setCreating(null);
     setCreateErrors([]);
@@ -267,13 +267,13 @@ export default function QuanLyNguoiDungScreen({
   // Gom người dùng theo phòng ban (+ sắp theo cấp bậc) để danh sách trực quan.
   const query = q.trim().toLowerCase();
   const filtered = query
-    ? ds.filter((u) => `${u.username} ${u.fullName} ${roleLabel(u.roles)}`.toLowerCase().includes(query))
-    : ds;
+    ? items.filter((u) => `${u.username} ${u.fullName} ${roleLabel(u.roles)}`.toLowerCase().includes(query))
+    : items;
   const userName = (u: UserProfile) => u.fullName || u.username || "";
   const thung: { u: UserProfile; rank: number }[][] = PHONG_BAN.map(() => []);
   const unassigned: UserProfile[] = [];
   for (const u of filtered) {
-    const { idx, rank } = xepPhongBan(rolesList(u.roles));
+    const { idx, rank } = rankDepartment(rolesList(u.roles));
     if (idx < PHONG_BAN.length) thung[idx].push({ u, rank });
     else unassigned.push(u);
   }
@@ -299,7 +299,7 @@ export default function QuanLyNguoiDungScreen({
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold text-foreground">Người dùng</h1>
-          <p className="text-muted-foreground">{ds.length} tài khoản · gom theo phòng ban &amp; cấp bậc</p>
+          <p className="text-muted-foreground">{items.length} tài khoản · gom theo phòng ban &amp; cấp bậc</p>
         </div>
         <Button
           title="Tạo tài khoản đăng nhập mới và gán vai trò cho người đó."
@@ -316,7 +316,7 @@ export default function QuanLyNguoiDungScreen({
 
       {isLoading ? (
         <TableSkeleton />
-      ) : ds.length === 0 ? (
+      ) : items.length === 0 ? (
         <EmptyState
           icon={Users}
           title="Chưa có người dùng nào"
@@ -420,7 +420,7 @@ export default function QuanLyNguoiDungScreen({
                   value={creating.username}
                   onChange={(e) =>
                     setCreating((t) =>
-                      t ? { ...t, username: e.target.value, usernameTuSua: true } : t
+                      t ? { ...t, username: e.target.value, usernameEdited: true } : t
                     )
                   }
                   autoCapitalize="none"
@@ -432,9 +432,9 @@ export default function QuanLyNguoiDungScreen({
               <Field label="Mật khẩu" required hint="Tối thiểu 6 ký tự.">
                 <Input
                   type="password"
-                  value={creating.matKhau}
+                  value={creating.password}
                   onChange={(e) =>
-                    setCreating((t) => (t ? { ...t, matKhau: e.target.value } : t))
+                    setCreating((t) => (t ? { ...t, password: e.target.value } : t))
                   }
                   placeholder="Mật khẩu"
                 />
@@ -444,7 +444,7 @@ export default function QuanLyNguoiDungScreen({
                 hint="Chọn một hoặc nhiều từ danh sách. VD Phó giám đốc kiêm Quản đốc xưởng Đông = thêm cả hai. Bỏ trống cũng được, gán sau."
               >
                 <RolePicker
-                  chon={creating.roles}
+                  selected={creating.roles}
                   onDoi={(v) => setCreating((t) => (t ? { ...t, roles: v } : t))}
                 />
               </Field>
@@ -493,7 +493,7 @@ export default function QuanLyNguoiDungScreen({
                 hint="Chọn từ danh sách để thêm; bấm ✕ trên vai trò để bỏ. Bỏ hết = Chưa gán."
               >
                 <RolePicker
-                  chon={editing.roles}
+                  selected={editing.roles}
                   onDoi={(v) => setEditing((d) => (d ? { ...d, roles: v } : d))}
                 />
               </Field>

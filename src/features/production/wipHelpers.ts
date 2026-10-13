@@ -8,10 +8,10 @@
 import type { Workshop } from "@/types";
 import { newId } from "@/lib/store";
 
-export const PHAN_XUONG: Workshop[] = ["Đông", "Cá", "Khô"];
+export const WORKSHOPS: Workshop[] = ["Đông", "Cá", "Khô"];
 
 /** Đầu phiên ghi — chọn một lần, đổ nhiều thành phẩm bên dưới. */
-export interface DauPhien {
+export interface SessionHeader {
   productionDate: string;
   postingDate: string;
   backdateReason: string;
@@ -30,63 +30,63 @@ export interface DauPhien {
  *    KHÔNG cộng vào tổng thành phẩm. Giữ cả loại đang để 0 (ô vẫn hiện); khi lưu
  *    `sanitizeBatterKg` (lib/batter) bỏ ô ≤ 0.
  */
-export interface DongSX {
+export interface ProductionLine {
   key: string;
   groupId: string; // nhóm ổn định (state form, không lưu DB)
   processingType: string; // KIỂU CHẾ BIẾN (luộc/chần/cắt…) — nhãn nhóm, lưu theo dòng
   customerName: string; // KHÁCH — nhãn nhóm, lưu theo dòng
   productId: string;
-  moRong: boolean; // dòng con (râu/bao tử) đang mở — trạng thái hiển thị
+  expanded: boolean; // dòng con (râu/bao tử) đang mở — trạng thái hiển thị
   quantityKg: number; // dùng khi KHÔNG tách
-  rauKg: number;
-  baoTuKg: number;
+  tentacleKg: number;
+  stomachKg: number;
   blocksCount: number;
   blockSpecKg: number; // quy cách kg/khối — nhập ngay trên dòng, nhớ về mặt hàng
   botKg: Record<string, number>; // bột tẩm theo loại — không cộng vào tổng TP
 }
 
-export const dongSXRong = (
+export const createEmptyProductionLine = (
   groupId: string,
   processingType = "",
   customerName = ""
-): DongSX => ({
+): ProductionLine => ({
   key: newId(),
   groupId,
   processingType,
   customerName,
   productId: "",
-  moRong: false,
+  expanded: false,
   quantityKg: 0,
-  rauKg: 0,
-  baoTuKg: 0,
+  tentacleKg: 0,
+  stomachKg: 0,
   blocksCount: 0,
   blockSpecKg: 0,
   botKg: {},
 });
 
 /** Dòng có tách râu/bao tử = đã nhập ít nhất một trong hai thành phần. */
-export const laTach = (d: DongSX): boolean =>
-  (d.rauKg || 0) > 0 || (d.baoTuKg || 0) > 0;
+export const isSplitLine = (d: ProductionLine): boolean =>
+  (d.tentacleKg || 0) > 0 || (d.stomachKg || 0) > 0;
 
 /** Tổng khối lượng một dòng (tách thì cộng 2 thành phần). */
-export const tongDong = (d: DongSX): number =>
-  laTach(d) ? (d.rauKg || 0) + (d.baoTuKg || 0) : d.quantityKg || 0;
+export const getLineTotalKg = (d: ProductionLine): number =>
+  isSplitLine(d) ? (d.tentacleKg || 0) + (d.stomachKg || 0) : d.quantityKg || 0;
 
 /** Dòng đủ để lưu: có thành phẩm + tổng > 0. */
-export const dongDayDu = (d: DongSX): boolean => Boolean(d.productId) && tongDong(d) > 0;
+export const isLineComplete = (d: ProductionLine): boolean => Boolean(d.productId) && getLineTotalKg(d) > 0;
 
 /**
  * Dòng CÒN TRỐNG = chưa nhập cả thành phẩm lẫn kg. Bỏ qua khi lưu (kể cả khi
  * đã mang nhãn nhóm chế biến/khách) — đây là "dòng trống chờ gõ" của bảng.
  */
-export const dongTrong = (d: DongSX): boolean => !d.productId && tongDong(d) <= 0;
+export const isLineEmpty = (d: ProductionLine): boolean => !d.productId && getLineTotalKg(d) <= 0;
 
 /**
  * Một dòng BÁN NỘI ĐỊA trong phiên ghi (mig 0054) — nguyên liệu bán THẲNG cho khách
  * trong nước, không chế biến. Lưu sang sổ riêng `domestic_sales` (KHÔNG phải dòng
  * thành phẩm — không cộng vào tổng sản lượng). Cân đối lấy làm dòng giảm "Bán nội địa".
  */
-export interface DongBanNoiDia {
+export interface DomesticSaleLine {
   key: string;
   materialTypeName: string; // TÊN loại NL (sổ lưu tên)
   quantityKg: number;
@@ -94,7 +94,7 @@ export interface DongBanNoiDia {
   customerName: string;
 }
 
-export const dongBanNoiDiaRong = (materialTypeName = ""): DongBanNoiDia => ({
+export const createEmptyDomesticSaleLine = (materialTypeName = ""): DomesticSaleLine => ({
   key: newId(),
   materialTypeName,
   quantityKg: 0,
@@ -103,9 +103,9 @@ export const dongBanNoiDiaRong = (materialTypeName = ""): DongBanNoiDia => ({
 });
 
 /** Đủ để lưu: có loại NL + kg > 0. */
-export const banNoiDiaDayDu = (d: DongBanNoiDia): boolean =>
+export const isDomesticSaleLineComplete = (d: DomesticSaleLine): boolean =>
   Boolean(d.materialTypeName.trim()) && (d.quantityKg || 0) > 0;
 
 /** Còn trống hẳn (chưa chọn loại, chưa gõ kg/giá/khách) — bỏ qua khi lưu. */
-export const banNoiDiaTrong = (d: DongBanNoiDia): boolean =>
+export const isDomesticSaleLineEmpty = (d: DomesticSaleLine): boolean =>
   !d.materialTypeName.trim() && !(d.quantityKg > 0) && d.unitPrice == null && !d.customerName.trim();

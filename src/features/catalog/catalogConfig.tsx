@@ -1,8 +1,8 @@
 // ============================================================
-// Tên file: src/features/catalog/cauHinhDanhMuc.tsx
+// Tên file: src/features/catalog/catalogConfig.tsx
 // Tên tiếng Việt: Cấu hình 5 danh mục (trường, kiểm tra, bản ghi rỗng) — MỘT nguồn
 // Dùng chung cho màn Danh mục (CatalogCrud) và hộp SỬA NHANH ở các màn nghiệp vụ
-// (bút chì trong ô chọn — xem SuaDanhMucNhanh.tsx). Tách khỏi CatalogScreen.tsx
+// (bút chì trong ô chọn — xem QuickCatalogEdit.tsx). Tách khỏi CatalogScreen.tsx
 // ngày 2026-10-02, KHÔNG đổi trường / luật kiểm tra của màn Danh mục.
 // 2026-10-06: thêm danh mục thứ 6 "Bột tẩm" (batter_types, mig 0051) + trường
 // "Bột đi kèm" của mặt hàng.
@@ -38,54 +38,54 @@ import {
   type FieldError,
   type CatalogField,
 } from "@/design-system";
-import { ChonBotDiKem } from "./ChonBotDiKem";
+import { BatterPicker } from "./BatterPicker";
 
 const MARKETS = ["Nhật", "EU", "Mỹ", "Hàn Quốc", "Trung Quốc", "Nội địa"];
 
-export type LoaiDanhMuc = "matHang" | "khachHang" | "daiLy" | "loaiNL" | "khoLuu" | "botTam";
+export type CatalogKind = "matHang" | "khachHang" | "daiLy" | "loaiNL" | "khoLuu" | "botTam";
 
 /** Đủ thứ để dựng màn CRUD một danh mục HOẶC hộp sửa nhanh một bản ghi. */
-export interface CauHinhDanhMuc<T extends { id: string }> {
-  tieuDe: string;
-  moTa: string;
-  tenDonVi: string;
+export interface CatalogConfig<T extends { id: string }> {
+  title: string;
+  description: string;
+  entityName: string;
   rows: T[];
   onChange: (next: T[]) => void;
   fields: CatalogField<T>[];
-  taoMoi: () => T;
-  timTheo: (r: T) => string;
-  moTaBanGhi: (r: T) => string;
-  kiemTraThem?: (editing: T, rows: T[], isAdding: boolean) => FieldError[];
-  dangTai: boolean;
+  createEmpty: () => T;
+  getSearchText: (r: T) => string;
+  getRecordDescription: (r: T) => string;
+  validate?: (editing: T, rows: T[], isAdding: boolean) => FieldError[];
+  loading: boolean;
   /** Trường TÊN của bản ghi. */
-  truongTen: keyof T & string;
+  nameField: keyof T & string;
   /**
    * Sổ đã ghi nối với danh mục này bằng TÊN (không phải id) — đổi tên ở đây
    * KHÔNG đổi các dòng đã ghi. Hộp sửa nhanh khoá ô tên của loại này.
    * matHang nối bằng id ⇒ false.
    */
-  noiTheoTen: boolean;
+  linkedByName: boolean;
 }
 
-export interface BoCauHinhDanhMuc {
-  matHang: CauHinhDanhMuc<Product>;
-  khachHang: CauHinhDanhMuc<Customer>;
-  daiLy: CauHinhDanhMuc<Supplier>;
-  loaiNL: CauHinhDanhMuc<MaterialType>;
-  khoLuu: CauHinhDanhMuc<StorageLocation>;
-  botTam: CauHinhDanhMuc<BatterType>;
+export interface CatalogConfigSet {
+  matHang: CatalogConfig<Product>;
+  khachHang: CatalogConfig<Customer>;
+  daiLy: CatalogConfig<Supplier>;
+  loaiNL: CatalogConfig<MaterialType>;
+  khoLuu: CatalogConfig<StorageLocation>;
+  botTam: CatalogConfig<BatterType>;
 }
 
 /** Cảnh báo khi mã số trùng với bản ghi khác (khách hàng / đại lý). Mã trống thì bỏ qua. */
-export function trungMaSo<T extends { id: string; code: string }>(
+export function checkDuplicateCode<T extends { id: string; code: string }>(
   editing: T,
   rows: T[],
   entityLabel: string
 ): FieldError[] {
   const ma = (editing.code ?? "").trim();
   if (!ma) return [];
-  const trung = rows.some((r) => r.id !== editing.id && (r.code ?? "").trim() === ma);
-  return trung
+  const isDuplicate = rows.some((r) => r.id !== editing.id && (r.code ?? "").trim() === ma);
+  return isDuplicate
     ? [
         {
           field: "Mã số",
@@ -96,22 +96,22 @@ export function trungMaSo<T extends { id: string; code: string }>(
 }
 
 /** Trùng TÊN (không phân hoa thường) với bản ghi khác — chỉ xét khi tên mới / vừa đổi. */
-function trungTen<T extends { id: string }>(
+function checkDuplicateName<T extends { id: string }>(
   editing: T,
   rows: T[],
-  truong: keyof T & string,
+  field: keyof T & string,
   label: string,
   entityLabel: string
 ): FieldError[] {
-  const ten = String(editing[truong] ?? "").trim().toLowerCase();
+  const ten = String(editing[field] ?? "").trim().toLowerCase();
   if (!ten) return [];
   const prev = rows.find((r) => r.id === editing.id);
-  if (prev && String(prev[truong] ?? "").trim().toLowerCase() === ten) return []; // không đổi tên
-  return rows.some((r) => r.id !== editing.id && String(r[truong] ?? "").trim().toLowerCase() === ten)
+  if (prev && String(prev[field] ?? "").trim().toLowerCase() === ten) return []; // không đổi tên
+  return rows.some((r) => r.id !== editing.id && String(r[field] ?? "").trim().toLowerCase() === ten)
     ? [
         {
           field: label,
-          message: `Đã có ${entityLabel} khác tên "${String(editing[truong]).trim()}" — chọn ${entityLabel} đó thay vì đặt trùng tên.`,
+          message: `Đã có ${entityLabel} khác tên "${String(editing[field]).trim()}" — chọn ${entityLabel} đó thay vì đặt trùng tên.`,
         },
       ]
     : [];
@@ -125,7 +125,7 @@ function trungTen<T extends { id: string }>(
  * Cả hai PHẢI ghi qua đúng instance `useBang` của màn đang mở — không có thì ô
  * chỉ cho chọn (VD hộp sửa nhanh ở màn nghiệp vụ không nắm danh mục loại NL).
  */
-export function taoTruongDanhMuc(
+export function buildCatalogFields(
   materialTypes: MaterialType[],
   finishedGoods: FinishedGood[],
   batterTypes: BatterType[] = [],
@@ -212,11 +212,11 @@ export function taoTruongDanhMuc(
       key: "batterIds",
       label: "Bột đi kèm",
       render: (value, changeValue) => (
-        <ChonBotDiKem
+        <BatterPicker
           value={value}
           onChange={changeValue}
           botTam={batterTypes}
-          onTaoBot={addBatter}
+          onCreateBatter={addBatter}
         />
       ),
       renderValue: (r) => {
@@ -465,38 +465,38 @@ export function taoTruongDanhMuc(
 }
 
 /** Nguồn dữ liệu của một danh mục — PHẢI là đúng instance `useBang` của màn đang mở. */
-export interface NguonDanhMuc<T> {
+export interface CatalogSource<T> {
   rows: T[];
   onChange: (next: T[]) => void;
-  dangTai: boolean;
+  loading: boolean;
 }
 
 /** Ráp cấu hình đầy đủ từ bộ trường + nguồn dữ liệu của từng danh mục. */
-export function taoCauHinhDanhMuc(
-  truong: ReturnType<typeof taoTruongDanhMuc>,
+export function buildCatalogConfigs(
+  fields: ReturnType<typeof buildCatalogFields>,
   n: {
-    matHang: NguonDanhMuc<Product>;
-    khachHang: NguonDanhMuc<Customer>;
-    daiLy: NguonDanhMuc<Supplier>;
-    loaiNL: NguonDanhMuc<MaterialType>;
-    khoLuu: NguonDanhMuc<StorageLocation>;
-    botTam: NguonDanhMuc<BatterType>;
+    matHang: CatalogSource<Product>;
+    khachHang: CatalogSource<Customer>;
+    daiLy: CatalogSource<Supplier>;
+    loaiNL: CatalogSource<MaterialType>;
+    khoLuu: CatalogSource<StorageLocation>;
+    botTam: CatalogSource<BatterType>;
   }
-): BoCauHinhDanhMuc {
+): CatalogConfigSet {
   return {
     matHang: {
-      tieuDe: "Mặt hàng cân đối",
-      moTa: "Mặt hàng dùng khi ghi bán thành phẩm sản xuất trong bảng cân đối.",
-      tenDonVi: "mặt hàng",
+      title: "Mặt hàng cân đối",
+      description: "Mặt hàng dùng khi ghi bán thành phẩm sản xuất trong bảng cân đối.",
+      entityName: "mặt hàng",
       rows: n.matHang.rows,
       onChange: n.matHang.onChange,
-      fields: truong.matHang,
-      dangTai: n.matHang.dangTai,
-      kiemTraThem: (editing, rows) => [
-        ...trungMaSo(editing, rows, "mặt hàng"),
-        ...trungTen(editing, rows, "name", "Tên mặt hàng", "mặt hàng"),
+      fields: fields.matHang,
+      loading: n.matHang.loading,
+      validate: (editing, rows) => [
+        ...checkDuplicateCode(editing, rows, "mặt hàng"),
+        ...checkDuplicateName(editing, rows, "name", "Tên mặt hàng", "mặt hàng"),
       ],
-      taoMoi: () => ({
+      createEmpty: () => ({
         id: uid(),
         code: "",
         name: "",
@@ -508,37 +508,37 @@ export function taoCauHinhDanhMuc(
         blockSpecKg: null,
         batterIds: [],
       }),
-      timTheo: (r) => `${r.code} ${r.name} ${r.finishedGoodCode}`,
-      moTaBanGhi: (r) => `${r.name}${r.code ? ` (mã ${r.code})` : ""}`,
-      truongTen: "name",
-      noiTheoTen: false,
+      getSearchText: (r) => `${r.code} ${r.name} ${r.finishedGoodCode}`,
+      getRecordDescription: (r) => `${r.name}${r.code ? ` (mã ${r.code})` : ""}`,
+      nameField: "name",
+      linkedByName: false,
     },
     khachHang: {
-      tieuDe: "Khách hàng",
-      moTa: "Khách mua thành phẩm (đầu ra) — khác với đại lý cung cấp nguyên liệu.",
-      tenDonVi: "khách hàng",
+      title: "Khách hàng",
+      description: "Khách mua thành phẩm (đầu ra) — khác với đại lý cung cấp nguyên liệu.",
+      entityName: "khách hàng",
       rows: n.khachHang.rows,
       onChange: n.khachHang.onChange,
-      fields: truong.khachHang,
-      dangTai: n.khachHang.dangTai,
-      kiemTraThem: (editing, rows) => trungMaSo(editing, rows, "khách hàng"),
-      taoMoi: () => ({ id: uid(), code: "", name: "", market: "" }),
-      timTheo: (r) => `${r.code} ${r.name} ${r.market}`,
-      moTaBanGhi: (r) => `${r.name}${r.market ? ` — thị trường ${r.market}` : ""}`,
-      truongTen: "name",
+      fields: fields.khachHang,
+      loading: n.khachHang.loading,
+      validate: (editing, rows) => checkDuplicateCode(editing, rows, "khách hàng"),
+      createEmpty: () => ({ id: uid(), code: "", name: "", market: "" }),
+      getSearchText: (r) => `${r.code} ${r.name} ${r.market}`,
+      getRecordDescription: (r) => `${r.name}${r.market ? ` — thị trường ${r.market}` : ""}`,
+      nameField: "name",
       // Bán hàng/đơn đặt nối theo id, nhưng sản lượng /wip lưu customerName.
-      noiTheoTen: true,
+      linkedByName: true,
     },
     daiLy: {
-      tieuDe: "Đại lý cung cấp nguyên liệu",
-      moTa: "Nơi giao hàng về xưởng — dùng khi ghi chuyến nguyên liệu hàng ngày.",
-      tenDonVi: "đại lý",
+      title: "Đại lý cung cấp nguyên liệu",
+      description: "Nơi giao hàng về xưởng — dùng khi ghi chuyến nguyên liệu hàng ngày.",
+      entityName: "đại lý",
       rows: n.daiLy.rows,
       onChange: n.daiLy.onChange,
-      fields: truong.daiLy,
-      dangTai: n.daiLy.dangTai,
-      kiemTraThem: (editing, rows) => trungMaSo(editing, rows, "đại lý"),
-      taoMoi: () => ({
+      fields: fields.daiLy,
+      loading: n.daiLy.loading,
+      validate: (editing, rows) => checkDuplicateCode(editing, rows, "đại lý"),
+      createEmpty: () => ({
         id: uid(),
         code: "",
         shortName: "",
@@ -550,35 +550,35 @@ export function taoCauHinhDanhMuc(
         phone: "",
         note: "",
       }),
-      timTheo: (r) => `${r.code} ${r.shortName} ${r.billingName} ${r.address} ${r.phone}`,
-      moTaBanGhi: (r) => r.shortName,
-      truongTen: "shortName",
-      noiTheoTen: true, // import_shipments.supplier_name
+      getSearchText: (r) => `${r.code} ${r.shortName} ${r.billingName} ${r.address} ${r.phone}`,
+      getRecordDescription: (r) => r.shortName,
+      nameField: "shortName",
+      linkedByName: true, // import_shipments.supplier_name
     },
     loaiNL: {
-      tieuDe: "Loại nguyên liệu",
-      moTa: "Quy cách / size nguyên liệu. Đã nạp sẵn các loại thường gặp trong sổ.",
-      tenDonVi: "loại nguyên liệu",
+      title: "Loại nguyên liệu",
+      description: "Quy cách / size nguyên liệu. Đã nạp sẵn các loại thường gặp trong sổ.",
+      entityName: "loại nguyên liệu",
       rows: n.loaiNL.rows,
       onChange: n.loaiNL.onChange,
-      fields: truong.loaiNL,
-      dangTai: n.loaiNL.dangTai,
-      taoMoi: () => ({ id: uid(), name: "", category: "", note: "" }),
-      timTheo: (r) => `${r.name} ${r.category}`,
-      moTaBanGhi: (r) => `${r.name}${r.category ? ` (${r.category})` : ""}`,
-      truongTen: "name",
-      noiTheoTen: true, // dòng nhập lưu materialTypeName
+      fields: fields.loaiNL,
+      loading: n.loaiNL.loading,
+      createEmpty: () => ({ id: uid(), name: "", category: "", note: "" }),
+      getSearchText: (r) => `${r.name} ${r.category}`,
+      getRecordDescription: (r) => `${r.name}${r.category ? ` (${r.category})` : ""}`,
+      nameField: "name",
+      linkedByName: true, // dòng nhập lưu materialTypeName
     },
     khoLuu: {
-      tieuDe: "Kho lưu trữ",
-      moTa: "Nơi hàng đang nằm: kho nhà (Kho Baseafood — tổng trong kho) và các kho lạnh thuê ngoài (Kho Hồng Phú, Kho Ánh Dương…). Dùng ở cột 'Kho lưu' của báo cáo Xuất–Nhập–Tồn.",
-      tenDonVi: "kho lưu trữ",
+      title: "Kho lưu trữ",
+      description: "Nơi hàng đang nằm: kho nhà (Kho Baseafood — tổng trong kho) và các kho lạnh thuê ngoài (Kho Hồng Phú, Kho Ánh Dương…). Dùng ở cột 'Kho lưu' của báo cáo Xuất–Nhập–Tồn.",
+      entityName: "kho lưu trữ",
       rows: n.khoLuu.rows,
       onChange: n.khoLuu.onChange,
-      fields: truong.khoLuu,
-      dangTai: n.khoLuu.dangTai,
-      kiemTraThem: (editing, rows) => [
-        ...trungMaSo(editing, rows, "kho lưu trữ"),
+      fields: fields.khoLuu,
+      loading: n.khoLuu.loading,
+      validate: (editing, rows) => [
+        ...checkDuplicateCode(editing, rows, "kho lưu trữ"),
         ...(rows.some(
           (r) =>
             r.id !== editing.id &&
@@ -592,7 +592,7 @@ export function taoCauHinhDanhMuc(
             ]
           : []),
       ],
-      taoMoi: (): StorageLocation => ({
+      createEmpty: (): StorageLocation => ({
         id: uid(),
         code: "",
         name: "",
@@ -601,78 +601,78 @@ export function taoCauHinhDanhMuc(
         phone: "",
         note: "",
       }),
-      timTheo: (r) => `${r.code} ${r.name} ${r.address} ${r.phone}`,
-      moTaBanGhi: (r) => `${r.name} (${STORAGE_KIND_LABELS[r.kind] ?? r.kind})`,
-      truongTen: "name",
-      noiTheoTen: true, // storageLocation lưu theo tên
+      getSearchText: (r) => `${r.code} ${r.name} ${r.address} ${r.phone}`,
+      getRecordDescription: (r) => `${r.name} (${STORAGE_KIND_LABELS[r.kind] ?? r.kind})`,
+      nameField: "name",
+      linkedByName: true, // storageLocation lưu theo tên
     },
     botTam: {
-      tieuDe: "Bột tẩm",
-      moTa: "Các loại bột dùng để tẩm thành phẩm (24V, 18V, 220H, 232, 20802…). Gắn bột đi kèm cho từng mặt hàng ở tab Mặt hàng — màn ghi thành phẩm sẽ hiện ô kg cho từng loại.",
-      tenDonVi: "loại bột",
+      title: "Bột tẩm",
+      description: "Các loại bột dùng để tẩm thành phẩm (24V, 18V, 220H, 232, 20802…). Gắn bột đi kèm cho từng mặt hàng ở tab Mặt hàng — màn ghi thành phẩm sẽ hiện ô kg cho từng loại.",
+      entityName: "loại bột",
       rows: n.botTam.rows,
       onChange: n.botTam.onChange,
-      fields: truong.botTam,
-      dangTai: n.botTam.dangTai,
-      kiemTraThem: (editing, rows) => [
-        ...trungMaSo(editing, rows, "loại bột"),
-        ...trungTen(editing, rows, "name", "Tên loại bột", "loại bột"),
+      fields: fields.botTam,
+      loading: n.botTam.loading,
+      validate: (editing, rows) => [
+        ...checkDuplicateCode(editing, rows, "loại bột"),
+        ...checkDuplicateName(editing, rows, "name", "Tên loại bột", "loại bột"),
       ],
-      taoMoi: (): BatterType => ({ id: uid(), code: "", name: "", note: "" }),
-      timTheo: (r) => `${r.code} ${r.name} ${r.note}`,
-      moTaBanGhi: (r) => `${r.name}${r.code ? ` (mã ${r.code})` : ""}`,
-      truongTen: "name",
-      noiTheoTen: true, // production_wips.batter_kg lưu theo TÊN loại bột
+      createEmpty: (): BatterType => ({ id: uid(), code: "", name: "", note: "" }),
+      getSearchText: (r) => `${r.code} ${r.name} ${r.note}`,
+      getRecordDescription: (r) => `${r.name}${r.code ? ` (mã ${r.code})` : ""}`,
+      nameField: "name",
+      linkedByName: true, // production_wips.batter_kg lưu theo TÊN loại bột
     },
   };
 }
 
 /** Cấu hình 6 danh mục cho màn Danh mục — gọi trong component (dùng hook catalogRepo). */
-export function useCauHinhDanhMuc(): BoCauHinhDanhMuc {
-  const [products, setProducts, { trangThai: ttMH }] = useProducts();
+export function useCatalogConfigs(): CatalogConfigSet {
+  const [products, setProducts, { trangThai: productStatus }] = useProducts();
   const [customers, setCustomers, { trangThai: ttKH }] = useCustomers();
   const [suppliers, setSuppliers, { trangThai: ttDL }] = useSuppliers();
-  const [materialTypes, setMaterialTypes, { trangThai: ttNL }] = useMaterialTypes();
+  const [materialTypes, setMaterialTypes, { trangThai: materialTypeStatus }] = useMaterialTypes();
   const [storageLocations, setStorageLocations, { trangThai: ttKL }] = useStorageLocations();
   const [batterTypes, setBatterTypes, { trangThai: ttBT }] = useBatterTypes();
   const [finishedGoods] = useFinishedGoods();
 
-  const isLoadingProducts = ttMH === "dang-tai" && products.length === 0;
+  const isLoadingProducts = productStatus === "dang-tai" && products.length === 0;
   const isLoadingCustomers = ttKH === "dang-tai" && customers.length === 0;
   const isLoadingSuppliers = ttDL === "dang-tai" && suppliers.length === 0;
-  const isLoadingMaterials = ttNL === "dang-tai" && materialTypes.length === 0;
+  const isLoadingMaterials = materialTypeStatus === "dang-tai" && materialTypes.length === 0;
   const isLoadingLocations = ttKL === "dang-tai" && storageLocations.length === 0;
   const isLoadingBatters = ttBT === "dang-tai" && batterTypes.length === 0;
 
-  const truong = useMemo(() => {
+  const fields = useMemo(() => {
     // Tạo loại bột tại chỗ từ ô "Bột đi kèm" — ghi qua ĐÚNG instance của tab Bột tẩm.
     const addBatter = (ten: string): string => {
-      const kq = findOrCreateBatter(batterTypes, ten);
-      if (kq.moi) {
-        setBatterTypes(kq.rows);
-        notify.saved(`Đã thêm loại bột "${kq.bot.name}" vào danh mục`);
+      const result = findOrCreateBatter(batterTypes, ten);
+      if (result.moi) {
+        setBatterTypes(result.rows);
+        notify.saved(`Đã thêm loại bột "${result.bot.name}" vào danh mục`);
       }
-      return kq.bot.id;
+      return result.bot.id;
     };
     // Tạo loại NL tại chỗ từ ô "Loại nguyên liệu" của form mặt hàng — ghi qua ĐÚNG
     // instance của tab Loại nguyên liệu. Trùng tên (không phân hoa thường) ⇒ dùng lại.
     const addMaterialType = (ten: string): string => {
-      const sach = ten.trim();
-      const co = materialTypes.find((l) => l.name.trim().toLowerCase() === sach.toLowerCase());
+      const trimmedName = ten.trim();
+      const co = materialTypes.find((l) => l.name.trim().toLowerCase() === trimmedName.toLowerCase());
       if (co) return co.id;
-      const created: MaterialType = { id: uid(), name: sach, category: "", note: "" };
+      const created: MaterialType = { id: uid(), name: trimmedName, category: "", note: "" };
       setMaterialTypes([...materialTypes, created]);
-      notify.saved(`Đã thêm loại nguyên liệu "${sach}" vào danh mục`);
+      notify.saved(`Đã thêm loại nguyên liệu "${trimmedName}" vào danh mục`);
       return created.id;
     };
-    return taoTruongDanhMuc(materialTypes, finishedGoods, batterTypes, addBatter, addMaterialType);
+    return buildCatalogFields(materialTypes, finishedGoods, batterTypes, addBatter, addMaterialType);
   }, [materialTypes, setMaterialTypes, finishedGoods, batterTypes, setBatterTypes]);
-  return taoCauHinhDanhMuc(truong, {
-    matHang: { rows: products, onChange: setProducts, dangTai: isLoadingProducts },
-    khachHang: { rows: customers, onChange: setCustomers, dangTai: isLoadingCustomers },
-    daiLy: { rows: suppliers, onChange: setSuppliers, dangTai: isLoadingSuppliers },
-    loaiNL: { rows: materialTypes, onChange: setMaterialTypes, dangTai: isLoadingMaterials },
-    khoLuu: { rows: storageLocations, onChange: setStorageLocations, dangTai: isLoadingLocations },
-    botTam: { rows: batterTypes, onChange: setBatterTypes, dangTai: isLoadingBatters },
+  return buildCatalogConfigs(fields, {
+    matHang: { rows: products, onChange: setProducts, loading: isLoadingProducts },
+    khachHang: { rows: customers, onChange: setCustomers, loading: isLoadingCustomers },
+    daiLy: { rows: suppliers, onChange: setSuppliers, loading: isLoadingSuppliers },
+    loaiNL: { rows: materialTypes, onChange: setMaterialTypes, loading: isLoadingMaterials },
+    khoLuu: { rows: storageLocations, onChange: setStorageLocations, loading: isLoadingLocations },
+    botTam: { rows: batterTypes, onChange: setBatterTypes, loading: isLoadingBatters },
   });
 }

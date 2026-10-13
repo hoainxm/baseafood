@@ -59,17 +59,17 @@ interface DongPivot {
   productId: string;
   productName: string;
   spec: string;
-  theoNgay: Record<string, number>;
-  tongKg: number;
-  tongBlock: number;
+  byDate: Record<string, number>;
+  totalKg: number;
+  totalBlocks: number;
 }
 
 interface WorkshopGroup {
   workshop: Workshop;
   rows: DongPivot[];
-  theoNgay: Record<string, number>;
-  tongKg: number;
-  tongBlock: number;
+  byDate: Record<string, number>;
+  totalKg: number;
+  totalBlocks: number;
 }
 
 /**
@@ -79,9 +79,9 @@ interface WorkshopGroup {
  * xuất được Excel để kế toán đối chiếu.
  */
 export default function DailyProductionReport() {
-  const [rows, , { trangThai }] = useWipProductions();
+  const [rows, , { trangThai: status }] = useWipProductions();
   const [products] = useProducts();
-  const isLoading = trangThai === "dang-tai" && rows.length === 0;
+  const isLoading = status === "dang-tai" && rows.length === 0;
 
   const [ky, setKy] = useState<ViewPeriod>("thang");
   const [moc, setMoc] = useState(todayIso());
@@ -95,9 +95,9 @@ export default function DailyProductionReport() {
   const to = useRowMarkTools(`bao-cao-sx-ngay|${tu}|${den}|${workshop}`);
   const rowSelection = useRowSelection();
 
-  const { days, groups, tongNgayTong, tongKgTong, tongBlockTong, soMatHang } =
+  const { days, groups, tongNgayTong: grandTotalByDay, tongKgTong: grandTotalKg, tongBlockTong: grandTotalBlocks, soMatHang: productCount } =
     useMemo(() => {
-      const tenMH = (id: string) => products.find((m) => m.id === id)?.name || "—";
+      const productNameOf = (id: string) => products.find((m) => m.id === id)?.name || "—";
       const filteredRows = rows.filter(
         (r) =>
           r.productionDate >= tu &&
@@ -115,18 +115,18 @@ export default function DailyProductionReport() {
           d = {
             workshop: r.workshop,
             productId: r.productId,
-            productName: tenMH(r.productId),
+            productName: productNameOf(r.productId),
             spec: r.spec,
-            theoNgay: {},
-            tongKg: 0,
-            tongBlock: 0,
+            byDate: {},
+            totalKg: 0,
+            totalBlocks: 0,
           };
           map.set(key, d);
         }
-        d.theoNgay[r.productionDate] =
-          (d.theoNgay[r.productionDate] ?? 0) + (r.quantityKg || 0);
-        d.tongKg += r.quantityKg || 0;
-        d.tongBlock += r.blocksCount || 0;
+        d.byDate[r.productionDate] =
+          (d.byDate[r.productionDate] ?? 0) + (r.quantityKg || 0);
+        d.totalKg += r.quantityKg || 0;
+        d.totalBlocks += r.blocksCount || 0;
       }
 
       const days = [...daySet].sort();
@@ -145,41 +145,41 @@ export default function DailyProductionReport() {
         let totalKg = 0;
         let totalBlocks = 0;
         for (const r of wr) {
-          totalKg += r.tongKg;
-          totalBlocks += r.tongBlock;
+          totalKg += r.totalKg;
+          totalBlocks += r.totalBlocks;
           for (const d of days)
-            byDate[d] = (byDate[d] ?? 0) + (r.theoNgay[d] ?? 0);
+            byDate[d] = (byDate[d] ?? 0) + (r.byDate[d] ?? 0);
         }
-        groups.push({ workshop: w, rows: wr, theoNgay: byDate, tongKg: totalKg, tongBlock: totalBlocks });
+        groups.push({ workshop: w, rows: wr, byDate, totalKg, totalBlocks });
       }
 
       const dailyGrandTotal: Record<string, number> = {};
       for (const d of days)
-        dailyGrandTotal[d] = groups.reduce((s, g) => s + (g.theoNgay[d] ?? 0), 0);
+        dailyGrandTotal[d] = groups.reduce((s, g) => s + (g.byDate[d] ?? 0), 0);
 
       return {
         days,
         groups,
         tongNgayTong: dailyGrandTotal,
-        tongKgTong: groups.reduce((s, g) => s + g.tongKg, 0),
-        tongBlockTong: groups.reduce((s, g) => s + g.tongBlock, 0),
+        tongKgTong: groups.reduce((s, g) => s + g.totalKg, 0),
+        tongBlockTong: groups.reduce((s, g) => s + g.totalBlocks, 0),
         soMatHang: allRows.length,
       };
     }, [rows, products, tu, den, workshop]);
   /** Khoá các dòng mặt hàng đang hiện — thứ tự cho Shift+tick chọn khoảng. */
-  const khoaDong = groups.flatMap((g) => g.rows.map((r) => `${r.workshop}|||${r.productId}|||${r.spec}`));
+  const rowKeys = groups.flatMap((g) => g.rows.map((r) => `${r.workshop}|||${r.productId}|||${r.spec}`));
 
   const chart: VerticalBarChartItem[] = days.map((d) => ({
     label: formatDateVN(d).slice(0, 5),
-    value: tongNgayTong[d] ?? 0,
+    value: grandTotalByDay[d] ?? 0,
     subLabel: formatDateVN(d),
   }));
 
   const the: StatCardData[] = [
     { label: "Kỳ báo cáo", value: `${formatDateVN(tu)} – ${formatDateVN(den)}`, icon: CalendarRange, color: "trung-tinh" },
-    { label: "Tổng sản lượng", value: `${num(tongKgTong)} kg`, numeric: true, icon: Scale, color: "brand" },
-    { label: "Tổng block", value: num(tongBlockTong), numeric: true, icon: Layers, color: "trung-tinh" },
-    { label: "Số mặt hàng", value: num(soMatHang), numeric: true, icon: Package, color: "success" },
+    { label: "Tổng sản lượng", value: `${num(grandTotalKg)} kg`, numeric: true, icon: Scale, color: "brand" },
+    { label: "Tổng block", value: num(grandTotalBlocks), numeric: true, icon: Layers, color: "trung-tinh" },
+    { label: "Số mặt hàng", value: num(productCount), numeric: true, icon: Package, color: "success" },
   ];
 
   const exportExcel = () => {
@@ -194,10 +194,10 @@ export default function DailyProductionReport() {
     aoa.push(["Phân xưởng", "Mặt hàng", "Quy cách", ...days.map((d) => formatDateVN(d)), "Tổng kg", "Tổng block"]);
     for (const g of groups) {
       for (const r of g.rows)
-        aoa.push([g.workshop, r.productName, r.spec, ...days.map((d) => r.theoNgay[d] ?? 0), r.tongKg, r.tongBlock]);
-      aoa.push([`Cộng xưởng ${g.workshop}`, "", "", ...days.map((d) => g.theoNgay[d] ?? 0), g.tongKg, g.tongBlock]);
+        aoa.push([g.workshop, r.productName, r.spec, ...days.map((d) => r.byDate[d] ?? 0), r.totalKg, r.totalBlocks]);
+      aoa.push([`Cộng xưởng ${g.workshop}`, "", "", ...days.map((d) => g.byDate[d] ?? 0), g.totalKg, g.totalBlocks]);
     }
-    aoa.push(["TỔNG CỘNG", "", "", ...days.map((d) => tongNgayTong[d] ?? 0), tongKgTong, tongBlockTong]);
+    aoa.push(["TỔNG CỘNG", "", "", ...days.map((d) => grandTotalByDay[d] ?? 0), grandTotalKg, grandTotalBlocks]);
     exportAoaToXlsx({
       sheetName: "Thành phẩm ngày",
       aoa,
@@ -331,7 +331,7 @@ export default function DailyProductionReport() {
                                 className="size-5 shrink-0"
                                 checked={rowSelection.daChon.has(k)}
                                 onChange={() => {}}
-                                onClick={(e) => rowSelection.doi(k, e.shiftKey, khoaDong)}
+                                onClick={(e) => rowSelection.doi(k, e.shiftKey, rowKeys)}
                                 aria-label={`Chọn dòng ${r.productName} ${r.spec}`}
                                 title="Tick để tô màu / in đậm dòng này (Shift+tick chọn cả khoảng)."
                               />
@@ -342,11 +342,11 @@ export default function DailyProductionReport() {
                         <TableCell>{r.spec || "—"}</TableCell>
                         {days.map((d) => (
                           <TableCell key={d} className="tnum text-right">
-                            {r.theoNgay[d] ? num(r.theoNgay[d]) : ""}
+                            {r.byDate[d] ? num(r.byDate[d]) : ""}
                           </TableCell>
                         ))}
-                        <TableCell className="tnum text-right font-semibold">{num(r.tongKg)}</TableCell>
-                        <TableCell className="tnum text-right">{num(r.tongBlock)}</TableCell>
+                        <TableCell className="tnum text-right font-semibold">{num(r.totalKg)}</TableCell>
+                        <TableCell className="tnum text-right">{num(r.totalBlocks)}</TableCell>
                       </TableRow>
                       );
                     })}
@@ -357,11 +357,11 @@ export default function DailyProductionReport() {
                       <TableCell />
                       {days.map((d) => (
                         <TableCell key={d} className="tnum text-right font-semibold">
-                          {g.theoNgay[d] ? num(g.theoNgay[d]) : ""}
+                          {g.byDate[d] ? num(g.byDate[d]) : ""}
                         </TableCell>
                       ))}
-                      <TableCell className="tnum text-right font-semibold">{num(g.tongKg)}</TableCell>
-                      <TableCell className="tnum text-right font-semibold">{num(g.tongBlock)}</TableCell>
+                      <TableCell className="tnum text-right font-semibold">{num(g.totalKg)}</TableCell>
+                      <TableCell className="tnum text-right font-semibold">{num(g.totalBlocks)}</TableCell>
                     </TableRow>
                   </Fragment>
                 ))}
@@ -372,16 +372,16 @@ export default function DailyProductionReport() {
                   <TableCell />
                   {days.map((d) => (
                     <TableCell key={d} className="tnum text-right font-bold">
-                      {tongNgayTong[d] ? num(tongNgayTong[d]) : ""}
+                      {grandTotalByDay[d] ? num(grandTotalByDay[d]) : ""}
                     </TableCell>
                   ))}
-                  <TableCell className="tnum text-right font-bold">{num(tongKgTong)}</TableCell>
-                  <TableCell className="tnum text-right font-bold">{num(tongBlockTong)}</TableCell>
+                  <TableCell className="tnum text-right font-bold">{num(grandTotalKg)}</TableCell>
+                  <TableCell className="tnum text-right font-bold">{num(grandTotalBlocks)}</TableCell>
                 </TableRow>
               </TableFooter>
             </Table>
           </HorizontalScroll>
-          <RowMarkToolbar marker={to} selectedKeys={khoaDong.filter((k) => rowSelection.daChon.has(k))} onClearSelection={rowSelection.boChon} />
+          <RowMarkToolbar marker={to} selectedKeys={rowKeys.filter((k) => rowSelection.daChon.has(k))} onClearSelection={rowSelection.boChon} />
         </>
       )}
 
@@ -419,14 +419,14 @@ export default function DailyProductionReport() {
                       <PrintTd>{r.spec || "—"}</PrintTd>
                       {days.map((d) => (
                         <PrintTd key={d} right className="tnum">
-                          {r.theoNgay[d] ? num(r.theoNgay[d]) : ""}
+                          {r.byDate[d] ? num(r.byDate[d]) : ""}
                         </PrintTd>
                       ))}
                       <PrintTd right className="tnum">
-                        {num(r.tongKg)}
+                        {num(r.totalKg)}
                       </PrintTd>
                       <PrintTd right className="tnum">
-                        {num(r.tongBlock)}
+                        {num(r.totalBlocks)}
                       </PrintTd>
                     </tr>
                   ))}
@@ -435,14 +435,14 @@ export default function DailyProductionReport() {
                     <PrintTd bold />
                     {days.map((d) => (
                       <PrintTd key={d} bold right className="tnum">
-                        {g.theoNgay[d] ? num(g.theoNgay[d]) : ""}
+                        {g.byDate[d] ? num(g.byDate[d]) : ""}
                       </PrintTd>
                     ))}
                     <PrintTd bold right className="tnum">
-                      {num(g.tongKg)}
+                      {num(g.totalKg)}
                     </PrintTd>
                     <PrintTd bold right className="tnum">
-                      {num(g.tongBlock)}
+                      {num(g.totalBlocks)}
                     </PrintTd>
                   </tr>
                 </Fragment>
@@ -452,14 +452,14 @@ export default function DailyProductionReport() {
                 <PrintTd bold />
                 {days.map((d) => (
                   <PrintTd key={d} bold right className="tnum">
-                    {tongNgayTong[d] ? num(tongNgayTong[d]) : ""}
+                    {grandTotalByDay[d] ? num(grandTotalByDay[d]) : ""}
                   </PrintTd>
                 ))}
                 <PrintTd bold right className="tnum">
-                  {num(tongKgTong)}
+                  {num(grandTotalKg)}
                 </PrintTd>
                 <PrintTd bold right className="tnum">
-                  {num(tongBlockTong)}
+                  {num(grandTotalBlocks)}
                 </PrintTd>
               </tr>
             </tbody>

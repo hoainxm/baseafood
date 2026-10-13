@@ -1,5 +1,5 @@
 // ============================================================
-// Tên file: src/features/imports/KhoiPheLieuNgay.tsx
+// Tên file: src/features/imports/DailyScrapSection.tsx
 // Tên tiếng Việt: Khối phế liệu cân gộp cuối ngày (nội tạng / dạt)
 // Tách khỏi MaterialImportScreen.tsx ngày 2026-09-21 — KHÔNG đổi logic.
 // ============================================================
@@ -28,25 +28,25 @@ import {
 } from "@/design-system";
 import { kg, num, formatDateVN } from "@/lib/format";
 import { Lock, Pencil, Plus, Scale } from "lucide-react";
-import { PHE_LIEU_GOI_Y } from "./importHelpers";
+import { SCRAP_SUGGESTIONS } from "./importHelpers";
 
 /* ---------- Phế liệu cân gộp cuối ngày (nội tạng / dạt) ---------- */
 
-export function KhoiPheLieuNgay({
-  ngay,
-  phanXuong,
+export function DailyScrapSection({
+  date,
+  workshop,
   rows,
   onChange,
-  khoa,
-  chiXem = false,
+  isLocked,
+  readOnly: isReadOnly = false,
 }: {
-  ngay: string;
-  phanXuong: Workshop;
+  date: string;
+  workshop: Workshop;
   rows: ScrapItem[];
   onChange: (n: ScrapItem[]) => void;
-  khoa: boolean;
+  isLocked: boolean;
   /** Chỉ hiển thị tóm tắt (ngoài trang) — ghi/sửa phế liệu làm trong dialog "Ghi nhập trong ngày". */
-  chiXem?: boolean;
+  readOnly?: boolean;
 }) {
   const [editing, setEditing] = useState<ScrapItem | null>(null);
   const [isAdding, setIsAdding] = useState(false);
@@ -56,9 +56,9 @@ export function KhoiPheLieuNgay({
     () =>
       rows.filter(
         (r) =>
-          r.source === "Nhập hàng" && r.date === ngay && r.workshop === phanXuong
+          r.source === "Nhập hàng" && r.date === date && r.workshop === workshop
       ),
-    [rows, ngay, phanXuong]
+    [rows, date, workshop]
   );
 
   const totalKg = dayScrapRows.reduce((s, r) => s + (r.quantityKg || 0), 0);
@@ -75,15 +75,15 @@ export function KhoiPheLieuNgay({
   const newScrapItem = (recordedNames: string[] = []): ScrapItem => ({
     id: newId(),
     periodId: "",
-    name: PHE_LIEU_GOI_Y.find((t) => !recordedNames.includes(t)) ?? PHE_LIEU_GOI_Y[0],
+    name: SCRAP_SUGGESTIONS.find((t) => !recordedNames.includes(t)) ?? SCRAP_SUGGESTIONS[0],
     quantityKg: 0,
     sellingPrice: null,
-    date: ngay,
-    workshop: phanXuong,
+    date,
+    workshop,
     source: "Nhập hàng",
   });
 
-  const typeOptions: ComboboxOption[] = PHE_LIEU_GOI_Y.map((t) => ({
+  const typeOptions: ComboboxOption[] = SCRAP_SUGGESTIONS.map((t) => ({
     value: t,
     label: t,
   }));
@@ -171,16 +171,16 @@ export function KhoiPheLieuNgay({
               Phế liệu cân trong ngày (nội tạng, dạt)
             </h2>
             <p className="text-base text-muted-foreground">
-              Cân gộp cuối ngày cho xưởng {phanXuong}, ngày {formatDateVN(ngay)}. Màn
+              Cân gộp cuối ngày cho xưởng {workshop}, ngày {formatDateVN(date)}. Màn
               Cân đối lấy lại số này — không nhập lại lần nữa.
             </p>
           </div>
         </div>
-        {khoa ? (
+        {isLocked ? (
           <Tag variant="xong" icon={Lock}>
             Ngày đã chốt
           </Tag>
-        ) : chiXem ? (
+        ) : isReadOnly ? (
           <Tag variant="nguon">Ghi ở “Ghi nhập trong ngày”</Tag>
         ) : (
           <Button
@@ -205,7 +205,7 @@ export function KhoiPheLieuNgay({
         rowMarkKey="phe-lieu-ngay"
         emptyText="Chưa cân phế liệu cho ngày này."
         actions={
-          khoa || chiXem
+          isLocked || isReadOnly
             ? undefined
             : (r) => (
                 <>
@@ -268,7 +268,7 @@ export function KhoiPheLieuNgay({
               {isAdding ? "Thêm phế liệu" : "Sửa phế liệu"}
             </DialogTitle>
             <DialogDescription className="text-base">
-              Ngày {formatDateVN(ngay)} · xưởng {phanXuong}.
+              Ngày {formatDateVN(date)} · xưởng {workshop}.
               {isAdding
                 ? " Có cả nội tạng lẫn dạt: bấm “Lưu, ghi tiếp loại khác” cho loại đầu."
                 : ""}

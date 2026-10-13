@@ -1,5 +1,5 @@
 // ============================================================
-// Tên file: src/features/production/KhoiLoPhien.tsx
+// Tên file: src/features/production/SessionLotsSection.tsx
 // Tên tiếng Việt: Khối "Lô nguyên liệu dùng cho phiên" (/wip — truy xuất QR đợt 2b)
 // ============================================================
 // Tổ trưởng khai MỘT lần các lô NL đem ra chế biến trong phiên (quét tem / gõ mã /
@@ -10,30 +10,30 @@
 // (không phải danh mục) ⇒ không có thêm mới / bút chì (CLAUDE.md quy tắc 7 ngoại lệ).
 import { useMemo, useState } from "react";
 import type { LotInput, Workshop } from "@/types";
-import { TRACE_KIND_LABELS, docMaQr, listSelectableMaterialLots, explainMultipleLots, buildLotNode, findLots, type TraceData, type LotNode } from "@/lib/lotTraceability";
+import { TRACE_KIND_LABELS, parseQrCode, listSelectableMaterialLots, explainMultipleLots, buildLotNode, findLots, type TraceData, type LotNode } from "@/lib/lotTraceability";
 import { Button, Combobox, Field, Input, Tag, notify } from "@/design-system";
-import { KhungQuetQr } from "@/features/shared";
+import { QrScanner } from "@/features/shared";
 import { Camera, CameraOff, Link2, Plus, X } from "lucide-react";
 import { kg, formatDateVN } from "@/lib/format";
 
-export interface LoPhien {
+export interface SessionLot {
   nut: LotNode;
   cach: LotInput["method"];
 }
 
-export function KhoiLoPhien({
+export function SessionLotsSection({
   dl,
-  xuong,
-  ngay,
-  loPhien,
+  workshop,
+  date,
+  sessionLots,
   onDoi,
 }: {
   dl: TraceData;
-  xuong: Workshop;
+  workshop: Workshop;
   /** Ngày sản xuất của phiên — mốc lọc lô gần đây. */
-  ngay: string;
-  loPhien: LoPhien[];
-  onDoi: (ds: LoPhien[]) => void;
+  date: string;
+  sessionLots: SessionLot[];
+  onDoi: (items: SessionLot[]) => void;
 }) {
   const [isScanning, setIsScanning] = useState(false);
   const [typedCode, setTypedCode] = useState("");
@@ -41,45 +41,45 @@ export function KhoiLoPhien({
   const [pickPrompt, setPickPrompt] = useState("");
 
   const candidates = useMemo(
-    () => listSelectableMaterialLots(dl, xuong, ngay).filter((n) => !loPhien.some((l) => l.nut.id === n.id)),
-    [dl, xuong, ngay, loPhien]
+    () => listSelectableMaterialLots(dl, workshop, date).filter((n) => !sessionLots.some((l) => l.nut.id === n.id)),
+    [dl, workshop, date, sessionLots]
   );
   const describeLot = (n: LotNode) =>
     [n.moTa, n.ngay && formatDateVN(n.ngay), n.chiTiet.find((c) => c.nhan === "Đại lý")?.giaTri, n.kg ? kg(n.kg) : ""].filter(Boolean).join(" · ");
 
-  const addLot = (n: LotNode, cach: LotInput["method"]) => {
+  const addLot = (n: LotNode, method: LotInput["method"]) => {
     if (n.kind !== "S") {
       notify.warning(`"${n.nhan}" là ${TRACE_KIND_LABELS[n.kind].toLowerCase()}, không phải lô nguyên liệu.`);
       return;
     }
-    if (loPhien.some((l) => l.nut.id === n.id)) {
+    if (sessionLots.some((l) => l.nut.id === n.id)) {
       notify.warning(`Lô ${n.nhan} đã có trong phiên.`);
       return;
     }
     // Khai lô cho phiên = nháp chưa lưu ⇒ không toast (luật 13); lưu phiên mới ghi.
-    onDoi([...loPhien, { nut: n, cach }]);
+    onDoi([...sessionLots, { nut: n, cach: method }]);
     setTypedCode("");
     setChoices([]);
   };
 
-  const handleCode = (text: string, cach: "quet" | "go") => {
-    const ma = docMaQr(text);
+  const handleCode = (text: string, method: "quet" | "go") => {
+    const ma = parseQrCode(text);
     if (!ma) return;
     if ("kind" in ma && ma.kind !== "S") {
       notify.warning(`Tem này là ${TRACE_KIND_LABELS[ma.kind].toLowerCase()}, không phải lô nguyên liệu.`);
       return;
     }
-    const kq = findLots(ma, dl).filter((n) => n.kind === "S");
-    if (!kq.length) {
+    const result = findLots(ma, dl).filter((n) => n.kind === "S");
+    if (!result.length) {
       notify.warning(`Không tìm thấy lô nguyên liệu "${text}". Kiểm tra lại mã, hoặc chọn trong danh sách.`);
       return;
     }
-    if (kq.length === 1) addLot(kq[0]!, cach);
+    if (result.length === 1) addLot(result[0]!, method);
     else {
       // Gõ mã chuyến ⇒ ra các loại NL của chuyến: việc thường ngày, chọn ở danh sách dưới,
       // không cần toast. Chỉ mã cũ trùng thật mới cảnh báo.
-      const ld = explainMultipleLots(text, kq, dl);
-      setChoices(kq);
+      const ld = explainMultipleLots(text, result, dl);
+      setChoices(result);
       setPickPrompt(ld.cau);
       if (!ld.cungChuyen) notify.warning(`${ld.cau} bên dưới.`);
     }
@@ -98,9 +98,9 @@ export function KhoiLoPhien({
         </p>
       </div>
 
-      {loPhien.length > 0 && (
+      {sessionLots.length > 0 && (
         <ul className="flex flex-wrap gap-2">
-          {loPhien.map((l) => (
+          {sessionLots.map((l) => (
             <li key={l.nut.id} className="flex max-w-full items-center gap-2 rounded-md border-2 border-primary/40 bg-accent/40 py-1 pl-3 pr-1">
               <span className="min-w-0">
                 <span className="tnum font-semibold">{l.nut.nhan}</span>{" "}
@@ -113,7 +113,7 @@ export function KhoiLoPhien({
                 className="shrink-0"
                 title={`Bỏ lô ${l.nut.nhan} khỏi phiên (chưa lưu nên chưa gắn vào đâu).`}
                 aria-label={`Bỏ lô ${l.nut.nhan}`}
-                onClick={() => onDoi(loPhien.filter((x) => x.nut.id !== l.nut.id))}
+                onClick={() => onDoi(sessionLots.filter((x) => x.nut.id !== l.nut.id))}
               >
                 <X />
               </Button>
@@ -140,8 +140,8 @@ export function KhoiLoPhien({
         </Button>
       </div>
       {isScanning && (
-        <KhungQuetQr
-          onQuet={(t) => {
+        <QrScanner
+          onScan={(t) => {
             setIsScanning(false);
             handleCode(t, "quet");
           }}
@@ -168,7 +168,7 @@ export function KhoiLoPhien({
 
       <Combobox
         label="Hoặc chọn lô nguyên liệu"
-        hint={`Mỗi loại NL của chuyến là một lô. Lô về gần đây của xưởng ${xuong} (mới trước), sau đó lô cũ còn dở — NL cấp đông đem xả.`}
+        hint={`Mỗi loại NL của chuyến là một lô. Lô về gần đây của xưởng ${workshop} (mới trước), sau đó lô cũ còn dở — NL cấp đông đem xả.`}
         value=""
         onChange={(id) => {
           const n = candidates.find((u) => u.id === id) ?? (id ? buildLotNode("S", id, dl) : undefined);
@@ -184,7 +184,7 @@ export function KhoiLoPhien({
         emptyText="Không thấy lô này — quét tem hoặc gõ mã lô ở trên."
       />
 
-      {loPhien.length === 0 && (
+      {sessionLots.length === 0 && (
         <p className="flex flex-wrap items-center gap-2 text-muted-foreground">
           <Tag variant="cho">Chưa khai lô</Tag>
           Lưu mà chưa khai thì mẻ chưa có lô — chốt ngày sẽ hỏi gắn lô hoặc lý do.

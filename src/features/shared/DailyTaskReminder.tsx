@@ -5,16 +5,16 @@
 // ============================================================
 import { BellRing, CircleCheck } from "lucide-react";
 
-export function DailyTaskReminder({ daChot, viec }: { daChot: boolean; viec: string }) {
-  return daChot ? (
+export function DailyTaskReminder({ isLocked, task }: { isLocked: boolean; task: string }) {
+  return isLocked ? (
     <div className="enter-up flex items-center gap-2 rounded-xl border-2 border-border bg-muted/30 px-4 py-3 text-base text-muted-foreground">
       <CircleCheck className="size-5 shrink-0 text-primary" aria-hidden />
-      <span>Hôm nay đã chốt — {viec}</span>
+      <span>Hôm nay đã chốt — {task}</span>
     </div>
   ) : (
     <div className="enter-up flex items-center gap-2 rounded-xl border-2 border-primary/40 bg-accent/40 px-4 py-3 text-base font-medium text-foreground">
       <BellRing className="size-5 shrink-0 text-primary" aria-hidden />
-      <span>Việc hôm nay: {viec}</span>
+      <span>Việc hôm nay: {task}</span>
     </div>
   );
 }

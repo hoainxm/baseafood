@@ -14,13 +14,13 @@ import { calculateImportAmount, isBackdatedImport } from "@/types";
 import { newId } from "@/lib/store";
 import type { FieldError } from "@/design-system";
 
-export const PHAN_XUONG: Workshop[] = ["Đông", "Cá", "Khô"];
+export const WORKSHOPS: Workshop[] = ["Đông", "Cá", "Khô"];
 
 /** Loại phế liệu hay gặp — vẫn thêm mới tại chỗ được. */
-export const PHE_LIEU_GOI_Y = ["Nội tạng", "Dạt"];
+export const SCRAP_SUGGESTIONS = ["Nội tạng", "Dạt"];
 
 /** Đầu chuyến đang nhập — dùng chung cho mọi dòng loại hàng trong chuyến. */
-export interface DauChuyen {
+export interface ShipmentHeader {
   deliveryDate: string;
   postingDate: string;
   backdateReason: string;
@@ -36,7 +36,7 @@ export interface DauChuyen {
 }
 
 /** Chữ viết tắt phân xưởng cho mã lô. */
-export const CHU_XUONG: Record<Workshop, string> = {
+export const WORKSHOP_INITIALS: Record<Workshop, string> = {
   Đông: "Đ",
   Cá: "C",
   Khô: "K",
@@ -44,12 +44,12 @@ export const CHU_XUONG: Record<Workshop, string> = {
 
 /** Sinh mã lô nội bộ đọc được: ‹chữ xưởng›-‹yymmdd›-‹stt trong ngày›, vd "Đ-260902-01".
  *  Là NHÃN hiển thị/trace, không phải khóa — trùng cũng không sao, cho sửa tay sau. */
-export function sinhMaLo(
+export function generateLotCode(
   deliveryDate: string,
   workshop: Workshop,
   shipments: ImportShipment[],
 ): string {
-  const w = CHU_XUONG[workshop] ?? "X";
+  const w = WORKSHOP_INITIALS[workshop] ?? "X";
   const date = (deliveryDate || "").replace(/-/g, "").slice(2); // yymmdd
   const stt =
     shipments.filter(
@@ -65,7 +65,7 @@ export function sinhMaLo(
  *  - `id`: id dòng ĐÃ LƯU (`null` = dòng mới chưa lưu). Khi sửa chuyến, dòng cũ
  *    giữ nguyên id để cập nhật đúng bản ghi; bỏ dòng = không đưa lại vào persist.
  */
-export interface DongBang {
+export interface ImportLine {
   key: string;
   id: string | null;
   category: Category;
@@ -78,13 +78,13 @@ export interface DongBang {
   goiY?: boolean;
   /** Ngày của lượt giao mà ĐƠN GIÁ điền sẵn lấy từ đó — hiện cạnh ô giá để người
    *  nhập biết đây là giá cũ, không phải giá vừa gõ. Tự sửa giá thì xóa. */
-  giaNgay?: string;
+  priceDate?: string;
 }
 
-export const LOAI_MAC_DINH: Category = "Bạch tuộc";
+export const DEFAULT_CATEGORY: Category = "Bạch tuộc";
 
 /** Dòng trống mới cho bảng (mặc định theo loài đang dùng cho nhanh). */
-export const dongBangRong = (cat: Category = LOAI_MAC_DINH): DongBang => ({
+export const createEmptyImportLine = (cat: Category = DEFAULT_CATEGORY): ImportLine => ({
   key: newId(),
   id: null,
   category: cat,
@@ -94,7 +94,7 @@ export const dongBangRong = (cat: Category = LOAI_MAC_DINH): DongBang => ({
 });
 
 /** Dòng đã có dữ liệu (dù chưa đủ) — dùng để biết khi nào cần thêm dòng trống. */
-export const dongCoData = (d: DongBang): boolean =>
+export const importLineHasData = (d: ImportLine): boolean =>
   d.goiY
     ? d.quantityKg > 0
     : d.materialTypeName.trim() !== "" ||
@@ -102,7 +102,7 @@ export const dongCoData = (d: DongBang): boolean =>
       d.unitPrice != null;
 
 /** Dòng đủ để lưu (có loại + số lượng > 0). */
-export const dongDayDu = (d: DongBang): boolean =>
+export const isLineComplete = (d: ImportLine): boolean =>
   d.materialTypeName.trim() !== "" && d.quantityKg > 0;
 
 /**
@@ -111,9 +111,9 @@ export const dongDayDu = (d: DongBang): boolean =>
  *  - nhóm NGẦM của dữ liệu cũ (dòng chưa có `chuyenId`) — gom theo
  *    (ngày + xưởng + đại lý + xe) đúng như cách màn cũ đếm.
  */
-export interface NhomChuyen {
-  khoa: string;
-  chuyen: ImportShipment | null;
+export interface ShipmentGroup {
+  groupKey: string;
+  shipment: ImportShipment | null;
   deliveryDate: string;
   postingDate: string;
   backdateReason: string;
@@ -123,28 +123,28 @@ export interface NhomChuyen {
   licensePlate: string;
   note: string;
   dong: MaterialImportItem[];
-  tongKg: number;
-  tongTien: number;
-  ghiBu: boolean;
+  totalKg: number;
+  totalAmount: number;
+  isBackdated: boolean;
 }
 
-export function gomChuyen(
+export function groupShipments(
   rows: MaterialImportItem[],
   shipments: ImportShipment[],
-): NhomChuyen[] {
+): ShipmentGroup[] {
   const theoId = new Map(shipments.map((c) => [c.id, c]));
-  const nhoms = new Map<string, NhomChuyen>();
+  const nhoms = new Map<string, ShipmentGroup>();
 
   for (const r of rows) {
     const c = r.shipmentId ? theoId.get(r.shipmentId) : undefined;
-    const khoa = c
+    const key = c
       ? c.id
       : `ngam|${r.deliveryDate}|${r.workshop}|${r.supplierName}|${r.driverName}|${r.licensePlate}`;
-    let nhom = nhoms.get(khoa);
+    let nhom = nhoms.get(key);
     if (!nhom) {
       nhom = {
-        khoa,
-        chuyen: c ?? null,
+        groupKey: key,
+        shipment: c ?? null,
         deliveryDate: c?.deliveryDate ?? r.deliveryDate,
         postingDate: c?.postingDate ?? r.deliveryDate,
         backdateReason: c?.backdateReason ?? "",
@@ -154,28 +154,28 @@ export function gomChuyen(
         licensePlate: c?.licensePlate ?? r.licensePlate,
         note: c?.note ?? r.note,
         dong: [],
-        tongKg: 0,
-        tongTien: 0,
-        ghiBu: false,
+        totalKg: 0,
+        totalAmount: 0,
+        isBackdated: false,
       };
-      nhom.ghiBu = isBackdatedImport(nhom);
-      nhoms.set(khoa, nhom);
+      nhom.isBackdated = isBackdatedImport(nhom);
+      nhoms.set(key, nhom);
     }
     nhom.dong.push(r);
-    nhom.tongKg += r.quantityKg || 0;
-    nhom.tongTien += calculateImportAmount(r);
+    nhom.totalKg += r.quantityKg || 0;
+    nhom.totalAmount += calculateImportAmount(r);
   }
 
   return [...nhoms.values()].sort(
     (a, b) =>
       a.deliveryDate.localeCompare(b.deliveryDate) ||
       a.supplierName.localeCompare(b.supplierName, "vi") ||
-      a.khoa.localeCompare(b.khoa),
+      a.groupKey.localeCompare(b.groupKey),
   );
 }
 
 /** Kiểm tra đầu chuyến — dùng chung cho lúc ghi mới và lúc sửa. */
-export function loiDauChuyen(d: DauChuyen, isLocked: boolean): FieldError[] {
+export function validateShipmentHeader(d: ShipmentHeader, isLocked: boolean): FieldError[] {
   const ls: FieldError[] = [];
   if (!d.supplierName.trim())
     ls.push({ field: "Đại lý", message: "Chưa chọn đại lý giao hàng" });
@@ -200,7 +200,7 @@ export function loiDauChuyen(d: DauChuyen, isLocked: boolean): FieldError[] {
 // ngày · đại lý · tài xế · biển số, kể cả dữ liệu cũ không có chuyến cha.
 
 /** Khóa gom một lượt giao: chuyến thật theo id, dữ liệu cũ theo (ngày + xe). */
-const khoaLuot = (r: MaterialImportItem) =>
+const tripKey = (r: MaterialImportItem) =>
   r.shipmentId || `ngam|${r.deliveryDate}|${r.licensePlate}|${r.driverName}`;
 
 /** Mới nhất lên đầu: theo ngày hàng về, cùng ngày thì theo id (id sinh theo giờ). */
@@ -208,11 +208,11 @@ const newestFirst = (a: MaterialImportItem, b: MaterialImportItem) =>
   b.deliveryDate.localeCompare(a.deliveryDate) || b.id.localeCompare(a.id);
 
 /** Biển số bỏ dấu cách/chấm/gạch, viết hoa — "72c-16603" và "72C 16603" là một xe. */
-export const chuanBienSo = (s: string) =>
+export const normalizePlate = (s: string) =>
   s.replace(/[\s.\-']/g, "").toUpperCase();
 
 /** Đại lý hay giao cho xưởng này gần đây — nhiều lượt trước, bằng nhau thì mới trước. */
-export function daiLyHayGiao(
+export function getFrequentSuppliers(
   rows: MaterialImportItem[],
   workshop: Workshop,
   maxCount = 4,
@@ -222,23 +222,23 @@ export function daiLyHayGiao(
   for (const r of rows
     .filter((x) => x.workshop === workshop && x.supplierName)
     .sort(newestFirst)) {
-    if (luot.size >= xetLuot && !luot.has(khoaLuot(r))) break;
-    if (!luot.has(khoaLuot(r))) luot.set(khoaLuot(r), r.supplierName);
+    if (luot.size >= xetLuot && !luot.has(tripKey(r))) break;
+    if (!luot.has(tripKey(r))) luot.set(tripKey(r), r.supplierName);
   }
-  const dem = new Map<string, { n: number; thuTu: number }>();
+  const dem = new Map<string, { n: number; firstIndex: number }>();
   [...luot.values()].forEach((ten, i) => {
     const d = dem.get(ten);
     if (d) d.n += 1;
-    else dem.set(ten, { n: 1, thuTu: i });
+    else dem.set(ten, { n: 1, firstIndex: i });
   });
   return [...dem.entries()]
-    .sort((a, b) => b[1].n - a[1].n || a[1].thuTu - b[1].thuTu)
+    .sort((a, b) => b[1].n - a[1].n || a[1].firstIndex - b[1].firstIndex)
     .slice(0, maxCount)
     .map(([ten]) => ten);
 }
 
 /** Một biển số từng chở cho đại lý, kèm tài xế GẦN NHẤT lái xe đó. */
-export interface XeGoiY {
+export interface VehicleSuggestion {
   licensePlate: string;
   driverName: string;
 }
@@ -249,12 +249,12 @@ export interface XeGoiY {
  * luôn tài xế gần nhất của xe đó; khác người thì chạm thêm tên tài xế.
  * Biển số gộp theo dạng chuẩn hóa và hiển thị VIẾT HOA cho sổ sạch.
  */
-export function xeCuaDaiLy(
+export function getSupplierVehicles(
   rows: MaterialImportItem[],
   supplierName: string,
   maxCount = 6,
-): { bienSo: XeGoiY[]; taiXe: string[] } {
-  const plateMap = new Map<string, XeGoiY>();
+): { plates: VehicleSuggestion[]; drivers: string[] } {
+  const plateMap = new Map<string, VehicleSuggestion>();
   const drivers = new Map<string, string>();
   if (supplierName)
     for (const r of rows
@@ -262,12 +262,12 @@ export function xeCuaDaiLy(
       .sort(newestFirst)) {
       const bien = r.licensePlate.trim().toUpperCase();
       const tx = r.driverName.trim();
-      if (bien && !plateMap.has(chuanBienSo(bien)) && plateMap.size < maxCount)
-        plateMap.set(chuanBienSo(bien), { licensePlate: bien, driverName: tx });
+      if (bien && !plateMap.has(normalizePlate(bien)) && plateMap.size < maxCount)
+        plateMap.set(normalizePlate(bien), { licensePlate: bien, driverName: tx });
       if (tx && !drivers.has(tx.toLowerCase()) && drivers.size < maxCount)
         drivers.set(tx.toLowerCase(), tx);
     }
-  return { bienSo: [...plateMap.values()], taiXe: [...drivers.values()] };
+  return { plates: [...plateMap.values()], drivers: [...drivers.values()] };
 }
 
 /**
@@ -275,43 +275,43 @@ export function xeCuaDaiLy(
  * nhất (loại của lượt mới nhất đứng trước), kèm ĐƠN GIÁ gần nhất của từng loại.
  * Kg để trống — người nhập chỉ còn gõ số. Không có lịch sử ⇒ mảng rỗng.
  */
-export function mauDongCuaDaiLy(
+export function getSupplierLineTemplates(
   rows: MaterialImportItem[],
   supplierName: string,
   workshop: Workshop,
   soLuot = 3,
   maxCount = 6,
-): DongBang[] {
+): ImportLine[] {
   if (!supplierName) return [];
-  const cua = rows.filter(
+  const supplierRows = rows.filter(
     (r) => r.supplierName === supplierName && r.workshop === workshop,
   );
   // Các lượt gần nhất (mới → cũ).
   const luot: string[] = [];
-  for (const r of [...cua].sort(newestFirst)) {
-    if (luot.includes(khoaLuot(r))) continue;
+  for (const r of [...supplierRows].sort(newestFirst)) {
+    if (luot.includes(tripKey(r))) continue;
     if (luot.length >= soLuot) break;
-    luot.push(khoaLuot(r));
+    luot.push(tripKey(r));
   }
   // Trong một lượt giữ THỨ TỰ GHI (thứ tự mảng gốc) — đúng thứ tự trên tờ giấy.
-  const templates = new Map<string, DongBang>();
+  const templates = new Map<string, ImportLine>();
   for (const k of luot)
-    for (const r of cua) {
-      if (khoaLuot(r) !== k) continue;
+    for (const r of supplierRows) {
+      if (tripKey(r) !== k) continue;
       const ten = r.materialTypeName.trim();
       if (!ten) continue;
       const co = templates.get(ten);
       if (!co)
         templates.set(ten, {
-          ...dongBangRong(r.category),
+          ...createEmptyImportLine(r.category),
           materialTypeName: ten,
           unitPrice: r.unitPrice,
-          giaNgay: r.unitPrice != null ? r.deliveryDate : undefined,
+          priceDate: r.unitPrice != null ? r.deliveryDate : undefined,
           goiY: true,
         });
       else if (co.unitPrice == null && r.unitPrice != null) {
         co.unitPrice = r.unitPrice;
-        co.giaNgay = r.deliveryDate;
+        co.priceDate = r.deliveryDate;
       }
     }
   return [...templates.values()].slice(0, maxCount);
@@ -324,7 +324,7 @@ export function mauDongCuaDaiLy(
  *  - dòng gợi ý cũ đã gõ kg mà đại lý mới chưa từng giao ⇒ giữ kg, GIÁ ĐỂ TRỐNG;
  *  - dòng người dùng tự nhập (không phải gợi ý) ⇒ giữ nguyên, kể cả giá tự gõ.
  */
-export function apMauDaiLyMoi(prev: DongBang[], templates: DongBang[]): DongBang[] {
+export function applyNewSupplierTemplate(prev: ImportLine[], templates: ImportLine[]): ImportLine[] {
   const oldKgByType = new Map(
     prev
       .filter((d) => d.goiY && d.quantityKg > 0)
@@ -339,12 +339,12 @@ export function apMauDaiLyMoi(prev: DongBang[], templates: DongBang[]): DongBang
     .filter(
       (d) => d.goiY && d.quantityKg > 0 && !templateNames.has(d.materialTypeName),
     )
-    .map((d) => ({ ...d, unitPrice: null, giaNgay: undefined }));
-  const userEntered = prev.filter((d) => !d.goiY && dongCoData(d));
-  const kq = [...fromTemplate, ...goiYLac, ...userEntered];
-  return kq.length ? kq : [dongBangRong()];
+    .map((d) => ({ ...d, unitPrice: null, priceDate: undefined }));
+  const userEntered = prev.filter((d) => !d.goiY && importLineHasData(d));
+  const result = [...fromTemplate, ...goiYLac, ...userEntered];
+  return result.length ? result : [createEmptyImportLine()];
 }
 
 /** Dòng điền sẵn bị BỎ QUA khi lưu vì chưa gõ kg — để báo rõ, không bỏ im lặng. */
-export const dongGoiYBoQua = (ds: DongBang[]): DongBang[] =>
-  ds.filter((d) => d.goiY && !(d.quantityKg > 0));
+export const getSkippedSuggestedLines = (items: ImportLine[]): ImportLine[] =>
+  items.filter((d) => d.goiY && !(d.quantityKg > 0));

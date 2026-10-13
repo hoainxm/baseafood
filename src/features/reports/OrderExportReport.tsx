@@ -73,8 +73,8 @@ interface NhomDon {
   orderDate: string;
   status: SalesOrderStatus;
   lines: ExportRow[];
-  tongKg: number;
-  tongBlock: number;
+  totalKg: number;
+  totalBlocks: number;
   requiredKg: number;
 }
 
@@ -84,13 +84,13 @@ interface NhomDon {
  * đã đặt của đơn để thấy mức hoàn thành. Chỉ đọc; xuất được Excel.
  */
 export default function OrderExportReport() {
-  const [exportOrders, , { trangThai }] = useExportOrders();
+  const [exportOrders, , { trangThai: status }] = useExportOrders();
   const [exportItems] = useExportItems();
   const [don] = useSalesOrders();
   const [dongDon] = useOrderItems();
   const [customers] = useCustomers();
   const [products] = useProducts();
-  const isLoading = trangThai === "dang-tai" && exportOrders.length === 0;
+  const isLoading = status === "dang-tai" && exportOrders.length === 0;
 
   const [ky, setKy] = useState<ViewPeriod>("thang");
   const [moc, setMoc] = useState(todayIso());
@@ -108,17 +108,17 @@ export default function OrderExportReport() {
     ...customers.map((k) => ({ value: k.id, label: k.name, phu: k.market || undefined })),
   ];
 
-  const { nhom, tongKg, tongBlock } = useMemo(() => {
-    const tenMH = (id: string) => products.find((m) => m.id === id)?.name || "—";
+  const { nhom, tongKg: totalKg, tongBlock: totalBlocks } = useMemo(() => {
+    const productNameOf = (id: string) => products.find((m) => m.id === id)?.name || "—";
     const tenKH = (id: string) => customers.find((k) => k.id === id)?.name || "(đơn đã xóa)";
-    const donCua = (id: string) => don.find((d) => d.id === id);
+    const orderById = (id: string) => don.find((d) => d.id === id);
 
     const periodExportOrders = exportOrders.filter((l) => l.exportDate >= tu && l.exportDate <= den);
 
     // Gom dòng lệnh (thực xuất) theo ĐƠN.
     const map = new Map<string, NhomDon>();
     for (const l of periodExportOrders) {
-      const d = donCua(l.orderId);
+      const d = orderById(l.orderId);
       if (customerFilter !== "Tất cả" && d?.customerId !== customerFilter) continue;
       let g = map.get(l.orderId);
       if (!g) {
@@ -128,8 +128,8 @@ export default function OrderExportReport() {
           orderDate: d?.orderDate || "",
           status: d?.status || "dong",
           lines: [],
-          tongKg: 0,
-          tongBlock: 0,
+          totalKg: 0,
+          totalBlocks: 0,
           requiredKg: dongDon
             .filter((x) => x.orderId === l.orderId)
             .reduce((s, x) => s + (x.requiredQuantityKg || 0), 0),
@@ -140,13 +140,13 @@ export default function OrderExportReport() {
         g.lines.push({
           id: dl.id,
           exportDate: l.exportDate,
-          productName: tenMH(dl.productId),
+          productName: productNameOf(dl.productId),
           spec: dl.spec,
           quantityKg: dl.quantityKg || 0,
           blocksCount: dl.blocksCount || 0,
         });
-        g.tongKg += dl.quantityKg || 0;
-        g.tongBlock += dl.blocksCount || 0;
+        g.totalKg += dl.quantityKg || 0;
+        g.totalBlocks += dl.blocksCount || 0;
       }
     }
 
@@ -166,17 +166,17 @@ export default function OrderExportReport() {
 
     return {
       nhom,
-      tongKg: nhom.reduce((s, g) => s + g.tongKg, 0),
-      tongBlock: nhom.reduce((s, g) => s + g.tongBlock, 0),
+      tongKg: nhom.reduce((s, g) => s + g.totalKg, 0),
+      tongBlock: nhom.reduce((s, g) => s + g.totalBlocks, 0),
     };
   }, [exportOrders, exportItems, don, dongDon, customers, products, tu, den, customerFilter]);
   /** Khoá dòng lệnh xuất đang hiện — thứ tự cho Shift+tick chọn khoảng. */
-  const khoaDong = nhom.flatMap((g) => g.lines.map((l) => l.id));
+  const rowKeys = nhom.flatMap((g) => g.lines.map((l) => l.id));
 
   const the: StatCardData[] = [
     { label: "Kỳ báo cáo", value: `${formatDateVN(tu)} – ${formatDateVN(den)}`, icon: CalendarRange, color: "trung-tinh" },
-    { label: "Tổng xuất", value: `${num(tongKg)} kg`, numeric: true, icon: Scale, color: "brand" },
-    { label: "Tổng block", value: num(tongBlock), numeric: true, icon: Layers, color: "trung-tinh" },
+    { label: "Tổng xuất", value: `${num(totalKg)} kg`, numeric: true, icon: Scale, color: "brand" },
+    { label: "Tổng block", value: num(totalBlocks), numeric: true, icon: Layers, color: "trung-tinh" },
     { label: "Số đơn được xuất", value: num(nhom.length), numeric: true, icon: PackageCheck, color: "success" },
   ];
 
@@ -193,9 +193,9 @@ export default function OrderExportReport() {
     for (const g of nhom) {
       for (const l of g.lines)
         aoa.push([g.customerName, formatDateVN(g.orderDate), formatDateVN(l.exportDate), l.productName, l.spec, l.quantityKg, l.blocksCount, ""]);
-      aoa.push([`Cộng đơn ${g.customerName}`, formatDateVN(g.orderDate), "", "", "", g.tongKg, g.tongBlock, g.requiredKg]);
+      aoa.push([`Cộng đơn ${g.customerName}`, formatDateVN(g.orderDate), "", "", "", g.totalKg, g.totalBlocks, g.requiredKg]);
     }
-    aoa.push(["TỔNG CỘNG", "", "", "", "", tongKg, tongBlock, ""]);
+    aoa.push(["TỔNG CỘNG", "", "", "", "", totalKg, totalBlocks, ""]);
     exportAoaToXlsx({
       sheetName: "Đơn xuất",
       aoa,
@@ -324,7 +324,7 @@ export default function OrderExportReport() {
                               className="size-5 shrink-0"
                               checked={rowSelection.daChon.has(l.id)}
                               onChange={() => {}}
-                              onClick={(e) => rowSelection.doi(l.id, e.shiftKey, khoaDong)}
+                              onClick={(e) => rowSelection.doi(l.id, e.shiftKey, rowKeys)}
                               aria-label={`Chọn dòng ${l.productName} ${formatDateVN(l.exportDate)}`}
                               title="Tick để tô màu / in đậm dòng này (Shift+tick chọn cả khoảng)."
                             />
@@ -342,8 +342,8 @@ export default function OrderExportReport() {
                     <TableCell colSpan={3} className="font-semibold text-muted-foreground">
                       Cộng đơn {g.customerName}
                     </TableCell>
-                    <TableCell className="tnum text-right font-semibold">{num(g.tongKg)}</TableCell>
-                    <TableCell className="tnum text-right font-semibold">{num(g.tongBlock)}</TableCell>
+                    <TableCell className="tnum text-right font-semibold">{num(g.totalKg)}</TableCell>
+                    <TableCell className="tnum text-right font-semibold">{num(g.totalBlocks)}</TableCell>
                   </TableRow>
                 </Fragment>
               ))}
@@ -351,14 +351,14 @@ export default function OrderExportReport() {
             <TableFooter>
               <TableRow>
                 <TableCell colSpan={3} className="font-bold">TỔNG CỘNG</TableCell>
-                <TableCell className="tnum text-right font-bold">{num(tongKg)}</TableCell>
-                <TableCell className="tnum text-right font-bold">{num(tongBlock)}</TableCell>
+                <TableCell className="tnum text-right font-bold">{num(totalKg)}</TableCell>
+                <TableCell className="tnum text-right font-bold">{num(totalBlocks)}</TableCell>
               </TableRow>
             </TableFooter>
           </Table>
         </HorizontalScroll>
       )}
-      <RowMarkToolbar marker={to} selectedKeys={khoaDong.filter((k) => rowSelection.daChon.has(k))} onClearSelection={rowSelection.boChon} />
+      <RowMarkToolbar marker={to} selectedKeys={rowKeys.filter((k) => rowSelection.daChon.has(k))} onClearSelection={rowSelection.boChon} />
 
       {inPrint && (
         <PrintSheet
@@ -403,10 +403,10 @@ export default function OrderExportReport() {
                       Cộng đơn {g.customerName}
                     </PrintTd>
                     <PrintTd bold right className="tnum">
-                      {num(g.tongKg)}
+                      {num(g.totalKg)}
                     </PrintTd>
                     <PrintTd bold right className="tnum">
-                      {num(g.tongBlock)}
+                      {num(g.totalBlocks)}
                     </PrintTd>
                   </tr>
                 </Fragment>
@@ -416,10 +416,10 @@ export default function OrderExportReport() {
                   TỔNG CỘNG
                 </PrintTd>
                 <PrintTd bold right className="tnum">
-                  {num(tongKg)}
+                  {num(totalKg)}
                 </PrintTd>
                 <PrintTd bold right className="tnum">
-                  {num(tongBlock)}
+                  {num(totalBlocks)}
                 </PrintTd>
               </tr>
             </tbody>

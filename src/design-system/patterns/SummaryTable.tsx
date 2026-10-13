@@ -61,7 +61,7 @@ export function SummaryTable<T>({
   className,
   selection,
   stickyHeader,
-  fullHeight: fullHeight,
+  fullHeight,
   addRow,
   rowMarkKey,
 }: {

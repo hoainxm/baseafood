@@ -11,19 +11,19 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import type { DomesticSaleItem, Packaging, SalesItem, WipProductionItem, Workshop } from "@/types";
-import { GanLoDauVao, GanLoXuat, TemLoQr, useDuLieuTruyXuat } from "@/features/shared";
+import { LotInputPicker, LotDispatchPicker, LotQrLabels, useTraceData } from "@/features/shared";
 import { kg, formatDateVN } from "@/lib/format";
 import { TRACE_KIND_LABELS, isOutboundKind, formatWipLotLabel, formatFinishedGoodLotLabel, groupByTraceStage, type TraceStage, type TraceStageKey, type TraceStageItem, type LotNode } from "@/lib/lotTraceability";
 import { Button, ChoiceGroup, DateRangeField, EmptyState, Tag, addDays, todayIso, toneByName } from "@/design-system";
 import { ClipboardCheck, Link2, Printer, ScanLine, Search } from "lucide-react";
 
 /** Màn gốc của từng khâu + đơn vị đếm. */
-const KHAU: Record<TraceStageKey, { donVi: string; man: { duong: string; nhan: string }[] }> = {
-  nhap: { donVi: "lô", man: [{ duong: "/imports", nhan: "Nhập hàng" }] },
-  "san-xuat": { donVi: "mẻ", man: [{ duong: "/wip", nhan: "Sản xuất thành phẩm" }] },
-  kho: { donVi: "mẻ", man: [{ duong: "/warehouse", nhan: "Kho dự trữ" }] },
-  "dong-goi": { donVi: "phiếu", man: [{ duong: "/packaging", nhan: "Đóng gói" }] },
-  "xuat-ban": { donVi: "dòng", man: [{ duong: "/orders", nhan: "Đơn đặt" }, { duong: "/sales", nhan: "Bán hàng" }] },
+const STAGES: Record<TraceStageKey, { unit: string; man: { path: string; label: string }[] }> = {
+  nhap: { unit: "lô", man: [{ path: "/imports", label: "Nhập hàng" }] },
+  "san-xuat": { unit: "mẻ", man: [{ path: "/wip", label: "Sản xuất thành phẩm" }] },
+  kho: { unit: "mẻ", man: [{ path: "/warehouse", label: "Kho dự trữ" }] },
+  "dong-goi": { unit: "phiếu", man: [{ path: "/packaging", label: "Đóng gói" }] },
+  "xuat-ban": { unit: "dòng", man: [{ path: "/orders", label: "Đơn đặt" }, { path: "/sales", label: "Bán hàng" }] },
 };
 
 const describeNode = (n: LotNode) =>
@@ -37,7 +37,7 @@ const describeNode = (n: LotNode) =>
     .join(" · ");
 
 /** Một dòng: nhãn lô (bấm mở hộ chiếu) + mô tả, nhãn trạng thái, nút thao tác. */
-function StageRow({ m, trangThai, nut }: { m: TraceStageItem; trangThai: ReactNode; nut: ReactNode }) {
+function StageRow({ m, status, action: actions }: { m: TraceStageItem; status: ReactNode; action: ReactNode }) {
   const n = m.nut;
   return (
     <li className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 border-b border-border py-2 last:border-b-0">
@@ -50,16 +50,16 @@ function StageRow({ m, trangThai, nut }: { m: TraceStageItem; trangThai: ReactNo
             <Link
               className="tnum font-medium text-primary underline-offset-4 hover:underline"
               title={`Mở hộ chiếu của lô ${n.nhan}: làm từ đâu, đã đi đâu, cân bằng kg.`}
-              to={`/qr?lo=${n.kind}:${encodeURIComponent(n.id)}`}
+              to={`/qr?lot=${n.kind}:${encodeURIComponent(n.id)}`}
             >
               {n.nhan}
             </Link>
           )}
         </div>
         <p className="text-muted-foreground">{describeNode(n)}</p>
-        <div className="flex flex-wrap gap-1.5">{trangThai}</div>
+        <div className="flex flex-wrap gap-1.5">{status}</div>
       </div>
-      <div className="flex flex-wrap items-center gap-2">{nut}</div>
+      <div className="flex flex-wrap items-center gap-2">{actions}</div>
     </li>
   );
 }
@@ -80,8 +80,8 @@ const lotBadge = (m: TraceStageItem, ten: string) =>
     <Tag variant="loi">Chưa gắn lô</Tag>
   );
 
-export function GiaiDoanTruyXuat() {
-  const { dl } = useDuLieuTruyXuat();
+export function TraceStagesView() {
+  const { dl } = useTraceData();
   const navigate = useNavigate();
   const [tu, setTu] = useState(() => addDays(todayIso(), -6));
   const [den, setDen] = useState(todayIso);
@@ -91,15 +91,15 @@ export function GiaiDoanTruyXuat() {
   const [lotLabel, setLotLabel] = useState<LotNode | null>(null);
   const [lotForBatch, setLotForBatch] = useState<WipProductionItem | null>(null);
   const [lotForPackaging, setLotForPackaging] = useState<Packaging | null>(null);
-  const [lotForSalesItem, setLotForSalesItem] = useState<{ dong: SalesItem; loaiLo: "W" | "P" } | null>(null);
+  const [lotForSalesItem, setLotForSalesItem] = useState<{ dong: SalesItem; lotKind: "W" | "P" } | null>(null);
   const [lotForDomesticSale, setLotForDomesticSale] = useState<DomesticSaleItem | null>(null);
 
-  const ds = useMemo(() => groupByTraceStage(dl, { tu, den, xuong: workshop }), [dl, tu, den, workshop]);
-  const tenMH = (id: string) => dl.products.find((p) => p.id === id)?.name || "—";
+  const items = useMemo(() => groupByTraceStage(dl, { tu, den, xuong: workshop }), [dl, tu, den, workshop]);
+  const productNameOf = (id: string) => dl.products.find((p) => p.id === id)?.name || "—";
 
   /** Nút: việc còn thiếu thì nổi (default), còn lại viền (outline). */
-  const taskButton = (thieu: boolean, title: string, onClick: () => void, icon: ReactNode, label: string) => (
-    <Button size="sm" variant={thieu ? "default" : "outline"} title={title} onClick={onClick}>
+  const taskButton = (isMissing: boolean, title: string, onClick: () => void, icon: ReactNode, label: string) => (
+    <Button size="sm" variant={isMissing ? "default" : "outline"} title={title} onClick={onClick}>
       {icon}
       {label}
     </Button>
@@ -107,20 +107,20 @@ export function GiaiDoanTruyXuat() {
   const labelButton = (m: TraceStageItem) =>
     taskButton(m.thieu.includes("tem"), `In tem QR cho lô ${m.nut.nhan} (mặc định mỗi block / thùng một tem).`, () => setLotLabel(m.nut), <Printer aria-hidden />, "In tem");
 
-  const dongCua = (g: TraceStage, m: TraceStageItem): ReactNode => {
+  const renderItemRow = (g: TraceStage, m: TraceStageItem): ReactNode => {
     const n = m.nut;
     if (g.khoa === "nhap")
       return (
         <StageRow
           key={n.id}
           m={m}
-          trangThai={
+          status={
             <>
               {labelBadge(m)}
               {(m.daDung ?? 0) > 0 ? <Tag variant="nguon">Đã dùng cho {m.daDung} mẻ / dòng bán</Tag> : <Tag variant="phu">Chưa dùng</Tag>}
             </>
           }
-          nut={labelButton(m)}
+          action={labelButton(m)}
         />
       );
     if (g.khoa === "san-xuat") {
@@ -129,13 +129,13 @@ export function GiaiDoanTruyXuat() {
         <StageRow
           key={n.id}
           m={m}
-          trangThai={
+          status={
             <>
               {lotBadge(m, "Lô NL")}
               {labelBadge(m)}
             </>
           }
-          nut={
+          action={
             <>
               {w &&
                 taskButton(m.thieu.includes("lo"), `Ghi mẻ ${n.nhan} đã dùng lô nguyên liệu nào (quét tem, gõ mã hoặc chọn).`, () => setLotForBatch(w), <Link2 aria-hidden />, (m.soLo ?? 0) > 0 ? "Lô NL" : "Gắn lô NL")}
@@ -150,16 +150,16 @@ export function GiaiDoanTruyXuat() {
         <StageRow
           key={n.id}
           m={m}
-          trangThai={
+          status={
             m.kho === "cho-nhap" ? (
               <Tag variant="cho">Chờ nhập kho</Tag>
             ) : (
               <Tag variant="xong">Đã nhập kho{m.ton != null ? ` · tồn ${kg(m.ton)}` : ""}</Tag>
             )
           }
-          nut={
+          action={
             m.kho === "cho-nhap"
-              ? taskButton(true, `Mở màn Kho dự trữ với hộp duyệt nhập kho của mẻ ${n.nhan}.`, () => navigate(`/warehouse?duyet=W:${encodeURIComponent(n.id)}`), <ClipboardCheck aria-hidden />, "Duyệt nhập kho")
+              ? taskButton(true, `Mở màn Kho dự trữ với hộp duyệt nhập kho của mẻ ${n.nhan}.`, () => navigate(`/warehouse?approve=W:${encodeURIComponent(n.id)}`), <ClipboardCheck aria-hidden />, "Duyệt nhập kho")
               : null
           }
         />
@@ -170,14 +170,14 @@ export function GiaiDoanTruyXuat() {
         <StageRow
           key={n.id}
           m={m}
-          trangThai={
+          status={
             <>
               {lotBadge(m, "Lô BTP")}
               {labelBadge(m)}
               {m.ton != null && <Tag variant="vi-tri">Tồn {kg(m.ton)}</Tag>}
             </>
           }
-          nut={
+          action={
             <>
               {p &&
                 taskButton(m.thieu.includes("lo"), `Ghi phiếu ${n.nhan} đã dùng lô bán thành phẩm nào.`, () => setLotForPackaging(p), <Link2 aria-hidden />, (m.soLo ?? 0) > 0 ? "Lô BTP" : "Gắn lô BTP")}
@@ -193,10 +193,10 @@ export function GiaiDoanTruyXuat() {
         <StageRow
           key={`X:${n.id}`}
           m={m}
-          trangThai={m.daQuet ? <Tag variant="xong">Đã quét kiểm</Tag> : <Tag variant="cho">Chưa quét kiểm</Tag>}
-          nut={
+          status={m.daQuet ? <Tag variant="xong">Đã quét kiểm</Tag> : <Tag variant="cho">Chưa quét kiểm</Tag>}
+          action={
             m.donId && m.lenhId
-              ? taskButton(!m.daQuet, "Mở màn Đơn đặt với hộp kiểm lô bằng quét của lệnh xuất này.", () => navigate(`/orders?don=${encodeURIComponent(m.donId!)}&kiem=${encodeURIComponent(m.lenhId!)}`), <ScanLine aria-hidden />, "Kiểm lô")
+              ? taskButton(!m.daQuet, "Mở màn Đơn đặt với hộp kiểm lô bằng quét của lệnh xuất này.", () => navigate(`/orders?order=${encodeURIComponent(m.donId!)}&check=${encodeURIComponent(m.lenhId!)}`), <ScanLine aria-hidden />, "Kiểm lô")
               : null
           }
         />
@@ -207,10 +207,10 @@ export function GiaiDoanTruyXuat() {
         <StageRow
           key={`B:${n.id}`}
           m={m}
-          trangThai={lotBadge(m, m.loaiLoBan === "P" ? "Lô TP" : "Lô BTP")}
-          nut={
+          status={lotBadge(m, m.loaiLoBan === "P" ? "Lô TP" : "Lô BTP")}
+          action={
             b && m.loaiLoBan
-              ? taskButton(m.thieu.includes("lo"), "Ghi dòng bán này lấy từ lô nào — để thu hồi tới được khách.", () => setLotForSalesItem({ dong: b, loaiLo: m.loaiLoBan! }), <Link2 aria-hidden />, (m.soLo ?? 0) > 0 ? "Lô" : "Gắn lô")
+              ? taskButton(m.thieu.includes("lo"), "Ghi dòng bán này lấy từ lô nào — để thu hồi tới được khách.", () => setLotForSalesItem({ dong: b, lotKind: m.loaiLoBan! }), <Link2 aria-hidden />, (m.soLo ?? 0) > 0 ? "Lô" : "Gắn lô")
               : null
           }
         />
@@ -221,8 +221,8 @@ export function GiaiDoanTruyXuat() {
       <StageRow
         key={`N:${n.id}`}
         m={m}
-        trangThai={lotBadge(m, "Lô NL")}
-        nut={r ? taskButton(m.thieu.includes("lo"), "Ghi nguyên liệu bán này lấy từ lô NL nào.", () => setLotForDomesticSale(r), <Link2 aria-hidden />, (m.soLo ?? 0) > 0 ? "Lô NL" : "Gắn lô NL") : null}
+        status={lotBadge(m, "Lô NL")}
+        action={r ? taskButton(m.thieu.includes("lo"), "Ghi nguyên liệu bán này lấy từ lô NL nào.", () => setLotForDomesticSale(r), <Link2 aria-hidden />, (m.soLo ?? 0) > 0 ? "Lô NL" : "Gắn lô NL") : null}
       />
     );
   };
@@ -258,8 +258,8 @@ export function GiaiDoanTruyXuat() {
       </div>
 
       <ol className="space-y-4">
-        {ds.map((g, i) => {
-          const soThieu = g.muc.filter((m) => m.thieu.length > 0).length;
+        {items.map((g, i) => {
+          const missingCount = g.muc.filter((m) => m.thieu.length > 0).length;
           const isVisible = onlyMissing ? g.muc.filter((m) => m.thieu.length > 0) : g.muc;
           return (
             <li key={g.khoa} className="space-y-2 rounded-xl border-2 border-border p-4">
@@ -269,84 +269,84 @@ export function GiaiDoanTruyXuat() {
                 </h2>
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="tnum text-muted-foreground">
-                    {g.muc.length} {KHAU[g.khoa].donVi}
+                    {g.muc.length} {STAGES[g.khoa].unit}
                   </span>
                   {g.muc.length > 0 &&
-                    (soThieu > 0 ? <Tag variant="loi">Còn thiếu {soThieu}</Tag> : <Tag variant="xong">Đủ</Tag>)}
+                    (missingCount > 0 ? <Tag variant="loi">Còn thiếu {missingCount}</Tag> : <Tag variant="xong">Đủ</Tag>)}
                 </div>
               </div>
               <p className="text-muted-foreground">
                 Làm ở{" "}
-                {KHAU[g.khoa].man.map((x, k) => (
-                  <span key={x.duong}>
+                {STAGES[g.khoa].man.map((x, k) => (
+                  <span key={x.path}>
                     {k > 0 && " · "}
-                    <Link className="text-primary underline-offset-4 hover:underline" to={x.duong}>
-                      {x.nhan}
+                    <Link className="text-primary underline-offset-4 hover:underline" to={x.path}>
+                      {x.label}
                     </Link>
                   </span>
                 ))}
                 , hoặc bấm nút ngay ở từng dòng.
               </p>
               {isVisible.length > 0 ? (
-                <ul>{isVisible.map((m) => dongCua(g, m))}</ul>
+                <ul>{isVisible.map((m) => renderItemRow(g, m))}</ul>
               ) : (
                 <p className="text-muted-foreground">
-                  {g.muc.length ? "Khâu này không còn mục thiếu." : `Không có ${KHAU[g.khoa].donVi} nào trong khoảng này.`}
+                  {g.muc.length ? "Khâu này không còn mục thiếu." : `Không có ${STAGES[g.khoa].unit} nào trong khoảng này.`}
                 </p>
               )}
             </li>
           );
         })}
       </ol>
-      {ds.every((g) => g.muc.length === 0) && (
+      {items.every((g) => g.muc.length === 0) && (
         <EmptyState title="Chưa có dữ liệu trong khoảng này" description="Nới khoảng ngày hoặc đổi phân xưởng." />
       )}
       <p className="flex items-center gap-2 text-muted-foreground">
         <Search aria-hidden className="size-4 shrink-0" /> Bấm vào mã lô để mở hộ chiếu: làm từ đâu, đã đi đâu, danh sách thu hồi.
       </p>
 
-      {lotLabel && <TemLoQr nut={lotLabel} onClose={() => setLotLabel(null)} />}
+      {lotLabel && <LotQrLabels node={lotLabel} onClose={() => setLotLabel(null)} />}
       {lotForBatch && (
-        <GanLoDauVao
+        <LotInputPicker
           outputKind="W"
           outputId={lotForBatch.id}
-          outputNhan={`mẻ ${formatWipLotLabel(lotForBatch)} · ${tenMH(lotForBatch.productId)}`}
-          xuong={lotForBatch.workshop}
-          ngay={lotForBatch.productionDate}
+          outputLabel={`mẻ ${formatWipLotLabel(lotForBatch)} · ${productNameOf(lotForBatch.productId)}`}
+          workshop={lotForBatch.workshop}
+          date={lotForBatch.productionDate}
           onClose={() => setLotForBatch(null)}
         />
       )}
       {lotForPackaging && (
-        <GanLoDauVao
+        <LotInputPicker
           outputKind="P"
           outputId={lotForPackaging.id}
-          outputNhan={`phiếu ${formatFinishedGoodLotLabel(lotForPackaging)} · ${tenMH(lotForPackaging.toProductId)}`}
-          xuong={lotForPackaging.workshop}
-          ngay={lotForPackaging.date}
-          matHangId={lotForPackaging.fromProductId}
+          outputLabel={`phiếu ${formatFinishedGoodLotLabel(lotForPackaging)} · ${productNameOf(lotForPackaging.toProductId)}`}
+          workshop={lotForPackaging.workshop}
+          date={lotForPackaging.date}
+          productId={lotForPackaging.fromProductId}
           onClose={() => setLotForPackaging(null)}
         />
       )}
       {lotForSalesItem && (
-        <GanLoXuat
+        <LotDispatchPicker
           docKind="sales_item"
           docId={lotForSalesItem.dong.id}
-          docNhan={`${tenMH(lotForSalesItem.dong.productId)} · ${kg(lotForSalesItem.dong.quantityKg)} · ${formatDateVN(lotForSalesItem.dong.deliveryDate)}`}
-          loaiLo={lotForSalesItem.loaiLo}
-          xuong={(dl.salesInvoices ?? []).find((v) => v.id === lotForSalesItem.dong.invoiceId)?.workshop ?? "Đông"}
-          ngay={lotForSalesItem.dong.deliveryDate}
-          matHangId={lotForSalesItem.dong.productId}
+          docLabel={`${productNameOf(lotForSalesItem.dong.productId)} · ${kg(lotForSalesItem.dong.quantityKg)} · ${formatDateVN(lotForSalesItem.dong.deliveryDate)}`}
+          lotKind={lotForSalesItem.lotKind}
+          workshop={(dl.salesInvoices ?? []).find((v) => v.id === lotForSalesItem.dong.invoiceId)?.workshop ?? "Đông"}
+          date={lotForSalesItem.dong.deliveryDate}
+          productId={lotForSalesItem.dong.productId}
           onClose={() => setLotForSalesItem(null)}
         />
       )}
       {lotForDomesticSale && (
-        <GanLoXuat
+        <LotDispatchPicker
           docKind="domestic_sale"
           docId={lotForDomesticSale.id}
-          docNhan={`bán nội địa ${lotForDomesticSale.materialTypeName} · ${kg(lotForDomesticSale.quantityKg)} · ${formatDateVN(lotForDomesticSale.saleDate)}`}
-          loaiLo="S"
-          xuong={lotForDomesticSale.workshop}
-          ngay={lotForDomesticSale.saleDate}
+          docLabel={`bán nội địa ${lotForDomesticSale.materialTypeName} · ${kg(lotForDomesticSale.quantityKg)} · ${formatDateVN(lotForDomesticSale.saleDate)}`}
+          lotKind="S"
+          workshop={lotForDomesticSale.workshop}
+          date={lotForDomesticSale.saleDate}
           onClose={() => setLotForDomesticSale(null)}
         />
       )}

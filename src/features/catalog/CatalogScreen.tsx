@@ -11,8 +11,9 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/design-system";
-import { useCauHinhDanhMuc, type CauHinhDanhMuc } from "./cauHinhDanhMuc";
+import { useCatalogConfigs, type CatalogConfig } from "./catalogConfig";
 import ThanhPham141 from "./FinishedGoodScreen";
+import { normalizeCatalogTab } from "@/lib/legacyUrls";
 
 
 
@@ -23,28 +24,27 @@ import ThanhPham141 from "./FinishedGoodScreen";
  * tên trang gần giống nhau, người dùng phải nhớ cái nào ở đâu.
  * Gộp lại: điều hướng còn 3 mục, mỗi mục là MỘT VIỆC rõ ràng.
  */
-/** Tab hợp lệ — deep-link từ nav module (VD /catalog?tab=dai-ly) mở đúng tab. */
-const TABS = ["mat-hang", "khach-hang", "dai-ly", "loai-nl", "bot-tam", "kho-luu", "tp-141"];
 
-export default function DanhMucScreen() {
+export default function CatalogScreen() {
   // Tab điều khiển bằng URL (?tab=) để deep-link từ nav module mở đúng tab —
   // vẫn MỘT nguồn danh mục duy nhất, chỉ đổi tab đang xem.
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get("tab") ?? "";
-  const tab = TABS.includes(tabParam) ? tabParam : "mat-hang";
+  // Tab cũ tiếng Việt (?tab=dai-ly…) vẫn mở đúng tab — lib/legacyUrls.
+  const tab = normalizeCatalogTab(tabParam) ?? "products";
   const setTab = (t: string) =>
     setSearchParams(
       (prev) => {
         const p = new URLSearchParams(prev);
-        // Xoá RIÊNG key "tab" (mặc định mat-hang), giữ nguyên param khác nếu sau này có.
-        if (t === "mat-hang") p.delete("tab");
+        // Xoá RIÊNG key "tab" (mặc định products), giữ nguyên param khác nếu sau này có.
+        if (t === "products") p.delete("tab");
         else p.set("tab", t);
         return p;
       },
       { replace: true }
     );
 
-  const c = useCauHinhDanhMuc();
+  const c = useCatalogConfigs();
 
   return (
     <div className="space-y-6">
@@ -55,40 +55,40 @@ export default function DanhMucScreen() {
       <Tabs value={tab} onValueChange={setTab}>
         {/* 6 tab: hẹp thì XUỐNG HÀNG thay vì cuộn ngang khuất tab cuối. */}
         <TabsList className="w-full flex-wrap justify-start group-data-horizontal/tabs:h-auto">
-          <TabsTrigger value="mat-hang" title="Danh mục mặt hàng thực tế của xưởng — dùng khi ghi sản lượng, đóng gói và bán hàng.">Mặt hàng</TabsTrigger>
-          <TabsTrigger value="khach-hang" title="Khách mua thành phẩm, kèm thị trường (Nhật, EU, nội địa…).">Khách hàng</TabsTrigger>
-          <TabsTrigger value="dai-ly" title="Đại lý cung cấp nguyên liệu — dùng khi ghi chuyến nhập hàng.">Đại lý</TabsTrigger>
-          <TabsTrigger value="loai-nl" title="Quy cách / size nguyên liệu, có gắn loài (bạch tuộc, mực, cá…).">Loại nguyên liệu</TabsTrigger>
-          <TabsTrigger value="bot-tam" title="Các loại bột tẩm (24V, 18V, 220H, 232, 20802…) — gắn vào mặt hàng tẩm bột để ghi kg bột theo từng loại.">Bột tẩm</TabsTrigger>
-          <TabsTrigger value="kho-luu" title="Nơi hàng đang nằm: kho nhà và các kho lạnh thuê ngoài.">Kho lưu trữ</TabsTrigger>
-          <TabsTrigger value="tp-141" title="141 mã thành phẩm kế toán (TK 1551) — chỉ đọc, không sửa ở đây.">Thành phẩm (141 mã)</TabsTrigger>
+          <TabsTrigger value="products" title="Danh mục mặt hàng thực tế của xưởng — dùng khi ghi sản lượng, đóng gói và bán hàng.">Mặt hàng</TabsTrigger>
+          <TabsTrigger value="customers" title="Khách mua thành phẩm, kèm thị trường (Nhật, EU, nội địa…).">Khách hàng</TabsTrigger>
+          <TabsTrigger value="suppliers" title="Đại lý cung cấp nguyên liệu — dùng khi ghi chuyến nhập hàng.">Đại lý</TabsTrigger>
+          <TabsTrigger value="material-types" title="Quy cách / size nguyên liệu, có gắn loài (bạch tuộc, mực, cá…).">Loại nguyên liệu</TabsTrigger>
+          <TabsTrigger value="batters" title="Các loại bột tẩm (24V, 18V, 220H, 232, 20802…) — gắn vào mặt hàng tẩm bột để ghi kg bột theo từng loại.">Bột tẩm</TabsTrigger>
+          <TabsTrigger value="storage-locations" title="Nơi hàng đang nằm: kho nhà và các kho lạnh thuê ngoài.">Kho lưu trữ</TabsTrigger>
+          <TabsTrigger value="finished-goods" title="141 mã thành phẩm kế toán (TK 1551) — chỉ đọc, không sửa ở đây.">Thành phẩm (141 mã)</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="mat-hang" className="pt-6">
-          <CatalogCrudFor cfg={c.matHang} toMau="danh-muc-mat-hang" />
+        <TabsContent value="products" className="pt-6">
+          <CatalogCrudFor cfg={c.matHang} rowMarkKey="danh-muc-mat-hang" />
         </TabsContent>
 
-        <TabsContent value="khach-hang" className="pt-6">
-          <CatalogCrudFor cfg={c.khachHang} toMau="danh-muc-khach-hang" />
+        <TabsContent value="customers" className="pt-6">
+          <CatalogCrudFor cfg={c.khachHang} rowMarkKey="danh-muc-khach-hang" />
         </TabsContent>
 
-        <TabsContent value="dai-ly" className="pt-6">
-          <CatalogCrudFor cfg={c.daiLy} toMau="danh-muc-dai-ly" />
+        <TabsContent value="suppliers" className="pt-6">
+          <CatalogCrudFor cfg={c.daiLy} rowMarkKey="danh-muc-dai-ly" />
         </TabsContent>
 
-        <TabsContent value="loai-nl" className="pt-6">
-          <CatalogCrudFor cfg={c.loaiNL} toMau="danh-muc-loai-nl" />
+        <TabsContent value="material-types" className="pt-6">
+          <CatalogCrudFor cfg={c.loaiNL} rowMarkKey="danh-muc-loai-nl" />
         </TabsContent>
 
-        <TabsContent value="bot-tam" className="pt-6">
-          <CatalogCrudFor cfg={c.botTam} toMau="danh-muc-bot-tam" />
+        <TabsContent value="batters" className="pt-6">
+          <CatalogCrudFor cfg={c.botTam} rowMarkKey="danh-muc-bot-tam" />
         </TabsContent>
 
-        <TabsContent value="kho-luu" className="pt-6">
-          <CatalogCrudFor cfg={c.khoLuu} toMau="danh-muc-kho-luu" />
+        <TabsContent value="storage-locations" className="pt-6">
+          <CatalogCrudFor cfg={c.khoLuu} rowMarkKey="danh-muc-kho-luu" />
         </TabsContent>
 
-        <TabsContent value="tp-141" className="pt-6">
+        <TabsContent value="finished-goods" className="pt-6">
           <ThanhPham141 />
         </TabsContent>
       </Tabs>
@@ -99,26 +99,26 @@ export default function DanhMucScreen() {
 /** Dựng CatalogCrud từ một cấu hình danh mục (giữ nguyên mọi prop cũ). */
 function CatalogCrudFor<T extends { id: string }>({
   cfg,
-  toMau,
+  rowMarkKey,
 }: {
-  cfg: CauHinhDanhMuc<T>;
+  cfg: CatalogConfig<T>;
   /** Khoá bảng tô màu dòng — một khoá cho mỗi tab, đừng đổi (mất dấu cũ). */
-  toMau: string;
+  rowMarkKey: string;
 }) {
   return (
     <CatalogCrud
-      rowMarkKey={toMau}
-      loading={cfg.dangTai}
-      title={cfg.tieuDe}
-      description={cfg.moTa}
-      entityName={cfg.tenDonVi}
+      rowMarkKey={rowMarkKey}
+      loading={cfg.loading}
+      title={cfg.title}
+      description={cfg.description}
+      entityName={cfg.entityName}
       rows={cfg.rows}
       onChange={cfg.onChange}
       fields={cfg.fields}
-      validate={cfg.kiemTraThem}
-      createEmpty={cfg.taoMoi}
-      getSearchText={cfg.timTheo}
-      getRecordDescription={cfg.moTaBanGhi}
+      validate={cfg.validate}
+      createEmpty={cfg.createEmpty}
+      getSearchText={cfg.getSearchText}
+      getRecordDescription={cfg.getRecordDescription}
     />
   );
 }

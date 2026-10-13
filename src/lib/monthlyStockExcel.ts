@@ -90,28 +90,28 @@ function toIsoDate(v: unknown): string {
   return "";
 }
 
-const gonKhoang = (s: string) => s.replace(/\s+/g, " ").trim();
+const collapseSpaces = (s: string) => s.replace(/\s+/g, " ").trim();
 
 /** Dòng tiêu đề mục → nhóm sổ kho, hoặc null nếu không phải mục. `a` = cột số thứ tự mục (I, II, III…). */
 function groupFromSection(a: string, b: string): string | null {
-  const B = gonKhoang(b).toUpperCase();
+  const B = collapseSpaces(b).toUpperCase();
   if (B.includes("NHẬP KHẨU")) return "Nguyên liệu nhập khẩu";
   if (B.includes("MUA NGOÀI") || B.includes("NỘI ĐỊA") || B.includes("TRONG NƯỚC")) return "Nguyên liệu mua ngoài";
   if (B.includes("HÀNG TẠM")) return "Hàng tạm";
   // Mục mới kế toán thêm (IV, V…) ⇒ nhóm riêng theo đúng tên, không dồn vào mục trước.
   if (/^[IVX]+\.?$/i.test(a.trim()) && B) {
-    const t = gonKhoang(b).toLowerCase();
+    const t = collapseSpaces(b).toLowerCase();
     return t.charAt(0).toUpperCase() + t.slice(1);
   }
   return null;
 }
 
 /** Dòng cộng của MỤC ("TỔNG HÀNG NHẬP KHẨU") — khác dòng cộng khối con ("TỔNG 2 DA"). */
-const isSectionTotal = (a: string) => /^(TỔNG|CỘNG)\s+HÀNG\b/i.test(gonKhoang(a));
+const isSectionTotal = (a: string) => /^(TỔNG|CỘNG)\s+HÀNG\b/i.test(collapseSpaces(a));
 
 /** Cột R → kho gửi (phần sau chữ "KHO") hoặc ghi chú thường. */
 function splitWarehouseNote(v: unknown): { khoGhi: string; ghiChu: string } {
-  const t = typeof v === "string" ? gonKhoang(v) : ""; // số ở cột R là công thức phụ, không phải ghi chú
+  const t = typeof v === "string" ? collapseSpaces(v) : ""; // số ở cột R là công thức phụ, không phải ghi chú
   if (!t) return { khoGhi: "", ghiChu: "" };
   const m = t.match(/\bkho\s+(.+)$/i);
   return m ? { khoGhi: m[1].trim(), ghiChu: "" } : { khoGhi: "", ghiChu: t };
@@ -156,7 +156,7 @@ function parseSheet(sheetName: string, rows: unknown[][], findBlockStart: FindBl
     if (isTotalRow(a)) {
       // dòng "TỔNG …" — kiểm TRƯỚC khi dò mục (chứa "NHẬP KHẨU")
       if (category && !isSectionTotal(a)) {
-        const ten = gonKhoang(a.replace(/^(TỔNG|CỘNG|TONG|CONG)\s*/i, ""));
+        const ten = collapseSpaces(a.replace(/^(TỔNG|CỘNG|TONG|CONG)\s*/i, ""));
         const dau = findBlockStart(i);
         if (ten && dau != null) {
           const subgroup = `${category} – ${ten}`;
@@ -196,7 +196,7 @@ function parseSheet(sheetName: string, rows: unknown[][], findBlockStart: FindBl
   return {
     sheetName,
     monthNum: inferMonth(sheetName),
-    tieuDe: gonKhoang(String(rows[0]?.[0] ?? "")),
+    tieuDe: collapseSpaces(String(rows[0]?.[0] ?? "")),
     rows: out,
   };
 }
@@ -207,7 +207,7 @@ function parseSheet(sheetName: string, rows: unknown[][], findBlockStart: FindBl
  * xuống các ô còn lại, CHỈ vào dòng đã có dữ liệu (dòng trống mà thành có chữ sẽ lệch `rowIndex`
  * — nằm trong id nạp).
  */
-function donOGop(ws: XLSX.WorkSheet) {
+function unmergeCells(ws: XLSX.WorkSheet) {
   const hasData = (r: number) => {
     for (let c = 0; c <= 16; c++) {
       const v = (ws[XLSX.utils.encode_cell({ r, c })] as XLSX.CellObject | undefined)?.v;
@@ -235,7 +235,7 @@ export async function parseStockStatementFile(file: File): Promise<StockStatemen
   for (const name of wb.SheetNames) {
     const ws = wb.Sheets[name];
     if (!ws) continue;
-    donOGop(ws);
+    unmergeCells(ws);
     // blankrows:false giữ chỉ số `rowIndex` cũ (nằm trong id nạp — KHÔNG được đổi); bản đủ dòng
     // chỉ để dịch chỉ số ⇄ số dòng Excel khi đọc công thức SUM của dòng cộng khối con.
     const rows = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, raw: true, blankrows: false });
@@ -298,7 +298,7 @@ export function findWarehouseByText(warehouseText: string, catalog: { code: stri
 
 /** Tên kho mới dựng từ viết tắt chưa có trong danh mục: "phước cơ" → "Kho Phước Cơ". */
 export const buildNewWarehouseName = (warehouseText: string) =>
-  `Kho ${gonKhoang(warehouseText)
+  `Kho ${collapseSpaces(warehouseText)
     .toLowerCase()
     .replace(/(^|\s)(\S)/g, (_, sp: string, c: string) => sp + c.toUpperCase())}`;
 
@@ -325,7 +325,7 @@ export function parseLoadedRowId(id: string): { maKho: string; nam: string; rowI
   return { maKho: p[1], nam: p[p.length - 2], rowIndex: p[p.length - 1] };
 }
 
-const chuanTen = (s: string) => (s || "").trim().toLowerCase().replace(/\s+/g, " ");
+const normalizeName = (s: string) => (s || "").trim().toLowerCase().replace(/\s+/g, " ");
 
 export interface ReloadMergeResult {
   lines: MonthlyStockLine[];
@@ -360,14 +360,14 @@ export function ghepNapLai(lines: MonthlyStockLine[], incoming: MonthlyStockLine
     if (!newIds.has(l.id)) byLocation.set(positionKey(l.period, t.rowIndex), l);
   }
   const idThay = new Set<string>();
-  const lechTen: ReloadMergeResult["lechTen"] = [];
+  const nameMismatches: ReloadMergeResult["lechTen"] = [];
   const daGhep = incoming.map((m) => {
     const t = parseLoadedRowId(m.id);
     const prev = theoId.get(m.id) ?? (t ? byLocation.get(positionKey(m.period, t.rowIndex)) : undefined);
     if (!prev) return m;
     if (prev.id !== m.id) idThay.add(prev.id);
-    if (chuanTen(prev.itemName) !== chuanTen(m.itemName)) {
-      lechTen.push({ cu: prev, moi: m });
+    if (normalizeName(prev.itemName) !== normalizeName(m.itemName)) {
+      nameMismatches.push({ cu: prev, moi: m });
       return m;
     }
     return {
@@ -378,7 +378,7 @@ export function ghepNapLai(lines: MonthlyStockLine[], incoming: MonthlyStockLine
   });
   const staleNonEmpty: MonthlyStockLine[] = [];
   let emptyDropped = 0;
-  const giuLai = lines.filter((l) => {
+  const kept = lines.filter((l) => {
     if (newIds.has(l.id) || idThay.has(l.id)) return false;
     if (!theoId.has(l.id)) return true; // ngoài phạm vi bản nạp (kho / tháng khác, dòng tay, carry…)
     if (isEmptyLine(l)) {
@@ -389,8 +389,8 @@ export function ghepNapLai(lines: MonthlyStockLine[], incoming: MonthlyStockLine
     return true;
   });
   const idNap = new Set([...newIds, ...idThay]);
-  const splitCount = giuLai.filter((l) =>
+  const splitCount = kept.filter((l) =>
     [...(l.note ?? "").matchAll(/\(tách từ dòng ([^)]+)\)/g)].some((m) => idNap.has(m[1]))
   ).length;
-  return { lines: [...giuLai, ...daGhep], cuConSo: staleNonEmpty, boRong: emptyDropped, thayIdCu: idThay.size, lechTen, soTach: splitCount };
+  return { lines: [...kept, ...daGhep], cuConSo: staleNonEmpty, boRong: emptyDropped, thayIdCu: idThay.size, lechTen: nameMismatches, soTach: splitCount };
 }

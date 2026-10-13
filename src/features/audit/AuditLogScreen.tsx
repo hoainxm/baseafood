@@ -94,7 +94,7 @@ function monthStart(): string {
  * Lọc theo khoảng ngày / loại thao tác / bảng ở tầng đọc; lọc người + tìm chữ ở
  * client. Xem chi tiết trước→sau trong hộp thoại. Xuất Excel.
  */
-export default function NhatKyScreen() {
+export default function AuditLogScreen() {
   const [tu, setTu] = useState(monthStart());
   const [den, setDen] = useState(todayIso());
   const [actionFilter, setActionFilter] = useState("");
@@ -107,17 +107,17 @@ export default function NhatKyScreen() {
   const [detail, setDetail] = useState<AuditEntry | null>(null);
 
   useEffect(() => {
-    let huy = false;
+    let isCancelled = false;
     setIsLoading(true);
     readAuditLog({ tu, den, loai: actionFilter || undefined, bang: bang || undefined, gioiHan: 1000 })
       .then((r) => {
-        if (!huy) setRows(r);
+        if (!isCancelled) setRows(r);
       })
       .finally(() => {
-        if (!huy) setIsLoading(false);
+        if (!isCancelled) setIsLoading(false);
       });
     return () => {
-      huy = true;
+      isCancelled = true;
     };
   }, [tu, den, actionFilter, bang]);
 

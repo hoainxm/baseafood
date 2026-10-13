@@ -53,9 +53,9 @@ import {
 import { kg, num, todayISO, formatDateVN } from "@/lib/format";
 import { formatMaterialLotLabel } from "@/lib/lotTraceability";
 import { useAuth } from "@/lib/auth";
-import { DailyTaskReminder, QrTemLoIn, PhieuTrongNhapNL } from "@/features/shared";
-import { useSuaDanhMuc } from "@/features/catalog/SuaDanhMucNhanh";
-import { OcrPhieuNhap } from "./OcrPhieuNhap";
+import { DailyTaskReminder, LotLabelPrint, BlankDailyImportSlip } from "@/features/shared";
+import { useQuickCatalogEdit } from "@/features/catalog/QuickCatalogEdit";
+import { ImportSlipOcr } from "./ImportSlipOcr";
 import { coOcr, type OcrCatalog } from "@/lib/ocr";
 import { hasImageStorage, getPhotoUrl } from "@/lib/storage";
 import { KY_OPT, getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
@@ -79,44 +79,44 @@ import {
   X,
   Replace,
 } from "lucide-react";
-import PhieuNLNgay from "@/features/imports/DailyImportInvoice";
-import BaoCaoNhap from "@/features/imports/ImportReport";
+import DailyImportInvoice from "@/features/imports/DailyImportInvoice";
+import ImportReport from "@/features/imports/ImportReport";
 import { cn } from "@/lib/utils";
 
-import { HopDoiLoaiHangLoat } from "./BulkTypeChange";
+import { BulkTypeChangeDialog } from "./BulkTypeChange";
 
-import { BangDongHang } from "./BangDongHang";
-import { ChuyenTrongNgay, TheBuoc, TheChon } from "./BuocNhap";
-import { KhoiPheLieuNgay } from "./KhoiPheLieuNgay";
+import { ImportLinesTable } from "./ImportLinesTable";
+import { DayShipmentList, StepCard, ChoiceCard } from "./ImportSteps";
+import { DailyScrapSection } from "./DailyScrapSection";
 import {
-  LOAI_MAC_DINH,
-  PHAN_XUONG,
-  daiLyHayGiao,
-  xeCuaDaiLy,
-  mauDongCuaDaiLy,
-  apMauDaiLyMoi,
-  dongGoiYBoQua,
-  chuanBienSo,
-  dongBangRong,
-  dongCoData,
-  dongDayDu,
-  gomChuyen,
-  loiDauChuyen,
-  sinhMaLo,
-  type DauChuyen,
-  type DongBang,
-  type NhomChuyen,
+  DEFAULT_CATEGORY,
+  WORKSHOPS,
+  getFrequentSuppliers,
+  getSupplierVehicles,
+  getSupplierLineTemplates,
+  applyNewSupplierTemplate,
+  getSkippedSuggestedLines,
+  normalizePlate,
+  createEmptyImportLine,
+  importLineHasData,
+  isLineComplete,
+  groupShipments,
+  validateShipmentHeader,
+  generateLotCode,
+  type ShipmentHeader,
+  type ImportLine,
+  type ShipmentGroup,
 } from "./importHelpers";
 
-export default function NhapNguyenLieuScreen() {
+export default function MaterialImportScreen() {
   // Người đang đăng nhập → gắn làm "người ghi" của chuyến khi lưu.
-  const { nguoiDung } = useAuth();
-  const operator = nguoiDung?.fullName || nguoiDung?.username || "";
+  const { nguoiDung: profile } = useAuth();
+  const operator = profile?.fullName || profile?.username || "";
   // kỳ xem sổ: ngày/tuần/tháng/năm/khoảng tự chọn
-  const [rows, persist, { trangThai }] = useMaterialImports();
-  const isLoading = trangThai === "dang-tai" && rows.length === 0;
+  const [rows, persist, { trangThai: status }] = useMaterialImports();
+  const isLoading = status === "dang-tai" && rows.length === 0;
   const [shipments, persistShipments] = useImportShipments();
-  const [locks, persistLocks, { trangThai: ttChot }] = useDailyLocks();
+  const [locks, persistLocks, { trangThai: lockStatus }] = useDailyLocks();
   const [scraps, persistScraps] = useScraps();
 
   const [ky, setKy] = useState<ViewPeriod>("ngay");
@@ -136,19 +136,19 @@ export default function NhapNguyenLieuScreen() {
   const [materialTypes, setMaterialTypes] = useMaterialTypes();
 
   /* Ghi chuyến: đầu chuyến ở trên, cả BẢNG loại hàng điền một lượt rồi lưu. */
-  const [phien, setPhien] = useState<DauChuyen | null>(null);
+  const [session, setSession] = useState<ShipmentHeader | null>(null);
   /** Ba chế độ phẳng: "nhap" = form ghi (mặc định); "so" = sổ ngày; "bao-cao" = báo cáo tổng hợp. */
-  const [cheDo, setCheDo] = useState<"nhap" | "so" | "bao-cao">("nhap");
+  const [mode, setMode] = useState<"nhap" | "so" | "bao-cao">("nhap");
   const [ocrMo, setOcrMo] = useState(false); // modal nhận diện ảnh phiếu (OCR)
   const [labelShipment, setLabelShipment] = useState<ImportShipment | null>(null);
   const [sessionShipmentId, setSessionShipmentId] = useState<string | null>(null);
-  const [tableRows, setTableRows] = useState<DongBang[]>([]);
+  const [tableRows, setTableRows] = useState<ImportLine[]>([]);
   /** Loài dùng gần nhất trong phiên — làm mặc định cho chuyến/dòng mới thay vì
    *  luôn nhảy về "Bạch tuộc" (sai ở xưởng Khô/Cá). */
-  const [lastCategory, setLastCategory] = useState<Category>(LOAI_MAC_DINH);
-  const [loiPhien, setLoiPhien] = useState<FieldError[]>([]);
+  const [lastCategory, setLastCategory] = useState<Category>(DEFAULT_CATEGORY);
+  const [sessionErrors, setSessionErrors] = useState<FieldError[]>([]);
   // Khối "Xe và ghi chú" (tài xế/biển số) mở sẵn — hầu hết chuyến đều có.
-  const [moPhuPhien, setMoPhuPhien] = useState(true);
+  const [isExtrasOpen, setIsExtrasOpen] = useState(true);
   /** Luồng theo bước: bước đang ÉP mở (bấm "Đổi" / đang gõ tay xe). null = tự suy theo dữ liệu. */
   const [openPanel, setOpenPanel] = useState<"dai-ly" | "xe" | null>(null);
   /** Người dùng chủ động bỏ qua bước xe (chuyến không ghi xe) ⇒ bước thu lại dù ô trống. */
@@ -172,16 +172,16 @@ export default function NhapNguyenLieuScreen() {
   const [lockErrors, setLockErrors] = useState<FieldError[]>([]);
 
   /** [từ, đến] của kỳ đang xem — mọi lọc/tổng tính theo khoảng này. */
-  const [tuHieuLuc, denHieuLuc] = getViewPeriodRange(ky, date, fromDate, toDate);
+  const [effectiveFrom, effectiveTo] = getViewPeriodRange(ky, date, fromDate, toDate);
   /** Kỳ chỉ gồm đúng một ngày ⇒ mới có nghĩa để chốt / phế liệu ngày. */
-  const isSingleDay = tuHieuLuc === denHieuLuc;
+  const isSingleDay = effectiveFrom === effectiveTo;
 
   const view = useMemo(
     () =>
       rows
         .filter((r) => {
           const matchesDate =
-            r.deliveryDate >= tuHieuLuc && r.deliveryDate <= denHieuLuc;
+            r.deliveryDate >= effectiveFrom && r.deliveryDate <= effectiveTo;
           const matchesWorkshop = workshop === "Tất cả" || r.workshop === workshop;
           const matchesSupplier = !supplierFilter || r.supplierName === supplierFilter;
           const matchesType = !materialTypeFilter || r.materialTypeName === materialTypeFilter;
@@ -193,18 +193,18 @@ export default function NhapNguyenLieuScreen() {
             a.deliveryDate.localeCompare(b.deliveryDate) ||
             a.id.localeCompare(b.id)
         ),
-    [rows, tuHieuLuc, denHieuLuc, workshop, supplierFilter, materialTypeFilter, priceFilter]
+    [rows, effectiveFrom, effectiveTo, workshop, supplierFilter, materialTypeFilter, priceFilter]
   );
 
-  const nhomView = useMemo(() => gomChuyen(view, shipments), [view, shipments]);
+  const nhomView = useMemo(() => groupShipments(view, shipments), [view, shipments]);
 
   /** Ngày / xưởng mặc định khi ghi chuyến mới — theo bộ lọc đang xem. */
-  const postingDate = isSingleDay ? tuHieuLuc : denHieuLuc;
+  const postingDate = isSingleDay ? effectiveFrom : effectiveTo;
   const recordWorkshop: Workshop = workshop === "Tất cả" ? "Đông" : workshop;
 
   const rangeDescription = isSingleDay
-    ? formatDateVN(tuHieuLuc)
-    : `${formatDateVN(tuHieuLuc)} – ${formatDateVN(denHieuLuc)}`;
+    ? formatDateVN(effectiveFrom)
+    : `${formatDateVN(effectiveFrom)} – ${formatDateVN(effectiveTo)}`;
 
   const total = useMemo(
     () => view.reduce((s, r) => s + (r.quantityKg || 0), 0),
@@ -245,11 +245,11 @@ export default function NhapNguyenLieuScreen() {
   const isSingleDayWorkshop = isSingleDay && workshop !== "Tất cả";
   const viewedWorkshop = workshop === "Tất cả" ? "Đông" : workshop;
   const currentLock = isSingleDayWorkshop
-    ? lockRecordOf(tuHieuLuc, viewedWorkshop)
+    ? lockRecordOf(effectiveFrom, viewedWorkshop)
     : undefined;
   const isDayLocked = Boolean(currentLock?.isLocked);
   const actualTotal = isSingleDayWorkshop
-    ? dayWorkshopTotal(tuHieuLuc, viewedWorkshop)
+    ? dayWorkshopTotal(effectiveFrom, viewedWorkshop)
     : 0;
   const postLockDiff =
     currentLock?.isLocked && actualTotal !== currentLock.totalKgAtLock
@@ -274,8 +274,8 @@ export default function NhapNguyenLieuScreen() {
   }));
 
   /** Sửa nhanh đại lý / loại NL tại chỗ — sổ nhập nối theo TÊN nên ô tên khoá. */
-  const supplierEditor = useSuaDanhMuc("daiLy", suppliers, setSuppliers, { theo: "ten" });
-  const materialTypeEditor = useSuaDanhMuc("loaiNL", materialTypes, setMaterialTypes, { theo: "ten" });
+  const supplierEditor = useQuickCatalogEdit("daiLy", suppliers, setSuppliers, { theo: "ten" });
+  const materialTypeEditor = useQuickCatalogEdit("loaiNL", materialTypes, setMaterialTypes, { theo: "ten" });
 
   const addSupplier = (ten: string) => {
     // Nhãn có mã số ("1 · Hồng Phú") nên ô chọn không tự nhận ra tên trùng ⇒ tự dò.
@@ -332,9 +332,9 @@ export default function NhapNguyenLieuScreen() {
 
   /** Bảng loại hàng MỞ ĐẦU cho một chuyến mới: đại lý đã có lịch sử ⇒ điền sẵn
    *  loại + đơn giá gần nhất (chỉ còn gõ kg); chưa có ⇒ một dòng trống. */
-  const newTableRows = (dl: string, workshop: Workshop, cat: Category): DongBang[] => {
-    const templateRows = mauDongCuaDaiLy(rows, dl, workshop);
-    return templateRows.length ? templateRows : [dongBangRong(cat)];
+  const newTableRows = (dl: string, workshop: Workshop, cat: Category): ImportLine[] => {
+    const templateRows = getSupplierLineTemplates(rows, dl, workshop);
+    return templateRows.length ? templateRows : [createEmptyImportLine(cat)];
   };
 
   /** Đưa con trỏ vào ô kg đầu tiên — bước kế tiếp tự nhiên sau khi chọn đại lý/xe. */
@@ -342,12 +342,12 @@ export default function NhapNguyenLieuScreen() {
   // trong thao tác của người dùng. Bảng bước ③ luôn có sẵn trong DOM nên làm được.
   // Ưu tiên ô kg còn TRỐNG đầu tiên; cuộn vào giữa màn sau khi bước trên thu lại.
   const focusFirstKgCell = () => {
-    const ds = [
+    const items = [
       ...document.querySelectorAll<HTMLInputElement>(
         '[data-grid-nav="import-lines"] [data-navcol="kg"]'
       ),
     ];
-    const o = ds.find((x) => !x.value.trim()) ?? ds[0];
+    const o = items.find((x) => !x.value.trim()) ?? items[0];
     if (!o) return;
     o.focus({ preventScroll: true });
     o.select();
@@ -366,7 +366,7 @@ export default function NhapNguyenLieuScreen() {
   };
 
   const openAdd = () => {
-    setPhien({
+    setSession({
       deliveryDate: postingDate,
       postingDate: todayISO(),
       backdateReason: "",
@@ -382,34 +382,34 @@ export default function NhapNguyenLieuScreen() {
     setSessionShipmentId(null);
     setEditRowIds(null);
     setTableRows(newTableRows(supplierFilter, recordWorkshop, lastCategory));
-    setLoiPhien([]);
+    setSessionErrors([]);
     // Ghi chú / SSCC / mã lô ít dùng → thu sẵn; tài xế + biển số đã đưa ra ngoài.
-    setMoPhuPhien(false);
+    setIsExtrasOpen(false);
     resetSteps(false);
   };
 
   // Form-first: vào "Ghi nhập" mà chưa có phiếu → tự mở phiếu trống (không modal).
   useEffect(() => {
-    if (cheDo === "nhap" && phien === null && !isLoading) openAdd();
+    if (mode === "nhap" && session === null && !isLoading) openAdd();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cheDo, phien, isLoading]);
+  }, [mode, session, isLoading]);
 
   // Trong "Ghi nhập", ngày+xưởng của PHIẾU là ngữ cảnh → đồng bộ về bộ lọc để
   // sổ/phế liệu/chốt/tổng ngày bám đúng ngày đang ghi.
   // Chỉ bám ngày + xưởng (không bám cả phiếu) để gõ các ô khác không kéo bộ lọc.
-  const sessionDate = phien?.deliveryDate;
-  const sessionWorkshop = phien?.workshop;
+  const sessionDate = session?.deliveryDate;
+  const sessionWorkshop = session?.workshop;
   useEffect(() => {
-    if (cheDo === "nhap" && sessionDate !== undefined && sessionWorkshop !== undefined) {
+    if (mode === "nhap" && sessionDate !== undefined && sessionWorkshop !== undefined) {
       setKy("ngay");
       setDate(sessionDate);
       setWorkshop(sessionWorkshop);
     }
-  }, [cheDo, sessionDate, sessionWorkshop]);
+  }, [mode, sessionDate, sessionWorkshop]);
 
   /** Mở lại một chuyến đã ghi để sửa — dùng CHUNG dialog với ghi chuyến mới. */
-  const openShipmentEdit = (n: NhomChuyen) => {
-    setPhien({
+  const openShipmentEdit = (n: ShipmentGroup) => {
+    setSession({
       deliveryDate: n.deliveryDate,
       postingDate: n.postingDate || n.deliveryDate,
       backdateReason: n.backdateReason,
@@ -418,10 +418,10 @@ export default function NhapNguyenLieuScreen() {
       driverName: n.driverName,
       licensePlate: n.licensePlate,
       note: n.note,
-      ssccCode: n.chuyen?.ssccCode ?? "",
-      scanPath: n.chuyen?.scanPath ?? "",
+      ssccCode: n.shipment?.ssccCode ?? "",
+      scanPath: n.shipment?.scanPath ?? "",
     });
-    setSessionShipmentId(n.chuyen?.id ?? null);
+    setSessionShipmentId(n.shipment?.id ?? null);
     setEditRowIds(n.dong.map((r) => r.id));
     // Nạp mọi dòng đã ghi vào bảng (giữ id để cập nhật đúng bản ghi). Muốn thêm
     // loại mới thì bấm nút "Thêm loại hàng" — không tự sinh dòng.
@@ -435,19 +435,19 @@ export default function NhapNguyenLieuScreen() {
         unitPrice: r.unitPrice,
       }))
     );
-    setLoiPhien([]);
-    setMoPhuPhien(true);
+    setSessionErrors([]);
+    setIsExtrasOpen(true);
     resetSteps(true);
-    setCheDo("nhap"); // sửa chuyến mở trong form inline (chế độ Ghi nhập)
+    setMode("nhap"); // sửa chuyến mở trong form inline (chế độ Ghi nhập)
   };
 
-  const setSessionField = <K extends keyof DauChuyen>(k: K, v: DauChuyen[K]) =>
-    setPhien((p) => (p ? { ...p, [k]: v } : p));
+  const setSessionField = <K extends keyof ShipmentHeader>(k: K, v: ShipmentHeader[K]) =>
+    setSession((p) => (p ? { ...p, [k]: v } : p));
 
   /** Đổi ngày ghi sổ: LUÔN kéo ngày hàng về nhảy theo (chủ động). Muốn hàng về
    *  ngày khác (ghi bù) thì sửa tay ô "Ngày hàng về xưởng" sau đó. */
   const changePostingDate = (v: string) =>
-    setPhien((p) => (p ? { ...p, postingDate: v, deliveryDate: v } : p));
+    setSession((p) => (p ? { ...p, postingDate: v, deliveryDate: v } : p));
 
   /** Chỉnh tay ngày hàng về ⇒ khác ngày ghi sổ (ghi bù). Đổi lại ngày ghi sổ sau
    *  đó thì ngày hàng về vẫn nhảy theo như thường. */
@@ -457,34 +457,34 @@ export default function NhapNguyenLieuScreen() {
    *  nhất của đại lý (loại + giá), xe cũ hiện thành nút gợi ý. KHÔNG đè khi người
    *  dùng đã gõ số vào bảng, và không đụng bảng khi đang sửa chuyến đã ghi. */
   const pickSupplier = (v: string) => {
-    if (!phien) return;
-    const isSupplierChanged = v !== phien.supplierName;
+    if (!session) return;
+    const isSupplierChanged = v !== session.supplierName;
     setSessionField("supplierName", v);
     if (v) setOpenPanel(null); // chọn xong ⇒ bước ① thu lại, bước ② (xe) tự mở
     // Chạm lại đúng đại lý đang chọn (mở "Đổi" rồi thôi) ⇒ không đụng xe / bảng.
     if (isEditingShipment || !v || !isSupplierChanged) return;
     // Đổi đại lý ⇒ xe của đại lý cũ không còn đúng (chỉ xóa khi đang ghi chuyến MỚI).
-    setPhien((p) => (p ? { ...p, driverName: "", licensePlate: "" } : p));
+    setSession((p) => (p ? { ...p, driverName: "", licensePlate: "" } : p));
     setSkipTruck(false);
     setIsManualVehicle(false);
     // Bảng dựng lại theo đại lý MỚI: giữ kg đã gõ, KHÔNG giữ giá điền sẵn của đại lý cũ.
-    const templateRows = mauDongCuaDaiLy(rows, v, phien.workshop);
-    setTableRows((ds) => apMauDaiLyMoi(ds, templateRows));
+    const templateRows = getSupplierLineTemplates(rows, v, session.workshop);
+    setTableRows((items) => applyNewSupplierTemplate(items, templateRows));
   };
 
   /** Đổi xưởng: mẫu loại hàng tính theo (đại lý + xưởng) ⇒ dựng lại nếu bảng chưa có số. */
   const pickWorkshop = (v: Workshop) => {
-    if (!phien) return;
+    if (!session) return;
     setSessionField("workshop", v);
-    if (isEditingShipment || v === phien.workshop) return;
-    const templateRows = mauDongCuaDaiLy(rows, phien.supplierName, v);
-    setTableRows((ds) => apMauDaiLyMoi(ds, templateRows));
+    if (isEditingShipment || v === session.workshop) return;
+    const templateRows = getSupplierLineTemplates(rows, session.supplierName, v);
+    setTableRows((items) => applyNewSupplierTemplate(items, templateRows));
   };
 
   /** Chạm BIỂN SỐ: điền biển + tài xế gần nhất của xe đó (ca thường: một chạm là xong)
    *  rồi nhảy xuống ô kg. Khác tài xế thì bấm "Đổi" → chạm tên tài xế. */
   const pickPlate = (x: { licensePlate: string; driverName: string }) => {
-    setPhien((p) =>
+    setSession((p) =>
       p
         ? { ...p, licensePlate: x.licensePlate, driverName: x.driverName || p.driverName }
         : p
@@ -497,7 +497,7 @@ export default function NhapNguyenLieuScreen() {
   /** Chạm TÀI XẾ: đã có biển số ⇒ xong bước xe; chưa có ⇒ ở lại chờ chọn biển số. */
   const pickDriver = (ten: string) => {
     setSessionField("driverName", ten);
-    if (!phien?.licensePlate.trim()) {
+    if (!session?.licensePlate.trim()) {
       setOpenPanel("xe");
       return;
     }
@@ -514,7 +514,7 @@ export default function NhapNguyenLieuScreen() {
 
   /** Chuyến không ghi xe ⇒ xóa 2 ô, thu bước ②, nhảy xuống ô kg. */
   const skipTruckStep = () => {
-    setPhien((p) => (p ? { ...p, licensePlate: "", driverName: "" } : p));
+    setSession((p) => (p ? { ...p, licensePlate: "", driverName: "" } : p));
     setSkipTruck(true);
     setIsManualVehicle(false);
     setOpenPanel(null);
@@ -527,18 +527,18 @@ export default function NhapNguyenLieuScreen() {
   // Chỉ gợi ý đại lý CÒN trong danh mục — tên cũ đã đổi/xóa thì ô chọn không hiện được.
   const dlHayGiao = useMemo(
     () =>
-      phien
-        ? daiLyHayGiao(rows, phien.workshop, 8)
+      session
+        ? getFrequentSuppliers(rows, session.workshop, 8)
             .filter((ten) => suppliers.some((d) => d.shortName === ten))
             .slice(0, 4)
         : [],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [rows, suppliers, phien?.workshop]
+    [rows, suppliers, session?.workshop]
   );
   const truckSuggestions = useMemo(
-    () => xeCuaDaiLy(rows, phien?.supplierName ?? ""),
+    () => getSupplierVehicles(rows, session?.supplierName ?? ""),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [rows, phien?.supplierName]
+    [rows, session?.supplierName]
   );
   /** Ngày giao gần nhất của từng đại lý — dòng phụ trên thẻ chọn. */
   const lastDateBySupplier = useMemo(() => {
@@ -550,61 +550,61 @@ export default function NhapNguyenLieuScreen() {
   /** Các chuyến đã ghi của ĐÚNG ngày + xưởng trên phiếu (không phụ thuộc bộ lọc sổ). */
   const sessionDayGroups = useMemo(
     () =>
-      phien
-        ? gomChuyen(
+      session
+        ? groupShipments(
             rows.filter(
-              (r) => r.deliveryDate === phien.deliveryDate && r.workshop === phien.workshop
+              (r) => r.deliveryDate === session.deliveryDate && r.workshop === session.workshop
             ),
             shipments
           )
         : [],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [rows, shipments, phien?.deliveryDate, phien?.workshop]
+    [rows, shipments, session?.deliveryDate, session?.workshop]
   );
-  const hasVehicleInfo = !!phien && !!(phien.licensePlate.trim() || phien.driverName.trim());
-  const hasVehicleHints = truckSuggestions.bienSo.length > 0 || truckSuggestions.taiXe.length > 0;
+  const hasVehicleInfo = !!session && !!(session.licensePlate.trim() || session.driverName.trim());
+  const hasVehicleHints = truckSuggestions.plates.length > 0 || truckSuggestions.drivers.length > 0;
   /** Bước mở/thu SUY từ dữ liệu, `dangMo` chỉ để ép mở khi bấm "Đổi" / đang gõ tay. */
-  const isSupplierStepOpen = openPanel === "dai-ly" || !phien?.supplierName;
+  const isSupplierStepOpen = openPanel === "dai-ly" || !session?.supplierName;
   const isVehicleStepOpen = !isSupplierStepOpen && (openPanel === "xe" || (!hasVehicleInfo && !skipTruck));
   /** Hai ô ngày chỉ hiện khi ghi bù (hoặc người dùng chủ động tách). */
   const twoDates =
-    !!phien && (splitDates || phien.postingDate !== phien.deliveryDate);
+    !!session && (splitDates || session.postingDate !== session.deliveryDate);
   /** Mã lô của phiếu đang mở: chuyến đã ghi giữ mã cũ, chuyến mới xem trước mã sẽ sinh. */
-  const sessionLotCode = !phien
+  const sessionLotCode = !session
     ? ""
     : sessionShipmentId
       ? (() => {
           const c = shipments.find((x) => x.id === sessionShipmentId);
           return c ? formatMaterialLotLabel(c) : "— (dữ liệu cũ)";
         })()
-      : sinhMaLo(phien.deliveryDate, phien.workshop, shipments);
+      : generateLotCode(session.deliveryDate, session.workshop, shipments);
   /** Các dòng trong bảng đủ để lưu (có loại + số lượng). */
-  const validRows = tableRows.filter(dongDayDu);
+  const validRows = tableRows.filter(isLineComplete);
   const shipmentTotal = validRows.reduce((s, d) => s + d.quantityKg, 0);
   const shipmentAmount = validRows.reduce(
     (s, d) => s + d.quantityKg * (d.unitPrice ?? 0),
     0
   );
   /** Dòng điền sẵn chưa gõ kg — sẽ bị bỏ qua khi lưu, phải báo rõ trên thanh lưu. */
-  const skipped = dongGoiYBoQua(tableRows);
+  const skipped = getSkippedSuggestedLines(tableRows);
   /** Số dòng ĐÃ LƯU đang mở trong bảng — cho câu "sửa đầu chuyến áp cho N dòng". */
   const savedRowCount = tableRows.filter((d) => d.id).length;
   /** Đang ở "Ghi nhập" và còn dòng hợp lệ CHƯA lưu vào sổ (dòng mới id=null) —
    *  để nhắc trước khi chốt ngày, kẻo số vừa gõ chưa tính vào tổng chốt. */
-  const hasUnsavedRows = cheDo === "nhap" && validRows.some((d) => !d.id);
-  const isSessionLocked = phien ? isLocked(phien.deliveryDate, phien.workshop) : false;
+  const hasUnsavedRows = mode === "nhap" && validRows.some((d) => !d.id);
+  const isSessionLocked = session ? isLocked(session.deliveryDate, session.workshop) : false;
 
   /** Dòng đã lưu thuộc chuyến đang mở (id-set khi sửa; tạo mới thì chưa có gì). */
   const belongsToSavedSession = (r: MaterialImportItem) =>
     editRowIds ? editRowIds.includes(r.id) : false;
   /** Tổng ngày = số đã lưu của ngày/xưởng (trừ chuyến đang mở, khỏi đếm đôi) +
    *  số đang gõ trong bảng ⇒ xem trước tổng ngày ngay cả khi chưa lưu. */
-  const dayTotalExShipment = phien
+  const dayTotalExShipment = session
     ? rows
         .filter(
           (r) =>
-            r.deliveryDate === phien.deliveryDate &&
-            r.workshop === phien.workshop &&
+            r.deliveryDate === session.deliveryDate &&
+            r.workshop === session.workshop &&
             !belongsToSavedSession(r)
         )
         .reduce((s, r) => s + (r.quantityKg || 0), 0)
@@ -612,9 +612,9 @@ export default function NhapNguyenLieuScreen() {
   const sessionDayTotal = dayTotalExShipment + shipmentTotal;
 
   /** Sửa một ô trong bảng (không tự sinh/xô dòng — thêm dòng bằng nút riêng). */
-  const updateRow = (key: string, patch: Partial<DongBang>) =>
-    setTableRows((ds) =>
-      ds.map((d) => {
+  const updateRow = (key: string, patch: Partial<ImportLine>) =>
+    setTableRows((items) =>
+      items.map((d) => {
         if (d.key !== key) return d;
         // Tự tay đổi loài/loại ⇒ thành dòng thường (thiếu kg sẽ bị nhắc khi lưu).
         // Chỉ sửa GIÁ thì vẫn là dòng gợi ý: không gõ kg thì vẫn tự bỏ qua.
@@ -624,23 +624,23 @@ export default function NhapNguyenLieuScreen() {
           ...patch,
           goiY: isTypeEdit ? false : d.goiY,
           // Giá vừa tự gõ không còn là "giá lượt trước".
-          giaNgay: isTypeEdit || "unitPrice" in patch ? undefined : d.giaNgay,
+          priceDate: isTypeEdit || "unitPrice" in patch ? undefined : d.priceDate,
         };
       })
     );
 
   /** Bỏ một dòng; luôn còn ít nhất một dòng để nhập. */
   const removeRow = (key: string) =>
-    setTableRows((ds) => {
-      const con = ds.filter((d) => d.key !== key);
-      return con.length ? con : [dongBangRong(lastCategory)];
+    setTableRows((items) => {
+      const con = items.filter((d) => d.key !== key);
+      return con.length ? con : [createEmptyImportLine(lastCategory)];
     });
 
   /** Thêm một dòng trống ở CUỐI bảng (mặc định loài theo dòng cuối cho nhanh). */
   const addNewRow = () =>
-    setTableRows((ds) => [
-      ...ds,
-      dongBangRong(ds[ds.length - 1]?.category ?? lastCategory),
+    setTableRows((items) => [
+      ...items,
+      createEmptyImportLine(items[items.length - 1]?.category ?? lastCategory),
     ]);
 
   /* ---- OCR: chụp ảnh phiếu → gợi ý điền form (nháp, người soát lại) ---- */
@@ -656,17 +656,17 @@ export default function NhapNguyenLieuScreen() {
 
   /** OCR đề xuất một dòng: nối vào bảng (thay dòng trống đầu nếu bảng chưa có data). */
   const addRowFromOcr = (ten: string, soKg: number) =>
-    setTableRows((ds) => {
+    setTableRows((items) => {
       const mt = materialTypes.find((l) => l.name === ten);
-      const cat = (mt?.category || ds[ds.length - 1]?.category || lastCategory) as Category;
-      const newRow: DongBang = { ...dongBangRong(cat), materialTypeName: ten, quantityKg: soKg };
-      return ds.some(dongCoData) ? [...ds, newRow] : [newRow];
+      const cat = (mt?.category || items[items.length - 1]?.category || lastCategory) as Category;
+      const newRow: ImportLine = { ...createEmptyImportLine(cat), materialTypeName: ten, quantityKg: soKg };
+      return items.some(importLineHasData) ? [...items, newRow] : [newRow];
     });
 
   /** Mở ảnh phiếu đã đính (signed URL có hạn) để đối chiếu tay. */
   const viewScanImage = async () => {
-    if (!phien?.scanPath) return;
-    const url = await getPhotoUrl(phien.scanPath);
+    if (!session?.scanPath) return;
+    const url = await getPhotoUrl(session.scanPath);
     if (url) window.open(url, "_blank", "noopener");
     else notify.error("Chưa xem được ảnh (cần đăng nhập máy chủ).");
   };
@@ -681,9 +681,9 @@ export default function NhapNguyenLieuScreen() {
    * Trả về true nếu đóng được dialog (đã lưu, hoặc không có gì để lưu khi imLang).
    */
   const saveSession = (imLang: boolean): boolean => {
-    if (!phien) return true;
-    const validRows = tableRows.filter(dongDayDu);
-    const ls: FieldError[] = [...loiDauChuyen(phien, isSessionLocked)];
+    if (!session) return true;
+    const validRows = tableRows.filter(isLineComplete);
+    const ls: FieldError[] = [...validateShipmentHeader(session, isSessionLocked)];
     if (validRows.length === 0)
       ls.push({
         field: "Loại hàng",
@@ -695,7 +695,7 @@ export default function NhapNguyenLieuScreen() {
     // người dùng bấm Lưu — đóng nhanh bằng X thì lặng lẽ bỏ dòng dở, giữ dòng đủ.
     if (!imLang)
       tableRows.forEach((d, i) => {
-        if (dongCoData(d) && !dongDayDu(d))
+        if (importLineHasData(d) && !isLineComplete(d))
           ls.push({
             field: `Dòng ${i + 1}`,
             message: !d.materialTypeName.trim()
@@ -705,7 +705,7 @@ export default function NhapNguyenLieuScreen() {
       });
 
     if (ls.length > 0) {
-      if (!imLang) setLoiPhien(ls);
+      if (!imLang) setSessionErrors(ls);
       return false;
     }
 
@@ -716,7 +716,7 @@ export default function NhapNguyenLieuScreen() {
     let nextShipments = shipments;
     if (sessionShipmentId) {
       nextShipments = shipments.map((c) =>
-        c.id === sessionShipmentId ? { ...c, ...phien, id: c.id } : c
+        c.id === sessionShipmentId ? { ...c, ...session, id: c.id } : c
       );
     } else if (!isEditingLegacy) {
       shipmentId = newId();
@@ -724,8 +724,8 @@ export default function NhapNguyenLieuScreen() {
         ...shipments,
         {
           id: shipmentId,
-          ...phien,
-          lotCode: sinhMaLo(phien.deliveryDate, phien.workshop, shipments),
+          ...session,
+          lotCode: generateLotCode(session.deliveryDate, session.workshop, shipments),
           operator,
         },
       ];
@@ -733,59 +733,59 @@ export default function NhapNguyenLieuScreen() {
 
     // Dòng của chuyến = các dòng hợp lệ trong bảng: dòng cũ giữ id (cập nhật),
     // dòng mới cấp id mới; dòng đã bỏ khỏi bảng không đưa lại (tức là xóa).
-    const rowsGiuLai = rows.filter((r) => !belongsToSavedSession(r));
+    const keptRows = rows.filter((r) => !belongsToSavedSession(r));
     const shipmentRows: MaterialImportItem[] = validRows.map((d) => ({
       id: d.id ?? newId(),
       shipmentId: shipmentId ?? "",
-      deliveryDate: phien.deliveryDate,
-      workshop: phien.workshop,
+      deliveryDate: session.deliveryDate,
+      workshop: session.workshop,
       category: d.category,
-      supplierName: phien.supplierName,
+      supplierName: session.supplierName,
       materialTypeName: d.materialTypeName,
       quantityKg: d.quantityKg,
       unitPrice: d.unitPrice,
-      driverName: phien.driverName,
-      licensePlate: phien.licensePlate,
-      note: phien.note,
+      driverName: session.driverName,
+      licensePlate: session.licensePlate,
+      note: session.note,
     }));
     persistShipments(nextShipments);
-    persist([...rowsGiuLai, ...shipmentRows]);
+    persist([...keptRows, ...shipmentRows]);
 
     const newTotal = validRows.reduce((s, d) => s + d.quantityKg, 0);
     const savedShipment = shipmentId ? nextShipments.find((c) => c.id === shipmentId) : undefined;
     notify.saved(
-      `Đã lưu chuyến ${phien.supplierName} — ${validRows.length} loại · ${kg(newTotal)}`,
+      `Đã lưu chuyến ${session.supplierName} — ${validRows.length} loại · ${kg(newTotal)}`,
       undefined,
       savedShipment ? { label: "In tem", onClick: () => setLabelShipment(savedShipment) } : undefined
     );
     // Ngày đã chốt mà ghi thêm → báo ngay tổng ngày lệch bao nhiêu so với lúc chốt.
-    const bg = lockRecordOf(phien.deliveryDate, phien.workshop);
+    const bg = lockRecordOf(session.deliveryDate, session.workshop);
     if (bg?.isLocked)
       notify.warning(
-        `Ngày ${formatDateVN(phien.deliveryDate)} đã chốt ${kg(bg.totalKgAtLock)} — sau khi ghi bù thành ${kg(dayTotalExShipment + newTotal)}`
+        `Ngày ${formatDateVN(session.deliveryDate)} đã chốt ${kg(bg.totalKgAtLock)} — sau khi ghi bù thành ${kg(dayTotalExShipment + newTotal)}`
       );
 
     // Nhớ loài cuối để chuyến/dòng sau khỏi nhảy về "Bạch tuộc".
     setLastCategory(validRows[validRows.length - 1].category);
 
     // Ghi ngày ngoài kỳ đang lọc → kéo bộ lọc về chuyến vừa ghi (khỏi tưởng mất).
-    if (phien.deliveryDate < tuHieuLuc || phien.deliveryDate > denHieuLuc) {
+    if (session.deliveryDate < effectiveFrom || session.deliveryDate > effectiveTo) {
       setKy("ngay");
-      setDate(phien.deliveryDate);
+      setDate(session.deliveryDate);
     }
-    if (workshop !== "Tất cả" && workshop !== phien.workshop)
-      setWorkshop(phien.workshop);
-    if (supplierFilter && supplierFilter !== phien.supplierName) setSupplierFilter("");
+    if (workshop !== "Tất cả" && workshop !== session.workshop)
+      setWorkshop(session.workshop);
+    if (supplierFilter && supplierFilter !== session.supplierName) setSupplierFilter("");
     if (priceFilter === "thieu-gia") setPriceFilter("tat-ca");
     return true;
   };
 
   const resetSession = () => {
-    setPhien(null);
+    setSession(null);
     setSessionShipmentId(null);
     setEditRowIds(null);
     setTableRows([]);
-    setLoiPhien([]);
+    setSessionErrors([]);
   };
 
   /** Lưu xong, đóng dialog. */
@@ -800,15 +800,15 @@ export default function NhapNguyenLieuScreen() {
     const lastRowCategory = validRows.length
       ? validRows[validRows.length - 1].category
       : lastCategory;
-    setPhien((p) =>
+    setSession((p) =>
       p
         ? { ...p, driverName: "", licensePlate: "", note: "", ssccCode: "", scanPath: "" }
         : p
     );
     setSessionShipmentId(null);
     setEditRowIds(null);
-    setTableRows(newTableRows(phien?.supplierName ?? "", phien?.workshop ?? recordWorkshop, lastRowCategory));
-    setLoiPhien([]);
+    setTableRows(newTableRows(session?.supplierName ?? "", session?.workshop ?? recordWorkshop, lastRowCategory));
+    setSessionErrors([]);
     resetSteps(false);
   };
 
@@ -824,7 +824,7 @@ export default function NhapNguyenLieuScreen() {
     if (sessionShipmentId)
       persistShipments(shipments.filter((c) => c.id !== sessionShipmentId));
     notify.deleted(
-      `Đã xóa chuyến ${phien?.supplierName || ""} — ${editRowIds.length} dòng`,
+      `Đã xóa chuyến ${session?.supplierName || ""} — ${editRowIds.length} dòng`,
       () => {
         persist(prevRows);
         persistShipments(prevShipment);
@@ -838,17 +838,17 @@ export default function NhapNguyenLieuScreen() {
   const lockDay = () => {
     /* Sổ chốt chưa nạp xong ⇒ chưa biết máy chủ đã có bản ghi (ngày, xưởng) chưa;
        tạo bản mới lúc này có thể trùng chỉ mục duy nhất (site, ngày, xưởng) ⇒ 23505. */
-    if (ttChot === "dang-tai") {
+    if (lockStatus === "dang-tai") {
       notify.error("Đang tải sổ chốt ngày từ máy chủ — đợi vài giây rồi bấm chốt lại");
       return;
     }
-    const bg = lockRecordOf(tuHieuLuc, viewedWorkshop);
+    const bg = lockRecordOf(effectiveFrom, viewedWorkshop);
     const ban: DailyLock = {
       /* Có bản ghi (kể cả đã mở lại) ⇒ dùng lại id. Chưa có ⇒ id CỐ ĐỊNH theo khoá
          nghiệp vụ (ngày|xưởng), không newId(): hai máy cùng chốt một ngày sẽ ghi
          CÙNG một dòng thay vì hai id đụng chỉ mục duy nhất và kẹt hàng chờ. */
-      id: bg?.id ?? `${tuHieuLuc}|${viewedWorkshop}`,
-      lockDate: tuHieuLuc,
+      id: bg?.id ?? `${effectiveFrom}|${viewedWorkshop}`,
+      lockDate: effectiveFrom,
       workshop: viewedWorkshop,
       isLocked: true,
       lockedAt: new Date().toISOString(),
@@ -860,14 +860,14 @@ export default function NhapNguyenLieuScreen() {
       bg ? locks.map((c) => (c.id === bg.id ? ban : c)) : [...locks, ban]
     );
     notify.saved(
-      `Đã chốt ngày ${formatDateVN(tuHieuLuc)} · xưởng ${viewedWorkshop} — ${kg(actualTotal)}`
+      `Đã chốt ngày ${formatDateVN(effectiveFrom)} · xưởng ${viewedWorkshop} — ${kg(actualTotal)}`
     );
     setIsConfirmingLock(false);
     setLockNote("");
   };
 
   const reopenDay = () => {
-    const bg = lockRecordOf(tuHieuLuc, viewedWorkshop);
+    const bg = lockRecordOf(effectiveFrom, viewedWorkshop);
     if (!bg) return;
     if (!reopenReason.trim()) {
       setLockErrors([
@@ -881,7 +881,7 @@ export default function NhapNguyenLieuScreen() {
       )
     );
     notify.warning(
-      `Đã mở lại ngày ${formatDateVN(tuHieuLuc)} · xưởng ${viewedWorkshop} — sửa xong nhớ chốt lại`
+      `Đã mở lại ngày ${formatDateVN(effectiveFrom)} · xưởng ${viewedWorkshop} — sửa xong nhớ chốt lại`
     );
     setIsConfirmingReopen(false);
     setReopenReason("");
@@ -959,7 +959,7 @@ export default function NhapNguyenLieuScreen() {
               />
             )}
             <span className="text-lg font-semibold text-foreground">
-              {isDayLocked ? "Đã chốt" : "Chưa chốt"} {formatDateVN(tuHieuLuc)} · xưởng{" "}
+              {isDayLocked ? "Đã chốt" : "Chưa chốt"} {formatDateVN(effectiveFrom)} · xưởng{" "}
               {viewedWorkshop}
             </span>
             <span className="text-base text-muted-foreground">
@@ -1018,10 +1018,10 @@ export default function NhapNguyenLieuScreen() {
   // → ① Đại lý → ② Xe → ③ Loại hàng & kg → thanh LƯU dính đáy. Bước xong thì thu
   // lại một dòng. Cột phải (desktop) / bên dưới (điện thoại): chuyến ĐÃ GHI trong
   // ngày + phế liệu — khỏi đổi tab sang "Sổ ngày" để biết đã ghi gì.
-  const entryForm = phien && (
+  const entryForm = session && (
     <div className="grid gap-5 xl:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)] xl:items-start">
       <div className="min-w-0 space-y-4">
-        <ErrorSummary errors={loiPhien} />
+        <ErrorSummary errors={sessionErrors} />
 
         {/* THANH NGỮ CẢNH — ngày + xưởng của cả phiếu */}
         <div className="space-y-3 rounded-xl border-2 border-border bg-card p-4">
@@ -1032,14 +1032,14 @@ export default function NhapNguyenLieuScreen() {
                   label="Ngày ghi sổ"
                   required
                   info="Ngày ghi vào hệ thống. Chọn ngày này thì ngày hàng về tự nhảy theo. Cần khác thì sửa ô ngày hàng về bên cạnh."
-                  value={phien.postingDate}
+                  value={session.postingDate}
                   onChange={changePostingDate}
                 />
                 <DateField
                   label="Ngày hàng về xưởng"
                   required
                   info="Ngày xe đổ hàng thật — mọi tổng hợp tính theo ngày này. Sửa tay ô này khi hàng về hôm khác (ghi bù)."
-                  value={phien.deliveryDate}
+                  value={session.deliveryDate}
                   onChange={changeDeliveryDate}
                 />
               </>
@@ -1048,7 +1048,7 @@ export default function NhapNguyenLieuScreen() {
                 label="Ngày hàng về"
                 required
                 info="Ngày xe đổ hàng — cũng là ngày ghi sổ. Hàng về hôm trước mà nay mới ghi thì bấm “Ghi bù” bên dưới để tách hai ngày."
-                value={phien.deliveryDate}
+                value={session.deliveryDate}
                 onChange={changePostingDate}
               />
             )}
@@ -1057,20 +1057,20 @@ export default function NhapNguyenLieuScreen() {
               required
               columns={3}
               className={twoDates ? "sm:col-span-2" : undefined}
-              value={phien.workshop}
+              value={session.workshop}
               onChange={(v) => pickWorkshop(v as Workshop)}
-              options={PHAN_XUONG.map((p) => ({ value: p, label: p }))}
+              options={WORKSHOPS.map((p) => ({ value: p, label: p }))}
             />
           </div>
 
-          {(isBackdatedImport(phien) || isSessionLocked) && (
+          {(isBackdatedImport(session) || isSessionLocked) && (
             <Field
               label="Lý do ghi bù"
               required
               hint="VD: đại lý chưa xuất hóa đơn, 31/7 mới có chứng từ."
             >
               <Input
-                value={phien.backdateReason}
+                value={session.backdateReason}
                 onChange={(e) => setSessionField("backdateReason", e.target.value)}
                 placeholder="Vì sao tới hôm nay mới ghi?"
               />
@@ -1091,7 +1091,7 @@ export default function NhapNguyenLieuScreen() {
                 Ghi bù (hai ngày khác nhau)
               </Button>
             ) : (
-              !isBackdatedImport(phien) && (
+              !isBackdatedImport(session) && (
                 <Button
                   title="Hàng về đúng ngày ghi sổ: gộp lại còn một ô ngày."
                   type="button"
@@ -1116,7 +1116,7 @@ export default function NhapNguyenLieuScreen() {
                 Nhận diện từ ảnh phiếu
               </Button>
             )}
-            {phien.scanPath && (
+            {session.scanPath && (
               <span className="flex items-center gap-1">
                 <Tag variant="xong">Đã đính ảnh phiếu</Tag>
                 {hasImageStorage && (
@@ -1134,7 +1134,7 @@ export default function NhapNguyenLieuScreen() {
           <p className="flex items-start gap-3 rounded-lg bg-accent px-4 py-3 text-base text-accent-foreground">
             <Lock className="mt-0.5 size-6 shrink-0" aria-hidden />
             <span>
-              Ngày {formatDateVN(phien.deliveryDate)} · xưởng {phien.workshop}{" "}
+              Ngày {formatDateVN(session.deliveryDate)} · xưởng {session.workshop}{" "}
               <strong>đã chốt</strong>. Vẫn ghi được nhưng là <strong>ghi bù</strong>{" "}
               — bắt buộc ghi rõ lý do.
             </span>
@@ -1157,22 +1157,22 @@ export default function NhapNguyenLieuScreen() {
         )}
 
         {/* ① ĐẠI LÝ — chọn xong là thu lại, kéo theo xe gợi ý + bảng loại hàng điền sẵn */}
-        <TheBuoc
+        <StepCard
           so={1}
-          tieuDe="Đại lý giao hàng"
-          xong={!!phien.supplierName}
+          title="Đại lý giao hàng"
+          xong={!!session.supplierName}
           mo={isSupplierStepOpen}
-          tomTat={phien.supplierName}
+          summary={session.supplierName}
           onDoi={() => setOpenPanel("dai-ly")}
         >
           {!isEditingShipment && dlHayGiao.length > 0 && (
             <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
               {dlHayGiao.map((ten) => (
-                <TheChon
+                <ChoiceCard
                   key={ten}
-                  tieuDe={ten}
+                  label={ten}
                   phu={lastDateBySupplier.get(ten) ? `Gần nhất ${formatDateVN(lastDateBySupplier.get(ten) ?? "")}` : undefined}
-                  dangChon={phien.supplierName === ten}
+                  isSelected={session.supplierName === ten}
                   title={`Chọn đại lý ${ten} — tự điền sẵn các loại hàng và đơn giá theo lượt giao gần nhất, chỉ còn gõ số kg.`}
                   onClick={() => pickSupplier(ten)}
                 />
@@ -1183,44 +1183,44 @@ export default function NhapNguyenLieuScreen() {
             label={dlHayGiao.length > 0 && !isEditingShipment ? "Đại lý khác" : "Đại lý giao hàng"}
             required
             hideRequiredMark
-            value={phien.supplierName}
+            value={session.supplierName}
             onChange={pickSupplier}
             options={supplierOptions}
             onCreate={addSupplier}
             emptyText="Chưa có đại lý nào trong danh mục."
-            onEditItem={supplierEditor.moSua}
-            editLabel={supplierEditor.nhanSua}
+            onEditItem={supplierEditor.openEdit}
+            editLabel={supplierEditor.editLabel}
           />
-        </TheBuoc>
+        </StepCard>
 
         {/* ② XE — xe cũ của đại lý bấm một chạm; xe lạ thì gõ tay; không có thì bỏ qua */}
-        <TheBuoc
+        <StepCard
           so={2}
-          tieuDe="Xe chở hàng"
+          title="Xe chở hàng"
           xong={hasVehicleInfo || skipTruck}
           mo={isVehicleStepOpen}
-          tomTat={
+          summary={
             hasVehicleInfo
-              ? [phien.licensePlate, phien.driverName].filter(Boolean).join(" · ")
-              : phien.supplierName
+              ? [session.licensePlate, session.driverName].filter(Boolean).join(" · ")
+              : session.supplierName
                 ? "Không ghi xe"
                 : undefined
           }
-          onDoi={phien.supplierName ? () => setOpenPanel("xe") : undefined}
+          onDoi={session.supplierName ? () => setOpenPanel("xe") : undefined}
         >
-          {truckSuggestions.bienSo.length > 0 && (
+          {truckSuggestions.plates.length > 0 && (
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">
                 Biển số — chạm là điền luôn tài xế hay lái xe đó
               </p>
               <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
-                {truckSuggestions.bienSo.map((x) => (
-                  <TheChon
+                {truckSuggestions.plates.map((x) => (
+                  <ChoiceCard
                     key={x.licensePlate}
                     icon={<Truck />}
-                    tieuDe={x.licensePlate}
+                    label={x.licensePlate}
                     phu={x.driverName || undefined}
-                    dangChon={chuanBienSo(x.licensePlate) === chuanBienSo(phien.licensePlate)}
+                    isSelected={normalizePlate(x.licensePlate) === normalizePlate(session.licensePlate)}
                     title="Điền biển số này kèm tài xế gần nhất lái xe đó, rồi nhảy xuống gõ số kg. Khác tài xế thì bấm Đổi và chạm tên tài xế."
                     onClick={() => pickPlate(x)}
                   />
@@ -1228,15 +1228,15 @@ export default function NhapNguyenLieuScreen() {
               </div>
             </div>
           )}
-          {truckSuggestions.taiXe.length > 0 && (
+          {truckSuggestions.drivers.length > 0 && (
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">Tài xế</p>
               <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
-                {truckSuggestions.taiXe.map((ten) => (
-                  <TheChon
+                {truckSuggestions.drivers.map((ten) => (
+                  <ChoiceCard
                     key={ten}
-                    tieuDe={ten}
-                    dangChon={ten.toLowerCase() === phien.driverName.trim().toLowerCase()}
+                    label={ten}
+                    isSelected={ten.toLowerCase() === session.driverName.trim().toLowerCase()}
                     title="Chọn tài xế này cho chuyến. Đã có biển số thì xong bước xe và nhảy xuống gõ số kg."
                     onClick={() => pickDriver(ten)}
                   />
@@ -1248,7 +1248,7 @@ export default function NhapNguyenLieuScreen() {
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Biển số xe">
                 <Input
-                  value={phien.licensePlate}
+                  value={session.licensePlate}
                   onFocus={() => setOpenPanel("xe")}
                   onChange={(e) => setSessionField("licensePlate", e.target.value)}
                   placeholder="VD: 86C 19555"
@@ -1256,7 +1256,7 @@ export default function NhapNguyenLieuScreen() {
               </Field>
               <Field label="Tài xế">
                 <Input
-                  value={phien.driverName}
+                  value={session.driverName}
                   onFocus={() => setOpenPanel("xe")}
                   onChange={(e) => setSessionField("driverName", e.target.value)}
                   placeholder="Tên tài xế"
@@ -1298,12 +1298,12 @@ export default function NhapNguyenLieuScreen() {
               </Button>
             )}
           </div>
-        </TheBuoc>
+        </StepCard>
 
         {/* ③ LOẠI HÀNG & KG — bảng điền sẵn theo đại lý, chỉ còn gõ số */}
-        <TheBuoc
+        <StepCard
           so={3}
-          tieuDe="Loại hàng và số kg"
+          title="Loại hàng và số kg"
           xong={validRows.length > 0}
           mo
         >
@@ -1312,24 +1312,24 @@ export default function NhapNguyenLieuScreen() {
               ? "Đã điền sẵn loại + giá theo lượt gần nhất — chỉ gõ số kg, Enter xuống dòng. Dòng không có kg tự bỏ qua."
               : "Mỗi loại một dòng. Đơn giá để trống nếu chưa có hóa đơn."}
           </p>
-          <BangDongHang
+          <ImportLinesTable
             dong={tableRows}
-            onSua={updateRow}
+            onUpdateRow={updateRow}
             onBo={removeRow}
-            onThem={addNewRow}
-            optLoaiTheoLoai={materialTypeOptionsByCategory}
-            onTaoLoai={addMaterialType}
-            onSuaLoai={materialTypeEditor.moSua}
-            onEnterCuoi={focusSaveButton}
+            onAddRow={addNewRow}
+            getMaterialTypeOptions={materialTypeOptionsByCategory}
+            onCreateMaterialType={addMaterialType}
+            onEditMaterialType={materialTypeEditor.openEdit}
+            onLastRowEnter={focusSaveButton}
           />
-        </TheBuoc>
+        </StepCard>
 
         <div className="rounded-xl border-2 border-border bg-card">
           <button
             title="Mở / thu phần ít dùng của chuyến: ghi chú, mã SSCC, mã lô nội bộ (không bắt buộc)."
             type="button"
-            onClick={() => setMoPhuPhien((v) => !v)}
-            aria-expanded={moPhuPhien}
+            onClick={() => setIsExtrasOpen((v) => !v)}
+            aria-expanded={isExtrasOpen}
             className="flex min-h-11 w-full items-center justify-between gap-3 px-4 text-left font-semibold"
           >
             <span>
@@ -1337,15 +1337,15 @@ export default function NhapNguyenLieuScreen() {
               <span className="tnum font-normal text-muted-foreground">{sessionLotCode}</span>
             </span>
             <ChevronDown
-              className={`size-6 shrink-0 transition-transform ${moPhuPhien ? "rotate-180" : ""}`}
+              className={`size-6 shrink-0 transition-transform ${isExtrasOpen ? "rotate-180" : ""}`}
               aria-hidden
             />
           </button>
-          {moPhuPhien && (
+          {isExtrasOpen && (
             <div className="space-y-4 border-t-2 border-border p-4">
               <Field label="Ghi chú">
                 <Input
-                  value={phien.note}
+                  value={session.note}
                   onChange={(e) => setSessionField("note", e.target.value)}
                   placeholder="Ghi chú thêm (nếu có)"
                 />
@@ -1356,7 +1356,7 @@ export default function NhapNguyenLieuScreen() {
                   hint="Để trống nếu chưa được cấp — điền sau."
                 >
                   <Input
-                    value={phien.ssccCode}
+                    value={session.ssccCode}
                     onChange={(e) => setSessionField("ssccCode", e.target.value)}
                     placeholder="Chưa có — điền sau"
                   />
@@ -1401,7 +1401,7 @@ export default function NhapNguyenLieuScreen() {
             {isEditingShipment ? (
               <>
                 <ConfirmDelete
-                  recordDescription={`Chuyến ${phien?.supplierName || "(chưa có đại lý)"} — ${formatDateVN(phien?.deliveryDate ?? "")} — ${savedRowCount} dòng — ${kg(shipmentTotal)}`}
+                  recordDescription={`Chuyến ${session?.supplierName || "(chưa có đại lý)"} — ${formatDateVN(session?.deliveryDate ?? "")} — ${savedRowCount} dòng — ${kg(shipmentTotal)}`}
                   onConfirm={deleteEditingShipment}
                   title="Xóa cả chuyến này?"
                   confirmLabel="Xóa chuyến"
@@ -1431,7 +1431,7 @@ export default function NhapNguyenLieuScreen() {
         <div className="space-y-3 rounded-xl border-2 border-border bg-card p-4">
           <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
             <p className="font-semibold">
-              Đã ghi ngày {formatDateVN(phien.deliveryDate)} · xưởng {phien.workshop}
+              Đã ghi ngày {formatDateVN(session.deliveryDate)} · xưởng {session.workshop}
             </p>
             <p className="text-muted-foreground">
               {sessionDayGroups.length} chuyến ·{" "}
@@ -1440,12 +1440,12 @@ export default function NhapNguyenLieuScreen() {
               </span>
             </p>
           </div>
-          <ChuyenTrongNgay
+          <DayShipmentList
             nhom={sessionDayGroups}
-            khoa={isSessionLocked}
-            dangSuaKhoa={sessionShipmentId}
-            onSua={openShipmentEdit}
-            onInTem={(n) => n.chuyen && setLabelShipment(n.chuyen)}
+            isLocked={isSessionLocked}
+            editingGroupKey={sessionShipmentId}
+            onEdit={openShipmentEdit}
+            onPrintLabel={(n) => n.shipment && setLabelShipment(n.shipment)}
           />
           <div className="flex flex-wrap gap-2 [&>*]:flex-1">
             <Button
@@ -1462,12 +1462,12 @@ export default function NhapNguyenLieuScreen() {
         </div>
 
         {/* Phế liệu cân trong ngày — GỘP CHUNG một chỗ với nguyên liệu */}
-        <KhoiPheLieuNgay
-          ngay={phien.deliveryDate}
-          phanXuong={phien.workshop}
+        <DailyScrapSection
+          date={session.deliveryDate}
+          workshop={session.workshop}
           rows={scraps}
           onChange={persistScraps}
-          khoa={isSessionLocked}
+          isLocked={isSessionLocked}
         />
 
         {lockSection}
@@ -1488,10 +1488,10 @@ export default function NhapNguyenLieuScreen() {
           <button
             title="Sang chế độ Ghi nhập để gõ chuyến nguyên liệu mới."
             type="button"
-            onClick={() => setCheDo("nhap")}
+            onClick={() => setMode("nhap")}
             className={cn(
               "flex-1 px-4 py-2.5 text-base font-semibold transition-colors sm:flex-none",
-              cheDo === "nhap"
+              mode === "nhap"
                 ? "bg-primary text-primary-foreground"
                 : "bg-card text-muted-foreground hover:bg-muted"
             )}
@@ -1501,10 +1501,10 @@ export default function NhapNguyenLieuScreen() {
           <button
             title="Tổng hợp nhập hàng theo kỳ (xuất Excel / in) và tra cứu sổ chi tiết các chuyến theo ngày, đại lý, loại, thiếu giá."
             type="button"
-            onClick={() => setCheDo("bao-cao")}
+            onClick={() => setMode("bao-cao")}
             className={cn(
               "flex-1 border-l-2 border-border px-4 py-2.5 text-base font-semibold transition-colors sm:flex-none",
-              cheDo !== "nhap"
+              mode !== "nhap"
                 ? "bg-primary text-primary-foreground"
                 : "bg-card text-muted-foreground hover:bg-muted"
             )}
@@ -1516,7 +1516,7 @@ export default function NhapNguyenLieuScreen() {
 
       {/* Trong "Báo cáo": tổng hợp theo kỳ ⇄ sổ chi tiết các chuyến (tab "Sổ ngày" cũ —
           việc xem/sửa chuyến TRONG NGÀY đã nằm ở cột phải của "Ghi nhập"). */}
-      {cheDo !== "nhap" && (
+      {mode !== "nhap" && (
         <div className="flex w-full overflow-hidden rounded-lg border-2 border-border sm:w-fit">
           {(
             [
@@ -1528,11 +1528,11 @@ export default function NhapNguyenLieuScreen() {
               key={id}
               title={description}
               type="button"
-              onClick={() => setCheDo(id)}
+              onClick={() => setMode(id)}
               className={cn(
                 "flex-1 px-4 py-2 font-semibold transition-colors sm:flex-none",
                 i > 0 && "border-l-2 border-border",
-                cheDo === id ? "bg-accent text-foreground" : "bg-card text-muted-foreground hover:bg-muted"
+                mode === id ? "bg-accent text-foreground" : "bg-card text-muted-foreground hover:bg-muted"
               )}
             >
               {label}
@@ -1541,16 +1541,16 @@ export default function NhapNguyenLieuScreen() {
         </div>
       )}
 
-      {cheDo === "bao-cao" && <BaoCaoNhap />}
+      {mode === "bao-cao" && <ImportReport />}
 
       {isTypeChangeOpen && (
-        <HopDoiLoaiHangLoat
+        <BulkTypeChangeDialog
           rows={rows}
           loaiNL={materialTypes}
-          onThemLoaiNL={addMaterialType}
-          suaLoai={materialTypeEditor}
+          onCreateMaterialType={addMaterialType}
+          materialTypeEdit={materialTypeEditor}
           onClose={() => setIsTypeChangeOpen(false)}
-          onLuu={(ids, targetType) => {
+          onSave={(ids, targetType) => {
             const bo = new Set(ids);
             const prevRows = rows;
             persist(
@@ -1564,13 +1564,13 @@ export default function NhapNguyenLieuScreen() {
         />
       )}
 
-      {cheDo === "nhap" && (
-        <DailyTaskReminder daChot={isImportLockedToday} viec={`chuyến nhập nguyên liệu hôm nay — xưởng ${recordWorkshop}`} />
+      {mode === "nhap" && (
+        <DailyTaskReminder isLocked={isImportLockedToday} task={`chuyến nhập nguyên liệu hôm nay — xưởng ${recordWorkshop}`} />
       )}
 
-      {cheDo === "nhap" && entryForm}
+      {mode === "nhap" && entryForm}
 
-      {cheDo === "so" && (
+      {mode === "so" && (
         <>
       <div className="flex flex-wrap gap-2">
         <Button
@@ -1643,7 +1643,7 @@ export default function NhapNguyenLieuScreen() {
                 hint={
                   ky === "ngay"
                     ? undefined
-                    : `Kỳ đang xem: ${formatDateVN(tuHieuLuc)} – ${formatDateVN(denHieuLuc)}`
+                    : `Kỳ đang xem: ${formatDateVN(effectiveFrom)} – ${formatDateVN(effectiveTo)}`
                 }
                 value={date}
                 onChange={setDate}
@@ -1658,7 +1658,7 @@ export default function NhapNguyenLieuScreen() {
             value={workshop}
             onChange={(v) => setWorkshop(v as Workshop | "Tất cả")}
             options={[
-              ...PHAN_XUONG.map((p) => ({ value: p, label: p })),
+              ...WORKSHOPS.map((p) => ({ value: p, label: p })),
               { value: "Tất cả", label: "Tất cả" },
             ]}
             className="min-w-[220px] flex-1"
@@ -1758,7 +1758,7 @@ export default function NhapNguyenLieuScreen() {
           }
           action={
             <Button
-              title="Chuyển sang chế độ Ghi để nhập chuyến mới cho ngày này." size="lg" onClick={() => setCheDo("nhap")}>
+              title="Chuyển sang chế độ Ghi để nhập chuyến mới cho ngày này." size="lg" onClick={() => setMode("nhap")}>
               <Plus />
               Sang Ghi nhập
             </Button>
@@ -1771,7 +1771,7 @@ export default function NhapNguyenLieuScreen() {
               const isShipmentLocked = isLocked(n.deliveryDate, n.workshop);
               return (
                 <section
-                  key={n.khoa}
+                  key={n.groupKey}
                   className="space-y-4 rounded-xl border-2 border-border p-5"
                 >
                   <div className="flex flex-wrap items-start justify-between gap-x-8 gap-y-3">
@@ -1788,7 +1788,7 @@ export default function NhapNguyenLieuScreen() {
                         </span>
                       </div>
                       <div className="flex flex-wrap items-center gap-2">
-                        {n.ghiBu && (
+                        {n.isBackdated && (
                           <Tag variant="luu-y">
                             Ghi bù {formatDateVN(n.postingDate)}
                           </Tag>
@@ -1798,17 +1798,17 @@ export default function NhapNguyenLieuScreen() {
                             Đã chốt
                           </Tag>
                         )}
-                        {!n.chuyen && (
+                        {!n.shipment && (
                           <Tag variant="nguon">Dữ liệu cũ</Tag>
                         )}
-                        {n.chuyen && (
+                        {n.shipment && (
                           <Tag variant="phu" className="tnum">
-                            Lô {formatMaterialLotLabel(n.chuyen)}
+                            Lô {formatMaterialLotLabel(n.shipment)}
                           </Tag>
                         )}
-                        {n.chuyen?.ssccCode && (
+                        {n.shipment?.ssccCode && (
                           <Tag variant="phu" className="tnum">
-                            SSCC {n.chuyen.ssccCode}
+                            SSCC {n.shipment.ssccCode}
                           </Tag>
                         )}
                         {[n.driverName, n.licensePlate].filter(Boolean).length > 0 && (
@@ -1817,7 +1817,7 @@ export default function NhapNguyenLieuScreen() {
                           </span>
                         )}
                       </div>
-                      {n.ghiBu && n.backdateReason && (
+                      {n.isBackdated && n.backdateReason && (
                         <p className="text-base text-muted-foreground">
                           Lý do ghi bù: {n.backdateReason}
                         </p>
@@ -1827,9 +1827,9 @@ export default function NhapNguyenLieuScreen() {
                           Ghi chú: {n.note}
                         </p>
                       )}
-                      {n.chuyen?.operator && (
+                      {n.shipment?.operator && (
                         <p className="text-base text-muted-foreground">
-                          Người ghi: {n.chuyen.operator}
+                          Người ghi: {n.shipment.operator}
                         </p>
                       )}
                     </div>
@@ -1839,7 +1839,7 @@ export default function NhapNguyenLieuScreen() {
                         Chuyến này
                       </span>
                       <span className="tnum text-xl font-semibold">
-                        {kg(n.tongKg)}
+                        {kg(n.totalKg)}
                       </span>
                       {!isShipmentLocked && (
                         <Button
@@ -1848,11 +1848,11 @@ export default function NhapNguyenLieuScreen() {
                           Sửa chuyến
                         </Button>
                       )}
-                      {n.chuyen && (
+                      {n.shipment && (
                         <Button
                           title="In tem QR cho chuyến này — mỗi loại nguyên liệu một tem (loại + kg) để dán đúng sọt, sau quét tra ngược được nguồn gốc."
                           variant="outline"
-                          onClick={() => setLabelShipment(n.chuyen)}
+                          onClick={() => setLabelShipment(n.shipment)}
                         >
                           <QrCode />
                           In tem QR
@@ -1893,13 +1893,13 @@ export default function NhapNguyenLieuScreen() {
 
       {/* Phế liệu cân gộp cuối ngày theo phân xưởng */}
       {isSingleDayWorkshop && (
-        <KhoiPheLieuNgay
-          ngay={tuHieuLuc}
-          phanXuong={viewedWorkshop}
+        <DailyScrapSection
+          date={effectiveFrom}
+          workshop={viewedWorkshop}
           rows={scraps}
           onChange={persistScraps}
-          khoa={isDayLocked}
-          chiXem
+          isLocked={isDayLocked}
+          readOnly
         />
       )}
         </>
@@ -1913,7 +1913,7 @@ export default function NhapNguyenLieuScreen() {
           <DialogHeader>
             <DialogTitle className="text-2xl">Chốt số liệu ngày này?</DialogTitle>
             <DialogDescription className="text-base">
-              Chốt xong ngày {formatDateVN(tuHieuLuc)} · xưởng {viewedWorkshop} sẽ khóa: không
+              Chốt xong ngày {formatDateVN(effectiveFrom)} · xưởng {viewedWorkshop} sẽ khóa: không
               sửa, không xóa, không thêm chuyến thường. Ghi thêm chỉ còn đường
               ghi bù (bắt buộc ghi lý do) hoặc mở lại ngày.
             </DialogDescription>
@@ -2016,7 +2016,7 @@ export default function NhapNguyenLieuScreen() {
           <DialogHeader>
             <DialogTitle className="text-2xl">Mở lại ngày đã chốt?</DialogTitle>
             <DialogDescription className="text-base">
-              Ngày {formatDateVN(tuHieuLuc)} · xưởng {viewedWorkshop} đang khóa. Mở lại thì
+              Ngày {formatDateVN(effectiveFrom)} · xưởng {viewedWorkshop} đang khóa. Mở lại thì
               sửa/xóa được như thường — nhớ chốt lại sau khi sửa xong.
             </DialogDescription>
           </DialogHeader>
@@ -2053,37 +2053,37 @@ export default function NhapNguyenLieuScreen() {
 
       {/* ---- Phiếu báo cáo tổng hợp nguyên liệu (in A4 ngang, theo kỳ) ---- */}
       {showInvoice && (
-        <PhieuNLNgay
+        <DailyImportInvoice
           ky={ky}
-          ngay={date}
+          date={date}
           startDate={fromDate}
           endDate={toDate}
           workshop={workshop}
           rows={rows}
-          pheLieu={scraps}
+          scraps={scraps}
           onClose={() => setShowInvoice(false)}
         />
       )}
       {labelShipment && (
-        <QrTemLoIn chuyen={labelShipment} onClose={() => setLabelShipment(null)} />
+        <LotLabelPrint shipment={labelShipment} onClose={() => setLabelShipment(null)} />
       )}
       {isPrintingBlank && (
-        <PhieuTrongNhapNL onClose={() => setIsPrintingBlank(false)} />
+        <BlankDailyImportSlip onClose={() => setIsPrintingBlank(false)} />
       )}
 
       {/* ---- Nhận diện ảnh phiếu (OCR) → gợi ý điền form Ghi nhập ---- */}
-      {ocrMo && phien && (
-        <OcrPhieuNhap
-          danhMuc={ocrCatalog}
-          onLuuAnh={(path) => setSessionField("scanPath", path)}
-          onApDaiLy={(name) => setSessionField("supplierName", name)}
-          onApNgay={(iso) => changeDeliveryDate(iso)}
-          onThemDong={addRowFromOcr}
+      {ocrMo && session && (
+        <ImportSlipOcr
+          catalog={ocrCatalog}
+          onImageSaved={(path) => setSessionField("scanPath", path)}
+          onApplySupplier={(name) => setSessionField("supplierName", name)}
+          onApplyDate={(iso) => changeDeliveryDate(iso)}
+          onAddRow={addRowFromOcr}
           onClose={() => setOcrMo(false)}
         />
       )}
-      {supplierEditor.hop}
-      {materialTypeEditor.hop}
+      {supplierEditor.dialog}
+      {materialTypeEditor.dialog}
     </div>
   );
 }

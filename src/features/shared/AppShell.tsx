@@ -18,7 +18,7 @@ import {
 } from "@/design-system";
 import { cn } from "@/lib/utils";
 import { readDevicePrefJson, writeDevicePrefJson } from "@/lib/devicePrefs";
-import { BangCapNhat } from "./UpdateBanner";
+import { UpdateBanner } from "./UpdateBanner";
 import {
   LayoutDashboard,
   ClipboardCheck,
@@ -69,38 +69,38 @@ import {
  *    nên phóng/thu đồng bộ theo cỡ chữ.
  */
 
-export interface MucNavShell {
+export interface ShellNavItem {
   id: string;
   label: string;
   icon: LucideIcon;
   /** Câu hướng dẫn hiện khi rê chuột lên mục nav — màn này để làm gì (README §9). */
-  moTa?: string;
+  description?: string;
   /** Màn còn dùng dữ liệu mẫu (chỉ admin thấy) — hiện cờ "DEMO" trên nav. */
   demo?: boolean;
 }
 
-/** id = path route. Danh sách phẳng (icon/nhãn/cờ demo) — thứ tự & gom nhóm do CAY_NAV quyết định. */
-export const KIT_NAV: MucNavShell[] = [
-  { id: "dashboard", label: "Tổng quan", icon: LayoutDashboard , moTa: "Trang tổng quan: số liệu nổi bật trong ngày và lối tắt sang các màn hay dùng." },
-  { id: "wip", label: "Sản xuất thành phẩm", icon: Factory , moTa: "Ghi sản lượng thành phẩm làm ra mỗi ngày theo xưởng, chốt ngày và gửi báo cáo." },
-  { id: "packaging", label: "Đóng gói", icon: Package , moTa: "Ghi phiếu đóng gói: trừ bán thành phẩm đem đóng, cộng thành phẩm ra, tính hao hụt." },
-  { id: "qc", label: "Kiểm tra QC", icon: ClipboardCheck , moTa: "Bảng kiểm QC chấm điểm cuối ngày theo từng chỉ tiêu, có chốt ngày và ghi bù." },
-  { id: "imports", label: "Nhập hàng", icon: Truck , moTa: "Ghi chuyến nguyên liệu mua về mỗi ngày, ghi bù chờ hóa đơn và chốt sổ ngày." },
-  { id: "warehouse", label: "Kho dự trữ", icon: Snowflake , moTa: "Kho dự trữ: duyệt lô bán thành phẩm từ chờ sang đã nhập kho và xem tồn." },
-  { id: "qr", label: "Mã lô QR", icon: QrCode , moTa: "Quét tem lô (hoặc gõ mã) để tra nguồn gốc; in tem QR hàng loạt cho nguyên liệu, bán thành phẩm, thành phẩm." },
-  { id: "sales", label: "Bán hàng", icon: ShoppingCart , moTa: "Ghi phiếu bán hàng: khách, kênh bán, quy cách và các dòng mặt hàng." },
-  { id: "orders", label: "Đơn đặt", icon: PackageCheck , moTa: "Đơn đặt hàng xuất khẩu và lệnh xuất lấy hàng theo FIFO từ tồn kho." },
-  { id: "balancing", label: "Cân đối kỳ", icon: Scale , moTa: "Cân đối theo kỳ (~5 ngày): tính định mức nguyên liệu → thành phẩm và lãi lỗ." },
-  { id: "bc-thanh-pham", label: "Báo cáo thành phẩm", icon: CalendarCheck , moTa: "Báo cáo sản lượng thành phẩm theo ngày, in A4 hoặc xuất Excel." },
-  { id: "bc-don-xuat", label: "Báo cáo đơn xuất", icon: Ship , moTa: "Báo cáo các đơn đã xuất, in A4 hoặc xuất Excel." },
-  { id: "nxt-nl", label: "Tồn kho nguyên liệu", icon: Boxes , moTa: "Tồn kho nguyên liệu theo kỳ cân đối: tồn đầu, đông gửi, xả đông, tồn cuối." },
-  { id: "nxt", label: "Tồn kho thành phẩm", icon: FileSpreadsheet , moTa: "Tồn kho thành phẩm theo khoảng ngày: nhập, xuất, tồn từng mã." },
-  { id: "nxt-kho", label: "Nhập xuất tồn kho", icon: Warehouse , moTa: "Sổ Nhập–Xuất–Tồn theo báo cáo thật của xí nghiệp, kèm cột hàng đang nằm ở kho nào." },
-  { id: "ton-kho-thang", label: "Sổ kho theo tháng", icon: CalendarRange , moTa: "Sổ kho theo tháng dương lịch cho cả nguyên liệu, bán thành phẩm và thành phẩm — tồn cuối tháng này tự thành tồn đầu tháng sau." },
-  { id: "doi-soat", label: "Đối soát hóa đơn điện tử", icon: FileCheck2 , moTa: "Đối soát sổ phần mềm với hóa đơn điện tử, tìm dòng lệch và lưu bản đối soát." },
-  { id: "catalog", label: "Danh mục", icon: Library , moTa: "Danh mục dùng chung: mặt hàng, khách hàng, đại lý, loại nguyên liệu, bột tẩm, kho lưu trữ, thành phẩm." },
-  { id: "users", label: "Người dùng", icon: Users , moTa: "Quản lý tài khoản đăng nhập và vai trò của từng người." },
-  { id: "audit", label: "Nhật ký thao tác", icon: History , moTa: "Nhật ký thao tác: ai sửa gì, lúc nào, giá trị trước và sau." },
+/** id = path route. Danh sách phẳng (icon/nhãn/cờ demo) — thứ tự & gom nhóm do NAV_TREE quyết định. */
+export const KIT_NAV: ShellNavItem[] = [
+  { id: "dashboard", label: "Tổng quan", icon: LayoutDashboard , description: "Trang tổng quan: số liệu nổi bật trong ngày và lối tắt sang các màn hay dùng." },
+  { id: "wip", label: "Sản xuất thành phẩm", icon: Factory , description: "Ghi sản lượng thành phẩm làm ra mỗi ngày theo xưởng, chốt ngày và gửi báo cáo." },
+  { id: "packaging", label: "Đóng gói", icon: Package , description: "Ghi phiếu đóng gói: trừ bán thành phẩm đem đóng, cộng thành phẩm ra, tính hao hụt." },
+  { id: "qc", label: "Kiểm tra QC", icon: ClipboardCheck , description: "Bảng kiểm QC chấm điểm cuối ngày theo từng chỉ tiêu, có chốt ngày và ghi bù." },
+  { id: "imports", label: "Nhập hàng", icon: Truck , description: "Ghi chuyến nguyên liệu mua về mỗi ngày, ghi bù chờ hóa đơn và chốt sổ ngày." },
+  { id: "warehouse", label: "Kho dự trữ", icon: Snowflake , description: "Kho dự trữ: duyệt lô bán thành phẩm từ chờ sang đã nhập kho và xem tồn." },
+  { id: "qr", label: "Mã lô QR", icon: QrCode , description: "Quét tem lô (hoặc gõ mã) để tra nguồn gốc; in tem QR hàng loạt cho nguyên liệu, bán thành phẩm, thành phẩm." },
+  { id: "sales", label: "Bán hàng", icon: ShoppingCart , description: "Ghi phiếu bán hàng: khách, kênh bán, quy cách và các dòng mặt hàng." },
+  { id: "orders", label: "Đơn đặt", icon: PackageCheck , description: "Đơn đặt hàng xuất khẩu và lệnh xuất lấy hàng theo FIFO từ tồn kho." },
+  { id: "balancing", label: "Cân đối kỳ", icon: Scale , description: "Cân đối theo kỳ (~5 ngày): tính định mức nguyên liệu → thành phẩm và lãi lỗ." },
+  { id: "production-report", label: "Báo cáo thành phẩm", icon: CalendarCheck , description: "Báo cáo sản lượng thành phẩm theo ngày, in A4 hoặc xuất Excel." },
+  { id: "export-report", label: "Báo cáo đơn xuất", icon: Ship , description: "Báo cáo các đơn đã xuất, in A4 hoặc xuất Excel." },
+  { id: "nxt-material", label: "Tồn kho nguyên liệu", icon: Boxes , description: "Tồn kho nguyên liệu theo kỳ cân đối: tồn đầu, đông gửi, xả đông, tồn cuối." },
+  { id: "nxt", label: "Tồn kho thành phẩm", icon: FileSpreadsheet , description: "Tồn kho thành phẩm theo khoảng ngày: nhập, xuất, tồn từng mã." },
+  { id: "nxt-warehouse", label: "Nhập xuất tồn kho", icon: Warehouse , description: "Sổ Nhập–Xuất–Tồn theo báo cáo thật của xí nghiệp, kèm cột hàng đang nằm ở kho nào." },
+  { id: "monthly-stock", label: "Sổ kho theo tháng", icon: CalendarRange , description: "Sổ kho theo tháng dương lịch cho cả nguyên liệu, bán thành phẩm và thành phẩm — tồn cuối tháng này tự thành tồn đầu tháng sau." },
+  { id: "reconciliation", label: "Đối soát hóa đơn điện tử", icon: FileCheck2 , description: "Đối soát sổ phần mềm với hóa đơn điện tử, tìm dòng lệch và lưu bản đối soát." },
+  { id: "catalog", label: "Danh mục", icon: Library , description: "Danh mục dùng chung: mặt hàng, khách hàng, đại lý, loại nguyên liệu, bột tẩm, kho lưu trữ, thành phẩm." },
+  { id: "users", label: "Người dùng", icon: Users , description: "Quản lý tài khoản đăng nhập và vai trò của từng người." },
+  { id: "audit", label: "Nhật ký thao tác", icon: History , description: "Nhật ký thao tác: ai sửa gì, lúc nào, giá trị trước và sau." },
 ];
 
 /**
@@ -115,17 +115,17 @@ export const KIT_NAV: MucNavShell[] = [
  *  - deep-link `{ to, gateId, label, icon }` → mở `/catalog?tab=…`; kiểm quyền
  *    theo `gateId` (= "catalog").
  */
-export interface NavCon {
+export interface NavTreeChild {
   ref?: string;
   to?: string;
   gateId?: string;
   label?: string;
   icon?: LucideIcon;
 }
-export interface NhomCay {
+export interface NavTreeGroup {
   ten: string;
   icon: LucideIcon;
-  con: NavCon[];
+  con: NavTreeChild[];
 }
 
 /**
@@ -133,19 +133,19 @@ export interface NhomCay {
  * Gom về 1 mục thay vì 1-mục-mỗi-tab: danh mục vốn là MỘT trang nhiều tab, không
  * cần tách sidebar theo từng tab. Danh mục ĐẦY ĐỦ vẫn ở nhóm Hệ thống ("Danh mục").
  */
-const TRACUU = (tab: string): NavCon => ({
+const TRACUU = (tab: string): NavTreeChild => ({
   to: `catalog?tab=${tab}`,
   gateId: "catalog",
   label: "Tra cứu",
   icon: Search,
 });
 
-export const CAY_NAV: NhomCay[] = [
+export const NAV_TREE: NavTreeGroup[] = [
   { ten: "Tổng quan", icon: LayoutDashboard, con: [{ ref: "dashboard" }] },
   {
     ten: "Nhập hàng",
     icon: Truck,
-    con: [{ ref: "imports" }, { ref: "nxt-nl" }, TRACUU("dai-ly")],
+    con: [{ ref: "imports" }, { ref: "nxt-material" }, TRACUU("suppliers")],
   },
   {
     ten: "Sản xuất",
@@ -154,7 +154,7 @@ export const CAY_NAV: NhomCay[] = [
       { ref: "wip" },
       { ref: "packaging" },
       { ref: "qc" },
-      TRACUU("mat-hang"),
+      TRACUU("products"),
     ],
   },
   {
@@ -162,26 +162,26 @@ export const CAY_NAV: NhomCay[] = [
     icon: Warehouse,
     con: [
       { ref: "warehouse" },
-      { ref: "ton-kho-thang" },
+      { ref: "monthly-stock" },
       { ref: "qr" },
-      { ref: "nxt-kho" },
-      TRACUU("kho-luu"),
+      { ref: "nxt-warehouse" },
+      TRACUU("storage-locations"),
     ],
   },
   {
     ten: "Kinh doanh",
     icon: ShoppingCart,
-    con: [{ ref: "sales" }, { ref: "orders" }, TRACUU("khach-hang")],
+    con: [{ ref: "sales" }, { ref: "orders" }, TRACUU("customers")],
   },
   {
     ten: "Báo cáo & Cân đối",
     icon: BarChart3,
     con: [
       { ref: "balancing" },
-      { ref: "bc-thanh-pham" },
-      { ref: "bc-don-xuat" },
+      { ref: "production-report" },
+      { ref: "export-report" },
       { ref: "nxt" },
-      { ref: "doi-soat" },
+      { ref: "reconciliation" },
     ],
   },
   {
@@ -196,15 +196,15 @@ interface NavChild {
   key: string; // định danh so khớp active
   target: string; // path để điều hướng (id hoặc "catalog?tab=…")
   label: string;
-  moTa?: string;
+  description?: string;
   icon: LucideIcon;
   demo?: boolean;
-  laDanhMuc: boolean; // deep-link danh mục (style phụ + ẩn khi thu gọn)
+  isCatalogLink: boolean; // deep-link danh mục (style phụ + ẩn khi thu gọn)
 }
 interface DisplayGroup {
   ten: string;
   icon: LucideIcon;
-  muc: NavChild[];
+  items: NavChild[];
 }
 
 /**
@@ -213,12 +213,12 @@ interface DisplayGroup {
  * - deep-link: giữ khi `items` có `gateId` (VD "catalog").
  * Mục trong `items` không nằm trong cây rơi vào nhóm "Khác" để không mất.
  */
-function groupTree(items: MucNavShell[]): DisplayGroup[] {
+function groupTree(items: ShellNavItem[]): DisplayGroup[] {
   const con = new Map(items.map((i) => [i.id, i]));
   const used = new Set<string>();
   const nhom: DisplayGroup[] = [];
 
-  for (const g of CAY_NAV) {
+  for (const g of NAV_TREE) {
     const childItems: NavChild[] = [];
     for (const c of g.con) {
       if (c.ref) {
@@ -228,10 +228,10 @@ function groupTree(items: MucNavShell[]): DisplayGroup[] {
           key: m.id === "catalog" ? "catalog" : m.id,
           target: m.id,
           label: m.label,
-          moTa: m.moTa,
+          description: m.description,
           icon: m.icon,
           demo: m.demo,
-          laDanhMuc: false,
+          isCatalogLink: false,
         });
         used.add(c.ref);
       } else if (c.to && c.gateId && con.has(c.gateId)) {
@@ -239,18 +239,18 @@ function groupTree(items: MucNavShell[]): DisplayGroup[] {
           key: c.to,
           target: c.to,
           label: c.label ?? "",
-          moTa: "Mở danh mục liên quan tới module này (cùng một trang Danh mục, chỉ nhảy đúng tab).",
+          description: "Mở danh mục liên quan tới module này (cùng một trang Danh mục, chỉ nhảy đúng tab).",
           icon: c.icon ?? Library,
-          laDanhMuc: true,
+          isCatalogLink: true,
         });
       }
     }
     // Bỏ deep-link danh mục MỒ CÔI: nếu module không có MÀN thật nào người dùng
     // thấy (vai trò bộ phận), đừng hiện nhánh chỉ có shortcut danh mục — danh mục
     // đầy đủ vẫn vào được ở nhóm Hệ thống. (Admin có đủ màn nên không đụng.)
-    const coMan = childItems.some((m) => !m.laDanhMuc);
+    const coMan = childItems.some((m) => !m.isCatalogLink);
     const keptItems = coMan ? childItems : [];
-    if (keptItems.length) nhom.push({ ten: g.ten, icon: g.icon, muc: keptItems });
+    if (keptItems.length) nhom.push({ ten: g.ten, icon: g.icon, items: keptItems });
   }
 
   const remaining = items.filter((i) => !used.has(i.id));
@@ -258,14 +258,14 @@ function groupTree(items: MucNavShell[]): DisplayGroup[] {
     nhom.push({
       ten: "Khác",
       icon: Library,
-      muc: remaining.map((m) => ({
+      items: remaining.map((m) => ({
         key: m.id,
         target: m.id,
         label: m.label,
-        moTa: m.moTa,
+        description: m.description,
         icon: m.icon,
         demo: m.demo,
-        laDanhMuc: false,
+        isCatalogLink: false,
       })),
     });
   }
@@ -302,13 +302,13 @@ function HeaderButton({
 /** Một mục lá trong cây nav. */
 function NavItemButton({
   m,
-  chon,
-  thuGon,
+  isActive: isCurrent,
+  collapsed: isCollapsed,
   onSelect,
 }: {
   m: NavChild;
-  chon: boolean;
-  thuGon: boolean;
+  isActive: boolean;
+  collapsed: boolean;
   onSelect: (target: string) => void;
 }) {
   const Icon = m.icon;
@@ -316,24 +316,24 @@ function NavItemButton({
     <button
       type="button"
       onClick={() => onSelect(m.target)}
-      aria-current={chon ? "page" : undefined}
-      title={thuGon ? [m.label, m.moTa].filter(Boolean).join(" — ") : m.moTa}
+      aria-current={isCurrent ? "page" : undefined}
+      title={isCollapsed ? [m.label, m.description].filter(Boolean).join(" — ") : m.description}
       className={cn(
         "press-feedback flex min-h-10 w-full items-center gap-3 rounded-lg border text-left",
-        thuGon ? "justify-center px-0" : "px-3",
-        m.laDanhMuc ? "text-sm font-medium" : "text-sm font-semibold",
-        chon
+        isCollapsed ? "justify-center px-0" : "px-3",
+        m.isCatalogLink ? "text-sm font-medium" : "text-sm font-semibold",
+        isCurrent
           ? "border-primary bg-accent text-accent-foreground shadow-sm"
-          : m.laDanhMuc
+          : m.isCatalogLink
             ? "border-transparent text-muted-foreground hover:bg-muted hover:text-foreground"
             : "border-transparent text-foreground hover:bg-muted"
       )}
     >
-      <Icon className={cn("shrink-0", m.laDanhMuc ? "size-icon-sm" : "size-icon")} aria-hidden />
-      {!thuGon && (
+      <Icon className={cn("shrink-0", m.isCatalogLink ? "size-icon-sm" : "size-icon")} aria-hidden />
+      {!isCollapsed && (
         <span className="min-w-0 whitespace-normal break-words leading-tight">{m.label}</span>
       )}
-      {!thuGon && m.demo && (
+      {!isCollapsed && m.demo && (
         <Tag variant="phu" className="ml-auto">
           DEMO
         </Tag>
@@ -350,22 +350,22 @@ function NavTree({
   nhom,
   activeKey,
   onSelect,
-  thuGon = false,
-  moNhom,
+  collapsed: isCollapsed = false,
+  openGroups,
   onToggle,
 }: {
   nhom: DisplayGroup[];
   activeKey: string;
   onSelect: (target: string) => void;
-  thuGon?: boolean;
-  moNhom: Record<string, boolean>;
+  collapsed?: boolean;
+  openGroups: Record<string, boolean>;
   onToggle: (ten: string) => void;
 }) {
   return (
     <nav className="scroll-nice flex-1 overflow-y-auto p-3">
       {nhom.map((g, i) => {
-        if (thuGon) {
-          const childItems = g.muc.filter((m) => !m.laDanhMuc);
+        if (isCollapsed) {
+          const childItems = g.items.filter((m) => !m.isCatalogLink);
           if (!childItems.length) return null;
           return (
             <div key={g.ten} className={cn(i > 0 && "mt-4")}>
@@ -375,8 +375,8 @@ function NavTree({
                   <NavItemButton
                     key={m.key}
                     m={m}
-                    chon={activeKey === m.key}
-                    thuGon
+                    isActive={activeKey === m.key}
+                    collapsed
                     onSelect={onSelect}
                   />
                 ))}
@@ -385,21 +385,21 @@ function NavTree({
           );
         }
         // Nhóm chỉ một màn (VD Tổng quan) → hiện thẳng, khỏi tiêu đề gập cho đỡ lặp.
-        if (g.muc.length === 1) {
+        if (g.items.length === 1) {
           return (
             <div key={g.ten} className={cn(i > 0 && "mt-3")}>
               <NavItemButton
-                m={g.muc[0]}
-                chon={activeKey === g.muc[0].key}
-                thuGon={false}
+                m={g.items[0]}
+                isActive={activeKey === g.items[0].key}
+                collapsed={false}
                 onSelect={onSelect}
               />
             </div>
           );
         }
-        const mo = moNhom[g.ten] !== false; // mặc định mở
+        const mo = openGroups[g.ten] !== false; // mặc định mở
         const GIcon = g.icon;
-        const coActive = g.muc.some((m) => m.key === activeKey);
+        const coActive = g.items.some((m) => m.key === activeKey);
         return (
           <div key={g.ten} className={cn(i > 0 && "mt-2")}>
             {/* Tiêu đề nhóm module = 1 LỚP: chữ hoa nhỏ + gạch dưới nhạt cho tách
@@ -429,12 +429,12 @@ function NavTree({
               // Rail dọc + thụt lề = con thuộc nhóm này (nhìn thấy rõ phân lớp).
               // enter-up: mở nhóm thì danh sách con nhích lên hiện vào.
               <div className="enter-up mt-1 ml-5 space-y-1 border-l-2 border-border pl-2">
-                {g.muc.map((m) => (
+                {g.items.map((m) => (
                   <NavItemButton
                     key={m.key}
                     m={m}
-                    chon={activeKey === m.key}
-                    thuGon={false}
+                    isActive={activeKey === m.key}
+                    collapsed={false}
                     onSelect={onSelect}
                   />
                 ))}
@@ -459,10 +459,10 @@ function Initials(ten: string): string {
   );
 }
 
-export interface HuongDanTrang {
-  tieuDe: string;
-  moTa?: string;
-  noiDung: ReactNode;
+export interface ShellPageGuide {
+  title: string;
+  description?: string;
+  content: ReactNode;
 }
 
 export interface AppShellProps {
@@ -470,21 +470,21 @@ export interface AppShellProps {
   /** Tab danh mục đang mở (chỉ dùng khi active = "catalog") để tô sáng đúng deep-link. */
   activeTab?: string;
   onSelect: (id: string) => void;
-  tieuDe: string;
+  title: string;
   breadcrumb?: string;
-  nguoiDung: string;
-  vaiTro: string;
+  displayName: string;
+  role: string;
   /** Username để lưu cấu hình giao diện theo người dùng. */
-  taiKhoan?: string;
+  account?: string;
   /** Nội dung hướng dẫn của trang đang mở; bỏ trống ⇒ không hiện nút. */
-  huongDan?: HuongDanTrang | null;
+  guide?: ShellPageGuide | null;
   ca?: string;
-  onDoiCa?: () => void;
-  soThongBao?: number;
-  onThongBao?: () => void;
-  onDangXuat?: () => void;
+  onChangeShift?: () => void;
+  notificationCount?: number;
+  onOpenNotifications?: () => void;
+  onLogout?: () => void;
   /** Danh sách nav (đã lọc theo quyền). Mặc định KIT_NAV. */
-  items?: MucNavShell[];
+  items?: ShellNavItem[];
   children: ReactNode;
 }
 
@@ -496,17 +496,17 @@ export default function AppShell({
   active,
   activeTab,
   onSelect,
-  tieuDe,
+  title,
   breadcrumb,
-  nguoiDung,
-  vaiTro,
-  taiKhoan,
-  huongDan,
+  displayName: profile,
+  role,
+  account,
+  guide,
   ca,
-  onDoiCa,
-  soThongBao,
-  onThongBao,
-  onDangXuat,
+  onChangeShift,
+  notificationCount,
+  onOpenNotifications,
+  onLogout: onSignOut,
   items = KIT_NAV,
   children,
 }: AppShellProps) {
@@ -514,9 +514,9 @@ export default function AppShell({
   // nhường chỗ cho tiêu đề + bảng; người dùng bấm nút thu/mở thì theo ý họ —
   // nhưng chỉ trong cùng một cỡ màn: xoay máy sang cỡ khác là về lại mặc định.
   const isNarrowSidebar = useMediaQuery(MEDIA_NARROW_SIDEBAR);
-  const [collapsePick, setCollapsePick] = useState<{ hep: boolean; thuGon: boolean } | null>(null);
-  const thuGon =
-    collapsePick && collapsePick.hep === isNarrowSidebar ? collapsePick.thuGon : isNarrowSidebar;
+  const [collapsePick, setCollapsePick] = useState<{ narrow: boolean; collapsed: boolean } | null>(null);
+  const isCollapsed =
+    collapsePick && collapsePick.narrow === isNarrowSidebar ? collapsePick.collapsed : isNarrowSidebar;
   const [moNav, setMoNav] = useState(false);
   const nhom = groupTree(items);
 
@@ -561,23 +561,23 @@ export default function AppShell({
       <aside
         className={cn(
           "pb-safe hidden shrink-0 flex-col border-r border-border bg-card transition-[width] duration-base ease-soft md:flex md:h-full md:overflow-hidden",
-          thuGon ? "w-20" : "w-72"
+          isCollapsed ? "w-20" : "w-72"
         )}
       >
         <div
           className={cn(
             "flex h-header shrink-0 items-center border-b border-border",
-            thuGon ? "justify-center px-2" : "px-4"
+            isCollapsed ? "justify-center px-2" : "px-4"
           )}
         >
-          <Logo heightClass="h-9" showWordmark={!thuGon} subtitle={thuGon ? undefined : "Xí nghiệp BSF1"} />
+          <Logo heightClass="h-9" showWordmark={!isCollapsed} subtitle={isCollapsed ? undefined : "Xí nghiệp BSF1"} />
         </div>
         <NavTree
           nhom={nhom}
           activeKey={activeKey}
           onSelect={onSelect}
-          thuGon={thuGon}
-          moNhom={openGroups}
+          collapsed={isCollapsed}
+          openGroups={openGroups}
           onToggle={toggleNhom}
         />
       </aside>
@@ -606,7 +606,7 @@ export default function AppShell({
               nhom={nhom}
               activeKey={activeKey}
               onSelect={select}
-              moNhom={openGroups}
+              openGroups={openGroups}
               onToggle={toggleNhom}
             />
 
@@ -619,54 +619,54 @@ export default function AppShell({
                   aria-hidden
                   className="flex size-tap shrink-0 items-center justify-center rounded-full bg-accent text-sm font-bold text-accent-foreground"
                 >
-                  {Initials(nguoiDung)}
+                  {Initials(profile)}
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold text-foreground">
-                    {nguoiDung}
+                    {profile}
                   </p>
-                  <p className="truncate text-sm text-muted-foreground">{vaiTro}</p>
+                  <p className="truncate text-sm text-muted-foreground">{role}</p>
                 </div>
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
-                <DisplaySettingsButton account={taiKhoan} />
+                <DisplaySettingsButton account={account} />
                 {ca && (
                   <button
                     title="Đổi ca làm việc đang chọn — số liệu trên màn lọc theo ca này."
                     type="button"
-                    onClick={onDoiCa}
+                    onClick={onChangeShift}
                     className="press-feedback inline-flex min-h-10 items-center gap-2 rounded-lg border border-input px-3.5 text-sm font-semibold text-foreground hover:bg-muted"
                   >
                     <RefreshCw className="size-icon-sm" aria-hidden />
                     {ca}
                   </button>
                 )}
-                {typeof soThongBao === "number" && (
+                {typeof notificationCount === "number" && (
                   <button
                     title="Xem các thông báo và việc cần làm trong ngày."
                     type="button"
-                    onClick={onThongBao}
+                    onClick={onOpenNotifications}
                     className="press-feedback inline-flex min-h-10 items-center gap-2 rounded-lg border border-input px-3.5 text-sm font-semibold text-foreground hover:bg-muted"
                   >
                     <Bell className="size-icon-sm" aria-hidden />
                     Thông báo
-                    {soThongBao > 0 && (
+                    {notificationCount > 0 && (
                       <span className="tnum rounded-full bg-destructive px-2 text-xs font-bold text-destructive-foreground">
-                        {soThongBao}
+                        {notificationCount}
                       </span>
                     )}
                   </button>
                 )}
-                {onDangXuat && (
+                {onSignOut && (
                   <ConfirmAction
                     title="Đăng xuất khỏi máy này?"
                     description="Số liệu đã ghi vẫn còn. Vào lại phải nhập tên đăng nhập và mật khẩu."
-                    detail={`${nguoiDung} · ${vaiTro}`}
+                    detail={`${profile} · ${role}`}
                     confirmLabel="Đăng xuất"
                     cancelLabel="Ở lại"
                     icon={LogOut}
-                    onConfirm={onDangXuat}
+                    onConfirm={onSignOut}
                     trigger={
                       <button
                         title="Thoát tài khoản và quay về màn đăng nhập."
@@ -697,9 +697,9 @@ export default function AppShell({
               className="md:hidden"
             />
             <HeaderButton
-              label={thuGon ? "Mở thanh bên" : "Thu thanh bên"}
-              icon={thuGon ? PanelLeftOpen : PanelLeftClose}
-              onClick={() => setCollapsePick({ hep: isNarrowSidebar, thuGon: !thuGon })}
+              label={isCollapsed ? "Mở thanh bên" : "Thu thanh bên"}
+              icon={isCollapsed ? PanelLeftOpen : PanelLeftClose}
+              onClick={() => setCollapsePick({ narrow: isNarrowSidebar, collapsed: !isCollapsed })}
               className="hidden md:inline-flex"
             />
             <div className="min-w-0">
@@ -709,7 +709,7 @@ export default function AppShell({
               {/* KHÔNG phải h1: mỗi màn tự có một h1 trong nội dung (màn không hiện tiêu đề thì
                   đặt h1 sr-only). Hai h1 ⇒ trình đọc màn hình đọc hai tiêu đề cấp 1 trùng nhau. */}
               <p className="truncate text-lg font-semibold text-foreground md:text-xl">
-                {tieuDe}
+                {title}
               </p>
             </div>
           </div>
@@ -720,7 +720,7 @@ export default function AppShell({
               <button
                 title="Đổi ca làm việc đang chọn — số liệu trên màn lọc theo ca này."
                 type="button"
-                onClick={onDoiCa}
+                onClick={onChangeShift}
                 className="press-feedback hidden min-h-10 items-center gap-2 rounded-lg border border-input px-3.5 text-sm font-semibold text-foreground hover:bg-muted xl:inline-flex"
               >
                 <RefreshCw className="size-icon-sm" aria-hidden />
@@ -728,31 +728,31 @@ export default function AppShell({
               </button>
             )}
 
-            {typeof soThongBao === "number" && (
+            {typeof notificationCount === "number" && (
               <span className="relative hidden md:inline-flex">
                 <HeaderButton
-                  label={`Thông báo (${soThongBao} chưa đọc)`}
+                  label={`Thông báo (${notificationCount} chưa đọc)`}
                   icon={Bell}
-                  onClick={onThongBao}
+                  onClick={onOpenNotifications}
                 />
-                {soThongBao > 0 && (
+                {notificationCount > 0 && (
                   <span
                     aria-hidden
                     className="tnum absolute -right-1.5 -top-1.5 flex h-6 min-w-6 items-center justify-center rounded-full bg-destructive px-1.5 text-xs font-bold text-destructive-foreground"
                   >
-                    {soThongBao}
+                    {notificationCount}
                   </span>
                 )}
               </span>
             )}
 
-            {huongDan && (
-              <GuideButton title={huongDan.tieuDe} description={huongDan.moTa}>
-                {huongDan.noiDung}
+            {guide && (
+              <GuideButton title={guide.title} description={guide.description}>
+                {guide.content}
               </GuideButton>
             )}
             <span className="hidden md:inline-flex">
-              <DisplaySettingsButton account={taiKhoan} />
+              <DisplaySettingsButton account={account} />
             </span>
             <DataSyncStatusButton />
 
@@ -761,23 +761,23 @@ export default function AppShell({
                 aria-hidden
                 className="flex size-tap shrink-0 items-center justify-center rounded-full bg-accent text-sm font-bold text-accent-foreground"
               >
-                {Initials(nguoiDung)}
+                {Initials(profile)}
               </span>
               <div className="hidden min-w-0 text-right xl:block">
                 <p className="truncate text-sm font-semibold text-foreground">
-                  {nguoiDung}
+                  {profile}
                 </p>
-                <p className="truncate text-sm text-muted-foreground">{vaiTro}</p>
+                <p className="truncate text-sm text-muted-foreground">{role}</p>
               </div>
-              {onDangXuat && (
+              {onSignOut && (
                 <ConfirmAction
                   title="Đăng xuất khỏi máy này?"
                   description="Số liệu đã ghi vẫn còn. Vào lại phải nhập tên đăng nhập và mật khẩu."
-                  detail={`${nguoiDung} · ${vaiTro}`}
+                  detail={`${profile} · ${role}`}
                   confirmLabel="Đăng xuất"
                   cancelLabel="Ở lại"
                   icon={LogOut}
-                  onConfirm={onDangXuat}
+                  onConfirm={onSignOut}
                   trigger={
                     <button
                       type="button"
@@ -798,7 +798,7 @@ export default function AppShell({
           {/* Nhắc tải lại khi có bản deploy mới — ĐẶT NGOÀI khối đổi-trang để
               không bị mất/khởi tạo lại mỗi lần chuyển màn. */}
           <div className="mx-auto w-full max-w-(--app-content-width)">
-            <BangCapNhat />
+            <UpdateBanner />
           </div>
           {/* key theo màn đang mở → fade nhẹ mỗi lần đổi trang (reduced-motion tắt) */}
           <div

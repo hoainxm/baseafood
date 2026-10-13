@@ -18,8 +18,8 @@ import {
 import DangNhap from "@/features/auth";
 import { NotFound } from "@/features/shared";
 import AppShell, { KIT_NAV } from "@/features/shared/AppShell";
-import { ToMauProvider } from "@/features/shared/ToMauProvider";
-import { HUONG_DAN } from "@/features/shared/guideContent";
+import { RowMarkProvider } from "@/features/shared/RowMarkProvider";
+import { PAGE_GUIDES } from "@/features/shared/guideContent";
 import { Toaster, applyDisplaySettings, ProcessingState, EmptyState } from "@/design-system";
 import { Users } from "lucide-react";
 import { useAuth } from "@/lib/auth";
@@ -27,7 +27,8 @@ import { setAuditOperator } from "@/lib/audit";
 import { roleLabel } from "@/types";
 import { allowedIds, homeFor } from "@/lib/nav-access";
 import { LA_DEMO, setDemoMode } from "@/lib/demoMode";
-import { DaiDemo, NapGoiDemo } from "@/features/shared/CheDoDemo";
+import { DemoModeBanner, DemoPackLoader } from "@/features/shared/DemoMode";
+import { LEGACY_PATHS, normalizeCatalogTab } from "@/lib/legacyUrls";
 
 // Tổng quan — dòng chảy số liệu
 const DashboardScreen = lazy(() => import("@/features/dashboard/DashboardScreen"));
@@ -39,7 +40,7 @@ const ReserveWarehouseScreen = lazy(() => import("@/features/warehouse"));
 const InOutStockReportScreen = lazy(() => import("@/features/reports/NxtReportScreen"));
 const MaterialStockScreen = lazy(() => import("@/features/reports/MaterialNxtScreen"));
 const WarehouseNxtReportScreen = lazy(() => import("@/features/reports/WarehouseNxtScreen"));
-const MonthlyStockLedgerScreen = lazy(() => import("@/features/monthly-stock")); // Sổ kho theo tháng, route /ton-kho-thang
+const MonthlyStockLedgerScreen = lazy(() => import("@/features/monthly-stock")); // Sổ kho theo tháng, route /monthly-stock
 const FinishedGoodReportScreen = lazy(() => import("@/features/reports/DailyProductionReport"));
 const OrderExportReportScreen = lazy(() => import("@/features/reports/OrderExportReport"));
 const SalesOrderScreen = lazy(() => import("@/features/orders"));
@@ -51,7 +52,7 @@ const WipProductionScreen = lazy(() => import("@/features/production")); // Sả
 const PackagingScreen = lazy(() => import("@/features/packaging")); // Đóng gói BTP → TP, route /packaging
 const QcChecklistScreen = lazy(() => import("@/features/quality-check")); // QC checklist chấm điểm, route /qc
 const LotScanScreen = lazy(() => import("@/features/qr")); // Quét/tra lô theo QR, route /qr
-const ReconciliationScreen = lazy(() => import("@/features/doi-soat")); // Đối soát HĐĐT ⇄ phần mềm kế toán, route /doi-soat
+const ReconciliationScreen = lazy(() => import("@/features/reconciliation")); // Đối soát HĐĐT ⇄ phần mềm kế toán, route /reconciliation (cũ /doi-soat
 const KitPage = lazy(() => import("@/design-system/kit/KitPage"));
 
 /**
@@ -89,54 +90,60 @@ function ShellLayout() {
   const seg = location.pathname.split("/").filter(Boolean)[0] ?? "dashboard";
   const roles = auth.nguoiDung?.roles ?? [];
   // 2 giao diện bộ phận: vai trò bộ phận chỉ thấy nav của bộ phận đó (null = đầy đủ).
-  const cacIdChoPhep = allowedIds(roles, auth.laAdmin);
-  const base = cacIdChoPhep
-    ? KIT_NAV.filter((n) => cacIdChoPhep.has(n.id))
+  const permittedIds = allowedIds(roles, auth.laAdmin);
+  const base = permittedIds
+    ? KIT_NAV.filter((n) => permittedIds.has(n.id))
     : auth.laAdmin
       ? KIT_NAV
       : KIT_NAV.filter((n) => n.id !== "users" && n.id !== "audit");
   const items = base;
 
   // Vào path ngoài bộ phận (gõ URL / link cũ) ⇒ đưa về trang chủ bộ phận.
-  if (cacIdChoPhep && seg && !cacIdChoPhep.has(seg)) {
+  if (permittedIds && seg && !permittedIds.has(seg)) {
     return <Navigate to={`/${homeFor(roles)}`} replace />;
   }
   const current = KIT_NAV.find((n) => n.id === seg);
-  const guide = HUONG_DAN[seg];
+  const guide = PAGE_GUIDES[seg];
 
   return (
     <AppShell
       active={seg}
-      activeTab={seg === "catalog" ? searchParams.get("tab") ?? undefined : undefined}
+      activeTab={seg === "catalog" ? normalizeCatalogTab(searchParams.get("tab")) : undefined}
       onSelect={(id) => navigate(`/${id}`)}
-      tieuDe={current?.label ?? ""}
-      taiKhoan={username}
-      huongDan={
+      title={current?.label ?? ""}
+      account={username}
+      guide={
         guide
-          ? { tieuDe: guide.tieuDe, moTa: guide.moTa, noiDung: guide.noiDung }
+          ? { title: guide.title, description: guide.description, content: guide.content }
           : null
       }
-      nguoiDung={
+      displayName={
         auth.nguoiDung?.fullName || auth.nguoiDung?.username || "Người dùng"
       }
-      vaiTro={roleLabel(auth.nguoiDung?.roles ?? [])}
+      role={roleLabel(auth.nguoiDung?.roles ?? [])}
       ca="Ca A"
-      soThongBao={3}
-      onDangXuat={
+      notificationCount={3}
+      onLogout={
         auth.canDangNhap && auth.session ? auth.dangXuat : undefined
       }
       items={items}
     >
       {/* Tô màu dòng "đã dò" — một nguồn row_marks cho mọi bảng (prop `rowMarkKey`). */}
-      <ToMauProvider nguoi={username ?? ""}>
-        <DaiDemo />
-        <NapGoiDemo />
+      <RowMarkProvider username={username ?? ""}>
+        <DemoModeBanner />
+        <DemoPackLoader />
         <Suspense fallback={<ProcessingState text="Đang mở màn hình…" />}>
           <Outlet />
         </Suspense>
-      </ToMauProvider>
+      </RowMarkProvider>
     </AppShell>
   );
+}
+
+/** Đường dẫn tiếng Việt cũ → đường dẫn mới, GIỮ query (?tab=…, ?lo=…) để link cũ mở đúng chỗ. */
+function LegacyPathRedirect({ from }: { from: string }) {
+  const { search } = useLocation();
+  return <Navigate to={`/${LEGACY_PATHS[from]}${search}`} replace />;
 }
 
 export default function App() {
@@ -156,7 +163,7 @@ export default function App() {
   if (auth.canDangNhap && !auth.session) {
     return (
       <>
-        <DangNhap dangNhap={auth.dangNhap} />
+        <DangNhap login={auth.dangNhap} />
         <Toaster position="bottom-center" richColors closeButton />
       </>
     );
@@ -179,16 +186,21 @@ export default function App() {
             <Route path="/reports" element={<Navigate to="/dashboard" replace />} />
             <Route path="/traceability" element={<Navigate to="/qr" replace />} />
 
+            {/* Đường dẫn tiếng Việt CŨ (trước 2026-10-13) — giữ vĩnh viễn: bookmark, link đã gửi Zalo. */}
+            {Object.keys(LEGACY_PATHS).map((old) => (
+              <Route key={old} path={`/${old}`} element={<LegacyPathRedirect from={old} />} />
+            ))}
+
             {/* Nghiệp vụ gốc */}
             <Route path="/imports" element={<MaterialImportScreen />} />
             <Route path="/sales" element={<SalesScreen />} />
             <Route path="/warehouse" element={<ReserveWarehouseScreen />} />
             <Route path="/nxt" element={<InOutStockReportScreen />} />
-            <Route path="/nxt-nl" element={<MaterialStockScreen />} />
-            <Route path="/nxt-kho" element={<WarehouseNxtReportScreen />} />
-            <Route path="/ton-kho-thang" element={<MonthlyStockLedgerScreen />} />
-            <Route path="/bc-thanh-pham" element={<FinishedGoodReportScreen />} />
-            <Route path="/bc-don-xuat" element={<OrderExportReportScreen />} />
+            <Route path="/nxt-material" element={<MaterialStockScreen />} />
+            <Route path="/nxt-warehouse" element={<WarehouseNxtReportScreen />} />
+            <Route path="/monthly-stock" element={<MonthlyStockLedgerScreen />} />
+            <Route path="/production-report" element={<FinishedGoodReportScreen />} />
+            <Route path="/export-report" element={<OrderExportReportScreen />} />
             <Route path="/orders" element={<SalesOrderScreen />} />
             <Route path="/balancing" element={<CanDoiScreen />} />
             <Route path="/balancing/:periodId" element={<CanDoiScreen />} />
@@ -197,7 +209,7 @@ export default function App() {
             <Route path="/packaging" element={<PackagingScreen />} />
             <Route path="/qc" element={<QcChecklistScreen />} />
             <Route path="/qr" element={<LotScanScreen />} />
-            <Route path="/doi-soat" element={<ReconciliationScreen />} />
+            <Route path="/reconciliation" element={<ReconciliationScreen />} />
             <Route
               path="/users"
               element={
@@ -210,7 +222,7 @@ export default function App() {
                     description="Người dùng và vai trò là tài khoản thật, không thuộc bộ demo. Thoát demo (nút trên dải vàng) để quản lý người dùng."
                   />
                 ) : auth.laAdmin ? (
-                  <UserManagementScreen taoTaiKhoan={auth.taoTaiKhoan} />
+                  <UserManagementScreen createAccount={auth.taoTaiKhoan} />
                 ) : (
                   <Navigate to="/dashboard" replace />
                 )

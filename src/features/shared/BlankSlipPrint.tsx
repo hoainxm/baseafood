@@ -1,5 +1,5 @@
 // ============================================================
-// Tên file: src/features/shared/PhieuTrongIn.tsx
+// Tên file: src/features/shared/BlankSlipPrint.tsx
 // Tên tiếng Việt: Biểu mẫu giấy IN TRỐNG (để xưởng ghi tay)
 // Description: Blank A4 print forms — daily material import & daily WIP report
 // ============================================================
@@ -20,47 +20,47 @@ const ROW_COUNT = 14;
 
 /** Một cột của biểu mẫu trống: nhãn + canh phải (cột số) + class rộng gợi ý. */
 interface BlankColumn {
-  nhan: string;
-  phai?: boolean;
-  rong?: string;
+  label: string;
+  right?: boolean;
+  widthClass?: string;
 }
 
 /** Bảng trống dùng chung: tiêu đề cột + N dòng trống + dòng TỔNG CỘNG.
  *  `tongSpan` = số cột đầu mà nhãn "TỔNG CỘNG" trải qua (các cột số để trống). */
-function BangTrong({
-  cot,
-  tongSpan,
-  soDong = ROW_COUNT,
+function BlankTable({
+  columns,
+  totalSpan: totalLabelSpan,
+  rowCount = ROW_COUNT,
 }: {
-  cot: BlankColumn[];
-  tongSpan: number;
-  soDong?: number;
+  columns: BlankColumn[];
+  totalSpan: number;
+  rowCount?: number;
 }) {
   return (
     <table className="w-full border-collapse">
       <thead>
         <tr>
-          {cot.map((c) => (
-            <PrintTh key={c.nhan} right={c.phai} className={c.rong}>
-              {c.nhan}
+          {columns.map((c) => (
+            <PrintTh key={c.label} right={c.right} className={c.widthClass}>
+              {c.label}
             </PrintTh>
           ))}
         </tr>
       </thead>
       <tbody>
-        {Array.from({ length: soDong }, (_, i) => (
+        {Array.from({ length: rowCount }, (_, i) => (
           <tr key={i}>
-            {cot.map((c) => (
-              <PrintTd key={c.nhan} className="h-9" />
+            {columns.map((c) => (
+              <PrintTd key={c.label} className="h-9" />
             ))}
           </tr>
         ))}
         <tr>
-          <PrintTd bold colSpan={tongSpan}>
+          <PrintTd bold colSpan={totalLabelSpan}>
             Tổng cộng
           </PrintTd>
-          {cot.slice(tongSpan).map((c) => (
-            <PrintTd key={c.nhan} bold className="h-9" />
+          {columns.slice(totalLabelSpan).map((c) => (
+            <PrintTd key={c.label} bold className="h-9" />
           ))}
         </tr>
       </tbody>
@@ -69,11 +69,11 @@ function BangTrong({
 }
 
 /** Ô ký tên cuối phiếu — người lập ghi tay rồi ký. */
-function SignatureFooter({ vaiTro = "Người lập biểu" }: { vaiTro?: string }) {
+function SignatureFooter({ signerTitle: role = "Người lập biểu" }: { signerTitle?: string }) {
   return (
     <div className="mt-6 flex justify-end">
       <div className="w-56 text-center text-sm">
-        <p className="font-semibold uppercase">{vaiTro}</p>
+        <p className="font-semibold uppercase">{role}</p>
         <p className="text-xs italic text-slate-500">(Ký, ghi rõ họ tên)</p>
         <div className="h-16" />
       </div>
@@ -88,22 +88,22 @@ const BLANK_DATE = "Ngày ……… tháng ……… năm 20………";
  * Phiếu TRỐNG — Báo cáo tổng hợp nguyên liệu hằng ngày (bám màn /imports).
  * Cột đúng tờ chị Trúc: STT · Tên đại lý · Loại nguyên liệu · Số lượng · Đơn giá · Ghi chú.
  */
-export function PhieuTrongNhapNL({ onClose }: { onClose: () => void }) {
+export function BlankDailyImportSlip({ onClose }: { onClose: () => void }) {
   return (
     <PrintSheet
       title="Báo cáo tổng hợp nguyên liệu hàng ngày"
       subtitle={BLANK_DATE}
       onClose={onClose}
     >
-      <BangTrong
-        tongSpan={3}
-        cot={[
-          { nhan: "STT", rong: "w-12" },
-          { nhan: "Tên đại lý", rong: "w-48" },
-          { nhan: "Loại nguyên liệu" },
-          { nhan: "Số lượng", phai: true, rong: "w-28" },
-          { nhan: "Đơn giá", phai: true, rong: "w-24" },
-          { nhan: "Ghi chú", rong: "w-64" },
+      <BlankTable
+        totalSpan={3}
+        columns={[
+          { label: "STT", widthClass: "w-12" },
+          { label: "Tên đại lý", widthClass: "w-48" },
+          { label: "Loại nguyên liệu" },
+          { label: "Số lượng", right: true, widthClass: "w-28" },
+          { label: "Đơn giá", right: true, widthClass: "w-24" },
+          { label: "Ghi chú", widthClass: "w-64" },
         ]}
       />
       <SignatureFooter />
@@ -115,22 +115,22 @@ export function PhieuTrongNhapNL({ onClose }: { onClose: () => void }) {
  * Phiếu TRỐNG — Báo cáo bán thành phẩm hằng ngày (bám màn /wip).
  * Cột đúng tờ mẫu: STT · Tên bán thành phẩm / Quy cách · Số lượng · Đơn giá · Thành tiền · Ghi chú.
  */
-export function PhieuTrongTPNgay({ onClose }: { onClose: () => void }) {
+export function BlankDailyWipSlip({ onClose }: { onClose: () => void }) {
   return (
     <PrintSheet
       title="Báo cáo bán thành phẩm hàng ngày"
       subtitle={BLANK_DATE}
       onClose={onClose}
     >
-      <BangTrong
-        tongSpan={2}
-        cot={[
-          { nhan: "STT", rong: "w-12" },
-          { nhan: "Tên bán thành phẩm / Quy cách" },
-          { nhan: "Số lượng", phai: true, rong: "w-28" },
-          { nhan: "Đơn giá", phai: true, rong: "w-24" },
-          { nhan: "Thành tiền", phai: true, rong: "w-32" },
-          { nhan: "Ghi chú", rong: "w-56" },
+      <BlankTable
+        totalSpan={2}
+        columns={[
+          { label: "STT", widthClass: "w-12" },
+          { label: "Tên bán thành phẩm / Quy cách" },
+          { label: "Số lượng", right: true, widthClass: "w-28" },
+          { label: "Đơn giá", right: true, widthClass: "w-24" },
+          { label: "Thành tiền", right: true, widthClass: "w-32" },
+          { label: "Ghi chú", widthClass: "w-56" },
         ]}
       />
       <SignatureFooter />

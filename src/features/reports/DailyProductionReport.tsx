@@ -47,10 +47,10 @@ import {
   Scale,
 } from "lucide-react";
 
-const PHAN_XUONG: Workshop[] = ["Đông", "Cá", "Khô"];
-const XUONG_OPT = [
+const WORKSHOPS: Workshop[] = ["Đông", "Cá", "Khô"];
+const WORKSHOP_OPTIONS = [
   { value: "Tất cả", label: "Tất cả xưởng" },
-  ...PHAN_XUONG.map((p) => ({ value: p, label: p })),
+  ...WORKSHOPS.map((p) => ({ value: p, label: p })),
 ];
 
 /** Một dòng lưới: mặt hàng × quy cách của một phân xưởng, phân bổ theo ngày. */
@@ -64,7 +64,7 @@ interface DongPivot {
   tongBlock: number;
 }
 
-interface NhomXuong {
+interface WorkshopGroup {
   workshop: Workshop;
   rows: DongPivot[];
   theoNgay: Record<string, number>;
@@ -80,34 +80,34 @@ interface NhomXuong {
  */
 export default function DailyProductionReport() {
   const [rows, , { trangThai }] = useWipProductions();
-  const [matHang] = useProducts();
-  const dangTai = trangThai === "dang-tai" && rows.length === 0;
+  const [products] = useProducts();
+  const isLoading = trangThai === "dang-tai" && rows.length === 0;
 
   const [ky, setKy] = useState<KyXem>("thang");
   const [moc, setMoc] = useState(homNay());
   const [tuTC, setTuTC] = useState(homNay());
   const [denTC, setDenTC] = useState(homNay());
-  const [xuong, setXuong] = useState("Tất cả");
+  const [workshop, setWorkshop] = useState("Tất cả");
   const [inPrint, setInPrint] = useState(false);
   const [tu, den] = phamViKy(ky, moc, tuTC, denTC);
   // Dòng là dòng GỘP (xưởng × mặt hàng × quy cách) ⇒ ghép kỳ + xưởng vào khoá
   // bảng để "đã dò" kỳ này không lan sang kỳ khác.
-  const to = useToMau(`bao-cao-sx-ngay|${tu}|${den}|${xuong}`);
-  const chonDong = useChonDong();
+  const to = useToMau(`bao-cao-sx-ngay|${tu}|${den}|${workshop}`);
+  const rowSelection = useChonDong();
 
   const { days, groups, tongNgayTong, tongKgTong, tongBlockTong, soMatHang } =
     useMemo(() => {
-      const tenMH = (id: string) => matHang.find((m) => m.id === id)?.name || "—";
-      const loc = rows.filter(
+      const tenMH = (id: string) => products.find((m) => m.id === id)?.name || "—";
+      const filteredRows = rows.filter(
         (r) =>
           r.productionDate >= tu &&
           r.productionDate <= den &&
-          (xuong === "Tất cả" || r.workshop === xuong)
+          (workshop === "Tất cả" || r.workshop === workshop)
       );
 
       const daySet = new Set<string>();
       const map = new Map<string, DongPivot>();
-      for (const r of loc) {
+      for (const r of filteredRows) {
         daySet.add(r.productionDate);
         const key = `${r.workshop}|||${r.productId}|||${r.spec}`;
         let d = map.get(key);
@@ -132,40 +132,40 @@ export default function DailyProductionReport() {
       const days = [...daySet].sort();
       const allRows = [...map.values()].sort(
         (a, b) =>
-          PHAN_XUONG.indexOf(a.workshop) - PHAN_XUONG.indexOf(b.workshop) ||
+          WORKSHOPS.indexOf(a.workshop) - WORKSHOPS.indexOf(b.workshop) ||
           a.productName.localeCompare(b.productName, "vi") ||
           a.spec.localeCompare(b.spec, "vi")
       );
 
-      const groups: NhomXuong[] = [];
-      for (const w of PHAN_XUONG) {
+      const groups: WorkshopGroup[] = [];
+      for (const w of WORKSHOPS) {
         const wr = allRows.filter((r) => r.workshop === w);
         if (!wr.length) continue;
-        const theoNgay: Record<string, number> = {};
-        let tongKg = 0;
-        let tongBlock = 0;
+        const byDate: Record<string, number> = {};
+        let totalKg = 0;
+        let totalBlocks = 0;
         for (const r of wr) {
-          tongKg += r.tongKg;
-          tongBlock += r.tongBlock;
+          totalKg += r.tongKg;
+          totalBlocks += r.tongBlock;
           for (const d of days)
-            theoNgay[d] = (theoNgay[d] ?? 0) + (r.theoNgay[d] ?? 0);
+            byDate[d] = (byDate[d] ?? 0) + (r.theoNgay[d] ?? 0);
         }
-        groups.push({ workshop: w, rows: wr, theoNgay, tongKg, tongBlock });
+        groups.push({ workshop: w, rows: wr, theoNgay: byDate, tongKg: totalKg, tongBlock: totalBlocks });
       }
 
-      const tongNgayTong: Record<string, number> = {};
+      const dailyGrandTotal: Record<string, number> = {};
       for (const d of days)
-        tongNgayTong[d] = groups.reduce((s, g) => s + (g.theoNgay[d] ?? 0), 0);
+        dailyGrandTotal[d] = groups.reduce((s, g) => s + (g.theoNgay[d] ?? 0), 0);
 
       return {
         days,
         groups,
-        tongNgayTong,
+        tongNgayTong: dailyGrandTotal,
         tongKgTong: groups.reduce((s, g) => s + g.tongKg, 0),
         tongBlockTong: groups.reduce((s, g) => s + g.tongBlock, 0),
         soMatHang: allRows.length,
       };
-    }, [rows, matHang, tu, den, xuong]);
+    }, [rows, products, tu, den, workshop]);
   /** Khoá các dòng mặt hàng đang hiện — thứ tự cho Shift+tick chọn khoảng. */
   const khoaDong = groups.flatMap((g) => g.rows.map((r) => `${r.workshop}|||${r.productId}|||${r.spec}`));
 
@@ -182,14 +182,14 @@ export default function DailyProductionReport() {
     { nhan: "Số mặt hàng", giaTri: num(soMatHang), so: true, icon: Package, mau: "success" },
   ];
 
-  const xuatExcel = () => {
+  const exportExcel = () => {
     if (!groups.length) {
       notify.canhBao("Không có số liệu để xuất");
       return;
     }
     const aoa: OExcel[][] = [];
     aoa.push(["Báo cáo tổng hợp thành phẩm sản xuất hàng ngày"]);
-    aoa.push([`Kỳ: ${viDate(tu)} – ${viDate(den)} · Phân xưởng: ${xuong}`]);
+    aoa.push([`Kỳ: ${viDate(tu)} – ${viDate(den)} · Phân xưởng: ${workshop}`]);
     aoa.push([]);
     aoa.push(["Phân xưởng", "Mặt hàng", "Quy cách", ...days.map((d) => viDate(d)), "Tổng kg", "Tổng block"]);
     for (const g of groups) {
@@ -207,7 +207,7 @@ export default function DailyProductionReport() {
     // Không toast: trình duyệt đã tự báo tải file xong (README luật 8 — xuất file là thao tác không đổi số).
   };
 
-  const soCot = days.length + 4;
+  const columnCount = days.length + 4;
 
   return (
     <div className="space-y-6">
@@ -222,7 +222,7 @@ export default function DailyProductionReport() {
             In A4
           </Button>
           <Button
-            title="Tải báo cáo sản lượng đang xem ra file Excel." size="lg" variant="outline" onClick={xuatExcel} disabled={!groups.length}>
+            title="Tải báo cáo sản lượng đang xem ra file Excel." size="lg" variant="outline" onClick={exportExcel} disabled={!groups.length}>
             <FileSpreadsheet />
             Xuất Excel
           </Button>
@@ -268,16 +268,16 @@ export default function DailyProductionReport() {
             label="Phân xưởng"
             anNhanBatBuoc
             choPhepXoa={false}
-            value={xuong}
-            onChange={setXuong}
-            options={XUONG_OPT}
+            value={workshop}
+            onChange={setWorkshop}
+            options={WORKSHOP_OPTIONS}
           />
         </div>
       </div>
 
       <ThongKe the={the} />
 
-      {dangTai ? (
+      {isLoading ? (
         <SkeletonBang />
       ) : groups.length === 0 ? (
         <EmptyState
@@ -315,7 +315,7 @@ export default function DailyProductionReport() {
                 {groups.map((g) => (
                   <Fragment key={g.workshop}>
                     <TableRow>
-                      <TableCell colSpan={soCot} className="bg-muted font-semibold">
+                      <TableCell colSpan={columnCount} className="bg-muted font-semibold">
                         Phân xưởng {g.workshop}
                       </TableCell>
                     </TableRow>
@@ -329,9 +329,9 @@ export default function DailyProductionReport() {
                               <input
                                 type="checkbox"
                                 className="size-5 shrink-0"
-                                checked={chonDong.daChon.has(k)}
+                                checked={rowSelection.daChon.has(k)}
                                 onChange={() => {}}
-                                onClick={(e) => chonDong.doi(k, e.shiftKey, khoaDong)}
+                                onClick={(e) => rowSelection.doi(k, e.shiftKey, khoaDong)}
                                 aria-label={`Chọn dòng ${r.productName} ${r.spec}`}
                                 title="Tick để tô màu / in đậm dòng này (Shift+tick chọn cả khoảng)."
                               />
@@ -381,14 +381,14 @@ export default function DailyProductionReport() {
               </TableFooter>
             </Table>
           </KhungCuonNgang>
-          <ThanhToMau to={to} khoa={khoaDong.filter((k) => chonDong.daChon.has(k))} onBoChon={chonDong.boChon} />
+          <ThanhToMau to={to} khoa={khoaDong.filter((k) => rowSelection.daChon.has(k))} onBoChon={rowSelection.boChon} />
         </>
       )}
 
       {inPrint && (
         <PhieuIn
           tieuDe="Báo cáo tổng hợp thành phẩm hàng ngày"
-          phuDe={`Kỳ: ${viDate(tu)} – ${viDate(den)}${xuong !== "Tất cả" ? ` · Phân xưởng ${xuong}` : ""}`}
+          phuDe={`Kỳ: ${viDate(tu)} – ${viDate(den)}${workshop !== "Tất cả" ? ` · Phân xưởng ${workshop}` : ""}`}
           onClose={() => setInPrint(false)}
         >
           <table className="w-full border-collapse">
@@ -409,7 +409,7 @@ export default function DailyProductionReport() {
               {groups.map((g) => (
                 <Fragment key={g.workshop}>
                   <tr>
-                    <TdIn dam colSpan={soCot}>
+                    <TdIn dam colSpan={columnCount}>
                       Phân xưởng {g.workshop}
                     </TdIn>
                   </tr>

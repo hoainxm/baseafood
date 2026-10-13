@@ -52,13 +52,13 @@ import {
   Scale,
 } from "lucide-react";
 
-const NHAN_TT: Record<SalesOrderStatus, string> = {
+const STATUS_LABELS: Record<SalesOrderStatus, string> = {
   "dang-gom": "Đang gom",
   du: "Đủ",
   dong: "Đã xuất",
 };
 
-interface DongXuat {
+interface ExportRow {
   /** id dòng lệnh xuất (export_items) — khoá ổn định cho tô màu dòng. */
   id: string;
   exportDate: string;
@@ -72,7 +72,7 @@ interface NhomDon {
   customerName: string;
   orderDate: string;
   status: SalesOrderStatus;
-  lines: DongXuat[];
+  lines: ExportRow[];
   tongKg: number;
   tongBlock: number;
   requiredKg: number;
@@ -84,42 +84,42 @@ interface NhomDon {
  * đã đặt của đơn để thấy mức hoàn thành. Chỉ đọc; xuất được Excel.
  */
 export default function OrderExportReport() {
-  const [lenh, , { trangThai }] = useExportOrders();
-  const [dongLenh] = useExportItems();
+  const [exportOrders, , { trangThai }] = useExportOrders();
+  const [exportItems] = useExportItems();
   const [don] = useSalesOrders();
   const [dongDon] = useOrderItems();
-  const [khach] = useCustomers();
-  const [matHang] = useProducts();
-  const dangTai = trangThai === "dang-tai" && lenh.length === 0;
+  const [customers] = useCustomers();
+  const [products] = useProducts();
+  const isLoading = trangThai === "dang-tai" && exportOrders.length === 0;
 
   const [ky, setKy] = useState<KyXem>("thang");
   const [moc, setMoc] = useState(homNay());
   const [tuTC, setTuTC] = useState(homNay());
   const [denTC, setDenTC] = useState(homNay());
-  const [khachLoc, setKhachLoc] = useState("Tất cả");
+  const [customerFilter, setCustomerFilter] = useState("Tất cả");
   const [inPrint, setInPrint] = useState(false);
   const [tu, den] = phamViKy(ky, moc, tuTC, denTC);
   // Mỗi dòng là một dòng lệnh xuất (id bản ghi) ⇒ dấu "đã dò" khỏi ghép kỳ.
   const to = useToMau("bao-cao-xuat-don");
-  const chonDong = useChonDong();
+  const rowSelection = useChonDong();
 
-  const optKhach = [
+  const customerOptions = [
     { value: "Tất cả", label: "Tất cả khách" },
-    ...khach.map((k) => ({ value: k.id, label: k.name, phu: k.market || undefined })),
+    ...customers.map((k) => ({ value: k.id, label: k.name, phu: k.market || undefined })),
   ];
 
   const { nhom, tongKg, tongBlock } = useMemo(() => {
-    const tenMH = (id: string) => matHang.find((m) => m.id === id)?.name || "—";
-    const tenKH = (id: string) => khach.find((k) => k.id === id)?.name || "(đơn đã xóa)";
+    const tenMH = (id: string) => products.find((m) => m.id === id)?.name || "—";
+    const tenKH = (id: string) => customers.find((k) => k.id === id)?.name || "(đơn đã xóa)";
     const donCua = (id: string) => don.find((d) => d.id === id);
 
-    const lenhKy = lenh.filter((l) => l.exportDate >= tu && l.exportDate <= den);
+    const periodExportOrders = exportOrders.filter((l) => l.exportDate >= tu && l.exportDate <= den);
 
     // Gom dòng lệnh (thực xuất) theo ĐƠN.
     const map = new Map<string, NhomDon>();
-    for (const l of lenhKy) {
+    for (const l of periodExportOrders) {
       const d = donCua(l.orderId);
-      if (khachLoc !== "Tất cả" && d?.customerId !== khachLoc) continue;
+      if (customerFilter !== "Tất cả" && d?.customerId !== customerFilter) continue;
       let g = map.get(l.orderId);
       if (!g) {
         g = {
@@ -136,7 +136,7 @@ export default function OrderExportReport() {
         };
         map.set(l.orderId, g);
       }
-      for (const dl of dongLenh.filter((x) => x.exportId === l.id)) {
+      for (const dl of exportItems.filter((x) => x.exportId === l.id)) {
         g.lines.push({
           id: dl.id,
           exportDate: l.exportDate,
@@ -169,7 +169,7 @@ export default function OrderExportReport() {
       tongKg: nhom.reduce((s, g) => s + g.tongKg, 0),
       tongBlock: nhom.reduce((s, g) => s + g.tongBlock, 0),
     };
-  }, [lenh, dongLenh, don, dongDon, khach, matHang, tu, den, khachLoc]);
+  }, [exportOrders, exportItems, don, dongDon, customers, products, tu, den, customerFilter]);
   /** Khoá dòng lệnh xuất đang hiện — thứ tự cho Shift+tick chọn khoảng. */
   const khoaDong = nhom.flatMap((g) => g.lines.map((l) => l.id));
 
@@ -180,14 +180,14 @@ export default function OrderExportReport() {
     { nhan: "Số đơn được xuất", giaTri: num(nhom.length), so: true, icon: PackageCheck, mau: "success" },
   ];
 
-  const xuatExcel = () => {
+  const exportExcel = () => {
     if (!nhom.length) {
       notify.canhBao("Không có lệnh xuất trong kỳ để xuất");
       return;
     }
     const aoa: OExcel[][] = [];
     aoa.push(["Báo cáo đơn đặt được xuất hàng"]);
-    aoa.push([`Kỳ: ${viDate(tu)} – ${viDate(den)} · Khách: ${khachLoc === "Tất cả" ? "Tất cả" : nhom[0]?.customerName ?? khachLoc}`]);
+    aoa.push([`Kỳ: ${viDate(tu)} – ${viDate(den)} · Khách: ${customerFilter === "Tất cả" ? "Tất cả" : nhom[0]?.customerName ?? customerFilter}`]);
     aoa.push([]);
     aoa.push(["Khách", "Ngày đặt", "Ngày xuất", "Mặt hàng", "Quy cách", "Kg xuất", "Block", "Đã đặt (kg)"]);
     for (const g of nhom) {
@@ -218,7 +218,7 @@ export default function OrderExportReport() {
             In A4
           </Button>
           <Button
-            title="Tải báo cáo đơn xuất đang xem ra file Excel." size="lg" variant="outline" onClick={xuatExcel} disabled={!nhom.length}>
+            title="Tải báo cáo đơn xuất đang xem ra file Excel." size="lg" variant="outline" onClick={exportExcel} disabled={!nhom.length}>
             <FileSpreadsheet />
             Xuất Excel
           </Button>
@@ -264,16 +264,16 @@ export default function OrderExportReport() {
             label="Khách hàng"
             anNhanBatBuoc
             choPhepXoa={false}
-            value={khachLoc}
-            onChange={setKhachLoc}
-            options={optKhach}
+            value={customerFilter}
+            onChange={setCustomerFilter}
+            options={customerOptions}
           />
         </div>
       </div>
 
       <ThongKe the={the} />
 
-      {dangTai ? (
+      {isLoading ? (
         <SkeletonBang />
       ) : nhom.length === 0 ? (
         <EmptyState
@@ -304,7 +304,7 @@ export default function OrderExportReport() {
                           · đặt {g.orderDate ? viDate(g.orderDate) : "—"}
                         </span>
                         <Nhan loai={g.status === "dang-gom" ? "cho" : "xong"}>
-                          {NHAN_TT[g.status]}
+                          {STATUS_LABELS[g.status]}
                         </Nhan>
                         {g.requiredKg > 0 && (
                           <span className="font-normal text-muted-foreground">
@@ -322,9 +322,9 @@ export default function OrderExportReport() {
                             <input
                               type="checkbox"
                               className="size-5 shrink-0"
-                              checked={chonDong.daChon.has(l.id)}
+                              checked={rowSelection.daChon.has(l.id)}
                               onChange={() => {}}
-                              onClick={(e) => chonDong.doi(l.id, e.shiftKey, khoaDong)}
+                              onClick={(e) => rowSelection.doi(l.id, e.shiftKey, khoaDong)}
                               aria-label={`Chọn dòng ${l.productName} ${viDate(l.exportDate)}`}
                               title="Tick để tô màu / in đậm dòng này (Shift+tick chọn cả khoảng)."
                             />
@@ -358,12 +358,12 @@ export default function OrderExportReport() {
           </Table>
         </KhungCuonNgang>
       )}
-      <ThanhToMau to={to} khoa={khoaDong.filter((k) => chonDong.daChon.has(k))} onBoChon={chonDong.boChon} />
+      <ThanhToMau to={to} khoa={khoaDong.filter((k) => rowSelection.daChon.has(k))} onBoChon={rowSelection.boChon} />
 
       {inPrint && (
         <PhieuIn
           tieuDe="Báo cáo đơn đặt được xuất hàng"
-          phuDe={`Kỳ: ${viDate(tu)} – ${viDate(den)}${khachLoc !== "Tất cả" ? ` · Khách ${nhom[0]?.customerName ?? ""}` : ""}`}
+          phuDe={`Kỳ: ${viDate(tu)} – ${viDate(den)}${customerFilter !== "Tất cả" ? ` · Khách ${nhom[0]?.customerName ?? ""}` : ""}`}
           onClose={() => setInPrint(false)}
         >
           <table className="w-full border-collapse">
@@ -381,7 +381,7 @@ export default function OrderExportReport() {
                 <Fragment key={g.orderId}>
                   <tr>
                     <TdIn dam colSpan={5}>
-                      {g.customerName} · đặt {g.orderDate ? viDate(g.orderDate) : "—"} · {NHAN_TT[g.status]}
+                      {g.customerName} · đặt {g.orderDate ? viDate(g.orderDate) : "—"} · {STATUS_LABELS[g.status]}
                       {g.requiredKg > 0 ? ` · đã đặt ${num(g.requiredKg)} kg` : ""}
                     </TdIn>
                   </tr>

@@ -80,15 +80,15 @@ interface OpeningForm {
  * Chỉ đọc; ô nhập tay duy nhất là "Tồn đầu" (số dư trước khi số hoá).
  */
 export default function BaoCaoNhapXuatTonScreen() {
-  const [sanXuat] = useWipProductions();
+  const [wips] = useWipProductions();
   const [exportItems] = useExportItems();
   const [exportOrders] = useExportOrders();
   const [salesItems] = useSalesItems();
   const [packagings] = usePackagings();
-  const [matHang, setMatHang] = useProducts();
+  const [products, setProducts] = useProducts();
   /** Bút chì sửa nhanh danh mục ngay trong ô chọn. */
-  const suaMH = useSuaDanhMuc("matHang", matHang, setMatHang);
-  const [opening, ghiOpening] = useFinishedGoodsOpeningStock();
+  const productEditor = useSuaDanhMuc("matHang", products, setProducts);
+  const [opening, writeOpening] = useFinishedGoodsOpeningStock();
 
   const [ky, setKy] = useState<KyXem>("thang");
   const [moc, setMoc] = useState(homNay());
@@ -97,42 +97,42 @@ export default function BaoCaoNhapXuatTonScreen() {
   const [tu, den] = phamViKy(ky, moc, tuTC, denTC);
 
   // Dialog tồn đầu
-  const [moTonDau, setMoTonDau] = useState(false);
+  const [isOpeningOpen, setIsOpeningOpen] = useState(false);
   const [form, setForm] = useState<OpeningForm | null>(null);
   const [loi, setLoi] = useState<LoiNhap[]>([]);
 
-  const tenMH = (id: string) => matHang.find((m) => m.id === id)?.name || "—";
+  const tenMH = (id: string) => products.find((m) => m.id === id)?.name || "—";
 
   const rows = useMemo(
     () =>
       tinhSoTonTP({
-        sanXuat,
+        sanXuat: wips,
         exportOrders,
         exportItems,
         salesItems,
         packagings,
         opening,
-        products: matHang,
+        products: products,
         tuNgay: tu,
         denNgay: den,
       }),
-    [sanXuat, exportOrders, exportItems, salesItems, packagings, opening, matHang, tu, den]
+    [wips, exportOrders, exportItems, salesItems, packagings, opening, products, tu, den]
   );
-  const tong = useMemo(() => tongSoTonTP(rows), [rows]);
+  const total = useMemo(() => tongSoTonTP(rows), [rows]);
 
   const the: TheThongTin[] = [
-    { nhan: "Tồn đầu kho", giaTri: `${num(tong.tonDau)} kg`, so: true, icon: Snowflake, mau: "trung-tinh" },
-    { nhan: "Nhập kho", giaTri: `${num(tong.nhap)} kg`, so: true, icon: ArrowDownToLine, mau: "brand" },
+    { nhan: "Tồn đầu kho", giaTri: `${num(total.tonDau)} kg`, so: true, icon: Snowflake, mau: "trung-tinh" },
+    { nhan: "Nhập kho", giaTri: `${num(total.nhap)} kg`, so: true, icon: ArrowDownToLine, mau: "brand" },
     {
       nhan: "Xuất (đơn+bán+gói)",
-      giaTri: `${num(tong.xuatDon)} + ${num(tong.xuatBan)} + ${num(tong.xuatDongGoi)} kg`,
+      giaTri: `${num(total.xuatDon)} + ${num(total.xuatBan)} + ${num(total.xuatDongGoi)} kg`,
       icon: Ship,
       mau: "warning",
     },
-    { nhan: "Tồn cuối kho", giaTri: `${num(tong.tonCuoi)} kg`, so: true, icon: Scale, mau: "success" },
+    { nhan: "Tồn cuối kho", giaTri: `${num(total.tonCuoi)} kg`, so: true, icon: Scale, mau: "success" },
   ];
 
-  const cot: CotTong<SoTonTPRow>[] = [
+  const columns: CotTong<SoTonTPRow>[] = [
     {
       key: "mh",
       header: "Mặt hàng · quy cách",
@@ -154,7 +154,7 @@ export default function BaoCaoNhapXuatTonScreen() {
         </div>
       ),
     },
-    { key: "tonDau", header: "Tồn đầu (kg)", so: true, render: (r) => num(r.tonDau), tong: () => num(tong.tonDau) },
+    { key: "tonDau", header: "Tồn đầu (kg)", so: true, render: (r) => num(r.tonDau), tong: () => num(total.tonDau) },
     {
       key: "nhap",
       header: "Nhập (kg)",
@@ -162,28 +162,28 @@ export default function BaoCaoNhapXuatTonScreen() {
       render: (r) => (
         <span className={r.nhap > 0 ? "font-semibold text-success" : ""}>{r.nhap ? `+${num(r.nhap)}` : "—"}</span>
       ),
-      tong: () => num(tong.nhap),
+      tong: () => num(total.nhap),
     },
     {
       key: "xuatDon",
       header: "Xuất đơn (kg)",
       so: true,
       render: (r) => (r.xuatDon ? `−${num(r.xuatDon)}` : "—"),
-      tong: () => num(tong.xuatDon),
+      tong: () => num(total.xuatDon),
     },
     {
       key: "xuatBan",
       header: "Xuất bán (kg)",
       so: true,
       render: (r) => (r.xuatBan ? `−${num(r.xuatBan)}` : "—"),
-      tong: () => num(tong.xuatBan),
+      tong: () => num(total.xuatBan),
     },
     {
       key: "xuatDongGoi",
       header: "Đóng gói (kg)",
       so: true,
       render: (r) => (r.xuatDongGoi ? `−${num(r.xuatDongGoi)}` : "—"),
-      tong: () => num(tong.xuatDongGoi),
+      tong: () => num(total.xuatDongGoi),
     },
     {
       key: "tonCuoi",
@@ -194,12 +194,12 @@ export default function BaoCaoNhapXuatTonScreen() {
           {num(r.tonCuoi)}
         </span>
       ),
-      tong: () => num(tong.tonCuoi),
+      tong: () => num(total.tonCuoi),
     },
   ];
 
   // ----- Xuất Excel (mẫu 10 cột) -----
-  const xuatExcel = () => {
+  const exportExcel = () => {
     if (!rows.length) {
       notify.canhBao("Không có số liệu để xuất");
       return;
@@ -225,13 +225,13 @@ export default function BaoCaoNhapXuatTonScreen() {
         warehouseText: "Chi nhánh: Kho thành phẩm BSF1",
         items,
         totalItemCount: items.length,
-        totalTonDauKg: tong.tonDau,
+        totalTonDauKg: total.tonDau,
         totalGiaTriDau: 0,
-        totalNhapKg: tong.nhap,
+        totalNhapKg: total.nhap,
         totalGiaTriNhap: 0,
-        totalXuatKg: tong.xuat,
+        totalXuatKg: total.xuat,
         totalGiaTriXuat: 0,
-        totalTonCuoiKg: tong.tonCuoi,
+        totalTonCuoiKg: total.tonCuoi,
         totalGiaTriCuoi: 0,
       },
       `Bao-Cao-NXT-Thanh-Pham-${tu}-${den}.xlsx`
@@ -240,19 +240,19 @@ export default function BaoCaoNhapXuatTonScreen() {
   };
 
   // ----- Tồn đầu: thêm / xóa -----
-  const optMatHang: MucChon[] = matHang.map((m) => ({ value: m.id, label: m.name, phu: m.code || undefined }));
+  const productOptions: MucChon[] = products.map((m) => ({ value: m.id, label: m.name, phu: m.code || undefined }));
   /** Thêm mặt hàng tại chỗ — lưu ngay vào danh mục; trùng tên (không phân hoa thường) ⇒ dùng lại. */
-  const themMatHang = (ten: string) => {
+  const addProduct = (ten: string) => {
     const sach = ten.trim();
-    const co = matHang.find((m) => m.name.trim().toLowerCase() === sach.toLowerCase());
+    const co = products.find((m) => m.name.trim().toLowerCase() === sach.toLowerCase());
     if (co) return co.id;
     const m = { id: uid(), code: "", name: sach, finishedGoodCode: "" };
-    setMatHang([...matHang, m]);
+    setProducts([...products, m]);
     notify.daLuu(`Đã thêm mặt hàng "${sach}" vào danh mục`);
     return m.id;
   };
 
-  const moThemTonDau = () => {
+  const openAddOpening = () => {
     setForm({
       productId: "",
       spec: "",
@@ -265,7 +265,7 @@ export default function BaoCaoNhapXuatTonScreen() {
     setLoi([]);
   };
 
-  const luuTonDau = () => {
+  const saveOpening = () => {
     if (!form) return;
     const ls: LoiNhap[] = [];
     if (!form.productId) ls.push({ truong: "Mặt hàng", thongBao: "Chưa chọn mặt hàng" });
@@ -273,7 +273,7 @@ export default function BaoCaoNhapXuatTonScreen() {
     if (!(Number(form.quantityKg) > 0)) ls.push({ truong: "Khối lượng", thongBao: "Phải lớn hơn 0 kg" });
     setLoi(ls);
     if (ls.length > 0) return;
-    const moi: FinishedGoodsOpeningStock = {
+    const newOpening: FinishedGoodsOpeningStock = {
       id: uid(),
       productId: form.productId,
       spec: form.spec.trim(),
@@ -283,13 +283,13 @@ export default function BaoCaoNhapXuatTonScreen() {
       warehouse: form.warehouse.trim(),
       note: form.note.trim(),
     };
-    ghiOpening([...opening, moi]);
-    notify.daLuu(`Đã lưu tồn đầu ${num(moi.quantityKg)} kg — ${tenMH(moi.productId)}`);
+    writeOpening([...opening, newOpening]);
+    notify.daLuu(`Đã lưu tồn đầu ${num(newOpening.quantityKg)} kg — ${tenMH(newOpening.productId)}`);
     setForm(null);
   };
 
-  const xoaTonDau = (id: string) => {
-    ghiOpening(opening.filter((o) => o.id !== id));
+  const deleteOpening = (id: string) => {
+    writeOpening(opening.filter((o) => o.id !== id));
     notify.daXoa("Đã xóa dòng tồn đầu");
   };
 
@@ -308,12 +308,12 @@ export default function BaoCaoNhapXuatTonScreen() {
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <Button
-            title="Khai tồn đầu kho thành phẩm cho các mã chưa có lịch sử giao dịch — không có số này thì kỳ đầu tiên tính thiếu." variant="outline" onClick={() => setMoTonDau(true)}>
+            title="Khai tồn đầu kho thành phẩm cho các mã chưa có lịch sử giao dịch — không có số này thì kỳ đầu tiên tính thiếu." variant="outline" onClick={() => setIsOpeningOpen(true)}>
             <PackagePlus className="mr-2 h-4 w-4" />
             Tồn đầu ({opening.length})
           </Button>
           <Button
-            title="Tải báo cáo đang xem ra file Excel." onClick={xuatExcel} disabled={!rows.length}>
+            title="Tải báo cáo đang xem ra file Excel." onClick={exportExcel} disabled={!rows.length}>
             <Download className="mr-2 h-4 w-4" />
             Xuất Excel
           </Button>
@@ -358,11 +358,11 @@ export default function BaoCaoNhapXuatTonScreen() {
 
       <ThongKe the={the} />
 
-      {tong.soCanhBao > 0 && (
+      {total.soCanhBao > 0 && (
         <div className="flex flex-wrap items-center gap-3 rounded-xl border-2 border-destructive bg-destructive/10 p-4">
           <AlertTriangle className="h-5 w-5 shrink-0 text-destructive" aria-hidden />
           <span className="text-base font-semibold text-destructive">
-            {tong.soCanhBao} mặt hàng có tồn cuối ÂM — xuất nhiều hơn số đang trữ. Kiểm lại sản xuất /
+            {total.soCanhBao} mặt hàng có tồn cuối ÂM — xuất nhiều hơn số đang trữ. Kiểm lại sản xuất /
             đơn đặt / bán hàng (số ghi tay có thể sai, hoặc thiếu khai tồn đầu).
           </span>
         </div>
@@ -375,7 +375,7 @@ export default function BaoCaoNhapXuatTonScreen() {
           moTa="Ghi sản lượng ở Sản xuất BTP, duyệt vào Kho dự trữ, rồi xuất theo Đơn đặt / Bán hàng — số sẽ tổng hợp về đây. Có số dư đông trước khi số hoá thì khai ở nút Tồn đầu."
         />
       ) : (
-        <BangTong rows={rows} cot={cot} getKey={(r) => `${r.productId}|||${r.spec}`} toMau={`nxt-tp|${tu}|${den}`} />
+        <BangTong rows={rows} cot={columns} getKey={(r) => `${r.productId}|||${r.spec}`} toMau={`nxt-tp|${tu}|${den}`} />
       )}
 
       <p className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
@@ -385,7 +385,7 @@ export default function BaoCaoNhapXuatTonScreen() {
       </p>
 
       {/* Dialog quản lý Tồn đầu thành phẩm */}
-      <Dialog open={moTonDau} onOpenChange={setMoTonDau}>
+      <Dialog open={isOpeningOpen} onOpenChange={setIsOpeningOpen}>
         <DialogContent className="w-full sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle className="text-2xl">Tồn đầu kho thành phẩm</DialogTitle>
@@ -414,7 +414,7 @@ export default function BaoCaoNhapXuatTonScreen() {
                     </span>
                     <ConfirmDelete
                       moTaBanGhi={`${tenMH(o.productId)}${o.spec ? ` · ${o.spec}` : ""} — ${num(o.quantityKg)} kg`}
-                      onConfirm={() => xoaTonDau(o.id)}
+                      onConfirm={() => deleteOpening(o.id)}
                       trigger={
                         <Button
                           title="Xóa dòng tồn đầu này." size="sm" variant="ghost">
@@ -440,10 +440,10 @@ export default function BaoCaoNhapXuatTonScreen() {
                   required
                   value={form.productId}
                   onChange={(v) => setForm((f) => (f ? { ...f, productId: v } : f))}
-                  options={optMatHang}
-                  onCreate={themMatHang}
-                  onSuaMuc={suaMH.moSua}
-                  nhanSua={suaMH.nhanSua}
+                  options={productOptions}
+                  onCreate={addProduct}
+                  onSuaMuc={productEditor.moSua}
+                  nhanSua={productEditor.nhanSua}
                   emptyText="Chưa có mặt hàng — gõ tên rồi bấm Thêm mới."
                 />
                 <div className="grid gap-4 sm:grid-cols-2">
@@ -493,7 +493,7 @@ export default function BaoCaoNhapXuatTonScreen() {
                     Hủy
                   </Button>
                   <Button
-                    title="Ghi số tồn đầu vừa khai vào sổ." onClick={luuTonDau}>
+                    title="Ghi số tồn đầu vừa khai vào sổ." onClick={saveOpening}>
                     <PackagePlus className="mr-1 h-4 w-4" />
                     Lưu tồn đầu
                   </Button>
@@ -501,7 +501,7 @@ export default function BaoCaoNhapXuatTonScreen() {
               </div>
             ) : (
               <Button
-                title="Khai thêm tồn đầu cho một mã thành phẩm nữa." variant="outline" onClick={moThemTonDau}>
+                title="Khai thêm tồn đầu cho một mã thành phẩm nữa." variant="outline" onClick={openAddOpening}>
                 <PackagePlus className="mr-2 h-4 w-4" />
                 Thêm tồn đầu
               </Button>
@@ -509,13 +509,13 @@ export default function BaoCaoNhapXuatTonScreen() {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" size="lg" onClick={() => setMoTonDau(false)}>
+            <Button variant="outline" size="lg" onClick={() => setIsOpeningOpen(false)}>
               Đóng
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      {suaMH.hop}
+      {productEditor.hop}
     </div>
   );
 }

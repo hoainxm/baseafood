@@ -63,7 +63,7 @@ import {
   Truck,
 } from "lucide-react";
 
-const XUONG_OPT: MucChon[] = [
+const WORKSHOP_OPTIONS: MucChon[] = [
   { value: "Tất cả", label: "Tất cả xưởng" },
   { value: "Đông", label: "Đông" },
   { value: "Cá", label: "Cá" },
@@ -94,27 +94,27 @@ export default function MaterialNxtScreen() {
   const [periods] = useBalancingPeriods();
   const [inputs] = useBalancingInputs();
   const [imports] = useMaterialImports();
-  const [opening, ghiOpening] = useMaterialOpeningStock();
+  const [opening, writeOpening] = useMaterialOpeningStock();
   const [materialTypes, setMaterialTypes] = useMaterialTypes();
   /** Bút chì sửa nhanh danh mục ngay trong ô chọn. */
-  const suaNL = useSuaDanhMuc("loaiNL", materialTypes, setMaterialTypes, { theo: "ten" });
+  const materialTypeEditor = useSuaDanhMuc("loaiNL", materialTypes, setMaterialTypes, { theo: "ten" });
   const [locks] = useProductionLocks();
   /** Sổ bán nội địa (mig 0054) — NL bán thẳng ghi ở /wip, là khoản XUẤT trừ tồn. */
-  const [banNoiDia] = useDomesticSales();
+  const [domesticSales] = useDomesticSales();
 
   const [ky, setKy] = useState<KyXem>("thang");
   const [moc, setMoc] = useState(homNay());
   const [tuTC, setTuTC] = useState(homNay());
   const [denTC, setDenTC] = useState(homNay());
-  const [xuong, setXuong] = useState<string>("Tất cả");
+  const [workshopFilter, setWorkshopFilter] = useState<string>("Tất cả");
   const [tu, den] = phamViKy(ky, moc, tuTC, denTC);
 
   // Dialog tồn đầu
-  const [moTonDau, setMoTonDau] = useState(false);
+  const [isOpeningOpen, setIsOpeningOpen] = useState(false);
   const [form, setForm] = useState<OpeningForm | null>(null);
   const [loi, setLoi] = useState<LoiNhap[]>([]);
 
-  const workshop = xuong === "Tất cả" ? undefined : (xuong as Workshop);
+  const workshop = workshopFilter === "Tất cả" ? undefined : (workshopFilter as Workshop);
 
   const data = useMemo(
     () =>
@@ -125,15 +125,15 @@ export default function MaterialNxtScreen() {
         opening,
         locks,
         { tuNgay: tu, denNgay: den, workshop },
-        banNoiDia,
+        domesticSales,
       ),
-    [periods, inputs, imports, opening, locks, tu, den, workshop, banNoiDia],
+    [periods, inputs, imports, opening, locks, tu, den, workshop, domesticSales],
   );
 
-  const coDongXa = data.tongDongGui > 0 || data.tongXaDong > 0;
+  const hasFreezeOrThaw = data.tongDongGui > 0 || data.tongXaDong > 0;
   // Còn dở SX ghi ở ngày KHÔNG có kỳ cân đối nào phủ → không lọt vào cột "Đông gửi"
   // (info) nào. Gọi tên thay vì để số biến mất (luật "màn tự giải thích").
-  const conDoRot = useMemo(
+  const unmatchedLeftover = useMemo(
     () => conDoChuaKhopKy(periods, locks, { tuNgay: tu, denNgay: den, workshop }),
     [periods, locks, tu, den, workshop],
   );
@@ -147,7 +147,7 @@ export default function MaterialNxtScreen() {
   ];
 
   // Bảng tồn theo NGÀY (mọi họ gộp) — trục "theo ngày" cho BGĐ.
-  const cotNgay: CotTong<TonNLTongNgay>[] = [
+  const dateColumns: CotTong<TonNLTongNgay>[] = [
     {
       key: "date",
       header: "Ngày",
@@ -188,7 +188,7 @@ export default function MaterialNxtScreen() {
   ];
 
   // Bảng tồn theo LOẠI (họ) NL.
-  const cotHo: CotTong<TonNLTongHo>[] = [
+  const materialFamilyColumns: CotTong<TonNLTongHo>[] = [
     {
       key: "hoNL",
       header: "Loại nguyên liệu",
@@ -260,9 +260,9 @@ export default function MaterialNxtScreen() {
   ];
 
   // ----- Tồn đầu: thêm / xóa -----
-  const optLoaiNL: MucChon[] = materialTypes.map((m) => ({ value: m.name, label: m.name }));
+  const materialTypeOptions: MucChon[] = materialTypes.map((m) => ({ value: m.name, label: m.name }));
 
-  const moThemTonDau = () => {
+  const openAddOpening = () => {
     setForm({
       workshop: (workshop ?? "Đông") as Workshop,
       materialTypeName: "",
@@ -273,7 +273,7 @@ export default function MaterialNxtScreen() {
     setLoi([]);
   };
 
-  const luuTonDau = () => {
+  const saveOpening = () => {
     if (!form) return;
     const ls: LoiNhap[] = [];
     if (!form.materialTypeName.trim())
@@ -283,7 +283,7 @@ export default function MaterialNxtScreen() {
       ls.push({ truong: "Khối lượng", thongBao: "Phải lớn hơn 0 kg" });
     setLoi(ls);
     if (ls.length > 0) return;
-    const moi: MaterialOpeningStock = {
+    const newOpening: MaterialOpeningStock = {
       id: uid(),
       workshop: form.workshop,
       materialTypeName: form.materialTypeName.trim(),
@@ -291,17 +291,17 @@ export default function MaterialNxtScreen() {
       quantityKg: Number(form.quantityKg),
       note: form.note.trim(),
     };
-    ghiOpening([...opening, moi]);
-    notify.daLuu(`Đã lưu tồn đầu ${num(moi.quantityKg)} kg — ${moi.materialTypeName}`);
+    writeOpening([...opening, newOpening]);
+    notify.daLuu(`Đã lưu tồn đầu ${num(newOpening.quantityKg)} kg — ${newOpening.materialTypeName}`);
     setForm(null);
   };
 
-  const xoaTonDau = (id: string) => {
-    ghiOpening(opening.filter((o) => o.id !== id));
+  const deleteOpening = (id: string) => {
+    writeOpening(opening.filter((o) => o.id !== id));
     notify.daXoa("Đã xóa dòng tồn đầu");
   };
 
-  const openingLoc = useMemo(
+  const filteredOpening = useMemo(
     () => (workshop ? opening.filter((o) => o.workshop === workshop) : opening),
     [opening, workshop],
   );
@@ -320,9 +320,9 @@ export default function MaterialNxtScreen() {
           </p>
         </div>
         <Button
-          title="Khai tồn đầu kho nguyên liệu cho các loại chưa có kỳ trước để kế thừa — không có số này thì kỳ đầu tiên tính thiếu." variant="outline" onClick={() => setMoTonDau(true)}>
+          title="Khai tồn đầu kho nguyên liệu cho các loại chưa có kỳ trước để kế thừa — không có số này thì kỳ đầu tiên tính thiếu." variant="outline" onClick={() => setIsOpeningOpen(true)}>
           <PackagePlus className="mr-2 h-4 w-4" />
-          Tồn đầu ({openingLoc.length})
+          Tồn đầu ({filteredOpening.length})
         </Button>
       </div>
 
@@ -366,9 +366,9 @@ export default function MaterialNxtScreen() {
             label="Phân xưởng"
             anNhanBatBuoc
             choPhepXoa={false}
-            value={xuong}
-            onChange={setXuong}
-            options={XUONG_OPT}
+            value={workshopFilter}
+            onChange={setWorkshopFilter}
+            options={WORKSHOP_OPTIONS}
           />
         </div>
       </div>
@@ -387,11 +387,11 @@ export default function MaterialNxtScreen() {
 
       {/* Còn dở SX ghi ở ngày không có kỳ cân đối phủ → không hiện ở cột đông gửi
           info nào. Gọi tên thay vì để số biến mất. */}
-      {conDoRot > 0 && (
+      {unmatchedLeftover > 0 && (
         <div className="flex flex-wrap items-center gap-3 rounded-xl border-2 border-warning bg-warning/10 p-4">
           <AlertTriangle className="h-5 w-5 shrink-0 text-warning" aria-hidden />
           <span className="text-base font-semibold text-warning">
-            {num(conDoRot)} kg còn dở SX chưa hiện ở đâu — ghi ở ngày CHƯA có kỳ cân đối nào (cùng
+            {num(unmatchedLeftover)} kg còn dở SX chưa hiện ở đâu — ghi ở ngày CHƯA có kỳ cân đối nào (cùng
             họ NL) phủ. Tạo kỳ cân đối phủ ngày đó ở màn Cân đối để phần còn dở vào cột "Đông gửi".
           </span>
         </div>
@@ -421,9 +421,9 @@ export default function MaterialNxtScreen() {
               <h3 className="text-lg font-semibold text-foreground">Tồn theo ngày</h3>
               <BangTong
                 rows={data.theoNgay}
-                cot={cotNgay}
+                cot={dateColumns}
                 getKey={(r) => r.date}
-                toMau={`ton-nl-ngay|${xuong}`}
+                toMau={`ton-nl-ngay|${workshopFilter}`}
                 emptyText="Không có ngày nào có nhập."
               />
             </section>
@@ -434,9 +434,9 @@ export default function MaterialNxtScreen() {
             <h3 className="text-lg font-semibold text-foreground">Tồn theo loại nguyên liệu</h3>
             <BangTong
               rows={data.theoHo}
-              cot={cotHo}
+              cot={materialFamilyColumns}
               getKey={(r) => r.hoNL}
-              toMau={`ton-nl-ho|${tu}|${den}|${xuong}`}
+              toMau={`ton-nl-ho|${tu}|${den}|${workshopFilter}`}
               emptyText="Chưa có loại nguyên liệu nào."
             />
           </section>
@@ -444,7 +444,7 @@ export default function MaterialNxtScreen() {
       )}
 
       {/* Dialog quản lý Tồn đầu */}
-      <Dialog open={moTonDau} onOpenChange={setMoTonDau}>
+      <Dialog open={isOpeningOpen} onOpenChange={setIsOpeningOpen}>
         <DialogContent className="w-full sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle className="text-2xl">Tồn đầu kho nguyên liệu</DialogTitle>
@@ -457,9 +457,9 @@ export default function MaterialNxtScreen() {
 
           <div className="space-y-4 py-2">
             {/* Danh sách đang có */}
-            {openingLoc.length > 0 ? (
+            {filteredOpening.length > 0 ? (
               <ul className="divide-y divide-border rounded-lg border-2 border-border">
-                {openingLoc.map((o) => (
+                {filteredOpening.map((o) => (
                   <li key={o.id} className="flex flex-wrap items-center justify-between gap-3 p-3">
                     <span className="min-w-0 flex-1 text-base">
                       <span className="font-semibold">{o.materialTypeName}</span>
@@ -473,7 +473,7 @@ export default function MaterialNxtScreen() {
                     </span>
                     <ConfirmDelete
                       moTaBanGhi={`${o.materialTypeName} — ${num(o.quantityKg)} kg (từ ${viDate(o.asOfDate)})`}
-                      onConfirm={() => xoaTonDau(o.id)}
+                      onConfirm={() => deleteOpening(o.id)}
                       trigger={
                         <Button
                           title="Xóa dòng tồn đầu này." size="sm" variant="ghost">
@@ -502,7 +502,7 @@ export default function MaterialNxtScreen() {
                     choPhepXoa={false}
                     value={form.workshop}
                     onChange={(v) => setForm((f) => (f ? { ...f, workshop: v as Workshop } : f))}
-                    options={XUONG_OPT.filter((o) => o.value !== "Tất cả")}
+                    options={WORKSHOP_OPTIONS.filter((o) => o.value !== "Tất cả")}
                   />
                   <Combobox
                     label="Loại nguyên liệu"
@@ -510,10 +510,10 @@ export default function MaterialNxtScreen() {
                     value={form.materialTypeName}
                     onChange={(v) => setForm((f) => (f ? { ...f, materialTypeName: v } : f))}
                     onCreate={(t) => t}
-                    options={optLoaiNL}
-                    onSuaMuc={suaNL.moSua}
-                    nhanSua={suaNL.nhanSua}
-                    suaDuoc={suaNL.suaDuoc}
+                    options={materialTypeOptions}
+                    onSuaMuc={materialTypeEditor.moSua}
+                    nhanSua={materialTypeEditor.nhanSua}
+                    suaDuoc={materialTypeEditor.suaDuoc}
                     hint="Chọn hoặc gõ tên loại; gõ đúng tên trong sổ Nhập hàng để khớp họ."
                   />
                   <DateField
@@ -542,7 +542,7 @@ export default function MaterialNxtScreen() {
                     Hủy
                   </Button>
                   <Button
-                    title="Ghi số tồn đầu vừa khai vào sổ." onClick={luuTonDau}>
+                    title="Ghi số tồn đầu vừa khai vào sổ." onClick={saveOpening}>
                     <PackagePlus className="mr-1 h-4 w-4" />
                     Lưu tồn đầu
                   </Button>
@@ -550,7 +550,7 @@ export default function MaterialNxtScreen() {
               </div>
             ) : (
               <Button
-                title="Khai thêm tồn đầu cho một loại nguyên liệu nữa." variant="outline" onClick={moThemTonDau}>
+                title="Khai thêm tồn đầu cho một loại nguyên liệu nữa." variant="outline" onClick={openAddOpening}>
                 <PackagePlus className="mr-2 h-4 w-4" />
                 Thêm tồn đầu
               </Button>
@@ -558,7 +558,7 @@ export default function MaterialNxtScreen() {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" size="lg" onClick={() => setMoTonDau(false)}>
+            <Button variant="outline" size="lg" onClick={() => setIsOpeningOpen(false)}>
               Đóng
             </Button>
           </DialogFooter>
@@ -569,11 +569,11 @@ export default function MaterialNxtScreen() {
       <p className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
         <Truck className="size-icon-sm" aria-hidden />
         "Nhập" lấy từ sổ Nhập hàng (mọi chuyến nhập trong kỳ).{" "}
-        {coDongXa
+        {hasFreezeOrThaw
           ? "Đông gửi / Xả đông là số kho đông dự trữ (Cân đối) — chỉ để tham khảo, không vào tồn."
           : "Chưa có đông gửi / xả đông nào trong kỳ."}
       </p>
-      {suaNL.hop}
+      {materialTypeEditor.hop}
     </div>
   );
 }

@@ -84,7 +84,8 @@ function inventory() {
         if (isVietnamese(parts[i])) counts.files++;
       }
     }
-    if (isVietnamese(fileStem(parts.at(-1)))) counts.files++;
+    // File doc (.md) được đặt tên tiếng Việt không dấu kebab-case (spec §2) — không tính.
+    if (!file.endsWith(".md") && isVietnamese(fileStem(parts.at(-1)))) counts.files++;
     const names = namesOf(file, read(abs));
     for (const [layer, list] of Object.entries(names)) {
       const viet = new Set(list.filter(isVietnamese)).size;

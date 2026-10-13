@@ -249,10 +249,13 @@ if (cmd === "collect") {
       );
       // Tra theo độ cụ thể: file::Chủ.tên → file::tên → tên. Thuộc tính ngắn mơ hồ chỉ nên khai
       // theo file (khóa trơn chỉ áp cho tên bị nhận là tiếng Việt).
-      const lookup = (x) =>
-        (x.owner && mapping[`${rel(f)}::${x.owner}.${x.name}`]) ??
-        mapping[`${rel(f)}::${x.name}`] ??
-        (!propsMode || isVietnamese(x.name) ? mapping[x.name] : undefined);
+      // Giá trị null = CỐ Ý giữ nguyên (vd tên gắn với chuỗi literal / dữ liệu chưa đổi).
+      const lookup = (x) => {
+        const keys = [x.owner && `${rel(f)}::${x.owner}.${x.name}`, `${rel(f)}::${x.name}`];
+        if (!propsMode || isVietnamese(x.name)) keys.push(x.name);
+        for (const k of keys) if (k && k in mapping) return mapping[k];
+        return undefined;
+      };
       const c = cands.find((x) => lookup(x));
       if (!c) break;
       const target = lookup(c);

@@ -46,11 +46,11 @@ Bảng dùng: `phieu_ban`, `ban_hang`, đọc danh mục `mat_hang` / `khach_han
 
 Song song chuyến nhập: một khách nhận **nhiều mặt hàng ⇒ 1 `phieu_ban` + nhiều dòng `ban_hang`** cùng `phieu_id`.
 Thuộc về phiếu: 2 ngày, phân xưởng, khách, **kênh**, ghi chú. Thuộc về dòng: mặt hàng, **quy cách**, kg, đơn giá.
-⇒ Sửa một dòng chỉ đổi mặt hàng/quy cách/kg/giá. Đổi ngày/khách/kênh phải sửa ở đầu phiếu (nút "Sửa phiếu"), áp cho **mọi dòng**. Phiếu chỉ tạo khi có dòng đầu (không phiếu rỗng — `dongPhienLai` dọn phiếu rỗng khi đóng).
+⇒ Sửa một dòng chỉ đổi mặt hàng/quy cách/kg/giá. Đổi ngày/khách/kênh phải sửa ở đầu phiếu (nút "Sửa phiếu"), áp cho **mọi dòng**. Phiếu chỉ tạo khi có dòng đầu (không phiếu rỗng — `closeSession` dọn phiếu rỗng khi đóng).
 
 ### 2. Hai ngày — như nhập hàng
 
-`ngayGiao` (ngày xuất bán thật) dùng cho **mọi tổng hợp** + hút vào cân đối. `ngayGhiSo` chỉ để giải trình + nhãn "Ghi bù". `laGhiBuBan()` (`types.ts`) = `ngayGhiSo > ngayGiao`, bắt buộc lý do. Dòng `ban_hang.ngay` là bản chép của `phieu.ngayGiao` để lọc nhanh — sửa ngày phiếu phải cập nhật `ngay` mọi dòng con (đã xử ở `themDong`/`dongPhienLai`).
+`ngayGiao` (ngày xuất bán thật) dùng cho **mọi tổng hợp** + hút vào cân đối. `ngayGhiSo` chỉ để giải trình + nhãn "Ghi bù". `laGhiBuBan()` (`types.ts`) = `ngayGhiSo > ngayGiao`, bắt buộc lý do. Dòng `ban_hang.ngay` là bản chép của `phieu.ngayGiao` để lọc nhanh — sửa ngày phiếu phải cập nhật `ngay` mọi dòng con (đã xử ở `addRow`/`closeSession`).
 
 ### 3. Quy cách (size/grade)
 
@@ -77,7 +77,7 @@ Khác phế liệu (gán `kyId` lên chính dòng gốc) vì `ban_hang` và `tha
 |---|---|
 | Khách / mặt hàng chưa có trong danh mục | Tạo ngay tại chỗ trong `Combobox`, lưu luôn vào danh mục + toast. |
 | Đơn giá null | Hợp lệ — badge "Chưa có giá"; mọi nơi tính tiền `?? 0`. |
-| Ghi phiếu ngày ngoài kỳ đang lọc | Màn tự kéo bộ lọc về ngày vừa ghi (`dongPhienLai`) — tránh tưởng mất phiếu. |
+| Ghi phiếu ngày ngoài kỳ đang lọc | Màn tự kéo bộ lọc về ngày vừa ghi (`closeSession`) — tránh tưởng mất phiếu. |
 | Hút dòng bán rồi sửa giá ở sổ bán | Bản sao trong kỳ KHÔNG tự cập nhật (đã tách bảng). Bỏ khỏi kỳ rồi hút lại nếu cần số mới. |
 | Nội địa (VND) và Xuất khẩu (USD) chung kỳ | Đơn vị đơn giá theo kênh từng dòng; giá trị xuất quy tỉ giá lúc tính (balancingCalc.ts). |
 

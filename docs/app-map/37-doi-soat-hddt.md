@@ -87,8 +87,8 @@ chạy **một lần**, rồi người dùng chọn **"Bạn cần soát việc 
 - **Màn không tự tính gì** — gọi đúng hàm thuần lớp xuất dùng ⇒ số trên màn = số trong file.
 - Kiểu **mặc định theo file** (`cheDoMacDinh`): có sổ → `so`; có hai bản → `haiBan`; còn lại → `kiemCong`.
   Lưu bản: `options.cheDo` + `options.benThue` (jsonb, bản cũ thiếu trường ⇒ suy lại theo file).
-- Khối **"Quy tắc máy đang áp dụng"** (`QUY_TAC` ở `CheDoDoiSoat.tsx`) liệt kê các quy tắc đã chốt ở doc
-  này bằng lời thường + kết luận ngoại tệ của chính file. **Chốt quy tắc mới ⇒ thêm một dòng vào `QUY_TAC`.**
+- Khối **"Quy tắc máy đang áp dụng"** (`RULES` ở `CheDoDoiSoat.tsx`) liệt kê các quy tắc đã chốt ở doc
+  này bằng lời thường + kết luận ngoại tệ của chính file. **Chốt quy tắc mới ⇒ thêm một dòng vào `RULES`.**
 - Thẻ "Lệch tiền / thuế" = `tong.lech + tong.lechThue` — hai nhóm **rời nhau** (cùng `trangThai = LECH`),
   cộng lại mới khớp số ở bộ lọc bảng. Chip dòng: "Lệch thuế" (ketLuan `LỆCH THUẾ`), "Không cần vào sổ" (`isNotBookable`).
 

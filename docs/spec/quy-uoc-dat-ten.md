@@ -97,7 +97,7 @@ Phân bố khai báo tên Việt theo khu: `lib` 1.129 · `design-system` 301 ·
 2. **Đổi tên thuần, không kèm đổi logic.** Mỗi commit chỉ rename, nên diff đọc được và `build + lint + test` là đủ cổng.
 3. **Dùng công cụ rename của TypeScript** (ts-morph / "Rename Symbol"), không sed tay. Tên Việt hay trùng chuỗi hiển thị, sed tay dễ đổi nhầm chữ trên màn.
 4. **Một khu một commit, làm lúc không có phiên khác đang sửa khu đó.** Repo hay có nhiều phiên Claude chạy chung thư mục; rename lan rộng mà chạy song song là xung đột chắc chắn.
-5. **Cái đã lưu (DB, localStorage, `row_marks`) theo luật "đọc cả cũ lẫn mới, ghi mới"**. Đã có tiền lệ: `VAI_TRO_CU_CHUAN` trong `types.ts` chuẩn hóa slug vai trò cũ lúc đọc. Không bao giờ đổi khóa mà không chuyển dữ liệu.
+5. **Cái đã lưu (DB, localStorage, `row_marks`) theo luật "đọc cả cũ lẫn mới, ghi mới"**. Đã có tiền lệ: `LEGACY_ROLE_MAP` trong `types.ts` chuẩn hóa slug vai trò cũ lúc đọc. Không bao giờ đổi khóa mà không chuyển dữ liệu.
 6. **Migration cũ `0001…0057` không sửa.** Chỉ thêm migration mới.
 
 ## 5. Kế hoạch theo đợt

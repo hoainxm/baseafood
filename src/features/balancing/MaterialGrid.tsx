@@ -39,7 +39,7 @@ import {
 import { num, viDate } from "@/lib/format";
 import { ChevronDown, ChevronsLeftRight, Combine, Download, ListChecks, Pencil, Plus, Users } from "lucide-react";
 
-const KHO_XUONG = BSF1_WAREHOUSES.filter((w) => w.type === "phan-xuong");
+const WORKSHOP_WAREHOUSES = BSF1_WAREHOUSES.filter((w) => w.type === "phan-xuong");
 
 /** Cắt hậu tố size để gom "2 da lớn"/"2 da nhỏ" về một họ — CHỈ dùng cho nút Gộp,
     KHÔNG đổi `hoNguyenLieu` (logic hút) để tránh đụng khớp họ khi hút. */
@@ -77,40 +77,40 @@ export function LuoiNguyenLieu({
     conDoSXTheoNgay,
     banNoiDiaSX,
   } = luoi;
-  const [suaTayMo, setSuaTayMo] = useState(false);
+  const [isManualEditOpen, setIsManualEditOpen] = useState(false);
   /* ---------- Chuyến nhập NGAY TRONG lưới (chỉ đọc) ----------
      Ô ngày của dòng lấy từ sổ nhập có nút "n chuyến" (đại lý → chuyến của ô đó);
      dòng loại NL mở ra dòng con theo ĐẠI LÝ (kg theo ngày, cộng lại = dòng cha).
      Không đi qua đường ghi: dữ liệu là chính các dòng sổ nhập đã lấy vào kỳ. */
-  const [chuyenSo] = useImportShipments();
-  const maLo = useMemo(
-    () => new Map(chuyenSo.filter((c) => c.lotCode).map((c) => [c.id, c.lotCode ?? ""])),
-    [chuyenSo]
+  const [shipmentList] = useImportShipments();
+  const lotCodes = useMemo(
+    () => new Map(shipmentList.filter((c) => c.lotCode).map((c) => [c.id, c.lotCode ?? ""])),
+    [shipmentList]
   );
-  const nhapTheoId = useMemo(() => new Map(luoi.nhapDaGan.map((r) => [r.id, r])), [luoi.nhapDaGan]);
-  const dongNhapCua = (h: HangLuoiNL): MaterialImportItem[] =>
-    h.tuSoNhap ? h.nguonIds.flatMap((id) => nhapTheoId.get(id) ?? []) : [];
+  const importById = useMemo(() => new Map(luoi.nhapDaGan.map((r) => [r.id, r])), [luoi.nhapDaGan]);
+  const importRowsOf = (h: HangLuoiNL): MaterialImportItem[] =>
+    h.tuSoNhap ? h.nguonIds.flatMap((id) => importById.get(id) ?? []) : [];
   /** Thành tiền thật của từng dòng con đại lý (id dòng con → đ). */
-  const tienDongCon = new Map<string, number>();
+  const childRowAmount = new Map<string, number>();
   /** Dòng loại NL đang mở dòng con theo đại lý. */
-  const [moDaiLy, setMoDaiLy] = useState<ReadonlySet<string>>(() => new Set());
+  const [expandedSuppliers, setExpandedSuppliers] = useState<ReadonlySet<string>>(() => new Set());
   /** Dòng loại NL có dòng sổ nhập (mở được theo đại lý) — cho nút mở/gập tất cả. */
-  const idsCoDaiLy = hangNL.filter((h) => h.tuSoNhap && h.nguonIds.length > 0).map((h) => h.id);
-  const coDongDaiLy = idsCoDaiLy.length > 0;
-  const moHetDaiLy = coDongDaiLy && idsCoDaiLy.every((id) => moDaiLy.has(id));
-  const doiMoDaiLy = (id: string) =>
-    setMoDaiLy((cu) => {
-      const n = new Set(cu);
+  const idsWithSupplier = hangNL.filter((h) => h.tuSoNhap && h.nguonIds.length > 0).map((h) => h.id);
+  const hasSupplierRows = idsWithSupplier.length > 0;
+  const allSuppliersExpanded = hasSupplierRows && idsWithSupplier.every((id) => expandedSuppliers.has(id));
+  const toggleSupplierOpen = (id: string) =>
+    setExpandedSuppliers((prev) => {
+      const n = new Set(prev);
       if (n.has(id)) n.delete(id);
       else n.add(id);
       return n;
     });
-  const [themMo, setThemMo] = useState<InputGroup | "giam" | null>(null);
-  const [chonNhapMo, setChonNhapMo] = useState(false);
+  const [addingGroup, setAddingGroup] = useState<InputGroup | "giam" | null>(null);
+  const [isImportPickerOpen, setIsImportPickerOpen] = useState(false);
   /** id dòng kho ẢO (chưa lưu) — dòng thật tạo ra DÙNG LẠI đúng id này, nên ô đang gõ
       không bị dựng lại (mất con trỏ, rơi các phím sau) khi phím đầu biến nó thành thật.
       Suy từ id kỳ ⇒ không bao giờ trùng giữa hai kỳ. */
-  const idAo = (loai: LoaiDongKho) => `${luoi.kyId}-${loai}`;
+  const idAo = (lineKind: LoaiDongKho) => `${luoi.kyId}-${lineKind}`;
 
   const theoId = useMemo(() => new Map(nlVao.map((r) => [r.id, r])), [nlVao]);
 
@@ -118,33 +118,33 @@ export function LuoiNguyenLieu({
      Kỳ chưa có dòng nào thì hiện dòng ẢO; gõ số / giá vào là thành dòng thật. Tồn
      kho đông đọc từ engine sổ NXT nên cộng trừ ngay theo từng phím. */
   /** Đơn giá bình quân NL thủy sản của kỳ — gợi ý giá cho phần gửi đông. */
-  const giaBinhQuanNL = useMemo(() => {
+  const avgMaterialPrice = useMemo(() => {
     const ts = hangNL.filter((h) => !h.loaiKho && !h.laGiam && h.nhom === "Thủy sản" && h.donGia != null);
     const kg = ts.reduce((s, h) => s + h.tong, 0);
     return kg > 0 ? Math.round(ts.reduce((s, h) => s + h.tong * (h.donGia ?? 0), 0) / kg) : null;
   }, [hangNL]);
 
-  const mauDongKho = (loai: LoaiDongKho): BalancingInputItem => ({
-    id: idAo(loai),
+  const stockLineTemplate = (lineKind: LoaiDongKho): BalancingInputItem => ({
+    id: idAo(lineKind),
     periodId: luoi.kyId,
     groupName: "Xả đông",
-    name: TEN_DONG_KHO[loai],
+    name: TEN_DONG_KHO[lineKind],
     quantityKg: 0,
-    unitPrice: loai === "lay-xa-dong" ? luoi.giaGuiDongTruoc : giaBinhQuanNL,
+    unitPrice: lineKind === "lay-xa-dong" ? luoi.giaGuiDongTruoc : avgMaterialPrice,
     ratioPercentage: null,
     sourceWarehouse: KHO_MINH,
     dailyQuantities: {},
     carryOverKg: 0,
-    isReduction: loai === "gui-dong",
-    reductionWarehouseId: loai === "gui-dong" ? (KHO_XUONG[0]?.id ?? "") : "",
+    isReduction: lineKind === "gui-dong",
+    reductionWarehouseId: lineKind === "gui-dong" ? (WORKSHOP_WAREHOUSES[0]?.id ?? "") : "",
     autoSource: "",
   });
-  const hangAo = (loai: LoaiDongKho): HangLuoiNL => {
-    const m = mauDongKho(loai);
+  const hangAo = (lineKind: LoaiDongKho): HangLuoiNL => {
+    const m = stockLineTemplate(lineKind);
     return {
       id: m.id,
       ten: m.name,
-      loaiKho: loai,
+      loaiKho: lineKind,
       nhom: m.groupName,
       theoNgay: {},
       chuyenKy: 0,
@@ -157,26 +157,26 @@ export function LuoiNguyenLieu({
       nguonIds: [],
     };
   };
-  const dongLay = hangNL.filter((h) => h.loaiKho === "lay-xa-dong");
+  const thawRows = hangNL.filter((h) => h.loaiKho === "lay-xa-dong");
   const dongGui = hangNL.filter((h) => h.loaiKho === "gui-dong");
-  const hangLay = dongLay.length ? dongLay : [hangAo("lay-xa-dong")];
+  const thawGridRows = thawRows.length ? thawRows : [hangAo("lay-xa-dong")];
   const hangGui = dongGui.length ? dongGui : [hangAo("gui-dong")];
   const aoTheoId = new Map<string, BalancingInputItem>(
     (["lay-xa-dong", "gui-dong"] as LoaiDongKho[])
-      .filter((l) => (l === "lay-xa-dong" ? !dongLay.length : !dongGui.length))
-      .map((l) => [idAo(l), mauDongKho(l)])
+      .filter((l) => (l === "lay-xa-dong" ? !thawRows.length : !dongGui.length))
+      .map((l) => [idAo(l), stockLineTemplate(l)])
   );
   const layGoc = (id: string) => theoId.get(id) ?? aoTheoId.get(id);
 
   /** Dòng ảo ⇒ dựng dòng thật (giữ id ảo) từ mẫu + patch. */
   const tuAo = (ao: BalancingInputItem, patch: Partial<BalancingInputItem>): BalancingInputItem => {
-    const moi = { ...ao, ...patch };
-    moi.quantityKg = sumGridRow(moi.dailyQuantities, moi.carryOverKg);
-    return moi;
+    const updated = { ...ao, ...patch };
+    updated.quantityKg = sumGridRow(updated.dailyQuantities, updated.carryOverKg);
+    return updated;
   };
 
   /** Sửa một dòng lưới + giữ `quantityKg` khớp tổng (công thức đọc trường này). */
-  const ghiDong = (id: string, patch: Partial<BalancingInputItem>) => {
+  const writeRow = (id: string, patch: Partial<BalancingInputItem>) => {
     const ao = aoTheoId.get(id);
     if (ao) {
       ghiNL([...nlVao, tuAo(ao, patch)]);
@@ -185,18 +185,18 @@ export function LuoiNguyenLieu({
     ghiNL(
       nlVao.map((r) => {
         if (r.id !== id) return r;
-        const moi = { ...r, ...patch };
+        const updated = { ...r, ...patch };
         /* Dòng hút lấy ngày từ sổ nhập → tổng tính ở chỗ khác, đừng đè. */
-        if (moi.autoSource !== "imports") {
-          moi.quantityKg = sumGridRow(moi.dailyQuantities, moi.carryOverKg);
+        if (updated.autoSource !== "imports") {
+          updated.quantityKg = sumGridRow(updated.dailyQuantities, updated.carryOverKg);
         }
-        return moi;
+        return updated;
       })
     );
   };
 
   /** Gõ vào ô ngày. Dòng hút thì ghi thẳng về sổ Nhập hàng, dòng tay thì ghi tại chỗ. */
-  const ghiONgay = (r: BalancingInputItem, iso: string, v: number | null) => {
+  const writeDayCell = (r: BalancingInputItem, iso: string, v: number | null) => {
     const kg = v ?? 0;
     if (r.autoSource === "imports") {
       ghiNhapNhieuNgay([{ khoa: r.name, ngay: iso, kg }]);
@@ -207,7 +207,7 @@ export function LuoiNguyenLieu({
     /* Dòng Giảm / Gửi đông: người dùng gõ số dương, hệ ghi số ÂM — bắt tổ trưởng
        gõ dấu trừ ở xưởng lạnh là cách chắc chắn nhất để có số sai. */
     else daily[iso] = r.isReduction ? -Math.abs(kg) : kg;
-    ghiDong(r.id, { dailyQuantities: daily });
+    writeRow(r.id, { dailyQuantities: daily });
   };
 
   /**
@@ -215,38 +215,38 @@ export function LuoiNguyenLieu({
    * nên phần chênh được dồn vào NGÀY CUỐI đang có số (chưa có ngày nào ⇒ ngày đầu
    * kỳ). Giữ nguyên các ngày khác ⇒ mở cột ngày ra vẫn thấy đúng số đã gõ theo ngày.
    */
-  const ghiSoLuong = (r: BalancingInputItem, h: HangLuoiNL, v: number | null) => {
+  const writeQuantity = (r: BalancingInputItem, h: HangLuoiNL, v: number | null) => {
     if (!ngay.length) {
       notify.loi("Kỳ chưa có ngày tiếp nhận — sửa ngày của kỳ trước khi nhập số lượng.");
       return;
     }
-    const muonTong = r.isReduction ? -Math.abs(v ?? 0) : (v ?? 0);
-    const coSo = ngay.filter((iso) => (h.theoNgay[iso] ?? 0) !== 0);
-    const iso = coSo.length ? coSo[coSo.length - 1] : ngay[0];
-    const moi = (h.theoNgay[iso] ?? 0) + (muonTong - h.tong);
+    const targetTotal = r.isReduction ? -Math.abs(v ?? 0) : (v ?? 0);
+    const datesWithValues = ngay.filter((iso) => (h.theoNgay[iso] ?? 0) !== 0);
+    const iso = datesWithValues.length ? datesWithValues[datesWithValues.length - 1] : ngay[0];
+    const updated = (h.theoNgay[iso] ?? 0) + (targetTotal - h.tong);
     /* Đã tính dấu ở trên ⇒ gọi thẳng, không qua lớp "dương → âm" của ghiONgay. */
     if (r.autoSource === "imports") {
-      ghiNhapNhieuNgay([{ khoa: r.name, ngay: iso, kg: moi }]);
+      ghiNhapNhieuNgay([{ khoa: r.name, ngay: iso, kg: updated }]);
       return;
     }
     const daily: DailyQuantities = { ...(r.dailyQuantities ?? {}) };
-    if (moi === 0) delete daily[iso];
-    else daily[iso] = moi;
-    ghiDong(r.id, { dailyQuantities: daily });
+    if (updated === 0) delete daily[iso];
+    else daily[iso] = updated;
+    writeRow(r.id, { dailyQuantities: daily });
   };
 
   /* ---------- Bán nội địa (mig 0054): dòng GIẢM "Bán nội địa" ⇄ sổ /wip ----------
      NL bán thẳng cho khách trong nước (bảng giấy: −987). Tổ trưởng ghi ở Sản xuất;
      ở đây chỉ điền / đối chiếu theo từng ngày — dòng giảm âm sẵn đúng công thức. */
-  const laBanNoiDia = (h: HangLuoiNL) => h.laGiam && laDongBanNoiDia({ name: h.ten });
-  const dongBanNoiDia = nlVao.find((r) => laDongBanNoiDia(r));
-  const dienBanNoiDia = () => {
+  const isDomesticSale = (h: HangLuoiNL) => h.laGiam && laDongBanNoiDia({ name: h.ten });
+  const domesticSaleRow = nlVao.find((r) => laDongBanNoiDia(r));
+  const fillDomesticSales = () => {
     const daily = amTheoNgay(banNoiDiaSX.theoNgay);
-    if (dongBanNoiDia) {
+    if (domesticSaleRow) {
       // Dòng cũ (Thủy sản kg âm thường) chuyển luôn thành dòng giảm — một dòng, không trừ đôi.
-      ghiDong(dongBanNoiDia.id, {
+      writeRow(domesticSaleRow.id, {
         dailyQuantities: daily,
-        unitPrice: banNoiDiaSX.giaBinhQuan ?? dongBanNoiDia.unitPrice,
+        unitPrice: banNoiDiaSX.giaBinhQuan ?? domesticSaleRow.unitPrice,
         isReduction: true,
         reductionWarehouseId: "",
       });
@@ -272,7 +272,7 @@ export function LuoiNguyenLieu({
     }
     notify.daLuu(`Đã ghi Bán nội địa ${num(banNoiDiaSX.tongKg)} kg theo sổ Sản xuất`);
   };
-  const phuBanNoiDia = (h: HangLuoiNL) => {
+  const domesticSaleSubtext = (h: HangLuoiNL) => {
     if (banNoiDiaSX.tongKg <= 0) return undefined;
     const kq = doiChieuBanNoiDia(h.theoNgay, banNoiDiaSX.theoNgay);
     if (kq === "khop") return <Nhan loai="xong" className="mt-0.5">khớp sổ SX</Nhan>;
@@ -287,7 +287,7 @@ export function LuoiNguyenLieu({
           <Button
             variant="outline"
             size="sm"
-            onClick={dienBanNoiDia}
+            onClick={fillDomesticSales}
             title="Điền dòng Bán nội địa đúng từng ngày bằng số tổ trưởng ghi ở màn Sản xuất thành phẩm (ghi đè số đang có của dòng này)."
           >
             {kq === "lech" ? "Lấy lại từ SX" : `Lấy ${num(banNoiDiaSX.tongKg)} kg từ SX`}
@@ -299,30 +299,30 @@ export function LuoiNguyenLieu({
 
   /* ---------- Thứ tự dòng trên màn = thứ tự dán khối ----------
      Lấy xả đông → các nhóm (Thủy sản · Xả đông mua về · Bột) → Giảm → Gửi đông. */
-  const nhomCoDong = INPUT_GROUPS.map((nhom) => ({
+  const groupsWithRows = INPUT_GROUPS.map((nhom) => ({
     nhom,
     dong: hangNL.filter((h) => !h.loaiKho && h.nhom === nhom && !h.laGiam),
   })).filter((g) => g.dong.length > 0);
-  const dongGiam = hangNL.filter((h) => !h.loaiKho && h.laGiam);
-  const hangHien: HangLuoiNL[] = [
-    ...hangLay,
-    ...nhomCoDong.flatMap((g) => g.dong),
-    ...dongGiam,
+  const reductionRows = hangNL.filter((h) => !h.loaiKho && h.laGiam);
+  const visibleRows: HangLuoiNL[] = [
+    ...thawGridRows,
+    ...groupsWithRows.flatMap((g) => g.dong),
+    ...reductionRows,
     ...hangGui,
   ];
 
-  const ghiO = (rowId: string, colKey: string, v: number | null) => {
+  const writeCell = (rowId: string, colKey: string, v: number | null) => {
     const r = layGoc(rowId);
     if (!r) return;
     if (colKey === "soLuong") {
-      const h = hangHien.find((x) => x.id === rowId);
-      if (h) ghiSoLuong(r, h, v);
+      const h = visibleRows.find((x) => x.id === rowId);
+      if (h) writeQuantity(r, h, v);
       return;
     }
-    if (colKey === "chuyenKy") return ghiDong(rowId, { carryOverKg: v ?? 0 });
-    if (colKey === "donGia") return ghiDong(rowId, { unitPrice: v });
-    if (colKey === "tyLe") return ghiDong(rowId, { ratioPercentage: v });
-    if (colKey.startsWith("ngay:")) ghiONgay(r, colKey.slice(5), v);
+    if (colKey === "chuyenKy") return writeRow(rowId, { carryOverKg: v ?? 0 });
+    if (colKey === "donGia") return writeRow(rowId, { unitPrice: v });
+    if (colKey === "tyLe") return writeRow(rowId, { ratioPercentage: v });
+    if (colKey.startsWith("ngay:")) writeDayCell(r, colKey.slice(5), v);
   };
 
   /**
@@ -330,29 +330,29 @@ export function LuoiNguyenLieu({
    * ô rồi gọi 50 lần thì 49 lần đầu bị ghi đè, chỉ ô cuối sống. Dòng tính theo
    * THỨ TỰ TRÊN MÀN (hangHien), không theo thứ tự lưu.
    */
-  const danKhoi = (rowId: string, colKey: string, khoi: (number | null)[][]) => {
+  const pasteBlock = (rowId: string, colKey: string, block: (number | null)[][]) => {
     if (!colKey.startsWith("ngay:")) return;
-    const cotNgay = ngay.map((iso) => `ngay:${iso}`);
+    const dateColumns = ngay.map((iso) => `ngay:${iso}`);
     /* Dòng theo THỨ TỰ TRÊN MÀN kể cả dòng con đại lý đang mở — dán đè lên dòng con
        (chỉ đọc) thì bỏ qua ô đó, không trượt số sang dòng dưới. */
     const thuTu = hang.map((x) => x.id);
     const iH = thuTu.indexOf(rowId);
-    const iC = cotNgay.indexOf(colKey);
+    const iC = dateColumns.indexOf(colKey);
     if (iH < 0 || iC < 0) return;
 
-    const veSoNhap: ONgay[] = [];
+    const importCells: ONgay[] = [];
     const doiTay = new Map<string, DailyQuantities>();
-    khoi.forEach((dong, i) =>
+    block.forEach((dong, i) =>
       dong.forEach((v, j) => {
         if (v == null) return;
-        const h = hangHien.find((x) => x.id === thuTu[iH + i]);
-        const cot = cotNgay[iC + j];
-        if (!h || !cot) return;
+        const h = visibleRows.find((x) => x.id === thuTu[iH + i]);
+        const column = dateColumns[iC + j];
+        if (!h || !column) return;
         const goc = layGoc(h.id);
         if (!goc) return;
-        const iso = cot.slice(5);
+        const iso = column.slice(5);
         if (goc.autoSource === "imports") {
-          veSoNhap.push({ khoa: goc.name, ngay: iso, kg: v });
+          importCells.push({ khoa: goc.name, ngay: iso, kg: v });
           return;
         }
         const daily = doiTay.get(h.id) ?? { ...(goc.dailyQuantities ?? {}) };
@@ -363,7 +363,7 @@ export function LuoiNguyenLieu({
     );
 
     if (doiTay.size > 0) {
-      const moiTuAo = [...aoTheoId.entries()]
+      const createdFromVirtual = [...aoTheoId.entries()]
         .filter(([id]) => doiTay.has(id))
         .map(([id, ao]) => tuAo(ao, { dailyQuantities: doiTay.get(id)! }));
       ghiNL([
@@ -372,20 +372,20 @@ export function LuoiNguyenLieu({
           if (!daily) return r;
           return { ...r, dailyQuantities: daily, quantityKg: sumGridRow(daily, r.carryOverKg) };
         }),
-        ...moiTuAo,
+        ...createdFromVirtual,
       ]);
     }
-    if (veSoNhap.length > 0) ghiNhapNhieuNgay(veSoNhap);
+    if (importCells.length > 0) ghiNhapNhieuNgay(importCells);
   };
 
-  const themDong = (nhom: InputGroup | "giam", ten: string) => {
-    const laGiam = nhom === "giam";
+  const addRow = (nhom: InputGroup | "giam", ten: string) => {
+    const isReduction = nhom === "giam";
     ghiNL([
       ...nlVao,
       {
         id: uid(),
         periodId: luoi.kyId,
-        groupName: laGiam ? "Thủy sản" : nhom,
+        groupName: isReduction ? "Thủy sản" : nhom,
         name: ten,
         quantityKg: 0,
         unitPrice: null,
@@ -393,24 +393,24 @@ export function LuoiNguyenLieu({
         sourceWarehouse: "",
         dailyQuantities: {},
         carryOverKg: 0,
-        isReduction: laGiam,
-        reductionWarehouseId: laGiam ? (KHO_XUONG[0]?.id ?? "") : "",
+        isReduction: isReduction,
+        reductionWarehouseId: isReduction ? (WORKSHOP_WAREHOUSES[0]?.id ?? "") : "",
         autoSource: "",
       },
     ]);
-    setThemMo(null);
-    notify.daLuu(laGiam ? `Đã thêm dòng giảm "${ten}"` : `Đã thêm "${ten}"`);
+    setAddingGroup(null);
+    notify.daLuu(isReduction ? `Đã thêm dòng giảm "${ten}"` : `Đã thêm "${ten}"`);
   };
 
-  const xoaDong = (id: string) => {
-    const truoc = nlVao;
+  const removeRow = (id: string) => {
+    const prevRows = nlVao;
     const d = theoId.get(id);
     ghiNL(nlVao.filter((r) => r.id !== id));
-    notify.daXoa(`Đã xóa dòng "${d?.name ?? ""}"`, () => ghiNL(truoc));
+    notify.daXoa(`Đã xóa dòng "${d?.name ?? ""}"`, () => ghiNL(prevRows));
   };
 
   /* Các dòng nhập TAY cùng HỌ (2 da lớn + nhỏ) — để bật nút "Gộp cùng loại". */
-  const nhomGopDuoc = useMemo(() => {
+  const mergeableGroups = useMemo(() => {
     const m = new Map<string, BalancingInputItem[]>();
     for (const r of nlVao) {
       if (r.autoSource === "imports") continue; // dòng hút đã một-dòng-mỗi-họ
@@ -430,55 +430,55 @@ export function LuoiNguyenLieu({
    * ghi bất đồng bộ làm cộng đôi (đã thử auto → bỏ).
    */
   const gopSize = () => {
-    if (nhomGopDuoc.length === 0) {
+    if (mergeableGroups.length === 0) {
       notify.daLuu("Không có dòng cùng loại để gộp");
       return;
     }
-    const truoc = nlVao;
+    const prevRows = nlVao;
     const boId = new Set<string>();
-    const them: BalancingInputItem[] = [];
-    let soDongCu = 0;
-    for (const g of nhomGopDuoc) {
-      soDongCu += g.length;
+    const toAdd: BalancingInputItem[] = [];
+    let oldRowCount = 0;
+    for (const g of mergeableGroups) {
+      oldRowCount += g.length;
       const neo = g[0];
       const daily: DailyQuantities = {};
-      let kgTong = 0;
-      let giaTri = 0;
+      let totalKg = 0;
+      let value = 0;
       let carry = 0;
       for (const r of g) {
         for (const [d, v] of Object.entries(r.dailyQuantities ?? {}))
           daily[d] = (daily[d] ?? 0) + v;
         // Cân theo TỔNG mỗi dòng (kể cả chuyển kỳ) để Σ kg×giá GIỮ NGUYÊN chính xác.
         const kg = sumGridRow(r.dailyQuantities ?? {}, r.carryOverKg ?? 0);
-        kgTong += kg;
-        giaTri += kg * (r.unitPrice ?? 0);
+        totalKg += kg;
+        value += kg * (r.unitPrice ?? 0);
         carry += r.carryOverKg ?? 0;
         boId.add(r.id);
       }
-      them.push({
+      toAdd.push({
         ...neo,
         name: hoGop(neo.name),
         dailyQuantities: daily,
         carryOverKg: carry,
         quantityKg: sumGridRow(daily, carry),
         // Bình quân gia quyền, KHÔNG làm tròn ⇒ Giá trị NL (Σ kg×giá) không lệch.
-        unitPrice: kgTong !== 0 ? giaTri / kgTong : neo.unitPrice,
+        unitPrice: totalKg !== 0 ? value / totalKg : neo.unitPrice,
       });
     }
-    ghiNL([...nlVao.filter((r) => !boId.has(r.id)), ...them]);
-    notify.daLuu(`Đã gộp ${soDongCu} dòng thành ${them.length} dòng cùng loại`, () =>
-      ghiNL(truoc)
+    ghiNL([...nlVao.filter((r) => !boId.has(r.id)), ...toAdd]);
+    notify.daLuu(`Đã gộp ${oldRowCount} dòng thành ${toAdd.length} dòng cùng loại`, () =>
+      ghiNL(prevRows)
     );
   };
 
   /* Cột "Chuyển kỳ" đã bỏ khỏi khối NL (ra/vào kho đi bằng hai dòng kho). Chỉ còn
      hiện khi kỳ CŨ lỡ có số ở đó — giấu đi thì Số lượng ≠ Σ ngày mà không ai hiểu vì sao. */
-  const coChuyenKyCu = hangNL.some((h) => h.chuyenKy !== 0);
+  const hasLegacyCarryOver = hangNL.some((h) => h.chuyenKy !== 0);
 
   /* Thứ tự cột theo file cân đối của kế toán (cột A–E): Loại hàng · Số lượng · Đơn giá
      VNĐ · T.tiền · tỷ lệ đứng SÁT tên — số chính luôn thấy, không phải cuộn ngang; phần
      chia ngày (khi mở) dời ra SAU CÙNG như cột ngày của bảng giấy. */
-  const cot: CotLuoi<HangLuoiNL>[] = [
+  const gridColumns: CotLuoi<HangLuoiNL>[] = [
     /* Hai cột "Số lượng" loại trừ nhau: đang MỞ ngày ⇒ ô tính (Σ ngày, gõ ở ô ngày);
        đang THU ngày ⇒ gõ thẳng (ghiSoLuong). */
     { key: "tong", header: "Số lượng", nhan: "Số lượng", kieu: "tinh", nhom: "khi-mo-ngay", rong: 104, lay: (h) => h.tong || null },
@@ -491,7 +491,7 @@ export function LuoiNguyenLieu({
       kieu: "tinh",
       rong: 136,
       // Dòng con đại lý: tiền THẬT của các chuyến (đơn giá hiện đã làm tròn).
-      lay: (h) => tienDongCon.get(h.id) ?? (h.tong * (h.donGia ?? 0) || null),
+      lay: (h) => childRowAmount.get(h.id) ?? (h.tong * (h.donGia ?? 0) || null),
     },
     { key: "tyLe", header: "Tỷ lệ", nhan: "Tỷ lệ phần trăm", kieu: "so", rong: 72, lay: (h) => h.tyLe },
     ...ngay.map<CotLuoi<HangLuoiNL>>((iso) => ({
@@ -503,9 +503,9 @@ export function LuoiNguyenLieu({
       rong: 88,
       lay: (h) => h.theoNgay[iso] ?? null,
       // Ngay dưới số kg: "n chuyến" → đại lý/chuyến làm nên đúng ô này.
-      phuO: (h) => <ChuyenTrongO dong={dongNhapCua(h)} ngay={iso} maLo={maLo} />,
+      phuO: (h) => <ChuyenTrongO dong={importRowsOf(h)} ngay={iso} maLo={lotCodes} />,
     })),
-    ...(coChuyenKyCu
+    ...(hasLegacyCarryOver
       ? [
           {
             key: "chuyenKy",
@@ -523,38 +523,38 @@ export function LuoiNguyenLieu({
 
   /* Kỳ đã chốt ⇒ khoá TOÀN BỘ ô + gỡ ô điều khiển. Khoá ở một chỗ thay vì rải
      `disabled` khắp nơi: thêm cột mới về sau tự động được khoá theo. */
-  const cotHienThi: CotLuoi<HangLuoiNL>[] = luoi.daChot
-    ? cot.map((c) => ({
+  const displayColumns: CotLuoi<HangLuoiNL>[] = luoi.daChot
+    ? gridColumns.map((c) => ({
         ...c,
         oRieng: undefined,
         khoa: () => true,
         lyDoKhoa: () => "Kỳ đã chốt — mở lại ở cuối màn mới sửa được",
       }))
-    : cot;
+    : gridColumns;
 
   /* Gửi đông ⇄ còn dở khai ở Sản xuất: cả hai cùng ghi, màn đối chiếu. Gửi đông có
      số thì là số chuẩn của tồn kho đông; chưa có thì tồn tạm lấy còn dở SX. */
-  const conDoSX = tonKhoDong?.conDoSX ?? 0;
-  const guiDongCanDoi = tonKhoDong?.guiDongCanDoi ?? 0;
-  const dienTuSX = () => {
+  const productionLeftover = tonKhoDong?.conDoSX ?? 0;
+  const balancingFreezeDeposit = tonKhoDong?.guiDongCanDoi ?? 0;
+  const fillFromProduction = () => {
     const daily: DailyQuantities = {};
     for (const [iso, kg] of Object.entries(conDoSXTheoNgay)) if (kg) daily[iso] = -Math.abs(kg);
-    ghiDong(hangGui[0].id, { dailyQuantities: daily });
-    notify.daLuu(`Đã ghi Gửi đông ${num(conDoSX)} kg theo còn dở của sổ Sản xuất`);
+    writeRow(hangGui[0].id, { dailyQuantities: daily });
+    notify.daLuu(`Đã ghi Gửi đông ${num(productionLeftover)} kg theo còn dở của sổ Sản xuất`);
   };
 
   /* Chọn ĐÍCH DANH lô để lấy / kho để gửi — gõ số là Sổ kho tháng đổi ngay theo lựa
      chọn này (cột xuất của lô · lô gửi đông theo ngày, xem lib/khoCanDoi.ts). Đổi lô khi
      đã có số ⇒ trả lô cũ, trừ lô mới; lô mới không đủ ⇒ chặn, không ghi gì. */
-  const chonLo = (h: HangLuoiNL, loId: string) => {
+  const pickLot = (h: HangLuoiNL, loId: string) => {
     const goc = layGoc(h.id);
     if (!goc) return;
     const lo = luoi.luaChonLo([loId]).find((x) => x.value === loId);
     /* Giá lấy xả đông = đơn giá của lô (đúng giá vốn); lô chưa có giá thì giữ giá đang có. */
-    ghiDong(h.id, { stockLineId: loId, unitPrice: lo?.gia ?? goc.unitPrice });
+    writeRow(h.id, { stockLineId: loId, unitPrice: lo?.gia ?? goc.unitPrice });
   };
 
-  const phuDongKho = (h: HangLuoiNL, dauNhom: boolean) => {
+  const stockRowSubtext = (h: HangLuoiNL, isGroupHead: boolean) => {
     const goc = layGoc(h.id);
     if (luoi.daChot) {
       const mt = goc ? luoi.moTaDongKho(goc) : "";
@@ -567,7 +567,7 @@ export function LuoiNguyenLieu({
             label={`Lô lấy xả đông — ${h.ten}`}
             anNhan
             value={goc?.stockLineId ?? ""}
-            onChange={(v) => chonLo(h, v)}
+            onChange={(v) => pickLot(h, v)}
             options={luoi.luaChonLo(goc?.stockLineId ? [goc.stockLineId] : [])}
             placeholder="Chọn kho · lô"
             emptyText="Sổ kho tháng không còn lô nào có tồn."
@@ -578,28 +578,28 @@ export function LuoiNguyenLieu({
             label={`Kho gửi đông — ${h.ten}`}
             anNhan
             value={goc?.stockLocation ?? ""}
-            onChange={(v) => ghiDong(h.id, { stockLocation: v })}
+            onChange={(v) => writeRow(h.id, { stockLocation: v })}
             options={luoi.luaChonKhoGui}
             placeholder="Chọn kho gửi"
             choPhepXoa={false}
           />
         )}
-        {h.loaiKho === "gui-dong" && dauNhom && conDoSX > 0 && (
+        {h.loaiKho === "gui-dong" && isGroupHead && productionLeftover > 0 && (
           <span className="inline-flex flex-wrap items-center gap-1">
-            {guiDongCanDoi === 0 ? (
+            {balancingFreezeDeposit === 0 ? (
               <Button
                 variant="outline"
                 size="sm"
-                onClick={dienTuSX}
+                onClick={fillFromProduction}
                 title="Điền dòng Gửi đông đúng từng ngày bằng số NL còn dở tổ trưởng khai khi chốt ngày ở Sản xuất."
               >
-                Lấy {num(conDoSX)} kg còn dở SX
+                Lấy {num(productionLeftover)} kg còn dở SX
               </Button>
-            ) : guiDongCanDoi === conDoSX ? (
+            ) : balancingFreezeDeposit === productionLeftover ? (
               <Nhan loai="xong">khớp còn dở SX</Nhan>
             ) : (
               <Nhan loai="luu-y">
-                SX còn dở {num(conDoSX)} · lệch {num(guiDongCanDoi - conDoSX)}
+                SX còn dở {num(productionLeftover)} · lệch {num(balancingFreezeDeposit - productionLeftover)}
               </Nhan>
             )}
           </span>
@@ -609,54 +609,54 @@ export function LuoiNguyenLieu({
   };
 
   /** Thêm một dòng kho nữa (lấy thêm lô khác / gửi thêm kho khác). */
-  const themDongKho = (loai: LoaiDongKho) => {
-    if (ghiNL([...nlVao, { ...mauDongKho(loai), id: uid() }]))
-      notify.daLuu(loai === "lay-xa-dong" ? "Đã thêm dòng Lấy xả đông — chọn lô" : "Đã thêm dòng Gửi đông — chọn kho");
+  const addStockRow = (lineKind: LoaiDongKho) => {
+    if (ghiNL([...nlVao, { ...stockLineTemplate(lineKind), id: uid() }]))
+      notify.daLuu(lineKind === "lay-xa-dong" ? "Đã thêm dòng Lấy xả đông — chọn lô" : "Đã thêm dòng Gửi đông — chọn kho");
   };
-  const duLo = dongLay.length > 0 && dongLay.every((h) => layGoc(h.id)?.stockLineId);
-  const duKho = dongGui.length > 0 && dongGui.every((h) => layGoc(h.id)?.stockLocation);
+  const hasAllLots = thawRows.length > 0 && thawRows.every((h) => layGoc(h.id)?.stockLineId);
+  const hasAllLocations = dongGui.length > 0 && dongGui.every((h) => layGoc(h.id)?.stockLocation);
 
-  const dongKho = (ds: HangLuoiNL[]): HangLuoi<HangLuoiNL>[] =>
+  const stockGridRows = (ds: HangLuoiNL[]): HangLuoi<HangLuoiNL>[] =>
     ds.map((h, i) => ({
       id: h.id,
       du: h,
       /* Chuỗi (không JSX) để nhãn đọc của từng ô mang tên dòng. */
       ten: h.ten === TEN_DONG_KHO[h.loaiKho!] ? h.ten : `${TEN_DONG_KHO[h.loaiKho!]} · ${h.ten}`,
       kieu: h.loaiKho === "gui-dong" ? "giam" : undefined,
-      phu: phuDongKho(h, i === 0),
+      phu: stockRowSubtext(h, i === 0),
     }));
 
   /* Không có dòng tiêu đề nhóm — bảng giấy cũng không: tên loại hàng tự nói nhóm
      ("x.đ Cò May", "Bột 24v"), dòng Giảm tô đỏ nhạt. Thứ tự vẫn theo nhóm. */
-  const hang: HangLuoi<HangLuoiNL>[] = [...dongKho(hangLay)];
-  for (const g of nhomCoDong) {
+  const hang: HangLuoi<HangLuoiNL>[] = [...stockGridRows(thawGridRows)];
+  for (const g of groupsWithRows) {
     for (const h of g.dong) {
-      const daiLy = h.tuSoNhap ? daiLyTrongKy(dongNhapCua(h)) : [];
-      const mo = moDaiLy.has(h.id);
+      const suppliers = h.tuSoNhap ? daiLyTrongKy(importRowsOf(h)) : [];
+      const mo = expandedSuppliers.has(h.id);
       hang.push({
         id: h.id,
         du: h,
         ten: h.ten,
         phu:
-          daiLy.length > 0 ? (
+          suppliers.length > 0 ? (
             <button
               type="button"
               aria-expanded={mo}
-              onClick={() => doiMoDaiLy(h.id)}
+              onClick={() => toggleSupplierOpen(h.id)}
               title={
                 mo
                   ? "Thu gọn các dòng đại lý của loại này."
-                  : `Tách dòng này theo ${daiLy.length} đại lý — mỗi đại lý một dòng, kg theo từng ngày (chỉ xem).`
+                  : `Tách dòng này theo ${suppliers.length} đại lý — mỗi đại lý một dòng, kg theo từng ngày (chỉ xem).`
               }
               className="mt-0.5 inline-flex items-center gap-1 text-sm text-primary hover:underline"
             >
               <ChevronDown className={`size-4 transition-transform ${mo ? "" : "-rotate-90"}`} aria-hidden />
-              {daiLy.length} đại lý
+              {suppliers.length} đại lý
             </button>
           ) : undefined,
       });
       if (!mo) continue;
-      for (const d of daiLy) {
+      for (const d of suppliers) {
         const con: HangLuoiNL = {
           ...h,
           id: `${h.id}::dl::${d.daiLy}`,
@@ -669,19 +669,19 @@ export function LuoiNguyenLieu({
           chuyenKy: 0,
           nguonIds: d.ids,
         };
-        tienDongCon.set(con.id, d.tien);
+        childRowAmount.set(con.id, d.tien);
         hang.push({ id: con.id, du: con, ten: d.daiLy, kieu: "con" });
       }
     }
   }
-  if (dongGiam.length > 0) {
-    for (const h of dongGiam) {
+  if (reductionRows.length > 0) {
+    for (const h of reductionRows) {
       hang.push({
         id: h.id,
         du: h,
         ten: h.ten,
         kieu: "giam",
-        phu: laBanNoiDia(h) ? phuBanNoiDia(h) : KHO_XUONG.some((k) => k.id === h.khoGiam) ? undefined : (
+        phu: isDomesticSale(h) ? domesticSaleSubtext(h) : WORKSHOP_WAREHOUSES.some((k) => k.id === h.khoGiam) ? undefined : (
           <Nhan loai="loi" className="mt-0.5">
             chưa chọn kho
           </Nhan>
@@ -689,19 +689,19 @@ export function LuoiNguyenLieu({
       });
     }
   }
-  hang.push(...dongKho(hangGui));
+  hang.push(...stockGridRows(hangGui));
 
   /* Dòng lệch tên + dòng đang thuộc kỳ khác đều chọn tay được từ một chỗ. */
-  const dongChonDuoc = useMemo(
+  const pickableRows = useMemo(
     () => [...nhapKhacLoai, ...nhapKyKhac],
     [nhapKhacLoai, nhapKyKhac]
   );
 
-  const tongKg = hangNL.reduce((s, h) => s + h.tong, 0);
-  const tongTien = hangNL.reduce((s, h) => s + h.tong * (h.donGia ?? 0), 0);
+  const materialTotalKg = hangNL.reduce((s, h) => s + h.tong, 0);
+  const totalAmount = hangNL.reduce((s, h) => s + h.tong * (h.donGia ?? 0), 0);
 
   /** Gợi ý cho hộp thêm dòng: danh mục + tên các dòng đã có trong kỳ. */
-  const goiYLoai = useMemo(() => {
+  const typeSuggestions = useMemo(() => {
     const ten = new Set<string>([
       ...loaiNLDanhMuc.map((l) => l.name),
       ...hangNL.filter((h) => !h.laGiam && !h.loaiKho).map((h) => h.ten),
@@ -711,7 +711,7 @@ export function LuoiNguyenLieu({
 
   /* Chẩn đoán sổ nhập — chỉ nói khi có việc cần làm (chuyến khác loại / thuộc kỳ khác);
      số "chờ lấy" đã nằm trên nút Lấy. */
-  const lyDoLech = [
+  const diffReasons = [
     chanDoanNhap.lechTen > 0 && `${chanDoanNhap.lechTen} chuyến khác loại`,
     chanDoanNhap.kyKhac > 0 && `${chanDoanNhap.kyKhac} chuyến thuộc kỳ khác`,
   ].filter(Boolean);
@@ -728,29 +728,29 @@ export function LuoiNguyenLieu({
               Lấy {nhapChoHut.length} dòng từ sổ nhập
             </Button>
           )}
-          {!luoi.daChot && !dongBanNoiDia?.isReduction && banNoiDiaSX.tongKg > 0 && (
+          {!luoi.daChot && !domesticSaleRow?.isReduction && banNoiDiaSX.tongKg > 0 && (
             <Button
               title="Tạo dòng giảm Bán nội địa và điền đúng từng ngày bằng số tổ trưởng ghi ở màn Sản xuất thành phẩm (NL bán thẳng, không chế biến)."
               variant="outline"
               size="lg"
-              onClick={dienBanNoiDia}
+              onClick={fillDomesticSales}
             >
               <Download />
               Lấy bán nội địa từ SX ({num(banNoiDiaSX.tongKg)} kg)
             </Button>
           )}
-          {dongChonDuoc.length > 0 && (
+          {pickableRows.length > 0 && (
             <Button
-              title="Tự chọn từng dòng nhập muốn đưa vào kỳ, thay vì lấy hết." variant="outline" onClick={() => setChonNhapMo(true)}>
+              title="Tự chọn từng dòng nhập muốn đưa vào kỳ, thay vì lấy hết." variant="outline" onClick={() => setIsImportPickerOpen(true)}>
               <ListChecks />
-              Chọn dòng nhập ({dongChonDuoc.length})
+              Chọn dòng nhập ({pickableRows.length})
             </Button>
           )}
-          {!luoi.daChot && nhomGopDuoc.length > 0 && (
+          {!luoi.daChot && mergeableGroups.length > 0 && (
             <Button
               title="Gộp các dòng cùng loại nguyên liệu lại thành một dòng cho gọn bảng." variant="outline" onClick={gopSize}>
               <Combine />
-              Gộp cùng loại ({nhomGopDuoc.reduce((s, g) => s + g.length, 0)})
+              Gộp cùng loại ({mergeableGroups.reduce((s, g) => s + g.length, 0)})
             </Button>
           )}
           <Button
@@ -758,28 +758,28 @@ export function LuoiNguyenLieu({
             <ChevronsLeftRight />
             {anNgay ? "Mở cột ngày" : "Thu cột ngày"}
           </Button>
-          {coDongDaiLy && (
+          {hasSupplierRows && (
             <Button
               variant="outline"
-              aria-pressed={moHetDaiLy}
+              aria-pressed={allSuppliersExpanded}
               title={
-                moHetDaiLy
+                allSuppliersExpanded
                   ? "Thu gọn mọi dòng đại lý — lưới về lại mỗi loại nguyên liệu một dòng."
                   : "Tách mọi loại nguyên liệu lấy từ sổ nhập theo đại lý — mỗi đại lý một dòng, kg theo từng ngày (chỉ xem)."
               }
-              onClick={() => setMoDaiLy(moHetDaiLy ? new Set() : new Set(idsCoDaiLy))}
+              onClick={() => setExpandedSuppliers(allSuppliersExpanded ? new Set() : new Set(idsWithSupplier))}
             >
               <Users />
-              {moHetDaiLy ? "Gộp đại lý" : "Tách theo đại lý"}
+              {allSuppliersExpanded ? "Gộp đại lý" : "Tách theo đại lý"}
             </Button>
           )}
         </div>
       </div>
 
       {/* Màn trống phải nói được vì sao trống — nhưng chỉ nói khi có chuyện. */}
-      {lyDoLech.length > 0 && (
+      {diffReasons.length > 0 && (
         <p className="mb-3 text-sm text-muted-foreground">
-          Sổ nhập trong khoảng ngày còn {lyDoLech.join(" · ")} — bấm “Chọn dòng nhập” nếu cần lấy.
+          Sổ nhập trong khoảng ngày còn {diffReasons.join(" · ")} — bấm “Chọn dòng nhập” nếu cần lấy.
         </p>
       )}
       {/* Sổ kho tháng bị sửa / nạp lại ngoài cân đối ⇒ phần lấy-gửi của kỳ không còn khớp. */}
@@ -803,7 +803,7 @@ export function LuoiNguyenLieu({
           {" "}— chuyến nhập những ngày đó đã thuộc kỳ kia.
         </p>
       )}
-      {chanDoanNhap.tongTrongKhoang === 0 && ngay.length > 0 && tongKg === 0 && (
+      {chanDoanNhap.tongTrongKhoang === 0 && ngay.length > 0 && materialTotalKg === 0 && (
         <p className="mb-3 rounded-lg bg-warning-surface px-4 py-2 text-sm text-warning">
           Sổ nhập không có chuyến nào ngày {nhanNgay(ngay[0])}–{nhanNgay(ngay[ngay.length - 1])} —
           kiểm lại ngày của kỳ (theo ngày hàng về xưởng).
@@ -813,12 +813,12 @@ export function LuoiNguyenLieu({
       <LuoiNhap
         moTa="Lưới nguyên liệu vào theo ngày trong kỳ"
         tenCotDau="Loại hàng"
-        cot={cotHienThi}
+        cot={displayColumns}
         hang={hang}
         toMau="can-doi-nl"
         nhomAn={anNgay ? ["ngay", "khi-mo-ngay"] : ["khi-thu-ngay"]}
-        onGhiO={ghiO}
-        onDanKhoi={danKhoi}
+        onGhiO={writeCell}
+        onDanKhoi={pasteBlock}
         cuoiBang={
           <tr className="bg-muted font-semibold">
             <th
@@ -828,13 +828,13 @@ export function LuoiNguyenLieu({
               T. CỘNG
             </th>
             <td className="tnum border-t-2 border-l border-border px-3 py-3 text-right">
-              {num(tongKg)}
+              {num(materialTotalKg)}
             </td>
             <td className="tnum border-t-2 border-l border-border px-3 py-3 text-right">
-              {tongKg > 0 ? num(Math.round(tongTien / tongKg)) : "—"}
+              {materialTotalKg > 0 ? num(Math.round(totalAmount / materialTotalKg)) : "—"}
             </td>
             <td className="tnum border-t-2 border-l border-border px-3 py-3 text-right">
-              {num(tongTien)}
+              {num(totalAmount)}
             </td>
             <td className="border-t-2 border-l border-border" />
             {!anNgay &&
@@ -843,7 +843,7 @@ export function LuoiNguyenLieu({
                   {num(hangNL.reduce((s, h) => s + (h.theoNgay[iso] ?? 0), 0)) || "—"}
                 </td>
               ))}
-            {!anNgay && coChuyenKyCu && (
+            {!anNgay && hasLegacyCarryOver && (
               <td className="tnum border-t-2 border-l border-border bg-warning-surface px-3 py-3 text-right">
                 {num(hangNL.reduce((s, h) => s + h.chuyenKy, 0)) || "—"}
               </td>
@@ -855,30 +855,30 @@ export function LuoiNguyenLieu({
       {!luoi.daChot && (
         <div className="mt-3 flex flex-wrap gap-2">
           <Button
-            title="Thêm dòng xả đông hàng mua về (cấp đông ở kho khác). Xả đông hàng kho mình gõ thẳng vào dòng Lấy xả đông." variant="outline" onClick={() => setThemMo("Xả đông")}>
+            title="Thêm dòng xả đông hàng mua về (cấp đông ở kho khác). Xả đông hàng kho mình gõ thẳng vào dòng Lấy xả đông." variant="outline" onClick={() => setAddingGroup("Xả đông")}>
             <Plus />
             Xả đông mua về
           </Button>
           <Button
-            title="Thêm dòng bột / phụ gia dùng trong kỳ." variant="outline" onClick={() => setThemMo("Bột phụ gia")}>
+            title="Thêm dòng bột / phụ gia dùng trong kỳ." variant="outline" onClick={() => setAddingGroup("Bột phụ gia")}>
             <Plus />
             Bột phụ gia
           </Button>
           <Button
-            title="Thêm một dòng giảm trừ nguyên liệu (bán nội địa, hao hụt, trả lại…)." variant="outline" onClick={() => setThemMo("giam")}>
+            title="Thêm một dòng giảm trừ nguyên liệu (bán nội địa, hao hụt, trả lại…)." variant="outline" onClick={() => setAddingGroup("giam")}>
             <Plus />
             Dòng giảm
           </Button>
-          {duLo && (
+          {hasAllLots && (
             <Button
-              title="Thêm một dòng Lấy xả đông nữa để lấy từ lô / kho khác." variant="outline" onClick={() => themDongKho("lay-xa-dong")}>
+              title="Thêm một dòng Lấy xả đông nữa để lấy từ lô / kho khác." variant="outline" onClick={() => addStockRow("lay-xa-dong")}>
               <Plus />
               Lấy thêm lô
             </Button>
           )}
-          {duKho && (
+          {hasAllLocations && (
             <Button
-              title="Thêm một dòng Gửi đông nữa để gửi vào kho khác." variant="outline" onClick={() => themDongKho("gui-dong")}>
+              title="Thêm một dòng Gửi đông nữa để gửi vào kho khác." variant="outline" onClick={() => addStockRow("gui-dong")}>
               <Plus />
               Gửi thêm kho
             </Button>
@@ -887,7 +887,7 @@ export function LuoiNguyenLieu({
             <Button
               title="Xoá dòng nhập tay hoặc đổi kho nhận của dòng giảm."
               variant="ghost"
-              onClick={() => setSuaTayMo(true)}
+              onClick={() => setIsManualEditOpen(true)}
             >
               <Pencil />
               Sửa / xoá dòng tay
@@ -897,44 +897,44 @@ export function LuoiNguyenLieu({
       )}
 
 
-      {suaTayMo && (
+      {isManualEditOpen && (
         <HopDongNhapTay
           dong={hangNL.filter((h) => !h.tuSoNhap)}
           tenDong={(h) => (h.loaiKho ? TEN_DONG_KHO[h.loaiKho] : h.ten)}
-          khoXuong={KHO_XUONG.map((k) => ({ value: k.id, label: k.name }))}
-          coKho={(h) => !laBanNoiDia(h)}
-          onDoiKho={(id, kho) => ghiDong(id, { reductionWarehouseId: kho })}
-          onXoa={xoaDong}
-          onClose={() => setSuaTayMo(false)}
+          khoXuong={WORKSHOP_WAREHOUSES.map((k) => ({ value: k.id, label: k.name }))}
+          coKho={(h) => !isDomesticSale(h)}
+          onDoiKho={(id, warehouse) => writeRow(id, { reductionWarehouseId: warehouse })}
+          onXoa={removeRow}
+          onClose={() => setIsManualEditOpen(false)}
         />
       )}
 
-      {themMo && (
+      {addingGroup && (
         <HopThemDongNL
-          laGiam={themMo === "giam"}
-          tieuDe={themMo === "giam" ? "Thêm dòng giảm" : `Thêm dòng ${themMo}`}
+          laGiam={addingGroup === "giam"}
+          tieuDe={addingGroup === "giam" ? "Thêm dòng giảm" : `Thêm dòng ${addingGroup}`}
           goiY={
-            themMo === "giam" && !dongBanNoiDia
-              ? [{ value: TEN_DONG_BAN_NOI_DIA, label: TEN_DONG_BAN_NOI_DIA }, ...goiYLoai]
-              : goiYLoai
+            addingGroup === "giam" && !domesticSaleRow
+              ? [{ value: TEN_DONG_BAN_NOI_DIA, label: TEN_DONG_BAN_NOI_DIA }, ...typeSuggestions]
+              : typeSuggestions
           }
           onThemLoaiNL={onThemLoaiNL}
           suaLoai={suaLoaiNL}
-          onClose={() => setThemMo(null)}
-          onLuu={(ten) => themDong(themMo, ten)}
+          onClose={() => setAddingGroup(null)}
+          onLuu={(ten) => addRow(addingGroup, ten)}
         />
       )}
 
-      {chonNhapMo && (
+      {isImportPickerOpen && (
         <HopChonDongNhap
-          dong={dongChonDuoc}
+          dong={pickableRows}
           kyDangGiu={new Set(nhapKyKhac.map((r) => r.id))}
           cungHo={luoi.cungHoKy}
           tenLoaiKy={hoNguyenLieu(luoi.tenLoaiKy)}
-          onClose={() => setChonNhapMo(false)}
+          onClose={() => setIsImportPickerOpen(false)}
           onLuu={(ids) => {
             hutNhapHang(ids);
-            setChonNhapMo(false);
+            setIsImportPickerOpen(false);
           }}
         />
       )}

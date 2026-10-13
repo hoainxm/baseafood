@@ -67,18 +67,18 @@ export function LuoiBanThanhPham({
 }) {
   const { ngay, tp, hangTP, sanXuatChoHut, ghiTP, hutSanXuat, ghiSanXuatNhieuNgay, ngayDaChot, kyMau, mauConThieu, goiY } =
     luoi;
-  const [themMo, setThemMo] = useState(false);
-  const [choLyDo, setChoLyDo] = useState<{ dsO: ONgay[]; ngay: string } | null>(null);
+  const [isAdding, setIsAdding] = useState(false);
+  const [reasonPrompt, setReasonPrompt] = useState<{ dsO: ONgay[]; ngay: string } | null>(null);
   /** Ẩn dòng chưa có số (dòng mẫu + dòng 0 kg) — MẶC ĐỊNH ẨN, xem gọn như bản in. */
-  const [anDongTrong, setAnDongTrong] = useState(true);
+  const [hideEmptyRows, setHideEmptyRows] = useState(true);
   /** Dòng vừa thêm trong phiên này — vẫn hiện dù chưa có số, kẻo thêm xong là biến mất. */
-  const [vuaThem, setVuaThem] = useState<Set<string>>(() => new Set());
-  const ghiNhoVuaThem = (id: string) => setVuaThem((s) => new Set(s).add(id));
+  const [justAdded, setJustAdded] = useState<Set<string>>(() => new Set());
+  const rememberJustAdded = (id: string) => setJustAdded((s) => new Set(s).add(id));
 
   const theoId = useMemo(() => new Map(tp.map((r) => [r.id, r])), [tp]);
-  const tenMatHang = (id: string) => matHang.find((m) => m.id === id)?.name || "—";
+  const productName = (id: string) => matHang.find((m) => m.id === id)?.name || "—";
   /** Khách BẮT BUỘC (không có nút bỏ chọn) — chưa rõ khách thì chọn "Khác". */
-  const optKhach = useMemo(
+  const customerOptions = useMemo(
     () => [...khach.map((k) => ({ value: k.id, label: k.name })), { value: KHACH_KHAC, label: "Khác" }],
     [khach]
   );
@@ -86,8 +86,8 @@ export function LuoiBanThanhPham({
   /* ---------- (A) Dòng MẪU: ảo, chưa lưu. Gõ số / chọn khách / gõ giá vào dòng nào
      thì dòng đó mới thành dòng thật (nhập tay, như "Thêm mặt hàng") — kỳ không bị
      rác bởi mấy chục dòng 0 kg, công thức không đụng tới dòng chưa có số. ---------- */
-  const mauTheoId = useMemo(() => new Map(mauConThieu.map((m) => [`mau:${m.id}`, m])), [mauConThieu]);
-  const taoTuMau = (m: DongMauTP, patch: Partial<BalancingOutputItem>): BalancingOutputItem => {
+  const templateById = useMemo(() => new Map(mauConThieu.map((m) => [`mau:${m.id}`, m])), [mauConThieu]);
+  const createFromTemplate = (m: DongMauTP, patch: Partial<BalancingOutputItem>): BalancingOutputItem => {
     const r: BalancingOutputItem = {
       id: uid(),
       periodId: luoi.kyId,
@@ -107,7 +107,7 @@ export function LuoiBanThanhPham({
     r.quantityKg = sumGridRow(r.dailyQuantities, r.carryOverKg);
     return r;
   };
-  const hangMau: HangLuoiTP[] = mauConThieu.map((m) => ({
+  const templateRows: HangLuoiTP[] = mauConThieu.map((m) => ({
     id: `mau:${m.id}`,
     matHangId: m.productId,
     khachId: m.customerId,
@@ -122,44 +122,44 @@ export function LuoiBanThanhPham({
     tuSoSanXuat: false,
     nguonIds: [],
   }));
-  const coSo = (h: HangLuoiTP) => h.tong !== 0 || h.tra !== 0 || h.no !== 0 || vuaThem.has(h.id);
+  const hasValues = (h: HangLuoiTP) => h.tong !== 0 || h.tra !== 0 || h.no !== 0 || justAdded.has(h.id);
   /** Thứ tự hiển thị: dòng thật trước, dòng mẫu sau — cùng một mảng cho lưới lẫn dán khối. */
-  const hangThat = anDongTrong ? hangTP.filter(coSo) : hangTP;
-  const hangHien: HangLuoiTP[] = anDongTrong ? hangThat : [...hangTP, ...hangMau];
+  const hangThat = hideEmptyRows ? hangTP.filter(hasValues) : hangTP;
+  const visibleRows: HangLuoiTP[] = hideEmptyRows ? hangThat : [...hangTP, ...templateRows];
 
-  const ghiDong = (id: string, patch: Partial<BalancingOutputItem>) => {
-    const m = mauTheoId.get(id);
+  const writeRow = (id: string, patch: Partial<BalancingOutputItem>) => {
+    const m = templateById.get(id);
     if (m) {
-      ghiTP([...tp, taoTuMau(m, patch)]);
+      ghiTP([...tp, createFromTemplate(m, patch)]);
       return;
     }
     ghiTP(
       tp.map((r) => {
         if (r.id !== id) return r;
-        const moi = { ...r, ...patch };
-        if (moi.autoSource !== "production") {
-          moi.quantityKg = sumGridRow(moi.dailyQuantities, moi.carryOverKg);
+        const updated = { ...r, ...patch };
+        if (updated.autoSource !== "production") {
+          updated.quantityKg = sumGridRow(updated.dailyQuantities, updated.carryOverKg);
         }
-        return moi;
+        return updated;
       })
     );
   };
 
-  const ghiO = (rowId: string, colKey: string, v: number | null) => {
-    const m = mauTheoId.get(rowId);
+  const writeCell = (rowId: string, colKey: string, v: number | null) => {
+    const m = templateById.get(rowId);
     if (m) {
-      if (colKey === "tra") return ghiDong(rowId, ghiTraNo({}, { tra: v ?? 0 }));
-      if (colKey === "no") return ghiDong(rowId, ghiTraNo({}, { no: v ?? 0 }));
-      if (colKey === "donGia") return ghiDong(rowId, { unitPrice: v });
-      if (colKey.startsWith("ngay:") && v) return ghiDong(rowId, { dailyQuantities: { [colKey.slice(5)]: v } });
+      if (colKey === "tra") return writeRow(rowId, ghiTraNo({}, { tra: v ?? 0 }));
+      if (colKey === "no") return writeRow(rowId, ghiTraNo({}, { no: v ?? 0 }));
+      if (colKey === "donGia") return writeRow(rowId, { unitPrice: v });
+      if (colKey.startsWith("ngay:") && v) return writeRow(rowId, { dailyQuantities: { [colKey.slice(5)]: v } });
       return;
     }
     const r = theoId.get(rowId);
     if (!r) return;
     /* Trả · Nợ: kế toán gõ số có dấu, Tổng = Σ ngày + Trả + Nợ (quy tắc chuyển kỳ). */
-    if (colKey === "tra") return ghiDong(rowId, ghiTraNo(r, { tra: v ?? 0 }));
-    if (colKey === "no") return ghiDong(rowId, ghiTraNo(r, { no: v ?? 0 }));
-    if (colKey === "donGia") return ghiDong(rowId, { unitPrice: v });
+    if (colKey === "tra") return writeRow(rowId, ghiTraNo(r, { tra: v ?? 0 }));
+    if (colKey === "no") return writeRow(rowId, ghiTraNo(r, { no: v ?? 0 }));
+    if (colKey === "donGia") return writeRow(rowId, { unitPrice: v });
     if (!colKey.startsWith("ngay:")) return;
 
     const iso = colKey.slice(5);
@@ -168,7 +168,7 @@ export function LuoiBanThanhPham({
       const o: ONgay = { khoa: khoaMatHang(r.productId, r.spec ?? ""), ngay: iso, kg };
       /* Ngày đã chốt sản xuất ⇒ đòi lý do trước khi đụng số đã gửi đi. */
       if (ngayDaChot.has(iso)) {
-        setChoLyDo({ dsO: [o], ngay: iso });
+        setReasonPrompt({ dsO: [o], ngay: iso });
         return;
       }
       ghiSanXuatNhieuNgay([o], "");
@@ -177,7 +177,7 @@ export function LuoiBanThanhPham({
     const daily: DailyQuantities = { ...(r.dailyQuantities ?? {}) };
     if (kg === 0) delete daily[iso];
     else daily[iso] = kg;
-    ghiDong(rowId, { dailyQuantities: daily });
+    writeRow(rowId, { dailyQuantities: daily });
   };
 
   /**
@@ -185,35 +185,35 @@ export function LuoiBanThanhPham({
    * khối), dòng nhập tay ghi vào chính dòng lưới. Ô rơi vào ngày đã chốt bị bỏ
    * qua — sửa ngày đã chốt phải có lý do, không cho lọt qua đường dán.
    */
-  const danKhoi = (rowId: string, colKey: string, khoi: (number | null)[][]) => {
+  const pasteBlock = (rowId: string, colKey: string, block: (number | null)[][]) => {
     if (!colKey.startsWith("ngay:")) return;
-    const cotNgay = ngay.map((iso) => `ngay:${iso}`);
-    const iH = hangHien.findIndex((h) => h.id === rowId);
-    const iC = cotNgay.indexOf(colKey);
+    const dateColumns = ngay.map((iso) => `ngay:${iso}`);
+    const iH = visibleRows.findIndex((h) => h.id === rowId);
+    const iC = dateColumns.indexOf(colKey);
     if (iH < 0 || iC < 0) return;
 
-    const veSoSanXuat: ONgay[] = [];
+    const productionCells: ONgay[] = [];
     const doiTay = new Map<string, DailyQuantities>();
     /* Dán trùm lên dòng MẪU ⇒ dòng đó thành dòng thật (nhập tay). */
-    const tuMau = new Map<string, BalancingOutputItem>();
-    let boQuaVichot = 0;
-    khoi.forEach((dong, i) =>
+    const fromTemplate = new Map<string, BalancingOutputItem>();
+    let skippedLocked = 0;
+    block.forEach((dong, i) =>
       dong.forEach((v, j) => {
         if (v == null) return;
-        const h = hangHien[iH + i];
-        const cot = cotNgay[iC + j];
-        if (!h || !cot) return;
-        const m = mauTheoId.get(h.id);
-        if (m && !tuMau.has(h.id)) tuMau.set(h.id, taoTuMau(m, {}));
-        const goc = tuMau.get(h.id) ?? theoId.get(h.id);
+        const h = visibleRows[iH + i];
+        const column = dateColumns[iC + j];
+        if (!h || !column) return;
+        const m = templateById.get(h.id);
+        if (m && !fromTemplate.has(h.id)) fromTemplate.set(h.id, createFromTemplate(m, {}));
+        const goc = fromTemplate.get(h.id) ?? theoId.get(h.id);
         if (!goc) return;
-        const iso = cot.slice(5);
+        const iso = column.slice(5);
         if (goc.autoSource === "production") {
           if (ngayDaChot.has(iso)) {
-            boQuaVichot++;
+            skippedLocked++;
             return;
           }
-          veSoSanXuat.push({
+          productionCells.push({
             khoa: khoaMatHang(goc.productId, goc.spec ?? ""),
             ngay: iso,
             kg: v,
@@ -228,7 +228,7 @@ export function LuoiBanThanhPham({
     );
 
     if (doiTay.size > 0) {
-      const moiTuMau = [...tuMau.entries()]
+      const createdFromTemplate = [...fromTemplate.entries()]
         .filter(([id]) => doiTay.has(id))
         .map(([id, r]) => {
           const daily = doiTay.get(id)!;
@@ -240,17 +240,17 @@ export function LuoiBanThanhPham({
           if (!daily) return r;
           return { ...r, dailyQuantities: daily, quantityKg: sumGridRow(daily, r.carryOverKg) };
         }),
-        ...moiTuMau,
+        ...createdFromTemplate,
       ]
       );
     }
-    if (veSoSanXuat.length > 0) ghiSanXuatNhieuNgay(veSoSanXuat, "");
-    if (boQuaVichot > 0) {
-      notify.loi(`Bỏ qua ${boQuaVichot} ô rơi vào ngày đã chốt — sửa từng ô để ghi lý do.`);
+    if (productionCells.length > 0) ghiSanXuatNhieuNgay(productionCells, "");
+    if (skippedLocked > 0) {
+      notify.loi(`Bỏ qua ${skippedLocked} ô rơi vào ngày đã chốt — sửa từng ô để ghi lý do.`);
     }
   };
 
-  const cot: CotLuoi<HangLuoiTP>[] = [
+  const gridColumns: CotLuoi<HangLuoiTP>[] = [
     {
       key: "khach",
       header: "Khách",
@@ -266,8 +266,8 @@ export function LuoiBanThanhPham({
           label="Khách hàng"
           anNhan
           value={h.khachId}
-          onChange={(v) => ghiDong(h.id, { customerId: v })}
-          options={optKhach}
+          onChange={(v) => writeRow(h.id, { customerId: v })}
+          options={customerOptions}
           onCreate={onThemKhach}
           placeholder="Chọn khách"
           choPhepXoa={false}
@@ -307,36 +307,36 @@ export function LuoiBanThanhPham({
 
   /* Kỳ đã chốt ⇒ khoá TOÀN BỘ ô + gỡ ô điều khiển. Khoá ở một chỗ thay vì rải
      `disabled` khắp nơi: thêm cột mới về sau tự động được khoá theo. */
-  const cotHienThi: CotLuoi<HangLuoiTP>[] = luoi.daChot
-    ? cot.map((c) => ({
+  const displayColumns: CotLuoi<HangLuoiTP>[] = luoi.daChot
+    ? gridColumns.map((c) => ({
         ...c,
         oRieng: undefined,
         khoa: () => true,
         lyDoKhoa: () => "Kỳ đã chốt — mở lại ở cuối màn mới sửa được",
       }))
-    : cot;
+    : gridColumns;
 
-  const nhanKyMau = kyMau ? kyMau.dateRangeDescription || `${kyMau.startDate} – ${kyMau.endDate}` : "";
+  const templatePeriodLabel = kyMau ? kyMau.dateRangeDescription || `${kyMau.startDate} – ${kyMau.endDate}` : "";
   const hang: HangLuoi<HangLuoiTP>[] = [
     ...hangThat.map((h) => ({
       id: h.id,
       du: h,
-      ten: tenMatHang(h.matHangId),
+      ten: productName(h.matHangId),
       phu: h.quyCach || undefined,
     })),
-    ...(anDongTrong || hangMau.length === 0
+    ...(hideEmptyRows || templateRows.length === 0
       ? []
       : [
           {
             id: "tieu-de-mau",
-            du: hangMau[0],
+            du: templateRows[0],
             ten: "",
-            tieuDeNhom: `Dòng mẫu theo kỳ ${nhanKyMau}`,
+            tieuDeNhom: `Dòng mẫu theo kỳ ${templatePeriodLabel}`,
           } as HangLuoi<HangLuoiTP>,
-          ...hangMau.map((h) => ({
+          ...templateRows.map((h) => ({
             id: h.id,
             du: h,
-            ten: <span className="text-muted-foreground">{tenMatHang(h.matHangId)}</span>,
+            ten: <span className="text-muted-foreground">{productName(h.matHangId)}</span>,
             phu: h.quyCach || undefined,
           })),
         ]),
@@ -344,31 +344,31 @@ export function LuoiBanThanhPham({
 
   /* ---------- (D) Thêm nhanh ngay dưới lưới: chọn mặt hàng là xong, khách + giá gợi ý
      theo dòng mẫu / kỳ gần nhất. Cần chọn quy cách, kênh ⇒ vẫn còn nút "Thêm mặt hàng". */
-  const themNhanh = (productId: string) => {
+  const quickAdd = (productId: string) => {
     if (!productId) return;
     const g = goiY(productId, "");
-    const khachId = g?.customerId ?? "";
-    const khoa = khoaDongTP(productId, "", khachId);
+    const customerId = g?.customerId ?? "";
+    const khoa = khoaDongTP(productId, "", customerId);
     if (tp.some((r) => khoaDongTP(r.productId, r.spec ?? "", r.customerId) === khoa)) {
-      notify.loi(`"${tenMatHang(productId)}" đã có dòng trong kỳ`);
+      notify.loi(`"${productName(productId)}" đã có dòng trong kỳ`);
       return;
     }
     /* Có sẵn ở dòng mẫu (đang ẩn vì chưa có số) ⇒ biến dòng mẫu đó thành dòng thật. */
     const m =
       mauConThieu.find((x) => x.khoa === khoa) ?? mauConThieu.find((x) => x.productId === productId && !x.spec);
-    const moi = taoTuMau(
-      m ?? { id: khoa, khoa, productId, spec: "", customerId: khachId, channel: g?.channel ?? "Xuất khẩu", unitPrice: g?.unitPrice ?? null },
+    const updated = createFromTemplate(
+      m ?? { id: khoa, khoa, productId, spec: "", customerId: customerId, channel: g?.channel ?? "Xuất khẩu", unitPrice: g?.unitPrice ?? null },
       {}
     );
-    ghiTP([...tp, moi]);
-    ghiNhoVuaThem(moi.id);
+    ghiTP([...tp, updated]);
+    rememberJustAdded(updated.id);
     notify.daLuu(
-      `Đã thêm "${tenMatHang(productId)}"${g ? " — khách + giá theo kỳ gần nhất, soát lại nếu đổi" : ""}`
+      `Đã thêm "${productName(productId)}"${g ? " — khách + giá theo kỳ gần nhất, soát lại nếu đổi" : ""}`
     );
   };
 
-  const tongKg = hangTP.reduce((s, h) => s + h.tong, 0);
-  const tongTien = hangTP.reduce((s, h) => s + h.tong * (h.donGia ?? 0), 0);
+  const totalKg = hangTP.reduce((s, h) => s + h.tong, 0);
+  const totalAmount = hangTP.reduce((s, h) => s + h.tong * (h.donGia ?? 0), 0);
 
   return (
     <section className="border-t-2 border-border p-5">
@@ -394,32 +394,32 @@ export function LuoiBanThanhPham({
             <ChevronsLeftRight />
             {anNgay ? "Mở cột ngày" : "Thu cột ngày"}
           </Button>
-          {(hangMau.length > 0 || hangTP.some((h) => !coSo(h))) && (
+          {(templateRows.length > 0 || hangTP.some((h) => !hasValues(h))) && (
             <Button
               title="Ẩn / hiện các dòng chưa có số (dòng mẫu và dòng 0 kg) để xem gọn như bản in."
               variant="outline"
-              aria-pressed={anDongTrong}
-              onClick={() => setAnDongTrong((v) => !v)}
+              aria-pressed={hideEmptyRows}
+              onClick={() => setHideEmptyRows((v) => !v)}
             >
               <EyeOff />
-              {anDongTrong ? "Hiện dòng trống" : "Ẩn dòng trống"}
+              {hideEmptyRows ? "Hiện dòng trống" : "Ẩn dòng trống"}
             </Button>
           )}
           <Button
-            title="Thêm tay một mặt hàng vào lưới thành phẩm của kỳ." variant="outline" onClick={() => setThemMo(true)}>
+            title="Thêm tay một mặt hàng vào lưới thành phẩm của kỳ." variant="outline" onClick={() => setIsAdding(true)}>
             <Plus />
             Thêm mặt hàng
           </Button>
         </div>
       </div>
 
-      {anDongTrong && hangThat.length === 0 && hangTP.length + hangMau.length > 0 && (
+      {hideEmptyRows && hangThat.length === 0 && hangTP.length + templateRows.length > 0 && (
         <p className="mb-3 text-sm text-muted-foreground">
-          Chưa dòng nào có số — đang ẩn {hangTP.length + hangMau.length} dòng trống.
+          Chưa dòng nào có số — đang ẩn {hangTP.length + templateRows.length} dòng trống.
         </p>
       )}
 
-      {hangTP.length === 0 && hangMau.length === 0 ? (
+      {hangTP.length === 0 && templateRows.length === 0 ? (
         <EmptyState
           icon={Layers}
           tieuDe="Kỳ chưa có bán thành phẩm"
@@ -432,12 +432,12 @@ export function LuoiBanThanhPham({
       ) : (
         <LuoiNhap
           moTa="Lưới bán thành phẩm sản xuất theo ngày trong kỳ"
-          cot={cotHienThi}
+          cot={displayColumns}
           hang={hang}
           toMau="can-doi-tp"
           nhomAn={anNgay ? ["ngay"] : []}
-          onGhiO={ghiO}
-          onDanKhoi={danKhoi}
+          onGhiO={writeCell}
+          onDanKhoi={pasteBlock}
           cuoiBang={
             <tr className="bg-muted font-semibold">
               <th
@@ -448,13 +448,13 @@ export function LuoiBanThanhPham({
               </th>
               <td className="border-t-2 border-l border-border" />
               <td className="tnum border-t-2 border-l border-border px-3 py-3 text-right">
-                {num(tongKg)}
+                {num(totalKg)}
               </td>
               <td className="tnum border-t-2 border-l border-border px-3 py-3 text-right">
-                {tongKg > 0 ? num(Math.round((tongTien / tongKg) * 100) / 100) : "—"}
+                {totalKg > 0 ? num(Math.round((totalAmount / totalKg) * 100) / 100) : "—"}
               </td>
               <td className="tnum border-t-2 border-l border-border px-3 py-3 text-right">
-                {num(Math.round(tongTien * 100) / 100)}
+                {num(Math.round(totalAmount * 100) / 100)}
               </td>
               {!anNgay &&
                 ngay.map((iso) => (
@@ -464,7 +464,7 @@ export function LuoiBanThanhPham({
                 ))}
               {!anNgay && (
                 <td className="tnum border-t-2 border-l border-border px-3 py-3 text-right">
-                  {num(tongKg)}
+                  {num(totalKg)}
                 </td>
               )}
               <td className="tnum border-t-2 border-l border-border bg-warning-surface px-3 py-3 text-right">
@@ -484,7 +484,7 @@ export function LuoiBanThanhPham({
             label="Thêm nhanh mặt hàng"
             info="Chọn mặt hàng là thêm ngay một dòng — khách + đơn giá gợi ý theo kỳ gần nhất cùng loại nguyên liệu. Cần chọn quy cách / kênh riêng thì dùng nút “Thêm mặt hàng”."
             value=""
-            onChange={themNhanh}
+            onChange={quickAdd}
             options={matHang.map((m) => ({ value: m.id, label: m.name }))}
             onCreate={(ten) => onThemMatHang(ten)}
             placeholder="Gõ tên mặt hàng để thêm dòng"
@@ -494,7 +494,7 @@ export function LuoiBanThanhPham({
         </div>
       )}
 
-      {themMo && (
+      {isAdding && (
         <HopThemMatHang
           matHang={matHang}
           khach={khach}
@@ -502,10 +502,10 @@ export function LuoiBanThanhPham({
           onThemKhach={onThemKhach}
           onSuaMatHang={onSuaMatHang}
           onSuaKhach={onSuaKhach}
-          onClose={() => setThemMo(false)}
-          onLuu={(matHangId, khachId, quyCach, kenh) => {
+          onClose={() => setIsAdding(false)}
+          onLuu={(productId, customerId, quyCach, kenh) => {
             const trung = tp.some(
-              (r) => khoaMatHang(r.productId, r.spec ?? "") === khoaMatHang(matHangId, quyCach)
+              (r) => khoaMatHang(r.productId, r.spec ?? "") === khoaMatHang(productId, quyCach)
             );
             if (trung) {
               notify.loi("Mặt hàng + quy cách này đã có dòng trong kỳ");
@@ -517,8 +517,8 @@ export function LuoiBanThanhPham({
               {
                 id,
                 periodId: luoi.kyId,
-                productId: matHangId,
-                customerId: khachId,
+                productId: productId,
+                customerId: customerId,
                 channel: kenh,
                 quantityKg: 0,
                 unitPrice: null,
@@ -530,18 +530,18 @@ export function LuoiBanThanhPham({
                 autoSource: "",
               },
             ]);
-            ghiNhoVuaThem(id);
-            setThemMo(false);
+            rememberJustAdded(id);
+            setIsAdding(false);
           }}
         />
       )}
 
-      {choLyDo && (
+      {reasonPrompt && (
         <HopLyDoGhiBu
-          ngay={choLyDo.ngay}
-          onClose={() => setChoLyDo(null)}
-          onLuu={(lyDo) => {
-            if (ghiSanXuatNhieuNgay(choLyDo.dsO, lyDo)) setChoLyDo(null);
+          ngay={reasonPrompt.ngay}
+          onClose={() => setReasonPrompt(null)}
+          onLuu={(reason) => {
+            if (ghiSanXuatNhieuNgay(reasonPrompt.dsO, reason)) setReasonPrompt(null);
           }}
         />
       )}

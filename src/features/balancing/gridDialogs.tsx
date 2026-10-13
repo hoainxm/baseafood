@@ -121,19 +121,19 @@ export function HopChonDongNhap({
   /* Chỉ tick sẵn dòng CÙNG loại mà chưa kỳ nào giữ. Trước đây tick sẵn MỌI dòng chưa
      gắn kỳ — kể cả khác loại — nên kỳ "Bạch tuộc 2 da" tạo trùng ngày bấm vào là kéo
      luôn các chuyến 1 da. Dòng khác loại / đang thuộc kỳ khác: người dùng tự tick. */
-  const [chon, setChon] = useState<Set<string>>(
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(
     () => new Set(dong.filter((r) => !kyDangGiu.has(r.id) && cungHo(r)).map((r) => r.id))
   );
-  const soKhacLoaiDaTick = dong.filter((r) => chon.has(r.id) && !cungHo(r)).length;
+  const otherTypeCheckedCount = dong.filter((r) => selectedIds.has(r.id) && !cungHo(r)).length;
   const doi = (id: string) =>
-    setChon((cu) => {
-      const moi = new Set(cu);
-      if (moi.has(id)) moi.delete(id);
-      else moi.add(id);
-      return moi;
+    setSelectedIds((prev) => {
+      const nextSet = new Set(prev);
+      if (nextSet.has(id)) nextSet.delete(id);
+      else nextSet.add(id);
+      return nextSet;
     });
-  const tongKg = dong
-    .filter((r) => chon.has(r.id))
+  const totalKg = dong
+    .filter((r) => selectedIds.has(r.id))
     .reduce((s, r) => s + r.quantityKg, 0);
 
   return (
@@ -172,7 +172,7 @@ export function HopChonDongNhap({
                     <input
                       type="checkbox"
                       className="size-6"
-                      checked={chon.has(r.id)}
+                      checked={selectedIds.has(r.id)}
                       onChange={() => doi(r.id)}
                       aria-label={`Lấy dòng ${r.materialTypeName} ngày ${viDate(r.deliveryDate)}`}
                     />
@@ -200,11 +200,11 @@ export function HopChonDongNhap({
         </div>
 
         <p className="text-base text-muted-foreground">
-          Đã chọn {chon.size} dòng — {num(tongKg)} kg
+          Đã chọn {selectedIds.size} dòng — {num(totalKg)} kg
         </p>
-        {soKhacLoaiDaTick > 0 && (
+        {otherTypeCheckedCount > 0 && (
           <p className="rounded-lg bg-warning-surface px-4 py-2.5 text-base font-medium text-destructive">
-            ⚠ Đang tick {soKhacLoaiDaTick} dòng KHÁC loại {tenLoaiKy} — số của chúng sẽ cộng vào
+            ⚠ Đang tick {otherTypeCheckedCount} dòng KHÁC loại {tenLoaiKy} — số của chúng sẽ cộng vào
             nguyên liệu của kỳ này.
           </p>
         )}
@@ -217,14 +217,14 @@ export function HopChonDongNhap({
             title="Đưa các dòng đang tick từ sổ nhập vào kỳ cân đối này."
             size="lg"
             onClick={() => {
-              if (chon.size === 0) {
+              if (selectedIds.size === 0) {
                 notify.loi("Chưa tick dòng nào");
                 return;
               }
-              onLuu([...chon]);
+              onLuu([...selectedIds]);
             }}
           >
-            Đưa {chon.size} dòng vào kỳ
+            Đưa {selectedIds.size} dòng vào kỳ
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -252,7 +252,7 @@ export function HopDongNhapTay({
   khoXuong: { value: string; label: string }[];
   /** Dòng giảm nào có ô "Kho nhận" — mặc định mọi dòng giảm (Bán nội địa: bán đi, không vào kho). */
   coKho?: (h: HangLuoiNL) => boolean;
-  onDoiKho: (id: string, kho: string) => void;
+  onDoiKho: (id: string, warehouse: string) => void;
   onXoa: (id: string) => void;
   onClose: () => void;
 }) {
@@ -332,10 +332,10 @@ export function HopThemMatHang({
   onSuaMatHang?: (id: string) => void;
   onSuaKhach?: (id: string) => void;
   onClose: () => void;
-  onLuu: (matHangId: string, khachId: string, quyCach: string, kenh: SalesChannel) => void;
+  onLuu: (productId: string, customerId: string, quyCach: string, kenh: SalesChannel) => void;
 }) {
-  const [matHangId, setMatHangId] = useState("");
-  const [khachId, setKhachId] = useState("");
+  const [productId, setProductId] = useState("");
+  const [customerId, setCustomerId] = useState("");
   const [quyCach, setQuyCach] = useState("");
   return (
     <Dialog open onOpenChange={(v) => !v && onClose()}>
@@ -349,8 +349,8 @@ export function HopThemMatHang({
         <div className="space-y-4">
           <Combobox
             label="Mặt hàng"
-            value={matHangId}
-            onChange={setMatHangId}
+            value={productId}
+            onChange={setProductId}
             options={matHang.map((m) => ({ value: m.id, label: m.name }))}
             onCreate={onThemMatHang}
             onSuaMuc={onSuaMatHang}
@@ -367,8 +367,8 @@ export function HopThemMatHang({
             label="Khách hàng"
             required
             hint="Chưa rõ khách thì chọn “Khác”."
-            value={khachId}
-            onChange={setKhachId}
+            value={customerId}
+            onChange={setCustomerId}
             options={[...khach.map((k) => ({ value: k.id, label: k.name })), { value: KHACH_KHAC, label: "Khác" }]}
             onCreate={onThemKhach}
             choPhepXoa={false}
@@ -385,15 +385,15 @@ export function HopThemMatHang({
             title="Thêm mặt hàng vừa chọn vào lưới thành phẩm của kỳ."
             size="lg"
             onClick={() => {
-              if (!matHangId) {
+              if (!productId) {
                 notify.loi("Chưa chọn mặt hàng");
                 return;
               }
-              if (!khachId) {
+              if (!customerId) {
                 notify.loi("Chưa chọn khách hàng — chưa rõ thì chọn “Khác”");
                 return;
               }
-              onLuu(matHangId, khachId, quyCach.trim(), "Xuất khẩu");
+              onLuu(productId, customerId, quyCach.trim(), "Xuất khẩu");
             }}
           >
             Thêm vào lưới
@@ -413,9 +413,9 @@ export function HopLyDoGhiBu({
 }: {
   ngay: string;
   onClose: () => void;
-  onLuu: (lyDo: string) => void;
+  onLuu: (reason: string) => void;
 }) {
-  const [lyDo, setLyDo] = useState("");
+  const [reason, setReason] = useState("");
   return (
     <Dialog open onOpenChange={(v) => !v && onClose()}>
       <DialogContent>
@@ -428,8 +428,8 @@ export function HopLyDoGhiBu({
         </DialogHeader>
         <Field label="Lý do ghi bù">
           <Textarea
-            value={lyDo}
-            onChange={(e) => setLyDo(e.target.value)}
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
             placeholder="Cân lại ca chiều, sót một mẻ"
           />
         </Field>
@@ -441,11 +441,11 @@ export function HopLyDoGhiBu({
             title="Ghi số vừa sửa kèm lý do. Lý do được lưu vết để đối chiếu về sau."
             size="lg"
             onClick={() => {
-              if (!lyDo.trim()) {
+              if (!reason.trim()) {
                 notify.loi("Chưa ghi lý do");
                 return;
               }
-              onLuu(lyDo.trim());
+              onLuu(reason.trim());
             }}
           >
             Lưu số mới
@@ -469,9 +469,9 @@ export function HopChotKy({
   tenKy: string;
   tongTP: string;
   onClose: () => void;
-  onLuu: (ghiChu: string) => void;
+  onLuu: (note: string) => void;
 }) {
-  const [ghiChu, setGhiChu] = useState("");
+  const [note, setNote] = useState("");
   return (
     <Dialog open onOpenChange={(v) => !v && onClose()}>
       <DialogContent>
@@ -485,8 +485,8 @@ export function HopChotKy({
         </DialogHeader>
         <Field label={daChot ? "Lý do mở lại" : "Ghi chú khi chốt"}>
           <Textarea
-            value={ghiChu}
-            onChange={(e) => setGhiChu(e.target.value)}
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
             placeholder={daChot ? "Kế toán báo lệch 12 kg mặt hàng luộc 230-250" : "Đã đối chiếu với bảng phụ, gửi kế toán"}
           />
         </Field>
@@ -500,11 +500,11 @@ export function HopChotKy({
             onClick={() => {
               /* Mở lại BẮT BUỘC có lý do — giống mở lại ngày đã chốt ở sổ nhập.
                  Chốt thì ghi chú không bắt buộc. */
-              if (daChot && !ghiChu.trim()) {
+              if (daChot && !note.trim()) {
                 notify.loi("Chưa ghi lý do mở lại");
                 return;
               }
-              onLuu(ghiChu.trim());
+              onLuu(note.trim());
             }}
           >
             {daChot ? "Mở lại kỳ" : "Chốt kỳ"}

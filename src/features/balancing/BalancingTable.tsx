@@ -55,33 +55,33 @@ export default function BangCanDoi({
   const tenMH = (id: string) => matHang.find((m) => m.id === id)?.name || "—";
   const tenKH = (id: string) => tenKhachCanDoi(id, khach);
 
-  const ngay = ngayTrongKy(ky);
+  const dates = ngayTrongKy(ky);
   /* Cùng thứ tự với lưới: Lấy xả đông đầu bảng, Gửi đông cuối bảng. */
   const thuTu = (h: HangLuoiNL) => (h.loaiKho === "lay-xa-dong" ? 0 : h.loaiKho === "gui-dong" ? 2 : 1);
-  const hangNL = dungHangNL(nlVao, nhapDaGan).sort((a, b) => thuTu(a) - thuTu(b));
+  const materialRows = dungHangNL(nlVao, nhapDaGan).sort((a, b) => thuTu(a) - thuTu(b));
   /* Cột chuyển kỳ đã bỏ ở khối NL — chỉ in khi kỳ cũ lỡ có số. */
-  const coChuyenKyCu = hangNL.some((r) => r.chuyenKy !== 0);
-  const nlTheoId = new Map(nlVao.map((r) => [r.id, r]));
-  const tenDongKho = (r: HangLuoiNL) => {
-    const goc = nlTheoId.get(r.id);
+  const hasLegacyCarryOver = materialRows.some((r) => r.chuyenKy !== 0);
+  const materialById = new Map(nlVao.map((r) => [r.id, r]));
+  const stockRowName = (r: HangLuoiNL) => {
+    const goc = materialById.get(r.id);
     const mt = goc && moTaDongKho ? moTaDongKho(goc) : "";
     const ten = r.loaiKho && r.ten !== TEN_DONG_KHO[r.loaiKho] ? `${TEN_DONG_KHO[r.loaiKho]} · ${r.ten}` : r.ten;
     return mt ? `${ten} — ${mt}` : ten;
   };
-  const hangTP = dungHangTP(tp, sanXuatDaGan);
+  const finishedGoodRows = dungHangTP(tp, sanXuatDaGan);
   /* Nhieu cot ngay ⇒ in NGANG, neu khong bang bi cat mat cot cuoi. */
-  const inNgang = ngay.length > 3;
+  const inNgang = dates.length > 3;
 
   /* Thu/mở cột NGAY TRONG phiếu. Bản trước chỉ có nút này ở lưới ngoài, nên khi
      kỳ dài người dùng phải thoát phiếu, thu cột, mở lại phiếu — ba bước cho một
      việc. Thu ở đây còn quyết định bản in ra giấy gồm cột nào. */
-  const [anNgay, setAnNgay] = useState(false);
-  const [anTien, setAnTien] = useState(false);
-  const cotNgay = anNgay ? [] : ngay;
+  const [hideDays, setHideDays] = useState(false);
+  const [hideAmounts, setHideAmounts] = useState(false);
+  const dateColumns = hideDays ? [] : dates;
   /* Khối NL: công tắc ngày riêng — mặc định MỞ như màn (chốt 2026-10-06); thu lại thì
      in đúng bảng giấy (Loại hàng · Số lượng · Đơn giá · T.tiền · tỷ lệ). */
-  const [moNgayNL, setMoNgayNL] = useState(true);
-  const cotNgayNL = moNgayNL ? cotNgay : [];
+  const [isMaterialDaysOpen, setIsMaterialDaysOpen] = useState(true);
+  const materialDateColumns = isMaterialDaysOpen ? dateColumns : [];
 
   /* Khoá cuộn nền khi phiếu đang mở — xem ghi chú ở src/index.css. */
   useEffect(() => {
@@ -106,19 +106,19 @@ export default function BangCanDoi({
         </Button>
         <div className="flex flex-wrap gap-2">
           <Button
-            title="Ẩn / hiện các cột chia theo ngày trên bản in cho vừa khổ giấy." variant="outline" onClick={() => setAnNgay((v) => !v)}>
+            title="Ẩn / hiện các cột chia theo ngày trên bản in cho vừa khổ giấy." variant="outline" onClick={() => setHideDays((v) => !v)}>
             <ChevronsLeftRight className="size-4" />
-            {anNgay ? "Mở cột ngày" : "Thu cột ngày"}
+            {hideDays ? "Mở cột ngày" : "Thu cột ngày"}
           </Button>
           <Button
-            title="Khối nguyên liệu: in theo tổng như bảng cân đối giấy, hoặc chia thêm cột từng ngày." variant="outline" onClick={() => setMoNgayNL((v) => !v)}>
+            title="Khối nguyên liệu: in theo tổng như bảng cân đối giấy, hoặc chia thêm cột từng ngày." variant="outline" onClick={() => setIsMaterialDaysOpen((v) => !v)}>
             <ChevronsLeftRight className="size-4" />
-            {moNgayNL ? "NL: thu cột ngày" : "NL: mở cột ngày"}
+            {isMaterialDaysOpen ? "NL: thu cột ngày" : "NL: mở cột ngày"}
           </Button>
           <Button
-            title="Ẩn / hiện các cột tiền trên bản in." variant="outline" onClick={() => setAnTien((v) => !v)}>
+            title="Ẩn / hiện các cột tiền trên bản in." variant="outline" onClick={() => setHideAmounts((v) => !v)}>
             <Coins className="size-4" />
-            {anTien ? "Mở cột tiền" : "Thu cột tiền"}
+            {hideAmounts ? "Mở cột tiền" : "Thu cột tiền"}
           </Button>
           <Button
             title="Mở hộp in của trình duyệt cho bảng cân đối này (in giấy hoặc lưu PDF)." onClick={() => window.print()}>
@@ -144,23 +144,23 @@ export default function BangCanDoi({
                 {/* Như file cân đối (cột A–E): số chính sát tên, chia ngày (nếu mở) ra sau. */}
                 <Th>Loại hàng</Th>
                 <Th right>Số lượng</Th>
-                {!anTien && <Th right>Đơn giá VNĐ</Th>}
-                {!anTien && <Th right>T.tiền (đồng)</Th>}
-                {!anTien && <Th right>tỷ lệ</Th>}
-                {cotNgayNL.map((iso) => (
+                {!hideAmounts && <Th right>Đơn giá VNĐ</Th>}
+                {!hideAmounts && <Th right>T.tiền (đồng)</Th>}
+                {!hideAmounts && <Th right>tỷ lệ</Th>}
+                {materialDateColumns.map((iso) => (
                   <Th key={iso} right>
                     {nhanNgay(iso)}
                   </Th>
                 ))}
-                {moNgayNL && coChuyenKyCu && <Th right>Chuyển kỳ (cũ)</Th>}
+                {isMaterialDaysOpen && hasLegacyCarryOver && <Th right>Chuyển kỳ (cũ)</Th>}
               </Tr>
             </thead>
             <tbody>
-              {hangNL.map((r) => (
+              {materialRows.map((r) => (
                 <Tr key={r.id}>
                   <Td>
                     {r.loaiKho ? (
-                      <strong>{tenDongKho(r)}</strong>
+                      <strong>{stockRowName(r)}</strong>
                     ) : (
                       <>
                         {r.ten}
@@ -171,33 +171,33 @@ export default function BangCanDoi({
                     )}
                   </Td>
                   <Td right>{num(r.tong)}</Td>
-                  {!anTien && <Td right>{num(r.donGia)}</Td>}
+                  {!hideAmounts && <Td right>{num(r.donGia)}</Td>}
                   {/* Chưa khai đơn giá thì để trống — "-0" (dòng giảm × giá 0)
                       đọc như một con số thật, người xem bảng in sẽ tưởng lỗi. */}
-                  {!anTien && <Td right>{r.donGia ? num(r.tong * r.donGia) : ""}</Td>}
-                  {!anTien && <Td right>{r.tyLe != null ? `${num(r.tyLe)}%` : ""}</Td>}
-                  {cotNgayNL.map((iso) => (
+                  {!hideAmounts && <Td right>{r.donGia ? num(r.tong * r.donGia) : ""}</Td>}
+                  {!hideAmounts && <Td right>{r.tyLe != null ? `${num(r.tyLe)}%` : ""}</Td>}
+                  {materialDateColumns.map((iso) => (
                     <Td key={iso} right>
                       {r.theoNgay[iso] ? num(r.theoNgay[iso]) : ""}
                     </Td>
                   ))}
-                  {moNgayNL && coChuyenKyCu && <Td right>{r.chuyenKy ? num(r.chuyenKy) : ""}</Td>}
+                  {isMaterialDaysOpen && hasLegacyCarryOver && <Td right>{r.chuyenKy ? num(r.chuyenKy) : ""}</Td>}
                 </Tr>
               ))}
               <Tr total>
                 <Td>T. CỘNG</Td>
                 <Td right>{num(kq.totalInputKg)}</Td>
-                {!anTien && (
+                {!hideAmounts && (
                   <Td right>{kq.totalInputKg ? num(Math.round(kq.materialValue / kq.totalInputKg) || 0) : ""}</Td>
                 )}
-                {!anTien && <Td right>{num(kq.materialValue)}</Td>}
-                {!anTien && <Td right></Td>}
-                {cotNgayNL.map((iso) => (
+                {!hideAmounts && <Td right>{num(kq.materialValue)}</Td>}
+                {!hideAmounts && <Td right></Td>}
+                {materialDateColumns.map((iso) => (
                   <Td key={iso} right>
-                    {num(hangNL.reduce((s, r) => s + (r.theoNgay[iso] ?? 0), 0))}
+                    {num(materialRows.reduce((s, r) => s + (r.theoNgay[iso] ?? 0), 0))}
                   </Td>
                 ))}
-                {moNgayNL && coChuyenKyCu && <Td right>{num(hangNL.reduce((s, r) => s + r.chuyenKy, 0))}</Td>}
+                {isMaterialDaysOpen && hasLegacyCarryOver && <Td right>{num(materialRows.reduce((s, r) => s + r.chuyenKy, 0))}</Td>}
               </Tr>
             </tbody>
           </table>
@@ -213,22 +213,22 @@ export default function BangCanDoi({
                 <Th>Mặt hàng</Th>
                 <Th>Khách</Th>
                 <Th right>Lượng</Th>
-                {!anTien && <Th right>Đơn giá</Th>}
-                {!anTien && <Th right>T.tiền (usd)</Th>}
-                {cotNgay.map((iso) => (
+                {!hideAmounts && <Th right>Đơn giá</Th>}
+                {!hideAmounts && <Th right>T.tiền (usd)</Th>}
+                {dateColumns.map((iso) => (
                   <Th key={iso} right>
                     {nhanNgay(iso)}
                   </Th>
                 ))}
-                {cotNgay.length > 0 && <Th right>Tổng</Th>}
+                {dateColumns.length > 0 && <Th right>Tổng</Th>}
                 <Th right>Trả</Th>
                 <Th right>Nợ</Th>
               </Tr>
             </thead>
             <tbody>
-              {hangTP.map((r) => {
+              {finishedGoodRows.map((r) => {
                 const xk = r.kenh === "Xuất khẩu";
-                const tien = r.tong * (r.donGia ?? 0);
+                const amount = r.tong * (r.donGia ?? 0);
                 return (
                   <Tr key={r.id}>
                     <Td>
@@ -242,24 +242,24 @@ export default function BangCanDoi({
                       {!xk && <span className="ml-1 text-xs text-slate-500">(nội địa)</span>}
                     </Td>
                     <Td right>{num(r.tong)}</Td>
-                    {!anTien && (
+                    {!hideAmounts && (
                       <Td right>
                         {num(r.donGia)}
                         {xk ? " $" : ""}
                       </Td>
                     )}
-                    {!anTien && (
+                    {!hideAmounts && (
                       <Td right>
-                        {num(tien)}
+                        {num(amount)}
                         {xk ? " $" : ""}
                       </Td>
                     )}
-                    {cotNgay.map((iso) => (
+                    {dateColumns.map((iso) => (
                       <Td key={iso} right>
                         {r.theoNgay[iso] ? num(r.theoNgay[iso]) : ""}
                       </Td>
                     ))}
-                    {cotNgay.length > 0 && <Td right>{num(r.tong)}</Td>}
+                    {dateColumns.length > 0 && <Td right>{num(r.tong)}</Td>}
                     <Td right>{r.tra ? num(r.tra) : ""}</Td>
                     <Td right>{r.no ? num(r.no) : ""}</Td>
                   </Tr>
@@ -269,24 +269,24 @@ export default function BangCanDoi({
                 <Td>Tổng cộng</Td>
                 <Td></Td>
                 <Td right>{num(kq.totalOutputKg)}</Td>
-                {!anTien && (
+                {!hideAmounts && (
                   <Td right>
                     {kq.totalOutputKg
-                      ? num(Math.round((hangTP.reduce((s, r) => s + r.tong * (r.donGia ?? 0), 0) / kq.totalOutputKg) * 100) / 100)
+                      ? num(Math.round((finishedGoodRows.reduce((s, r) => s + r.tong * (r.donGia ?? 0), 0) / kq.totalOutputKg) * 100) / 100)
                       : ""}
                   </Td>
                 )}
-                {!anTien && (
-                  <Td right>{num(Math.round(hangTP.reduce((s, r) => s + r.tong * (r.donGia ?? 0), 0) * 100) / 100)}</Td>
+                {!hideAmounts && (
+                  <Td right>{num(Math.round(finishedGoodRows.reduce((s, r) => s + r.tong * (r.donGia ?? 0), 0) * 100) / 100)}</Td>
                 )}
-                {cotNgay.map((iso) => (
+                {dateColumns.map((iso) => (
                   <Td key={iso} right>
-                    {num(hangTP.reduce((s, r) => s + (r.theoNgay[iso] ?? 0), 0))}
+                    {num(finishedGoodRows.reduce((s, r) => s + (r.theoNgay[iso] ?? 0), 0))}
                   </Td>
                 ))}
-                {cotNgay.length > 0 && <Td right>{num(kq.totalOutputKg)}</Td>}
-                <Td right>{num(hangTP.reduce((s, r) => s + r.tra, 0))}</Td>
-                <Td right>{num(hangTP.reduce((s, r) => s + r.no, 0))}</Td>
+                {dateColumns.length > 0 && <Td right>{num(kq.totalOutputKg)}</Td>}
+                <Td right>{num(finishedGoodRows.reduce((s, r) => s + r.tra, 0))}</Td>
+                <Td right>{num(finishedGoodRows.reduce((s, r) => s + r.no, 0))}</Td>
               </Tr>
             </tbody>
           </table>

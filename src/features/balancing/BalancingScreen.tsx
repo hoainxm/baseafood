@@ -78,7 +78,7 @@ import { HopChotKy } from "./gridDialogs";
 import BangCanDoi from "./BalancingTable";
 
 /** Chuỗi ngày để in trên bảng, sinh từ khoảng ngày đã chọn. */
-function moTaKhoang(tu?: string, den?: string): string {
+function describeRange(tu?: string, den?: string): string {
   if (!tu) return "";
   if (!den || den === tu) return viDate(tu);
   return `${viDate(tu)} – ${viDate(den)}`;
@@ -86,7 +86,7 @@ function moTaKhoang(tu?: string, den?: string): string {
 
 export default function CanDoiScreen() {
   const [kyList, persistKy, { trangThai: ttKy }] = useBalancingPeriods();
-  const dangTaiKy = ttKy === "dang-tai" && kyList.length === 0;
+  const isLoadingPeriods = ttKy === "dang-tai" && kyList.length === 0;
   const { periodId } = useParams<{ periodId?: string }>();
   const navigate = useNavigate();
   const selId = periodId || null;
@@ -97,86 +97,86 @@ export default function CanDoiScreen() {
       navigate("/balancing");
     }
   };
-  const [loaiNLDanhMuc, setLoaiNLDanhMuc] = useMaterialTypes();
+  const [catalogMaterialTypes, setCatalogMaterialTypes] = useMaterialTypes();
 
   /* Xóa kỳ phải xóa luôn dòng con của nó (NL vào / phế liệu / TP ra), nếu không
      các dòng này mồ côi trong kho — chiếm chỗ, sai tổng khi thống kê sau này. */
-  const [tatCaNL, ghiNL] = useBalancingInputs();
-  const [tatCaPL, ghiPL] = useScraps();
-  const [tatCaTP, ghiTP] = useBalancingOutputs();
+  const [allMaterialRows, writeMaterials] = useBalancingInputs();
+  const [allScraps, writeScraps] = useScraps();
+  const [allOutputs, writeFinishedGoods] = useBalancingOutputs();
   /* Hai sổ nguồn: kỳ chỉ MƯỢN dòng của chúng bằng `balancingPeriodId`. */
-  const [tatCaNhap, ghiNhap] = useMaterialImports();
-  const [tatCaSanXuat, ghiSanXuat] = useWipProductions();
+  const [allImports, writeImports] = useMaterialImports();
+  const [allWips, writeProductions] = useWipProductions();
   /* Sổ kho tháng: dòng Lấy xả đông / Gửi đông của kỳ đã ghi thẳng vào đây. */
-  const [soKho, ghiSoKho] = useMonthlyStock();
+  const [monthlyStock, writeStockLedger] = useMonthlyStock();
 
   /** Gõ loại mới trong ô chọn → LƯU LUÔN vào danh mục (rule 7), không để mồ côi. */
-  const themLoaiNL = (ten: string) => {
-    setLoaiNLDanhMuc([...loaiNLDanhMuc, { id: uid(), name: ten, category: "", note: "" }]);
+  const addMaterialType = (ten: string) => {
+    setCatalogMaterialTypes([...catalogMaterialTypes, { id: uid(), name: ten, category: "", note: "" }]);
     notify.daLuu(`Đã thêm loại nguyên liệu "${ten}" vào danh mục`);
     return ten;
   };
   /** Bút chì sửa nhanh loại NL (value là TÊN; mục gộp họ không trùng tên danh mục thì không có bút chì). */
-  const suaNL = useSuaDanhMuc("loaiNL", loaiNLDanhMuc, setLoaiNLDanhMuc, { theo: "ten" });
+  const materialTypeEditor = useSuaDanhMuc("loaiNL", catalogMaterialTypes, setCatalogMaterialTypes, { theo: "ten" });
 
   /* Chọn loại NL cho kỳ: GỘP biến thể size về HỌ — "Bạch tuộc 2 da lớn (80↑)" +
      "… nhỏ (80↓)" chỉ hiện MỘT mục "Bạch tuộc 2 da" (cân đối không tách size, chốt
      với chủ dự án). Tên không có mốc 80↑/↓ giữ nguyên. Value = tên họ nên chọn xong
      ô hiển thị đúng và lưu thẳng tên họ. Danh mục gốc (sổ nhập) vẫn giữ đủ size. */
-  const optLoaiNL = useMemo(() => {
-    const daCo = new Set<string>();
+  const materialTypeOptions = useMemo(() => {
+    const existing = new Set<string>();
     const ra: { value: string; label: string; phu?: string }[] = [];
-    for (const l of loaiNLDanhMuc) {
+    for (const l of catalogMaterialTypes) {
       const ho = hoNguyenLieu(l.name) || l.name;
       const khoa = ho.toLowerCase();
-      if (daCo.has(khoa)) continue;
-      daCo.add(khoa);
+      if (existing.has(khoa)) continue;
+      existing.add(khoa);
       ra.push({ value: ho, label: ho, phu: l.category || undefined });
     }
     return ra;
-  }, [loaiNLDanhMuc]);
+  }, [catalogMaterialTypes]);
 
-  const [dang, setDang] = useState<BalancingPeriod | null>(null);
-  const [laThem, setLaThem] = useState(false);
+  const [editing, setEditing] = useState<BalancingPeriod | null>(null);
+  const [isAdding, setIsAdding] = useState(false);
   const [loi, setLoi] = useState<LoiNhap[]>([]);
 
-  const moThem = () => {
-    const homNay = dateToIso(new Date());
-    setDang({
+  const openAdd = () => {
+    const today = dateToIso(new Date());
+    setEditing({
       id: uid(),
       materialTypeName: "",
       dateRangeDescription: "",
-      startDate: homNay,
-      endDate: homNay,
+      startDate: today,
+      endDate: today,
       totalInputKg: null,
       exchangeRate: 26000,
       processingCostPerKg: null,
       createdAt: new Date().toISOString(),
     });
-    setLaThem(true);
+    setIsAdding(true);
     setLoi([]);
   };
 
-  const luuKy = () => {
-    if (!dang) return;
+  const savePeriod = () => {
+    if (!editing) return;
     const ls: LoiNhap[] = [];
-    if (!dang.materialTypeName.trim())
+    if (!editing.materialTypeName.trim())
       ls.push({ truong: "Loại nguyên liệu", thongBao: "Chưa chọn loại" });
-    if (!dang.startDate)
+    if (!editing.startDate)
       ls.push({ truong: "Ngày tiếp nhận", thongBao: "Chưa chọn ngày" });
     setLoi(ls);
     if (ls.length > 0) return;
 
     const ban: BalancingPeriod = {
-      ...dang,
+      ...editing,
       // QUY TẮC: kỳ dùng tên HỌ nguyên liệu — "Bạch tuộc 2 da lớn (80↑)" và
       // "… nhỏ (80↓)" đều là "Bạch tuộc 2 da", một kỳ gộp cả hai size. Chuẩn hoá
       // ở đây để dù chọn biến thể size nào, tên kỳ vẫn là họ (khớp cách hút theo
       // họ ở nhapHangHopLe/kyLienTruoc). Tên khác (không có mốc 80↑/↓) giữ nguyên.
-      materialTypeName: hoNguyenLieu(dang.materialTypeName.trim()),
-      dateRangeDescription: moTaKhoang(dang.startDate, dang.endDate),
+      materialTypeName: hoNguyenLieu(editing.materialTypeName.trim()),
+      dateRangeDescription: describeRange(editing.startDate, editing.endDate),
     };
-    if (laThem) {
+    if (isAdding) {
       persistKy([ban, ...kyList]);
       notify.daLuu(`Đã tạo kỳ cân đối "${ban.materialTypeName}"`);
       setSelId(ban.id);
@@ -184,65 +184,65 @@ export default function CanDoiScreen() {
       persistKy(kyList.map((k) => (k.id === ban.id ? ban : k)));
       notify.daLuu("Đã lưu thay đổi");
     }
-    setDang(null);
+    setEditing(null);
   };
 
-  const xoaKy = (k: BalancingPeriod) => {
-    const truocKy = kyList;
-    const truocNL = tatCaNL;
-    const truocPL = tatCaPL;
-    const truocTP = tatCaTP;
-    const truocNhap = tatCaNhap;
-    const truocSanXuat = tatCaSanXuat;
-    const truocKho = soKho;
+  const deletePeriod = (k: BalancingPeriod) => {
+    const prevPeriods = kyList;
+    const prevMaterials = allMaterialRows;
+    const prevScrap = allScraps;
+    const prevFinishedGoods = allOutputs;
+    const prevImports = allImports;
+    const prevProduction = allWips;
+    const prevStock = monthlyStock;
     /* Trả lại Sổ kho tháng phần kỳ này đã lấy xả đông (cột xuất của lô) / gửi đông (lô
        gửi theo ngày) — xoá kỳ mà để nguyên thì tồn kho lệch vĩnh viễn. */
-    const traKho = dongBoSoKho(
-      soKho,
-      tatCaNL.filter((r) => r.periodId === k.id),
+    const stockSyncResult = dongBoSoKho(
+      monthlyStock,
+      allMaterialRows.filter((r) => r.periodId === k.id),
       [],
       {
         nhanKy: `${k.materialTypeName} ${k.dateRangeDescription ?? ""}`.trim(),
         hoNL: hoNguyenLieu(k.materialTypeName),
       }
     );
-    if (traKho.doi) ghiSoKho(traKho.lines);
+    if (stockSyncResult.doi) writeStockLedger(stockSyncResult.lines);
     persistKy(kyList.filter((x) => x.id !== k.id));
-    ghiNL(tatCaNL.filter((r) => r.periodId !== k.id));
+    writeMaterials(allMaterialRows.filter((r) => r.periodId !== k.id));
     /* Phế liệu cân ở màn Nhập hàng chỉ MƯỢN kỳ này — xóa kỳ thì gỡ liên kết,
        tuyệt đối không xóa theo, vì bản gốc là số cân của sổ nhập hàng. */
-    ghiPL(
-      tatCaPL
+    writeScraps(
+      allScraps
         .filter((r) => r.periodId !== k.id || r.source === "Nhập hàng")
         .map((r) =>
           r.periodId === k.id && r.source === "Nhập hàng" ? { ...r, periodId: "" } : r
         )
     );
-    ghiTP(tatCaTP.filter((r) => r.periodId !== k.id));
+    writeFinishedGoods(allOutputs.filter((r) => r.periodId !== k.id));
     /* Sổ nhập hàng và sổ sản xuất cũng chỉ MƯỢN kỳ này: xóa kỳ phải NHẢ dòng
        ra, không thì chúng còn ghim vào một kỳ đã chết — mọi kỳ sau lọc theo
        "chưa gắn kỳ nào" sẽ không thấy chúng nữa và số liệu biến mất khỏi cân
        đối vĩnh viễn (dù sổ gốc vẫn còn nguyên). */
-    ghiNhap(
-      tatCaNhap.map((r) =>
+    writeImports(
+      allImports.map((r) =>
         r.balancingPeriodId === k.id ? { ...r, balancingPeriodId: "" } : r
       )
     );
-    ghiSanXuat(
-      tatCaSanXuat.map((r) =>
+    writeProductions(
+      allWips.map((r) =>
         r.balancingPeriodId === k.id ? { ...r, balancingPeriodId: "" } : r
       )
     );
     notify.daXoa(
       `Đã xóa kỳ "${k.materialTypeName}" — số ở sổ nhập hàng và sổ sản xuất vẫn còn`,
       () => {
-        persistKy(truocKy);
-        ghiNL(truocNL);
-        ghiPL(truocPL);
-        ghiTP(truocTP);
-        ghiNhap(truocNhap);
-        ghiSanXuat(truocSanXuat);
-        if (traKho.doi) ghiSoKho(truocKho);
+        persistKy(prevPeriods);
+        writeMaterials(prevMaterials);
+        writeScraps(prevScrap);
+        writeFinishedGoods(prevFinishedGoods);
+        writeImports(prevImports);
+        writeProductions(prevProduction);
+        if (stockSyncResult.doi) writeStockLedger(prevStock);
       }
     );
   };
@@ -300,13 +300,13 @@ export default function CanDoiScreen() {
           </h1>
         </div>
         <Button
-          title="Mở một kỳ cân đối mới (thường ~5 ngày một lô): khai khoảng ngày rồi hút số liệu nhập · sản xuất · bán vào." size="lg" onClick={moThem}>
+          title="Mở một kỳ cân đối mới (thường ~5 ngày một lô): khai khoảng ngày rồi hút số liệu nhập · sản xuất · bán vào." size="lg" onClick={openAdd}>
           <Plus />
           Tạo kỳ cân đối
         </Button>
       </div>
 
-      {dangTaiKy ? (
+      {isLoadingPeriods ? (
         <SkeletonBang />
       ) : kyList.length === 0 ? (
         <EmptyState
@@ -315,7 +315,7 @@ export default function CanDoiScreen() {
           moTa="Tạo kỳ đầu tiên: chọn loại nguyên liệu và khoảng ngày tiếp nhận."
           action={
             <Button
-              title="Mở kỳ cân đối đầu tiên." size="lg" onClick={moThem}>
+              title="Mở kỳ cân đối đầu tiên." size="lg" onClick={openAdd}>
               <Plus />
               Tạo kỳ cân đối
             </Button>
@@ -340,8 +340,8 @@ export default function CanDoiScreen() {
                 variant="outline"
                 size="sm"
                 onClick={() => {
-                  setDang({ ...r });
-                  setLaThem(false);
+                  setEditing({ ...r });
+                  setIsAdding(false);
                   setLoi([]);
                 }}
               >
@@ -350,7 +350,7 @@ export default function CanDoiScreen() {
               </Button>
               <ConfirmDelete
                 moTaBanGhi={`Kỳ "${r.materialTypeName}" — ${r.dateRangeDescription || "chưa ghi ngày"}`}
-                onConfirm={() => xoaKy(r)}
+                onConfirm={() => deletePeriod(r)}
                 tieuDe="Xóa kỳ cân đối này?"
                 nhanNut="Xóa kỳ"
               />
@@ -360,19 +360,19 @@ export default function CanDoiScreen() {
       )}
 
       <Dialog
-        open={dang !== null}
+        open={editing !== null}
         onOpenChange={(o) => {
-          if (!o) setDang(null);
+          if (!o) setEditing(null);
         }}
       >
         <DialogContent className="max-h-[92dvh] overflow-y-auto w-full sm:max-w-3xl lg:max-w-5xl">
           <DialogHeader>
             <DialogTitle className="text-xl">
-              {laThem ? "Tạo kỳ cân đối" : "Sửa kỳ cân đối"}
+              {isAdding ? "Tạo kỳ cân đối" : "Sửa kỳ cân đối"}
             </DialogTitle>
           </DialogHeader>
 
-          {dang && (
+          {editing && (
             <div className="space-y-6 py-2">
               <ErrorSummary loi={loi} />
               <ChuThichBatBuoc />
@@ -381,9 +381,9 @@ export default function CanDoiScreen() {
                 label="Loại nguyên liệu"
                 required
                 hint="Lô đem cân đối. Lớn/nhỏ (80↑/80↓) gộp chung — kỳ tự dùng tên họ, VD: Bạch tuộc 2 da."
-                value={dang.materialTypeName}
+                value={editing.materialTypeName}
                 onChange={(v) =>
-                  setDang((d) => {
+                  setEditing((d) => {
                     if (!d) return d;
                     // optLoaiNL đã gộp về HỌ nên `v` là tên họ (VD "Bạch tuộc 2 da")
                     // — vừa hiển thị đúng, vừa lưu thẳng. luuKy vẫn chuẩn hoá lần nữa
@@ -394,32 +394,32 @@ export default function CanDoiScreen() {
                     // kỳ, vẫn sửa được. kyList mới-nhất-trước nên find lấy kỳ gần.
                     if (d.processingCostPerKg == null) {
                       const ho = hoNguyenLieu(v);
-                      const truoc = kyList.find(
+                      const prevRows = kyList.find(
                         (k) => hoNguyenLieu(k.materialTypeName) === ho
                       );
-                      if (truoc) {
-                        next.processingCostPerKg = truoc.processingCostPerKg;
-                        if (truoc.exchangeRate) next.exchangeRate = truoc.exchangeRate;
+                      if (prevRows) {
+                        next.processingCostPerKg = prevRows.processingCostPerKg;
+                        if (prevRows.exchangeRate) next.exchangeRate = prevRows.exchangeRate;
                       }
                     }
                     return next;
                   })
                 }
-                options={optLoaiNL}
-                onCreate={themLoaiNL}
-                onSuaMuc={suaNL.moSua}
-                nhanSua={suaNL.nhanSua}
-                suaDuoc={suaNL.suaDuoc}
+                options={materialTypeOptions}
+                onCreate={addMaterialType}
+                onSuaMuc={materialTypeEditor.moSua}
+                nhanSua={materialTypeEditor.nhanSua}
+                suaDuoc={materialTypeEditor.suaDuoc}
               />
 
               <DateRangeField
                 label="Ngày tiếp nhận"
                 required
                 hint="Kỳ xưởng Đông thường 5 ngày — có nút chọn nhanh bên dưới."
-                startDate={dang.startDate ?? ""}
-                endDate={dang.endDate ?? ""}
+                startDate={editing.startDate ?? ""}
+                endDate={editing.endDate ?? ""}
                 onChange={(tu, den) =>
-                  setDang((d) => (d ? { ...d, startDate: tu, endDate: den } : d))
+                  setEditing((d) => (d ? { ...d, startDate: tu, endDate: den } : d))
                 }
               />
 
@@ -427,42 +427,42 @@ export default function CanDoiScreen() {
                 <NumberField
                   label="Tổng NL nhận cả kỳ"
                   unit="kg"
-                  value={dang.totalInputKg}
+                  value={editing.totalInputKg}
                   onChange={(v) =>
-                    setDang((d) => (d ? { ...d, totalInputKg: v } : d))
+                    setEditing((d) => (d ? { ...d, totalInputKg: v } : d))
                   }
                   hint="Lấy từ bảng phụ — để tính tỉ lệ thu hồi."
                 />
                 <NumberField
                   label="Chi phí chế biến / kg TP"
                   unit="đ"
-                  value={dang.processingCostPerKg}
+                  value={editing.processingCostPerKg}
                   onChange={(v) =>
-                    setDang((d) => (d ? { ...d, processingCostPerKg: v } : d))
+                    setEditing((d) => (d ? { ...d, processingCostPerKg: v } : d))
                   }
                 />
                 <NumberField
                   label="Tỉ giá"
                   unit="đ/USD"
-                  value={dang.exchangeRate}
-                  onChange={(v) => setDang((d) => (d ? { ...d, exchangeRate: v } : d))}
+                  value={editing.exchangeRate}
+                  onChange={(v) => setEditing((d) => (d ? { ...d, exchangeRate: v } : d))}
                 />
               </div>
             </div>
           )}
 
           <DialogFooter>
-            <Button variant="outline" size="lg" onClick={() => setDang(null)}>
+            <Button variant="outline" size="lg" onClick={() => setEditing(null)}>
               Hủy
             </Button>
             <Button
-              title="Ghi kỳ cân đối này vào sổ." size="lg" onClick={luuKy}>
-              {laThem ? "Tạo kỳ" : "Lưu thay đổi"}
+              title="Ghi kỳ cân đối này vào sổ." size="lg" onClick={savePeriod}>
+              {isAdding ? "Tạo kỳ" : "Lưu thay đổi"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      {suaNL.hop}
+      {materialTypeEditor.hop}
     </div>
   );
 }
@@ -483,24 +483,24 @@ function KyDetail({
   onBack: () => void;
   onChangeKy: (patch: Partial<BalancingPeriod>) => void;
 }) {
-  const luoi = usePeriodGrid(ky);
-  const [matHang, setMatHang] = useProducts();
-  const [khach, setKhach] = useCustomers();
+  const grid = usePeriodGrid(ky);
+  const [products, setProducts] = useProducts();
+  const [customers, setCustomers] = useCustomers();
   /** Bút chì sửa nhanh mặt hàng / khách trong lưới bán thành phẩm (nối theo id). */
-  const suaMH = useSuaDanhMuc("matHang", matHang, setMatHang);
-  const suaKH = useSuaDanhMuc("khachHang", khach, setKhach);
-  const [loaiNLDanhMuc, setLoaiNLDanhMuc] = useMaterialTypes();
+  const productEditor = useSuaDanhMuc("matHang", products, setProducts);
+  const customerEditor = useSuaDanhMuc("khachHang", customers, setCustomers);
+  const [catalogMaterialTypes, setCatalogMaterialTypes] = useMaterialTypes();
   /** Bút chì loại NL ở hộp thêm dòng khối 1 (theo TÊN) — instance danh mục của KyDetail. */
-  const suaNLKy = useSuaDanhMuc("loaiNL", loaiNLDanhMuc, setLoaiNLDanhMuc, { theo: "ten" });
+  const periodMaterialTypeEditor = useSuaDanhMuc("loaiNL", catalogMaterialTypes, setCatalogMaterialTypes, { theo: "ten" });
   const [showBang, setShowBang] = useState(false);
   /* Công tắc cột ngày RIÊNG từng khối — cả hai MẶC ĐỊNH MỞ (chốt 2026-10-06: kế
      toán đối chiếu theo ngày). Thu lại thì khối NL gõ thẳng Số lượng như bảng giấy. */
-  const [anNgayNL, setAnNgayNL] = useState(false);
-  const [anNgayTP, setAnNgayTP] = useState(false);
+  const [hideMaterialDays, setHideMaterialDays] = useState(false);
+  const [hideFinishedGoodDays, setHideFinishedGoodDays] = useState(false);
   /* Mặc định xếp NGANG như bảng giấy (NL + ô GHI CHÚ bên trái, BTP bên phải — từ màn
      2xl). Người dùng vẫn đổi tay được; không tự nhảy theo bề rộng. */
   const [xepNgang, setXepNgang] = useState(true);
-  const [chotMo, setChotMo] = useState(false);
+  const [isLockOpen, setIsLockOpen] = useState(false);
 
   /* Ctrl+Z / Ctrl+Y — nghe ở cấp màn, bỏ qua khi con trỏ đang trong hộp thoại. */
   useEffect(() => {
@@ -509,25 +509,25 @@ function KyDetail({
       const k = e.key.toLowerCase();
       if (k === "z" && !e.shiftKey) {
         e.preventDefault();
-        luoi.hoanTac();
+        grid.hoanTac();
       } else if (k === "y" || (k === "z" && e.shiftKey)) {
         e.preventDefault();
-        luoi.lamLai();
+        grid.lamLai();
       }
     };
     window.addEventListener("keydown", nghe);
     return () => window.removeEventListener("keydown", nghe);
-  }, [luoi]);
+  }, [grid]);
 
   /* Sổ bán — seam cũ cho tình huống output = hàng đã bán ra. */
-  const [tatCaBan] = useSalesItems();
-  const [dsPhieu] = useSalesInvoices();
+  const [allSalesItems] = useSalesItems();
+  const [salesInvoices] = useSalesInvoices();
   const banChoHut = useMemo(() => {
-    const phieuTheoId = new Map(dsPhieu.map((p) => [p.id, p]));
-    const daHut = new Set(luoi.tp.map((t) => t.salesItemId).filter(Boolean));
-    return tatCaBan
+    const salesInvoiceById = new Map(salesInvoices.map((p) => [p.id, p]));
+    const daHut = new Set(grid.tp.map((t) => t.salesItemId).filter(Boolean));
+    return allSalesItems
       .filter((b) => {
-        const p = phieuTheoId.get(b.invoiceId);
+        const p = salesInvoiceById.get(b.invoiceId);
         if (!p || daHut.has(b.id)) return false;
         return (
           !ky.startDate ||
@@ -535,12 +535,12 @@ function KyDetail({
           (p.deliveryDate >= ky.startDate && p.deliveryDate <= ky.endDate)
         );
       })
-      .map((b) => ({ ban: b, phieu: phieuTheoId.get(b.invoiceId)! }));
-  }, [tatCaBan, dsPhieu, luoi.tp, ky.startDate, ky.endDate]);
+      .map((b) => ({ ban: b, phieu: salesInvoiceById.get(b.invoiceId)! }));
+  }, [allSalesItems, salesInvoices, grid.tp, ky.startDate, ky.endDate]);
 
-  const hutBanVaoKy = (items: { ban: SalesItem; phieu: SalesInvoice }[]) => {
-    luoi.ghiTP([
-      ...luoi.tp,
+  const pullSalesIntoPeriod = (items: { ban: SalesItem; phieu: SalesInvoice }[]) => {
+    grid.ghiTP([
+      ...grid.tp,
       ...items.map(({ ban, phieu }) => ({
         id: uid(),
         periodId: ky.id,
@@ -556,14 +556,14 @@ function KyDetail({
     notify.daLuu(`Đã hút ${items.length} dòng bán vào kỳ này`);
   };
 
-  const { kq } = luoi;
+  const { kq } = grid;
   /** Chưa có bán thành phẩm → định mức + lãi/lỗ chưa có nghĩa. */
-  const chuaCoTP = kq.totalOutputKg <= 0;
+  const hasNoFinishedGood = kq.totalOutputKg <= 0;
   /** Lệch giữa Tổng NL nhận (thông số kỳ) và Tổng NL vào lưới (khối 1) — hiện
    *  sẵn để khỏi nhẩm tay khi đối chiếu. */
-  const lechNL = ky.totalInputKg != null ? ky.totalInputKg - kq.totalInputKg : null;
+  const materialDiff = ky.totalInputKg != null ? ky.totalInputKg - kq.totalInputKg : null;
   /** Số dòng ở hai sổ nguồn tự động còn chờ hút vào kỳ. */
-  const soNguonChoHut = luoi.nhapChoHut.length + luoi.sanXuatChoHut.length;
+  const pendingSourceCount = grid.nhapChoHut.length + grid.sanXuatChoHut.length;
 
   return (
     <div className="space-y-6">
@@ -583,21 +583,21 @@ function KyDetail({
         </div>
         <div className="flex flex-wrap gap-2">
           {/* Một chạm kéo cả hai sổ nguồn tự động (nhập + sản xuất) vào kỳ. Không gộp sổ bán. */}
-          {!luoi.daChot && soNguonChoHut > 0 && (
+          {!grid.daChot && pendingSourceCount > 0 && (
             <Button
-              title={`Hút ${luoi.nhapChoHut.length} dòng sổ nhập hàng và ${luoi.sanXuatChoHut.length} dòng sổ sản xuất trong khoảng ngày của kỳ vào lưới.`}
+              title={`Hút ${grid.nhapChoHut.length} dòng sổ nhập hàng và ${grid.sanXuatChoHut.length} dòng sổ sản xuất trong khoảng ngày của kỳ vào lưới.`}
               size="lg"
-              onClick={luoi.hutTatCaNguon}
+              onClick={grid.hutTatCaNguon}
             >
               <ArrowDownToLine />
-              Lấy {soNguonChoHut} dòng từ sổ
+              Lấy {pendingSourceCount} dòng từ sổ
             </Button>
           )}
           <Button
             variant="outline"
             size="lg"
-            onClick={luoi.hoanTac}
-            disabled={!luoi.hoanTacDuoc}
+            onClick={grid.hoanTac}
+            disabled={!grid.hoanTacDuoc}
             title="Ctrl+Z"
           >
             <Undo2 />
@@ -606,8 +606,8 @@ function KyDetail({
           <Button
             variant="outline"
             size="lg"
-            onClick={luoi.lamLai}
-            disabled={!luoi.lamLaiDuoc}
+            onClick={grid.lamLai}
+            disabled={!grid.lamLaiDuoc}
             title="Ctrl+Y"
           >
             <Redo2 />
@@ -640,50 +640,50 @@ function KyDetail({
         }
       >
         <LuoiNguyenLieu
-          luoi={luoi}
-          loaiNLDanhMuc={loaiNLDanhMuc}
-          suaLoaiNL={suaNLKy}
-          anNgay={anNgayNL}
-          onDoiAnNgay={() => setAnNgayNL((v) => !v)}
+          luoi={grid}
+          loaiNLDanhMuc={catalogMaterialTypes}
+          suaLoaiNL={periodMaterialTypeEditor}
+          anNgay={hideMaterialDays}
+          onDoiAnNgay={() => setHideMaterialDays((v) => !v)}
           onThemLoaiNL={(ten) => {
-            setLoaiNLDanhMuc([
-              ...loaiNLDanhMuc,
+            setCatalogMaterialTypes([
+              ...catalogMaterialTypes,
               { id: uid(), name: ten, category: "", note: "" },
             ]);
             notify.daLuu(`Đã thêm loại nguyên liệu "${ten}" vào danh mục`);
             return ten;
           }}
         />
-        <GhiChuKetQua
+        <ResultNote
           ky={ky}
-          kyTruoc={luoi.kyTruoc}
+          kyTruoc={grid.kyTruoc}
           kq={kq}
-          chuaCoTP={chuaCoTP}
-          lechNL={lechNL}
+          chuaCoTP={hasNoFinishedGood}
+          lechNL={materialDiff}
           xepNgang={xepNgang}
-          daChot={luoi.daChot}
+          daChot={grid.daChot}
           onChangeKy={onChangeKy}
         />
         <div className={xepNgang ? "2xl:col-span-2" : undefined}>
           <LuoiBanThanhPham
-            luoi={luoi}
-            matHang={matHang}
-            khach={khach}
-            onSuaMatHang={suaMH.moSua}
-            onSuaKhach={suaKH.moSua}
+            luoi={grid}
+            matHang={products}
+            khach={customers}
+            onSuaMatHang={productEditor.moSua}
+            onSuaKhach={customerEditor.moSua}
             choHutBan={banChoHut}
-            onHutBan={hutBanVaoKy}
-            anNgay={anNgayTP}
-            onDoiAnNgay={() => setAnNgayTP((v) => !v)}
+            onHutBan={pullSalesIntoPeriod}
+            anNgay={hideFinishedGoodDays}
+            onDoiAnNgay={() => setHideFinishedGoodDays((v) => !v)}
             onThemMatHang={(ten) => {
               const m: Product = { id: uid(), code: "", name: ten, finishedGoodCode: "" };
-              setMatHang([...matHang, m]);
+              setProducts([...products, m]);
               notify.daLuu(`Đã thêm mặt hàng "${ten}" vào danh mục`);
               return m.id;
             }}
             onThemKhach={(ten) => {
               const k: Customer = { id: uid(), code: "", name: ten, market: "" };
-              setKhach([...khach, k]);
+              setCustomers([...customers, k]);
               notify.daLuu(`Đã thêm khách hàng "${ten}" vào danh mục`);
               return k.id;
             }}
@@ -693,16 +693,16 @@ function KyDetail({
 
       {/* Vòng gối đầu: phần kỳ trước đẩy sang được kéo vào đây bằng một nút, thay
           cho việc mở file kỳ cũ ra chép tay. */}
-      {luoi.soDongChuyenKy > 0 && !luoi.daChot && (
+      {grid.soDongChuyenKy > 0 && !grid.daChot && (
         <Card className="flex flex-wrap items-center justify-between gap-3 p-4">
           <p className="text-base">
-            Kỳ trước ({luoi.kyTruoc?.dateRangeDescription || "…"}) có{" "}
-            <strong>{luoi.soDongChuyenKy}</strong> dòng chuyển sang chưa nhận.
+            Kỳ trước ({grid.kyTruoc?.dateRangeDescription || "…"}) có{" "}
+            <strong>{grid.soDongChuyenKy}</strong> dòng chuyển sang chưa nhận.
           </p>
           <Button
-            title="Nhận phần tồn chuyển từ kỳ trước sang làm số đầu kỳ này." size="lg" onClick={luoi.nhanChuyenKy}>
+            title="Nhận phần tồn chuyển từ kỳ trước sang làm số đầu kỳ này." size="lg" onClick={grid.nhanChuyenKy}>
             <ArrowRightLeft />
-            Nhận {luoi.soDongChuyenKy} dòng chuyển kỳ
+            Nhận {grid.soDongChuyenKy} dòng chuyển kỳ
           </Button>
         </Card>
       )}
@@ -728,28 +728,28 @@ function KyDetail({
           title="Chốt khi đã đối chiếu xong và gửi kế toán — mọi ô trong lưới khoá lại. Kỳ đã chốt thì bấm để mở lại (phải ghi lý do)."
           variant={ky.isLocked ? "outline" : "default"}
           size="lg"
-          onClick={() => setChotMo(true)}
+          onClick={() => setIsLockOpen(true)}
         >
           {ky.isLocked ? <LockOpen /> : <Lock />}
           {ky.isLocked ? "Mở lại kỳ" : "Chốt kỳ"}
         </Button>
       </Card>
 
-      {chotMo && (
+      {isLockOpen && (
         <HopChotKy
           daChot={Boolean(ky.isLocked)}
           tenKy={`${ky.materialTypeName} · ${ky.dateRangeDescription}`}
           tongTP={`${num(kq.totalOutputKg)} kg bán thành phẩm`}
-          onClose={() => setChotMo(false)}
-          onLuu={(ghiChu) => {
+          onClose={() => setIsLockOpen(false)}
+          onLuu={(note) => {
             /* Mở lại KHÔNG xoá dấu đã chốt — chỉ hạ cờ và ghi lý do, giữ vết. */
             onChangeKy(
               ky.isLocked
-                ? { isLocked: false, reopenReason: ghiChu }
-                : { isLocked: true, lockedAt: new Date().toISOString(), lockNote: ghiChu }
+                ? { isLocked: false, reopenReason: note }
+                : { isLocked: true, lockedAt: new Date().toISOString(), lockNote: note }
             );
             notify.daLuu(ky.isLocked ? "Đã mở lại kỳ" : "Đã chốt kỳ");
-            setChotMo(false);
+            setIsLockOpen(false);
           }}
         />
       )}
@@ -757,20 +757,20 @@ function KyDetail({
       {showBang && (
         <BangCanDoi
           ky={ky}
-          nlVao={luoi.nlVao}
-          tp={luoi.tp}
-          matHang={matHang}
-          khach={khach}
+          nlVao={grid.nlVao}
+          tp={grid.tp}
+          matHang={products}
+          khach={customers}
           kq={kq}
-          nhapDaGan={luoi.nhapDaGan}
-          sanXuatDaGan={luoi.sanXuatDaGan}
-          moTaDongKho={luoi.moTaDongKho}
+          nhapDaGan={grid.nhapDaGan}
+          sanXuatDaGan={grid.sanXuatDaGan}
+          moTaDongKho={grid.moTaDongKho}
           onClose={() => setShowBang(false)}
         />
       )}
-      {suaMH.hop}
-      {suaKH.hop}
-      {suaNLKy.hop}
+      {productEditor.hop}
+      {customerEditor.hop}
+      {periodMaterialTypeEditor.hop}
     </div>
   );
 }
@@ -784,7 +784,7 @@ function KyDetail({
  * "Thông số kỳ" riêng (trước đây một chỗ sửa, một chỗ xem). Ô sửa được trông như ô
  * nhập; khác kỳ trước cùng họ NL thì ghi "kỳ trước …" để biết số đã đổi.
  */
-function GhiChuKetQua({
+function ResultNote({
   ky,
   kyTruoc,
   kq,
@@ -816,7 +816,7 @@ function GhiChuKetQua({
         <div>
           <KV k="Tổng thành phẩm" v={`${num(kq.totalOutputKg)} kg`} />
           <KV k="Định mức chế biến" v={chuaCoTP ? "—" : num(kq.norm)} strong />
-          <KVNhap
+          <KeyValueInput
             k="Chi phí CB / kg TP"
             unit="đ"
             value={ky.processingCostPerKg}
@@ -833,7 +833,7 @@ function GhiChuKetQua({
             strong
           />
           <KV k="Bình quân / kg NL" v={chuaCoTP ? "—" : `${num(kq.avgProfitPerKgMaterial)} đ`} />
-          <KVNhap
+          <KeyValueInput
             k="Tỉ giá"
             unit="đ/USD"
             value={ky.exchangeRate}
@@ -845,7 +845,7 @@ function GhiChuKetQua({
         <div>
           <KV k="Tổng NL vào" v={`${num(kq.totalInputKg)} kg`} />
           <KV k="Giá trị NL" v={`${num(kq.materialValue)} đ`} />
-          <KVNhap
+          <KeyValueInput
             k="Tổng NL nhận cả kỳ"
             unit="kg"
             value={ky.totalInputKg}
@@ -926,7 +926,7 @@ function KV({
  * Dòng GHI CHÚ là số ĐẦU VÀO: nhãn nhìn thấy (gắn với ô) + ô nhập ngay bên phải, sửa
  * là kết quả tính lại tức thì. Kỳ đã chốt ⇒ chỉ hiện số.
  */
-function KVNhap({
+function KeyValueInput({
   k,
   unit,
   value,
@@ -948,7 +948,7 @@ function KVNhap({
   return (
     <div className="border-b border-border py-1.5">
       {khoa ? (
-        <KVKhung k={k} v={value == null ? "—" : `${num(value)} ${unit}`} />
+        <KeyValueFrame k={k} v={value == null ? "—" : `${num(value)} ${unit}`} />
       ) : (
         <NumberField
           label={k}
@@ -969,7 +969,7 @@ function KVNhap({
   );
 }
 
-function KVKhung({ k, v }: { k: string; v: string }) {
+function KeyValueFrame({ k, v }: { k: string; v: string }) {
   return (
     <div className="flex items-baseline justify-between gap-4">
       <span className="min-w-0 text-sm text-muted-foreground">{k}</span>

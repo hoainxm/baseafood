@@ -30,7 +30,7 @@ export function ChuyenTrongO({
   const [mo, setMo] = useState(false);
   const n = soChuyenNgay(dong, ngay);
   if (n === 0) return null;
-  const daiLy = mo
+  const suppliers = mo
     ? chuyenTrongNgay(dong, ngay, [...maLo].map(([id, lotCode]) => ({ id, lotCode })))
     : [];
   return (
@@ -50,9 +50,9 @@ export function ChuyenTrongO({
       <PopoverContent align="end" className="w-auto max-w-[min(26rem,calc(100vw-1rem))] p-3">
         <div className="space-y-3">
           <p className="text-sm font-semibold text-foreground">
-            Ngày {viDate(ngay)} · {n} chuyến · {num(daiLy.reduce((s, d) => s + d.kg, 0))} kg
+            Ngày {viDate(ngay)} · {n} chuyến · {num(suppliers.reduce((s, d) => s + d.kg, 0))} kg
           </p>
-          {daiLy.map((d) => (
+          {suppliers.map((d) => (
             <div key={d.daiLy} className="space-y-1">
               <p className="text-sm font-semibold text-foreground">
                 {d.daiLy}{" "}

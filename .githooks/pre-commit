@@ -90,8 +90,10 @@ for f in $staged; do
     fi
   fi
 
-  # BalancingTable.tsx là bản in A4 — ngoại lệ có chủ đích.
-  case "$f" in */BalancingTable.tsx) continue ;; esac
+  # BalancingTable.tsx + DailyImportInvoice.tsx là bản in A4 theo mẫu giấy — ngoại lệ có
+  # chủ đích (src/design-system/README.md § Ngoại lệ luật). Trước 2026-10-13 hook chỉ miễn
+  # BalancingTable nên mọi sửa ở DailyImportInvoice đều bị chặn oan.
+  case "$f" in */BalancingTable.tsx|*/DailyImportInvoice.tsx) continue ;; esac
   if printf '%s\n' "$them" | grep -q 'text-xs\|uppercase'; then
     do_hong "$f — cấm text-xs / IN HOA trong màn nghiệp vụ (người dùng 45–60 tuổi, src/design-system/README.md §3)"
   fi

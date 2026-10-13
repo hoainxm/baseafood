@@ -398,7 +398,7 @@ export function generateDemoBundle(n: DemoSource, tc: DemoOptions): GoiDemo {
         domesticSales.push(nd);
         if (ng.r() < 0.7)
           for (const p0 of takeMaterial([materialRow], nd.quantityKg))
-            lotDispatches.push({ id: id("lr"), lotKind: "S", lotId: p0.dong.id, lotLabel: p0.dong.materialTypeName, docKind: "domestic_sale", docId: nd.id, quantityKg: p0.kg, method: "chon", operator: "Demo", recordedAt: luc });
+            lotDispatches.push({ id: id("lr"), lotKind: "S", lotId: p0.dong.id, lotLabel: p0.dong.materialTypeName, docKind: "domestic_sale", docId: nd.id, quantityKg: p0.kg, method: "picked", operator: "Demo", recordedAt: luc });
       }
 
       // Sản xuất BTP: TP ≈ NL × tỉ lệ ra thành phẩm (± nhiễu), chia 2–3 mẻ.
@@ -424,7 +424,7 @@ export function generateDemoBundle(n: DemoSource, tc: DemoOptions): GoiDemo {
           quantityKg: kg,
           blocksCount: Math.max(1, tron(kg / 10)),
           warehouse: RETAIL_WAREHOUSE,
-          status: isPending ? "cho-nhap" : "da-nhap",
+          status: isPending ? "pending" : "stocked",
           note: "",
           processingType: sp.get(pid)?.processingType ?? "",
           operator: "Demo",
@@ -435,7 +435,7 @@ export function generateDemoBundle(n: DemoSource, tc: DemoOptions): GoiDemo {
         const materialParts = ng.r() < 0.45 + 0.5 * progress ? takeMaterial(todayRows, tron((kg / ts.tiLeTP) * heSo, 1)) : [];
         if (materialParts.length > 0) {
           for (const p0 of materialParts)
-            lotInputs.push({ id: id("gl"), outputKind: "W", outputId: w.id, inputKind: "S", inputId: p0.dong.id, inputLabel: p0.dong.materialTypeName, material: p0.dong.materialTypeName, quantityKg: p0.kg, method: "quet", operator: "Demo", recordedAt: `${date}T15:00:00.000Z` });
+            lotInputs.push({ id: id("gl"), outputKind: "W", outputId: w.id, inputKind: "S", inputId: p0.dong.id, inputLabel: p0.dong.materialTypeName, material: p0.dong.materialTypeName, quantityKg: p0.kg, method: "scan", operator: "Demo", recordedAt: `${date}T15:00:00.000Z` });
         } else if (isPast && ng.r() < 0.6) {
           lotWaivers.push({ id: id("ld"), outputKind: "W", outputId: w.id, reason: "Trộn NL nhiều chuyến trong mẻ", operator: "Demo", recordedAt: `${date}T17:00:00.000Z` });
         }
@@ -449,8 +449,8 @@ export function generateDemoBundle(n: DemoSource, tc: DemoOptions): GoiDemo {
       // QC cuối ngày
       for (const criterion of QC_CRITERIA) {
         const r0 = ng.r();
-        const result: QcResult = r0 < 0.85 ? "dat" : r0 < 0.97 ? "tam" : "khong-dat";
-        qcChecklists.push({ id: id("qc"), date, workshop: x, criterion, result, score: result === "dat" ? ng.nguyen(8, 10) : result === "tam" ? ng.nguyen(6, 7) : ng.nguyen(3, 5), note: result === "dat" ? "" : "Đã nhắc tổ khắc phục", backdateReason: "" });
+        const result: QcResult = r0 < 0.85 ? "pass" : r0 < 0.97 ? "conditional" : "fail";
+        qcChecklists.push({ id: id("qc"), date, workshop: x, criterion, result, score: result === "pass" ? ng.nguyen(8, 10) : result === "conditional" ? ng.nguyen(6, 7) : ng.nguyen(3, 5), note: result === "pass" ? "" : "Đã nhắc tổ khắc phục", backdateReason: "" });
       }
       if (isPast) qcLocks.push({ id: `${date}|${x}`, lockDate: date, workshop: x, isLocked: true, lockedAt: `${date}T18:00:00.000Z`, totalKgAtLock: 0, reopenReason: "", note: "" });
     });
@@ -470,12 +470,12 @@ export function generateDemoBundle(n: DemoSource, tc: DemoOptions): GoiDemo {
   if (lastWorkshopLocks[0]) productionLocks.splice(productionLocks.indexOf(lastWorkshopLocks[0]), 1);
   // 4. BTP chờ duyệt lâu: một mẻ 5–9 ngày trước quên duyệt nhập kho.
   const unapprovedWip = wips.find((w) => w.productionDate <= subtractDays(tc.homNay, 5) && w.productionDate >= subtractDays(tc.homNay, 9));
-  if (unapprovedWip) unapprovedWip.status = "cho-nhap";
+  if (unapprovedWip) unapprovedWip.status = "pending";
 
   // ---- Kho → đóng gói / xuất đơn / bán: theo dõi phần còn của từng mẻ (FIFO) ----
-  const con = new Map(wips.filter((w) => w.status === "da-nhap").map((w) => [w.id, w.quantityKg]));
+  const con = new Map(wips.filter((w) => w.status === "stocked").map((w) => [w.id, w.quantityKg]));
   const olderBatches = (date: string, filter?: (w: WipProductionItem) => boolean) =>
-    wips.filter((w) => w.status === "da-nhap" && w.productionDate < date && (con.get(w.id) ?? 0) > 20 && (!filter || filter(w)));
+    wips.filter((w) => w.status === "stocked" && w.productionDate < date && (con.get(w.id) ?? 0) > 20 && (!filter || filter(w)));
   /** Lấy kg NGUYÊN (làm tròn XUỐNG) khỏi mẻ — làm tròn lên là dùng quá lô 1 kg,
    *  hộ chiếu lô báo đỏ "dùng quá" sai. Trả đúng số đã trừ. */
   const lay = (wid: string, kg: number) => {
@@ -498,7 +498,7 @@ export function generateDemoBundle(n: DemoSource, tc: DemoOptions): GoiDemo {
       const p: Packaging = { id: id("goi"), date, workshop: x, fromProductId: w.productId, fromSpec: "", inputKg, inputBlocks: 0, toProductId: w.productId, toSpec: "Khay 1 kg", outputKg: ra, outputUnits: Math.max(1, tron(ra / 10)), warehouse: FG_WAREHOUSE, note: "" };
       packagings.push(p);
       remainingFinishedGood.set(p.id, ra);
-      lotInputs.push({ id: id("gl"), outputKind: "P", outputId: p.id, inputKind: "W", inputId: w.id, inputLabel: sp.get(w.productId)?.name ?? "", material: "", quantityKg: inputKg, method: "quet", operator: "Demo", recordedAt: `${date}T10:00:00.000Z` });
+      lotInputs.push({ id: id("gl"), outputKind: "P", outputId: p.id, inputKind: "W", inputId: w.id, inputLabel: sp.get(w.productId)?.name ?? "", material: "", quantityKg: inputKg, method: "scan", operator: "Demo", recordedAt: `${date}T10:00:00.000Z` });
       if (ng.r() < 0.7) printLabel("P", p.id, `${sp.get(p.toProductId)?.name ?? "TP"} · Khay 1 kg`, date);
     }
   });
@@ -512,18 +512,18 @@ export function generateDemoBundle(n: DemoSource, tc: DemoOptions): GoiDemo {
   // Đơn chọn mặt hàng ĐÃ có trong kho (sản xuất nhiều nhất trước) — đơn hàng chưa từng
   // làm thì lệnh xuất rỗng, demo không có gì để kể.
   const kgByProduct = new Map<string, number>();
-  for (const w of wips) if (w.status === "da-nhap") kgByProduct.set(w.productId, (kgByProduct.get(w.productId) ?? 0) + w.quantityKg);
+  for (const w of wips) if (w.status === "stocked") kgByProduct.set(w.productId, (kgByProduct.get(w.productId) ?? 0) + w.quantityKg);
   const productsWithStock = [...kgByProduct.entries()].sort((a0, b0) => b0[1] - a0[1]).map(([k]) => k);
   for (let d = 0; d < soDon; d++) {
     const orderDate = ngays[Math.floor(((d + 0.5) * ngays.length) / soDon) - 3] ?? ngays[0];
     const exportDate = subtractDays(orderDate, -4) <= tc.homNay ? subtractDays(orderDate, -4) : tc.homNay;
     const kh = customers[d % customers.length];
     const pid = productsWithStock.length ? productsWithStock[d % productsWithStock.length] : allProducts[d % allProducts.length];
-    const don: SalesOrder = { id: id("don"), customerId: kh?.id ?? "", orderDate, status: "dang-gom", note: "Đơn demo" };
+    const don: SalesOrder = { id: id("don"), customerId: kh?.id ?? "", orderDate, status: "collecting", note: "Đơn demo" };
     salesOrders.push(don);
     const can = tron(ng.tu(800, 2_000), 10);
     orderItems.push({ id: id("dongdon"), orderId: don.id, productId: pid, spec: "", requiredQuantityKg: can, requiredBlocksCount: tron(can / 10) });
-    const exportOrder: ExportOrder = { id: id("lenh"), orderId: don.id, exportDate, status: exportDate < tc.homNay ? "dong" : "mo", note: "" };
+    const exportOrder: ExportOrder = { id: id("lenh"), orderId: don.id, exportDate, status: exportDate < tc.homNay ? "closed" : "open", note: "" };
     let canCon = can;
     for (const w of olderBatches(exportDate, (m) => m.productId === pid)) {
       if (canCon <= 0) break;
@@ -532,12 +532,12 @@ export function generateDemoBundle(n: DemoSource, tc: DemoOptions): GoiDemo {
       canCon -= kg;
       const di: ExportItem = { id: id("xuat"), exportId: exportOrder.id, wipId: w.id, productId: w.productId, spec: "", quantityKg: kg, blocksCount: Math.max(1, tron(kg / 10)) };
       exportItems.push(di);
-      if (ng.r() < 0.8) lotDispatches.push({ id: id("lr"), lotKind: "W", lotId: w.id, lotLabel: sp.get(w.productId)?.name ?? "", docKind: "export_item", docId: di.id, quantityKg: kg, method: "quet", operator: "Demo", recordedAt: `${exportDate}T08:00:00.000Z` });
+      if (ng.r() < 0.8) lotDispatches.push({ id: id("lr"), lotKind: "W", lotId: w.id, lotLabel: sp.get(w.productId)?.name ?? "", docKind: "export_item", docId: di.id, quantityKg: kg, method: "scan", operator: "Demo", recordedAt: `${exportDate}T08:00:00.000Z` });
     }
     // Chỉ "đã xuất" khi thật có lệnh xuất (kho có hàng) và ngày xuất đã qua.
     if (exportItems.some((x) => x.exportId === exportOrder.id)) {
       exportOrders.push(exportOrder);
-      if (exportDate < tc.homNay) don.status = "dong";
+      if (exportDate < tc.homNay) don.status = "closed";
     }
   }
 
@@ -555,7 +555,7 @@ export function generateDemoBundle(n: DemoSource, tc: DemoOptions): GoiDemo {
       remainingFinishedGood.set(p.id, (remainingFinishedGood.get(p.id) ?? 0) - kg);
       const b: SalesItem = { id: id("ban"), invoiceId: salesInvoice.id, deliveryDate: date, productId: p.toProductId, spec: p.toSpec, quantityKg: kg, unitPrice: kenh === "Xuất khẩu" ? 7.5 : tron(180_000 * priceFactor, 1_000), sourceWarehouse: FG_WAREHOUSE };
       salesItems.push(b);
-      lotDispatches.push({ id: id("lr"), lotKind: "P", lotId: p.id, lotLabel: sp.get(p.toProductId)?.name ?? "", docKind: "sales_item", docId: b.id, quantityKg: kg, method: "chon", operator: "Demo", recordedAt: `${date}T11:00:00.000Z` });
+      lotDispatches.push({ id: id("lr"), lotKind: "P", lotId: p.id, lotLabel: sp.get(p.toProductId)?.name ?? "", docKind: "sales_item", docId: b.id, quantityKg: kg, method: "picked", operator: "Demo", recordedAt: `${date}T11:00:00.000Z` });
     }
     const w = olderBatches(date)[0];
     if (w) {
@@ -563,14 +563,14 @@ export function generateDemoBundle(n: DemoSource, tc: DemoOptions): GoiDemo {
       if (kg > 0) {
         const b: SalesItem = { id: id("ban"), invoiceId: salesInvoice.id, deliveryDate: date, productId: w.productId, spec: "", quantityKg: kg, unitPrice: kenh === "Xuất khẩu" ? 5.2 : tron(125_000 * priceFactor, 1_000), sourceWarehouse: RETAIL_WAREHOUSE };
         salesItems.push(b);
-        if (ng.r() < 0.75) lotDispatches.push({ id: id("lr"), lotKind: "W", lotId: w.id, lotLabel: sp.get(w.productId)?.name ?? "", docKind: "sales_item", docId: b.id, quantityKg: kg, method: "chon", operator: "Demo", recordedAt: `${date}T11:00:00.000Z` });
+        if (ng.r() < 0.75) lotDispatches.push({ id: id("lr"), lotKind: "W", lotId: w.id, lotLabel: sp.get(w.productId)?.name ?? "", docKind: "sales_item", docId: b.id, quantityKg: kg, method: "picked", operator: "Demo", recordedAt: `${date}T11:00:00.000Z` });
       }
     }
     if (salesItems.some((x) => x.invoiceId === salesInvoice.id)) salesInvoices.push(salesInvoice);
   });
   // Cố ý: một dòng bán block thô VƯỢT tồn (cảnh báo "bán vượt tồn") hôm qua.
   const oversoldProduct = allProducts[allProducts.length - 1];
-  const productStock = wips.filter((w) => w.productId === oversoldProduct && w.status === "da-nhap").reduce((s0, w) => s0 + (con.get(w.id) ?? 0), 0);
+  const productStock = wips.filter((w) => w.productId === oversoldProduct && w.status === "stocked").reduce((s0, w) => s0 + (con.get(w.id) ?? 0), 0);
   const fo = finishedOpening.filter((o) => o.productId === oversoldProduct).reduce((s0, o) => s0 + o.quantityKg, 0);
   const overSoldInvoice: SalesInvoice = { id: id("phieu"), deliveryDate: yesterday, postingDate: yesterday, backdateReason: "", workshop: ts.xuong[0], customerId: customers[0]?.id ?? "", channel: "Nội địa", note: "" };
   salesInvoices.push(overSoldInvoice);

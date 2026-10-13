@@ -46,7 +46,7 @@ const imports = [importRow("S1", 1000, "Bạch tuộc", "Bạch tuộc"), import
 
 const me = (id: string, date: string, productId: string, kg: number, block: number): WipProductionItem => ({
   id, productionDate: date, postingDate: date, backdateReason: "", workshop: "Đông", productId, spec: "",
-  quantityKg: kg, blocksCount: block, warehouse: "Kho Baseafood", status: "da-nhap", note: "",
+  quantityKg: kg, blocksCount: block, warehouse: "Kho Baseafood", status: "stocked", note: "",
 });
 const wips = [
   me("W0", "2026-09-29", "mh2da", 100, 10), // mẻ cũ — không ai gắn lô NL
@@ -59,7 +59,7 @@ const packagings: Packaging[] = [{
 }];
 
 const lotInput = (id: string, outputKind: "W" | "P", outputId: string, inputKind: "S" | "W", inputId: string, kg: number | null): LotInput => ({
-  id, outputKind, outputId, inputKind, inputId, inputLabel: inputId, material: "", quantityKg: kg, method: "quet", operator: "Trúc", recordedAt: "2026-10-02T08:00:00Z",
+  id, outputKind, outputId, inputKind, inputId, inputLabel: inputId, material: "", quantityKg: kg, method: "scan", operator: "Trúc", recordedAt: "2026-10-02T08:00:00Z",
 });
 const lotInputs = [
   lotInput("l1", "W", "W1", "S", "S1-1", 600),
@@ -68,8 +68,8 @@ const lotInputs = [
   lotInput("l4", "P", "P1", "W", "W1", 200),
 ];
 
-const salesOrders: SalesOrder[] = [{ id: "o1", customerId: "kX", orderDate: "2026-10-03", status: "dong", note: "" }];
-const exportOrders: ExportOrder[] = [{ id: "e1", orderId: "o1", exportDate: "2026-10-04", status: "dong", note: "" }];
+const salesOrders: SalesOrder[] = [{ id: "o1", customerId: "kX", orderDate: "2026-10-03", status: "closed", note: "" }];
+const exportOrders: ExportOrder[] = [{ id: "e1", orderId: "o1", exportDate: "2026-10-04", status: "closed", note: "" }];
 const exportItems: ExportItem[] = [{ id: "x1", exportId: "e1", wipId: "W2", productId: "mhCat", spec: "", quantityKg: 200, blocksCount: 20 }];
 
 const salesInvoice = (id: string, customerId: string): SalesInvoice =>
@@ -86,7 +86,7 @@ const domesticSales: DomesticSaleItem[] = [{
   materialTypeName: "Bạch tuộc", quantityKg: 30, unitPrice: 145000, customerName: "Chợ Bà Rịa", note: "", operator: "Trúc",
 }];
 const ra = (id: string, lotKind: "S" | "W" | "P", lotId: string, docKind: LotDispatch["docKind"], docId: string, kg: number | null): LotDispatch => ({
-  id, lotKind, lotId, lotLabel: lotId, docKind, docId, quantityKg: kg, method: "quet", operator: "Trúc", recordedAt: "2026-10-05T08:00:00Z",
+  id, lotKind, lotId, lotLabel: lotId, docKind, docId, quantityKg: kg, method: "scan", operator: "Trúc", recordedAt: "2026-10-05T08:00:00Z",
 });
 const lotDispatches = [
   ra("d1", "P", "P1", "sales_item", "b1", 50),
@@ -183,7 +183,7 @@ describe("kịch bản mẫu: nhập → SX → kho → đóng gói / xuất / b
     expect(missingTasksOf("san-xuat")).toEqual({ W0: "lo,tem", W1: "", W2: "" });
     // Kho: cả 3 đã nhập, tồn theo đúng lô gắn
     expect(gd.kho!.muc.map((m) => [m.nut.id, m.kho, m.ton])).toEqual(
-      expect.arrayContaining([["W0", "da-nhap", 100], ["W1", "da-nhap", 200], ["W2", "da-nhap", 100]])
+      expect.arrayContaining([["W0", "stocked", 100], ["W1", "stocked", 200], ["W2", "stocked", 100]])
     );
     expect(gd["dong-goi"]!.muc.map((m) => [m.nut.id, m.soLo, m.ton, m.thieu.length])).toEqual([["P1", 1, 140, 0]]);
     // Xuất & bán: lệnh x1 đã quét, b1/b2/n1 đã gắn lô; handoff Đơn đặt (b3) không tính là bán lẻ
@@ -204,7 +204,7 @@ describe("kịch bản mẫu: nhập → SX → kho → đóng gói / xuất / b
     const result = assignSessionLots({
       mes: [{ id: "Wmoi", productId: "mh2da" }, { id: "Wmuc", productId: "mhMuc" }],
       banNoiDia: [{ id: "n2", materialTypeName: "Bạch tuộc" }],
-      loNl: [{ nut: buildLotNode("S", "S1-1", dl), cach: "quet" }, { nut: buildLotNode("S", "S3-1", dl), cach: "chon" }],
+      loNl: [{ nut: buildLotNode("S", "S1-1", dl), cach: "scan" }, { nut: buildLotNode("S", "S3-1", dl), cach: "picked" }],
       dl, nguoiGhi: "Trúc", luc: "2026-10-06T07:00:00Z", taoId: () => `g${++i}`,
     });
     expect(result.lotInputs.map((l) => `${l.outputId}<${l.inputId}`)).toEqual(["Wmoi<S1-1", "Wmuc<S3-1"]);
@@ -261,7 +261,7 @@ describe("lô NL theo loại: một chuyến 3 loại ⇒ 3 lô, 3 tem", () => {
     const result = assignSessionLots({
       mes: [{ id: "mLon", productId: "mhLon" }, { id: "mChung", productId: "mhChung" }],
       banNoiDia: [{ id: "nd", materialTypeName: "Bạch tuộc 1 da" }],
-      loNl: ["HP-a", "HP-b", "HP-c"].map((id) => ({ nut: buildLotNode("S", id, d2), cach: "quet" as const })),
+      loNl: ["HP-a", "HP-b", "HP-c"].map((id) => ({ nut: buildLotNode("S", id, d2), cach: "scan" as const })),
       dl: d2, nguoiGhi: "", luc: "", taoId: () => `g${++i}`,
     });
     expect(result.lotInputs.filter((l) => l.outputId === "mLon").map((l) => l.inputId)).toEqual(["HP-b"]);
@@ -272,7 +272,7 @@ describe("lô NL theo loại: một chuyến 3 loại ⇒ 3 lô, 3 tem", () => {
   });
 
   it("cân bằng kg theo từng loại, không trộn 3 loại", () => {
-    const d3 = { ...d2, lotInputs: [{ id: "x", outputKind: "W", outputId: "w", inputKind: "S", inputId: "HP-b", inputLabel: "", material: "", quantityKg: 1000, method: "chon", operator: "", recordedAt: "" } as LotInput] };
+    const d3 = { ...d2, lotInputs: [{ id: "x", outputKind: "W", outputId: "w", inputKind: "S", inputId: "HP-b", inputLabel: "", material: "", quantityKg: 1000, method: "picked", operator: "", recordedAt: "" } as LotInput] };
     expect(computeLotMassBalance("S", "HP-b", d3)).toMatchObject({ vao: 1038, con: 38 });
     expect(computeLotMassBalance("S", "HP-a", d3)).toMatchObject({ vao: 5100, con: 5100 });
   });
@@ -282,7 +282,7 @@ describe("lô NL theo loại: một chuyến 3 loại ⇒ 3 lô, 3 tem", () => {
     const d4: TraceData = {
       ...d2,
       wips: [sharedWip],
-      lotInputs: ["HP-a", "HP-c"].map((id, k) => ({ id: `li${k}`, outputKind: "W", outputId: "WC", inputKind: "S", inputId: id, inputLabel: "", material: "", quantityKg: null, method: "chon", operator: "", recordedAt: "" }) as LotInput),
+      lotInputs: ["HP-a", "HP-c"].map((id, k) => ({ id: `li${k}`, outputKind: "W", outputId: "WC", inputKind: "S", inputId: id, inputLabel: "", material: "", quantityKg: null, method: "picked", operator: "", recordedAt: "" }) as LotInput),
       exportItems: [{ id: "xC", exportId: "e1", wipId: "WC", productId: "mhChung", spec: "", quantityKg: 100, blocksCount: 10 }],
     };
     expect(findSameShipmentLots("HP-b", d4).map((n) => n.id)).toEqual(["HP-a", "HP-b", "HP-c"]);

@@ -17,6 +17,7 @@ import type {
   DailyLock,
   FinishedGoodsOpeningStock,
   MaterialOpeningStock,
+  QcResult,
   ScrapItem,
   Workshop,
 } from "@/types";
@@ -188,8 +189,8 @@ export function buildDataFlow(d: DataFlowInput, k: FlowRange): DataFlow {
   }
 
   // Tầng 2 → 3: BTP → kho dự trữ / chờ duyệt
-  const stockedInKg = sum(s.wips.filter((w) => w.status === "da-nhap"), (w) => w.quantityKg);
-  const pendingApproval = sum(s.wips.filter((w) => w.status !== "da-nhap"), (w) => w.quantityKg);
+  const stockedInKg = sum(s.wips.filter((w) => w.status === "stocked"), (w) => w.quantityKg);
+  const pendingApproval = sum(s.wips.filter((w) => w.status !== "stocked"), (w) => w.quantityKg);
   addNode("kho", "Kho dự trữ (BTP)", 3, "giua", "/warehouse");
   link("btp", "kho", stockedInKg);
   if (pendingApproval > 0) addNode("cho", "Chờ duyệt nhập kho", 3, "ton", "/warehouse");
@@ -320,8 +321,8 @@ export function buildFlowStages(d: DataFlowInput, k: FlowRange): FlowStage[] {
     nhap: [sum(s.imports, (r) => r.quantityKg), 0],
     "san-xuat": [sum(s.wips, (w) => w.quantityKg), 0],
     kho: [
-      sum(s.wips.filter((w) => w.status === "da-nhap"), (w) => w.quantityKg),
-      sum(s.wips.filter((w) => w.status !== "da-nhap"), (w) => w.quantityKg),
+      sum(s.wips.filter((w) => w.status === "stocked"), (w) => w.quantityKg),
+      sum(s.wips.filter((w) => w.status !== "stocked"), (w) => w.quantityKg),
     ],
     "dong-goi": [sum(s.packagings, (p) => p.outputKg), 0],
     "xuat-ban": [sum(s.exportItems, (x) => x.quantityKg) + sum(s.sales, (b) => b.quantityKg) + sum(s.domestic, (r) => r.quantityKg), 0],
@@ -591,7 +592,7 @@ export function buildChainWarnings(d: DataFlowInput, k: FlowRange, today: string
 
   // 7. BTP chờ duyệt nhập kho quá N ngày.
   const han = subtractDays(today, APPROVAL_WAIT_DAYS);
-  for (const w of s.wips.filter((w) => w.status === "cho-nhap" && w.productionDate < han))
+  for (const w of s.wips.filter((w) => w.status === "pending" && w.productionDate < han))
     ra.push({ id: `cd|${w.id}`, loai: "cho-duyet-lau", muc: "nhac", tieuDe: `${ten.get(w.productId) ?? "BTP"} ${fmtKg(w.quantityKg)} chờ duyệt quá ${APPROVAL_WAIT_DAYS} ngày`, chiTiet: "Thủ kho duyệt nhập kho để tồn dự trữ đủ.", ngay: w.productionDate, xuong: w.workshop, duongDan: `/warehouse?approve=W:${w.id}` });
 
   // 8. Định mức mặt hàng lệch ngưỡng.
@@ -660,7 +661,7 @@ export interface DailyQcCount {
 
 /** Đếm chỉ tiêu QC đạt / tạm / không đạt mỗi ngày trong [tu, den] của một xưởng ("" = mọi xưởng). */
 export function countQcByDay(
-  rows: readonly { date: string; workshop: Workshop; result: "dat" | "tam" | "khong-dat" }[],
+  rows: readonly { date: string; workshop: Workshop; result: QcResult }[],
   workshop: Workshop | "",
   tu: string,
   den: string,
@@ -670,8 +671,8 @@ export function countQcByDay(
     if (workshop && r.workshop !== workshop) continue;
     const g = m.get(r.date);
     if (!g) continue;
-    if (r.result === "dat") g.dat += 1;
-    else if (r.result === "tam") g.tam += 1;
+    if (r.result === "pass") g.dat += 1;
+    else if (r.result === "conditional") g.tam += 1;
     else g.khongDat += 1;
   }
   return [...m.values()];

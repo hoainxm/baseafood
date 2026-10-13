@@ -34,7 +34,7 @@ import { Camera, CameraOff, Link2, Plus, Trash2 } from "lucide-react";
 import { QrScanner } from "./QrScanner";
 import { useTraceData } from "./useTraceData";
 
-const METHOD_NAMES: Record<LotInput["method"] | LotDispatch["method"], string> = { quet: "quét", go: "gõ", chon: "chọn", fifo: "máy chọn" };
+const METHOD_NAMES: Record<LotInput["method"] | LotDispatch["method"], string> = { scan: "quét", typed: "gõ", picked: "chọn", fifo: "máy chọn" };
 
 /** Một mối nối đã gắn, hiện trong mục "Đã gắn". */
 interface LinkedInput {
@@ -107,7 +107,7 @@ function LotInputDialog({
   };
 
   /** Mã quét/gõ → lô. Trùng nhiều lô (tem cũ) ⇒ hiện danh sách cho chọn, KHÔNG tự chọn. */
-  const handleCode = (text: string, method: "quet" | "go") => {
+  const handleCode = (text: string, method: "scan" | "typed") => {
     const ma = parseQrCode(text);
     if (!ma) return;
     const result = findLots(ma, dl);
@@ -188,16 +188,16 @@ function LotInputDialog({
             <QrScanner
               onScan={(t) => {
                 setIsScanning(false);
-                handleCode(t, "quet");
+                handleCode(t, "scan");
               }}
             />
           )}
 
           <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
             <Field label="Hoặc gõ mã lô in trên tem" className="min-w-0 flex-1">
-              <Input value={typedCode} onChange={(e) => setTypedCode(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleCode(typedCode, "go")} />
+              <Input value={typedCode} onChange={(e) => setTypedCode(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleCode(typedCode, "typed")} />
             </Field>
-            <Button variant="outline" className="w-full sm:w-auto" title="Tìm lô theo mã vừa gõ rồi gắn vào." onClick={() => handleCode(typedCode, "go")}>
+            <Button variant="outline" className="w-full sm:w-auto" title="Tìm lô theo mã vừa gõ rồi gắn vào." onClick={() => handleCode(typedCode, "typed")}>
               <Plus aria-hidden /> Gắn
             </Button>
           </div>
@@ -209,7 +209,7 @@ function LotInputDialog({
                 {choices.map((n) =>
                   lotRow(
                     n,
-                    <Button size="sm" title={`Gắn đúng lô ${n.nhan} này.`} onClick={() => addLot(n, "go")}>
+                    <Button size="sm" title={`Gắn đúng lô ${n.nhan} này.`} onClick={() => addLot(n, "typed")}>
                       Chọn lô này
                     </Button>
                   )
@@ -228,7 +228,7 @@ function LotInputDialog({
               {candidates.map((n) =>
                 lotRow(
                   n,
-                  <Button size="sm" variant="outline" title={`Gắn ${inputLabel} ${n.nhan}.`} onClick={() => addLot(n, "chon")}>
+                  <Button size="sm" variant="outline" title={`Gắn ${inputLabel} ${n.nhan}.`} onClick={() => addLot(n, "picked")}>
                     Chọn
                   </Button>
                 )
@@ -376,7 +376,7 @@ export function LotDispatchPicker({
     const lotStockTable = buildLotStockIndex(dl); // một lượt cho mọi lô ứng viên
     const items =
       lotKind === "W"
-        ? dl.wips.filter((w) => w.status === "da-nhap" && (!productId || w.productId === productId)).map((w) => buildLotNode("W", w.id, dl))
+        ? dl.wips.filter((w) => w.status === "stocked" && (!productId || w.productId === productId)).map((w) => buildLotNode("W", w.id, dl))
         : dl.packagings.filter((p) => !productId || p.toProductId === productId).map((p) => buildLotNode("P", p.id, dl));
     return items
       .filter((n) => isUnassigned(n) && (getLotStockKg(n.kind, n.id, dl, lotStockTable) ?? 0) > 0)

@@ -365,7 +365,7 @@ export default function WipProductionScreen() {
 
   const total = view.reduce((s, r) => s + (r.quantityKg || 0), 0);
   const totalBlocks = view.reduce((s, r) => s + (r.blocksCount || 0), 0);
-  const pendingInCount = view.filter((r) => r.status === "cho-nhap").length;
+  const pendingInCount = view.filter((r) => r.status === "pending").length;
   /** Bột tẩm đã dùng trong phạm vi đang xem, cộng theo loại (mig 0051). */
   const batterByType = useMemo(() => sumBatterByType(view.map((r) => r.batterKg)), [view]);
   const batterViewTotal = batterByType.reduce((s, b) => s + b.kg, 0);
@@ -632,7 +632,7 @@ export default function WipProductionScreen() {
       quantityKg: getLineTotalKg(d),
       blocksCount: d.blocksCount || 0,
       warehouse: "",
-      status: "cho-nhap",
+      status: "pending",
       note: "",
       customerName: d.customerName.trim(),
       processingType: d.processingType.trim(),
@@ -894,7 +894,7 @@ export default function WipProductionScreen() {
       .join("; ");
     appendAuditEntries([
       {
-        action: "gui",
+        action: "submit",
         entity: "production_report",
         entityKey: reportKey,
         summary: `Gửi báo cáo thành phẩm ${rangeDescription} · ${workshop} — tổng ${kg(total)} (${view.length} dòng). ${dong}`,
@@ -1071,7 +1071,7 @@ export default function WipProductionScreen() {
       key: "tt",
       header: "Trạng thái",
       render: (r) =>
-        r.status === "da-nhap" ? (
+        r.status === "stocked" ? (
           <Tag variant="xong">
             Đã nhập kho{r.warehouse ? ` · ${r.warehouse}` : ""}
           </Tag>

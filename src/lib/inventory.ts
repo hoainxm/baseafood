@@ -107,7 +107,7 @@ export function computeWipStockDetail(
     outByLot.set(d.wipId, cur);
   }
   const los = wips
-    .filter((s) => s.status === "da-nhap")
+    .filter((s) => s.status === "stocked")
     .map((s) => {
       const x = outByLot.get(s.id) ?? { kg: 0, block: 0 };
       return {

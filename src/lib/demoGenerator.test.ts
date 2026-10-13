@@ -105,7 +105,7 @@ describe("generateDemoBundle", () => {
   });
 
   it("đơn đặt nào đã tới ngày xuất cũng có lệnh xuất", () => {
-    const closedOrders = goi.salesOrders.filter((d) => d.status === "dong");
+    const closedOrders = goi.salesOrders.filter((d) => d.status === "closed");
     expect(closedOrders.length).toBeGreaterThan(0);
     for (const d of closedOrders) expect(goi.exportOrders.some((l) => l.orderId === d.id), d.id).toBe(true);
   });

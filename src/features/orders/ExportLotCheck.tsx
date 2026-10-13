@@ -114,7 +114,7 @@ export function ExportLotCheck({
     }));
   };
 
-  const checkLot = (text: string, method: "quet" | "go") => {
+  const checkLot = (text: string, method: "scan" | "typed") => {
     const ma = parseQrCode(text);
     if (!ma) return;
     const items = findLots(ma, {
@@ -145,9 +145,9 @@ export function ExportLotCheck({
       notify.error(`Lô ${n.nhan} KHÔNG thuộc lệnh xuất này${w ? " và khác mặt hàng các lô còn chờ" : ""} — đừng xếp lên xe.`);
       return;
     }
-    if (w.status !== "da-nhap" || remaining < cho.kg) {
+    if (w.status !== "stocked" || remaining < cho.kg) {
       notify.error(
-        `Lô ${n.nhan} cùng mặt hàng nhưng ${w.status !== "da-nhap" ? "chưa duyệt nhập kho" : `chỉ còn ${kg(Math.max(0, remaining))}, không đủ thay ${kg(cho.kg)}`} — đừng xếp lên xe.`
+        `Lô ${n.nhan} cùng mặt hàng nhưng ${w.status !== "stocked" ? "chưa duyệt nhập kho" : `chỉ còn ${kg(Math.max(0, remaining))}, không đủ thay ${kg(cho.kg)}`} — đừng xếp lên xe.`
       );
       return;
     }
@@ -162,7 +162,7 @@ export function ExportLotCheck({
     const doi = (d: ExportItem) => d.exportId === order.id && d.wipId === oldLot.wipId;
     const updatedItems = allExportItems.map((d) => (doi(d) ? { ...d, wipId: replacementLot.id } : d));
     onSaveExportItems(updatedItems);
-    saveLotDispatches([...lotDispatches, ...makeCheckDispatches(replacementLot.id, replacementLot.nhan, updatedItems.filter((d) => d.exportId === order.id && d.wipId === replacementLot.id), "quet")]);
+    saveLotDispatches([...lotDispatches, ...makeCheckDispatches(replacementLot.id, replacementLot.nhan, updatedItems.filter((d) => d.exportId === order.id && d.wipId === replacementLot.id), "scan")]);
     setProposal(null);
     notify.saved(`Đã thay lô ${oldLot.label} bằng ${replacementLot.nhan} trong lệnh xuất — đã ghi kiểm.`, () => {
       onSaveExportItems(prevRows);
@@ -195,14 +195,14 @@ export function ExportLotCheck({
               {isScanning ? "Tắt camera" : "Quét tem"}
             </Button>
             <Field label="Hoặc gõ mã lô trên tem" className="min-w-0 flex-1">
-              <Input value={typedCode} onChange={(e) => setTypedCode(e.target.value)} onKeyDown={(e) => e.key === "Enter" && checkLot(typedCode, "go")} />
+              <Input value={typedCode} onChange={(e) => setTypedCode(e.target.value)} onKeyDown={(e) => e.key === "Enter" && checkLot(typedCode, "typed")} />
             </Field>
-            <Button title="Kiểm lô theo mã vừa gõ." variant="outline" className="w-full sm:w-auto" onClick={() => checkLot(typedCode, "go")}>
+            <Button title="Kiểm lô theo mã vừa gõ." variant="outline" className="w-full sm:w-auto" onClick={() => checkLot(typedCode, "typed")}>
               <Search />
               Kiểm
             </Button>
           </div>
-          {isScanning && <QrScanner onScan={(t) => checkLot(t, "quet")} />}
+          {isScanning && <QrScanner onScan={(t) => checkLot(t, "scan")} />}
 
           <p className="font-semibold">
             Đã kiểm <span className="tnum">{checked.size}</span> / {lotsOfOrder.length} lô{" "}

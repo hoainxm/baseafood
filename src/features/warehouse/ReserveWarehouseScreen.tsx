@@ -80,7 +80,7 @@ export default function ReserveWarehouseScreen() {
   const productNameOf = (id: string) => products.find((m) => m.id === id)?.name || "—";
 
   const pendingIntake = useMemo(
-    () => wips.filter((s) => s.status === "cho-nhap"),
+    () => wips.filter((s) => s.status === "pending"),
     [wips]
   );
   // Bán lẻ / đóng gói vượt số đang trữ: lô không xuống âm nên phần vượt không nằm
@@ -144,7 +144,7 @@ export default function ReserveWarehouseScreen() {
     const wip = wips.find((x) => x.id === items[0]!.id);
     if (!wip) return;
     setTypedCode("");
-    if (wip.status !== "cho-nhap") {
+    if (wip.status !== "pending") {
       notify.warning(`Lô ${items[0]!.nhan} đã nhập kho${wip.warehouse ? ` ${wip.warehouse}` : ""} rồi.`);
       return;
     }
@@ -181,7 +181,7 @@ export default function ReserveWarehouseScreen() {
               warehouse: approval.warehouse,
               quantityKg: approval.actualKg,
               blocksCount: approval.actualBlocks,
-              status: "da-nhap",
+              status: "stocked",
               note: approval.note || s.note,
             }
           : s

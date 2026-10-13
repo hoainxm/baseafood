@@ -63,19 +63,21 @@ const TABLE_LABELS: Record<string, string> = {
 const tableLabel = (e: string) => TABLE_LABELS[e] ?? e;
 
 const ACTION_LABELS: Record<string, string> = {
-  them: "Thêm",
-  sua: "Sửa",
-  xoa: "Xóa",
-  "dang-nhap": "Đăng nhập",
-  "dang-xuat": "Đăng xuất",
+  create: "Thêm",
+  update: "Sửa",
+  delete: "Xóa",
+  login: "Đăng nhập",
+  logout: "Đăng xuất",
+  submit: "Gửi báo cáo",
 };
 const ACTION_OPTIONS: ComboboxOption[] = [
   { value: "", label: "Tất cả thao tác" },
-  { value: "them", label: "Thêm" },
-  { value: "sua", label: "Sửa" },
-  { value: "xoa", label: "Xóa" },
-  { value: "dang-nhap", label: "Đăng nhập" },
-  { value: "dang-xuat", label: "Đăng xuất" },
+  { value: "create", label: "Thêm" },
+  { value: "update", label: "Sửa" },
+  { value: "delete", label: "Xóa" },
+  { value: "login", label: "Đăng nhập" },
+  { value: "logout", label: "Đăng xuất" },
+  { value: "submit", label: "Gửi báo cáo" },
 ];
 
 function formatDate(iso: string): string {
@@ -164,7 +166,7 @@ export default function AuditLogScreen() {
 
   const actionLabel = (a: string) => ACTION_LABELS[a] ?? a;
   const badgeKind = (a: string): TagVariant =>
-    a === "xoa" ? "loi" : a === "them" ? "xong" : a === "sua" ? "luu-y" : "phu";
+    a === "delete" ? "loi" : a === "create" ? "xong" : a === "update" ? "luu-y" : "phu";
 
   const cols: RecordTableColumn<AuditEntry>[] = [
     { key: "at", header: "Thời gian", primary: true, render: (r) => formatDate(r.at), getSortValue: (r) => r.at },

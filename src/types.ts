@@ -196,7 +196,8 @@ export interface DailyLock {
 /* ---------- QC checklist chấm điểm cuối ngày (họp 2026-09-02, QĐ-8) ---------- */
 
 /** Kết quả một chỉ tiêu: đạt · tạm (cần khắc phục) · không đạt (cần kiểm tra lại). */
-export type QcResult = "dat" | "tam" | "khong-dat";
+/** Giá trị lưu DB tiếng Anh từ mig 0059 (trước đó dat/tam/khong-dat — đọc qua lib/legacyValues). */
+export type QcResult = "pass" | "conditional" | "fail";
 
 export interface QcChecklistItem {
   id: string;
@@ -425,7 +426,8 @@ export function calculateSalesAmount(r: Pick<SalesItem, "quantityKg" | "unitPric
 
 /* ---------- WIP Production Module ---------- */
 
-export type WipWarehouseStatus = "cho-nhap" | "da-nhap";
+/** pending = chờ nhập kho · stocked = đã nhập (trước mig 0059: cho-nhap / da-nhap). */
+export type WipWarehouseStatus = "pending" | "stocked";
 
 export interface WipProductionItem {
   id: string;
@@ -525,7 +527,10 @@ export function computePackagingLoss(p: Pick<Packaging, "inputKg" | "outputKg">)
   return p.inputKg - p.outputKg;
 }
 
-export type SalesOrderStatus = "dang-gom" | "du" | "dong";
+/** collecting = đang gom · complete = đủ · closed = đóng (trước mig 0059: dang-gom / du / dong). */
+export type SalesOrderStatus = "collecting" | "complete" | "closed";
+/** open = mở · closed = đóng (trước mig 0059: mo / dong). */
+export type ExportOrderStatus = "open" | "closed";
 
 export interface SalesOrder {
   id: string;
@@ -548,7 +553,7 @@ export interface ExportOrder {
   id: string;
   orderId: string;
   exportDate: string;
-  status: "mo" | "dong";
+  status: ExportOrderStatus;
   note: string;
 }
 
@@ -632,11 +637,12 @@ export const BSF1_WAREHOUSES: WarehouseInfo[] = [
 
 /* ---------- Danh mục KHO LƯU TRỮ (kho nhà + kho lạnh thuê ngoài) ---------- */
 
-export type StorageKind = "noi-bo" | "thue-ngoai";
+/** internal = kho nhà · external = kho thuê ngoài (trước mig 0059: noi-bo / thue-ngoai). */
+export type StorageKind = "internal" | "external";
 
 export const STORAGE_KIND_LABELS: Record<StorageKind, string> = {
-  "noi-bo": "Kho nhà",
-  "thue-ngoai": "Kho thuê ngoài",
+  internal: "Kho nhà",
+  external: "Kho thuê ngoài",
 };
 
 /**
@@ -801,6 +807,10 @@ export type LotKind = "S" | "W" | "P";
  * Sự kiện BIẾN ĐỔI lô (bảng `lot_inputs`, mig 0046): "đầu ra đã dùng đầu vào này".
  * Tương đương Transformation Event của EPCIS. Thiết kế: docs/spec/qr-truy-xuat-lo.md.
  */
+/** Cách gắn lô: scan = quét tem · typed = gõ mã · picked = chọn trong danh sách · fifo = tự trừ
+ *  (trước mig 0059: quet / go / chon). */
+export type LotMethod = "scan" | "typed" | "picked" | "fifo";
+
 export interface LotInput {
   id: string;
   /** W = mẻ SX BTP · P = phiếu đóng gói TP */
@@ -814,7 +824,7 @@ export interface LotInput {
   material: string;
   /** kg đã dùng; null = chưa cân. */
   quantityKg: number | null;
-  method: "quet" | "go" | "chon";
+  method: Exclude<LotMethod, "fifo">;
   operator: string;
   recordedAt: string;
 }
@@ -837,7 +847,7 @@ export interface LotDispatch {
   docId: string;
   /** kg lấy từ lô; null = chưa cân. */
   quantityKg: number | null;
-  method: "quet" | "go" | "chon" | "fifo";
+  method: LotMethod;
   operator: string;
   recordedAt: string;
 }

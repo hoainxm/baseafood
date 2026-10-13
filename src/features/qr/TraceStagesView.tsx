@@ -151,14 +151,14 @@ export function TraceStagesView() {
           key={n.id}
           m={m}
           status={
-            m.kho === "cho-nhap" ? (
+            m.kho === "pending" ? (
               <Tag variant="cho">Chờ nhập kho</Tag>
             ) : (
               <Tag variant="xong">Đã nhập kho{m.ton != null ? ` · tồn ${kg(m.ton)}` : ""}</Tag>
             )
           }
           action={
-            m.kho === "cho-nhap"
+            m.kho === "pending"
               ? taskButton(true, `Mở màn Kho dự trữ với hộp duyệt nhập kho của mẻ ${n.nhan}.`, () => navigate(`/warehouse?approve=W:${encodeURIComponent(n.id)}`), <ClipboardCheck aria-hidden />, "Duyệt nhập kho")
               : null
           }

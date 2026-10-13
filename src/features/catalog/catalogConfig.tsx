@@ -422,7 +422,7 @@ export function buildCatalogFields(
         <Combobox
           label="Loại kho"
           hint="Kho nhà = kho của xí nghiệp; kho thuê ngoài = kho lạnh gửi hàng."
-          value={value || "noi-bo"}
+          value={value || "internal"}
           onChange={changeValue}
           clearable={false}
           options={(Object.keys(STORAGE_KIND_LABELS) as (keyof typeof STORAGE_KIND_LABELS)[]).map(
@@ -596,7 +596,7 @@ export function buildCatalogConfigs(
         id: uid(),
         code: "",
         name: "",
-        kind: "thue-ngoai",
+        kind: "external",
         address: "",
         phone: "",
         note: "",

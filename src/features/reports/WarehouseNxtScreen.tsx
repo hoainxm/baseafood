@@ -177,7 +177,7 @@ export default function WarehouseNxtScreen() {
       id: newId(),
       code: "",
       name: trimmedName,
-      kind: "thue-ngoai",
+      kind: "external",
       address: "",
       phone: "",
       note: "",

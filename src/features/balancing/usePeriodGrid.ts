@@ -605,7 +605,7 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
             quantityKg: result.kg,
             blocksCount: 0,
             warehouse: "",
-            status: "cho-nhap",
+            status: "pending",
             note: "Ghi từ lưới cân đối",
             balancingPeriodId: ky.id,
           };

@@ -53,9 +53,9 @@ import {
 } from "lucide-react";
 
 const STATUS_LABELS: Record<SalesOrderStatus, string> = {
-  "dang-gom": "Đang gom",
-  du: "Đủ",
-  dong: "Đã xuất",
+  collecting: "Đang gom",
+  complete: "Đủ",
+  closed: "Đã xuất",
 };
 
 interface ExportRow {
@@ -126,7 +126,7 @@ export default function OrderExportReport() {
           orderId: l.orderId,
           customerName: d ? tenKH(d.customerId) : "(đơn đã xóa)",
           orderDate: d?.orderDate || "",
-          status: d?.status || "dong",
+          status: d?.status || "closed",
           lines: [],
           totalKg: 0,
           totalBlocks: 0,
@@ -303,7 +303,7 @@ export default function OrderExportReport() {
                         <span className="font-normal text-muted-foreground">
                           · đặt {g.orderDate ? formatDateVN(g.orderDate) : "—"}
                         </span>
-                        <Tag variant={g.status === "dang-gom" ? "cho" : "xong"}>
+                        <Tag variant={g.status === "collecting" ? "cho" : "xong"}>
                           {STATUS_LABELS[g.status]}
                         </Tag>
                         {g.requiredKg > 0 && (

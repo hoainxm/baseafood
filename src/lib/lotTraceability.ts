@@ -33,6 +33,7 @@ import type {
   SalesItem,
   SalesOrder,
   WipProductionItem,
+  WipWarehouseStatus,
   Workshop,
 } from "@/types";
 import { RETAIL_WAREHOUSE, FG_WAREHOUSE, filterRetailSales, computeWipStock, computeFinishedGoodLotStock, collectWipDeductions } from "./inventory";
@@ -758,7 +759,7 @@ export interface TraceStageItem {
   /** S: số mẻ / dòng bán nội địa đã dùng lô này. */
   daDung?: number;
   /** W: trạng thái kho. */
-  kho?: "cho-nhap" | "da-nhap";
+  kho?: WipWarehouseStatus;
   /** Tồn trong kho theo sổ tồn (W đã nhập, P). */
   ton?: number | null;
   /** X: đã quét kiểm khi xếp xe. */
@@ -826,11 +827,11 @@ export function groupByTraceStage(dl: TraceData, filter: { tu: string; den: stri
     .map((w) => ({
       nut: buildLotNode("W", w.id, dl),
       kho: w.status,
-      ton: w.status === "da-nhap" ? getLotStockKg("W", w.id, dl, lotStockTable) : null,
+      ton: w.status === "stocked" ? getLotStockKg("W", w.id, dl, lotStockTable) : null,
       daIn: countLabels("W", w.id),
-      thieu: w.status === "cho-nhap" ? (["duyet"] as MissingTask[]) : [],
+      thieu: w.status === "pending" ? (["duyet"] as MissingTask[]) : [],
     }))
-    .sort((a, b) => Number(b.kho === "cho-nhap") - Number(a.kho === "cho-nhap") || newestFirst(a, b));
+    .sort((a, b) => Number(b.kho === "pending") - Number(a.kho === "pending") || newestFirst(a, b));
 
   const packagingStages: TraceStageItem[] = dl.packagings
     .filter((p) => isWithin(p.date, p.workshop))

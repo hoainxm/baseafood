@@ -1,7 +1,7 @@
 # Quy ước đặt tên + kế hoạch dọn tên tiếng Việt không dấu
 
 - **Ngày lập:** 2026-10-12
-- **Trạng thái:** CHỐT 2026-10-12 (chủ dự án duyệt 4 câu ở §6). §2 Luật áp dụng NGAY cho mọi thứ MỚI. §5 chạy theo đợt có lịch, **Đợt 0 → 4 xong 2026-10-13**; còn lại: tên TRƯỜNG dữ liệu trong `lib` + literal loại danh mục (xem Kết quả Đợt 4) và **Đợt 5** (5a enum slug + 5f tên policy, mỗi mục một câu xác nhận RED).
+- **Trạng thái:** CHỐT 2026-10-12 (chủ dự án duyệt 4 câu ở §6). §2 Luật áp dụng NGAY cho mọi thứ MỚI. §5 chạy theo đợt có lịch, **Đợt 0 → 4 xong 2026-10-13**; **Đợt 5 (5a + 5f) code xong 2026-10-13, chờ chủ dự án chạy `0059` + `0060` rồi mới deploy** (xem Kết quả Đợt 5); còn lại: tên TRƯỜNG dữ liệu trong `lib` + literal loại danh mục (xem Kết quả Đợt 4).
 - **Thay cho:** Phần B của [`routing-va-naming.md`](routing-va-naming.md) (dự thảo 2026-08-07; nửa DB + route của nó đã làm xong ở `0016` và đợt react-router).
 - **Liên quan:** [`CLAUDE.md`](../../CLAUDE.md) luật 8 · [`app-map/03-database.md`](../app-map/03-database.md) · [`app-map/04-tang-du-lieu.md`](../app-map/04-tang-du-lieu.md) · [`src/design-system/README.md`](../../src/design-system/README.md)
 
@@ -179,7 +179,19 @@ Phân bố khai báo tên Việt theo khu: `lib` 1.129 · `design-system` 301 ·
 |---|---|---|
 | Tên trường kiểu dữ liệu `lib` (`LotNode.nhan`, `FlowStage.ten/kgCho`…) — KHÔNG lưu DB | 🟡 | `rename.mjs --props` trên `src/lib`; LOẠI kiểu trong `types.ts` (đã tiếng Anh) và mọi kiểu đi vào `toRow`/localStorage |
 | Literal loại danh mục (`"daiLy"`…) + `theo: "ten"` + khóa cùng tên | 🟡 | đổi cùng lúc literal + khóa (grep `"daiLy"`), có test |
-| Đợt 5a/5f | 🔴 | xác nhận riêng từng mục |
+| Đợt 5a/5f | 🔴 | ✅ code xong — xem Kết quả Đợt 5 |
+
+### Kết quả Đợt 5 (2026-10-13)
+
+Chủ dự án duyệt cả 5a + 5f, **tự chạy migration ở SQL Editor**, code commit nhưng CHỈ push sau khi migration đã chạy.
+
+- **5a — giá trị enum lưu DB** (7 họ): `production_wips.status` `cho-nhap/da-nhap` → `pending/stocked` · `sales_orders.status` `dang-gom/du/dong` → `collecting/complete/closed` · `export_orders.status` `mo/dong` → `open/closed` · `storage_locations.kind` `noi-bo/thue-ngoai` → `internal/external` · `qc_checklists.result` `dat/tam/khong-dat` → `pass/conditional/fail` · `lot_inputs.method` + `lot_dispatches.method` `quet/go/chon` → `scan/typed/picked` (`fifo` giữ) · `audit_log.action` `them/sua/xoa/dang-nhap/dang-xuat/gui` → `create/update/delete/login/logout/submit`.
+- **Một nguồn cũ → mới:** `src/lib/legacyValues.ts` (`LEGACY_VALUES` + `normalize*`, có test). Code **ghi giá trị mới, đọc cả hai**: `fromRow` (dòng máy chủ chưa đổi) + `patchLegacy` (bộ đệm máy, hàng chờ offline) đi qua `normalize*`. Mặc định khi rỗng giữ như cũ.
+- **`audit_log` KHÔNG sửa lịch sử** (append-only): đọc qua `normalizeAuditAction`, lọc theo thao tác dùng `auditActionAliases` (`in (mới, cũ…)`). Trigger ghi vết SQL `0048` vẫn ghi `them/sua/xoa` — app đọc ra đúng nhãn, để nguyên (5e không làm).
+- **`0059_english_enum_values.sql`:** nới CHECK 3 cột (0036/0046/0056) nhận CẢ cũ LẪN mới (máy chưa tải lại bản mới vẫn ghi được), UPDATE cũ → mới, đổi DEFAULT. Mỗi dòng đổi để lại một dòng `audit_log` "[SQL trực tiếp]" qua trigger 0048. Có ROLLBACK.
+- **`0060_english_policy_names.sql`:** chỉ `alter policy … rename` — policy public có hậu tố `_nguoi_dung/_toan_quyen/_cua_toi/_them/_sua/_xoa/_xem/_doc` thành `<bảng>_authenticated/_full_access/_own_rows/_insert/_update/_delete/_select/_read`; điều kiện quyền không đổi. Tên cũ lưu trong COMMENT để ROLLBACK đổi ngược chính xác. ⚠ Sau 0060 đừng chạy lại 0021/0047/0057 (tạo lại tên cũ song song) — cần thì chạy 0060 ngay sau.
+- **Kiểm:** hai migration chạy 2 lần trên Postgres nhúng (PGlite, lược đồ tối thiểu có CHECK nội tuyến + policy tên cũ + ca trùng tên) — lần 2 không đổi gì; CHECK vẫn chặn giá trị lạ; ROLLBACK trả đúng giá trị, default, tên policy. Preview demo: bộ đệm `cho-nhap` hiện "Chờ nhập", duyệt ghi `stocked`, nhật ký ghi `update`; kho lưu `noi-bo` hiện "Kho nhà".
+- Sau Đợt 5: `fields` **600**.
 
 ### Cách chạy lại codemod
 

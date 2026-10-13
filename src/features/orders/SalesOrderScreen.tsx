@@ -74,9 +74,9 @@ interface NewOrder {
 }
 
 const STATUS_LABELS: Record<SalesOrder["status"], string> = {
-  "dang-gom": "Đang gom",
-  du: "Đủ",
-  dong: "Đã xuất",
+  collecting: "Đang gom",
+  complete: "Đủ",
+  closed: "Đã xuất",
 };
 
 export default function SalesOrderScreen() {
@@ -203,7 +203,7 @@ export default function SalesOrderScreen() {
       id: donId,
       customerId: creating.customerId,
       orderDate: creating.orderDate,
-      status: "dang-gom",
+      status: "collecting",
       note: creating.note,
     };
     const newOrderItems: OrderItem[] = validRows.map((d) => ({
@@ -257,7 +257,7 @@ export default function SalesOrderScreen() {
       id: exportOrderId,
       orderId: d.id,
       exportDate: todayISO(),
-      status: "dong",
+      status: "closed",
       note: "",
     };
     // Handoff sổ Bán hàng: 1 phiếu bán (kênh Xuất khẩu), mỗi dòng lệnh = 1 dòng bán.
@@ -288,7 +288,7 @@ export default function SalesOrderScreen() {
     persistSalesInvoices([...salesInvoices, salesInvoice]);
     persistBan([...salesItems, ...newSalesItems]);
 
-    // Cập nhật trạng thái đơn: đủ hết → "dong", còn thiếu → "dang-gom".
+    // Cập nhật trạng thái đơn: đủ hết → "closed", còn thiếu → "collecting".
     const hasMissing = orderLines.some(
       (dc) =>
         dc.requiredQuantityKg -
@@ -302,7 +302,7 @@ export default function SalesOrderScreen() {
     );
     persistDon(
       don.map((x) =>
-        x.id === d.id ? { ...x, status: hasMissing ? "dang-gom" : "dong" } : x
+        x.id === d.id ? { ...x, status: hasMissing ? "collecting" : "closed" } : x
       )
     );
     const totalOut = newExportItems.reduce((s, dl) => s + dl.quantityKg, 0);
@@ -313,7 +313,7 @@ export default function SalesOrderScreen() {
   };
 
   const confirmFulfilled = (d: SalesOrder) => {
-    persistDon(don.map((x) => (x.id === d.id ? { ...x, status: "du" } : x)));
+    persistDon(don.map((x) => (x.id === d.id ? { ...x, status: "complete" } : x)));
     notify.saved("Đã đánh dấu đơn đủ — bấm Lệnh xuất để xuất container");
   };
 
@@ -342,7 +342,7 @@ export default function SalesOrderScreen() {
       key: "tt",
       header: "Trạng thái",
       render: (r) => (
-        <Tag variant={r.status === "dang-gom" ? "cho" : "xong"}>{STATUS_LABELS[r.status]}</Tag>
+        <Tag variant={r.status === "collecting" ? "cho" : "xong"}>{STATUS_LABELS[r.status]}</Tag>
       ),
       getSortValue: (r) => r.status,
     },
@@ -369,8 +369,8 @@ export default function SalesOrderScreen() {
         className="grid-cols-1 sm:grid-cols-3"
         cards={[
           { label: "Tổng số đơn", value: don.length, numeric: true, icon: ClipboardList, color: "trung-tinh" },
-          { label: "Đang gom hàng", value: don.filter((d) => d.status === "dang-gom").length, numeric: true, icon: Package, color: "brand" },
-          { label: "Đã xuất xong", value: don.filter((d) => d.status === "dong").length, numeric: true, icon: CheckCircle, color: "success" },
+          { label: "Đang gom hàng", value: don.filter((d) => d.status === "collecting").length, numeric: true, icon: Package, color: "brand" },
+          { label: "Đã xuất xong", value: don.filter((d) => d.status === "closed").length, numeric: true, icon: CheckCircle, color: "success" },
         ]}
       />
 
@@ -425,7 +425,7 @@ export default function SalesOrderScreen() {
               </p>
             </div>
             <div className="flex min-w-0 flex-wrap gap-2">
-              {selectedOrder.status !== "dong" && (
+              {selectedOrder.status !== "closed" && (
                 <>
                   <Button
                     title="Đánh dấu đơn này đã gom đủ hàng — chuyển trạng thái, chưa xuất kho." variant="outline" onClick={() => confirmFulfilled(selectedOrder)}>

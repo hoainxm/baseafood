@@ -31,10 +31,8 @@ import type {
   SalesInvoice,
   SalesItem,
   WipProductionItem,
-  WipWarehouseStatus,
   Packaging,
   SalesOrder,
-  SalesOrderStatus,
   OrderItem,
   ExportOrder,
   ExportItem,
@@ -57,6 +55,14 @@ import type {
 import { rolesFromCsv, rolesToCsv } from "@/types";
 import { getProductBatterIds, sanitizeBatterKg } from "@/lib/batter";
 import { appendAuditEntries, type NewAuditEntry } from "@/lib/audit";
+import {
+  normalizeExportOrderStatus,
+  normalizeLotMethod,
+  normalizeQcResult,
+  normalizeSalesOrderStatus,
+  normalizeStorageKind,
+  normalizeWipStatus,
+} from "@/lib/legacyValues";
 
 /**
  * Tầng dữ liệu dùng chung.
@@ -675,7 +681,7 @@ export const WIP_PRODUCTION_TABLE: TableMapping<WipProductionItem> = {
     quantityKg: Number(r.quantity_kg ?? 0),
     blocksCount: Number(r.blocks_count ?? 0),
     warehouse: s(r.warehouse),
-    status: (s(r.status) || "cho-nhap") as WipWarehouseStatus,
+    status: normalizeWipStatus(r.status),
     note: s(r.note),
     customerName: s(r.customer_name),
     processingType: r.processing_type == null ? "" : s(r.processing_type),
@@ -696,6 +702,7 @@ export const WIP_PRODUCTION_TABLE: TableMapping<WipProductionItem> = {
     balancingPeriodId: x.balancingPeriodId ?? "",
     operator: x.operator ?? "",
     batterKg: x.batterKg ?? {},
+    status: normalizeWipStatus(x.status), // bộ đệm / hàng chờ trước Đợt 5 còn "cho-nhap"/"da-nhap" (lib/legacyValues)
   }),
 };
 
@@ -739,6 +746,8 @@ export const PRODUCTION_LOCK_TABLE: TableMapping<DailyLock> = {
 export const QC_CHECKLIST_TABLE: TableMapping<QcChecklistItem> = {
   table: "qc_checklists",
   localKey: "bsf.qc-checklists.v1",
+  // Bộ đệm / hàng chờ trước Đợt 5 còn giá trị tiếng Việt (lib/legacyValues).
+  patchLegacy: (x) => ({ ...x, result: normalizeQcResult(x.result) }),
   getKey: theoId,
   toRow: (x) => ({
     id: x.id,
@@ -758,7 +767,7 @@ export const QC_CHECKLIST_TABLE: TableMapping<QcChecklistItem> = {
     date: s(r.date).slice(0, 10),
     workshop: s(r.workshop) as Workshop,
     criterion: s(r.criterion),
-    result: (s(r.result) || "dat") as QcChecklistItem["result"],
+    result: normalizeQcResult(r.result),
     score: n(r.score),
     note: s(r.note),
     backdateReason: s(r.backdate_reason),
@@ -834,6 +843,7 @@ export const PACKAGING_TABLE: TableMapping<Packaging> = {
 export const SALES_ORDER_TABLE: TableMapping<SalesOrder> = {
   table: "sales_orders",
   localKey: "bsf.sales-orders.v2",
+  patchLegacy: (x) => ({ ...x, status: normalizeSalesOrderStatus(x.status) }),
   getKey: theoId,
   toRow: (x) => ({
     id: x.id,
@@ -846,7 +856,7 @@ export const SALES_ORDER_TABLE: TableMapping<SalesOrder> = {
     id: s(r.id),
     customerId: s(r.customer_id),
     orderDate: s(r.order_date).slice(0, 10),
-    status: (s(r.status) || "dang-gom") as SalesOrderStatus,
+    status: normalizeSalesOrderStatus(r.status),
     note: s(r.note),
   }),
 };
@@ -878,6 +888,7 @@ export const ORDER_ITEM_TABLE: TableMapping<OrderItem> = {
 export const EXPORT_ORDER_TABLE: TableMapping<ExportOrder> = {
   table: "export_orders",
   localKey: "bsf.export-orders.v2",
+  patchLegacy: (x) => ({ ...x, status: normalizeExportOrderStatus(x.status) }),
   getKey: theoId,
   toRow: (x) => ({
     id: x.id,
@@ -890,7 +901,7 @@ export const EXPORT_ORDER_TABLE: TableMapping<ExportOrder> = {
     id: s(r.id),
     orderId: s(r.order_id),
     exportDate: s(r.export_date).slice(0, 10),
-    status: (s(r.status) || "mo") as "mo" | "dong",
+    status: normalizeExportOrderStatus(r.status),
     note: s(r.note),
   }),
 };
@@ -1017,6 +1028,7 @@ export const NXT_SNAPSHOT_TABLE: TableMapping<NxtSnapshotLine> = {
 export const STORAGE_LOCATION_TABLE: TableMapping<StorageLocation> = {
   table: "storage_locations",
   localKey: "bsf.storage-locations.v1",
+  patchLegacy: (x) => ({ ...x, kind: normalizeStorageKind(x.kind) }),
   getKey: theoId,
   toRow: (x) => ({
     id: x.id,
@@ -1031,7 +1043,7 @@ export const STORAGE_LOCATION_TABLE: TableMapping<StorageLocation> = {
     id: s(r.id),
     code: s(r.code),
     name: s(r.name),
-    kind: (s(r.kind) === "thue-ngoai" ? "thue-ngoai" : "noi-bo") as StorageLocation["kind"],
+    kind: normalizeStorageKind(r.kind),
     address: s(r.address),
     phone: s(r.phone),
     note: s(r.note),
@@ -1585,6 +1597,7 @@ export const RECONCILIATION_RUN_TABLE: TableMapping<ReconciliationRun> = {
 export const LOT_INPUT_TABLE: TableMapping<LotInput> = {
   table: "lot_inputs",
   localKey: "bsf.lot-inputs.v1",
+  patchLegacy: (x) => ({ ...x, method: normalizeLotMethod<LotInput["method"]>(x.method) }),
   getKey: theoId,
   toRow: (x) => ({
     id: x.id,
@@ -1608,7 +1621,7 @@ export const LOT_INPUT_TABLE: TableMapping<LotInput> = {
     inputLabel: s(r.input_label),
     material: s(r.material),
     quantityKg: r.quantity_kg == null || r.quantity_kg === "" ? null : Number(r.quantity_kg),
-    method: s(r.method) === "quet" ? "quet" : s(r.method) === "go" ? "go" : "chon",
+    method: normalizeLotMethod<LotInput["method"]>(r.method),
     operator: s(r.operator),
     recordedAt: s(r.recorded_at),
   }),
@@ -1649,6 +1662,7 @@ export const LABEL_PRINT_TABLE: TableMapping<LabelPrint> = {
 export const LOT_DISPATCH_TABLE: TableMapping<LotDispatch> = {
   table: "lot_dispatches",
   localKey: "bsf.lot-dispatches.v1",
+  patchLegacy: (x) => ({ ...x, method: normalizeLotMethod<LotDispatch["method"]>(x.method) }),
   getKey: theoId,
   toRow: (x) => ({
     id: x.id,
@@ -1670,7 +1684,7 @@ export const LOT_DISPATCH_TABLE: TableMapping<LotDispatch> = {
     docKind: s(r.doc_kind) === "export_item" ? "export_item" : s(r.doc_kind) === "domestic_sale" ? "domestic_sale" : "sales_item",
     docId: s(r.doc_id),
     quantityKg: r.quantity_kg == null || r.quantity_kg === "" ? null : Number(r.quantity_kg),
-    method: s(r.method) === "quet" ? "quet" : s(r.method) === "go" ? "go" : s(r.method) === "fifo" ? "fifo" : "chon",
+    method: normalizeLotMethod<LotDispatch["method"]>(r.method),
     operator: s(r.operator),
     recordedAt: s(r.recorded_at),
   }),
@@ -1790,16 +1804,16 @@ function logChanges<T>(bang: TableMapping<T>, prev: T[], next: T[]): void {
   for (const [k, x] of nextMap) {
     const c = prevByKey.get(k);
     if (c === undefined) {
-      entries.push({ action: "them", entity: bang.table, entityKey: k, summary: `Thêm ${label}`, diff: { _new: compactForAudit(x) } });
+      entries.push({ action: "create", entity: bang.table, entityKey: k, summary: `Thêm ${label}`, diff: { _new: compactForAudit(x) } });
     } else if (JSON.stringify(c) !== JSON.stringify(x)) {
       const diff = Object.fromEntries(
         Object.entries(diffFields(c, x)).map(([f, [a, b]]) => [f, [compactForAudit(a, f), compactForAudit(b, f)]]),
       );
-      entries.push({ action: "sua", entity: bang.table, entityKey: k, summary: `Sửa ${label}`, diff });
+      entries.push({ action: "update", entity: bang.table, entityKey: k, summary: `Sửa ${label}`, diff });
     }
   }
   for (const [k] of prevByKey) {
-    if (!nextMap.has(k)) entries.push({ action: "xoa", entity: bang.table, entityKey: k, summary: `Xóa ${label}` });
+    if (!nextMap.has(k)) entries.push({ action: "delete", entity: bang.table, entityKey: k, summary: `Xóa ${label}` });
   }
   appendAuditEntries(entries);
 }

@@ -681,7 +681,7 @@ export default function MonthlyStockScreen() {
     const co = locationOptions.find((o) => o.value.toLowerCase() === name.toLowerCase());
     if (co) return co.value;
     if (name) {
-      setStorageLocationCatalog([...storageLocationCatalog, { id: uid(), code: "", name, kind: "thue-ngoai", address: "", phone: "", note: "Từ sổ kho theo tháng" }]);
+      setStorageLocationCatalog([...storageLocationCatalog, { id: uid(), code: "", name, kind: "external", address: "", phone: "", note: "Từ sổ kho theo tháng" }]);
       notify.saved(`Đã thêm kho lưu "${name}" vào danh mục`);
     }
     return name;
@@ -1008,7 +1008,7 @@ export default function MonthlyStockScreen() {
       const co = findWarehouseByText(rawText, warehouseCatalog);
       if (co) return co;
       const name = buildNewWarehouseName(rawText);
-      warehouseCatalog.push({ id: uid(), code: `K${toWarehouseKey(rawText)}`, name, kind: "thue-ngoai", address: "", phone: "", note: "Từ bảng kê kho (cột ghi chú)" });
+      warehouseCatalog.push({ id: uid(), code: `K${toWarehouseKey(rawText)}`, name, kind: "external", address: "", phone: "", note: "Từ bảng kê kho (cột ghi chú)" });
       addedWarehouses.push(name);
       return name;
     };

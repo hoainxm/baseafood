@@ -11,7 +11,7 @@ const dong = (shipmentId: string, date: string, kg: number, materialType: string
   ({ id: `${shipmentId}-${materialType}`, shipmentId, deliveryDate: date, workshop: "Đông", quantityKg: kg, materialTypeName: materialType, category: materialType }) as MaterialImportItem;
 const me = (id: string, date: string, workshop: WipProductionItem["workshop"]): WipProductionItem => ({
   id, productionDate: date, postingDate: date, backdateReason: "", workshop, productId: "mh1",
-  spec: "", quantityKg: 100, blocksCount: 0, warehouse: "", status: "cho-nhap" as WipProductionItem["status"], note: "",
+  spec: "", quantityKg: 100, blocksCount: 0, warehouse: "", status: "pending" as WipProductionItem["status"], note: "",
 });
 const salesInvoice = (id: string, date: string): Packaging => ({
   id, date, workshop: "Đông", fromProductId: "mh1", fromSpec: "", inputKg: 50, inputBlocks: 0,
@@ -76,7 +76,7 @@ describe("sổ in tem", () => {
 
 describe("đợt 2b — chọn lô, chốt ngày, tem, gắn phiên", () => {
   const inputKg = (id: string, outputId: string, inputId: string, kg: number | null, luc: string) =>
-    ({ id, outputKind: "W", outputId, inputKind: "S", inputId, inputLabel: "", material: "", quantityKg: kg, method: "chon", operator: "", recordedAt: luc }) as LotInput;
+    ({ id, outputKind: "W", outputId, inputKind: "S", inputId, inputLabel: "", material: "", quantityKg: kg, method: "picked", operator: "", recordedAt: luc }) as LotInput;
 
   it("listSelectableMaterialLots: lô cũ quá 45 ngày vẫn hiện nếu còn kg và đã vào thời truy xuất; lô cũ chưa từng theo dõi thì không", () => {
     const d: TraceData = {
@@ -132,11 +132,11 @@ describe("đợt 2b — chọn lô, chốt ngày, tem, gắn phiên", () => {
     const result = assignSessionLots({
       mes: [{ id: "w1", productId: "mh1" }, { id: "w2", productId: "mh1" }],
       banNoiDia: [{ id: "n1", materialTypeName: "Cá ngừ" }],
-      loNl: [{ nut: buildLotNode("S", "s1-Mực ống", d), cach: "go" }],
+      loNl: [{ nut: buildLotNode("S", "s1-Mực ống", d), cach: "typed" }],
       dl: d, nguoiGhi: "", luc: "", taoId: () => "g",
     });
     expect(result.lotInputs.map((l) => l.outputId)).toEqual(["w2"]); // w1 đã gắn s1 rồi
-    expect(result.lotInputs[0]!.method).toBe("go");
+    expect(result.lotInputs[0]!.method).toBe("typed");
     expect(result.khongKhop).toEqual([{ kind: "N", id: "n1" }]);
   });
 });
@@ -145,7 +145,7 @@ describe("groupByTraceStage — quy mô một năm", () => {
   it("~3.000 mẻ + 3.000 dòng bán: sổ tồn dựng MỘT lần, không tính lại từng lô (trước đây vài giây)", () => {
     const N = 3000;
     const wips = Array.from({ length: N }, (_, i) => ({
-      ...me(`w${i}`, `2026-${String(1 + (i % 12)).padStart(2, "0")}-10`, "Đông"), productId: `p${i % 50}`, status: "da-nhap" as const,
+      ...me(`w${i}`, `2026-${String(1 + (i % 12)).padStart(2, "0")}-10`, "Đông"), productId: `p${i % 50}`, status: "stocked" as const,
     }));
     const salesItems = Array.from({ length: N }, (_, i) =>
       ({ id: `b${i}`, productId: `p${i % 50}`, spec: "", quantityKg: 30, sourceWarehouse: "Kho dự trữ", deliveryDate: "2026-06-01", invoiceId: "" }) as SalesItem);

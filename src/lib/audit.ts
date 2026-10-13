@@ -6,6 +6,7 @@
 import { supabase, SITE_ID } from "@/lib/supabase";
 import { modeLocalKey } from "@/lib/demoMode";
 import { uid } from "@/lib/db";
+import { auditActionAliases, normalizeAuditAction } from "@/lib/legacyValues";
 
 /**
  * Lưu vết thao tác CHẠM DỮ LIỆU (thêm/sửa/xóa bản ghi, đăng nhập/xuất). KHÔNG
@@ -22,7 +23,7 @@ import { uid } from "@/lib/db";
  */
 
 export interface NewAuditEntry {
-  action: string; // them | sua | xoa | dang-nhap | dang-xuat
+  action: string; // create | update | delete | login | logout | submit (dòng cũ tiếng Việt: xem lib/legacyValues)
   entity: string; // tên bảng (vd material_imports) hoặc 'auth'
   entityKey: string;
   summary: string;
@@ -102,7 +103,7 @@ function fromRow(r: Record<string, unknown>): AuditEntry {
     at: s(r.at),
     actorId: s(r.actor_id),
     actorUsername: s(r.actor_username),
-    action: s(r.action),
+    action: normalizeAuditAction(r.action),
     entity: s(r.entity),
     entityKey: s(r.entity_key),
     summary: s(r.summary),
@@ -186,7 +187,7 @@ export async function readAuditLog(filter: AuditLogFilter = {}): Promise<AuditEn
   const matches = (r: AuditEntry) => {
     if (filter.nguoi && r.actorUsername !== filter.nguoi) return false;
     if (filter.bang && r.entity !== filter.bang) return false;
-    if (filter.loai && r.action !== filter.loai) return false;
+    if (filter.loai && normalizeAuditAction(r.action) !== normalizeAuditAction(filter.loai)) return false;
     if (bien.tu && r.at < bien.tu) return false;
     if (bien.den && r.at > bien.den) return false;
     if (filter.timKiem) {
@@ -206,7 +207,7 @@ export async function readAuditLog(filter: AuditLogFilter = {}): Promise<AuditEn
       .limit(gioiHan);
     if (filter.nguoi) q = q.eq("actor_username", filter.nguoi);
     if (filter.bang) q = q.eq("entity", filter.bang);
-    if (filter.loai) q = q.eq("action", filter.loai);
+    if (filter.loai) q = q.in("action", auditActionAliases(filter.loai));
     if (bien.tu) q = q.gte("at", bien.tu);
     if (bien.den) q = q.lte("at", bien.den);
     const { data, error } = await q;
@@ -219,6 +220,7 @@ export async function readAuditLog(filter: AuditLogFilter = {}): Promise<AuditEn
   // Chế độ localStorage: buffer chính là kho.
   return [...docBuffer()]
     .reverse()
+    .map((r) => ({ ...r, action: normalizeAuditAction(r.action) }))
     .filter(matches)
     .slice(0, gioiHan);
 }

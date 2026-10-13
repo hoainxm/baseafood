@@ -7,7 +7,7 @@ const lo = (
   productionDate: string,
   quantityKg: number,
   blocksCount: number,
-  status: "da-nhap" | "cho-nhap" = "da-nhap",
+  status: "stocked" | "pending" = "stocked",
 ) =>
   ({
     id,
@@ -23,10 +23,10 @@ const lo = (
 describe("computeWipStock", () => {
   it("chỉ tính lô đã nhập kho, conLai = nhập − xuất", () => {
     const los = computeWipStock(
-      [lo("w1", "2026-09-01", 100, 10), lo("w2", "2026-09-02", 50, 5, "cho-nhap")],
+      [lo("w1", "2026-09-01", 100, 10), lo("w2", "2026-09-02", 50, 5, "pending")],
       [{ wipId: "w1", quantityKg: 30, blocksCount: 3 } as ExportItem],
     );
-    expect(los).toHaveLength(1); // w2 "cho-nhap" bị loại
+    expect(los).toHaveLength(1); // w2 "pending" bị loại
     expect(los[0].wipId).toBe("w1");
     expect(los[0].conLai).toBe(70);
     expect(los[0].luongXuat).toBe(30);
@@ -122,10 +122,10 @@ describe("trừ tồn theo lô đã gắn (truy xuất QR)", () => {
     const ban = [{ id: "b1", productId: "p1", spec: "s1", quantityKg: 100, sourceWarehouse: RETAIL_WAREHOUSE }];
     const dg = [{ id: "pk1", fromProductId: "p1", fromSpec: "s1", inputKg: 200 } as Packaging];
     const dispatches: LotDispatch[] = [
-      { id: "d1", lotKind: "W", lotId: "w1", lotLabel: "", docKind: "sales_item", docId: "b1", quantityKg: 100, method: "quet", operator: "", recordedAt: "" },
+      { id: "d1", lotKind: "W", lotId: "w1", lotLabel: "", docKind: "sales_item", docId: "b1", quantityKg: 100, method: "scan", operator: "", recordedAt: "" },
     ];
     const inputKg: LotInput[] = [
-      { id: "l1", outputKind: "P", outputId: "pk1", inputKind: "W", inputId: "w1", inputLabel: "", material: "", quantityKg: 200, method: "quet", operator: "", recordedAt: "" },
+      { id: "l1", outputKind: "P", outputId: "pk1", inputKind: "W", inputId: "w1", inputLabel: "", material: "", quantityKg: 200, method: "scan", operator: "", recordedAt: "" },
     ];
     const los = computeWipStock([w0, w1], [], collectWipDeductions(ban, dg, inputKg, dispatches));
     expect(remainingOf(los, "w0")).toBe(100);

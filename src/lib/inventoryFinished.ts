@@ -20,7 +20,7 @@ import { RETAIL_WAREHOUSE } from "@/lib/inventory";
  *
  *   Tồn cuối = Tồn đầu + Nhập kho − Xuất kho
  *
- *   - Nhập kho = BTP sản xuất đã DUYỆT vào kho (status "da-nhap"), theo ngày SX.
+ *   - Nhập kho = BTP sản xuất đã DUYỆT vào kho (status "stocked"), theo ngày SX.
  *   - Xuất kho (3 luồng, đúng mô hình 2 kho của inventory.ts):
  *       • Xuất đơn đặt   = dòng lệnh xuất container (theo ngày lệnh).
  *       • Xuất bán lẻ    = phiếu bán block thô rút từ KHO DỰ TRỮ
@@ -164,7 +164,7 @@ export function computeFinishedGoodNxt(args: FinishedGoodNxtArgs): FinishedGoodN
 
   // Nhập kho = BTP đã duyệt (da-nhap), theo ngày SX
   for (const s of wips) {
-    if (s.status !== "da-nhap") continue;
+    if (s.status !== "stocked") continue;
     if (s.productionDate > toDate) continue;
     const a = layAcc(map, s.productId, s.spec);
     if (isBeforeCutoff(a, s.productionDate)) continue;

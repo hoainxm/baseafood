@@ -35,9 +35,9 @@ const WORKSHOP_OPTIONS: ChoiceOption[] = [
 ];
 
 const KET_QUA_OPT: ChoiceOption[] = [
-  { value: "dat", label: "Đạt" },
-  { value: "tam", label: "Cần khắc phục" },
-  { value: "khong-dat", label: "Không đạt" },
+  { value: "pass", label: "Đạt" },
+  { value: "conditional", label: "Cần khắc phục" },
+  { value: "fail", label: "Không đạt" },
 ];
 
 /** Bộ chỉ tiêu mặc định — chấm nhanh, vẫn thêm chỉ tiêu mới tại chỗ. */
@@ -129,8 +129,8 @@ export default function QcChecklistScreen() {
   const coQc30 = qc30.some((x) => x.dat + x.tam + x.khongDat > 0);
 
   const scoredRows = dongs.filter((d) => d.result);
-  const passCount = scoredRows.filter((d) => d.result === "dat").length;
-  const failCount = scoredRows.filter((d) => d.result === "khong-dat").length;
+  const passCount = scoredRows.filter((d) => d.result === "pass").length;
+  const failCount = scoredRows.filter((d) => d.result === "fail").length;
 
   const save = () => {
     const scored = dongs.filter((d) => d.result);

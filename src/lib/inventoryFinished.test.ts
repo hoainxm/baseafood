@@ -4,7 +4,7 @@ import { computeFinishedGoodNxt, sumFinishedGoodNxt, type FinishedGoodNxtArgs } 
 import { RETAIL_WAREHOUSE } from "./inventory";
 
 const me = (id: string, productionDate: string, quantityKg: number): WipProductionItem =>
-  ({ id, productId: "p1", spec: "s1", productionDate, quantityKg, blocksCount: 0, status: "da-nhap", warehouse: "" }) as WipProductionItem;
+  ({ id, productId: "p1", spec: "s1", productionDate, quantityKg, blocksCount: 0, status: "stocked", warehouse: "" }) as WipProductionItem;
 const ban = (id: string, deliveryDate: string, quantityKg: number): SalesItem =>
   ({ id, productId: "p1", spec: "s1", deliveryDate, quantityKg, sourceWarehouse: RETAIL_WAREHOUSE }) as SalesItem;
 const makeOpening = (asOfDate: string, quantityKg: number): FinishedGoodsOpeningStock => ({

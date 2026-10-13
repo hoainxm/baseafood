@@ -151,7 +151,7 @@ export function useAuth() {
       if (error) return { ok: false, loi: translateError(error.message) };
       const u = username.trim().toLowerCase();
       setAuditOperator({ username: u });
-      appendAuditEntries([{ action: "dang-nhap", entity: "auth", entityKey: u, summary: `Đăng nhập: ${u}` }]);
+      appendAuditEntries([{ action: "login", entity: "auth", entityKey: u, summary: `Đăng nhập: ${u}` }]);
       return { ok: true };
     },
     []
@@ -215,7 +215,7 @@ export function useAuth() {
   );
 
   const signOut = useCallback(async () => {
-    appendAuditEntries([{ action: "dang-xuat", entity: "auth", entityKey: "", summary: "Đăng xuất" }]);
+    appendAuditEntries([{ action: "logout", entity: "auth", entityKey: "", summary: "Đăng xuất" }]);
     await supabase?.auth.signOut();
     setAuditOperator(null);
   }, []);

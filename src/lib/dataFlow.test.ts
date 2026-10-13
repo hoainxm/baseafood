@@ -39,7 +39,7 @@ const makeImport = (id: string, shipmentId: string, date: string, workshop: Work
   id, shipmentId, deliveryDate: date, workshop, category: "Mực", supplierName: dl, materialTypeName: "Mực ống",
   quantityKg: kg, unitPrice: 50000, driverName: "", licensePlate: "", note: "",
 });
-const me = (id: string, date: string, workshop: Workshop, kg: number, status: WipProductionItem["status"] = "da-nhap", productId = "mh1"): WipProductionItem => ({
+const me = (id: string, date: string, workshop: Workshop, kg: number, status: WipProductionItem["status"] = "stocked", productId = "mh1"): WipProductionItem => ({
   id, productionDate: date, postingDate: date, backdateReason: "", workshop, productId, spec: "",
   quantityKg: kg, blocksCount: 0, warehouse: "", status, note: "",
 });
@@ -59,7 +59,7 @@ const makeLock = (date: string, workshop: Workshop, kg: number, leftoverKg = 0):
 });
 const lotInput = (outputId: string, kg: number | null): LotInput => ({
   id: `li-${outputId}`, outputKind: "W", outputId, inputKind: "S", inputId: "n1", inputLabel: "", material: "",
-  quantityKg: kg, method: "chon", operator: "", recordedAt: "",
+  quantityKg: kg, method: "picked", operator: "", recordedAt: "",
 });
 
 function makeFlowData(p: Partial<DataFlowInput> = {}): DataFlowInput {
@@ -90,12 +90,12 @@ const K = { tu: "2026-09-01", den: "2026-09-30" };
 const flowScenario = makeFlowData({
   shipments: [makeShipment("c1", "2026-09-02", "Đông")],
   imports: [makeImport("n1", "c1", "2026-09-02", "Đông", 1000)],
-  wips: [me("w1", "2026-09-02", "Đông", 500), me("w2", "2026-09-03", "Đông", 100, "cho-nhap")],
+  wips: [me("w1", "2026-09-02", "Đông", 500), me("w2", "2026-09-03", "Đông", 100, "pending")],
   scraps: [{ id: "pl1", periodId: "", name: "Nội tạng", quantityKg: 50, sellingPrice: 0, date: "2026-09-02", workshop: "Đông", source: "Nhập hàng" }],
   productionLocks: [makeLock("2026-09-02", "Đông", 500, 100)],
   dailyLocks: [makeLock("2026-09-02", "Đông", 1000)],
   packagings: [goi("g1", "2026-09-05", 300, 290)],
-  exportOrders: [{ id: "lx1", orderId: "d1", exportDate: "2026-09-06", status: "dong", note: "" } as ExportOrder],
+  exportOrders: [{ id: "lx1", orderId: "d1", exportDate: "2026-09-06", status: "closed", note: "" } as ExportOrder],
   exportItems: [{ id: "x1", exportId: "lx1", wipId: "w1", productId: "mh1", spec: "", quantityKg: 100, blocksCount: 0 } as ExportItem],
   salesInvoices: [makeSalesInvoice("pb1", "2026-09-07")],
   salesItems: [ban("b1", "pb1", "2026-09-07", "mh1", 50, RETAIL_WAREHOUSE), ban("b2", "pb1", "2026-09-07", "mh2", 200, FG_WAREHOUSE)],
@@ -137,7 +137,7 @@ describe("buildDataFlow", () => {
     const d = makeFlowData({
       imports: [makeImport("n2", "c2", "2026-10-01", "Cá", 100)],
       wips: [me("w9", "2026-09-20", "Cá", 300), me("w10", "2026-10-01", "Cá", 150)],
-      exportOrders: [{ id: "lx", orderId: "d", exportDate: "2026-10-02", status: "dong", note: "" } as ExportOrder],
+      exportOrders: [{ id: "lx", orderId: "d", exportDate: "2026-10-02", status: "closed", note: "" } as ExportOrder],
       exportItems: [{ id: "x", exportId: "lx", wipId: "w9", productId: "mh1", spec: "", quantityKg: 250, blocksCount: 0 } as ExportItem],
     });
     const dc = buildDataFlow(d, { tu: "2026-10-01", den: "2026-10-31" });
@@ -219,7 +219,7 @@ describe("buildDailyFlowSeries", () => {
 describe("computeYieldByProduct", () => {
   it("chỉ tính mẻ đã gắn lô có kg, bình quân gia quyền, cờ lệch ±5%", () => {
     const d = makeFlowData({
-      wips: [me("a", "2026-09-02", "Đông", 100), me("b", "2026-09-02", "Đông", 100, "da-nhap", "mh2"), me("c", "2026-09-02", "Đông", 100)],
+      wips: [me("a", "2026-09-02", "Đông", 100), me("b", "2026-09-02", "Đông", 100, "stocked", "mh2"), me("c", "2026-09-02", "Đông", 100)],
       lotInputs: [lotInput("a", 110), lotInput("b", 130), lotInput("c", null)],
     });
     const { dong, binhQuan } = computeYieldByProduct(d, K);
@@ -313,8 +313,8 @@ describe("bucketStockByAge", () => {
 
 describe("countQcByDay", () => {
   it("đếm theo ngày + xưởng, đủ ngày kể cả ngày trống", () => {
-    const r = (date: string, workshop: Workshop, result: "dat" | "tam" | "khong-dat") => ({ date, workshop, result });
-    const items = countQcByDay([r("2026-10-01", "Đông", "dat"), r("2026-10-01", "Đông", "khong-dat"), r("2026-10-01", "Cá", "dat"), r("2026-10-03", "Đông", "tam")], "Đông", "2026-10-01", "2026-10-03");
+    const r = (date: string, workshop: Workshop, result: "pass" | "conditional" | "fail") => ({ date, workshop, result });
+    const items = countQcByDay([r("2026-10-01", "Đông", "pass"), r("2026-10-01", "Đông", "fail"), r("2026-10-01", "Cá", "pass"), r("2026-10-03", "Đông", "conditional")], "Đông", "2026-10-01", "2026-10-03");
     expect(items).toEqual([
       { ngay: "2026-10-01", dat: 1, tam: 0, khongDat: 1 },
       { ngay: "2026-10-02", dat: 0, tam: 0, khongDat: 0 },

@@ -62,7 +62,7 @@ export function SessionLotsSection({
     setChoices([]);
   };
 
-  const handleCode = (text: string, method: "quet" | "go") => {
+  const handleCode = (text: string, method: "scan" | "typed") => {
     const ma = parseQrCode(text);
     if (!ma) return;
     if ("kind" in ma && ma.kind !== "S") {
@@ -133,9 +133,9 @@ export function SessionLotsSection({
           {isScanning ? <CameraOff aria-hidden /> : <Camera aria-hidden />} {isScanning ? "Tắt camera" : "Quét tem NL"}
         </Button>
         <Field label="Hoặc gõ mã lô" className="min-w-0 flex-1 sm:min-w-48">
-          <Input value={typedCode} onChange={(e) => setTypedCode(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleCode(typedCode, "go")} />
+          <Input value={typedCode} onChange={(e) => setTypedCode(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleCode(typedCode, "typed")} />
         </Field>
-        <Button type="button" variant="outline" className="w-full sm:w-auto" title="Tìm lô theo mã vừa gõ rồi thêm vào phiên." onClick={() => handleCode(typedCode, "go")}>
+        <Button type="button" variant="outline" className="w-full sm:w-auto" title="Tìm lô theo mã vừa gõ rồi thêm vào phiên." onClick={() => handleCode(typedCode, "typed")}>
           <Plus aria-hidden /> Thêm
         </Button>
       </div>
@@ -143,7 +143,7 @@ export function SessionLotsSection({
         <QrScanner
           onScan={(t) => {
             setIsScanning(false);
-            handleCode(t, "quet");
+            handleCode(t, "scan");
           }}
         />
       )}
@@ -158,7 +158,7 @@ export function SessionLotsSection({
               <span className="min-w-0">
                 <span className="font-medium">{n.nhan}</span> <span className="text-muted-foreground">{describeLot(n)}</span>
               </span>
-              <Button type="button" size="sm" title={`Thêm đúng lô ${n.nhan} này vào phiên.`} onClick={() => addLot(n, "go")}>
+              <Button type="button" size="sm" title={`Thêm đúng lô ${n.nhan} này vào phiên.`} onClick={() => addLot(n, "typed")}>
                 Chọn lô này
               </Button>
             </li>
@@ -172,7 +172,7 @@ export function SessionLotsSection({
         value=""
         onChange={(id) => {
           const n = candidates.find((u) => u.id === id) ?? (id ? buildLotNode("S", id, dl) : undefined);
-          if (n) addLot(n, "chon");
+          if (n) addLot(n, "picked");
         }}
         // Mỗi loại NL của chuyến là một lô cùng mã chuyến ⇒ nhãn ghép loại NL cho phân biệt được.
         options={candidates.map((n) => ({

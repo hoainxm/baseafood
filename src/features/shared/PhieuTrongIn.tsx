@@ -16,10 +16,10 @@ import { PhieuIn, ThIn, TdIn } from "@/design-system";
  */
 
 /** Đủ dòng kín một trang A4 ngang mà vẫn cao thoáng để viết tay. */
-const SO_DONG = 14;
+const ROW_COUNT = 14;
 
 /** Một cột của biểu mẫu trống: nhãn + canh phải (cột số) + class rộng gợi ý. */
-interface CotTrong {
+interface BlankColumn {
   nhan: string;
   phai?: boolean;
   rong?: string;
@@ -30,9 +30,9 @@ interface CotTrong {
 function BangTrong({
   cot,
   tongSpan,
-  soDong = SO_DONG,
+  soDong = ROW_COUNT,
 }: {
-  cot: CotTrong[];
+  cot: BlankColumn[];
   tongSpan: number;
   soDong?: number;
 }) {
@@ -69,7 +69,7 @@ function BangTrong({
 }
 
 /** Ô ký tên cuối phiếu — người lập ghi tay rồi ký. */
-function ChanKy({ vaiTro = "Người lập biểu" }: { vaiTro?: string }) {
+function SignatureFooter({ vaiTro = "Người lập biểu" }: { vaiTro?: string }) {
   return (
     <div className="mt-6 flex justify-end">
       <div className="w-56 text-center text-sm">
@@ -82,7 +82,7 @@ function ChanKy({ vaiTro = "Người lập biểu" }: { vaiTro?: string }) {
 }
 
 /** Dòng "NGÀY … THÁNG … NĂM …" bỏ trống cho người ghi điền tay. */
-const NGAY_TRONG = "Ngày ……… tháng ……… năm 20………";
+const BLANK_DATE = "Ngày ……… tháng ……… năm 20………";
 
 /**
  * Phiếu TRỐNG — Báo cáo tổng hợp nguyên liệu hằng ngày (bám màn /imports).
@@ -92,7 +92,7 @@ export function PhieuTrongNhapNL({ onClose }: { onClose: () => void }) {
   return (
     <PhieuIn
       tieuDe="Báo cáo tổng hợp nguyên liệu hàng ngày"
-      phuDe={NGAY_TRONG}
+      phuDe={BLANK_DATE}
       onClose={onClose}
     >
       <BangTrong
@@ -106,7 +106,7 @@ export function PhieuTrongNhapNL({ onClose }: { onClose: () => void }) {
           { nhan: "Ghi chú", rong: "w-64" },
         ]}
       />
-      <ChanKy />
+      <SignatureFooter />
     </PhieuIn>
   );
 }
@@ -119,7 +119,7 @@ export function PhieuTrongTPNgay({ onClose }: { onClose: () => void }) {
   return (
     <PhieuIn
       tieuDe="Báo cáo bán thành phẩm hàng ngày"
-      phuDe={NGAY_TRONG}
+      phuDe={BLANK_DATE}
       onClose={onClose}
     >
       <BangTrong
@@ -133,7 +133,7 @@ export function PhieuTrongTPNgay({ onClose }: { onClose: () => void }) {
           { nhan: "Ghi chú", rong: "w-56" },
         ]}
       />
-      <ChanKy />
+      <SignatureFooter />
     </PhieuIn>
   );
 }

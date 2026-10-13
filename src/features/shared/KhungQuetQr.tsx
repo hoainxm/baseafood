@@ -16,9 +16,9 @@ type Scanner = import("html5-qrcode").Html5QrcodeScanner;
 export function KhungQuetQr({ onQuet }: { onQuet: (text: string) => void }) {
   const id = `qr-${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
   // Giữ callback mới nhất mà không phải dựng lại camera mỗi lần render.
-  const goiLai = useRef(onQuet);
+  const callbackRef = useRef(onQuet);
   useEffect(() => {
-    goiLai.current = onQuet;
+    callbackRef.current = onQuet;
   });
 
   useEffect(() => {
@@ -28,7 +28,7 @@ export function KhungQuetQr({ onQuet }: { onQuet: (text: string) => void }) {
       if (daHuy) return;
       scanner = new Html5QrcodeScanner(id, { fps: 10, qrbox: 250 }, false);
       scanner.render(
-        (decoded: string) => goiLai.current(decoded.trim()),
+        (decoded: string) => callbackRef.current(decoded.trim()),
         () => {
           /* lỗi từng khung hình — bỏ qua, không spam */
         }

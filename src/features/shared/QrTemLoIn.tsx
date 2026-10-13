@@ -23,13 +23,13 @@ import { useDuLieuTruyXuat } from "./useDuLieuTruyXuat";
 const laLo = (n: NutLo) => n.kind === "S" || n.kind === "W" || n.kind === "P";
 
 /** Các dòng chữ phụ in dưới mã lô. */
-function dongTem(nut: NutLo): string[] {
+function labelLines(node: NutLo): string[] {
   return [
-    `${TEN_LOAI[nut.kind]} · ${nut.moTa}`,
-    [nut.ngay && viDate(nut.ngay), nut.xuong && `xưởng ${nut.xuong}`, nut.kg ? kg(Math.round(nut.kg * 10) / 10) : ""]
+    `${TEN_LOAI[node.kind]} · ${node.moTa}`,
+    [node.ngay && viDate(node.ngay), node.xuong && `xưởng ${node.xuong}`, node.kg ? kg(Math.round(node.kg * 10) / 10) : ""]
       .filter(Boolean)
       .join(" · "),
-    ...nut.chiTiet.filter((c) => c.nhan === "Đại lý" || c.nhan === "SSCC").map((c) => `${c.nhan}: ${c.giaTri}`),
+    ...node.chiTiet.filter((c) => c.nhan === "Đại lý" || c.nhan === "SSCC").map((c) => `${c.nhan}: ${c.giaTri}`),
   ].filter(Boolean);
 }
 
@@ -57,11 +57,11 @@ export function TemLoQr({ nut, nuts, onClose }: { nut?: NutLo; nuts?: NutLo[]; o
 
   // Sổ in tem (mig 0049): bấm In là ghi mỗi lô một dòng — biết lô nào đã có tem,
   // và nhãn in ra lúc đó (nhãn BTP/TP suy lại từ bản ghi có thể đổi về sau).
-  const [soIn, luuSoIn] = useLabelPrints();
+  const [soIn, saveLabelPrints] = useLabelPrints();
   const { nguoiDung } = useAuth();
-  const ghiSoIn = (soBan: number[]) => {
-    const moi = banGhiIn(ds, nguoiDung?.fullName || nguoiDung?.username || "", new Date().toISOString(), newId, (n) => soBan[ds.indexOf(n)] ?? 1);
-    if (moi.length) luuSoIn([...soIn, ...moi]);
+  const recordPrintCount = (copies: number[]) => {
+    const newPrints = banGhiIn(ds, nguoiDung?.fullName || nguoiDung?.username || "", new Date().toISOString(), newId, (n) => copies[ds.indexOf(n)] ?? 1);
+    if (newPrints.length) saveLabelPrints([...soIn, ...newPrints]);
   };
 
   // Mặc định mỗi block (BTP) / mỗi thùng-gói (TP) một tem; người in sửa được ở xem trước.
@@ -70,10 +70,10 @@ export function TemLoQr({ nut, nuts, onClose }: { nut?: NutLo; nuts?: NutLo[]; o
   const tems: TemIn[] = ds.map((n) => ({
     maLo: n.nhan,
     qrDataUrl: qr[`${n.kind}:${n.id}`] ?? "",
-    dong: dongTem(n),
+    dong: labelLines(n),
     soBan: soTemMacDinh(n, { wips, packagings }),
   }));
-  return <PhieuInTem onClose={onClose} tems={tems} onIn={ghiSoIn} />;
+  return <PhieuInTem onClose={onClose} tems={tems} onIn={recordPrintCount} />;
 }
 
 /**
@@ -85,8 +85,8 @@ export function TemLoQr({ nut, nuts, onClose }: { nut?: NutLo; nuts?: NutLo[]; o
  */
 export function QrTemLoIn({ chuyen, onClose }: { chuyen: ImportShipment; onClose: () => void }) {
   const { dl } = useDuLieuTruyXuat();
-  const theoLoai = dongCuaChuyen(dl, chuyen.id).map((m) => nutLo("S", m.id, dl));
-  if (theoLoai.length) return <TemLoQr nuts={theoLoai} onClose={onClose} />;
+  const byType = dongCuaChuyen(dl, chuyen.id).map((m) => nutLo("S", m.id, dl));
+  if (byType.length) return <TemLoQr nuts={byType} onClose={onClose} />;
   const tam: NutLo = {
     kind: "S",
     id: chuyen.id,

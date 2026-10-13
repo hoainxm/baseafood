@@ -17,9 +17,9 @@ import { RefreshCw } from "lucide-react";
  * Kiểm lúc mở, mỗi vài phút, và mỗi khi quay lại tab (hay gặp: mở tab cả ngày).
  * Dev không có version.json ⇒ fetch hỏng ⇒ bỏ qua, không báo nhầm.
  */
-function useKiemTraCapNhat(): boolean {
-  const [coBanMoi, setCoBanMoi] = useState(false);
-  const dangChay = useRef<string>(
+function useUpdateCheck(): boolean {
+  const [hasNewVersion, setHasNewVersion] = useState(false);
+  const runningVersion = useRef<string>(
     typeof __BUILD_ID__ === "string" ? __BUILD_ID__ : ""
   );
 
@@ -27,37 +27,37 @@ function useKiemTraCapNhat(): boolean {
     let huy = false;
     const url = `${import.meta.env.BASE_URL}version.json`;
 
-    const kiemTra = async () => {
+    const checkForUpdate = async () => {
       try {
         const res = await fetch(`${url}?t=${Date.now()}`, { cache: "no-store" });
         if (!res.ok) return;
         const data = (await res.json()) as { buildId?: string };
-        const moi = String(data?.buildId ?? "");
+        const newBuildId = String(data?.buildId ?? "");
         // Chỉ báo khi biết chắc cả hai mã và chúng khác nhau.
-        if (!huy && moi && dangChay.current && moi !== dangChay.current)
-          setCoBanMoi(true);
+        if (!huy && newBuildId && runningVersion.current && newBuildId !== runningVersion.current)
+          setHasNewVersion(true);
       } catch {
         /* mạng chập chờn / dev chưa có file → im lặng, không báo nhầm */
       }
     };
 
-    kiemTra();
-    const id = window.setInterval(kiemTra, 3 * 60 * 1000);
-    const khiQuayLai = () => {
-      if (document.visibilityState === "visible") kiemTra();
+    checkForUpdate();
+    const id = window.setInterval(checkForUpdate, 3 * 60 * 1000);
+    const onReturn = () => {
+      if (document.visibilityState === "visible") checkForUpdate();
     };
-    document.addEventListener("visibilitychange", khiQuayLai);
-    window.addEventListener("focus", kiemTra);
+    document.addEventListener("visibilitychange", onReturn);
+    window.addEventListener("focus", checkForUpdate);
 
     return () => {
       huy = true;
       window.clearInterval(id);
-      document.removeEventListener("visibilitychange", khiQuayLai);
-      window.removeEventListener("focus", kiemTra);
+      document.removeEventListener("visibilitychange", onReturn);
+      window.removeEventListener("focus", checkForUpdate);
     };
   }, []);
 
-  return coBanMoi;
+  return hasNewVersion;
 }
 
 /**
@@ -65,8 +65,8 @@ function useKiemTraCapNhat(): boolean {
  * (AppShell), ngoài khối đổi-trang nên không mất khi chuyển màn.
  */
 export function BangCapNhat() {
-  const coBanMoi = useKiemTraCapNhat();
-  if (!coBanMoi) return null;
+  const hasNewVersion = useUpdateCheck();
+  if (!hasNewVersion) return null;
 
   return (
     <div

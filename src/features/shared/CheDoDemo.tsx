@@ -135,7 +135,7 @@ function NapGoiDemoThat({ goi }: { goi: GoiDemo }) {
     monthlyStock: useMonthlyStock(),
   } satisfies Record<keyof GoiDemo, unknown>;
   const daNap = useRef(false);
-  const [daGhi, setDaGhi] = useState(false);
+  const [isWritten, setIsWritten] = useState(false);
   const xong = (Object.values(bang) as { 2: { trangThai: string } }[]).every((b) => b[2].trangThai !== "dang-tai");
 
   useEffect(() => {
@@ -144,21 +144,21 @@ function NapGoiDemoThat({ goi }: { goi: GoiDemo }) {
     datTamTatNhatKy(true);
     try {
       for (const k of Object.keys(bang) as (keyof GoiDemo)[]) {
-        const ghi = bang[k][1] as (rows: unknown[]) => void;
-        ghi(goi[k] ?? []);
+        const writer = bang[k][1] as (rows: unknown[]) => void;
+        writer(goi[k] ?? []);
       }
     } finally {
       datTamTatNhatKy(false);
     }
     xoaGoiDemo();
-    const tong = Object.values(goi).reduce((s, ds) => s + (ds as unknown[]).length, 0);
-    notify.daLuu(`Đã nạp bộ demo: ${num(tong)} dòng số trình diễn.`);
-    setDaGhi(true);
+    const total = Object.values(goi).reduce((s, ds) => s + (ds as unknown[]).length, 0);
+    notify.daLuu(`Đã nạp bộ demo: ${num(total)} dòng số trình diễn.`);
+    setIsWritten(true);
     // Chạy MỘT lần khi mọi bảng nạp xong (daNap chặn lần hai); `bang` đổi mỗi lần vẽ.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [xong]);
 
-  if (daGhi) return null;
+  if (isWritten) return null;
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-background/80" role="status">
       <DangXuLy chu="Đang nạp bộ số demo…" />
@@ -172,11 +172,11 @@ function NapGoiDemoThat({ goi }: { goi: GoiDemo }) {
  * lại về chế độ thật để quét, rồi tự vào lại) hoặc thoát.
  */
 export function KhoiCheDoDemo() {
-  return LA_DEMO ? <KhoiDangDemo /> : <KhoiSinhDemo />;
+  return LA_DEMO ? <DemoActiveSection /> : <DemoGeneratorSection />;
 }
 
-function KhoiDangDemo() {
-  const lamMoi = () => {
+function DemoActiveSection() {
+  const refresh = () => {
     datViecDemo("tao");
     datCheDo(false);
   };
@@ -193,7 +193,7 @@ function KhoiDangDemo() {
           moTa="App quay về chế độ thật một lát để quét số mới nhất, sinh lại bộ demo rồi tự vào lại. Mọi thứ đã ghi trong bộ demo hiện tại bị thay. Số thật không bị đụng."
           nhanNut="Làm mới bộ demo"
           icon={RefreshCw}
-          onConfirm={lamMoi}
+          onConfirm={refresh}
           trigger={
             <Button title="Sinh lại bộ demo từ số thật mới nhất, thay bộ đang có." variant="outline">
               <RefreshCw />
@@ -210,7 +210,7 @@ function KhoiDangDemo() {
   );
 }
 
-function KhoiSinhDemo() {
+function DemoGeneratorSection() {
   const [products, , a1] = useProducts();
   const [materialTypes, , a2] = useMaterialTypes();
   const [suppliers, , a3] = useSuppliers();
@@ -225,21 +225,21 @@ function KhoiSinhDemo() {
   const [nxtSnapshots, , a12] = useNxtSnapshots();
   const [monthlyStock, , a13] = useMonthlyStock();
   const daNap = [a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13].every((x) => x.trangThai !== "dang-tai");
-  const [anDanh, setAnDanh] = useState("an");
-  const [dangTao, setDangTao] = useState(false);
+  const [anonymize, setAnonymize] = useState("an");
+  const [isCreating, setIsCreating] = useState(false);
 
-  const nguon: NguonDemo = useMemo(
+  const source: NguonDemo = useMemo(
     () => ({ products, materialTypes, suppliers, customers, batterTypes, storageLocations, imports, wips, periods, balancingInputs, balancingOutputs, nxtSnapshots, monthlyStock }),
     [products, materialTypes, suppliers, customers, batterTypes, storageLocations, imports, wips, periods, balancingInputs, balancingOutputs, nxtSnapshots, monthlyStock],
   );
-  const thamSo = useMemo(() => quetThamSo(nguon), [nguon]);
+  const thamSo = useMemo(() => quetThamSo(source), [source]);
 
-  const taoVaVao = () => {
-    setDangTao(true);
-    const goi = sinhGoiDemo(nguon, { homNay: homNay(), anDanh: anDanh === "an", hat: Date.now() % 100_000 });
+  const createAndEnter = () => {
+    setIsCreating(true);
+    const goi = sinhGoiDemo(source, { homNay: homNay(), anDanh: anonymize === "an", hat: Date.now() % 100_000 });
     datViecDemo(null);
     if (!luuGoiDemo(goi)) {
-      setDangTao(false);
+      setIsCreating(false);
       notify.loi("Không tạo được bộ demo (bộ nhớ trình duyệt đầy?). Thử xóa bớt dữ liệu trình duyệt rồi làm lại.");
       return;
     }
@@ -247,14 +247,14 @@ function KhoiSinhDemo() {
   };
 
   // Việc chờ từ chế độ demo ("Làm mới bộ demo"): nạp xong số thật thì tự sinh và vào lại.
-  const [viecTao] = useState(() => docViecDemo() === "tao");
+  const [pendingCreate] = useState(() => docViecDemo() === "tao");
   useEffect(() => {
-    if (viecTao && daNap) taoVaVao();
+    if (pendingCreate && daNap) createAndEnter();
     // taoVaVao tải lại trang ⇒ chỉ chạy một lần.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viecTao, daNap]);
+  }, [pendingCreate, daNap]);
 
-  if (viecTao) {
+  if (pendingCreate) {
     return (
       <section className="rounded-xl border-2 border-border p-4" role="status">
         <DangXuLy chu="Đang quét số thật để làm mới bộ demo…" />
@@ -278,8 +278,8 @@ function KhoiSinhDemo() {
       <div className="flex flex-wrap items-end gap-3">
         <ChoiceGroup
           label="Tên đối tác trong bộ demo"
-          value={anDanh}
-          onChange={setAnDanh}
+          value={anonymize}
+          onChange={setAnonymize}
           options={[
             { value: "an", label: "Ẩn tên + đổi giá", moTa: "Trình bày cho người ngoài" },
             { value: "giu", label: "Giữ tên thật", moTa: "Trình bày nội bộ" },
@@ -292,9 +292,9 @@ function KhoiSinhDemo() {
             moTa="Quét số thật, sinh bộ demo 60 ngày rồi chuyển cả app sang chế độ demo. Bộ demo cũ (nếu có) bị thay. Số thật của xưởng không bị đụng."
             nhanNut="Tạo và vào demo"
             icon={FlaskConical}
-            onConfirm={taoVaVao}
+            onConfirm={createAndEnter}
             trigger={
-              <Button title="Sinh bộ số demo từ số thật đã nhập rồi chuyển sang chế độ demo." disabled={!daNap || dangTao}>
+              <Button title="Sinh bộ số demo từ số thật đã nhập rồi chuyển sang chế độ demo." disabled={!daNap || isCreating}>
                 <FlaskConical />
                 {daNap ? "Tạo bộ demo mới" : "Đang nạp số thật…"}
               </Button>

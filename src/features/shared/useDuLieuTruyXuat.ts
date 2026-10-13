@@ -29,7 +29,7 @@ export function useDuLieuTruyXuat() {
   const [imports] = useMaterialImports();
   const [wips] = useWipProductions();
   const [packagings] = usePackagings();
-  const [lotInputs, luuLotInputs] = useLotInputs();
+  const [lotInputs, saveLotInputs] = useLotInputs();
   const [exportItems] = useExportItems();
   const [exportOrders] = useExportOrders();
   const [salesOrders] = useSalesOrders();
@@ -38,8 +38,8 @@ export function useDuLieuTruyXuat() {
   const [salesItems] = useSalesItems();
   const [salesInvoices] = useSalesInvoices();
   const [domesticSales] = useDomesticSales();
-  const [lotDispatches, luuLotDispatches] = useLotDispatches();
-  const [lotWaivers, luuLotWaivers] = useLotWaivers();
+  const [lotDispatches, saveLotDispatches] = useLotDispatches();
+  const [lotWaivers, saveLotWaivers] = useLotWaivers();
   const [labelPrints] = useLabelPrints();
   const [materialTypes] = useMaterialTypes();
 
@@ -54,5 +54,5 @@ export function useDuLieuTruyXuat() {
       salesItems, salesInvoices, domesticSales, lotDispatches, lotWaivers, labelPrints, materialTypes,
     ]
   );
-  return { dl, lotInputs, luuLotInputs, lotDispatches, luuLotDispatches, lotWaivers, luuLotWaivers };
+  return { dl, lotInputs, luuLotInputs: saveLotInputs, lotDispatches, luuLotDispatches: saveLotDispatches, lotWaivers, luuLotWaivers: saveLotWaivers };
 }

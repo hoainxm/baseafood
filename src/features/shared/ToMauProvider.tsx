@@ -8,7 +8,7 @@ import { ToMauContext, type DauDong, type NguonToMau } from "@/design-system";
 import { useRowMarks } from "@/lib/catalogRepo";
 import { datDau, dauCuaBang } from "@/lib/toMau";
 
-const RONG: ReadonlyMap<string, DauDong> = new Map();
+const EMPTY_MARKS: ReadonlyMap<string, DauDong> = new Map();
 
 /**
  * Gắn MỘT lần ở ShellLayout (App.tsx). Cả app dùng chung một instance
@@ -18,12 +18,12 @@ const RONG: ReadonlyMap<string, DauDong> = new Map();
  * `nguoi` = username đang đăng nhập — ghi vào `marked_by` (ai tô).
  */
 export function ToMauProvider({ nguoi, children }: { nguoi: string; children: ReactNode }) {
-  const [marks, ghi] = useRowMarks();
+  const [marks, write] = useRowMarks();
   // Bản mới nhất ngay sau mỗi lần ghi — hai cú tô liền nhau trong cùng một nhịp
   // render không được dựng từ cùng một danh sách cũ (cú sau nuốt cú trước).
-  const moiNhat = useRef(marks);
+  const latest = useRef(marks);
   useLayoutEffect(() => {
-    moiNhat.current = marks;
+    latest.current = marks;
   }, [marks]);
 
   const theoBang = useMemo(() => {
@@ -32,17 +32,17 @@ export function ToMauProvider({ nguoi, children }: { nguoi: string; children: Re
     return ra;
   }, [marks]);
 
-  const nguon = useMemo<NguonToMau>(
+  const source = useMemo<NguonToMau>(
     () => ({
-      dauCuaBang: (maBang) => theoBang.get(maBang) ?? RONG,
-      dat: (maBang, khoaDong, dau) => {
-        const next = datDau(moiNhat.current, maBang, khoaDong, dau, nguoi);
-        moiNhat.current = next;
-        ghi(next);
+      dauCuaBang: (tableKey) => theoBang.get(tableKey) ?? EMPTY_MARKS,
+      dat: (tableKey, khoaDong, dau) => {
+        const next = datDau(latest.current, tableKey, khoaDong, dau, nguoi);
+        latest.current = next;
+        write(next);
       },
     }),
-    [theoBang, ghi, nguoi]
+    [theoBang, write, nguoi]
   );
 
-  return <ToMauContext.Provider value={nguon}>{children}</ToMauContext.Provider>;
+  return <ToMauContext.Provider value={source}>{children}</ToMauContext.Provider>;
 }

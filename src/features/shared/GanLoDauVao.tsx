@@ -37,7 +37,7 @@ import { useDuLieuTruyXuat } from "./useDuLieuTruyXuat";
 const TEN_CACH: Record<LotInput["method"] | LotDispatch["method"], string> = { quet: "quét", go: "gõ", chon: "chọn", fifo: "máy chọn" };
 
 /** Một mối nối đã gắn, hiện trong mục "Đã gắn". */
-interface MoiDaGan {
+interface LinkedInput {
   id: string;
   nhan: string;
   moTa: string;
@@ -50,7 +50,7 @@ interface MoiDaGan {
  * Lõi dùng chung: quét / gõ / chọn lô, kg tùy chọn, danh sách đã gắn (bỏ được,
  * có Hoàn tác). Bên gọi quyết định ghi vào bảng nào qua `onThem` / `onBo`.
  */
-function HopGanLo({
+function LotInputDialog({
   tieuDe,
   moTa,
   loaiVao,
@@ -69,45 +69,45 @@ function HopGanLo({
   loaiVao: LotKind;
   tenVao: string;
   dl: DuLieuTruyXuat;
-  daGan: MoiDaGan[];
+  daGan: LinkedInput[];
   ungVien: NutLo[];
   tieuDeUngVien: string;
   /** Kiểm thêm (VD đúng mặt hàng). Trả câu cảnh báo để chặn, hoặc null. */
   kiemNut?: (n: NutLo) => string | null;
-  onThem: (nut: NutLo, cach: LotInput["method"], kg: number | null) => void;
+  onThem: (node: NutLo, cach: LotInput["method"], kg: number | null) => void;
   onBo: (id: string) => void;
   onClose: () => void;
 }) {
-  const [dangQuet, setDangQuet] = useState(false);
-  const [maGo, setMaGo] = useState("");
-  const [kgNhap, setKgNhap] = useState<number | null>(null);
-  const [luaChon, setLuaChon] = useState<NutLo[]>([]); // một mã nhiều lô ⇒ cho người chọn
-  const [cauChon, setCauChon] = useState("");
+  const [isScanning, setIsScanning] = useState(false);
+  const [typedCode, setTypedCode] = useState("");
+  const [inputKg, setInputKg] = useState<number | null>(null);
+  const [choices, setChoices] = useState<NutLo[]>([]); // một mã nhiều lô ⇒ cho người chọn
+  const [pickPrompt, setPickPrompt] = useState("");
   // Sổ tồn theo lô dựng MỘT lần cho cả danh sách — tính lại từng dòng là O(n²).
-  const bangTon = useMemo(() => bangTonKhoLo(dl), [dl]);
+  const lotStockTable = useMemo(() => bangTonKhoLo(dl), [dl]);
 
-  const them = (nut: NutLo, cach: LotInput["method"]) => {
-    if (nut.kind !== loaiVao) {
-      notify.canhBao(`"${nut.nhan}" là ${TEN_LOAI[nut.kind].toLowerCase()}, không phải ${tenVao}.`);
+  const addLot = (node: NutLo, cach: LotInput["method"]) => {
+    if (node.kind !== loaiVao) {
+      notify.canhBao(`"${node.nhan}" là ${TEN_LOAI[node.kind].toLowerCase()}, không phải ${tenVao}.`);
       return;
     }
-    const chan = kiemNut?.(nut); // gồm cả "đã gắn rồi" — bên gọi biết id lô của mối nối
-    if (chan) {
-      notify.canhBao(chan);
+    const blockReason = kiemNut?.(node); // gồm cả "đã gắn rồi" — bên gọi biết id lô của mối nối
+    if (blockReason) {
+      notify.canhBao(blockReason);
       return;
     }
-    if (kgNhap != null && !(kgNhap > 0)) {
+    if (inputKg != null && !(inputKg > 0)) {
       notify.canhBao("Số kg phải là số dương, hoặc để trống nếu chưa cân.");
       return;
     }
-    onThem(nut, cach, kgNhap);
-    setMaGo("");
-    setKgNhap(null);
-    setLuaChon([]);
+    onThem(node, cach, inputKg);
+    setTypedCode("");
+    setInputKg(null);
+    setChoices([]);
   };
 
   /** Mã quét/gõ → lô. Trùng nhiều lô (tem cũ) ⇒ hiện danh sách cho chọn, KHÔNG tự chọn. */
-  const xuLyMa = (text: string, cach: "quet" | "go") => {
+  const handleCode = (text: string, cach: "quet" | "go") => {
     const ma = docMaQr(text);
     if (!ma) return;
     const kq = timLo(ma, dl);
@@ -115,19 +115,19 @@ function HopGanLo({
       notify.canhBao(`Không tìm thấy lô "${text}". Kiểm tra lại mã, hoặc chọn trong danh sách bên dưới.`);
       return;
     }
-    if (kq.length === 1) them(kq[0]!, cach);
+    if (kq.length === 1) addLot(kq[0]!, cach);
     else {
       // Mã chuyến ⇒ các loại NL của chuyến (việc thường ngày, không toast); mã cũ trùng thật ⇒ cảnh báo.
       const ld = lyDoNhieuLo(text, kq, dl);
-      setLuaChon(kq);
-      setCauChon(ld.cau);
+      setChoices(kq);
+      setPickPrompt(ld.cau);
       if (!ld.cungChuyen) notify.canhBao(`${ld.cau} bên dưới.`);
     }
   };
 
-  const dongLo = (n: NutLo, nut: ReactNode) => {
+  const lotRow = (n: NutLo, node: ReactNode) => {
     const cb = canBangLo(n.kind, n.id, dl);
-    const ton = tonKhoCuaLo(n.kind, n.id, dl, bangTon);
+    const lotStock = tonKhoCuaLo(n.kind, n.id, dl, lotStockTable);
     return (
       <li key={`${n.kind}:${n.id}`} className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-2">
         <div className="min-w-0">
@@ -136,10 +136,10 @@ function HopGanLo({
             {[n.moTa, n.ngay && viDate(n.ngay), n.chiTiet.find((c) => c.nhan === "Đại lý")?.giaTri, n.kg ? kgChu(n.kg) : ""]
               .filter(Boolean)
               .join(" · ")}
-            {ton != null ? ` · tồn kho ${kgChu(ton)}` : cb && cb.ra.length > 0 ? ` · còn ${kgChu(cb.con)}` : ""}
+            {lotStock != null ? ` · tồn kho ${kgChu(lotStock)}` : cb && cb.ra.length > 0 ? ` · còn ${kgChu(cb.con)}` : ""}
           </div>
         </div>
-        {nut}
+        {node}
       </li>
     );
   };
@@ -172,44 +172,44 @@ function HopGanLo({
 
         <section className="space-y-3">
           <h3 className="font-semibold">Thêm lô</h3>
-          <NumberField label="Số kg" hint="Để trống nếu chưa cân — bổ sung sau cũng được." unit="kg" value={kgNhap} onChange={setKgNhap} />
+          <NumberField label="Số kg" hint="Để trống nếu chưa cân — bổ sung sau cũng được." unit="kg" value={inputKg} onChange={setInputKg} />
 
           <div className="flex flex-wrap gap-2">
             <Button
               className="w-full sm:w-auto"
-              variant={dangQuet ? "outline" : "default"}
-              title={dangQuet ? "Tắt camera." : "Mở camera để quét tem QR trên thùng hàng. Quét xong là tự gắn lô."}
-              onClick={() => setDangQuet((v) => !v)}
+              variant={isScanning ? "outline" : "default"}
+              title={isScanning ? "Tắt camera." : "Mở camera để quét tem QR trên thùng hàng. Quét xong là tự gắn lô."}
+              onClick={() => setIsScanning((v) => !v)}
             >
-              {dangQuet ? <CameraOff aria-hidden /> : <Camera aria-hidden />} {dangQuet ? "Tắt camera" : "Quét tem QR"}
+              {isScanning ? <CameraOff aria-hidden /> : <Camera aria-hidden />} {isScanning ? "Tắt camera" : "Quét tem QR"}
             </Button>
           </div>
-          {dangQuet && (
+          {isScanning && (
             <KhungQuetQr
               onQuet={(t) => {
-                setDangQuet(false);
-                xuLyMa(t, "quet");
+                setIsScanning(false);
+                handleCode(t, "quet");
               }}
             />
           )}
 
           <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
             <Field label="Hoặc gõ mã lô in trên tem" className="min-w-0 flex-1">
-              <Input value={maGo} onChange={(e) => setMaGo(e.target.value)} onKeyDown={(e) => e.key === "Enter" && xuLyMa(maGo, "go")} />
+              <Input value={typedCode} onChange={(e) => setTypedCode(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleCode(typedCode, "go")} />
             </Field>
-            <Button variant="outline" className="w-full sm:w-auto" title="Tìm lô theo mã vừa gõ rồi gắn vào." onClick={() => xuLyMa(maGo, "go")}>
+            <Button variant="outline" className="w-full sm:w-auto" title="Tìm lô theo mã vừa gõ rồi gắn vào." onClick={() => handleCode(typedCode, "go")}>
               <Plus aria-hidden /> Gắn
             </Button>
           </div>
 
-          {luaChon.length > 0 && (
+          {choices.length > 0 && (
             <div className="space-y-2">
-              <p className="font-medium">{cauChon}:</p>
+              <p className="font-medium">{pickPrompt}:</p>
               <ul className="space-y-2">
-                {luaChon.map((n) =>
-                  dongLo(
+                {choices.map((n) =>
+                  lotRow(
                     n,
-                    <Button size="sm" title={`Gắn đúng lô ${n.nhan} này.`} onClick={() => them(n, "go")}>
+                    <Button size="sm" title={`Gắn đúng lô ${n.nhan} này.`} onClick={() => addLot(n, "go")}>
                       Chọn lô này
                     </Button>
                   )
@@ -226,9 +226,9 @@ function HopGanLo({
           {ungVien.length ? (
             <ul className="max-h-80 space-y-2 overflow-y-auto">
               {ungVien.map((n) =>
-                dongLo(
+                lotRow(
                   n,
-                  <Button size="sm" variant="outline" title={`Gắn ${tenVao} ${n.nhan}.`} onClick={() => them(n, "chon")}>
+                  <Button size="sm" variant="outline" title={`Gắn ${tenVao} ${n.nhan}.`} onClick={() => addLot(n, "chon")}>
                     Chọn
                   </Button>
                 )
@@ -244,7 +244,7 @@ function HopGanLo({
 }
 
 /** Họ tên người đang đăng nhập — ghi vào mối nối (KDE "Ai"). */
-function useNguoiGhi() {
+function useRecorder() {
   const { nguoiDung } = useAuth();
   return nguoiDung?.fullName || nguoiDung?.username || "";
 }
@@ -270,34 +270,34 @@ export function GanLoDauVao({
   onClose: () => void;
 }) {
   const { dl, lotInputs, luuLotInputs } = useDuLieuTruyXuat();
-  const nguoiGhi = useNguoiGhi();
-  const loaiVao: "S" | "W" = outputKind === "W" ? "S" : "W";
-  const tenVao = outputKind === "W" ? "lô nguyên liệu" : "lô bán thành phẩm";
+  const recordedBy = useRecorder();
+  const inputKind: "S" | "W" = outputKind === "W" ? "S" : "W";
+  const inputLabel = outputKind === "W" ? "lô nguyên liệu" : "lô bán thành phẩm";
 
-  const daGan = useMemo(
+  const assigned = useMemo(
     () => lotInputs.filter((l) => l.outputKind === outputKind && l.outputId === outputId),
     [lotInputs, outputKind, outputId]
   );
-  const ungVien = useMemo(
+  const candidates = useMemo(
     () =>
       (outputKind === "W" ? loNlDeChon(dl, xuong, ngay) : loBtpDeChon(dl, xuong, ngay, 120, matHangId)).filter(
-        (n) => !daGan.some((l) => l.inputId === n.id)
+        (n) => !assigned.some((l) => l.inputId === n.id)
       ),
-    [dl, outputKind, xuong, ngay, matHangId, daGan]
+    [dl, outputKind, xuong, ngay, matHangId, assigned]
   );
 
   return (
-    <HopGanLo
-      tieuDe={`Gắn ${tenVao} — ${outputNhan}`}
-      moTa={`Ghi ${outputKind === "W" ? "mẻ sản xuất này" : "phiếu đóng gói này"} đã dùng ${tenVao} nào. Quét tem, gõ mã, hoặc chọn trong danh sách. Số kg có thể để trống nếu chưa cân.`}
-      loaiVao={loaiVao}
-      tenVao={tenVao}
+    <LotInputDialog
+      tieuDe={`Gắn ${inputLabel} — ${outputNhan}`}
+      moTa={`Ghi ${outputKind === "W" ? "mẻ sản xuất này" : "phiếu đóng gói này"} đã dùng ${inputLabel} nào. Quét tem, gõ mã, hoặc chọn trong danh sách. Số kg có thể để trống nếu chưa cân.`}
+      loaiVao={inputKind}
+      tenVao={inputLabel}
       dl={dl}
-      daGan={daGan.map((l) => ({ id: l.id, nhan: l.inputLabel, moTa: l.material, kg: l.quantityKg, cach: l.method, nguoi: l.operator }))}
-      ungVien={ungVien}
-      tieuDeUngVien={`Hoặc chọn ${tenVao} — xưởng ${xuong}`}
+      daGan={assigned.map((l) => ({ id: l.id, nhan: l.inputLabel, moTa: l.material, kg: l.quantityKg, cach: l.method, nguoi: l.operator }))}
+      ungVien={candidates}
+      tieuDeUngVien={`Hoặc chọn ${inputLabel} — xưởng ${xuong}`}
       kiemNut={(n) => {
-        if (daGan.some((l) => l.inputId === n.id)) return `Lô ${n.nhan} đã gắn rồi.`;
+        if (assigned.some((l) => l.inputId === n.id)) return `Lô ${n.nhan} đã gắn rồi.`;
         if (outputKind === "P" && matHangId) {
           const w = dl.wips.find((x) => x.id === n.id);
           if (w && w.productId !== matHangId)
@@ -305,28 +305,28 @@ export function GanLoDauVao({
         }
         return null;
       }}
-      onThem={(nut, cach, kg) => {
-        const moi: LotInput = {
+      onThem={(node, cach, kg) => {
+        const created: LotInput = {
           id: crypto.randomUUID(),
           outputKind,
           outputId,
-          inputKind: loaiVao,
-          inputId: nut.id,
-          inputLabel: nut.nhan,
-          material: nut.moTa,
+          inputKind: inputKind,
+          inputId: node.id,
+          inputLabel: node.nhan,
+          material: node.moTa,
           quantityKg: kg,
           method: cach,
-          operator: nguoiGhi,
+          operator: recordedBy,
           recordedAt: new Date().toISOString(),
         };
-        luuLotInputs([...lotInputs, moi]);
-        notify.daLuu(`Đã gắn ${tenVao} ${nut.nhan}${kg != null ? ` · ${kgChu(kg)}` : ""}.`);
+        luuLotInputs([...lotInputs, created]);
+        notify.daLuu(`Đã gắn ${inputLabel} ${node.nhan}${kg != null ? ` · ${kgChu(kg)}` : ""}.`);
       }}
       onBo={(id) => {
-        const truoc = lotInputs;
+        const prevRows = lotInputs;
         const l = lotInputs.find((x) => x.id === id);
         luuLotInputs(lotInputs.filter((x) => x.id !== id));
-        notify.daXoa(`Đã bỏ lô ${l?.inputLabel ?? ""}.`, () => luuLotInputs(truoc));
+        notify.daXoa(`Đã bỏ lô ${l?.inputLabel ?? ""}.`, () => luuLotInputs(prevRows));
       }}
       onClose={onClose}
     />
@@ -359,67 +359,67 @@ export function GanLoXuat({
   onClose: () => void;
 }) {
   const { dl, lotDispatches, luuLotDispatches } = useDuLieuTruyXuat();
-  const nguoiGhi = useNguoiGhi();
-  const tenVao = loaiLo === "S" ? "lô nguyên liệu" : loaiLo === "W" ? "lô bán thành phẩm" : "lô thành phẩm";
+  const recordedBy = useRecorder();
+  const inputLabel = loaiLo === "S" ? "lô nguyên liệu" : loaiLo === "W" ? "lô bán thành phẩm" : "lô thành phẩm";
 
-  const daGan = useMemo(
+  const assigned = useMemo(
     () => lotDispatches.filter((d) => d.docKind === docKind && d.docId === docId),
     [lotDispatches, docKind, docId]
   );
-  const matHangCua = (n: NutLo) =>
+  const productOf = (n: NutLo) =>
     n.kind === "W" ? dl.wips.find((w) => w.id === n.id)?.productId : n.kind === "P" ? dl.packagings.find((p) => p.id === n.id)?.toProductId : undefined;
 
   /** Gợi ý: lô cùng mặt hàng còn tồn, lô cũ trước (FIFO). NL: như khi gắn cho mẻ SX. */
-  const ungVien = useMemo(() => {
-    const chuaGan = (n: NutLo) => !daGan.some((d) => d.lotId === n.id);
-    if (loaiLo === "S") return loNlDeChon(dl, xuong, ngay).filter(chuaGan);
-    const bangTon = bangTonKhoLo(dl); // một lượt cho mọi lô ứng viên
+  const candidates = useMemo(() => {
+    const isUnassigned = (n: NutLo) => !assigned.some((d) => d.lotId === n.id);
+    if (loaiLo === "S") return loNlDeChon(dl, xuong, ngay).filter(isUnassigned);
+    const lotStockTable = bangTonKhoLo(dl); // một lượt cho mọi lô ứng viên
     const ds =
       loaiLo === "W"
         ? dl.wips.filter((w) => w.status === "da-nhap" && (!matHangId || w.productId === matHangId)).map((w) => nutLo("W", w.id, dl))
         : dl.packagings.filter((p) => !matHangId || p.toProductId === matHangId).map((p) => nutLo("P", p.id, dl));
     return ds
-      .filter((n) => chuaGan(n) && (tonKhoCuaLo(n.kind, n.id, dl, bangTon) ?? 0) > 0)
+      .filter((n) => isUnassigned(n) && (tonKhoCuaLo(n.kind, n.id, dl, lotStockTable) ?? 0) > 0)
       .sort((a, b) => a.ngay.localeCompare(b.ngay));
-  }, [dl, loaiLo, xuong, ngay, matHangId, daGan]);
+  }, [dl, loaiLo, xuong, ngay, matHangId, assigned]);
 
   return (
-    <HopGanLo
-      tieuDe={`Gắn ${tenVao} — ${docNhan}`}
+    <LotInputDialog
+      tieuDe={`Gắn ${inputLabel} — ${docNhan}`}
       moTa="Ghi hàng này lấy từ lô nào để truy xuất tới được khách. Quét tem trên thùng, gõ mã, hoặc chọn lô còn tồn. Số kg có thể để trống nếu chưa cân."
       loaiVao={loaiLo}
-      tenVao={tenVao}
+      tenVao={inputLabel}
       dl={dl}
-      daGan={daGan.map((d) => ({ id: d.id, nhan: d.lotLabel, moTa: "", kg: d.quantityKg, cach: d.method, nguoi: d.operator }))}
-      ungVien={ungVien}
+      daGan={assigned.map((d) => ({ id: d.id, nhan: d.lotLabel, moTa: "", kg: d.quantityKg, cach: d.method, nguoi: d.operator }))}
+      ungVien={candidates}
       tieuDeUngVien={loaiLo === "S" ? `Hoặc chọn lô NL — xưởng ${xuong}` : "Hoặc chọn lô còn tồn — cũ trước"}
       kiemNut={(n) => {
-        if (daGan.some((d) => d.lotId === n.id)) return `Lô ${n.nhan} đã gắn rồi.`;
-        const mh = matHangCua(n);
+        if (assigned.some((d) => d.lotId === n.id)) return `Lô ${n.nhan} đã gắn rồi.`;
+        const mh = productOf(n);
         if (matHangId && mh && mh !== matHangId) return `Lô ${n.nhan} là "${n.moTa}", khác mặt hàng của dòng bán.`;
         return null;
       }}
-      onThem={(nut, cach, kg) => {
-        const moi: LotDispatch = {
+      onThem={(node, cach, kg) => {
+        const created: LotDispatch = {
           id: crypto.randomUUID(),
           lotKind: loaiLo,
-          lotId: nut.id,
-          lotLabel: nut.nhan,
+          lotId: node.id,
+          lotLabel: node.nhan,
           docKind,
           docId,
           quantityKg: kg,
           method: cach,
-          operator: nguoiGhi,
+          operator: recordedBy,
           recordedAt: new Date().toISOString(),
         };
-        luuLotDispatches([...lotDispatches, moi]);
-        notify.daLuu(`Đã gắn ${tenVao} ${nut.nhan}${kg != null ? ` · ${kgChu(kg)}` : ""}.`);
+        luuLotDispatches([...lotDispatches, created]);
+        notify.daLuu(`Đã gắn ${inputLabel} ${node.nhan}${kg != null ? ` · ${kgChu(kg)}` : ""}.`);
       }}
       onBo={(id) => {
-        const truoc = lotDispatches;
+        const prevRows = lotDispatches;
         const d = lotDispatches.find((x) => x.id === id);
         luuLotDispatches(lotDispatches.filter((x) => x.id !== id));
-        notify.daXoa(`Đã bỏ lô ${d?.lotLabel ?? ""}.`, () => luuLotDispatches(truoc));
+        notify.daXoa(`Đã bỏ lô ${d?.lotLabel ?? ""}.`, () => luuLotDispatches(prevRows));
       }}
       onClose={onClose}
     />

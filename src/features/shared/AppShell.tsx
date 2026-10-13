@@ -191,7 +191,7 @@ export const CAY_NAV: NhomCay[] = [
 ];
 
 /** Một mục con đã phân giải để hiển thị (đã lọc quyền). */
-interface MucCon {
+interface NavChild {
   key: string; // định danh so khớp active
   target: string; // path để điều hướng (id hoặc "catalog?tab=…")
   label: string;
@@ -200,10 +200,10 @@ interface MucCon {
   demo?: boolean;
   laDanhMuc: boolean; // deep-link danh mục (style phụ + ẩn khi thu gọn)
 }
-interface NhomHienThi {
+interface DisplayGroup {
   ten: string;
   icon: LucideIcon;
-  muc: MucCon[];
+  muc: NavChild[];
 }
 
 /**
@@ -212,18 +212,18 @@ interface NhomHienThi {
  * - deep-link: giữ khi `items` có `gateId` (VD "catalog").
  * Mục trong `items` không nằm trong cây rơi vào nhóm "Khác" để không mất.
  */
-function gomCay(items: MucNavShell[]): NhomHienThi[] {
+function groupTree(items: MucNavShell[]): DisplayGroup[] {
   const con = new Map(items.map((i) => [i.id, i]));
-  const daDung = new Set<string>();
-  const nhom: NhomHienThi[] = [];
+  const used = new Set<string>();
+  const nhom: DisplayGroup[] = [];
 
   for (const g of CAY_NAV) {
-    const muc: MucCon[] = [];
+    const childItems: NavChild[] = [];
     for (const c of g.con) {
       if (c.ref) {
         const m = con.get(c.ref);
         if (!m) continue;
-        muc.push({
+        childItems.push({
           key: m.id === "catalog" ? "catalog" : m.id,
           target: m.id,
           label: m.label,
@@ -232,9 +232,9 @@ function gomCay(items: MucNavShell[]): NhomHienThi[] {
           demo: m.demo,
           laDanhMuc: false,
         });
-        daDung.add(c.ref);
+        used.add(c.ref);
       } else if (c.to && c.gateId && con.has(c.gateId)) {
-        muc.push({
+        childItems.push({
           key: c.to,
           target: c.to,
           label: c.label ?? "",
@@ -247,17 +247,17 @@ function gomCay(items: MucNavShell[]): NhomHienThi[] {
     // Bỏ deep-link danh mục MỒ CÔI: nếu module không có MÀN thật nào người dùng
     // thấy (vai trò bộ phận), đừng hiện nhánh chỉ có shortcut danh mục — danh mục
     // đầy đủ vẫn vào được ở nhóm Hệ thống. (Admin có đủ màn nên không đụng.)
-    const coMan = muc.some((m) => !m.laDanhMuc);
-    const mucGiu = coMan ? muc : [];
-    if (mucGiu.length) nhom.push({ ten: g.ten, icon: g.icon, muc: mucGiu });
+    const coMan = childItems.some((m) => !m.laDanhMuc);
+    const keptItems = coMan ? childItems : [];
+    if (keptItems.length) nhom.push({ ten: g.ten, icon: g.icon, muc: keptItems });
   }
 
-  const conLai = items.filter((i) => !daDung.has(i.id));
-  if (conLai.length) {
+  const remaining = items.filter((i) => !used.has(i.id));
+  if (remaining.length) {
     nhom.push({
       ten: "Khác",
       icon: Library,
-      muc: conLai.map((m) => ({
+      muc: remaining.map((m) => ({
         key: m.id,
         target: m.id,
         label: m.label,
@@ -271,10 +271,10 @@ function gomCay(items: MucNavShell[]): NhomHienThi[] {
   return nhom;
 }
 
-const CN_NUT_ICON =
+const ICON_BUTTON_CLASS =
   "nhan-an inline-flex size-tap shrink-0 items-center justify-center rounded-lg border border-input text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
 
-function HeaderNut({
+function HeaderButton({
   label,
   icon: Icon,
   onClick,
@@ -291,7 +291,7 @@ function HeaderNut({
       aria-label={label}
       title={label}
       onClick={onClick}
-      className={cn(CN_NUT_ICON, className)}
+      className={cn(ICON_BUTTON_CLASS, className)}
     >
       <Icon className="size-icon" aria-hidden />
     </button>
@@ -299,13 +299,13 @@ function HeaderNut({
 }
 
 /** Một mục lá trong cây nav. */
-function MucNut({
+function NavItemButton({
   m,
   chon,
   thuGon,
   onSelect,
 }: {
-  m: MucCon;
+  m: NavChild;
   chon: boolean;
   thuGon: boolean;
   onSelect: (target: string) => void;
@@ -345,7 +345,7 @@ function MucNut({
  * Cây nav dọc gập/mở theo nhóm module. `thuGon` (chỉ sidebar desktop) = icon-only:
  * bỏ nhãn + bỏ deep-link danh mục (còn nút Danh mục đầy đủ), bỏ qua trạng thái gập.
  */
-function CayNav({
+function NavTree({
   nhom,
   activeKey,
   onSelect,
@@ -353,7 +353,7 @@ function CayNav({
   moNhom,
   onToggle,
 }: {
-  nhom: NhomHienThi[];
+  nhom: DisplayGroup[];
   activeKey: string;
   onSelect: (target: string) => void;
   thuGon?: boolean;
@@ -364,14 +364,14 @@ function CayNav({
     <nav className="scroll-nice flex-1 overflow-y-auto p-3">
       {nhom.map((g, i) => {
         if (thuGon) {
-          const muc = g.muc.filter((m) => !m.laDanhMuc);
-          if (!muc.length) return null;
+          const childItems = g.muc.filter((m) => !m.laDanhMuc);
+          if (!childItems.length) return null;
           return (
             <div key={g.ten} className={cn(i > 0 && "mt-4")}>
               {i > 0 && <div className="mx-2 mb-3 border-t-2 border-border" />}
               <div className="space-y-1.5">
-                {muc.map((m) => (
-                  <MucNut
+                {childItems.map((m) => (
+                  <NavItemButton
                     key={m.key}
                     m={m}
                     chon={activeKey === m.key}
@@ -387,7 +387,7 @@ function CayNav({
         if (g.muc.length === 1) {
           return (
             <div key={g.ten} className={cn(i > 0 && "mt-3")}>
-              <MucNut
+              <NavItemButton
                 m={g.muc[0]}
                 chon={activeKey === g.muc[0].key}
                 thuGon={false}
@@ -429,7 +429,7 @@ function CayNav({
               // hien-len: mở nhóm thì danh sách con nhích lên hiện vào.
               <div className="hien-len mt-1 ml-5 space-y-1 border-l-2 border-border pl-2">
                 {g.muc.map((m) => (
-                  <MucNut
+                  <NavItemButton
                     key={m.key}
                     m={m}
                     chon={activeKey === m.key}
@@ -446,7 +446,7 @@ function CayNav({
   );
 }
 
-function VietTat(ten: string): string {
+function Initials(ten: string): string {
   return (
     String(ten || "?")
       .trim()
@@ -510,19 +510,19 @@ export default function AppShell({
   // Thanh bên thu về dải icon: TỰ ĐỘNG ở màn hẹp (iPhone ngang, iPad dọc) để
   // nhường chỗ cho tiêu đề + bảng; người dùng bấm nút thu/mở thì theo ý họ —
   // nhưng chỉ trong cùng một cỡ màn: xoay máy sang cỡ khác là về lại mặc định.
-  const thanhBenHep = useKhopMedia(MEDIA_THANH_BEN_HEP);
-  const [thuGonChon, setThuGonChon] = useState<{ hep: boolean; thuGon: boolean } | null>(null);
+  const isNarrowSidebar = useKhopMedia(MEDIA_THANH_BEN_HEP);
+  const [collapsePick, setCollapsePick] = useState<{ hep: boolean; thuGon: boolean } | null>(null);
   const thuGon =
-    thuGonChon && thuGonChon.hep === thanhBenHep ? thuGonChon.thuGon : thanhBenHep;
+    collapsePick && collapsePick.hep === isNarrowSidebar ? collapsePick.thuGon : isNarrowSidebar;
   const [moNav, setMoNav] = useState(false);
-  const nhom = gomCay(items);
+  const nhom = groupTree(items);
 
   // Deep-link danh mục tô sáng theo tab; các màn khác so theo id path.
   const activeKey =
     active === "catalog" ? (activeTab ? `catalog?tab=${activeTab}` : "catalog") : active;
 
   // Trạng thái gập/mở từng nhóm (mặc định mở), nhớ theo máy.
-  const [moNhom, setMoNhom] = useState<Record<string, boolean>>(() => {
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
     try {
       return JSON.parse(localStorage.getItem(KEY_NAV_NHOM) || "{}");
     } catch {
@@ -530,7 +530,7 @@ export default function AppShell({
     }
   });
   const toggleNhom = (ten: string) =>
-    setMoNhom((m) => {
+    setOpenGroups((m) => {
       const next = { ...m, [ten]: m[ten] === false };
       try {
         localStorage.setItem(KEY_NAV_NHOM, JSON.stringify(next));
@@ -550,7 +550,7 @@ export default function AppShell({
     return () => window.removeEventListener("keydown", onKey);
   }, [moNav]);
 
-  const chon = (id: string) => {
+  const select = (id: string) => {
     onSelect(id);
     setMoNav(false);
   };
@@ -577,12 +577,12 @@ export default function AppShell({
         >
           <Logo cao="h-9" hienChu={!thuGon} phuDe={thuGon ? undefined : "Xí nghiệp BSF1"} />
         </div>
-        <CayNav
+        <NavTree
           nhom={nhom}
           activeKey={activeKey}
           onSelect={onSelect}
           thuGon={thuGon}
-          moNhom={moNhom}
+          moNhom={openGroups}
           onToggle={toggleNhom}
         />
       </aside>
@@ -604,14 +604,14 @@ export default function AppShell({
           >
             <div className="flex h-header shrink-0 items-center justify-between gap-2 border-b border-border px-4">
               <Logo cao="h-9" phuDe="Xí nghiệp BSF1" />
-              <HeaderNut label="Đóng menu" icon={X} onClick={() => setMoNav(false)} />
+              <HeaderButton label="Đóng menu" icon={X} onClick={() => setMoNav(false)} />
             </div>
 
-            <CayNav
+            <NavTree
               nhom={nhom}
               activeKey={activeKey}
-              onSelect={chon}
-              moNhom={moNhom}
+              onSelect={select}
+              moNhom={openGroups}
               onToggle={toggleNhom}
             />
 
@@ -624,7 +624,7 @@ export default function AppShell({
                   aria-hidden
                   className="flex size-tap shrink-0 items-center justify-center rounded-full bg-accent text-sm font-bold text-accent-foreground"
                 >
-                  {VietTat(nguoiDung)}
+                  {Initials(nguoiDung)}
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold text-foreground">
@@ -695,16 +695,16 @@ export default function AppShell({
         <header className="sticky top-0 z-40 flex h-header shrink-0 items-center gap-2 border-b border-border bg-card px-4 md:gap-3 md:px-6">
           {/* Trái — ĐƯỢC ƯU TIÊN ngân sách ngang (flex-1, không shrink-0) */}
           <div className="flex min-w-0 flex-1 items-center gap-2 md:gap-3">
-            <HeaderNut
+            <HeaderButton
               label="Mở menu"
               icon={Menu}
               onClick={() => setMoNav(true)}
               className="md:hidden"
             />
-            <HeaderNut
+            <HeaderButton
               label={thuGon ? "Mở thanh bên" : "Thu thanh bên"}
               icon={thuGon ? PanelLeftOpen : PanelLeftClose}
-              onClick={() => setThuGonChon({ hep: thanhBenHep, thuGon: !thuGon })}
+              onClick={() => setCollapsePick({ hep: isNarrowSidebar, thuGon: !thuGon })}
               className="hidden md:inline-flex"
             />
             <div className="min-w-0">
@@ -735,7 +735,7 @@ export default function AppShell({
 
             {typeof soThongBao === "number" && (
               <span className="relative hidden md:inline-flex">
-                <HeaderNut
+                <HeaderButton
                   label={`Thông báo (${soThongBao} chưa đọc)`}
                   icon={Bell}
                   onClick={onThongBao}
@@ -766,7 +766,7 @@ export default function AppShell({
                 aria-hidden
                 className="flex size-tap shrink-0 items-center justify-center rounded-full bg-accent text-sm font-bold text-accent-foreground"
               >
-                {VietTat(nguoiDung)}
+                {Initials(nguoiDung)}
               </span>
               <div className="hidden min-w-0 text-right xl:block">
                 <p className="truncate text-sm font-semibold text-foreground">
@@ -788,7 +788,7 @@ export default function AppShell({
                       type="button"
                       aria-label="Đăng xuất"
                       title="Đăng xuất"
-                      className={cn(CN_NUT_ICON, "hover:text-destructive")}
+                      className={cn(ICON_BUTTON_CLASS, "hover:text-destructive")}
                     >
                       <LogOut className="size-icon" aria-hidden />
                     </button>

@@ -95,7 +95,7 @@ export function BangDongSX({
     .map((v) => ({ value: v, label: v }));
 
   // Mọi mặt hàng (gõ tên để tìm) — không giới hạn theo loài.
-  const optMatHangTatCa: MucChon[] = matHang.map((m) => ({
+  const allProductOptions: MucChon[] = matHang.map((m) => ({
     value: m.id,
     label: m.code ? `${m.code} · ${m.name}` : m.name,
     phu: [m.code, m.processingType, m.category].filter(Boolean).join(" · ") || undefined,
@@ -167,12 +167,12 @@ export function BangDongSX({
                   {rows.map((d) => {
                     // Mũi tên tách hiện ở MỌI dòng; tách "tính" khi đã nhập
                     // râu/bao tử. Mã đánh dấu "Có tách" chỉ để tự mở sẵn.
-                    const tach = laTach(d);
+                    const isSplit = laTach(d);
                     const p = d.productId
                       ? matHang.find((m) => m.id === d.productId)
                       : undefined;
                     // Khối bột: mã tẩm bột, nhóm chế biến có "bột", hoặc dòng đã nhập bột.
-                    const hienBot =
+                    const showBatter =
                       Boolean(d.productId) &&
                       (laMatHangTamBot(p) ||
                         /bột/i.test(d.processingType) ||
@@ -213,7 +213,7 @@ export function BangDongSX({
                                   blockSpecKg: quyCachBlock(p) ?? d.blockSpecKg,
                                 });
                               }}
-                              options={optMatHangTatCa}
+                              options={allProductOptions}
                               onCreate={(ten) => onTaoMatHang(ten, info.pt)}
                               emptyText="Chưa có mặt hàng — gõ tên rồi Thêm mới."
                               onSuaMuc={onSuaMatHang}
@@ -235,7 +235,7 @@ export function BangDongSX({
                             </div>
                           </td>
                           <td className={td}>
-                            {tach ? (
+                            {isSplit ? (
                               <div
                                 className="tnum flex h-10 items-center rounded-md bg-muted px-3 font-semibold"
                                 title="Tổng = râu + bao tử"
@@ -272,7 +272,7 @@ export function BangDongSX({
                                   // Có quy cách & chưa tách → tự tính kg = block × quy cách.
                                   onSua(
                                     d.key,
-                                    s > 0 && !tach
+                                    s > 0 && !isSplit
                                       ? { blocksCount: b, quantityKg: b * s }
                                       : { blocksCount: b }
                                   );
@@ -294,7 +294,7 @@ export function BangDongSX({
                                   const b = d.blocksCount || 0;
                                   onSua(
                                     d.key,
-                                    b > 0 && s > 0 && !tach
+                                    b > 0 && s > 0 && !isSplit
                                       ? { blockSpecKg: s, quantityKg: b * s }
                                       : { blockSpecKg: s }
                                   );
@@ -359,7 +359,7 @@ export function BangDongSX({
                           </tr>
                         )}
 
-                        {hienBot && (
+                        {showBatter && (
                           <tr className="bg-accent/30">
                             <td
                               className="border-b border-border px-2 pt-2 pb-3"

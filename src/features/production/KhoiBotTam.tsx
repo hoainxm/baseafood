@@ -35,10 +35,10 @@ export function KhoiBotTam({
   /** Ô số nhảy ↑/↓ theo cột trong bảng ghi (khung `[data-luoi-phim]`). */
   dieuHuongCot?: boolean;
 }) {
-  const hien = botHienTrenDong(diKem, botKg);
-  const tong = tongBot(botKg);
-  const tyLe = tyLeBot(tong, kgThanhPham);
-  const soLoaiCoSo = Object.keys(lamSachBot(botKg)).length;
+  const visibleBatters = botHienTrenDong(diKem, botKg);
+  const total = tongBot(botKg);
+  const tyLe = tyLeBot(total, kgThanhPham);
+  const batterTypeCount = Object.keys(lamSachBot(botKg)).length;
 
   const bo = (ten: string) => {
     const next = { ...botKg };
@@ -53,7 +53,7 @@ export function KhoiBotTam({
         gia — <b>không</b> cộng vào số lượng thành phẩm.
       </p>
 
-      {hien.length === 0 && (
+      {visibleBatters.length === 0 && (
         <p className="text-sm text-muted-foreground">
           Mặt hàng này chưa gắn bột đi kèm. Chọn loại bột bên dưới — lưu xong, lần
           sau chọn mặt hàng này sẽ tự hiện sẵn các loại đã dùng.
@@ -61,8 +61,8 @@ export function KhoiBotTam({
       )}
 
       <div className="flex flex-wrap items-end gap-4">
-        {hien.map((ten) => {
-          const ngoaiDiKem = !diKem.includes(ten);
+        {visibleBatters.map((ten) => {
+          const isNotBundled = !diKem.includes(ten);
           return (
             <div key={ten} className="flex min-w-0 flex-[1_1_9rem] items-end gap-1 sm:max-w-[13rem]">
               <NumberField
@@ -74,7 +74,7 @@ export function KhoiBotTam({
                 value={botKg[ten] || null}
                 onChange={(v) => onDoi({ ...botKg, [ten]: v ?? 0 })}
               />
-              {ngoaiDiKem && (
+              {isNotBundled && (
                 <Button
                   type="button"
                   variant="ghost"
@@ -96,7 +96,7 @@ export function KhoiBotTam({
             anNhanBatBuoc
             value=""
             onChange={(ten) => ten && onDoi({ ...botKg, [ten]: botKg[ten] ?? 0 })}
-            options={optBot.filter((o) => !hien.includes(o.value))}
+            options={optBot.filter((o) => !visibleBatters.includes(o.value))}
             onCreate={onTaoBot}
             onSuaMuc={onSuaBot}
             nhanSua="Sửa thông tin loại bột này — lưu thẳng vào Danh mục."
@@ -106,10 +106,10 @@ export function KhoiBotTam({
         </div>
       </div>
 
-      {soLoaiCoSo > 0 && (
+      {batterTypeCount > 0 && (
         <p className="text-base text-muted-foreground">
           Tổng bột ={" "}
-          <span className="tnum font-semibold text-foreground">{num(tong)}</span> kg
+          <span className="tnum font-semibold text-foreground">{num(total)}</span> kg
           {tyLe != null && (
             <>
               {" "}

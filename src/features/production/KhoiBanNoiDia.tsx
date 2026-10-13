@@ -11,7 +11,7 @@ import { kg, num } from "@/lib/format";
 import { Plus, Store, X } from "lucide-react";
 import { banNoiDiaDayDu, type DongBanNoiDia } from "./wipHelpers";
 
-interface ODanhMuc {
+interface CatalogCell {
   options: MucChon[];
   onCreate: (ten: string) => string;
   onSuaMuc: (value: string) => void;
@@ -32,13 +32,13 @@ export function KhoiBanNoiDia({
   onBo: (key: string) => void;
   onThem: () => void;
   /** Danh mục loại NL — value = TÊN. */
-  loaiNL: ODanhMuc;
+  loaiNL: CatalogCell;
   /** Danh mục khách hàng — value = TÊN. */
-  khach: ODanhMuc;
+  khach: CatalogCell;
 }) {
-  const hopLe = dong.filter(banNoiDiaDayDu);
-  const tongKg = hopLe.reduce((s, d) => s + d.quantityKg, 0);
-  const tongTien = hopLe.reduce((s, d) => s + d.quantityKg * (d.unitPrice ?? 0), 0);
+  const validItems = dong.filter(banNoiDiaDayDu);
+  const totalKg = validItems.reduce((s, d) => s + d.quantityKg, 0);
+  const totalAmount = validItems.reduce((s, d) => s + d.quantityKg * (d.unitPrice ?? 0), 0);
 
   return (
     <div className="space-y-3 rounded-xl border-2 border-border p-4">
@@ -134,13 +134,13 @@ export function KhoiBanNoiDia({
         </div>
       ))}
 
-      {hopLe.length > 0 && (
+      {validItems.length > 0 && (
         <p className="text-right text-base text-muted-foreground">
           Bán nội địa phiên này:{" "}
-          <span className="tnum font-semibold text-foreground">{kg(tongKg)}</span>
-          {tongTien > 0 && (
+          <span className="tnum font-semibold text-foreground">{kg(totalKg)}</span>
+          {totalAmount > 0 && (
             <>
-              {" "}· <span className="tnum">{num(tongTien)}</span> đ
+              {" "}· <span className="tnum">{num(totalAmount)}</span> đ
             </>
           )}
         </p>

@@ -35,19 +35,19 @@ export function KhoiLoPhien({
   loPhien: LoPhien[];
   onDoi: (ds: LoPhien[]) => void;
 }) {
-  const [dangQuet, setDangQuet] = useState(false);
-  const [maGo, setMaGo] = useState("");
-  const [luaChon, setLuaChon] = useState<NutLo[]>([]);
-  const [cauChon, setCauChon] = useState("");
+  const [isScanning, setIsScanning] = useState(false);
+  const [typedCode, setTypedCode] = useState("");
+  const [choices, setChoices] = useState<NutLo[]>([]);
+  const [pickPrompt, setPickPrompt] = useState("");
 
-  const ungVien = useMemo(
+  const candidates = useMemo(
     () => loNlDeChon(dl, xuong, ngay).filter((n) => !loPhien.some((l) => l.nut.id === n.id)),
     [dl, xuong, ngay, loPhien]
   );
-  const moTaLo = (n: NutLo) =>
+  const describeLot = (n: NutLo) =>
     [n.moTa, n.ngay && viDate(n.ngay), n.chiTiet.find((c) => c.nhan === "Đại lý")?.giaTri, n.kg ? kg(n.kg) : ""].filter(Boolean).join(" · ");
 
-  const them = (n: NutLo, cach: LotInput["method"]) => {
+  const addLot = (n: NutLo, cach: LotInput["method"]) => {
     if (n.kind !== "S") {
       notify.canhBao(`"${n.nhan}" là ${TEN_LOAI[n.kind].toLowerCase()}, không phải lô nguyên liệu.`);
       return;
@@ -58,11 +58,11 @@ export function KhoiLoPhien({
     }
     // Khai lô cho phiên = nháp chưa lưu ⇒ không toast (luật 13); lưu phiên mới ghi.
     onDoi([...loPhien, { nut: n, cach }]);
-    setMaGo("");
-    setLuaChon([]);
+    setTypedCode("");
+    setChoices([]);
   };
 
-  const xuLyMa = (text: string, cach: "quet" | "go") => {
+  const handleCode = (text: string, cach: "quet" | "go") => {
     const ma = docMaQr(text);
     if (!ma) return;
     if ("kind" in ma && ma.kind !== "S") {
@@ -74,13 +74,13 @@ export function KhoiLoPhien({
       notify.canhBao(`Không tìm thấy lô nguyên liệu "${text}". Kiểm tra lại mã, hoặc chọn trong danh sách.`);
       return;
     }
-    if (kq.length === 1) them(kq[0]!, cach);
+    if (kq.length === 1) addLot(kq[0]!, cach);
     else {
       // Gõ mã chuyến ⇒ ra các loại NL của chuyến: việc thường ngày, chọn ở danh sách dưới,
       // không cần toast. Chỉ mã cũ trùng thật mới cảnh báo.
       const ld = lyDoNhieuLo(text, kq, dl);
-      setLuaChon(kq);
-      setCauChon(ld.cau);
+      setChoices(kq);
+      setPickPrompt(ld.cau);
       if (!ld.cungChuyen) notify.canhBao(`${ld.cau} bên dưới.`);
     }
   };
@@ -104,7 +104,7 @@ export function KhoiLoPhien({
             <li key={l.nut.id} className="flex max-w-full items-center gap-2 rounded-md border-2 border-primary/40 bg-accent/40 py-1 pl-3 pr-1">
               <span className="min-w-0">
                 <span className="tnum font-semibold">{l.nut.nhan}</span>{" "}
-                <span className="text-muted-foreground">{moTaLo(l.nut)}</span>
+                <span className="text-muted-foreground">{describeLot(l.nut)}</span>
               </span>
               <Button
                 type="button"
@@ -126,39 +126,39 @@ export function KhoiLoPhien({
         <Button
           type="button"
           className="w-full sm:w-auto"
-          variant={dangQuet ? "outline" : "default"}
-          title={dangQuet ? "Tắt camera." : "Mở camera quét tem QR trên sọt / thùng nguyên liệu."}
-          onClick={() => setDangQuet((v) => !v)}
+          variant={isScanning ? "outline" : "default"}
+          title={isScanning ? "Tắt camera." : "Mở camera quét tem QR trên sọt / thùng nguyên liệu."}
+          onClick={() => setIsScanning((v) => !v)}
         >
-          {dangQuet ? <CameraOff aria-hidden /> : <Camera aria-hidden />} {dangQuet ? "Tắt camera" : "Quét tem NL"}
+          {isScanning ? <CameraOff aria-hidden /> : <Camera aria-hidden />} {isScanning ? "Tắt camera" : "Quét tem NL"}
         </Button>
         <Field label="Hoặc gõ mã lô" className="min-w-0 flex-1 sm:min-w-48">
-          <Input value={maGo} onChange={(e) => setMaGo(e.target.value)} onKeyDown={(e) => e.key === "Enter" && xuLyMa(maGo, "go")} />
+          <Input value={typedCode} onChange={(e) => setTypedCode(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleCode(typedCode, "go")} />
         </Field>
-        <Button type="button" variant="outline" className="w-full sm:w-auto" title="Tìm lô theo mã vừa gõ rồi thêm vào phiên." onClick={() => xuLyMa(maGo, "go")}>
+        <Button type="button" variant="outline" className="w-full sm:w-auto" title="Tìm lô theo mã vừa gõ rồi thêm vào phiên." onClick={() => handleCode(typedCode, "go")}>
           <Plus aria-hidden /> Thêm
         </Button>
       </div>
-      {dangQuet && (
+      {isScanning && (
         <KhungQuetQr
           onQuet={(t) => {
-            setDangQuet(false);
-            xuLyMa(t, "quet");
+            setIsScanning(false);
+            handleCode(t, "quet");
           }}
         />
       )}
 
-      {luaChon.length > 0 && (
-        <p className="font-medium">{cauChon}:</p>
+      {choices.length > 0 && (
+        <p className="font-medium">{pickPrompt}:</p>
       )}
-      {luaChon.length > 0 && (
+      {choices.length > 0 && (
         <ul className="space-y-1">
-          {luaChon.map((n) => (
+          {choices.map((n) => (
             <li key={n.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-2">
               <span className="min-w-0">
-                <span className="font-medium">{n.nhan}</span> <span className="text-muted-foreground">{moTaLo(n)}</span>
+                <span className="font-medium">{n.nhan}</span> <span className="text-muted-foreground">{describeLot(n)}</span>
               </span>
-              <Button type="button" size="sm" title={`Thêm đúng lô ${n.nhan} này vào phiên.`} onClick={() => them(n, "go")}>
+              <Button type="button" size="sm" title={`Thêm đúng lô ${n.nhan} này vào phiên.`} onClick={() => addLot(n, "go")}>
                 Chọn lô này
               </Button>
             </li>
@@ -171,16 +171,16 @@ export function KhoiLoPhien({
         hint={`Mỗi loại NL của chuyến là một lô. Lô về gần đây của xưởng ${xuong} (mới trước), sau đó lô cũ còn dở — NL cấp đông đem xả.`}
         value=""
         onChange={(id) => {
-          const n = ungVien.find((u) => u.id === id) ?? (id ? nutLo("S", id, dl) : undefined);
-          if (n) them(n, "chon");
+          const n = candidates.find((u) => u.id === id) ?? (id ? nutLo("S", id, dl) : undefined);
+          if (n) addLot(n, "chon");
         }}
         // Mỗi loại NL của chuyến là một lô cùng mã chuyến ⇒ nhãn ghép loại NL cho phân biệt được.
-        options={ungVien.map((n) => ({
+        options={candidates.map((n) => ({
           value: n.id,
           label: `${n.nhan} · ${n.moTa}`,
           phu: [n.ngay && viDate(n.ngay), n.chiTiet.find((c) => c.nhan === "Đại lý")?.giaTri, n.kg ? kg(n.kg) : ""].filter(Boolean).join(" · ") || undefined,
         }))}
-        placeholder={ungVien.length ? "— Chọn lô —" : "Không có lô gợi ý"}
+        placeholder={candidates.length ? "— Chọn lô —" : "Không có lô gợi ý"}
         emptyText="Không thấy lô này — quét tem hoặc gõ mã lô ở trên."
       />
 

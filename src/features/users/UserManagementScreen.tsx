@@ -95,15 +95,15 @@ function sapTheoCap(roles: Role[]): Role[] {
  * Chọn NHIỀU vai trò: vai trò đã chọn hiện thành CHIP có nút ✕ để bỏ; thêm mới
  * qua DROPDOWN tìm-kiếm (gom theo phòng ban) — hợp khi danh sách vai trò dài dần.
  */
-function ChonVaiTro({
+function RolePicker({
   chon,
   onDoi,
 }: {
   chon: Role[];
   onDoi: (v: Role[]) => void;
 }) {
-  const conLai = ROLES.filter((r) => !chon.includes(r.value));
-  const options: MucChon[] = conLai.map((r) => ({
+  const remaining = ROLES.filter((r) => !chon.includes(r.value));
+  const options: MucChon[] = remaining.map((r) => ({
     value: r.value,
     label: r.label,
     phu: phongBanCuaRole(r.value),
@@ -133,7 +133,7 @@ function ChonVaiTro({
       ) : (
         <p className="text-muted-foreground">Chưa gán vai trò nào.</p>
       )}
-      {conLai.length > 0 && (
+      {remaining.length > 0 && (
         <Combobox
           label="Thêm vai trò"
           anNhanBatBuoc
@@ -149,14 +149,14 @@ function ChonVaiTro({
   );
 }
 
-interface TaoMoi {
+interface NewUserForm {
   fullName: string;
   username: string;
   usernameTuSua: boolean;
   matKhau: string;
   roles: Role[];
 }
-const TAO_RONG: TaoMoi = {
+const EMPTY_CREATE: NewUserForm = {
   fullName: "",
   username: "",
   usernameTuSua: false,
@@ -176,56 +176,56 @@ export default function QuanLyNguoiDungScreen({
     roles: Role[]
   ) => Promise<KetQuaDangNhap>;
 }) {
-  const [ds, ghi, { trangThai }] = useUserProfiles();
-  const dangTai = trangThai === "dang-tai" && ds.length === 0;
-  const [dang, setDang] = useState<UserProfile | null>(null);
+  const [ds, write, { trangThai }] = useUserProfiles();
+  const isLoading = trangThai === "dang-tai" && ds.length === 0;
+  const [editing, setEditing] = useState<UserProfile | null>(null);
   const [q, setQ] = useState("");
 
-  const [tao, setTao] = useState<TaoMoi | null>(null);
-  const [loiTao, setLoiTao] = useState<LoiNhap[]>([]);
-  const [dangTao, setDangTao] = useState(false);
+  const [creating, setCreating] = useState<NewUserForm | null>(null);
+  const [createErrors, setCreateErrors] = useState<LoiNhap[]>([]);
+  const [isCreating, setIsCreating] = useState(false);
 
-  const luu = () => {
-    if (!dang) return;
-    ghi(ds.map((n) => (n.id === dang.id ? dang : n)));
-    notify.daLuu(`Đã lưu người dùng ${dang.username || dang.id}`);
-    setDang(null);
+  const save = () => {
+    if (!editing) return;
+    write(ds.map((n) => (n.id === editing.id ? editing : n)));
+    notify.daLuu(`Đã lưu người dùng ${editing.username || editing.id}`);
+    setEditing(null);
   };
 
-  const doiHoTenTao = (v: string) =>
-    setTao((t) =>
+  const changeNewFullName = (v: string) =>
+    setCreating((t) =>
       t
         ? { ...t, fullName: v, username: t.usernameTuSua ? t.username : hoTenToUsername(v) }
         : t
     );
 
-  const luuTao = async () => {
-    if (!tao) return;
+  const saveCreate = async () => {
+    if (!creating) return;
     const ls: LoiNhap[] = [];
-    if (!tao.fullName.trim()) ls.push({ truong: "Họ tên", thongBao: "Chưa nhập họ tên" });
-    if (!tao.username.trim())
+    if (!creating.fullName.trim()) ls.push({ truong: "Họ tên", thongBao: "Chưa nhập họ tên" });
+    if (!creating.username.trim())
       ls.push({ truong: "Tên đăng nhập", thongBao: "Chưa nhập tên đăng nhập" });
-    if (tao.matKhau.length < 6)
+    if (creating.matKhau.length < 6)
       ls.push({ truong: "Mật khẩu", thongBao: "Tối thiểu 6 ký tự" });
-    setLoiTao(ls);
+    setCreateErrors(ls);
     if (ls.length > 0) return;
 
-    setDangTao(true);
+    setIsCreating(true);
     const kq = await taoTaiKhoan(
-      tao.fullName,
-      tao.username,
-      tao.matKhau,
-      tao.roles
+      creating.fullName,
+      creating.username,
+      creating.matKhau,
+      creating.roles
     );
-    setDangTao(false);
+    setIsCreating(false);
     if (!kq.ok) {
-      setLoiTao([{ truong: "Tạo tài khoản", thongBao: kq.loi ?? "Thất bại" }]);
+      setCreateErrors([{ truong: "Tạo tài khoản", thongBao: kq.loi ?? "Thất bại" }]);
       return;
     }
-    if (kq.nguoiDung) ghi([...ds, kq.nguoiDung]);
-    notify.daLuu(`Đã tạo tài khoản ${tao.username}`);
-    setTao(null);
-    setLoiTao([]);
+    if (kq.nguoiDung) write([...ds, kq.nguoiDung]);
+    notify.daLuu(`Đã tạo tài khoản ${creating.username}`);
+    setCreating(null);
+    setCreateErrors([]);
   };
 
   const cols: Cot<UserProfile>[] = [
@@ -265,32 +265,32 @@ export default function QuanLyNguoiDungScreen({
   ];
 
   // Gom người dùng theo phòng ban (+ sắp theo cấp bậc) để danh sách trực quan.
-  const loc = q.trim().toLowerCase();
-  const daLoc = loc
-    ? ds.filter((u) => `${u.username} ${u.fullName} ${roleLabel(u.roles)}`.toLowerCase().includes(loc))
+  const query = q.trim().toLowerCase();
+  const filtered = query
+    ? ds.filter((u) => `${u.username} ${u.fullName} ${roleLabel(u.roles)}`.toLowerCase().includes(query))
     : ds;
-  const tenNguoi = (u: UserProfile) => u.fullName || u.username || "";
+  const userName = (u: UserProfile) => u.fullName || u.username || "";
   const thung: { u: UserProfile; rank: number }[][] = PHONG_BAN.map(() => []);
-  const chuaGan: UserProfile[] = [];
-  for (const u of daLoc) {
+  const unassigned: UserProfile[] = [];
+  for (const u of filtered) {
     const { idx, rank } = xepPhongBan(rolesList(u.roles));
     if (idx < PHONG_BAN.length) thung[idx].push({ u, rank });
-    else chuaGan.push(u);
+    else unassigned.push(u);
   }
-  const nhomHienThi = [
+  const visibleGroups = [
     ...PHONG_BAN.map((pb, i) => ({
       id: pb.id,
       ten: pb.ten,
       icon: pb.icon,
       users: thung[i]
-        .sort((a, b) => a.rank - b.rank || tenNguoi(a.u).localeCompare(tenNguoi(b.u), "vi"))
+        .sort((a, b) => a.rank - b.rank || userName(a.u).localeCompare(userName(b.u), "vi"))
         .map((x) => x.u),
     })),
     {
       id: "chua",
       ten: "Chưa phân công",
       icon: UserRound,
-      users: [...chuaGan].sort((a, b) => tenNguoi(a).localeCompare(tenNguoi(b), "vi")),
+      users: [...unassigned].sort((a, b) => userName(a).localeCompare(userName(b), "vi")),
     },
   ].filter((n) => n.users.length > 0);
 
@@ -305,8 +305,8 @@ export default function QuanLyNguoiDungScreen({
           title="Tạo tài khoản đăng nhập mới và gán vai trò cho người đó."
           size="lg"
           onClick={() => {
-            setTao({ ...TAO_RONG });
-            setLoiTao([]);
+            setCreating({ ...EMPTY_CREATE });
+            setCreateErrors([]);
           }}
         >
           <Plus />
@@ -314,7 +314,7 @@ export default function QuanLyNguoiDungScreen({
         </Button>
       </div>
 
-      {dangTai ? (
+      {isLoading ? (
         <SkeletonBang />
       ) : ds.length === 0 ? (
         <EmptyState
@@ -326,8 +326,8 @@ export default function QuanLyNguoiDungScreen({
               title="Tạo tài khoản đăng nhập đầu tiên."
               size="lg"
               onClick={() => {
-                setTao({ ...TAO_RONG });
-                setLoiTao([]);
+                setCreating({ ...EMPTY_CREATE });
+                setCreateErrors([]);
               }}
             >
               <Plus />
@@ -351,10 +351,10 @@ export default function QuanLyNguoiDungScreen({
             />
           </div>
 
-          {nhomHienThi.length === 0 ? (
+          {visibleGroups.length === 0 ? (
             <p className="text-muted-foreground">Không tìm thấy người dùng nào khớp “{q}”.</p>
           ) : (
-            nhomHienThi.map((nhom) => {
+            visibleGroups.map((nhom) => {
               const Icon = nhom.icon;
               return (
                 <section key={nhom.id} className="space-y-3">
@@ -373,7 +373,7 @@ export default function QuanLyNguoiDungScreen({
                         title="Sửa họ tên hoặc vai trò của tài khoản này."
                         variant="outline"
                         size="sm"
-                        onClick={() => setDang({ ...r, roles: rolesList(r.roles) })}
+                        onClick={() => setEditing({ ...r, roles: rolesList(r.roles) })}
                       >
                         <Pencil />
                         Sửa
@@ -389,9 +389,9 @@ export default function QuanLyNguoiDungScreen({
 
       {/* Tạo tài khoản (admin) */}
       <Dialog
-        open={tao !== null}
+        open={creating !== null}
         onOpenChange={(o) => {
-          if (!o) setTao(null);
+          if (!o) setCreating(null);
         }}
       >
         <DialogContent className="w-full sm:max-w-2xl">
@@ -399,14 +399,14 @@ export default function QuanLyNguoiDungScreen({
             <DialogTitle className="text-2xl">Tạo tài khoản</DialogTitle>
           </DialogHeader>
 
-          {tao && (
+          {creating && (
             <div className="space-y-6 py-2">
-              <ErrorSummary loi={loiTao} />
+              <ErrorSummary loi={createErrors} />
               <ChuThichBatBuoc />
               <Field label="Họ tên" required>
                 <Input
-                  value={tao.fullName}
-                  onChange={(e) => doiHoTenTao(e.target.value)}
+                  value={creating.fullName}
+                  onChange={(e) => changeNewFullName(e.target.value)}
                   autoFocus
                   placeholder="VD: Nguyễn Văn A"
                 />
@@ -417,9 +417,9 @@ export default function QuanLyNguoiDungScreen({
                 hint="Gợi ý từ họ tên — sửa được. Người dùng dùng tên này để đăng nhập."
               >
                 <Input
-                  value={tao.username}
+                  value={creating.username}
                   onChange={(e) =>
-                    setTao((t) =>
+                    setCreating((t) =>
                       t ? { ...t, username: e.target.value, usernameTuSua: true } : t
                     )
                   }
@@ -432,9 +432,9 @@ export default function QuanLyNguoiDungScreen({
               <Field label="Mật khẩu" required hint="Tối thiểu 6 ký tự.">
                 <Input
                   type="password"
-                  value={tao.matKhau}
+                  value={creating.matKhau}
                   onChange={(e) =>
-                    setTao((t) => (t ? { ...t, matKhau: e.target.value } : t))
+                    setCreating((t) => (t ? { ...t, matKhau: e.target.value } : t))
                   }
                   placeholder="Mật khẩu"
                 />
@@ -443,21 +443,21 @@ export default function QuanLyNguoiDungScreen({
                 label="Vai trò"
                 hint="Chọn một hoặc nhiều từ danh sách. VD Phó giám đốc kiêm Quản đốc xưởng Đông = thêm cả hai. Bỏ trống cũng được, gán sau."
               >
-                <ChonVaiTro
-                  chon={tao.roles}
-                  onDoi={(v) => setTao((t) => (t ? { ...t, roles: v } : t))}
+                <RolePicker
+                  chon={creating.roles}
+                  onDoi={(v) => setCreating((t) => (t ? { ...t, roles: v } : t))}
                 />
               </Field>
             </div>
           )}
 
           <DialogFooter>
-            <Button variant="outline" size="lg" onClick={() => setTao(null)}>
+            <Button variant="outline" size="lg" onClick={() => setCreating(null)}>
               Hủy
             </Button>
             <Button
-              title="Tạo tài khoản với tên đăng nhập, mật khẩu và vai trò vừa khai." size="lg" onClick={luuTao} disabled={dangTao}>
-              {dangTao ? "Đang tạo…" : "Tạo tài khoản"}
+              title="Tạo tài khoản với tên đăng nhập, mật khẩu và vai trò vừa khai." size="lg" onClick={saveCreate} disabled={isCreating}>
+              {isCreating ? "Đang tạo…" : "Tạo tài khoản"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -465,25 +465,25 @@ export default function QuanLyNguoiDungScreen({
 
       {/* Sửa họ tên + vai trò */}
       <Dialog
-        open={dang !== null}
+        open={editing !== null}
         onOpenChange={(o) => {
-          if (!o) setDang(null);
+          if (!o) setEditing(null);
         }}
       >
         <DialogContent className="w-full sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle className="text-2xl">
-              Sửa người dùng {dang?.username}
+              Sửa người dùng {editing?.username}
             </DialogTitle>
           </DialogHeader>
 
-          {dang && (
+          {editing && (
             <div className="space-y-6 py-2">
               <Field label="Họ tên">
                 <Input
-                  value={dang.fullName}
+                  value={editing.fullName}
                   onChange={(e) =>
-                    setDang((d) => (d ? { ...d, fullName: e.target.value } : d))
+                    setEditing((d) => (d ? { ...d, fullName: e.target.value } : d))
                   }
                   placeholder="Họ tên đầy đủ"
                 />
@@ -492,20 +492,20 @@ export default function QuanLyNguoiDungScreen({
                 label="Vai trò"
                 hint="Chọn từ danh sách để thêm; bấm ✕ trên vai trò để bỏ. Bỏ hết = Chưa gán."
               >
-                <ChonVaiTro
-                  chon={dang.roles}
-                  onDoi={(v) => setDang((d) => (d ? { ...d, roles: v } : d))}
+                <RolePicker
+                  chon={editing.roles}
+                  onDoi={(v) => setEditing((d) => (d ? { ...d, roles: v } : d))}
                 />
               </Field>
             </div>
           )}
 
           <DialogFooter>
-            <Button variant="outline" size="lg" onClick={() => setDang(null)}>
+            <Button variant="outline" size="lg" onClick={() => setEditing(null)}>
               Hủy
             </Button>
             <Button
-              title="Ghi lại thay đổi cho tài khoản này. Vai trò mới có hiệu lực ở lần vào màn kế tiếp." size="lg" onClick={luu}>
+              title="Ghi lại thay đổi cho tài khoản này. Vai trò mới có hiệu lực ở lần vào màn kế tiếp." size="lg" onClick={save}>
               Lưu thay đổi
             </Button>
           </DialogFooter>

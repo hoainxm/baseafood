@@ -1,12 +1,12 @@
 import { describe, it, expect } from "vitest";
 import type { DomesticSaleItem } from "@/types";
 import {
-  TEN_DONG_BAN_NOI_DIA,
-  amTheoNgay,
-  banNoiDiaTheoKy,
-  doiChieuBanNoiDia,
-  laDongBanNoiDia,
-} from "./banNoiDia";
+  DOMESTIC_SALE_ROW_NAME,
+  negateDailyQuantities,
+  getPeriodDomesticSales,
+  compareDomesticSales,
+  isDomesticSaleRow,
+} from "./domesticSales";
 
 // Bán nội địa = NL bán thẳng cho khách trong nước (VND), không chế biến. Sổ /wip
 // ghi kg dương; Cân đối khối 1 là dòng giảm "Bán nội địa" (lưu âm, như bảng giấy −987).
@@ -28,17 +28,17 @@ const d = (p: Partial<DomesticSaleItem>): DomesticSaleItem => ({
 
 const ky = { startDate: "2026-07-21", endDate: "2026-07-25", materialTypeName: "Bạch tuộc 2 da" };
 
-describe("laDongBanNoiDia", () => {
+describe("isDomesticSaleRow", () => {
   it("nhận theo TÊN (không phân hoa thường), kể cả dòng cũ không phải dòng giảm — tránh trừ đôi", () => {
-    expect(laDongBanNoiDia({ name: TEN_DONG_BAN_NOI_DIA })).toBe(true);
-    expect(laDongBanNoiDia({ name: " bán nội địa " })).toBe(true);
-    expect(laDongBanNoiDia({ name: "Hao hụt" })).toBe(false);
+    expect(isDomesticSaleRow({ name: DOMESTIC_SALE_ROW_NAME })).toBe(true);
+    expect(isDomesticSaleRow({ name: " bán nội địa " })).toBe(true);
+    expect(isDomesticSaleRow({ name: "Hao hụt" })).toBe(false);
   });
 });
 
-describe("banNoiDiaTheoKy", () => {
+describe("getPeriodDomesticSales", () => {
   it("lọc ngày trong kỳ + cùng HỌ NL, cộng theo ngày, giá bình quân gia quyền", () => {
-    const kq = banNoiDiaTheoKy(
+    const kq = getPeriodDomesticSales(
       [
         d({ quantityKg: 600, unitPrice: 145000 }),
         d({ quantityKg: 387, unitPrice: 150000, materialTypeName: "Bạch tuộc 2 da nhỏ (80↓)" }),
@@ -56,21 +56,21 @@ describe("banNoiDiaTheoKy", () => {
     expect(kq.giaBinhQuan).toBe(146960);
   });
   it("không dòng nào có giá ⇒ giá null; kỳ thiếu ngày ⇒ rỗng", () => {
-    expect(banNoiDiaTheoKy([d({ quantityKg: 5 })], ky).giaBinhQuan).toBeNull();
-    expect(banNoiDiaTheoKy([d({ quantityKg: 5 })], { materialTypeName: "Bạch tuộc 2 da" }).tongKg).toBe(0);
+    expect(getPeriodDomesticSales([d({ quantityKg: 5 })], ky).giaBinhQuan).toBeNull();
+    expect(getPeriodDomesticSales([d({ quantityKg: 5 })], { materialTypeName: "Bạch tuộc 2 da" }).tongKg).toBe(0);
   });
 });
 
-describe("doiChieuBanNoiDia / amTheoNgay", () => {
+describe("compareDomesticSales / negateDailyQuantities", () => {
   it("Cân đối (âm) so sổ SX (dương) theo từng ngày", () => {
     const production = { "2026-07-21": 987 };
-    expect(doiChieuBanNoiDia({}, production)).toBe("trong");
-    expect(doiChieuBanNoiDia(undefined, production)).toBe("trong");
-    expect(doiChieuBanNoiDia({ "2026-07-21": -987 }, production)).toBe("khop");
-    expect(doiChieuBanNoiDia({ "2026-07-21": -900 }, production)).toBe("lech");
-    expect(doiChieuBanNoiDia({ "2026-07-21": -987, "2026-07-22": -5 }, production)).toBe("lech");
+    expect(compareDomesticSales({}, production)).toBe("trong");
+    expect(compareDomesticSales(undefined, production)).toBe("trong");
+    expect(compareDomesticSales({ "2026-07-21": -987 }, production)).toBe("khop");
+    expect(compareDomesticSales({ "2026-07-21": -900 }, production)).toBe("lech");
+    expect(compareDomesticSales({ "2026-07-21": -987, "2026-07-22": -5 }, production)).toBe("lech");
   });
   it("đổi dấu sang âm, bỏ ngày 0", () => {
-    expect(amTheoNgay({ a: 5, b: 0, c: -3 })).toEqual({ a: -5, c: -3 });
+    expect(negateDailyQuantities({ a: 5, b: 0, c: -3 })).toEqual({ a: -5, c: -3 });
   });
 });

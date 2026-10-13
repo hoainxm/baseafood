@@ -17,38 +17,38 @@ import { InTemHangLoat } from "./InTemHangLoat";
 import { GiaiDoanTruyXuat } from "./GiaiDoanTruyXuat";
 import { ThuHoiLo } from "./ThuHoiLo";
 import { useLabelPrints } from "@/lib/catalogRepo";
-import { kg, viDate } from "@/lib/format";
+import { kg, formatDateVN } from "@/lib/format";
 import {
-  TEN_LOAI,
-  canBangLo,
+  TRACE_KIND_LABELS,
+  computeLotMassBalance,
   docMaQr,
-  khoaLo,
-  laHangRa,
-  loCungChuyen,
-  lyDoNhieuLo,
-  tomTatIn,
-  nutLo,
-  timLo,
-  tonKhoCuaLo,
-  truyNguoc,
-  truyXuoi,
-  type LoaiNut,
-  type NhanhCay,
-  type NutLo,
-} from "@/lib/truyXuatLo";
+  lotKey,
+  isOutboundKind,
+  findSameShipmentLots,
+  explainMultipleLots,
+  summarizeLabelPrints,
+  buildLotNode,
+  findLots,
+  getLotStockKg,
+  traceBackward,
+  traceForward,
+  type TraceNodeKind,
+  type TraceBranch,
+  type LotNode,
+} from "@/lib/lotTraceability";
 import { Button, EmptyState, Field, Input, InfoTip, Nhan, sacTheoTen, ThanhChiaPhan } from "@/design-system";
 import { ArrowDownRight, ArrowUpLeft, Camera, CameraOff, ListChecks, Printer, Scale, Search, Tags } from "lucide-react";
 import type { LotKind } from "@/types";
 import { cn } from "@/lib/utils";
 
-const laLo = (k: LoaiNut): k is LotKind => !laHangRa(k);
+const laLo = (k: TraceNodeKind): k is LotKind => !isOutboundKind(k);
 
 /** Dòng lô gọn: nhãn + mô tả; bấm vào là mở hộ chiếu của lô đó. */
-function NodeRow({ nut, kgNoi, onMo }: { nut: NutLo; kgNoi?: number | null; onMo: (n: NutLo) => void }) {
+function NodeRow({ nut, kgNoi, onMo }: { nut: LotNode; kgNoi?: number | null; onMo: (n: LotNode) => void }) {
   const canOpen = laLo(nut.kind) && !nut.mat;
   return (
     <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-      <Nhan loai="phan-loai" sac={sacTheoTen(TEN_LOAI[nut.kind])}>{TEN_LOAI[nut.kind]}</Nhan>
+      <Nhan loai="phan-loai" sac={sacTheoTen(TRACE_KIND_LABELS[nut.kind])}>{TRACE_KIND_LABELS[nut.kind]}</Nhan>
       {canOpen ? (
         <button
           type="button"
@@ -62,7 +62,7 @@ function NodeRow({ nut, kgNoi, onMo }: { nut: NutLo; kgNoi?: number | null; onMo
         <span className="font-medium">{nut.nhan}</span>
       )}
       <span className="text-muted-foreground">
-        {[nut.moTa, nut.ngay && viDate(nut.ngay), nut.chiTiet.find((c) => c.nhan === "Đại lý")?.giaTri]
+        {[nut.moTa, nut.ngay && formatDateVN(nut.ngay), nut.chiTiet.find((c) => c.nhan === "Đại lý")?.giaTri]
           .filter(Boolean)
           .join(" · ")}
       </span>
@@ -74,7 +74,7 @@ function NodeRow({ nut, kgNoi, onMo }: { nut: NutLo; kgNoi?: number | null; onMo
 }
 
 /** Cây gia phả lô, lồng nhiều tầng. */
-function Tree({ nhanh, onMo }: { nhanh: NhanhCay[]; onMo: (n: NutLo) => void }) {
+function Tree({ nhanh, onMo }: { nhanh: TraceBranch[]; onMo: (n: LotNode) => void }) {
   return (
     <ul className="space-y-2">
       {nhanh.map((n, i) => (
@@ -98,7 +98,7 @@ export default function QrTraCuuScreen() {
   const [typedCode, setTypedCode] = useState("");
   const [isPrintingLabel, setIsPrintingLabel] = useState(false);
   const [soIn] = useLabelPrints();
-  const daIn = useMemo(() => tomTatIn(soIn), [soIn]);
+  const daIn = useMemo(() => summarizeLabelPrints(soIn), [soIn]);
 
   // Mã đang tra nằm trên đường link (?lo=…) ⇒ camera điện thoại quét tem mở thẳng
   // màn này, và copy link gửi người khác là họ thấy đúng lô đó.
@@ -109,7 +109,7 @@ export default function QrTraCuuScreen() {
   const tab = lo ? "tra" : tabUrl === "in" ? "in" : tabUrl === "giai-doan" || tabUrl === "do-phu" ? "giai-doan" : "tra";
   const ketQua = useMemo(() => {
     const ma = docMaQr(lo);
-    return ma ? timLo(ma, dl) : [];
+    return ma ? findLots(ma, dl) : [];
   }, [lo, dl]);
   const viewing = ketQua.length === 1 ? ketQua[0]! : null;
 
@@ -118,25 +118,25 @@ export default function QrTraCuuScreen() {
     if (!ma) return;
     setParams("kind" in ma ? { lo: `${ma.kind}:${ma.id}` } : { lo: ma.ma });
   };
-  const openLot = (n: NutLo) => {
+  const openLot = (n: LotNode) => {
     if (!laLo(n.kind)) return;
     setParams({ lo: `${n.kind}:${n.id}` });
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const nguoc = useMemo(() => (viewing ? truyNguoc(viewing.kind, viewing.id, dl) : []), [viewing, dl]);
-  const xuoi = useMemo(() => (viewing ? truyXuoi(viewing.kind, viewing.id, dl) : []), [viewing, dl]);
-  const canBang = useMemo(() => (viewing ? canBangLo(viewing.kind, viewing.id, dl) : null), [viewing, dl]);
-  const lotStock = useMemo(() => (viewing ? tonKhoCuaLo(viewing.kind, viewing.id, dl) : null), [viewing, dl]);
+  const nguoc = useMemo(() => (viewing ? traceBackward(viewing.kind, viewing.id, dl) : []), [viewing, dl]);
+  const xuoi = useMemo(() => (viewing ? traceForward(viewing.kind, viewing.id, dl) : []), [viewing, dl]);
+  const canBang = useMemo(() => (viewing ? computeLotMassBalance(viewing.kind, viewing.id, dl) : null), [viewing, dl]);
+  const lotStock = useMemo(() => (viewing ? getLotStockKg(viewing.kind, viewing.id, dl) : null), [viewing, dl]);
   /** Lô NL: các loại NL khác của CÙNG CHUYẾN (mỗi loại một lô, chốt 2026-10-08). */
-  const sameShipmentLots = useMemo(() => (viewing?.kind === "S" ? loCungChuyen(viewing.id, dl) : []), [viewing, dl]);
+  const sameShipmentLots = useMemo(() => (viewing?.kind === "S" ? findSameShipmentLots(viewing.id, dl) : []), [viewing, dl]);
 
-  const loiNguoc: Partial<Record<LoaiNut, string>> = {
+  const loiNguoc: Partial<Record<TraceNodeKind, string>> = {
     S: "Lô nguyên liệu là đầu chuỗi — nguồn gốc là đại lý / chuyến nhập ghi ở trên.",
     W: "Mẻ này CHƯA gắn lô nguyên liệu nào. Vào Sản xuất BTP, bấm \"Gắn lô NL\" ở dòng của mẻ.",
     P: "Phiếu đóng gói này CHƯA gắn lô bán thành phẩm nào. Vào Đóng gói, bấm \"Gắn lô BTP\".",
   };
-  const loiXuoi: Partial<Record<LoaiNut, string>> = {
+  const loiXuoi: Partial<Record<TraceNodeKind, string>> = {
     S: "Lô này chưa được gắn vào mẻ sản xuất nào.",
     W: "Mẻ này chưa được gắn vào phiếu đóng gói hay lệnh xuất nào.",
     P: "Chưa ghi nhận thành phẩm này bán cho ai. Ở Bán hàng, bấm \"Gắn lô\" ở dòng bán đóng gói.",
@@ -241,7 +241,7 @@ export default function QrTraCuuScreen() {
         <div className="space-y-3 rounded-xl border-2 border-border p-4">
           <p className="font-medium">
             {(() => {
-              const ld = lyDoNhieuLo(lo, ketQua, dl);
+              const ld = explainMultipleLots(lo, ketQua, dl);
               return ld.cungChuyen ? `${ld.cau}:` : `${ld.cau} (tem in trước đợt nâng cấp không đảm bảo mã duy nhất):`;
             })()}
           </p>
@@ -260,7 +260,7 @@ export default function QrTraCuuScreen() {
             <section className="space-y-3 rounded-xl border-2 border-border p-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex flex-wrap items-center gap-2">
-                  <Nhan loai="phan-loai" sac={sacTheoTen(TEN_LOAI[viewing.kind])}>{TEN_LOAI[viewing.kind]}</Nhan>
+                  <Nhan loai="phan-loai" sac={sacTheoTen(TRACE_KIND_LABELS[viewing.kind])}>{TRACE_KIND_LABELS[viewing.kind]}</Nhan>
                   <span className="text-xl font-semibold tnum">{viewing.nhan}</span>
                 </div>
                 <Button title="In lại tem QR của lô này (tem cũ bong / mờ thì in cái mới)." variant="outline" onClick={() => setIsPrintingLabel(true)}>
@@ -272,7 +272,7 @@ export default function QrTraCuuScreen() {
               </p>
               {laLo(viewing.kind) &&
                 (() => {
-                  const t = daIn.get(khoaLo(viewing.kind as LotKind, viewing.id));
+                  const t = daIn.get(lotKey(viewing.kind as LotKind, viewing.id));
                   if (!t)
                     return (
                       <p className="flex flex-wrap items-center gap-2">
@@ -285,7 +285,7 @@ export default function QrTraCuuScreen() {
                       <p className="flex flex-wrap items-center gap-2">
                         <Nhan loai="xong">Đã in {t.tem} tem</Nhan>
                         <span className="text-muted-foreground">
-                          Lần gần nhất {viDate(t.cuoi.printedAt.slice(0, 10))}
+                          Lần gần nhất {formatDateVN(t.cuoi.printedAt.slice(0, 10))}
                           {t.cuoi.operator ? ` · ${t.cuoi.operator}` : ""}
                         </span>
                       </p>
@@ -425,7 +425,7 @@ export default function QrTraCuuScreen() {
       )}
 
       {isPrintingLabel && viewing && laLo(viewing.kind) && (
-        <TemLoQr nut={nutLo(viewing.kind, viewing.id, dl)} onClose={() => setIsPrintingLabel(false)} />
+        <TemLoQr nut={buildLotNode(viewing.kind, viewing.id, dl)} onClose={() => setIsPrintingLabel(false)} />
       )}
     </div>
   );

@@ -14,7 +14,7 @@ import * as React from "react";
 
 /* ---------- Bảng màu kiểu Excel: 10 sắc × 5 mức (1 rất nhạt → 5 rất đậm) ----------
    Mã lưu DB = "<sắc>-<mức>" (VD "vang-5"). Màu thật ở token `--to-<mã>` (tokens.css).
-   Khớp `SAC_TO_LIB` ở lib/toMau.ts — test toMauNguon.test.ts canh. */
+   Khớp `SAC_TO_LIB` ở lib/rowMarks.ts — test toMauNguon.test.ts canh. */
 export const SAC_TO = [
   { ma: "xam", nhan: "xám" },
   { ma: "do", nhan: "đỏ" },

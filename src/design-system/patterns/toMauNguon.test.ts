@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, test } from "vitest";
-import { SAC_TO_LIB, chuanMau } from "@/lib/toMau";
+import { SAC_TO_LIB, normalizeRowMarkColor } from "@/lib/rowMarks";
 import { LUOI_MAU, MAU_TOI, MUC_TO, SAC_TO, tenMau } from "./toMauNguon";
 
 /*
@@ -41,7 +41,7 @@ describe("bảng màu tô kiểu Excel", () => {
     for (const ma of allColors) {
       expect(token(`to-${ma}`)).toMatch(/^#/);
       expect(tenMau(ma)).not.toBe("");
-      expect(chuanMau(ma)).toBe(ma);
+      expect(normalizeRowMarkColor(ma)).toBe(ma);
     }
     for (const s of SAC_TO) expect(token(`to-${s.ma}-line`)).toMatch(/^#/);
   });

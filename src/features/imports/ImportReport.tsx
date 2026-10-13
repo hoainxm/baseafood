@@ -19,8 +19,8 @@ import {
   type TheThongTin,
 } from "@/design-system";
 import { useMaterialImports, useScraps } from "@/lib/catalogRepo";
-import { KY_OPT, phamViKy, type KyXem } from "@/lib/periodUtils";
-import { num, viDate } from "@/lib/format";
+import { KY_OPT, getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
+import { num, formatDateVN } from "@/lib/format";
 import { calculateImportAmount } from "@/types";
 import { exportAoaToXlsx, type OExcel } from "@/lib/reportXlsx";
 import { CalendarRange, Coins, FileClock, FileSpreadsheet, Scale } from "lucide-react";
@@ -64,12 +64,12 @@ export default function BaoCaoNhap() {
   const [rows] = useMaterialImports();
   const [scraps] = useScraps();
 
-  const [ky, setKy] = useState<KyXem>("thang");
+  const [ky, setKy] = useState<ViewPeriod>("thang");
   const [moc, setMoc] = useState(homNay());
   const [tuTC, setTuTC] = useState(homNay());
   const [denTC, setDenTC] = useState(homNay());
   const [workshop, setWorkshop] = useState("Tất cả");
-  const [tu, den] = phamViKy(ky, moc, tuTC, denTC);
+  const [tu, den] = getViewPeriodRange(ky, moc, tuTC, denTC);
 
   const {
     dongMua,
@@ -154,13 +154,13 @@ export default function BaoCaoNhap() {
       const d = ct.get(date)!;
       const typeEntries = [...d.loai.entries()].sort((a, b) => b[1] - a[1]);
       return {
-        nhan: viDate(date),
+        nhan: formatDateVN(date),
         giaTri: d.tongKg,
         chiTiet: (
           <div className="space-y-2">
             <div className="border-b border-border pb-1.5">
               <div className="font-semibold text-foreground">
-                {viDate(date)}
+                {formatDateVN(date)}
                 {dayOfWeek(date) ? ` · ${dayOfWeek(date)}` : ""}
               </div>
               <div className="text-muted-foreground">
@@ -198,7 +198,7 @@ export default function BaoCaoNhap() {
   }, [rows, scraps, tu, den, workshop]);
 
   const the: TheThongTin[] = [
-    { nhan: "Kỳ báo cáo", giaTri: `${viDate(tu)} – ${viDate(den)}`, icon: CalendarRange, mau: "trung-tinh" },
+    { nhan: "Kỳ báo cáo", giaTri: `${formatDateVN(tu)} – ${formatDateVN(den)}`, icon: CalendarRange, mau: "trung-tinh" },
     { nhan: "Nhập mua", giaTri: `${num(tongKg)} kg`, so: true, icon: Scale, mau: "brand" },
     { nhan: "Giá trị mua", giaTri: `${num(tongTien)} đ`, so: true, icon: Coins, mau: "success" },
     {
@@ -237,7 +237,7 @@ export default function BaoCaoNhap() {
     }
     const aoa: OExcel[][] = [];
     aoa.push(["Báo cáo tổng hợp nhập hàng"]);
-    aoa.push([`Kỳ: ${viDate(tu)} – ${viDate(den)} · Phân xưởng: ${workshop}`]);
+    aoa.push([`Kỳ: ${formatDateVN(tu)} – ${formatDateVN(den)} · Phân xưởng: ${workshop}`]);
     aoa.push([]);
     aoa.push(["NGUYÊN LIỆU MUA"]);
     aoa.push(["Đại lý", "Loại nguyên liệu", "Số cân (kg)", "Chờ giá (kg)", "Giá trị (đ)"]);
@@ -270,7 +270,7 @@ export default function BaoCaoNhap() {
               anNhanBatBuoc
               choPhepXoa={false}
               value={ky}
-              onChange={(v) => setKy(v as KyXem)}
+              onChange={(v) => setKy(v as ViewPeriod)}
               options={KY_OPT}
             />
           </div>
@@ -291,7 +291,7 @@ export default function BaoCaoNhap() {
               <DateField
                 label={ky === "ngay" ? "Ngày" : "Ngày bất kỳ trong kỳ"}
                 anNhanBatBuoc
-                hint={ky === "ngay" ? undefined : `Kỳ: ${viDate(tu)} – ${viDate(den)}`}
+                hint={ky === "ngay" ? undefined : `Kỳ: ${formatDateVN(tu)} – ${formatDateVN(den)}`}
                 value={moc}
                 onChange={setMoc}
               />

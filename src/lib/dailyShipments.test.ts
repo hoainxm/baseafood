@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { MaterialImportItem } from "@/types";
-import { chuyenTrongNgay, daiLyTrongKy, soChuyenNgay, tomTatTheoNgay } from "./chuyenTrongNgay";
+import { groupDailyShipments, groupImportsBySupplier, countDailyShipments, summarizeImportsByDay } from "./dailyShipments";
 
 const dong = (p: Partial<MaterialImportItem> & Pick<MaterialImportItem, "id">): MaterialImportItem => ({
   shipmentId: "",
@@ -17,9 +17,9 @@ const dong = (p: Partial<MaterialImportItem> & Pick<MaterialImportItem, "id">): 
   ...p,
 });
 
-describe("tomTatTheoNgay", () => {
+describe("summarizeImportsByDay", () => {
   it("đếm chuyến (theo shipmentId) và cộng kg từng ngày", () => {
-    const r = tomTatTheoNgay([
+    const r = summarizeImportsByDay([
       dong({ id: "1", shipmentId: "s1" }),
       dong({ id: "2", shipmentId: "s1", quantityKg: 50 }),
       dong({ id: "3", shipmentId: "s2" }),
@@ -30,7 +30,7 @@ describe("tomTatTheoNgay", () => {
   });
 });
 
-describe("chuyenTrongNgay", () => {
+describe("groupDailyShipments", () => {
   const imports = [
     dong({ id: "1", shipmentId: "s1", supplierName: "Đại lý A", quantityKg: 100, licensePlate: "72C-123", driverName: "Hùng" }),
     dong({ id: "2", shipmentId: "s1", supplierName: "Đại lý A", materialTypeName: "Bạch tuộc nhỏ", quantityKg: 40, unitPrice: 30000 }),
@@ -40,7 +40,7 @@ describe("chuyenTrongNgay", () => {
   ];
 
   it("gom đại lý → chuyến → dòng của đúng ngày, đại lý nhiều kg trước", () => {
-    const r = chuyenTrongNgay(imports, "2026-09-02", [{ id: "s1", lotCode: "Đ-260902-01" }]);
+    const r = groupDailyShipments(imports, "2026-09-02", [{ id: "s1", lotCode: "Đ-260902-01" }]);
     expect(r.map((d) => [d.daiLy, d.kg, d.chuyen.length])).toEqual([
       ["Đại lý B", 500, 1],
       ["Đại lý A", 200, 2],
@@ -56,7 +56,7 @@ describe("chuyenTrongNgay", () => {
   });
 
   it("dòng cũ không có chuyến: mỗi dòng là một chuyến; đại lý trống có nhãn riêng", () => {
-    const r = chuyenTrongNgay(
+    const r = groupDailyShipments(
       [dong({ id: "x" }), dong({ id: "y", supplierName: " " })],
       "2026-09-02"
     );
@@ -65,11 +65,11 @@ describe("chuyenTrongNgay", () => {
   });
 
   it("ngày không có chuyến ⇒ rỗng", () => {
-    expect(chuyenTrongNgay(imports, "2026-09-10")).toEqual([]);
+    expect(groupDailyShipments(imports, "2026-09-10")).toEqual([]);
   });
 });
 
-describe("daiLyTrongKy", () => {
+describe("groupImportsBySupplier", () => {
   it("gom theo đại lý, kg theo ngày, tổng các đại lý = tổng dòng cha", () => {
     const imports = [
       dong({ id: "1", shipmentId: "s1", supplierName: "A", quantityKg: 100 }),
@@ -77,7 +77,7 @@ describe("daiLyTrongKy", () => {
       dong({ id: "3", shipmentId: "s2", supplierName: "A", quantityKg: 60, deliveryDate: "2026-09-03" }),
       dong({ id: "4", shipmentId: "s3", supplierName: "B", quantityKg: 500, unitPrice: null }),
     ];
-    const r = daiLyTrongKy(imports);
+    const r = groupImportsBySupplier(imports);
     expect(r.map((d) => [d.daiLy, d.kg, d.theoNgay, d.ids])).toEqual([
       ["B", 500, { "2026-09-02": 500 }, ["4"]],
       ["A", 200, { "2026-09-02": 140, "2026-09-03": 60 }, ["1", "2", "3"]],
@@ -87,7 +87,7 @@ describe("daiLyTrongKy", () => {
   });
 });
 
-describe("soChuyenNgay", () => {
+describe("countDailyShipments", () => {
   it("đếm chuyến khác nhau trong ngày; dòng không chuyến tính riêng", () => {
     const imports = [
       dong({ id: "1", shipmentId: "s1" }),
@@ -95,8 +95,8 @@ describe("soChuyenNgay", () => {
       dong({ id: "3", shipmentId: "" }),
       dong({ id: "4", shipmentId: "s2", deliveryDate: "2026-09-03" }),
     ];
-    expect(soChuyenNgay(imports, "2026-09-02")).toBe(2);
-    expect(soChuyenNgay(imports, "2026-09-03")).toBe(1);
-    expect(soChuyenNgay(imports, "2026-09-09")).toBe(0);
+    expect(countDailyShipments(imports, "2026-09-02")).toBe(2);
+    expect(countDailyShipments(imports, "2026-09-03")).toBe(1);
+    expect(countDailyShipments(imports, "2026-09-09")).toBe(0);
   });
 });

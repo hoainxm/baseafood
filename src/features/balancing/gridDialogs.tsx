@@ -21,8 +21,8 @@ import {
   Textarea,
   notify,
 } from "@/design-system";
-import { num, viDate } from "@/lib/format";
-import { KHACH_KHAC, type HangLuoiNL } from "@/lib/balancingGrid";
+import { num, formatDateVN } from "@/lib/format";
+import { OTHER_CUSTOMER_ID, type MaterialGridRow } from "@/lib/balancingGrid";
 import { Trash2 } from "lucide-react";
 
 /* ---------- Thêm dòng nguyên liệu / dòng giảm ---------- */
@@ -174,10 +174,10 @@ export function HopChonDongNhap({
                       className="size-6"
                       checked={selectedIds.has(r.id)}
                       onChange={() => doi(r.id)}
-                      aria-label={`Lấy dòng ${r.materialTypeName} ngày ${viDate(r.deliveryDate)}`}
+                      aria-label={`Lấy dòng ${r.materialTypeName} ngày ${formatDateVN(r.deliveryDate)}`}
                     />
                   </td>
-                  <td className="border-b border-border px-3 py-2">{viDate(r.deliveryDate)}</td>
+                  <td className="border-b border-border px-3 py-2">{formatDateVN(r.deliveryDate)}</td>
                   <td className="border-b border-border px-3 py-2">{r.materialTypeName}</td>
                   <td className="border-b border-border px-3 py-2">{r.supplierName}</td>
                   <td className="tnum border-b border-border px-3 py-2 text-right">
@@ -247,11 +247,11 @@ export function HopDongNhapTay({
   onXoa,
   onClose,
 }: {
-  dong: HangLuoiNL[];
-  tenDong: (h: HangLuoiNL) => string;
+  dong: MaterialGridRow[];
+  tenDong: (h: MaterialGridRow) => string;
   khoXuong: { value: string; label: string }[];
   /** Dòng giảm nào có ô "Kho nhận" — mặc định mọi dòng giảm (Bán nội địa: bán đi, không vào kho). */
-  coKho?: (h: HangLuoiNL) => boolean;
+  coKho?: (h: MaterialGridRow) => boolean;
   onDoiKho: (id: string, warehouse: string) => void;
   onXoa: (id: string) => void;
   onClose: () => void;
@@ -369,11 +369,11 @@ export function HopThemMatHang({
             hint="Chưa rõ khách thì chọn “Khác”."
             value={customerId}
             onChange={setCustomerId}
-            options={[...khach.map((k) => ({ value: k.id, label: k.name })), { value: KHACH_KHAC, label: "Khác" }]}
+            options={[...khach.map((k) => ({ value: k.id, label: k.name })), { value: OTHER_CUSTOMER_ID, label: "Khác" }]}
             onCreate={onThemKhach}
             choPhepXoa={false}
             onSuaMuc={onSuaKhach}
-            suaDuoc={(v) => v !== KHACH_KHAC}
+            suaDuoc={(v) => v !== OTHER_CUSTOMER_ID}
             nhanSua="Sửa thông tin khách hàng này — lưu thẳng vào Danh mục."
           />
         </div>
@@ -420,7 +420,7 @@ export function HopLyDoGhiBu({
     <Dialog open onOpenChange={(v) => !v && onClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Ngày {viDate(ngay)} đã chốt</DialogTitle>
+          <DialogTitle>Ngày {formatDateVN(ngay)} đã chốt</DialogTitle>
           <DialogDescription>
             Số của ngày này đã được chốt và có thể đã gửi đi. Sửa vẫn được, nhưng phải ghi
             lý do để sau này giải trình được.

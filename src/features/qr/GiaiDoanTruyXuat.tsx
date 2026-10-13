@@ -5,20 +5,20 @@
 // lô đã gắn, kho, quét kiểm) và nút làm NGAY tại đây: In tem · Gắn lô · Hộ chiếu ·
 // Duyệt nhập kho / Kiểm lô (mở thẳng hộp ở màn Kho dự trữ / Đơn đặt).
 // Thay cho tab "Độ phủ" (mỗi khâu đã có số đếm đã gắn / còn thiếu).
-// Số lấy từ theoGiaiDoan (lib/truyXuatLo, hàm thuần có test).
+// Số lấy từ groupByTraceStage (lib/lotTraceability, hàm thuần có test).
 // Thiết kế: docs/spec/qr-truy-xuat-lo.md §6d
 // ============================================================
 import { useMemo, useState, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import type { DomesticSaleItem, Packaging, SalesItem, WipProductionItem, Workshop } from "@/types";
 import { GanLoDauVao, GanLoXuat, TemLoQr, useDuLieuTruyXuat } from "@/features/shared";
-import { kg, viDate } from "@/lib/format";
-import { TEN_LOAI, laHangRa, nhanLoBtp, nhanLoTp, theoGiaiDoan, type GiaiDoan, type KhoaGiaiDoan, type MucGiaiDoan, type NutLo } from "@/lib/truyXuatLo";
+import { kg, formatDateVN } from "@/lib/format";
+import { TRACE_KIND_LABELS, isOutboundKind, formatWipLotLabel, formatFinishedGoodLotLabel, groupByTraceStage, type TraceStage, type TraceStageKey, type TraceStageItem, type LotNode } from "@/lib/lotTraceability";
 import { Button, ChoiceGroup, DateRangeField, EmptyState, Nhan, congNgay, homNay, sacTheoTen } from "@/design-system";
 import { ClipboardCheck, Link2, Printer, ScanLine, Search } from "lucide-react";
 
 /** Màn gốc của từng khâu + đơn vị đếm. */
-const KHAU: Record<KhoaGiaiDoan, { donVi: string; man: { duong: string; nhan: string }[] }> = {
+const KHAU: Record<TraceStageKey, { donVi: string; man: { duong: string; nhan: string }[] }> = {
   nhap: { donVi: "lô", man: [{ duong: "/imports", nhan: "Nhập hàng" }] },
   "san-xuat": { donVi: "mẻ", man: [{ duong: "/wip", nhan: "Sản xuất thành phẩm" }] },
   kho: { donVi: "mẻ", man: [{ duong: "/warehouse", nhan: "Kho dự trữ" }] },
@@ -26,10 +26,10 @@ const KHAU: Record<KhoaGiaiDoan, { donVi: string; man: { duong: string; nhan: st
   "xuat-ban": { donVi: "dòng", man: [{ duong: "/orders", nhan: "Đơn đặt" }, { duong: "/sales", nhan: "Bán hàng" }] },
 };
 
-const describeNode = (n: NutLo) =>
+const describeNode = (n: LotNode) =>
   [
     n.moTa,
-    n.ngay && viDate(n.ngay),
+    n.ngay && formatDateVN(n.ngay),
     n.chiTiet.find((c) => c.nhan === "Đại lý" || c.nhan === "Khách")?.giaTri,
     n.kg ? kg(n.kg) : "",
   ]
@@ -37,14 +37,14 @@ const describeNode = (n: NutLo) =>
     .join(" · ");
 
 /** Một dòng: nhãn lô (bấm mở hộ chiếu) + mô tả, nhãn trạng thái, nút thao tác. */
-function StageRow({ m, trangThai, nut }: { m: MucGiaiDoan; trangThai: ReactNode; nut: ReactNode }) {
+function StageRow({ m, trangThai, nut }: { m: TraceStageItem; trangThai: ReactNode; nut: ReactNode }) {
   const n = m.nut;
   return (
     <li className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 border-b border-border py-2 last:border-b-0">
       <div className="min-w-0 flex-1 basis-64 space-y-1">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          <Nhan loai="phan-loai" sac={sacTheoTen(TEN_LOAI[n.kind])}>{TEN_LOAI[n.kind]}</Nhan>
-          {laHangRa(n.kind) || n.mat ? (
+          <Nhan loai="phan-loai" sac={sacTheoTen(TRACE_KIND_LABELS[n.kind])}>{TRACE_KIND_LABELS[n.kind]}</Nhan>
+          {isOutboundKind(n.kind) || n.mat ? (
             <span className="tnum font-medium">{n.nhan}</span>
           ) : (
             <Link
@@ -64,10 +64,10 @@ function StageRow({ m, trangThai, nut }: { m: MucGiaiDoan; trangThai: ReactNode;
   );
 }
 
-const labelBadge = (m: MucGiaiDoan) =>
+const labelBadge = (m: TraceStageItem) =>
   m.daIn === undefined ? null : m.daIn > 0 ? <Nhan loai="xong">Đã in {m.daIn} tem</Nhan> : <Nhan loai="cho">Chưa in tem</Nhan>;
 
-const lotBadge = (m: MucGiaiDoan, ten: string) =>
+const lotBadge = (m: TraceStageItem, ten: string) =>
   (m.soLo ?? 0) > 0 ? (
     <Nhan loai="xong">
       {ten} ({m.soLo})
@@ -88,13 +88,13 @@ export function GiaiDoanTruyXuat() {
   const [workshop, setWorkshop] = useState<Workshop | "">("");
   const [onlyMissing, setOnlyMissing] = useState(false);
 
-  const [lotLabel, setLotLabel] = useState<NutLo | null>(null);
+  const [lotLabel, setLotLabel] = useState<LotNode | null>(null);
   const [lotForBatch, setLotForBatch] = useState<WipProductionItem | null>(null);
   const [lotForPackaging, setLotForPackaging] = useState<Packaging | null>(null);
   const [lotForSalesItem, setLotForSalesItem] = useState<{ dong: SalesItem; loaiLo: "W" | "P" } | null>(null);
   const [lotForDomesticSale, setLotForDomesticSale] = useState<DomesticSaleItem | null>(null);
 
-  const ds = useMemo(() => theoGiaiDoan(dl, { tu, den, xuong: workshop }), [dl, tu, den, workshop]);
+  const ds = useMemo(() => groupByTraceStage(dl, { tu, den, xuong: workshop }), [dl, tu, den, workshop]);
   const tenMH = (id: string) => dl.products.find((p) => p.id === id)?.name || "—";
 
   /** Nút: việc còn thiếu thì nổi (default), còn lại viền (outline). */
@@ -104,10 +104,10 @@ export function GiaiDoanTruyXuat() {
       {label}
     </Button>
   );
-  const labelButton = (m: MucGiaiDoan) =>
+  const labelButton = (m: TraceStageItem) =>
     taskButton(m.thieu.includes("tem"), `In tem QR cho lô ${m.nut.nhan} (mặc định mỗi block / thùng một tem).`, () => setLotLabel(m.nut), <Printer aria-hidden />, "In tem");
 
-  const dongCua = (g: GiaiDoan, m: MucGiaiDoan): ReactNode => {
+  const dongCua = (g: TraceStage, m: TraceStageItem): ReactNode => {
     const n = m.nut;
     if (g.khoa === "nhap")
       return (
@@ -310,7 +310,7 @@ export function GiaiDoanTruyXuat() {
         <GanLoDauVao
           outputKind="W"
           outputId={lotForBatch.id}
-          outputNhan={`mẻ ${nhanLoBtp(lotForBatch)} · ${tenMH(lotForBatch.productId)}`}
+          outputNhan={`mẻ ${formatWipLotLabel(lotForBatch)} · ${tenMH(lotForBatch.productId)}`}
           xuong={lotForBatch.workshop}
           ngay={lotForBatch.productionDate}
           onClose={() => setLotForBatch(null)}
@@ -320,7 +320,7 @@ export function GiaiDoanTruyXuat() {
         <GanLoDauVao
           outputKind="P"
           outputId={lotForPackaging.id}
-          outputNhan={`phiếu ${nhanLoTp(lotForPackaging)} · ${tenMH(lotForPackaging.toProductId)}`}
+          outputNhan={`phiếu ${formatFinishedGoodLotLabel(lotForPackaging)} · ${tenMH(lotForPackaging.toProductId)}`}
           xuong={lotForPackaging.workshop}
           ngay={lotForPackaging.date}
           matHangId={lotForPackaging.fromProductId}
@@ -331,7 +331,7 @@ export function GiaiDoanTruyXuat() {
         <GanLoXuat
           docKind="sales_item"
           docId={lotForSalesItem.dong.id}
-          docNhan={`${tenMH(lotForSalesItem.dong.productId)} · ${kg(lotForSalesItem.dong.quantityKg)} · ${viDate(lotForSalesItem.dong.deliveryDate)}`}
+          docNhan={`${tenMH(lotForSalesItem.dong.productId)} · ${kg(lotForSalesItem.dong.quantityKg)} · ${formatDateVN(lotForSalesItem.dong.deliveryDate)}`}
           loaiLo={lotForSalesItem.loaiLo}
           xuong={(dl.salesInvoices ?? []).find((v) => v.id === lotForSalesItem.dong.invoiceId)?.workshop ?? "Đông"}
           ngay={lotForSalesItem.dong.deliveryDate}
@@ -343,7 +343,7 @@ export function GiaiDoanTruyXuat() {
         <GanLoXuat
           docKind="domestic_sale"
           docId={lotForDomesticSale.id}
-          docNhan={`bán nội địa ${lotForDomesticSale.materialTypeName} · ${kg(lotForDomesticSale.quantityKg)} · ${viDate(lotForDomesticSale.saleDate)}`}
+          docNhan={`bán nội địa ${lotForDomesticSale.materialTypeName} · ${kg(lotForDomesticSale.quantityKg)} · ${formatDateVN(lotForDomesticSale.saleDate)}`}
           loaiLo="S"
           xuong={lotForDomesticSale.workshop}
           ngay={lotForDomesticSale.saleDate}

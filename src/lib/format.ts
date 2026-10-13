@@ -31,7 +31,7 @@ export function todayISO(): string {
 }
 
 /** yyyy-mm-dd -> dd/mm/yyyy */
-export function viDate(iso: string): string {
+export function formatDateVN(iso: string): string {
   const [y, m, d] = iso.split("-");
   return `${d}/${m}/${y}`;
 }

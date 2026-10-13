@@ -11,20 +11,20 @@
  *  - Chỗ nào dò được trên chính sheet gốc (cột A, cột "Nguyên nhân lệch") thì chỉ
  *    đường tới đó, không chép thành danh sách mới.
  *
- * Số liệu lấy từ chính kết quả engine (`KetQuaDoiSoat`) nên luôn khớp với màn hình.
+ * Số liệu lấy từ chính kết quả engine (`ReconciliationResult`) nên luôn khớp với màn hình.
  */
-import type { KetQuaDoiSoat, SheetHoaDon } from "./doiSoatHddt";
-import { SHEET_TU_DUNG } from "./doiSoatHddt";
-import type { KetQuaSoHaiBan, NhomCungNgay } from "./doiSoatHaiBan";
-import { gomCungMstCungNgay, phanBenThue, soHaiBanHddt } from "./doiSoatHaiBan";
-import { MAU_NEN, chuCotExcel as chuCot, nenDac as to } from "./doiSoatChung";
+import type { ReconciliationResult, InvoiceSheet } from "./einvoiceReconciliation";
+import { GENERATED_SHEET_NAMES } from "./einvoiceReconciliation";
+import type { TwoVersionResult, SameDayGroup } from "./twoVersionReconciliation";
+import { groupSameTaxCodeSameDay, resolveTaxSideSheets, compareTwoInvoiceVersions } from "./twoVersionReconciliation";
+import { FILL_COLORS, columnIndexToLetter as chuCot, solidFill as to } from "./reconciliationCommon";
 
 type Workbook = import("exceljs").Workbook;
 type Worksheet = import("exceljs").Worksheet;
 /** `orderNo` quyết định thứ tự tab lúc ghi — có thật lúc chạy nhưng thiếu trong .d.ts của exceljs. */
 type ThuTu = { orderNo: number };
 
-/** Tên các sheet tự dựng — phải nằm trong `SHEET_TU_DUNG` để đọc lại bỏ qua, xuất lại xóa đi. */
+/** Tên các sheet tự dựng — phải nằm trong `GENERATED_SHEET_NAMES` để đọc lại bỏ qua, xuất lại xóa đi. */
 const TEN = {
   ketLuan: "KẾT LUẬN CHUNG",
   kiemChung: "KIỂM CHỨNG",
@@ -43,11 +43,11 @@ const GROUP_NAMES: Record<number, string> = {
   7: "SHEET TRÙNG LẶP",
 };
 
-const BG_HEADING = MAU_NEN.tieuDe;
-const NEN_TITLE = MAU_NEN.title;
-const BG_PASS = MAU_NEN.xanh;
-const NEN_TRUOT = MAU_NEN.do;
-const NEN_NGHI = MAU_NEN.vang;
+const BG_HEADING = FILL_COLORS.tieuDe;
+const NEN_TITLE = FILL_COLORS.title;
+const BG_PASS = FILL_COLORS.xanh;
+const NEN_TRUOT = FILL_COLORS.do;
+const NEN_NGHI = FILL_COLORS.vang;
 
 const vnd = (n: number) => `${Math.round(n).toLocaleString("vi-VN")} đ`;
 /** Địa chỉ nội bộ tới một ô, dạng `#'Sheet'!A1` — đích của hàm HYPERLINK. */
@@ -69,7 +69,7 @@ interface SumTotals {
   n: number;
 }
 const ZERO_SUM: SumTotals = { chua: 0, thue: 0, tong: 0, n: 0 };
-function sum(sheets: readonly SheetHoaDon[], filter: (d: SheetHoaDon["dong"][number]) => boolean): SumTotals {
+function sum(sheets: readonly InvoiceSheet[], filter: (d: InvoiceSheet["dong"][number]) => boolean): SumTotals {
   const r = { ...ZERO_SUM };
   for (const sh of sheets)
     for (const d of sh.dong)
@@ -83,7 +83,7 @@ function sum(sheets: readonly SheetHoaDon[], filter: (d: SheetHoaDon["dong"][num
 }
 
 /** Cộng ba cột tiền + đếm dòng cho các dòng SỔ thỏa điều kiện. */
-function sumLedger(kq: KetQuaDoiSoat, filter: (d: NonNullable<KetQuaDoiSoat["sheetPhanMem"]>["dong"][number]) => boolean = () => true): SumTotals {
+function sumLedger(kq: ReconciliationResult, filter: (d: NonNullable<ReconciliationResult["sheetPhanMem"]>["dong"][number]) => boolean = () => true): SumTotals {
   const r = { ...ZERO_SUM };
   for (const d of kq.sheetPhanMem?.dong ?? [])
     if (filter(d)) {
@@ -215,7 +215,7 @@ function criteriaTable(ws: Worksheet, fromRow: number, dong: readonly CriterionR
 }
 
 /** Khối SỐ LIỆU ĐỐI CHIẾU VỚI SỔ (trước v6.4 là sheet `ĐỐI CHIẾU TỔNG`) — chỉ khi có sổ. */
-function writeCompareBlock(ws: Worksheet, r0: number, kq: KetQuaDoiSoat): number {
+function writeCompareBlock(ws: Worksheet, r0: number, kq: ReconciliationResult): number {
   const hd = kq.sheetsHoaDon.filter((s) => !s.laPhu);
   const ledgerName = kq.sheetPhanMem?.ten ?? "";
   const A = sum(hd, () => true);
@@ -288,7 +288,7 @@ function writeCompareBlock(ws: Worksheet, r0: number, kq: KetQuaDoiSoat): number
 // ---------------------------------------------------------------------------
 
 /** Cột AOA → cột 0-based trong FILE RA (tính cả cột A chèn/gỡ). */
-export type CotRa = (sh: SheetHoaDon, c: number) => number;
+export type OutputColumnMapper = (sh: InvoiceSheet, c: number) => number;
 
 interface DiffPart {
   ten: string;
@@ -298,7 +298,7 @@ interface DiffPart {
 }
 
 /** Con số kế toán đang nhìn + các phần cộng lại đúng bằng nó. */
-function analyzeMismatch(sh: SheetHoaDon): { V: number; phan: DiffPart[] } {
+function analyzeMismatch(sh: InvoiceSheet): { V: number; phan: DiffPart[] } {
   const cd = sh.canDoiCot;
   const o = cd.oTuDat;
   const includeFees = o?.congPhi ?? false;
@@ -319,7 +319,7 @@ function analyzeMismatch(sh: SheetHoaDon): { V: number; phan: DiffPart[] } {
 const formatAmount = (n: number) => Math.round(n).toLocaleString("vi-VN");
 
 /** Câu trả lời một dòng cho một sheet — đặt ở bảng TRẢ LỜI đầu trang. */
-function columnSumAnswer(sh: SheetHoaDon, outputColumn: CotRa): { cau: string; sai: boolean } {
+function columnSumAnswer(sh: InvoiceSheet, outputColumn: OutputColumnMapper): { cau: string; sai: boolean } {
   const cd = sh.canDoiCot;
   const { V, phan } = analyzeMismatch(sh);
   const wrongRows = cd.dongLech.filter((d) => d.loai === "that");
@@ -337,7 +337,7 @@ function columnSumAnswer(sh: SheetHoaDon, outputColumn: CotRa): { cau: string; s
 }
 
 /** Khối dò lệch của MỘT sheet. */
-function writeDiffBlock(ws: Worksheet, r0: number, sh: SheetHoaDon, outputColumn: CotRa): number {
+function writeDiffBlock(ws: Worksheet, r0: number, sh: InvoiceSheet, outputColumn: OutputColumnMapper): number {
   const cd = sh.canDoiCot;
   const columns = (c: number) => (c >= 0 ? chuCot(outputColumn(sh, c)) : "");
   const oCua = (c: number, dong: number) => (c >= 0 ? `${columns(c)}${dong}` : "");
@@ -422,7 +422,7 @@ function writeDiffBlock(ws: Worksheet, r0: number, sh: SheetHoaDon, outputColumn
 }
 
 /** Khối CHỖ CẦN SOÁT LẠI (trước v6.4 là sheet `NGHI VẤN SỐ LIỆU`) — chỉ khi có. */
-function writeSuspectBlock(ws: Worksheet, r0: number, kq: KetQuaDoiSoat): number {
+function writeSuspectBlock(ws: Worksheet, r0: number, kq: ReconciliationResult): number {
   const hasLedger = !!kq.sheetPhanMem;
   let r = writeBlockTitle(ws, r0, `CHỖ CẦN SOÁT LẠI — ${kq.nghiVan.length + kq.nghiVanGop.length} ô nghi sai số liệu (máy KHÔNG tự sửa ô nào)`);
   writeHeaderSpans(ws, r++, [["VỊ TRÍ (trong chính file này)", 1], ["SỐ ĐANG CÓ", 1], ["SỐ ĐỐI CHỨNG", 1], ["NHÓM", 2], ["SAI Ở CHỖ NÀO", 2], ["ẢNH HƯỞNG · AI LÀM GÌ", 1]]);
@@ -449,7 +449,7 @@ function writeSuspectBlock(ws: Worksheet, r0: number, kq: KetQuaDoiSoat): number
 }
 
 /** Khối TỰ KIỂM TRA — bằng chứng máy tự chấm, đứng CUỐI. */
-function writeSelfCheckBlock(ws: Worksheet, r0: number, kq: KetQuaDoiSoat): number {
+function writeSelfCheckBlock(ws: Worksheet, r0: number, kq: ReconciliationResult): number {
   const passedCount = kq.phepThu.filter((p) => p.dat).length;
   const total = kq.phepThu.length;
   let r = writeBlockTitle(ws, r0, `MÁY TỰ KIỂM TRA — ${total} phép thử chấm lúc xuất file`);
@@ -484,7 +484,7 @@ interface UnlistedAnchors {
  * tổng sổ, chênh — đủ 3 cột trước thuế/thuế/tổng. Chi tiết cách tính + tự kiểm đẩy
  * sang sheet KIỂM CHỨNG (khối `khoiDoiChieu`).
  */
-function writeSummaryBlock(ws: Worksheet, r0: number, kq: KetQuaDoiSoat): number {
+function writeSummaryBlock(ws: Worksheet, r0: number, kq: ReconciliationResult): number {
   const hd = kq.sheetsHoaDon.filter((s) => !s.laPhu);
   const A = sum(hd, () => true);
   const B = sumLedger(kq);
@@ -507,9 +507,9 @@ function writeSummaryBlock(ws: Worksheet, r0: number, kq: KetQuaDoiSoat): number
  */
 function sheetKetLuan(
   wb: Workbook,
-  kq: KetQuaDoiSoat,
-  ds: { chuaKe: UnlistedAnchors | null; haiBan: KetQuaSoHaiBan | null; cungNgay: readonly NhomCungNgay[] },
-  outputColumn: CotRa
+  kq: ReconciliationResult,
+  ds: { chuaKe: UnlistedAnchors | null; haiBan: TwoVersionResult | null; cungNgay: readonly SameDayGroup[] },
+  outputColumn: OutputColumnMapper
 ): { ketLuan: Worksheet; kiemChung: Worksheet } {
   const ws = wb.addWorksheet(TEN.ketLuan);
   EMPTY_MARKS.forEach((w, i) => (ws.getColumn(i + 1).width = w));
@@ -758,7 +758,7 @@ const dateKey = (s: string): string => {
  * đây là bắt người ta đi kê oan. Chúng được nêu riêng ở cuối cho minh bạch.
  * Phần 2: dòng sổ KHÔNG có hóa đơn điện tử (chiều ngược lại).
  */
-function buildUndeclaredSheet(wb: Workbook, kq: KetQuaDoiSoat): { ws: Worksheet; moc: UnlistedAnchors } | null {
+function buildUndeclaredSheet(wb: Workbook, kq: ReconciliationResult): { ws: Worksheet; moc: UnlistedAnchors } | null {
   const hd = kq.sheetsHoaDon.filter((sh) => !sh.laPhu);
   const allMissing = hd.flatMap((sh) => sh.dong.filter((d) => d.trangThai === "THIEU"));
   const soThieu = (kq.sheetPhanMem?.dong ?? []).filter((d) => d.trangThai === "THIEU");
@@ -886,7 +886,7 @@ function buildUndeclaredSheet(wb: Workbook, kq: KetQuaDoiSoat): { ws: Worksheet;
 }
 
 /** Sheet SO HAI BẢN — chỉ dựng khi file có cả bản thuế gửi lẫn bản tự tải. */
-function buildVersionCompareSheet(wb: Workbook, so: KetQuaSoHaiBan): Worksheet {
+function buildVersionCompareSheet(wb: Workbook, so: TwoVersionResult): Worksheet {
   const ws = wb.addWorksheet(TEN.haiBan);
   [26, 16, 16, 14, 40, 18, 18, 18, 16, 26, 26, 64].forEach((w, i) => (ws.getColumn(i + 1).width = w));
   writePageTitle(ws, "SO HAI BẢN HÓA ĐƠN ĐIỆN TỬ — bản cơ quan thuế gửi ⇄ bản tự tải", [
@@ -943,7 +943,7 @@ function buildVersionCompareSheet(wb: Workbook, so: KetQuaSoHaiBan): Worksheet {
 }
 
 /** Sheet CÙNG MST + CÙNG NGÀY — lọc hóa đơn nghi trùng / nghi tách đơn. */
-function buildSameDaySheet(wb: Workbook, nhom: readonly NhomCungNgay[]): Worksheet {
+function buildSameDaySheet(wb: Workbook, nhom: readonly SameDayGroup[]): Worksheet {
   const ws = wb.addWorksheet(TEN.cungNgay);
   [22, 14, 40, 20, 10, 20, 16, 18, 22, 40].forEach((w, i) => (ws.getColumn(i + 1).width = w));
   const nghi = nhom.filter((g) => g.trungSoTien).length;
@@ -993,16 +993,16 @@ function buildSameDaySheet(wb: Workbook, nhom: readonly NhomCungNgay[]): Workshe
  * tự: KẾT LUẬN → chưa kê (có sổ) / so hai bản → các sheet gốc → cùng MST cùng ngày
  * (tham khảo) → nhật ký sửa.
  */
-export function themSheetTongHop(wb: Workbook, kq: KetQuaDoiSoat, outputColumn: CotRa): void {
+export function addSummarySheets(wb: Workbook, kq: ReconciliationResult, outputColumn: OutputColumnMapper): void {
   // Chạy lại trên file đã xuất: bỏ mọi sheet tự dựng (kể cả tên cũ trước v6.4)
   // rồi dựng lại, kẻo trùng tên hoặc sót sheet cũ nằm lại.
-  for (const w of [...wb.worksheets]) if (SHEET_TU_DUNG.has(w.name) && w.name !== "NHẬT KÝ SỬA") wb.removeWorksheet(w.id);
+  for (const w of [...wb.worksheets]) if (GENERATED_SHEET_NAMES.has(w.name) && w.name !== "NHẬT KÝ SỬA") wb.removeWorksheet(w.id);
   // Sheet gốc lùi về sau; sheet tổng hợp chiếm các chỗ đầu.
   wb.worksheets.forEach((w, i) => ((w as unknown as ThuTu).orderNo = 10 + i));
 
-  const { benThue } = phanBenThue(kq.sheetsHoaDon.map((s) => s.ten), kq.benThue);
-  const versionCompare = soHaiBanHddt(kq.sheetsHoaDon, kq.nguong, benThue);
-  const sameDayGroups = gomCungMstCungNgay(kq.sheetsHoaDon.filter((s) => !s.laPhu), benThue);
+  const { benThue } = resolveTaxSideSheets(kq.sheetsHoaDon.map((s) => s.ten), kq.benThue);
+  const versionCompare = compareTwoInvoiceVersions(kq.sheetsHoaDon, kq.nguong, benThue);
+  const sameDayGroups = groupSameTaxCodeSameDay(kq.sheetsHoaDon.filter((s) => !s.laPhu), benThue);
   const unlisted = kq.sheetPhanMem ? buildUndeclaredSheet(wb, kq) : null;
   const twoVersionSheet = versionCompare ? buildVersionCompareSheet(wb, versionCompare) : null;
   const sameDaySheet = sameDayGroups.length ? buildSameDaySheet(wb, sameDayGroups) : null;

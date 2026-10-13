@@ -64,7 +64,7 @@ const LEGACY_ROLE_MAP: Record<string, Role> = {
 };
 
 /** Chuẩn hoá một slug vai trò: slug cũ → chuẩn; slug đã chuẩn giữ nguyên. */
-export function chuanHoaVaiTro(v: string): Role {
+export function normalizeRole(v: string): Role {
   const t = v.trim();
   return (LEGACY_ROLE_MAP[t] ?? t) as Role;
 }
@@ -74,7 +74,7 @@ export function rolesFromCsv(csv: string): Role[] {
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean)
-    .map(chuanHoaVaiTro);
+    .map(normalizeRole);
 }
 
 export function rolesToCsv(arr: Role[]): string {
@@ -82,7 +82,7 @@ export function rolesToCsv(arr: Role[]): string {
 }
 
 export function rolesList(v: unknown): Role[] {
-  if (Array.isArray(v)) return v.map((x) => chuanHoaVaiTro(String(x)));
+  if (Array.isArray(v)) return v.map((x) => normalizeRole(String(x)));
   if (typeof v === "string") return rolesFromCsv(v);
   return [];
 }
@@ -118,7 +118,7 @@ export type Category = (typeof CATEGORIES)[number];
 
 /** Kiểu chế biến của thành phẩm — facet thứ 3 (migration 0027). Danh mục MỞ, thêm tại chỗ.
  *  Dùng chung cho Danh mục mặt hàng và hộp sửa nhanh thành phẩm ở /wip. */
-export const KIEU_CHE_BIEN = [
+export const PROCESSING_TYPES = [
   "Nguyên con làm sạch",
   "Luộc",
   "Chần",
@@ -229,13 +229,13 @@ export interface Product {
   processingType?: string; // KIỂU CHẾ BIẾN (luộc/chần/cắt/tẩm bột…) — facet thứ 3, migration 0027
   /** Mã tách 2 thành phần râu/bao tử (cùng giá) — chỉ mã này mới hiện ô tách ở
    *  màn ghi thành phẩm. Migration 0031. Nhận cả boolean lẫn chuỗi "1"/"" từ
-   *  danh mục (CRUD lưu chuỗi) — đọc bằng `laCoTach()`. */
+   *  danh mục (CRUD lưu chuỗi) — đọc bằng `hasSplitComponents()`. */
   splitComponents?: boolean | string;
   /** Quy cách MỖI block (kg/khối). Migration 0031. Danh mục lưu chuỗi. */
   blockSpecKg?: number | string | null;
   /** BỘT ĐI KÈM (migration 0051): id các loại bột tẩm của mặt hàng — VD tẩm bột
    *  nước tương = [24V, 18V, 220H]. Màn /wip tự hiện ô kg cho từng loại. Danh mục
-   *  (CRUD lưu chuỗi) giữ dạng "id1,id2" — đọc bằng `botDiKemIds()` (lib/botTam). */
+   *  (CRUD lưu chuỗi) giữ dạng "id1,id2" — đọc bằng `getProductBatterIds()` (lib/batter). */
   batterIds?: string[] | string;
 }
 
@@ -248,13 +248,13 @@ export interface BatterType {
 }
 
 /** Mặt hàng có tách râu/bao tử không (chịu cả boolean lẫn chuỗi "1"/"true"). */
-export function laCoTach(p: Pick<Product, "splitComponents"> | undefined): boolean {
+export function hasSplitComponents(p: Pick<Product, "splitComponents"> | undefined): boolean {
   const v = p?.splitComponents;
   return v === true || v === "1" || v === "true";
 }
 
 /** Quy cách block (kg/khối) dạng số, 0/không hợp lệ → null. */
-export function quyCachBlock(p: Pick<Product, "blockSpecKg"> | undefined): number | null {
+export function blockSpec(p: Pick<Product, "blockSpecKg"> | undefined): number | null {
   const n = Number(p?.blockSpecKg);
   return Number.isFinite(n) && n > 0 ? n : null;
 }
@@ -336,7 +336,7 @@ export interface BalancingInputItem {
   autoSource?: GridAutoSource;
   /**
    * Dòng LẤY XẢ ĐÔNG: id dòng Sổ kho tháng (LÔ) chọn đích danh để lấy (mig 0053).
-   * Tháng sau của cùng lô theo chuỗi dồn kỳ `carry|<id>` — xem lib/khoCanDoi.ts.
+   * Tháng sau của cùng lô theo chuỗi dồn kỳ `carry|<id>` — xem lib/balancingStockLines.ts.
    */
   stockLineId?: string;
   /** Dòng GỬI ĐÔNG: kho nhận `"<sổ kho>|<vị trí>"` (mig 0053), VD "Kho 1500 tấn|Kho Hồng Phú". */
@@ -485,7 +485,7 @@ export interface DomesticSaleItem {
  * BẢN GHI (không phải chỉ số dòng) để sắp xếp/lọc không làm lệch dấu.
  */
 export interface RowMark {
-  id: string; // tất định: xem lib/toMau.ts#idDauTo
+  id: string; // tất định: xem lib/rowMarks.ts#idDauTo
   tableKey: string; // khoá ổn định của bảng/màn — VD "ton-kho-thang"
   rowId: string;
   columnKey: string | null; // null = cả dòng (chừa cho tô ô lẻ)
@@ -521,7 +521,7 @@ export interface Packaging {
 }
 
 /** Hao hụt đóng gói (kg) = BTP vào − TP ra. Âm = ghi nhầm (TP ra > BTP vào). */
-export function haoHutDongGoi(p: Pick<Packaging, "inputKg" | "outputKg">): number {
+export function computePackagingLoss(p: Pick<Packaging, "inputKg" | "outputKg">): number {
   return p.inputKg - p.outputKg;
 }
 
@@ -656,7 +656,7 @@ export interface StorageLocation {
 }
 
 /** Kho nhà — mặc định khi một dòng chưa gán kho lưu. */
-export const KHO_LUU_MAC_DINH = "Kho Baseafood";
+export const DEFAULT_STORAGE_LOCATION = "Kho Baseafood";
 
 export interface NxtReportItem {
   productId: string;
@@ -791,7 +791,7 @@ export interface MonthlyStockLine {
 /**
  * Bản đối soát hóa đơn đã LƯU theo tài khoản (màn /doi-soat). Lưu file gốc
  * (base64, để mở lại chạy lại) + tham số + ảnh chụp tóm tắt kết quả. Bản
- * `official` (chính thức) đóng băng `summary`. Logic đối soát ở `lib/doiSoatHddt.ts`
+ * `official` (chính thức) đóng băng `summary`. Logic đối soát ở `lib/einvoiceReconciliation.ts`
  * (không import ở đây để repo.ts không kéo xlsx vào bundle chính).
  */
 /** Loại lô: S = nguyên liệu (chuyến nhập) · W = bán thành phẩm (mẻ SX) · P = thành phẩm (phiếu đóng gói). */

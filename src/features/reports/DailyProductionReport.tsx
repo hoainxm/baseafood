@@ -34,8 +34,8 @@ import {
   useChonDong,
   useToMau,
 } from "@/design-system";
-import { KY_OPT, phamViKy, type KyXem } from "@/lib/periodUtils";
-import { num, viDate } from "@/lib/format";
+import { KY_OPT, getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
+import { num, formatDateVN } from "@/lib/format";
 import { exportAoaToXlsx, type OExcel } from "@/lib/reportXlsx";
 import {
   CalendarRange,
@@ -83,13 +83,13 @@ export default function DailyProductionReport() {
   const [products] = useProducts();
   const isLoading = trangThai === "dang-tai" && rows.length === 0;
 
-  const [ky, setKy] = useState<KyXem>("thang");
+  const [ky, setKy] = useState<ViewPeriod>("thang");
   const [moc, setMoc] = useState(homNay());
   const [tuTC, setTuTC] = useState(homNay());
   const [denTC, setDenTC] = useState(homNay());
   const [workshop, setWorkshop] = useState("Tất cả");
   const [inPrint, setInPrint] = useState(false);
-  const [tu, den] = phamViKy(ky, moc, tuTC, denTC);
+  const [tu, den] = getViewPeriodRange(ky, moc, tuTC, denTC);
   // Dòng là dòng GỘP (xưởng × mặt hàng × quy cách) ⇒ ghép kỳ + xưởng vào khoá
   // bảng để "đã dò" kỳ này không lan sang kỳ khác.
   const to = useToMau(`bao-cao-sx-ngay|${tu}|${den}|${workshop}`);
@@ -170,13 +170,13 @@ export default function DailyProductionReport() {
   const khoaDong = groups.flatMap((g) => g.rows.map((r) => `${r.workshop}|||${r.productId}|||${r.spec}`));
 
   const chart: CotBieuDoDoc[] = days.map((d) => ({
-    nhan: viDate(d).slice(0, 5),
+    nhan: formatDateVN(d).slice(0, 5),
     giaTri: tongNgayTong[d] ?? 0,
-    phu: viDate(d),
+    phu: formatDateVN(d),
   }));
 
   const the: TheThongTin[] = [
-    { nhan: "Kỳ báo cáo", giaTri: `${viDate(tu)} – ${viDate(den)}`, icon: CalendarRange, mau: "trung-tinh" },
+    { nhan: "Kỳ báo cáo", giaTri: `${formatDateVN(tu)} – ${formatDateVN(den)}`, icon: CalendarRange, mau: "trung-tinh" },
     { nhan: "Tổng sản lượng", giaTri: `${num(tongKgTong)} kg`, so: true, icon: Scale, mau: "brand" },
     { nhan: "Tổng block", giaTri: num(tongBlockTong), so: true, icon: Layers, mau: "trung-tinh" },
     { nhan: "Số mặt hàng", giaTri: num(soMatHang), so: true, icon: Package, mau: "success" },
@@ -189,9 +189,9 @@ export default function DailyProductionReport() {
     }
     const aoa: OExcel[][] = [];
     aoa.push(["Báo cáo tổng hợp thành phẩm sản xuất hàng ngày"]);
-    aoa.push([`Kỳ: ${viDate(tu)} – ${viDate(den)} · Phân xưởng: ${workshop}`]);
+    aoa.push([`Kỳ: ${formatDateVN(tu)} – ${formatDateVN(den)} · Phân xưởng: ${workshop}`]);
     aoa.push([]);
-    aoa.push(["Phân xưởng", "Mặt hàng", "Quy cách", ...days.map((d) => viDate(d)), "Tổng kg", "Tổng block"]);
+    aoa.push(["Phân xưởng", "Mặt hàng", "Quy cách", ...days.map((d) => formatDateVN(d)), "Tổng kg", "Tổng block"]);
     for (const g of groups) {
       for (const r of g.rows)
         aoa.push([g.workshop, r.productName, r.spec, ...days.map((d) => r.theoNgay[d] ?? 0), r.tongKg, r.tongBlock]);
@@ -236,7 +236,7 @@ export default function DailyProductionReport() {
             anNhanBatBuoc
             choPhepXoa={false}
             value={ky}
-            onChange={(v) => setKy(v as KyXem)}
+            onChange={(v) => setKy(v as ViewPeriod)}
             options={KY_OPT}
           />
         </div>
@@ -257,7 +257,7 @@ export default function DailyProductionReport() {
             <DateField
               label={ky === "ngay" ? "Ngày" : "Ngày bất kỳ trong kỳ"}
               anNhanBatBuoc
-              hint={ky === "ngay" ? undefined : `Kỳ: ${viDate(tu)} – ${viDate(den)}`}
+              hint={ky === "ngay" ? undefined : `Kỳ: ${formatDateVN(tu)} – ${formatDateVN(den)}`}
               value={moc}
               onChange={setMoc}
             />
@@ -282,7 +282,7 @@ export default function DailyProductionReport() {
       ) : groups.length === 0 ? (
         <EmptyState
           icon={Factory}
-          tieuDe={`Chưa có thành phẩm sản xuất trong ${viDate(tu)} – ${viDate(den)}`}
+          tieuDe={`Chưa có thành phẩm sản xuất trong ${formatDateVN(tu)} – ${formatDateVN(den)}`}
           moTa="Ghi sản lượng ở màn Sản xuất BTP, số liệu sẽ tổng hợp về đây."
         />
       ) : (
@@ -304,7 +304,7 @@ export default function DailyProductionReport() {
                   <TableHead>Quy cách</TableHead>
                   {days.map((d) => (
                     <TableHead key={d} className="whitespace-nowrap text-right">
-                      {viDate(d).slice(0, 5)}
+                      {formatDateVN(d).slice(0, 5)}
                     </TableHead>
                   ))}
                   <TableHead className="text-right">Tổng kg</TableHead>
@@ -388,7 +388,7 @@ export default function DailyProductionReport() {
       {inPrint && (
         <PhieuIn
           tieuDe="Báo cáo tổng hợp thành phẩm hàng ngày"
-          phuDe={`Kỳ: ${viDate(tu)} – ${viDate(den)}${workshop !== "Tất cả" ? ` · Phân xưởng ${workshop}` : ""}`}
+          phuDe={`Kỳ: ${formatDateVN(tu)} – ${formatDateVN(den)}${workshop !== "Tất cả" ? ` · Phân xưởng ${workshop}` : ""}`}
           onClose={() => setInPrint(false)}
         >
           <table className="w-full border-collapse">
@@ -398,7 +398,7 @@ export default function DailyProductionReport() {
                 <ThIn>Quy cách</ThIn>
                 {days.map((d) => (
                   <ThIn key={d} right>
-                    {viDate(d).slice(0, 5)}
+                    {formatDateVN(d).slice(0, 5)}
                   </ThIn>
                 ))}
                 <ThIn right>Tổng kg</ThIn>

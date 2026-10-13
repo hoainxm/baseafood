@@ -17,8 +17,8 @@ import {
   type TheThongTin,
 } from "@/design-system";
 import { useSalesItems, useSalesInvoices, useCustomers } from "@/lib/catalogRepo";
-import { KY_OPT, phamViKy, type KyXem } from "@/lib/periodUtils";
-import { num, viDate } from "@/lib/format";
+import { KY_OPT, getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
+import { num, formatDateVN } from "@/lib/format";
 import { calculateSalesAmount, type SalesChannel } from "@/types";
 import { CalendarRange, Scale, Users } from "lucide-react";
 
@@ -44,11 +44,11 @@ export default function BaoCaoBan() {
   const [invoices] = useSalesInvoices();
   const [customers] = useCustomers();
 
-  const [ky, setKy] = useState<KyXem>("thang");
+  const [ky, setKy] = useState<ViewPeriod>("thang");
   const [moc, setMoc] = useState(homNay());
   const [tuTC, setTuTC] = useState(homNay());
   const [denTC, setDenTC] = useState(homNay());
-  const [tu, den] = phamViKy(ky, moc, tuTC, denTC);
+  const [tu, den] = getViewPeriodRange(ky, moc, tuTC, denTC);
 
   const { dong, chart, soKhach, tongKg } = useMemo(() => {
     const invById = new Map(invoices.map((i) => [i.id, i]));
@@ -89,7 +89,7 @@ export default function BaoCaoBan() {
   }, [items, invoices, customers, tu, den]);
 
   const the: TheThongTin[] = [
-    { nhan: "Kỳ báo cáo", giaTri: `${viDate(tu)} – ${viDate(den)}`, icon: CalendarRange, mau: "trung-tinh" },
+    { nhan: "Kỳ báo cáo", giaTri: `${formatDateVN(tu)} – ${formatDateVN(den)}`, icon: CalendarRange, mau: "trung-tinh" },
     { nhan: "Tổng bán", giaTri: `${num(tongKg)} kg`, so: true, icon: Scale, mau: "brand" },
     { nhan: "Số khách", giaTri: num(soKhach), so: true, icon: Users, mau: "trung-tinh" },
   ];
@@ -121,7 +121,7 @@ export default function BaoCaoBan() {
             anNhanBatBuoc
             choPhepXoa={false}
             value={ky}
-            onChange={(v) => setKy(v as KyXem)}
+            onChange={(v) => setKy(v as ViewPeriod)}
             options={KY_OPT}
           />
         </div>
@@ -142,7 +142,7 @@ export default function BaoCaoBan() {
             <DateField
               label={ky === "ngay" ? "Ngày" : "Ngày bất kỳ trong kỳ"}
               anNhanBatBuoc
-              hint={ky === "ngay" ? undefined : `Kỳ: ${viDate(tu)} – ${viDate(den)}`}
+              hint={ky === "ngay" ? undefined : `Kỳ: ${formatDateVN(tu)} – ${formatDateVN(den)}`}
               value={moc}
               onChange={setMoc}
             />

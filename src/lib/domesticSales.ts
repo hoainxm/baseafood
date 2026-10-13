@@ -1,5 +1,5 @@
 // ============================================================
-// Tên file: src/lib/banNoiDia.ts
+// Tên file: src/lib/domesticSales.ts
 // Tên tiếng Việt: Bán nội địa — NL bán thẳng (sổ /wip) ⇄ dòng "Bán nội địa" khối 1 Cân đối
 // Description: Pure helpers for domestic raw-material sales (migration 0054).
 // ============================================================
@@ -8,13 +8,13 @@
 // (VD −987 kg) — trừ khỏi pool NL đưa vào sản xuất. Ở app:
 //   - tổ trưởng ghi từng dòng ở /wip  → sổ `domestic_sales` (kg DƯƠNG);
 //   - Cân đối có dòng giảm tên "Bán nội địa" (isReduction ⇒ lưu ÂM) — nút "Lấy
-//     bán nội địa từ SX" điền đúng từng ngày bằng `banNoiDiaTheoKy`.
+//     bán nội địa từ SX" điền đúng từng ngày bằng `getPeriodDomesticSales`.
 // Dòng giảm âm sẵn hợp lệ với calculateBalancing ⇒ KHÔNG đổi công thức.
 import type { BalancingPeriod, DailyQuantities, DomesticSaleItem } from "@/types";
-import { cungHoNguyenLieu, ngayTrongKy } from "@/lib/balancingGrid";
+import { isSameMaterialFamily, getPeriodDates } from "@/lib/balancingGrid";
 
 /** Tên dòng giảm khối 1 — đúng chữ trên bảng cân đối giấy. */
-export const TEN_DONG_BAN_NOI_DIA = "Bán nội địa";
+export const DOMESTIC_SALE_ROW_NAME = "Bán nội địa";
 
 /**
  * Dòng NL khối 1 là dòng Bán nội địa: nhận theo TÊN (không phân hoa thường), BẤT KỂ
@@ -22,11 +22,11 @@ export const TEN_DONG_BAN_NOI_DIA = "Bán nội địa";
  * Thủy sản kg âm thường, không phải dòng giảm. Nhận theo cờ thì nút "Lấy từ SX" sẽ
  * đẻ dòng thứ hai ⇒ TRỪ ĐÔI. Khi điền từ SX, dòng cũ được chuyển thành dòng giảm.
  */
-export function laDongBanNoiDia(r: { name: string }): boolean {
-  return r.name.trim().toLowerCase() === TEN_DONG_BAN_NOI_DIA.toLowerCase();
+export function isDomesticSaleRow(r: { name: string }): boolean {
+  return r.name.trim().toLowerCase() === DOMESTIC_SALE_ROW_NAME.toLowerCase();
 }
 
-export interface BanNoiDiaKy {
+export interface PeriodDomesticSales {
   /** kg DƯƠNG theo ngày (dòng Cân đối tự đổi dấu khi ghi). */
   theoNgay: DailyQuantities;
   tongKg: number;
@@ -39,11 +39,11 @@ export interface BanNoiDiaKy {
  * Bán nội địa của MỘT kỳ cân đối: dòng có ngày bán nằm trong kỳ + loại NL CÙNG HỌ
  * với kỳ (kỳ dùng tên họ — "2 da lớn/nhỏ" đều thuộc "Bạch tuộc 2 da"). Bỏ dòng ≤ 0.
  */
-export function banNoiDiaTheoKy(
+export function getPeriodDomesticSales(
   ds: DomesticSaleItem[],
   ky: Pick<BalancingPeriod, "startDate" | "endDate" | "materialTypeName">
-): BanNoiDiaKy {
-  const dates = new Set(ngayTrongKy(ky));
+): PeriodDomesticSales {
+  const dates = new Set(getPeriodDates(ky));
   const byDate: DailyQuantities = {};
   let totalKg = 0;
   let pricedKg = 0;
@@ -52,7 +52,7 @@ export function banNoiDiaTheoKy(
   for (const d of ds) {
     const kg = Number(d.quantityKg) || 0;
     if (kg <= 0 || !dates.has(d.saleDate)) continue;
-    if (!cungHoNguyenLieu(d.materialTypeName, ky.materialTypeName)) continue;
+    if (!isSameMaterialFamily(d.materialTypeName, ky.materialTypeName)) continue;
     byDate[d.saleDate] = (byDate[d.saleDate] ?? 0) + kg;
     totalKg += kg;
     rowCount += 1;
@@ -74,7 +74,7 @@ export function banNoiDiaTheoKy(
  * "khop" khi mọi ngày bằng nhau (sai số < 0,001 kg), "lech" khi khác, "trong" khi
  * Cân đối chưa có số nào.
  */
-export function doiChieuBanNoiDia(
+export function compareDomesticSales(
   canDoi: DailyQuantities | undefined,
   production: DailyQuantities
 ): "khop" | "lech" | "trong" {
@@ -91,7 +91,7 @@ export function doiChieuBanNoiDia(
 }
 
 /** Ngày-theo-kg DƯƠNG → ÂM để ghi vào dòng giảm (bỏ ngày 0). */
-export function amTheoNgay(m: DailyQuantities): DailyQuantities {
+export function negateDailyQuantities(m: DailyQuantities): DailyQuantities {
   const ra: DailyQuantities = {};
   for (const [iso, kg] of Object.entries(m)) if (kg) ra[iso] = -Math.abs(kg);
   return ra;

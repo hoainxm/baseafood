@@ -5,8 +5,8 @@
 // ============================================================
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase, hasSupabase, SITE_ID } from "@/lib/supabase";
-import { dongLenMay, dongTuMay, khoaLenMay, khoaLocal } from "@/lib/cheDo";
-import { ketNoi } from "@/lib/connectivity";
+import { rowToServer, rowFromServer, toServerKey, modeLocalKey } from "@/lib/demoMode";
+import { connectivity } from "@/lib/connectivity";
 import { load, save } from "@/lib/db";
 import type {
   FinishedGood,
@@ -55,8 +55,8 @@ import type {
   RowMark,
 } from "@/types";
 import { rolesFromCsv, rolesToCsv } from "@/types";
-import { botDiKemIds, lamSachBot } from "@/lib/botTam";
-import { ghiNhatKy, type NhatKyMoi } from "@/lib/audit";
+import { getProductBatterIds, sanitizeBatterKg } from "@/lib/batter";
+import { appendAuditEntries, type NewAuditEntry } from "@/lib/audit";
 
 /**
  * Tầng dữ liệu dùng chung.
@@ -74,7 +74,7 @@ import { ghiNhatKy, type NhatKyMoi } from "@/lib/audit";
  * Tên bảng/cột trong DB: Tiếng Anh, snake_case.
  */
 
-export interface AnhXaBang<T> {
+export interface TableMapping<T> {
   /** Tên bảng trong Supabase */
   table: string;
   /** Khóa chính trong DB — mặc định "id", danh mục thành phẩm dùng "code" */
@@ -101,7 +101,7 @@ export interface AnhXaBang<T> {
   truongKhongCache?: (keyof T & string)[];
   /**
    * Cột (tên DB) là KHÓA NGOẠI trỏ tới khóa chính bảng khác — chế độ demo phải thêm
-   * tiền tố `demo:` cho cả cột này như khóa chính (lib/cheDo.ts), không thì máy chủ
+   * tiền tố `demo:` cho cả cột này như khóa chính (lib/demoMode.ts), không thì máy chủ
    * từ chối (23503). DB thật: `period_id → balancing_periods.id` ở balancing_inputs,
    * balancing_outputs, scraps. Thêm khóa ngoại mới giữa hai bảng nghiệp vụ ⇒ khai ở đây.
    */
@@ -137,7 +137,7 @@ function parseDailyQuantities(v: unknown): DailyQuantities {
 
 /* ---------- Ánh xạ camelCase (app) ↔ snake_case (Postgres) ---------- */
 
-export const BANG_SUPPLIER: AnhXaBang<Supplier> = {
+export const BANG_SUPPLIER: TableMapping<Supplier> = {
   table: "suppliers",
   localKey: "bsf.suppliers.v2",
   layKhoa: theoId,
@@ -167,7 +167,7 @@ export const BANG_SUPPLIER: AnhXaBang<Supplier> = {
   }),
 };
 
-export const BANG_MATERIAL_TYPE: AnhXaBang<MaterialType> = {
+export const BANG_MATERIAL_TYPE: TableMapping<MaterialType> = {
   table: "material_types",
   localKey: "bsf.material-types.v2",
   layKhoa: theoId,
@@ -181,7 +181,7 @@ export const BANG_MATERIAL_TYPE: AnhXaBang<MaterialType> = {
 };
 
 /** Danh mục 141 mã kế toán — khóa chính là CODE, không phải id sinh tự động. */
-export const BANG_FINISHED_GOOD: AnhXaBang<FinishedGood> = {
+export const BANG_FINISHED_GOOD: TableMapping<FinishedGood> = {
   table: "finished_goods",
   khoaChinh: "code",
   localKey: "bsf.finished-goods.v2",
@@ -202,7 +202,7 @@ export const BANG_FINISHED_GOOD: AnhXaBang<FinishedGood> = {
   }),
 };
 
-export const BANG_PRODUCT: AnhXaBang<Product> = {
+export const BANG_PRODUCT: TableMapping<Product> = {
   table: "products",
   localKey: "bsf.products.v2",
   layKhoa: theoId,
@@ -223,7 +223,7 @@ export const BANG_PRODUCT: AnhXaBang<Product> = {
         : Number(x.blockSpecKg),
     // Migration 0051 → gửi LUÔN (form danh mục lưu chuỗi "id1,id2" ⇒ chuẩn hoá về
     // mảng). Gửi có điều kiện sẽ KHÔNG xoá được về rỗng (upsert giữ giá trị cũ).
-    batter_ids: botDiKemIds(x),
+    batter_ids: getProductBatterIds(x),
   }),
   fromRow: (r) => ({
     id: s(r.id),
@@ -246,7 +246,7 @@ export const BANG_PRODUCT: AnhXaBang<Product> = {
   }),
 };
 
-export const BANG_CUSTOMER: AnhXaBang<Customer> = {
+export const BANG_CUSTOMER: TableMapping<Customer> = {
   table: "customers",
   localKey: "bsf.customers.v2",
   layKhoa: theoId,
@@ -260,7 +260,7 @@ export const BANG_CUSTOMER: AnhXaBang<Customer> = {
 };
 
 /** Chuyến hàng — một đại lý, một lượt giao, nhiều dòng loại hàng. */
-export const BANG_IMPORT_SHIPMENT: AnhXaBang<ImportShipment> = {
+export const BANG_IMPORT_SHIPMENT: TableMapping<ImportShipment> = {
   table: "import_shipments",
   localKey: "bsf.import-shipments.v2",
   layKhoa: theoId,
@@ -305,7 +305,7 @@ export const BANG_IMPORT_SHIPMENT: AnhXaBang<ImportShipment> = {
 };
 
 /** Chốt số liệu một ngày của một phân xưởng. */
-export const BANG_DAILY_LOCK: AnhXaBang<DailyLock> = {
+export const BANG_DAILY_LOCK: TableMapping<DailyLock> = {
   table: "daily_locks",
   localKey: "bsf.daily-locks.v2",
   layKhoa: theoId,
@@ -331,7 +331,7 @@ export const BANG_DAILY_LOCK: AnhXaBang<DailyLock> = {
   }),
 };
 
-export const BANG_MATERIAL_IMPORT: AnhXaBang<MaterialImportItem> = {
+export const BANG_MATERIAL_IMPORT: TableMapping<MaterialImportItem> = {
   table: "material_imports",
   localKey: "bsf.material-imports.v2",
   layKhoa: theoId,
@@ -374,7 +374,7 @@ export const BANG_MATERIAL_IMPORT: AnhXaBang<MaterialImportItem> = {
   }),
 };
 
-export const BANG_BALANCING_PERIOD: AnhXaBang<BalancingPeriod> = {
+export const BANG_BALANCING_PERIOD: TableMapping<BalancingPeriod> = {
   table: "balancing_periods",
   localKey: "bsf.balancing-periods.v2",
   layKhoa: theoId,
@@ -418,7 +418,7 @@ export const BANG_BALANCING_PERIOD: AnhXaBang<BalancingPeriod> = {
   }),
 };
 
-export const BANG_BALANCING_INPUT: AnhXaBang<BalancingInputItem> = {
+export const BANG_BALANCING_INPUT: TableMapping<BalancingInputItem> = {
   table: "balancing_inputs",
   localKey: "bsf.balancing-inputs.v2",
   layKhoa: theoId,
@@ -474,7 +474,7 @@ export const BANG_BALANCING_INPUT: AnhXaBang<BalancingInputItem> = {
   }),
 };
 
-export const BANG_SCRAP: AnhXaBang<ScrapItem> = {
+export const BANG_SCRAP: TableMapping<ScrapItem> = {
   table: "scraps",
   localKey: "bsf.scraps.v2",
   layKhoa: theoId,
@@ -508,7 +508,7 @@ export const BANG_SCRAP: AnhXaBang<ScrapItem> = {
       : x,
 };
 
-export const BANG_BALANCING_OUTPUT: AnhXaBang<BalancingOutputItem> = {
+export const BANG_BALANCING_OUTPUT: TableMapping<BalancingOutputItem> = {
   table: "balancing_outputs",
   localKey: "bsf.balancing-outputs.v2",
   layKhoa: theoId,
@@ -562,7 +562,7 @@ export const BANG_BALANCING_OUTPUT: AnhXaBang<BalancingOutputItem> = {
 };
 
 /** Hồ sơ người dùng — khóa `id` = auth user id (uuid). */
-export const BANG_USER_PROFILE: AnhXaBang<UserProfile> = {
+export const BANG_USER_PROFILE: TableMapping<UserProfile> = {
   table: "user_profiles",
   localKey: "bsf.user-profiles.v2",
   layKhoa: theoId,
@@ -581,7 +581,7 @@ export const BANG_USER_PROFILE: AnhXaBang<UserProfile> = {
 };
 
 /** Phiếu bán — một khách, một lượt, nhiều dòng mặt hàng. */
-export const BANG_SALES_INVOICE: AnhXaBang<SalesInvoice> = {
+export const BANG_SALES_INVOICE: TableMapping<SalesInvoice> = {
   table: "sales_invoices",
   localKey: "bsf.sales-invoices.v2",
   layKhoa: theoId,
@@ -608,7 +608,7 @@ export const BANG_SALES_INVOICE: AnhXaBang<SalesInvoice> = {
 };
 
 /** Dòng bán trong phiếu. */
-export const BANG_SALES_ITEM: AnhXaBang<SalesItem> = {
+export const BANG_SALES_ITEM: TableMapping<SalesItem> = {
   table: "sales_items",
   localKey: "bsf.sales-items.v2",
   layKhoa: theoId,
@@ -637,7 +637,7 @@ export const BANG_SALES_ITEM: AnhXaBang<SalesItem> = {
 /* ---------- Module WIP ---------- */
 
 /** Dòng BTP sản xuất ngày. */
-export const BANG_WIP_PRODUCTION: AnhXaBang<WipProductionItem> = {
+export const BANG_WIP_PRODUCTION: TableMapping<WipProductionItem> = {
   table: "production_wips",
   localKey: "bsf.production-wips.v2",
   layKhoa: theoId,
@@ -662,7 +662,7 @@ export const BANG_WIP_PRODUCTION: AnhXaBang<WipProductionItem> = {
     operator: x.operator ?? "",
     // Migration 0051 → gửi LUÔN (như leftover_by_material 0038): gửi có điều kiện
     // sẽ KHÔNG xoá được lượng bột khi sửa về rỗng.
-    batter_kg: lamSachBot(x.batterKg),
+    batter_kg: sanitizeBatterKg(x.batterKg),
   }),
   fromRow: (r) => ({
     id: s(r.id),
@@ -684,7 +684,7 @@ export const BANG_WIP_PRODUCTION: AnhXaBang<WipProductionItem> = {
       r.component_bao_tu_kg == null ? null : Number(r.component_bao_tu_kg),
     balancingPeriodId: s(r.balancing_period_id),
     operator: s(r.operator),
-    batterKg: lamSachBot(r.batter_kg),
+    batterKg: sanitizeBatterKg(r.batter_kg),
   }),
   // Dòng ghi trước 0019/0030/0033/0037/0051 chưa có cột kỳ / khách / chế biến / thành phần / người thao tác / bột → mặc định trống.
   vaDongCu: (x) => ({
@@ -700,7 +700,7 @@ export const BANG_WIP_PRODUCTION: AnhXaBang<WipProductionItem> = {
 };
 
 /** Chốt ngày sản xuất (bảng riêng, cùng hình dạng DailyLock). */
-export const BANG_PRODUCTION_LOCK: AnhXaBang<DailyLock> = {
+export const BANG_PRODUCTION_LOCK: TableMapping<DailyLock> = {
   table: "production_locks",
   localKey: "bsf.production-locks.v2",
   layKhoa: theoId,
@@ -736,7 +736,7 @@ export const BANG_PRODUCTION_LOCK: AnhXaBang<DailyLock> = {
 };
 
 /** QC checklist chấm điểm cuối ngày (họp 2026-09-02, migration 0036). */
-export const BANG_QC_CHECKLIST: AnhXaBang<QcChecklistItem> = {
+export const BANG_QC_CHECKLIST: TableMapping<QcChecklistItem> = {
   table: "qc_checklists",
   localKey: "bsf.qc-checklists.v1",
   layKhoa: theoId,
@@ -767,7 +767,7 @@ export const BANG_QC_CHECKLIST: AnhXaBang<QcChecklistItem> = {
 };
 
 /** Chốt ngày QC (cùng hình dạng DailyLock, migration 0036). */
-export const BANG_QC_LOCK: AnhXaBang<DailyLock> = {
+export const BANG_QC_LOCK: TableMapping<DailyLock> = {
   table: "qc_locks",
   localKey: "bsf.qc-locks.v1",
   layKhoa: theoId,
@@ -794,7 +794,7 @@ export const BANG_QC_LOCK: AnhXaBang<DailyLock> = {
 };
 
 /** Phiếu đóng gói BTP → thành phẩm (G3, migration 0029). */
-export const BANG_PACKAGING: AnhXaBang<Packaging> = {
+export const BANG_PACKAGING: TableMapping<Packaging> = {
   table: "packagings",
   localKey: "bsf.packagings.v1",
   layKhoa: theoId,
@@ -831,7 +831,7 @@ export const BANG_PACKAGING: AnhXaBang<Packaging> = {
 };
 
 /** Đơn đặt. */
-export const BANG_SALES_ORDER: AnhXaBang<SalesOrder> = {
+export const BANG_SALES_ORDER: TableMapping<SalesOrder> = {
   table: "sales_orders",
   localKey: "bsf.sales-orders.v2",
   layKhoa: theoId,
@@ -852,7 +852,7 @@ export const BANG_SALES_ORDER: AnhXaBang<SalesOrder> = {
 };
 
 /** Dòng cần của đơn. */
-export const BANG_ORDER_ITEM: AnhXaBang<OrderItem> = {
+export const BANG_ORDER_ITEM: TableMapping<OrderItem> = {
   table: "order_items",
   localKey: "bsf.order-items.v2",
   layKhoa: theoId,
@@ -875,7 +875,7 @@ export const BANG_ORDER_ITEM: AnhXaBang<OrderItem> = {
 };
 
 /** Lệnh xuất. */
-export const BANG_EXPORT_ORDER: AnhXaBang<ExportOrder> = {
+export const BANG_EXPORT_ORDER: TableMapping<ExportOrder> = {
   table: "export_orders",
   localKey: "bsf.export-orders.v2",
   layKhoa: theoId,
@@ -896,7 +896,7 @@ export const BANG_EXPORT_ORDER: AnhXaBang<ExportOrder> = {
 };
 
 /** Dòng thực xuất (trừ tồn theo lô). */
-export const BANG_EXPORT_ITEM: AnhXaBang<ExportItem> = {
+export const BANG_EXPORT_ITEM: TableMapping<ExportItem> = {
   table: "export_items",
   localKey: "bsf.export-items.v2",
   layKhoa: theoId,
@@ -921,7 +921,7 @@ export const BANG_EXPORT_ITEM: AnhXaBang<ExportItem> = {
 };
 
 /** Tồn đầu kho nguyên liệu — số dư đông dự trữ có sẵn trước khi số hoá (kg). */
-export const BANG_OPENING_STOCK: AnhXaBang<MaterialOpeningStock> = {
+export const BANG_OPENING_STOCK: TableMapping<MaterialOpeningStock> = {
   table: "material_opening_stock",
   localKey: "bsf.material-opening-stock.v2",
   layKhoa: theoId,
@@ -944,7 +944,7 @@ export const BANG_OPENING_STOCK: AnhXaBang<MaterialOpeningStock> = {
 };
 
 /** Tồn đầu kho thành phẩm — số dư BTP đông dự trữ có sẵn trước khi số hoá (kg + block). */
-export const BANG_FINISHED_OPENING_STOCK: AnhXaBang<FinishedGoodsOpeningStock> = {
+export const BANG_FINISHED_OPENING_STOCK: TableMapping<FinishedGoodsOpeningStock> = {
   table: "finished_goods_opening_stock",
   localKey: "bsf.finished-opening-stock.v2",
   layKhoa: theoId,
@@ -971,7 +971,7 @@ export const BANG_FINISHED_OPENING_STOCK: AnhXaBang<FinishedGoodsOpeningStock> =
 };
 
 /** Snapshot Xuất–Nhập–Tồn nhập từ báo cáo thật (Kho × Mã hàng × Kỳ). Tồn cuối suy ở app. */
-export const BANG_NXT_SNAPSHOT: AnhXaBang<NxtSnapshotLine> = {
+export const BANG_NXT_SNAPSHOT: TableMapping<NxtSnapshotLine> = {
   table: "nxt_snapshots",
   localKey: "bsf.nxt-snapshots.v2",
   layKhoa: theoId,
@@ -1014,7 +1014,7 @@ export const BANG_NXT_SNAPSHOT: AnhXaBang<NxtSnapshotLine> = {
 };
 
 /** Danh mục kho LƯU hàng (kho nhà + kho lạnh thuê ngoài) — nối dữ liệu theo TÊN. */
-export const BANG_STORAGE_LOCATION: AnhXaBang<StorageLocation> = {
+export const BANG_STORAGE_LOCATION: TableMapping<StorageLocation> = {
   table: "storage_locations",
   localKey: "bsf.storage-locations.v1",
   layKhoa: theoId,
@@ -1039,7 +1039,7 @@ export const BANG_STORAGE_LOCATION: AnhXaBang<StorageLocation> = {
 };
 
 /** Sổ BÁN NỘI ĐỊA (migration 0054) — NL bán thẳng, ghi ở /wip, Cân đối lấy làm dòng giảm. */
-export const BANG_DOMESTIC_SALE: AnhXaBang<DomesticSaleItem> = {
+export const BANG_DOMESTIC_SALE: TableMapping<DomesticSaleItem> = {
   table: "domestic_sales",
   localKey: "bsf.domestic-sales.v1",
   layKhoa: theoId,
@@ -1072,7 +1072,7 @@ export const BANG_DOMESTIC_SALE: AnhXaBang<DomesticSaleItem> = {
 };
 
 /** TÔ MÀU DÒNG (migration 0055) — dấu "đã dò" kiểu Excel, dùng chung mọi bảng. */
-export const BANG_ROW_MARK: AnhXaBang<RowMark> = {
+export const BANG_ROW_MARK: TableMapping<RowMark> = {
   table: "row_marks",
   localKey: "bsf.row-marks.v1",
   layKhoa: theoId,
@@ -1099,7 +1099,7 @@ export const BANG_ROW_MARK: AnhXaBang<RowMark> = {
 };
 
 /** Danh mục LOẠI BỘT TẨM (migration 0051) — sổ sản lượng nối theo TÊN. */
-export const BANG_BATTER_TYPE: AnhXaBang<BatterType> = {
+export const BANG_BATTER_TYPE: TableMapping<BatterType> = {
   table: "batter_types",
   localKey: "bsf.batter-types.v1",
   layKhoa: theoId,
@@ -1113,7 +1113,7 @@ export const BANG_BATTER_TYPE: AnhXaBang<BatterType> = {
 };
 
 /** Sổ kho theo THÁNG — dồn tồn cuối kỳ → đầu kỳ sau. Tồn cuối suy ở app (kiện + kg). */
-export const BANG_MONTHLY_STOCK: AnhXaBang<MonthlyStockLine> = {
+export const BANG_MONTHLY_STOCK: TableMapping<MonthlyStockLine> = {
   table: "monthly_stock_ledger",
   localKey: "bsf.monthly-stock.v2",
   layKhoa: theoId,
@@ -1190,10 +1190,10 @@ export const BANG_MONTHLY_STOCK: AnhXaBang<MonthlyStockLine> = {
    chuyến hàng ghi hụt.
    Các lượt gửi của MỘT bảng chạy TUẦN TỰ (chuoiGui), và gửi xong chỉ bỏ đúng
    khóa vừa gửi mà dòng chưa đổi tiếp — ghi chồng lúc đang gửi vẫn còn trong hàng
-   chờ cho lượt sau. Phần thuần (docCho/hoaDuLieu/guiHangCho/boKhoaDaGui) có test
+   chờ cho lượt sau. Phần thuần (docCho/mergeServerAndLocal/pushQueue/dropSentKeys) có test
    ở repo.test.ts. */
 
-export interface ChoDongBo {
+export interface SyncQueue {
   them: string[];
   xoa: string[];
 }
@@ -1210,10 +1210,10 @@ function layMsg(e: unknown): string {
 
 /** Đọc hàng chờ từ chuỗi localStorage. Dạng `{them, xoa}` từ trước tới nay; chịu
  *  chuỗi hỏng / thiếu mảng (ra rỗng) để không vỡ lúc mở app. */
-export function docCho(raw: string | null): ChoDongBo {
+export function docCho(raw: string | null): SyncQueue {
   if (!raw) return { them: [], xoa: [] };
   try {
-    const p = JSON.parse(raw) as Partial<ChoDongBo> | null;
+    const p = JSON.parse(raw) as Partial<SyncQueue> | null;
     const ds = (v: unknown) => (Array.isArray(v) ? v.map(String) : []);
     return { them: ds(p?.them), xoa: ds(p?.xoa) };
   } catch {
@@ -1221,18 +1221,18 @@ export function docCho(raw: string | null): ChoDongBo {
   }
 }
 
-function napCho(localKey: string): ChoDongBo {
+function napCho(localKey: string): SyncQueue {
   try {
-    return docCho(localStorage.getItem(`${khoaLocal(localKey)}.cho`));
+    return docCho(localStorage.getItem(`${modeLocalKey(localKey)}.cho`));
   } catch {
     return { them: [], xoa: [] };
   }
 }
 
 /** Ghi hàng chờ. `false` = không ghi được (hết dung lượng) — người gọi phải báo. */
-function saveQueue(localKey: string, cho: ChoDongBo): boolean {
+function saveQueue(localKey: string, cho: SyncQueue): boolean {
   try {
-    const k = `${khoaLocal(localKey)}.cho`;
+    const k = `${modeLocalKey(localKey)}.cho`;
     if (cho.them.length === 0 && cho.xoa.length === 0) localStorage.removeItem(k);
     else localStorage.setItem(k, JSON.stringify(cho));
     return true;
@@ -1244,7 +1244,7 @@ function saveQueue(localKey: string, cho: ChoDongBo): boolean {
 const STORAGE_FULL_ERROR =
   "Bộ nhớ trình duyệt đầy — không lưu được bản sao/hàng chờ dưới máy. Số đã ghi vẫn hiện, nhưng rớt mạng lúc này có thể mất. Báo quản trị.";
 
-/** Bỏ các trường không chép xuống bản sao (xem AnhXaBang.truongKhongCache). */
+/** Bỏ các trường không chép xuống bản sao (xem TableMapping.truongKhongCache). */
 function boTruong<T>(x: T, truong: readonly string[]): T {
   const o = { ...(x as Record<string, unknown>) };
   for (const f of truong) delete o[f];
@@ -1257,10 +1257,10 @@ function boTruong<T>(x: T, truong: readonly string[]): T {
  * `xoa` bị gỡ (đừng hồi sinh dòng đã xóa). Dòng local thiếu trường không-cache
  * (đã bỏ khỏi bản sao) thì lấy lại trường đó từ server.
  */
-export function hoaDuLieu<T>(
+export function mergeServerAndLocal<T>(
   may: T[],
   local: T[],
-  cho: ChoDongBo,
+  cho: SyncQueue,
   layKhoa: (x: T) => string,
   uncachedFields: readonly string[] = [],
 ): T[] {
@@ -1280,18 +1280,18 @@ export function hoaDuLieu<T>(
   return [...serverByKey.values()];
 }
 
-export interface LoiGui {
+export interface PushError {
   message: string;
   code?: string;
 }
 
 /** Cổng gửi lên máy chủ — tách ra để test được không cần Supabase. */
-export interface CongGui {
-  upsert: (rows: Record<string, unknown>[]) => Promise<LoiGui | null>;
-  xoa: (keys: string[]) => Promise<LoiGui | null>;
+export interface UploadPort {
+  upsert: (rows: Record<string, unknown>[]) => Promise<PushError | null>;
+  xoa: (keys: string[]) => Promise<PushError | null>;
 }
 
-export interface KetQuaGuiCho {
+export interface QueuePushResult {
   /** khóa đã gửi xong → JSON toRow đã gửi (null = dòng không còn để gửi). */
   daGuiThem: Map<string, string | null>;
   daXoa: string[];
@@ -1301,11 +1301,11 @@ export interface KetQuaGuiCho {
   loiChung?: string;
 }
 
-const msgLoiGui = (e: LoiGui) => (e.code ? `${e.code} ${e.message}` : e.message);
+const msgLoiGui = (e: PushError) => (e.code ? `${e.code} ${e.message}` : e.message);
 /** Lỗi do dữ liệu một/vài dòng (SQLSTATE lớp 21 cardinality, 22 data, 23 ràng
  *  buộc: 23505 trùng khóa duy nhất, 23502 NOT NULL…) — gửi lại từng dòng thì các
  *  dòng lành vẫn lên. Lỗi khác (mạng, 42P01, 42703) dòng nào cũng hỏng như nhau. */
-const isRowLevelError = (e: LoiGui) => /^2[123]/.test(e.code ?? "");
+const isRowLevelError = (e: PushError) => /^2[123]/.test(e.code ?? "");
 
 /**
  * Gửi hàng chờ của một bảng qua `cong`. Upsert GOM THEO BỘ CỘT: supabase-js gộp
@@ -1314,13 +1314,13 @@ const isRowLevelError = (e: LoiGui) => /^2[123]/.test(e.code ?? "");
  * Lượt gộp bị từ chối vì dữ liệu ⇒ gửi lại TỪNG dòng: dòng lành lên, chỉ dòng
  * hỏng ở lại (trước đây một dòng 23505 làm kẹt vĩnh viễn cả bảng).
  */
-export async function guiHangCho<T>(
-  bang: Pick<AnhXaBang<T>, "layKhoa" | "toRow">,
-  cho: ChoDongBo,
+export async function pushQueue<T>(
+  bang: Pick<TableMapping<T>, "layKhoa" | "toRow">,
+  cho: SyncQueue,
   rows: T[],
-  gateway: CongGui,
-): Promise<KetQuaGuiCho> {
-  const kq: KetQuaGuiCho = { daGuiThem: new Map(), daXoa: [], dongLoi: [] };
+  gateway: UploadPort,
+): Promise<QueuePushResult> {
+  const kq: QueuePushResult = { daGuiThem: new Map(), daXoa: [], dongLoi: [] };
   const theoKhoa = new Map(rows.map((x) => [bang.layKhoa(x), x]));
   const nhom = new Map<string, { khoa: string; row: Record<string, unknown>; json: string }[]>();
   for (const k of new Set(cho.them)) {
@@ -1381,11 +1381,11 @@ export async function guiHangCho<T>(
  * gửi) rồi chỉ bỏ khóa đã gửi mà dòng CHƯA đổi tiếp (`hienTai` = JSON toRow của
  * bản mới nhất). Ghi chồng lúc đang gửi ⇒ JSON khác ⇒ khóa ở lại cho lượt sau.
  */
-export function boKhoaDaGui(
-  cho: ChoDongBo,
-  kq: Pick<KetQuaGuiCho, "daGuiThem" | "daXoa">,
+export function dropSentKeys(
+  cho: SyncQueue,
+  kq: Pick<QueuePushResult, "daGuiThem" | "daXoa">,
   currentJson: Map<string, string>,
-): ChoDongBo {
+): SyncQueue {
   const deleted = new Set(kq.daXoa);
   return {
     them: cho.them.filter(
@@ -1404,7 +1404,7 @@ const chuoiGui = new Map<string, Promise<unknown>>();
 
 /** Dòng hiện tại để gửi: bản trong tab, bù dòng tab khác (cùng trình duyệt) đã
  *  đưa vào hàng chờ chung mà tab này chưa có — lấy từ bản sao localStorage. */
-function currentRows<T>(bang: AnhXaBang<T>, rows: T[], toAdd: string[]): T[] {
+function currentRows<T>(bang: TableMapping<T>, rows: T[], toAdd: string[]): T[] {
   const ban = (latestSnapshot.get(bang.localKey) as T[] | undefined) ?? rows;
   const co = new Set(ban.map((x) => bang.layKhoa(x)));
   const thieu = new Set(toAdd.filter((k) => !co.has(k)));
@@ -1416,7 +1416,7 @@ function currentRows<T>(bang: AnhXaBang<T>, rows: T[], toAdd: string[]): T[] {
 }
 
 /** Ghi bản sao localStorage (bỏ trường không-cache ở dòng đã đồng bộ). */
-function saveLocalCopy<T>(bang: AnhXaBang<T>, rows: T[]): boolean {
+function saveLocalCopy<T>(bang: TableMapping<T>, rows: T[]): boolean {
   const bo = hasSupabase ? bang.truongKhongCache : undefined;
   if (!bo?.length) return save(bang.localKey, rows);
   const cho = new Set(napCho(bang.localKey).them);
@@ -1428,7 +1428,7 @@ function saveLocalCopy<T>(bang: AnhXaBang<T>, rows: T[]): boolean {
 
 async function bocLoi(
   p: PromiseLike<{ error: { message: string; code?: string } | null }>,
-): Promise<LoiGui | null> {
+): Promise<PushError | null> {
   try {
     const { error } = await p;
     return error ? { message: error.message, code: error.code } : null;
@@ -1438,7 +1438,7 @@ async function bocLoi(
 }
 
 async function syncOnePass<T>(
-  bang: AnhXaBang<T>,
+  bang: TableMapping<T>,
   khoa: string,
   rows: T[],
 ): Promise<{ ok: boolean; msg?: string }> {
@@ -1447,7 +1447,7 @@ async function syncOnePass<T>(
   const cho = napCho(bang.localKey);
   if (cho.them.length === 0 && cho.xoa.length === 0) return { ok: true };
 
-  const gateway: CongGui = {
+  const gateway: UploadPort = {
     /* defaultToNull: false ⇒ dòng THIẾU một cột (vd mặt hàng tạo nhanh ở /wip
        không có materialTypeId) dùng DEFAULT của cột thay vì NULL. Mặc định của
        supabase-js khi upsert NHIỀU dòng là điền NULL cho cột dòng khác có mà
@@ -1459,8 +1459,8 @@ async function syncOnePass<T>(
         db
           .from(bang.table)
           .upsert(
-            // Khóa chính theo chế độ (demo ⇒ tiền tố `demo:`) + site — rào R1 (lib/cheDo.ts).
-            ds.map((r) => dongLenMay(r, khoa, SITE_ID, undefined, bang.cotThamChieu)),
+            // Khóa chính theo chế độ (demo ⇒ tiền tố `demo:`) + site — rào R1 (lib/demoMode.ts).
+            ds.map((r) => rowToServer(r, khoa, SITE_ID, undefined, bang.cotThamChieu)),
             { onConflict: khoa, defaultToNull: false },
           ),
       ),
@@ -1471,10 +1471,10 @@ async function syncOnePass<T>(
           .from(bang.table)
           .delete()
           .eq("site_id", SITE_ID)
-          .in(khoa, keys.map((k) => khoaLenMay(k))),
+          .in(khoa, keys.map((k) => toServerKey(k))),
       ),
   };
-  const kq = await guiHangCho(bang, cho, currentRows(bang, rows, cho.them), gateway);
+  const kq = await pushQueue(bang, cho, currentRows(bang, rows, cho.them), gateway);
 
   // Đọc LẠI hàng chờ + bản mới nhất: khóa ghi thêm/sửa tiếp trong lúc gửi phải còn.
   const freshQueue = napCho(bang.localKey);
@@ -1483,7 +1483,7 @@ async function syncOnePass<T>(
       .filter((x) => kq.daGuiThem.has(bang.layKhoa(x)))
       .map((x) => [bang.layKhoa(x), JSON.stringify(bang.toRow(x))]),
   );
-  const okCho = saveQueue(bang.localKey, boKhoaDaGui(freshQueue, kq, currentJson));
+  const okCho = saveQueue(bang.localKey, dropSentKeys(freshQueue, kq, currentJson));
   // Dòng vừa lên server thì bỏ trường không-cache khỏi bản sao (nhả dung lượng).
   if (bang.truongKhongCache?.length && kq.daGuiThem.size > 0)
     saveLocalCopy(bang, (latestSnapshot.get(bang.localKey) as T[] | undefined) ?? rows);
@@ -1507,7 +1507,7 @@ async function syncOnePass<T>(
 
 /** Đẩy hàng chờ của một bảng lên máy chủ — xếp hàng sau lượt đang chạy của bảng đó. */
 function syncQueueFor<T>(
-  bang: AnhXaBang<T>,
+  bang: TableMapping<T>,
   khoa: string,
   rows: T[],
 ): Promise<{ ok: boolean; msg?: string }> {
@@ -1536,7 +1536,7 @@ const parseObj = (v: unknown): Record<string, unknown> => {
  * Bản đối soát hóa đơn đã lưu (màn /doi-soat). file_b64 = file Excel gốc để mở
  * lại chạy lại; options/summary là jsonb. Riêng tư theo tài khoản ép ở tầng app.
  */
-export const BANG_RECONCILIATION_RUN: AnhXaBang<ReconciliationRun> = {
+export const BANG_RECONCILIATION_RUN: TableMapping<ReconciliationRun> = {
   table: "reconciliation_runs",
   localKey: "bsf.reconciliation-runs.v1",
   layKhoa: theoId,
@@ -1582,7 +1582,7 @@ export const BANG_RECONCILIATION_RUN: AnhXaBang<ReconciliationRun> = {
  * Sự kiện biến đổi lô (mig 0046) — "đầu ra đã dùng đầu vào này". Nối chuỗi truy
  * xuất NL → BTP → TP. KHÔNG thêm cột vào production_wips/packagings (xem 0046).
  */
-export const BANG_LOT_INPUT: AnhXaBang<LotInput> = {
+export const BANG_LOT_INPUT: TableMapping<LotInput> = {
   table: "lot_inputs",
   localKey: "bsf.lot-inputs.v1",
   layKhoa: theoId,
@@ -1618,7 +1618,7 @@ export const BANG_LOT_INPUT: AnhXaBang<LotInput> = {
  * Sổ in tem QR (mig 0049) — mỗi lần bấm In ghi một dòng cho mỗi lô. Chỉ THÊM
  * bảng; nhãn lô vẫn suy từ bản ghi, `label` ở đây là nhãn đã in (đông cứng).
  */
-export const BANG_LABEL_PRINT: AnhXaBang<LabelPrint> = {
+export const BANG_LABEL_PRINT: TableMapping<LabelPrint> = {
   table: "label_prints",
   localKey: "bsf.label-prints.v1",
   layKhoa: theoId,
@@ -1646,7 +1646,7 @@ export const BANG_LABEL_PRINT: AnhXaBang<LabelPrint> = {
  * Lô đi ra (mig 0056) — dòng bán lẻ / bán nội địa / quét kiểm lệnh xuất lấy từ
  * lô nào. Bảng RIÊNG, không thêm cột vào sales_items/domestic_sales/export_items.
  */
-export const BANG_LOT_DISPATCH: AnhXaBang<LotDispatch> = {
+export const BANG_LOT_DISPATCH: TableMapping<LotDispatch> = {
   table: "lot_dispatches",
   localKey: "bsf.lot-dispatches.v1",
   layKhoa: theoId,
@@ -1677,7 +1677,7 @@ export const BANG_LOT_DISPATCH: AnhXaBang<LotDispatch> = {
 };
 
 /** Lý do chưa gắn lô khi chốt ngày (mig 0056). */
-export const BANG_LOT_WAIVER: AnhXaBang<LotWaiver> = {
+export const BANG_LOT_WAIVER: TableMapping<LotWaiver> = {
   table: "lot_waivers",
   localKey: "bsf.lot-waivers.v1",
   layKhoa: theoId,
@@ -1756,15 +1756,15 @@ const TRUONG_FILE = new Set(["fileB64"]);
 
 /** Thu gọn giá trị trước khi vào nhật ký: thay file / chuỗi quá dài bằng nhãn
  *  "[… ký tự — không ghi nhật ký]" (vẫn thấy là CÓ đổi, không chép nội dung). */
-export function gonChoNhatKy(v: unknown, truong = ""): unknown {
+export function compactForAudit(v: unknown, truong = ""): unknown {
   if (typeof v === "string") {
     if (v && TRUONG_FILE.has(truong)) return `[file ${v.length} ký tự — không ghi nhật ký]`;
     return v.length > MAX_AUDIT_STRING ? `[chuỗi ${v.length} ký tự — không ghi nhật ký]` : v;
   }
-  if (Array.isArray(v)) return v.map((x) => gonChoNhatKy(x));
+  if (Array.isArray(v)) return v.map((x) => compactForAudit(x));
   if (v && typeof v === "object")
     return Object.fromEntries(
-      Object.entries(v as Record<string, unknown>).map(([k, x]) => [k, gonChoNhatKy(x, k)]),
+      Object.entries(v as Record<string, unknown>).map(([k, x]) => [k, compactForAudit(x, k)]),
     );
   return v;
 }
@@ -1772,12 +1772,12 @@ export function gonChoNhatKy(v: unknown, truong = ""): unknown {
 /** Tạm tắt nhật ký thao tác — CHỈ khi nạp hàng loạt bộ demo (hàng nghìn dòng, không
  *  phải thao tác của người dùng). Bật lại ngay sau khi nạp xong. */
 let isAuditPaused = false;
-export function datTamTatNhatKy(paused: boolean): void {
+export function setAuditPaused(paused: boolean): void {
   isAuditPaused = paused;
 }
 
 /** So danh sách cũ↔mới của một bảng, phát entry nhật ký thêm/sửa/xóa. */
-function logChanges<T>(bang: AnhXaBang<T>, prev: T[], next: T[]): void {
+function logChanges<T>(bang: TableMapping<T>, prev: T[], next: T[]): void {
   if (isAuditPaused) return;
   if (bang.table === "audit_log") return; // không tự lưu vết chính mình
   // Tô màu dòng chỉ là dấu trình bày (đã có marked_by/marked_at) — kế toán dò cả
@@ -1786,14 +1786,14 @@ function logChanges<T>(bang: AnhXaBang<T>, prev: T[], next: T[]): void {
   const label = TABLE_LABELS[bang.table] ?? bang.table;
   const prevByKey = new Map(prev.map((x) => [bang.layKhoa(x), x]));
   const nextMap = new Map(next.map((x) => [bang.layKhoa(x), x]));
-  const entries: NhatKyMoi[] = [];
+  const entries: NewAuditEntry[] = [];
   for (const [k, x] of nextMap) {
     const c = prevByKey.get(k);
     if (c === undefined) {
-      entries.push({ action: "them", entity: bang.table, entityKey: k, summary: `Thêm ${label}`, diff: { _new: gonChoNhatKy(x) } });
+      entries.push({ action: "them", entity: bang.table, entityKey: k, summary: `Thêm ${label}`, diff: { _new: compactForAudit(x) } });
     } else if (JSON.stringify(c) !== JSON.stringify(x)) {
       const diff = Object.fromEntries(
-        Object.entries(khacBiet(c, x)).map(([f, [a, b]]) => [f, [gonChoNhatKy(a, f), gonChoNhatKy(b, f)]]),
+        Object.entries(khacBiet(c, x)).map(([f, [a, b]]) => [f, [compactForAudit(a, f), compactForAudit(b, f)]]),
       );
       entries.push({ action: "sua", entity: bang.table, entityKey: k, summary: `Sửa ${label}`, diff });
     }
@@ -1801,12 +1801,12 @@ function logChanges<T>(bang: AnhXaBang<T>, prev: T[], next: T[]): void {
   for (const [k] of prevByKey) {
     if (!nextMap.has(k)) entries.push({ action: "xoa", entity: bang.table, entityKey: k, summary: `Xóa ${label}` });
   }
-  ghiNhatKy(entries);
+  appendAuditEntries(entries);
 }
 
 /* ---------- Hook ---------- */
 
-export type TrangThai = "dang-tai" | "san-sang" | "loi";
+export type LoadStatus = "dang-tai" | "san-sang" | "loi";
 
 /**
  * Đồng bộ CÙNG TAB giữa các lần gọi `useBang` của cùng một bảng. Mỗi lần gọi giữ
@@ -1818,7 +1818,7 @@ export type TrangThai = "dang-tai" | "san-sang" | "loi";
 const SU_KIEN_BANG = "bsf:bang-doi";
 type SuKienBang = { localKey: string; tu: string; rows: unknown[] };
 
-export function useBang<T>(bang: AnhXaBang<T>, seed: () => T[] = () => []) {
+export function useBang<T>(bang: TableMapping<T>, seed: () => T[] = () => []) {
   const khoa = bang.khoaChinh ?? "id";
   const va = bang.vaDongCu;
   const napLocal = (key: string) => {
@@ -1833,7 +1833,7 @@ export function useBang<T>(bang: AnhXaBang<T>, seed: () => T[] = () => []) {
     if (s0.length > 0 && !hasSupabase) save(bang.localKey, s0);
     return s0;
   });
-  const [status, setStatus] = useState<TrangThai>(
+  const [status, setStatus] = useState<LoadStatus>(
     hasSupabase ? "dang-tai" : "san-sang"
   );
   const [loi, setLoi] = useState<string | null>(null);
@@ -1846,12 +1846,12 @@ export function useBang<T>(bang: AnhXaBang<T>, seed: () => T[] = () => []) {
     if (kq.ok) {
       setLoi(null);
       setStatus("san-sang");
-      ketNoi.baoOK();
+      connectivity.baoOK();
     } else {
       const msg = kq.msg ?? fallback;
       setStatus("loi");
       setLoi(msg);
-      ketNoi.baoLoi(msg);
+      connectivity.baoLoi(msg);
     }
   }, []);
 
@@ -1907,7 +1907,7 @@ export function useBang<T>(bang: AnhXaBang<T>, seed: () => T[] = () => []) {
           }
           // Bỏ tiền tố khóa demo; dòng không thuộc chế độ này (null) bỏ qua.
           const may = thoRaw
-            .map((r) => dongTuMay(r, khoa, undefined, bang.cotThamChieu))
+            .map((r) => rowFromServer(r, khoa, undefined, bang.cotThamChieu))
             .filter((r): r is Record<string, unknown> => r != null)
             .map((r) => bang.fromRow(r));
 
@@ -1923,7 +1923,7 @@ export function useBang<T>(bang: AnhXaBang<T>, seed: () => T[] = () => []) {
                 const { error: e2 } = await db
                   .from(bang.table)
                   .upsert(
-                    s0.map((x) => dongLenMay(bang.toRow(x), khoa, SITE_ID, undefined, bang.cotThamChieu)),
+                    s0.map((x) => rowToServer(bang.toRow(x), khoa, SITE_ID, undefined, bang.cotThamChieu)),
                     { onConflict: khoa }
                   );
                 if (huy) return;
@@ -1949,7 +1949,7 @@ export function useBang<T>(bang: AnhXaBang<T>, seed: () => T[] = () => []) {
              Bản dưới máy = bản trong tab (mới nhất) nếu có, không thì bản sao. */
           const local =
             (latestSnapshot.get(bang.localKey) as T[] | undefined) ?? napLocal(bang.localKey);
-          const ketQua = hoaDuLieu(
+          const ketQua = mergeServerAndLocal(
             may,
             local,
             napCho(bang.localKey),

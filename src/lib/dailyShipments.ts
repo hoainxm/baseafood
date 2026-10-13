@@ -1,12 +1,12 @@
 // ============================================================
-// Tên file: src/lib/chuyenTrongNgay.ts
+// Tên file: src/lib/dailyShipments.ts
 // Tên tiếng Việt: Gom chuyến nhập theo ngày → đại lý → chuyến (chỉ đọc)
 // Description: Group material imports of a day by supplier and shipment
 // ============================================================
 import type { ImportShipment, MaterialImportItem } from "@/types";
 
 /** Một dòng hàng của chuyến (một loại NL). */
-export interface DongChuyenNgay {
+export interface DailyShipmentLine {
   id: string;
   loai: string;
   kg: number;
@@ -15,21 +15,21 @@ export interface DongChuyenNgay {
 }
 
 /** Một chuyến nhập trong ngày. */
-export interface ChuyenNgay {
+export interface DailyShipment {
   shipmentId: string;
   /** Mã lô nếu có, không thì "Chuyến n" theo thứ tự trong ngày của đại lý. */
   nhan: string;
   xuong: string;
   xe: string;
-  dong: DongChuyenNgay[];
+  dong: DailyShipmentLine[];
   kg: number;
   tien: number;
 }
 
 /** Một đại lý trong ngày với các chuyến của họ. */
-export interface DaiLyNgay {
+export interface DailySupplierGroup {
   daiLy: string;
-  chuyen: ChuyenNgay[];
+  chuyen: DailyShipment[];
   kg: number;
   tien: number;
 }
@@ -37,7 +37,7 @@ export interface DaiLyNgay {
 const rowAmount = (r: MaterialImportItem) => r.quantityKg * (r.unitPrice ?? 0);
 
 /** Mỗi ngày (ngày hàng về) có bao nhiêu chuyến + bao nhiêu kg — cho hàng nút chọn ngày. */
-export function tomTatTheoNgay(imports: MaterialImportItem[]): Map<string, { soChuyen: number; kg: number }> {
+export function summarizeImportsByDay(imports: MaterialImportItem[]): Map<string, { soChuyen: number; kg: number }> {
   const shipments = new Map<string, Set<string>>();
   const kg = new Map<string, number>();
   for (const r of imports) {
@@ -55,11 +55,11 @@ export function tomTatTheoNgay(imports: MaterialImportItem[]): Map<string, { soC
  * Dòng nhập của MỘT ngày → đại lý (nhiều kg đứng trước) → chuyến (giữ thứ tự ghi)
  * → dòng loại NL. Dòng cũ không có chuyến (shipmentId rỗng) coi mỗi dòng là một chuyến.
  */
-export function chuyenTrongNgay(
+export function groupDailyShipments(
   imports: MaterialImportItem[],
   date: string,
   shipmentList: Pick<ImportShipment, "id" | "lotCode">[] = []
-): DaiLyNgay[] {
+): DailySupplierGroup[] {
   const lotCodes = new Map(shipmentList.map((c) => [c.id, c.lotCode ?? ""]));
   const bySupplier = new Map<string, Map<string, MaterialImportItem[]>>();
   for (const r of imports) {
@@ -71,10 +71,10 @@ export function chuyenTrongNgay(
     if (!m.has(k)) m.set(k, []);
     m.get(k)!.push(r);
   }
-  const ra: DaiLyNgay[] = [];
+  const ra: DailySupplierGroup[] = [];
   for (const [supplier, m] of bySupplier) {
     let i = 0;
-    const shipments: ChuyenNgay[] = [...m].map(([shipmentId, ds]) => {
+    const shipments: DailyShipment[] = [...m].map(([shipmentId, ds]) => {
       i += 1;
       const dong = ds.map((r) => ({
         id: r.id,
@@ -105,7 +105,7 @@ export function chuyenTrongNgay(
 }
 
 /** Một đại lý trong CẢ KỲ — cho dòng con theo đại lý dưới dòng loại NL của lưới. */
-export interface DaiLyKy {
+export interface PeriodSupplierRow {
   daiLy: string;
   /** kg theo ngày hàng về. */
   theoNgay: Record<string, number>;
@@ -119,8 +119,8 @@ export interface DaiLyKy {
  * Gom dòng sổ nhập (thường là các dòng làm nên MỘT dòng loại NL của lưới) theo đại
  * lý, kg theo ngày — tổng các đại lý đúng bằng dòng cha. Đại lý nhiều kg đứng trước.
  */
-export function daiLyTrongKy(imports: MaterialImportItem[]): DaiLyKy[] {
-  const m = new Map<string, DaiLyKy>();
+export function groupImportsBySupplier(imports: MaterialImportItem[]): PeriodSupplierRow[] {
+  const m = new Map<string, PeriodSupplierRow>();
   for (const r of imports) {
     const dl = r.supplierName.trim() || "(chưa ghi đại lý)";
     const o = m.get(dl) ?? { daiLy: dl, theoNgay: {}, kg: 0, tien: 0, ids: [] };
@@ -134,6 +134,6 @@ export function daiLyTrongKy(imports: MaterialImportItem[]): DaiLyKy[] {
 }
 
 /** Số chuyến (shipmentId khác nhau) của các dòng trong một ngày — cho nhãn "n chuyến" ở ô. */
-export function soChuyenNgay(imports: MaterialImportItem[], date: string): number {
+export function countDailyShipments(imports: MaterialImportItem[], date: string): number {
   return new Set(imports.filter((r) => r.deliveryDate === date).map((r) => r.shipmentId || r.id)).size;
 }

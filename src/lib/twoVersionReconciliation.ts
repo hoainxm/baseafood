@@ -1,31 +1,31 @@
 /**
- * Hai việc soát nằm NGOÀI chiều "hóa đơn ⇄ sổ kế toán" của `doiSoatHddt.ts`.
+ * Hai việc soát nằm NGOÀI chiều "hóa đơn ⇄ sổ kế toán" của `einvoiceReconciliation.ts`.
  *
- * 1. **So HAI BẢN hóa đơn điện tử với nhau** (`soHaiBanHddt`). Cơ quan thuế gửi một
+ * 1. **So HAI BẢN hóa đơn điện tử với nhau** (`compareTwoInvoiceVersions`). Cơ quan thuế gửi một
  *    bảng kê, kế toán tự tải một bảng kê từ cổng hóa đơn điện tử — lẽ ra y hệt nhau,
  *    thực tế lệch. Thuế bắt kiểm tra lại thì phải chỉ ra ĐÍCH DANH hóa đơn nào chỉ
  *    có một bên, hóa đơn nào có cả hai mà số tiền khác nhau.
  *
- * 2. **Gom hóa đơn cùng MST người bán + cùng ngày** (`gomCungMstCungNgay`). Một nhà
+ * 2. **Gom hóa đơn cùng MST người bán + cùng ngày** (`groupSameTaxCodeSameDay`). Một nhà
  *    cung cấp xuất nhiều hóa đơn trong cùng một ngày thì hoặc là tách đơn thật, hoặc
  *    là hạch toán trùng. Máy không đoán thay được, chỉ lọc ra cho người soát.
  *
- * Cả hai đều là hàm THUẦN trên `SheetHoaDon[]` đã parse — không đọc file, không đụng
+ * Cả hai đều là hàm THUẦN trên `InvoiceSheet[]` đã parse — không đọc file, không đụng
  * engine đối soát, nên bật/tắt không ảnh hưởng các phép tự kiểm đã verify.
  */
-import type { DongHoaDon, SheetHoaDon } from "./doiSoatHddt";
-import { chuanChu as chuan } from "./doiSoatChung";
+import type { InvoiceRow, InvoiceSheet } from "./einvoiceReconciliation";
+import { normalizeText as chuan } from "./reconciliationCommon";
 
-export { chuCotExcel } from "./doiSoatChung";
+export { columnIndexToLetter } from "./reconciliationCommon";
 
 /** Sheet thuộc bản CƠ QUAN THUẾ gửi: tên sheet có chữ "thuế". */
-export const laBenThue = (tenSheet: string): boolean => chuan(tenSheet).includes("thue");
+export const isTaxSide = (tenSheet: string): boolean => chuan(tenSheet).includes("thue");
 
 /** Tên sheet đánh dấu bản KẾ TOÁN TỰ TẢI: có chữ "tải" đứng riêng (VD "HDDT-CTY TẢI", "TỰ TẢI"). */
-export const laBenTai = (tenSheet: string): boolean => /(^|[^a-z0-9])tai([^a-z0-9]|$)/.test(chuan(tenSheet));
+export const isDownloadSide = (tenSheet: string): boolean => /(^|[^a-z0-9])tai([^a-z0-9]|$)/.test(chuan(tenSheet));
 
 /** Cách máy chia hai bên — để màn hình nói rõ vì sao sheet nằm bên nào. */
-export type CachPhanBen = "chi-dinh" | "ten-thue" | "ten-tai" | "khong-ro";
+export type SideSplitMethod = "chi-dinh" | "ten-thue" | "ten-tai" | "khong-ro";
 
 /**
  * Chia các sheet hóa đơn thành bên THUẾ GỬI / bên TỰ TẢI.
@@ -38,19 +38,19 @@ export type CachPhanBen = "chi-dinh" | "ten-thue" | "ten-tai" | "khong-ro";
  *    `HDDT-CTY TẢI` — chỉ dò chữ "thuế" thì không nhận ra hai bản (memory 2026-09-21).
  * 4. Không nhận ra ⇒ tập rỗng (không so hai bản được, màn hình mời người dùng chọn).
  */
-export function phanBenThue(
+export function resolveTaxSideSheets(
   tenSheets: readonly string[],
   specified?: readonly string[] | null
-): { benThue: Set<string>; cach: CachPhanBen } {
+): { benThue: Set<string>; cach: SideSplitMethod } {
   if (specified) {
     const co = new Set(tenSheets);
     return { benThue: new Set(specified.filter((t) => co.has(t))), cach: "chi-dinh" };
   }
-  const theoThue = tenSheets.filter(laBenThue);
+  const theoThue = tenSheets.filter(isTaxSide);
   if (theoThue.length) return { benThue: new Set(theoThue), cach: "ten-thue" };
-  const downloadSheets = tenSheets.filter(laBenTai);
+  const downloadSheets = tenSheets.filter(isDownloadSide);
   if (downloadSheets.length && downloadSheets.length < tenSheets.length)
-    return { benThue: new Set(tenSheets.filter((t) => !laBenTai(t))), cach: "ten-tai" };
+    return { benThue: new Set(tenSheets.filter((t) => !isDownloadSide(t))), cach: "ten-tai" };
   return { benThue: new Set(), cach: "khong-ro" };
 }
 
@@ -58,7 +58,7 @@ export function phanBenThue(
 
 export type BenCo = "CA_HAI" | "CHI_THUE" | "CHI_TAI";
 
-export interface DongSoBan {
+export interface TwoVersionRow {
   khoa: string;
   kyHieu: string;
   soHoaDon: string;
@@ -87,10 +87,10 @@ export interface DongSoBan {
   ghiChu: string;
 }
 
-export interface KetQuaSoHaiBan {
+export interface TwoVersionResult {
   sheetThue: string[];
   sheetTai: string[];
-  dong: DongSoBan[];
+  dong: TwoVersionRow[];
   tong: {
     soThue: number;
     soTai: number;
@@ -107,7 +107,7 @@ export interface KetQuaSoHaiBan {
   };
 }
 
-const locationOf = (d: DongHoaDon): string => `${d.sheet} dòng ${d.dongFile}`;
+const locationOf = (d: InvoiceRow): string => `${d.sheet} dòng ${d.dongFile}`;
 
 /**
  * So bản THUẾ gửi với bản TỰ TẢI. Trả `null` nếu file không có đủ hai bên
@@ -117,18 +117,18 @@ const locationOf = (d: DongHoaDon): string => `${d.sheet} dòng ${d.dongFile}`;
  * khỏi phải ghép đôi sheet theo tên (bản thuế hay gộp "có mã + không mã" vào một
  * sheet trong khi bản tự tải tách ra, ghép đôi theo tên là gãy).
  */
-export function soHaiBanHddt(
-  sheets: readonly SheetHoaDon[],
+export function compareTwoInvoiceVersions(
+  sheets: readonly InvoiceSheet[],
   nguong = 1,
-  benThue: ReadonlySet<string> = phanBenThue(sheets.map((s) => s.ten)).benThue
-): KetQuaSoHaiBan | null {
+  benThue: ReadonlySet<string> = resolveTaxSideSheets(sheets.map((s) => s.ten)).benThue
+): TwoVersionResult | null {
   const benT = sheets.filter((s) => benThue.has(s.ten));
   const benX = sheets.filter((s) => !benThue.has(s.ten));
   if (!benT.length || !benX.length) return null;
 
   /** Gộp theo khóa: một khóa có thể xuất hiện nhiều dòng (hóa đơn bị kê hai lần). */
-  const groupInvoices = (ds: readonly SheetHoaDon[]) => {
-    const m = new Map<string, DongHoaDon[]>();
+  const groupInvoices = (ds: readonly InvoiceSheet[]) => {
+    const m = new Map<string, InvoiceRow[]>();
     for (const sh of ds)
       for (const d of sh.dong) {
         const a = m.get(d.khoa);
@@ -140,10 +140,10 @@ export function soHaiBanHddt(
   const mT = groupInvoices(benT);
   const mX = groupInvoices(benX);
 
-  const sum = (ds: DongHoaDon[] | undefined, lay: (d: DongHoaDon) => number) =>
+  const sum = (ds: InvoiceRow[] | undefined, lay: (d: InvoiceRow) => number) =>
     ds?.length ? ds.reduce((s, d) => s + lay(d), 0) : null;
 
-  const dong: DongSoBan[] = [];
+  const dong: TwoVersionRow[] = [];
   for (const khoa of new Set([...mT.keys(), ...mX.keys()])) {
     const t = mT.get(khoa);
     const x = mX.get(khoa);
@@ -203,7 +203,7 @@ export function soHaiBanHddt(
   );
 
   const rowsOfSide = (b: BenCo) => dong.filter((d) => d.ben === b);
-  const sumAmount = (ds: DongSoBan[], lay: (d: DongSoBan) => number | null) =>
+  const sumAmount = (ds: TwoVersionRow[], lay: (d: TwoVersionRow) => number | null) =>
     ds.reduce((s, d) => s + (lay(d) ?? 0), 0);
 
   return {
@@ -229,7 +229,7 @@ export function soHaiBanHddt(
 
 // ---------- 2. Hóa đơn cùng MST người bán + cùng ngày ----------
 
-export interface DongCungNgay {
+export interface SameDayRow {
   sheet: string;
   dongFile: number;
   kyHieu: string;
@@ -238,7 +238,7 @@ export interface DongCungNgay {
   ketLuan: string;
 }
 
-export interface NhomCungNgay {
+export interface SameDayGroup {
   mstBan: string;
   tenBan: string;
   ngay: string;
@@ -248,7 +248,7 @@ export interface NhomCungNgay {
   trungSoTien: boolean;
   /** Mô tả các cụm trùng tiền, VD "2 hóa đơn cùng 1.200.000 đ". */
   moTaTrung: string;
-  dong: DongCungNgay[];
+  dong: SameDayRow[];
 }
 
 /**
@@ -258,11 +258,11 @@ export interface NhomCungNgay {
  * siêu thị…), nên KHÔNG kết luận là sai. Việc của hàm này là lọc ra để người soát
  * nhìn, và đánh dấu riêng nhóm có hóa đơn **trùng khít số tiền** — chỗ dễ kê hai lần nhất.
  */
-export function gomCungMstCungNgay(
-  sheets: readonly SheetHoaDon[],
-  benThue: ReadonlySet<string> = phanBenThue(sheets.map((s) => s.ten)).benThue
-): NhomCungNgay[] {
-  const m = new Map<string, { mst: string; ten: string; ngay: string; ds: DongHoaDon[] }>();
+export function groupSameTaxCodeSameDay(
+  sheets: readonly InvoiceSheet[],
+  benThue: ReadonlySet<string> = resolveTaxSideSheets(sheets.map((s) => s.ten)).benThue
+): SameDayGroup[] {
+  const m = new Map<string, { mst: string; ten: string; ngay: string; ds: InvoiceRow[] }>();
   // File có HAI BẢN (thuế gửi + tự tải) thì mỗi hóa đơn hiện hai lần — một ở mỗi
   // bản. Đếm cả hai là nhóm nào cũng "trùng khít số tiền" (HDONDT 6 tháng: 1790/1923
   // nhóm), danh sách thành vô dụng. Cùng khóa mà KHÁC bên thì chỉ lấy một lần.
@@ -281,7 +281,7 @@ export function gomCungMstCungNgay(
       else m.set(k, { mst: d.mstBan, ten: d.tenBan, ngay: d.ngayLap, ds: [d] });
     }
 
-  const ra: NhomCungNgay[] = [];
+  const ra: SameDayGroup[] = [];
   for (const { mst, ten, ngay, ds } of m.values()) {
     if (ds.length < 2) continue;
     // cụm trùng khít số tiền trong cùng nhóm

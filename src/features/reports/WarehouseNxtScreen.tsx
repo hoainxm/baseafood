@@ -5,7 +5,7 @@
 // ============================================================
 import { useMemo, useRef, useState } from "react";
 import type { NxtSnapshotLine, StorageLocation } from "@/types";
-import { KHO_LUU_MAC_DINH, STORAGE_KIND_LABELS } from "@/types";
+import { DEFAULT_STORAGE_LOCATION, STORAGE_KIND_LABELS } from "@/types";
 import { useNxtSnapshots, useStorageLocations } from "@/lib/catalogRepo";
 import {
   parseNxtExcelFile,
@@ -49,7 +49,7 @@ import {
   useToMau,
 } from "@/design-system";
 import { useSuaDanhMuc } from "@/features/catalog/SuaDanhMucNhanh";
-import { num, viDate } from "@/lib/format";
+import { num, formatDateVN } from "@/lib/format";
 import { newId } from "@/lib/store";
 import {
   ArrowDownToLine,
@@ -130,7 +130,7 @@ export default function WarehouseNxtScreen() {
     }
     return [...set.entries()]
       .sort((a, b) => b[1].from.localeCompare(a[1].from))
-      .map(([k, v]) => ({ value: k, label: `${viDate(v.from)} – ${viDate(v.to)}` }));
+      .map(([k, v]) => ({ value: k, label: `${formatDateVN(v.from)} – ${formatDateVN(v.to)}` }));
   }, [snapshots, selectedWarehouse]);
 
   const [ky, setKy] = useState("");
@@ -147,10 +147,10 @@ export default function WarehouseNxtScreen() {
 
   // ---------- Chiều KHO LƯU (kho nhà / kho lạnh thuê ngoài) ----------
   /** Tên kho lưu hiển thị của một dòng — rỗng nghĩa là chưa gán ⇒ kho nhà. */
-  const storageLocationOf = (r: { storageLocation: string }) => r.storageLocation || KHO_LUU_MAC_DINH;
+  const storageLocationOf = (r: { storageLocation: string }) => r.storageLocation || DEFAULT_STORAGE_LOCATION;
 
   const storageLocationOpts: MucChon[] = useMemo(() => {
-    const set = new Set<string>([KHO_LUU_MAC_DINH]);
+    const set = new Set<string>([DEFAULT_STORAGE_LOCATION]);
     for (const k of storageLocationCatalog) if (k.name.trim()) set.add(k.name.trim());
     for (const r of snapshots) if (r.storageLocation) set.add(r.storageLocation);
     const kindByName = new Map(storageLocationCatalog.map((k) => [k.name.trim(), k.kind]));
@@ -304,7 +304,7 @@ export default function WarehouseNxtScreen() {
     const newLines: NxtSnapshotLine = {
       id: idDong(selectedWarehouse, fromDate, toDate, code),
       warehouseCode: selectedWarehouse,
-      storageLocation: storageLocationFilter === ALL ? KHO_LUU_MAC_DINH : storageLocationFilter,
+      storageLocation: storageLocationFilter === ALL ? DEFAULT_STORAGE_LOCATION : storageLocationFilter,
       periodFrom: fromDate,
       periodTo: toDate,
       itemCode: code,
@@ -376,7 +376,7 @@ export default function WarehouseNxtScreen() {
     setIsEditMode(true);
     const totalKg = carried.reduce((t, c) => t + c.openingKg, 0);
     notify.daLuu(
-      `Đã tạo kỳ ${viDate(from)}–${viDate(to)} · kế thừa tồn đầu ${num(totalKg)} kg · ${carried.length} mã` +
+      `Đã tạo kỳ ${formatDateVN(from)}–${formatDateVN(to)} · kế thừa tồn đầu ${num(totalKg)} kg · ${carried.length} mã` +
         (existing.size ? ` (${existing.size} mã đã có: chỉ cập nhật tồn đầu, giữ nhập/xuất)` : "")
     );
   };
@@ -403,7 +403,7 @@ export default function WarehouseNxtScreen() {
       key: "khoLuu",
       header: "Kho lưu",
       render: (r) => (
-        <Nhan loai={r.storageLocation && r.storageLocation !== KHO_LUU_MAC_DINH ? "vi-tri" : "phu"}>
+        <Nhan loai={r.storageLocation && r.storageLocation !== DEFAULT_STORAGE_LOCATION ? "vi-tri" : "phu"}>
           {storageLocationOf(r)}
         </Nhan>
       ),
@@ -498,9 +498,9 @@ export default function WarehouseNxtScreen() {
     }));
     exportNxtToExcel(
       {
-        createdDateText: `Ngày lập: ${viDate(homNay())}`,
+        createdDateText: `Ngày lập: ${formatDateVN(homNay())}`,
         title: "Báo cáo xuất nhập tồn",
-        dateRangeText: `Từ ngày ${viDate(fromDate)} đến ngày ${viDate(toDate)}`,
+        dateRangeText: `Từ ngày ${formatDateVN(fromDate)} đến ngày ${formatDateVN(toDate)}`,
         warehouseText: `Chi nhánh: ${selectedWarehouse}`,
         items,
         totalItemCount: items.length,
@@ -538,7 +538,7 @@ export default function WarehouseNxtScreen() {
       const newLines: NxtSnapshotLine[] = data.items.map((it) => ({
         id: idDong(fileWarehouse, from, to, it.code),
         warehouseCode: fileWarehouse,
-        storageLocation: KHO_LUU_MAC_DINH,
+        storageLocation: DEFAULT_STORAGE_LOCATION,
         periodFrom: from,
         periodTo: to,
         itemCode: it.code,
@@ -567,7 +567,7 @@ export default function WarehouseNxtScreen() {
       const sn = newLines.reduce((s, r) => s + r.inKg, 0);
       const productionKg = newLines.reduce((s, r) => s + r.outKg, 0);
       notify.daLuu(
-        `Đã nạp ${newLines.length} mã · ${fileWarehouse} · ${viDate(from)}–${viDate(to)} — tồn cuối ${num(sd + sn - productionKg)} kg`
+        `Đã nạp ${newLines.length} mã · ${fileWarehouse} · ${formatDateVN(from)}–${formatDateVN(to)} — tồn cuối ${num(sd + sn - productionKg)} kg`
       );
     } catch (err) {
       notify.loi(`Không đọc được file: ${err instanceof Error ? err.message : String(err)}`);
@@ -756,7 +756,7 @@ export default function WarehouseNxtScreen() {
                 </Button>
               </div>
               <LuoiNhap
-                moTa={`Sổ Xuất–Nhập–Tồn ${selectedWarehouse} kỳ ${viDate(fromDate)}–${viDate(toDate)}`}
+                moTa={`Sổ Xuất–Nhập–Tồn ${selectedWarehouse} kỳ ${formatDateVN(fromDate)}–${formatDateVN(toDate)}`}
                 cot={gridColumns}
                 hang={gridRows}
                 toMau="nxt-kho"
@@ -793,7 +793,7 @@ export default function WarehouseNxtScreen() {
                 <NutToMauChon to={rowMark} khoa={selectedRows.map((r) => r.id)} />
                 <Button
                   size="sm"
-                  onClick={() => setAssignLocation(storageLocationFilter === ALL ? KHO_LUU_MAC_DINH : storageLocationFilter)}
+                  onClick={() => setAssignLocation(storageLocationFilter === ALL ? DEFAULT_STORAGE_LOCATION : storageLocationFilter)}
                   title="Ghi lại các mã đang tick là đang nằm ở một kho khác (kho nhà hay kho lạnh thuê ngoài). Sửa danh sách kho ở Danh mục → Kho lưu trữ."
                 >
                   <PackageOpen className="mr-2 h-4 w-4" />
@@ -807,8 +807,8 @@ export default function WarehouseNxtScreen() {
           )}
 
           <p className="text-sm text-muted-foreground">
-            Kho <span className="font-semibold text-foreground">{selectedWarehouse}</span> · kỳ {viDate(fromDate)} –{" "}
-            {viDate(toDate)}
+            Kho <span className="font-semibold text-foreground">{selectedWarehouse}</span> · kỳ {formatDateVN(fromDate)} –{" "}
+            {formatDateVN(toDate)}
             {storageLocationFilter === ALL ? " · tất cả kho lưu" : ` · kho lưu ${storageLocationFilter}`}. Tick dòng để cộng tổng
             hoặc gán kho lưu theo lô. "Tạo kỳ kế tiếp" kế thừa tồn cuối kỳ này (kèm kho lưu) thành tồn đầu kỳ
             sau. Nối tự động với sổ nhập/SX/bán là bước sau (cần bảng ánh xạ mã).
@@ -822,7 +822,7 @@ export default function WarehouseNxtScreen() {
           <DialogHeader>
             <DialogTitle className="text-2xl">Thêm mã hàng vào kỳ</DialogTitle>
             <DialogDescription className="text-base">
-              Thêm một mặt hàng kho vào {selectedWarehouse} · kỳ {viDate(fromDate)}–{viDate(toDate)}. Tồn đầu/nhập/xuất
+              Thêm một mặt hàng kho vào {selectedWarehouse} · kỳ {formatDateVN(fromDate)}–{formatDateVN(toDate)}. Tồn đầu/nhập/xuất
               ghi ở lưới.
             </DialogDescription>
           </DialogHeader>
@@ -938,13 +938,13 @@ export default function WarehouseNxtScreen() {
       {moIn && rows.length > 0 && (
         <PhieuIn
           tieuDe="Báo cáo xuất nhập tồn"
-          phuDe={`${selectedWarehouse} · từ ${viDate(fromDate)} đến ${viDate(toDate)}${
+          phuDe={`${selectedWarehouse} · từ ${formatDateVN(fromDate)} đến ${formatDateVN(toDate)}${
             storageLocationFilter === ALL ? "" : ` · kho lưu ${storageLocationFilter}`
           }`}
           onClose={() => setMoIn(false)}
         >
           <div className="mb-2 flex items-center justify-between text-sm">
-            <span>Ngày lập: {viDate(homNay())}</span>
+            <span>Ngày lập: {formatDateVN(homNay())}</span>
             <span>SL mặt hàng: {rows.length}</span>
           </div>
           <table className="w-full border-collapse">

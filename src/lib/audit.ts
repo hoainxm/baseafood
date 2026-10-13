@@ -4,14 +4,14 @@
 // Description: Append-only user action audit trail — capture + buffer + flush
 // ============================================================
 import { supabase, SITE_ID } from "@/lib/supabase";
-import { khoaLocal } from "@/lib/cheDo";
+import { modeLocalKey } from "@/lib/demoMode";
 import { uid } from "@/lib/db";
 
 /**
  * Lưu vết thao tác CHẠM DỮ LIỆU (thêm/sửa/xóa bản ghi, đăng nhập/xuất). KHÔNG
  * log thao tác UI vụn (điều hướng, mở dialog) — ồn, phình dung lượng, vô giá trị
  * kiểm toán. Bắt tại MỘT chốt: `useBang.ghi` trong repo.ts so cũ↔mới rồi gọi
- * `ghiNhatKy` ở đây, nên mọi bảng đều được lưu vết mà không phải sửa từng màn.
+ * `appendAuditEntries` ở đây, nên mọi bảng đều được lưu vết mà không phải sửa từng màn.
  *
  * Bền bỉ như tầng dữ liệu: ghi xuống localStorage TRƯỚC (buffer), rồi đẩy lên
  * `audit_log`. Đẩy hụt (mất mạng / bảng chưa tạo) thì giữ buffer, IM LẶNG — KHÔNG
@@ -21,7 +21,7 @@ import { uid } from "@/lib/db";
  * Append-only: bảng chỉ cho INSERT, cấm UPDATE/DELETE ở RLS (migration 0025).
  */
 
-export interface NhatKyMoi {
+export interface NewAuditEntry {
   action: string; // them | sua | xoa | dang-nhap | dang-xuat
   entity: string; // tên bảng (vd material_imports) hoặc 'auth'
   entityKey: string;
@@ -29,7 +29,7 @@ export interface NhatKyMoi {
   diff?: unknown; // {truong: [truoc, sau]} cho sửa; {_new: row} cho thêm
 }
 
-export interface NhatKy extends NhatKyMoi {
+export interface AuditEntry extends NewAuditEntry {
   id: string;
   at: string; // ISO
   actorId: string;
@@ -41,7 +41,7 @@ let actorId = "";
 let actorName = "";
 
 /** Set người đang thao tác (gọi từ App khi đổi tài khoản). null = đăng xuất. */
-export function datNguoiThaoTac(a: { id?: string; username?: string } | null): void {
+export function setAuditOperator(a: { id?: string; username?: string } | null): void {
   actorId = a?.id ?? "";
   actorName = a?.username ?? "";
 }
@@ -60,19 +60,19 @@ function layDeviceId(): string {
   }
 }
 
-/** Buffer nhật ký — chế độ demo dùng vùng `bsf-demo.*` riêng (lib/cheDo.ts). */
-const KEY_BUF = khoaLocal("bsf.audit.buffer");
+/** Buffer nhật ký — chế độ demo dùng vùng `bsf-demo.*` riêng (lib/demoMode.ts). */
+const KEY_BUF = modeLocalKey("bsf.audit.buffer");
 const CAP = 3000; // giới hạn buffer để không nuốt hết quota localStorage
 
-function docBuffer(): NhatKy[] {
+function docBuffer(): AuditEntry[] {
   try {
     const raw = localStorage.getItem(KEY_BUF);
-    return raw ? (JSON.parse(raw) as NhatKy[]) : [];
+    return raw ? (JSON.parse(raw) as AuditEntry[]) : [];
   } catch {
     return [];
   }
 }
-function saveBuffer(xs: NhatKy[]): void {
+function saveBuffer(xs: AuditEntry[]): void {
   try {
     localStorage.setItem(KEY_BUF, JSON.stringify(xs.slice(-CAP)));
   } catch {
@@ -80,7 +80,7 @@ function saveBuffer(xs: NhatKy[]): void {
   }
 }
 
-function toRow(r: NhatKy): Record<string, unknown> {
+function toRow(r: AuditEntry): Record<string, unknown> {
   return {
     id: r.id,
     site_id: SITE_ID,
@@ -95,7 +95,7 @@ function toRow(r: NhatKy): Record<string, unknown> {
     device_id: r.deviceId,
   };
 }
-function fromRow(r: Record<string, unknown>): NhatKy {
+function fromRow(r: Record<string, unknown>): AuditEntry {
   const s = (v: unknown) => (v == null ? "" : String(v));
   return {
     id: s(r.id),
@@ -132,12 +132,12 @@ async function flush(): Promise<void> {
 }
 
 /** Ghi một loạt entry nhật ký. Không throw — lỗi nuốt để không chặn nghiệp vụ. */
-export function ghiNhatKy(list: NhatKyMoi[]): void {
+export function appendAuditEntries(list: NewAuditEntry[]): void {
   if (!list.length) return;
   try {
     const at = new Date().toISOString();
     const dev = layDeviceId();
-    const toAdd: NhatKy[] = list.map((e) => ({
+    const toAdd: AuditEntry[] = list.map((e) => ({
       ...e,
       id: uid(),
       at,
@@ -152,7 +152,7 @@ export function ghiNhatKy(list: NhatKyMoi[]): void {
   }
 }
 
-export interface LocNhatKy {
+export interface AuditLogFilter {
   tu?: string; // yyyy-mm-dd
   den?: string; // yyyy-mm-dd
   nguoi?: string; // actor_username
@@ -168,7 +168,7 @@ export interface LocNhatKy {
  * ngày 11/10 — so thẳng `yyyy-mm-dd` với chuỗi UTC lệch 7 tiếng (thao tác 0h–7h
  * sáng VN rơi sang ngày hôm trước).
  */
-export function bienNgayVN(tu?: string, den?: string): { tu?: string; den?: string } {
+export function toVnDayBoundsUtc(tu?: string, den?: string): { tu?: string; den?: string } {
   const iso = (s: string) => {
     const t = Date.parse(s);
     return Number.isFinite(t) ? new Date(t).toISOString() : undefined;
@@ -180,10 +180,10 @@ export function bienNgayVN(tu?: string, den?: string): { tu?: string; den?: stri
 }
 
 /** Đọc nhật ký cho màn Nhật ký (admin). Server: query audit_log; local: đọc buffer. */
-export async function docNhatKy(filter: LocNhatKy = {}): Promise<NhatKy[]> {
+export async function readAuditLog(filter: AuditLogFilter = {}): Promise<AuditEntry[]> {
   const gioiHan = filter.gioiHan ?? 500;
-  const bien = bienNgayVN(filter.tu, filter.den);
-  const matches = (r: NhatKy) => {
+  const bien = toVnDayBoundsUtc(filter.tu, filter.den);
+  const matches = (r: AuditEntry) => {
     if (filter.nguoi && r.actorUsername !== filter.nguoi) return false;
     if (filter.bang && r.entity !== filter.bang) return false;
     if (filter.loai && r.action !== filter.loai) return false;

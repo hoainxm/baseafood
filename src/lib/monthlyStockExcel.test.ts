@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import * as XLSX from "xlsx";
 import type { MonthlyStockLine } from "@/types";
-import { parseBangKeKhoFile, khoTuTieuDe, timKhoTheoGhi, tenKhoMoi, idDongNap, ghepNapLai } from "./monthlyStockExcel";
+import { parseStockStatementFile, parseWarehouseFromTitle, findWarehouseByText, buildNewWarehouseName, idDongNap, ghepNapLai } from "./monthlyStockExcel";
 
 /** Dựng sheet theo bố cục bảng kê thật: A tên mục/ngày, B tên hàng, J/L/N kg, R ghi chú kho. */
 function stockRow(ten: string, stock: number, write = ""): unknown[] {
@@ -12,7 +12,7 @@ function stockRow(ten: string, stock: number, write = ""): unknown[] {
   return r;
 }
 
-async function docFile(dong6: unknown[] = []): Promise<ReturnType<typeof parseBangKeKhoFile>> {
+async function docFile(dong6: unknown[] = []): Promise<ReturnType<typeof parseStockStatementFile>> {
   const aoa: unknown[][] = [
     ["BẢNG KÊ NGUYÊN LIỆU KHO 1500 THÁNG 08 / 2026"], // dòng 1
     ["I", "HÀNG NHẬP KHẨU"], // 2
@@ -40,10 +40,10 @@ async function docFile(dong6: unknown[] = []): Promise<ReturnType<typeof parseBa
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "8");
   const buf = XLSX.write(wb, { type: "array", bookType: "xlsx" }) as ArrayBuffer;
-  return parseBangKeKhoFile(new File([buf], "kho.xlsx"));
+  return parseStockStatementFile(new File([buf], "kho.xlsx"));
 }
 
-describe("parseBangKeKhoFile", () => {
+describe("parseStockStatementFile", () => {
   test("tách nhóm theo mục + khối con TỔNG 2 DA + Hàng tạm", async () => {
     const [sh] = await docFile();
     const nhom = Object.fromEntries(sh.rows.map((r) => [r.itemName, r.category]));
@@ -53,7 +53,7 @@ describe("parseBangKeKhoFile", () => {
     expect(nhom["4 DA RÂU NGẮN"]).toBe("Nguyên liệu nhập khẩu – 2 DA");
     expect(nhom["B.TUỘC  2 DA"]).toBe("Nguyên liệu mua ngoài");
     expect(nhom["CÁ TRÍCH DẠT"]).toBe("Hàng tạm");
-    expect(khoTuTieuDe(sh.tieuDe)).toBe("1500");
+    expect(parseWarehouseFromTitle(sh.tieuDe)).toBe("1500");
   });
 
   test("ô gộp ngày nhập/invoice chép xuống cả lô, ngày không lùi 1 ngày, dòng trống giữ nguyên", async () => {
@@ -85,19 +85,19 @@ describe("parseBangKeKhoFile", () => {
   });
 });
 
-describe("timKhoTheoGhi", () => {
+describe("findWarehouseByText", () => {
   const dm = [
     { code: "KHP", name: "Kho Hồng Phú" },
     { code: "KAD", name: "Kho Ánh Dương" },
   ];
   test("khớp mã có/không tiền tố K, bỏ dấu + khoảng trắng", () => {
-    expect(timKhoTheoGhi("HP", dm)).toBe("Kho Hồng Phú");
-    expect(timKhoTheoGhi("Á D", dm)).toBe("Kho Ánh Dương");
-    expect(timKhoTheoGhi("ánh dương", dm)).toBe("Kho Ánh Dương");
+    expect(findWarehouseByText("HP", dm)).toBe("Kho Hồng Phú");
+    expect(findWarehouseByText("Á D", dm)).toBe("Kho Ánh Dương");
+    expect(findWarehouseByText("ánh dương", dm)).toBe("Kho Ánh Dương");
   });
   test("viết tắt lạ ⇒ null + tên kho mới", () => {
-    expect(timKhoTheoGhi("phước cơ", dm)).toBeNull();
-    expect(tenKhoMoi("phước cơ")).toBe("Kho Phước Cơ");
+    expect(findWarehouseByText("phước cơ", dm)).toBeNull();
+    expect(buildNewWarehouseName("phước cơ")).toBe("Kho Phước Cơ");
   });
 });
 

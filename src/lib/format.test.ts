@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { num, kg, viDate, todayISO, chuan0 } from "@/lib/format";
+import { num, kg, formatDateVN, todayISO, chuan0 } from "@/lib/format";
 
 describe("num", () => {
   it("null/undefined/NaN ⇒ chuỗi rỗng (không phải '0')", () => {
@@ -31,9 +31,9 @@ describe("kg", () => {
   });
 });
 
-describe("viDate", () => {
+describe("formatDateVN", () => {
   it("yyyy-mm-dd ⇒ dd/mm/yyyy", () => {
-    expect(viDate("2026-09-21")).toBe("21/09/2026");
+    expect(formatDateVN("2026-09-21")).toBe("21/09/2026");
   });
 });
 

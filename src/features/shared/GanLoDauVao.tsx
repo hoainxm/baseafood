@@ -14,21 +14,21 @@
 import { useMemo, useState, type ReactNode } from "react";
 import type { LotDispatch, LotDispatchDoc, LotInput, LotKind, Workshop } from "@/types";
 import { useAuth } from "@/lib/auth";
-import { kg as kgChu, viDate } from "@/lib/format";
+import { kg as kgChu, formatDateVN } from "@/lib/format";
 import {
-  TEN_LOAI,
-  bangTonKhoLo,
-  canBangLo,
+  TRACE_KIND_LABELS,
+  buildLotStockIndex,
+  computeLotMassBalance,
   docMaQr,
-  lyDoNhieuLo,
-  loBtpDeChon,
-  loNlDeChon,
-  nutLo,
-  timLo,
-  tonKhoCuaLo,
-  type DuLieuTruyXuat,
-  type NutLo,
-} from "@/lib/truyXuatLo";
+  explainMultipleLots,
+  listSelectableWipLots,
+  listSelectableMaterialLots,
+  buildLotNode,
+  findLots,
+  getLotStockKg,
+  type TraceData,
+  type LotNode,
+} from "@/lib/lotTraceability";
 import { Button, EmptyState, Field, FormDialog, Input, Nhan, NumberField, NutDong, notify } from "@/design-system";
 import { Camera, CameraOff, Link2, Plus, Trash2 } from "lucide-react";
 import { KhungQuetQr } from "./KhungQuetQr";
@@ -68,27 +68,27 @@ function LotInputDialog({
   moTa: string;
   loaiVao: LotKind;
   tenVao: string;
-  dl: DuLieuTruyXuat;
+  dl: TraceData;
   daGan: LinkedInput[];
-  ungVien: NutLo[];
+  ungVien: LotNode[];
   tieuDeUngVien: string;
   /** Kiểm thêm (VD đúng mặt hàng). Trả câu cảnh báo để chặn, hoặc null. */
-  kiemNut?: (n: NutLo) => string | null;
-  onThem: (node: NutLo, cach: LotInput["method"], kg: number | null) => void;
+  kiemNut?: (n: LotNode) => string | null;
+  onThem: (node: LotNode, cach: LotInput["method"], kg: number | null) => void;
   onBo: (id: string) => void;
   onClose: () => void;
 }) {
   const [isScanning, setIsScanning] = useState(false);
   const [typedCode, setTypedCode] = useState("");
   const [inputKg, setInputKg] = useState<number | null>(null);
-  const [choices, setChoices] = useState<NutLo[]>([]); // một mã nhiều lô ⇒ cho người chọn
+  const [choices, setChoices] = useState<LotNode[]>([]); // một mã nhiều lô ⇒ cho người chọn
   const [pickPrompt, setPickPrompt] = useState("");
   // Sổ tồn theo lô dựng MỘT lần cho cả danh sách — tính lại từng dòng là O(n²).
-  const lotStockTable = useMemo(() => bangTonKhoLo(dl), [dl]);
+  const lotStockTable = useMemo(() => buildLotStockIndex(dl), [dl]);
 
-  const addLot = (node: NutLo, cach: LotInput["method"]) => {
+  const addLot = (node: LotNode, cach: LotInput["method"]) => {
     if (node.kind !== loaiVao) {
-      notify.canhBao(`"${node.nhan}" là ${TEN_LOAI[node.kind].toLowerCase()}, không phải ${tenVao}.`);
+      notify.canhBao(`"${node.nhan}" là ${TRACE_KIND_LABELS[node.kind].toLowerCase()}, không phải ${tenVao}.`);
       return;
     }
     const blockReason = kiemNut?.(node); // gồm cả "đã gắn rồi" — bên gọi biết id lô của mối nối
@@ -110,7 +110,7 @@ function LotInputDialog({
   const handleCode = (text: string, cach: "quet" | "go") => {
     const ma = docMaQr(text);
     if (!ma) return;
-    const kq = timLo(ma, dl);
+    const kq = findLots(ma, dl);
     if (!kq.length) {
       notify.canhBao(`Không tìm thấy lô "${text}". Kiểm tra lại mã, hoặc chọn trong danh sách bên dưới.`);
       return;
@@ -118,22 +118,22 @@ function LotInputDialog({
     if (kq.length === 1) addLot(kq[0]!, cach);
     else {
       // Mã chuyến ⇒ các loại NL của chuyến (việc thường ngày, không toast); mã cũ trùng thật ⇒ cảnh báo.
-      const ld = lyDoNhieuLo(text, kq, dl);
+      const ld = explainMultipleLots(text, kq, dl);
       setChoices(kq);
       setPickPrompt(ld.cau);
       if (!ld.cungChuyen) notify.canhBao(`${ld.cau} bên dưới.`);
     }
   };
 
-  const lotRow = (n: NutLo, node: ReactNode) => {
-    const cb = canBangLo(n.kind, n.id, dl);
-    const lotStock = tonKhoCuaLo(n.kind, n.id, dl, lotStockTable);
+  const lotRow = (n: LotNode, node: ReactNode) => {
+    const cb = computeLotMassBalance(n.kind, n.id, dl);
+    const lotStock = getLotStockKg(n.kind, n.id, dl, lotStockTable);
     return (
       <li key={`${n.kind}:${n.id}`} className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-2">
         <div className="min-w-0">
           <div className="font-medium">{n.nhan}</div>
           <div className="text-muted-foreground">
-            {[n.moTa, n.ngay && viDate(n.ngay), n.chiTiet.find((c) => c.nhan === "Đại lý")?.giaTri, n.kg ? kgChu(n.kg) : ""]
+            {[n.moTa, n.ngay && formatDateVN(n.ngay), n.chiTiet.find((c) => c.nhan === "Đại lý")?.giaTri, n.kg ? kgChu(n.kg) : ""]
               .filter(Boolean)
               .join(" · ")}
             {lotStock != null ? ` · tồn kho ${kgChu(lotStock)}` : cb && cb.ra.length > 0 ? ` · còn ${kgChu(cb.con)}` : ""}
@@ -280,7 +280,7 @@ export function GanLoDauVao({
   );
   const candidates = useMemo(
     () =>
-      (outputKind === "W" ? loNlDeChon(dl, xuong, ngay) : loBtpDeChon(dl, xuong, ngay, 120, matHangId)).filter(
+      (outputKind === "W" ? listSelectableMaterialLots(dl, xuong, ngay) : listSelectableWipLots(dl, xuong, ngay, 120, matHangId)).filter(
         (n) => !assigned.some((l) => l.inputId === n.id)
       ),
     [dl, outputKind, xuong, ngay, matHangId, assigned]
@@ -366,20 +366,20 @@ export function GanLoXuat({
     () => lotDispatches.filter((d) => d.docKind === docKind && d.docId === docId),
     [lotDispatches, docKind, docId]
   );
-  const productOf = (n: NutLo) =>
+  const productOf = (n: LotNode) =>
     n.kind === "W" ? dl.wips.find((w) => w.id === n.id)?.productId : n.kind === "P" ? dl.packagings.find((p) => p.id === n.id)?.toProductId : undefined;
 
   /** Gợi ý: lô cùng mặt hàng còn tồn, lô cũ trước (FIFO). NL: như khi gắn cho mẻ SX. */
   const candidates = useMemo(() => {
-    const isUnassigned = (n: NutLo) => !assigned.some((d) => d.lotId === n.id);
-    if (loaiLo === "S") return loNlDeChon(dl, xuong, ngay).filter(isUnassigned);
-    const lotStockTable = bangTonKhoLo(dl); // một lượt cho mọi lô ứng viên
+    const isUnassigned = (n: LotNode) => !assigned.some((d) => d.lotId === n.id);
+    if (loaiLo === "S") return listSelectableMaterialLots(dl, xuong, ngay).filter(isUnassigned);
+    const lotStockTable = buildLotStockIndex(dl); // một lượt cho mọi lô ứng viên
     const ds =
       loaiLo === "W"
-        ? dl.wips.filter((w) => w.status === "da-nhap" && (!matHangId || w.productId === matHangId)).map((w) => nutLo("W", w.id, dl))
-        : dl.packagings.filter((p) => !matHangId || p.toProductId === matHangId).map((p) => nutLo("P", p.id, dl));
+        ? dl.wips.filter((w) => w.status === "da-nhap" && (!matHangId || w.productId === matHangId)).map((w) => buildLotNode("W", w.id, dl))
+        : dl.packagings.filter((p) => !matHangId || p.toProductId === matHangId).map((p) => buildLotNode("P", p.id, dl));
     return ds
-      .filter((n) => isUnassigned(n) && (tonKhoCuaLo(n.kind, n.id, dl, lotStockTable) ?? 0) > 0)
+      .filter((n) => isUnassigned(n) && (getLotStockKg(n.kind, n.id, dl, lotStockTable) ?? 0) > 0)
       .sort((a, b) => a.ngay.localeCompare(b.ngay));
   }, [dl, loaiLo, xuong, ngay, matHangId, assigned]);
 

@@ -5,7 +5,7 @@
 // ============================================================
 import { useMemo, useState } from "react";
 import type { Packaging, Product, Workshop } from "@/types";
-import { haoHutDongGoi, BSF1_WAREHOUSES } from "@/types";
+import { computePackagingLoss, BSF1_WAREHOUSES } from "@/types";
 import { newId } from "@/lib/store";
 import { uid } from "@/lib/db";
 import {
@@ -18,14 +18,14 @@ import {
   useLotDispatches,
 } from "@/lib/catalogRepo";
 import { GanLoDauVao, TemLoQr } from "@/features/shared";
-import { nhanLoTp, nutLo } from "@/lib/truyXuatLo";
+import { formatFinishedGoodLotLabel, buildLotNode } from "@/lib/lotTraceability";
 import {
-  tinhTon,
-  khaDung,
-  locBanLe,
-  truTonBTP,
-  tinhTonTP,
-  KHO_TP,
+  computeWipStock,
+  getAvailableKg,
+  filterRetailSales,
+  collectWipDeductions,
+  computeFinishedGoodStock,
+  FG_WAREHOUSE,
 } from "@/lib/inventory";
 import {
   Button,
@@ -54,8 +54,8 @@ import {
   type MucChon,
 } from "@/design-system";
 import { useSuaDanhMuc } from "@/features/catalog/SuaDanhMucNhanh";
-import { kg, num, todayISO, viDate } from "@/lib/format";
-import { KY_OPT, phamViKy, type KyXem } from "@/lib/periodUtils";
+import { kg, num, todayISO, formatDateVN } from "@/lib/format";
+import { KY_OPT, getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
 import { Boxes, CalendarRange, Link2, Package, PackageCheck, Plus, QrCode, Scale } from "lucide-react";
 
 const WORKSHOPS: Workshop[] = ["Đông", "Cá", "Khô"];
@@ -86,7 +86,7 @@ export default function DongGoiScreen() {
   /** Bút chì sửa nhanh danh mục ngay trong ô chọn. */
   const productEditor = useSuaDanhMuc("matHang", products, setProducts);
 
-  const [ky, setKy] = useState<KyXem>("ngay");
+  const [ky, setKy] = useState<ViewPeriod>("ngay");
   const [date, setDate] = useState(todayISO());
   const [fromDate, setFromDate] = useState(todayISO());
   const [toDate, setToDate] = useState(todayISO());
@@ -101,11 +101,11 @@ export default function DongGoiScreen() {
   const [lotLabel, setLotLabel] = useState<Packaging | null>(null);
   const countLotInputs = (id: string) => lotInputs.filter((l) => l.outputKind === "P" && l.outputId === id).length;
 
-  const [tuHieuLuc, denHieuLuc] = phamViKy(ky, date, fromDate, toDate);
+  const [tuHieuLuc, denHieuLuc] = getViewPeriodRange(ky, date, fromDate, toDate);
   const isSingleDay = tuHieuLuc === denHieuLuc;
   const rangeDescription = isSingleDay
-    ? viDate(tuHieuLuc)
-    : `${viDate(tuHieuLuc)} – ${viDate(denHieuLuc)}`;
+    ? formatDateVN(tuHieuLuc)
+    : `${formatDateVN(tuHieuLuc)} – ${formatDateVN(denHieuLuc)}`;
 
   const tenMH = (id: string) => products.find((m) => m.id === id)?.name || "—";
   const productOptions: MucChon[] = products.map((m) => ({
@@ -116,15 +116,15 @@ export default function DongGoiScreen() {
 
   /* Tồn BTP khả dụng: sản xuất − xuất − bán lẻ block thô − ĐÃ đóng gói. */
   const wipDeductions = useMemo(
-    () => truTonBTP(salesItems, rows, lotInputs, lotDispatches),
+    () => collectWipDeductions(salesItems, rows, lotInputs, lotDispatches),
     [salesItems, rows, lotInputs, lotDispatches]
   );
   const wipStock = useMemo(
-    () => tinhTon(wips, exportItems, wipDeductions),
+    () => computeWipStock(wips, exportItems, wipDeductions),
     [wips, exportItems, wipDeductions]
   );
   /* Tồn TP đóng gói (chưa trừ bán TP ở đây — chỉ để xem đã đóng gói bao nhiêu còn kho). */
-  const finishedGoodStock = useMemo(() => tinhTonTP(rows, locBanLe(salesItems, KHO_TP)), [rows, salesItems]);
+  const finishedGoodStock = useMemo(() => computeFinishedGoodStock(rows, filterRetailSales(salesItems, FG_WAREHOUSE)), [rows, salesItems]);
 
   const view = useMemo(
     () =>
@@ -179,7 +179,7 @@ export default function DongGoiScreen() {
     setForm((p) => (p ? { ...p, [k]: v } : p));
 
   const wipAvailable = form?.fromProductId
-    ? khaDung(wipStock, form.fromProductId, form.fromSpec.trim())
+    ? getAvailableKg(wipStock, form.fromProductId, form.fromSpec.trim())
     : null;
   const exceedsWipStock = wipAvailable != null && form != null && form.inputKg > wipAvailable;
   const haoAm = form != null && form.outputKg > form.inputKg;
@@ -225,7 +225,7 @@ export default function DongGoiScreen() {
   };
 
   const columns: Cot<Packaging>[] = [
-    { key: "date", header: "Ngày", chinh: true, render: (r) => viDate(r.date), sapXep: (r) => r.date },
+    { key: "date", header: "Ngày", chinh: true, render: (r) => formatDateVN(r.date), sapXep: (r) => r.date },
     { key: "workshop", header: "Xưởng", render: (r) => r.workshop },
     {
       key: "from",
@@ -256,10 +256,10 @@ export default function DongGoiScreen() {
       header: "Hao hụt (kg)",
       so: true,
       render: (r) => {
-        const h = haoHutDongGoi(r);
+        const h = computePackagingLoss(r);
         return <span className={h < 0 ? "tnum text-warning" : "tnum"}>{num(h)}</span>;
       },
-      sapXep: (r) => haoHutDongGoi(r),
+      sapXep: (r) => computePackagingLoss(r),
     },
     { key: "kho", header: "Kho TP", render: (r) => r.warehouse || "—" },
     {
@@ -327,7 +327,7 @@ export default function DongGoiScreen() {
           anNhanBatBuoc
           choPhepXoa={false}
           value={ky}
-          onChange={(v) => setKy(v as KyXem)}
+          onChange={(v) => setKy(v as ViewPeriod)}
           options={KY_OPT}
           className="min-w-[13rem]"
         />
@@ -518,7 +518,7 @@ export default function DongGoiScreen() {
         <GanLoDauVao
           outputKind="P"
           outputId={lotTarget.id}
-          outputNhan={`phiếu ${nhanLoTp(lotTarget)} · ${tenMH(lotTarget.toProductId)}`}
+          outputNhan={`phiếu ${formatFinishedGoodLotLabel(lotTarget)} · ${tenMH(lotTarget.toProductId)}`}
           xuong={lotTarget.workshop}
           ngay={lotTarget.date}
           matHangId={lotTarget.fromProductId}
@@ -527,7 +527,7 @@ export default function DongGoiScreen() {
       )}
       {lotLabel && (
         <TemLoQr
-          nut={nutLo("P", lotLabel.id, {
+          nut={buildLotNode("P", lotLabel.id, {
             shipments: [], imports: [], wips: wips,
             packagings: rows.some((r) => r.id === lotLabel.id) ? rows : [...rows, lotLabel], lotInputs,
             exportItems: [], exportOrders: [], salesOrders: [], products: products, customers: [],

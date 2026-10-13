@@ -28,7 +28,7 @@ import {
   useLotInputs,
   useLotDispatches,
 } from "@/lib/catalogRepo";
-import { loConHang, tinhTon, truTonBTP } from "@/lib/inventory";
+import { listLotsWithStock, computeWipStock, collectWipDeductions } from "@/lib/inventory";
 import {
   ChuThichBatBuoc,
   Button,
@@ -55,7 +55,7 @@ import {
   type MucChon,
 } from "@/design-system";
 import { useSuaDanhMuc } from "@/features/catalog/SuaDanhMucNhanh";
-import { kg, num, todayISO, viDate } from "@/lib/format";
+import { kg, num, todayISO, formatDateVN } from "@/lib/format";
 import { CheckCircle, ClipboardList, Package, PackageCheck, Plus, ScanLine, Truck } from "lucide-react";
 import { KiemLoXuat } from "./KiemLoXuat";
 
@@ -119,10 +119,10 @@ export default function DonDatScreen() {
   const [lotDispatches] = useLotDispatches();
   // Trừ đúng lô đã gắn (truy xuất QR) trước khi lập lệnh FIFO — lệnh không lấy lô đã đi.
   const retailSales = useMemo(
-    () => truTonBTP(salesItems, packagings, lotInputs, lotDispatches),
+    () => collectWipDeductions(salesItems, packagings, lotInputs, lotDispatches),
     [salesItems, packagings, lotInputs, lotDispatches]
   );
-  const stock = useMemo(() => tinhTon(wips, exportItems, retailSales), [wips, exportItems, retailSales]);
+  const stock = useMemo(() => computeWipStock(wips, exportItems, retailSales), [wips, exportItems, retailSales]);
 
   const productOptions: MucChon[] = products.map((m) => ({
     value: m.id,
@@ -223,13 +223,13 @@ export default function DonDatScreen() {
   /* ---- Tạo lệnh xuất (FIFO, cho xuất một phần) + handoff sổ Bán hàng ---- */
   const createExportOrder = (d: SalesOrder) => {
     const dsDong = dongDon.filter((x) => x.orderId === d.id);
-    const currentStock = tinhTon(wips, exportItems, retailSales);
+    const currentStock = computeWipStock(wips, exportItems, retailSales);
     const exportOrderId = newId();
     const newExportItems: ExportItem[] = [];
     for (const dc of dsDong) {
       let conCan = dc.requiredQuantityKg - exportedKg(d.id, dc.productId, dc.spec);
       if (conCan <= 0) continue;
-      const los = loConHang(currentStock, dc.productId, dc.spec);
+      const los = listLotsWithStock(currentStock, dc.productId, dc.spec);
       for (const lo of los) {
         if (conCan <= 0) break;
         const lay = Math.min(conCan, lo.conLai);
@@ -330,7 +330,7 @@ export default function DonDatScreen() {
 
   const colsDon: Cot<SalesOrder>[] = [
     { key: "kh", header: "Khách", chinh: true, render: (r) => tenKH(r.customerId), sapXep: (r) => tenKH(r.customerId) },
-    { key: "ngay", header: "Ngày đặt", render: (r) => viDate(r.orderDate), sapXep: (r) => r.orderDate },
+    { key: "ngay", header: "Ngày đặt", render: (r) => formatDateVN(r.orderDate), sapXep: (r) => r.orderDate },
     {
       key: "sd",
       header: "Số dòng",
@@ -420,7 +420,7 @@ export default function DonDatScreen() {
                 {tenKH(selectedOrder.customerId)}
               </p>
               <p className="text-base text-muted-foreground">
-                Đặt {viDate(selectedOrder.orderDate)} · {STATUS_LABELS[selectedOrder.status]}
+                Đặt {formatDateVN(selectedOrder.orderDate)} · {STATUS_LABELS[selectedOrder.status]}
               </p>
             </div>
             <div className="flex min-w-0 flex-wrap gap-2">
@@ -436,7 +436,7 @@ export default function DonDatScreen() {
                   <XacNhan
                     tieuDe="Xuất hàng cho đơn này?"
                     moTa="Sẽ trừ tồn kho dự trữ theo FIFO và tạo một phiếu bán (kênh Xuất khẩu) ở sổ Bán hàng. Không hoàn tác được — sai thì phải sửa tay ở cả hai sổ."
-                    chiTiet={`${tenKH(selectedOrder.customerId)} · đặt ${viDate(selectedOrder.orderDate)} · ${selectedOrderItems.length} dòng hàng`}
+                    chiTiet={`${tenKH(selectedOrder.customerId)} · đặt ${formatDateVN(selectedOrder.orderDate)} · ${selectedOrderItems.length} dòng hàng`}
                     nhanNut="Xuất hàng"
                     icon={Truck}
                     onConfirm={() => createExportOrder(selectedOrder)}
@@ -513,7 +513,7 @@ export default function DonDatScreen() {
                     return (
                       <li key={l.id} className="flex flex-wrap items-center justify-between gap-3 py-2">
                         <span className="min-w-0 text-base">
-                          {viDate(l.exportDate)} ·{" "}
+                          {formatDateVN(l.exportDate)} ·{" "}
                           <span className="tnum font-semibold">{kg(ds.reduce((t, d) => t + (d.quantityKg || 0), 0))}</span>
                           <span className="text-muted-foreground"> · {lotCount} lô</span>
                         </span>

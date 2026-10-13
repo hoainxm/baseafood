@@ -6,7 +6,7 @@
 // qua features/shared (tem QR), nạp tĩnh là phạt lần mở đầu (P2-8 audit 2026-09-21).
 // ============================================================
 
-export async function taoQrDataUrl(text: string, size = 240): Promise<string> {
+export async function createQrDataUrl(text: string, size = 240): Promise<string> {
   if (!text) return "";
   try {
     const { default: QRCode } = await import("qrcode");

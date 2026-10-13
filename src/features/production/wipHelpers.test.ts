@@ -29,7 +29,7 @@ describe("dongSXRong", () => {
   });
 });
 
-describe("laTach / tongDong", () => {
+describe("laTach / sumMonthlyStockRows", () => {
   it("chưa nhập râu/bao tử ⇒ không tách, tổng = quantityKg", () => {
     const r = d({ productId: "p", quantityKg: 120 });
     expect(laTach(r)).toBe(false);

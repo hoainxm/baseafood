@@ -18,7 +18,7 @@ import {
   EmptyState,
   notify,
 } from "@/design-system";
-import { num, viDate } from "@/lib/format";
+import { num, formatDateVN } from "@/lib/format";
 import { Layers } from "lucide-react";
 
 /**
@@ -181,11 +181,11 @@ export function HopDoiLoaiHangLoat({
                           className="size-6"
                           checked={selectedIds.has(r.id)}
                           onChange={() => doi(r.id)}
-                          aria-label={`Đổi loại chuyến ${r.supplierName} ngày ${viDate(r.deliveryDate)}`}
+                          aria-label={`Đổi loại chuyến ${r.supplierName} ngày ${formatDateVN(r.deliveryDate)}`}
                         />
                       </td>
                       <td className="border-b border-border px-3 py-2">
-                        {viDate(r.deliveryDate)}
+                        {formatDateVN(r.deliveryDate)}
                       </td>
                       <td className="border-b border-border px-3 py-2">{r.supplierName}</td>
                       <td className="border-b border-border px-3 py-2">{r.workshop}</td>

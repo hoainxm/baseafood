@@ -4,7 +4,7 @@
 // Description: User action audit-log viewer (admin only)
 // ============================================================
 import { useEffect, useMemo, useState } from "react";
-import { docNhatKy, type NhatKy } from "@/lib/audit";
+import { readAuditLog, type AuditEntry } from "@/lib/audit";
 import {
   Nhan,
   Button,
@@ -102,14 +102,14 @@ export default function NhatKyScreen() {
   const [user, setUser] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
 
-  const [rows, setRows] = useState<NhatKy[]>([]);
+  const [rows, setRows] = useState<AuditEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [detail, setDetail] = useState<NhatKy | null>(null);
+  const [detail, setDetail] = useState<AuditEntry | null>(null);
 
   useEffect(() => {
     let huy = false;
     setIsLoading(true);
-    docNhatKy({ tu, den, loai: actionFilter || undefined, bang: bang || undefined, gioiHan: 1000 })
+    readAuditLog({ tu, den, loai: actionFilter || undefined, bang: bang || undefined, gioiHan: 1000 })
       .then((r) => {
         if (!huy) setRows(r);
       })
@@ -123,7 +123,7 @@ export default function NhatKyScreen() {
 
   const reload = () => {
     setIsLoading(true);
-    docNhatKy({ tu, den, loai: actionFilter || undefined, bang: bang || undefined, gioiHan: 1000 })
+    readAuditLog({ tu, den, loai: actionFilter || undefined, bang: bang || undefined, gioiHan: 1000 })
       .then(setRows)
       .finally(() => setIsLoading(false));
   };
@@ -166,7 +166,7 @@ export default function NhatKyScreen() {
   const badgeKind = (a: string): LoaiNhan =>
     a === "xoa" ? "loi" : a === "them" ? "xong" : a === "sua" ? "luu-y" : "phu";
 
-  const cols: Cot<NhatKy>[] = [
+  const cols: Cot<AuditEntry>[] = [
     { key: "at", header: "Thời gian", chinh: true, render: (r) => formatDate(r.at), sapXep: (r) => r.at },
     { key: "nguoi", header: "Người", render: (r) => r.actorUsername || "—", sapXep: (r) => r.actorUsername },
     {
@@ -305,7 +305,7 @@ export default function NhatKyScreen() {
 }
 
 /** Hiển thị diff: bản ghi mới ({_new}) hoặc các trường đổi ({field:[trước,sau]}). */
-function DiffDetail({ r }: { r: NhatKy }) {
+function DiffDetail({ r }: { r: AuditEntry }) {
   const val = (v: unknown) =>
     v == null || v === "" ? "(trống)" : typeof v === "object" ? JSON.stringify(v) : String(v);
   const diff = r.diff as Record<string, unknown> | undefined;

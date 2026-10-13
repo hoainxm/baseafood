@@ -47,7 +47,7 @@ export function suyDong(l: MonthlyStockLine): MonthlyStockRow {
 }
 
 /** Cộng tổng một tập dòng (mỗi dòng độc lập trong cùng một tháng ⇒ cộng thẳng). */
-export function tongDong(rows: MonthlyStockRow[]): MonthlyStockTotals {
+export function sumMonthlyStockRows(rows: MonthlyStockRow[]): MonthlyStockTotals {
   const t: MonthlyStockTotals = {
     openCtn: 0, openKg: 0, inCtn: 0, inKg: 0, outCtn: 0, outKg: 0,
     closeCtn: 0, closeKg: 0, remainingValue: 0, soDong: rows.length,
@@ -65,27 +65,27 @@ export function tongDong(rows: MonthlyStockRow[]): MonthlyStockTotals {
 /* ---------- Tháng dương lịch ---------- */
 
 /** Tháng hiện tại theo giờ máy, dạng 'YYYY-MM'. */
-export function thangHienTai(): string {
+export function getCurrentMonth(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
 /** 'YYYY-MM' → tháng kế tiếp (qua năm khi tháng 12). */
-export function thangSau(period: string): string {
+export function getNextMonth(period: string): string {
   const [y, m] = period.split("-").map(Number);
   const d = new Date(y, (m || 1) - 1 + 1, 1);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
 /** 'YYYY-MM' → tháng liền trước. */
-export function thangTruoc(period: string): string {
+export function getPrevMonth(period: string): string {
   const [y, m] = period.split("-").map(Number);
   const d = new Date(y, (m || 1) - 1 - 1, 1);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
 /** 'YYYY-MM' → "Tháng 7/2026". */
-export function nhanThang(period: string): string {
+export function formatMonthLabel(period: string): string {
   const [y, m] = period.split("-");
   return `Tháng ${Number(m)}/${y}`;
 }
@@ -94,19 +94,19 @@ export function nhanThang(period: string): string {
  * Danh sách N tháng gần đây (mới → cũ) từ mốc `moc` (mặc định tháng hiện tại),
  * hợp nhất với mọi tháng đã có dữ liệu để không bao giờ thiếu kỳ nào trong sổ.
  */
-export function danhSachThang(coSan: string[], moc = thangHienTai(), monthCount = 24): string[] {
+export function listMonths(coSan: string[], moc = getCurrentMonth(), monthCount = 24): string[] {
   const set = new Set<string>(coSan);
   let p = moc;
   for (let i = 0; i < monthCount; i++) {
     set.add(p);
-    p = thangTruoc(p);
+    p = getPrevMonth(p);
   }
   return [...set].sort((a, b) => b.localeCompare(a));
 }
 
 /* ---------- Gom nhóm hiển thị (như các "TỔNG" của bảng kê) ---------- */
 
-export interface NhomKho {
+export interface StockCategoryGroup {
   category: string;
   rows: MonthlyStockRow[];
   tong: MonthlyStockTotals;
@@ -118,7 +118,7 @@ export interface NhomKho {
  * xếp cuối theo bảng chữ cái. Trong mỗi nhóm
  * giữ `sortOrder` rồi tới tên.
  */
-export function gomNhom(rows: MonthlyStockRow[]): NhomKho[] {
+export function groupByCategory(rows: MonthlyStockRow[]): StockCategoryGroup[] {
   const map = new Map<string, MonthlyStockRow[]>();
   for (const r of rows) {
     const k = r.category || "(Chưa phân nhóm)";
@@ -140,24 +140,24 @@ export function gomNhom(rows: MonthlyStockRow[]): NhomKho[] {
     .sort((a, b) => priorityOf(a[0]) - priorityOf(b[0]) || a[0].localeCompare(b[0]))
     .map(([category, rs]) => {
       rs.sort((x, y) => x.sortOrder - y.sortOrder || x.itemName.localeCompare(y.itemName));
-      return { category, rows: rs, tong: tongDong(rs) };
+      return { category, rows: rs, tong: sumMonthlyStockRows(rs) };
     });
 }
 
 /* ---------- Cờ lệch dồn kỳ (tồn đầu tháng này vs tồn cuối tháng trước) ---------- */
 
-export interface LechNhom {
+export interface GroupMismatch {
   category: string;
   closeTruoc: number; // tồn cuối tháng trước (kg)
   openNay: number; // tồn đầu tháng này (kg)
   lech: number; // openNay − closeTruoc
 }
 
-export interface LechDonKy {
+export interface CarryOverMismatch {
   closeTruoc: number;
   openNay: number;
   lech: number; // tổng: tồn đầu tháng này − tồn cuối tháng trước
-  theoNhom: LechNhom[]; // các nhóm có chênh (|lech| > NGUONG)
+  theoNhom: GroupMismatch[]; // các nhóm có chênh (|lech| > NGUONG)
 }
 
 const NGUONG_LECH = 1; // < 1 kg coi như khớp (làm tròn số lẻ)
@@ -173,13 +173,13 @@ const sumByGroup = (rows: MonthlyStockRow[], lay: (r: MonthlyStockRow) => number
  * bằng nhau; lệch = ghi chép dồn kỳ sai (đúng nỗi đau file Excel gốc). Trả tổng
  * + các nhóm chênh để gọi tên đúng chỗ. KHÔNG sửa số — chỉ soi.
  */
-export function soLechDonKy(priorRows: MonthlyStockRow[], currentRows: MonthlyStockRow[]): LechDonKy {
+export function measureCarryForwardGap(priorRows: MonthlyStockRow[], currentRows: MonthlyStockRow[]): CarryOverMismatch {
   const prevClose = priorRows.reduce((s, r) => s + r.closeKg, 0);
   const currentOpening = currentRows.reduce((s, r) => s + r.openKg, 0);
   const mClose = sumByGroup(priorRows, (r) => r.closeKg);
   const mOpen = sumByGroup(currentRows, (r) => r.openKg);
   const cats = new Set([...mClose.keys(), ...mOpen.keys()]);
-  const theoNhom: LechNhom[] = [];
+  const theoNhom: GroupMismatch[] = [];
   for (const c of cats) {
     const ct = mClose.get(c) ?? 0;
     const on = mOpen.get(c) ?? 0;
@@ -190,7 +190,7 @@ export function soLechDonKy(priorRows: MonthlyStockRow[], currentRows: MonthlySt
 }
 
 /** Có đáng gắn cờ lệch không (có tháng trước + tổng lệch quá ngưỡng). */
-export const coLechDonKy = (l: LechDonKy | null) => !!l && Math.abs(l.lech) > NGUONG_LECH;
+export const hasCarryForwardGap = (l: CarryOverMismatch | null) => !!l && Math.abs(l.lech) > NGUONG_LECH;
 
 /* ---------- Đối chiếu lệch theo MẶT HÀNG (chẩn đoán, không tự sửa) ---------- */
 
@@ -200,10 +200,10 @@ export const coLechDonKy = (l: LechDonKy | null) => !!l && Math.abs(l.lech) > NG
  * SANMA + SANMA 50-90) — gộp về tên thì các tách đó TRIỆT TIÊU, chỉ còn lệch
  * THẬT. So theo size sẽ báo động giả và dẫn tới sửa sai (cộng đôi).
  */
-export const khoaLo = (l: { warehouse: string; category: string; itemName: string }) =>
+export const stockLineKey = (l: { warehouse: string; category: string; itemName: string }) =>
   [l.warehouse, l.category, l.itemName].map((s) => (s || "").trim().toLowerCase()).join("|");
 
-export interface DoiChieuDong {
+export interface CarryForwardDiff {
   key: string;
   warehouse: string;
   category: string;
@@ -217,7 +217,7 @@ export interface DoiChieuDong {
 function groupByName(rows: MonthlyStockRow[], layKg: (r: MonthlyStockRow) => number) {
   const m = new Map<string, { kg: number; sl: number; w: string; c: string; ten: string }>();
   for (const r of rows) {
-    const k = khoaLo(r);
+    const k = stockLineKey(r);
     const g = m.get(k) ?? { kg: 0, sl: 0, w: r.warehouse, c: r.category, ten: r.itemName };
     g.kg += layKg(r);
     g.sl += 1;
@@ -231,11 +231,11 @@ function groupByName(rows: MonthlyStockRow[], layKg: (r: MonthlyStockRow) => num
  * hàng LỆCH THẬT (|Δkg| > ngưỡng, sau khi gộp các tách size). KHÔNG sửa gì —
  * chẩn đoán để người dùng tự sửa ở lưới Ghi (con người phán đoán, tránh cộng đôi).
  */
-export function doiChieuDonKy(priorRows: MonthlyStockRow[], currentRows: MonthlyStockRow[]): DoiChieuDong[] {
+export function compareCarryForward(priorRows: MonthlyStockRow[], currentRows: MonthlyStockRow[]): CarryForwardDiff[] {
   const prevCloseByName = groupByName(priorRows, (r) => r.closeKg);
   const openByName = groupByName(currentRows, (r) => r.openKg);
   const keys = new Set([...prevCloseByName.keys(), ...openByName.keys()]);
-  const out: DoiChieuDong[] = [];
+  const out: CarryForwardDiff[] = [];
   for (const k of keys) {
     const t = prevCloseByName.get(k);
     const n = openByName.get(k);
@@ -259,7 +259,7 @@ export function doiChieuDonKy(priorRows: MonthlyStockRow[], currentRows: Monthly
 
 /* ---------- Thẻ kho: lịch sử một MẶT HÀNG qua các tháng ---------- */
 
-export interface ThangTheKho {
+export interface StockCardMonth {
   period: string;
   openCtn: number;
   openKg: number;
@@ -276,18 +276,18 @@ export interface ThangTheKho {
  * "Thẻ kho" (sổ chi tiết vật tư) của MỘT mặt hàng: mỗi tháng một dòng tồn đầu ·
  * nhập · xuất · tồn cuối, mới → cũ. Khóa gộp là `khoaLo` (kho·nhóm·TÊN, bỏ size)
  * nên các lô tách theo size của cùng mặt hàng cộng lại thành một dòng tháng —
- * đúng cách đối chiếu dồn kỳ (xem `doiChieuDonKy`), tránh báo động giả.
+ * đúng cách đối chiếu dồn kỳ (xem `compareCarryForward`), tránh báo động giả.
  *
  * Thuần đọc: chỉ cộng lại từ `lines`, KHÔNG sửa gì.
  */
-export function theKhoMatHang(
+export function buildProductStockCard(
   lines: MonthlyStockLine[],
   khoa: string,
   maxMonths = 24
-): ThangTheKho[] {
-  const m = new Map<string, ThangTheKho>();
+): StockCardMonth[] {
+  const m = new Map<string, StockCardMonth>();
   for (const l of lines) {
-    if (khoaLo(l) !== khoa) continue;
+    if (stockLineKey(l) !== khoa) continue;
     const g =
       m.get(l.period) ??
       {
@@ -316,7 +316,7 @@ const normalizeForMatch = (s: string) => (s || "").trim().toLowerCase().replace(
 const chuanNgat = (s: string) => (s || "").toLowerCase().replace(/[\s.,\-()/]+/g, "");
 
 /** Đoán nhóm (category, loài) từ tên — chỉ gợi ý, người dùng sửa được. */
-export function suyNhomNguyenLieu(name: string): string {
+export function inferMaterialCategory(name: string): string {
   const s = name.toLowerCase();
   if (/(b[aạ]ch\s*tu[ộo]c|b\.\s*tu[ộo]c|\bda\b|mada|râu|dạt)/.test(s)) return "Bạch tuộc";
   if (/(m[ựu]c|\bống\b|nang|bao\s*t[ửu]|đầu\s*ống)/.test(s)) return "Mực";
@@ -327,7 +327,7 @@ export function suyNhomNguyenLieu(name: string): string {
   return "Khác";
 }
 
-export type DichDanhMuc = "product" | "material" | "skip";
+export type CatalogTarget = "product" | "material" | "skip";
 
 /**
  * Đoán ĐÍCH danh mục cho một tên trong sổ kho:
@@ -336,7 +336,7 @@ export type DichDanhMuc = "product" | "material" | "skip";
  *  - Còn lại (cá/tôm/mực/bào ngư NGUYÊN CON) → "material" (loại nguyên liệu).
  * Chỉ GỢI Ý — người dùng đổi từng dòng.
  */
-export function suyDichDanhMuc(name: string): DichDanhMuc {
+export function inferCatalogTarget(name: string): CatalogTarget {
   const coSize = /(\d+\s*[-/]\s*\d+|\d+\s*up\b|\bup\b|<\s*\d+|>\s*\d+|\d+\s*gr?\b)/i.test(name);
   const cheBien = /(r[âa]u|c[ắa]t|lu[ộo]c|ch[ầa]n|t[ẩa]m|b[ộo]t|d[aạ]t|\bc[ổo]\b|bao\s*t[ửu]|mada|vòi|\bda\b)/i.test(
     name.toLowerCase()
@@ -351,22 +351,22 @@ export function suyDichDanhMuc(name: string): DichDanhMuc {
  * người quyết ánh xạ về danh mục nào.
  */
 export function laRoRang(name: string): boolean {
-  const nhom = suyNhomNguyenLieu(name);
+  const nhom = inferMaterialCategory(name);
   return nhom !== "Bạch tuộc" && nhom !== "Khác";
 }
 
-export interface DongBoDong {
+export interface CatalogSyncItem {
   name: string;
   nhomGoiY: string;
-  dichGoiY: DichDanhMuc; // đích gợi ý (product/material)
+  dichGoiY: CatalogTarget; // đích gợi ý (product/material)
   roRang: boolean; // true = tự nhận loài, khỏi bận tâm; false = mã khó, cần đồng bộ
 }
 
-export interface DongBoDanhMuc {
+export interface CatalogSyncReport {
   tongTen: number; // số tên phân biệt trong sổ
   daCoNL: number; // đã có trong loại NL
   daCoMH: number; // đã có trong mặt hàng
-  chuaCo: DongBoDong[]; // chưa có ở CẢ HAI (kèm đích + nhóm gợi ý)
+  chuaCo: CatalogSyncItem[]; // chưa có ở CẢ HAI (kèm đích + nhóm gợi ý)
   nhomTrung: { variants: string[] }[]; // các tên TRÙNG CÁCH GHI (>1 biến thể)
 }
 
@@ -377,17 +377,17 @@ export interface DongBoDanhMuc {
  *  - `nhomTrung`: tên chỉ khác nhau cách ghi (chuẩn hoá ngặt) — gom để sửa tay.
  * KHÔNG sửa gì — chỉ báo. Thành phẩm 141 mã kế toán KHÔNG xét (cố định).
  */
-export function phanTichDongBoDanhMuc(
+export function analyzeCatalogSync(
   ledgerNames: string[],
   materialTypeNames: string[],
   productNames: string[]
-): DongBoDanhMuc {
+): CatalogSyncReport {
   const materialNameSet = new Set(materialTypeNames.map(normalizeForMatch));
   const setMH = new Set(productNames.map(normalizeForMatch));
   const distinctNames = [...new Set(ledgerNames.map((t) => t.trim()).filter(Boolean))];
   let existingMaterialCount = 0;
   let existingProductCount = 0;
-  const missing: DongBoDong[] = [];
+  const missing: CatalogSyncItem[] = [];
   for (const name of distinctNames) {
     const k = normalizeForMatch(name);
     const isMaterial = materialNameSet.has(k);
@@ -395,7 +395,7 @@ export function phanTichDongBoDanhMuc(
     if (isMaterial) existingMaterialCount++;
     if (oMH) existingProductCount++;
     if (isMaterial || oMH) continue;
-    missing.push({ name, nhomGoiY: suyNhomNguyenLieu(name), dichGoiY: suyDichDanhMuc(name), roRang: laRoRang(name) });
+    missing.push({ name, nhomGoiY: inferMaterialCategory(name), dichGoiY: inferCatalogTarget(name), roRang: laRoRang(name) });
   }
 
   // Gom trùng-cách-ghi trong chính danh sách tên của sổ.
@@ -435,10 +435,10 @@ export const idDon = (srcId: string) => `carry|${srcId}`;
  * 2026-09-15, kiện chỉ đi kèm. Dòng hết kg mà còn lẻ kiện (sai số chia kiện) không dồn,
  * kẻo dồn mãi một dòng màn hình hiện toàn số 0.
  *
- * ⚠ Hàm này chỉ DỰNG dòng (xem trước). GHI vào sổ thì dùng `donKyVaoSo` — nó giữ số
+ * ⚠ Hàm này chỉ DỰNG dòng (xem trước). GHI vào sổ thì dùng `carryForwardIntoLedger` — nó giữ số
  * người dùng đã gõ ở tháng đích, không thay cả dòng.
  */
-export function donSangThang(source: MonthlyStockRow[], targetMonth: string): MonthlyStockLine[] {
+export function buildCarryForwardLines(source: MonthlyStockRow[], targetMonth: string): MonthlyStockLine[] {
   return source
     .filter((r) => Math.abs(r.closeKg) > 1e-9)
     .map((r) => ({
@@ -465,7 +465,7 @@ export function donSangThang(source: MonthlyStockRow[], targetMonth: string): Mo
     }));
 }
 
-export interface KetQuaDonKy {
+export interface CarryForwardResult {
   lines: MonthlyStockLine[];
   /** Số dòng tháng đích đang mang tồn kế thừa (thêm mới + cập nhật). */
   soDong: number;
@@ -487,14 +487,14 @@ export interface KetQuaDonKy {
  * Vì sao không thay cả dòng như trước: dồn LẠI sau khi tháng đích đã có số (nhập/xuất,
  * vị trí, ghi chú, vết ⟦CĐ:…⟧ của Cân đối) sẽ xoá trắng những thứ đó. Quy tắc:
  *  - id `carry|<nguồn>` đã có ⇒ CHỈ cập nhật `openKg/openCtn`, mọi cột khác giữ nguyên.
- *  - chưa có ⇒ thêm dòng mới (`donSangThang`).
+ *  - chưa có ⇒ thêm dòng mới (`buildCarryForwardLines`).
  *  - dòng `carry|…` ở tháng đích mà nguồn (trong phạm vi kho) đã hết tồn hay bị xoá ⇒
  *    tồn đầu về 0; trống hẳn (không số, không ghi chú) thì bỏ, còn số thì GIỮ.
  */
-export function donKyVaoSo(lines: MonthlyStockLine[], targetMonth: string, warehouse?: string): KetQuaDonKy {
-  const sourceMonth = thangTruoc(targetMonth);
+export function carryForwardIntoLedger(lines: MonthlyStockLine[], targetMonth: string, warehouse?: string): CarryForwardResult {
+  const sourceMonth = getPrevMonth(targetMonth);
   const inWarehouse = (l: MonthlyStockLine) => !warehouse || l.warehouse === warehouse;
-  const carried = donSangThang(
+  const carried = buildCarryForwardLines(
     lines.filter((l) => l.period === sourceMonth && inWarehouse(l)).map(suyDong),
     targetMonth
   );
@@ -524,7 +524,7 @@ export function donKyVaoSo(lines: MonthlyStockLine[], targetMonth: string, wareh
       continue;
     }
     const z = { ...l, openKg: 0, openCtn: 0 };
-    if (laDongTrong(z) && !(z.note ?? "").trim()) {
+    if (isEmptyLine(z) && !(z.note ?? "").trim()) {
       bo++;
       continue;
     }
@@ -546,14 +546,14 @@ export function donKyVaoSo(lines: MonthlyStockLine[], targetMonth: string, wareh
 /* ---------- Thao tác trên MỘT dòng: lấy ra dùng · nhập thêm · chuyển vị trí ---------- */
 
 /** Dòng KHÔNG có số liệu: tồn đầu, nhập, xuất (kg lẫn kiện) đều bằng 0. */
-export function laDongTrong(l: MonthlyStockLine): boolean {
+export function isEmptyLine(l: MonthlyStockLine): boolean {
   const z = (v: number) => Math.abs(v) < 1e-9;
   return z(l.openKg) && z(l.inKg) && z(l.outKg) && z(l.openCtn) && z(l.inCtn) && z(l.outCtn);
 }
 
-export type KieuThaoTac = "xuat" | "nhap" | "chuyen";
+export type LotActionKind = "xuat" | "nhap" | "chuyen";
 
-export interface KetQuaThaoTac {
+export interface LotActionResult {
   /** Dòng gốc sau khi áp (thay đúng id). */
   dong: MonthlyStockLine;
   /** Dòng MỚI tách ra (chỉ khi chuyển MỘT PHẦN sang vị trí khác). */
@@ -576,12 +576,12 @@ const tiLeKien = (ctn: number, kg: number, kgBot: number) => (kg > 1e-9 ? (ctn *
  *
  * `ghiChu` được nối vào `note` của dòng để còn vết (ngày · việc · kg).
  */
-export function apThaoTacLo(
+export function applyLotAction(
   l: MonthlyStockLine,
-  kieu: KieuThaoTac,
+  kieu: LotActionKind,
   kg: number,
   opts: { viTriDich?: string; ghiChu: string; idMoi: string }
-): KetQuaThaoTac {
+): LotActionResult {
   const note = (l.note ? l.note + "\n" : "") + opts.ghiChu;
   if (kieu === "xuat") {
     const ctn = l.kgPerCtn ? kg / l.kgPerCtn : 0;

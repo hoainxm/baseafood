@@ -8,7 +8,7 @@
 // mục (DanhMucCrud) lưu chuỗi — repo.ts chuẩn hoá về mảng khi ghi.
 import { useId } from "react";
 import type { BatterType } from "@/types";
-import { botDiKemIds } from "@/lib/botTam";
+import { getProductBatterIds } from "@/lib/batter";
 import { Combobox, Label } from "@/design-system";
 import { X } from "lucide-react";
 
@@ -26,7 +26,7 @@ export function ChonBotDiKem({
   onTaoBot?: (ten: string) => string;
 }) {
   const hintId = useId();
-  const ids = botDiKemIds({ batterIds: value });
+  const ids = getProductBatterIds({ batterIds: value });
   const theoId = new Map(botTam.map((b) => [b.id, b]));
   const setIds = (next: string[]) => onChange(next.join(","));
 

@@ -11,7 +11,7 @@
  * ⚠️ Chữ VIẾT TAY nhận chưa chuẩn — kết quả là **bản nháp để người soát lại**,
  * không tin tuyệt đối. Chuẩn hơn với phiếu in/đánh máy. Bộ máy nhận diện tách sau
  * hàm `chayTesseract` để sau nâng cấp cloud (Google Vision qua edge function) chỉ
- * thay MỘT chỗ — phần parser (`phanTich`) giữ nguyên.
+ * thay MỘT chỗ — phần parser (`parseOcrText`) giữ nguyên.
  */
 
 /** OCR client-side luôn có (Tesseract nạp động). Cờ để màn quyết định hiện nút. */
@@ -40,7 +40,7 @@ export interface KetQuaOcr {
 }
 
 /** Danh mục để dò khớp tên trên phiếu (tên đại lý, mã đại lý, tên loại NL). */
-export interface DanhMucOcr {
+export interface OcrCatalog {
   daiLy: { name: string; code?: string }[];
   loaiNL: { name: string }[];
 }
@@ -111,7 +111,7 @@ function extractDate(text: string): string | undefined {
 const RE_DL = /\b(dai ly|dl|ma dl|ma dai ly|khach)\b/;
 
 /** Parser thuần: từ toàn văn OCR + danh mục → các ứng viên điền form. */
-export function phanTich(text: string, dm: DanhMucOcr): KetQuaOcr {
+export function parseOcrText(text: string, dm: OcrCatalog): KetQuaOcr {
   const toanVan = stripAccents(text);
   const dong = text
     .split(/\r?\n/)
@@ -195,11 +195,11 @@ async function runTesseract(
  * Nhận diện một ảnh phiếu → ứng viên điền form. `onTienDo` báo % lúc nhận chữ để
  * hiện thanh tiến trình. Lỗi (mất mạng tải model, ảnh hỏng) ném ra để màn báo.
  */
-export async function nhanDienPhieu(
+export async function recognizeImportSlip(
   file: File | Blob,
-  dm: DanhMucOcr,
+  dm: OcrCatalog,
   onProgress?: (percent: number) => void
 ): Promise<KetQuaOcr> {
   const text = await runTesseract(file, onProgress);
-  return phanTich(text, dm);
+  return parseOcrText(text, dm);
 }

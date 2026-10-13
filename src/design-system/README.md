@@ -396,7 +396,7 @@ thứ tự DOM, tự bỏ ô ẩn của dòng chưa mở); Tab để trình duy�
 - [ ] Màn mới đã vào `KIT_NAV` **và** `CAY_NAV`
 - [ ] **Mọi nút thao tác có `title` giải thích nút làm gì** (§9) — nút chỉ-icon
       bắt buộc, kèm `aria-label`
-- [ ] **Mọi bảng nghiệp vụ đã bật tô màu dòng** (`toMau`) hoặc nằm trong bảng ngoại
+- [ ] **Mọi bảng nghiệp vụ đã bật tô màu dòng** (`rowMarks`) hoặc nằm trong bảng ngoại
       lệ — mục [Tô màu dòng](#tô-màu-dòng-đã-dò-kiểu-excel)
 
 ## 8. Nhãn theo CHỨC NĂNG — `Nhan` (từ 2026-09-30)
@@ -452,7 +452,7 @@ chip đếm/điều khiển của primitive; màn nghiệp vụ **không** dùng
 | Cho biết đang làm cho ngày/xưởng nào | `ContextBar` |
 | Danh sách rỗng | `EmptyState` (phải nói việc tiếp theo) |
 | Câu diễn giải dài cạnh nhãn | `InfoTip` (nút ⓘ + popover). `DateField` **và** `Combobox` có sẵn prop `info` — dùng thay `hint` khi câu dài khiến hai ô cùng hàng lệch chiều cao. Nhãn tiêu đề vẫn luôn hiện. |
-| Bảng tổng hợp cho trang Báo cáo | `BangTong` — prop **`dinhDau`** (bảng dài): khung cuộn riêng cao ≤70dvh, hàng tên cột **dính đỉnh** + dòng tổng dính đáy (utility `bang-dinh-dau` trong `tokens.css`; sticky theo trang không chạy xuyên khung cuộn ngang nên phải cuộn trong khung). Cột số căn phải `tnum`, hàng TỔNG CỘNG ở chân tự cộng theo `tong` từng cột. Component cha lo gom nhóm; `BangTong` chỉ hiển thị. Prop **`chon?: ChonBang<T>`** bật thêm cột ô tick ở đầu bảng (`{daChon: Set<khóa>, doi(k), doiTatCa(keys, bat), nhanDong?(row)}`): ô tick ở header = chọn/bỏ mọi dòng ĐANG HIỆN của bảng đó, dòng đã tick tô `bg-primary/5`. `BangTong` **không giữ state** — màn hình giữ `Set` khóa và tự cộng tổng / in / xử theo lô (khuôn phần mềm kế toán kho). Nhiều bảng chia nhóm dùng CHUNG một `ChonBang` để tick xuyên nhóm. Prop **`dongThem?: ReactNode`**: dòng THÊM MỚI cuối thân bảng (trải hết bề ngang, trước hàng tổng) — chỗ gõ tên hàng để ghi dòng mới ngay trên bảng (VD Sổ kho tháng); có `dongThem` thì bảng rỗng vẫn hiện. Prop **`xoRa`** (thay `dinhDau` cho sổ dài): KHÔNG khung cuộn riêng — bảng trải hết, trang cuộn một mạch; hàng tên cột **nổi** (vẽ lại, đo bề rộng cột thật, đồng bộ cuộn ngang) dính dưới header trang (`top-header` = cùng token `--spacing-header` với `h-header` của `AppShell`) khi cuộn qua bảng; bảng rộng ⇒ thanh cuộn ngang **dính đáy màn hình** (`bang-thanh-cuon`), thanh cuộn thật của bảng ẩn đi (`bang-xo-ra`). Prop **`toMau`**: bật ô tick + thanh "Đã chọn N dòng" để tô màu / in đậm nhiều dòng — xem mục Tô màu dòng. |
+| Bảng tổng hợp cho trang Báo cáo | `BangTong` — prop **`dinhDau`** (bảng dài): khung cuộn riêng cao ≤70dvh, hàng tên cột **dính đỉnh** + dòng tổng dính đáy (utility `bang-dinh-dau` trong `tokens.css`; sticky theo trang không chạy xuyên khung cuộn ngang nên phải cuộn trong khung). Cột số căn phải `tnum`, hàng TỔNG CỘNG ở chân tự cộng theo `tong` từng cột. Component cha lo gom nhóm; `BangTong` chỉ hiển thị. Prop **`chon?: ChonBang<T>`** bật thêm cột ô tick ở đầu bảng (`{daChon: Set<khóa>, doi(k), doiTatCa(keys, bat), nhanDong?(row)}`): ô tick ở header = chọn/bỏ mọi dòng ĐANG HIỆN của bảng đó, dòng đã tick tô `bg-primary/5`. `BangTong` **không giữ state** — màn hình giữ `Set` khóa và tự cộng tổng / in / xử theo lô (khuôn phần mềm kế toán kho). Nhiều bảng chia nhóm dùng CHUNG một `ChonBang` để tick xuyên nhóm. Prop **`dongThem?: ReactNode`**: dòng THÊM MỚI cuối thân bảng (trải hết bề ngang, trước hàng tổng) — chỗ gõ tên hàng để ghi dòng mới ngay trên bảng (VD Sổ kho tháng); có `dongThem` thì bảng rỗng vẫn hiện. Prop **`xoRa`** (thay `dinhDau` cho sổ dài): KHÔNG khung cuộn riêng — bảng trải hết, trang cuộn một mạch; hàng tên cột **nổi** (vẽ lại, đo bề rộng cột thật, đồng bộ cuộn ngang) dính dưới header trang (`top-header` = cùng token `--spacing-header` với `h-header` của `AppShell`) khi cuộn qua bảng; bảng rộng ⇒ thanh cuộn ngang **dính đáy màn hình** (`bang-thanh-cuon`), thanh cuộn thật của bảng ẩn đi (`bang-xo-ra`). Prop **`rowMarks`**: bật ô tick + thanh "Đã chọn N dòng" để tô màu / in đậm nhiều dòng — xem mục Tô màu dòng. |
 | **Dialog/form thông tin hay thao tác** | `FormDialog` — khung CHUẨN: đầu cố định (icon + tiêu đề + mô tả) · thân cuộn `scroll-nice` · chân cố định chứa nút. `rong`: sm/vua/rong/xl. Điều khiển bằng `open`/`onOpenChange` hoặc `trigger`. Nút đóng tiện dụng: `NutDong`. |
 | **`Dialog` trần** (không qua `FormDialog`) | Khung gốc (`components/ui/dialog.tsx`, 2026-09-29) tự **giới hạn cao `100dvh−2rem` + cuộn trong khung**, cột lưới `minmax(0,1fr)` (không nới theo phần tử rộng nhất ⇒ hết tràn ngang ở 360px), và `DialogFooter` **dính đáy** (`sticky`) khi thân cuộn. ⇒ **Nút xác nhận LUÔN đặt trong `DialogFooter`**, không để giữa thân dưới danh sách dài (từng bị cuộn mất ở Đồng bộ danh mục). Nhãn nút dài ⇒ `h-auto min-h-11 whitespace-normal` cho xuống dòng. |
 | Các con số bối cảnh/tổng | `ThongKe` (lưới thẻ KPI: nhãn nhỏ + số TO + icon màu) — sinh động hơn nhồi một dòng. **Bỏ trống `cot` ⇒ tự suy theo số thẻ**: ≤4 một hàng · 5 thẻ một hàng ở xl (lg 3+2; từ lg thẻ hẹp: icon lên trên, số nhỏ một bậc) · 6 thẻ 3×2 · nhiều hơn 4 cột. Điện thoại: cột tối thiểu 9.5rem (chữ 130% tự về 1 cột), thẻ cuối lẻ trải hết hàng. Truyền `cot` chỉ khi cần ép. **`sac` (SacPhanLoai) theo LOẠI SỐ** ⇒ thẻ tô nền nhạt + viền trái đậm + số cùng màu (VD Tổng quan: nhập = `bien` · sản xuất = `tim` · kho = `ngoc` · đóng gói = `bang` · bán = `la` · định mức = `cat`); dùng cùng sắc cho biểu đồ trên màn đó. Số mang nghĩa tốt/xấu (lãi/lỗ, việc tồn) vẫn dùng `mau`, đừng truyền `sac`. `ContextBar` chỉ dùng cho thanh dính "đang xem ngày/xưởng nào" trong màn nhập liệu. |
@@ -561,7 +561,7 @@ chữ phụ / chữ màu về màu chữ thường.
 | design-system | `patterns/ToMauDong.tsx` | `ThanhToMau` (thanh "Đã chọn N dòng") · `NutToMauChon` (cụm Tô màu ▾ / In đậm / Bỏ tô — cho màn tự đặt vào thanh "Đã chọn" riêng) |
 | design-system | `BangTong` · `RecordTable` · `LuoiNhap` · `DanhMucCrud` | prop `toMau="<khoá bảng>"` ⇒ tự có ô tick + thanh + nền dòng |
 | tokens | `--to-<sắc>-<1..5>` (+ `-line`) · khối `[data-to-mau]`/`[data-to-toi]`/`[data-dam]` | nền phủ cả ô ghim/ô dính, vạch đậm mép trái, chữ đổi bản đậm trên nền đậm |
-| app | `features/shared/ToMauProvider.tsx` (gắn MỘT lần ở `ShellLayout`) | nối `useRowMarks()` → `row_marks`; hàm thuần `lib/toMau.ts` (+ test) |
+| app | `features/shared/ToMauProvider.tsx` (gắn MỘT lần ở `ShellLayout`) | nối `useRowMarks()` → `row_marks`; hàm thuần `lib/rowMarks.ts` (+ test) |
 
 `BangTong` mà màn đã truyền `chon` riêng (VD Sổ kho tháng, Nhập xuất tồn kho — có
 thanh "Đã chọn" với cộng tổng / in / gán kho) thì bảng KHÔNG tự hiện thanh; màn đặt
@@ -575,7 +575,7 @@ bảng chỉ 4 nút nên dính đáy cả trên điện thoại (~1/5 màn).
 
 **Luật:**
 
-1. **Khoá bảng (`toMau`) ổn định, kebab-case, đặt một lần** — đổi khoá là mất
+1. **Khoá bảng (`rowMarks`) ổn định, kebab-case, đặt một lần** — đổi khoá là mất
    dấu cũ. Một khoá cho một bảng; hai chế độ xem CÙNG bản ghi (VD bảng xem + lưới
    Ghi của `/nxt-kho`) dùng chung khoá để dấu không mất khi đổi chế độ.
 2. **Khoá dòng = id BẢN GHI** (`getKey` / `HangLuoi.id`), **cấm chỉ số dòng** —
@@ -641,7 +641,7 @@ const chonDong = useChonDong();
 **Sửa/thêm màu:** mỗi mức = trộn sắc gốc với trắng (tỉ lệ 0,16 · 0,32 · 0,52 ·
 0,76 · 1 của mức đậm nhất; mức đậm nhất chặn ở độ chói ≥ 0,25 để chữ đen ≥ 4,5:1).
 Sửa token `--to-<sắc>-<mức>` / `--to-<sắc>-line` ở `tokens.css` + `SAC_TO`
-(`toMauNguon.ts`) + `SAC_TO_LIB` (`lib/toMau.ts`) + `MAU_TOI` (ô độ chói < 0,68).
+(`toMauNguon.ts`) + `SAC_TO_LIB` (`lib/rowMarks.ts`) + `MAU_TOI` (ô độ chói < 0,68).
 **Test `patterns/toMauNguon.test.ts` canh hết:** đủ token, hai danh sách sắc khớp,
 chữ thường ≥ 4,5:1 trên mọi ô, `MAU_TOI` đúng, chữ phụ/chữ đỏ ≥ 4,5:1 trên ô sáng.
 Không cần migration — cột `color` không có CHECK; mã lạ bị bỏ qua. 4 mã của bản
@@ -831,7 +831,7 @@ Các pattern dùng lại đã tự gắn `title`, màn hình KHÔNG phải làm 
 | `ChoiceGroup` | từng lựa chọn — lấy `o.moTa`, không có thì ghép "Chọn X cho {nhãn}" |
 | `Combobox` · `DateField` · `NumberField` | nút mở danh sách / mở lịch / tăng giảm |
 | `StepForm` · `PrintSheet` · `InfoTip` · `DisplaySettings` | nút điều hướng bước, In / Xuất PDF, ⓘ, Đặt lại |
-| `ThanhToMau` · `NutToMauChon` (prop `toMau` của bảng) | Tô màu ▾ / In đậm / Bỏ in đậm / Bỏ tô / Bỏ chọn — nói rõ áp cho bao nhiêu dòng; từng ô màu ("Tô vàng rất đậm") |
+| `ThanhToMau` · `NutToMauChon` (prop `rowMarks` của bảng) | Tô màu ▾ / In đậm / Bỏ in đậm / Bỏ tô / Bỏ chọn — nói rõ áp cho bao nhiêu dòng; từng ô màu ("Tô vàng rất đậm") |
 
 Mục **điều hướng** lấy câu mô tả từ `KIT_NAV[].moTa` (`features/shared/AppShell.tsx`):
 rê lên tên màn là biết màn đó để làm gì. **Thêm màn mới thì viết luôn `moTa`** —

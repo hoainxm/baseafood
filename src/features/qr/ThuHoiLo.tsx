@@ -3,30 +3,30 @@
 // Lô nghi có vấn đề ⇒ trả lời ngay: những ai đã nhận hàng (khách · ngày · chứng
 // từ · kg) và lô BTP/TP nào còn trong xưởng cần khoanh lại. In A4 + tải Excel để
 // gửi đoàn kiểm tra (FSMA 204 đòi hồ sơ trong 24 giờ).
-// Số lấy từ danhSachThuHoi (lib/truyXuatLo, hàm thuần có test).
+// Số lấy từ buildRecallList (lib/lotTraceability, hàm thuần có test).
 // ============================================================
 import { useMemo, useState } from "react";
-import { kg, viDate } from "@/lib/format";
-import { TEN_LOAI, bangTonKhoLo, danhSachThuHoi, danhSachThuHoiNhieu, tonKhoCuaLo, type DuLieuTruyXuat, type NutLo } from "@/lib/truyXuatLo";
+import { kg, formatDateVN } from "@/lib/format";
+import { TRACE_KIND_LABELS, buildLotStockIndex, buildRecallList, buildRecallListForLots, getLotStockKg, type TraceData, type LotNode } from "@/lib/lotTraceability";
 import { Button, InfoTip, KhungCuonNgang, PhieuIn, TdIn, ThIn } from "@/design-system";
 import { FileSpreadsheet, Printer, ShieldAlert } from "lucide-react";
 
 const kgHoacTrong = (v: number | null) => (v == null ? "chưa ghi kg" : kg(v));
 
-export function ThuHoiLo({ nut, dl, cungChuyen = [] }: { nut: NutLo; dl: DuLieuTruyXuat; cungChuyen?: NutLo[] }) {
+export function ThuHoiLo({ nut, dl, cungChuyen = [] }: { nut: LotNode; dl: TraceData; cungChuyen?: LotNode[] }) {
   const [isPrinting, setIsPrinting] = useState(false);
   /** Lô NL có nhiều loại cùng chuyến ⇒ cho thu hồi GỘP cả chuyến (nghi cả xe hàng của đại lý). */
   const [wholeShipment, setWholeShipment] = useState(false);
   const isMergedShipment = wholeShipment && cungChuyen.length > 1;
   const { hangRa, loTrongXuong } = useMemo(
-    () => (isMergedShipment ? danhSachThuHoiNhieu(cungChuyen, dl) : danhSachThuHoi(nut.kind, nut.id, dl)),
+    () => (isMergedShipment ? buildRecallListForLots(cungChuyen, dl) : buildRecallList(nut.kind, nut.id, dl)),
     [isMergedShipment, cungChuyen, nut, dl]
   );
   const scope = isMergedShipment ? `chuyến ${nut.nhan} (${cungChuyen.length} loại NL)` : `lô ${nut.nhan}${nut.kind === "S" ? ` · ${nut.moTa}` : ""}`;
   const lotStockNow = useMemo(
     () => {
-      const bang = bangTonKhoLo(dl); // một lượt cho mọi lô cần khoanh
-      return loTrongXuong.map((n) => ({ n, ton: tonKhoCuaLo(n.kind, n.id, dl, bang) }));
+      const bang = buildLotStockIndex(dl); // một lượt cho mọi lô cần khoanh
+      return loTrongXuong.map((n) => ({ n, ton: getLotStockKg(n.kind, n.id, dl, bang) }));
     },
     [loTrongXuong, dl]
   );
@@ -40,13 +40,13 @@ export function ThuHoiLo({ nut, dl, cungChuyen = [] }: { nut: NutLo; dl: DuLieuT
       fileName: `thu-hoi-${nut.nhan}-${new Date().toISOString().slice(0, 16).replace(/[:T]/g, "")}.xlsx`,
       colWidths: [14, 28, 12, 26, 32, 12, 22],
       aoa: [
-        [`Danh sách thu hồi — ${scope} (${TEN_LOAI[nut.kind]})`],
+        [`Danh sách thu hồi — ${scope} (${TRACE_KIND_LABELS[nut.kind]})`],
         [],
         ["Ngả ra", "Khách", "Ngày", "Chứng từ", "Mặt hàng", "Kg", "Từ lô"],
-        ...hangRa.map((r) => [TEN_LOAI[r.loai], r.khach, r.ngay, r.chungTu, r.matHang, r.kg, r.tuLo]),
+        ...hangRa.map((r) => [TRACE_KIND_LABELS[r.loai], r.khach, r.ngay, r.chungTu, r.matHang, r.kg, r.tuLo]),
         [],
         ["Lô còn trong xưởng", "Mặt hàng", "Ngày", "Tồn trong kho (kg)"],
-        ...lotStockNow.map(({ n, ton }) => [`${TEN_LOAI[n.kind]} ${n.nhan}`, n.moTa, n.ngay, ton]),
+        ...lotStockNow.map(({ n, ton }) => [`${TRACE_KIND_LABELS[n.kind]} ${n.nhan}`, n.moTa, n.ngay, ton]),
       ],
     });
   };
@@ -103,7 +103,7 @@ export function ThuHoiLo({ nut, dl, cungChuyen = [] }: { nut: NutLo; dl: DuLieuT
               {hangRa.map((r, i) => (
                 <tr key={i} className="border-b border-border">
                   <td className="py-1 pr-3 font-medium">{r.khach || "khách ?"}</td>
-                  <td className="tnum py-1 pr-3">{r.ngay ? viDate(r.ngay) : "—"}</td>
+                  <td className="tnum py-1 pr-3">{r.ngay ? formatDateVN(r.ngay) : "—"}</td>
                   <td className="py-1 pr-3">{r.chungTu}</td>
                   <td className="py-1 pr-3">{r.matHang}</td>
                   <td className="tnum py-1 pr-3 text-right">{kgHoacTrong(r.kg)}</td>
@@ -121,7 +121,7 @@ export function ThuHoiLo({ nut, dl, cungChuyen = [] }: { nut: NutLo; dl: DuLieuT
           <ul className="space-y-1">
             {lotStockNow.map(({ n, ton }) => (
               <li key={`${n.kind}:${n.id}`} className="tnum text-muted-foreground">
-                {TEN_LOAI[n.kind]} <span className="font-medium text-foreground">{n.nhan}</span> · {n.moTa}
+                {TRACE_KIND_LABELS[n.kind]} <span className="font-medium text-foreground">{n.nhan}</span> · {n.moTa}
                 {ton != null ? ` · tồn trong kho ${kg(ton)}` : ""}
               </li>
             ))}
@@ -132,7 +132,7 @@ export function ThuHoiLo({ nut, dl, cungChuyen = [] }: { nut: NutLo; dl: DuLieuT
       {isPrinting && (
         <PhieuIn
           tieuDe="Danh sách thu hồi theo lô"
-          phuDe={`${isMergedShipment ? `Chuyến ${nut.nhan} · ${cungChuyen.length} loại NL` : `Lô ${nut.nhan} · ${TEN_LOAI[nut.kind]} · ${nut.moTa}`}${nut.ngay ? ` · ${viDate(nut.ngay)}` : ""}`}
+          phuDe={`${isMergedShipment ? `Chuyến ${nut.nhan} · ${cungChuyen.length} loại NL` : `Lô ${nut.nhan} · ${TRACE_KIND_LABELS[nut.kind]} · ${nut.moTa}`}${nut.ngay ? ` · ${formatDateVN(nut.ngay)}` : ""}`}
           onClose={() => setIsPrinting(false)}
         >
           <table className="w-full border-collapse">
@@ -151,9 +151,9 @@ export function ThuHoiLo({ nut, dl, cungChuyen = [] }: { nut: NutLo; dl: DuLieuT
               {hangRa.length ? (
                 hangRa.map((r, i) => (
                   <tr key={i}>
-                    <TdIn>{TEN_LOAI[r.loai]}</TdIn>
+                    <TdIn>{TRACE_KIND_LABELS[r.loai]}</TdIn>
                     <TdIn>{r.khach || "khách ?"}</TdIn>
-                    <TdIn>{r.ngay ? viDate(r.ngay) : "—"}</TdIn>
+                    <TdIn>{r.ngay ? formatDateVN(r.ngay) : "—"}</TdIn>
                     <TdIn>{r.chungTu}</TdIn>
                     <TdIn>{r.matHang}</TdIn>
                     <TdIn right>{kgHoacTrong(r.kg)}</TdIn>
@@ -180,9 +180,9 @@ export function ThuHoiLo({ nut, dl, cungChuyen = [] }: { nut: NutLo; dl: DuLieuT
               <tbody>
                 {lotStockNow.map(({ n, ton }) => (
                   <tr key={`${n.kind}:${n.id}`}>
-                    <TdIn>{`${TEN_LOAI[n.kind]} ${n.nhan}`}</TdIn>
+                    <TdIn>{`${TRACE_KIND_LABELS[n.kind]} ${n.nhan}`}</TdIn>
                     <TdIn>{n.moTa}</TdIn>
-                    <TdIn>{n.ngay ? viDate(n.ngay) : "—"}</TdIn>
+                    <TdIn>{n.ngay ? formatDateVN(n.ngay) : "—"}</TdIn>
                     <TdIn right>{ton != null ? kg(ton) : "—"}</TdIn>
                   </tr>
                 ))}

@@ -6,7 +6,7 @@
 import { useLayoutEffect, useMemo, useRef, type ReactNode } from "react";
 import { ToMauContext, type DauDong, type NguonToMau } from "@/design-system";
 import { useRowMarks } from "@/lib/catalogRepo";
-import { datDau, dauCuaBang } from "@/lib/toMau";
+import { setRowMarks, getTableRowMarks } from "@/lib/rowMarks";
 
 const EMPTY_MARKS: ReadonlyMap<string, DauDong> = new Map();
 
@@ -28,7 +28,7 @@ export function ToMauProvider({ nguoi, children }: { nguoi: string; children: Re
 
   const theoBang = useMemo(() => {
     const ra = new Map<string, ReadonlyMap<string, DauDong>>();
-    for (const k of new Set(marks.map((m) => m.tableKey))) ra.set(k, dauCuaBang(marks, k).dong);
+    for (const k of new Set(marks.map((m) => m.tableKey))) ra.set(k, getTableRowMarks(marks, k).dong);
     return ra;
   }, [marks]);
 
@@ -36,7 +36,7 @@ export function ToMauProvider({ nguoi, children }: { nguoi: string; children: Re
     () => ({
       dauCuaBang: (tableKey) => theoBang.get(tableKey) ?? EMPTY_MARKS,
       dat: (tableKey, khoaDong, dau) => {
-        const next = datDau(latest.current, tableKey, khoaDong, dau, nguoi);
+        const next = setRowMarks(latest.current, tableKey, khoaDong, dau, nguoi);
         latest.current = next;
         write(next);
       },

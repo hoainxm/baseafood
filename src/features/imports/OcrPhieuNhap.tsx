@@ -17,13 +17,13 @@ import {
   sacTheoTen,
 } from "@/design-system";
 import { Camera, Check, Loader2, Plus, RefreshCw } from "lucide-react";
-import { nhanDienPhieu, type DanhMucOcr, type KetQuaOcr } from "@/lib/ocr";
-import { coLuuAnh, taiAnhLen } from "@/lib/storage";
-import { kg as fmtKg, viDate } from "@/lib/format";
+import { recognizeImportSlip, type OcrCatalog, type KetQuaOcr } from "@/lib/ocr";
+import { hasImageStorage, uploadImage } from "@/lib/storage";
+import { kg as fmtKg, formatDateVN } from "@/lib/format";
 
 interface Props {
   /** Danh mục để dò khớp tên trên phiếu (đại lý, loại NL). */
-  danhMuc: DanhMucOcr;
+  danhMuc: OcrCatalog;
   /** Đã tải ảnh lên Storage → đường dẫn lưu kèm chuyến. */
   onLuuAnh: (path: string) => void;
   onApDaiLy: (name: string) => void;
@@ -61,8 +61,8 @@ export function OcrPhieuNhap({
     setAppliedRows(new Set());
 
     // Tải ảnh lên Storage song song (ảnh là bằng chứng phiếu, lưu kèm chuyến).
-    if (coLuuAnh)
-      taiAnhLen(file).then((path) => {
+    if (hasImageStorage)
+      uploadImage(file).then((path) => {
         if (path) {
           onLuuAnh(path);
           notify.daLuu("Đã lưu ảnh phiếu kèm chuyến");
@@ -70,7 +70,7 @@ export function OcrPhieuNhap({
       });
 
     try {
-      const r = await nhanDienPhieu(file, danhMuc, setPercent);
+      const r = await recognizeImportSlip(file, danhMuc, setPercent);
       setKq(r);
       setStage("xong");
     } catch {
@@ -191,7 +191,7 @@ export function OcrPhieuNhap({
                       }}
                     >
                       {isDateApplied ? <Check /> : <Plus />}
-                      Ngày: {viDate(kq.ngay)}
+                      Ngày: {formatDateVN(kq.ngay)}
                     </Button>
                   )}
                 </div>

@@ -52,8 +52,8 @@ import type {
   NxtSnapshotLine,
   StorageLocation,
 } from "@/types";
-import { KHO_LUU_MAC_DINH } from "@/types";
-import { BOT_TAM_SEED, suyBotDiKem } from "@/lib/botTam";
+import { DEFAULT_STORAGE_LOCATION } from "@/types";
+import { BATTER_TYPE_SEED, inferBattersFromName } from "@/lib/batter";
 import fgSeed from "@/data/thanh-pham.json";
 import nxtBachTuoc from "@/data/nxt-bachtuoc-2026-07.json";
 
@@ -101,7 +101,7 @@ export const seedFinishedGoods = (): FinishedGood[] =>
  * chủ ý, loài đó cần từ khóa riêng mới bổ sung (spec §5.1). Migration 0034 nhân
  * bản luật này bằng SQL để vá cả bản đã deploy.
  */
-export const suyKieuCheBien = (ten: string): string => {
+export const inferProcessingType = (ten: string): string => {
   const t = ten.toLowerCase();
   if (t.includes("ncls") || t.includes("nguyên con làm sạch"))
     return "Nguyên con làm sạch";
@@ -138,7 +138,7 @@ const EXTRA_PRODUCTS: { id: string; name: string }[] = [
 /** Mặt hàng nạp sẵn TỪ 141 thành phẩm (mỗi cái gắn loài = nhóm + kiểu chế biến suy
  *  từ tên) + các mặt hàng thật còn thiếu. Để lần đầu mở đã có cái mà chọn, lọc theo
  *  loài. `finishedGoodCode` trỏ về mã 141; `category` = nhóm; `processingType` = facet B;
- *  `batterIds` = bột đi kèm suy từ tên (chỉ 2 nhóm đã chốt — `suyBotDiKem`, khớp 0051). */
+ *  `batterIds` = bột đi kèm suy từ tên (chỉ 2 nhóm đã chốt — `inferBattersFromName`, khớp 0051). */
 export const seedProducts = (): Product[] => [
   ...(fgSeed as any[]).map((t) => ({
     id: uid(),
@@ -146,8 +146,8 @@ export const seedProducts = (): Product[] => [
     name: t.ten,
     finishedGoodCode: t.ma,
     category: t.nhom,
-    processingType: suyKieuCheBien(t.ten),
-    batterIds: suyBotDiKem(t.ten),
+    processingType: inferProcessingType(t.ten),
+    batterIds: inferBattersFromName(t.ten),
   })),
   ...EXTRA_PRODUCTS.map((m) => ({
     id: uid(),
@@ -155,8 +155,8 @@ export const seedProducts = (): Product[] => [
     name: m.name,
     finishedGoodCode: "",
     category: "Bạch tuộc",
-    processingType: suyKieuCheBien(m.name),
-    batterIds: suyBotDiKem(m.name),
+    processingType: inferProcessingType(m.name),
+    batterIds: inferBattersFromName(m.name),
   })),
 ];
 
@@ -210,7 +210,7 @@ export const seedNxtSnapshots = (): NxtSnapshotLine[] => {
   return h.items.map((it) => ({
     id: `nxt|${h.warehouseCode}|${h.periodFrom}|${h.periodTo}|${it.code}`,
     warehouseCode: h.warehouseCode,
-    storageLocation: KHO_LUU_MAC_DINH,
+    storageLocation: DEFAULT_STORAGE_LOCATION,
     periodFrom: h.periodFrom,
     periodTo: h.periodTo,
     itemCode: it.code,
@@ -271,7 +271,7 @@ export const useNxtSnapshots = () => useBang(BANG_NXT_SNAPSHOT, seedNxtSnapshots
 export const useDomesticSales = () => useBang(BANG_DOMESTIC_SALE);
 
 /* --- Danh mục LOẠI BỘT TẨM (mig 0051) — seed id tất định, khớp migration --- */
-export const seedBatterTypes = (): BatterType[] => BOT_TAM_SEED.map((b) => ({ ...b }));
+export const seedBatterTypes = (): BatterType[] => BATTER_TYPE_SEED.map((b) => ({ ...b }));
 export const useBatterTypes = () => useBang(BANG_BATTER_TYPE, seedBatterTypes);
 
 /* --- Danh mục kho LƯU hàng (kho nhà + kho lạnh thuê ngoài) --- */
@@ -295,4 +295,4 @@ export const useLotWaivers = () => useBang(BANG_LOT_WAIVER);
 export const useRowMarks = () => useBang(BANG_ROW_MARK);
 
 /** Nạp bộ demo hàng loạt không ghi nhật ký (lib/repo.ts) — chỉ NapGoiDemo dùng. */
-export { datTamTatNhatKy } from "@/lib/repo";
+export { setAuditPaused } from "@/lib/repo";

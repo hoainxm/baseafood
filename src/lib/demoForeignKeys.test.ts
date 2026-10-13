@@ -1,6 +1,6 @@
-// Chế độ demo thêm tiền tố `demo:` cho khóa chính ở ranh giới máy chủ (lib/cheDo.ts).
+// Chế độ demo thêm tiền tố `demo:` cho khóa chính ở ranh giới máy chủ (lib/demoMode.ts).
 // Cột KHÓA NGOẠI trỏ tới khóa chính bảng nghiệp vụ khác cũng phải mang tiền tố —
-// khai ở `AnhXaBang.cotThamChieu`. Test này quét mọi migration: thêm khóa ngoại mới
+// khai ở `TableMapping.cotThamChieu`. Test này quét mọi migration: thêm khóa ngoại mới
 // giữa hai bảng nghiệp vụ mà quên khai ⇒ đỏ (đã lọt một lần: 2026-10-12, period_id).
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";

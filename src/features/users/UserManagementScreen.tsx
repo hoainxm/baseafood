@@ -7,8 +7,8 @@ import { useState } from "react";
 import type { UserProfile, Role } from "@/types";
 import { ROLES, roleLabel, rolesList } from "@/types";
 import { useUserProfiles } from "@/lib/catalogRepo";
-import { hoTenToUsername } from "@/lib/username";
-import type { KetQuaDangNhap } from "@/lib/auth";
+import { fullNameToUsername } from "@/lib/username";
+import type { AuthResult } from "@/lib/auth";
 import {
   Nhan,
   sacTheoTen,
@@ -174,7 +174,7 @@ export default function QuanLyNguoiDungScreen({
     username: string,
     matKhau: string,
     roles: Role[]
-  ) => Promise<KetQuaDangNhap>;
+  ) => Promise<AuthResult>;
 }) {
   const [ds, write, { trangThai }] = useUserProfiles();
   const isLoading = trangThai === "dang-tai" && ds.length === 0;
@@ -195,7 +195,7 @@ export default function QuanLyNguoiDungScreen({
   const changeNewFullName = (v: string) =>
     setCreating((t) =>
       t
-        ? { ...t, fullName: v, username: t.usernameTuSua ? t.username : hoTenToUsername(v) }
+        ? { ...t, fullName: v, username: t.usernameTuSua ? t.username : fullNameToUsername(v) }
         : t
     );
 

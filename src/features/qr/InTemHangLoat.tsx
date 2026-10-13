@@ -2,14 +2,14 @@
 // IN TEM HÀNG LOẠT — tab của màn /qr.
 // Một chỗ duy nhất để in tem cho mọi lô (NL · BTP · TP) theo ngày / xưởng / loại,
 // in nhiều tem một lượt thay vì đi từng màn bấm từng nút "Tem".
-// Danh sách lô lấy qua dsLoDeIn (lib/truyXuatLo, hàm thuần có test).
+// Danh sách lô lấy qua listLotsToPrint (lib/lotTraceability, hàm thuần có test).
 // Thiết kế: docs/spec/qr-truy-xuat-lo.md §8
 // ============================================================
 import { useMemo, useState } from "react";
 import type { LotKind, Workshop } from "@/types";
 import { TemLoQr, useDuLieuTruyXuat } from "@/features/shared";
-import { kg, viDate } from "@/lib/format";
-import { TEN_LOAI, dsLoDeIn, khoaLo, tomTatIn, type NutLo } from "@/lib/truyXuatLo";
+import { kg, formatDateVN } from "@/lib/format";
+import { TRACE_KIND_LABELS, listLotsToPrint, lotKey, summarizeLabelPrints, type LotNode } from "@/lib/lotTraceability";
 import { useLabelPrints } from "@/lib/catalogRepo";
 import { Button, ChoiceGroup, DateRangeField, EmptyState, Nhan, congNgay, homNay, notify, sacTheoTen } from "@/design-system";
 import { Printer } from "lucide-react";
@@ -19,7 +19,7 @@ const LOT_KINDS: { kind: LotKind; moTa: string }[] = [
   { kind: "W", moTa: "mẻ sản xuất" },
   { kind: "P", moTa: "phiếu đóng gói" },
 ];
-const nodeKey = (n: NutLo) => `${n.kind}:${n.id}`;
+const nodeKey = (n: LotNode) => `${n.kind}:${n.id}`;
 
 export function InTemHangLoat() {
   const { dl } = useDuLieuTruyXuat();
@@ -29,19 +29,19 @@ export function InTemHangLoat() {
   const [lotKinds, setLotKinds] = useState<LotKind[]>(["S", "W", "P"]);
   // Lưu những lô người dùng BỎ chọn (mặc định chọn hết) — đổi bộ lọc thì lô mới vào vẫn được chọn.
   const [deselected, setDeselected] = useState<Set<string>>(new Set());
-  const [printing, setPrinting] = useState<NutLo[] | null>(null);
+  const [printing, setPrinting] = useState<LotNode[] | null>(null);
   const [onlyUnprinted, setOnlyUnprinted] = useState(false);
   const [soIn] = useLabelPrints();
-  const daIn = useMemo(() => tomTatIn(soIn), [soIn]);
+  const daIn = useMemo(() => summarizeLabelPrints(soIn), [soIn]);
 
-  const allLots = useMemo(() => dsLoDeIn(dl, { tu, den, xuong: workshop, loai: lotKinds }), [dl, tu, den, workshop, lotKinds]);
-  const unprintedCount = allLots.filter((n) => !daIn.has(khoaLo(n.kind as LotKind, n.id))).length;
-  const ds = onlyUnprinted ? allLots.filter((n) => !daIn.has(khoaLo(n.kind as LotKind, n.id))) : allLots;
+  const allLots = useMemo(() => listLotsToPrint(dl, { tu, den, xuong: workshop, loai: lotKinds }), [dl, tu, den, workshop, lotKinds]);
+  const unprintedCount = allLots.filter((n) => !daIn.has(lotKey(n.kind as LotKind, n.id))).length;
+  const ds = onlyUnprinted ? allLots.filter((n) => !daIn.has(lotKey(n.kind as LotKind, n.id))) : allLots;
   const selected = ds.filter((n) => !deselected.has(nodeKey(n)));
 
   const toggleKind = (k: LotKind) =>
     setLotKinds((prev) => (prev.includes(k) ? prev.filter((x) => x !== k) : [...prev, k]));
-  const toggleSelect = (n: NutLo) =>
+  const toggleSelect = (n: LotNode) =>
     setDeselected((prev) => {
       const nextSet = new Set(prev);
       const k = nodeKey(n);
@@ -84,11 +84,11 @@ export function InTemHangLoat() {
                 key={kind}
                 type="button"
                 variant={lotKinds.includes(kind) ? "default" : "outline"}
-                title={`${lotKinds.includes(kind) ? "Bỏ" : "Thêm"} tem ${TEN_LOAI[kind].toLowerCase()} (${moTa}) khỏi danh sách in.`}
+                title={`${lotKinds.includes(kind) ? "Bỏ" : "Thêm"} tem ${TRACE_KIND_LABELS[kind].toLowerCase()} (${moTa}) khỏi danh sách in.`}
                 aria-pressed={lotKinds.includes(kind)}
                 onClick={() => toggleKind(kind)}
               >
-                {TEN_LOAI[kind]}
+                {TRACE_KIND_LABELS[kind]}
               </Button>
             ))}
           </div>
@@ -158,19 +158,19 @@ export function InTemHangLoat() {
                     />
                     <span className="min-w-0 flex-1 space-y-1">
                       <span className="flex flex-wrap items-center gap-2">
-                        <Nhan loai="phan-loai" sac={sacTheoTen(TEN_LOAI[n.kind])}>{TEN_LOAI[n.kind]}</Nhan>
+                        <Nhan loai="phan-loai" sac={sacTheoTen(TRACE_KIND_LABELS[n.kind])}>{TRACE_KIND_LABELS[n.kind]}</Nhan>
                         <span className="tnum font-semibold">{n.nhan}</span>
                         {(() => {
-                          const t = daIn.get(khoaLo(n.kind as LotKind, n.id));
+                          const t = daIn.get(lotKey(n.kind as LotKind, n.id));
                           return t ? (
-                            <Nhan loai="xong">Đã in {t.tem} tem · {viDate(t.cuoi.printedAt.slice(0, 10))}</Nhan>
+                            <Nhan loai="xong">Đã in {t.tem} tem · {formatDateVN(t.cuoi.printedAt.slice(0, 10))}</Nhan>
                           ) : (
                             <Nhan loai="cho">Chưa in tem</Nhan>
                           );
                         })()}
                       </span>
                       <span className="block text-muted-foreground">
-                        {[n.moTa, viDate(n.ngay), n.xuong && `xưởng ${n.xuong}`, supplier, n.kg ? kg(n.kg) : ""]
+                        {[n.moTa, formatDateVN(n.ngay), n.xuong && `xưởng ${n.xuong}`, supplier, n.kg ? kg(n.kg) : ""]
                           .filter(Boolean)
                           .join(" · ")}
                       </span>

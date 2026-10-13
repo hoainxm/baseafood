@@ -1,12 +1,12 @@
 // ============================================================
-// Tên file: src/lib/khoCanDoi.ts
+// Tên file: src/lib/balancingStockLines.ts
 // Tên tiếng Việt: Hai dòng kho của Cân đối ⇄ Sổ kho theo tháng (hàm thuần)
 // Description: Balancing stock rows (draw-from-lot / send-to-freezer) ⇄ monthly stock ledger
 // ============================================================
 import type { BalancingInputItem, MonthlyStockLine } from "@/types";
-import { loaiDongKho } from "@/lib/balancingGrid";
-import { donKyVaoSo, suyDong, thangSau, type MonthlyStockRow } from "@/lib/monthlyStock";
-import { num, viDate } from "@/lib/format";
+import { getBalancingStockLineKind } from "@/lib/balancingGrid";
+import { carryForwardIntoLedger, suyDong, getNextMonth, type MonthlyStockRow } from "@/lib/monthlyStock";
+import { num, formatDateVN } from "@/lib/format";
 
 /**
  * VÌ SAO — khối NL ở Cân đối có hai dòng kho (chốt 2026-10-06):
@@ -28,23 +28,23 @@ import { num, viDate } from "@/lib/format";
  * tháng một — đúng nút "Kế thừa & lưu vào sổ" của màn Sổ kho tháng (chốt với người dùng).
  */
 
-export const NHOM_GUI_DONG = "Nguyên liệu gửi đông";
+export const FREEZE_DEPOSIT_CATEGORY = "Nguyên liệu gửi đông";
 /** Sổ kho mặc định khi vị trí gửi là kho ngoài chưa từng xuất hiện trong sổ. */
-export const SO_KHO_MAC_DINH = "Kho 1500 tấn";
+export const DEFAULT_LEDGER_WAREHOUSE = "Kho 1500 tấn";
 
-export const thangCuaNgay = (iso: string) => iso.slice(0, 7);
+export const monthOfDate = (iso: string) => iso.slice(0, 7);
 
 /** "<sổ kho>|<vị trí>" ⇄ cặp (warehouse, storageLocation) của dòng sổ kho. */
-export function tachKhoGui(v: string): { warehouse: string; storageLocation: string } {
+export function splitDepositLocation(v: string): { warehouse: string; storageLocation: string } {
   const i = v.indexOf("|");
   if (i < 0) return { warehouse: v, storageLocation: "" };
   return { warehouse: v.slice(0, i), storageLocation: v.slice(i + 1) };
 }
-export const ghepKhoGui = (warehouse: string, storageLocation: string) =>
+export const joinDepositLocation = (warehouse: string, storageLocation: string) =>
   `${warehouse}|${storageLocation}`;
 
 /** Tên ngắn của nơi để hàng: vị trí nếu có, không thì sổ kho; bỏ chữ "Kho " đầu. */
-export const viTriNgan = (l: Pick<MonthlyStockLine, "warehouse" | "storageLocation">) =>
+export const shortLocationName = (l: Pick<MonthlyStockLine, "warehouse" | "storageLocation">) =>
   (l.storageLocation || l.warehouse).replace(/^Kho\s+/i, "");
 
 /* ---------- Tháng của sổ ---------- */
@@ -54,7 +54,7 @@ export const viTriNgan = (l: Pick<MonthlyStockLine, "warehouse" | "storageLocati
  * TRƯỚC đó có dòng, dồn qua từng tháng (tối đa 24) — id `carry|…` tất định nên chạy lại
  * không nhân đôi. Tháng đã có dòng (dù một) thì để nguyên: dồn lúc đó dễ cộng đôi.
  */
-export function damBaoThang(
+export function ensureMonthOpened(
   lines: MonthlyStockLine[],
   month: string
 ): { lines: MonthlyStockLine[]; keThua: number } {
@@ -66,10 +66,10 @@ export function damBaoThang(
   let keThua = 0;
   let source = tu;
   for (let i = 0; i < 24 && source < month; i++) {
-    const nextMonth = thangSau(source);
+    const nextMonth = getNextMonth(source);
     if (!ds.some((l) => l.period === nextMonth)) {
       // Cùng hàm ghi dồn kỳ của màn Sổ kho tháng (không thay cả dòng đã có).
-      const kq = donKyVaoSo(ds, nextMonth);
+      const kq = carryForwardIntoLedger(ds, nextMonth);
       ds = kq.lines;
       keThua += kq.soDong;
     }
@@ -82,7 +82,7 @@ export function damBaoThang(
  * Dòng sổ của LÔ `loId` trong tháng `thang`: chính nó nếu cùng tháng, tháng sau theo
  * chuỗi dồn kỳ `carry|<id>` (id dồn tất định). Không có ⇒ null (lô đã hết, chưa dồn).
  */
-export function dongLoTheoThang(
+export function findLotLineInMonth(
   lines: MonthlyStockLine[],
   loId: string,
   month: string
@@ -93,7 +93,7 @@ export function dongLoTheoThang(
   let p = goc.period;
   while (p < month) {
     id = `carry|${id}`;
-    p = thangSau(p);
+    p = getNextMonth(p);
   }
   return lines.find((l) => l.id === id && l.period === month) ?? null;
 }
@@ -104,7 +104,7 @@ const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const reVet = (rowId: string) => new RegExp(`⟦CĐ:${escapeRegex(rowId)}:(-?[0-9.]+)⟧[^\\n]*`);
 
 /** Phần kg dòng cân đối `rowId` đang ghi vào lô (đọc từ vết trong ghi chú). */
-export function phanCanDoiTrongLo(l: Pick<MonthlyStockLine, "note">, rowId: string): number {
+export function getBalancingShareInLot(l: Pick<MonthlyStockLine, "note">, rowId: string): number {
   const m = (l.note ?? "").match(reVet(rowId));
   return m ? Number(m[1]) || 0 : 0;
 }
@@ -123,7 +123,7 @@ function thawByMonth(r: BalancingInputItem): Map<string, number> {
   const m = new Map<string, number>();
   for (const [iso, v] of Object.entries(r.dailyQuantities ?? {})) {
     if (!v) continue;
-    const t = thangCuaNgay(iso);
+    const t = monthOfDate(iso);
     m.set(t, (m.get(t) ?? 0) + Math.abs(v));
   }
   return m;
@@ -136,16 +136,16 @@ function freezeDepositByDay(r: BalancingInputItem): Map<string, number> {
   return m;
 }
 
-export const idDongGui = (rowId: string, date: string) => `cd|${rowId}|${date}`;
+export const freezeDepositRowId = (rowId: string, date: string) => `cd|${rowId}|${date}`;
 
-export interface NguCanhKy {
+export interface BalancingPeriodContext {
   /** Nhãn kỳ để ghi vết, VD "Bạch tuộc 2 da 01/10/2026 – 05/10/2026". */
   nhanKy: string;
   /** Tên HỌ nguyên liệu của kỳ — tên lô gửi đông trong sổ. */
   hoNL: string;
 }
 
-export interface KetQuaDongBo {
+export interface MonthlyStockSyncResult {
   lines: MonthlyStockLine[];
   /** Có đổi gì trong sổ không (khỏi ghi thừa). */
   doi: boolean;
@@ -160,13 +160,13 @@ export interface KetQuaDongBo {
  * ở `truoc` (bị xoá) ⇒ đặt mọi phần về 0. ĐẶT GIÁ TRỊ ⇒ gọi lại với cùng `sau` không đổi
  * gì; truyền `truoc = []` để GHI LẠI toàn bộ (sửa lệch sau khi sổ bị nạp đè).
  */
-export function dongBoSoKho(
+export function syncMonthlyStockLedger(
   lines: MonthlyStockLine[],
   prevRows: BalancingInputItem[],
   after: BalancingInputItem[],
-  ctx: NguCanhKy
-): KetQuaDongBo {
-  const isStockLine = (r: BalancingInputItem) => loaiDongKho(r) != null;
+  ctx: BalancingPeriodContext
+): MonthlyStockSyncResult {
+  const isStockLine = (r: BalancingInputItem) => getBalancingStockLineKind(r) != null;
   const prev = new Map(prevRows.filter(isStockLine).map((r) => [r.id, r]));
   const nextById = new Map(after.filter(isStockLine).map((r) => [r.id, r]));
   let ds = lines;
@@ -174,7 +174,7 @@ export function dongBoSoKho(
   let doi = false;
 
   const ensureMonth = (t: string) => {
-    const kq = damBaoThang(ds, t);
+    const kq = ensureMonthOpened(ds, t);
     if (kq.keThua) {
       ds = kq.lines;
       keThua += kq.keThua;
@@ -189,7 +189,7 @@ export function dongBoSoKho(
   for (const id of new Set([...prev.keys(), ...nextById.keys()])) {
     const a = prev.get(id);
     const b = nextById.get(id);
-    const lineKind = loaiDongKho((b ?? a)!);
+    const lineKind = getBalancingStockLineKind((b ?? a)!);
 
     if (lineKind === "lay-xa-dong") {
       const prevStockLineId = a?.stockLineId ?? "";
@@ -216,7 +216,7 @@ export function dongBoSoKho(
       can.sort((x, y) => x.thang.localeCompare(y.thang) || (x.kg === 0 ? -1 : 1));
       for (const c of can) {
         ensureMonth(c.thang);
-        const dong = dongLoTheoThang(ds, c.lo, c.thang);
+        const dong = findLotLineInMonth(ds, c.lo, c.thang);
         if (!dong) {
           if (c.kg === 0) continue; // lô không còn ở tháng đó — không có gì để trả
           return {
@@ -226,7 +226,7 @@ export function dongBoSoKho(
             loi: `Lô đã chọn không còn trong sổ kho ${c.thang.slice(5)}/${c.thang.slice(0, 4)} — chọn lô khác.`,
           };
         }
-        const existing = phanCanDoiTrongLo(dong, id);
+        const existing = getBalancingShareInLot(dong, id);
         const chenh = c.kg - existing;
         if (Math.abs(chenh) < 1e-9) continue;
         const outKg = dong.outKg + chenh;
@@ -236,7 +236,7 @@ export function dongBoSoKho(
             lines,
             doi: false,
             keThua: 0,
-            loi: `Lô ${viTriNgan(dong)} · ${dong.itemName}${dong.origin ? ` · ${dong.origin}` : ""} chỉ còn ${num(
+            loi: `Lô ${shortLocationName(dong)} · ${dong.itemName}${dong.origin ? ` · ${dong.origin}` : ""} chỉ còn ${num(
               dong.openKg + dong.inKg - dong.outKg + existing
             )} kg — không lấy được ${num(c.kg)} kg.`,
           };
@@ -262,7 +262,7 @@ export function dongBoSoKho(
           return { lines, doi: false, keThua: 0, loi: "Chọn kho gửi trước khi ghi số Gửi đông." };
         if (b) continue; // chưa chọn kho: chưa có gì trong sổ để đặt
       }
-      const { warehouse, storageLocation } = tachKhoGui(newLocation);
+      const { warehouse, storageLocation } = splitDepositLocation(newLocation);
       for (const date of [...new Set([...oldParts.keys(), ...newParts.keys()])].sort()) {
         const kg = newParts.get(date) ?? 0;
         if (
@@ -273,7 +273,7 @@ export function dongBoSoKho(
           a.unitPrice === b.unitPrice
         )
           continue; // ngày này không đổi gì
-        const did = idDongGui(id, date);
+        const did = freezeDepositRowId(id, date);
         const coSan = ds.find((l) => l.id === did);
         if (kg === 0) {
           if (coSan) {
@@ -282,12 +282,12 @@ export function dongBoSoKho(
           }
           continue;
         }
-        const month = thangCuaNgay(date);
+        const month = monthOfDate(date);
         ensureMonth(month);
         const dong: MonthlyStockLine = {
           id: did,
           period: month,
-          category: NHOM_GUI_DONG,
+          category: FREEZE_DEPOSIT_CATEGORY,
           warehouse,
           itemName: ctx.hoNL,
           size: "",
@@ -306,7 +306,7 @@ export function dongBoSoKho(
           sortOrder: coSan?.sortOrder ?? 9000,
           /* Giữ các dòng vết ⟦CĐ:…⟧ của dòng LẤY từ chính lô gửi này (cùng tháng). */
           note: [
-            `Gửi đông từ cân đối ${ctx.nhanKy} — ngày gửi ${viDate(date)}`,
+            `Gửi đông từ cân đối ${ctx.nhanKy} — ngày gửi ${formatDateVN(date)}`,
             ...(coSan?.note ?? "").split("\n").filter((d) => d.startsWith("⟦CĐ:")),
           ].join("\n"),
         };
@@ -331,23 +331,23 @@ export function dongBoSoKho(
 
 /**
  * Số chỗ sổ kho KHÔNG khớp phần kho của các dòng cân đối (VD sổ tháng bị nạp lại Excel
- * đè mất cột xuất). = số thay đổi mà `dongBoSoKho(lines, [], rows)` sẽ phải ghi.
+ * đè mất cột xuất). = số thay đổi mà `syncMonthlyStockLedger(lines, [], rows)` sẽ phải ghi.
  */
-export function soChoLechSoKho(
+export function countMonthlyStockMismatches(
   lines: MonthlyStockLine[],
   rows: BalancingInputItem[]
 ): number {
   let lech = 0;
   for (const r of rows) {
-    const lineKind = loaiDongKho(r);
+    const lineKind = getBalancingStockLineKind(r);
     if (lineKind === "lay-xa-dong" && r.stockLineId) {
       for (const [t, kg] of thawByMonth(r)) {
-        const dong = dongLoTheoThang(lines, r.stockLineId, t);
-        if (!dong || Math.abs(phanCanDoiTrongLo(dong, r.id) - kg) > 1e-6) lech++;
+        const dong = findLotLineInMonth(lines, r.stockLineId, t);
+        if (!dong || Math.abs(getBalancingShareInLot(dong, r.id) - kg) > 1e-6) lech++;
       }
     } else if (lineKind === "gui-dong" && r.stockLocation) {
       for (const [date, kg] of freezeDepositByDay(r)) {
-        const dong = lines.find((l) => l.id === idDongGui(r.id, date));
+        const dong = lines.find((l) => l.id === freezeDepositRowId(r.id, date));
         if (!dong || Math.abs(dong.inKg - kg) > 1e-6) lech++;
       }
     }
@@ -358,7 +358,7 @@ export function soChoLechSoKho(
 /* ---------- Danh sách chọn ---------- */
 
 /** Chuẩn hoá tên để so: bỏ dấu, "B." → "bach", chỉ giữ chữ số. */
-export function chuanTenHang(s: string): string {
+export function normalizeItemName(s: string): string {
   return s
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "")
@@ -370,14 +370,14 @@ export function chuanTenHang(s: string): string {
 }
 
 /** Độ khớp tên lô với họ NL của kỳ: số từ của họ có mặt trong tên lô. */
-export function diemKhopTen(itemName: string, materialFamily: string): number {
-  const tu = new Set(chuanTenHang(itemName).split(" "));
-  return chuanTenHang(materialFamily)
+export function scoreNameMatch(itemName: string, materialFamily: string): number {
+  const tu = new Set(normalizeItemName(itemName).split(" "));
+  return normalizeItemName(materialFamily)
     .split(" ")
     .filter((w) => w && tu.has(w)).length;
 }
 
-export interface LuaChonLo {
+export interface LotOption {
   value: string;
   label: string;
   phu: string;
@@ -392,13 +392,13 @@ export interface LuaChonLo {
  * id `carry|…` tất định nên chọn trước, ghi sau vẫn trúng). Chỉ lô còn tồn (+ lô đang
  * chọn). Lô trùng tên họ NL của kỳ lên đầu.
  */
-export function danhSachLo(
+export function listThawLotOptions(
   lines: MonthlyStockLine[],
   month: string,
   materialFamily: string,
   selected: string[] = []
-): LuaChonLo[] {
-  const { lines: ds } = damBaoThang(lines, month);
+): LotOption[] {
+  const { lines: ds } = ensureMonthOpened(lines, month);
   const giu = new Set(selected);
   return ds
     .filter((l) => l.period === month)
@@ -406,15 +406,15 @@ export function danhSachLo(
     .filter((r) => r.closeKg > 1e-9 || giu.has(r.id))
     .sort(
       (a, b) =>
-        diemKhopTen(b.itemName, materialFamily) - diemKhopTen(a.itemName, materialFamily) ||
-        viTriNgan(a).localeCompare(viTriNgan(b), "vi") ||
+        scoreNameMatch(b.itemName, materialFamily) - scoreNameMatch(a.itemName, materialFamily) ||
+        shortLocationName(a).localeCompare(shortLocationName(b), "vi") ||
         a.itemName.localeCompare(b.itemName, "vi") ||
         (a.importDate || "").localeCompare(b.importDate || "")
     )
     .map((r) => ({
       value: r.id,
-      label: `${viTriNgan(r)} · ${r.itemName}${r.size ? ` ${r.size}` : ""}${r.origin ? ` · ${r.origin}` : ""}`,
-      phu: `còn ${num(r.closeKg)} kg${r.importDate ? ` · nhập ${viDate(r.importDate)}` : ""}`,
+      label: `${shortLocationName(r)} · ${r.itemName}${r.size ? ` ${r.size}` : ""}${r.origin ? ` · ${r.origin}` : ""}`,
+      phu: `còn ${num(r.closeKg)} kg${r.importDate ? ` · nhập ${formatDateVN(r.importDate)}` : ""}`,
       ton: r.closeKg,
       gia: r.unitPrice,
     }));
@@ -424,7 +424,7 @@ export function danhSachLo(
  * Kho để chọn GỬI ĐÔNG: kho xí nghiệp (sổ riêng) + nơi để hàng (danh mục kho lưu và vị
  * trí đã dùng trong sổ). Kho ngoài ghi vào sổ kho đang quản lý nó nhiều nhất.
  */
-export function danhSachKhoGui(
+export function listDepositLocationOptions(
   lines: MonthlyStockLine[],
   plantWarehouses: string[],
   storageLocations: string[]
@@ -438,7 +438,7 @@ export function danhSachKhoGui(
   }
   const soChinh = (vt: string) => {
     const m = qtyByLocation.get(vt);
-    if (!m) return SO_KHO_MAC_DINH;
+    if (!m) return DEFAULT_LEDGER_WAREHOUSE;
     return [...m.entries()].sort((a, b) => b[1] - a[1])[0][0];
   };
   const ra: { value: string; label: string; phu?: string }[] = [];
@@ -446,13 +446,13 @@ export function danhSachKhoGui(
   for (const k of plantWarehouses) {
     if (existing.has(k)) continue;
     existing.add(k);
-    ra.push({ value: ghepKhoGui(k, ""), label: k });
+    ra.push({ value: joinDepositLocation(k, ""), label: k });
   }
   for (const vt of [...storageLocations, ...qtyByLocation.keys()]) {
     if (!vt || existing.has(vt)) continue;
     existing.add(vt);
     const so = soChinh(vt);
-    ra.push({ value: ghepKhoGui(so, vt), label: vt, phu: `sổ ${so}` });
+    ra.push({ value: joinDepositLocation(so, vt), label: vt, phu: `sổ ${so}` });
   }
   return ra;
 }

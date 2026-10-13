@@ -5,13 +5,13 @@
 // ============================================================
 // Bộ đệm localStorage cấp thấp. Màn hình KHÔNG gọi trực tiếp — đi qua
 // src/lib/repo.ts để chạy được cả hai chế độ (Supabase / chỉ máy này).
-// Khóa localStorage khai báo trong repo.ts (AnhXaBang.localKey). Chế độ demo đổi
-// `bsf.*` → `bsf-demo.*` NGAY TẠI ĐÂY (lib/cheDo.ts) — bản sao thật không bị đụng.
-import { khoaLocal } from "@/lib/cheDo";
+// Khóa localStorage khai báo trong repo.ts (TableMapping.localKey). Chế độ demo đổi
+// `bsf.*` → `bsf-demo.*` NGAY TẠI ĐÂY (lib/demoMode.ts) — bản sao thật không bị đụng.
+import { modeLocalKey } from "@/lib/demoMode";
 
 export function load<T>(key: string): T[] {
   try {
-    const raw = localStorage.getItem(khoaLocal(key));
+    const raw = localStorage.getItem(modeLocalKey(key));
     return raw ? (JSON.parse(raw) as T[]) : [];
   } catch {
     return [];
@@ -25,7 +25,7 @@ export function load<T>(key: string): T[] {
  */
 export function save<T>(key: string, rows: T[]): boolean {
   try {
-    localStorage.setItem(khoaLocal(key), JSON.stringify(rows));
+    localStorage.setItem(modeLocalKey(key), JSON.stringify(rows));
     return true;
   } catch {
     return false;
@@ -54,7 +54,7 @@ let lastMs = 0;
  *   second time" ⇒ kẹt cả hàng chờ của bảng.
  * - Tiền tố mốc ms (tăng ngặt trong một tab) giữ THỨ TỰ GHI khi sắp theo id: nhiều
  *   chỗ lấy id làm khóa phụ "cùng ngày thì cái ghi trước/sau" (importHelpers,
- *   truyXuatLo.dongCuaChuyen, /wip…) — id cũ dạng `ms-số` vẫn so đúng với id mới.
+ *   truyXuatLo.getShipmentLines, /wip…) — id cũ dạng `ms-số` vẫn so đúng với id mới.
  * - Đuôi 4 ký tự của id làm hậu tố nhãn lô (truyXuatLo.duoiId) — UUID cho hex.
  */
 export function uid(): string {

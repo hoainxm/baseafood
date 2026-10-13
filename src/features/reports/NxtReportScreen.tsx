@@ -15,9 +15,9 @@ import {
   useFinishedGoodsOpeningStock,
 } from "@/lib/catalogRepo";
 import {
-  tinhSoTonTP,
-  tongSoTonTP,
-  type SoTonTPRow,
+  computeFinishedGoodNxt,
+  sumFinishedGoodNxt,
+  type FinishedGoodNxtRow,
 } from "@/lib/inventoryFinished";
 import { exportNxtToExcel, inferCategory, type NxtExcelRow } from "@/lib/nxtExcel";
 import {
@@ -49,8 +49,8 @@ import {
   type TheThongTin,
 } from "@/design-system";
 import { useSuaDanhMuc } from "@/features/catalog/SuaDanhMucNhanh";
-import { KY_OPT, phamViKy, dauThang, type KyXem } from "@/lib/periodUtils";
-import { num, viDate } from "@/lib/format";
+import { KY_OPT, getViewPeriodRange, startOfMonth, type ViewPeriod } from "@/lib/periodUtils";
+import { num, formatDateVN } from "@/lib/format";
 import { uid } from "@/lib/db";
 import {
   AlertTriangle,
@@ -90,11 +90,11 @@ export default function BaoCaoNhapXuatTonScreen() {
   const productEditor = useSuaDanhMuc("matHang", products, setProducts);
   const [opening, writeOpening] = useFinishedGoodsOpeningStock();
 
-  const [ky, setKy] = useState<KyXem>("thang");
+  const [ky, setKy] = useState<ViewPeriod>("thang");
   const [moc, setMoc] = useState(homNay());
-  const [tuTC, setTuTC] = useState(dauThang(homNay()));
+  const [tuTC, setTuTC] = useState(startOfMonth(homNay()));
   const [denTC, setDenTC] = useState(homNay());
-  const [tu, den] = phamViKy(ky, moc, tuTC, denTC);
+  const [tu, den] = getViewPeriodRange(ky, moc, tuTC, denTC);
 
   // Dialog tồn đầu
   const [isOpeningOpen, setIsOpeningOpen] = useState(false);
@@ -105,7 +105,7 @@ export default function BaoCaoNhapXuatTonScreen() {
 
   const rows = useMemo(
     () =>
-      tinhSoTonTP({
+      computeFinishedGoodNxt({
         sanXuat: wips,
         exportOrders,
         exportItems,
@@ -118,7 +118,7 @@ export default function BaoCaoNhapXuatTonScreen() {
       }),
     [wips, exportOrders, exportItems, salesItems, packagings, opening, products, tu, den]
   );
-  const total = useMemo(() => tongSoTonTP(rows), [rows]);
+  const total = useMemo(() => sumFinishedGoodNxt(rows), [rows]);
 
   const the: TheThongTin[] = [
     { nhan: "Tồn đầu kho", giaTri: `${num(total.tonDau)} kg`, so: true, icon: Snowflake, mau: "trung-tinh" },
@@ -132,7 +132,7 @@ export default function BaoCaoNhapXuatTonScreen() {
     { nhan: "Tồn cuối kho", giaTri: `${num(total.tonCuoi)} kg`, so: true, icon: Scale, mau: "success" },
   ];
 
-  const columns: CotTong<SoTonTPRow>[] = [
+  const columns: CotTong<FinishedGoodNxtRow>[] = [
     {
       key: "mh",
       header: "Mặt hàng · quy cách",
@@ -219,9 +219,9 @@ export default function BaoCaoNhapXuatTonScreen() {
     }));
     exportNxtToExcel(
       {
-        createdDateText: `Ngày lập: ${viDate(homNay())}`,
+        createdDateText: `Ngày lập: ${formatDateVN(homNay())}`,
         title: "Báo cáo xuất nhập tồn thành phẩm",
-        dateRangeText: `Từ ngày ${viDate(tu)} đến ngày ${viDate(den)}`,
+        dateRangeText: `Từ ngày ${formatDateVN(tu)} đến ngày ${formatDateVN(den)}`,
         warehouseText: "Chi nhánh: Kho thành phẩm BSF1",
         items,
         totalItemCount: items.length,
@@ -327,7 +327,7 @@ export default function BaoCaoNhapXuatTonScreen() {
             anNhanBatBuoc
             choPhepXoa={false}
             value={ky}
-            onChange={(v) => setKy(v as KyXem)}
+            onChange={(v) => setKy(v as ViewPeriod)}
             options={KY_OPT}
           />
         </div>
@@ -348,7 +348,7 @@ export default function BaoCaoNhapXuatTonScreen() {
             <DateField
               label={ky === "ngay" ? "Ngày" : "Ngày bất kỳ trong kỳ"}
               anNhanBatBuoc
-              hint={ky === "ngay" ? undefined : `Kỳ: ${viDate(tu)} – ${viDate(den)}`}
+              hint={ky === "ngay" ? undefined : `Kỳ: ${formatDateVN(tu)} – ${formatDateVN(den)}`}
               value={moc}
               onChange={setMoc}
             />
@@ -407,7 +407,7 @@ export default function BaoCaoNhapXuatTonScreen() {
                       <span className="tnum font-semibold">{num(o.quantityKg)}</span> kg
                       <span className="text-muted-foreground">
                         {" "}
-                        · từ {viDate(o.asOfDate)}
+                        · từ {formatDateVN(o.asOfDate)}
                         {o.warehouse ? ` · ${o.warehouse}` : ""}
                         {o.note ? ` · ${o.note}` : ""}
                       </span>

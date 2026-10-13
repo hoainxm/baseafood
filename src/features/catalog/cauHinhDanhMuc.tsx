@@ -17,10 +17,10 @@ import type {
   Product,
   StorageLocation,
 } from "@/types";
-import { CATEGORIES, KIEU_CHE_BIEN, STORAGE_KIND_LABELS, laCoTach, quyCachBlock } from "@/types";
+import { CATEGORIES, PROCESSING_TYPES, STORAGE_KIND_LABELS, hasSplitComponents, blockSpec } from "@/types";
 import { newId as uid } from "@/lib/store";
 import { num } from "@/lib/format";
-import { taoHoacLayBot, tenBotDiKem } from "@/lib/botTam";
+import { findOrCreateBatter, getProductBatterNames } from "@/lib/batter";
 import {
   useBatterTypes,
   useSuppliers,
@@ -199,7 +199,7 @@ export function taoTruongDanhMuc(
           hint="Luộc, chần, cắt, tẩm bột… Chưa có thì gõ rồi Thêm mới."
           value={value}
           onChange={changeValue}
-          options={KIEU_CHE_BIEN.map((k) => ({ value: k, label: k }))}
+          options={PROCESSING_TYPES.map((k) => ({ value: k, label: k }))}
           onCreate={(t) => t}
           placeholder="— Chọn kiểu chế biến —"
         />
@@ -220,7 +220,7 @@ export function taoTruongDanhMuc(
         />
       ),
       hienThi: (r) => {
-        const ten = tenBotDiKem(r, batterTypes);
+        const ten = getProductBatterNames(r, batterTypes);
         return ten.length > 0 ? (
           ten.join(" + ")
         ) : (
@@ -250,7 +250,7 @@ export function taoTruongDanhMuc(
         );
       },
       hienThi: (r) =>
-        laCoTach(r) ? (
+        hasSplitComponents(r) ? (
           "Có tách"
         ) : (
           <span className="text-muted-foreground">—</span>
@@ -271,7 +271,7 @@ export function taoTruongDanhMuc(
         />
       ),
       hienThi: (r) => {
-        const q = quyCachBlock(r);
+        const q = blockSpec(r);
         return q ? (
           `${num(q)} kg/khối`
         ) : (
@@ -647,7 +647,7 @@ export function useCauHinhDanhMuc(): BoCauHinhDanhMuc {
   const truong = useMemo(() => {
     // Tạo loại bột tại chỗ từ ô "Bột đi kèm" — ghi qua ĐÚNG instance của tab Bột tẩm.
     const addBatter = (ten: string): string => {
-      const kq = taoHoacLayBot(batterTypes, ten);
+      const kq = findOrCreateBatter(batterTypes, ten);
       if (kq.moi) {
         setBatterTypes(kq.rows);
         notify.daLuu(`Đã thêm loại bột "${kq.bot.name}" vào danh mục`);

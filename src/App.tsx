@@ -23,10 +23,10 @@ import { HUONG_DAN } from "@/features/shared/guideContent";
 import { Toaster, apDungCaiDatHienThi, DangXuLy, EmptyState } from "@/design-system";
 import { Users } from "lucide-react";
 import { useAuth } from "@/lib/auth";
-import { datNguoiThaoTac } from "@/lib/audit";
+import { setAuditOperator } from "@/lib/audit";
 import { roleLabel } from "@/types";
 import { allowedIds, homeFor } from "@/lib/nav-access";
-import { LA_DEMO, datCheDo } from "@/lib/cheDo";
+import { LA_DEMO, setDemoMode } from "@/lib/demoMode";
 import { DaiDemo, NapGoiDemo } from "@/features/shared/CheDoDemo";
 
 // Tổng quan — dòng chảy số liệu
@@ -74,12 +74,12 @@ function ShellLayout() {
   // trên máy đó thì tự tắt, về số thật (không ai thấy số demo mà tưởng số xưởng).
   const isDemoDenied = LA_DEMO && auth.canDangNhap && !!auth.nguoiDung && !auth.laAdmin;
   useEffect(() => {
-    if (isDemoDenied) datCheDo(false);
+    if (isDemoDenied) setDemoMode(false);
   }, [isDemoDenied]);
 
   // Ai đang thao tác — cho nhật ký (audit) gắn đúng người.
   useEffect(() => {
-    datNguoiThaoTac(
+    setAuditOperator(
       auth.nguoiDung
         ? { id: auth.nguoiDung.id, username: auth.nguoiDung.username }
         : null

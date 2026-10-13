@@ -12,8 +12,8 @@ import {
   DateRangeField,
   ngayTrongKhoang,
 } from "@/design-system";
-import { num, viDate } from "@/lib/format";
-import { KY_OPT, phamViKy, type KyXem } from "@/lib/periodUtils";
+import { num, formatDateVN } from "@/lib/format";
+import { KY_OPT, getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
 import { Printer, X } from "lucide-react";
 
 /** "2026-07-31" → "31 THÁNG 07 NĂM 2026" (đúng giọng phiếu giấy). */
@@ -66,7 +66,7 @@ export default function PhieuNLNgay({
   onClose,
 }: {
   /** Kỳ + ngày neo + khoảng tự chọn — khởi tạo theo bộ lọc ngoài màn. */
-  ky: KyXem;
+  ky: ViewPeriod;
   ngay: string;
   startDate: string;
   endDate: string;
@@ -77,11 +77,11 @@ export default function PhieuNLNgay({
   onClose: () => void;
 }) {
   // Bộ chọn kỳ NGAY trong phiếu — cùng cách với màn Nhập hàng.
-  const [ky, setKy] = useState<KyXem>(kyBanDau);
+  const [ky, setKy] = useState<ViewPeriod>(kyBanDau);
   const [moc, setMoc] = useState(ngayBanDau);
   const [tuTC, setTuTC] = useState(startDate);
   const [denTC, setDenTC] = useState(endDate);
-  const [tu, den] = phamViKy(ky, moc, tuTC, denTC);
+  const [tu, den] = getViewPeriodRange(ky, moc, tuTC, denTC);
 
   const isInWorkshop = (px: string) =>
     workshop === "Tất cả" || px === workshop;
@@ -115,7 +115,7 @@ export default function PhieuNLNgay({
             anNhanBatBuoc
             choPhepXoa={false}
             value={ky}
-            onChange={(v) => setKy(v as KyXem)}
+            onChange={(v) => setKy(v as ViewPeriod)}
             options={KY_OPT}
           />
         </div>
@@ -148,7 +148,7 @@ export default function PhieuNLNgay({
               hint={
                 ky === "ngay"
                   ? undefined
-                  : `Kỳ: ${viDate(tu)} – ${viDate(den)}`
+                  : `Kỳ: ${formatDateVN(tu)} – ${formatDateVN(den)}`
               }
               value={moc}
               onChange={setMoc}

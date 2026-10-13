@@ -28,7 +28,7 @@ export interface DauPhien {
  *    khi bật, tổng khối lượng = râu + bao tử (khoá, tự cộng).
  *  - `botKg`: bột tẩm đã dùng theo loại `{ tên bột: kg }` (mig 0051) — phụ gia,
  *    KHÔNG cộng vào tổng thành phẩm. Giữ cả loại đang để 0 (ô vẫn hiện); khi lưu
- *    `lamSachBot` (lib/botTam) bỏ ô ≤ 0.
+ *    `sanitizeBatterKg` (lib/batter) bỏ ô ≤ 0.
  */
 export interface DongSX {
   key: string;

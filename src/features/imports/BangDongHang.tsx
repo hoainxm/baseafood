@@ -8,7 +8,7 @@ import { CATEGORIES } from "@/types";
 import { Button, Combobox, NumberField, type MucChon } from "@/design-system";
 import { useState } from "react";
 import { Pencil, Plus, X } from "lucide-react";
-import { viDate } from "@/lib/format";
+import { formatDateVN } from "@/lib/format";
 import type { DongBang } from "./importHelpers";
 
 /* ---------- Bảng loại hàng của một chuyến (nhập nhiều dòng một lượt) ---------- */
@@ -75,7 +75,7 @@ export function BangDongHang({
                 {/* Giá điền sẵn là GIÁ CŨ — nói rõ của lượt nào để người nhập soát, khỏi lưu nhầm. */}
                 <p className="text-sm text-muted-foreground">
                   {d.giaNgay
-                    ? `Giá theo lượt ${viDate(d.giaNgay).slice(0, 5)} — khác thì sửa ô đơn giá`
+                    ? `Giá theo lượt ${formatDateVN(d.giaNgay).slice(0, 5)} — khác thì sửa ô đơn giá`
                     : d.unitPrice == null
                       ? "Chưa có giá lượt trước — để trống nếu chờ hóa đơn"
                       : "Giá tự nhập"}

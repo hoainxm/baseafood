@@ -7,7 +7,9 @@
 //   node scripts/naming/rename.mjs collect <out.json> [pathPrefix…]
 //        list NON-exported declarations (variables, array-destructured names,
 //        functions, parameters, local types) whose name is Vietnamese.
-//   node scripts/naming/rename.mjs apply <mapping.json> [pathPrefix…]
+//   node scripts/naming/rename.mjs collect --exported <out.json> [pathPrefix…]
+//        same for EXPORTED declarations (Đợt 2) — renamed in every importing file.
+//   node scripts/naming/rename.mjs apply [--exported] <mapping.json> [pathPrefix…]
 //        mapping = { "oldName": "newName", "path/file.ts::oldName": "override" }.
 //        Skips (and reports) a rename when the new name would collide with any
 //        other identifier visible in the declaration's scope, or breaks the
@@ -15,6 +17,7 @@
 //        (`{ nhan }` → `{ nhan: label }`).
 // Spec: docs/spec/quy-uoc-dat-ten.md §5 (Đợt 1).
 // ============================================================
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -122,8 +125,8 @@ function isPropertyName(id) {
   return false;
 }
 
-/** Every Vietnamese, non-exported declaration in one file. */
-function candidatesIn(sf, checker) {
+/** Every Vietnamese declaration in one file: non-exported ones, or ONLY exported ones. */
+function candidatesIn(sf, checker, exportedOnly = false) {
   const moduleSym = checker.getSymbolAtLocation(sf);
   const exported = new Set();
   if (moduleSym) {
@@ -147,9 +150,12 @@ function candidatesIn(sf, checker) {
       [decl, kind] = [n, "array-binding"];
     else if (ts.isFunctionDeclaration(n) && n.name) [decl, kind] = [n, "function"];
     else if (ts.isParameter(n) && ts.isIdentifier(n.name) && n.name.text !== "this") [decl, kind] = [n, "parameter"];
-    else if ((ts.isTypeAliasDeclaration(n) || ts.isInterfaceDeclaration(n)) && n.parent === sf)
+    else if ((ts.isTypeAliasDeclaration(n) || ts.isInterfaceDeclaration(n) || ts.isEnumDeclaration(n) ||
+              ts.isClassDeclaration(n)) && n.parent === sf && n.name)
       [decl, kind] = [n, "type"];
-    if (decl && isVietnamese(decl.name.text) && !isExported(decl, exported, checker)) {
+    if (exportedOnly && kind !== "variable" && kind !== "function" && kind !== "type") decl = null;
+    if (exportedOnly && decl && ts.isVariableDeclaration(decl) && decl.parent?.parent?.parent !== sf) decl = null;
+    if (decl && isVietnamese(decl.name.text) && isExported(decl, exported, checker) === exportedOnly) {
       const line = sf.getLineAndCharacterOfPosition(decl.name.getStart(sf)).line;
       out.push({ name: decl.name.text, kind, pos: decl.name.getStart(sf), line: line + 1,
         context: sf.text.split("\n")[line].trim().slice(0, 140), decl });
@@ -169,7 +175,9 @@ function caseStyle(name) {
 const matchesPrefix = (file, prefixes) => !prefixes.length || prefixes.some((p) => rel(file).startsWith(p));
 
 // ---------- main ----------
-const [cmd, arg, ...prefixes] = process.argv.slice(2);
+const argv = process.argv.slice(2);
+const exportedMode = argv.includes("--exported");
+const [cmd, arg, ...prefixes] = argv.filter((a) => a !== "--exported");
 const ctx = createService();
 
 if (cmd === "collect") {
@@ -178,7 +186,7 @@ if (cmd === "collect") {
   const rows = [];
   for (const f of ctx.files.filter((f) => matchesPrefix(f, prefixes))) {
     const sf = program.getSourceFile(f);
-    for (const c of candidatesIn(sf, checker)) {
+    for (const c of candidatesIn(sf, checker, exportedMode)) {
       rows.push({ file: rel(f), name: c.name, kind: c.kind, line: c.line, context: c.context });
     }
   }
@@ -189,6 +197,7 @@ if (cmd === "collect") {
 } else if (cmd === "apply") {
   const mapping = JSON.parse(fs.readFileSync(arg, "utf8"));
   const skipped = [];
+  const touched = new Set();
   let renamed = 0;
   for (const f of ctx.files.filter((f) => matchesPrefix(f, prefixes))) {
     // One file at a time; positions are recomputed after each rename (fresh program).
@@ -196,7 +205,7 @@ if (cmd === "collect") {
       const program = ctx.service.getProgram();
       const checker = program.getTypeChecker();
       const sf = program.getSourceFile(f);
-      const cands = candidatesIn(sf, checker).filter(
+      const cands = candidatesIn(sf, checker, exportedMode).filter(
         (c) => !skipped.some((s) => s.file === rel(f) && s.pos === c.pos && s.name === c.name)
       );
       const c = cands.find((x) => mapping[`${rel(f)}::${x.name}`] ?? mapping[x.name]);
@@ -226,21 +235,64 @@ if (cmd === "collect") {
       if (clash) { skip(`va chạm với "${target}" sẵn có trong phạm vi`); continue; }
 
       const locs = ctx.service.findRenameLocations(f, c.pos, false, false, { providePrefixAndSuffixTextForRename: true }) ?? [];
-      if (locs.some((l) => l.fileName !== f)) { skip("được dùng ngoài file (không phải cục bộ)"); continue; }
-      let text = ctx.text(f);
-      for (const l of [...locs].sort((a, b) => b.textSpan.start - a.textSpan.start)) {
-        const repl = `${l.prefixText ?? ""}${target}${l.suffixText ?? ""}`;
-        text = text.slice(0, l.textSpan.start) + repl + text.slice(l.textSpan.start + l.textSpan.length);
+      const otherFiles = [...new Set(locs.map((l) => l.fileName))].filter((x) => x !== f);
+      if (otherFiles.length && !exportedMode) { skip("được dùng ngoài file (không phải cục bộ)"); continue; }
+      if (otherFiles.some((x) => !ctx.files.includes(x))) { skip("được dùng ngoài src"); continue; }
+      // Tên export: file NÀO dùng nó cũng không được có sẵn định danh trùng tên mới.
+      const clashFile = otherFiles.find((x) => {
+        let hit = false;
+        const walk = (n) => {
+          if (hit) return;
+          if (ts.isIdentifier(n) && n.text === target && !isPropertyName(n) && checker.getSymbolAtLocation(n) !== sym) hit = true;
+          ts.forEachChild(n, walk);
+        };
+        walk(program.getSourceFile(x));
+        return hit;
+      });
+      if (clashFile) { skip(`va chạm với "${target}" sẵn có ở ${rel(clashFile)}`); continue; }
+      const byFile = new Map();
+      for (const l of locs) byFile.set(l.fileName, [...(byFile.get(l.fileName) ?? []), l]);
+      for (const [file, list] of byFile) {
+        let text = ctx.text(file);
+        for (const l of list.sort((a, b) => b.textSpan.start - a.textSpan.start)) {
+          const repl = `${l.prefixText ?? ""}${target}${l.suffixText ?? ""}`;
+          text = text.slice(0, l.textSpan.start) + repl + text.slice(l.textSpan.start + l.textSpan.length);
+        }
+        ctx.update(file, text);
+        touched.add(file);
       }
-      ctx.update(f, text);
       renamed++;
     }
-    if (ctx.text(f) !== fs.readFileSync(f, "utf8")) fs.writeFileSync(f, ctx.text(f));
+    touched.add(f);
   }
+  for (const f of touched) if (ctx.text(f) !== fs.readFileSync(f, "utf8")) fs.writeFileSync(f, ctx.text(f));
   const report = path.join(path.dirname(arg), `${path.basename(arg, ".json")}.skipped.json`);
   fs.writeFileSync(report, `${JSON.stringify(skipped.map(({ pos, ...r }) => r), null, 1)}\n`);
   console.log(`Đổi ${renamed} khai báo, bỏ qua ${skipped.length} (xem ${rel(report)})`);
+} else if (cmd === "move") {
+  // move <moves.json>: {"src/lib/old.ts": "src/lib/new.ts", …} — sửa mọi import (cả import() động)
+  // bằng getEditsForFileRename rồi `git mv` để giữ lịch sử file.
+  const moves = JSON.parse(fs.readFileSync(arg, "utf8"));
+  for (const [from, to] of Object.entries(moves)) {
+    const absFrom = path.join(ROOT, from);
+    const absTo = path.join(ROOT, to);
+    const edits = ctx.service.getEditsForFileRename(absFrom, absTo, {}, {}) ?? [];
+    for (const e of edits) {
+      let text = ctx.text(e.fileName) ?? fs.readFileSync(e.fileName, "utf8");
+      for (const c of [...e.textChanges].sort((a, b) => b.span.start - a.span.start)) {
+        text = text.slice(0, c.span.start) + c.newText + text.slice(c.span.start + c.span.length);
+      }
+      fs.writeFileSync(e.fileName, text);
+      ctx.update(e.fileName, text);
+    }
+    execFileSync("git", ["mv", from, to], { cwd: ROOT });
+    // cho các lượt move sau thấy file ở tên MỚI
+    const i = ctx.files.indexOf(absFrom);
+    if (i >= 0) ctx.files[i] = absTo;
+    ctx.update(absTo, fs.readFileSync(absTo, "utf8"));
+    console.log(`${from} → ${to} (${edits.length} file sửa import)`);
+  }
 } else {
-  console.log("Dùng: rename.mjs collect <out.json> [prefix…] | apply <mapping.json> [prefix…]");
+  console.log("Dùng: rename.mjs collect [--exported] <out.json> [prefix…] | apply [--exported] <mapping.json> [prefix…] | move <moves.json>");
   process.exit(1);
 }

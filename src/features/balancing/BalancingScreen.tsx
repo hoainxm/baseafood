@@ -27,10 +27,10 @@ import {
   useMonthlyStock,
   useWipProductions,
 } from "@/lib/catalogRepo";
-import { dongBoSoKho } from "@/lib/khoCanDoi";
+import { syncMonthlyStockLedger } from "@/lib/balancingStockLines";
 import { usePeriodGrid } from "./usePeriodGrid";
 import { LuoiNguyenLieu } from "./MaterialGrid";
-import { hoNguyenLieu } from "@/lib/balancingGrid";
+import { getMaterialFamily } from "@/lib/balancingGrid";
 import type { BalancingResult } from "@/lib/balancingCalc";
 import { LuoiBanThanhPham } from "./WipGrid";
 import {
@@ -58,7 +58,7 @@ import {
   ThanhChiaPhan,
 } from "@/design-system";
 import { useSuaDanhMuc } from "@/features/catalog/SuaDanhMucNhanh";
-import { num, viDate } from "@/lib/format";
+import { num, formatDateVN } from "@/lib/format";
 import {
   ChevronLeft,
   Columns2,
@@ -80,8 +80,8 @@ import BangCanDoi from "./BalancingTable";
 /** Chuỗi ngày để in trên bảng, sinh từ khoảng ngày đã chọn. */
 function describeRange(tu?: string, den?: string): string {
   if (!tu) return "";
-  if (!den || den === tu) return viDate(tu);
-  return `${viDate(tu)} – ${viDate(den)}`;
+  if (!den || den === tu) return formatDateVN(tu);
+  return `${formatDateVN(tu)} – ${formatDateVN(den)}`;
 }
 
 export default function CanDoiScreen() {
@@ -127,7 +127,7 @@ export default function CanDoiScreen() {
     const existing = new Set<string>();
     const ra: { value: string; label: string; phu?: string }[] = [];
     for (const l of catalogMaterialTypes) {
-      const ho = hoNguyenLieu(l.name) || l.name;
+      const ho = getMaterialFamily(l.name) || l.name;
       const khoa = ho.toLowerCase();
       if (existing.has(khoa)) continue;
       existing.add(khoa);
@@ -172,8 +172,8 @@ export default function CanDoiScreen() {
       // QUY TẮC: kỳ dùng tên HỌ nguyên liệu — "Bạch tuộc 2 da lớn (80↑)" và
       // "… nhỏ (80↓)" đều là "Bạch tuộc 2 da", một kỳ gộp cả hai size. Chuẩn hoá
       // ở đây để dù chọn biến thể size nào, tên kỳ vẫn là họ (khớp cách hút theo
-      // họ ở nhapHangHopLe/kyLienTruoc). Tên khác (không có mốc 80↑/↓) giữ nguyên.
-      materialTypeName: hoNguyenLieu(editing.materialTypeName.trim()),
+      // họ ở filterEligibleImports/findPreviousPeriod). Tên khác (không có mốc 80↑/↓) giữ nguyên.
+      materialTypeName: getMaterialFamily(editing.materialTypeName.trim()),
       dateRangeDescription: describeRange(editing.startDate, editing.endDate),
     };
     if (isAdding) {
@@ -197,13 +197,13 @@ export default function CanDoiScreen() {
     const prevStock = monthlyStock;
     /* Trả lại Sổ kho tháng phần kỳ này đã lấy xả đông (cột xuất của lô) / gửi đông (lô
        gửi theo ngày) — xoá kỳ mà để nguyên thì tồn kho lệch vĩnh viễn. */
-    const stockSyncResult = dongBoSoKho(
+    const stockSyncResult = syncMonthlyStockLedger(
       monthlyStock,
       allMaterialRows.filter((r) => r.periodId === k.id),
       [],
       {
         nhanKy: `${k.materialTypeName} ${k.dateRangeDescription ?? ""}`.trim(),
-        hoNL: hoNguyenLieu(k.materialTypeName),
+        hoNL: getMaterialFamily(k.materialTypeName),
       }
     );
     if (stockSyncResult.doi) writeStockLedger(stockSyncResult.lines);
@@ -393,9 +393,9 @@ export default function CanDoiScreen() {
                     // NL, chỉ khi chi phí còn trống (chưa gõ) — khỏi gõ lại mỗi
                     // kỳ, vẫn sửa được. kyList mới-nhất-trước nên find lấy kỳ gần.
                     if (d.processingCostPerKg == null) {
-                      const ho = hoNguyenLieu(v);
+                      const ho = getMaterialFamily(v);
                       const prevRows = kyList.find(
-                        (k) => hoNguyenLieu(k.materialTypeName) === ho
+                        (k) => getMaterialFamily(k.materialTypeName) === ho
                       );
                       if (prevRows) {
                         next.processingCostPerKg = prevRows.processingCostPerKg;

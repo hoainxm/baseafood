@@ -7,7 +7,7 @@ import type { WipProductionItem, ExportItem, WarehouseInfo, Packaging, LotInput,
 import { BSF1_WAREHOUSES } from "@/types";
 
 /** Tồn của MỘT lô = dòng BTP sản xuất đã duyệt vào kho, trừ đi phần đã xuất. */
-export interface LoTon {
+export interface LotStock {
   wipId: string;
   productId: string;
   spec: string;
@@ -22,7 +22,7 @@ export interface LoTon {
 }
 
 /** Một lô đã gắn cho dòng trừ tồn (truy xuất QR). kg null = gắn mà chưa cân. */
-export interface LoGan {
+export interface AssignedLot {
   /** id lô: mẻ SX (BTP) khi trừ tồn BTP · phiếu đóng gói (TP) khi trừ tồn TP theo lô. */
   id: string;
   kg: number | null;
@@ -34,11 +34,11 @@ export interface LoGan {
  * qua truy xuất QR) ⇒ trừ ĐÚNG lô đó trước, phần còn lại mới FIFO — để sổ tồn và
  * hộ chiếu lô nói cùng một lô.
  */
-export interface BanLeTruTon {
+export interface StockDeduction {
   productId: string;
   spec: string;
   quantityKg: number;
-  lo?: readonly LoGan[];
+  lo?: readonly AssignedLot[];
 }
 
 /**
@@ -57,12 +57,12 @@ export interface BanLeTruTon {
  * Lô gắn khác mặt hàng của dòng bị bỏ qua (gắn nhầm) — phần đó rơi xuống FIFO.
  * Không dòng nào gắn lô ⇒ kết quả y như trước khi có truy xuất (chỉ còn bước 3).
  */
-export function tinhTon(
+export function computeWipStock(
   wips: WipProductionItem[],
   exportItems: ExportItem[],
-  retailSales: BanLeTruTon[] = []
-): LoTon[] {
-  return tinhTonChiTiet(wips, exportItems, retailSales).los;
+  retailSales: StockDeduction[] = []
+): LotStock[] {
+  return computeWipStockDetail(wips, exportItems, retailSales).los;
 }
 
 /**
@@ -70,35 +70,35 @@ export function tinhTon(
  * đã về 0, hoặc không có lô) — tức bán/đóng gói VƯỢT số đang trữ. Lô không bao
  * giờ âm vì bán lẻ, nên phần này phải trả ra ngoài để màn gọi tên, không được nuốt.
  */
-export interface BanVuot {
+export interface Oversale {
   productId: string;
   spec: string;
   kg: number;
 }
 
-export interface KetQuaTon {
-  los: LoTon[];
+export interface LotStockResult {
+  los: LotStock[];
   /** Bán vượt theo (mặt hàng × quy cách); rỗng khi không vượt. */
-  banVuot: BanVuot[];
+  banVuot: Oversale[];
   tongBanVuot: number;
 }
 
-const ketQua = (los: LoTon[], banVuot: BanVuot[]): KetQuaTon => ({
+const ketQua = (los: LotStock[], banVuot: Oversale[]): LotStockResult => ({
   los,
   banVuot,
   tongBanVuot: banVuot.reduce((s, v) => s + v.kg, 0),
 });
 
 /**
- * Như `tinhTon`, kèm phần BÁN VƯỢT (dòng trừ tồn không còn lô nào để trừ).
+ * Như `computeWipStock`, kèm phần BÁN VƯỢT (dòng trừ tồn không còn lô nào để trừ).
  * Bất biến: Σ conLai các lô − tongBanVuot = nhập − xuất lệnh − mọi dòng `banLe`
  * (cùng con số sổ NXT `inventoryFinished` khi không có tồn đầu khai tay).
  */
-export function tinhTonChiTiet(
+export function computeWipStockDetail(
   wips: WipProductionItem[],
   exportItems: ExportItem[],
-  retailSales: readonly BanLeTruTon[] = []
-): KetQuaTon {
+  retailSales: readonly StockDeduction[] = []
+): LotStockResult {
   const outByLot = new Map<string, { kg: number; block: number }>();
   for (const d of exportItems) {
     const cur = outByLot.get(d.wipId) ?? { kg: 0, block: 0 };
@@ -130,14 +130,14 @@ export function tinhTonChiTiet(
 
 /**
  * Trừ các dòng `banLe` vào danh sách lô `los` (sửa tại chỗ) theo đúng thứ tự ở
- * `tinhTon`: lô gắn có kg → lô gắn chưa cân (FIFO trong lô gắn) → FIFO theo
+ * `computeWipStock`: lô gắn có kg → lô gắn chưa cân (FIFO trong lô gắn) → FIFO theo
  * (mặt hàng × quy cách). Dùng chung cho tồn BTP (mẻ SX) và tồn TP theo lô (phiếu
- * đóng gói) — `LoTon.wipId` khi đó là id phiếu đóng gói.
+ * đóng gói) — `LotStock.wipId` khi đó là id phiếu đóng gói.
  * Trả về phần KHÔNG trừ được vào lô nào (bán vượt) theo (mặt hàng × quy cách).
  */
-function deductByLot(los: LoTon[], retailSales: readonly BanLeTruTon[]): BanVuot[] {
+function deductByLot(los: LotStock[], retailSales: readonly StockDeduction[]): Oversale[] {
   /** Trừ tối đa `kg` khỏi một lô (không vượt phần lô còn). Trả kg đã trừ. */
-  const deductFromLot = (lo: LoTon, kg: number): number => {
+  const deductFromLot = (lo: LotStock, kg: number): number => {
     const lay = Math.min(kg, Math.max(0, lo.conLai));
     if (lay <= 0) return 0;
     const ty = lo.conLai > 0 ? lay / lo.conLai : 0;
@@ -146,9 +146,9 @@ function deductByLot(los: LoTon[], retailSales: readonly BanLeTruTon[]): BanVuot
     lo.luongXuat += lay;
     return lay;
   };
-  const fifo = (a: LoTon, b: LoTon) => a.ngaySX.localeCompare(b.ngaySX) || a.wipId.localeCompare(b.wipId);
+  const fifo = (a: LotStock, b: LotStock) => a.ngaySX.localeCompare(b.ngaySX) || a.wipId.localeCompare(b.wipId);
   const theoId = new Map(los.map((l) => [l.wipId, l]));
-  const lotOfRow = (b: BanLeTruTon, g: LoGan) => {
+  const lotOfRow = (b: StockDeduction, g: AssignedLot) => {
     const lo = theoId.get(g.id);
     return lo && lo.productId === b.productId ? lo : undefined;
   };
@@ -168,7 +168,7 @@ function deductByLot(los: LoTon[], retailSales: readonly BanLeTruTon[]): BanVuot
     const ds = (b.lo ?? [])
       .filter((g) => g.kg == null)
       .map((g) => lotOfRow(b, g))
-      .filter((lo): lo is LoTon => !!lo)
+      .filter((lo): lo is LotStock => !!lo)
       .sort(fifo);
     for (const lo of ds) {
       if (con[i]! <= 0) break;
@@ -176,7 +176,7 @@ function deductByLot(los: LoTon[], retailSales: readonly BanLeTruTon[]): BanVuot
     }
   });
   // 3. Phần còn lại — FIFO theo (mặt hàng × quy cách) như trước.
-  const pendingDeduct = new Map<string, BanVuot>();
+  const pendingDeduct = new Map<string, Oversale>();
   retailSales.forEach((b, i) => {
     if (con[i]! <= 0) return;
     const k = `${b.productId}|${b.spec}`;
@@ -184,14 +184,14 @@ function deductByLot(los: LoTon[], retailSales: readonly BanLeTruTon[]): BanVuot
     if (cur) cur.kg += con[i]!;
     else pendingDeduct.set(k, { productId: b.productId, spec: b.spec, kg: con[i]! });
   });
-  const theoKey = new Map<string, LoTon[]>();
+  const theoKey = new Map<string, LotStock[]>();
   for (const lo of los) {
     const k = `${lo.productId}|${lo.spec}`;
     const arr = theoKey.get(k);
     if (arr) arr.push(lo);
     else theoKey.set(k, [lo]);
   }
-  const banVuot: BanVuot[] = [];
+  const banVuot: Oversale[] = [];
   for (const [k, can] of pendingDeduct) {
     let conKey = can.kg;
     const arr = theoKey.get(k) ?? [];
@@ -207,24 +207,24 @@ function deductByLot(los: LoTon[], retailSales: readonly BanLeTruTon[]): BanVuot
 }
 
 /** Marker `sales_items.sourceWarehouse`: bán block thô ⇒ trừ tồn BTP dự trữ. */
-export const KHO_BAN_LE = "Kho dự trữ";
+export const RETAIL_WAREHOUSE = "Kho dự trữ";
 /** Marker `sales_items.sourceWarehouse`: bán hàng đóng gói ⇒ trừ tồn thành phẩm (G3). */
-export const KHO_TP = "Kho thành phẩm";
+export const FG_WAREHOUSE = "Kho thành phẩm";
 
 /**
  * Lọc các dòng bán lẻ (trừ tồn) từ sổ bán theo marker nguồn.
- * Mặc định `KHO_BAN_LE` (bán block thô, trừ tồn BTP). Truyền `KHO_TP` để lấy
+ * Mặc định `RETAIL_WAREHOUSE` (bán block thô, trừ tồn BTP). Truyền `FG_WAREHOUSE` để lấy
  * dòng bán hàng đóng gói (trừ tồn TP). Bỏ handoff Đơn đặt ("Lưu trữ") và dòng cũ ("").
  *
  * `loGan` (mig 0056 `lot_dispatches`): dòng bán đã gắn lô ⇒ kèm `lo` để trừ đúng lô
  * (block thô: lô BTP `W` · đóng gói: lô TP `P`).
  */
-export function locBanLe(
+export function filterRetailSales(
   salesItems: { id?: string; productId: string; spec: string; quantityKg: number; sourceWarehouse: string }[],
-  marker: string = KHO_BAN_LE,
+  marker: string = RETAIL_WAREHOUSE,
   assignedLots: readonly LotDispatch[] = []
-): BanLeTruTon[] {
-  const lotKind = marker === KHO_TP ? "P" : "W";
+): StockDeduction[] {
+  const lotKind = marker === FG_WAREHOUSE ? "P" : "W";
   return salesItems
     .filter((r) => r.sourceWarehouse === marker)
     .map((r) => {
@@ -242,18 +242,18 @@ export function locBanLe(
  * hao BTP, KÈM lô đã gắn (truy xuất QR). MỘT chỗ dựng để các màn tồn (kho dự trữ,
  * kho lạnh, đơn đặt, đóng gói, bán hàng) ra cùng một con số theo lô.
  */
-export function truTonBTP(
+export function collectWipDeductions(
   salesItems: { id?: string; productId: string; spec: string; quantityKg: number; sourceWarehouse: string }[],
   packagings: Packaging[],
   lotInputs: readonly LotInput[] = [],
   lotDispatches: readonly LotDispatch[] = []
-): BanLeTruTon[] {
-  return [...locBanLe(salesItems, KHO_BAN_LE, lotDispatches), ...dongGoiTruTon(packagings, lotInputs)];
+): StockDeduction[] {
+  return [...filterRetailSales(salesItems, RETAIL_WAREHOUSE, lotDispatches), ...collectPackagingDeductions(packagings, lotInputs)];
 }
 
 /** Khả dụng (kg) cho một (mặt hàng × quy cách): tổng phần còn lại các lô. */
-export function khaDung(
-  stock: LoTon[],
+export function getAvailableKg(
+  stock: LotStock[],
   productId: string,
   spec: string
 ): number {
@@ -263,11 +263,11 @@ export function khaDung(
 }
 
 /** Lô còn hàng của (mặt hàng × quy cách), FIFO — lô cũ (ngày SX sớm) trước. */
-export function loConHang(
-  stock: LoTon[],
+export function listLotsWithStock(
+  stock: LotStock[],
   productId: string,
   spec: string
-): LoTon[] {
+): LotStock[] {
   return stock
     .filter(
       (t) => t.productId === productId && t.spec === spec && t.conLai > 0
@@ -296,7 +296,7 @@ export interface WarehouseOccupancy {
 }
 
 /** Tính mức độ sử dụng (%) của từng kho BSF1 từ danh sách lô tồn. */
-export function tinhDungTichKho(stock: LoTon[]): WarehouseOccupancy[] {
+export function computeWarehouseOccupancy(stock: LotStock[]): WarehouseOccupancy[] {
   const stockByWarehouse = new Map<string, number>();
   for (const t of stock) {
     if (!t.warehouse) continue;
@@ -330,11 +330,11 @@ export function tinhDungTichKho(stock: LoTon[]): WarehouseOccupancy[] {
 /* ---------- Đóng gói BTP → Thành phẩm (G3) ---------- */
 
 /**
- * Phiếu đóng gói TIÊU HAO BTP — trả về dạng `BanLeTruTon` để trừ tồn BTP (dùng
- * cùng tham số `banLe` của `tinhTon`). Nhờ vậy BTP đã đóng gói không còn tính là
- * tồn dự trữ nữa. Truyền kèm với `locBanLe(sales)` ở các màn tồn.
+ * Phiếu đóng gói TIÊU HAO BTP — trả về dạng `StockDeduction` để trừ tồn BTP (dùng
+ * cùng tham số `banLe` của `computeWipStock`). Nhờ vậy BTP đã đóng gói không còn tính là
+ * tồn dự trữ nữa. Truyền kèm với `filterRetailSales(sales)` ở các màn tồn.
  */
-export function dongGoiTruTon(packagings: Packaging[], lotInputs: readonly LotInput[] = []): BanLeTruTon[] {
+export function collectPackagingDeductions(packagings: Packaging[], lotInputs: readonly LotInput[] = []): StockDeduction[] {
   return packagings.map((p) => {
     // Phiếu đã gắn lô BTP (truy xuất QR, mig 0046) ⇒ trừ đúng lô đó trước.
     const lo = lotInputs
@@ -350,7 +350,7 @@ export function dongGoiTruTon(packagings: Packaging[], lotInputs: readonly LotIn
 }
 
 /** Tồn thành phẩm đóng gói theo (mặt hàng × quy cách): output đóng gói − bán TP. */
-export interface TonTP {
+export interface FinishedGoodStock {
   productId: string;
   spec: string;
   outputKg: number;
@@ -361,11 +361,11 @@ export interface TonTP {
 
 /**
  * Tồn TP đóng gói (SUY). `banLeTP` = dòng bán LẺ chọn nguồn "Kho thành phẩm"
- * (marker `KHO_TP`). Trừ suy nên xóa dòng bán/đóng gói là tồn tự hồi.
+ * (marker `FG_WAREHOUSE`). Trừ suy nên xóa dòng bán/đóng gói là tồn tự hồi.
  */
-export function tinhTonTP(packagings: Packaging[], finishedGoodRetail: BanLeTruTon[] = []): TonTP[] {
-  const map = new Map<string, TonTP>();
-  const lay = (productId: string, spec: string): TonTP => {
+export function computeFinishedGoodStock(packagings: Packaging[], finishedGoodRetail: StockDeduction[] = []): FinishedGoodStock[] {
+  const map = new Map<string, FinishedGoodStock>();
+  const lay = (productId: string, spec: string): FinishedGoodStock => {
     const k = `${productId}|${spec}`;
     let cur = map.get(k);
     if (!cur) {
@@ -388,28 +388,28 @@ export function tinhTonTP(packagings: Packaging[], finishedGoodRetail: BanLeTruT
 }
 
 /** Tồn TP khả dụng của một (mặt hàng × quy cách). */
-export function khaDungTP(finishedGoodStock: TonTP[], productId: string, spec: string): number {
+export function getAvailableFinishedGoodKg(finishedGoodStock: FinishedGoodStock[], productId: string, spec: string): number {
   const t = finishedGoodStock.find((x) => x.productId === productId && x.spec === spec);
   return t ? t.conLai : 0;
 }
 
 /**
  * Tồn TP THEO LÔ (mỗi phiếu đóng gói là một lô TP `P:<id>`) — tách được lô nào
- * còn bao nhiêu, cho hộ chiếu lô và gắn lô khi bán. `banLeTP` = `locBanLe(sales,
- * KHO_TP, loGan)`: dòng đã gắn lô TP trừ đúng lô, còn lại FIFO (phiếu đóng gói sớm
+ * còn bao nhiêu, cho hộ chiếu lô và gắn lô khi bán. `banLeTP` = `filterRetailSales(sales,
+ * FG_WAREHOUSE, loGan)`: dòng đã gắn lô TP trừ đúng lô, còn lại FIFO (phiếu đóng gói sớm
  * trước). Ở kết quả, `wipId` là id PHIẾU ĐÓNG GÓI, `blockNhap` là số thùng/gói ra.
  *
- * KHÔNG phải lúc nào cũng cùng tổng với `tinhTonTP`: lô không xuống âm, nên khi bán
- * vượt số đã đóng gói thì `tinhTonTP` âm còn Σ theo lô dừng ở 0. Cần phần vượt ⇒
- * dùng `tinhTonTPTheoLoChiTiet` (Σ conLai − tongBanVuot = tổng `tinhTonTP`).
+ * KHÔNG phải lúc nào cũng cùng tổng với `computeFinishedGoodStock`: lô không xuống âm, nên khi bán
+ * vượt số đã đóng gói thì `computeFinishedGoodStock` âm còn Σ theo lô dừng ở 0. Cần phần vượt ⇒
+ * dùng `computeFinishedGoodLotStockDetail` (Σ conLai − tongBanVuot = tổng `computeFinishedGoodStock`).
  */
-export function tinhTonTPTheoLo(packagings: Packaging[], finishedGoodRetail: readonly BanLeTruTon[] = []): LoTon[] {
-  return tinhTonTPTheoLoChiTiet(packagings, finishedGoodRetail).los;
+export function computeFinishedGoodLotStock(packagings: Packaging[], finishedGoodRetail: readonly StockDeduction[] = []): LotStock[] {
+  return computeFinishedGoodLotStockDetail(packagings, finishedGoodRetail).los;
 }
 
-/** Như `tinhTonTPTheoLo`, kèm phần bán vượt (bán TP không còn phiếu đóng gói nào để trừ). */
-export function tinhTonTPTheoLoChiTiet(packagings: Packaging[], finishedGoodRetail: readonly BanLeTruTon[] = []): KetQuaTon {
-  const los: LoTon[] = packagings.map((p) => ({
+/** Như `computeFinishedGoodLotStock`, kèm phần bán vượt (bán TP không còn phiếu đóng gói nào để trừ). */
+export function computeFinishedGoodLotStockDetail(packagings: Packaging[], finishedGoodRetail: readonly StockDeduction[] = []): LotStockResult {
+  const los: LotStock[] = packagings.map((p) => ({
     wipId: p.id,
     productId: p.toProductId,
     spec: p.toSpec,

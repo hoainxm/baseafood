@@ -1,20 +1,20 @@
 import { describe, expect, test } from "vitest";
 import type { BalancingOutputItem, BalancingPeriod, MaterialImportItem } from "@/types";
 import {
-  KHACH_KHAC,
-  ghiTraNo,
-  loaiDongKho,
-  tachTraNo,
-  tenKhachCanDoi,
-  dongMauConThieu,
-  dungDongMauTP,
-  goiYKhachGia,
-  gomNhapTheoLoai,
-  khoaDongTP,
-  kyMauTP,
-  kyTrungNgayCungHo,
-  ngayTrongKy,
-  nhapHangHopLe,
+  OTHER_CUSTOMER_ID,
+  setRepaidDebt,
+  getBalancingStockLineKind,
+  splitRepaidDebt,
+  getBalancingCustomerName,
+  findMissingTemplateRows,
+  buildFinishedGoodTemplateRows,
+  suggestCustomerPrice,
+  groupImportsByMaterialType,
+  finishedGoodTemplateKey,
+  pickTemplatePeriod,
+  findOverlappingFamilyPeriods,
+  getPeriodDates,
+  filterEligibleImports,
 } from "./balancingGrid";
 
 const ky = (id: string, startDate: string, endDate: string, materialTypeName = "Bạch tuộc 2 da") =>
@@ -53,28 +53,28 @@ const so: MaterialImportItem[] = [
 
 describe("hút sổ nhập vào kỳ cân đối", () => {
   test("ngày trong kỳ tính theo UTC, đủ cả hai đầu mút", () => {
-    expect(ngayTrongKy(ky("k", "2026-09-01", "2026-09-05"))).toEqual([
+    expect(getPeriodDates(ky("k", "2026-09-01", "2026-09-05"))).toEqual([
       "2026-09-01", "2026-09-02", "2026-09-03", "2026-09-04", "2026-09-05",
     ]);
   });
 
   test("chỉ lấy ĐÚNG họ 2 da (lớn + nhỏ) trong ngày của kỳ — không 1 da, không ngày ngoài kỳ", () => {
-    const lay = nhapHangHopLe(ky("k", "2026-09-01", "2026-09-05"), so);
+    const lay = filterEligibleImports(ky("k", "2026-09-01", "2026-09-05"), so);
     expect(lay.every((r) => r.materialTypeName.startsWith("Bạch tuộc 2 da"))).toBe(true);
     expect(lay.map((r) => r.deliveryDate).sort()).toEqual(["2026-09-01", "2026-09-01", "2026-09-03", "2026-09-05"]);
-    const grouped = gomNhapTheoLoai(lay);
+    const grouped = groupImportsByMaterialType(lay);
     expect([...grouped.keys()]).toEqual(["Bạch tuộc 2 da"]);
     expect(grouped.get("Bạch tuộc 2 da")!.theoNgay).toEqual({ "2026-09-01": 7964, "2026-09-03": 5019, "2026-09-05": 2491 });
   });
 
   test("chuyến đã thuộc kỳ khác không bị hút lại", () => {
     const assigned = so.map((r) => (r.deliveryDate === "2026-09-01" ? { ...r, balancingPeriodId: "kyA" } : r));
-    const lay = nhapHangHopLe(ky("kyB", "2026-09-01", "2026-09-05"), assigned);
+    const lay = filterEligibleImports(ky("kyB", "2026-09-01", "2026-09-05"), assigned);
     expect(lay.some((r) => r.deliveryDate === "2026-09-01")).toBe(false);
   });
 });
 
-describe("kyTrungNgayCungHo", () => {
+describe("findOverlappingFamilyPeriods", () => {
   const dsKy = [
     ky("A", "2026-09-01", "2026-09-05"),
     ky("B", "2026-09-01", "2026-09-05"),
@@ -83,8 +83,8 @@ describe("kyTrungNgayCungHo", () => {
     ky("E", "2026-09-05", "2026-09-07", "Bạch tuộc 2 da lớn (80↑)"),
   ];
   test("bắt kỳ cùng họ chồng ngày; bỏ qua chính nó, kỳ liền kề không chồng, kỳ khác loại", () => {
-    expect(kyTrungNgayCungHo(dsKy[1], dsKy).map((k) => k.id).sort()).toEqual(["A", "E"]);
-    expect(kyTrungNgayCungHo(dsKy[2], dsKy).map((k) => k.id)).toEqual(["E"]);
+    expect(findOverlappingFamilyPeriods(dsKy[1], dsKy).map((k) => k.id).sort()).toEqual(["A", "E"]);
+    expect(findOverlappingFamilyPeriods(dsKy[2], dsKy).map((k) => k.id)).toEqual(["E"]);
   });
 });
 
@@ -117,76 +117,76 @@ describe("dòng mẫu khối 2", () => {
   ];
 
   test("kỳ mẫu = kỳ cùng họ gần nhất KẾT THÚC TRƯỚC, có dòng; không lấy kỳ khác loại", () => {
-    expect(kyMauTP(dsKy[2], dsKy, allOutputs)?.id).toBe("K2");
-    expect(kyMauTP(dsKy[3], dsKy, allOutputs)?.id).toBe("K2");
+    expect(pickTemplatePeriod(dsKy[2], dsKy, allOutputs)?.id).toBe("K2");
+    expect(pickTemplatePeriod(dsKy[3], dsKy, allOutputs)?.id).toBe("K2");
     // kỳ đầu tiên, không có kỳ trước có dòng ⇒ lấy kỳ mới nhất còn lại
-    expect(kyMauTP(ky("K0", "2026-08-01", "2026-08-05"), dsKy, allOutputs)?.id).toBe("K2");
-    expect(kyMauTP(ky("M", "2026-09-01", "2026-09-05", "Mực ống"), dsKy, allOutputs)).toBeNull();
+    expect(pickTemplatePeriod(ky("K0", "2026-08-01", "2026-08-05"), dsKy, allOutputs)?.id).toBe("K2");
+    expect(pickTemplatePeriod(ky("M", "2026-09-01", "2026-09-05", "Mực ống"), dsKy, allOutputs)).toBeNull();
   });
 
   test("mỗi mặt hàng × khách × GIÁ một dòng mẫu; khác khách hoặc khác giá vẫn tách", () => {
-    const templates = dungDongMauTP(allOutputs.filter((r) => r.periodId === "K2"));
+    const templates = buildFinishedGoodTemplateRows(allOutputs.filter((r) => r.periodId === "K2"));
     expect(templates.map((m) => [m.khoa, m.unitPrice])).toEqual([
-      [khoaDongTP("luoc230", "", "hanwa"), 10.43],
-      [khoaDongTP("tambot", "", "jfda"), 9.3],
-      [khoaDongTP("tambot", "", "dairei"), 9.2],
-      [khoaDongTP("tambot", "", "jfda"), null],
+      [finishedGoodTemplateKey("luoc230", "", "hanwa"), 10.43],
+      [finishedGoodTemplateKey("tambot", "", "jfda"), 9.3],
+      [finishedGoodTemplateKey("tambot", "", "dairei"), 9.2],
+      [finishedGoodTemplateKey("tambot", "", "jfda"), null],
     ]);
     expect(new Set(templates.map((m) => m.id)).size).toBe(4);
   });
 
   test("hai dòng mẫu cùng khoá: kỳ đã có 1 dòng ⇒ còn thiếu đúng 1 (không biến mất cả hai)", () => {
-    const templates = dungDongMauTP(allOutputs.filter((r) => r.periodId === "K2"));
-    const thieu = dongMauConThieu(templates, [{ productId: "tambot", spec: "", customerId: "jfda" }]);
+    const templates = buildFinishedGoodTemplateRows(allOutputs.filter((r) => r.periodId === "K2"));
+    const thieu = findMissingTemplateRows(templates, [{ productId: "tambot", spec: "", customerId: "jfda" }]);
     expect(thieu.filter((m) => m.customerId === "jfda").map((m) => m.unitPrice)).toEqual([null]);
   });
 
   test("dòng mẫu còn thiếu: bỏ dòng kỳ đã có (cùng khách, hoặc dòng hút chưa chọn khách)", () => {
-    const templates = dungDongMauTP(allOutputs.filter((r) => r.periodId === "K2"));
-    expect(dongMauConThieu(templates, [{ productId: "luoc230", spec: "", customerId: "hanwa" }]).length).toBe(3);
-    expect(dongMauConThieu(templates, [{ productId: "tambot", spec: "", customerId: "" }]).map((m) => m.productId)).toEqual(["luoc230"]);
+    const templates = buildFinishedGoodTemplateRows(allOutputs.filter((r) => r.periodId === "K2"));
+    expect(findMissingTemplateRows(templates, [{ productId: "luoc230", spec: "", customerId: "hanwa" }]).length).toBe(3);
+    expect(findMissingTemplateRows(templates, [{ productId: "tambot", spec: "", customerId: "" }]).map((m) => m.productId)).toEqual(["luoc230"]);
   });
 
   test("gợi ý khách + giá: ưu tiên dòng mẫu, rồi kỳ gần nhất có giá, không có ⇒ null", () => {
-    const templates = dungDongMauTP(allOutputs.filter((r) => r.periodId === "K2"));
-    expect(goiYKhachGia("tambot", "", templates, allOutputs, dsKy, "K3")).toEqual({ customerId: "jfda", channel: "Xuất khẩu", unitPrice: 9.3 });
-    expect(goiYKhachGia("luoc230", "", [], allOutputs, dsKy, "K3")?.unitPrice).toBe(10.43);
-    expect(goiYKhachGia("moi", "", templates, allOutputs, dsKy, "K3")).toBeNull();
+    const templates = buildFinishedGoodTemplateRows(allOutputs.filter((r) => r.periodId === "K2"));
+    expect(suggestCustomerPrice("tambot", "", templates, allOutputs, dsKy, "K3")).toEqual({ customerId: "jfda", channel: "Xuất khẩu", unitPrice: 9.3 });
+    expect(suggestCustomerPrice("luoc230", "", [], allOutputs, dsKy, "K3")?.unitPrice).toBe(10.43);
+    expect(suggestCustomerPrice("moi", "", templates, allOutputs, dsKy, "K3")).toBeNull();
   });
 });
 
-describe("dòng kho khối NL — loaiDongKho", () => {
+describe("dòng kho khối NL — getBalancingStockLineKind", () => {
   const base = { groupName: "Xả đông" as const, sourceWarehouse: "Kho mình", isReduction: false };
   test("Xả đông · Kho mình = lấy xả đông; thêm cờ giảm = gửi đông", () => {
-    expect(loaiDongKho(base)).toBe("lay-xa-dong");
-    expect(loaiDongKho({ ...base, isReduction: true })).toBe("gui-dong");
+    expect(getBalancingStockLineKind(base)).toBe("lay-xa-dong");
+    expect(getBalancingStockLineKind({ ...base, isReduction: true })).toBe("gui-dong");
   });
   test("xả đông mua về / dòng thủy sản / dòng giảm thường KHÔNG phải dòng kho", () => {
-    expect(loaiDongKho({ ...base, sourceWarehouse: "Mua về" })).toBeNull();
-    expect(loaiDongKho({ ...base, sourceWarehouse: "" })).toBeNull();
-    expect(loaiDongKho({ ...base, groupName: "Thủy sản", isReduction: true })).toBeNull();
+    expect(getBalancingStockLineKind({ ...base, sourceWarehouse: "Mua về" })).toBeNull();
+    expect(getBalancingStockLineKind({ ...base, sourceWarehouse: "" })).toBeNull();
+    expect(getBalancingStockLineKind({ ...base, groupName: "Thủy sản", isReduction: true })).toBeNull();
   });
 });
 
-describe("Trả · Nợ — tachTraNo / ghiTraNo", () => {
+describe("Trả · Nợ — splitRepaidDebt / setRepaidDebt", () => {
   test("chuyển kỳ cũ (chưa có debtKg) hiện ở Trả", () => {
-    expect(tachTraNo({ carryOverKg: -2000 })).toEqual({ tra: -2000, no: 0 });
+    expect(splitRepaidDebt({ carryOverKg: -2000 })).toEqual({ tra: -2000, no: 0 });
   });
   test("ghi một cột giữ cột kia, tổng chuyển kỳ = Trả + Nợ (có dấu)", () => {
-    const after = ghiTraNo({ carryOverKg: -2000 }, { no: 258 });
+    const after = setRepaidDebt({ carryOverKg: -2000 }, { no: 258 });
     expect(after).toEqual({ carryOverKg: -1742, debtKg: 258 });
-    expect(tachTraNo(after)).toEqual({ tra: -2000, no: 258 });
-    expect(ghiTraNo(after, { tra: 0 })).toEqual({ carryOverKg: 258, debtKg: 258 });
+    expect(splitRepaidDebt(after)).toEqual({ tra: -2000, no: 258 });
+    expect(setRepaidDebt(after, { tra: 0 })).toEqual({ carryOverKg: 258, debtKg: 258 });
   });
   test("số lẻ không trôi dấu phẩy động", () => {
-    expect(tachTraNo(ghiTraNo({ carryOverKg: 0.3 }, { no: 0.1 }))).toEqual({ tra: 0.3, no: 0.1 });
+    expect(splitRepaidDebt(setRepaidDebt({ carryOverKg: 0.3 }, { no: 0.1 }))).toEqual({ tra: 0.3, no: 0.1 });
   });
 });
 
 describe("khách Khác", () => {
   test("mục cố định ngoài danh mục", () => {
-    expect(tenKhachCanDoi(KHACH_KHAC, [])).toBe("Khác");
-    expect(tenKhachCanDoi("k1", [{ id: "k1", name: "Hanwa" }])).toBe("Hanwa");
-    expect(tenKhachCanDoi("", [])).toBe("—");
+    expect(getBalancingCustomerName(OTHER_CUSTOMER_ID, [])).toBe("Khác");
+    expect(getBalancingCustomerName("k1", [{ id: "k1", name: "Hanwa" }])).toBe("Hanwa");
+    expect(getBalancingCustomerName("", [])).toBe("—");
   });
 });

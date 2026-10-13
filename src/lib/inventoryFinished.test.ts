@@ -1,25 +1,25 @@
 import { describe, expect, test } from "vitest";
 import type { FinishedGoodsOpeningStock, Packaging, SalesItem, WipProductionItem } from "@/types";
-import { tinhSoTonTP, tongSoTonTP, type NxtTPArgs } from "./inventoryFinished";
-import { KHO_BAN_LE } from "./inventory";
+import { computeFinishedGoodNxt, sumFinishedGoodNxt, type FinishedGoodNxtArgs } from "./inventoryFinished";
+import { RETAIL_WAREHOUSE } from "./inventory";
 
 const me = (id: string, productionDate: string, quantityKg: number): WipProductionItem =>
   ({ id, productId: "p1", spec: "s1", productionDate, quantityKg, blocksCount: 0, status: "da-nhap", warehouse: "" }) as WipProductionItem;
 const ban = (id: string, deliveryDate: string, quantityKg: number): SalesItem =>
-  ({ id, productId: "p1", spec: "s1", deliveryDate, quantityKg, sourceWarehouse: KHO_BAN_LE }) as SalesItem;
+  ({ id, productId: "p1", spec: "s1", deliveryDate, quantityKg, sourceWarehouse: RETAIL_WAREHOUSE }) as SalesItem;
 const makeOpening = (asOfDate: string, quantityKg: number): FinishedGoodsOpeningStock => ({
   id: `o${asOfDate}`, productId: "p1", spec: "s1", asOfDate, quantityKg, blocksCount: 0, warehouse: "", note: "",
 });
 
-const goi = (fromDate: string, toDate: string, p: Partial<NxtTPArgs> = {}) =>
-  tongSoTonTP(
-    tinhSoTonTP({
+const goi = (fromDate: string, toDate: string, p: Partial<FinishedGoodNxtArgs> = {}) =>
+  sumFinishedGoodNxt(
+    computeFinishedGoodNxt({
       sanXuat: [], exportOrders: [], exportItems: [], salesItems: [], packagings: [] as Packaging[],
       opening: [], products: [], tuNgay: fromDate, denNgay: toDate, ...p,
     })
   );
 
-describe("tinhSoTonTP — tồn đầu khai tay có mốc (cùng quy tắc với sổ NL)", () => {
+describe("computeFinishedGoodNxt — tồn đầu khai tay có mốc (cùng quy tắc với sổ NL)", () => {
   const opening = [makeOpening("2026-07-01", 500)];
 
   test("xem tháng 7 (mốc = đầu khoảng) và xem cả năm (mốc giữa khoảng) cùng ra 500", () => {

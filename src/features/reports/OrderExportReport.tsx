@@ -40,8 +40,8 @@ import {
   useChonDong,
   useToMau,
 } from "@/design-system";
-import { KY_OPT, phamViKy, type KyXem } from "@/lib/periodUtils";
-import { num, viDate } from "@/lib/format";
+import { KY_OPT, getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
+import { num, formatDateVN } from "@/lib/format";
 import { exportAoaToXlsx, type OExcel } from "@/lib/reportXlsx";
 import {
   CalendarRange,
@@ -92,13 +92,13 @@ export default function OrderExportReport() {
   const [products] = useProducts();
   const isLoading = trangThai === "dang-tai" && exportOrders.length === 0;
 
-  const [ky, setKy] = useState<KyXem>("thang");
+  const [ky, setKy] = useState<ViewPeriod>("thang");
   const [moc, setMoc] = useState(homNay());
   const [tuTC, setTuTC] = useState(homNay());
   const [denTC, setDenTC] = useState(homNay());
   const [customerFilter, setCustomerFilter] = useState("Tất cả");
   const [inPrint, setInPrint] = useState(false);
-  const [tu, den] = phamViKy(ky, moc, tuTC, denTC);
+  const [tu, den] = getViewPeriodRange(ky, moc, tuTC, denTC);
   // Mỗi dòng là một dòng lệnh xuất (id bản ghi) ⇒ dấu "đã dò" khỏi ghép kỳ.
   const to = useToMau("bao-cao-xuat-don");
   const rowSelection = useChonDong();
@@ -174,7 +174,7 @@ export default function OrderExportReport() {
   const khoaDong = nhom.flatMap((g) => g.lines.map((l) => l.id));
 
   const the: TheThongTin[] = [
-    { nhan: "Kỳ báo cáo", giaTri: `${viDate(tu)} – ${viDate(den)}`, icon: CalendarRange, mau: "trung-tinh" },
+    { nhan: "Kỳ báo cáo", giaTri: `${formatDateVN(tu)} – ${formatDateVN(den)}`, icon: CalendarRange, mau: "trung-tinh" },
     { nhan: "Tổng xuất", giaTri: `${num(tongKg)} kg`, so: true, icon: Scale, mau: "brand" },
     { nhan: "Tổng block", giaTri: num(tongBlock), so: true, icon: Layers, mau: "trung-tinh" },
     { nhan: "Số đơn được xuất", giaTri: num(nhom.length), so: true, icon: PackageCheck, mau: "success" },
@@ -187,13 +187,13 @@ export default function OrderExportReport() {
     }
     const aoa: OExcel[][] = [];
     aoa.push(["Báo cáo đơn đặt được xuất hàng"]);
-    aoa.push([`Kỳ: ${viDate(tu)} – ${viDate(den)} · Khách: ${customerFilter === "Tất cả" ? "Tất cả" : nhom[0]?.customerName ?? customerFilter}`]);
+    aoa.push([`Kỳ: ${formatDateVN(tu)} – ${formatDateVN(den)} · Khách: ${customerFilter === "Tất cả" ? "Tất cả" : nhom[0]?.customerName ?? customerFilter}`]);
     aoa.push([]);
     aoa.push(["Khách", "Ngày đặt", "Ngày xuất", "Mặt hàng", "Quy cách", "Kg xuất", "Block", "Đã đặt (kg)"]);
     for (const g of nhom) {
       for (const l of g.lines)
-        aoa.push([g.customerName, viDate(g.orderDate), viDate(l.exportDate), l.productName, l.spec, l.quantityKg, l.blocksCount, ""]);
-      aoa.push([`Cộng đơn ${g.customerName}`, viDate(g.orderDate), "", "", "", g.tongKg, g.tongBlock, g.requiredKg]);
+        aoa.push([g.customerName, formatDateVN(g.orderDate), formatDateVN(l.exportDate), l.productName, l.spec, l.quantityKg, l.blocksCount, ""]);
+      aoa.push([`Cộng đơn ${g.customerName}`, formatDateVN(g.orderDate), "", "", "", g.tongKg, g.tongBlock, g.requiredKg]);
     }
     aoa.push(["TỔNG CỘNG", "", "", "", "", tongKg, tongBlock, ""]);
     exportAoaToXlsx({
@@ -232,7 +232,7 @@ export default function OrderExportReport() {
             anNhanBatBuoc
             choPhepXoa={false}
             value={ky}
-            onChange={(v) => setKy(v as KyXem)}
+            onChange={(v) => setKy(v as ViewPeriod)}
             options={KY_OPT}
           />
         </div>
@@ -253,7 +253,7 @@ export default function OrderExportReport() {
             <DateField
               label={ky === "ngay" ? "Ngày xuất" : "Ngày bất kỳ trong kỳ"}
               anNhanBatBuoc
-              hint={ky === "ngay" ? undefined : `Kỳ: ${viDate(tu)} – ${viDate(den)}`}
+              hint={ky === "ngay" ? undefined : `Kỳ: ${formatDateVN(tu)} – ${formatDateVN(den)}`}
               value={moc}
               onChange={setMoc}
             />
@@ -278,7 +278,7 @@ export default function OrderExportReport() {
       ) : nhom.length === 0 ? (
         <EmptyState
           icon={PackageCheck}
-          tieuDe={`Chưa có đơn nào được xuất trong ${viDate(tu)} – ${viDate(den)}`}
+          tieuDe={`Chưa có đơn nào được xuất trong ${formatDateVN(tu)} – ${formatDateVN(den)}`}
           moTa="Tạo lệnh xuất ở màn Đơn đặt, số liệu xuất sẽ tổng hợp về đây."
         />
       ) : (
@@ -301,7 +301,7 @@ export default function OrderExportReport() {
                       <span className="flex flex-wrap items-center gap-x-3 gap-y-1 font-semibold">
                         {g.customerName}
                         <span className="font-normal text-muted-foreground">
-                          · đặt {g.orderDate ? viDate(g.orderDate) : "—"}
+                          · đặt {g.orderDate ? formatDateVN(g.orderDate) : "—"}
                         </span>
                         <Nhan loai={g.status === "dang-gom" ? "cho" : "xong"}>
                           {STATUS_LABELS[g.status]}
@@ -325,11 +325,11 @@ export default function OrderExportReport() {
                               checked={rowSelection.daChon.has(l.id)}
                               onChange={() => {}}
                               onClick={(e) => rowSelection.doi(l.id, e.shiftKey, khoaDong)}
-                              aria-label={`Chọn dòng ${l.productName} ${viDate(l.exportDate)}`}
+                              aria-label={`Chọn dòng ${l.productName} ${formatDateVN(l.exportDate)}`}
                               title="Tick để tô màu / in đậm dòng này (Shift+tick chọn cả khoảng)."
                             />
                           )}
-                          {viDate(l.exportDate)}
+                          {formatDateVN(l.exportDate)}
                         </span>
                       </TableCell>
                       <TableCell className="font-medium">{l.productName}</TableCell>
@@ -363,7 +363,7 @@ export default function OrderExportReport() {
       {inPrint && (
         <PhieuIn
           tieuDe="Báo cáo đơn đặt được xuất hàng"
-          phuDe={`Kỳ: ${viDate(tu)} – ${viDate(den)}${customerFilter !== "Tất cả" ? ` · Khách ${nhom[0]?.customerName ?? ""}` : ""}`}
+          phuDe={`Kỳ: ${formatDateVN(tu)} – ${formatDateVN(den)}${customerFilter !== "Tất cả" ? ` · Khách ${nhom[0]?.customerName ?? ""}` : ""}`}
           onClose={() => setInPrint(false)}
         >
           <table className="w-full border-collapse">
@@ -381,13 +381,13 @@ export default function OrderExportReport() {
                 <Fragment key={g.orderId}>
                   <tr>
                     <TdIn dam colSpan={5}>
-                      {g.customerName} · đặt {g.orderDate ? viDate(g.orderDate) : "—"} · {STATUS_LABELS[g.status]}
+                      {g.customerName} · đặt {g.orderDate ? formatDateVN(g.orderDate) : "—"} · {STATUS_LABELS[g.status]}
                       {g.requiredKg > 0 ? ` · đã đặt ${num(g.requiredKg)} kg` : ""}
                     </TdIn>
                   </tr>
                   {g.lines.map((l, i) => (
                     <tr key={`${g.orderId}-${i}`}>
-                      <TdIn>{viDate(l.exportDate)}</TdIn>
+                      <TdIn>{formatDateVN(l.exportDate)}</TdIn>
                       <TdIn>{l.productName}</TdIn>
                       <TdIn>{l.spec || "—"}</TdIn>
                       <TdIn right className="tnum">

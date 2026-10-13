@@ -5,7 +5,7 @@
 // ============================================================
 import { supabase } from "./supabase";
 import { uid } from "./db";
-import { LA_DEMO, SITE_DEMO } from "./cheDo";
+import { LA_DEMO, SITE_DEMO } from "./demoMode";
 
 /**
  * Lưu ảnh sổ sách (ảnh QC chấm điểm, sau này ảnh phiếu tay OCR) trên **Supabase
@@ -22,7 +22,7 @@ import { LA_DEMO, SITE_DEMO } from "./cheDo";
 const BUCKET = "qc";
 
 /** true khi có Supabase → mới hiện nút chụp/chọn ảnh. */
-export const coLuuAnh = Boolean(supabase);
+export const hasImageStorage = Boolean(supabase);
 
 /** Path khóa file trong bucket: bsf1/qc/<yyyy>/<mm>/<uid>.jpg (chia tháng cho đỡ phình).
  *  Chế độ demo ⇒ thư mục `site-demo/…` riêng (rào R5), ảnh demo không lẫn ảnh thật. */
@@ -57,7 +57,7 @@ async function nenAnh(file: File, maxW = 1600, jpegQuality = 0.72): Promise<Blob
 }
 
 /** Tải một ảnh lên → trả PATH để lưu vào DB (null nếu không có Supabase / lỗi tải). */
-export async function taiAnhLen(file: File): Promise<string | null> {
+export async function uploadImage(file: File): Promise<string | null> {
   if (!supabase) return null;
   const path = imagePath();
   const blob = await nenAnh(file);
@@ -68,14 +68,14 @@ export async function taiAnhLen(file: File): Promise<string | null> {
 }
 
 /** Xem ảnh: bucket private → tạo signed URL có hạn (mặc định 1 giờ). */
-export async function urlAnh(path: string, hanGiay = 3600): Promise<string | null> {
+export async function getPhotoUrl(path: string, hanGiay = 3600): Promise<string | null> {
   if (!supabase) return null;
   const { data } = await supabase.storage.from(BUCKET).createSignedUrl(path, hanGiay);
   return data?.signedUrl ?? null;
 }
 
 /** Xóa một ảnh tải nhầm (RLS delete cho authenticated). */
-export async function xoaAnh(path: string): Promise<boolean> {
+export async function deleteImage(path: string): Promise<boolean> {
   if (!supabase) return false;
   const { error } = await supabase.storage.from(BUCKET).remove([path]);
   return !error;

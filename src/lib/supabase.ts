@@ -4,7 +4,7 @@
 // Description: Supabase client initialization and environment variables handling
 // ============================================================
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { LA_DEMO, SITE_DEMO } from "@/lib/cheDo";
+import { LA_DEMO, SITE_DEMO } from "@/lib/demoMode";
 
 /**
  * Client Supabase — dùng chung project "baseafood" với SDFactory.
@@ -28,7 +28,7 @@ export const hasSupabase = Boolean(supabase);
  * khoản (signUp) mà không đá văng phiên đăng nhập của chính admin trên client
  * chính. Tự huỷ khi hết tham chiếu.
  */
-export function taoClientTam(): SupabaseClient | null {
+export function createTempClient(): SupabaseClient | null {
   if (!url || !anon) return null;
   return createClient(url, anon, {
     auth: {
@@ -45,6 +45,6 @@ export const SITE_ID_THAT =
 
 /**
  * Site của SỐ LIỆU nghiệp vụ: mọi bảng đọc/ghi qua repo lọc theo cột site_id này.
- * Chế độ demo (lib/cheDo.ts) ⇒ `site-demo` — cả app chạy trên bộ số trình diễn.
+ * Chế độ demo (lib/demoMode.ts) ⇒ `site-demo` — cả app chạy trên bộ số trình diễn.
  */
 export const SITE_ID = LA_DEMO ? SITE_DEMO : SITE_ID_THAT;

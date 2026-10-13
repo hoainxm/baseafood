@@ -23,19 +23,19 @@ import {
   type TheThongTin,
 } from "@/design-system";
 import {
-  NHAN_LECH_CONG,
-  cotExcel,
-  type CanhBao,
-  type DongLechCong,
-  type SheetHoaDon,
-} from "@/lib/doiSoatHddt";
+  SUM_MISMATCH_LABELS,
+  aoaToExcelColumn,
+  type FlowWarning,
+  type SumMismatchRow,
+  type InvoiceSheet,
+} from "@/lib/einvoiceReconciliation";
 import {
-  chuCotExcel,
-  type CachPhanBen,
-  type DongSoBan,
-  type KetQuaSoHaiBan,
-  type NhomCungNgay,
-} from "@/lib/doiSoatHaiBan";
+  columnIndexToLetter,
+  type SideSplitMethod,
+  type TwoVersionRow,
+  type TwoVersionResult,
+  type SameDayGroup,
+} from "@/lib/twoVersionReconciliation";
 import { num } from "@/lib/format";
 import type { CheDo } from "./cheDo";
 import {
@@ -136,7 +136,7 @@ const RULES: { ten: string; noiDung: string }[] = [
   { ten: "Không sửa số", noiDung: "Máy chỉ báo. Số chỉ đổi khi bạn bấm Sửa từng dòng; file xuất giữ nguyên định dạng và địa chỉ ô của file gốc." },
 ];
 
-export function QuyTacBox({ canhBao }: { canhBao: CanhBao[] }) {
+export function QuyTacBox({ canhBao }: { canhBao: FlowWarning[] }) {
   const [mo, setMo] = useState(false);
   const fxWarnings = canhBao.filter((c) => c.loai === "Đơn vị tiền tệ ngoại tệ");
   return (
@@ -174,7 +174,7 @@ export function QuyTacBox({ canhBao }: { canhBao: CanhBao[] }) {
 }
 
 // ---------- Chia bên thuế gửi / tự tải ----------
-const METHOD_LABELS: Record<CachPhanBen, string> = {
+const METHOD_LABELS: Record<SideSplitMethod, string> = {
   "chi-dinh": "bạn đã tự chọn",
   "ten-thue": "máy nhận theo chữ “thuế” trong tên sheet",
   "ten-tai": "máy nhận theo chữ “tải” trong tên sheet",
@@ -190,7 +190,7 @@ function SideSplitBox({
 }: {
   tenSheets: string[];
   benThue: ReadonlySet<string>;
-  cach: CachPhanBen;
+  cach: SideSplitMethod;
   onDoi: (ten: string, laThue: boolean) => void;
   onTuNhan: () => void;
 }) {
@@ -243,7 +243,7 @@ function SideSplitBox({
 // ---------- 1. So hai bản ----------
 type TwoVersionFilter = "all" | "CHI_THUE" | "CHI_TAI" | "LECH" | "KHONG_SO";
 
-function twoVersionChip(d: DongSoBan) {
+function twoVersionChip(d: TwoVersionRow) {
   if (d.ben === "CHI_THUE") return <Nhan loai="loi">Chỉ bản thuế có</Nhan>;
   if (d.ben === "CHI_TAI") return <Nhan loai="luu-y">Chỉ bản tự tải có</Nhan>;
   if (d.khongSoDuocTien) return <Nhan loai="luu-y">Không so được tiền</Nhan>;
@@ -259,10 +259,10 @@ export function SoHaiBanView({
   onDoiBen,
   onTuNhan,
 }: {
-  kq: KetQuaSoHaiBan | null;
+  kq: TwoVersionResult | null;
   tenSheets: string[];
   benThue: ReadonlySet<string>;
-  cach: CachPhanBen;
+  cach: SideSplitMethod;
   onDoiBen: (ten: string, laThue: boolean) => void;
   onTuNhan: () => void;
 }) {
@@ -315,7 +315,7 @@ export function SoHaiBanView({
     { id: "LECH", nhan: "Lệch tiền", n: t.lechTien },
     { id: "KHONG_SO", nhan: "Không so được", n: t.khongSoDuocTien },
   ];
-  const columns: Cot<DongSoBan>[] = [
+  const columns: Cot<TwoVersionRow>[] = [
     { key: "kq", header: "Kết quả", chinh: true, render: twoVersionChip },
     { key: "kh", header: "Ký hiệu", render: (d) => d.kyHieu, sapXep: (d) => d.kyHieu },
     { key: "so", header: "Số HĐ", render: (d) => d.soHoaDon },
@@ -351,11 +351,11 @@ export function SoHaiBanView({
 }
 
 // ---------- 2. Kiểm cộng cột bảng kê ----------
-function SheetSumCheck({ sh }: { sh: SheetHoaDon }) {
+function SheetSumCheck({ sh }: { sh: InvoiceSheet }) {
   const cd = sh.canDoiCot;
   const [onlyReal, setOnlyReal] = useState(cd.soDong.lechThat > 0);
   const rows = useMemo(() => (onlyReal ? cd.dongLech.filter((d) => d.loai === "that") : cd.dongLech), [cd, onlyReal]);
-  const columnLetter = (c: number) => (c >= 0 ? chuCotExcel(cotExcel(sh.goc, c)) : "");
+  const columnLetter = (c: number) => (c >= 0 ? columnIndexToLetter(aoaToExcelColumn(sh.goc, c)) : "");
   const columnName = (c: number, ten: string) => (c >= 0 ? `${ten} (cột ${columnLetter(c)})` : ten);
   const isMatch = Math.abs(cd.lech) < 0.5;
   const o = cd.oTuDat;
@@ -366,9 +366,9 @@ function SheetSumCheck({ sh }: { sh: SheetHoaDon }) {
     ["Làm tròn ±1 đ", cd.boc.lamTron, cd.soDong.lamTron],
     ["LỆCH THẬT — phải sửa", cd.boc.lechThat, cd.soDong.lechThat],
   ];
-  const columns: Cot<DongLechCong>[] = [
+  const columns: Cot<SumMismatchRow>[] = [
     { key: "d", header: "Dòng", chinh: true, render: (d) => `dòng ${d.dongFile}`, sapXep: (d) => d.dongFile },
-    { key: "loai", header: "Nguyên nhân", render: (d) => (d.loai === "that" ? <Nhan loai="loi">Lệch thật</Nhan> : <Nhan loai="luu-y">{NHAN_LECH_CONG[d.loai]}</Nhan>) },
+    { key: "loai", header: "Nguyên nhân", render: (d) => (d.loai === "that" ? <Nhan loai="loi">Lệch thật</Nhan> : <Nhan loai="luu-y">{SUM_MISMATCH_LABELS[d.loai]}</Nhan>) },
     { key: "ma", header: "Hóa đơn", render: (d) => d.ma },
     { key: "ngay", header: "Ngày", render: (d) => d.ngay, anTrenDienThoai: true },
     { key: "ban", header: "Người bán", render: (d) => d.ban, anTrenDienThoai: true },
@@ -395,7 +395,7 @@ function SheetSumCheck({ sh }: { sh: SheetHoaDon }) {
         </p>
         {o && (
           <p className="rounded-lg border border-border bg-muted/40 p-2 text-sm">
-            Ô bạn tự đặt dưới bảng: <b>{chuCotExcel(cotExcel(sh.goc, o.cot))}{o.dongFile}</b> ={" "}
+            Ô bạn tự đặt dưới bảng: <b>{columnIndexToLetter(aoaToExcelColumn(sh.goc, o.cot))}{o.dongFile}</b> ={" "}
             <span className="tnum font-medium">{num(o.giaTri)} đ</span>
             {o.congPhi ? " — công thức đã cộng phí" : ""}
             {o.truCk ? ", đã trừ chiết khấu" : ""}. File xuất sẽ chỉ ra ô này gồm những dòng nào.
@@ -453,7 +453,7 @@ function SheetSumCheck({ sh }: { sh: SheetHoaDon }) {
   );
 }
 
-export function KiemCongView({ sheets }: { sheets: SheetHoaDon[] }) {
+export function KiemCongView({ sheets }: { sheets: InvoiceSheet[] }) {
   const ds = sheets.filter((s) => !s.laPhu && s.canDoiCot.cotTong >= 0);
   if (!ds.length)
     return (
@@ -485,7 +485,7 @@ export function KiemCongView({ sheets }: { sheets: SheetHoaDon[] }) {
 }
 
 // ---------- 3. Cùng MST cùng ngày ----------
-export function CungNgayView({ nhom }: { nhom: NhomCungNgay[] }) {
+export function CungNgayView({ nhom }: { nhom: SameDayGroup[] }) {
   const soTrung = nhom.filter((g) => g.trungSoTien).length;
   const [onlyDuplicates, setOnlyDuplicates] = useState(soTrung > 0);
   const rows = useMemo(() => (onlyDuplicates ? nhom.filter((g) => g.trungSoTien) : nhom), [nhom, onlyDuplicates]);
@@ -502,7 +502,7 @@ export function CungNgayView({ nhom }: { nhom: NhomCungNgay[] }) {
     { nhan: "Hóa đơn trong các nhóm", giaTri: num(nhom.reduce((s, g) => s + g.soHoaDon, 0)), so: true, mau: "trung-tinh" },
     { nhan: "Nhóm trùng khít số tiền", giaTri: num(soTrung), so: true, mau: soTrung ? "warning" : "success", phu: "dễ kê hai lần — soát trước", onChon: () => setOnlyDuplicates(true), moTaChon: "Xem nhóm trùng khít số tiền" },
   ];
-  const columns: Cot<NhomCungNgay>[] = [
+  const columns: Cot<SameDayGroup>[] = [
     { key: "ban", header: "Người bán", chinh: true, render: (g) => g.tenBan || g.mstBan, sapXep: (g) => g.tenBan },
     { key: "mst", header: "MST", render: (g) => g.mstBan, anTrenDienThoai: true },
     { key: "ngay", header: "Ngày", render: (g) => g.ngay, sapXep: (g) => g.ngay },

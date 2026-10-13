@@ -16,10 +16,10 @@ import type { ExportItem, ExportOrder, LotDispatch, Product, WipProductionItem }
 import { KhungQuetQr } from "@/features/shared";
 import { useAuth } from "@/lib/auth";
 import { useLotDispatches } from "@/lib/catalogRepo";
-import type { LoTon } from "@/lib/inventory";
+import type { LotStock } from "@/lib/inventory";
 import { newId } from "@/lib/store";
-import { kg, viDate } from "@/lib/format";
-import { docMaQr, nhanLoBtp, timLo, type NutLo } from "@/lib/truyXuatLo";
+import { kg, formatDateVN } from "@/lib/format";
+import { docMaQr, formatWipLotLabel, findLots, type LotNode } from "@/lib/lotTraceability";
 import {
   Button,
   Dialog,
@@ -62,7 +62,7 @@ export function KiemLoXuat({
   tatCaDongLenh: readonly ExportItem[];
   onLuuDongLenh: (rows: ExportItem[]) => void;
   /** Tồn từng lô hiện tại (đã trừ mọi lệnh xuất, kể cả lệnh này). */
-  ton: readonly LoTon[];
+  ton: readonly LotStock[];
   sanXuat: readonly WipProductionItem[];
   matHang: readonly Product[];
   onClose: () => void;
@@ -73,7 +73,7 @@ export function KiemLoXuat({
   const { nguoiDung } = useAuth();
   const recordedBy = nguoiDung?.fullName || nguoiDung?.username || "";
   /** Đề nghị thay lô đang chờ xác nhận. */
-  const [deNghi, setDeNghi] = useState<{ cu: OrderLot; moi: NutLo } | null>(null);
+  const [deNghi, setDeNghi] = useState<{ cu: OrderLot; moi: LotNode } | null>(null);
 
   const tenMH = (id: string) => matHang.find((m) => m.id === id)?.name || "—";
   // Gom dòng lệnh theo lô (một lô có thể tách nhiều dòng).
@@ -84,7 +84,7 @@ export function KiemLoXuat({
       const prev = m.get(d.wipId);
       m.set(d.wipId, {
         wipId: d.wipId,
-        nhan: w ? nhanLoBtp(w) : d.wipId,
+        nhan: w ? formatWipLotLabel(w) : d.wipId,
         productId: d.productId,
         spec: d.spec,
         kg: (prev?.kg ?? 0) + (d.quantityKg || 0),
@@ -117,7 +117,7 @@ export function KiemLoXuat({
   const checkLot = (text: string, cach: "quet" | "go") => {
     const ma = docMaQr(text);
     if (!ma) return;
-    const ds = timLo(ma, {
+    const ds = findLots(ma, {
       shipments: [], imports: [], wips: [...sanXuat], packagings: [], lotInputs: [],
       exportItems: [], exportOrders: [], salesOrders: [], products: [...matHang], customers: [],
     }).filter((n) => n.kind === "W");
@@ -178,7 +178,7 @@ export function KiemLoXuat({
         <DialogHeader>
           <DialogTitle className="text-2xl">Kiểm lô bằng quét tem</DialogTitle>
           <DialogDescription className="text-base">
-            Lệnh xuất {viDate(lenh.exportDate)} · {lotsOfOrder.length} lô. Quét tem từng block khi xếp hàng — đúng lô thì ghi
+            Lệnh xuất {formatDateVN(lenh.exportDate)} · {lotsOfOrder.length} lô. Quét tem từng block khi xếp hàng — đúng lô thì ghi
             kiểm, sai lô app báo ngay.
           </DialogDescription>
         </DialogHeader>

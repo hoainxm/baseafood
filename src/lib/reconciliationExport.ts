@@ -1,7 +1,7 @@
 /**
  * Xuất Excel đối soát **GIỮ NGUYÊN ĐỊNH DẠNG FILE GỐC**.
  *
- * Vì sao có file này: bản cũ (`xuatExcelDoiSoat` trong `doiSoatHddt.ts`) dựng
+ * Vì sao có file này: bản cũ (`exportReconciliationExcel` trong `einvoiceReconciliation.ts`) dựng
  * workbook MỚI từ giá trị, nên font / khung / định dạng số / ô gộp / độ rộng cột
  * của file cổng thuế đều biến mất — kế toán mở ra thấy một file lạ, không soi
  * song song với bản gốc được nữa.
@@ -13,38 +13,38 @@
  * 1. **Bố cục bám đúng file mẫu kế toán đang dùng**: chèn cột `KẾT QUẢ` làm cột A,
  *    dữ liệu gốc dời sang phải 1 cột, khối cột phân tích nằm SAU vùng dữ liệu
  *    (chừa 1 cột trống ngăn cách), và sheet `KẾT LUẬN CHUNG` đứng đầu workbook
- *    (+ sheet danh sách chỉ khi có dữ liệu — xem `doiSoatXuatTongHop.ts`).
- *    Chèn cột thì **bắt buộc phải dịch tham chiếu công thức** — xem `doiSoatXuatShift.ts`.
+ *    (+ sheet danh sách chỉ khi có dữ liệu — xem `reconciliationExportSummary.ts`).
+ *    Chèn cột thì **bắt buộc phải dịch tham chiếu công thức** — xem `reconciliationExportShift.ts`.
  * 2. Chỉ ghi đè hai thứ trong vùng dữ liệu: **màu nền dòng** (để nhìn ra khớp/lệch/
  *    thiếu) và **ô người dùng bấm Sửa**. Font, khung, canh lề, định dạng số, ô gộp,
  *    độ rộng cột, chiều cao dòng của file gốc giữ nguyên.
  *
  * Chạy lại trên chính file đã xuất thì ghi đè đúng khối cột cũ (không đẻ thêm cột)
- * — `goCotDoiSoatCu` bên `doiSoatHddt.ts` lo phần gỡ khỏi dữ liệu đọc vào.
+ * — `goCotDoiSoatCu` bên `einvoiceReconciliation.ts` lo phần gỡ khỏi dữ liệu đọc vào.
  */
 import type {
-  DongHoaDon,
-  DongPhanMem,
-  KetQuaDoiSoat,
-  SheetHoaDon,
-  SheetPhanMem,
-  ToaDoGoc,
-} from "./doiSoatHddt";
+  InvoiceRow,
+  LedgerRow,
+  ReconciliationResult,
+  InvoiceSheet,
+  LedgerSheet,
+  SourceCellCoord,
+} from "./einvoiceReconciliation";
 import {
   CHU_THICH,
-  CHU_THICH_PM,
-  DICH_COT_XUAT,
-  HEADER_HD_THEM,
-  HEADER_KIEM,
-  NHAN_LECH_CONG,
+  LEDGER_NOTE,
+  EXPORT_COLUMN_SHIFT,
+  INVOICE_EXTRA_HEADERS,
+  COLUMN_SUM_CHECK_HEADERS,
+  SUM_MISMATCH_LABELS,
   base64SangXlsx,
-  HEADER_PM_THEM,
-  cotExcel,
-  ngayHienThi,
-} from "./doiSoatHddt";
-import { MAU_NEN as NEN, chuCotExcel as chuCot, nenDac as to, tachKhoaSua } from "./doiSoatChung";
-import { chenCotDau, dichThamChieuCheoSheet, xoaCotDuoi } from "./doiSoatXuatShift";
-import { themSheetTongHop } from "./doiSoatXuatTongHop";
+  LEDGER_EXTRA_HEADERS,
+  aoaToExcelColumn,
+  formatDisplayDate,
+} from "./einvoiceReconciliation";
+import { FILL_COLORS as NEN, columnIndexToLetter as chuCot, solidFill as to, parseEditKey } from "./reconciliationCommon";
+import { insertLeadingColumns, shiftCrossSheetRefs, deleteTrailingColumns } from "./reconciliationExportShift";
+import { addSummarySheets } from "./reconciliationExportSummary";
 
 // exceljs nạp động: chunk /doi-soat đã nặng, không kéo thêm vào bundle chính.
 type Worksheet = import("exceljs").Worksheet;
@@ -58,7 +58,7 @@ const isFormula = (v: unknown): v is FormulaCell =>
   typeof v === "object" && v !== null && typeof (v as FormulaCell).ct === "string";
 
 function toExportCell(v: unknown): string | number | null {
-  if (v instanceof Date) return ngayHienThi(v);
+  if (v instanceof Date) return formatDisplayDate(v);
   if (typeof v === "number" || typeof v === "string") return v;
   if (v == null || v === "") return null;
   return String(v);
@@ -70,7 +70,7 @@ function toExportCell(v: unknown): string | number | null {
  */
 function writeReconcileBlock(
   ws: Worksheet,
-  goc: ToaDoGoc,
+  goc: SourceCellCoord,
   hIdx: number,
   width: number,
   chuThich: string,
@@ -85,9 +85,9 @@ function writeReconcileBlock(
    */
   hasColumnA = true,
   /** Cột AOA → cột trong file ra lệch bao nhiêu (tính cả cột A cũ/mới) — để ghi ô Sửa đúng chỗ. */
-  columnShift: number = DICH_COT_XUAT
+  columnShift: number = EXPORT_COLUMN_SHIFT
 ): void {
-  const D = hasColumnA ? DICH_COT_XUAT : 0;
+  const D = hasColumnA ? EXPORT_COLUMN_SHIFT : 0;
   // Dữ liệu gốc đã dời sang phải D cột ⇒ khối thêm bắt đầu sau nó, chừa 1 cột trống.
   const cot1 = goc.c0 + width + D + SHORT_COL + 1; // 1-based
   const lastColumn = cot1 + extraHeaders.length - 1;
@@ -142,7 +142,7 @@ function writeReconcileBlock(
 
   // --- ô người dùng đã bấm Sửa: ghi đè giá trị + đánh dấu vàng để soát lại ---
   for (const e of editedCells) {
-    const o = ws.getCell(e.dongFile, cotExcel(goc, e.cot) + columnShift + 1);
+    const o = ws.getCell(e.dongFile, aoaToExcelColumn(goc, e.cot) + columnShift + 1);
     o.value = e.giaTri;
     o.fill = to(NEN.sua);
   }
@@ -156,15 +156,15 @@ function writeReconcileBlock(
   ws.autoFilter = { from: batDau, to: { row: headerRow, column: lastColumn } };
 }
 
-const nenHd = (d: DongHoaDon) => (d.trangThai === "KHOP" ? NEN.xanh : d.trangThai === "LECH" ? NEN.vang : NEN.do);
+const nenHd = (d: InvoiceRow) => (d.trangThai === "KHOP" ? NEN.xanh : d.trangThai === "LECH" ? NEN.vang : NEN.do);
 
-const addInvoiceRow = (d: DongHoaDon): unknown[] => [
+const addInvoiceRow = (d: InvoiceRow): unknown[] => [
   d.tyGia, d.soChuan, d.khoa, d.chuaThueVnd, d.thueVnd, d.tongTtVnd,
   d.soDongKhopPm, d.tongTtPm, d.chenh, d.ketLuan, d.phieuKe, d.ctgs, d.ngayGhiSo,
   d.tkNoCo, d.dienGiaiPm, d.soTienHachToan, d.bangChung,
 ];
 
-const addLedgerRow = (d: DongPhanMem): unknown[] => [
+const addLedgerRow = (d: LedgerRow): unknown[] => [
   d.soChuan, d.khoa, d.soHddtKhop, d.ketLuan, d.nguonHddt, d.dongHddt, d.ngayLapHd,
   d.tenBanHddt, d.tongTtHddt, d.bangChung,
 ];
@@ -175,30 +175,30 @@ const addLedgerRow = (d: DongPhanMem): unknown[] => [
  * không có TK Nợ/Có mà là thuế suất / loại.
  */
 const headerHd = (ledgerName: string, tenTk: string): string[] =>
-  HEADER_HD_THEM.map((h) =>
+  INVOICE_EXTRA_HEADERS.map((h) =>
     h === "Số dòng khớp PMKT" ? `Số dòng khớp ${ledgerName}`
     : h === "Tổng TT bên PMKT" ? `Tổng TT bên ${ledgerName}`
     : h === "TK Nợ / TK Có" ? tenTk
     : h
   );
-const HEADER_PM = [...HEADER_PM_THEM];
+const HEADER_PM = [...LEDGER_EXTRA_HEADERS];
 
 /**
  * Ba ô kiểm "chưa thuế + thuế = tổng thanh toán" cho một dòng, viết bằng CÔNG THỨC
- * trỏ vào chính ô gốc (đã dời sang phải `DICH_COT_XUAT` cột). Kế toán dò TRỰC TIẾP
+ * trỏ vào chính ô gốc (đã dời sang phải `EXPORT_COLUMN_SHIFT` cột). Kế toán dò TRỰC TIẾP
  * trên sheet, không phải lật qua sheet tổng hợp.
  */
-function sumCheckCells(sh: SheetHoaDon, d: DongHoaDon, shift: number): unknown[] {
+function sumCheckCells(sh: InvoiceSheet, d: InvoiceRow, shift: number): unknown[] {
   const cd = sh.canDoiCot;
   if (cd.cotChua < 0 || cd.cotTong < 0) return ["", "", ""];
-  const A = chuCot(cotExcel(sh.goc, cd.cotChua) + shift);
-  const T = chuCot(cotExcel(sh.goc, cd.cotTong) + shift);
-  const sumFormula = cd.cotThue >= 0 ? `${A}{r}+${chuCot(cotExcel(sh.goc, cd.cotThue) + shift)}{r}` : `${A}{r}`;
+  const A = chuCot(aoaToExcelColumn(sh.goc, cd.cotChua) + shift);
+  const T = chuCot(aoaToExcelColumn(sh.goc, cd.cotTong) + shift);
+  const sumFormula = cd.cotThue >= 0 ? `${A}{r}+${chuCot(aoaToExcelColumn(sh.goc, cd.cotThue) + shift)}{r}` : `${A}{r}`;
   // exceljs tự thêm dấu "=" — đừng viết sẵn, không là ra "==N3+O3".
   return [
     { ct: sumFormula },
     { ct: `${T}{r}-(${sumFormula})` },
-    d.lechCong ? NHAN_LECH_CONG[d.lechCong.loai] : "",
+    d.lechCong ? SUM_MISMATCH_LABELS[d.lechCong.loai] : "",
   ];
 }
 
@@ -206,7 +206,7 @@ function sumCheckCells(sh: SheetHoaDon, d: DongHoaDon, shift: number): unknown[]
  * Màu dòng khi file CHỈ có bảng kê: CHỈ tô dòng có lệch (đỏ = sai thật, vàng = phí /
  * chiết khấu / làm tròn). Dòng khớp để nguyên — tô xanh 3.000 dòng thì mắt không biết dừng đâu.
  */
-const shouldCheck = (d: DongHoaDon) =>
+const shouldCheck = (d: InvoiceRow) =>
   !d.lechCong ? null : d.lechCong.loai === "that" ? NEN.do : NEN.vang;
 
 /** Các ô người dùng bấm Sửa, gom theo sheet (key `edits` = `sheet#soDong#cot`). */
@@ -218,7 +218,7 @@ function editsBySheet(
   if (!edits) return [];
   const ra: { dongFile: number; cot: number; giaTri: number }[] = [];
   for (const [k, v] of Object.entries(edits)) {
-    const { sheet, soDong, cot } = tachKhoaSua(k);
+    const { sheet, soDong, cot } = parseEditKey(k);
     if (sheet !== ten) continue;
     const dongFile = rowByLineNo.get(soDong);
     if (dongFile != null && Number.isFinite(cot)) ra.push({ dongFile, cot, giaTri: v });
@@ -243,8 +243,8 @@ function downloadFile(bytes: ArrayBuffer, tenFile: string): void {
  * Xuất workbook đối soát dựa trên **chính file gốc** (base64 người dùng đã tải lên).
  * Ném lỗi nếu không nạp được file — nơi gọi bắt lấy để lùi về bản dựng-mới.
  */
-export async function xuatExcelGiuDinhDang(
-  kq: KetQuaDoiSoat,
+export async function exportExcelPreserveFormat(
+  kq: ReconciliationResult,
   fileGocB64: string,
   tenFile = "doi-soat-hddt.xlsx",
   edits?: Record<string, number>
@@ -269,13 +269,13 @@ export async function xuatExcelGiuDinhDang(
 
   // --- B1. Dọn khối cột của lần chạy trước, rồi chèn cột "KẾT QUẢ" làm cột A ---
   const dsSheet = [...kq.sheetsHoaDon, kq.sheetPhanMem, ...kq.sheetsPhanMemPhu].filter(
-    (x): x is SheetHoaDon | SheetPhanMem => !!x
+    (x): x is InvoiceSheet | LedgerSheet => !!x
   );
   // File đã qua một lần xuất thì cột A của nó ĐANG là "KẾT QUẢ": engine gỡ cột
-  // đó khỏi dữ liệu đọc vào, nên `cotExcel` của cột gốc đầu tiên lệch sẵn 1.
+  // đó khỏi dữ liệu đọc vào, nên `aoaToExcelColumn` của cột gốc đầu tiên lệch sẵn 1.
   // Trường hợp đó chỉ ghi đè cột A, KHÔNG chèn thêm — nếu không mỗi lần xuất lại
   // đẻ thêm một cột "KẾT QUẢ" nữa.
-  const hasResultColumn = (sh: SheetHoaDon | SheetPhanMem) => cotExcel(sh.goc, 0) - sh.goc.c0 >= DICH_COT_XUAT;
+  const hasResultColumn = (sh: InvoiceSheet | LedgerSheet) => aoaToExcelColumn(sh.goc, 0) - sh.goc.c0 >= EXPORT_COLUMN_SHIFT;
   // File CHỈ có bảng kê (không sổ) thì KHÔNG chèn cột A (v6.5): kế toán dò theo địa
   // chỉ ô của chính họ (VD Q3049) — dời sang R3049 là họ lạc. File xuất từ bản cũ
   // đã có cột A thì GỠ nó ra để địa chỉ trở về như file gốc.
@@ -287,19 +287,19 @@ export async function xuatExcelGiuDinhDang(
   for (const sh of dsSheet) {
     const ws = findSheet(sh.ten)!;
     // dữ liệu gốc chiếm các cột [lech+1 … lech+rong]; mọi cột sau đó là của lần xuất trước
-    const lech = hasResultColumn(sh) ? DICH_COT_XUAT : 0;
-    xoaCotDuoi(ws, sh.goc.c0 + lech + sh.rong + 1);
+    const lech = hasResultColumn(sh) ? EXPORT_COLUMN_SHIFT : 0;
+    deleteTrailingColumns(ws, sh.goc.c0 + lech + sh.rong + 1);
   }
   for (const ws of wb.worksheets)
-    if (tenChen.has(ws.name)) chenCotDau(ws, DICH_COT_XUAT, tenChen);
-    else if (tenChen.size) dichThamChieuCheoSheet(ws, DICH_COT_XUAT, tenChen);
+    if (tenChen.has(ws.name)) insertLeadingColumns(ws, EXPORT_COLUMN_SHIFT, tenChen);
+    else if (tenChen.size) shiftCrossSheetRefs(ws, EXPORT_COLUMN_SHIFT, tenChen);
   for (const ws of wb.worksheets)
-    if (skippedNames.has(ws.name)) chenCotDau(ws, -DICH_COT_XUAT, skippedNames);
-    else if (skippedNames.size) dichThamChieuCheoSheet(ws, -DICH_COT_XUAT, skippedNames);
+    if (skippedNames.has(ws.name)) insertLeadingColumns(ws, -EXPORT_COLUMN_SHIFT, skippedNames);
+    else if (skippedNames.size) shiftCrossSheetRefs(ws, -EXPORT_COLUMN_SHIFT, skippedNames);
   /** Cột (0-based) trong FILE RA của cột AOA `c` — cho công thức kiểm + địa chỉ ở sheet kết luận. */
-  const outputShift = (sh: SheetHoaDon | SheetPhanMem) =>
-    hasNoColumnA ? (hasResultColumn(sh) ? -DICH_COT_XUAT : 0) : hasResultColumn(sh) ? 0 : DICH_COT_XUAT;
-  const outputColumn = (sh: SheetHoaDon, c: number) => cotExcel(sh.goc, c) + outputShift(sh);
+  const outputShift = (sh: InvoiceSheet | LedgerSheet) =>
+    hasNoColumnA ? (hasResultColumn(sh) ? -EXPORT_COLUMN_SHIFT : 0) : hasResultColumn(sh) ? 0 : EXPORT_COLUMN_SHIFT;
+  const outputColumn = (sh: InvoiceSheet, c: number) => aoaToExcelColumn(sh.goc, c) + outputShift(sh);
 
   // --- B2. Ghi khối đối soát ---
   const ledgerName = kq.sheetPhanMem?.ten ?? "PMKT";
@@ -309,9 +309,9 @@ export async function xuatExcelGiuDinhDang(
   // về phép kiểm "chưa thuế + thuế = tổng thanh toán", khối thêm chỉ 3 cột kiểm.
   const checkListing = !kq.sheetPhanMem;
   // Có sổ: cột kiểm xuống CUỐI khối, giữ nguyên thứ tự cột theo file mẫu kế toán.
-  const HEADER_HD = checkListing ? [...HEADER_KIEM] : [...headerHd(ledgerName, tenTk), ...HEADER_KIEM];
+  const HEADER_HD = checkListing ? [...COLUMN_SUM_CHECK_HEADERS] : [...headerHd(ledgerName, tenTk), ...COLUMN_SUM_CHECK_HEADERS];
 
-  const writeInvoiceSheet = (sh: SheetHoaDon) => {
+  const writeInvoiceSheet = (sh: InvoiceSheet) => {
     const ws = findSheet(sh.ten)!;
     const chuThich = checkListing
       ? `Dòng ĐỎ = chưa thuế + thuế KHÁC tổng thanh toán, phải soát · dòng VÀNG = lệch do phí / chiết khấu / làm tròn, bình thường · dòng không tô = khớp. 3 cột này là công thức tính từ ô gốc, không ô gốc nào bị sửa.`
@@ -322,7 +322,7 @@ export async function xuatExcelGiuDinhDang(
       ws, sh.goc, sh.hIdx, sh.rong, chuThich, HEADER_HD,
       sh.dong.map((d) => ({
         dongFile: d.dongFile,
-        ketLuan: checkListing ? (d.lechCong ? NHAN_LECH_CONG[d.lechCong.loai] : "khớp") : d.ketLuan,
+        ketLuan: checkListing ? (d.lechCong ? SUM_MISMATCH_LABELS[d.lechCong.loai] : "khớp") : d.ketLuan,
         nen: checkListing ? shouldCheck(d) : nenHd(d),
         them: checkListing
           ? sumCheckCells(sh, d, outputShift(sh))
@@ -335,11 +335,11 @@ export async function xuatExcelGiuDinhDang(
     );
   };
 
-  const writeLedgerSheet = (sh: SheetPhanMem) => {
+  const writeLedgerSheet = (sh: LedgerSheet) => {
     const ws = findSheet(sh.ten)!;
     writeReconcileBlock(
       ws, sh.goc, sh.hIdx, sh.rong,
-      sh.laPhu ? `${CHU_THICH_PM} — (SHEET PHỤ / TẬP CON: KHÔNG cộng vào tổng)` : CHU_THICH_PM,
+      sh.laPhu ? `${LEDGER_NOTE} — (SHEET PHỤ / TẬP CON: KHÔNG cộng vào tổng)` : LEDGER_NOTE,
       HEADER_PM,
       sh.dong.map((d) => ({
         dongFile: d.dongFile,
@@ -372,7 +372,7 @@ export async function xuatExcelGiuDinhDang(
     nk.columns.forEach((c, i) => (c.width = i === 0 ? 54 : 22));
     (nk as unknown as { orderNo: number }).orderNo = 99;
   }
-  themSheetTongHop(wb, kq, (sh, c) => outputColumn(sh, c));
+  addSummarySheets(wb, kq, (sh, c) => outputColumn(sh, c));
 
   // Công thức trong file đã bị dịch cột ⇒ ép Excel tính lại lúc mở, đừng tin
   // giá trị cache của lần lưu trước.

@@ -15,13 +15,13 @@ import type {
 import { sumGridRow } from "@/types";
 import { uid } from "@/lib/db";
 import {
-  KHACH_KHAC,
-  ghiTraNo,
-  khoaDongTP,
-  khoaMatHang,
-  nhanNgay,
-  type DongMauTP,
-  type HangLuoiTP,
+  OTHER_CUSTOMER_ID,
+  setRepaidDebt,
+  finishedGoodTemplateKey,
+  productSpecKey,
+  formatDayLabel,
+  type FinishedGoodTemplateRow,
+  type FinishedGoodGridRow,
 } from "@/lib/balancingGrid";
 import type { ONgay, PeriodGrid } from "./usePeriodGrid";
 import { HopLyDoGhiBu, HopThemMatHang } from "./gridDialogs";
@@ -34,7 +34,7 @@ import {
   type CotLuoi,
   type HangLuoi,
 } from "@/design-system";
-import { num, viDate } from "@/lib/format";
+import { num, formatDateVN } from "@/lib/format";
 import { ChevronsLeftRight, Download, EyeOff, Layers, Plus } from "lucide-react";
 
 export function LuoiBanThanhPham({
@@ -79,7 +79,7 @@ export function LuoiBanThanhPham({
   const productName = (id: string) => matHang.find((m) => m.id === id)?.name || "—";
   /** Khách BẮT BUỘC (không có nút bỏ chọn) — chưa rõ khách thì chọn "Khác". */
   const customerOptions = useMemo(
-    () => [...khach.map((k) => ({ value: k.id, label: k.name })), { value: KHACH_KHAC, label: "Khác" }],
+    () => [...khach.map((k) => ({ value: k.id, label: k.name })), { value: OTHER_CUSTOMER_ID, label: "Khác" }],
     [khach]
   );
 
@@ -87,7 +87,7 @@ export function LuoiBanThanhPham({
      thì dòng đó mới thành dòng thật (nhập tay, như "Thêm mặt hàng") — kỳ không bị
      rác bởi mấy chục dòng 0 kg, công thức không đụng tới dòng chưa có số. ---------- */
   const templateById = useMemo(() => new Map(mauConThieu.map((m) => [`mau:${m.id}`, m])), [mauConThieu]);
-  const createFromTemplate = (m: DongMauTP, patch: Partial<BalancingOutputItem>): BalancingOutputItem => {
+  const createFromTemplate = (m: FinishedGoodTemplateRow, patch: Partial<BalancingOutputItem>): BalancingOutputItem => {
     const r: BalancingOutputItem = {
       id: uid(),
       periodId: luoi.kyId,
@@ -107,7 +107,7 @@ export function LuoiBanThanhPham({
     r.quantityKg = sumGridRow(r.dailyQuantities, r.carryOverKg);
     return r;
   };
-  const templateRows: HangLuoiTP[] = mauConThieu.map((m) => ({
+  const templateRows: FinishedGoodGridRow[] = mauConThieu.map((m) => ({
     id: `mau:${m.id}`,
     matHangId: m.productId,
     khachId: m.customerId,
@@ -122,10 +122,10 @@ export function LuoiBanThanhPham({
     tuSoSanXuat: false,
     nguonIds: [],
   }));
-  const hasValues = (h: HangLuoiTP) => h.tong !== 0 || h.tra !== 0 || h.no !== 0 || justAdded.has(h.id);
+  const hasValues = (h: FinishedGoodGridRow) => h.tong !== 0 || h.tra !== 0 || h.no !== 0 || justAdded.has(h.id);
   /** Thứ tự hiển thị: dòng thật trước, dòng mẫu sau — cùng một mảng cho lưới lẫn dán khối. */
   const hangThat = hideEmptyRows ? hangTP.filter(hasValues) : hangTP;
-  const visibleRows: HangLuoiTP[] = hideEmptyRows ? hangThat : [...hangTP, ...templateRows];
+  const visibleRows: FinishedGoodGridRow[] = hideEmptyRows ? hangThat : [...hangTP, ...templateRows];
 
   const writeRow = (id: string, patch: Partial<BalancingOutputItem>) => {
     const m = templateById.get(id);
@@ -148,8 +148,8 @@ export function LuoiBanThanhPham({
   const writeCell = (rowId: string, colKey: string, v: number | null) => {
     const m = templateById.get(rowId);
     if (m) {
-      if (colKey === "tra") return writeRow(rowId, ghiTraNo({}, { tra: v ?? 0 }));
-      if (colKey === "no") return writeRow(rowId, ghiTraNo({}, { no: v ?? 0 }));
+      if (colKey === "tra") return writeRow(rowId, setRepaidDebt({}, { tra: v ?? 0 }));
+      if (colKey === "no") return writeRow(rowId, setRepaidDebt({}, { no: v ?? 0 }));
       if (colKey === "donGia") return writeRow(rowId, { unitPrice: v });
       if (colKey.startsWith("ngay:") && v) return writeRow(rowId, { dailyQuantities: { [colKey.slice(5)]: v } });
       return;
@@ -157,15 +157,15 @@ export function LuoiBanThanhPham({
     const r = theoId.get(rowId);
     if (!r) return;
     /* Trả · Nợ: kế toán gõ số có dấu, Tổng = Σ ngày + Trả + Nợ (quy tắc chuyển kỳ). */
-    if (colKey === "tra") return writeRow(rowId, ghiTraNo(r, { tra: v ?? 0 }));
-    if (colKey === "no") return writeRow(rowId, ghiTraNo(r, { no: v ?? 0 }));
+    if (colKey === "tra") return writeRow(rowId, setRepaidDebt(r, { tra: v ?? 0 }));
+    if (colKey === "no") return writeRow(rowId, setRepaidDebt(r, { no: v ?? 0 }));
     if (colKey === "donGia") return writeRow(rowId, { unitPrice: v });
     if (!colKey.startsWith("ngay:")) return;
 
     const iso = colKey.slice(5);
     const kg = v ?? 0;
     if (r.autoSource === "production") {
-      const o: ONgay = { khoa: khoaMatHang(r.productId, r.spec ?? ""), ngay: iso, kg };
+      const o: ONgay = { khoa: productSpecKey(r.productId, r.spec ?? ""), ngay: iso, kg };
       /* Ngày đã chốt sản xuất ⇒ đòi lý do trước khi đụng số đã gửi đi. */
       if (ngayDaChot.has(iso)) {
         setReasonPrompt({ dsO: [o], ngay: iso });
@@ -214,7 +214,7 @@ export function LuoiBanThanhPham({
             return;
           }
           productionCells.push({
-            khoa: khoaMatHang(goc.productId, goc.spec ?? ""),
+            khoa: productSpecKey(goc.productId, goc.spec ?? ""),
             ngay: iso,
             kg: v,
           });
@@ -250,7 +250,7 @@ export function LuoiBanThanhPham({
     }
   };
 
-  const gridColumns: CotLuoi<HangLuoiTP>[] = [
+  const gridColumns: CotLuoi<FinishedGoodGridRow>[] = [
     {
       key: "khach",
       header: "Khách",
@@ -272,7 +272,7 @@ export function LuoiBanThanhPham({
           placeholder="Chọn khách"
           choPhepXoa={false}
           onSuaMuc={onSuaKhach}
-          suaDuoc={(v) => v !== KHACH_KHAC}
+          suaDuoc={(v) => v !== OTHER_CUSTOMER_ID}
           nhanSua="Sửa thông tin khách hàng này — lưu thẳng vào Danh mục."
         />
       ),
@@ -290,10 +290,10 @@ export function LuoiBanThanhPham({
       rong: 148,
       lay: (h) => h.tong * (h.donGia ?? 0) || null,
     },
-    ...ngay.map<CotLuoi<HangLuoiTP>>((iso) => ({
+    ...ngay.map<CotLuoi<FinishedGoodGridRow>>((iso) => ({
       key: `ngay:${iso}`,
-      header: nhanNgay(iso),
-      nhan: `Ngày ${viDate(iso)}`,
+      header: formatDayLabel(iso),
+      nhan: `Ngày ${formatDateVN(iso)}`,
       kieu: "so",
       nhom: "ngay",
       rong: 96,
@@ -307,7 +307,7 @@ export function LuoiBanThanhPham({
 
   /* Kỳ đã chốt ⇒ khoá TOÀN BỘ ô + gỡ ô điều khiển. Khoá ở một chỗ thay vì rải
      `disabled` khắp nơi: thêm cột mới về sau tự động được khoá theo. */
-  const displayColumns: CotLuoi<HangLuoiTP>[] = luoi.daChot
+  const displayColumns: CotLuoi<FinishedGoodGridRow>[] = luoi.daChot
     ? gridColumns.map((c) => ({
         ...c,
         oRieng: undefined,
@@ -317,7 +317,7 @@ export function LuoiBanThanhPham({
     : gridColumns;
 
   const templatePeriodLabel = kyMau ? kyMau.dateRangeDescription || `${kyMau.startDate} – ${kyMau.endDate}` : "";
-  const hang: HangLuoi<HangLuoiTP>[] = [
+  const hang: HangLuoi<FinishedGoodGridRow>[] = [
     ...hangThat.map((h) => ({
       id: h.id,
       du: h,
@@ -332,7 +332,7 @@ export function LuoiBanThanhPham({
             du: templateRows[0],
             ten: "",
             tieuDeNhom: `Dòng mẫu theo kỳ ${templatePeriodLabel}`,
-          } as HangLuoi<HangLuoiTP>,
+          } as HangLuoi<FinishedGoodGridRow>,
           ...templateRows.map((h) => ({
             id: h.id,
             du: h,
@@ -348,8 +348,8 @@ export function LuoiBanThanhPham({
     if (!productId) return;
     const g = goiY(productId, "");
     const customerId = g?.customerId ?? "";
-    const khoa = khoaDongTP(productId, "", customerId);
-    if (tp.some((r) => khoaDongTP(r.productId, r.spec ?? "", r.customerId) === khoa)) {
+    const khoa = finishedGoodTemplateKey(productId, "", customerId);
+    if (tp.some((r) => finishedGoodTemplateKey(r.productId, r.spec ?? "", r.customerId) === khoa)) {
       notify.loi(`"${productName(productId)}" đã có dòng trong kỳ`);
       return;
     }
@@ -505,7 +505,7 @@ export function LuoiBanThanhPham({
           onClose={() => setIsAdding(false)}
           onLuu={(productId, customerId, quyCach, kenh) => {
             const trung = tp.some(
-              (r) => khoaMatHang(r.productId, r.spec ?? "") === khoaMatHang(productId, quyCach)
+              (r) => productSpecKey(r.productId, r.spec ?? "") === productSpecKey(productId, quyCach)
             );
             if (trung) {
               notify.loi("Mặt hàng + quy cách này đã có dòng trong kỳ");

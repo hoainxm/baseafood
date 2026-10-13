@@ -50,15 +50,15 @@ import {
   type LoiNhap,
   type MucChon,
 } from "@/design-system";
-import { kg, num, todayISO, viDate } from "@/lib/format";
-import { nhanLoNl } from "@/lib/truyXuatLo";
+import { kg, num, todayISO, formatDateVN } from "@/lib/format";
+import { formatMaterialLotLabel } from "@/lib/lotTraceability";
 import { useAuth } from "@/lib/auth";
 import { DailyTaskReminder, QrTemLoIn, PhieuTrongNhapNL } from "@/features/shared";
 import { useSuaDanhMuc } from "@/features/catalog/SuaDanhMucNhanh";
 import { OcrPhieuNhap } from "./OcrPhieuNhap";
-import { coOcr, type DanhMucOcr } from "@/lib/ocr";
-import { coLuuAnh, urlAnh } from "@/lib/storage";
-import { KY_OPT, phamViKy, type KyXem } from "@/lib/periodUtils";
+import { coOcr, type OcrCatalog } from "@/lib/ocr";
+import { hasImageStorage, getPhotoUrl } from "@/lib/storage";
+import { KY_OPT, getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
 import {
   CalendarRange,
   Camera,
@@ -119,7 +119,7 @@ export default function NhapNguyenLieuScreen() {
   const [locks, persistLocks, { trangThai: ttChot }] = useDailyLocks();
   const [scraps, persistScraps] = useScraps();
 
-  const [ky, setKy] = useState<KyXem>("ngay");
+  const [ky, setKy] = useState<ViewPeriod>("ngay");
   const [date, setDate] = useState(todayISO()); // ngày neo cho ngày/tuần/tháng/năm
   const [fromDate, setFromDate] = useState(todayISO());
   const [toDate, setToDate] = useState(todayISO());
@@ -172,7 +172,7 @@ export default function NhapNguyenLieuScreen() {
   const [lockErrors, setLockErrors] = useState<LoiNhap[]>([]);
 
   /** [từ, đến] của kỳ đang xem — mọi lọc/tổng tính theo khoảng này. */
-  const [tuHieuLuc, denHieuLuc] = phamViKy(ky, date, fromDate, toDate);
+  const [tuHieuLuc, denHieuLuc] = getViewPeriodRange(ky, date, fromDate, toDate);
   /** Kỳ chỉ gồm đúng một ngày ⇒ mới có nghĩa để chốt / phế liệu ngày. */
   const isSingleDay = tuHieuLuc === denHieuLuc;
 
@@ -203,8 +203,8 @@ export default function NhapNguyenLieuScreen() {
   const recordWorkshop: Workshop = workshop === "Tất cả" ? "Đông" : workshop;
 
   const rangeDescription = isSingleDay
-    ? viDate(tuHieuLuc)
-    : `${viDate(tuHieuLuc)} – ${viDate(denHieuLuc)}`;
+    ? formatDateVN(tuHieuLuc)
+    : `${formatDateVN(tuHieuLuc)} – ${formatDateVN(denHieuLuc)}`;
 
   const total = useMemo(
     () => view.reduce((s, r) => s + (r.quantityKg || 0), 0),
@@ -575,7 +575,7 @@ export default function NhapNguyenLieuScreen() {
     : sessionShipmentId
       ? (() => {
           const c = shipments.find((x) => x.id === sessionShipmentId);
-          return c ? nhanLoNl(c) : "— (dữ liệu cũ)";
+          return c ? formatMaterialLotLabel(c) : "— (dữ liệu cũ)";
         })()
       : sinhMaLo(phien.deliveryDate, phien.workshop, shipments);
   /** Các dòng trong bảng đủ để lưu (có loại + số lượng). */
@@ -646,7 +646,7 @@ export default function NhapNguyenLieuScreen() {
   /* ---- OCR: chụp ảnh phiếu → gợi ý điền form (nháp, người soát lại) ---- */
 
   /** Danh mục để OCR dò khớp tên trên phiếu (đại lý theo tên tắt, loại NL). */
-  const ocrCatalog: DanhMucOcr = useMemo(
+  const ocrCatalog: OcrCatalog = useMemo(
     () => ({
       daiLy: suppliers.map((d) => ({ name: d.shortName, code: d.code })),
       loaiNL: materialTypes.map((l) => ({ name: l.name })),
@@ -666,7 +666,7 @@ export default function NhapNguyenLieuScreen() {
   /** Mở ảnh phiếu đã đính (signed URL có hạn) để đối chiếu tay. */
   const viewScanImage = async () => {
     if (!phien?.scanPath) return;
-    const url = await urlAnh(phien.scanPath);
+    const url = await getPhotoUrl(phien.scanPath);
     if (url) window.open(url, "_blank", "noopener");
     else notify.loi("Chưa xem được ảnh (cần đăng nhập máy chủ).");
   };
@@ -762,7 +762,7 @@ export default function NhapNguyenLieuScreen() {
     const bg = lockRecordOf(phien.deliveryDate, phien.workshop);
     if (bg?.isLocked)
       notify.canhBao(
-        `Ngày ${viDate(phien.deliveryDate)} đã chốt ${kg(bg.totalKgAtLock)} — sau khi ghi bù thành ${kg(dayTotalExShipment + newTotal)}`
+        `Ngày ${formatDateVN(phien.deliveryDate)} đã chốt ${kg(bg.totalKgAtLock)} — sau khi ghi bù thành ${kg(dayTotalExShipment + newTotal)}`
       );
 
     // Nhớ loài cuối để chuyến/dòng sau khỏi nhảy về "Bạch tuộc".
@@ -860,7 +860,7 @@ export default function NhapNguyenLieuScreen() {
       bg ? locks.map((c) => (c.id === bg.id ? ban : c)) : [...locks, ban]
     );
     notify.daLuu(
-      `Đã chốt ngày ${viDate(tuHieuLuc)} · xưởng ${viewedWorkshop} — ${kg(actualTotal)}`
+      `Đã chốt ngày ${formatDateVN(tuHieuLuc)} · xưởng ${viewedWorkshop} — ${kg(actualTotal)}`
     );
     setIsConfirmingLock(false);
     setLockNote("");
@@ -881,7 +881,7 @@ export default function NhapNguyenLieuScreen() {
       )
     );
     notify.canhBao(
-      `Đã mở lại ngày ${viDate(tuHieuLuc)} · xưởng ${viewedWorkshop} — sửa xong nhớ chốt lại`
+      `Đã mở lại ngày ${formatDateVN(tuHieuLuc)} · xưởng ${viewedWorkshop} — sửa xong nhớ chốt lại`
     );
     setIsConfirmingReopen(false);
     setReopenReason("");
@@ -959,7 +959,7 @@ export default function NhapNguyenLieuScreen() {
               />
             )}
             <span className="text-lg font-semibold text-foreground">
-              {isDayLocked ? "Đã chốt" : "Chưa chốt"} {viDate(tuHieuLuc)} · xưởng{" "}
+              {isDayLocked ? "Đã chốt" : "Chưa chốt"} {formatDateVN(tuHieuLuc)} · xưởng{" "}
               {viewedWorkshop}
             </span>
             <span className="text-base text-muted-foreground">
@@ -1119,7 +1119,7 @@ export default function NhapNguyenLieuScreen() {
             {phien.scanPath && (
               <span className="flex items-center gap-1">
                 <Nhan loai="xong">Đã đính ảnh phiếu</Nhan>
-                {coLuuAnh && (
+                {hasImageStorage && (
                   <Button
                     title="Mở lại ảnh phiếu tay đã lưu kèm chuyến này." type="button" variant="link" size="sm" onClick={viewScanImage}>
                     Xem
@@ -1134,7 +1134,7 @@ export default function NhapNguyenLieuScreen() {
           <p className="flex items-start gap-3 rounded-lg bg-accent px-4 py-3 text-base text-accent-foreground">
             <Lock className="mt-0.5 size-6 shrink-0" aria-hidden />
             <span>
-              Ngày {viDate(phien.deliveryDate)} · xưởng {phien.workshop}{" "}
+              Ngày {formatDateVN(phien.deliveryDate)} · xưởng {phien.workshop}{" "}
               <strong>đã chốt</strong>. Vẫn ghi được nhưng là <strong>ghi bù</strong>{" "}
               — bắt buộc ghi rõ lý do.
             </span>
@@ -1171,7 +1171,7 @@ export default function NhapNguyenLieuScreen() {
                 <TheChon
                   key={ten}
                   tieuDe={ten}
-                  phu={lastDateBySupplier.get(ten) ? `Gần nhất ${viDate(lastDateBySupplier.get(ten) ?? "")}` : undefined}
+                  phu={lastDateBySupplier.get(ten) ? `Gần nhất ${formatDateVN(lastDateBySupplier.get(ten) ?? "")}` : undefined}
                   dangChon={phien.supplierName === ten}
                   title={`Chọn đại lý ${ten} — tự điền sẵn các loại hàng và đơn giá theo lượt giao gần nhất, chỉ còn gõ số kg.`}
                   onClick={() => pickSupplier(ten)}
@@ -1401,7 +1401,7 @@ export default function NhapNguyenLieuScreen() {
             {isEditingShipment ? (
               <>
                 <ConfirmDelete
-                  moTaBanGhi={`Chuyến ${phien?.supplierName || "(chưa có đại lý)"} — ${viDate(phien?.deliveryDate ?? "")} — ${savedRowCount} dòng — ${kg(shipmentTotal)}`}
+                  moTaBanGhi={`Chuyến ${phien?.supplierName || "(chưa có đại lý)"} — ${formatDateVN(phien?.deliveryDate ?? "")} — ${savedRowCount} dòng — ${kg(shipmentTotal)}`}
                   onConfirm={deleteEditingShipment}
                   tieuDe="Xóa cả chuyến này?"
                   nhanNut="Xóa chuyến"
@@ -1431,7 +1431,7 @@ export default function NhapNguyenLieuScreen() {
         <div className="space-y-3 rounded-xl border-2 border-border bg-card p-4">
           <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
             <p className="font-semibold">
-              Đã ghi ngày {viDate(phien.deliveryDate)} · xưởng {phien.workshop}
+              Đã ghi ngày {formatDateVN(phien.deliveryDate)} · xưởng {phien.workshop}
             </p>
             <p className="text-muted-foreground">
               {sessionDayGroups.length} chuyến ·{" "}
@@ -1610,7 +1610,7 @@ export default function NhapNguyenLieuScreen() {
             anNhanBatBuoc
             choPhepXoa={false}
             value={ky}
-            onChange={(v) => setKy(v as KyXem)}
+            onChange={(v) => setKy(v as ViewPeriod)}
             options={KY_OPT}
             className="min-w-[13rem]"
           />
@@ -1643,7 +1643,7 @@ export default function NhapNguyenLieuScreen() {
                 hint={
                   ky === "ngay"
                     ? undefined
-                    : `Kỳ đang xem: ${viDate(tuHieuLuc)} – ${viDate(denHieuLuc)}`
+                    : `Kỳ đang xem: ${formatDateVN(tuHieuLuc)} – ${formatDateVN(denHieuLuc)}`
                 }
                 value={date}
                 onChange={setDate}
@@ -1784,13 +1784,13 @@ export default function NhapNguyenLieuScreen() {
                           {n.supplierName || "(chưa có đại lý)"}
                         </span>
                         <span className="text-base text-muted-foreground">
-                          {viDate(n.deliveryDate)} · xưởng {n.workshop}
+                          {formatDateVN(n.deliveryDate)} · xưởng {n.workshop}
                         </span>
                       </div>
                       <div className="flex flex-wrap items-center gap-2">
                         {n.ghiBu && (
                           <Nhan loai="luu-y">
-                            Ghi bù {viDate(n.postingDate)}
+                            Ghi bù {formatDateVN(n.postingDate)}
                           </Nhan>
                         )}
                         {isShipmentLocked && (
@@ -1803,7 +1803,7 @@ export default function NhapNguyenLieuScreen() {
                         )}
                         {n.chuyen && (
                           <Nhan loai="phu" className="tnum">
-                            Lô {nhanLoNl(n.chuyen)}
+                            Lô {formatMaterialLotLabel(n.chuyen)}
                           </Nhan>
                         )}
                         {n.chuyen?.ssccCode && (
@@ -1913,7 +1913,7 @@ export default function NhapNguyenLieuScreen() {
           <DialogHeader>
             <DialogTitle className="text-2xl">Chốt số liệu ngày này?</DialogTitle>
             <DialogDescription className="text-base">
-              Chốt xong ngày {viDate(tuHieuLuc)} · xưởng {viewedWorkshop} sẽ khóa: không
+              Chốt xong ngày {formatDateVN(tuHieuLuc)} · xưởng {viewedWorkshop} sẽ khóa: không
               sửa, không xóa, không thêm chuyến thường. Ghi thêm chỉ còn đường
               ghi bù (bắt buộc ghi lý do) hoặc mở lại ngày.
             </DialogDescription>
@@ -2016,7 +2016,7 @@ export default function NhapNguyenLieuScreen() {
           <DialogHeader>
             <DialogTitle className="text-2xl">Mở lại ngày đã chốt?</DialogTitle>
             <DialogDescription className="text-base">
-              Ngày {viDate(tuHieuLuc)} · xưởng {viewedWorkshop} đang khóa. Mở lại thì
+              Ngày {formatDateVN(tuHieuLuc)} · xưởng {viewedWorkshop} đang khóa. Mở lại thì
               sửa/xóa được như thường — nhớ chốt lại sau khi sửa xong.
             </DialogDescription>
           </DialogHeader>

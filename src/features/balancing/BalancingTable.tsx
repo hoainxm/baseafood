@@ -15,13 +15,13 @@ import type {
 import type { BalancingResult } from "@/lib/balancingCalc";
 import type { MaterialImportItem, WipProductionItem } from "@/types";
 import {
-  TEN_DONG_KHO,
-  dungHangNL,
-  dungHangTP,
-  nhanNgay,
-  ngayTrongKy,
-  tenKhachCanDoi,
-  type HangLuoiNL,
+  BALANCING_STOCK_LINE_NAMES,
+  buildMaterialGridRows,
+  buildFinishedGoodGridRows,
+  formatDayLabel,
+  getPeriodDates,
+  getBalancingCustomerName,
+  type MaterialGridRow,
 } from "@/lib/balancingGrid";
 import { Button } from "@/design-system";
 import { num } from "@/lib/format";
@@ -53,22 +53,22 @@ export default function BangCanDoi({
   onClose: () => void;
 }) {
   const tenMH = (id: string) => matHang.find((m) => m.id === id)?.name || "—";
-  const tenKH = (id: string) => tenKhachCanDoi(id, khach);
+  const tenKH = (id: string) => getBalancingCustomerName(id, khach);
 
-  const dates = ngayTrongKy(ky);
+  const dates = getPeriodDates(ky);
   /* Cùng thứ tự với lưới: Lấy xả đông đầu bảng, Gửi đông cuối bảng. */
-  const thuTu = (h: HangLuoiNL) => (h.loaiKho === "lay-xa-dong" ? 0 : h.loaiKho === "gui-dong" ? 2 : 1);
-  const materialRows = dungHangNL(nlVao, nhapDaGan).sort((a, b) => thuTu(a) - thuTu(b));
+  const thuTu = (h: MaterialGridRow) => (h.loaiKho === "lay-xa-dong" ? 0 : h.loaiKho === "gui-dong" ? 2 : 1);
+  const materialRows = buildMaterialGridRows(nlVao, nhapDaGan).sort((a, b) => thuTu(a) - thuTu(b));
   /* Cột chuyển kỳ đã bỏ ở khối NL — chỉ in khi kỳ cũ lỡ có số. */
   const hasLegacyCarryOver = materialRows.some((r) => r.chuyenKy !== 0);
   const materialById = new Map(nlVao.map((r) => [r.id, r]));
-  const stockRowName = (r: HangLuoiNL) => {
+  const stockRowName = (r: MaterialGridRow) => {
     const goc = materialById.get(r.id);
     const mt = goc && moTaDongKho ? moTaDongKho(goc) : "";
-    const ten = r.loaiKho && r.ten !== TEN_DONG_KHO[r.loaiKho] ? `${TEN_DONG_KHO[r.loaiKho]} · ${r.ten}` : r.ten;
+    const ten = r.loaiKho && r.ten !== BALANCING_STOCK_LINE_NAMES[r.loaiKho] ? `${BALANCING_STOCK_LINE_NAMES[r.loaiKho]} · ${r.ten}` : r.ten;
     return mt ? `${ten} — ${mt}` : ten;
   };
-  const finishedGoodRows = dungHangTP(tp, sanXuatDaGan);
+  const finishedGoodRows = buildFinishedGoodGridRows(tp, sanXuatDaGan);
   /* Nhieu cot ngay ⇒ in NGANG, neu khong bang bi cat mat cot cuoi. */
   const inNgang = dates.length > 3;
 
@@ -149,7 +149,7 @@ export default function BangCanDoi({
                 {!hideAmounts && <Th right>tỷ lệ</Th>}
                 {materialDateColumns.map((iso) => (
                   <Th key={iso} right>
-                    {nhanNgay(iso)}
+                    {formatDayLabel(iso)}
                   </Th>
                 ))}
                 {isMaterialDaysOpen && hasLegacyCarryOver && <Th right>Chuyển kỳ (cũ)</Th>}
@@ -217,7 +217,7 @@ export default function BangCanDoi({
                 {!hideAmounts && <Th right>T.tiền (usd)</Th>}
                 {dateColumns.map((iso) => (
                   <Th key={iso} right>
-                    {nhanNgay(iso)}
+                    {formatDayLabel(iso)}
                   </Th>
                 ))}
                 {dateColumns.length > 0 && <Th right>Tổng</Th>}

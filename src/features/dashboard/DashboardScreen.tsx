@@ -43,22 +43,22 @@ import { useDuLieuTruyXuat } from "@/features/shared/useDuLieuTruyXuat";
 import { KhoiCheDoDemo } from "@/features/shared/CheDoDemo";
 import { useAuth } from "@/lib/auth";
 import {
-  bangChuyen,
-  canhBaoChuoi,
-  chuoiTheoNgay,
-  dinhMucTheoMatHang,
-  dongChayKg,
-  ketQuaCacKy,
-  nhanLoaiCanhBao,
-  phanBoRa,
-  NGUONG_DINH_MUC,
-  type CanhBao,
-  type DuLieuDongChay,
-  type KetQuaKy,
-  type KhoangXem,
-} from "@/lib/dongChay";
-import { phamViKy, type KyXem } from "@/lib/periodUtils";
-import { num, viDate } from "@/lib/format";
+  buildFlowStages,
+  buildChainWarnings,
+  buildDailyFlowSeries,
+  computeYieldByProduct,
+  buildDataFlow,
+  computeAllPeriodResults,
+  getWarningKindLabel,
+  splitOutflows,
+  YIELD_RATIO_THRESHOLD,
+  type FlowWarning,
+  type DataFlowInput,
+  type PeriodBalancingResult,
+  type FlowRange,
+} from "@/lib/dataFlow";
+import { getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
+import { num, formatDateVN } from "@/lib/format";
 import type { Workshop } from "@/types";
 import {
   AlertTriangle,
@@ -77,7 +77,7 @@ import {
 
 /**
  * Tổng quan = "Dòng chảy số liệu" (spec docs/spec/che-do-demo.md §5b): kg nguyên liệu
- * vào ⇒ qua 5 khâu ⇒ ra đâu, kèm việc cần đốc. Mọi số tính ở `lib/dongChay.ts` (hàm
+ * vào ⇒ qua 5 khâu ⇒ ra đâu, kèm việc cần đốc. Mọi số tính ở `lib/dataFlow.ts` (hàm
  * thuần có test) trên đúng các sổ thật — sổ nào trống thì hình trống trung thực.
  */
 
@@ -92,7 +92,7 @@ interface WarehouseRow {
   soMH: number;
 }
 
-const KY_NHANH: { value: KyXem; label: string }[] = [
+const KY_NHANH: { value: ViewPeriod; label: string }[] = [
   { value: "ngay", label: "Ngày" },
   { value: "tuan", label: "Tuần" },
   { value: "thang", label: "Tháng" },
@@ -127,7 +127,7 @@ const SAC_KHAU: Record<string, SacPhanLoai> = {
   "xuat-ban": KIND_TONES.ban,
 };
 
-/** Tên + sắc + câu phụ cho từng phần của hai thanh "đi đâu" (id nút ở lib/dongChay). */
+/** Tên + sắc + câu phụ cho từng phần của hai thanh "đi đâu" (id nút ở lib/dataFlow). */
 const MATERIAL_PARTS: Record<string, { nhan: string; sac: SacPhanLoai; moTa?: string }> = {
   btp: { nhan: "Thành bán thành phẩm", sac: KIND_TONES.sanXuat },
   nd: { nhan: "Bán thẳng nội địa", sac: KIND_TONES.ban },
@@ -143,7 +143,7 @@ const WAREHOUSE_PARTS: Record<string, { nhan: string; sac: SacPhanLoai; moTa?: s
 };
 
 /** Lùi / tiến mốc kỳ một bước (ngày · tuần · tháng · năm). */
-function stepPeriod(ky: KyXem, moc: string, step: 1 | -1): string {
+function stepPeriod(ky: ViewPeriod, moc: string, step: 1 | -1): string {
   const d = new Date(`${moc}T00:00:00Z`);
   if (ky === "ngay") d.setUTCDate(d.getUTCDate() + step);
   else if (ky === "tuan") d.setUTCDate(d.getUTCDate() + 7 * step);
@@ -153,14 +153,14 @@ function stepPeriod(ky: KyXem, moc: string, step: 1 | -1): string {
 }
 
 /** Nhãn kỳ đang xem, ngắn: "Tháng 10/2026" · "Năm 2026" · "06/10 – 12/10/2026". */
-function periodLabel(ky: KyXem, tu: string, den: string): string {
-  if (ky === "ngay") return viDate(tu);
+function periodLabel(ky: ViewPeriod, tu: string, den: string): string {
+  if (ky === "ngay") return formatDateVN(tu);
   if (ky === "thang") return `Tháng ${tu.slice(5, 7)}/${tu.slice(0, 4)}`;
   if (ky === "nam") return `Năm ${tu.slice(0, 4)}`;
-  return `${viDate(tu)} – ${viDate(den)}`;
+  return `${formatDateVN(tu)} – ${formatDateVN(den)}`;
 }
 
-const LEVEL_LABELS: Record<CanhBao["muc"], { chu: string; loai: LoaiNhan }> = {
+const LEVEL_LABELS: Record<FlowWarning["muc"], { chu: string; loai: LoaiNhan }> = {
   loi: { chu: "Sổ sai", loai: "loi" },
   nhac: { chu: "Chưa làm", loai: "luu-y" },
   tin: { chu: "Để biết", loai: "phu" },
@@ -199,13 +199,13 @@ function Section({
 export default function DashboardScreen() {
   const navigate = useNavigate();
   const { laAdmin, canDangNhap } = useAuth();
-  const [ky, setKy] = useState<KyXem>("thang");
+  const [ky, setKy] = useState<ViewPeriod>("thang");
   const [moc, setMoc] = useState(homNay());
   const [tuTC, setTuTC] = useState(homNay());
   const [denTC, setDenTC] = useState(homNay());
   const [workshop, setWorkshop] = useState<Workshop | "">("");
-  const [tu, den] = phamViKy(ky, moc, tuTC, denTC);
-  const khoang: KhoangXem = useMemo(() => ({ tu, den, xuong: workshop }), [tu, den, workshop]);
+  const [tu, den] = getViewPeriodRange(ky, moc, tuTC, denTC);
+  const khoang: FlowRange = useMemo(() => ({ tu, den, xuong: workshop }), [tu, den, workshop]);
   const warningsRef = useRef<HTMLDivElement>(null);
 
   // ---- Nạp sổ ----
@@ -220,22 +220,22 @@ export default function DashboardScreen() {
   const [finishedOpening] = useFinishedGoodsOpeningStock();
   const [snapshots] = useNxtSnapshots();
 
-  const d: DuLieuDongChay = useMemo(
+  const d: DataFlowInput = useMemo(
     () => ({ ...dl, scraps, dailyLocks, productionLocks, periods, balancingInputs, balancingOutputs, materialOpening, finishedOpening }),
     [dl, scraps, dailyLocks, productionLocks, periods, balancingInputs, balancingOutputs, materialOpening, finishedOpening],
   );
 
-  // ---- Gom số (lib/dongChay) ----
-  const dataFlow = useMemo(() => dongChayKg(d, khoang), [d, khoang]);
-  const khau = useMemo(() => bangChuyen(d, khoang), [d, khoang]);
+  // ---- Gom số (lib/dataFlow) ----
+  const dataFlow = useMemo(() => buildDataFlow(d, khoang), [d, khoang]);
+  const khau = useMemo(() => buildFlowStages(d, khoang), [d, khoang]);
   // Chuỗi theo ngày dừng ở hôm nay — ngày tương lai chưa có số, vẽ ra chỉ là đường phẳng.
   const byDate = useMemo(() => {
     const today = homNay();
-    return chuoiTheoNgay(d, { ...khoang, den: khoang.den < today ? khoang.den : today });
+    return buildDailyFlowSeries(d, { ...khoang, den: khoang.den < today ? khoang.den : today });
   }, [d, khoang]);
-  const yieldRatio = useMemo(() => dinhMucTheoMatHang(d, khoang), [d, khoang]);
-  const warnings = useMemo(() => canhBaoChuoi(d, khoang, homNay()), [d, khoang]);
-  const cacKy = useMemo(() => ketQuaCacKy(d), [d]);
+  const yieldRatio = useMemo(() => computeYieldByProduct(d, khoang), [d, khoang]);
+  const warnings = useMemo(() => buildChainWarnings(d, khoang, homNay()), [d, khoang]);
+  const cacKy = useMemo(() => computeAllPeriodResults(d), [d]);
 
   const kgKhau = (k: string) => khau.find((x) => x.khoa === k)?.kg ?? 0;
   const inKg = kgKhau("nhap");
@@ -349,19 +349,19 @@ export default function DashboardScreen() {
     () => Object.fromEntries(dataFlow.nut.filter((n) => n.duongDan).map((n) => [n.id, n.duongDan as string])),
     [dataFlow],
   );
-  const toShares = (ds: ReturnType<typeof phanBoRa>, ten: typeof MATERIAL_PARTS): PhanChia[] =>
+  const toShares = (ds: ReturnType<typeof splitOutflows>, ten: typeof MATERIAL_PARTS): PhanChia[] =>
     ds.map((x) => ({ khoa: x.id, nhan: ten[x.id]?.nhan ?? x.nhan, sac: ten[x.id]?.sac ?? "xam", moTa: ten[x.id]?.moTa, giaTri: x.kg }));
   const materialOutflow = useMemo(
-    () => phanBoRa(dataFlow, (id) => id.startsWith("x:"), Object.keys(MATERIAL_PARTS)),
+    () => splitOutflows(dataFlow, (id) => id.startsWith("x:"), Object.keys(MATERIAL_PARTS)),
     [dataFlow],
   );
-  const outOfWarehouse = useMemo(() => phanBoRa(dataFlow, (id) => id === "kho", Object.keys(WAREHOUSE_PARTS)), [dataFlow]);
+  const outOfWarehouse = useMemo(() => splitOutflows(dataFlow, (id) => id === "kho", Object.keys(WAREHOUSE_PARTS)), [dataFlow]);
   const priorMaterialKg = dataFlow.canh.filter((c) => c.tu === "nlTruoc").reduce((s, c) => s + c.kg, 0);
   const priorWipStock = dataFlow.canh.filter((c) => c.tu === "tonBtpDau").reduce((s, c) => s + c.kg, 0);
   const wipRatio = materialOutflow.find((x) => x.id === "btp")?.tiLe ?? 0;
 
   // ---- Bảng việc cần đốc ----
-  const warningColumns: CotTong<CanhBao>[] = [
+  const warningColumns: CotTong<FlowWarning>[] = [
     {
       key: "muc",
       header: "Mức",
@@ -378,12 +378,12 @@ export default function DashboardScreen() {
         <div className="min-w-0">
           <div className="font-semibold text-foreground">{r.tieuDe}</div>
           <div className="text-sm text-muted-foreground">
-            {nhanLoaiCanhBao(r.loai)} · {r.chiTiet}
+            {getWarningKindLabel(r.loai)} · {r.chiTiet}
           </div>
         </div>
       ),
     },
-    { key: "ngay", header: "Ngày", render: (r) => (r.ngay ? viDate(r.ngay) : "—") },
+    { key: "ngay", header: "Ngày", render: (r) => (r.ngay ? formatDateVN(r.ngay) : "—") },
     {
       key: "xuong",
       header: "Xưởng",
@@ -402,7 +402,7 @@ export default function DashboardScreen() {
   ];
 
   // ---- Kỳ cân đối ----
-  const periodColumns: CotTong<KetQuaKy>[] = [
+  const periodColumns: CotTong<PeriodBalancingResult>[] = [
     {
       key: "ky",
       header: "Kỳ",
@@ -471,7 +471,7 @@ export default function DashboardScreen() {
         <div className="min-w-0">
           <div className="font-semibold text-foreground">{r.kho}</div>
           <div className="text-sm text-muted-foreground">
-            kỳ {viDate(r.periodFrom)} – {viDate(r.periodTo)} · {r.soMH} mặt hàng
+            kỳ {formatDateVN(r.periodFrom)} – {formatDateVN(r.periodTo)} · {r.soMH} mặt hàng
           </div>
         </div>
       ),
@@ -511,7 +511,7 @@ export default function DashboardScreen() {
       {/* Thanh lọc GỌN một hàng: kỳ (bấm nhanh) · lùi/tiến · xưởng. Tự chọn mới hiện ô ngày. */}
       <div className="grid gap-3 rounded-xl border bg-muted/30 p-3">
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-          <Tabs value={ky} onValueChange={(v) => setKy(v as KyXem)}>
+          <Tabs value={ky} onValueChange={(v) => setKy(v as ViewPeriod)}>
             <TabsList aria-label="Kỳ xem" className="flex-wrap group-data-horizontal/tabs:h-auto">
               {KY_NHANH.map((k) => (
                 <TabsTrigger key={k.value} value={k.value} title={`Xem số theo ${k.label.toLowerCase()}.`}>
@@ -673,7 +673,7 @@ export default function DashboardScreen() {
           tieuDe="Định mức theo mặt hàng"
           moTa={
             yieldRatio.binhQuan != null
-              ? `Chỉ tính mẻ đã gắn lô NL có cân kg. Bình quân ${num(yieldRatio.binhQuan)} — mặt hàng lệch quá ±${NGUONG_DINH_MUC * 100}% được ghi chú.`
+              ? `Chỉ tính mẻ đã gắn lô NL có cân kg. Bình quân ${num(yieldRatio.binhQuan)} — mặt hàng lệch quá ±${YIELD_RATIO_THRESHOLD * 100}% được ghi chú.`
               : "Chỉ tính mẻ đã gắn lô NL có cân kg."
           }
         >

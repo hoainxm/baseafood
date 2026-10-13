@@ -7,8 +7,8 @@ import { useState } from "react";
 import { Truck } from "lucide-react";
 import type { MaterialImportItem } from "@/types";
 import { Popover, PopoverContent, PopoverTrigger } from "@/design-system";
-import { chuyenTrongNgay, soChuyenNgay } from "@/lib/chuyenTrongNgay";
-import { num, viDate } from "@/lib/format";
+import { groupDailyShipments, countDailyShipments } from "@/lib/dailyShipments";
+import { num, formatDateVN } from "@/lib/format";
 
 /**
  * Kế toán dò ô ngày của lưới: "1.530 kg ngày 21/07 này gồm những chuyến nào, của
@@ -28,10 +28,10 @@ export function ChuyenTrongO({
   maLo: Map<string, string>;
 }) {
   const [mo, setMo] = useState(false);
-  const n = soChuyenNgay(dong, ngay);
+  const n = countDailyShipments(dong, ngay);
   if (n === 0) return null;
   const suppliers = mo
-    ? chuyenTrongNgay(dong, ngay, [...maLo].map(([id, lotCode]) => ({ id, lotCode })))
+    ? groupDailyShipments(dong, ngay, [...maLo].map(([id, lotCode]) => ({ id, lotCode })))
     : [];
   return (
     <Popover open={mo} onOpenChange={setMo}>
@@ -40,7 +40,7 @@ export function ChuyenTrongO({
           type="button"
           // Không để phím Enter/↑↓ của lưới nhảy vào đây — nút phụ, không phải ô số.
           tabIndex={-1}
-          title={`Xem ${n} chuyến nhập ngày ${viDate(ngay)}: đại lý nào, chuyến nào, bao nhiêu kg, giá bao nhiêu.`}
+          title={`Xem ${n} chuyến nhập ngày ${formatDateVN(ngay)}: đại lý nào, chuyến nào, bao nhiêu kg, giá bao nhiêu.`}
           className="inline-flex items-center gap-1 rounded px-1 text-sm whitespace-nowrap text-primary underline decoration-dotted underline-offset-2 hover:bg-accent"
         >
           <Truck className="size-3.5" aria-hidden />
@@ -50,7 +50,7 @@ export function ChuyenTrongO({
       <PopoverContent align="end" className="w-auto max-w-[min(26rem,calc(100vw-1rem))] p-3">
         <div className="space-y-3">
           <p className="text-sm font-semibold text-foreground">
-            Ngày {viDate(ngay)} · {n} chuyến · {num(suppliers.reduce((s, d) => s + d.kg, 0))} kg
+            Ngày {formatDateVN(ngay)} · {n} chuyến · {num(suppliers.reduce((s, d) => s + d.kg, 0))} kg
           </p>
           {suppliers.map((d) => (
             <div key={d.daiLy} className="space-y-1">

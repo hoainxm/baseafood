@@ -15,35 +15,35 @@ import type {
 } from "@/types";
 import { BSF1_WAREHOUSES } from "@/types";
 import { uid } from "@/lib/db";
-import { num, todayISO, viDate } from "@/lib/format";
+import { num, todayISO, formatDateVN } from "@/lib/format";
 import { notify } from "@/design-system";
 import { calculateBalancing, type BalancingResult } from "@/lib/balancingCalc";
 import {
-  dungHangNL,
-  dungHangTP,
-  ghiNguocNhapNgay,
-  ghiNguocSanLuongNgay,
-  gomNhapTheoLoai,
-  gomSanXuatTheoMatHang,
-  hoNguyenLieu,
-  khoaMatHang,
-  chuyenKyChoNhan,
-  chuyenNhapTheoNgay,
-  cungHoNguyenLieu,
-  kyLienTruoc,
-  kyTrungNgayCungHo,
-  kyMauTP,
-  loaiDongKho,
-  dungDongMauTP,
-  dongMauConThieu,
-  goiYKhachGia,
-  type DongMauTP,
-  nhapHangHopLe,
-  nhapTrongKhoangNgay,
-  ngayTrongKy,
-  sanXuatHopLe,
-  type HangLuoiNL,
-  type HangLuoiTP,
+  buildMaterialGridRows,
+  buildFinishedGoodGridRows,
+  writeBackDailyImport,
+  writeBackDailyOutput,
+  groupImportsByMaterialType,
+  groupWipsByProduct,
+  getMaterialFamily,
+  productSpecKey,
+  listPendingCarryOvers,
+  filterAllImportsInPeriod,
+  isSameMaterialFamily,
+  findPreviousPeriod,
+  findOverlappingFamilyPeriods,
+  pickTemplatePeriod,
+  getBalancingStockLineKind,
+  buildFinishedGoodTemplateRows,
+  findMissingTemplateRows,
+  suggestCustomerPrice,
+  type FinishedGoodTemplateRow,
+  filterEligibleImports,
+  filterFreeImportsInPeriod,
+  getPeriodDates,
+  filterEligibleWips,
+  type MaterialGridRow,
+  type FinishedGoodGridRow,
 } from "@/lib/balancingGrid";
 import {
   useBalancingInputs,
@@ -58,16 +58,16 @@ import {
   useWipProductions,
 } from "@/lib/catalogRepo";
 import {
-  danhSachKhoGui,
-  danhSachLo,
-  dongBoSoKho,
-  soChoLechSoKho,
-  tachKhoGui,
-  thangCuaNgay,
-  type LuaChonLo,
-} from "@/lib/khoCanDoi";
-import { conDoTheoNgay, tinhSoTonNL, type SoTonNLKy } from "@/lib/inventoryMaterial";
-import { banNoiDiaTheoKy, type BanNoiDiaKy } from "@/lib/banNoiDia";
+  listDepositLocationOptions,
+  listThawLotOptions,
+  syncMonthlyStockLedger,
+  countMonthlyStockMismatches,
+  splitDepositLocation,
+  monthOfDate,
+  type LotOption,
+} from "@/lib/balancingStockLines";
+import { sumLeftoverByDay, computeMaterialNxt, type MaterialPeriodNxtRow } from "@/lib/inventoryMaterial";
+import { getPeriodDomesticSales, type PeriodDomesticSales } from "@/lib/domesticSales";
 
 /** Một ô ngày cần ghi về sổ nguồn. */
 export interface ONgay {
@@ -82,7 +82,7 @@ export interface PeriodGrid {
   ngay: string[];
   /* --- khối 1 --- */
   nlVao: BalancingInputItem[];
-  hangNL: HangLuoiNL[];
+  hangNL: MaterialGridRow[];
   nhapDaGan: MaterialImportItem[];
   nhapChoHut: MaterialImportItem[];
   /** Dòng sổ nhập trong khoảng ngày nhưng KHÁC họ nguyên liệu — chọn tay. */
@@ -103,13 +103,13 @@ export interface PeriodGrid {
   /** Ghi nhiều ô ngày về sổ Nhập hàng. Trả về false nếu bị từ chối. */
   ghiNhapNhieuNgay: (dsO: ONgay[]) => boolean;
   /** Tồn kho đông của họ NL này qua kỳ (tồn đầu · gửi đông · xả đông · tồn cuối) — sống theo từng phím gõ. */
-  tonKhoDong: SoTonNLKy | null;
+  tonKhoDong: MaterialPeriodNxtRow | null;
   /** Còn dở SX theo ngày chốt trong kỳ (cùng họ) — đối chiếu / điền nhanh dòng Gửi đông. */
   conDoSXTheoNgay: DailyQuantities;
   /** Đơn giá dòng Gửi đông gần nhất (kỳ trước, cùng họ) — gợi ý giá cho Lấy xả đông. */
   giaGuiDongTruoc: number | null;
   /** Lô (Sổ kho tháng) để chọn ĐÍCH DANH cho dòng Lấy xả đông — tháng của ngày đầu kỳ. */
-  luaChonLo: (selected: string[]) => LuaChonLo[];
+  luaChonLo: (selected: string[]) => LotOption[];
   /** Kho nhận cho dòng Gửi đông: "<sổ kho>|<vị trí>". */
   luaChonKhoGui: { value: string; label: string; phu?: string }[];
   /** Mô tả lô / kho của một dòng kho (bản in, nhãn). */
@@ -120,10 +120,10 @@ export interface PeriodGrid {
   ghiLaiSoKho: () => void;
   /** Bán nội địa tổ trưởng ghi ở /wip (sổ domestic_sales, mig 0054) trong kỳ, cùng họ —
    *  điền / đối chiếu dòng giảm "Bán nội địa". kg DƯƠNG theo ngày. */
-  banNoiDiaSX: BanNoiDiaKy;
+  banNoiDiaSX: PeriodDomesticSales;
   /* --- khối 2 --- */
   tp: BalancingOutputItem[];
-  hangTP: HangLuoiTP[];
+  hangTP: FinishedGoodGridRow[];
   sanXuatDaGan: WipProductionItem[];
   sanXuatChoHut: WipProductionItem[];
   ghiTP: (rows: BalancingOutputItem[]) => void;
@@ -131,11 +131,11 @@ export interface PeriodGrid {
   /** Kỳ làm mẫu cho khối 2 (kỳ gần nhất cùng họ NL có dòng) — null nếu chưa có. */
   kyMau: BalancingPeriod | null;
   /** Dòng mẫu CHƯA có trong kỳ — hiện ảo, gõ vào mới thành dòng thật. */
-  mauConThieu: DongMauTP[];
+  mauConThieu: FinishedGoodTemplateRow[];
   /** Toàn bộ dòng mẫu (để so "giá = kỳ trước"). */
-  mauTP: DongMauTP[];
+  mauTP: FinishedGoodTemplateRow[];
   /** Gợi ý khách · kênh · giá cho một mặt hàng mới vào kỳ (mẫu → kỳ gần nhất). */
-  goiY: (productId: string, spec: string) => Pick<DongMauTP, "customerId" | "channel" | "unitPrice"> | null;
+  goiY: (productId: string, spec: string) => Pick<FinishedGoodTemplateRow, "customerId" | "channel" | "unitPrice"> | null;
   /** Hút cả sổ nhập + sổ sản xuất trong một chạm (KHÔNG đụng sổ bán). */
   hutTatCaNguon: () => void;
   ghiSanXuatNhieuNgay: (dsO: ONgay[], backdateReason: string) => boolean;
@@ -192,7 +192,7 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
   /** Kỳ đã chốt ⇒ mọi ô khoá, mọi nút ghi ẩn. Mở lại ở thanh cuối màn. */
   const isLocked = Boolean(ky.isLocked);
 
-  const dates = useMemo(() => ngayTrongKy(ky), [ky]);
+  const dates = useMemo(() => getPeriodDates(ky), [ky]);
 
   /* ---------- Ngăn xếp hoàn tác (Ctrl+Z / Ctrl+Y) ----------
      Người dùng đến từ Excel, ở đó Ctrl+Z lùi được MỌI thứ vừa làm chứ không chỉ
@@ -276,17 +276,17 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
   const ngucanh = useMemo(
     () => ({
       nhanKy: `${ky.materialTypeName} ${ky.dateRangeDescription ?? ""}`.trim(),
-      hoNL: hoNguyenLieu(ky.materialTypeName),
+      hoNL: getMaterialFamily(ky.materialTypeName),
     }),
     [ky.materialTypeName, ky.dateRangeDescription]
   );
 
   /* MỘT chốt cho mọi lần ghi khối NL (gõ ô, dán khối, xoá dòng, gộp…): hai dòng kho
      (Lấy xả đông / Gửi đông) ghi THẲNG vào Sổ kho tháng theo kiểu đặt giá trị — xem
-     lib/khoCanDoi.ts. Sổ kho từ chối (vượt tồn lô, chưa chọn lô/kho) ⇒ KHÔNG ghi gì. */
+     lib/balancingStockLines.ts. Sổ kho từ chối (vượt tồn lô, chưa chọn lô/kho) ⇒ KHÔNG ghi gì. */
   const writeMaterials = useCallback(
     (rows: BalancingInputItem[], nhom = "nl"): boolean => {
-      const kq = dongBoSoKho(monthlyStock, materialInRows, rows, ngucanh);
+      const kq = syncMonthlyStockLedger(monthlyStock, materialInRows, rows, ngucanh);
       if (kq.loi) {
         notify.loi(kq.loi);
         return false;
@@ -315,7 +315,7 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
     [allImports, ky.id]
   );
   const importsToPull = useMemo(
-    () => nhapHangHopLe(ky, allImports).filter((r) => !r.balancingPeriodId),
+    () => filterEligibleImports(ky, allImports).filter((r) => !r.balancingPeriodId),
     [ky, allImports]
   );
   /* Khớp theo tên loại NL hay trượt vì sổ nhập ghi tên tự do. Giữ sẵn danh sách
@@ -323,30 +323,30 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
      báo "không có gì để lấy" trong khi sổ đầy số. */
   const otherTypeImports = useMemo(() => {
     const suggestedIds = new Set(importsToPull.map((r) => r.id));
-    return nhapTrongKhoangNgay(ky, allImports).filter((r) => !suggestedIds.has(r.id));
+    return filterFreeImportsInPeriod(ky, allImports).filter((r) => !suggestedIds.has(r.id));
   }, [ky, allImports, importsToPull]);
 
   /* Dòng đang bị kỳ KHÁC giữ. Không đếm được nhóm này thì khi người dùng lỡ hút
      vào nhầm kỳ, mọi kỳ sau chỉ thấy màn trống và không có manh mối nào. */
   const otherPeriodImports = useMemo(
     () =>
-      chuyenNhapTheoNgay(ky, allImports).filter(
+      filterAllImportsInPeriod(ky, allImports).filter(
         (r) => r.balancingPeriodId && r.balancingPeriodId !== ky.id
       ),
     [ky, allImports]
   );
 
   const overlappingPeriods = useMemo(
-    () => kyTrungNgayCungHo(ky, allPeriods) as BalancingPeriod[],
+    () => findOverlappingFamilyPeriods(ky, allPeriods) as BalancingPeriod[],
     [ky, allPeriods]
   );
   const isSamePeriodFamily = useCallback(
-    (r: MaterialImportItem) => cungHoNguyenLieu(r.materialTypeName, ky.materialTypeName),
+    (r: MaterialImportItem) => isSameMaterialFamily(r.materialTypeName, ky.materialTypeName),
     [ky.materialTypeName]
   );
 
   const importDiagnosis = useMemo(() => {
-    const trong = chuyenNhapTheoNgay(ky, allImports);
+    const trong = filterAllImportsInPeriod(ky, allImports);
     return {
       tongTrongKhoang: trong.length,
       chuaGan: importsToPull.length,
@@ -372,12 +372,12 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
       );
 
       /* Mỗi HỌ nguyên liệu một dòng lưới (lớn/nhỏ gộp chung); họ đã có dòng thì
-         giữ nguyên. gomNhapTheoLoai trả key theo họ nên so theo họ. */
+         giữ nguyên. groupImportsByMaterialType trả key theo họ nên so theo họ. */
       const existing = new Set(
-        materialInRows.filter((r) => r.autoSource === "imports").map((r) => hoNguyenLieu(r.name))
+        materialInRows.filter((r) => r.autoSource === "imports").map((r) => getMaterialFamily(r.name))
       );
       const toAdd: BalancingInputItem[] = [];
-      for (const [materialType, o] of gomNhapTheoLoai([...assignedImports, ...selectedIds])) {
+      for (const [materialType, o] of groupImportsByMaterialType([...assignedImports, ...selectedIds])) {
         if (existing.has(materialType)) continue;
         toAdd.push({
           id: uid(),
@@ -418,9 +418,9 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
         // Dòng lưới mang tên HỌ (lớn/nhỏ gộp) ⇒ tìm chuyến nhập theo HỌ; sửa ô
         // ngày gộp sẽ chỉnh chuyến size cuối cùng của ngày cho khớp tổng.
         const sameDayRows = current.filter(
-          (r) => hoNguyenLieu(r.materialTypeName) === o.khoa && r.deliveryDate === o.ngay
+          (r) => getMaterialFamily(r.materialTypeName) === o.khoa && r.deliveryDate === o.ngay
         );
-        const kq = ghiNguocNhapNgay(sameDayRows, o.kg);
+        const kq = writeBackDailyImport(sameDayRows, o.kg);
         if (kq.loai === "tuChoi") {
           notify.loi(kq.lyDo);
           return false;
@@ -430,7 +430,7 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
           current = current.map((r) => (r.id === kq.id ? { ...r, quantityKg: kq.kg } : r));
         } else {
           if (kq.kg === 0) continue;
-          const template = assignedImports.find((r) => hoNguyenLieu(r.materialTypeName) === o.khoa);
+          const template = assignedImports.find((r) => getMaterialFamily(r.materialTypeName) === o.khoa);
           const created: MaterialImportItem = {
             id: uid(),
             shipmentId: "",
@@ -467,7 +467,7 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
       ]);
       notify.daLuu(
         dsO.length === 1
-          ? `Đã ghi ${num(dsO[0].kg)} kg ngày ${viDate(dsO[0].ngay)} vào sổ nhập hàng`
+          ? `Đã ghi ${num(dsO[0].kg)} kg ngày ${formatDateVN(dsO[0].ngay)} vào sổ nhập hàng`
           : `Đã ghi ${dsO.length} ô vào sổ nhập hàng`,
         () => writeAllImports(prevRows)
       );
@@ -483,19 +483,19 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
     [allWips, ky.id]
   );
   const pendingWips = useMemo(
-    () => sanXuatHopLe(ky, allWips).filter((r) => !r.balancingPeriodId),
+    () => filterEligibleWips(ky, allWips).filter((r) => !r.balancingPeriodId),
     [ky, allWips]
   );
 
   /* ---------- Dòng mẫu khối 2 (A) + gợi ý khách/giá (B) ---------- */
-  const templatePeriod = useMemo(() => (isLocked ? null : kyMauTP(ky, allPeriods, allOutputs)), [isLocked, ky, allPeriods, allOutputs]);
+  const templatePeriod = useMemo(() => (isLocked ? null : pickTemplatePeriod(ky, allPeriods, allOutputs)), [isLocked, ky, allPeriods, allOutputs]);
   const finishedGoodTemplates = useMemo(
-    () => (templatePeriod ? dungDongMauTP(allOutputs.filter((r) => r.periodId === templatePeriod.id)) : []),
+    () => (templatePeriod ? buildFinishedGoodTemplateRows(allOutputs.filter((r) => r.periodId === templatePeriod.id)) : []),
     [templatePeriod, allOutputs]
   );
-  const missingTemplates = useMemo(() => dongMauConThieu(finishedGoodTemplates, finishedGoods), [finishedGoodTemplates, finishedGoods]);
+  const missingTemplates = useMemo(() => findMissingTemplateRows(finishedGoodTemplates, finishedGoods), [finishedGoodTemplates, finishedGoods]);
   const goiY = useCallback(
-    (productId: string, spec: string) => goiYKhachGia(productId, spec, finishedGoodTemplates, allOutputs, allPeriods, ky.id),
+    (productId: string, spec: string) => suggestCustomerPrice(productId, spec, finishedGoodTemplates, allOutputs, allPeriods, ky.id),
     [finishedGoodTemplates, allOutputs, allPeriods, ky.id]
   );
 
@@ -511,10 +511,10 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
     const existing = new Set(
       finishedGoods
         .filter((r) => r.autoSource === "production")
-        .map((r) => khoaMatHang(r.productId, r.spec ?? ""))
+        .map((r) => productSpecKey(r.productId, r.spec ?? ""))
     );
     const toAdd: BalancingOutputItem[] = [];
-    for (const [khoa, o] of gomSanXuatTheoMatHang([...assignedWips, ...pendingWips])) {
+    for (const [khoa, o] of groupWipsByProduct([...assignedWips, ...pendingWips])) {
       if (existing.has(khoa)) continue;
       const [productId, spec] = khoa.split("|");
       /* (B) Khách · kênh · giá lấy theo dòng mẫu / kỳ gần nhất — trước đây để trống
@@ -584,7 +584,7 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
           (r) =>
             r.productId === productId && r.spec === quyCach && r.productionDate === o.ngay
         );
-        const kq = ghiNguocSanLuongNgay(sameDayRows, o.kg);
+        const kq = writeBackDailyOutput(sameDayRows, o.kg);
         if (kq.loai === "tuChoi") {
           notify.loi(kq.lyDo);
           return false;
@@ -631,7 +631,7 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
       ]);
       notify.daLuu(
         dsO.length === 1
-          ? `Đã ghi ${num(dsO[0].kg)} kg ngày ${viDate(dsO[0].ngay)} vào sổ sản xuất`
+          ? `Đã ghi ${num(dsO[0].kg)} kg ngày ${formatDateVN(dsO[0].ngay)} vào sổ sản xuất`
           : `Đã ghi ${dsO.length} ô vào sổ sản xuất`,
         () => writeAllProductions(prevRows)
       );
@@ -642,8 +642,8 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
 
   /* ---------- Dòng lưới + kết quả ---------- */
 
-  const materialRows = useMemo(() => dungHangNL(materialInRows, assignedImports), [materialInRows, assignedImports]);
-  const finishedGoodRows = useMemo(() => dungHangTP(finishedGoods, assignedWips), [finishedGoods, assignedWips]);
+  const materialRows = useMemo(() => buildMaterialGridRows(materialInRows, assignedImports), [materialInRows, assignedImports]);
+  const finishedGoodRows = useMemo(() => buildFinishedGoodGridRows(finishedGoods, assignedWips), [finishedGoods, assignedWips]);
 
   /* Dòng hút đọc sản lượng thẳng từ sổ nguồn, nhưng `calculateBalancing` (bất
      biến, không sửa) đọc `quantityKg`. Tính kết quả từ bản đã đồng bộ thay vì
@@ -697,26 +697,26 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
 
   /* ---------- Kho đông: dòng Lấy xả đông / Gửi đông ---------- */
 
-  /* Cùng engine với sổ /nxt-nl (tinhSoTonNL) — gõ vào hai dòng kho là tồn đổi
+  /* Cùng engine với sổ /nxt-nl (computeMaterialNxt) — gõ vào hai dòng kho là tồn đổi
      ngay, không có bản sao số nào phải đồng bộ. Nhập tươi không cần ở đây ⇒ []. */
   const stockRows = useMemo(
     () =>
-      tinhSoTonNL(allPeriods, allMaterialRows, [], manualOpeningStock, productionLocks).find(
+      computeMaterialNxt(allPeriods, allMaterialRows, [], manualOpeningStock, productionLocks).find(
         (r) => r.periodId === ky.id
       ) ?? null,
     [allPeriods, allMaterialRows, manualOpeningStock, productionLocks, ky.id]
   );
-  const productionLeftoverByDate = useMemo(() => conDoTheoNgay(productionLocks, ky), [productionLocks, ky]);
-  const periodDomesticSales = useMemo(() => banNoiDiaTheoKy(domesticSales, ky), [domesticSales, ky]);
+  const productionLeftoverByDate = useMemo(() => sumLeftoverByDay(productionLocks, ky), [productionLocks, ky]);
+  const periodDomesticSales = useMemo(() => getPeriodDomesticSales(domesticSales, ky), [domesticSales, ky]);
 
   const prevFreezePrice = useMemo(() => {
-    const ho = hoNguyenLieu(ky.materialTypeName);
+    const ho = getMaterialFamily(ky.materialTypeName);
     const kyTheoId = new Map(allPeriods.map((k) => [k.id, k]));
     let latest: { ngay: string; gia: number } | null = null;
     for (const r of allMaterialRows) {
-      if (r.periodId === ky.id || r.unitPrice == null || loaiDongKho(r) !== "gui-dong") continue;
+      if (r.periodId === ky.id || r.unitPrice == null || getBalancingStockLineKind(r) !== "gui-dong") continue;
       const k = kyTheoId.get(r.periodId);
-      if (!k || hoNguyenLieu(k.materialTypeName) !== ho) continue;
+      if (!k || getMaterialFamily(k.materialTypeName) !== ho) continue;
       const d = k.endDate || k.startDate || "";
       if (ky.startDate && d >= ky.startDate) continue;
       if (!latest || d > latest.ngay) latest = { ngay: d, gia: r.unitPrice };
@@ -726,14 +726,14 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
 
   /* Sổ kho tháng: lô để Lấy xả đông (tháng của ngày đầu kỳ; tháng chưa mở ⇒ xem trước
      phần kế thừa) + kho nhận để Gửi đông + kiểm khớp. */
-  const periodMonth = thangCuaNgay(dates[0] ?? ky.startDate ?? "");
+  const periodMonth = monthOfDate(dates[0] ?? ky.startDate ?? "");
   const selectLot = useCallback(
-    (selected: string[]) => (periodMonth ? danhSachLo(monthlyStock, periodMonth, ngucanh.hoNL, selected) : []),
+    (selected: string[]) => (periodMonth ? listThawLotOptions(monthlyStock, periodMonth, ngucanh.hoNL, selected) : []),
     [monthlyStock, periodMonth, ngucanh.hoNL]
   );
   const storageOptions = useMemo(
     () =>
-      danhSachKhoGui(
+      listDepositLocationOptions(
         monthlyStock,
         BSF1_WAREHOUSES.filter((w) => w.type === "xi-nghiep").map((w) => w.name),
         storageLocations.map((k) => k.name)
@@ -747,17 +747,17 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
         return lo ? lo.label : "lô đã chọn không còn trong sổ kho";
       }
       if (r.stockLocation) {
-        const { warehouse, storageLocation } = tachKhoGui(r.stockLocation);
+        const { warehouse, storageLocation } = splitDepositLocation(r.stockLocation);
         return storageLocation || warehouse;
       }
       return "";
     },
     [selectLot]
   );
-  const stockLedgerDiff = useMemo(() => soChoLechSoKho(monthlyStock, materialInRows), [monthlyStock, materialInRows]);
+  const stockLedgerDiff = useMemo(() => countMonthlyStockMismatches(monthlyStock, materialInRows), [monthlyStock, materialInRows]);
   const rewriteStockLedger = useCallback(() => {
     const prevRows = monthlyStock;
-    const kq = dongBoSoKho(monthlyStock, [], materialInRows, ngucanh);
+    const kq = syncMonthlyStockLedger(monthlyStock, [], materialInRows, ngucanh);
     if (kq.loi) {
       notify.loi(kq.loi);
       return;
@@ -772,18 +772,18 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
 
   /* ---------- Chuyển kỳ từ kỳ liền trước ---------- */
 
-  const prevPeriod = useMemo(() => kyLienTruoc(ky, allPeriods), [ky, allPeriods]);
+  const prevPeriod = useMemo(() => findPreviousPeriod(ky, allPeriods), [ky, allPeriods]);
 
   const materialCarryOver = useMemo(() => {
     if (!prevPeriod) return [];
     const dong = allMaterialRows.filter((r) => r.periodId === prevPeriod.id);
-    return chuyenKyChoNhan(dong, (r) => r.name);
+    return listPendingCarryOvers(dong, (r) => r.name);
   }, [prevPeriod, allMaterialRows]);
 
   const finishedGoodCarryOver = useMemo(() => {
     if (!prevPeriod) return [];
     const dong = allOutputs.filter((r) => r.periodId === prevPeriod.id);
-    return chuyenKyChoNhan(dong, (r) => r.productId);
+    return listPendingCarryOvers(dong, (r) => r.productId);
   }, [prevPeriod, allOutputs]);
 
   /**

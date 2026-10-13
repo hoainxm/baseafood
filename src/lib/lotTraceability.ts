@@ -1,5 +1,5 @@
 // ============================================================
-// Tên file: src/lib/truyXuatLo.ts
+// Tên file: src/lib/lotTraceability.ts
 // Truy xuất theo LÔ: đọc mã QR, nhận diện lô, dựng cây truy NGƯỢC / truy XUÔI,
 // cân bằng khối lượng. Hàm THUẦN — không đọc/ghi dữ liệu, không đụng giao diện.
 // Thiết kế + căn cứ chuẩn (GS1 Digital Link · EPCIS · GDST · FSMA 204 · TT 02/2024):
@@ -8,7 +8,7 @@
 // Ba loại lô dùng đúng bản ghi đang có, KHÔNG thêm cột:
 //   S = lô NL  = MỘT DÒNG loại NL của chuyến nhập (material_imports), nhãn = lot_code
 //              của chuyến (chốt 2026-10-08: mỗi tem đúng một loại + kg của loại đó;
-//              `S:<id chuyến>` trước ngày đó vẫn đọc được — xem nutLo / timLo)
+//              `S:<id chuyến>` trước ngày đó vẫn đọc được — xem buildLotNode / findLots)
 //   W = lô BTP = một dòng sản xuất (production_wips), nhãn SUY RA
 //   P = lô TP  = một phiếu đóng gói (packagings),     nhãn SUY RA
 // Mối nối giữa các tầng: bảng lot_inputs (mig 0046) + export_items.wip_id (đã có)
@@ -35,10 +35,10 @@ import type {
   WipProductionItem,
   Workshop,
 } from "@/types";
-import { KHO_BAN_LE, KHO_TP, locBanLe, tinhTon, tinhTonTPTheoLo, truTonBTP } from "./inventory";
-import { kg as kgVi, viDate } from "./format";
+import { RETAIL_WAREHOUSE, FG_WAREHOUSE, filterRetailSales, computeWipStock, computeFinishedGoodLotStock, collectWipDeductions } from "./inventory";
+import { kg as kgVi, formatDateVN } from "./format";
 
-export interface DuLieuTruyXuat {
+export interface TraceData {
   shipments: readonly ImportShipment[];
   imports: readonly MaterialImportItem[];
   wips: readonly WipProductionItem[];
@@ -63,13 +63,13 @@ export interface DuLieuTruyXuat {
  * Lá cuối của cây truy xuôi — hàng đã rời xưởng:
  *   X = một dòng lệnh xuất theo đơn · B = một dòng bán lẻ · N = một dòng bán nội địa NL.
  */
-export type LoaiNut = LotKind | "X" | "B" | "N";
+export type TraceNodeKind = LotKind | "X" | "B" | "N";
 
 /** Lá "hàng đã ra khỏi xưởng" — dùng cho danh sách thu hồi. */
-export const laHangRa = (k: LoaiNut): k is "X" | "B" | "N" => k === "X" || k === "B" || k === "N";
+export const isOutboundKind = (k: TraceNodeKind): k is "X" | "B" | "N" => k === "X" || k === "B" || k === "N";
 
-export interface NutLo {
-  kind: LoaiNut;
+export interface LotNode {
+  kind: TraceNodeKind;
   id: string;
   /** Nhãn đọc được, in trên tem. */
   nhan: string;
@@ -86,7 +86,7 @@ export interface NutLo {
   mat: boolean;
 }
 
-export const TEN_LOAI: Record<LoaiNut, string> = {
+export const TRACE_KIND_LABELS: Record<TraceNodeKind, string> = {
   S: "Nguyên liệu",
   W: "Bán thành phẩm",
   P: "Thành phẩm",
@@ -104,11 +104,11 @@ const WORKSHOP_LETTER: Record<Workshop, string> = { Đông: "Đ", Cá: "C", Khô
  * cũng mở thẳng hộ chiếu lô. `origin` lấy lúc IN từ chính địa chỉ app đang chạy —
  * không ghi cứng tên miền trong code.
  */
-export function noiDungQr(kind: LotKind, id: string, origin: string): string {
+export function buildLotQrUrl(kind: LotKind, id: string, origin: string): string {
   return `${origin.replace(/\/+$/, "")}/#/qr?lo=${kind}:${encodeURIComponent(id)}`;
 }
 
-export type MaDaDoc = { kind: LotKind; id: string } | { ma: string };
+export type ScannedCode = { kind: LotKind; id: string } | { ma: string };
 
 /**
  * Đọc chuỗi quét được / gõ vào. Nhận CẢ BA dạng:
@@ -116,7 +116,7 @@ export type MaDaDoc = { kind: LotKind; id: string } | { ma: string };
  *  - mã trần `W:<id>`
  *  - mã lô trần của TEM CŨ (`Đ-260902-01`) — tem in trước đợt này vẫn dùng được.
  */
-export function docMaQr(text: string): MaDaDoc | null {
+export function docMaQr(text: string): ScannedCode | null {
   const t = (text ?? "").trim();
   if (!t) return null;
   const m = /[?&]lo=([^&#\s]+)/.exec(t);
@@ -132,25 +132,25 @@ const yymmdd = (iso: string) => (iso || "").replace(/-/g, "").slice(2, 8);
 const idSuffix = (id: string) => id.replace(/[^0-9a-zA-Z]/g, "").slice(-4).toUpperCase();
 
 /** Nhãn lô BTP suy ra từ mẻ SX: `BĐ-260918-7F3A`. Không lưu — luôn khớp bản ghi. */
-export const nhanLoBtp = (w: Pick<WipProductionItem, "id" | "workshop" | "productionDate">) =>
+export const formatWipLotLabel = (w: Pick<WipProductionItem, "id" | "workshop" | "productionDate">) =>
   `B${WORKSHOP_LETTER[w.workshop] ?? "X"}-${yymmdd(w.productionDate)}-${idSuffix(w.id)}`;
 
 /** Nhãn lô TP suy ra từ phiếu đóng gói: `TĐ-260918-C21B`. */
-export const nhanLoTp = (p: Pick<Packaging, "id" | "workshop" | "date">) =>
+export const formatFinishedGoodLotLabel = (p: Pick<Packaging, "id" | "workshop" | "date">) =>
   `T${WORKSHOP_LETTER[p.workshop] ?? "X"}-${yymmdd(p.date)}-${idSuffix(p.id)}`;
 
 /** Nhãn lô NL = mã lô của CHUYẾN (mọi loại NL cùng chuyến in cùng mã to trên tem, loại
  *  NL ở dòng mô tả); chuyến cũ chưa có mã thì suy như BTP/TP. */
-export const nhanLoNl = (s: Pick<ImportShipment, "id" | "workshop" | "deliveryDate" | "lotCode">) =>
+export const formatMaterialLotLabel = (s: Pick<ImportShipment, "id" | "workshop" | "deliveryDate" | "lotCode">) =>
   s.lotCode?.trim() || `N${WORKSHOP_LETTER[s.workshop] ?? "X"}-${yymmdd(s.deliveryDate)}-${idSuffix(s.id)}`;
 
 /** Các dòng loại NL của một chuyến = các lô NL của chuyến đó, theo thứ tự ghi. */
-export const dongCuaChuyen = (dl: Pick<DuLieuTruyXuat, "imports">, shipmentId: string) =>
+export const getShipmentLines = (dl: Pick<TraceData, "imports">, shipmentId: string) =>
   dl.imports.filter((m) => m.shipmentId === shipmentId).sort((a, b) => a.id.localeCompare(b.id));
 
 // ---------- Dựng nút ----------
 
-const productName = (dl: DuLieuTruyXuat, id: string) => {
+const productName = (dl: TraceData, id: string) => {
   const p = dl.products.find((x) => x.id === id);
   return p ? (p.code ? `${p.code} · ${p.name}` : p.name) : id || "—";
 };
@@ -158,10 +158,10 @@ const productName = (dl: DuLieuTruyXuat, id: string) => {
 /** kg hiển thị locale vi-VN (quy tắc 2): 7.842 kg. */
 const kgChu = (v: number) => kgVi(Math.round(v * 100) / 100);
 /** Ngày hiển thị dd/mm/yyyy (quy tắc 2 — locale vi-VN); trống thì "—". */
-const formatDate = (iso: string | undefined) => (iso ? viDate(iso) : "—");
+const formatDate = (iso: string | undefined) => (iso ? formatDateVN(iso) : "—");
 
 /** Nhãn lô đã CHỤP lúc gắn / in (lot_inputs · lot_dispatches · label_prints) — cho lô đã bị xóa. */
-function snapshotLabel(dl: DuLieuTruyXuat, kind: LotKind, id: string): string {
+function snapshotLabel(dl: TraceData, kind: LotKind, id: string): string {
   return (
     dl.lotInputs.find((l) => l.inputKind === kind && l.inputId === id)?.inputLabel ||
     (dl.lotDispatches ?? []).find((d) => d.lotKind === kind && d.lotId === id)?.lotLabel ||
@@ -171,8 +171,8 @@ function snapshotLabel(dl: DuLieuTruyXuat, kind: LotKind, id: string): string {
 }
 
 /** Dựng một nút lô từ loại + id. Bản ghi đã mất thì trả nút `mat` với nhãn đã chụp. */
-export function nutLo(kind: LoaiNut, id: string, dl: DuLieuTruyXuat): NutLo {
-  const mat = (label: string): NutLo => ({
+export function buildLotNode(kind: TraceNodeKind, id: string, dl: TraceData): LotNode {
+  const mat = (label: string): LotNode => ({
     kind, id, nhan: label, moTa: "(bản ghi không còn)", ngay: "", xuong: "", kg: 0, chiTiet: [], mat: true,
   });
   if (kind === "S") {
@@ -186,7 +186,7 @@ export function nutLo(kind: LoaiNut, id: string, dl: DuLieuTruyXuat): NutLo {
       const workshop = s?.workshop || m.workshop;
       return {
         kind, id,
-        nhan: s ? nhanLoNl(s) : `N${WORKSHOP_LETTER[workshop] ?? "X"}-${yymmdd(date)}-${idSuffix(m.id)}`,
+        nhan: s ? formatMaterialLotLabel(s) : `N${WORKSHOP_LETTER[workshop] ?? "X"}-${yymmdd(date)}-${idSuffix(m.id)}`,
         moTa: materialType, ngay: date, xuong: workshop, kg: m.quantityKg || 0, mat: false,
         chiTiet: [
           { nhan: "Loại NL", giaTri: materialType },
@@ -205,11 +205,11 @@ export function nutLo(kind: LoaiNut, id: string, dl: DuLieuTruyXuat): NutLo {
     // Tương thích: `S:<id chuyến>` (tem / dây lô ghi trước khi tách lô theo loại) ⇒ nút cả chuyến.
     const s = dl.shipments.find((x) => x.id === id);
     if (!s) return mat(snapshotLabel(dl, "S", id));
-    const dong = dongCuaChuyen(dl, id);
+    const dong = getShipmentLines(dl, id);
     const materialTypeNames = [...new Set(dong.map((m) => m.materialTypeName || m.category).filter(Boolean))];
     const kg = dong.reduce((t, m) => t + (m.quantityKg || 0), 0);
     return {
-      kind, id, nhan: nhanLoNl(s), moTa: materialTypeNames.join(", ") || "nguyên liệu",
+      kind, id, nhan: formatMaterialLotLabel(s), moTa: materialTypeNames.join(", ") || "nguyên liệu",
       ngay: s.deliveryDate, xuong: s.workshop, kg, mat: false,
       chiTiet: [
         { nhan: "Đại lý", giaTri: s.supplierName || "—" },
@@ -225,7 +225,7 @@ export function nutLo(kind: LoaiNut, id: string, dl: DuLieuTruyXuat): NutLo {
     const w = dl.wips.find((x) => x.id === id);
     if (!w) return mat(snapshotLabel(dl, "W", id));
     return {
-      kind, id, nhan: nhanLoBtp(w), moTa: productName(dl, w.productId),
+      kind, id, nhan: formatWipLotLabel(w), moTa: productName(dl, w.productId),
       ngay: w.productionDate, xuong: w.workshop, kg: w.quantityKg || 0, mat: false,
       chiTiet: [
         { nhan: "Mặt hàng", giaTri: productName(dl, w.productId) },
@@ -242,7 +242,7 @@ export function nutLo(kind: LoaiNut, id: string, dl: DuLieuTruyXuat): NutLo {
     const p = dl.packagings.find((x) => x.id === id);
     if (!p) return mat(snapshotLabel(dl, "P", id));
     return {
-      kind, id, nhan: nhanLoTp(p), moTa: productName(dl, p.toProductId),
+      kind, id, nhan: formatFinishedGoodLotLabel(p), moTa: productName(dl, p.toProductId),
       ngay: p.date, xuong: p.workshop, kg: p.outputKg || 0, mat: false,
       chiTiet: [
         { nhan: "Thành phẩm", giaTri: productName(dl, p.toProductId) },
@@ -259,7 +259,7 @@ export function nutLo(kind: LoaiNut, id: string, dl: DuLieuTruyXuat): NutLo {
     if (!b) return mat(id);
     const salesInvoice = (dl.salesInvoices ?? []).find((v) => v.id === b.invoiceId);
     const customer = salesInvoice ? dl.customers.find((c) => c.id === salesInvoice.customerId) : undefined;
-    const source = b.sourceWarehouse === KHO_TP ? "đóng gói" : b.sourceWarehouse === KHO_BAN_LE ? "block thô" : b.sourceWarehouse;
+    const source = b.sourceWarehouse === FG_WAREHOUSE ? "đóng gói" : b.sourceWarehouse === RETAIL_WAREHOUSE ? "block thô" : b.sourceWarehouse;
     return {
       kind, id, nhan: `Bán ${formatDate(b.deliveryDate)} → ${customer?.name ?? "khách ?"}`,
       moTa: productName(dl, b.productId), ngay: b.deliveryDate, xuong: salesInvoice?.workshop ?? "", kg: b.quantityKg || 0, mat: false,
@@ -314,14 +314,14 @@ const chuanMa = (s: string) => s.normalize("NFC").trim().toUpperCase();
  * nhãn) có thể trúng NHIỀU lô — mã lô cũ không đảm bảo duy nhất — nên trả MẢNG để
  * màn hình cho người chọn. Không bao giờ tự chọn bừa một cái.
  */
-export function timLo(ma: MaDaDoc, dl: DuLieuTruyXuat): NutLo[] {
+export function findLots(ma: ScannedCode, dl: TraceData): LotNode[] {
   // QR cũ `S:<id chuyến>` (trước khi tách lô theo loại) ⇒ trả các lô loại NL của chuyến để chọn.
   if ("kind" in ma && ma.kind === "S" && !dl.imports.some((m) => m.id === ma.id)) {
-    const dong = dongCuaChuyen(dl, ma.id);
-    if (dong.length) return dong.map((m) => nutLo("S", m.id, dl));
+    const dong = getShipmentLines(dl, ma.id);
+    if (dong.length) return dong.map((m) => buildLotNode("S", m.id, dl));
   }
   if ("kind" in ma) {
-    const n = nutLo(ma.kind, ma.id, dl);
+    const n = buildLotNode(ma.kind, ma.id, dl);
     const hasTrace =
       dl.lotInputs.some((l) => l.inputId === ma.id || l.outputId === ma.id) ||
       (dl.lotDispatches ?? []).some((d) => d.lotKind === ma.kind && d.lotId === ma.id);
@@ -330,9 +330,9 @@ export function timLo(ma: MaDaDoc, dl: DuLieuTruyXuat): NutLo[] {
   const k = chuanMa(ma.ma);
   return [
     // Mã lô in trên tem là mã CHUYẾN ⇒ trả mọi lô loại NL của chuyến đó cho người chọn.
-    ...dl.shipments.filter((s) => chuanMa(nhanLoNl(s)) === k).flatMap((s) => dongCuaChuyen(dl, s.id).map((m) => nutLo("S", m.id, dl))),
-    ...dl.wips.filter((w) => chuanMa(nhanLoBtp(w)) === k).map((w) => nutLo("W", w.id, dl)),
-    ...dl.packagings.filter((p) => chuanMa(nhanLoTp(p)) === k).map((p) => nutLo("P", p.id, dl)),
+    ...dl.shipments.filter((s) => chuanMa(formatMaterialLotLabel(s)) === k).flatMap((s) => getShipmentLines(dl, s.id).map((m) => buildLotNode("S", m.id, dl))),
+    ...dl.wips.filter((w) => chuanMa(formatWipLotLabel(w)) === k).map((w) => buildLotNode("W", w.id, dl)),
+    ...dl.packagings.filter((p) => chuanMa(formatFinishedGoodLotLabel(p)) === k).map((p) => buildLotNode("P", p.id, dl)),
   ];
 }
 
@@ -341,7 +341,7 @@ export function timLo(ma: MaDaDoc, dl: DuLieuTruyXuat): NutLo[] {
  * chuyến / quét QR cũ theo chuyến — ca thường ngày từ khi lô NL tách theo loại) hay
  * mã cũ trùng thật giữa các bản ghi khác nhau. `cungChuyen` = ca thứ nhất.
  */
-export function lyDoNhieuLo(ma: string, ds: readonly NutLo[], dl: Pick<DuLieuTruyXuat, "imports">): { cau: string; cungChuyen: boolean } {
+export function explainMultipleLots(ma: string, ds: readonly LotNode[], dl: Pick<TraceData, "imports">): { cau: string; cungChuyen: boolean } {
   const shipments = new Set(ds.map((n) => (n.kind === "S" ? dl.imports.find((m) => m.id === n.id)?.shipmentId : undefined)));
   const isSameShipment = ds.length > 1 && ds.every((n) => n.kind === "S") && shipments.size === 1 && !shipments.has(undefined);
   return isSameShipment
@@ -351,18 +351,18 @@ export function lyDoNhieuLo(ma: string, ds: readonly NutLo[], dl: Pick<DuLieuTru
 
 // ---------- Cây gia phả lô ----------
 
-export interface NhanhCay {
-  nut: NutLo;
+export interface TraceBranch {
+  nut: LotNode;
   /** kg của mối nối (đầu vào đã dùng / đầu ra đã nhận). null = chưa cân. */
   kg: number | null;
-  con: NhanhCay[];
+  con: TraceBranch[];
 }
 
 /**
  * Truy NGƯỢC: lô này làm từ những lô nào (nhiều tầng: TP → BTP → NL).
  * `sau` giới hạn độ sâu; `daQua` chặn vòng lặp nếu dữ liệu nhập sai thành vòng.
  */
-export function truyNguoc(kind: LoaiNut, id: string, dl: DuLieuTruyXuat, depth = 5, visited = new Set<string>()): NhanhCay[] {
+export function traceBackward(kind: TraceNodeKind, id: string, dl: TraceData, depth = 5, visited = new Set<string>()): TraceBranch[] {
   if (depth <= 0 || (kind !== "W" && kind !== "P")) return [];
   const khoa = `${kind}:${id}`;
   if (visited.has(khoa)) return [];
@@ -370,9 +370,9 @@ export function truyNguoc(kind: LoaiNut, id: string, dl: DuLieuTruyXuat, depth =
   return dl.lotInputs
     .filter((l) => l.outputKind === kind && l.outputId === id)
     .map((l) => ({
-      nut: nutLo(l.inputKind, l.inputId, dl),
+      nut: buildLotNode(l.inputKind, l.inputId, dl),
       kg: l.quantityKg,
-      con: truyNguoc(l.inputKind, l.inputId, dl, depth - 1, visited),
+      con: traceBackward(l.inputKind, l.inputId, dl, depth - 1, visited),
     }));
 }
 
@@ -386,30 +386,30 @@ const isLeavingFactory = (d: LotDispatch) => d.docKind === "sales_item" || d.doc
  * (BTP block thô / TP đóng gói) · bán nội địa (NL bán thẳng) — hai ngả sau qua
  * `lot_dispatches` (mig 0056).
  */
-export function truyXuoi(kind: LoaiNut, id: string, dl: DuLieuTruyXuat, depth = 5, visited = new Set<string>()): NhanhCay[] {
-  if (depth <= 0 || laHangRa(kind)) return [];
+export function traceForward(kind: TraceNodeKind, id: string, dl: TraceData, depth = 5, visited = new Set<string>()): TraceBranch[] {
+  if (depth <= 0 || isOutboundKind(kind)) return [];
   const khoa = `${kind}:${id}`;
   if (visited.has(khoa)) return [];
   visited.add(khoa);
-  const viaTransform: NhanhCay[] =
+  const viaTransform: TraceBranch[] =
     kind === "P"
       ? []
       : dl.lotInputs
           .filter((l) => l.inputKind === kind && l.inputId === id)
           .map((l) => ({
-            nut: nutLo(l.outputKind, l.outputId, dl),
+            nut: buildLotNode(l.outputKind, l.outputId, dl),
             kg: l.quantityKg,
-            con: truyXuoi(l.outputKind, l.outputId, dl, depth - 1, visited),
+            con: traceForward(l.outputKind, l.outputId, dl, depth - 1, visited),
           }));
-  const viaExport: NhanhCay[] =
+  const viaExport: TraceBranch[] =
     kind === "W"
       ? dl.exportItems
           .filter((x) => x.wipId === id)
-          .map((x) => ({ nut: nutLo("X", x.id, dl), kg: x.quantityKg || 0, con: [] }))
+          .map((x) => ({ nut: buildLotNode("X", x.id, dl), kg: x.quantityKg || 0, con: [] }))
       : [];
-  const viaSales: NhanhCay[] = (dl.lotDispatches ?? [])
+  const viaSales: TraceBranch[] = (dl.lotDispatches ?? [])
     .filter((d) => isLeavingFactory(d) && d.lotKind === kind && d.lotId === id)
-    .map((d) => ({ nut: nutLo(d.docKind === "domestic_sale" ? "N" : "B", d.docId, dl), kg: d.quantityKg, con: [] }));
+    .map((d) => ({ nut: buildLotNode(d.docKind === "domestic_sale" ? "N" : "B", d.docId, dl), kg: d.quantityKg, con: [] }));
   return [...viaTransform, ...viaExport, ...viaSales];
 }
 
@@ -432,9 +432,9 @@ export interface CanBang {
  *   BTP: sản xuất ↔ đóng gói + xuất theo lệnh + bán lẻ block thô
  *   TP : đóng gói ra ↔ bán lẻ
  */
-export function canBangLo(kind: LoaiNut, id: string, dl: DuLieuTruyXuat): CanBang | null {
+export function computeLotMassBalance(kind: TraceNodeKind, id: string, dl: TraceData): CanBang | null {
   if (kind !== "S" && kind !== "W" && kind !== "P") return null;
-  const n = nutLo(kind, id, dl);
+  const n = buildLotNode(kind, id, dl);
   if (n.mat) return null;
   const ra: CanBang["ra"] = [];
   let unbalancedCount = 0;
@@ -460,7 +460,7 @@ export function canBangLo(kind: LoaiNut, id: string, dl: DuLieuTruyXuat): CanBan
 }
 
 /** Sổ tồn theo lô dựng MỘT lần: id lô → kg còn (W: mẻ đã duyệt nhập kho · P: phiếu đóng gói). */
-export interface BangTonLo {
+export interface LotStockIndex {
   W: ReadonlyMap<string, number>;
   P: ReadonlyMap<string, number>;
 }
@@ -468,15 +468,15 @@ export interface BangTonLo {
 /**
  * Dựng sổ tồn BTP + TP theo lô một lượt. Màn / hàm cần tồn của NHIỀU lô (danh sách
  * gắn lô, tab Theo giai đoạn, thu hồi) dựng bảng này một lần rồi truyền vào
- * `tonKhoCuaLo` — gọi `tinhTon` cho từng lô là O(n²), ~3.000 mẻ/năm treo vài giây.
+ * `getLotStockKg` — gọi `computeWipStock` cho từng lô là O(n²), ~3.000 mẻ/năm treo vài giây.
  */
-export function bangTonKhoLo(dl: DuLieuTruyXuat): BangTonLo {
-  const wipStock = tinhTon(
+export function buildLotStockIndex(dl: TraceData): LotStockIndex {
+  const wipStock = computeWipStock(
     [...dl.wips],
     [...dl.exportItems],
-    truTonBTP([...(dl.salesItems ?? [])], [...dl.packagings], dl.lotInputs, dl.lotDispatches ?? [])
+    collectWipDeductions([...(dl.salesItems ?? [])], [...dl.packagings], dl.lotInputs, dl.lotDispatches ?? [])
   );
-  const finishedGoods = tinhTonTPTheoLo([...dl.packagings], locBanLe([...(dl.salesItems ?? [])], KHO_TP, dl.lotDispatches ?? []));
+  const finishedGoods = computeFinishedGoodLotStock([...dl.packagings], filterRetailSales([...(dl.salesItems ?? [])], FG_WAREHOUSE, dl.lotDispatches ?? []));
   return { W: new Map(wipStock.map((l) => [l.wipId, l.conLai])), P: new Map(finishedGoods.map((l) => [l.wipId, l.conLai])) };
 }
 
@@ -484,16 +484,16 @@ export function bangTonKhoLo(dl: DuLieuTruyXuat): BangTonLo {
  * Kg CÒN TRONG KHO của lô theo SỔ TỒN (khác cân bằng theo hồ sơ lô: sổ tồn trừ cả
  * dòng bán/đóng gói CHƯA gắn lô theo FIFO). BTP chưa duyệt nhập kho ⇒ null.
  * NL ⇒ null (tồn NL theo lô chưa có — doc 38).
- * Tra nhiều lô ⇒ truyền `bang` dựng sẵn bằng `bangTonKhoLo(dl)` (không thì dựng lại mỗi lần).
+ * Tra nhiều lô ⇒ truyền `bang` dựng sẵn bằng `buildLotStockIndex(dl)` (không thì dựng lại mỗi lần).
  */
-export function tonKhoCuaLo(kind: LoaiNut, id: string, dl: DuLieuTruyXuat, bang?: BangTonLo): number | null {
+export function getLotStockKg(kind: TraceNodeKind, id: string, dl: TraceData, bang?: LotStockIndex): number | null {
   if (kind !== "W" && kind !== "P") return null;
-  return (bang ?? bangTonKhoLo(dl))[kind].get(id) ?? null;
+  return (bang ?? buildLotStockIndex(dl))[kind].get(id) ?? null;
 }
 
 // ---------- Danh sách lô để CHỌN khi gắn ----------
 
-/** Lùi `ngay` ngày lịch. Tính hết bằng UTC (như `ngayTrongKy`) — giờ máy +07 mà đọc
+/** Lùi `ngay` ngày lịch. Tính hết bằng UTC (như `getPeriodDates`) — giờ máy +07 mà đọc
  *  nửa đêm địa phương rồi `toISOString` sẽ lùi thêm một ngày. */
 const lui = (iso: string, date: number) => {
   const d = new Date(`${iso}T00:00:00Z`);
@@ -509,9 +509,9 @@ const lui = (iso: string, date: number) => {
  *     bắt đầu truy xuất (lần gắn lô đầu tiên) — lô trước đó chưa ai theo dõi,
  *     liệt kê ra chỉ làm rối.
  */
-export function loNlDeChon(dl: DuLieuTruyXuat, workshop: Workshop, toDate: string, days = 45): NutLo[] {
+export function listSelectableMaterialLots(dl: TraceData, workshop: Workshop, toDate: string, days = 45): LotNode[] {
   const tu = lui(toDate, days);
-  const dongCua = (ds: ImportShipment[]) => ds.flatMap((s) => dongCuaChuyen(dl, s.id).map((m) => ({ s, m })));
+  const dongCua = (ds: ImportShipment[]) => ds.flatMap((s) => getShipmentLines(dl, s.id).map((m) => ({ s, m })));
   const recentLots = dongCua(
     dl.shipments
       .filter((s) => s.workshop === workshop && s.deliveryDate >= tu && s.deliveryDate <= toDate)
@@ -526,13 +526,13 @@ export function loNlDeChon(dl: DuLieuTruyXuat, workshop: Workshop, toDate: strin
       .sort((a, b) => a.deliveryDate.localeCompare(b.deliveryDate) || a.id.localeCompare(b.id))
   ).filter(
     ({ s, m }) =>
-      (assigned.has(m.id) || (!!batDau && s.deliveryDate >= batDau)) && (canBangLo("S", m.id, dl)?.con ?? 0) > 0
+      (assigned.has(m.id) || (!!batDau && s.deliveryDate >= batDau)) && (computeLotMassBalance("S", m.id, dl)?.con ?? 0) > 0
   );
-  return [...recentLots, ...olderOpenLots].map(({ m }) => nutLo("S", m.id, dl));
+  return [...recentLots, ...olderOpenLots].map(({ m }) => buildLotNode("S", m.id, dl));
 }
 
 /** Lô BTP gần đây để chọn khi gắn cho phiếu đóng gói: cùng xưởng (hàng đông trữ lâu ⇒ cửa sổ rộng). */
-export function loBtpDeChon(dl: DuLieuTruyXuat, workshop: Workshop, toDate: string, days = 120, productId?: string): NutLo[] {
+export function listSelectableWipLots(dl: TraceData, workshop: Workshop, toDate: string, days = 120, productId?: string): LotNode[] {
   const tu = lui(toDate, days);
   return dl.wips
     .filter((w) => w.workshop === workshop && w.productionDate >= tu && w.productionDate <= toDate)
@@ -541,12 +541,12 @@ export function loBtpDeChon(dl: DuLieuTruyXuat, workshop: Workshop, toDate: stri
         Number(b.productId === productId) - Number(a.productId === productId) ||
         b.productionDate.localeCompare(a.productionDate)
     )
-    .map((w) => nutLo("W", w.id, dl));
+    .map((w) => buildLotNode("W", w.id, dl));
 }
 
 // ---------- Danh sách lô để IN TEM hàng loạt ----------
 
-export interface LocLoDeIn {
+export interface LabelPrintFilter {
   /** yyyy-mm-dd, tính cả hai đầu. */
   tu: string;
   den: string;
@@ -562,16 +562,16 @@ const KIND_ORDER: Record<LotKind, number> = { S: 0, W: 1, P: 2 };
  * Mọi lô (NL · BTP · TP) trong khoảng ngày để in tem một lượt — MỚI trước, cùng
  * ngày thì theo chuỗi NL → BTP → TP. Ngày của lô: ngày hàng về · ngày SX · ngày đóng gói.
  */
-export function dsLoDeIn(dl: DuLieuTruyXuat, filter: LocLoDeIn): NutLo[] {
+export function listLotsToPrint(dl: TraceData, filter: LabelPrintFilter): LotNode[] {
   const trong = (date: string, workshop: Workshop) =>
     date >= filter.tu && date <= filter.den && (!filter.xuong || workshop === filter.xuong);
   const co = (k: LotKind) => filter.loai.includes(k);
   return [
     ...(co("S")
-      ? dl.shipments.filter((s) => trong(s.deliveryDate, s.workshop)).flatMap((s) => dongCuaChuyen(dl, s.id).map((m) => nutLo("S", m.id, dl)))
+      ? dl.shipments.filter((s) => trong(s.deliveryDate, s.workshop)).flatMap((s) => getShipmentLines(dl, s.id).map((m) => buildLotNode("S", m.id, dl)))
       : []),
-    ...(co("W") ? dl.wips.filter((w) => trong(w.productionDate, w.workshop)).map((w) => nutLo("W", w.id, dl)) : []),
-    ...(co("P") ? dl.packagings.filter((p) => trong(p.date, p.workshop)).map((p) => nutLo("P", p.id, dl)) : []),
+    ...(co("W") ? dl.wips.filter((w) => trong(w.productionDate, w.workshop)).map((w) => buildLotNode("W", w.id, dl)) : []),
+    ...(co("P") ? dl.packagings.filter((p) => trong(p.date, p.workshop)).map((p) => buildLotNode("P", p.id, dl)) : []),
   ].sort(
     (a, b) =>
       b.ngay.localeCompare(a.ngay) ||
@@ -582,9 +582,9 @@ export function dsLoDeIn(dl: DuLieuTruyXuat, filter: LocLoDeIn): NutLo[] {
 
 // ---------- Sổ in tem (mig 0049) ----------
 
-export const khoaLo = (kind: LotKind, id: string) => `${kind}:${id}`;
+export const lotKey = (kind: LotKind, id: string) => `${kind}:${id}`;
 
-export interface TomTatIn {
+export interface LabelPrintSummary {
   /** số lượt bấm In */
   lan: number;
   /** tổng số tem đã in */
@@ -594,10 +594,10 @@ export interface TomTatIn {
 }
 
 /** Gom sổ in tem theo lô: khóa `loại:id` → số lượt, số tem, lần in gần nhất. */
-export function tomTatIn(prints: readonly LabelPrint[]): Map<string, TomTatIn> {
-  const m = new Map<string, TomTatIn>();
+export function summarizeLabelPrints(prints: readonly LabelPrint[]): Map<string, LabelPrintSummary> {
+  const m = new Map<string, LabelPrintSummary>();
   for (const p of prints) {
-    const k = khoaLo(p.lotKind, p.lotId);
+    const k = lotKey(p.lotKind, p.lotId);
     const prev = m.get(k);
     if (!prev) m.set(k, { lan: 1, tem: p.copies, cuoi: p });
     else
@@ -614,15 +614,15 @@ export function tomTatIn(prints: readonly LabelPrint[]): Map<string, TomTatIn> {
  * Dòng sổ in cho một lượt in (mỗi lô một dòng). Bỏ nút không phải lô (hàng đã ra)
  * và lô đã mất. `soTem` = số tem đã in của từng lô (mặc định 1).
  */
-export function banGhiIn(
-  nuts: readonly NutLo[],
+export function buildLabelPrintRecords(
+  nuts: readonly LotNode[],
   printedBy: string,
   luc: string,
   newId: () => string,
-  countLabels: (n: NutLo) => number = () => 1
+  countLabels: (n: LotNode) => number = () => 1
 ): LabelPrint[] {
   return nuts
-    .filter((n): n is NutLo & { kind: LotKind } => !laHangRa(n.kind) && !n.mat)
+    .filter((n): n is LotNode & { kind: LotKind } => !isOutboundKind(n.kind) && !n.mat)
     .map((n) => ({
       id: newId(), lotKind: n.kind, lotId: n.id, label: n.nhan,
       copies: Math.max(1, Math.round(countLabels(n) || 1)), operator: printedBy, printedAt: luc,
@@ -634,7 +634,7 @@ export function banGhiIn(
 const chuan = (s: string | undefined) => (s ?? "").normalize("NFC").trim().toLowerCase();
 
 /** Họ NL của một lô NL: tên loại NL + loài (category). Lô = một dòng; mã cũ theo chuyến ⇒ mọi dòng. */
-function materialLotFamily(dl: DuLieuTruyXuat, loId: string) {
+function materialLotFamily(dl: TraceData, loId: string) {
   const importRow = dl.imports.find((m) => m.id === loId);
   const dong = importRow ? [importRow] : dl.imports.filter((m) => m.shipmentId === loId);
   const ten = new Set(dong.map((m) => chuan(m.materialTypeName)).filter(Boolean));
@@ -648,19 +648,19 @@ function materialLotFamily(dl: DuLieuTruyXuat, loId: string) {
 }
 
 /** Tên loại NL gắn trên mặt hàng của mẻ ("" = mặt hàng chưa gắn loại NL). */
-function batchMaterialName(dl: DuLieuTruyXuat, w: Pick<WipProductionItem, "productId">): string {
+function batchMaterialName(dl: TraceData, w: Pick<WipProductionItem, "productId">): string {
   const p = dl.products.find((x) => x.id === w.productId);
   return chuan((dl.materialTypes ?? []).find((t) => t.id === p?.materialTypeId)?.name);
 }
 
 /** Loài của mặt hàng một mẻ ("" = không rõ): category mặt hàng, rồi tới loài của loại NL gắn trên mặt hàng. */
-function materialTypeOfBatch(dl: DuLieuTruyXuat, w: Pick<WipProductionItem, "productId">): string {
+function materialTypeOfBatch(dl: TraceData, w: Pick<WipProductionItem, "productId">): string {
   const p = dl.products.find((x) => x.id === w.productId);
   if (!p) return "";
   return chuan(p.category) || chuan((dl.materialTypes ?? []).find((t) => t.id === p.materialTypeId)?.category);
 }
 
-export interface KetQuaGanPhien {
+export interface SessionLotInputResult {
   lotInputs: LotInput[];
   dispatches: LotDispatch[];
   /** Mẻ / dòng bán nội địa không khớp họ NL với lô nào của phiên — để người ghi tự gắn. */
@@ -679,19 +679,19 @@ export interface KetQuaGanPhien {
  *  - bán nội địa: lô đúng loại NL đó; không có thì lô cùng loài.
  * Cặp đã gắn rồi thì bỏ qua (không nhân đôi).
  */
-export function ganLoChoPhien(a: {
+export function assignSessionLots(a: {
   mes: readonly Pick<WipProductionItem, "id" | "productId">[];
   banNoiDia: readonly Pick<DomesticSaleItem, "id" | "materialTypeName">[];
-  loNl: readonly { nut: NutLo; cach: LotInput["method"] }[];
-  dl: DuLieuTruyXuat;
+  loNl: readonly { nut: LotNode; cach: LotInput["method"] }[];
+  dl: TraceData;
   nguoiGhi: string;
   luc: string;
   taoId: () => string;
-}): KetQuaGanPhien {
+}): SessionLotInputResult {
   const lots = a.loNl.filter((l) => l.nut.kind === "S" && !l.nut.mat).map((l) => ({ ...l, ho: materialLotFamily(a.dl, l.nut.id) }));
   const lotInputs: LotInput[] = [];
   const dispatches: LotDispatch[] = [];
-  const unmatched: KetQuaGanPhien["khongKhop"] = [];
+  const unmatched: SessionLotInputResult["khongKhop"] = [];
   if (!lots.length) return { lotInputs, dispatches, khongKhop: unmatched };
 
   for (const me of a.mes) {
@@ -727,7 +727,7 @@ export function ganLoChoPhien(a: {
 }
 
 /** Mẻ SX CHƯA gắn lô NL và CHƯA ghi lý do bỏ qua — chốt ngày phải xử lý hết. */
-export function meThieuLo<T extends Pick<WipProductionItem, "id">>(
+export function findBatchesWithoutLot<T extends Pick<WipProductionItem, "id">>(
   mes: readonly T[],
   lotInputs: readonly LotInput[],
   lotWaivers: readonly LotWaiver[]
@@ -741,14 +741,14 @@ export function meThieuLo<T extends Pick<WipProductionItem, "id">>(
 
 // ---------- Theo giai đoạn (đợt 2b) ----------
 
-export type KhoaGiaiDoan = "nhap" | "san-xuat" | "kho" | "dong-goi" | "xuat-ban";
+export type TraceStageKey = "nhap" | "san-xuat" | "kho" | "dong-goi" | "xuat-ban";
 
 /** Việc còn thiếu ở một mục: in tem · gắn lô · duyệt nhập kho · quét kiểm khi xếp xe. */
-export type ViecThieu = "tem" | "lo" | "duyet" | "quet";
+export type MissingTask = "tem" | "lo" | "duyet" | "quet";
 
-export interface MucGiaiDoan {
+export interface TraceStageItem {
   /** Lô (S/W/P) hoặc dòng hàng ra (X lệnh xuất · B bán lẻ · N bán nội địa). */
-  nut: NutLo;
+  nut: LotNode;
   /** Số tem đã in (lô S/W/P); undefined = không áp dụng. */
   daIn?: number;
   /** Số lô đầu vào đã gắn (W: lô NL · P: lô BTP) hoặc lô đã gắn cho hàng ra (B/N). */
@@ -768,13 +768,13 @@ export interface MucGiaiDoan {
   donId?: string;
   /** B: lô gắn cho dòng bán lẻ là BTP (block thô) hay TP (đóng gói). */
   loaiLoBan?: "W" | "P";
-  thieu: ViecThieu[];
+  thieu: MissingTask[];
 }
 
-export interface GiaiDoan {
-  khoa: KhoaGiaiDoan;
+export interface TraceStage {
+  khoa: TraceStageKey;
   ten: string;
-  muc: MucGiaiDoan[];
+  muc: TraceStageItem[];
 }
 
 /**
@@ -783,86 +783,86 @@ export interface GiaiDoan {
  * kho, quét kiểm) và VIỆC CÒN THIẾU — để kiểm QR từng khâu ở MỘT chỗ thay vì đi 7 màn.
  * Ngày của mục: ngày hàng về · ngày SX · ngày đóng gói · ngày xuất / bán.
  */
-export function theoGiaiDoan(dl: DuLieuTruyXuat, filter: { tu: string; den: string; xuong: Workshop | "" }): GiaiDoan[] {
+export function groupByTraceStage(dl: TraceData, filter: { tu: string; den: string; xuong: Workshop | "" }): TraceStage[] {
   const trong = (date: string, workshop: Workshop | "" | undefined) =>
     !!date && date >= filter.tu && date <= filter.den && (!filter.xuong || workshop === filter.xuong);
   const disp = dl.lotDispatches ?? [];
   const waivers = dl.lotWaivers ?? [];
-  const daIn = tomTatIn(dl.labelPrints ?? []);
-  const countLabels = (k: LotKind, id: string) => daIn.get(khoaLo(k, id))?.tem ?? 0;
+  const daIn = summarizeLabelPrints(dl.labelPrints ?? []);
+  const countLabels = (k: LotKind, id: string) => daIn.get(lotKey(k, id))?.tem ?? 0;
   const waiverReason = (k: "W" | "P", id: string) => waivers.find((x) => x.outputKind === k && x.outputId === id)?.reason;
   const countInputLots = (k: "W" | "P", id: string) => dl.lotInputs.filter((l) => l.outputKind === k && l.outputId === id).length;
   const countDispatchLots = (doc: LotDispatch["docKind"], id: string) => disp.filter((d) => d.docKind === doc && d.docId === id).length;
-  const missingLotLabels = (labelCount: number, lo: number, hasReason: boolean): ViecThieu[] => [
+  const missingLotLabels = (labelCount: number, lo: number, hasReason: boolean): MissingTask[] => [
     ...(lo === 0 && !hasReason ? (["lo"] as const) : []),
     ...(labelCount === 0 ? (["tem"] as const) : []),
   ];
-  const newestFirst = <T extends { nut: NutLo }>(a: T, b: T) => b.nut.ngay.localeCompare(a.nut.ngay) || a.nut.nhan.localeCompare(b.nut.nhan);
-  const lotStockTable = bangTonKhoLo(dl); // một lượt cho mọi lô — không tính lại sổ tồn từng dòng
+  const newestFirst = <T extends { nut: LotNode }>(a: T, b: T) => b.nut.ngay.localeCompare(a.nut.ngay) || a.nut.nhan.localeCompare(b.nut.nhan);
+  const lotStockTable = buildLotStockIndex(dl); // một lượt cho mọi lô — không tính lại sổ tồn từng dòng
 
-  const importStages: MucGiaiDoan[] = dl.shipments
+  const importStages: TraceStageItem[] = dl.shipments
     .filter((s) => trong(s.deliveryDate, s.workshop))
-    .flatMap((s) => dongCuaChuyen(dl, s.id))
+    .flatMap((s) => getShipmentLines(dl, s.id))
     .map((m) => {
       const labelCount = countLabels("S", m.id);
       const expected =
         new Set(dl.lotInputs.filter((l) => l.inputKind === "S" && l.inputId === m.id).map((l) => l.outputId)).size +
         disp.filter((d) => d.lotKind === "S" && d.lotId === m.id && d.docKind === "domestic_sale").length;
-      return { nut: nutLo("S", m.id, dl), daIn: labelCount, daDung: expected, thieu: labelCount === 0 ? (["tem"] as ViecThieu[]) : [] };
+      return { nut: buildLotNode("S", m.id, dl), daIn: labelCount, daDung: expected, thieu: labelCount === 0 ? (["tem"] as MissingTask[]) : [] };
     })
     .sort(newestFirst);
 
   const mes = dl.wips.filter((w) => trong(w.productionDate, w.workshop));
-  const wips: MucGiaiDoan[] = mes
+  const wips: TraceStageItem[] = mes
     .map((w) => {
       const labelCount = countLabels("W", w.id);
       const lo = countInputLots("W", w.id);
       const ld = waiverReason("W", w.id);
-      return { nut: nutLo("W", w.id, dl), daIn: labelCount, soLo: lo, lyDo: ld, kho: w.status, thieu: missingLotLabels(labelCount, lo, !!ld) };
+      return { nut: buildLotNode("W", w.id, dl), daIn: labelCount, soLo: lo, lyDo: ld, kho: w.status, thieu: missingLotLabels(labelCount, lo, !!ld) };
     })
     .sort(newestFirst);
 
-  const warehouse: MucGiaiDoan[] = mes
+  const warehouse: TraceStageItem[] = mes
     .map((w) => ({
-      nut: nutLo("W", w.id, dl),
+      nut: buildLotNode("W", w.id, dl),
       kho: w.status,
-      ton: w.status === "da-nhap" ? tonKhoCuaLo("W", w.id, dl, lotStockTable) : null,
+      ton: w.status === "da-nhap" ? getLotStockKg("W", w.id, dl, lotStockTable) : null,
       daIn: countLabels("W", w.id),
-      thieu: w.status === "cho-nhap" ? (["duyet"] as ViecThieu[]) : [],
+      thieu: w.status === "cho-nhap" ? (["duyet"] as MissingTask[]) : [],
     }))
     .sort((a, b) => Number(b.kho === "cho-nhap") - Number(a.kho === "cho-nhap") || newestFirst(a, b));
 
-  const packagingStages: MucGiaiDoan[] = dl.packagings
+  const packagingStages: TraceStageItem[] = dl.packagings
     .filter((p) => trong(p.date, p.workshop))
     .map((p) => {
       const labelCount = countLabels("P", p.id);
       const lo = countInputLots("P", p.id);
       const ld = waiverReason("P", p.id);
-      return { nut: nutLo("P", p.id, dl), daIn: labelCount, soLo: lo, lyDo: ld, ton: tonKhoCuaLo("P", p.id, dl, lotStockTable), thieu: missingLotLabels(labelCount, lo, !!ld) };
+      return { nut: buildLotNode("P", p.id, dl), daIn: labelCount, soLo: lo, lyDo: ld, ton: getLotStockKg("P", p.id, dl, lotStockTable), thieu: missingLotLabels(labelCount, lo, !!ld) };
     })
     .sort(newestFirst);
 
   const exportOrder = new Map(dl.exportOrders.map((o) => [o.id, o]));
   const workshopByWip = new Map(dl.wips.map((w) => [w.id, w.workshop]));
   const salesInvoiceById = new Map((dl.salesInvoices ?? []).map((v) => [v.id, v]));
-  const salesOutStages: MucGiaiDoan[] = [
+  const salesOutStages: TraceStageItem[] = [
     ...dl.exportItems
       .filter((x) => trong(exportOrder.get(x.exportId)?.exportDate ?? "", workshopByWip.get(x.wipId)))
       .map((x) => {
         const isScanned = countDispatchLots("export_item", x.id) > 0;
-        return { nut: nutLo("X", x.id, dl), daQuet: isScanned, lenhId: x.exportId, donId: exportOrder.get(x.exportId)?.orderId, thieu: isScanned ? [] : (["quet"] as ViecThieu[]) };
+        return { nut: buildLotNode("X", x.id, dl), daQuet: isScanned, lenhId: x.exportId, donId: exportOrder.get(x.exportId)?.orderId, thieu: isScanned ? [] : (["quet"] as MissingTask[]) };
       }),
     ...(dl.salesItems ?? [])
-      .filter((b) => (b.sourceWarehouse === KHO_BAN_LE || b.sourceWarehouse === KHO_TP) && trong(b.deliveryDate, salesInvoiceById.get(b.invoiceId)?.workshop))
+      .filter((b) => (b.sourceWarehouse === RETAIL_WAREHOUSE || b.sourceWarehouse === FG_WAREHOUSE) && trong(b.deliveryDate, salesInvoiceById.get(b.invoiceId)?.workshop))
       .map((b) => {
         const lo = countDispatchLots("sales_item", b.id);
-        return { nut: nutLo("B", b.id, dl), soLo: lo, loaiLoBan: (b.sourceWarehouse === KHO_TP ? "P" : "W") as "W" | "P", thieu: lo ? [] : (["lo"] as ViecThieu[]) };
+        return { nut: buildLotNode("B", b.id, dl), soLo: lo, loaiLoBan: (b.sourceWarehouse === FG_WAREHOUSE ? "P" : "W") as "W" | "P", thieu: lo ? [] : (["lo"] as MissingTask[]) };
       }),
     ...(dl.domesticSales ?? [])
       .filter((n) => trong(n.saleDate, n.workshop))
       .map((n) => {
         const lo = countDispatchLots("domestic_sale", n.id);
-        return { nut: nutLo("N", n.id, dl), soLo: lo, thieu: lo ? [] : (["lo"] as ViecThieu[]) };
+        return { nut: buildLotNode("N", n.id, dl), soLo: lo, thieu: lo ? [] : (["lo"] as MissingTask[]) };
       }),
   ].sort(newestFirst);
 
@@ -877,7 +877,7 @@ export function theoGiaiDoan(dl: DuLieuTruyXuat, filter: { tu: string; den: stri
 
 // ---------- Danh sách thu hồi (đợt 2b) ----------
 
-export interface DongThuHoi {
+export interface RecallRow {
   loai: "X" | "B" | "N";
   /** id dòng hàng ra (lệnh xuất / bán lẻ / bán nội địa) — để bỏ trùng khi gộp nhiều lô. */
   id: string;
@@ -895,10 +895,10 @@ export interface DongThuHoi {
  * Lô này nghi có vấn đề ⇒ ai đã nhận hàng (khách · ngày · chứng từ · kg) và
  * những lô BTP/TP còn trong xưởng cần khoanh lại. Đi hết cây truy xuôi.
  */
-export function danhSachThuHoi(kind: LoaiNut, id: string, dl: DuLieuTruyXuat): { hangRa: DongThuHoi[]; loTrongXuong: NutLo[] } {
-  const recallRows: DongThuHoi[] = [];
-  const lotsInPlant: NutLo[] = [];
-  const goc = nutLo(kind, id, dl);
+export function buildRecallList(kind: TraceNodeKind, id: string, dl: TraceData): { hangRa: RecallRow[]; loTrongXuong: LotNode[] } {
+  const recallRows: RecallRow[] = [];
+  const lotsInPlant: LotNode[] = [];
+  const goc = buildLotNode(kind, id, dl);
   if (goc.kind === "W" || goc.kind === "P") lotsInPlant.push(goc);
   const exportCustomer = (xId: string) => {
     const x = dl.exportItems.find((e) => e.id === xId);
@@ -911,7 +911,7 @@ export function danhSachThuHoi(kind: LoaiNut, id: string, dl: DuLieuTruyXuat): {
     const salesInvoice = b ? (dl.salesInvoices ?? []).find((v) => v.id === b.invoiceId) : undefined;
     return dl.customers.find((c) => c.id === salesInvoice?.customerId)?.name ?? "";
   };
-  const di = (tree: NhanhCay[], parent: NutLo) => {
+  const di = (tree: TraceBranch[], parent: LotNode) => {
     for (const nh of tree) {
       const n = nh.nut;
       if (n.kind === "X") {
@@ -928,26 +928,26 @@ export function danhSachThuHoi(kind: LoaiNut, id: string, dl: DuLieuTruyXuat): {
       }
     }
   };
-  di(truyXuoi(kind, id, dl), goc);
+  di(traceForward(kind, id, dl), goc);
   recallRows.sort((a, b) => a.ngay.localeCompare(b.ngay) || a.khach.localeCompare(b.khach));
   return { hangRa: recallRows, loTrongXuong: lotsInPlant };
 }
 
 /** Các lô NL CÙNG CHUYẾN với lô này (gồm chính nó) — để xem / thu hồi gộp theo chuyến. */
-export function loCungChuyen(id: string, dl: DuLieuTruyXuat): NutLo[] {
+export function findSameShipmentLots(id: string, dl: TraceData): LotNode[] {
   const m = dl.imports.find((x) => x.id === id);
-  return m ? dongCuaChuyen(dl, m.shipmentId).map((x) => nutLo("S", x.id, dl)) : [];
+  return m ? getShipmentLines(dl, m.shipmentId).map((x) => buildLotNode("S", x.id, dl)) : [];
 }
 
 /**
  * Thu hồi GỘP nhiều lô (vd mọi loại NL của một chuyến): nối danh sách của từng lô,
  * mỗi dòng hàng ra chỉ một lần (lấy lần gặp đầu), lô trong xưởng cũng bỏ trùng.
  */
-export function danhSachThuHoiNhieu(ds: readonly NutLo[], dl: DuLieuTruyXuat): { hangRa: DongThuHoi[]; loTrongXuong: NutLo[] } {
-  const recallRows: DongThuHoi[] = [];
-  const lotsInPlant: NutLo[] = [];
+export function buildRecallListForLots(ds: readonly LotNode[], dl: TraceData): { hangRa: RecallRow[]; loTrongXuong: LotNode[] } {
+  const recallRows: RecallRow[] = [];
+  const lotsInPlant: LotNode[] = [];
   for (const n of ds) {
-    const kq = danhSachThuHoi(n.kind, n.id, dl);
+    const kq = buildRecallList(n.kind, n.id, dl);
     for (const r of kq.hangRa) if (!recallRows.some((x) => x.loai === r.loai && x.id === r.id)) recallRows.push(r);
     for (const l of kq.loTrongXuong) if (!lotsInPlant.some((x) => x.kind === l.kind && x.id === l.id)) lotsInPlant.push(l);
   }
@@ -958,7 +958,7 @@ export function danhSachThuHoiNhieu(ds: readonly NutLo[], dl: DuLieuTruyXuat): {
 // ---------- Số tem mặc định (đợt 2b) ----------
 
 /** Mỗi block (BTP) / mỗi thùng-gói (TP) một tem; NL một tem cho chuyến. Sửa được khi in. */
-export function soTemMacDinh(n: Pick<NutLo, "kind" | "id">, dl: Pick<DuLieuTruyXuat, "wips" | "packagings">): number {
+export function getDefaultLabelCount(n: Pick<LotNode, "kind" | "id">, dl: Pick<TraceData, "wips" | "packagings">): number {
   const so =
     n.kind === "W" ? dl.wips.find((w) => w.id === n.id)?.blocksCount :
     n.kind === "P" ? dl.packagings.find((p) => p.id === n.id)?.outputUnits :

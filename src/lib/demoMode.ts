@@ -1,5 +1,5 @@
 // ============================================================
-// Tên file: src/lib/cheDo.ts
+// Tên file: src/lib/demoMode.ts
 // Tên tiếng Việt: Chế độ chạy — THẬT hay DEMO
 // Description: Demo-mode flag + pure key/site helpers (spec docs/spec/che-do-demo.md §4, §4b)
 // ============================================================
@@ -16,7 +16,7 @@
  *     không khóa demo nào trùng khóa thật. App bên trong vẫn dùng khóa gốc. CỘT KHÓA
  *     NGOẠI trỏ tới khóa chính đã có tiền tố (`period_id` → `balancing_periods.id`
  *     ở balancing_inputs / balancing_outputs / scraps) cũng phải mang tiền tố, không
- *     thì máy chủ từ chối (23503) — khai ở `AnhXaBang.cotThamChieu`.
+ *     thì máy chủ từ chối (23503) — khai ở `TableMapping.cotThamChieu`.
  *  3. Bản sao + hàng chờ dưới máy dùng khóa `bsf-demo.*` thay `bsf.*` — hàng chờ thật
  *     chưa gửi của máy đó không bao giờ bị lượt đồng bộ demo đẩy nhầm site.
  *
@@ -25,15 +25,15 @@
  */
 
 /** Cờ chế độ trong localStorage (khóa riêng, KHÔNG thuộc vùng `bsf.*` / `bsf-demo.*`). */
-export const KHOA_CHE_DO = "bsf1:che-do";
+export const APP_MODE_KEY = "bsf1:che-do";
 /** Gói số demo vừa sinh ở chế độ thật, chờ nạp khi sang chế độ demo. */
-export const KHOA_GOI_DEMO = "bsf1:demo-goi";
+export const DEMO_BUNDLE_KEY = "bsf1:demo-goi";
 export const SITE_DEMO = "site-demo";
-export const TIEN_TO_DEMO = "demo:";
+export const DEMO_KEY_PREFIX = "demo:";
 
 function docCo(): boolean {
   try {
-    return typeof localStorage !== "undefined" && localStorage.getItem(KHOA_CHE_DO) === "demo";
+    return typeof localStorage !== "undefined" && localStorage.getItem(APP_MODE_KEY) === "demo";
   } catch {
     return false;
   }
@@ -43,27 +43,27 @@ function docCo(): boolean {
 export const LA_DEMO: boolean = docCo();
 
 /** Khóa localStorage theo chế độ: `bsf.x` → `bsf-demo.x` khi demo; khóa khác giữ nguyên. */
-export function khoaLocal(k: string, demo: boolean = LA_DEMO): string {
+export function modeLocalKey(k: string, demo: boolean = LA_DEMO): string {
   return demo && k.startsWith("bsf.") ? `bsf-demo.${k.slice(4)}` : k;
 }
 
 /** Khóa chính gửi lên máy chủ: demo ⇒ thêm tiền tố (không thêm hai lần). */
-export function khoaLenMay(k: string, demo: boolean = LA_DEMO): string {
-  return demo && !k.startsWith(TIEN_TO_DEMO) ? `${TIEN_TO_DEMO}${k}` : k;
+export function toServerKey(k: string, demo: boolean = LA_DEMO): string {
+  return demo && !k.startsWith(DEMO_KEY_PREFIX) ? `${DEMO_KEY_PREFIX}${k}` : k;
 }
 
 /**
  * Khóa chính đọc từ máy chủ về khóa của app. Demo ⇒ bỏ tiền tố; dòng THIẾU tiền tố
  * (không phải dòng demo — không bao giờ nên có ở `site-demo`) ⇒ `null` để bỏ qua.
  */
-export function khoaTuMay(k: string, demo: boolean = LA_DEMO): string | null {
+export function fromServerKey(k: string, demo: boolean = LA_DEMO): string | null {
   if (!demo) return k;
-  return k.startsWith(TIEN_TO_DEMO) ? k.slice(TIEN_TO_DEMO.length) : null;
+  return k.startsWith(DEMO_KEY_PREFIX) ? k.slice(DEMO_KEY_PREFIX.length) : null;
 }
 
 /** Dòng (đã `toRow`) gửi lên: đổi khóa chính + cột khóa ngoại theo chế độ, gắn `site_id`.
  *  Cột khóa ngoại rỗng / null giữ nguyên (không trỏ đi đâu). */
-export function dongLenMay(
+export function rowToServer(
   row: Record<string, unknown>,
   keyColumn: string,
   siteId: string,
@@ -73,34 +73,34 @@ export function dongLenMay(
   const ra: Record<string, unknown> = { ...row, site_id: siteId };
   for (const c of [keyColumn, ...refColumns]) {
     const v = row[c];
-    if (v != null && v !== "") ra[c] = khoaLenMay(String(v), demo);
+    if (v != null && v !== "") ra[c] = toServerKey(String(v), demo);
   }
   return ra;
 }
 
 /** Dòng đọc từ máy chủ → bỏ tiền tố khóa; `null` = không thuộc chế độ này, bỏ qua. */
-export function dongTuMay(
+export function rowFromServer(
   row: Record<string, unknown>,
   keyColumn: string,
   demo: boolean = LA_DEMO,
   refColumns: readonly string[] = [],
 ): Record<string, unknown> | null {
   if (!demo) return row;
-  const k = khoaTuMay(String(row[keyColumn] ?? ""), demo);
+  const k = fromServerKey(String(row[keyColumn] ?? ""), demo);
   if (k == null) return null;
   const ra: Record<string, unknown> = { ...row, [keyColumn]: k };
   for (const c of refColumns) {
     const v = row[c];
-    if (typeof v === "string" && v.startsWith(TIEN_TO_DEMO)) ra[c] = v.slice(TIEN_TO_DEMO.length);
+    if (typeof v === "string" && v.startsWith(DEMO_KEY_PREFIX)) ra[c] = v.slice(DEMO_KEY_PREFIX.length);
   }
   return ra;
 }
 
 /** Bật / tắt chế độ demo rồi tải lại trang. */
-export function datCheDo(demo: boolean): void {
+export function setDemoMode(demo: boolean): void {
   try {
-    if (demo) localStorage.setItem(KHOA_CHE_DO, "demo");
-    else localStorage.removeItem(KHOA_CHE_DO);
+    if (demo) localStorage.setItem(APP_MODE_KEY, "demo");
+    else localStorage.removeItem(APP_MODE_KEY);
   } catch {
     /* chế độ riêng tư chặn localStorage — không bật được, giữ nguyên */
   }
@@ -117,7 +117,7 @@ const KHOA_VIEC_DEMO = "bsf1:demo-viec";
 /** Gói demo đang chờ nạp (null = không có / hỏng). */
 export function docGoiDemo<T>(): T | null {
   try {
-    const raw = localStorage.getItem(KHOA_GOI_DEMO);
+    const raw = localStorage.getItem(DEMO_BUNDLE_KEY);
     return raw ? (JSON.parse(raw) as T) : null;
   } catch {
     return null;
@@ -125,24 +125,24 @@ export function docGoiDemo<T>(): T | null {
 }
 
 /** Cất gói demo chờ nạp. `false` = không cất được (đầy bộ nhớ trình duyệt). */
-export function luuGoiDemo(goi: unknown): boolean {
+export function saveDemoBundle(goi: unknown): boolean {
   try {
-    localStorage.setItem(KHOA_GOI_DEMO, JSON.stringify(goi));
+    localStorage.setItem(DEMO_BUNDLE_KEY, JSON.stringify(goi));
     return true;
   } catch {
     return false;
   }
 }
 
-export function xoaGoiDemo(): void {
+export function clearDemoBundle(): void {
   try {
-    localStorage.removeItem(KHOA_GOI_DEMO);
+    localStorage.removeItem(DEMO_BUNDLE_KEY);
   } catch {
     /* bỏ qua */
   }
 }
 
-export function docViecDemo(): string | null {
+export function readDemoJob(): string | null {
   try {
     return localStorage.getItem(KHOA_VIEC_DEMO);
   } catch {
@@ -151,7 +151,7 @@ export function docViecDemo(): string | null {
 }
 
 /** Đặt / xóa (null) việc chờ sau khi tải lại. */
-export function datViecDemo(viec: "tao" | null): void {
+export function setPendingDemoTask(viec: "tao" | null): void {
   try {
     if (viec) localStorage.setItem(KHOA_VIEC_DEMO, viec);
     else localStorage.removeItem(KHOA_VIEC_DEMO);

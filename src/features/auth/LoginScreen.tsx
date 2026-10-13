@@ -5,7 +5,7 @@
 // ============================================================
 import { useState } from "react";
 import { Button, Card, Field, Input, Logo } from "@/design-system";
-import type { KetQuaDangNhap } from "@/lib/auth";
+import type { AuthResult } from "@/lib/auth";
 import { LogIn, TriangleAlert } from "lucide-react";
 
 /**
@@ -17,7 +17,7 @@ import { LogIn, TriangleAlert } from "lucide-react";
 export default function DangNhap({
   dangNhap,
 }: {
-  dangNhap: (username: string, matKhau: string) => Promise<KetQuaDangNhap>;
+  dangNhap: (username: string, matKhau: string) => Promise<AuthResult>;
 }) {
   const [username, setUsername] = useState("");
   const [matKhau, setMatKhau] = useState("");

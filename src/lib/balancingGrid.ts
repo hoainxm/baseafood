@@ -21,9 +21,9 @@ import { sumGridRow } from "@/types";
  * Chặn ở 62 ngày: quá mốc đó lưới không còn đọc được trên tablet, và một "kỳ"
  * dài vậy là dấu hiệu chọn nhầm khoảng ngày.
  */
-export const SO_NGAY_TOI_DA = 62;
+export const MAX_PERIOD_DAYS = 62;
 
-export function ngayTrongKy(ky: Pick<BalancingPeriod, "startDate" | "endDate">): string[] {
+export function getPeriodDates(ky: Pick<BalancingPeriod, "startDate" | "endDate">): string[] {
   const tu = ky.startDate;
   const den = ky.endDate || ky.startDate;
   if (!tu || !den || den < tu) return [];
@@ -34,7 +34,7 @@ export function ngayTrongKy(ky: Pick<BalancingPeriod, "startDate" | "endDate">):
      ra ngoài kỳ (dòng nhập hàng ngày 25 không hút được). */
   const d = new Date(`${tu}T00:00:00Z`);
   const end = new Date(`${den}T00:00:00Z`);
-  while (d.getTime() <= end.getTime() && ra.length < SO_NGAY_TOI_DA) {
+  while (d.getTime() <= end.getTime() && ra.length < MAX_PERIOD_DAYS) {
     ra.push(d.toISOString().slice(0, 10));
     d.setUTCDate(d.getUTCDate() + 1);
   }
@@ -42,7 +42,7 @@ export function ngayTrongKy(ky: Pick<BalancingPeriod, "startDate" | "endDate">):
 }
 
 /** Nhãn cột ngày: "22/7" — ngắn để lưới 5–8 cột vẫn vừa màn tablet. */
-export function nhanNgay(iso: string): string {
+export function formatDayLabel(iso: string): string {
   const [, m, d] = iso.split("-");
   return `${Number(d)}/${Number(m)}`;
 }
@@ -54,16 +54,16 @@ export function nhanNgay(iso: string): string {
  * "Bạch tuộc 2 da lớn (80↑)" và "Bạch tuộc 2 da nhỏ (80↓)" cùng họ
  * "Bạch tuộc 2 da" ⇒ một kỳ cân đối gom được cả hai, đúng bảng giấy.
  */
-export function hoNguyenLieu(ten: string): string {
+export function getMaterialFamily(ten: string): string {
   return ten
     .replace(/\s*(lớn|nhỏ)\s*\(\s*80\s*[↑↓]\s*\)\s*$/iu, "")
     .replace(/\s+/g, " ")
     .trim();
 }
 
-export function cungHoNguyenLieu(a: string, b: string): boolean {
-  const x = hoNguyenLieu(a).toLowerCase();
-  const y = hoNguyenLieu(b).toLowerCase();
+export function isSameMaterialFamily(a: string, b: string): boolean {
+  const x = getMaterialFamily(a).toLowerCase();
+  const y = getMaterialFamily(b).toLowerCase();
   return Boolean(x) && x === y;
 }
 
@@ -72,7 +72,7 @@ export function cungHoNguyenLieu(a: string, b: string): boolean {
  * đường chính dẫn tới hút nhầm: kỳ trước đã giữ hết chuyến đúng loại, kỳ trùng chỉ
  * còn thấy chuyến khác loại (VD 1 da khi kỳ là 2 da) trong hộp "Chọn dòng nhập".
  */
-export function kyTrungNgayCungHo(
+export function findOverlappingFamilyPeriods(
   ky: Pick<BalancingPeriod, "id" | "materialTypeName" | "startDate" | "endDate">,
   all: Pick<BalancingPeriod, "id" | "materialTypeName" | "startDate" | "endDate">[]
 ): typeof all {
@@ -80,7 +80,7 @@ export function kyTrungNgayCungHo(
   const den = ky.endDate || ky.startDate;
   if (!tu || !den) return [];
   return all.filter((k) => {
-    if (k.id === ky.id || !cungHoNguyenLieu(k.materialTypeName, ky.materialTypeName)) return false;
+    if (k.id === ky.id || !isSameMaterialFamily(k.materialTypeName, ky.materialTypeName)) return false;
     const kTu = k.startDate;
     const kDen = k.endDate || k.startDate;
     if (!kTu || !kDen) return false;
@@ -95,16 +95,16 @@ export function kyTrungNgayCungHo(
  * trong kỳ, và chưa bị kỳ nào khác giữ. Kỳ chưa khai ngày ⇒ không hút gì (tránh
  * kéo nhầm cả sổ vào một kỳ trống).
  */
-export function nhapHangHopLe(
+export function filterEligibleImports(
   ky: BalancingPeriod,
   imports: MaterialImportItem[]
 ): MaterialImportItem[] {
-  const dates = new Set(ngayTrongKy(ky));
+  const dates = new Set(getPeriodDates(ky));
   if (dates.size === 0) return [];
   return imports.filter(
     (r) =>
       dates.has(r.deliveryDate) &&
-      cungHoNguyenLieu(r.materialTypeName, ky.materialTypeName) &&
+      isSameMaterialFamily(r.materialTypeName, ky.materialTypeName) &&
       (!r.balancingPeriodId || r.balancingPeriodId === ky.id)
   );
 }
@@ -114,11 +114,11 @@ export function nhapHangHopLe(
  * KHÔNG lọc theo loại nguyên liệu — một lô nguyên liệu ra nhiều mặt hàng, và
  * mặt hàng không mang thông tin nguyên liệu nguồn.
  */
-export function sanXuatHopLe(
+export function filterEligibleWips(
   ky: BalancingPeriod,
   wips: WipProductionItem[]
 ): WipProductionItem[] {
-  const dates = new Set(ngayTrongKy(ky));
+  const dates = new Set(getPeriodDates(ky));
   if (dates.size === 0) return [];
   return wips.filter(
     (r) =>
@@ -130,7 +130,7 @@ export function sanXuatHopLe(
 /* ---------- Dòng ra/vào KHO ĐÔNG của khối nguyên liệu ---------- */
 
 /** Cờ nguồn kho (`source_warehouse`) của hàng kho đông chính xưởng. */
-export const KHO_MINH = "Kho mình";
+export const OWN_WAREHOUSE = "Kho mình";
 
 /**
  * Hai dòng cố định của khối NL: LẤY XẢ ĐÔNG (đầu bảng — lấy NL đông từ kho ra
@@ -141,16 +141,16 @@ export const KHO_MINH = "Kho mình";
  * cờ 0008), chiều theo `isReduction` (gửi đông là dòng giảm — gõ dương, lưu âm).
  * Dòng "nhận chuyển kỳ" cũ (Xả đông · Kho mình · chuyển kỳ dương) tự là lấy xả đông.
  */
-export type LoaiDongKho = "lay-xa-dong" | "gui-dong";
+export type BalancingStockLineKind = "lay-xa-dong" | "gui-dong";
 
-export function loaiDongKho(
+export function getBalancingStockLineKind(
   r: Pick<BalancingInputItem, "groupName" | "sourceWarehouse" | "isReduction">
-): LoaiDongKho | null {
-  if (r.groupName !== "Xả đông" || r.sourceWarehouse !== KHO_MINH) return null;
+): BalancingStockLineKind | null {
+  if (r.groupName !== "Xả đông" || r.sourceWarehouse !== OWN_WAREHOUSE) return null;
   return r.isReduction ? "gui-dong" : "lay-xa-dong";
 }
 
-export const TEN_DONG_KHO: Record<LoaiDongKho, string> = {
+export const BALANCING_STOCK_LINE_NAMES: Record<BalancingStockLineKind, string> = {
   "lay-xa-dong": "Lấy xả đông",
   "gui-dong": "Gửi đông",
 };
@@ -165,7 +165,7 @@ const tron3 = (x: number) => Math.round(x * 1000) / 1000;
  * `carryOverKg` (mọi công thức cũ đọc trường này), phần Nợ ở `debtKg`; số chuyển kỳ
  * cũ (chưa có `debtKg`) hiện ở cột Trả.
  */
-export function tachTraNo(r: Pick<BalancingOutputItem, "carryOverKg" | "debtKg">): {
+export function splitRepaidDebt(r: Pick<BalancingOutputItem, "carryOverKg" | "debtKg">): {
   tra: number;
   no: number;
 } {
@@ -174,11 +174,11 @@ export function tachTraNo(r: Pick<BalancingOutputItem, "carryOverKg" | "debtKg">
 }
 
 /** Patch ghi một trong hai cột, giữ nguyên cột kia. */
-export function ghiTraNo(
+export function setRepaidDebt(
   r: Pick<BalancingOutputItem, "carryOverKg" | "debtKg">,
   edit: { tra?: number; no?: number }
 ): Pick<BalancingOutputItem, "carryOverKg" | "debtKg"> {
-  const prev = tachTraNo(r);
+  const prev = splitRepaidDebt(r);
   const tra = edit.tra ?? prev.tra;
   const no = edit.no ?? prev.no;
   return { carryOverKg: tron3(tra + no), debtKg: no };
@@ -190,21 +190,21 @@ export function ghiTraNo(
  * Dòng bán thành phẩm BẮT BUỘC có khách — chưa biết khách thật thì chọn "Khác".
  * Là mục cố định (không nằm trong danh mục khách) để danh mục không lẫn khách ảo.
  */
-export const KHACH_KHAC = "khac";
+export const OTHER_CUSTOMER_ID = "khac";
 
-export function tenKhachCanDoi(id: string, customers: { id: string; name: string }[]): string {
-  if (id === KHACH_KHAC) return "Khác";
+export function getBalancingCustomerName(id: string, customers: { id: string; name: string }[]): string {
+  if (id === OTHER_CUSTOMER_ID) return "Khác";
   return customers.find((k) => k.id === id)?.name || "—";
 }
 
 /* ---------- Dựng dòng lưới ---------- */
 
-export interface HangLuoiNL {
+export interface MaterialGridRow {
   /** id của dòng balancing_inputs */
   id: string;
   ten: string;
   /** Dòng lấy xả đông / gửi đông (ra/vào kho đông) — null nếu là dòng thường. */
-  loaiKho: LoaiDongKho | null;
+  loaiKho: BalancingStockLineKind | null;
   nhom: BalancingInputItem["groupName"];
   theoNgay: DailyQuantities;
   chuyenKy: number;
@@ -222,19 +222,19 @@ export interface HangLuoiNL {
  * Gom sản lượng theo ngày của các dòng sổ nhập đã gắn kỳ, khoá theo TÊN loại
  * nguyên liệu (sổ nhập lưu theo tên, không phải khoá ngoại — xem 30-nhap-hang).
  */
-export function gomNhapTheoLoai(
+export function groupImportsByMaterialType(
   rows: MaterialImportItem[]
 ): Map<string, { theoNgay: DailyQuantities; ids: string[]; donGia: number | null }> {
   /* GỘP theo HỌ nguyên liệu: "Bạch tuộc 2 da lớn (80↑)" + "… nhỏ (80↓)" gom về
      MỘT dòng "Bạch tuộc 2 da" — chốt với chủ dự án: cân đối KHÔNG tách size, gộp
      chung. Sổ Nhập hàng vẫn ghi tên có size (truy nguyên); chỉ khi ĐƯA VÀO cân
-     đối mới gộp. Tên không có mốc 80↑/↓ giữ nguyên (hoNguyenLieu không cắt). */
+     đối mới gộp. Tên không có mốc 80↑/↓ giữ nguyên (getMaterialFamily không cắt). */
   const ra = new Map<
     string,
     { theoNgay: DailyQuantities; ids: string[]; donGia: number | null; tenNguon: Set<string> }
   >();
   for (const r of rows) {
-    const k = hoNguyenLieu(r.materialTypeName || "") || "(chưa ghi loại)";
+    const k = getMaterialFamily(r.materialTypeName || "") || "(chưa ghi loại)";
     const o = ra.get(k) ?? { theoNgay: {}, ids: [], donGia: null, tenNguon: new Set<string>() };
     o.theoNgay[r.deliveryDate] = (o.theoNgay[r.deliveryDate] ?? 0) + r.quantityKg;
     o.ids.push(r.id);
@@ -252,7 +252,7 @@ export function gomNhapTheoLoai(
   return out;
 }
 
-export interface HangLuoiTP {
+export interface FinishedGoodGridRow {
   /** id của dòng balancing_outputs */
   id: string;
   matHangId: string;
@@ -271,16 +271,16 @@ export interface HangLuoiTP {
 }
 
 /** Khoá gom dòng bán thành phẩm: một mặt hàng × một quy cách = một dòng lưới. */
-export function khoaMatHang(productId: string, spec: string): string {
+export function productSpecKey(productId: string, spec: string): string {
   return `${productId}|${spec || ""}`;
 }
 
-export function gomSanXuatTheoMatHang(
+export function groupWipsByProduct(
   rows: WipProductionItem[]
 ): Map<string, { theoNgay: DailyQuantities; ids: string[] }> {
   const ra = new Map<string, { theoNgay: DailyQuantities; ids: string[] }>();
   for (const r of rows) {
-    const k = khoaMatHang(r.productId, r.spec);
+    const k = productSpecKey(r.productId, r.spec);
     const o = ra.get(k) ?? { theoNgay: {}, ids: [] };
     o.theoNgay[r.productionDate] = (o.theoNgay[r.productionDate] ?? 0) + r.quantityKg;
     o.ids.push(r.id);
@@ -294,22 +294,22 @@ export function gomSanXuatTheoMatHang(
  * `autoSource = "imports"` lấy sản lượng ngày THẲNG từ sổ nhập (không chép
  * sang bảng cân đối) nên hai nơi không bao giờ lệch nhau.
  */
-export function dungHangNL(
+export function buildMaterialGridRows(
   inputs: BalancingInputItem[],
   assignedImports: MaterialImportItem[]
-): HangLuoiNL[] {
-  const byType = gomNhapTheoLoai(assignedImports);
+): MaterialGridRow[] {
+  const byType = groupImportsByMaterialType(assignedImports);
   return inputs.map((r) => {
     const isFromImports = r.autoSource === "imports";
     // Tra theo HỌ: gom nhập keyed theo họ, dòng lưới có thể mang tên họ (hút mới)
     // hoặc tên size cũ ⇒ chuẩn hoá r.name về họ khi tra.
-    const source = isFromImports ? byType.get(hoNguyenLieu(r.name)) : undefined;
+    const source = isFromImports ? byType.get(getMaterialFamily(r.name)) : undefined;
     const byDate = source ? source.theoNgay : (r.dailyQuantities ?? {});
     const carryOver = r.carryOverKg ?? 0;
     return {
       id: r.id,
       ten: r.name,
-      loaiKho: loaiDongKho(r),
+      loaiKho: getBalancingStockLineKind(r),
       nhom: r.groupName,
       theoNgay: byDate,
       chuyenKy: carryOver,
@@ -324,14 +324,14 @@ export function dungHangNL(
   });
 }
 
-export function dungHangTP(
+export function buildFinishedGoodGridRows(
   outputs: BalancingOutputItem[],
   assignedWips: WipProductionItem[]
-): HangLuoiTP[] {
-  const byProduct = gomSanXuatTheoMatHang(assignedWips);
+): FinishedGoodGridRow[] {
+  const byProduct = groupWipsByProduct(assignedWips);
   return outputs.map((r) => {
     const isFromProduction = r.autoSource === "production";
-    const source = isFromProduction ? byProduct.get(khoaMatHang(r.productId, r.spec ?? "")) : undefined;
+    const source = isFromProduction ? byProduct.get(productSpecKey(r.productId, r.spec ?? "")) : undefined;
     const byDate = source ? source.theoNgay : (r.dailyQuantities ?? {});
     const carryOver = r.carryOverKg ?? 0;
     return {
@@ -343,7 +343,7 @@ export function dungHangTP(
       donGia: r.unitPrice,
       theoNgay: byDate,
       chuyenKy: carryOver,
-      ...tachTraNo(r),
+      ...splitRepaidDebt(r),
       tong: sumGridRow(byDate, carryOver),
       tuSoSanXuat: isFromProduction,
       nguonIds: source?.ids ?? [],
@@ -358,7 +358,7 @@ export function dungHangTP(
  * nhất cùng họ nguyên liệu. Bảng cân đối giấy in sẵn cả danh sách này (kể cả dòng
  * không ra hàng) — người dùng chỉ điền số, không phải thêm từng dòng.
  */
-export interface DongMauTP {
+export interface FinishedGoodTemplateRow {
   /** Định danh DUY NHẤT của dòng mẫu (khoa + thứ tự) — cùng mặt hàng + khách có thể có
       nhiều dòng khác giá (bảng giấy: "2 da tẩm bột 9-12 · Seachemot" 7,95 và 9,2). */
   id: string;
@@ -371,7 +371,7 @@ export interface DongMauTP {
   unitPrice: number | null;
 }
 
-export const khoaDongTP = (productId: string, spec: string, customerId: string): string =>
+export const finishedGoodTemplateKey = (productId: string, spec: string, customerId: string): string =>
   `${productId}|${spec || ""}|${customerId || ""}`;
 
 type PeriodSummary = Pick<BalancingPeriod, "id" | "materialTypeName" | "startDate" | "endDate">;
@@ -382,14 +382,14 @@ const periodEnd = (k: Pick<BalancingPeriod, "startDate" | "endDate">) => k.endDa
  * Ưu tiên kỳ KẾT THÚC TRƯỚC kỳ này (mới nhất trước); không có thì lấy kỳ mới nhất
  * còn lại (VD kỳ đầu năm nhưng đã nhập kỳ sau trước).
  */
-export function kyMauTP<K extends PeriodSummary>(
+export function pickTemplatePeriod<K extends PeriodSummary>(
   ky: PeriodSummary,
   allPeriods: K[],
   allOutputs: Pick<BalancingOutputItem, "periodId" | "productId">[]
 ): K | null {
   const periodsWithRows = new Set(allOutputs.filter((r) => r.productId).map((r) => r.periodId));
   const ung = allPeriods
-    .filter((k) => k.id !== ky.id && periodsWithRows.has(k.id) && cungHoNguyenLieu(k.materialTypeName, ky.materialTypeName))
+    .filter((k) => k.id !== ky.id && periodsWithRows.has(k.id) && isSameMaterialFamily(k.materialTypeName, ky.materialTypeName))
     .sort((a, b) => periodEnd(b).localeCompare(periodEnd(a)));
   const batDau = ky.startDate || "";
   return ung.find((k) => batDau && periodEnd(k) && periodEnd(k) < batDau) ?? ung[0] ?? null;
@@ -399,12 +399,12 @@ export function kyMauTP<K extends PeriodSummary>(
  * Dòng mẫu từ các dòng khối 2 của kỳ mẫu, giữ thứ tự gốc. Cùng (mặt hàng, quy cách,
  * khách) mà KHÁC giá ⇒ vẫn là hai dòng (như bảng giấy); trùng cả giá ⇒ một dòng.
  */
-export function dungDongMauTP(templatePeriodRows: BalancingOutputItem[]): DongMauTP[] {
-  const ra = new Map<string, DongMauTP>();
+export function buildFinishedGoodTemplateRows(templatePeriodRows: BalancingOutputItem[]): FinishedGoodTemplateRow[] {
+  const ra = new Map<string, FinishedGoodTemplateRow>();
   const dem = new Map<string, number>();
   for (const r of templatePeriodRows) {
     if (!r.productId) continue;
-    const khoa = khoaDongTP(r.productId, r.spec ?? "", r.customerId);
+    const khoa = finishedGoodTemplateKey(r.productId, r.spec ?? "", r.customerId);
     const priceKey = `${khoa}|${r.unitPrice ?? ""}`;
     if (ra.has(priceKey)) continue;
     const thu = dem.get(khoa) ?? 0;
@@ -429,19 +429,19 @@ export function dungDongMauTP(templatePeriodRows: BalancingOutputItem[]): DongMa
  * hút từ sổ sản xuất cũ) ⇒ ẩn mọi dòng mẫu của mặt hàng đó: hiện thêm cạnh nó dễ khiến
  * người dùng gõ số hai lần cho cùng một mặt hàng.
  */
-export function dongMauConThieu(
-  template: DongMauTP[],
+export function findMissingTemplateRows(
+  template: FinishedGoodTemplateRow[],
   finishedGoods: Pick<BalancingOutputItem, "productId" | "spec" | "customerId">[]
-): DongMauTP[] {
+): FinishedGoodTemplateRow[] {
   const existing = new Map<string, number>();
   for (const r of finishedGoods) {
-    const k = khoaDongTP(r.productId, r.spec ?? "", r.customerId);
+    const k = finishedGoodTemplateKey(r.productId, r.spec ?? "", r.customerId);
     existing.set(k, (existing.get(k) ?? 0) + 1);
   }
-  const missingCustomerKeys = new Set(finishedGoods.filter((r) => !r.customerId).map((r) => khoaMatHang(r.productId, r.spec ?? "")));
+  const missingCustomerKeys = new Set(finishedGoods.filter((r) => !r.customerId).map((r) => productSpecKey(r.productId, r.spec ?? "")));
   const removed = new Map<string, number>();
   return template.filter((m) => {
-    if (missingCustomerKeys.has(khoaMatHang(m.productId, m.spec))) return false;
+    if (missingCustomerKeys.has(productSpecKey(m.productId, m.spec))) return false;
     const bo = removed.get(m.khoa) ?? 0;
     if (bo < (existing.get(m.khoa) ?? 0)) {
       removed.set(m.khoa, bo + 1);
@@ -457,14 +457,14 @@ export function dongMauConThieu(
  * 3) dòng GẦN NHẤT ở các kỳ khác (theo ngày cuối kỳ) cùng mặt hàng có đơn giá.
  * Không có gì ⇒ null (để trống, không bịa).
  */
-export function goiYKhachGia(
+export function suggestCustomerPrice(
   productId: string,
   spec: string,
-  template: DongMauTP[],
+  template: FinishedGoodTemplateRow[],
   allOutputs: BalancingOutputItem[],
   allPeriods: Pick<BalancingPeriod, "id" | "startDate" | "endDate">[],
   currentPeriod: string
-): Pick<DongMauTP, "customerId" | "channel" | "unitPrice"> | null {
+): Pick<FinishedGoodTemplateRow, "customerId" | "channel" | "unitPrice"> | null {
   const m =
     template.find((x) => x.productId === productId && x.spec === (spec || "")) ??
     template.find((x) => x.productId === productId);
@@ -482,7 +482,7 @@ export function goiYKhachGia(
 
 /* ---------- Ghi ngược ô ngày về sổ nguồn ---------- */
 
-export type KetQuaGhiNguoc =
+export type WriteBackResult =
   | { loai: "sua"; id: string; kg: number }
   | { loai: "them"; kg: number }
   | { loai: "tuChoi"; lyDo: string };
@@ -496,10 +496,10 @@ export type KetQuaGhiNguoc =
  *   vừa gõ, giữ nguyên các dòng trước. Nếu phải làm dòng cuối âm thì từ chối —
  *   thà bắt người dùng vào sổ Sản xuất sửa đúng dòng còn hơn bịa số.
  */
-export function ghiNguocSanLuongNgay(
+export function writeBackDailyOutput(
   daySources: WipProductionItem[],
   newKg: number
-): KetQuaGhiNguoc {
+): WriteBackResult {
   if (daySources.length === 0) return { loai: "them", kg: newKg };
   if (daySources.length === 1) {
     return { loai: "sua", id: daySources[0].id, kg: newKg };
@@ -520,16 +520,16 @@ export function ghiNguocSanLuongNgay(
  * Mọi dòng sổ nhập rơi trong khoảng ngày của kỳ và CHƯA kỳ nào giữ — bất kể
  * loại nguyên liệu.
  *
- * Vì sao cần: `nhapHangHopLe` lọc theo họ nguyên liệu, mà sổ nhập ghi loại NL
+ * Vì sao cần: `filterEligibleImports` lọc theo họ nguyên liệu, mà sổ nhập ghi loại NL
  * theo TÊN tự do (xem 30-nhap-hang). Xưởng gõ "2 da nguyên liệu" trong khi kỳ
  * tên "Bạch tuộc 2 da" ⇒ khớp tên thất bại và màn hình báo "không có gì để
  * lấy" dù sổ đầy số. Danh sách này là đường lui: cho người dùng tự tick dòng.
  */
-export function nhapTrongKhoangNgay(
+export function filterFreeImportsInPeriod(
   ky: BalancingPeriod,
   imports: MaterialImportItem[]
 ): MaterialImportItem[] {
-  const dates = new Set(ngayTrongKy(ky));
+  const dates = new Set(getPeriodDates(ky));
   if (dates.size === 0) return [];
   return imports.filter((r) => dates.has(r.deliveryDate) && !r.balancingPeriodId);
 }
@@ -542,24 +542,24 @@ export function nhapTrongKhoangNgay(
  * khai nhầm ngày (sổ lọc theo ngày HÀNG VỀ, không phải ngày ghi sổ). Không đếm
  * được ba con số này thì màn chỉ biết nói "chưa có nguyên liệu".
  */
-export function chuyenNhapTheoNgay(
+export function filterAllImportsInPeriod(
   ky: BalancingPeriod,
   imports: MaterialImportItem[]
 ): MaterialImportItem[] {
-  const dates = new Set(ngayTrongKy(ky));
+  const dates = new Set(getPeriodDates(ky));
   if (dates.size === 0) return [];
   return imports.filter((r) => dates.has(r.deliveryDate));
 }
 
 /**
  * Sửa một ô ngày của dòng nguyên liệu ⇒ ghi ngược về sổ Nhập hàng.
- * Cùng luật với `ghiNguocSanLuongNgay`: một dòng thì sửa thẳng, nhiều dòng thì
+ * Cùng luật với `writeBackDailyOutput`: một dòng thì sửa thẳng, nhiều dòng thì
  * chỉnh dòng CUỐI cho tổng ngày khớp, phải làm âm thì từ chối.
  */
-export function ghiNguocNhapNgay(
+export function writeBackDailyImport(
   daySources: MaterialImportItem[],
   newKg: number
-): KetQuaGhiNguoc {
+): WriteBackResult {
   if (daySources.length === 0) return { loai: "them", kg: newKg };
   if (daySources.length === 1) {
     return { loai: "sua", id: daySources[0].id, kg: newKg };
@@ -583,7 +583,7 @@ export function ghiNguocNhapNgay(
  * gần nhất. Dùng để lấy phần "chuyển kỳ âm" (hàng làm ra nhưng đẩy sang kỳ sau)
  * mà kỳ trước đã khai.
  */
-export function kyLienTruoc(
+export function findPreviousPeriod(
   ky: BalancingPeriod,
   allPeriods: BalancingPeriod[]
 ): BalancingPeriod | null {
@@ -593,14 +593,14 @@ export function kyLienTruoc(
     .filter(
       (k) =>
         k.id !== ky.id &&
-        cungHoNguyenLieu(k.materialTypeName, ky.materialTypeName) &&
+        isSameMaterialFamily(k.materialTypeName, ky.materialTypeName) &&
         (k.endDate || k.startDate || "") < batDau
     )
     .sort((a, b) => (b.endDate || b.startDate || "").localeCompare(a.endDate || a.startDate || ""));
   return prevRows[0] ?? null;
 }
 
-export interface DongChuyenKy {
+export interface CarryOverRow {
   /** id dòng ở kỳ TRƯỚC — đánh dấu đã nhận để không lấy hai lần. */
   nguonId: string;
   ten: string;
@@ -614,9 +614,9 @@ export interface DongChuyenKy {
  * dựng dòng có chuyển kỳ DƯƠNG bằng đúng trị tuyệt đối — vòng gối đầu khép lại
  * mà không ai phải mở file kỳ cũ ra chép tay.
  */
-export function chuyenKyChoNhan<
+export function listPendingCarryOvers<
   T extends { id: string; carryOverKg?: number; carryOverPeriodId?: string },
->(prevPeriodRows: T[], ten: (r: T) => string): DongChuyenKy[] {
+>(prevPeriodRows: T[], ten: (r: T) => string): CarryOverRow[] {
   return prevPeriodRows
     .filter((r) => (r.carryOverKg ?? 0) < 0 && !r.carryOverPeriodId)
     .map((r) => ({ nguonId: r.id, ten: ten(r), kg: Math.abs(r.carryOverKg ?? 0) }));

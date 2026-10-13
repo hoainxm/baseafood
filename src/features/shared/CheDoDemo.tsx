@@ -7,7 +7,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { FlaskConical, LogOut, RefreshCw } from "lucide-react";
 import { Button, ChoiceGroup, DangXuLy, XacNhan, homNay, notify } from "@/design-system";
 import {
-  datTamTatNhatKy,
+  setAuditPaused,
   useBalancingInputs,
   useBalancingOutputs,
   useBalancingPeriods,
@@ -42,8 +42,8 @@ import {
   useSuppliers,
   useWipProductions,
 } from "@/lib/catalogRepo";
-import { LA_DEMO, datCheDo, datViecDemo, docGoiDemo, docViecDemo, luuGoiDemo, xoaGoiDemo } from "@/lib/cheDo";
-import { quetThamSo, sinhGoiDemo, type GoiDemo, type NguonDemo } from "@/lib/sinhDemo";
+import { LA_DEMO, setDemoMode, setPendingDemoTask, docGoiDemo, readDemoJob, saveDemoBundle, clearDemoBundle } from "@/lib/demoMode";
+import { scanDemoParams, generateDemoBundle, type GoiDemo, type DemoSource } from "@/lib/demoGenerator";
 import { num } from "@/lib/format";
 
 
@@ -77,7 +77,7 @@ export function DaiDemo() {
         size="sm"
         variant="outline"
         className="bg-card text-foreground"
-        onClick={() => datCheDo(false)}
+        onClick={() => setDemoMode(false)}
       >
         <LogOut />
         Thoát demo
@@ -141,16 +141,16 @@ function NapGoiDemoThat({ goi }: { goi: GoiDemo }) {
   useEffect(() => {
     if (!xong || daNap.current) return;
     daNap.current = true;
-    datTamTatNhatKy(true);
+    setAuditPaused(true);
     try {
       for (const k of Object.keys(bang) as (keyof GoiDemo)[]) {
         const writer = bang[k][1] as (rows: unknown[]) => void;
         writer(goi[k] ?? []);
       }
     } finally {
-      datTamTatNhatKy(false);
+      setAuditPaused(false);
     }
-    xoaGoiDemo();
+    clearDemoBundle();
     const total = Object.values(goi).reduce((s, ds) => s + (ds as unknown[]).length, 0);
     notify.daLuu(`Đã nạp bộ demo: ${num(total)} dòng số trình diễn.`);
     setIsWritten(true);
@@ -177,8 +177,8 @@ export function KhoiCheDoDemo() {
 
 function DemoActiveSection() {
   const refresh = () => {
-    datViecDemo("tao");
-    datCheDo(false);
+    setPendingDemoTask("tao");
+    setDemoMode(false);
   };
   return (
     <section className="flex flex-wrap items-center gap-3 rounded-xl border-2 border-warning/50 bg-warning-surface p-4">
@@ -201,7 +201,7 @@ function DemoActiveSection() {
             </Button>
           }
         />
-        <Button title="Thoát chế độ demo, quay về số thật của xưởng." onClick={() => datCheDo(false)}>
+        <Button title="Thoát chế độ demo, quay về số thật của xưởng." onClick={() => setDemoMode(false)}>
           <LogOut />
           Thoát demo
         </Button>
@@ -228,26 +228,26 @@ function DemoGeneratorSection() {
   const [anonymize, setAnonymize] = useState("an");
   const [isCreating, setIsCreating] = useState(false);
 
-  const source: NguonDemo = useMemo(
+  const source: DemoSource = useMemo(
     () => ({ products, materialTypes, suppliers, customers, batterTypes, storageLocations, imports, wips, periods, balancingInputs, balancingOutputs, nxtSnapshots, monthlyStock }),
     [products, materialTypes, suppliers, customers, batterTypes, storageLocations, imports, wips, periods, balancingInputs, balancingOutputs, nxtSnapshots, monthlyStock],
   );
-  const thamSo = useMemo(() => quetThamSo(source), [source]);
+  const thamSo = useMemo(() => scanDemoParams(source), [source]);
 
   const createAndEnter = () => {
     setIsCreating(true);
-    const goi = sinhGoiDemo(source, { homNay: homNay(), anDanh: anonymize === "an", hat: Date.now() % 100_000 });
-    datViecDemo(null);
-    if (!luuGoiDemo(goi)) {
+    const goi = generateDemoBundle(source, { homNay: homNay(), anDanh: anonymize === "an", hat: Date.now() % 100_000 });
+    setPendingDemoTask(null);
+    if (!saveDemoBundle(goi)) {
       setIsCreating(false);
       notify.loi("Không tạo được bộ demo (bộ nhớ trình duyệt đầy?). Thử xóa bớt dữ liệu trình duyệt rồi làm lại.");
       return;
     }
-    datCheDo(true);
+    setDemoMode(true);
   };
 
   // Việc chờ từ chế độ demo ("Làm mới bộ demo"): nạp xong số thật thì tự sinh và vào lại.
-  const [pendingCreate] = useState(() => docViecDemo() === "tao");
+  const [pendingCreate] = useState(() => readDemoJob() === "tao");
   useEffect(() => {
     if (pendingCreate && daNap) createAndEnter();
     // taoVaVao tải lại trang ⇒ chỉ chạy một lần.
@@ -303,7 +303,7 @@ function DemoGeneratorSection() {
           <Button
             title="Vào chế độ demo, giữ nguyên bộ demo đã tạo lần trước."
             variant="outline"
-            onClick={() => datCheDo(true)}
+            onClick={() => setDemoMode(true)}
           >
             Vào demo (giữ bộ cũ)
           </Button>

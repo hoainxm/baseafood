@@ -8,43 +8,43 @@ import type { MonthlyStockLine, MaterialType, Product } from "@/types";
 import { MONTHLY_STOCK_CATEGORIES, BSF1_WAREHOUSES, STORAGE_KIND_LABELS } from "@/types";
 import { useMonthlyStock, useMaterialTypes, useProducts, useStorageLocations } from "@/lib/catalogRepo";
 import { uid } from "@/lib/db";
-import { chuan0, num, viDate } from "@/lib/format";
+import { chuan0, num, formatDateVN } from "@/lib/format";
 import {
-  parseBangKeKhoFile,
-  namTuTenFile,
-  khoTuTieuDe,
-  timKhoTheoGhi,
-  tenKhoMoi,
-  khoaKho,
+  parseStockStatementFile,
+  parseYearFromFileName,
+  parseWarehouseFromTitle,
+  findWarehouseByText,
+  buildNewWarehouseName,
+  toWarehouseKey,
   idDongNap,
   ghepNapLai,
-  type BangKeKhoSheet,
+  type StockStatementSheet,
 } from "@/lib/monthlyStockExcel";
 import {
   suyDong,
-  tongDong,
-  gomNhom,
-  donSangThang,
-  donKyVaoSo,
-  danhSachThang,
-  thangHienTai,
-  thangTruoc,
-  thangSau,
-  nhanThang,
-  soLechDonKy,
-  coLechDonKy,
-  doiChieuDonKy,
-  phanTichDongBoDanhMuc,
-  suyNhomNguyenLieu,
-  khoaLo,
-  theKhoMatHang,
-  laDongTrong,
-  apThaoTacLo,
-  type KieuThaoTac,
+  sumMonthlyStockRows,
+  groupByCategory,
+  buildCarryForwardLines,
+  carryForwardIntoLedger,
+  listMonths,
+  getCurrentMonth,
+  getPrevMonth,
+  getNextMonth,
+  formatMonthLabel,
+  measureCarryForwardGap,
+  hasCarryForwardGap,
+  compareCarryForward,
+  analyzeCatalogSync,
+  inferMaterialCategory,
+  stockLineKey,
+  buildProductStockCard,
+  isEmptyLine,
+  applyLotAction,
+  type LotActionKind,
   type MonthlyStockRow,
-  type DoiChieuDong,
-  type DichDanhMuc,
-  type DongBoDong,
+  type CarryForwardDiff,
+  type CatalogTarget,
+  type CatalogSyncItem,
 } from "@/lib/monthlyStock";
 import {
   KhungCuonNgang,
@@ -178,7 +178,7 @@ export default function MonthlyStockScreen() {
   const [products, setProducts] = useProducts();
   const [storageLocationCatalog, setStorageLocationCatalog] = useStorageLocations();
 
-  const [month, setMonth] = useState(thangHienTai());
+  const [month, setMonth] = useState(getCurrentMonth());
   const [warehouse, setWarehouse] = useState(ALL_WAREHOUSES);
   const [moIn, setMoIn] = useState(false);
   const [searchQuery, setSearchQuery] = useState(""); // tìm nhanh trong tháng (tên · size · xuất xứ · nhóm)
@@ -188,7 +188,7 @@ export default function MonthlyStockScreen() {
 
   // ---------- Nhập Excel bảng kê (seed số cũ) ----------
   const fileRef = useRef<HTMLInputElement>(null);
-  const [napForm, setNapForm] = useState<{ sheets: BangKeKhoSheet[]; nam: number; kho: string } | null>(null);
+  const [napForm, setNapForm] = useState<{ sheets: StockStatementSheet[]; nam: number; kho: string } | null>(null);
 
   // ---------- Tuỳ chọn tháng / kho ----------
   const monthsWithData = useMemo(
@@ -196,7 +196,7 @@ export default function MonthlyStockScreen() {
     [lines]
   );
   const monthOptions: MucChon[] = useMemo(
-    () => danhSachThang([...monthsWithData, month]).map((p) => ({ value: p, label: nhanThang(p) })),
+    () => listMonths([...monthsWithData, month]).map((p) => ({ value: p, label: formatMonthLabel(p) })),
     [monthsWithData, month]
   );
 
@@ -219,7 +219,7 @@ export default function MonthlyStockScreen() {
   }, [lines, month, warehouse]);
 
   // Tháng liền trước (mọi kho — dồn kỳ không bỏ sót kho nào).
-  const prevMonth = thangTruoc(month);
+  const prevMonth = getPrevMonth(month);
   const priorRows = useMemo(
     () => lines.filter((l) => l.period === prevMonth).map(suyDong),
     [lines, prevMonth]
@@ -230,12 +230,12 @@ export default function MonthlyStockScreen() {
    * dựng SẴN tồn đầu kế thừa để màn hình không "trống trơn" (đây là chỗ hay bị
    * hiểu là mất số liệu). Dòng xem trước CHƯA LƯU — người dùng bấm "Kế thừa & lưu"
    * mới ghi. Cố ý không tự ghi: dồn kỳ phải đi qua bước đối chiếu khi lô tách/đổi
-   * mã (xem `doiChieuDonKy`), tự ghi đè dễ cộng đôi.
+   * mã (xem `compareCarryForward`), tự ghi đè dễ cộng đôi.
    */
   const previewRows: MonthlyStockRow[] = useMemo(() => {
     if (savedRows.length > 0) return [];
     const source = priorRows.filter((r) => warehouse === ALL_WAREHOUSES || r.warehouse === warehouse);
-    return donSangThang(source, month).map(suyDong);
+    return buildCarryForwardLines(source, month).map(suyDong);
   }, [savedRows.length, priorRows, warehouse, month]);
 
   // Theo kho đang lọc (lọc một kho còn trống vẫn xem trước được); phần GHI chỉ dồn
@@ -246,20 +246,20 @@ export default function MonthlyStockScreen() {
   const rowsGoc = isPreview ? previewRows : savedRows;
 
   /** Số dòng không có số liệu trong phạm vi đang xem (để ghi trên nút ẩn/hiện). */
-  const emptyRowCount = useMemo(() => rowsGoc.filter(laDongTrong).length, [rowsGoc]);
+  const emptyRowCount = useMemo(() => rowsGoc.filter(isEmptyLine).length, [rowsGoc]);
 
   /** Ô tìm nhanh: tên · size · invoice · nhóm · kho · vị trí (không phân biệt hoa thường) + ẩn dòng trống. */
   const monthRows: MonthlyStockRow[] = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    const source = hideEmptyRows ? rowsGoc.filter((r) => !laDongTrong(r)) : rowsGoc;
+    const source = hideEmptyRows ? rowsGoc.filter((r) => !isEmptyLine(r)) : rowsGoc;
     if (!q) return source;
     return source.filter((r) =>
       `${r.itemName} ${r.size} ${r.origin} ${r.category} ${r.warehouse} ${r.storageLocation}`.toLowerCase().includes(q)
     );
   }, [rowsGoc, searchQuery, hideEmptyRows]);
 
-  const nhomList = useMemo(() => gomNhom(monthRows), [monthRows]);
-  const total = useMemo(() => tongDong(monthRows), [monthRows]);
+  const nhomList = useMemo(() => groupByCategory(monthRows), [monthRows]);
+  const total = useMemo(() => sumMonthlyStockRows(monthRows), [monthRows]);
   const invariantHolds = Math.abs(total.openKg + total.inKg - total.outKg - total.closeKg) < 0.001;
 
   // Dồn sang tháng sau dùng TOÀN BỘ dòng của tháng (mọi kho), không theo bộ lọc.
@@ -267,7 +267,7 @@ export default function MonthlyStockScreen() {
     () => lines.filter((l) => l.period === month).map(suyDong),
     [lines, month]
   );
-  // Theo KG (đơn vị ghi sổ) — cùng điều kiện lọc của `donSangThang`.
+  // Theo KG (đơn vị ghi sổ) — cùng điều kiện lọc của `buildCarryForwardLines`.
   const hasCarryForward = fullMonthRows.some((r) => Math.abs(r.closeKg) > 1e-9);
 
   /** Phạm vi kho khi kéo tồn tháng trước về (gõ ở xem trước / "Kế thừa"): tháng còn trống
@@ -276,20 +276,20 @@ export default function MonthlyStockScreen() {
   const carryWarehouse = () => (fullMonthRows.length === 0 || warehouse === ALL_WAREHOUSES ? undefined : warehouse);
 
   // Cờ lệch dồn kỳ: tồn đầu tháng này (mọi kho) vs tồn cuối tháng trước.
-  const lech = useMemo(() => soLechDonKy(priorRows, fullMonthRows), [priorRows, fullMonthRows]);
+  const lech = useMemo(() => measureCarryForwardGap(priorRows, fullMonthRows), [priorRows, fullMonthRows]);
   // Đang XEM TRƯỚC thì "lệch" chính là phần chưa dồn — banner xem trước đã nói rồi,
   // hiện thêm cảnh báo đỏ chỉ làm người dùng tưởng sai số liệu.
-  const showDiffWarning = priorRows.length > 0 && coLechDonKy(lech) && !isPreview;
+  const showDiffWarning = priorRows.length > 0 && hasCarryForwardGap(lech) && !isPreview;
 
   // Đối chiếu lệch theo MẶT HÀNG (chẩn đoán — người dùng tự sửa thẳng trên bảng).
-  const dsDoiChieu = useMemo(() => doiChieuDonKy(priorRows, fullMonthRows), [priorRows, fullMonthRows]);
+  const dsDoiChieu = useMemo(() => compareCarryForward(priorRows, fullMonthRows), [priorRows, fullMonthRows]);
   const [isCompareOpen, setIsCompareOpen] = useState(false);
 
   // Đồng bộ tên trong sổ ↔ CẢ HAI danh mục (loại NL + mặt hàng), định tuyến TỪNG DÒNG.
   // Thành phẩm (141 mã kế toán) CỐ ĐỊNH — không thêm ở đây.
   const catalogSync = useMemo(
     () =>
-      phanTichDongBoDanhMuc(
+      analyzeCatalogSync(
         [...new Set(lines.map((l) => l.itemName))],
         mtypes.map((m) => m.name),
         products.map((p) => p.name)
@@ -297,7 +297,7 @@ export default function MonthlyStockScreen() {
     [lines, mtypes, products]
   );
   const [isSyncOpen, setIsSyncOpen] = useState(false);
-  const [savedTargets, setSavedTargets] = useState<Record<string, DichDanhMuc>>({}); // đích từng dòng (đè gợi ý)
+  const [savedTargets, setSavedTargets] = useState<Record<string, CatalogTarget>>({}); // đích từng dòng (đè gợi ý)
   const [mapDB, setMapDB] = useState<Record<string, string>>({}); // ánh xạ tên file → tên chuẩn trong danh mục
 
   // ---------- Hoàn tác / làm lại (Ctrl+Z / Ctrl+Y) — như lưới Cân đối ----------
@@ -366,11 +366,11 @@ export default function MonthlyStockScreen() {
    */
   const baseLinesForWrite = (): { nen: MonthlyStockLine[]; keThua: number } => {
     if (!isPreview) return { nen: lines, keThua: 0 };
-    const kq = donKyVaoSo(lines, month, carryWarehouse());
+    const kq = carryForwardIntoLedger(lines, month, carryWarehouse());
     return { nen: kq.lines, keThua: kq.soDong };
   };
   const baoKeThua = (n: number) => {
-    if (n) notify.daLuu(`Đã kế thừa ${n} dòng tồn cuối ${nhanThang(prevMonth)} vào sổ ${nhanThang(month)} rồi ghi số vừa gõ`);
+    if (n) notify.daLuu(`Đã kế thừa ${n} dòng tồn cuối ${formatMonthLabel(prevMonth)} vào sổ ${formatMonthLabel(month)} rồi ghi số vừa gõ`);
   };
 
   const editLedger = (id: string, patch: Partial<MonthlyStockLine>, nhom?: string) => {
@@ -581,25 +581,25 @@ export default function MonthlyStockScreen() {
   };
 
   // ---------- Dồn kỳ ----------
-  /* Ghi qua `donKyVaoSo` (hàm thuần): dòng carry đã có chỉ đổi tồn đầu, giữ nhập/xuất,
+  /* Ghi qua `carryForwardIntoLedger` (hàm thuần): dòng carry đã có chỉ đổi tồn đầu, giữ nhập/xuất,
      vị trí, ghi chú, vết Cân đối; dòng carry mất nguồn về tồn đầu 0. */
   const viecVe0 = (kq: { veKhong: number; bo: number }) =>
     (kq.veKhong ? ` · ${kq.veKhong} dòng về tồn đầu 0 (tháng trước đã hết)` : "") +
     (kq.bo ? ` · bỏ ${kq.bo} dòng trống` : "");
 
   const carryFromPrevMonth = () => {
-    const kq = donKyVaoSo(lines, month, carryWarehouse());
+    const kq = carryForwardIntoLedger(lines, month, carryWarehouse());
     if (!kq.soDong && !kq.veKhong && !kq.bo) {
-      notify.canhBao(`${nhanThang(prevMonth)} không có tồn để dồn sang.`);
+      notify.canhBao(`${formatMonthLabel(prevMonth)} không có tồn để dồn sang.`);
       return;
     }
     writeLines(kq.lines);
-    notify.daLuu(`Đã kế thừa ${kq.soDong} dòng · ${num(kq.tongKg)} kg từ ${nhanThang(prevMonth)}${viecVe0(kq)}`);
+    notify.daLuu(`Đã kế thừa ${kq.soDong} dòng · ${num(kq.tongKg)} kg từ ${formatMonthLabel(prevMonth)}${viecVe0(kq)}`);
   };
 
   const carryToNextMonth = () => {
-    const target = thangSau(month);
-    const kq = donKyVaoSo(lines, target);
+    const target = getNextMonth(month);
+    const kq = carryForwardIntoLedger(lines, target);
     if (!kq.soDong && !kq.veKhong && !kq.bo) {
       notify.canhBao("Tháng này không còn tồn cuối để dồn sang.");
       return;
@@ -608,7 +608,7 @@ export default function MonthlyStockScreen() {
     setMonth(target);
     setWarehouse(ALL_WAREHOUSES);
     notify.daLuu(
-      `Đã dồn tồn cuối sang ${nhanThang(target)} · ${kq.soDong} dòng (${kq.them} mới, ${kq.capNhat} cập nhật tồn đầu, giữ nguyên nhập/xuất đã ghi)${viecVe0(kq)}`
+      `Đã dồn tồn cuối sang ${formatMonthLabel(target)} · ${kq.soDong} dòng (${kq.them} mới, ${kq.capNhat} cập nhật tồn đầu, giữ nguyên nhập/xuất đã ghi)${viecVe0(kq)}`
     );
   };
 
@@ -642,13 +642,13 @@ export default function MonthlyStockScreen() {
   // Tô màu dòng "đã dò" — cùng khoá với BangTong toMau="ton-kho-thang" bên dưới:
   // tick dòng → nút Tô màu / In đậm / Bỏ tô ở thanh "Đã chọn N dòng".
   const rowMark = useToMau("ton-kho-thang");
-  const selectedTotal = useMemo(() => tongDong(selectedRows), [selectedRows]);
+  const selectedTotal = useMemo(() => sumMonthlyStockRows(selectedRows), [selectedRows]);
   const clearSelection = () => setSelected(new Set());
 
   /** Bản in: có tick thì in đúng mấy dòng đó, không thì in cả tháng đang xem. */
   const rowsIn = selectedRows.length ? selectedRows : monthRows;
-  const nhomIn = useMemo(() => gomNhom(rowsIn), [rowsIn]);
-  const printTotal = useMemo(() => tongDong(rowsIn), [rowsIn]);
+  const nhomIn = useMemo(() => groupByCategory(rowsIn), [rowsIn]);
+  const printTotal = useMemo(() => sumMonthlyStockRows(rowsIn), [rowsIn]);
 
   /** Chọn hết các dòng đang hiện (mọi nhóm) — nút ở thanh công cụ. */
   const selectAll = () => setSelected(new Set(monthRows.map((r) => r.id)));
@@ -660,7 +660,7 @@ export default function MonthlyStockScreen() {
     const prevRows = lines;
     writeLines(lines.filter((l) => !ids.has(l.id)));
     clearSelection();
-    notify.daXoa(`Đã xóa ${ids.size} dòng ${nhanThang(month)}`, () => writeLines(prevRows));
+    notify.daXoa(`Đã xóa ${ids.size} dòng ${formatMonthLabel(month)}`, () => writeLines(prevRows));
   };
 
   // ---------- Vị trí hàng đang nằm (kho nhà + kho thuê ngoài) ----------
@@ -707,7 +707,7 @@ export default function MonthlyStockScreen() {
   // ---------- Thao tác một dòng: lấy ra dùng · nhập thêm · chuyển vị trí ----------
   const [action, setAction] = useState<{
     row: MonthlyStockRow;
-    kieu: KieuThaoTac;
+    kieu: LotActionKind;
     kg: number | null;
     viTri: string;
     ngay: string;
@@ -715,7 +715,7 @@ export default function MonthlyStockScreen() {
   } | null>(null);
   const [loiTT, setLoiTT] = useState<LoiNhap[]>([]);
 
-  const openAction = (row: MonthlyStockRow, kieu: KieuThaoTac = "xuat") => {
+  const openAction = (row: MonthlyStockRow, kieu: LotActionKind = "xuat") => {
     setAction({ row, kieu, kg: null, viTri: "", ngay: homNay(), lyDo: "" });
     setLoiTT([]);
   };
@@ -741,10 +741,10 @@ export default function MonthlyStockScreen() {
         : kieu === "nhap"
           ? `Nhập thêm ${num(kg)} kg`
           : `Gửi ${num(kg)} kg từ ${locationOf(row) || "(chưa rõ)"} tới ${viTri.trim()}`;
-    const note = `${viDate(ngay || homNay())}: ${viec}${lyDo.trim() ? ` — ${lyDo.trim()}` : ""}`;
+    const note = `${formatDateVN(ngay || homNay())}: ${viec}${lyDo.trim() ? ` — ${lyDo.trim()}` : ""}`;
     const goc = lines.find((l) => l.id === row.id);
     if (!goc) return;
-    const kq = apThaoTacLo(goc, kieu, kg, { viTriDich: viTri, ghiChu: note, idMoi: `msl|${month}|${uid()}` });
+    const kq = applyLotAction(goc, kieu, kg, { viTriDich: viTri, ghiChu: note, idMoi: `msl|${month}|${uid()}` });
     const prevRows = lines;
     const updatedLines = lines.map((l) => (l.id === kq.dong.id ? kq.dong : l));
     writeLines(kq.dongTach ? [...updatedLines, kq.dongTach] : updatedLines);
@@ -754,12 +754,12 @@ export default function MonthlyStockScreen() {
 
   // ---------- Thẻ kho: lịch sử một mặt hàng qua các tháng ----------
   const stockCardList = useMemo(
-    () => (viewedCard ? theKhoMatHang(lines, khoaLo(viewedCard)) : []),
+    () => (viewedCard ? buildProductStockCard(lines, stockLineKey(viewedCard)) : []),
     [lines, viewedCard]
   );
 
   // Lọc bảng về đúng mặt hàng lệch (ô Tìm) để sửa tay ngay trên bảng.
-  const manualFixProduct = (d: DoiChieuDong) => {
+  const manualFixProduct = (d: CarryForwardDiff) => {
     setWarehouse(d.warehouse);
     setSearchQuery(d.itemName);
     setHideEmptyRows(false);
@@ -804,7 +804,7 @@ export default function MonthlyStockScreen() {
   // Tách: MÃ KHÓ cần người quyết vs tên RÕ RÀNG (tự nhận loài, khỏi bận tâm).
   const needsSync = catalogSync.chuaCo.filter((x) => !x.roRang);
   const dsRoRang = catalogSync.chuaCo.filter((x) => x.roRang);
-  const targetOf = (x: { name: string; dichGoiY: DichDanhMuc }): DichDanhMuc => savedTargets[x.name] ?? x.dichGoiY;
+  const targetOf = (x: { name: string; dichGoiY: CatalogTarget }): CatalogTarget => savedTargets[x.name] ?? x.dichGoiY;
   // Tên chuẩn được ánh xạ tới (mặc định = tên file nếu chưa chọn).
   const mapCua = (x: { name: string }) => (mapDB[x.name] ?? x.name).trim();
   const chuan = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " ");
@@ -829,10 +829,10 @@ export default function MonthlyStockScreen() {
       const canon = mapCua(x);
       if (!canon) continue;
       if (d === "material" && !materialNames.has(chuan(canon))) {
-        materialsToAdd.push({ id: uid(), name: canon, category: suyNhomNguyenLieu(canon), note: "Từ sổ kho theo tháng" });
+        materialsToAdd.push({ id: uid(), name: canon, category: inferMaterialCategory(canon), note: "Từ sổ kho theo tháng" });
         materialNames.add(chuan(canon));
       } else if (d === "product" && !coMH.has(chuan(canon))) {
-        productsToAdd.push({ id: uid(), code: "", name: canon, finishedGoodCode: "", category: suyNhomNguyenLieu(canon), processingType: "" });
+        productsToAdd.push({ id: uid(), code: "", name: canon, finishedGoodCode: "", category: inferMaterialCategory(canon), processingType: "" });
         coMH.add(chuan(canon));
       }
       if (chuan(canon) !== chuan(x.name)) renames.set(x.name, canon);
@@ -851,7 +851,7 @@ export default function MonthlyStockScreen() {
   };
 
   /** Đặt đích cho một NHÓM dòng (bulk theo section). */
-  const setTarget = (list: DongBoDong[], d: DichDanhMuc | "goiY") => {
+  const setTarget = (list: CatalogSyncItem[], d: CatalogTarget | "goiY") => {
     setSavedTargets((m) => {
       const next = { ...m };
       for (const x of list) {
@@ -867,27 +867,27 @@ export default function MonthlyStockScreen() {
    * ô chọn danh mục — chốt 2026-10-06; trước đây chờ bấm Đồng bộ mới thêm). Trùng tên
    * (không phân hoa thường) ⇒ dùng lại bản có sẵn. Trả về TÊN (value của ô).
    */
-  const addCanonicalName = (d: DichDanhMuc, t: string): string => {
+  const addCanonicalName = (d: CatalogTarget, t: string): string => {
     const ten = t.trim();
     if (d === "product") {
       const co = products.find((p) => chuan(p.name) === chuan(ten));
       if (co) return co.name;
       setProducts([
         ...products,
-        { id: uid(), code: "", name: ten, finishedGoodCode: "", category: suyNhomNguyenLieu(ten), processingType: "" },
+        { id: uid(), code: "", name: ten, finishedGoodCode: "", category: inferMaterialCategory(ten), processingType: "" },
       ]);
       notify.daLuu(`Đã thêm mặt hàng "${ten}" vào danh mục`);
     } else if (d === "material") {
       const co = mtypes.find((m) => chuan(m.name) === chuan(ten));
       if (co) return co.name;
-      setMtypes([...mtypes, { id: uid(), name: ten, category: suyNhomNguyenLieu(ten), note: "Từ sổ kho theo tháng" }]);
+      setMtypes([...mtypes, { id: uid(), name: ten, category: inferMaterialCategory(ten), note: "Từ sổ kho theo tháng" }]);
       notify.daLuu(`Đã thêm loại nguyên liệu "${ten}" vào danh mục`);
     }
     return ten;
   };
 
   /** Một dòng: tên file · đích (Mặt hàng/Loại NL/Bỏ qua) · ánh xạ tới tên CHUẨN. */
-  const dongRow = (x: DongBoDong) => {
+  const dongRow = (x: CatalogSyncItem) => {
     const d = targetOf(x);
     const goc = d === "product" ? productOpts : materialTypeOpts;
     const edit = d === "product" ? productEditor : d === "material" ? materialTypeEditor : null;
@@ -906,7 +906,7 @@ export default function MonthlyStockScreen() {
         <select
           className="h-9 shrink-0 rounded-md border border-border bg-background px-2"
           value={d}
-          onChange={(e) => setSavedTargets((m) => ({ ...m, [x.name]: e.target.value as DichDanhMuc }))}
+          onChange={(e) => setSavedTargets((m) => ({ ...m, [x.name]: e.target.value as CatalogTarget }))}
           aria-label={`Đích ${x.name}`}
         >
           <option value="product">→ Mặt hàng</option>
@@ -939,15 +939,15 @@ export default function MonthlyStockScreen() {
     e.target.value = "";
     if (!file) return;
     try {
-      const sheets = await parseBangKeKhoFile(file);
+      const sheets = await parseStockStatementFile(file);
       if (!sheets.length) {
         notify.canhBao("File không có sheet dữ liệu nào đọc được (mẫu 'bảng kê kho').");
         return;
       }
-      const nam = namTuTenFile(file.name);
+      const nam = parseYearFromFileName(file.name);
       // Kho mặc định: kho của bản đã nạp cùng năm (nạp lại chỉ CẬP NHẬT) → kho khớp số ở tiêu đề sheet → K1500T.
       const daNap = lines.find((l) => l.id.startsWith("xlsx|") && l.id.split("|")[3] === String(nam));
-      const so = khoTuTieuDe(sheets[0]?.tieuDe ?? "");
+      const so = parseWarehouseFromTitle(sheets[0]?.tieuDe ?? "");
       const titleWarehouse = so ? BSF1_WAREHOUSES.find((w) => w.code.includes(so) || w.name.includes(so))?.name : undefined;
       setNapForm({ sheets, nam, kho: daNap?.warehouse ?? titleWarehouse ?? DEFAULT_WAREHOUSE });
     } catch (err) {
@@ -960,7 +960,7 @@ export default function MonthlyStockScreen() {
   /** Soát trước khi nạp: số kho ở tiêu đề sheet + bản nạp cũ của cùng năm ở kho KHÁC (nạp nhầm = cộng đôi). */
   const importCheck = useMemo(() => {
     if (!napForm) return null;
-    const titleWarehouses = [...new Set(napForm.sheets.map((sh) => khoTuTieuDe(sh.tieuDe)).filter(Boolean))];
+    const titleWarehouses = [...new Set(napForm.sheets.map((sh) => parseWarehouseFromTitle(sh.tieuDe)).filter(Boolean))];
     const ma = warehouseCode(napForm.kho.trim());
     const otherWarehouses = new Map<string, number>();
     for (const l of lines) {
@@ -974,7 +974,7 @@ export default function MonthlyStockScreen() {
       for (const r of sh.rows) {
         nhom.set(r.category, (nhom.get(r.category) ?? 0) + 1);
         if (r.khoGhi) {
-          const ten = timKhoTheoGhi(r.khoGhi, storageLocationCatalog) ?? `${tenKhoMoi(r.khoGhi)} (mới)`;
+          const ten = findWarehouseByText(r.khoGhi, storageLocationCatalog) ?? `${buildNewWarehouseName(r.khoGhi)} (mới)`;
           gui.set(ten, (gui.get(ten) ?? 0) + 1);
         }
       }
@@ -1005,10 +1005,10 @@ export default function MonthlyStockScreen() {
     const warehouseCatalog = [...storageLocationCatalog];
     const addedWarehouses: string[] = [];
     const resolveWarehouse = (rawText: string) => {
-      const co = timKhoTheoGhi(rawText, warehouseCatalog);
+      const co = findWarehouseByText(rawText, warehouseCatalog);
       if (co) return co;
-      const name = tenKhoMoi(rawText);
-      warehouseCatalog.push({ id: uid(), code: `K${khoaKho(rawText)}`, name, kind: "thue-ngoai", address: "", phone: "", note: "Từ bảng kê kho (cột ghi chú)" });
+      const name = buildNewWarehouseName(rawText);
+      warehouseCatalog.push({ id: uid(), code: `K${toWarehouseKey(rawText)}`, name, kind: "thue-ngoai", address: "", phone: "", note: "Từ bảng kê kho (cột ghi chú)" });
       addedWarehouses.push(name);
       return name;
     };
@@ -1115,7 +1115,7 @@ export default function MonthlyStockScreen() {
       className={`${oChu} w-full ${template ?? ""}`}
     />
   );
-  const summaryColumns = (t: ReturnType<typeof tongDong>): CotTong<MonthlyStockRow>[] => [
+  const summaryColumns = (t: ReturnType<typeof sumMonthlyStockRows>): CotTong<MonthlyStockRow>[] => [
     {
       key: "ngay",
       header: "Ngày nhập",
@@ -1130,7 +1130,7 @@ export default function MonthlyStockScreen() {
             className={`${oChu} w-36`}
           />
         ) : (
-          <span className="tnum whitespace-nowrap">{r.importDate ? viDate(r.importDate) : "—"}</span>
+          <span className="tnum whitespace-nowrap">{r.importDate ? formatDateVN(r.importDate) : "—"}</span>
         ),
     },
     {
@@ -1349,7 +1349,7 @@ export default function MonthlyStockScreen() {
             variant="outline"
             size="icon"
             aria-label="Tháng trước"
-            onClick={() => setMonth(thangTruoc(month))}
+            onClick={() => setMonth(getPrevMonth(month))}
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
@@ -1368,7 +1368,7 @@ export default function MonthlyStockScreen() {
             variant="outline"
             size="icon"
             aria-label="Tháng sau"
-            onClick={() => setMonth(thangSau(month))}
+            onClick={() => setMonth(getNextMonth(month))}
           >
             <ChevronRight className="h-4 w-4" />
           </Button>
@@ -1455,7 +1455,7 @@ export default function MonthlyStockScreen() {
               title="Lấy tồn cuối tháng này làm tồn đầu tháng sau, cho MỌI kho (bỏ qua bộ lọc kho). Chạy lại chỉ cập nhật, không nhân đôi dòng."
             >
               <ArrowRightLeft className="mr-2 h-4 w-4" />
-              Dồn sang {nhanThang(thangSau(month))}
+              Dồn sang {formatMonthLabel(getNextMonth(month))}
             </Button>
           )}
         </div>
@@ -1464,11 +1464,11 @@ export default function MonthlyStockScreen() {
       {!hasData ? (
         <EmptyState
           icon={FileSpreadsheet}
-          tieuDe={`${nhanThang(month)} chưa có số liệu`}
+          tieuDe={`${formatMonthLabel(month)} chưa có số liệu`}
           moTa={
             priorRows.length
-              ? `Bấm "Kế thừa tồn cuối ${nhanThang(prevMonth)}" để dồn tồn cuối tháng trước thành tồn đầu tháng này, hoặc "Thêm dòng" để nhập tay.`
-              : `Bấm "Thêm dòng" để nhập bảng kê kho của ${nhanThang(month)} (tồn đầu · nhập · xuất theo từng mặt hàng).`
+              ? `Bấm "Kế thừa tồn cuối ${formatMonthLabel(prevMonth)}" để dồn tồn cuối tháng trước thành tồn đầu tháng này, hoặc "Thêm dòng" để nhập tay.`
+              : `Bấm "Thêm dòng" để nhập bảng kê kho của ${formatMonthLabel(month)} (tồn đầu · nhập · xuất theo từng mặt hàng).`
           }
           action={
             priorRows.length ? (
@@ -1477,7 +1477,7 @@ export default function MonthlyStockScreen() {
                 title="Lấy tồn cuối tháng trước làm tồn đầu tháng này và GHI vào sổ. Chạy lại chỉ cập nhật, không nhân đôi dòng."
               >
                 <ArrowDownToLine className="mr-2 h-4 w-4" />
-                Kế thừa tồn cuối {nhanThang(prevMonth)}
+                Kế thừa tồn cuối {formatMonthLabel(prevMonth)}
               </Button>
             ) : (
               <Button onClick={() => openAdd()} title="Thêm tay dòng đầu tiên cho tháng này (tên hàng · tồn đầu · nhập · xuất).">
@@ -1495,7 +1495,7 @@ export default function MonthlyStockScreen() {
                 <Sparkles className="mt-0.5 h-5 w-5 shrink-0 text-primary" aria-hidden />
                 <div className="min-w-0 space-y-1">
                   <p className="font-semibold text-foreground">
-                    Xem trước tồn đầu {nhanThang(month)} — kế thừa từ tồn cuối {nhanThang(prevMonth)} (
+                    Xem trước tồn đầu {formatMonthLabel(month)} — kế thừa từ tồn cuối {formatMonthLabel(prevMonth)} (
                     {previewRows.length} dòng · {num(total.closeKg)} kg). CHƯA LƯU.
                   </p>
                   <p className="text-sm text-muted-foreground">
@@ -1551,8 +1551,8 @@ export default function MonthlyStockScreen() {
           {noSearchMatch && (
             <p className="rounded-lg border-2 border-dashed border-border p-6 text-center text-sm text-muted-foreground">
               {searchQuery.trim()
-                ? `Không có mặt hàng nào khớp "${searchQuery}" trong ${nhanThang(month)}.`
-                : `Mọi dòng của ${nhanThang(month)} đều không có số liệu và đang bị ẩn.`}{" "}
+                ? `Không có mặt hàng nào khớp "${searchQuery}" trong ${formatMonthLabel(month)}.`
+                : `Mọi dòng của ${formatMonthLabel(month)} đều không có số liệu và đang bị ẩn.`}{" "}
               <button
                 title="Xóa ô tìm và hiện lại dòng trống để thấy toàn bộ mặt hàng của tháng." type="button" className="underline" onClick={() => { setSearchQuery(""); setHideEmptyRows(false); }}>
                 Hiện tất cả
@@ -1566,8 +1566,8 @@ export default function MonthlyStockScreen() {
                 <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-warning" aria-hidden />
                 <div className="min-w-0 space-y-1">
                   <p className="font-semibold text-foreground">
-                    Lệch dồn kỳ: tồn đầu {nhanThang(month)} ({num(lech.openNay)} kg) ≠ tồn cuối{" "}
-                    {nhanThang(prevMonth)} ({num(lech.closeTruoc)} kg) — lệch{" "}
+                    Lệch dồn kỳ: tồn đầu {formatMonthLabel(month)} ({num(lech.openNay)} kg) ≠ tồn cuối{" "}
+                    {formatMonthLabel(prevMonth)} ({num(lech.closeTruoc)} kg) — lệch{" "}
                     <span className="text-warning">
                       {lech.lech > 0 ? "+" : ""}
                       {num(lech.lech)} kg
@@ -1694,7 +1694,7 @@ export default function MonthlyStockScreen() {
                 </Button>
                 {!isPreview && (
                   <ConfirmDelete
-                    moTaBanGhi={`${selectedRows.length} dòng ${nhanThang(month)}`}
+                    moTaBanGhi={`${selectedRows.length} dòng ${formatMonthLabel(month)}`}
                     onConfirm={deleteSelected}
                     trigger={
                       <Button size="sm" variant="ghost" title="Xóa các dòng đang tick khỏi tháng này. Có hỏi xác nhận, và xóa xong vẫn còn nút Hoàn tác.">
@@ -1712,7 +1712,7 @@ export default function MonthlyStockScreen() {
           )}
 
           <p className="text-sm text-muted-foreground">
-            {nhanThang(month)}
+            {formatMonthLabel(month)}
             {warehouse !== ALL_WAREHOUSES ? ` · kho ${warehouse}` : " · tất cả kho"}. "Dồn sang tháng sau" kế thừa tồn cuối
             (mọi kho) thành tồn đầu kỳ sau; chạy lại chỉ cập nhật, không nhân đôi.
           </p>
@@ -1725,7 +1725,7 @@ export default function MonthlyStockScreen() {
           <DialogHeader>
             <DialogTitle className="text-2xl">{form?.id ? "Sửa dòng kho" : "Thêm dòng kho"}</DialogTitle>
             <DialogDescription className="text-base">
-              {nhanThang(month)} — nhập tồn đầu · nhập · xuất theo kg. Tồn cuối và tiền còn lại tự tính.
+              {formatMonthLabel(month)} — nhập tồn đầu · nhập · xuất theo kg. Tồn cuối và tiền còn lại tự tính.
             </DialogDescription>
           </DialogHeader>
           {form && (
@@ -2016,7 +2016,7 @@ export default function MonthlyStockScreen() {
                         <td className="px-3 py-2 font-mono">{sh.sheetName}</td>
                         <td className="px-3 py-2">
                           {sh.monthNum ? (
-                            nhanThang(`${napForm.nam}-${String(sh.monthNum).padStart(2, "0")}`)
+                            formatMonthLabel(`${napForm.nam}-${String(sh.monthNum).padStart(2, "0")}`)
                           ) : (
                             <Nhan loai="luu-y">bỏ (tên sheet không phải số tháng)</Nhan>
                           )}
@@ -2077,7 +2077,7 @@ export default function MonthlyStockScreen() {
           <DialogHeader>
             <DialogTitle className="text-2xl">Đối chiếu lệch dồn kỳ theo mặt hàng</DialogTitle>
             <DialogDescription className="text-base">
-              So tồn cuối {nhanThang(prevMonth)} ↔ tồn đầu {nhanThang(month)} theo MẶT HÀNG (đã gộp các
+              So tồn cuối {formatMonthLabel(prevMonth)} ↔ tồn đầu {formatMonthLabel(month)} theo MẶT HÀNG (đã gộp các
               tách size để bỏ báo động giả). Đây là chẩn đoán — bấm "Sửa tay" để lọc bảng về đúng mặt
               hàng đó rồi gõ số thẳng trên bảng theo phán đoán (không tự sửa để tránh cộng đôi khi lô bị tách/đổi mã).
             </DialogDescription>
@@ -2094,8 +2094,8 @@ export default function MonthlyStockScreen() {
                   <thead className="sticky top-0 bg-muted">
                     <tr className="text-left">
                       <th className="px-3 py-2">Mặt hàng · kho · nhóm</th>
-                      <th className="px-3 py-2 text-right">Cuối {nhanThang(prevMonth).replace("Tháng ", "T")}</th>
-                      <th className="px-3 py-2 text-right">Đầu {nhanThang(month).replace("Tháng ", "T")}</th>
+                      <th className="px-3 py-2 text-right">Cuối {formatMonthLabel(prevMonth).replace("Tháng ", "T")}</th>
+                      <th className="px-3 py-2 text-right">Đầu {formatMonthLabel(month).replace("Tháng ", "T")}</th>
                       <th className="px-3 py-2 text-right">Lệch (kg)</th>
                       <th className="px-3 py-2 text-right">Sửa</th>
                     </tr>
@@ -2290,7 +2290,7 @@ export default function MonthlyStockScreen() {
                 <div>
                   Ngày nhập:{" "}
                   <span className="font-medium text-foreground">
-                    {viewedCard.importDate ? viDate(viewedCard.importDate) : "—"}
+                    {viewedCard.importDate ? formatDateVN(viewedCard.importDate) : "—"}
                   </span>
                 </div>
                 {viewedCard.note && (
@@ -2321,7 +2321,7 @@ export default function MonthlyStockScreen() {
                     {stockCardList.map((t) => (
                       <tr key={t.period} className={t.period === month ? "bg-primary/5" : undefined}>
                         <td className="border-b border-border px-3 py-2 font-medium text-foreground">
-                          {nhanThang(t.period)}
+                          {formatMonthLabel(t.period)}
                         </td>
                         <td className="tnum border-b border-border px-3 py-2 text-right">{soHoacGach(t.openKg)}</td>
                         <td className="tnum border-b border-border px-3 py-2 text-right text-success">
@@ -2362,13 +2362,13 @@ export default function MonthlyStockScreen() {
       {moIn && hasData && (
         <PhieuIn
           tieuDe="Bảng kê kho theo tháng"
-          phuDe={`${nhanThang(month)}${warehouse !== ALL_WAREHOUSES ? ` · kho ${warehouse}` : ""}${
+          phuDe={`${formatMonthLabel(month)}${warehouse !== ALL_WAREHOUSES ? ` · kho ${warehouse}` : ""}${
             selectedRows.length ? ` · ${selectedRows.length} dòng đã chọn` : ""
           }${isPreview ? " · XEM TRƯỚC (chưa lưu)" : ""}`}
           onClose={() => setMoIn(false)}
         >
           <div className="mb-2 flex items-center justify-between text-sm">
-            <span>Ngày lập: {viDate(homNay())}</span>
+            <span>Ngày lập: {formatDateVN(homNay())}</span>
             <span>SL mặt hàng: {rowsIn.length}</span>
           </div>
           <table className="w-full border-collapse">
@@ -2408,7 +2408,7 @@ export default function MonthlyStockScreen() {
 }
 
 /** Một nhóm trên bản in: dòng tiêu đề nhóm + các mặt hàng + dòng cộng nhóm. */
-function FragmentGroup({ group }: { group: ReturnType<typeof gomNhom>[number] }) {
+function FragmentGroup({ group }: { group: ReturnType<typeof groupByCategory>[number] }) {
   return (
     <>
       <tr>

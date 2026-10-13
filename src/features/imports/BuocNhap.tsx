@@ -6,7 +6,7 @@
 import type { ReactNode } from "react";
 import { Button, Nhan } from "@/design-system";
 import { kg } from "@/lib/format";
-import { nhanLoNl } from "@/lib/truyXuatLo";
+import { formatMaterialLotLabel } from "@/lib/lotTraceability";
 import { cn } from "@/lib/utils";
 import { Check, Pencil, QrCode } from "lucide-react";
 import type { NhomChuyen } from "./importHelpers";
@@ -194,7 +194,7 @@ export function ChuyenTrongNgay({
             <span className="flex shrink-0 gap-1">
               {onInTem && n.chuyen && (
                 <Button
-                  title={`In tem QR lô ${nhanLoNl(n.chuyen)} — mỗi loại nguyên liệu của chuyến một tem (loại + kg của loại đó) để dán đúng sọt. Quét tem là ra hộ chiếu lô.`}
+                  title={`In tem QR lô ${formatMaterialLotLabel(n.chuyen)} — mỗi loại nguyên liệu của chuyến một tem (loại + kg của loại đó) để dán đúng sọt. Quét tem là ra hộ chiếu lô.`}
                   type="button"
                   variant="outline"
                   size="sm"

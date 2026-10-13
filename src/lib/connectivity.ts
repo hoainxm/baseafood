@@ -1,5 +1,5 @@
 // ============================================================
-// Tên file cũ: src/lib/ketNoi.ts
+// Tên file cũ: src/lib/connectivity.ts
 // Tên tiếng Việt: Trạng thái Kết nối Mạng & Queue đồng bộ
 // Description: Network connectivity state tracking and sync offline queue manager
 // ============================================================
@@ -16,25 +16,25 @@
  * ("lần lưu vừa rồi có lên máy chủ không").
  */
 
-export type TrangKetNoi = "chua-ro" | "da-noi" | "loi";
+export type ConnectionStatus = "chua-ro" | "da-noi" | "loi";
 
-export interface AnhTrangKetNoi {
-  trang: TrangKetNoi;
+export interface ConnectionSnapshot {
+  trang: ConnectionStatus;
   loi: string;
 }
 
 // Snapshot bất biến — đổi tham chiếu chỉ khi trạng thái đổi, để
 // useSyncExternalStore không render vô hạn.
-let anh: AnhTrangKetNoi = { trang: "chua-ro", loi: "" };
+let anh: ConnectionSnapshot = { trang: "chua-ro", loi: "" };
 const listeners = new Set<() => void>();
 
-function setStatus(status: TrangKetNoi, loi: string) {
+function setStatus(status: ConnectionStatus, loi: string) {
   if (anh.trang === status && anh.loi === loi) return;
   anh = { trang: status, loi };
   listeners.forEach((f) => f());
 }
 
-export const ketNoi = {
+export const connectivity = {
   /** Một thao tác server vừa thành công. */
   baoOK: () => setStatus("da-noi", ""),
   /** Một thao tác server vừa lỗi (kèm thông báo để hiện cho người dùng). */
@@ -45,5 +45,5 @@ export const ketNoi = {
       listeners.delete(f);
     };
   },
-  laySnapshot: (): AnhTrangKetNoi => anh,
+  laySnapshot: (): ConnectionSnapshot => anh,
 };

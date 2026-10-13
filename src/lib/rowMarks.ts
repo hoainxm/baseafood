@@ -1,5 +1,5 @@
 // ============================================================
-// Tên file: src/lib/toMau.ts
+// Tên file: src/lib/rowMarks.ts
 // Tên tiếng Việt: Tô màu dòng/ô "đã dò" kiểu Excel — hàm thuần
 // Description: Pure helpers for shared row/cell marks (row_marks, migration 0055)
 // ============================================================
@@ -9,22 +9,22 @@ import type { RowMark } from "@/types";
 export const SAC_TO_LIB = ["xam", "do", "cam", "vang", "chuoi", "la", "troi", "duong", "tim", "hong"] as const;
 export type SacTo = (typeof SAC_TO_LIB)[number];
 /** Mã màu lưu DB: "<sắc>-<mức 1..5>" (VD "vang-5"). */
-export type MaMauTo = `${SacTo}-${1 | 2 | 3 | 4 | 5}`;
+export type RowMarkColor = `${SacTo}-${1 | 2 | 3 | 4 | 5}`;
 
 /** Dấu của một dòng / ô như màn hình thấy. `mau` rỗng = chỉ in đậm. */
-export interface DauDong {
-  mau: MaMauTo | "";
+export interface RowMarkStyle {
+  mau: RowMarkColor | "";
   dam: boolean;
 }
 
 /** Đích tô: cả dòng (`cot` null) hoặc một ô. */
-export interface DichTo {
+export interface RowMarkTarget {
   dong: string;
   cot: string | null;
 }
 
 /* Bản đầu (sáng 2026-10-06) lưu 4 mã trơn — đọc ra mức 2 của sắc tương ứng. */
-const LEGACY_CODES: Record<string, MaMauTo> = {
+const LEGACY_CODES: Record<string, RowMarkColor> = {
   vang: "vang-2",
   "xanh-la": "la-2",
   "xanh-duong": "duong-2",
@@ -33,9 +33,9 @@ const LEGACY_CODES: Record<string, MaMauTo> = {
 const RE_MA = new RegExp(`^(${SAC_TO_LIB.join("|")})-[1-5]$`);
 
 /** Mã màu lạ (bản app mới hơn ghi) ⇒ coi như không màu, không vỡ. */
-export function chuanMau(v: string): MaMauTo | "" {
+export function normalizeRowMarkColor(v: string): RowMarkColor | "" {
   if (LEGACY_CODES[v]) return LEGACY_CODES[v];
-  return RE_MA.test(v) ? (v as MaMauTo) : "";
+  return RE_MA.test(v) ? (v as RowMarkColor) : "";
 }
 
 /**
@@ -47,22 +47,22 @@ export function idDauTo(tableKey: string, rowId: string, columnKey: string | nul
 }
 
 /** Khoá tra dấu ô trong `dauCuaBang().o` — khớp `khoaODau` ở design-system. */
-export const khoaO = (rowId: string, columnKey: string) => `${rowId}\u0001${columnKey}`;
+export const cellKey = (rowId: string, columnKey: string) => `${rowId}\u0001${columnKey}`;
 
 /** Dấu của một bảng: theo DÒNG (Map rowId) + theo Ô (Map khoaO). */
-export function dauCuaBang(
+export function getTableRowMarks(
   marks: RowMark[],
   tableKey: string
-): { dong: Map<string, DauDong>; o: Map<string, DauDong> } {
-  const dong = new Map<string, DauDong>();
-  const o = new Map<string, DauDong>();
+): { dong: Map<string, RowMarkStyle>; o: Map<string, RowMarkStyle> } {
+  const dong = new Map<string, RowMarkStyle>();
+  const o = new Map<string, RowMarkStyle>();
   for (const m of marks) {
     if (m.tableKey !== tableKey) continue;
-    const color = chuanMau(m.color);
+    const color = normalizeRowMarkColor(m.color);
     if (!color && !m.bold) continue;
     const dau = { mau: color, dam: m.bold };
     if (m.columnKey == null) dong.set(m.rowId, dau);
-    else o.set(khoaO(m.rowId, m.columnKey), dau);
+    else o.set(cellKey(m.rowId, m.columnKey), dau);
   }
   return { dong, o };
 }
@@ -73,11 +73,11 @@ export function dauCuaBang(
  * Dấu của bảng khác / đích khác giữ nguyên (repo nhận NGUYÊN danh sách — quên
  * ghép là mất dấu chỗ khác).
  */
-export function datDau(
+export function setRowMarks(
   marks: RowMark[],
   tableKey: string,
-  target: (string | DichTo)[],
-  dau: DauDong | null,
+  target: (string | RowMarkTarget)[],
+  dau: RowMarkStyle | null,
   user: string,
   luc: string = new Date().toISOString()
 ): RowMark[] {
@@ -90,7 +90,7 @@ export function datDau(
   const nextMarks = [...theoId].map(([id, d]): RowMark => {
     const c = prev.get(id);
     // Giữ nguyên bản cũ khi không đổi gì ⇒ repo không đẩy cập nhật thừa.
-    if (c && chuanMau(c.color) === dau.mau && c.bold === dau.dam) return c;
+    if (c && normalizeRowMarkColor(c.color) === dau.mau && c.bold === dau.dam) return c;
     return {
       id,
       tableKey,

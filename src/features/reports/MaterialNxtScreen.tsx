@@ -42,14 +42,14 @@ import {
   useMaterialTypes,
   useProductionLocks,
 } from "@/lib/catalogRepo";
-import { KY_OPT, phamViKy, type KyXem } from "@/lib/periodUtils";
+import { KY_OPT, getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
 import {
-  tinhTonNLTong,
-  conDoChuaKhopKy,
-  type TonNLTongHo,
-  type TonNLTongNgay,
+  computeMaterialTotalStock,
+  sumUnmatchedLeftover,
+  type MaterialTotalStockFamily,
+  type MaterialTotalStockDay,
 } from "@/lib/inventoryMaterial";
-import { num, viDate } from "@/lib/format";
+import { num, formatDateVN } from "@/lib/format";
 import { uid } from "@/lib/db";
 import type { MaterialOpeningStock, Workshop } from "@/types";
 import {
@@ -88,7 +88,7 @@ interface OpeningForm {
  * Xuất SX ("NL lấy ra sản xuất") CHƯA được ghi ở màn Sản xuất nên = 0 (cột chờ) —
  * tồn hiện là "chưa trừ xuất". Đông gửi / xả đông (vòng gối đầu ở Cân đối) chỉ hiện
  * làm CỘT THÔNG TIN, KHÔNG cộng vào tồn (tránh đếm đôi — PA-a, chốt 2026-09-11).
- * Ô nhập tay duy nhất là "Tồn đầu". Xem lib/inventoryMaterial.ts#tinhTonNLTong.
+ * Ô nhập tay duy nhất là "Tồn đầu". Xem lib/inventoryMaterial.ts#computeMaterialTotalStock.
  */
 export default function MaterialNxtScreen() {
   const [periods] = useBalancingPeriods();
@@ -102,12 +102,12 @@ export default function MaterialNxtScreen() {
   /** Sổ bán nội địa (mig 0054) — NL bán thẳng ghi ở /wip, là khoản XUẤT trừ tồn. */
   const [domesticSales] = useDomesticSales();
 
-  const [ky, setKy] = useState<KyXem>("thang");
+  const [ky, setKy] = useState<ViewPeriod>("thang");
   const [moc, setMoc] = useState(homNay());
   const [tuTC, setTuTC] = useState(homNay());
   const [denTC, setDenTC] = useState(homNay());
   const [workshopFilter, setWorkshopFilter] = useState<string>("Tất cả");
-  const [tu, den] = phamViKy(ky, moc, tuTC, denTC);
+  const [tu, den] = getViewPeriodRange(ky, moc, tuTC, denTC);
 
   // Dialog tồn đầu
   const [isOpeningOpen, setIsOpeningOpen] = useState(false);
@@ -118,7 +118,7 @@ export default function MaterialNxtScreen() {
 
   const data = useMemo(
     () =>
-      tinhTonNLTong(
+      computeMaterialTotalStock(
         periods,
         inputs,
         imports,
@@ -134,7 +134,7 @@ export default function MaterialNxtScreen() {
   // Còn dở SX ghi ở ngày KHÔNG có kỳ cân đối nào phủ → không lọt vào cột "Đông gửi"
   // (info) nào. Gọi tên thay vì để số biến mất (luật "màn tự giải thích").
   const unmatchedLeftover = useMemo(
-    () => conDoChuaKhopKy(periods, locks, { tuNgay: tu, denNgay: den, workshop }),
+    () => sumUnmatchedLeftover(periods, locks, { tuNgay: tu, denNgay: den, workshop }),
     [periods, locks, tu, den, workshop],
   );
 
@@ -147,11 +147,11 @@ export default function MaterialNxtScreen() {
   ];
 
   // Bảng tồn theo NGÀY (mọi họ gộp) — trục "theo ngày" cho BGĐ.
-  const dateColumns: CotTong<TonNLTongNgay>[] = [
+  const dateColumns: CotTong<MaterialTotalStockDay>[] = [
     {
       key: "date",
       header: "Ngày",
-      render: (r) => <span className="font-semibold text-foreground">{viDate(r.date)}</span>,
+      render: (r) => <span className="font-semibold text-foreground">{formatDateVN(r.date)}</span>,
     },
     {
       key: "nhap",
@@ -188,7 +188,7 @@ export default function MaterialNxtScreen() {
   ];
 
   // Bảng tồn theo LOẠI (họ) NL.
-  const materialFamilyColumns: CotTong<TonNLTongHo>[] = [
+  const materialFamilyColumns: CotTong<MaterialTotalStockFamily>[] = [
     {
       key: "hoNL",
       header: "Loại nguyên liệu",
@@ -334,7 +334,7 @@ export default function MaterialNxtScreen() {
             anNhanBatBuoc
             choPhepXoa={false}
             value={ky}
-            onChange={(v) => setKy(v as KyXem)}
+            onChange={(v) => setKy(v as ViewPeriod)}
             options={KY_OPT}
           />
         </div>
@@ -355,7 +355,7 @@ export default function MaterialNxtScreen() {
             <DateField
               label={ky === "ngay" ? "Ngày" : "Ngày bất kỳ trong kỳ"}
               anNhanBatBuoc
-              hint={ky === "ngay" ? undefined : `Kỳ: ${viDate(tu)} – ${viDate(den)}`}
+              hint={ky === "ngay" ? undefined : `Kỳ: ${formatDateVN(tu)} – ${formatDateVN(den)}`}
               value={moc}
               onChange={setMoc}
             />
@@ -467,12 +467,12 @@ export default function MaterialNxtScreen() {
                       <span className="tnum font-semibold">{num(o.quantityKg)}</span> kg
                       <span className="text-muted-foreground">
                         {" "}
-                        · từ {viDate(o.asOfDate)} · xưởng {o.workshop}
+                        · từ {formatDateVN(o.asOfDate)} · xưởng {o.workshop}
                         {o.note ? ` · ${o.note}` : ""}
                       </span>
                     </span>
                     <ConfirmDelete
-                      moTaBanGhi={`${o.materialTypeName} — ${num(o.quantityKg)} kg (từ ${viDate(o.asOfDate)})`}
+                      moTaBanGhi={`${o.materialTypeName} — ${num(o.quantityKg)} kg (từ ${formatDateVN(o.asOfDate)})`}
                       onConfirm={() => deleteOpening(o.id)}
                       trigger={
                         <Button

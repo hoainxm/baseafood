@@ -5,7 +5,7 @@
 // ============================================================
 import * as XLSX from "xlsx";
 import type { MonthlyStockLine } from "@/types";
-import { laDongTrong } from "@/lib/monthlyStock";
+import { isEmptyLine } from "@/lib/monthlyStock";
 
 /**
  * Đọc đúng bố cục "BẢNG KÊ NGUYÊN LIỆU KHO 1500 T" (file kho ... năm ....xlsx):
@@ -24,7 +24,7 @@ import { laDongTrong } from "@/lib/monthlyStock";
  * trước mục đầu tiên đều bỏ. KHÔNG chép tồn cuối của file (file gốc dồn kỳ sai ở dòng
  * tổng) — chỉ lấy tồn đầu + nhập + xuất.
  */
-export interface BangKeKhoRow {
+export interface StockStatementRow {
   category: string;
   itemName: string;
   size: string;
@@ -43,11 +43,11 @@ export interface BangKeKhoRow {
   ghiChu: string; // chữ khác ở cột R (không phải kho)
 }
 
-export interface BangKeKhoSheet {
+export interface StockStatementSheet {
   sheetName: string;
   monthNum: number | null; // suy từ tên sheet nếu là số tháng 1..12
   tieuDe: string; // dòng tiêu đề đầu sheet, VD "BẢNG KÊ NGUYÊN LIỆU KHO 1500 THÁNG 08 / 2026"
-  rows: BangKeKhoRow[];
+  rows: StockStatementRow[];
 }
 
 const toNum = (v: unknown, def = 0): number => {
@@ -141,10 +141,10 @@ function inferMonth(name: string): number | null {
  * `tuDong` tới trước dòng cộng thuộc nhóm "<mục> – <tên>". `tuDong` = dòng nhỏ nhất
  * trong các vùng SUM của dòng cộng (chỉ số trong `rows`), null nếu không đọc được.
  */
-export type TimDauKhoi = (totalRowIdx: number) => number | null;
+export type FindBlockStart = (totalRowIdx: number) => number | null;
 
-function parseSheet(sheetName: string, rows: unknown[][], findBlockStart: TimDauKhoi = () => null): BangKeKhoSheet {
-  const out: BangKeKhoRow[] = [];
+function parseSheet(sheetName: string, rows: unknown[][], findBlockStart: FindBlockStart = () => null): StockStatementSheet {
+  const out: StockStatementRow[] = [];
   let category: string | null = null;
   let sectionStart = 0; // vị trí đầu mục hiện tại trong `out`
 
@@ -227,11 +227,11 @@ function donOGop(ws: XLSX.WorkSheet) {
 }
 
 /** Đọc cả workbook: mỗi sheet → một tháng. Chỉ giữ sheet có ít nhất một dòng hàng. */
-export async function parseBangKeKhoFile(file: File): Promise<BangKeKhoSheet[]> {
+export async function parseStockStatementFile(file: File): Promise<StockStatementSheet[]> {
   const buf = await file.arrayBuffer();
   const wb = XLSX.read(buf, { type: "array" }); // KHÔNG cellDates — xem toIsoDate
 
-  const sheets: BangKeKhoSheet[] = [];
+  const sheets: StockStatementSheet[] = [];
   for (const name of wb.SheetNames) {
     const ws = wb.Sheets[name];
     if (!ws) continue;
@@ -247,7 +247,7 @@ export async function parseBangKeKhoFile(file: File): Promise<BangKeKhoSheet[]> 
     du.forEach((row, k) => {
       if (row.some((v) => v != null)) dongExcel.push(k + r0);
     });
-    const findBlockStart: TimDauKhoi = (i) => {
+    const findBlockStart: FindBlockStart = (i) => {
       const r = dongExcel[i];
       if (r == null) return null;
       let min = Infinity;
@@ -266,12 +266,12 @@ export async function parseBangKeKhoFile(file: File): Promise<BangKeKhoSheet[]> 
 }
 
 /** Số kho ghi ở tiêu đề sheet ("…KHO 1500 THÁNG 08…" → "1500"), "" nếu không có. */
-export function khoTuTieuDe(title: string): string {
+export function parseWarehouseFromTitle(title: string): string {
   return title.match(/\bKHO\s+(\d{3,5})\b/i)?.[1] ?? "";
 }
 
 /** Khóa so khớp tên/mã kho: bỏ dấu, bỏ khoảng trắng + dấu câu, viết hoa ("Á D" → "AD"). */
-export const khoaKho = (s: string) =>
+export const toWarehouseKey = (s: string) =>
   s
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
@@ -284,12 +284,12 @@ export const khoaKho = (s: string) =>
  * Khớp theo mã (có/không tiền tố "K": "HP" ≡ "KHP") hoặc theo tên ("phước cơ" ≡ "Kho Phước Cơ").
  * Chưa có trong danh mục ⇒ null (màn tự tạo mục mới "Kho <tên>" với mã K<viết tắt>).
  */
-export function timKhoTheoGhi(warehouseText: string, catalog: { code: string; name: string }[]): string | null {
-  const k = khoaKho(warehouseText);
+export function findWarehouseByText(warehouseText: string, catalog: { code: string; name: string }[]): string | null {
+  const k = toWarehouseKey(warehouseText);
   if (!k) return null;
   for (const d of catalog) {
-    const ma = khoaKho(d.code);
-    const ten = khoaKho(d.name);
+    const ma = toWarehouseKey(d.code);
+    const ten = toWarehouseKey(d.name);
     if (ma && (ma === k || ma === `K${k}`)) return d.name;
     if (ten === k || ten === `KHO${k}`) return d.name;
   }
@@ -297,13 +297,13 @@ export function timKhoTheoGhi(warehouseText: string, catalog: { code: string; na
 }
 
 /** Tên kho mới dựng từ viết tắt chưa có trong danh mục: "phước cơ" → "Kho Phước Cơ". */
-export const tenKhoMoi = (warehouseText: string) =>
+export const buildNewWarehouseName = (warehouseText: string) =>
   `Kho ${gonKhoang(warehouseText)
     .toLowerCase()
     .replace(/(^|\s)(\S)/g, (_, sp: string, c: string) => sp + c.toUpperCase())}`;
 
 /** Năm suy từ tên file ("kho 1000 năm 2026.xlsx" → 2026), mặc định năm hiện tại. */
-export function namTuTenFile(fileName: string): number {
+export function parseYearFromFileName(fileName: string): number {
   const m = fileName.match(/(20\d{2})/);
   return m ? Number(m[1]) : new Date().getFullYear();
 }
@@ -319,7 +319,7 @@ export const idDongNap = (warehouseCode: string, monthNum: number, nam: number, 
   `xlsx|${warehouseCode}|${monthNum}|${nam}|${rowIndex}`;
 
 /** Tách id dòng nạp (dạng mới lẫn cũ `xlsx|<kho>|<tên sheet>|<năm>|<rowIndex>`); không phải ⇒ null. */
-export function tachIdNap(id: string): { maKho: string; nam: string; rowIndex: string } | null {
+export function parseLoadedRowId(id: string): { maKho: string; nam: string; rowIndex: string } | null {
   const p = id.split("|");
   if (p[0] !== "xlsx" || p.length < 5) return null;
   return { maKho: p[1], nam: p[p.length - 2], rowIndex: p[p.length - 1] };
@@ -327,7 +327,7 @@ export function tachIdNap(id: string): { maKho: string; nam: string; rowIndex: s
 
 const chuanTen = (s: string) => (s || "").trim().toLowerCase().replace(/\s+/g, " ");
 
-export interface KetQuaNapLai {
+export interface ReloadMergeResult {
   lines: MonthlyStockLine[];
   /** Dòng nạp lần trước (cùng kho + tháng) mà file mới không còn, vẫn còn số ⇒ GIỮ, cảnh báo. */
   cuConSo: MonthlyStockLine[];
@@ -347,22 +347,22 @@ export interface KetQuaNapLai {
  * cũ theo tên sheet) cùng kho · THÁNG (`period` của dòng) · rowIndex. Dọn dòng cũ theo
  * `period` của dòng chứ không theo tiền tố id ⇒ đổi tên sheet không làm tháng nhân đôi.
  */
-export function ghepNapLai(lines: MonthlyStockLine[], incoming: MonthlyStockLine[], warehouseCode: string): KetQuaNapLai {
+export function ghepNapLai(lines: MonthlyStockLine[], incoming: MonthlyStockLine[], warehouseCode: string): ReloadMergeResult {
   const newIds = new Set(incoming.map((m) => m.id));
   const month = new Set(incoming.map((m) => m.period));
   const positionKey = (period: string, rowIndex: string) => `${period}|${rowIndex}`;
   const theoId = new Map<string, MonthlyStockLine>();
   const byLocation = new Map<string, MonthlyStockLine>();
   for (const l of lines) {
-    const t = tachIdNap(l.id);
+    const t = parseLoadedRowId(l.id);
     if (!t || t.maKho !== warehouseCode || !month.has(l.period)) continue;
     theoId.set(l.id, l);
     if (!newIds.has(l.id)) byLocation.set(positionKey(l.period, t.rowIndex), l);
   }
   const idThay = new Set<string>();
-  const lechTen: KetQuaNapLai["lechTen"] = [];
+  const lechTen: ReloadMergeResult["lechTen"] = [];
   const daGhep = incoming.map((m) => {
-    const t = tachIdNap(m.id);
+    const t = parseLoadedRowId(m.id);
     const prev = theoId.get(m.id) ?? (t ? byLocation.get(positionKey(m.period, t.rowIndex)) : undefined);
     if (!prev) return m;
     if (prev.id !== m.id) idThay.add(prev.id);
@@ -381,7 +381,7 @@ export function ghepNapLai(lines: MonthlyStockLine[], incoming: MonthlyStockLine
   const giuLai = lines.filter((l) => {
     if (newIds.has(l.id) || idThay.has(l.id)) return false;
     if (!theoId.has(l.id)) return true; // ngoài phạm vi bản nạp (kho / tháng khác, dòng tay, carry…)
-    if (laDongTrong(l)) {
+    if (isEmptyLine(l)) {
       emptyDropped++;
       return false;
     }

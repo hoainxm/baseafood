@@ -14,10 +14,10 @@
  * TLD dành riêng này khi signUp ("Email address ... is invalid"). Dùng TLD thật
  * `.vn` — email tổng hợp không nhận mail nên chỉ cần đúng định dạng, không cần MX.
  */
-export const DUOI_EMAIL = "@bsf1.vn";
+export const EMAIL_SUFFIX = "@bsf1.vn";
 
 /** Bỏ dấu tiếng Việt + đổi đ→d, về chữ thường ASCII. */
-export function boDau(s: string): string {
+export function stripAccents(s: string): string {
   return s
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "") // dấu tổ hợp
@@ -25,8 +25,8 @@ export function boDau(s: string): string {
     .replace(/Đ/g, "D");
 }
 
-export function hoTenToUsername(fullName: string): string {
-  const tu = boDau(fullName).toLowerCase().trim().split(/\s+/).filter(Boolean);
+export function fullNameToUsername(fullName: string): string {
+  const tu = stripAccents(fullName).toLowerCase().trim().split(/\s+/).filter(Boolean);
   if (tu.length === 0) return "";
   if (tu.length === 1) return tu[0];
   const dau = tu
@@ -39,7 +39,7 @@ export function hoTenToUsername(fullName: string): string {
 /** username → email tổng hợp để đưa vào Supabase Auth. */
 export function usernameToEmail(username: string): string {
   const u = username.trim().toLowerCase();
-  return u.includes("@") ? u : `${u}${DUOI_EMAIL}`;
+  return u.includes("@") ? u : `${u}${EMAIL_SUFFIX}`;
 }
 
 /** email tổng hợp → username (phần trước @). */

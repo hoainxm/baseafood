@@ -26,7 +26,7 @@ import {
   type LoiNhap,
   type MucChon,
 } from "@/design-system";
-import { kg, num, viDate } from "@/lib/format";
+import { kg, num, formatDateVN } from "@/lib/format";
 import { Lock, Pencil, Plus, Scale } from "lucide-react";
 import { PHE_LIEU_GOI_Y } from "./importHelpers";
 
@@ -171,7 +171,7 @@ export function KhoiPheLieuNgay({
               Phế liệu cân trong ngày (nội tạng, dạt)
             </h2>
             <p className="text-base text-muted-foreground">
-              Cân gộp cuối ngày cho xưởng {phanXuong}, ngày {viDate(ngay)}. Màn
+              Cân gộp cuối ngày cho xưởng {phanXuong}, ngày {formatDateVN(ngay)}. Màn
               Cân đối lấy lại số này — không nhập lại lần nữa.
             </p>
           </div>
@@ -223,7 +223,7 @@ export function KhoiPheLieuNgay({
                     Sửa
                   </Button>
                   <ConfirmDelete
-                    moTaBanGhi={`${r.name} — ${kg(r.quantityKg)} — ngày ${viDate(r.date)}`}
+                    moTaBanGhi={`${r.name} — ${kg(r.quantityKg)} — ngày ${formatDateVN(r.date)}`}
                     onConfirm={() => {
                       const prevRows = rows;
                       onChange(rows.filter((x) => x.id !== r.id));
@@ -268,7 +268,7 @@ export function KhoiPheLieuNgay({
               {isAdding ? "Thêm phế liệu" : "Sửa phế liệu"}
             </DialogTitle>
             <DialogDescription className="text-base">
-              Ngày {viDate(ngay)} · xưởng {phanXuong}.
+              Ngày {formatDateVN(ngay)} · xưởng {phanXuong}.
               {isAdding
                 ? " Có cả nội tạng lẫn dạt: bấm “Lưu, ghi tiếp loại khác” cho loại đầu."
                 : ""}

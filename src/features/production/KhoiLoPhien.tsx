@@ -3,21 +3,21 @@
 // Tên tiếng Việt: Khối "Lô nguyên liệu dùng cho phiên" (/wip — truy xuất QR đợt 2b)
 // ============================================================
 // Tổ trưởng khai MỘT lần các lô NL đem ra chế biến trong phiên (quét tem / gõ mã /
-// chọn), thay vì gắn từng mẻ sau khi lưu. Lưu phiên ⇒ `ganLoChoPhien` (lib/truyXuatLo)
+// chọn), thay vì gắn từng mẻ sau khi lưu. Lưu phiên ⇒ `assignSessionLots` (lib/lotTraceability)
 // gắn lô cho thành phẩm đúng LOẠI NL (mặt hàng đã gắn loại NL ở Danh mục), không thì cùng
 // LOÀI, và dòng bán nội địa đúng loại NL; kg để trống. Mỗi loại NL của chuyến là một lô.
 // Mẻ nào cần sửa riêng vẫn mở "Gắn lô NL" ở sổ. Lô ở đây chỉ là danh sách chọn
 // (không phải danh mục) ⇒ không có thêm mới / bút chì (CLAUDE.md quy tắc 7 ngoại lệ).
 import { useMemo, useState } from "react";
 import type { LotInput, Workshop } from "@/types";
-import { TEN_LOAI, docMaQr, loNlDeChon, lyDoNhieuLo, nutLo, timLo, type DuLieuTruyXuat, type NutLo } from "@/lib/truyXuatLo";
+import { TRACE_KIND_LABELS, docMaQr, listSelectableMaterialLots, explainMultipleLots, buildLotNode, findLots, type TraceData, type LotNode } from "@/lib/lotTraceability";
 import { Button, Combobox, Field, Input, Nhan, notify } from "@/design-system";
 import { KhungQuetQr } from "@/features/shared";
 import { Camera, CameraOff, Link2, Plus, X } from "lucide-react";
-import { kg, viDate } from "@/lib/format";
+import { kg, formatDateVN } from "@/lib/format";
 
 export interface LoPhien {
-  nut: NutLo;
+  nut: LotNode;
   cach: LotInput["method"];
 }
 
@@ -28,7 +28,7 @@ export function KhoiLoPhien({
   loPhien,
   onDoi,
 }: {
-  dl: DuLieuTruyXuat;
+  dl: TraceData;
   xuong: Workshop;
   /** Ngày sản xuất của phiên — mốc lọc lô gần đây. */
   ngay: string;
@@ -37,19 +37,19 @@ export function KhoiLoPhien({
 }) {
   const [isScanning, setIsScanning] = useState(false);
   const [typedCode, setTypedCode] = useState("");
-  const [choices, setChoices] = useState<NutLo[]>([]);
+  const [choices, setChoices] = useState<LotNode[]>([]);
   const [pickPrompt, setPickPrompt] = useState("");
 
   const candidates = useMemo(
-    () => loNlDeChon(dl, xuong, ngay).filter((n) => !loPhien.some((l) => l.nut.id === n.id)),
+    () => listSelectableMaterialLots(dl, xuong, ngay).filter((n) => !loPhien.some((l) => l.nut.id === n.id)),
     [dl, xuong, ngay, loPhien]
   );
-  const describeLot = (n: NutLo) =>
-    [n.moTa, n.ngay && viDate(n.ngay), n.chiTiet.find((c) => c.nhan === "Đại lý")?.giaTri, n.kg ? kg(n.kg) : ""].filter(Boolean).join(" · ");
+  const describeLot = (n: LotNode) =>
+    [n.moTa, n.ngay && formatDateVN(n.ngay), n.chiTiet.find((c) => c.nhan === "Đại lý")?.giaTri, n.kg ? kg(n.kg) : ""].filter(Boolean).join(" · ");
 
-  const addLot = (n: NutLo, cach: LotInput["method"]) => {
+  const addLot = (n: LotNode, cach: LotInput["method"]) => {
     if (n.kind !== "S") {
-      notify.canhBao(`"${n.nhan}" là ${TEN_LOAI[n.kind].toLowerCase()}, không phải lô nguyên liệu.`);
+      notify.canhBao(`"${n.nhan}" là ${TRACE_KIND_LABELS[n.kind].toLowerCase()}, không phải lô nguyên liệu.`);
       return;
     }
     if (loPhien.some((l) => l.nut.id === n.id)) {
@@ -66,10 +66,10 @@ export function KhoiLoPhien({
     const ma = docMaQr(text);
     if (!ma) return;
     if ("kind" in ma && ma.kind !== "S") {
-      notify.canhBao(`Tem này là ${TEN_LOAI[ma.kind].toLowerCase()}, không phải lô nguyên liệu.`);
+      notify.canhBao(`Tem này là ${TRACE_KIND_LABELS[ma.kind].toLowerCase()}, không phải lô nguyên liệu.`);
       return;
     }
-    const kq = timLo(ma, dl).filter((n) => n.kind === "S");
+    const kq = findLots(ma, dl).filter((n) => n.kind === "S");
     if (!kq.length) {
       notify.canhBao(`Không tìm thấy lô nguyên liệu "${text}". Kiểm tra lại mã, hoặc chọn trong danh sách.`);
       return;
@@ -78,7 +78,7 @@ export function KhoiLoPhien({
     else {
       // Gõ mã chuyến ⇒ ra các loại NL của chuyến: việc thường ngày, chọn ở danh sách dưới,
       // không cần toast. Chỉ mã cũ trùng thật mới cảnh báo.
-      const ld = lyDoNhieuLo(text, kq, dl);
+      const ld = explainMultipleLots(text, kq, dl);
       setChoices(kq);
       setPickPrompt(ld.cau);
       if (!ld.cungChuyen) notify.canhBao(`${ld.cau} bên dưới.`);
@@ -171,14 +171,14 @@ export function KhoiLoPhien({
         hint={`Mỗi loại NL của chuyến là một lô. Lô về gần đây của xưởng ${xuong} (mới trước), sau đó lô cũ còn dở — NL cấp đông đem xả.`}
         value=""
         onChange={(id) => {
-          const n = candidates.find((u) => u.id === id) ?? (id ? nutLo("S", id, dl) : undefined);
+          const n = candidates.find((u) => u.id === id) ?? (id ? buildLotNode("S", id, dl) : undefined);
           if (n) addLot(n, "chon");
         }}
         // Mỗi loại NL của chuyến là một lô cùng mã chuyến ⇒ nhãn ghép loại NL cho phân biệt được.
         options={candidates.map((n) => ({
           value: n.id,
           label: `${n.nhan} · ${n.moTa}`,
-          phu: [n.ngay && viDate(n.ngay), n.chiTiet.find((c) => c.nhan === "Đại lý")?.giaTri, n.kg ? kg(n.kg) : ""].filter(Boolean).join(" · ") || undefined,
+          phu: [n.ngay && formatDateVN(n.ngay), n.chiTiet.find((c) => c.nhan === "Đại lý")?.giaTri, n.kg ? kg(n.kg) : ""].filter(Boolean).join(" · ") || undefined,
         }))}
         placeholder={candidates.length ? "— Chọn lô —" : "Không có lô gợi ý"}
         emptyText="Không thấy lô này — quét tem hoặc gõ mã lô ở trên."

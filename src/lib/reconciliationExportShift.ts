@@ -7,10 +7,10 @@
  * cũ ⇒ **số sai âm thầm**. Nên ở đây dời ô XONG là dịch luôn mọi tham chiếu.
  */
 
-import { chuCotExcel, soCotExcel } from "./doiSoatChung";
+import { columnIndexToLetter, columnLetterToNumber } from "./reconciliationCommon";
 
 /** Dời chữ cột `c` sang phải `dich` cột ("Q", 1 → "R"). */
-const shiftColumnLetter = (c: string, shift: number): string => chuCotExcel(soCotExcel(c) + shift - 1);
+const shiftColumnLetter = (c: string, shift: number): string => columnIndexToLetter(columnLetterToNumber(c) + shift - 1);
 
 /**
  * Dịch mọi tham chiếu ô trong một công thức sang phải `dich` cột.
@@ -19,7 +19,7 @@ const shiftColumnLetter = (c: string, shift: number): string => chuCotExcel(soCo
  * chuỗi trong nháy kép (`"KHỚP"`), tên sheet trong nháy đơn (`'T6-KMA'`), và
  * tên hàm (`SUM(`). Tham chiếu sang sheet KHÁC chỉ dịch khi sheet đó cũng bị chèn cột.
  */
-export function dichCongThuc(
+export function shiftFormula(
   ct: string,
   shift: number,
   shiftedSheets: ReadonlySet<string>,
@@ -114,7 +114,7 @@ export function dichCongThuc(
 }
 
 /** Dịch một vùng kiểu `B3:T3` sang phải `dich` cột. */
-export const dichVung = (ref: string, shift: number): string =>
+export const shiftRange = (ref: string, shift: number): string =>
   ref.replace(/([A-Z]+)(\d+)/g, (_m, c: string, r: string) => `${shiftColumnLetter(c, shift)}${r}`);
 
 type Worksheet = import("exceljs").Worksheet;
@@ -130,7 +130,7 @@ type Worksheet = import("exceljs").Worksheet;
  * Bắt buộc làm trước mọi thao tác thêm/bớt cột, nếu không exceljs ném lỗi
  * "Shared Formula master must exist above and or left of clone" lúc ghi.
  */
-export function boCongThucDungChung(ws: Worksheet): void {
+export function unshareFormulas(ws: Worksheet): void {
   ws.eachRow({ includeEmpty: false }, (row) =>
     row.eachCell({ includeEmpty: false }, (cell) => {
       const v = cell.value as { formula?: string; sharedFormula?: string } | null;
@@ -145,15 +145,15 @@ export function boCongThucDungChung(ws: Worksheet): void {
  * của lần chạy trước. Cắt ở ĐUÔI nên không ô nào bên trái bị dời ⇒ công thức
  * của dữ liệu gốc không cần dịch.
  */
-export function xoaCotDuoi(ws: Worksheet, fromColumn: number): void {
+export function deleteTrailingColumns(ws: Worksheet, fromColumn: number): void {
   const last = ws.columnCount;
   if (last < fromColumn) return;
-  boCongThucDungChung(ws);
+  unshareFormulas(ws);
   ws.spliceColumns(fromColumn, last - fromColumn + 1);
 }
 
-export function chenCotDau(ws: Worksheet, shift: number, shiftedSheets: ReadonlySet<string>): void {
-  boCongThucDungChung(ws);
+export function insertLeadingColumns(ws: Worksheet, shift: number, shiftedSheets: ReadonlySet<string>): void {
+  unshareFormulas(ws);
 
   const gop = Object.keys((ws as unknown as { _merges?: Record<string, unknown> })._merges ?? {}).map(
     (k) => {
@@ -178,31 +178,31 @@ export function chenCotDau(ws: Worksheet, shift: number, shiftedSheets: Readonly
   if (shift >= 0) ws.spliceColumns(1, 0, ...Array.from({ length: shift }, () => []));
   else ws.spliceColumns(1, -shift);
 
-  rewriteFormulas(ws, (ct) => dichCongThuc(ct, shift, shiftedSheets));
+  rewriteFormulas(ws, (ct) => shiftFormula(ct, shift, shiftedSheets));
 
   for (const g of gop) {
     if (!g) continue;
     // vùng gộp nằm (một phần) trong cột vừa gỡ thì bỏ, đừng dựng ra địa chỉ cột âm
     if (shift < 0 && /(^|:)\$?A\d/.test(g)) continue;
     try {
-      ws.mergeCells(dichVung(g, shift));
+      ws.mergeCells(shiftRange(g, shift));
     } catch {
       /* chồng vùng khác — bỏ qua, không đáng làm hỏng cả file xuất */
     }
   }
-  if (typeof autoFilter === "string") ws.autoFilter = dichVung(autoFilter, shift);
+  if (typeof autoFilter === "string") ws.autoFilter = shiftRange(autoFilter, shift);
 }
 
 /**
  * Vá tham chiếu chéo sheet cho sheet KHÔNG bị chèn cột: nó vẫn có thể trỏ sang
  * sheet bị chèn (`='T6'!K144`) nên phải dịch riêng những tham chiếu có tên sheet.
  */
-export function dichThamChieuCheoSheet(
+export function shiftCrossSheetRefs(
   ws: Worksheet,
   shift: number,
   shiftedSheets: ReadonlySet<string>
 ): void {
-  rewriteFormulas(ws, (ct) => dichCongThuc(ct, shift, shiftedSheets, false));
+  rewriteFormulas(ws, (ct) => shiftFormula(ct, shift, shiftedSheets, false));
 }
 
 /** Viết lại mọi ô công thức của sheet (giữ kết quả cache). */

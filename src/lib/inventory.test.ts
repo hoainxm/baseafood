@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { tinhTon, tinhTonChiTiet, locBanLe, khaDung, KHO_BAN_LE, KHO_TP, truTonBTP, tinhTonTP, tinhTonTPTheoLo, tinhTonTPTheoLoChiTiet, dongGoiTruTon } from "@/lib/inventory";
+import { computeWipStock, computeWipStockDetail, filterRetailSales, getAvailableKg, RETAIL_WAREHOUSE, FG_WAREHOUSE, collectWipDeductions, computeFinishedGoodStock, computeFinishedGoodLotStock, computeFinishedGoodLotStockDetail, collectPackagingDeductions } from "@/lib/inventory";
 import type { WipProductionItem, ExportItem, LotDispatch, LotInput, Packaging } from "@/types";
 
 const lo = (
@@ -20,9 +20,9 @@ const lo = (
     status,
   }) as WipProductionItem;
 
-describe("tinhTon", () => {
+describe("computeWipStock", () => {
   it("chỉ tính lô đã nhập kho, conLai = nhập − xuất", () => {
-    const los = tinhTon(
+    const los = computeWipStock(
       [lo("w1", "2026-09-01", 100, 10), lo("w2", "2026-09-02", 50, 5, "cho-nhap")],
       [{ wipId: "w1", quantityKg: 30, blocksCount: 3 } as ExportItem],
     );
@@ -34,7 +34,7 @@ describe("tinhTon", () => {
   });
 
   it("bán lẻ trừ tồn FIFO theo ngày SX (lô cũ trước)", () => {
-    const los = tinhTon(
+    const los = computeWipStock(
       [lo("wNew", "2026-09-02", 100, 10), lo("wOld", "2026-08-30", 40, 4)],
       [],
       [{ productId: "p1", spec: "s1", quantityKg: 50 }],
@@ -46,80 +46,80 @@ describe("tinhTon", () => {
   });
 });
 
-describe("locBanLe", () => {
+describe("filterRetailSales", () => {
   const rows = [
-    { productId: "p1", spec: "s1", quantityKg: 10, sourceWarehouse: KHO_BAN_LE },
-    { productId: "p2", spec: "s1", quantityKg: 20, sourceWarehouse: KHO_TP },
+    { productId: "p1", spec: "s1", quantityKg: 10, sourceWarehouse: RETAIL_WAREHOUSE },
+    { productId: "p2", spec: "s1", quantityKg: 20, sourceWarehouse: FG_WAREHOUSE },
     { productId: "p3", spec: "s1", quantityKg: 30, sourceWarehouse: "Lưu trữ" },
     { productId: "p4", spec: "s1", quantityKg: 40, sourceWarehouse: "" },
   ];
 
-  it("mặc định lấy dòng bán block thô (KHO_BAN_LE), bỏ handoff/đơn đặt", () => {
-    const r = locBanLe(rows);
+  it("mặc định lấy dòng bán block thô (RETAIL_WAREHOUSE), bỏ handoff/đơn đặt", () => {
+    const r = filterRetailSales(rows);
     expect(r).toHaveLength(1);
     expect(r[0].productId).toBe("p1");
   });
 
-  it("truyền KHO_TP lấy dòng bán hàng đóng gói", () => {
-    const r = locBanLe(rows, KHO_TP);
+  it("truyền FG_WAREHOUSE lấy dòng bán hàng đóng gói", () => {
+    const r = filterRetailSales(rows, FG_WAREHOUSE);
     expect(r).toHaveLength(1);
     expect(r[0].productId).toBe("p2");
   });
 });
 
-describe("khaDung", () => {
+describe("getAvailableKg", () => {
   it("cộng phần còn lại theo (mặt hàng × quy cách), kẹp âm về 0", () => {
     const stockRows = [
       { productId: "p1", spec: "s1", conLai: 70 },
       { productId: "p1", spec: "s1", conLai: 30 },
       { productId: "p1", spec: "s1", conLai: -5 }, // âm không được cộng vào
       { productId: "p2", spec: "s1", conLai: 999 },
-    ] as Parameters<typeof khaDung>[0];
-    expect(khaDung(stockRows, "p1", "s1")).toBe(100);
-    expect(khaDung(stockRows, "pX", "s1")).toBe(0);
+    ] as Parameters<typeof getAvailableKg>[0];
+    expect(getAvailableKg(stockRows, "p1", "s1")).toBe(100);
+    expect(getAvailableKg(stockRows, "pX", "s1")).toBe(0);
   });
 });
 
 describe("trừ tồn theo lô đã gắn (truy xuất QR)", () => {
   const w0 = lo("w0", "2026-09-29", 100, 10); // lô cũ, không ai gắn
   const w1 = lo("w1", "2026-10-02", 500, 50);
-  const remainingOf = (los: ReturnType<typeof tinhTon>, id: string) => los.find((l) => l.wipId === id)!.conLai;
+  const remainingOf = (los: ReturnType<typeof computeWipStock>, id: string) => los.find((l) => l.wipId === id)!.conLai;
 
   it("không gắn lô ⇒ y như FIFO cũ", () => {
-    const los = tinhTon([w0, w1], [], [{ productId: "p1", spec: "s1", quantityKg: 200 }]);
+    const los = computeWipStock([w0, w1], [], [{ productId: "p1", spec: "s1", quantityKg: 200 }]);
     expect(remainingOf(los, "w0")).toBe(0);
     expect(remainingOf(los, "w1")).toBe(400);
   });
 
   it("gắn lô có kg ⇒ trừ đúng lô đó, lô cũ không bị đụng", () => {
-    const los = tinhTon([w0, w1], [], [{ productId: "p1", spec: "s1", quantityKg: 200, lo: [{ id: "w1", kg: 200 }] }]);
+    const los = computeWipStock([w0, w1], [], [{ productId: "p1", spec: "s1", quantityKg: 200, lo: [{ id: "w1", kg: 200 }] }]);
     expect(remainingOf(los, "w0")).toBe(100);
     expect(remainingOf(los, "w1")).toBe(300);
   });
 
   it("gắn lô chưa cân ⇒ FIFO trong các lô đã gắn", () => {
     const w2 = lo("w2", "2026-10-03", 50, 5);
-    const los = tinhTon([w0, w1, w2], [], [{ productId: "p1", spec: "s1", quantityKg: 530, lo: [{ id: "w2", kg: null }, { id: "w1", kg: null }] }]);
+    const los = computeWipStock([w0, w1, w2], [], [{ productId: "p1", spec: "s1", quantityKg: 530, lo: [{ id: "w2", kg: null }, { id: "w1", kg: null }] }]);
     expect(remainingOf(los, "w0")).toBe(100);
     expect(remainingOf(los, "w1")).toBe(0); // w1 cũ hơn w2 ⇒ trừ trước
     expect(remainingOf(los, "w2")).toBe(20);
   });
 
   it("kg gắn vượt phần lô còn ⇒ phần dư rơi xuống FIFO, không làm lô âm", () => {
-    const los = tinhTon([w0, w1], [], [{ productId: "p1", spec: "s1", quantityKg: 550, lo: [{ id: "w1", kg: 550 }] }]);
+    const los = computeWipStock([w0, w1], [], [{ productId: "p1", spec: "s1", quantityKg: 550, lo: [{ id: "w1", kg: 550 }] }]);
     expect(remainingOf(los, "w1")).toBe(0);
     expect(remainingOf(los, "w0")).toBe(50);
   });
 
   it("gắn nhầm lô khác mặt hàng ⇒ bỏ qua, trừ FIFO", () => {
     const khac = { ...lo("wx", "2026-09-01", 80, 8), productId: "p9" } as WipProductionItem;
-    const los = tinhTon([w0, w1, khac], [], [{ productId: "p1", spec: "s1", quantityKg: 60, lo: [{ id: "wx", kg: 60 }] }]);
+    const los = computeWipStock([w0, w1, khac], [], [{ productId: "p1", spec: "s1", quantityKg: 60, lo: [{ id: "wx", kg: 60 }] }]);
     expect(remainingOf(los, "wx")).toBe(80);
     expect(remainingOf(los, "w0")).toBe(40);
   });
 
-  it("truTonBTP gom bán lẻ + đóng gói kèm lô gắn từ lot_dispatches / lot_inputs", () => {
-    const ban = [{ id: "b1", productId: "p1", spec: "s1", quantityKg: 100, sourceWarehouse: KHO_BAN_LE }];
+  it("collectWipDeductions gom bán lẻ + đóng gói kèm lô gắn từ lot_dispatches / lot_inputs", () => {
+    const ban = [{ id: "b1", productId: "p1", spec: "s1", quantityKg: 100, sourceWarehouse: RETAIL_WAREHOUSE }];
     const dg = [{ id: "pk1", fromProductId: "p1", fromSpec: "s1", inputKg: 200 } as Packaging];
     const dispatches: LotDispatch[] = [
       { id: "d1", lotKind: "W", lotId: "w1", lotLabel: "", docKind: "sales_item", docId: "b1", quantityKg: 100, method: "quet", operator: "", recordedAt: "" },
@@ -127,37 +127,37 @@ describe("trừ tồn theo lô đã gắn (truy xuất QR)", () => {
     const inputKg: LotInput[] = [
       { id: "l1", outputKind: "P", outputId: "pk1", inputKind: "W", inputId: "w1", inputLabel: "", material: "", quantityKg: 200, method: "quet", operator: "", recordedAt: "" },
     ];
-    const los = tinhTon([w0, w1], [], truTonBTP(ban, dg, inputKg, dispatches));
+    const los = computeWipStock([w0, w1], [], collectWipDeductions(ban, dg, inputKg, dispatches));
     expect(remainingOf(los, "w0")).toBe(100);
     expect(remainingOf(los, "w1")).toBe(200);
     // Không truyền lô gắn ⇒ FIFO như cũ (lô cũ hết trước).
-    const prev = tinhTon([w0, w1], [], truTonBTP(ban, dg));
+    const prev = computeWipStock([w0, w1], [], collectWipDeductions(ban, dg));
     expect(remainingOf(prev, "w0")).toBe(0); // 300 kg: lô cũ 100 trước
     expect(remainingOf(prev, "w1")).toBe(300); // rồi 200 từ lô mới
   });
 
-  it("dongGoiTruTon chỉ lấy lô BTP gắn đúng phiếu", () => {
+  it("collectPackagingDeductions chỉ lấy lô BTP gắn đúng phiếu", () => {
     const inputKg = [
       { outputKind: "P", outputId: "pk1", inputKind: "W", inputId: "w1", quantityKg: null },
       { outputKind: "W", outputId: "pk1", inputKind: "S", inputId: "s1", quantityKg: 5 },
     ] as LotInput[];
-    const [d] = dongGoiTruTon([{ id: "pk1", fromProductId: "p1", fromSpec: "s1", inputKg: 10 } as Packaging], inputKg);
+    const [d] = collectPackagingDeductions([{ id: "pk1", fromProductId: "p1", fromSpec: "s1", inputKg: 10 } as Packaging], inputKg);
     expect(d!.lo).toEqual([{ id: "w1", kg: null }]);
   });
 
-  it("locBanLe: bán đóng gói lấy lô TP (P), bán block thô lấy lô BTP (W)", () => {
+  it("filterRetailSales: bán đóng gói lấy lô TP (P), bán block thô lấy lô BTP (W)", () => {
     const dispatches = [
       { docKind: "sales_item", docId: "b1", lotKind: "P", lotId: "pk1", quantityKg: 5 },
       { docKind: "sales_item", docId: "b1", lotKind: "W", lotId: "w1", quantityKg: 5 },
     ] as LotDispatch[];
-    const rows = [{ id: "b1", productId: "p1", spec: "s1", quantityKg: 5, sourceWarehouse: KHO_TP }];
-    expect(locBanLe(rows, KHO_TP, dispatches)[0]!.lo).toEqual([{ id: "pk1", kg: 5 }]);
+    const rows = [{ id: "b1", productId: "p1", spec: "s1", quantityKg: 5, sourceWarehouse: FG_WAREHOUSE }];
+    expect(filterRetailSales(rows, FG_WAREHOUSE, dispatches)[0]!.lo).toEqual([{ id: "pk1", kg: 5 }]);
   });
 
-  it("tinhTonTPTheoLo: lô TP gắn trừ đúng phiếu, còn lại FIFO phiếu sớm trước", () => {
+  it("computeFinishedGoodLotStock: lô TP gắn trừ đúng phiếu, còn lại FIFO phiếu sớm trước", () => {
     const pk = (id: string, date: string, outputKg: number) =>
       ({ id, date, toProductId: "tp", toSpec: "1kg", outputKg, outputUnits: outputKg, warehouse: "" }) as Packaging;
-    const los = tinhTonTPTheoLo(
+    const los = computeFinishedGoodLotStock(
       [pk("pk1", "2026-10-01", 100), pk("pk2", "2026-10-03", 190)],
       [
         { productId: "tp", spec: "1kg", quantityKg: 50, lo: [{ id: "pk2", kg: 50 }] },
@@ -172,41 +172,41 @@ describe("trừ tồn theo lô đã gắn (truy xuất QR)", () => {
 describe("bán vượt tồn — phần trừ không phân được vào lô nào", () => {
   const w0 = lo("w0", "2026-09-29", 100, 10);
   it("BTP: bán 120 trên lô 100 ⇒ lô về 0, bán vượt 20 (không nuốt mất)", () => {
-    const kq = tinhTonChiTiet([w0], [], [{ productId: "p1", spec: "s1", quantityKg: 120 }]);
+    const kq = computeWipStockDetail([w0], [], [{ productId: "p1", spec: "s1", quantityKg: 120 }]);
     expect(kq.los[0]!.conLai).toBe(0);
     expect(kq.banVuot).toEqual([{ productId: "p1", spec: "s1", kg: 20 }]);
     expect(kq.tongBanVuot).toBe(20);
-    // tinhTon giữ nguyên API cũ: chỉ trả danh sách lô.
-    expect(tinhTon([w0], [], [{ productId: "p1", spec: "s1", quantityKg: 120 }])[0]!.conLai).toBe(0);
+    // computeWipStock giữ nguyên API cũ: chỉ trả danh sách lô.
+    expect(computeWipStock([w0], [], [{ productId: "p1", spec: "s1", quantityKg: 120 }])[0]!.conLai).toBe(0);
   });
 
   it("BTP: bán mặt hàng không có lô nào trong kho ⇒ cả dòng là bán vượt", () => {
-    const kq = tinhTonChiTiet([w0], [], [{ productId: "p2", spec: "s1", quantityKg: 30 }]);
+    const kq = computeWipStockDetail([w0], [], [{ productId: "p2", spec: "s1", quantityKg: 30 }]);
     expect(kq.los[0]!.conLai).toBe(100);
     expect(kq.tongBanVuot).toBe(30);
   });
 
   it("BTP: lô gắn có kg vượt phần lô còn, FIFO cũng hết ⇒ phần dư thành bán vượt", () => {
-    const kq = tinhTonChiTiet([w0], [], [{ productId: "p1", spec: "s1", quantityKg: 150, lo: [{ id: "w0", kg: 150 }] }]);
+    const kq = computeWipStockDetail([w0], [], [{ productId: "p1", spec: "s1", quantityKg: 150, lo: [{ id: "w0", kg: 150 }] }]);
     expect(kq.los[0]!.conLai).toBe(0);
     expect(kq.tongBanVuot).toBe(50);
   });
 
   it("không bán vượt ⇒ danh sách rỗng, tổng 0", () => {
-    const kq = tinhTonChiTiet([w0], [], [{ productId: "p1", spec: "s1", quantityKg: 60 }]);
+    const kq = computeWipStockDetail([w0], [], [{ productId: "p1", spec: "s1", quantityKg: 60 }]);
     expect(kq.banVuot).toEqual([]);
     expect(kq.tongBanVuot).toBe(0);
   });
 
-  it("TP: đóng gói 100, bán 120 ⇒ tinhTonTP −20 = Σ tồn theo lô (0) − bán vượt (20)", () => {
+  it("TP: đóng gói 100, bán 120 ⇒ computeFinishedGoodStock −20 = Σ tồn theo lô (0) − bán vượt (20)", () => {
     const pk = { id: "pk1", date: "2026-10-01", toProductId: "tp", toSpec: "1kg", outputKg: 100, outputUnits: 100, warehouse: "" } as Packaging;
     const ban = [{ productId: "tp", spec: "1kg", quantityKg: 120 }];
-    const total = tinhTonTP([pk], ban)[0]!.conLai;
-    const theoLo = tinhTonTPTheoLoChiTiet([pk], ban);
+    const total = computeFinishedGoodStock([pk], ban)[0]!.conLai;
+    const theoLo = computeFinishedGoodLotStockDetail([pk], ban);
     expect(total).toBe(-20);
     expect(theoLo.los[0]!.conLai).toBe(0);
     expect(theoLo.tongBanVuot).toBe(20);
     expect(theoLo.los.reduce((s, l) => s + l.conLai, 0) - theoLo.tongBanVuot).toBe(total);
-    expect(tinhTonTPTheoLo([pk], ban)[0]!.conLai).toBe(0);
+    expect(computeFinishedGoodLotStock([pk], ban)[0]!.conLai).toBe(0);
   });
 });

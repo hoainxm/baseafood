@@ -20,14 +20,14 @@ import {
   useLotDispatches,
 } from "@/lib/catalogRepo";
 import {
-  tinhTon,
-  khaDung,
-  KHO_BAN_LE,
-  KHO_TP,
-  locBanLe,
-  truTonBTP,
-  tinhTonTP,
-  khaDungTP,
+  computeWipStock,
+  getAvailableKg,
+  RETAIL_WAREHOUSE,
+  FG_WAREHOUSE,
+  filterRetailSales,
+  collectWipDeductions,
+  computeFinishedGoodStock,
+  getAvailableFinishedGoodKg,
 } from "@/lib/inventory";
 import {
   ChuThichBatBuoc,
@@ -60,8 +60,8 @@ import {
 } from "@/design-system";
 import { useSuaDanhMuc } from "@/features/catalog/SuaDanhMucNhanh";
 import { GanLoXuat } from "@/features/shared";
-import { kg, num, todayISO, viDate } from "@/lib/format";
-import { KY_OPT, phamViKy, type KyXem } from "@/lib/periodUtils";
+import { kg, num, todayISO, formatDateVN } from "@/lib/format";
+import { KY_OPT, getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
 import {
   CalendarRange,
   CircleCheck,
@@ -95,7 +95,7 @@ interface NewRow {
   spec: string;
   quantityKg: number;
   unitPrice: number | null;
-  nguon: string; // KHO_BAN_LE (block thô) | KHO_TP (đóng gói)
+  nguon: string; // RETAIL_WAREHOUSE (block thô) | FG_WAREHOUSE (đóng gói)
 }
 
 const EMPTY_NEW_ROW: NewRow = {
@@ -103,7 +103,7 @@ const EMPTY_NEW_ROW: NewRow = {
   spec: "",
   quantityKg: 0,
   unitPrice: null,
-  nguon: KHO_BAN_LE,
+  nguon: RETAIL_WAREHOUSE,
 };
 
 /** Một phiếu bán hiện trên sổ, gom từ các dòng của nó. */
@@ -166,7 +166,7 @@ export default function BanHangScreen() {
   const [salesInvoices, persistSalesInvoices, { trangThai }] = useSalesInvoices();
 
   /* Tồn khả dụng để bán: trừ SUY từ chính các dòng bán (theo marker nguồn).
-   * - Block thô (KHO_BAN_LE) trừ tồn BTP; đóng gói (KHO_TP) trừ tồn TP.
+   * - Block thô (RETAIL_WAREHOUSE) trừ tồn BTP; đóng gói (FG_WAREHOUSE) trừ tồn TP.
    * - Handoff Đơn đặt ("Lưu trữ") đã trừ qua lệnh xuất → không đưa vào đây. */
   const [wips] = useWipProductions();
   const [exportItems] = useExportItems();
@@ -176,7 +176,7 @@ export default function BanHangScreen() {
   // Truy xuất lô (đợt 2b): dòng bán lẻ ghi lấy từ lô nào ⇒ hộ chiếu lô thấy được khách,
   // sổ tồn trừ đúng lô đó. Block thô ⇒ lô BTP (W) · đóng gói ⇒ lô TP (P).
   const [lotSalesItem, setLotSalesItem] = useState<SalesItem | null>(null);
-  const saleLotKind = (r: SalesItem) => (r.sourceWarehouse === KHO_TP ? "P" : r.sourceWarehouse === KHO_BAN_LE ? "W" : null);
+  const saleLotKind = (r: SalesItem) => (r.sourceWarehouse === FG_WAREHOUSE ? "P" : r.sourceWarehouse === RETAIL_WAREHOUSE ? "W" : null);
   const countSalesLots = (id: string) => lotDispatches.filter((d) => d.docKind === "sales_item" && d.docId === id).length;
   const lotInputButton = (r: SalesItem) =>
     saleLotKind(r) ? (
@@ -191,15 +191,15 @@ export default function BanHangScreen() {
       </Button>
     ) : null;
   const wipDeductions = useMemo(
-    () => truTonBTP(rows, packagings, lotInputs, lotDispatches),
+    () => collectWipDeductions(rows, packagings, lotInputs, lotDispatches),
     [rows, packagings, lotInputs, lotDispatches]
   );
   const wipStock = useMemo(
-    () => tinhTon(wips, exportItems, wipDeductions),
+    () => computeWipStock(wips, exportItems, wipDeductions),
     [wips, exportItems, wipDeductions]
   );
   const finishedGoodStock = useMemo(
-    () => tinhTonTP(packagings, locBanLe(rows, KHO_TP)),
+    () => computeFinishedGoodStock(packagings, filterRetailSales(rows, FG_WAREHOUSE)),
     [packagings, rows]
   );
   const isLoading = trangThai === "dang-tai" && salesInvoices.length === 0;
@@ -207,7 +207,7 @@ export default function BanHangScreen() {
   const [customers, setCustomers] = useCustomers();
 
   // Kỳ xem sổ: ngày/tuần/tháng/năm/khoảng tự chọn
-  const [ky, setKy] = useState<KyXem>("ngay");
+  const [ky, setKy] = useState<ViewPeriod>("ngay");
   const [date, setDate] = useState(todayISO());
   const [fromDate, setFromDate] = useState(todayISO());
   const [toDate, setToDate] = useState(todayISO());
@@ -219,9 +219,9 @@ export default function BanHangScreen() {
   const [editRowIds, setEditRowIds] = useState<string[] | null>(null);
   const [newRows, setNewRows] = useState<NewRow>(EMPTY_NEW_ROW);
   const newRowAvailable = newRows.productId
-    ? newRows.nguon === KHO_TP
-      ? khaDungTP(finishedGoodStock, newRows.productId, newRows.spec.trim())
-      : khaDung(wipStock, newRows.productId, newRows.spec.trim())
+    ? newRows.nguon === FG_WAREHOUSE
+      ? getAvailableFinishedGoodKg(finishedGoodStock, newRows.productId, newRows.spec.trim())
+      : getAvailableKg(wipStock, newRows.productId, newRows.spec.trim())
     : null;
   const isOversold = newRowAvailable != null && newRows.quantityKg > newRowAvailable;
   /** Kênh bán dùng gần nhất trong phiên — làm mặc định cho phiếu mới thay vì
@@ -233,7 +233,7 @@ export default function BanHangScreen() {
   const [editing, setEditing] = useState<SalesItem | null>(null);
   const [loi, setLoi] = useState<LoiNhap[]>([]);
 
-  const [tuHieuLuc, denHieuLuc] = phamViKy(ky, date, fromDate, toDate);
+  const [tuHieuLuc, denHieuLuc] = getViewPeriodRange(ky, date, fromDate, toDate);
   const isSingleDay = tuHieuLuc === denHieuLuc;
 
   const productName = (id: string) =>
@@ -255,8 +255,8 @@ export default function BanHangScreen() {
   const nhomView = useMemo(() => groupByInvoice(view, salesInvoices), [view, salesInvoices]);
 
   const rangeDescription = isSingleDay
-    ? viDate(tuHieuLuc)
-    : `${viDate(tuHieuLuc)} – ${viDate(denHieuLuc)}`;
+    ? formatDateVN(tuHieuLuc)
+    : `${formatDateVN(tuHieuLuc)} – ${formatDateVN(denHieuLuc)}`;
 
   const total = useMemo(
     () => view.reduce((s, r) => s + (r.quantityKg || 0), 0),
@@ -389,7 +389,7 @@ export default function BanHangScreen() {
       spec: newRows.spec.trim(),
       quantityKg: newRows.quantityKg,
       unitPrice: newRows.unitPrice,
-      sourceWarehouse: newRows.nguon, // KHO_BAN_LE ⇒ trừ tồn BTP; KHO_TP ⇒ trừ tồn TP đóng gói
+      sourceWarehouse: newRows.nguon, // RETAIL_WAREHOUSE ⇒ trừ tồn BTP; FG_WAREHOUSE ⇒ trừ tồn TP đóng gói
     };
     // Đồng bộ đầu phiếu cho MỌI dòng của phiếu (khách/ngày/kênh có thể vừa đổi
     // tại chỗ) rồi thêm dòng mới — giữ bất biến "đầu phiếu áp cả phiếu".
@@ -578,7 +578,7 @@ export default function BanHangScreen() {
             anNhanBatBuoc
             choPhepXoa={false}
             value={ky}
-            onChange={(v) => setKy(v as KyXem)}
+            onChange={(v) => setKy(v as ViewPeriod)}
             options={KY_OPT}
             className="min-w-[13rem]"
           />
@@ -611,7 +611,7 @@ export default function BanHangScreen() {
                 hint={
                   ky === "ngay"
                     ? undefined
-                    : `Kỳ đang xem: ${viDate(tuHieuLuc)} – ${viDate(denHieuLuc)}`
+                    : `Kỳ đang xem: ${formatDateVN(tuHieuLuc)} – ${formatDateVN(denHieuLuc)}`
                 }
                 value={date}
                 onChange={setDate}
@@ -672,7 +672,7 @@ export default function BanHangScreen() {
                         {customerName(n.phieu.customerId) || "(chưa có khách)"}
                       </span>
                       <span className="text-base text-muted-foreground">
-                        {viDate(n.phieu.deliveryDate)} · xưởng {n.phieu.workshop}
+                        {formatDateVN(n.phieu.deliveryDate)} · xưởng {n.phieu.workshop}
                       </span>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
@@ -681,7 +681,7 @@ export default function BanHangScreen() {
                       </Nhan>
                       {n.ghiBu && (
                         <Nhan loai="luu-y">
-                          Ghi bù {viDate(n.phieu.postingDate)}
+                          Ghi bù {formatDateVN(n.phieu.postingDate)}
                         </Nhan>
                       )}
                     </div>
@@ -920,8 +920,8 @@ export default function BanHangScreen() {
                   value={newRows.nguon}
                   onChange={(v) => setDong("nguon", v)}
                   options={[
-                    { value: KHO_BAN_LE, label: "Block thô (kho dự trữ)" },
-                    { value: KHO_TP, label: "Đóng gói (kho thành phẩm)" },
+                    { value: RETAIL_WAREHOUSE, label: "Block thô (kho dự trữ)" },
+                    { value: FG_WAREHOUSE, label: "Đóng gói (kho thành phẩm)" },
                   ]}
                   cot={2}
                 />
@@ -962,7 +962,7 @@ export default function BanHangScreen() {
                         : "rounded-lg bg-muted px-4 py-3 text-base text-muted-foreground"
                     }
                   >
-                    Tồn khả dụng ({newRows.nguon === KHO_TP ? "kho thành phẩm" : "kho dự trữ"}):{" "}
+                    Tồn khả dụng ({newRows.nguon === FG_WAREHOUSE ? "kho thành phẩm" : "kho dự trữ"}):{" "}
                     <span className="tnum font-semibold">{kg(newRowAvailable)}</span>
                     {isOversold
                       ? " — bán vượt tồn, kiểm lại (vẫn ghi được, tồn sẽ báo âm)."
@@ -989,7 +989,7 @@ export default function BanHangScreen() {
               {/* Tổng phiếu */}
               <div className="flex flex-wrap items-baseline justify-end gap-x-8 gap-y-2 rounded-xl bg-muted px-5 py-4">
                 <span className="text-base text-muted-foreground">
-                  Tổng phiếu {viDate(phien.deliveryDate)} · xưởng {phien.workshop}
+                  Tổng phiếu {formatDateVN(phien.deliveryDate)} · xưởng {phien.workshop}
                 </span>
                 <span className="tnum text-2xl font-semibold">
                   {kg(sessionTotal)}
@@ -1001,7 +1001,7 @@ export default function BanHangScreen() {
           <DialogFooter>
             {isEditingInvoice ? (
               <ConfirmDelete
-                moTaBanGhi={`Phiếu ${customerName(phien?.customerId ?? "") || "(chưa có khách)"} — ${viDate(phien?.deliveryDate ?? "")} — ${dongPhien.length} dòng — ${kg(sessionTotal)}`}
+                moTaBanGhi={`Phiếu ${customerName(phien?.customerId ?? "") || "(chưa có khách)"} — ${formatDateVN(phien?.deliveryDate ?? "")} — ${dongPhien.length} dòng — ${kg(sessionTotal)}`}
                 onConfirm={deleteEditingInvoice}
                 tieuDe="Xóa cả phiếu này?"
                 nhanNut="Xóa phiếu"
@@ -1106,7 +1106,7 @@ export default function BanHangScreen() {
         <GanLoXuat
           docKind="sales_item"
           docId={lotSalesItem.id}
-          docNhan={`${productName(lotSalesItem.productId)} · ${kg(lotSalesItem.quantityKg)} · ${viDate(lotSalesItem.deliveryDate)}`}
+          docNhan={`${productName(lotSalesItem.productId)} · ${kg(lotSalesItem.quantityKg)} · ${formatDateVN(lotSalesItem.deliveryDate)}`}
           loaiLo={saleLotKind(lotSalesItem)!}
           xuong={salesInvoices.find((p) => p.id === lotSalesItem.invoiceId)?.workshop ?? "Đông"}
           ngay={lotSalesItem.deliveryDate}

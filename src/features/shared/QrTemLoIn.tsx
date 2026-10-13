@@ -12,21 +12,21 @@
 import { useEffect, useState } from "react";
 import type { ImportShipment, LotKind } from "@/types";
 import { PhieuInTem, type TemIn } from "@/design-system";
-import { kg, viDate } from "@/lib/format";
-import { taoQrDataUrl } from "@/lib/qr";
-import { TEN_LOAI, banGhiIn, dongCuaChuyen, nhanLoNl, noiDungQr, nutLo, soTemMacDinh, type NutLo } from "@/lib/truyXuatLo";
+import { kg, formatDateVN } from "@/lib/format";
+import { createQrDataUrl } from "@/lib/qr";
+import { TRACE_KIND_LABELS, buildLabelPrintRecords, getShipmentLines, formatMaterialLotLabel, buildLotQrUrl, buildLotNode, getDefaultLabelCount, type LotNode } from "@/lib/lotTraceability";
 import { useLabelPrints, usePackagings, useWipProductions } from "@/lib/catalogRepo";
 import { useAuth } from "@/lib/auth";
 import { newId } from "@/lib/store";
 import { useDuLieuTruyXuat } from "./useDuLieuTruyXuat";
 
-const laLo = (n: NutLo) => n.kind === "S" || n.kind === "W" || n.kind === "P";
+const laLo = (n: LotNode) => n.kind === "S" || n.kind === "W" || n.kind === "P";
 
 /** Các dòng chữ phụ in dưới mã lô. */
-function labelLines(node: NutLo): string[] {
+function labelLines(node: LotNode): string[] {
   return [
-    `${TEN_LOAI[node.kind]} · ${node.moTa}`,
-    [node.ngay && viDate(node.ngay), node.xuong && `xưởng ${node.xuong}`, node.kg ? kg(Math.round(node.kg * 10) / 10) : ""]
+    `${TRACE_KIND_LABELS[node.kind]} · ${node.moTa}`,
+    [node.ngay && formatDateVN(node.ngay), node.xuong && `xưởng ${node.xuong}`, node.kg ? kg(Math.round(node.kg * 10) / 10) : ""]
       .filter(Boolean)
       .join(" · "),
     ...node.chiTiet.filter((c) => c.nhan === "Đại lý" || c.nhan === "SSCC").map((c) => `${c.nhan}: ${c.giaTri}`),
@@ -34,10 +34,10 @@ function labelLines(node: NutLo): string[] {
 }
 
 /**
- * Tem cho MỘT hoặc NHIỀU lô (nút đã dựng bằng `nutLo`). Nhiều lô ⇒ in một lượt,
+ * Tem cho MỘT hoặc NHIỀU lô (nút đã dựng bằng `buildLotNode`). Nhiều lô ⇒ in một lượt,
  * mỗi tem một nhãn (dùng cho "In tem hàng loạt" và in tem cả mẻ vừa lưu).
  */
-export function TemLoQr({ nut, nuts, onClose }: { nut?: NutLo; nuts?: NutLo[]; onClose: () => void }) {
+export function TemLoQr({ nut, nuts, onClose }: { nut?: LotNode; nuts?: LotNode[]; onClose: () => void }) {
   const ds = (nuts ?? (nut ? [nut] : [])).filter(laLo);
   const khoa = ds.map((n) => `${n.kind}:${n.id}`).join("|");
   const [qr, setQr] = useState<Record<string, string>>({});
@@ -45,7 +45,7 @@ export function TemLoQr({ nut, nuts, onClose }: { nut?: NutLo; nuts?: NutLo[]; o
     let huy = false;
     // Tên miền lấy từ chính địa chỉ app đang chạy — không ghi cứng trong code.
     Promise.all(
-      ds.map(async (n) => [`${n.kind}:${n.id}`, await taoQrDataUrl(noiDungQr(n.kind as LotKind, n.id, window.location.origin), 320)] as const)
+      ds.map(async (n) => [`${n.kind}:${n.id}`, await createQrDataUrl(buildLotQrUrl(n.kind as LotKind, n.id, window.location.origin), 320)] as const)
     ).then((cap) => {
       if (!huy) setQr(Object.fromEntries(cap));
     });
@@ -60,7 +60,7 @@ export function TemLoQr({ nut, nuts, onClose }: { nut?: NutLo; nuts?: NutLo[]; o
   const [soIn, saveLabelPrints] = useLabelPrints();
   const { nguoiDung } = useAuth();
   const recordPrintCount = (copies: number[]) => {
-    const newPrints = banGhiIn(ds, nguoiDung?.fullName || nguoiDung?.username || "", new Date().toISOString(), newId, (n) => copies[ds.indexOf(n)] ?? 1);
+    const newPrints = buildLabelPrintRecords(ds, nguoiDung?.fullName || nguoiDung?.username || "", new Date().toISOString(), newId, (n) => copies[ds.indexOf(n)] ?? 1);
     if (newPrints.length) saveLabelPrints([...soIn, ...newPrints]);
   };
 
@@ -71,7 +71,7 @@ export function TemLoQr({ nut, nuts, onClose }: { nut?: NutLo; nuts?: NutLo[]; o
     maLo: n.nhan,
     qrDataUrl: qr[`${n.kind}:${n.id}`] ?? "",
     dong: labelLines(n),
-    soBan: soTemMacDinh(n, { wips, packagings }),
+    soBan: getDefaultLabelCount(n, { wips, packagings }),
   }));
   return <PhieuInTem onClose={onClose} tems={tems} onIn={recordPrintCount} />;
 }
@@ -85,12 +85,12 @@ export function TemLoQr({ nut, nuts, onClose }: { nut?: NutLo; nuts?: NutLo[]; o
  */
 export function QrTemLoIn({ chuyen, onClose }: { chuyen: ImportShipment; onClose: () => void }) {
   const { dl } = useDuLieuTruyXuat();
-  const byType = dongCuaChuyen(dl, chuyen.id).map((m) => nutLo("S", m.id, dl));
+  const byType = getShipmentLines(dl, chuyen.id).map((m) => buildLotNode("S", m.id, dl));
   if (byType.length) return <TemLoQr nuts={byType} onClose={onClose} />;
-  const tam: NutLo = {
+  const tam: LotNode = {
     kind: "S",
     id: chuyen.id,
-    nhan: nhanLoNl(chuyen),
+    nhan: formatMaterialLotLabel(chuyen),
     moTa: "nguyên liệu",
     ngay: chuyen.deliveryDate,
     xuong: chuyen.workshop,

@@ -10,11 +10,11 @@ import type {
   LotWaiver, MaterialImportItem, MaterialType, Packaging, Product, SalesInvoice, SalesItem, SalesOrder,
   WipProductionItem,
 } from "@/types";
-import { KHO_BAN_LE, KHO_TP, tinhTon, truTonBTP } from "./inventory";
+import { RETAIL_WAREHOUSE, FG_WAREHOUSE, computeWipStock, collectWipDeductions } from "./inventory";
 import {
-  bangTonKhoLo, canBangLo, danhSachThuHoi, danhSachThuHoiNhieu, docMaQr, dsLoDeIn, ganLoChoPhien, loCungChuyen, theoGiaiDoan, nutLo, timLo, tonKhoCuaLo, truyNguoc,
-  truyXuoi, type DuLieuTruyXuat, type NhanhCay,
-} from "./truyXuatLo";
+  buildLotStockIndex, computeLotMassBalance, buildRecallList, buildRecallListForLots, docMaQr, listLotsToPrint, assignSessionLots, findSameShipmentLots, groupByTraceStage, buildLotNode, findLots, getLotStockKg, traceBackward,
+  traceForward, type TraceData, type TraceBranch,
+} from "./lotTraceability";
 
 // ---------- Dữ liệu ----------
 const mh = (id: string, name: string, category: string): Product =>
@@ -76,8 +76,8 @@ const salesInvoice = (id: string, customerId: string): SalesInvoice =>
   ({ id, deliveryDate: "2026-10-05", postingDate: "2026-10-05", backdateReason: "", workshop: "Đông", customerId, channel: "Nội địa", note: "" });
 const salesInvoices = [salesInvoice("v1", "kY"), salesInvoice("v2", "kZ"), salesInvoice("v3", "kX")];
 const salesItems: SalesItem[] = [
-  { id: "b1", invoiceId: "v1", deliveryDate: "2026-10-05", productId: "tpTui", spec: "", quantityKg: 50, unitPrice: null, sourceWarehouse: KHO_TP },
-  { id: "b2", invoiceId: "v2", deliveryDate: "2026-10-05", productId: "mh2da", spec: "", quantityKg: 100, unitPrice: null, sourceWarehouse: KHO_BAN_LE },
+  { id: "b1", invoiceId: "v1", deliveryDate: "2026-10-05", productId: "tpTui", spec: "", quantityKg: 50, unitPrice: null, sourceWarehouse: FG_WAREHOUSE },
+  { id: "b2", invoiceId: "v2", deliveryDate: "2026-10-05", productId: "mh2da", spec: "", quantityKg: 100, unitPrice: null, sourceWarehouse: RETAIL_WAREHOUSE },
   // handoff của lệnh xuất (Đơn đặt) — đã trừ qua export_items, không phải bán lẻ
   { id: "b3", invoiceId: "v3", deliveryDate: "2026-10-04", productId: "mhCat", spec: "", quantityKg: 200, unitPrice: null, sourceWarehouse: "Đơn đặt" },
 ];
@@ -99,17 +99,17 @@ const labelPrints = (["S:S1-1", "S:S2-1", "W:W1", "W:W2", "P:P1"] as const).map(
   return { id: `t${i}`, lotKind, lotId, label: lotId, copies: 1, operator: "", printedAt: "2026-10-02T09:00:00Z" };
 });
 
-const dl: DuLieuTruyXuat = {
+const dl: TraceData = {
   shipments, imports, wips, packagings, lotInputs, exportItems, exportOrders, salesOrders, products, customers,
   salesItems, salesInvoices, domesticSales, lotDispatches, lotWaivers: [], labelPrints, materialTypes,
 };
 
-const phang = (tree: NhanhCay[]): string[] => tree.flatMap((n) => [`${n.nut.kind}:${n.nut.id}`, ...phang(n.con)]);
+const phang = (tree: TraceBranch[]): string[] => tree.flatMap((n) => [`${n.nut.kind}:${n.nut.id}`, ...phang(n.con)]);
 
 // ---------- Kỳ vọng ----------
 describe("kịch bản mẫu: nhập → SX → kho → đóng gói / xuất / bán", () => {
   it("truy ngược thùng TP P1 → mẻ W1 → lô NL S1 → Đại lý A, ngày 01/10", () => {
-    const tree = truyNguoc("P", "P1", dl);
+    const tree = traceBackward("P", "P1", dl);
     expect(phang(tree)).toEqual(["W:W1", "S:S1-1"]);
     expect(tree[0]!.kg).toBe(200);
     const s1 = tree[0]!.con[0]!.nut;
@@ -118,62 +118,62 @@ describe("kịch bản mẫu: nhập → SX → kho → đóng gói / xuất / b
   });
 
   it("truy xuôi lô TP không còn là ngõ cụt: P1 → khách Y", () => {
-    expect(phang(truyXuoi("P", "P1", dl))).toEqual(["B:b1"]);
-    expect(nutLo("B", "b1", dl).nhan).toBe("Bán 05/10/2026 → Khách Y");
+    expect(phang(traceForward("P", "P1", dl))).toEqual(["B:b1"]);
+    expect(buildLotNode("B", "b1", dl).nhan).toBe("Bán 05/10/2026 → Khách Y");
   });
 
   it("thu hồi lô S1 tới đúng khách X, Y, Z", () => {
-    const { hangRa, loTrongXuong } = danhSachThuHoi("S", "S1-1", dl);
+    const { hangRa, loTrongXuong } = buildRecallList("S", "S1-1", dl);
     expect([...new Set(hangRa.map((r) => r.khach))].sort()).toEqual(["Khách X", "Khách Y", "Khách Z"]);
-    expect(hangRa.find((r) => r.khach === "Khách Y")).toMatchObject({ loai: "B", kg: 50, tuLo: nutLo("P", "P1", dl).nhan });
+    expect(hangRa.find((r) => r.khach === "Khách Y")).toMatchObject({ loai: "B", kg: 50, tuLo: buildLotNode("P", "P1", dl).nhan });
     expect(loTrongXuong.map((n) => n.id).sort()).toEqual(["P1", "W1", "W2"]);
   });
 
   it("thu hồi lô S2 CHỈ tới khách X + chợ (bán nội địa) — không kéo theo Y, Z", () => {
-    const customers = danhSachThuHoi("S", "S2-1", dl).hangRa.map((r) => r.khach).sort();
+    const customers = buildRecallList("S", "S2-1", dl).hangRa.map((r) => r.khach).sort();
     expect(customers).toEqual(["Chợ Bà Rịa", "Khách X"]);
   });
 
   it("quét kiểm lệnh xuất không đẻ thêm ngả ra (không đếm hai lần)", () => {
-    expect(phang(truyXuoi("W", "W2", dl))).toEqual(["X:x1"]);
+    expect(phang(traceForward("W", "W2", dl))).toEqual(["X:x1"]);
   });
 
   it("cân bằng kg theo hồ sơ lô", () => {
-    expect(canBangLo("S", "S1-1", dl)).toMatchObject({ vao: 1000, con: 150, chuaCan: 0 });
-    expect(canBangLo("S", "S2-1", dl)).toMatchObject({ vao: 600, con: 420 });
-    expect(canBangLo("S", "S2-1", dl)!.ra).toContainEqual({ nhan: "Bán nội địa", kg: 30 });
-    expect(canBangLo("W", "W1", dl)).toMatchObject({ vao: 500, con: 200 });
-    expect(canBangLo("W", "W2", dl)).toMatchObject({ vao: 300, con: 100 });
-    expect(canBangLo("P", "P1", dl)).toMatchObject({ vao: 190, con: 140 });
+    expect(computeLotMassBalance("S", "S1-1", dl)).toMatchObject({ vao: 1000, con: 150, chuaCan: 0 });
+    expect(computeLotMassBalance("S", "S2-1", dl)).toMatchObject({ vao: 600, con: 420 });
+    expect(computeLotMassBalance("S", "S2-1", dl)!.ra).toContainEqual({ nhan: "Bán nội địa", kg: 30 });
+    expect(computeLotMassBalance("W", "W1", dl)).toMatchObject({ vao: 500, con: 200 });
+    expect(computeLotMassBalance("W", "W2", dl)).toMatchObject({ vao: 300, con: 100 });
+    expect(computeLotMassBalance("P", "P1", dl)).toMatchObject({ vao: 190, con: 140 });
   });
 
   it("sổ tồn khớp hộ chiếu: trừ đúng lô đã gắn, lô cũ W0 không bị đụng", () => {
-    expect(tonKhoCuaLo("W", "W0", dl)).toBe(100);
-    expect(tonKhoCuaLo("W", "W1", dl)).toBe(200);
-    expect(tonKhoCuaLo("W", "W2", dl)).toBe(100);
-    expect(tonKhoCuaLo("P", "P1", dl)).toBe(140);
+    expect(getLotStockKg("W", "W0", dl)).toBe(100);
+    expect(getLotStockKg("W", "W1", dl)).toBe(200);
+    expect(getLotStockKg("W", "W2", dl)).toBe(100);
+    expect(getLotStockKg("P", "P1", dl)).toBe(140);
     // Bảng tồn dựng một lần (cho danh sách nhiều lô) ra đúng cùng con số.
-    const bang = bangTonKhoLo(dl);
+    const bang = buildLotStockIndex(dl);
     for (const [k, id] of [["W", "W0"], ["W", "W1"], ["W", "W2"], ["P", "P1"], ["S", "x"]] as const)
-      expect(tonKhoCuaLo(k, id, dl, bang)).toBe(tonKhoCuaLo(k, id, dl));
+      expect(getLotStockKg(k, id, dl, bang)).toBe(getLotStockKg(k, id, dl));
   });
 
   it("(đối chứng) trừ FIFO kiểu cũ thì sổ tồn nói lô khác hộ chiếu", () => {
-    const prev = tinhTon(wips, exportItems, truTonBTP(salesItems, packagings));
+    const prev = computeWipStock(wips, exportItems, collectWipDeductions(salesItems, packagings));
     expect(prev.find((l) => l.wipId === "W0")!.conLai).toBe(0);
     expect(prev.find((l) => l.wipId === "W1")!.conLai).toBe(300);
   });
 
   it("quét tem: link QR và mã lô in trên tem đều ra đúng lô", () => {
-    expect(timLo(docMaQr("https://app.example/#/qr?lo=W:W1")!, dl).map((n) => n.id)).toEqual(["W1"]);
-    expect(timLo(docMaQr("đ-261001-01")!, dl).map((n) => n.id)).toEqual(["S1-1"]);
+    expect(findLots(docMaQr("https://app.example/#/qr?lo=W:W1")!, dl).map((n) => n.id)).toEqual(["W1"]);
+    expect(findLots(docMaQr("đ-261001-01")!, dl).map((n) => n.id)).toEqual(["S1-1"]);
     // QR cũ trỏ cả chuyến (trước khi tách lô theo loại) ⇒ ra các lô loại NL của chuyến
-    expect(timLo(docMaQr("S:S1")!, dl).map((n) => n.id)).toEqual(["S1-1"]);
+    expect(findLots(docMaQr("S:S1")!, dl).map((n) => n.id)).toEqual(["S1-1"]);
   });
 
   it("theo giai đoạn 29/09–05/10: mỗi khâu đủ mục, chỉ ra đúng việc còn thiếu", () => {
     const filter = { tu: "2026-09-29", den: "2026-10-05", xuong: "Đông" as const };
-    const gd = Object.fromEntries(theoGiaiDoan(dl, filter).map((g) => [g.khoa, g]));
+    const gd = Object.fromEntries(groupByTraceStage(dl, filter).map((g) => [g.khoa, g]));
     const thieu = (k: string) => Object.fromEntries(gd[k]!.muc.map((m) => [m.nut.id, m.thieu.join(",")]));
     expect(Object.keys(gd)).toEqual(["nhap", "san-xuat", "kho", "dong-goi", "xuat-ban"]);
     // Nhập NL: S3 chưa in tem; S1 đã vào 2 mẻ, S2 vào 1 mẻ + 1 dòng bán nội địa
@@ -193,18 +193,18 @@ describe("kịch bản mẫu: nhập → SX → kho → đóng gói / xuất / b
 
     // Ghi lý do cho W0 ⇒ chỉ còn thiếu tem
     const waiver: LotWaiver = { id: "z1", outputKind: "W", outputId: "W0", reason: "Mẻ trước ngày áp dụng QR", operator: "", recordedAt: "" };
-    const w0 = theoGiaiDoan({ ...dl, lotWaivers: [waiver] }, filter)[1]!.muc.find((m) => m.nut.id === "W0")!;
+    const w0 = groupByTraceStage({ ...dl, lotWaivers: [waiver] }, filter)[1]!.muc.find((m) => m.nut.id === "W0")!;
     expect(w0).toMatchObject({ thieu: ["tem"], lyDo: "Mẻ trước ngày áp dụng QR" });
     // Lọc xưởng khác ⇒ trống
-    expect(theoGiaiDoan(dl, { ...filter, xuong: "Cá" }).every((g) => g.muc.length === 0)).toBe(true);
+    expect(groupByTraceStage(dl, { ...filter, xuong: "Cá" }).every((g) => g.muc.length === 0)).toBe(true);
   });
 
   it("gắn lô cả phiên: lô bạch tuộc vào mẻ bạch tuộc, lô mực không dính", () => {
     let i = 0;
-    const kq = ganLoChoPhien({
+    const kq = assignSessionLots({
       mes: [{ id: "Wmoi", productId: "mh2da" }, { id: "Wmuc", productId: "mhMuc" }],
       banNoiDia: [{ id: "n2", materialTypeName: "Bạch tuộc" }],
-      loNl: [{ nut: nutLo("S", "S1-1", dl), cach: "quet" }, { nut: nutLo("S", "S3-1", dl), cach: "chon" }],
+      loNl: [{ nut: buildLotNode("S", "S1-1", dl), cach: "quet" }, { nut: buildLotNode("S", "S3-1", dl), cach: "chon" }],
       dl, nguoiGhi: "Trúc", luc: "2026-10-06T07:00:00Z", taoId: () => `g${++i}`,
     });
     expect(kq.lotInputs.map((l) => `${l.outputId}<${l.inputId}`)).toEqual(["Wmoi<S1-1", "Wmuc<S3-1"]);
@@ -225,7 +225,7 @@ describe("lô NL theo loại: một chuyến 3 loại ⇒ 3 lô, 3 tem", () => {
     { id: "t2", name: "Bạch tuộc 2 da lớn (80↑)", category: "Bạch tuộc", note: "" },
     { id: "t3", name: "Bạch tuộc 2 da nhỏ (80↓)", category: "Bạch tuộc", note: "" },
   ];
-  const d2: DuLieuTruyXuat = {
+  const d2: TraceData = {
     ...dl,
     shipments: [hp],
     imports: [dongHP("HP-a", "Bạch tuộc 1 da", 5100), dongHP("HP-b", "Bạch tuộc 2 da lớn (80↑)", 1038), dongHP("HP-c", "Bạch tuộc 2 da nhỏ (80↓)", 1704)],
@@ -238,7 +238,7 @@ describe("lô NL theo loại: một chuyến 3 loại ⇒ 3 lô, 3 tem", () => {
   };
 
   it("in tem chuyến ra 3 tem: cùng mã chuyến, mỗi tem một loại + kg của loại đó (định dạng vi-VN)", () => {
-    const ds = dsLoDeIn(d2, { tu: "2026-10-02", den: "2026-10-02", xuong: "", loai: ["S"] });
+    const ds = listLotsToPrint(d2, { tu: "2026-10-02", den: "2026-10-02", xuong: "", loai: ["S"] });
     expect(ds.map((n) => [n.nhan, n.moTa, n.kg])).toEqual([
       ["Đ-261002-01", "Bạch tuộc 1 da", 5100],
       ["Đ-261002-01", "Bạch tuộc 2 da lớn (80↑)", 1038],
@@ -249,19 +249,19 @@ describe("lô NL theo loại: một chuyến 3 loại ⇒ 3 lô, 3 tem", () => {
   });
 
   it("gõ mã chuyến hay quét QR cũ theo chuyến ⇒ hiện 3 lô để chọn; QR mới ⇒ đúng 1 lô", () => {
-    expect(timLo(docMaQr("Đ-261002-01")!, d2).map((n) => n.id)).toEqual(["HP-a", "HP-b", "HP-c"]);
-    expect(timLo(docMaQr("S:HP")!, d2).map((n) => n.id)).toEqual(["HP-a", "HP-b", "HP-c"]);
-    expect(timLo(docMaQr("https://app.example/#/qr?lo=S:HP-b")!, d2).map((n) => n.moTa)).toEqual(["Bạch tuộc 2 da lớn (80↑)"]);
+    expect(findLots(docMaQr("Đ-261002-01")!, d2).map((n) => n.id)).toEqual(["HP-a", "HP-b", "HP-c"]);
+    expect(findLots(docMaQr("S:HP")!, d2).map((n) => n.id)).toEqual(["HP-a", "HP-b", "HP-c"]);
+    expect(findLots(docMaQr("https://app.example/#/qr?lo=S:HP-b")!, d2).map((n) => n.moTa)).toEqual(["Bạch tuộc 2 da lớn (80↑)"]);
     // nút cả chuyến vẫn dựng được cho dây lô ghi trước ngày tách
-    expect(nutLo("S", "HP", d2)).toMatchObject({ kg: 7842, nhan: "Đ-261002-01" });
+    expect(buildLotNode("S", "HP", d2)).toMatchObject({ kg: 7842, nhan: "Đ-261002-01" });
   });
 
   it("gắn lô cả phiên: mẻ đã gắn loại NL chỉ nhận đúng lô loại đó; mẻ chỉ biết loài nhận cả 3", () => {
     let i = 0;
-    const kq = ganLoChoPhien({
+    const kq = assignSessionLots({
       mes: [{ id: "mLon", productId: "mhLon" }, { id: "mChung", productId: "mhChung" }],
       banNoiDia: [{ id: "nd", materialTypeName: "Bạch tuộc 1 da" }],
-      loNl: ["HP-a", "HP-b", "HP-c"].map((id) => ({ nut: nutLo("S", id, d2), cach: "quet" as const })),
+      loNl: ["HP-a", "HP-b", "HP-c"].map((id) => ({ nut: buildLotNode("S", id, d2), cach: "quet" as const })),
       dl: d2, nguoiGhi: "", luc: "", taoId: () => `g${++i}`,
     });
     expect(kq.lotInputs.filter((l) => l.outputId === "mLon").map((l) => l.inputId)).toEqual(["HP-b"]);
@@ -273,21 +273,21 @@ describe("lô NL theo loại: một chuyến 3 loại ⇒ 3 lô, 3 tem", () => {
 
   it("cân bằng kg theo từng loại, không trộn 3 loại", () => {
     const d3 = { ...d2, lotInputs: [{ id: "x", outputKind: "W", outputId: "w", inputKind: "S", inputId: "HP-b", inputLabel: "", material: "", quantityKg: 1000, method: "chon", operator: "", recordedAt: "" } as LotInput] };
-    expect(canBangLo("S", "HP-b", d3)).toMatchObject({ vao: 1038, con: 38 });
-    expect(canBangLo("S", "HP-a", d3)).toMatchObject({ vao: 5100, con: 5100 });
+    expect(computeLotMassBalance("S", "HP-b", d3)).toMatchObject({ vao: 1038, con: 38 });
+    expect(computeLotMassBalance("S", "HP-a", d3)).toMatchObject({ vao: 5100, con: 5100 });
   });
 
   it("thu hồi cả chuyến gộp các loại, mỗi dòng hàng ra một lần", () => {
     const wipChung: WipProductionItem = { ...me("WC", "2026-10-03", "mhChung", 500, 50) };
-    const d4: DuLieuTruyXuat = {
+    const d4: TraceData = {
       ...d2,
       wips: [wipChung],
       lotInputs: ["HP-a", "HP-c"].map((id, k) => ({ id: `li${k}`, outputKind: "W", outputId: "WC", inputKind: "S", inputId: id, inputLabel: "", material: "", quantityKg: null, method: "chon", operator: "", recordedAt: "" }) as LotInput),
       exportItems: [{ id: "xC", exportId: "e1", wipId: "WC", productId: "mhChung", spec: "", quantityKg: 100, blocksCount: 10 }],
     };
-    expect(loCungChuyen("HP-b", d4).map((n) => n.id)).toEqual(["HP-a", "HP-b", "HP-c"]);
-    expect(danhSachThuHoi("S", "HP-b", d4).hangRa).toEqual([]); // loại 2 da lớn chưa đi đâu
-    const gop = danhSachThuHoiNhieu(loCungChuyen("HP-b", d4), d4);
+    expect(findSameShipmentLots("HP-b", d4).map((n) => n.id)).toEqual(["HP-a", "HP-b", "HP-c"]);
+    expect(buildRecallList("S", "HP-b", d4).hangRa).toEqual([]); // loại 2 da lớn chưa đi đâu
+    const gop = buildRecallListForLots(findSameShipmentLots("HP-b", d4), d4);
     expect(gop.hangRa.map((r) => `${r.loai}:${r.id}:${r.khach}`)).toEqual(["X:xC:Khách X"]); // qua 2 loại nhưng chỉ 1 dòng
     expect(gop.loTrongXuong.map((n) => n.id)).toEqual(["WC"]);
   });

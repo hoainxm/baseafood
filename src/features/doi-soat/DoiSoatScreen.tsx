@@ -30,25 +30,25 @@ import {
   type TheThongTin,
 } from "@/design-system";
 import {
-  doiSoat,
+  reconcile,
   docWorkbook,
-  tenFileKetQua,
-  xuatExcelDoiSoat,
-  xuatFileMau,
+  buildResultFileName,
+  exportReconciliationExcel,
+  exportReconciliationTemplate,
   fileSangBase64,
   sheetsTuBase64,
-  type CauNoi,
-  type DongHoaDon,
-  type DongPhanMem,
-  type KetQuaDoiSoat,
-  type NghiVan,
-  type NghiVanGop,
-  type PhepThu,
-  type SheetHoaDon,
-  type SheetPhanMem,
-  type TrangThaiHoaDon,
-} from "@/lib/doiSoatHddt";
-import { gomCungMstCungNgay, phanBenThue, soHaiBanHddt } from "@/lib/doiSoatHaiBan";
+  type ReconciliationBridge,
+  type InvoiceRow,
+  type LedgerRow,
+  type ReconciliationResult,
+  type SuspectItem,
+  type MergedSuspect,
+  type TrialCheck,
+  type InvoiceSheet,
+  type LedgerSheet,
+  type InvoiceMatchStatus,
+} from "@/lib/einvoiceReconciliation";
+import { groupSameTaxCodeSameDay, resolveTaxSideSheets, compareTwoInvoiceVersions } from "@/lib/twoVersionReconciliation";
 import { num } from "@/lib/format";
 import {
   ChonCheDo,
@@ -80,9 +80,9 @@ import {
 
 type Workbook = Awaited<ReturnType<typeof docWorkbook>>;
 const PM_TAB = "__phan-mem__";
-const editKey = (nv: NghiVan) => `${nv.sheet}#${nv.soDong}#${nv.cot}`;
+const editKey = (nv: SuspectItem) => `${nv.sheet}#${nv.soDong}#${nv.cot}`;
 
-function invoiceChip(r: DongHoaDon) {
+function invoiceChip(r: InvoiceRow) {
   if (r.trangThai === "KHOP") return <Nhan loai="xong">Khớp</Nhan>;
   if (r.trangThai === "LECH")
     return r.ketLuan === "LỆCH THUẾ" ? <Nhan loai="luu-y">Lệch thuế</Nhan> : <Nhan loai="loi">Lệch tiền</Nhan>;
@@ -204,7 +204,7 @@ function SavedRunsBox({
 }
 
 // ---------- Khối tự kiểm (§6) ----------
-function SelfCheckBox({ phepThu }: { phepThu: PhepThu[] }) {
+function SelfCheckBox({ phepThu }: { phepThu: TrialCheck[] }) {
   const passedCount = phepThu.filter((p) => p.dat).length;
   const allPassed = passedCount === phepThu.length;
   return (
@@ -251,7 +251,7 @@ function SelfCheckBox({ phepThu }: { phepThu: PhepThu[] }) {
 }
 
 // ---------- Cầu nối số liệu (§5) ----------
-function BridgeBox({ cauNoi }: { cauNoi: CauNoi }) {
+function BridgeBox({ cauNoi }: { cauNoi: ReconciliationBridge }) {
   const chenhAB = cauNoi.chuaCoBenSo - cauNoi.chuaCoBenSoTrucTiep;
   const sumBoc = cauNoi.bocTach.reduce((s, x) => s + x.tien, 0);
   return (
@@ -336,17 +336,17 @@ function NghiVanBox({
   onHoanTac,
   suaLog,
 }: {
-  nghiVan: NghiVan[];
-  nghiVanGop: NghiVanGop[];
+  nghiVan: SuspectItem[];
+  nghiVanGop: MergedSuspect[];
   edits: Record<string, number>;
-  onSua: (nv: NghiVan) => void;
+  onSua: (nv: SuspectItem) => void;
   onHoanTac: (key: string) => void;
   suaLog: Record<string, { viTri: string; cu: string; moi: string }>;
 }) {
   const [moGop, setMoGop] = useState<Record<string, boolean>>({});
   const editedKeys = Object.keys(suaLog);
 
-  const columns: Cot<NghiVan>[] = [
+  const columns: Cot<SuspectItem>[] = [
     {
       key: "nhom",
       header: "Nhóm",
@@ -479,7 +479,7 @@ function NghiVanBox({
 }
 
 // ---------- Bảng HĐĐT ----------
-const INVOICE_FILTERS: { id: TrangThaiHoaDon | "all"; nhan: string }[] = [
+const INVOICE_FILTERS: { id: InvoiceMatchStatus | "all"; nhan: string }[] = [
   { id: "all", nhan: "Tất cả" },
   { id: "KHOP", nhan: "Khớp" },
   { id: "LECH", nhan: "Lệch tiền / thuế" },
@@ -491,12 +491,12 @@ function InvoiceTable({
   loc,
   setLoc,
 }: {
-  sheet: SheetHoaDon;
-  loc: TrangThaiHoaDon | "all";
-  setLoc: (v: TrangThaiHoaDon | "all") => void;
+  sheet: InvoiceSheet;
+  loc: InvoiceMatchStatus | "all";
+  setLoc: (v: InvoiceMatchStatus | "all") => void;
 }) {
   const dem = useMemo(() => {
-    const d = { KHOP: 0, LECH: 0, THIEU: 0 } as Record<TrangThaiHoaDon, number>;
+    const d = { KHOP: 0, LECH: 0, THIEU: 0 } as Record<InvoiceMatchStatus, number>;
     for (const r of sheet.dong) d[r.trangThai]++;
     return d;
   }, [sheet]);
@@ -504,7 +504,7 @@ function InvoiceTable({
     () => (loc === "all" ? sheet.dong : sheet.dong.filter((r) => r.trangThai === loc)),
     [sheet, loc]
   );
-  const columns: Cot<DongHoaDon>[] = [
+  const columns: Cot<InvoiceRow>[] = [
     { key: "kq", header: "Kết quả", chinh: true, render: (r) => invoiceChip(r) },
     { key: "kh", header: "Ký hiệu", render: (r) => r.kyHieu, sapXep: (r) => r.kyHieu },
     { key: "so", header: "Số HĐ", render: (r) => r.soHoaDon, sapXep: (r) => r.soChuan },
@@ -522,7 +522,7 @@ function InvoiceTable({
           <Button
             title="Lọc danh sách hóa đơn theo trạng thái khớp này." key={l.id} variant={loc === l.id ? "default" : "outline"} size="sm" onClick={() => setLoc(l.id)}>
             {l.nhan}
-            {l.id !== "all" && <span className="tnum ml-1">({num(dem[l.id as TrangThaiHoaDon])})</span>}
+            {l.id !== "all" && <span className="tnum ml-1">({num(dem[l.id as InvoiceMatchStatus])})</span>}
           </Button>
         ))}
       </div>
@@ -543,7 +543,7 @@ function LedgerTable({
   chiThieu,
   setChiThieu,
 }: {
-  sheet: SheetPhanMem;
+  sheet: LedgerSheet;
   chiThieu: boolean;
   setChiThieu: (v: boolean) => void;
 }) {
@@ -556,7 +556,7 @@ function LedgerTable({
     () => (chiThieu ? sheet.dong.filter((r) => r.trangThai === "THIEU") : sheet.dong),
     [sheet, chiThieu]
   );
-  const columns: Cot<DongPhanMem>[] = [
+  const columns: Cot<LedgerRow>[] = [
     {
       key: "kq",
       header: "Kết quả",
@@ -612,7 +612,7 @@ export default function DoiSoatScreen() {
   const [ledgerSheetName, setLedgerSheetName] = useState<string | undefined>(undefined);
   const [isRunning, setIsRunning] = useState(false);
   const [tab, setTab] = useState<string>("");
-  const [invoiceFilter, setInvoiceFilter] = useState<TrangThaiHoaDon | "all">("all"); // lọc bảng HĐĐT (điều khiển được từ thẻ tổng)
+  const [invoiceFilter, setInvoiceFilter] = useState<InvoiceMatchStatus | "all">("all"); // lọc bảng HĐĐT (điều khiển được từ thẻ tổng)
   const [ledgerMissingOnly, setLedgerMissingOnly] = useState(false); // lọc bảng sổ: chỉ dòng chưa có hóa đơn
   const [isCheckOpen, setIsCheckOpen] = useState(false); // mở khối "Kiểm tra chi tiết"
   const [cheDo, setCheDo] = useState<CheDo>("so"); // kiểu đối soát đang xem
@@ -633,9 +633,9 @@ export default function DoiSoatScreen() {
     return [...list].sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || ""));
   }, [runs, auth.laAdmin, auth.nguoiDung]);
 
-  const ketQua: KetQuaDoiSoat | null = useMemo(() => {
+  const ketQua: ReconciliationResult | null = useMemo(() => {
     if (!wb) return null;
-    return doiSoat(wb, {
+    return reconcile(wb, {
       nguong: nguong ?? 0,
       edits,
       nghiVanBanDau: initialSuspectCount ?? undefined,
@@ -647,13 +647,13 @@ export default function DoiSoatScreen() {
 
   // Ba chiều soát ngoài "hóa đơn ⇄ sổ" — cùng hàm thuần lớp xuất dùng, nên số trên màn = số trong file.
   const tenSheetHd = useMemo(() => ketQua?.sheetsHoaDon.map((s) => s.ten) ?? [], [ketQua]);
-  const sideSplit = useMemo(() => phanBenThue(tenSheetHd, pickedTaxSides), [tenSheetHd, pickedTaxSides]);
+  const sideSplit = useMemo(() => resolveTaxSideSheets(tenSheetHd, pickedTaxSides), [tenSheetHd, pickedTaxSides]);
   const versionCompare = useMemo(
-    () => (ketQua ? soHaiBanHddt(ketQua.sheetsHoaDon, ketQua.nguong, sideSplit.benThue) : null),
+    () => (ketQua ? compareTwoInvoiceVersions(ketQua.sheetsHoaDon, ketQua.nguong, sideSplit.benThue) : null),
     [ketQua, sideSplit]
   );
   const sameDayGroups = useMemo(
-    () => (ketQua ? gomCungMstCungNgay(ketQua.sheetsHoaDon.filter((s) => !s.laPhu), sideSplit.benThue) : []),
+    () => (ketQua ? groupSameTaxCodeSameDay(ketQua.sheetsHoaDon.filter((s) => !s.laPhu), sideSplit.benThue) : []),
     [ketQua, sideSplit]
   );
   const doiBen = (ten: string, laThue: boolean) => {
@@ -663,10 +663,10 @@ export default function DoiSoatScreen() {
     setPickedTaxSides(tenSheetHd.filter((t) => s.has(t)));
   };
   /** Kiểu mặc định theo nội dung file, tính trên kết quả vừa chạy. */
-  const cheDoTheoFile = (kq: KetQuaDoiSoat, pickedSides: string[] | null) =>
+  const cheDoTheoFile = (kq: ReconciliationResult, pickedSides: string[] | null) =>
     cheDoMacDinh(
       !!kq.sheetPhanMem,
-      !!soHaiBanHddt(kq.sheetsHoaDon, kq.nguong, phanBenThue(kq.sheetsHoaDon.map((s) => s.ten), pickedSides).benThue)
+      !!compareTwoInvoiceVersions(kq.sheetsHoaDon, kq.nguong, resolveTaxSideSheets(kq.sheetsHoaDon.map((s) => s.ten), pickedSides).benThue)
     );
 
   const pickFile = () => fileRef.current?.click();
@@ -696,7 +696,7 @@ export default function DoiSoatScreen() {
       // riêng dễ lệch toạ độ dòng/cột, mà toạ độ là thứ cột "Vị trí" dựa vào.
       const b64Goc = await fileSangBase64(file);
       const raw = sheetsTuBase64(b64Goc);
-      const kq0 = doiSoat(raw, { nguong: nguong ?? 0 });
+      const kq0 = reconcile(raw, { nguong: nguong ?? 0 });
       const baseline = kq0.nghiVan.length + kq0.nghiVanGop.reduce((s, g) => s + g.soDong, 0);
       setEdits({});
       setEditLog({});
@@ -730,16 +730,16 @@ export default function DoiSoatScreen() {
    * hoặc thư viện nạp hụt thì mới lùi về bản dựng-mới.
    */
   const exportFile = async (
-    kq: KetQuaDoiSoat,
+    kq: ReconciliationResult,
     ten: string,
     fileGocB64: string,
     editsCuaBan: Record<string, number> | undefined
   ) => {
-    const tenFile = tenFileKetQua(ten);
+    const tenFile = buildResultFileName(ten);
     if (fileGocB64) {
       try {
-        const { xuatExcelGiuDinhDang } = await import("@/lib/doiSoatXuat");
-        await xuatExcelGiuDinhDang(kq, fileGocB64, tenFile, editsCuaBan);
+        const { exportExcelPreserveFormat } = await import("@/lib/reconciliationExport");
+        await exportExcelPreserveFormat(kq, fileGocB64, tenFile, editsCuaBan);
         notify.daLuu("Đã xuất Excel — giữ nguyên định dạng file gốc, chỉ thêm cột đối soát và tô màu dòng.");
         return;
       } catch (err) {
@@ -748,7 +748,7 @@ export default function DoiSoatScreen() {
         );
       }
     }
-    xuatExcelDoiSoat(kq, tenFile);
+    exportReconciliationExcel(kq, tenFile);
     notify.daLuu("Đã xuất Excel (tô màu + cột phân tích + nhật ký sửa nếu có).");
   };
 
@@ -758,7 +758,7 @@ export default function DoiSoatScreen() {
     void exportFile({ ...ketQua, benThue: pickedTaxSides ?? undefined }, displayName || file?.name || "doi-soat", b64, edits);
   };
 
-  const applyFix = (nv: NghiVan) => {
+  const applyFix = (nv: SuspectItem) => {
     if (nv.giaTriDung == null || nv.sheet == null || nv.soDong == null || nv.cot == null) return;
     const k = editKey(nv);
     setEdits((e) => ({ ...e, [k]: nv.giaTriDung! }));
@@ -821,7 +821,7 @@ export default function DoiSoatScreen() {
   const openRun = (run: ReconciliationRun) => {
     try {
       const raw = sheetsTuBase64(run.fileB64);
-      const kq0 = doiSoat(raw, {
+      const kq0 = reconcile(raw, {
         nguong: run.threshold,
         edits: run.options?.edits,
         soChuanTen: run.options?.soChuanTen,
@@ -862,7 +862,7 @@ export default function DoiSoatScreen() {
   const downloadRunExcel = (run: ReconciliationRun) => {
     try {
       const raw = sheetsTuBase64(run.fileB64);
-      const kq = doiSoat(raw, {
+      const kq = reconcile(raw, {
         nguong: run.threshold,
         edits: run.options?.edits,
         soChuanTen: run.options?.soChuanTen,
@@ -876,7 +876,7 @@ export default function DoiSoatScreen() {
 
   // Drill-down: bấm thẻ tổng → nhảy xuống đúng bảng + lọc sẵn theo trạng thái đó.
   const firstHdTab = ketQua?.sheetsHoaDon[0]?.ten ?? "";
-  const denHD = (statusFilter: TrangThaiHoaDon | "all") => {
+  const denHD = (statusFilter: InvoiceMatchStatus | "all") => {
     if (firstHdTab) setTab(firstHdTab);
     setInvoiceFilter(statusFilter);
     scrollToId("ds-bang");
@@ -929,7 +929,7 @@ export default function DoiSoatScreen() {
       : { chu: "Không có nhóm nào", apDung: false },
   };
 
-  const dsSoPm = ketQua ? [ketQua.sheetPhanMem, ...ketQua.sheetsPhanMemPhu].filter(Boolean) as SheetPhanMem[] : [];
+  const dsSoPm = ketQua ? [ketQua.sheetPhanMem, ...ketQua.sheetsPhanMemPhu].filter(Boolean) as LedgerSheet[] : [];
   const selfCheckFailed = ketQua ? ketQua.phepThu.some((p) => !p.dat) : false;
   const isCheckOpenEffective = isCheckOpen || selfCheckFailed; // luôn mở khi có phép tự kiểm chưa đạt
 
@@ -959,7 +959,7 @@ export default function DoiSoatScreen() {
               title="Tải về file Excel mẫu đúng định dạng. Hệ thống vẫn đọc được file khác, đây chỉ là bản chuẩn cho dễ."
               variant="outline"
               onClick={() => {
-                xuatFileMau();
+                exportReconciliationTemplate();
                 notify.daLuu("Đã tải file mẫu — làm theo format này (hệ thống vẫn đọc file khác).");
               }}
               className="w-full md:w-auto"

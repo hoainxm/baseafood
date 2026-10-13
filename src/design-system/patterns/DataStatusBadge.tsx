@@ -10,7 +10,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { hasSupabase, supabase, SITE_ID } from "@/lib/supabase";
-import { ketNoi } from "@/lib/connectivity";
+import { connectivity } from "@/lib/connectivity";
 import { cn } from "@/lib/utils";
 import { Cloud, CloudOff, HardDrive, Loader2, RotateCcw } from "lucide-react";
 
@@ -18,7 +18,7 @@ type SyncState = "cuc-bo" | "dang-kiem" | "da-noi" | "loi";
 
 /**
  * Thử một lần đọc thật lên máy chủ để cập nhật đèn trạng thái. Đọc `dai_ly` là
- * phép probe rẻ nhất (bảng nhỏ, luôn có). Kết quả báo vào store `ketNoi` chung —
+ * phép probe rẻ nhất (bảng nhỏ, luôn có). Kết quả báo vào store `connectivity` chung —
  * mọi nơi hiển thị trạng thái tự cập nhật.
  */
 async function probeConnection(): Promise<void> {
@@ -28,8 +28,8 @@ async function probeConnection(): Promise<void> {
     .select("id")
     .eq("site_id", SITE_ID)
     .limit(1);
-  if (error) ketNoi.baoLoi(error.message);
-  else ketNoi.baoOK();
+  if (error) connectivity.baoLoi(error.message);
+  else connectivity.baoOK();
 }
 
 const CAU_HINH: Record<
@@ -64,7 +64,7 @@ const CAU_HINH: Record<
 
 /** Suy trạng thái hiển thị từ cấu hình môi trường + snapshot store. */
 function useConnectionStatus() {
-  const anh = React.useSyncExternalStore(ketNoi.subscribe, ketNoi.laySnapshot);
+  const anh = React.useSyncExternalStore(connectivity.subscribe, connectivity.laySnapshot);
   const status: SyncState = !hasSupabase
     ? "cuc-bo"
     : anh.trang === "chua-ro"
@@ -104,7 +104,7 @@ export function TrangThaiDuLieu({ className }: { className?: string }) {
 
 /**
  * NutTrangThai — 1 nút icon gọn cho header. Màu icon = sức khỏe kết nối thật
- * (bám store `ketNoi`). Bấm mở popover chi tiết + nút "Thử kết nối lại".
+ * (bám store `connectivity`). Bấm mở popover chi tiết + nút "Thử kết nối lại".
  *
  * Probe một lần lúc mở để có trạng thái ban đầu khi người dùng chưa thao tác gì.
  * Trên tablet tay ướt: bấm (không chỉ hover) là mở được — Radix Popover mở bằng

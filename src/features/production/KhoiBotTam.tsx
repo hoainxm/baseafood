@@ -8,7 +8,7 @@
 // Bột là PHỤ GIA — không cộng vào số lượng thành phẩm; hiện tổng bột + tỷ lệ %.
 import { Button, Combobox, NumberField, type MucChon } from "@/design-system";
 import { num } from "@/lib/format";
-import { botHienTrenDong, lamSachBot, tongBot, tyLeBot } from "@/lib/botTam";
+import { listVisibleBatters, sanitizeBatterKg, sumBatterKg, computeBatterRatio } from "@/lib/batter";
 import { X } from "lucide-react";
 
 export function KhoiBotTam({
@@ -35,10 +35,10 @@ export function KhoiBotTam({
   /** Ô số nhảy ↑/↓ theo cột trong bảng ghi (khung `[data-luoi-phim]`). */
   dieuHuongCot?: boolean;
 }) {
-  const visibleBatters = botHienTrenDong(diKem, botKg);
-  const total = tongBot(botKg);
-  const tyLe = tyLeBot(total, kgThanhPham);
-  const batterTypeCount = Object.keys(lamSachBot(botKg)).length;
+  const visibleBatters = listVisibleBatters(diKem, botKg);
+  const total = sumBatterKg(botKg);
+  const tyLe = computeBatterRatio(total, kgThanhPham);
+  const batterTypeCount = Object.keys(sanitizeBatterKg(botKg)).length;
 
   const bo = (ten: string) => {
     const next = { ...botKg };

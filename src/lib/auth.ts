@@ -6,11 +6,11 @@
 import { useCallback, useEffect, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 // Hồ sơ đăng nhập luôn ở site THẬT — kể cả khi đang chế độ demo (SITE_ID = site-demo).
-import { supabase, hasSupabase, SITE_ID_THAT as SITE_ID, taoClientTam } from "@/lib/supabase";
+import { supabase, hasSupabase, SITE_ID_THAT as SITE_ID, createTempClient } from "@/lib/supabase";
 import type { UserProfile, Role } from "@/types";
 import { rolesFromCsv, rolesToCsv, rolesList } from "@/types";
 import { emailToUsername, usernameToEmail } from "@/lib/username";
-import { datNguoiThaoTac, ghiNhatKy } from "@/lib/audit";
+import { setAuditOperator, appendAuditEntries } from "@/lib/audit";
 
 /**
  * Đăng nhập qua Supabase Auth (email tổng hợp `<username>@bsf1.vn`).
@@ -89,7 +89,7 @@ function translateSignUpError(msg: string): string {
   return msg;
 }
 
-export interface KetQuaDangNhap {
+export interface AuthResult {
   ok: boolean;
   loi?: string;
   /** Hồ sơ vừa tạo (taoTaiKhoan) — để màn admin cập nhật danh sách ngay. */
@@ -140,7 +140,7 @@ export function useAuth() {
   }, [uid]);
 
   const signIn = useCallback(
-    async (username: string, matKhau: string): Promise<KetQuaDangNhap> => {
+    async (username: string, matKhau: string): Promise<AuthResult> => {
       if (!supabase) return { ok: false, loi: "Chưa cấu hình máy chủ" };
       if (!username.trim() || !matKhau)
         return { ok: false, loi: "Nhập tên đăng nhập và mật khẩu" };
@@ -150,8 +150,8 @@ export function useAuth() {
       });
       if (error) return { ok: false, loi: translateError(error.message) };
       const u = username.trim().toLowerCase();
-      datNguoiThaoTac({ username: u });
-      ghiNhatKy([{ action: "dang-nhap", entity: "auth", entityKey: u, summary: `Đăng nhập: ${u}` }]);
+      setAuditOperator({ username: u });
+      appendAuditEntries([{ action: "dang-nhap", entity: "auth", entityKey: u, summary: `Đăng nhập: ${u}` }]);
       return { ok: true };
     },
     []
@@ -168,7 +168,7 @@ export function useAuth() {
       username: string,
       matKhau: string,
       roles: Role[] = []
-    ): Promise<KetQuaDangNhap> => {
+    ): Promise<AuthResult> => {
       if (!supabase) return { ok: false, loi: "Chưa cấu hình máy chủ" };
       const u = username.trim().toLowerCase();
       if (!fullName.trim()) return { ok: false, loi: "Nhập họ tên" };
@@ -184,7 +184,7 @@ export function useAuth() {
         .maybeSingle();
       if (trung) return { ok: false, loi: "Tên đăng nhập đã tồn tại" };
 
-      const phu = taoClientTam();
+      const phu = createTempClient();
       if (!phu) return { ok: false, loi: "Chưa cấu hình máy chủ" };
       const { data, error } = await phu.auth.signUp({
         email: usernameToEmail(u),
@@ -215,9 +215,9 @@ export function useAuth() {
   );
 
   const signOut = useCallback(async () => {
-    ghiNhatKy([{ action: "dang-xuat", entity: "auth", entityKey: "", summary: "Đăng xuất" }]);
+    appendAuditEntries([{ action: "dang-xuat", entity: "auth", entityKey: "", summary: "Đăng xuất" }]);
     await supabase?.auth.signOut();
-    datNguoiThaoTac(null);
+    setAuditOperator(null);
   }, []);
 
   return {

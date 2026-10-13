@@ -1,6 +1,6 @@
 // ============================================================
-// Gom các bảng mà truy xuất lô cần thành MỘT đối tượng `DuLieuTruyXuat`
-// (lib/truyXuatLo.ts là hàm thuần, nhận dữ liệu qua tham số).
+// Gom các bảng mà truy xuất lô cần thành MỘT đối tượng `TraceData`
+// (lib/lotTraceability.ts là hàm thuần, nhận dữ liệu qua tham số).
 // ============================================================
 import { useMemo } from "react";
 import {
@@ -22,7 +22,7 @@ import {
   useSalesOrders,
   useWipProductions,
 } from "@/lib/catalogRepo";
-import type { DuLieuTruyXuat } from "@/lib/truyXuatLo";
+import type { TraceData } from "@/lib/lotTraceability";
 
 export function useDuLieuTruyXuat() {
   const [shipments] = useImportShipments();
@@ -43,7 +43,7 @@ export function useDuLieuTruyXuat() {
   const [labelPrints] = useLabelPrints();
   const [materialTypes] = useMaterialTypes();
 
-  const dl: DuLieuTruyXuat = useMemo(
+  const dl: TraceData = useMemo(
     () => ({
       shipments, imports, wips, packagings, lotInputs,
       exportItems, exportOrders, salesOrders, products, customers,

@@ -10,9 +10,9 @@ import type { QcChecklistItem, QcResult, Workshop } from "@/types";
 import { isBackdatedQc } from "@/types";
 import { newId } from "@/lib/store";
 import { useQcChecklists, useQcLocks } from "@/lib/catalogRepo";
-import { luiNgay, qcTheoNgay } from "@/lib/dongChay";
-import { taiAnhLen, urlAnh, xoaAnh, coLuuAnh } from "@/lib/storage";
-import { todayISO, viDate } from "@/lib/format";
+import { subtractDays, countQcByDay } from "@/lib/dataFlow";
+import { uploadImage, getPhotoUrl, deleteImage, hasImageStorage } from "@/lib/storage";
+import { todayISO, formatDateVN } from "@/lib/format";
 import {
   Field,
   ChoiceGroup,
@@ -125,7 +125,7 @@ export default function QcChecklistScreen() {
   };
 
   // 30 ngày tới ngày đang xem — xu hướng chất lượng của xưởng.
-  const qc30 = useMemo(() => qcTheoNgay(rows, workshop, luiNgay(date, 29), date), [rows, workshop, date]);
+  const qc30 = useMemo(() => countQcByDay(rows, workshop, subtractDays(date, 29), date), [rows, workshop, date]);
   const coQc30 = qc30.some((x) => x.dat + x.tam + x.khongDat > 0);
 
   const daCham = dongs.filter((d) => d.result);
@@ -160,7 +160,7 @@ export default function QcChecklistScreen() {
     }));
     const giuLai = rows.filter((r) => !(r.date === date && r.workshop === workshop));
     persist([...giuLai, ...newRows]);
-    notify.daLuu(`Đã lưu QC ${viDate(date)} · xưởng ${workshop} — ${cham.length} chỉ tiêu`);
+    notify.daLuu(`Đã lưu QC ${formatDateVN(date)} · xưởng ${workshop} — ${cham.length} chỉ tiêu`);
   };
 
   const lockDay = () => {
@@ -186,13 +186,13 @@ export default function QcChecklistScreen() {
       note: "",
     };
     persistLocks([...locks.filter((l) => l.id !== record.id), record]);
-    notify.daLuu(`Đã chốt QC ${viDate(date)} · xưởng ${workshop}`);
+    notify.daLuu(`Đã chốt QC ${formatDateVN(date)} · xưởng ${workshop}`);
   };
 
   const reopen = () => {
     if (!khoa) return;
     persistLocks(locks.map((l) => (l.id === khoa.id ? { ...l, isLocked: false } : l)));
-    notify.canhBao(`Đã mở lại QC ${viDate(date)} · xưởng ${workshop}`);
+    notify.canhBao(`Đã mở lại QC ${formatDateVN(date)} · xưởng ${workshop}`);
   };
 
   return (
@@ -222,7 +222,7 @@ export default function QcChecklistScreen() {
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border-2 border-border p-4">
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-base font-semibold">
-            {viDate(date)} · xưởng {workshop}
+            {formatDateVN(date)} · xưởng {workshop}
           </span>
           {isLocked ? (
             <Nhan loai="xong" icon={Lock}>
@@ -321,7 +321,7 @@ export default function QcChecklistScreen() {
                   />
                 </Field>
               </div>
-              {coLuuAnh && (
+              {hasImageStorage && (
                 <CriterionPhoto
                   paths={d.photoPaths}
                   onChange={(p) => updateRow(i, { photoPaths: p })}
@@ -373,7 +373,7 @@ function AnhThumb({ path, onXoa }: { path: string; onXoa?: () => void }) {
   const [url, setUrl] = useState<string | null>(null);
   useEffect(() => {
     let con = true;
-    urlAnh(path).then((u) => con && setUrl(u));
+    getPhotoUrl(path).then((u) => con && setUrl(u));
     return () => {
       con = false;
     };
@@ -425,7 +425,7 @@ function CriterionPhoto({
     setIsLoading(true);
     const toAdd: string[] = [];
     for (const f of Array.from(files)) {
-      const p = await taiAnhLen(f);
+      const p = await uploadImage(f);
       if (p) toAdd.push(p);
     }
     setIsLoading(false);
@@ -453,7 +453,7 @@ function CriterionPhoto({
                 khoa
                   ? undefined
                   : () => {
-                      void xoaAnh(p); // xóa file khỏi Storage; bỏ path khỏi dòng ngay
+                      void deleteImage(p); // xóa file khỏi Storage; bỏ path khỏi dòng ngay
                       onChange(paths.filter((x) => x !== p));
                     }
               }

@@ -7,8 +7,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import type { WipProductionItem } from "@/types";
 import { useExportItems, useLotDispatches, useLotInputs, usePackagings, useProducts, useSalesItems, useWipProductions } from "@/lib/catalogRepo";
-import { tinhTonChiTiet, truTonBTP, type LoTon } from "@/lib/inventory";
-import { tuoiTon } from "@/lib/dongChay";
+import { computeWipStockDetail, collectWipDeductions, type LotStock } from "@/lib/inventory";
+import { bucketStockByAge } from "@/lib/dataFlow";
 import {
   ChuThichBatBuoc,
   Button,
@@ -37,13 +37,13 @@ import {
   ThanhChiaPhan,
   homNay,
 } from "@/design-system";
-import { kg, num, viDate } from "@/lib/format";
+import { kg, num, formatDateVN } from "@/lib/format";
 import { AlertTriangle, CalendarRange, Camera, CameraOff, ClipboardList, PackageCheck, Scale, Search, Snowflake, Warehouse } from "lucide-react";
 import { KhungQuetQr } from "@/features/shared";
-import { docMaQr, nhanLoBtp, timLo } from "@/lib/truyXuatLo";
+import { docMaQr, formatWipLotLabel, findLots } from "@/lib/lotTraceability";
 
 import { BSF1_WAREHOUSES } from "@/types";
-import { tinhDungTichKho } from "@/lib/inventory";
+import { computeWarehouseOccupancy } from "@/lib/inventory";
 
 const BSF1_WAREHOUSE_NAMES = BSF1_WAREHOUSES.map((w) => w.name);
 
@@ -66,7 +66,7 @@ export default function KhoDuTruScreen() {
   const [lotDispatches] = useLotDispatches();
   // Trừ đúng lô đã gắn (truy xuất QR), phần còn lại FIFO — cùng con số với hộ chiếu lô.
   const retailSales = useMemo(
-    () => truTonBTP(salesItems, packagings, lotInputs, lotDispatches),
+    () => collectWipDeductions(salesItems, packagings, lotInputs, lotDispatches),
     [salesItems, packagings, lotInputs, lotDispatches]
   );
 
@@ -85,10 +85,10 @@ export default function KhoDuTruScreen() {
   // Bán lẻ / đóng gói vượt số đang trữ: lô không xuống âm nên phần vượt không nằm
   // trong "Tổng tồn" — phải gọi tên ra, không được nuốt (lỗi ghi chép cần dò).
   const { los: ton, banVuot, tongBanVuot } = useMemo(
-    () => tinhTonChiTiet(wips, exportItems, retailSales),
+    () => computeWipStockDetail(wips, exportItems, retailSales),
     [wips, exportItems, retailSales]
   );
-  const warehouseCapacity = useMemo(() => tinhDungTichKho(ton), [ton]);
+  const warehouseCapacity = useMemo(() => computeWarehouseOccupancy(ton), [ton]);
 
   const warehouseList = useMemo(() => {
     const set = new Set<string>(BSF1_WAREHOUSE_NAMES);
@@ -108,7 +108,7 @@ export default function KhoDuTruScreen() {
     [ton, warehouseFilter]
   );
   const totalStock = filteredStock.reduce((s, t) => s + t.conLai, 0);
-  const nhomTuoi = useMemo(() => tuoiTon(filteredStock, homNay()), [filteredStock]);
+  const nhomTuoi = useMemo(() => bucketStockByAge(filteredStock, homNay()), [filteredStock]);
 
   const openApprove = (s: WipProductionItem) => {
     setApproval({
@@ -128,7 +128,7 @@ export default function KhoDuTruScreen() {
   const approveByLabel = (text: string) => {
     const ma = docMaQr(text);
     if (!ma) return;
-    const ds = timLo(ma, {
+    const ds = findLots(ma, {
       shipments: [], imports: [], wips: wips, packagings: [], lotInputs: [],
       exportItems: [], exportOrders: [], salesOrders: [], products: products, customers: [],
     }).filter((n) => n.kind === "W");
@@ -193,7 +193,7 @@ export default function KhoDuTruScreen() {
     setApproval(null);
   };
 
-  const stockColumns: Cot<LoTon>[] = [
+  const stockColumns: Cot<LotStock>[] = [
     {
       key: "mh",
       header: "Mặt hàng",
@@ -205,7 +205,7 @@ export default function KhoDuTruScreen() {
     {
       key: "lo",
       header: "Lô (ngày SX)",
-      render: (r) => viDate(r.ngaySX),
+      render: (r) => formatDateVN(r.ngaySX),
       sapXep: (r) => r.ngaySX,
     },
     { key: "con", header: "Còn (kg)", so: true, render: (r) => num(r.conLai), sapXep: (r) => r.conLai },
@@ -372,13 +372,13 @@ export default function KhoDuTruScreen() {
                 className="flex flex-wrap items-center justify-between gap-3 py-2"
               >
                 <span className="min-w-0 flex-1 text-base">
-                  <span className="tnum mr-2 font-semibold">{nhanLoBtp(s)}</span>
+                  <span className="tnum mr-2 font-semibold">{formatWipLotLabel(s)}</span>
                   {tenMH(s.productId)}
                   {s.spec ? ` · ${s.spec}` : ""} —{" "}
                   <span className="tnum font-semibold">{num(s.quantityKg)}</span> kg
                   <span className="text-muted-foreground">
                     {" "}
-                    · SX {viDate(s.productionDate)} · xưởng {s.workshop}
+                    · SX {formatDateVN(s.productionDate)} · xưởng {s.workshop}
                   </span>
                 </span>
                 <Button
@@ -442,7 +442,7 @@ export default function KhoDuTruScreen() {
             <DialogTitle className="text-2xl">Duyệt nhập kho</DialogTitle>
             <DialogDescription className="text-base">
               {approvalSource
-                ? `${tenMH(approvalSource.productId)}${approvalSource.spec ? ` · ${approvalSource.spec}` : ""} — SX ${viDate(approvalSource.productionDate)}. Đối chiếu kg/block thực, chọn kho.`
+                ? `${tenMH(approvalSource.productId)}${approvalSource.spec ? ` · ${approvalSource.spec}` : ""} — SX ${formatDateVN(approvalSource.productionDate)}. Đối chiếu kg/block thực, chọn kho.`
                 : ""}
             </DialogDescription>
           </DialogHeader>

@@ -5,11 +5,11 @@
 // ============================================================
 import { Fragment } from "react";
 import type { BatterType, Product } from "@/types";
-import { laCoTach, quyCachBlock } from "@/types";
+import { hasSplitComponents, blockSpec } from "@/types";
 import {
   KhungCuonNgang, Button, Combobox, NumberField, type MucChon } from "@/design-system";
 import { num } from "@/lib/format";
-import { laMatHangTamBot, tenBotDiKem } from "@/lib/botTam";
+import { isBatteredProduct, getProductBatterNames } from "@/lib/batter";
 import { ChevronDown, Pencil, Plus, X } from "lucide-react";
 import { dongTrong, laTach, tongDong, type DongSX } from "./wipHelpers";
 import { KhoiBotTam } from "./KhoiBotTam";
@@ -174,7 +174,7 @@ export function BangDongSX({
                     // Khối bột: mã tẩm bột, nhóm chế biến có "bột", hoặc dòng đã nhập bột.
                     const showBatter =
                       Boolean(d.productId) &&
-                      (laMatHangTamBot(p) ||
+                      (isBatteredProduct(p) ||
                         /bột/i.test(d.processingType) ||
                         Object.keys(d.botKg).length > 0);
                     return (
@@ -208,9 +208,9 @@ export function BangDongSX({
                                 onSua(d.key, {
                                   productId: v,
                                   // Mã đánh dấu "Có tách" → tự mở ô tách.
-                                  moRong: laCoTach(p) ? true : d.moRong,
+                                  moRong: hasSplitComponents(p) ? true : d.moRong,
                                   // Có quy cách đã gắn ở mặt hàng → tự điền kg/khối.
-                                  blockSpecKg: quyCachBlock(p) ?? d.blockSpecKg,
+                                  blockSpecKg: blockSpec(p) ?? d.blockSpecKg,
                                 });
                               }}
                               options={allProductOptions}
@@ -370,7 +370,7 @@ export function BangDongSX({
                                   ô bột xếp dọc trong vùng nhìn thấy, không phải vuốt ngang. */}
                               <div className="sticky left-2 max-w-[calc(100vw-8.5rem)] sm:pl-10">
                                 <KhoiBotTam
-                                  diKem={tenBotDiKem(p, botTam)}
+                                  diKem={getProductBatterNames(p, botTam)}
                                   botKg={d.botKg}
                                   onDoi={(botKg) => onSua(d.key, { botKg })}
                                   optBot={optBot}

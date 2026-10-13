@@ -14,43 +14,43 @@ import { useLabelPrints } from "@/lib/catalogRepo";
 import { Button, ChoiceGroup, DateRangeField, EmptyState, Nhan, congNgay, homNay, notify, sacTheoTen } from "@/design-system";
 import { Printer } from "lucide-react";
 
-const LOAI: { kind: LotKind; moTa: string }[] = [
+const LOT_KINDS: { kind: LotKind; moTa: string }[] = [
   { kind: "S", moTa: "chuyến nhập" },
   { kind: "W", moTa: "mẻ sản xuất" },
   { kind: "P", moTa: "phiếu đóng gói" },
 ];
-const khoaNut = (n: NutLo) => `${n.kind}:${n.id}`;
+const nodeKey = (n: NutLo) => `${n.kind}:${n.id}`;
 
 export function InTemHangLoat() {
   const { dl } = useDuLieuTruyXuat();
   const [tu, setTu] = useState(() => congNgay(homNay(), -6));
   const [den, setDen] = useState(homNay);
-  const [xuong, setXuong] = useState<Workshop | "">("");
-  const [loai, setLoai] = useState<LotKind[]>(["S", "W", "P"]);
+  const [workshop, setWorkshop] = useState<Workshop | "">("");
+  const [lotKinds, setLotKinds] = useState<LotKind[]>(["S", "W", "P"]);
   // Lưu những lô người dùng BỎ chọn (mặc định chọn hết) — đổi bộ lọc thì lô mới vào vẫn được chọn.
-  const [boChon, setBoChon] = useState<Set<string>>(new Set());
-  const [dangIn, setDangIn] = useState<NutLo[] | null>(null);
-  const [chiChuaIn, setChiChuaIn] = useState(false);
+  const [deselected, setDeselected] = useState<Set<string>>(new Set());
+  const [printing, setPrinting] = useState<NutLo[] | null>(null);
+  const [onlyUnprinted, setOnlyUnprinted] = useState(false);
   const [soIn] = useLabelPrints();
   const daIn = useMemo(() => tomTatIn(soIn), [soIn]);
 
-  const tatCa = useMemo(() => dsLoDeIn(dl, { tu, den, xuong, loai }), [dl, tu, den, xuong, loai]);
-  const soChuaIn = tatCa.filter((n) => !daIn.has(khoaLo(n.kind as LotKind, n.id))).length;
-  const ds = chiChuaIn ? tatCa.filter((n) => !daIn.has(khoaLo(n.kind as LotKind, n.id))) : tatCa;
-  const daChon = ds.filter((n) => !boChon.has(khoaNut(n)));
+  const allLots = useMemo(() => dsLoDeIn(dl, { tu, den, xuong: workshop, loai: lotKinds }), [dl, tu, den, workshop, lotKinds]);
+  const unprintedCount = allLots.filter((n) => !daIn.has(khoaLo(n.kind as LotKind, n.id))).length;
+  const ds = onlyUnprinted ? allLots.filter((n) => !daIn.has(khoaLo(n.kind as LotKind, n.id))) : allLots;
+  const selected = ds.filter((n) => !deselected.has(nodeKey(n)));
 
-  const doiLoai = (k: LotKind) =>
-    setLoai((cu) => (cu.includes(k) ? cu.filter((x) => x !== k) : [...cu, k]));
-  const doiChon = (n: NutLo) =>
-    setBoChon((cu) => {
-      const moi = new Set(cu);
-      const k = khoaNut(n);
-      if (moi.has(k)) moi.delete(k);
-      else moi.add(k);
-      return moi;
+  const toggleKind = (k: LotKind) =>
+    setLotKinds((prev) => (prev.includes(k) ? prev.filter((x) => x !== k) : [...prev, k]));
+  const toggleSelect = (n: NutLo) =>
+    setDeselected((prev) => {
+      const nextSet = new Set(prev);
+      const k = nodeKey(n);
+      if (nextSet.has(k)) nextSet.delete(k);
+      else nextSet.add(k);
+      return nextSet;
     });
-  const chonHet = (chon: boolean) =>
-    setBoChon(chon ? new Set() : new Set(ds.map(khoaNut)));
+  const selectAll = (isSelected: boolean) =>
+    setDeselected(isSelected ? new Set() : new Set(ds.map(nodeKey)));
 
   return (
     <div className="space-y-4">
@@ -69,8 +69,8 @@ export function InTemHangLoat() {
           />
           <ChoiceGroup
             label="Phân xưởng"
-            value={xuong}
-            onChange={(v) => setXuong(v as Workshop | "")}
+            value={workshop}
+            onChange={(v) => setWorkshop(v as Workshop | "")}
             options={[{ value: "", label: "Tất cả" }, ...(["Đông", "Cá", "Khô"] as const).map((x) => ({ value: x, label: x }))]}
             cot={4}
             anNhanBatBuoc
@@ -79,14 +79,14 @@ export function InTemHangLoat() {
         <div className="space-y-2">
           <p className="font-medium">Loại lô</p>
           <div className="flex flex-wrap gap-2">
-            {LOAI.map(({ kind, moTa }) => (
+            {LOT_KINDS.map(({ kind, moTa }) => (
               <Button
                 key={kind}
                 type="button"
-                variant={loai.includes(kind) ? "default" : "outline"}
-                title={`${loai.includes(kind) ? "Bỏ" : "Thêm"} tem ${TEN_LOAI[kind].toLowerCase()} (${moTa}) khỏi danh sách in.`}
-                aria-pressed={loai.includes(kind)}
-                onClick={() => doiLoai(kind)}
+                variant={lotKinds.includes(kind) ? "default" : "outline"}
+                title={`${lotKinds.includes(kind) ? "Bỏ" : "Thêm"} tem ${TEN_LOAI[kind].toLowerCase()} (${moTa}) khỏi danh sách in.`}
+                aria-pressed={lotKinds.includes(kind)}
+                onClick={() => toggleKind(kind)}
               >
                 {TEN_LOAI[kind]}
               </Button>
@@ -97,21 +97,21 @@ export function InTemHangLoat() {
           <input
             type="checkbox"
             className="size-5 shrink-0"
-            checked={chiChuaIn}
-            onChange={(e) => setChiChuaIn(e.target.checked)}
+            checked={onlyUnprinted}
+            onChange={(e) => setOnlyUnprinted(e.target.checked)}
           />
           <span>
             Chỉ lô <b>chưa in tem</b>{" "}
-            <span className="tnum text-muted-foreground">({soChuaIn} / {tatCa.length} lô)</span>
+            <span className="tnum text-muted-foreground">({unprintedCount} / {allLots.length} lô)</span>
           </span>
         </label>
       </div>
 
       {ds.length === 0 ? (
         <EmptyState
-          tieuDe={chiChuaIn && tatCa.length ? "Lô trong khoảng này đều đã in tem" : "Không có lô nào trong khoảng này"}
+          tieuDe={onlyUnprinted && allLots.length ? "Lô trong khoảng này đều đã in tem" : "Không có lô nào trong khoảng này"}
           moTa={
-            chiChuaIn && tatCa.length
+            onlyUnprinted && allLots.length
               ? "Bỏ tick \"Chỉ lô chưa in tem\" nếu cần in lại."
               : "Nới khoảng ngày, chọn thêm loại lô hoặc đổi phân xưởng."
           }
@@ -120,40 +120,40 @@ export function InTemHangLoat() {
         <div className="space-y-3 rounded-xl border-2 border-border p-4">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-muted-foreground">
-              Đã chọn <span className="tnum font-semibold text-foreground">{daChon.length}</span> / {ds.length} lô
+              Đã chọn <span className="tnum font-semibold text-foreground">{selected.length}</span> / {ds.length} lô
             </p>
             <div className="flex flex-wrap gap-2 [&>*]:flex-1 sm:[&>*]:flex-none">
               <Button
                 type="button"
                 variant="outline"
-                title={daChon.length === ds.length ? "Bỏ chọn mọi lô trong danh sách." : "Chọn mọi lô trong danh sách để in."}
-                onClick={() => chonHet(daChon.length !== ds.length)}
+                title={selected.length === ds.length ? "Bỏ chọn mọi lô trong danh sách." : "Chọn mọi lô trong danh sách để in."}
+                onClick={() => selectAll(selected.length !== ds.length)}
               >
-                {daChon.length === ds.length ? "Bỏ chọn hết" : "Chọn hết"}
+                {selected.length === ds.length ? "Bỏ chọn hết" : "Chọn hết"}
               </Button>
               <Button
                 type="button"
                 title="Mở bản in cho các lô đang chọn, mỗi tem một nhãn đúng khổ tem."
-                onClick={() => (daChon.length ? setDangIn(daChon) : notify.canhBao("Chưa chọn lô nào để in."))}
+                onClick={() => (selected.length ? setPrinting(selected) : notify.canhBao("Chưa chọn lô nào để in."))}
               >
-                <Printer aria-hidden /> In {daChon.length} tem
+                <Printer aria-hidden /> In {selected.length} tem
               </Button>
             </div>
           </div>
 
           <ul className="max-h-[60dvh] divide-y divide-border overflow-y-auto rounded-lg border border-border">
             {ds.map((n) => {
-              const k = khoaNut(n);
-              const chon = !boChon.has(k);
-              const daiLy = n.chiTiet.find((c) => c.nhan === "Đại lý")?.giaTri;
+              const k = nodeKey(n);
+              const isSelected = !deselected.has(k);
+              const supplier = n.chiTiet.find((c) => c.nhan === "Đại lý")?.giaTri;
               return (
                 <li key={k}>
                   <label className="flex cursor-pointer items-start gap-3 px-3 py-2 hover:bg-muted">
                     <input
                       type="checkbox"
                       className="mt-1 size-5 shrink-0"
-                      checked={chon}
-                      onChange={() => doiChon(n)}
+                      checked={isSelected}
+                      onChange={() => toggleSelect(n)}
                       aria-label={`In tem lô ${n.nhan} · ${n.moTa}`}
                     />
                     <span className="min-w-0 flex-1 space-y-1">
@@ -170,7 +170,7 @@ export function InTemHangLoat() {
                         })()}
                       </span>
                       <span className="block text-muted-foreground">
-                        {[n.moTa, viDate(n.ngay), n.xuong && `xưởng ${n.xuong}`, daiLy, n.kg ? kg(n.kg) : ""]
+                        {[n.moTa, viDate(n.ngay), n.xuong && `xưởng ${n.xuong}`, supplier, n.kg ? kg(n.kg) : ""]
                           .filter(Boolean)
                           .join(" · ")}
                       </span>
@@ -183,7 +183,7 @@ export function InTemHangLoat() {
         </div>
       )}
 
-      {dangIn && <TemLoQr nuts={dangIn} onClose={() => setDangIn(null)} />}
+      {printing && <TemLoQr nuts={printing} onClose={() => setPrinting(null)} />}
     </div>
   );
 }

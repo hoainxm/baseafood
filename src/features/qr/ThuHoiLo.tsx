@@ -14,39 +14,39 @@ import { FileSpreadsheet, Printer, ShieldAlert } from "lucide-react";
 const kgHoacTrong = (v: number | null) => (v == null ? "chưa ghi kg" : kg(v));
 
 export function ThuHoiLo({ nut, dl, cungChuyen = [] }: { nut: NutLo; dl: DuLieuTruyXuat; cungChuyen?: NutLo[] }) {
-  const [dangIn, setDangIn] = useState(false);
+  const [isPrinting, setIsPrinting] = useState(false);
   /** Lô NL có nhiều loại cùng chuyến ⇒ cho thu hồi GỘP cả chuyến (nghi cả xe hàng của đại lý). */
-  const [caChuyen, setCaChuyen] = useState(false);
-  const gopChuyen = caChuyen && cungChuyen.length > 1;
+  const [wholeShipment, setWholeShipment] = useState(false);
+  const isMergedShipment = wholeShipment && cungChuyen.length > 1;
   const { hangRa, loTrongXuong } = useMemo(
-    () => (gopChuyen ? danhSachThuHoiNhieu(cungChuyen, dl) : danhSachThuHoi(nut.kind, nut.id, dl)),
-    [gopChuyen, cungChuyen, nut, dl]
+    () => (isMergedShipment ? danhSachThuHoiNhieu(cungChuyen, dl) : danhSachThuHoi(nut.kind, nut.id, dl)),
+    [isMergedShipment, cungChuyen, nut, dl]
   );
-  const phamVi = gopChuyen ? `chuyến ${nut.nhan} (${cungChuyen.length} loại NL)` : `lô ${nut.nhan}${nut.kind === "S" ? ` · ${nut.moTa}` : ""}`;
-  const tonTrong = useMemo(
+  const scope = isMergedShipment ? `chuyến ${nut.nhan} (${cungChuyen.length} loại NL)` : `lô ${nut.nhan}${nut.kind === "S" ? ` · ${nut.moTa}` : ""}`;
+  const lotStockNow = useMemo(
     () => {
       const bang = bangTonKhoLo(dl); // một lượt cho mọi lô cần khoanh
       return loTrongXuong.map((n) => ({ n, ton: tonKhoCuaLo(n.kind, n.id, dl, bang) }));
     },
     [loTrongXuong, dl]
   );
-  const soKhach = new Set(hangRa.map((r) => r.khach || "khách ?")).size;
-  const tongKg = hangRa.reduce((s, r) => s + (r.kg ?? 0), 0);
+  const customerCount = new Set(hangRa.map((r) => r.khach || "khách ?")).size;
+  const totalKg = hangRa.reduce((s, r) => s + (r.kg ?? 0), 0);
 
-  const taiExcel = async () => {
+  const downloadExcel = async () => {
     const { exportAoaToXlsx } = await import("@/lib/reportXlsx"); // nạp động — xlsx không vào chunk chính
     exportAoaToXlsx({
       sheetName: "Thu hồi",
       fileName: `thu-hoi-${nut.nhan}-${new Date().toISOString().slice(0, 16).replace(/[:T]/g, "")}.xlsx`,
       colWidths: [14, 28, 12, 26, 32, 12, 22],
       aoa: [
-        [`Danh sách thu hồi — ${phamVi} (${TEN_LOAI[nut.kind]})`],
+        [`Danh sách thu hồi — ${scope} (${TEN_LOAI[nut.kind]})`],
         [],
         ["Ngả ra", "Khách", "Ngày", "Chứng từ", "Mặt hàng", "Kg", "Từ lô"],
         ...hangRa.map((r) => [TEN_LOAI[r.loai], r.khach, r.ngay, r.chungTu, r.matHang, r.kg, r.tuLo]),
         [],
         ["Lô còn trong xưởng", "Mặt hàng", "Ngày", "Tồn trong kho (kg)"],
-        ...tonTrong.map(({ n, ton }) => [`${TEN_LOAI[n.kind]} ${n.nhan}`, n.moTa, n.ngay, ton]),
+        ...lotStockNow.map(({ n, ton }) => [`${TEN_LOAI[n.kind]} ${n.nhan}`, n.moTa, n.ngay, ton]),
       ],
     });
   };
@@ -61,10 +61,10 @@ export function ThuHoiLo({ nut, dl, cungChuyen = [] }: { nut: NutLo; dl: DuLieuT
           </InfoTip>
         </h2>
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" title="Mở bản in A4 danh sách thu hồi để in hoặc lưu PDF." onClick={() => setDangIn(true)}>
+          <Button variant="outline" title="Mở bản in A4 danh sách thu hồi để in hoặc lưu PDF." onClick={() => setIsPrinting(true)}>
             <Printer aria-hidden /> In danh sách
           </Button>
-          <Button variant="outline" title="Tải danh sách thu hồi ra file Excel." onClick={taiExcel}>
+          <Button variant="outline" title="Tải danh sách thu hồi ra file Excel." onClick={downloadExcel}>
             <FileSpreadsheet aria-hidden /> Tải Excel
           </Button>
         </div>
@@ -72,7 +72,7 @@ export function ThuHoiLo({ nut, dl, cungChuyen = [] }: { nut: NutLo; dl: DuLieuT
 
       {cungChuyen.length > 1 && (
         <label className="flex cursor-pointer items-center gap-3">
-          <input type="checkbox" className="size-5 shrink-0" checked={caChuyen} onChange={(e) => setCaChuyen(e.target.checked)} />
+          <input type="checkbox" className="size-5 shrink-0" checked={wholeShipment} onChange={(e) => setWholeShipment(e.target.checked)} />
           <span>
             Thu hồi <b>cả chuyến</b> ({cungChuyen.length} loại nguyên liệu cùng xe, cùng đại lý)
           </span>
@@ -81,7 +81,7 @@ export function ThuHoiLo({ nut, dl, cungChuyen = [] }: { nut: NutLo; dl: DuLieuT
 
       <p className="tnum">
         {hangRa.length
-          ? `${hangRa.length} ngả ra · ${soKhach} khách · ${kg(tongKg)} đã ghi kg`
+          ? `${hangRa.length} ngả ra · ${customerCount} khách · ${kg(totalKg)} đã ghi kg`
           : "Chưa ghi nhận hàng nào từ lô này ra khỏi xưởng."}
         {loTrongXuong.length > 0 && ` · ${loTrongXuong.length} lô còn trong xưởng cần khoanh lại`}
       </p>
@@ -115,11 +115,11 @@ export function ThuHoiLo({ nut, dl, cungChuyen = [] }: { nut: NutLo; dl: DuLieuT
         </KhungCuonNgang>
       )}
 
-      {tonTrong.length > 0 && (
+      {lotStockNow.length > 0 && (
         <div className="space-y-1">
           <p className="font-medium">Lô còn trong xưởng</p>
           <ul className="space-y-1">
-            {tonTrong.map(({ n, ton }) => (
+            {lotStockNow.map(({ n, ton }) => (
               <li key={`${n.kind}:${n.id}`} className="tnum text-muted-foreground">
                 {TEN_LOAI[n.kind]} <span className="font-medium text-foreground">{n.nhan}</span> · {n.moTa}
                 {ton != null ? ` · tồn trong kho ${kg(ton)}` : ""}
@@ -129,11 +129,11 @@ export function ThuHoiLo({ nut, dl, cungChuyen = [] }: { nut: NutLo; dl: DuLieuT
         </div>
       )}
 
-      {dangIn && (
+      {isPrinting && (
         <PhieuIn
           tieuDe="Danh sách thu hồi theo lô"
-          phuDe={`${gopChuyen ? `Chuyến ${nut.nhan} · ${cungChuyen.length} loại NL` : `Lô ${nut.nhan} · ${TEN_LOAI[nut.kind]} · ${nut.moTa}`}${nut.ngay ? ` · ${viDate(nut.ngay)}` : ""}`}
-          onClose={() => setDangIn(false)}
+          phuDe={`${isMergedShipment ? `Chuyến ${nut.nhan} · ${cungChuyen.length} loại NL` : `Lô ${nut.nhan} · ${TEN_LOAI[nut.kind]} · ${nut.moTa}`}${nut.ngay ? ` · ${viDate(nut.ngay)}` : ""}`}
+          onClose={() => setIsPrinting(false)}
         >
           <table className="w-full border-collapse">
             <thead>
@@ -167,7 +167,7 @@ export function ThuHoiLo({ nut, dl, cungChuyen = [] }: { nut: NutLo; dl: DuLieuT
               )}
             </tbody>
           </table>
-          {tonTrong.length > 0 && (
+          {lotStockNow.length > 0 && (
             <table className="mt-4 w-full border-collapse">
               <thead>
                 <tr>
@@ -178,7 +178,7 @@ export function ThuHoiLo({ nut, dl, cungChuyen = [] }: { nut: NutLo; dl: DuLieuT
                 </tr>
               </thead>
               <tbody>
-                {tonTrong.map(({ n, ton }) => (
+                {lotStockNow.map(({ n, ton }) => (
                   <tr key={`${n.kind}:${n.id}`}>
                     <TdIn>{`${TEN_LOAI[n.kind]} ${n.nhan}`}</TdIn>
                     <TdIn>{n.moTa}</TdIn>

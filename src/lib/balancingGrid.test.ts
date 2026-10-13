@@ -21,7 +21,7 @@ const ky = (id: string, startDate: string, endDate: string, materialTypeName = "
   ({ id, materialTypeName, startDate, endDate }) as BalancingPeriod;
 
 let n = 0;
-const nhap = (deliveryDate: string, materialTypeName: string, quantityKg: number, balancingPeriodId = ""): MaterialImportItem => ({
+const makeImport = (deliveryDate: string, materialTypeName: string, quantityKg: number, balancingPeriodId = ""): MaterialImportItem => ({
   id: `m${++n}`,
   shipmentId: "",
   deliveryDate,
@@ -39,16 +39,16 @@ const nhap = (deliveryDate: string, materialTypeName: string, quantityKg: number
 
 /* Sổ nhập thật 31/08–06/09/2026 (rút gọn): mỗi ngày 2 da lớn + nhỏ, xen 1 da. */
 const so: MaterialImportItem[] = [
-  nhap("2026-08-31", "Bạch tuộc 2 da lớn (80↑)", 1649),
-  nhap("2026-08-31", "Bạch tuộc 1 da", 1525),
-  nhap("2026-09-01", "Bạch tuộc 2 da lớn (80↑)", 6762),
-  nhap("2026-09-01", "Bạch tuộc 2 da nhỏ (80↓)", 1202),
-  nhap("2026-09-01", "Bạch tuộc 1 da", 2160),
-  nhap("2026-09-03", "Bạch tuộc 2 da nhỏ (80↓)", 5019),
-  nhap("2026-09-03", "Bạch tuộc 1 da", 6137),
-  nhap("2026-09-05", "Bạch tuộc 2 da lớn (80↑)", 2491),
-  nhap("2026-09-05", "Bạch tuộc 1 da", 5509),
-  nhap("2026-09-06", "Bạch tuộc 2 da lớn (80↑)", 3146),
+  makeImport("2026-08-31", "Bạch tuộc 2 da lớn (80↑)", 1649),
+  makeImport("2026-08-31", "Bạch tuộc 1 da", 1525),
+  makeImport("2026-09-01", "Bạch tuộc 2 da lớn (80↑)", 6762),
+  makeImport("2026-09-01", "Bạch tuộc 2 da nhỏ (80↓)", 1202),
+  makeImport("2026-09-01", "Bạch tuộc 1 da", 2160),
+  makeImport("2026-09-03", "Bạch tuộc 2 da nhỏ (80↓)", 5019),
+  makeImport("2026-09-03", "Bạch tuộc 1 da", 6137),
+  makeImport("2026-09-05", "Bạch tuộc 2 da lớn (80↑)", 2491),
+  makeImport("2026-09-05", "Bạch tuộc 1 da", 5509),
+  makeImport("2026-09-06", "Bạch tuộc 2 da lớn (80↑)", 3146),
 ];
 
 describe("hút sổ nhập vào kỳ cân đối", () => {
@@ -62,14 +62,14 @@ describe("hút sổ nhập vào kỳ cân đối", () => {
     const lay = nhapHangHopLe(ky("k", "2026-09-01", "2026-09-05"), so);
     expect(lay.every((r) => r.materialTypeName.startsWith("Bạch tuộc 2 da"))).toBe(true);
     expect(lay.map((r) => r.deliveryDate).sort()).toEqual(["2026-09-01", "2026-09-01", "2026-09-03", "2026-09-05"]);
-    const gom = gomNhapTheoLoai(lay);
-    expect([...gom.keys()]).toEqual(["Bạch tuộc 2 da"]);
-    expect(gom.get("Bạch tuộc 2 da")!.theoNgay).toEqual({ "2026-09-01": 7964, "2026-09-03": 5019, "2026-09-05": 2491 });
+    const grouped = gomNhapTheoLoai(lay);
+    expect([...grouped.keys()]).toEqual(["Bạch tuộc 2 da"]);
+    expect(grouped.get("Bạch tuộc 2 da")!.theoNgay).toEqual({ "2026-09-01": 7964, "2026-09-03": 5019, "2026-09-05": 2491 });
   });
 
   test("chuyến đã thuộc kỳ khác không bị hút lại", () => {
-    const daGan = so.map((r) => (r.deliveryDate === "2026-09-01" ? { ...r, balancingPeriodId: "kyA" } : r));
-    const lay = nhapHangHopLe(ky("kyB", "2026-09-01", "2026-09-05"), daGan);
+    const assigned = so.map((r) => (r.deliveryDate === "2026-09-01" ? { ...r, balancingPeriodId: "kyA" } : r));
+    const lay = nhapHangHopLe(ky("kyB", "2026-09-01", "2026-09-05"), assigned);
     expect(lay.some((r) => r.deliveryDate === "2026-09-01")).toBe(false);
   });
 });
@@ -88,7 +88,7 @@ describe("kyTrungNgayCungHo", () => {
   });
 });
 
-const tpRow = (periodId: string, productId: string, customerId: string, unitPrice: number | null, spec = "", channel: BalancingOutputItem["channel"] = "Xuất khẩu"): BalancingOutputItem => ({
+const finishedGoodRow = (periodId: string, productId: string, customerId: string, unitPrice: number | null, spec = "", channel: BalancingOutputItem["channel"] = "Xuất khẩu"): BalancingOutputItem => ({
   id: `${periodId}-${productId}-${customerId}-${spec}`,
   periodId,
   productId,
@@ -107,51 +107,51 @@ describe("dòng mẫu khối 2", () => {
     ky("K4", "2026-09-10", "2026-09-12"),
     ky("L1", "2026-08-28", "2026-08-30", "Bạch tuộc 1 da"),
   ];
-  const tatCaTP = [
-    tpRow("K1", "luoc230", "hanwa", 10.4),
-    tpRow("K2", "luoc230", "hanwa", 10.43),
-    tpRow("K2", "tambot", "jfda", 9.3),
-    tpRow("K2", "tambot", "dairei", 9.2),
-    tpRow("K2", "tambot", "jfda", null),
-    tpRow("L1", "motda", "x", 5),
+  const allOutputs = [
+    finishedGoodRow("K1", "luoc230", "hanwa", 10.4),
+    finishedGoodRow("K2", "luoc230", "hanwa", 10.43),
+    finishedGoodRow("K2", "tambot", "jfda", 9.3),
+    finishedGoodRow("K2", "tambot", "dairei", 9.2),
+    finishedGoodRow("K2", "tambot", "jfda", null),
+    finishedGoodRow("L1", "motda", "x", 5),
   ];
 
   test("kỳ mẫu = kỳ cùng họ gần nhất KẾT THÚC TRƯỚC, có dòng; không lấy kỳ khác loại", () => {
-    expect(kyMauTP(dsKy[2], dsKy, tatCaTP)?.id).toBe("K2");
-    expect(kyMauTP(dsKy[3], dsKy, tatCaTP)?.id).toBe("K2");
+    expect(kyMauTP(dsKy[2], dsKy, allOutputs)?.id).toBe("K2");
+    expect(kyMauTP(dsKy[3], dsKy, allOutputs)?.id).toBe("K2");
     // kỳ đầu tiên, không có kỳ trước có dòng ⇒ lấy kỳ mới nhất còn lại
-    expect(kyMauTP(ky("K0", "2026-08-01", "2026-08-05"), dsKy, tatCaTP)?.id).toBe("K2");
-    expect(kyMauTP(ky("M", "2026-09-01", "2026-09-05", "Mực ống"), dsKy, tatCaTP)).toBeNull();
+    expect(kyMauTP(ky("K0", "2026-08-01", "2026-08-05"), dsKy, allOutputs)?.id).toBe("K2");
+    expect(kyMauTP(ky("M", "2026-09-01", "2026-09-05", "Mực ống"), dsKy, allOutputs)).toBeNull();
   });
 
   test("mỗi mặt hàng × khách × GIÁ một dòng mẫu; khác khách hoặc khác giá vẫn tách", () => {
-    const mau = dungDongMauTP(tatCaTP.filter((r) => r.periodId === "K2"));
-    expect(mau.map((m) => [m.khoa, m.unitPrice])).toEqual([
+    const templates = dungDongMauTP(allOutputs.filter((r) => r.periodId === "K2"));
+    expect(templates.map((m) => [m.khoa, m.unitPrice])).toEqual([
       [khoaDongTP("luoc230", "", "hanwa"), 10.43],
       [khoaDongTP("tambot", "", "jfda"), 9.3],
       [khoaDongTP("tambot", "", "dairei"), 9.2],
       [khoaDongTP("tambot", "", "jfda"), null],
     ]);
-    expect(new Set(mau.map((m) => m.id)).size).toBe(4);
+    expect(new Set(templates.map((m) => m.id)).size).toBe(4);
   });
 
   test("hai dòng mẫu cùng khoá: kỳ đã có 1 dòng ⇒ còn thiếu đúng 1 (không biến mất cả hai)", () => {
-    const mau = dungDongMauTP(tatCaTP.filter((r) => r.periodId === "K2"));
-    const thieu = dongMauConThieu(mau, [{ productId: "tambot", spec: "", customerId: "jfda" }]);
+    const templates = dungDongMauTP(allOutputs.filter((r) => r.periodId === "K2"));
+    const thieu = dongMauConThieu(templates, [{ productId: "tambot", spec: "", customerId: "jfda" }]);
     expect(thieu.filter((m) => m.customerId === "jfda").map((m) => m.unitPrice)).toEqual([null]);
   });
 
   test("dòng mẫu còn thiếu: bỏ dòng kỳ đã có (cùng khách, hoặc dòng hút chưa chọn khách)", () => {
-    const mau = dungDongMauTP(tatCaTP.filter((r) => r.periodId === "K2"));
-    expect(dongMauConThieu(mau, [{ productId: "luoc230", spec: "", customerId: "hanwa" }]).length).toBe(3);
-    expect(dongMauConThieu(mau, [{ productId: "tambot", spec: "", customerId: "" }]).map((m) => m.productId)).toEqual(["luoc230"]);
+    const templates = dungDongMauTP(allOutputs.filter((r) => r.periodId === "K2"));
+    expect(dongMauConThieu(templates, [{ productId: "luoc230", spec: "", customerId: "hanwa" }]).length).toBe(3);
+    expect(dongMauConThieu(templates, [{ productId: "tambot", spec: "", customerId: "" }]).map((m) => m.productId)).toEqual(["luoc230"]);
   });
 
   test("gợi ý khách + giá: ưu tiên dòng mẫu, rồi kỳ gần nhất có giá, không có ⇒ null", () => {
-    const mau = dungDongMauTP(tatCaTP.filter((r) => r.periodId === "K2"));
-    expect(goiYKhachGia("tambot", "", mau, tatCaTP, dsKy, "K3")).toEqual({ customerId: "jfda", channel: "Xuất khẩu", unitPrice: 9.3 });
-    expect(goiYKhachGia("luoc230", "", [], tatCaTP, dsKy, "K3")?.unitPrice).toBe(10.43);
-    expect(goiYKhachGia("moi", "", mau, tatCaTP, dsKy, "K3")).toBeNull();
+    const templates = dungDongMauTP(allOutputs.filter((r) => r.periodId === "K2"));
+    expect(goiYKhachGia("tambot", "", templates, allOutputs, dsKy, "K3")).toEqual({ customerId: "jfda", channel: "Xuất khẩu", unitPrice: 9.3 });
+    expect(goiYKhachGia("luoc230", "", [], allOutputs, dsKy, "K3")?.unitPrice).toBe(10.43);
+    expect(goiYKhachGia("moi", "", templates, allOutputs, dsKy, "K3")).toBeNull();
   });
 });
 
@@ -173,10 +173,10 @@ describe("Trả · Nợ — tachTraNo / ghiTraNo", () => {
     expect(tachTraNo({ carryOverKg: -2000 })).toEqual({ tra: -2000, no: 0 });
   });
   test("ghi một cột giữ cột kia, tổng chuyển kỳ = Trả + Nợ (có dấu)", () => {
-    const sau = ghiTraNo({ carryOverKg: -2000 }, { no: 258 });
-    expect(sau).toEqual({ carryOverKg: -1742, debtKg: 258 });
-    expect(tachTraNo(sau)).toEqual({ tra: -2000, no: 258 });
-    expect(ghiTraNo(sau, { tra: 0 })).toEqual({ carryOverKg: 258, debtKg: 258 });
+    const after = ghiTraNo({ carryOverKg: -2000 }, { no: 258 });
+    expect(after).toEqual({ carryOverKg: -1742, debtKg: 258 });
+    expect(tachTraNo(after)).toEqual({ tra: -2000, no: 258 });
+    expect(ghiTraNo(after, { tra: 0 })).toEqual({ carryOverKg: 258, debtKg: 258 });
   });
   test("số lẻ không trôi dấu phẩy động", () => {
     expect(tachTraNo(ghiTraNo({ carryOverKg: 0.3 }, { no: 0.1 }))).toEqual({ tra: 0.3, no: 0.1 });

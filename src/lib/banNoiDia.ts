@@ -43,29 +43,29 @@ export function banNoiDiaTheoKy(
   ds: DomesticSaleItem[],
   ky: Pick<BalancingPeriod, "startDate" | "endDate" | "materialTypeName">
 ): BanNoiDiaKy {
-  const ngay = new Set(ngayTrongKy(ky));
-  const theoNgay: DailyQuantities = {};
-  let tongKg = 0;
-  let kgCoGia = 0;
-  let tien = 0;
-  let soDong = 0;
+  const dates = new Set(ngayTrongKy(ky));
+  const byDate: DailyQuantities = {};
+  let totalKg = 0;
+  let pricedKg = 0;
+  let amount = 0;
+  let rowCount = 0;
   for (const d of ds) {
     const kg = Number(d.quantityKg) || 0;
-    if (kg <= 0 || !ngay.has(d.saleDate)) continue;
+    if (kg <= 0 || !dates.has(d.saleDate)) continue;
     if (!cungHoNguyenLieu(d.materialTypeName, ky.materialTypeName)) continue;
-    theoNgay[d.saleDate] = (theoNgay[d.saleDate] ?? 0) + kg;
-    tongKg += kg;
-    soDong += 1;
+    byDate[d.saleDate] = (byDate[d.saleDate] ?? 0) + kg;
+    totalKg += kg;
+    rowCount += 1;
     if (d.unitPrice != null && d.unitPrice > 0) {
-      kgCoGia += kg;
-      tien += kg * d.unitPrice;
+      pricedKg += kg;
+      amount += kg * d.unitPrice;
     }
   }
   return {
-    theoNgay,
-    tongKg,
-    giaBinhQuan: kgCoGia > 0 ? Math.round(tien / kgCoGia) : null,
-    soDong,
+    theoNgay: byDate,
+    tongKg: totalKg,
+    giaBinhQuan: pricedKg > 0 ? Math.round(amount / pricedKg) : null,
+    soDong: rowCount,
   };
 }
 
@@ -76,15 +76,15 @@ export function banNoiDiaTheoKy(
  */
 export function doiChieuBanNoiDia(
   canDoi: DailyQuantities | undefined,
-  sx: DailyQuantities
+  production: DailyQuantities
 ): "khop" | "lech" | "trong" {
   const cd = canDoi ?? {};
-  const coSo = Object.values(cd).some((v) => (Number(v) || 0) !== 0);
-  if (!coSo) return "trong";
-  const ngay = new Set([...Object.keys(cd), ...Object.keys(sx)]);
-  for (const iso of ngay) {
+  const hasValues = Object.values(cd).some((v) => (Number(v) || 0) !== 0);
+  if (!hasValues) return "trong";
+  const dates = new Set([...Object.keys(cd), ...Object.keys(production)]);
+  for (const iso of dates) {
     const a = Math.abs(Number(cd[iso]) || 0);
-    const b = Math.abs(Number(sx[iso]) || 0);
+    const b = Math.abs(Number(production[iso]) || 0);
     if (Math.abs(a - b) >= 0.001) return "lech";
   }
   return "khop";

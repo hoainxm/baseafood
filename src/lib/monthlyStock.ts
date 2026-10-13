@@ -94,10 +94,10 @@ export function nhanThang(period: string): string {
  * Danh sách N tháng gần đây (mới → cũ) từ mốc `moc` (mặc định tháng hiện tại),
  * hợp nhất với mọi tháng đã có dữ liệu để không bao giờ thiếu kỳ nào trong sổ.
  */
-export function danhSachThang(coSan: string[], moc = thangHienTai(), soThang = 24): string[] {
+export function danhSachThang(coSan: string[], moc = thangHienTai(), monthCount = 24): string[] {
   const set = new Set<string>(coSan);
   let p = moc;
-  for (let i = 0; i < soThang; i++) {
+  for (let i = 0; i < monthCount; i++) {
     set.add(p);
     p = thangTruoc(p);
   }
@@ -129,15 +129,15 @@ export function gomNhom(rows: MonthlyStockRow[]): NhomKho[] {
     }
     arr.push(r);
   }
-  const uuTien = (c: string) => {
+  const priorityOf = (c: string) => {
     const i = MONTHLY_STOCK_CATEGORIES.indexOf(c);
     if (i !== -1) return i;
     // Khối con của một nhóm ("Nguyên liệu nhập khẩu – 2 DA") đứng ngay sau nhóm cha.
-    const cha = MONTHLY_STOCK_CATEGORIES.findIndex((m) => c.startsWith(`${m} – `));
-    return cha === -1 ? MONTHLY_STOCK_CATEGORIES.length : cha + 0.5;
+    const parentIdx = MONTHLY_STOCK_CATEGORIES.findIndex((m) => c.startsWith(`${m} – `));
+    return parentIdx === -1 ? MONTHLY_STOCK_CATEGORIES.length : parentIdx + 0.5;
   };
   return [...map.entries()]
-    .sort((a, b) => uuTien(a[0]) - uuTien(b[0]) || a[0].localeCompare(b[0]))
+    .sort((a, b) => priorityOf(a[0]) - priorityOf(b[0]) || a[0].localeCompare(b[0]))
     .map(([category, rs]) => {
       rs.sort((x, y) => x.sortOrder - y.sortOrder || x.itemName.localeCompare(y.itemName));
       return { category, rows: rs, tong: tongDong(rs) };
@@ -162,7 +162,7 @@ export interface LechDonKy {
 
 const NGUONG_LECH = 1; // < 1 kg coi như khớp (làm tròn số lẻ)
 
-const congTheoNhom = (rows: MonthlyStockRow[], lay: (r: MonthlyStockRow) => number) => {
+const sumByGroup = (rows: MonthlyStockRow[], lay: (r: MonthlyStockRow) => number) => {
   const m = new Map<string, number>();
   for (const r of rows) m.set(r.category || "(Chưa phân nhóm)", (m.get(r.category || "(Chưa phân nhóm)") ?? 0) + lay(r));
   return m;
@@ -173,11 +173,11 @@ const congTheoNhom = (rows: MonthlyStockRow[], lay: (r: MonthlyStockRow) => numb
  * bằng nhau; lệch = ghi chép dồn kỳ sai (đúng nỗi đau file Excel gốc). Trả tổng
  * + các nhóm chênh để gọi tên đúng chỗ. KHÔNG sửa số — chỉ soi.
  */
-export function soLechDonKy(rowsTruoc: MonthlyStockRow[], rowsNay: MonthlyStockRow[]): LechDonKy {
-  const closeTruoc = rowsTruoc.reduce((s, r) => s + r.closeKg, 0);
-  const openNay = rowsNay.reduce((s, r) => s + r.openKg, 0);
-  const mClose = congTheoNhom(rowsTruoc, (r) => r.closeKg);
-  const mOpen = congTheoNhom(rowsNay, (r) => r.openKg);
+export function soLechDonKy(priorRows: MonthlyStockRow[], currentRows: MonthlyStockRow[]): LechDonKy {
+  const prevClose = priorRows.reduce((s, r) => s + r.closeKg, 0);
+  const currentOpening = currentRows.reduce((s, r) => s + r.openKg, 0);
+  const mClose = sumByGroup(priorRows, (r) => r.closeKg);
+  const mOpen = sumByGroup(currentRows, (r) => r.openKg);
   const cats = new Set([...mClose.keys(), ...mOpen.keys()]);
   const theoNhom: LechNhom[] = [];
   for (const c of cats) {
@@ -186,7 +186,7 @@ export function soLechDonKy(rowsTruoc: MonthlyStockRow[], rowsNay: MonthlyStockR
     if (Math.abs(on - ct) > NGUONG_LECH) theoNhom.push({ category: c, closeTruoc: ct, openNay: on, lech: on - ct });
   }
   theoNhom.sort((a, b) => Math.abs(b.lech) - Math.abs(a.lech));
-  return { closeTruoc, openNay, lech: openNay - closeTruoc, theoNhom };
+  return { closeTruoc: prevClose, openNay: currentOpening, lech: currentOpening - prevClose, theoNhom };
 }
 
 /** Có đáng gắn cờ lệch không (có tháng trước + tổng lệch quá ngưỡng). */
@@ -214,7 +214,7 @@ export interface DoiChieuDong {
   soDongNay: number; // số dòng tháng này của mặt hàng (để biết sửa ở đâu)
 }
 
-function gomTheoTen(rows: MonthlyStockRow[], layKg: (r: MonthlyStockRow) => number) {
+function groupByName(rows: MonthlyStockRow[], layKg: (r: MonthlyStockRow) => number) {
   const m = new Map<string, { kg: number; sl: number; w: string; c: string; ten: string }>();
   for (const r of rows) {
     const k = khoaLo(r);
@@ -231,14 +231,14 @@ function gomTheoTen(rows: MonthlyStockRow[], layKg: (r: MonthlyStockRow) => numb
  * hàng LỆCH THẬT (|Δkg| > ngưỡng, sau khi gộp các tách size). KHÔNG sửa gì —
  * chẩn đoán để người dùng tự sửa ở lưới Ghi (con người phán đoán, tránh cộng đôi).
  */
-export function doiChieuDonKy(rowsTruoc: MonthlyStockRow[], rowsNay: MonthlyStockRow[]): DoiChieuDong[] {
-  const mTruoc = gomTheoTen(rowsTruoc, (r) => r.closeKg);
-  const mNay = gomTheoTen(rowsNay, (r) => r.openKg);
-  const keys = new Set([...mTruoc.keys(), ...mNay.keys()]);
+export function doiChieuDonKy(priorRows: MonthlyStockRow[], currentRows: MonthlyStockRow[]): DoiChieuDong[] {
+  const prevCloseByName = groupByName(priorRows, (r) => r.closeKg);
+  const openByName = groupByName(currentRows, (r) => r.openKg);
+  const keys = new Set([...prevCloseByName.keys(), ...openByName.keys()]);
   const out: DoiChieuDong[] = [];
   for (const k of keys) {
-    const t = mTruoc.get(k);
-    const n = mNay.get(k);
+    const t = prevCloseByName.get(k);
+    const n = openByName.get(k);
     const closeKg = t?.kg ?? 0;
     const openKg = n?.kg ?? 0;
     if (Math.abs(openKg - closeKg) <= NGUONG_LECH) continue;
@@ -283,7 +283,7 @@ export interface ThangTheKho {
 export function theKhoMatHang(
   lines: MonthlyStockLine[],
   khoa: string,
-  soThangToiDa = 24
+  maxMonths = 24
 ): ThangTheKho[] {
   const m = new Map<string, ThangTheKho>();
   for (const l of lines) {
@@ -305,13 +305,13 @@ export function theKhoMatHang(
   }
   return [...m.values()]
     .sort((a, b) => b.period.localeCompare(a.period))
-    .slice(0, soThangToiDa);
+    .slice(0, maxMonths);
 }
 
 /* ---------- Đồng bộ tên mặt hàng trong sổ với danh mục loại nguyên liệu ---------- */
 
 /** Chuẩn hoá để SO KHỚP với danh mục: bỏ khoảng trắng thừa + thường hoá. */
-const chuanKhop = (s: string) => (s || "").trim().toLowerCase().replace(/\s+/g, " ");
+const normalizeForMatch = (s: string) => (s || "").trim().toLowerCase().replace(/\s+/g, " ");
 /** Chuẩn hoá NGẶT để dò TRÙNG CÁCH GHI: bỏ hết khoảng trắng + dấu câu (250UP≡250 UP). */
 const chuanNgat = (s: string) => (s || "").toLowerCase().replace(/[\s.,\-()/]+/g, "");
 
@@ -378,44 +378,44 @@ export interface DongBoDanhMuc {
  * KHÔNG sửa gì — chỉ báo. Thành phẩm 141 mã kế toán KHÔNG xét (cố định).
  */
 export function phanTichDongBoDanhMuc(
-  tenTrongSo: string[],
-  tenLoaiNL: string[],
-  tenMatHang: string[]
+  ledgerNames: string[],
+  materialTypeNames: string[],
+  productNames: string[]
 ): DongBoDanhMuc {
-  const setNL = new Set(tenLoaiNL.map(chuanKhop));
-  const setMH = new Set(tenMatHang.map(chuanKhop));
-  const phanBiet = [...new Set(tenTrongSo.map((t) => t.trim()).filter(Boolean))];
-  let daCoNL = 0;
-  let daCoMH = 0;
-  const chuaCo: DongBoDong[] = [];
-  for (const name of phanBiet) {
-    const k = chuanKhop(name);
-    const oNL = setNL.has(k);
+  const materialNameSet = new Set(materialTypeNames.map(normalizeForMatch));
+  const setMH = new Set(productNames.map(normalizeForMatch));
+  const distinctNames = [...new Set(ledgerNames.map((t) => t.trim()).filter(Boolean))];
+  let existingMaterialCount = 0;
+  let existingProductCount = 0;
+  const missing: DongBoDong[] = [];
+  for (const name of distinctNames) {
+    const k = normalizeForMatch(name);
+    const isMaterial = materialNameSet.has(k);
     const oMH = setMH.has(k);
-    if (oNL) daCoNL++;
-    if (oMH) daCoMH++;
-    if (oNL || oMH) continue;
-    chuaCo.push({ name, nhomGoiY: suyNhomNguyenLieu(name), dichGoiY: suyDichDanhMuc(name), roRang: laRoRang(name) });
+    if (isMaterial) existingMaterialCount++;
+    if (oMH) existingProductCount++;
+    if (isMaterial || oMH) continue;
+    missing.push({ name, nhomGoiY: suyNhomNguyenLieu(name), dichGoiY: suyDichDanhMuc(name), roRang: laRoRang(name) });
   }
 
   // Gom trùng-cách-ghi trong chính danh sách tên của sổ.
-  const gom = new Map<string, Set<string>>();
-  for (const t of phanBiet) {
+  const grouped = new Map<string, Set<string>>();
+  for (const t of distinctNames) {
     const k = chuanNgat(t);
     if (!k) continue;
-    const set = gom.get(k) ?? new Set<string>();
+    const set = grouped.get(k) ?? new Set<string>();
     set.add(t);
-    gom.set(k, set);
+    grouped.set(k, set);
   }
-  const nhomTrung = [...gom.values()]
+  const nhomTrung = [...grouped.values()]
     .filter((s) => s.size > 1)
     .map((s) => ({ variants: [...s].sort() }));
 
   return {
-    tongTen: phanBiet.length,
-    daCoNL,
-    daCoMH,
-    chuaCo,
+    tongTen: distinctNames.length,
+    daCoNL: existingMaterialCount,
+    daCoMH: existingProductCount,
+    chuaCo: missing,
     nhomTrung,
   };
 }
@@ -438,12 +438,12 @@ export const idDon = (srcId: string) => `carry|${srcId}`;
  * ⚠ Hàm này chỉ DỰNG dòng (xem trước). GHI vào sổ thì dùng `donKyVaoSo` — nó giữ số
  * người dùng đã gõ ở tháng đích, không thay cả dòng.
  */
-export function donSangThang(nguon: MonthlyStockRow[], thangDich: string): MonthlyStockLine[] {
-  return nguon
+export function donSangThang(source: MonthlyStockRow[], targetMonth: string): MonthlyStockLine[] {
+  return source
     .filter((r) => Math.abs(r.closeKg) > 1e-9)
     .map((r) => ({
       id: idDon(r.id),
-      period: thangDich,
+      period: targetMonth,
       category: r.category,
       warehouse: r.warehouse,
       itemName: r.itemName,
@@ -491,35 +491,35 @@ export interface KetQuaDonKy {
  *  - dòng `carry|…` ở tháng đích mà nguồn (trong phạm vi kho) đã hết tồn hay bị xoá ⇒
  *    tồn đầu về 0; trống hẳn (không số, không ghi chú) thì bỏ, còn số thì GIỮ.
  */
-export function donKyVaoSo(lines: MonthlyStockLine[], thangDich: string, kho?: string): KetQuaDonKy {
-  const thangNguon = thangTruoc(thangDich);
-  const trongKho = (l: MonthlyStockLine) => !kho || l.warehouse === kho;
+export function donKyVaoSo(lines: MonthlyStockLine[], targetMonth: string, warehouse?: string): KetQuaDonKy {
+  const sourceMonth = thangTruoc(targetMonth);
+  const inWarehouse = (l: MonthlyStockLine) => !warehouse || l.warehouse === warehouse;
   const carried = donSangThang(
-    lines.filter((l) => l.period === thangNguon && trongKho(l)).map(suyDong),
-    thangDich
+    lines.filter((l) => l.period === sourceMonth && inWarehouse(l)).map(suyDong),
+    targetMonth
   );
   const theoId = new Map(carried.map((c) => [c.id, c]));
-  const nguonTheoId = new Map(lines.filter((l) => l.period === thangNguon).map((l) => [l.id, l]));
-  let capNhat = 0;
-  let veKhong = 0;
+  const sourceById = new Map(lines.filter((l) => l.period === sourceMonth).map((l) => [l.id, l]));
+  let updatedCount = 0;
+  let zeroedCount = 0;
   let bo = 0;
-  const daCo = new Set<string>();
+  const existing = new Set<string>();
   const ra: MonthlyStockLine[] = [];
   for (const l of lines) {
     const c = theoId.get(l.id);
     if (c) {
-      daCo.add(l.id);
-      capNhat++;
+      existing.add(l.id);
+      updatedCount++;
       ra.push(l.openKg === c.openKg && l.openCtn === c.openCtn ? l : { ...l, openKg: c.openKg, openCtn: c.openCtn });
       continue;
     }
-    if (l.period !== thangDich || !l.id.startsWith("carry|")) {
+    if (l.period !== targetMonth || !l.id.startsWith("carry|")) {
       ra.push(l);
       continue;
     }
     // Dòng dồn cũ không còn nguồn mang tồn. Nguồn còn ⇒ xét kho của nguồn; mất ⇒ kho của dòng.
-    const nguon = nguonTheoId.get(l.carriedFromId || l.id.slice("carry|".length));
-    if (!(nguon ? trongKho(nguon) : trongKho(l)) || (l.openKg === 0 && l.openCtn === 0)) {
+    const source = sourceById.get(l.carriedFromId || l.id.slice("carry|".length));
+    if (!(source ? inWarehouse(source) : inWarehouse(l)) || (l.openKg === 0 && l.openCtn === 0)) {
       ra.push(l);
       continue;
     }
@@ -528,16 +528,16 @@ export function donKyVaoSo(lines: MonthlyStockLine[], thangDich: string, kho?: s
       bo++;
       continue;
     }
-    veKhong++;
+    zeroedCount++;
     ra.push(z);
   }
-  const moi = carried.filter((c) => !daCo.has(c.id));
+  const newCarried = carried.filter((c) => !existing.has(c.id));
   return {
-    lines: [...ra, ...moi],
+    lines: [...ra, ...newCarried],
     soDong: carried.length,
-    them: moi.length,
-    capNhat,
-    veKhong,
+    them: newCarried.length,
+    capNhat: updatedCount,
+    veKhong: zeroedCount,
     bo,
     tongKg: carried.reduce((s, c) => s + c.openKg, 0),
   };
@@ -591,36 +591,36 @@ export function apThaoTacLo(
     const ctn = l.kgPerCtn ? kg / l.kgPerCtn : 0;
     return { dong: { ...l, inKg: l.inKg + kg, inCtn: l.inCtn + ctn, note }, dongTach: null };
   }
-  const dich = (opts.viTriDich ?? "").trim();
+  const target = (opts.viTriDich ?? "").trim();
   const closeKg = l.openKg + l.inKg - l.outKg;
   if (kg >= closeKg - 1e-9) {
-    return { dong: { ...l, storageLocation: dich, note }, dongTach: null };
+    return { dong: { ...l, storageLocation: target, note }, dongTach: null };
   }
-  const tuDau = Math.min(kg, l.openKg);
-  const tuNhap = kg - tuDau;
-  const ctnDau = tiLeKien(l.openCtn, l.openKg, tuDau);
-  const ctnNhap = tiLeKien(l.inCtn, l.inKg, tuNhap);
+  const fromOpening = Math.min(kg, l.openKg);
+  const fromIn = kg - fromOpening;
+  const ctnDau = tiLeKien(l.openCtn, l.openKg, fromOpening);
+  const inCartons = tiLeKien(l.inCtn, l.inKg, fromIn);
   const dong: MonthlyStockLine = {
     ...l,
-    openKg: l.openKg - tuDau,
+    openKg: l.openKg - fromOpening,
     openCtn: l.openCtn - ctnDau,
-    inKg: l.inKg - tuNhap,
-    inCtn: l.inCtn - ctnNhap,
+    inKg: l.inKg - fromIn,
+    inCtn: l.inCtn - inCartons,
     note,
   };
-  const dongTach: MonthlyStockLine = {
+  const splitLine: MonthlyStockLine = {
     ...l,
     id: opts.idMoi,
-    storageLocation: dich,
-    openKg: tuDau,
+    storageLocation: target,
+    openKg: fromOpening,
     openCtn: ctnDau,
-    inKg: tuNhap,
-    inCtn: ctnNhap,
+    inKg: fromIn,
+    inCtn: inCartons,
     outKg: 0,
     outCtn: 0,
     carriedFromId: "",
     sortOrder: l.sortOrder,
     note: `${opts.ghiChu} (tách từ dòng ${l.id})`,
   };
-  return { dong, dongTach };
+  return { dong, dongTach: splitLine };
 }

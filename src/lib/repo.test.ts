@@ -26,10 +26,10 @@ const jsonCua = (rows: Dong[]) =>
   new Map(rows.map((x) => [x.id, JSON.stringify(bang.toRow(x))]));
 
 /** Cổng giả: ghi lại mọi lượt gửi; `tuChoi(row)` trả lỗi cho dòng hỏng. */
-function congGia(tuChoi: (row: Record<string, unknown>) => LoiGui | null = () => null) {
+function fakeGateway(tuChoi: (row: Record<string, unknown>) => LoiGui | null = () => null) {
   const luotUpsert: Record<string, unknown>[][] = [];
-  const luotXoa: string[][] = [];
-  const cong: CongGui = {
+  const deleteCalls: string[][] = [];
+  const gateway: CongGui = {
     upsert: async (rows) => {
       luotUpsert.push(rows);
       for (const r of rows) {
@@ -39,11 +39,11 @@ function congGia(tuChoi: (row: Record<string, unknown>) => LoiGui | null = () =>
       return null;
     },
     xoa: async (keys) => {
-      luotXoa.push(keys);
+      deleteCalls.push(keys);
       return null;
     },
   };
-  return { cong, luotUpsert, luotXoa };
+  return { cong: gateway, luotUpsert, luotXoa: deleteCalls };
 }
 
 describe("docCho — đọc hàng chờ dạng cũ", () => {
@@ -66,38 +66,38 @@ describe("kịch bản 1 — ghi chồng trong lúc đang gửi", () => {
     ];
     let mo!: () => void;
     const cho = new Promise<void>((r) => (mo = r));
-    const cong: CongGui = {
+    const gateway: CongGui = {
       upsert: async () => {
         await cho; // lượt 1 đang treo trên mạng
         return null;
       },
       xoa: async () => null,
     };
-    const dangGui = guiHangCho(bang, { them: ["A", "C"], xoa: [] }, rows, cong);
+    const sendPromise = guiHangCho(bang, { them: ["A", "C"], xoa: [] }, rows, gateway);
 
     // Trong lúc gửi: sửa A lần nữa + thêm B (useBang.ghi đưa vào hàng chờ).
     rows = [{ id: "A", kg: 10 }, { id: "C", kg: 3 }, { id: "B", kg: 2 }];
-    const choSauGhi = { them: ["A", "C", "B"], xoa: [] };
+    const pendingAfterWrite = { them: ["A", "C", "B"], xoa: [] };
     mo();
-    const kq = await dangGui;
+    const kq = await sendPromise;
 
-    const conLai = boKhoaDaGui(choSauGhi, kq, jsonCua(rows));
-    expect(conLai.them.sort()).toEqual(["A", "B"]); // C đã lên đúng bản ⇒ ra khỏi hàng chờ
+    const remaining = boKhoaDaGui(pendingAfterWrite, kq, jsonCua(rows));
+    expect(remaining.them.sort()).toEqual(["A", "B"]); // C đã lên đúng bản ⇒ ra khỏi hàng chờ
   });
 
   it("khóa không còn dòng nào ⇒ bỏ; tab khác thêm lại dòng đó trong lúc gửi ⇒ giữ", () => {
     const kq = { daGuiThem: new Map<string, string | null>([["X", null], ["Y", null]]), daXoa: [] };
-    const conLai = boKhoaDaGui({ them: ["X", "Y"], xoa: [] }, kq, jsonCua([{ id: "Y", kg: 1 }]));
-    expect(conLai.them).toEqual(["Y"]);
+    const remaining = boKhoaDaGui({ them: ["X", "Y"], xoa: [] }, kq, jsonCua([{ id: "Y", kg: 1 }]));
+    expect(remaining.them).toEqual(["Y"]);
   });
 
   it("xóa đã gửi thì bỏ tombstone; tombstone mới thêm lúc đang gửi vẫn giữ", () => {
-    const conLai = boKhoaDaGui(
+    const remaining = boKhoaDaGui(
       { them: [], xoa: ["D", "E"] },
       { daGuiThem: new Map(), daXoa: ["D"] },
       new Map(),
     );
-    expect(conLai.xoa).toEqual(["E"]);
+    expect(remaining.xoa).toEqual(["E"]);
   });
 });
 
@@ -108,7 +108,7 @@ describe("kịch bản 2 — một dòng lỗi trong lô", () => {
       { id: "HONG", kg: 2 },
       { id: "C", kg: 3 },
     ];
-    const { cong, luotUpsert } = congGia((r) =>
+    const { cong, luotUpsert } = fakeGateway((r) =>
       r.id === "HONG" ? { code: "23505", message: "duplicate key value" } : null,
     );
     const kq = await guiHangCho(bang, { them: ["A", "HONG", "C"], xoa: [] }, rows, cong);
@@ -116,8 +116,8 @@ describe("kịch bản 2 — một dòng lỗi trong lô", () => {
     expect(kq.loiChung).toBeUndefined();
     expect(kq.dongLoi).toEqual([{ khoa: "HONG", msg: "23505 duplicate key value" }]);
     expect(luotUpsert.length).toBe(4); // 1 lượt gộp + 3 lượt từng dòng
-    const conLai = boKhoaDaGui({ them: ["A", "HONG", "C"], xoa: [] }, kq, jsonCua(rows));
-    expect(conLai.them).toEqual(["HONG"]);
+    const remaining = boKhoaDaGui({ them: ["A", "HONG", "C"], xoa: [] }, kq, jsonCua(rows));
+    expect(remaining.them).toEqual(["HONG"]);
   });
 
   it("lỗi mạng / lỗi chung ⇒ KHÔNG gửi từng dòng, giữ nguyên cả hàng chờ", async () => {
@@ -125,12 +125,12 @@ describe("kịch bản 2 — một dòng lỗi trong lô", () => {
       { id: "A", kg: 1 },
       { id: "B", kg: 2 },
     ];
-    const { cong, luotUpsert } = congGia(() => ({ message: "TypeError: Failed to fetch" }));
+    const { cong, luotUpsert } = fakeGateway(() => ({ message: "TypeError: Failed to fetch" }));
     const kq = await guiHangCho(bang, { them: ["A", "B"], xoa: ["Z"] }, rows, cong);
     expect(kq.loiChung).toContain("Failed to fetch");
     expect(luotUpsert.length).toBe(1);
-    const conLai = boKhoaDaGui({ them: ["A", "B"], xoa: ["Z"] }, kq, jsonCua(rows));
-    expect(conLai).toEqual({ them: ["A", "B"], xoa: ["Z"] });
+    const remaining = boKhoaDaGui({ them: ["A", "B"], xoa: ["Z"] }, kq, jsonCua(rows));
+    expect(remaining).toEqual({ them: ["A", "B"], xoa: ["Z"] });
   });
 
   it("gom upsert theo bộ cột — dòng thiếu cột không bị gộp với dòng có cột (tránh DEFAULT đè)", async () => {
@@ -138,7 +138,7 @@ describe("kịch bản 2 — một dòng lỗi trong lô", () => {
       { id: "A", kg: 1, file: "abc" },
       { id: "B", kg: 2 },
     ];
-    const { cong, luotUpsert } = congGia();
+    const { cong, luotUpsert } = fakeGateway();
     await guiHangCho(bang, { them: ["A", "B"], xoa: [] }, rows, cong);
     expect(luotUpsert.map((l) => l.map((r) => r.id))).toEqual([["A"], ["B"]]);
   });

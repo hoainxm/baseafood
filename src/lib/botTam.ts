@@ -37,9 +37,9 @@ export function botDiKemIds(p: Pick<Product, "batterIds"> | undefined): string[]
 /** TÊN bột đi kèm theo đúng thứ tự gắn — bỏ id không còn trong danh mục. */
 export function tenBotDiKem(
   p: Pick<Product, "batterIds"> | undefined,
-  botTam: BatterType[]
+  batterTypes: BatterType[]
 ): string[] {
-  const theoId = new Map(botTam.map((b) => [b.id, b.name.trim()]));
+  const theoId = new Map(batterTypes.map((b) => [b.id, b.name.trim()]));
   return botDiKemIds(p)
     .map((id) => theoId.get(id) ?? "")
     .filter(Boolean);
@@ -103,8 +103,8 @@ export function tongBot(m: Record<string, number> | undefined): number {
 }
 
 /** Tỷ lệ bột trên thành phẩm (%) — null khi chưa có thành phẩm (không chia cho 0). */
-export function tyLeBot(kgBot: number, kgTP: number): number | null {
-  return kgTP > 0 && kgBot > 0 ? (kgBot / kgTP) * 100 : null;
+export function tyLeBot(kgBot: number, finishedGoodKg: number): number | null {
+  return finishedGoodKg > 0 && kgBot > 0 ? (kgBot / finishedGoodKg) * 100 : null;
 }
 
 /** Cộng dồn bột của nhiều dòng theo loại — kg + số dòng dùng; nhiều kg đứng trước. */
@@ -156,11 +156,11 @@ export function taoHoacLayBot(
       (b.code.trim() !== "" && b.code.trim().toLowerCase() === khoa)
   );
   if (co) return { bot: co, rows, moi: false };
-  const coTienTo = /^bột\s/i.test(sach);
+  const hasPrefix = /^bột\s/i.test(sach);
   const bot: BatterType = {
     id: uid(),
-    code: coTienTo ? "" : sach,
-    name: coTienTo ? sach : `Bột ${sach}`,
+    code: hasPrefix ? "" : sach,
+    name: hasPrefix ? sach : `Bột ${sach}`,
     note: "",
   };
   return { bot, rows: [...rows, bot], moi: true };

@@ -46,7 +46,7 @@ export interface DanhMucOcr {
 }
 
 /** Bỏ dấu tiếng Việt + hạ chữ thường để so khớp mềm (OCR hay lệch dấu). */
-function boDau(x: string): string {
+function stripAccents(x: string): string {
   return x
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "")
@@ -61,7 +61,7 @@ function boDau(x: string): string {
  * đoán bảo thủ: có cả "." và "," → "." là nghìn, "," là thập phân; chỉ "," → thập
  * phân; chỉ "." với đúng 3 số sau → nghìn (bỏ), còn lại coi là thập phân.
  */
-function doiSo(tok: string): number | null {
+function parseNumber(tok: string): number | null {
   let t = tok.trim();
   if (!t) return null;
   const coCham = t.includes(".");
@@ -69,35 +69,35 @@ function doiSo(tok: string): number | null {
   if (coCham && coPhay) t = t.replace(/\./g, "").replace(",", ".");
   else if (coPhay) t = t.replace(",", ".");
   else if (coCham) {
-    const sau = t.split(".").pop() ?? "";
-    if (sau.length === 3) t = t.replace(/\./g, ""); // 1.234 → nghìn
+    const after = t.split(".").pop() ?? "";
+    if (after.length === 3) t = t.replace(/\./g, ""); // 1.234 → nghìn
   }
   const n = Number(t.replace(/[^\d.]/g, ""));
   return Number.isFinite(n) ? n : null;
 }
 
 /** Số nghi là khối lượng: > 0 và ≤ 100 tấn (chặn năm/điện thoại/mã lọt vào). */
-function laKgHopLy(n: number): boolean {
+function isValidKg(n: number): boolean {
   return n > 0 && n <= 100000;
 }
 
 const RE_SO = /\d[\d.,]*\d|\d/g;
 
 /** Bóc mọi số kg hợp lý trong một đoạn chữ (đã khử trùng, giữ thứ tự xuất hiện). */
-function bocKg(doan: string): number[] {
+function bocKg(segment: string): number[] {
   const ra: number[] = [];
-  for (const m of doan.matchAll(RE_SO)) {
-    const n = doiSo(m[0]);
-    if (n != null && laKgHopLy(n) && !ra.includes(n)) ra.push(n);
+  for (const m of segment.matchAll(RE_SO)) {
+    const n = parseNumber(m[0]);
+    if (n != null && isValidKg(n) && !ra.includes(n)) ra.push(n);
   }
   return ra;
 }
 
-const RE_NGAY = /(\d{1,2})\s*[/\-.]\s*(\d{1,2})(?:\s*[/\-.]\s*(\d{2,4}))?/;
+const RE_DATE = /(\d{1,2})\s*[/\-.]\s*(\d{1,2})(?:\s*[/\-.]\s*(\d{2,4}))?/;
 
 /** Bắt ngày dd/mm[/yyyy] → yyyy-mm-dd (thiếu năm thì lấy năm hiện tại). */
-function bocNgay(text: string): string | undefined {
-  const m = text.match(RE_NGAY);
+function extractDate(text: string): string | undefined {
+  const m = text.match(RE_DATE);
   if (!m) return undefined;
   const d = Number(m[1]);
   const mo = Number(m[2]);
@@ -112,80 +112,80 @@ const RE_DL = /\b(dai ly|dl|ma dl|ma dai ly|khach)\b/;
 
 /** Parser thuần: từ toàn văn OCR + danh mục → các ứng viên điền form. */
 export function phanTich(text: string, dm: DanhMucOcr): KetQuaOcr {
-  const toanVan = boDau(text);
+  const toanVan = stripAccents(text);
   const dong = text
     .split(/\r?\n/)
     .map((d) => d.trim())
     .filter(Boolean);
 
   // Đại lý: tên khớp dài nhất trong toàn văn; hoặc mã đại lý = một token số riêng.
-  let daiLy: string | undefined;
-  let daiLen = 0;
+  let supplier: string | undefined;
+  let supplierLen = 0;
   for (const d of dm.daiLy) {
-    const ten = boDau(d.name);
-    if (ten.length >= 3 && toanVan.includes(ten) && ten.length > daiLen) {
-      daiLy = d.name;
-      daiLen = ten.length;
+    const ten = stripAccents(d.name);
+    if (ten.length >= 3 && toanVan.includes(ten) && ten.length > supplierLen) {
+      supplier = d.name;
+      supplierLen = ten.length;
     }
   }
   // Mã số đại lý: CHỈ dò trên hàng chữ có nhắc "đại lý / DL / mã" — tránh trùng
   // với số cân (vd 12,5 kg lẫn thành mã "12").
-  if (!daiLy) {
+  if (!supplier) {
     for (const h of dong) {
-      if (!RE_DL.test(boDau(h))) continue;
+      if (!RE_DL.test(stripAccents(h))) continue;
       const soRieng = new Set(Array.from(h.matchAll(/\b\d{1,6}\b/g), (m) => m[0]));
       const theoMa = dm.daiLy.find((d) => d.code && soRieng.has(String(d.code)));
       if (theoMa) {
-        daiLy = theoMa.name;
+        supplier = theoMa.name;
         break;
       }
     }
   }
 
   // Loại NL: mọi tên danh mục xuất hiện trong toàn văn.
-  const loaiNL: string[] = [];
+  const materialTypes: string[] = [];
   for (const l of dm.loaiNL) {
-    const ten = boDau(l.name);
-    if (ten.length >= 2 && toanVan.includes(ten) && !loaiNL.includes(l.name))
-      loaiNL.push(l.name);
+    const ten = stripAccents(l.name);
+    if (ten.length >= 2 && toanVan.includes(ten) && !materialTypes.includes(l.name))
+      materialTypes.push(l.name);
   }
 
   // Ghép dòng: mỗi hàng chữ có tên loại NL + số kg lớn nhất trên hàng đó.
   const dongOcr: DongOcr[] = [];
   for (const hang of dong) {
-    const hangKhongDau = boDau(hang);
-    const loai = dm.loaiNL.find(
-      (l) => boDau(l.name).length >= 2 && hangKhongDau.includes(boDau(l.name))
+    const lineNoAccent = stripAccents(hang);
+    const materialType = dm.loaiNL.find(
+      (l) => stripAccents(l.name).length >= 2 && lineNoAccent.includes(stripAccents(l.name))
     );
-    if (!loai) continue;
+    if (!materialType) continue;
     const kgs = bocKg(hang);
     if (!kgs.length) continue;
     const kg = Math.max(...kgs);
-    if (!dongOcr.some((x) => x.loaiNL === loai.name && x.kg === kg))
-      dongOcr.push({ loaiNL: loai.name, kg });
+    if (!dongOcr.some((x) => x.loaiNL === materialType.name && x.kg === kg))
+      dongOcr.push({ loaiNL: materialType.name, kg });
   }
 
   return {
     text,
-    daiLy,
-    ngay: bocNgay(text),
+    daiLy: supplier,
+    ngay: extractDate(text),
     // Bỏ cụm ngày khỏi số tham khảo cho đỡ nhiễu (2/9/2026 không phải kg).
-    soKg: bocKg(text.replace(RE_NGAY, " ")),
-    loaiNL,
+    soKg: bocKg(text.replace(RE_DATE, " ")),
+    loaiNL: materialTypes,
     dong: dongOcr,
   };
 }
 
 /** Bộ máy nhận diện (chỉ chỗ này phụ thuộc Tesseract — cloud sau thay đúng đây). */
-async function chayTesseract(
+async function runTesseract(
   file: File | Blob,
-  onTienDo?: (phanTram: number) => void
+  onProgress?: (percent: number) => void
 ): Promise<string> {
   const { recognize } = await import("tesseract.js");
   const { data } = await recognize(file, "vie", {
     logger: (m: { status?: string; progress?: number }) => {
       if (m.status === "recognizing text" && typeof m.progress === "number")
-        onTienDo?.(Math.round(m.progress * 100));
+        onProgress?.(Math.round(m.progress * 100));
     },
   });
   return data.text ?? "";
@@ -198,8 +198,8 @@ async function chayTesseract(
 export async function nhanDienPhieu(
   file: File | Blob,
   dm: DanhMucOcr,
-  onTienDo?: (phanTram: number) => void
+  onProgress?: (percent: number) => void
 ): Promise<KetQuaOcr> {
-  const text = await chayTesseract(file, onTienDo);
+  const text = await runTesseract(file, onProgress);
   return phanTich(text, dm);
 }

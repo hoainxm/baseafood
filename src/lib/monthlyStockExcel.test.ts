@@ -4,11 +4,11 @@ import type { MonthlyStockLine } from "@/types";
 import { parseBangKeKhoFile, khoTuTieuDe, timKhoTheoGhi, tenKhoMoi, idDongNap, ghepNapLai } from "./monthlyStockExcel";
 
 /** Dựng sheet theo bố cục bảng kê thật: A tên mục/ngày, B tên hàng, J/L/N kg, R ghi chú kho. */
-function dongHang(ten: string, ton: number, ghi = ""): unknown[] {
+function stockRow(ten: string, stock: number, write = ""): unknown[] {
   const r: unknown[] = Array(18).fill(null);
   r[1] = ten;
-  r[9] = ton;
-  if (ghi) r[17] = ghi;
+  r[9] = stock;
+  if (write) r[17] = write;
   return r;
 }
 
@@ -16,19 +16,19 @@ async function docFile(dong6: unknown[] = []): Promise<ReturnType<typeof parseBa
   const aoa: unknown[][] = [
     ["BẢNG KÊ NGUYÊN LIỆU KHO 1500 THÁNG 08 / 2026"], // dòng 1
     ["I", "HÀNG NHẬP KHẨU"], // 2
-    dongHang("SABA", 100, "GỬI KHO Á D"), // 3
-    dongHang("CÁ SÒNG", 50, "gừi kho HP"), // 4
-    dongHang("2 DA RÂU NGẮN", 30, "GỬI KHO HP"), // 5 ← đầu khối 2 DA
+    stockRow("SABA", 100, "GỬI KHO Á D"), // 3
+    stockRow("CÁ SÒNG", 50, "gừi kho HP"), // 4
+    stockRow("2 DA RÂU NGẮN", 30, "GỬI KHO HP"), // 5 ← đầu khối 2 DA
     dong6, // 6 trống (hoặc chỉ có ô chuỗi rỗng — xem test 28b)
-    dongHang("4 DA RÂU NGẮN", 20), // 7
+    stockRow("4 DA RÂU NGẮN", 20), // 7
     ["TỔNG 2 DA"], // 8 — công thức SUM(J5:J7)
     ["TỔNG HÀNG NHẬP KHẨU"], // 9
     ["II", "HÀNG MUA NGOÀI"], // 10
-    dongHang(" B.TUỘC  2 DA", 10, "xuất trả lại 4240"), // 11
-    dongHang("BẠCH TUỘC <80gr", 5, "gửi kho phước cơ"), // 12
+    stockRow(" B.TUỘC  2 DA", 10, "xuất trả lại 4240"), // 11
+    stockRow("BẠCH TUỘC <80gr", 5, "gửi kho phước cơ"), // 12
     ["TỔNG HÀNG NỘI ĐỊA"], // 13
     ["III", "HÀNG  TẠM"], // 14
-    dongHang("CÁ TRÍCH DẠT", 573), // 15
+    stockRow("CÁ TRÍCH DẠT", 573), // 15
   ];
   const ws = XLSX.utils.aoa_to_sheet(aoa);
   ws["J8"] = { t: "n", v: 50, f: "SUM(J7:J7)" }; // cột kg khoanh hẹp…
@@ -131,14 +131,14 @@ describe("idDongNap + ghepNapLai — nạp lại không nhân đôi (#28a)", () 
   });
 
   test("dữ liệu cũ id theo tên sheet '08' + nạp lại (sheet 'T8') ⇒ thay, không nhân đôi, thừa kế vị trí", () => {
-    const cu = [
+    const prev = [
       dong("xlsx|K1000T|08|2026|5", { storageLocation: "Kho Ánh Dương", note: "đã kiểm" }),
       dong("xlsx|K1000T|08|2026|6", { itemName: "SÒNG" }),
       dong("xlsx|K1500T|08|2026|5"), // kho khác — không đụng
       dong("xlsx|K1000T|7|2026|5", { period: "2026-07" }), // tháng khác — không đụng
     ];
-    const moi = [dong(idDongNap("K1000T", 8, 2026, 5), { openKg: 120 }), dong(idDongNap("K1000T", 8, 2026, 6), { itemName: "SÒNG" })];
-    const kq = ghepNapLai(cu, moi, "K1000T");
+    const incoming = [dong(idDongNap("K1000T", 8, 2026, 5), { openKg: 120 }), dong(idDongNap("K1000T", 8, 2026, 6), { itemName: "SÒNG" })];
+    const kq = ghepNapLai(prev, incoming, "K1000T");
     const t8 = kq.lines.filter((l) => l.period === "2026-08" && l.warehouse === "Kho 1000 tấn" && l.id.includes("K1000T"));
     expect(t8.map((l) => l.id).sort()).toEqual(["xlsx|K1000T|8|2026|5", "xlsx|K1000T|8|2026|6"]);
     expect(kq.thayIdCu).toBe(2);
@@ -150,21 +150,21 @@ describe("idDongNap + ghepNapLai — nạp lại không nhân đôi (#28a)", () 
   });
 
   test("cùng id mà tên hàng khác (rowIndex trượt) ⇒ không thừa kế vị trí/ghi chú + báo", () => {
-    const cu = [dong("xlsx|K1000T|8|2026|5", { storageLocation: "Kho Hồng Phú", note: "x" })];
-    const kq = ghepNapLai(cu, [dong("xlsx|K1000T|8|2026|5", { itemName: "CÁ THU" })], "K1000T");
+    const prev = [dong("xlsx|K1000T|8|2026|5", { storageLocation: "Kho Hồng Phú", note: "x" })];
+    const kq = ghepNapLai(prev, [dong("xlsx|K1000T|8|2026|5", { itemName: "CÁ THU" })], "K1000T");
     expect(kq.lines).toHaveLength(1);
     expect(kq.lines[0]).toMatchObject({ itemName: "CÁ THU", storageLocation: "", note: "" });
     expect(kq.lechTen).toHaveLength(1);
   });
 
   test("dòng cũ không còn trong file: trống ⇒ bỏ, còn số ⇒ giữ + báo; file có kho ở cột R thì file thắng", () => {
-    const cu = [
+    const prev = [
       dong("xlsx|K1000T|8|2026|1", { storageLocation: "Kho A" }),
       dong("xlsx|K1000T|8|2026|9", { openKg: 0 }),
       dong("xlsx|K1000T|8|2026|10", { openKg: 7 }),
       dong("msl|2026-08|tach", { note: "Gửi kho (tách từ dòng xlsx|K1000T|8|2026|1)" }),
     ];
-    const kq = ghepNapLai(cu, [dong("xlsx|K1000T|8|2026|1", { storageLocation: "Kho B" })], "K1000T");
+    const kq = ghepNapLai(prev, [dong("xlsx|K1000T|8|2026|1", { storageLocation: "Kho B" })], "K1000T");
     expect(kq.boRong).toBe(1);
     expect(kq.cuConSo.map((l) => l.id)).toEqual(["xlsx|K1000T|8|2026|10"]);
     expect(kq.lines.find((l) => l.id === "xlsx|K1000T|8|2026|1")?.storageLocation).toBe("Kho B");

@@ -7,23 +7,23 @@ import { tinhTonChiTiet, truTonBTP } from "./inventory";
 import { sumGridRow } from "@/types";
 
 const mh = (id: string, materialTypeId: string): Product => ({ id, code: id, name: `Mặt hàng ${id}`, finishedGoodCode: "", materialTypeId });
-const nhap = (i: number, xuong: MaterialImportItem["workshop"], nl: string, dl: string, kg: number): MaterialImportItem => ({
-  id: `n${i}`, shipmentId: `c${i}`, deliveryDate: "2026-09-01", workshop: xuong, category: "Mực", supplierName: dl,
-  materialTypeName: nl, quantityKg: kg, unitPrice: 55_000, driverName: "", licensePlate: "", note: "",
+const makeImport = (i: number, workshop: MaterialImportItem["workshop"], material: string, dl: string, kg: number): MaterialImportItem => ({
+  id: `n${i}`, shipmentId: `c${i}`, deliveryDate: "2026-09-01", workshop: workshop, category: "Mực", supplierName: dl,
+  materialTypeName: material, quantityKg: kg, unitPrice: 55_000, driverName: "", licensePlate: "", note: "",
 });
-const daiLy = (ten: string): Supplier => ({ id: `s-${ten}`, code: "", shortName: ten, billingName: `Cơ sở ${ten}`, address: "12 Lê Lợi", nationalId: "0123", issuedDate: "", issuedPlace: "", phone: "0909555111", note: "" });
+const makeSupplier = (ten: string): Supplier => ({ id: `s-${ten}`, code: "", shortName: ten, billingName: `Cơ sở ${ten}`, address: "12 Lê Lợi", nationalId: "0123", issuedDate: "", issuedPlace: "", phone: "0909555111", note: "" });
 
-const NGUON: NguonDemo = {
+const SOURCE: NguonDemo = {
   products: [mh("p1", "m1"), mh("p2", "m1"), mh("p3", "m2"), mh("p4", "m2")],
   materialTypes: [
     { id: "m1", name: "Mực ống", category: "Mực", note: "" },
     { id: "m2", name: "Bạch tuộc 2 da", category: "Bạch tuộc", note: "" },
   ],
-  suppliers: [daiLy("Hồng Phú"), daiLy("Bê 3")],
+  suppliers: [makeSupplier("Hồng Phú"), makeSupplier("Bê 3")],
   customers: [{ id: "k1", code: "", name: "Hanwa", market: "Nhật Bản" }, { id: "k2", code: "", name: "Chợ Bà Rịa", market: "Nội địa" }],
   batterTypes: [],
   storageLocations: [],
-  imports: [nhap(1, "Đông", "Mực ống", "Hồng Phú", 1_000), nhap(2, "Đông", "Mực ống", "Bê 3", 1_500), nhap(3, "Khô", "Bạch tuộc 2 da", "Hồng Phú", 800)],
+  imports: [makeImport(1, "Đông", "Mực ống", "Hồng Phú", 1_000), makeImport(2, "Đông", "Mực ống", "Bê 3", 1_500), makeImport(3, "Khô", "Bạch tuộc 2 da", "Hồng Phú", 800)],
   wips: [],
   periods: [],
   balancingInputs: [],
@@ -31,10 +31,10 @@ const NGUON: NguonDemo = {
   nxtSnapshots: [],
   monthlyStock: [],
 };
-const HOM_NAY = "2026-10-12";
-const goi = sinhGoiDemo(NGUON, { homNay: HOM_NAY });
+const TODAY = "2026-10-12";
+const goi = sinhGoiDemo(SOURCE, { homNay: TODAY });
 
-const thanhDuLieu = (g: GoiDemo): DuLieuDongChay => ({
+const toFlowData = (g: GoiDemo): DuLieuDongChay => ({
   shipments: g.shipments, imports: g.imports, wips: g.wips, packagings: g.packagings, lotInputs: g.lotInputs,
   exportItems: g.exportItems, exportOrders: g.exportOrders, salesOrders: g.salesOrders, products: g.products,
   customers: g.customers, salesItems: g.salesItems, salesInvoices: g.salesInvoices, domesticSales: g.domesticSales,
@@ -46,7 +46,7 @@ const thanhDuLieu = (g: GoiDemo): DuLieuDongChay => ({
 
 describe("quetThamSo", () => {
   it("lấy xưởng, NL từng xưởng, đại lý theo kg từ sổ thật", () => {
-    const ts = quetThamSo(NGUON);
+    const ts = quetThamSo(SOURCE);
     expect(ts.xuong).toEqual(["Đông", "Khô"]);
     expect(ts.nlTheoXuong["Đông"]).toEqual(["Mực ống"]);
     expect(ts.daiLy).toEqual(["Hồng Phú", "Bê 3"]); // 1.800 kg > 1.500 kg
@@ -58,20 +58,20 @@ describe("quetThamSo", () => {
 describe("sinhGoiDemo", () => {
   it("nhiều hạt khác nhau vẫn giữ mọi bất biến (bán vượt đúng 1 ca, lô không âm, đủ cảnh báo)", () => {
     for (const hat of [1, 7, 42, 99, 2026, 31337]) {
-      const g = sinhGoiDemo(NGUON, { homNay: HOM_NAY, hat });
-      const d = thanhDuLieu(g);
+      const g = sinhGoiDemo(SOURCE, { homNay: TODAY, hat });
+      const d = toFlowData(g);
       expect(tinhTonChiTiet(g.wips, g.exportItems, truTonBTP(g.salesItems, g.packagings, g.lotInputs, g.lotDispatches)).banVuot.length, `hạt ${hat}`).toBe(1);
       for (const w of g.wips) expect(canBangLo("W", w.id, d)?.con ?? 0, `hạt ${hat} W:${w.id}`).toBeGreaterThanOrEqual(0);
       for (const r of g.imports) expect(canBangLo("S", r.id, d)?.con ?? 0, `hạt ${hat} S:${r.id}`).toBeGreaterThanOrEqual(0);
-      const loai = new Set(canhBaoChuoi(d, { tu: "2026-08-14", den: HOM_NAY }, HOM_NAY).map((x) => x.loai));
+      const kinds = new Set(canhBaoChuoi(d, { tu: "2026-08-14", den: TODAY }, TODAY).map((x) => x.loai));
       for (const l of ["chua-chot-nhap", "chua-chot-sx", "doi-sau-chot", "ban-vuot", "lo-chua-gan", "cho-duyet-lau", "dinh-muc-lech"])
-        expect(loai.has(l as never), `hạt ${hat} ${l}`).toBe(true);
+        expect(kinds.has(l as never), `hạt ${hat} ${l}`).toBe(true);
     }
   });
 
   it("tất định theo hạt", () => {
-    expect(sinhGoiDemo(NGUON, { homNay: HOM_NAY })).toEqual(goi);
-    expect(sinhGoiDemo(NGUON, { homNay: HOM_NAY, hat: 7 }).imports).not.toEqual(goi.imports);
+    expect(sinhGoiDemo(SOURCE, { homNay: TODAY })).toEqual(goi);
+    expect(sinhGoiDemo(SOURCE, { homNay: TODAY, hat: 7 }).imports).not.toEqual(goi.imports);
   });
 
   it("đủ chuỗi: mọi bảng nửa sau đều có số", () => {
@@ -82,7 +82,7 @@ describe("sinhGoiDemo", () => {
   it("ngày nằm trong 60 ngày tới hôm nay, Chủ nhật không nhập", () => {
     const ngays = goi.imports.map((r) => r.deliveryDate).sort();
     expect(ngays[0] >= "2026-08-14").toBe(true);
-    expect(ngays[ngays.length - 1] <= HOM_NAY).toBe(true);
+    expect(ngays[ngays.length - 1] <= TODAY).toBe(true);
     expect(goi.imports.every((r) => new Date(`${r.deliveryDate}T00:00:00Z`).getUTCDay() !== 0)).toBe(true);
   });
 
@@ -91,23 +91,23 @@ describe("sinhGoiDemo", () => {
     for (const that of ["Hồng Phú", "Bê 3", "Hanwa", "Chợ Bà Rịa", "12 Lê Lợi", "0909555111"]) expect(chu).not.toContain(that);
     expect(goi.suppliers.map((s) => s.shortName)).toEqual(["Đại lý 01", "Đại lý 02"]);
     // Tắt ẩn danh ⇒ giữ tên thật.
-    expect(sinhGoiDemo(NGUON, { homNay: HOM_NAY, anDanh: false }).suppliers[0].shortName).toBe("Hồng Phú");
+    expect(sinhGoiDemo(SOURCE, { homNay: TODAY, anDanh: false }).suppliers[0].shortName).toBe("Hồng Phú");
   });
 
   it("mọi tham chiếu lô / đơn / lệnh đều trỏ tới bản ghi có trong gói", () => {
     const co = new Set([...goi.imports, ...goi.wips, ...goi.packagings, ...goi.salesItems, ...goi.exportItems, ...goi.domesticSales].map((x) => x.id));
     for (const l of goi.lotInputs) expect(co.has(l.outputId) && co.has(l.inputId), l.id).toBe(true);
     for (const l of goi.lotDispatches) expect(co.has(l.lotId) && co.has(l.docId), l.id).toBe(true);
-    const lenh = new Set(goi.exportOrders.map((x) => x.id));
-    for (const x of goi.exportItems) expect(lenh.has(x.exportId) && co.has(x.wipId)).toBe(true);
-    const phieu = new Set(goi.salesInvoices.map((x) => x.id));
-    for (const b of goi.salesItems) expect(phieu.has(b.invoiceId)).toBe(true);
+    const exportOrderIds = new Set(goi.exportOrders.map((x) => x.id));
+    for (const x of goi.exportItems) expect(exportOrderIds.has(x.exportId) && co.has(x.wipId)).toBe(true);
+    const salesInvoice = new Set(goi.salesInvoices.map((x) => x.id));
+    for (const b of goi.salesItems) expect(salesInvoice.has(b.invoiceId)).toBe(true);
   });
 
   it("đơn đặt nào đã tới ngày xuất cũng có lệnh xuất", () => {
-    const daXuat = goi.salesOrders.filter((d) => d.status === "dong");
-    expect(daXuat.length).toBeGreaterThan(0);
-    for (const d of daXuat) expect(goi.exportOrders.some((l) => l.orderId === d.id), d.id).toBe(true);
+    const closedOrders = goi.salesOrders.filter((d) => d.status === "dong");
+    expect(closedOrders.length).toBeGreaterThan(0);
+    for (const d of closedOrders) expect(goi.exportOrders.some((l) => l.orderId === d.id), d.id).toBe(true);
   });
 
   it("id không trùng trong từng bảng", () => {
@@ -124,7 +124,7 @@ describe("sinhGoiDemo", () => {
   });
 
   it("hộ chiếu lô: không lô nào bị dùng quá số kg (cân bằng lô không âm)", () => {
-    const d = thanhDuLieu(goi);
+    const d = toFlowData(goi);
     const lo = [...goi.imports.map((x) => ["S", x.id] as const), ...goi.wips.map((x) => ["W", x.id] as const), ...goi.packagings.map((x) => ["P", x.id] as const)];
     for (const [k, id] of lo) {
       const cb = canBangLo(k, id, d);
@@ -133,11 +133,11 @@ describe("sinhGoiDemo", () => {
   });
 
   it("đủ ca cho mọi loại cảnh báo của Tổng quan", () => {
-    const d = thanhDuLieu(goi);
-    const cb = canhBaoChuoi(d, { tu: "2026-08-14", den: HOM_NAY }, HOM_NAY);
-    const loai = new Set(cb.map((x) => x.loai));
+    const d = toFlowData(goi);
+    const cb = canhBaoChuoi(d, { tu: "2026-08-14", den: TODAY }, TODAY);
+    const kinds = new Set(cb.map((x) => x.loai));
     for (const l of ["chua-chot-nhap", "chua-chot-sx", "doi-sau-chot", "ghi-bu", "ban-vuot", "lo-chua-gan", "cho-duyet-lau", "dinh-muc-lech"])
-      expect(loai.has(l as never), l).toBe(true);
+      expect(kinds.has(l as never), l).toBe(true);
   });
 
   it("dòng kỳ cân đối mang sản lượng theo ngày khớp tổng (lưới tính lại từ ngày)", () => {
@@ -146,15 +146,15 @@ describe("sinhGoiDemo", () => {
   });
 
   it("kỳ cân đối có kỳ lãi và kỳ lỗ", () => {
-    const ky = ketQuaCacKy(thanhDuLieu(goi)).filter((x) => x.coThanhPham);
+    const ky = ketQuaCacKy(toFlowData(goi)).filter((x) => x.coThanhPham);
     expect(ky.length).toBeGreaterThanOrEqual(3);
     expect(ky.some((x) => x.kq.profitOrLoss > 0)).toBe(true);
     expect(ky.some((x) => x.kq.profitOrLoss < 0)).toBe(true);
   });
 
   it("dòng chảy đi đủ 5 khâu", () => {
-    const d = thanhDuLieu(goi);
-    const k = { tu: "2026-08-14", den: HOM_NAY };
+    const d = toFlowData(goi);
+    const k = { tu: "2026-08-14", den: TODAY };
     expect(bangChuyen(d, k).every((x) => x.kg > 0)).toBe(true);
     const ids = new Set(dongChayKg(d, k).nut.map((n) => n.id));
     for (const n of ["btp", "kho", "goi", "xd", "bb", "btpb", "pl", "cd", "nd"]) expect(ids.has(n), n).toBe(true);

@@ -65,13 +65,13 @@ export function khoaTuMay(k: string, demo: boolean = LA_DEMO): string | null {
  *  Cột khóa ngoại rỗng / null giữ nguyên (không trỏ đi đâu). */
 export function dongLenMay(
   row: Record<string, unknown>,
-  cotKhoa: string,
+  keyColumn: string,
   siteId: string,
   demo: boolean = LA_DEMO,
-  cotThamChieu: readonly string[] = [],
+  refColumns: readonly string[] = [],
 ): Record<string, unknown> {
   const ra: Record<string, unknown> = { ...row, site_id: siteId };
-  for (const c of [cotKhoa, ...cotThamChieu]) {
+  for (const c of [keyColumn, ...refColumns]) {
     const v = row[c];
     if (v != null && v !== "") ra[c] = khoaLenMay(String(v), demo);
   }
@@ -81,15 +81,15 @@ export function dongLenMay(
 /** Dòng đọc từ máy chủ → bỏ tiền tố khóa; `null` = không thuộc chế độ này, bỏ qua. */
 export function dongTuMay(
   row: Record<string, unknown>,
-  cotKhoa: string,
+  keyColumn: string,
   demo: boolean = LA_DEMO,
-  cotThamChieu: readonly string[] = [],
+  refColumns: readonly string[] = [],
 ): Record<string, unknown> | null {
   if (!demo) return row;
-  const k = khoaTuMay(String(row[cotKhoa] ?? ""), demo);
+  const k = khoaTuMay(String(row[keyColumn] ?? ""), demo);
   if (k == null) return null;
-  const ra: Record<string, unknown> = { ...row, [cotKhoa]: k };
-  for (const c of cotThamChieu) {
+  const ra: Record<string, unknown> = { ...row, [keyColumn]: k };
+  for (const c of refColumns) {
     const v = row[c];
     if (typeof v === "string" && v.startsWith(TIEN_TO_DEMO)) ra[c] = v.slice(TIEN_TO_DEMO.length);
   }

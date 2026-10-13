@@ -12,8 +12,8 @@ describe("uid — id bản ghi mới", () => {
     expect([...ids].sort((a, b) => a.localeCompare(b))).toEqual(ids);
   });
   it("id mới vẫn xếp SAU id cũ dạng `ms-số` tạo trước đó", () => {
-    const cu = `${Date.now() - 1000}-123456`;
-    expect(cu.localeCompare(uid())).toBeLessThan(0);
+    const prev = `${Date.now() - 1000}-123456`;
+    expect(prev.localeCompare(uid())).toBeLessThan(0);
   });
   it("dạng `<ms>-<uuid>`; newId ở store.ts là cùng một hàm", () => {
     expect(uid()).toMatch(/^\d{13}-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);

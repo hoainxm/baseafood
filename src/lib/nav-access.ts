@@ -10,20 +10,20 @@ import type { Role } from "@/types";
  * Vai trò KHÔNG nằm trong bảng này (giám đốc, phó GĐ, kế toán, kế toán trưởng,
  * admin) = xem đầy đủ — chỉ 2 bộ phận thao tác theo bước bị giới hạn nav cho gọn.
  */
-const DEPT_NHAP_HANG = ["imports", "warehouse", "nxt-nl", "ton-kho-thang", "qr", "catalog"];
-const DEPT_SAN_XUAT = ["wip", "packaging", "warehouse", "qc", "qr", "catalog"];
+const DEPT_IMPORT = ["imports", "warehouse", "nxt-nl", "ton-kho-thang", "qr", "catalog"];
+const DEPT_PRODUCTION = ["wip", "packaging", "warehouse", "qc", "qr", "catalog"];
 
 // Màn DEMO dữ liệu mẫu (DEMO_IDS / laDemo) đã GỠ 2026-10-12 — trình diễn dùng chế độ
 // demo (docs/spec/che-do-demo.md, CLAUDE.md quy tắc 15), không thêm màn mẫu nữa.
 
 /** Vai trò bị giới hạn → tập nav id được phép thấy. */
 export const ALLOWED_NAV: Partial<Record<Role, string[]>> = {
-  "warehouse-keeper": DEPT_NHAP_HANG, // thủ kho / nhập hàng
-  "team-leader": DEPT_SAN_XUAT, // tổ trưởng sản xuất
-  "manager-dong": DEPT_SAN_XUAT, // quản đốc xưởng Đông
-  "manager-ca": DEPT_SAN_XUAT, // quản đốc xưởng Cá
-  "manager-kho": DEPT_SAN_XUAT, // quản đốc xưởng Khô
-  "vice-manager": DEPT_SAN_XUAT, // phó quản đốc — ghi thành phẩm hằng ngày
+  "warehouse-keeper": DEPT_IMPORT, // thủ kho / nhập hàng
+  "team-leader": DEPT_PRODUCTION, // tổ trưởng sản xuất
+  "manager-dong": DEPT_PRODUCTION, // quản đốc xưởng Đông
+  "manager-ca": DEPT_PRODUCTION, // quản đốc xưởng Cá
+  "manager-kho": DEPT_PRODUCTION, // quản đốc xưởng Khô
+  "vice-manager": DEPT_PRODUCTION, // phó quản đốc — ghi thành phẩm hằng ngày
 };
 
 /** Vai trò bị giới hạn → trang chủ (màn mở đầu khi đăng nhập vào). */

@@ -26,7 +26,7 @@ const dong = (id: string, period: string, p: Partial<MonthlyStockLine> = {}): Mo
   ...p,
 });
 
-const tim = (ds: MonthlyStockLine[], id: string) => ds.find((l) => l.id === id);
+const findLine = (ds: MonthlyStockLine[], id: string) => ds.find((l) => l.id === id);
 
 describe("donKyVaoSo — dồn lại không xoá trắng số tháng sau (#26)", () => {
   test("ca A: dồn T9→T10, ghi nhập/xuất/vị trí/ghi chú ở T10, sửa T9 rồi dồn lại ⇒ chỉ tồn đầu đổi", () => {
@@ -34,17 +34,17 @@ describe("donKyVaoSo — dồn lại không xoá trắng số tháng sau (#26)",
     const lan1 = donKyVaoSo(t9, "2026-10");
     expect(lan1.them).toBe(1);
     // Người dùng ghi ở T10: nhập 500, xuất xả đông 200 (Cân đối), vị trí, ghi chú vết.
-    const daGo = lan1.lines.map((l) =>
+    const editedLines = lan1.lines.map((l) =>
       l.id === "carry|X"
         ? { ...l, inKg: 500, outKg: 200, storageLocation: "Kho Ánh Dương", note: "⟦CĐ:d1:200⟧ Cân đối kỳ 1" }
         : l
     );
     // Quay lại T9 sửa xuất 300 rồi dồn lại.
-    const suaT9 = daGo.map((l) => (l.id === "X" ? { ...l, outKg: 300 } : l));
-    const lan2 = donKyVaoSo(suaT9, "2026-10");
+    const editedSep = editedLines.map((l) => (l.id === "X" ? { ...l, outKg: 300 } : l));
+    const lan2 = donKyVaoSo(editedSep, "2026-10");
     expect(lan2.capNhat).toBe(1);
     expect(lan2.them).toBe(0);
-    const c = tim(lan2.lines, "carry|X")!;
+    const c = findLine(lan2.lines, "carry|X")!;
     expect(c.openKg).toBe(700);
     expect(c.inKg).toBe(500);
     expect(c.outKg).toBe(200);
@@ -59,7 +59,7 @@ describe("donKyVaoSo — dồn lại không xoá trắng số tháng sau (#26)",
       dong("carry|X", "2026-10", { carriedFromId: "X", openKg: 1000, openCtn: 100, inKg: 50 }),
     ];
     const kq = donKyVaoSo(ds, "2026-10");
-    const c = tim(kq.lines, "carry|X")!;
+    const c = findLine(kq.lines, "carry|X")!;
     expect(c.openKg).toBe(0);
     expect(c.openCtn).toBe(0);
     expect(c.inKg).toBe(50);
@@ -69,27 +69,27 @@ describe("donKyVaoSo — dồn lại không xoá trắng số tháng sau (#26)",
   test("ca B: dòng T9 bị xoá, carry ở T10 không có số nào khác ⇒ bỏ dòng", () => {
     const ds = [dong("carry|X", "2026-10", { carriedFromId: "X", openKg: 1000 })];
     const kq = donKyVaoSo(ds, "2026-10");
-    expect(tim(kq.lines, "carry|X")).toBeUndefined();
+    expect(findLine(kq.lines, "carry|X")).toBeUndefined();
     expect(kq.bo).toBe(1);
   });
 
   test("carry về 0 mà còn ghi chú ⇒ giữ (không xoá chữ người dùng gõ)", () => {
     const ds = [dong("carry|X", "2026-10", { carriedFromId: "X", openKg: 1000, note: "đã kiểm" })];
     const kq = donKyVaoSo(ds, "2026-10");
-    expect(tim(kq.lines, "carry|X")?.openKg).toBe(0);
+    expect(findLine(kq.lines, "carry|X")?.openKg).toBe(0);
   });
 
   test("dòng nhập tay (không phải carry) ở tháng đích không bị đụng", () => {
     const tay = dong("msl|2026-10|a", "2026-10", { openKg: 77 });
     const kq = donKyVaoSo([dong("X", "2026-09"), tay], "2026-10");
-    expect(tim(kq.lines, tay.id)).toBe(tay);
+    expect(findLine(kq.lines, tay.id)).toBe(tay);
   });
 
   test("chạy lại khi không đổi gì ⇒ giữ nguyên tham chiếu dòng (không ghi thừa)", () => {
     const a = donKyVaoSo([dong("X", "2026-09")], "2026-10").lines;
     const b = donKyVaoSo(a, "2026-10").lines;
     expect(b).toEqual(a);
-    expect(tim(b, "carry|X")).toBe(tim(a, "carry|X"));
+    expect(findLine(b, "carry|X")).toBe(findLine(a, "carry|X"));
   });
 });
 
@@ -101,15 +101,15 @@ describe("donKyVaoSo — phạm vi kho (#27)", () => {
       dong("carry|A", "2026-10", { warehouse: "Kho 1500 tấn", carriedFromId: "A", openKg: 1000, inKg: 9 }),
     ];
     const kq = donKyVaoSo(ds, "2026-10", "Kho 1000 tấn");
-    expect(tim(kq.lines, "carry|A")).toBe(ds[2]);
-    expect(tim(kq.lines, "carry|B")?.openKg).toBe(1000);
+    expect(findLine(kq.lines, "carry|A")).toBe(ds[2]);
+    expect(findLine(kq.lines, "carry|B")?.openKg).toBe(1000);
     expect(kq.soDong).toBe(1);
   });
 
   test("carry mất nguồn ở kho khác phạm vi ⇒ không về 0", () => {
     const giu = dong("carry|Z", "2026-10", { warehouse: "Kho 1500 tấn", carriedFromId: "Z", openKg: 5 });
     const kq = donKyVaoSo([giu], "2026-10", "Kho 1000 tấn");
-    expect(tim(kq.lines, "carry|Z")).toBe(giu);
+    expect(findLine(kq.lines, "carry|Z")).toBe(giu);
   });
 });
 

@@ -124,7 +124,7 @@ export const suyKieuCheBien = (ten: string): string => {
  * Mức GỘP (theo lựa chọn của chủ dữ liệu 2026-08-28). Migration 0034 nạp bản này
  * lên server (id tất định để chạy lại không đẻ trùng).
  */
-const MAT_HANG_BO_SUNG: { id: string; name: string }[] = [
+const EXTRA_PRODUCTS: { id: string; name: string }[] = [
   { id: "mh-bs-cc-380-420", name: "Bạch tuộc 2 da cắt chần 380-420" },
   { id: "mh-bs-cc-455-555", name: "Bạch tuộc 2 da cắt chần 455-555" },
   { id: "mh-bs-cc-700-750", name: "Bạch tuộc 2 da cắt chần 700-750" },
@@ -149,7 +149,7 @@ export const seedProducts = (): Product[] => [
     processingType: suyKieuCheBien(t.ten),
     batterIds: suyBotDiKem(t.ten),
   })),
-  ...MAT_HANG_BO_SUNG.map((m) => ({
+  ...EXTRA_PRODUCTS.map((m) => ({
     id: uid(),
     code: "",
     name: m.name,

@@ -18,8 +18,8 @@ const HDR_HD = [
   "Tổng tiền chưa thuế", "Tổng tiền thuế", "Tổng tiền thanh toán", "Đơn vị tiền tệ", "Tỷ giá",
 ];
 /** Một dòng hóa đơn: [ký hiệu, số, mst, chưa thuế, thuế, tổng, tiền tệ?, tỷ giá?] */
-const hd = (kh: string, so: string, mst: unknown, chua: number, thue: number, tong: number, dvt = "VND", tyGia: unknown = 1) =>
-  [kh, so, "05/02/2026", mst, "NCC", chua, thue, tong, dvt, tyGia];
+const hd = (kh: string, so: string, mst: unknown, preTax: number, thue: number, total: number, dvt = "VND", exchangeRate: unknown = 1) =>
+  [kh, so, "05/02/2026", mst, "NCC", preTax, thue, total, dvt, exchangeRate];
 const sheetHd = (ten: string, dong: unknown[][]) => sheet(ten, [["DANH SÁCH HÓA ĐƠN"], HDR_HD, ...dong]);
 
 const sheetSo = (dong: unknown[][], hdrMst = "RMST") =>
@@ -50,7 +50,7 @@ describe("soVN — số kiểu Việt/US không phụ thuộc locale", () => {
     ["25.42", 25.42],
     ["1.234.567 đ", 1234567],
     ["1 234 567", 1234567],
-  ])("%s → %s", (vao, ra) => expect(soVN(vao)).toBe(ra));
+  ])("%s → %s", (input, ra) => expect(soVN(input)).toBe(ra));
 
   it("số giữ nguyên, rác → null (không mặc định 0)", () => {
     expect(soVN(1234.5)).toBe(1234.5);
@@ -75,9 +75,9 @@ describe("ngoại tệ — sheet tập con (bản tự tải) theo cùng quy ư�
       ],
       { nguong: 1 }
     );
-    const tai = kq.sheetsHoaDon.find((s) => s.ten === "HDDT TẢI")!;
-    expect(tai.laPhu).toBe(true);
-    expect(tai.dong[0]!.tongTtVnd).toBe(5_500_000);
+    const downloadedSheet = kq.sheetsHoaDon.find((s) => s.ten === "HDDT TẢI")!;
+    expect(downloadedSheet.laPhu).toBe(true);
+    expect(downloadedSheet.dong[0]!.tongTtVnd).toBe(5_500_000);
     const sb = soHaiBanHddt(kq.sheetsHoaDon, kq.nguong)!;
     expect(sb.tong.lechTien).toBe(0);
     expect(sb.tong.chenhTongTien).toBe(1_100_000); // chỉ hóa đơn VND chỉ có ở bản thuế
@@ -141,9 +141,9 @@ describe("MST chuẩn hóa — chỉ giữ số, bù số 0 đầu bị mất", 
     expect(kq.tong.khop).toBe(2);
   });
 
-  it.each(["MST", "Mã số thuế", "MST người bán"])("nhận tiêu đề cột MST của sổ: %s", (tieuDe) => {
+  it.each(["MST", "Mã số thuế", "MST người bán"])("nhận tiêu đề cột MST của sổ: %s", (title) => {
     const kq = doiSoat(
-      [sheetHd("CÓ MÃ", [hd("C26TAA", "1", MST, 100, 10, 110)]), sheetSo([so("C26TAA", "1", MST, 100, 10)], tieuDe)],
+      [sheetHd("CÓ MÃ", [hd("C26TAA", "1", MST, 100, 10, 110)]), sheetSo([so("C26TAA", "1", MST, 100, 10)], title)],
       { nguong: 1 }
     );
     expect(kq.tong.khop).toBe(1);

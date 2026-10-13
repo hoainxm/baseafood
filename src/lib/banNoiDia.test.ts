@@ -63,12 +63,12 @@ describe("banNoiDiaTheoKy", () => {
 
 describe("doiChieuBanNoiDia / amTheoNgay", () => {
   it("Cân đối (âm) so sổ SX (dương) theo từng ngày", () => {
-    const sx = { "2026-07-21": 987 };
-    expect(doiChieuBanNoiDia({}, sx)).toBe("trong");
-    expect(doiChieuBanNoiDia(undefined, sx)).toBe("trong");
-    expect(doiChieuBanNoiDia({ "2026-07-21": -987 }, sx)).toBe("khop");
-    expect(doiChieuBanNoiDia({ "2026-07-21": -900 }, sx)).toBe("lech");
-    expect(doiChieuBanNoiDia({ "2026-07-21": -987, "2026-07-22": -5 }, sx)).toBe("lech");
+    const production = { "2026-07-21": 987 };
+    expect(doiChieuBanNoiDia({}, production)).toBe("trong");
+    expect(doiChieuBanNoiDia(undefined, production)).toBe("trong");
+    expect(doiChieuBanNoiDia({ "2026-07-21": -987 }, production)).toBe("khop");
+    expect(doiChieuBanNoiDia({ "2026-07-21": -900 }, production)).toBe("lech");
+    expect(doiChieuBanNoiDia({ "2026-07-21": -987, "2026-07-22": -5 }, production)).toBe("lech");
   });
   it("đổi dấu sang âm, bỏ ngày 0", () => {
     expect(amTheoNgay({ a: 5, b: 0, c: -3 })).toEqual({ a: -5, c: -3 });

@@ -26,7 +26,7 @@ export const coLuuAnh = Boolean(supabase);
 
 /** Path khóa file trong bucket: bsf1/qc/<yyyy>/<mm>/<uid>.jpg (chia tháng cho đỡ phình).
  *  Chế độ demo ⇒ thư mục `site-demo/…` riêng (rào R5), ảnh demo không lẫn ảnh thật. */
-function duongDanAnh(): string {
+function imagePath(): string {
   const d = new Date();
   const yyyy = d.getFullYear();
   const mm = String(d.getMonth() + 1).padStart(2, "0");
@@ -38,7 +38,7 @@ function duongDanAnh(): string {
  * px, JPEG chất lượng ~0.72. Trình duyệt cũ / lỗi giải mã → trả nguyên file gốc để
  * vẫn tải được (ảnh là phụ, ưu tiên không mất).
  */
-async function nenAnh(file: File, maxW = 1600, chatLuong = 0.72): Promise<Blob> {
+async function nenAnh(file: File, maxW = 1600, jpegQuality = 0.72): Promise<Blob> {
   try {
     if (typeof createImageBitmap !== "function" || typeof OffscreenCanvas !== "function")
       return file;
@@ -50,7 +50,7 @@ async function nenAnh(file: File, maxW = 1600, chatLuong = 0.72): Promise<Blob> 
     const ctx = cv.getContext("2d");
     if (!ctx) return file;
     ctx.drawImage(img, 0, 0, w, h);
-    return await cv.convertToBlob({ type: "image/jpeg", quality: chatLuong });
+    return await cv.convertToBlob({ type: "image/jpeg", quality: jpegQuality });
   } catch {
     return file; // lỗi nén → tải nguyên bản
   }
@@ -59,7 +59,7 @@ async function nenAnh(file: File, maxW = 1600, chatLuong = 0.72): Promise<Blob> 
 /** Tải một ảnh lên → trả PATH để lưu vào DB (null nếu không có Supabase / lỗi tải). */
 export async function taiAnhLen(file: File): Promise<string | null> {
   if (!supabase) return null;
-  const path = duongDanAnh();
+  const path = imagePath();
   const blob = await nenAnh(file);
   const { error } = await supabase.storage
     .from(BUCKET)

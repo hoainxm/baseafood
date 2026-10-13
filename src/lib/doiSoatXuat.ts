@@ -50,14 +50,14 @@ import { themSheetTongHop } from "./doiSoatXuatTongHop";
 type Worksheet = import("exceljs").Worksheet;
 
 /** 1 cột trống ngăn giữa dữ liệu gốc và khối cột đối soát. */
-const COT_NGAN = 1;
+const SHORT_COL = 1;
 
 /** Ô là công thức sống: `{r}` thay bằng số dòng thật lúc ghi. */
-type OCongThuc = { ct: string };
-const laCongThuc = (v: unknown): v is OCongThuc =>
-  typeof v === "object" && v !== null && typeof (v as OCongThuc).ct === "string";
+type FormulaCell = { ct: string };
+const isFormula = (v: unknown): v is FormulaCell =>
+  typeof v === "object" && v !== null && typeof (v as FormulaCell).ct === "string";
 
-function oXuat(v: unknown): string | number | null {
+function toExportCell(v: unknown): string | number | null {
   if (v instanceof Date) return ngayHienThi(v);
   if (typeof v === "number" || typeof v === "string") return v;
   if (v == null || v === "") return null;
@@ -66,57 +66,57 @@ function oXuat(v: unknown): string | number | null {
 
 /**
  * Ghi khối đối soát vào một sheet CÓ SẴN của file gốc.
- * @param rong  số cột dữ liệu gốc (đã trừ cột đối soát của lần chạy trước)
+ * @param width  số cột dữ liệu gốc (đã trừ cột đối soát của lần chạy trước)
  */
-function ghiKhoiDoiSoat(
+function writeReconcileBlock(
   ws: Worksheet,
   goc: ToaDoGoc,
   hIdx: number,
-  rong: number,
+  width: number,
   chuThich: string,
-  headerThem: readonly string[],
+  extraHeaders: readonly string[],
   dong: readonly { dongFile: number; ketLuan: string; nen: string | null; them: readonly unknown[] }[],
-  cotSua: readonly { dongFile: number; cot: number; giaTri: number }[],
+  editedCells: readonly { dongFile: number; cot: number; giaTri: number }[],
   /** Tiêu đề cột A. */
-  nhanCotA = "KẾT QUẢ",
+  columnALabel = "KẾT QUẢ",
   /**
    * false = KHÔNG có cột A chèn thêm (file chỉ có bảng kê — v6.5): địa chỉ mọi ô giữ
    * nguyên như file của kế toán, chỉ nối khối kiểm ở cuối.
    */
-  coCotA = true,
+  hasColumnA = true,
   /** Cột AOA → cột trong file ra lệch bao nhiêu (tính cả cột A cũ/mới) — để ghi ô Sửa đúng chỗ. */
-  dichCot: number = DICH_COT_XUAT
+  columnShift: number = DICH_COT_XUAT
 ): void {
-  const D = coCotA ? DICH_COT_XUAT : 0;
+  const D = hasColumnA ? DICH_COT_XUAT : 0;
   // Dữ liệu gốc đã dời sang phải D cột ⇒ khối thêm bắt đầu sau nó, chừa 1 cột trống.
-  const cot1 = goc.c0 + rong + D + COT_NGAN + 1; // 1-based
-  const cotCuoi = cot1 + headerThem.length - 1;
-  const hangTieuDe = goc.r0 + hIdx + 1;
-  const COT_KQ = 1; // cột "KẾT QUẢ" vừa chèn vào đầu sheet
-  const cotDauTo = coCotA ? COT_KQ : goc.c0 + 1; // tô nền từ cột này
+  const cot1 = goc.c0 + width + D + SHORT_COL + 1; // 1-based
+  const lastColumn = cot1 + extraHeaders.length - 1;
+  const headerRow = goc.r0 + hIdx + 1;
+  const RESULT_COL = 1; // cột "KẾT QUẢ" vừa chèn vào đầu sheet
+  const firstShadedColumn = hasColumnA ? RESULT_COL : goc.c0 + 1; // tô nền từ cột này
 
   // --- tiêu đề: lấy dáng từ chính tiêu đề gốc để nhìn liền mạch ---
-  const mau = ws.getCell(hangTieuDe, goc.c0 + D + 1);
-  const dungTieuDe = (o: ReturnType<Worksheet["getCell"]>, ten: string) => {
+  const styleCell = ws.getCell(headerRow, goc.c0 + D + 1);
+  const buildHeader = (o: ReturnType<Worksheet["getCell"]>, ten: string) => {
     o.value = ten;
-    if (mau.font) o.font = { ...mau.font, bold: true };
-    if (mau.border) o.border = { ...mau.border };
-    o.alignment = { ...(mau.alignment ?? {}), vertical: "middle", wrapText: true };
+    if (styleCell.font) o.font = { ...styleCell.font, bold: true };
+    if (styleCell.border) o.border = { ...styleCell.border };
+    o.alignment = { ...(styleCell.alignment ?? {}), vertical: "middle", wrapText: true };
     o.fill = to(NEN.tieuDe);
   };
-  if (coCotA) {
-    dungTieuDe(ws.getCell(hangTieuDe, COT_KQ), nhanCotA);
-    ws.getColumn(COT_KQ).width = 24;
+  if (hasColumnA) {
+    buildHeader(ws.getCell(headerRow, RESULT_COL), columnALabel);
+    ws.getColumn(RESULT_COL).width = 24;
   }
-  headerThem.forEach((ten, i) => {
-    dungTieuDe(ws.getCell(hangTieuDe, cot1 + i), ten);
+  extraHeaders.forEach((ten, i) => {
+    buildHeader(ws.getCell(headerRow, cot1 + i), ten);
     const c = ws.getColumn(cot1 + i);
     if (!c.width) c.width = Math.min(Math.max(ten.length + 2, 12), 42);
   });
 
   // --- chú thích màu: ô A ngay trên hàng tiêu đề (đúng chỗ file mẫu đặt) ---
-  if (hangTieuDe > 1) {
-    const oCt = ws.getCell(hangTieuDe - 1, coCotA ? COT_KQ : cot1);
+  if (headerRow > 1) {
+    const oCt = ws.getCell(headerRow - 1, hasColumnA ? RESULT_COL : cot1);
     if (oCt.value == null || oCt.value === "") {
       oCt.value = chuThich;
       oCt.font = { italic: true, size: 10 };
@@ -125,46 +125,46 @@ function ghiKhoiDoiSoat(
 
   // --- từng dòng: nhãn ở cột A + giá trị khối thêm + tô nền cả dòng ---
   for (const d of dong) {
-    if (coCotA) ws.getCell(d.dongFile, COT_KQ).value = d.ketLuan;
+    if (hasColumnA) ws.getCell(d.dongFile, RESULT_COL).value = d.ketLuan;
     d.them.forEach((v, i) => {
       const o = ws.getCell(d.dongFile, cot1 + i);
       // Công thức sống trỏ thẳng ô gốc: bấm vào là thấy số được TÍNH ra, không phải
       // số chép tay — bằng chứng file xuất không sửa số liệu của thuế.
-      if (laCongThuc(v)) o.value = { formula: v.ct.replaceAll("{r}", String(d.dongFile)) };
-      else o.value = oXuat(v);
+      if (isFormula(v)) o.value = { formula: v.ct.replaceAll("{r}", String(d.dongFile)) };
+      else o.value = toExportCell(v);
     });
     // nen null = dòng không có gì đáng nói ⇒ để nguyên màu gốc, mắt chỉ dừng ở dòng có vấn đề
     if (d.nen) {
       const nen = to(d.nen);
-      for (let c = cotDauTo; c <= cotCuoi; c++) ws.getCell(d.dongFile, c).fill = nen;
+      for (let c = firstShadedColumn; c <= lastColumn; c++) ws.getCell(d.dongFile, c).fill = nen;
     }
   }
 
   // --- ô người dùng đã bấm Sửa: ghi đè giá trị + đánh dấu vàng để soát lại ---
-  for (const e of cotSua) {
-    const o = ws.getCell(e.dongFile, cotExcel(goc, e.cot) + dichCot + 1);
+  for (const e of editedCells) {
+    const o = ws.getCell(e.dongFile, cotExcel(goc, e.cot) + columnShift + 1);
     o.value = e.giaTri;
     o.fill = to(NEN.sua);
   }
 
   // Bộ lọc: nới vùng lọc sẵn có sang hết khối mới, giữ nguyên ô bắt đầu.
-  const loc = ws.autoFilter as string | { from?: { row?: number; column?: number } } | undefined;
+  const autoFilter = ws.autoFilter as string | { from?: { row?: number; column?: number } } | undefined;
   const batDau =
-    typeof loc === "object" && loc?.from?.row != null && loc.from.column != null
-      ? { row: loc.from.row, column: loc.from.column }
-      : { row: hangTieuDe, column: cotDauTo };
-  ws.autoFilter = { from: batDau, to: { row: hangTieuDe, column: cotCuoi } };
+    typeof autoFilter === "object" && autoFilter?.from?.row != null && autoFilter.from.column != null
+      ? { row: autoFilter.from.row, column: autoFilter.from.column }
+      : { row: headerRow, column: firstShadedColumn };
+  ws.autoFilter = { from: batDau, to: { row: headerRow, column: lastColumn } };
 }
 
 const nenHd = (d: DongHoaDon) => (d.trangThai === "KHOP" ? NEN.xanh : d.trangThai === "LECH" ? NEN.vang : NEN.do);
 
-const themHd = (d: DongHoaDon): unknown[] => [
+const addInvoiceRow = (d: DongHoaDon): unknown[] => [
   d.tyGia, d.soChuan, d.khoa, d.chuaThueVnd, d.thueVnd, d.tongTtVnd,
   d.soDongKhopPm, d.tongTtPm, d.chenh, d.ketLuan, d.phieuKe, d.ctgs, d.ngayGhiSo,
   d.tkNoCo, d.dienGiaiPm, d.soTienHachToan, d.bangChung,
 ];
 
-const themPm = (d: DongPhanMem): unknown[] => [
+const addLedgerRow = (d: DongPhanMem): unknown[] => [
   d.soChuan, d.khoa, d.soHddtKhop, d.ketLuan, d.nguonHddt, d.dongHddt, d.ngayLapHd,
   d.tenBanHddt, d.tongTtHddt, d.bangChung,
 ];
@@ -174,10 +174,10 @@ const themPm = (d: DongPhanMem): unknown[] => [
  * tên sheet sổ (mẫu ghi "PMEM" chứ không phải "PMKT") và cặp cột TK — sổ mã máy
  * không có TK Nợ/Có mà là thuế suất / loại.
  */
-const headerHd = (tenSo: string, tenTk: string): string[] =>
+const headerHd = (ledgerName: string, tenTk: string): string[] =>
   HEADER_HD_THEM.map((h) =>
-    h === "Số dòng khớp PMKT" ? `Số dòng khớp ${tenSo}`
-    : h === "Tổng TT bên PMKT" ? `Tổng TT bên ${tenSo}`
+    h === "Số dòng khớp PMKT" ? `Số dòng khớp ${ledgerName}`
+    : h === "Tổng TT bên PMKT" ? `Tổng TT bên ${ledgerName}`
     : h === "TK Nợ / TK Có" ? tenTk
     : h
   );
@@ -188,16 +188,16 @@ const HEADER_PM = [...HEADER_PM_THEM];
  * trỏ vào chính ô gốc (đã dời sang phải `DICH_COT_XUAT` cột). Kế toán dò TRỰC TIẾP
  * trên sheet, không phải lật qua sheet tổng hợp.
  */
-function oKiemCong(sh: SheetHoaDon, d: DongHoaDon, dich: number): unknown[] {
+function sumCheckCells(sh: SheetHoaDon, d: DongHoaDon, shift: number): unknown[] {
   const cd = sh.canDoiCot;
   if (cd.cotChua < 0 || cd.cotTong < 0) return ["", "", ""];
-  const A = chuCot(cotExcel(sh.goc, cd.cotChua) + dich);
-  const T = chuCot(cotExcel(sh.goc, cd.cotTong) + dich);
-  const cong = cd.cotThue >= 0 ? `${A}{r}+${chuCot(cotExcel(sh.goc, cd.cotThue) + dich)}{r}` : `${A}{r}`;
+  const A = chuCot(cotExcel(sh.goc, cd.cotChua) + shift);
+  const T = chuCot(cotExcel(sh.goc, cd.cotTong) + shift);
+  const sumFormula = cd.cotThue >= 0 ? `${A}{r}+${chuCot(cotExcel(sh.goc, cd.cotThue) + shift)}{r}` : `${A}{r}`;
   // exceljs tự thêm dấu "=" — đừng viết sẵn, không là ra "==N3+O3".
   return [
-    { ct: cong },
-    { ct: `${T}{r}-(${cong})` },
+    { ct: sumFormula },
+    { ct: `${T}{r}-(${sumFormula})` },
     d.lechCong ? NHAN_LECH_CONG[d.lechCong.loai] : "",
   ];
 }
@@ -206,13 +206,13 @@ function oKiemCong(sh: SheetHoaDon, d: DongHoaDon, dich: number): unknown[] {
  * Màu dòng khi file CHỈ có bảng kê: CHỈ tô dòng có lệch (đỏ = sai thật, vàng = phí /
  * chiết khấu / làm tròn). Dòng khớp để nguyên — tô xanh 3.000 dòng thì mắt không biết dừng đâu.
  */
-const nenKiem = (d: DongHoaDon) =>
+const shouldCheck = (d: DongHoaDon) =>
   !d.lechCong ? null : d.lechCong.loai === "that" ? NEN.do : NEN.vang;
 
 /** Các ô người dùng bấm Sửa, gom theo sheet (key `edits` = `sheet#soDong#cot`). */
-function suaTheoSheet(
+function editsBySheet(
   edits: Record<string, number> | undefined,
-  dongTheoSoDong: Map<number, number>,
+  rowByLineNo: Map<number, number>,
   ten: string
 ): { dongFile: number; cot: number; giaTri: number }[] {
   if (!edits) return [];
@@ -220,13 +220,13 @@ function suaTheoSheet(
   for (const [k, v] of Object.entries(edits)) {
     const { sheet, soDong, cot } = tachKhoaSua(k);
     if (sheet !== ten) continue;
-    const dongFile = dongTheoSoDong.get(soDong);
+    const dongFile = rowByLineNo.get(soDong);
     if (dongFile != null && Number.isFinite(cot)) ra.push({ dongFile, cot, giaTri: v });
   }
   return ra;
 }
 
-function taiVe(bytes: ArrayBuffer, tenFile: string): void {
+function downloadFile(bytes: ArrayBuffer, tenFile: string): void {
   const url = URL.createObjectURL(
     new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" })
   );
@@ -258,12 +258,12 @@ export async function xuatExcelGiuDinhDang(
   const bytes = base64SangXlsx(fileGocB64);
   await wb.xlsx.load(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer);
 
-  const timSheet = (ten: string): Worksheet | undefined =>
+  const findSheet = (ten: string): Worksheet | undefined =>
     wb.worksheets.find((w) => w.name === ten) ?? wb.getWorksheet(ten);
 
   const thieu: string[] = [];
   for (const sh of [...kq.sheetsHoaDon, kq.sheetPhanMem, ...kq.sheetsPhanMemPhu])
-    if (sh && !timSheet(sh.ten)) thieu.push(sh.ten);
+    if (sh && !findSheet(sh.ten)) thieu.push(sh.ten);
   if (thieu.length)
     throw new Error(`Không tìm thấy sheet ${thieu.map((t) => `"${t}"`).join(", ")} trong file gốc.`);
 
@@ -275,69 +275,69 @@ export async function xuatExcelGiuDinhDang(
   // đó khỏi dữ liệu đọc vào, nên `cotExcel` của cột gốc đầu tiên lệch sẵn 1.
   // Trường hợp đó chỉ ghi đè cột A, KHÔNG chèn thêm — nếu không mỗi lần xuất lại
   // đẻ thêm một cột "KẾT QUẢ" nữa.
-  const daCoCotKq = (sh: SheetHoaDon | SheetPhanMem) => cotExcel(sh.goc, 0) - sh.goc.c0 >= DICH_COT_XUAT;
+  const hasResultColumn = (sh: SheetHoaDon | SheetPhanMem) => cotExcel(sh.goc, 0) - sh.goc.c0 >= DICH_COT_XUAT;
   // File CHỈ có bảng kê (không sổ) thì KHÔNG chèn cột A (v6.5): kế toán dò theo địa
   // chỉ ô của chính họ (VD Q3049) — dời sang R3049 là họ lạc. File xuất từ bản cũ
   // đã có cột A thì GỠ nó ra để địa chỉ trở về như file gốc.
-  const khongCotA = !kq.sheetPhanMem;
-  const canChen = khongCotA ? [] : dsSheet.filter((sh) => !daCoCotKq(sh));
+  const hasNoColumnA = !kq.sheetPhanMem;
+  const canChen = hasNoColumnA ? [] : dsSheet.filter((sh) => !hasResultColumn(sh));
   const tenChen = new Set(canChen.map((sh) => sh.ten));
-  const tenBo = new Set(khongCotA ? dsSheet.filter(daCoCotKq).map((sh) => sh.ten) : []);
+  const skippedNames = new Set(hasNoColumnA ? dsSheet.filter(hasResultColumn).map((sh) => sh.ten) : []);
 
   for (const sh of dsSheet) {
-    const ws = timSheet(sh.ten)!;
+    const ws = findSheet(sh.ten)!;
     // dữ liệu gốc chiếm các cột [lech+1 … lech+rong]; mọi cột sau đó là của lần xuất trước
-    const lech = daCoCotKq(sh) ? DICH_COT_XUAT : 0;
+    const lech = hasResultColumn(sh) ? DICH_COT_XUAT : 0;
     xoaCotDuoi(ws, sh.goc.c0 + lech + sh.rong + 1);
   }
   for (const ws of wb.worksheets)
     if (tenChen.has(ws.name)) chenCotDau(ws, DICH_COT_XUAT, tenChen);
     else if (tenChen.size) dichThamChieuCheoSheet(ws, DICH_COT_XUAT, tenChen);
   for (const ws of wb.worksheets)
-    if (tenBo.has(ws.name)) chenCotDau(ws, -DICH_COT_XUAT, tenBo);
-    else if (tenBo.size) dichThamChieuCheoSheet(ws, -DICH_COT_XUAT, tenBo);
+    if (skippedNames.has(ws.name)) chenCotDau(ws, -DICH_COT_XUAT, skippedNames);
+    else if (skippedNames.size) dichThamChieuCheoSheet(ws, -DICH_COT_XUAT, skippedNames);
   /** Cột (0-based) trong FILE RA của cột AOA `c` — cho công thức kiểm + địa chỉ ở sheet kết luận. */
-  const dichRa = (sh: SheetHoaDon | SheetPhanMem) =>
-    khongCotA ? (daCoCotKq(sh) ? -DICH_COT_XUAT : 0) : daCoCotKq(sh) ? 0 : DICH_COT_XUAT;
-  const cotRa = (sh: SheetHoaDon, c: number) => cotExcel(sh.goc, c) + dichRa(sh);
+  const outputShift = (sh: SheetHoaDon | SheetPhanMem) =>
+    hasNoColumnA ? (hasResultColumn(sh) ? -DICH_COT_XUAT : 0) : hasResultColumn(sh) ? 0 : DICH_COT_XUAT;
+  const outputColumn = (sh: SheetHoaDon, c: number) => cotExcel(sh.goc, c) + outputShift(sh);
 
   // --- B2. Ghi khối đối soát ---
-  const tenSo = kq.sheetPhanMem?.ten ?? "PMKT";
+  const ledgerName = kq.sheetPhanMem?.ten ?? "PMKT";
   const tenTk = kq.sheetPhanMem?.tenTk ?? "TK Nợ / TK Có";
   // File CHỈ có bảng kê thuế, không có sheet sổ ⇒ mọi cột đối soát với sổ đều rỗng,
   // in ra chỉ tổ rối. Khi đó chuyển sang CHẾ ĐỘ KIỂM BẢNG KÊ: cột A và màu dòng nói
   // về phép kiểm "chưa thuế + thuế = tổng thanh toán", khối thêm chỉ 3 cột kiểm.
-  const kiemBangKe = !kq.sheetPhanMem;
+  const checkListing = !kq.sheetPhanMem;
   // Có sổ: cột kiểm xuống CUỐI khối, giữ nguyên thứ tự cột theo file mẫu kế toán.
-  const HEADER_HD = kiemBangKe ? [...HEADER_KIEM] : [...headerHd(tenSo, tenTk), ...HEADER_KIEM];
+  const HEADER_HD = checkListing ? [...HEADER_KIEM] : [...headerHd(ledgerName, tenTk), ...HEADER_KIEM];
 
-  const ghiHd = (sh: SheetHoaDon) => {
-    const ws = timSheet(sh.ten)!;
-    const chuThich = kiemBangKe
+  const writeInvoiceSheet = (sh: SheetHoaDon) => {
+    const ws = findSheet(sh.ten)!;
+    const chuThich = checkListing
       ? `Dòng ĐỎ = chưa thuế + thuế KHÁC tổng thanh toán, phải soát · dòng VÀNG = lệch do phí / chiết khấu / làm tròn, bình thường · dòng không tô = khớp. 3 cột này là công thức tính từ ô gốc, không ô gốc nào bị sửa.`
       : sh.laPhu
         ? `${CHU_THICH} — (SHEET TRÙNG LẶP / TẬP CON: KHÔNG cộng vào tổng)`
         : CHU_THICH;
-    ghiKhoiDoiSoat(
+    writeReconcileBlock(
       ws, sh.goc, sh.hIdx, sh.rong, chuThich, HEADER_HD,
       sh.dong.map((d) => ({
         dongFile: d.dongFile,
-        ketLuan: kiemBangKe ? (d.lechCong ? NHAN_LECH_CONG[d.lechCong.loai] : "khớp") : d.ketLuan,
-        nen: kiemBangKe ? nenKiem(d) : nenHd(d),
-        them: kiemBangKe
-          ? oKiemCong(sh, d, dichRa(sh))
-          : [...themHd(d), ...oKiemCong(sh, d, dichRa(sh))],
+        ketLuan: checkListing ? (d.lechCong ? NHAN_LECH_CONG[d.lechCong.loai] : "khớp") : d.ketLuan,
+        nen: checkListing ? shouldCheck(d) : nenHd(d),
+        them: checkListing
+          ? sumCheckCells(sh, d, outputShift(sh))
+          : [...addInvoiceRow(d), ...sumCheckCells(sh, d, outputShift(sh))],
       })),
-      suaTheoSheet(edits, new Map(sh.dong.map((d) => [d.soDong, d.dongFile])), sh.ten),
-      kiemBangKe ? "KIỂM CỘNG" : "KẾT QUẢ",
-      !khongCotA,
-      dichRa(sh)
+      editsBySheet(edits, new Map(sh.dong.map((d) => [d.soDong, d.dongFile])), sh.ten),
+      checkListing ? "KIỂM CỘNG" : "KẾT QUẢ",
+      !hasNoColumnA,
+      outputShift(sh)
     );
   };
 
-  const ghiPm = (sh: SheetPhanMem) => {
-    const ws = timSheet(sh.ten)!;
-    ghiKhoiDoiSoat(
+  const writeLedgerSheet = (sh: SheetPhanMem) => {
+    const ws = findSheet(sh.ten)!;
+    writeReconcileBlock(
       ws, sh.goc, sh.hIdx, sh.rong,
       sh.laPhu ? `${CHU_THICH_PM} — (SHEET PHỤ / TẬP CON: KHÔNG cộng vào tổng)` : CHU_THICH_PM,
       HEADER_PM,
@@ -345,24 +345,24 @@ export async function xuatExcelGiuDinhDang(
         dongFile: d.dongFile,
         ketLuan: d.ketLuan,
         nen: d.trangThai === "CO" ? NEN.xanh : NEN.do,
-        them: themPm(d),
+        them: addLedgerRow(d),
       })),
-      suaTheoSheet(edits, new Map(sh.dong.map((d) => [d.soDong, d.dongFile])), sh.ten),
+      editsBySheet(edits, new Map(sh.dong.map((d) => [d.soDong, d.dongFile])), sh.ten),
       "KẾT QUẢ",
       true,
-      dichRa(sh)
+      outputShift(sh)
     );
   };
 
-  for (const sh of kq.sheetsHoaDon) ghiHd(sh);
-  if (kq.sheetPhanMem) ghiPm(kq.sheetPhanMem);
-  for (const p of kq.sheetsPhanMemPhu) ghiPm(p);
+  for (const sh of kq.sheetsHoaDon) writeInvoiceSheet(sh);
+  if (kq.sheetPhanMem) writeLedgerSheet(kq.sheetPhanMem);
+  for (const p of kq.sheetsPhanMemPhu) writeLedgerSheet(p);
 
   // --- B3. Sheet phụ trợ: KẾT LUẬN CHUNG (+ danh sách có dữ liệu) lên ĐẦU, nhật ký sửa xuống cuối ---
   if (kq.nhatKySua.length) {
     const ten = "NHẬT KÝ SỬA";
-    const cu = timSheet(ten);
-    if (cu) wb.removeWorksheet(cu.id);
+    const prev = findSheet(ten);
+    if (prev) wb.removeWorksheet(prev.id);
     const nk = wb.addWorksheet(ten);
     nk.addRow(["NHẬT KÝ SỬA — do người dùng xác nhận, giữ lại giá trị cũ"]);
     nk.addRow(["Vị trí", "Giá trị cũ", "Giá trị mới"]);
@@ -372,11 +372,11 @@ export async function xuatExcelGiuDinhDang(
     nk.columns.forEach((c, i) => (c.width = i === 0 ? 54 : 22));
     (nk as unknown as { orderNo: number }).orderNo = 99;
   }
-  themSheetTongHop(wb, kq, (sh, c) => cotRa(sh, c));
+  themSheetTongHop(wb, kq, (sh, c) => outputColumn(sh, c));
 
   // Công thức trong file đã bị dịch cột ⇒ ép Excel tính lại lúc mở, đừng tin
   // giá trị cache của lần lưu trước.
   wb.calcProperties.fullCalcOnLoad = true;
 
-  taiVe(await wb.xlsx.writeBuffer(), tenFile);
+  downloadFile(await wb.xlsx.writeBuffer(), tenFile);
 }

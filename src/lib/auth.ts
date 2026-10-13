@@ -25,7 +25,7 @@ import { datNguoiThaoTac, ghiNhatKy } from "@/lib/audit";
 
 const s = (v: unknown) => (v == null ? "" : String(v));
 
-function hoSoTuRow(r: Record<string, unknown>): UserProfile {
+function profileFromRow(r: Record<string, unknown>): UserProfile {
   return {
     id: s(r.id),
     fullName: s(r.full_name),
@@ -36,7 +36,7 @@ function hoSoTuRow(r: Record<string, unknown>): UserProfile {
 
 /** Lấy hồ sơ của tài khoản đang đăng nhập; chưa có thì tạo (vai trò rỗng).
  * Họ tên/username lấy từ metadata lúc đăng ký (nếu có), không thì suy từ email. */
-async function layHoacTaoHoSo(session: Session): Promise<UserProfile | null> {
+async function getOrCreateProfile(session: Session): Promise<UserProfile | null> {
   if (!supabase) return null;
   const id = session.user.id;
   const meta = (session.user.user_metadata ?? {}) as Record<string, unknown>;
@@ -51,7 +51,7 @@ async function layHoacTaoHoSo(session: Session): Promise<UserProfile | null> {
   // Đọc LỖI (hết hạn token, rớt mạng, timeout) ≠ "chưa có hồ sơ": đừng ghi gì —
   // trước đây nhánh này upsert roles:"" đè mất vai trò thật của tài khoản.
   if (error) return null;
-  if (data) return hoSoTuRow(data as Record<string, unknown>);
+  if (data) return profileFromRow(data as Record<string, unknown>);
 
   // Chưa có hồ sơ thật sự ⇒ tạo mới; ignoreDuplicates: dòng đã có (máy khác vừa
   // tạo / select hụt) thì GIỮ NGUYÊN, không bao giờ đè vai trò.
@@ -63,7 +63,7 @@ async function layHoacTaoHoSo(session: Session): Promise<UserProfile | null> {
 }
 
 /** Dịch lỗi Supabase Auth sang tiếng Việt cho người dùng đọc được. */
-function dichLoi(msg: string): string {
+function translateError(msg: string): string {
   if (/invalid login credentials/i.test(msg))
     return "Sai tên đăng nhập hoặc mật khẩu";
   if (/email not confirmed/i.test(msg))
@@ -73,7 +73,7 @@ function dichLoi(msg: string): string {
   return msg;
 }
 
-function dichLoiTaoTK(msg: string): string {
+function translateSignUpError(msg: string): string {
   if (/already registered|already exists|user_already_exists/i.test(msg))
     return "Tên đăng nhập đã tồn tại";
   if (/password.*(6|short|weak)|weak.?password/i.test(msg))
@@ -98,8 +98,8 @@ export interface KetQuaDangNhap {
 
 export function useAuth() {
   const [session, setSession] = useState<Session | null>(null);
-  const [nguoiDung, setNguoiDung] = useState<UserProfile | null>(null);
-  const [daKhoiTao, setDaKhoiTao] = useState(!hasSupabase);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [isInitialized, setIsInitialized] = useState(!hasSupabase);
 
   useEffect(() => {
     if (!supabase) return;
@@ -107,13 +107,13 @@ export function useAuth() {
     supabase.auth.getSession().then(({ data }) => {
       if (huy) return;
       setSession(data.session);
-      setDaKhoiTao(true);
+      setIsInitialized(true);
     });
     const { data: sub } = supabase.auth.onAuthStateChange((_e, s2) => {
       // KHÔNG gọi supabase async thẳng trong callback (dễ deadlock) — chỉ set
       // session, hồ sơ nạp ở effect theo user id bên dưới.
       setSession(s2);
-      setDaKhoiTao(true);
+      setIsInitialized(true);
     });
     return () => {
       huy = true;
@@ -125,13 +125,13 @@ export function useAuth() {
   useEffect(() => {
     if (!supabase) return;
     if (!session) {
-      setNguoiDung(null);
+      setProfile(null);
       return;
     }
     let huy = false;
     (async () => {
-      const nd = await layHoacTaoHoSo(session);
-      if (!huy) setNguoiDung(nd);
+      const nd = await getOrCreateProfile(session);
+      if (!huy) setProfile(nd);
     })();
     return () => {
       huy = true;
@@ -139,7 +139,7 @@ export function useAuth() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [uid]);
 
-  const dangNhap = useCallback(
+  const signIn = useCallback(
     async (username: string, matKhau: string): Promise<KetQuaDangNhap> => {
       if (!supabase) return { ok: false, loi: "Chưa cấu hình máy chủ" };
       if (!username.trim() || !matKhau)
@@ -148,7 +148,7 @@ export function useAuth() {
         email: usernameToEmail(username),
         password: matKhau,
       });
-      if (error) return { ok: false, loi: dichLoi(error.message) };
+      if (error) return { ok: false, loi: translateError(error.message) };
       const u = username.trim().toLowerCase();
       datNguoiThaoTac({ username: u });
       ghiNhatKy([{ action: "dang-nhap", entity: "auth", entityKey: u, summary: `Đăng nhập: ${u}` }]);
@@ -162,7 +162,7 @@ export function useAuth() {
    * Người dùng (admin). Dùng client PHỤ để signUp nên KHÔNG đá văng phiên admin
    * trên client chính. Hồ sơ `user_profiles` tạo với vai trò rỗng (admin gán sau).
    */
-  const taoTaiKhoan = useCallback(
+  const createAccount = useCallback(
     async (
       fullName: string,
       username: string,
@@ -191,7 +191,7 @@ export function useAuth() {
         password: matKhau,
         options: { data: { ho_ten: fullName.trim(), username: u } },
       });
-      if (error) return { ok: false, loi: dichLoiTaoTK(error.message) };
+      if (error) return { ok: false, loi: translateSignUpError(error.message) };
 
       // Lưu hồ sơ qua client CHÍNH (phiên admin) — vai trò rỗng.
       const uid = data.user?.id;
@@ -214,7 +214,7 @@ export function useAuth() {
     []
   );
 
-  const dangXuat = useCallback(async () => {
+  const signOut = useCallback(async () => {
     ghiNhatKy([{ action: "dang-xuat", entity: "auth", entityKey: "", summary: "Đăng xuất" }]);
     await supabase?.auth.signOut();
     datNguoiThaoTac(null);
@@ -222,13 +222,13 @@ export function useAuth() {
 
   return {
     session,
-    nguoiDung,
-    dangTai: hasSupabase && !daKhoiTao,
+    nguoiDung: profile,
+    dangTai: hasSupabase && !isInitialized,
     /** Có cần đăng nhập không (chỉ khi đã cấu hình Supabase). */
     canDangNhap: hasSupabase,
-    laAdmin: rolesList(nguoiDung?.roles).includes("admin"),
-    dangNhap,
-    taoTaiKhoan,
-    dangXuat,
+    laAdmin: rolesList(profile?.roles).includes("admin"),
+    dangNhap: signIn,
+    taoTaiKhoan: createAccount,
+    dangXuat: signOut,
   };
 }

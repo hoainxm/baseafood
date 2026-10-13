@@ -26,23 +26,23 @@ export interface AnhTrangKetNoi {
 // Snapshot bất biến — đổi tham chiếu chỉ khi trạng thái đổi, để
 // useSyncExternalStore không render vô hạn.
 let anh: AnhTrangKetNoi = { trang: "chua-ro", loi: "" };
-const nguoiNghe = new Set<() => void>();
+const listeners = new Set<() => void>();
 
-function dat(trang: TrangKetNoi, loi: string) {
-  if (anh.trang === trang && anh.loi === loi) return;
-  anh = { trang, loi };
-  nguoiNghe.forEach((f) => f());
+function setStatus(status: TrangKetNoi, loi: string) {
+  if (anh.trang === status && anh.loi === loi) return;
+  anh = { trang: status, loi };
+  listeners.forEach((f) => f());
 }
 
 export const ketNoi = {
   /** Một thao tác server vừa thành công. */
-  baoOK: () => dat("da-noi", ""),
+  baoOK: () => setStatus("da-noi", ""),
   /** Một thao tác server vừa lỗi (kèm thông báo để hiện cho người dùng). */
-  baoLoi: (thongBao: string) => dat("loi", thongBao),
+  baoLoi: (message: string) => setStatus("loi", message),
   subscribe: (f: () => void) => {
-    nguoiNghe.add(f);
+    listeners.add(f);
     return () => {
-      nguoiNghe.delete(f);
+      listeners.delete(f);
     };
   },
   laySnapshot: (): AnhTrangKetNoi => anh,

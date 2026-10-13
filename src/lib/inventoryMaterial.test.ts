@@ -29,7 +29,7 @@ const dong = (periodId: string, p: Partial<BalancingInputItem>): BalancingInputI
   autoSource: "",
   ...p,
 });
-const layXaDong = (periodId: string, daily: Record<string, number>) =>
+const thawRow = (periodId: string, daily: Record<string, number>) =>
   dong(periodId, { groupName: "Xả đông", sourceWarehouse: "Kho mình", name: "Lấy xả đông", dailyQuantities: daily });
 /** Gửi đông là dòng giảm: lưu ÂM. */
 const guiDong = (periodId: string, daily: Record<string, number>) =>
@@ -41,7 +41,7 @@ const guiDong = (periodId: string, daily: Record<string, number>) =>
     reductionWarehouseId: "kho-dong",
     dailyQuantities: daily,
   });
-const chot = (lockDate: string, leftover: Record<string, number>): DailyLock => ({
+const makeLock = (lockDate: string, leftover: Record<string, number>): DailyLock => ({
   id: `l${lockDate}`,
   lockDate,
   workshop: "Đông",
@@ -60,7 +60,7 @@ describe("tinhSoTonNL — hai dòng kho ở Cân đối", () => {
   test("Gửi đông CỘNG tồn, Lấy xả đông kỳ sau TRỪ tồn — tồn chạy nối kỳ", () => {
     const inputs = [
       guiDong("k1", { "2026-09-02": -1500, "2026-09-03": -500 }),
-      layXaDong("k2", { "2026-09-04": 1200 }),
+      thawRow("k2", { "2026-09-04": 1200 }),
     ];
     const [r1, r2] = tinhSoTonNL([K1, K2], inputs, [], [], []);
     expect(r1).toMatchObject({ tonDau: 0, dongGui: 2000, xaDong: 0, tonCuoi: 2000, nguonDongGui: "can-doi" });
@@ -68,13 +68,13 @@ describe("tinhSoTonNL — hai dòng kho ở Cân đối", () => {
   });
 
   test("Lấy xả đông vượt tồn ⇒ tồn âm, gắn cảnh báo", () => {
-    const [r] = tinhSoTonNL([K1], [layXaDong("k1", { "2026-09-01": 300 })], [], [], []);
+    const [r] = tinhSoTonNL([K1], [thawRow("k1", { "2026-09-01": 300 })], [], [], []);
     expect(r.tonCuoi).toBe(-300);
     expect(r.canhBaoAm).toBe(true);
   });
 
   test("Gửi đông ở Cân đối là số chuẩn, còn dở SX vẫn trả ra để đối chiếu (không cộng đôi)", () => {
-    const locks = [chot("2026-09-02", { "Bạch tuộc 2 da lớn (80↑)": 700 })];
+    const locks = [makeLock("2026-09-02", { "Bạch tuộc 2 da lớn (80↑)": 700 })];
     const [r] = tinhSoTonNL([K1], [guiDong("k1", { "2026-09-02": -650 })], [], [], locks);
     expect(r.dongGui).toBe(650);
     expect(r.guiDongCanDoi).toBe(650);
@@ -83,7 +83,7 @@ describe("tinhSoTonNL — hai dòng kho ở Cân đối", () => {
   });
 
   test("Chưa gõ Gửi đông ⇒ lấy còn dở SX (hướng 1 giữ nguyên)", () => {
-    const locks = [chot("2026-09-02", { "Bạch tuộc 2 da": 700 })];
+    const locks = [makeLock("2026-09-02", { "Bạch tuộc 2 da": 700 })];
     const [r] = tinhSoTonNL([K1], [], [], [], locks);
     expect(r).toMatchObject({ dongGui: 700, nguonDongGui: "san-xuat", tonCuoi: 700 });
   });
@@ -103,16 +103,16 @@ describe("tinhSoTonNL — hai dòng kho ở Cân đối", () => {
 describe("conDoTheoNgay", () => {
   test("gom còn dở cùng họ theo ngày chốt trong kỳ, bỏ ngày ngoài kỳ và họ khác", () => {
     const locks = [
-      chot("2026-09-01", { "Bạch tuộc 2 da lớn (80↑)": 100, "Bạch tuộc 2 da nhỏ (80↓)": 50 }),
-      chot("2026-09-03", { "Bạch tuộc 1 da": 999 }),
-      chot("2026-09-09", { "Bạch tuộc 2 da": 70 }),
+      makeLock("2026-09-01", { "Bạch tuộc 2 da lớn (80↑)": 100, "Bạch tuộc 2 da nhỏ (80↓)": 50 }),
+      makeLock("2026-09-03", { "Bạch tuộc 1 da": 999 }),
+      makeLock("2026-09-09", { "Bạch tuộc 2 da": 70 }),
     ];
     expect(conDoTheoNgay(locks, K1)).toEqual({ "2026-09-01": 150 });
   });
 });
 
 describe("tinhTonNLTong — bán nội địa là khoản XUẤT, trừ tồn NL", () => {
-  const nhap = (deliveryDate: string, kg: number, ten = "Bạch tuộc 2 da lớn (80↑)"): MaterialImportItem =>
+  const makeImport = (deliveryDate: string, kg: number, ten = "Bạch tuộc 2 da lớn (80↑)"): MaterialImportItem =>
     ({
       id: `n${deliveryDate}${kg}`,
       shipmentId: "",
@@ -143,7 +143,7 @@ describe("tinhTonNLTong — bán nội địa là khoản XUẤT, trừ tồn NL
   const range = { tuNgay: "2026-10-05", denNgay: "2026-10-07" };
 
   test("trong kỳ: tồn cuối = tồn đầu + nhập − bán nội địa; cùng HỌ gộp lớn/nhỏ", () => {
-    const kq = tinhTonNLTong([], [], [nhap("2026-10-05", 5000)], [], [], range, [ban("2026-10-06", 987)]);
+    const kq = tinhTonNLTong([], [], [makeImport("2026-10-05", 5000)], [], [], range, [ban("2026-10-06", 987)]);
     expect(kq.theoHo).toHaveLength(1);
     const h = kq.theoHo[0];
     expect(h.banNoiDia).toBe(987);
@@ -154,7 +154,7 @@ describe("tinhTonNLTong — bán nội địa là khoản XUẤT, trừ tồn NL
 
   test("bán TRƯỚC kỳ trừ vào tồn đầu; bán ngoài kỳ (sau) không tính", () => {
     const kq = tinhTonNLTong(
-      [], [], [nhap("2026-10-01", 3000)], [], [], range,
+      [], [], [makeImport("2026-10-01", 3000)], [], [], range,
       [ban("2026-10-02", 500), ban("2026-10-09", 70)],
     );
     expect(kq.theoHo[0].tonDau).toBe(2500);
@@ -171,7 +171,7 @@ describe("tinhTonNLTong — bán nội địa là khoản XUẤT, trừ tồn NL
   });
 
   test("bảng theo ngày: ngày chỉ có bán nội địa cũng thành dòng, tồn giảm dần", () => {
-    const kq = tinhTonNLTong([], [], [nhap("2026-10-05", 2000)], [], [], range, [ban("2026-10-06", 300)]);
+    const kq = tinhTonNLTong([], [], [makeImport("2026-10-05", 2000)], [], [], range, [ban("2026-10-06", 300)]);
     expect(kq.theoNgay.map((d) => [d.date, d.nhap, d.banNoiDia, d.tonCuoi])).toEqual([
       ["2026-10-05", 2000, 0, 2000],
       ["2026-10-06", 0, 300, 1700],
@@ -179,36 +179,36 @@ describe("tinhTonNLTong — bán nội địa là khoản XUẤT, trừ tồn NL
   });
 
   test("không truyền sổ bán nội địa ⇒ kết quả y như trước", () => {
-    const kq = tinhTonNLTong([], [], [nhap("2026-10-05", 1234)], [], [], range);
+    const kq = tinhTonNLTong([], [], [makeImport("2026-10-05", 1234)], [], [], range);
     expect(kq.tongTonCuoi).toBe(1234);
     expect(kq.tongBanNoiDia).toBe(0);
   });
 });
 
 describe("tinhTonNLTong — tồn đầu khai tay có mốc NẰM GIỮA khoảng xem", () => {
-  const nhap = (id: string, deliveryDate: string, kg: number): MaterialImportItem =>
+  const makeImport = (id: string, deliveryDate: string, kg: number): MaterialImportItem =>
     ({ id, shipmentId: "", deliveryDate, workshop: "Đông", category: "Bạch tuộc", materialTypeName: "Bạch tuộc 2 da", quantityKg: kg }) as MaterialImportItem;
   const opening: MaterialOpeningStock[] = [
     { id: "o1", workshop: "Đông", materialTypeName: "Bạch tuộc 2 da", asOfDate: "2026-07-01", quantityKg: 1000, note: "" },
   ];
-  const nhapDs = [nhap("a", "2026-06-20", 50), nhap("b", "2026-07-10", 300)];
-  const cuoi = (tuNgay: string, denNgay: string) => tinhTonNLTong([], [], nhapDs, opening, [], { tuNgay, denNgay }).tongTonCuoi;
+  const importList = [makeImport("a", "2026-06-20", 50), makeImport("b", "2026-07-10", 300)];
+  const last = (fromDate: string, toDate: string) => tinhTonNLTong([], [], importList, opening, [], { tuNgay: fromDate, denNgay: toDate }).tongTonCuoi;
 
   test("xem tháng 7 (mốc = đầu khoảng): 1000 + 300", () => {
-    expect(cuoi("2026-07-01", "2026-07-31")).toBe(1300);
+    expect(last("2026-07-01", "2026-07-31")).toBe(1300);
   });
   test("xem 01/06–31/07 hoặc cả năm: tồn đầu vẫn áp ⇒ cùng 1300 (không rơi về 300/350)", () => {
-    expect(cuoi("2026-06-01", "2026-07-31")).toBe(1300);
-    expect(cuoi("2026-01-01", "2026-12-31")).toBe(1300);
+    expect(last("2026-06-01", "2026-07-31")).toBe(1300);
+    expect(last("2026-01-01", "2026-12-31")).toBe(1300);
   });
   test("mốc giữa khoảng: nhập TRƯỚC mốc đã nằm trong số khai tay ⇒ không cộng; nhập từ mốc vào cột nhập", () => {
-    const kq = tinhTonNLTong([], [], nhapDs, opening, [], { tuNgay: "2026-06-01", denNgay: "2026-07-31" });
+    const kq = tinhTonNLTong([], [], importList, opening, [], { tuNgay: "2026-06-01", denNgay: "2026-07-31" });
     expect(kq.theoHo[0]!.tonDau).toBe(1000);
     expect(kq.theoHo[0]!.nhapKy).toBe(300);
     expect(kq.theoHo[0]!.seedTonDau).toBe(true);
     expect(kq.theoNgay.at(-1)!.tonCuoi).toBe(1300);
   });
   test("xem TRƯỚC mốc (tháng 6): chưa có khai tay ⇒ chỉ nhập tháng 6", () => {
-    expect(cuoi("2026-06-01", "2026-06-30")).toBe(50);
+    expect(last("2026-06-01", "2026-06-30")).toBe(50);
   });
 });

@@ -31,38 +31,38 @@ import {
   type DongChay,
 } from "./dongChay";
 
-const chuyen = (id: string, ngay: string, xuong: Workshop, dl = "Hồng Phú", ghiSo = ngay): ImportShipment => ({
-  id, deliveryDate: ngay, postingDate: ghiSo, backdateReason: ghiSo > ngay ? "quên ghi" : "", workshop: xuong,
+const makeShipment = (id: string, date: string, workshop: Workshop, dl = "Hồng Phú", bookDate = date): ImportShipment => ({
+  id, deliveryDate: date, postingDate: bookDate, backdateReason: bookDate > date ? "quên ghi" : "", workshop: workshop,
   supplierName: dl, driverName: "", licensePlate: "", note: "",
 });
-const nhap = (id: string, shipmentId: string, ngay: string, xuong: Workshop, kg: number, dl = "Hồng Phú"): MaterialImportItem => ({
-  id, shipmentId, deliveryDate: ngay, workshop: xuong, category: "Mực", supplierName: dl, materialTypeName: "Mực ống",
+const makeImport = (id: string, shipmentId: string, date: string, workshop: Workshop, kg: number, dl = "Hồng Phú"): MaterialImportItem => ({
+  id, shipmentId, deliveryDate: date, workshop: workshop, category: "Mực", supplierName: dl, materialTypeName: "Mực ống",
   quantityKg: kg, unitPrice: 50000, driverName: "", licensePlate: "", note: "",
 });
-const me = (id: string, ngay: string, xuong: Workshop, kg: number, status: WipProductionItem["status"] = "da-nhap", productId = "mh1"): WipProductionItem => ({
-  id, productionDate: ngay, postingDate: ngay, backdateReason: "", workshop: xuong, productId, spec: "",
+const me = (id: string, date: string, workshop: Workshop, kg: number, status: WipProductionItem["status"] = "da-nhap", productId = "mh1"): WipProductionItem => ({
+  id, productionDate: date, postingDate: date, backdateReason: "", workshop: workshop, productId, spec: "",
   quantityKg: kg, blocksCount: 0, warehouse: "", status, note: "",
 });
-const goi = (id: string, ngay: string, vao: number, ra: number): Packaging => ({
-  id, date: ngay, workshop: "Đông", fromProductId: "mh1", fromSpec: "", inputKg: vao, inputBlocks: 0,
+const goi = (id: string, date: string, inputKg: number, ra: number): Packaging => ({
+  id, date: date, workshop: "Đông", fromProductId: "mh1", fromSpec: "", inputKg: inputKg, inputBlocks: 0,
   toProductId: "mh2", toSpec: "", outputKg: ra, outputUnits: 1, warehouse: "", note: "",
 });
-const phieuBan = (id: string, ngay: string): SalesInvoice => ({
-  id, deliveryDate: ngay, postingDate: ngay, backdateReason: "", workshop: "Đông", customerId: "k1", channel: "Nội địa", note: "",
+const makeSalesInvoice = (id: string, date: string): SalesInvoice => ({
+  id, deliveryDate: date, postingDate: date, backdateReason: "", workshop: "Đông", customerId: "k1", channel: "Nội địa", note: "",
 });
-const ban = (id: string, invoiceId: string, ngay: string, productId: string, kg: number, nguon: string): SalesItem => ({
-  id, invoiceId, deliveryDate: ngay, productId, spec: "", quantityKg: kg, unitPrice: 1, sourceWarehouse: nguon,
+const ban = (id: string, invoiceId: string, date: string, productId: string, kg: number, source: string): SalesItem => ({
+  id, invoiceId, deliveryDate: date, productId, spec: "", quantityKg: kg, unitPrice: 1, sourceWarehouse: source,
 });
-const chot = (ngay: string, xuong: Workshop, kg: number, conDo = 0): DailyLock => ({
-  id: `${ngay}|${xuong}`, lockDate: ngay, workshop: xuong, isLocked: true, lockedAt: "", totalKgAtLock: kg,
-  reopenReason: "", note: "", leftoverKg: conDo,
+const makeLock = (date: string, workshop: Workshop, kg: number, leftoverKg = 0): DailyLock => ({
+  id: `${date}|${workshop}`, lockDate: date, workshop: workshop, isLocked: true, lockedAt: "", totalKgAtLock: kg,
+  reopenReason: "", note: "", leftoverKg: leftoverKg,
 });
-const gan = (outputId: string, kg: number | null): LotInput => ({
+const lotInput = (outputId: string, kg: number | null): LotInput => ({
   id: `li-${outputId}`, outputKind: "W", outputId, inputKind: "S", inputId: "n1", inputLabel: "", material: "",
   quantityKg: kg, method: "chon", operator: "", recordedAt: "",
 });
 
-function duLieu(p: Partial<DuLieuDongChay> = {}): DuLieuDongChay {
+function makeFlowData(p: Partial<DuLieuDongChay> = {}): DuLieuDongChay {
   return {
     shipments: [], imports: [], wips: [], packagings: [], lotInputs: [], exportItems: [], exportOrders: [],
     salesOrders: [], products: [{ id: "mh1", code: "", name: "Mực cắt", finishedGoodCode: "" }, { id: "mh2", code: "", name: "Mực khay", finishedGoodCode: "" }],
@@ -74,11 +74,11 @@ function duLieu(p: Partial<DuLieuDongChay> = {}): DuLieuDongChay {
 }
 
 /** Bất biến: mọi nút có cả vào lẫn ra ⇒ Σ vào = Σ ra. */
-function kiemCanBang(dc: DongChay) {
+function checkBalance(dc: DongChay) {
   for (const n of dc.nut) {
-    const vao = dc.canh.filter((c) => c.den === n.id).reduce((s, c) => s + c.kg, 0);
+    const inputKg = dc.canh.filter((c) => c.den === n.id).reduce((s, c) => s + c.kg, 0);
     const ra = dc.canh.filter((c) => c.tu === n.id).reduce((s, c) => s + c.kg, 0);
-    if (vao > 0 && ra > 0) expect(Math.abs(vao - ra), n.id).toBeLessThan(1e-6);
+    if (inputKg > 0 && ra > 0) expect(Math.abs(inputKg - ra), n.id).toBeLessThan(1e-6);
   }
   for (const c of dc.canh) expect(c.kg).toBeGreaterThan(0);
 }
@@ -87,17 +87,17 @@ const K = { tu: "2026-09-01", den: "2026-09-30" };
 
 // Kịch bản chuỗi: 1.000 kg NL → 600 kg BTP (500 nhập kho, 100 chờ) + phế 50 + còn dở 100
 // → kho: đóng gói 300 (ra 290), xuất đơn 100, bán block 50 → TP: bán 200.
-const chuoi = duLieu({
-  shipments: [chuyen("c1", "2026-09-02", "Đông")],
-  imports: [nhap("n1", "c1", "2026-09-02", "Đông", 1000)],
+const chuoi = makeFlowData({
+  shipments: [makeShipment("c1", "2026-09-02", "Đông")],
+  imports: [makeImport("n1", "c1", "2026-09-02", "Đông", 1000)],
   wips: [me("w1", "2026-09-02", "Đông", 500), me("w2", "2026-09-03", "Đông", 100, "cho-nhap")],
   scraps: [{ id: "pl1", periodId: "", name: "Nội tạng", quantityKg: 50, sellingPrice: 0, date: "2026-09-02", workshop: "Đông", source: "Nhập hàng" }],
-  productionLocks: [chot("2026-09-02", "Đông", 500, 100)],
-  dailyLocks: [chot("2026-09-02", "Đông", 1000)],
+  productionLocks: [makeLock("2026-09-02", "Đông", 500, 100)],
+  dailyLocks: [makeLock("2026-09-02", "Đông", 1000)],
   packagings: [goi("g1", "2026-09-05", 300, 290)],
   exportOrders: [{ id: "lx1", orderId: "d1", exportDate: "2026-09-06", status: "dong", note: "" } as ExportOrder],
   exportItems: [{ id: "x1", exportId: "lx1", wipId: "w1", productId: "mh1", spec: "", quantityKg: 100, blocksCount: 0 } as ExportItem],
-  salesInvoices: [phieuBan("pb1", "2026-09-07")],
+  salesInvoices: [makeSalesInvoice("pb1", "2026-09-07")],
   salesItems: [ban("b1", "pb1", "2026-09-07", "mh1", 50, KHO_BAN_LE), ban("b2", "pb1", "2026-09-07", "mh2", 200, KHO_TP)],
 });
 
@@ -111,7 +111,7 @@ describe("cacNgay", () => {
 describe("dongChayKg", () => {
   it("đi đủ chuỗi, cân bằng kg ở mọi nút, gọi tên phần hụt", () => {
     const dc = dongChayKg(chuoi, K);
-    kiemCanBang(dc);
+    checkBalance(dc);
     const kg = (tu: string, den: string) => dc.canh.find((c) => c.tu === tu && c.den === den)?.kg ?? 0;
     expect(dc.tongNhap).toBe(1000);
     expect(kg("dl:Hồng Phú", "x:Đông")).toBe(1000);
@@ -134,29 +134,29 @@ describe("dongChayKg", () => {
 
   it("ra nhiều hơn vào ⇒ thêm nút nguồn 'tồn trước kỳ', vẫn cân bằng", () => {
     // Kỳ tháng 10: không SX, chỉ xuất 100 kg từ mẻ tháng 9 + SX nhiều hơn nhập.
-    const d = duLieu({
-      imports: [nhap("n2", "c2", "2026-10-01", "Cá", 100)],
+    const d = makeFlowData({
+      imports: [makeImport("n2", "c2", "2026-10-01", "Cá", 100)],
       wips: [me("w9", "2026-09-20", "Cá", 300), me("w10", "2026-10-01", "Cá", 150)],
       exportOrders: [{ id: "lx", orderId: "d", exportDate: "2026-10-02", status: "dong", note: "" } as ExportOrder],
       exportItems: [{ id: "x", exportId: "lx", wipId: "w9", productId: "mh1", spec: "", quantityKg: 250, blocksCount: 0 } as ExportItem],
     });
     const dc = dongChayKg(d, { tu: "2026-10-01", den: "2026-10-31" });
-    kiemCanBang(dc);
+    checkBalance(dc);
     expect(dc.canh.find((c) => c.tu === "nlTruoc")?.kg).toBe(50);
     expect(dc.canh.find((c) => c.tu === "tonBtpDau")?.kg).toBe(100);
   });
 
   it("đóng gói ra vượt BTP vào ⇒ gọi tên phần dư, vẫn cân bằng", () => {
-    const d = duLieu({ wips: [me("w", "2026-09-02", "Đông", 100)], packagings: [goi("g", "2026-09-03", 50, 60)] });
+    const d = makeFlowData({ wips: [me("w", "2026-09-02", "Đông", 100)], packagings: [goi("g", "2026-09-03", 50, 60)] });
     const dc = dongChayKg(d, K);
-    kiemCanBang(dc);
+    checkBalance(dc);
     expect(dc.canh.find((c) => c.tu === "goiDu")?.kg).toBe(10);
     expect(dc.canh.find((c) => c.den === "tonTp")?.kg).toBe(60);
   });
 
   it("lọc xưởng: chỉ còn số của xưởng đó", () => {
-    const d = duLieu({
-      imports: [nhap("a", "c", "2026-09-02", "Đông", 100), nhap("b", "c", "2026-09-02", "Khô", 70, "Bê 3")],
+    const d = makeFlowData({
+      imports: [makeImport("a", "c", "2026-09-02", "Đông", 100), makeImport("b", "c", "2026-09-02", "Khô", 70, "Bê 3")],
     });
     const dc = dongChayKg(d, { ...K, xuong: "Khô" });
     expect(dc.tongNhap).toBe(70);
@@ -164,8 +164,8 @@ describe("dongChayKg", () => {
   });
 
   it("gộp đại lý nhỏ thành 'Đại lý khác' khi quá 5", () => {
-    const ds = ["A", "B", "C", "D", "E", "F", "G"].map((t, i) => nhap(`n${i}`, "c", "2026-09-02", "Đông", 100 - i, t));
-    const dc = dongChayKg(duLieu({ imports: ds }), K);
+    const ds = ["A", "B", "C", "D", "E", "F", "G"].map((t, i) => makeImport(`n${i}`, "c", "2026-09-02", "Đông", 100 - i, t));
+    const dc = dongChayKg(makeFlowData({ imports: ds }), K);
     expect(dc.nut.filter((n) => n.nhom === "nguon").map((n) => n.nhan)).toEqual(["A", "B", "C", "D", "E", "Đại lý khác"]);
     expect(dc.canh.find((c) => c.tu === "dl:*")?.kg).toBe(94 + 95);
   });
@@ -189,38 +189,38 @@ describe("phanBoRa", () => {
 
 describe("bangChuyen", () => {
   it("kg từng khâu, kg chờ duyệt, tỉ lệ chuyển tiếp", () => {
-    const bc = bangChuyen(chuoi, K);
-    expect(bc.map((x) => x.khoa)).toEqual(["nhap", "san-xuat", "kho", "dong-goi", "xuat-ban"]);
-    expect(bc.map((x) => x.kg)).toEqual([1000, 600, 500, 290, 350]);
-    expect(bc[2].kgCho).toBe(100);
-    expect(bc[0].tiLeChuyen).toBeNull();
-    expect(bc[1].tiLeChuyen).toBeCloseTo(0.6);
+    const conveyor = bangChuyen(chuoi, K);
+    expect(conveyor.map((x) => x.khoa)).toEqual(["nhap", "san-xuat", "kho", "dong-goi", "xuat-ban"]);
+    expect(conveyor.map((x) => x.kg)).toEqual([1000, 600, 500, 290, 350]);
+    expect(conveyor[2].kgCho).toBe(100);
+    expect(conveyor[0].tiLeChuyen).toBeNull();
+    expect(conveyor[1].tiLeChuyen).toBeCloseTo(0.6);
     // Đóng gói và xuất/bán cùng rút từ kho ⇒ chia cho kg nhập kho, không chia nối tiếp.
-    expect(bc[3].tiLeChuyen).toBeCloseTo(290 / 500);
-    expect(bc[4].tiLeChuyen).toBeCloseTo(350 / 500);
+    expect(conveyor[3].tiLeChuyen).toBeCloseTo(290 / 500);
+    expect(conveyor[4].tiLeChuyen).toBeCloseTo(350 / 500);
     // Mẻ chưa gắn lô ⇒ khâu SX có việc thiếu.
-    expect(bc[1].viecThieu).toBeGreaterThan(0);
+    expect(conveyor[1].viecThieu).toBeGreaterThan(0);
   });
 });
 
 describe("chuoiTheoNgay", () => {
   it("tồn BTP + TP cuối ngày theo đúng engine sổ tồn", () => {
     const ds = chuoiTheoNgay(chuoi, { tu: "2026-09-01", den: "2026-09-07" });
-    const ngay = (n: string) => ds.find((x) => x.ngay === n)!;
+    const date = (n: string) => ds.find((x) => x.ngay === n)!;
     expect(ds).toHaveLength(7);
-    expect(ngay("2026-09-01").tonBtp).toBe(0);
-    expect(ngay("2026-09-02")).toMatchObject({ nhap: 1000, sanXuat: 500, tonBtp: 500 });
-    expect(ngay("2026-09-03")).toMatchObject({ sanXuat: 100, tonBtp: 500 }); // mẻ chờ duyệt chưa vào kho
-    expect(ngay("2026-09-05")).toMatchObject({ tonBtp: 200, tonTp: 290 });
-    expect(ngay("2026-09-07")).toMatchObject({ tonBtp: 50, tonTp: 90 });
+    expect(date("2026-09-01").tonBtp).toBe(0);
+    expect(date("2026-09-02")).toMatchObject({ nhap: 1000, sanXuat: 500, tonBtp: 500 });
+    expect(date("2026-09-03")).toMatchObject({ sanXuat: 100, tonBtp: 500 }); // mẻ chờ duyệt chưa vào kho
+    expect(date("2026-09-05")).toMatchObject({ tonBtp: 200, tonTp: 290 });
+    expect(date("2026-09-07")).toMatchObject({ tonBtp: 50, tonTp: 90 });
   });
 });
 
 describe("dinhMucTheoMatHang", () => {
   it("chỉ tính mẻ đã gắn lô có kg, bình quân gia quyền, cờ lệch ±5%", () => {
-    const d = duLieu({
+    const d = makeFlowData({
       wips: [me("a", "2026-09-02", "Đông", 100), me("b", "2026-09-02", "Đông", 100, "da-nhap", "mh2"), me("c", "2026-09-02", "Đông", 100)],
-      lotInputs: [gan("a", 110), gan("b", 130), gan("c", null)],
+      lotInputs: [lotInput("a", 110), lotInput("b", 130), lotInput("c", null)],
     });
     const { dong, binhQuan } = dinhMucTheoMatHang(d, K);
     expect(binhQuan).toBeCloseTo(240 / 200);
@@ -238,33 +238,33 @@ describe("dinhMucTheoMatHang", () => {
 
 describe("canhBaoChuoi", () => {
   it("bắt ngày chưa chốt, đổi sau chốt, ghi bù, chờ duyệt lâu, lô chưa gắn", () => {
-    const d = duLieu({
+    const d = makeFlowData({
       ...chuoi,
-      shipments: [...chuoi.shipments, chuyen("c9", "2026-09-10", "Cá", "Bê 3", "2026-09-12")],
-      imports: [...chuoi.imports, nhap("n9", "c9", "2026-09-10", "Cá", 80, "Bê 3"), nhap("n10", "c1", "2026-09-02", "Đông", 5)],
+      shipments: [...chuoi.shipments, makeShipment("c9", "2026-09-10", "Cá", "Bê 3", "2026-09-12")],
+      imports: [...chuoi.imports, makeImport("n9", "c9", "2026-09-10", "Cá", 80, "Bê 3"), makeImport("n10", "c1", "2026-09-02", "Đông", 5)],
     });
     const cb = canhBaoChuoi(d, K, "2026-09-20");
-    const loai = (l: string) => cb.filter((x) => x.loai === l);
-    expect(loai("doi-sau-chot")).toHaveLength(1); // chốt 1.000, nay 1.005
-    expect(loai("chua-chot-nhap").map((x) => x.xuong)).toEqual(["Cá"]);
-    expect(loai("chua-chot-sx").map((x) => x.ngay)).toEqual(["2026-09-03"]);
-    expect(loai("ghi-bu").map((x) => x.id)).toEqual(["gbn|c9"]);
-    expect(loai("cho-duyet-lau").map((x) => x.duongDan)).toEqual(["/warehouse?duyet=W:w2"]);
-    expect(loai("lo-chua-gan").length).toBeGreaterThan(0);
+    const warningsOfKind = (l: string) => cb.filter((x) => x.loai === l);
+    expect(warningsOfKind("doi-sau-chot")).toHaveLength(1); // chốt 1.000, nay 1.005
+    expect(warningsOfKind("chua-chot-nhap").map((x) => x.xuong)).toEqual(["Cá"]);
+    expect(warningsOfKind("chua-chot-sx").map((x) => x.ngay)).toEqual(["2026-09-03"]);
+    expect(warningsOfKind("ghi-bu").map((x) => x.id)).toEqual(["gbn|c9"]);
+    expect(warningsOfKind("cho-duyet-lau").map((x) => x.duongDan)).toEqual(["/warehouse?duyet=W:w2"]);
+    expect(warningsOfKind("lo-chua-gan").length).toBeGreaterThan(0);
     // Lỗi đứng trước nhắc, nhắc trước tin.
     const thuTu = cb.map((x) => x.muc);
     expect(thuTu.indexOf("tin")).toBeGreaterThan(thuTu.lastIndexOf("loi"));
   });
 
   it("hôm nay chưa chốt thì chưa nhắc", () => {
-    const cb = canhBaoChuoi(duLieu({ imports: [nhap("n", "c", "2026-09-20", "Đông", 10)] }), K, "2026-09-20");
+    const cb = canhBaoChuoi(makeFlowData({ imports: [makeImport("n", "c", "2026-09-20", "Đông", 10)] }), K, "2026-09-20");
     expect(cb.filter((x) => x.loai === "chua-chot-nhap")).toEqual([]);
   });
 
   it("bán vượt tồn BTP được gọi tên", () => {
-    const d = duLieu({
+    const d = makeFlowData({
       wips: [me("w", "2026-09-02", "Đông", 100)],
-      salesInvoices: [phieuBan("pb", "2026-09-03")],
+      salesInvoices: [makeSalesInvoice("pb", "2026-09-03")],
       salesItems: [ban("b", "pb", "2026-09-03", "mh1", 130, KHO_BAN_LE)],
     });
     const cb = canhBaoChuoi(d, K, "2026-09-20").filter((x) => x.loai === "ban-vuot");
@@ -277,11 +277,11 @@ describe("canhBaoChuoi", () => {
       id, materialTypeName: "Bạch tuộc", dateRangeDescription: id, startDate: start, endDate: start,
       totalInputKg: null, exchangeRate: 25000, processingCostPerKg: 0, createdAt: start,
     });
-    const vao = (periodId: string, kg: number) => ({ id: `i${periodId}`, periodId, groupName: "Thủy sản", name: "BT", quantityKg: kg, unitPrice: 1, ratioPercentage: null }) as BalancingInputItem;
+    const inputKg = (periodId: string, kg: number) => ({ id: `i${periodId}`, periodId, groupName: "Thủy sản", name: "BT", quantityKg: kg, unitPrice: 1, ratioPercentage: null }) as BalancingInputItem;
     const ra = (periodId: string, kg: number) => ({ id: `o${periodId}`, periodId, productId: "mh1", customerId: "", channel: "Nội địa", quantityKg: kg, unitPrice: 1 }) as BalancingOutputItem;
-    const d = duLieu({
+    const d = makeFlowData({
       periods: [ky("k1", "2026-09-05"), ky("k2", "2026-09-10"), ky("k3", "2026-09-15")],
-      balancingInputs: [vao("k1", 2000), vao("k2", 2000), vao("k3", 2400)],
+      balancingInputs: [inputKg("k1", 2000), inputKg("k2", 2000), inputKg("k3", 2400)],
       balancingOutputs: [ra("k1", 1000), ra("k2", 1000), ra("k3", 1000)],
     });
     expect(ketQuaCacKy(d).map((x) => x.period.id)).toEqual(["k3", "k2", "k1"]);

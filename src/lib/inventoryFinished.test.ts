@@ -7,20 +7,20 @@ const me = (id: string, productionDate: string, quantityKg: number): WipProducti
   ({ id, productId: "p1", spec: "s1", productionDate, quantityKg, blocksCount: 0, status: "da-nhap", warehouse: "" }) as WipProductionItem;
 const ban = (id: string, deliveryDate: string, quantityKg: number): SalesItem =>
   ({ id, productId: "p1", spec: "s1", deliveryDate, quantityKg, sourceWarehouse: KHO_BAN_LE }) as SalesItem;
-const tonDau = (asOfDate: string, quantityKg: number): FinishedGoodsOpeningStock => ({
+const makeOpening = (asOfDate: string, quantityKg: number): FinishedGoodsOpeningStock => ({
   id: `o${asOfDate}`, productId: "p1", spec: "s1", asOfDate, quantityKg, blocksCount: 0, warehouse: "", note: "",
 });
 
-const goi = (tuNgay: string, denNgay: string, p: Partial<NxtTPArgs> = {}) =>
+const goi = (fromDate: string, toDate: string, p: Partial<NxtTPArgs> = {}) =>
   tongSoTonTP(
     tinhSoTonTP({
       sanXuat: [], exportOrders: [], exportItems: [], salesItems: [], packagings: [] as Packaging[],
-      opening: [], products: [], tuNgay, denNgay, ...p,
+      opening: [], products: [], tuNgay: fromDate, denNgay: toDate, ...p,
     })
   );
 
 describe("tinhSoTonTP — tồn đầu khai tay có mốc (cùng quy tắc với sổ NL)", () => {
-  const opening = [tonDau("2026-07-01", 500)];
+  const opening = [makeOpening("2026-07-01", 500)];
 
   test("xem tháng 7 (mốc = đầu khoảng) và xem cả năm (mốc giữa khoảng) cùng ra 500", () => {
     expect(goi("2026-07-01", "2026-07-31", { opening }).tonCuoi).toBe(500);

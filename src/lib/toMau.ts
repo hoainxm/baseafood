@@ -24,7 +24,7 @@ export interface DichTo {
 }
 
 /* Bản đầu (sáng 2026-10-06) lưu 4 mã trơn — đọc ra mức 2 của sắc tương ứng. */
-const MA_CU: Record<string, MaMauTo> = {
+const LEGACY_CODES: Record<string, MaMauTo> = {
   vang: "vang-2",
   "xanh-la": "la-2",
   "xanh-duong": "duong-2",
@@ -34,7 +34,7 @@ const RE_MA = new RegExp(`^(${SAC_TO_LIB.join("|")})-[1-5]$`);
 
 /** Mã màu lạ (bản app mới hơn ghi) ⇒ coi như không màu, không vỡ. */
 export function chuanMau(v: string): MaMauTo | "" {
-  if (MA_CU[v]) return MA_CU[v];
+  if (LEGACY_CODES[v]) return LEGACY_CODES[v];
   return RE_MA.test(v) ? (v as MaMauTo) : "";
 }
 
@@ -58,9 +58,9 @@ export function dauCuaBang(
   const o = new Map<string, DauDong>();
   for (const m of marks) {
     if (m.tableKey !== tableKey) continue;
-    const mau = chuanMau(m.color);
-    if (!mau && !m.bold) continue;
-    const dau = { mau, dam: m.bold };
+    const color = chuanMau(m.color);
+    if (!color && !m.bold) continue;
+    const dau = { mau: color, dam: m.bold };
     if (m.columnKey == null) dong.set(m.rowId, dau);
     else o.set(khoaO(m.rowId, m.columnKey), dau);
   }
@@ -76,19 +76,19 @@ export function dauCuaBang(
 export function datDau(
   marks: RowMark[],
   tableKey: string,
-  dich: (string | DichTo)[],
+  target: (string | DichTo)[],
   dau: DauDong | null,
-  nguoi: string,
+  user: string,
   luc: string = new Date().toISOString()
 ): RowMark[] {
-  const ds = dich.map((d) => (typeof d === "string" ? { dong: d, cot: null } : d));
+  const ds = target.map((d) => (typeof d === "string" ? { dong: d, cot: null } : d));
   const theoId = new Map(ds.map((d) => [idDauTo(tableKey, d.dong, d.cot), d]));
   const bo = !dau || (!dau.mau && !dau.dam);
-  const conLai = marks.filter((m) => !theoId.has(m.id));
-  if (bo) return conLai;
-  const cu = new Map(marks.map((m) => [m.id, m]));
-  const moi = [...theoId].map(([id, d]): RowMark => {
-    const c = cu.get(id);
+  const remaining = marks.filter((m) => !theoId.has(m.id));
+  if (bo) return remaining;
+  const prev = new Map(marks.map((m) => [m.id, m]));
+  const nextMarks = [...theoId].map(([id, d]): RowMark => {
+    const c = prev.get(id);
     // Giữ nguyên bản cũ khi không đổi gì ⇒ repo không đẩy cập nhật thừa.
     if (c && chuanMau(c.color) === dau.mau && c.bold === dau.dam) return c;
     return {
@@ -98,9 +98,9 @@ export function datDau(
       columnKey: d.cot,
       color: dau.mau,
       bold: dau.dam,
-      markedBy: nguoi,
+      markedBy: user,
       markedAt: luc,
     };
   });
-  return [...conLai, ...moi];
+  return [...remaining, ...nextMarks];
 }

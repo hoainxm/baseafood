@@ -147,8 +147,8 @@ export function tinhSoTonTP(args: NxtTPArgs): SoTonTPRow[] {
   const map = new Map<string, Acc>();
 
   // Ngày xuất của mỗi lệnh
-  const ngayLenh = new Map<string, string>();
-  for (const l of exportOrders) ngayLenh.set(l.id, l.exportDate);
+  const exportDateById = new Map<string, string>();
+  for (const l of exportOrders) exportDateById.set(l.id, l.exportDate);
 
   // Tồn đầu khai tay: áp khi mốc ≤ CUỐI khoảng xem (mốc giữa khoảng cũng áp).
   for (const o of opening) {
@@ -160,14 +160,14 @@ export function tinhSoTonTP(args: NxtTPArgs): SoTonTPRow[] {
     if (o.asOfDate && o.asOfDate > a.moc) a.moc = o.asOfDate;
   }
   /** Phát sinh trước mốc khai tay đã nằm trong số khai ⇒ bỏ, không cộng chồng. */
-  const truocMoc = (a: Acc, ngay: string) => !!a.moc && ngay < a.moc;
+  const isBeforeCutoff = (a: Acc, date: string) => !!a.moc && date < a.moc;
 
   // Nhập kho = BTP đã duyệt (da-nhap), theo ngày SX
   for (const s of sanXuat) {
     if (s.status !== "da-nhap") continue;
     if (s.productionDate > denNgay) continue;
     const a = layAcc(map, s.productId, s.spec);
-    if (truocMoc(a, s.productionDate)) continue;
+    if (isBeforeCutoff(a, s.productionDate)) continue;
     if (s.productionDate < tuNgay) {
       a.nhapTruocKg += s.quantityKg || 0;
       a.nhapTruocBlock += s.blocksCount || 0;
@@ -179,11 +179,11 @@ export function tinhSoTonTP(args: NxtTPArgs): SoTonTPRow[] {
 
   // Xuất đơn đặt = dòng lệnh, theo ngày lệnh xuất
   for (const d of exportItems) {
-    const ngay = ngayLenh.get(d.exportId);
-    if (!ngay || ngay > denNgay) continue;
+    const date = exportDateById.get(d.exportId);
+    if (!date || date > denNgay) continue;
     const a = layAcc(map, d.productId, d.spec);
-    if (truocMoc(a, ngay)) continue;
-    if (ngay < tuNgay) {
+    if (isBeforeCutoff(a, date)) continue;
+    if (date < tuNgay) {
       a.xuatDonTruocKg += d.quantityKg || 0;
       a.xuatDonTruocBlock += d.blocksCount || 0;
     } else {
@@ -197,7 +197,7 @@ export function tinhSoTonTP(args: NxtTPArgs): SoTonTPRow[] {
     if (b.sourceWarehouse !== KHO_BAN_LE) continue; // chỉ bán lẻ rút kho dự trữ mới trừ tồn BTP
     if (b.deliveryDate > denNgay) continue;
     const a = layAcc(map, b.productId, b.spec);
-    if (truocMoc(a, b.deliveryDate)) continue;
+    if (isBeforeCutoff(a, b.deliveryDate)) continue;
     if (b.deliveryDate < tuNgay) a.xuatBanTruocKg += b.quantityKg || 0;
     else a.xuatBanKyKg += b.quantityKg || 0;
   }
@@ -206,7 +206,7 @@ export function tinhSoTonTP(args: NxtTPArgs): SoTonTPRow[] {
   for (const p of packagings) {
     if (p.date > denNgay) continue;
     const a = layAcc(map, p.fromProductId, p.fromSpec);
-    if (truocMoc(a, p.date)) continue;
+    if (isBeforeCutoff(a, p.date)) continue;
     if (p.date < tuNgay) a.xuatGoiTruocKg += p.inputKg || 0;
     else a.xuatGoiKyKg += p.inputKg || 0;
   }
@@ -214,15 +214,15 @@ export function tinhSoTonTP(args: NxtTPArgs): SoTonTPRow[] {
   const tenMH = (id: string) => products.find((m) => m.id === id);
   const rows: SoTonTPRow[] = [];
   for (const a of map.values()) {
-    const tonDau =
+    const openingKg =
       a.openKg + a.nhapTruocKg - a.xuatDonTruocKg - a.xuatBanTruocKg - a.xuatGoiTruocKg;
-    const xuat = a.xuatDonKyKg + a.xuatBanKyKg + a.xuatGoiKyKg;
-    const tonCuoi = tonDau + a.nhapKyKg - xuat;
-    const tonDauBlock = a.openBlock + a.nhapTruocBlock - a.xuatDonTruocBlock;
-    const tonCuoiBlock = tonDauBlock + a.nhapKyBlock - a.xuatDonKyBlock;
+    const outKg = a.xuatDonKyKg + a.xuatBanKyKg + a.xuatGoiKyKg;
+    const closingKg = openingKg + a.nhapKyKg - outKg;
+    const openingBlocks = a.openBlock + a.nhapTruocBlock - a.xuatDonTruocBlock;
+    const closingBlocks = openingBlocks + a.nhapKyBlock - a.xuatDonKyBlock;
 
     // Bỏ dòng hoàn toàn trống (không tồn, không phát sinh trong kỳ)
-    if (tonDau === 0 && a.nhapKyKg === 0 && xuat === 0 && tonCuoi === 0) continue;
+    if (openingKg === 0 && a.nhapKyKg === 0 && outKg === 0 && closingKg === 0) continue;
 
     const p = tenMH(a.productId);
     rows.push({
@@ -230,18 +230,18 @@ export function tinhSoTonTP(args: NxtTPArgs): SoTonTPRow[] {
       productCode: p?.code || "",
       productName: p?.name || `Mặt hàng ${a.productId}`,
       spec: a.spec,
-      tonDau,
+      tonDau: openingKg,
       nhap: a.nhapKyKg,
       xuatDon: a.xuatDonKyKg,
       xuatBan: a.xuatBanKyKg,
       xuatDongGoi: a.xuatGoiKyKg,
-      xuat,
-      tonCuoi,
-      tonDauBlock,
+      xuat: outKg,
+      tonCuoi: closingKg,
+      tonDauBlock: openingBlocks,
       nhapBlock: a.nhapKyBlock,
       xuatBlock: a.xuatDonKyBlock,
-      tonCuoiBlock,
-      canhBaoAm: tonCuoi < 0,
+      tonCuoiBlock: closingBlocks,
+      canhBaoAm: closingKg < 0,
       seedTonDau: a.seed,
     });
   }

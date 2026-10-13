@@ -3,29 +3,29 @@ import type { ImportShipment, MaterialImportItem, Packaging, SalesItem, WipProdu
 import { banGhiIn, dsLoDeIn, theoGiaiDoan, ganLoChoPhien, loNlDeChon, meThieuLo, nhanLoNl, nutLo, soTemMacDinh, tomTatIn, type DuLieuTruyXuat } from "./truyXuatLo";
 import type { LabelPrint, LotInput, LotWaiver } from "@/types";
 
-const chuyen = (id: string, ngay: string, xuong: ImportShipment["workshop"], lotCode = ""): ImportShipment => ({
-  id, deliveryDate: ngay, postingDate: ngay, backdateReason: "", workshop: xuong,
+const makeShipment = (id: string, date: string, workshop: ImportShipment["workshop"], lotCode = ""): ImportShipment => ({
+  id, deliveryDate: date, postingDate: date, backdateReason: "", workshop: workshop,
   supplierName: "Hồng Phú", driverName: "", licensePlate: "", note: "", lotCode,
 });
-const dong = (shipmentId: string, ngay: string, kg: number, loai: string): MaterialImportItem =>
-  ({ id: `${shipmentId}-${loai}`, shipmentId, deliveryDate: ngay, workshop: "Đông", quantityKg: kg, materialTypeName: loai, category: loai }) as MaterialImportItem;
-const me = (id: string, ngay: string, xuong: WipProductionItem["workshop"]): WipProductionItem => ({
-  id, productionDate: ngay, postingDate: ngay, backdateReason: "", workshop: xuong, productId: "mh1",
+const dong = (shipmentId: string, date: string, kg: number, materialType: string): MaterialImportItem =>
+  ({ id: `${shipmentId}-${materialType}`, shipmentId, deliveryDate: date, workshop: "Đông", quantityKg: kg, materialTypeName: materialType, category: materialType }) as MaterialImportItem;
+const me = (id: string, date: string, workshop: WipProductionItem["workshop"]): WipProductionItem => ({
+  id, productionDate: date, postingDate: date, backdateReason: "", workshop: workshop, productId: "mh1",
   spec: "", quantityKg: 100, blocksCount: 0, warehouse: "", status: "cho-nhap" as WipProductionItem["status"], note: "",
 });
-const phieu = (id: string, ngay: string): Packaging => ({
-  id, date: ngay, workshop: "Đông", fromProductId: "mh1", fromSpec: "", inputKg: 50, inputBlocks: 0,
+const salesInvoice = (id: string, date: string): Packaging => ({
+  id, date: date, workshop: "Đông", fromProductId: "mh1", fromSpec: "", inputKg: 50, inputBlocks: 0,
   toProductId: "mh2", toSpec: "", outputKg: 48, outputUnits: 4, warehouse: "", note: "",
 });
 
 const dl: DuLieuTruyXuat = {
-  shipments: [chuyen("s1", "2026-09-01", "Đông", "Đ-260901-01"), chuyen("s2", "2026-09-03", "Cá"), chuyen("s3", "2026-08-20", "Đông")],
+  shipments: [makeShipment("s1", "2026-09-01", "Đông", "Đ-260901-01"), makeShipment("s2", "2026-09-03", "Cá"), makeShipment("s3", "2026-08-20", "Đông")],
   imports: [
     dong("s1", "2026-09-01", 1000, "Mực ống"), dong("s1", "2026-09-01", 200, "Bạch tuộc"),
     dong("s2", "2026-09-03", 300, "Cá thu"), dong("s3", "2026-08-20", 400, "Bạch tuộc"),
   ],
   wips: [me("w1", "2026-09-02", "Đông")],
-  packagings: [phieu("p1", "2026-09-02")],
+  packagings: [salesInvoice("p1", "2026-09-02")],
   lotInputs: [], exportItems: [], exportOrders: [], salesOrders: [], products: [], customers: [],
 };
 
@@ -51,7 +51,7 @@ describe("dsLoDeIn", () => {
 
 describe("nhanLoNl", () => {
   it("chuyến chưa có mã lô thì suy từ xưởng + ngày + đuôi id", () => {
-    expect(nhanLoNl({ ...chuyen("1787820268862-288016", "2026-08-26", "Đông") })).toBe("NĐ-260826-8016");
+    expect(nhanLoNl({ ...makeShipment("1787820268862-288016", "2026-08-26", "Đông") })).toBe("NĐ-260826-8016");
   });
 });
 
@@ -75,47 +75,47 @@ describe("sổ in tem", () => {
 });
 
 describe("đợt 2b — chọn lô, chốt ngày, tem, gắn phiên", () => {
-  const vao = (id: string, outputId: string, inputId: string, kg: number | null, luc: string) =>
+  const inputKg = (id: string, outputId: string, inputId: string, kg: number | null, luc: string) =>
     ({ id, outputKind: "W", outputId, inputKind: "S", inputId, inputLabel: "", material: "", quantityKg: kg, method: "chon", operator: "", recordedAt: luc }) as LotInput;
 
   it("loNlDeChon: lô cũ quá 45 ngày vẫn hiện nếu còn kg và đã vào thời truy xuất; lô cũ chưa từng theo dõi thì không", () => {
     const d: DuLieuTruyXuat = {
       ...dl,
-      shipments: [chuyen("moi", "2026-10-01", "Đông"), chuyen("dong", "2026-07-10", "Đông"), chuyen("xua", "2026-06-01", "Đông")],
+      shipments: [makeShipment("moi", "2026-10-01", "Đông"), makeShipment("dong", "2026-07-10", "Đông"), makeShipment("xua", "2026-06-01", "Đông")],
       imports: [dong("moi", "2026-10-01", 100, "Bạch tuộc"), dong("dong", "2026-07-10", 500, "Bạch tuộc"), dong("xua", "2026-06-01", 300, "Bạch tuộc")],
-      lotInputs: [vao("a", "w1", "dong-Bạch tuộc", 200, "2026-07-11T08:00:00Z")],
+      lotInputs: [inputKg("a", "w1", "dong-Bạch tuộc", 200, "2026-07-11T08:00:00Z")],
     };
     expect(loNlDeChon(d, "Đông", "2026-10-05").map((n) => n.id)).toEqual(["moi-Bạch tuộc", "dong-Bạch tuộc"]);
     // dùng hết lô đông ⇒ thôi gợi ý
-    const het = { ...d, lotInputs: [...d.lotInputs, vao("b", "w2", "dong-Bạch tuộc", 300, "2026-08-01T08:00:00Z")] };
+    const het = { ...d, lotInputs: [...d.lotInputs, inputKg("b", "w2", "dong-Bạch tuộc", 300, "2026-08-01T08:00:00Z")] };
     expect(loNlDeChon(het, "Đông", "2026-10-05").map((n) => n.id)).toEqual(["moi-Bạch tuộc"]);
   });
 
   it("loNlDeChon: cửa sổ 45 ngày tính theo NGÀY LỊCH, không lệch theo múi giờ máy (+07)", () => {
-    const tzCu = process.env.TZ;
+    const prevTz = process.env.TZ;
     process.env.TZ = "Asia/Ho_Chi_Minh";
     try {
       const d: DuLieuTruyXuat = {
         ...dl,
-        shipments: [chuyen("bien", "2026-08-24", "Đông"), chuyen("ngoai", "2026-08-23", "Đông")],
+        shipments: [makeShipment("bien", "2026-08-24", "Đông"), makeShipment("ngoai", "2026-08-23", "Đông")],
         imports: [dong("bien", "2026-08-24", 100, "Bạch tuộc"), dong("ngoai", "2026-08-23", 100, "Bạch tuộc")],
       };
       // 08/10 lùi 45 ngày = 24/08: chuyến 24/08 nằm trong cửa sổ, 23/08 thì không.
       expect(loNlDeChon(d, "Đông", "2026-10-08").map((n) => n.id)).toEqual(["bien-Bạch tuộc"]);
     } finally {
-      if (tzCu === undefined) delete process.env.TZ;
-      else process.env.TZ = tzCu;
+      if (prevTz === undefined) delete process.env.TZ;
+      else process.env.TZ = prevTz;
     }
   });
 
   it("meThieuLo: mẻ có lô hoặc có lý do thì không còn thiếu", () => {
-    const lyDo = [{ outputKind: "W", outputId: "b" } as LotWaiver];
-    const ds = meThieuLo([{ id: "a" }, { id: "b" }, { id: "c" }], [vao("x", "a", "s1", null, "")], lyDo);
+    const waivers = [{ outputKind: "W", outputId: "b" } as LotWaiver];
+    const ds = meThieuLo([{ id: "a" }, { id: "b" }, { id: "c" }], [inputKg("x", "a", "s1", null, "")], waivers);
     expect(ds.map((m) => m.id)).toEqual(["c"]);
   });
 
   it("soTemMacDinh: BTP theo số block, TP theo số thùng, NL 1 tem", () => {
-    const d = { wips: [{ ...me("w9", "2026-09-02", "Đông"), blocksCount: 24 }], packagings: [phieu("p9", "2026-09-02")] };
+    const d = { wips: [{ ...me("w9", "2026-09-02", "Đông"), blocksCount: 24 }], packagings: [salesInvoice("p9", "2026-09-02")] };
     expect(soTemMacDinh({ kind: "W", id: "w9" }, d)).toBe(24);
     expect(soTemMacDinh({ kind: "P", id: "p9" }, d)).toBe(4);
     expect(soTemMacDinh({ kind: "S", id: "s1" }, d)).toBe(1);
@@ -128,7 +128,7 @@ describe("đợt 2b — chọn lô, chốt ngày, tem, gắn phiên", () => {
   });
 
   it("ganLoChoPhien: không rõ loài vẫn gắn (chiều an toàn), không gắn trùng, báo dòng không khớp", () => {
-    const d: DuLieuTruyXuat = { ...dl, products: [{ id: "mh1", code: "", name: "Hàng lạ", finishedGoodCode: "" }], lotInputs: [vao("cu", "w1", "s1-Mực ống", null, "")] };
+    const d: DuLieuTruyXuat = { ...dl, products: [{ id: "mh1", code: "", name: "Hàng lạ", finishedGoodCode: "" }], lotInputs: [inputKg("cu", "w1", "s1-Mực ống", null, "")] };
     const kq = ganLoChoPhien({
       mes: [{ id: "w1", productId: "mh1" }, { id: "w2", productId: "mh1" }],
       banNoiDia: [{ id: "n1", materialTypeName: "Cá ngừ" }],

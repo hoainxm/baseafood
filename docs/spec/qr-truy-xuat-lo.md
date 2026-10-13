@@ -253,7 +253,7 @@ Quét hoặc gõ → một trang gồm:
 | Lô NL `S:<id dòng nhập>`: kg = kg của loại; chi tiết có "Loại NL", "Khối lượng", "Cùng chuyến: n loại · tổng kg". Nhãn = mã lô chuyến | `nutLo` · `dongCuaChuyen` |
 | Nút **Tem** / **In tem QR** của chuyến ở Nhập hàng in **mỗi loại một tem** (cùng mã chuyến in to, loại + kg dòng dưới, QR đúng lô loại đó) | `QrTemLoIn` |
 | Gõ mã chuyến / quét **QR cũ** `S:<id chuyến>` ⇒ ra các loại của chuyến để chọn, câu "Chuyến … có n loại nguyên liệu, mỗi loại là một lô — chọn đúng loại" (không toast — việc thường ngày); mã cũ trùng thật vẫn cảnh báo | `timLo` · `lyDoNhieuLo` |
-| Gắn lô cả phiên: mặt hàng đã gắn **loại NL** (Danh mục) ⇒ chỉ nhận lô đúng loại; chưa gắn ⇒ theo loài như cũ. Bán nội địa: đúng loại trước, không có mới theo loài | `ganLoChoPhien` · `tenNlCuaMe` |
+| Gắn lô cả phiên: mặt hàng đã gắn **loại NL** (Danh mục) ⇒ chỉ nhận lô đúng loại; chưa gắn ⇒ theo loài như cũ. Bán nội địa: đúng loại trước, không có mới theo loài | `ganLoChoPhien` · `batchMaterialName` |
 | Hộ chiếu lô NL: mục **Cùng chuyến** (các loại khác, bấm sang được) · Thu hồi có ô **"Thu hồi cả chuyến"** (gộp các loại, mỗi dòng hàng ra một lần) | `QrTraCuuScreen` · `ThuHoiLo` · `loCungChuyen` · `danhSachThuHoiNhieu` |
 | Chọn lô NL (gắn cho mẻ / phiên / bán nội địa), In tem hàng loạt, tab Theo giai đoạn: đều liệt kê theo loại | `loNlDeChon` · `dsLoDeIn` · `theoGiaiDoan` |
 | Số kg trên tem + hộ chiếu theo locale vi-VN (`7.842 kg`, trước in `7842 kg`) | `kgChu` · `QrTemLoIn.dongTem` |

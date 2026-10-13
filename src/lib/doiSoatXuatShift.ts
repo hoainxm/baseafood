@@ -10,7 +10,7 @@
 import { chuCotExcel, soCotExcel } from "./doiSoatChung";
 
 /** Dời chữ cột `c` sang phải `dich` cột ("Q", 1 → "R"). */
-const dichChuCot = (c: string, dich: number): string => chuCotExcel(soCotExcel(c) + dich - 1);
+const shiftColumnLetter = (c: string, shift: number): string => chuCotExcel(soCotExcel(c) + shift - 1);
 
 /**
  * Dịch mọi tham chiếu ô trong một công thức sang phải `dich` cột.
@@ -21,14 +21,14 @@ const dichChuCot = (c: string, dich: number): string => chuCotExcel(soCotExcel(c
  */
 export function dichCongThuc(
   ct: string,
-  dich: number,
-  sheetDaDich: ReadonlySet<string>,
+  shift: number,
+  shiftedSheets: ReadonlySet<string>,
   /** Sheet chứa công thức này có bị chèn cột không — quyết định số phận tham chiếu KHÔNG ghi tên sheet. */
-  sheetChuaCongThucCoDich = true
+  isFormulaSheetShifted = true
 ): string {
   let ra = "";
   let i = 0;
-  let sheetNay = sheetChuaCongThucCoDich; // tham chiếu đang xét thuộc sheet có dịch hay không
+  let isCurrentSheetShifted = isFormulaSheetShifted; // tham chiếu đang xét thuộc sheet có dịch hay không
   const n = ct.length;
   while (i < n) {
     const ch = ct[i]!;
@@ -66,13 +66,13 @@ export function dichCongThuc(
       if (ct[i] === "!") {
         ra += "!";
         i++;
-        sheetNay = sheetDaDich.has(ten);
+        isCurrentSheetShifted = shiftedSheets.has(ten);
       }
       continue;
     }
-    const dinhDanh = /^([A-Za-z_\\][A-Za-z0-9_.\\]*)/.exec(ct.slice(i));
-    if (dinhDanh) {
-      const tok = dinhDanh[1]!;
+    const identifier = /^([A-Za-z_\\][A-Za-z0-9_.\\]*)/.exec(ct.slice(i));
+    if (identifier) {
+      const tok = identifier[1]!;
       if (ct[i + tok.length] === "(") {
         ra += tok; // tên hàm
         i += tok.length;
@@ -81,32 +81,32 @@ export function dichCongThuc(
       if (ct[i + tok.length] === "!") {
         ra += `${tok}!`; // tên sheet không nháy
         i += tok.length + 1;
-        sheetNay = sheetDaDich.has(tok);
+        isCurrentSheetShifted = shiftedSheets.has(tok);
         continue;
       }
       const o = /^(\$?)([A-Z]{1,3})(\$?)(\d+)(?![A-Za-z0-9_])/.exec(ct.slice(i));
       if (o) {
-        ra += o[1]! + (sheetNay ? dichChuCot(o[2]!, dich) : o[2]!) + o[3]! + o[4]!;
+        ra += o[1]! + (isCurrentSheetShifted ? shiftColumnLetter(o[2]!, shift) : o[2]!) + o[3]! + o[4]!;
         i += o[0].length;
         // Ô ĐẦU của vùng `Sheet!A1:B9`: nửa sau vẫn thuộc sheet đó — giữ `sheetNay`,
         // reset ngay là `HDDT!Q3:Q3047` dịch thành `R3:Q3047` (lệch vùng âm thầm).
-        if (ct[i] !== ":") sheetNay = sheetChuaCongThucCoDich;
+        if (ct[i] !== ":") isCurrentSheetShifted = isFormulaSheetShifted;
         continue;
       }
-      const cot = /^(\$?)([A-Z]{1,3}):(\$?)([A-Z]{1,3})(?![A-Za-z0-9_])/.exec(ct.slice(i));
-      if (cot) {
-        const a = sheetNay ? dichChuCot(cot[2]!, dich) : cot[2]!;
-        const b = sheetNay ? dichChuCot(cot[4]!, dich) : cot[4]!;
-        ra += `${cot[1]!}${a}:${cot[3]!}${b}`;
-        i += cot[0].length;
-        sheetNay = sheetChuaCongThucCoDich;
+      const columnMatch = /^(\$?)([A-Z]{1,3}):(\$?)([A-Z]{1,3})(?![A-Za-z0-9_])/.exec(ct.slice(i));
+      if (columnMatch) {
+        const a = isCurrentSheetShifted ? shiftColumnLetter(columnMatch[2]!, shift) : columnMatch[2]!;
+        const b = isCurrentSheetShifted ? shiftColumnLetter(columnMatch[4]!, shift) : columnMatch[4]!;
+        ra += `${columnMatch[1]!}${a}:${columnMatch[3]!}${b}`;
+        i += columnMatch[0].length;
+        isCurrentSheetShifted = isFormulaSheetShifted;
         continue;
       }
       ra += tok;
       i += tok.length;
       continue;
     }
-    if (ch !== ":" && ch !== "$") sheetNay = sheetChuaCongThucCoDich;
+    if (ch !== ":" && ch !== "$") isCurrentSheetShifted = isFormulaSheetShifted;
     ra += ch;
     i++;
   }
@@ -114,8 +114,8 @@ export function dichCongThuc(
 }
 
 /** Dịch một vùng kiểu `B3:T3` sang phải `dich` cột. */
-export const dichVung = (ref: string, dich: number): string =>
-  ref.replace(/([A-Z]+)(\d+)/g, (_m, c: string, r: string) => `${dichChuCot(c, dich)}${r}`);
+export const dichVung = (ref: string, shift: number): string =>
+  ref.replace(/([A-Z]+)(\d+)/g, (_m, c: string, r: string) => `${shiftColumnLetter(c, shift)}${r}`);
 
 type Worksheet = import("exceljs").Worksheet;
 
@@ -145,14 +145,14 @@ export function boCongThucDungChung(ws: Worksheet): void {
  * của lần chạy trước. Cắt ở ĐUÔI nên không ô nào bên trái bị dời ⇒ công thức
  * của dữ liệu gốc không cần dịch.
  */
-export function xoaCotDuoi(ws: Worksheet, tuCot: number): void {
-  const cuoi = ws.columnCount;
-  if (cuoi < tuCot) return;
+export function xoaCotDuoi(ws: Worksheet, fromColumn: number): void {
+  const last = ws.columnCount;
+  if (last < fromColumn) return;
   boCongThucDungChung(ws);
-  ws.spliceColumns(tuCot, cuoi - tuCot + 1);
+  ws.spliceColumns(fromColumn, last - fromColumn + 1);
 }
 
-export function chenCotDau(ws: Worksheet, dich: number, sheetDaDich: ReadonlySet<string>): void {
+export function chenCotDau(ws: Worksheet, shift: number, shiftedSheets: ReadonlySet<string>): void {
   boCongThucDungChung(ws);
 
   const gop = Object.keys((ws as unknown as { _merges?: Record<string, unknown> })._merges ?? {}).map(
@@ -161,7 +161,7 @@ export function chenCotDau(ws: Worksheet, dich: number, sheetDaDich: ReadonlySet
       return m?.range ?? k;
     }
   );
-  const loc = ws.autoFilter;
+  const autoFilter = ws.autoFilter;
 
   // Gỡ ô gộp TRƯỚC khi dời cột. Gỡ sau thì vùng gộp cũ đã lệch chỗ, exceljs xóa
   // luôn giá trị của ô đã dời sang (tiêu đề "DANH SÁCH HÓA ĐƠN" biến mất).
@@ -175,22 +175,22 @@ export function chenCotDau(ws: Worksheet, dich: number, sheetDaDich: ReadonlySet
   }
 
   // dich < 0: GỠ bớt cột đầu (file xuất từ bản cũ còn cột "KIỂM CỘNG" ở A — v6.5)
-  if (dich >= 0) ws.spliceColumns(1, 0, ...Array.from({ length: dich }, () => []));
-  else ws.spliceColumns(1, -dich);
+  if (shift >= 0) ws.spliceColumns(1, 0, ...Array.from({ length: shift }, () => []));
+  else ws.spliceColumns(1, -shift);
 
-  vietLaiCongThuc(ws, (ct) => dichCongThuc(ct, dich, sheetDaDich));
+  rewriteFormulas(ws, (ct) => dichCongThuc(ct, shift, shiftedSheets));
 
   for (const g of gop) {
     if (!g) continue;
     // vùng gộp nằm (một phần) trong cột vừa gỡ thì bỏ, đừng dựng ra địa chỉ cột âm
-    if (dich < 0 && /(^|:)\$?A\d/.test(g)) continue;
+    if (shift < 0 && /(^|:)\$?A\d/.test(g)) continue;
     try {
-      ws.mergeCells(dichVung(g, dich));
+      ws.mergeCells(dichVung(g, shift));
     } catch {
       /* chồng vùng khác — bỏ qua, không đáng làm hỏng cả file xuất */
     }
   }
-  if (typeof loc === "string") ws.autoFilter = dichVung(loc, dich);
+  if (typeof autoFilter === "string") ws.autoFilter = dichVung(autoFilter, shift);
 }
 
 /**
@@ -199,14 +199,14 @@ export function chenCotDau(ws: Worksheet, dich: number, sheetDaDich: ReadonlySet
  */
 export function dichThamChieuCheoSheet(
   ws: Worksheet,
-  dich: number,
-  sheetDaDich: ReadonlySet<string>
+  shift: number,
+  shiftedSheets: ReadonlySet<string>
 ): void {
-  vietLaiCongThuc(ws, (ct) => dichCongThuc(ct, dich, sheetDaDich, false));
+  rewriteFormulas(ws, (ct) => dichCongThuc(ct, shift, shiftedSheets, false));
 }
 
 /** Viết lại mọi ô công thức của sheet (giữ kết quả cache). */
-function vietLaiCongThuc(ws: Worksheet, doi: (ct: string) => string): void {
+function rewriteFormulas(ws: Worksheet, doi: (ct: string) => string): void {
   ws.eachRow({ includeEmpty: false }, (row) =>
     row.eachCell({ includeEmpty: false }, (cell) => {
       const v = cell.value as { formula?: string; result?: unknown } | null;

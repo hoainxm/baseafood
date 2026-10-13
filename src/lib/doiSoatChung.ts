@@ -36,12 +36,12 @@ export const MAU_NEN = {
 export const nenDac = (argb: string) => ({ type: "pattern" as const, pattern: "solid" as const, fgColor: { argb } });
 
 /** Khóa ô người dùng bấm Sửa: `sheet#soDong#cot` (tên sheet có thể chứa "#"). */
-export const khoaSua = (sheet: string, soDong: number, cot: number): string => `${sheet}#${soDong}#${cot}`;
+export const khoaSua = (sheet: string, rowNo: number, columns: number): string => `${sheet}#${rowNo}#${columns}`;
 
 /** Tách khóa ô Sửa ngược lại. */
 export function tachKhoaSua(k: string): { sheet: string; soDong: number; cot: number } {
-  const phan = k.split("#");
-  const cot = Number(phan.pop());
-  const soDong = Number(phan.pop());
-  return { sheet: phan.join("#"), soDong, cot };
+  const parts = k.split("#");
+  const columns = Number(parts.pop());
+  const rowNo = Number(parts.pop());
+  return { sheet: parts.join("#"), soDong: rowNo, cot: columns };
 }

@@ -63,7 +63,7 @@ export async function parseNxtExcelFile(file: File): Promise<NxtExcelReportData>
   let dateRangeText = "";
   let warehouseText = "";
   const items: NxtExcelRow[] = [];
-  let quaTieuDeCot = false; // đã qua hàng tên cột "Mã hàng" ⇒ hết phần đầu trang
+  let isPastHeaderRow = false; // đã qua hàng tên cột "Mã hàng" ⇒ hết phần đầu trang
 
   for (let r = 0; r < rows.length; r++) {
     const row = rows[r];
@@ -77,10 +77,10 @@ export async function parseNxtExcelFile(file: File): Promise<NxtExcelReportData>
       title = cellA;
     } else if (cellA.startsWith("Từ ngày")) {
       dateRangeText = cellA;
-    } else if ((cellA.startsWith("Chi nhánh:") || cellA.startsWith("KHO")) && (!quaTieuDeCot || row.length <= 1)) {
+    } else if ((cellA.startsWith("Chi nhánh:") || cellA.startsWith("KHO")) && (!isPastHeaderRow || row.length <= 1)) {
       // Dòng kho CHỈ nhận ở phần đầu trang, lần đầu. Chân file ("Chi nhánh: …: Bà Rịa…" — chính
       // exportNxtToExcel ghi ra) cũng bắt đầu y vậy: nhận nó thì xuất rồi nhập lại đẻ kho rác.
-      if (!warehouseText && !quaTieuDeCot) warehouseText = cellA;
+      if (!warehouseText && !isPastHeaderRow) warehouseText = cellA;
       continue;
     } else if (
       cellA.startsWith("Mã hàng") ||
@@ -88,7 +88,7 @@ export async function parseNxtExcelFile(file: File): Promise<NxtExcelReportData>
       r < 5
     ) {
       // Tiêu đề hoặc dòng tổng hợp của file gốc -> bỏ qua dòng dữ liệu
-      if (cellA.startsWith("Mã hàng")) quaTieuDeCot = true;
+      if (cellA.startsWith("Mã hàng")) isPastHeaderRow = true;
       continue;
     } else {
       // Dòng dữ liệu sản phẩm
@@ -97,39 +97,39 @@ export async function parseNxtExcelFile(file: File): Promise<NxtExcelReportData>
 
       if (!code && !name) continue;
 
-      const tonDauKg = Number(row[2]) || 0;
-      const giaTriDau = Number(row[3]) || 0;
-      const nhapKg = Number(row[4]) || 0;
-      const giaTriNhap = Number(row[5]) || 0;
-      const xuatKg = Number(row[6]) || 0;
-      const giaTriXuat = Number(row[7]) || 0;
-      const tonCuoiKg = row[8] != null ? Number(row[8]) : tonDauKg + nhapKg - xuatKg;
-      const giaTriCuoi = row[9] != null ? Number(row[9]) : giaTriDau + giaTriNhap - giaTriXuat;
+      const openingKg = Number(row[2]) || 0;
+      const openingValue = Number(row[3]) || 0;
+      const inKg = Number(row[4]) || 0;
+      const inValue = Number(row[5]) || 0;
+      const outKg = Number(row[6]) || 0;
+      const outValue = Number(row[7]) || 0;
+      const closingKg = row[8] != null ? Number(row[8]) : openingKg + inKg - outKg;
+      const closingValue = row[9] != null ? Number(row[9]) : openingValue + inValue - outValue;
 
       items.push({
         code,
         name,
         category: inferCategory(code, name),
-        tonDauKg,
-        giaTriDau,
-        nhapKg,
-        giaTriNhap,
-        xuatKg,
-        giaTriXuat,
-        tonCuoiKg,
-        giaTriCuoi,
+        tonDauKg: openingKg,
+        giaTriDau: openingValue,
+        nhapKg: inKg,
+        giaTriNhap: inValue,
+        xuatKg: outKg,
+        giaTriXuat: outValue,
+        tonCuoiKg: closingKg,
+        giaTriCuoi: closingValue,
       });
     }
   }
 
-  const totalTonDauKg = items.reduce((sum, item) => sum + item.tonDauKg, 0);
-  const totalGiaTriDau = items.reduce((sum, item) => sum + item.giaTriDau, 0);
-  const totalNhapKg = items.reduce((sum, item) => sum + item.nhapKg, 0);
-  const totalGiaTriNhap = items.reduce((sum, item) => sum + item.giaTriNhap, 0);
-  const totalXuatKg = items.reduce((sum, item) => sum + item.xuatKg, 0);
-  const totalGiaTriXuat = items.reduce((sum, item) => sum + item.giaTriXuat, 0);
-  const totalTonCuoiKg = items.reduce((sum, item) => sum + item.tonCuoiKg, 0);
-  const totalGiaTriCuoi = items.reduce((sum, item) => sum + item.giaTriCuoi, 0);
+  const totalOpeningKg = items.reduce((sum, item) => sum + item.tonDauKg, 0);
+  const totalOpeningValue = items.reduce((sum, item) => sum + item.giaTriDau, 0);
+  const totalInKg = items.reduce((sum, item) => sum + item.nhapKg, 0);
+  const totalInValue = items.reduce((sum, item) => sum + item.giaTriNhap, 0);
+  const totalOutKg = items.reduce((sum, item) => sum + item.xuatKg, 0);
+  const totalOutValue = items.reduce((sum, item) => sum + item.giaTriXuat, 0);
+  const totalClosingKg = items.reduce((sum, item) => sum + item.tonCuoiKg, 0);
+  const totalClosingValue = items.reduce((sum, item) => sum + item.giaTriCuoi, 0);
 
   return {
     createdDateText: createdDateText || `Ngày lập: ${new Date().toLocaleString("vi-VN")}`,
@@ -138,14 +138,14 @@ export async function parseNxtExcelFile(file: File): Promise<NxtExcelReportData>
     warehouseText,
     items,
     totalItemCount: items.length,
-    totalTonDauKg,
-    totalGiaTriDau,
-    totalNhapKg,
-    totalGiaTriNhap,
-    totalXuatKg,
-    totalGiaTriXuat,
-    totalTonCuoiKg,
-    totalGiaTriCuoi,
+    totalTonDauKg: totalOpeningKg,
+    totalGiaTriDau: totalOpeningValue,
+    totalNhapKg: totalInKg,
+    totalGiaTriNhap: totalInValue,
+    totalXuatKg: totalOutKg,
+    totalGiaTriXuat: totalOutValue,
+    totalTonCuoiKg: totalClosingKg,
+    totalGiaTriCuoi: totalClosingValue,
   };
 }
 

@@ -40,16 +40,16 @@ export type CachPhanBen = "chi-dinh" | "ten-thue" | "ten-tai" | "khong-ro";
  */
 export function phanBenThue(
   tenSheets: readonly string[],
-  chiDinh?: readonly string[] | null
+  specified?: readonly string[] | null
 ): { benThue: Set<string>; cach: CachPhanBen } {
-  if (chiDinh) {
+  if (specified) {
     const co = new Set(tenSheets);
-    return { benThue: new Set(chiDinh.filter((t) => co.has(t))), cach: "chi-dinh" };
+    return { benThue: new Set(specified.filter((t) => co.has(t))), cach: "chi-dinh" };
   }
   const theoThue = tenSheets.filter(laBenThue);
   if (theoThue.length) return { benThue: new Set(theoThue), cach: "ten-thue" };
-  const theoTai = tenSheets.filter(laBenTai);
-  if (theoTai.length && theoTai.length < tenSheets.length)
+  const downloadSheets = tenSheets.filter(laBenTai);
+  if (downloadSheets.length && downloadSheets.length < tenSheets.length)
     return { benThue: new Set(tenSheets.filter((t) => !laBenTai(t))), cach: "ten-tai" };
   return { benThue: new Set(), cach: "khong-ro" };
 }
@@ -107,7 +107,7 @@ export interface KetQuaSoHaiBan {
   };
 }
 
-const viTri = (d: DongHoaDon): string => `${d.sheet} dòng ${d.dongFile}`;
+const locationOf = (d: DongHoaDon): string => `${d.sheet} dòng ${d.dongFile}`;
 
 /**
  * So bản THUẾ gửi với bản TỰ TẢI. Trả `null` nếu file không có đủ hai bên
@@ -127,7 +127,7 @@ export function soHaiBanHddt(
   if (!benT.length || !benX.length) return null;
 
   /** Gộp theo khóa: một khóa có thể xuất hiện nhiều dòng (hóa đơn bị kê hai lần). */
-  const gom = (ds: readonly SheetHoaDon[]) => {
+  const groupInvoices = (ds: readonly SheetHoaDon[]) => {
     const m = new Map<string, DongHoaDon[]>();
     for (const sh of ds)
       for (const d of sh.dong) {
@@ -137,55 +137,55 @@ export function soHaiBanHddt(
       }
     return m;
   };
-  const mT = gom(benT);
-  const mX = gom(benX);
+  const mT = groupInvoices(benT);
+  const mX = groupInvoices(benX);
 
-  const cong = (ds: DongHoaDon[] | undefined, lay: (d: DongHoaDon) => number) =>
+  const sum = (ds: DongHoaDon[] | undefined, lay: (d: DongHoaDon) => number) =>
     ds?.length ? ds.reduce((s, d) => s + lay(d), 0) : null;
 
   const dong: DongSoBan[] = [];
   for (const khoa of new Set([...mT.keys(), ...mX.keys()])) {
     const t = mT.get(khoa);
     const x = mX.get(khoa);
-    const mau = (t ?? x)![0]!;
-    const tongT = cong(t, (d) => d.tongTtVnd);
-    const tongX = cong(x, (d) => d.tongTtVnd);
-    const chenhTong = tongT != null && tongX != null ? tongT - tongX : null;
+    const sample = (t ?? x)![0]!;
+    const taxSideTotal = sum(t, (d) => d.tongTtVnd);
+    const downloadSideTotal = sum(x, (d) => d.tongTtVnd);
+    const totalDiff = taxSideTotal != null && downloadSideTotal != null ? taxSideTotal - downloadSideTotal : null;
     const ben: BenCo = t && x ? "CA_HAI" : t ? "CHI_THUE" : "CHI_TAI";
     // Dòng lệch bố cục thì cột tiền đọc sai chỗ — so tiền là kết luận bừa.
-    const khongSoDuocTien =
+    const isAmountIncomparable =
       ben === "CA_HAI" && [...(t ?? []), ...(x ?? [])].some((d) => d.boCucLech);
-    const lechTien = !khongSoDuocTien && chenhTong != null && Math.abs(chenhTong) > nguong;
+    const hasAmountMismatch = !isAmountIncomparable && totalDiff != null && Math.abs(totalDiff) > nguong;
     dong.push({
       khoa,
-      kyHieu: mau.kyHieu,
-      soHoaDon: mau.soHoaDon,
-      ngayLap: mau.ngayLap,
-      mstBan: mau.mstBan,
-      tenBan: mau.tenBan,
+      kyHieu: sample.kyHieu,
+      soHoaDon: sample.soHoaDon,
+      ngayLap: sample.ngayLap,
+      mstBan: sample.mstBan,
+      tenBan: sample.tenBan,
       ben,
-      chuaThueT: cong(t, (d) => d.chuaThueVnd),
-      thueT: cong(t, (d) => d.thueVnd),
-      tongT,
-      chuaThueX: cong(x, (d) => d.chuaThueVnd),
-      thueX: cong(x, (d) => d.thueVnd),
-      tongX,
+      chuaThueT: sum(t, (d) => d.chuaThueVnd),
+      thueT: sum(t, (d) => d.thueVnd),
+      tongT: taxSideTotal,
+      chuaThueX: sum(x, (d) => d.chuaThueVnd),
+      thueX: sum(x, (d) => d.thueVnd),
+      tongX: downloadSideTotal,
       chenhChuaThue:
-        t && x ? cong(t, (d) => d.chuaThueVnd)! - cong(x, (d) => d.chuaThueVnd)! : null,
-      chenhThue: t && x ? cong(t, (d) => d.thueVnd)! - cong(x, (d) => d.thueVnd)! : null,
-      chenhTong,
-      lechTien,
-      khongSoDuocTien,
-      viTriT: t?.map(viTri).join("; ") ?? "",
-      viTriX: x?.map(viTri).join("; ") ?? "",
-      ghiChu: khongSoDuocTien
+        t && x ? sum(t, (d) => d.chuaThueVnd)! - sum(x, (d) => d.chuaThueVnd)! : null,
+      chenhThue: t && x ? sum(t, (d) => d.thueVnd)! - sum(x, (d) => d.thueVnd)! : null,
+      chenhTong: totalDiff,
+      lechTien: hasAmountMismatch,
+      khongSoDuocTien: isAmountIncomparable,
+      viTriT: t?.map(locationOf).join("; ") ?? "",
+      viTriX: x?.map(locationOf).join("; ") ?? "",
+      ghiChu: isAmountIncomparable
         ? "Có ở cả hai bản. KHÔNG so được số tiền: dòng bên bản tự tải nằm ở bố cục cột khác (sheet bị dán hai bản xuất vào làm một) nên cột tiền lệch ô. Tách sheet ra rồi chạy lại mới so được."
         : ben === "CHI_THUE"
           ? "CHỈ có ở bản cơ quan thuế gửi — bản tự tải THIẾU hóa đơn này. Tải lại từ cổng hóa đơn điện tử rồi kê bổ sung."
           : ben === "CHI_TAI"
             ? "CHỈ có ở bản tự tải — bản thuế gửi KHÔNG có. Kiểm tra lại: có thể tải nhầm kỳ, hoặc hóa đơn chưa lên hệ thống thuế."
-            : lechTien
-              ? `Có ở cả hai bản nhưng SỐ TIỀN LỆCH ${Math.round(chenhTong ?? 0).toLocaleString("vi-VN")} đ (thuế − tự tải). Đây là chỗ thuế bắt kiểm tra.`
+            : hasAmountMismatch
+              ? `Có ở cả hai bản nhưng SỐ TIỀN LỆCH ${Math.round(totalDiff ?? 0).toLocaleString("vi-VN")} đ (thuế − tự tải). Đây là chỗ thuế bắt kiểm tra.`
               : (t?.length ?? 0) > 1 || (x?.length ?? 0) > 1
                 ? "Khớp tiền, nhưng hóa đơn này xuất hiện NHIỀU DÒNG — xem cột vị trí, coi chừng kê hai lần."
                 : "Khớp cả hai bản.",
@@ -193,17 +193,17 @@ export function soHaiBanHddt(
   }
 
   // Thiếu ở bản tự tải xếp lên trước — đó là việc phải đi làm ngay.
-  const uuTien: Record<BenCo, number> = { CHI_THUE: 0, CHI_TAI: 1, CA_HAI: 2 };
+  const priority: Record<BenCo, number> = { CHI_THUE: 0, CHI_TAI: 1, CA_HAI: 2 };
   dong.sort(
     (a, b) =>
-      uuTien[a.ben] - uuTien[b.ben] ||
+      priority[a.ben] - priority[b.ben] ||
       Number(b.lechTien) - Number(a.lechTien) ||
       Math.abs(b.chenhTong ?? 0) - Math.abs(a.chenhTong ?? 0) ||
       (b.tongT ?? b.tongX ?? 0) - (a.tongT ?? a.tongX ?? 0)
   );
 
-  const loc = (b: BenCo) => dong.filter((d) => d.ben === b);
-  const congTien = (ds: DongSoBan[], lay: (d: DongSoBan) => number | null) =>
+  const rowsOfSide = (b: BenCo) => dong.filter((d) => d.ben === b);
+  const sumAmount = (ds: DongSoBan[], lay: (d: DongSoBan) => number | null) =>
     ds.reduce((s, d) => s + (lay(d) ?? 0), 0);
 
   return {
@@ -213,16 +213,16 @@ export function soHaiBanHddt(
     tong: {
       soThue: benT.reduce((s, sh) => s + sh.dong.length, 0),
       soTai: benX.reduce((s, sh) => s + sh.dong.length, 0),
-      caHai: loc("CA_HAI").length,
-      chiThue: loc("CHI_THUE").length,
-      chiTai: loc("CHI_TAI").length,
+      caHai: rowsOfSide("CA_HAI").length,
+      chiThue: rowsOfSide("CHI_THUE").length,
+      chiTai: rowsOfSide("CHI_TAI").length,
       lechTien: dong.filter((d) => d.lechTien).length,
       khongSoDuocTien: dong.filter((d) => d.khongSoDuocTien).length,
-      tienThue: congTien(dong, (d) => d.tongT),
-      tienTai: congTien(dong, (d) => d.tongX),
-      tienChiThue: congTien(loc("CHI_THUE"), (d) => d.tongT),
-      tienChiTai: congTien(loc("CHI_TAI"), (d) => d.tongX),
-      chenhTongTien: congTien(dong, (d) => d.tongT) - congTien(dong, (d) => d.tongX),
+      tienThue: sumAmount(dong, (d) => d.tongT),
+      tienTai: sumAmount(dong, (d) => d.tongX),
+      tienChiThue: sumAmount(rowsOfSide("CHI_THUE"), (d) => d.tongT),
+      tienChiTai: sumAmount(rowsOfSide("CHI_TAI"), (d) => d.tongX),
+      chenhTongTien: sumAmount(dong, (d) => d.tongT) - sumAmount(dong, (d) => d.tongX),
     },
   };
 }
@@ -285,9 +285,9 @@ export function gomCungMstCungNgay(
   for (const { mst, ten, ngay, ds } of m.values()) {
     if (ds.length < 2) continue;
     // cụm trùng khít số tiền trong cùng nhóm
-    const theoTien = new Map<number, number>();
-    for (const d of ds) theoTien.set(d.tongTtVnd, (theoTien.get(d.tongTtVnd) ?? 0) + 1);
-    const trung = [...theoTien].filter(([, n]) => n > 1);
+    const byAmount = new Map<number, number>();
+    for (const d of ds) byAmount.set(d.tongTtVnd, (byAmount.get(d.tongTtVnd) ?? 0) + 1);
+    const trung = [...byAmount].filter(([, n]) => n > 1);
     ra.push({
       mstBan: mst,
       tenBan: ten,
@@ -296,7 +296,7 @@ export function gomCungMstCungNgay(
       tongTien: ds.reduce((s, d) => s + d.tongTtVnd, 0),
       trungSoTien: trung.length > 0,
       moTaTrung: trung
-        .map(([tien, n]) => `${n} hóa đơn cùng ${Math.round(tien).toLocaleString("vi-VN")} đ`)
+        .map(([amount, n]) => `${n} hóa đơn cùng ${Math.round(amount).toLocaleString("vi-VN")} đ`)
         .join("; "),
       dong: ds.map((d) => ({
         sheet: d.sheet,

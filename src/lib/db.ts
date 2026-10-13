@@ -44,7 +44,7 @@ function uuidNgauNhien(): string {
   return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
 }
 
-let msTruoc = 0;
+let lastMs = 0;
 
 /**
  * Sinh id bản ghi mới: `<mốc ms tăng dần>-<uuid>`.
@@ -58,8 +58,8 @@ let msTruoc = 0;
  * - Đuôi 4 ký tự của id làm hậu tố nhãn lô (truyXuatLo.duoiId) — UUID cho hex.
  */
 export function uid(): string {
-  const ms = Math.max(Date.now(), msTruoc + 1);
-  msTruoc = ms;
+  const ms = Math.max(Date.now(), lastMs + 1);
+  lastMs = ms;
   return `${ms}-${uuidNgauNhien()}`;
 }
 

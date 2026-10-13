@@ -72,7 +72,7 @@ function docBuffer(): NhatKy[] {
     return [];
   }
 }
-function luuBuffer(xs: NhatKy[]): void {
+function saveBuffer(xs: NhatKy[]): void {
   try {
     localStorage.setItem(KEY_BUF, JSON.stringify(xs.slice(-CAP)));
   } catch {
@@ -111,23 +111,23 @@ function fromRow(r: Record<string, unknown>): NhatKy {
   };
 }
 
-let dangFlush = false;
+let isFlushing = false;
 async function flush(): Promise<void> {
-  if (!supabase || dangFlush) return;
+  if (!supabase || isFlushing) return;
   const buf = docBuffer();
   if (buf.length === 0) return;
-  dangFlush = true;
+  isFlushing = true;
   try {
     const guiIds = new Set(buf.map((r) => r.id));
     const { error } = await supabase.from("audit_log").insert(buf.map(toRow));
     if (!error) {
       // Chỉ xóa đúng dòng đã gửi — dòng mới thêm lúc đang gửi vẫn giữ.
-      luuBuffer(docBuffer().filter((r) => !guiIds.has(r.id)));
+      saveBuffer(docBuffer().filter((r) => !guiIds.has(r.id)));
     }
   } catch {
     /* giữ buffer, thử lại lần sau — im lặng */
   } finally {
-    dangFlush = false;
+    isFlushing = false;
   }
 }
 
@@ -137,7 +137,7 @@ export function ghiNhatKy(list: NhatKyMoi[]): void {
   try {
     const at = new Date().toISOString();
     const dev = layDeviceId();
-    const them: NhatKy[] = list.map((e) => ({
+    const toAdd: NhatKy[] = list.map((e) => ({
       ...e,
       id: uid(),
       at,
@@ -145,7 +145,7 @@ export function ghiNhatKy(list: NhatKyMoi[]): void {
       actorUsername: actorName,
       deviceId: dev,
     }));
-    luuBuffer([...docBuffer(), ...them]);
+    saveBuffer([...docBuffer(), ...toAdd]);
     void flush();
   } catch {
     /* nhật ký là phụ — không bao giờ ném lỗi ra màn nghiệp vụ */
@@ -180,17 +180,17 @@ export function bienNgayVN(tu?: string, den?: string): { tu?: string; den?: stri
 }
 
 /** Đọc nhật ký cho màn Nhật ký (admin). Server: query audit_log; local: đọc buffer. */
-export async function docNhatKy(loc: LocNhatKy = {}): Promise<NhatKy[]> {
-  const gioiHan = loc.gioiHan ?? 500;
-  const bien = bienNgayVN(loc.tu, loc.den);
-  const khop = (r: NhatKy) => {
-    if (loc.nguoi && r.actorUsername !== loc.nguoi) return false;
-    if (loc.bang && r.entity !== loc.bang) return false;
-    if (loc.loai && r.action !== loc.loai) return false;
+export async function docNhatKy(filter: LocNhatKy = {}): Promise<NhatKy[]> {
+  const gioiHan = filter.gioiHan ?? 500;
+  const bien = bienNgayVN(filter.tu, filter.den);
+  const matches = (r: NhatKy) => {
+    if (filter.nguoi && r.actorUsername !== filter.nguoi) return false;
+    if (filter.bang && r.entity !== filter.bang) return false;
+    if (filter.loai && r.action !== filter.loai) return false;
     if (bien.tu && r.at < bien.tu) return false;
     if (bien.den && r.at > bien.den) return false;
-    if (loc.timKiem) {
-      const t = loc.timKiem.toLowerCase();
+    if (filter.timKiem) {
+      const t = filter.timKiem.toLowerCase();
       const hay = `${r.actorUsername} ${r.entity} ${r.entityKey} ${r.summary}`.toLowerCase();
       if (!hay.includes(t)) return false;
     }
@@ -204,22 +204,22 @@ export async function docNhatKy(loc: LocNhatKy = {}): Promise<NhatKy[]> {
       .eq("site_id", SITE_ID)
       .order("at", { ascending: false })
       .limit(gioiHan);
-    if (loc.nguoi) q = q.eq("actor_username", loc.nguoi);
-    if (loc.bang) q = q.eq("entity", loc.bang);
-    if (loc.loai) q = q.eq("action", loc.loai);
+    if (filter.nguoi) q = q.eq("actor_username", filter.nguoi);
+    if (filter.bang) q = q.eq("entity", filter.bang);
+    if (filter.loai) q = q.eq("action", filter.loai);
     if (bien.tu) q = q.gte("at", bien.tu);
     if (bien.den) q = q.lte("at", bien.den);
     const { data, error } = await q;
     if (error) return [];
     let rows = (data ?? []).map((r) => fromRow(r as Record<string, unknown>));
-    if (loc.timKiem) rows = rows.filter(khop);
+    if (filter.timKiem) rows = rows.filter(matches);
     return rows;
   }
 
   // Chế độ localStorage: buffer chính là kho.
   return [...docBuffer()]
     .reverse()
-    .filter(khop)
+    .filter(matches)
     .slice(0, gioiHan);
 }
 

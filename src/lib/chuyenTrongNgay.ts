@@ -34,20 +34,20 @@ export interface DaiLyNgay {
   tien: number;
 }
 
-const tienDong = (r: MaterialImportItem) => r.quantityKg * (r.unitPrice ?? 0);
+const rowAmount = (r: MaterialImportItem) => r.quantityKg * (r.unitPrice ?? 0);
 
 /** Mỗi ngày (ngày hàng về) có bao nhiêu chuyến + bao nhiêu kg — cho hàng nút chọn ngày. */
-export function tomTatTheoNgay(nhap: MaterialImportItem[]): Map<string, { soChuyen: number; kg: number }> {
-  const chuyen = new Map<string, Set<string>>();
+export function tomTatTheoNgay(imports: MaterialImportItem[]): Map<string, { soChuyen: number; kg: number }> {
+  const shipments = new Map<string, Set<string>>();
   const kg = new Map<string, number>();
-  for (const r of nhap) {
+  for (const r of imports) {
     const d = r.deliveryDate;
-    if (!chuyen.has(d)) chuyen.set(d, new Set());
-    chuyen.get(d)!.add(r.shipmentId || r.id);
+    if (!shipments.has(d)) shipments.set(d, new Set());
+    shipments.get(d)!.add(r.shipmentId || r.id);
     kg.set(d, (kg.get(d) ?? 0) + r.quantityKg);
   }
   const ra = new Map<string, { soChuyen: number; kg: number }>();
-  for (const [d, s] of chuyen) ra.set(d, { soChuyen: s.size, kg: kg.get(d) ?? 0 });
+  for (const [d, s] of shipments) ra.set(d, { soChuyen: s.size, kg: kg.get(d) ?? 0 });
   return ra;
 }
 
@@ -56,37 +56,37 @@ export function tomTatTheoNgay(nhap: MaterialImportItem[]): Map<string, { soChuy
  * → dòng loại NL. Dòng cũ không có chuyến (shipmentId rỗng) coi mỗi dòng là một chuyến.
  */
 export function chuyenTrongNgay(
-  nhap: MaterialImportItem[],
-  ngay: string,
-  chuyenSo: Pick<ImportShipment, "id" | "lotCode">[] = []
+  imports: MaterialImportItem[],
+  date: string,
+  shipmentList: Pick<ImportShipment, "id" | "lotCode">[] = []
 ): DaiLyNgay[] {
-  const maLo = new Map(chuyenSo.map((c) => [c.id, c.lotCode ?? ""]));
-  const theoDaiLy = new Map<string, Map<string, MaterialImportItem[]>>();
-  for (const r of nhap) {
-    if (r.deliveryDate !== ngay) continue;
+  const lotCodes = new Map(shipmentList.map((c) => [c.id, c.lotCode ?? ""]));
+  const bySupplier = new Map<string, Map<string, MaterialImportItem[]>>();
+  for (const r of imports) {
+    if (r.deliveryDate !== date) continue;
     const dl = r.supplierName.trim() || "(chưa ghi đại lý)";
     const k = r.shipmentId || r.id;
-    if (!theoDaiLy.has(dl)) theoDaiLy.set(dl, new Map());
-    const m = theoDaiLy.get(dl)!;
+    if (!bySupplier.has(dl)) bySupplier.set(dl, new Map());
+    const m = bySupplier.get(dl)!;
     if (!m.has(k)) m.set(k, []);
     m.get(k)!.push(r);
   }
   const ra: DaiLyNgay[] = [];
-  for (const [daiLy, m] of theoDaiLy) {
+  for (const [supplier, m] of bySupplier) {
     let i = 0;
-    const chuyen: ChuyenNgay[] = [...m].map(([shipmentId, ds]) => {
+    const shipments: ChuyenNgay[] = [...m].map(([shipmentId, ds]) => {
       i += 1;
       const dong = ds.map((r) => ({
         id: r.id,
         loai: r.materialTypeName,
         kg: r.quantityKg,
         donGia: r.unitPrice,
-        tien: tienDong(r),
+        tien: rowAmount(r),
       }));
       const dau = ds[0];
       return {
         shipmentId,
-        nhan: maLo.get(shipmentId) || `Chuyến ${i}`,
+        nhan: lotCodes.get(shipmentId) || `Chuyến ${i}`,
         xuong: dau.workshop,
         xe: [dau.licensePlate, dau.driverName].filter(Boolean).join(" · "),
         dong,
@@ -95,10 +95,10 @@ export function chuyenTrongNgay(
       };
     });
     ra.push({
-      daiLy,
-      chuyen,
-      kg: chuyen.reduce((s, c) => s + c.kg, 0),
-      tien: chuyen.reduce((s, c) => s + c.tien, 0),
+      daiLy: supplier,
+      chuyen: shipments,
+      kg: shipments.reduce((s, c) => s + c.kg, 0),
+      tien: shipments.reduce((s, c) => s + c.tien, 0),
     });
   }
   return ra.sort((a, b) => b.kg - a.kg || a.daiLy.localeCompare(b.daiLy, "vi"));
@@ -119,14 +119,14 @@ export interface DaiLyKy {
  * Gom dòng sổ nhập (thường là các dòng làm nên MỘT dòng loại NL của lưới) theo đại
  * lý, kg theo ngày — tổng các đại lý đúng bằng dòng cha. Đại lý nhiều kg đứng trước.
  */
-export function daiLyTrongKy(nhap: MaterialImportItem[]): DaiLyKy[] {
+export function daiLyTrongKy(imports: MaterialImportItem[]): DaiLyKy[] {
   const m = new Map<string, DaiLyKy>();
-  for (const r of nhap) {
+  for (const r of imports) {
     const dl = r.supplierName.trim() || "(chưa ghi đại lý)";
     const o = m.get(dl) ?? { daiLy: dl, theoNgay: {}, kg: 0, tien: 0, ids: [] };
     o.theoNgay[r.deliveryDate] = (o.theoNgay[r.deliveryDate] ?? 0) + r.quantityKg;
     o.kg += r.quantityKg;
-    o.tien += tienDong(r);
+    o.tien += rowAmount(r);
     o.ids.push(r.id);
     m.set(dl, o);
   }
@@ -134,6 +134,6 @@ export function daiLyTrongKy(nhap: MaterialImportItem[]): DaiLyKy[] {
 }
 
 /** Số chuyến (shipmentId khác nhau) của các dòng trong một ngày — cho nhãn "n chuyến" ở ô. */
-export function soChuyenNgay(nhap: MaterialImportItem[], ngay: string): number {
-  return new Set(nhap.filter((r) => r.deliveryDate === ngay).map((r) => r.shipmentId || r.id)).size;
+export function soChuyenNgay(imports: MaterialImportItem[], date: string): number {
+  return new Set(imports.filter((r) => r.deliveryDate === date).map((r) => r.shipmentId || r.id)).size;
 }

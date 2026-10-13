@@ -93,7 +93,7 @@ function toIsoDate(v: unknown): string {
 const gonKhoang = (s: string) => s.replace(/\s+/g, " ").trim();
 
 /** Dòng tiêu đề mục → nhóm sổ kho, hoặc null nếu không phải mục. `a` = cột số thứ tự mục (I, II, III…). */
-function nhomTuMuc(a: string, b: string): string | null {
+function groupFromSection(a: string, b: string): string | null {
   const B = gonKhoang(b).toUpperCase();
   if (B.includes("NHẬP KHẨU")) return "Nguyên liệu nhập khẩu";
   if (B.includes("MUA NGOÀI") || B.includes("NỘI ĐỊA") || B.includes("TRONG NƯỚC")) return "Nguyên liệu mua ngoài";
@@ -107,25 +107,25 @@ function nhomTuMuc(a: string, b: string): string | null {
 }
 
 /** Dòng cộng của MỤC ("TỔNG HÀNG NHẬP KHẨU") — khác dòng cộng khối con ("TỔNG 2 DA"). */
-const laTongMuc = (a: string) => /^(TỔNG|CỘNG)\s+HÀNG\b/i.test(gonKhoang(a));
+const isSectionTotal = (a: string) => /^(TỔNG|CỘNG)\s+HÀNG\b/i.test(gonKhoang(a));
 
 /** Cột R → kho gửi (phần sau chữ "KHO") hoặc ghi chú thường. */
-function tachGhiChuKho(v: unknown): { khoGhi: string; ghiChu: string } {
+function splitWarehouseNote(v: unknown): { khoGhi: string; ghiChu: string } {
   const t = typeof v === "string" ? gonKhoang(v) : ""; // số ở cột R là công thức phụ, không phải ghi chú
   if (!t) return { khoGhi: "", ghiChu: "" };
   const m = t.match(/\bkho\s+(.+)$/i);
   return m ? { khoGhi: m[1].trim(), ghiChu: "" } : { khoGhi: "", ghiChu: t };
 }
 
-const laDongTong = (a: string) => /^(TỔNG|CỘNG|TONG|CONG)\b/i.test(a.trim());
-const chiToanSo = (b: string) => /^[\d.,\s]+$/.test(b.trim());
+const isTotalRow = (a: string) => /^(TỔNG|CỘNG|TONG|CONG)\b/i.test(a.trim());
+const isAllDigits = (b: string) => /^[\d.,\s]+$/.test(b.trim());
 
 /**
  * Suy SỐ THÁNG từ tên sheet. Nhận: "8", "08", "T8", "Tháng 8", "thang 8"
  * (dùng cho báo cáo bù tháng 8, dữ liệu tháng 9 live…). KHÔNG đoán bừa từ chuỗi
  * có năm ("2026-08" → null để người dùng đặt lại, tránh bắt nhầm "20").
  */
-function suyThang(name: string): number | null {
+function inferMonth(name: string): number | null {
   const s = name.trim();
   let n: number | null = null;
   if (/^\d{1,2}$/.test(s)) n = Number(s);
@@ -141,41 +141,41 @@ function suyThang(name: string): number | null {
  * `tuDong` tới trước dòng cộng thuộc nhóm "<mục> – <tên>". `tuDong` = dòng nhỏ nhất
  * trong các vùng SUM của dòng cộng (chỉ số trong `rows`), null nếu không đọc được.
  */
-export type TimDauKhoi = (iDongTong: number) => number | null;
+export type TimDauKhoi = (totalRowIdx: number) => number | null;
 
-function parseSheet(sheetName: string, rows: unknown[][], timDauKhoi: TimDauKhoi = () => null): BangKeKhoSheet {
+function parseSheet(sheetName: string, rows: unknown[][], findBlockStart: TimDauKhoi = () => null): BangKeKhoSheet {
   const out: BangKeKhoRow[] = [];
   let category: string | null = null;
-  let batDauMuc = 0; // vị trí đầu mục hiện tại trong `out`
+  let sectionStart = 0; // vị trí đầu mục hiện tại trong `out`
 
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i] ?? [];
     const a = String(row[0] ?? "").trim();
     const b = String(row[1] ?? "").trim();
 
-    if (laDongTong(a)) {
+    if (isTotalRow(a)) {
       // dòng "TỔNG …" — kiểm TRƯỚC khi dò mục (chứa "NHẬP KHẨU")
-      if (category && !laTongMuc(a)) {
+      if (category && !isSectionTotal(a)) {
         const ten = gonKhoang(a.replace(/^(TỔNG|CỘNG|TONG|CONG)\s*/i, ""));
-        const dau = timDauKhoi(i);
+        const dau = findBlockStart(i);
         if (ten && dau != null) {
-          const nhomCon = `${category} – ${ten}`;
-          for (let k = batDauMuc; k < out.length; k++) if (out[k].rowIndex >= dau && out[k].rowIndex < i) out[k].category = nhomCon;
+          const subgroup = `${category} – ${ten}`;
+          for (let k = sectionStart; k < out.length; k++) if (out[k].rowIndex >= dau && out[k].rowIndex < i) out[k].category = subgroup;
         }
       }
       continue;
     }
-    const nhom = nhomTuMuc(a, b);
+    const nhom = groupFromSection(a, b);
     if (nhom) {
       category = nhom;
-      batDauMuc = out.length;
+      sectionStart = out.length;
       continue;
     }
     if (!category) continue; // chưa tới mục đầu tiên → tiêu đề/cấu hình, bỏ
-    if (!b || chiToanSo(b)) continue; // không có tên hàng → bỏ
+    if (!b || isAllDigits(b)) continue; // không có tên hàng → bỏ
 
     out.push({
-      ...tachGhiChuKho(row[17]),
+      ...splitWarehouseNote(row[17]),
       category,
       itemName: b,
       size: String(row[5] ?? "").trim(),
@@ -195,7 +195,7 @@ function parseSheet(sheetName: string, rows: unknown[][], timDauKhoi: TimDauKhoi
 
   return {
     sheetName,
-    monthNum: suyThang(sheetName),
+    monthNum: inferMonth(sheetName),
     tieuDe: gonKhoang(String(rows[0]?.[0] ?? "")),
     rows: out,
   };
@@ -208,7 +208,7 @@ function parseSheet(sheetName: string, rows: unknown[][], timDauKhoi: TimDauKhoi
  * — nằm trong id nạp).
  */
 function donOGop(ws: XLSX.WorkSheet) {
-  const coDuLieu = (r: number) => {
+  const hasData = (r: number) => {
     for (let c = 0; c <= 16; c++) {
       const v = (ws[XLSX.utils.encode_cell({ r, c })] as XLSX.CellObject | undefined)?.v;
       if (v != null && v !== "") return true;
@@ -221,7 +221,7 @@ function donOGop(ws: XLSX.WorkSheet) {
     if (!dau || dau.v == null || dau.v === "") continue;
     for (let r = m.s.r + 1; r <= m.e.r; r++) {
       const dc = XLSX.utils.encode_cell({ r, c: m.s.c });
-      if (!ws[dc] && coDuLieu(r)) ws[dc] = { ...dau };
+      if (!ws[dc] && hasData(r)) ws[dc] = { ...dau };
     }
   }
 }
@@ -247,7 +247,7 @@ export async function parseBangKeKhoFile(file: File): Promise<BangKeKhoSheet[]> 
     du.forEach((row, k) => {
       if (row.some((v) => v != null)) dongExcel.push(k + r0);
     });
-    const timDauKhoi: TimDauKhoi = (i) => {
+    const findBlockStart: TimDauKhoi = (i) => {
       const r = dongExcel[i];
       if (r == null) return null;
       let min = Infinity;
@@ -259,15 +259,15 @@ export async function parseBangKeKhoFile(file: File): Promise<BangKeKhoSheet[]> 
       const idx = dongExcel.findIndex((x) => x >= min);
       return idx === -1 ? null : idx;
     };
-    const parsed = parseSheet(name, rows, timDauKhoi);
+    const parsed = parseSheet(name, rows, findBlockStart);
     if (parsed.rows.length) sheets.push(parsed);
   }
   return sheets;
 }
 
 /** Số kho ghi ở tiêu đề sheet ("…KHO 1500 THÁNG 08…" → "1500"), "" nếu không có. */
-export function khoTuTieuDe(tieuDe: string): string {
-  return tieuDe.match(/\bKHO\s+(\d{3,5})\b/i)?.[1] ?? "";
+export function khoTuTieuDe(title: string): string {
+  return title.match(/\bKHO\s+(\d{3,5})\b/i)?.[1] ?? "";
 }
 
 /** Khóa so khớp tên/mã kho: bỏ dấu, bỏ khoảng trắng + dấu câu, viết hoa ("Á D" → "AD"). */
@@ -284,10 +284,10 @@ export const khoaKho = (s: string) =>
  * Khớp theo mã (có/không tiền tố "K": "HP" ≡ "KHP") hoặc theo tên ("phước cơ" ≡ "Kho Phước Cơ").
  * Chưa có trong danh mục ⇒ null (màn tự tạo mục mới "Kho <tên>" với mã K<viết tắt>).
  */
-export function timKhoTheoGhi(khoGhi: string, danhMuc: { code: string; name: string }[]): string | null {
-  const k = khoaKho(khoGhi);
+export function timKhoTheoGhi(warehouseText: string, catalog: { code: string; name: string }[]): string | null {
+  const k = khoaKho(warehouseText);
   if (!k) return null;
-  for (const d of danhMuc) {
+  for (const d of catalog) {
     const ma = khoaKho(d.code);
     const ten = khoaKho(d.name);
     if (ma && (ma === k || ma === `K${k}`)) return d.name;
@@ -297,8 +297,8 @@ export function timKhoTheoGhi(khoGhi: string, danhMuc: { code: string; name: str
 }
 
 /** Tên kho mới dựng từ viết tắt chưa có trong danh mục: "phước cơ" → "Kho Phước Cơ". */
-export const tenKhoMoi = (khoGhi: string) =>
-  `Kho ${gonKhoang(khoGhi)
+export const tenKhoMoi = (warehouseText: string) =>
+  `Kho ${gonKhoang(warehouseText)
     .toLowerCase()
     .replace(/(^|\s)(\S)/g, (_, sp: string, c: string) => sp + c.toUpperCase())}`;
 
@@ -315,8 +315,8 @@ export function namTuTenFile(fileName: string): number {
  * tháng (không phải tên sheet) ⇒ đổi tên sheet "8" → "T8"/"08" rồi nạp lại vẫn ra đúng id
  * cũ, không đẻ bản sao. Sổ thật nạp từ sheet tên "1".."8" ⇒ id cũ giữ nguyên.
  */
-export const idDongNap = (maKho: string, monthNum: number, nam: number, rowIndex: number) =>
-  `xlsx|${maKho}|${monthNum}|${nam}|${rowIndex}`;
+export const idDongNap = (warehouseCode: string, monthNum: number, nam: number, rowIndex: number) =>
+  `xlsx|${warehouseCode}|${monthNum}|${nam}|${rowIndex}`;
 
 /** Tách id dòng nạp (dạng mới lẫn cũ `xlsx|<kho>|<tên sheet>|<năm>|<rowIndex>`); không phải ⇒ null. */
 export function tachIdNap(id: string): { maKho: string; nam: string; rowIndex: string } | null {
@@ -347,50 +347,50 @@ export interface KetQuaNapLai {
  * cũ theo tên sheet) cùng kho · THÁNG (`period` của dòng) · rowIndex. Dọn dòng cũ theo
  * `period` của dòng chứ không theo tiền tố id ⇒ đổi tên sheet không làm tháng nhân đôi.
  */
-export function ghepNapLai(lines: MonthlyStockLine[], moi: MonthlyStockLine[], maKho: string): KetQuaNapLai {
-  const idMoi = new Set(moi.map((m) => m.id));
-  const thang = new Set(moi.map((m) => m.period));
-  const khoaViTri = (period: string, rowIndex: string) => `${period}|${rowIndex}`;
+export function ghepNapLai(lines: MonthlyStockLine[], incoming: MonthlyStockLine[], warehouseCode: string): KetQuaNapLai {
+  const newIds = new Set(incoming.map((m) => m.id));
+  const month = new Set(incoming.map((m) => m.period));
+  const positionKey = (period: string, rowIndex: string) => `${period}|${rowIndex}`;
   const theoId = new Map<string, MonthlyStockLine>();
-  const theoViTri = new Map<string, MonthlyStockLine>();
+  const byLocation = new Map<string, MonthlyStockLine>();
   for (const l of lines) {
     const t = tachIdNap(l.id);
-    if (!t || t.maKho !== maKho || !thang.has(l.period)) continue;
+    if (!t || t.maKho !== warehouseCode || !month.has(l.period)) continue;
     theoId.set(l.id, l);
-    if (!idMoi.has(l.id)) theoViTri.set(khoaViTri(l.period, t.rowIndex), l);
+    if (!newIds.has(l.id)) byLocation.set(positionKey(l.period, t.rowIndex), l);
   }
   const idThay = new Set<string>();
   const lechTen: KetQuaNapLai["lechTen"] = [];
-  const daGhep = moi.map((m) => {
+  const daGhep = incoming.map((m) => {
     const t = tachIdNap(m.id);
-    const cu = theoId.get(m.id) ?? (t ? theoViTri.get(khoaViTri(m.period, t.rowIndex)) : undefined);
-    if (!cu) return m;
-    if (cu.id !== m.id) idThay.add(cu.id);
-    if (chuanTen(cu.itemName) !== chuanTen(m.itemName)) {
-      lechTen.push({ cu, moi: m });
+    const prev = theoId.get(m.id) ?? (t ? byLocation.get(positionKey(m.period, t.rowIndex)) : undefined);
+    if (!prev) return m;
+    if (prev.id !== m.id) idThay.add(prev.id);
+    if (chuanTen(prev.itemName) !== chuanTen(m.itemName)) {
+      lechTen.push({ cu: prev, moi: m });
       return m;
     }
     return {
       ...m,
-      storageLocation: m.storageLocation || cu.storageLocation || "",
-      note: m.note || cu.note || "",
+      storageLocation: m.storageLocation || prev.storageLocation || "",
+      note: m.note || prev.note || "",
     };
   });
-  const cuConSo: MonthlyStockLine[] = [];
-  let boRong = 0;
+  const staleNonEmpty: MonthlyStockLine[] = [];
+  let emptyDropped = 0;
   const giuLai = lines.filter((l) => {
-    if (idMoi.has(l.id) || idThay.has(l.id)) return false;
+    if (newIds.has(l.id) || idThay.has(l.id)) return false;
     if (!theoId.has(l.id)) return true; // ngoài phạm vi bản nạp (kho / tháng khác, dòng tay, carry…)
     if (laDongTrong(l)) {
-      boRong++;
+      emptyDropped++;
       return false;
     }
-    cuConSo.push(l);
+    staleNonEmpty.push(l);
     return true;
   });
-  const idNap = new Set([...idMoi, ...idThay]);
-  const soTach = giuLai.filter((l) =>
+  const idNap = new Set([...newIds, ...idThay]);
+  const splitCount = giuLai.filter((l) =>
     [...(l.note ?? "").matchAll(/\(tách từ dòng ([^)]+)\)/g)].some((m) => idNap.has(m[1]))
   ).length;
-  return { lines: [...giuLai, ...daGhep], cuConSo, boRong, thayIdCu: idThay.size, lechTen, soTach };
+  return { lines: [...giuLai, ...daGhep], cuConSo: staleNonEmpty, boRong: emptyDropped, thayIdCu: idThay.size, lechTen, soTach: splitCount };
 }

@@ -33,8 +33,8 @@ export function ngayTrongKy(ky: Pick<BalancingPeriod, "startDate" | "endDate">):
      thành 17:00 UTC HÔM TRƯỚC, kỳ 21–25/7 biến thành 20–24/7 và ngày cuối rơi
      ra ngoài kỳ (dòng nhập hàng ngày 25 không hút được). */
   const d = new Date(`${tu}T00:00:00Z`);
-  const cuoi = new Date(`${den}T00:00:00Z`);
-  while (d.getTime() <= cuoi.getTime() && ra.length < SO_NGAY_TOI_DA) {
+  const end = new Date(`${den}T00:00:00Z`);
+  while (d.getTime() <= end.getTime() && ra.length < SO_NGAY_TOI_DA) {
     ra.push(d.toISOString().slice(0, 10));
     d.setUTCDate(d.getUTCDate() + 1);
   }
@@ -74,12 +74,12 @@ export function cungHoNguyenLieu(a: string, b: string): boolean {
  */
 export function kyTrungNgayCungHo(
   ky: Pick<BalancingPeriod, "id" | "materialTypeName" | "startDate" | "endDate">,
-  tatCa: Pick<BalancingPeriod, "id" | "materialTypeName" | "startDate" | "endDate">[]
-): typeof tatCa {
+  all: Pick<BalancingPeriod, "id" | "materialTypeName" | "startDate" | "endDate">[]
+): typeof all {
   const tu = ky.startDate;
   const den = ky.endDate || ky.startDate;
   if (!tu || !den) return [];
-  return tatCa.filter((k) => {
+  return all.filter((k) => {
     if (k.id === ky.id || !cungHoNguyenLieu(k.materialTypeName, ky.materialTypeName)) return false;
     const kTu = k.startDate;
     const kDen = k.endDate || k.startDate;
@@ -99,11 +99,11 @@ export function nhapHangHopLe(
   ky: BalancingPeriod,
   imports: MaterialImportItem[]
 ): MaterialImportItem[] {
-  const ngay = new Set(ngayTrongKy(ky));
-  if (ngay.size === 0) return [];
+  const dates = new Set(ngayTrongKy(ky));
+  if (dates.size === 0) return [];
   return imports.filter(
     (r) =>
-      ngay.has(r.deliveryDate) &&
+      dates.has(r.deliveryDate) &&
       cungHoNguyenLieu(r.materialTypeName, ky.materialTypeName) &&
       (!r.balancingPeriodId || r.balancingPeriodId === ky.id)
   );
@@ -118,11 +118,11 @@ export function sanXuatHopLe(
   ky: BalancingPeriod,
   wips: WipProductionItem[]
 ): WipProductionItem[] {
-  const ngay = new Set(ngayTrongKy(ky));
-  if (ngay.size === 0) return [];
+  const dates = new Set(ngayTrongKy(ky));
+  if (dates.size === 0) return [];
   return wips.filter(
     (r) =>
-      ngay.has(r.productionDate) &&
+      dates.has(r.productionDate) &&
       (!r.balancingPeriodId || r.balancingPeriodId === ky.id)
   );
 }
@@ -176,11 +176,11 @@ export function tachTraNo(r: Pick<BalancingOutputItem, "carryOverKg" | "debtKg">
 /** Patch ghi một trong hai cột, giữ nguyên cột kia. */
 export function ghiTraNo(
   r: Pick<BalancingOutputItem, "carryOverKg" | "debtKg">,
-  sua: { tra?: number; no?: number }
+  edit: { tra?: number; no?: number }
 ): Pick<BalancingOutputItem, "carryOverKg" | "debtKg"> {
-  const cu = tachTraNo(r);
-  const tra = sua.tra ?? cu.tra;
-  const no = sua.no ?? cu.no;
+  const prev = tachTraNo(r);
+  const tra = edit.tra ?? prev.tra;
+  const no = edit.no ?? prev.no;
   return { carryOverKg: tron3(tra + no), debtKg: no };
 }
 
@@ -192,9 +192,9 @@ export function ghiTraNo(
  */
 export const KHACH_KHAC = "khac";
 
-export function tenKhachCanDoi(id: string, khach: { id: string; name: string }[]): string {
+export function tenKhachCanDoi(id: string, customers: { id: string; name: string }[]): string {
   if (id === KHACH_KHAC) return "Khác";
-  return khach.find((k) => k.id === id)?.name || "—";
+  return customers.find((k) => k.id === id)?.name || "—";
 }
 
 /* ---------- Dựng dòng lưới ---------- */
@@ -296,44 +296,44 @@ export function gomSanXuatTheoMatHang(
  */
 export function dungHangNL(
   inputs: BalancingInputItem[],
-  nhapDaGan: MaterialImportItem[]
+  assignedImports: MaterialImportItem[]
 ): HangLuoiNL[] {
-  const theoLoai = gomNhapTheoLoai(nhapDaGan);
+  const byType = gomNhapTheoLoai(assignedImports);
   return inputs.map((r) => {
-    const tuSoNhap = r.autoSource === "imports";
+    const isFromImports = r.autoSource === "imports";
     // Tra theo HỌ: gom nhập keyed theo họ, dòng lưới có thể mang tên họ (hút mới)
     // hoặc tên size cũ ⇒ chuẩn hoá r.name về họ khi tra.
-    const nguon = tuSoNhap ? theoLoai.get(hoNguyenLieu(r.name)) : undefined;
-    const theoNgay = nguon ? nguon.theoNgay : (r.dailyQuantities ?? {});
-    const chuyenKy = r.carryOverKg ?? 0;
+    const source = isFromImports ? byType.get(hoNguyenLieu(r.name)) : undefined;
+    const byDate = source ? source.theoNgay : (r.dailyQuantities ?? {});
+    const carryOver = r.carryOverKg ?? 0;
     return {
       id: r.id,
       ten: r.name,
       loaiKho: loaiDongKho(r),
       nhom: r.groupName,
-      theoNgay,
-      chuyenKy,
-      tong: sumGridRow(theoNgay, chuyenKy),
+      theoNgay: byDate,
+      chuyenKy: carryOver,
+      tong: sumGridRow(byDate, carryOver),
       donGia: r.unitPrice,
       tyLe: r.ratioPercentage,
       laGiam: Boolean(r.isReduction),
       khoGiam: r.reductionWarehouseId ?? "",
-      tuSoNhap,
-      nguonIds: nguon?.ids ?? [],
+      tuSoNhap: isFromImports,
+      nguonIds: source?.ids ?? [],
     };
   });
 }
 
 export function dungHangTP(
   outputs: BalancingOutputItem[],
-  sanXuatDaGan: WipProductionItem[]
+  assignedWips: WipProductionItem[]
 ): HangLuoiTP[] {
-  const theoMatHang = gomSanXuatTheoMatHang(sanXuatDaGan);
+  const byProduct = gomSanXuatTheoMatHang(assignedWips);
   return outputs.map((r) => {
-    const tuSoSanXuat = r.autoSource === "production";
-    const nguon = tuSoSanXuat ? theoMatHang.get(khoaMatHang(r.productId, r.spec ?? "")) : undefined;
-    const theoNgay = nguon ? nguon.theoNgay : (r.dailyQuantities ?? {});
-    const chuyenKy = r.carryOverKg ?? 0;
+    const isFromProduction = r.autoSource === "production";
+    const source = isFromProduction ? byProduct.get(khoaMatHang(r.productId, r.spec ?? "")) : undefined;
+    const byDate = source ? source.theoNgay : (r.dailyQuantities ?? {});
+    const carryOver = r.carryOverKg ?? 0;
     return {
       id: r.id,
       matHangId: r.productId,
@@ -341,12 +341,12 @@ export function dungHangTP(
       quyCach: r.spec ?? "",
       kenh: r.channel,
       donGia: r.unitPrice,
-      theoNgay,
-      chuyenKy,
+      theoNgay: byDate,
+      chuyenKy: carryOver,
       ...tachTraNo(r),
-      tong: sumGridRow(theoNgay, chuyenKy),
-      tuSoSanXuat,
-      nguonIds: nguon?.ids ?? [],
+      tong: sumGridRow(byDate, carryOver),
+      tuSoSanXuat: isFromProduction,
+      nguonIds: source?.ids ?? [],
     };
   });
 }
@@ -374,42 +374,42 @@ export interface DongMauTP {
 export const khoaDongTP = (productId: string, spec: string, customerId: string): string =>
   `${productId}|${spec || ""}|${customerId || ""}`;
 
-type KyTomTat = Pick<BalancingPeriod, "id" | "materialTypeName" | "startDate" | "endDate">;
-const cuoiKy = (k: Pick<BalancingPeriod, "startDate" | "endDate">) => k.endDate || k.startDate || "";
+type PeriodSummary = Pick<BalancingPeriod, "id" | "materialTypeName" | "startDate" | "endDate">;
+const periodEnd = (k: Pick<BalancingPeriod, "startDate" | "endDate">) => k.endDate || k.startDate || "";
 
 /**
  * Kỳ làm MẪU cho khối 2: kỳ khác cùng họ NL có ít nhất một dòng bán thành phẩm.
  * Ưu tiên kỳ KẾT THÚC TRƯỚC kỳ này (mới nhất trước); không có thì lấy kỳ mới nhất
  * còn lại (VD kỳ đầu năm nhưng đã nhập kỳ sau trước).
  */
-export function kyMauTP<K extends KyTomTat>(
-  ky: KyTomTat,
-  tatCaKy: K[],
-  tatCaTP: Pick<BalancingOutputItem, "periodId" | "productId">[]
+export function kyMauTP<K extends PeriodSummary>(
+  ky: PeriodSummary,
+  allPeriods: K[],
+  allOutputs: Pick<BalancingOutputItem, "periodId" | "productId">[]
 ): K | null {
-  const coDong = new Set(tatCaTP.filter((r) => r.productId).map((r) => r.periodId));
-  const ung = tatCaKy
-    .filter((k) => k.id !== ky.id && coDong.has(k.id) && cungHoNguyenLieu(k.materialTypeName, ky.materialTypeName))
-    .sort((a, b) => cuoiKy(b).localeCompare(cuoiKy(a)));
+  const periodsWithRows = new Set(allOutputs.filter((r) => r.productId).map((r) => r.periodId));
+  const ung = allPeriods
+    .filter((k) => k.id !== ky.id && periodsWithRows.has(k.id) && cungHoNguyenLieu(k.materialTypeName, ky.materialTypeName))
+    .sort((a, b) => periodEnd(b).localeCompare(periodEnd(a)));
   const batDau = ky.startDate || "";
-  return ung.find((k) => batDau && cuoiKy(k) && cuoiKy(k) < batDau) ?? ung[0] ?? null;
+  return ung.find((k) => batDau && periodEnd(k) && periodEnd(k) < batDau) ?? ung[0] ?? null;
 }
 
 /**
  * Dòng mẫu từ các dòng khối 2 của kỳ mẫu, giữ thứ tự gốc. Cùng (mặt hàng, quy cách,
  * khách) mà KHÁC giá ⇒ vẫn là hai dòng (như bảng giấy); trùng cả giá ⇒ một dòng.
  */
-export function dungDongMauTP(dongKyMau: BalancingOutputItem[]): DongMauTP[] {
+export function dungDongMauTP(templatePeriodRows: BalancingOutputItem[]): DongMauTP[] {
   const ra = new Map<string, DongMauTP>();
   const dem = new Map<string, number>();
-  for (const r of dongKyMau) {
+  for (const r of templatePeriodRows) {
     if (!r.productId) continue;
     const khoa = khoaDongTP(r.productId, r.spec ?? "", r.customerId);
-    const trungGia = `${khoa}|${r.unitPrice ?? ""}`;
-    if (ra.has(trungGia)) continue;
+    const priceKey = `${khoa}|${r.unitPrice ?? ""}`;
+    if (ra.has(priceKey)) continue;
     const thu = dem.get(khoa) ?? 0;
     dem.set(khoa, thu + 1);
-    ra.set(trungGia, {
+    ra.set(priceKey, {
       id: `${khoa}#${thu}`,
       khoa,
       productId: r.productId,
@@ -430,21 +430,21 @@ export function dungDongMauTP(dongKyMau: BalancingOutputItem[]): DongMauTP[] {
  * người dùng gõ số hai lần cho cùng một mặt hàng.
  */
 export function dongMauConThieu(
-  mau: DongMauTP[],
-  tp: Pick<BalancingOutputItem, "productId" | "spec" | "customerId">[]
+  template: DongMauTP[],
+  finishedGoods: Pick<BalancingOutputItem, "productId" | "spec" | "customerId">[]
 ): DongMauTP[] {
-  const daCo = new Map<string, number>();
-  for (const r of tp) {
+  const existing = new Map<string, number>();
+  for (const r of finishedGoods) {
     const k = khoaDongTP(r.productId, r.spec ?? "", r.customerId);
-    daCo.set(k, (daCo.get(k) ?? 0) + 1);
+    existing.set(k, (existing.get(k) ?? 0) + 1);
   }
-  const coChuaKhach = new Set(tp.filter((r) => !r.customerId).map((r) => khoaMatHang(r.productId, r.spec ?? "")));
-  const daBo = new Map<string, number>();
-  return mau.filter((m) => {
-    if (coChuaKhach.has(khoaMatHang(m.productId, m.spec))) return false;
-    const bo = daBo.get(m.khoa) ?? 0;
-    if (bo < (daCo.get(m.khoa) ?? 0)) {
-      daBo.set(m.khoa, bo + 1);
+  const missingCustomerKeys = new Set(finishedGoods.filter((r) => !r.customerId).map((r) => khoaMatHang(r.productId, r.spec ?? "")));
+  const removed = new Map<string, number>();
+  return template.filter((m) => {
+    if (missingCustomerKeys.has(khoaMatHang(m.productId, m.spec))) return false;
+    const bo = removed.get(m.khoa) ?? 0;
+    if (bo < (existing.get(m.khoa) ?? 0)) {
+      removed.set(m.khoa, bo + 1);
       return false;
     }
     return true;
@@ -460,22 +460,22 @@ export function dongMauConThieu(
 export function goiYKhachGia(
   productId: string,
   spec: string,
-  mau: DongMauTP[],
-  tatCaTP: BalancingOutputItem[],
-  tatCaKy: Pick<BalancingPeriod, "id" | "startDate" | "endDate">[],
-  kyHienTai: string
+  template: DongMauTP[],
+  allOutputs: BalancingOutputItem[],
+  allPeriods: Pick<BalancingPeriod, "id" | "startDate" | "endDate">[],
+  currentPeriod: string
 ): Pick<DongMauTP, "customerId" | "channel" | "unitPrice"> | null {
   const m =
-    mau.find((x) => x.productId === productId && x.spec === (spec || "")) ??
-    mau.find((x) => x.productId === productId);
+    template.find((x) => x.productId === productId && x.spec === (spec || "")) ??
+    template.find((x) => x.productId === productId);
   if (m) return { customerId: m.customerId, channel: m.channel, unitPrice: m.unitPrice };
-  const cuoi = new Map(tatCaKy.map((k) => [k.id, cuoiKy(k)]));
-  const ung = tatCaTP
-    .filter((r) => r.periodId !== kyHienTai && r.productId === productId && r.unitPrice != null)
+  const end = new Map(allPeriods.map((k) => [k.id, periodEnd(k)]));
+  const ung = allOutputs
+    .filter((r) => r.periodId !== currentPeriod && r.productId === productId && r.unitPrice != null)
     .sort(
       (a, b) =>
         Number((b.spec ?? "") === (spec || "")) - Number((a.spec ?? "") === (spec || "")) ||
-        (cuoi.get(b.periodId) ?? "").localeCompare(cuoi.get(a.periodId) ?? "")
+        (end.get(b.periodId) ?? "").localeCompare(end.get(a.periodId) ?? "")
     )[0];
   return ung ? { customerId: ung.customerId, channel: ung.channel, unitPrice: ung.unitPrice } : null;
 }
@@ -497,23 +497,23 @@ export type KetQuaGhiNguoc =
  *   thà bắt người dùng vào sổ Sản xuất sửa đúng dòng còn hơn bịa số.
  */
 export function ghiNguocSanLuongNgay(
-  nguonTrongNgay: WipProductionItem[],
-  kgMoi: number
+  daySources: WipProductionItem[],
+  newKg: number
 ): KetQuaGhiNguoc {
-  if (nguonTrongNgay.length === 0) return { loai: "them", kg: kgMoi };
-  if (nguonTrongNgay.length === 1) {
-    return { loai: "sua", id: nguonTrongNgay[0].id, kg: kgMoi };
+  if (daySources.length === 0) return { loai: "them", kg: newKg };
+  if (daySources.length === 1) {
+    return { loai: "sua", id: daySources[0].id, kg: newKg };
   }
-  const cuoi = nguonTrongNgay[nguonTrongNgay.length - 1];
-  const tongKhac = nguonTrongNgay.slice(0, -1).reduce((s, r) => s + r.quantityKg, 0);
-  const conLai = kgMoi - tongKhac;
-  if (conLai < 0) {
+  const end = daySources[daySources.length - 1];
+  const otherTotal = daySources.slice(0, -1).reduce((s, r) => s + r.quantityKg, 0);
+  const remaining = newKg - otherTotal;
+  if (remaining < 0) {
     return {
       loai: "tuChoi",
-      lyDo: `Ngày này có ${nguonTrongNgay.length} dòng sản xuất, các dòng khác đã ${tongKhac} kg. Sửa trực tiếp ở màn Sản xuất bán thành phẩm.`,
+      lyDo: `Ngày này có ${daySources.length} dòng sản xuất, các dòng khác đã ${otherTotal} kg. Sửa trực tiếp ở màn Sản xuất bán thành phẩm.`,
     };
   }
-  return { loai: "sua", id: cuoi.id, kg: conLai };
+  return { loai: "sua", id: end.id, kg: remaining };
 }
 
 /**
@@ -529,9 +529,9 @@ export function nhapTrongKhoangNgay(
   ky: BalancingPeriod,
   imports: MaterialImportItem[]
 ): MaterialImportItem[] {
-  const ngay = new Set(ngayTrongKy(ky));
-  if (ngay.size === 0) return [];
-  return imports.filter((r) => ngay.has(r.deliveryDate) && !r.balancingPeriodId);
+  const dates = new Set(ngayTrongKy(ky));
+  if (dates.size === 0) return [];
+  return imports.filter((r) => dates.has(r.deliveryDate) && !r.balancingPeriodId);
 }
 
 /**
@@ -546,9 +546,9 @@ export function chuyenNhapTheoNgay(
   ky: BalancingPeriod,
   imports: MaterialImportItem[]
 ): MaterialImportItem[] {
-  const ngay = new Set(ngayTrongKy(ky));
-  if (ngay.size === 0) return [];
-  return imports.filter((r) => ngay.has(r.deliveryDate));
+  const dates = new Set(ngayTrongKy(ky));
+  if (dates.size === 0) return [];
+  return imports.filter((r) => dates.has(r.deliveryDate));
 }
 
 /**
@@ -557,23 +557,23 @@ export function chuyenNhapTheoNgay(
  * chỉnh dòng CUỐI cho tổng ngày khớp, phải làm âm thì từ chối.
  */
 export function ghiNguocNhapNgay(
-  nguonTrongNgay: MaterialImportItem[],
-  kgMoi: number
+  daySources: MaterialImportItem[],
+  newKg: number
 ): KetQuaGhiNguoc {
-  if (nguonTrongNgay.length === 0) return { loai: "them", kg: kgMoi };
-  if (nguonTrongNgay.length === 1) {
-    return { loai: "sua", id: nguonTrongNgay[0].id, kg: kgMoi };
+  if (daySources.length === 0) return { loai: "them", kg: newKg };
+  if (daySources.length === 1) {
+    return { loai: "sua", id: daySources[0].id, kg: newKg };
   }
-  const cuoi = nguonTrongNgay[nguonTrongNgay.length - 1];
-  const tongKhac = nguonTrongNgay.slice(0, -1).reduce((s, r) => s + r.quantityKg, 0);
-  const conLai = kgMoi - tongKhac;
-  if (conLai < 0) {
+  const end = daySources[daySources.length - 1];
+  const otherTotal = daySources.slice(0, -1).reduce((s, r) => s + r.quantityKg, 0);
+  const remaining = newKg - otherTotal;
+  if (remaining < 0) {
     return {
       loai: "tuChoi",
-      lyDo: `Ngày này có ${nguonTrongNgay.length} chuyến nhập, các chuyến khác đã ${tongKhac} kg. Sửa trực tiếp ở màn Nhập hàng.`,
+      lyDo: `Ngày này có ${daySources.length} chuyến nhập, các chuyến khác đã ${otherTotal} kg. Sửa trực tiếp ở màn Nhập hàng.`,
     };
   }
-  return { loai: "sua", id: cuoi.id, kg: conLai };
+  return { loai: "sua", id: end.id, kg: remaining };
 }
 
 /* ---------- Chuyển kỳ: nối kỳ trước sang kỳ sau ---------- */
@@ -585,11 +585,11 @@ export function ghiNguocNhapNgay(
  */
 export function kyLienTruoc(
   ky: BalancingPeriod,
-  tatCaKy: BalancingPeriod[]
+  allPeriods: BalancingPeriod[]
 ): BalancingPeriod | null {
   const batDau = ky.startDate;
   if (!batDau) return null;
-  const truoc = tatCaKy
+  const prevRows = allPeriods
     .filter(
       (k) =>
         k.id !== ky.id &&
@@ -597,7 +597,7 @@ export function kyLienTruoc(
         (k.endDate || k.startDate || "") < batDau
     )
     .sort((a, b) => (b.endDate || b.startDate || "").localeCompare(a.endDate || a.startDate || ""));
-  return truoc[0] ?? null;
+  return prevRows[0] ?? null;
 }
 
 export interface DongChuyenKy {
@@ -616,8 +616,8 @@ export interface DongChuyenKy {
  */
 export function chuyenKyChoNhan<
   T extends { id: string; carryOverKg?: number; carryOverPeriodId?: string },
->(dongKyTruoc: T[], ten: (r: T) => string): DongChuyenKy[] {
-  return dongKyTruoc
+>(prevPeriodRows: T[], ten: (r: T) => string): DongChuyenKy[] {
+  return prevPeriodRows
     .filter((r) => (r.carryOverKg ?? 0) < 0 && !r.carryOverPeriodId)
     .map((r) => ({ nguonId: r.id, ten: ten(r), kg: Math.abs(r.carryOverKg ?? 0) }));
 }

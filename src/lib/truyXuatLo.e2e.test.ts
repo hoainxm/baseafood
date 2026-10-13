@@ -35,17 +35,17 @@ const customers = [
   { id: "kZ", name: "Khách Z" },
 ] as Customer[];
 
-const chuyen = (id: string, dai: string, lotCode: string): ImportShipment => ({
+const makeShipment = (id: string, supplier: string, lotCode: string): ImportShipment => ({
   id, deliveryDate: "2026-10-01", postingDate: "2026-10-01", backdateReason: "", workshop: "Đông",
-  supplierName: dai, driverName: "Tài", licensePlate: "72C-123.45", note: "", lotCode,
+  supplierName: supplier, driverName: "Tài", licensePlate: "72C-123.45", note: "", lotCode,
 });
-const shipments = [chuyen("S1", "Đại lý A", "Đ-261001-01"), chuyen("S2", "Đại lý B", "Đ-261001-02"), chuyen("S3", "Đại lý C", "Đ-261001-03")];
-const dongNhap = (shipmentId: string, kg: number, loai: string, category: string) =>
-  ({ id: `${shipmentId}-1`, shipmentId, deliveryDate: "2026-10-01", workshop: "Đông", category, materialTypeName: loai, quantityKg: kg, unitPrice: null }) as MaterialImportItem;
-const imports = [dongNhap("S1", 1000, "Bạch tuộc", "Bạch tuộc"), dongNhap("S2", 600, "Bạch tuộc", "Bạch tuộc"), dongNhap("S3", 400, "Mực ống", "Mực")];
+const shipments = [makeShipment("S1", "Đại lý A", "Đ-261001-01"), makeShipment("S2", "Đại lý B", "Đ-261001-02"), makeShipment("S3", "Đại lý C", "Đ-261001-03")];
+const importRow = (shipmentId: string, kg: number, materialType: string, category: string) =>
+  ({ id: `${shipmentId}-1`, shipmentId, deliveryDate: "2026-10-01", workshop: "Đông", category, materialTypeName: materialType, quantityKg: kg, unitPrice: null }) as MaterialImportItem;
+const imports = [importRow("S1", 1000, "Bạch tuộc", "Bạch tuộc"), importRow("S2", 600, "Bạch tuộc", "Bạch tuộc"), importRow("S3", 400, "Mực ống", "Mực")];
 
-const me = (id: string, ngay: string, productId: string, kg: number, block: number): WipProductionItem => ({
-  id, productionDate: ngay, postingDate: ngay, backdateReason: "", workshop: "Đông", productId, spec: "",
+const me = (id: string, date: string, productId: string, kg: number, block: number): WipProductionItem => ({
+  id, productionDate: date, postingDate: date, backdateReason: "", workshop: "Đông", productId, spec: "",
   quantityKg: kg, blocksCount: block, warehouse: "Kho Baseafood", status: "da-nhap", note: "",
 });
 const wips = [
@@ -58,23 +58,23 @@ const packagings: Packaging[] = [{
   toProductId: "tpTui", toSpec: "", outputKg: 190, outputUnits: 190, warehouse: "Kho thành phẩm", note: "",
 }];
 
-const gan = (id: string, outputKind: "W" | "P", outputId: string, inputKind: "S" | "W", inputId: string, kg: number | null): LotInput => ({
+const lotInput = (id: string, outputKind: "W" | "P", outputId: string, inputKind: "S" | "W", inputId: string, kg: number | null): LotInput => ({
   id, outputKind, outputId, inputKind, inputId, inputLabel: inputId, material: "", quantityKg: kg, method: "quet", operator: "Trúc", recordedAt: "2026-10-02T08:00:00Z",
 });
 const lotInputs = [
-  gan("l1", "W", "W1", "S", "S1-1", 600),
-  gan("l2", "W", "W2", "S", "S1-1", 250),
-  gan("l3", "W", "W2", "S", "S2-1", 150),
-  gan("l4", "P", "P1", "W", "W1", 200),
+  lotInput("l1", "W", "W1", "S", "S1-1", 600),
+  lotInput("l2", "W", "W2", "S", "S1-1", 250),
+  lotInput("l3", "W", "W2", "S", "S2-1", 150),
+  lotInput("l4", "P", "P1", "W", "W1", 200),
 ];
 
 const salesOrders: SalesOrder[] = [{ id: "o1", customerId: "kX", orderDate: "2026-10-03", status: "dong", note: "" }];
 const exportOrders: ExportOrder[] = [{ id: "e1", orderId: "o1", exportDate: "2026-10-04", status: "dong", note: "" }];
 const exportItems: ExportItem[] = [{ id: "x1", exportId: "e1", wipId: "W2", productId: "mhCat", spec: "", quantityKg: 200, blocksCount: 20 }];
 
-const phieu = (id: string, customerId: string): SalesInvoice =>
+const salesInvoice = (id: string, customerId: string): SalesInvoice =>
   ({ id, deliveryDate: "2026-10-05", postingDate: "2026-10-05", backdateReason: "", workshop: "Đông", customerId, channel: "Nội địa", note: "" });
-const salesInvoices = [phieu("v1", "kY"), phieu("v2", "kZ"), phieu("v3", "kX")];
+const salesInvoices = [salesInvoice("v1", "kY"), salesInvoice("v2", "kZ"), salesInvoice("v3", "kX")];
 const salesItems: SalesItem[] = [
   { id: "b1", invoiceId: "v1", deliveryDate: "2026-10-05", productId: "tpTui", spec: "", quantityKg: 50, unitPrice: null, sourceWarehouse: KHO_TP },
   { id: "b2", invoiceId: "v2", deliveryDate: "2026-10-05", productId: "mh2da", spec: "", quantityKg: 100, unitPrice: null, sourceWarehouse: KHO_BAN_LE },
@@ -104,15 +104,15 @@ const dl: DuLieuTruyXuat = {
   salesItems, salesInvoices, domesticSales, lotDispatches, lotWaivers: [], labelPrints, materialTypes,
 };
 
-const phang = (cay: NhanhCay[]): string[] => cay.flatMap((n) => [`${n.nut.kind}:${n.nut.id}`, ...phang(n.con)]);
+const phang = (tree: NhanhCay[]): string[] => tree.flatMap((n) => [`${n.nut.kind}:${n.nut.id}`, ...phang(n.con)]);
 
 // ---------- Kỳ vọng ----------
 describe("kịch bản mẫu: nhập → SX → kho → đóng gói / xuất / bán", () => {
   it("truy ngược thùng TP P1 → mẻ W1 → lô NL S1 → Đại lý A, ngày 01/10", () => {
-    const cay = truyNguoc("P", "P1", dl);
-    expect(phang(cay)).toEqual(["W:W1", "S:S1-1"]);
-    expect(cay[0]!.kg).toBe(200);
-    const s1 = cay[0]!.con[0]!.nut;
+    const tree = truyNguoc("P", "P1", dl);
+    expect(phang(tree)).toEqual(["W:W1", "S:S1-1"]);
+    expect(tree[0]!.kg).toBe(200);
+    const s1 = tree[0]!.con[0]!.nut;
     expect(s1.chiTiet).toContainEqual({ nhan: "Đại lý", giaTri: "Đại lý A" });
     expect(s1.ngay).toBe("2026-10-01");
   });
@@ -130,8 +130,8 @@ describe("kịch bản mẫu: nhập → SX → kho → đóng gói / xuất / b
   });
 
   it("thu hồi lô S2 CHỈ tới khách X + chợ (bán nội địa) — không kéo theo Y, Z", () => {
-    const khach = danhSachThuHoi("S", "S2-1", dl).hangRa.map((r) => r.khach).sort();
-    expect(khach).toEqual(["Chợ Bà Rịa", "Khách X"]);
+    const customers = danhSachThuHoi("S", "S2-1", dl).hangRa.map((r) => r.khach).sort();
+    expect(customers).toEqual(["Chợ Bà Rịa", "Khách X"]);
   });
 
   it("quét kiểm lệnh xuất không đẻ thêm ngả ra (không đếm hai lần)", () => {
@@ -159,9 +159,9 @@ describe("kịch bản mẫu: nhập → SX → kho → đóng gói / xuất / b
   });
 
   it("(đối chứng) trừ FIFO kiểu cũ thì sổ tồn nói lô khác hộ chiếu", () => {
-    const cu = tinhTon(wips, exportItems, truTonBTP(salesItems, packagings));
-    expect(cu.find((l) => l.wipId === "W0")!.conLai).toBe(0);
-    expect(cu.find((l) => l.wipId === "W1")!.conLai).toBe(300);
+    const prev = tinhTon(wips, exportItems, truTonBTP(salesItems, packagings));
+    expect(prev.find((l) => l.wipId === "W0")!.conLai).toBe(0);
+    expect(prev.find((l) => l.wipId === "W1")!.conLai).toBe(300);
   });
 
   it("quét tem: link QR và mã lô in trên tem đều ra đúng lô", () => {
@@ -172,8 +172,8 @@ describe("kịch bản mẫu: nhập → SX → kho → đóng gói / xuất / b
   });
 
   it("theo giai đoạn 29/09–05/10: mỗi khâu đủ mục, chỉ ra đúng việc còn thiếu", () => {
-    const loc = { tu: "2026-09-29", den: "2026-10-05", xuong: "Đông" as const };
-    const gd = Object.fromEntries(theoGiaiDoan(dl, loc).map((g) => [g.khoa, g]));
+    const filter = { tu: "2026-09-29", den: "2026-10-05", xuong: "Đông" as const };
+    const gd = Object.fromEntries(theoGiaiDoan(dl, filter).map((g) => [g.khoa, g]));
     const thieu = (k: string) => Object.fromEntries(gd[k]!.muc.map((m) => [m.nut.id, m.thieu.join(",")]));
     expect(Object.keys(gd)).toEqual(["nhap", "san-xuat", "kho", "dong-goi", "xuat-ban"]);
     // Nhập NL: S3 chưa in tem; S1 đã vào 2 mẻ, S2 vào 1 mẻ + 1 dòng bán nội địa
@@ -192,11 +192,11 @@ describe("kịch bản mẫu: nhập → SX → kho → đóng gói / xuất / b
     expect(gd["xuat-ban"]!.muc.find((m) => m.nut.id === "b1")!.loaiLoBan).toBe("P");
 
     // Ghi lý do cho W0 ⇒ chỉ còn thiếu tem
-    const lyDo: LotWaiver = { id: "z1", outputKind: "W", outputId: "W0", reason: "Mẻ trước ngày áp dụng QR", operator: "", recordedAt: "" };
-    const w0 = theoGiaiDoan({ ...dl, lotWaivers: [lyDo] }, loc)[1]!.muc.find((m) => m.nut.id === "W0")!;
+    const waiver: LotWaiver = { id: "z1", outputKind: "W", outputId: "W0", reason: "Mẻ trước ngày áp dụng QR", operator: "", recordedAt: "" };
+    const w0 = theoGiaiDoan({ ...dl, lotWaivers: [waiver] }, filter)[1]!.muc.find((m) => m.nut.id === "W0")!;
     expect(w0).toMatchObject({ thieu: ["tem"], lyDo: "Mẻ trước ngày áp dụng QR" });
     // Lọc xưởng khác ⇒ trống
-    expect(theoGiaiDoan(dl, { ...loc, xuong: "Cá" }).every((g) => g.muc.length === 0)).toBe(true);
+    expect(theoGiaiDoan(dl, { ...filter, xuong: "Cá" }).every((g) => g.muc.length === 0)).toBe(true);
   });
 
   it("gắn lô cả phiên: lô bạch tuộc vào mẻ bạch tuộc, lô mực không dính", () => {
@@ -217,10 +217,10 @@ describe("kịch bản mẫu: nhập → SX → kho → đóng gói / xuất / b
 // ---------- Lô NL = mỗi loại NL của chuyến (chốt 2026-10-08) ----------
 // Đúng ca thật: chuyến Hồng Phú Đ-261002-01 chở 3 loại bạch tuộc, cân riêng từng loại.
 describe("lô NL theo loại: một chuyến 3 loại ⇒ 3 lô, 3 tem", () => {
-  const hp = { ...chuyen("HP", "Hồng Phú", "Đ-261002-01"), deliveryDate: "2026-10-02", postingDate: "2026-10-02" };
-  const dongHP = (id: string, loai: string, kg: number) =>
-    ({ id, shipmentId: "HP", deliveryDate: "2026-10-02", workshop: "Đông", category: "Bạch tuộc", materialTypeName: loai, quantityKg: kg, unitPrice: null }) as MaterialImportItem;
-  const loaiNL: MaterialType[] = [
+  const hp = { ...makeShipment("HP", "Hồng Phú", "Đ-261002-01"), deliveryDate: "2026-10-02", postingDate: "2026-10-02" };
+  const dongHP = (id: string, materialType: string, kg: number) =>
+    ({ id, shipmentId: "HP", deliveryDate: "2026-10-02", workshop: "Đông", category: "Bạch tuộc", materialTypeName: materialType, quantityKg: kg, unitPrice: null }) as MaterialImportItem;
+  const testMaterialTypes: MaterialType[] = [
     { id: "t1", name: "Bạch tuộc 1 da", category: "Bạch tuộc", note: "" },
     { id: "t2", name: "Bạch tuộc 2 da lớn (80↑)", category: "Bạch tuộc", note: "" },
     { id: "t3", name: "Bạch tuộc 2 da nhỏ (80↓)", category: "Bạch tuộc", note: "" },
@@ -233,7 +233,7 @@ describe("lô NL theo loại: một chuyến 3 loại ⇒ 3 lô, 3 tem", () => {
       { ...mh("mhLon", "Bạch tuộc 2 da lớn chần", "Bạch tuộc"), materialTypeId: "t2" }, // đã gắn loại NL ở Danh mục
       mh("mhChung", "Bạch tuộc cắt", "Bạch tuộc"), // chỉ biết loài
     ],
-    materialTypes: loaiNL,
+    materialTypes: testMaterialTypes,
     lotInputs: [], lotDispatches: [], labelPrints: [],
   };
 

@@ -13,7 +13,7 @@
 > `import_shipments.scan_path` (migration `0040`). Nhận diện chữ chạy **client-side**
 > bằng **Tesseract** (`src/lib/ocr.ts`, nạp động — KHÔNG cần key/dịch vụ/edge
 > function), tự điền NHÁP ở màn `/imports`. Chữ viết tay là bản nháp người soát lại;
-> bộ nhận diện tách sau hàm `chayTesseract` để **nâng cấp Google Vision** (mục 6 §3)
+> bộ nhận diện tách sau hàm `runTesseract` để **nâng cấp Google Vision** (mục 6 §3)
 > sau chỉ thay một chỗ. Ảnh phiếu (khác ảnh QC) vẫn dùng chung bucket/RLS.
 
 > Load khi: cần lưu **ảnh** (ảnh QC chấm điểm cuối ngày, ảnh phiếu tay chụp để

@@ -7,15 +7,15 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import * as repo from "./repo";
 
-const THU_MUC = join(__dirname, "../../supabase/migrations");
+const MIGRATIONS_DIR = join(__dirname, "../../supabase/migrations");
 /** Bảng đích được phép không khai (site chung — không mang tiền tố). */
-const BO_QUA = new Set(["sites", "xi_nghiep"]);
+const SKIPPED_TABLES = new Set(["sites", "xi_nghiep"]);
 
-function khoaNgoaiNghiepVu(): string[] {
+function businessForeignKeys(): string[] {
   const ra: string[] = [];
-  for (const f of readdirSync(THU_MUC).filter((x) => x.endsWith(".sql")).sort()) {
-    const sql = readFileSync(join(THU_MUC, f), "utf8");
-    for (const m of sql.matchAll(/references\s+(?:public\.)?([a-z_]+)\s*\(/gi)) if (!BO_QUA.has(m[1])) ra.push(`${f}:${m[1]}`);
+  for (const f of readdirSync(MIGRATIONS_DIR).filter((x) => x.endsWith(".sql")).sort()) {
+    const sql = readFileSync(join(MIGRATIONS_DIR, f), "utf8");
+    for (const m of sql.matchAll(/references\s+(?:public\.)?([a-z_]+)\s*\(/gi)) if (!SKIPPED_TABLES.has(m[1])) ra.push(`${f}:${m[1]}`);
   }
   return ra;
 }
@@ -23,7 +23,7 @@ function khoaNgoaiNghiepVu(): string[] {
 describe("khóa ngoại giữa bảng nghiệp vụ ⇄ cotThamChieu", () => {
   it("migration chỉ có đúng 3 khóa ngoại (period_id → kỳ cân đối) — thêm mới thì khai cotThamChieu rồi sửa test này", () => {
     // 0001 tạo bằng tên cũ ky_can_doi; 0016 đổi thành balancing_periods.
-    expect(khoaNgoaiNghiepVu()).toEqual([
+    expect(businessForeignKeys()).toEqual([
       "0001_baseafood_mes.sql:ky_can_doi",
       "0001_baseafood_mes.sql:ky_can_doi",
       "0001_baseafood_mes.sql:ky_can_doi",

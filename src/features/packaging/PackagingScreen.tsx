@@ -58,8 +58,8 @@ import { kg, num, todayISO, viDate } from "@/lib/format";
 import { KY_OPT, phamViKy, type KyXem } from "@/lib/periodUtils";
 import { Boxes, CalendarRange, Link2, Package, PackageCheck, Plus, QrCode, Scale } from "lucide-react";
 
-const PHAN_XUONG: Workshop[] = ["Đông", "Cá", "Khô"];
-const KHO_TP_NAMES = BSF1_WAREHOUSES.map((w) => w.name);
+const WORKSHOPS: Workshop[] = ["Đông", "Cá", "Khô"];
+const FG_WAREHOUSE_NAMES = BSF1_WAREHOUSES.map((w) => w.name);
 
 interface FormDG {
   date: string;
@@ -78,53 +78,53 @@ interface FormDG {
 
 export default function DongGoiScreen() {
   const [rows, persist, { trangThai }] = usePackagings();
-  const dangTai = trangThai === "dang-tai" && rows.length === 0;
-  const [sanXuat] = useWipProductions();
-  const [dongLenh] = useExportItems();
-  const [banHang] = useSalesItems();
-  const [matHang, setMatHang] = useProducts();
+  const isLoading = trangThai === "dang-tai" && rows.length === 0;
+  const [wips] = useWipProductions();
+  const [exportItems] = useExportItems();
+  const [salesItems] = useSalesItems();
+  const [products, setProducts] = useProducts();
   /** Bút chì sửa nhanh danh mục ngay trong ô chọn. */
-  const suaMH = useSuaDanhMuc("matHang", matHang, setMatHang);
+  const productEditor = useSuaDanhMuc("matHang", products, setProducts);
 
   const [ky, setKy] = useState<KyXem>("ngay");
-  const [ngay, setNgay] = useState(todayISO());
-  const [tuNgay, setTuNgay] = useState(todayISO());
-  const [denNgay, setDenNgay] = useState(todayISO());
-  const [phanXuong, setPhanXuong] = useState<Workshop | "Tất cả">("Đông");
+  const [date, setDate] = useState(todayISO());
+  const [fromDate, setFromDate] = useState(todayISO());
+  const [toDate, setToDate] = useState(todayISO());
+  const [workshop, setWorkshop] = useState<Workshop | "Tất cả">("Đông");
 
   const [form, setForm] = useState<FormDG | null>(null);
   const [loi, setLoi] = useState<LoiNhap[]>([]);
   // Truy xuất lô (docs/spec/qr-truy-xuat-lo.md): gắn lô BTP cho phiếu + in tem lô TP.
   const [lotInputs] = useLotInputs();
   const [lotDispatches] = useLotDispatches();
-  const [ganLo, setGanLo] = useState<Packaging | null>(null);
-  const [temLo, setTemLo] = useState<Packaging | null>(null);
-  const soLoGan = (id: string) => lotInputs.filter((l) => l.outputKind === "P" && l.outputId === id).length;
+  const [lotTarget, setLotTarget] = useState<Packaging | null>(null);
+  const [lotLabel, setLotLabel] = useState<Packaging | null>(null);
+  const countLotInputs = (id: string) => lotInputs.filter((l) => l.outputKind === "P" && l.outputId === id).length;
 
-  const [tuHieuLuc, denHieuLuc] = phamViKy(ky, ngay, tuNgay, denNgay);
-  const laMotNgay = tuHieuLuc === denHieuLuc;
-  const moTaPhamVi = laMotNgay
+  const [tuHieuLuc, denHieuLuc] = phamViKy(ky, date, fromDate, toDate);
+  const isSingleDay = tuHieuLuc === denHieuLuc;
+  const rangeDescription = isSingleDay
     ? viDate(tuHieuLuc)
     : `${viDate(tuHieuLuc)} – ${viDate(denHieuLuc)}`;
 
-  const tenMH = (id: string) => matHang.find((m) => m.id === id)?.name || "—";
-  const optMatHang: MucChon[] = matHang.map((m) => ({
+  const tenMH = (id: string) => products.find((m) => m.id === id)?.name || "—";
+  const productOptions: MucChon[] = products.map((m) => ({
     value: m.id,
     label: m.code ? `${m.code} · ${m.name}` : m.name,
     phu: m.code || undefined,
   }));
 
   /* Tồn BTP khả dụng: sản xuất − xuất − bán lẻ block thô − ĐÃ đóng gói. */
-  const truBTP = useMemo(
-    () => truTonBTP(banHang, rows, lotInputs, lotDispatches),
-    [banHang, rows, lotInputs, lotDispatches]
+  const wipDeductions = useMemo(
+    () => truTonBTP(salesItems, rows, lotInputs, lotDispatches),
+    [salesItems, rows, lotInputs, lotDispatches]
   );
-  const tonBTP = useMemo(
-    () => tinhTon(sanXuat, dongLenh, truBTP),
-    [sanXuat, dongLenh, truBTP]
+  const wipStock = useMemo(
+    () => tinhTon(wips, exportItems, wipDeductions),
+    [wips, exportItems, wipDeductions]
   );
   /* Tồn TP đóng gói (chưa trừ bán TP ở đây — chỉ để xem đã đóng gói bao nhiêu còn kho). */
-  const tonTP = useMemo(() => tinhTonTP(rows, locBanLe(banHang, KHO_TP)), [rows, banHang]);
+  const finishedGoodStock = useMemo(() => tinhTonTP(rows, locBanLe(salesItems, KHO_TP)), [rows, salesItems]);
 
   const view = useMemo(
     () =>
@@ -133,35 +133,35 @@ export default function DongGoiScreen() {
           (r) =>
             r.date >= tuHieuLuc &&
             r.date <= denHieuLuc &&
-            (phanXuong === "Tất cả" || r.workshop === phanXuong)
+            (workshop === "Tất cả" || r.workshop === workshop)
         )
         .sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id)),
-    [rows, tuHieuLuc, denHieuLuc, phanXuong]
+    [rows, tuHieuLuc, denHieuLuc, workshop]
   );
 
-  const tongVao = view.reduce((s, r) => s + (r.inputKg || 0), 0);
-  const tongRa = view.reduce((s, r) => s + (r.outputKg || 0), 0);
-  const tongHao = tongVao - tongRa;
-  const tongTonTP = tonTP.reduce((s, t) => s + Math.max(0, t.conLai), 0);
+  const totalIn = view.reduce((s, r) => s + (r.inputKg || 0), 0);
+  const totalOut = view.reduce((s, r) => s + (r.outputKg || 0), 0);
+  const totalLoss = totalIn - totalOut;
+  const totalFinishedGoodStock = finishedGoodStock.reduce((s, t) => s + Math.max(0, t.conLai), 0);
 
-  const ngayGhi = laMotNgay ? tuHieuLuc : denHieuLuc;
-  const xuongGhi: Workshop = phanXuong === "Tất cả" ? "Đông" : phanXuong;
+  const postingDate = isSingleDay ? tuHieuLuc : denHieuLuc;
+  const recordWorkshop: Workshop = workshop === "Tất cả" ? "Đông" : workshop;
 
-  const themMatHang = (ten: string): string => {
+  const addProduct = (ten: string): string => {
     // Nhãn có mã số nên ô chọn không tự nhận ra tên trùng ⇒ trùng tên (không phân
     // hoa thường) thì dùng lại bản có sẵn.
-    const co = matHang.find((x) => x.name.trim().toLowerCase() === ten.trim().toLowerCase());
+    const co = products.find((x) => x.name.trim().toLowerCase() === ten.trim().toLowerCase());
     if (co) return co.id;
     const m: Product = { id: uid(), code: "", name: ten, finishedGoodCode: "", category: "", materialTypeId: "" };
-    setMatHang([...matHang, m]);
+    setProducts([...products, m]);
     notify.daLuu(`Đã thêm mặt hàng "${ten}"`);
     return m.id;
   };
 
-  const moThem = () => {
+  const openAdd = () => {
     setForm({
-      date: ngayGhi,
-      workshop: xuongGhi,
+      date: postingDate,
+      workshop: recordWorkshop,
       fromProductId: "",
       fromSpec: "",
       inputKg: 0,
@@ -170,21 +170,21 @@ export default function DongGoiScreen() {
       toSpec: "",
       outputKg: 0,
       outputUnits: 0,
-      warehouse: KHO_TP_NAMES[0] ?? "",
+      warehouse: FG_WAREHOUSE_NAMES[0] ?? "",
       note: "",
     });
     setLoi([]);
   };
-  const dat = <K extends keyof FormDG>(k: K, v: FormDG[K]) =>
+  const setField = <K extends keyof FormDG>(k: K, v: FormDG[K]) =>
     setForm((p) => (p ? { ...p, [k]: v } : p));
 
-  const btpKhaDung = form?.fromProductId
-    ? khaDung(tonBTP, form.fromProductId, form.fromSpec.trim())
+  const wipAvailable = form?.fromProductId
+    ? khaDung(wipStock, form.fromProductId, form.fromSpec.trim())
     : null;
-  const vuotTonBTP = btpKhaDung != null && form != null && form.inputKg > btpKhaDung;
+  const exceedsWipStock = wipAvailable != null && form != null && form.inputKg > wipAvailable;
   const haoAm = form != null && form.outputKg > form.inputKg;
 
-  const ghi = () => {
+  const save = () => {
     if (!form) return;
     const ls: LoiNhap[] = [];
     if (!form.fromProductId) ls.push({ truong: "BTP tiêu hao", thongBao: "Chưa chọn mặt hàng BTP" });
@@ -213,18 +213,18 @@ export default function DongGoiScreen() {
     notify.daLuu(
       `Đã đóng gói: ${tenMH(p.fromProductId)} ${kg(p.inputKg)} → ${tenMH(p.toProductId)} ${kg(p.outputKg)}`,
       undefined,
-      { label: "In tem", onClick: () => setTemLo(p) }
+      { label: "In tem", onClick: () => setLotLabel(p) }
     );
     setForm(null);
   };
 
-  const xoa = (r: Packaging) => {
-    const truoc = rows;
+  const remove = (r: Packaging) => {
+    const prevRows = rows;
     persist(rows.filter((x) => x.id !== r.id));
-    notify.daXoa(`Đã xóa phiếu đóng gói ${tenMH(r.toProductId)}`, () => persist(truoc));
+    notify.daXoa(`Đã xóa phiếu đóng gói ${tenMH(r.toProductId)}`, () => persist(prevRows));
   };
 
-  const cot: Cot<Packaging>[] = [
+  const columns: Cot<Packaging>[] = [
     { key: "date", header: "Ngày", chinh: true, render: (r) => viDate(r.date), sapXep: (r) => r.date },
     { key: "workshop", header: "Xưởng", render: (r) => r.workshop },
     {
@@ -269,24 +269,24 @@ export default function DongGoiScreen() {
         <div className="flex flex-wrap gap-2">
           <Button
             title="Ghi phiếu này đã đóng từ lô bán thành phẩm nào (quét tem, gõ mã, hoặc chọn). Có lô thì mới truy được nguồn của thành phẩm."
-            variant={soLoGan(r.id) ? "outline" : "default"}
+            variant={countLotInputs(r.id) ? "outline" : "default"}
             size="sm"
-            onClick={() => setGanLo(r)}
+            onClick={() => setLotTarget(r)}
           >
             <Link2 />
-            {soLoGan(r.id) ? `Lô BTP (${soLoGan(r.id)})` : "Gắn lô BTP"}
+            {countLotInputs(r.id) ? `Lô BTP (${countLotInputs(r.id)})` : "Gắn lô BTP"}
           </Button>
           <Button
             title="In tem QR lô thành phẩm của phiếu này để dán lên thùng. Quét tem là ra nguồn gốc."
             variant="outline"
             size="sm"
-            onClick={() => setTemLo(r)}
+            onClick={() => setLotLabel(r)}
           >
             <QrCode />
             Tem
           </Button>
           <Button
-            title="Xóa phiếu đóng gói này. Tồn bán thành phẩm và tồn thành phẩm sẽ được tính lại." variant="outline" size="sm" onClick={() => xoa(r)}>
+            title="Xóa phiếu đóng gói này. Tồn bán thành phẩm và tồn thành phẩm sẽ được tính lại." variant="outline" size="sm" onClick={() => remove(r)}>
             Xóa
           </Button>
         </div>
@@ -304,7 +304,7 @@ export default function DongGoiScreen() {
           </p>
         </div>
         <Button
-          title="Ghi một phiếu đóng gói: trừ bán thành phẩm đem đóng, cộng thành phẩm ra, phần chênh là hao hụt." size="lg" onClick={moThem}>
+          title="Ghi một phiếu đóng gói: trừ bán thành phẩm đem đóng, cộng thành phẩm ra, phần chênh là hao hụt." size="lg" onClick={openAdd}>
           <Plus />
           Ghi phiếu đóng gói
         </Button>
@@ -313,11 +313,11 @@ export default function DongGoiScreen() {
       <ThongKe
         className="grid-cols-2 sm:grid-cols-3 lg:grid-cols-5"
         the={[
-          { nhan: "Đang xem", giaTri: moTaPhamVi, icon: CalendarRange, mau: "trung-tinh" },
+          { nhan: "Đang xem", giaTri: rangeDescription, icon: CalendarRange, mau: "trung-tinh" },
           { nhan: "Số phiếu", giaTri: view.length, so: true, icon: Package, mau: "brand" },
-          { nhan: "BTP vào", giaTri: kg(tongVao), so: true, icon: Scale, mau: "trung-tinh" },
-          { nhan: "TP ra", giaTri: kg(tongRa), so: true, icon: PackageCheck, mau: "success" },
-          { nhan: "Hao hụt", giaTri: kg(tongHao), so: true, icon: Scale, mau: tongHao < 0 ? "warning" : "trung-tinh" },
+          { nhan: "BTP vào", giaTri: kg(totalIn), so: true, icon: Scale, mau: "trung-tinh" },
+          { nhan: "TP ra", giaTri: kg(totalOut), so: true, icon: PackageCheck, mau: "success" },
+          { nhan: "Hao hụt", giaTri: kg(totalLoss), so: true, icon: Scale, mau: totalLoss < 0 ? "warning" : "trung-tinh" },
         ]}
       />
 
@@ -337,38 +337,38 @@ export default function DongGoiScreen() {
               label="Khoảng ngày"
               anNhanBatBuoc
               presets={false}
-              startDate={tuNgay}
-              endDate={denNgay}
+              startDate={fromDate}
+              endDate={toDate}
               onChange={(tu, den) => {
-                setTuNgay(tu);
-                setDenNgay(den);
+                setFromDate(tu);
+                setToDate(den);
               }}
             />
           ) : (
-            <DateField label="Ngày" anNhanBatBuoc value={ngay} onChange={setNgay} />
+            <DateField label="Ngày" anNhanBatBuoc value={date} onChange={setDate} />
           )}
         </div>
         <Combobox
           label="Phân xưởng"
           choPhepXoa={false}
-          value={phanXuong}
-          onChange={(v) => setPhanXuong(v as Workshop | "Tất cả")}
-          options={[{ value: "Tất cả", label: "Tất cả" }, ...PHAN_XUONG.map((p) => ({ value: p, label: p }))]}
+          value={workshop}
+          onChange={(v) => setWorkshop(v as Workshop | "Tất cả")}
+          options={[{ value: "Tất cả", label: "Tất cả" }, ...WORKSHOPS.map((p) => ({ value: p, label: p }))]}
           className="min-w-[12rem]"
         />
       </div>
 
       {/* Tồn thành phẩm đóng gói còn kho */}
-      {tonTP.some((t) => t.conLai > 0) && (
+      {finishedGoodStock.some((t) => t.conLai > 0) && (
         <section className="grid gap-3 rounded-xl border-2 border-border bg-card p-5">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-lg font-semibold text-foreground">Tồn thành phẩm đóng gói</h2>
             <Nhan loai="phu" icon={Boxes}>
-              {kg(tongTonTP)}
+              {kg(totalFinishedGoodStock)}
             </Nhan>
           </div>
           <div className="flex flex-wrap gap-2">
-            {tonTP
+            {finishedGoodStock
               .filter((t) => t.conLai > 0)
               .map((t) => (
                 <span
@@ -384,7 +384,7 @@ export default function DongGoiScreen() {
         </section>
       )}
 
-      {dangTai ? (
+      {isLoading ? (
         <SkeletonBang />
       ) : view.length === 0 ? (
         <EmptyState
@@ -393,7 +393,7 @@ export default function DongGoiScreen() {
           moTa="Bấm “Ghi phiếu đóng gói” để chuyển bán thành phẩm thành thành phẩm đóng gói."
         />
       ) : (
-        <RecordTable columns={cot} rows={view} getKey={(r) => r.id} toMau="dong-goi" />
+        <RecordTable columns={columns} rows={view} getKey={(r) => r.id} toMau="dong-goi" />
       )}
 
       {/* Dialog ghi phiếu */}
@@ -412,14 +412,14 @@ export default function DongGoiScreen() {
               <ChuThichBatBuoc />
 
               <div className="grid gap-6 sm:grid-cols-2">
-                <DateField label="Ngày đóng gói" required value={form.date} onChange={(v) => dat("date", v)} />
+                <DateField label="Ngày đóng gói" required value={form.date} onChange={(v) => setField("date", v)} />
                 <Combobox
                   label="Phân xưởng"
                   required
                   choPhepXoa={false}
                   value={form.workshop}
-                  onChange={(v) => dat("workshop", v as Workshop)}
-                  options={PHAN_XUONG.map((p) => ({ value: p, label: p }))}
+                  onChange={(v) => setField("workshop", v as Workshop)}
+                  options={WORKSHOPS.map((p) => ({ value: p, label: p }))}
                 />
               </div>
 
@@ -429,30 +429,30 @@ export default function DongGoiScreen() {
                   label="Mặt hàng BTP"
                   required
                   value={form.fromProductId}
-                  onChange={(v) => dat("fromProductId", v)}
-                  options={optMatHang}
-                  onSuaMuc={suaMH.moSua}
-                  nhanSua={suaMH.nhanSua}
-                  onCreate={themMatHang}
+                  onChange={(v) => setField("fromProductId", v)}
+                  options={productOptions}
+                  onSuaMuc={productEditor.moSua}
+                  nhanSua={productEditor.nhanSua}
+                  onCreate={addProduct}
                   emptyText="Chưa có mặt hàng — gõ tên rồi Thêm mới."
                 />
                 <Field label="Quy cách BTP" hint="Size/grade của lô BTP. VD: 230-250.">
-                  <Input value={form.fromSpec} onChange={(e) => dat("fromSpec", e.target.value)} placeholder="VD: 230-250" />
+                  <Input value={form.fromSpec} onChange={(e) => setField("fromSpec", e.target.value)} placeholder="VD: 230-250" />
                 </Field>
                 <div className="grid gap-6 sm:grid-cols-2">
-                  <NumberField label="BTP vào" required unit="kg" value={form.inputKg || null} onChange={(v) => dat("inputKg", v ?? 0)} />
-                  <NumberField label="Số block" unit="block" value={form.inputBlocks || null} onChange={(v) => dat("inputBlocks", v ?? 0)} />
+                  <NumberField label="BTP vào" required unit="kg" value={form.inputKg || null} onChange={(v) => setField("inputKg", v ?? 0)} />
+                  <NumberField label="Số block" unit="block" value={form.inputBlocks || null} onChange={(v) => setField("inputBlocks", v ?? 0)} />
                 </div>
-                {btpKhaDung != null ? (
+                {wipAvailable != null ? (
                   <div
                     className={
-                      vuotTonBTP
+                      exceedsWipStock
                         ? "rounded-lg bg-warning-surface px-4 py-3 text-base text-warning"
                         : "rounded-lg bg-muted px-4 py-3 text-base text-muted-foreground"
                     }
                   >
-                    Tồn BTP khả dụng: <span className="tnum font-semibold">{kg(btpKhaDung)}</span>
-                    {vuotTonBTP ? " — đóng gói vượt tồn, kiểm lại (vẫn ghi được, tồn báo âm)." : ""}
+                    Tồn BTP khả dụng: <span className="tnum font-semibold">{kg(wipAvailable)}</span>
+                    {exceedsWipStock ? " — đóng gói vượt tồn, kiểm lại (vẫn ghi được, tồn báo âm)." : ""}
                   </div>
                 ) : null}
               </div>
@@ -464,26 +464,26 @@ export default function DongGoiScreen() {
                   required
                   hint="Thành phẩm đã đóng gói (có thể khác mã BTP)."
                   value={form.toProductId}
-                  onChange={(v) => dat("toProductId", v)}
-                  options={optMatHang}
-                  onSuaMuc={suaMH.moSua}
-                  nhanSua={suaMH.nhanSua}
-                  onCreate={themMatHang}
+                  onChange={(v) => setField("toProductId", v)}
+                  options={productOptions}
+                  onSuaMuc={productEditor.moSua}
+                  nhanSua={productEditor.nhanSua}
+                  onCreate={addProduct}
                   emptyText="Chưa có mặt hàng — gõ tên rồi Thêm mới."
                 />
                 <Field label="Quy cách đóng gói" hint="VD: thùng 10 kg, hộp 1 kg.">
-                  <Input value={form.toSpec} onChange={(e) => dat("toSpec", e.target.value)} placeholder="VD: hộp 1 kg" />
+                  <Input value={form.toSpec} onChange={(e) => setField("toSpec", e.target.value)} placeholder="VD: hộp 1 kg" />
                 </Field>
                 <div className="grid gap-6 sm:grid-cols-2">
-                  <NumberField label="TP ra" required unit="kg" value={form.outputKg || null} onChange={(v) => dat("outputKg", v ?? 0)} />
-                  <NumberField label="Số thùng" unit="thùng" value={form.outputUnits || null} onChange={(v) => dat("outputUnits", v ?? 0)} />
+                  <NumberField label="TP ra" required unit="kg" value={form.outputKg || null} onChange={(v) => setField("outputKg", v ?? 0)} />
+                  <NumberField label="Số thùng" unit="thùng" value={form.outputUnits || null} onChange={(v) => setField("outputUnits", v ?? 0)} />
                 </div>
                 <Combobox
                   label="Kho chứa TP"
                   choPhepXoa={false}
                   value={form.warehouse}
-                  onChange={(v) => dat("warehouse", v)}
-                  options={KHO_TP_NAMES.map((k) => ({ value: k, label: k }))}
+                  onChange={(v) => setField("warehouse", v)}
+                  options={FG_WAREHOUSE_NAMES.map((k) => ({ value: k, label: k }))}
                 />
                 {haoAm ? (
                   <div className="rounded-lg bg-warning-surface px-4 py-3 text-base text-warning">
@@ -497,7 +497,7 @@ export default function DongGoiScreen() {
               </div>
 
               <Field label="Ghi chú">
-                <Input value={form.note} onChange={(e) => dat("note", e.target.value)} placeholder="Ghi chú (nếu có)" />
+                <Input value={form.note} onChange={(e) => setField("note", e.target.value)} placeholder="Ghi chú (nếu có)" />
               </Field>
             </div>
           )}
@@ -507,35 +507,35 @@ export default function DongGoiScreen() {
               Hủy
             </Button>
             <Button
-              title="Ghi phiếu này vào sổ — trừ tồn bán thành phẩm và cộng tồn thành phẩm ngay." size="lg" onClick={ghi}>
+              title="Ghi phiếu này vào sổ — trừ tồn bán thành phẩm và cộng tồn thành phẩm ngay." size="lg" onClick={save}>
               <PackageCheck />
               Ghi đóng gói
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      {ganLo && (
+      {lotTarget && (
         <GanLoDauVao
           outputKind="P"
-          outputId={ganLo.id}
-          outputNhan={`phiếu ${nhanLoTp(ganLo)} · ${tenMH(ganLo.toProductId)}`}
-          xuong={ganLo.workshop}
-          ngay={ganLo.date}
-          matHangId={ganLo.fromProductId}
-          onClose={() => setGanLo(null)}
+          outputId={lotTarget.id}
+          outputNhan={`phiếu ${nhanLoTp(lotTarget)} · ${tenMH(lotTarget.toProductId)}`}
+          xuong={lotTarget.workshop}
+          ngay={lotTarget.date}
+          matHangId={lotTarget.fromProductId}
+          onClose={() => setLotTarget(null)}
         />
       )}
-      {temLo && (
+      {lotLabel && (
         <TemLoQr
-          nut={nutLo("P", temLo.id, {
-            shipments: [], imports: [], wips: sanXuat,
-            packagings: rows.some((r) => r.id === temLo.id) ? rows : [...rows, temLo], lotInputs,
-            exportItems: [], exportOrders: [], salesOrders: [], products: matHang, customers: [],
+          nut={nutLo("P", lotLabel.id, {
+            shipments: [], imports: [], wips: wips,
+            packagings: rows.some((r) => r.id === lotLabel.id) ? rows : [...rows, lotLabel], lotInputs,
+            exportItems: [], exportOrders: [], salesOrders: [], products: products, customers: [],
           })}
-          onClose={() => setTemLo(null)}
+          onClose={() => setLotLabel(null)}
         />
       )}
-      {suaMH.hop}
+      {productEditor.hop}
     </div>
   );
 }

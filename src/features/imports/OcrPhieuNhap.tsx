@@ -28,11 +28,11 @@ interface Props {
   onLuuAnh: (path: string) => void;
   onApDaiLy: (name: string) => void;
   onApNgay: (iso: string) => void;
-  onThemDong: (loaiNL: string, kg: number) => void;
+  onThemDong: (materialType: string, kg: number) => void;
   onClose: () => void;
 }
 
-type GiaiDoan = "chon" | "dang-nhan" | "xong" | "loi";
+type Phase = "chon" | "dang-nhan" | "xong" | "loi";
 
 export function OcrPhieuNhap({
   danhMuc,
@@ -43,22 +43,22 @@ export function OcrPhieuNhap({
   onClose,
 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const [giaiDoan, setGiaiDoan] = useState<GiaiDoan>("chon");
+  const [stage, setStage] = useState<Phase>("chon");
   const [anhURL, setAnhURL] = useState<string | null>(null);
-  const [phanTram, setPhanTram] = useState(0);
+  const [percent, setPercent] = useState(0);
   const [kq, setKq] = useState<KetQuaOcr | null>(null);
-  const [daDaiLy, setDaDaiLy] = useState(false);
-  const [daNgay, setDaNgay] = useState(false);
-  const [daDong, setDaDong] = useState<Set<number>>(new Set());
+  const [isSupplierApplied, setIsSupplierApplied] = useState(false);
+  const [isDateApplied, setIsDateApplied] = useState(false);
+  const [appliedRows, setAppliedRows] = useState<Set<number>>(new Set());
 
-  const chonAnh = async (file: File) => {
+  const pickImage = async (file: File) => {
     setAnhURL(URL.createObjectURL(file));
-    setGiaiDoan("dang-nhan");
-    setPhanTram(0);
+    setStage("dang-nhan");
+    setPercent(0);
     setKq(null);
-    setDaDaiLy(false);
-    setDaNgay(false);
-    setDaDong(new Set());
+    setIsSupplierApplied(false);
+    setIsDateApplied(false);
+    setAppliedRows(new Set());
 
     // Tải ảnh lên Storage song song (ảnh là bằng chứng phiếu, lưu kèm chuyến).
     if (coLuuAnh)
@@ -70,24 +70,24 @@ export function OcrPhieuNhap({
       });
 
     try {
-      const r = await nhanDienPhieu(file, danhMuc, setPhanTram);
+      const r = await nhanDienPhieu(file, danhMuc, setPercent);
       setKq(r);
-      setGiaiDoan("xong");
+      setStage("xong");
     } catch {
-      setGiaiDoan("loi");
+      setStage("loi");
     }
   };
 
-  const themTatCa = () => {
+  const addAll = () => {
     kq?.dong.forEach((d, i) => {
-      if (!daDong.has(i)) onThemDong(d.loaiNL, d.kg);
+      if (!appliedRows.has(i)) onThemDong(d.loaiNL, d.kg);
     });
-    setDaDong(new Set(kq?.dong.map((_, i) => i)));
+    setAppliedRows(new Set(kq?.dong.map((_, i) => i)));
     notify.daLuu("Đã thêm các dòng nhận được — soát lại số trước khi lưu");
   };
 
   const doiAnh = () => {
-    setGiaiDoan("chon");
+    setStage("chon");
     setAnhURL(null);
     setKq(null);
   };
@@ -112,7 +112,7 @@ export function OcrPhieuNhap({
             hidden
             onChange={(e) => {
               const f = e.target.files?.[0];
-              if (f) chonAnh(f);
+              if (f) pickImage(f);
               e.target.value = ""; // cho chọn lại cùng ảnh
             }}
           />
@@ -126,7 +126,7 @@ export function OcrPhieuNhap({
             />
           )}
 
-          {giaiDoan === "chon" && (
+          {stage === "chon" && (
             <Button
               title="Mở máy ảnh hoặc chọn ảnh phiếu nhập viết tay có sẵn trong máy." size="lg" className="w-full" onClick={() => inputRef.current?.click()}>
               <Camera />
@@ -134,22 +134,22 @@ export function OcrPhieuNhap({
             </Button>
           )}
 
-          {giaiDoan === "dang-nhan" && (
+          {stage === "dang-nhan" && (
             <div className="space-y-2">
               <div className="flex items-center gap-2 text-base text-muted-foreground">
                 <Loader2 className="animate-spin" />
-                Đang đọc chữ trên phiếu… {phanTram}%
+                Đang đọc chữ trên phiếu… {percent}%
               </div>
               <div className="h-2 w-full overflow-hidden rounded bg-muted">
                 <div
                   className="h-full rounded bg-primary transition-all"
-                  style={{ width: `${Math.max(4, phanTram)}%` }}
+                  style={{ width: `${Math.max(4, percent)}%` }}
                 />
               </div>
             </div>
           )}
 
-          {giaiDoan === "loi" && (
+          {stage === "loi" && (
             <div className="space-y-3">
               <p className="text-base text-muted-foreground">
                 Không đọc được ảnh (có thể mất mạng khi tải bộ nhận diện, hoặc ảnh
@@ -163,7 +163,7 @@ export function OcrPhieuNhap({
             </div>
           )}
 
-          {giaiDoan === "xong" && kq && (
+          {stage === "xong" && kq && (
             <div className="space-y-4">
               {/* Đầu chuyến: đại lý + ngày */}
               {(kq.daiLy || kq.ngay) && (
@@ -171,26 +171,26 @@ export function OcrPhieuNhap({
                   {kq.daiLy && (
                     <Button
                       title="Điền tên đại lý máy đọc được vào form nhập hàng."
-                      variant={daDaiLy ? "outline" : "default"}
+                      variant={isSupplierApplied ? "outline" : "default"}
                       onClick={() => {
                         onApDaiLy(kq.daiLy!);
-                        setDaDaiLy(true);
+                        setIsSupplierApplied(true);
                       }}
                     >
-                      {daDaiLy ? <Check /> : <Plus />}
+                      {isSupplierApplied ? <Check /> : <Plus />}
                       Đại lý: {kq.daiLy}
                     </Button>
                   )}
                   {kq.ngay && (
                     <Button
                       title="Điền ngày máy đọc được vào form nhập hàng."
-                      variant={daNgay ? "outline" : "default"}
+                      variant={isDateApplied ? "outline" : "default"}
                       onClick={() => {
                         onApNgay(kq.ngay!);
-                        setDaNgay(true);
+                        setIsDateApplied(true);
                       }}
                     >
-                      {daNgay ? <Check /> : <Plus />}
+                      {isDateApplied ? <Check /> : <Plus />}
                       Ngày: {viDate(kq.ngay)}
                     </Button>
                   )}
@@ -205,7 +205,7 @@ export function OcrPhieuNhap({
                       Dòng nhận được ({kq.dong.length})
                     </span>
                     <Button
-                      title="Điền hết các dòng loại nguyên liệu + kg máy đọc được vào form. Vẫn soát lại từng dòng trước khi lưu." variant="outline" size="sm" onClick={themTatCa}>
+                      title="Điền hết các dòng loại nguyên liệu + kg máy đọc được vào form. Vẫn soát lại từng dòng trước khi lưu." variant="outline" size="sm" onClick={addAll}>
                       <Plus />
                       Thêm tất cả
                     </Button>
@@ -221,15 +221,15 @@ export function OcrPhieuNhap({
                         </span>
                         <Button
                           title="Điền riêng dòng này vào form nhập hàng."
-                          variant={daDong.has(i) ? "outline" : "default"}
+                          variant={appliedRows.has(i) ? "outline" : "default"}
                           size="sm"
                           onClick={() => {
                             onThemDong(d.loaiNL, d.kg);
-                            setDaDong((s) => new Set(s).add(i));
+                            setAppliedRows((s) => new Set(s).add(i));
                           }}
                         >
-                          {daDong.has(i) ? <Check /> : <Plus />}
-                          {daDong.has(i) ? "Đã thêm" : "Thêm dòng"}
+                          {appliedRows.has(i) ? <Check /> : <Plus />}
+                          {appliedRows.has(i) ? "Đã thêm" : "Thêm dòng"}
                         </Button>
                       </li>
                     ))}

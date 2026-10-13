@@ -48,11 +48,11 @@ export function KhoiPheLieuNgay({
   /** Chỉ hiển thị tóm tắt (ngoài trang) — ghi/sửa phế liệu làm trong dialog "Ghi nhập trong ngày". */
   chiXem?: boolean;
 }) {
-  const [dang, setDang] = useState<ScrapItem | null>(null);
-  const [laThem, setLaThem] = useState(false);
+  const [editing, setEditing] = useState<ScrapItem | null>(null);
+  const [isAdding, setIsAdding] = useState(false);
   const [loi, setLoi] = useState<LoiNhap[]>([]);
 
-  const cuaNgay = useMemo(
+  const dayScrapRows = useMemo(
     () =>
       rows.filter(
         (r) =>
@@ -61,8 +61,8 @@ export function KhoiPheLieuNgay({
     [rows, ngay, phanXuong]
   );
 
-  const tongKg = cuaNgay.reduce((s, r) => s + (r.quantityKg || 0), 0);
-  const tongTien = cuaNgay.reduce(
+  const totalKg = dayScrapRows.reduce((s, r) => s + (r.quantityKg || 0), 0);
+  const totalAmount = dayScrapRows.reduce(
     (s, r) => s + r.quantityKg * (r.sellingPrice ?? 0),
     0
   );
@@ -72,10 +72,10 @@ export function KhoiPheLieuNgay({
    * cân dạt thì người dùng đổi ở ô Loại. Riêng "ghi tiếp loại khác" truyền
    * `daGhi` để gợi ý loại chưa ghi (vừa ghi nội tạng ⇒ gợi ý Dạt).
    */
-  const dongMoi = (daGhi: string[] = []): ScrapItem => ({
+  const newScrapItem = (recordedNames: string[] = []): ScrapItem => ({
     id: newId(),
     periodId: "",
-    name: PHE_LIEU_GOI_Y.find((t) => !daGhi.includes(t)) ?? PHE_LIEU_GOI_Y[0],
+    name: PHE_LIEU_GOI_Y.find((t) => !recordedNames.includes(t)) ?? PHE_LIEU_GOI_Y[0],
     quantityKg: 0,
     sellingPrice: null,
     date: ngay,
@@ -83,35 +83,35 @@ export function KhoiPheLieuNgay({
     source: "Nhập hàng",
   });
 
-  const optLoai: MucChon[] = PHE_LIEU_GOI_Y.map((t) => ({
+  const typeOptions: MucChon[] = PHE_LIEU_GOI_Y.map((t) => ({
     value: t,
     label: t,
   }));
 
   /** `ghiTiep`: lưu xong giữ hộp thoại mở để ghi loại khác (chỉ khi thêm mới). */
-  const luu = (ghiTiep = false) => {
-    if (!dang) return;
+  const save = (keepEntering = false) => {
+    if (!editing) return;
     const ls: LoiNhap[] = [];
-    if (!dang.name.trim())
+    if (!editing.name.trim())
       ls.push({ truong: "Loại phế liệu", thongBao: "Chưa chọn loại phế liệu" });
-    if (!(dang.quantityKg > 0))
+    if (!(editing.quantityKg > 0))
       ls.push({ truong: "Số lượng", thongBao: "Phải lớn hơn 0 kg" });
     setLoi(ls);
     if (ls.length > 0) return;
     onChange(
-      laThem ? [...rows, dang] : rows.map((r) => (r.id === dang.id ? dang : r))
+      isAdding ? [...rows, editing] : rows.map((r) => (r.id === editing.id ? editing : r))
     );
     notify.daLuu(
-      laThem
-        ? `Đã ghi phế liệu ${dang.name} — ${kg(dang.quantityKg)}`
+      isAdding
+        ? `Đã ghi phế liệu ${editing.name} — ${kg(editing.quantityKg)}`
         : "Đã lưu thay đổi"
     );
-    if (laThem && ghiTiep) {
+    if (isAdding && keepEntering) {
       // Ghi thêm loại khác: reset form, giữ hộp thoại mở, gợi ý loại chưa ghi.
-      setDang(dongMoi([...cuaNgay.map((r) => r.name), dang.name]));
+      setEditing(newScrapItem([...dayScrapRows.map((r) => r.name), editing.name]));
       setLoi([]);
     } else {
-      setDang(null);
+      setEditing(null);
     }
   };
 
@@ -187,8 +187,8 @@ export function KhoiPheLieuNgay({
             title="Ghi một dòng phế liệu phát sinh trong ngày (đầu, da, vụn…) để kỳ cân đối hút sang."
             size="lg"
             onClick={() => {
-              setDang(dongMoi());
-              setLaThem(true);
+              setEditing(newScrapItem());
+              setIsAdding(true);
               setLoi([]);
             }}
           >
@@ -200,7 +200,7 @@ export function KhoiPheLieuNgay({
 
       <RecordTable
         columns={cols}
-        rows={cuaNgay}
+        rows={dayScrapRows}
         getKey={(r) => r.id}
         toMau="phe-lieu-ngay"
         emptyText="Chưa cân phế liệu cho ngày này."
@@ -214,8 +214,8 @@ export function KhoiPheLieuNgay({
                     variant="outline"
                     size="sm"
                     onClick={() => {
-                      setDang({ ...r });
-                      setLaThem(false);
+                      setEditing({ ...r });
+                      setIsAdding(false);
                       setLoi([]);
                     }}
                   >
@@ -225,10 +225,10 @@ export function KhoiPheLieuNgay({
                   <ConfirmDelete
                     moTaBanGhi={`${r.name} — ${kg(r.quantityKg)} — ngày ${viDate(r.date)}`}
                     onConfirm={() => {
-                      const truoc = rows;
+                      const prevRows = rows;
                       onChange(rows.filter((x) => x.id !== r.id));
                       notify.daXoa(`Đã xóa phế liệu ${r.name}`, () =>
-                        onChange(truoc)
+                        onChange(prevRows)
                       );
                     }}
                     tieuDe="Xóa dòng phế liệu này?"
@@ -239,43 +239,43 @@ export function KhoiPheLieuNgay({
         }
       />
 
-      {cuaNgay.length > 0 && (
+      {dayScrapRows.length > 0 && (
         <div className="flex flex-wrap justify-end gap-x-10 gap-y-3 rounded-xl bg-muted px-5 py-4">
           <div className="flex items-baseline gap-3">
             <span className="text-base text-muted-foreground">
               Tổng phế liệu
             </span>
-            <span className="tnum text-xl font-semibold">{kg(tongKg)}</span>
+            <span className="tnum text-xl font-semibold">{kg(totalKg)}</span>
           </div>
           <div className="flex items-baseline gap-3">
             <span className="text-base text-muted-foreground">Tổng tiền</span>
             <span className="tnum text-xl font-semibold">
-              {num(tongTien)} đ
+              {num(totalAmount)} đ
             </span>
           </div>
         </div>
       )}
 
       <Dialog
-        open={dang !== null}
+        open={editing !== null}
         onOpenChange={(o) => {
-          if (!o) setDang(null);
+          if (!o) setEditing(null);
         }}
       >
         <DialogContent className="w-full sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle className="text-2xl">
-              {laThem ? "Thêm phế liệu" : "Sửa phế liệu"}
+              {isAdding ? "Thêm phế liệu" : "Sửa phế liệu"}
             </DialogTitle>
             <DialogDescription className="text-base">
               Ngày {viDate(ngay)} · xưởng {phanXuong}.
-              {laThem
+              {isAdding
                 ? " Có cả nội tạng lẫn dạt: bấm “Lưu, ghi tiếp loại khác” cho loại đầu."
                 : ""}
             </DialogDescription>
           </DialogHeader>
 
-          {dang && (
+          {editing && (
             <div className="space-y-6 py-2">
               <ErrorSummary loi={loi} />
               <ChuThichBatBuoc />
@@ -284,9 +284,9 @@ export function KhoiPheLieuNgay({
                 label="Loại phế liệu"
                 required
                 hint="Mặc định Nội tạng — cân hàng dạt thì đổi sang Dạt. Loại khác: gõ tên rồi bấm Thêm mới."
-                value={dang.name}
-                onChange={(v) => setDang((d) => (d ? { ...d, name: v } : d))}
-                options={optLoai}
+                value={editing.name}
+                onChange={(v) => setEditing((d) => (d ? { ...d, name: v } : d))}
+                options={typeOptions}
                 onCreate={(ten) => ten}
               />
 
@@ -295,17 +295,17 @@ export function KhoiPheLieuNgay({
                   label="Số lượng"
                   required
                   unit="kg"
-                  value={dang.quantityKg || null}
+                  value={editing.quantityKg || null}
                   onChange={(v) =>
-                    setDang((d) => (d ? { ...d, quantityKg: v ?? 0 } : d))
+                    setEditing((d) => (d ? { ...d, quantityKg: v ?? 0 } : d))
                   }
                 />
                 <NumberField
                   label="Đơn giá bán"
                   unit="đ"
-                  value={dang.sellingPrice}
+                  value={editing.sellingPrice}
                   onChange={(v) =>
-                    setDang((d) => (d ? { ...d, sellingPrice: v } : d))
+                    setEditing((d) => (d ? { ...d, sellingPrice: v } : d))
                   }
                   hint="Bỏ trống nếu chưa chốt giá bán."
                 />
@@ -317,16 +317,16 @@ export function KhoiPheLieuNgay({
             <Button
               variant="outline"
               size="lg"
-              onClick={() => setDang(null)}
+              onClick={() => setEditing(null)}
             >
               Hủy
             </Button>
-            {laThem && (
+            {isAdding && (
               <Button
                 title="Lưu dòng này rồi để hộp thoại mở để ghi tiếp loại phế liệu khác (VD vừa ghi nội tạng, giờ ghi dạt)."
                 variant="outline"
                 size="lg"
-                onClick={() => luu(true)}
+                onClick={() => save(true)}
               >
                 <Plus />
                 Lưu, ghi tiếp loại khác
@@ -334,12 +334,12 @@ export function KhoiPheLieuNgay({
             )}
             <Button
               title={
-                laThem
+                isAdding
                   ? "Lưu dòng phế liệu này vào sổ của ngày đang chọn rồi đóng hộp thoại."
                   : "Lưu thay đổi của dòng phế liệu này."
               }
               size="lg"
-              onClick={() => luu(false)}
+              onClick={() => save(false)}
             >
               Lưu
             </Button>

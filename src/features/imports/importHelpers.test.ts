@@ -18,7 +18,7 @@ import type { ImportShipment, MaterialImportItem } from "@/types";
 // Logic gom chuyến / ghi bù / mã lô — CLAUDE.md xếp đây là chỗ đáng test nhất
 // sau balancingCalc. Hàm thuần, tách khỏi màn 2026-09-21.
 
-const chuyen = (p: Partial<ImportShipment>): ImportShipment =>
+const makeShipment = (p: Partial<ImportShipment>): ImportShipment =>
   ({
     id: "c1",
     deliveryDate: "2026-09-02",
@@ -50,20 +50,20 @@ const dong = (p: Partial<MaterialImportItem>): MaterialImportItem =>
 describe("sinhMaLo", () => {
   it("‹chữ xưởng›-‹yymmdd›-‹stt trong ngày›, stt đếm theo cùng ngày + cùng xưởng", () => {
     expect(sinhMaLo("2026-09-02", "Đông", [])).toBe("Đ-260902-01");
-    const daCo = [
-      chuyen({ id: "a" }),
-      chuyen({ id: "b" }),
-      chuyen({ id: "c", workshop: "Cá" }), // xưởng khác — không đếm
-      chuyen({ id: "d", deliveryDate: "2026-09-01" }), // ngày khác — không đếm
+    const existing = [
+      makeShipment({ id: "a" }),
+      makeShipment({ id: "b" }),
+      makeShipment({ id: "c", workshop: "Cá" }), // xưởng khác — không đếm
+      makeShipment({ id: "d", deliveryDate: "2026-09-01" }), // ngày khác — không đếm
     ];
-    expect(sinhMaLo("2026-09-02", "Đông", daCo)).toBe("Đ-260902-03");
-    expect(sinhMaLo("2026-09-02", "Khô", daCo)).toBe("K-260902-01");
+    expect(sinhMaLo("2026-09-02", "Đông", existing)).toBe("Đ-260902-03");
+    expect(sinhMaLo("2026-09-02", "Khô", existing)).toBe("K-260902-01");
   });
 });
 
 describe("gomChuyen", () => {
   it("gom dòng theo chuyến THẬT (shipmentId), cộng kg + tiền, cờ ghi bù theo chuyến", () => {
-    const cs = [chuyen({ id: "c1", postingDate: "2026-09-05" })]; // ghi sổ SAU ngày về ⇒ ghi bù
+    const cs = [makeShipment({ id: "c1", postingDate: "2026-09-05" })]; // ghi sổ SAU ngày về ⇒ ghi bù
     const rows = [
       dong({ id: "r1", shipmentId: "c1", quantityKg: 100, unitPrice: 20 }),
       dong({ id: "r2", shipmentId: "c1", quantityKg: 50, unitPrice: null }),
@@ -291,11 +291,11 @@ describe("gợi ý theo đại lý", () => {
   });
 
   it("apMauDaiLyMoi: đổi đại lý giữ kg đã gõ nhưng KHÔNG giữ giá của đại lý cũ", () => {
-    const cu = mauDongCuaDaiLy(so, "Hồng Phú", "Đông").map((d, i) => ({
+    const prev = mauDongCuaDaiLy(so, "Hồng Phú", "Đông").map((d, i) => ({
       ...d,
       quantityKg: i === 0 ? 1200 : i === 2 ? 300 : 0, // BT 1 da = 1200, BT 2 da lớn = 300
     }));
-    const tuNhap: DongBang = {
+    const userEntered: DongBang = {
       key: "k",
       id: null,
       category: "Mực",
@@ -304,7 +304,7 @@ describe("gợi ý theo đại lý", () => {
       unitPrice: 99000,
     };
     const kq = apMauDaiLyMoi(
-      [...cu, tuNhap],
+      [...prev, userEntered],
       mauDongCuaDaiLy(so, "Hương Pháp", "Đông"),
     );
     expect(

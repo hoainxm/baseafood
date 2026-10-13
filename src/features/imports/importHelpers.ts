@@ -47,15 +47,15 @@ export const CHU_XUONG: Record<Workshop, string> = {
 export function sinhMaLo(
   deliveryDate: string,
   workshop: Workshop,
-  dsChuyen: ImportShipment[],
+  shipments: ImportShipment[],
 ): string {
   const w = CHU_XUONG[workshop] ?? "X";
-  const ngay = (deliveryDate || "").replace(/-/g, "").slice(2); // yymmdd
+  const date = (deliveryDate || "").replace(/-/g, "").slice(2); // yymmdd
   const stt =
-    dsChuyen.filter(
+    shipments.filter(
       (c) => c.deliveryDate === deliveryDate && c.workshop === workshop,
     ).length + 1;
-  return `${w}-${ngay}-${String(stt).padStart(2, "0")}`;
+  return `${w}-${date}-${String(stt).padStart(2, "0")}`;
 }
 
 /**
@@ -130,9 +130,9 @@ export interface NhomChuyen {
 
 export function gomChuyen(
   rows: MaterialImportItem[],
-  chuyen: ImportShipment[],
+  shipments: ImportShipment[],
 ): NhomChuyen[] {
-  const theoId = new Map(chuyen.map((c) => [c.id, c]));
+  const theoId = new Map(shipments.map((c) => [c.id, c]));
   const nhoms = new Map<string, NhomChuyen>();
 
   for (const r of rows) {
@@ -175,7 +175,7 @@ export function gomChuyen(
 }
 
 /** Kiểm tra đầu chuyến — dùng chung cho lúc ghi mới và lúc sửa. */
-export function loiDauChuyen(d: DauChuyen, daChot: boolean): LoiNhap[] {
+export function loiDauChuyen(d: DauChuyen, isLocked: boolean): LoiNhap[] {
   const ls: LoiNhap[] = [];
   if (!d.supplierName.trim())
     ls.push({ truong: "Đại lý", thongBao: "Chưa chọn đại lý giao hàng" });
@@ -184,11 +184,11 @@ export function loiDauChuyen(d: DauChuyen, daChot: boolean): LoiNhap[] {
       truong: "Ngày ghi sổ",
       thongBao: "Ngày ghi sổ không thể trước ngày hàng về xưởng",
     });
-  const canLyDo = isBackdatedImport(d) || daChot;
-  if (canLyDo && !d.backdateReason.trim())
+  const needsReason = isBackdatedImport(d) || isLocked;
+  if (needsReason && !d.backdateReason.trim())
     ls.push({
       truong: "Lý do ghi bù",
-      thongBao: daChot
+      thongBao: isLocked
         ? "Ngày này đã chốt — phải ghi rõ vì sao ghi thêm"
         : "Ghi sau ngày hàng về — phải ghi rõ lý do (VD: chờ hóa đơn)",
     });
@@ -204,7 +204,7 @@ const khoaLuot = (r: MaterialImportItem) =>
   r.shipmentId || `ngam|${r.deliveryDate}|${r.licensePlate}|${r.driverName}`;
 
 /** Mới nhất lên đầu: theo ngày hàng về, cùng ngày thì theo id (id sinh theo giờ). */
-const moiTruoc = (a: MaterialImportItem, b: MaterialImportItem) =>
+const newestFirst = (a: MaterialImportItem, b: MaterialImportItem) =>
   b.deliveryDate.localeCompare(a.deliveryDate) || b.id.localeCompare(a.id);
 
 /** Biển số bỏ dấu cách/chấm/gạch, viết hoa — "72c-16603" và "72C 16603" là một xe. */
@@ -215,13 +215,13 @@ export const chuanBienSo = (s: string) =>
 export function daiLyHayGiao(
   rows: MaterialImportItem[],
   workshop: Workshop,
-  toiDa = 4,
+  maxCount = 4,
   xetLuot = 40,
 ): string[] {
   const luot = new Map<string, string>(); // khóa lượt → đại lý (giữ thứ tự mới→cũ)
   for (const r of rows
     .filter((x) => x.workshop === workshop && x.supplierName)
-    .sort(moiTruoc)) {
+    .sort(newestFirst)) {
     if (luot.size >= xetLuot && !luot.has(khoaLuot(r))) break;
     if (!luot.has(khoaLuot(r))) luot.set(khoaLuot(r), r.supplierName);
   }
@@ -233,7 +233,7 @@ export function daiLyHayGiao(
   });
   return [...dem.entries()]
     .sort((a, b) => b[1].n - a[1].n || a[1].thuTu - b[1].thuTu)
-    .slice(0, toiDa)
+    .slice(0, maxCount)
     .map(([ten]) => ten);
 }
 
@@ -252,22 +252,22 @@ export interface XeGoiY {
 export function xeCuaDaiLy(
   rows: MaterialImportItem[],
   supplierName: string,
-  toiDa = 6,
+  maxCount = 6,
 ): { bienSo: XeGoiY[]; taiXe: string[] } {
-  const bienSo = new Map<string, XeGoiY>();
-  const taiXe = new Map<string, string>();
+  const plateMap = new Map<string, XeGoiY>();
+  const drivers = new Map<string, string>();
   if (supplierName)
     for (const r of rows
       .filter((x) => x.supplierName === supplierName)
-      .sort(moiTruoc)) {
+      .sort(newestFirst)) {
       const bien = r.licensePlate.trim().toUpperCase();
       const tx = r.driverName.trim();
-      if (bien && !bienSo.has(chuanBienSo(bien)) && bienSo.size < toiDa)
-        bienSo.set(chuanBienSo(bien), { licensePlate: bien, driverName: tx });
-      if (tx && !taiXe.has(tx.toLowerCase()) && taiXe.size < toiDa)
-        taiXe.set(tx.toLowerCase(), tx);
+      if (bien && !plateMap.has(chuanBienSo(bien)) && plateMap.size < maxCount)
+        plateMap.set(chuanBienSo(bien), { licensePlate: bien, driverName: tx });
+      if (tx && !drivers.has(tx.toLowerCase()) && drivers.size < maxCount)
+        drivers.set(tx.toLowerCase(), tx);
     }
-  return { bienSo: [...bienSo.values()], taiXe: [...taiXe.values()] };
+  return { bienSo: [...plateMap.values()], taiXe: [...drivers.values()] };
 }
 
 /**
@@ -280,7 +280,7 @@ export function mauDongCuaDaiLy(
   supplierName: string,
   workshop: Workshop,
   soLuot = 3,
-  toiDa = 6,
+  maxCount = 6,
 ): DongBang[] {
   if (!supplierName) return [];
   const cua = rows.filter(
@@ -288,21 +288,21 @@ export function mauDongCuaDaiLy(
   );
   // Các lượt gần nhất (mới → cũ).
   const luot: string[] = [];
-  for (const r of [...cua].sort(moiTruoc)) {
+  for (const r of [...cua].sort(newestFirst)) {
     if (luot.includes(khoaLuot(r))) continue;
     if (luot.length >= soLuot) break;
     luot.push(khoaLuot(r));
   }
   // Trong một lượt giữ THỨ TỰ GHI (thứ tự mảng gốc) — đúng thứ tự trên tờ giấy.
-  const mau = new Map<string, DongBang>();
+  const templates = new Map<string, DongBang>();
   for (const k of luot)
     for (const r of cua) {
       if (khoaLuot(r) !== k) continue;
       const ten = r.materialTypeName.trim();
       if (!ten) continue;
-      const co = mau.get(ten);
+      const co = templates.get(ten);
       if (!co)
-        mau.set(ten, {
+        templates.set(ten, {
           ...dongBangRong(r.category),
           materialTypeName: ten,
           unitPrice: r.unitPrice,
@@ -314,7 +314,7 @@ export function mauDongCuaDaiLy(
         co.giaNgay = r.deliveryDate;
       }
     }
-  return [...mau.values()].slice(0, toiDa);
+  return [...templates.values()].slice(0, maxCount);
 }
 
 /**
@@ -324,24 +324,24 @@ export function mauDongCuaDaiLy(
  *  - dòng gợi ý cũ đã gõ kg mà đại lý mới chưa từng giao ⇒ giữ kg, GIÁ ĐỂ TRỐNG;
  *  - dòng người dùng tự nhập (không phải gợi ý) ⇒ giữ nguyên, kể cả giá tự gõ.
  */
-export function apMauDaiLyMoi(cu: DongBang[], mau: DongBang[]): DongBang[] {
-  const kgCu = new Map(
-    cu
+export function apMauDaiLyMoi(prev: DongBang[], templates: DongBang[]): DongBang[] {
+  const oldKgByType = new Map(
+    prev
       .filter((d) => d.goiY && d.quantityKg > 0)
       .map((d) => [d.materialTypeName, d.quantityKg]),
   );
-  const tenMau = new Set(mau.map((d) => d.materialTypeName));
-  const tuMau = mau.map((d) => ({
+  const templateNames = new Set(templates.map((d) => d.materialTypeName));
+  const fromTemplate = templates.map((d) => ({
     ...d,
-    quantityKg: kgCu.get(d.materialTypeName) ?? 0,
+    quantityKg: oldKgByType.get(d.materialTypeName) ?? 0,
   }));
-  const goiYLac = cu
+  const goiYLac = prev
     .filter(
-      (d) => d.goiY && d.quantityKg > 0 && !tenMau.has(d.materialTypeName),
+      (d) => d.goiY && d.quantityKg > 0 && !templateNames.has(d.materialTypeName),
     )
     .map((d) => ({ ...d, unitPrice: null, giaNgay: undefined }));
-  const tuNhap = cu.filter((d) => !d.goiY && dongCoData(d));
-  const kq = [...tuMau, ...goiYLac, ...tuNhap];
+  const userEntered = prev.filter((d) => !d.goiY && dongCoData(d));
+  const kq = [...fromTemplate, ...goiYLac, ...userEntered];
   return kq.length ? kq : [dongBangRong()];
 }
 

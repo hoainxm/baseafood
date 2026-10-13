@@ -17,21 +17,21 @@ import { KY_OPT, phamViKy, type KyXem } from "@/lib/periodUtils";
 import { Printer, X } from "lucide-react";
 
 /** "2026-07-31" → "31 THÁNG 07 NĂM 2026" (đúng giọng phiếu giấy). */
-function ngayChu(iso: string): string {
+function dateInWords(iso: string): string {
   const [y, m, d] = iso.split("-");
   if (!y || !m || !d) return "…";
   return `${d} THÁNG ${m} NĂM ${y}`;
 }
 
 /** Gom dòng theo đại lý — mỗi đại lý một cụm, giữ thứ tự xuất hiện. */
-interface CumDaiLy {
+interface SupplierGroup {
   supplierName: string;
   dong: MaterialImportItem[];
   note: string[];
 }
 
-function gomTheoDaiLy(rows: MaterialImportItem[]): CumDaiLy[] {
-  const map = new Map<string, CumDaiLy>();
+function groupBySupplier(rows: MaterialImportItem[]): SupplierGroup[] {
+  const map = new Map<string, SupplierGroup>();
   for (const r of rows) {
     const ten = r.supplierName || "(chưa có đại lý)";
     let cum = map.get(ten);
@@ -40,8 +40,8 @@ function gomTheoDaiLy(rows: MaterialImportItem[]): CumDaiLy[] {
       map.set(ten, cum);
     }
     cum.dong.push(r);
-    const moTaXe = [r.driverName, r.licensePlate].filter(Boolean).join(" - ");
-    if (moTaXe && !cum.note.includes(moTaXe)) cum.note.push(moTaXe);
+    const vehicleDescription = [r.driverName, r.licensePlate].filter(Boolean).join(" - ");
+    if (vehicleDescription && !cum.note.includes(vehicleDescription)) cum.note.push(vehicleDescription);
   }
   return [...map.values()];
 }
@@ -83,22 +83,22 @@ export default function PhieuNLNgay({
   const [denTC, setDenTC] = useState(endDate);
   const [tu, den] = phamViKy(ky, moc, tuTC, denTC);
 
-  const trongXuong = (px: string) =>
+  const isInWorkshop = (px: string) =>
     workshop === "Tất cả" || px === workshop;
 
-  const laMotNgay = tu === den;
+  const isSingleDay = tu === den;
 
-  const ngayCoData = ngayTrongKhoang(tu, den).filter(
+  const datesWithData = ngayTrongKhoang(tu, den).filter(
     (d) =>
-      rows.some((r) => r.deliveryDate === d && trongXuong(r.workshop)) ||
+      rows.some((r) => r.deliveryDate === d && isInWorkshop(r.workshop)) ||
       pheLieu.some(
         (r) =>
-          r.source === "Nhập hàng" && r.date === d && trongXuong(r.workshop)
+          r.source === "Nhập hàng" && r.date === d && isInWorkshop(r.workshop)
       )
   );
 
-  const tongCaKy = rows
-    .filter((r) => r.deliveryDate >= tu && r.deliveryDate <= den && trongXuong(r.workshop))
+  const periodTotal = rows
+    .filter((r) => r.deliveryDate >= tu && r.deliveryDate <= den && isInWorkshop(r.workshop))
     .reduce((s, r) => s + (r.quantityKg || 0), 0);
 
   return (
@@ -171,39 +171,39 @@ export default function PhieuNLNgay({
 
         <div className="mt-2 text-center">
           <h1 className="text-lg font-bold uppercase tracking-wide">
-            Báo cáo tổng hợp nguyên liệu{laMotNgay ? " hàng ngày" : ""}
+            Báo cáo tổng hợp nguyên liệu{isSingleDay ? " hàng ngày" : ""}
           </h1>
           <p className="text-sm font-semibold uppercase">
-            {laMotNgay
-              ? `Ngày ${ngayChu(tu)}`
-              : `Từ ${ngayChu(tu)} đến ${ngayChu(den)}`}
+            {isSingleDay
+              ? `Ngày ${dateInWords(tu)}`
+              : `Từ ${dateInWords(tu)} đến ${dateInWords(den)}`}
             {workshop !== "Tất cả" ? ` · Phân xưởng ${workshop}` : ""}
           </p>
         </div>
 
-        {ngayCoData.length === 0 ? (
+        {datesWithData.length === 0 ? (
           <p className="mt-8 text-center text-sm text-slate-500">
             Không có nguyên liệu nhập trong khoảng này.
           </p>
         ) : (
-          ngayCoData.map((d, i) => (
-            <KhoiNgay
+          datesWithData.map((d, i) => (
+            <DaySection
               key={d}
               ngay={d}
               workshop={workshop}
               rows={rows}
               pheLieu={pheLieu}
-              hienTieuDeNgay={!laMotNgay}
+              hienTieuDeNgay={!isSingleDay}
               sangTrang={i > 0}
             />
           ))
         )}
 
-        {!laMotNgay && ngayCoData.length > 0 && (
+        {!isSingleDay && datesWithData.length > 0 && (
           <div className="mt-5 flex justify-end border-t-2 border-slate-800 pt-2 text-sm font-bold uppercase">
             <span>
               Tổng cộng cả kỳ:{" "}
-              <span className="tnum">{num(tongCaKy)}</span> kg
+              <span className="tnum">{num(periodTotal)}</span> kg
             </span>
           </div>
         )}
@@ -213,7 +213,7 @@ export default function PhieuNLNgay({
 }
 
 /** Một ngày = một khối như tờ giấy: STT theo đại lý + tổng cộng + phụ phẩm. */
-function KhoiNgay({
+function DaySection({
   ngay,
   workshop,
   rows,
@@ -228,18 +228,18 @@ function KhoiNgay({
   hienTieuDeNgay: boolean;
   sangTrang: boolean;
 }) {
-  const trongXuong = (px: string) =>
+  const isInWorkshop = (px: string) =>
     workshop === "Tất cả" || px === workshop;
 
-  const dongNgay = rows.filter(
-    (r) => r.deliveryDate === ngay && trongXuong(r.workshop)
+  const dayRows = rows.filter(
+    (r) => r.deliveryDate === ngay && isInWorkshop(r.workshop)
   );
-  const pheNgay = pheLieu.filter(
+  const dailyScraps = pheLieu.filter(
     (r) =>
-      r.source === "Nhập hàng" && r.date === ngay && trongXuong(r.workshop)
+      r.source === "Nhập hàng" && r.date === ngay && isInWorkshop(r.workshop)
   );
-  const cum = gomTheoDaiLy(dongNgay);
-  const tongKg = dongNgay.reduce((s, r) => s + (r.quantityKg || 0), 0);
+  const cum = groupBySupplier(dayRows);
+  const totalKg = dayRows.reduce((s, r) => s + (r.quantityKg || 0), 0);
 
   let stt = 0;
 
@@ -249,7 +249,7 @@ function KhoiNgay({
       style={sangTrang ? { breakBefore: "page" } : undefined}
     >
       {hienTieuDeNgay && (
-        <p className="mb-1 text-sm font-bold uppercase">Ngày {ngayChu(ngay)}</p>
+        <p className="mb-1 text-sm font-bold uppercase">Ngày {dateInWords(ngay)}</p>
       )}
 
       <table className="w-full border-collapse text-sm">
@@ -301,7 +301,7 @@ function KhoiNgay({
           <tr className="border-t-2 border-slate-700 bg-slate-50 font-bold">
             <Td colSpan={3}>Tổng cộng</Td>
             <Td right className="tnum">
-              {num(tongKg)}
+              {num(totalKg)}
             </Td>
             <Td />
             <Td />
@@ -309,7 +309,7 @@ function KhoiNgay({
         </tbody>
       </table>
 
-      {pheNgay.length > 0 && (
+      {dailyScraps.length > 0 && (
         <div className="mt-3 flex justify-end">
           <table className="border-collapse text-sm">
             <thead>
@@ -321,7 +321,7 @@ function KhoiNgay({
               </tr>
             </thead>
             <tbody>
-              {pheNgay.map((r) => (
+              {dailyScraps.map((r) => (
                 <tr key={r.id}>
                   <Td>{r.name}</Td>
                   <Td right className="tnum">

@@ -49,16 +49,16 @@ export function HopDoiLoaiHangLoat({
     nhanSua: string;
   };
   onClose: () => void;
-  onLuu: (ids: string[], loaiDich: string) => void;
+  onLuu: (ids: string[], targetType: string) => void;
 }) {
-  const [loaiNguon, setLoaiNguon] = useState("");
-  const [loaiDich, setLoaiDich] = useState("");
-  const [tuNgay, setTuNgay] = useState("");
-  const [denNgay, setDenNgay] = useState("");
-  const [chon, setChon] = useState<Set<string>>(new Set());
+  const [sourceType, setSourceType] = useState("");
+  const [targetType, setTargetType] = useState("");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   /** Tên loại NL có THẬT trong sổ + có trong danh mục — lọc theo cả hai nguồn. */
-  const optLoai = useMemo(() => {
+  const typeOptions = useMemo(() => {
     const ten = new Set<string>([
       ...rows.map((r) => r.materialTypeName).filter(Boolean),
       ...loaiNL.map((l) => l.name),
@@ -66,27 +66,27 @@ export function HopDoiLoaiHangLoat({
     return [...ten].sort((a, b) => a.localeCompare(b, "vi")).map((t) => ({ value: t, label: t }));
   }, [rows, loaiNL]);
 
-  const dongKhop = useMemo(() => {
-    if (!loaiNguon) return [];
+  const matchedRows = useMemo(() => {
+    if (!sourceType) return [];
     return rows
-      .filter((r) => r.materialTypeName === loaiNguon)
-      .filter((r) => !tuNgay || r.deliveryDate >= tuNgay)
-      .filter((r) => !denNgay || r.deliveryDate <= denNgay)
+      .filter((r) => r.materialTypeName === sourceType)
+      .filter((r) => !fromDate || r.deliveryDate >= fromDate)
+      .filter((r) => !toDate || r.deliveryDate <= toDate)
       .sort((a, b) => a.deliveryDate.localeCompare(b.deliveryDate));
-  }, [rows, loaiNguon, tuNgay, denNgay]);
+  }, [rows, sourceType, fromDate, toDate]);
 
   const doi = (id: string) =>
-    setChon((cu) => {
-      const moi = new Set(cu);
-      if (moi.has(id)) moi.delete(id);
-      else moi.add(id);
-      return moi;
+    setSelectedIds((prev) => {
+      const nextSet = new Set(prev);
+      if (nextSet.has(id)) nextSet.delete(id);
+      else nextSet.add(id);
+      return nextSet;
     });
 
-  const tickHet = () => setChon(new Set(dongKhop.map((r) => r.id)));
-  const boHet = () => setChon(new Set());
+  const tickHet = () => setSelectedIds(new Set(matchedRows.map((r) => r.id)));
+  const boHet = () => setSelectedIds(new Set());
 
-  const tongKg = dongKhop.filter((r) => chon.has(r.id)).reduce((s, r) => s + r.quantityKg, 0);
+  const totalKg = matchedRows.filter((r) => selectedIds.has(r.id)).reduce((s, r) => s + r.quantityKg, 0);
 
   return (
     <Dialog open onOpenChange={(v) => !v && onClose()}>
@@ -103,18 +103,18 @@ export function HopDoiLoaiHangLoat({
         <div className="grid gap-4 sm:grid-cols-2">
           <Combobox
             label="Đang ghi là loại"
-            value={loaiNguon}
+            value={sourceType}
             onChange={(v) => {
-              setLoaiNguon(v);
-              setChon(new Set());
+              setSourceType(v);
+              setSelectedIds(new Set());
             }}
-            options={optLoai}
+            options={typeOptions}
           />
           <Combobox
             label="Đổi sang loại"
-            value={loaiDich}
-            onChange={setLoaiDich}
-            options={optLoai}
+            value={targetType}
+            onChange={setTargetType}
+            options={typeOptions}
             onCreate={onThemLoaiNL}
             onSuaMuc={suaLoai?.moSua}
             nhanSua={suaLoai?.nhanSua}
@@ -124,16 +124,16 @@ export function HopDoiLoaiHangLoat({
         <DateRangeField
           label="Giới hạn khoảng ngày"
           anNhanBatBuoc
-          startDate={tuNgay}
-          endDate={denNgay}
+          startDate={fromDate}
+          endDate={toDate}
           onChange={(tu, den) => {
-            setTuNgay(tu);
-            setDenNgay(den);
-            setChon(new Set());
+            setFromDate(tu);
+            setToDate(den);
+            setSelectedIds(new Set());
           }}
         />
 
-        {loaiNguon && dongKhop.length === 0 && (
+        {sourceType && matchedRows.length === 0 && (
           <EmptyState
             icon={Layers}
             tieuDe="Không có chuyến nào khớp"
@@ -141,19 +141,19 @@ export function HopDoiLoaiHangLoat({
           />
         )}
 
-        {dongKhop.length > 0 && (
+        {matchedRows.length > 0 && (
           <>
             <div className="flex flex-wrap items-center gap-2">
               <Button
                 title="Tick hết các chuyến đang hiện trong danh sách." variant="outline" size="sm" onClick={tickHet}>
-                Tick hết ({dongKhop.length})
+                Tick hết ({matchedRows.length})
               </Button>
               <Button
                 title="Bỏ tick toàn bộ chuyến đang chọn." variant="outline" size="sm" onClick={boHet}>
                 Bỏ tick
               </Button>
               <span className="text-base text-muted-foreground">
-                Đã chọn {chon.size} chuyến — {num(tongKg)} kg
+                Đã chọn {selectedIds.size} chuyến — {num(totalKg)} kg
               </span>
             </div>
 
@@ -173,13 +173,13 @@ export function HopDoiLoaiHangLoat({
                   </tr>
                 </thead>
                 <tbody>
-                  {dongKhop.map((r) => (
+                  {matchedRows.map((r) => (
                     <tr key={r.id}>
                       <td className="border-b border-border px-3 py-2">
                         <input
                           type="checkbox"
                           className="size-6"
-                          checked={chon.has(r.id)}
+                          checked={selectedIds.has(r.id)}
                           onChange={() => doi(r.id)}
                           aria-label={`Đổi loại chuyến ${r.supplierName} ngày ${viDate(r.deliveryDate)}`}
                         />
@@ -208,22 +208,22 @@ export function HopDoiLoaiHangLoat({
             title="Đổi loại nguyên liệu của mọi chuyến đang tick sang loại đích. Sổ ghi lại theo loại mới."
             size="lg"
             onClick={() => {
-              if (!loaiDich.trim()) {
+              if (!targetType.trim()) {
                 notify.loi("Chưa chọn loại đích");
                 return;
               }
-              if (loaiDich === loaiNguon) {
+              if (targetType === sourceType) {
                 notify.loi("Loại đích trùng loại nguồn");
                 return;
               }
-              if (chon.size === 0) {
+              if (selectedIds.size === 0) {
                 notify.loi("Chưa tick chuyến nào");
                 return;
               }
-              onLuu([...chon], loaiDich.trim());
+              onLuu([...selectedIds], targetType.trim());
             }}
           >
-            Đổi {chon.size} chuyến
+            Đổi {selectedIds.size} chuyến
           </Button>
         </DialogFooter>
       </DialogContent>

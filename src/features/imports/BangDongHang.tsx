@@ -34,14 +34,14 @@ export function BangDongHang({
   onSua: (key: string, patch: Partial<DongBang>) => void;
   onBo: (key: string) => void;
   onThem: () => void;
-  optLoaiTheoLoai: (loai: string) => MucChon[];
-  onTaoLoai: (ten: string, loai: string) => string;
+  optLoaiTheoLoai: (category: string) => MucChon[];
+  onTaoLoai: (ten: string, category: string) => string;
   /** Bút chì sửa nhanh loại NL trong danh mục (value = tên). */
   onSuaLoai?: (ten: string) => void;
   /** Enter ở ô kg của dòng cuối — màn dùng để đưa con trỏ tới nút lưu. */
   onEnterCuoi?: () => void;
 }) {
-  const coTheBo = dong.length > 1;
+  const canRemove = dong.length > 1;
   // Dòng ĐIỀN SẴN theo đại lý hiện GỌN (tên loại là chữ, chỉ còn ô kg + giá) —
   // bấm "Đổi loại" mới bung đủ ô chọn. Chỉ là trạng thái hiển thị, không đụng dữ liệu.
   const [bung, setBung] = useState<Set<string>>(new Set());
@@ -82,9 +82,9 @@ export function BangDongHang({
                 </p>
               </div>
               <span className="flex shrink-0 gap-1 lg:hidden">
-                <NutDongGon
+                <CompactCloseButton
                   d={d}
-                  coTheBo={coTheBo}
+                  coTheBo={canRemove}
                   onBo={onBo}
                   onBung={() => setBung((b) => new Set(b).add(d.key))}
                 />
@@ -107,9 +107,9 @@ export function BangDongHang({
               onChange={(v) => onSua(d.key, { unitPrice: v })}
             />
             <span className="hidden gap-1 lg:flex">
-              <NutDongGon
+              <CompactCloseButton
                 d={d}
-                coTheBo={coTheBo}
+                coTheBo={canRemove}
                 onBo={onBo}
                 onBung={() => setBung((b) => new Set(b).add(d.key))}
               />
@@ -156,7 +156,7 @@ export function BangDongHang({
               value={d.unitPrice}
               onChange={(v) => onSua(d.key, { unitPrice: v })}
             />
-            {coTheBo ? (
+            {canRemove ? (
               <Button
                 title="Bỏ dòng loại hàng này khỏi chuyến đang gõ (chưa lưu nên không đụng sổ)."
                 variant="outline"
@@ -190,7 +190,7 @@ export function BangDongHang({
 }
 
 /** Hai nút nhỏ của dòng gọn: đổi loại (bung đủ ô chọn) · bỏ dòng. */
-function NutDongGon({
+function CompactCloseButton({
   d,
   coTheBo,
   onBo,

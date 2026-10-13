@@ -27,13 +27,13 @@ import { CalendarRange, Coins, FileClock, FileSpreadsheet, Scale } from "lucide-
 
 const THU = ["Chủ nhật", "Thứ hai", "Thứ ba", "Thứ tư", "Thứ năm", "Thứ sáu", "Thứ bảy"];
 /** Thứ trong tuần từ ngày ISO (yyyy-mm-dd) — tính theo UTC để không lệch múi giờ. */
-function thuTrongTuan(iso: string): string {
+function dayOfWeek(iso: string): string {
   const [y, m, d] = iso.split("-").map(Number);
   if (!y || !m || !d) return "";
   return THU[new Date(Date.UTC(y, m - 1, d)).getUTCDay()] ?? "";
 }
 
-const XUONG_OPT = [
+const WORKSHOP_OPTIONS = [
   { value: "Tất cả", label: "Tất cả xưởng" },
   { value: "Đông", label: "Đông" },
   { value: "Cá", label: "Cá" },
@@ -68,7 +68,7 @@ export default function BaoCaoNhap() {
   const [moc, setMoc] = useState(homNay());
   const [tuTC, setTuTC] = useState(homNay());
   const [denTC, setDenTC] = useState(homNay());
-  const [xuong, setXuong] = useState("Tất cả");
+  const [workshop, setWorkshop] = useState("Tất cả");
   const [tu, den] = phamViKy(ky, moc, tuTC, denTC);
 
   const {
@@ -81,23 +81,23 @@ export default function BaoCaoNhap() {
     tongKgPhe,
     tongTienPhe,
   } = useMemo(() => {
-    const locImports = rows.filter(
+    const filteredImports = rows.filter(
       (r) =>
         r.deliveryDate >= tu &&
         r.deliveryDate <= den &&
-        (xuong === "Tất cả" || r.workshop === xuong)
+        (workshop === "Tất cả" || r.workshop === workshop)
     );
-    const locScraps = scraps.filter(
+    const filteredScraps = scraps.filter(
       (r) =>
         r.source === "Nhập hàng" &&
         r.date >= tu &&
         r.date <= den &&
-        (xuong === "Tất cả" || r.workshop === xuong)
+        (workshop === "Tất cả" || r.workshop === workshop)
     );
 
     // Gom nguyên liệu MUA
     const mua = new Map<string, DongMua>();
-    for (const r of locImports) {
+    for (const r of filteredImports) {
       const sup = r.supplierName || "(chưa có đại lý)";
       const mt = r.materialTypeName || "(chưa rõ loại)";
       const k = `${sup}|||${mt}`;
@@ -118,7 +118,7 @@ export default function BaoCaoNhap() {
 
     // Gom phế liệu RIÊNG
     const phe = new Map<string, DongPhe>();
-    for (const r of locScraps) {
+    for (const r of filteredScraps) {
       const nm = r.name || "(chưa rõ loại phế liệu)";
       let d = phe.get(nm);
       if (!d) {
@@ -138,7 +138,7 @@ export default function BaoCaoNhap() {
       loai: Map<string, number>;
     }
     const ct = new Map<string, CtNgay>();
-    for (const r of locImports) {
+    for (const r of filteredImports) {
       let d = ct.get(r.deliveryDate);
       if (!d) {
         d = { tongKg: 0, tongTien: 0, chuyen: new Set(), loai: new Map() };
@@ -152,7 +152,7 @@ export default function BaoCaoNhap() {
     }
     const chart: CotBieuDo[] = [...ct.keys()].sort().map((date) => {
       const d = ct.get(date)!;
-      const loaiArr = [...d.loai.entries()].sort((a, b) => b[1] - a[1]);
+      const typeEntries = [...d.loai.entries()].sort((a, b) => b[1] - a[1]);
       return {
         nhan: viDate(date),
         giaTri: d.tongKg,
@@ -161,7 +161,7 @@ export default function BaoCaoNhap() {
             <div className="border-b border-border pb-1.5">
               <div className="font-semibold text-foreground">
                 {viDate(date)}
-                {thuTrongTuan(date) ? ` · ${thuTrongTuan(date)}` : ""}
+                {dayOfWeek(date) ? ` · ${dayOfWeek(date)}` : ""}
               </div>
               <div className="text-muted-foreground">
                 {d.chuyen.size} chuyến ·{" "}
@@ -170,14 +170,14 @@ export default function BaoCaoNhap() {
               </div>
             </div>
             <ul className="space-y-1">
-              {loaiArr.slice(0, 16).map(([ten, kg]) => (
+              {typeEntries.slice(0, 16).map(([ten, kg]) => (
                 <li key={ten} className="flex items-baseline justify-between gap-4">
                   <span className="min-w-0 break-words text-muted-foreground">{ten}</span>
                   <span className="tnum shrink-0 font-medium text-foreground">{num(kg)} kg</span>
                 </li>
               ))}
-              {loaiArr.length > 16 && (
-                <li className="text-muted-foreground">… +{loaiArr.length - 16} loại khác</li>
+              {typeEntries.length > 16 && (
+                <li className="text-muted-foreground">… +{typeEntries.length - 16} loại khác</li>
               )}
             </ul>
           </div>
@@ -195,7 +195,7 @@ export default function BaoCaoNhap() {
       tongKgPhe: dongPhe.reduce((s, d) => s + d.quantityKg, 0),
       tongTienPhe: dongPhe.reduce((s, d) => s + d.saleValue, 0),
     };
-  }, [rows, scraps, tu, den, xuong]);
+  }, [rows, scraps, tu, den, workshop]);
 
   const the: TheThongTin[] = [
     { nhan: "Kỳ báo cáo", giaTri: `${viDate(tu)} – ${viDate(den)}`, icon: CalendarRange, mau: "trung-tinh" },
@@ -210,7 +210,7 @@ export default function BaoCaoNhap() {
     },
   ];
 
-  const cotMua: CotTong<DongMua>[] = [
+  const purchaseColumns: CotTong<DongMua>[] = [
     { key: "dl", header: "Đại lý", render: (r) => r.supplierName },
     { key: "loai", header: "Loại nguyên liệu", render: (r) => r.materialTypeName },
     { key: "kg", header: "Số cân (kg)", so: true, render: (r) => num(r.quantityKg), tong: () => num(tongKg) },
@@ -224,20 +224,20 @@ export default function BaoCaoNhap() {
     { key: "tien", header: "Giá trị (đ)", so: true, render: (r) => num(r.amount), tong: () => num(tongTien) },
   ];
 
-  const cotPhe: CotTong<DongPhe>[] = [
+  const scrapColumns: CotTong<DongPhe>[] = [
     { key: "loai", header: "Loại phế liệu", render: (r) => r.name },
     { key: "kg", header: "Số cân (kg)", so: true, render: (r) => num(r.quantityKg), tong: () => num(tongKgPhe) },
     { key: "tien", header: "Giá trị bán (đ)", so: true, render: (r) => num(r.saleValue), tong: () => num(tongTienPhe) },
   ];
 
-  const xuatExcel = () => {
+  const exportExcel = () => {
     if (!dongMua.length && !dongPhe.length) {
       notify.canhBao("Không có số liệu để xuất");
       return;
     }
     const aoa: OExcel[][] = [];
     aoa.push(["Báo cáo tổng hợp nhập hàng"]);
-    aoa.push([`Kỳ: ${viDate(tu)} – ${viDate(den)} · Phân xưởng: ${xuong}`]);
+    aoa.push([`Kỳ: ${viDate(tu)} – ${viDate(den)} · Phân xưởng: ${workshop}`]);
     aoa.push([]);
     aoa.push(["NGUYÊN LIỆU MUA"]);
     aoa.push(["Đại lý", "Loại nguyên liệu", "Số cân (kg)", "Chờ giá (kg)", "Giá trị (đ)"]);
@@ -302,9 +302,9 @@ export default function BaoCaoNhap() {
               label="Phân xưởng"
               anNhanBatBuoc
               choPhepXoa={false}
-              value={xuong}
-              onChange={setXuong}
-              options={XUONG_OPT}
+              value={workshop}
+              onChange={setWorkshop}
+              options={WORKSHOP_OPTIONS}
             />
           </div>
         </div>
@@ -312,7 +312,7 @@ export default function BaoCaoNhap() {
           title="Tải báo cáo nhập hàng đang xem (hàng mua + phế liệu) ra file Excel."
           size="lg"
           variant="outline"
-          onClick={xuatExcel}
+          onClick={exportExcel}
           disabled={!dongMua.length && !dongPhe.length}
         >
           <FileSpreadsheet />
@@ -338,9 +338,9 @@ export default function BaoCaoNhap() {
 
       <BangTong
         rows={dongMua}
-        cot={cotMua}
+        cot={purchaseColumns}
         getKey={(r) => `${r.supplierName}|||${r.materialTypeName}`}
-        toMau={`bao-cao-nhap|${tu}|${den}|${xuong}`}
+        toMau={`bao-cao-nhap|${tu}|${den}|${workshop}`}
         emptyText="Không có nguyên liệu mua trong kỳ này."
       />
 
@@ -354,9 +354,9 @@ export default function BaoCaoNhap() {
           </div>
           <BangTong
             rows={dongPhe}
-            cot={cotPhe}
+            cot={scrapColumns}
             getKey={(r) => r.name}
-            toMau={`bao-cao-nhap-phe-lieu|${tu}|${den}|${xuong}`}
+            toMau={`bao-cao-nhap-phe-lieu|${tu}|${den}|${workshop}`}
             emptyText="Không có phế liệu trong kỳ này."
           />
         </section>

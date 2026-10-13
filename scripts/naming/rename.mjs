@@ -9,7 +9,10 @@
 //        functions, parameters, local types) whose name is Vietnamese.
 //   node scripts/naming/rename.mjs collect --exported <out.json> [pathPrefix…]
 //        same for EXPORTED declarations (Đợt 2) — renamed in every importing file.
-//   node scripts/naming/rename.mjs apply [--exported] <mapping.json> [pathPrefix…]
+//   node scripts/naming/rename.mjs collect --props <out.json> [pathPrefix…]
+//        PROPERTY names declared in interfaces / type literals (component props,
+//        column definitions…) — Đợt 3. Never use on types that are persisted.
+//   node scripts/naming/rename.mjs apply [--exported|--props] <mapping.json> [pathPrefix…]
 //        mapping = { "oldName": "newName", "path/file.ts::oldName": "override" }.
 //        Skips (and reports) a rename when the new name would collide with any
 //        other identifier visible in the declaration's scope, or breaks the
@@ -126,7 +129,8 @@ function isPropertyName(id) {
 }
 
 /** Every Vietnamese declaration in one file: non-exported ones, or ONLY exported ones. */
-function candidatesIn(sf, checker, exportedOnly = false) {
+function candidatesIn(sf, checker, exportedOnly = false, propsOnly = false) {
+  if (propsOnly) return propertyCandidatesIn(sf, propsOnly === "all");
   const moduleSym = checker.getSymbolAtLocation(sf);
   const exported = new Set();
   if (moduleSym) {
@@ -148,6 +152,8 @@ function candidatesIn(sf, checker, exportedOnly = false) {
     if (ts.isVariableDeclaration(n) && ts.isIdentifier(n.name)) [decl, kind] = [n, "variable"];
     else if (ts.isBindingElement(n) && ts.isIdentifier(n.name) && ts.isArrayBindingPattern(n.parent))
       [decl, kind] = [n, "array-binding"];
+    else if (ts.isBindingElement(n) && ts.isIdentifier(n.name) && ts.isObjectBindingPattern(n.parent))
+      [decl, kind] = [n, n.propertyName ? "object-alias" : "object-binding"];
     else if (ts.isFunctionDeclaration(n) && n.name) [decl, kind] = [n, "function"];
     else if (ts.isParameter(n) && ts.isIdentifier(n.name) && n.name.text !== "this") [decl, kind] = [n, "parameter"];
     else if ((ts.isTypeAliasDeclaration(n) || ts.isInterfaceDeclaration(n) || ts.isEnumDeclaration(n) ||
@@ -155,10 +161,38 @@ function candidatesIn(sf, checker, exportedOnly = false) {
       [decl, kind] = [n, "type"];
     if (exportedOnly && kind !== "variable" && kind !== "function" && kind !== "type") decl = null;
     if (exportedOnly && decl && ts.isVariableDeclaration(decl) && decl.parent?.parent?.parent !== sf) decl = null;
-    if (decl && isVietnamese(decl.name.text) && isExported(decl, exported, checker) === exportedOnly) {
+    if (decl && (acceptNames?.has(decl.name.text) || isVietnamese(decl.name.text)) &&
+        isExported(decl, exported, checker) === exportedOnly) {
       const line = sf.getLineAndCharacterOfPosition(decl.name.getStart(sf)).line;
       out.push({ name: decl.name.text, kind, pos: decl.name.getStart(sf), line: line + 1,
         context: sf.text.split("\n")[line].trim().slice(0, 140), decl });
+    }
+    ts.forEachChild(n, visit);
+  };
+  visit(sf);
+  return out;
+}
+
+/** Tên "chủ" của một thuộc tính: interface / type alias / hằng / hàm gần nhất bao nó. */
+function ownerOf(n) {
+  for (let p = n.parent; p; p = p.parent) {
+    if ((ts.isInterfaceDeclaration(p) || ts.isTypeAliasDeclaration(p) || ts.isFunctionDeclaration(p) ||
+         ts.isClassDeclaration(p)) && p.name) return p.name.text;
+    if (ts.isVariableDeclaration(p) && ts.isIdentifier(p.name)) return p.name.text;
+  }
+  return "";
+}
+
+/** Property names declared in interfaces / type literals of one file. `all` = cả tên không bị
+ *  nhận là tiếng Việt (âm tiết ngắn mơ hồ) — chỉ dùng khi apply, lọc theo bảng ánh xạ. */
+function propertyCandidatesIn(sf, all = false) {
+  const out = [];
+  const visit = (n) => {
+    if ((ts.isPropertySignature(n) || ts.isMethodSignature(n)) && n.name && ts.isIdentifier(n.name) &&
+        (ts.isInterfaceDeclaration(n.parent) || ts.isTypeLiteralNode(n.parent)) && (all || isVietnamese(n.name.text))) {
+      const line = sf.getLineAndCharacterOfPosition(n.name.getStart(sf)).line;
+      out.push({ name: n.name.text, kind: "property", owner: ownerOf(n), pos: n.name.getStart(sf), line: line + 1,
+        context: sf.text.split("\n")[line].trim().slice(0, 140), decl: n });
     }
     ts.forEachChild(n, visit);
   };
@@ -176,8 +210,11 @@ const matchesPrefix = (file, prefixes) => !prefixes.length || prefixes.some((p) 
 
 // ---------- main ----------
 const argv = process.argv.slice(2);
+/** apply: tên có trong bảng ánh xạ là ứng viên kể cả khi lexicon không nhận ra (âm tiết ngắn). */
+let acceptNames = null;
 const exportedMode = argv.includes("--exported");
-const [cmd, arg, ...prefixes] = argv.filter((a) => a !== "--exported");
+const propsMode = argv.includes("--props");
+const [cmd, arg, ...prefixes] = argv.filter((a) => a !== "--exported" && a !== "--props");
 const ctx = createService();
 
 if (cmd === "collect") {
@@ -186,8 +223,9 @@ if (cmd === "collect") {
   const rows = [];
   for (const f of ctx.files.filter((f) => matchesPrefix(f, prefixes))) {
     const sf = program.getSourceFile(f);
-    for (const c of candidatesIn(sf, checker, exportedMode)) {
-      rows.push({ file: rel(f), name: c.name, kind: c.kind, line: c.line, context: c.context });
+    for (const c of candidatesIn(sf, checker, exportedMode, propsMode)) {
+      const prop = c.kind === "object-alias" && ts.isIdentifier(c.decl.propertyName) ? c.decl.propertyName.text : undefined;
+      rows.push({ file: rel(f), name: c.name, kind: c.kind, line: c.line, context: c.context, ...(prop ? { prop } : {}) });
     }
   }
   fs.writeFileSync(arg, `${JSON.stringify(rows, null, 1)}\n`);
@@ -196,6 +234,7 @@ if (cmd === "collect") {
   console.log(`${rows.length} khai báo, ${names.size} tên khác nhau`, byKind);
 } else if (cmd === "apply") {
   const mapping = JSON.parse(fs.readFileSync(arg, "utf8"));
+  acceptNames = new Set(Object.keys(mapping).map((k) => k.split("::").pop().split(".").pop()));
   const skipped = [];
   const touched = new Set();
   let renamed = 0;
@@ -205,12 +244,18 @@ if (cmd === "collect") {
       const program = ctx.service.getProgram();
       const checker = program.getTypeChecker();
       const sf = program.getSourceFile(f);
-      const cands = candidatesIn(sf, checker, exportedMode).filter(
+      const cands = candidatesIn(sf, checker, exportedMode, propsMode ? "all" : false).filter(
         (c) => !skipped.some((s) => s.file === rel(f) && s.pos === c.pos && s.name === c.name)
       );
-      const c = cands.find((x) => mapping[`${rel(f)}::${x.name}`] ?? mapping[x.name]);
+      // Tra theo độ cụ thể: file::Chủ.tên → file::tên → tên. Thuộc tính ngắn mơ hồ chỉ nên khai
+      // theo file (khóa trơn chỉ áp cho tên bị nhận là tiếng Việt).
+      const lookup = (x) =>
+        (x.owner && mapping[`${rel(f)}::${x.owner}.${x.name}`]) ??
+        mapping[`${rel(f)}::${x.name}`] ??
+        (!propsMode || isVietnamese(x.name) ? mapping[x.name] : undefined);
+      const c = cands.find((x) => lookup(x));
       if (!c) break;
-      const target = mapping[`${rel(f)}::${c.name}`] ?? mapping[c.name];
+      const target = lookup(c);
       const skip = (why) => skipped.push({ file: rel(f), pos: c.pos, name: c.name, target, line: c.line, why });
 
       if (!/^[A-Za-z_$][\w$]*$/.test(target) || ts.stringToToken(target) !== undefined) { skip("tên không hợp lệ / từ khóa"); continue; }
@@ -220,8 +265,20 @@ if (cmd === "collect") {
       }
       if (isVietnamese(target)) { skip("tên mới vẫn bị nhận là tiếng Việt"); continue; }
 
-      const scope = scopeOf(c.decl);
       const sym = checker.getSymbolAtLocation(c.decl.name);
+      if (propsMode) {
+        // Thuộc tính: không được trùng thành viên khác của CÙNG kiểu, kể cả thành viên kế thừa
+        // (vd đổi `tieuDe` → `title` trên props đã extends thuộc tính HTML có sẵn `title`).
+        const owner = c.decl.parent;
+        const ownerType = ts.isInterfaceDeclaration(owner)
+          ? checker.getDeclaredTypeOfSymbol(checker.getSymbolAtLocation(owner.name))
+          : checker.getTypeAtLocation(owner);
+        if (checker.getPropertiesOfType(ownerType).some((p) => p.name === target)) {
+          skip(`va chạm với thuộc tính "${target}" sẵn có của kiểu`);
+          continue;
+        }
+      }
+      const scope = propsMode ? sf : scopeOf(c.decl);
       let clash = false;
       const look = (n) => {
         if (clash) return;
@@ -231,15 +288,15 @@ if (cmd === "collect") {
         }
         ts.forEachChild(n, look);
       };
-      look(scope);
+      if (!propsMode) look(scope);
       if (clash) { skip(`va chạm với "${target}" sẵn có trong phạm vi`); continue; }
 
       const locs = ctx.service.findRenameLocations(f, c.pos, false, false, { providePrefixAndSuffixTextForRename: true }) ?? [];
       const otherFiles = [...new Set(locs.map((l) => l.fileName))].filter((x) => x !== f);
-      if (otherFiles.length && !exportedMode) { skip("được dùng ngoài file (không phải cục bộ)"); continue; }
+      if (otherFiles.length && !exportedMode && !propsMode) { skip("được dùng ngoài file (không phải cục bộ)"); continue; }
       if (otherFiles.some((x) => !ctx.files.includes(x))) { skip("được dùng ngoài src"); continue; }
       // Tên export: file NÀO dùng nó cũng không được có sẵn định danh trùng tên mới.
-      const clashFile = otherFiles.find((x) => {
+      const clashFile = propsMode ? null : otherFiles.find((x) => {
         let hit = false;
         const walk = (n) => {
           if (hit) return;

@@ -28,7 +28,7 @@ import {
 } from "@/design-system";
 import { Camera, Lock, Plus, X } from "lucide-react";
 
-const XUONG_OPT: LuaChon[] = [
+const WORKSHOP_OPTIONS: LuaChon[] = [
   { value: "Đông", label: "Đông" },
   { value: "Cá", label: "Cá" },
   { value: "Khô", label: "Khô" },
@@ -41,7 +41,7 @@ const KET_QUA_OPT: LuaChon[] = [
 ];
 
 /** Bộ chỉ tiêu mặc định — chấm nhanh, vẫn thêm chỉ tiêu mới tại chỗ. */
-const CHI_TIEU_MAC_DINH = [
+const DEFAULT_CRITERIA = [
   "Vệ sinh nhà xưởng",
   "Vệ sinh dụng cụ sản xuất",
   "Thiết bị / máy móc",
@@ -67,51 +67,51 @@ export default function QcChecklistScreen() {
   const [rows, persist] = useQcChecklists();
   const [locks, persistLocks, { trangThai: ttKhoa }] = useQcLocks();
 
-  const [ngay, setNgay] = useState(todayISO());
-  const [xuong, setXuong] = useState<Workshop>("Đông");
+  const [date, setDate] = useState(todayISO());
+  const [workshop, setWorkshop] = useState<Workshop>("Đông");
   const [dongs, setDongs] = useState<Dong[]>([]);
-  const [lyDoGhiBu, setLyDoGhiBu] = useState("");
-  const [themTen, setThemTen] = useState("");
+  const [backdateReason, setBackdateReason] = useState("");
+  const [newName, setNewName] = useState("");
 
-  const daLuu = useMemo(
-    () => rows.filter((r) => r.date === ngay && r.workshop === xuong),
-    [rows, ngay, xuong]
+  const saved = useMemo(
+    () => rows.filter((r) => r.date === date && r.workshop === workshop),
+    [rows, date, workshop]
   );
   const khoa = useMemo(
-    () => locks.find((l) => l.lockDate === ngay && l.workshop === xuong && l.isLocked),
-    [locks, ngay, xuong]
+    () => locks.find((l) => l.lockDate === date && l.workshop === workshop && l.isLocked),
+    [locks, date, workshop]
   );
-  const dangKhoa = Boolean(khoa);
-  const ghiBu = dangKhoa || isBackdatedQc(ngay, todayISO());
+  const isLocked = Boolean(khoa);
+  const isBackdate = isLocked || isBackdatedQc(date, todayISO());
 
   // Đổi (ngày × xưởng) hoặc dữ liệu tải xong → nạp lại bảng chấm điểm từ sổ.
   useEffect(() => {
-    const luuNgay = rows.filter((r) => r.date === ngay && r.workshop === xuong);
-    const theoTen = new Map(luuNgay.map((r) => [r.criterion, r]));
+    const dayRows = rows.filter((r) => r.date === date && r.workshop === workshop);
+    const theoTen = new Map(dayRows.map((r) => [r.criterion, r]));
     const tenList = [
-      ...CHI_TIEU_MAC_DINH,
-      ...luuNgay.map((r) => r.criterion).filter((t) => !CHI_TIEU_MAC_DINH.includes(t)),
+      ...DEFAULT_CRITERIA,
+      ...dayRows.map((r) => r.criterion).filter((t) => !DEFAULT_CRITERIA.includes(t)),
     ];
     setDongs(
       tenList.map((ten) => {
-        const cu = theoTen.get(ten);
+        const prev = theoTen.get(ten);
         return {
           criterion: ten,
-          result: (cu?.result ?? "") as QcResult | "",
-          score: cu?.score ?? null,
-          note: cu?.note ?? "",
-          photoPaths: cu?.photoPaths ?? [],
+          result: (prev?.result ?? "") as QcResult | "",
+          score: prev?.score ?? null,
+          note: prev?.note ?? "",
+          photoPaths: prev?.photoPaths ?? [],
         };
       })
     );
-    setLyDoGhiBu(luuNgay.find((r) => r.backdateReason)?.backdateReason ?? "");
-  }, [ngay, xuong, rows]);
+    setBackdateReason(dayRows.find((r) => r.backdateReason)?.backdateReason ?? "");
+  }, [date, workshop, rows]);
 
-  const doiDong = (i: number, patch: Partial<Dong>) =>
+  const updateRow = (i: number, patch: Partial<Dong>) =>
     setDongs((ds) => ds.map((d, k) => (k === i ? { ...d, ...patch } : d)));
 
-  const themChiTieu = () => {
-    const ten = themTen.trim();
+  const addCriterion = () => {
+    const ten = newName.trim();
     if (!ten) return;
     if (dongs.some((d) => d.criterion === ten)) {
       notify.canhBao("Chỉ tiêu này đã có trong danh sách");
@@ -121,50 +121,50 @@ export default function QcChecklistScreen() {
       ...ds,
       { criterion: ten, result: "", score: null, note: "", photoPaths: [] },
     ]);
-    setThemTen("");
+    setNewName("");
   };
 
   // 30 ngày tới ngày đang xem — xu hướng chất lượng của xưởng.
-  const qc30 = useMemo(() => qcTheoNgay(rows, xuong, luiNgay(ngay, 29), ngay), [rows, xuong, ngay]);
+  const qc30 = useMemo(() => qcTheoNgay(rows, workshop, luiNgay(date, 29), date), [rows, workshop, date]);
   const coQc30 = qc30.some((x) => x.dat + x.tam + x.khongDat > 0);
 
   const daCham = dongs.filter((d) => d.result);
-  const soDat = daCham.filter((d) => d.result === "dat").length;
-  const soKhongDat = daCham.filter((d) => d.result === "khong-dat").length;
+  const passCount = daCham.filter((d) => d.result === "dat").length;
+  const failCount = daCham.filter((d) => d.result === "khong-dat").length;
 
-  const luu = () => {
+  const save = () => {
     const cham = dongs.filter((d) => d.result);
     if (cham.length === 0) {
       notify.canhBao("Chưa chấm chỉ tiêu nào — chọn ít nhất một kết quả");
       return;
     }
-    if (ghiBu && !lyDoGhiBu.trim()) {
+    if (isBackdate && !backdateReason.trim()) {
       notify.canhBao(
-        dangKhoa
+        isLocked
           ? "Ngày đã chốt — nhập lý do ghi bù để sửa"
           : "Ghi cho ngày cũ — nhập lý do ghi bù"
       );
       return;
     }
-    const idTheoTen = new Map(daLuu.map((r) => [r.criterion, r.id]));
-    const moi: QcChecklistItem[] = cham.map((d) => ({
+    const idTheoTen = new Map(saved.map((r) => [r.criterion, r.id]));
+    const newRows: QcChecklistItem[] = cham.map((d) => ({
       id: idTheoTen.get(d.criterion) ?? newId(),
-      date: ngay,
-      workshop: xuong,
+      date: date,
+      workshop: workshop,
       criterion: d.criterion,
       result: d.result as QcResult,
       score: d.score,
       note: d.note,
-      backdateReason: ghiBu ? lyDoGhiBu.trim() : "",
+      backdateReason: isBackdate ? backdateReason.trim() : "",
       photoPaths: d.photoPaths,
     }));
-    const giuLai = rows.filter((r) => !(r.date === ngay && r.workshop === xuong));
-    persist([...giuLai, ...moi]);
-    notify.daLuu(`Đã lưu QC ${viDate(ngay)} · xưởng ${xuong} — ${cham.length} chỉ tiêu`);
+    const giuLai = rows.filter((r) => !(r.date === date && r.workshop === workshop));
+    persist([...giuLai, ...newRows]);
+    notify.daLuu(`Đã lưu QC ${viDate(date)} · xưởng ${workshop} — ${cham.length} chỉ tiêu`);
   };
 
-  const chotNgay = () => {
-    if (daLuu.length === 0) {
+  const lockDay = () => {
+    if (saved.length === 0) {
       notify.canhBao("Chưa có chỉ tiêu nào đã lưu để chốt");
       return;
     }
@@ -173,26 +173,26 @@ export default function QcChecklistScreen() {
       notify.loi("Đang tải sổ chốt QC từ máy chủ — đợi vài giây rồi bấm chốt lại");
       return;
     }
-    const cu = locks.find((l) => l.lockDate === ngay && l.workshop === xuong);
-    const banGhi = {
+    const prev = locks.find((l) => l.lockDate === date && l.workshop === workshop);
+    const record = {
       // Id cố định theo (ngày|xưởng): hai máy cùng chốt ghi CÙNG một dòng, không sinh bản trùng.
-      id: cu?.id ?? `${ngay}|${xuong}`,
-      lockDate: ngay,
-      workshop: xuong,
+      id: prev?.id ?? `${date}|${workshop}`,
+      lockDate: date,
+      workshop: workshop,
       isLocked: true,
       lockedAt: todayISO(),
-      totalKgAtLock: daLuu.length,
+      totalKgAtLock: saved.length,
       reopenReason: "",
       note: "",
     };
-    persistLocks([...locks.filter((l) => l.id !== banGhi.id), banGhi]);
-    notify.daLuu(`Đã chốt QC ${viDate(ngay)} · xưởng ${xuong}`);
+    persistLocks([...locks.filter((l) => l.id !== record.id), record]);
+    notify.daLuu(`Đã chốt QC ${viDate(date)} · xưởng ${workshop}`);
   };
 
-  const moLai = () => {
+  const reopen = () => {
     if (!khoa) return;
     persistLocks(locks.map((l) => (l.id === khoa.id ? { ...l, isLocked: false } : l)));
-    notify.canhBao(`Đã mở lại QC ${viDate(ngay)} · xưởng ${xuong}`);
+    notify.canhBao(`Đã mở lại QC ${viDate(date)} · xưởng ${workshop}`);
   };
 
   return (
@@ -207,12 +207,12 @@ export default function QcChecklistScreen() {
 
       {/* Bộ lọc: ngày + xưởng */}
       <div className="grid gap-5 rounded-xl border-2 border-border p-4 sm:grid-cols-2">
-        <DateField label="Ngày kiểm" value={ngay} onChange={setNgay} anNhanBatBuoc />
+        <DateField label="Ngày kiểm" value={date} onChange={setDate} anNhanBatBuoc />
         <ChoiceGroup
           label="Phân xưởng"
-          value={xuong}
-          onChange={(v) => setXuong(v as Workshop)}
-          options={XUONG_OPT}
+          value={workshop}
+          onChange={(v) => setWorkshop(v as Workshop)}
+          options={WORKSHOP_OPTIONS}
           cot={3}
           anNhanBatBuoc
         />
@@ -222,9 +222,9 @@ export default function QcChecklistScreen() {
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border-2 border-border p-4">
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-base font-semibold">
-            {viDate(ngay)} · xưởng {xuong}
+            {viDate(date)} · xưởng {workshop}
           </span>
-          {dangKhoa ? (
+          {isLocked ? (
             <Nhan loai="xong" icon={Lock}>
               Đã chốt
             </Nhan>
@@ -233,19 +233,19 @@ export default function QcChecklistScreen() {
           )}
           {daCham.length > 0 && (
             <span className="text-base text-muted-foreground">
-              Đã chấm {daCham.length}/{dongs.length} · Đạt {soDat}
-              {soKhongDat > 0 && ` · Không đạt ${soKhongDat}`}
+              Đã chấm {daCham.length}/{dongs.length} · Đạt {passCount}
+              {failCount > 0 && ` · Không đạt ${failCount}`}
             </span>
           )}
         </div>
-        {dangKhoa ? (
+        {isLocked ? (
           <Button
-            title="Mở khóa lại ngày QC đã chốt để sửa hoặc chấm bù." variant="outline" size="lg" onClick={moLai}>
+            title="Mở khóa lại ngày QC đã chốt để sửa hoặc chấm bù." variant="outline" size="lg" onClick={reopen}>
             Mở lại ngày
           </Button>
         ) : (
           <Button
-            title="Khóa sổ QC ngày này. Sau khi chốt muốn sửa phải mở lại ngày." variant="outline" size="lg" onClick={chotNgay}>
+            title="Khóa sổ QC ngày này. Sau khi chốt muốn sửa phải mở lại ngày." variant="outline" size="lg" onClick={lockDay}>
             <Lock aria-hidden />
             Chốt ngày
           </Button>
@@ -255,12 +255,12 @@ export default function QcChecklistScreen() {
       {/* Xu hướng 30 ngày — số chỉ tiêu đạt / tạm / không đạt mỗi ngày */}
       {coQc30 && (
         <section className="space-y-3 rounded-xl border-2 border-border p-4">
-          <h2 className="text-lg font-semibold text-foreground">30 ngày gần đây · xưởng {xuong}</h2>
+          <h2 className="text-lg font-semibold text-foreground">30 ngày gần đây · xưởng {workshop}</h2>
           <BieuDoTheoNgay
             nhan={qc30.map((x) => `${x.ngay.slice(8, 10)}/${x.ngay.slice(5, 7)}`)}
             donVi="chỉ tiêu"
             cao={220}
-            moTa={`Số chỉ tiêu QC đạt, tạm, không đạt mỗi ngày — xưởng ${xuong}`}
+            moTa={`Số chỉ tiêu QC đạt, tạm, không đạt mỗi ngày — xưởng ${workshop}`}
             chuoi={[
               { khoa: "dat", ten: "Đạt", mau: "la", dang: "cot", giaTri: qc30.map((x) => x.dat) },
               { khoa: "tam", ten: "Tạm (cần khắc phục)", mau: "cat", dang: "cot", giaTri: qc30.map((x) => x.tam) },
@@ -271,19 +271,19 @@ export default function QcChecklistScreen() {
       )}
 
       {/* Ghi bù: ngày cũ hoặc ngày đã chốt → bắt lý do */}
-      {ghiBu && (
+      {isBackdate && (
         <Field
           label="Lý do ghi bù"
           required
           hint={
-            dangKhoa
+            isLocked
               ? "Ngày này đã chốt — sửa phải ghi rõ lý do."
               : "Đang ghi cho ngày trước hôm nay — ghi rõ lý do."
           }
         >
           <Input
-            value={lyDoGhiBu}
-            onChange={(e) => setLyDoGhiBu(e.target.value)}
+            value={backdateReason}
+            onChange={(e) => setBackdateReason(e.target.value)}
             placeholder="VD: bổ sung chỉ tiêu sót, sửa kết quả sau khi kiểm lại…"
           />
         </Field>
@@ -300,7 +300,7 @@ export default function QcChecklistScreen() {
               <ChoiceGroup
                 label="Kết quả"
                 value={d.result}
-                onChange={(v) => doiDong(i, { result: v as QcResult })}
+                onChange={(v) => updateRow(i, { result: v as QcResult })}
                 options={KET_QUA_OPT}
                 cot={3}
                 anNhanBatBuoc
@@ -310,22 +310,22 @@ export default function QcChecklistScreen() {
                   label="Điểm (tùy chọn)"
                   unit="điểm"
                   value={d.score}
-                  onChange={(v) => doiDong(i, { score: v })}
+                  onChange={(v) => updateRow(i, { score: v })}
                   anNhanBatBuoc
                 />
                 <Field label="Ghi chú">
                   <Input
                     value={d.note}
-                    onChange={(e) => doiDong(i, { note: e.target.value })}
+                    onChange={(e) => updateRow(i, { note: e.target.value })}
                     placeholder="Mô tả khi cần khắc phục / không đạt…"
                   />
                 </Field>
               </div>
               {coLuuAnh && (
-                <AnhChiTieu
+                <CriterionPhoto
                   paths={d.photoPaths}
-                  onChange={(p) => doiDong(i, { photoPaths: p })}
-                  khoa={dangKhoa}
+                  onChange={(p) => updateRow(i, { photoPaths: p })}
+                  khoa={isLocked}
                 />
               )}
             </div>
@@ -337,19 +337,19 @@ export default function QcChecklistScreen() {
       <div className="flex flex-wrap items-end gap-3 rounded-xl border-2 border-dashed border-border p-4">
         <Field label="Thêm chỉ tiêu khác" className="min-w-[min(15rem,100%)] flex-1">
           <Input
-            value={themTen}
-            onChange={(e) => setThemTen(e.target.value)}
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
                 e.preventDefault();
-                themChiTieu();
+                addCriterion();
               }
             }}
             placeholder="VD: Kiểm tra kim loại"
           />
         </Field>
         <Button
-          title="Thêm một chỉ tiêu chấm điểm nữa vào bảng kiểm của ngày." variant="outline" size="lg" onClick={themChiTieu}>
+          title="Thêm một chỉ tiêu chấm điểm nữa vào bảng kiểm của ngày." variant="outline" size="lg" onClick={addCriterion}>
           <Plus aria-hidden />
           Thêm chỉ tiêu
         </Button>
@@ -358,7 +358,7 @@ export default function QcChecklistScreen() {
       {/* Lưu — không bao giờ disabled (thiếu thì báo qua toast) */}
       <div className="flex justify-end">
         <Button
-          title="Ghi điểm của toàn bộ chỉ tiêu vào sổ QC ngày đang chọn." size="lg" onClick={luu}>
+          title="Ghi điểm của toàn bộ chỉ tiêu vào sổ QC ngày đang chọn." size="lg" onClick={save}>
           Lưu chấm điểm
         </Button>
       </div>
@@ -408,7 +408,7 @@ function AnhThumb({ path, onXoa }: { path: string; onXoa?: () => void }) {
 }
 
 /** Khối ảnh của một chỉ tiêu: các thumbnail + nút "Chụp / chọn ảnh" (ẩn khi đã chốt). */
-function AnhChiTieu({
+function CriterionPhoto({
   paths,
   onChange,
   khoa,
@@ -417,22 +417,22 @@ function AnhChiTieu({
   onChange: (paths: string[]) => void;
   khoa: boolean;
 }) {
-  const [dangTai, setDangTai] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const chon = async (files: FileList | null) => {
+  const pickFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
-    setDangTai(true);
-    const them: string[] = [];
+    setIsLoading(true);
+    const toAdd: string[] = [];
     for (const f of Array.from(files)) {
       const p = await taiAnhLen(f);
-      if (p) them.push(p);
+      if (p) toAdd.push(p);
     }
-    setDangTai(false);
+    setIsLoading(false);
     if (inputRef.current) inputRef.current.value = "";
-    if (them.length) {
-      onChange([...paths, ...them]);
-      notify.daLuu(`Đã tải ${them.length} ảnh`);
+    if (toAdd.length) {
+      onChange([...paths, ...toAdd]);
+      notify.daLuu(`Đã tải ${toAdd.length} ảnh`);
     } else {
       notify.canhBao("Không tải được ảnh — thử lại");
     }
@@ -470,17 +470,17 @@ function AnhChiTieu({
             capture="environment"
             multiple
             hidden
-            onChange={(e) => chon(e.target.files)}
+            onChange={(e) => pickFiles(e.target.files)}
           />
           <Button
             title="Chọn ảnh minh chứng cho chỉ tiêu này (ảnh lưu trên máy chủ, xem lại được sau)."
             variant="outline"
             size="sm"
             onClick={() => inputRef.current?.click()}
-            disabled={dangTai}
+            disabled={isLoading}
           >
             <Camera aria-hidden />
-            {dangTai ? "Đang tải ảnh…" : "Chụp / chọn ảnh"}
+            {isLoading ? "Đang tải ảnh…" : "Chụp / chọn ảnh"}
           </Button>
         </>
       )}

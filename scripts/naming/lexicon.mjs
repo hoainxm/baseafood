@@ -21,6 +21,10 @@ export const STRONG_SYLLABLES = new Set(
   hoan tac xac thong huong dan khoi tao thiet lap cai hop sai chua roi
   vua giam tang uoc luong mot hai bon muoi nghin trieu gom tach gan
   thoat vao quay chay tat lam duyet khong duoc dat cuon ghim xem rau khop vien
+  khoa thue xep gui truong thieu goc trong dien chuan chung anh viec cua nghi thu
+  thoai luan kieu trung chinh nen chenh khau bieu cung nguong cau cach ke gop
+  sach thuc khac phien hieu giu huy chuoi khoang chieu phe vuot duong phep sinh
+  toa tham gon nhanh cham lech
   `
     .split(/\s+/)
     .filter(Boolean)
@@ -38,6 +42,7 @@ export const AMBIGUOUS_SYLLABLES = new Set(
   an do go the con tin hop me bo sang lay ten ma le mat ban
   dong tam chu co da di ra ve len lo so nam hang cao gap ly mai qua bay
   ho tu mo bot dau lai bang bien doi loi goi ky ta de nhom bao ca du cat lap
+  pm dl va dem lua che van moc
   `
     .split(/\s+/)
     .filter(Boolean)
@@ -45,7 +50,7 @@ export const AMBIGUOUS_SYLLABLES = new Set(
 for (const s of AMBIGUOUS_SYLLABLES) STRONG_SYLLABLES.delete(s);
 
 /** Vietnamese abbreviations the spec says to translate (`nl` → material, `hddt` → einvoice…). */
-for (const s of ["nl", "tp", "btp", "hddt", "sx", "bc", "ncc"]) STRONG_SYLLABLES.add(s);
+for (const s of ["nl", "tp", "btp", "hddt", "hd", "sx", "bc", "ncc", "kq", "ds", "mst", "mh"]) STRONG_SYLLABLES.add(s);
 
 /** Business acronyms allowed as identifier words (spec §2). */
 export const ALLOWED_ACRONYMS = new Set(["nxt", "wip", "qc", "qr", "sscc", "bsf", "bsf1"]);

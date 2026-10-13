@@ -31,6 +31,11 @@ describe("isVietnamese — tên Việt phải bị bắt", () => {
     "nxt-nl", // nxt được phép, nl phải dịch
     "doiSoatHddt",
     "hien-len",
+    "kqDoiSoat", // âm tiết bổ sung 2026-10-13
+    "thueRaw",
+    "sapXep",
+    "NghiVan",
+    "kyHieuChuan",
   ])("%s", (n) => expect(isVietnamese(n)).toBe(true));
 });
 
@@ -53,6 +58,9 @@ describe("isVietnamese — tên tiếng Anh không được bắt nhầm", () =>
     "SummaryTable",
     "banner",
     "dongle",
+    "mockData", // moc chỉ là âm tiết mơ hồ
+    "strongTone",
+    "luaScript",
   ])("%s", (n) => expect(isVietnamese(n)).toBe(false));
 });
 

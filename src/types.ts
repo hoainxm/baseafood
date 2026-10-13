@@ -48,7 +48,7 @@ export const ROLES: { value: Role; label: string }[] = [
  * cột roles ⇒ chuẩn hoá lúc ĐỌC để hiện đúng nhãn + chạy đúng phân quyền. Ghi
  * lại (rolesToCsv) luôn ra slug chuẩn nên dữ liệu tự lành dần khi admin lưu lại.
  */
-const VAI_TRO_CU_CHUAN: Record<string, Role> = {
+const LEGACY_ROLE_MAP: Record<string, Role> = {
   "giam-doc": "director",
   "pho-giam-doc": "vice-director",
   "quan-doc-dong": "manager-dong",
@@ -66,7 +66,7 @@ const VAI_TRO_CU_CHUAN: Record<string, Role> = {
 /** Chuẩn hoá một slug vai trò: slug cũ → chuẩn; slug đã chuẩn giữ nguyên. */
 export function chuanHoaVaiTro(v: string): Role {
   const t = v.trim();
-  return (VAI_TRO_CU_CHUAN[t] ?? t) as Role;
+  return (LEGACY_ROLE_MAP[t] ?? t) as Role;
 }
 
 export function rolesFromCsv(csv: string): Role[] {

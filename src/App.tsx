@@ -30,28 +30,28 @@ import { LA_DEMO, datCheDo } from "@/lib/cheDo";
 import { DaiDemo, NapGoiDemo } from "@/features/shared/CheDoDemo";
 
 // Tổng quan — dòng chảy số liệu
-const ManTongQuan = lazy(() => import("@/features/dashboard/DashboardScreen"));
+const DashboardScreen = lazy(() => import("@/features/dashboard/DashboardScreen"));
 
 // Màn nghiệp vụ gốc
-const NhapNguyenLieuScreen = lazy(() => import("@/features/imports"));
-const BanHangScreen = lazy(() => import("@/features/sales"));
-const KhoDuTruScreen = lazy(() => import("@/features/warehouse"));
-const BaoCaoNhapXuatTonScreen = lazy(() => import("@/features/reports/NxtReportScreen"));
-const TonKhoNguyenLieuScreen = lazy(() => import("@/features/reports/MaterialNxtScreen"));
-const BaoCaoXuatNhapTonKhoScreen = lazy(() => import("@/features/reports/WarehouseNxtScreen"));
-const SoKhoThangScreen = lazy(() => import("@/features/monthly-stock")); // Sổ kho theo tháng, route /ton-kho-thang
-const BaoCaoThanhPhamScreen = lazy(() => import("@/features/reports/DailyProductionReport"));
-const BaoCaoDonXuatScreen = lazy(() => import("@/features/reports/OrderExportReport"));
-const DonDatScreen = lazy(() => import("@/features/orders"));
+const MaterialImportScreen = lazy(() => import("@/features/imports"));
+const SalesScreen = lazy(() => import("@/features/sales"));
+const ReserveWarehouseScreen = lazy(() => import("@/features/warehouse"));
+const InOutStockReportScreen = lazy(() => import("@/features/reports/NxtReportScreen"));
+const MaterialStockScreen = lazy(() => import("@/features/reports/MaterialNxtScreen"));
+const WarehouseNxtReportScreen = lazy(() => import("@/features/reports/WarehouseNxtScreen"));
+const MonthlyStockLedgerScreen = lazy(() => import("@/features/monthly-stock")); // Sổ kho theo tháng, route /ton-kho-thang
+const FinishedGoodReportScreen = lazy(() => import("@/features/reports/DailyProductionReport"));
+const OrderExportReportScreen = lazy(() => import("@/features/reports/OrderExportReport"));
+const SalesOrderScreen = lazy(() => import("@/features/orders"));
 const CanDoiScreen = lazy(() => import("@/features/balancing"));
-const DanhMucScreen = lazy(() => import("@/features/catalog"));
-const QuanLyNguoiDungScreen = lazy(() => import("@/features/users"));
-const NhatKyScreen = lazy(() => import("@/features/audit"));
-const SanXuatBTPScreen = lazy(() => import("@/features/production")); // Sản xuất BTP (WIP), route /wip
-const DongGoiScreen = lazy(() => import("@/features/packaging")); // Đóng gói BTP → TP, route /packaging
-const KiemTraQcScreen = lazy(() => import("@/features/quality-check")); // QC checklist chấm điểm, route /qc
-const QuetLoScreen = lazy(() => import("@/features/qr")); // Quét/tra lô theo QR, route /qr
-const DoiSoatScreen = lazy(() => import("@/features/doi-soat")); // Đối soát HĐĐT ⇄ phần mềm kế toán, route /doi-soat
+const CatalogScreen = lazy(() => import("@/features/catalog"));
+const UserManagementScreen = lazy(() => import("@/features/users"));
+const AuditLogScreen = lazy(() => import("@/features/audit"));
+const WipProductionScreen = lazy(() => import("@/features/production")); // Sản xuất BTP (WIP), route /wip
+const PackagingScreen = lazy(() => import("@/features/packaging")); // Đóng gói BTP → TP, route /packaging
+const QcChecklistScreen = lazy(() => import("@/features/quality-check")); // QC checklist chấm điểm, route /qc
+const LotScanScreen = lazy(() => import("@/features/qr")); // Quét/tra lô theo QR, route /qr
+const ReconciliationScreen = lazy(() => import("@/features/doi-soat")); // Đối soát HĐĐT ⇄ phần mềm kế toán, route /doi-soat
 const KitPage = lazy(() => import("@/design-system/kit/KitPage"));
 
 /**
@@ -72,10 +72,10 @@ function ShellLayout() {
 
   // Chế độ demo CHỈ admin bật. Cờ nằm theo máy (localStorage) ⇒ người khác đăng nhập
   // trên máy đó thì tự tắt, về số thật (không ai thấy số demo mà tưởng số xưởng).
-  const khongDuocDemo = LA_DEMO && auth.canDangNhap && !!auth.nguoiDung && !auth.laAdmin;
+  const isDemoDenied = LA_DEMO && auth.canDangNhap && !!auth.nguoiDung && !auth.laAdmin;
   useEffect(() => {
-    if (khongDuocDemo) datCheDo(false);
-  }, [khongDuocDemo]);
+    if (isDemoDenied) datCheDo(false);
+  }, [isDemoDenied]);
 
   // Ai đang thao tác — cho nhật ký (audit) gắn đúng người.
   useEffect(() => {
@@ -170,7 +170,7 @@ export default function App() {
             <Route path="/" element={<Navigate to={`/${homeFor(roles)}`} replace />} />
 
             {/* MES */}
-            <Route path="/dashboard" element={<ManTongQuan />} />
+            <Route path="/dashboard" element={<DashboardScreen />} />
             {/* 5 màn DEMO dữ liệu mẫu đã GỠ (2026-10-12, spec che-do-demo) — link cũ
                 chuyển sang màn THẬT tương ứng. Trình diễn ⇒ chế độ demo, không màn mẫu. */}
             <Route path="/production" element={<Navigate to="/wip" replace />} />
@@ -180,24 +180,24 @@ export default function App() {
             <Route path="/traceability" element={<Navigate to="/qr" replace />} />
 
             {/* Nghiệp vụ gốc */}
-            <Route path="/imports" element={<NhapNguyenLieuScreen />} />
-            <Route path="/sales" element={<BanHangScreen />} />
-            <Route path="/warehouse" element={<KhoDuTruScreen />} />
-            <Route path="/nxt" element={<BaoCaoNhapXuatTonScreen />} />
-            <Route path="/nxt-nl" element={<TonKhoNguyenLieuScreen />} />
-            <Route path="/nxt-kho" element={<BaoCaoXuatNhapTonKhoScreen />} />
-            <Route path="/ton-kho-thang" element={<SoKhoThangScreen />} />
-            <Route path="/bc-thanh-pham" element={<BaoCaoThanhPhamScreen />} />
-            <Route path="/bc-don-xuat" element={<BaoCaoDonXuatScreen />} />
-            <Route path="/orders" element={<DonDatScreen />} />
+            <Route path="/imports" element={<MaterialImportScreen />} />
+            <Route path="/sales" element={<SalesScreen />} />
+            <Route path="/warehouse" element={<ReserveWarehouseScreen />} />
+            <Route path="/nxt" element={<InOutStockReportScreen />} />
+            <Route path="/nxt-nl" element={<MaterialStockScreen />} />
+            <Route path="/nxt-kho" element={<WarehouseNxtReportScreen />} />
+            <Route path="/ton-kho-thang" element={<MonthlyStockLedgerScreen />} />
+            <Route path="/bc-thanh-pham" element={<FinishedGoodReportScreen />} />
+            <Route path="/bc-don-xuat" element={<OrderExportReportScreen />} />
+            <Route path="/orders" element={<SalesOrderScreen />} />
             <Route path="/balancing" element={<CanDoiScreen />} />
             <Route path="/balancing/:periodId" element={<CanDoiScreen />} />
-            <Route path="/catalog" element={<DanhMucScreen />} />
-            <Route path="/wip" element={<SanXuatBTPScreen />} />
-            <Route path="/packaging" element={<DongGoiScreen />} />
-            <Route path="/qc" element={<KiemTraQcScreen />} />
-            <Route path="/qr" element={<QuetLoScreen />} />
-            <Route path="/doi-soat" element={<DoiSoatScreen />} />
+            <Route path="/catalog" element={<CatalogScreen />} />
+            <Route path="/wip" element={<WipProductionScreen />} />
+            <Route path="/packaging" element={<PackagingScreen />} />
+            <Route path="/qc" element={<QcChecklistScreen />} />
+            <Route path="/qr" element={<LotScanScreen />} />
+            <Route path="/doi-soat" element={<ReconciliationScreen />} />
             <Route
               path="/users"
               element={
@@ -210,7 +210,7 @@ export default function App() {
                     moTa="Người dùng và vai trò là tài khoản thật, không thuộc bộ demo. Thoát demo (nút trên dải vàng) để quản lý người dùng."
                   />
                 ) : auth.laAdmin ? (
-                  <QuanLyNguoiDungScreen taoTaiKhoan={auth.taoTaiKhoan} />
+                  <UserManagementScreen taoTaiKhoan={auth.taoTaiKhoan} />
                 ) : (
                   <Navigate to="/dashboard" replace />
                 )
@@ -219,7 +219,7 @@ export default function App() {
             <Route
               path="/audit"
               element={
-                auth.laAdmin ? <NhatKyScreen /> : <Navigate to="/dashboard" replace />
+                auth.laAdmin ? <AuditLogScreen /> : <Navigate to="/dashboard" replace />
               }
             />
             <Route path="/kit" element={<KitPage />} />

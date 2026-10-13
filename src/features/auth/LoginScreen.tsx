@@ -22,14 +22,14 @@ export default function DangNhap({
   const [username, setUsername] = useState("");
   const [matKhau, setMatKhau] = useState("");
   const [loi, setLoi] = useState<string | null>(null);
-  const [dangGui, setDangGui] = useState(false);
+  const [isSending, setIsSending] = useState(false);
 
   const gui = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoi(null);
-    setDangGui(true);
+    setIsSending(true);
     const kq = await dangNhap(username, matKhau);
-    setDangGui(false);
+    setIsSending(false);
     if (!kq.ok) setLoi(kq.loi ?? "Đăng nhập thất bại");
   };
 
@@ -77,9 +77,9 @@ export default function DangNhap({
           </Field>
 
           <Button
-            title="Đăng nhập bằng tên tài khoản và mật khẩu vừa nhập." type="submit" size="lg" className="w-full" disabled={dangGui}>
+            title="Đăng nhập bằng tên tài khoản và mật khẩu vừa nhập." type="submit" size="lg" className="w-full" disabled={isSending}>
             <LogIn />
-            {dangGui ? "Đang đăng nhập…" : "Đăng nhập"}
+            {isSending ? "Đang đăng nhập…" : "Đăng nhập"}
           </Button>
         </form>
       </Card>

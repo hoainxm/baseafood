@@ -76,10 +76,10 @@ import {
   X,
 } from "lucide-react";
 
-const PHAN_XUONG: Workshop[] = ["Đông", "Cá", "Khô"];
+const WORKSHOPS: Workshop[] = ["Đông", "Cá", "Khô"];
 
 /** Đầu phiếu bán đang nhập — dùng chung cho mọi dòng mặt hàng của phiếu. */
-interface DauPhieu {
+interface InvoiceHeader {
   deliveryDate: string;
   postingDate: string;
   backdateReason: string;
@@ -90,7 +90,7 @@ interface DauPhieu {
 }
 
 /** Một dòng mặt hàng đang nhập trong phiếu. */
-interface DongMoi {
+interface NewRow {
   productId: string;
   spec: string;
   quantityKg: number;
@@ -98,7 +98,7 @@ interface DongMoi {
   nguon: string; // KHO_BAN_LE (block thô) | KHO_TP (đóng gói)
 }
 
-const DONG_MOI_RONG: DongMoi = {
+const EMPTY_NEW_ROW: NewRow = {
   productId: "",
   spec: "",
   quantityKg: 0,
@@ -107,7 +107,7 @@ const DONG_MOI_RONG: DongMoi = {
 };
 
 /** Một phiếu bán hiện trên sổ, gom từ các dòng của nó. */
-interface NhomPhieu {
+interface InvoiceGroup {
   phieu: SalesInvoice;
   dong: SalesItem[];
   tongKg: number;
@@ -115,9 +115,9 @@ interface NhomPhieu {
   ghiBu: boolean;
 }
 
-function gomPhieu(rows: SalesItem[], phieu: SalesInvoice[]): NhomPhieu[] {
-  const theoId = new Map(phieu.map((p) => [p.id, p]));
-  const nhoms = new Map<string, NhomPhieu>();
+function groupByInvoice(rows: SalesItem[], salesInvoices: SalesInvoice[]): InvoiceGroup[] {
+  const theoId = new Map(salesInvoices.map((p) => [p.id, p]));
+  const nhoms = new Map<string, InvoiceGroup>();
 
   for (const r of rows) {
     const p = theoId.get(r.invoiceId);
@@ -146,7 +146,7 @@ function gomPhieu(rows: SalesItem[], phieu: SalesInvoice[]): NhomPhieu[] {
 }
 
 /** Kiểm đầu phiếu — dùng chung lúc ghi mới và lúc sửa. */
-function loiDauPhieu(d: DauPhieu): LoiNhap[] {
+function invoiceHeaderErrors(d: InvoiceHeader): LoiNhap[] {
   const ls: LoiNhap[] = [];
   if (d.postingDate < d.deliveryDate)
     ls.push({
@@ -163,168 +163,168 @@ function loiDauPhieu(d: DauPhieu): LoiNhap[] {
 
 export default function BanHangScreen() {
   const [rows, persist] = useSalesItems();
-  const [phieu, persistPhieu, { trangThai }] = useSalesInvoices();
+  const [salesInvoices, persistSalesInvoices, { trangThai }] = useSalesInvoices();
 
   /* Tồn khả dụng để bán: trừ SUY từ chính các dòng bán (theo marker nguồn).
    * - Block thô (KHO_BAN_LE) trừ tồn BTP; đóng gói (KHO_TP) trừ tồn TP.
    * - Handoff Đơn đặt ("Lưu trữ") đã trừ qua lệnh xuất → không đưa vào đây. */
-  const [sanXuat] = useWipProductions();
-  const [dongLenh] = useExportItems();
+  const [wips] = useWipProductions();
+  const [exportItems] = useExportItems();
   const [packagings] = usePackagings();
   const [lotInputs] = useLotInputs();
   const [lotDispatches] = useLotDispatches();
   // Truy xuất lô (đợt 2b): dòng bán lẻ ghi lấy từ lô nào ⇒ hộ chiếu lô thấy được khách,
   // sổ tồn trừ đúng lô đó. Block thô ⇒ lô BTP (W) · đóng gói ⇒ lô TP (P).
-  const [ganLoBan, setGanLoBan] = useState<SalesItem | null>(null);
-  const loaiLoBan = (r: SalesItem) => (r.sourceWarehouse === KHO_TP ? "P" : r.sourceWarehouse === KHO_BAN_LE ? "W" : null);
-  const soLoBan = (id: string) => lotDispatches.filter((d) => d.docKind === "sales_item" && d.docId === id).length;
-  const nutGanLo = (r: SalesItem) =>
-    loaiLoBan(r) ? (
+  const [lotSalesItem, setLotSalesItem] = useState<SalesItem | null>(null);
+  const saleLotKind = (r: SalesItem) => (r.sourceWarehouse === KHO_TP ? "P" : r.sourceWarehouse === KHO_BAN_LE ? "W" : null);
+  const countSalesLots = (id: string) => lotDispatches.filter((d) => d.docKind === "sales_item" && d.docId === id).length;
+  const lotInputButton = (r: SalesItem) =>
+    saleLotKind(r) ? (
       <Button
-        title={`Ghi dòng bán này lấy từ ${loaiLoBan(r) === "P" ? "lô thành phẩm" : "lô bán thành phẩm"} nào (quét tem thùng, gõ mã, hoặc chọn lô còn tồn). Có lô thì thu hồi mới tới được khách.`}
-        variant={soLoBan(r.id) ? "outline" : "default"}
+        title={`Ghi dòng bán này lấy từ ${saleLotKind(r) === "P" ? "lô thành phẩm" : "lô bán thành phẩm"} nào (quét tem thùng, gõ mã, hoặc chọn lô còn tồn). Có lô thì thu hồi mới tới được khách.`}
+        variant={countSalesLots(r.id) ? "outline" : "default"}
         size="sm"
-        onClick={() => setGanLoBan(r)}
+        onClick={() => setLotSalesItem(r)}
       >
         <Link2 />
-        {soLoBan(r.id) ? `Lô (${soLoBan(r.id)})` : "Gắn lô"}
+        {countSalesLots(r.id) ? `Lô (${countSalesLots(r.id)})` : "Gắn lô"}
       </Button>
     ) : null;
-  const truBTP = useMemo(
+  const wipDeductions = useMemo(
     () => truTonBTP(rows, packagings, lotInputs, lotDispatches),
     [rows, packagings, lotInputs, lotDispatches]
   );
-  const tonBTP = useMemo(
-    () => tinhTon(sanXuat, dongLenh, truBTP),
-    [sanXuat, dongLenh, truBTP]
+  const wipStock = useMemo(
+    () => tinhTon(wips, exportItems, wipDeductions),
+    [wips, exportItems, wipDeductions]
   );
-  const tonTP = useMemo(
+  const finishedGoodStock = useMemo(
     () => tinhTonTP(packagings, locBanLe(rows, KHO_TP)),
     [packagings, rows]
   );
-  const dangTai = trangThai === "dang-tai" && phieu.length === 0;
-  const [matHang, setMatHang] = useProducts();
-  const [khach, setKhach] = useCustomers();
+  const isLoading = trangThai === "dang-tai" && salesInvoices.length === 0;
+  const [products, setProducts] = useProducts();
+  const [customers, setCustomers] = useCustomers();
 
   // Kỳ xem sổ: ngày/tuần/tháng/năm/khoảng tự chọn
   const [ky, setKy] = useState<KyXem>("ngay");
-  const [ngay, setNgay] = useState(todayISO());
-  const [tuNgay, setTuNgay] = useState(todayISO());
-  const [denNgay, setDenNgay] = useState(todayISO());
-  const [phanXuong, setPhanXuong] = useState<Workshop | "Tất cả">("Đông");
+  const [date, setDate] = useState(todayISO());
+  const [fromDate, setFromDate] = useState(todayISO());
+  const [toDate, setToDate] = useState(todayISO());
+  const [workshop, setWorkshop] = useState<Workshop | "Tất cả">("Đông");
 
   /* Phiên ghi phiếu: đầu phiếu + đổ từng dòng mặt hàng. */
-  const [phien, setPhien] = useState<DauPhieu | null>(null);
-  const [phieuIdPhien, setPhieuIdPhien] = useState<string | null>(null);
-  const [suaRowIds, setSuaRowIds] = useState<string[] | null>(null);
-  const [dongMoi, setDongMoi] = useState<DongMoi>(DONG_MOI_RONG);
-  const kdDongMoi = dongMoi.productId
-    ? dongMoi.nguon === KHO_TP
-      ? khaDungTP(tonTP, dongMoi.productId, dongMoi.spec.trim())
-      : khaDung(tonBTP, dongMoi.productId, dongMoi.spec.trim())
+  const [phien, setPhien] = useState<InvoiceHeader | null>(null);
+  const [sessionInvoiceId, setSessionInvoiceId] = useState<string | null>(null);
+  const [editRowIds, setEditRowIds] = useState<string[] | null>(null);
+  const [newRows, setNewRows] = useState<NewRow>(EMPTY_NEW_ROW);
+  const newRowAvailable = newRows.productId
+    ? newRows.nguon === KHO_TP
+      ? khaDungTP(finishedGoodStock, newRows.productId, newRows.spec.trim())
+      : khaDung(wipStock, newRows.productId, newRows.spec.trim())
     : null;
-  const banVuotTon = kdDongMoi != null && dongMoi.quantityKg > kdDongMoi;
+  const isOversold = newRowAvailable != null && newRows.quantityKg > newRowAvailable;
   /** Kênh bán dùng gần nhất trong phiên — làm mặc định cho phiếu mới thay vì
    *  luôn về "Xuất khẩu" (người bán Nội địa khỏi lật kênh mỗi phiếu). */
-  const [kenhGanNhat, setKenhGanNhat] = useState<SalesChannel>("Xuất khẩu");
+  const [lastChannel, setLastChannel] = useState<SalesChannel>("Xuất khẩu");
   const [loiPhien, setLoiPhien] = useState<LoiNhap[]>([]);
 
   /* Sửa MỘT dòng mặt hàng — chỉ mặt hàng / quy cách / kg / giá. */
-  const [dang, setDang] = useState<SalesItem | null>(null);
+  const [editing, setEditing] = useState<SalesItem | null>(null);
   const [loi, setLoi] = useState<LoiNhap[]>([]);
 
-  const [tuHieuLuc, denHieuLuc] = phamViKy(ky, ngay, tuNgay, denNgay);
-  const laMotNgay = tuHieuLuc === denHieuLuc;
+  const [tuHieuLuc, denHieuLuc] = phamViKy(ky, date, fromDate, toDate);
+  const isSingleDay = tuHieuLuc === denHieuLuc;
 
-  const tenMatHang = (id: string) =>
-    matHang.find((m) => m.id === id)?.name || "—";
-  const tenKhach = (id: string) => khach.find((k) => k.id === id)?.name || "";
+  const productName = (id: string) =>
+    products.find((m) => m.id === id)?.name || "—";
+  const customerName = (id: string) => customers.find((k) => k.id === id)?.name || "";
 
   const view = useMemo(
     () =>
       rows.filter((r) => {
-        const p = phieu.find((x) => x.id === r.invoiceId);
+        const p = salesInvoices.find((x) => x.id === r.invoiceId);
         if (!p) return false;
-        const hopNgay = p.deliveryDate >= tuHieuLuc && p.deliveryDate <= denHieuLuc;
-        const hopXuong = phanXuong === "Tất cả" || p.workshop === phanXuong;
-        return hopNgay && hopXuong;
+        const matchesDate = p.deliveryDate >= tuHieuLuc && p.deliveryDate <= denHieuLuc;
+        const matchesWorkshop = workshop === "Tất cả" || p.workshop === workshop;
+        return matchesDate && matchesWorkshop;
       }),
-    [rows, phieu, tuHieuLuc, denHieuLuc, phanXuong]
+    [rows, salesInvoices, tuHieuLuc, denHieuLuc, workshop]
   );
 
-  const nhomView = useMemo(() => gomPhieu(view, phieu), [view, phieu]);
+  const nhomView = useMemo(() => groupByInvoice(view, salesInvoices), [view, salesInvoices]);
 
-  const moTaPhamVi = laMotNgay
+  const rangeDescription = isSingleDay
     ? viDate(tuHieuLuc)
     : `${viDate(tuHieuLuc)} – ${viDate(denHieuLuc)}`;
 
-  const tong = useMemo(
+  const total = useMemo(
     () => view.reduce((s, r) => s + (r.quantityKg || 0), 0),
     [view]
   );
-  const tongTien = useMemo(
+  const totalAmount = useMemo(
     () => view.reduce((s, r) => s + calculateSalesAmount(r), 0),
     [view]
   );
 
-  const ngayGhi = laMotNgay ? tuHieuLuc : denHieuLuc;
-  const xuongGhi: Workshop = phanXuong === "Tất cả" ? "Đông" : phanXuong;
+  const postingDate = isSingleDay ? tuHieuLuc : denHieuLuc;
+  const recordWorkshop: Workshop = workshop === "Tất cả" ? "Đông" : workshop;
 
   /* ---- Danh mục: chọn sẵn, thiếu thì tạo ngay tại chỗ ---- */
 
-  const optMatHang: MucChon[] = matHang.map((m) => ({
+  const productOptions: MucChon[] = products.map((m) => ({
     value: m.id,
     label: m.code ? `${m.code} · ${m.name}` : m.name,
     phu: m.code || undefined,
   }));
-  const optKhach: MucChon[] = khach.map((k) => ({
+  const customerOptions: MucChon[] = customers.map((k) => ({
     value: k.id,
     label: k.code ? `${k.code} · ${k.name}` : k.name,
     phu: [k.code, k.market].map((s) => s?.trim()).filter(Boolean).join(" – ") || undefined,
   }));
 
   /** Sửa nhanh khách hàng / mặt hàng tại chỗ (cả hai nối theo id ở phiếu bán). */
-  const suaKH = useSuaDanhMuc("khachHang", khach, setKhach);
-  const suaMH = useSuaDanhMuc("matHang", matHang, setMatHang);
+  const customerEditor = useSuaDanhMuc("khachHang", customers, setCustomers);
+  const productEditor = useSuaDanhMuc("matHang", products, setProducts);
 
   // Nhãn có mã số ("12 · tên") nên ô chọn không tự nhận ra tên trùng ⇒ tự dò,
   // trùng tên (không phân hoa thường) thì dùng lại bản có sẵn.
-  const themMatHang = (ten: string) => {
-    const co = matHang.find((m) => m.name.trim().toLowerCase() === ten.trim().toLowerCase());
+  const addProduct = (ten: string) => {
+    const co = products.find((m) => m.name.trim().toLowerCase() === ten.trim().toLowerCase());
     if (co) return co.id;
     const m: Product = { id: uid(), code: "", name: ten, finishedGoodCode: "" };
-    setMatHang([...matHang, m]);
+    setProducts([...products, m]);
     notify.daLuu(`Đã thêm mặt hàng "${ten}" vào danh mục`);
     return m.id;
   };
-  const themKhach = (ten: string) => {
-    const co = khach.find((k) => k.name.trim().toLowerCase() === ten.trim().toLowerCase());
+  const addCustomer = (ten: string) => {
+    const co = customers.find((k) => k.name.trim().toLowerCase() === ten.trim().toLowerCase());
     if (co) return co.id;
     const k: Customer = { id: uid(), code: "", name: ten, market: "" };
-    setKhach([...khach, k]);
+    setCustomers([...customers, k]);
     notify.daLuu(`Đã thêm khách hàng "${ten}" vào danh mục`);
     return k.id;
   };
 
   /* ---- Ghi phiếu ---- */
 
-  const moThem = () => {
+  const openAdd = () => {
     setPhien({
-      deliveryDate: ngayGhi,
+      deliveryDate: postingDate,
       postingDate: todayISO(),
       backdateReason: "",
-      workshop: xuongGhi,
+      workshop: recordWorkshop,
       customerId: "",
-      channel: kenhGanNhat,
+      channel: lastChannel,
       note: "",
     });
-    setPhieuIdPhien(null);
-    setSuaRowIds(null);
-    setDongMoi(DONG_MOI_RONG);
+    setSessionInvoiceId(null);
+    setEditRowIds(null);
+    setNewRows(EMPTY_NEW_ROW);
     setLoiPhien([]);
   };
 
-  const moSuaPhieu = (n: NhomPhieu) => {
+  const openInvoiceEdit = (n: InvoiceGroup) => {
     setPhien({
       deliveryDate: n.phieu.deliveryDate,
       postingDate: n.phieu.postingDate || n.phieu.deliveryDate,
@@ -334,180 +334,180 @@ export default function BanHangScreen() {
       channel: n.phieu.channel,
       note: n.phieu.note,
     });
-    setPhieuIdPhien(n.phieu.id);
-    setSuaRowIds(n.dong.map((r) => r.id));
-    setDongMoi(DONG_MOI_RONG);
+    setSessionInvoiceId(n.phieu.id);
+    setEditRowIds(n.dong.map((r) => r.id));
+    setNewRows(EMPTY_NEW_ROW);
     setLoiPhien([]);
   };
 
-  const datPhien = <K extends keyof DauPhieu>(k: K, v: DauPhieu[K]) =>
+  const setSessionField = <K extends keyof InvoiceHeader>(k: K, v: InvoiceHeader[K]) =>
     setPhien((p) => (p ? { ...p, [k]: v } : p));
 
   const dongPhien = useMemo(() => {
-    if (suaRowIds) return rows.filter((r) => suaRowIds.includes(r.id));
-    if (phieuIdPhien) return rows.filter((r) => r.invoiceId === phieuIdPhien);
+    if (editRowIds) return rows.filter((r) => editRowIds.includes(r.id));
+    if (sessionInvoiceId) return rows.filter((r) => r.invoiceId === sessionInvoiceId);
     return [];
-  }, [rows, suaRowIds, phieuIdPhien]);
+  }, [rows, editRowIds, sessionInvoiceId]);
 
-  const dangSuaPhieu = suaRowIds !== null;
-  const tongPhien = dongPhien.reduce((s, r) => s + (r.quantityKg || 0), 0);
+  const isEditingInvoice = editRowIds !== null;
+  const sessionTotal = dongPhien.reduce((s, r) => s + (r.quantityKg || 0), 0);
 
-  const setDong = <K extends keyof DongMoi>(k: K, v: DongMoi[K]) =>
-    setDongMoi((d) => ({ ...d, [k]: v }));
+  const setDong = <K extends keyof NewRow>(k: K, v: NewRow[K]) =>
+    setNewRows((d) => ({ ...d, [k]: v }));
 
   /** Thêm một dòng mặt hàng — LƯU NGAY thành một dòng ban_hang. */
-  const themDong = () => {
+  const addRow = () => {
     if (!phien) return;
-    const ls: LoiNhap[] = [...loiDauPhieu(phien)];
-    if (!dongMoi.productId)
+    const ls: LoiNhap[] = [...invoiceHeaderErrors(phien)];
+    if (!newRows.productId)
       ls.push({ truong: "Mặt hàng", thongBao: "Chưa chọn mặt hàng" });
-    if (!(dongMoi.quantityKg > 0))
+    if (!(newRows.quantityKg > 0))
       ls.push({ truong: "Lượng", thongBao: "Phải lớn hơn 0 kg" });
     setLoiPhien(ls);
     if (ls.length > 0) return;
 
-    let idPhieu = phieuIdPhien;
-    if (phieuIdPhien) {
+    let invoiceId = sessionInvoiceId;
+    if (sessionInvoiceId) {
       // Phiếu đang tạo dở hoặc đang sửa → áp đầu phiếu vào bản ghi.
-      persistPhieu(
-        phieu.map((p) =>
-          p.id === phieuIdPhien ? { ...p, ...phien, id: p.id } : p
+      persistSalesInvoices(
+        salesInvoices.map((p) =>
+          p.id === sessionInvoiceId ? { ...p, ...phien, id: p.id } : p
         )
       );
     } else {
       // Phiếu mới: chỉ tạo khi có dòng đầu tiên — không để lại phiếu rỗng.
-      idPhieu = newId();
-      persistPhieu([...phieu, { id: idPhieu, ...phien }]);
-      setPhieuIdPhien(idPhieu);
+      invoiceId = newId();
+      persistSalesInvoices([...salesInvoices, { id: invoiceId, ...phien }]);
+      setSessionInvoiceId(invoiceId);
     }
 
     const dong: SalesItem = {
       id: newId(),
-      invoiceId: idPhieu ?? "",
+      invoiceId: invoiceId ?? "",
       deliveryDate: phien.deliveryDate,
-      productId: dongMoi.productId,
-      spec: dongMoi.spec.trim(),
-      quantityKg: dongMoi.quantityKg,
-      unitPrice: dongMoi.unitPrice,
-      sourceWarehouse: dongMoi.nguon, // KHO_BAN_LE ⇒ trừ tồn BTP; KHO_TP ⇒ trừ tồn TP đóng gói
+      productId: newRows.productId,
+      spec: newRows.spec.trim(),
+      quantityKg: newRows.quantityKg,
+      unitPrice: newRows.unitPrice,
+      sourceWarehouse: newRows.nguon, // KHO_BAN_LE ⇒ trừ tồn BTP; KHO_TP ⇒ trừ tồn TP đóng gói
     };
     // Đồng bộ đầu phiếu cho MỌI dòng của phiếu (khách/ngày/kênh có thể vừa đổi
     // tại chỗ) rồi thêm dòng mới — giữ bất biến "đầu phiếu áp cả phiếu".
-    const thuocPhieu = (r: SalesItem) =>
-      suaRowIds ? suaRowIds.includes(r.id) : r.invoiceId === idPhieu;
+    const belongsToInvoice = (r: SalesItem) =>
+      editRowIds ? editRowIds.includes(r.id) : r.invoiceId === invoiceId;
     persist([
       ...rows.map((r) =>
-        thuocPhieu(r) ? { ...r, deliveryDate: phien.deliveryDate } : r
+        belongsToInvoice(r) ? { ...r, deliveryDate: phien.deliveryDate } : r
       ),
       dong,
     ]);
-    if (suaRowIds) setSuaRowIds([...suaRowIds, dong.id]);
-    notify.daLuu(`Đã vào sổ: ${tenMatHang(dong.productId)} — ${kg(dong.quantityKg)}`);
+    if (editRowIds) setEditRowIds([...editRowIds, dong.id]);
+    notify.daLuu(`Đã vào sổ: ${productName(dong.productId)} — ${kg(dong.quantityKg)}`);
 
     // Nhớ kênh vừa bán để phiếu sau khỏi lật lại.
-    setKenhGanNhat(phien.channel);
+    setLastChannel(phien.channel);
     // Giữ quy cách cho dòng kế (một lô thường cùng size); xóa mặt hàng / kg / giá.
-    setDongMoi((d) => ({ ...DONG_MOI_RONG, spec: d.spec, nguon: d.nguon }));
+    setNewRows((d) => ({ ...EMPTY_NEW_ROW, spec: d.spec, nguon: d.nguon }));
     setLoiPhien([]);
   };
 
-  const boDongPhien = (r: SalesItem) => {
-    const truoc = rows;
-    const truocIds = suaRowIds;
+  const removeSessionRow = (r: SalesItem) => {
+    const prevRows = rows;
+    const prevIds = editRowIds;
     persist(rows.filter((x) => x.id !== r.id));
-    if (suaRowIds) setSuaRowIds(suaRowIds.filter((id) => id !== r.id));
-    notify.daXoa(`Đã bỏ ${tenMatHang(r.productId)} — ${kg(r.quantityKg)}`, () => {
-      persist(truoc);
-      if (truocIds) setSuaRowIds(truocIds);
+    if (editRowIds) setEditRowIds(editRowIds.filter((id) => id !== r.id));
+    notify.daXoa(`Đã bỏ ${productName(r.productId)} — ${kg(r.quantityKg)}`, () => {
+      persist(prevRows);
+      if (prevIds) setEditRowIds(prevIds);
     });
   };
 
   /** Đóng phiếu: bỏ phiếu rỗng, áp đầu phiếu lần cuối, kéo bộ lọc về phiếu vừa ghi. */
-  const dongPhienLai = (mo: "dong" | "phieu-khac") => {
+  const closeSession = (mo: "dong" | "phieu-khac") => {
     const p = phien;
-    if (p && phieuIdPhien && dongPhien.length === 0) {
-      persistPhieu(phieu.filter((x) => x.id !== phieuIdPhien));
+    if (p && sessionInvoiceId && dongPhien.length === 0) {
+      persistSalesInvoices(salesInvoices.filter((x) => x.id !== sessionInvoiceId));
     }
-    if (p && dongPhien.length > 0 && phieuIdPhien) {
-      persistPhieu(
-        phieu.map((x) => (x.id === phieuIdPhien ? { ...x, ...p, id: x.id } : x))
+    if (p && dongPhien.length > 0 && sessionInvoiceId) {
+      persistSalesInvoices(
+        salesInvoices.map((x) => (x.id === sessionInvoiceId ? { ...x, ...p, id: x.id } : x))
       );
       const thuoc = (r: SalesItem) =>
-        suaRowIds ? suaRowIds.includes(r.id) : r.invoiceId === phieuIdPhien;
+        editRowIds ? editRowIds.includes(r.id) : r.invoiceId === sessionInvoiceId;
       persist(rows.map((r) => (thuoc(r) ? { ...r, deliveryDate: p.deliveryDate } : r)));
     }
     if (p && dongPhien.length > 0) {
       if (p.deliveryDate < tuHieuLuc || p.deliveryDate > denHieuLuc) {
         setKy("ngay");
-        setNgay(p.deliveryDate);
+        setDate(p.deliveryDate);
       }
-      if (phanXuong !== "Tất cả" && phanXuong !== p.workshop)
-        setPhanXuong(p.workshop);
+      if (workshop !== "Tất cả" && workshop !== p.workshop)
+        setWorkshop(p.workshop);
     }
 
     if (mo === "dong") {
       setPhien(null);
-      setPhieuIdPhien(null);
-      setSuaRowIds(null);
+      setSessionInvoiceId(null);
+      setEditRowIds(null);
       return;
     }
     // Ghi phiếu khác: giữ ngày + xưởng, làm mới khách.
     setPhien(p ? { ...p, customerId: "", note: "" } : null);
-    setPhieuIdPhien(null);
-    setSuaRowIds(null);
-    setDongMoi(DONG_MOI_RONG);
+    setSessionInvoiceId(null);
+    setEditRowIds(null);
+    setNewRows(EMPTY_NEW_ROW);
     setLoiPhien([]);
   };
 
-  const xoaPhieuDangSua = () => {
-    if (!suaRowIds) return;
-    const truocRows = rows;
-    const truocPhieu = phieu;
-    const ids = new Set(suaRowIds);
+  const deleteEditingInvoice = () => {
+    if (!editRowIds) return;
+    const prevRows = rows;
+    const prevInvoices = salesInvoices;
+    const ids = new Set(editRowIds);
     persist(rows.filter((r) => !ids.has(r.id)));
-    if (phieuIdPhien) persistPhieu(phieu.filter((x) => x.id !== phieuIdPhien));
+    if (sessionInvoiceId) persistSalesInvoices(salesInvoices.filter((x) => x.id !== sessionInvoiceId));
     notify.daXoa(
-      `Đã xóa phiếu ${tenKhach(phien?.customerId ?? "") || "(chưa có khách)"} — ${suaRowIds.length} dòng`,
+      `Đã xóa phiếu ${customerName(phien?.customerId ?? "") || "(chưa có khách)"} — ${editRowIds.length} dòng`,
       () => {
-        persist(truocRows);
-        persistPhieu(truocPhieu);
+        persist(prevRows);
+        persistSalesInvoices(prevInvoices);
       }
     );
     setPhien(null);
-    setPhieuIdPhien(null);
-    setSuaRowIds(null);
+    setSessionInvoiceId(null);
+    setEditRowIds(null);
   };
 
   /* ---- Sửa một dòng mặt hàng ---- */
 
-  const luu = () => {
-    if (!dang) return;
+  const save = () => {
+    if (!editing) return;
     const ls: LoiNhap[] = [];
-    if (!dang.productId)
+    if (!editing.productId)
       ls.push({ truong: "Mặt hàng", thongBao: "Chưa chọn mặt hàng" });
-    if (!(dang.quantityKg > 0))
+    if (!(editing.quantityKg > 0))
       ls.push({ truong: "Lượng", thongBao: "Phải lớn hơn 0 kg" });
     setLoi(ls);
     if (ls.length > 0) return;
-    persist(rows.map((r) => (r.id === dang.id ? dang : r)));
+    persist(rows.map((r) => (r.id === editing.id ? editing : r)));
     notify.daLuu("Đã lưu thay đổi");
-    setDang(null);
+    setEditing(null);
   };
 
   const set = <K extends keyof SalesItem>(k: K, v: SalesItem[K]) =>
-    setDang((d) => (d ? { ...d, [k]: v } : d));
+    setEditing((d) => (d ? { ...d, [k]: v } : d));
 
   /** Kênh của phiếu đang mở — quyết định đơn vị đơn giá. */
-  const donViGia = phien?.channel === "Nội địa" ? "đ" : "USD";
-  const donViGiaDong = (kenh: SalesChannel) => (kenh === "Nội địa" ? "đ" : "USD");
+  const priceUnit = phien?.channel === "Nội địa" ? "đ" : "USD";
+  const priceUnitFor = (kenh: SalesChannel) => (kenh === "Nội địa" ? "đ" : "USD");
 
-  const cotDong = (kenh: SalesChannel): Cot<SalesItem>[] => [
+  const itemColumns = (kenh: SalesChannel): Cot<SalesItem>[] => [
     {
       key: "mh",
       header: "Mặt hàng",
       chinh: true,
-      render: (r) => tenMatHang(r.productId),
-      sapXep: (r) => tenMatHang(r.productId),
+      render: (r) => productName(r.productId),
+      sapXep: (r) => productName(r.productId),
     },
     {
       key: "qc",
@@ -525,7 +525,7 @@ export default function BanHangScreen() {
     },
     {
       key: "gia",
-      header: `Đơn giá (${donViGiaDong(kenh)})`,
+      header: `Đơn giá (${priceUnitFor(kenh)})`,
       so: true,
       render: (r) =>
         r.unitPrice != null ? (
@@ -537,7 +537,7 @@ export default function BanHangScreen() {
     },
     {
       key: "tien",
-      header: `Thành tiền (${donViGiaDong(kenh)})`,
+      header: `Thành tiền (${priceUnitFor(kenh)})`,
       so: true,
       render: (r) => num(calculateSalesAmount(r)),
       sapXep: (r) => calculateSalesAmount(r),
@@ -552,7 +552,7 @@ export default function BanHangScreen() {
         </div>
         <div className="flex flex-wrap gap-2">
           <Button
-            title="Mở form ghi một phiếu bán mới: chọn khách, kênh bán, rồi thêm từng dòng mặt hàng." size="lg" onClick={moThem}>
+            title="Mở form ghi một phiếu bán mới: chọn khách, kênh bán, rồi thêm từng dòng mặt hàng." size="lg" onClick={openAdd}>
             <Plus />
             Ghi phiếu bán
           </Button>
@@ -562,11 +562,11 @@ export default function BanHangScreen() {
       <ThongKe
         className="grid-cols-2 sm:grid-cols-3 lg:grid-cols-5"
         the={[
-          { nhan: "Đang xem", giaTri: moTaPhamVi, icon: CalendarRange, mau: "trung-tinh" },
-          { nhan: "Phân xưởng", giaTri: phanXuong, icon: Warehouse, mau: "trung-tinh" },
+          { nhan: "Đang xem", giaTri: rangeDescription, icon: CalendarRange, mau: "trung-tinh" },
+          { nhan: "Phân xưởng", giaTri: workshop, icon: Warehouse, mau: "trung-tinh" },
           { nhan: "Số phiếu", giaTri: nhomView.length, so: true, icon: Truck, mau: "brand" },
           { nhan: "Số dòng", giaTri: view.length, so: true, icon: FileText, mau: "brand" },
-          { nhan: "Tổng bán", giaTri: kg(tong), so: true, icon: Scale, mau: "success" },
+          { nhan: "Tổng bán", giaTri: kg(total), so: true, icon: Scale, mau: "success" },
         ]}
       />
 
@@ -589,11 +589,11 @@ export default function BanHangScreen() {
                 label="Khoảng ngày xuất bán"
                 anNhanBatBuoc
                 presets={false}
-                startDate={tuNgay}
-                endDate={denNgay}
+                startDate={fromDate}
+                endDate={toDate}
                 onChange={(tu, den) => {
-                  setTuNgay(tu);
-                  setDenNgay(den);
+                  setFromDate(tu);
+                  setToDate(den);
                 }}
               />
             ) : (
@@ -613,8 +613,8 @@ export default function BanHangScreen() {
                     ? undefined
                     : `Kỳ đang xem: ${viDate(tuHieuLuc)} – ${viDate(denHieuLuc)}`
                 }
-                value={ngay}
-                onChange={setNgay}
+                value={date}
+                onChange={setDate}
               />
             )}
           </div>
@@ -623,10 +623,10 @@ export default function BanHangScreen() {
             label="Phân xưởng"
             anNhanBatBuoc
             choPhepXoa={false}
-            value={phanXuong}
-            onChange={(v) => setPhanXuong(v as Workshop | "Tất cả")}
+            value={workshop}
+            onChange={(v) => setWorkshop(v as Workshop | "Tất cả")}
             options={[
-              ...PHAN_XUONG.map((p) => ({ value: p, label: p })),
+              ...WORKSHOPS.map((p) => ({ value: p, label: p })),
               { value: "Tất cả", label: "Tất cả" },
             ]}
             className="min-w-[220px] flex-1"
@@ -635,20 +635,20 @@ export default function BanHangScreen() {
       </div>
 
       {/* Sổ: mỗi phiếu một cụm */}
-      {dangTai ? (
+      {isLoading ? (
         <SkeletonBang />
       ) : nhomView.length === 0 ? (
         <EmptyState
           icon={ShoppingCart}
-          tieuDe={`Chưa có phiếu bán nào trong ${moTaPhamVi}`}
+          tieuDe={`Chưa có phiếu bán nào trong ${rangeDescription}`}
           moTa={
-            phanXuong === "Tất cả"
+            workshop === "Tất cả"
               ? "Bấm nút dưới để ghi phiếu bán đầu tiên."
-              : `Phân xưởng ${phanXuong}. Bấm nút dưới để ghi phiếu bán đầu tiên.`
+              : `Phân xưởng ${workshop}. Bấm nút dưới để ghi phiếu bán đầu tiên.`
           }
           action={
             <Button
-              title="Mở form ghi phiếu bán đầu tiên cho ngày này." size="lg" onClick={moThem}>
+              title="Mở form ghi phiếu bán đầu tiên cho ngày này." size="lg" onClick={openAdd}>
               <Plus />
               Ghi phiếu bán
             </Button>
@@ -669,7 +669,7 @@ export default function BanHangScreen() {
                         Phiếu {i + 1}
                       </span>
                       <span className="text-xl font-semibold text-foreground">
-                        {tenKhach(n.phieu.customerId) || "(chưa có khách)"}
+                        {customerName(n.phieu.customerId) || "(chưa có khách)"}
                       </span>
                       <span className="text-base text-muted-foreground">
                         {viDate(n.phieu.deliveryDate)} · xưởng {n.phieu.workshop}
@@ -705,7 +705,7 @@ export default function BanHangScreen() {
                       {kg(n.tongKg)}
                     </span>
                     <Button
-                      title="Mở lại phiếu bán này để sửa khách hàng, kênh bán hay các dòng hàng." variant="outline" onClick={() => moSuaPhieu(n)}>
+                      title="Mở lại phiếu bán này để sửa khách hàng, kênh bán hay các dòng hàng." variant="outline" onClick={() => openInvoiceEdit(n)}>
                       <Pencil />
                       Sửa phiếu
                     </Button>
@@ -713,11 +713,11 @@ export default function BanHangScreen() {
                 </div>
 
                 <RecordTable
-                  columns={cotDong(n.phieu.channel)}
+                  columns={itemColumns(n.phieu.channel)}
                   rows={n.dong}
                   getKey={(r) => r.id}
                   toMau="ban-hang"
-                  actions={(r) => nutGanLo(r)}
+                  actions={(r) => lotInputButton(r)}
                 />
               </section>
             ))}
@@ -728,14 +728,14 @@ export default function BanHangScreen() {
               <span className="text-base text-muted-foreground">
                 Tổng khối lượng
               </span>
-              <span className="tnum text-xl font-semibold">{kg(tong)}</span>
+              <span className="tnum text-xl font-semibold">{kg(total)}</span>
             </div>
             <div className="flex items-baseline gap-3">
               <span className="text-base text-muted-foreground">
                 Tổng tiền bán
               </span>
               <span className="tnum text-xl font-semibold">
-                {num(tongTien)}
+                {num(totalAmount)}
               </span>
             </div>
           </div>
@@ -746,16 +746,16 @@ export default function BanHangScreen() {
       <Dialog
         open={phien !== null}
         onOpenChange={(o) => {
-          if (!o) dongPhienLai("dong");
+          if (!o) closeSession("dong");
         }}
       >
         <DialogContent className="max-h-[92dvh] w-full overflow-y-auto sm:max-w-3xl lg:max-w-5xl">
           <DialogHeader>
             <DialogTitle className="text-2xl">
-              {dangSuaPhieu ? "Sửa phiếu bán" : "Ghi phiếu bán"}
+              {isEditingInvoice ? "Sửa phiếu bán" : "Ghi phiếu bán"}
             </DialogTitle>
             <DialogDescription className="text-base">
-              {dangSuaPhieu
+              {isEditingInvoice
                 ? "Sửa đầu phiếu (áp cho mọi dòng), thêm hoặc bỏ mặt hàng ngay bên dưới."
                 : "Điền đầu phiếu (khách, kênh, ngày) rồi đổ từng mặt hàng ngay bên dưới — mỗi mặt hàng bấm “Thêm mặt hàng vào sổ” là vào sổ ngay."}
             </DialogDescription>
@@ -772,14 +772,14 @@ export default function BanHangScreen() {
                   required
                   info="Ngày ghi vào hệ thống. Khác ngày xuất bán ⇒ ghi bù."
                   value={phien.postingDate}
-                  onChange={(v) => datPhien("postingDate", v)}
+                  onChange={(v) => setSessionField("postingDate", v)}
                 />
                 <DateField
                   label="Ngày xuất bán"
                   required
                   info="Ngày hàng thực xuất bán — mọi tổng hợp tính theo ngày này."
                   value={phien.deliveryDate}
-                  onChange={(v) => datPhien("deliveryDate", v)}
+                  onChange={(v) => setSessionField("deliveryDate", v)}
                 />
               </div>
 
@@ -791,7 +791,7 @@ export default function BanHangScreen() {
                 >
                   <Input
                     value={phien.backdateReason}
-                    onChange={(e) => datPhien("backdateReason", e.target.value)}
+                    onChange={(e) => setSessionField("backdateReason", e.target.value)}
                     placeholder="Vì sao tới hôm nay mới ghi?"
                   />
                 </Field>
@@ -803,13 +803,13 @@ export default function BanHangScreen() {
                   required
                   choPhepXoa={false}
                   value={phien.workshop}
-                  onChange={(v) => datPhien("workshop", v as Workshop)}
-                  options={PHAN_XUONG.map((p) => ({ value: p, label: p }))}
+                  onChange={(v) => setSessionField("workshop", v as Workshop)}
+                  options={WORKSHOPS.map((p) => ({ value: p, label: p }))}
                 />
                 <ChoiceGroup
                   label="Kênh bán"
                   value={phien.channel}
-                  onChange={(v) => datPhien("channel", v as SalesChannel)}
+                  onChange={(v) => setSessionField("channel", v as SalesChannel)}
                   options={SALES_CHANNELS.map((k) => ({ value: k, label: k }))}
                   cot={2}
                 />
@@ -819,18 +819,18 @@ export default function BanHangScreen() {
                 label="Khách hàng"
                 hint="Chọn trong danh mục. Chưa có thì gõ tên rồi bấm Thêm mới. Bỏ trống nếu chưa xác định khách."
                 value={phien.customerId}
-                onChange={(v) => datPhien("customerId", v)}
-                options={optKhach}
-                onCreate={themKhach}
+                onChange={(v) => setSessionField("customerId", v)}
+                options={customerOptions}
+                onCreate={addCustomer}
                 emptyText="Chưa có khách hàng nào trong danh mục."
-                onSuaMuc={suaKH.moSua}
-                nhanSua={suaKH.nhanSua}
+                onSuaMuc={customerEditor.moSua}
+                nhanSua={customerEditor.nhanSua}
               />
 
               <Field label="Ghi chú phiếu">
                 <Input
                   value={phien.note}
-                  onChange={(e) => datPhien("note", e.target.value)}
+                  onChange={(e) => setSessionField("note", e.target.value)}
                   placeholder="Ghi chú thêm (nếu có)"
                 />
               </Field>
@@ -843,7 +843,7 @@ export default function BanHangScreen() {
                   <p className="flex items-center gap-2 text-base font-semibold text-foreground">
                     <CircleCheck className="size-6 text-primary" aria-hidden />
                     Đã vào sổ {dongPhien.length} mặt hàng — phiếu này{" "}
-                    <span className="tnum">{kg(tongPhien)}</span>
+                    <span className="tnum">{kg(sessionTotal)}</span>
                   </p>
                   <ul className="divide-y divide-border">
                     {dongPhien.map((r, i) => (
@@ -855,7 +855,7 @@ export default function BanHangScreen() {
                           <span className="tnum text-muted-foreground">
                             {i + 1}.
                           </span>{" "}
-                          {tenMatHang(r.productId)}
+                          {productName(r.productId)}
                           {r.spec ? (
                             <span className="text-muted-foreground">
                               {" "}
@@ -869,13 +869,13 @@ export default function BanHangScreen() {
                           kg
                         </span>
                         <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
-                          {nutGanLo(r)}
+                          {lotInputButton(r)}
                           <Button
                             title="Sửa dòng bán này (mặt hàng · quy cách · số kg · đơn giá)."
                             variant="outline"
                             size="sm"
                             onClick={() => {
-                              setDang({ ...r });
+                              setEditing({ ...r });
                               setLoi([]);
                             }}
                           >
@@ -886,7 +886,7 @@ export default function BanHangScreen() {
                             title="Bỏ dòng bán này khỏi phiếu đang gõ."
                             variant="outline"
                             size="sm"
-                            onClick={() => boDongPhien(r)}
+                            onClick={() => removeSessionRow(r)}
                           >
                             <X />
                             Bỏ
@@ -906,18 +906,18 @@ export default function BanHangScreen() {
                   label="Mặt hàng"
                   required
                   hint="Chưa có trong danh mục thì gõ tên rồi bấm Thêm mới."
-                  value={dongMoi.productId}
+                  value={newRows.productId}
                   onChange={(v) => setDong("productId", v)}
-                  options={optMatHang}
-                  onCreate={themMatHang}
+                  options={productOptions}
+                  onCreate={addProduct}
                   emptyText="Chưa có mặt hàng nào trong danh mục."
-                  onSuaMuc={suaMH.moSua}
-                  nhanSua={suaMH.nhanSua}
+                  onSuaMuc={productEditor.moSua}
+                  nhanSua={productEditor.nhanSua}
                 />
 
                 <ChoiceGroup
                   label="Nguồn bán"
-                  value={dongMoi.nguon}
+                  value={newRows.nguon}
                   onChange={(v) => setDong("nguon", v)}
                   options={[
                     { value: KHO_BAN_LE, label: "Block thô (kho dự trữ)" },
@@ -931,7 +931,7 @@ export default function BanHangScreen() {
                   hint="Size/grade của thành phẩm. VD: 18-20, 1000-1300, 1.5g."
                 >
                   <Input
-                    value={dongMoi.spec}
+                    value={newRows.spec}
                     onChange={(e) => setDong("spec", e.target.value)}
                     placeholder="VD: 18-20"
                   />
@@ -942,45 +942,45 @@ export default function BanHangScreen() {
                     label="Lượng"
                     required
                     unit="kg"
-                    value={dongMoi.quantityKg || null}
+                    value={newRows.quantityKg || null}
                     onChange={(v) => setDong("quantityKg", v ?? 0)}
                   />
                   <NumberField
                     label="Đơn giá"
-                    unit={donViGia}
-                    value={dongMoi.unitPrice}
+                    unit={priceUnit}
+                    value={newRows.unitPrice}
                     onChange={(v) => setDong("unitPrice", v)}
                     hint="Bỏ trống nếu chưa chốt giá."
                   />
                 </div>
 
-                {kdDongMoi != null ? (
+                {newRowAvailable != null ? (
                   <div
                     className={
-                      banVuotTon
+                      isOversold
                         ? "rounded-lg bg-warning-surface px-4 py-3 text-base text-warning"
                         : "rounded-lg bg-muted px-4 py-3 text-base text-muted-foreground"
                     }
                   >
-                    Tồn khả dụng ({dongMoi.nguon === KHO_TP ? "kho thành phẩm" : "kho dự trữ"}):{" "}
-                    <span className="tnum font-semibold">{kg(kdDongMoi)}</span>
-                    {banVuotTon
+                    Tồn khả dụng ({newRows.nguon === KHO_TP ? "kho thành phẩm" : "kho dự trữ"}):{" "}
+                    <span className="tnum font-semibold">{kg(newRowAvailable)}</span>
+                    {isOversold
                       ? " — bán vượt tồn, kiểm lại (vẫn ghi được, tồn sẽ báo âm)."
                       : ""}
                   </div>
                 ) : null}
 
-                {dongMoi.quantityKg > 0 && dongMoi.unitPrice ? (
+                {newRows.quantityKg > 0 && newRows.unitPrice ? (
                   <div className="rounded-lg bg-accent px-4 py-3 text-base text-accent-foreground">
                     Thành tiền:{" "}
                     <span className="tnum text-lg font-semibold">
-                      {num(dongMoi.quantityKg * dongMoi.unitPrice)} {donViGia}
+                      {num(newRows.quantityKg * newRows.unitPrice)} {priceUnit}
                     </span>
                   </div>
                 ) : null}
 
                 <Button
-                  title="Thêm dòng hàng vừa chọn vào phiếu bán đang gõ. Một phiếu bán được nhiều mặt hàng." size="lg" className="w-full" onClick={themDong}>
+                  title="Thêm dòng hàng vừa chọn vào phiếu bán đang gõ. Một phiếu bán được nhiều mặt hàng." size="lg" className="w-full" onClick={addRow}>
                   <Plus />
                   Thêm mặt hàng vào sổ
                 </Button>
@@ -992,17 +992,17 @@ export default function BanHangScreen() {
                   Tổng phiếu {viDate(phien.deliveryDate)} · xưởng {phien.workshop}
                 </span>
                 <span className="tnum text-2xl font-semibold">
-                  {kg(tongPhien)}
+                  {kg(sessionTotal)}
                 </span>
               </div>
             </div>
           )}
 
           <DialogFooter>
-            {dangSuaPhieu ? (
+            {isEditingInvoice ? (
               <ConfirmDelete
-                moTaBanGhi={`Phiếu ${tenKhach(phien?.customerId ?? "") || "(chưa có khách)"} — ${viDate(phien?.deliveryDate ?? "")} — ${dongPhien.length} dòng — ${kg(tongPhien)}`}
-                onConfirm={xoaPhieuDangSua}
+                moTaBanGhi={`Phiếu ${customerName(phien?.customerId ?? "") || "(chưa có khách)"} — ${viDate(phien?.deliveryDate ?? "")} — ${dongPhien.length} dòng — ${kg(sessionTotal)}`}
+                onConfirm={deleteEditingInvoice}
                 tieuDe="Xóa cả phiếu này?"
                 nhanNut="Xóa phiếu"
               />
@@ -1011,15 +1011,15 @@ export default function BanHangScreen() {
                 title="Ghi phiếu đang gõ vào sổ rồi mở phiếu trống để bán tiếp cho khách khác."
                 variant="outline"
                 size="lg"
-                onClick={() => dongPhienLai("phieu-khac")}
+                onClick={() => closeSession("phieu-khac")}
               >
                 <Truck />
                 Lưu &amp; thêm phiếu khác
               </Button>
             )}
             <Button
-              title="Ghi phiếu đang gõ vào sổ rồi quay về danh sách phiếu bán." size="lg" onClick={() => dongPhienLai("dong")}>
-              {dangSuaPhieu ? "Xong" : "Xong phiếu"}
+              title="Ghi phiếu đang gõ vào sổ rồi quay về danh sách phiếu bán." size="lg" onClick={() => closeSession("dong")}>
+              {isEditingInvoice ? "Xong" : "Xong phiếu"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1027,9 +1027,9 @@ export default function BanHangScreen() {
 
       {/* ---- Hộp thoại: sửa một dòng mặt hàng ---- */}
       <Dialog
-        open={dang !== null}
+        open={editing !== null}
         onOpenChange={(o) => {
-          if (!o) setDang(null);
+          if (!o) setEditing(null);
         }}
       >
         <DialogContent className="max-h-[92dvh] w-full overflow-y-auto sm:max-w-3xl">
@@ -1041,7 +1041,7 @@ export default function BanHangScreen() {
             </DialogDescription>
           </DialogHeader>
 
-          {dang && (
+          {editing && (
             <div className="space-y-6 py-2">
               <ErrorSummary loi={loi} />
               <ChuThichBatBuoc />
@@ -1050,13 +1050,13 @@ export default function BanHangScreen() {
                 label="Mặt hàng"
                 required
                 hint="Chưa có trong danh mục thì gõ tên rồi bấm Thêm mới."
-                value={dang.productId}
+                value={editing.productId}
                 onChange={(v) => set("productId", v)}
-                options={optMatHang}
-                onCreate={themMatHang}
+                options={productOptions}
+                onCreate={addProduct}
                 emptyText="Chưa có mặt hàng nào trong danh mục."
-                onSuaMuc={suaMH.moSua}
-                nhanSua={suaMH.nhanSua}
+                onSuaMuc={productEditor.moSua}
+                nhanSua={productEditor.nhanSua}
               />
 
               <Field
@@ -1064,7 +1064,7 @@ export default function BanHangScreen() {
                 hint="Size/grade của thành phẩm. VD: 18-20, 1000-1300."
               >
                 <Input
-                  value={dang.spec}
+                  value={editing.spec}
                   onChange={(e) => set("spec", e.target.value)}
                   placeholder="VD: 18-20"
                 />
@@ -1075,13 +1075,13 @@ export default function BanHangScreen() {
                   label="Lượng"
                   required
                   unit="kg"
-                  value={dang.quantityKg || null}
+                  value={editing.quantityKg || null}
                   onChange={(v) => set("quantityKg", v ?? 0)}
                 />
                 <NumberField
                   label="Đơn giá"
-                  unit={donViGia}
-                  value={dang.unitPrice}
+                  unit={priceUnit}
+                  value={editing.unitPrice}
                   onChange={(v) => set("unitPrice", v)}
                   hint="Bỏ trống nếu chưa chốt giá."
                 />
@@ -1090,28 +1090,28 @@ export default function BanHangScreen() {
           )}
 
           <DialogFooter>
-            <Button variant="outline" size="lg" onClick={() => setDang(null)}>
+            <Button variant="outline" size="lg" onClick={() => setEditing(null)}>
               Hủy
             </Button>
             <Button
-              title="Ghi đè dòng bán này bằng số vừa sửa." size="lg" onClick={luu}>
+              title="Ghi đè dòng bán này bằng số vừa sửa." size="lg" onClick={save}>
               Lưu thay đổi
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      {suaKH.hop}
-      {suaMH.hop}
-      {ganLoBan && loaiLoBan(ganLoBan) && (
+      {customerEditor.hop}
+      {productEditor.hop}
+      {lotSalesItem && saleLotKind(lotSalesItem) && (
         <GanLoXuat
           docKind="sales_item"
-          docId={ganLoBan.id}
-          docNhan={`${tenMatHang(ganLoBan.productId)} · ${kg(ganLoBan.quantityKg)} · ${viDate(ganLoBan.deliveryDate)}`}
-          loaiLo={loaiLoBan(ganLoBan)!}
-          xuong={phieu.find((p) => p.id === ganLoBan.invoiceId)?.workshop ?? "Đông"}
-          ngay={ganLoBan.deliveryDate}
-          matHangId={ganLoBan.productId}
-          onClose={() => setGanLoBan(null)}
+          docId={lotSalesItem.id}
+          docNhan={`${productName(lotSalesItem.productId)} · ${kg(lotSalesItem.quantityKg)} · ${viDate(lotSalesItem.deliveryDate)}`}
+          loaiLo={saleLotKind(lotSalesItem)!}
+          xuong={salesInvoices.find((p) => p.id === lotSalesItem.invoiceId)?.workshop ?? "Đông"}
+          ngay={lotSalesItem.deliveryDate}
+          matHangId={lotSalesItem.productId}
+          onClose={() => setLotSalesItem(null)}
         />
       )}
     </div>

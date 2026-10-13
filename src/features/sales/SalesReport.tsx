@@ -22,7 +22,7 @@ import { num, viDate } from "@/lib/format";
 import { calculateSalesAmount, type SalesChannel } from "@/types";
 import { CalendarRange, Scale, Users } from "lucide-react";
 
-interface DongTong {
+interface TotalRow {
   customerName: string;
   channel: SalesChannel;
   quantityKg: number;
@@ -30,7 +30,7 @@ interface DongTong {
 }
 
 /** Đơn vị tiền theo kênh: Xuất khẩu bằng USD, Nội địa bằng VND. */
-function donVi(channel: SalesChannel): string {
+function unitOf(channel: SalesChannel): string {
   return channel === "Xuất khẩu" ? "$" : "đ";
 }
 
@@ -54,7 +54,7 @@ export default function BaoCaoBan() {
     const invById = new Map(invoices.map((i) => [i.id, i]));
     const tenKH = new Map(customers.map((c) => [c.id, c.name]));
 
-    const map = new Map<string, DongTong>();
+    const map = new Map<string, TotalRow>();
     const theoKH = new Map<string, number>();
     for (const it of items) {
       if (it.deliveryDate < tu || it.deliveryDate > den) continue;
@@ -76,9 +76,9 @@ export default function BaoCaoBan() {
         a.customerName.localeCompare(b.customerName, "vi") ||
         a.channel.localeCompare(b.channel, "vi")
     );
-    const chart: CotBieuDo[] = [...theoKH.entries()].map(([id, giaTri]) => ({
+    const chart: CotBieuDo[] = [...theoKH.entries()].map(([id, value]) => ({
       nhan: tenKH.get(id) || "(chưa có khách)",
-      giaTri,
+      giaTri: value,
     }));
     return {
       dong,
@@ -94,7 +94,7 @@ export default function BaoCaoBan() {
     { nhan: "Số khách", giaTri: num(soKhach), so: true, icon: Users, mau: "trung-tinh" },
   ];
 
-  const cot: CotTong<DongTong>[] = [
+  const columns: CotTong<TotalRow>[] = [
     { key: "kh", header: "Khách hàng", render: (r) => r.customerName },
     { key: "kenh", header: "Kênh", render: (r) => r.channel },
     {
@@ -108,7 +108,7 @@ export default function BaoCaoBan() {
       key: "tien",
       header: "Giá trị",
       so: true,
-      render: (r) => `${num(r.amount)} ${donVi(r.channel)}`,
+      render: (r) => `${num(r.amount)} ${unitOf(r.channel)}`,
     },
   ];
 
@@ -163,7 +163,7 @@ export default function BaoCaoBan() {
 
       <BangTong
         rows={dong}
-        cot={cot}
+        cot={columns}
         getKey={(r) => `${r.customerName}|||${r.channel}`}
         toMau={`bao-cao-ban|${tu}|${den}`}
         emptyText="Không có phiếu bán trong kỳ này."

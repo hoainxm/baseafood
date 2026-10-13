@@ -39,3 +39,23 @@ describe("khóa chính ở ranh giới máy chủ (rào R1)", () => {
     expect(dongTuMay(dongLenMay(row, "id", SITE_DEMO, true), "id", true)).toEqual({ ...row, site_id: SITE_DEMO });
   });
 });
+
+describe("cột khóa ngoại (cotThamChieu) — period_id → balancing_periods.id", () => {
+  it("demo: khóa ngoại mang tiền tố như khóa chính kỳ; rỗng / null giữ nguyên", () => {
+    expect(dongLenMay({ id: "v1", period_id: "ky-1" }, "id", SITE_DEMO, true, ["period_id"])).toEqual({
+      id: "demo:v1",
+      period_id: "demo:ky-1",
+      site_id: SITE_DEMO,
+    });
+    expect(dongLenMay({ id: "p1", period_id: null }, "id", SITE_DEMO, true, ["period_id"]).period_id).toBeNull();
+    expect(dongLenMay({ id: "p1", period_id: "" }, "id", SITE_DEMO, true, ["period_id"]).period_id).toBe("");
+  });
+  it("demo: đọc về bỏ tiền tố cả khóa ngoại — khớp lại đúng id kỳ của app", () => {
+    const ky = dongTuMay(dongLenMay({ id: "ky-1" }, "id", SITE_DEMO, true), "id", true);
+    const dong = dongTuMay(dongLenMay({ id: "v1", period_id: "ky-1" }, "id", SITE_DEMO, true, ["period_id"]), "id", true, ["period_id"]);
+    expect(dong?.period_id).toBe(ky?.id);
+  });
+  it("thật: khóa ngoại không đổi", () => {
+    expect(dongLenMay({ id: "v1", period_id: "ky-1" }, "id", "bsf1", false, ["period_id"]).period_id).toBe("ky-1");
+  });
+});

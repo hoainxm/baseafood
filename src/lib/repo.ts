@@ -99,6 +99,13 @@ export interface AnhXaBang<T> {
    * này lấy lại từ server. Chế độ chỉ-máy-này: không bỏ gì (local là kho duy nhất).
    */
   truongKhongCache?: (keyof T & string)[];
+  /**
+   * Cột (tên DB) là KHÓA NGOẠI trỏ tới khóa chính bảng khác — chế độ demo phải thêm
+   * tiền tố `demo:` cho cả cột này như khóa chính (lib/cheDo.ts), không thì máy chủ
+   * từ chối (23503). DB thật: `period_id → balancing_periods.id` ở balancing_inputs,
+   * balancing_outputs, scraps. Thêm khóa ngoại mới giữa hai bảng nghiệp vụ ⇒ khai ở đây.
+   */
+  cotThamChieu?: string[];
 }
 
 const s = (v: unknown) => (v == null ? "" : String(v));
@@ -415,6 +422,8 @@ export const BANG_BALANCING_INPUT: AnhXaBang<BalancingInputItem> = {
   table: "balancing_inputs",
   localKey: "bsf.balancing-inputs.v2",
   layKhoa: theoId,
+  // Khóa ngoại → balancing_periods.id (ON DELETE CASCADE) — chế độ demo thêm tiền tố.
+  cotThamChieu: ["period_id"],
   toRow: (x) => ({
     id: x.id,
     period_id: x.periodId,
@@ -469,6 +478,8 @@ export const BANG_SCRAP: AnhXaBang<ScrapItem> = {
   table: "scraps",
   localKey: "bsf.scraps.v2",
   layKhoa: theoId,
+  // Khóa ngoại → balancing_periods.id (ON DELETE CASCADE) — chế độ demo thêm tiền tố.
+  cotThamChieu: ["period_id"],
   toRow: (x) => ({
     id: x.id,
     // Chưa gắn kỳ thì phải là NULL — chuỗi rỗng vi phạm khóa ngoại balancing_periods.
@@ -501,6 +512,8 @@ export const BANG_BALANCING_OUTPUT: AnhXaBang<BalancingOutputItem> = {
   table: "balancing_outputs",
   localKey: "bsf.balancing-outputs.v2",
   layKhoa: theoId,
+  // Khóa ngoại → balancing_periods.id (ON DELETE CASCADE) — chế độ demo thêm tiền tố.
+  cotThamChieu: ["period_id"],
   toRow: (x) => ({
     id: x.id,
     period_id: x.periodId,
@@ -1447,7 +1460,7 @@ async function dongBoMotLuot<T>(
           .from(bang.table)
           .upsert(
             // Khóa chính theo chế độ (demo ⇒ tiền tố `demo:`) + site — rào R1 (lib/cheDo.ts).
-            ds.map((r) => dongLenMay(r, khoa, SITE_ID)),
+            ds.map((r) => dongLenMay(r, khoa, SITE_ID, undefined, bang.cotThamChieu)),
             { onConflict: khoa, defaultToNull: false },
           ),
       ),
@@ -1894,7 +1907,7 @@ export function useBang<T>(bang: AnhXaBang<T>, seed: () => T[] = () => []) {
           }
           // Bỏ tiền tố khóa demo; dòng không thuộc chế độ này (null) bỏ qua.
           const may = thoRaw
-            .map((r) => dongTuMay(r, khoa))
+            .map((r) => dongTuMay(r, khoa, undefined, bang.cotThamChieu))
             .filter((r): r is Record<string, unknown> => r != null)
             .map((r) => bang.fromRow(r));
 
@@ -1910,7 +1923,7 @@ export function useBang<T>(bang: AnhXaBang<T>, seed: () => T[] = () => []) {
                 const { error: e2 } = await db
                   .from(bang.table)
                   .upsert(
-                    s0.map((x) => dongLenMay(bang.toRow(x), khoa, SITE_ID)),
+                    s0.map((x) => dongLenMay(bang.toRow(x), khoa, SITE_ID, undefined, bang.cotThamChieu)),
                     { onConflict: khoa }
                   );
                 if (huy) return;

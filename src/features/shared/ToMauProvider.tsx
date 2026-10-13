@@ -4,11 +4,11 @@
 // Description: Provides shared row marks to every design-system table
 // ============================================================
 import { useLayoutEffect, useMemo, useRef, type ReactNode } from "react";
-import { ToMauContext, type DauDong, type NguonToMau } from "@/design-system";
+import { RowMarkContext, type MarkStyle, type RowMarkSource } from "@/design-system";
 import { useRowMarks } from "@/lib/catalogRepo";
 import { setRowMarks, getTableRowMarks } from "@/lib/rowMarks";
 
-const EMPTY_MARKS: ReadonlyMap<string, DauDong> = new Map();
+const EMPTY_MARKS: ReadonlyMap<string, MarkStyle> = new Map();
 
 /**
  * Gắn MỘT lần ở ShellLayout (App.tsx). Cả app dùng chung một instance
@@ -27,15 +27,15 @@ export function ToMauProvider({ nguoi, children }: { nguoi: string; children: Re
   }, [marks]);
 
   const theoBang = useMemo(() => {
-    const ra = new Map<string, ReadonlyMap<string, DauDong>>();
+    const ra = new Map<string, ReadonlyMap<string, MarkStyle>>();
     for (const k of new Set(marks.map((m) => m.tableKey))) ra.set(k, getTableRowMarks(marks, k).dong);
     return ra;
   }, [marks]);
 
-  const source = useMemo<NguonToMau>(
+  const source = useMemo<RowMarkSource>(
     () => ({
-      dauCuaBang: (tableKey) => theoBang.get(tableKey) ?? EMPTY_MARKS,
-      dat: (tableKey, khoaDong, dau) => {
+      getTableMarks: (tableKey) => theoBang.get(tableKey) ?? EMPTY_MARKS,
+      setMarks: (tableKey, khoaDong, dau) => {
         const next = setRowMarks(latest.current, tableKey, khoaDong, dau, nguoi);
         latest.current = next;
         write(next);
@@ -44,5 +44,5 @@ export function ToMauProvider({ nguoi, children }: { nguoi: string; children: Re
     [theoBang, write, nguoi]
   );
 
-  return <ToMauContext.Provider value={source}>{children}</ToMauContext.Provider>;
+  return <RowMarkContext.Provider value={source}>{children}</RowMarkContext.Provider>;
 }

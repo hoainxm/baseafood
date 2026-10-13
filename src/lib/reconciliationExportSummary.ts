@@ -183,7 +183,7 @@ function hang8(ws: Worksheet, r: number, columns: readonly (readonly [CellValue,
   let cao = 1;
   for (const [v, width] of columns) {
     const la = typeof v === "object" && v !== null;
-    cao = Math.max(cao, oChu(ws, r, c, c + width - 1, v, la ? { color: { argb: "FF0563C1" }, underline: true, bold: bold } : bold ? { bold: true } : undefined, nen));
+    cao = Math.max(cao, oChu(ws, r, c, c + width - 1, v, la ? { color: { argb: "FF0563C1" }, underline: true, bold } : bold ? { bold: true } : undefined, nen));
     c += width;
   }
   setRowHeight(ws, r, cao);

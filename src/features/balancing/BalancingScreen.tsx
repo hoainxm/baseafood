@@ -34,7 +34,7 @@ import { getMaterialFamily } from "@/lib/balancingGrid";
 import type { BalancingResult } from "@/lib/balancingCalc";
 import { LuoiBanThanhPham } from "./WipGrid";
 import {
-  ChuThichBatBuoc,
+  RequiredLegend,
   Button,
   Card,
   Combobox,
@@ -49,13 +49,13 @@ import {
   ErrorSummary,
   NumberField,
   RecordTable,
-  SkeletonBang,
+  TableSkeleton,
   dateToIso,
   notify,
-  type Cot,
-  type LoiNhap,
-  BieuDoCot,
-  ThanhChiaPhan,
+  type RecordTableColumn,
+  type FieldError,
+  BarChart,
+  ProportionBar,
 } from "@/design-system";
 import { useSuaDanhMuc } from "@/features/catalog/SuaDanhMucNhanh";
 import { num, formatDateVN } from "@/lib/format";
@@ -113,7 +113,7 @@ export default function CanDoiScreen() {
   /** Gõ loại mới trong ô chọn → LƯU LUÔN vào danh mục (rule 7), không để mồ côi. */
   const addMaterialType = (ten: string) => {
     setCatalogMaterialTypes([...catalogMaterialTypes, { id: uid(), name: ten, category: "", note: "" }]);
-    notify.daLuu(`Đã thêm loại nguyên liệu "${ten}" vào danh mục`);
+    notify.saved(`Đã thêm loại nguyên liệu "${ten}" vào danh mục`);
     return ten;
   };
   /** Bút chì sửa nhanh loại NL (value là TÊN; mục gộp họ không trùng tên danh mục thì không có bút chì). */
@@ -138,7 +138,7 @@ export default function CanDoiScreen() {
 
   const [editing, setEditing] = useState<BalancingPeriod | null>(null);
   const [isAdding, setIsAdding] = useState(false);
-  const [loi, setLoi] = useState<LoiNhap[]>([]);
+  const [loi, setLoi] = useState<FieldError[]>([]);
 
   const openAdd = () => {
     const today = dateToIso(new Date());
@@ -159,11 +159,11 @@ export default function CanDoiScreen() {
 
   const savePeriod = () => {
     if (!editing) return;
-    const ls: LoiNhap[] = [];
+    const ls: FieldError[] = [];
     if (!editing.materialTypeName.trim())
-      ls.push({ truong: "Loại nguyên liệu", thongBao: "Chưa chọn loại" });
+      ls.push({ field: "Loại nguyên liệu", message: "Chưa chọn loại" });
     if (!editing.startDate)
-      ls.push({ truong: "Ngày tiếp nhận", thongBao: "Chưa chọn ngày" });
+      ls.push({ field: "Ngày tiếp nhận", message: "Chưa chọn ngày" });
     setLoi(ls);
     if (ls.length > 0) return;
 
@@ -178,11 +178,11 @@ export default function CanDoiScreen() {
     };
     if (isAdding) {
       persistKy([ban, ...kyList]);
-      notify.daLuu(`Đã tạo kỳ cân đối "${ban.materialTypeName}"`);
+      notify.saved(`Đã tạo kỳ cân đối "${ban.materialTypeName}"`);
       setSelId(ban.id);
     } else {
       persistKy(kyList.map((k) => (k.id === ban.id ? ban : k)));
-      notify.daLuu("Đã lưu thay đổi");
+      notify.saved("Đã lưu thay đổi");
     }
     setEditing(null);
   };
@@ -233,7 +233,7 @@ export default function CanDoiScreen() {
         r.balancingPeriodId === k.id ? { ...r, balancingPeriodId: "" } : r
       )
     );
-    notify.daXoa(
+    notify.deleted(
       `Đã xóa kỳ "${k.materialTypeName}" — số ở sổ nhập hàng và sổ sản xuất vẫn còn`,
       () => {
         persistKy(prevPeriods);
@@ -261,33 +261,33 @@ export default function CanDoiScreen() {
     );
   }
 
-  const cols: Cot<BalancingPeriod>[] = [
+  const cols: RecordTableColumn<BalancingPeriod>[] = [
     {
       key: "loaiNL",
       header: "Loại nguyên liệu",
-      chinh: true,
+      primary: true,
       render: (r) => r.materialTypeName,
-      sapXep: (r) => r.materialTypeName,
+      getSortValue: (r) => r.materialTypeName,
     },
     {
       key: "ngay",
       header: "Ngày tiếp nhận",
       render: (r) =>
         r.dateRangeDescription || <span className="text-muted-foreground">Chưa ghi</span>,
-      sapXep: (r) => r.startDate ?? "",
+      getSortValue: (r) => r.startDate ?? "",
     },
     {
       key: "tongNLNhan",
       header: "Tổng NL nhận (kg)",
-      so: true,
-      anTrenDienThoai: true,
+      numeric: true,
+      hideOnMobile: true,
       render: (r) =>
         r.totalInputKg != null ? (
           num(r.totalInputKg)
         ) : (
           <span className="text-muted-foreground">—</span>
         ),
-      sapXep: (r) => r.totalInputKg ?? 0,
+      getSortValue: (r) => r.totalInputKg ?? 0,
     },
   ];
 
@@ -307,12 +307,12 @@ export default function CanDoiScreen() {
       </div>
 
       {isLoadingPeriods ? (
-        <SkeletonBang />
+        <TableSkeleton />
       ) : kyList.length === 0 ? (
         <EmptyState
           icon={Scale}
-          tieuDe="Chưa có kỳ cân đối nào"
-          moTa="Tạo kỳ đầu tiên: chọn loại nguyên liệu và khoảng ngày tiếp nhận."
+          title="Chưa có kỳ cân đối nào"
+          description="Tạo kỳ đầu tiên: chọn loại nguyên liệu và khoảng ngày tiếp nhận."
           action={
             <Button
               title="Mở kỳ cân đối đầu tiên." size="lg" onClick={openAdd}>
@@ -326,9 +326,9 @@ export default function CanDoiScreen() {
           columns={cols}
           rows={kyList}
           getKey={(r) => r.id}
-          toMau="can-doi-ky"
-          timKiem={(r) => `${r.materialTypeName} ${r.dateRangeDescription}`}
-          nhanTimKiem="Tìm kỳ theo loại nguyên liệu…"
+          rowMarkKey="can-doi-ky"
+          getSearchText={(r) => `${r.materialTypeName} ${r.dateRangeDescription}`}
+          searchLabel="Tìm kỳ theo loại nguyên liệu…"
           actions={(r) => (
             <>
               <Button
@@ -349,10 +349,10 @@ export default function CanDoiScreen() {
                 Sửa
               </Button>
               <ConfirmDelete
-                moTaBanGhi={`Kỳ "${r.materialTypeName}" — ${r.dateRangeDescription || "chưa ghi ngày"}`}
+                recordDescription={`Kỳ "${r.materialTypeName}" — ${r.dateRangeDescription || "chưa ghi ngày"}`}
                 onConfirm={() => deletePeriod(r)}
-                tieuDe="Xóa kỳ cân đối này?"
-                nhanNut="Xóa kỳ"
+                title="Xóa kỳ cân đối này?"
+                confirmLabel="Xóa kỳ"
               />
             </>
           )}
@@ -374,8 +374,8 @@ export default function CanDoiScreen() {
 
           {editing && (
             <div className="space-y-6 py-2">
-              <ErrorSummary loi={loi} />
-              <ChuThichBatBuoc />
+              <ErrorSummary errors={loi} />
+              <RequiredLegend />
 
               <Combobox
                 label="Loại nguyên liệu"
@@ -407,9 +407,9 @@ export default function CanDoiScreen() {
                 }
                 options={materialTypeOptions}
                 onCreate={addMaterialType}
-                onSuaMuc={materialTypeEditor.moSua}
-                nhanSua={materialTypeEditor.nhanSua}
-                suaDuoc={materialTypeEditor.suaDuoc}
+                onEditItem={materialTypeEditor.moSua}
+                editLabel={materialTypeEditor.nhanSua}
+                canEdit={materialTypeEditor.suaDuoc}
               />
 
               <DateRangeField
@@ -553,7 +553,7 @@ function KyDetail({
         salesItemId: ban.id,
       })),
     ]);
-    notify.daLuu(`Đã hút ${items.length} dòng bán vào kỳ này`);
+    notify.saved(`Đã hút ${items.length} dòng bán vào kỳ này`);
   };
 
   const { kq } = grid;
@@ -650,7 +650,7 @@ function KyDetail({
               ...catalogMaterialTypes,
               { id: uid(), name: ten, category: "", note: "" },
             ]);
-            notify.daLuu(`Đã thêm loại nguyên liệu "${ten}" vào danh mục`);
+            notify.saved(`Đã thêm loại nguyên liệu "${ten}" vào danh mục`);
             return ten;
           }}
         />
@@ -678,13 +678,13 @@ function KyDetail({
             onThemMatHang={(ten) => {
               const m: Product = { id: uid(), code: "", name: ten, finishedGoodCode: "" };
               setProducts([...products, m]);
-              notify.daLuu(`Đã thêm mặt hàng "${ten}" vào danh mục`);
+              notify.saved(`Đã thêm mặt hàng "${ten}" vào danh mục`);
               return m.id;
             }}
             onThemKhach={(ten) => {
               const k: Customer = { id: uid(), code: "", name: ten, market: "" };
               setCustomers([...customers, k]);
-              notify.daLuu(`Đã thêm khách hàng "${ten}" vào danh mục`);
+              notify.saved(`Đã thêm khách hàng "${ten}" vào danh mục`);
               return k.id;
             }}
           />
@@ -748,7 +748,7 @@ function KyDetail({
                 ? { isLocked: false, reopenReason: note }
                 : { isLocked: true, lockedAt: new Date().toISOString(), lockNote: note }
             );
-            notify.daLuu(ky.isLocked ? "Đã mở lại kỳ" : "Đã chốt kỳ");
+            notify.saved(ky.isLocked ? "Đã mở lại kỳ" : "Đã chốt kỳ");
             setIsLockOpen(false);
           }}
         />
@@ -873,22 +873,22 @@ function ResultNote({
               {lai ? "bán được nhiều hơn tiền bỏ ra" : "tiền bỏ ra nhiều hơn bán được"} {num(Math.abs(kq.profitOrLoss))} đ
             </span>
           </h3>
-          <BieuDoCot
+          <BarChart
             data={[
-              { nhan: "Tiền bán được", phu: "giá trị xuất", giaTri: kq.exportValue },
-              { nhan: "Tiền bỏ ra", phu: "nguyên liệu + chế biến", giaTri: kq.costOfGoods },
+              { label: "Tiền bán được", subLabel: "giá trị xuất", value: kq.exportValue },
+              { label: "Tiền bỏ ra", subLabel: "nguyên liệu + chế biến", value: kq.costOfGoods },
             ]}
-            giuThuTu
-            duongTrungBinh={false}
-            donVi="đ"
+            preserveOrder
+            showAverageLine={false}
+            unit="đ"
           />
           <p className="text-sm font-semibold text-foreground">Tiền bỏ ra gồm:</p>
-          <ThanhChiaPhan
-            donVi="đ"
-            moTa="Giá thành chia theo tiền nguyên liệu và chi phí chế biến"
-            phan={[
-              { khoa: "nl", nhan: "Tiền nguyên liệu", giaTri: kq.materialValue, sac: "bien" },
-              { khoa: "cb", nhan: "Chi phí chế biến", giaTri: kq.costOfGoods - kq.materialValue, sac: "tim" },
+          <ProportionBar
+            unit="đ"
+            description="Giá thành chia theo tiền nguyên liệu và chi phí chế biến"
+            segments={[
+              { id: "nl", label: "Tiền nguyên liệu", value: kq.materialValue, tone: "bien" },
+              { id: "cb", label: "Chi phí chế biến", value: kq.costOfGoods - kq.materialValue, tone: "tim" },
             ]}
           />
         </div>
@@ -952,7 +952,7 @@ function KeyValueInput({
       ) : (
         <NumberField
           label={k}
-          anNhanBatBuoc
+          hideRequiredMark
           unit={unit}
           value={value}
           onChange={onChange}

@@ -20,21 +20,21 @@ import {
   DateField,
   Input,
   Button,
-  Nhan,
+  Tag,
   EmptyState,
   notify,
-  type LuaChon,
-  BieuDoTheoNgay,
+  type ChoiceOption,
+  TimeSeriesChart,
 } from "@/design-system";
 import { Camera, Lock, Plus, X } from "lucide-react";
 
-const WORKSHOP_OPTIONS: LuaChon[] = [
+const WORKSHOP_OPTIONS: ChoiceOption[] = [
   { value: "Đông", label: "Đông" },
   { value: "Cá", label: "Cá" },
   { value: "Khô", label: "Khô" },
 ];
 
-const KET_QUA_OPT: LuaChon[] = [
+const KET_QUA_OPT: ChoiceOption[] = [
   { value: "dat", label: "Đạt" },
   { value: "tam", label: "Cần khắc phục" },
   { value: "khong-dat", label: "Không đạt" },
@@ -114,7 +114,7 @@ export default function QcChecklistScreen() {
     const ten = newName.trim();
     if (!ten) return;
     if (dongs.some((d) => d.criterion === ten)) {
-      notify.canhBao("Chỉ tiêu này đã có trong danh sách");
+      notify.warning("Chỉ tiêu này đã có trong danh sách");
       return;
     }
     setDongs((ds) => [
@@ -135,11 +135,11 @@ export default function QcChecklistScreen() {
   const save = () => {
     const cham = dongs.filter((d) => d.result);
     if (cham.length === 0) {
-      notify.canhBao("Chưa chấm chỉ tiêu nào — chọn ít nhất một kết quả");
+      notify.warning("Chưa chấm chỉ tiêu nào — chọn ít nhất một kết quả");
       return;
     }
     if (isBackdate && !backdateReason.trim()) {
-      notify.canhBao(
+      notify.warning(
         isLocked
           ? "Ngày đã chốt — nhập lý do ghi bù để sửa"
           : "Ghi cho ngày cũ — nhập lý do ghi bù"
@@ -149,8 +149,8 @@ export default function QcChecklistScreen() {
     const idTheoTen = new Map(saved.map((r) => [r.criterion, r.id]));
     const newRows: QcChecklistItem[] = cham.map((d) => ({
       id: idTheoTen.get(d.criterion) ?? newId(),
-      date: date,
-      workshop: workshop,
+      date,
+      workshop,
       criterion: d.criterion,
       result: d.result as QcResult,
       score: d.score,
@@ -160,17 +160,17 @@ export default function QcChecklistScreen() {
     }));
     const giuLai = rows.filter((r) => !(r.date === date && r.workshop === workshop));
     persist([...giuLai, ...newRows]);
-    notify.daLuu(`Đã lưu QC ${formatDateVN(date)} · xưởng ${workshop} — ${cham.length} chỉ tiêu`);
+    notify.saved(`Đã lưu QC ${formatDateVN(date)} · xưởng ${workshop} — ${cham.length} chỉ tiêu`);
   };
 
   const lockDay = () => {
     if (saved.length === 0) {
-      notify.canhBao("Chưa có chỉ tiêu nào đã lưu để chốt");
+      notify.warning("Chưa có chỉ tiêu nào đã lưu để chốt");
       return;
     }
     // Chưa nạp xong sổ chốt ⇒ chưa biết máy chủ đã có bản ghi (ngày, xưởng) chưa.
     if (ttKhoa === "dang-tai") {
-      notify.loi("Đang tải sổ chốt QC từ máy chủ — đợi vài giây rồi bấm chốt lại");
+      notify.error("Đang tải sổ chốt QC từ máy chủ — đợi vài giây rồi bấm chốt lại");
       return;
     }
     const prev = locks.find((l) => l.lockDate === date && l.workshop === workshop);
@@ -178,7 +178,7 @@ export default function QcChecklistScreen() {
       // Id cố định theo (ngày|xưởng): hai máy cùng chốt ghi CÙNG một dòng, không sinh bản trùng.
       id: prev?.id ?? `${date}|${workshop}`,
       lockDate: date,
-      workshop: workshop,
+      workshop,
       isLocked: true,
       lockedAt: todayISO(),
       totalKgAtLock: saved.length,
@@ -186,13 +186,13 @@ export default function QcChecklistScreen() {
       note: "",
     };
     persistLocks([...locks.filter((l) => l.id !== record.id), record]);
-    notify.daLuu(`Đã chốt QC ${formatDateVN(date)} · xưởng ${workshop}`);
+    notify.saved(`Đã chốt QC ${formatDateVN(date)} · xưởng ${workshop}`);
   };
 
   const reopen = () => {
     if (!khoa) return;
     persistLocks(locks.map((l) => (l.id === khoa.id ? { ...l, isLocked: false } : l)));
-    notify.canhBao(`Đã mở lại QC ${formatDateVN(date)} · xưởng ${workshop}`);
+    notify.warning(`Đã mở lại QC ${formatDateVN(date)} · xưởng ${workshop}`);
   };
 
   return (
@@ -207,14 +207,14 @@ export default function QcChecklistScreen() {
 
       {/* Bộ lọc: ngày + xưởng */}
       <div className="grid gap-5 rounded-xl border-2 border-border p-4 sm:grid-cols-2">
-        <DateField label="Ngày kiểm" value={date} onChange={setDate} anNhanBatBuoc />
+        <DateField label="Ngày kiểm" value={date} onChange={setDate} hideRequiredMark />
         <ChoiceGroup
           label="Phân xưởng"
           value={workshop}
           onChange={(v) => setWorkshop(v as Workshop)}
           options={WORKSHOP_OPTIONS}
-          cot={3}
-          anNhanBatBuoc
+          columns={3}
+          hideRequiredMark
         />
       </div>
 
@@ -225,11 +225,11 @@ export default function QcChecklistScreen() {
             {formatDateVN(date)} · xưởng {workshop}
           </span>
           {isLocked ? (
-            <Nhan loai="xong" icon={Lock}>
+            <Tag variant="xong" icon={Lock}>
               Đã chốt
-            </Nhan>
+            </Tag>
           ) : (
-            <Nhan loai="cho">Chưa chốt</Nhan>
+            <Tag variant="cho">Chưa chốt</Tag>
           )}
           {daCham.length > 0 && (
             <span className="text-base text-muted-foreground">
@@ -256,15 +256,15 @@ export default function QcChecklistScreen() {
       {coQc30 && (
         <section className="space-y-3 rounded-xl border-2 border-border p-4">
           <h2 className="text-lg font-semibold text-foreground">30 ngày gần đây · xưởng {workshop}</h2>
-          <BieuDoTheoNgay
-            nhan={qc30.map((x) => `${x.ngay.slice(8, 10)}/${x.ngay.slice(5, 7)}`)}
-            donVi="chỉ tiêu"
-            cao={220}
-            moTa={`Số chỉ tiêu QC đạt, tạm, không đạt mỗi ngày — xưởng ${workshop}`}
-            chuoi={[
-              { khoa: "dat", ten: "Đạt", mau: "la", dang: "cot", giaTri: qc30.map((x) => x.dat) },
-              { khoa: "tam", ten: "Tạm (cần khắc phục)", mau: "cat", dang: "cot", giaTri: qc30.map((x) => x.tam) },
-              { khoa: "kd", ten: "Không đạt", mau: "hong", dang: "cot", giaTri: qc30.map((x) => x.khongDat) },
+          <TimeSeriesChart
+            labels={qc30.map((x) => `${x.ngay.slice(8, 10)}/${x.ngay.slice(5, 7)}`)}
+            unit="chỉ tiêu"
+            height={220}
+            description={`Số chỉ tiêu QC đạt, tạm, không đạt mỗi ngày — xưởng ${workshop}`}
+            series={[
+              { id: "dat", name: "Đạt", color: "la", kind: "cot", values: qc30.map((x) => x.dat) },
+              { id: "tam", name: "Tạm (cần khắc phục)", color: "cat", kind: "cot", values: qc30.map((x) => x.tam) },
+              { id: "kd", name: "Không đạt", color: "hong", kind: "cot", values: qc30.map((x) => x.khongDat) },
             ]}
           />
         </section>
@@ -291,7 +291,7 @@ export default function QcChecklistScreen() {
 
       {/* Bảng chấm điểm từng chỉ tiêu */}
       {dongs.length === 0 ? (
-        <EmptyState tieuDe="Chưa có chỉ tiêu" moTa="Thêm chỉ tiêu để bắt đầu chấm." />
+        <EmptyState title="Chưa có chỉ tiêu" description="Thêm chỉ tiêu để bắt đầu chấm." />
       ) : (
         <div className="space-y-4">
           {dongs.map((d, i) => (
@@ -302,8 +302,8 @@ export default function QcChecklistScreen() {
                 value={d.result}
                 onChange={(v) => updateRow(i, { result: v as QcResult })}
                 options={KET_QUA_OPT}
-                cot={3}
-                anNhanBatBuoc
+                columns={3}
+                hideRequiredMark
               />
               <div className="grid gap-4 sm:grid-cols-2">
                 <NumberField
@@ -311,7 +311,7 @@ export default function QcChecklistScreen() {
                   unit="điểm"
                   value={d.score}
                   onChange={(v) => updateRow(i, { score: v })}
-                  anNhanBatBuoc
+                  hideRequiredMark
                 />
                 <Field label="Ghi chú">
                   <Input
@@ -432,9 +432,9 @@ function CriterionPhoto({
     if (inputRef.current) inputRef.current.value = "";
     if (toAdd.length) {
       onChange([...paths, ...toAdd]);
-      notify.daLuu(`Đã tải ${toAdd.length} ảnh`);
+      notify.saved(`Đã tải ${toAdd.length} ảnh`);
     } else {
-      notify.canhBao("Không tải được ảnh — thử lại");
+      notify.warning("Không tải được ảnh — thử lại");
     }
   };
 

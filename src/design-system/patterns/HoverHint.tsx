@@ -7,7 +7,7 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 
 /**
- * GoiYHover — MỘT bộ điều khiển chung cho toàn app, gắn một lần ở khung
+ * HoverHint — MỘT bộ điều khiển chung cho toàn app, gắn một lần ở khung
  * (`AppShell`). Không phải bọc từng nút.
  *
  * Vì sao có file này: luật §9 của design-system bắt mọi nút thao tác phải có
@@ -17,42 +17,42 @@ import { cn } from "@/lib/utils";
  * rồi, coi như mất tác dụng.
  *
  * Cách làm: nghe rê chuột ở cấp document, tìm phần tử gần nhất CÓ `title`, rồi
- * tự vẽ tooltip sau {@link TRE_HIEN_MS}. `title` vẫn là NGUỒN DUY NHẤT của câu
+ * tự vẽ tooltip sau {@link HINT_DELAY_MS}. `title` vẫn là NGUỒN DUY NHẤT của câu
  * chữ — màn hình không phải đổi gì, không phải import gì.
  *
- * Chống hiện HAI tooltip: lúc rê thì gỡ tạm `title` ra (cất ở `data-goi-y`), rời
+ * Chống hiện HAI tooltip: lúc rê thì gỡ tạm `title` ra (cất ở `data-hint`), rời
  * chuột thì trả lại. Đi bằng BÀN PHÍM thì KHÔNG gỡ — trình duyệt không bật
  * tooltip khi focus, mà giữ nguyên `title` thì trình đọc màn hình vẫn đọc được.
  */
 
 /** Trễ trước khi hiện (ms). Đủ ngắn để rê tới là thấy, đủ dài để lướt qua không nhấp nháy. */
-export const TRE_HIEN_MS = 150;
+export const HINT_DELAY_MS = 150;
 
 /** Khoảng cách từ mép phần tử tới tooltip (px). */
-const CACH_LE = 8;
+const EDGE_MARGIN = 8;
 /** Chừa mép màn hình (px) — không để tooltip dính sát viền. */
 const LE_MAN = 8;
 
 /** Chỗ neo: câu chữ + khung của phần tử đang rê (toạ độ so với khung nhìn). */
 interface Neo {
-  chu: string;
-  trai: number;
-  tren: number;
-  duoi: number;
-  rong: number;
+  text: string;
+  left: number;
+  top: number;
+  bottom: number;
+  width: number;
 }
 
 /** Phần tử có thể mang gợi ý: có `title` và không phải đang bị tắt. */
 function findAnchor(t: EventTarget | null): HTMLElement | null {
   if (!(t instanceof Element)) return null;
-  const el = t.closest<HTMLElement>("[title], [data-goi-y]");
+  const el = t.closest<HTMLElement>("[title], [data-hint]");
   return el ?? null;
 }
 
 const getText = (el: HTMLElement) =>
-  (el.getAttribute("data-goi-y") ?? el.getAttribute("title") ?? "").trim();
+  (el.getAttribute("data-hint") ?? el.getAttribute("title") ?? "").trim();
 
-export function GoiYHover() {
+export function HoverHint() {
   const [neo, setNeo] = React.useState<Neo | null>(null);
   const hen = React.useRef<number | null>(null);
   /** Phần tử đang bị gỡ `title` — giữ để trả lại đúng chỗ. */
@@ -63,7 +63,7 @@ export function GoiYHover() {
     // Máy cảm ứng không có "rê chuột" — đừng bật, tránh tooltip nhảy khi chạm.
     if (!window.matchMedia?.("(hover: hover)").matches) return;
 
-    const huyHen = () => {
+    const cancelTimer = () => {
       if (hen.current != null) {
         window.clearTimeout(hen.current);
         hen.current = null;
@@ -74,17 +74,17 @@ export function GoiYHover() {
     const traTitle = () => {
       const el = typingEl.current;
       if (el) {
-        const chu = el.getAttribute("data-goi-y");
+        const chu = el.getAttribute("data-hint");
         if (chu != null) {
           el.setAttribute("title", chu);
-          el.removeAttribute("data-goi-y");
+          el.removeAttribute("data-hint");
         }
         typingEl.current = null;
       }
     };
 
     const an = () => {
-      huyHen();
+      cancelTimer();
       traTitle();
       setNeo(null);
     };
@@ -92,23 +92,23 @@ export function GoiYHover() {
     /** Ghi lại khung của phần tử; chỗ đặt thật tính sau khi đo được hộp chữ. */
     const positionAt = (el: HTMLElement, chu: string) => {
       const o = el.getBoundingClientRect();
-      setNeo({ chu, trai: o.left, tren: o.top, duoi: o.bottom, rong: o.width });
+      setNeo({ text: chu, left: o.left, top: o.top, bottom: o.bottom, width: o.width });
     };
 
     const showAfter = (el: HTMLElement, goTitle: boolean) => {
       const chu = getText(el);
       if (!chu) return;
-      huyHen();
+      cancelTimer();
       hen.current = window.setTimeout(() => {
         // Gỡ `title` NGAY TRƯỚC khi hiện, để tooltip gốc của trình duyệt không
         // đua lên cùng lúc. Chỉ gỡ khi rê chuột (xem docblock đầu file).
         if (goTitle && el.hasAttribute("title")) {
-          el.setAttribute("data-goi-y", chu);
+          el.setAttribute("data-hint", chu);
           el.removeAttribute("title");
           typingEl.current = el;
         }
         positionAt(el, chu);
-      }, TRE_HIEN_MS);
+      }, HINT_DELAY_MS);
     };
 
     const onPointerEnter = (e: PointerEvent) => {
@@ -153,7 +153,7 @@ export function GoiYHover() {
       window.removeEventListener("scroll", an, true);
       window.removeEventListener("resize", an);
       window.removeEventListener("blur", an);
-      huyHen();
+      cancelTimer();
       traTitle();
     };
   }, []);
@@ -170,19 +170,19 @@ export function GoiYHover() {
     const el = hop.current;
     if (!el || !neo) return;
     const o = el.getBoundingClientRect();
-    const trongKhoang = (v: number, min: number, max: number) => Math.max(min, Math.min(v, max));
+    const inRange = (v: number, min: number, max: number) => Math.max(min, Math.min(v, max));
 
     // Mặc định nằm DƯỚI; dưới không đủ chỗ mà trên rộng hơn thì lật lên TRÊN.
-    const spaceBelow = window.innerHeight - neo.duoi - CACH_LE - LE_MAN;
-    const placeAbove = spaceBelow < o.height && neo.tren - CACH_LE - LE_MAN > spaceBelow;
+    const spaceBelow = window.innerHeight - neo.bottom - EDGE_MARGIN - LE_MAN;
+    const placeAbove = spaceBelow < o.height && neo.top - EDGE_MARGIN - LE_MAN > spaceBelow;
 
-    const left = trongKhoang(
-      neo.trai + neo.rong / 2 - o.width / 2,
+    const left = inRange(
+      neo.left + neo.width / 2 - o.width / 2,
       LE_MAN,
       Math.max(LE_MAN, window.innerWidth - LE_MAN - o.width)
     );
-    const top = trongKhoang(
-      placeAbove ? neo.tren - CACH_LE - o.height : neo.duoi + CACH_LE,
+    const top = inRange(
+      placeAbove ? neo.top - EDGE_MARGIN - o.height : neo.bottom + EDGE_MARGIN,
       LE_MAN,
       Math.max(LE_MAN, window.innerHeight - LE_MAN - o.height)
     );
@@ -206,7 +206,7 @@ export function GoiYHover() {
         "bg-popover px-3 py-2 text-sm leading-snug text-popover-foreground shadow-lg"
       )}
     >
-      {neo.chu}
+      {neo.text}
     </div>
   );
 }

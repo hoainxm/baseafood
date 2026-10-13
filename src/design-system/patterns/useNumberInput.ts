@@ -1,9 +1,9 @@
 // ============================================================
-// Tên file: src/design-system/patterns/useNhapSo.ts
+// Tên file: src/design-system/patterns/useNumberInput.ts
 // Tên tiếng Việt: Hook hành vi ô nhập số dùng chung (số / biểu thức kiểu Excel)
 // ============================================================
 import * as React from "react";
-import { dinhDangSo, laBieuThuc, parseSoHoacBieuThuc } from "./bieuThucSo";
+import { formatNumber, isExpression, parseNumberOrExpression } from "./numberExpression";
 
 /**
  * Hành vi chung của ô số:
@@ -15,27 +15,27 @@ import { dinhDangSo, laBieuThuc, parseSoHoacBieuThuc } from "./bieuThucSo";
  *  - Đang gõ biểu thức: trả `xemTruoc` để hiện "= 550" ngay dưới ô.
  *  - `rong0`: số 0 hiện ô trống (ô lưới — đỡ rối mắt).
  */
-export function useNhapSo({
+export function useNumberInput({
   value,
   onChange,
-  rong0 = false,
+  emptyIsZero: rong0 = false,
 }: {
   value: number | null;
   onChange: (v: number | null) => void;
-  rong0?: boolean;
+  emptyIsZero?: boolean;
 }) {
   const [isTyping, setIsTyping] = React.useState(false);
   const [raw, setRaw] = React.useState("");
-  const goc = React.useRef<number | null>(value);
+  const rawValue = React.useRef<number | null>(value);
 
-  const displayNumber = (v: number | null) => (v == null || (rong0 && v === 0) ? "" : dinhDangSo(v));
-  const laBT = isTyping && laBieuThuc(raw);
-  const preview = laBT ? { ketQua: parseSoHoacBieuThuc(raw) } : null;
+  const displayNumber = (v: number | null) => (v == null || (rong0 && v === 0) ? "" : formatNumber(v));
+  const laBT = isTyping && isExpression(raw);
+  const preview = laBT ? { ketQua: parseNumberOrExpression(raw) } : null;
 
   const props = {
     value: isTyping ? raw : displayNumber(value),
     onFocus: (e: React.FocusEvent<HTMLInputElement>) => {
-      goc.current = value;
+      rawValue.current = value;
       setRaw(displayNumber(value));
       setIsTyping(true);
       e.currentTarget.select();
@@ -47,7 +47,7 @@ export function useNhapSo({
         onChange(null); // xoá ô
         return;
       }
-      const v = parseSoHoacBieuThuc(t);
+      const v = parseNumberOrExpression(t);
       if (v != null) onChange(v);
     },
     onBlur: () => setIsTyping(false),
@@ -55,8 +55,8 @@ export function useNhapSo({
       if (e.key === "Escape" && isTyping) {
         e.preventDefault();
         e.stopPropagation(); // đừng để Esc đóng luôn hộp thoại
-        onChange(goc.current);
-        setRaw(displayNumber(goc.current));
+        onChange(rawValue.current);
+        setRaw(displayNumber(rawValue.current));
       }
     },
   };

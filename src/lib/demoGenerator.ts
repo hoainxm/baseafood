@@ -339,7 +339,7 @@ export function generateDemoBundle(n: DemoSource, tc: DemoOptions): GoiDemo {
         shipments.push({
           id: sid,
           deliveryDate: date,
-          postingDate: postingDate,
+          postingDate,
           backdateReason: postingDate > date ? "Phiếu cân về muộn, ghi bổ sung" : "",
           workshop: x,
           supplierName: dl,
@@ -377,7 +377,7 @@ export function generateDemoBundle(n: DemoSource, tc: DemoOptions): GoiDemo {
       // Chốt ngày nhập (ca "chưa chốt" / "sửa sau chốt" cài sau vòng sinh).
       if (isPast)
         dailyLocks.push({ id: `${date}|${x}`, lockDate: date, workshop: x, isLocked: true, lockedAt: `${date}T17:00:00.000Z`, totalKgAtLock: totalIn, reopenReason: "", note: "" });
-      scraps.push({ id: id("phe"), periodId: "", name: "Nội tạng, đầu", quantityKg: tron(totalIn * ng.tu(0.05, 0.07), 1), sellingPrice: 4_000, date: date, workshop: x, source: "Nhập hàng" });
+      scraps.push({ id: id("phe"), periodId: "", name: "Nội tạng, đầu", quantityKg: tron(totalIn * ng.tu(0.05, 0.07), 1), sellingPrice: 4_000, date, workshop: x, source: "Nhập hàng" });
 
       // Bán nội địa NL thẳng
       if (ng.r() < 0.2) {
@@ -444,13 +444,13 @@ export function generateDemoBundle(n: DemoSource, tc: DemoOptions): GoiDemo {
       // Chốt ngày SX (ghi còn dở theo loại NL) — ca "chưa chốt SX" cài sau vòng sinh.
       if (isPast) {
         const leftoverKg = tron(totalIn * ng.tu(0.05, 0.08), 1);
-        productionLocks.push({ id: `${date}|${x}`, lockDate: date, workshop: x, isLocked: true, lockedAt: `${date}T17:30:00.000Z`, totalKgAtLock: tron(totalFinishedGood, 1), reopenReason: "", note: "", leftoverKg: leftoverKg, leftoverByMaterial: { [todayRows[0].materialTypeName]: leftoverKg } });
+        productionLocks.push({ id: `${date}|${x}`, lockDate: date, workshop: x, isLocked: true, lockedAt: `${date}T17:30:00.000Z`, totalKgAtLock: tron(totalFinishedGood, 1), reopenReason: "", note: "", leftoverKg, leftoverByMaterial: { [todayRows[0].materialTypeName]: leftoverKg } });
       }
       // QC cuối ngày
       for (const criterion of QC_CRITERIA) {
         const r0 = ng.r();
         const kq: QcResult = r0 < 0.85 ? "dat" : r0 < 0.97 ? "tam" : "khong-dat";
-        qcChecklists.push({ id: id("qc"), date: date, workshop: x, criterion: criterion, result: kq, score: kq === "dat" ? ng.nguyen(8, 10) : kq === "tam" ? ng.nguyen(6, 7) : ng.nguyen(3, 5), note: kq === "dat" ? "" : "Đã nhắc tổ khắc phục", backdateReason: "" });
+        qcChecklists.push({ id: id("qc"), date, workshop: x, criterion, result: kq, score: kq === "dat" ? ng.nguyen(8, 10) : kq === "tam" ? ng.nguyen(6, 7) : ng.nguyen(3, 5), note: kq === "dat" ? "" : "Đã nhắc tổ khắc phục", backdateReason: "" });
       }
       if (isPast) qcLocks.push({ id: `${date}|${x}`, lockDate: date, workshop: x, isLocked: true, lockedAt: `${date}T18:00:00.000Z`, totalKgAtLock: 0, reopenReason: "", note: "" });
     });
@@ -495,7 +495,7 @@ export function generateDemoBundle(n: DemoSource, tc: DemoOptions): GoiDemo {
       const inputKg = lay(w.id, w.quantityKg * ng.tu(0.4, 0.6));
       if (inputKg <= 0) continue;
       const ra = tron(inputKg * ng.tu(0.95, 0.97), 1);
-      const p: Packaging = { id: id("goi"), date: date, workshop: x, fromProductId: w.productId, fromSpec: "", inputKg: inputKg, inputBlocks: 0, toProductId: w.productId, toSpec: "Khay 1 kg", outputKg: ra, outputUnits: Math.max(1, tron(ra / 10)), warehouse: FG_WAREHOUSE, note: "" };
+      const p: Packaging = { id: id("goi"), date, workshop: x, fromProductId: w.productId, fromSpec: "", inputKg, inputBlocks: 0, toProductId: w.productId, toSpec: "Khay 1 kg", outputKg: ra, outputUnits: Math.max(1, tron(ra / 10)), warehouse: FG_WAREHOUSE, note: "" };
       packagings.push(p);
       remainingFinishedGood.set(p.id, ra);
       lotInputs.push({ id: id("gl"), outputKind: "P", outputId: p.id, inputKind: "W", inputId: w.id, inputLabel: sp.get(w.productId)?.name ?? "", material: "", quantityKg: inputKg, method: "quet", operator: "Demo", recordedAt: `${date}T10:00:00.000Z` });
@@ -519,11 +519,11 @@ export function generateDemoBundle(n: DemoSource, tc: DemoOptions): GoiDemo {
     const exportDate = subtractDays(orderDate, -4) <= tc.homNay ? subtractDays(orderDate, -4) : tc.homNay;
     const kh = customers[d % customers.length];
     const pid = productsWithStock.length ? productsWithStock[d % productsWithStock.length] : allProducts[d % allProducts.length];
-    const don: SalesOrder = { id: id("don"), customerId: kh?.id ?? "", orderDate: orderDate, status: "dang-gom", note: "Đơn demo" };
+    const don: SalesOrder = { id: id("don"), customerId: kh?.id ?? "", orderDate, status: "dang-gom", note: "Đơn demo" };
     salesOrders.push(don);
     const can = tron(ng.tu(800, 2_000), 10);
     orderItems.push({ id: id("dongdon"), orderId: don.id, productId: pid, spec: "", requiredQuantityKg: can, requiredBlocksCount: tron(can / 10) });
-    const exportOrder: ExportOrder = { id: id("lenh"), orderId: don.id, exportDate: exportDate, status: exportDate < tc.homNay ? "dong" : "mo", note: "" };
+    const exportOrder: ExportOrder = { id: id("lenh"), orderId: don.id, exportDate, status: exportDate < tc.homNay ? "dong" : "mo", note: "" };
     let canCon = can;
     for (const w of olderBatches(exportDate, (m) => m.productId === pid)) {
       if (canCon <= 0) break;

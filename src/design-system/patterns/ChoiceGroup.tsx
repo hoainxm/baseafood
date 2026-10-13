@@ -2,11 +2,11 @@ import { Combobox } from "./Combobox";
 import { cn } from "@/lib/utils";
 import { Check } from "lucide-react";
 
-export interface LuaChon {
+export interface ChoiceOption {
   value: string;
   label: string;
   /** Mô tả phụ hiện dưới nhãn khi ở dạng nút */
-  moTa?: string;
+  description?: string;
 }
 
 /**
@@ -26,40 +26,40 @@ export function ChoiceGroup({
   required,
   hint,
   error,
-  nguongNut = 6,
-  cot = 2,
-  anNhanBatBuoc = false,
+  maxButtons = 6,
+  columns = 2,
+  hideRequiredMark = false,
   className,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
-  options: LuaChon[];
+  options: ChoiceOption[];
   required?: boolean;
   hint?: string;
   error?: string;
-  nguongNut?: number;
-  cot?: 2 | 3 | 4;
+  maxButtons?: number;
+  columns?: 2 | 3 | 4;
   /** Ẩn nhãn "Bắt buộc / (không bắt buộc)" — dùng khi đây là BỘ LỌC, không phải ô nhập. */
-  anNhanBatBuoc?: boolean;
+  hideRequiredMark?: boolean;
   className?: string;
 }) {
   // Quá nhiều lựa chọn để bày hết thành nút → chuyển sang danh sách có ô tìm.
-  if (options.length > nguongNut) {
+  if (options.length > maxButtons) {
     return (
       <Combobox
         label={label}
         required={required}
         hint={hint}
         error={error}
-        anNhanBatBuoc={anNhanBatBuoc}
+        hideRequiredMark={hideRequiredMark}
         className={className}
         value={value}
         onChange={onChange}
         options={options.map((o) => ({
           value: o.value,
           label: o.label,
-          phu: o.moTa,
+          phu: o.description,
         }))}
       />
     );
@@ -70,7 +70,7 @@ export function ChoiceGroup({
       <div className="flex flex-wrap items-center gap-2">
         <legend className="text-sm leading-snug font-semibold text-foreground">
           {label}
-          {!anNhanBatBuoc && required && (
+          {!hideRequiredMark && required && (
             <span aria-hidden className="ml-1 font-bold text-destructive">
               *
             </span>
@@ -90,9 +90,9 @@ export function ChoiceGroup({
       <div
         className={cn(
           "grid gap-3",
-          cot === 2 && "grid-cols-1 sm:grid-cols-2",
-          cot === 3 && "grid-cols-2 sm:grid-cols-3",
-          cot === 4 && "grid-cols-2 sm:grid-cols-4"
+          columns === 2 && "grid-cols-1 sm:grid-cols-2",
+          columns === 3 && "grid-cols-2 sm:grid-cols-3",
+          columns === 4 && "grid-cols-2 sm:grid-cols-4"
         )}
       >
         {options.map((o) => {
@@ -104,12 +104,12 @@ export function ChoiceGroup({
               data-slot="choice-option"
               aria-pressed={isSelected}
               onClick={() => onChange(o.value)}
-              title={o.moTa ?? `Chọn "${o.label}" cho ${label.toLowerCase()}.`}
+              title={o.description ?? `Chọn "${o.label}" cho ${label.toLowerCase()}.`}
               className={cn(
                 /* 40px — bằng đúng chiều cao ô nhập, để hai cột cạnh nhau
                    (VD "Ngày nhập hàng" ↔ "Phân xưởng") thẳng hàng.
                    Giữ border-2: viền dày là tín hiệu CHỌN (không chỉ dựa màu). */
-                "flex min-h-10 w-full items-center justify-between gap-4 rounded-lg border-2 px-4 py-2 text-left text-sm font-semibold nhan-an",
+                "flex min-h-10 w-full items-center justify-between gap-4 rounded-lg border-2 px-4 py-2 text-left text-sm font-semibold press-feedback",
                 isSelected
                   ? "border-primary bg-accent text-accent-foreground"
                   : "border-input bg-background text-foreground hover:bg-muted"
@@ -117,9 +117,9 @@ export function ChoiceGroup({
             >
               <span className="min-w-0">
                 {o.label}
-                {o.moTa && (
+                {o.description && (
                   <span className="block text-sm font-normal text-muted-foreground">
-                    {o.moTa}
+                    {o.description}
                   </span>
                 )}
               </span>

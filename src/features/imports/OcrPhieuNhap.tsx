@@ -12,9 +12,9 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  Nhan,
+  Tag,
   notify,
-  sacTheoTen,
+  toneByName,
 } from "@/design-system";
 import { Camera, Check, Loader2, Plus, RefreshCw } from "lucide-react";
 import { recognizeImportSlip, type OcrCatalog, type KetQuaOcr } from "@/lib/ocr";
@@ -65,7 +65,7 @@ export function OcrPhieuNhap({
       uploadImage(file).then((path) => {
         if (path) {
           onLuuAnh(path);
-          notify.daLuu("Đã lưu ảnh phiếu kèm chuyến");
+          notify.saved("Đã lưu ảnh phiếu kèm chuyến");
         }
       });
 
@@ -83,7 +83,7 @@ export function OcrPhieuNhap({
       if (!appliedRows.has(i)) onThemDong(d.loaiNL, d.kg);
     });
     setAppliedRows(new Set(kq?.dong.map((_, i) => i)));
-    notify.daLuu("Đã thêm các dòng nhận được — soát lại số trước khi lưu");
+    notify.saved("Đã thêm các dòng nhận được — soát lại số trước khi lưu");
   };
 
   const doiAnh = () => {
@@ -249,9 +249,9 @@ export function OcrPhieuNhap({
                     <div className="flex flex-wrap items-center gap-1.5">
                       <span className="text-sm text-muted-foreground">Loại NL:</span>
                       {kq.loaiNL.map((l) => (
-                        <Nhan key={l} loai="phan-loai" sac={sacTheoTen(l)}>
+                        <Tag key={l} variant="phan-loai" tone={toneByName(l)}>
                           {l}
-                        </Nhan>
+                        </Tag>
                       ))}
                     </div>
                   )}
@@ -259,9 +259,9 @@ export function OcrPhieuNhap({
                     <div className="flex flex-wrap items-center gap-1.5">
                       <span className="text-sm text-muted-foreground">Số nhận được:</span>
                       {kq.soKg.map((n, i) => (
-                        <Nhan key={i} loai="phu" className="tnum">
+                        <Tag key={i} variant="phu" className="tnum">
                           {fmtKg(n)}
-                        </Nhan>
+                        </Tag>
                       ))}
                     </div>
                   )}

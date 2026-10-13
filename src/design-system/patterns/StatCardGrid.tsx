@@ -1,6 +1,6 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
-import type { SacPhanLoai } from "./Nhan";
+import type { CategoryTone } from "./Tag";
 
 /**
  * Thẻ thông tin (KPI card) — thay cho việc nhồi mọi số vào một dòng chữ.
@@ -9,55 +9,55 @@ import type { SacPhanLoai } from "./Nhan";
  * icon màu để mắt bắt nhanh. Người 45–60 tuổi đọc "thẻ" nhanh hơn đọc một câu
  * dài gộp Ngày · Xưởng · Tổng. Màu chỉ để phân nhóm, luôn kèm nhãn chữ.
  */
-export type MauThe = "brand" | "success" | "warning" | "danger" | "trung-tinh";
+export type StatCardColor = "brand" | "success" | "warning" | "danger" | "trung-tinh";
 
-export interface TheThongTin {
-  nhan: string;
-  giaTri: React.ReactNode;
+export interface StatCardData {
+  label: string;
+  value: React.ReactNode;
   /** Dòng phụ nhỏ dưới số (VD đơn vị, ghi chú). */
-  phu?: React.ReactNode;
+  subtext?: React.ReactNode;
   icon?: React.ComponentType<{ className?: string; "aria-hidden"?: boolean }>;
-  mau?: MauThe;
+  color?: StatCardColor;
   /**
-   * SẮC THEO LOẠI SỐ (bảng tone dùng chung với `Nhan`) — thẻ tô nền nhạt + viền trái
+   * SẮC THEO LOẠI SỐ (bảng tone dùng chung với `Tag`) — thẻ tô nền nhạt + viền trái
    * đậm + số cùng màu, để mỗi loại (nhập · sản xuất · kho · bán…) nhận ra ngay và khớp
    * màu với biểu đồ cùng màn. Có `sac` thì bỏ qua `mau` (trừ khi muốn báo tốt/xấu: khi
    * đó dùng `mau`, đừng truyền `sac`).
    */
-  sac?: SacPhanLoai;
+  tone?: CategoryTone;
   /** Số → tabular-nums cho thẳng cột. */
-  so?: boolean;
+  numeric?: boolean;
   /** Nếu có → thẻ bấm được (drill-down tới dữ liệu). Thêm con trỏ + viền nổi khi rê. */
-  onChon?: () => void;
+  onSelect?: () => void;
   /** Câu gợi ý khi rê chuột / cho screen-reader (dùng với onChon). */
-  moTaChon?: string;
+  selectHint?: string;
 }
 
-const CARD_COLORS: Record<MauThe, { chip: string; vien: string }> = {
-  brand: { chip: "bg-accent text-accent-foreground", vien: "border-border" },
+const CARD_COLORS: Record<StatCardColor, { chip: string; border: string }> = {
+  brand: { chip: "bg-accent text-accent-foreground", border: "border-border" },
   success: {
     chip: "bg-success-surface text-success",
-    vien: "border-success/30",
+    border: "border-success/30",
   },
   warning: {
     chip: "bg-warning-surface text-warning",
-    vien: "border-warning/30",
+    border: "border-warning/30",
   },
-  danger: { chip: "bg-destructive/10 text-destructive", vien: "border-destructive/30" },
-  "trung-tinh": { chip: "bg-muted text-muted-foreground", vien: "border-border" },
+  danger: { chip: "bg-destructive/10 text-destructive", border: "border-destructive/30" },
+  "trung-tinh": { chip: "bg-muted text-muted-foreground", border: "border-border" },
 };
 
 /* Liệt kê TRỌN tên lớp (không ghép chuỗi) để Tailwind quét thấy. */
-const SAC_THE: Record<SacPhanLoai, { the: string; chip: string; so: string }> = {
-  tim: { the: "border-tone-tim-line bg-tone-tim-surface", chip: "bg-tone-tim text-white", so: "text-tone-tim" },
-  ngoc: { the: "border-tone-ngoc-line bg-tone-ngoc-surface", chip: "bg-tone-ngoc text-white", so: "text-tone-ngoc" },
-  bien: { the: "border-tone-bien-line bg-tone-bien-surface", chip: "bg-tone-bien text-white", so: "text-tone-bien" },
-  bang: { the: "border-tone-bang-line bg-tone-bang-surface", chip: "bg-tone-bang text-white", so: "text-tone-bang" },
-  cat: { the: "border-tone-cat-line bg-tone-cat-surface", chip: "bg-tone-cat text-white", so: "text-tone-cat" },
-  hong: { the: "border-tone-hong-line bg-tone-hong-surface", chip: "bg-tone-hong text-white", so: "text-tone-hong" },
-  la: { the: "border-tone-la-line bg-tone-la-surface", chip: "bg-tone-la text-white", so: "text-tone-la" },
-  cam: { the: "border-tone-cam-line bg-tone-cam-surface", chip: "bg-tone-cam text-white", so: "text-tone-cam" },
-  xam: { the: "border-tone-xam-line bg-tone-xam-surface", chip: "bg-tone-xam text-white", so: "text-tone-xam" },
+const SAC_THE: Record<CategoryTone, { card: string; chip: string; value: string }> = {
+  tim: { card: "border-tone-tim-line bg-tone-tim-surface", chip: "bg-tone-tim text-white", value: "text-tone-tim" },
+  ngoc: { card: "border-tone-ngoc-line bg-tone-ngoc-surface", chip: "bg-tone-ngoc text-white", value: "text-tone-ngoc" },
+  bien: { card: "border-tone-bien-line bg-tone-bien-surface", chip: "bg-tone-bien text-white", value: "text-tone-bien" },
+  bang: { card: "border-tone-bang-line bg-tone-bang-surface", chip: "bg-tone-bang text-white", value: "text-tone-bang" },
+  cat: { card: "border-tone-cat-line bg-tone-cat-surface", chip: "bg-tone-cat text-white", value: "text-tone-cat" },
+  hong: { card: "border-tone-hong-line bg-tone-hong-surface", chip: "bg-tone-hong text-white", value: "text-tone-hong" },
+  la: { card: "border-tone-la-line bg-tone-la-surface", chip: "bg-tone-la text-white", value: "text-tone-la" },
+  cam: { card: "border-tone-cam-line bg-tone-cam-surface", chip: "bg-tone-cam text-white", value: "text-tone-cam" },
+  xam: { card: "border-tone-xam-line bg-tone-xam-surface", chip: "bg-tone-xam text-white", value: "text-tone-xam" },
 };
 
 const LG_GRID_COLS: Record<number, string> = {
@@ -79,17 +79,17 @@ function autoColumnCount(cardCount: number): 2 | 3 | 4 | 5 {
   return 4;
 }
 
-export function ThongKe({
-  the,
-  cot,
+export function StatCardGrid({
+  cards: the,
+  columns,
   className,
 }: {
-  the: TheThongTin[];
+  cards: StatCardData[];
   /** Số cột tối đa (màn rộng). Bỏ trống ⇒ tự suy theo số thẻ (xem `cotTuDong`). */
-  cot?: 2 | 3 | 4 | 5;
+  columns?: 2 | 3 | 4 | 5;
   className?: string;
 }) {
-  const columnCount = cot ?? autoColumnCount(the.length);
+  const columnCount = columns ?? autoColumnCount(the.length);
   // 5 cột trên màn rộng: thẻ hẹp ⇒ icon lên trên nhãn, số nhỏ một bậc, để số dài
   // (1.478.897,83 kg · 29.535.327.023 đ) vẫn nằm trọn một dòng, không ngắt giữa số.
   const isNarrow = columnCount === 5;
@@ -106,15 +106,15 @@ export function ThongKe({
       )}
     >
       {the.map((t) => {
-        const color = CARD_COLORS[t.mau ?? "brand"];
-        const sac = t.sac ? SAC_THE[t.sac] : null;
+        const color = CARD_COLORS[t.color ?? "brand"];
+        const sac = t.tone ? SAC_THE[t.tone] : null;
         const Icon = t.icon;
-        const isString = typeof t.giaTri === "string";
-        const len = isString ? (t.giaTri as string).length : 0;
+        const isString = typeof t.value === "string";
+        const len = isString ? (t.value as string).length : 0;
         // Chuỗi vừa (ngày "21/08/2026"…) để cỡ nhỏ đủ HIỆN TRỌN 1 dòng trong thẻ
         // hẹp nhất (mobile 2 cột) — không bẻ dòng giữa số, không cắt mất năm.
         // Chuỗi thật dài (>12) mới cho ngắt từ; số (t.so) luôn to.
-        const fontSizeClass = t.so
+        const fontSizeClass = t.numeric
           ? isNarrow
             ? "text-xl md:text-2xl lg:text-lg 2xl:text-xl"
             : "text-xl md:text-2xl"
@@ -138,52 +138,52 @@ export function ThongKe({
             )}
             <div className="w-full min-w-0 flex-1">
               <p className="text-sm font-medium text-muted-foreground break-words">
-                {t.nhan}
+                {t.label}
               </p>
               <p
                 className={cn(
                   "min-w-0 leading-tight",
-                  sac ? sac.so : "text-foreground",
+                  sac ? sac.value : "text-foreground",
                   // Số & chuỗi ngắn để bold cho nổi; chuỗi vừa/dài (ngày…) chỉ
                   // semibold để hẹp hơn, vừa thẻ mà không cắt chữ.
-                  t.so || len <= 7 ? "font-bold" : "font-semibold",
+                  t.numeric || len <= 7 ? "font-bold" : "font-semibold",
                   // Số (tiền/kg) KHÔNG truncate — thà bẻ dòng còn hơn cắt mất chữ
                   // số. Chỉ chuỗi vừa (ngày…) mới truncate cho gọn 1 dòng.
-                  t.so || len > 12 ? "break-words" : "truncate",
+                  t.numeric || len > 12 ? "break-words" : "truncate",
                   fontSizeClass,
-                  t.so && "tnum"
+                  t.numeric && "tnum"
                 )}
               >
-                {t.giaTri}
+                {t.value}
               </p>
-              {t.phu && (
-                <p className="text-sm text-muted-foreground break-words">{t.phu}</p>
+              {t.subtext && (
+                <p className="text-sm text-muted-foreground break-words">{t.subtext}</p>
               )}
             </div>
           </>
         );
         const cls = cn(
           "flex items-center gap-2.5 rounded-xl border px-3 py-3",
-          sac ? cn("border-l-4", sac.the) : "bg-card",
+          sac ? cn("border-l-4", sac.card) : "bg-card",
           isNarrow && "lg:flex-col lg:items-start lg:gap-2",
-          !sac && color.vien
+          !sac && color.border
         );
-        return t.onChon ? (
+        return t.onSelect ? (
           <button
-            key={t.nhan}
+            key={t.label}
             type="button"
-            onClick={t.onChon}
-            title={t.moTaChon}
-            aria-label={t.moTaChon ?? `Xem chi tiết: ${t.nhan}`}
+            onClick={t.onSelect}
+            title={t.selectHint}
+            aria-label={t.selectHint ?? `Xem chi tiết: ${t.label}`}
             className={cn(
               cls,
-              "cursor-pointer text-left nhan-an hover:border-primary hover:bg-muted/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+              "cursor-pointer text-left press-feedback hover:border-primary hover:bg-muted/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
             )}
           >
             {content}
           </button>
         ) : (
-          <div key={t.nhan} className={cls}>
+          <div key={t.label} className={cls}>
             {content}
           </div>
         );

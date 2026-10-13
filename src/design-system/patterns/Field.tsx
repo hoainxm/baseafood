@@ -1,7 +1,7 @@
 import * as React from "react";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import { ONhapCuaField, type ThuocTinhONhap } from "./oNhapCuaField";
+import { FieldInputContext, type FieldInputProps } from "./fieldInput";
 
 /**
  * Field — bọc mọi ô nhập.
@@ -9,7 +9,7 @@ import { ONhapCuaField, type ThuocTinhONhap } from "./oNhapCuaField";
  * Luật:
  *  - Nhãn LUÔN hiện, nằm TRÊN ô, không bao giờ thay bằng placeholder
  *    (placeholder biến mất khi gõ → người lớn tuổi quên đang nhập ô gì).
- *  - Ô bắt buộc đánh dấu bằng **dấu * đỏ** sau nhãn; form đặt `ChuThichBatBuoc`
+ *  - Ô bắt buộc đánh dấu bằng **dấu * đỏ** sau nhãn; form đặt `RequiredLegend`
  *    ở đầu để giải nghĩa. Dấu * là `aria-hidden` — trình đọc màn hình nhận
  *    thông tin bắt buộc qua `aria-required` trên chính ô nhập, không đọc "sao".
  *    (Khác GOV.UK — quyết định của chủ dự án 2026-08-17 vì chip "Bắt buộc"
@@ -22,7 +22,7 @@ import { ONhapCuaField, type ThuocTinhONhap } from "./oNhapCuaField";
  * Chú thích giải nghĩa dấu *. Đặt MỘT lần ở đầu form / đầu thân dialog có ô bắt
  * buộc — dấu * không tự nói lên điều gì với người chưa quen ký hiệu.
  */
-export function ChuThichBatBuoc({ className }: { className?: string }) {
+export function RequiredLegend({ className }: { className?: string }) {
   return (
     <p className={cn("text-sm text-muted-foreground", className)}>
       Ô có dấu <span className="font-bold text-destructive">*</span> là bắt buộc.
@@ -32,10 +32,10 @@ export function ChuThichBatBuoc({ className }: { className?: string }) {
 
 /**
  * Dò xem trong một vùng DOM có ô bắt buộc không (`aria-required="true"`), để
- * form tự quyết định có hiện `ChuThichBatBuoc` hay không — khỏi phải bật cờ tay
+ * form tự quyết định có hiện `RequiredLegend` hay không — khỏi phải bật cờ tay
  * ở từng chỗ gọi và không bao giờ hiện thừa.
  */
-export function useCoOBatBuoc(
+export function useHasRequiredField(
   ref: React.RefObject<HTMLElement | null>,
   deps: React.DependencyList = []
 ) {
@@ -62,9 +62,9 @@ export function Field({
   hint,
   error,
   unit,
-  anNhanBatBuoc = false,
-  anNhan = false,
-  oNhapLong = false,
+  hideRequiredMark = false,
+  hideLabel = false,
+  nestedInput = false,
   className,
   children,
 }: {
@@ -75,18 +75,18 @@ export function Field({
   /** Đơn vị hiện chìm bên phải trong ô, vd "kg", "đ", "%" */
   unit?: string;
   /** Ẩn nhãn "Bắt buộc / (không bắt buộc)" — dùng khi đây là BỘ LỌC hoặc ô sửa nhanh. */
-  anNhanBatBuoc?: boolean;
+  hideRequiredMark?: boolean;
   /**
    * Giấu HẲN nhãn nhìn thấy, giữ nhãn cho trình đọc màn hình (aria-label). CHỈ
    * dùng khi tiêu đề CỘT đã nói rõ ô này là gì (ô trong bảng/lưới nhập) — giống
    * `Combobox anNhan`. Ngoài bảng thì nhãn phải luôn hiện.
    */
-  anNhan?: boolean;
+  hideLabel?: boolean;
   /**
    * Con KHÔNG phải ô nhập mà là thẻ bọc có ô nhập bên trong ⇒ `Field` không gắn gì
-   * lên thẻ bọc; ô nhập tự lấy qua `useONhapCuaField()`.
+   * lên thẻ bọc; ô nhập tự lấy qua `useFieldInput()`.
    */
-  oNhapLong?: boolean;
+  nestedInput?: boolean;
   className?: string;
   children: React.ReactElement;
 }) {
@@ -118,19 +118,19 @@ export function Field({
     return () => ro.disconnect();
   }, [unit]);
 
-  const inputAttrs: ThuocTinhONhap = {
+  const inputAttrs: FieldInputProps = {
     id,
     // anNhan: nhãn nhìn thấy bị giấu → chuyển tên ô cho trình đọc màn hình.
-    "aria-label": anNhan ? label : undefined,
+    "aria-label": hideLabel ? label : undefined,
     "aria-describedby": describedBy,
     "aria-invalid": error ? true : undefined,
     // Dấu * chỉ là tín hiệu THỊ GIÁC (aria-hidden). Trình đọc màn hình lấy
     // thông tin bắt buộc từ đây.
-    "aria-required": required && !anNhanBatBuoc ? true : undefined,
+    "aria-required": required && !hideRequiredMark ? true : undefined,
     style: pendingCount ? { paddingRight: pendingCount } : undefined,
   };
 
-  const child = oNhapLong
+  const child = nestedInput
     ? children
     : React.cloneElement(children as React.ReactElement<Record<string, unknown>>, {
         ...inputAttrs,
@@ -146,11 +146,11 @@ export function Field({
        ô nhập LUÔN thẳng hàng dưới cùng — kể cả khi ô bên cạnh có thêm dòng gợi ý
        (VD "Số lượng" cạnh "Đơn giá" có hint → trước đây hai ô lệch nhau). */
     <div className={cn("flex h-full flex-col gap-2", className)}>
-      {!anNhan && (
+      {!hideLabel && (
         <div className="flex flex-wrap items-center gap-2">
           <Label htmlFor={id}>
             {label}
-            {!anNhanBatBuoc && required && (
+            {!hideRequiredMark && required && (
               <span aria-hidden className="ml-1 font-bold text-destructive">
                 *
               </span>
@@ -176,7 +176,7 @@ export function Field({
       )}
 
       <div className="relative mt-auto">
-        <ONhapCuaField.Provider value={oNhapLong ? inputAttrs : null}>{child}</ONhapCuaField.Provider>
+        <FieldInputContext.Provider value={nestedInput ? inputAttrs : null}>{child}</FieldInputContext.Provider>
         {unit && (
           <span
             ref={unitRef}

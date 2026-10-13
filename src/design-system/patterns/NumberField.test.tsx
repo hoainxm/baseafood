@@ -27,13 +27,13 @@ describe("NumberField — thuộc tính của Field nằm trên CHÍNH <input>",
     const o = theInput(html);
     expect(getAttr(o, "aria-required")).toBe("true");
     expect(getAttr(o, "aria-invalid")).toBe("true");
-    const ds = getAttr(o, "aria-describedby")!.split(" ");
-    expect(ds).toHaveLength(2);
-    for (const x of ds) expect(html).toContain(`id="${x}"`);
+    const items = getAttr(o, "aria-describedby")!.split(" ");
+    expect(items).toHaveLength(2);
+    for (const x of items) expect(html).toContain(`id="${x}"`);
   });
 
   test("giấu nhãn (anNhan, ô trong bảng) ⇒ ô nhập mang aria-label", () => {
-    const o = theInput(render(<NumberField label="Số kg ngày 21/7" anNhan value={5} onChange={() => {}} />));
+    const o = theInput(render(<NumberField label="Số kg ngày 21/7" hideLabel value={5} onChange={() => {}} />));
     expect(getAttr(o, "aria-label")).toBe("Số kg ngày 21/7");
   });
 

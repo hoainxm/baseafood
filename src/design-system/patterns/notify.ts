@@ -15,7 +15,7 @@ export const notify = {
    * `thaoTac` = việc nên làm NGAY sau khi lưu (vd "In tem" cho lô vừa ghi). Có cả
    * Hoàn tác thì Hoàn tác giữ nút chính, thao tác kia đứng cạnh.
    */
-  daLuu(message: string, onUndo?: () => void, action?: { label: string; onClick: () => void }) {
+  saved(message: string, onUndo?: () => void, action?: { label: string; onClick: () => void }) {
     const undo = onUndo ? { label: "Hoàn tác", onClick: onUndo } : undefined;
     toast.success(message, {
       duration: THOI_GIAN,
@@ -24,18 +24,18 @@ export const notify = {
     });
   },
 
-  daXoa(message: string, onUndo?: () => void) {
+  deleted(message: string, onUndo?: () => void) {
     toast(message, {
       duration: THOI_GIAN,
       action: onUndo ? { label: "Hoàn tác", onClick: onUndo } : undefined,
     });
   },
 
-  loi(message: string) {
+  error(message: string) {
     toast.error(message, { duration: THOI_GIAN });
   },
 
-  canhBao(message: string) {
+  warning(message: string) {
     toast.warning(message, { duration: THOI_GIAN });
   },
 };

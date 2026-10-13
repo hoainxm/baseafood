@@ -1,11 +1,11 @@
 import * as React from "react";
 import { AlertTriangle } from "lucide-react";
 
-export interface LoiNhap {
+export interface FieldError {
   /** Nhãn ô bị lỗi, vd "Số lượng" */
-  truong: string;
+  field: string;
   /** Câu nói người dùng hiểu, vd "Chưa nhập số lượng" */
-  thongBao: string;
+  message: string;
   /** id của ô để nhảy tới khi bấm */
   targetId?: string;
 }
@@ -19,7 +19,7 @@ export interface LoiNhap {
  * Dùng chung với nguyên tắc: nút "Lưu" KHÔNG BAO GIỜ bị disable —
  * bấm vào thì hiện hộp này, thay vì im lặng không phản ứng.
  */
-export function ErrorSummary({ loi }: { loi: LoiNhap[] }) {
+export function ErrorSummary({ errors: loi }: { errors: FieldError[] }) {
   const ref = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
@@ -59,11 +59,11 @@ export function ErrorSummary({ loi }: { loi: LoiNhap[] }) {
                 }}
                 className="text-left text-sm font-semibold text-destructive underline underline-offset-4"
               >
-                {l.truong}: {l.thongBao}
+                {l.field}: {l.message}
               </button>
             ) : (
               <span className="text-sm font-semibold text-destructive">
-                {l.truong}: {l.thongBao}
+                {l.field}: {l.message}
               </span>
             )}
           </li>

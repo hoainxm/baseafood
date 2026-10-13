@@ -85,8 +85,8 @@ export default function BangCanDoi({
 
   /* Khoá cuộn nền khi phiếu đang mở — xem ghi chú ở src/index.css. */
   useEffect(() => {
-    document.documentElement.setAttribute("data-xem-phieu", "");
-    return () => document.documentElement.removeAttribute("data-xem-phieu");
+    document.documentElement.setAttribute("data-print-preview", "");
+    return () => document.documentElement.removeAttribute("data-print-preview");
   }, []);
 
   return (

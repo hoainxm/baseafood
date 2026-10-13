@@ -16,7 +16,7 @@
  *     không khóa demo nào trùng khóa thật. App bên trong vẫn dùng khóa gốc. CỘT KHÓA
  *     NGOẠI trỏ tới khóa chính đã có tiền tố (`period_id` → `balancing_periods.id`
  *     ở balancing_inputs / balancing_outputs / scraps) cũng phải mang tiền tố, không
- *     thì máy chủ từ chối (23503) — khai ở `TableMapping.cotThamChieu`.
+ *     thì máy chủ từ chối (23503) — khai ở `TableMapping.refColumns`.
  *  3. Bản sao + hàng chờ dưới máy dùng khóa `bsf-demo.*` thay `bsf.*` — hàng chờ thật
  *     chưa gửi của máy đó không bao giờ bị lượt đồng bộ demo đẩy nhầm site.
  *

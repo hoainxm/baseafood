@@ -17,7 +17,7 @@ import {
   DialogTitle,
   Field,
   Input,
-  Nhan,
+  Tag,
   Textarea,
   notify,
 } from "@/design-system";
@@ -66,9 +66,9 @@ export function HopThemDongNL({
           onChange={setTen}
           options={goiY}
           onCreate={onThemLoaiNL}
-          onSuaMuc={suaLoai?.moSua}
-          suaDuoc={suaLoai?.suaDuoc}
-          nhanSua={suaLoai?.nhanSua}
+          onEditItem={suaLoai?.moSua}
+          canEdit={suaLoai?.suaDuoc}
+          editLabel={suaLoai?.nhanSua}
         />
         <DialogFooter>
           <Button variant="outline" size="lg" onClick={onClose}>
@@ -80,7 +80,7 @@ export function HopThemDongNL({
             onClick={() => {
               const t = ten.trim();
               if (!t) {
-                notify.loi("Chưa chọn loại nguyên liệu");
+                notify.error("Chưa chọn loại nguyên liệu");
                 return;
               }
               onLuu(t);
@@ -185,11 +185,11 @@ export function HopChonDongNhap({
                   </td>
                   <td className="border-b border-border px-3 py-2">
                     <span className="inline-flex flex-wrap gap-1">
-                      {!cungHo(r) && <Nhan loai="loi">Khác loại</Nhan>}
+                      {!cungHo(r) && <Tag variant="loi">Khác loại</Tag>}
                       {kyDangGiu.has(r.id) ? (
-                        <Nhan loai="luu-y">Đang thuộc kỳ khác</Nhan>
+                        <Tag variant="luu-y">Đang thuộc kỳ khác</Tag>
                       ) : (
-                        <Nhan loai="cho">Chưa gắn kỳ</Nhan>
+                        <Tag variant="cho">Chưa gắn kỳ</Tag>
                       )}
                     </span>
                   </td>
@@ -218,7 +218,7 @@ export function HopChonDongNhap({
             size="lg"
             onClick={() => {
               if (selectedIds.size === 0) {
-                notify.loi("Chưa tick dòng nào");
+                notify.error("Chưa tick dòng nào");
                 return;
               }
               onLuu([...selectedIds]);
@@ -275,17 +275,17 @@ export function HopDongNhapTay({
               {h.laGiam && !h.loaiKho && (coKho?.(h) ?? true) && (
                 <Combobox
                   label={`Kho nhận — ${tenDong(h)}`}
-                  anNhan
+                  hideLabel
                   value={h.khoGiam}
                   onChange={(v) => onDoiKho(h.id, v)}
                   options={khoXuong}
                   placeholder="Chọn kho nhận"
-                  choPhepXoa={false}
+                  clearable={false}
                   className="w-48"
                 />
               )}
               <ConfirmDelete
-                moTaBanGhi={`${tenDong(h)} — ${num(h.tong)} kg`}
+                recordDescription={`${tenDong(h)} — ${num(h.tong)} kg`}
                 onConfirm={() => onXoa(h.id)}
                 trigger={
                   <Button
@@ -353,8 +353,8 @@ export function HopThemMatHang({
             onChange={setProductId}
             options={matHang.map((m) => ({ value: m.id, label: m.name }))}
             onCreate={onThemMatHang}
-            onSuaMuc={onSuaMatHang}
-            nhanSua="Sửa thông tin mặt hàng này — lưu thẳng vào Danh mục."
+            onEditItem={onSuaMatHang}
+            editLabel="Sửa thông tin mặt hàng này — lưu thẳng vào Danh mục."
           />
           <Field label="Quy cách">
             <Input
@@ -371,10 +371,10 @@ export function HopThemMatHang({
             onChange={setCustomerId}
             options={[...khach.map((k) => ({ value: k.id, label: k.name })), { value: OTHER_CUSTOMER_ID, label: "Khác" }]}
             onCreate={onThemKhach}
-            choPhepXoa={false}
-            onSuaMuc={onSuaKhach}
-            suaDuoc={(v) => v !== OTHER_CUSTOMER_ID}
-            nhanSua="Sửa thông tin khách hàng này — lưu thẳng vào Danh mục."
+            clearable={false}
+            onEditItem={onSuaKhach}
+            canEdit={(v) => v !== OTHER_CUSTOMER_ID}
+            editLabel="Sửa thông tin khách hàng này — lưu thẳng vào Danh mục."
           />
         </div>
         <DialogFooter>
@@ -386,11 +386,11 @@ export function HopThemMatHang({
             size="lg"
             onClick={() => {
               if (!productId) {
-                notify.loi("Chưa chọn mặt hàng");
+                notify.error("Chưa chọn mặt hàng");
                 return;
               }
               if (!customerId) {
-                notify.loi("Chưa chọn khách hàng — chưa rõ thì chọn “Khác”");
+                notify.error("Chưa chọn khách hàng — chưa rõ thì chọn “Khác”");
                 return;
               }
               onLuu(productId, customerId, quyCach.trim(), "Xuất khẩu");
@@ -442,7 +442,7 @@ export function HopLyDoGhiBu({
             size="lg"
             onClick={() => {
               if (!reason.trim()) {
-                notify.loi("Chưa ghi lý do");
+                notify.error("Chưa ghi lý do");
                 return;
               }
               onLuu(reason.trim());
@@ -501,7 +501,7 @@ export function HopChotKy({
               /* Mở lại BẮT BUỘC có lý do — giống mở lại ngày đã chốt ở sổ nhập.
                  Chốt thì ghi chú không bắt buộc. */
               if (daChot && !note.trim()) {
-                notify.loi("Chưa ghi lý do mở lại");
+                notify.error("Chưa ghi lý do mở lại");
                 return;
               }
               onLuu(note.trim());

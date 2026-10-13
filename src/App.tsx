@@ -20,7 +20,7 @@ import { NotFound } from "@/features/shared";
 import AppShell, { KIT_NAV } from "@/features/shared/AppShell";
 import { ToMauProvider } from "@/features/shared/ToMauProvider";
 import { HUONG_DAN } from "@/features/shared/guideContent";
-import { Toaster, apDungCaiDatHienThi, DangXuLy, EmptyState } from "@/design-system";
+import { Toaster, applyDisplaySettings, ProcessingState, EmptyState } from "@/design-system";
 import { Users } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { setAuditOperator } from "@/lib/audit";
@@ -67,7 +67,7 @@ function ShellLayout() {
   const username = auth.nguoiDung?.username;
 
   useEffect(() => {
-    apDungCaiDatHienThi(username);
+    applyDisplaySettings(username);
   }, [username]);
 
   // Chế độ demo CHỈ admin bật. Cờ nằm theo máy (localStorage) ⇒ người khác đăng nhập
@@ -127,11 +127,11 @@ function ShellLayout() {
       }
       items={items}
     >
-      {/* Tô màu dòng "đã dò" — một nguồn row_marks cho mọi bảng (prop `toMau`). */}
+      {/* Tô màu dòng "đã dò" — một nguồn row_marks cho mọi bảng (prop `rowMarkKey`). */}
       <ToMauProvider nguoi={username ?? ""}>
         <DaiDemo />
         <NapGoiDemo />
-        <Suspense fallback={<DangXuLy chu="Đang mở màn hình…" />}>
+        <Suspense fallback={<ProcessingState text="Đang mở màn hình…" />}>
           <Outlet />
         </Suspense>
       </ToMauProvider>
@@ -147,7 +147,7 @@ export default function App() {
   if (auth.dangTai) {
     return (
       <div className="flex min-h-dvh items-center justify-center p-6">
-        <DangXuLy chu="Đang kết nối…" />
+        <ProcessingState text="Đang kết nối…" />
       </div>
     );
   }
@@ -206,8 +206,8 @@ export default function App() {
                   // đang sửa demo. Bắt thoát demo trước.
                   <EmptyState
                     icon={Users}
-                    tieuDe="Đang ở chế độ demo"
-                    moTa="Người dùng và vai trò là tài khoản thật, không thuộc bộ demo. Thoát demo (nút trên dải vàng) để quản lý người dùng."
+                    title="Đang ở chế độ demo"
+                    description="Người dùng và vai trò là tài khoản thật, không thuộc bộ demo. Thoát demo (nút trên dải vàng) để quản lý người dùng."
                   />
                 ) : auth.laAdmin ? (
                   <UserManagementScreen taoTaiKhoan={auth.taoTaiKhoan} />

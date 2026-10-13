@@ -10,7 +10,7 @@ import { useExportItems, useLotDispatches, useLotInputs, usePackagings, useProdu
 import { computeWipStockDetail, collectWipDeductions, type LotStock } from "@/lib/inventory";
 import { bucketStockByAge } from "@/lib/dataFlow";
 import {
-  ChuThichBatBuoc,
+  RequiredLegend,
   Button,
   Combobox,
   Dialog,
@@ -20,22 +20,22 @@ import {
   DialogHeader,
   DialogTitle,
   EmptyState,
-  SkeletonBang,
+  TableSkeleton,
   ErrorSummary,
   Field,
   Input,
-  Nhan,
+  Tag,
   NumberField,
   RecordTable,
-  sacTheoTen,
-  sacXuong,
-  ThongKe,
+  toneByName,
+  toneForWorkshop,
+  StatCardGrid,
   notify,
-  type Cot,
-  type LoiNhap,
-  type MucChon,
-  ThanhChiaPhan,
-  homNay,
+  type RecordTableColumn,
+  type FieldError,
+  type ComboboxOption,
+  ProportionBar,
+  todayIso,
 } from "@/design-system";
 import { kg, num, formatDateVN } from "@/lib/format";
 import { AlertTriangle, CalendarRange, Camera, CameraOff, ClipboardList, PackageCheck, Scale, Search, Snowflake, Warehouse } from "lucide-react";
@@ -72,7 +72,7 @@ export default function KhoDuTruScreen() {
 
   const [warehouseFilter, setWarehouseFilter] = useState("");
   const [approval, setApproval] = useState<ApprovalForm | null>(null);
-  const [loi, setLoi] = useState<LoiNhap[]>([]);
+  const [loi, setLoi] = useState<FieldError[]>([]);
   const [isScanning, setIsScanning] = useState(false);
   const [typedCode, setTypedCode] = useState("");
 
@@ -95,7 +95,7 @@ export default function KhoDuTruScreen() {
     for (const s of wips) if (s.warehouse) set.add(s.warehouse);
     return [...set];
   }, [wips]);
-  const warehouseOptions: MucChon[] = warehouseList.map((k) => {
+  const warehouseOptions: ComboboxOption[] = warehouseList.map((k) => {
     const wh = BSF1_WAREHOUSES.find((w) => w.name === k);
     return {
       value: k,
@@ -108,7 +108,7 @@ export default function KhoDuTruScreen() {
     [ton, warehouseFilter]
   );
   const totalStock = filteredStock.reduce((s, t) => s + t.conLai, 0);
-  const nhomTuoi = useMemo(() => bucketStockByAge(filteredStock, homNay()), [filteredStock]);
+  const nhomTuoi = useMemo(() => bucketStockByAge(filteredStock, todayIso()), [filteredStock]);
 
   const openApprove = (s: WipProductionItem) => {
     setApproval({
@@ -129,22 +129,22 @@ export default function KhoDuTruScreen() {
     const ma = docMaQr(text);
     if (!ma) return;
     const ds = findLots(ma, {
-      shipments: [], imports: [], wips: wips, packagings: [], lotInputs: [],
-      exportItems: [], exportOrders: [], salesOrders: [], products: products, customers: [],
+      shipments: [], imports: [], wips, packagings: [], lotInputs: [],
+      exportItems: [], exportOrders: [], salesOrders: [], products, customers: [],
     }).filter((n) => n.kind === "W");
     if (ds.length === 0) {
-      notify.canhBao(`"${text.trim()}" không phải tem lô bán thành phẩm nào.`);
+      notify.warning(`"${text.trim()}" không phải tem lô bán thành phẩm nào.`);
       return;
     }
     if (ds.length > 1) {
-      notify.canhBao(`Mã "${text.trim()}" trùng ${ds.length} lô — quét QR trên tem thay vì gõ mã.`);
+      notify.warning(`Mã "${text.trim()}" trùng ${ds.length} lô — quét QR trên tem thay vì gõ mã.`);
       return;
     }
     const wip = wips.find((x) => x.id === ds[0]!.id);
     if (!wip) return;
     setTypedCode("");
     if (wip.status !== "cho-nhap") {
-      notify.canhBao(`Lô ${ds[0]!.nhan} đã nhập kho${wip.warehouse ? ` ${wip.warehouse}` : ""} rồi.`);
+      notify.warning(`Lô ${ds[0]!.nhan} đã nhập kho${wip.warehouse ? ` ${wip.warehouse}` : ""} rồi.`);
       return;
     }
     setIsScanning(false);
@@ -164,10 +164,10 @@ export default function KhoDuTruScreen() {
 
   const saveApproval = () => {
     if (!approval) return;
-    const ls: LoiNhap[] = [];
-    if (!approval.warehouse.trim()) ls.push({ truong: "Kho", thongBao: "Chưa chọn kho" });
+    const ls: FieldError[] = [];
+    if (!approval.warehouse.trim()) ls.push({ field: "Kho", message: "Chưa chọn kho" });
     if (!(approval.luongThuc > 0))
-      ls.push({ truong: "Lượng thực", thongBao: "Phải lớn hơn 0 kg" });
+      ls.push({ field: "Lượng thực", message: "Phải lớn hơn 0 kg" });
     setLoi(ls);
     if (ls.length > 0) return;
     const goc = wips.find((s) => s.id === approval.wipId);
@@ -186,30 +186,30 @@ export default function KhoDuTruScreen() {
           : s
       )
     );
-    notify.daLuu(
+    notify.saved(
       `Đã nhập kho ${approval.warehouse} — ${kg(approval.luongThuc)}` +
         (lech ? ` (lệch ${lech > 0 ? "+" : ""}${num(lech)} kg)` : "")
     );
     setApproval(null);
   };
 
-  const stockColumns: Cot<LotStock>[] = [
+  const stockColumns: RecordTableColumn<LotStock>[] = [
     {
       key: "mh",
       header: "Mặt hàng",
-      chinh: true,
+      primary: true,
       render: (r) => tenMH(r.productId),
-      sapXep: (r) => tenMH(r.productId),
+      getSortValue: (r) => tenMH(r.productId),
     },
-    { key: "kho", header: "Kho", render: (r) => <Nhan loai="phan-loai" sac={sacTheoTen(r.warehouse)}>{r.warehouse || "—"}</Nhan>, sapXep: (r) => r.warehouse },
+    { key: "kho", header: "Kho", render: (r) => <Tag variant="phan-loai" tone={toneByName(r.warehouse)}>{r.warehouse || "—"}</Tag>, getSortValue: (r) => r.warehouse },
     {
       key: "lo",
       header: "Lô (ngày SX)",
       render: (r) => formatDateVN(r.ngaySX),
-      sapXep: (r) => r.ngaySX,
+      getSortValue: (r) => r.ngaySX,
     },
-    { key: "con", header: "Còn (kg)", so: true, render: (r) => num(r.conLai), sapXep: (r) => r.conLai },
-    { key: "blk", header: "Block", so: true, render: (r) => num(r.blockConLai) },
+    { key: "con", header: "Còn (kg)", numeric: true, render: (r) => num(r.conLai), getSortValue: (r) => r.conLai },
+    { key: "blk", header: "Block", numeric: true, render: (r) => num(r.blockConLai) },
     {
       key: "nx",
       header: "Nhập / xuất",
@@ -231,13 +231,13 @@ export default function KhoDuTruScreen() {
         <h1 className="text-2xl font-semibold text-foreground">Kho dự trữ đông</h1>
       </div>
 
-      <ThongKe
+      <StatCardGrid
         className="grid-cols-2 lg:grid-cols-4"
-        the={[
-          { nhan: "Đang xem", giaTri: "Tồn hiện tại", icon: CalendarRange, mau: "trung-tinh" },
-          { nhan: "Chờ nhập", giaTri: pendingIntake.length, so: true, icon: Warehouse, mau: "trung-tinh" },
-          { nhan: "Số lô hàng", giaTri: filteredStock.length, so: true, icon: ClipboardList, mau: "brand" },
-          { nhan: "Tổng tồn", giaTri: kg(totalStock), so: true, icon: Scale, mau: "success" },
+        cards={[
+          { label: "Đang xem", value: "Tồn hiện tại", icon: CalendarRange, color: "trung-tinh" },
+          { label: "Chờ nhập", value: pendingIntake.length, numeric: true, icon: Warehouse, color: "trung-tinh" },
+          { label: "Số lô hàng", value: filteredStock.length, numeric: true, icon: ClipboardList, color: "brand" },
+          { label: "Tổng tồn", value: kg(totalStock), numeric: true, icon: Scale, color: "success" },
         ]}
       />
 
@@ -261,14 +261,14 @@ export default function KhoDuTruScreen() {
           <p className="text-sm text-muted-foreground">
             Tồn {warehouseFilter ? `kho ${warehouseFilter}` : "mọi kho"} chia theo số ngày từ ngày sản xuất tới hôm nay. Phần nằm lâu nên xuất trước.
           </p>
-          <ThanhChiaPhan
-            moTa="Tồn kho chia theo số ngày nằm kho"
-            phan={nhomTuoi.map((g) => ({
-              khoa: g.khoa,
-              nhan: g.nhan,
-              moTa: `${num(g.soLo)} lô`,
-              giaTri: g.kg,
-              sac: ({ "duoi-30": "la", "30-60": "cat", "60-90": "cam", "tren-90": "hong" } as const)[g.khoa],
+          <ProportionBar
+            description="Tồn kho chia theo số ngày nằm kho"
+            segments={nhomTuoi.map((g) => ({
+              id: g.khoa,
+              label: g.nhan,
+              description: `${num(g.soLo)} lô`,
+              value: g.kg,
+              tone: ({ "duoi-30": "la", "30-60": "cat", "60-90": "cam", "tren-90": "hong" } as const)[g.khoa],
             }))}
           />
         </section>
@@ -299,11 +299,11 @@ export default function KhoDuTruScreen() {
                 <div className="flex flex-wrap items-center justify-between gap-1">
                   <span className="min-w-0 font-semibold text-sm text-foreground">{item.warehouse.name}</span>
                   {item.warehouse.type === "xi-nghiep" ? (
-                    <Nhan loai="phan-loai" sac={sacTheoTen("Kho lớn")}>Kho lớn</Nhan>
+                    <Tag variant="phan-loai" tone={toneByName("Kho lớn")}>Kho lớn</Tag>
                   ) : (
-                    <Nhan loai="phan-loai" sac={sacXuong(item.warehouse.workshop)}>
+                    <Tag variant="phan-loai" tone={toneForWorkshop(item.warehouse.workshop)}>
                       {`Xưởng ${item.warehouse.workshop}`}
-                    </Nhan>
+                    </Tag>
                   )}
                 </div>
                 <div className="text-xs text-muted-foreground mt-1">
@@ -395,7 +395,7 @@ export default function KhoDuTruScreen() {
       <div className="flex flex-wrap items-end gap-4 rounded-xl border-2 border-border p-4">
         <Combobox
           label="Lọc theo kho"
-          anNhanBatBuoc
+          hideRequiredMark
           value={warehouseFilter}
           onChange={setWarehouseFilter}
           options={warehouseOptions}
@@ -405,12 +405,12 @@ export default function KhoDuTruScreen() {
       </div>
 
       {isLoading ? (
-        <SkeletonBang />
+        <TableSkeleton />
       ) : filteredStock.length === 0 ? (
         <EmptyState
           icon={Snowflake}
-          tieuDe="Chưa có tồn trong kho"
-          moTa={
+          title="Chưa có tồn trong kho"
+          description={
             pendingIntake.length > 0
               ? "Duyệt các lô chờ nhập ở trên để tồn hiện ra."
               : "Ghi sản lượng ở màn Sản xuất BTP rồi duyệt vào kho."
@@ -422,9 +422,9 @@ export default function KhoDuTruScreen() {
             columns={stockColumns}
             rows={filteredStock}
             getKey={(r) => r.wipId}
-            toMau="kho-du-tru"
-            timKiem={(r) => `${tenMH(r.productId)} ${r.spec} ${r.warehouse}`}
-            nhanTimKiem="Tìm theo mặt hàng / quy cách / kho…"
+            rowMarkKey="kho-du-tru"
+            getSearchText={(r) => `${tenMH(r.productId)} ${r.spec} ${r.warehouse}`}
+            searchLabel="Tìm theo mặt hàng / quy cách / kho…"
           />
           <div className="flex justify-end rounded-xl bg-muted px-5 py-4">
             <div className="flex items-baseline gap-3">
@@ -448,8 +448,8 @@ export default function KhoDuTruScreen() {
           </DialogHeader>
           {approval && (
             <div className="space-y-6 py-2">
-              <ErrorSummary loi={loi} />
-              <ChuThichBatBuoc />
+              <ErrorSummary errors={loi} />
+              <RequiredLegend />
               <Combobox
                 label="Kho (phòng đông)"
                 required

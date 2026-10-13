@@ -6,7 +6,7 @@
 // Sửa dòng ở /wip. Mỗi loại bột đi kèm của mặt hàng một ô kg (VD tẩm bột nước
 // tương: 24V · 18V · 220H); thiếu loại nào thì "Thêm loại bột khác" tại chỗ.
 // Bột là PHỤ GIA — không cộng vào số lượng thành phẩm; hiện tổng bột + tỷ lệ %.
-import { Button, Combobox, NumberField, type MucChon } from "@/design-system";
+import { Button, Combobox, NumberField, type ComboboxOption } from "@/design-system";
 import { num } from "@/lib/format";
 import { listVisibleBatters, sanitizeBatterKg, sumBatterKg, computeBatterRatio } from "@/lib/batter";
 import { X } from "lucide-react";
@@ -26,13 +26,13 @@ export function KhoiBotTam({
   botKg: Record<string, number>;
   onDoi: (next: Record<string, number>) => void;
   /** Danh mục loại bột — value = TÊN (sổ lưu theo tên). */
-  optBot: MucChon[];
+  optBot: ComboboxOption[];
   /** Tạo loại bột mới tại chỗ (lưu ngay vào danh mục) — trả về TÊN. */
   onTaoBot: (ten: string) => string;
   /** Mở hộp sửa nhanh loại bột (value = tên). */
   onSuaBot?: (ten: string) => void;
   kgThanhPham: number;
-  /** Ô số nhảy ↑/↓ theo cột trong bảng ghi (khung `[data-luoi-phim]`). */
+  /** Ô số nhảy ↑/↓ theo cột trong bảng ghi (khung `[data-grid-nav]`). */
   dieuHuongCot?: boolean;
 }) {
   const visibleBatters = listVisibleBatters(diKem, botKg);
@@ -67,7 +67,7 @@ export function KhoiBotTam({
             <div key={ten} className="flex min-w-0 flex-[1_1_9rem] items-end gap-1 sm:max-w-[13rem]">
               <NumberField
                 label={ten}
-                anNhanBatBuoc
+                hideRequiredMark
                 unit="kg"
                 navCol={dieuHuongCot ? `bot:${ten}` : undefined}
                 className="min-w-0 flex-1"
@@ -93,13 +93,13 @@ export function KhoiBotTam({
         <div className="min-w-0 flex-[1_1_12rem] sm:max-w-[16rem]">
           <Combobox
             label="Thêm loại bột khác"
-            anNhanBatBuoc
+            hideRequiredMark
             value=""
             onChange={(ten) => ten && onDoi({ ...botKg, [ten]: botKg[ten] ?? 0 })}
             options={optBot.filter((o) => !visibleBatters.includes(o.value))}
             onCreate={onTaoBot}
-            onSuaMuc={onSuaBot}
-            nhanSua="Sửa thông tin loại bột này — lưu thẳng vào Danh mục."
+            onEditItem={onSuaBot}
+            editLabel="Sửa thông tin loại bột này — lưu thẳng vào Danh mục."
             placeholder="— Chọn loại bột —"
             emptyText="Chưa có loại bột này — gõ tên rồi Thêm mới."
           />

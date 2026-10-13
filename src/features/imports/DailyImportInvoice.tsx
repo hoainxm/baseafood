@@ -10,7 +10,7 @@ import {
   Combobox,
   DateField,
   DateRangeField,
-  ngayTrongKhoang,
+  getDatesInRange,
 } from "@/design-system";
 import { num, formatDateVN } from "@/lib/format";
 import { KY_OPT, getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
@@ -88,7 +88,7 @@ export default function PhieuNLNgay({
 
   const isSingleDay = tu === den;
 
-  const datesWithData = ngayTrongKhoang(tu, den).filter(
+  const datesWithData = getDatesInRange(tu, den).filter(
     (d) =>
       rows.some((r) => r.deliveryDate === d && isInWorkshop(r.workshop)) ||
       pheLieu.some(
@@ -112,8 +112,8 @@ export default function PhieuNLNgay({
         <div className="min-w-[12rem]">
           <Combobox
             label="Kỳ báo cáo"
-            anNhanBatBuoc
-            choPhepXoa={false}
+            hideRequiredMark
+            clearable={false}
             value={ky}
             onChange={(v) => setKy(v as ViewPeriod)}
             options={KY_OPT}
@@ -124,7 +124,7 @@ export default function PhieuNLNgay({
           {ky === "tuy-chon" ? (
             <DateRangeField
               label="Khoảng ngày"
-              anNhanBatBuoc
+              hideRequiredMark
               presets={false}
               startDate={tuTC}
               endDate={denTC}
@@ -144,7 +144,7 @@ export default function PhieuNLNgay({
                       ? "Ngày bất kỳ trong tháng"
                       : "Ngày bất kỳ trong năm"
               }
-              anNhanBatBuoc
+              hideRequiredMark
               hint={
                 ky === "ngay"
                   ? undefined

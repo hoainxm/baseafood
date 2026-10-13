@@ -14,15 +14,15 @@ import {
   useSalesOrders,
 } from "@/lib/catalogRepo";
 import {
-  KhungCuonNgang,
-  Nhan,
+  HorizontalScroll,
+  Tag,
   Button,
   Combobox,
   DateField,
   DateRangeField,
   EmptyState,
-  PhieuIn,
-  SkeletonBang,
+  PrintSheet,
+  TableSkeleton,
   Table,
   TableBody,
   TableCell,
@@ -30,15 +30,15 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-  TdIn,
-  ThIn,
-  ThongKe,
-  homNay,
+  PrintTd,
+  PrintTh,
+  StatCardGrid,
+  todayIso,
   notify,
-  type TheThongTin,
-  ThanhToMau,
-  useChonDong,
-  useToMau,
+  type StatCardData,
+  RowMarkToolbar,
+  useRowSelection,
+  useRowMarkTools,
 } from "@/design-system";
 import { KY_OPT, getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
 import { num, formatDateVN } from "@/lib/format";
@@ -93,15 +93,15 @@ export default function OrderExportReport() {
   const isLoading = trangThai === "dang-tai" && exportOrders.length === 0;
 
   const [ky, setKy] = useState<ViewPeriod>("thang");
-  const [moc, setMoc] = useState(homNay());
-  const [tuTC, setTuTC] = useState(homNay());
-  const [denTC, setDenTC] = useState(homNay());
+  const [moc, setMoc] = useState(todayIso());
+  const [tuTC, setTuTC] = useState(todayIso());
+  const [denTC, setDenTC] = useState(todayIso());
   const [customerFilter, setCustomerFilter] = useState("Tất cả");
   const [inPrint, setInPrint] = useState(false);
   const [tu, den] = getViewPeriodRange(ky, moc, tuTC, denTC);
   // Mỗi dòng là một dòng lệnh xuất (id bản ghi) ⇒ dấu "đã dò" khỏi ghép kỳ.
-  const to = useToMau("bao-cao-xuat-don");
-  const rowSelection = useChonDong();
+  const to = useRowMarkTools("bao-cao-xuat-don");
+  const rowSelection = useRowSelection();
 
   const customerOptions = [
     { value: "Tất cả", label: "Tất cả khách" },
@@ -173,16 +173,16 @@ export default function OrderExportReport() {
   /** Khoá dòng lệnh xuất đang hiện — thứ tự cho Shift+tick chọn khoảng. */
   const khoaDong = nhom.flatMap((g) => g.lines.map((l) => l.id));
 
-  const the: TheThongTin[] = [
-    { nhan: "Kỳ báo cáo", giaTri: `${formatDateVN(tu)} – ${formatDateVN(den)}`, icon: CalendarRange, mau: "trung-tinh" },
-    { nhan: "Tổng xuất", giaTri: `${num(tongKg)} kg`, so: true, icon: Scale, mau: "brand" },
-    { nhan: "Tổng block", giaTri: num(tongBlock), so: true, icon: Layers, mau: "trung-tinh" },
-    { nhan: "Số đơn được xuất", giaTri: num(nhom.length), so: true, icon: PackageCheck, mau: "success" },
+  const the: StatCardData[] = [
+    { label: "Kỳ báo cáo", value: `${formatDateVN(tu)} – ${formatDateVN(den)}`, icon: CalendarRange, color: "trung-tinh" },
+    { label: "Tổng xuất", value: `${num(tongKg)} kg`, numeric: true, icon: Scale, color: "brand" },
+    { label: "Tổng block", value: num(tongBlock), numeric: true, icon: Layers, color: "trung-tinh" },
+    { label: "Số đơn được xuất", value: num(nhom.length), numeric: true, icon: PackageCheck, color: "success" },
   ];
 
   const exportExcel = () => {
     if (!nhom.length) {
-      notify.canhBao("Không có lệnh xuất trong kỳ để xuất");
+      notify.warning("Không có lệnh xuất trong kỳ để xuất");
       return;
     }
     const aoa: OExcel[][] = [];
@@ -229,8 +229,8 @@ export default function OrderExportReport() {
         <div className="min-w-[12rem]">
           <Combobox
             label="Kỳ báo cáo"
-            anNhanBatBuoc
-            choPhepXoa={false}
+            hideRequiredMark
+            clearable={false}
             value={ky}
             onChange={(v) => setKy(v as ViewPeriod)}
             options={KY_OPT}
@@ -240,7 +240,7 @@ export default function OrderExportReport() {
           {ky === "tuy-chon" ? (
             <DateRangeField
               label="Khoảng ngày xuất"
-              anNhanBatBuoc
+              hideRequiredMark
               presets={false}
               startDate={tuTC}
               endDate={denTC}
@@ -252,7 +252,7 @@ export default function OrderExportReport() {
           ) : (
             <DateField
               label={ky === "ngay" ? "Ngày xuất" : "Ngày bất kỳ trong kỳ"}
-              anNhanBatBuoc
+              hideRequiredMark
               hint={ky === "ngay" ? undefined : `Kỳ: ${formatDateVN(tu)} – ${formatDateVN(den)}`}
               value={moc}
               onChange={setMoc}
@@ -262,8 +262,8 @@ export default function OrderExportReport() {
         <div className="min-w-[12rem]">
           <Combobox
             label="Khách hàng"
-            anNhanBatBuoc
-            choPhepXoa={false}
+            hideRequiredMark
+            clearable={false}
             value={customerFilter}
             onChange={setCustomerFilter}
             options={customerOptions}
@@ -271,18 +271,18 @@ export default function OrderExportReport() {
         </div>
       </div>
 
-      <ThongKe the={the} />
+      <StatCardGrid cards={the} />
 
       {isLoading ? (
-        <SkeletonBang />
+        <TableSkeleton />
       ) : nhom.length === 0 ? (
         <EmptyState
           icon={PackageCheck}
-          tieuDe={`Chưa có đơn nào được xuất trong ${formatDateVN(tu)} – ${formatDateVN(den)}`}
-          moTa="Tạo lệnh xuất ở màn Đơn đặt, số liệu xuất sẽ tổng hợp về đây."
+          title={`Chưa có đơn nào được xuất trong ${formatDateVN(tu)} – ${formatDateVN(den)}`}
+          description="Tạo lệnh xuất ở màn Đơn đặt, số liệu xuất sẽ tổng hợp về đây."
         />
       ) : (
-        <KhungCuonNgang classNameKhung="rounded-xl border-2 border-border">
+        <HorizontalScroll viewportClassName="rounded-xl border-2 border-border">
           <Table>
             <TableHeader>
               <TableRow>
@@ -303,9 +303,9 @@ export default function OrderExportReport() {
                         <span className="font-normal text-muted-foreground">
                           · đặt {g.orderDate ? formatDateVN(g.orderDate) : "—"}
                         </span>
-                        <Nhan loai={g.status === "dang-gom" ? "cho" : "xong"}>
+                        <Tag variant={g.status === "dang-gom" ? "cho" : "xong"}>
                           {STATUS_LABELS[g.status]}
-                        </Nhan>
+                        </Tag>
                         {g.requiredKg > 0 && (
                           <span className="font-normal text-muted-foreground">
                             · đã đặt <span className="tnum">{num(g.requiredKg)}</span> kg
@@ -315,10 +315,10 @@ export default function OrderExportReport() {
                     </TableCell>
                   </TableRow>
                   {g.lines.map((l) => (
-                    <TableRow key={l.id} {...to.thuocTinh(l.id)}>
+                    <TableRow key={l.id} {...to.getRowProps(l.id)}>
                       <TableCell className="whitespace-nowrap">
                         <span className="flex items-center gap-2">
-                          {to.bat && (
+                          {to.enabled && (
                             <input
                               type="checkbox"
                               className="size-5 shrink-0"
@@ -356,75 +356,75 @@ export default function OrderExportReport() {
               </TableRow>
             </TableFooter>
           </Table>
-        </KhungCuonNgang>
+        </HorizontalScroll>
       )}
-      <ThanhToMau to={to} khoa={khoaDong.filter((k) => rowSelection.daChon.has(k))} onBoChon={rowSelection.boChon} />
+      <RowMarkToolbar marker={to} selectedKeys={khoaDong.filter((k) => rowSelection.daChon.has(k))} onClearSelection={rowSelection.boChon} />
 
       {inPrint && (
-        <PhieuIn
-          tieuDe="Báo cáo đơn đặt được xuất hàng"
-          phuDe={`Kỳ: ${formatDateVN(tu)} – ${formatDateVN(den)}${customerFilter !== "Tất cả" ? ` · Khách ${nhom[0]?.customerName ?? ""}` : ""}`}
+        <PrintSheet
+          title="Báo cáo đơn đặt được xuất hàng"
+          subtitle={`Kỳ: ${formatDateVN(tu)} – ${formatDateVN(den)}${customerFilter !== "Tất cả" ? ` · Khách ${nhom[0]?.customerName ?? ""}` : ""}`}
           onClose={() => setInPrint(false)}
         >
           <table className="w-full border-collapse">
             <thead>
               <tr>
-                <ThIn>Ngày xuất</ThIn>
-                <ThIn>Mặt hàng</ThIn>
-                <ThIn>Quy cách</ThIn>
-                <ThIn right>Kg xuất</ThIn>
-                <ThIn right>Block</ThIn>
+                <PrintTh>Ngày xuất</PrintTh>
+                <PrintTh>Mặt hàng</PrintTh>
+                <PrintTh>Quy cách</PrintTh>
+                <PrintTh right>Kg xuất</PrintTh>
+                <PrintTh right>Block</PrintTh>
               </tr>
             </thead>
             <tbody>
               {nhom.map((g) => (
                 <Fragment key={g.orderId}>
                   <tr>
-                    <TdIn dam colSpan={5}>
+                    <PrintTd bold colSpan={5}>
                       {g.customerName} · đặt {g.orderDate ? formatDateVN(g.orderDate) : "—"} · {STATUS_LABELS[g.status]}
                       {g.requiredKg > 0 ? ` · đã đặt ${num(g.requiredKg)} kg` : ""}
-                    </TdIn>
+                    </PrintTd>
                   </tr>
                   {g.lines.map((l, i) => (
                     <tr key={`${g.orderId}-${i}`}>
-                      <TdIn>{formatDateVN(l.exportDate)}</TdIn>
-                      <TdIn>{l.productName}</TdIn>
-                      <TdIn>{l.spec || "—"}</TdIn>
-                      <TdIn right className="tnum">
+                      <PrintTd>{formatDateVN(l.exportDate)}</PrintTd>
+                      <PrintTd>{l.productName}</PrintTd>
+                      <PrintTd>{l.spec || "—"}</PrintTd>
+                      <PrintTd right className="tnum">
                         {num(l.quantityKg)}
-                      </TdIn>
-                      <TdIn right className="tnum">
+                      </PrintTd>
+                      <PrintTd right className="tnum">
                         {num(l.blocksCount)}
-                      </TdIn>
+                      </PrintTd>
                     </tr>
                   ))}
                   <tr>
-                    <TdIn dam colSpan={3}>
+                    <PrintTd bold colSpan={3}>
                       Cộng đơn {g.customerName}
-                    </TdIn>
-                    <TdIn dam right className="tnum">
+                    </PrintTd>
+                    <PrintTd bold right className="tnum">
                       {num(g.tongKg)}
-                    </TdIn>
-                    <TdIn dam right className="tnum">
+                    </PrintTd>
+                    <PrintTd bold right className="tnum">
                       {num(g.tongBlock)}
-                    </TdIn>
+                    </PrintTd>
                   </tr>
                 </Fragment>
               ))}
               <tr>
-                <TdIn dam colSpan={3}>
+                <PrintTd bold colSpan={3}>
                   TỔNG CỘNG
-                </TdIn>
-                <TdIn dam right className="tnum">
+                </PrintTd>
+                <PrintTd bold right className="tnum">
                   {num(tongKg)}
-                </TdIn>
-                <TdIn dam right className="tnum">
+                </PrintTd>
+                <PrintTd bold right className="tnum">
                   {num(tongBlock)}
-                </TdIn>
+                </PrintTd>
               </tr>
             </tbody>
           </table>
-        </PhieuIn>
+        </PrintSheet>
       )}
     </div>
   );

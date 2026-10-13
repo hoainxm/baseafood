@@ -37,7 +37,7 @@ export default function DangNhap({
     <div className="flex min-h-full items-center justify-center p-6">
       <Card className="w-full max-w-md space-y-8 p-8">
         <div className="flex flex-col items-center gap-3 text-center">
-          <Logo cao="h-14" phuDe="Xí nghiệp BSF1" />
+          <Logo heightClass="h-14" subtitle="Xí nghiệp BSF1" />
           <h1 className="text-2xl font-semibold text-foreground">Đăng nhập</h1>
           <p className="text-base text-muted-foreground">
             Nhập tên đăng nhập và mật khẩu.

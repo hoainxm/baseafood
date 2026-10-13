@@ -40,7 +40,7 @@ describe("khóa chính ở ranh giới máy chủ (rào R1)", () => {
   });
 });
 
-describe("cột khóa ngoại (cotThamChieu) — period_id → balancing_periods.id", () => {
+describe("cột khóa ngoại (refColumns) — period_id → balancing_periods.id", () => {
   it("demo: khóa ngoại mang tiền tố như khóa chính kỳ; rỗng / null giữ nguyên", () => {
     expect(rowToServer({ id: "v1", period_id: "ky-1" }, "id", SITE_DEMO, true, ["period_id"])).toEqual({
       id: "demo:v1",

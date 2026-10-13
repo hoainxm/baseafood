@@ -8,7 +8,7 @@ import type { ScrapItem, Workshop } from "@/types";
 import { newId } from "@/lib/store";
 import {
   Button,
-  ChuThichBatBuoc,
+  RequiredLegend,
   Combobox,
   ConfirmDelete,
   Dialog,
@@ -18,13 +18,13 @@ import {
   DialogHeader,
   DialogTitle,
   ErrorSummary,
-  Nhan,
+  Tag,
   NumberField,
   RecordTable,
   notify,
-  type Cot,
-  type LoiNhap,
-  type MucChon,
+  type RecordTableColumn,
+  type FieldError,
+  type ComboboxOption,
 } from "@/design-system";
 import { kg, num, formatDateVN } from "@/lib/format";
 import { Lock, Pencil, Plus, Scale } from "lucide-react";
@@ -50,7 +50,7 @@ export function KhoiPheLieuNgay({
 }) {
   const [editing, setEditing] = useState<ScrapItem | null>(null);
   const [isAdding, setIsAdding] = useState(false);
-  const [loi, setLoi] = useState<LoiNhap[]>([]);
+  const [loi, setLoi] = useState<FieldError[]>([]);
 
   const dayScrapRows = useMemo(
     () =>
@@ -83,7 +83,7 @@ export function KhoiPheLieuNgay({
     source: "Nhập hàng",
   });
 
-  const typeOptions: MucChon[] = PHE_LIEU_GOI_Y.map((t) => ({
+  const typeOptions: ComboboxOption[] = PHE_LIEU_GOI_Y.map((t) => ({
     value: t,
     label: t,
   }));
@@ -91,17 +91,17 @@ export function KhoiPheLieuNgay({
   /** `ghiTiep`: lưu xong giữ hộp thoại mở để ghi loại khác (chỉ khi thêm mới). */
   const save = (keepEntering = false) => {
     if (!editing) return;
-    const ls: LoiNhap[] = [];
+    const ls: FieldError[] = [];
     if (!editing.name.trim())
-      ls.push({ truong: "Loại phế liệu", thongBao: "Chưa chọn loại phế liệu" });
+      ls.push({ field: "Loại phế liệu", message: "Chưa chọn loại phế liệu" });
     if (!(editing.quantityKg > 0))
-      ls.push({ truong: "Số lượng", thongBao: "Phải lớn hơn 0 kg" });
+      ls.push({ field: "Số lượng", message: "Phải lớn hơn 0 kg" });
     setLoi(ls);
     if (ls.length > 0) return;
     onChange(
       isAdding ? [...rows, editing] : rows.map((r) => (r.id === editing.id ? editing : r))
     );
-    notify.daLuu(
+    notify.saved(
       isAdding
         ? `Đã ghi phế liệu ${editing.name} — ${kg(editing.quantityKg)}`
         : "Đã lưu thay đổi"
@@ -115,48 +115,48 @@ export function KhoiPheLieuNgay({
     }
   };
 
-  const cols: Cot<ScrapItem>[] = [
+  const cols: RecordTableColumn<ScrapItem>[] = [
     {
       key: "category",
       header: "Loại phế liệu",
-      chinh: true,
+      primary: true,
       render: (r) => r.name,
-      sapXep: (r) => r.name,
+      getSortValue: (r) => r.name,
     },
     {
       key: "sl",
       header: "Số lượng (kg)",
-      so: true,
+      numeric: true,
       render: (r) => num(r.quantityKg),
-      sapXep: (r) => r.quantityKg,
+      getSortValue: (r) => r.quantityKg,
     },
     {
       key: "gia",
       header: "Đơn giá bán (đ)",
-      so: true,
+      numeric: true,
       render: (r) =>
         r.sellingPrice != null ? (
           num(r.sellingPrice)
         ) : (
-          <Nhan loai="loi">Chưa có giá</Nhan>
+          <Tag variant="loi">Chưa có giá</Tag>
         ),
-      sapXep: (r) => r.sellingPrice ?? 0,
+      getSortValue: (r) => r.sellingPrice ?? 0,
     },
     {
       key: "tien",
       header: "Thành tiền (đ)",
-      so: true,
+      numeric: true,
       render: (r) => num(r.quantityKg * (r.sellingPrice ?? 0)),
-      sapXep: (r) => r.quantityKg * (r.sellingPrice ?? 0),
+      getSortValue: (r) => r.quantityKg * (r.sellingPrice ?? 0),
     },
     {
       key: "ky",
       header: "Kỳ cân đối",
       render: (r) =>
         r.periodId ? (
-          <Nhan loai="xong">Đã vào kỳ</Nhan>
+          <Tag variant="xong">Đã vào kỳ</Tag>
         ) : (
-          <Nhan loai="cho">Chưa vào kỳ</Nhan>
+          <Tag variant="cho">Chưa vào kỳ</Tag>
         ),
     },
   ];
@@ -177,11 +177,11 @@ export function KhoiPheLieuNgay({
           </div>
         </div>
         {khoa ? (
-          <Nhan loai="xong" icon={Lock}>
+          <Tag variant="xong" icon={Lock}>
             Ngày đã chốt
-          </Nhan>
+          </Tag>
         ) : chiXem ? (
-          <Nhan loai="nguon">Ghi ở “Ghi nhập trong ngày”</Nhan>
+          <Tag variant="nguon">Ghi ở “Ghi nhập trong ngày”</Tag>
         ) : (
           <Button
             title="Ghi một dòng phế liệu phát sinh trong ngày (đầu, da, vụn…) để kỳ cân đối hút sang."
@@ -202,7 +202,7 @@ export function KhoiPheLieuNgay({
         columns={cols}
         rows={dayScrapRows}
         getKey={(r) => r.id}
-        toMau="phe-lieu-ngay"
+        rowMarkKey="phe-lieu-ngay"
         emptyText="Chưa cân phế liệu cho ngày này."
         actions={
           khoa || chiXem
@@ -223,16 +223,16 @@ export function KhoiPheLieuNgay({
                     Sửa
                   </Button>
                   <ConfirmDelete
-                    moTaBanGhi={`${r.name} — ${kg(r.quantityKg)} — ngày ${formatDateVN(r.date)}`}
+                    recordDescription={`${r.name} — ${kg(r.quantityKg)} — ngày ${formatDateVN(r.date)}`}
                     onConfirm={() => {
                       const prevRows = rows;
                       onChange(rows.filter((x) => x.id !== r.id));
-                      notify.daXoa(`Đã xóa phế liệu ${r.name}`, () =>
+                      notify.deleted(`Đã xóa phế liệu ${r.name}`, () =>
                         onChange(prevRows)
                       );
                     }}
-                    tieuDe="Xóa dòng phế liệu này?"
-                    nhanNut="Xóa dòng"
+                    title="Xóa dòng phế liệu này?"
+                    confirmLabel="Xóa dòng"
                   />
                 </>
               )
@@ -277,8 +277,8 @@ export function KhoiPheLieuNgay({
 
           {editing && (
             <div className="space-y-6 py-2">
-              <ErrorSummary loi={loi} />
-              <ChuThichBatBuoc />
+              <ErrorSummary errors={loi} />
+              <RequiredLegend />
 
               <Combobox
                 label="Loại phế liệu"

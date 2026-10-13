@@ -1,21 +1,21 @@
 // ============================================================
-// Tên file: src/design-system/patterns/toMauNguon.ts
+// Tên file: src/design-system/patterns/rowMarkSource.ts
 // Tên tiếng Việt: Tô màu dòng — hợp đồng dữ liệu + hook (không phải component)
-// Description: Row highlight context, palette, hooks (components in ToMauDong.tsx)
+// Description: Row highlight context, palette, hooks (components in RowMarkToolbar.tsx)
 // ============================================================
 import * as React from "react";
 
 /*
  * MỘT cách dùng, giống Excel: tick các dòng → thanh "Đã chọn N dòng" → Tô màu ▾ /
  * In đậm / Bỏ tô áp cho mọi dòng đang tick. Design-system CHỈ định nghĩa hợp đồng
- * `NguonToMau`; đọc/ghi dấu do app cấp qua `ToMauContext` — provider ở
+ * `RowMarkSource`; đọc/ghi dấu do app cấp qua `RowMarkContext` — provider ở
  * `features/shared/ToMauProvider.tsx` nối bảng `row_marks`. Luật: README § Tô màu dòng.
  */
 
 /* ---------- Bảng màu kiểu Excel: 10 sắc × 5 mức (1 rất nhạt → 5 rất đậm) ----------
    Mã lưu DB = "<sắc>-<mức>" (VD "vang-5"). Màu thật ở token `--to-<mã>` (tokens.css).
-   Khớp `SAC_TO_LIB` ở lib/rowMarks.ts — test toMauNguon.test.ts canh. */
-export const SAC_TO = [
+   Khớp `SAC_TO_LIB` ở lib/rowMarks.ts — test rowMarkSource.test.ts canh. */
+export const MARK_COLORS = [
   { ma: "xam", nhan: "xám" },
   { ma: "do", nhan: "đỏ" },
   { ma: "cam", nhan: "cam" },
@@ -27,13 +27,13 @@ export const SAC_TO = [
   { ma: "tim", nhan: "tím" },
   { ma: "hong", nhan: "hồng" },
 ] as const;
-export const MUC_TO = ["rất nhạt", "nhạt", "vừa", "đậm", "rất đậm"] as const;
+export const MARK_SHADES = ["rất nhạt", "nhạt", "vừa", "đậm", "rất đậm"] as const;
 
-export type SacTo = (typeof SAC_TO)[number]["ma"];
-export type MauTo = `${SacTo}-${1 | 2 | 3 | 4 | 5}`;
+export type MarkColorDef = (typeof MARK_COLORS)[number]["ma"];
+export type MarkColor = `${MarkColorDef}-${1 | 2 | 3 | 4 | 5}`;
 
 /** Ô nền "tối" (độ chói < 0,68) ⇒ chữ phụ/chữ màu trong dòng về màu chữ thường. */
-export const MAU_TOI: ReadonlySet<string> = new Set([
+export const DARK_MARK_COLORS: ReadonlySet<string> = new Set([
   "xam-3", "xam-4", "xam-5", "do-2", "do-3", "do-4", "do-5", "cam-3", "cam-4", "cam-5",
   "chuoi-4", "chuoi-5", "la-3", "la-4", "la-5", "troi-3", "troi-4", "troi-5",
   "duong-2", "duong-3", "duong-4", "duong-5", "tim-3", "tim-4", "tim-5",
@@ -41,66 +41,66 @@ export const MAU_TOI: ReadonlySet<string> = new Set([
 ]);
 
 /** Lưới bảng chọn: HÀNG = mức (nhạt → đậm), CỘT = sắc — như bảng màu Excel. */
-export const LUOI_MAU: MauTo[][] = MUC_TO.map((_, i) =>
-  SAC_TO.map((s) => `${s.ma}-${(i + 1) as 1 | 2 | 3 | 4 | 5}` as MauTo)
+export const MARK_COLOR_GRID: MarkColor[][] = MARK_SHADES.map((_, i) =>
+  MARK_COLORS.map((s) => `${s.ma}-${(i + 1) as 1 | 2 | 3 | 4 | 5}` as MarkColor)
 );
 
 /** "vàng rất đậm", "xanh lá nhạt"… — cho aria-label / title. */
-export function tenMau(ma: string): string {
+export function getMarkColorName(ma: string): string {
   const i = ma.lastIndexOf("-");
-  const s = SAC_TO.find((x) => x.ma === ma.slice(0, i));
-  const shadeLevel = MUC_TO[Number(ma.slice(i + 1)) - 1];
+  const s = MARK_COLORS.find((x) => x.ma === ma.slice(0, i));
+  const shadeLevel = MARK_SHADES[Number(ma.slice(i + 1)) - 1];
   return s && shadeLevel ? `${s.nhan} ${shadeLevel}` : "";
 }
 
 /** Dấu của một dòng. `mau` rỗng = chỉ in đậm. */
-export interface DauDong {
-  mau: MauTo | "";
-  dam: boolean;
+export interface MarkStyle {
+  color: MarkColor | "";
+  bold: boolean;
 }
 
 /** Hợp đồng app cấp cho design-system — đọc/ghi dấu theo khoá bảng. */
-export interface NguonToMau {
+export interface RowMarkSource {
   /** Dấu CẢ DÒNG của một bảng: Map(khoá dòng → dấu). Bảng chưa có dấu ⇒ Map rỗng. */
-  dauCuaBang: (tableKey: string) => ReadonlyMap<string, DauDong>;
+  getTableMarks: (tableKey: string) => ReadonlyMap<string, MarkStyle>;
   /** Đặt dấu cho nhiều dòng một lượt. `null` = bỏ tô (xoá dấu). */
-  dat: (tableKey: string, khoaDong: string[], dau: DauDong | null) => void;
+  setMarks: (tableKey: string, rowKeys: string[], dau: MarkStyle | null) => void;
 }
 
-export const ToMauContext = React.createContext<NguonToMau | null>(null);
+export const RowMarkContext = React.createContext<RowMarkSource | null>(null);
 
-const EMPTY_MARKS: ReadonlyMap<string, DauDong> = new Map();
+const EMPTY_MARKS: ReadonlyMap<string, MarkStyle> = new Map();
 
 /** Vá dấu: chỉ đổi phần được nêu (màu HOẶC in đậm), phần kia giữ theo từng dòng. */
-export type VaDau = Partial<DauDong>;
+export type MarkStylePatch = Partial<MarkStyle>;
 
 /** Áp vá lên dấu cũ ⇒ dấu mới (null = hết dấu). */
-export function apVa(prev: DauDong | undefined | null, va: VaDau | null): DauDong | null {
+export function applyMarkPatch(prev: MarkStyle | undefined | null, va: MarkStylePatch | null): MarkStyle | null {
   if (!va) return null;
-  const dau = { mau: va.mau ?? prev?.mau ?? "", dam: va.dam ?? prev?.dam ?? false };
-  return dau.mau || dau.dam ? dau : null;
+  const dau = { color: va.color ?? prev?.color ?? "", bold: va.bold ?? prev?.bold ?? false };
+  return dau.color || dau.bold ? dau : null;
 }
 
-export interface ToMauBang {
+export interface RowMarkTools {
   /** Có tô được không (có provider + màn đã khai khoá bảng). */
-  bat: boolean;
-  lay: (khoa: string) => DauDong | undefined;
+  enabled: boolean;
+  getMark: (key: string) => MarkStyle | undefined;
   /**
    * Vá dấu các dòng. `null` = bỏ tô. Đổi màu giữ nguyên in đậm của TỪNG dòng (và
    * ngược lại). Không bắn thông báo — thao tác trình bày (README luật 8).
    */
-  sua: (khoa: string[], va: VaDau | null) => void;
+  patch: (key: string[], va: MarkStylePatch | null) => void;
   /** Thuộc tính gắn lên `<tr>` / thẻ để nền + chữ đậm ăn theo dấu. */
-  thuocTinh: (khoa: string) => Record<string, unknown>;
+  getRowProps: (key: string) => Record<string, unknown>;
 }
 
 /** Gom các dòng theo dấu đích ⇒ mỗi nhóm một lần ghi. */
-function groupByMark(cap: [string, DauDong | null][]) {
-  const nhom = new Map<string, { dau: DauDong | null; khoa: string[] }>();
+function groupByMark(cap: [string, MarkStyle | null][]) {
+  const nhom = new Map<string, { mark: MarkStyle | null; keys: string[] }>();
   for (const [k, d] of cap) {
     const kk = JSON.stringify(d);
-    const g = nhom.get(kk) ?? { dau: d, khoa: [] };
-    g.khoa.push(k);
+    const g = nhom.get(kk) ?? { mark: d, keys: [] };
+    g.keys.push(k);
     nhom.set(kk, g);
   }
   return [...nhom.values()];
@@ -110,32 +110,32 @@ function groupByMark(cap: [string, DauDong | null][]) {
  * Hook tô màu của MỘT bảng. `maBang` = khoá ổn định của bảng (VD "ton-kho-thang")
  * — đổi khoá là mất dấu cũ, nên đặt một lần rồi để yên. Bỏ trống ⇒ tắt.
  */
-export function useToMau(tableKey?: string): ToMauBang {
-  const source = React.useContext(ToMauContext);
+export function useRowMarkTools(tableKey?: string): RowMarkTools {
+  const source = React.useContext(RowMarkContext);
   const bat = Boolean(source && tableKey);
-  const map = bat && source && tableKey ? source.dauCuaBang(tableKey) : EMPTY_MARKS;
+  const map = bat && source && tableKey ? source.getTableMarks(tableKey) : EMPTY_MARKS;
 
-  return React.useMemo<ToMauBang>(() => {
-    const update = (khoa: string[], va: VaDau | null) => {
-      const ds = [...new Set(khoa)];
-      if (!source || !tableKey || ds.length === 0) return;
-      const prev = ds.map((k) => [k, map.get(k) ?? null] as [string, DauDong | null]);
-      const nextMarks = prev.map(([k, d]) => [k, apVa(d, va)] as [string, DauDong | null]);
+  return React.useMemo<RowMarkTools>(() => {
+    const update = (key: string[], va: MarkStylePatch | null) => {
+      const items = [...new Set(key)];
+      if (!source || !tableKey || items.length === 0) return;
+      const prev = items.map((k) => [k, map.get(k) ?? null] as [string, MarkStyle | null]);
+      const nextMarks = prev.map(([k, d]) => [k, applyMarkPatch(d, va)] as [string, MarkStyle | null]);
       // KHÔNG toast (README luật 8): tô màu / in đậm là dấu trình bày, không đổi số
       // sổ sách — màu dòng đổi ngay trước mắt đã là phản hồi; muốn gỡ thì Bỏ tô.
-      for (const g of groupByMark(nextMarks)) source.dat(tableKey, g.khoa, g.dau);
+      for (const g of groupByMark(nextMarks)) source.setMarks(tableKey, g.keys, g.mark);
     };
     return {
-      bat,
-      lay: (k) => map.get(k),
-      sua: update,
-      thuocTinh: (k) => {
+      enabled: bat,
+      getMark: (k) => map.get(k),
+      patch: update,
+      getRowProps: (k) => {
         const d = map.get(k);
         if (!d) return {};
         return {
-          ...(d.mau ? { "data-to-mau": d.mau, style: { "--to-nen": `var(--to-${d.mau})` } } : {}),
-          ...(d.mau && MAU_TOI.has(d.mau) ? { "data-to-toi": "" } : {}),
-          ...(d.dam ? { "data-dam": "" } : {}),
+          ...(d.color ? { "data-marked": d.color, style: { "--mark-bg": `var(--to-${d.color})` } } : {}),
+          ...(d.color && DARK_MARK_COLORS.has(d.color) ? { "data-mark-dark": "" } : {}),
+          ...(d.bold ? { "data-bold": "" } : {}),
         };
       },
     };
@@ -146,19 +146,19 @@ export function useToMau(tableKey?: string): ToMauBang {
  * Tick chọn dòng do BẢNG tự giữ (khi màn không truyền `chon` riêng). Shift+tick
  * chọn cả khoảng từ dòng tick trước — như Shift+bấm ở Excel.
  */
-export function useChonDong() {
+export function useRowSelection() {
   const [selected, setSelected] = React.useState<ReadonlySet<string>>(() => new Set());
   const neo = React.useRef<string | null>(null);
   /** Tick/bỏ một dòng; `shift` + `thuTu` (khoá đang hiện) ⇒ đặt cả khoảng theo dòng vừa bấm. */
-  const doi = React.useCallback((k: string, shift = false, thuTu: string[] = []) => {
-    const a = neo.current ? thuTu.indexOf(neo.current) : -1;
+  const doi = React.useCallback((k: string, shift = false, order: string[] = []) => {
+    const a = neo.current ? order.indexOf(neo.current) : -1;
     neo.current = k;
     setSelected((prev) => {
       const n = new Set(prev);
       const bat = !prev.has(k);
-      const b = thuTu.indexOf(k);
+      const b = order.indexOf(k);
       if (shift && a >= 0 && b >= 0) {
-        for (const x of thuTu.slice(Math.min(a, b), Math.max(a, b) + 1)) {
+        for (const x of order.slice(Math.min(a, b), Math.max(a, b) + 1)) {
           if (bat) n.add(x);
           else n.delete(x);
         }

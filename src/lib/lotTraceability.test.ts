@@ -4,17 +4,17 @@ import { buildLabelPrintRecords, listLotsToPrint, groupByTraceStage, assignSessi
 import type { LabelPrint, LotInput, LotWaiver } from "@/types";
 
 const makeShipment = (id: string, date: string, workshop: ImportShipment["workshop"], lotCode = ""): ImportShipment => ({
-  id, deliveryDate: date, postingDate: date, backdateReason: "", workshop: workshop,
+  id, deliveryDate: date, postingDate: date, backdateReason: "", workshop,
   supplierName: "Hồng Phú", driverName: "", licensePlate: "", note: "", lotCode,
 });
 const dong = (shipmentId: string, date: string, kg: number, materialType: string): MaterialImportItem =>
   ({ id: `${shipmentId}-${materialType}`, shipmentId, deliveryDate: date, workshop: "Đông", quantityKg: kg, materialTypeName: materialType, category: materialType }) as MaterialImportItem;
 const me = (id: string, date: string, workshop: WipProductionItem["workshop"]): WipProductionItem => ({
-  id, productionDate: date, postingDate: date, backdateReason: "", workshop: workshop, productId: "mh1",
+  id, productionDate: date, postingDate: date, backdateReason: "", workshop, productId: "mh1",
   spec: "", quantityKg: 100, blocksCount: 0, warehouse: "", status: "cho-nhap" as WipProductionItem["status"], note: "",
 });
 const salesInvoice = (id: string, date: string): Packaging => ({
-  id, date: date, workshop: "Đông", fromProductId: "mh1", fromSpec: "", inputKg: 50, inputBlocks: 0,
+  id, date, workshop: "Đông", fromProductId: "mh1", fromSpec: "", inputKg: 50, inputBlocks: 0,
   toProductId: "mh2", toSpec: "", outputKg: 48, outputUnits: 4, warehouse: "", note: "",
 });
 

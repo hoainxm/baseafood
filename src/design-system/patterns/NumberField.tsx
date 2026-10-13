@@ -2,23 +2,23 @@ import * as React from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Field } from "./Field";
-import { useONhapCuaField } from "./oNhapCuaField";
-import { dieuHuongCotSo } from "./dieuHuongCotSo";
-import { XemTruocBieuThuc } from "./ONhapSo";
-import { useNhapSo } from "./useNhapSo";
+import { useFieldInput } from "./fieldInput";
+import { navigateNumberColumn } from "./numberColumnNav";
+import { ExpressionPreview } from "./NumberInput";
+import { useNumberInput } from "./useNumberInput";
 import { Minus, Plus } from "lucide-react";
 
-// Lõi đọc số / tính biểu thức ở `bieuThucSo.ts` (hàm thuần, có test); hành vi
-// ô (ghi theo phím, Esc, xem trước "= kết quả") ở `ONhapSo.tsx` — dùng chung
-// với ô lưới `LuoiNhap`.
+// Lõi đọc số / tính biểu thức ở `numberExpression.ts` (hàm thuần, có test); hành vi
+// ô (ghi theo phím, Esc, xem trước "= kết quả") ở `NumberInput.tsx` — dùng chung
+// với ô lưới `EditableGrid`.
 
 /**
  * Ô `<input>` của NumberField. Tách component riêng để đọc thuộc tính của `Field`
  * (id cho nhãn, aria-*, khoảng chừa đơn vị) qua context và trải lên CHÍNH ô nhập —
  * con trực tiếp của `Field` là thẻ bọc (`<div>` + dòng xem trước biểu thức).
  */
-function OSoTrongField(props: React.ComponentProps<typeof Input>) {
-  const tt = useONhapCuaField();
+function NumberInputInField(props: React.ComponentProps<typeof Input>) {
+  const tt = useFieldInput();
   return <Input {...tt} {...props} style={{ ...tt?.style, ...props.style }} />;
 }
 
@@ -41,8 +41,8 @@ export function NumberField({
   unit = "kg",
   step,
   placeholder = "0",
-  anNhanBatBuoc = false,
-  anNhan = false,
+  hideRequiredMark = false,
+  hideLabel = false,
   navCol,
   className,
 }: {
@@ -57,24 +57,24 @@ export function NumberField({
   step?: number;
   placeholder?: string;
   /** Ẩn nhãn "Bắt buộc / (không bắt buộc)" — dùng cho ô sửa nhanh trong bảng thông số. */
-  anNhanBatBuoc?: boolean;
+  hideRequiredMark?: boolean;
   /** Giấu hẳn nhãn (aria-label), dùng trong bảng/lưới có tiêu đề cột. */
-  anNhan?: boolean;
+  hideLabel?: boolean;
   /**
    * Bật điều hướng ↑/↓/Enter kiểu Excel: nhảy dọc trong CỘT cùng tên này (mọi
-   * ô cùng `navCol` trong khung `[data-luoi-phim]`). Dùng cho bảng số TỰ DỰNG
+   * ô cùng `navCol` trong khung `[data-grid-nav]`). Dùng cho bảng số TỰ DỰNG
    * (VD ghi thành phẩm). Bỏ trống ⇒ không đổi hành vi (form thường dùng Tab).
    */
   navCol?: string;
   className?: string;
 }) {
-  const { props: o, xemTruoc } = useNhapSo({ value, onChange });
+  const { props: o, xemTruoc: preview } = useNumberInput({ value, onChange });
 
   const stepBy = (delta: number) => onChange(Math.max(0, (value ?? 0) + delta));
 
   const input = (
     <div className="relative">
-      <OSoTrongField
+      <NumberInputInField
         type="text"
         inputMode="decimal"
         autoComplete="off"
@@ -84,13 +84,13 @@ export function NumberField({
         data-navcol={navCol || undefined}
         onKeyDown={(e) => {
           o.onKeyDown(e);
-          if (navCol && !e.defaultPrevented) dieuHuongCotSo(e, navCol);
+          if (navCol && !e.defaultPrevented) navigateNumberColumn(e, navCol);
         }}
         onFocus={o.onFocus}
         onChange={o.onChange}
         onBlur={o.onBlur}
       />
-      <XemTruocBieuThuc xemTruoc={xemTruoc} donVi={unit} />
+      <ExpressionPreview preview={preview} unit={unit} />
     </div>
   );
 
@@ -101,9 +101,9 @@ export function NumberField({
       hint={hint}
       error={error}
       unit={step ? undefined : unit}
-      anNhanBatBuoc={anNhanBatBuoc}
-      anNhan={anNhan}
-      oNhapLong
+      hideRequiredMark={hideRequiredMark}
+      hideLabel={hideLabel}
+      nestedInput
       className={className}
     >
       {step ? (

@@ -8,22 +8,22 @@ import { Inbox } from "lucide-react";
  */
 export function EmptyState({
   icon: Icon = Inbox,
-  tieuDe,
-  moTa,
+  title,
+  description,
   action,
 }: {
   icon?: LucideIcon;
-  tieuDe: string;
-  moTa?: string;
+  title: string;
+  description?: string;
   action?: React.ReactNode;
 }) {
   return (
     <div className="rounded-xl border-2 border-dashed border-border px-6 py-12 text-center">
       <Icon className="mx-auto size-10 text-muted-foreground" aria-hidden />
-      <p className="mt-4 text-lg font-semibold text-foreground">{tieuDe}</p>
-      {moTa && (
+      <p className="mt-4 text-lg font-semibold text-foreground">{title}</p>
+      {description && (
         <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
-          {moTa}
+          {description}
         </p>
       )}
       {action && <div className="mt-6 flex justify-center">{action}</div>}

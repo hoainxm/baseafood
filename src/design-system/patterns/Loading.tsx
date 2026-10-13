@@ -5,8 +5,8 @@ import { Skeleton } from "@/components/ui/skeleton";
  * Chỉ báo "hệ thống đang suy nghĩ" — thay spinner khô khan bằng thứ mềm hơn.
  *
  *  - `ThinkingDots`: ba chấm nhấp nháy so le (bám màu chữ hiện tại).
- *  - `DangXuLy`: khối giữa vùng trống, dùng khi chờ tải/đang xử lý cả màn.
- *  - `SkeletonBang`: khung xương của một bảng danh sách trong lúc dữ liệu về —
+ *  - `ProcessingState`: khối giữa vùng trống, dùng khi chờ tải/đang xử lý cả màn.
+ *  - `TableSkeleton`: khung xương của một bảng danh sách trong lúc dữ liệu về —
  *    tránh chớp "Chưa có dữ liệu" rồi mới nhảy ra danh sách.
  *
  * Mọi hiệu ứng chỉ dùng opacity nên nhẹ máy; người đặt hệ điều hành "giảm
@@ -29,11 +29,11 @@ export function ThinkingDots({ className }: { className?: string }) {
 }
 
 /** Khối "đang xử lý" giữa vùng trống — chờ tải cả màn hoặc tác vụ dài. */
-export function DangXuLy({
-  chu = "Đang xử lý…",
+export function ProcessingState({
+  text: chu = "Đang xử lý…",
   className,
 }: {
-  chu?: string;
+  text?: string;
   className?: string;
 }) {
   return (
@@ -52,11 +52,11 @@ export function DangXuLy({
 }
 
 /** Khung xương của một bảng danh sách (RecordTable) trong lúc dữ liệu đang về. */
-export function SkeletonBang({
-  dong = 5,
+export function TableSkeleton({
+  rows: dong = 5,
   className,
 }: {
-  dong?: number;
+  rows?: number;
   className?: string;
 }) {
   return (

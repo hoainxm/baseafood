@@ -5,7 +5,7 @@
 // ============================================================
 import type { Category } from "@/types";
 import { CATEGORIES } from "@/types";
-import { Button, Combobox, NumberField, type MucChon } from "@/design-system";
+import { Button, Combobox, NumberField, type ComboboxOption } from "@/design-system";
 import { useState } from "react";
 import { Pencil, Plus, X } from "lucide-react";
 import { formatDateVN } from "@/lib/format";
@@ -34,7 +34,7 @@ export function BangDongHang({
   onSua: (key: string, patch: Partial<DongBang>) => void;
   onBo: (key: string) => void;
   onThem: () => void;
-  optLoaiTheoLoai: (category: string) => MucChon[];
+  optLoaiTheoLoai: (category: string) => ComboboxOption[];
   onTaoLoai: (ten: string, category: string) => string;
   /** Bút chì sửa nhanh loại NL trong danh mục (value = tên). */
   onSuaLoai?: (ten: string) => void;
@@ -48,7 +48,7 @@ export function BangDongHang({
   return (
     <div
       className="space-y-3"
-      data-luoi-phim="dong-hang"
+      data-grid-nav="import-lines"
       // Enter ở ô kg CUỐI (NumberField đã lo nhảy giữa các dòng) ⇒ báo ra ngoài để nhảy tới nút lưu.
       onKeyDown={(e) => {
         if (e.key !== "Enter") return;
@@ -93,7 +93,7 @@ export function BangDongHang({
             <NumberField
               label="Số lượng"
               required
-              anNhanBatBuoc
+              hideRequiredMark
               unit="kg"
               navCol="kg"
               value={d.quantityKg || null}
@@ -101,7 +101,7 @@ export function BangDongHang({
             />
             <NumberField
               label="Đơn giá"
-              anNhanBatBuoc
+              hideRequiredMark
               unit="đ"
               value={d.unitPrice}
               onChange={(v) => onSua(d.key, { unitPrice: v })}
@@ -123,7 +123,7 @@ export function BangDongHang({
             <Combobox
               label="Loài"
               required
-              choPhepXoa={false}
+              clearable={false}
               className="col-span-2 lg:col-span-1"
               value={d.category}
               onChange={(v) =>
@@ -139,8 +139,8 @@ export function BangDongHang({
               onChange={(v) => onSua(d.key, { materialTypeName: v })}
               options={optLoaiTheoLoai(d.category)}
               onCreate={(ten) => onTaoLoai(ten, d.category)}
-              onSuaMuc={onSuaLoai}
-              nhanSua="Sửa thông tin loại nguyên liệu này — lưu thẳng vào Danh mục."
+              onEditItem={onSuaLoai}
+              editLabel="Sửa thông tin loại nguyên liệu này — lưu thẳng vào Danh mục."
             />
             <NumberField
               label="Số lượng"

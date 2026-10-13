@@ -5,15 +5,15 @@
 // ============================================================
 import * as React from "react";
 import { cn } from "@/lib/utils";
-import { dinhDangSo, parseSo } from "./bieuThucSo";
-import { XemTruocBieuThuc } from "./ONhapSo";
-import { useNhapSo } from "./useNhapSo";
-import { ThanhToMau } from "./ToMauDong";
-import { useThanhCuonTren } from "./thanhCuonTren";
-import { useChonDong, useToMau } from "./toMauNguon";
+import { formatNumber, parseVnNumber } from "./numberExpression";
+import { ExpressionPreview } from "./NumberInput";
+import { useNumberInput } from "./useNumberInput";
+import { RowMarkToolbar } from "./RowMarkToolbar";
+import { useTopScrollbar } from "./topScrollbar";
+import { useRowSelection, useRowMarkTools } from "./rowMarkSource";
 
 /**
- * LuoiNhap — lưới nhập liệu thay cho "mở hộp thoại, điền, bấm lưu" từng dòng.
+ * EditableGrid — lưới nhập liệu thay cho "mở hộp thoại, điền, bấm lưu" từng dòng.
  *
  * Vì sao cần: người dùng đang làm bảng cân đối trên Excel. Nếu phần mềm bắt mở
  * hộp thoại cho từng ô sản lượng ngày thì Excel vẫn nhanh hơn và họ sẽ quay về
@@ -25,114 +25,114 @@ import { useChonDong, useToMau } from "./toMauNguon";
  * cột tên dính bên trái để cuộn ngang không lạc dòng.
  */
 
-export type KieuOLuoi = "so" | "tinh" | "chu";
+export type GridCellKind = "so" | "tinh" | "chu";
 
-export interface CotLuoi<R> {
+export interface GridColumn<R> {
   key: string;
   header: React.ReactNode;
   /** Nhãn đọc cho trình đọc màn hình + tiêu đề khi thu gọn. */
-  nhan: string;
-  kieu: KieuOLuoi;
+  label: string;
+  kind: GridCellKind;
   /** Giá trị hiện tại của ô. */
-  lay: (row: R) => number | null;
+  getValue: (row: R) => number | null;
   /** Chuỗi hiển thị thay cho số (dùng cho cột chữ / cột tính đặc biệt). */
-  hien?: (row: R) => React.ReactNode;
+  renderValue?: (row: R) => React.ReactNode;
   /**
    * Ô điều khiển riêng (Combobox chọn khách, nút…). Khác `hien` ở chỗ nội dung
    * TƯƠNG TÁC được: ô không bọc lớp căn phải cứng và không bị coi là ô số.
    */
-  oRieng?: (row: R) => React.ReactNode;
+  renderCell?: (row: R) => React.ReactNode;
   /**
    * Phần PHỤ dưới giá trị của ô (ô gõ được hay ô khoá đều có) — VD nút "2 chuyến"
    * mở danh sách đại lý/chuyến của ngày đó. Trả `null` thì ô như cũ.
    */
-  phuO?: (row: R) => React.ReactNode;
+  renderCellNote?: (row: R) => React.ReactNode;
   /** Ô này có khoá không (dòng hút từ sổ khác, dòng tổng…). */
-  khoa?: (row: R) => boolean;
+  isLocked?: (row: R) => boolean;
   /** Lý do khoá — hiện thành tooltip, đừng để người dùng gõ vào ô câm. */
-  lyDoKhoa?: (row: R) => string;
+  lockReason?: (row: R) => string;
   /** Nhóm cột để gập chung (VD "ngay" cho toàn bộ cột ngày). */
-  nhom?: string;
+  group?: string;
   /** Tô nền riêng (VD cột Chuyển kỳ). */
-  toNen?: "chuyen-ky" | "tinh" | "hut";
+  tint?: "chuyen-ky" | "tinh" | "hut";
   /** Rộng tối thiểu, px. */
-  rong?: number;
+  minWidth?: number;
 }
 
-export interface HangLuoi<R> {
+export interface GridRow<R> {
   id: string;
-  du: R;
+  data: R;
   /** Dòng tiêu đề nhóm — chỉ hiện chữ, không có ô nhập. */
-  tieuDeNhom?: string;
+  groupTitle?: string;
   /** Kiểu dòng: dòng giảm tô đỏ nhạt, dòng tổng in đậm. */
-  kieu?: "thuong" | "giam" | "tong" | "con";
+  kind?: "thuong" | "giam" | "tong" | "con";
   /** Tên hiện ở cột dính bên trái. */
-  ten: React.ReactNode;
+  label: React.ReactNode;
   /** Chú thích nhỏ dưới tên (VD "hút từ sổ nhập hàng"). */
-  phu?: React.ReactNode;
+  subLabel?: React.ReactNode;
 }
 
-const NEN: Record<NonNullable<CotLuoi<unknown>["toNen"]>, string> = {
+const TINT_CLASSES: Record<NonNullable<GridColumn<unknown>["tint"]>, string> = {
   "chuyen-ky": "bg-warning-surface",
   tinh: "bg-muted",
   hut: "bg-primary/8",
 };
 
 /** Khoá ô để định vị khi di chuyển bằng phím. */
-const khoaO = (rowId: string, colKey: string) => `${rowId}|${colKey}`;
+const cellKey = (rowId: string, colKey: string) => `${rowId}|${colKey}`;
 
-export function LuoiNhap<R>({
-  cot,
-  hang,
-  onGhiO,
-  onDanKhoi,
-  nhomAn = [],
-  cuoiBang,
+export function EditableGrid<R>({
+  columns,
+  rows: hang,
+  onCellCommit,
+  onPasteBlock,
+  collapsedGroups = [],
+  footer,
   className,
-  moTa,
-  tenCotDau = "Mặt hàng",
-  toMau,
+  description,
+  rowHeaderLabel = "Mặt hàng",
+  rowMarkKey,
 }: {
-  cot: CotLuoi<R>[];
-  hang: HangLuoi<R>[];
+  columns: GridColumn<R>[];
+  rows: GridRow<R>[];
   /** Ghi một ô. Trả về false nếu bị từ chối (VD ngày đã chốt, chưa có lý do). */
-  onGhiO: (rowId: string, colKey: string, value: number | null) => void | boolean;
+  onCellCommit: (rowId: string, colKey: string, value: number | null) => void | boolean;
   /**
    * Dán một khối số từ Excel: `khoi[i][j]` là ô ở dòng thứ i, cột thứ j tính từ
    * ô đang đứng. Không có hàm này thì lưới vẫn dán được từng ô một.
    */
-  onDanKhoi?: (rowId: string, colKey: string, block: (number | null)[][]) => void;
+  onPasteBlock?: (rowId: string, colKey: string, block: (number | null)[][]) => void;
   /** Nhóm cột đang thu gọn (VD ["ngay"]). */
-  nhomAn?: string[];
+  collapsedGroups?: string[];
   /** Dòng tổng cuối bảng, tự dựng ở màn gọi. */
-  cuoiBang?: React.ReactNode;
+  footer?: React.ReactNode;
   className?: string;
   /** Câu mô tả cho trình đọc màn hình. */
-  moTa: string;
+  description: string;
   /** Tên cột đầu (cột tên dòng, dính trái). Mặc định "Mặt hàng". */
-  tenCotDau?: string;
+  rowHeaderLabel?: string;
   /**
    * Tô màu dòng "đã dò" (lưu chung, mọi máy thấy): khoá ỔN ĐỊNH của lưới, VD
-   * "can-doi-nl". Nút tô nằm trong ô tên dính trái; khoá dòng = `HangLuoi.id`
+   * "can-doi-nl". Nút tô nằm trong ô tên dính trái; khoá dòng = `GridRow.id`
    * (phải là id bản ghi). Dòng tiêu đề nhóm không tô. Luật: README § Tô màu dòng.
    */
-  toMau?: string;
+  rowMarkKey?: string;
 }) {
-  const to = useToMau(toMau);
-  // Tick dòng để tô màu / in đậm nhiều dòng một lúc (chỉ khi bật toMau).
-  const rowSelection = useChonDong();
+  const to = useRowMarkTools(rowMarkKey);
+  // Tick dòng để tô màu / in đậm nhiều dòng một lúc (chỉ khi bật rowMarkKey).
+  const rowSelection = useRowSelection();
   // Thanh cuộn ngang TRÊN đầu lưới (README § 5a) — lưới ngày của Cân đối rất rộng.
   const frameRef = React.useRef<HTMLDivElement>(null);
-  const topScrollBar = useThanhCuonTren(() => frameRef.current);
+  const topScrollBar = useTopScrollbar(() => frameRef.current);
   const oRef = React.useRef(new Map<string, HTMLInputElement>());
   const visibleColumns = React.useMemo(
-    () => cot.filter((c) => !c.nhom || !nhomAn.includes(c.nhom)),
-    [cot, nhomAn]
+    () => columns.filter((c) => !c.group || !collapsedGroups.includes(c.group)),
+    [columns, collapsedGroups]
   );
   /** Chỉ ô gõ được mới nằm trong đường đi của phím mũi tên. */
-  const inputRows = React.useMemo(() => hang.filter((h) => !h.tieuDeNhom), [hang]);
+  const inputRows = React.useMemo(() => hang.filter((h) => !h.groupTitle), [hang]);
   // Dòng con (chỉ đọc, VD tách theo đại lý) không tick tô màu — tô ở dòng cha.
-  const visibleKeys = inputRows.filter((h) => h.kieu !== "con").map((h) => h.id);
+  const visibleKeys = inputRows.filter((h) => h.kind !== "con").map((h) => h.id);
   const daTick = visibleKeys.filter((k) => rowSelection.daChon.has(k));
   const isAllSelected = daTick.length > 0 && daTick.length === visibleKeys.length;
 
@@ -161,7 +161,7 @@ export function LuoiNhap<R>({
       const targetRow = inputRows[r];
       const targetColumn = visibleColumns[c];
       if (!targetRow || !targetColumn) return;
-      const o = oRef.current.get(khoaO(targetRow.id, targetColumn.key));
+      const o = oRef.current.get(cellKey(targetRow.id, targetColumn.key));
       if (o) {
         o.focus();
         o.select();
@@ -211,13 +211,13 @@ export function LuoiNhap<R>({
           if (!t) return null;
           /* Kế toán ghi số âm bằng ngoặc: (2.000) = −2.000 */
           const am = /^\(.*\)$/.test(t);
-          const so = parseSo(am ? t.slice(1, -1) : t);
+          const so = parseVnNumber(am ? t.slice(1, -1) : t);
           if (so == null) return null;
           return am ? -so : so;
         })
       );
-    if (onDanKhoi) {
-      onDanKhoi(rowId, colKey, block);
+    if (onPasteBlock) {
+      onPasteBlock(rowId, colKey, block);
       return;
     }
     /* Không khai onDanKhoi → rải từng ô qua onGhiO. */
@@ -228,7 +228,7 @@ export function LuoiNhap<R>({
         if (v == null) return;
         const h = inputRows[iH + i];
         const c = visibleColumns[iC + j];
-        if (h && c && c.kieu === "so" && !c.khoa?.(h.du)) onGhiO(h.id, c.key, v);
+        if (h && c && c.kind === "so" && !c.isLocked?.(h.data)) onCellCommit(h.id, c.key, v);
       })
     );
   };
@@ -247,7 +247,7 @@ export function LuoiNhap<R>({
           sr-only là position:absolute, mà hộp cuộn ngoài không phải khối định vị
           ⇒ caption rơi ra toạ độ trang, đội chiều cao trang lên và sinh thêm một
           thanh cuộn dọc + mảng trắng dưới cùng. */}
-      <table className="w-full border-collapse text-sm" aria-label={moTa}>
+      <table className="w-full border-collapse text-sm" aria-label={description}>
         <thead>
           <tr>
             <th
@@ -255,7 +255,7 @@ export function LuoiNhap<R>({
               className="sticky left-0 z-30 min-w-40 border-b-2 border-border bg-card px-3 py-3 text-left align-bottom text-sm font-semibold sm:min-w-52"
             >
               <span className="flex items-center gap-1">
-                {to.bat && (
+                {to.enabled && (
                   <input
                     type="checkbox"
                     className="size-5 shrink-0"
@@ -265,17 +265,17 @@ export function LuoiNhap<R>({
                     title={isAllSelected ? "Bỏ tick mọi dòng." : "Tick mọi dòng (để tô màu / in đậm cùng lúc)."}
                   />
                 )}
-                <span className="min-w-0 flex-1">{tenCotDau}</span>
+                <span className="min-w-0 flex-1">{rowHeaderLabel}</span>
               </span>
             </th>
             {visibleColumns.map((c) => (
               <th
                 key={c.key}
                 scope="col"
-                style={c.rong ? { minWidth: c.rong } : undefined}
+                style={c.minWidth ? { minWidth: c.minWidth } : undefined}
                 className={cn(
                   "border-b-2 border-l border-border bg-card px-2 py-3 text-right align-bottom text-sm font-semibold whitespace-nowrap",
-                  c.toNen === "chuyen-ky" && "text-warning"
+                  c.tint === "chuyen-ky" && "text-warning"
                 )}
               >
                 {c.header}
@@ -285,101 +285,101 @@ export function LuoiNhap<R>({
         </thead>
         <tbody>
           {hang.map((h) =>
-            h.tieuDeNhom ? (
+            h.groupTitle ? (
               <tr key={h.id}>
                 <td
                   colSpan={visibleColumns.length + 1}
                   className="sticky left-0 border-b border-border bg-muted px-4 py-2 text-left text-sm font-semibold text-muted-foreground"
                 >
-                  {h.tieuDeNhom}
+                  {h.groupTitle}
                 </td>
               </tr>
             ) : (
               <tr
                 key={h.id}
                 className={cn(
-                  h.kieu === "giam" && "bg-warning-surface/40",
-                  h.kieu === "tong" && "bg-muted font-semibold",
-                  h.kieu === "con" && "text-muted-foreground"
+                  h.kind === "giam" && "bg-warning-surface/40",
+                  h.kind === "tong" && "bg-muted font-semibold",
+                  h.kind === "con" && "text-muted-foreground"
                 )}
-                {...(h.kieu === "con" ? {} : to.thuocTinh(h.id))}
+                {...(h.kind === "con" ? {} : to.getRowProps(h.id))}
               >
                 <th
                   scope="row"
                   className={cn(
                     "sticky left-0 z-10 border-r-2 border-b border-border px-3 py-2 text-left align-middle font-normal",
-                    h.kieu === "tong" ? "bg-muted font-semibold" : h.kieu === "con" ? "bg-muted" : "bg-card",
-                    h.kieu === "giam" && "bg-warning-surface/40",
+                    h.kind === "tong" ? "bg-muted font-semibold" : h.kind === "con" ? "bg-muted" : "bg-card",
+                    h.kind === "giam" && "bg-warning-surface/40",
                     // Dòng con: thụt vào + vạch trái nhạt ⇒ đọc ra "thuộc dòng trên".
-                    h.kieu === "con" && "pl-10 text-sm shadow-[inset_3px_0_0_var(--border)]"
+                    h.kind === "con" && "pl-10 text-sm shadow-[inset_3px_0_0_var(--border)]"
                   )}
                 >
                   <div className="flex items-start gap-2">
-                    {to.bat && h.kieu !== "con" && (
+                    {to.enabled && h.kind !== "con" && (
                       <input
                         type="checkbox"
                         className="mt-0.5 size-5 shrink-0"
                         checked={rowSelection.daChon.has(h.id)}
                         onChange={() => {}}
                         onClick={(e) => rowSelection.doi(h.id, e.shiftKey, visibleKeys)}
-                        aria-label={`Chọn dòng ${typeof h.ten === "string" ? h.ten : h.id}`}
+                        aria-label={`Chọn dòng ${typeof h.label === "string" ? h.label : h.id}`}
                         title="Tick để tô màu / in đậm dòng này (Shift+tick chọn cả khoảng)."
                       />
                     )}
                     <div className="min-w-0 flex-1">
-                      <span className="block leading-tight">{h.ten}</span>
-                      {h.phu && (
-                        <span className="block text-sm text-muted-foreground">{h.phu}</span>
+                      <span className="block leading-tight">{h.label}</span>
+                      {h.subLabel && (
+                        <span className="block text-sm text-muted-foreground">{h.subLabel}</span>
                       )}
                     </div>
                   </div>
                 </th>
                 {visibleColumns.map((c) => {
-                  const isReadOnly = h.kieu === "tong" || h.kieu === "con";
-                  const oRieng = isReadOnly ? undefined : c.oRieng?.(h.du);
-                  const bikhoa = c.kieu !== "so" || Boolean(c.khoa?.(h.du)) || isReadOnly;
-                  const phu = c.phuO?.(h.du);
-                  const gt = c.lay(h.du);
-                  const nen = c.toNen ? NEN[c.toNen] : undefined;
+                  const isReadOnly = h.kind === "tong" || h.kind === "con";
+                  const oRieng = isReadOnly ? undefined : c.renderCell?.(h.data);
+                  const bikhoa = c.kind !== "so" || Boolean(c.isLocked?.(h.data)) || isReadOnly;
+                  const phu = c.renderCellNote?.(h.data);
+                  const gt = c.getValue(h.data);
+                  const tint = c.tint ? TINT_CLASSES[c.tint] : undefined;
                   return (
                     <td
                       key={c.key}
                       className={cn(
                         "border-b border-l border-border p-0 text-right align-middle",
-                        nen,
-                        c.kieu === "tinh" && !nen && "bg-muted",
-                        h.kieu === "con" && "bg-muted/40 text-sm"
+                        tint,
+                        c.kind === "tinh" && !tint && "bg-muted",
+                        h.kind === "con" && "bg-muted/40 text-sm"
                       )}
                     >
                       {oRieng ? (
                         <div className="px-2 py-1 text-left">{oRieng}</div>
                       ) : bikhoa ? (
                         <span
-                          title={c.lyDoKhoa?.(h.du)}
+                          title={c.lockReason?.(h.data)}
                           className={cn(
                             "tnum flex min-h-11 items-center justify-end px-2 py-2",
-                            c.kieu === "tinh" && "font-semibold",
+                            c.kind === "tinh" && "font-semibold",
                             gt != null && gt < 0 && "text-destructive"
                           )}
                         >
-                          {c.hien
-                            ? c.hien(h.du)
+                          {c.renderValue
+                            ? c.renderValue(h.data)
                             : gt == null || gt === 0
                               ? <span className="text-muted-foreground">—</span>
-                              : dinhDangSo(gt)}
+                              : formatNumber(gt)}
                         </span>
                       ) : (
                         <GridCell
-                          giaTri={gt}
-                          nhan={`${c.nhan} — ${typeof h.ten === "string" ? h.ten : "dòng"}`}
-                          dangKy={(el) => {
-                            const k = khoaO(h.id, c.key);
+                          value={gt}
+                          label={`${c.label} — ${typeof h.label === "string" ? h.label : "dòng"}`}
+                          inputRef={(el) => {
+                            const k = cellKey(h.id, c.key);
                             if (el) oRef.current.set(k, el);
                             else oRef.current.delete(k);
                           }}
-                          onGhi={(v) => onGhiO(h.id, c.key, v)}
-                          onPhim={(e) => xuLyPhim(e, h.id, c.key)}
-                          onDan={(e) => handlePaste(e, h.id, c.key)}
+                          onCommit={(v) => onCellCommit(h.id, c.key, v)}
+                          onKeyDown={(e) => xuLyPhim(e, h.id, c.key)}
+                          onPaste={(e) => handlePaste(e, h.id, c.key)}
                         />
                       )}
                       {phu && <div className="flex justify-end px-1 pb-1">{phu}</div>}
@@ -389,11 +389,11 @@ export function LuoiNhap<R>({
               </tr>
             )
           )}
-          {cuoiBang}
+          {footer}
         </tbody>
       </table>
     </div>
-    <ThanhToMau to={to} khoa={daTick} onBoChon={rowSelection.boChon} />
+    <RowMarkToolbar marker={to} selectedKeys={daTick} onClearSelection={rowSelection.boChon} />
     </>
   );
 }
@@ -410,37 +410,37 @@ export function LuoiNhap<R>({
  * không tự nhảy số dưới tay; dấu chấm phần nghìn chỉ hiện khi rời ô.
  */
 function GridCell({
-  giaTri,
-  nhan,
-  dangKy,
-  onGhi,
-  onPhim,
-  onDan,
+  value,
+  label,
+  inputRef,
+  onCommit,
+  onKeyDown: onPhim,
+  onPaste,
 }: {
-  giaTri: number | null;
-  nhan: string;
-  dangKy: (el: HTMLInputElement | null) => void;
-  onGhi: (v: number | null) => void;
-  onPhim: (e: React.KeyboardEvent<HTMLInputElement>) => void;
-  onDan: (e: React.ClipboardEvent<HTMLInputElement>) => void;
+  value: number | null;
+  label: string;
+  inputRef: (el: HTMLInputElement | null) => void;
+  onCommit: (v: number | null) => void;
+  onKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => void;
+  onPaste: (e: React.ClipboardEvent<HTMLInputElement>) => void;
 }) {
   // Lõi chung với NumberField: gõ số / biểu thức ("250+300", "=12x5"), ra số hợp
   // lệ mới ghi (ô lưới ghi THẲNG về sổ nguồn — biểu thức dở không được ghi tạm),
   // Esc trả số cũ, đang gõ biểu thức hiện "= kết quả" dưới ô.
-  const { props: o, xemTruoc } = useNhapSo({ value: giaTri, onChange: onGhi, rong0: true });
+  const { props: o, xemTruoc: preview } = useNumberInput({ value, onChange: onCommit, emptyIsZero: true });
 
   return (
     <span className="relative block">
     <input
-      ref={dangKy}
+      ref={inputRef}
       value={o.value}
-      aria-label={nhan}
+      aria-label={label}
       inputMode="decimal"
       autoComplete="off"
       onChange={o.onChange}
       onFocus={o.onFocus}
       onBlur={o.onBlur}
-      onPaste={onDan}
+      onPaste={onPaste}
       onKeyDown={(e) => {
         o.onKeyDown(e);
         if (!e.defaultPrevented) onPhim(e);
@@ -448,10 +448,10 @@ function GridCell({
       className={cn(
         "tnum h-11 w-full min-w-20 border-0 bg-transparent px-2 text-right text-sm",
         "focus:ring-2 focus:ring-ring focus:ring-inset focus:outline-none",
-        giaTri != null && giaTri < 0 && "text-destructive"
+        value != null && value < 0 && "text-destructive"
       )}
     />
-    <XemTruocBieuThuc xemTruoc={xemTruoc} />
+    <ExpressionPreview preview={preview} />
     </span>
   );
 }

@@ -628,7 +628,7 @@ export interface StockAgeBucket {
 }
 
 /**
- * Chia kg tồn theo số ngày lô đã nằm kho (tính từ ngày sản xuất tới `homNay`): dưới 30
+ * Chia kg tồn theo số ngày lô đã nằm kho (tính từ ngày sản xuất tới `todayIso`): dưới 30
  * · 30–60 · 60–90 · trên 90 ngày. Hàng nằm lâu phải đẩy trước (FIFO). Lô hết hàng bỏ qua.
  */
 export function bucketStockByAge(los: readonly { ngaySX: string; conLai: number }[], today: string): StockAgeBucket[] {

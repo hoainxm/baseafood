@@ -8,7 +8,7 @@ import { sumGridRow } from "@/types";
 
 const mh = (id: string, materialTypeId: string): Product => ({ id, code: id, name: `Mặt hàng ${id}`, finishedGoodCode: "", materialTypeId });
 const makeImport = (i: number, workshop: MaterialImportItem["workshop"], material: string, dl: string, kg: number): MaterialImportItem => ({
-  id: `n${i}`, shipmentId: `c${i}`, deliveryDate: "2026-09-01", workshop: workshop, category: "Mực", supplierName: dl,
+  id: `n${i}`, shipmentId: `c${i}`, deliveryDate: "2026-09-01", workshop, category: "Mực", supplierName: dl,
   materialTypeName: material, quantityKg: kg, unitPrice: 55_000, driverName: "", licensePlate: "", note: "",
 });
 const makeSupplier = (ten: string): Supplier => ({ id: `s-${ten}`, code: "", shortName: ten, billingName: `Cơ sở ${ten}`, address: "12 Lê Lợi", nationalId: "0123", issuedDate: "", issuedPlace: "", phone: "0909555111", note: "" });

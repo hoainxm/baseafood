@@ -14,10 +14,10 @@ import {
   type NxtExcelRow,
 } from "@/lib/nxtExcel";
 import {
-  Nhan,
-  BangTong,
+  Tag,
+  SummaryTable,
   Button,
-  ChuThichBatBuoc,
+  RequiredLegend,
   Combobox,
   ConfirmDelete,
   DateRangeField,
@@ -31,22 +31,22 @@ import {
   ErrorSummary,
   Field,
   Input,
-  LuoiNhap,
-  PhieuIn,
-  TdIn,
-  ThIn,
-  ThongKe,
-  homNay,
+  EditableGrid,
+  PrintSheet,
+  PrintTd,
+  PrintTh,
+  StatCardGrid,
+  todayIso,
   notify,
-  type ChonBang,
-  type CotLuoi,
-  type CotTong,
-  type HangLuoi,
-  type LoiNhap,
-  type MucChon,
-  type TheThongTin,
-  NutToMauChon,
-  useToMau,
+  type TableSelection,
+  type GridColumn,
+  type SummaryTableColumn,
+  type GridRow,
+  type FieldError,
+  type ComboboxOption,
+  type StatCardData,
+  RowMarkActions,
+  useRowMarkTools,
 } from "@/design-system";
 import { useSuaDanhMuc } from "@/features/catalog/SuaDanhMucNhanh";
 import { num, formatDateVN } from "@/lib/format";
@@ -113,7 +113,7 @@ export default function WarehouseNxtScreen() {
   const storageLocationEditor = useSuaDanhMuc("khoLuu", storageLocationCatalog, setStorageLocationCatalog, { theo: "ten" });
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const warehouseOpts: MucChon[] = useMemo(() => {
+  const warehouseOpts: ComboboxOption[] = useMemo(() => {
     const set = new Set<string>();
     for (const r of snapshots) set.add(r.warehouseCode);
     return [...set].sort().map((k) => ({ value: k, label: k }));
@@ -122,7 +122,7 @@ export default function WarehouseNxtScreen() {
   const [warehouse, setWarehouse] = useState("");
   const selectedWarehouse = warehouse || warehouseOpts[0]?.value || "";
 
-  const kyOpts: MucChon[] = useMemo(() => {
+  const kyOpts: ComboboxOption[] = useMemo(() => {
     const set = new Map<string, { from: string; to: string }>();
     for (const r of snapshots) {
       if (selectedWarehouse && r.warehouseCode !== selectedWarehouse) continue;
@@ -149,7 +149,7 @@ export default function WarehouseNxtScreen() {
   /** Tên kho lưu hiển thị của một dòng — rỗng nghĩa là chưa gán ⇒ kho nhà. */
   const storageLocationOf = (r: { storageLocation: string }) => r.storageLocation || DEFAULT_STORAGE_LOCATION;
 
-  const storageLocationOpts: MucChon[] = useMemo(() => {
+  const storageLocationOpts: ComboboxOption[] = useMemo(() => {
     const set = new Set<string>([DEFAULT_STORAGE_LOCATION]);
     for (const k of storageLocationCatalog) if (k.name.trim()) set.add(k.name.trim());
     for (const r of snapshots) if (r.storageLocation) set.add(r.storageLocation);
@@ -183,7 +183,7 @@ export default function WarehouseNxtScreen() {
       note: "",
     };
     setStorageLocationCatalog([...storageLocationCatalog, k]);
-    notify.daLuu(`Đã thêm kho lưu "${sach}" vào danh mục`);
+    notify.saved(`Đã thêm kho lưu "${sach}" vào danh mục`);
     return sach;
   };
 
@@ -229,32 +229,32 @@ export default function WarehouseNxtScreen() {
 
   const removeRow = (id: string, ten: string) => {
     setSnapshots(snapshots.filter((l) => l.id !== id));
-    notify.daXoa(`Đã xóa dòng ${ten}`);
+    notify.deleted(`Đã xóa dòng ${ten}`);
   };
 
   // ---------- Tick dòng: cộng tổng + gán kho lưu theo lô ----------
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const tableSelection: ChonBang<ComputedRow> = {
-    daChon: selected,
-    doi: (k) =>
+  const tableSelection: TableSelection<ComputedRow> = {
+    selectedKeys: selected,
+    toggle: (k) =>
       setSelected((prev) => {
         const next = new Set(prev);
         if (next.has(k)) next.delete(k);
         else next.add(k);
         return next;
       }),
-    doiTatCa: (keys, bat) =>
+    toggleAll: (keys, bat) =>
       setSelected((prev) => {
         const next = new Set(prev);
         for (const k of keys) if (bat) next.add(k);
           else next.delete(k);
         return next;
       }),
-    nhanDong: (r) => `${r.itemName} · ${r.itemCode}`,
+    getRowLabel: (r) => `${r.itemName} · ${r.itemCode}`,
   };
   const selectedRows = useMemo(() => rows.filter((r) => selected.has(r.id)), [rows, selected]);
-  // Tô màu dòng đang tick — cùng khoá với BangTong/LuoiNhap toMau="nxt-kho".
-  const rowMark = useToMau("nxt-kho");
+  // Tô màu dòng đang tick — cùng khoá với SummaryTable/EditableGrid rowMarkKey="nxt-kho".
+  const rowMark = useRowMarkTools("nxt-kho");
   const selectedTotal = useMemo(() => {
     const t = { tonDau: 0, nhap: 0, xuat: 0, tonCuoi: 0 };
     for (const r of selectedRows) {
@@ -272,33 +272,33 @@ export default function WarehouseNxtScreen() {
   const assignStorageLocation = () => {
     const target = (assignLocation ?? "").trim();
     if (!target) {
-      notify.canhBao("Chưa chọn kho lưu để gán.");
+      notify.warning("Chưa chọn kho lưu để gán.");
       return;
     }
     const ids = new Set(selectedRows.map((r) => r.id));
     if (!ids.size) {
-      notify.canhBao("Chưa tick dòng nào.");
+      notify.warning("Chưa tick dòng nào.");
       return;
     }
     setSnapshots(snapshots.map((l) => (ids.has(l.id) ? { ...l, storageLocation: target } : l)));
     setAssignLocation(null);
     setSelected(new Set());
-    notify.daLuu(`Đã gán ${ids.size} mã về ${target}`);
+    notify.saved(`Đã gán ${ids.size} mã về ${target}`);
   };
 
   // ---------- Thêm mã ----------
   const [addForm, setAddForm] = useState<{ code: string; name: string } | null>(null);
-  const [addErrors, setAddErrors] = useState<LoiNhap[]>([]);
+  const [addErrors, setAddErrors] = useState<FieldError[]>([]);
 
   const saveAddCode = () => {
     if (!addForm) return;
-    const ls: LoiNhap[] = [];
+    const ls: FieldError[] = [];
     const code = addForm.code.trim();
     const name = addForm.name.trim();
-    if (!code) ls.push({ truong: "Mã hàng", thongBao: "Chưa nhập mã hàng" });
-    if (!name) ls.push({ truong: "Tên hàng", thongBao: "Chưa nhập tên hàng" });
+    if (!code) ls.push({ field: "Mã hàng", message: "Chưa nhập mã hàng" });
+    if (!name) ls.push({ field: "Tên hàng", message: "Chưa nhập tên hàng" });
     if (code && rows.some((r) => r.itemCode === code))
-      ls.push({ truong: "Mã hàng", thongBao: "Mã này đã có trong kỳ" });
+      ls.push({ field: "Mã hàng", message: "Mã này đã có trong kỳ" });
     setAddErrors(ls);
     if (ls.length) return;
     const newLines: NxtSnapshotLine = {
@@ -320,21 +320,21 @@ export default function WarehouseNxtScreen() {
     };
     setSnapshots([...snapshots, newLines]);
     setAddForm(null);
-    notify.daLuu(`Đã thêm mã ${code}`);
+    notify.saved(`Đã thêm mã ${code}`);
   };
 
   // ---------- Tạo kỳ kế tiếp (kế thừa tồn) ----------
   const [kyForm, setKyForm] = useState<{ from: string; to: string } | null>(null);
-  const [periodErrors, setPeriodErrors] = useState<LoiNhap[]>([]);
+  const [periodErrors, setPeriodErrors] = useState<FieldError[]>([]);
 
   const saveNewPeriod = () => {
     if (!kyForm) return;
-    const ls: LoiNhap[] = [];
-    if (!kyForm.from || !kyForm.to) ls.push({ truong: "Khoảng ngày", thongBao: "Chưa chọn kỳ mới" });
+    const ls: FieldError[] = [];
+    if (!kyForm.from || !kyForm.to) ls.push({ field: "Khoảng ngày", message: "Chưa chọn kỳ mới" });
     if (kyForm.from && kyForm.to && kyForm.to < kyForm.from)
-      ls.push({ truong: "Khoảng ngày", thongBao: "Đến ngày phải sau từ ngày" });
+      ls.push({ field: "Khoảng ngày", message: "Đến ngày phải sau từ ngày" });
     if (kyForm.from === fromDate && kyForm.to === toDate)
-      ls.push({ truong: "Khoảng ngày", thongBao: "Kỳ mới trùng kỳ đang xem" });
+      ls.push({ field: "Khoảng ngày", message: "Kỳ mới trùng kỳ đang xem" });
     setPeriodErrors(ls);
     if (ls.length) return;
     const { from, to } = kyForm;
@@ -375,20 +375,20 @@ export default function WarehouseNxtScreen() {
     setStorageLocationFilter(ALL);
     setIsEditMode(true);
     const totalKg = carried.reduce((t, c) => t + c.openingKg, 0);
-    notify.daLuu(
+    notify.saved(
       `Đã tạo kỳ ${formatDateVN(from)}–${formatDateVN(to)} · kế thừa tồn đầu ${num(totalKg)} kg · ${carried.length} mã` +
         (existing.size ? ` (${existing.size} mã đã có: chỉ cập nhật tồn đầu, giữ nhập/xuất)` : "")
     );
   };
 
-  const the: TheThongTin[] = [
-    { nhan: "Tồn đầu kỳ", giaTri: `${num(total.tonDau)} kg`, so: true, icon: Snowflake, mau: "trung-tinh" },
-    { nhan: "Nhập trong kỳ", giaTri: `${num(total.nhap)} kg`, so: true, icon: ArrowDownToLine, mau: "brand" },
-    { nhan: "Xuất trong kỳ", giaTri: `${num(total.xuat)} kg`, so: true, icon: Ship, mau: "warning" },
-    { nhan: "Tồn cuối kỳ", giaTri: `${num(total.tonCuoi)} kg`, so: true, icon: Scale, mau: "success" },
+  const the: StatCardData[] = [
+    { label: "Tồn đầu kỳ", value: `${num(total.tonDau)} kg`, numeric: true, icon: Snowflake, color: "trung-tinh" },
+    { label: "Nhập trong kỳ", value: `${num(total.nhap)} kg`, numeric: true, icon: ArrowDownToLine, color: "brand" },
+    { label: "Xuất trong kỳ", value: `${num(total.xuat)} kg`, numeric: true, icon: Ship, color: "warning" },
+    { label: "Tồn cuối kỳ", value: `${num(total.tonCuoi)} kg`, numeric: true, icon: Scale, color: "success" },
   ];
 
-  const columns: CotTong<ComputedRow>[] = [
+  const columns: SummaryTableColumn<ComputedRow>[] = [
     {
       key: "ma",
       header: "Mã hàng · tên hàng",
@@ -403,51 +403,51 @@ export default function WarehouseNxtScreen() {
       key: "khoLuu",
       header: "Kho lưu",
       render: (r) => (
-        <Nhan loai={r.storageLocation && r.storageLocation !== DEFAULT_STORAGE_LOCATION ? "vi-tri" : "phu"}>
+        <Tag variant={r.storageLocation && r.storageLocation !== DEFAULT_STORAGE_LOCATION ? "vi-tri" : "phu"}>
           {storageLocationOf(r)}
-        </Nhan>
+        </Tag>
       ),
     },
-    { key: "tonDau", header: "Tồn đầu (kg)", so: true, render: (r) => num(r.openingKg), tong: () => num(total.tonDau) },
+    { key: "tonDau", header: "Tồn đầu (kg)", numeric: true, render: (r) => num(r.openingKg), total: () => num(total.tonDau) },
     {
       key: "nhap",
       header: "Nhập (kg)",
-      so: true,
+      numeric: true,
       render: (r) => (r.inKg ? <span className="font-semibold text-success">+{num(r.inKg)}</span> : "—"),
-      tong: () => num(total.nhap),
+      total: () => num(total.nhap),
     },
     {
       key: "xuat",
       header: "Xuất (kg)",
-      so: true,
+      numeric: true,
       render: (r) => (r.outKg ? <span className="font-semibold text-warning">−{num(r.outKg)}</span> : "—"),
-      tong: () => num(total.xuat),
+      total: () => num(total.xuat),
     },
     {
       key: "tonCuoi",
       header: "Tồn cuối (kg)",
-      so: true,
+      numeric: true,
       render: (r) => <span className="tnum font-bold text-foreground">{num(r.closingKg)}</span>,
-      tong: () => num(total.tonCuoi),
+      total: () => num(total.tonCuoi),
     },
   ];
 
   // ---------- Lưới ghi (chế độ Ghi) ----------
-  const gridColumns: CotLuoi<ComputedRow>[] = [
-    { key: "tonDau", header: "Tồn đầu", nhan: "Tồn đầu (kg)", kieu: "so", lay: (r) => r.openingKg || null, rong: 110 },
-    { key: "nhap", header: "Nhập", nhan: "Nhập (kg)", kieu: "so", lay: (r) => r.inKg || null, rong: 110 },
-    { key: "xuat", header: "Xuất", nhan: "Xuất (kg)", kieu: "so", lay: (r) => r.outKg || null, rong: 110 },
-    { key: "tonCuoi", header: "Tồn cuối", nhan: "Tồn cuối (kg)", kieu: "tinh", lay: (r) => r.closingKg, rong: 120 },
+  const gridColumns: GridColumn<ComputedRow>[] = [
+    { key: "tonDau", header: "Tồn đầu", label: "Tồn đầu (kg)", kind: "so", getValue: (r) => r.openingKg || null, minWidth: 110 },
+    { key: "nhap", header: "Nhập", label: "Nhập (kg)", kind: "so", getValue: (r) => r.inKg || null, minWidth: 110 },
+    { key: "xuat", header: "Xuất", label: "Xuất (kg)", kind: "so", getValue: (r) => r.outKg || null, minWidth: 110 },
+    { key: "tonCuoi", header: "Tồn cuối", label: "Tồn cuối (kg)", kind: "tinh", getValue: (r) => r.closingKg, minWidth: 120 },
     {
       key: "xoa",
       header: "",
-      nhan: "Xóa dòng",
-      kieu: "chu",
-      lay: () => null,
-      rong: 64,
-      oRieng: (r) => (
+      label: "Xóa dòng",
+      kind: "chu",
+      getValue: () => null,
+      minWidth: 64,
+      renderCell: (r) => (
         <ConfirmDelete
-          moTaBanGhi={`${r.itemName} · ${r.itemCode}`}
+          recordDescription={`${r.itemName} · ${r.itemCode}`}
           onConfirm={() => removeRow(r.id, r.itemCode)}
           trigger={
             <Button
@@ -460,11 +460,11 @@ export default function WarehouseNxtScreen() {
     },
   ];
 
-  const gridRows: HangLuoi<ComputedRow>[] = rows.map((r) => ({
+  const gridRows: GridRow<ComputedRow>[] = rows.map((r) => ({
     id: r.id,
-    du: r,
-    ten: r.itemName,
-    phu: <span className="font-mono">{r.itemCode}</span>,
+    data: r,
+    label: r.itemName,
+    subLabel: <span className="font-mono">{r.itemCode}</span>,
   }));
 
   const writeCell = (rowId: string, colKey: string, value: number | null) => {
@@ -480,7 +480,7 @@ export default function WarehouseNxtScreen() {
   // ---------- Excel ----------
   const exportExcel = () => {
     if (!rows.length) {
-      notify.canhBao("Không có số liệu để xuất");
+      notify.warning("Không có số liệu để xuất");
       return;
     }
     const items: NxtExcelRow[] = rows.map((r) => ({
@@ -498,7 +498,7 @@ export default function WarehouseNxtScreen() {
     }));
     exportNxtToExcel(
       {
-        createdDateText: `Ngày lập: ${formatDateVN(homNay())}`,
+        createdDateText: `Ngày lập: ${formatDateVN(todayIso())}`,
         title: "Báo cáo xuất nhập tồn",
         dateRangeText: `Từ ngày ${formatDateVN(fromDate)} đến ngày ${formatDateVN(toDate)}`,
         warehouseText: `Chi nhánh: ${selectedWarehouse}`,
@@ -528,7 +528,7 @@ export default function WarehouseNxtScreen() {
       const data = await parseNxtExcelFile(file);
       const range = parseDateRange(data.dateRangeText);
       if (!range) {
-        notify.canhBao("Không đọc được khoảng ngày trong file (dòng 'Từ ngày… đến ngày…').");
+        notify.warning("Không đọc được khoảng ngày trong file (dòng 'Từ ngày… đến ngày…').");
         return;
       }
       const fileWarehouse = parseWarehouse(data.warehouseText) || "KHO (không rõ)";
@@ -553,7 +553,7 @@ export default function WarehouseNxtScreen() {
         note: "",
       }));
       if (!newLines.length) {
-        notify.canhBao("File không có dòng dữ liệu nào đọc được.");
+        notify.warning("File không có dòng dữ liệu nào đọc được.");
         return;
       }
       const newIds = new Set(newLines.map((x) => x.id));
@@ -566,11 +566,11 @@ export default function WarehouseNxtScreen() {
       const sd = newLines.reduce((s, r) => s + r.openingKg, 0);
       const sn = newLines.reduce((s, r) => s + r.inKg, 0);
       const productionKg = newLines.reduce((s, r) => s + r.outKg, 0);
-      notify.daLuu(
+      notify.saved(
         `Đã nạp ${newLines.length} mã · ${fileWarehouse} · ${formatDateVN(from)}–${formatDateVN(to)} — tồn cuối ${num(sd + sn - productionKg)} kg`
       );
     } catch (err) {
-      notify.loi(`Không đọc được file: ${err instanceof Error ? err.message : String(err)}`);
+      notify.error(`Không đọc được file: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
 
@@ -610,8 +610,8 @@ export default function WarehouseNxtScreen() {
           <div className="min-w-0 sm:min-w-[16rem]">
             <Combobox
               label="Kho / chi nhánh"
-              anNhanBatBuoc
-              choPhepXoa={false}
+              hideRequiredMark
+              clearable={false}
               value={selectedWarehouse}
               onChange={(v) => {
                 setWarehouse(v);
@@ -624,8 +624,8 @@ export default function WarehouseNxtScreen() {
           <div className="min-w-[14rem]">
             <Combobox
               label="Kỳ báo cáo"
-              anNhanBatBuoc
-              choPhepXoa={false}
+              hideRequiredMark
+              clearable={false}
               value={selectedPeriod}
               onChange={(v) => {
                 setKy(v);
@@ -638,8 +638,8 @@ export default function WarehouseNxtScreen() {
           <div className="min-w-0 sm:min-w-[14rem]">
             <Combobox
               label="Kho lưu"
-              anNhanBatBuoc
-              choPhepXoa={false}
+              hideRequiredMark
+              clearable={false}
               value={storageLocationFilter}
               onChange={(v) => {
                 setStorageLocationFilter(v);
@@ -681,12 +681,12 @@ export default function WarehouseNxtScreen() {
       {rows.length === 0 ? (
         <EmptyState
           icon={FileSpreadsheet}
-          tieuDe="Chưa có số liệu Xuất–Nhập–Tồn"
-          moTa="Bấm 'Nhập Excel báo cáo' để nạp file NXT xuất từ hệ thống đang dùng (mẫu 10 cột). Số sẽ hiện đúng theo file, rồi bấm 'Tạo kỳ kế tiếp' để kế thừa tồn sang kỳ sau."
+          title="Chưa có số liệu Xuất–Nhập–Tồn"
+          description="Bấm 'Nhập Excel báo cáo' để nạp file NXT xuất từ hệ thống đang dùng (mẫu 10 cột). Số sẽ hiện đúng theo file, rồi bấm 'Tạo kỳ kế tiếp' để kế thừa tồn sang kỳ sau."
         />
       ) : (
         <>
-          <ThongKe the={the} />
+          <StatCardGrid cards={the} />
 
           <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-muted/40 p-3">
             {invariantHolds ? (
@@ -699,9 +699,9 @@ export default function WarehouseNxtScreen() {
                 Lệch bất biến — kiểm lại số liệu nguồn (đầu + nhập − xuất ≠ tồn cuối).
               </span>
             )}
-            <Nhan loai="phu" className="ml-auto">
+            <Tag variant="phu" className="ml-auto">
               SL mặt hàng: {rows.length}
-            </Nhan>
+            </Tag>
           </div>
 
           {/* Tồn cuối theo từng KHO LƯU — trả lời "hàng đang nằm ở kho nào" */}
@@ -755,13 +755,13 @@ export default function WarehouseNxtScreen() {
                   Thêm mã
                 </Button>
               </div>
-              <LuoiNhap
-                moTa={`Sổ Xuất–Nhập–Tồn ${selectedWarehouse} kỳ ${formatDateVN(fromDate)}–${formatDateVN(toDate)}`}
-                cot={gridColumns}
-                hang={gridRows}
-                toMau="nxt-kho"
-                onGhiO={writeCell}
-                cuoiBang={
+              <EditableGrid
+                description={`Sổ Xuất–Nhập–Tồn ${selectedWarehouse} kỳ ${formatDateVN(fromDate)}–${formatDateVN(toDate)}`}
+                columns={gridColumns}
+                rows={gridRows}
+                rowMarkKey="nxt-kho"
+                onCellCommit={writeCell}
+                footer={
                   <tr className="bg-muted font-semibold">
                     <th scope="row" className="sticky left-0 z-10 border-r-2 border-b border-border bg-muted px-4 py-2 text-left">
                       Tổng cộng — {rows.length} mặt hàng
@@ -776,7 +776,7 @@ export default function WarehouseNxtScreen() {
               />
             </div>
           ) : (
-            <BangTong rows={rows} cot={columns} getKey={(r) => r.id} chon={tableSelection} dinhDau toMau="nxt-kho" />
+            <SummaryTable rows={rows} columns={columns} getKey={(r) => r.id} selection={tableSelection} stickyHeader rowMarkKey="nxt-kho" />
           )}
 
           {/* Thanh dòng đã tick: cộng tổng + tô màu + gán kho lưu theo lô. Đặt SAU bảng và
@@ -790,7 +790,7 @@ export default function WarehouseNxtScreen() {
                 <span className="font-semibold text-foreground">tồn cuối {num(selectedTotal.tonCuoi)} kg</span>
               </span>
               <div className="ml-auto flex flex-wrap items-center gap-2">
-                <NutToMauChon to={rowMark} khoa={selectedRows.map((r) => r.id)} />
+                <RowMarkActions marker={rowMark} selectedKeys={selectedRows.map((r) => r.id)} />
                 <Button
                   size="sm"
                   onClick={() => setAssignLocation(storageLocationFilter === ALL ? DEFAULT_STORAGE_LOCATION : storageLocationFilter)}
@@ -828,8 +828,8 @@ export default function WarehouseNxtScreen() {
           </DialogHeader>
           {addForm && (
             <div className="space-y-4 py-2">
-              <ErrorSummary loi={addErrors} />
-              <ChuThichBatBuoc />
+              <ErrorSummary errors={addErrors} />
+              <RequiredLegend />
               <Field label="Mã hàng" required>
                 <Input
                   value={addForm.code}
@@ -870,7 +870,7 @@ export default function WarehouseNxtScreen() {
           </DialogHeader>
           {assignLocation !== null && (
             <div className="space-y-4 py-2">
-              <ChuThichBatBuoc />
+              <RequiredLegend />
               <Combobox
                 label="Kho lưu"
                 required
@@ -878,10 +878,10 @@ export default function WarehouseNxtScreen() {
                 onChange={(v) => setAssignLocation(v)}
                 options={storageLocationOpts}
                 onCreate={addStorageLocation}
-                onSuaMuc={storageLocationEditor.moSua}
-                nhanSua={storageLocationEditor.nhanSua}
-                suaDuoc={storageLocationEditor.suaDuoc}
-                choPhepXoa={false}
+                onEditItem={storageLocationEditor.moSua}
+                editLabel={storageLocationEditor.nhanSua}
+                canEdit={storageLocationEditor.suaDuoc}
+                clearable={false}
               />
             </div>
           )}
@@ -910,11 +910,11 @@ export default function WarehouseNxtScreen() {
           </DialogHeader>
           {kyForm && (
             <div className="space-y-4 py-2">
-              <ErrorSummary loi={periodErrors} />
-              <ChuThichBatBuoc />
+              <ErrorSummary errors={periodErrors} />
+              <RequiredLegend />
               <DateRangeField
                 label="Kỳ mới"
-                anNhanBatBuoc
+                hideRequiredMark
                 presets={false}
                 startDate={kyForm.from}
                 endDate={kyForm.to}
@@ -936,53 +936,53 @@ export default function WarehouseNxtScreen() {
 
       {/* In A4 */}
       {moIn && rows.length > 0 && (
-        <PhieuIn
-          tieuDe="Báo cáo xuất nhập tồn"
-          phuDe={`${selectedWarehouse} · từ ${formatDateVN(fromDate)} đến ${formatDateVN(toDate)}${
+        <PrintSheet
+          title="Báo cáo xuất nhập tồn"
+          subtitle={`${selectedWarehouse} · từ ${formatDateVN(fromDate)} đến ${formatDateVN(toDate)}${
             storageLocationFilter === ALL ? "" : ` · kho lưu ${storageLocationFilter}`
           }`}
           onClose={() => setMoIn(false)}
         >
           <div className="mb-2 flex items-center justify-between text-sm">
-            <span>Ngày lập: {formatDateVN(homNay())}</span>
+            <span>Ngày lập: {formatDateVN(todayIso())}</span>
             <span>SL mặt hàng: {rows.length}</span>
           </div>
           <table className="w-full border-collapse">
             <thead>
               <tr>
-                <ThIn>Mã hàng</ThIn>
-                <ThIn>Tên hàng</ThIn>
-                <ThIn>Kho lưu</ThIn>
-                <ThIn right>Tồn đầu</ThIn>
-                <ThIn right>Nhập</ThIn>
-                <ThIn right>Xuất</ThIn>
-                <ThIn right>Tồn cuối</ThIn>
+                <PrintTh>Mã hàng</PrintTh>
+                <PrintTh>Tên hàng</PrintTh>
+                <PrintTh>Kho lưu</PrintTh>
+                <PrintTh right>Tồn đầu</PrintTh>
+                <PrintTh right>Nhập</PrintTh>
+                <PrintTh right>Xuất</PrintTh>
+                <PrintTh right>Tồn cuối</PrintTh>
               </tr>
             </thead>
             <tbody>
               <tr>
-                <TdIn dam colSpan={3}>
+                <PrintTd bold colSpan={3}>
                   Tổng cộng — {rows.length} mặt hàng
-                </TdIn>
-                <TdIn dam right>{num(total.tonDau)}</TdIn>
-                <TdIn dam right>{num(total.nhap)}</TdIn>
-                <TdIn dam right>{num(total.xuat)}</TdIn>
-                <TdIn dam right>{num(total.tonCuoi)}</TdIn>
+                </PrintTd>
+                <PrintTd bold right>{num(total.tonDau)}</PrintTd>
+                <PrintTd bold right>{num(total.nhap)}</PrintTd>
+                <PrintTd bold right>{num(total.xuat)}</PrintTd>
+                <PrintTd bold right>{num(total.tonCuoi)}</PrintTd>
               </tr>
               {rows.map((r) => (
                 <tr key={r.id}>
-                  <TdIn className="font-mono">{r.itemCode}</TdIn>
-                  <TdIn>{r.itemName}</TdIn>
-                  <TdIn>{storageLocationOf(r)}</TdIn>
-                  <TdIn right>{num(r.openingKg)}</TdIn>
-                  <TdIn right>{r.inKg ? num(r.inKg) : ""}</TdIn>
-                  <TdIn right>{r.outKg ? num(r.outKg) : ""}</TdIn>
-                  <TdIn right>{num(r.closingKg)}</TdIn>
+                  <PrintTd className="font-mono">{r.itemCode}</PrintTd>
+                  <PrintTd>{r.itemName}</PrintTd>
+                  <PrintTd>{storageLocationOf(r)}</PrintTd>
+                  <PrintTd right>{num(r.openingKg)}</PrintTd>
+                  <PrintTd right>{r.inKg ? num(r.inKg) : ""}</PrintTd>
+                  <PrintTd right>{r.outKg ? num(r.outKg) : ""}</PrintTd>
+                  <PrintTd right>{num(r.closingKg)}</PrintTd>
                 </tr>
               ))}
             </tbody>
           </table>
-        </PhieuIn>
+        </PrintSheet>
       )}
       {storageLocationEditor.hop}
     </div>

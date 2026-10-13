@@ -3,7 +3,7 @@
 // Tên tiếng Việt: Biểu mẫu giấy IN TRỐNG (để xưởng ghi tay)
 // Description: Blank A4 print forms — daily material import & daily WIP report
 // ============================================================
-import { PhieuIn, ThIn, TdIn } from "@/design-system";
+import { PrintSheet, PrintTh, PrintTd } from "@/design-system";
 
 /**
  * Biểu mẫu giấy TRỐNG in A4 để tổ xưởng ghi tay hằng ngày (QĐ-1/NR-1).
@@ -41,9 +41,9 @@ function BangTrong({
       <thead>
         <tr>
           {cot.map((c) => (
-            <ThIn key={c.nhan} right={c.phai} className={c.rong}>
+            <PrintTh key={c.nhan} right={c.phai} className={c.rong}>
               {c.nhan}
-            </ThIn>
+            </PrintTh>
           ))}
         </tr>
       </thead>
@@ -51,16 +51,16 @@ function BangTrong({
         {Array.from({ length: soDong }, (_, i) => (
           <tr key={i}>
             {cot.map((c) => (
-              <TdIn key={c.nhan} className="h-9" />
+              <PrintTd key={c.nhan} className="h-9" />
             ))}
           </tr>
         ))}
         <tr>
-          <TdIn dam colSpan={tongSpan}>
+          <PrintTd bold colSpan={tongSpan}>
             Tổng cộng
-          </TdIn>
+          </PrintTd>
           {cot.slice(tongSpan).map((c) => (
-            <TdIn key={c.nhan} dam className="h-9" />
+            <PrintTd key={c.nhan} bold className="h-9" />
           ))}
         </tr>
       </tbody>
@@ -90,9 +90,9 @@ const BLANK_DATE = "Ngày ……… tháng ……… năm 20………";
  */
 export function PhieuTrongNhapNL({ onClose }: { onClose: () => void }) {
   return (
-    <PhieuIn
-      tieuDe="Báo cáo tổng hợp nguyên liệu hàng ngày"
-      phuDe={BLANK_DATE}
+    <PrintSheet
+      title="Báo cáo tổng hợp nguyên liệu hàng ngày"
+      subtitle={BLANK_DATE}
       onClose={onClose}
     >
       <BangTrong
@@ -107,7 +107,7 @@ export function PhieuTrongNhapNL({ onClose }: { onClose: () => void }) {
         ]}
       />
       <SignatureFooter />
-    </PhieuIn>
+    </PrintSheet>
   );
 }
 
@@ -117,9 +117,9 @@ export function PhieuTrongNhapNL({ onClose }: { onClose: () => void }) {
  */
 export function PhieuTrongTPNgay({ onClose }: { onClose: () => void }) {
   return (
-    <PhieuIn
-      tieuDe="Báo cáo bán thành phẩm hàng ngày"
-      phuDe={BLANK_DATE}
+    <PrintSheet
+      title="Báo cáo bán thành phẩm hàng ngày"
+      subtitle={BLANK_DATE}
       onClose={onClose}
     >
       <BangTrong
@@ -134,6 +134,6 @@ export function PhieuTrongTPNgay({ onClose }: { onClose: () => void }) {
         ]}
       />
       <SignatureFooter />
-    </PhieuIn>
+    </PrintSheet>
   );
 }

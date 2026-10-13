@@ -5,7 +5,7 @@
 // ============================================================
 import { useEffect, useMemo, useRef, useState } from "react";
 import { FlaskConical, LogOut, RefreshCw } from "lucide-react";
-import { Button, ChoiceGroup, DangXuLy, XacNhan, homNay, notify } from "@/design-system";
+import { Button, ChoiceGroup, ProcessingState, ConfirmAction, todayIso, notify } from "@/design-system";
 import {
   setAuditPaused,
   useBalancingInputs,
@@ -65,7 +65,7 @@ export function DaiDemo() {
   return (
     <div
       role="status"
-      // Dính ngay dưới header trang (cùng token với BangTong xoRa) — cuộn đâu cũng thấy.
+      // Dính ngay dưới header trang (cùng token với SummaryTable fullHeight) — cuộn đâu cũng thấy.
       className="sticky top-header z-20 mb-4 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border-2 border-warning bg-warning px-4 py-2 text-warning-foreground"
     >
       <FlaskConical className="size-5 shrink-0" aria-hidden />
@@ -152,7 +152,7 @@ function NapGoiDemoThat({ goi }: { goi: GoiDemo }) {
     }
     clearDemoBundle();
     const total = Object.values(goi).reduce((s, ds) => s + (ds as unknown[]).length, 0);
-    notify.daLuu(`Đã nạp bộ demo: ${num(total)} dòng số trình diễn.`);
+    notify.saved(`Đã nạp bộ demo: ${num(total)} dòng số trình diễn.`);
     setIsWritten(true);
     // Chạy MỘT lần khi mọi bảng nạp xong (daNap chặn lần hai); `bang` đổi mỗi lần vẽ.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -161,7 +161,7 @@ function NapGoiDemoThat({ goi }: { goi: GoiDemo }) {
   if (isWritten) return null;
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-background/80" role="status">
-      <DangXuLy chu="Đang nạp bộ số demo…" />
+      <ProcessingState text="Đang nạp bộ số demo…" />
     </div>
   );
 }
@@ -188,10 +188,10 @@ function DemoActiveSection() {
         <p className="text-sm text-muted-foreground">Số trên mọi màn là bộ trình diễn. Bấm thử thoải mái — làm mới là về nguyên trạng.</p>
       </div>
       <div className="flex flex-wrap gap-2">
-        <XacNhan
-          tieuDe="Làm mới bộ demo?"
-          moTa="App quay về chế độ thật một lát để quét số mới nhất, sinh lại bộ demo rồi tự vào lại. Mọi thứ đã ghi trong bộ demo hiện tại bị thay. Số thật không bị đụng."
-          nhanNut="Làm mới bộ demo"
+        <ConfirmAction
+          title="Làm mới bộ demo?"
+          description="App quay về chế độ thật một lát để quét số mới nhất, sinh lại bộ demo rồi tự vào lại. Mọi thứ đã ghi trong bộ demo hiện tại bị thay. Số thật không bị đụng."
+          confirmLabel="Làm mới bộ demo"
           icon={RefreshCw}
           onConfirm={refresh}
           trigger={
@@ -236,11 +236,11 @@ function DemoGeneratorSection() {
 
   const createAndEnter = () => {
     setIsCreating(true);
-    const goi = generateDemoBundle(source, { homNay: homNay(), anDanh: anonymize === "an", hat: Date.now() % 100_000 });
+    const goi = generateDemoBundle(source, { homNay: todayIso(), anDanh: anonymize === "an", hat: Date.now() % 100_000 });
     setPendingDemoTask(null);
     if (!saveDemoBundle(goi)) {
       setIsCreating(false);
-      notify.loi("Không tạo được bộ demo (bộ nhớ trình duyệt đầy?). Thử xóa bớt dữ liệu trình duyệt rồi làm lại.");
+      notify.error("Không tạo được bộ demo (bộ nhớ trình duyệt đầy?). Thử xóa bớt dữ liệu trình duyệt rồi làm lại.");
       return;
     }
     setDemoMode(true);
@@ -257,7 +257,7 @@ function DemoGeneratorSection() {
   if (pendingCreate) {
     return (
       <section className="rounded-xl border-2 border-border p-4" role="status">
-        <DangXuLy chu="Đang quét số thật để làm mới bộ demo…" />
+        <ProcessingState text="Đang quét số thật để làm mới bộ demo…" />
       </section>
     );
   }
@@ -281,16 +281,16 @@ function DemoGeneratorSection() {
           value={anonymize}
           onChange={setAnonymize}
           options={[
-            { value: "an", label: "Ẩn tên + đổi giá", moTa: "Trình bày cho người ngoài" },
-            { value: "giu", label: "Giữ tên thật", moTa: "Trình bày nội bộ" },
+            { value: "an", label: "Ẩn tên + đổi giá", description: "Trình bày cho người ngoài" },
+            { value: "giu", label: "Giữ tên thật", description: "Trình bày nội bộ" },
           ]}
           className="min-w-[min(20rem,100%)] flex-1"
         />
         <div className="flex flex-wrap gap-2">
-          <XacNhan
-            tieuDe="Tạo bộ demo mới và vào chế độ demo?"
-            moTa="Quét số thật, sinh bộ demo 60 ngày rồi chuyển cả app sang chế độ demo. Bộ demo cũ (nếu có) bị thay. Số thật của xưởng không bị đụng."
-            nhanNut="Tạo và vào demo"
+          <ConfirmAction
+            title="Tạo bộ demo mới và vào chế độ demo?"
+            description="Quét số thật, sinh bộ demo 60 ngày rồi chuyển cả app sang chế độ demo. Bộ demo cũ (nếu có) bị thay. Số thật của xưởng không bị đụng."
+            confirmLabel="Tạo và vào demo"
             icon={FlaskConical}
             onConfirm={createAndEnter}
             trigger={

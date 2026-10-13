@@ -7,7 +7,7 @@
  * Trạng thái kết nối máy chủ DÙNG CHUNG.
  *
  * repo.ts báo vào đây sau MỖI lần đọc/ghi Supabase (mọi bảng, mọi lúc),
- * TrangThaiDuLieu đọc ra. Nhờ vậy đèn báo phản ánh sức khỏe ghi/đọc THẬT —
+ * DataSyncStatus đọc ra. Nhờ vậy đèn báo phản ánh sức khỏe ghi/đọc THẬT —
  * một lần ghi bảng bất kỳ thất bại là đỏ ngay — thay vì tự probe 1 bảng 1 lần
  * lúc mở app rồi xanh mãi.
  *
@@ -36,14 +36,14 @@ function setStatus(status: ConnectionStatus, loi: string) {
 
 export const connectivity = {
   /** Một thao tác server vừa thành công. */
-  baoOK: () => setStatus("da-noi", ""),
+  reportOk: () => setStatus("da-noi", ""),
   /** Một thao tác server vừa lỗi (kèm thông báo để hiện cho người dùng). */
-  baoLoi: (message: string) => setStatus("loi", message),
+  reportError: (message: string) => setStatus("loi", message),
   subscribe: (f: () => void) => {
     listeners.add(f);
     return () => {
       listeners.delete(f);
     };
   },
-  laySnapshot: (): ConnectionSnapshot => anh,
+  getSnapshot: (): ConnectionSnapshot => anh,
 };

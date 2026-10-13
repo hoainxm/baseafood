@@ -7,15 +7,15 @@ import { Fragment, useMemo, useState } from "react";
 import type { Workshop } from "@/types";
 import { useProducts, useWipProductions } from "@/lib/catalogRepo";
 import {
-  KhungCuonNgang,
-  BieuDoCotDoc,
+  HorizontalScroll,
+  VerticalBarChart,
   Button,
   Combobox,
   DateField,
   DateRangeField,
   EmptyState,
-  PhieuIn,
-  SkeletonBang,
+  PrintSheet,
+  TableSkeleton,
   Table,
   TableBody,
   TableCell,
@@ -23,16 +23,16 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-  TdIn,
-  ThIn,
-  ThongKe,
-  homNay,
+  PrintTd,
+  PrintTh,
+  StatCardGrid,
+  todayIso,
   notify,
-  type CotBieuDoDoc,
-  type TheThongTin,
-  ThanhToMau,
-  useChonDong,
-  useToMau,
+  type VerticalBarChartItem,
+  type StatCardData,
+  RowMarkToolbar,
+  useRowSelection,
+  useRowMarkTools,
 } from "@/design-system";
 import { KY_OPT, getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
 import { num, formatDateVN } from "@/lib/format";
@@ -84,16 +84,16 @@ export default function DailyProductionReport() {
   const isLoading = trangThai === "dang-tai" && rows.length === 0;
 
   const [ky, setKy] = useState<ViewPeriod>("thang");
-  const [moc, setMoc] = useState(homNay());
-  const [tuTC, setTuTC] = useState(homNay());
-  const [denTC, setDenTC] = useState(homNay());
+  const [moc, setMoc] = useState(todayIso());
+  const [tuTC, setTuTC] = useState(todayIso());
+  const [denTC, setDenTC] = useState(todayIso());
   const [workshop, setWorkshop] = useState("Tất cả");
   const [inPrint, setInPrint] = useState(false);
   const [tu, den] = getViewPeriodRange(ky, moc, tuTC, denTC);
   // Dòng là dòng GỘP (xưởng × mặt hàng × quy cách) ⇒ ghép kỳ + xưởng vào khoá
   // bảng để "đã dò" kỳ này không lan sang kỳ khác.
-  const to = useToMau(`bao-cao-sx-ngay|${tu}|${den}|${workshop}`);
-  const rowSelection = useChonDong();
+  const to = useRowMarkTools(`bao-cao-sx-ngay|${tu}|${den}|${workshop}`);
+  const rowSelection = useRowSelection();
 
   const { days, groups, tongNgayTong, tongKgTong, tongBlockTong, soMatHang } =
     useMemo(() => {
@@ -169,22 +169,22 @@ export default function DailyProductionReport() {
   /** Khoá các dòng mặt hàng đang hiện — thứ tự cho Shift+tick chọn khoảng. */
   const khoaDong = groups.flatMap((g) => g.rows.map((r) => `${r.workshop}|||${r.productId}|||${r.spec}`));
 
-  const chart: CotBieuDoDoc[] = days.map((d) => ({
-    nhan: formatDateVN(d).slice(0, 5),
-    giaTri: tongNgayTong[d] ?? 0,
-    phu: formatDateVN(d),
+  const chart: VerticalBarChartItem[] = days.map((d) => ({
+    label: formatDateVN(d).slice(0, 5),
+    value: tongNgayTong[d] ?? 0,
+    subLabel: formatDateVN(d),
   }));
 
-  const the: TheThongTin[] = [
-    { nhan: "Kỳ báo cáo", giaTri: `${formatDateVN(tu)} – ${formatDateVN(den)}`, icon: CalendarRange, mau: "trung-tinh" },
-    { nhan: "Tổng sản lượng", giaTri: `${num(tongKgTong)} kg`, so: true, icon: Scale, mau: "brand" },
-    { nhan: "Tổng block", giaTri: num(tongBlockTong), so: true, icon: Layers, mau: "trung-tinh" },
-    { nhan: "Số mặt hàng", giaTri: num(soMatHang), so: true, icon: Package, mau: "success" },
+  const the: StatCardData[] = [
+    { label: "Kỳ báo cáo", value: `${formatDateVN(tu)} – ${formatDateVN(den)}`, icon: CalendarRange, color: "trung-tinh" },
+    { label: "Tổng sản lượng", value: `${num(tongKgTong)} kg`, numeric: true, icon: Scale, color: "brand" },
+    { label: "Tổng block", value: num(tongBlockTong), numeric: true, icon: Layers, color: "trung-tinh" },
+    { label: "Số mặt hàng", value: num(soMatHang), numeric: true, icon: Package, color: "success" },
   ];
 
   const exportExcel = () => {
     if (!groups.length) {
-      notify.canhBao("Không có số liệu để xuất");
+      notify.warning("Không có số liệu để xuất");
       return;
     }
     const aoa: OExcel[][] = [];
@@ -233,8 +233,8 @@ export default function DailyProductionReport() {
         <div className="min-w-[12rem]">
           <Combobox
             label="Kỳ báo cáo"
-            anNhanBatBuoc
-            choPhepXoa={false}
+            hideRequiredMark
+            clearable={false}
             value={ky}
             onChange={(v) => setKy(v as ViewPeriod)}
             options={KY_OPT}
@@ -244,7 +244,7 @@ export default function DailyProductionReport() {
           {ky === "tuy-chon" ? (
             <DateRangeField
               label="Khoảng ngày sản xuất"
-              anNhanBatBuoc
+              hideRequiredMark
               presets={false}
               startDate={tuTC}
               endDate={denTC}
@@ -256,7 +256,7 @@ export default function DailyProductionReport() {
           ) : (
             <DateField
               label={ky === "ngay" ? "Ngày" : "Ngày bất kỳ trong kỳ"}
-              anNhanBatBuoc
+              hideRequiredMark
               hint={ky === "ngay" ? undefined : `Kỳ: ${formatDateVN(tu)} – ${formatDateVN(den)}`}
               value={moc}
               onChange={setMoc}
@@ -266,8 +266,8 @@ export default function DailyProductionReport() {
         <div className="min-w-[10rem]">
           <Combobox
             label="Phân xưởng"
-            anNhanBatBuoc
-            choPhepXoa={false}
+            hideRequiredMark
+            clearable={false}
             value={workshop}
             onChange={setWorkshop}
             options={WORKSHOP_OPTIONS}
@@ -275,15 +275,15 @@ export default function DailyProductionReport() {
         </div>
       </div>
 
-      <ThongKe the={the} />
+      <StatCardGrid cards={the} />
 
       {isLoading ? (
-        <SkeletonBang />
+        <TableSkeleton />
       ) : groups.length === 0 ? (
         <EmptyState
           icon={Factory}
-          tieuDe={`Chưa có thành phẩm sản xuất trong ${formatDateVN(tu)} – ${formatDateVN(den)}`}
-          moTa="Ghi sản lượng ở màn Sản xuất BTP, số liệu sẽ tổng hợp về đây."
+          title={`Chưa có thành phẩm sản xuất trong ${formatDateVN(tu)} – ${formatDateVN(den)}`}
+          description="Ghi sản lượng ở màn Sản xuất BTP, số liệu sẽ tổng hợp về đây."
         />
       ) : (
         <>
@@ -292,11 +292,11 @@ export default function DailyProductionReport() {
               <h3 className="text-lg font-semibold text-foreground">
                 Sản lượng làm ra theo ngày
               </h3>
-              <BieuDoCotDoc data={chart} donVi="kg" />
+              <VerticalBarChart data={chart} unit="kg" />
             </section>
           )}
 
-          <KhungCuonNgang classNameKhung="rounded-xl border-2 border-border">
+          <HorizontalScroll viewportClassName="rounded-xl border-2 border-border">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -322,10 +322,10 @@ export default function DailyProductionReport() {
                     {g.rows.map((r) => {
                       const k = `${r.workshop}|||${r.productId}|||${r.spec}`;
                       return (
-                      <TableRow key={k} {...to.thuocTinh(k)}>
+                      <TableRow key={k} {...to.getRowProps(k)}>
                         <TableCell className="font-medium">
                           <span className="flex items-center gap-2">
-                            {to.bat && (
+                            {to.enabled && (
                               <input
                                 type="checkbox"
                                 className="size-5 shrink-0"
@@ -380,91 +380,91 @@ export default function DailyProductionReport() {
                 </TableRow>
               </TableFooter>
             </Table>
-          </KhungCuonNgang>
-          <ThanhToMau to={to} khoa={khoaDong.filter((k) => rowSelection.daChon.has(k))} onBoChon={rowSelection.boChon} />
+          </HorizontalScroll>
+          <RowMarkToolbar marker={to} selectedKeys={khoaDong.filter((k) => rowSelection.daChon.has(k))} onClearSelection={rowSelection.boChon} />
         </>
       )}
 
       {inPrint && (
-        <PhieuIn
-          tieuDe="Báo cáo tổng hợp thành phẩm hàng ngày"
-          phuDe={`Kỳ: ${formatDateVN(tu)} – ${formatDateVN(den)}${workshop !== "Tất cả" ? ` · Phân xưởng ${workshop}` : ""}`}
+        <PrintSheet
+          title="Báo cáo tổng hợp thành phẩm hàng ngày"
+          subtitle={`Kỳ: ${formatDateVN(tu)} – ${formatDateVN(den)}${workshop !== "Tất cả" ? ` · Phân xưởng ${workshop}` : ""}`}
           onClose={() => setInPrint(false)}
         >
           <table className="w-full border-collapse">
             <thead>
               <tr>
-                <ThIn>Mặt hàng</ThIn>
-                <ThIn>Quy cách</ThIn>
+                <PrintTh>Mặt hàng</PrintTh>
+                <PrintTh>Quy cách</PrintTh>
                 {days.map((d) => (
-                  <ThIn key={d} right>
+                  <PrintTh key={d} right>
                     {formatDateVN(d).slice(0, 5)}
-                  </ThIn>
+                  </PrintTh>
                 ))}
-                <ThIn right>Tổng kg</ThIn>
-                <ThIn right>Block</ThIn>
+                <PrintTh right>Tổng kg</PrintTh>
+                <PrintTh right>Block</PrintTh>
               </tr>
             </thead>
             <tbody>
               {groups.map((g) => (
                 <Fragment key={g.workshop}>
                   <tr>
-                    <TdIn dam colSpan={columnCount}>
+                    <PrintTd bold colSpan={columnCount}>
                       Phân xưởng {g.workshop}
-                    </TdIn>
+                    </PrintTd>
                   </tr>
                   {g.rows.map((r) => (
                     <tr key={`${r.workshop}|||${r.productId}|||${r.spec}`}>
-                      <TdIn>{r.productName}</TdIn>
-                      <TdIn>{r.spec || "—"}</TdIn>
+                      <PrintTd>{r.productName}</PrintTd>
+                      <PrintTd>{r.spec || "—"}</PrintTd>
                       {days.map((d) => (
-                        <TdIn key={d} right className="tnum">
+                        <PrintTd key={d} right className="tnum">
                           {r.theoNgay[d] ? num(r.theoNgay[d]) : ""}
-                        </TdIn>
+                        </PrintTd>
                       ))}
-                      <TdIn right className="tnum">
+                      <PrintTd right className="tnum">
                         {num(r.tongKg)}
-                      </TdIn>
-                      <TdIn right className="tnum">
+                      </PrintTd>
+                      <PrintTd right className="tnum">
                         {num(r.tongBlock)}
-                      </TdIn>
+                      </PrintTd>
                     </tr>
                   ))}
                   <tr>
-                    <TdIn dam>Cộng xưởng {g.workshop}</TdIn>
-                    <TdIn dam />
+                    <PrintTd bold>Cộng xưởng {g.workshop}</PrintTd>
+                    <PrintTd bold />
                     {days.map((d) => (
-                      <TdIn key={d} dam right className="tnum">
+                      <PrintTd key={d} bold right className="tnum">
                         {g.theoNgay[d] ? num(g.theoNgay[d]) : ""}
-                      </TdIn>
+                      </PrintTd>
                     ))}
-                    <TdIn dam right className="tnum">
+                    <PrintTd bold right className="tnum">
                       {num(g.tongKg)}
-                    </TdIn>
-                    <TdIn dam right className="tnum">
+                    </PrintTd>
+                    <PrintTd bold right className="tnum">
                       {num(g.tongBlock)}
-                    </TdIn>
+                    </PrintTd>
                   </tr>
                 </Fragment>
               ))}
               <tr>
-                <TdIn dam>TỔNG CỘNG</TdIn>
-                <TdIn dam />
+                <PrintTd bold>TỔNG CỘNG</PrintTd>
+                <PrintTd bold />
                 {days.map((d) => (
-                  <TdIn key={d} dam right className="tnum">
+                  <PrintTd key={d} bold right className="tnum">
                     {tongNgayTong[d] ? num(tongNgayTong[d]) : ""}
-                  </TdIn>
+                  </PrintTd>
                 ))}
-                <TdIn dam right className="tnum">
+                <PrintTd bold right className="tnum">
                   {num(tongKgTong)}
-                </TdIn>
-                <TdIn dam right className="tnum">
+                </PrintTd>
+                <PrintTd bold right className="tnum">
                   {num(tongBlockTong)}
-                </TdIn>
+                </PrintTd>
               </tr>
             </tbody>
           </table>
-        </PhieuIn>
+        </PrintSheet>
       )}
     </div>
   );

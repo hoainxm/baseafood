@@ -14,7 +14,7 @@ import type { DomesticSaleItem, Packaging, SalesItem, WipProductionItem, Worksho
 import { GanLoDauVao, GanLoXuat, TemLoQr, useDuLieuTruyXuat } from "@/features/shared";
 import { kg, formatDateVN } from "@/lib/format";
 import { TRACE_KIND_LABELS, isOutboundKind, formatWipLotLabel, formatFinishedGoodLotLabel, groupByTraceStage, type TraceStage, type TraceStageKey, type TraceStageItem, type LotNode } from "@/lib/lotTraceability";
-import { Button, ChoiceGroup, DateRangeField, EmptyState, Nhan, congNgay, homNay, sacTheoTen } from "@/design-system";
+import { Button, ChoiceGroup, DateRangeField, EmptyState, Tag, addDays, todayIso, toneByName } from "@/design-system";
 import { ClipboardCheck, Link2, Printer, ScanLine, Search } from "lucide-react";
 
 /** Màn gốc của từng khâu + đơn vị đếm. */
@@ -43,7 +43,7 @@ function StageRow({ m, trangThai, nut }: { m: TraceStageItem; trangThai: ReactNo
     <li className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 border-b border-border py-2 last:border-b-0">
       <div className="min-w-0 flex-1 basis-64 space-y-1">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          <Nhan loai="phan-loai" sac={sacTheoTen(TRACE_KIND_LABELS[n.kind])}>{TRACE_KIND_LABELS[n.kind]}</Nhan>
+          <Tag variant="phan-loai" tone={toneByName(TRACE_KIND_LABELS[n.kind])}>{TRACE_KIND_LABELS[n.kind]}</Tag>
           {isOutboundKind(n.kind) || n.mat ? (
             <span className="tnum font-medium">{n.nhan}</span>
           ) : (
@@ -65,26 +65,26 @@ function StageRow({ m, trangThai, nut }: { m: TraceStageItem; trangThai: ReactNo
 }
 
 const labelBadge = (m: TraceStageItem) =>
-  m.daIn === undefined ? null : m.daIn > 0 ? <Nhan loai="xong">Đã in {m.daIn} tem</Nhan> : <Nhan loai="cho">Chưa in tem</Nhan>;
+  m.daIn === undefined ? null : m.daIn > 0 ? <Tag variant="xong">Đã in {m.daIn} tem</Tag> : <Tag variant="cho">Chưa in tem</Tag>;
 
 const lotBadge = (m: TraceStageItem, ten: string) =>
   (m.soLo ?? 0) > 0 ? (
-    <Nhan loai="xong">
+    <Tag variant="xong">
       {ten} ({m.soLo})
-    </Nhan>
+    </Tag>
   ) : m.lyDo ? (
-    <Nhan loai="luu-y" title={`Lý do chưa gắn lô: ${m.lyDo}`}>
+    <Tag variant="luu-y" title={`Lý do chưa gắn lô: ${m.lyDo}`}>
       Chưa gắn lô · có lý do
-    </Nhan>
+    </Tag>
   ) : (
-    <Nhan loai="loi">Chưa gắn lô</Nhan>
+    <Tag variant="loi">Chưa gắn lô</Tag>
   );
 
 export function GiaiDoanTruyXuat() {
   const { dl } = useDuLieuTruyXuat();
   const navigate = useNavigate();
-  const [tu, setTu] = useState(() => congNgay(homNay(), -6));
-  const [den, setDen] = useState(homNay);
+  const [tu, setTu] = useState(() => addDays(todayIso(), -6));
+  const [den, setDen] = useState(todayIso);
   const [workshop, setWorkshop] = useState<Workshop | "">("");
   const [onlyMissing, setOnlyMissing] = useState(false);
 
@@ -117,7 +117,7 @@ export function GiaiDoanTruyXuat() {
           trangThai={
             <>
               {labelBadge(m)}
-              {(m.daDung ?? 0) > 0 ? <Nhan loai="nguon">Đã dùng cho {m.daDung} mẻ / dòng bán</Nhan> : <Nhan loai="phu">Chưa dùng</Nhan>}
+              {(m.daDung ?? 0) > 0 ? <Tag variant="nguon">Đã dùng cho {m.daDung} mẻ / dòng bán</Tag> : <Tag variant="phu">Chưa dùng</Tag>}
             </>
           }
           nut={labelButton(m)}
@@ -152,9 +152,9 @@ export function GiaiDoanTruyXuat() {
           m={m}
           trangThai={
             m.kho === "cho-nhap" ? (
-              <Nhan loai="cho">Chờ nhập kho</Nhan>
+              <Tag variant="cho">Chờ nhập kho</Tag>
             ) : (
-              <Nhan loai="xong">Đã nhập kho{m.ton != null ? ` · tồn ${kg(m.ton)}` : ""}</Nhan>
+              <Tag variant="xong">Đã nhập kho{m.ton != null ? ` · tồn ${kg(m.ton)}` : ""}</Tag>
             )
           }
           nut={
@@ -174,7 +174,7 @@ export function GiaiDoanTruyXuat() {
             <>
               {lotBadge(m, "Lô BTP")}
               {labelBadge(m)}
-              {m.ton != null && <Nhan loai="vi-tri">Tồn {kg(m.ton)}</Nhan>}
+              {m.ton != null && <Tag variant="vi-tri">Tồn {kg(m.ton)}</Tag>}
             </>
           }
           nut={
@@ -193,7 +193,7 @@ export function GiaiDoanTruyXuat() {
         <StageRow
           key={`X:${n.id}`}
           m={m}
-          trangThai={m.daQuet ? <Nhan loai="xong">Đã quét kiểm</Nhan> : <Nhan loai="cho">Chưa quét kiểm</Nhan>}
+          trangThai={m.daQuet ? <Tag variant="xong">Đã quét kiểm</Tag> : <Tag variant="cho">Chưa quét kiểm</Tag>}
           nut={
             m.donId && m.lenhId
               ? taskButton(!m.daQuet, "Mở màn Đơn đặt với hộp kiểm lô bằng quét của lệnh xuất này.", () => navigate(`/orders?don=${encodeURIComponent(m.donId!)}&kiem=${encodeURIComponent(m.lenhId!)}`), <ScanLine aria-hidden />, "Kiểm lô")
@@ -239,15 +239,15 @@ export function GiaiDoanTruyXuat() {
             setTu(a);
             setDen(b);
           }}
-          anNhanBatBuoc
+          hideRequiredMark
         />
         <ChoiceGroup
           label="Phân xưởng"
           value={workshop}
           onChange={(v) => setWorkshop(v as Workshop | "")}
           options={[{ value: "", label: "Tất cả" }, ...(["Đông", "Cá", "Khô"] as const).map((x) => ({ value: x, label: x }))]}
-          cot={4}
-          anNhanBatBuoc
+          columns={4}
+          hideRequiredMark
         />
         <label className="flex cursor-pointer items-center gap-3">
           <input type="checkbox" className="size-5 shrink-0" checked={onlyMissing} onChange={(e) => setOnlyMissing(e.target.checked)} />
@@ -272,7 +272,7 @@ export function GiaiDoanTruyXuat() {
                     {g.muc.length} {KHAU[g.khoa].donVi}
                   </span>
                   {g.muc.length > 0 &&
-                    (soThieu > 0 ? <Nhan loai="loi">Còn thiếu {soThieu}</Nhan> : <Nhan loai="xong">Đủ</Nhan>)}
+                    (soThieu > 0 ? <Tag variant="loi">Còn thiếu {soThieu}</Tag> : <Tag variant="xong">Đủ</Tag>)}
                 </div>
               </div>
               <p className="text-muted-foreground">
@@ -299,7 +299,7 @@ export function GiaiDoanTruyXuat() {
         })}
       </ol>
       {ds.every((g) => g.muc.length === 0) && (
-        <EmptyState tieuDe="Chưa có dữ liệu trong khoảng này" moTa="Nới khoảng ngày hoặc đổi phân xưởng." />
+        <EmptyState title="Chưa có dữ liệu trong khoảng này" description="Nới khoảng ngày hoặc đổi phân xưởng." />
       )}
       <p className="flex items-center gap-2 text-muted-foreground">
         <Search aria-hidden className="size-4 shrink-0" /> Bấm vào mã lô để mở hộ chiếu: làm từ đâu, đã đi đâu, danh sách thu hồi.

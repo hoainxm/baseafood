@@ -7,7 +7,7 @@ import { Fragment } from "react";
 import type { BatterType, Product } from "@/types";
 import { hasSplitComponents, blockSpec } from "@/types";
 import {
-  KhungCuonNgang, Button, Combobox, NumberField, type MucChon } from "@/design-system";
+  HorizontalScroll, Button, Combobox, NumberField, type ComboboxOption } from "@/design-system";
 import { num } from "@/lib/format";
 import { isBatteredProduct, getProductBatterNames } from "@/lib/batter";
 import { ChevronDown, Pencil, Plus, X } from "lucide-react";
@@ -61,12 +61,12 @@ export function BangDongSX({
   onSuaMatHang: (productId: string) => void;
   /** Mở hộp sửa nhanh khách hàng (value = tên). */
   onSuaKhach: (ten: string) => void;
-  optKhach: MucChon[];
+  optKhach: ComboboxOption[];
   onTaoKhach: (ten: string) => string;
   /** Danh mục loại bột (để ra TÊN bột đi kèm của mặt hàng). */
   botTam: BatterType[];
   /** Ô chọn loại bột — value = TÊN. */
-  optBot: MucChon[];
+  optBot: ComboboxOption[];
   onTaoBot: (ten: string) => string;
   onSuaBot: (ten: string) => void;
 }) {
@@ -86,7 +86,7 @@ export function BangDongSX({
   }
 
   // Gợi ý kiểu chế biến = các giá trị đã có trên mặt hàng (thêm mới tại chỗ được).
-  const optCheBien: MucChon[] = [
+  const optCheBien: ComboboxOption[] = [
     ...new Set(
       matHang.map((m) => (m.processingType || "").trim()).filter(Boolean)
     ),
@@ -95,15 +95,15 @@ export function BangDongSX({
     .map((v) => ({ value: v, label: v }));
 
   // Mọi mặt hàng (gõ tên để tìm) — không giới hạn theo loài.
-  const allProductOptions: MucChon[] = matHang.map((m) => ({
+  const allProductOptions: ComboboxOption[] = matHang.map((m) => ({
     value: m.id,
     label: m.code ? `${m.code} · ${m.name}` : m.name,
-    phu: [m.code, m.processingType, m.category].filter(Boolean).join(" · ") || undefined,
+    subLabel: [m.code, m.processingType, m.category].filter(Boolean).join(" · ") || undefined,
   }));
 
   return (
-    // data-luoi-phim: khung điều hướng ↑/↓/Enter theo cột cho các ô số (navCol).
-    <div className="space-y-4" data-luoi-phim>
+    // data-grid-nav: khung điều hướng ↑/↓/Enter theo cột cho các ô số (navCol).
+    <div className="space-y-4" data-grid-nav>
       {nhomKeys.map((gid) => {
         const rows = nhomRows.get(gid)!;
         const info = { pt: rows[0].processingType, cust: rows[0].customerName };
@@ -134,8 +134,8 @@ export function BangDongSX({
                   onChange={(v) => onDoiNhom(gid, { customerName: v })}
                   options={optKhach}
                   onCreate={(ten) => onTaoKhach(ten)}
-                  onSuaMuc={onSuaKhach}
-                  nhanSua="Sửa thông tin khách hàng này — lưu thẳng vào Danh mục."
+                  onEditItem={onSuaKhach}
+                  editLabel="Sửa thông tin khách hàng này — lưu thẳng vào Danh mục."
                   placeholder="VD: Peacock…"
                   emptyText="Chưa có — gõ tên rồi Thêm mới."
                 />
@@ -146,7 +146,7 @@ export function BangDongSX({
             </div>
             {/* Bề rộng tối thiểu do min-w (rem) của từng cột quyết định — co giãn
                 theo cỡ chữ; không ép cứng px cho cả bảng. */}
-            <KhungCuonNgang>
+            <HorizontalScroll>
               <table className="w-full border-collapse text-sm">
                 <thead>
                   <tr>
@@ -199,7 +199,7 @@ export function BangDongSX({
                             <div className="flex items-center gap-1.5">
                             <div className="min-w-0 flex-1">
                             <Combobox
-                              anNhan
+                              hideLabel
                               label="Thành phẩm"
                               required
                               value={d.productId}
@@ -216,8 +216,8 @@ export function BangDongSX({
                               options={allProductOptions}
                               onCreate={(ten) => onTaoMatHang(ten, info.pt)}
                               emptyText="Chưa có mặt hàng — gõ tên rồi Thêm mới."
-                              onSuaMuc={onSuaMatHang}
-                              nhanSua="Sửa thông tin mặt hàng này — lưu thẳng vào Danh mục."
+                              onEditItem={onSuaMatHang}
+                              editLabel="Sửa thông tin mặt hàng này — lưu thẳng vào Danh mục."
                             />
                             </div>
                             {d.productId && (
@@ -244,7 +244,7 @@ export function BangDongSX({
                               </div>
                             ) : (
                               <NumberField
-                                anNhan
+                                hideLabel
                                 navCol="sl"
                                 label="Số lượng"
                                 required
@@ -259,8 +259,8 @@ export function BangDongSX({
                           <td className={td}>
                             <div className="flex items-center gap-1.5">
                               <NumberField
-                                anNhan
-                                anNhanBatBuoc
+                                hideLabel
+                                hideRequiredMark
                                 navCol="block"
                                 label="Số block"
                                 unit="block"
@@ -282,8 +282,8 @@ export function BangDongSX({
                                 ×
                               </span>
                               <NumberField
-                                anNhan
-                                anNhanBatBuoc
+                                hideLabel
+                                hideRequiredMark
                                 navCol="quycach"
                                 label="Quy cách kg/khối"
                                 unit="kg/khối"
@@ -388,7 +388,7 @@ export function BangDongSX({
                   })}
                 </tbody>
               </table>
-            </KhungCuonNgang>
+            </HorizontalScroll>
             <div className="p-2">
               <Button
                 title="Thêm một dòng thành phẩm nữa vào nhóm này (cùng kiểu chế biến và khách hàng)."

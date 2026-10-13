@@ -19,7 +19,7 @@ interface Dong {
   file?: string;
 }
 const bang = {
-  layKhoa: (x: Dong) => x.id,
+  getKey: (x: Dong) => x.id,
   toRow: (x: Dong) => ({ id: x.id, quantity_kg: x.kg, ...(x.file ? { file: x.file } : {}) }),
 };
 const jsonCua = (rows: Dong[]) =>

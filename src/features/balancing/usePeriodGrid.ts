@@ -255,7 +255,7 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
     redoStack.current.push(snapshotCurrent(m.nhom));
     apMoc(m);
     syncHistoryCount();
-    notify.daLuu("Đã hoàn tác");
+    notify.saved("Đã hoàn tác");
   }, [apMoc, snapshotCurrent, syncHistoryCount]);
 
   const redo = useCallback(() => {
@@ -264,7 +264,7 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
     lui.current.push(snapshotCurrent(m.nhom));
     apMoc(m);
     syncHistoryCount();
-    notify.daLuu("Đã làm lại");
+    notify.saved("Đã làm lại");
   }, [apMoc, snapshotCurrent, syncHistoryCount]);
 
   /* Repo trả về dòng của MỌI kỳ. Ghi mà quên ghép lại với kỳ khác = xoá sạch
@@ -288,14 +288,14 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
     (rows: BalancingInputItem[], nhom = "nl"): boolean => {
       const kq = syncMonthlyStockLedger(monthlyStock, materialInRows, rows, ngucanh);
       if (kq.loi) {
-        notify.loi(kq.loi);
+        notify.error(kq.loi);
         return false;
       }
       saveCheckpoint(nhom);
       writeAllMaterials([...allMaterialRows.filter((r) => r.periodId !== ky.id), ...rows]);
       if (kq.doi) writeStockLedger(kq.lines);
       if (kq.keThua > 0)
-        notify.daLuu(`Sổ kho tháng: đã tự kế thừa ${kq.keThua} dòng tồn sang tháng mới`);
+        notify.saved(`Sổ kho tháng: đã tự kế thừa ${kq.keThua} dòng tồn sang tháng mới`);
       return true;
     },
     [writeAllMaterials, allMaterialRows, ky.id, saveCheckpoint, monthlyStock, materialInRows, ngucanh, writeStockLedger]
@@ -396,7 +396,7 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
         });
       }
       if (toAdd.length > 0) writeMaterials([...materialInRows, ...toAdd], "");
-      notify.daLuu(`Đã lấy ${selectedIds.length} dòng nhập hàng vào kỳ`, () => {
+      notify.saved(`Đã lấy ${selectedIds.length} dòng nhập hàng vào kỳ`, () => {
         writeAllImports(prevImports);
         writeAllMaterials(prevMaterials);
       });
@@ -422,7 +422,7 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
         );
         const kq = writeBackDailyImport(sameDayRows, o.kg);
         if (kq.loai === "tuChoi") {
-          notify.loi(kq.lyDo);
+          notify.error(kq.lyDo);
           return false;
         }
         if (kq.loai === "sua") {
@@ -465,7 +465,7 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
         }),
         ...toAdd,
       ]);
-      notify.daLuu(
+      notify.saved(
         dsO.length === 1
           ? `Đã ghi ${num(dsO[0].kg)} kg ngày ${formatDateVN(dsO[0].ngay)} vào sổ nhập hàng`
           : `Đã ghi ${dsO.length} ô vào sổ nhập hàng`,
@@ -537,7 +537,7 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
       });
     }
     if (toAdd.length > 0) writeFinishedGoods([...finishedGoods, ...toAdd], "");
-    notify.daLuu(`Đã lấy ${pendingWips.length} dòng sản xuất vào kỳ`, () => {
+    notify.saved(`Đã lấy ${pendingWips.length} dòng sản xuất vào kỳ`, () => {
       writeAllProductions(prevProduction);
       writeAllFinishedGoods(prevFinishedGoods);
     });
@@ -586,7 +586,7 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
         );
         const kq = writeBackDailyOutput(sameDayRows, o.kg);
         if (kq.loai === "tuChoi") {
-          notify.loi(kq.lyDo);
+          notify.error(kq.lyDo);
           return false;
         }
         if (kq.loai === "sua") {
@@ -598,9 +598,9 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
             id: uid(),
             productionDate: o.ngay,
             postingDate: todayISO(),
-            backdateReason: backdateReason,
+            backdateReason,
             workshop: "Đông",
-            productId: productId,
+            productId,
             spec: quyCach,
             quantityKg: kq.kg,
             blocksCount: 0,
@@ -629,7 +629,7 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
         }),
         ...toAdd,
       ]);
-      notify.daLuu(
+      notify.saved(
         dsO.length === 1
           ? `Đã ghi ${num(dsO[0].kg)} kg ngày ${formatDateVN(dsO[0].ngay)} vào sổ sản xuất`
           : `Đã ghi ${dsO.length} ô vào sổ sản xuất`,
@@ -759,13 +759,13 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
     const prevRows = monthlyStock;
     const kq = syncMonthlyStockLedger(monthlyStock, [], materialInRows, ngucanh);
     if (kq.loi) {
-      notify.loi(kq.loi);
+      notify.error(kq.loi);
       return;
     }
     if (!kq.doi) return;
     saveCheckpoint(`ghi-lai-so-kho:${ky.id}`);
     writeStockLedger(kq.lines);
-    notify.daLuu("Đã ghi lại phần lấy xả đông / gửi đông của kỳ vào Sổ kho tháng", () =>
+    notify.saved("Đã ghi lại phần lấy xả đông / gửi đông của kỳ vào Sổ kho tháng", () =>
       writeStockLedger(prevRows)
     );
   }, [monthlyStock, materialInRows, ngucanh, saveCheckpoint, ky.id, writeStockLedger]);
@@ -850,7 +850,7 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
       ),
       ...finishedGoodsToAdd,
     ]);
-    notify.daLuu(
+    notify.saved(
       `Đã nhận ${materialsToAdd.length + finishedGoodsToAdd.length} dòng chuyển từ kỳ ${prevPeriod.dateRangeDescription || "trước"}`,
       () => {
         writeAllMaterials(prevMaterials);

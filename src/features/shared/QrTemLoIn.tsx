@@ -1,6 +1,6 @@
 // ============================================================
 // Tem mã lô QR in được — dùng chung cho MỌI loại lô (NL · BTP · TP).
-// In ĐÚNG KHỔ TEM (không phải A4) qua PhieuInTem — chọn cỡ tem, xem trước phóng
+// In ĐÚNG KHỔ TEM (không phải A4) qua LabelPrintSheet — chọn cỡ tem, xem trước phóng
 // to, in ra tem nhãn thật. Kết nối thẳng máy in tem (WebUSB/ESC-POS) làm sau.
 //
 // QR chứa một ĐƯỜNG LINK tới hộ chiếu lô (kiểu GS1 Digital Link): camera điện thoại
@@ -11,7 +11,7 @@
 // ============================================================
 import { useEffect, useState } from "react";
 import type { ImportShipment, LotKind } from "@/types";
-import { PhieuInTem, type TemIn } from "@/design-system";
+import { LabelPrintSheet, type PrintLabel } from "@/design-system";
 import { kg, formatDateVN } from "@/lib/format";
 import { createQrDataUrl } from "@/lib/qr";
 import { TRACE_KIND_LABELS, buildLabelPrintRecords, getShipmentLines, formatMaterialLotLabel, buildLotQrUrl, buildLotNode, getDefaultLabelCount, type LotNode } from "@/lib/lotTraceability";
@@ -67,13 +67,13 @@ export function TemLoQr({ nut, nuts, onClose }: { nut?: LotNode; nuts?: LotNode[
   // Mặc định mỗi block (BTP) / mỗi thùng-gói (TP) một tem; người in sửa được ở xem trước.
   const [wips] = useWipProductions();
   const [packagings] = usePackagings();
-  const tems: TemIn[] = ds.map((n) => ({
-    maLo: n.nhan,
+  const tems: PrintLabel[] = ds.map((n) => ({
+    lotCode: n.nhan,
     qrDataUrl: qr[`${n.kind}:${n.id}`] ?? "",
-    dong: labelLines(n),
-    soBan: getDefaultLabelCount(n, { wips, packagings }),
+    lines: labelLines(n),
+    copies: getDefaultLabelCount(n, { wips, packagings }),
   }));
-  return <PhieuInTem onClose={onClose} tems={tems} onIn={recordPrintCount} />;
+  return <LabelPrintSheet onClose={onClose} labels={tems} onPrint={recordPrintCount} />;
 }
 
 /**

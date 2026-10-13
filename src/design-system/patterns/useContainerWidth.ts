@@ -9,7 +9,7 @@ import { useEffect, useRef, useState } from "react";
  * to/thu nhỏ một viewBox cố định (thu viewBox là thu luôn chữ trục). Không nhỏ hơn
  * `toiThieu`: khung hẹp hơn thì khung ngoài cuộn ngang có chủ đích (README §5a).
  */
-export function useBeRongKhung<T extends HTMLElement>(minWidth: number) {
+export function useContainerWidth<T extends HTMLElement>(minWidth: number) {
   const ref = useRef<T | null>(null);
   const [width, setWidth] = useState(minWidth);
   useEffect(() => {

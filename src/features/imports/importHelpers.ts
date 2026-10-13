@@ -12,7 +12,7 @@ import type {
 } from "@/types";
 import { calculateImportAmount, isBackdatedImport } from "@/types";
 import { newId } from "@/lib/store";
-import type { LoiNhap } from "@/design-system";
+import type { FieldError } from "@/design-system";
 
 export const PHAN_XUONG: Workshop[] = ["Đông", "Cá", "Khô"];
 
@@ -175,20 +175,20 @@ export function gomChuyen(
 }
 
 /** Kiểm tra đầu chuyến — dùng chung cho lúc ghi mới và lúc sửa. */
-export function loiDauChuyen(d: DauChuyen, isLocked: boolean): LoiNhap[] {
-  const ls: LoiNhap[] = [];
+export function loiDauChuyen(d: DauChuyen, isLocked: boolean): FieldError[] {
+  const ls: FieldError[] = [];
   if (!d.supplierName.trim())
-    ls.push({ truong: "Đại lý", thongBao: "Chưa chọn đại lý giao hàng" });
+    ls.push({ field: "Đại lý", message: "Chưa chọn đại lý giao hàng" });
   if (d.postingDate < d.deliveryDate)
     ls.push({
-      truong: "Ngày ghi sổ",
-      thongBao: "Ngày ghi sổ không thể trước ngày hàng về xưởng",
+      field: "Ngày ghi sổ",
+      message: "Ngày ghi sổ không thể trước ngày hàng về xưởng",
     });
   const needsReason = isBackdatedImport(d) || isLocked;
   if (needsReason && !d.backdateReason.trim())
     ls.push({
-      truong: "Lý do ghi bù",
-      thongBao: isLocked
+      field: "Lý do ghi bù",
+      message: isLocked
         ? "Ngày này đã chốt — phải ghi rõ vì sao ghi thêm"
         : "Ghi sau ngày hàng về — phải ghi rõ lý do (VD: chờ hóa đơn)",
     });

@@ -1,5 +1,5 @@
 // ============================================================
-// Tên file cũ: src/design-system/patterns/CaiDatHienThi.tsx
+// Tên file cũ: src/design-system/patterns/DisplaySettingsPanel.tsx
 // Tên tiếng Việt: Cấu hình hiển thị cỡ chữ, mật độ UI
 // Description: Display & Density Preference Settings Panel
 // ============================================================
@@ -24,34 +24,34 @@ const BASE_FONT_SIZE = "coChu";
 const BASE_DENSITY = "matDo";
 const BASE_WIDTH = "beRong";
 
-function khoa(base: string, account?: string) {
+function storageKey(base: string, account?: string) {
   return account ? `bsf.${account}.${base}` : `bsf.${base}`;
 }
 
 /** MẶC ĐỊNH là "100" — thang token nền 16px (mật độ web thường). Người mắt kém
  *  kéo lên 110–130% như một lối phóng to; ai muốn gọn hơn nữa hạ 90%. Thang rem
  *  nên bố cục giãn theo, không vỡ như phóng to trình duyệt. */
-export const CO_CHU = [
-  { id: "90", nhan: "A", scale: "90%", moTa: "Nhỏ — 14px" },
-  { id: "100", nhan: "A", scale: "100%", moTa: "Thường — 16px" },
-  { id: "110", nhan: "A", scale: "110%", moTa: "Lớn — 18px" },
-  { id: "120", nhan: "A", scale: "120%", moTa: "Rất lớn — 19px" },
-  { id: "130", nhan: "A", scale: "130%", moTa: "Cực lớn — 21px" },
+export const FONT_SIZES = [
+  { id: "90", label: "A", scale: "90%", description: "Nhỏ — 14px" },
+  { id: "100", label: "A", scale: "100%", description: "Thường — 16px" },
+  { id: "110", label: "A", scale: "110%", description: "Lớn — 18px" },
+  { id: "120", label: "A", scale: "120%", description: "Rất lớn — 19px" },
+  { id: "130", label: "A", scale: "130%", description: "Cực lớn — 21px" },
 ] as const;
 
 /** Bậc cỡ chữ mặc định khi chưa ai chọn gì. */
-export const CO_CHU_MAC_DINH = "100";
+export const DEFAULT_FONT_SIZE = "100";
 
-export const MAT_DO = [
-  { id: "thoang", nhan: "Thoáng", moTa: "Ô cao 44px — dễ bấm nhất" },
-  { id: "vua", nhan: "Vừa", moTa: "Ô cao 40px" },
-  { id: "gon", nhan: "Gọn", moTa: "Ô cao 36px — thấy nhiều dòng hơn" },
+export const DENSITIES = [
+  { id: "thoang", label: "Thoáng", description: "Ô cao 44px — dễ bấm nhất" },
+  { id: "vua", label: "Vừa", description: "Ô cao 40px" },
+  { id: "gon", label: "Gọn", description: "Ô cao 36px — thấy nhiều dòng hơn" },
 ] as const;
 
-export const BE_RONG = [
-  { id: "vua", nhan: "Vừa", moTa: "Dễ đọc, ít đảo mắt", css: "64rem" },
-  { id: "rong", nhan: "Rộng", moTa: "Bảng nhiều cột đỡ chật", css: "80rem" },
-  { id: "toi-da", nhan: "Tối đa", moTa: "Dùng hết màn hình", css: "100%" },
+export const CONTENT_WIDTHS = [
+  { id: "vua", label: "Vừa", description: "Dễ đọc, ít đảo mắt", css: "64rem" },
+  { id: "rong", label: "Rộng", description: "Bảng nhiều cột đỡ chật", css: "80rem" },
+  { id: "toi-da", label: "Tối đa", description: "Dùng hết màn hình", css: "100%" },
 ] as const;
 
 function doc(key: string, fallback: string) {
@@ -59,7 +59,7 @@ function doc(key: string, fallback: string) {
 }
 
 function applyFontSize(id: string) {
-  const m = CO_CHU.find((x) => x.id === id) ?? CO_CHU[0];
+  const m = FONT_SIZES.find((x) => x.id === id) ?? FONT_SIZES[0];
   document.documentElement.style.setProperty("--app-font-scale", m.scale);
 }
 
@@ -68,7 +68,7 @@ function applyDensity(id: string) {
 }
 
 function applyWidth(id: string) {
-  const m = BE_RONG.find((x) => x.id === id) ?? BE_RONG[0];
+  const m = CONTENT_WIDTHS.find((x) => x.id === id) ?? CONTENT_WIDTHS[0];
   document.documentElement.style.setProperty("--app-content-width", m.css);
 }
 
@@ -77,52 +77,52 @@ function applyWidth(id: string) {
  * username → bucket mặc định) VÀ mỗi khi đổi tài khoản đăng nhập (nạp lại đúng
  * giao diện của người vừa đăng nhập).
  */
-export function apDungCaiDatHienThi(account?: string) {
-  applyFontSize(doc(khoa(BASE_FONT_SIZE, account), CO_CHU_MAC_DINH));
-  applyDensity(doc(khoa(BASE_DENSITY, account), "gon"));
-  applyWidth(doc(khoa(BASE_WIDTH, account), "toi-da"));
+export function applyDisplaySettings(account?: string) {
+  applyFontSize(doc(storageKey(BASE_FONT_SIZE, account), DEFAULT_FONT_SIZE));
+  applyDensity(doc(storageKey(BASE_DENSITY, account), "gon"));
+  applyWidth(doc(storageKey(BASE_WIDTH, account), "toi-da"));
 }
 
-export interface AnhCaiDat {
-  coChu: string;
-  matDo: string;
-  beRong: string;
+export interface DisplaySettingsSnapshot {
+  fontSize: string;
+  density: string;
+  contentWidth: string;
 }
 
 /** Chụp cài đặt hiện tại của một tài khoản — để làm mốc "hoàn tác" khi Hủy. */
-export function docCaiDatHienThi(account?: string): AnhCaiDat {
+export function readDisplaySettings(account?: string): DisplaySettingsSnapshot {
   return {
-    coChu: doc(khoa(BASE_FONT_SIZE, account), CO_CHU_MAC_DINH),
-    matDo: doc(khoa(BASE_DENSITY, account), "gon"),
-    beRong: doc(khoa(BASE_WIDTH, account), "toi-da"),
+    fontSize: doc(storageKey(BASE_FONT_SIZE, account), DEFAULT_FONT_SIZE),
+    density: doc(storageKey(BASE_DENSITY, account), "gon"),
+    contentWidth: doc(storageKey(BASE_WIDTH, account), "toi-da"),
   };
 }
 
 /** Ghi lại một ảnh cài đặt và áp ngay — dùng để khôi phục khi người dùng Hủy. */
-export function ghiCaiDatHienThi(account: string | undefined, snap: AnhCaiDat) {
-  localStorage.setItem(khoa(BASE_FONT_SIZE, account), snap.coChu);
-  localStorage.setItem(khoa(BASE_DENSITY, account), snap.matDo);
-  localStorage.setItem(khoa(BASE_WIDTH, account), snap.beRong);
-  apDungCaiDatHienThi(account);
+export function writeDisplaySettings(account: string | undefined, snap: DisplaySettingsSnapshot) {
+  localStorage.setItem(storageKey(BASE_FONT_SIZE, account), snap.fontSize);
+  localStorage.setItem(storageKey(BASE_DENSITY, account), snap.density);
+  localStorage.setItem(storageKey(BASE_WIDTH, account), snap.contentWidth);
+  applyDisplaySettings(account);
 }
 
 /* ---------- Hook dùng chung cho cả nút nhanh và panel đầy đủ ---------- */
 
 function useSettings(account?: string) {
-  const fontSizeKey = khoa(BASE_FONT_SIZE, account);
-  const densityKey = khoa(BASE_DENSITY, account);
-  const widthKey = khoa(BASE_WIDTH, account);
+  const fontSizeKey = storageKey(BASE_FONT_SIZE, account);
+  const densityKey = storageKey(BASE_DENSITY, account);
+  const widthKey = storageKey(BASE_WIDTH, account);
 
-  const [fontSize, setFontSize] = React.useState(() => doc(fontSizeKey, CO_CHU_MAC_DINH));
+  const [fontSize, setFontSize] = React.useState(() => doc(fontSizeKey, DEFAULT_FONT_SIZE));
   const [density, setDensity] = React.useState(() => doc(densityKey, "gon"));
   const [width, setWidth] = React.useState(() => doc(widthKey, "toi-da"));
 
   // Đổi tài khoản → nạp lại state từ bucket của người mới rồi áp ngay.
   React.useEffect(() => {
-    setFontSize(doc(fontSizeKey, CO_CHU_MAC_DINH));
+    setFontSize(doc(fontSizeKey, DEFAULT_FONT_SIZE));
     setDensity(doc(densityKey, "gon"));
     setWidth(doc(widthKey, "toi-da"));
-    apDungCaiDatHienThi(account);
+    applyDisplaySettings(account);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [account]);
 
@@ -146,13 +146,13 @@ function useSettings(account?: string) {
       applyWidth(id);
     },
     datLai: () => {
-      setFontSize(CO_CHU_MAC_DINH);
+      setFontSize(DEFAULT_FONT_SIZE);
       setDensity("gon");
       setWidth("toi-da");
       localStorage.removeItem(fontSizeKey);
       localStorage.removeItem(densityKey);
       localStorage.removeItem(widthKey);
-      apDungCaiDatHienThi(account);
+      applyDisplaySettings(account);
     },
   };
 }
@@ -163,14 +163,14 @@ function useSettings(account?: string) {
  * Chỉ có cỡ chữ — thứ người dùng cần chỉnh ngay giữa ca làm.
  * Các cấu hình còn lại nằm trong trang "Bộ giao diện".
  */
-export function CoChuNhanh({
+export function FontSizeQuickPicker({
   className,
-  taiKhoan,
+  account,
 }: {
   className?: string;
-  taiKhoan?: string;
+  account?: string;
 }) {
-  const { coChu, doiCoChu } = useSettings(taiKhoan);
+  const { coChu: fontSize, doiCoChu: changeFontSize } = useSettings(account);
 
   return (
     <div
@@ -185,27 +185,27 @@ export function CoChuNhanh({
       <span className="hidden px-2 text-sm font-medium text-muted-foreground sm:inline">
         Cỡ chữ
       </span>
-      {CO_CHU.map((m, i) => (
+      {FONT_SIZES.map((m, i) => (
         <button
           key={m.id}
           type="button"
-          aria-pressed={coChu === m.id}
-          aria-label={m.moTa}
-          title={m.moTa}
-          onClick={() => doiCoChu(m.id)}
+          aria-pressed={fontSize === m.id}
+          aria-label={m.description}
+          title={m.description}
+          onClick={() => changeFontSize(m.id)}
           className={cn(
-            "min-h-10 min-w-10 rounded-md px-2 font-semibold nhan-an",
+            "min-h-10 min-w-10 rounded-md px-2 font-semibold press-feedback",
             i === 0 && "text-xs",
             i === 1 && "text-sm",
             i === 2 && "text-base",
             i === 3 && "text-lg",
             i === 4 && "text-xl",
-            coChu === m.id
+            fontSize === m.id
               ? "bg-primary text-primary-foreground"
               : "text-foreground hover:bg-muted"
           )}
         >
-          {m.nhan}
+          {m.label}
         </button>
       ))}
     </div>
@@ -215,25 +215,25 @@ export function CoChuNhanh({
 /* ---------- Panel đầy đủ, đặt trong trang "Bộ giao diện" ---------- */
 
 function OptionGroup({
-  nhan,
-  moTa,
-  giaTri,
+  label,
+  description,
+  value,
   onChange,
-  muc,
+  options,
 }: {
-  nhan: string;
-  moTa: string;
-  giaTri: string;
+  label: string;
+  description: string;
+  value: string;
   onChange: (id: string) => void;
-  muc: readonly { id: string; nhan: string; moTa: string }[];
+  options: readonly { id: string; label: string; description: string }[];
 }) {
   return (
     <fieldset className="space-y-3">
-      <legend className="text-lg font-semibold text-foreground">{nhan}</legend>
-      <p className="text-sm text-muted-foreground">{moTa}</p>
+      <legend className="text-lg font-semibold text-foreground">{label}</legend>
+      <p className="text-sm text-muted-foreground">{description}</p>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {muc.map((m) => {
-          const isSelected = m.id === giaTri;
+        {options.map((m) => {
+          const isSelected = m.id === value;
           return (
             <button
               key={m.id}
@@ -241,20 +241,20 @@ function OptionGroup({
               aria-pressed={isSelected}
               onClick={() => onChange(m.id)}
               className={cn(
-                "min-h-14 rounded-lg border-2 px-4 py-3 text-left nhan-an",
+                "min-h-14 rounded-lg border-2 px-4 py-3 text-left press-feedback",
                 isSelected
                   ? "border-primary bg-accent text-accent-foreground"
                   : "border-input bg-background hover:bg-muted"
               )}
             >
-              <span className="block text-sm font-semibold">{m.nhan}</span>
+              <span className="block text-sm font-semibold">{m.label}</span>
               <span
                 className={cn(
                   "block text-sm",
                   isSelected ? "text-accent-foreground" : "text-muted-foreground"
                 )}
               >
-                {m.moTa}
+                {m.description}
               </span>
             </button>
           );
@@ -264,37 +264,37 @@ function OptionGroup({
   );
 }
 
-export function CaiDatHienThi({ taiKhoan }: { taiKhoan?: string }) {
-  const c = useSettings(taiKhoan);
+export function DisplaySettingsPanel({ account }: { account?: string }) {
+  const c = useSettings(account);
 
   return (
     <div className="space-y-8 rounded-xl border border-border p-5">
       <OptionGroup
-        nhan="Cỡ chữ toàn hệ thống"
-        moTa="Áp cho mọi màn. Bố cục giãn theo, không vỡ như khi phóng to trình duyệt."
-        giaTri={c.coChu}
+        label="Cỡ chữ toàn hệ thống"
+        description="Áp cho mọi màn. Bố cục giãn theo, không vỡ như khi phóng to trình duyệt."
+        value={c.coChu}
         onChange={c.doiCoChu}
-        muc={CO_CHU.map((m) => ({
+        options={FONT_SIZES.map((m) => ({
           id: m.id,
-          nhan: `${m.scale}`,
-          moTa: m.moTa,
+          label: `${m.scale}`,
+          description: m.description,
         }))}
       />
 
       <OptionGroup
-        nhan="Mật độ (chiều cao ô nhập và dòng bảng)"
-        moTa="Thoáng dễ bấm nhất. Gọn cho người quen Excel muốn thấy nhiều dòng."
-        giaTri={c.matDo}
+        label="Mật độ (chiều cao ô nhập và dòng bảng)"
+        description="Thoáng dễ bấm nhất. Gọn cho người quen Excel muốn thấy nhiều dòng."
+        value={c.matDo}
         onChange={c.doiMatDo}
-        muc={MAT_DO}
+        options={DENSITIES}
       />
 
       <OptionGroup
-        nhan="Bề rộng nội dung"
-        moTa="Bảng cân đối nhiều cột thì để Rộng hoặc Tối đa."
-        giaTri={c.beRong}
+        label="Bề rộng nội dung"
+        description="Bảng cân đối nhiều cột thì để Rộng hoặc Tối đa."
+        value={c.beRong}
         onChange={c.doiBeRong}
-        muc={BE_RONG}
+        options={CONTENT_WIDTHS}
       />
 
       <div className="flex justify-end border-t border-border pt-5">

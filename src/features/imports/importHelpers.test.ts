@@ -122,7 +122,7 @@ describe("loiDauChuyen", () => {
     scanPath: "",
   };
   const truong = (ls: ReturnType<typeof loiDauChuyen>) =>
-    ls.map((l) => l.truong);
+    ls.map((l) => l.field);
 
   it("đầu chuyến hợp lệ ⇒ không lỗi", () => {
     expect(loiDauChuyen(ok, false)).toEqual([]);
@@ -151,7 +151,7 @@ describe("loiDauChuyen", () => {
   it("ngày đã CHỐT ⇒ bắt lý do dù cùng ngày", () => {
     const ls = loiDauChuyen(ok, true);
     expect(truong(ls)).toContain("Lý do ghi bù");
-    expect(ls[0].thongBao).toMatch(/đã chốt/);
+    expect(ls[0].message).toMatch(/đã chốt/);
   });
 });
 

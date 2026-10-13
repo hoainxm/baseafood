@@ -1,5 +1,5 @@
 // ============================================================
-// Tên file cũ: src/design-system/patterns/BieuDoCot.tsx
+// Tên file cũ: src/design-system/patterns/BarChart.tsx
 // Tên tiếng Việt: Biểu đồ cột ngang
 // Description: Horizontal Bar Chart Component
 // ============================================================
@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import { useEffect, useState, type ReactNode } from "react";
 
 /**
- * BieuDoCot — biểu đồ thanh NGANG cho trang Báo cáo, kèm ĐƯỜNG TRUNG BÌNH.
+ * BarChart — biểu đồ thanh NGANG cho trang Báo cáo, kèm ĐƯỜNG TRUNG BÌNH.
  *
  * Thanh ngang (không phải cột đứng) vì nhãn là tên đại lý/khách dài, để ngang mới
  * đọc được; và người lớn tuổi so sánh độ dài thanh nhanh hơn đọc trục số. Một màu
@@ -20,53 +20,53 @@ import { useEffect, useState, type ReactNode } from "react";
  *
  * Chỉ vẽ số truyền vào — không đọc/ghi dữ liệu.
  */
-export interface CotBieuDo {
-  nhan: string;
-  giaTri: number;
+export interface BarChartItem {
+  label: string;
+  value: number;
   /** Dòng phụ nhỏ dưới nhãn (VD kênh, loại). */
-  phu?: string;
+  subLabel?: string;
   /** Nội dung tóm tắt hiện khi DI CHUỘT vào thanh (VD phân rã theo đại lý/loại). */
-  chiTiet?: ReactNode;
+  detail?: ReactNode;
 }
 
-export function BieuDoCot({
+export function BarChart({
   data,
-  dinhDang = (n) => n.toLocaleString("vi-VN"),
-  donVi,
-  duongTrungBinh = true,
-  soDongToiDa = 12,
-  giuThuTu = false,
-  giaTriTrungBinh,
+  formatValue = (n) => n.toLocaleString("vi-VN"),
+  unit,
+  showAverageLine = true,
+  maxItems = 12,
+  preserveOrder = false,
+  averageValue,
   className,
 }: {
-  data: CotBieuDo[];
+  data: BarChartItem[];
   /** Định dạng số cho nhãn giá trị (mặc định vi-VN). */
-  dinhDang?: (n: number) => string;
-  donVi?: string;
-  duongTrungBinh?: boolean;
+  formatValue?: (n: number) => string;
+  unit?: string;
+  showAverageLine?: boolean;
   /** Cắt bớt còn N thanh lớn nhất (gọn màn). */
-  soDongToiDa?: number;
+  maxItems?: number;
   /**
    * Giữ NGUYÊN thứ tự `data` truyền vào (VD chuỗi theo ngày) thay vì sắp giảm
    * dần theo giá trị. Khi bật, `soDongToiDa` cắt từ đầu danh sách.
    */
-  giuThuTu?: boolean;
+  preserveOrder?: boolean;
   /**
    * Mốc vạch trung bình truyền sẵn (VD bình quân GIA QUYỀN của định mức) thay cho
    * trung bình cộng các thanh. Có giá trị này thì nhãn TB không làm tròn.
    */
-  giaTriTrungBinh?: number;
+  averageValue?: number;
   className?: string;
 }) {
-  const sap = giuThuTu ? [...data] : [...data].sort((a, b) => b.giaTri - a.giaTri);
-  const visibleItems = sap.slice(0, soDongToiDa);
+  const sap = preserveOrder ? [...data] : [...data].sort((a, b) => b.value - a.value);
+  const visibleItems = sap.slice(0, maxItems);
   const con = sap.length - visibleItems.length;
 
-  const max = Math.max(1, ...visibleItems.map((d) => d.giaTri));
+  const max = Math.max(1, ...visibleItems.map((d) => d.value));
   const tb =
-    giaTriTrungBinh ??
+    averageValue ??
     (data.length > 0
-      ? data.reduce((s, d) => s + d.giaTri, 0) / data.length
+      ? data.reduce((s, d) => s + d.value, 0) / data.length
       : 0);
   const tbPct = Math.min(100, (tb / max) * 100);
 
@@ -85,7 +85,7 @@ export function BieuDoCot({
     );
   }
 
-  const unitSuffix = donVi ? ` ${donVi}` : "";
+  const unitSuffix = unit ? ` ${unit}` : "";
 
   return (
     <div className={cn("space-y-3 animate-in fade-in-0 duration-500", className)}>
@@ -93,13 +93,13 @@ export function BieuDoCot({
         {/* Cột nhãn */}
         <div className="w-28 shrink-0 space-y-2 sm:w-40">
           {visibleItems.map((d) => (
-            <div key={d.nhan} className="flex h-10 flex-col justify-center">
+            <div key={d.label} className="flex h-10 flex-col justify-center">
               <span className="truncate text-sm font-medium text-foreground">
-                {d.nhan}
+                {d.label}
               </span>
-              {d.phu && (
+              {d.subLabel && (
                 <span className="truncate text-xs text-muted-foreground">
-                  {d.phu}
+                  {d.subLabel}
                 </span>
               )}
             </div>
@@ -109,23 +109,23 @@ export function BieuDoCot({
         {/* Cột thanh — đường trung bình phủ toàn cột này */}
         <div className="relative flex-1 space-y-2">
           {visibleItems.map((d, index) => {
-            const pct = Math.max(2, (d.giaTri / max) * 100);
+            const pct = Math.max(2, (d.value / max) * 100);
             // Nửa trên: thẻ xổ XUỐNG; nửa dưới: thẻ xổ LÊN → luôn trong vùng chart.
             const isBottomHalf = index < visibleItems.length / 2;
             return (
-              <div key={d.nhan} className="group relative h-10">
+              <div key={d.label} className="group relative h-10">
                 <div className="absolute inset-0 rounded-md bg-muted transition-colors group-hover:bg-muted/70" />
                 <div
                   className="absolute inset-y-0 left-0 rounded-md bg-primary shadow-sm transition-all duration-700 ease-out group-hover:bg-primary/90 group-hover:shadow-md"
                   style={{ width: isShown ? `${pct}%` : "0%" }}
                 />
                 <span className="absolute inset-y-0 right-2 flex items-center text-sm font-semibold tnum text-foreground transition-transform duration-150 group-hover:scale-105">
-                  {dinhDang(d.giaTri)}
+                  {formatValue(d.value)}
                   {unitSuffix}
                 </span>
 
                 {/* Thẻ tóm tắt khi di chuột (fade + trượt nhẹ) */}
-                {d.chiTiet != null && (
+                {d.detail != null && (
                   <div
                     role="tooltip"
                     className={cn(
@@ -135,7 +135,7 @@ export function BieuDoCot({
                         : "bottom-full mb-2 translate-y-1 group-hover:translate-y-0"
                     )}
                   >
-                    {d.chiTiet}
+                    {d.detail}
                   </div>
                 )}
               </div>
@@ -143,14 +143,14 @@ export function BieuDoCot({
           })}
 
           {/* Đường trung bình */}
-          {duongTrungBinh && tb > 0 && (
+          {showAverageLine && tb > 0 && (
             <div
               className="pointer-events-none absolute inset-y-0 z-10 border-l-2 border-dashed border-warning transition-all duration-700 ease-out"
               style={{ left: `${isShown ? tbPct : 0}%` }}
               aria-hidden
             >
               <span className="absolute -top-0.5 left-1 whitespace-nowrap rounded bg-warning px-1.5 py-0.5 text-xs font-semibold text-warning-foreground">
-                TB {dinhDang(giaTriTrungBinh != null ? tb : Math.round(tb))}
+                TB {formatValue(averageValue != null ? tb : Math.round(tb))}
                 {unitSuffix}
               </span>
             </div>

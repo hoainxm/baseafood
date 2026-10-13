@@ -6,13 +6,13 @@
 // dòng "Bán nội địa −987" ở khối NL). Ghi cùng phiên với thành phẩm, lưu sang sổ
 // riêng `domestic_sales` — KHÔNG cộng vào sản lượng thành phẩm. Cân đối điền dòng
 // giảm "Bán nội địa" từ sổ này. Ô chọn loại NL / khách: thêm mới tại chỗ + bút chì.
-import { Button, Combobox, NumberField, type MucChon } from "@/design-system";
+import { Button, Combobox, NumberField, type ComboboxOption } from "@/design-system";
 import { kg, num } from "@/lib/format";
 import { Plus, Store, X } from "lucide-react";
 import { banNoiDiaDayDu, type DongBanNoiDia } from "./wipHelpers";
 
 interface CatalogCell {
-  options: MucChon[];
+  options: ComboboxOption[];
   onCreate: (ten: string) => string;
   onSuaMuc: (value: string) => void;
   suaDuoc: (value: string) => boolean;
@@ -78,9 +78,9 @@ export function KhoiBanNoiDia({
               onChange={(v) => onSua(d.key, { materialTypeName: v })}
               options={loaiNL.options}
               onCreate={loaiNL.onCreate}
-              onSuaMuc={loaiNL.onSuaMuc}
-              suaDuoc={loaiNL.suaDuoc}
-              nhanSua={loaiNL.nhanSua}
+              onEditItem={loaiNL.onSuaMuc}
+              canEdit={loaiNL.suaDuoc}
+              editLabel={loaiNL.nhanSua}
               placeholder="— Chọn loại NL —"
               emptyText="Chưa có loại này — gõ tên rồi Thêm mới."
             />
@@ -107,9 +107,9 @@ export function KhoiBanNoiDia({
               onChange={(v) => onSua(d.key, { customerName: v })}
               options={khach.options}
               onCreate={khach.onCreate}
-              onSuaMuc={khach.onSuaMuc}
-              suaDuoc={khach.suaDuoc}
-              nhanSua={khach.nhanSua}
+              onEditItem={khach.onSuaMuc}
+              canEdit={khach.suaDuoc}
+              editLabel={khach.nhanSua}
               placeholder="— Chọn khách (nếu có) —"
               emptyText="Chưa có khách này — gõ tên rồi Thêm mới."
             />

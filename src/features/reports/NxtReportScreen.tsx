@@ -21,10 +21,10 @@ import {
 } from "@/lib/inventoryFinished";
 import { exportNxtToExcel, inferCategory, type NxtExcelRow } from "@/lib/nxtExcel";
 import {
-  Nhan,
-  BangTong,
+  Tag,
+  SummaryTable,
   Button,
-  ChuThichBatBuoc,
+  RequiredLegend,
   Combobox,
   ConfirmDelete,
   DateField,
@@ -40,13 +40,13 @@ import {
   Field,
   Input,
   NumberField,
-  ThongKe,
-  homNay,
+  StatCardGrid,
+  todayIso,
   notify,
-  type CotTong,
-  type LoiNhap,
-  type MucChon,
-  type TheThongTin,
+  type SummaryTableColumn,
+  type FieldError,
+  type ComboboxOption,
+  type StatCardData,
 } from "@/design-system";
 import { useSuaDanhMuc } from "@/features/catalog/SuaDanhMucNhanh";
 import { KY_OPT, getViewPeriodRange, startOfMonth, type ViewPeriod } from "@/lib/periodUtils";
@@ -91,15 +91,15 @@ export default function BaoCaoNhapXuatTonScreen() {
   const [opening, writeOpening] = useFinishedGoodsOpeningStock();
 
   const [ky, setKy] = useState<ViewPeriod>("thang");
-  const [moc, setMoc] = useState(homNay());
-  const [tuTC, setTuTC] = useState(startOfMonth(homNay()));
-  const [denTC, setDenTC] = useState(homNay());
+  const [moc, setMoc] = useState(todayIso());
+  const [tuTC, setTuTC] = useState(startOfMonth(todayIso()));
+  const [denTC, setDenTC] = useState(todayIso());
   const [tu, den] = getViewPeriodRange(ky, moc, tuTC, denTC);
 
   // Dialog tồn đầu
   const [isOpeningOpen, setIsOpeningOpen] = useState(false);
   const [form, setForm] = useState<OpeningForm | null>(null);
-  const [loi, setLoi] = useState<LoiNhap[]>([]);
+  const [loi, setLoi] = useState<FieldError[]>([]);
 
   const tenMH = (id: string) => products.find((m) => m.id === id)?.name || "—";
 
@@ -112,7 +112,7 @@ export default function BaoCaoNhapXuatTonScreen() {
         salesItems,
         packagings,
         opening,
-        products: products,
+        products,
         tuNgay: tu,
         denNgay: den,
       }),
@@ -120,19 +120,19 @@ export default function BaoCaoNhapXuatTonScreen() {
   );
   const total = useMemo(() => sumFinishedGoodNxt(rows), [rows]);
 
-  const the: TheThongTin[] = [
-    { nhan: "Tồn đầu kho", giaTri: `${num(total.tonDau)} kg`, so: true, icon: Snowflake, mau: "trung-tinh" },
-    { nhan: "Nhập kho", giaTri: `${num(total.nhap)} kg`, so: true, icon: ArrowDownToLine, mau: "brand" },
+  const the: StatCardData[] = [
+    { label: "Tồn đầu kho", value: `${num(total.tonDau)} kg`, numeric: true, icon: Snowflake, color: "trung-tinh" },
+    { label: "Nhập kho", value: `${num(total.nhap)} kg`, numeric: true, icon: ArrowDownToLine, color: "brand" },
     {
-      nhan: "Xuất (đơn+bán+gói)",
-      giaTri: `${num(total.xuatDon)} + ${num(total.xuatBan)} + ${num(total.xuatDongGoi)} kg`,
+      label: "Xuất (đơn+bán+gói)",
+      value: `${num(total.xuatDon)} + ${num(total.xuatBan)} + ${num(total.xuatDongGoi)} kg`,
       icon: Ship,
-      mau: "warning",
+      color: "warning",
     },
-    { nhan: "Tồn cuối kho", giaTri: `${num(total.tonCuoi)} kg`, so: true, icon: Scale, mau: "success" },
+    { label: "Tồn cuối kho", value: `${num(total.tonCuoi)} kg`, numeric: true, icon: Scale, color: "success" },
   ];
 
-  const columns: CotTong<FinishedGoodNxtRow>[] = [
+  const columns: SummaryTableColumn<FinishedGoodNxtRow>[] = [
     {
       key: "mh",
       header: "Mặt hàng · quy cách",
@@ -140,12 +140,12 @@ export default function BaoCaoNhapXuatTonScreen() {
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-semibold text-foreground">{r.productName}</span>
-            {r.spec && <Nhan loai="phu">{r.spec}</Nhan>}
-            {r.seedTonDau && <Nhan loai="nguon">Tồn đầu khai tay</Nhan>}
+            {r.spec && <Tag variant="phu">{r.spec}</Tag>}
+            {r.seedTonDau && <Tag variant="nguon">Tồn đầu khai tay</Tag>}
             {r.canhBaoAm && (
-              <Nhan loai="loi" icon={AlertTriangle}>
+              <Tag variant="loi" icon={AlertTriangle}>
                 Tồn âm
-              </Nhan>
+              </Tag>
             )}
           </div>
           {r.productCode && (
@@ -154,54 +154,54 @@ export default function BaoCaoNhapXuatTonScreen() {
         </div>
       ),
     },
-    { key: "tonDau", header: "Tồn đầu (kg)", so: true, render: (r) => num(r.tonDau), tong: () => num(total.tonDau) },
+    { key: "tonDau", header: "Tồn đầu (kg)", numeric: true, render: (r) => num(r.tonDau), total: () => num(total.tonDau) },
     {
       key: "nhap",
       header: "Nhập (kg)",
-      so: true,
+      numeric: true,
       render: (r) => (
         <span className={r.nhap > 0 ? "font-semibold text-success" : ""}>{r.nhap ? `+${num(r.nhap)}` : "—"}</span>
       ),
-      tong: () => num(total.nhap),
+      total: () => num(total.nhap),
     },
     {
       key: "xuatDon",
       header: "Xuất đơn (kg)",
-      so: true,
+      numeric: true,
       render: (r) => (r.xuatDon ? `−${num(r.xuatDon)}` : "—"),
-      tong: () => num(total.xuatDon),
+      total: () => num(total.xuatDon),
     },
     {
       key: "xuatBan",
       header: "Xuất bán (kg)",
-      so: true,
+      numeric: true,
       render: (r) => (r.xuatBan ? `−${num(r.xuatBan)}` : "—"),
-      tong: () => num(total.xuatBan),
+      total: () => num(total.xuatBan),
     },
     {
       key: "xuatDongGoi",
       header: "Đóng gói (kg)",
-      so: true,
+      numeric: true,
       render: (r) => (r.xuatDongGoi ? `−${num(r.xuatDongGoi)}` : "—"),
-      tong: () => num(total.xuatDongGoi),
+      total: () => num(total.xuatDongGoi),
     },
     {
       key: "tonCuoi",
       header: "Tồn cuối (kg)",
-      so: true,
+      numeric: true,
       render: (r) => (
         <span className={`tnum font-bold ${r.canhBaoAm ? "text-destructive" : "text-foreground"}`}>
           {num(r.tonCuoi)}
         </span>
       ),
-      tong: () => num(total.tonCuoi),
+      total: () => num(total.tonCuoi),
     },
   ];
 
   // ----- Xuất Excel (mẫu 10 cột) -----
   const exportExcel = () => {
     if (!rows.length) {
-      notify.canhBao("Không có số liệu để xuất");
+      notify.warning("Không có số liệu để xuất");
       return;
     }
     const items: NxtExcelRow[] = rows.map((r) => ({
@@ -219,7 +219,7 @@ export default function BaoCaoNhapXuatTonScreen() {
     }));
     exportNxtToExcel(
       {
-        createdDateText: `Ngày lập: ${formatDateVN(homNay())}`,
+        createdDateText: `Ngày lập: ${formatDateVN(todayIso())}`,
         title: "Báo cáo xuất nhập tồn thành phẩm",
         dateRangeText: `Từ ngày ${formatDateVN(tu)} đến ngày ${formatDateVN(den)}`,
         warehouseText: "Chi nhánh: Kho thành phẩm BSF1",
@@ -240,7 +240,7 @@ export default function BaoCaoNhapXuatTonScreen() {
   };
 
   // ----- Tồn đầu: thêm / xóa -----
-  const productOptions: MucChon[] = products.map((m) => ({ value: m.id, label: m.name, phu: m.code || undefined }));
+  const productOptions: ComboboxOption[] = products.map((m) => ({ value: m.id, label: m.name, subLabel: m.code || undefined }));
   /** Thêm mặt hàng tại chỗ — lưu ngay vào danh mục; trùng tên (không phân hoa thường) ⇒ dùng lại. */
   const addProduct = (ten: string) => {
     const sach = ten.trim();
@@ -248,7 +248,7 @@ export default function BaoCaoNhapXuatTonScreen() {
     if (co) return co.id;
     const m = { id: uid(), code: "", name: sach, finishedGoodCode: "" };
     setProducts([...products, m]);
-    notify.daLuu(`Đã thêm mặt hàng "${sach}" vào danh mục`);
+    notify.saved(`Đã thêm mặt hàng "${sach}" vào danh mục`);
     return m.id;
   };
 
@@ -256,7 +256,7 @@ export default function BaoCaoNhapXuatTonScreen() {
     setForm({
       productId: "",
       spec: "",
-      asOfDate: homNay(),
+      asOfDate: todayIso(),
       quantityKg: null,
       blocksCount: null,
       warehouse: "",
@@ -267,10 +267,10 @@ export default function BaoCaoNhapXuatTonScreen() {
 
   const saveOpening = () => {
     if (!form) return;
-    const ls: LoiNhap[] = [];
-    if (!form.productId) ls.push({ truong: "Mặt hàng", thongBao: "Chưa chọn mặt hàng" });
-    if (!form.asOfDate) ls.push({ truong: "Ngày mốc", thongBao: "Chưa chọn ngày tồn đầu" });
-    if (!(Number(form.quantityKg) > 0)) ls.push({ truong: "Khối lượng", thongBao: "Phải lớn hơn 0 kg" });
+    const ls: FieldError[] = [];
+    if (!form.productId) ls.push({ field: "Mặt hàng", message: "Chưa chọn mặt hàng" });
+    if (!form.asOfDate) ls.push({ field: "Ngày mốc", message: "Chưa chọn ngày tồn đầu" });
+    if (!(Number(form.quantityKg) > 0)) ls.push({ field: "Khối lượng", message: "Phải lớn hơn 0 kg" });
     setLoi(ls);
     if (ls.length > 0) return;
     const newOpening: FinishedGoodsOpeningStock = {
@@ -284,13 +284,13 @@ export default function BaoCaoNhapXuatTonScreen() {
       note: form.note.trim(),
     };
     writeOpening([...opening, newOpening]);
-    notify.daLuu(`Đã lưu tồn đầu ${num(newOpening.quantityKg)} kg — ${tenMH(newOpening.productId)}`);
+    notify.saved(`Đã lưu tồn đầu ${num(newOpening.quantityKg)} kg — ${tenMH(newOpening.productId)}`);
     setForm(null);
   };
 
   const deleteOpening = (id: string) => {
     writeOpening(opening.filter((o) => o.id !== id));
-    notify.daXoa("Đã xóa dòng tồn đầu");
+    notify.deleted("Đã xóa dòng tồn đầu");
   };
 
   return (
@@ -324,8 +324,8 @@ export default function BaoCaoNhapXuatTonScreen() {
         <div className="min-w-[12rem]">
           <Combobox
             label="Kỳ báo cáo"
-            anNhanBatBuoc
-            choPhepXoa={false}
+            hideRequiredMark
+            clearable={false}
             value={ky}
             onChange={(v) => setKy(v as ViewPeriod)}
             options={KY_OPT}
@@ -335,7 +335,7 @@ export default function BaoCaoNhapXuatTonScreen() {
           {ky === "tuy-chon" ? (
             <DateRangeField
               label="Khoảng ngày"
-              anNhanBatBuoc
+              hideRequiredMark
               presets={false}
               startDate={tuTC}
               endDate={denTC}
@@ -347,7 +347,7 @@ export default function BaoCaoNhapXuatTonScreen() {
           ) : (
             <DateField
               label={ky === "ngay" ? "Ngày" : "Ngày bất kỳ trong kỳ"}
-              anNhanBatBuoc
+              hideRequiredMark
               hint={ky === "ngay" ? undefined : `Kỳ: ${formatDateVN(tu)} – ${formatDateVN(den)}`}
               value={moc}
               onChange={setMoc}
@@ -356,7 +356,7 @@ export default function BaoCaoNhapXuatTonScreen() {
         </div>
       </div>
 
-      <ThongKe the={the} />
+      <StatCardGrid cards={the} />
 
       {total.soCanhBao > 0 && (
         <div className="flex flex-wrap items-center gap-3 rounded-xl border-2 border-destructive bg-destructive/10 p-4">
@@ -371,11 +371,11 @@ export default function BaoCaoNhapXuatTonScreen() {
       {rows.length === 0 ? (
         <EmptyState
           icon={Snowflake}
-          tieuDe="Chưa có số liệu thành phẩm trong khoảng ngày này"
-          moTa="Ghi sản lượng ở Sản xuất BTP, duyệt vào Kho dự trữ, rồi xuất theo Đơn đặt / Bán hàng — số sẽ tổng hợp về đây. Có số dư đông trước khi số hoá thì khai ở nút Tồn đầu."
+          title="Chưa có số liệu thành phẩm trong khoảng ngày này"
+          description="Ghi sản lượng ở Sản xuất BTP, duyệt vào Kho dự trữ, rồi xuất theo Đơn đặt / Bán hàng — số sẽ tổng hợp về đây. Có số dư đông trước khi số hoá thì khai ở nút Tồn đầu."
         />
       ) : (
-        <BangTong rows={rows} cot={columns} getKey={(r) => `${r.productId}|||${r.spec}`} toMau={`nxt-tp|${tu}|${den}`} />
+        <SummaryTable rows={rows} columns={columns} getKey={(r) => `${r.productId}|||${r.spec}`} rowMarkKey={`nxt-tp|${tu}|${den}`} />
       )}
 
       <p className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
@@ -413,7 +413,7 @@ export default function BaoCaoNhapXuatTonScreen() {
                       </span>
                     </span>
                     <ConfirmDelete
-                      moTaBanGhi={`${tenMH(o.productId)}${o.spec ? ` · ${o.spec}` : ""} — ${num(o.quantityKg)} kg`}
+                      recordDescription={`${tenMH(o.productId)}${o.spec ? ` · ${o.spec}` : ""} — ${num(o.quantityKg)} kg`}
                       onConfirm={() => deleteOpening(o.id)}
                       trigger={
                         <Button
@@ -433,8 +433,8 @@ export default function BaoCaoNhapXuatTonScreen() {
 
             {form ? (
               <div className="space-y-4 rounded-xl border-2 border-primary/40 bg-accent/30 p-4">
-                <ErrorSummary loi={loi} />
-                <ChuThichBatBuoc />
+                <ErrorSummary errors={loi} />
+                <RequiredLegend />
                 <Combobox
                   label="Mặt hàng"
                   required
@@ -442,8 +442,8 @@ export default function BaoCaoNhapXuatTonScreen() {
                   onChange={(v) => setForm((f) => (f ? { ...f, productId: v } : f))}
                   options={productOptions}
                   onCreate={addProduct}
-                  onSuaMuc={productEditor.moSua}
-                  nhanSua={productEditor.nhanSua}
+                  onEditItem={productEditor.moSua}
+                  editLabel={productEditor.nhanSua}
                   emptyText="Chưa có mặt hàng — gõ tên rồi bấm Thêm mới."
                 />
                 <div className="grid gap-4 sm:grid-cols-2">

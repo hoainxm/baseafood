@@ -1,5 +1,5 @@
 // ============================================================
-// Tên file: src/design-system/patterns/Nhan.tsx
+// Tên file: src/design-system/patterns/Tag.tsx
 // Tên tiếng Việt: Nhãn theo chức năng (trạng thái · nguồn · cảnh báo · phân loại)
 // Description: Semantic label chip — colour chosen by MEANING, not by the screen
 // ============================================================
@@ -18,71 +18,71 @@ import { cn } from "@/lib/utils";
  * - `phan-loai` phân loại nghiệp vụ (kênh, nhóm NL, xưởng…) → sắc nhạt theo `sac`
  * - `phu`       phụ chú / đếm / DEMO                       → xám
  */
-export type LoaiNhan = "xong" | "cho" | "luu-y" | "loi" | "nguon" | "vi-tri" | "phan-loai" | "phu";
+export type TagVariant = "xong" | "cho" | "luu-y" | "loi" | "nguon" | "vi-tri" | "phan-loai" | "phu";
 
 /** Sắc cho nhãn PHÂN LOẠI — không mang nghĩa tốt/xấu, chỉ để phân biệt nhóm. */
-export type SacPhanLoai = "tim" | "ngoc" | "bien" | "bang" | "cat" | "hong" | "la" | "cam" | "xam";
+export type CategoryTone = "tim" | "ngoc" | "bien" | "bang" | "cat" | "hong" | "la" | "cam" | "xam";
 
-const KIEU: Record<Exclude<LoaiNhan, "phan-loai">, { vo: string; cham: string }> = {
-  xong: { vo: "border-success-line bg-success-surface text-success", cham: "bg-success" },
-  cho: { vo: "border-dashed border-warning-line bg-warning-surface text-warning", cham: "border border-warning bg-transparent" },
-  "luu-y": { vo: "border-warning-line bg-warning-surface text-warning", cham: "bg-warning" },
-  loi: { vo: "border-destructive-line bg-destructive-surface text-destructive", cham: "bg-destructive" },
-  nguon: { vo: "border-info-line bg-info-surface text-info", cham: "bg-info" },
-  "vi-tri": { vo: "border-primary/30 bg-accent text-accent-foreground", cham: "bg-primary" },
-  phu: { vo: "border-border bg-muted text-muted-foreground", cham: "bg-muted-foreground" },
+const VARIANT_STYLES: Record<Exclude<TagVariant, "phan-loai">, { base: string; dot: string }> = {
+  xong: { base: "border-success-line bg-success-surface text-success", dot: "bg-success" },
+  cho: { base: "border-dashed border-warning-line bg-warning-surface text-warning", dot: "border border-warning bg-transparent" },
+  "luu-y": { base: "border-warning-line bg-warning-surface text-warning", dot: "bg-warning" },
+  loi: { base: "border-destructive-line bg-destructive-surface text-destructive", dot: "bg-destructive" },
+  nguon: { base: "border-info-line bg-info-surface text-info", dot: "bg-info" },
+  "vi-tri": { base: "border-primary/30 bg-accent text-accent-foreground", dot: "bg-primary" },
+  phu: { base: "border-border bg-muted text-muted-foreground", dot: "bg-muted-foreground" },
 };
 
 /* Liệt kê TRỌN tên lớp (không ghép chuỗi) để Tailwind quét thấy. */
-const SAC: Record<SacPhanLoai, { vo: string; cham: string }> = {
-  tim: { vo: "border-tone-tim-line bg-tone-tim-surface text-tone-tim", cham: "bg-tone-tim" },
-  ngoc: { vo: "border-tone-ngoc-line bg-tone-ngoc-surface text-tone-ngoc", cham: "bg-tone-ngoc" },
-  bien: { vo: "border-tone-bien-line bg-tone-bien-surface text-tone-bien", cham: "bg-tone-bien" },
-  bang: { vo: "border-tone-bang-line bg-tone-bang-surface text-tone-bang", cham: "bg-tone-bang" },
-  cat: { vo: "border-tone-cat-line bg-tone-cat-surface text-tone-cat", cham: "bg-tone-cat" },
-  hong: { vo: "border-tone-hong-line bg-tone-hong-surface text-tone-hong", cham: "bg-tone-hong" },
-  la: { vo: "border-tone-la-line bg-tone-la-surface text-tone-la", cham: "bg-tone-la" },
-  cam: { vo: "border-tone-cam-line bg-tone-cam-surface text-tone-cam", cham: "bg-tone-cam" },
-  xam: { vo: "border-tone-xam-line bg-tone-xam-surface text-tone-xam", cham: "bg-tone-xam" },
+const SAC: Record<CategoryTone, { base: string; dot: string }> = {
+  tim: { base: "border-tone-tim-line bg-tone-tim-surface text-tone-tim", dot: "bg-tone-tim" },
+  ngoc: { base: "border-tone-ngoc-line bg-tone-ngoc-surface text-tone-ngoc", dot: "bg-tone-ngoc" },
+  bien: { base: "border-tone-bien-line bg-tone-bien-surface text-tone-bien", dot: "bg-tone-bien" },
+  bang: { base: "border-tone-bang-line bg-tone-bang-surface text-tone-bang", dot: "bg-tone-bang" },
+  cat: { base: "border-tone-cat-line bg-tone-cat-surface text-tone-cat", dot: "bg-tone-cat" },
+  hong: { base: "border-tone-hong-line bg-tone-hong-surface text-tone-hong", dot: "bg-tone-hong" },
+  la: { base: "border-tone-la-line bg-tone-la-surface text-tone-la", dot: "bg-tone-la" },
+  cam: { base: "border-tone-cam-line bg-tone-cam-surface text-tone-cam", dot: "bg-tone-cam" },
+  xam: { base: "border-tone-xam-line bg-tone-xam-surface text-tone-xam", dot: "bg-tone-xam" },
 };
 
 /**
- * Nhan — chip nhãn một dòng. Luôn có CHỮ + chấm (hoặc icon): màu không bao giờ là
+ * Tag — chip nhãn một dòng. Luôn có CHỮ + chấm (hoặc icon): màu không bao giờ là
  * tín hiệu duy nhất. `className` chỉ để căn chỉnh bố cục (margin…), KHÔNG đè màu/cỡ.
  */
-export function Nhan({
-  loai,
-  sac = "xam",
+export function Tag({
+  variant,
+  tone: sac = "xam",
   icon: Icon,
   children,
   title,
   className,
 }: {
-  loai: LoaiNhan;
-  /** Chỉ dùng khi `loai="phan-loai"` — lấy từ `sacKenh` / `sacNhomNL` / `sacXuong` / `sacTheoTen`. */
-  sac?: SacPhanLoai;
+  variant: TagVariant;
+  /** Chỉ dùng khi `loai="phan-loai"` — lấy từ `channelTone` / `toneForMaterialGroup` / `toneForWorkshop` / `toneByName`. */
+  tone?: CategoryTone;
   /** Icon thay cho chấm (VD Lock cho "Đã chốt"). */
   icon?: LucideIcon;
   children: React.ReactNode;
   title?: string;
   className?: string;
 }) {
-  const k = loai === "phan-loai" ? SAC[sac] : KIEU[loai];
+  const k = variant === "phan-loai" ? SAC[sac] : VARIANT_STYLES[variant];
   return (
     <span
       data-slot="nhan"
-      data-loai={loai}
+      data-kind={variant}
       title={title}
       className={cn(
         "inline-flex h-6 w-fit max-w-full shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 text-xs font-semibold",
-        k.vo,
+        k.base,
         className
       )}
     >
       {Icon ? (
         <Icon className="size-3.5 shrink-0" aria-hidden />
       ) : (
-        <span className={cn("size-2 shrink-0 rounded-full", k.cham)} aria-hidden />
+        <span className={cn("size-2 shrink-0 rounded-full", k.dot)} aria-hidden />
       )}
       <span className="truncate">{children}</span>
     </span>
@@ -92,7 +92,7 @@ export function Nhan({
 /* ---------- Sắc cố định theo giá trị nghiệp vụ — cùng giá trị luôn cùng màu ---------- */
 
 /** Kênh bán: Xuất khẩu tím · Nội địa ngọc. */
-export function sacKenh(kenh: string | null | undefined): SacPhanLoai {
+export function channelTone(kenh: string | null | undefined): CategoryTone {
   const k = (kenh ?? "").toLowerCase();
   if (k.includes("xuất") || k === "xk") return "tim";
   if (k.includes("nội") || k === "nđ" || k === "nd") return "ngoc";
@@ -100,7 +100,7 @@ export function sacKenh(kenh: string | null | undefined): SacPhanLoai {
 }
 
 /** Nhóm nguyên liệu cân đối: Thủy sản biển · Xả đông băng · Bột phụ gia cát · Giảm hồng. */
-export function sacNhomNL(nhom: string | null | undefined): SacPhanLoai {
+export function toneForMaterialGroup(nhom: string | null | undefined): CategoryTone {
   const k = (nhom ?? "").toLowerCase();
   if (k.includes("giảm")) return "hong";
   if (k.includes("xả")) return "bang";
@@ -110,7 +110,7 @@ export function sacNhomNL(nhom: string | null | undefined): SacPhanLoai {
 }
 
 /** Phân xưởng: Đông biển · Cá ngọc · Khô cam; kho lớn / khác → xám. */
-export function sacXuong(workshop: string | null | undefined): SacPhanLoai {
+export function toneForWorkshop(workshop: string | null | undefined): CategoryTone {
   /* Tách TỪ theo chữ Unicode — `\b` của regex JS không coi "đ", "á", "ô" là chữ cái
      nên /\bđông\b/ không bao giờ khớp "Xưởng Đông". */
   const tu = (workshop ?? "").toLowerCase().normalize("NFC").split(/[^\p{L}\p{N}]+/u);
@@ -120,14 +120,14 @@ export function sacXuong(workshop: string | null | undefined): SacPhanLoai {
   return "xam";
 }
 
-const SAC_XOAY: SacPhanLoai[] = ["bien", "tim", "ngoc", "cam", "hong", "la", "bang", "cat"];
+const SAC_XOAY: CategoryTone[] = ["bien", "tim", "ngoc", "cam", "hong", "la", "bang", "cat"];
 
 /**
  * Sắc ổn định theo TÊN cho phân loại mở (kho, nhóm thành phẩm, vai trò, ca, dây
  * chuyền…): cùng tên ⇒ cùng màu ở mọi màn. Băm tên đã chuẩn hoá (bỏ hoa/thường,
  * khoảng trắng thừa).
  */
-export function sacTheoTen(ten: string | null | undefined): SacPhanLoai {
+export function toneByName(ten: string | null | undefined): CategoryTone {
   const k = (ten ?? "").trim().toLowerCase().replace(/\s+/g, " ");
   if (!k) return "xam";
   let h = 0;

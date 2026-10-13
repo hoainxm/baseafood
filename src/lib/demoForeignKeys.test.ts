@@ -1,6 +1,6 @@
 // Chế độ demo thêm tiền tố `demo:` cho khóa chính ở ranh giới máy chủ (lib/demoMode.ts).
 // Cột KHÓA NGOẠI trỏ tới khóa chính bảng nghiệp vụ khác cũng phải mang tiền tố —
-// khai ở `TableMapping.cotThamChieu`. Test này quét mọi migration: thêm khóa ngoại mới
+// khai ở `TableMapping.refColumns`. Test này quét mọi migration: thêm khóa ngoại mới
 // giữa hai bảng nghiệp vụ mà quên khai ⇒ đỏ (đã lọt một lần: 2026-10-12, period_id).
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -20,8 +20,8 @@ function businessForeignKeys(): string[] {
   return ra;
 }
 
-describe("khóa ngoại giữa bảng nghiệp vụ ⇄ cotThamChieu", () => {
-  it("migration chỉ có đúng 3 khóa ngoại (period_id → kỳ cân đối) — thêm mới thì khai cotThamChieu rồi sửa test này", () => {
+describe("khóa ngoại giữa bảng nghiệp vụ ⇄ refColumns", () => {
+  it("migration chỉ có đúng 3 khóa ngoại (period_id → kỳ cân đối) — thêm mới thì khai refColumns rồi sửa test này", () => {
     // 0001 tạo bằng tên cũ ky_can_doi; 0016 đổi thành balancing_periods.
     expect(businessForeignKeys()).toEqual([
       "0001_baseafood_mes.sql:ky_can_doi",
@@ -31,6 +31,6 @@ describe("khóa ngoại giữa bảng nghiệp vụ ⇄ cotThamChieu", () => {
   });
 
   it("ba bảng trỏ tới balancing_periods đã khai period_id", () => {
-    for (const b of [repo.BANG_BALANCING_INPUT, repo.BANG_BALANCING_OUTPUT, repo.BANG_SCRAP]) expect(b.cotThamChieu, b.table).toEqual(["period_id"]);
+    for (const b of [repo.BALANCING_INPUT_TABLE, repo.BALANCING_OUTPUT_TABLE, repo.SCRAP_TABLE]) expect(b.refColumns, b.table).toEqual(["period_id"]);
   });
 });

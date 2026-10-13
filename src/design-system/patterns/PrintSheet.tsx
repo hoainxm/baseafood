@@ -7,10 +7,10 @@ import { type ReactNode, useState } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { Printer, X } from "lucide-react";
-import { ONhapSo } from "./ONhapSo";
+import { NumberInput } from "./NumberInput";
 
 /**
- * PhieuIn — khung bản in A4 NGANG dùng chung cho các màn Báo cáo.
+ * PrintSheet — khung bản in A4 NGANG dùng chung cho các màn Báo cáo.
  *
  * Là lớp phủ toàn màn (`fixed inset-0`) nền trắng; khi bấm "In / Xuất PDF" thì
  * `@media print` (src/index.css) chỉ in vùng `.print-root`, ẩn thanh công cụ
@@ -18,14 +18,14 @@ import { ONhapSo } from "./ONhapSo";
  * cỡ nhỏ) nằm Ở ĐÂY (tầng design-system) để màn nghiệp vụ không phải viết
  * `text-xs`/`uppercase` — đúng ranh giới của CLAUDE.md §3.
  */
-export function PhieuIn({
-  tieuDe,
-  phuDe,
+export function PrintSheet({
+  title,
+  subtitle: phuDe,
   onClose,
   children,
 }: {
-  tieuDe: string;
-  phuDe?: string;
+  title: string;
+  subtitle?: string;
   onClose: () => void;
   children: ReactNode;
 }) {
@@ -49,7 +49,7 @@ export function PhieuIn({
           <div>Xí nghiệp BSF1 — Bà Rịa</div>
         </div>
         <div className="mt-2 text-center">
-          <h1 className="text-lg font-bold uppercase tracking-wide">{tieuDe}</h1>
+          <h1 className="text-lg font-bold uppercase tracking-wide">{title}</h1>
           {phuDe ? <p className="text-sm font-semibold uppercase">{phuDe}</p> : null}
         </div>
         <div className="mt-4">{children}</div>
@@ -70,27 +70,27 @@ const keo = (v: number) => Math.max(10, Math.min(200, Math.round(v) || 0));
 const keoBan = (v: number) => Math.max(1, Math.min(500, Math.round(v) || 1));
 
 /** Một tem trong lượt in: mã lô (to, một dòng) + ảnh QR + các dòng phụ. */
-export interface TemIn {
-  maLo: string;
+export interface PrintLabel {
+  lotCode: string;
   qrDataUrl: string;
-  dong?: string[];
+  lines?: string[];
   /** Số bản in của tem này (VD mỗi block một tem). Mặc định 1, sửa được ở xem trước. */
-  soBan?: number;
+  copies?: number;
 }
 
 /** Một tem — co giãn theo khổ nhờ container-query, dùng chung cho xem trước và bản in. */
-function LabelTile({ tem, rong, cao, px, cuoi }: { tem: TemIn; rong: number; cao: number; px: number; cuoi?: boolean }) {
-  const { maLo, qrDataUrl, dong = [] } = tem;
+function LabelTile({ label, width, height: cao, px, isLast }: { label: PrintLabel; width: number; height: number; px: number; isLast?: boolean }) {
+  const { lotCode, qrDataUrl, lines: dong = [] } = label;
   return (
     <div
-      className={`print-tem-box shrink-0 border border-slate-300 bg-white${cuoi ? " print-tem-cuoi" : ""}`}
-      style={{ width: rong * px, height: cao * px, containerType: "size" }}
+      className={`print-tem-box shrink-0 border border-slate-300 bg-white${isLast ? " print-tem-cuoi" : ""}`}
+      style={{ width: width * px, height: cao * px, containerType: "size" }}
     >
       <div className="flex h-full w-full items-center" style={{ gap: "4cqw", padding: "6cqmin" }}>
         {qrDataUrl ? (
           <img
             src={qrDataUrl}
-            alt={`QR mã lô ${maLo}`}
+            alt={`QR mã lô ${lotCode}`}
             className="shrink-0"
             style={{ height: "min(88cqh, 44cqw)", width: "min(88cqh, 44cqw)" }}
           />
@@ -112,7 +112,7 @@ function LabelTile({ tem, rong, cao, px, cuoi }: { tem: TemIn; rong: number; cao
             className="tnum font-bold leading-none"
             style={{ fontSize: "min(14cqw, 32cqh)", color: "#0f172a", whiteSpace: "nowrap" }}
           >
-            {maLo || "—"}
+            {lotCode || "—"}
           </div>
           {dong.map((d, i) => (
             <div
@@ -134,7 +134,7 @@ function LabelTile({ tem, rong, cao, px, cuoi }: { tem: TemIn; rong: number; cao
 }
 
 /**
- * PhieuInTem — bản in TEM NHÃN khổ nhỏ (khác PhieuIn khổ A4), cho mã lô + QR.
+ * LabelPrintSheet — bản in TEM NHÃN khổ nhỏ (khác PrintSheet khổ A4), cho mã lô + QR.
  *
  * In ĐÚNG KHỔ TEM qua `@page { size }` động (bơm `<style>` khi chọn cỡ); xem
  * trước phóng to trên màn. Nội dung tem (QR + chữ) co giãn theo khổ nhờ đơn vị
@@ -147,32 +147,32 @@ function LabelTile({ tem, rong, cao, px, cuoi }: { tem: TemIn; rong: number; cao
  * tem cuộn coi mỗi trang là một nhãn). Khung được portal thẳng vào <body> để lúc
  * in ẩn được toàn bộ app (không thì phần app ẩn vẫn chiếm chỗ ⇒ in thừa nhãn trắng).
  */
-export function PhieuInTem({
+export function LabelPrintSheet({
   onClose,
-  maLo = "",
+  lotCode = "",
   qrDataUrl = "",
-  dong = [],
-  tems,
-  onIn,
-  rongMacDinh = 50,
-  caoMacDinh = 30,
+  lines: dong = [],
+  labels: tems,
+  onPrint: onIn,
+  defaultWidth = 50,
+  defaultHeight = 30,
 }: {
   onClose: () => void;
   /** Gọi ngay trước khi mở hộp in (vd ghi sổ in tem) — kèm số bản của từng tem. */
-  onIn?: (copies: number[]) => void;
-  maLo?: string;
+  onPrint?: (copies: number[]) => void;
+  lotCode?: string;
   qrDataUrl?: string;
-  dong?: string[];
-  tems?: TemIn[];
-  rongMacDinh?: number;
-  caoMacDinh?: number;
+  lines?: string[];
+  labels?: PrintLabel[];
+  defaultWidth?: number;
+  defaultHeight?: number;
 }) {
-  const [width, setWidth] = useState(rongMacDinh);
-  const [cao, setCao] = useState(caoMacDinh);
-  const ds: TemIn[] = tems ?? [{ maLo, qrDataUrl, dong }];
-  const [copies, setCopies] = useState<number[]>(() => ds.map((t) => keoBan(t.soBan ?? 1)));
-  const banCua = (i: number) => copies[i] ?? 1;
-  const totalLabels = ds.reduce((s, _, i) => s + banCua(i), 0);
+  const [width, setWidth] = useState(defaultWidth);
+  const [cao, setCao] = useState(defaultHeight);
+  const list: PrintLabel[] = tems ?? [{ lotCode, qrDataUrl, lines: dong }];
+  const [copies, setCopies] = useState<number[]>(() => list.map((t) => keoBan(t.copies ?? 1)));
+  const copiesOf = (i: number) => copies[i] ?? 1;
+  const totalLabels = list.reduce((s, _, i) => s + copiesOf(i), 0);
   const nhieu = totalLabels > 1;
   const PX = nhieu ? 4 : 6; // px mỗi mm khi xem trước (chỉ ảnh hưởng màn, không ảnh hưởng bản in)
   const isSelected = (r: number, c: number) => r === width && c === cao;
@@ -198,7 +198,7 @@ export function PhieuInTem({
         </Button>
         <Button
           onClick={() => {
-            onIn?.(ds.map((_, i) => banCua(i)));
+            onIn?.(list.map((_, i) => copiesOf(i)));
             window.print();
           }}
           title={
@@ -229,20 +229,20 @@ export function PhieuInTem({
         ))}
         <span className="ml-1 flex items-center gap-1 text-sm text-slate-600">
           <span className="ml-1">Tự chọn</span>
-          <ONhapSo
+          <NumberInput
             value={width}
             onChange={(v) => v != null && setWidth(keo(v))}
-            donVi="mm"
-            khungClassName="inline-block"
+            unit="mm"
+            wrapperClassName="inline-block"
             className="w-16 rounded-md border border-slate-300 px-2 py-1 text-sm"
             aria-label="Chiều rộng tem (mm)"
           />
           <span aria-hidden>×</span>
-          <ONhapSo
+          <NumberInput
             value={cao}
             onChange={(v) => v != null && setCao(keo(v))}
-            donVi="mm"
-            khungClassName="inline-block"
+            unit="mm"
+            wrapperClassName="inline-block"
             className="w-16 rounded-md border border-slate-300 px-2 py-1 text-sm"
             aria-label="Chiều cao tem (mm)"
           />
@@ -256,23 +256,23 @@ export function PhieuInTem({
       </p>
 
       <div className="print-tem-list mx-auto flex max-w-5xl flex-wrap justify-center gap-4">
-        {ds.map((t, i) => (
+        {list.map((t, i) => (
           <div key={i} className="flex flex-col items-center gap-1">
-            <LabelTile tem={t} rong={width} cao={cao} px={PX} cuoi={i === ds.length - 1 && banCua(i) === 1} />
+            <LabelTile label={t} width={width} height={cao} px={PX} isLast={i === list.length - 1 && copiesOf(i) === 1} />
             {/* Bản sao: ẩn trên màn, chỉ hiện khi in (.print-tem-sao trong printCss). */}
-            {Array.from({ length: banCua(i) - 1 }, (_, k) => (
+            {Array.from({ length: copiesOf(i) - 1 }, (_, k) => (
               <div key={k} className="print-tem-sao" style={{ display: "none" }}>
-                <LabelTile tem={t} rong={width} cao={cao} px={PX} cuoi={i === ds.length - 1 && k === banCua(i) - 2} />
+                <LabelTile label={t} width={width} height={cao} px={PX} isLast={i === list.length - 1 && k === copiesOf(i) - 2} />
               </div>
             ))}
             <label className="no-print flex items-center gap-1 text-sm text-slate-600">
               Số tem
-              <ONhapSo
-                value={banCua(i)}
-                onChange={(v) => v != null && setCopies((prev) => ds.map((_, j) => (j === i ? keoBan(v) : (prev[j] ?? 1))))}
-                khungClassName="inline-block"
+              <NumberInput
+                value={copiesOf(i)}
+                onChange={(v) => v != null && setCopies((prev) => list.map((_, j) => (j === i ? keoBan(v) : (prev[j] ?? 1))))}
+                wrapperClassName="inline-block"
                 className="w-16 rounded-md border border-slate-300 px-2 py-1 text-sm"
-                aria-label={`Số tem in cho lô ${t.maLo}`}
+                aria-label={`Số tem in cho lô ${t.lotCode}`}
               />
             </label>
           </div>
@@ -284,7 +284,7 @@ export function PhieuInTem({
 }
 
 /** Ô tiêu đề bảng in (nền xám nhạt, IN HOA, viền). */
-export function ThIn({
+export function PrintTh({
   children,
   right,
   className = "",
@@ -305,17 +305,17 @@ export function ThIn({
 }
 
 /** Ô dữ liệu bảng in. `dam` = dòng cộng/tổng (in đậm + viền trên rõ). */
-export function TdIn({
+export function PrintTd({
   children,
   right,
-  dam,
+  bold,
   rowSpan,
   colSpan,
   className = "",
 }: {
   children?: ReactNode;
   right?: boolean;
-  dam?: boolean;
+  bold?: boolean;
   rowSpan?: number;
   colSpan?: number;
   className?: string;
@@ -325,7 +325,7 @@ export function TdIn({
       rowSpan={rowSpan}
       colSpan={colSpan}
       className={`border border-slate-400 px-2 py-1 text-sm ${right ? "text-right" : "text-left"} ${
-        dam ? "bg-slate-50 font-bold" : ""
+        bold ? "bg-slate-50 font-bold" : ""
       } ${className}`}
     >
       {children}

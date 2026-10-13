@@ -1,7 +1,7 @@
 // ============================================================
 // Tên file: src/features/catalog/cauHinhDanhMuc.tsx
 // Tên tiếng Việt: Cấu hình 5 danh mục (trường, kiểm tra, bản ghi rỗng) — MỘT nguồn
-// Dùng chung cho màn Danh mục (DanhMucCrud) và hộp SỬA NHANH ở các màn nghiệp vụ
+// Dùng chung cho màn Danh mục (CatalogCrud) và hộp SỬA NHANH ở các màn nghiệp vụ
 // (bút chì trong ô chọn — xem SuaDanhMucNhanh.tsx). Tách khỏi CatalogScreen.tsx
 // ngày 2026-10-02, KHÔNG đổi trường / luật kiểm tra của màn Danh mục.
 // 2026-10-06: thêm danh mục thứ 6 "Bột tẩm" (batter_types, mig 0051) + trường
@@ -35,8 +35,8 @@ import {
   Combobox,
   NumberField,
   notify,
-  type LoiNhap,
-  type TruongDanhMuc,
+  type FieldError,
+  type CatalogField,
 } from "@/design-system";
 import { ChonBotDiKem } from "./ChonBotDiKem";
 
@@ -51,11 +51,11 @@ export interface CauHinhDanhMuc<T extends { id: string }> {
   tenDonVi: string;
   rows: T[];
   onChange: (next: T[]) => void;
-  fields: TruongDanhMuc<T>[];
+  fields: CatalogField<T>[];
   taoMoi: () => T;
   timTheo: (r: T) => string;
   moTaBanGhi: (r: T) => string;
-  kiemTraThem?: (editing: T, rows: T[], isAdding: boolean) => LoiNhap[];
+  kiemTraThem?: (editing: T, rows: T[], isAdding: boolean) => FieldError[];
   dangTai: boolean;
   /** Trường TÊN của bản ghi. */
   truongTen: keyof T & string;
@@ -81,15 +81,15 @@ export function trungMaSo<T extends { id: string; code: string }>(
   editing: T,
   rows: T[],
   entityLabel: string
-): { truong: string; thongBao: string }[] {
+): FieldError[] {
   const ma = (editing.code ?? "").trim();
   if (!ma) return [];
   const trung = rows.some((r) => r.id !== editing.id && (r.code ?? "").trim() === ma);
   return trung
     ? [
         {
-          truong: "Mã số",
-          thongBao: `Mã số "${ma}" đã dùng cho ${entityLabel} khác — đổi số khác hoặc để trống.`,
+          field: "Mã số",
+          message: `Mã số "${ma}" đã dùng cho ${entityLabel} khác — đổi số khác hoặc để trống.`,
         },
       ]
     : [];
@@ -102,7 +102,7 @@ function trungTen<T extends { id: string }>(
   truong: keyof T & string,
   label: string,
   entityLabel: string
-): LoiNhap[] {
+): FieldError[] {
   const ten = String(editing[truong] ?? "").trim().toLowerCase();
   if (!ten) return [];
   const prev = rows.find((r) => r.id === editing.id);
@@ -110,8 +110,8 @@ function trungTen<T extends { id: string }>(
   return rows.some((r) => r.id !== editing.id && String(r[truong] ?? "").trim().toLowerCase() === ten)
     ? [
         {
-          truong: label,
-          thongBao: `Đã có ${entityLabel} khác tên "${String(editing[truong]).trim()}" — chọn ${entityLabel} đó thay vì đặt trùng tên.`,
+          field: label,
+          message: `Đã có ${entityLabel} khác tên "${String(editing[truong]).trim()}" — chọn ${entityLabel} đó thay vì đặt trùng tên.`,
         },
       ]
     : [];
@@ -138,17 +138,17 @@ export function taoTruongDanhMuc(
     phu: `Mã ${t.code} · ${t.groupName}`,
   }));
 
-  const productFields: TruongDanhMuc<Product>[] = [
+  const productFields: CatalogField<Product>[] = [
     {
       key: "name",
-      nhan: "Tên mặt hàng",
-      batBuoc: true,
-      viDu: "VD: 2 da cắt luộc 1000-1300",
+      label: "Tên mặt hàng",
+      required: true,
+      example: "VD: 2 da cắt luộc 1000-1300",
     },
     {
       key: "materialTypeId",
-      anTrenBang: true,
-      nhan: "Loại nguyên liệu",
+      hideInTable: true,
+      label: "Loại nguyên liệu",
       render: (value, changeValue) => (
         <Combobox
           label="Loại nguyên liệu"
@@ -169,14 +169,14 @@ export function taoTruongDanhMuc(
           }
         />
       ),
-      hienThi: (r) =>
+      renderValue: (r) =>
         materialTypes.find((l) => l.id === r.materialTypeId)?.name || (
           <span className="text-muted-foreground">—</span>
         ),
     },
     {
       key: "category",
-      nhan: "Loài",
+      label: "Loài",
       render: (value, changeValue) => (
         <Combobox
           label="Loài"
@@ -188,11 +188,11 @@ export function taoTruongDanhMuc(
           placeholder="— Chọn loài —"
         />
       ),
-      anTrenDienThoai: true,
+      hideOnMobile: true,
     },
     {
       key: "processingType",
-      nhan: "Kiểu chế biến",
+      label: "Kiểu chế biến",
       render: (value, changeValue) => (
         <Combobox
           label="Kiểu chế biến"
@@ -204,13 +204,13 @@ export function taoTruongDanhMuc(
           placeholder="— Chọn kiểu chế biến —"
         />
       ),
-      hienThi: (r) =>
+      renderValue: (r) =>
         r.processingType || <span className="text-muted-foreground">—</span>,
-      anTrenDienThoai: true,
+      hideOnMobile: true,
     },
     {
       key: "batterIds",
-      nhan: "Bột đi kèm",
+      label: "Bột đi kèm",
       render: (value, changeValue) => (
         <ChonBotDiKem
           value={value}
@@ -219,7 +219,7 @@ export function taoTruongDanhMuc(
           onTaoBot={addBatter}
         />
       ),
-      hienThi: (r) => {
+      renderValue: (r) => {
         const ten = getProductBatterNames(r, batterTypes);
         return ten.length > 0 ? (
           ten.join(" + ")
@@ -227,12 +227,12 @@ export function taoTruongDanhMuc(
           <span className="text-muted-foreground">—</span>
         );
       },
-      anTrenDienThoai: true,
+      hideOnMobile: true,
     },
     {
       key: "splitComponents",
-      anTrenBang: true,
-      nhan: "Tách râu + bao tử",
+      hideInTable: true,
+      label: "Tách râu + bao tử",
       render: (value, changeValue) => {
         const on = value === "1" || value === "true";
         return (
@@ -245,22 +245,22 @@ export function taoTruongDanhMuc(
               { value: "1", label: "Có tách" },
               { value: "0", label: "Không tách" },
             ]}
-            cot={2}
+            columns={2}
           />
         );
       },
-      hienThi: (r) =>
+      renderValue: (r) =>
         hasSplitComponents(r) ? (
           "Có tách"
         ) : (
           <span className="text-muted-foreground">—</span>
         ),
-      anTrenDienThoai: true,
+      hideOnMobile: true,
     },
     {
       key: "blockSpecKg",
-      anTrenBang: true,
-      nhan: "Quy cách block (kg/khối)",
+      hideInTable: true,
+      label: "Quy cách block (kg/khối)",
       render: (value, changeValue) => (
         <NumberField
           label="Quy cách mỗi block"
@@ -270,7 +270,7 @@ export function taoTruongDanhMuc(
           onChange={(v) => changeValue(v == null ? "" : String(v))}
         />
       ),
-      hienThi: (r) => {
+      renderValue: (r) => {
         const q = blockSpec(r);
         return q ? (
           `${num(q)} kg/khối`
@@ -278,20 +278,20 @@ export function taoTruongDanhMuc(
           <span className="text-muted-foreground">—</span>
         );
       },
-      anTrenDienThoai: true,
+      hideOnMobile: true,
     },
     {
       key: "code",
-      anTrenBang: true,
-      nhan: "Mã số",
-      anTrenDienThoai: true,
-      goiY: "Nhập số để gọi nhanh. Gõ số này khi chọn mặt hàng là ra tên.",
-      viDu: "VD: 12",
+      hideInTable: true,
+      label: "Mã số",
+      hideOnMobile: true,
+      hint: "Nhập số để gọi nhanh. Gõ số này khi chọn mặt hàng là ra tên.",
+      example: "VD: 12",
     },
     {
       key: "finishedGoodCode",
-      nhan: "Mã thành phẩm (danh mục kế toán)",
-      anTrenDienThoai: false,
+      label: "Mã thành phẩm (danh mục kế toán)",
+      hideOnMobile: false,
       render: (value, changeValue) => (
         <Combobox
           label="Mã thành phẩm (danh mục kế toán)"
@@ -303,7 +303,7 @@ export function taoTruongDanhMuc(
           emptyText="Không có mã nào khớp."
         />
       ),
-      hienThi: (r) =>
+      renderValue: (r) =>
         r.finishedGoodCode ? (
           <span className="tnum">{r.finishedGoodCode}</span>
         ) : (
@@ -312,17 +312,17 @@ export function taoTruongDanhMuc(
     },
   ];
 
-  const customerFields: TruongDanhMuc<Customer>[] = [
-    { key: "name", nhan: "Tên khách hàng", batBuoc: true, viDu: "VD: Lucky" },
+  const customerFields: CatalogField<Customer>[] = [
+    { key: "name", label: "Tên khách hàng", required: true, example: "VD: Lucky" },
     {
       key: "code",
-      nhan: "Mã số",
-      goiY: "Nhập số để gọi nhanh (VD: 1 = Hanwha). Gõ số này ở màn Bán hàng là ra tên.",
-      viDu: "VD: 1",
+      label: "Mã số",
+      hint: "Nhập số để gọi nhanh (VD: 1 = Hanwha). Gõ số này ở màn Bán hàng là ra tên.",
+      example: "VD: 1",
     },
     {
       key: "market",
-      nhan: "Thị trường",
+      label: "Thị trường",
       render: (value, changeValue) => (
         <Combobox
           label="Thị trường"
@@ -337,61 +337,61 @@ export function taoTruongDanhMuc(
     },
   ];
 
-  const supplierFields: TruongDanhMuc<Supplier>[] = [
-    { key: "shortName", nhan: "Tên đại lý (gọi tắt)", batBuoc: true, viDu: "VD: Hồng Phú" },
+  const supplierFields: CatalogField<Supplier>[] = [
+    { key: "shortName", label: "Tên đại lý (gọi tắt)", required: true, example: "VD: Hồng Phú" },
     {
       key: "billingName",
-      nhan: "Tên ghi phiếu (đầy đủ)",
-      viDu: "VD: Công ty TNHH TM Hồng Phú",
+      label: "Tên ghi phiếu (đầy đủ)",
+      example: "VD: Công ty TNHH TM Hồng Phú",
     },
     {
       key: "address",
-      anTrenBang: true,
-      nhan: "Địa chỉ",
-      anTrenDienThoai: true,
-      viDu: "Số nhà, đường, phường, tỉnh",
+      hideInTable: true,
+      label: "Địa chỉ",
+      hideOnMobile: true,
+      example: "Số nhà, đường, phường, tỉnh",
     },
     {
       key: "nationalId",
-      nhan: "CMND / CCCD / MST",
-      anTrenDienThoai: true,
-      viDu: "VD: 3500424848",
+      label: "CMND / CCCD / MST",
+      hideOnMobile: true,
+      example: "VD: 3500424848",
     },
-    { key: "issuedDate", anTrenBang: true, nhan: "Ngày cấp", anTrenDienThoai: true, viDu: "VD: 12/05/2015" },
+    { key: "issuedDate", hideInTable: true, label: "Ngày cấp", hideOnMobile: true, example: "VD: 12/05/2015" },
     {
       key: "issuedPlace",
-      anTrenBang: true,
-      nhan: "Nơi cấp",
-      anTrenDienThoai: true,
-      viDu: "VD: CA Bà Rịa - Vũng Tàu",
+      hideInTable: true,
+      label: "Nơi cấp",
+      hideOnMobile: true,
+      example: "VD: CA Bà Rịa - Vũng Tàu",
     },
     {
       key: "code",
-      anTrenBang: true,
-      nhan: "Mã số",
-      anTrenDienThoai: true,
-      goiY: "Nhập số để gọi nhanh. Gõ số này ở màn Nhập hàng là ra tên.",
-      viDu: "VD: 1",
+      hideInTable: true,
+      label: "Mã số",
+      hideOnMobile: true,
+      hint: "Nhập số để gọi nhanh. Gõ số này ở màn Nhập hàng là ra tên.",
+      example: "VD: 1",
     },
     {
       key: "phone",
-      nhan: "Điện thoại",
-      anTrenDienThoai: true,
-      viDu: "VD: 0913 xxx xxx",
+      label: "Điện thoại",
+      hideOnMobile: true,
+      example: "VD: 0913 xxx xxx",
     },
-    { key: "note", anTrenBang: true, nhan: "Ghi chú", anTrenDienThoai: true, viDu: "Ghi chú thêm" },
+    { key: "note", hideInTable: true, label: "Ghi chú", hideOnMobile: true, example: "Ghi chú thêm" },
   ];
 
-  const materialTypeFields: TruongDanhMuc<MaterialType>[] = [
+  const materialTypeFields: CatalogField<MaterialType>[] = [
     {
       key: "name",
-      nhan: "Tên loại nguyên liệu",
-      batBuoc: true,
-      viDu: "VD: 2 da nguyên liệu",
+      label: "Tên loại nguyên liệu",
+      required: true,
+      example: "VD: 2 da nguyên liệu",
     },
     {
       key: "category",
-      nhan: "Loài",
+      label: "Loài",
       render: (value, changeValue) => (
         <Combobox
           label="Loài"
@@ -403,55 +403,55 @@ export function taoTruongDanhMuc(
         />
       ),
     },
-    { key: "note", nhan: "Ghi chú", anTrenDienThoai: true, viDu: "Ghi chú thêm" },
+    { key: "note", label: "Ghi chú", hideOnMobile: true, example: "Ghi chú thêm" },
   ];
 
-  const storageLocationFields: TruongDanhMuc<StorageLocation>[] = [
-    { key: "code", nhan: "Mã số", viDu: "VD: KHP" },
+  const storageLocationFields: CatalogField<StorageLocation>[] = [
+    { key: "code", label: "Mã số", example: "VD: KHP" },
     {
       key: "name",
-      nhan: "Tên kho",
-      batBuoc: true,
-      viDu: "VD: Kho Hồng Phú",
-      goiY: "Tên này là chỗ nối dữ liệu — đổi tên ở đây KHÔNG tự đổi các dòng đã gán.",
+      label: "Tên kho",
+      required: true,
+      example: "VD: Kho Hồng Phú",
+      hint: "Tên này là chỗ nối dữ liệu — đổi tên ở đây KHÔNG tự đổi các dòng đã gán.",
     },
     {
       key: "kind",
-      nhan: "Loại kho",
+      label: "Loại kho",
       render: (value, changeValue) => (
         <Combobox
           label="Loại kho"
           hint="Kho nhà = kho của xí nghiệp; kho thuê ngoài = kho lạnh gửi hàng."
           value={value || "noi-bo"}
           onChange={changeValue}
-          choPhepXoa={false}
+          clearable={false}
           options={(Object.keys(STORAGE_KIND_LABELS) as (keyof typeof STORAGE_KIND_LABELS)[]).map(
             (k) => ({ value: k, label: STORAGE_KIND_LABELS[k] })
           )}
         />
       ),
-      hienThi: (r) => STORAGE_KIND_LABELS[r.kind] ?? r.kind,
+      renderValue: (r) => STORAGE_KIND_LABELS[r.kind] ?? r.kind,
     },
-    { key: "address", nhan: "Địa chỉ", anTrenDienThoai: true, viDu: "VD: Hồng Phú, Bà Rịa" },
-    { key: "phone", anTrenBang: true, nhan: "Điện thoại", anTrenDienThoai: true, viDu: "VD: 0254 123 456" },
-    { key: "note", anTrenBang: true, nhan: "Ghi chú", anTrenDienThoai: true, viDu: "Ghi chú thêm" },
+    { key: "address", label: "Địa chỉ", hideOnMobile: true, example: "VD: Hồng Phú, Bà Rịa" },
+    { key: "phone", hideInTable: true, label: "Điện thoại", hideOnMobile: true, example: "VD: 0254 123 456" },
+    { key: "note", hideInTable: true, label: "Ghi chú", hideOnMobile: true, example: "Ghi chú thêm" },
   ];
 
-  const batterFields: TruongDanhMuc<BatterType>[] = [
+  const batterFields: CatalogField<BatterType>[] = [
     {
       key: "name",
-      nhan: "Tên loại bột",
-      batBuoc: true,
-      viDu: "VD: Bột 24V",
-      goiY: "Tên này là chỗ nối với sổ sản lượng — đổi tên ở đây KHÔNG tự đổi các dòng đã ghi.",
+      label: "Tên loại bột",
+      required: true,
+      example: "VD: Bột 24V",
+      hint: "Tên này là chỗ nối với sổ sản lượng — đổi tên ở đây KHÔNG tự đổi các dòng đã ghi.",
     },
     {
       key: "code",
-      nhan: "Mã số",
-      goiY: "Mã in trên bao bột để gọi nhanh. Gõ mã này khi chọn bột là ra tên.",
-      viDu: "VD: 24V",
+      label: "Mã số",
+      hint: "Mã in trên bao bột để gọi nhanh. Gõ mã này khi chọn bột là ra tên.",
+      example: "VD: 24V",
     },
-    { key: "note", nhan: "Ghi chú", anTrenDienThoai: true, viDu: "VD: Bột tẩm nước tương" },
+    { key: "note", label: "Ghi chú", hideOnMobile: true, example: "VD: Bột tẩm nước tương" },
   ];
 
   return {
@@ -586,8 +586,8 @@ export function taoCauHinhDanhMuc(
         )
           ? [
               {
-                truong: "Tên kho",
-                thongBao: `Tên "${editing.name}" đã có kho khác dùng — tên là chỗ nối dữ liệu nên không được trùng.`,
+                field: "Tên kho",
+                message: `Tên "${editing.name}" đã có kho khác dùng — tên là chỗ nối dữ liệu nên không được trùng.`,
               },
             ]
           : []),
@@ -650,7 +650,7 @@ export function useCauHinhDanhMuc(): BoCauHinhDanhMuc {
       const kq = findOrCreateBatter(batterTypes, ten);
       if (kq.moi) {
         setBatterTypes(kq.rows);
-        notify.daLuu(`Đã thêm loại bột "${kq.bot.name}" vào danh mục`);
+        notify.saved(`Đã thêm loại bột "${kq.bot.name}" vào danh mục`);
       }
       return kq.bot.id;
     };
@@ -662,7 +662,7 @@ export function useCauHinhDanhMuc(): BoCauHinhDanhMuc {
       if (co) return co.id;
       const created: MaterialType = { id: uid(), name: sach, category: "", note: "" };
       setMaterialTypes([...materialTypes, created]);
-      notify.daLuu(`Đã thêm loại nguyên liệu "${sach}" vào danh mục`);
+      notify.saved(`Đã thêm loại nguyên liệu "${sach}" vào danh mục`);
       return created.id;
     };
     return taoTruongDanhMuc(materialTypes, finishedGoods, batterTypes, addBatter, addMaterialType);

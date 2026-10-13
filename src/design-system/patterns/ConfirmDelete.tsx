@@ -24,17 +24,17 @@ import { Trash2 } from "lucide-react";
  *  - Sau khi xóa, màn gọi phải bắn toast có nút Hoàn tác (xem notify.ts).
  */
 export function ConfirmDelete({
-  moTaBanGhi,
+  recordDescription,
   onConfirm,
-  tieuDe = "Xóa dòng này?",
-  nhanNut = "Xóa dòng",
+  title = "Xóa dòng này?",
+  confirmLabel = "Xóa dòng",
   trigger,
 }: {
   /** Mô tả bản ghi sắp xóa — hiện nguyên văn trong hộp thoại */
-  moTaBanGhi: string;
+  recordDescription: string;
   onConfirm: () => void;
-  tieuDe?: string;
-  nhanNut?: string;
+  title?: string;
+  confirmLabel?: string;
   trigger?: React.ReactNode;
 }) {
   return (
@@ -53,11 +53,11 @@ export function ConfirmDelete({
       </AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle className="text-xl">{tieuDe}</AlertDialogTitle>
+          <AlertDialogTitle className="text-xl">{title}</AlertDialogTitle>
           <AlertDialogDescription className="text-base text-foreground">
             Sắp xóa:
             <span className="mt-2 block rounded-lg bg-muted px-4 py-3 text-base font-semibold text-foreground">
-              {moTaBanGhi}
+              {recordDescription}
             </span>
             <span className="mt-3 block text-base text-muted-foreground">
               Xóa xong vẫn hoàn tác được trong vài giây.
@@ -68,7 +68,7 @@ export function ConfirmDelete({
           <AlertDialogCancel size="lg">Không xóa</AlertDialogCancel>
           <AlertDialogAction variant="destructive" size="lg" onClick={onConfirm}>
             <Trash2 />
-            {nhanNut}
+            {confirmLabel}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

@@ -1,14 +1,14 @@
 // ============================================================
-// Tên file: src/design-system/patterns/ONhapSo.tsx
+// Tên file: src/design-system/patterns/NumberInput.tsx
 // Tên tiếng Việt: Lõi ô nhập số dùng chung — gõ số hoặc biểu thức kiểu Excel
-// MỌI ô số trong app đi qua đây (NumberField, ô lưới LuoiNhap, ô số trần).
+// MỌI ô số trong app đi qua đây (NumberField, ô lưới EditableGrid, ô số trần).
 // ============================================================
 import * as React from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
-import { dinhDangSo } from "./bieuThucSo";
-import { useNhapSo } from "./useNhapSo";
-import { dieuHuongCotSo } from "./dieuHuongCotSo";
+import { formatNumber } from "./numberExpression";
+import { useNumberInput } from "./useNumberInput";
+import { navigateNumberColumn } from "./numberColumnNav";
 
 /**
  * Nhãn nổi "= 550" ngay dưới ô khi đang gõ biểu thức. Đưa ra `document.body`
@@ -16,16 +16,16 @@ import { dieuHuongCotSo } from "./dieuHuongCotSo";
  * (`overflow-x-auto`) hay hộp thoại (có `transform`) cắt/lệch, cũng không đẩy
  * dòng bảng nhảy cao thấp. Mốc toạ độ = phần tử cha của mốc ẩn (khung ô).
  */
-export function XemTruocBieuThuc({
-  xemTruoc,
-  donVi,
+export function ExpressionPreview({
+  preview,
+  unit,
 }: {
-  xemTruoc: { ketQua: number | null } | null;
-  donVi?: string;
+  preview: { ketQua: number | null } | null;
+  unit?: string;
 }) {
   const ref = React.useRef<HTMLSpanElement>(null);
   const [position, setPosition] = React.useState<{ top: number; right: number } | null>(null);
-  const isVisible = xemTruoc != null;
+  const isVisible = preview != null;
 
   React.useLayoutEffect(() => {
     if (!isVisible) return;
@@ -44,7 +44,7 @@ export function XemTruocBieuThuc({
     };
   }, [isVisible]);
 
-  const { ketQua } = xemTruoc ?? { ketQua: null };
+  const { ketQua } = preview ?? { ketQua: null };
   return (
     <>
       <span ref={ref} hidden />
@@ -64,7 +64,7 @@ export function XemTruocBieuThuc({
           >
             {ketQua == null
               ? "Đang gõ phép tính…"
-              : `= ${dinhDangSo(ketQua)}${donVi ? ` ${donVi}` : ""}`}
+              : `= ${formatNumber(ketQua)}${unit ? ` ${unit}` : ""}`}
           </span>,
           document.body
         )}
@@ -76,17 +76,17 @@ export function XemTruocBieuThuc({
  * Ô số TRẦN (không nhãn, không Field) — dùng khi cần ô số ở chỗ đã có nhãn riêng
  * (ô trong bảng tự dựng, thanh cấu hình). Có nhãn thì dùng `NumberField`.
  */
-export const ONhapSo = React.forwardRef<
+export const NumberInput = React.forwardRef<
   HTMLInputElement,
   {
     value: number | null;
     onChange: (v: number | null) => void;
-    donVi?: string;
-    rong0?: boolean;
+    unit?: string;
+    emptyIsZero?: boolean;
     className?: string;
-    khungClassName?: string;
+    wrapperClassName?: string;
     /**
-     * ↑ / ↓ / Enter nhảy dọc trong CỘT cùng tên (bảng số tự dựng bọc `[data-luoi-phim]`)
+     * ↑ / ↓ / Enter nhảy dọc trong CỘT cùng tên (bảng số tự dựng bọc `[data-grid-nav]`)
      * — như `NumberField navCol`. Bỏ trống ⇒ không đổi hành vi.
      */
     navCol?: string;
@@ -94,13 +94,13 @@ export const ONhapSo = React.forwardRef<
     React.InputHTMLAttributes<HTMLInputElement>,
     "value" | "onChange" | "type" | "defaultValue"
   >
->(function ONhapSo(
-  { value, onChange, donVi, rong0, className, khungClassName, navCol, onKeyDown, onFocus, onBlur, ...rest },
+>(function NumberInput(
+  { value, onChange, unit, emptyIsZero: rong0, className, wrapperClassName, navCol, onKeyDown, onFocus, onBlur, ...rest },
   ref
 ) {
-  const { props, xemTruoc } = useNhapSo({ value, onChange, rong0 });
+  const { props, xemTruoc: preview } = useNumberInput({ value, onChange, emptyIsZero: rong0 });
   return (
-    <span className={cn("relative block", khungClassName)}>
+    <span className={cn("relative block", wrapperClassName)}>
       <input
         ref={ref}
         type="text"
@@ -121,11 +121,11 @@ export const ONhapSo = React.forwardRef<
         onKeyDown={(e) => {
           props.onKeyDown(e);
           if (!e.defaultPrevented) onKeyDown?.(e);
-          if (navCol && !e.defaultPrevented) dieuHuongCotSo(e, navCol);
+          if (navCol && !e.defaultPrevented) navigateNumberColumn(e, navCol);
         }}
         className={cn("tnum text-right", className)}
       />
-      <XemTruocBieuThuc xemTruoc={xemTruoc} donVi={donVi} />
+      <ExpressionPreview preview={preview} unit={unit} />
     </span>
   );
 });

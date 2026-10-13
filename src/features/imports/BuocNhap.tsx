@@ -1,10 +1,10 @@
 // ============================================================
-// Tên file: src/features/imports/BuocNhap.tsx
+// Tên file: src/features/imports/FormStep.tsx
 // Tên tiếng Việt: Khối giao diện của luồng nhập nhanh — thẻ BƯỚC có số, thẻ CHỌN lớn, chuyến trong ngày
 // Description: Presentational blocks for the guided import flow (no data access).
 // ============================================================
 import type { ReactNode } from "react";
-import { Button, Nhan } from "@/design-system";
+import { Button, Tag } from "@/design-system";
 import { kg } from "@/lib/format";
 import { formatMaterialLotLabel } from "@/lib/lotTraceability";
 import { cn } from "@/lib/utils";
@@ -178,9 +178,9 @@ export function ChuyenTrongNgay({
               </span>
               {n.supplierName || "(chưa có đại lý)"}
               {n.ghiBu && (
-                <Nhan loai="luu-y" className="ml-2 align-middle">
+                <Tag variant="luu-y" className="ml-2 align-middle">
                   Ghi bù
-                </Nhan>
+                </Tag>
               )}
             </p>
             <span className="tnum shrink-0 font-semibold">{kg(n.tongKg)}</span>

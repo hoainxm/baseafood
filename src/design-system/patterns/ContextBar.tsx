@@ -1,11 +1,11 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
 
-export interface MucNguCanh {
-  nhan: string;
-  giaTri: React.ReactNode;
+export interface ContextBarItem {
+  label: string;
+  value: React.ReactNode;
   /** Số → tabular-nums */
-  so?: boolean;
+  numeric?: boolean;
 }
 
 /**
@@ -19,7 +19,7 @@ export function ContextBar({
   actions,
   className,
 }: {
-  items: MucNguCanh[];
+  items: ContextBarItem[];
   actions?: React.ReactNode;
   className?: string;
 }) {
@@ -34,15 +34,15 @@ export function ContextBar({
     >
       <dl className="flex flex-wrap items-center gap-x-6 gap-y-2">
         {items.map((m) => (
-          <div key={m.nhan} className="flex items-baseline gap-2">
-            <dt className="text-sm text-muted-foreground">{m.nhan}</dt>
+          <div key={m.label} className="flex items-baseline gap-2">
+            <dt className="text-sm text-muted-foreground">{m.label}</dt>
             <dd
               className={cn(
                 "text-lg font-semibold text-foreground",
-                m.so && "tnum"
+                m.numeric && "tnum"
               )}
             >
-              {m.giaTri}
+              {m.value}
             </dd>
           </div>
         ))}

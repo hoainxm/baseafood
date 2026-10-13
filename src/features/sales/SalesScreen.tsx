@@ -30,7 +30,7 @@ import {
   getAvailableFinishedGoodKg,
 } from "@/lib/inventory";
 import {
-  ChuThichBatBuoc,
+  RequiredLegend,
   Button,
   ChoiceGroup,
   Combobox,
@@ -44,19 +44,19 @@ import {
   DialogHeader,
   DialogTitle,
   EmptyState,
-  SkeletonBang,
+  TableSkeleton,
   ErrorSummary,
   Field,
   Input,
-  Nhan,
+  Tag,
   NumberField,
   RecordTable,
-  sacKenh,
-  ThongKe,
+  channelTone,
+  StatCardGrid,
   notify,
-  type Cot,
-  type LoiNhap,
-  type MucChon,
+  type RecordTableColumn,
+  type FieldError,
+  type ComboboxOption,
 } from "@/design-system";
 import { useSuaDanhMuc } from "@/features/catalog/SuaDanhMucNhanh";
 import { GanLoXuat } from "@/features/shared";
@@ -146,17 +146,17 @@ function groupByInvoice(rows: SalesItem[], salesInvoices: SalesInvoice[]): Invoi
 }
 
 /** Kiểm đầu phiếu — dùng chung lúc ghi mới và lúc sửa. */
-function invoiceHeaderErrors(d: InvoiceHeader): LoiNhap[] {
-  const ls: LoiNhap[] = [];
+function invoiceHeaderErrors(d: InvoiceHeader): FieldError[] {
+  const ls: FieldError[] = [];
   if (d.postingDate < d.deliveryDate)
     ls.push({
-      truong: "Ngày ghi sổ",
-      thongBao: "Ngày ghi sổ không thể trước ngày xuất bán",
+      field: "Ngày ghi sổ",
+      message: "Ngày ghi sổ không thể trước ngày xuất bán",
     });
   if (isBackdatedSales(d) && !d.backdateReason.trim())
     ls.push({
-      truong: "Lý do ghi bù",
-      thongBao: "Ghi sau ngày xuất bán — phải ghi rõ lý do",
+      field: "Lý do ghi bù",
+      message: "Ghi sau ngày xuất bán — phải ghi rõ lý do",
     });
   return ls;
 }
@@ -227,11 +227,11 @@ export default function BanHangScreen() {
   /** Kênh bán dùng gần nhất trong phiên — làm mặc định cho phiếu mới thay vì
    *  luôn về "Xuất khẩu" (người bán Nội địa khỏi lật kênh mỗi phiếu). */
   const [lastChannel, setLastChannel] = useState<SalesChannel>("Xuất khẩu");
-  const [loiPhien, setLoiPhien] = useState<LoiNhap[]>([]);
+  const [loiPhien, setLoiPhien] = useState<FieldError[]>([]);
 
   /* Sửa MỘT dòng mặt hàng — chỉ mặt hàng / quy cách / kg / giá. */
   const [editing, setEditing] = useState<SalesItem | null>(null);
-  const [loi, setLoi] = useState<LoiNhap[]>([]);
+  const [loi, setLoi] = useState<FieldError[]>([]);
 
   const [tuHieuLuc, denHieuLuc] = getViewPeriodRange(ky, date, fromDate, toDate);
   const isSingleDay = tuHieuLuc === denHieuLuc;
@@ -272,15 +272,15 @@ export default function BanHangScreen() {
 
   /* ---- Danh mục: chọn sẵn, thiếu thì tạo ngay tại chỗ ---- */
 
-  const productOptions: MucChon[] = products.map((m) => ({
+  const productOptions: ComboboxOption[] = products.map((m) => ({
     value: m.id,
     label: m.code ? `${m.code} · ${m.name}` : m.name,
-    phu: m.code || undefined,
+    subLabel: m.code || undefined,
   }));
-  const customerOptions: MucChon[] = customers.map((k) => ({
+  const customerOptions: ComboboxOption[] = customers.map((k) => ({
     value: k.id,
     label: k.code ? `${k.code} · ${k.name}` : k.name,
-    phu: [k.code, k.market].map((s) => s?.trim()).filter(Boolean).join(" – ") || undefined,
+    subLabel: [k.code, k.market].map((s) => s?.trim()).filter(Boolean).join(" – ") || undefined,
   }));
 
   /** Sửa nhanh khách hàng / mặt hàng tại chỗ (cả hai nối theo id ở phiếu bán). */
@@ -294,7 +294,7 @@ export default function BanHangScreen() {
     if (co) return co.id;
     const m: Product = { id: uid(), code: "", name: ten, finishedGoodCode: "" };
     setProducts([...products, m]);
-    notify.daLuu(`Đã thêm mặt hàng "${ten}" vào danh mục`);
+    notify.saved(`Đã thêm mặt hàng "${ten}" vào danh mục`);
     return m.id;
   };
   const addCustomer = (ten: string) => {
@@ -302,7 +302,7 @@ export default function BanHangScreen() {
     if (co) return co.id;
     const k: Customer = { id: uid(), code: "", name: ten, market: "" };
     setCustomers([...customers, k]);
-    notify.daLuu(`Đã thêm khách hàng "${ten}" vào danh mục`);
+    notify.saved(`Đã thêm khách hàng "${ten}" vào danh mục`);
     return k.id;
   };
 
@@ -358,11 +358,11 @@ export default function BanHangScreen() {
   /** Thêm một dòng mặt hàng — LƯU NGAY thành một dòng ban_hang. */
   const addRow = () => {
     if (!phien) return;
-    const ls: LoiNhap[] = [...invoiceHeaderErrors(phien)];
+    const ls: FieldError[] = [...invoiceHeaderErrors(phien)];
     if (!newRows.productId)
-      ls.push({ truong: "Mặt hàng", thongBao: "Chưa chọn mặt hàng" });
+      ls.push({ field: "Mặt hàng", message: "Chưa chọn mặt hàng" });
     if (!(newRows.quantityKg > 0))
-      ls.push({ truong: "Lượng", thongBao: "Phải lớn hơn 0 kg" });
+      ls.push({ field: "Lượng", message: "Phải lớn hơn 0 kg" });
     setLoiPhien(ls);
     if (ls.length > 0) return;
 
@@ -402,7 +402,7 @@ export default function BanHangScreen() {
       dong,
     ]);
     if (editRowIds) setEditRowIds([...editRowIds, dong.id]);
-    notify.daLuu(`Đã vào sổ: ${productName(dong.productId)} — ${kg(dong.quantityKg)}`);
+    notify.saved(`Đã vào sổ: ${productName(dong.productId)} — ${kg(dong.quantityKg)}`);
 
     // Nhớ kênh vừa bán để phiếu sau khỏi lật lại.
     setLastChannel(phien.channel);
@@ -416,7 +416,7 @@ export default function BanHangScreen() {
     const prevIds = editRowIds;
     persist(rows.filter((x) => x.id !== r.id));
     if (editRowIds) setEditRowIds(editRowIds.filter((id) => id !== r.id));
-    notify.daXoa(`Đã bỏ ${productName(r.productId)} — ${kg(r.quantityKg)}`, () => {
+    notify.deleted(`Đã bỏ ${productName(r.productId)} — ${kg(r.quantityKg)}`, () => {
       persist(prevRows);
       if (prevIds) setEditRowIds(prevIds);
     });
@@ -466,7 +466,7 @@ export default function BanHangScreen() {
     const ids = new Set(editRowIds);
     persist(rows.filter((r) => !ids.has(r.id)));
     if (sessionInvoiceId) persistSalesInvoices(salesInvoices.filter((x) => x.id !== sessionInvoiceId));
-    notify.daXoa(
+    notify.deleted(
       `Đã xóa phiếu ${customerName(phien?.customerId ?? "") || "(chưa có khách)"} — ${editRowIds.length} dòng`,
       () => {
         persist(prevRows);
@@ -482,15 +482,15 @@ export default function BanHangScreen() {
 
   const save = () => {
     if (!editing) return;
-    const ls: LoiNhap[] = [];
+    const ls: FieldError[] = [];
     if (!editing.productId)
-      ls.push({ truong: "Mặt hàng", thongBao: "Chưa chọn mặt hàng" });
+      ls.push({ field: "Mặt hàng", message: "Chưa chọn mặt hàng" });
     if (!(editing.quantityKg > 0))
-      ls.push({ truong: "Lượng", thongBao: "Phải lớn hơn 0 kg" });
+      ls.push({ field: "Lượng", message: "Phải lớn hơn 0 kg" });
     setLoi(ls);
     if (ls.length > 0) return;
     persist(rows.map((r) => (r.id === editing.id ? editing : r)));
-    notify.daLuu("Đã lưu thay đổi");
+    notify.saved("Đã lưu thay đổi");
     setEditing(null);
   };
 
@@ -501,46 +501,46 @@ export default function BanHangScreen() {
   const priceUnit = phien?.channel === "Nội địa" ? "đ" : "USD";
   const priceUnitFor = (kenh: SalesChannel) => (kenh === "Nội địa" ? "đ" : "USD");
 
-  const itemColumns = (kenh: SalesChannel): Cot<SalesItem>[] => [
+  const itemColumns = (kenh: SalesChannel): RecordTableColumn<SalesItem>[] => [
     {
       key: "mh",
       header: "Mặt hàng",
-      chinh: true,
+      primary: true,
       render: (r) => productName(r.productId),
-      sapXep: (r) => productName(r.productId),
+      getSortValue: (r) => productName(r.productId),
     },
     {
       key: "qc",
       header: "Quy cách",
       render: (r) =>
         r.spec || <span className="text-muted-foreground">—</span>,
-      sapXep: (r) => r.spec,
+      getSortValue: (r) => r.spec,
     },
     {
       key: "sl",
       header: "Lượng (kg)",
-      so: true,
+      numeric: true,
       render: (r) => num(r.quantityKg),
-      sapXep: (r) => r.quantityKg,
+      getSortValue: (r) => r.quantityKg,
     },
     {
       key: "gia",
       header: `Đơn giá (${priceUnitFor(kenh)})`,
-      so: true,
+      numeric: true,
       render: (r) =>
         r.unitPrice != null ? (
           num(r.unitPrice)
         ) : (
-          <Nhan loai="loi">Chưa có giá</Nhan>
+          <Tag variant="loi">Chưa có giá</Tag>
         ),
-      sapXep: (r) => r.unitPrice ?? 0,
+      getSortValue: (r) => r.unitPrice ?? 0,
     },
     {
       key: "tien",
       header: `Thành tiền (${priceUnitFor(kenh)})`,
-      so: true,
+      numeric: true,
       render: (r) => num(calculateSalesAmount(r)),
-      sapXep: (r) => calculateSalesAmount(r),
+      getSortValue: (r) => calculateSalesAmount(r),
     },
   ];
 
@@ -559,14 +559,14 @@ export default function BanHangScreen() {
         </div>
       </div>
 
-      <ThongKe
+      <StatCardGrid
         className="grid-cols-2 sm:grid-cols-3 lg:grid-cols-5"
-        the={[
-          { nhan: "Đang xem", giaTri: rangeDescription, icon: CalendarRange, mau: "trung-tinh" },
-          { nhan: "Phân xưởng", giaTri: workshop, icon: Warehouse, mau: "trung-tinh" },
-          { nhan: "Số phiếu", giaTri: nhomView.length, so: true, icon: Truck, mau: "brand" },
-          { nhan: "Số dòng", giaTri: view.length, so: true, icon: FileText, mau: "brand" },
-          { nhan: "Tổng bán", giaTri: kg(total), so: true, icon: Scale, mau: "success" },
+        cards={[
+          { label: "Đang xem", value: rangeDescription, icon: CalendarRange, color: "trung-tinh" },
+          { label: "Phân xưởng", value: workshop, icon: Warehouse, color: "trung-tinh" },
+          { label: "Số phiếu", value: nhomView.length, numeric: true, icon: Truck, color: "brand" },
+          { label: "Số dòng", value: view.length, numeric: true, icon: FileText, color: "brand" },
+          { label: "Tổng bán", value: kg(total), numeric: true, icon: Scale, color: "success" },
         ]}
       />
 
@@ -575,8 +575,8 @@ export default function BanHangScreen() {
         <div className="flex flex-wrap items-end gap-4">
           <Combobox
             label="Kỳ xem sổ"
-            anNhanBatBuoc
-            choPhepXoa={false}
+            hideRequiredMark
+            clearable={false}
             value={ky}
             onChange={(v) => setKy(v as ViewPeriod)}
             options={KY_OPT}
@@ -587,7 +587,7 @@ export default function BanHangScreen() {
             {ky === "tuy-chon" ? (
               <DateRangeField
                 label="Khoảng ngày xuất bán"
-                anNhanBatBuoc
+                hideRequiredMark
                 presets={false}
                 startDate={fromDate}
                 endDate={toDate}
@@ -607,7 +607,7 @@ export default function BanHangScreen() {
                         ? "Ngày bất kỳ trong tháng"
                         : "Ngày bất kỳ trong năm"
                 }
-                anNhanBatBuoc
+                hideRequiredMark
                 hint={
                   ky === "ngay"
                     ? undefined
@@ -621,8 +621,8 @@ export default function BanHangScreen() {
 
           <Combobox
             label="Phân xưởng"
-            anNhanBatBuoc
-            choPhepXoa={false}
+            hideRequiredMark
+            clearable={false}
             value={workshop}
             onChange={(v) => setWorkshop(v as Workshop | "Tất cả")}
             options={[
@@ -636,12 +636,12 @@ export default function BanHangScreen() {
 
       {/* Sổ: mỗi phiếu một cụm */}
       {isLoading ? (
-        <SkeletonBang />
+        <TableSkeleton />
       ) : nhomView.length === 0 ? (
         <EmptyState
           icon={ShoppingCart}
-          tieuDe={`Chưa có phiếu bán nào trong ${rangeDescription}`}
-          moTa={
+          title={`Chưa có phiếu bán nào trong ${rangeDescription}`}
+          description={
             workshop === "Tất cả"
               ? "Bấm nút dưới để ghi phiếu bán đầu tiên."
               : `Phân xưởng ${workshop}. Bấm nút dưới để ghi phiếu bán đầu tiên.`
@@ -676,13 +676,13 @@ export default function BanHangScreen() {
                       </span>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
-                      <Nhan loai="phan-loai" sac={sacKenh(n.phieu.channel)}>
+                      <Tag variant="phan-loai" tone={channelTone(n.phieu.channel)}>
                         {n.phieu.channel}
-                      </Nhan>
+                      </Tag>
                       {n.ghiBu && (
-                        <Nhan loai="luu-y">
+                        <Tag variant="luu-y">
                           Ghi bù {formatDateVN(n.phieu.postingDate)}
-                        </Nhan>
+                        </Tag>
                       )}
                     </div>
                     {n.ghiBu && n.phieu.backdateReason && (
@@ -716,7 +716,7 @@ export default function BanHangScreen() {
                   columns={itemColumns(n.phieu.channel)}
                   rows={n.dong}
                   getKey={(r) => r.id}
-                  toMau="ban-hang"
+                  rowMarkKey="ban-hang"
                   actions={(r) => lotInputButton(r)}
                 />
               </section>
@@ -763,8 +763,8 @@ export default function BanHangScreen() {
 
           {phien && (
             <div className="space-y-6 py-2">
-              <ErrorSummary loi={loiPhien} />
-              <ChuThichBatBuoc />
+              <ErrorSummary errors={loiPhien} />
+              <RequiredLegend />
 
               <div className="grid gap-6 sm:grid-cols-2">
                 <DateField
@@ -801,7 +801,7 @@ export default function BanHangScreen() {
                 <Combobox
                   label="Phân xưởng"
                   required
-                  choPhepXoa={false}
+                  clearable={false}
                   value={phien.workshop}
                   onChange={(v) => setSessionField("workshop", v as Workshop)}
                   options={WORKSHOPS.map((p) => ({ value: p, label: p }))}
@@ -811,7 +811,7 @@ export default function BanHangScreen() {
                   value={phien.channel}
                   onChange={(v) => setSessionField("channel", v as SalesChannel)}
                   options={SALES_CHANNELS.map((k) => ({ value: k, label: k }))}
-                  cot={2}
+                  columns={2}
                 />
               </div>
 
@@ -823,8 +823,8 @@ export default function BanHangScreen() {
                 options={customerOptions}
                 onCreate={addCustomer}
                 emptyText="Chưa có khách hàng nào trong danh mục."
-                onSuaMuc={customerEditor.moSua}
-                nhanSua={customerEditor.nhanSua}
+                onEditItem={customerEditor.moSua}
+                editLabel={customerEditor.nhanSua}
               />
 
               <Field label="Ghi chú phiếu">
@@ -911,8 +911,8 @@ export default function BanHangScreen() {
                   options={productOptions}
                   onCreate={addProduct}
                   emptyText="Chưa có mặt hàng nào trong danh mục."
-                  onSuaMuc={productEditor.moSua}
-                  nhanSua={productEditor.nhanSua}
+                  onEditItem={productEditor.moSua}
+                  editLabel={productEditor.nhanSua}
                 />
 
                 <ChoiceGroup
@@ -923,7 +923,7 @@ export default function BanHangScreen() {
                     { value: RETAIL_WAREHOUSE, label: "Block thô (kho dự trữ)" },
                     { value: FG_WAREHOUSE, label: "Đóng gói (kho thành phẩm)" },
                   ]}
-                  cot={2}
+                  columns={2}
                 />
 
                 <Field
@@ -1001,10 +1001,10 @@ export default function BanHangScreen() {
           <DialogFooter>
             {isEditingInvoice ? (
               <ConfirmDelete
-                moTaBanGhi={`Phiếu ${customerName(phien?.customerId ?? "") || "(chưa có khách)"} — ${formatDateVN(phien?.deliveryDate ?? "")} — ${dongPhien.length} dòng — ${kg(sessionTotal)}`}
+                recordDescription={`Phiếu ${customerName(phien?.customerId ?? "") || "(chưa có khách)"} — ${formatDateVN(phien?.deliveryDate ?? "")} — ${dongPhien.length} dòng — ${kg(sessionTotal)}`}
                 onConfirm={deleteEditingInvoice}
-                tieuDe="Xóa cả phiếu này?"
-                nhanNut="Xóa phiếu"
+                title="Xóa cả phiếu này?"
+                confirmLabel="Xóa phiếu"
               />
             ) : (
               <Button
@@ -1043,8 +1043,8 @@ export default function BanHangScreen() {
 
           {editing && (
             <div className="space-y-6 py-2">
-              <ErrorSummary loi={loi} />
-              <ChuThichBatBuoc />
+              <ErrorSummary errors={loi} />
+              <RequiredLegend />
 
               <Combobox
                 label="Mặt hàng"
@@ -1055,8 +1055,8 @@ export default function BanHangScreen() {
                 options={productOptions}
                 onCreate={addProduct}
                 emptyText="Chưa có mặt hàng nào trong danh mục."
-                onSuaMuc={productEditor.moSua}
-                nhanSua={productEditor.nhanSua}
+                onEditItem={productEditor.moSua}
+                editLabel={productEditor.nhanSua}
               />
 
               <Field

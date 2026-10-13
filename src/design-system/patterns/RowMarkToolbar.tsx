@@ -1,5 +1,5 @@
 // ============================================================
-// Tên file: src/design-system/patterns/ToMauDong.tsx
+// Tên file: src/design-system/patterns/RowMarkToolbar.tsx
 // Tên tiếng Việt: Tô màu dòng "đã dò" kiểu Excel — thanh thao tác dòng đang tick
 // Description: Row highlight UI: palette + bold + clear for ticked rows
 // ============================================================
@@ -8,49 +8,49 @@ import { Bold, Check, ChevronDown, Eraser, PaintBucket, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import { LUOI_MAU, tenMau, type MauTo, type ToMauBang } from "./toMauNguon";
+import { MARK_COLOR_GRID, getMarkColorName, type MarkColor, type RowMarkTools } from "./rowMarkSource";
 
 /**
  * MỘT cách dùng, giống Excel: tick các dòng → thanh "Đã chọn N dòng" hiện ra →
  * Tô màu ▾ / In đậm / Bỏ tô áp cho mọi dòng đang tick. Bảng dùng chung
- * (`BangTong`, `RecordTable`, `LuoiNhap`) tự có ô tick + thanh khi bật `toMau`.
+ * (`SummaryTable`, `RecordTable`, `EditableGrid`) tự có ô tick + thanh khi bật `rowMarkKey`.
  */
 
 /** Ô màu nhỏ kiểu Excel — không chữ; tên màu nằm ở aria-label + title. */
-function ColorSwatch({ ma, chon, onChon }: { ma: MauTo; chon: boolean; onChon: () => void }) {
-  const ten = tenMau(ma);
+function ColorSwatch({ code: ma, selected, onSelect }: { code: MarkColor; selected: boolean; onSelect: () => void }) {
+  const ten = getMarkColorName(ma);
   return (
     <button
       type="button"
-      aria-pressed={chon}
+      aria-pressed={selected}
       aria-label={`Tô ${ten}`}
       title={`Tô ${ten}`}
-      onClick={onChon}
+      onClick={onSelect}
       style={{ backgroundColor: `var(--to-${ma})` }}
       className={cn(
         "flex size-6 items-center justify-center rounded-sm ring-1 ring-foreground/15 hover:z-10 hover:scale-110 hover:ring-2 hover:ring-foreground/60",
-        chon && "ring-2 ring-foreground"
+        selected && "ring-2 ring-foreground"
       )}
     >
-      {chon && <Check className="size-3.5 text-foreground" aria-hidden />}
+      {selected && <Check className="size-3.5 text-foreground" aria-hidden />}
     </button>
   );
 }
 
 /**
  * Cụm nút áp cho các dòng đang tick: **Tô màu ▾** (bảng màu 10 sắc × 5 mức) ·
- * **In đậm** (bấm lại = bỏ in đậm) · **Bỏ tô**. Dùng trong `ThanhToMau`, hoặc màn
+ * **In đậm** (bấm lại = bỏ in đậm) · **Bỏ tô**. Dùng trong `RowMarkToolbar`, hoặc màn
  * tự đặt vào thanh "Đã chọn" riêng của nó (VD Sổ kho tháng).
  */
-export function NutToMauChon({ to, khoa }: { to: ToMauBang; khoa: string[] }) {
+export function RowMarkActions({ marker: to, selectedKeys }: { marker: RowMarkTools; selectedKeys: string[] }) {
   const [mo, setMo] = React.useState(false);
-  if (!to.bat || khoa.length === 0) return null;
-  const ds = khoa.map((k) => to.lay(k));
-  const mau0 = ds[0]?.mau ?? "";
-  const commonColor = mau0 && ds.every((d) => (d?.mau ?? "") === mau0) ? mau0 : "";
-  const isAllBold = ds.every((d) => d?.dam);
-  const hasMarks = ds.some(Boolean);
-  const n = khoa.length;
+  if (!to.enabled || selectedKeys.length === 0) return null;
+  const items = selectedKeys.map((k) => to.getMark(k));
+  const mau0 = items[0]?.color ?? "";
+  const commonColor = mau0 && items.every((d) => (d?.color ?? "") === mau0) ? mau0 : "";
+  const isAllBold = items.every((d) => d?.bold);
+  const hasMarks = items.some(Boolean);
+  const n = selectedKeys.length;
   return (
     <>
       <Popover open={mo} onOpenChange={setMo}>
@@ -75,13 +75,13 @@ export function NutToMauChon({ to, khoa }: { to: ToMauBang; khoa: string[] }) {
         </PopoverTrigger>
         <PopoverContent align="start" className="w-auto max-w-[calc(100vw-1rem)] p-3">
           <div className="grid w-max grid-cols-10 gap-1" role="group" aria-label="Bảng màu">
-            {LUOI_MAU.flat().map((ma) => (
+            {MARK_COLOR_GRID.flat().map((ma) => (
               <ColorSwatch
                 key={ma}
-                ma={ma}
-                chon={commonColor === ma}
-                onChon={() => {
-                  to.sua(khoa, { mau: ma });
+                code={ma}
+                selected={commonColor === ma}
+                onSelect={() => {
+                  to.patch(selectedKeys, { color: ma });
                   setMo(false);
                 }}
               />
@@ -99,7 +99,7 @@ export function NutToMauChon({ to, khoa }: { to: ToMauBang; khoa: string[] }) {
             ? `Bỏ in đậm ${n} dòng đang tick (giữ nguyên màu).`
             : `In đậm ${n} dòng đang tick (giữ nguyên màu).`
         }
-        onClick={() => to.sua(khoa, { dam: !isAllBold })}
+        onClick={() => to.patch(selectedKeys, { bold: !isAllBold })}
       >
         <Bold />
         {isAllBold ? "Bỏ in đậm" : "In đậm"}
@@ -110,7 +110,7 @@ export function NutToMauChon({ to, khoa }: { to: ToMauBang; khoa: string[] }) {
           size="sm"
           variant="ghost"
           title={`Bỏ màu và bỏ in đậm của ${n} dòng đang tick. Số liệu không đổi.`}
-          onClick={() => to.sua(khoa, null)}
+          onClick={() => to.patch(selectedKeys, null)}
         >
           <Eraser />
           Bỏ tô
@@ -124,18 +124,18 @@ export function NutToMauChon({ to, khoa }: { to: ToMauBang; khoa: string[] }) {
  * Thanh "Đã chọn N dòng" — bảng tự hiện khi có dòng tick. Dính đáy màn hình khi
  * bảng dài, để tick dòng tận dưới vẫn thấy nút.
  */
-export function ThanhToMau({
-  to,
-  khoa,
-  onBoChon,
+export function RowMarkToolbar({
+  marker: to,
+  selectedKeys,
+  onClearSelection,
   className,
 }: {
-  to: ToMauBang;
-  khoa: string[];
-  onBoChon: () => void;
+  marker: RowMarkTools;
+  selectedKeys: string[];
+  onClearSelection: () => void;
   className?: string;
 }) {
-  if (!to.bat || khoa.length === 0) return null;
+  if (!to.enabled || selectedKeys.length === 0) return null;
   return (
     <div
       className={cn(
@@ -143,15 +143,15 @@ export function ThanhToMau({
         className
       )}
     >
-      <span className="font-semibold text-foreground">Đã chọn {khoa.length} dòng</span>
-      <NutToMauChon to={to} khoa={khoa} />
+      <span className="font-semibold text-foreground">Đã chọn {selectedKeys.length} dòng</span>
+      <RowMarkActions marker={to} selectedKeys={selectedKeys} />
       <Button
         type="button"
         size="sm"
         variant="ghost"
         className="ml-auto"
         title="Bỏ tick mọi dòng đang chọn."
-        onClick={onBoChon}
+        onClick={onClearSelection}
       >
         <X />
         Bỏ chọn

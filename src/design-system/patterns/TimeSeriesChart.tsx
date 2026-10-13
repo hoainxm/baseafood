@@ -4,31 +4,31 @@
 // ============================================================
 import { useState } from "react";
 import { cn } from "@/lib/utils";
-import { useBeRongKhung } from "./useBeRongKhung";
-import type { SacPhanLoai } from "./Nhan";
+import { useContainerWidth } from "./useContainerWidth";
+import type { CategoryTone } from "./Tag";
 
 /**
- * BieuDoTheoNgay — nhiều chuỗi số trên CÙNG một trục (cùng đơn vị, VD kg): chuỗi
+ * TimeSeriesChart — nhiều chuỗi số trên CÙNG một trục (cùng đơn vị, VD kg): chuỗi
  * `cot` vẽ cột đứng xếp cạnh nhau theo ngày, chuỗi `duong` vẽ đường (có vùng mờ dưới
  * nếu `vung`). Rê chuột / chạm một ngày ⇒ vạch dọc + thẻ số của ngày đó.
  *
  * Bề rộng vẽ = khung đo thật (chữ trục không bị co); nhiều ngày quá thì khung cuộn
  * ngang. Nhãn ngày thưa tự động cho khỏi đè nhau. Chỉ vẽ số truyền vào.
  */
-/** Màu chuỗi: 4 màu nghĩa + bảng tone theo loại (`SacPhanLoai`) để khớp thẻ số cùng màn. */
-export type MauChuoi = "brand" | "success" | "warning" | "trung-tinh" | SacPhanLoai;
+/** Màu chuỗi: 4 màu nghĩa + bảng tone theo loại (`CategoryTone`) để khớp thẻ số cùng màn. */
+export type SeriesColor = "brand" | "success" | "warning" | "trung-tinh" | CategoryTone;
 
-export interface ChuoiSo {
-  khoa: string;
-  ten: string;
-  mau: MauChuoi;
-  dang: "duong" | "cot";
+export interface ChartSeries {
+  id: string;
+  name: string;
+  color: SeriesColor;
+  kind: "duong" | "cot";
   /** Tô vùng dưới đường (chỉ với `duong`). */
-  vung?: boolean;
-  giaTri: number[];
+  area?: boolean;
+  values: number[];
 }
 
-const NET: Record<MauChuoi, string> = {
+const NET: Record<SeriesColor, string> = {
   brand: "stroke-primary",
   success: "stroke-success",
   warning: "stroke-warning",
@@ -43,7 +43,7 @@ const NET: Record<MauChuoi, string> = {
   cam: "stroke-tone-cam",
   xam: "stroke-tone-xam",
 };
-const NEN: Record<MauChuoi, string> = {
+const TONE_FILL: Record<SeriesColor, string> = {
   brand: "fill-primary",
   success: "fill-success",
   warning: "fill-warning",
@@ -60,9 +60,9 @@ const NEN: Record<MauChuoi, string> = {
 };
 
 /** Mốc trục tròn: 1 · 2 · 2,5 · 5 × 10ⁿ. */
-function mocTron(max: number, soMoc = 4): number[] {
+function mocTron(max: number, tickCount = 4): number[] {
   if (max <= 0) return [0];
-  const tho = max / soMoc;
+  const tho = max / tickCount;
   const mu = 10 ** Math.floor(Math.log10(tho));
   const step = [1, 2, 2.5, 5, 10].map((b) => b * mu).find((b) => b >= tho) ?? tho;
   const ra: number[] = [];
@@ -72,39 +72,39 @@ function mocTron(max: number, soMoc = 4): number[] {
 }
 
 /** Nhãn trục gọn: kg ≥ 1.000 ghi theo tấn; đơn vị khác ghi nghìn / triệu. */
-const rutGon = (n: number, unit: string) => {
+const compact = (n: number, unit: string) => {
   const so = (x: number) => x.toLocaleString("vi-VN", { maximumFractionDigits: 1 });
   if (unit === "kg") return n >= 1e3 ? `${so(n / 1e3)} tấn` : `${so(n)} kg`;
   return n >= 1e6 ? `${so(n / 1e6)} tr` : n >= 1e3 ? `${so(n / 1e3)} nghìn` : so(n);
 };
 
-export function BieuDoTheoNgay({
-  nhan,
-  chuoi,
-  dinhDang = (n) => n.toLocaleString("vi-VN", { maximumFractionDigits: 0 }),
-  donVi = "kg",
-  cao = 280,
-  rongToiThieu = 560,
-  moTa,
+export function TimeSeriesChart({
+  labels,
+  series,
+  formatValue = (n) => n.toLocaleString("vi-VN", { maximumFractionDigits: 0 }),
+  unit = "kg",
+  height: cao = 280,
+  minWidth = 560,
+  description,
   className,
 }: {
   /** Nhãn trục ngang (VD "02/09"), cùng độ dài với mỗi `giaTri`. */
-  nhan: string[];
-  chuoi: ChuoiSo[];
-  dinhDang?: (n: number) => string;
-  donVi?: string;
-  cao?: number;
-  rongToiThieu?: number;
-  moTa?: string;
+  labels: string[];
+  series: ChartSeries[];
+  formatValue?: (n: number) => string;
+  unit?: string;
+  height?: number;
+  minWidth?: number;
+  description?: string;
   className?: string;
 }) {
-  const columnCount = chuoi.filter((c) => c.dang === "cot").length;
-  const n = nhan.length;
-  const { ref, rong } = useBeRongKhung<HTMLDivElement>(Math.max(rongToiThieu, n * Math.max(14, columnCount * 10 + 6) + 64));
+  const columnCount = series.filter((c) => c.kind === "cot").length;
+  const n = labels.length;
+  const { ref, rong: width } = useContainerWidth<HTMLDivElement>(Math.max(minWidth, n * Math.max(14, columnCount * 10 + 6) + 64));
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
 
-  const max = Math.max(0, ...chuoi.flatMap((c) => c.giaTri));
-  if (n === 0 || chuoi.length === 0 || max <= 0) {
+  const max = Math.max(0, ...series.flatMap((c) => c.values));
+  if (n === 0 || series.length === 0 || max <= 0) {
     return (
       <p className="rounded-lg border-2 border-dashed border-border p-6 text-center text-sm text-muted-foreground">
         Chưa có số liệu để vẽ biểu đồ.
@@ -118,7 +118,7 @@ export function BieuDoTheoNgay({
   const bottom = 28;
   const moc = mocTron(max);
   const peak = moc[moc.length - 1] || 1;
-  const w = rong - left - padRight;
+  const w = width - left - padRight;
   const h = cao - top - bottom;
   const bang = w / n;
   const midX = (i: number) => left + bang * (i + 0.5);
@@ -132,26 +132,26 @@ export function BieuDoTheoNgay({
     <div className={cn("space-y-3", className)}>
       <div ref={ref} className="relative overflow-x-auto scroll-nice-x">
         <svg
-          width={rong}
+          width={width}
           height={cao}
-          viewBox={`0 0 ${rong} ${cao}`}
+          viewBox={`0 0 ${width} ${cao}`}
           role="img"
-          aria-label={moTa ?? "Biểu đồ theo ngày"}
+          aria-label={description ?? "Biểu đồ theo ngày"}
           className="block"
-          style={{ minWidth: rong }}
+          style={{ minWidth: width }}
           onMouseLeave={() => setSelectedIndex(null)}
         >
           {/* Lưới + trục dọc */}
           {moc.map((v) => (
             <g key={v}>
-              <line x1={left} x2={rong - padRight} y1={y(v)} y2={y(v)} className="stroke-border" strokeDasharray={v === 0 ? undefined : "3 4"} />
+              <line x1={left} x2={width - padRight} y1={y(v)} y2={y(v)} className="stroke-border" strokeDasharray={v === 0 ? undefined : "3 4"} />
               <text x={left - 6} y={y(v)} dy="0.35em" textAnchor="end" className="fill-muted-foreground text-xs tnum">
-                {rutGon(v, donVi)}
+                {compact(v, unit)}
               </text>
             </g>
           ))}
           {/* Nhãn ngày */}
-          {nhan.map((t, i) =>
+          {labels.map((t, i) =>
             i % labelStep === 0 ? (
               <text key={i} x={midX(i)} y={cao - 8} textAnchor="middle" className="fill-muted-foreground text-xs tnum">
                 {t}
@@ -161,33 +161,33 @@ export function BieuDoTheoNgay({
           {/* Vạch ngày đang chọn */}
           {selectedIndex != null && <line x1={midX(selectedIndex)} x2={midX(selectedIndex)} y1={top} y2={top + h} className="stroke-foreground/30" />}
           {/* Cột */}
-          {chuoi.map((c) => {
-            if (c.dang !== "cot") return null;
-            const lech = (columnIndex++ - (columnCount - 1) / 2) * barWidth;
+          {series.map((c) => {
+            if (c.kind !== "cot") return null;
+            const offset = (columnIndex++ - (columnCount - 1) / 2) * barWidth;
             return (
-              <g key={c.khoa} className={NEN[c.mau]}>
-                {c.giaTri.map((v, i) =>
+              <g key={c.id} className={TONE_FILL[c.color]}>
+                {c.values.map((v, i) =>
                   v > 0 ? (
-                    <rect key={i} x={midX(i) + lech - barWidth / 2} y={y(v)} width={barWidth - 1} height={top + h - y(v)} rx={2} opacity={selectedIndex == null || selectedIndex === i ? 0.9 : 0.45} />
+                    <rect key={i} x={midX(i) + offset - barWidth / 2} y={y(v)} width={barWidth - 1} height={top + h - y(v)} rx={2} opacity={selectedIndex == null || selectedIndex === i ? 0.9 : 0.45} />
                   ) : null,
                 )}
               </g>
             );
           })}
           {/* Đường */}
-          {chuoi.map((c) => {
-            if (c.dang !== "duong") return null;
-            const d = c.giaTri.map((v, i) => `${i ? "L" : "M"}${midX(i)},${y(v)}`).join(" ");
+          {series.map((c) => {
+            if (c.kind !== "duong") return null;
+            const d = c.values.map((v, i) => `${i ? "L" : "M"}${midX(i)},${y(v)}`).join(" ");
             return (
-              <g key={c.khoa}>
-                {c.vung && <path d={`${d} L${midX(n - 1)},${top + h} L${midX(0)},${top + h} Z`} className={NEN[c.mau]} opacity={0.12} />}
-                <path d={d} fill="none" className={NET[c.mau]} strokeWidth={2.5} strokeLinejoin="round" />
-                {selectedIndex != null && <circle cx={midX(selectedIndex)} cy={y(c.giaTri[selectedIndex] ?? 0)} r={4} className={cn(NEN[c.mau], "stroke-card")} strokeWidth={2} />}
+              <g key={c.id}>
+                {c.area && <path d={`${d} L${midX(n - 1)},${top + h} L${midX(0)},${top + h} Z`} className={TONE_FILL[c.color]} opacity={0.12} />}
+                <path d={d} fill="none" className={NET[c.color]} strokeWidth={2.5} strokeLinejoin="round" />
+                {selectedIndex != null && <circle cx={midX(selectedIndex)} cy={y(c.values[selectedIndex] ?? 0)} r={4} className={cn(TONE_FILL[c.color], "stroke-card")} strokeWidth={2} />}
               </g>
             );
           })}
           {/* Vùng bắt chuột theo ngày */}
-          {nhan.map((t, i) => (
+          {labels.map((t, i) => (
             <rect
               key={i}
               x={left + bang * i}
@@ -198,7 +198,7 @@ export function BieuDoTheoNgay({
               onMouseEnter={() => setSelectedIndex(i)}
               onClick={() => setSelectedIndex(i)}
             >
-              <title>{`${t}: ${chuoi.map((c) => `${c.ten} ${dinhDang(c.giaTri[i] ?? 0)} ${donVi}`).join(" · ")}`}</title>
+              <title>{`${t}: ${series.map((c) => `${c.name} ${formatValue(c.values[i] ?? 0)} ${unit}`).join(" · ")}`}</title>
             </rect>
           ))}
         </svg>
@@ -206,27 +206,27 @@ export function BieuDoTheoNgay({
           <div
             role="status"
             className="pointer-events-none absolute top-2 z-10 rounded-lg border-2 border-border bg-card p-2.5 text-sm shadow-lg"
-            style={midX(selectedIndex) < rong / 2 ? { left: midX(selectedIndex) + 12 } : { left: midX(selectedIndex) - 12, transform: "translateX(-100%)" }}
+            style={midX(selectedIndex) < width / 2 ? { left: midX(selectedIndex) + 12 } : { left: midX(selectedIndex) - 12, transform: "translateX(-100%)" }}
           >
-            <p className="font-semibold text-foreground">{nhan[selectedIndex]}</p>
-            {chuoi.map((c) => (
-              <p key={c.khoa} className="flex items-center gap-2 whitespace-nowrap text-muted-foreground">
+            <p className="font-semibold text-foreground">{labels[selectedIndex]}</p>
+            {series.map((c) => (
+              <p key={c.id} className="flex items-center gap-2 whitespace-nowrap text-muted-foreground">
                 <svg width="10" height="10" aria-hidden>
-                  <rect width="10" height="10" rx="2" className={NEN[c.mau]} />
+                  <rect width="10" height="10" rx="2" className={TONE_FILL[c.color]} />
                 </svg>
-                {c.ten}: <span className="tnum font-semibold text-foreground">{dinhDang(c.giaTri[selectedIndex] ?? 0)} {donVi}</span>
+                {c.name}: <span className="tnum font-semibold text-foreground">{formatValue(c.values[selectedIndex] ?? 0)} {unit}</span>
               </p>
             ))}
           </div>
         )}
       </div>
       <ul className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground" aria-label="Chú giải">
-        {chuoi.map((c) => (
-          <li key={c.khoa} className="flex items-center gap-1.5">
+        {series.map((c) => (
+          <li key={c.id} className="flex items-center gap-1.5">
             <svg width="16" height="10" aria-hidden>
-              {c.dang === "cot" ? <rect width="10" height="10" rx="2" className={NEN[c.mau]} /> : <line x1="0" x2="16" y1="5" y2="5" strokeWidth="3" className={NET[c.mau]} />}
+              {c.kind === "cot" ? <rect width="10" height="10" rx="2" className={TONE_FILL[c.color]} /> : <line x1="0" x2="16" y1="5" y2="5" strokeWidth="3" className={NET[c.color]} />}
             </svg>
-            {c.ten}
+            {c.name}
           </li>
         ))}
       </ul>

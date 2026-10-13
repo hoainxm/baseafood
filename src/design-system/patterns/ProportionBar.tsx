@@ -3,29 +3,29 @@
 // Description: 100% stacked bar + legend rows — "where did X kg go", plain HTML + tokens
 // ============================================================
 import { cn } from "@/lib/utils";
-import type { SacPhanLoai } from "./Nhan";
+import type { CategoryTone } from "./Tag";
 
 /**
- * ThanhChiaPhan — MỘT thanh dài = 100% của một tổng, chia khúc theo từng phần; dưới
+ * ProportionBar — MỘT thanh dài = 100% của một tổng, chia khúc theo từng phần; dưới
  * thanh là danh sách phần (chấm màu · tên · kg · %), mỗi dòng bấm được. Kiểu đọc
  * "cứ 100 kg nguyên liệu thì ra 42 kg bán thành phẩm, 6 kg phế liệu…" — người xem
  * hiểu ngay, không cần học cách đọc sơ đồ.
  *
- * Màu theo `sac` (bảng tone dùng chung với `Nhan`), luôn kèm tên + số — màu không
+ * Màu theo `sac` (bảng tone dùng chung với `Tag`), luôn kèm tên + số — màu không
  * bao giờ là tín hiệu duy nhất. Khúc quá hẹp (< 7%) không ghi % trong thanh, số vẫn ở
  * danh sách. Thuần HTML ⇒ ăn theo cỡ chữ, không cuộn ngang.
  */
-export interface PhanChia {
-  khoa: string;
-  nhan: string;
-  giaTri: number;
-  sac: SacPhanLoai;
+export interface ProportionSegment {
+  id: string;
+  label: string;
+  value: number;
+  tone: CategoryTone;
   /** Câu phụ dưới tên (VD "chưa ghi ra khâu nào"). */
-  moTa?: string;
+  description?: string;
 }
 
 /* Liệt kê TRỌN tên lớp để Tailwind quét thấy. */
-const NEN: Record<SacPhanLoai, string> = {
+const TONE_BG: Record<CategoryTone, string> = {
   tim: "bg-tone-tim",
   ngoc: "bg-tone-ngoc",
   bien: "bg-tone-bien",
@@ -36,7 +36,7 @@ const NEN: Record<SacPhanLoai, string> = {
   cam: "bg-tone-cam",
   xam: "bg-tone-xam",
 };
-const CHU: Record<SacPhanLoai, string> = {
+const CHU: Record<CategoryTone, string> = {
   tim: "text-tone-tim",
   ngoc: "text-tone-ngoc",
   bien: "text-tone-bien",
@@ -48,25 +48,25 @@ const CHU: Record<SacPhanLoai, string> = {
   xam: "text-tone-xam",
 };
 
-export function ThanhChiaPhan({
-  phan,
-  dinhDang = (n) => n.toLocaleString("vi-VN", { maximumFractionDigits: 0 }),
-  donVi = "kg",
-  onChon,
-  moTa,
+export function ProportionBar({
+  segments,
+  formatValue = (n) => n.toLocaleString("vi-VN", { maximumFractionDigits: 0 }),
+  unit = "kg",
+  onSelect,
+  description,
   className,
 }: {
-  phan: PhanChia[];
-  dinhDang?: (n: number) => string;
-  donVi?: string;
+  segments: ProportionSegment[];
+  formatValue?: (n: number) => string;
+  unit?: string;
   /** Bấm một phần ⇒ mở màn liên quan. */
-  onChon?: (khoa: string) => void;
+  onSelect?: (id: string) => void;
   /** Câu cho trình đọc màn hình. */
-  moTa?: string;
+  description?: string;
   className?: string;
 }) {
-  const ds = phan.filter((p) => p.giaTri > 0);
-  const total = ds.reduce((s, p) => s + p.giaTri, 0);
+  const items = segments.filter((p) => p.value > 0);
+  const total = items.reduce((s, p) => s + p.value, 0);
   if (total <= 0) {
     return (
       <p className="rounded-lg border-2 border-dashed border-border p-6 text-center text-sm text-muted-foreground">
@@ -78,45 +78,45 @@ export function ThanhChiaPhan({
 
   return (
     <div className={cn("grid gap-3", className)}>
-      <div role="img" aria-label={moTa ?? ds.map((p) => `${p.nhan} ${pt(p.giaTri)}`).join(", ")} className="flex h-11 w-full overflow-hidden rounded-lg border-2 border-border">
-        {ds.map((p) => {
-          const width = (p.giaTri / total) * 100;
+      <div role="img" aria-label={description ?? items.map((p) => `${p.label} ${pt(p.value)}`).join(", ")} className="flex h-11 w-full overflow-hidden rounded-lg border-2 border-border">
+        {items.map((p) => {
+          const width = (p.value / total) * 100;
           return (
             <div
-              key={p.khoa}
-              title={`${p.nhan}: ${dinhDang(p.giaTri)} ${donVi} (${pt(p.giaTri)})`}
-              className={cn("flex min-w-0 items-center justify-center border-r-2 border-card last:border-r-0", NEN[p.sac])}
+              key={p.id}
+              title={`${p.label}: ${formatValue(p.value)} ${unit} (${pt(p.value)})`}
+              className={cn("flex min-w-0 items-center justify-center border-r-2 border-card last:border-r-0", TONE_BG[p.tone])}
               style={{ width: `${width}%` }}
             >
-              {width >= 7 && <span className="tnum truncate px-1 text-sm font-bold text-white">{pt(p.giaTri)}</span>}
+              {width >= 7 && <span className="tnum truncate px-1 text-sm font-bold text-white">{pt(p.value)}</span>}
             </div>
           );
         })}
       </div>
       <ul className="grid grid-cols-[repeat(auto-fill,minmax(min(12rem,100%),1fr))] gap-2">
-        {ds.map((p) => {
+        {items.map((p) => {
           const content = (
             <>
-              <span aria-hidden className={cn("mt-1 size-3.5 shrink-0 rounded-sm", NEN[p.sac])} />
+              <span aria-hidden className={cn("mt-1 size-3.5 shrink-0 rounded-sm", TONE_BG[p.tone])} />
               <span className="min-w-0 flex-1">
-                <span className="block text-sm font-semibold text-foreground">{p.nhan}</span>
-                {p.moTa && <span className="block text-sm text-muted-foreground">{p.moTa}</span>}
+                <span className="block text-sm font-semibold text-foreground">{p.label}</span>
+                {p.description && <span className="block text-sm text-muted-foreground">{p.description}</span>}
                 <span className="tnum block text-sm text-muted-foreground">
-                  {dinhDang(p.giaTri)} {donVi}
+                  {formatValue(p.value)} {unit}
                 </span>
               </span>
-              <span className={cn("tnum shrink-0 text-xl font-bold", CHU[p.sac])}>{pt(p.giaTri)}</span>
+              <span className={cn("tnum shrink-0 text-xl font-bold", CHU[p.tone])}>{pt(p.value)}</span>
             </>
           );
           const cls = "flex w-full items-start gap-2.5 rounded-lg border-2 border-border bg-card p-2.5 text-left";
           return (
-            <li key={p.khoa} className="flex min-w-0">
-              {onChon ? (
+            <li key={p.id} className="flex min-w-0">
+              {onSelect ? (
                 <button
                   type="button"
-                  onClick={() => onChon(p.khoa)}
-                  title={`Mở màn liên quan tới "${p.nhan}".`}
-                  className={cn(cls, "nhan-an cursor-pointer hover:border-primary hover:bg-muted/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring")}
+                  onClick={() => onSelect(p.id)}
+                  title={`Mở màn liên quan tới "${p.label}".`}
+                  className={cn(cls, "press-feedback cursor-pointer hover:border-primary hover:bg-muted/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring")}
                 >
                   {content}
                 </button>

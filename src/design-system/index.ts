@@ -7,78 +7,78 @@
  * Quy tắc đầy đủ: xem src/design-system/README.md
  */
 
-export { Field, ChuThichBatBuoc } from "./patterns/Field";
-export { useONhapCuaField, type ThuocTinhONhap } from "./patterns/oNhapCuaField";
+export { Field, RequiredLegend } from "./patterns/Field";
+export { useFieldInput, type FieldInputProps } from "./patterns/fieldInput";
 export { NumberField } from "./patterns/NumberField";
-export { ONhapSo } from "./patterns/ONhapSo";
-export { useNhapSo } from "./patterns/useNhapSo";
-export { parseSo, dinhDangSo, parseSoHoacBieuThuc } from "./patterns/bieuThucSo";
-export { ChoiceGroup, type LuaChon } from "./patterns/ChoiceGroup";
-export { Combobox, type MucChon } from "./patterns/Combobox";
+export { NumberInput } from "./patterns/NumberInput";
+export { useNumberInput } from "./patterns/useNumberInput";
+export { parseVnNumber, formatNumber, parseNumberOrExpression } from "./patterns/numberExpression";
+export { ChoiceGroup, type ChoiceOption } from "./patterns/ChoiceGroup";
+export { Combobox, type ComboboxOption } from "./patterns/Combobox";
 export {
   DateField,
   DateRangeField,
   isoToDate,
   dateToIso,
-  viNgay,
-  ngayTrongKhoang,
-  congNgay,
-  homNay,
+  formatWeekdayDate,
+  getDatesInRange,
+  addDays,
+  todayIso,
 } from "./patterns/DateField";
-export { DanhMucCrud, HopSuaDanhMuc, type TruongDanhMuc } from "./patterns/CatalogCrudModal";
+export { CatalogCrud, CatalogEditDialog, type CatalogField } from "./patterns/CatalogCrudModal";
 export { Logo } from "./patterns/Logo";
-export { RecordTable, type Cot } from "./patterns/RecordTable";
+export { RecordTable, type RecordTableColumn } from "./patterns/RecordTable";
 export {
-  LuoiNhap,
-  type CotLuoi,
-  type HangLuoi,
-  type KieuOLuoi,
+  EditableGrid,
+  type GridColumn,
+  type GridRow,
+  type GridCellKind,
 } from "./patterns/EditableGrid";
 export { ConfirmDelete } from "./patterns/ConfirmDelete";
-export { XacNhan } from "./patterns/ConfirmAction";
-export { StepForm, type BuocNhap } from "./patterns/StepForm";
-export { ContextBar, type MucNguCanh } from "./patterns/ContextBar";
-export { ErrorSummary, type LoiNhap } from "./patterns/ErrorSummary";
+export { ConfirmAction } from "./patterns/ConfirmAction";
+export { StepForm, type FormStep } from "./patterns/StepForm";
+export { ContextBar, type ContextBarItem } from "./patterns/ContextBar";
+export { ErrorSummary, type FieldError } from "./patterns/ErrorSummary";
 export { EmptyState } from "./patterns/EmptyState";
 export { InfoTip } from "./patterns/InfoTip";
 export {
-  CoChuNhanh,
-  CaiDatHienThi,
-  apDungCaiDatHienThi,
+  FontSizeQuickPicker,
+  DisplaySettingsPanel,
+  applyDisplaySettings,
 } from "./patterns/DisplaySettings";
-export { TrangThaiDuLieu, NutTrangThai } from "./patterns/DataStatusBadge";
-export { NutGiaoDien } from "./patterns/ThemeToggleButton";
-export { NutHuongDan } from "./patterns/GuideButton";
-export { FormDialog, NutDong } from "./patterns/FormDialog";
-export { BangTong, type CotTong, type ChonBang } from "./patterns/SummaryTable";
-export { NutToMauChon, ThanhToMau } from "./patterns/ToMauDong";
-export { KhungCuonNgang } from "./patterns/CuonNgang";
-export { useThanhCuonTren } from "./patterns/thanhCuonTren";
+export { DataSyncStatus, DataSyncStatusButton } from "./patterns/DataStatusBadge";
+export { DisplaySettingsButton } from "./patterns/ThemeToggleButton";
+export { GuideButton } from "./patterns/GuideButton";
+export { FormDialog, CloseButton } from "./patterns/FormDialog";
+export { SummaryTable, type SummaryTableColumn, type TableSelection } from "./patterns/SummaryTable";
+export { RowMarkActions, RowMarkToolbar } from "./patterns/RowMarkToolbar";
+export { HorizontalScroll } from "./patterns/HorizontalScroll";
+export { useTopScrollbar } from "./patterns/topScrollbar";
 export {
-  ToMauContext,
-  useToMau,
-  useChonDong,
-  SAC_TO,
-  MUC_TO,
-  LUOI_MAU,
-  tenMau,
-  type MauTo,
-  type DauDong,
-  type VaDau,
-  type NguonToMau,
-  type ToMauBang,
-} from "./patterns/toMauNguon";
-export { GoiYHover, TRE_HIEN_MS } from "./patterns/HoverHint";
-export { useKhopMedia, MEDIA_THANH_BEN_HEP } from "./patterns/khopMedia";
-export { ThongKe, type TheThongTin } from "./patterns/ThongKe";
-export { BieuDoCot, type CotBieuDo } from "./patterns/BarChart";
-export { Nhan, sacKenh, sacNhomNL, sacXuong, sacTheoTen, type LoaiNhan, type SacPhanLoai } from "./patterns/Nhan";
-export { BieuDoCotDoc, type CotBieuDoDoc } from "./patterns/VerticalBarChart";
-export { ThanhChiaPhan, type PhanChia } from "./patterns/ProportionBar";
-export { BangChuyen, type KhauBangChuyen } from "./patterns/PipelineStages";
-export { BieuDoTheoNgay, type ChuoiSo, type MauChuoi } from "./patterns/TimeSeriesChart";
-export { PhieuIn, PhieuInTem, ThIn, TdIn, type TemIn } from "./patterns/PrintSheet";
-export { ThinkingDots, DangXuLy, SkeletonBang } from "./patterns/Loading";
+  RowMarkContext,
+  useRowMarkTools,
+  useRowSelection,
+  MARK_COLORS,
+  MARK_SHADES,
+  MARK_COLOR_GRID,
+  getMarkColorName,
+  type MarkColor,
+  type MarkStyle,
+  type MarkStylePatch,
+  type RowMarkSource,
+  type RowMarkTools,
+} from "./patterns/rowMarkSource";
+export { HoverHint, HINT_DELAY_MS } from "./patterns/HoverHint";
+export { useMediaQuery, MEDIA_NARROW_SIDEBAR } from "./patterns/mediaQuery";
+export { StatCardGrid, type StatCardData } from "./patterns/StatCardGrid";
+export { BarChart, type BarChartItem } from "./patterns/BarChart";
+export { Tag, channelTone, toneForMaterialGroup, toneForWorkshop, toneByName, type TagVariant, type CategoryTone } from "./patterns/Tag";
+export { VerticalBarChart, type VerticalBarChartItem } from "./patterns/VerticalBarChart";
+export { ProportionBar, type ProportionSegment } from "./patterns/ProportionBar";
+export { PipelineStages, type PipelineStage } from "./patterns/PipelineStages";
+export { TimeSeriesChart, type ChartSeries, type SeriesColor } from "./patterns/TimeSeriesChart";
+export { PrintSheet, LabelPrintSheet, PrintTh, PrintTd, type PrintLabel } from "./patterns/PrintSheet";
+export { ThinkingDots, ProcessingState, TableSkeleton } from "./patterns/Loading";
 export { notify } from "./patterns/notify";
 
 /* Primitive được phép dùng lại nguyên bản (đã đè size trong components/ui). */

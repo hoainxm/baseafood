@@ -1,12 +1,12 @@
 // ============================================================
-// Tên file cũ: src/design-system/patterns/BieuDoCotDoc.tsx
+// Tên file cũ: src/design-system/patterns/VerticalBarChart.tsx
 // Tên tiếng Việt: Biểu đồ cột đứng
 // Description: Vertical Bar Chart Component
 // ============================================================
 import { cn } from "@/lib/utils";
 
 /**
- * BieuDoCotDoc — biểu đồ cột đứng (dọc) hiển thị sản lượng/số liệu theo NGÀY.
+ * VerticalBarChart — biểu đồ cột đứng (dọc) hiển thị sản lượng/số liệu theo NGÀY.
  *
  * Cột đứng hiển thị trực quan các ngày từ trái qua phải theo thứ tự thời gian.
  * Có vùng cuộn ngang tự động (scroll-nice) giúp biểu đồ không bị ép chặt khi xem khoảng
@@ -14,30 +14,30 @@ import { cn } from "@/lib/utils";
  * không bao giờ bị cắt bớt hay hiển thị dấu ba chấm (...).
  * Vẽ đường trung bình nét đứt (warning color) làm mốc so sánh với nhãn ghim cố định ở rìa phải.
  */
-export interface CotBieuDoDoc {
-  nhan: string;
-  giaTri: number;
-  phu?: string;
+export interface VerticalBarChartItem {
+  label: string;
+  value: number;
+  subLabel?: string;
 }
 
-export function BieuDoCotDoc({
+export function VerticalBarChart({
   data,
-  dinhDang = (n) => n.toLocaleString("vi-VN"),
-  donVi,
-  duongTrungBinh = true,
+  formatValue = (n) => n.toLocaleString("vi-VN"),
+  unit,
+  showAverageLine = true,
   className,
 }: {
-  data: CotBieuDoDoc[];
+  data: VerticalBarChartItem[];
   /** Định dạng số hiển thị. */
-  dinhDang?: (n: number) => string;
-  donVi?: string;
-  duongTrungBinh?: boolean;
+  formatValue?: (n: number) => string;
+  unit?: string;
+  showAverageLine?: boolean;
   className?: string;
 }) {
-  const max = Math.max(1, ...data.map((d) => d.giaTri));
+  const max = Math.max(1, ...data.map((d) => d.value));
   const tb =
     data.length > 0
-      ? data.reduce((s, d) => s + d.giaTri, 0) / data.length
+      ? data.reduce((s, d) => s + d.value, 0) / data.length
       : 0;
   const tbPct = Math.min(100, (tb / max) * 100);
 
@@ -49,7 +49,7 @@ export function BieuDoCotDoc({
     );
   }
 
-  const unitSuffix = donVi ? ` ${donVi}` : "";
+  const unitSuffix = unit ? ` ${unit}` : "";
 
   return (
     <div className={cn("space-y-4", className)}>
@@ -61,7 +61,7 @@ export function BieuDoCotDoc({
             {/* Lớp cột sản lượng */}
             <div className="flex items-end gap-5 relative z-10">
               {data.map((d, index) => {
-                const pct = (d.giaTri / max) * 100;
+                const pct = (d.value / max) * 100;
                 return (
                   <div
                     key={index}
@@ -70,7 +70,7 @@ export function BieuDoCotDoc({
                   >
                     {/* Số lượng nhập bên trên cột */}
                     <span className="text-xs font-bold text-foreground mb-2 select-none whitespace-nowrap">
-                      {dinhDang(d.giaTri)}
+                      {formatValue(d.value)}
                     </span>
 
                     {/* Thanh biểu đồ */}
@@ -83,7 +83,7 @@ export function BieuDoCotDoc({
 
                     {/* Nhãn ngày/kỳ */}
                     <span className="text-xs font-semibold text-muted-foreground mt-2 select-none whitespace-nowrap">
-                      {d.nhan}
+                      {d.label}
                     </span>
                   </div>
                 );
@@ -91,7 +91,7 @@ export function BieuDoCotDoc({
             </div>
 
             {/* Lớp phủ đường trung bình nét đứt (dashed line) */}
-            {duongTrungBinh && tb > 0 && (
+            {showAverageLine && tb > 0 && (
               <div
                 className="absolute left-0 right-0 pointer-events-none"
                 style={{
@@ -109,7 +109,7 @@ export function BieuDoCotDoc({
         </div>
 
         {/* Lớp ghim nhãn trung bình ở bên phải biểu đồ (không trôi khi cuộn cột) */}
-        {duongTrungBinh && tb > 0 && (
+        {showAverageLine && tb > 0 && (
           <div className="absolute inset-y-5 right-5 pointer-events-none z-20 w-full">
             <div
               className="absolute right-0"
@@ -122,7 +122,7 @@ export function BieuDoCotDoc({
                 className="absolute right-0 -translate-y-1/2 select-none whitespace-nowrap rounded border border-warning bg-warning px-2.5 py-1 text-sm font-bold text-warning-foreground shadow-md"
                 style={{ bottom: `${tbPct}%` }}
               >
-                TB: {dinhDang(Math.round(tb))}
+                TB: {formatValue(Math.round(tb))}
                 {unitSuffix}
               </div>
             </div>

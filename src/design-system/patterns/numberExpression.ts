@@ -1,11 +1,11 @@
 // ============================================================
-// Tên file: src/design-system/patterns/bieuThucSo.ts
+// Tên file: src/design-system/patterns/numberExpression.ts
 // Tên tiếng Việt: Đọc số + tính biểu thức kiểu Excel cho MỌI ô nhập số
-// Hàm THUẦN (không React) — test ở bieuThucSo.test.ts.
+// Hàm THUẦN (không React) — test ở numberExpression.test.ts.
 // ============================================================
 
 /** "1.234,5" | "1234.5" | "1 234,5" → 1234.5 ; rỗng/không hợp lệ → null */
-export function parseSo(raw: string): number | null {
+export function parseVnNumber(raw: string): number | null {
   const s = raw.replace(/[\s.]/g, "").replace(",", ".").trim();
   if (!s) return null;
   const n = Number(s);
@@ -13,7 +13,7 @@ export function parseSo(raw: string): number | null {
 }
 
 /** 1234.5 → "1.234,5" (vi-VN) */
-export function dinhDangSo(n: number | null): string {
+export function formatNumber(n: number | null): string {
   if (n == null) return "";
   return n.toLocaleString("vi-VN", { maximumFractionDigits: 3 });
 }
@@ -39,7 +39,7 @@ function normalize(raw: string): string {
  * tử ngoài dấu đầu ("-5" vẫn là số thường). Dùng để quyết định có hiện ô xem
  * trước kết quả hay không — kể cả khi biểu thức còn dở ("250+").
  */
-export function laBieuThuc(raw: string): boolean {
+export function isExpression(raw: string): boolean {
   const t = raw.trim();
   if (t.startsWith("=")) return true;
   return /[+\-*/xX×÷:%()]/.test(t.replace(/\s/g, "").slice(1));
@@ -55,7 +55,7 @@ function evaluate(s: string): number | null {
   let i = 0;
   const peek = () => s[i];
 
-  function bieuThuc(): number | null {
+  function expression(): number | null {
     let v = hang();
     if (v == null) return null;
     while (peek() === "+" || peek() === "-") {
@@ -99,7 +99,7 @@ function evaluate(s: string): number | null {
     }
     if (peek() === "(") {
       i++;
-      const v = bieuThuc();
+      const v = expression();
       if (peek() !== ")") return null;
       i++;
       return v;
@@ -112,29 +112,29 @@ function evaluate(s: string): number | null {
     return Number.isFinite(num) ? num : null;
   }
 
-  const kq = bieuThuc();
-  return i === s.length && kq != null && Number.isFinite(kq) ? kq : null;
+  const result = expression();
+  return i === s.length && result != null && Number.isFinite(result) ? result : null;
 }
 
 /**
  * "1+2" → 3 · "=1.000+250" → 1250 · "250,5*2" → 501 · "(3+4)x2" → 14 · "1000*5%" → 50.
- * Trả null nếu KHÔNG phải biểu thức hợp lệ ⇒ nơi gọi rơi về `parseSo`.
+ * Trả null nếu KHÔNG phải biểu thức hợp lệ ⇒ nơi gọi rơi về `parseVnNumber`.
  */
-export function tinhBieuThuc(raw: string): number | null {
-  if (!laBieuThuc(raw)) return null;
+export function evaluateExpression(raw: string): number | null {
+  if (!isExpression(raw)) return null;
   const s = normalize(raw);
   if (!s) return null;
   if (!/^[-+*/%().\d]+$/.test(s)) return null; // lẫn ký tự lạ ⇒ không tính
-  const kq = evaluate(s);
+  const result = evaluate(s);
   // Làm tròn nhiễu dấu phẩy động (0,1+0,2 = 0,30000000000000004) về 6 chữ số lẻ.
-  return kq == null ? null : Math.round(kq * 1e6) / 1e6;
+  return result == null ? null : Math.round(result * 1e6) / 1e6;
 }
 
 /**
  * Ô số hiểu cả biểu thức: gõ "250+300" (hay "=250+300") ra 550. Là biểu thức thì
- * tính; còn lại rơi về `parseSo` (số thường). Biểu thức dở/sai ⇒ null.
+ * tính; còn lại rơi về `parseVnNumber` (số thường). Biểu thức dở/sai ⇒ null.
  */
-export function parseSoHoacBieuThuc(raw: string): number | null {
-  if (laBieuThuc(raw)) return tinhBieuThuc(raw);
-  return parseSo(raw);
+export function parseNumberOrExpression(raw: string): number | null {
+  if (isExpression(raw)) return evaluateExpression(raw);
+  return parseVnNumber(raw);
 }

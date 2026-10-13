@@ -1,16 +1,16 @@
 import * as React from "react";
 import { Button } from "@/components/ui/button";
-import { ErrorSummary, type LoiNhap } from "./ErrorSummary";
-import { ChuThichBatBuoc, useCoOBatBuoc } from "./Field";
+import { ErrorSummary, type FieldError } from "./ErrorSummary";
+import { RequiredLegend, useHasRequiredField } from "./Field";
 import { cn } from "@/lib/utils";
 import { ArrowLeft, ArrowRight, Check } from "lucide-react";
 
-export interface BuocNhap {
-  tieuDe: string;
-  moTa?: string;
-  noiDung: React.ReactNode;
+export interface FormStep {
+  title: string;
+  description?: string;
+  content: React.ReactNode;
   /** Trả về danh sách lỗi. Rỗng = qua bước. */
-  kiemTra?: () => LoiNhap[];
+  validate?: () => FieldError[];
 }
 
 /**
@@ -24,27 +24,27 @@ export interface BuocNhap {
  */
 export function StepForm({
   steps,
-  xemLai,
+  review,
   onSubmit,
-  nhanHoanTat = "Ghi vào sổ",
+  submitLabel = "Ghi vào sổ",
   onCancel,
 }: {
-  steps: BuocNhap[];
+  steps: FormStep[];
   /** Nội dung màn xem lại (bước cuối) */
-  xemLai: React.ReactNode;
+  review: React.ReactNode;
   onSubmit: () => void;
-  nhanHoanTat?: string;
+  submitLabel?: string;
   onCancel?: () => void;
 }) {
   const [i, setI] = React.useState(0);
-  const [loi, setLoi] = React.useState<LoiNhap[]>([]);
+  const [loi, setLoi] = React.useState<FieldError[]>([]);
 
   const stepCount = steps.length + 1; // + màn xem lại
   const isReview = i === steps.length;
   const step = isReview ? null : steps[i];
 
   const goNext = () => {
-    const ls = step?.kiemTra?.() ?? [];
+    const ls = step?.validate?.() ?? [];
     setLoi(ls);
     if (ls.length === 0) {
       setLoi([]);
@@ -59,7 +59,7 @@ export function StepForm({
 
   // Bước nào có ô bắt buộc thì bước đó mới hiện chú thích dấu *.
   const thanRef = React.useRef<HTMLDivElement>(null);
-  const hasRequiredField = useCoOBatBuoc(thanRef, [i]);
+  const hasRequiredField = useHasRequiredField(thanRef, [i]);
 
   return (
     <div className="space-y-6">
@@ -88,14 +88,14 @@ export function StepForm({
         </div>
       </div>
 
-      <ErrorSummary loi={loi} />
+      <ErrorSummary errors={loi} />
 
       <div>
         <h2 className="text-xl font-semibold text-foreground">
-          {isReview ? "Xem lại trước khi ghi" : step!.tieuDe}
+          {isReview ? "Xem lại trước khi ghi" : step!.title}
         </h2>
-        {!isReview && step!.moTa && (
-          <p className="mt-2 text-sm text-muted-foreground">{step!.moTa}</p>
+        {!isReview && step!.description && (
+          <p className="mt-2 text-sm text-muted-foreground">{step!.description}</p>
         )}
         {isReview && (
           <p className="mt-2 text-sm text-muted-foreground">
@@ -104,12 +104,12 @@ export function StepForm({
         )}
       </div>
 
-      {/* key theo bước → đổi bước là nội dung fade-trượt nhẹ vào (hien-ngang;
-          prefers-reduced-motion tắt). thanRef remount theo nhưng useCoOBatBuoc
+      {/* key theo bước → đổi bước là nội dung fade-trượt nhẹ vào (enter-side;
+          prefers-reduced-motion tắt). thanRef remount theo nhưng useHasRequiredField
           dò lại theo dep [i] nên chú thích dấu * vẫn đúng. */}
-      <div key={i} ref={thanRef} className="hien-ngang space-y-6">
-        {hasRequiredField && <ChuThichBatBuoc />}
-        {isReview ? xemLai : step!.noiDung}
+      <div key={i} ref={thanRef} className="enter-side space-y-6">
+        {hasRequiredField && <RequiredLegend />}
+        {isReview ? review : step!.content}
       </div>
 
       <div className="flex flex-col-reverse gap-3 border-t border-border pt-5 sm:flex-row sm:justify-between">
@@ -128,7 +128,7 @@ export function StepForm({
         {isReview ? (
           <Button size="lg" onClick={onSubmit} title="Ghi toàn bộ những gì đã nhập ở các bước trên vào sổ.">
             <Check />
-            {nhanHoanTat}
+            {submitLabel}
           </Button>
         ) : (
           <Button size="lg" onClick={goNext} title="Sang bước kế tiếp. Thiếu ô bắt buộc sẽ được nhắc ngay tại đây.">

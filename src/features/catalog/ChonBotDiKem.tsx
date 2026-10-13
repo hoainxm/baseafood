@@ -5,7 +5,7 @@
 // Mỗi mặt hàng tẩm bột đi kèm một BỘ loại bột riêng (VD tẩm bột nước tương =
 // 24V + 18V + 220H; tẩm bột 5-10 = 232 + 20802). Chọn từng loại bằng Combobox,
 // loại đã chọn hiện thành thẻ có nút bỏ. Giá trị là chuỗi "id1,id2" vì form danh
-// mục (DanhMucCrud) lưu chuỗi — repo.ts chuẩn hoá về mảng khi ghi.
+// mục (CatalogCrud) lưu chuỗi — repo.ts chuẩn hoá về mảng khi ghi.
 import { useId } from "react";
 import type { BatterType } from "@/types";
 import { getProductBatterIds } from "@/lib/batter";
@@ -70,7 +70,7 @@ export function ChonBotDiKem({
 
       <Combobox
         label="Thêm loại bột đi kèm"
-        anNhanBatBuoc
+        hideRequiredMark
         value=""
         onChange={(id) => id && setIds([...ids, id])}
         options={remainingOptions}

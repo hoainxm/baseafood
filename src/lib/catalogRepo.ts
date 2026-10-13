@@ -5,43 +5,43 @@
 // ============================================================
 import { uid } from "@/lib/db";
 import {
-  BANG_SALES_ITEM,
-  BANG_DAILY_LOCK,
-  BANG_PRODUCTION_LOCK,
-  BANG_IMPORT_SHIPMENT,
-  BANG_SUPPLIER,
-  BANG_SALES_ORDER,
-  BANG_ORDER_ITEM,
-  BANG_EXPORT_ITEM,
-  BANG_CUSTOMER,
-  BANG_BALANCING_PERIOD,
-  BANG_EXPORT_ORDER,
-  BANG_MATERIAL_TYPE,
-  BANG_PRODUCT,
-  BANG_USER_PROFILE,
-  BANG_MATERIAL_IMPORT,
-  BANG_BALANCING_INPUT,
-  BANG_SCRAP,
-  BANG_SALES_INVOICE,
-  BANG_WIP_PRODUCTION,
-  BANG_QC_CHECKLIST,
-  BANG_QC_LOCK,
-  BANG_PACKAGING,
-  BANG_FINISHED_GOOD,
-  BANG_BALANCING_OUTPUT,
-  BANG_OPENING_STOCK,
-  BANG_FINISHED_OPENING_STOCK,
-  BANG_NXT_SNAPSHOT,
-  BANG_STORAGE_LOCATION,
-  BANG_MONTHLY_STOCK,
-  BANG_RECONCILIATION_RUN,
-  BANG_LOT_INPUT,
-  BANG_LABEL_PRINT,
-  BANG_LOT_DISPATCH,
-  BANG_LOT_WAIVER,
-  BANG_BATTER_TYPE,
-  BANG_ROW_MARK,
-  BANG_DOMESTIC_SALE,
+  SALES_ITEM_TABLE,
+  DAILY_LOCK_TABLE,
+  PRODUCTION_LOCK_TABLE,
+  IMPORT_SHIPMENT_TABLE,
+  SUPPLIER_TABLE,
+  SALES_ORDER_TABLE,
+  ORDER_ITEM_TABLE,
+  EXPORT_ITEM_TABLE,
+  CUSTOMER_TABLE,
+  BALANCING_PERIOD_TABLE,
+  EXPORT_ORDER_TABLE,
+  MATERIAL_TYPE_TABLE,
+  PRODUCT_TABLE,
+  USER_PROFILE_TABLE,
+  MATERIAL_IMPORT_TABLE,
+  BALANCING_INPUT_TABLE,
+  SCRAP_TABLE,
+  SALES_INVOICE_TABLE,
+  WIP_PRODUCTION_TABLE,
+  QC_CHECKLIST_TABLE,
+  QC_LOCK_TABLE,
+  PACKAGING_TABLE,
+  FINISHED_GOOD_TABLE,
+  BALANCING_OUTPUT_TABLE,
+  OPENING_STOCK_TABLE,
+  FINISHED_OPENING_STOCK_TABLE,
+  NXT_SNAPSHOT_TABLE,
+  STORAGE_LOCATION_TABLE,
+  MONTHLY_STOCK_TABLE,
+  RECONCILIATION_RUN_TABLE,
+  LOT_INPUT_TABLE,
+  LABEL_PRINT_TABLE,
+  LOT_DISPATCH_TABLE,
+  LOT_WAIVER_TABLE,
+  BATTER_TYPE_TABLE,
+  ROW_MARK_TABLE,
+  DOMESTIC_SALE_TABLE,
   useBang,
 } from "@/lib/repo";
 import type {
@@ -227,72 +227,72 @@ export const seedNxtSnapshots = (): NxtSnapshotLine[] => {
 };
 
 /* --- Danh mục --- */
-export const useProducts = () => useBang(BANG_PRODUCT, seedProducts);
-export const useCustomers = () => useBang(BANG_CUSTOMER);
-export const useSuppliers = () => useBang(BANG_SUPPLIER);
-export const useMaterialTypes = () => useBang(BANG_MATERIAL_TYPE, seedMaterialTypes);
-export const useFinishedGoods = () => useBang(BANG_FINISHED_GOOD, seedFinishedGoods);
+export const useProducts = () => useBang(PRODUCT_TABLE, seedProducts);
+export const useCustomers = () => useBang(CUSTOMER_TABLE);
+export const useSuppliers = () => useBang(SUPPLIER_TABLE);
+export const useMaterialTypes = () => useBang(MATERIAL_TYPE_TABLE, seedMaterialTypes);
+export const useFinishedGoods = () => useBang(FINISHED_GOOD_TABLE, seedFinishedGoods);
 
 /* --- Nghiệp vụ --- */
-export const useMaterialImports = () => useBang(BANG_MATERIAL_IMPORT);
-export const useImportShipments = () => useBang(BANG_IMPORT_SHIPMENT);
-export const useDailyLocks = () => useBang(BANG_DAILY_LOCK);
-export const useBalancingPeriods = () => useBang(BANG_BALANCING_PERIOD);
-export const useBalancingInputs = () => useBang(BANG_BALANCING_INPUT);
-export const useScraps = () => useBang(BANG_SCRAP);
-export const useBalancingOutputs = () => useBang(BANG_BALANCING_OUTPUT);
-export const useSalesInvoices = () => useBang(BANG_SALES_INVOICE);
-export const useSalesItems = () => useBang(BANG_SALES_ITEM);
-export const useUserProfiles = () => useBang(BANG_USER_PROFILE);
+export const useMaterialImports = () => useBang(MATERIAL_IMPORT_TABLE);
+export const useImportShipments = () => useBang(IMPORT_SHIPMENT_TABLE);
+export const useDailyLocks = () => useBang(DAILY_LOCK_TABLE);
+export const useBalancingPeriods = () => useBang(BALANCING_PERIOD_TABLE);
+export const useBalancingInputs = () => useBang(BALANCING_INPUT_TABLE);
+export const useScraps = () => useBang(SCRAP_TABLE);
+export const useBalancingOutputs = () => useBang(BALANCING_OUTPUT_TABLE);
+export const useSalesInvoices = () => useBang(SALES_INVOICE_TABLE);
+export const useSalesItems = () => useBang(SALES_ITEM_TABLE);
+export const useUserProfiles = () => useBang(USER_PROFILE_TABLE);
 
 /* --- QC checklist chấm điểm cuối ngày --- */
-export const useQcChecklists = () => useBang(BANG_QC_CHECKLIST);
-export const useQcLocks = () => useBang(BANG_QC_LOCK);
+export const useQcChecklists = () => useBang(QC_CHECKLIST_TABLE);
+export const useQcLocks = () => useBang(QC_LOCK_TABLE);
 
 /* --- Module WIP: sản xuất BTP · kho · đơn đặt --- */
-export const useWipProductions = () => useBang(BANG_WIP_PRODUCTION);
-export const useProductionLocks = () => useBang(BANG_PRODUCTION_LOCK);
-export const usePackagings = () => useBang(BANG_PACKAGING);
-export const useSalesOrders = () => useBang(BANG_SALES_ORDER);
-export const useOrderItems = () => useBang(BANG_ORDER_ITEM);
-export const useExportOrders = () => useBang(BANG_EXPORT_ORDER);
-export const useExportItems = () => useBang(BANG_EXPORT_ITEM);
+export const useWipProductions = () => useBang(WIP_PRODUCTION_TABLE);
+export const useProductionLocks = () => useBang(PRODUCTION_LOCK_TABLE);
+export const usePackagings = () => useBang(PACKAGING_TABLE);
+export const useSalesOrders = () => useBang(SALES_ORDER_TABLE);
+export const useOrderItems = () => useBang(ORDER_ITEM_TABLE);
+export const useExportOrders = () => useBang(EXPORT_ORDER_TABLE);
+export const useExportItems = () => useBang(EXPORT_ITEM_TABLE);
 
 /* --- Tồn kho nguyên liệu (NXT nguyên liệu) --- */
-export const useMaterialOpeningStock = () => useBang(BANG_OPENING_STOCK);
+export const useMaterialOpeningStock = () => useBang(OPENING_STOCK_TABLE);
 
 /* --- Tồn đầu kho thành phẩm (NXT thành phẩm) --- */
-export const useFinishedGoodsOpeningStock = () => useBang(BANG_FINISHED_OPENING_STOCK);
+export const useFinishedGoodsOpeningStock = () => useBang(FINISHED_OPENING_STOCK_TABLE);
 
 /* --- Xuất–Nhập–Tồn kho (snapshot từ báo cáo thật) --- */
-export const useNxtSnapshots = () => useBang(BANG_NXT_SNAPSHOT, seedNxtSnapshots);
+export const useNxtSnapshots = () => useBang(NXT_SNAPSHOT_TABLE, seedNxtSnapshots);
 
 /* --- Sổ BÁN NỘI ĐỊA (mig 0054) — NL bán thẳng, ghi ở /wip, Cân đối lấy làm dòng giảm --- */
-export const useDomesticSales = () => useBang(BANG_DOMESTIC_SALE);
+export const useDomesticSales = () => useBang(DOMESTIC_SALE_TABLE);
 
 /* --- Danh mục LOẠI BỘT TẨM (mig 0051) — seed id tất định, khớp migration --- */
 export const seedBatterTypes = (): BatterType[] => BATTER_TYPE_SEED.map((b) => ({ ...b }));
-export const useBatterTypes = () => useBang(BANG_BATTER_TYPE, seedBatterTypes);
+export const useBatterTypes = () => useBang(BATTER_TYPE_TABLE, seedBatterTypes);
 
 /* --- Danh mục kho LƯU hàng (kho nhà + kho lạnh thuê ngoài) --- */
-export const useStorageLocations = () => useBang(BANG_STORAGE_LOCATION, seedStorageLocations);
+export const useStorageLocations = () => useBang(STORAGE_LOCATION_TABLE, seedStorageLocations);
 
 /* --- Sổ kho theo tháng (dồn tồn cuối kỳ → đầu kỳ sau) --- */
-export const useMonthlyStock = () => useBang(BANG_MONTHLY_STOCK);
+export const useMonthlyStock = () => useBang(MONTHLY_STOCK_TABLE);
 /** Bản đối soát hóa đơn đã lưu (màn /doi-soat) — nháp/chính thức theo tài khoản. */
-export const useReconciliationRuns = () => useBang(BANG_RECONCILIATION_RUN);
+export const useReconciliationRuns = () => useBang(RECONCILIATION_RUN_TABLE);
 /** Sự kiện biến đổi lô — mẻ SX / đóng gói đã dùng lô nào (truy xuất QR, mig 0046). */
-export const useLotInputs = () => useBang(BANG_LOT_INPUT);
+export const useLotInputs = () => useBang(LOT_INPUT_TABLE);
 /** Sổ in tem QR — lô nào đã in tem, nhãn in ra, ai in, lúc nào (mig 0049). */
-export const useLabelPrints = () => useBang(BANG_LABEL_PRINT);
+export const useLabelPrints = () => useBang(LABEL_PRINT_TABLE);
 /** Lô đi ra — dòng bán lẻ / bán nội địa / quét kiểm lệnh xuất lấy từ lô nào (mig 0056). */
-export const useLotDispatches = () => useBang(BANG_LOT_DISPATCH);
+export const useLotDispatches = () => useBang(LOT_DISPATCH_TABLE);
 /** Lý do chưa gắn lô khi chốt ngày SX (mig 0056). */
-export const useLotWaivers = () => useBang(BANG_LOT_WAIVER);
+export const useLotWaivers = () => useBang(LOT_WAIVER_TABLE);
 /** Tô màu dòng "đã dò" kiểu Excel — MỘT bảng dùng chung mọi bảng (mig 0055).
  *  Màn hình KHÔNG gọi thẳng: đi qua `ToMauProvider` (features/shared) gắn một lần
- *  ở ShellLayout, bảng bật bằng prop `toMau` của design-system. */
-export const useRowMarks = () => useBang(BANG_ROW_MARK);
+ *  ở ShellLayout, bảng bật bằng prop `rowMarkKey` của design-system. */
+export const useRowMarks = () => useBang(ROW_MARK_TABLE);
 
 /** Nạp bộ demo hàng loạt không ghi nhật ký (lib/repo.ts) — chỉ NapGoiDemo dùng. */
 export { setAuditPaused } from "@/lib/repo";

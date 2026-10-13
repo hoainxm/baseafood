@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { ChuThichBatBuoc, useCoOBatBuoc } from "./Field";
+import { RequiredLegend, useHasRequiredField } from "./Field";
 
 /**
  * FormDialog — khung dialog/form CHUẨN cho toàn hệ thống.
@@ -35,33 +35,33 @@ export function FormDialog({
   open,
   onOpenChange,
   trigger,
-  tieuDe,
-  moTa,
+  title,
+  description,
   icon: Icon,
-  rong = "rong",
-  chan,
-  coOBatBuoc = false,
+  size = "rong",
+  footer,
+  hasRequiredFields = false,
   children,
 }: {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   /** Nút mở (bọc DialogTrigger asChild). Bỏ trống ⇒ dùng open/onOpenChange. */
   trigger?: React.ReactNode;
-  tieuDe: string;
-  moTa?: React.ReactNode;
+  title: string;
+  description?: React.ReactNode;
   icon?: React.ComponentType<{ className?: string; "aria-hidden"?: boolean }>;
-  rong?: keyof typeof WIDTHS;
+  size?: keyof typeof WIDTHS;
   /** Nút hành động ở chân (VD Hủy / Lưu). Bỏ trống ⇒ không có chân. */
-  chan?: React.ReactNode;
+  footer?: React.ReactNode;
   /** Ép hiện chú thích dấu * kể cả khi không dò thấy `aria-required`. */
-  coOBatBuoc?: boolean;
+  hasRequiredFields?: boolean;
   children: React.ReactNode;
 }) {
   /* Tự dò ô bắt buộc trong thân form (`aria-required`) rồi mới hiện chú thích
      dấu * — không phải đi bật cờ ở từng chỗ gọi, và không bao giờ hiện thừa ở
      dialog chỉ để xem. */
   const thanRef = React.useRef<HTMLDivElement>(null);
-  const hasRequiredField = useCoOBatBuoc(thanRef, [open]);
+  const hasRequiredField = useHasRequiredField(thanRef, [open]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -70,12 +70,12 @@ export function FormDialog({
         className={cn(
           // dvh, không vh: Safari iOS tính vh theo màn KHI ẨN thanh địa chỉ ⇒ 88vh cao
           // hơn phần nhìn thấy lúc xoay ngang, chân hộp (nút Lưu) lọt xuống dưới mép.
-          "flex max-h-[min(88dvh,calc(100dvh-2rem))] flex-col items-stretch gap-0 overflow-hidden p-0 ngang-thap:max-h-[calc(100dvh-1rem)]",
-          WIDTHS[rong]
+          "flex max-h-[min(88dvh,calc(100dvh-2rem))] flex-col items-stretch gap-0 overflow-hidden p-0 short-landscape:max-h-[calc(100dvh-1rem)]",
+          WIDTHS[size]
         )}
       >
         {/* Đầu — cố định */}
-        <div className="flex shrink-0 items-start gap-3 border-b border-border px-6 py-4 ngang-thap:py-2.5">
+        <div className="flex shrink-0 items-start gap-3 border-b border-border px-6 py-4 short-landscape:py-2.5">
           {Icon && (
             <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-accent text-accent-foreground">
               <Icon className="size-5" aria-hidden />
@@ -83,11 +83,11 @@ export function FormDialog({
           )}
           <div className="min-w-0 flex-1">
             <DialogTitle className="text-lg leading-tight font-semibold text-foreground">
-              {tieuDe}
+              {title}
             </DialogTitle>
-            {moTa && (
+            {description && (
               <DialogDescription className="mt-1 text-sm text-muted-foreground">
-                {moTa}
+                {description}
               </DialogDescription>
             )}
           </div>
@@ -96,16 +96,16 @@ export function FormDialog({
         {/* Thân — cuộn riêng */}
         <div
           ref={thanRef}
-          className="scroll-nice min-h-0 flex-1 overflow-y-auto px-6 py-5 ngang-thap:py-3"
+          className="scroll-nice min-h-0 flex-1 overflow-y-auto px-6 py-5 short-landscape:py-3"
         >
-          {(coOBatBuoc || hasRequiredField) && <ChuThichBatBuoc className="mb-4" />}
+          {(hasRequiredFields || hasRequiredField) && <RequiredLegend className="mb-4" />}
           {children}
         </div>
 
         {/* Chân — cố định */}
-        {chan && (
-          <div className="flex shrink-0 flex-wrap items-center justify-end gap-3 border-t border-border bg-muted/40 px-6 py-3.5 ngang-thap:py-2">
-            {chan}
+        {footer && (
+          <div className="flex shrink-0 flex-wrap items-center justify-end gap-3 border-t border-border bg-muted/40 px-6 py-3.5 short-landscape:py-2">
+            {footer}
           </div>
         )}
       </DialogContent>
@@ -114,7 +114,7 @@ export function FormDialog({
 }
 
 /** Nút "Đóng" tiện dụng cho chân FormDialog (đóng dialog gần nhất). */
-export function NutDong({ children = "Đóng" }: { children?: React.ReactNode }) {
+export function CloseButton({ children = "Đóng" }: { children?: React.ReactNode }) {
   return (
     <DialogClose asChild>
       <Button variant="outline">{children}</Button>

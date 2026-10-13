@@ -18,11 +18,11 @@ import { InfoTip } from "./InfoTip";
 import { cn } from "@/lib/utils";
 import { Check, ChevronsUpDown, Pencil, Plus, X } from "lucide-react";
 
-export interface MucChon {
+export interface ComboboxOption {
   value: string;
   label: string;
   /** Dòng phụ: mã, quy cách, ghi chú… */
-  phu?: string;
+  subLabel?: string;
 }
 
 /**
@@ -37,7 +37,7 @@ export interface MucChon {
  *  - Danh sách CÓ THANH CUỘN NHÌN THẤY ĐƯỢC, dòng cao 48px.
  *  - Không tìm thấy → nút "Thêm mới «...»" ngay trong danh sách.
  *  - Đã chọn thì có dấu ✓ và nút xóa lựa chọn (không phải xóa bản ghi).
- *  - Có `onSuaMuc` → mỗi mục có nút bút chì để SỬA bản ghi danh mục đó (mở hộp
+ *  - Có `onEditItem` → mỗi mục có nút bút chì để SỬA bản ghi danh mục đó (mở hộp
  *    sửa của màn gọi). Bấm tên vẫn là chọn; bút chì không chọn mục.
  */
 export function Combobox({
@@ -52,18 +52,18 @@ export function Combobox({
   error,
   placeholder,
   emptyText = "Không tìm thấy mục nào khớp.",
-  choPhepXoa = true,
-  anNhanBatBuoc = false,
-  anNhan = false,
-  onSuaMuc,
-  nhanSua,
-  suaDuoc,
+  clearable = true,
+  hideRequiredMark = false,
+  hideLabel = false,
+  onEditItem,
+  editLabel,
+  canEdit,
   className,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
-  options: MucChon[];
+  options: ComboboxOption[];
   /** Có hàm này → cho phép tạo mới tại chỗ. Trả về value của mục vừa tạo. */
   onCreate?: (ten: string) => string;
   required?: boolean;
@@ -74,25 +74,25 @@ export function Combobox({
   placeholder?: string;
   emptyText?: string;
   /** Cho phép bỏ lựa chọn về rỗng. Tắt khi ô bắt buộc phải có giá trị. */
-  choPhepXoa?: boolean;
+  clearable?: boolean;
   /** Ẩn nhãn "Bắt buộc / (không bắt buộc)" — dùng khi đây là BỘ LỌC, không phải ô nhập. */
-  anNhanBatBuoc?: boolean;
+  hideRequiredMark?: boolean;
   /**
    * Giấu nhãn nhìn thấy được, giữ nhãn cho trình đọc màn hình. CHỈ dùng khi
    * tiêu đề cột đã nói rõ ô này là gì (ô trong lưới nhập). Ngoài lưới thì
    * nhãn phải luôn hiện — xem luật ở src/design-system/README.md.
    */
-  anNhan?: boolean;
+  hideLabel?: boolean;
   /**
    * Có hàm này → mỗi mục trong danh sách có nút bút chì "Sửa". Bấm thì đóng
    * danh sách và gọi hàm với value của mục — màn gọi tự mở hộp sửa của nó.
    * Chỉ bật cho danh mục mà màn có hộp sửa (VD thành phẩm ở /wip).
    */
-  onSuaMuc?: (value: string) => void;
+  onEditItem?: (value: string) => void;
   /** Câu `title` cho nút bút chì (mặc định "Sửa mục này trong danh mục."). */
-  nhanSua?: string;
+  editLabel?: string;
   /** Mục nào có bút chì (VD chỉ mục CÓ trong danh mục). Bỏ trống ⇒ mọi mục. */
-  suaDuoc?: (value: string) => boolean;
+  canEdit?: (value: string) => boolean;
   className?: string;
 }) {
   const [open, setOpen] = React.useState(false);
@@ -102,10 +102,10 @@ export function Combobox({
   const selectedOption = options.find((o) => o.value === value);
 
   const trimmedSearch = searchText.trim();
-  const trungTen = options.some(
+  const duplicateName = options.some(
     (o) => o.label.trim().toLowerCase() === trimmedSearch.toLowerCase()
   );
-  const canCreate = Boolean(onCreate) && trimmedSearch.length > 0 && !trungTen;
+  const canCreate = Boolean(onCreate) && trimmedSearch.length > 0 && !duplicateName;
 
   const usageHint = onCreate
     ? "Gõ để tìm — chưa có thì thêm mới ngay"
@@ -122,17 +122,17 @@ export function Combobox({
   return (
     /* min-w-0: ô này thường nằm trong grid/flex — mặc định min-width:auto lấy
        theo chữ dài nhất trong nút, ở cỡ chữ 130% sẽ đẩy rộng cả trang. */
-    <div className={cn("min-w-0", anNhan ? "space-y-0" : "space-y-2", className)}>
+    <div className={cn("min-w-0", hideLabel ? "space-y-0" : "space-y-2", className)}>
       {/* min-h-9 = chiều cao nút ⓘ: hàng nhãn luôn cao bằng nhau dù có/không ⓘ,
          hai ô cùng lưới không lệch. */}
       {/* anNhan: BỎ HẲN hàng nhãn, tên ô đi bằng aria-label trên nút. Không dùng
           class sr-only ở đây — sr-only là position:absolute, gặp tổ tiên không
           định vị sẽ rơi ra toạ độ trang và đội chiều cao trang lên. */}
-      {!anNhan && (
+      {!hideLabel && (
         <div className="flex min-h-9 flex-wrap items-center gap-2">
           <Label htmlFor={id}>
             {label}
-            {!anNhanBatBuoc && required && (
+            {!hideRequiredMark && required && (
               <span aria-hidden className="ml-1 font-bold text-destructive">
                 *
               </span>
@@ -161,7 +161,7 @@ export function Combobox({
               role="combobox"
               aria-expanded={open}
               aria-invalid={error ? true : undefined}
-              aria-required={required && !anNhanBatBuoc ? true : undefined}
+              aria-required={required && !hideRequiredMark ? true : undefined}
               className="h-10 min-w-0 flex-1 justify-between px-3 text-sm font-medium"
             >
               <span className={cn("truncate", !selectedOption && "text-muted-foreground")}>
@@ -209,13 +209,13 @@ export function Combobox({
                   {options.map((o) => (
                     <CommandItem
                       key={o.value}
-                      value={`${o.label} ${o.phu ?? ""}`}
+                      value={`${o.label} ${o.subLabel ?? ""}`}
                       onSelect={() => {
                         onChange(o.value);
                         setSearchText("");
                         setOpen(false);
                       }}
-                      className={onSuaMuc ? "group/muc" : undefined}
+                      className={onEditItem ? "group/muc" : undefined}
                     >
                       <Check
                         className={cn(
@@ -225,17 +225,17 @@ export function Combobox({
                       />
                       <span className="flex-1">
                         {o.label}
-                        {o.phu && (
+                        {o.subLabel && (
                           <span className="block text-sm text-muted-foreground">
-                            {o.phu}
+                            {o.subLabel}
                           </span>
                         )}
                       </span>
-                      {onSuaMuc && (!suaDuoc || suaDuoc(o.value)) && (
+                      {onEditItem && (!canEdit || canEdit(o.value)) && (
                         <button
                           type="button"
                           aria-label={`Sửa ${o.label}`}
-                          title={nhanSua ?? "Sửa mục này trong danh mục."}
+                          title={editLabel ?? "Sửa mục này trong danh mục."}
                           // Chặn cả pointerdown lẫn click để cmdk KHÔNG coi là chọn mục.
                           onPointerDown={(e) => {
                             e.preventDefault();
@@ -246,7 +246,7 @@ export function Combobox({
                             e.stopPropagation();
                             setSearchText("");
                             setOpen(false);
-                            onSuaMuc(o.value);
+                            onEditItem(o.value);
                           }}
                           className={cn(
                             "inline-flex size-9 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:opacity-100",
@@ -278,7 +278,7 @@ export function Combobox({
           </PopoverContent>
         </Popover>
 
-        {choPhepXoa && selectedOption && (
+        {clearable && selectedOption && (
           <Button
             type="button"
             variant="outline"

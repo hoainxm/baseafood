@@ -63,19 +63,19 @@
   --ease-soft: cubic-bezier(0.22, 1, 0.36, 1); /* ease-out dịu, không nảy */
 
   /* --- KHUNG APP: chiều cao header — MỘT nguồn cho header nội dung, đầu thanh
-     bên, đầu drawer và hàng tên cột nổi của `BangTong xoRa` (`top-header`).
+     bên, đầu drawer và hàng tên cột nổi của `SummaryTable fullHeight` (`top-header`).
      Sinh tiện ích `h-header` / `top-header`. Máy xoay ngang thấp (iPhone ngang)
-     thu còn 3rem ở khối @media `ngang-thap` phía dưới. */
+     thu còn 3rem ở khối @media `short-landscape` phía dưới. */
   --spacing-header: 4rem;
 }
 
 /* ============================================================
    MÁY XOAY NGANG THẤP — iPhone ngang (cao 320–440px). Chỉ thu chrome DỌC
    (header, đệm trang), KHÔNG phải mốc bố cục thứ ba theo bề rộng: bố cục vẫn
-   do `md:` quyết. Biến thể `ngang-thap:` dùng cho chỗ cần ẩn/thu thêm.
+   do `md:` quyết. Biến thể `short-landscape:` dùng cho chỗ cần ẩn/thu thêm.
    iPad ngang cao ≥ 744px ⇒ không bao giờ khớp.
    ============================================================ */
-@custom-variant ngang-thap (@media (orientation: landscape) and (max-height: 500px));
+@custom-variant short-landscape (@media (orientation: landscape) and (max-height: 500px));
 @media (orientation: landscape) and (max-height: 500px) {
   :root {
     --spacing-header: 3rem;
@@ -85,9 +85,9 @@
 :root {
   color-scheme: light;
 
-  /* Cỡ chữ gốc — CaiDatHienThi ghi đè bằng inline style trên <html>.
+  /* Cỡ chữ gốc — DisplaySettingsPanel ghi đè bằng inline style trên <html>.
      100% = 16px browser → text-base = 18px.
-     MẶC ĐỊNH thực tế của app là 90% (xem CO_CHU_MAC_DINH trong
+     MẶC ĐỊNH thực tế của app là 90% (xem DEFAULT_FONT_SIZE trong
      patterns/DisplaySettings.tsx) ⇒ text-base ≈ 16px. Thang token giữ nguyên,
      người mắt kém kéo lên 110–130% là về đúng cỡ cũ. */
   --app-font-scale: 100%;
@@ -153,7 +153,7 @@
   --status-maintenance-ink: #6d28d9;
   --status-changeover-ink: #1d4ed8;
 
-  /* --- Nhãn theo CHỨC NĂNG (pattern `Nhan`) — mỗi chức năng một màu, màn hình gọi
+  /* --- Nhãn theo CHỨC NĂNG (pattern `Tag`) — mỗi chức năng một màu, màn hình gọi
      theo Ý NGHĨA không gọi theo màu. Mỗi sắc có nền nhạt (-surface), viền (-line) và
      chữ đậm (-ink) ≥ 4.5:1 trên nền nhạt. Nhãn LUÔN có chữ + chấm/icon. --- */
   --info: #0369a1; /* nguồn dữ liệu (sổ nhập, sổ sản xuất, Excel, nhập tay) */
@@ -196,10 +196,10 @@
      10 sắc × 5 mức (1 rất nhạt → 5 rất đậm) = trộn sắc gốc với trắng như "tint"
      của Excel. SINH BẰNG SCRIPT có kiểm tương phản: mọi ô giữ chữ thường
      (#0f172a) ≥ 4,5:1 (mức đậm nhất bị chặn ở độ chói 0,25). Ô "tối" (độ chói
-     < 0,68, danh sách MAU_TOI ở patterns/toMauNguon.ts) ⇒ chữ phụ + chữ màu trong
-     ô đổi về màu chữ thường (khối [data-to-toi] cuối file). `-line` = sắc đậm
-     (dự phòng, test canh đủ token). Sửa/thêm màu: sửa cả SAC_TO (toMauNguon.ts) + SAC_TO_LIB
-     (lib/rowMarks.ts) + MAU_TOI. App chưa có giao diện tối ⇒ chỉ bản sáng. */
+     < 0,68, danh sách DARK_MARK_COLORS ở patterns/rowMarkSource.ts) ⇒ chữ phụ + chữ màu trong
+     ô đổi về màu chữ thường (khối [data-mark-dark] cuối file). `-line` = sắc đậm
+     (dự phòng, test canh đủ token). Sửa/thêm màu: sửa cả MARK_COLORS (rowMarkSource.ts) + SAC_TO_LIB
+     (lib/rowMarks.ts) + DARK_MARK_COLORS. App chưa có giao diện tối ⇒ chỉ bản sáng. */
   /* xám */
   --to-xam-1: #ececec; --to-xam-2: #d9d9d9; --to-xam-3: #c1c1c1; --to-xam-4: #a5a5a5; --to-xam-5: #898989;
   --to-xam-line: #5c5c5c;
@@ -314,7 +314,7 @@
 }
 
 /* ============================================================
-   MẬT ĐỘ — đặt bằng data-density trên <html> (xem CaiDatHienThi).
+   MẬT ĐỘ — đặt bằng data-density trên <html> (xem DisplaySettingsPanel).
    "thoang" 44px · "vua" 40px · "gon" (MẶC ĐỊNH) 36px.
    Kế toán quen Excel chọn Gọn để thấy nhiều dòng hơn trong một màn;
    ai muốn thoáng hơn thì Vừa/Thoáng. Mật độ web thường.
@@ -322,20 +322,20 @@
 :root[data-density="thoang"] {
   --h-control: 2.75rem;
   --h-row: 3rem;
-  --pad-o: 1rem;
+  --cell-pad: 1rem;
 }
 :root[data-density="vua"] {
   --h-control: 2.5rem;
   --h-row: 2.75rem;
-  --pad-o: 0.75rem;
+  --cell-pad: 0.75rem;
 }
-/* --pad-o = đệm NGANG mỗi ô bảng (TableHead/TableCell, tiêu đề cột sắp xếp của
+/* --cell-pad = đệm NGANG mỗi ô bảng (TableHead/TableCell, tiêu đề cột sắp xếp của
    RecordTable). Gọn 10px: bảng 13 cột như Sổ kho tháng hẹp đi ~150px so với 16px
    cứng trước 2026-10-06 — đỡ kéo ngang, mắt vẫn tách được cột nhờ vạch kẻ. */
 :root[data-density="gon"] {
   --h-control: 2.25rem;
   --h-row: 2.5rem;
-  --pad-o: 0.625rem;
+  --cell-pad: 0.625rem;
 }
 
 :root[data-density="thoang"],
@@ -433,7 +433,7 @@
 
 /* Bảng quá rộng buộc phải cuộn ngang (báo cáo kiểu Excel): khoá cột đầu để
    người dùng luôn biết đang đọc dòng nào. Đặt lên chính thẻ <table>. */
-@utility cot-dau-dinh {
+@utility sticky-first-col {
   & th:first-child {
     position: sticky;
     left: 0;
@@ -451,11 +451,11 @@
 /* RecordTable: ghim cột ĐẦU (trái) và cột THAO TÁC (phải) khi bảng vẫn phải
    cuộn ngang — nút Sửa/Xóa không bao giờ trôi khỏi tầm nhìn. Nền ô ghim phải
    ĐẶC và khớp sọc dòng (odd: background · even: muted/40 trộn sẵn) + hover/đang
-   mở, nếu không chữ cột bên dưới lộ qua. Dòng "Chi tiết" (data-chi-tiet) là MỘT
+   mở, nếu không chữ cột bên dưới lộ qua. Dòng "Chi tiết" (data-detail) là MỘT
    ô colSpan nên loại khỏi luật ghim. Đặt lên thẻ <table>. */
-@utility bang-ghim-dau {
+@utility table-pin-first {
   & th:first-child,
-  & tbody tr:not([data-chi-tiet]) > td:first-child {
+  & tbody tr:not([data-detail]) > td:first-child {
     position: sticky;
     left: 0;
     z-index: 1;
@@ -463,20 +463,20 @@
   & th:first-child {
     z-index: 2;
   }
-  & tbody tr:not([data-chi-tiet]):nth-child(odd) > td:first-child {
+  & tbody tr:not([data-detail]):nth-child(odd) > td:first-child {
     background: var(--background);
   }
-  & tbody tr:not([data-chi-tiet]):nth-child(even) > td:first-child {
+  & tbody tr:not([data-detail]):nth-child(even) > td:first-child {
     background: color-mix(in oklab, var(--muted) 40%, var(--background));
   }
-  & tbody tr:not([data-chi-tiet]):hover > td:first-child,
-  & tbody tr:not([data-chi-tiet]):has([aria-expanded="true"]) > td:first-child {
+  & tbody tr:not([data-detail]):hover > td:first-child,
+  & tbody tr:not([data-detail]):has([aria-expanded="true"]) > td:first-child {
     background: var(--accent);
   }
 }
-@utility bang-ghim-cuoi {
+@utility table-pin-last {
   & th:last-child,
-  & tbody tr:not([data-chi-tiet]) > td:last-child {
+  & tbody tr:not([data-detail]) > td:last-child {
     position: sticky;
     right: 0;
     z-index: 1;
@@ -485,23 +485,23 @@
   & th:last-child {
     z-index: 2;
   }
-  & tbody tr:not([data-chi-tiet]):nth-child(odd) > td:last-child {
+  & tbody tr:not([data-detail]):nth-child(odd) > td:last-child {
     background: var(--background);
   }
-  & tbody tr:not([data-chi-tiet]):nth-child(even) > td:last-child {
+  & tbody tr:not([data-detail]):nth-child(even) > td:last-child {
     background: color-mix(in oklab, var(--muted) 40%, var(--background));
   }
-  & tbody tr:not([data-chi-tiet]):hover > td:last-child,
-  & tbody tr:not([data-chi-tiet]):has([aria-expanded="true"]) > td:last-child {
+  & tbody tr:not([data-detail]):hover > td:last-child,
+  & tbody tr:not([data-detail]):has([aria-expanded="true"]) > td:last-child {
     background: var(--accent);
   }
 }
 
-/* Bảng dài: hàng tên cột DÍNH trên cùng khi cuộn dọc (BangTong `dinhDau`). Khung
+/* Bảng dài: hàng tên cột DÍNH trên cùng khi cuộn dọc (SummaryTable `stickyHeader`). Khung
    bảng (data-slot="table-container") vừa cuộn ngang vừa cuộn dọc trong chiều cao
    tối đa, vì sticky không bám theo trang khi tổ tiên đã overflow-x. Chân tổng
    dính đáy để luôn thấy dòng cộng. Đặt lên thẻ bọc ngoài bảng. */
-@utility bang-dinh-dau {
+@utility table-sticky-head {
   & [data-slot="table-container"] {
     max-height: min(70dvh, 48rem);
     overflow: auto;
@@ -604,14 +604,14 @@
    tràn tới mép máy; các tiện ích này đẩy nội dung vào trong. Máy không có tai
    thỏ (desktop, Android) ⇒ env() = 0, không đổi gì.
    ============================================================ */
-@utility px-an-toan {
+@utility px-safe {
   padding-left: env(safe-area-inset-left, 0px);
   padding-right: env(safe-area-inset-right, 0px);
 }
-@utility pl-an-toan {
+@utility pl-safe {
   padding-left: env(safe-area-inset-left, 0px);
 }
-@utility pb-an-toan {
+@utility pb-safe {
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
@@ -622,10 +622,10 @@
    bấm lại lần hai. Thay cho `transition-colors` ở nút tự dựng: chuyển cả màu
    lẫn transform. Bỏ ô xám nháy mặc định của Safari vì đã có phản hồi riêng.
    ============================================================ */
-@utility nhan-an {
+@utility press-feedback {
   -webkit-tap-highlight-color: transparent;
   /* Bọc :not(:disabled) để nâng độ ưu tiên: đi cạnh `transition-colors` (vẫn còn
-     ở vài nút cũ) thì nhan-an vẫn thắng, co nhẹ có chuyển động chứ không giật. */
+     ở vài nút cũ) thì press-feedback vẫn thắng, co nhẹ có chuyển động chứ không giật. */
   &:not(:disabled) {
     transition-property: color, background-color, border-color, box-shadow, transform;
     transition-duration: var(--duration-fast);
@@ -645,40 +645,40 @@
    utility dưới đây TỰ tắt, không cần lặp @media. `both` fill-mode đảm bảo khi
    tắt vẫn dừng ở trạng thái cuối (hiện rõ), không kẹt ở opacity 0.
    ============================================================ */
-@utility hien-len {
-  animation: bsf-hien-len var(--duration-base) var(--ease-soft) both;
+@utility enter-up {
+  animation: bsf-enter-up var(--duration-base) var(--ease-soft) both;
 }
-@utility hien-ngang {
-  animation: bsf-hien-ngang var(--duration-base) var(--ease-soft) both;
+@utility enter-side {
+  animation: bsf-enter-side var(--duration-base) var(--ease-soft) both;
 }
-@utility hien-xuong {
-  animation: bsf-hien-xuong var(--duration-base) var(--ease-soft) both;
+@utility enter-down {
+  animation: bsf-enter-down var(--duration-base) var(--ease-soft) both;
 }
 /* Chỉ mờ→rõ, KHÔNG transform, KHÔNG fill-mode: dùng cho khối LỚN có thể chứa
    phần tử `fixed`/`sticky` (nội dung tab, nội dung màn). Transform — kể cả
    transform đang "giữ" sau animation (fill-mode both) — biến khối thành gốc toạ độ
    của con `fixed` ⇒ thanh cuộn dính đáy / hàng tên cột nổi chạy sai chỗ. */
-@utility hien-mo {
-  animation: bsf-hien-mo var(--duration-fast) var(--ease-soft);
+@utility enter-fade {
+  animation: bsf-enter-fade var(--duration-fast) var(--ease-soft);
 }
-@keyframes bsf-hien-mo {
+@keyframes bsf-enter-fade {
   from {
     opacity: 0;
   }
 }
-@keyframes bsf-hien-len {
+@keyframes bsf-enter-up {
   from {
     opacity: 0;
     transform: translateY(6px);
   }
 }
-@keyframes bsf-hien-ngang {
+@keyframes bsf-enter-side {
   from {
     opacity: 0;
     transform: translateX(10px);
   }
 }
-@keyframes bsf-hien-xuong {
+@keyframes bsf-enter-down {
   from {
     opacity: 0;
     transform: translateY(-8px);
@@ -686,28 +686,28 @@
 }
 
 /* ============================================================
-   TÔ MÀU DÒNG "ĐÃ DÒ" — gắn qua useToMau().thuocTinh(khoá) lên <tr> (hoặc thẻ
-   <li> của RecordTable trên điện thoại). Thuộc tính mang `data-to-mau` + style
-   `--to-nen` (màu nền); màn hình không tự viết class màu. Luật: README
+   TÔ MÀU DÒNG "ĐÃ DÒ" — gắn qua useRowMarkTools().thuocTinh(khoá) lên <tr> (hoặc thẻ
+   <li> của RecordTable trên điện thoại). Thuộc tính mang `data-marked` + style
+   `--mark-bg` (màu nền); màn hình không tự viết class màu. Luật: README
    design-system § Tô màu dòng.
    KHÔNG bọc @layer: khối này phải THẮNG sọc dòng, hover, nền ô ghim/ô dính
-   (bang-ghim-*, cot-dau-dinh, cột tính của LuoiNhap) — utility nằm trong layer
+   (table-pin-*, sticky-first-col, cột tính của EditableGrid) — utility nằm trong layer
    nên CSS ngoài layer luôn thắng, khỏi cần !important.
    ============================================================ */
-tr[data-to-mau] > td,
-tr[data-to-mau] > th,
-li[data-to-mau] {
-  background-color: var(--to-nen);
+tr[data-marked] > td,
+tr[data-marked] > th,
+li[data-marked] {
+  background-color: var(--mark-bg);
 }
 /* Chữ xanh lá / hổ phách (nhập +, xuất −) trên nền tô nhạt: bản đậm hơn cho đủ
    4,5:1. @theme inline ⇒ text-success đọc thẳng var(--success) nên đè biến ở đây là ăn. */
-[data-to-mau] {
+[data-marked] {
   --success: #166534;
   --warning: #92400e;
 }
 /* Nền "tối" (mức đậm): chữ phụ + chữ màu về màu chữ thường — như Excel, chữ
    vẫn đen trên ô tô đậm. Ô nhập trong ô (nền trắng riêng) không bị ảnh hưởng. */
-[data-to-toi] {
+[data-mark-dark] {
   --muted-foreground: var(--foreground);
   --success: var(--foreground);
   --warning: var(--foreground);
@@ -715,32 +715,32 @@ li[data-to-mau] {
   --primary: var(--foreground);
 }
 /* Rê chuột vẫn thấy đang đứng dòng nào — phủ một lớp mờ lên màu tô. */
-tr[data-to-mau]:hover > td,
-tr[data-to-mau]:hover > th {
+tr[data-marked]:hover > td,
+tr[data-marked]:hover > th {
   background-image: linear-gradient(rgb(15 23 42 / 0.05), rgb(15 23 42 / 0.05));
 }
 /* Vạch đậm mép trái dòng tô (màu không phải tín hiệu duy nhất) — đậm hơn nền
    cùng sắc: trộn màu nền với chữ thường. */
-tr[data-to-mau] > :first-child,
-li[data-to-mau] {
-  box-shadow: inset 4px 0 0 color-mix(in oklab, var(--to-nen), var(--foreground) 45%);
+tr[data-marked] > :first-child,
+li[data-marked] {
+  box-shadow: inset 4px 0 0 color-mix(in oklab, var(--mark-bg), var(--foreground) 45%);
 }
-tr[data-dam] > td,
-tr[data-dam] > th,
-tr[data-dam] > td *,
-tr[data-dam] > th *,
-li[data-dam],
-li[data-dam] * {
+tr[data-bold] > td,
+tr[data-bold] > th,
+tr[data-bold] > td *,
+tr[data-bold] > th *,
+li[data-bold],
+li[data-bold] * {
   font-weight: 700;
 }
 
 /* ============================================================
-   BẢNG XỔ RA — BangTong `xoRa`: bảng dài trải hết, trang cuộn một mạch (không
-   khung cuộn riêng như dinhDau). Thanh cuộn ngang THẬT của bảng ẩn đi; thay
-   bằng thanh cuộn DÍNH ĐÁY màn hình (bang-thanh-cuon) — bảng dài cả nghìn px
+   BẢNG XỔ RA — SummaryTable `fullHeight`: bảng dài trải hết, trang cuộn một mạch (không
+   khung cuộn riêng như stickyHeader). Thanh cuộn ngang THẬT của bảng ẩn đi; thay
+   bằng thanh cuộn DÍNH ĐÁY màn hình (table-scrollbar) — bảng dài cả nghìn px
    vẫn kéo ngang được mà không phải cuộn xuống tận đáy bảng (bài học §5a).
    ============================================================ */
-@utility bang-xo-ra {
+@utility table-expanded {
   & [data-slot="table-container"] {
     scrollbar-width: none;
   }
@@ -752,7 +752,7 @@ li[data-dam] * {
    HIỆN, kể cả máy Mac đặt "chỉ hiện khi cuộn". Chrome bỏ qua kiểu webkit khi
    scrollbar-width/-color khác `auto` — mà scrollbar-color KẾ THỪA từ khung
    `scroll-nice` (cột nội dung) ⇒ phải đặt lại `auto` ở đây, nếu không thanh cao 0. */
-@utility bang-thanh-cuon {
+@utility table-scrollbar {
   scrollbar-color: auto;
   scrollbar-width: auto;
   overflow-x: auto;

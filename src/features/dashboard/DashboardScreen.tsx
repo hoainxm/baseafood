@@ -7,26 +7,26 @@
 import { useMemo, useRef, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  BangChuyen,
-  BangTong,
-  BieuDoCot,
-  BieuDoTheoNgay,
+  PipelineStages,
+  SummaryTable,
+  BarChart,
+  TimeSeriesChart,
   Button,
   DateRangeField,
   EmptyState,
-  Nhan,
+  Tag,
   Tabs,
   TabsList,
   TabsTrigger,
-  ThanhChiaPhan,
-  ThongKe,
-  homNay,
-  sacXuong,
-  type CotTong,
-  type LoaiNhan,
-  type PhanChia,
-  type SacPhanLoai,
-  type TheThongTin,
+  ProportionBar,
+  StatCardGrid,
+  todayIso,
+  toneForWorkshop,
+  type SummaryTableColumn,
+  type TagVariant,
+  type ProportionSegment,
+  type CategoryTone,
+  type StatCardData,
 } from "@/design-system";
 import {
   useBalancingInputs,
@@ -118,8 +118,8 @@ const KIND_TONES = {
   dongGoi: "bang",
   ban: "la",
   lo: "bang",
-} as const satisfies Record<string, SacPhanLoai>;
-const SAC_KHAU: Record<string, SacPhanLoai> = {
+} as const satisfies Record<string, CategoryTone>;
+const SAC_KHAU: Record<string, CategoryTone> = {
   nhap: KIND_TONES.nhap,
   "san-xuat": KIND_TONES.sanXuat,
   kho: KIND_TONES.kho,
@@ -128,18 +128,18 @@ const SAC_KHAU: Record<string, SacPhanLoai> = {
 };
 
 /** Tên + sắc + câu phụ cho từng phần của hai thanh "đi đâu" (id nút ở lib/dataFlow). */
-const MATERIAL_PARTS: Record<string, { nhan: string; sac: SacPhanLoai; moTa?: string }> = {
-  btp: { nhan: "Thành bán thành phẩm", sac: KIND_TONES.sanXuat },
-  nd: { nhan: "Bán thẳng nội địa", sac: KIND_TONES.ban },
-  cd: { nhan: "Còn dở, gửi đông", sac: KIND_TONES.kho, moTa: "ghi lúc chốt ngày sản xuất" },
-  pl: { nhan: "Phế liệu", sac: "cam" },
-  hh: { nhan: "Hao hụt / chưa ghi ra", sac: "xam", moTa: "hao hụt chế biến hoặc NL chưa ghi dùng vào đâu" },
+const MATERIAL_PARTS: Record<string, { label: string; tone: CategoryTone; description?: string }> = {
+  btp: { label: "Thành bán thành phẩm", tone: KIND_TONES.sanXuat },
+  nd: { label: "Bán thẳng nội địa", tone: KIND_TONES.ban },
+  cd: { label: "Còn dở, gửi đông", tone: KIND_TONES.kho, description: "ghi lúc chốt ngày sản xuất" },
+  pl: { label: "Phế liệu", tone: "cam" },
+  hh: { label: "Hao hụt / chưa ghi ra", tone: "xam", description: "hao hụt chế biến hoặc NL chưa ghi dùng vào đâu" },
 };
-const WAREHOUSE_PARTS: Record<string, { nhan: string; sac: SacPhanLoai; moTa?: string }> = {
-  goi: { nhan: "Đem đóng gói", sac: KIND_TONES.dongGoi },
-  xd: { nhan: "Xuất theo đơn", sac: KIND_TONES.ban },
-  bb: { nhan: "Bán block thô", sac: "hong" },
-  tonBtp: { nhan: "Còn trong kho", sac: KIND_TONES.kho },
+const WAREHOUSE_PARTS: Record<string, { label: string; tone: CategoryTone; description?: string }> = {
+  goi: { label: "Đem đóng gói", tone: KIND_TONES.dongGoi },
+  xd: { label: "Xuất theo đơn", tone: KIND_TONES.ban },
+  bb: { label: "Bán block thô", tone: "hong" },
+  tonBtp: { label: "Còn trong kho", tone: KIND_TONES.kho },
 };
 
 /** Lùi / tiến mốc kỳ một bước (ngày · tuần · tháng · năm). */
@@ -160,7 +160,7 @@ function periodLabel(ky: ViewPeriod, tu: string, den: string): string {
   return `${formatDateVN(tu)} – ${formatDateVN(den)}`;
 }
 
-const LEVEL_LABELS: Record<FlowWarning["muc"], { chu: string; loai: LoaiNhan }> = {
+const LEVEL_LABELS: Record<FlowWarning["muc"], { chu: string; loai: TagVariant }> = {
   loi: { chu: "Sổ sai", loai: "loi" },
   nhac: { chu: "Chưa làm", loai: "luu-y" },
   tin: { chu: "Để biết", loai: "phu" },
@@ -200,9 +200,9 @@ export default function DashboardScreen() {
   const navigate = useNavigate();
   const { laAdmin, canDangNhap } = useAuth();
   const [ky, setKy] = useState<ViewPeriod>("thang");
-  const [moc, setMoc] = useState(homNay());
-  const [tuTC, setTuTC] = useState(homNay());
-  const [denTC, setDenTC] = useState(homNay());
+  const [moc, setMoc] = useState(todayIso());
+  const [tuTC, setTuTC] = useState(todayIso());
+  const [denTC, setDenTC] = useState(todayIso());
   const [workshop, setWorkshop] = useState<Workshop | "">("");
   const [tu, den] = getViewPeriodRange(ky, moc, tuTC, denTC);
   const khoang: FlowRange = useMemo(() => ({ tu, den, xuong: workshop }), [tu, den, workshop]);
@@ -230,11 +230,11 @@ export default function DashboardScreen() {
   const khau = useMemo(() => buildFlowStages(d, khoang), [d, khoang]);
   // Chuỗi theo ngày dừng ở hôm nay — ngày tương lai chưa có số, vẽ ra chỉ là đường phẳng.
   const byDate = useMemo(() => {
-    const today = homNay();
+    const today = todayIso();
     return buildDailyFlowSeries(d, { ...khoang, den: khoang.den < today ? khoang.den : today });
   }, [d, khoang]);
   const yieldRatio = useMemo(() => computeYieldByProduct(d, khoang), [d, khoang]);
-  const warnings = useMemo(() => buildChainWarnings(d, khoang, homNay()), [d, khoang]);
+  const warnings = useMemo(() => buildChainWarnings(d, khoang, todayIso()), [d, khoang]);
   const cacKy = useMemo(() => computeAllPeriodResults(d), [d]);
 
   const kgKhau = (k: string) => khau.find((x) => x.khoa === k)?.kg ?? 0;
@@ -258,89 +258,89 @@ export default function DashboardScreen() {
     return mes.filter((w) => lottedWipIds.has(w.id)).reduce((s, w) => s + (w.quantityKg || 0), 0) / total;
   }, [d, tu, den, workshop]);
 
-  const the: TheThongTin[] = [
+  const the: StatCardData[] = [
     {
-      nhan: "Nguyên liệu nhập",
-      giaTri: `${num(inKg)} kg`,
-      phu: `${new Set(d.imports.filter((r) => r.deliveryDate >= tu && r.deliveryDate <= den && (!workshop || r.workshop === workshop)).map((r) => r.shipmentId)).size} chuyến`,
-      so: true,
+      label: "Nguyên liệu nhập",
+      value: `${num(inKg)} kg`,
+      subtext: `${new Set(d.imports.filter((r) => r.deliveryDate >= tu && r.deliveryDate <= den && (!workshop || r.workshop === workshop)).map((r) => r.shipmentId)).size} chuyến`,
+      numeric: true,
       icon: Truck,
-      sac: KIND_TONES.nhap,
-      onChon: () => navigate("/imports"),
-      moTaChon: "Mở màn Nhập hàng để xem từng chuyến.",
+      tone: KIND_TONES.nhap,
+      onSelect: () => navigate("/imports"),
+      selectHint: "Mở màn Nhập hàng để xem từng chuyến.",
     },
     {
-      nhan: "Bán thành phẩm sản xuất",
-      giaTri: `${num(productionKg)} kg`,
-      phu: inKg > 0 ? `= ${num((productionKg / inKg) * 100)}% kg NL nhập` : undefined,
-      so: true,
+      label: "Bán thành phẩm sản xuất",
+      value: `${num(productionKg)} kg`,
+      subtext: inKg > 0 ? `= ${num((productionKg / inKg) * 100)}% kg NL nhập` : undefined,
+      numeric: true,
       icon: Factory,
-      sac: KIND_TONES.sanXuat,
-      onChon: () => navigate("/wip"),
-      moTaChon: "Mở màn Sản xuất thành phẩm.",
+      tone: KIND_TONES.sanXuat,
+      onSelect: () => navigate("/wip"),
+      selectHint: "Mở màn Sản xuất thành phẩm.",
     },
     {
-      nhan: "Định mức NL/TP bình quân",
-      giaTri: yieldRatio.binhQuan != null ? num(yieldRatio.binhQuan) : latestPeriod ? num(latestPeriod.kq.norm) : "—",
-      phu:
+      label: "Định mức NL/TP bình quân",
+      value: yieldRatio.binhQuan != null ? num(yieldRatio.binhQuan) : latestPeriod ? num(latestPeriod.kq.norm) : "—",
+      subtext:
         yieldRatio.binhQuan != null
           ? `từ ${yieldRatio.dong.length} mặt hàng có gắn lô cân kg`
           : latestPeriod
             ? `kỳ cân đối ${latestPeriod.period.materialTypeName} gần nhất`
             : "chưa có mẻ gắn lô cân kg",
-      so: true,
+      numeric: true,
       icon: Gauge,
-      sac: KIND_TONES.dinhMuc,
+      tone: KIND_TONES.dinhMuc,
     },
     {
-      nhan: "Tồn BTP kho dự trữ cuối kỳ",
-      giaTri: `${num(last?.tonBtp ?? 0)} kg`,
-      phu: `TP đóng gói còn ${num(last?.tonTp ?? 0)} kg`,
-      so: true,
+      label: "Tồn BTP kho dự trữ cuối kỳ",
+      value: `${num(last?.tonBtp ?? 0)} kg`,
+      subtext: `TP đóng gói còn ${num(last?.tonTp ?? 0)} kg`,
+      numeric: true,
       icon: Warehouse,
-      sac: KIND_TONES.kho,
-      onChon: () => navigate("/warehouse"),
-      moTaChon: "Mở màn Kho dự trữ để xem tồn theo lô.",
+      tone: KIND_TONES.kho,
+      onSelect: () => navigate("/warehouse"),
+      selectHint: "Mở màn Kho dự trữ để xem tồn theo lô.",
     },
     {
-      nhan: "Xuất + bán ra",
-      giaTri: `${num(raKg)} kg`,
-      phu: "xuất theo đơn · bán lẻ · bán nội địa",
-      so: true,
+      label: "Xuất + bán ra",
+      value: `${num(raKg)} kg`,
+      subtext: "xuất theo đơn · bán lẻ · bán nội địa",
+      numeric: true,
       icon: ShoppingCart,
-      sac: KIND_TONES.ban,
-      onChon: () => navigate("/orders"),
-      moTaChon: "Mở màn Đơn đặt để xem lệnh xuất.",
+      tone: KIND_TONES.ban,
+      onSelect: () => navigate("/orders"),
+      selectHint: "Mở màn Đơn đặt để xem lệnh xuất.",
     },
     {
-      nhan: "Lãi/lỗ kỳ cân đối gần nhất",
-      giaTri: latestPeriod ? formatMoney(latestPeriod.kq.profitOrLoss) : "—",
-      phu: latestPeriod ? `${latestPeriod.period.materialTypeName} · ${latestPeriod.period.dateRangeDescription}` : "chưa có kỳ có thành phẩm",
-      so: true,
+      label: "Lãi/lỗ kỳ cân đối gần nhất",
+      value: latestPeriod ? formatMoney(latestPeriod.kq.profitOrLoss) : "—",
+      subtext: latestPeriod ? `${latestPeriod.period.materialTypeName} · ${latestPeriod.period.dateRangeDescription}` : "chưa có kỳ có thành phẩm",
+      numeric: true,
       icon: Scale,
-      mau: !latestPeriod ? "trung-tinh" : latestPeriod.kq.profitOrLoss >= 0 ? "success" : "danger",
-      onChon: latestPeriod ? () => navigate(`/balancing/${latestPeriod.period.id}`) : undefined,
-      moTaChon: "Mở kỳ cân đối để xem bảng chi tiết.",
+      color: !latestPeriod ? "trung-tinh" : latestPeriod.kq.profitOrLoss >= 0 ? "success" : "danger",
+      onSelect: latestPeriod ? () => navigate(`/balancing/${latestPeriod.period.id}`) : undefined,
+      selectHint: "Mở kỳ cân đối để xem bảng chi tiết.",
     },
     {
-      nhan: "Mẻ đã gắn lô NL",
-      giaTri: lotCoverageRatio == null ? "—" : `${num(lotCoverageRatio * 100)}%`,
-      phu: "tính theo kg BTP (gồm mẻ đã ghi lý do)",
-      so: true,
+      label: "Mẻ đã gắn lô NL",
+      value: lotCoverageRatio == null ? "—" : `${num(lotCoverageRatio * 100)}%`,
+      subtext: "tính theo kg BTP (gồm mẻ đã ghi lý do)",
+      numeric: true,
       icon: QrCode,
-      sac: KIND_TONES.lo,
-      onChon: () => navigate("/qr?tab=giai-doan"),
-      moTaChon: "Mở Mã lô QR — tab Theo giai đoạn để gắn lô còn thiếu.",
+      tone: KIND_TONES.lo,
+      onSelect: () => navigate("/qr?tab=giai-doan"),
+      selectHint: "Mở Mã lô QR — tab Theo giai đoạn để gắn lô còn thiếu.",
     },
     {
-      nhan: "Việc cần đốc",
-      giaTri: `${num(soViec)} việc`,
-      phu: errorCount > 0 ? `${errorCount} chỗ sổ sai cần sửa` : "không có sổ sai",
-      so: true,
+      label: "Việc cần đốc",
+      value: `${num(soViec)} việc`,
+      subtext: errorCount > 0 ? `${errorCount} chỗ sổ sai cần sửa` : "không có sổ sai",
+      numeric: true,
       icon: AlertTriangle,
-      mau: errorCount > 0 ? "danger" : soViec > 0 ? "warning" : "success",
-      onChon: () => warningsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
-      moTaChon: "Cuộn tới danh sách việc cần đốc.",
+      color: errorCount > 0 ? "danger" : soViec > 0 ? "warning" : "success",
+      onSelect: () => warningsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
+      selectHint: "Cuộn tới danh sách việc cần đốc.",
     },
   ];
 
@@ -349,8 +349,8 @@ export default function DashboardScreen() {
     () => Object.fromEntries(dataFlow.nut.filter((n) => n.duongDan).map((n) => [n.id, n.duongDan as string])),
     [dataFlow],
   );
-  const toShares = (ds: ReturnType<typeof splitOutflows>, ten: typeof MATERIAL_PARTS): PhanChia[] =>
-    ds.map((x) => ({ khoa: x.id, nhan: ten[x.id]?.nhan ?? x.nhan, sac: ten[x.id]?.sac ?? "xam", moTa: ten[x.id]?.moTa, giaTri: x.kg }));
+  const toShares = (ds: ReturnType<typeof splitOutflows>, ten: typeof MATERIAL_PARTS): ProportionSegment[] =>
+    ds.map((x) => ({ id: x.id, label: ten[x.id]?.label ?? x.nhan, tone: ten[x.id]?.tone ?? "xam", description: ten[x.id]?.description, value: x.kg }));
   const materialOutflow = useMemo(
     () => splitOutflows(dataFlow, (id) => id.startsWith("x:"), Object.keys(MATERIAL_PARTS)),
     [dataFlow],
@@ -361,14 +361,14 @@ export default function DashboardScreen() {
   const wipRatio = materialOutflow.find((x) => x.id === "btp")?.tiLe ?? 0;
 
   // ---- Bảng việc cần đốc ----
-  const warningColumns: CotTong<FlowWarning>[] = [
+  const warningColumns: SummaryTableColumn<FlowWarning>[] = [
     {
       key: "muc",
       header: "Mức",
       render: (r) => (
-        <Nhan loai={LEVEL_LABELS[r.muc].loai}>
+        <Tag variant={LEVEL_LABELS[r.muc].loai}>
           {LEVEL_LABELS[r.muc].chu}
-        </Nhan>
+        </Tag>
       ),
     },
     {
@@ -387,7 +387,7 @@ export default function DashboardScreen() {
     {
       key: "xuong",
       header: "Xưởng",
-      render: (r) => (r.xuong ? <Nhan loai="phan-loai" sac={sacXuong(r.xuong)}>{r.xuong}</Nhan> : "—"),
+      render: (r) => (r.xuong ? <Tag variant="phan-loai" tone={toneForWorkshop(r.xuong)}>{r.xuong}</Tag> : "—"),
     },
     {
       key: "mo",
@@ -402,7 +402,7 @@ export default function DashboardScreen() {
   ];
 
   // ---- Kỳ cân đối ----
-  const periodColumns: CotTong<PeriodBalancingResult>[] = [
+  const periodColumns: SummaryTableColumn<PeriodBalancingResult>[] = [
     {
       key: "ky",
       header: "Kỳ",
@@ -413,13 +413,13 @@ export default function DashboardScreen() {
         </div>
       ),
     },
-    { key: "nl", header: "NL vào (kg)", so: true, render: (r) => num(r.kq.totalInputKg) },
-    { key: "tp", header: "TP ra (kg)", so: true, render: (r) => num(r.kq.totalOutputKg) },
-    { key: "dm", header: "Định mức", so: true, render: (r) => (r.coThanhPham ? num(r.kq.norm) : "chưa có TP") },
+    { key: "nl", header: "NL vào (kg)", numeric: true, render: (r) => num(r.kq.totalInputKg) },
+    { key: "tp", header: "TP ra (kg)", numeric: true, render: (r) => num(r.kq.totalOutputKg) },
+    { key: "dm", header: "Định mức", numeric: true, render: (r) => (r.coThanhPham ? num(r.kq.norm) : "chưa có TP") },
     {
       key: "lai",
       header: "Lãi/lỗ (đ)",
-      so: true,
+      numeric: true,
       render: (r) =>
         r.coThanhPham ? (
           <span className={r.kq.profitOrLoss >= 0 ? "font-semibold text-success" : "font-semibold text-destructive"}>
@@ -463,7 +463,7 @@ export default function DashboardScreen() {
     }
     return [...m.values()].sort((a, b) => b.tonCuoi - a.tonCuoi);
   }, [snapshots]);
-  const warehouseColumns: CotTong<WarehouseRow>[] = [
+  const warehouseColumns: SummaryTableColumn<WarehouseRow>[] = [
     {
       key: "kho",
       header: "Kho / chi nhánh",
@@ -476,15 +476,15 @@ export default function DashboardScreen() {
         </div>
       ),
     },
-    { key: "tonDau", header: "Tồn đầu (kg)", so: true, render: (r) => num(r.tonDau), tong: () => num(warehouseTotals.reduce((s, k) => s + k.tonDau, 0)) },
-    { key: "nhap", header: "Nhập (kg)", so: true, render: (r) => (r.nhap ? `+${num(r.nhap)}` : "—"), tong: () => num(warehouseTotals.reduce((s, k) => s + k.nhap, 0)) },
-    { key: "xuat", header: "Xuất (kg)", so: true, render: (r) => (r.xuat ? `−${num(r.xuat)}` : "—"), tong: () => num(warehouseTotals.reduce((s, k) => s + k.xuat, 0)) },
+    { key: "tonDau", header: "Tồn đầu (kg)", numeric: true, render: (r) => num(r.tonDau), total: () => num(warehouseTotals.reduce((s, k) => s + k.tonDau, 0)) },
+    { key: "nhap", header: "Nhập (kg)", numeric: true, render: (r) => (r.nhap ? `+${num(r.nhap)}` : "—"), total: () => num(warehouseTotals.reduce((s, k) => s + k.nhap, 0)) },
+    { key: "xuat", header: "Xuất (kg)", numeric: true, render: (r) => (r.xuat ? `−${num(r.xuat)}` : "—"), total: () => num(warehouseTotals.reduce((s, k) => s + k.xuat, 0)) },
     {
       key: "tonCuoi",
       header: "Tồn cuối (kg)",
-      so: true,
+      numeric: true,
       render: (r) => <span className="tnum font-bold text-foreground">{num(r.tonCuoi)}</span>,
-      tong: () => num(warehouseTotals.reduce((s, k) => s + k.tonCuoi, 0)),
+      total: () => num(warehouseTotals.reduce((s, k) => s + k.tonCuoi, 0)),
     },
   ];
 
@@ -493,7 +493,15 @@ export default function DashboardScreen() {
   const hasStock = byDate.some((x) => x.tonBtp !== 0 || x.tonTp !== 0);
   const khoaKy = `${tu}|${den}|${workshop || "tat-ca"}`;
   const duongKhau = Object.fromEntries(khau.map((k) => [k.khoa, k.duongDan]));
-  const coloredStages = khau.map((k) => ({ ...k, sac: SAC_KHAU[k.khoa] }));
+  const coloredStages = khau.map((k) => ({
+    id: k.khoa,
+    name: k.ten,
+    kg: k.kg,
+    pendingKg: k.kgCho,
+    pendingTasks: k.viecThieu,
+    conversionRate: k.tiLeChuyen,
+    tone: SAC_KHAU[k.khoa],
+  }));
 
   return (
     <div className="grid grid-cols-[minmax(0,1fr)] gap-6">
@@ -545,7 +553,7 @@ export default function DashboardScreen() {
           <div className="max-w-md">
             <DateRangeField
               label="Khoảng ngày"
-              anNhanBatBuoc
+              hideRequiredMark
               presets={false}
               startDate={tuTC}
               endDate={denTC}
@@ -558,13 +566,13 @@ export default function DashboardScreen() {
         )}
       </div>
 
-      <ThongKe the={the} />
+      <StatCardGrid cards={the} />
 
       <Section
         tieuDe="Năm khâu của chuỗi"
         moTa="kg đã qua từng khâu trong kỳ và số lô / dòng còn thiếu việc (tem, gắn lô, duyệt, quét kiểm). Phần trăm trên mũi tên so với khâu nguồn: SX so với NL nhập, nhập kho so với SX, đóng gói và xuất/bán so với nhập kho. Bấm một khâu để mở màn của khâu đó."
       >
-        <BangChuyen khau={coloredStages} onChon={(k) => navigate(duongKhau[k] ?? "/dashboard")} />
+        <PipelineStages stages={coloredStages} onSelect={(k) => navigate(duongKhau[k] ?? "/dashboard")} />
       </Section>
 
       <Section
@@ -572,7 +580,7 @@ export default function DashboardScreen() {
         moTa="Mỗi thanh là 100% một khối hàng, chia theo nơi nó đi tới. Bấm một phần để mở màn liên quan."
       >
         {materialOutflow.length === 0 && outOfWarehouse.length === 0 ? (
-          <EmptyState icon={Truck} tieuDe="Kỳ này chưa có số" moTa="Chưa ghi nhập hàng hay sản xuất nào trong kỳ đang xem." />
+          <EmptyState icon={Truck} title="Kỳ này chưa có số" description="Chưa ghi nhập hàng hay sản xuất nào trong kỳ đang xem." />
         ) : (
           <div className="grid grid-cols-[minmax(0,1fr)] gap-6">
             {materialOutflow.length > 0 && (
@@ -584,10 +592,10 @@ export default function DashboardScreen() {
                     <span className="text-sm text-muted-foreground"> (Đã gồm {num(priorMaterialKg)} kg NL lấy từ kho / kỳ trước.)</span>
                   )}
                 </p>
-                <ThanhChiaPhan
-                  phan={toShares(materialOutflow, MATERIAL_PARTS)}
-                  moTa="Nguyên liệu vào xưởng chia theo nơi đi tới"
-                  onChon={(k) => nodePaths[k] && navigate(nodePaths[k])}
+                <ProportionBar
+                  segments={toShares(materialOutflow, MATERIAL_PARTS)}
+                  description="Nguyên liệu vào xưởng chia theo nơi đi tới"
+                  onSelect={(k) => nodePaths[k] && navigate(nodePaths[k])}
                 />
               </div>
             )}
@@ -600,10 +608,10 @@ export default function DashboardScreen() {
                   )}
                   :
                 </p>
-                <ThanhChiaPhan
-                  phan={toShares(outOfWarehouse, WAREHOUSE_PARTS)}
-                  moTa="Hàng trong kho dự trữ chia theo nơi đi tới"
-                  onChon={(k) => nodePaths[k] && navigate(nodePaths[k])}
+                <ProportionBar
+                  segments={toShares(outOfWarehouse, WAREHOUSE_PARTS)}
+                  description="Hàng trong kho dự trữ chia theo nơi đi tới"
+                  onSelect={(k) => nodePaths[k] && navigate(nodePaths[k])}
                 />
               </div>
             )}
@@ -617,9 +625,9 @@ export default function DashboardScreen() {
           moTa="Sổ sai đứng trước, rồi việc chưa làm, cuối cùng là các ghi bù để biết. Bấm Mở để tới đúng chỗ sửa."
         >
           {warnings.length === 0 ? (
-            <EmptyState icon={AlertTriangle} tieuDe="Không có việc tồn đọng" moTa="Các ngày đã chốt, lô đã gắn, không có bán vượt tồn trong kỳ này." />
+            <EmptyState icon={AlertTriangle} title="Không có việc tồn đọng" description="Các ngày đã chốt, lô đã gắn, không có bán vượt tồn trong kỳ này." />
           ) : (
-            <BangTong rows={warnings} cot={warningColumns} getKey={(r) => r.id} toMau={`tong-quan-canh-bao|${khoaKy}`} />
+            <SummaryTable rows={warnings} columns={warningColumns} getKey={(r) => r.id} rowMarkKey={`tong-quan-canh-bao|${khoaKy}`} />
           )}
         </Section>
       </div>
@@ -627,16 +635,16 @@ export default function DashboardScreen() {
       <div className="grid grid-cols-[minmax(0,1fr)] gap-6 2xl:grid-cols-2">
         <Section tieuDe="Nhập và sản xuất theo ngày" moTa="Cột: kg nguyên liệu nhập và kg bán thành phẩm sản xuất mỗi ngày.">
           {hasDailyFigures ? (
-            <BieuDoTheoNgay
-              nhan={dayLabels}
-              moTa="Biểu đồ kg nhập và sản xuất theo ngày"
-              chuoi={[
-                { khoa: "nhap", ten: "NL nhập", mau: KIND_TONES.nhap, dang: "cot", giaTri: byDate.map((x) => x.nhap) },
-                { khoa: "sx", ten: "BTP sản xuất", mau: KIND_TONES.sanXuat, dang: "cot", giaTri: byDate.map((x) => x.sanXuat) },
+            <TimeSeriesChart
+              labels={dayLabels}
+              description="Biểu đồ kg nhập và sản xuất theo ngày"
+              series={[
+                { id: "nhap", name: "NL nhập", color: KIND_TONES.nhap, kind: "cot", values: byDate.map((x) => x.nhap) },
+                { id: "sx", name: "BTP sản xuất", color: KIND_TONES.sanXuat, kind: "cot", values: byDate.map((x) => x.sanXuat) },
               ]}
             />
           ) : (
-            <EmptyState icon={Factory} tieuDe="Chưa có nhập / sản xuất trong kỳ" moTa="Ghi chuyến ở Nhập hàng và mẻ ở Sản xuất thành phẩm để thấy biểu đồ." />
+            <EmptyState icon={Factory} title="Chưa có nhập / sản xuất trong kỳ" description="Ghi chuyến ở Nhập hàng và mẻ ở Sản xuất thành phẩm để thấy biểu đồ." />
           )}
         </Section>
         <Section
@@ -644,16 +652,16 @@ export default function DashboardScreen() {
           moTa="Tồn bán thành phẩm kho dự trữ và thành phẩm đóng gói cuối mỗi ngày. Tồn nguyên liệu chưa vẽ: sổ NL chưa trừ phần đưa vào sản xuất."
         >
           {hasStock ? (
-            <BieuDoTheoNgay
-              nhan={dayLabels}
-              moTa="Biểu đồ tồn kho theo ngày"
-              chuoi={[
-                { khoa: "btp", ten: "Tồn BTP kho dự trữ", mau: KIND_TONES.kho, dang: "duong", vung: true, giaTri: byDate.map((x) => x.tonBtp) },
-                { khoa: "tp", ten: "Tồn TP đóng gói", mau: KIND_TONES.dongGoi, dang: "duong", giaTri: byDate.map((x) => x.tonTp) },
+            <TimeSeriesChart
+              labels={dayLabels}
+              description="Biểu đồ tồn kho theo ngày"
+              series={[
+                { id: "btp", name: "Tồn BTP kho dự trữ", color: KIND_TONES.kho, kind: "duong", area: true, values: byDate.map((x) => x.tonBtp) },
+                { id: "tp", name: "Tồn TP đóng gói", color: KIND_TONES.dongGoi, kind: "duong", values: byDate.map((x) => x.tonTp) },
               ]}
             />
           ) : (
-            <EmptyState icon={Warehouse} tieuDe="Chưa có tồn trong kỳ" moTa="Duyệt nhập kho bán thành phẩm ở Kho dự trữ để có tồn." />
+            <EmptyState icon={Warehouse} title="Chưa có tồn trong kỳ" description="Duyệt nhập kho bán thành phẩm ở Kho dự trữ để có tồn." />
           )}
         </Section>
       </div>
@@ -664,9 +672,9 @@ export default function DashboardScreen() {
           moTa="Định mức = NL vào ÷ TP ra; lãi/lỗ = giá trị xuất − giá thành. Kỳ chưa có thành phẩm thì chưa tính."
         >
           {cacKy.length === 0 ? (
-            <EmptyState icon={Scale} tieuDe="Chưa có kỳ cân đối" moTa="Tạo kỳ ở màn Cân đối kỳ để thấy định mức và lãi/lỗ." />
+            <EmptyState icon={Scale} title="Chưa có kỳ cân đối" description="Tạo kỳ ở màn Cân đối kỳ để thấy định mức và lãi/lỗ." />
           ) : (
-            <BangTong rows={cacKy.slice(0, 8)} cot={periodColumns} getKey={(r) => r.period.id} className="cot-dau-dinh" toMau="tong-quan-ky-can-doi" />
+            <SummaryTable rows={cacKy.slice(0, 8)} columns={periodColumns} getKey={(r) => r.period.id} className="sticky-first-col" rowMarkKey="tong-quan-ky-can-doi" />
           )}
         </Section>
         <Section
@@ -678,16 +686,16 @@ export default function DashboardScreen() {
           }
         >
           {yieldRatio.dong.length === 0 ? (
-            <EmptyState icon={Gauge} tieuDe="Chưa đủ số để tính" moTa="Khi gắn lô NL cho mẻ ở Sản xuất có ghi kg, định mức từng mặt hàng hiện ở đây." />
+            <EmptyState icon={Gauge} title="Chưa đủ số để tính" description="Khi gắn lô NL cho mẻ ở Sản xuất có ghi kg, định mức từng mặt hàng hiện ở đây." />
           ) : (
-            <BieuDoCot
+            <BarChart
               data={yieldRatio.dong.map((r) => ({
-                nhan: r.ten,
-                giaTri: r.dinhMuc,
-                phu: `${r.lech > 0 ? "+" : ""}${num(r.lech * 100)}% so bình quân${r.vuotNguong ? " · lệch" : ""}`,
+                label: r.ten,
+                value: r.dinhMuc,
+                subLabel: `${r.lech > 0 ? "+" : ""}${num(r.lech * 100)}% so bình quân${r.vuotNguong ? " · lệch" : ""}`,
               }))}
-              dinhDang={(n) => n.toLocaleString("vi-VN", { maximumFractionDigits: 2 })}
-              giaTriTrungBinh={yieldRatio.binhQuan ?? undefined}
+              formatValue={(n) => n.toLocaleString("vi-VN", { maximumFractionDigits: 2 })}
+              averageValue={yieldRatio.binhQuan ?? undefined}
             />
           )}
         </Section>
@@ -706,9 +714,9 @@ export default function DashboardScreen() {
         }
       >
         {warehouseTotals.length === 0 ? (
-          <EmptyState icon={FileSpreadsheet} tieuDe="Chưa có số liệu tồn kho" moTa="Nạp báo cáo Xuất–Nhập–Tồn ở màn Nhập xuất tồn kho để thấy tồn theo kho tại đây." />
+          <EmptyState icon={FileSpreadsheet} title="Chưa có số liệu tồn kho" description="Nạp báo cáo Xuất–Nhập–Tồn ở màn Nhập xuất tồn kho để thấy tồn theo kho tại đây." />
         ) : (
-          <BangTong rows={warehouseTotals} cot={warehouseColumns} getKey={(r) => r.kho} className="cot-dau-dinh" />
+          <SummaryTable rows={warehouseTotals} columns={warehouseColumns} getKey={(r) => r.kho} className="sticky-first-col" />
         )}
       </Section>
     </div>

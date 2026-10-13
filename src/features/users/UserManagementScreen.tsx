@@ -10,9 +10,9 @@ import { useUserProfiles } from "@/lib/catalogRepo";
 import { fullNameToUsername } from "@/lib/username";
 import type { AuthResult } from "@/lib/auth";
 import {
-  Nhan,
-  sacTheoTen,
-  ChuThichBatBuoc,
+  Tag,
+  toneByName,
+  RequiredLegend,
   Button,
   Combobox,
   Dialog,
@@ -25,11 +25,11 @@ import {
   Field,
   Input,
   RecordTable,
-  SkeletonBang,
+  TableSkeleton,
   notify,
-  type Cot,
-  type LoiNhap,
-  type MucChon,
+  type RecordTableColumn,
+  type FieldError,
+  type ComboboxOption,
 } from "@/design-system";
 import {
   Pencil,
@@ -103,10 +103,10 @@ function RolePicker({
   onDoi: (v: Role[]) => void;
 }) {
   const remaining = ROLES.filter((r) => !chon.includes(r.value));
-  const options: MucChon[] = remaining.map((r) => ({
+  const options: ComboboxOption[] = remaining.map((r) => ({
     value: r.value,
     label: r.label,
-    phu: phongBanCuaRole(r.value),
+    subLabel: phongBanCuaRole(r.value),
   }));
   return (
     <div className="space-y-3">
@@ -136,13 +136,13 @@ function RolePicker({
       {remaining.length > 0 && (
         <Combobox
           label="Thêm vai trò"
-          anNhanBatBuoc
+          hideRequiredMark
           value=""
           onChange={(v) => v && onDoi([...chon, v as Role])}
           options={options}
           placeholder="Gõ hoặc chọn vai trò để thêm…"
           emptyText="Đã thêm hết vai trò."
-          choPhepXoa={false}
+          clearable={false}
         />
       )}
     </div>
@@ -182,13 +182,13 @@ export default function QuanLyNguoiDungScreen({
   const [q, setQ] = useState("");
 
   const [creating, setCreating] = useState<NewUserForm | null>(null);
-  const [createErrors, setCreateErrors] = useState<LoiNhap[]>([]);
+  const [createErrors, setCreateErrors] = useState<FieldError[]>([]);
   const [isCreating, setIsCreating] = useState(false);
 
   const save = () => {
     if (!editing) return;
     write(ds.map((n) => (n.id === editing.id ? editing : n)));
-    notify.daLuu(`Đã lưu người dùng ${editing.username || editing.id}`);
+    notify.saved(`Đã lưu người dùng ${editing.username || editing.id}`);
     setEditing(null);
   };
 
@@ -201,12 +201,12 @@ export default function QuanLyNguoiDungScreen({
 
   const saveCreate = async () => {
     if (!creating) return;
-    const ls: LoiNhap[] = [];
-    if (!creating.fullName.trim()) ls.push({ truong: "Họ tên", thongBao: "Chưa nhập họ tên" });
+    const ls: FieldError[] = [];
+    if (!creating.fullName.trim()) ls.push({ field: "Họ tên", message: "Chưa nhập họ tên" });
     if (!creating.username.trim())
-      ls.push({ truong: "Tên đăng nhập", thongBao: "Chưa nhập tên đăng nhập" });
+      ls.push({ field: "Tên đăng nhập", message: "Chưa nhập tên đăng nhập" });
     if (creating.matKhau.length < 6)
-      ls.push({ truong: "Mật khẩu", thongBao: "Tối thiểu 6 ký tự" });
+      ls.push({ field: "Mật khẩu", message: "Tối thiểu 6 ký tự" });
     setCreateErrors(ls);
     if (ls.length > 0) return;
 
@@ -219,29 +219,29 @@ export default function QuanLyNguoiDungScreen({
     );
     setIsCreating(false);
     if (!kq.ok) {
-      setCreateErrors([{ truong: "Tạo tài khoản", thongBao: kq.loi ?? "Thất bại" }]);
+      setCreateErrors([{ field: "Tạo tài khoản", message: kq.loi ?? "Thất bại" }]);
       return;
     }
     if (kq.nguoiDung) write([...ds, kq.nguoiDung]);
-    notify.daLuu(`Đã tạo tài khoản ${creating.username}`);
+    notify.saved(`Đã tạo tài khoản ${creating.username}`);
     setCreating(null);
     setCreateErrors([]);
   };
 
-  const cols: Cot<UserProfile>[] = [
+  const cols: RecordTableColumn<UserProfile>[] = [
     {
       key: "username",
       header: "Tên đăng nhập",
-      chinh: true,
+      primary: true,
       render: (r) => r.username || <span className="text-muted-foreground">—</span>,
-      sapXep: (r) => r.username,
+      getSortValue: (r) => r.username,
     },
     {
       key: "hoTen",
       header: "Họ tên",
       render: (r) =>
         r.fullName || <span className="text-muted-foreground">Chưa đặt</span>,
-      sapXep: (r) => r.fullName,
+      getSortValue: (r) => r.fullName,
     },
     {
       key: "vaiTro",
@@ -251,16 +251,16 @@ export default function QuanLyNguoiDungScreen({
         return vt.length ? (
           <span className="flex flex-wrap gap-1">
             {vt.map((v) => (
-              <Nhan key={v} loai="phan-loai" sac={sacTheoTen(roleLabel([v]))}>
+              <Tag key={v} variant="phan-loai" tone={toneByName(roleLabel([v]))}>
                 {roleLabel([v])}
-              </Nhan>
+              </Tag>
             ))}
           </span>
         ) : (
-          <Nhan loai="loi">Chưa gán</Nhan>
+          <Tag variant="loi">Chưa gán</Tag>
         );
       },
-      sapXep: (r) => roleLabel(r.roles),
+      getSortValue: (r) => roleLabel(r.roles),
     },
   ];
 
@@ -315,12 +315,12 @@ export default function QuanLyNguoiDungScreen({
       </div>
 
       {isLoading ? (
-        <SkeletonBang />
+        <TableSkeleton />
       ) : ds.length === 0 ? (
         <EmptyState
           icon={Users}
-          tieuDe="Chưa có người dùng nào"
-          moTa="Bấm “Tạo tài khoản” để thêm người dùng đầu tiên, rồi gán vai trò."
+          title="Chưa có người dùng nào"
+          description="Bấm “Tạo tài khoản” để thêm người dùng đầu tiên, rồi gán vai trò."
           action={
             <Button
               title="Tạo tài khoản đăng nhập đầu tiên."
@@ -361,13 +361,13 @@ export default function QuanLyNguoiDungScreen({
                   <h2 className="flex items-center gap-2 text-lg font-semibold text-foreground">
                     <Icon className="size-5 text-muted-foreground" aria-hidden />
                     {nhom.ten}
-                    <Nhan loai="phu">{nhom.users.length}</Nhan>
+                    <Tag variant="phu">{nhom.users.length}</Tag>
                   </h2>
                   <RecordTable
                     columns={cols}
                     rows={nhom.users}
                     getKey={(r) => r.id}
-                    toMau="nguoi-dung"
+                    rowMarkKey="nguoi-dung"
                     actions={(r) => (
                       <Button
                         title="Sửa họ tên hoặc vai trò của tài khoản này."
@@ -401,8 +401,8 @@ export default function QuanLyNguoiDungScreen({
 
           {creating && (
             <div className="space-y-6 py-2">
-              <ErrorSummary loi={createErrors} />
-              <ChuThichBatBuoc />
+              <ErrorSummary errors={createErrors} />
+              <RequiredLegend />
               <Field label="Họ tên" required>
                 <Input
                   value={creating.fullName}

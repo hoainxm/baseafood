@@ -11,7 +11,7 @@ import { TemLoQr, useDuLieuTruyXuat } from "@/features/shared";
 import { kg, formatDateVN } from "@/lib/format";
 import { TRACE_KIND_LABELS, listLotsToPrint, lotKey, summarizeLabelPrints, type LotNode } from "@/lib/lotTraceability";
 import { useLabelPrints } from "@/lib/catalogRepo";
-import { Button, ChoiceGroup, DateRangeField, EmptyState, Nhan, congNgay, homNay, notify, sacTheoTen } from "@/design-system";
+import { Button, ChoiceGroup, DateRangeField, EmptyState, Tag, addDays, todayIso, notify, toneByName } from "@/design-system";
 import { Printer } from "lucide-react";
 
 const LOT_KINDS: { kind: LotKind; moTa: string }[] = [
@@ -23,8 +23,8 @@ const nodeKey = (n: LotNode) => `${n.kind}:${n.id}`;
 
 export function InTemHangLoat() {
   const { dl } = useDuLieuTruyXuat();
-  const [tu, setTu] = useState(() => congNgay(homNay(), -6));
-  const [den, setDen] = useState(homNay);
+  const [tu, setTu] = useState(() => addDays(todayIso(), -6));
+  const [den, setDen] = useState(todayIso);
   const [workshop, setWorkshop] = useState<Workshop | "">("");
   const [lotKinds, setLotKinds] = useState<LotKind[]>(["S", "W", "P"]);
   // Lưu những lô người dùng BỎ chọn (mặc định chọn hết) — đổi bộ lọc thì lô mới vào vẫn được chọn.
@@ -65,15 +65,15 @@ export function InTemHangLoat() {
               setTu(a);
               setDen(b);
             }}
-            anNhanBatBuoc
+            hideRequiredMark
           />
           <ChoiceGroup
             label="Phân xưởng"
             value={workshop}
             onChange={(v) => setWorkshop(v as Workshop | "")}
             options={[{ value: "", label: "Tất cả" }, ...(["Đông", "Cá", "Khô"] as const).map((x) => ({ value: x, label: x }))]}
-            cot={4}
-            anNhanBatBuoc
+            columns={4}
+            hideRequiredMark
           />
         </div>
         <div className="space-y-2">
@@ -109,8 +109,8 @@ export function InTemHangLoat() {
 
       {ds.length === 0 ? (
         <EmptyState
-          tieuDe={onlyUnprinted && allLots.length ? "Lô trong khoảng này đều đã in tem" : "Không có lô nào trong khoảng này"}
-          moTa={
+          title={onlyUnprinted && allLots.length ? "Lô trong khoảng này đều đã in tem" : "Không có lô nào trong khoảng này"}
+          description={
             onlyUnprinted && allLots.length
               ? "Bỏ tick \"Chỉ lô chưa in tem\" nếu cần in lại."
               : "Nới khoảng ngày, chọn thêm loại lô hoặc đổi phân xưởng."
@@ -134,7 +134,7 @@ export function InTemHangLoat() {
               <Button
                 type="button"
                 title="Mở bản in cho các lô đang chọn, mỗi tem một nhãn đúng khổ tem."
-                onClick={() => (selected.length ? setPrinting(selected) : notify.canhBao("Chưa chọn lô nào để in."))}
+                onClick={() => (selected.length ? setPrinting(selected) : notify.warning("Chưa chọn lô nào để in."))}
               >
                 <Printer aria-hidden /> In {selected.length} tem
               </Button>
@@ -158,14 +158,14 @@ export function InTemHangLoat() {
                     />
                     <span className="min-w-0 flex-1 space-y-1">
                       <span className="flex flex-wrap items-center gap-2">
-                        <Nhan loai="phan-loai" sac={sacTheoTen(TRACE_KIND_LABELS[n.kind])}>{TRACE_KIND_LABELS[n.kind]}</Nhan>
+                        <Tag variant="phan-loai" tone={toneByName(TRACE_KIND_LABELS[n.kind])}>{TRACE_KIND_LABELS[n.kind]}</Tag>
                         <span className="tnum font-semibold">{n.nhan}</span>
                         {(() => {
                           const t = daIn.get(lotKey(n.kind as LotKind, n.id));
                           return t ? (
-                            <Nhan loai="xong">Đã in {t.tem} tem · {formatDateVN(t.cuoi.printedAt.slice(0, 10))}</Nhan>
+                            <Tag variant="xong">Đã in {t.tem} tem · {formatDateVN(t.cuoi.printedAt.slice(0, 10))}</Tag>
                           ) : (
-                            <Nhan loai="cho">Chưa in tem</Nhan>
+                            <Tag variant="cho">Chưa in tem</Tag>
                           );
                         })()}
                       </span>

@@ -2,7 +2,7 @@
 // Tên file: src/features/catalog/SuaDanhMucNhanh.tsx
 // Tên tiếng Việt: Sửa nhanh một bản ghi danh mục ngay tại màn nghiệp vụ
 // ============================================================
-// Mở từ bút chì trong ô chọn (`Combobox.onSuaMuc`) hoặc nút cạnh ô. Dùng ĐÚNG
+// Mở từ bút chì trong ô chọn (`Combobox.onEditItem`) hoặc nút cạnh ô. Dùng ĐÚNG
 // bộ trường + luật kiểm tra của màn Danh mục (cauHinhDanhMuc.tsx) — một nguồn.
 //
 // ⚠️ Ghi qua `rows` / `onChange` CỦA MÀN GỌI (đúng instance `useBang` đang mở):
@@ -21,7 +21,7 @@ import type {
   Supplier,
 } from "@/types";
 import { useBatterTypes, useFinishedGoods, useMaterialTypes } from "@/lib/catalogRepo";
-import { HopSuaDanhMuc, notify, type LoiNhap } from "@/design-system";
+import { CatalogEditDialog, notify, type FieldError } from "@/design-system";
 import {
   taoCauHinhDanhMuc,
   taoTruongDanhMuc,
@@ -96,44 +96,44 @@ function QuickEditDialog<K extends LoaiDanhMuc>({
 
   const goc = rows.find((r) => r.id === id);
   const [editing, setEditing] = useState<T | null>(goc ? { ...goc } : null);
-  const [loi, setLoi] = useState<LoiNhap[]>([]);
+  const [loi, setLoi] = useState<FieldError[]>([]);
   if (!goc) return null;
 
   const save = () => {
     if (!editing) return;
-    const ls: LoiNhap[] = [
+    const ls: FieldError[] = [
       ...cfg.fields
-        .filter((f) => f.batBuoc && !String(editing[f.key] ?? "").trim())
-        .map((f) => ({ truong: f.nhan, thongBao: `Chưa nhập ${f.nhan.toLowerCase()}` })),
+        .filter((f) => f.required && !String(editing[f.key] ?? "").trim())
+        .map((f) => ({ field: f.label, message: `Chưa nhập ${f.label.toLowerCase()}` })),
       ...(cfg.kiemTraThem?.(editing, rows, false) ?? []),
     ];
     setLoi(ls);
     if (ls.length) return;
     onChange(rows.map((r) => (r.id === editing.id ? editing : r)));
-    notify.daLuu(`Đã lưu ${cfg.tenDonVi} "${cfg.moTaBanGhi(editing)}"`);
+    notify.saved(`Đã lưu ${cfg.tenDonVi} "${cfg.moTaBanGhi(editing)}"`);
     onDaLuu?.(editing, goc);
     onClose();
   };
 
   return (
-    <HopSuaDanhMuc<T>
-      dang={editing}
-      laThem={false}
+    <CatalogEditDialog<T>
+      editing={editing}
+      isAdding={false}
       fields={cfg.fields}
-      tenDonVi={cfg.tenDonVi}
-      loi={loi}
-      onDoi={setEditing}
-      onLuu={save}
+      entityName={cfg.tenDonVi}
+      errors={loi}
+      onChange={setEditing}
+      onSave={save}
       onClose={onClose}
-      moTa={
+      description={
         moTa?.(goc) ??
         `Sửa ở đây là sửa trong Danh mục — áp cho mọi màn dùng ${cfg.tenDonVi} này.`
       }
-      khoaTruong={
+      lockedField={
         cfg.noiTheoTen
           ? {
               key: cfg.truongTen,
-              lyDo: "Tên là chỗ nối với sổ đã ghi nên không đổi tại chỗ được (đổi tên sẽ tách các dòng cũ khỏi danh mục). Các thông tin khác sửa bình thường.",
+              reason: "Tên là chỗ nối với sổ đã ghi nên không đổi tại chỗ được (đổi tên sẽ tách các dòng cũ khỏi danh mục). Các thông tin khác sửa bình thường.",
             }
           : undefined
       }
@@ -145,7 +145,7 @@ function QuickEditDialog<K extends LoaiDanhMuc>({
  * Bật sửa nhanh một danh mục ở màn nghiệp vụ:
  *
  *   const sua = useSuaDanhMuc("khachHang", khach, setKhach, { theo: "ten" });
- *   <Combobox … onSuaMuc={sua.moSua} nhanSua={sua.nhanSua} />
+ *   <Combobox … onEditItem={sua.moSua} editLabel={sua.editLabel} />
  *   {sua.hop}
  *
  * `theo`: value trong ô chọn là `id` (mặc định) hay TÊN bản ghi.
@@ -179,7 +179,7 @@ export function useSuaDanhMuc<K extends LoaiDanhMuc>(
         ? rows.find((x) => tenCua(catalogKind, x).trim() === value.trim())
         : rows.find((x) => x.id === value);
     if (r) setId(r.id);
-    else notify.canhBao(`Không tìm thấy ${TEN[catalogKind]} này trong danh mục.`);
+    else notify.warning(`Không tìm thấy ${TEN[catalogKind]} này trong danh mục.`);
   };
 
   const hop = id ? (
@@ -196,7 +196,7 @@ export function useSuaDanhMuc<K extends LoaiDanhMuc>(
     />
   ) : null;
 
-  /** Value này có bản ghi trong danh mục không — truyền vào `Combobox.suaDuoc`. */
+  /** Value này có bản ghi trong danh mục không — truyền vào `Combobox.canEdit`. */
   const isEditable = (value: string) =>
     opts.theo === "ten"
       ? rows.some((x) => tenCua(catalogKind, x).trim() === value.trim())

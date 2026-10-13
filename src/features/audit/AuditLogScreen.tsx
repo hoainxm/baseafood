@@ -6,7 +6,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { readAuditLog, type AuditEntry } from "@/lib/audit";
 import {
-  Nhan,
+  Tag,
   Button,
   Combobox,
   DateField,
@@ -20,14 +20,14 @@ import {
   Field,
   Input,
   RecordTable,
-  SkeletonBang,
-  ThongKe,
-  homNay,
+  TableSkeleton,
+  StatCardGrid,
+  todayIso,
   notify,
-  type Cot,
-  type LoaiNhan,
-  type MucChon,
-  type TheThongTin,
+  type RecordTableColumn,
+  type TagVariant,
+  type ComboboxOption,
+  type StatCardData,
 } from "@/design-system";
 import { exportAoaToXlsx, type OExcel } from "@/lib/reportXlsx";
 import { FileSpreadsheet, History, RefreshCw, Users } from "lucide-react";
@@ -69,7 +69,7 @@ const ACTION_LABELS: Record<string, string> = {
   "dang-nhap": "Đăng nhập",
   "dang-xuat": "Đăng xuất",
 };
-const ACTION_OPTIONS: MucChon[] = [
+const ACTION_OPTIONS: ComboboxOption[] = [
   { value: "", label: "Tất cả thao tác" },
   { value: "them", label: "Thêm" },
   { value: "sua", label: "Sửa" },
@@ -85,7 +85,7 @@ function formatDate(iso: string): string {
 }
 
 function monthStart(): string {
-  const t = homNay();
+  const t = todayIso();
   return `${t.slice(0, 7)}-01`;
 }
 
@@ -96,7 +96,7 @@ function monthStart(): string {
  */
 export default function NhatKyScreen() {
   const [tu, setTu] = useState(monthStart());
-  const [den, setDen] = useState(homNay());
+  const [den, setDen] = useState(todayIso());
   const [actionFilter, setActionFilter] = useState("");
   const [bang, setBang] = useState("");
   const [user, setUser] = useState("");
@@ -129,12 +129,12 @@ export default function NhatKyScreen() {
   };
 
   // Tùy chọn người + bảng suy từ dữ liệu đang có.
-  const userOptions: MucChon[] = useMemo(() => {
+  const userOptions: ComboboxOption[] = useMemo(() => {
     const set = new Set(rows.map((r) => r.actorUsername).filter(Boolean));
     return [{ value: "", label: "Tất cả người" }, ...[...set].sort().map((u) => ({ value: u, label: u }))];
   }, [rows]);
 
-  const optBang: MucChon[] = useMemo(() => {
+  const optBang: ComboboxOption[] = useMemo(() => {
     const set = new Set(rows.map((r) => r.entity).filter(Boolean));
     return [
       { value: "", label: "Tất cả đối tượng" },
@@ -156,32 +156,32 @@ export default function NhatKyScreen() {
 
   const userCount = useMemo(() => new Set(view.map((r) => r.actorUsername).filter(Boolean)).size, [view]);
 
-  const the: TheThongTin[] = [
-    { nhan: "Khoảng ngày", giaTri: `${tu} → ${den}`, icon: History, mau: "trung-tinh" },
-    { nhan: "Số thao tác", giaTri: view.length, so: true, icon: History, mau: "brand" },
-    { nhan: "Số người", giaTri: userCount, so: true, icon: Users, mau: "success" },
+  const the: StatCardData[] = [
+    { label: "Khoảng ngày", value: `${tu} → ${den}`, icon: History, color: "trung-tinh" },
+    { label: "Số thao tác", value: view.length, numeric: true, icon: History, color: "brand" },
+    { label: "Số người", value: userCount, numeric: true, icon: Users, color: "success" },
   ];
 
   const actionLabel = (a: string) => ACTION_LABELS[a] ?? a;
-  const badgeKind = (a: string): LoaiNhan =>
+  const badgeKind = (a: string): TagVariant =>
     a === "xoa" ? "loi" : a === "them" ? "xong" : a === "sua" ? "luu-y" : "phu";
 
-  const cols: Cot<AuditEntry>[] = [
-    { key: "at", header: "Thời gian", chinh: true, render: (r) => formatDate(r.at), sapXep: (r) => r.at },
-    { key: "nguoi", header: "Người", render: (r) => r.actorUsername || "—", sapXep: (r) => r.actorUsername },
+  const cols: RecordTableColumn<AuditEntry>[] = [
+    { key: "at", header: "Thời gian", primary: true, render: (r) => formatDate(r.at), getSortValue: (r) => r.at },
+    { key: "nguoi", header: "Người", render: (r) => r.actorUsername || "—", getSortValue: (r) => r.actorUsername },
     {
       key: "loai",
       header: "Thao tác",
-      render: (r) => <Nhan loai={badgeKind(r.action)}>{actionLabel(r.action)}</Nhan>,
-      sapXep: (r) => r.action,
+      render: (r) => <Tag variant={badgeKind(r.action)}>{actionLabel(r.action)}</Tag>,
+      getSortValue: (r) => r.action,
     },
-    { key: "doiTuong", header: "Đối tượng", render: (r) => tableLabel(r.entity), sapXep: (r) => r.entity },
+    { key: "doiTuong", header: "Đối tượng", render: (r) => tableLabel(r.entity), getSortValue: (r) => r.entity },
     { key: "tomTat", header: "Tóm tắt", render: (r) => r.summary },
   ];
 
   const exportExcel = () => {
     if (!view.length) {
-      notify.canhBao("Không có nhật ký để xuất");
+      notify.warning("Không có nhật ký để xuất");
       return;
     }
     const aoa: OExcel[][] = [];
@@ -226,23 +226,23 @@ export default function NhatKyScreen() {
         </div>
       </div>
 
-      <ThongKe the={the} />
+      <StatCardGrid cards={the} />
 
       <div className="flex flex-wrap items-end gap-4 rounded-xl border-2 border-border p-4">
         <div className="min-w-[10rem]">
-          <DateField label="Từ ngày" anNhanBatBuoc value={tu} onChange={setTu} />
+          <DateField label="Từ ngày" hideRequiredMark value={tu} onChange={setTu} />
         </div>
         <div className="min-w-[10rem]">
-          <DateField label="Đến ngày" anNhanBatBuoc value={den} onChange={setDen} />
+          <DateField label="Đến ngày" hideRequiredMark value={den} onChange={setDen} />
         </div>
         <div className="min-w-[12rem]">
-          <Combobox label="Thao tác" anNhanBatBuoc choPhepXoa={false} value={actionFilter} onChange={setActionFilter} options={ACTION_OPTIONS} />
+          <Combobox label="Thao tác" hideRequiredMark clearable={false} value={actionFilter} onChange={setActionFilter} options={ACTION_OPTIONS} />
         </div>
         <div className="min-w-[12rem]">
-          <Combobox label="Đối tượng" anNhanBatBuoc choPhepXoa={false} value={bang} onChange={setBang} options={optBang} />
+          <Combobox label="Đối tượng" hideRequiredMark clearable={false} value={bang} onChange={setBang} options={optBang} />
         </div>
         <div className="min-w-[12rem]">
-          <Combobox label="Người" anNhanBatBuoc choPhepXoa={false} value={user} onChange={setUser} options={userOptions} />
+          <Combobox label="Người" hideRequiredMark clearable={false} value={user} onChange={setUser} options={userOptions} />
         </div>
         <div className="min-w-[12rem] flex-1">
           <Field label="Tìm nhanh">
@@ -256,21 +256,21 @@ export default function NhatKyScreen() {
       </div>
 
       {isLoading ? (
-        <SkeletonBang />
+        <TableSkeleton />
       ) : view.length === 0 ? (
         <EmptyState
           icon={History}
-          tieuDe="Chưa có nhật ký trong khoảng này"
-          moTa="Đổi khoảng ngày / bộ lọc. Nhật ký ghi các thao tác thêm/sửa/xóa dữ liệu và đăng nhập/xuất."
+          title="Chưa có nhật ký trong khoảng này"
+          description="Đổi khoảng ngày / bộ lọc. Nhật ký ghi các thao tác thêm/sửa/xóa dữ liệu và đăng nhập/xuất."
         />
       ) : (
         <RecordTable
           columns={cols}
           rows={view}
           getKey={(r) => r.id}
-          toMau="nhat-ky"
-          timKiem={(r) => `${r.actorUsername} ${tableLabel(r.entity)} ${r.summary}`}
-          nhanTimKiem="Tìm trong nhật ký…"
+          rowMarkKey="nhat-ky"
+          getSearchText={(r) => `${r.actorUsername} ${tableLabel(r.entity)} ${r.summary}`}
+          searchLabel="Tìm trong nhật ký…"
           actions={(r) => (
             <Button
               title="Xem đầy đủ những trường đã đổi trong thao tác này (giá trị trước → sau)." variant="outline" size="sm" onClick={() => setDetail(r)}>

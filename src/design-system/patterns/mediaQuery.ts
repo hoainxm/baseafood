@@ -6,10 +6,10 @@ import { useSyncExternalStore } from "react";
  * dải icon để nhường chỗ cho tiêu đề + bảng — KHÔNG phải mốc bố cục thứ ba:
  * bố cục trang vẫn do `md:` quyết (README design-system § Quy chuẩn mobile).
  */
-export const MEDIA_THANH_BEN_HEP = "(min-width: 768px) and (max-width: 1023.98px)";
+export const MEDIA_NARROW_SIDEBAR = "(min-width: 768px) and (max-width: 1023.98px)";
 
 /** `true` khi media query đang khớp; tự cập nhật khi xoay máy / đổi cỡ cửa sổ. */
-export function useKhopMedia(query: string): boolean {
+export function useMediaQuery(query: string): boolean {
   return useSyncExternalStore(
     (doi) => {
       const mq = window.matchMedia?.(query);

@@ -5,7 +5,7 @@
 // ============================================================
 import { useSearchParams } from "react-router-dom";
 import {
-  DanhMucCrud,
+  CatalogCrud,
   Tabs,
   TabsContent,
   TabsList,
@@ -96,7 +96,7 @@ export default function DanhMucScreen() {
   );
 }
 
-/** Dựng DanhMucCrud từ một cấu hình danh mục (giữ nguyên mọi prop cũ). */
+/** Dựng CatalogCrud từ một cấu hình danh mục (giữ nguyên mọi prop cũ). */
 function CatalogCrudFor<T extends { id: string }>({
   cfg,
   toMau,
@@ -106,19 +106,19 @@ function CatalogCrudFor<T extends { id: string }>({
   toMau: string;
 }) {
   return (
-    <DanhMucCrud
-      toMau={toMau}
-      dangTai={cfg.dangTai}
-      tieuDe={cfg.tieuDe}
-      moTa={cfg.moTa}
-      tenDonVi={cfg.tenDonVi}
+    <CatalogCrud
+      rowMarkKey={toMau}
+      loading={cfg.dangTai}
+      title={cfg.tieuDe}
+      description={cfg.moTa}
+      entityName={cfg.tenDonVi}
       rows={cfg.rows}
       onChange={cfg.onChange}
       fields={cfg.fields}
-      kiemTraThem={cfg.kiemTraThem}
-      taoMoi={cfg.taoMoi}
-      timTheo={cfg.timTheo}
-      moTaBanGhi={cfg.moTaBanGhi}
+      validate={cfg.kiemTraThem}
+      createEmpty={cfg.taoMoi}
+      getSearchText={cfg.timTheo}
+      getRecordDescription={cfg.moTaBanGhi}
     />
   );
 }

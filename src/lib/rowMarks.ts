@@ -5,7 +5,7 @@
 // ============================================================
 import type { RowMark } from "@/types";
 
-/** Sắc màu tô — khớp `SAC_TO` ở design-system/patterns/toMauNguon.ts + token `--to-<sắc>-<mức>`. */
+/** Sắc màu tô — khớp `MARK_COLORS` ở design-system/patterns/rowMarkSource.ts + token `--to-<sắc>-<mức>`. */
 export const SAC_TO_LIB = ["xam", "do", "cam", "vang", "chuoi", "la", "troi", "duong", "tim", "hong"] as const;
 export type SacTo = (typeof SAC_TO_LIB)[number];
 /** Mã màu lưu DB: "<sắc>-<mức 1..5>" (VD "vang-5"). */
@@ -13,14 +13,14 @@ export type RowMarkColor = `${SacTo}-${1 | 2 | 3 | 4 | 5}`;
 
 /** Dấu của một dòng / ô như màn hình thấy. `mau` rỗng = chỉ in đậm. */
 export interface RowMarkStyle {
-  mau: RowMarkColor | "";
-  dam: boolean;
+  color: RowMarkColor | "";
+  bold: boolean;
 }
 
 /** Đích tô: cả dòng (`cot` null) hoặc một ô. */
 export interface RowMarkTarget {
   dong: string;
-  cot: string | null;
+  columns: string | null;
 }
 
 /* Bản đầu (sáng 2026-10-06) lưu 4 mã trơn — đọc ra mức 2 của sắc tương ứng. */
@@ -60,7 +60,7 @@ export function getTableRowMarks(
     if (m.tableKey !== tableKey) continue;
     const color = normalizeRowMarkColor(m.color);
     if (!color && !m.bold) continue;
-    const dau = { mau: color, dam: m.bold };
+    const dau = { color, bold: m.bold };
     if (m.columnKey == null) dong.set(m.rowId, dau);
     else o.set(cellKey(m.rowId, m.columnKey), dau);
   }
@@ -81,23 +81,23 @@ export function setRowMarks(
   user: string,
   luc: string = new Date().toISOString()
 ): RowMark[] {
-  const ds = target.map((d) => (typeof d === "string" ? { dong: d, cot: null } : d));
-  const theoId = new Map(ds.map((d) => [idDauTo(tableKey, d.dong, d.cot), d]));
-  const bo = !dau || (!dau.mau && !dau.dam);
+  const ds = target.map((d) => (typeof d === "string" ? { dong: d, columns: null } : d));
+  const theoId = new Map(ds.map((d) => [idDauTo(tableKey, d.dong, d.columns), d]));
+  const bo = !dau || (!dau.color && !dau.bold);
   const remaining = marks.filter((m) => !theoId.has(m.id));
   if (bo) return remaining;
   const prev = new Map(marks.map((m) => [m.id, m]));
   const nextMarks = [...theoId].map(([id, d]): RowMark => {
     const c = prev.get(id);
     // Giữ nguyên bản cũ khi không đổi gì ⇒ repo không đẩy cập nhật thừa.
-    if (c && normalizeRowMarkColor(c.color) === dau.mau && c.bold === dau.dam) return c;
+    if (c && normalizeRowMarkColor(c.color) === dau.color && c.bold === dau.bold) return c;
     return {
       id,
       tableKey,
       rowId: d.dong,
-      columnKey: d.cot,
-      color: dau.mau,
-      bold: dau.dam,
+      columnKey: d.columns,
+      color: dau.color,
+      bold: dau.bold,
       markedBy: user,
       markedAt: luc,
     };

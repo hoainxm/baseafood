@@ -6,15 +6,15 @@
 // src/features/shared/AppShell.tsx
 import { useEffect, useState, type ReactNode } from "react";
 import {
-  Nhan,
-  GoiYHover,
+  Tag,
+  HoverHint,
   Logo,
-  MEDIA_THANH_BEN_HEP,
-  NutGiaoDien,
-  NutHuongDan,
-  NutTrangThai,
-  XacNhan,
-  useKhopMedia,
+  MEDIA_NARROW_SIDEBAR,
+  DisplaySettingsButton,
+  GuideButton,
+  DataSyncStatusButton,
+  ConfirmAction,
+  useMediaQuery,
 } from "@/design-system";
 import { cn } from "@/lib/utils";
 import { readDevicePrefJson, writeDevicePrefJson } from "@/lib/devicePrefs";
@@ -273,7 +273,7 @@ function groupTree(items: MucNavShell[]): DisplayGroup[] {
 }
 
 const ICON_BUTTON_CLASS =
-  "nhan-an inline-flex size-tap shrink-0 items-center justify-center rounded-lg border border-input text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
+  "press-feedback inline-flex size-tap shrink-0 items-center justify-center rounded-lg border border-input text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
 
 function HeaderButton({
   label,
@@ -319,7 +319,7 @@ function NavItemButton({
       aria-current={chon ? "page" : undefined}
       title={thuGon ? [m.label, m.moTa].filter(Boolean).join(" — ") : m.moTa}
       className={cn(
-        "nhan-an flex min-h-10 w-full items-center gap-3 rounded-lg border text-left",
+        "press-feedback flex min-h-10 w-full items-center gap-3 rounded-lg border text-left",
         thuGon ? "justify-center px-0" : "px-3",
         m.laDanhMuc ? "text-sm font-medium" : "text-sm font-semibold",
         chon
@@ -334,9 +334,9 @@ function NavItemButton({
         <span className="min-w-0 whitespace-normal break-words leading-tight">{m.label}</span>
       )}
       {!thuGon && m.demo && (
-        <Nhan loai="phu" className="ml-auto">
+        <Tag variant="phu" className="ml-auto">
           DEMO
-        </Nhan>
+        </Tag>
       )}
     </button>
   );
@@ -410,7 +410,7 @@ function NavTree({
               onClick={() => onToggle(g.ten)}
               aria-expanded={mo}
               className={cn(
-                "nhan-an",
+                "press-feedback",
                 "flex min-h-9 w-full items-center gap-2 rounded-lg px-3 text-left text-xs font-bold uppercase tracking-wide transition-colors hover:bg-muted",
                 coActive ? "text-primary" : "text-muted-foreground"
               )}
@@ -427,8 +427,8 @@ function NavTree({
             </button>
             {mo && (
               // Rail dọc + thụt lề = con thuộc nhóm này (nhìn thấy rõ phân lớp).
-              // hien-len: mở nhóm thì danh sách con nhích lên hiện vào.
-              <div className="hien-len mt-1 ml-5 space-y-1 border-l-2 border-border pl-2">
+              // enter-up: mở nhóm thì danh sách con nhích lên hiện vào.
+              <div className="enter-up mt-1 ml-5 space-y-1 border-l-2 border-border pl-2">
                 {g.muc.map((m) => (
                   <NavItemButton
                     key={m.key}
@@ -513,7 +513,7 @@ export default function AppShell({
   // Thanh bên thu về dải icon: TỰ ĐỘNG ở màn hẹp (iPhone ngang, iPad dọc) để
   // nhường chỗ cho tiêu đề + bảng; người dùng bấm nút thu/mở thì theo ý họ —
   // nhưng chỉ trong cùng một cỡ màn: xoay máy sang cỡ khác là về lại mặc định.
-  const isNarrowSidebar = useKhopMedia(MEDIA_THANH_BEN_HEP);
+  const isNarrowSidebar = useMediaQuery(MEDIA_NARROW_SIDEBAR);
   const [collapsePick, setCollapsePick] = useState<{ hep: boolean; thuGon: boolean } | null>(null);
   const thuGon =
     collapsePick && collapsePick.hep === isNarrowSidebar ? collapsePick.thuGon : isNarrowSidebar;
@@ -554,13 +554,13 @@ export default function AppShell({
     /* Desktop: khoá chiều cao khung (h-dvh + overflow-hidden) để THANH BÊN và
        VÙNG NỘI DUNG cuộn RIÊNG — trước đây cuộn chung, kéo bảng dài là nav trôi
        mất. Điện thoại giữ cuộn trang tự nhiên (nav là drawer, có scroll riêng). */
-    <div className="px-an-toan flex min-h-full flex-col bg-background md:h-dvh md:flex-row md:overflow-hidden">
+    <div className="px-safe flex min-h-full flex-col bg-background md:h-dvh md:flex-row md:overflow-hidden">
       {/* Gợi ý rê chuột cho MỌI phần tử có `title` — gắn một lần cho cả app. */}
-      <GoiYHover />
+      <HoverHint />
       {/* Sidebar dọc — chỉ desktop */}
       <aside
         className={cn(
-          "pb-an-toan hidden shrink-0 flex-col border-r border-border bg-card transition-[width] duration-base ease-soft md:flex md:h-full md:overflow-hidden",
+          "pb-safe hidden shrink-0 flex-col border-r border-border bg-card transition-[width] duration-base ease-soft md:flex md:h-full md:overflow-hidden",
           thuGon ? "w-20" : "w-72"
         )}
       >
@@ -570,7 +570,7 @@ export default function AppShell({
             thuGon ? "justify-center px-2" : "px-4"
           )}
         >
-          <Logo cao="h-9" hienChu={!thuGon} phuDe={thuGon ? undefined : "Xí nghiệp BSF1"} />
+          <Logo heightClass="h-9" showWordmark={!thuGon} subtitle={thuGon ? undefined : "Xí nghiệp BSF1"} />
         </div>
         <NavTree
           nhom={nhom}
@@ -595,10 +595,10 @@ export default function AppShell({
             role="dialog"
             aria-modal="true"
             aria-label="Điều hướng"
-            className="pl-an-toan pb-an-toan absolute inset-y-0 left-0 flex w-80 max-w-[85vw] flex-col border-r border-border bg-card shadow-xl duration-base ease-soft animate-in slide-in-from-left"
+            className="pl-safe pb-safe absolute inset-y-0 left-0 flex w-80 max-w-[85vw] flex-col border-r border-border bg-card shadow-xl duration-base ease-soft animate-in slide-in-from-left"
           >
             <div className="flex h-header shrink-0 items-center justify-between gap-2 border-b border-border px-4">
-              <Logo cao="h-9" phuDe="Xí nghiệp BSF1" />
+              <Logo heightClass="h-9" subtitle="Xí nghiệp BSF1" />
               <HeaderButton label="Đóng menu" icon={X} onClick={() => setMoNav(false)} />
             </div>
 
@@ -613,8 +613,8 @@ export default function AppShell({
             {/* Chân drawer: những gì KHÔNG còn chỗ trên header điện thoại. Máy xoay
                 ngang thấp: bỏ dòng tên người dùng để menu còn chỗ (chân không được
                 ăn quá nửa chiều cao drawer). */}
-            <div className="shrink-0 space-y-3 border-t border-border p-3 ngang-thap:p-2">
-              <div className="flex items-center gap-3 ngang-thap:hidden">
+            <div className="shrink-0 space-y-3 border-t border-border p-3 short-landscape:p-2">
+              <div className="flex items-center gap-3 short-landscape:hidden">
                 <span
                   aria-hidden
                   className="flex size-tap shrink-0 items-center justify-center rounded-full bg-accent text-sm font-bold text-accent-foreground"
@@ -630,13 +630,13 @@ export default function AppShell({
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
-                <NutGiaoDien taiKhoan={taiKhoan} />
+                <DisplaySettingsButton account={taiKhoan} />
                 {ca && (
                   <button
                     title="Đổi ca làm việc đang chọn — số liệu trên màn lọc theo ca này."
                     type="button"
                     onClick={onDoiCa}
-                    className="nhan-an inline-flex min-h-10 items-center gap-2 rounded-lg border border-input px-3.5 text-sm font-semibold text-foreground hover:bg-muted"
+                    className="press-feedback inline-flex min-h-10 items-center gap-2 rounded-lg border border-input px-3.5 text-sm font-semibold text-foreground hover:bg-muted"
                   >
                     <RefreshCw className="size-icon-sm" aria-hidden />
                     {ca}
@@ -647,7 +647,7 @@ export default function AppShell({
                     title="Xem các thông báo và việc cần làm trong ngày."
                     type="button"
                     onClick={onThongBao}
-                    className="nhan-an inline-flex min-h-10 items-center gap-2 rounded-lg border border-input px-3.5 text-sm font-semibold text-foreground hover:bg-muted"
+                    className="press-feedback inline-flex min-h-10 items-center gap-2 rounded-lg border border-input px-3.5 text-sm font-semibold text-foreground hover:bg-muted"
                   >
                     <Bell className="size-icon-sm" aria-hidden />
                     Thông báo
@@ -659,19 +659,19 @@ export default function AppShell({
                   </button>
                 )}
                 {onDangXuat && (
-                  <XacNhan
-                    tieuDe="Đăng xuất khỏi máy này?"
-                    moTa="Số liệu đã ghi vẫn còn. Vào lại phải nhập tên đăng nhập và mật khẩu."
-                    chiTiet={`${nguoiDung} · ${vaiTro}`}
-                    nhanNut="Đăng xuất"
-                    nhanHuy="Ở lại"
+                  <ConfirmAction
+                    title="Đăng xuất khỏi máy này?"
+                    description="Số liệu đã ghi vẫn còn. Vào lại phải nhập tên đăng nhập và mật khẩu."
+                    detail={`${nguoiDung} · ${vaiTro}`}
+                    confirmLabel="Đăng xuất"
+                    cancelLabel="Ở lại"
                     icon={LogOut}
                     onConfirm={onDangXuat}
                     trigger={
                       <button
                         title="Thoát tài khoản và quay về màn đăng nhập."
                         type="button"
-                        className="nhan-an inline-flex min-h-10 items-center gap-2 rounded-lg border border-input px-3.5 text-sm font-semibold text-foreground hover:bg-muted hover:text-destructive"
+                        className="press-feedback inline-flex min-h-10 items-center gap-2 rounded-lg border border-input px-3.5 text-sm font-semibold text-foreground hover:bg-muted hover:text-destructive"
                       >
                         <LogOut className="size-icon-sm" aria-hidden />
                         Đăng xuất
@@ -686,7 +686,7 @@ export default function AppShell({
       )}
 
       {/* Cột nội dung — cuộn riêng trên desktop */}
-      <div className="scroll-nice pb-an-toan flex min-w-0 flex-1 flex-col md:h-full md:overflow-y-auto">
+      <div className="scroll-nice pb-safe flex min-w-0 flex-1 flex-col md:h-full md:overflow-y-auto">
         <header className="sticky top-0 z-40 flex h-header shrink-0 items-center gap-2 border-b border-border bg-card px-4 md:gap-3 md:px-6">
           {/* Trái — ĐƯỢC ƯU TIÊN ngân sách ngang (flex-1, không shrink-0) */}
           <div className="flex min-w-0 flex-1 items-center gap-2 md:gap-3">
@@ -703,7 +703,7 @@ export default function AppShell({
               className="hidden md:inline-flex"
             />
             <div className="min-w-0">
-              <p className="truncate text-sm text-muted-foreground ngang-thap:hidden">
+              <p className="truncate text-sm text-muted-foreground short-landscape:hidden">
                 Baseafood MES{breadcrumb ? ` · ${breadcrumb}` : ""}
               </p>
               {/* KHÔNG phải h1: mỗi màn tự có một h1 trong nội dung (màn không hiện tiêu đề thì
@@ -721,7 +721,7 @@ export default function AppShell({
                 title="Đổi ca làm việc đang chọn — số liệu trên màn lọc theo ca này."
                 type="button"
                 onClick={onDoiCa}
-                className="nhan-an hidden min-h-10 items-center gap-2 rounded-lg border border-input px-3.5 text-sm font-semibold text-foreground hover:bg-muted xl:inline-flex"
+                className="press-feedback hidden min-h-10 items-center gap-2 rounded-lg border border-input px-3.5 text-sm font-semibold text-foreground hover:bg-muted xl:inline-flex"
               >
                 <RefreshCw className="size-icon-sm" aria-hidden />
                 {ca}
@@ -747,14 +747,14 @@ export default function AppShell({
             )}
 
             {huongDan && (
-              <NutHuongDan tieuDe={huongDan.tieuDe} moTa={huongDan.moTa}>
+              <GuideButton title={huongDan.tieuDe} description={huongDan.moTa}>
                 {huongDan.noiDung}
-              </NutHuongDan>
+              </GuideButton>
             )}
             <span className="hidden md:inline-flex">
-              <NutGiaoDien taiKhoan={taiKhoan} />
+              <DisplaySettingsButton account={taiKhoan} />
             </span>
-            <NutTrangThai />
+            <DataSyncStatusButton />
 
             <div className="hidden items-center gap-2 border-l border-border pl-2 md:flex md:gap-3 md:pl-3">
               <span
@@ -770,12 +770,12 @@ export default function AppShell({
                 <p className="truncate text-sm text-muted-foreground">{vaiTro}</p>
               </div>
               {onDangXuat && (
-                <XacNhan
-                  tieuDe="Đăng xuất khỏi máy này?"
-                  moTa="Số liệu đã ghi vẫn còn. Vào lại phải nhập tên đăng nhập và mật khẩu."
-                  chiTiet={`${nguoiDung} · ${vaiTro}`}
-                  nhanNut="Đăng xuất"
-                  nhanHuy="Ở lại"
+                <ConfirmAction
+                  title="Đăng xuất khỏi máy này?"
+                  description="Số liệu đã ghi vẫn còn. Vào lại phải nhập tên đăng nhập và mật khẩu."
+                  detail={`${nguoiDung} · ${vaiTro}`}
+                  confirmLabel="Đăng xuất"
+                  cancelLabel="Ở lại"
                   icon={LogOut}
                   onConfirm={onDangXuat}
                   trigger={
@@ -794,7 +794,7 @@ export default function AppShell({
           </div>
         </header>
 
-        <main className="w-full flex-1 p-5 md:p-8 ngang-thap:p-4">
+        <main className="w-full flex-1 p-5 md:p-8 short-landscape:p-4">
           {/* Nhắc tải lại khi có bản deploy mới — ĐẶT NGOÀI khối đổi-trang để
               không bị mất/khởi tạo lại mỗi lần chuyển màn. */}
           <div className="mx-auto w-full max-w-(--app-content-width)">
@@ -803,7 +803,7 @@ export default function AppShell({
           {/* key theo màn đang mở → fade nhẹ mỗi lần đổi trang (reduced-motion tắt) */}
           <div
             key={active}
-            className="hien-mo mx-auto w-full max-w-(--app-content-width)"
+            className="enter-fade mx-auto w-full max-w-(--app-content-width)"
           >
             {children}
           </div>

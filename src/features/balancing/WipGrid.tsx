@@ -29,10 +29,10 @@ import {
   Button,
   Combobox,
   EmptyState,
-  LuoiNhap,
+  EditableGrid,
   notify,
-  type CotLuoi,
-  type HangLuoi,
+  type GridColumn,
+  type GridRow,
 } from "@/design-system";
 import { num, formatDateVN } from "@/lib/format";
 import { ChevronsLeftRight, Download, EyeOff, Layers, Plus } from "lucide-react";
@@ -246,98 +246,98 @@ export function LuoiBanThanhPham({
     }
     if (productionCells.length > 0) ghiSanXuatNhieuNgay(productionCells, "");
     if (skippedLocked > 0) {
-      notify.loi(`Bỏ qua ${skippedLocked} ô rơi vào ngày đã chốt — sửa từng ô để ghi lý do.`);
+      notify.error(`Bỏ qua ${skippedLocked} ô rơi vào ngày đã chốt — sửa từng ô để ghi lý do.`);
     }
   };
 
-  const gridColumns: CotLuoi<FinishedGoodGridRow>[] = [
+  const gridColumns: GridColumn<FinishedGoodGridRow>[] = [
     {
       key: "khach",
       header: "Khách",
-      nhan: "Khách hàng",
-      kieu: "chu",
-      rong: 210,
-      lay: () => null,
+      label: "Khách hàng",
+      kind: "chu",
+      minWidth: 210,
+      getValue: () => null,
       /* Chọn trong danh mục, gõ tên lạ thì tạo mới tại chỗ — nhập tự do là
          nguồn sai số liệu lớn nhất ("Hanwa" / "hanwa" / "Han wa" thành 3 khách
          khi tổng hợp cuối kỳ). */
-      oRieng: (h) => (
+      renderCell: (h) => (
         <Combobox
           label="Khách hàng"
-          anNhan
+          hideLabel
           value={h.khachId}
           onChange={(v) => writeRow(h.id, { customerId: v })}
           options={customerOptions}
           onCreate={onThemKhach}
           placeholder="Chọn khách"
-          choPhepXoa={false}
-          onSuaMuc={onSuaKhach}
-          suaDuoc={(v) => v !== OTHER_CUSTOMER_ID}
-          nhanSua="Sửa thông tin khách hàng này — lưu thẳng vào Danh mục."
+          clearable={false}
+          onEditItem={onSuaKhach}
+          canEdit={(v) => v !== OTHER_CUSTOMER_ID}
+          editLabel="Sửa thông tin khách hàng này — lưu thẳng vào Danh mục."
         />
       ),
     },
     /* Thứ tự theo bảng cân đối giấy: XUẤT KHẨU Lượng · Đơn giá · T.tiền đứng ngay sau
        Khách, rồi các ngày + Tổng; Trả · Nợ (thay cột Chuyển kỳ) đứng CUỐI. "Lượng" = Tổng. */
-    { key: "luong", header: "Lượng (kg)", nhan: "Lượng", kieu: "tinh", rong: 110, lay: (h) => h.tong || null },
-    { key: "donGia", header: "Đơn giá (USD)", nhan: "Đơn giá", kieu: "so", nhom: "tien", rong: 112, lay: (h) => h.donGia },
+    { key: "luong", header: "Lượng (kg)", label: "Lượng", kind: "tinh", minWidth: 110, getValue: (h) => h.tong || null },
+    { key: "donGia", header: "Đơn giá (USD)", label: "Đơn giá", kind: "so", group: "tien", minWidth: 112, getValue: (h) => h.donGia },
     {
       key: "thanhTien",
       header: "T.tiền (USD)",
-      nhan: "Thành tiền",
-      kieu: "tinh",
-      nhom: "tien",
-      rong: 148,
-      lay: (h) => h.tong * (h.donGia ?? 0) || null,
+      label: "Thành tiền",
+      kind: "tinh",
+      group: "tien",
+      minWidth: 148,
+      getValue: (h) => h.tong * (h.donGia ?? 0) || null,
     },
-    ...ngay.map<CotLuoi<FinishedGoodGridRow>>((iso) => ({
+    ...ngay.map<GridColumn<FinishedGoodGridRow>>((iso) => ({
       key: `ngay:${iso}`,
       header: formatDayLabel(iso),
-      nhan: `Ngày ${formatDateVN(iso)}`,
-      kieu: "so",
-      nhom: "ngay",
-      rong: 96,
-      lay: (h) => h.theoNgay[iso] ?? null,
+      label: `Ngày ${formatDateVN(iso)}`,
+      kind: "so",
+      group: "ngay",
+      minWidth: 96,
+      getValue: (h) => h.theoNgay[iso] ?? null,
     })),
     /* Tổng cuối hàng (như cột W bảng giấy) — chỉ khi mở cột ngày; thu ngày thì đã có "Lượng". */
-    { key: "tong", header: "Tổng (kg)", nhan: "Tổng", kieu: "tinh", nhom: "ngay", rong: 116, lay: (h) => h.tong || null },
-    { key: "tra", header: "Trả", nhan: "Trả", kieu: "so", toNen: "chuyen-ky", rong: 104, lay: (h) => h.tra || null },
-    { key: "no", header: "Nợ", nhan: "Nợ", kieu: "so", toNen: "chuyen-ky", rong: 104, lay: (h) => h.no || null },
+    { key: "tong", header: "Tổng (kg)", label: "Tổng", kind: "tinh", group: "ngay", minWidth: 116, getValue: (h) => h.tong || null },
+    { key: "tra", header: "Trả", label: "Trả", kind: "so", tint: "chuyen-ky", minWidth: 104, getValue: (h) => h.tra || null },
+    { key: "no", header: "Nợ", label: "Nợ", kind: "so", tint: "chuyen-ky", minWidth: 104, getValue: (h) => h.no || null },
   ];
 
   /* Kỳ đã chốt ⇒ khoá TOÀN BỘ ô + gỡ ô điều khiển. Khoá ở một chỗ thay vì rải
      `disabled` khắp nơi: thêm cột mới về sau tự động được khoá theo. */
-  const displayColumns: CotLuoi<FinishedGoodGridRow>[] = luoi.daChot
+  const displayColumns: GridColumn<FinishedGoodGridRow>[] = luoi.daChot
     ? gridColumns.map((c) => ({
         ...c,
-        oRieng: undefined,
-        khoa: () => true,
-        lyDoKhoa: () => "Kỳ đã chốt — mở lại ở cuối màn mới sửa được",
+        renderCell: undefined,
+        isLocked: () => true,
+        lockReason: () => "Kỳ đã chốt — mở lại ở cuối màn mới sửa được",
       }))
     : gridColumns;
 
   const templatePeriodLabel = kyMau ? kyMau.dateRangeDescription || `${kyMau.startDate} – ${kyMau.endDate}` : "";
-  const hang: HangLuoi<FinishedGoodGridRow>[] = [
+  const hang: GridRow<FinishedGoodGridRow>[] = [
     ...hangThat.map((h) => ({
       id: h.id,
-      du: h,
-      ten: productName(h.matHangId),
-      phu: h.quyCach || undefined,
+      data: h,
+      label: productName(h.matHangId),
+      subLabel: h.quyCach || undefined,
     })),
     ...(hideEmptyRows || templateRows.length === 0
       ? []
       : [
           {
             id: "tieu-de-mau",
-            du: templateRows[0],
-            ten: "",
-            tieuDeNhom: `Dòng mẫu theo kỳ ${templatePeriodLabel}`,
-          } as HangLuoi<FinishedGoodGridRow>,
+            data: templateRows[0],
+            label: "",
+            groupTitle: `Dòng mẫu theo kỳ ${templatePeriodLabel}`,
+          } as GridRow<FinishedGoodGridRow>,
           ...templateRows.map((h) => ({
             id: h.id,
-            du: h,
-            ten: <span className="text-muted-foreground">{productName(h.matHangId)}</span>,
-            phu: h.quyCach || undefined,
+            data: h,
+            label: <span className="text-muted-foreground">{productName(h.matHangId)}</span>,
+            subLabel: h.quyCach || undefined,
           })),
         ]),
   ];
@@ -350,19 +350,19 @@ export function LuoiBanThanhPham({
     const customerId = g?.customerId ?? "";
     const khoa = finishedGoodTemplateKey(productId, "", customerId);
     if (tp.some((r) => finishedGoodTemplateKey(r.productId, r.spec ?? "", r.customerId) === khoa)) {
-      notify.loi(`"${productName(productId)}" đã có dòng trong kỳ`);
+      notify.error(`"${productName(productId)}" đã có dòng trong kỳ`);
       return;
     }
     /* Có sẵn ở dòng mẫu (đang ẩn vì chưa có số) ⇒ biến dòng mẫu đó thành dòng thật. */
     const m =
       mauConThieu.find((x) => x.khoa === khoa) ?? mauConThieu.find((x) => x.productId === productId && !x.spec);
     const updated = createFromTemplate(
-      m ?? { id: khoa, khoa, productId, spec: "", customerId: customerId, channel: g?.channel ?? "Xuất khẩu", unitPrice: g?.unitPrice ?? null },
+      m ?? { id: khoa, khoa, productId, spec: "", customerId, channel: g?.channel ?? "Xuất khẩu", unitPrice: g?.unitPrice ?? null },
       {}
     );
     ghiTP([...tp, updated]);
     rememberJustAdded(updated.id);
-    notify.daLuu(
+    notify.saved(
       `Đã thêm "${productName(productId)}"${g ? " — khách + giá theo kỳ gần nhất, soát lại nếu đổi" : ""}`
     );
   };
@@ -422,23 +422,23 @@ export function LuoiBanThanhPham({
       {hangTP.length === 0 && templateRows.length === 0 ? (
         <EmptyState
           icon={Layers}
-          tieuDe="Kỳ chưa có bán thành phẩm"
-          moTa={
+          title="Kỳ chưa có bán thành phẩm"
+          description={
             sanXuatChoHut.length > 0
               ? `Có ${sanXuatChoHut.length} dòng ở sổ sản xuất — bấm "Lấy từ sổ sản xuất".`
               : "Thêm mặt hàng rồi gõ thẳng vào lưới."
           }
         />
       ) : (
-        <LuoiNhap
-          moTa="Lưới bán thành phẩm sản xuất theo ngày trong kỳ"
-          cot={displayColumns}
-          hang={hang}
-          toMau="can-doi-tp"
-          nhomAn={anNgay ? ["ngay"] : []}
-          onGhiO={writeCell}
-          onDanKhoi={pasteBlock}
-          cuoiBang={
+        <EditableGrid
+          description="Lưới bán thành phẩm sản xuất theo ngày trong kỳ"
+          columns={displayColumns}
+          rows={hang}
+          rowMarkKey="can-doi-tp"
+          collapsedGroups={anNgay ? ["ngay"] : []}
+          onCellCommit={writeCell}
+          onPasteBlock={pasteBlock}
+          footer={
             <tr className="bg-muted font-semibold">
               <th
                 scope="row"
@@ -488,8 +488,8 @@ export function LuoiBanThanhPham({
             options={matHang.map((m) => ({ value: m.id, label: m.name }))}
             onCreate={(ten) => onThemMatHang(ten)}
             placeholder="Gõ tên mặt hàng để thêm dòng"
-            onSuaMuc={onSuaMatHang}
-            nhanSua="Sửa thông tin mặt hàng này — lưu thẳng vào Danh mục."
+            onEditItem={onSuaMatHang}
+            editLabel="Sửa thông tin mặt hàng này — lưu thẳng vào Danh mục."
           />
         </div>
       )}
@@ -508,7 +508,7 @@ export function LuoiBanThanhPham({
               (r) => productSpecKey(r.productId, r.spec ?? "") === productSpecKey(productId, quyCach)
             );
             if (trung) {
-              notify.loi("Mặt hàng + quy cách này đã có dòng trong kỳ");
+              notify.error("Mặt hàng + quy cách này đã có dòng trong kỳ");
               return;
             }
             const id = uid();
@@ -517,8 +517,8 @@ export function LuoiBanThanhPham({
               {
                 id,
                 periodId: luoi.kyId,
-                productId: productId,
-                customerId: customerId,
+                productId,
+                customerId,
                 channel: kenh,
                 quantityKg: 0,
                 unitPrice: null,

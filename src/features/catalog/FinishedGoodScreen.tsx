@@ -10,11 +10,11 @@ import {
   Button,
   Combobox,
   EmptyState,
-  Nhan,
+  Tag,
   RecordTable,
-  SkeletonBang,
-  sacTheoTen,
-  type Cot,
+  TableSkeleton,
+  toneByName,
+  type RecordTableColumn,
 } from "@/design-system";
 import { Search, X } from "lucide-react";
 
@@ -40,31 +40,31 @@ export default function ThanhPhamScreen() {
     [nhom, items]
   );
 
-  const cols: Cot<FinishedGood>[] = [
+  const cols: RecordTableColumn<FinishedGood>[] = [
     {
       key: "name",
       header: "Tên thành phẩm",
-      chinh: true,
+      primary: true,
       render: (r) => r.name,
-      sapXep: (r) => r.name,
+      getSortValue: (r) => r.name,
     },
     {
       key: "code",
       header: "Mã",
       render: (r) => <span className="tnum font-medium">{r.code}</span>,
-      sapXep: (r) => r.code,
+      getSortValue: (r) => r.code,
     },
     {
       key: "groupName",
       header: "Nhóm",
-      render: (r) => <Nhan loai="phan-loai" sac={sacTheoTen(r.groupName)}>{r.groupName}</Nhan>,
-      sapXep: (r) => r.groupName,
+      render: (r) => <Tag variant="phan-loai" tone={toneByName(r.groupName)}>{r.groupName}</Tag>,
+      getSortValue: (r) => r.groupName,
     },
     {
       key: "unit",
       header: "Đơn vị",
       render: (r) => r.unit,
-      anTrenDienThoai: true,
+      hideOnMobile: true,
     },
   ];
 
@@ -107,12 +107,12 @@ export default function ThanhPhamScreen() {
       </div>
 
       {isLoading ? (
-        <SkeletonBang />
+        <TableSkeleton />
       ) : rows.length === 0 ? (
         <EmptyState
           icon={Search}
-          tieuDe="Không có mã nào trong nhóm này"
-          moTa="Bỏ lọc nhóm để xem lại toàn bộ danh mục."
+          title="Không có mã nào trong nhóm này"
+          description="Bỏ lọc nhóm để xem lại toàn bộ danh mục."
           action={
             <Button
               title="Bỏ lọc theo nhóm để xem lại toàn bộ danh mục." size="lg" onClick={() => setNhom("")}>
@@ -125,9 +125,9 @@ export default function ThanhPhamScreen() {
           columns={cols}
           rows={rows}
           getKey={(r) => r.code}
-          toMau="danh-muc-tp-141"
-          timKiem={(r) => `${r.code} ${r.name} ${r.groupName}`}
-          nhanTimKiem="Tìm theo tên hoặc mã thành phẩm…"
+          rowMarkKey="danh-muc-tp-141"
+          getSearchText={(r) => `${r.code} ${r.name} ${r.groupName}`}
+          searchLabel="Tìm theo tên hoặc mã thành phẩm…"
         />
       )}
     </div>

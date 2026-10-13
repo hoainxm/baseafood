@@ -36,7 +36,7 @@ import {
   type TraceBranch,
   type LotNode,
 } from "@/lib/lotTraceability";
-import { Button, EmptyState, Field, Input, InfoTip, Nhan, sacTheoTen, ThanhChiaPhan } from "@/design-system";
+import { Button, EmptyState, Field, Input, InfoTip, Tag, toneByName, ProportionBar } from "@/design-system";
 import { ArrowDownRight, ArrowUpLeft, Camera, CameraOff, ListChecks, Printer, Scale, Search, Tags } from "lucide-react";
 import type { LotKind } from "@/types";
 import { cn } from "@/lib/utils";
@@ -48,7 +48,7 @@ function NodeRow({ nut, kgNoi, onMo }: { nut: LotNode; kgNoi?: number | null; on
   const canOpen = laLo(nut.kind) && !nut.mat;
   return (
     <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-      <Nhan loai="phan-loai" sac={sacTheoTen(TRACE_KIND_LABELS[nut.kind])}>{TRACE_KIND_LABELS[nut.kind]}</Nhan>
+      <Tag variant="phan-loai" tone={toneByName(TRACE_KIND_LABELS[nut.kind])}>{TRACE_KIND_LABELS[nut.kind]}</Tag>
       {canOpen ? (
         <button
           type="button"
@@ -231,11 +231,11 @@ export default function QrTraCuuScreen() {
 
       {/* Kết quả */}
       {!lo ? (
-        <EmptyState tieuDe="Chưa có mã lô" moTa="Quét tem QR hoặc gõ mã lô để xem hộ chiếu của lô." />
+        <EmptyState title="Chưa có mã lô" description="Quét tem QR hoặc gõ mã lô để xem hộ chiếu của lô." />
       ) : ketQua.length === 0 ? (
         <EmptyState
-          tieuDe={`Không tìm thấy lô "${lo}"`}
-          moTa="Kiểm tra lại mã. Lô bán thành phẩm / thành phẩm chỉ có từ khi mẻ hoặc phiếu đóng gói được ghi vào sổ."
+          title={`Không tìm thấy lô "${lo}"`}
+          description="Kiểm tra lại mã. Lô bán thành phẩm / thành phẩm chỉ có từ khi mẻ hoặc phiếu đóng gói được ghi vào sổ."
         />
       ) : ketQua.length > 1 ? (
         <div className="space-y-3 rounded-xl border-2 border-border p-4">
@@ -260,7 +260,7 @@ export default function QrTraCuuScreen() {
             <section className="space-y-3 rounded-xl border-2 border-border p-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex flex-wrap items-center gap-2">
-                  <Nhan loai="phan-loai" sac={sacTheoTen(TRACE_KIND_LABELS[viewing.kind])}>{TRACE_KIND_LABELS[viewing.kind]}</Nhan>
+                  <Tag variant="phan-loai" tone={toneByName(TRACE_KIND_LABELS[viewing.kind])}>{TRACE_KIND_LABELS[viewing.kind]}</Tag>
                   <span className="text-xl font-semibold tnum">{viewing.nhan}</span>
                 </div>
                 <Button title="In lại tem QR của lô này (tem cũ bong / mờ thì in cái mới)." variant="outline" onClick={() => setIsPrintingLabel(true)}>
@@ -276,14 +276,14 @@ export default function QrTraCuuScreen() {
                   if (!t)
                     return (
                       <p className="flex flex-wrap items-center gap-2">
-                        <Nhan loai="cho">Chưa in tem</Nhan>
+                        <Tag variant="cho">Chưa in tem</Tag>
                         <span className="text-muted-foreground">Lô này chưa có lần in tem nào được ghi lại.</span>
                       </p>
                     );
                   return (
                     <div className="space-y-1">
                       <p className="flex flex-wrap items-center gap-2">
-                        <Nhan loai="xong">Đã in {t.tem} tem</Nhan>
+                        <Tag variant="xong">Đã in {t.tem} tem</Tag>
                         <span className="text-muted-foreground">
                           Lần gần nhất {formatDateVN(t.cuoi.printedAt.slice(0, 10))}
                           {t.cuoi.operator ? ` · ${t.cuoi.operator}` : ""}
@@ -291,7 +291,7 @@ export default function QrTraCuuScreen() {
                       </p>
                       {t.cuoi.label && t.cuoi.label !== viewing.nhan && (
                         <p className="flex flex-wrap items-center gap-2">
-                          <Nhan loai="luu-y">Nhãn đã đổi</Nhan>
+                          <Tag variant="luu-y">Nhãn đã đổi</Tag>
                           <span>
                             Tem đang dán ghi <b className="tnum">{t.cuoi.label}</b>, nay là{" "}
                             <b className="tnum">{viewing.nhan}</b> (sửa ngày / xưởng sau khi in). Quét tem cũ vẫn ra đúng lô — in lại nếu cần chữ khớp.
@@ -328,7 +328,7 @@ export default function QrTraCuuScreen() {
                           </button>
                         )}
                         <span className="tnum text-muted-foreground">{kg(n.kg)}</span>
-                        {n.id === viewing.id && <Nhan loai="xong">Đang xem</Nhan>}
+                        {n.id === viewing.id && <Tag variant="xong">Đang xem</Tag>}
                       </li>
                     ))}
                   </ul>
@@ -374,16 +374,16 @@ export default function QrTraCuuScreen() {
                 </div>
                 {/* Lô này đi đâu — một thanh 100% kg của lô, chia theo ngả đã đi + phần còn. */}
                 {canBang.vao > 0 && canBang.ra.length > 0 && (
-                  <ThanhChiaPhan
-                    moTa="Khối lượng của lô chia theo nơi đã đi tới"
-                    phan={[
+                  <ProportionBar
+                    description="Khối lượng của lô chia theo nơi đã đi tới"
+                    segments={[
                       ...canBang.ra.map((r, i) => ({
-                        khoa: `ra-${i}`,
-                        nhan: r.nhan,
-                        giaTri: r.kg,
-                        sac: (["tim", "la", "bang", "hong", "cam", "bien"] as const)[i % 6],
+                        id: `ra-${i}`,
+                        label: r.nhan,
+                        value: r.kg,
+                        tone: (["tim", "la", "bang", "hong", "cam", "bien"] as const)[i % 6],
                       })),
-                      ...(canBang.con > 0 ? [{ khoa: "con", nhan: "Còn lại (theo hồ sơ lô)", giaTri: canBang.con, sac: "ngoc" as const }] : []),
+                      ...(canBang.con > 0 ? [{ id: "con", label: "Còn lại (theo hồ sơ lô)", value: canBang.con, tone: "ngoc" as const }] : []),
                     ]}
                   />
                 )}

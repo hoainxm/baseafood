@@ -5,16 +5,16 @@
 // ============================================================
 import { useMemo, useState } from "react";
 import {
-  BangTong,
-  BieuDoCot,
+  SummaryTable,
+  BarChart,
   Combobox,
   DateField,
   DateRangeField,
-  ThongKe,
-  homNay,
-  type CotBieuDo,
-  type CotTong,
-  type TheThongTin,
+  StatCardGrid,
+  todayIso,
+  type BarChartItem,
+  type SummaryTableColumn,
+  type StatCardData,
 } from "@/design-system";
 import { useSalesItems, useSalesInvoices, useCustomers } from "@/lib/catalogRepo";
 import { KY_OPT, getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
@@ -45,9 +45,9 @@ export default function BaoCaoBan() {
   const [customers] = useCustomers();
 
   const [ky, setKy] = useState<ViewPeriod>("thang");
-  const [moc, setMoc] = useState(homNay());
-  const [tuTC, setTuTC] = useState(homNay());
-  const [denTC, setDenTC] = useState(homNay());
+  const [moc, setMoc] = useState(todayIso());
+  const [tuTC, setTuTC] = useState(todayIso());
+  const [denTC, setDenTC] = useState(todayIso());
   const [tu, den] = getViewPeriodRange(ky, moc, tuTC, denTC);
 
   const { dong, chart, soKhach, tongKg } = useMemo(() => {
@@ -76,9 +76,9 @@ export default function BaoCaoBan() {
         a.customerName.localeCompare(b.customerName, "vi") ||
         a.channel.localeCompare(b.channel, "vi")
     );
-    const chart: CotBieuDo[] = [...theoKH.entries()].map(([id, value]) => ({
-      nhan: tenKH.get(id) || "(chưa có khách)",
-      giaTri: value,
+    const chart: BarChartItem[] = [...theoKH.entries()].map(([id, value]) => ({
+      label: tenKH.get(id) || "(chưa có khách)",
+      value,
     }));
     return {
       dong,
@@ -88,26 +88,26 @@ export default function BaoCaoBan() {
     };
   }, [items, invoices, customers, tu, den]);
 
-  const the: TheThongTin[] = [
-    { nhan: "Kỳ báo cáo", giaTri: `${formatDateVN(tu)} – ${formatDateVN(den)}`, icon: CalendarRange, mau: "trung-tinh" },
-    { nhan: "Tổng bán", giaTri: `${num(tongKg)} kg`, so: true, icon: Scale, mau: "brand" },
-    { nhan: "Số khách", giaTri: num(soKhach), so: true, icon: Users, mau: "trung-tinh" },
+  const the: StatCardData[] = [
+    { label: "Kỳ báo cáo", value: `${formatDateVN(tu)} – ${formatDateVN(den)}`, icon: CalendarRange, color: "trung-tinh" },
+    { label: "Tổng bán", value: `${num(tongKg)} kg`, numeric: true, icon: Scale, color: "brand" },
+    { label: "Số khách", value: num(soKhach), numeric: true, icon: Users, color: "trung-tinh" },
   ];
 
-  const columns: CotTong<TotalRow>[] = [
+  const columns: SummaryTableColumn<TotalRow>[] = [
     { key: "kh", header: "Khách hàng", render: (r) => r.customerName },
     { key: "kenh", header: "Kênh", render: (r) => r.channel },
     {
       key: "kg",
       header: "Số cân (kg)",
-      so: true,
+      numeric: true,
       render: (r) => num(r.quantityKg),
-      tong: () => num(tongKg),
+      total: () => num(tongKg),
     },
     {
       key: "tien",
       header: "Giá trị",
-      so: true,
+      numeric: true,
       render: (r) => `${num(r.amount)} ${unitOf(r.channel)}`,
     },
   ];
@@ -118,8 +118,8 @@ export default function BaoCaoBan() {
         <div className="min-w-[12rem]">
           <Combobox
             label="Kỳ báo cáo"
-            anNhanBatBuoc
-            choPhepXoa={false}
+            hideRequiredMark
+            clearable={false}
             value={ky}
             onChange={(v) => setKy(v as ViewPeriod)}
             options={KY_OPT}
@@ -129,7 +129,7 @@ export default function BaoCaoBan() {
           {ky === "tuy-chon" ? (
             <DateRangeField
               label="Khoảng ngày"
-              anNhanBatBuoc
+              hideRequiredMark
               presets={false}
               startDate={tuTC}
               endDate={denTC}
@@ -141,7 +141,7 @@ export default function BaoCaoBan() {
           ) : (
             <DateField
               label={ky === "ngay" ? "Ngày" : "Ngày bất kỳ trong kỳ"}
-              anNhanBatBuoc
+              hideRequiredMark
               hint={ky === "ngay" ? undefined : `Kỳ: ${formatDateVN(tu)} – ${formatDateVN(den)}`}
               value={moc}
               onChange={setMoc}
@@ -150,22 +150,22 @@ export default function BaoCaoBan() {
         </div>
       </div>
 
-      <ThongKe the={the} />
+      <StatCardGrid cards={the} />
 
       {chart.length > 0 && (
         <section className="space-y-3 rounded-xl border-2 border-border bg-card p-5">
           <h3 className="text-lg font-semibold text-foreground">
             Sản lượng bán theo khách
           </h3>
-          <BieuDoCot data={chart} donVi="kg" />
+          <BarChart data={chart} unit="kg" />
         </section>
       )}
 
-      <BangTong
+      <SummaryTable
         rows={dong}
-        cot={columns}
+        columns={columns}
         getKey={(r) => `${r.customerName}|||${r.channel}`}
-        toMau={`bao-cao-ban|${tu}|${den}`}
+        rowMarkKey={`bao-cao-ban|${tu}|${den}`}
         emptyText="Không có phiếu bán trong kỳ này."
       />
     </div>

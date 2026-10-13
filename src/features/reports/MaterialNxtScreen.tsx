@@ -5,10 +5,10 @@
 // ============================================================
 import { useMemo, useState } from "react";
 import {
-  Nhan,
-  BangTong,
+  Tag,
+  SummaryTable,
   Button,
-  ChuThichBatBuoc,
+  RequiredLegend,
   Combobox,
   ConfirmDelete,
   DateField,
@@ -24,13 +24,13 @@ import {
   Field,
   Input,
   NumberField,
-  ThongKe,
-  homNay,
+  StatCardGrid,
+  todayIso,
   notify,
-  type CotTong,
-  type LoiNhap,
-  type MucChon,
-  type TheThongTin,
+  type SummaryTableColumn,
+  type FieldError,
+  type ComboboxOption,
+  type StatCardData,
 } from "@/design-system";
 import { useSuaDanhMuc } from "@/features/catalog/SuaDanhMucNhanh";
 import {
@@ -63,7 +63,7 @@ import {
   Truck,
 } from "lucide-react";
 
-const WORKSHOP_OPTIONS: MucChon[] = [
+const WORKSHOP_OPTIONS: ComboboxOption[] = [
   { value: "Tất cả", label: "Tất cả xưởng" },
   { value: "Đông", label: "Đông" },
   { value: "Cá", label: "Cá" },
@@ -103,16 +103,16 @@ export default function MaterialNxtScreen() {
   const [domesticSales] = useDomesticSales();
 
   const [ky, setKy] = useState<ViewPeriod>("thang");
-  const [moc, setMoc] = useState(homNay());
-  const [tuTC, setTuTC] = useState(homNay());
-  const [denTC, setDenTC] = useState(homNay());
+  const [moc, setMoc] = useState(todayIso());
+  const [tuTC, setTuTC] = useState(todayIso());
+  const [denTC, setDenTC] = useState(todayIso());
   const [workshopFilter, setWorkshopFilter] = useState<string>("Tất cả");
   const [tu, den] = getViewPeriodRange(ky, moc, tuTC, denTC);
 
   // Dialog tồn đầu
   const [isOpeningOpen, setIsOpeningOpen] = useState(false);
   const [form, setForm] = useState<OpeningForm | null>(null);
-  const [loi, setLoi] = useState<LoiNhap[]>([]);
+  const [loi, setLoi] = useState<FieldError[]>([]);
 
   const workshop = workshopFilter === "Tất cả" ? undefined : (workshopFilter as Workshop);
 
@@ -138,16 +138,16 @@ export default function MaterialNxtScreen() {
     [periods, locks, tu, den, workshop],
   );
 
-  const the: TheThongTin[] = [
-    { nhan: "Tồn đầu kỳ", giaTri: `${num(data.tongTonDau)} kg`, so: true, icon: Snowflake, mau: "trung-tinh" },
-    { nhan: "Nhập trong kỳ", giaTri: `${num(data.tongNhap)} kg`, so: true, icon: ArrowDownToLine, mau: "brand" },
-    { nhan: "Xuất SX (chờ)", giaTri: "0 kg", so: true, icon: Truck, mau: "trung-tinh" },
-    { nhan: "Bán nội địa", giaTri: `${num(data.tongBanNoiDia)} kg`, so: true, icon: Store, mau: "warning" },
-    { nhan: "Tồn cuối (chưa trừ SX)", giaTri: `${num(data.tongTonCuoi)} kg`, so: true, icon: Scale, mau: "success" },
+  const the: StatCardData[] = [
+    { label: "Tồn đầu kỳ", value: `${num(data.tongTonDau)} kg`, numeric: true, icon: Snowflake, color: "trung-tinh" },
+    { label: "Nhập trong kỳ", value: `${num(data.tongNhap)} kg`, numeric: true, icon: ArrowDownToLine, color: "brand" },
+    { label: "Xuất SX (chờ)", value: "0 kg", numeric: true, icon: Truck, color: "trung-tinh" },
+    { label: "Bán nội địa", value: `${num(data.tongBanNoiDia)} kg`, numeric: true, icon: Store, color: "warning" },
+    { label: "Tồn cuối (chưa trừ SX)", value: `${num(data.tongTonCuoi)} kg`, numeric: true, icon: Scale, color: "success" },
   ];
 
   // Bảng tồn theo NGÀY (mọi họ gộp) — trục "theo ngày" cho BGĐ.
-  const dateColumns: CotTong<MaterialTotalStockDay>[] = [
+  const dateColumns: SummaryTableColumn<MaterialTotalStockDay>[] = [
     {
       key: "date",
       header: "Ngày",
@@ -156,117 +156,117 @@ export default function MaterialNxtScreen() {
     {
       key: "nhap",
       header: "Nhập (kg)",
-      so: true,
+      numeric: true,
       render: (r) => <span className="font-semibold text-primary">+{num(r.nhap)}</span>,
-      tong: () => num(data.tongNhap),
+      total: () => num(data.tongNhap),
     },
     {
       key: "xuatSX",
       header: "Xuất SX (kg)",
-      so: true,
+      numeric: true,
       render: () => <span className="text-muted-foreground">—</span>,
-      tong: () => "—",
+      total: () => "—",
     },
     {
       key: "banNoiDia",
       header: "Bán nội địa (kg)",
-      so: true,
+      numeric: true,
       render: (r) =>
         r.banNoiDia > 0 ? (
           <span className="font-semibold text-warning">−{num(r.banNoiDia)}</span>
         ) : (
           <span className="text-muted-foreground">—</span>
         ),
-      tong: () => (data.tongBanNoiDia > 0 ? `−${num(data.tongBanNoiDia)}` : "—"),
+      total: () => (data.tongBanNoiDia > 0 ? `−${num(data.tongBanNoiDia)}` : "—"),
     },
     {
       key: "tonCuoi",
       header: "Tồn cuối ngày (kg)",
-      so: true,
+      numeric: true,
       render: (r) => <span className="tnum font-bold text-foreground">{num(r.tonCuoi)}</span>,
     },
   ];
 
   // Bảng tồn theo LOẠI (họ) NL.
-  const materialFamilyColumns: CotTong<MaterialTotalStockFamily>[] = [
+  const materialFamilyColumns: SummaryTableColumn<MaterialTotalStockFamily>[] = [
     {
       key: "hoNL",
       header: "Loại nguyên liệu",
       render: (r) => (
         <div className="flex flex-wrap items-center gap-2">
           <span className="font-semibold text-foreground">{r.hoNL}</span>
-          {r.seedTonDau && <Nhan loai="nguon">Tồn đầu khai tay</Nhan>}
+          {r.seedTonDau && <Tag variant="nguon">Tồn đầu khai tay</Tag>}
           {r.canhBaoAm && (
-            <Nhan loai="loi" icon={AlertTriangle}>
+            <Tag variant="loi" icon={AlertTriangle}>
               Tồn âm
-            </Nhan>
+            </Tag>
           )}
         </div>
       ),
     },
-    { key: "tonDau", header: "Tồn đầu (kg)", so: true, render: (r) => num(r.tonDau), tong: () => num(data.tongTonDau) },
+    { key: "tonDau", header: "Tồn đầu (kg)", numeric: true, render: (r) => num(r.tonDau), total: () => num(data.tongTonDau) },
     {
       key: "nhapKy",
       header: "Nhập (kg)",
-      so: true,
+      numeric: true,
       render: (r) => <span className="font-semibold text-primary">+{num(r.nhapKy)}</span>,
-      tong: () => num(data.tongNhap),
+      total: () => num(data.tongNhap),
     },
     {
       key: "xuatSX",
       header: "Xuất SX (kg)",
-      so: true,
+      numeric: true,
       render: () => <span className="text-muted-foreground">—</span>,
-      tong: () => "—",
+      total: () => "—",
     },
     {
       key: "banNoiDia",
       header: "Bán nội địa (kg)",
-      so: true,
+      numeric: true,
       render: (r) =>
         r.banNoiDia > 0 ? (
           <span className="font-semibold text-warning">−{num(r.banNoiDia)}</span>
         ) : (
           <span className="text-muted-foreground">—</span>
         ),
-      tong: () => (data.tongBanNoiDia > 0 ? `−${num(data.tongBanNoiDia)}` : "—"),
+      total: () => (data.tongBanNoiDia > 0 ? `−${num(data.tongBanNoiDia)}` : "—"),
     },
     {
       key: "tonCuoi",
       header: "Tồn cuối (kg)",
-      so: true,
+      numeric: true,
       render: (r) => (
         <span className={`tnum font-bold ${r.canhBaoAm ? "text-destructive" : "text-foreground"}`}>
           {num(r.tonCuoi)}
         </span>
       ),
-      tong: () => num(data.tongTonCuoi),
+      total: () => num(data.tongTonCuoi),
     },
     // Cột THÔNG TIN (kho đông dự trữ) — không vào tồn.
     {
       key: "dongGui",
       header: "Đông gửi (kho đông)",
-      so: true,
+      numeric: true,
       render: (r) => <span className="text-muted-foreground">{r.dongGui > 0 ? num(r.dongGui) : "—"}</span>,
-      tong: () => (data.tongDongGui > 0 ? num(data.tongDongGui) : "—"),
+      total: () => (data.tongDongGui > 0 ? num(data.tongDongGui) : "—"),
     },
     {
       key: "xaDong",
       header: "Xả đông (kho đông)",
-      so: true,
+      numeric: true,
       render: (r) => <span className="text-muted-foreground">{r.xaDong > 0 ? num(r.xaDong) : "—"}</span>,
-      tong: () => (data.tongXaDong > 0 ? num(data.tongXaDong) : "—"),
+      total: () => (data.tongXaDong > 0 ? num(data.tongXaDong) : "—"),
     },
   ];
 
   // ----- Tồn đầu: thêm / xóa -----
-  const materialTypeOptions: MucChon[] = materialTypes.map((m) => ({ value: m.name, label: m.name }));
+  const materialTypeOptions: ComboboxOption[] = materialTypes.map((m) => ({ value: m.name, label: m.name }));
 
   const openAddOpening = () => {
     setForm({
       workshop: (workshop ?? "Đông") as Workshop,
       materialTypeName: "",
-      asOfDate: homNay(),
+      asOfDate: todayIso(),
       quantityKg: null,
       note: "",
     });
@@ -275,12 +275,12 @@ export default function MaterialNxtScreen() {
 
   const saveOpening = () => {
     if (!form) return;
-    const ls: LoiNhap[] = [];
+    const ls: FieldError[] = [];
     if (!form.materialTypeName.trim())
-      ls.push({ truong: "Loại nguyên liệu", thongBao: "Chưa chọn loại nguyên liệu" });
-    if (!form.asOfDate) ls.push({ truong: "Ngày mốc", thongBao: "Chưa chọn ngày tồn đầu" });
+      ls.push({ field: "Loại nguyên liệu", message: "Chưa chọn loại nguyên liệu" });
+    if (!form.asOfDate) ls.push({ field: "Ngày mốc", message: "Chưa chọn ngày tồn đầu" });
     if (!(Number(form.quantityKg) > 0))
-      ls.push({ truong: "Khối lượng", thongBao: "Phải lớn hơn 0 kg" });
+      ls.push({ field: "Khối lượng", message: "Phải lớn hơn 0 kg" });
     setLoi(ls);
     if (ls.length > 0) return;
     const newOpening: MaterialOpeningStock = {
@@ -292,13 +292,13 @@ export default function MaterialNxtScreen() {
       note: form.note.trim(),
     };
     writeOpening([...opening, newOpening]);
-    notify.daLuu(`Đã lưu tồn đầu ${num(newOpening.quantityKg)} kg — ${newOpening.materialTypeName}`);
+    notify.saved(`Đã lưu tồn đầu ${num(newOpening.quantityKg)} kg — ${newOpening.materialTypeName}`);
     setForm(null);
   };
 
   const deleteOpening = (id: string) => {
     writeOpening(opening.filter((o) => o.id !== id));
-    notify.daXoa("Đã xóa dòng tồn đầu");
+    notify.deleted("Đã xóa dòng tồn đầu");
   };
 
   const filteredOpening = useMemo(
@@ -331,8 +331,8 @@ export default function MaterialNxtScreen() {
         <div className="min-w-[12rem]">
           <Combobox
             label="Kỳ báo cáo"
-            anNhanBatBuoc
-            choPhepXoa={false}
+            hideRequiredMark
+            clearable={false}
             value={ky}
             onChange={(v) => setKy(v as ViewPeriod)}
             options={KY_OPT}
@@ -342,7 +342,7 @@ export default function MaterialNxtScreen() {
           {ky === "tuy-chon" ? (
             <DateRangeField
               label="Khoảng ngày"
-              anNhanBatBuoc
+              hideRequiredMark
               presets={false}
               startDate={tuTC}
               endDate={denTC}
@@ -354,7 +354,7 @@ export default function MaterialNxtScreen() {
           ) : (
             <DateField
               label={ky === "ngay" ? "Ngày" : "Ngày bất kỳ trong kỳ"}
-              anNhanBatBuoc
+              hideRequiredMark
               hint={ky === "ngay" ? undefined : `Kỳ: ${formatDateVN(tu)} – ${formatDateVN(den)}`}
               value={moc}
               onChange={setMoc}
@@ -364,8 +364,8 @@ export default function MaterialNxtScreen() {
         <div className="min-w-[10rem]">
           <Combobox
             label="Phân xưởng"
-            anNhanBatBuoc
-            choPhepXoa={false}
+            hideRequiredMark
+            clearable={false}
             value={workshopFilter}
             onChange={setWorkshopFilter}
             options={WORKSHOP_OPTIONS}
@@ -373,7 +373,7 @@ export default function MaterialNxtScreen() {
         </div>
       </div>
 
-      <ThongKe the={the} />
+      <StatCardGrid cards={the} />
 
       {/* Chú thích phạm vi — trung thực (nhất là với BGĐ) */}
       <div className="flex flex-wrap items-start gap-3 rounded-xl border-2 border-warning bg-warning/10 p-4">
@@ -410,8 +410,8 @@ export default function MaterialNxtScreen() {
       {data.soHo === 0 ? (
         <EmptyState
           icon={CalendarDays}
-          tieuDe="Chưa có nhập hàng nào trong khoảng ngày này"
-          moTa="Đổi lại Kỳ báo cáo / phân xưởng, hoặc ghi chuyến nhập ở màn Nhập hàng trước. Có thể khai Tồn đầu để cộng vào tồn."
+          title="Chưa có nhập hàng nào trong khoảng ngày này"
+          description="Đổi lại Kỳ báo cáo / phân xưởng, hoặc ghi chuyến nhập ở màn Nhập hàng trước. Có thể khai Tồn đầu để cộng vào tồn."
         />
       ) : (
         <>
@@ -419,11 +419,11 @@ export default function MaterialNxtScreen() {
           {data.theoNgay.length > 0 && (
             <section className="space-y-2">
               <h3 className="text-lg font-semibold text-foreground">Tồn theo ngày</h3>
-              <BangTong
+              <SummaryTable
                 rows={data.theoNgay}
-                cot={dateColumns}
+                columns={dateColumns}
                 getKey={(r) => r.date}
-                toMau={`ton-nl-ngay|${workshopFilter}`}
+                rowMarkKey={`ton-nl-ngay|${workshopFilter}`}
                 emptyText="Không có ngày nào có nhập."
               />
             </section>
@@ -432,11 +432,11 @@ export default function MaterialNxtScreen() {
           {/* Tồn theo loại NL */}
           <section className="space-y-2">
             <h3 className="text-lg font-semibold text-foreground">Tồn theo loại nguyên liệu</h3>
-            <BangTong
+            <SummaryTable
               rows={data.theoHo}
-              cot={materialFamilyColumns}
+              columns={materialFamilyColumns}
               getKey={(r) => r.hoNL}
-              toMau={`ton-nl-ho|${tu}|${den}|${workshopFilter}`}
+              rowMarkKey={`ton-nl-ho|${tu}|${den}|${workshopFilter}`}
               emptyText="Chưa có loại nguyên liệu nào."
             />
           </section>
@@ -472,7 +472,7 @@ export default function MaterialNxtScreen() {
                       </span>
                     </span>
                     <ConfirmDelete
-                      moTaBanGhi={`${o.materialTypeName} — ${num(o.quantityKg)} kg (từ ${formatDateVN(o.asOfDate)})`}
+                      recordDescription={`${o.materialTypeName} — ${num(o.quantityKg)} kg (từ ${formatDateVN(o.asOfDate)})`}
                       onConfirm={() => deleteOpening(o.id)}
                       trigger={
                         <Button
@@ -493,13 +493,13 @@ export default function MaterialNxtScreen() {
             {/* Form thêm */}
             {form ? (
               <div className="space-y-4 rounded-xl border-2 border-primary/40 bg-accent/30 p-4">
-                <ErrorSummary loi={loi} />
-                <ChuThichBatBuoc />
+                <ErrorSummary errors={loi} />
+                <RequiredLegend />
                 <div className="grid gap-4 sm:grid-cols-2">
                   <Combobox
                     label="Phân xưởng"
                     required
-                    choPhepXoa={false}
+                    clearable={false}
                     value={form.workshop}
                     onChange={(v) => setForm((f) => (f ? { ...f, workshop: v as Workshop } : f))}
                     options={WORKSHOP_OPTIONS.filter((o) => o.value !== "Tất cả")}
@@ -511,9 +511,9 @@ export default function MaterialNxtScreen() {
                     onChange={(v) => setForm((f) => (f ? { ...f, materialTypeName: v } : f))}
                     onCreate={(t) => t}
                     options={materialTypeOptions}
-                    onSuaMuc={materialTypeEditor.moSua}
-                    nhanSua={materialTypeEditor.nhanSua}
-                    suaDuoc={materialTypeEditor.suaDuoc}
+                    onEditItem={materialTypeEditor.moSua}
+                    editLabel={materialTypeEditor.nhanSua}
+                    canEdit={materialTypeEditor.suaDuoc}
                     hint="Chọn hoặc gõ tên loại; gõ đúng tên trong sổ Nhập hàng để khớp họ."
                   />
                   <DateField

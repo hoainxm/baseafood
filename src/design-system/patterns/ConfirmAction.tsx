@@ -18,7 +18,7 @@ import {
 import type { LucideIcon } from "lucide-react";
 
 /**
- * XacNhan — cổng hỏi lại trước thao tác HỆ TRỌNG không phải xóa
+ * ConfirmAction — cổng hỏi lại trước thao tác HỆ TRỌNG không phải xóa
  * (đăng xuất, chốt sổ, ghi đè dữ liệu, bỏ dữ liệu đang xem…).
  *
  * KHI NÀO DÙNG — chỉ 3 nhóm:
@@ -35,13 +35,13 @@ import type { LucideIcon } from "lucide-react";
  *  - Nói rõ HỆ QUẢ: mất gì, khóa gì, còn sửa được không.
  *  - Nút an toàn đứng TRƯỚC và là mặc định khi nhấn Esc.
  */
-export function XacNhan({
-  tieuDe,
-  moTa,
-  chiTiet,
-  nhanNut,
-  nhanHuy = "Quay lại",
-  nguyHiem = false,
+export function ConfirmAction({
+  title,
+  description,
+  detail,
+  confirmLabel,
+  cancelLabel = "Quay lại",
+  destructive: nguyHiem = false,
   icon: Icon,
   onConfirm,
   trigger,
@@ -49,15 +49,15 @@ export function XacNhan({
   onOpenChange,
 }: {
   /** Câu hỏi nêu đích danh việc sắp làm. VD "Đăng xuất khỏi máy này?" */
-  tieuDe: string;
+  title: string;
   /** Hệ quả của thao tác — luôn nói rõ mất gì / khóa gì. */
-  moTa: React.ReactNode;
+  description: React.ReactNode;
   /** Số liệu hoặc tên bản ghi cụ thể, hiện trong khối nền xám. */
-  chiTiet?: React.ReactNode;
-  nhanNut: string;
-  nhanHuy?: string;
+  detail?: React.ReactNode;
+  confirmLabel: string;
+  cancelLabel?: string;
   /** Thao tác gây mất dữ liệu ⇒ nút đỏ. */
-  nguyHiem?: boolean;
+  destructive?: boolean;
   icon?: LucideIcon;
   onConfirm: () => void;
   /** Nút mở (bọc asChild). Bỏ trống ⇒ điều khiển bằng open/onOpenChange. */
@@ -70,25 +70,25 @@ export function XacNhan({
       {trigger && <AlertDialogTrigger asChild>{trigger}</AlertDialogTrigger>}
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle className="text-xl">{tieuDe}</AlertDialogTitle>
+          <AlertDialogTitle className="text-xl">{title}</AlertDialogTitle>
           <AlertDialogDescription className="text-base text-foreground">
-            {moTa}
-            {chiTiet && (
+            {description}
+            {detail && (
               <span className="mt-2 block rounded-lg bg-muted px-4 py-3 text-base font-semibold text-foreground">
-                {chiTiet}
+                {detail}
               </span>
             )}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel size="lg">{nhanHuy}</AlertDialogCancel>
+          <AlertDialogCancel size="lg">{cancelLabel}</AlertDialogCancel>
           <AlertDialogAction
             size="lg"
             variant={nguyHiem ? "destructive" : "default"}
             onClick={onConfirm}
           >
             {Icon && <Icon aria-hidden />}
-            {nhanNut}
+            {confirmLabel}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

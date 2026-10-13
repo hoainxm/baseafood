@@ -30,7 +30,7 @@ import {
 } from "@/lib/catalogRepo";
 import { listLotsWithStock, computeWipStock, collectWipDeductions } from "@/lib/inventory";
 import {
-  ChuThichBatBuoc,
+  RequiredLegend,
   Button,
   Combobox,
   Dialog,
@@ -40,19 +40,19 @@ import {
   DialogHeader,
   DialogTitle,
   EmptyState,
-  SkeletonBang,
+  TableSkeleton,
   ErrorSummary,
   Field,
   Input,
-  Nhan,
+  Tag,
   NumberField,
   RecordTable,
-  ThongKe,
-  XacNhan,
+  StatCardGrid,
+  ConfirmAction,
   notify,
-  type Cot,
-  type LoiNhap,
-  type MucChon,
+  type RecordTableColumn,
+  type FieldError,
+  type ComboboxOption,
 } from "@/design-system";
 import { useSuaDanhMuc } from "@/features/catalog/SuaDanhMucNhanh";
 import { kg, num, todayISO, formatDateVN } from "@/lib/format";
@@ -95,7 +95,7 @@ export default function DonDatScreen() {
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [creating, setCreating] = useState<NewOrder | null>(null);
-  const [loi, setLoi] = useState<LoiNhap[]>([]);
+  const [loi, setLoi] = useState<FieldError[]>([]);
   const [lotCheckOrder, setLotCheckOrder] = useState<ExportOrder | null>(null);
 
   // Link từ /qr "Theo giai đoạn" (`?don=<id>&kiem=<id lệnh xuất>`) ⇒ mở đơn và hộp kiểm
@@ -124,15 +124,15 @@ export default function DonDatScreen() {
   );
   const stock = useMemo(() => computeWipStock(wips, exportItems, retailSales), [wips, exportItems, retailSales]);
 
-  const productOptions: MucChon[] = products.map((m) => ({
+  const productOptions: ComboboxOption[] = products.map((m) => ({
     value: m.id,
     label: m.name,
-    phu: m.code || undefined,
+    subLabel: m.code || undefined,
   }));
-  const customerOptions: MucChon[] = customers.map((k) => ({
+  const customerOptions: ComboboxOption[] = customers.map((k) => ({
     value: k.id,
     label: k.name,
-    phu: k.market || undefined,
+    subLabel: k.market || undefined,
   }));
   /** kg đã xuất cho (đơn × mặt hàng × quy cách) — gom dòng lệnh của lệnh thuộc đơn. */
   const exportedKg = (orderId: string, mh: string, qc: string) => {
@@ -169,7 +169,7 @@ export default function DonDatScreen() {
     if (co) return co.id; // trùng tên (không phân hoa thường) ⇒ dùng lại bản có sẵn
     const m = { id: newId(), code: "", name: sach, finishedGoodCode: "" };
     setProducts([...products, m]);
-    notify.daLuu(`Đã thêm mặt hàng "${sach}" vào danh mục`);
+    notify.saved(`Đã thêm mặt hàng "${sach}" vào danh mục`);
     return m.id;
   };
   const addCustomer = (ten: string) => {
@@ -178,7 +178,7 @@ export default function DonDatScreen() {
     if (co) return co.id; // trùng tên (không phân hoa thường) ⇒ dùng lại bản có sẵn
     const k = { id: newId(), code: "", name: sach, market: "" };
     setCustomers([...customers, k]);
-    notify.daLuu(`Đã thêm khách hàng "${sach}" vào danh mục`);
+    notify.saved(`Đã thêm khách hàng "${sach}" vào danh mục`);
     return k.id;
   };
   const updateRow = (i: number, patch: Partial<NewWeighRow>) =>
@@ -190,11 +190,11 @@ export default function DonDatScreen() {
 
   const saveCreate = () => {
     if (!creating) return;
-    const ls: LoiNhap[] = [];
-    if (!creating.customerId) ls.push({ truong: "Khách", thongBao: "Chưa chọn khách" });
+    const ls: FieldError[] = [];
+    if (!creating.customerId) ls.push({ field: "Khách", message: "Chưa chọn khách" });
     const validRows = creating.dong.filter((d) => d.productId && d.requiredQuantityKg > 0);
     if (validRows.length === 0)
-      ls.push({ truong: "Dòng cần", thongBao: "Thêm ít nhất 1 mặt hàng cần" });
+      ls.push({ field: "Dòng cần", message: "Thêm ít nhất 1 mặt hàng cần" });
     setLoi(ls);
     if (ls.length > 0) return;
     const donId = newId();
@@ -215,7 +215,7 @@ export default function DonDatScreen() {
     }));
     persistDon([...don, newOrder]);
     persistDongDon([...dongDon, ...newOrderItems]);
-    notify.daLuu(`Đã tạo đơn cho ${tenKH(creating.customerId)}`);
+    notify.saved(`Đã tạo đơn cho ${tenKH(creating.customerId)}`);
     setCreating(null);
     setSelectedId(donId);
   };
@@ -249,7 +249,7 @@ export default function DonDatScreen() {
       }
     }
     if (newExportItems.length === 0) {
-      notify.canhBao("Chưa có tồn khả dụng để xuất cho đơn này");
+      notify.warning("Chưa có tồn khả dụng để xuất cho đơn này");
       return;
     }
     const newExportOrder: ExportOrder = {
@@ -305,7 +305,7 @@ export default function DonDatScreen() {
       )
     );
     const totalOut = newExportItems.reduce((s, dl) => s + dl.quantityKg, 0);
-    notify.daLuu(
+    notify.saved(
       `Đã xuất ${kg(totalOut)} → sổ Bán hàng (phiếu ${tenKH(d.customerId)})` +
         (conThieu ? " · đơn còn thiếu, vẫn mở" : " · đơn đóng")
     );
@@ -313,7 +313,7 @@ export default function DonDatScreen() {
 
   const confirmFulfilled = (d: SalesOrder) => {
     persistDon(don.map((x) => (x.id === d.id ? { ...x, status: "du" } : x)));
-    notify.daLuu("Đã đánh dấu đơn đủ — bấm Lệnh xuất để xuất container");
+    notify.saved("Đã đánh dấu đơn đủ — bấm Lệnh xuất để xuất container");
   };
 
   const deleteOrder = (d: SalesOrder) => {
@@ -322,28 +322,28 @@ export default function DonDatScreen() {
     persistDon(don.filter((x) => x.id !== d.id));
     persistDongDon(dongDon.filter((x) => x.orderId !== d.id));
     if (selectedId === d.id) setSelectedId(null);
-    notify.daXoa(`Đã xóa đơn ${tenKH(d.customerId)}`, () => {
+    notify.deleted(`Đã xóa đơn ${tenKH(d.customerId)}`, () => {
       persistDon(prevOrders);
       persistDongDon(prevRows);
     });
   };
 
-  const colsDon: Cot<SalesOrder>[] = [
-    { key: "kh", header: "Khách", chinh: true, render: (r) => tenKH(r.customerId), sapXep: (r) => tenKH(r.customerId) },
-    { key: "ngay", header: "Ngày đặt", render: (r) => formatDateVN(r.orderDate), sapXep: (r) => r.orderDate },
+  const colsDon: RecordTableColumn<SalesOrder>[] = [
+    { key: "kh", header: "Khách", primary: true, render: (r) => tenKH(r.customerId), getSortValue: (r) => tenKH(r.customerId) },
+    { key: "ngay", header: "Ngày đặt", render: (r) => formatDateVN(r.orderDate), getSortValue: (r) => r.orderDate },
     {
       key: "sd",
       header: "Số dòng",
-      so: true,
+      numeric: true,
       render: (r) => num(dongDon.filter((d) => d.orderId === r.id).length),
     },
     {
       key: "tt",
       header: "Trạng thái",
       render: (r) => (
-        <Nhan loai={r.status === "dang-gom" ? "cho" : "xong"}>{STATUS_LABELS[r.status]}</Nhan>
+        <Tag variant={r.status === "dang-gom" ? "cho" : "xong"}>{STATUS_LABELS[r.status]}</Tag>
       ),
-      sapXep: (r) => r.status,
+      getSortValue: (r) => r.status,
     },
   ];
 
@@ -364,22 +364,22 @@ export default function DonDatScreen() {
         </div>
       </div>
 
-      <ThongKe
+      <StatCardGrid
         className="grid-cols-1 sm:grid-cols-3"
-        the={[
-          { nhan: "Tổng số đơn", giaTri: don.length, so: true, icon: ClipboardList, mau: "trung-tinh" },
-          { nhan: "Đang gom hàng", giaTri: don.filter((d) => d.status === "dang-gom").length, so: true, icon: Package, mau: "brand" },
-          { nhan: "Đã xuất xong", giaTri: don.filter((d) => d.status === "dong").length, so: true, icon: CheckCircle, mau: "success" },
+        cards={[
+          { label: "Tổng số đơn", value: don.length, numeric: true, icon: ClipboardList, color: "trung-tinh" },
+          { label: "Đang gom hàng", value: don.filter((d) => d.status === "dang-gom").length, numeric: true, icon: Package, color: "brand" },
+          { label: "Đã xuất xong", value: don.filter((d) => d.status === "dong").length, numeric: true, icon: CheckCircle, color: "success" },
         ]}
       />
 
       {isLoading ? (
-        <SkeletonBang />
+        <TableSkeleton />
       ) : don.length === 0 ? (
         <EmptyState
           icon={ClipboardList}
-          tieuDe="Chưa có đơn đặt nào"
-          moTa="Bấm Tạo đơn để khai đơn khách đặt (mặt hàng, quy cách, số lượng cần)."
+          title="Chưa có đơn đặt nào"
+          description="Bấm Tạo đơn để khai đơn khách đặt (mặt hàng, quy cách, số lượng cần)."
           action={
             <Button
               title="Tạo đơn đặt đầu tiên." size="lg" onClick={openCreate}>
@@ -393,9 +393,9 @@ export default function DonDatScreen() {
           columns={colsDon}
           rows={don}
           getKey={(r) => r.id}
-          toMau="don-dat"
-          timKiem={(r) => tenKH(r.customerId)}
-          nhanTimKiem="Tìm theo khách…"
+          rowMarkKey="don-dat"
+          getSearchText={(r) => tenKH(r.customerId)}
+          searchLabel="Tìm theo khách…"
           actions={(r) => (
             <div className="flex flex-wrap gap-2">
               <Button
@@ -433,11 +433,11 @@ export default function DonDatScreen() {
                   </Button>
                   {/* Lệnh xuất TRỪ TỒN KHO + đẻ phiếu ở sổ Bán hàng — chạm hai
                       sổ cùng lúc, không có nút hoàn tác. Phải hỏi lại. */}
-                  <XacNhan
-                    tieuDe="Xuất hàng cho đơn này?"
-                    moTa="Sẽ trừ tồn kho dự trữ theo FIFO và tạo một phiếu bán (kênh Xuất khẩu) ở sổ Bán hàng. Không hoàn tác được — sai thì phải sửa tay ở cả hai sổ."
-                    chiTiet={`${tenKH(selectedOrder.customerId)} · đặt ${formatDateVN(selectedOrder.orderDate)} · ${selectedOrderItems.length} dòng hàng`}
-                    nhanNut="Xuất hàng"
+                  <ConfirmAction
+                    title="Xuất hàng cho đơn này?"
+                    description="Sẽ trừ tồn kho dự trữ theo FIFO và tạo một phiếu bán (kênh Xuất khẩu) ở sổ Bán hàng. Không hoàn tác được — sai thì phải sửa tay ở cả hai sổ."
+                    detail={`${tenKH(selectedOrder.customerId)} · đặt ${formatDateVN(selectedOrder.orderDate)} · ${selectedOrderItems.length} dòng hàng`}
+                    confirmLabel="Xuất hàng"
                     icon={Truck}
                     onConfirm={() => createExportOrder(selectedOrder)}
                     trigger={
@@ -487,9 +487,9 @@ export default function DonDatScreen() {
                       Khả dụng <span className="tnum">{num(kd)}</span>
                     </span>
                     {du ? (
-                      <Nhan loai="xong">Đủ</Nhan>
+                      <Tag variant="xong">Đủ</Tag>
                     ) : (
-                      <Nhan loai="luu-y">Còn thiếu {num(con)} kg</Nhan>
+                      <Tag variant="luu-y">Còn thiếu {num(con)} kg</Tag>
                     )}
                   </div>
                 </li>
@@ -560,8 +560,8 @@ export default function DonDatScreen() {
           </DialogHeader>
           {creating && (
             <div className="space-y-6 py-2">
-              <ErrorSummary loi={loi} />
-              <ChuThichBatBuoc />
+              <ErrorSummary errors={loi} />
+              <RequiredLegend />
               <Combobox
                 label="Khách hàng"
                 required
@@ -569,8 +569,8 @@ export default function DonDatScreen() {
                 onChange={(v) => setCreating((t) => (t ? { ...t, customerId: v } : t))}
                 options={customerOptions}
                 onCreate={addCustomer}
-                onSuaMuc={customerEditor.moSua}
-                nhanSua={customerEditor.nhanSua}
+                onEditItem={customerEditor.moSua}
+                editLabel={customerEditor.nhanSua}
                 emptyText="Chưa có khách nào — gõ tên rồi bấm Thêm mới."
               />
               <div className="space-y-4">
@@ -586,8 +586,8 @@ export default function DonDatScreen() {
                       value={dc.productId}
                       onChange={(v) => updateRow(i, { productId: v })}
                       options={productOptions}
-                      onSuaMuc={productEditor.moSua}
-                      nhanSua={productEditor.nhanSua}
+                      onEditItem={productEditor.moSua}
+                      editLabel={productEditor.nhanSua}
                       onCreate={addProduct}
                     />
                     <Field

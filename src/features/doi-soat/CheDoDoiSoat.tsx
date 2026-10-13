@@ -9,7 +9,7 @@
 // ============================================================
 import { useMemo, useState } from "react";
 import {
-  KhungCuonNgang,
+  HorizontalScroll,
   Button,
   Card,
   CardContent,
@@ -17,10 +17,10 @@ import {
   CardTitle,
   EmptyState,
   RecordTable,
-  Nhan,
-  ThongKe,
-  type Cot,
-  type TheThongTin,
+  Tag,
+  StatCardGrid,
+  type RecordTableColumn,
+  type StatCardData,
 } from "@/design-system";
 import {
   SUM_MISMATCH_LABELS,
@@ -244,11 +244,11 @@ function SideSplitBox({
 type TwoVersionFilter = "all" | "CHI_THUE" | "CHI_TAI" | "LECH" | "KHONG_SO";
 
 function twoVersionChip(d: TwoVersionRow) {
-  if (d.ben === "CHI_THUE") return <Nhan loai="loi">Chỉ bản thuế có</Nhan>;
-  if (d.ben === "CHI_TAI") return <Nhan loai="luu-y">Chỉ bản tự tải có</Nhan>;
-  if (d.khongSoDuocTien) return <Nhan loai="luu-y">Không so được tiền</Nhan>;
-  if (d.lechTien) return <Nhan loai="loi">Lệch tiền</Nhan>;
-  return <Nhan loai="xong">Khớp</Nhan>;
+  if (d.ben === "CHI_THUE") return <Tag variant="loi">Chỉ bản thuế có</Tag>;
+  if (d.ben === "CHI_TAI") return <Tag variant="luu-y">Chỉ bản tự tải có</Tag>;
+  if (d.khongSoDuocTien) return <Tag variant="luu-y">Không so được tiền</Tag>;
+  if (d.lechTien) return <Tag variant="loi">Lệch tiền</Tag>;
+  return <Tag variant="xong">Khớp</Tag>;
 }
 
 export function SoHaiBanView({
@@ -283,8 +283,8 @@ export function SoHaiBanView({
     return (
       <EmptyState
         icon={Files}
-        tieuDe="File chỉ có một sheet hóa đơn"
-        moTa="So hai bản cần ít nhất hai sheet hóa đơn: một bản cơ quan thuế gửi và một bản kế toán tự tải. Dán hai bản vào hai sheet của cùng một file rồi chạy lại."
+        title="File chỉ có một sheet hóa đơn"
+        description="So hai bản cần ít nhất hai sheet hóa đơn: một bản cơ quan thuế gửi và một bản kế toán tự tải. Dán hai bản vào hai sheet của cùng một file rồi chạy lại."
       />
     );
   if (!kq)
@@ -293,20 +293,20 @@ export function SoHaiBanView({
         {sideSplitBox}
         <EmptyState
           icon={Files}
-          tieuDe="Chưa chia được hai bên"
-          moTa="Cần ít nhất một sheet ở mỗi bên. Bấm “Thuế gửi” / “Tự tải” cho từng sheet ở trên."
+          title="Chưa chia được hai bên"
+          description="Cần ít nhất một sheet ở mỗi bên. Bấm “Thuế gửi” / “Tự tải” cho từng sheet ở trên."
         />
       </div>
     );
 
   const t = kq.tong;
-  const the: TheThongTin[] = [
-    { nhan: "Bản thuế gửi", giaTri: num(t.soThue), so: true, mau: "brand", phu: `${num(t.tienThue)} đ`, onChon: () => setFilter("all"), moTaChon: "Xem tất cả hóa đơn" },
-    { nhan: "Bản tự tải", giaTri: num(t.soTai), so: true, mau: "brand", phu: `${num(t.tienTai)} đ`, onChon: () => setFilter("all"), moTaChon: "Xem tất cả hóa đơn" },
-    { nhan: "Chỉ bản thuế có", giaTri: num(t.chiThue), so: true, mau: t.chiThue ? "danger" : "success", phu: `${num(t.tienChiThue)} đ — bản tự tải thiếu`, onChon: () => setFilter("CHI_THUE"), moTaChon: "Xem hóa đơn bản tự tải thiếu" },
-    { nhan: "Chỉ bản tự tải có", giaTri: num(t.chiTai), so: true, mau: t.chiTai ? "warning" : "success", phu: `${num(t.tienChiTai)} đ`, onChon: () => setFilter("CHI_TAI"), moTaChon: "Xem hóa đơn bản thuế không có" },
-    { nhan: "Có cả hai, lệch tiền", giaTri: num(t.lechTien), so: true, mau: t.lechTien ? "warning" : "success", onChon: () => setFilter("LECH"), moTaChon: "Xem hóa đơn lệch tiền giữa hai bản" },
-    { nhan: "Không so được tiền", giaTri: num(t.khongSoDuocTien), so: true, mau: "trung-tinh", phu: "sheet trộn hai bố cục cột", onChon: () => setFilter("KHONG_SO"), moTaChon: "Xem hóa đơn không so được tiền" },
+  const the: StatCardData[] = [
+    { label: "Bản thuế gửi", value: num(t.soThue), numeric: true, color: "brand", subtext: `${num(t.tienThue)} đ`, onSelect: () => setFilter("all"), selectHint: "Xem tất cả hóa đơn" },
+    { label: "Bản tự tải", value: num(t.soTai), numeric: true, color: "brand", subtext: `${num(t.tienTai)} đ`, onSelect: () => setFilter("all"), selectHint: "Xem tất cả hóa đơn" },
+    { label: "Chỉ bản thuế có", value: num(t.chiThue), numeric: true, color: t.chiThue ? "danger" : "success", subtext: `${num(t.tienChiThue)} đ — bản tự tải thiếu`, onSelect: () => setFilter("CHI_THUE"), selectHint: "Xem hóa đơn bản tự tải thiếu" },
+    { label: "Chỉ bản tự tải có", value: num(t.chiTai), numeric: true, color: t.chiTai ? "warning" : "success", subtext: `${num(t.tienChiTai)} đ`, onSelect: () => setFilter("CHI_TAI"), selectHint: "Xem hóa đơn bản thuế không có" },
+    { label: "Có cả hai, lệch tiền", value: num(t.lechTien), numeric: true, color: t.lechTien ? "warning" : "success", onSelect: () => setFilter("LECH"), selectHint: "Xem hóa đơn lệch tiền giữa hai bản" },
+    { label: "Không so được tiền", value: num(t.khongSoDuocTien), numeric: true, color: "trung-tinh", subtext: "sheet trộn hai bố cục cột", onSelect: () => setFilter("KHONG_SO"), selectHint: "Xem hóa đơn không so được tiền" },
   ];
   const TWO_VERSION_FILTERS: { id: TwoVersionFilter; nhan: string; n: number }[] = [
     { id: "all", nhan: "Tất cả", n: kq.dong.length },
@@ -315,22 +315,22 @@ export function SoHaiBanView({
     { id: "LECH", nhan: "Lệch tiền", n: t.lechTien },
     { id: "KHONG_SO", nhan: "Không so được", n: t.khongSoDuocTien },
   ];
-  const columns: Cot<TwoVersionRow>[] = [
-    { key: "kq", header: "Kết quả", chinh: true, render: twoVersionChip },
-    { key: "kh", header: "Ký hiệu", render: (d) => d.kyHieu, sapXep: (d) => d.kyHieu },
+  const columns: RecordTableColumn<TwoVersionRow>[] = [
+    { key: "kq", header: "Kết quả", primary: true, render: twoVersionChip },
+    { key: "kh", header: "Ký hiệu", render: (d) => d.kyHieu, getSortValue: (d) => d.kyHieu },
     { key: "so", header: "Số HĐ", render: (d) => d.soHoaDon },
-    { key: "ngay", header: "Ngày lập", render: (d) => d.ngayLap, sapXep: (d) => d.ngayLap },
+    { key: "ngay", header: "Ngày lập", render: (d) => d.ngayLap, getSortValue: (d) => d.ngayLap },
     { key: "ban", header: "Người bán", render: (d) => d.tenBan },
-    { key: "tT", header: "Tổng bản thuế", so: true, render: (d) => (d.tongT == null ? "—" : num(d.tongT)), sapXep: (d) => d.tongT ?? 0 },
-    { key: "tX", header: "Tổng bản tự tải", so: true, render: (d) => (d.tongX == null ? "—" : num(d.tongX)), sapXep: (d) => d.tongX ?? 0 },
-    { key: "chenh", header: "Chênh (thuế − tải)", so: true, render: (d) => (d.chenhTong == null ? "—" : num(d.chenhTong)), sapXep: (d) => Math.abs(d.chenhTong ?? 0) },
-    { key: "vt", header: "Ở đâu", render: (d) => [d.viTriT, d.viTriX].filter(Boolean).join(" · "), anTrenDienThoai: true },
+    { key: "tT", header: "Tổng bản thuế", numeric: true, render: (d) => (d.tongT == null ? "—" : num(d.tongT)), getSortValue: (d) => d.tongT ?? 0 },
+    { key: "tX", header: "Tổng bản tự tải", numeric: true, render: (d) => (d.tongX == null ? "—" : num(d.tongX)), getSortValue: (d) => d.tongX ?? 0 },
+    { key: "chenh", header: "Chênh (thuế − tải)", numeric: true, render: (d) => (d.chenhTong == null ? "—" : num(d.chenhTong)), getSortValue: (d) => Math.abs(d.chenhTong ?? 0) },
+    { key: "vt", header: "Ở đâu", render: (d) => [d.viTriT, d.viTriX].filter(Boolean).join(" · "), hideOnMobile: true },
     { key: "gc", header: "Ghi chú", render: (d) => d.ghiChu },
   ];
   return (
     <div className="space-y-4">
       {sideSplitBox}
-      <ThongKe the={the} />
+      <StatCardGrid cards={the} />
       <div className="flex flex-wrap gap-2">
         {TWO_VERSION_FILTERS.map((l) => (
           <Button key={l.id} title={`Lọc danh sách: ${l.nhan}.`} size="sm" variant={filter === l.id ? "default" : "outline"} onClick={() => setFilter(l.id)}>
@@ -342,8 +342,8 @@ export function SoHaiBanView({
         columns={columns}
         rows={rows}
         getKey={(d) => d.khoa}
-        timKiem={(d) => `${d.kyHieu} ${d.soHoaDon} ${d.tenBan} ${d.mstBan}`}
-        nhanTimKiem="Tìm ký hiệu / số HĐ / người bán / MST…"
+        getSearchText={(d) => `${d.kyHieu} ${d.soHoaDon} ${d.tenBan} ${d.mstBan}`}
+        searchLabel="Tìm ký hiệu / số HĐ / người bán / MST…"
         emptyText="Không có hóa đơn nào ở mục này."
       />
     </div>
@@ -366,16 +366,16 @@ function SheetSumCheck({ sh }: { sh: InvoiceSheet }) {
     ["Làm tròn ±1 đ", cd.boc.lamTron, cd.soDong.lamTron],
     ["LỆCH THẬT — phải sửa", cd.boc.lechThat, cd.soDong.lechThat],
   ];
-  const columns: Cot<SumMismatchRow>[] = [
-    { key: "d", header: "Dòng", chinh: true, render: (d) => `dòng ${d.dongFile}`, sapXep: (d) => d.dongFile },
-    { key: "loai", header: "Nguyên nhân", render: (d) => (d.loai === "that" ? <Nhan loai="loi">Lệch thật</Nhan> : <Nhan loai="luu-y">{SUM_MISMATCH_LABELS[d.loai]}</Nhan>) },
+  const columns: RecordTableColumn<SumMismatchRow>[] = [
+    { key: "d", header: "Dòng", primary: true, render: (d) => `dòng ${d.dongFile}`, getSortValue: (d) => d.dongFile },
+    { key: "loai", header: "Nguyên nhân", render: (d) => (d.loai === "that" ? <Tag variant="loi">Lệch thật</Tag> : <Tag variant="luu-y">{SUM_MISMATCH_LABELS[d.loai]}</Tag>) },
     { key: "ma", header: "Hóa đơn", render: (d) => d.ma },
-    { key: "ngay", header: "Ngày", render: (d) => d.ngay, anTrenDienThoai: true },
-    { key: "ban", header: "Người bán", render: (d) => d.ban, anTrenDienThoai: true },
-    { key: "chua", header: "Chưa thuế", so: true, render: (d) => num(d.chua) },
-    { key: "thue", header: "Thuế", so: true, render: (d) => num(d.thue) },
-    { key: "tong", header: "Tổng TT", so: true, render: (d) => num(d.tong) },
-    { key: "lech", header: "Lệch", so: true, render: (d) => num(d.lech), sapXep: (d) => Math.abs(d.lech) },
+    { key: "ngay", header: "Ngày", render: (d) => d.ngay, hideOnMobile: true },
+    { key: "ban", header: "Người bán", render: (d) => d.ban, hideOnMobile: true },
+    { key: "chua", header: "Chưa thuế", numeric: true, render: (d) => num(d.chua) },
+    { key: "thue", header: "Thuế", numeric: true, render: (d) => num(d.thue) },
+    { key: "tong", header: "Tổng TT", numeric: true, render: (d) => num(d.tong) },
+    { key: "lech", header: "Lệch", numeric: true, render: (d) => num(d.lech), getSortValue: (d) => Math.abs(d.lech) },
   ];
 
   return (
@@ -383,7 +383,7 @@ function SheetSumCheck({ sh }: { sh: InvoiceSheet }) {
       <CardHeader>
         <CardTitle className="flex flex-wrap items-center gap-2">
           Sheet {sh.ten}
-          {isMatch ? <Nhan loai="xong">Cộng khớp</Nhan> : cd.soDong.lechThat ? <Nhan loai="loi">{`${num(cd.soDong.lechThat)} dòng lệch thật`}</Nhan> : <Nhan loai="luu-y">Lệch bình thường</Nhan>}
+          {isMatch ? <Tag variant="xong">Cộng khớp</Tag> : cd.soDong.lechThat ? <Tag variant="loi">{`${num(cd.soDong.lechThat)} dòng lệch thật`}</Tag> : <Tag variant="luu-y">Lệch bình thường</Tag>}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -402,7 +402,7 @@ function SheetSumCheck({ sh }: { sh: InvoiceSheet }) {
           </p>
         )}
         {!isMatch && (
-          <KhungCuonNgang>
+          <HorizontalScroll>
             <table className="w-full min-w-80 text-sm">
               <thead>
                 <tr className="border-b border-border text-left text-muted-foreground">
@@ -426,7 +426,7 @@ function SheetSumCheck({ sh }: { sh: InvoiceSheet }) {
                 </tr>
               </tbody>
             </table>
-          </KhungCuonNgang>
+          </HorizontalScroll>
         )}
         {cd.dongLech.length > 0 && (
           <>
@@ -442,8 +442,8 @@ function SheetSumCheck({ sh }: { sh: InvoiceSheet }) {
               columns={columns}
               rows={rows}
               getKey={(d) => `${d.dongFile}`}
-              timKiem={(d) => `${d.ma} ${d.ban} ${d.dongFile}`}
-              nhanTimKiem="Tìm hóa đơn / người bán / số dòng…"
+              getSearchText={(d) => `${d.ma} ${d.ban} ${d.dongFile}`}
+              searchLabel="Tìm hóa đơn / người bán / số dòng…"
               emptyText="Không có dòng lệch thật — phần lệch đều do phí, chiết khấu hoặc làm tròn."
             />
           </>
@@ -459,24 +459,24 @@ export function KiemCongView({ sheets }: { sheets: InvoiceSheet[] }) {
     return (
       <EmptyState
         icon={Calculator}
-        tieuDe="Không tìm thấy cột tiền để cộng"
-        moTa="Cần sheet hóa đơn có cột chưa thuế, thuế và tổng thanh toán."
+        title="Không tìm thấy cột tiền để cộng"
+        description="Cần sheet hóa đơn có cột chưa thuế, thuế và tổng thanh toán."
       />
     );
-  const the: TheThongTin[] = ds.map((s) => {
+  const the: StatCardData[] = ds.map((s) => {
     const cd = s.canDoiCot;
     const isMatch = Math.abs(cd.lech) < 0.5;
     return {
-      nhan: s.ten,
-      giaTri: `${num(cd.lech)} đ`,
+      label: s.ten,
+      value: `${num(cd.lech)} đ`,
       so: true,
-      mau: isMatch ? "success" : cd.soDong.lechThat ? "danger" : "warning",
+      color: isMatch ? "success" : cd.soDong.lechThat ? "danger" : "warning",
       phu: isMatch ? "cộng khớp" : cd.soDong.lechThat ? `${num(cd.soDong.lechThat)} dòng lệch thật · ${num(cd.boc.lechThat)} đ` : "chỉ phí / chiết khấu / làm tròn",
     };
   });
   return (
     <div className="space-y-4">
-      <ThongKe the={the} />
+      <StatCardGrid cards={the} />
       {ds.map((s) => (
         <SheetSumCheck key={s.ten} sh={s} />
       ))}
@@ -493,21 +493,21 @@ export function CungNgayView({ nhom }: { nhom: SameDayGroup[] }) {
     return (
       <EmptyState
         icon={CalendarSearch}
-        tieuDe="Không có nhóm nào"
-        moTa="Không người bán nào xuất từ 2 hóa đơn trở lên trong cùng một ngày."
+        title="Không có nhóm nào"
+        description="Không người bán nào xuất từ 2 hóa đơn trở lên trong cùng một ngày."
       />
     );
-  const the: TheThongTin[] = [
-    { nhan: "Nhóm cùng MST cùng ngày", giaTri: num(nhom.length), so: true, mau: "brand", onChon: () => setOnlyDuplicates(false), moTaChon: "Xem mọi nhóm" },
-    { nhan: "Hóa đơn trong các nhóm", giaTri: num(nhom.reduce((s, g) => s + g.soHoaDon, 0)), so: true, mau: "trung-tinh" },
-    { nhan: "Nhóm trùng khít số tiền", giaTri: num(soTrung), so: true, mau: soTrung ? "warning" : "success", phu: "dễ kê hai lần — soát trước", onChon: () => setOnlyDuplicates(true), moTaChon: "Xem nhóm trùng khít số tiền" },
+  const the: StatCardData[] = [
+    { label: "Nhóm cùng MST cùng ngày", value: num(nhom.length), numeric: true, color: "brand", onSelect: () => setOnlyDuplicates(false), selectHint: "Xem mọi nhóm" },
+    { label: "Hóa đơn trong các nhóm", value: num(nhom.reduce((s, g) => s + g.soHoaDon, 0)), numeric: true, color: "trung-tinh" },
+    { label: "Nhóm trùng khít số tiền", value: num(soTrung), numeric: true, color: soTrung ? "warning" : "success", subtext: "dễ kê hai lần — soát trước", onSelect: () => setOnlyDuplicates(true), selectHint: "Xem nhóm trùng khít số tiền" },
   ];
-  const columns: Cot<SameDayGroup>[] = [
-    { key: "ban", header: "Người bán", chinh: true, render: (g) => g.tenBan || g.mstBan, sapXep: (g) => g.tenBan },
-    { key: "mst", header: "MST", render: (g) => g.mstBan, anTrenDienThoai: true },
-    { key: "ngay", header: "Ngày", render: (g) => g.ngay, sapXep: (g) => g.ngay },
-    { key: "n", header: "Số HĐ", so: true, render: (g) => num(g.soHoaDon), sapXep: (g) => g.soHoaDon },
-    { key: "tien", header: "Tổng tiền", so: true, render: (g) => num(g.tongTien), sapXep: (g) => g.tongTien },
+  const columns: RecordTableColumn<SameDayGroup>[] = [
+    { key: "ban", header: "Người bán", primary: true, render: (g) => g.tenBan || g.mstBan, getSortValue: (g) => g.tenBan },
+    { key: "mst", header: "MST", render: (g) => g.mstBan, hideOnMobile: true },
+    { key: "ngay", header: "Ngày", render: (g) => g.ngay, getSortValue: (g) => g.ngay },
+    { key: "n", header: "Số HĐ", numeric: true, render: (g) => num(g.soHoaDon), getSortValue: (g) => g.soHoaDon },
+    { key: "tien", header: "Tổng tiền", numeric: true, render: (g) => num(g.tongTien), getSortValue: (g) => g.tongTien },
     { key: "trung", header: "Trùng tiền", render: (g) => (g.trungSoTien ? <span className="font-medium text-warning">{g.moTaTrung}</span> : "—") },
     {
       key: "ds",
@@ -521,7 +521,7 @@ export function CungNgayView({ nhom }: { nhom: SameDayGroup[] }) {
         Nhiều hóa đơn cùng người bán trong một ngày <b>chưa chắc là sai</b> (xăng dầu, siêu thị, phí ngân hàng…). Nhóm có hóa
         đơn trùng khít số tiền mới đáng soát trước.
       </p>
-      <ThongKe the={the} />
+      <StatCardGrid cards={the} />
       <div className="flex flex-wrap gap-2">
         <Button title="Chỉ xem nhóm có hóa đơn trùng khít số tiền." size="sm" variant={onlyDuplicates ? "default" : "outline"} onClick={() => setOnlyDuplicates(true)}>
           Trùng khít số tiền <span className="tnum ml-1">({num(soTrung)})</span>
@@ -534,8 +534,8 @@ export function CungNgayView({ nhom }: { nhom: SameDayGroup[] }) {
         columns={columns}
         rows={rows}
         getKey={(g) => `${g.mstBan}#${g.ngay}`}
-        timKiem={(g) => `${g.tenBan} ${g.mstBan} ${g.ngay} ${g.dong.map((d) => d.soHoaDon).join(" ")}`}
-        nhanTimKiem="Tìm người bán / MST / ngày / số HĐ…"
+        getSearchText={(g) => `${g.tenBan} ${g.mstBan} ${g.ngay} ${g.dong.map((d) => d.soHoaDon).join(" ")}`}
+        searchLabel="Tìm người bán / MST / ngày / số HĐ…"
         emptyText="Không có nhóm nào ở mục này."
       />
     </div>

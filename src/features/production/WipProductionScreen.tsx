@@ -39,8 +39,8 @@ import {
   sumBatterKg,
 } from "@/lib/batter";
 import {
-  KhungCuonNgang,
-  ChuThichBatBuoc,
+  HorizontalScroll,
+  RequiredLegend,
   Button,
   ConfirmDelete,
   Combobox,
@@ -53,18 +53,18 @@ import {
   DialogHeader,
   DialogTitle,
   EmptyState,
-  SkeletonBang,
+  TableSkeleton,
   ErrorSummary,
   Field,
   Input,
-  Nhan,
+  Tag,
   NumberField,
   RecordTable,
-  ThongKe,
+  StatCardGrid,
   notify,
-  type Cot,
-  type LoiNhap,
-  type MucChon,
+  type RecordTableColumn,
+  type FieldError,
+  type ComboboxOption,
 } from "@/design-system";
 import { kg, num, todayISO, formatDateVN } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -152,7 +152,7 @@ export default function SanXuatBTPScreen() {
   const [tableRows, setTableRows] = useState<DongSX[]>([]);
   /** Dòng bán nội địa của phiên đang gõ — mặc định trống, bấm "Thêm dòng" mới hiện. */
   const [dongBND, setDongBND] = useState<DongBanNoiDia[]>([]);
-  const [loiPhien, setLoiPhien] = useState<LoiNhap[]>([]);
+  const [loiPhien, setLoiPhien] = useState<FieldError[]>([]);
   /** Nhóm (kiểu chế biến × khách) của phiên trước → phiếu mới tự điền sẵn nhóm
    *  đầu, gõ thành phẩm ngay, khỏi tạo nhóm lại. Chỉ sống trong phiên làm việc. */
   const [lastGroup, setLastGroup] = useState<{ pt: string; cust: string }>({
@@ -164,8 +164,8 @@ export default function SanXuatBTPScreen() {
   const [edit, setEdit] = useState<WipProductionItem | null>(null);
   /* Sửa một dòng BÁN NỘI ĐỊA đã ghi. */
   const [editingDomesticSale, setEditingDomesticSale] = useState<DomesticSaleItem | null>(null);
-  const [domesticSaleEditErrors, setDomesticSaleEditErrors] = useState<LoiNhap[]>([]);
-  const [editErrors, setEditErrors] = useState<LoiNhap[]>([]);
+  const [domesticSaleEditErrors, setDomesticSaleEditErrors] = useState<FieldError[]>([]);
+  const [editErrors, setEditErrors] = useState<FieldError[]>([]);
   /** Dòng đang sửa có tách không = đã nhập râu/bao tử (ô tách luôn có sẵn). */
   const isEditSplit =
     (edit?.componentRauKg ?? 0) > 0 || (edit?.componentBaoTuKg ?? 0) > 0;
@@ -196,7 +196,7 @@ export default function SanXuatBTPScreen() {
   const dlNhe: TraceData = useMemo(
     () => ({
       shipments, imports, wips: rows, packagings: [], lotInputs, exportItems: [], exportOrders: [],
-      salesOrders: [], products: products, customers: customers, lotDispatches, lotWaivers, materialTypes: materialTypes,
+      salesOrders: [], products, customers, lotDispatches, lotWaivers, materialTypes,
     }),
     [shipments, imports, rows, lotInputs, products, customers, lotDispatches, lotWaivers, materialTypes]
   );
@@ -217,7 +217,7 @@ export default function SanXuatBTPScreen() {
   });
   const [isConfirmingReopen, setIsConfirmingReopen] = useState(false);
   const [reopenReason, setReopenReason] = useState("");
-  const [lockErrors, setLockErrors] = useState<LoiNhap[]>([]);
+  const [lockErrors, setLockErrors] = useState<FieldError[]>([]);
 
   const [tuHieuLuc, denHieuLuc] = getViewPeriodRange(ky, date, fromDate, toDate);
   const isSingleDay = tuHieuLuc === denHieuLuc;
@@ -225,17 +225,17 @@ export default function SanXuatBTPScreen() {
   const tenMH = (id: string) => products.find((m) => m.id === id)?.name || "—";
 
   /** Danh mục thành phẩm — gõ để tìm, thêm mới tại chỗ. */
-  const productOptions: MucChon[] = products.map((m) => ({
+  const productOptions: ComboboxOption[] = products.map((m) => ({
     value: m.id,
     label: m.code ? `${m.code} · ${m.name}` : m.name,
-    phu: [m.code, m.category].filter(Boolean).join(" · ") || undefined,
+    subLabel: [m.code, m.category].filter(Boolean).join(" · ") || undefined,
   }));
 
   /** Danh mục khách hàng — chọn/ thêm mới tại chỗ (lưu theo TÊN). */
-  const customerOptions: MucChon[] = customers.map((c) => ({
+  const customerOptions: ComboboxOption[] = customers.map((c) => ({
     value: c.name,
     label: c.name,
-    phu: c.market || undefined,
+    subLabel: c.market || undefined,
   }));
 
   const addProduct = (ten: string, processingType = ""): string => {
@@ -248,7 +248,7 @@ export default function SanXuatBTPScreen() {
       processingType, // gắn KIỂU CHẾ BIẾN của nhóm để mã mới nằm đúng nhóm
     };
     setProducts([...products, m]);
-    notify.daLuu(`Đã thêm thành phẩm "${ten}"`);
+    notify.saved(`Đã thêm thành phẩm "${ten}"`);
     return m.id;
   };
 
@@ -289,7 +289,7 @@ export default function SanXuatBTPScreen() {
 
   const addCustomer = (ten: string): string => {
     setCustomers([...customers, { id: uid(), code: "", name: ten, market: "" }]);
-    notify.daLuu(`Đã thêm khách hàng "${ten}"`);
+    notify.saved(`Đã thêm khách hàng "${ten}"`);
     return ten;
   };
 
@@ -299,7 +299,7 @@ export default function SanXuatBTPScreen() {
     const co = materialTypes.find((l) => l.name.trim().toLowerCase() === sach.toLowerCase());
     if (co) return co.name;
     setMaterialTypes([...materialTypes, { id: uid(), name: sach, category: "", note: "" }]);
-    notify.daLuu(`Đã thêm loại nguyên liệu "${sach}"`);
+    notify.saved(`Đã thêm loại nguyên liệu "${sach}"`);
     return sach;
   };
   const materialTypeFieldProps = {
@@ -318,17 +318,17 @@ export default function SanXuatBTPScreen() {
   };
 
   /* ---- Bột tẩm (mig 0051): danh mục loại bột — dòng sản lượng lưu theo TÊN ---- */
-  const optBot: MucChon[] = batterTypes.map((b) => ({
+  const optBot: ComboboxOption[] = batterTypes.map((b) => ({
     value: b.name,
     label: b.name,
-    phu: [b.code && `Mã ${b.code}`, b.note].filter(Boolean).join(" · ") || undefined,
+    subLabel: [b.code && `Mã ${b.code}`, b.note].filter(Boolean).join(" · ") || undefined,
   }));
   /** Tạo loại bột tại chỗ (trùng tên ⇒ dùng lại loại có sẵn). Trả về bản ghi. */
   const addBatterRecord = (ten: string) => {
     const kq = findOrCreateBatter(batterTypes, ten);
     if (kq.moi) {
       setBatterTypes(kq.rows);
-      notify.daLuu(`Đã thêm loại bột "${kq.bot.name}" vào danh mục`);
+      notify.saved(`Đã thêm loại bột "${kq.bot.name}" vào danh mục`);
     }
     return kq.bot;
   };
@@ -558,12 +558,12 @@ export default function SanXuatBTPScreen() {
     );
 
   /** Kiểm đầu phiên (ngày + lý do ghi bù). */
-  const sessionHeaderErrors = (p: DauPhien): LoiNhap[] => {
-    const ls: LoiNhap[] = [];
+  const sessionHeaderErrors = (p: DauPhien): FieldError[] => {
+    const ls: FieldError[] = [];
     if (p.postingDate < p.productionDate)
       ls.push({
-        truong: "Ngày ghi sổ",
-        thongBao: "Không thể trước ngày sản xuất",
+        field: "Ngày ghi sổ",
+        message: "Không thể trước ngày sản xuất",
       });
     const needsReason =
       isBackdatedWip({
@@ -572,8 +572,8 @@ export default function SanXuatBTPScreen() {
       }) || isLockedOn(p.productionDate, p.workshop);
     if (needsReason && !p.backdateReason.trim())
       ls.push({
-        truong: "Lý do ghi bù",
-        thongBao: "Ghi sau ngày SX / ngày đã chốt — ghi rõ lý do",
+        field: "Lý do ghi bù",
+        message: "Ghi sau ngày SX / ngày đã chốt — ghi rõ lý do",
       });
     return ls;
   };
@@ -590,18 +590,18 @@ export default function SanXuatBTPScreen() {
     if (!phien) return true;
     const validRows = tableRows.filter(dongDayDu);
     const validDomesticRows = dongBND.filter(banNoiDiaDayDu);
-    const ls: LoiNhap[] = [...sessionHeaderErrors(phien)];
+    const ls: FieldError[] = [...sessionHeaderErrors(phien)];
     if (validRows.length === 0 && validDomesticRows.length === 0)
       ls.push({
-        truong: "Thành phẩm",
-        thongBao: "Thêm ít nhất một thành phẩm (hoặc một dòng bán nội địa) vào phiên",
+        field: "Thành phẩm",
+        message: "Thêm ít nhất một thành phẩm (hoặc một dòng bán nội địa) vào phiên",
       });
     if (!imLang)
       dongBND.forEach((d, i) => {
         if (!banNoiDiaTrong(d) && !banNoiDiaDayDu(d))
           ls.push({
-            truong: `Bán nội địa dòng ${i + 1}`,
-            thongBao: !d.materialTypeName.trim()
+            field: `Bán nội địa dòng ${i + 1}`,
+            message: !d.materialTypeName.trim()
               ? "Chưa chọn loại nguyên liệu"
               : "Số lượng phải lớn hơn 0 kg",
           });
@@ -610,8 +610,8 @@ export default function SanXuatBTPScreen() {
       tableRows.forEach((d, i) => {
         if (!dongTrong(d) && !dongDayDu(d))
           ls.push({
-            truong: `Dòng ${i + 1}`,
-            thongBao: !d.productId
+            field: `Dòng ${i + 1}`,
+            message: !d.productId
               ? "Chưa chọn thành phẩm"
               : "Số lượng phải lớn hơn 0 kg",
           });
@@ -638,7 +638,7 @@ export default function SanXuatBTPScreen() {
       processingType: d.processingType.trim(),
       componentRauKg: laTach(d) ? d.rauKg || 0 : null,
       componentBaoTuKg: laTach(d) ? d.baoTuKg || 0 : null,
-      operator: operator,
+      operator,
       batterKg: sanitizeBatterKg(d.botKg),
     }));
     if (newWips.length > 0) persist([...rows, ...newWips]);
@@ -655,7 +655,7 @@ export default function SanXuatBTPScreen() {
       unitPrice: d.unitPrice,
       customerName: d.customerName.trim(),
       note: "",
-      operator: operator,
+      operator,
     }));
     if (newDomesticSales.length > 0) persistDomesticSales([...domesticSales, ...newDomesticSales]);
 
@@ -699,7 +699,7 @@ export default function SanXuatBTPScreen() {
     const newTotal = newWips.reduce((s, r) => s + r.quantityKg, 0);
     const newBatterKg = newWips.reduce((s, r) => s + sumBatterKg(r.batterKg), 0);
     const newDomesticKg = newDomesticSales.reduce((s, r) => s + r.quantityKg, 0);
-    notify.daLuu(
+    notify.saved(
       [
         newWips.length > 0 && `Đã lưu ${newWips.length} thành phẩm · ${kg(newTotal)}`,
         newBatterKg > 0 && `bột tẩm ${kg(newBatterKg)}`,
@@ -719,13 +719,13 @@ export default function SanXuatBTPScreen() {
     );
 
     if (sessionLotResult.khongKhop.length > 0)
-      notify.canhBao(
+      notify.warning(
         `${sessionLotResult.khongKhop.length} dòng không cùng loài với lô NL đã khai — chưa gắn lô. Gắn riêng ở sổ ngày ("Gắn lô NL").`
       );
 
     const bg = lockRecordOf(phien.productionDate, phien.workshop);
     if (bg?.isLocked && newWips.length > 0)
-      notify.canhBao(
+      notify.warning(
         `Ngày ${formatDateVN(phien.productionDate)} đã chốt ${kg(bg.totalKgAtLock)} — sau khi ghi bù thành ${kg(dayWorkshopTotal(phien.productionDate, phien.workshop) + newTotal)}`
       );
 
@@ -768,14 +768,14 @@ export default function SanXuatBTPScreen() {
     setEdit((d) => (d ? { ...d, ...patch } : d));
   const saveEdit = () => {
     if (!edit) return;
-    const ls: LoiNhap[] = [];
+    const ls: FieldError[] = [];
     if (!edit.productId)
-      ls.push({ truong: "Thành phẩm", thongBao: "Chưa chọn thành phẩm" });
+      ls.push({ field: "Thành phẩm", message: "Chưa chọn thành phẩm" });
     const total = isEditSplit
       ? (edit.componentRauKg || 0) + (edit.componentBaoTuKg || 0)
       : edit.quantityKg;
     if (!(total > 0))
-      ls.push({ truong: "Khối lượng", thongBao: "Phải lớn hơn 0 kg" });
+      ls.push({ field: "Khối lượng", message: "Phải lớn hơn 0 kg" });
     setEditErrors(ls);
     if (ls.length > 0) return;
     const record: WipProductionItem = {
@@ -786,13 +786,13 @@ export default function SanXuatBTPScreen() {
       batterKg: sanitizeBatterKg(edit.batterKg),
     };
     persist(rows.map((r) => (r.id === edit.id ? record : r)));
-    notify.daLuu("Đã lưu thay đổi");
+    notify.saved("Đã lưu thay đổi");
     setEdit(null);
   };
   const remove = (r: WipProductionItem) => {
     const prevRows = rows;
     persist(rows.filter((x) => x.id !== r.id));
-    notify.daXoa(`Đã xóa ${tenMH(r.productId)} — ${kg(r.quantityKg)}`, () =>
+    notify.deleted(`Đã xóa ${tenMH(r.productId)} — ${kg(r.quantityKg)}`, () =>
       persist(prevRows)
     );
   };
@@ -806,11 +806,11 @@ export default function SanXuatBTPScreen() {
     setEditingDomesticSale((d) => (d ? { ...d, ...patch } : d));
   const saveDomesticSaleEdit = () => {
     if (!editingDomesticSale) return;
-    const ls: LoiNhap[] = [];
+    const ls: FieldError[] = [];
     if (!editingDomesticSale.materialTypeName.trim())
-      ls.push({ truong: "Loại nguyên liệu", thongBao: "Chưa chọn loại nguyên liệu" });
+      ls.push({ field: "Loại nguyên liệu", message: "Chưa chọn loại nguyên liệu" });
     if (!(editingDomesticSale.quantityKg > 0))
-      ls.push({ truong: "Số lượng", thongBao: "Phải lớn hơn 0 kg" });
+      ls.push({ field: "Số lượng", message: "Phải lớn hơn 0 kg" });
     setDomesticSaleEditErrors(ls);
     if (ls.length > 0) return;
     const record: DomesticSaleItem = {
@@ -819,70 +819,70 @@ export default function SanXuatBTPScreen() {
       customerName: editingDomesticSale.customerName.trim(),
     };
     persistDomesticSales(domesticSales.map((r) => (r.id === record.id ? record : r)));
-    notify.daLuu("Đã lưu thay đổi bán nội địa");
+    notify.saved("Đã lưu thay đổi bán nội địa");
     setEditingDomesticSale(null);
   };
   const removeDomesticSale = (r: DomesticSaleItem) => {
     const prevRows = domesticSales;
     persistDomesticSales(domesticSales.filter((x) => x.id !== r.id));
-    notify.daXoa(`Đã bỏ bán nội địa ${r.materialTypeName} — ${kg(r.quantityKg)}`, () =>
+    notify.deleted(`Đã bỏ bán nội địa ${r.materialTypeName} — ${kg(r.quantityKg)}`, () =>
       persistDomesticSales(prevRows)
     );
   };
-  const domesticSaleColumns: Cot<DomesticSaleItem>[] = [
+  const domesticSaleColumns: RecordTableColumn<DomesticSaleItem>[] = [
     {
       key: "ngay",
       header: "Ngày",
       render: (r) => formatDateVN(r.saleDate),
-      sapXep: (r) => r.saleDate,
+      getSortValue: (r) => r.saleDate,
     },
     {
       key: "loai",
       header: "Loại nguyên liệu",
-      chinh: true,
+      primary: true,
       render: (r) => r.materialTypeName,
-      sapXep: (r) => r.materialTypeName,
+      getSortValue: (r) => r.materialTypeName,
     },
     {
       key: "kg",
       header: "Số lượng (kg)",
-      so: true,
+      numeric: true,
       render: (r) => num(r.quantityKg),
-      sapXep: (r) => r.quantityKg,
+      getSortValue: (r) => r.quantityKg,
     },
     {
       key: "gia",
       header: "Đơn giá (đ/kg)",
-      so: true,
+      numeric: true,
       render: (r) =>
         r.unitPrice != null ? num(r.unitPrice) : <span className="text-muted-foreground">—</span>,
-      sapXep: (r) => r.unitPrice ?? 0,
+      getSortValue: (r) => r.unitPrice ?? 0,
     },
     {
       key: "tien",
       header: "Thành tiền (đ)",
-      so: true,
-      anTrenDienThoai: true,
+      numeric: true,
+      hideOnMobile: true,
       render: (r) =>
         r.unitPrice != null ? (
           num(r.quantityKg * r.unitPrice)
         ) : (
           <span className="text-muted-foreground">—</span>
         ),
-      sapXep: (r) => r.quantityKg * (r.unitPrice ?? 0),
+      getSortValue: (r) => r.quantityKg * (r.unitPrice ?? 0),
     },
     {
       key: "kh",
       header: "Khách hàng",
       render: (r) => r.customerName || <span className="text-muted-foreground">—</span>,
-      sapXep: (r) => r.customerName,
+      getSortValue: (r) => r.customerName,
     },
     {
       key: "nguoi",
       header: "Người ghi",
-      anTrenDienThoai: true,
+      hideOnMobile: true,
       render: (r) => r.operator || <span className="text-muted-foreground">—</span>,
-      sapXep: (r) => r.operator,
+      getSortValue: (r) => r.operator,
     },
   ];
 
@@ -912,7 +912,7 @@ export default function SanXuatBTPScreen() {
     setDaGui(next);
     // mốc "đã gửi" chỉ là phản hồi tại chỗ — lưu hụt (chặn cookie) thì thôi
     writeDevicePref(KEY_WIP_REPORT, JSON.stringify(next));
-    notify.daLuu(
+    notify.saved(
       `Đã gửi báo cáo thành phẩm ${rangeDescription} · ${workshop} lên hệ thống`
     );
   };
@@ -922,15 +922,15 @@ export default function SanXuatBTPScreen() {
     /* Sổ chốt SX chưa nạp xong ⇒ chưa biết máy chủ đã có bản ghi (ngày, xưởng)
        chưa; tạo bản mới lúc này có thể trùng chỉ mục duy nhất ⇒ 23505. */
     if (ttChot === "dang-tai") {
-      notify.loi("Đang tải sổ chốt sản xuất từ máy chủ — đợi vài giây rồi bấm chốt lại");
+      notify.error("Đang tải sổ chốt sản xuất từ máy chủ — đợi vài giây rồi bấm chốt lại");
       return;
     }
     // Mẻ chưa gắn lô NL: phải gắn, hoặc ghi lý do (lưu `lot_waivers` cho từng mẻ còn thiếu).
     if (batchesWithoutLot.length > 0 && !waiverReason.trim()) {
       setLockErrors([
         {
-          truong: "Lý do chưa gắn lô",
-          thongBao: `Còn ${batchesWithoutLot.length} mẻ chưa gắn lô nguyên liệu — bấm "Gắn lô NL" ở từng mẻ, hoặc ghi lý do chưa gắn`,
+          field: "Lý do chưa gắn lô",
+          message: `Còn ${batchesWithoutLot.length} mẻ chưa gắn lô nguyên liệu — bấm "Gắn lô NL" ở từng mẻ, hoặc ghi lý do chưa gắn`,
         },
       ]);
       return;
@@ -944,7 +944,7 @@ export default function SanXuatBTPScreen() {
           outputKind: "W" as const,
           outputId: r.id,
           reason: waiverReason.trim(),
-          operator: operator,
+          operator,
           recordedAt: luc,
         })),
       ]);
@@ -975,7 +975,7 @@ export default function SanXuatBTPScreen() {
       leftoverByMaterial,
     };
     persistLocks(bg ? locks.map((c) => (c.id === bg.id ? ban : c)) : [...locks, ban]);
-    notify.daLuu(
+    notify.saved(
       `Đã chốt SX ${formatDateVN(tuHieuLuc)} · xưởng ${activeWorkshop} — ${kg(actualTotal)}` +
         (leftoverTotal > 0 ? ` · còn dở ${kg(leftoverTotal)}` : "") +
         (batchesWithoutLot.length > 0 ? ` · ${batchesWithoutLot.length} mẻ chưa gắn lô (có lý do)` : "")
@@ -990,32 +990,32 @@ export default function SanXuatBTPScreen() {
     const bg = lockRecordOf(tuHieuLuc, activeWorkshop);
     if (!bg) return;
     if (!reopenReason.trim()) {
-      setLockErrors([{ truong: "Lý do mở lại", thongBao: "Ghi rõ vì sao mở lại" }]);
+      setLockErrors([{ field: "Lý do mở lại", message: "Ghi rõ vì sao mở lại" }]);
       return;
     }
     persistLocks(
       locks.map((c) =>
-        c.id === bg.id ? { ...c, isLocked: false, reopenReason: reopenReason } : c
+        c.id === bg.id ? { ...c, isLocked: false, reopenReason } : c
       )
     );
-    notify.canhBao(`Đã mở lại SX ${formatDateVN(tuHieuLuc)} · xưởng ${activeWorkshop}`);
+    notify.warning(`Đã mở lại SX ${formatDateVN(tuHieuLuc)} · xưởng ${activeWorkshop}`);
     setIsConfirmingReopen(false);
     setReopenReason("");
     setLockErrors([]);
   };
 
-  const cols: Cot<WipProductionItem>[] = [
+  const cols: RecordTableColumn<WipProductionItem>[] = [
     {
       key: "mh",
       header: "Thành phẩm",
-      chinh: true,
+      primary: true,
       render: (r) => tenMH(r.productId),
-      sapXep: (r) => tenMH(r.productId),
+      getSortValue: (r) => tenMH(r.productId),
     },
     {
       key: "kg",
       header: "Số lượng (kg)",
-      so: true,
+      numeric: true,
       render: (r) =>
         r.componentRauKg != null || r.componentBaoTuKg != null ? (
           <span>
@@ -1028,20 +1028,20 @@ export default function SanXuatBTPScreen() {
         ) : (
           num(r.quantityKg)
         ),
-      sapXep: (r) => r.quantityKg,
+      getSortValue: (r) => r.quantityKg,
     },
     {
       key: "bl",
       header: "Block",
-      so: true,
+      numeric: true,
       render: (r) =>
         r.blocksCount ? num(r.blocksCount) : <span className="text-muted-foreground">—</span>,
-      sapXep: (r) => r.blocksCount,
+      getSortValue: (r) => r.blocksCount,
     },
     {
       key: "bot",
       header: "Bột tẩm (kg)",
-      anTrenDienThoai: true,
+      hideOnMobile: true,
       render: (r) => {
         const t = sumBatterKg(r.batterKg);
         return t > 0 ? (
@@ -1053,39 +1053,39 @@ export default function SanXuatBTPScreen() {
           <span className="text-muted-foreground">—</span>
         );
       },
-      sapXep: (r) => sumBatterKg(r.batterKg),
+      getSortValue: (r) => sumBatterKg(r.batterKg),
     },
     {
       key: "cb",
       header: "Chế biến",
       render: (r) => r.processingType || <span className="text-muted-foreground">—</span>,
-      sapXep: (r) => r.processingType ?? "",
+      getSortValue: (r) => r.processingType ?? "",
     },
     {
       key: "kh",
       header: "Khách hàng",
       render: (r) => r.customerName || <span className="text-muted-foreground">—</span>,
-      sapXep: (r) => r.customerName ?? "",
+      getSortValue: (r) => r.customerName ?? "",
     },
     {
       key: "tt",
       header: "Trạng thái",
       render: (r) =>
         r.status === "da-nhap" ? (
-          <Nhan loai="xong">
+          <Tag variant="xong">
             Đã nhập kho{r.warehouse ? ` · ${r.warehouse}` : ""}
-          </Nhan>
+          </Tag>
         ) : (
-          <Nhan loai="cho">Chờ nhập kho</Nhan>
+          <Tag variant="cho">Chờ nhập kho</Tag>
         ),
-      sapXep: (r) => r.status,
+      getSortValue: (r) => r.status,
     },
     {
       key: "nguoi",
       header: "Người ghi",
-      anTrenDienThoai: true,
+      hideOnMobile: true,
       render: (r) => r.operator || <span className="text-muted-foreground">—</span>,
-      sapXep: (r) => r.operator ?? "",
+      getSortValue: (r) => r.operator ?? "",
     },
   ];
 
@@ -1097,8 +1097,8 @@ export default function SanXuatBTPScreen() {
   // "Ghi nhập": điền như tờ giấy, không phải mở modal trong trang quản lý.
   const entryForm = phien && (
     <div className="space-y-6 rounded-xl border-2 border-border bg-card p-4 md:p-6">
-      <ErrorSummary loi={loiPhien} />
-      <ChuThichBatBuoc />
+      <ErrorSummary errors={loiPhien} />
+      <RequiredLegend />
 
       {isSessionLocked && (
         <p className="flex items-start gap-3 rounded-lg bg-accent px-4 py-3 text-base text-accent-foreground">
@@ -1141,7 +1141,7 @@ export default function SanXuatBTPScreen() {
       <Combobox
         label="Phân xưởng"
         required
-        choPhepXoa={false}
+        clearable={false}
         value={phien.workshop}
         onChange={(v) => setSessionField("workshop", v as Workshop)}
         options={PHAN_XUONG.map((p) => ({ value: p, label: p }))}
@@ -1293,22 +1293,22 @@ export default function SanXuatBTPScreen() {
           In phiếu trống
         </Button>
       </div>
-      <ThongKe
+      <StatCardGrid
         className="grid-cols-2 sm:grid-cols-3 lg:grid-cols-5"
-        the={[
-          { nhan: "Đang xem", giaTri: rangeDescription, icon: CalendarRange, mau: "trung-tinh" },
-          { nhan: "Phân xưởng", giaTri: workshop, icon: Warehouse, mau: "trung-tinh" },
-          { nhan: "Số dòng", giaTri: view.length, so: true, icon: ClipboardList, mau: "brand" },
-          { nhan: "Chờ nhập kho", giaTri: pendingInCount, so: true, icon: Hourglass, mau: "warning" },
-          { nhan: "Tổng sản lượng", giaTri: kg(total), so: true, icon: Scale, mau: "success" },
+        cards={[
+          { label: "Đang xem", value: rangeDescription, icon: CalendarRange, color: "trung-tinh" },
+          { label: "Phân xưởng", value: workshop, icon: Warehouse, color: "trung-tinh" },
+          { label: "Số dòng", value: view.length, numeric: true, icon: ClipboardList, color: "brand" },
+          { label: "Chờ nhập kho", value: pendingInCount, numeric: true, icon: Hourglass, color: "warning" },
+          { label: "Tổng sản lượng", value: kg(total), numeric: true, icon: Scale, color: "success" },
         ]}
       />
 
       <div className="flex flex-wrap items-end gap-4 rounded-xl border-2 border-border p-4">
         <Combobox
           label="Kỳ xem sổ"
-          anNhanBatBuoc
-          choPhepXoa={false}
+          hideRequiredMark
+          clearable={false}
           value={ky}
           onChange={(v) => setKy(v as ViewPeriod)}
           options={KY_OPT}
@@ -1318,7 +1318,7 @@ export default function SanXuatBTPScreen() {
           {ky === "tuy-chon" ? (
             <DateRangeField
               label="Khoảng ngày sản xuất"
-              anNhanBatBuoc
+              hideRequiredMark
               presets={false}
               startDate={fromDate}
               endDate={toDate}
@@ -1330,7 +1330,7 @@ export default function SanXuatBTPScreen() {
           ) : (
             <DateField
               label="Ngày sản xuất"
-              anNhanBatBuoc
+              hideRequiredMark
               hint={
                 ky === "ngay"
                   ? undefined
@@ -1343,8 +1343,8 @@ export default function SanXuatBTPScreen() {
         </div>
         <Combobox
           label="Phân xưởng"
-          anNhanBatBuoc
-          choPhepXoa={false}
+          hideRequiredMark
+          clearable={false}
           value={workshop}
           onChange={(v) => setWorkshop(v as Workshop | "Tất cả")}
           options={[
@@ -1356,12 +1356,12 @@ export default function SanXuatBTPScreen() {
       </div>
 
       {isLoading ? (
-        <SkeletonBang />
+        <TableSkeleton />
       ) : view.length === 0 ? (
         <EmptyState
           icon={Factory}
-          tieuDe={`Chưa ghi thành phẩm trong ${rangeDescription}`}
-          moTa={`Phân xưởng ${workshop}. Chuyển sang "Ghi nhập" để ghi.`}
+          title={`Chưa ghi thành phẩm trong ${rangeDescription}`}
+          description={`Phân xưởng ${workshop}. Chuyển sang "Ghi nhập" để ghi.`}
           action={
             <Button
               title="Chuyển sang chế độ Ghi để nhập sản lượng cho ngày này." size="lg" onClick={() => setCheDo("nhap")}>
@@ -1376,9 +1376,9 @@ export default function SanXuatBTPScreen() {
             columns={cols}
             rows={view}
             getKey={(r) => r.id}
-            toMau="san-xuat-tp"
-            timKiem={(r) => `${tenMH(r.productId)} ${r.customerName ?? ""}`}
-            nhanTimKiem="Tìm theo thành phẩm / khách…"
+            rowMarkKey="san-xuat-tp"
+            getSearchText={(r) => `${tenMH(r.productId)} ${r.customerName ?? ""}`}
+            searchLabel="Tìm theo thành phẩm / khách…"
             actions={(r) => (
               <div className="flex flex-wrap gap-2">
                 <Button
@@ -1439,7 +1439,7 @@ export default function SanXuatBTPScreen() {
                   Cân đối.
                 </p>
               </div>
-              <KhungCuonNgang classNameKhung="rounded-lg border border-border">
+              <HorizontalScroll viewportClassName="rounded-lg border border-border">
                 <table className="w-full border-collapse text-base">
                   <thead>
                     <tr className="border-b border-border bg-muted/50 text-left">
@@ -1466,7 +1466,7 @@ export default function SanXuatBTPScreen() {
                     </tr>
                   </tfoot>
                 </table>
-              </KhungCuonNgang>
+              </HorizontalScroll>
             </div>
           )}
         </>
@@ -1489,7 +1489,7 @@ export default function SanXuatBTPScreen() {
             columns={domesticSaleColumns}
             rows={bndView}
             getKey={(r) => r.id}
-            toMau="ban-noi-dia"
+            rowMarkKey="ban-noi-dia"
             actions={(r) => (
               <div className="flex flex-wrap gap-2">
                 <Button
@@ -1511,7 +1511,7 @@ export default function SanXuatBTPScreen() {
                   Sửa
                 </Button>
                 <ConfirmDelete
-                  moTaBanGhi={`Bán nội địa ${r.materialTypeName} — ${kg(r.quantityKg)} (${formatDateVN(r.saleDate)})`}
+                  recordDescription={`Bán nội địa ${r.materialTypeName} — ${kg(r.quantityKg)} (${formatDateVN(r.saleDate)})`}
                   onConfirm={() => removeDomesticSale(r)}
                   trigger={
                     <Button
@@ -1631,7 +1631,7 @@ export default function SanXuatBTPScreen() {
             </div>
           </div>
 
-          <KhungCuonNgang classNameKhung="rounded-lg border border-border">
+          <HorizontalScroll viewportClassName="rounded-lg border border-border">
             <table className="w-full border-collapse text-base">
               <thead>
                 <tr className="border-b border-border bg-muted/50 text-left">
@@ -1661,7 +1661,7 @@ export default function SanXuatBTPScreen() {
                 </tr>
               </tfoot>
             </table>
-          </KhungCuonNgang>
+          </HorizontalScroll>
         </div>
       )}
 
@@ -1675,8 +1675,8 @@ export default function SanXuatBTPScreen() {
           </DialogHeader>
           {edit && (
             <div className="space-y-6 py-2">
-              <ErrorSummary loi={editErrors} />
-              <ChuThichBatBuoc />
+              <ErrorSummary errors={editErrors} />
+              <RequiredLegend />
               <div className="grid gap-6 sm:grid-cols-2">
                 <DateField
                   label="Ngày ghi sổ"
@@ -1694,7 +1694,7 @@ export default function SanXuatBTPScreen() {
               <Combobox
                 label="Phân xưởng"
                 required
-                choPhepXoa={false}
+                clearable={false}
                 value={edit.workshop}
                 onChange={(v) => patchEdit({ workshop: v as Workshop })}
                 options={PHAN_XUONG.map((p) => ({ value: p, label: p }))}
@@ -1709,8 +1709,8 @@ export default function SanXuatBTPScreen() {
                     options={productOptions}
                     onCreate={(ten) => addProduct(ten)}
                     emptyText="Chưa có thành phẩm — gõ tên rồi Thêm mới."
-                    onSuaMuc={openProductEdit}
-                    nhanSua={productEditor.nhanSua}
+                    onEditItem={openProductEdit}
+                    editLabel={productEditor.nhanSua}
                   />
                 </div>
                 {edit.productId && (
@@ -1734,8 +1734,8 @@ export default function SanXuatBTPScreen() {
                 onCreate={(ten) => addCustomer(ten)}
                 placeholder="Chọn khách hàng (nếu có)"
                 emptyText="Chưa có khách — gõ tên rồi Thêm mới."
-                onSuaMuc={customerEditor.moSua}
-                nhanSua={customerEditor.nhanSua}
+                onEditItem={customerEditor.moSua}
+                editLabel={customerEditor.nhanSua}
               />
 
               {isEditSplit ? (
@@ -1823,8 +1823,8 @@ export default function SanXuatBTPScreen() {
           </DialogHeader>
           {editingDomesticSale && (
             <div className="space-y-6 py-2">
-              <ErrorSummary loi={domesticSaleEditErrors} />
-              <ChuThichBatBuoc />
+              <ErrorSummary errors={domesticSaleEditErrors} />
+              <RequiredLegend />
               <div className="grid gap-6 sm:grid-cols-2">
                 <DateField
                   label="Ngày bán"
@@ -1835,7 +1835,7 @@ export default function SanXuatBTPScreen() {
                 <Combobox
                   label="Phân xưởng"
                   required
-                  choPhepXoa={false}
+                  clearable={false}
                   value={editingDomesticSale.workshop}
                   onChange={(v) => patchDomesticSaleEdit({ workshop: v as Workshop })}
                   options={PHAN_XUONG.map((p) => ({ value: p, label: p }))}
@@ -1848,9 +1848,9 @@ export default function SanXuatBTPScreen() {
                 onChange={(v) => patchDomesticSaleEdit({ materialTypeName: v })}
                 options={materialTypeFieldProps.options}
                 onCreate={materialTypeFieldProps.onCreate}
-                onSuaMuc={materialTypeFieldProps.onSuaMuc}
-                suaDuoc={materialTypeFieldProps.suaDuoc}
-                nhanSua={materialTypeFieldProps.nhanSua}
+                onEditItem={materialTypeFieldProps.onSuaMuc}
+                canEdit={materialTypeFieldProps.suaDuoc}
+                editLabel={materialTypeFieldProps.nhanSua}
                 placeholder="— Chọn loại NL —"
                 emptyText="Chưa có loại này — gõ tên rồi Thêm mới."
               />
@@ -1875,9 +1875,9 @@ export default function SanXuatBTPScreen() {
                 onChange={(v) => patchDomesticSaleEdit({ customerName: v })}
                 options={customerFieldProps.options}
                 onCreate={customerFieldProps.onCreate}
-                onSuaMuc={customerFieldProps.onSuaMuc}
-                suaDuoc={customerFieldProps.suaDuoc}
-                nhanSua={customerFieldProps.nhanSua}
+                onEditItem={customerFieldProps.onSuaMuc}
+                canEdit={customerFieldProps.suaDuoc}
+                editLabel={customerFieldProps.nhanSua}
                 placeholder="— Chọn khách (nếu có) —"
                 emptyText="Chưa có khách này — gõ tên rồi Thêm mới."
               />
@@ -1910,7 +1910,7 @@ export default function SanXuatBTPScreen() {
               thêm sau khi chốt phải ghi bù.
             </DialogDescription>
           </DialogHeader>
-          <ErrorSummary loi={lockErrors} />
+          <ErrorSummary errors={lockErrors} />
           <Field label="Ghi chú chốt">
             <Input
               value={lockNote}
@@ -1924,7 +1924,7 @@ export default function SanXuatBTPScreen() {
           {batchesWithoutLot.length > 0 && (
             <div className="min-w-0 space-y-2 rounded-lg border-2 border-warning/60 bg-warning/10 p-3">
               <p className="flex flex-wrap items-center gap-2 font-semibold text-foreground">
-                <Nhan loai="luu-y">Chưa gắn lô</Nhan>
+                <Tag variant="luu-y">Chưa gắn lô</Tag>
                 {batchesWithoutLot.length} mẻ chưa ghi đã dùng lô nguyên liệu nào
               </p>
               <p className="text-muted-foreground">
@@ -1986,7 +1986,7 @@ export default function SanXuatBTPScreen() {
                     <div className="min-w-0 flex-1 basis-40">
                       <Combobox
                         label="Loại nguyên liệu"
-                        anNhan
+                        hideLabel
                         value={d.ten}
                         onChange={(v) =>
                           setLeftover((rs) =>
@@ -1998,9 +1998,9 @@ export default function SanXuatBTPScreen() {
                           label: l.name,
                           phu: l.category || undefined,
                         }))}
-                        onSuaMuc={materialTypeEditor.moSua}
-                        nhanSua={materialTypeEditor.nhanSua}
-                        suaDuoc={materialTypeEditor.suaDuoc}
+                        onEditItem={materialTypeEditor.moSua}
+                        editLabel={materialTypeEditor.nhanSua}
+                        canEdit={materialTypeEditor.suaDuoc}
                         onCreate={(ten) => {
                           setMaterialTypes([
                             ...materialTypes,
@@ -2014,7 +2014,7 @@ export default function SanXuatBTPScreen() {
                     <div className="w-28 shrink-0">
                       <NumberField
                         label="Kg còn dở"
-                        anNhan
+                        hideLabel
                         unit="kg"
                         value={d.kg}
                         onChange={(v) =>
@@ -2075,8 +2075,8 @@ export default function SanXuatBTPScreen() {
               {formatDateVN(tuHieuLuc)} · xưởng {activeWorkshop}. Sửa xong nhớ chốt lại.
             </DialogDescription>
           </DialogHeader>
-          <ErrorSummary loi={lockErrors} />
-          <ChuThichBatBuoc />
+          <ErrorSummary errors={lockErrors} />
+          <RequiredLegend />
           <Field label="Lý do mở lại" required>
             <Input
               value={reopenReason}
@@ -2127,7 +2127,7 @@ export default function SanXuatBTPScreen() {
           nuts={lotLabel.map((w) =>
             buildLotNode("W", w.id, {
               shipments: [], imports: [], wips: [...rows, ...lotLabel.filter((t) => !rows.some((r) => r.id === t.id))],
-              packagings: [], lotInputs, exportItems: [], exportOrders: [], salesOrders: [], products: products, customers: [],
+              packagings: [], lotInputs, exportItems: [], exportOrders: [], salesOrders: [], products, customers: [],
             })
           )}
           onClose={() => setLotLabel(null)}

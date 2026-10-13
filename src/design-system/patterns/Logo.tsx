@@ -12,26 +12,26 @@ import { cn } from "@/lib/utils";
  */
 export function Logo({
   className,
-  cao = "h-11",
-  hienChu = true,
-  phuDe,
+  heightClass: cao = "h-11",
+  showWordmark = true,
+  subtitle: phuDe,
 }: {
   className?: string;
   /** Class chiều cao Tailwind của ảnh, vd "h-11" */
-  cao?: string;
-  hienChu?: boolean;
+  heightClass?: string;
+  showWordmark?: boolean;
   /** Dòng nhỏ dưới chữ Baseafood. Bỏ trống thì không hiện. */
-  phuDe?: string;
+  subtitle?: string;
 }) {
   return (
     <span className={cn("flex items-center gap-2", className)}>
       <img
         src="/baseafood-logo.png"
         alt=""
-        aria-hidden={hienChu}
+        aria-hidden={showWordmark}
         className={cn("w-auto shrink-0 object-contain", cao)}
       />
-      {hienChu && (
+      {showWordmark && (
         <span className="min-w-0 shrink-0">
           <span className="block text-lg lg:text-xl leading-tight font-bold tracking-tight text-primary whitespace-nowrap">
             BASEAFOOD

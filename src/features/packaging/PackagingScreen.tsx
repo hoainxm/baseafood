@@ -29,7 +29,7 @@ import {
 } from "@/lib/inventory";
 import {
   Button,
-  ChuThichBatBuoc,
+  RequiredLegend,
   Combobox,
   DateField,
   DateRangeField,
@@ -43,15 +43,15 @@ import {
   ErrorSummary,
   Field,
   Input,
-  Nhan,
+  Tag,
   NumberField,
   RecordTable,
-  SkeletonBang,
-  ThongKe,
+  TableSkeleton,
+  StatCardGrid,
   notify,
-  type Cot,
-  type LoiNhap,
-  type MucChon,
+  type RecordTableColumn,
+  type FieldError,
+  type ComboboxOption,
 } from "@/design-system";
 import { useSuaDanhMuc } from "@/features/catalog/SuaDanhMucNhanh";
 import { kg, num, todayISO, formatDateVN } from "@/lib/format";
@@ -93,7 +93,7 @@ export default function DongGoiScreen() {
   const [workshop, setWorkshop] = useState<Workshop | "Tất cả">("Đông");
 
   const [form, setForm] = useState<FormDG | null>(null);
-  const [loi, setLoi] = useState<LoiNhap[]>([]);
+  const [loi, setLoi] = useState<FieldError[]>([]);
   // Truy xuất lô (docs/spec/qr-truy-xuat-lo.md): gắn lô BTP cho phiếu + in tem lô TP.
   const [lotInputs] = useLotInputs();
   const [lotDispatches] = useLotDispatches();
@@ -108,10 +108,10 @@ export default function DongGoiScreen() {
     : `${formatDateVN(tuHieuLuc)} – ${formatDateVN(denHieuLuc)}`;
 
   const tenMH = (id: string) => products.find((m) => m.id === id)?.name || "—";
-  const productOptions: MucChon[] = products.map((m) => ({
+  const productOptions: ComboboxOption[] = products.map((m) => ({
     value: m.id,
     label: m.code ? `${m.code} · ${m.name}` : m.name,
-    phu: m.code || undefined,
+    subLabel: m.code || undefined,
   }));
 
   /* Tồn BTP khả dụng: sản xuất − xuất − bán lẻ block thô − ĐÃ đóng gói. */
@@ -154,7 +154,7 @@ export default function DongGoiScreen() {
     if (co) return co.id;
     const m: Product = { id: uid(), code: "", name: ten, finishedGoodCode: "", category: "", materialTypeId: "" };
     setProducts([...products, m]);
-    notify.daLuu(`Đã thêm mặt hàng "${ten}"`);
+    notify.saved(`Đã thêm mặt hàng "${ten}"`);
     return m.id;
   };
 
@@ -186,11 +186,11 @@ export default function DongGoiScreen() {
 
   const save = () => {
     if (!form) return;
-    const ls: LoiNhap[] = [];
-    if (!form.fromProductId) ls.push({ truong: "BTP tiêu hao", thongBao: "Chưa chọn mặt hàng BTP" });
-    if (!(form.inputKg > 0)) ls.push({ truong: "BTP vào (kg)", thongBao: "Phải lớn hơn 0" });
-    if (!form.toProductId) ls.push({ truong: "Thành phẩm ra", thongBao: "Chưa chọn mặt hàng TP" });
-    if (!(form.outputKg > 0)) ls.push({ truong: "TP ra (kg)", thongBao: "Phải lớn hơn 0" });
+    const ls: FieldError[] = [];
+    if (!form.fromProductId) ls.push({ field: "BTP tiêu hao", message: "Chưa chọn mặt hàng BTP" });
+    if (!(form.inputKg > 0)) ls.push({ field: "BTP vào (kg)", message: "Phải lớn hơn 0" });
+    if (!form.toProductId) ls.push({ field: "Thành phẩm ra", message: "Chưa chọn mặt hàng TP" });
+    if (!(form.outputKg > 0)) ls.push({ field: "TP ra (kg)", message: "Phải lớn hơn 0" });
     setLoi(ls);
     if (ls.length > 0) return;
 
@@ -210,7 +210,7 @@ export default function DongGoiScreen() {
       note: form.note,
     };
     persist([...rows, p]);
-    notify.daLuu(
+    notify.saved(
       `Đã đóng gói: ${tenMH(p.fromProductId)} ${kg(p.inputKg)} → ${tenMH(p.toProductId)} ${kg(p.outputKg)}`,
       undefined,
       { label: "In tem", onClick: () => setLotLabel(p) }
@@ -221,11 +221,11 @@ export default function DongGoiScreen() {
   const remove = (r: Packaging) => {
     const prevRows = rows;
     persist(rows.filter((x) => x.id !== r.id));
-    notify.daXoa(`Đã xóa phiếu đóng gói ${tenMH(r.toProductId)}`, () => persist(prevRows));
+    notify.deleted(`Đã xóa phiếu đóng gói ${tenMH(r.toProductId)}`, () => persist(prevRows));
   };
 
-  const columns: Cot<Packaging>[] = [
-    { key: "date", header: "Ngày", chinh: true, render: (r) => formatDateVN(r.date), sapXep: (r) => r.date },
+  const columns: RecordTableColumn<Packaging>[] = [
+    { key: "date", header: "Ngày", primary: true, render: (r) => formatDateVN(r.date), getSortValue: (r) => r.date },
     { key: "workshop", header: "Xưởng", render: (r) => r.workshop },
     {
       key: "from",
@@ -254,12 +254,12 @@ export default function DongGoiScreen() {
     {
       key: "hao",
       header: "Hao hụt (kg)",
-      so: true,
+      numeric: true,
       render: (r) => {
         const h = computePackagingLoss(r);
         return <span className={h < 0 ? "tnum text-warning" : "tnum"}>{num(h)}</span>;
       },
-      sapXep: (r) => computePackagingLoss(r),
+      getSortValue: (r) => computePackagingLoss(r),
     },
     { key: "kho", header: "Kho TP", render: (r) => r.warehouse || "—" },
     {
@@ -310,22 +310,22 @@ export default function DongGoiScreen() {
         </Button>
       </div>
 
-      <ThongKe
+      <StatCardGrid
         className="grid-cols-2 sm:grid-cols-3 lg:grid-cols-5"
-        the={[
-          { nhan: "Đang xem", giaTri: rangeDescription, icon: CalendarRange, mau: "trung-tinh" },
-          { nhan: "Số phiếu", giaTri: view.length, so: true, icon: Package, mau: "brand" },
-          { nhan: "BTP vào", giaTri: kg(totalIn), so: true, icon: Scale, mau: "trung-tinh" },
-          { nhan: "TP ra", giaTri: kg(totalOut), so: true, icon: PackageCheck, mau: "success" },
-          { nhan: "Hao hụt", giaTri: kg(totalLoss), so: true, icon: Scale, mau: totalLoss < 0 ? "warning" : "trung-tinh" },
+        cards={[
+          { label: "Đang xem", value: rangeDescription, icon: CalendarRange, color: "trung-tinh" },
+          { label: "Số phiếu", value: view.length, numeric: true, icon: Package, color: "brand" },
+          { label: "BTP vào", value: kg(totalIn), numeric: true, icon: Scale, color: "trung-tinh" },
+          { label: "TP ra", value: kg(totalOut), numeric: true, icon: PackageCheck, color: "success" },
+          { label: "Hao hụt", value: kg(totalLoss), numeric: true, icon: Scale, color: totalLoss < 0 ? "warning" : "trung-tinh" },
         ]}
       />
 
       <div className="flex flex-wrap items-end gap-4 rounded-xl border-2 border-border p-4">
         <Combobox
           label="Kỳ xem"
-          anNhanBatBuoc
-          choPhepXoa={false}
+          hideRequiredMark
+          clearable={false}
           value={ky}
           onChange={(v) => setKy(v as ViewPeriod)}
           options={KY_OPT}
@@ -335,7 +335,7 @@ export default function DongGoiScreen() {
           {ky === "tuy-chon" ? (
             <DateRangeField
               label="Khoảng ngày"
-              anNhanBatBuoc
+              hideRequiredMark
               presets={false}
               startDate={fromDate}
               endDate={toDate}
@@ -345,12 +345,12 @@ export default function DongGoiScreen() {
               }}
             />
           ) : (
-            <DateField label="Ngày" anNhanBatBuoc value={date} onChange={setDate} />
+            <DateField label="Ngày" hideRequiredMark value={date} onChange={setDate} />
           )}
         </div>
         <Combobox
           label="Phân xưởng"
-          choPhepXoa={false}
+          clearable={false}
           value={workshop}
           onChange={(v) => setWorkshop(v as Workshop | "Tất cả")}
           options={[{ value: "Tất cả", label: "Tất cả" }, ...WORKSHOPS.map((p) => ({ value: p, label: p }))]}
@@ -363,9 +363,9 @@ export default function DongGoiScreen() {
         <section className="grid gap-3 rounded-xl border-2 border-border bg-card p-5">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-lg font-semibold text-foreground">Tồn thành phẩm đóng gói</h2>
-            <Nhan loai="phu" icon={Boxes}>
+            <Tag variant="phu" icon={Boxes}>
               {kg(totalFinishedGoodStock)}
-            </Nhan>
+            </Tag>
           </div>
           <div className="flex flex-wrap gap-2">
             {finishedGoodStock
@@ -385,15 +385,15 @@ export default function DongGoiScreen() {
       )}
 
       {isLoading ? (
-        <SkeletonBang />
+        <TableSkeleton />
       ) : view.length === 0 ? (
         <EmptyState
           icon={Package}
-          tieuDe="Chưa có phiếu đóng gói"
-          moTa="Bấm “Ghi phiếu đóng gói” để chuyển bán thành phẩm thành thành phẩm đóng gói."
+          title="Chưa có phiếu đóng gói"
+          description="Bấm “Ghi phiếu đóng gói” để chuyển bán thành phẩm thành thành phẩm đóng gói."
         />
       ) : (
-        <RecordTable columns={columns} rows={view} getKey={(r) => r.id} toMau="dong-goi" />
+        <RecordTable columns={columns} rows={view} getKey={(r) => r.id} rowMarkKey="dong-goi" />
       )}
 
       {/* Dialog ghi phiếu */}
@@ -408,15 +408,15 @@ export default function DongGoiScreen() {
 
           {form && (
             <div className="space-y-6 py-2">
-              <ErrorSummary loi={loi} />
-              <ChuThichBatBuoc />
+              <ErrorSummary errors={loi} />
+              <RequiredLegend />
 
               <div className="grid gap-6 sm:grid-cols-2">
                 <DateField label="Ngày đóng gói" required value={form.date} onChange={(v) => setField("date", v)} />
                 <Combobox
                   label="Phân xưởng"
                   required
-                  choPhepXoa={false}
+                  clearable={false}
                   value={form.workshop}
                   onChange={(v) => setField("workshop", v as Workshop)}
                   options={WORKSHOPS.map((p) => ({ value: p, label: p }))}
@@ -431,8 +431,8 @@ export default function DongGoiScreen() {
                   value={form.fromProductId}
                   onChange={(v) => setField("fromProductId", v)}
                   options={productOptions}
-                  onSuaMuc={productEditor.moSua}
-                  nhanSua={productEditor.nhanSua}
+                  onEditItem={productEditor.moSua}
+                  editLabel={productEditor.nhanSua}
                   onCreate={addProduct}
                   emptyText="Chưa có mặt hàng — gõ tên rồi Thêm mới."
                 />
@@ -466,8 +466,8 @@ export default function DongGoiScreen() {
                   value={form.toProductId}
                   onChange={(v) => setField("toProductId", v)}
                   options={productOptions}
-                  onSuaMuc={productEditor.moSua}
-                  nhanSua={productEditor.nhanSua}
+                  onEditItem={productEditor.moSua}
+                  editLabel={productEditor.nhanSua}
                   onCreate={addProduct}
                   emptyText="Chưa có mặt hàng — gõ tên rồi Thêm mới."
                 />
@@ -480,7 +480,7 @@ export default function DongGoiScreen() {
                 </div>
                 <Combobox
                   label="Kho chứa TP"
-                  choPhepXoa={false}
+                  clearable={false}
                   value={form.warehouse}
                   onChange={(v) => setField("warehouse", v)}
                   options={FG_WAREHOUSE_NAMES.map((k) => ({ value: k, label: k }))}
@@ -528,9 +528,9 @@ export default function DongGoiScreen() {
       {lotLabel && (
         <TemLoQr
           nut={buildLotNode("P", lotLabel.id, {
-            shipments: [], imports: [], wips: wips,
+            shipments: [], imports: [], wips,
             packagings: rows.some((r) => r.id === lotLabel.id) ? rows : [...rows, lotLabel], lotInputs,
-            exportItems: [], exportOrders: [], salesOrders: [], products: products, customers: [],
+            exportItems: [], exportOrders: [], salesOrders: [], products, customers: [],
           })}
           onClose={() => setLotLabel(null)}
         />

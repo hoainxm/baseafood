@@ -1,5 +1,5 @@
 // ============================================================
-// Tên file: src/design-system/patterns/thanhCuonTren.tsx
+// Tên file: src/design-system/patterns/topScrollbar.tsx
 // Tên tiếng Việt: Hook thanh cuộn ngang TRÊN đầu bảng (đồng bộ với thanh dưới)
 // Description: Hook rendering a top scrollbar synced with a table's horizontal scroller
 // ============================================================
@@ -11,12 +11,12 @@ import { cn } from "@/lib/utils";
  * phải cuộn xuống tận đáy mới kéo ngang được. Luật (README § 5a): bảng tràn ngang
  * có thanh cuộn ở CẢ TRÊN lẫn DƯỚI, đồng bộ hai chiều. Hook này trả về `thanh` —
  * thanh TRÊN dựng sẵn (null khi bảng không tràn), đặt ngay trên khung bảng; thanh
- * dưới là thanh thật của khung (hoặc thanh dính đáy của `BangTong xoRa`).
+ * dưới là thanh thật của khung (hoặc thanh dính đáy của `SummaryTable fullHeight`).
  *
  * `layKhung` trả về phần tử ĐANG cuộn ngang (thường là `[data-slot=table-container]`
  * của primitive `Table`, hoặc chính div `overflow-x-auto` của bảng tự dựng).
  */
-export function useThanhCuonTren(getFrame: () => HTMLElement | null, className?: string) {
+export function useTopScrollbar(getFrame: () => HTMLElement | null, className?: string) {
   const topBarRef = React.useRef<HTMLDivElement>(null);
   const [container, setContainer] = React.useState<HTMLElement | null>(null);
   const [tran, setTran] = React.useState(false);
@@ -73,9 +73,9 @@ export function useThanhCuonTren(getFrame: () => HTMLElement | null, className?:
       ref={topBarRef}
       aria-hidden
       title="Kéo để cuộn bảng sang ngang (thanh này chạy cùng thanh cuộn dưới đáy bảng)."
-      className={cn("bang-thanh-cuon mb-1 print:hidden", className)}
+      className={cn("table-scrollbar mb-1 print:hidden", className)}
     >
-      <div style={{ width: width, height: 1 }} />
+      <div style={{ width, height: 1 }} />
     </div>
   ) : null;
 }

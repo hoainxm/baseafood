@@ -8,7 +8,7 @@
 import { useMemo, useState } from "react";
 import { kg, formatDateVN } from "@/lib/format";
 import { TRACE_KIND_LABELS, buildLotStockIndex, buildRecallList, buildRecallListForLots, getLotStockKg, type TraceData, type LotNode } from "@/lib/lotTraceability";
-import { Button, InfoTip, KhungCuonNgang, PhieuIn, TdIn, ThIn } from "@/design-system";
+import { Button, InfoTip, HorizontalScroll, PrintSheet, PrintTd, PrintTh } from "@/design-system";
 import { FileSpreadsheet, Printer, ShieldAlert } from "lucide-react";
 
 const kgHoacTrong = (v: number | null) => (v == null ? "chưa ghi kg" : kg(v));
@@ -87,7 +87,7 @@ export function ThuHoiLo({ nut, dl, cungChuyen = [] }: { nut: LotNode; dl: Trace
       </p>
 
       {hangRa.length > 0 && (
-        <KhungCuonNgang>
+        <HorizontalScroll>
           <table className="w-full min-w-[40rem] border-collapse">
             <thead>
               <tr className="border-b border-border text-left text-muted-foreground">
@@ -112,7 +112,7 @@ export function ThuHoiLo({ nut, dl, cungChuyen = [] }: { nut: LotNode; dl: Trace
               ))}
             </tbody>
           </table>
-        </KhungCuonNgang>
+        </HorizontalScroll>
       )}
 
       {lotStockNow.length > 0 && (
@@ -130,39 +130,39 @@ export function ThuHoiLo({ nut, dl, cungChuyen = [] }: { nut: LotNode; dl: Trace
       )}
 
       {isPrinting && (
-        <PhieuIn
-          tieuDe="Danh sách thu hồi theo lô"
-          phuDe={`${isMergedShipment ? `Chuyến ${nut.nhan} · ${cungChuyen.length} loại NL` : `Lô ${nut.nhan} · ${TRACE_KIND_LABELS[nut.kind]} · ${nut.moTa}`}${nut.ngay ? ` · ${formatDateVN(nut.ngay)}` : ""}`}
+        <PrintSheet
+          title="Danh sách thu hồi theo lô"
+          subtitle={`${isMergedShipment ? `Chuyến ${nut.nhan} · ${cungChuyen.length} loại NL` : `Lô ${nut.nhan} · ${TRACE_KIND_LABELS[nut.kind]} · ${nut.moTa}`}${nut.ngay ? ` · ${formatDateVN(nut.ngay)}` : ""}`}
           onClose={() => setIsPrinting(false)}
         >
           <table className="w-full border-collapse">
             <thead>
               <tr>
-                <ThIn>Ngả ra</ThIn>
-                <ThIn>Khách</ThIn>
-                <ThIn>Ngày</ThIn>
-                <ThIn>Chứng từ</ThIn>
-                <ThIn>Mặt hàng</ThIn>
-                <ThIn right>Kg</ThIn>
-                <ThIn>Từ lô</ThIn>
+                <PrintTh>Ngả ra</PrintTh>
+                <PrintTh>Khách</PrintTh>
+                <PrintTh>Ngày</PrintTh>
+                <PrintTh>Chứng từ</PrintTh>
+                <PrintTh>Mặt hàng</PrintTh>
+                <PrintTh right>Kg</PrintTh>
+                <PrintTh>Từ lô</PrintTh>
               </tr>
             </thead>
             <tbody>
               {hangRa.length ? (
                 hangRa.map((r, i) => (
                   <tr key={i}>
-                    <TdIn>{TRACE_KIND_LABELS[r.loai]}</TdIn>
-                    <TdIn>{r.khach || "khách ?"}</TdIn>
-                    <TdIn>{r.ngay ? formatDateVN(r.ngay) : "—"}</TdIn>
-                    <TdIn>{r.chungTu}</TdIn>
-                    <TdIn>{r.matHang}</TdIn>
-                    <TdIn right>{kgHoacTrong(r.kg)}</TdIn>
-                    <TdIn>{r.tuLo}</TdIn>
+                    <PrintTd>{TRACE_KIND_LABELS[r.loai]}</PrintTd>
+                    <PrintTd>{r.khach || "khách ?"}</PrintTd>
+                    <PrintTd>{r.ngay ? formatDateVN(r.ngay) : "—"}</PrintTd>
+                    <PrintTd>{r.chungTu}</PrintTd>
+                    <PrintTd>{r.matHang}</PrintTd>
+                    <PrintTd right>{kgHoacTrong(r.kg)}</PrintTd>
+                    <PrintTd>{r.tuLo}</PrintTd>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <TdIn colSpan={7}>Chưa ghi nhận hàng nào từ lô này ra khỏi xưởng.</TdIn>
+                  <PrintTd colSpan={7}>Chưa ghi nhận hàng nào từ lô này ra khỏi xưởng.</PrintTd>
                 </tr>
               )}
             </tbody>
@@ -171,25 +171,25 @@ export function ThuHoiLo({ nut, dl, cungChuyen = [] }: { nut: LotNode; dl: Trace
             <table className="mt-4 w-full border-collapse">
               <thead>
                 <tr>
-                  <ThIn>Lô còn trong xưởng</ThIn>
-                  <ThIn>Mặt hàng</ThIn>
-                  <ThIn>Ngày</ThIn>
-                  <ThIn right>Tồn trong kho</ThIn>
+                  <PrintTh>Lô còn trong xưởng</PrintTh>
+                  <PrintTh>Mặt hàng</PrintTh>
+                  <PrintTh>Ngày</PrintTh>
+                  <PrintTh right>Tồn trong kho</PrintTh>
                 </tr>
               </thead>
               <tbody>
                 {lotStockNow.map(({ n, ton }) => (
                   <tr key={`${n.kind}:${n.id}`}>
-                    <TdIn>{`${TRACE_KIND_LABELS[n.kind]} ${n.nhan}`}</TdIn>
-                    <TdIn>{n.moTa}</TdIn>
-                    <TdIn>{n.ngay ? formatDateVN(n.ngay) : "—"}</TdIn>
-                    <TdIn right>{ton != null ? kg(ton) : "—"}</TdIn>
+                    <PrintTd>{`${TRACE_KIND_LABELS[n.kind]} ${n.nhan}`}</PrintTd>
+                    <PrintTd>{n.moTa}</PrintTd>
+                    <PrintTd>{n.ngay ? formatDateVN(n.ngay) : "—"}</PrintTd>
+                    <PrintTd right>{ton != null ? kg(ton) : "—"}</PrintTd>
                   </tr>
                 ))}
               </tbody>
             </table>
           )}
-        </PhieuIn>
+        </PrintSheet>
       )}
     </section>
   );

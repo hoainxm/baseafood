@@ -32,19 +32,19 @@ import {
 } from "./dataFlow";
 
 const makeShipment = (id: string, date: string, workshop: Workshop, dl = "Hồng Phú", bookDate = date): ImportShipment => ({
-  id, deliveryDate: date, postingDate: bookDate, backdateReason: bookDate > date ? "quên ghi" : "", workshop: workshop,
+  id, deliveryDate: date, postingDate: bookDate, backdateReason: bookDate > date ? "quên ghi" : "", workshop,
   supplierName: dl, driverName: "", licensePlate: "", note: "",
 });
 const makeImport = (id: string, shipmentId: string, date: string, workshop: Workshop, kg: number, dl = "Hồng Phú"): MaterialImportItem => ({
-  id, shipmentId, deliveryDate: date, workshop: workshop, category: "Mực", supplierName: dl, materialTypeName: "Mực ống",
+  id, shipmentId, deliveryDate: date, workshop, category: "Mực", supplierName: dl, materialTypeName: "Mực ống",
   quantityKg: kg, unitPrice: 50000, driverName: "", licensePlate: "", note: "",
 });
 const me = (id: string, date: string, workshop: Workshop, kg: number, status: WipProductionItem["status"] = "da-nhap", productId = "mh1"): WipProductionItem => ({
-  id, productionDate: date, postingDate: date, backdateReason: "", workshop: workshop, productId, spec: "",
+  id, productionDate: date, postingDate: date, backdateReason: "", workshop, productId, spec: "",
   quantityKg: kg, blocksCount: 0, warehouse: "", status, note: "",
 });
 const goi = (id: string, date: string, inputKg: number, ra: number): Packaging => ({
-  id, date: date, workshop: "Đông", fromProductId: "mh1", fromSpec: "", inputKg: inputKg, inputBlocks: 0,
+  id, date, workshop: "Đông", fromProductId: "mh1", fromSpec: "", inputKg, inputBlocks: 0,
   toProductId: "mh2", toSpec: "", outputKg: ra, outputUnits: 1, warehouse: "", note: "",
 });
 const makeSalesInvoice = (id: string, date: string): SalesInvoice => ({
@@ -54,8 +54,8 @@ const ban = (id: string, invoiceId: string, date: string, productId: string, kg:
   id, invoiceId, deliveryDate: date, productId, spec: "", quantityKg: kg, unitPrice: 1, sourceWarehouse: source,
 });
 const makeLock = (date: string, workshop: Workshop, kg: number, leftoverKg = 0): DailyLock => ({
-  id: `${date}|${workshop}`, lockDate: date, workshop: workshop, isLocked: true, lockedAt: "", totalKgAtLock: kg,
-  reopenReason: "", note: "", leftoverKg: leftoverKg,
+  id: `${date}|${workshop}`, lockDate: date, workshop, isLocked: true, lockedAt: "", totalKgAtLock: kg,
+  reopenReason: "", note: "", leftoverKg,
 });
 const lotInput = (outputId: string, kg: number | null): LotInput => ({
   id: `li-${outputId}`, outputKind: "W", outputId, inputKind: "S", inputId: "n1", inputLabel: "", material: "",

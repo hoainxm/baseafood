@@ -48,9 +48,9 @@ describe("getTableRowMarks", () => {
     ];
     const r = getTableRowMarks(m, "a");
     expect([...r.dong.keys()]).toEqual(["1", "3"]);
-    expect(r.dong.get("1")).toEqual({ mau: "vang-2", dam: false });
-    expect(r.dong.get("3")).toEqual({ mau: "", dam: true });
-    expect(r.o.get(cellKey("2", "kg"))).toEqual({ mau: "la-4", dam: false });
+    expect(r.dong.get("1")).toEqual({ color: "vang-2", bold: false });
+    expect(r.dong.get("3")).toEqual({ color: "", bold: true });
+    expect(r.o.get(cellKey("2", "kg"))).toEqual({ color: "la-4", bold: false });
     expect(r.o.size).toBe(1);
   });
 });
@@ -60,7 +60,7 @@ describe("setRowMarks", () => {
 
   it("tô nhiều dòng, giữ dấu bảng khác", () => {
     const prev = [dau({ tableKey: "b", rowId: "1" })];
-    const nextMarks = setRowMarks(prev, "a", ["1", "2"], { mau: "la-3", dam: true }, "truc", luc);
+    const nextMarks = setRowMarks(prev, "a", ["1", "2"], { color: "la-3", bold: true }, "truc", luc);
     expect(nextMarks).toHaveLength(3);
     expect(nextMarks[0]).toBe(prev[0]);
     expect(nextMarks.slice(1).map((m) => [m.id, m.color, m.bold, m.markedBy])).toEqual([
@@ -70,15 +70,15 @@ describe("setRowMarks", () => {
   });
 
   it("tô nhiều Ô một lượt — dấu ô tách khỏi dấu dòng", () => {
-    const prev = setRowMarks([], "a", ["1"], { mau: "vang-5", dam: false }, "x", luc);
+    const prev = setRowMarks([], "a", ["1"], { color: "vang-5", bold: false }, "x", luc);
     const nextMarks = setRowMarks(
       prev,
       "a",
       [
-        { dong: "1", cot: "kg" },
-        { dong: "2", cot: "kg" },
+        { dong: "1", columns: "kg" },
+        { dong: "2", columns: "kg" },
       ],
-      { mau: "do-2", dam: false },
+      { color: "do-2", bold: false },
       "x",
       luc
     );
@@ -88,36 +88,36 @@ describe("setRowMarks", () => {
       ["a::2::kg", "kg", "do-2"],
     ]);
     const r = getTableRowMarks(nextMarks, "a");
-    expect(r.dong.get("1")?.mau).toBe("vang-5");
-    expect(r.o.get(cellKey("2", "kg"))?.mau).toBe("do-2");
+    expect(r.dong.get("1")?.color).toBe("vang-5");
+    expect(r.o.get(cellKey("2", "kg"))?.color).toBe("do-2");
   });
 
   it("tô lại cùng chỗ chỉ cập nhật, không đẻ dấu trùng", () => {
-    const prev = setRowMarks([], "a", ["1"], { mau: "vang-2", dam: false }, "x", luc);
-    const nextMarks = setRowMarks(prev, "a", ["1", "1"], { mau: "do-4", dam: false }, "y", luc);
+    const prev = setRowMarks([], "a", ["1"], { color: "vang-2", bold: false }, "x", luc);
+    const nextMarks = setRowMarks(prev, "a", ["1", "1"], { color: "do-4", bold: false }, "y", luc);
     expect(nextMarks).toHaveLength(1);
     expect(nextMarks[0].color).toBe("do-4");
     expect(nextMarks[0].markedBy).toBe("y");
   });
 
   it("không đổi gì thì giữ nguyên object cũ (repo khỏi đẩy thừa)", () => {
-    const prev = setRowMarks([], "a", ["1"], { mau: "vang-2", dam: true }, "x", luc);
-    const nextMarks = setRowMarks(prev, "a", ["1"], { mau: "vang-2", dam: true }, "y", "2026-10-07T00:00:00.000Z");
+    const prev = setRowMarks([], "a", ["1"], { color: "vang-2", bold: true }, "x", luc);
+    const nextMarks = setRowMarks(prev, "a", ["1"], { color: "vang-2", bold: true }, "y", "2026-10-07T00:00:00.000Z");
     expect(nextMarks[0]).toBe(prev[0]);
   });
 
   it("bỏ tô = xoá dấu (null hoặc không màu + không đậm)", () => {
-    const prev = setRowMarks([], "a", ["1", "2", { dong: "3", cot: "kg" }], { mau: "vang-2", dam: true }, "x", luc);
+    const prev = setRowMarks([], "a", ["1", "2", { dong: "3", columns: "kg" }], { color: "vang-2", bold: true }, "x", luc);
     expect(setRowMarks(prev, "a", ["1"], null, "x").map((m) => m.id)).toEqual(["a::2::*", "a::3::kg"]);
-    expect(setRowMarks(prev, "a", [{ dong: "3", cot: "kg" }], { mau: "", dam: false }, "x").map((m) => m.id)).toEqual([
+    expect(setRowMarks(prev, "a", [{ dong: "3", columns: "kg" }], { color: "", bold: false }, "x").map((m) => m.id)).toEqual([
       "a::1::*",
       "a::2::*",
     ]);
   });
 
   it("chỉ in đậm, không màu vẫn là một dấu", () => {
-    const nextMarks = setRowMarks([], "a", ["1"], { mau: "", dam: true }, "x", luc);
+    const nextMarks = setRowMarks([], "a", ["1"], { color: "", bold: true }, "x", luc);
     expect(nextMarks).toHaveLength(1);
-    expect(getTableRowMarks(nextMarks, "a").dong.get("1")).toEqual({ mau: "", dam: true });
+    expect(getTableRowMarks(nextMarks, "a").dong.get("1")).toEqual({ color: "", bold: true });
   });
 });

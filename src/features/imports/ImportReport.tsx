@@ -5,18 +5,18 @@
 // ============================================================
 import { useMemo, useState } from "react";
 import {
-  BangTong,
-  BieuDoCot,
+  SummaryTable,
+  BarChart,
   Button,
   Combobox,
   DateField,
   DateRangeField,
-  ThongKe,
-  homNay,
+  StatCardGrid,
+  todayIso,
   notify,
-  type CotBieuDo,
-  type CotTong,
-  type TheThongTin,
+  type BarChartItem,
+  type SummaryTableColumn,
+  type StatCardData,
 } from "@/design-system";
 import { useMaterialImports, useScraps } from "@/lib/catalogRepo";
 import { KY_OPT, getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
@@ -65,9 +65,9 @@ export default function BaoCaoNhap() {
   const [scraps] = useScraps();
 
   const [ky, setKy] = useState<ViewPeriod>("thang");
-  const [moc, setMoc] = useState(homNay());
-  const [tuTC, setTuTC] = useState(homNay());
-  const [denTC, setDenTC] = useState(homNay());
+  const [moc, setMoc] = useState(todayIso());
+  const [tuTC, setTuTC] = useState(todayIso());
+  const [denTC, setDenTC] = useState(todayIso());
   const [workshop, setWorkshop] = useState("Tất cả");
   const [tu, den] = getViewPeriodRange(ky, moc, tuTC, denTC);
 
@@ -150,13 +150,13 @@ export default function BaoCaoNhap() {
       const nhomKey = `${r.supplierName || "(chưa có đại lý)"} · ${r.materialTypeName || "(chưa rõ loại)"}`;
       d.loai.set(nhomKey, (d.loai.get(nhomKey) ?? 0) + (r.quantityKg || 0));
     }
-    const chart: CotBieuDo[] = [...ct.keys()].sort().map((date) => {
+    const chart: BarChartItem[] = [...ct.keys()].sort().map((date) => {
       const d = ct.get(date)!;
       const typeEntries = [...d.loai.entries()].sort((a, b) => b[1] - a[1]);
       return {
-        nhan: formatDateVN(date),
-        giaTri: d.tongKg,
-        chiTiet: (
+        label: formatDateVN(date),
+        value: d.tongKg,
+        detail: (
           <div className="space-y-2">
             <div className="border-b border-border pb-1.5">
               <div className="font-semibold text-foreground">
@@ -197,42 +197,42 @@ export default function BaoCaoNhap() {
     };
   }, [rows, scraps, tu, den, workshop]);
 
-  const the: TheThongTin[] = [
-    { nhan: "Kỳ báo cáo", giaTri: `${formatDateVN(tu)} – ${formatDateVN(den)}`, icon: CalendarRange, mau: "trung-tinh" },
-    { nhan: "Nhập mua", giaTri: `${num(tongKg)} kg`, so: true, icon: Scale, mau: "brand" },
-    { nhan: "Giá trị mua", giaTri: `${num(tongTien)} đ`, so: true, icon: Coins, mau: "success" },
+  const the: StatCardData[] = [
+    { label: "Kỳ báo cáo", value: `${formatDateVN(tu)} – ${formatDateVN(den)}`, icon: CalendarRange, color: "trung-tinh" },
+    { label: "Nhập mua", value: `${num(tongKg)} kg`, numeric: true, icon: Scale, color: "brand" },
+    { label: "Giá trị mua", value: `${num(tongTien)} đ`, numeric: true, icon: Coins, color: "success" },
     {
-      nhan: "Chờ hóa đơn",
-      giaTri: `${num(tongChoGia)} kg`,
-      so: true,
+      label: "Chờ hóa đơn",
+      value: `${num(tongChoGia)} kg`,
+      numeric: true,
       icon: FileClock,
-      mau: tongChoGia > 0 ? "warning" : "trung-tinh",
+      color: tongChoGia > 0 ? "warning" : "trung-tinh",
     },
   ];
 
-  const purchaseColumns: CotTong<DongMua>[] = [
+  const purchaseColumns: SummaryTableColumn<DongMua>[] = [
     { key: "dl", header: "Đại lý", render: (r) => r.supplierName },
     { key: "loai", header: "Loại nguyên liệu", render: (r) => r.materialTypeName },
-    { key: "kg", header: "Số cân (kg)", so: true, render: (r) => num(r.quantityKg), tong: () => num(tongKg) },
+    { key: "kg", header: "Số cân (kg)", numeric: true, render: (r) => num(r.quantityKg), total: () => num(tongKg) },
     {
       key: "chogia",
       header: "Chờ giá (kg)",
-      so: true,
+      numeric: true,
       render: (r) => (r.quantityChoGiaKg ? num(r.quantityChoGiaKg) : ""),
-      tong: () => (tongChoGia ? num(tongChoGia) : ""),
+      total: () => (tongChoGia ? num(tongChoGia) : ""),
     },
-    { key: "tien", header: "Giá trị (đ)", so: true, render: (r) => num(r.amount), tong: () => num(tongTien) },
+    { key: "tien", header: "Giá trị (đ)", numeric: true, render: (r) => num(r.amount), total: () => num(tongTien) },
   ];
 
-  const scrapColumns: CotTong<DongPhe>[] = [
+  const scrapColumns: SummaryTableColumn<DongPhe>[] = [
     { key: "loai", header: "Loại phế liệu", render: (r) => r.name },
-    { key: "kg", header: "Số cân (kg)", so: true, render: (r) => num(r.quantityKg), tong: () => num(tongKgPhe) },
-    { key: "tien", header: "Giá trị bán (đ)", so: true, render: (r) => num(r.saleValue), tong: () => num(tongTienPhe) },
+    { key: "kg", header: "Số cân (kg)", numeric: true, render: (r) => num(r.quantityKg), total: () => num(tongKgPhe) },
+    { key: "tien", header: "Giá trị bán (đ)", numeric: true, render: (r) => num(r.saleValue), total: () => num(tongTienPhe) },
   ];
 
   const exportExcel = () => {
     if (!dongMua.length && !dongPhe.length) {
-      notify.canhBao("Không có số liệu để xuất");
+      notify.warning("Không có số liệu để xuất");
       return;
     }
     const aoa: OExcel[][] = [];
@@ -267,8 +267,8 @@ export default function BaoCaoNhap() {
           <div className="min-w-[12rem]">
             <Combobox
               label="Kỳ báo cáo"
-              anNhanBatBuoc
-              choPhepXoa={false}
+              hideRequiredMark
+              clearable={false}
               value={ky}
               onChange={(v) => setKy(v as ViewPeriod)}
               options={KY_OPT}
@@ -278,7 +278,7 @@ export default function BaoCaoNhap() {
             {ky === "tuy-chon" ? (
               <DateRangeField
                 label="Khoảng ngày"
-                anNhanBatBuoc
+                hideRequiredMark
                 presets={false}
                 startDate={tuTC}
                 endDate={denTC}
@@ -290,7 +290,7 @@ export default function BaoCaoNhap() {
             ) : (
               <DateField
                 label={ky === "ngay" ? "Ngày" : "Ngày bất kỳ trong kỳ"}
-                anNhanBatBuoc
+                hideRequiredMark
                 hint={ky === "ngay" ? undefined : `Kỳ: ${formatDateVN(tu)} – ${formatDateVN(den)}`}
                 value={moc}
                 onChange={setMoc}
@@ -300,8 +300,8 @@ export default function BaoCaoNhap() {
           <div className="min-w-[10rem]">
             <Combobox
               label="Phân xưởng"
-              anNhanBatBuoc
-              choPhepXoa={false}
+              hideRequiredMark
+              clearable={false}
               value={workshop}
               onChange={setWorkshop}
               options={WORKSHOP_OPTIONS}
@@ -320,7 +320,7 @@ export default function BaoCaoNhap() {
         </Button>
       </div>
 
-      <ThongKe the={the} />
+      <StatCardGrid cards={the} />
 
       {chart.length > 0 && (
         <section className="space-y-3 rounded-xl border-2 border-border bg-card p-5">
@@ -332,15 +332,15 @@ export default function BaoCaoNhap() {
               {chart.length} ngày có nhập · tổng {num(tongKg)} kg
             </span>
           </div>
-          <BieuDoCot data={chart} donVi="kg" giuThuTu soDongToiDa={62} />
+          <BarChart data={chart} unit="kg" preserveOrder maxItems={62} />
         </section>
       )}
 
-      <BangTong
+      <SummaryTable
         rows={dongMua}
-        cot={purchaseColumns}
+        columns={purchaseColumns}
         getKey={(r) => `${r.supplierName}|||${r.materialTypeName}`}
-        toMau={`bao-cao-nhap|${tu}|${den}|${workshop}`}
+        rowMarkKey={`bao-cao-nhap|${tu}|${den}|${workshop}`}
         emptyText="Không có nguyên liệu mua trong kỳ này."
       />
 
@@ -352,11 +352,11 @@ export default function BaoCaoNhap() {
               (giá bán, tách riêng — không cộng vào giá trị nhập mua)
             </span>
           </div>
-          <BangTong
+          <SummaryTable
             rows={dongPhe}
-            cot={scrapColumns}
+            columns={scrapColumns}
             getKey={(r) => r.name}
-            toMau={`bao-cao-nhap-phe-lieu|${tu}|${den}|${workshop}`}
+            rowMarkKey={`bao-cao-nhap-phe-lieu|${tu}|${den}|${workshop}`}
             emptyText="Không có phế liệu trong kỳ này."
           />
         </section>

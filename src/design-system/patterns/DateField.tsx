@@ -26,7 +26,7 @@ export function dateToIso(d: Date | undefined): string {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
 }
 
-export function viNgay(iso: string | undefined): string {
+export function formatWeekdayDate(iso: string | undefined): string {
   const d = isoToDate(iso);
   if (!d) return "";
   return d.toLocaleDateString("vi-VN", {
@@ -38,7 +38,7 @@ export function viNgay(iso: string | undefined): string {
 }
 
 /** Các ngày trong khoảng (bao gồm hai đầu), dạng ISO. */
-export function ngayTrongKhoang(tu: string, den: string): string[] {
+export function getDatesInRange(tu: string, den: string): string[] {
   const a = isoToDate(tu);
   const b = isoToDate(den) ?? a;
   if (!a || !b) return [];
@@ -51,13 +51,13 @@ export function ngayTrongKhoang(tu: string, den: string): string[] {
   return out;
 }
 
-export function congNgay(iso: string, days: number): string {
+export function addDays(iso: string, days: number): string {
   const d = isoToDate(iso) ?? new Date();
   d.setDate(d.getDate() + days);
   return dateToIso(d);
 }
 
-export const homNay = () => dateToIso(new Date());
+export const todayIso = () => dateToIso(new Date());
 
 /* ---- Khối nhãn dùng chung ---- */
 
@@ -68,7 +68,7 @@ function LabelBlock({
   info,
   error,
   htmlFor,
-  anNhanBatBuoc,
+  hideRequiredMark,
 }: {
   label: string;
   required?: boolean;
@@ -77,14 +77,14 @@ function LabelBlock({
   info?: React.ReactNode;
   error?: string;
   htmlFor?: string;
-  anNhanBatBuoc?: boolean;
+  hideRequiredMark?: boolean;
 }) {
   return (
     <>
       <div className="flex flex-wrap items-center gap-2">
         <Label htmlFor={htmlFor}>
           {label}
-          {!anNhanBatBuoc && required && (
+          {!hideRequiredMark && required && (
             <span aria-hidden className="ml-1 font-bold text-destructive">
               *
             </span>
@@ -108,22 +108,22 @@ function LabelBlock({
 function CalendarButton({
   value,
   onChange,
-  chuMacDinh,
+  placeholder,
   min,
   max,
   id,
-  batBuoc,
+  required,
 }: {
   value: string;
   onChange: (iso: string) => void;
-  chuMacDinh: string;
+  placeholder: string;
   /** Giới hạn: không cho chọn trước ngày này (ISO) */
   min?: string;
   /** Giới hạn: không cho chọn sau ngày này (ISO) */
   max?: string;
   id?: string;
   /** Đánh dấu bắt buộc cho trình đọc màn hình + để form dò ra ô bắt buộc. */
-  batBuoc?: boolean;
+  required?: boolean;
 }) {
   const [open, setOpen] = React.useState(false);
   const d = isoToDate(value);
@@ -140,25 +140,25 @@ function CalendarButton({
           id={id}
           data-slot="date-trigger"
           variant="outline"
-          aria-required={batBuoc ? true : undefined}
+          aria-required={required ? true : undefined}
           title="Mở lịch để chọn ngày. Có sẵn lối tắt Hôm nay / Hôm qua ở đầu lịch."
           className="h-10 w-full justify-start px-3 text-sm font-medium"
         >
           <CalendarDays className="shrink-0 text-muted-foreground" />
           <span className={cn("truncate", !d && "text-muted-foreground")}>
-            {d ? viNgay(value) : chuMacDinh}
+            {d ? formatWeekdayDate(value) : placeholder}
           </span>
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-auto gap-0 p-0" align="start">
         <div className="flex flex-wrap gap-2 border-b border-border p-3">
-          <Button variant="secondary" size="sm" onClick={() => setDate(homNay())} title="Điền ngay ngày hôm nay, khỏi dò trên lịch.">
+          <Button variant="secondary" size="sm" onClick={() => setDate(todayIso())} title="Điền ngay ngày hôm nay, khỏi dò trên lịch.">
             Hôm nay
           </Button>
           <Button
             variant="secondary"
             size="sm"
-            onClick={() => setDate(congNgay(homNay(), -1))}
+            onClick={() => setDate(addDays(todayIso(), -1))}
             title="Điền ngay ngày hôm qua — hay dùng khi ghi bù sổ của ngày trước."
           >
             Hôm qua
@@ -197,8 +197,8 @@ export function DateField({
   hint,
   info,
   error,
-  choPhepXoa = false,
-  anNhanBatBuoc = false,
+  clearable = false,
+  hideRequiredMark = false,
   className,
 }: {
   label: string;
@@ -210,9 +210,9 @@ export function DateField({
   /** Câu diễn giải dài — gom vào nút ⓘ cạnh nhãn (giữ nhãn 1 dòng, không đẩy ô lệch). */
   info?: React.ReactNode;
   error?: string;
-  choPhepXoa?: boolean;
+  clearable?: boolean;
   /** Ẩn nhãn "Bắt buộc / (không bắt buộc)" — dùng khi đây là BỘ LỌC, không phải ô nhập. */
-  anNhanBatBuoc?: boolean;
+  hideRequiredMark?: boolean;
   className?: string;
 }) {
   const id = React.useId();
@@ -225,7 +225,7 @@ export function DateField({
         info={info}
         error={error}
         htmlFor={id}
-        anNhanBatBuoc={anNhanBatBuoc}
+        hideRequiredMark={hideRequiredMark}
       />
       <div className="flex items-center gap-2">
         <div className="min-w-0 flex-1">
@@ -233,11 +233,11 @@ export function DateField({
             id={id}
             value={value}
             onChange={onChange}
-            chuMacDinh="Bấm để chọn ngày"
-            batBuoc={required && !anNhanBatBuoc}
+            placeholder="Bấm để chọn ngày"
+            required={required && !hideRequiredMark}
           />
         </div>
-        {choPhepXoa && value && (
+        {clearable && value && (
           <Button
             variant="outline"
             size="icon"
@@ -269,7 +269,7 @@ export function DateRangeField({
   hint,
   error,
   presets = true,
-  anNhanBatBuoc = false,
+  hideRequiredMark = false,
   className,
 }: {
   label: string;
@@ -282,16 +282,16 @@ export function DateRangeField({
   /** Hiện nút nhanh 5 / 7 / 30 ngày gần đây */
   presets?: boolean;
   /** Ẩn nhãn "Bắt buộc / (không bắt buộc)" — dùng khi đây là BỘ LỌC, không phải ô nhập. */
-  anNhanBatBuoc?: boolean;
+  hideRequiredMark?: boolean;
   className?: string;
 }) {
-  const nhanh = (days: number) => {
-    const den = homNay();
-    onChange(congNgay(den, -(days - 1)), den);
+  const quickPick = (days: number) => {
+    const den = todayIso();
+    onChange(addDays(den, -(days - 1)), den);
   };
 
   const dayCount =
-    startDate && endDate ? ngayTrongKhoang(startDate, endDate).length : 0;
+    startDate && endDate ? getDatesInRange(startDate, endDate).length : 0;
 
   return (
     <div className={cn("min-w-0 space-y-2", className)}>
@@ -300,7 +300,7 @@ export function DateRangeField({
         required={required}
         hint={hint}
         error={error}
-        anNhanBatBuoc={anNhanBatBuoc}
+        hideRequiredMark={hideRequiredMark}
       />
 
       <div className="grid gap-3 sm:grid-cols-2">
@@ -311,7 +311,7 @@ export function DateRangeField({
           <CalendarButton
             value={startDate}
             onChange={(v) => onChange(v, endDate && endDate < v ? v : endDate)}
-            chuMacDinh="Chọn ngày đầu"
+            placeholder="Chọn ngày đầu"
             max={endDate || undefined}
           />
         </div>
@@ -322,7 +322,7 @@ export function DateRangeField({
           <CalendarButton
             value={endDate}
             onChange={(v) => onChange(startDate, v)}
-            chuMacDinh="Chọn ngày cuối"
+            placeholder="Chọn ngày cuối"
             min={startDate || undefined}
           />
         </div>
@@ -330,16 +330,16 @@ export function DateRangeField({
 
       {presets && (
         <div className="flex flex-wrap items-center gap-2 pt-1">
-          <Button variant="secondary" size="sm" onClick={() => nhanh(1)} title="Đặt khoảng xem = riêng ngày hôm nay.">
+          <Button variant="secondary" size="sm" onClick={() => quickPick(1)} title="Đặt khoảng xem = riêng ngày hôm nay.">
             Hôm nay
           </Button>
-          <Button variant="secondary" size="sm" onClick={() => nhanh(5)} title="Đặt khoảng xem = 5 ngày gần nhất tính tới hôm nay.">
+          <Button variant="secondary" size="sm" onClick={() => quickPick(5)} title="Đặt khoảng xem = 5 ngày gần nhất tính tới hôm nay.">
             5 ngày
           </Button>
-          <Button variant="secondary" size="sm" onClick={() => nhanh(7)} title="Đặt khoảng xem = 7 ngày gần nhất tính tới hôm nay.">
+          <Button variant="secondary" size="sm" onClick={() => quickPick(7)} title="Đặt khoảng xem = 7 ngày gần nhất tính tới hôm nay.">
             7 ngày
           </Button>
-          <Button variant="secondary" size="sm" onClick={() => nhanh(30)} title="Đặt khoảng xem = 30 ngày gần nhất tính tới hôm nay.">
+          <Button variant="secondary" size="sm" onClick={() => quickPick(30)} title="Đặt khoảng xem = 30 ngày gần nhất tính tới hôm nay.">
             30 ngày
           </Button>
           {dayCount > 0 && (

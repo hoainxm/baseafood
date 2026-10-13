@@ -30,8 +30,8 @@ import {
   DialogTitle,
   Field,
   Input,
-  Nhan,
-  XacNhan,
+  Tag,
+  ConfirmAction,
   notify,
 } from "@/design-system";
 import { ArrowLeftRight, Camera, CameraOff, Search } from "lucide-react";
@@ -123,17 +123,17 @@ export function KiemLoXuat({
     }).filter((n) => n.kind === "W");
     setTypedCode("");
     if (ds.length === 0) {
-      notify.loi(`"${text.trim()}" không phải tem lô bán thành phẩm.`);
+      notify.error(`"${text.trim()}" không phải tem lô bán thành phẩm.`);
       return;
     }
     const trung = ds.find((n) => lotsOfOrder.some((l) => l.wipId === n.id));
     if (trung) {
       if (checked.has(trung.id)) {
-        notify.canhBao(`Lô ${trung.nhan} đã kiểm rồi.`);
+        notify.warning(`Lô ${trung.nhan} đã kiểm rồi.`);
         return;
       }
       saveLotDispatches([...lotDispatches, ...makeCheckDispatches(trung.id, trung.nhan, dongLenh.filter((d) => d.wipId === trung.id), cach)]);
-      notify.daLuu(`Đúng lô ${trung.nhan} — đã ghi kiểm.`);
+      notify.saved(`Đúng lô ${trung.nhan} — đã ghi kiểm.`);
       return;
     }
     // Lô ngoài lệnh: cùng mặt hàng × quy cách với một lô CHƯA quét, đủ tồn ⇒ đề nghị thay.
@@ -142,11 +142,11 @@ export function KiemLoXuat({
     const cho = w ? lotsOfOrder.find((l) => !checked.has(l.wipId) && l.productId === w.productId && l.spec === w.spec) : undefined;
     const remaining = ton.find((t) => t.wipId === n.id)?.conLai ?? 0;
     if (!w || !cho) {
-      notify.loi(`Lô ${n.nhan} KHÔNG thuộc lệnh xuất này${w ? " và khác mặt hàng các lô còn chờ" : ""} — đừng xếp lên xe.`);
+      notify.error(`Lô ${n.nhan} KHÔNG thuộc lệnh xuất này${w ? " và khác mặt hàng các lô còn chờ" : ""} — đừng xếp lên xe.`);
       return;
     }
     if (w.status !== "da-nhap" || remaining < cho.kg) {
-      notify.loi(
+      notify.error(
         `Lô ${n.nhan} cùng mặt hàng nhưng ${w.status !== "da-nhap" ? "chưa duyệt nhập kho" : `chỉ còn ${kg(Math.max(0, remaining))}, không đủ thay ${kg(cho.kg)}`} — đừng xếp lên xe.`
       );
       return;
@@ -164,7 +164,7 @@ export function KiemLoXuat({
     onLuuDongLenh(updatedItems);
     saveLotDispatches([...lotDispatches, ...makeCheckDispatches(moi.id, moi.nhan, updatedItems.filter((d) => d.exportId === lenh.id && d.wipId === moi.id), "quet")]);
     setDeNghi(null);
-    notify.daLuu(`Đã thay lô ${cu.nhan} bằng ${moi.nhan} trong lệnh xuất — đã ghi kiểm.`, () => {
+    notify.saved(`Đã thay lô ${cu.nhan} bằng ${moi.nhan} trong lệnh xuất — đã ghi kiểm.`, () => {
       onLuuDongLenh(prevRows);
       saveLotDispatches(prevDispatches);
     });
@@ -206,7 +206,7 @@ export function KiemLoXuat({
 
           <p className="font-semibold">
             Đã kiểm <span className="tnum">{checked.size}</span> / {lotsOfOrder.length} lô{" "}
-            {du && <Nhan loai="xong">Đủ lô</Nhan>}
+            {du && <Tag variant="xong">Đủ lô</Tag>}
           </p>
           <ul className="divide-y divide-border rounded-lg border border-border">
             {lotsOfOrder.map((l) => (
@@ -220,7 +220,7 @@ export function KiemLoXuat({
                     {l.block ? ` · ${l.block} block` : ""}
                   </span>
                 </span>
-                {checked.has(l.wipId) ? <Nhan loai="xong">Đã quét</Nhan> : <Nhan loai="cho">Chưa quét</Nhan>}
+                {checked.has(l.wipId) ? <Tag variant="xong">Đã quét</Tag> : <Tag variant="cho">Chưa quét</Tag>}
               </li>
             ))}
           </ul>
@@ -236,13 +236,13 @@ export function KiemLoXuat({
         </DialogFooter>
       </DialogContent>
 
-      <XacNhan
+      <ConfirmAction
         open={deNghi !== null}
         onOpenChange={(o) => !o && setDeNghi(null)}
-        tieuDe={deNghi ? `Thay lô ${deNghi.cu.nhan} bằng ${deNghi.moi.nhan}?` : ""}
-        moTa="Lô vừa quét không có trong lệnh nhưng cùng mặt hàng và quy cách với một lô chưa quét. Thay thì lệnh xuất trỏ sang lô đang xếp lên xe: tồn kho trừ lô mới, lô cũ trả về kho, hồ sơ thu hồi ghi đúng lô thật. Còn nút Hoàn tác."
-        chiTiet={deNghi ? `${tenMH(deNghi.cu.productId)} · ${kg(deNghi.cu.kg)}${deNghi.cu.block ? ` · ${deNghi.cu.block} block` : ""}` : undefined}
-        nhanNut="Thay lô"
+        title={deNghi ? `Thay lô ${deNghi.cu.nhan} bằng ${deNghi.moi.nhan}?` : ""}
+        description="Lô vừa quét không có trong lệnh nhưng cùng mặt hàng và quy cách với một lô chưa quét. Thay thì lệnh xuất trỏ sang lô đang xếp lên xe: tồn kho trừ lô mới, lô cũ trả về kho, hồ sơ thu hồi ghi đúng lô thật. Còn nút Hoàn tác."
+        detail={deNghi ? `${tenMH(deNghi.cu.productId)} · ${kg(deNghi.cu.kg)}${deNghi.cu.block ? ` · ${deNghi.cu.block} block` : ""}` : undefined}
+        confirmLabel="Thay lô"
         icon={ArrowLeftRight}
         onConfirm={thayLo}
       />

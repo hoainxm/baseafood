@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
   Button,
-  CaiDatHienThi,
+  DisplaySettingsPanel,
   Card,
   ChoiceGroup,
   Combobox,
@@ -16,11 +16,11 @@ import {
   NumberField,
   RecordTable,
   StepForm,
-  homNay,
+  todayIso,
   notify,
-  type Cot,
-  type LoiNhap,
-  type MucChon,
+  type RecordTableColumn,
+  type FieldError,
+  type ComboboxOption,
 } from "@/design-system";
 import { Fish, Plus } from "lucide-react";
 
@@ -33,7 +33,7 @@ import { Fish, Plus } from "lucide-react";
 
 interface DongDemo {
   id: string;
-  loai: string;
+  materialType: string;
   supplierName: string;
   quantityKg: number;
   unitPrice: number;
@@ -42,21 +42,21 @@ interface DongDemo {
 const DEMO: DongDemo[] = [
   {
     id: "1",
-    loai: "Bạch tuộc 2 da",
+    materialType: "Bạch tuộc 2 da",
     supplierName: "H.Phú",
     quantityKg: 1250,
     unitPrice: 92000,
   },
   {
     id: "2",
-    loai: "Mực ống 7cm",
+    materialType: "Mực ống 7cm",
     supplierName: "Tân Phước",
     quantityKg: 430.5,
     unitPrice: 145000,
   },
   {
     id: "3",
-    loai: "Cá nục",
+    materialType: "Cá nục",
     supplierName: "Bảy Lành",
     quantityKg: 2010,
     unitPrice: 21500,
@@ -71,63 +71,63 @@ const SPECIES_OPTIONS = [
 ];
 
 /** Danh sách dài để thử thanh cuộn của dropdown. */
-const LONG_PRODUCT_LIST: MucChon[] = Array.from({ length: 40 }, (_, i) => ({
+const LONG_PRODUCT_LIST: ComboboxOption[] = Array.from({ length: 40 }, (_, i) => ({
   value: `mh-${i}`,
   label: `Mặt hàng mẫu số ${i + 1}`,
-  phu: `Mã MH${String(i + 1).padStart(3, "0")}`,
+  subLabel: `Mã MH${String(i + 1).padStart(3, "0")}`,
 }));
 
 export default function KitPage() {
   const [kind, setKind] = useState("bt");
   const [sl, setSl] = useState<number | null>(1250);
   const [supplier, setSupplier] = useState("");
-  const [loi, setLoi] = useState<LoiNhap[]>([]);
+  const [loi, setLoi] = useState<FieldError[]>([]);
   const [rows, setRows] = useState(DEMO);
-  const [date, setDate] = useState(homNay());
-  const [fromDate, setFromDate] = useState(homNay());
-  const [toDate, setToDate] = useState(homNay());
+  const [date, setDate] = useState(todayIso());
+  const [fromDate, setFromDate] = useState(todayIso());
+  const [toDate, setToDate] = useState(todayIso());
   const [selectedSupplier, setSelectedSupplier] = useState("");
   const [selectedProduct, setSelectedProduct] = useState("");
-  const [supplierOptions, setSupplierOptions] = useState<MucChon[]>([
-    { value: "H.Phú", label: "H.Phú", phu: "0913 123 456" },
+  const [supplierOptions, setSupplierOptions] = useState<ComboboxOption[]>([
+    { value: "H.Phú", label: "H.Phú", subLabel: "0913 123 456" },
     { value: "Tân Phước", label: "Tân Phước" },
     { value: "Bảy Lành", label: "Bảy Lành" },
   ]);
 
-  const cols: Cot<DongDemo>[] = [
+  const cols: RecordTableColumn<DongDemo>[] = [
     {
       key: "loai",
       header: "Loại nguyên liệu",
-      chinh: true,
-      render: (r) => r.loai,
-      sapXep: (r) => r.loai,
+      primary: true,
+      render: (r) => r.materialType,
+      getSortValue: (r) => r.materialType,
     },
     {
       key: "daiLy",
       header: "Đại lý",
       render: (r) => r.supplierName,
-      sapXep: (r) => r.supplierName,
+      getSortValue: (r) => r.supplierName,
     },
     {
       key: "sl",
       header: "Số lượng (kg)",
-      so: true,
+      numeric: true,
       render: (r) => r.quantityKg.toLocaleString("vi-VN"),
-      sapXep: (r) => r.quantityKg,
+      getSortValue: (r) => r.quantityKg,
     },
     {
       key: "gia",
       header: "Đơn giá (đ)",
-      so: true,
+      numeric: true,
       render: (r) => r.unitPrice.toLocaleString("vi-VN"),
-      sapXep: (r) => r.unitPrice,
+      getSortValue: (r) => r.unitPrice,
     },
   ];
 
   const remove = (r: DongDemo) => {
     const prevRows = rows;
     setRows((v) => v.filter((x) => x.id !== r.id));
-    notify.daXoa(`Đã xóa "${r.loai}"`, () => setRows(prevRows));
+    notify.deleted(`Đã xóa "${r.materialType}"`, () => setRows(prevRows));
   };
 
   return (
@@ -147,7 +147,7 @@ export default function KitPage() {
         title="1. Cài đặt hiển thị"
         note="Áp ngay cho toàn hệ thống và nhớ lại ở lần mở sau"
       >
-        <CaiDatHienThi />
+        <DisplaySettingsPanel />
       </Section>
 
       <Section
@@ -215,7 +215,7 @@ export default function KitPage() {
           value={kind}
           onChange={setKind}
           options={SPECIES_OPTIONS}
-          cot={4}
+          columns={4}
         />
       </Section>
 
@@ -257,7 +257,7 @@ export default function KitPage() {
             options={supplierOptions}
             onCreate={(ten) => {
               setSupplierOptions((v) => [...v, { value: ten, label: ten }]);
-              notify.daLuu(`Đã thêm đại lý "${ten}" vào danh mục`);
+              notify.saved(`Đã thêm đại lý "${ten}" vào danh mục`);
               return ten;
             }}
             hint="Thử gõ một tên chưa có, VD: Sáu Tèo."
@@ -276,7 +276,7 @@ export default function KitPage() {
         title="7. Gộp lỗi đầu form"
         note="Nút Lưu không bao giờ mờ đi — bấm khi thiếu thì hiện hộp này"
       >
-        <ErrorSummary loi={loi} />
+        <ErrorSummary errors={loi} />
         <Button
           className="mt-4"
           onClick={() =>
@@ -284,8 +284,8 @@ export default function KitPage() {
               loi.length
                 ? []
                 : [
-                    { truong: "Đại lý", thongBao: "Chưa nhập tên đại lý" },
-                    { truong: "Số lượng", thongBao: "Phải lớn hơn 0" },
+                    { field: "Đại lý", message: "Chưa nhập tên đại lý" },
+                    { field: "Số lượng", message: "Phải lớn hơn 0" },
                   ]
             )
           }
@@ -300,9 +300,9 @@ export default function KitPage() {
       >
         <ContextBar
           items={[
-            { nhan: "Đang xem", giaTri: "05/08/2026" },
-            { nhan: "Phân xưởng", giaTri: "Đông" },
-            { nhan: "Đã nhập", giaTri: "3.690,5 kg", so: true },
+            { label: "Đang xem", value: "05/08/2026" },
+            { label: "Phân xưởng", value: "Đông" },
+            { label: "Đã nhập", value: "3.690,5 kg", numeric: true },
           ]}
         />
       </Section>
@@ -315,10 +315,10 @@ export default function KitPage() {
           columns={cols}
           rows={rows}
           getKey={(r) => r.id}
-          timKiem={(r) => `${r.loai} ${r.supplierName}`}
+          getSearchText={(r) => `${r.materialType} ${r.supplierName}`}
           actions={(r) => (
             <ConfirmDelete
-              moTaBanGhi={`${r.loai} — ${r.quantityKg.toLocaleString("vi-VN")} kg — đại lý ${r.supplierName}`}
+              recordDescription={`${r.materialType} — ${r.quantityKg.toLocaleString("vi-VN")} kg — đại lý ${r.supplierName}`}
               onConfirm={() => remove(r)}
             />
           )}
@@ -341,13 +341,13 @@ export default function KitPage() {
       >
         <div className="flex flex-wrap gap-3">
           <Button
-            onClick={() => notify.daLuu("Đã ghi 1.250 kg vào sổ", () => {})}
+            onClick={() => notify.saved("Đã ghi 1.250 kg vào sổ", () => {})}
           >
             Bắn báo đã lưu
           </Button>
           <Button
             variant="outline"
-            onClick={() => notify.loi("Mất kết nối, chưa lưu được")}
+            onClick={() => notify.error("Mất kết nối, chưa lưu được")}
           >
             Bắn báo lỗi
           </Button>
@@ -360,8 +360,8 @@ export default function KitPage() {
       >
         <EmptyState
           icon={Fish}
-          tieuDe="Chưa có chuyến hàng nào hôm nay"
-          moTa="Bấm nút dưới để ghi chuyến đầu tiên của ngày."
+          title="Chưa có chuyến hàng nào hôm nay"
+          description="Bấm nút dưới để ghi chuyến đầu tiên của ngày."
           action={
             <Button size="lg">
               <Plus />
@@ -379,18 +379,18 @@ export default function KitPage() {
           <StepForm
             steps={[
               {
-                tieuDe: "Ai giao hàng?",
-                moTa: "Ghi tên đại lý theo đúng sổ tay.",
-                noiDung: (
+                title: "Ai giao hàng?",
+                description: "Ghi tên đại lý theo đúng sổ tay.",
+                content: (
                   <Field label="Đại lý" required>
                     <Input placeholder="VD: H.Phú" />
                   </Field>
                 ),
-                kiemTra: () => [],
+                validate: () => [],
               },
               {
-                tieuDe: "Hàng gì, bao nhiêu?",
-                noiDung: (
+                title: "Hàng gì, bao nhiêu?",
+                content: (
                   <div className="grid gap-6 sm:grid-cols-2">
                     <ChoiceGroup
                       label="Loài"
@@ -398,7 +398,7 @@ export default function KitPage() {
                       value={kind}
                       onChange={setKind}
                       options={SPECIES_OPTIONS}
-                      cot={2}
+                      columns={2}
                     />
                     <NumberField
                       label="Số lượng"
@@ -409,13 +409,13 @@ export default function KitPage() {
                     />
                   </div>
                 ),
-                kiemTra: () =>
+                validate: () =>
                   sl && sl > 0
                     ? []
-                    : [{ truong: "Số lượng", thongBao: "Phải lớn hơn 0" }],
+                    : [{ field: "Số lượng", message: "Phải lớn hơn 0" }],
               },
             ]}
-            xemLai={
+            review={
               <dl className="space-y-3 text-base">
                 <div className="flex justify-between border-b border-border pb-2">
                   <dt className="text-muted-foreground">Loài</dt>
@@ -431,7 +431,7 @@ export default function KitPage() {
                 </div>
               </dl>
             }
-            onSubmit={() => notify.daLuu("Đã ghi vào sổ", () => {})}
+            onSubmit={() => notify.saved("Đã ghi vào sổ", () => {})}
           />
         </Card>
       </Section>

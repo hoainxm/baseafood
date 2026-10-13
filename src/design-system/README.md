@@ -36,7 +36,7 @@ src/features/*                 ← màn nghiệp vụ
    Nhãn luôn hiện. Placeholder không bao giờ thay nhãn. Ô bắt buộc đánh dấu
    **`*` đỏ sau nhãn**; ô không bắt buộc không ghi gì. `*` là `aria-hidden`,
    thông tin bắt buộc đi qua `aria-required` trên chính ô — `FormDialog` và
-   `StepForm` dò thuộc tính này để tự hiện `ChuThichBatBuoc` ("Ô có dấu * là
+   `StepForm` dò thuộc tính này để tự hiện `RequiredLegend` ("Ô có dấu * là
    bắt buộc"), không phải bật cờ tay.
 7. **Nút Lưu không bao giờ `disabled`.** Thiếu dữ liệu thì bấm ra `ErrorSummary`.
 8. **Thông báo theo MỨC ĐỘ thao tác** (chốt 2026-10-06 — người dùng than toast "Đã
@@ -45,20 +45,20 @@ src/features/*                 ← màn nghiệp vụ
    | Mức | Thao tác | Phản hồi |
    |---|---|---|
    | 0 · trình bày | KHÔNG đổi số sổ sách: tô màu / in đậm dòng, tick chọn, lọc, sắp xếp, gập/mở, đổi chế độ xem, lưu cài đặt giao diện, **xuất Excel / In / tải file** (trình duyệt đã báo tải xong) | **Không toast** — thay đổi trên màn là phản hồi |
-   | 1 · ghi dữ liệu | Lưu / sửa sổ sách hay danh mục: ghi chuyến, phiếu bán, mẻ SX, thêm vào danh mục, dồn kỳ, gán kho, nạp Excel vào sổ, dán khối, Hoàn tác/Làm lại số liệu | `notify.daLuu` ngắn; ghi HÀNG LOẠT / ghi đè thì kèm **Hoàn tác** (tham số 2) |
-   | 2 · xóa / hệ trọng | Xóa bản ghi · chốt sổ · ghi đè · lệnh xuất | `ConfirmDelete` / `XacNhan` (8b) **trước**, rồi toast + **Hoàn tác** |
-   | — · lỗi, cảnh báo, kết quả kiểm | Ghi hụt, thiếu dữ liệu, kiểm lô đúng/sai, quét tem | `notify.loi` / `canhBao` / `daLuu` — LUÔN báo |
+   | 1 · ghi dữ liệu | Lưu / sửa sổ sách hay danh mục: ghi chuyến, phiếu bán, mẻ SX, thêm vào danh mục, dồn kỳ, gán kho, nạp Excel vào sổ, dán khối, Hoàn tác/Làm lại số liệu | `notify.saved` ngắn; ghi HÀNG LOẠT / ghi đè thì kèm **Hoàn tác** (tham số 2) |
+   | 2 · xóa / hệ trọng | Xóa bản ghi · chốt sổ · ghi đè · lệnh xuất | `ConfirmDelete` / `ConfirmAction` (8b) **trước**, rồi toast + **Hoàn tác** |
+   | — · lỗi, cảnh báo, kết quả kiểm | Ghi hụt, thiếu dữ liệu, kiểm lô đúng/sai, quét tem | `notify.error` / `canhBao` / `daLuu` — LUÔN báo |
 
    Xuất file mà nội dung cần giải thích (VD đối soát: "giữ nguyên định dạng gốc, chỉ
    thêm cột…") được giữ toast — vì câu đó là hướng dẫn, không phải "đã xong". Việc
    nên làm NGAY sau khi lưu (vd in tem lô vừa ghi) truyền tham số thứ ba
-   `notify.daLuu(msg, onUndo?, { label, onClick })` — nút hiện trên toast.
-   In tem nhãn: `PhieuInTem` nhận `tems[]` để in nhiều tem một lượt (mỗi tem một trang đúng khổ).
-   Mỗi tem có `soBan` (số bản in, VD mỗi block một tem — mặc định 1): xem trước hiện MỘT tem
+   `notify.saved(msg, onUndo?, { label, onClick })` — nút hiện trên toast.
+   In tem nhãn: `LabelPrintSheet` nhận `tems[]` để in nhiều tem một lượt (mỗi tem một trang đúng khổ).
+   Mỗi tem có `copies` (số bản in, VD mỗi block một tem — mặc định 1): xem trước hiện MỘT tem
    kèm ô "Số tem" sửa được, bản sao ẩn trên màn (`.print-tem-sao`) chỉ hiện khi in; tem in
-   cuối cùng mang `.print-tem-cuoi` để không thừa trang trắng. `onIn(soBan[])` trả số bản
+   cuối cùng mang `.print-tem-cuoi` để không thừa trang trắng. `onIn(copies[])` trả số bản
    từng tem để màn ghi sổ in (`label_prints.copies`).
-8b. **Thao tác hệ trọng KHÔNG phải xóa đi qua `XacNhan`** — đúng ba nhóm:
+8b. **Thao tác hệ trọng KHÔNG phải xóa đi qua `ConfirmAction`** — đúng ba nhóm:
     mất việc đang làm (đăng xuất, bỏ dữ liệu vừa nạp) · ghi đè dữ liệu đang có ·
     khóa sổ hay đổi trạng thái khó quay đầu (chốt ngày, lệnh xuất).
     **Lưu thường ngày KHÔNG hỏi** — tổ trưởng ghi 30 chuyến/ngày mà lần nào cũng
@@ -80,8 +80,8 @@ src/features/*                 ← màn nghiệp vụ
     **`Field` gắn `id` (cho `<label for>`), `aria-*` và khoảng chừa đơn vị lên CHÍNH
     `<input>`.** Con trực tiếp là ô nhập (`Input`, `Textarea`) ⇒ gắn thẳng. Con là
     THẺ BỌC có ô nhập bên trong (VD `NumberField`: `<div>` + dòng xem trước biểu
-    thức) ⇒ khai `oNhapLong` và ô bên trong trải `useONhapCuaField()` lên `<input>`.
-    Quên `oNhapLong` thì thẻ div nhận id: nhãn không trỏ tới ô nào (trình đọc màn
+    thức) ⇒ khai `nestedInput` và ô bên trong trải `useFieldInput()` lên `<input>`.
+    Quên `nestedInput` thì thẻ div nhận id: nhãn không trỏ tới ô nào (trình đọc màn
     hình đọc "ô không tên", bấm nhãn không vào ô) và đơn vị lòi ra NGOÀI viền ô —
     đúng lỗi `NumberField` dính tới 2026-10-06 (test: `NumberField.test.tsx`).
 13. **Mọi chữ hiển thị theo chuẩn label.** Sentence case; nhãn field = danh từ
@@ -89,8 +89,8 @@ src/features/*                 ← màn nghiệp vụ
     Chi tiết + before→after: [`noi-dung-va-label.md`](noi-dung-va-label.md).
 14. **Mọi bảng nghiệp vụ tô màu dòng được** ("đánh dấu đã dò" kiểu Excel): tick
     các dòng → thanh "Đã chọn N dòng" → Tô màu ▾ (10 sắc × 5 mức) / In đậm / Bỏ tô;
-    lưu chung mọi máy. Bảng dùng chung bật bằng MỘT prop `toMau="<khoá bảng>"`; bảng
-    tự dựng dùng `useToMau` + `useChonDong` + `ThanhToMau`. Luật + ngoại lệ + mẫu:
+    lưu chung mọi máy. Bảng dùng chung bật bằng MỘT prop `rowMarkKey="<khoá bảng>"`; bảng
+    tự dựng dùng `useRowMarkTools` + `useRowSelection` + `RowMarkToolbar`. Luật + ngoại lệ + mẫu:
     mục [Tô màu dòng](#tô-màu-dòng-đã-dò-kiểu-excel).
 
 **Ngoại lệ luật (bản in theo mẫu giấy):** `src/features/balancing/BalancingTable.tsx` và
@@ -123,17 +123,17 @@ tự thích nghi ở ba chỗ, màn nghiệp vụ **không phải làm gì**:
 
 | Tình huống | Khung tự làm | Ở đâu |
 |---|---|---|
-| Bề rộng 768–1023px (iPhone ngang, iPad dọc) | Thanh bên **tự thu về dải icon** (w-20) — tiêu đề + bảng có thêm ~200px. Nút thu/mở vẫn theo ý người dùng | `AppShell` + `useKhopMedia(MEDIA_THANH_BEN_HEP)` |
-| Cao ≤ 500px khi nằm ngang (biến thể **`ngang-thap:`**) | Header 4rem→**3rem** (token `--spacing-header`), ẩn dòng breadcrumb, đệm trang 16px, hộp thoại cao `100dvh−1rem` + đệm đầu/chân gọn, chân drawer bỏ dòng tên | `tokens.css` · `AppShell` · `dialog.tsx` · `FormDialog` |
-| Tai thỏ / Dynamic Island hai bên, thanh Home ở đáy | Đẩy nội dung vào trong bằng `env(safe-area-inset-*)` (`viewport-fit=cover` ở `index.html`) | `px-an-toan` (khung app) · `pb-an-toan` (cột nội dung, thanh bên, drawer) · `pl-an-toan` (drawer) |
+| Bề rộng 768–1023px (iPhone ngang, iPad dọc) | Thanh bên **tự thu về dải icon** (w-20) — tiêu đề + bảng có thêm ~200px. Nút thu/mở vẫn theo ý người dùng | `AppShell` + `useMediaQuery(MEDIA_NARROW_SIDEBAR)` |
+| Cao ≤ 500px khi nằm ngang (biến thể **`short-landscape:`**) | Header 4rem→**3rem** (token `--spacing-header`), ẩn dòng breadcrumb, đệm trang 16px, hộp thoại cao `100dvh−1rem` + đệm đầu/chân gọn, chân drawer bỏ dòng tên | `tokens.css` · `AppShell` · `dialog.tsx` · `FormDialog` |
+| Tai thỏ / Dynamic Island hai bên, thanh Home ở đáy | Đẩy nội dung vào trong bằng `env(safe-area-inset-*)` (`viewport-fit=cover` ở `index.html`) | `px-safe` (khung app) · `pb-safe` (cột nội dung, thanh bên, drawer) · `pl-safe` (drawer) |
 
-- **`ngang-thap:` KHÔNG phải mốc bố cục** — chỉ để thu chrome DỌC (đệm, ẩn dòng phụ).
+- **`short-landscape:` KHÔNG phải mốc bố cục** — chỉ để thu chrome DỌC (đệm, ẩn dòng phụ).
   Đừng dùng nó để đổi số cột hay ẩn nội dung nghiệp vụ.
 - **Chiều cao theo màn: dùng `dvh`, cấm `vh`** (`max-h-[92dvh]`, không `max-h-[92vh]`).
   Safari iOS tính `vh` theo màn KHI ẨN thanh địa chỉ ⇒ hộp `92vh` cao hơn phần nhìn
   thấy lúc xoay ngang, nút Lưu ở chân lọt xuống dưới mép (đã vá 19 chỗ 2026-10-12).
 - Phần tử `fixed` mới bám mép màn (thanh dính đáy, nút nổi) ⇒ cộng `env(safe-area-inset-*)`
-  hoặc dùng tiện ích `*-an-toan`, không thì nằm dưới tai thỏ/thanh Home.
+  hoặc dùng tiện ích `*-safe` (`px-safe`, `pl-safe`, `pb-safe`), không thì nằm dưới tai thỏ/thanh Home.
 - Kiểm: 844×390 và 932×430 (iPhone ngang, thêm cỡ chữ 130%) · 667×375 (iPhone SE
   ngang — bố cục điện thoại + drawer) · 820×1180 (iPad dọc) · 1024×768 / 1180×820 /
   1366×1024 (iPad ngang).
@@ -157,7 +157,7 @@ dùng `min-h-10`.
 
 - Cụm trái (menu · logo · tiêu đề) = `min-w-0 flex-1`. Cụm phải = `shrink-0`
   nhưng **phải ít nút**.
-- Điện thoại chỉ giữ: `☰` · `NutTrangThai` (+ `NutHuongDan` nếu trang có).
+- Điện thoại chỉ giữ: `☰` · `DataSyncStatusButton` (+ `GuideButton` nếu trang có).
   Đổi ca · thông báo · giao diện · tài khoản · đăng xuất nằm ở **chân drawer**.
 - Lý do: 6 nút icon ở cỡ chữ 130% = 407px > màn 390px → tiêu đề bị bóp còn 0px
   và cả trang cuộn ngang.
@@ -178,9 +178,9 @@ ngoài màn mà người dùng không biết là còn.
 
 | Loại bảng | Cách làm |
 |---|---|
-| Danh sách bản ghi (mặc định) | `RecordTable` — vùng chứa đủ rộng ra bảng, hẹp ra thẻ (xem **5a**). Đánh dấu `chinh` cho cột tiêu đề thẻ, `anTrenDienThoai` cho cột ẩn trên thẻ, **`phu`** cho cột ẩn khỏi bảng — cả hai xem qua nút **Chi tiết** |
-| Báo cáo kiểu Excel, phải đối chiếu nhiều cột số | Giữ bảng rộng + `overflow-x-auto` + **`cot-dau-dinh`** trên `<table>` để khoá cột đầu |
-| **Nhập số hàng loạt kiểu bảng tính** (hàng = mặt hàng, cột = ngày) | `LuoiNhap` — xem mục 5b |
+| Danh sách bản ghi (mặc định) | `RecordTable` — vùng chứa đủ rộng ra bảng, hẹp ra thẻ (xem **5a**). Đánh dấu `primary` cho cột tiêu đề thẻ, `hideOnMobile` cho cột ẩn trên thẻ, **`phu`** cho cột ẩn khỏi bảng — cả hai xem qua nút **Chi tiết** |
+| Báo cáo kiểu Excel, phải đối chiếu nhiều cột số | Giữ bảng rộng + `overflow-x-auto` + **`sticky-first-col`** trên `<table>` để khoá cột đầu |
+| **Nhập số hàng loạt kiểu bảng tính** (hàng = mặt hàng, cột = ngày) | `EditableGrid` — xem mục 5b |
 | Bản in A4 | Ngoại lệ, giữ nguyên bố cục giấy — không responsive hoá |
 
 **Cấm** viết `<table className="min-w-[1120px]">` tay trong màn mới rồi bọc
@@ -197,23 +197,23 @@ người dùng phải cuộn xuống tận đáy rồi kéo ngang mới bấm đ
   thanh bên, bảng trong lưới 2 cột, chữ phóng 130%… tự ra thẻ khi không đủ chỗ.
   Thanh tìm/sắp xếp cũng đổi theo `@3xl:` (đừng trộn `md:` với `@3xl:` trong
   cùng khối — dính lỗi ô tìm bị bóp còn icon).
-- **Bảng tối đa ~4–5 cột dữ liệu.** Cột còn lại đánh `phu` (với `DanhMucCrud`:
-  `anTrenBang`) ⇒ ẩn khỏi bảng, xem qua nút **Chi tiết** (mở một dòng con
-  `data-chi-tiet` ngay dưới). Thẻ cũng có nút Chi tiết cho cột `anTrenDienThoai`
+- **Bảng tối đa ~4–5 cột dữ liệu.** Cột còn lại đánh `phu` (với `CatalogCrud`:
+  `hideInTable`) ⇒ ẩn khỏi bảng, xem qua nút **Chi tiết** (mở một dòng con
+  `data-detail` ngay dưới). Thẻ cũng có nút Chi tiết cho cột `hideOnMobile`
   — ẩn cho gọn nhưng không bao giờ mất đường xem.
-- **Cột đầu ghim trái, cột Thao tác ghim phải** (utility `bang-ghim-dau` /
-  `bang-ghim-cuoi` trong `tokens.css`, nền ô ghim khớp sọc + hover). Nếu bảng
+- **Cột đầu ghim trái, cột Thao tác ghim phải** (utility `table-pin-first` /
+  `table-pin-last` trong `tokens.css`, nền ô ghim khớp sọc + hover). Nếu bảng
   vẫn phải cuộn ngang thì nút Sửa/Xóa vẫn luôn trong tầm nhìn.
 - **Chữ dài xuống dòng** trong khung ≤ 18rem (ô dữ liệu không phải số), tiêu đề
   cột cũng được xuống dòng — không để một ô địa chỉ kéo cả bảng rộng ra.
 - Cột số (`so`) giữ một dòng, căn phải `tnum`.
 
-Bảng **báo cáo** nhiều cột số (`BangTong`) vẫn giữ dạng bảng: dài thì **`xoRa`**
+Bảng **báo cáo** nhiều cột số (`SummaryTable`) vẫn giữ dạng bảng: dài thì **`fullHeight`**
 (sổ kế toán dò từng dòng — trang cuộn một mạch, hàng tên cột nổi dính dưới header
-trang, thanh cuộn ngang dính đáy màn hình) hoặc `dinhDau` (khung cuộn riêng ≤70dvh —
+trang, thanh cuộn ngang dính đáy màn hình) hoặc `stickyHeader` (khung cuộn riêng ≤70dvh —
 chỉ khi bảng nằm giữa nội dung khác cần thấy cùng lúc), cần dò ngang thì
-`className="cot-dau-dinh"`. Người dùng sổ dài **than "bọc"** với `dinhDau` (cuộn
-lồng cuộn, khó nhìn tổng quát — Sổ kho tháng 2026-10-06) ⇒ sổ dài mặc định `xoRa`.
+`className="sticky-first-col"`. Người dùng sổ dài **than "bọc"** với `stickyHeader` (cuộn
+lồng cuộn, khó nhìn tổng quát — Sổ kho tháng 2026-10-06) ⇒ sổ dài mặc định `fullHeight`.
 
 **Bảng tràn ngang ⇒ thanh cuộn ngang ở CẢ TRÊN lẫn DƯỚI (2026-10-06).** Thanh cuộn
 thật nằm ở đáy bảng — bảng dài thì phải cuộn xuống tận đáy mới kéo ngang được. Nay
@@ -222,17 +222,17 @@ thanh dưới, CHỈ hiện khi bảng thật sự tràn:
 
 | Bảng | Cách có |
 |---|---|
-| `BangTong` (mặc định · `dinhDau` · `xoRa`), `RecordTable` dạng bảng, `LuoiNhap` | Tự có — không phải làm gì (`xoRa` còn giữ thanh dưới DÍNH ĐÁY màn hình) |
-| Bảng TỰ DỰNG ở features | Bọc bằng **`<KhungCuonNgang classNameKhung="viền/bo góc">`** thay cho `<div className="overflow-x-auto">` — cấm tự viết `overflow-x-auto` cho bảng mới |
-| Pattern mới tự quản khung cuộn | `const thanh = useThanhCuonTren(() => phầnTửĐangCuộn)` rồi đặt `{thanh}` ngay trên khung (`patterns/thanhCuonTren.tsx`) |
+| `SummaryTable` (mặc định · `stickyHeader` · `fullHeight`), `RecordTable` dạng bảng, `EditableGrid` | Tự có — không phải làm gì (`fullHeight` còn giữ thanh dưới DÍNH ĐÁY màn hình) |
+| Bảng TỰ DỰNG ở features | Bọc bằng **`<HorizontalScroll viewportClassName="viền/bo góc">`** thay cho `<div className="overflow-x-auto">` — cấm tự viết `overflow-x-auto` cho bảng mới |
+| Pattern mới tự quản khung cuộn | `const thanh = useTopScrollbar(() => phầnTửĐangCuộn)` rồi đặt `{thanh}` ngay trên khung (`patterns/topScrollbar.tsx`) |
 
-Thanh trên dùng utility `bang-thanh-cuon` (luôn hiện, kể cả Mac "chỉ hiện khi cuộn").
+Thanh trên dùng utility `table-scrollbar` (luôn hiện, kể cả Mac "chỉ hiện khi cuộn").
 Ngoại lệ: bảng in A4, bảng trong hộp thoại hẹp đã có khung cuộn riêng, biểu đồ.
 
 **Bớt khoảng trắng ngang (2026-10-06, người dùng than "thừa khoảng trắng, phải kéo
-ngang nhiều"):** đệm ngang ô bảng theo **mật độ** — token `--pad-o` (Gọn 10px ·
+ngang nhiều"):** đệm ngang ô bảng theo **mật độ** — token `--cell-pad` (Gọn 10px ·
 Vừa 12px · Thoáng 16px; trước cứng 16px) ở `TableHead`/`TableCell` + tiêu đề cột
-sắp xếp của `RecordTable`. `BangTong`: tên cột **xuống dòng** (cột số rộng theo con
+sắp xếp của `RecordTable`. `SummaryTable`: tên cột **xuống dòng** (cột số rộng theo con
 số, không theo tên cột dài) và chữ "Cộng …" ở dòng tổng **trải qua các cột đầu
 không có tổng** (để chung ô với cột đầu thì nó đẩy cột đó rộng gấp rưỡi). Ô nhập
 trong bảng đặt bề rộng vừa đủ số (`w-24` cho số tới hàng triệu), chữ dài (tên hàng)
@@ -256,7 +256,7 @@ không tràn ⇒ thêm class `scroll-nice`, không tự viết `overflow` rời.
 trục. Với `scroll-nice` (`overscroll-behavior: contain` cả 2 trục), lăn chuột DỌC khi
 con trỏ ĐANG TRÊN BẢNG bị **nuốt** — trang không cuộn (đã dính ở màn Danh mục). Utility
 **`scroll-nice-x`** (`tokens.css`) chỉ `overscroll-behavior-x: contain`, để `-y: auto`
-nên cuộn dọc trên bảng vẫn đẩy được trang. Áp cho `RecordTable`, `BangTong`, `LuoiNhap`
+nên cuộn dọc trên bảng vẫn đẩy được trang. Áp cho `RecordTable`, `SummaryTable`, `EditableGrid`
 (`EditableGrid`), biểu đồ cuộn ngang. `scroll-nice` (contain 2 trục) chỉ cho vùng cuộn
 DỌC (thân `FormDialog`, nav sidebar/drawer, cột nội dung).
 
@@ -278,9 +278,9 @@ lại không mất số.
 Combobox trên cùng một hộp thoại, đóng cái đầu, đếm `document.querySelectorAll(
 '[cmdk-root]')` — phải bằng 1.
 
-### 5b. `LuoiNhap` — lưới nhập kiểu bảng tính
+### 5b. `EditableGrid` — lưới nhập kiểu bảng tính
 
-- Prop `tenCotDau` đổi tên cột đầu (cột tên dòng, dính trái) — mặc định "Mặt hàng"; VD khối NL ở Cân đối dùng "Loại hàng" theo bảng giấy kế toán.
+- Prop `rowHeaderLabel` đổi tên cột đầu (cột tên dòng, dính trái) — mặc định "Mặt hàng"; VD khối NL ở Cân đối dùng "Loại hàng" theo bảng giấy kế toán.
 
 Dùng khi người dùng phải gõ **nhiều ô số cùng lúc** và đang có sẵn thói quen làm
 việc đó trên Excel (màn Cân đối kỳ). Mở hộp thoại cho từng ô thì Excel vẫn nhanh
@@ -289,7 +289,7 @@ hơn và người dùng sẽ quay về Excel — đó là lý do primitive này 
 Cho sẵn:
 
 - Enter / mũi tên xuống → ô dưới; Tab → ô phải, hết hàng thì xuống dòng.
-- Ô khoá tự bị bỏ qua khi di chuyển, không làm kẹt con trỏ; khai `lyDoKhoa` để
+- Ô khoá tự bị bỏ qua khi di chuyển, không làm kẹt con trỏ; khai `lockReason` để
   người dùng biết vì sao không gõ được (đừng để ô câm).
 - **Dán khối từ Excel** (TSV). Hiểu cả `(2.000)` = −2.000 kiểu kế toán. Ô rỗng
   trong khối dán **giữ nguyên** số cũ, không xoá về 0.
@@ -301,34 +301,34 @@ Luật khi dùng:
 
 - Ô nhập **ghi theo từng phím** (như `NumberField`), không đợi rời ô — cột tổng
   và khối kết quả phải nhúc nhích theo con số đang gõ.
-- **Cột tổng phải là `kieu: "tinh"`** (ô tính, không gõ). Cho gõ tay vào cột tổng
+- **Cột tổng phải là `kind: "tinh"`** (ô tính, không gõ). Cho gõ tay vào cột tổng
   là cách chắc chắn nhất để bảng lệch — bảng cân đối giấy của xí nghiệp đã lệch
   1.109 kg đúng vì lý do đó.
-- Khoá ô (`khoa`) chỉ dùng khi ô **thật sự không có nghĩa**, không dùng để
+- Khoá ô (`id`) chỉ dùng khi ô **thật sự không có nghĩa**, không dùng để
   "bảo vệ" số: ô khoá đọc ra là ô hỏng. Số đến từ sổ khác thì cho gõ rồi ghi
   ngược về sổ đó.
-- Khai `onDanKhoi` nếu màn có ghi ra ngoài (state cha, sổ khác). Không khai thì
-  lưới rải từng ô qua `onGhiO`, và **nhiều `setState` liên tiếp trên cùng mảng
+- Khai `onPasteBlock` nếu màn có ghi ra ngoài (state cha, sổ khác). Không khai thì
+  lưới rải từng ô qua `onCellCommit`, và **nhiều `setState` liên tiếp trên cùng mảng
   sẽ ghi đè nhau** — chỉ ô cuối sống sót.
-- Ô cần điều khiển (chọn khách, nút…): `CotLuoi.oRieng`, KHÔNG phải `hien`.
-  Combobox trong ô dùng `anNhan` — tiêu đề cột đã nói ô đó là gì.
-- **Bảng nhập tự dựng (không qua `LuoiNhap`):** `Field` / `NumberField` cũng nhận
-  `anNhan` (giấu nhãn nhìn thấy, giữ `aria-label`) — dùng khi bảng có **hàng tiêu
+- Ô cần điều khiển (chọn khách, nút…): `GridColumn.oRieng`, KHÔNG phải `renderValue`.
+  Combobox trong ô dùng `hideLabel` — tiêu đề cột đã nói ô đó là gì.
+- **Bảng nhập tự dựng (không qua `EditableGrid`):** `Field` / `NumberField` cũng nhận
+  `hideLabel` (giấu nhãn nhìn thấy, giữ `aria-label`) — dùng khi bảng có **hàng tiêu
   đề cột**. Ngoài bảng thì KHÔNG dùng, nhãn phải luôn hiện. Bảng phải cuộn ngang
-  trong khung riêng — bọc `KhungCuonNgang` (có sẵn thanh cuộn trên + dưới), không
+  trong khung riêng — bọc `HorizontalScroll` (có sẵn thanh cuộn trên + dưới), không
   để cuộn ngang cả trang. VD: bảng
   ghi thành phẩm ngày (`WipProductionScreen` › `BangDongSX`).
 - **Cấm `sr-only` cho nhãn nằm trong hộp cuộn.** `sr-only` là `position:absolute`;
   gặp tổ tiên không định vị thì rơi ra toạ độ trang, đội chiều cao trang lên và
   sinh thêm một thanh cuộn dọc + mảng trắng dưới cùng. Dùng `aria-label`.
-- Dòng tiêu đề nhóm: `HangLuoi.tieuDeNhom`. Dòng tổng cuối bảng tự dựng ở màn
-  gọi qua `cuoiBang` (số cột phải khớp, kể cả khi nhóm cột đang thu).
-- **Phần phụ dưới ô — `CotLuoi.phuO(row)`**: nội dung nhỏ ngay dưới giá trị ô (ô gõ
+- Dòng tiêu đề nhóm: `GridRow.groupTitle`. Dòng tổng cuối bảng tự dựng ở màn
+  gọi qua `footer` (số cột phải khớp, kể cả khi nhóm cột đang thu).
+- **Phần phụ dưới ô — `GridColumn.phuO(row)`**: nội dung nhỏ ngay dưới giá trị ô (ô gõ
   được hay ô khoá đều có), VD nút "🚚 3 chuyến" mở chi tiết nguồn của ô (Cân đối).
   Nút trong `phuO` để `tabIndex={-1}` — phím Enter/↑↓ của lưới không nhảy vào.
-- **Dòng con chỉ đọc — `HangLuoi.kieu = "con"`**: thụt vào, nền xám, mọi ô khoá, không
+- **Dòng con chỉ đọc — `GridRow.kind = "con"`**: thụt vào, nền xám, mọi ô khoá, không
   ô tick tô màu (tô ở dòng cha). Màn tự chèn dòng con ngay dưới dòng cha khi người
-  dùng mở (VD tách theo đại lý). Có dòng con thì `onDanKhoi` phải tính dòng theo
+  dùng mở (VD tách theo đại lý). Có dòng con thì `onPasteBlock` phải tính dòng theo
   THỨ TỰ TRÊN MÀN (kể cả dòng con) và bỏ qua ô dòng con — kẻo dán trượt số.
 
 ### 5d. Ô số: nhập biểu thức + điều hướng phím kiểu Excel
@@ -337,9 +337,9 @@ Luật khi dùng:
 
 | Lớp | File | Vai trò |
 |---|---|---|
-| Hàm thuần | `patterns/bieuThucSo.ts` (+ `bieuThucSo.test.ts`) | `parseSo` · `dinhDangSo` · `laBieuThuc` · `tinhBieuThuc` · `parseSoHoacBieuThuc` |
-| Hành vi ô | `patterns/useNhapSo.ts` | ghi theo phím, Esc trả số cũ, rời ô định dạng lại, trả `xemTruoc` |
-| Ô dựng sẵn | `NumberField` (có nhãn) · ô lưới `LuoiNhap` · `ONhapSo` (ô trần, không nhãn) | cùng gọi `useNhapSo` + `XemTruocBieuThuc` |
+| Hàm thuần | `patterns/numberExpression.ts` (+ `numberExpression.test.ts`) | `parseVnNumber` · `formatNumber` · `isExpression` · `evaluateExpression` · `parseNumberOrExpression` |
+| Hành vi ô | `patterns/useNumberInput.ts` | ghi theo phím, Esc trả số cũ, rời ô định dạng lại, trả `preview` |
+| Ô dựng sẵn | `NumberField` (có nhãn) · ô lưới `EditableGrid` · `ONhapSo` (ô trần, không nhãn) | cùng gọi `useNumberInput` + `ExpressionPreview` |
 
 - Gõ được: `250+300`, `=250+300` (dấu `=` đầu như Excel), `(3+4)*2`, `12x5` / `12×5`
   (`x` = nhân), `100:4` / `100÷4` (`:` = chia), `1000*5%` (`%` hậu tố = chia 100).
@@ -352,10 +352,10 @@ Luật khi dùng:
   bảng / thanh cấu hình) — **cấm** `<Input inputMode="decimal">` / `type="number"` tự
   parse. Màn KHÔNG tự parse số. Ngoại lệ: ô **năm** (số nguyên không phân nghìn).
 
-**Điều hướng ↑/↓/Enter theo cột** cho **bảng số TỰ DỰNG** (không qua `LuoiNhap`,
-VD `WipProductionScreen › BangDongSX`): bọc bảng trong `[data-luoi-phim]`, mỗi
-`NumberField` (hoặc ô trần `ONhapSo`) khai `navCol="<tên cột>"` (hàm chung `patterns/dieuHuongCotSo.ts`). ↑/↓/Enter nhảy dọc trong cùng cột (theo
-thứ tự DOM, tự bỏ ô ẩn của dòng chưa mở); Tab để trình duyệt lo đi ngang. `LuoiNhap`
+**Điều hướng ↑/↓/Enter theo cột** cho **bảng số TỰ DỰNG** (không qua `EditableGrid`,
+VD `WipProductionScreen › BangDongSX`): bọc bảng trong `[data-grid-nav]`, mỗi
+`NumberField` (hoặc ô trần `ONhapSo`) khai `navCol="<tên cột>"` (hàm chung `patterns/numberColumnNav.ts`). ↑/↓/Enter nhảy dọc trong cùng cột (theo
+thứ tự DOM, tự bỏ ô ẩn của dòng chưa mở); Tab để trình duyệt lo đi ngang. `EditableGrid`
 đã có sẵn nav đầy đủ (§ 5b) — `navCol` chỉ dành cho bảng dựng tay.
 
 ### 6. Các bẫy làm vỡ trang ở cỡ chữ 130%
@@ -377,7 +377,7 @@ thứ tự DOM, tự bỏ ô ẩn của dòng chưa mở); Tab để trình duy�
    lưới một cột chứa khối rộng dùng `grid-cols-[minmax(0,1fr)]`.
 6. **Nút / nhãn chữ dài** (`whitespace-nowrap` mặc định): nhãn tên nhóm, tháng dài
    ("Dồn sang Tháng 10/2026", "Thêm dòng vào <nhóm>") ⇒ thêm
-   `h-auto min-h-9 whitespace-normal text-left`; `Nhan` dài ⇒ tách 2 nhãn ngắn.
+   `h-auto min-h-9 whitespace-normal text-left`; `Tag` dài ⇒ tách 2 nhãn ngắn.
 7. **Kiểm đúng thứ tự người dùng**: đặt 130% TRƯỚC rồi mới mở màn (đổi cỡ chữ sau
    khi trang đã dựng có lúc đo ra "không tràn" dù thật ra có).
 
@@ -390,8 +390,8 @@ thứ tự DOM, tự bỏ ô ẩn của dòng chưa mở); Tab để trình duy�
 - [ ] Nút / ô tick chạm được thoải mái (~40px `size-tap`; ô tick nhỏ bọc `<label>`)
 - [ ] Thân chữ ≥ **`text-sm`** (14px); `text-xs` (12px) CHỈ cho chip/badge/phụ chú
       (đo bằng TOKEN, không bằng px tuyệt đối). Không `fontSize` cứng < 12 trong SVG
-- [ ] Bảng dài đã ra thẻ trên điện thoại (hoặc có `cot-dau-dinh` nếu là báo cáo Excel)
-- [ ] Bảng tràn ngang có thanh cuộn TRÊN + DƯỚI (pattern dùng chung tự có; bảng tự dựng bọc `KhungCuonNgang`)
+- [ ] Bảng dài đã ra thẻ trên điện thoại (hoặc có `sticky-first-col` nếu là báo cáo Excel)
+- [ ] Bảng tràn ngang có thanh cuộn TRÊN + DƯỚI (pattern dùng chung tự có; bảng tự dựng bọc `HorizontalScroll`)
 - [ ] Chỉ dùng `md:` cho bố cục khung; không thêm `sm:`
 - [ ] Màn mới đã vào `KIT_NAV` **và** `CAY_NAV`
 - [ ] **Mọi nút thao tác có `title` giải thích nút làm gì** (§9) — nút chỉ-icon
@@ -399,14 +399,14 @@ thứ tự DOM, tự bỏ ô ẩn của dòng chưa mở); Tab để trình duy�
 - [ ] **Mọi bảng nghiệp vụ đã bật tô màu dòng** (`rowMarks`) hoặc nằm trong bảng ngoại
       lệ — mục [Tô màu dòng](#tô-màu-dòng-đã-dò-kiểu-excel)
 
-## 8. Nhãn theo CHỨC NĂNG — `Nhan` (từ 2026-09-30)
+## 8. Nhãn theo CHỨC NĂNG — `Tag` (từ 2026-09-30)
 
-Mọi chip/nhãn nhỏ trong màn nghiệp vụ dùng `Nhan`, **chọn theo Ý NGHĨA, không chọn
+Mọi chip/nhãn nhỏ trong màn nghiệp vụ dùng `Tag`, **chọn theo Ý NGHĨA, không chọn
 màu**. Trước đây `Badge` chỉ có xám/xanh thương hiệu/đỏ nên "Đã chốt" và "Nháp" trông
 y hệt, cảnh báo "Chưa có giá" trông như nhãn thường. `Badge` giờ chỉ còn dùng cho
 chip đếm/điều khiển của primitive; màn nghiệp vụ **không** dùng `Badge` làm nhãn.
 
-| `loai` | Nghĩa | Màu | Ví dụ |
+| `variant` | Nghĩa | Màu | Ví dụ |
 |---|---|---|---|
 | `xong` | đã xong · đạt · khớp · chính thức · đủ | xanh lá | Đã chốt · Đã nhập kho · Đủ · Khớp · Đạt |
 | `cho` | đang chờ · chưa xong · nháp (viền **đứt**) | hổ phách | Chờ nhập kho · Chưa chốt · Đang gom · Nháp |
@@ -414,20 +414,20 @@ chip đếm/điều khiển của primitive; màn nghiệp vụ **không** dùng
 | `loi` | cần xử lý · sai | đỏ | Tồn âm · Lệch · Khác loại · Chưa có giá · Chưa vào sổ |
 | `nguon` | nguồn dữ liệu | xanh thông tin (`--info`) | Sổ nhập · Sổ sản xuất · Nhập tay · Excel · Mẫu |
 | `vi-tri` | vị trí / kho ngoài | xanh thương hiệu nhạt | Gửi: Kho Hồng Phú |
-| `phan-loai` | phân loại nghiệp vụ, sắc theo `sac` | sắc nhạt | Kênh · nhóm NL · xưởng · kho · vai trò · ca |
+| `segments-loai` | phân loại nghiệp vụ, sắc theo `sac` | sắc nhạt | Kênh · nhóm NL · xưởng · kho · vai trò · ca |
 | `phu` | phụ chú · đếm · DEMO | xám | Lô … · SL mặt hàng · DEMO |
 
-- Sắc phân loại lấy từ hàm, **không tự chọn**: `sacKenh` (Xuất khẩu tím · Nội địa
-  ngọc) · `sacNhomNL` (Thủy sản biển · Xả đông băng · Bột phụ gia cát · Giảm hồng) ·
-  `sacXuong` (Đông biển · Cá ngọc · Khô cam) · `sacTheoTen` (phân loại mở — kho, nhóm
+- Sắc phân loại lấy từ hàm, **không tự chọn**: `channelTone` (Xuất khẩu tím · Nội địa
+  ngọc) · `toneForMaterialGroup` (Thủy sản biển · Xả đông băng · Bột phụ gia cát · Giảm hồng) ·
+  `toneForWorkshop` (Đông biển · Cá ngọc · Khô cam) · `toneByName` (phân loại mở — kho, nhóm
   TP, vai trò, ca, dây chuyền: băm tên ⇒ cùng tên cùng màu ở mọi màn).
 - Luôn có chữ + chấm (hoặc `icon`, VD `Lock` cho "Đã chốt"): màu không bao giờ là tín
   hiệu duy nhất. `className` chỉ để căn bố cục, không đè màu/cỡ.
 - Token: `--info*`, `--destructive-surface/-line`, `--success-line`, `--warning-line`,
   `--tone-<sắc>` / `-surface` / `-line` trong `tokens.css`; chữ `-ink`/nền đều ≥ 4,5:1.
-- Trạng thái (đối soát, QC, hóa đơn…) dùng `Nhan` (`xong`/`luu-y`/`loi`). (`StatusChip`
+- Trạng thái (đối soát, QC, hóa đơn…) dùng `Tag` (`xong`/`luu-y`/`loi`). (`StatusChip`
   — chip trạng thái máy/dây chuyền của màn DEMO Lệnh sản xuất — đã gỡ cùng màn 2026-10-12.)
-- Nhãn phụ dưới tên dòng trong `LuoiNhap` (`phu`) được đặt `Nhan` (VD nguồn "sổ sản
+- Nhãn phụ dưới tên dòng trong `EditableGrid` (`phu`) được đặt `Tag` (VD nguồn "sổ sản
   xuất", "mẫu · chưa có số", lưu ý "giá = kỳ trước").
 
 ## Bảng chọn component
@@ -438,33 +438,33 @@ chip đếm/điều khiển của primitive; màn nghiệp vụ **không** dùng
 | Ô số (kg, tiền, %) | `NumberField` |
 | Chọn 1 trong ≤ 6 | `ChoiceGroup` (nút to) |
 | Chọn 1 trong danh mục dài / cần tạo mới | `Combobox` |
-| Chọn trong danh mục **và cho sửa bản ghi danh mục ngay tại chỗ** | `Combobox` + `onSuaMuc` (bút chì trên từng mục; máy có chuột: hiện khi rê/trỏ phím, cảm ứng: luôn hiện) + `suaDuoc` (chỉ mục có trong danh mục). Màn nghiệp vụ KHÔNG tự viết hộp: dùng `useSuaDanhMuc` (`features/catalog/SuaDanhMucNhanh.tsx`) — hộp là `HopSuaDanhMuc`, chung với `DanhMucCrud`. Không gắn ở ô LỌC. **Bắt buộc ở mọi ô nhập liệu dùng danh mục, đi cùng `onCreate`** — xem mục "Ô chọn danh mục" ngay dưới bảng. |
+| Chọn trong danh mục **và cho sửa bản ghi danh mục ngay tại chỗ** | `Combobox` + `onEditItem` (bút chì trên từng mục; máy có chuột: hiện khi rê/trỏ phím, cảm ứng: luôn hiện) + `canEdit` (chỉ mục có trong danh mục). Màn nghiệp vụ KHÔNG tự viết hộp: dùng `useSuaDanhMuc` (`features/catalog/SuaDanhMucNhanh.tsx`) — hộp là `CatalogEditDialog`, chung với `CatalogCrud`. Không gắn ở ô LỌC. **Bắt buộc ở mọi ô nhập liệu dùng danh mục, đi cùng `onCreate`** — xem mục "Ô chọn danh mục" ngay dưới bảng. |
 | Chọn ngày | `DateField` |
 | Chọn khoảng ngày | `DateRangeField` (hai ô riêng Từ / Đến) |
-| Danh sách bản ghi | `RecordTable` — truyền `sapXep` cho cột để bấm tiêu đề sắp xếp, truyền `timKiem` để hiện ô tìm |
-| Nhập nhiều ô số một lúc (lưới ngày) | `LuoiNhap` — cột tổng luôn `kieu: "tinh"` |
-| Danh mục có Thêm/Sửa/Xóa/Tìm | `DanhMucCrud` — nhận `dangTai` để hiện `SkeletonBang` trong lúc tải, vẫn giữ header + nút Thêm |
+| Danh sách bản ghi | `RecordTable` — truyền `getSortValue` cho cột để bấm tiêu đề sắp xếp, truyền `getSearchText` để hiện ô tìm |
+| Nhập nhiều ô số một lúc (lưới ngày) | `EditableGrid` — cột tổng luôn `kind: "tinh"` |
+| Danh mục có Thêm/Sửa/Xóa/Tìm | `CatalogCrud` — nhận `loading` để hiện `TableSkeleton` trong lúc tải, vẫn giữ header + nút Thêm |
 | Xóa bất kỳ thứ gì | `ConfirmDelete` |
-| Thao tác hệ trọng không phải xóa (đăng xuất · chốt sổ · ghi đè · lệnh xuất) | `XacNhan` — nêu đích danh việc sắp làm + hệ quả, nút an toàn đứng trước |
+| Thao tác hệ trọng không phải xóa (đăng xuất · chốt sổ · ghi đè · lệnh xuất) | `ConfirmAction` — nêu đích danh việc sắp làm + hệ quả, nút an toàn đứng trước |
 | Form > 5 ô, nhập không thường xuyên | `StepForm` |
 | Form > 5 ô, nhập lặp nhiều lần/ngày | `Dialog` + nhóm ô, phần phụ gập lại |
 | Báo lỗi cả form | `ErrorSummary` (đầu form, có link nhảy tới ô) |
 | Cho biết đang làm cho ngày/xưởng nào | `ContextBar` |
 | Danh sách rỗng | `EmptyState` (phải nói việc tiếp theo) |
 | Câu diễn giải dài cạnh nhãn | `InfoTip` (nút ⓘ + popover). `DateField` **và** `Combobox` có sẵn prop `info` — dùng thay `hint` khi câu dài khiến hai ô cùng hàng lệch chiều cao. Nhãn tiêu đề vẫn luôn hiện. |
-| Bảng tổng hợp cho trang Báo cáo | `BangTong` — prop **`dinhDau`** (bảng dài): khung cuộn riêng cao ≤70dvh, hàng tên cột **dính đỉnh** + dòng tổng dính đáy (utility `bang-dinh-dau` trong `tokens.css`; sticky theo trang không chạy xuyên khung cuộn ngang nên phải cuộn trong khung). Cột số căn phải `tnum`, hàng TỔNG CỘNG ở chân tự cộng theo `tong` từng cột. Component cha lo gom nhóm; `BangTong` chỉ hiển thị. Prop **`chon?: ChonBang<T>`** bật thêm cột ô tick ở đầu bảng (`{daChon: Set<khóa>, doi(k), doiTatCa(keys, bat), nhanDong?(row)}`): ô tick ở header = chọn/bỏ mọi dòng ĐANG HIỆN của bảng đó, dòng đã tick tô `bg-primary/5`. `BangTong` **không giữ state** — màn hình giữ `Set` khóa và tự cộng tổng / in / xử theo lô (khuôn phần mềm kế toán kho). Nhiều bảng chia nhóm dùng CHUNG một `ChonBang` để tick xuyên nhóm. Prop **`dongThem?: ReactNode`**: dòng THÊM MỚI cuối thân bảng (trải hết bề ngang, trước hàng tổng) — chỗ gõ tên hàng để ghi dòng mới ngay trên bảng (VD Sổ kho tháng); có `dongThem` thì bảng rỗng vẫn hiện. Prop **`xoRa`** (thay `dinhDau` cho sổ dài): KHÔNG khung cuộn riêng — bảng trải hết, trang cuộn một mạch; hàng tên cột **nổi** (vẽ lại, đo bề rộng cột thật, đồng bộ cuộn ngang) dính dưới header trang (`top-header` = cùng token `--spacing-header` với `h-header` của `AppShell`) khi cuộn qua bảng; bảng rộng ⇒ thanh cuộn ngang **dính đáy màn hình** (`bang-thanh-cuon`), thanh cuộn thật của bảng ẩn đi (`bang-xo-ra`). Prop **`rowMarks`**: bật ô tick + thanh "Đã chọn N dòng" để tô màu / in đậm nhiều dòng — xem mục Tô màu dòng. |
-| **Dialog/form thông tin hay thao tác** | `FormDialog` — khung CHUẨN: đầu cố định (icon + tiêu đề + mô tả) · thân cuộn `scroll-nice` · chân cố định chứa nút. `rong`: sm/vua/rong/xl. Điều khiển bằng `open`/`onOpenChange` hoặc `trigger`. Nút đóng tiện dụng: `NutDong`. |
+| Bảng tổng hợp cho trang Báo cáo | `SummaryTable` — prop **`stickyHeader`** (bảng dài): khung cuộn riêng cao ≤70dvh, hàng tên cột **dính đỉnh** + dòng tổng dính đáy (utility `table-sticky-head` trong `tokens.css`; sticky theo trang không chạy xuyên khung cuộn ngang nên phải cuộn trong khung). Cột số căn phải `tnum`, hàng TỔNG CỘNG ở chân tự cộng theo `total` từng cột. Component cha lo gom nhóm; `SummaryTable` chỉ hiển thị. Prop **`selection?: TableSelection<T>`** bật thêm cột ô tick ở đầu bảng (`{selectedKeys: Set<khóa>, doi(k), toggleAll(keys, bat), getRowLabel?(row)}`): ô tick ở header = chọn/bỏ mọi dòng ĐANG HIỆN của bảng đó, dòng đã tick tô `bg-primary/5`. `SummaryTable` **không giữ state** — màn hình giữ `Set` khóa và tự cộng tổng / in / xử theo lô (khuôn phần mềm kế toán kho). Nhiều bảng chia nhóm dùng CHUNG một `TableSelection` để tick xuyên nhóm. Prop **`addRow?: ReactNode`**: dòng THÊM MỚI cuối thân bảng (trải hết bề ngang, trước hàng tổng) — chỗ gõ tên hàng để ghi dòng mới ngay trên bảng (VD Sổ kho tháng); có `addRow` thì bảng rỗng vẫn hiện. Prop **`fullHeight`** (thay `stickyHeader` cho sổ dài): KHÔNG khung cuộn riêng — bảng trải hết, trang cuộn một mạch; hàng tên cột **nổi** (vẽ lại, đo bề rộng cột thật, đồng bộ cuộn ngang) dính dưới header trang (`top-header` = cùng token `--spacing-header` với `h-header` của `AppShell`) khi cuộn qua bảng; bảng rộng ⇒ thanh cuộn ngang **dính đáy màn hình** (`table-scrollbar`), thanh cuộn thật của bảng ẩn đi (`table-expanded`). Prop **`rowMarks`**: bật ô tick + thanh "Đã chọn N dòng" để tô màu / in đậm nhiều dòng — xem mục Tô màu dòng. |
+| **Dialog/form thông tin hay thao tác** | `FormDialog` — khung CHUẨN: đầu cố định (icon + tiêu đề + mô tả) · thân cuộn `scroll-nice` · chân cố định chứa nút. `width`: sm/vua/rong/xl. Điều khiển bằng `open`/`onOpenChange` hoặc `trigger`. Nút đóng tiện dụng: `CloseButton`. |
 | **`Dialog` trần** (không qua `FormDialog`) | Khung gốc (`components/ui/dialog.tsx`, 2026-09-29) tự **giới hạn cao `100dvh−2rem` + cuộn trong khung**, cột lưới `minmax(0,1fr)` (không nới theo phần tử rộng nhất ⇒ hết tràn ngang ở 360px), và `DialogFooter` **dính đáy** (`sticky`) khi thân cuộn. ⇒ **Nút xác nhận LUÔN đặt trong `DialogFooter`**, không để giữa thân dưới danh sách dài (từng bị cuộn mất ở Đồng bộ danh mục). Nhãn nút dài ⇒ `h-auto min-h-11 whitespace-normal` cho xuống dòng. |
-| Các con số bối cảnh/tổng | `ThongKe` (lưới thẻ KPI: nhãn nhỏ + số TO + icon màu) — sinh động hơn nhồi một dòng. **Bỏ trống `cot` ⇒ tự suy theo số thẻ**: ≤4 một hàng · 5 thẻ một hàng ở xl (lg 3+2; từ lg thẻ hẹp: icon lên trên, số nhỏ một bậc) · 6 thẻ 3×2 · nhiều hơn 4 cột. Điện thoại: cột tối thiểu 9.5rem (chữ 130% tự về 1 cột), thẻ cuối lẻ trải hết hàng. Truyền `cot` chỉ khi cần ép. **`sac` (SacPhanLoai) theo LOẠI SỐ** ⇒ thẻ tô nền nhạt + viền trái đậm + số cùng màu (VD Tổng quan: nhập = `bien` · sản xuất = `tim` · kho = `ngoc` · đóng gói = `bang` · bán = `la` · định mức = `cat`); dùng cùng sắc cho biểu đồ trên màn đó. Số mang nghĩa tốt/xấu (lãi/lỗ, việc tồn) vẫn dùng `mau`, đừng truyền `sac`. `ContextBar` chỉ dùng cho thanh dính "đang xem ngày/xưởng nào" trong màn nhập liệu. |
-| Biểu đồ trong Báo cáo | `BieuDoCot` — thanh NGANG + đường trung bình nét đứt, một màu thương hiệu, thuần HTML + token (ăn theo cỡ chữ). Mặc định sắp giảm dần theo giá trị; chuỗi theo NGÀY thì bật `giuThuTu` để giữ trình tự thời gian (giá trị hiện cuối mỗi thanh, không cuộn ngang). Ưu tiên hơn `BieuDoCotDoc` (cột đứng) khi nhiều mục — cột đứng dễ tràn ngang phải cuộn. Mỗi mục có thể kèm `chiTiet` (ReactNode) → hiện thẻ TÓM TẮT khi di chuột (thẻ tự xổ xuống/lên tùy vị trí để không trồi khỏi vùng chart; rộng tới **~26rem** ở desktop, hẹp lại **16rem** ở điện thoại, nội dung **xuống dòng — không cắt chữ**, để tóm tắt đủ thông tin trong ngày mà không tràn ngang mobile); thanh có animation mọc từ 0 + hiệu ứng hover. Prop `giaTriTrungBinh` truyền sẵn mốc vạch TB (VD bình quân **gia quyền** của định mức) thay trung bình cộng các thanh — có nó thì nhãn TB không làm tròn. KHÔNG thêm thư viện chart. |
-| "X kg đi đâu" (chia phần một tổng) | `ThanhChiaPhan` — MỘT thanh 100% chia khúc theo phần + danh sách phần (chấm màu · tên · kg · % to), mỗi phần bấm được (`onChon`). Kiểu đọc "cứ 100 kg nguyên liệu thì ra 42 kg bán thành phẩm…" — **thay sơ đồ sankey** (người dùng thử 2026-10-12 thấy sankey khó hiểu; đã gỡ cùng `d3-sankey`). Màu theo `sac` (bảng tone của `Nhan`), khúc < 7% không ghi % trong thanh. Thuần HTML, không cuộn ngang. |
-| Chuỗi khâu nối tiếp | `BangChuyen` — mỗi khâu một ô (kg qua · kg chờ · số việc thiếu), mũi tên ghi % chuyển tiếp. Xếp theo `@container`: vùng ≥ `@3xl` ngang, hẹp hơn dọc. Ô bấm được (`onChon`) có `title` + `nhan-an`. `sac` từng khâu ⇒ viền trái + số cùng màu thẻ số cùng loại. |
-| Số theo ngày (cùng đơn vị) | `BieuDoTheoNgay` — chuỗi `cot` (cột cạnh nhau) và `duong` (đường, `vung` tô mờ) trên MỘT trục. `mau` nhận 4 màu nghĩa hoặc một `SacPhanLoai` (khớp thẻ cùng loại). Rê/chạm ngày ⇒ vạch dọc + thẻ số. Trục kg ghi theo tấn khi ≥ 1.000. Nhãn ngày tự thưa (≥ 44px/nhãn). Vẽ theo bề rộng khung đo thật; nhiều ngày thì khung cuộn ngang. Đừng truyền ngày tương lai (đường phẳng vô nghĩa). |
+| Các con số bối cảnh/tổng | `StatCardGrid` (lưới thẻ KPI: nhãn nhỏ + số TO + icon màu) — sinh động hơn nhồi một dòng. **Bỏ trống `columns` ⇒ tự suy theo số thẻ**: ≤4 một hàng · 5 thẻ một hàng ở xl (lg 3+2; từ lg thẻ hẹp: icon lên trên, số nhỏ một bậc) · 6 thẻ 3×2 · nhiều hơn 4 cột. Điện thoại: cột tối thiểu 9.5rem (chữ 130% tự về 1 cột), thẻ cuối lẻ trải hết hàng. Truyền `columns` chỉ khi cần ép. **`sac` (CategoryTone) theo LOẠI SỐ** ⇒ thẻ tô nền nhạt + viền trái đậm + số cùng màu (VD Tổng quan: nhập = `bien` · sản xuất = `tim` · kho = `ngoc` · đóng gói = `bang` · bán = `la` · định mức = `cat`); dùng cùng sắc cho biểu đồ trên màn đó. Số mang nghĩa tốt/xấu (lãi/lỗ, việc tồn) vẫn dùng `color`, đừng truyền `sac`. `ContextBar` chỉ dùng cho thanh dính "đang xem ngày/xưởng nào" trong màn nhập liệu. |
+| Biểu đồ trong Báo cáo | `BarChart` — thanh NGANG + đường trung bình nét đứt, một màu thương hiệu, thuần HTML + token (ăn theo cỡ chữ). Mặc định sắp giảm dần theo giá trị; chuỗi theo NGÀY thì bật `preserveOrder` để giữ trình tự thời gian (giá trị hiện cuối mỗi thanh, không cuộn ngang). Ưu tiên hơn `VerticalBarChart` (cột đứng) khi nhiều mục — cột đứng dễ tràn ngang phải cuộn. Mỗi mục có thể kèm `detail` (ReactNode) → hiện thẻ TÓM TẮT khi di chuột (thẻ tự xổ xuống/lên tùy vị trí để không trồi khỏi vùng chart; rộng tới **~26rem** ở desktop, hẹp lại **16rem** ở điện thoại, nội dung **xuống dòng — không cắt chữ**, để tóm tắt đủ thông tin trong ngày mà không tràn ngang mobile); thanh có animation mọc từ 0 + hiệu ứng hover. Prop `averageValue` truyền sẵn mốc vạch TB (VD bình quân **gia quyền** của định mức) thay trung bình cộng các thanh — có nó thì nhãn TB không làm tròn. KHÔNG thêm thư viện chart. |
+| "X kg đi đâu" (chia phần một tổng) | `ProportionBar` — MỘT thanh 100% chia khúc theo phần + danh sách phần (chấm màu · tên · kg · % to), mỗi phần bấm được (`onSelect`). Kiểu đọc "cứ 100 kg nguyên liệu thì ra 42 kg bán thành phẩm…" — **thay sơ đồ sankey** (người dùng thử 2026-10-12 thấy sankey khó hiểu; đã gỡ cùng `d3-sankey`). Màu theo `sac` (bảng tone của `Tag`), khúc < 7% không ghi % trong thanh. Thuần HTML, không cuộn ngang. |
+| Chuỗi khâu nối tiếp | `PipelineStages` — mỗi khâu một ô (kg qua · kg chờ · số việc thiếu), mũi tên ghi % chuyển tiếp. Xếp theo `@container`: vùng ≥ `@3xl` ngang, hẹp hơn dọc. Ô bấm được (`onSelect`) có `title` + `press-feedback`. `sac` từng khâu ⇒ viền trái + số cùng màu thẻ số cùng loại. |
+| Số theo ngày (cùng đơn vị) | `TimeSeriesChart` — chuỗi `columns` (cột cạnh nhau) và `duong` (đường, `vung` tô mờ) trên MỘT trục. `color` nhận 4 màu nghĩa hoặc một `CategoryTone` (khớp thẻ cùng loại). Rê/chạm ngày ⇒ vạch dọc + thẻ số. Trục kg ghi theo tấn khi ≥ 1.000. Nhãn ngày tự thưa (≥ 44px/nhãn). Vẽ theo bề rộng khung đo thật; nhiều ngày thì khung cuộn ngang. Đừng truyền ngày tương lai (đường phẳng vô nghĩa). |
 | **Khung lưới chứa biểu đồ** | Khối bọc biểu đồ / bảng rộng là lưới một cột ⇒ **bắt buộc `grid-cols-[minmax(0,1fr)]`** (cả khối ngoài lẫn khối trong). Thiếu nó, cột `auto` nở theo bề rộng tối thiểu của SVG (đo ra trang 1.086px ở 360px). |
-| **Khung tải danh sách** (chờ dữ liệu về) | `SkeletonBang` — vài dòng nhấp nháy; hiện khi `trangThai==="dang-tai" && rows.length===0` (đọc phần tử thứ 3 của `useBang`), tránh chớp "Chưa có dữ liệu". |
-| **Đang xử lý cả màn / tác vụ dài** | `DangXuLy` (chấm suy nghĩ + chữ). Fallback `Suspense` khi mở màn lazy cũng dùng cái này (thay "Đang tải…"). |
+| **Khung tải danh sách** (chờ dữ liệu về) | `TableSkeleton` — vài dòng nhấp nháy; hiện khi `trangThai==="type-tai" && rows.length===0` (đọc phần tử thứ 3 của `useBang`), tránh chớp "Chưa có dữ liệu". |
+| **Đang xử lý cả màn / tác vụ dài** | `ProcessingState` (chấm suy nghĩ + chữ). Fallback `Suspense` khi mở màn lazy cũng dùng cái này (thay "Đang tải…"). |
 | **Chấm "đang suy nghĩ" nội tuyến** | `ThinkingDots` — ba chấm nhấp nháy so le, bám màu chữ hiện tại. |
-| **Khối xương tuỳ biến** | `Skeleton` (primitive) — `<Skeleton className="h-4 w-32" />`. Ghép nên khung tải riêng khi `SkeletonBang` không hợp. |
+| **Khối xương tuỳ biến** | `Skeleton` (primitive) — `<Skeleton className="h-4 w-32" />`. Ghép nên khung tải riêng khi `TableSkeleton` không hợp. |
 
 ## Ô chọn danh mục: luôn có Thêm mới + Bút chì sửa nhanh
 
@@ -473,25 +473,25 @@ CRUD ở `/catalog`** — mặt hàng · khách hàng · đại lý · loại NL
 bột tẩm — phải có **đủ hai thứ**, kể cả ô thêm về sau:
 
 1. **Thêm mới tại chỗ — `onCreate`.** Lưu NGAY vào danh mục qua setter của màn
-   (đúng instance `useBang` đang mở), báo `notify.daLuu("Đã thêm … vào danh mục")`,
+   (đúng instance `useBang` đang mở), báo `notify.saved("Đã thêm … vào danh mục")`,
    trả về value của mục đúng kiểu value của ô (id hay tên). **Trùng tên không phân
    hoa thường ⇒ trả lại bản có sẵn**, không đẻ bản trùng. `Combobox` tự ẩn nút
    "Thêm mới" khi NHÃN trùng chữ gõ, nhưng nhãn dạng `"12 · tên"` hay danh sách
    đã lọc (theo loài, gộp họ) thì không nhận ra ⇒ handler phải tự dò.
-2. **Bút chì sửa nhanh — `useSuaDanhMuc`.** `onSuaMuc={sua.moSua}` +
-   `nhanSua={sua.nhanSua}` + `suaDuoc={sua.suaDuoc}`, và render `{sua.hop}` đúng
-   một lần trong màn. Hộp là `HopSuaDanhMuc` dùng chung bộ trường + luật kiểm tra
+2. **Bút chì sửa nhanh — `useSuaDanhMuc`.** `onEditItem={patch.moSua}` +
+   `editLabel={patch.editLabel}` + `canEdit={patch.canEdit}`, và render `{patch.hop}` đúng
+   một lần trong màn. Hộp là `CatalogEditDialog` dùng chung bộ trường + luật kiểm tra
    với màn Danh mục — màn nghiệp vụ KHÔNG tự viết hộp.
 
 **Ngoại lệ — không gắn:**
 
 | Ô | Vì sao |
 |---|---|
-| Ô LỌC / bộ lọc xem sổ ("Tất cả …", `anNhanBatBuoc`) | Không nhập liệu |
+| Ô LỌC / bộ lọc xem sổ ("Tất cả …", `hideRequiredMark`) | Không nhập liệu |
 | Danh sách cố định không phải danh mục: Phân xưởng, Loài (`CATEGORIES`), Kiểu chế biến, Thị trường, Loại kho, kho hệ thống (`BSF1_WAREHOUSES`, `KHO_TP_NAMES`, `KHO_XUONG`), vai trò, kỳ báo cáo, loại phế liệu gợi ý (`PHE_LIEU_GOI_Y`), nhóm hàng sổ kho | Không có bảng CRUD. Ô nào đang có `onCreate={(t) => t}` (gõ tự do) thì **để nguyên** |
 | 141 mã kế toán TK 1551 (`thanh-pham.json`) | Chỉ CHỌN — không thêm, không sửa |
 | Màn DEMO (`WorkOrderScreen`, `QualityScreen`, `ReportsScreen`) | Dữ liệu mẫu |
-| Ô chọn NẰM TRONG form danh mục (`DanhMucCrud` / `HopSuaDanhMuc`) | Chỉ `onCreate` — không bút chì (tránh hộp lồng hộp). Hộp sửa nhanh ở màn nghiệp vụ không nắm instance danh mục con của màn ⇒ ô đó chỉ cho chọn (VD "Loại nguyên liệu" trong hộp sửa nhanh mặt hàng) |
+| Ô chọn NẰM TRONG form danh mục (`CatalogCrud` / `CatalogEditDialog`) | Chỉ `onCreate` — không bút chì (tránh hộp lồng hộp). Hộp sửa nhanh ở màn nghiệp vụ không nắm instance danh mục con của màn ⇒ ô đó chỉ cho chọn (VD "Loại nguyên liệu" trong hộp sửa nhanh mặt hàng) |
 | Ô chọn giá trị ĐANG CÓ trong sổ để tìm (VD "Đang ghi là loại" ở Đổi loại hàng loạt) | Không ghi danh mục |
 
 **Mẫu:**
@@ -506,7 +506,7 @@ const themKhach = (ten: string) => {
   if (co) return co.id; // trùng tên ⇒ dùng lại bản có sẵn
   const k: Customer = { id: newId(), code: "", name: ten.trim(), market: "" };
   setKhach([...khach, k]);
-  notify.daLuu(`Đã thêm khách hàng "${k.name}" vào danh mục`);
+  notify.saved(`Đã thêm khách hàng "${k.name}" vào danh mục`);
   return k.id;
 };
 // <Combobox … options={optKhach} onCreate={themKhach}
@@ -524,9 +524,9 @@ const themKhach = (ten: string) => {
 - [ ] `theo: "ten"` khi value của ô là TÊN (đại lý, loại NL, kho lưu, bột tẩm —
       và khách hàng ở `/wip`); mặc định là id.
 - [ ] Options có mục ngoài danh mục (tên lấy từ sổ, kho hệ thống, mục gộp họ) ⇒
-      bắt buộc `suaDuoc` để mục đó không có bút chì.
-- [ ] `onCreate` dò trùng tên không phân hoa thường + `notify.daLuu`.
-- [ ] Hook gọi trước mọi `return` sớm; `{sua.hop}` render một lần (thường cuối JSX).
+      bắt buộc `canEdit` để mục đó không có bút chì.
+- [ ] `onCreate` dò trùng tên không phân hoa thường + `notify.saved`.
+- [ ] Hook gọi trước mọi `return` sớm; `{patch.hop}` render một lần (thường cuối JSX).
 - [ ] Danh mục nối theo TÊN ⇒ hộp tự khoá ô tên (`noiTheoTen`). Mặt hàng nối id
       nên đổi được tên — màn nào giữ TÊN mặt hàng trong state thì dời theo qua
       `onDaLuu(moi, cu)` (VD ô "Ánh xạ … tới" ở Sổ kho tháng).
@@ -557,20 +557,20 @@ chữ phụ / chữ màu về màu chữ thường.
 
 | Tầng | Thứ | Vai trò |
 |---|---|---|
-| design-system | `patterns/toMauNguon.ts` | hợp đồng `NguonToMau` + `ToMauContext` + `useToMau(maBang)` + `useChonDong()` (tick + Shift) + bảng màu `SAC_TO`/`MUC_TO`/`LUOI_MAU` — KHÔNG gọi repo |
-| design-system | `patterns/ToMauDong.tsx` | `ThanhToMau` (thanh "Đã chọn N dòng") · `NutToMauChon` (cụm Tô màu ▾ / In đậm / Bỏ tô — cho màn tự đặt vào thanh "Đã chọn" riêng) |
-| design-system | `BangTong` · `RecordTable` · `LuoiNhap` · `DanhMucCrud` | prop `toMau="<khoá bảng>"` ⇒ tự có ô tick + thanh + nền dòng |
-| tokens | `--to-<sắc>-<1..5>` (+ `-line`) · khối `[data-to-mau]`/`[data-to-toi]`/`[data-dam]` | nền phủ cả ô ghim/ô dính, vạch đậm mép trái, chữ đổi bản đậm trên nền đậm |
+| design-system | `patterns/rowMarkSource.ts` | hợp đồng `RowMarkSource` + `RowMarkContext` + `useRowMarkTools(maBang)` + `useRowSelection()` (tick + Shift) + bảng màu `MARK_COLORS`/`MARK_SHADES`/`MARK_COLOR_GRID` — KHÔNG gọi repo |
+| design-system | `patterns/RowMarkToolbar.tsx` | `RowMarkToolbar` (thanh "Đã chọn N dòng") · `RowMarkActions` (cụm Tô màu ▾ / In đậm / Bỏ tô — cho màn tự đặt vào thanh "Đã chọn" riêng) |
+| design-system | `SummaryTable` · `RecordTable` · `EditableGrid` · `CatalogCrud` | prop `rowMarkKey="<khoá bảng>"` ⇒ tự có ô tick + thanh + nền dòng |
+| tokens | `--to-<sắc>-<1..5>` (+ `-line`) · khối `[data-marked]`/`[data-mark-dark]`/`[data-bold]` | nền phủ cả ô ghim/ô dính, vạch đậm mép trái, chữ đổi bản đậm trên nền đậm |
 | app | `features/shared/ToMauProvider.tsx` (gắn MỘT lần ở `ShellLayout`) | nối `useRowMarks()` → `row_marks`; hàm thuần `lib/rowMarks.ts` (+ test) |
 
-`BangTong` mà màn đã truyền `chon` riêng (VD Sổ kho tháng, Nhập xuất tồn kho — có
+`SummaryTable` mà màn đã truyền `selection` riêng (VD Sổ kho tháng, Nhập xuất tồn kho — có
 thanh "Đã chọn" với cộng tổng / in / gán kho) thì bảng KHÔNG tự hiện thanh; màn đặt
-`<NutToMauChon to={useToMau("<khoá>")} khoa={idsDangTick} />` vào thanh của nó.
+`<RowMarkActions to={useRowMarkTools("<khoá>")} id={idsDangTick} />` vào thanh của nó.
 **Thanh "Đã chọn" riêng của màn phải đặt SAU bảng và dính đáy từ desktop**
 (`md:sticky md:bottom-8 md:z-30 md:shadow-lg`, nền đặc `bg-card`) — đặt trên đầu
 trang thì tick dòng cuối bảng phải lăn ngược lên mới bấm được (người dùng than
 2026-10-06). Điện thoại KHÔNG dính khi thanh nhiều nút + số tổng (cao tới ~3/4
-màn ở 360px chữ 130%) — nằm ngay dưới bảng là đủ gần. `ThanhToMau` mặc định của
+màn ở 360px chữ 130%) — nằm ngay dưới bảng là đủ gần. `RowMarkToolbar` mặc định của
 bảng chỉ 4 nút nên dính đáy cả trên điện thoại (~1/5 màn).
 
 **Luật:**
@@ -578,11 +578,11 @@ bảng chỉ 4 nút nên dính đáy cả trên điện thoại (~1/5 màn).
 1. **Khoá bảng (`rowMarks`) ổn định, kebab-case, đặt một lần** — đổi khoá là mất
    dấu cũ. Một khoá cho một bảng; hai chế độ xem CÙNG bản ghi (VD bảng xem + lưới
    Ghi của `/nxt-kho`) dùng chung khoá để dấu không mất khi đổi chế độ.
-2. **Khoá dòng = id BẢN GHI** (`getKey` / `HangLuoi.id`), **cấm chỉ số dòng** —
+2. **Khoá dòng = id BẢN GHI** (`getKey` / `GridRow.id`), **cấm chỉ số dòng** —
    sắp xếp / lọc / thêm dòng sẽ làm dấu nhảy sang dòng khác.
 3. **Bảng dòng GỘP theo kỳ/bộ lọc** (báo cáo: đại lý × loại, khách × kênh, mặt
    hàng × quy cách…) — khoá dòng là khoá nhóm, lặp lại ở mọi kỳ ⇒ **ghép kỳ + bộ
-   lọc vào khoá bảng**: `` toMau={`bao-cao-nhap|${tu}|${den}|${xuong}`} ``. Không
+   lọc vào khoá bảng**: `` rowMarkKey={`bao-cao-nhap|${tu}|${den}|${xuong}`} ``. Không
    ghép thì "đã dò tháng 9" hiện luôn ở tháng 10.
 4. Màn hình **không** tự viết class/mã màu dòng, **không** gọi `useRowMarks()`
    (mỗi `useBang` giữ state riêng — nhiều instance đè mất dấu nhau). Chỉ provider gọi.
@@ -592,7 +592,7 @@ bảng chỉ 4 nút nên dính đáy cả trên điện thoại (~1/5 màn).
 
 | Bảng | Vì sao |
 |---|---|
-| Bản in A4 / phiếu in (`BalancingTable`, `DailyImportInvoice`, `PhieuIn`, `PhieuTrongIn`, khối in của báo cáo) | Giữ bố cục giấy; dấu dò là chuyện trên màn |
+| Bản in A4 / phiếu in (`BalancingTable`, `DailyImportInvoice`, `PrintSheet`, `PhieuTrongIn`, khối in của báo cáo) | Giữ bố cục giấy; dấu dò là chuyện trên màn |
 | Màn DEMO (`WorkOrderScreen`/`WorkOrderTable`, `QualityScreen`, `ReportsScreen`, `TraceabilityScreen`, `ColdStorageScreen`) | Dữ liệu mẫu |
 | Bảng NHÁP đang gõ, chưa lưu (`BangDongSX` ở `/wip`) | Dòng chưa có id bản ghi; lưu xong dòng hiện ở sổ có tô |
 | Bảng trong hộp thoại / xem trước (chọn dòng nhập vào kỳ, đổi loại hàng loạt, đối chiếu lệch, xem trước nạp Excel) | Bảng tạm để chọn, không phải sổ để dò |
@@ -604,19 +604,19 @@ bảng chỉ 4 nút nên dính đáy cả trên điện thoại (~1/5 màn).
 ```tsx
 // Bảng dùng chung — MỘT prop (tự có ô tick + thanh "Đã chọn N dòng"):
 <RecordTable columns={cot} rows={rows} getKey={(r) => r.id} toMau="ban-hang" />
-<BangTong rows={rows} cot={cot} getKey={(r) => r.id} xoRa toMau="ton-kho-thang" />
-<LuoiNhap cot={cot} hang={hang} onGhiO={ghiO} moTa="…" toMau="can-doi-nl" />
+<SummaryTable rows={rows} cot={cot} getKey={(r) => r.id} fullHeight toMau="ton-kho-thang" />
+<EditableGrid cot={cot} hang={hang} onGhiO={ghiO} moTa="…" toMau="can-doi-nl" />
 // Báo cáo dòng gộp — ghép kỳ + bộ lọc:
-<BangTong rows={dong} cot={cot} getKey={(r) => `${r.customerName}|||${r.channel}`}
+<SummaryTable rows={dong} cot={cot} getKey={(r) => `${r.customerName}|||${r.channel}`}
   toMau={`bao-cao-ban|${tu}|${den}`} />
 
-// Màn có thanh "Đã chọn" riêng (BangTong nhận `chon` của màn):
-const to = useToMau("ton-kho-thang"); // CÙNG khoá với bảng
-<NutToMauChon to={to} khoa={rowsChon.map((r) => r.id)} />
+// Màn có thanh "Đã chọn" riêng (SummaryTable nhận `selection` của màn):
+const to = useRowMarkTools("ton-kho-thang"); // CÙNG khoá với bảng
+<RowMarkActions to={to} khoa={rowsChon.map((r) => r.id)} />
 
 // Bảng TỰ DỰNG (<Table> tay):
-const to = useToMau(`bao-cao-sx-ngay|${tu}|${den}|${xuong}`);
-const chonDong = useChonDong();
+const to = useRowMarkTools(`bao-cao-sx-ngay|${tu}|${den}|${xuong}`);
+const chonDong = useRowSelection();
 <TableRow key={k} {...to.thuocTinh(k)}>
   <TableCell>
     <input type="checkbox" className="size-5" checked={chonDong.daChon.has(k)}
@@ -624,26 +624,26 @@ const chonDong = useChonDong();
       aria-label={`Chọn dòng ${ten}`} />
     …
 // sau bảng:
-<ThanhToMau to={to} khoa={khoaDangHien.filter((k) => chonDong.daChon.has(k))}
+<RowMarkToolbar to={to} khoa={khoaDangHien.filter((k) => chonDong.daChon.has(k))}
   onBoChon={chonDong.boChon} />
 ```
 
 **Checklist khi thêm một bảng mới:**
 
 - [ ] Bảng có trong bảng ngoại lệ? Có ⇒ dừng. Không ⇒ phải tô được.
-- [ ] Đặt khoá bảng mới (kebab-case, chưa trùng khoá nào — `grep -rn 'toMau=' src/features`).
-- [ ] `getKey` / `HangLuoi.id` là id bản ghi, không phải chỉ số dòng.
+- [ ] Đặt khoá bảng mới (kebab-case, chưa trùng khoá nào — `grep -rn 'rowMarkKey=' src/features`).
+- [ ] `getKey` / `GridRow.id` là id bản ghi, không phải chỉ số dòng.
 - [ ] Dòng là dòng GỘP theo kỳ/bộ lọc ⇒ ghép kỳ + bộ lọc vào khoá bảng.
-- [ ] Màn đã có thanh "Đã chọn" riêng ⇒ thêm `NutToMauChon` vào đó, đặt thanh SAU bảng + `md:sticky md:bottom-8`.
-- [ ] Bảng tự dựng ⇒ ô tick `useChonDong` + `{...to.thuocTinh(k)}` lên `<tr>` + `ThanhToMau`.
+- [ ] Màn đã có thanh "Đã chọn" riêng ⇒ thêm `RowMarkActions` vào đó, đặt thanh SAU bảng + `md:sticky md:bottom-8`.
+- [ ] Bảng tự dựng ⇒ ô tick `useRowSelection` + `{...to.getRowProps(k)}` lên `<tr>` + `RowMarkToolbar`.
 - [ ] Thử: tick 3 dòng (Shift) → In đậm → Tô màu → Bỏ tô (không toast nào hiện); sắp xếp/lọc lại ⇒ dấu vẫn đúng dòng; 360px + 130% không tràn.
 
 **Sửa/thêm màu:** mỗi mức = trộn sắc gốc với trắng (tỉ lệ 0,16 · 0,32 · 0,52 ·
 0,76 · 1 của mức đậm nhất; mức đậm nhất chặn ở độ chói ≥ 0,25 để chữ đen ≥ 4,5:1).
-Sửa token `--to-<sắc>-<mức>` / `--to-<sắc>-line` ở `tokens.css` + `SAC_TO`
-(`toMauNguon.ts`) + `SAC_TO_LIB` (`lib/rowMarks.ts`) + `MAU_TOI` (ô độ chói < 0,68).
-**Test `patterns/toMauNguon.test.ts` canh hết:** đủ token, hai danh sách sắc khớp,
-chữ thường ≥ 4,5:1 trên mọi ô, `MAU_TOI` đúng, chữ phụ/chữ đỏ ≥ 4,5:1 trên ô sáng.
+Sửa token `--to-<sắc>-<mức>` / `--to-<sắc>-line` ở `tokens.css` + `MARK_COLORS`
+(`rowMarkSource.ts`) + `SAC_TO_LIB` (`lib/rowMarks.ts`) + `DARK_MARK_COLORS` (ô độ chói < 0,68).
+**Test `patterns/rowMarkSource.test.ts` canh hết:** đủ token, hai danh sách sắc khớp,
+chữ thường ≥ 4,5:1 trên mọi ô, `DARK_MARK_COLORS` đúng, chữ phụ/chữ đỏ ≥ 4,5:1 trên ô sáng.
 Không cần migration — cột `color` không có CHECK; mã lạ bị bỏ qua. 4 mã của bản
 đầu (`vang`, `xanh-la`, `xanh-duong`, `do`) vẫn đọc được (ra mức 2). Dấu theo Ô
 (`column_key`) từ bản bút tô cũ vẫn nằm trong DB nhưng không còn hiện / không còn
@@ -663,10 +663,10 @@ Mục tiêu: tinh tế, không phô — giao diện *mượt* chứ không *ồn
   toàn cục — nhưng đừng dựa vào animation để TRUYỀN THÔNG TIN (phải có trạng thái
   tĩnh tương đương).
 - Chuyển màn: `AppShell` bọc `children` trong `<div key={active}
-  className="hien-mo …">` → đổi menu là fade nhẹ (chỉ opacity). Nội dung tab
-  (`TabsContent`) cũng `hien-mo`.
+  className="enter-fade …">` → đổi menu là fade nhẹ (chỉ opacity). Nội dung tab
+  (`TabsContent`) cũng `enter-fade`.
 - **Khối LỚN chứa con `fixed`/`sticky` (nội dung màn, nội dung tab) chỉ được fade
-  opacity** (`hien-mo`), cấm `animate-in`/`hien-len`: keyframe có `transform` biến
+  opacity** (`enter-fade`), cấm `animate-in`/`enter-up`: keyframe có `transform` biến
   khối thành gốc toạ độ của con `fixed` ⇒ thanh cuộn dính đáy, hàng tên cột nổi
   chạy sai chỗ trong lúc (hoặc sau khi, nếu fill-mode `both`) animation chạy.
 
@@ -688,20 +688,20 @@ fill-mode nên reduced-motion tắt vẫn dừng ở trạng thái HIỆN RÕ):
 
 | Utility | Hiệu ứng | Áp ở đâu (design-system, features chỉ dùng lại) |
 |---|---|---|
-| `hien-len` | mờ→rõ + `translateY(6px)→0` | `RecordTable` (dòng/thẻ mới, keyed nên chỉ dòng MỚI animate) · `DailyTaskReminder` · nhóm nav mở (`AppShell`) |
-| `hien-ngang` | mờ→rõ + `translateX(10px)→0` | nội dung mỗi bước `StepForm` (keyed theo `i`) |
-| `hien-xuong` | mờ→rõ + `translateY(-8px)→0` | `UpdateBanner` (băng nhắc tải lại) |
-| `hien-mo` | chỉ mờ→rõ, 150ms, không fill-mode | nội dung màn khi đổi route (`AppShell`) · `TabsContent` |
+| `enter-up` | mờ→rõ + `translateY(6px)→0` | `RecordTable` (dòng/thẻ mới, keyed nên chỉ dòng MỚI animate) · `DailyTaskReminder` · nhóm nav mở (`AppShell`) |
+| `enter-side` | mờ→rõ + `translateX(10px)→0` | nội dung mỗi bước `StepForm` (keyed theo `i`) |
+| `enter-down` | mờ→rõ + `translateY(-8px)→0` | `UpdateBanner` (băng nhắc tải lại) |
+| `enter-fade` | chỉ mờ→rõ, 150ms, không fill-mode | nội dung màn khi đổi route (`AppShell`) · `TabsContent` |
 
-**Phản hồi khi chạm — `nhan-an`** (2026-10-12): nút/mục tự dựng co nhẹ `scale(.97)`
+**Phản hồi khi chạm — `press-feedback`** (2026-10-12): nút/mục tự dựng co nhẹ `scale(.97)`
 lúc đang nhấn + chuyển màu theo `--duration-fast`, bỏ ô xám nháy của Safari. Trên
 iPhone/iPad không có hover (Tailwind v4 gói `hover:` trong `@media (hover: hover)`)
 nên đây là phản hồi DUY NHẤT trước khi màn đổi — thiếu nó người dùng bấm lần hai.
 Dùng **thay** `transition-colors` cho nút tự dựng (không dựng trên `Button`; `Button`
 đã có `active:translate-y-px`). Đã gắn: mục nav · tiêu đề nhóm nav · nút icon header
-· nút chân drawer (`AppShell`) · `ChoiceGroup` · `InfoTip` · `NutHuongDan` ·
-`NutGiaoDien` · `NutTrangThai` · `CaiDatHienThi` · thẻ `ThongKe` bấm được. Nút tự
-dựng mới ⇒ gắn `nhan-an`.
+· nút chân drawer (`AppShell`) · `ChoiceGroup` · `InfoTip` · `GuideButton` ·
+`DisplaySettingsButton` · `DataSyncStatusButton` · `DisplaySettingsPanel` · thẻ `StatCardGrid` bấm được. Nút tự
+dựng mới ⇒ gắn `press-feedback`.
 
 Drawer điện thoại (`AppShell`) dùng tw-animate-css `animate-in slide-in-from-left
 duration-base`, overlay `animate-in fade-in-0 duration-fast`. **Không** làm
@@ -716,49 +716,49 @@ row-leave animation khi xóa (cần theo dõi presence → thêm framer-motion, 
 
 **Loading → Thinking:** thay spinner/"Đang tải" khô khan bằng cảm giác "hệ thống
 đang suy nghĩ".
-- Tải danh sách lần đầu → `SkeletonBang` (không chớp EmptyState). Màn đọc phần tử
+- Tải danh sách lần đầu → `TableSkeleton` (không chớp EmptyState). Màn đọc phần tử
   thứ 3 của `useBang`: `const [rows, ghi, { trangThai }] = useX();` rồi
-  `const dangTai = trangThai === "dang-tai" && rows.length === 0;`.
-- Mở màn lazy / kết nối / tác vụ dài → `DangXuLy` (chấm suy nghĩ + chữ).
-- Nhấn nút / đồng bộ → giữ toast; đèn `NutTrangThai` đã phản ánh trạng thái đồng bộ.
+  `const loading = trangThai === "type-tai" && rows.length === 0;`.
+- Mở màn lazy / kết nối / tác vụ dài → `ProcessingState` (chấm suy nghĩ + chữ).
+- Nhấn nút / đồng bộ → giữ toast; đèn `DataSyncStatusButton` đã phản ánh trạng thái đồng bộ.
 - Định nghĩa ở `patterns/Loading.tsx` + primitive `components/ui/skeleton.tsx`.
 
 ## Nút toàn cục trên header (`features/shared/AppShell.tsx`)
 
 Nút toàn cục là **nút icon `size-tap`** ở góc phải header. Trên **desktop** hiện
-đủ; trên **điện thoại** header chỉ giữ `NutTrangThai` (+ `NutHuongDan` nếu trang
+đủ; trên **điện thoại** header chỉ giữ `DataSyncStatusButton` (+ `GuideButton` nếu trang
 có) — phần còn lại nằm ở **chân drawer**. Lý do: ngân sách ngang của header
 thuộc về tiêu đề màn, xem § Quy chuẩn mobile.
 
 | Component | Vai trò |
 |---|---|
-| `NutGiaoDien` | Icon 🎨 → `FormDialog` chứa `CaiDatHienThi`. Nhận `taiKhoan` để **lưu theo người dùng**. Có **draft**: xem trước live, **Lưu** mới giữ, **Hủy**/đóng khôi phục ảnh chụp (`docCaiDatHienThi`/`ghiCaiDatHienThi`). |
-| `NutTrangThai` | Icon theo màu store `ketNoi`. Popover chi tiết + nút **Thử kết nối lại** (`probeKetNoi`). |
-| `NutHuongDan` | Icon "?" → hộp hướng dẫn của trang. Nội dung lấy từ `features/shared/guideContent.tsx`, chỉ hiện ở trang có trong registry. |
+| `DisplaySettingsButton` | Icon 🎨 → `FormDialog` chứa `DisplaySettingsPanel`. Nhận `account` để **lưu theo người dùng**. Có **draft**: xem trước live, **Lưu** mới giữ, **Hủy**/đóng khôi phục ảnh chụp (`readDisplaySettings`/`writeDisplaySettings`). |
+| `DataSyncStatusButton` | Icon theo màu store `ketNoi`. Popover chi tiết + nút **Thử kết nối lại** (`probeKetNoi`). |
+| `GuideButton` | Icon "?" → hộp hướng dẫn của trang. Nội dung lấy từ `features/shared/guideContent.tsx`, chỉ hiện ở trang có trong registry. |
 
 ## Trang duyệt + cấu hình
 
 `Bộ giao diện` (`src/design-system/kit/KitPage.tsx`) — trang demo component, vào
 bằng URL `/kit` (đã gỡ khỏi sidebar), desktop-only.
 
-**Cài đặt hiển thị** (`patterns/DisplaySettings.tsx`) giờ mở từ nút `NutGiaoDien`
+**Cài đặt hiển thị** (`patterns/DisplaySettings.tsx`) giờ mở từ nút `DisplaySettingsButton`
 trên header. Áp ngay và **nhớ theo từng tài khoản**:
 
 | Cấu hình | Cách áp | Giá trị |
 |---|---|---|
 | Cỡ chữ | `--app-font-scale` trên `<html>` | 90 / **100 (mặc định)** / 110 / 120 / 130 % (nền token 16px) |
-| Mật độ | `data-density` trên `<html>` | thoáng 44px · vừa 40px · **gọn 36px (mặc định)** — kèm đệm ngang ô bảng `--pad-o` 16 · 12 · 10px |
+| Mật độ | `data-density` trên `<html>` | thoáng 44px · vừa 40px · **gọn 36px (mặc định)** — kèm đệm ngang ô bảng `--cell-pad` 16 · 12 · 10px |
 | Bề rộng nội dung | `--app-content-width` | 64rem / 80rem / 100% |
 
-Khóa localStorage theo username: `bsf.<username>.<coChu|matDo|beRong>`; chưa đăng
-nhập ⇒ bucket mặc định `bsf.coChu` (tương thích ngược). Đổi tài khoản →
-`ShellLayout` trong `App.tsx` gọi `apDungCaiDatHienThi(username)` nạp lại.
-(`CoChuNhanh` — nút cỡ chữ nhanh cũ — vẫn còn trong file nhưng không còn gắn
+Khóa localStorage theo username: `bsf.<username>.<fontSize|density|contentWidth>`; chưa đăng
+nhập ⇒ bucket mặc định `bsf.fontSize` (tương thích ngược). Đổi tài khoản →
+`ShellLayout` trong `App.tsx` gọi `applyDisplaySettings(username)` nạp lại.
+(`FontSizeQuickPicker` — nút cỡ chữ nhanh cũ — vẫn còn trong file nhưng không còn gắn
 trên header.)
 
 > Đầu thanh bên, đầu drawer và header nội dung cùng cao **`h-header`** — token
 > `--spacing-header` trong `tokens.css` (4rem; máy xoay ngang thấp 3rem). Hàng tên
-> cột nổi của `BangTong xoRa` dính ở `top-header`. Đổi chiều cao ⇒ đổi MỘT token;
+> cột nổi của `SummaryTable fullHeight` dính ở `top-header`. Đổi chiều cao ⇒ đổi MỘT token;
 > đừng gõ `h-16`/`top-16` rời (lệch là trang vênh).
 
 ## Thêm component shadcn mới
@@ -825,30 +825,30 @@ Các pattern dùng lại đã tự gắn `title`, màn hình KHÔNG phải làm 
 
 | Pattern | Hover ra câu gì |
 |---|---|
-| `DanhMucCrud` | nút Thêm / Sửa từng bản ghi (ghép sẵn `tenDonVi` + mô tả bản ghi) |
+| `CatalogCrud` | nút Thêm / Sửa từng bản ghi (ghép sẵn `entityName` + mô tả bản ghi) |
 | `ConfirmDelete` | nút Xóa mặc định — nói rõ có xác nhận và có Hoàn tác |
 | `RecordTable` | tiêu đề cột sắp xếp (cả bản bảng lẫn nút sắp trên điện thoại) + nút bỏ lọc |
-| `ChoiceGroup` | từng lựa chọn — lấy `o.moTa`, không có thì ghép "Chọn X cho {nhãn}" |
+| `ChoiceGroup` | từng lựa chọn — lấy `o.description`, không có thì ghép "Chọn X cho {nhãn}" |
 | `Combobox` · `DateField` · `NumberField` | nút mở danh sách / mở lịch / tăng giảm |
 | `StepForm` · `PrintSheet` · `InfoTip` · `DisplaySettings` | nút điều hướng bước, In / Xuất PDF, ⓘ, Đặt lại |
-| `ThanhToMau` · `NutToMauChon` (prop `rowMarks` của bảng) | Tô màu ▾ / In đậm / Bỏ in đậm / Bỏ tô / Bỏ chọn — nói rõ áp cho bao nhiêu dòng; từng ô màu ("Tô vàng rất đậm") |
+| `RowMarkToolbar` · `RowMarkActions` (prop `rowMarks` của bảng) | Tô màu ▾ / In đậm / Bỏ in đậm / Bỏ tô / Bỏ chọn — nói rõ áp cho bao nhiêu dòng; từng ô màu ("Tô vàng rất đậm") |
 
-Mục **điều hướng** lấy câu mô tả từ `KIT_NAV[].moTa` (`features/shared/AppShell.tsx`):
-rê lên tên màn là biết màn đó để làm gì. **Thêm màn mới thì viết luôn `moTa`** —
+Mục **điều hướng** lấy câu mô tả từ `KIT_NAV[].description` (`features/shared/AppShell.tsx`):
+rê lên tên màn là biết màn đó để làm gì. **Thêm màn mới thì viết luôn `description`** —
 xem [02-pages-navigation](../../docs/app-map/02-pages-navigation.md).
 
-### Tốc độ hiện: `GoiYHover` vẽ tooltip riêng, KHÔNG dùng của trình duyệt
+### Tốc độ hiện: `HoverHint` vẽ tooltip riêng, KHÔNG dùng của trình duyệt
 
 Tooltip mặc định của `title` có **độ trễ do trình duyệt/OS quyết — trang web
 không chỉnh được** (Chrome để ~1 giây). Chờ một giây mới thấy chữ thì người dùng
-đã bấm đại hoặc bỏ đi rồi, gắn `title` coi như công cốc. Nên `GoiYHover`
+đã bấm đại hoặc bỏ đi rồi, gắn `title` coi như công cốc. Nên `HoverHint`
 (`patterns/HoverHint.tsx`) **gắn MỘT lần ở `AppShell`** và tự vẽ:
 
-- Trễ hiện = hằng **`TRE_HIEN_MS` (hiện tại 150ms)** — đổi một chỗ, cả app đổi theo.
+- Trễ hiện = hằng **`HINT_DELAY_MS` (hiện tại 150ms)** — đổi một chỗ, cả app đổi theo.
 - Nghe ở cấp document, bắt **mọi phần tử có `title`** (cả `<button>` thường,
   `TabsTrigger`, mục nav…). **Màn hình không phải import hay bọc gì** — cứ viết
   `title` như luật §9, phần còn lại tự chạy.
-- Chống hiện HAI tooltip: lúc rê thì cất `title` sang `data-goi-y`, rời chuột trả
+- Chống hiện HAI tooltip: lúc rê thì cất `title` sang `data-hint`, rời chuột trả
   lại. Đi bằng **bàn phím thì KHÔNG cất** — trình duyệt không bật tooltip khi
   focus, giữ `title` để trình đọc màn hình còn đọc được.
 - Máy cảm ứng (`(hover: hover)` = false) **tự tắt** — không có rê chuột thì đừng

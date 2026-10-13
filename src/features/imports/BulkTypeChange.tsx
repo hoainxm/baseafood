@@ -116,14 +116,14 @@ export function HopDoiLoaiHangLoat({
             onChange={setTargetType}
             options={typeOptions}
             onCreate={onThemLoaiNL}
-            onSuaMuc={suaLoai?.moSua}
-            nhanSua={suaLoai?.nhanSua}
-            suaDuoc={suaLoai?.suaDuoc}
+            onEditItem={suaLoai?.moSua}
+            editLabel={suaLoai?.nhanSua}
+            canEdit={suaLoai?.suaDuoc}
           />
         </div>
         <DateRangeField
           label="Giới hạn khoảng ngày"
-          anNhanBatBuoc
+          hideRequiredMark
           startDate={fromDate}
           endDate={toDate}
           onChange={(tu, den) => {
@@ -136,8 +136,8 @@ export function HopDoiLoaiHangLoat({
         {sourceType && matchedRows.length === 0 && (
           <EmptyState
             icon={Layers}
-            tieuDe="Không có chuyến nào khớp"
-            moTa="Đổi loại nguồn hoặc nới khoảng ngày."
+            title="Không có chuyến nào khớp"
+            description="Đổi loại nguồn hoặc nới khoảng ngày."
           />
         )}
 
@@ -209,15 +209,15 @@ export function HopDoiLoaiHangLoat({
             size="lg"
             onClick={() => {
               if (!targetType.trim()) {
-                notify.loi("Chưa chọn loại đích");
+                notify.error("Chưa chọn loại đích");
                 return;
               }
               if (targetType === sourceType) {
-                notify.loi("Loại đích trùng loại nguồn");
+                notify.error("Loại đích trùng loại nguồn");
                 return;
               }
               if (selectedIds.size === 0) {
-                notify.loi("Chưa tick chuyến nào");
+                notify.error("Chưa tick chuyến nào");
                 return;
               }
               onLuu([...selectedIds], targetType.trim());

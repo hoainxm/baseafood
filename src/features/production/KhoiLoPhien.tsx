@@ -11,7 +11,7 @@
 import { useMemo, useState } from "react";
 import type { LotInput, Workshop } from "@/types";
 import { TRACE_KIND_LABELS, docMaQr, listSelectableMaterialLots, explainMultipleLots, buildLotNode, findLots, type TraceData, type LotNode } from "@/lib/lotTraceability";
-import { Button, Combobox, Field, Input, Nhan, notify } from "@/design-system";
+import { Button, Combobox, Field, Input, Tag, notify } from "@/design-system";
 import { KhungQuetQr } from "@/features/shared";
 import { Camera, CameraOff, Link2, Plus, X } from "lucide-react";
 import { kg, formatDateVN } from "@/lib/format";
@@ -49,11 +49,11 @@ export function KhoiLoPhien({
 
   const addLot = (n: LotNode, cach: LotInput["method"]) => {
     if (n.kind !== "S") {
-      notify.canhBao(`"${n.nhan}" là ${TRACE_KIND_LABELS[n.kind].toLowerCase()}, không phải lô nguyên liệu.`);
+      notify.warning(`"${n.nhan}" là ${TRACE_KIND_LABELS[n.kind].toLowerCase()}, không phải lô nguyên liệu.`);
       return;
     }
     if (loPhien.some((l) => l.nut.id === n.id)) {
-      notify.canhBao(`Lô ${n.nhan} đã có trong phiên.`);
+      notify.warning(`Lô ${n.nhan} đã có trong phiên.`);
       return;
     }
     // Khai lô cho phiên = nháp chưa lưu ⇒ không toast (luật 13); lưu phiên mới ghi.
@@ -66,12 +66,12 @@ export function KhoiLoPhien({
     const ma = docMaQr(text);
     if (!ma) return;
     if ("kind" in ma && ma.kind !== "S") {
-      notify.canhBao(`Tem này là ${TRACE_KIND_LABELS[ma.kind].toLowerCase()}, không phải lô nguyên liệu.`);
+      notify.warning(`Tem này là ${TRACE_KIND_LABELS[ma.kind].toLowerCase()}, không phải lô nguyên liệu.`);
       return;
     }
     const kq = findLots(ma, dl).filter((n) => n.kind === "S");
     if (!kq.length) {
-      notify.canhBao(`Không tìm thấy lô nguyên liệu "${text}". Kiểm tra lại mã, hoặc chọn trong danh sách.`);
+      notify.warning(`Không tìm thấy lô nguyên liệu "${text}". Kiểm tra lại mã, hoặc chọn trong danh sách.`);
       return;
     }
     if (kq.length === 1) addLot(kq[0]!, cach);
@@ -81,7 +81,7 @@ export function KhoiLoPhien({
       const ld = explainMultipleLots(text, kq, dl);
       setChoices(kq);
       setPickPrompt(ld.cau);
-      if (!ld.cungChuyen) notify.canhBao(`${ld.cau} bên dưới.`);
+      if (!ld.cungChuyen) notify.warning(`${ld.cau} bên dưới.`);
     }
   };
 
@@ -186,7 +186,7 @@ export function KhoiLoPhien({
 
       {loPhien.length === 0 && (
         <p className="flex flex-wrap items-center gap-2 text-muted-foreground">
-          <Nhan loai="cho">Chưa khai lô</Nhan>
+          <Tag variant="cho">Chưa khai lô</Tag>
           Lưu mà chưa khai thì mẻ chưa có lô — chốt ngày sẽ hỏi gắn lô hoặc lý do.
         </p>
       )}

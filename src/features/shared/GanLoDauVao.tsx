@@ -29,7 +29,7 @@ import {
   type TraceData,
   type LotNode,
 } from "@/lib/lotTraceability";
-import { Button, EmptyState, Field, FormDialog, Input, Nhan, NumberField, NutDong, notify } from "@/design-system";
+import { Button, EmptyState, Field, FormDialog, Input, Tag, NumberField, CloseButton, notify } from "@/design-system";
 import { Camera, CameraOff, Link2, Plus, Trash2 } from "lucide-react";
 import { KhungQuetQr } from "./KhungQuetQr";
 import { useDuLieuTruyXuat } from "./useDuLieuTruyXuat";
@@ -88,16 +88,16 @@ function LotInputDialog({
 
   const addLot = (node: LotNode, cach: LotInput["method"]) => {
     if (node.kind !== loaiVao) {
-      notify.canhBao(`"${node.nhan}" là ${TRACE_KIND_LABELS[node.kind].toLowerCase()}, không phải ${tenVao}.`);
+      notify.warning(`"${node.nhan}" là ${TRACE_KIND_LABELS[node.kind].toLowerCase()}, không phải ${tenVao}.`);
       return;
     }
     const blockReason = kiemNut?.(node); // gồm cả "đã gắn rồi" — bên gọi biết id lô của mối nối
     if (blockReason) {
-      notify.canhBao(blockReason);
+      notify.warning(blockReason);
       return;
     }
     if (inputKg != null && !(inputKg > 0)) {
-      notify.canhBao("Số kg phải là số dương, hoặc để trống nếu chưa cân.");
+      notify.warning("Số kg phải là số dương, hoặc để trống nếu chưa cân.");
       return;
     }
     onThem(node, cach, inputKg);
@@ -112,7 +112,7 @@ function LotInputDialog({
     if (!ma) return;
     const kq = findLots(ma, dl);
     if (!kq.length) {
-      notify.canhBao(`Không tìm thấy lô "${text}". Kiểm tra lại mã, hoặc chọn trong danh sách bên dưới.`);
+      notify.warning(`Không tìm thấy lô "${text}". Kiểm tra lại mã, hoặc chọn trong danh sách bên dưới.`);
       return;
     }
     if (kq.length === 1) addLot(kq[0]!, cach);
@@ -121,7 +121,7 @@ function LotInputDialog({
       const ld = explainMultipleLots(text, kq, dl);
       setChoices(kq);
       setPickPrompt(ld.cau);
-      if (!ld.cungChuyen) notify.canhBao(`${ld.cau} bên dưới.`);
+      if (!ld.cungChuyen) notify.warning(`${ld.cau} bên dưới.`);
     }
   };
 
@@ -145,7 +145,7 @@ function LotInputDialog({
   };
 
   return (
-    <FormDialog open onOpenChange={(o) => !o && onClose()} icon={Link2} tieuDe={tieuDe} moTa={moTa} rong="rong" chan={<NutDong />}>
+    <FormDialog open onOpenChange={(o) => !o && onClose()} icon={Link2} title={tieuDe} description={moTa} size="rong" footer={<CloseButton />}>
       <div className="space-y-5">
         <section className="space-y-2">
           <h3 className="font-semibold">Đã gắn ({daGan.length})</h3>
@@ -154,7 +154,7 @@ function LotInputDialog({
               {daGan.map((g) => (
                 <li key={g.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-2">
                   <div className="min-w-0">
-                    <span className="font-medium">{g.nhan}</span> <Nhan loai="nguon">{TEN_CACH[g.cach]}</Nhan>
+                    <span className="font-medium">{g.nhan}</span> <Tag variant="nguon">{TEN_CACH[g.cach]}</Tag>
                     <div className="text-muted-foreground">
                       {[g.moTa, g.kg != null ? kgChu(g.kg) : "chưa ghi kg", g.nguoi].filter(Boolean).join(" · ")}
                     </div>
@@ -166,7 +166,7 @@ function LotInputDialog({
               ))}
             </ul>
           ) : (
-            <EmptyState tieuDe={`Chưa gắn ${tenVao} nào`} moTa="Chưa gắn thì hộ chiếu lô không truy được đoạn này." />
+            <EmptyState title={`Chưa gắn ${tenVao} nào`} description="Chưa gắn thì hộ chiếu lô không truy được đoạn này." />
           )}
         </section>
 
@@ -235,7 +235,7 @@ function LotInputDialog({
               )}
             </ul>
           ) : (
-            <EmptyState tieuDe="Không có lô gợi ý" moTa="Quét tem hoặc gõ mã lô ở trên." />
+            <EmptyState title="Không có lô gợi ý" description="Quét tem hoặc gõ mã lô ở trên." />
           )}
         </section>
       </div>
@@ -310,7 +310,7 @@ export function GanLoDauVao({
           id: crypto.randomUUID(),
           outputKind,
           outputId,
-          inputKind: inputKind,
+          inputKind,
           inputId: node.id,
           inputLabel: node.nhan,
           material: node.moTa,
@@ -320,13 +320,13 @@ export function GanLoDauVao({
           recordedAt: new Date().toISOString(),
         };
         luuLotInputs([...lotInputs, created]);
-        notify.daLuu(`Đã gắn ${inputLabel} ${node.nhan}${kg != null ? ` · ${kgChu(kg)}` : ""}.`);
+        notify.saved(`Đã gắn ${inputLabel} ${node.nhan}${kg != null ? ` · ${kgChu(kg)}` : ""}.`);
       }}
       onBo={(id) => {
         const prevRows = lotInputs;
         const l = lotInputs.find((x) => x.id === id);
         luuLotInputs(lotInputs.filter((x) => x.id !== id));
-        notify.daXoa(`Đã bỏ lô ${l?.inputLabel ?? ""}.`, () => luuLotInputs(prevRows));
+        notify.deleted(`Đã bỏ lô ${l?.inputLabel ?? ""}.`, () => luuLotInputs(prevRows));
       }}
       onClose={onClose}
     />
@@ -413,13 +413,13 @@ export function GanLoXuat({
           recordedAt: new Date().toISOString(),
         };
         luuLotDispatches([...lotDispatches, created]);
-        notify.daLuu(`Đã gắn ${inputLabel} ${node.nhan}${kg != null ? ` · ${kgChu(kg)}` : ""}.`);
+        notify.saved(`Đã gắn ${inputLabel} ${node.nhan}${kg != null ? ` · ${kgChu(kg)}` : ""}.`);
       }}
       onBo={(id) => {
         const prevRows = lotDispatches;
         const d = lotDispatches.find((x) => x.id === id);
         luuLotDispatches(lotDispatches.filter((x) => x.id !== id));
-        notify.daXoa(`Đã bỏ lô ${d?.lotLabel ?? ""}.`, () => luuLotDispatches(prevRows));
+        notify.deleted(`Đã bỏ lô ${d?.lotLabel ?? ""}.`, () => luuLotDispatches(prevRows));
       }}
       onClose={onClose}
     />

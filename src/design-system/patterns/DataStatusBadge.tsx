@@ -1,5 +1,5 @@
 // ============================================================
-// Tên file cũ: src/design-system/patterns/TrangThaiDuLieu.tsx
+// Tên file cũ: src/design-system/patterns/DataSyncStatus.tsx
 // Tên tiếng Việt: Badge trạng thái đồng bộ dữ liệu máy chủ
 // Description: Server Sync & Connectivity Status Indicator
 // ============================================================
@@ -28,74 +28,74 @@ async function probeConnection(): Promise<void> {
     .select("id")
     .eq("site_id", SITE_ID)
     .limit(1);
-  if (error) connectivity.baoLoi(error.message);
-  else connectivity.baoOK();
+  if (error) connectivity.reportError(error.message);
+  else connectivity.reportOk();
 }
 
-const CAU_HINH: Record<
+const STATUS_CONFIG: Record<
   SyncState,
-  { icon: typeof Cloud; chu: string; phu: string; mau: string }
+  { icon: typeof Cloud; label: string; hint: string; color: string }
 > = {
   "cuc-bo": {
     icon: HardDrive,
-    chu: "Lưu trên máy này",
-    phu: "Chỉ máy này thấy. Xóa dữ liệu trình duyệt là mất.",
-    mau: "text-warning",
+    label: "Lưu trên máy này",
+    hint: "Chỉ máy này thấy. Xóa dữ liệu trình duyệt là mất.",
+    color: "text-warning",
   },
   "dang-kiem": {
     icon: Loader2,
-    chu: "Đang kiểm tra máy chủ…",
-    phu: "",
-    mau: "text-muted-foreground",
+    label: "Đang kiểm tra máy chủ…",
+    hint: "",
+    color: "text-muted-foreground",
   },
   "da-noi": {
     icon: Cloud,
-    chu: "Đã nối máy chủ",
-    phu: `Mọi máy dùng chung số liệu · ${SITE_ID}`,
-    mau: "text-success",
+    label: "Đã nối máy chủ",
+    hint: `Mọi máy dùng chung số liệu · ${SITE_ID}`,
+    color: "text-success",
   },
   loi: {
     icon: CloudOff,
-    chu: "Mất kết nối máy chủ",
-    phu: "Đang ghi tạm trên máy, nối lại sẽ đồng bộ.",
-    mau: "text-destructive",
+    label: "Mất kết nối máy chủ",
+    hint: "Đang ghi tạm trên máy, nối lại sẽ đồng bộ.",
+    color: "text-destructive",
   },
 };
 
 /** Suy trạng thái hiển thị từ cấu hình môi trường + snapshot store. */
 function useConnectionStatus() {
-  const anh = React.useSyncExternalStore(connectivity.subscribe, connectivity.laySnapshot);
+  const snapshot = React.useSyncExternalStore(connectivity.subscribe, connectivity.getSnapshot);
   const status: SyncState = !hasSupabase
     ? "cuc-bo"
-    : anh.trang === "chua-ro"
+    : snapshot.trang === "chua-ro"
       ? "dang-kiem"
-      : anh.trang;
-  return { trang: status, loi: anh.loi };
+      : snapshot.trang;
+  return { trang: status, loi: snapshot.loi };
 }
 
 /**
  * Bản CHI TIẾT (nhiều dòng) — giữ lại cho nơi có chỗ rộng. Header dùng
- * `NutTrangThai` (gom thành 1 nút icon) bên dưới.
+ * `DataSyncStatusButton` (gom thành 1 nút icon) bên dưới.
  */
-export function TrangThaiDuLieu({ className }: { className?: string }) {
-  const { trang, loi } = useConnectionStatus();
+export function DataSyncStatus({ className }: { className?: string }) {
+  const { trang: state, loi } = useConnectionStatus();
 
   React.useEffect(() => {
     void probeConnection();
   }, []);
 
-  const c = CAU_HINH[trang];
+  const c = STATUS_CONFIG[state];
   const Icon = c.icon;
-  const phu = trang === "loi" ? loi || c.phu : c.phu;
+  const phu = state === "loi" ? loi || c.hint : c.hint;
 
   return (
     <div className={cn("space-y-1", className)}>
-      <p className={cn("flex items-center gap-2 text-sm font-semibold", c.mau)}>
+      <p className={cn("flex items-center gap-2 text-sm font-semibold", c.color)}>
         <Icon
-          className={cn("size-5 shrink-0", trang === "dang-kiem" && "animate-spin")}
+          className={cn("size-5 shrink-0", state === "dang-kiem" && "animate-spin")}
           aria-hidden
         />
-        {c.chu}
+        {c.label}
       </p>
       {phu && <p className="text-sm text-muted-foreground">{phu}</p>}
     </div>
@@ -103,27 +103,27 @@ export function TrangThaiDuLieu({ className }: { className?: string }) {
 }
 
 /**
- * NutTrangThai — 1 nút icon gọn cho header. Màu icon = sức khỏe kết nối thật
+ * DataSyncStatusButton — 1 nút icon gọn cho header. Màu icon = sức khỏe kết nối thật
  * (bám store `connectivity`). Bấm mở popover chi tiết + nút "Thử kết nối lại".
  *
  * Probe một lần lúc mở để có trạng thái ban đầu khi người dùng chưa thao tác gì.
  * Trên tablet tay ướt: bấm (không chỉ hover) là mở được — Radix Popover mở bằng
  * cả click lẫn touch.
  */
-export function NutTrangThai({ className }: { className?: string }) {
-  const { trang, loi } = useConnectionStatus();
+export function DataSyncStatusButton({ className }: { className?: string }) {
+  const { trang: state, loi } = useConnectionStatus();
   const [isRetrying, setIsRetrying] = React.useState(false);
 
   React.useEffect(() => {
     void probeConnection();
   }, []);
 
-  const c = CAU_HINH[trang];
+  const c = STATUS_CONFIG[state];
   const Icon = c.icon;
-  const phu = trang === "loi" ? loi || c.phu : c.phu;
-  const canRetry = hasSupabase && trang !== "dang-kiem";
+  const phu = state === "loi" ? loi || c.hint : c.hint;
+  const canRetry = hasSupabase && state !== "dang-kiem";
 
-  const thuLai = async () => {
+  const retry = async () => {
     setIsRetrying(true);
     await probeConnection();
     setIsRetrying(false);
@@ -134,18 +134,18 @@ export function NutTrangThai({ className }: { className?: string }) {
       <PopoverTrigger asChild>
         <button
           type="button"
-          aria-label={`Trạng thái máy chủ: ${c.chu}`}
-          title={c.chu}
+          aria-label={`Trạng thái máy chủ: ${c.label}`}
+          title={c.label}
           className={cn(
-            "inline-flex size-10 shrink-0 items-center justify-center rounded-lg border border-input nhan-an hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
-            c.mau,
+            "inline-flex size-10 shrink-0 items-center justify-center rounded-lg border border-input press-feedback hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+            c.color,
             className
           )}
         >
           <Icon
             className={cn(
               "size-5",
-              (trang === "dang-kiem" || isRetrying) && "animate-spin"
+              (state === "dang-kiem" || isRetrying) && "animate-spin"
             )}
             aria-hidden
           />
@@ -156,20 +156,20 @@ export function NutTrangThai({ className }: { className?: string }) {
           <p
             className={cn(
               "flex items-center gap-2 text-sm font-semibold",
-              c.mau
+              c.color
             )}
           >
             <Icon className="size-5 shrink-0" aria-hidden />
-            {c.chu}
+            {c.label}
           </p>
           {phu && <p className="text-sm text-muted-foreground">{phu}</p>}
         </div>
         {canRetry && (
           <button
             type="button"
-            onClick={thuLai}
+            onClick={retry}
             disabled={isRetrying}
-            className="mt-2 flex min-h-10 w-full items-center justify-center gap-2 rounded-lg border border-input text-sm font-medium nhan-an hover:bg-muted disabled:opacity-60"
+            className="mt-2 flex min-h-10 w-full items-center justify-center gap-2 rounded-lg border border-input text-sm font-medium press-feedback hover:bg-muted disabled:opacity-60"
           >
             <RotateCcw
               className={cn("size-5", isRetrying && "animate-spin")}

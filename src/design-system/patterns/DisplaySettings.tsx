@@ -20,12 +20,12 @@ import { RotateCcw } from "lucide-react";
  * nhập) ⇒ dùng bucket mặc định = khóa cũ `bsf.coChu` → tương thích ngược, không
  * làm mất cài đặt người dùng đã chọn trước khi có tính năng này.
  */
-const BASE_CO_CHU = "coChu";
-const BASE_MAT_DO = "matDo";
-const BASE_BE_RONG = "beRong";
+const BASE_FONT_SIZE = "coChu";
+const BASE_DENSITY = "matDo";
+const BASE_WIDTH = "beRong";
 
-function khoa(base: string, taiKhoan?: string) {
-  return taiKhoan ? `bsf.${taiKhoan}.${base}` : `bsf.${base}`;
+function khoa(base: string, account?: string) {
+  return account ? `bsf.${account}.${base}` : `bsf.${base}`;
 }
 
 /** MẶC ĐỊNH là "100" — thang token nền 16px (mật độ web thường). Người mắt kém
@@ -54,20 +54,20 @@ export const BE_RONG = [
   { id: "toi-da", nhan: "Tối đa", moTa: "Dùng hết màn hình", css: "100%" },
 ] as const;
 
-function doc(key: string, macDinh: string) {
-  return localStorage.getItem(key) ?? macDinh;
+function doc(key: string, fallback: string) {
+  return localStorage.getItem(key) ?? fallback;
 }
 
-function apCoChu(id: string) {
+function applyFontSize(id: string) {
   const m = CO_CHU.find((x) => x.id === id) ?? CO_CHU[0];
   document.documentElement.style.setProperty("--app-font-scale", m.scale);
 }
 
-function apMatDo(id: string) {
+function applyDensity(id: string) {
   document.documentElement.setAttribute("data-density", id);
 }
 
-function apBeRong(id: string) {
+function applyWidth(id: string) {
   const m = BE_RONG.find((x) => x.id === id) ?? BE_RONG[0];
   document.documentElement.style.setProperty("--app-content-width", m.css);
 }
@@ -77,10 +77,10 @@ function apBeRong(id: string) {
  * username → bucket mặc định) VÀ mỗi khi đổi tài khoản đăng nhập (nạp lại đúng
  * giao diện của người vừa đăng nhập).
  */
-export function apDungCaiDatHienThi(taiKhoan?: string) {
-  apCoChu(doc(khoa(BASE_CO_CHU, taiKhoan), CO_CHU_MAC_DINH));
-  apMatDo(doc(khoa(BASE_MAT_DO, taiKhoan), "gon"));
-  apBeRong(doc(khoa(BASE_BE_RONG, taiKhoan), "toi-da"));
+export function apDungCaiDatHienThi(account?: string) {
+  applyFontSize(doc(khoa(BASE_FONT_SIZE, account), CO_CHU_MAC_DINH));
+  applyDensity(doc(khoa(BASE_DENSITY, account), "gon"));
+  applyWidth(doc(khoa(BASE_WIDTH, account), "toi-da"));
 }
 
 export interface AnhCaiDat {
@@ -90,69 +90,69 @@ export interface AnhCaiDat {
 }
 
 /** Chụp cài đặt hiện tại của một tài khoản — để làm mốc "hoàn tác" khi Hủy. */
-export function docCaiDatHienThi(taiKhoan?: string): AnhCaiDat {
+export function docCaiDatHienThi(account?: string): AnhCaiDat {
   return {
-    coChu: doc(khoa(BASE_CO_CHU, taiKhoan), CO_CHU_MAC_DINH),
-    matDo: doc(khoa(BASE_MAT_DO, taiKhoan), "gon"),
-    beRong: doc(khoa(BASE_BE_RONG, taiKhoan), "toi-da"),
+    coChu: doc(khoa(BASE_FONT_SIZE, account), CO_CHU_MAC_DINH),
+    matDo: doc(khoa(BASE_DENSITY, account), "gon"),
+    beRong: doc(khoa(BASE_WIDTH, account), "toi-da"),
   };
 }
 
 /** Ghi lại một ảnh cài đặt và áp ngay — dùng để khôi phục khi người dùng Hủy. */
-export function ghiCaiDatHienThi(taiKhoan: string | undefined, snap: AnhCaiDat) {
-  localStorage.setItem(khoa(BASE_CO_CHU, taiKhoan), snap.coChu);
-  localStorage.setItem(khoa(BASE_MAT_DO, taiKhoan), snap.matDo);
-  localStorage.setItem(khoa(BASE_BE_RONG, taiKhoan), snap.beRong);
-  apDungCaiDatHienThi(taiKhoan);
+export function ghiCaiDatHienThi(account: string | undefined, snap: AnhCaiDat) {
+  localStorage.setItem(khoa(BASE_FONT_SIZE, account), snap.coChu);
+  localStorage.setItem(khoa(BASE_DENSITY, account), snap.matDo);
+  localStorage.setItem(khoa(BASE_WIDTH, account), snap.beRong);
+  apDungCaiDatHienThi(account);
 }
 
 /* ---------- Hook dùng chung cho cả nút nhanh và panel đầy đủ ---------- */
 
-function useCaiDat(taiKhoan?: string) {
-  const kCoChu = khoa(BASE_CO_CHU, taiKhoan);
-  const kMatDo = khoa(BASE_MAT_DO, taiKhoan);
-  const kBeRong = khoa(BASE_BE_RONG, taiKhoan);
+function useSettings(account?: string) {
+  const fontSizeKey = khoa(BASE_FONT_SIZE, account);
+  const densityKey = khoa(BASE_DENSITY, account);
+  const widthKey = khoa(BASE_WIDTH, account);
 
-  const [coChu, setCoChu] = React.useState(() => doc(kCoChu, CO_CHU_MAC_DINH));
-  const [matDo, setMatDo] = React.useState(() => doc(kMatDo, "gon"));
-  const [beRong, setBeRong] = React.useState(() => doc(kBeRong, "toi-da"));
+  const [fontSize, setFontSize] = React.useState(() => doc(fontSizeKey, CO_CHU_MAC_DINH));
+  const [density, setDensity] = React.useState(() => doc(densityKey, "gon"));
+  const [width, setWidth] = React.useState(() => doc(widthKey, "toi-da"));
 
   // Đổi tài khoản → nạp lại state từ bucket của người mới rồi áp ngay.
   React.useEffect(() => {
-    setCoChu(doc(kCoChu, CO_CHU_MAC_DINH));
-    setMatDo(doc(kMatDo, "gon"));
-    setBeRong(doc(kBeRong, "toi-da"));
-    apDungCaiDatHienThi(taiKhoan);
+    setFontSize(doc(fontSizeKey, CO_CHU_MAC_DINH));
+    setDensity(doc(densityKey, "gon"));
+    setWidth(doc(widthKey, "toi-da"));
+    apDungCaiDatHienThi(account);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [taiKhoan]);
+  }, [account]);
 
   return {
-    coChu,
-    matDo,
-    beRong,
+    coChu: fontSize,
+    matDo: density,
+    beRong: width,
     doiCoChu: (id: string) => {
-      setCoChu(id);
-      localStorage.setItem(kCoChu, id);
-      apCoChu(id);
+      setFontSize(id);
+      localStorage.setItem(fontSizeKey, id);
+      applyFontSize(id);
     },
     doiMatDo: (id: string) => {
-      setMatDo(id);
-      localStorage.setItem(kMatDo, id);
-      apMatDo(id);
+      setDensity(id);
+      localStorage.setItem(densityKey, id);
+      applyDensity(id);
     },
     doiBeRong: (id: string) => {
-      setBeRong(id);
-      localStorage.setItem(kBeRong, id);
-      apBeRong(id);
+      setWidth(id);
+      localStorage.setItem(widthKey, id);
+      applyWidth(id);
     },
     datLai: () => {
-      setCoChu(CO_CHU_MAC_DINH);
-      setMatDo("gon");
-      setBeRong("toi-da");
-      localStorage.removeItem(kCoChu);
-      localStorage.removeItem(kMatDo);
-      localStorage.removeItem(kBeRong);
-      apDungCaiDatHienThi(taiKhoan);
+      setFontSize(CO_CHU_MAC_DINH);
+      setDensity("gon");
+      setWidth("toi-da");
+      localStorage.removeItem(fontSizeKey);
+      localStorage.removeItem(densityKey);
+      localStorage.removeItem(widthKey);
+      apDungCaiDatHienThi(account);
     },
   };
 }
@@ -170,7 +170,7 @@ export function CoChuNhanh({
   className?: string;
   taiKhoan?: string;
 }) {
-  const { coChu, doiCoChu } = useCaiDat(taiKhoan);
+  const { coChu, doiCoChu } = useSettings(taiKhoan);
 
   return (
     <div
@@ -214,7 +214,7 @@ export function CoChuNhanh({
 
 /* ---------- Panel đầy đủ, đặt trong trang "Bộ giao diện" ---------- */
 
-function NhomChon({
+function OptionGroup({
   nhan,
   moTa,
   giaTri,
@@ -233,16 +233,16 @@ function NhomChon({
       <p className="text-sm text-muted-foreground">{moTa}</p>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {muc.map((m) => {
-          const chon = m.id === giaTri;
+          const isSelected = m.id === giaTri;
           return (
             <button
               key={m.id}
               type="button"
-              aria-pressed={chon}
+              aria-pressed={isSelected}
               onClick={() => onChange(m.id)}
               className={cn(
                 "min-h-14 rounded-lg border-2 px-4 py-3 text-left nhan-an",
-                chon
+                isSelected
                   ? "border-primary bg-accent text-accent-foreground"
                   : "border-input bg-background hover:bg-muted"
               )}
@@ -251,7 +251,7 @@ function NhomChon({
               <span
                 className={cn(
                   "block text-sm",
-                  chon ? "text-accent-foreground" : "text-muted-foreground"
+                  isSelected ? "text-accent-foreground" : "text-muted-foreground"
                 )}
               >
                 {m.moTa}
@@ -265,11 +265,11 @@ function NhomChon({
 }
 
 export function CaiDatHienThi({ taiKhoan }: { taiKhoan?: string }) {
-  const c = useCaiDat(taiKhoan);
+  const c = useSettings(taiKhoan);
 
   return (
     <div className="space-y-8 rounded-xl border border-border p-5">
-      <NhomChon
+      <OptionGroup
         nhan="Cỡ chữ toàn hệ thống"
         moTa="Áp cho mọi màn. Bố cục giãn theo, không vỡ như khi phóng to trình duyệt."
         giaTri={c.coChu}
@@ -281,7 +281,7 @@ export function CaiDatHienThi({ taiKhoan }: { taiKhoan?: string }) {
         }))}
       />
 
-      <NhomChon
+      <OptionGroup
         nhan="Mật độ (chiều cao ô nhập và dòng bảng)"
         moTa="Thoáng dễ bấm nhất. Gọn cho người quen Excel muốn thấy nhiều dòng."
         giaTri={c.matDo}
@@ -289,7 +289,7 @@ export function CaiDatHienThi({ taiKhoan }: { taiKhoan?: string }) {
         muc={MAT_DO}
       />
 
-      <NhomChon
+      <OptionGroup
         nhan="Bề rộng nội dung"
         moTa="Bảng cân đối nhiều cột thì để Rộng hoặc Tối đa."
         giaTri={c.beRong}

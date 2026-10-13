@@ -51,9 +51,9 @@ export function ngayTrongKhoang(tu: string, den: string): string[] {
   return out;
 }
 
-export function congNgay(iso: string, soNgay: number): string {
+export function congNgay(iso: string, days: number): string {
   const d = isoToDate(iso) ?? new Date();
-  d.setDate(d.getDate() + soNgay);
+  d.setDate(d.getDate() + days);
   return dateToIso(d);
 }
 
@@ -61,7 +61,7 @@ export const homNay = () => dateToIso(new Date());
 
 /* ---- Khối nhãn dùng chung ---- */
 
-function KhoiNhan({
+function LabelBlock({
   label,
   required,
   hint,
@@ -105,7 +105,7 @@ function KhoiNhan({
 
 /* ---- Nút mở lịch (dùng cho cả 1 ngày và 2 đầu khoảng) ---- */
 
-function NutLich({
+function CalendarButton({
   value,
   onChange,
   chuMacDinh,
@@ -128,7 +128,7 @@ function NutLich({
   const [open, setOpen] = React.useState(false);
   const d = isoToDate(value);
 
-  const dat = (iso: string) => {
+  const setDate = (iso: string) => {
     onChange(iso);
     setOpen(false);
   };
@@ -152,13 +152,13 @@ function NutLich({
       </PopoverTrigger>
       <PopoverContent className="w-auto gap-0 p-0" align="start">
         <div className="flex flex-wrap gap-2 border-b border-border p-3">
-          <Button variant="secondary" size="sm" onClick={() => dat(homNay())} title="Điền ngay ngày hôm nay, khỏi dò trên lịch.">
+          <Button variant="secondary" size="sm" onClick={() => setDate(homNay())} title="Điền ngay ngày hôm nay, khỏi dò trên lịch.">
             Hôm nay
           </Button>
           <Button
             variant="secondary"
             size="sm"
-            onClick={() => dat(congNgay(homNay(), -1))}
+            onClick={() => setDate(congNgay(homNay(), -1))}
             title="Điền ngay ngày hôm qua — hay dùng khi ghi bù sổ của ngày trước."
           >
             Hôm qua
@@ -173,7 +173,7 @@ function NutLich({
             ...(max ? [{ after: isoToDate(max)! }] : []),
           ]}
           onSelect={(x) => {
-            if (x) dat(dateToIso(x));
+            if (x) setDate(dateToIso(x));
           }}
           autoFocus
         />
@@ -218,7 +218,7 @@ export function DateField({
   const id = React.useId();
   return (
     <div className={cn("min-w-0 space-y-2", className)}>
-      <KhoiNhan
+      <LabelBlock
         label={label}
         required={required}
         hint={hint}
@@ -229,7 +229,7 @@ export function DateField({
       />
       <div className="flex items-center gap-2">
         <div className="min-w-0 flex-1">
-          <NutLich
+          <CalendarButton
             id={id}
             value={value}
             onChange={onChange}
@@ -285,17 +285,17 @@ export function DateRangeField({
   anNhanBatBuoc?: boolean;
   className?: string;
 }) {
-  const nhanh = (soNgay: number) => {
+  const nhanh = (days: number) => {
     const den = homNay();
-    onChange(congNgay(den, -(soNgay - 1)), den);
+    onChange(congNgay(den, -(days - 1)), den);
   };
 
-  const soNgay =
+  const dayCount =
     startDate && endDate ? ngayTrongKhoang(startDate, endDate).length : 0;
 
   return (
     <div className={cn("min-w-0 space-y-2", className)}>
-      <KhoiNhan
+      <LabelBlock
         label={label}
         required={required}
         hint={hint}
@@ -308,7 +308,7 @@ export function DateRangeField({
           <span className="block text-sm font-medium text-muted-foreground">
             Từ ngày
           </span>
-          <NutLich
+          <CalendarButton
             value={startDate}
             onChange={(v) => onChange(v, endDate && endDate < v ? v : endDate)}
             chuMacDinh="Chọn ngày đầu"
@@ -319,7 +319,7 @@ export function DateRangeField({
           <span className="block text-sm font-medium text-muted-foreground">
             Đến ngày
           </span>
-          <NutLich
+          <CalendarButton
             value={endDate}
             onChange={(v) => onChange(startDate, v)}
             chuMacDinh="Chọn ngày cuối"
@@ -342,11 +342,11 @@ export function DateRangeField({
           <Button variant="secondary" size="sm" onClick={() => nhanh(30)} title="Đặt khoảng xem = 30 ngày gần nhất tính tới hôm nay.">
             30 ngày
           </Button>
-          {soNgay > 0 && (
+          {dayCount > 0 && (
             <span className="ml-auto text-sm text-muted-foreground">
               Đang chọn{" "}
               <span className="tnum font-semibold text-foreground">
-                {soNgay}
+                {dayCount}
               </span>{" "}
               ngày
             </span>

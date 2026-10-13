@@ -59,10 +59,10 @@ export function BieuDoCot({
   className?: string;
 }) {
   const sap = giuThuTu ? [...data] : [...data].sort((a, b) => b.giaTri - a.giaTri);
-  const hienThi = sap.slice(0, soDongToiDa);
-  const con = sap.length - hienThi.length;
+  const visibleItems = sap.slice(0, soDongToiDa);
+  const con = sap.length - visibleItems.length;
 
-  const max = Math.max(1, ...hienThi.map((d) => d.giaTri));
+  const max = Math.max(1, ...visibleItems.map((d) => d.giaTri));
   const tb =
     giaTriTrungBinh ??
     (data.length > 0
@@ -71,9 +71,9 @@ export function BieuDoCot({
   const tbPct = Math.min(100, (tb / max) * 100);
 
   // Thanh "mọc" từ 0 → giá trị thật khi vào màn (và mượt theo khi số đổi).
-  const [hien, setHien] = useState(false);
+  const [isShown, setIsShown] = useState(false);
   useEffect(() => {
-    const id = requestAnimationFrame(() => setHien(true));
+    const id = requestAnimationFrame(() => setIsShown(true));
     return () => cancelAnimationFrame(id);
   }, []);
 
@@ -85,14 +85,14 @@ export function BieuDoCot({
     );
   }
 
-  const donViChu = donVi ? ` ${donVi}` : "";
+  const unitSuffix = donVi ? ` ${donVi}` : "";
 
   return (
     <div className={cn("space-y-3 animate-in fade-in-0 duration-500", className)}>
       <div className="flex gap-3">
         {/* Cột nhãn */}
         <div className="w-28 shrink-0 space-y-2 sm:w-40">
-          {hienThi.map((d) => (
+          {visibleItems.map((d) => (
             <div key={d.nhan} className="flex h-10 flex-col justify-center">
               <span className="truncate text-sm font-medium text-foreground">
                 {d.nhan}
@@ -108,20 +108,20 @@ export function BieuDoCot({
 
         {/* Cột thanh — đường trung bình phủ toàn cột này */}
         <div className="relative flex-1 space-y-2">
-          {hienThi.map((d, index) => {
+          {visibleItems.map((d, index) => {
             const pct = Math.max(2, (d.giaTri / max) * 100);
             // Nửa trên: thẻ xổ XUỐNG; nửa dưới: thẻ xổ LÊN → luôn trong vùng chart.
-            const thePhiaDuoi = index < hienThi.length / 2;
+            const isBottomHalf = index < visibleItems.length / 2;
             return (
               <div key={d.nhan} className="group relative h-10">
                 <div className="absolute inset-0 rounded-md bg-muted transition-colors group-hover:bg-muted/70" />
                 <div
                   className="absolute inset-y-0 left-0 rounded-md bg-primary shadow-sm transition-all duration-700 ease-out group-hover:bg-primary/90 group-hover:shadow-md"
-                  style={{ width: hien ? `${pct}%` : "0%" }}
+                  style={{ width: isShown ? `${pct}%` : "0%" }}
                 />
                 <span className="absolute inset-y-0 right-2 flex items-center text-sm font-semibold tnum text-foreground transition-transform duration-150 group-hover:scale-105">
                   {dinhDang(d.giaTri)}
-                  {donViChu}
+                  {unitSuffix}
                 </span>
 
                 {/* Thẻ tóm tắt khi di chuột (fade + trượt nhẹ) */}
@@ -130,7 +130,7 @@ export function BieuDoCot({
                     role="tooltip"
                     className={cn(
                       "pointer-events-none absolute left-1/2 z-40 w-max max-w-[16rem] sm:max-w-[26rem] -translate-x-1/2 scale-95 rounded-lg border-2 border-border bg-card p-3.5 text-left text-sm text-foreground opacity-0 shadow-xl transition-all duration-150 ease-out group-hover:scale-100 group-hover:opacity-100",
-                      thePhiaDuoi
+                      isBottomHalf
                         ? "top-full mt-2 -translate-y-1 group-hover:translate-y-0"
                         : "bottom-full mb-2 translate-y-1 group-hover:translate-y-0"
                     )}
@@ -146,12 +146,12 @@ export function BieuDoCot({
           {duongTrungBinh && tb > 0 && (
             <div
               className="pointer-events-none absolute inset-y-0 z-10 border-l-2 border-dashed border-warning transition-all duration-700 ease-out"
-              style={{ left: `${hien ? tbPct : 0}%` }}
+              style={{ left: `${isShown ? tbPct : 0}%` }}
               aria-hidden
             >
               <span className="absolute -top-0.5 left-1 whitespace-nowrap rounded bg-warning px-1.5 py-0.5 text-xs font-semibold text-warning-foreground">
                 TB {dinhDang(giaTriTrungBinh != null ? tb : Math.round(tb))}
-                {donViChu}
+                {unitSuffix}
               </span>
             </div>
           )}

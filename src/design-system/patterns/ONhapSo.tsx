@@ -24,37 +24,37 @@ export function XemTruocBieuThuc({
   donVi?: string;
 }) {
   const ref = React.useRef<HTMLSpanElement>(null);
-  const [viTri, setViTri] = React.useState<{ top: number; right: number } | null>(null);
-  const hien = xemTruoc != null;
+  const [position, setPosition] = React.useState<{ top: number; right: number } | null>(null);
+  const isVisible = xemTruoc != null;
 
   React.useLayoutEffect(() => {
-    if (!hien) return;
-    const cha = ref.current?.parentElement;
-    if (!cha) return;
-    const dat = () => {
-      const r = cha.getBoundingClientRect();
-      setViTri({ top: r.bottom + 4, right: window.innerWidth - r.right });
+    if (!isVisible) return;
+    const parent = ref.current?.parentElement;
+    if (!parent) return;
+    const reposition = () => {
+      const r = parent.getBoundingClientRect();
+      setPosition({ top: r.bottom + 4, right: window.innerWidth - r.right });
     };
-    dat();
-    window.addEventListener("scroll", dat, true);
-    window.addEventListener("resize", dat);
+    reposition();
+    window.addEventListener("scroll", reposition, true);
+    window.addEventListener("resize", reposition);
     return () => {
-      window.removeEventListener("scroll", dat, true);
-      window.removeEventListener("resize", dat);
+      window.removeEventListener("scroll", reposition, true);
+      window.removeEventListener("resize", reposition);
     };
-  }, [hien]);
+  }, [isVisible]);
 
   const { ketQua } = xemTruoc ?? { ketQua: null };
   return (
     <>
       <span ref={ref} hidden />
-      {hien &&
-        viTri &&
+      {isVisible &&
+        position &&
         createPortal(
           <span
             role="status"
             aria-live="polite"
-            style={{ top: viTri.top, right: viTri.right }}
+            style={{ top: position.top, right: position.right }}
             className={cn(
               "tnum pointer-events-none fixed z-[100] rounded-md border px-2 py-0.5 text-sm font-semibold whitespace-nowrap shadow-sm",
               ketQua == null

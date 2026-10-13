@@ -96,26 +96,26 @@ export function Combobox({
   className?: string;
 }) {
   const [open, setOpen] = React.useState(false);
-  const [tim, setTim] = React.useState("");
+  const [searchText, setSearchText] = React.useState("");
   const id = React.useId();
 
-  const daChon = options.find((o) => o.value === value);
+  const selectedOption = options.find((o) => o.value === value);
 
-  const timSach = tim.trim();
+  const trimmedSearch = searchText.trim();
   const trungTen = options.some(
-    (o) => o.label.trim().toLowerCase() === timSach.toLowerCase()
+    (o) => o.label.trim().toLowerCase() === trimmedSearch.toLowerCase()
   );
-  const choPhepTao = Boolean(onCreate) && timSach.length > 0 && !trungTen;
+  const canCreate = Boolean(onCreate) && trimmedSearch.length > 0 && !trungTen;
 
-  const cachDung = onCreate
+  const usageHint = onCreate
     ? "Gõ để tìm — chưa có thì thêm mới ngay"
     : "Gõ để tìm trong danh sách";
 
-  const taoMoi = () => {
+  const createNew = () => {
     if (!onCreate) return;
-    const v = onCreate(timSach);
+    const v = onCreate(trimmedSearch);
     onChange(v);
-    setTim("");
+    setSearchText("");
     setOpen(false);
   };
 
@@ -164,8 +164,8 @@ export function Combobox({
               aria-required={required && !anNhanBatBuoc ? true : undefined}
               className="h-10 min-w-0 flex-1 justify-between px-3 text-sm font-medium"
             >
-              <span className={cn("truncate", !daChon && "text-muted-foreground")}>
-                {daChon?.label ?? placeholder ?? cachDung}
+              <span className={cn("truncate", !selectedOption && "text-muted-foreground")}>
+                {selectedOption?.label ?? placeholder ?? usageHint}
               </span>
               <ChevronsUpDown className="shrink-0 text-muted-foreground" />
             </Button>
@@ -180,8 +180,8 @@ export function Combobox({
                 placeholder={
                   onCreate ? "Gõ tên để tìm hoặc thêm mới…" : "Gõ để tìm…"
                 }
-                value={tim}
-                onValueChange={setTim}
+                value={searchText}
+                onValueChange={setSearchText}
               />
 
               <p className="border-b border-border px-3 py-2 text-sm text-muted-foreground">
@@ -191,14 +191,14 @@ export function Combobox({
 
               <CommandList>
                 <CommandEmpty>
-                  {choPhepTao ? (
+                  {canCreate ? (
                     <button
                       type="button"
-                      onClick={taoMoi}
+                      onClick={createNew}
                       className="mx-auto flex min-h-9 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground"
                     >
                       <Plus className="size-5" />
-                      Thêm mới “{timSach}”
+                      Thêm mới “{trimmedSearch}”
                     </button>
                   ) : (
                     emptyText
@@ -212,7 +212,7 @@ export function Combobox({
                       value={`${o.label} ${o.phu ?? ""}`}
                       onSelect={() => {
                         onChange(o.value);
-                        setTim("");
+                        setSearchText("");
                         setOpen(false);
                       }}
                       className={onSuaMuc ? "group/muc" : undefined}
@@ -244,7 +244,7 @@ export function Combobox({
                           onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
-                            setTim("");
+                            setSearchText("");
                             setOpen(false);
                             onSuaMuc(o.value);
                           }}
@@ -263,12 +263,12 @@ export function Combobox({
                 </CommandGroup>
 
                 {/* Vẫn cho tạo mới khi danh sách có kết quả gần đúng nhưng không trùng tên */}
-                {choPhepTao && (
+                {canCreate && (
                   <CommandGroup>
-                    <CommandItem value={`__tao__${timSach}`} onSelect={taoMoi}>
+                    <CommandItem value={`__tao__${trimmedSearch}`} onSelect={createNew}>
                       <Plus className="size-5 shrink-0 text-primary" />
                       <span className="font-semibold text-primary">
-                        Thêm mới “{timSach}”
+                        Thêm mới “{trimmedSearch}”
                       </span>
                     </CommandItem>
                   </CommandGroup>
@@ -278,7 +278,7 @@ export function Combobox({
           </PopoverContent>
         </Popover>
 
-        {choPhepXoa && daChon && (
+        {choPhepXoa && selectedOption && (
           <Button
             type="button"
             variant="outline"

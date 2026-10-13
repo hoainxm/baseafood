@@ -33,7 +33,7 @@ export interface TheThongTin {
   moTaChon?: string;
 }
 
-const MAU: Record<MauThe, { chip: string; vien: string }> = {
+const CARD_COLORS: Record<MauThe, { chip: string; vien: string }> = {
   brand: { chip: "bg-accent text-accent-foreground", vien: "border-border" },
   success: {
     chip: "bg-success-surface text-success",
@@ -60,7 +60,7 @@ const SAC_THE: Record<SacPhanLoai, { the: string; chip: string; so: string }> = 
   xam: { the: "border-tone-xam-line bg-tone-xam-surface", chip: "bg-tone-xam text-white", so: "text-tone-xam" },
 };
 
-const COT_LG: Record<number, string> = {
+const LG_GRID_COLS: Record<number, string> = {
   2: "lg:grid-cols-2",
   3: "lg:grid-cols-3",
   4: "lg:grid-cols-4",
@@ -72,10 +72,10 @@ const COT_LG: Record<number, string> = {
  * Số cột màn rộng tự suy theo SỐ THẺ để lưới cân: ≤4 thẻ một hàng; 5 thẻ một hàng
  * (màn đủ rộng); 6 thẻ 3×2; nhiều hơn thì 4 cột. Tránh cảnh 4+1 hay 4+2 lệch.
  */
-function cotTuDong(soThe: number): 2 | 3 | 4 | 5 {
-  if (soThe <= 2) return 2;
-  if (soThe === 3 || soThe === 6 || soThe === 9) return 3;
-  if (soThe === 5) return 5;
+function autoColumnCount(cardCount: number): 2 | 3 | 4 | 5 {
+  if (cardCount <= 2) return 2;
+  if (cardCount === 3 || cardCount === 6 || cardCount === 9) return 3;
+  if (cardCount === 5) return 5;
   return 4;
 }
 
@@ -89,24 +89,24 @@ export function ThongKe({
   cot?: 2 | 3 | 4 | 5;
   className?: string;
 }) {
-  const soCot = cot ?? cotTuDong(the.length);
+  const columnCount = cot ?? autoColumnCount(the.length);
   // 5 cột trên màn rộng: thẻ hẹp ⇒ icon lên trên nhãn, số nhỏ một bậc, để số dài
   // (1.478.897,83 kg · 29.535.327.023 đ) vẫn nằm trọn một dòng, không ngắt giữa số.
-  const hep = soCot === 5;
+  const isNarrow = columnCount === 5;
   return (
     <div
       className={cn(
         // Điện thoại: bề ngang tối thiểu mỗi thẻ tính theo rem ⇒ cỡ chữ thường 2 cột,
         // phóng chữ 130% tự rơi về 1 cột (khỏi bẻ vụn số). Từ md giữ 2 cột như cũ.
         "grid grid-cols-[repeat(auto-fit,minmax(min(100%,9.5rem),1fr))] gap-3 md:grid-cols-2 md:gap-4",
-        COT_LG[soCot] ?? "lg:grid-cols-4",
+        LG_GRID_COLS[columnCount] ?? "lg:grid-cols-4",
         // Thẻ cuối lẻ trải hết hàng thay vì bỏ trống nửa hàng (1/-1 không đẻ cột ẩn).
         "[&>*:last-child:nth-child(odd)]:col-[1/-1] lg:[&>*:last-child:nth-child(odd)]:col-auto",
         className
       )}
     >
       {the.map((t) => {
-        const mau = MAU[t.mau ?? "brand"];
+        const color = CARD_COLORS[t.mau ?? "brand"];
         const sac = t.sac ? SAC_THE[t.sac] : null;
         const Icon = t.icon;
         const isString = typeof t.giaTri === "string";
@@ -115,7 +115,7 @@ export function ThongKe({
         // hẹp nhất (mobile 2 cột) — không bẻ dòng giữa số, không cắt mất năm.
         // Chuỗi thật dài (>12) mới cho ngắt từ; số (t.so) luôn to.
         const fontSizeClass = t.so
-          ? hep
+          ? isNarrow
             ? "text-xl md:text-2xl lg:text-lg 2xl:text-xl"
             : "text-xl md:text-2xl"
           : len > 12
@@ -124,13 +124,13 @@ export function ThongKe({
               ? "text-xs md:text-sm"
               : "text-base md:text-lg lg:text-xl";
 
-        const noiDung = (
+        const content = (
           <>
             {Icon && (
               <span
                 className={cn(
                   "flex size-9 shrink-0 items-center justify-center rounded-lg",
-                  sac ? sac.chip : mau.chip
+                  sac ? sac.chip : color.chip
                 )}
               >
                 <Icon className="size-5" aria-hidden />
@@ -165,8 +165,8 @@ export function ThongKe({
         const cls = cn(
           "flex items-center gap-2.5 rounded-xl border px-3 py-3",
           sac ? cn("border-l-4", sac.the) : "bg-card",
-          hep && "lg:flex-col lg:items-start lg:gap-2",
-          !sac && mau.vien
+          isNarrow && "lg:flex-col lg:items-start lg:gap-2",
+          !sac && color.vien
         );
         return t.onChon ? (
           <button
@@ -180,11 +180,11 @@ export function ThongKe({
               "cursor-pointer text-left nhan-an hover:border-primary hover:bg-muted/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
             )}
           >
-            {noiDung}
+            {content}
           </button>
         ) : (
           <div key={t.nhan} className={cls}>
-            {noiDung}
+            {content}
           </div>
         );
       })}

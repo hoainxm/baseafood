@@ -64,17 +64,17 @@ function mocTron(max: number, soMoc = 4): number[] {
   if (max <= 0) return [0];
   const tho = max / soMoc;
   const mu = 10 ** Math.floor(Math.log10(tho));
-  const buoc = [1, 2, 2.5, 5, 10].map((b) => b * mu).find((b) => b >= tho) ?? tho;
+  const step = [1, 2, 2.5, 5, 10].map((b) => b * mu).find((b) => b >= tho) ?? tho;
   const ra: number[] = [];
-  for (let v = 0; v <= max + buoc * 0.001; v += buoc) ra.push(v);
-  if (ra[ra.length - 1] < max) ra.push(ra[ra.length - 1] + buoc);
+  for (let v = 0; v <= max + step * 0.001; v += step) ra.push(v);
+  if (ra[ra.length - 1] < max) ra.push(ra[ra.length - 1] + step);
   return ra;
 }
 
 /** Nhãn trục gọn: kg ≥ 1.000 ghi theo tấn; đơn vị khác ghi nghìn / triệu. */
-const rutGon = (n: number, donVi: string) => {
+const rutGon = (n: number, unit: string) => {
   const so = (x: number) => x.toLocaleString("vi-VN", { maximumFractionDigits: 1 });
-  if (donVi === "kg") return n >= 1e3 ? `${so(n / 1e3)} tấn` : `${so(n)} kg`;
+  if (unit === "kg") return n >= 1e3 ? `${so(n / 1e3)} tấn` : `${so(n)} kg`;
   return n >= 1e6 ? `${so(n / 1e6)} tr` : n >= 1e3 ? `${so(n / 1e3)} nghìn` : so(n);
 };
 
@@ -98,10 +98,10 @@ export function BieuDoTheoNgay({
   moTa?: string;
   className?: string;
 }) {
-  const soCot = chuoi.filter((c) => c.dang === "cot").length;
+  const columnCount = chuoi.filter((c) => c.dang === "cot").length;
   const n = nhan.length;
-  const { ref, rong } = useBeRongKhung<HTMLDivElement>(Math.max(rongToiThieu, n * Math.max(14, soCot * 10 + 6) + 64));
-  const [chon, setChon] = useState<number | null>(null);
+  const { ref, rong } = useBeRongKhung<HTMLDivElement>(Math.max(rongToiThieu, n * Math.max(14, columnCount * 10 + 6) + 64));
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
 
   const max = Math.max(0, ...chuoi.flatMap((c) => c.giaTri));
   if (n === 0 || chuoi.length === 0 || max <= 0) {
@@ -112,21 +112,21 @@ export function BieuDoTheoNgay({
     );
   }
 
-  const trai = 64;
-  const phai = 12;
-  const tren = 12;
-  const duoi = 28;
+  const left = 64;
+  const padRight = 12;
+  const top = 12;
+  const bottom = 28;
   const moc = mocTron(max);
-  const dinh = moc[moc.length - 1] || 1;
-  const w = rong - trai - phai;
-  const h = cao - tren - duoi;
+  const peak = moc[moc.length - 1] || 1;
+  const w = rong - left - padRight;
+  const h = cao - top - bottom;
   const bang = w / n;
-  const xGiua = (i: number) => trai + bang * (i + 0.5);
-  const y = (v: number) => tren + h - (v / dinh) * h;
+  const midX = (i: number) => left + bang * (i + 0.5);
+  const y = (v: number) => top + h - (v / peak) * h;
   // Nhãn ngày: tối thiểu ~44px một nhãn để không đè.
-  const buocNhan = Math.max(1, Math.ceil(44 / bang));
-  const rongCot = Math.max(3, Math.min(22, (bang * 0.72) / Math.max(1, soCot)));
-  let thuCot = 0;
+  const labelStep = Math.max(1, Math.ceil(44 / bang));
+  const barWidth = Math.max(3, Math.min(22, (bang * 0.72) / Math.max(1, columnCount)));
+  let columnIndex = 0;
 
   return (
     <div className={cn("space-y-3", className)}>
@@ -139,36 +139,36 @@ export function BieuDoTheoNgay({
           aria-label={moTa ?? "Biểu đồ theo ngày"}
           className="block"
           style={{ minWidth: rong }}
-          onMouseLeave={() => setChon(null)}
+          onMouseLeave={() => setSelectedIndex(null)}
         >
           {/* Lưới + trục dọc */}
           {moc.map((v) => (
             <g key={v}>
-              <line x1={trai} x2={rong - phai} y1={y(v)} y2={y(v)} className="stroke-border" strokeDasharray={v === 0 ? undefined : "3 4"} />
-              <text x={trai - 6} y={y(v)} dy="0.35em" textAnchor="end" className="fill-muted-foreground text-xs tnum">
+              <line x1={left} x2={rong - padRight} y1={y(v)} y2={y(v)} className="stroke-border" strokeDasharray={v === 0 ? undefined : "3 4"} />
+              <text x={left - 6} y={y(v)} dy="0.35em" textAnchor="end" className="fill-muted-foreground text-xs tnum">
                 {rutGon(v, donVi)}
               </text>
             </g>
           ))}
           {/* Nhãn ngày */}
           {nhan.map((t, i) =>
-            i % buocNhan === 0 ? (
-              <text key={i} x={xGiua(i)} y={cao - 8} textAnchor="middle" className="fill-muted-foreground text-xs tnum">
+            i % labelStep === 0 ? (
+              <text key={i} x={midX(i)} y={cao - 8} textAnchor="middle" className="fill-muted-foreground text-xs tnum">
                 {t}
               </text>
             ) : null,
           )}
           {/* Vạch ngày đang chọn */}
-          {chon != null && <line x1={xGiua(chon)} x2={xGiua(chon)} y1={tren} y2={tren + h} className="stroke-foreground/30" />}
+          {selectedIndex != null && <line x1={midX(selectedIndex)} x2={midX(selectedIndex)} y1={top} y2={top + h} className="stroke-foreground/30" />}
           {/* Cột */}
           {chuoi.map((c) => {
             if (c.dang !== "cot") return null;
-            const lech = (thuCot++ - (soCot - 1) / 2) * rongCot;
+            const lech = (columnIndex++ - (columnCount - 1) / 2) * barWidth;
             return (
               <g key={c.khoa} className={NEN[c.mau]}>
                 {c.giaTri.map((v, i) =>
                   v > 0 ? (
-                    <rect key={i} x={xGiua(i) + lech - rongCot / 2} y={y(v)} width={rongCot - 1} height={tren + h - y(v)} rx={2} opacity={chon == null || chon === i ? 0.9 : 0.45} />
+                    <rect key={i} x={midX(i) + lech - barWidth / 2} y={y(v)} width={barWidth - 1} height={top + h - y(v)} rx={2} opacity={selectedIndex == null || selectedIndex === i ? 0.9 : 0.45} />
                   ) : null,
                 )}
               </g>
@@ -177,12 +177,12 @@ export function BieuDoTheoNgay({
           {/* Đường */}
           {chuoi.map((c) => {
             if (c.dang !== "duong") return null;
-            const d = c.giaTri.map((v, i) => `${i ? "L" : "M"}${xGiua(i)},${y(v)}`).join(" ");
+            const d = c.giaTri.map((v, i) => `${i ? "L" : "M"}${midX(i)},${y(v)}`).join(" ");
             return (
               <g key={c.khoa}>
-                {c.vung && <path d={`${d} L${xGiua(n - 1)},${tren + h} L${xGiua(0)},${tren + h} Z`} className={NEN[c.mau]} opacity={0.12} />}
+                {c.vung && <path d={`${d} L${midX(n - 1)},${top + h} L${midX(0)},${top + h} Z`} className={NEN[c.mau]} opacity={0.12} />}
                 <path d={d} fill="none" className={NET[c.mau]} strokeWidth={2.5} strokeLinejoin="round" />
-                {chon != null && <circle cx={xGiua(chon)} cy={y(c.giaTri[chon] ?? 0)} r={4} className={cn(NEN[c.mau], "stroke-card")} strokeWidth={2} />}
+                {selectedIndex != null && <circle cx={midX(selectedIndex)} cy={y(c.giaTri[selectedIndex] ?? 0)} r={4} className={cn(NEN[c.mau], "stroke-card")} strokeWidth={2} />}
               </g>
             );
           })}
@@ -190,31 +190,31 @@ export function BieuDoTheoNgay({
           {nhan.map((t, i) => (
             <rect
               key={i}
-              x={trai + bang * i}
-              y={tren}
+              x={left + bang * i}
+              y={top}
               width={bang}
               height={h}
               fill="transparent"
-              onMouseEnter={() => setChon(i)}
-              onClick={() => setChon(i)}
+              onMouseEnter={() => setSelectedIndex(i)}
+              onClick={() => setSelectedIndex(i)}
             >
               <title>{`${t}: ${chuoi.map((c) => `${c.ten} ${dinhDang(c.giaTri[i] ?? 0)} ${donVi}`).join(" · ")}`}</title>
             </rect>
           ))}
         </svg>
-        {chon != null && (
+        {selectedIndex != null && (
           <div
             role="status"
             className="pointer-events-none absolute top-2 z-10 rounded-lg border-2 border-border bg-card p-2.5 text-sm shadow-lg"
-            style={xGiua(chon) < rong / 2 ? { left: xGiua(chon) + 12 } : { left: xGiua(chon) - 12, transform: "translateX(-100%)" }}
+            style={midX(selectedIndex) < rong / 2 ? { left: midX(selectedIndex) + 12 } : { left: midX(selectedIndex) - 12, transform: "translateX(-100%)" }}
           >
-            <p className="font-semibold text-foreground">{nhan[chon]}</p>
+            <p className="font-semibold text-foreground">{nhan[selectedIndex]}</p>
             {chuoi.map((c) => (
               <p key={c.khoa} className="flex items-center gap-2 whitespace-nowrap text-muted-foreground">
                 <svg width="10" height="10" aria-hidden>
                   <rect width="10" height="10" rx="2" className={NEN[c.mau]} />
                 </svg>
-                {c.ten}: <span className="tnum font-semibold text-foreground">{dinhDang(c.giaTri[chon] ?? 0)} {donVi}</span>
+                {c.ten}: <span className="tnum font-semibold text-foreground">{dinhDang(c.giaTri[selectedIndex] ?? 0)} {donVi}</span>
               </p>
             ))}
           </div>

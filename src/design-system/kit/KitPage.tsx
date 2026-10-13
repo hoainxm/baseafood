@@ -63,7 +63,7 @@ const DEMO: DongDemo[] = [
   },
 ];
 
-const LOAI = [
+const SPECIES_OPTIONS = [
   { value: "bt", label: "Bạch tuộc" },
   { value: "muc", label: "Mực" },
   { value: "ca", label: "Cá" },
@@ -71,24 +71,24 @@ const LOAI = [
 ];
 
 /** Danh sách dài để thử thanh cuộn của dropdown. */
-const MAT_HANG_DAI: MucChon[] = Array.from({ length: 40 }, (_, i) => ({
+const LONG_PRODUCT_LIST: MucChon[] = Array.from({ length: 40 }, (_, i) => ({
   value: `mh-${i}`,
   label: `Mặt hàng mẫu số ${i + 1}`,
   phu: `Mã MH${String(i + 1).padStart(3, "0")}`,
 }));
 
 export default function KitPage() {
-  const [loai, setLoai] = useState("bt");
+  const [kind, setKind] = useState("bt");
   const [sl, setSl] = useState<number | null>(1250);
-  const [daiLy, setDaiLy] = useState("");
+  const [supplier, setSupplier] = useState("");
   const [loi, setLoi] = useState<LoiNhap[]>([]);
   const [rows, setRows] = useState(DEMO);
-  const [ngay, setNgay] = useState(homNay());
-  const [tuNgay, setTuNgay] = useState(homNay());
-  const [denNgay, setDenNgay] = useState(homNay());
-  const [daiLyChon, setDaiLyChon] = useState("");
-  const [matHangChon, setMatHangChon] = useState("");
-  const [daiLyList, setDaiLyList] = useState<MucChon[]>([
+  const [date, setDate] = useState(homNay());
+  const [fromDate, setFromDate] = useState(homNay());
+  const [toDate, setToDate] = useState(homNay());
+  const [selectedSupplier, setSelectedSupplier] = useState("");
+  const [selectedProduct, setSelectedProduct] = useState("");
+  const [supplierOptions, setSupplierOptions] = useState<MucChon[]>([
     { value: "H.Phú", label: "H.Phú", phu: "0913 123 456" },
     { value: "Tân Phước", label: "Tân Phước" },
     { value: "Bảy Lành", label: "Bảy Lành" },
@@ -124,10 +124,10 @@ export default function KitPage() {
     },
   ];
 
-  const xoa = (r: DongDemo) => {
-    const truoc = rows;
+  const remove = (r: DongDemo) => {
+    const prevRows = rows;
     setRows((v) => v.filter((x) => x.id !== r.id));
-    notify.daXoa(`Đã xóa "${r.loai}"`, () => setRows(truoc));
+    notify.daXoa(`Đã xóa "${r.loai}"`, () => setRows(prevRows));
   };
 
   return (
@@ -176,11 +176,11 @@ export default function KitPage() {
             label="Đại lý"
             required
             hint="Tên đại lý giao chuyến hàng này"
-            error={daiLy.trim() === "x" ? "Tên đại lý quá ngắn" : undefined}
+            error={supplier.trim() === "x" ? "Tên đại lý quá ngắn" : undefined}
           >
             <Input
-              value={daiLy}
-              onChange={(e) => setDaiLy(e.target.value)}
+              value={supplier}
+              onChange={(e) => setSupplier(e.target.value)}
               placeholder="VD: H.Phú"
             />
           </Field>
@@ -212,9 +212,9 @@ export default function KitPage() {
         <ChoiceGroup
           label="Loài"
           required
-          value={loai}
-          onChange={setLoai}
-          options={LOAI}
+          value={kind}
+          onChange={setKind}
+          options={SPECIES_OPTIONS}
           cot={4}
         />
       </Section>
@@ -228,17 +228,17 @@ export default function KitPage() {
             <DateField
               label="Ngày nhập hàng"
               required
-              value={ngay}
-              onChange={setNgay}
+              value={date}
+              onChange={setDate}
             />
           </div>
           <DateRangeField
             label="Khoảng ngày tiếp nhận"
-            startDate={tuNgay}
-            endDate={denNgay}
+            startDate={fromDate}
+            endDate={toDate}
             onChange={(tu, den) => {
-              setTuNgay(tu);
-              setDenNgay(den);
+              setFromDate(tu);
+              setToDate(den);
             }}
           />
         </div>
@@ -252,11 +252,11 @@ export default function KitPage() {
           <Combobox
             label="Đại lý giao hàng"
             required
-            value={daiLyChon}
-            onChange={setDaiLyChon}
-            options={daiLyList}
+            value={selectedSupplier}
+            onChange={setSelectedSupplier}
+            options={supplierOptions}
             onCreate={(ten) => {
-              setDaiLyList((v) => [...v, { value: ten, label: ten }]);
+              setSupplierOptions((v) => [...v, { value: ten, label: ten }]);
               notify.daLuu(`Đã thêm đại lý "${ten}" vào danh mục`);
               return ten;
             }}
@@ -264,9 +264,9 @@ export default function KitPage() {
           />
           <Combobox
             label="Mặt hàng (danh sách 40 mục)"
-            value={matHangChon}
-            onChange={setMatHangChon}
-            options={MAT_HANG_DAI}
+            value={selectedProduct}
+            onChange={setSelectedProduct}
+            options={LONG_PRODUCT_LIST}
             hint="Kéo trong danh sách để thấy thanh cuộn."
           />
         </div>
@@ -319,7 +319,7 @@ export default function KitPage() {
           actions={(r) => (
             <ConfirmDelete
               moTaBanGhi={`${r.loai} — ${r.quantityKg.toLocaleString("vi-VN")} kg — đại lý ${r.supplierName}`}
-              onConfirm={() => xoa(r)}
+              onConfirm={() => remove(r)}
             />
           )}
           emptyText="Chưa có dòng nhập nào cho ngày này."
@@ -395,9 +395,9 @@ export default function KitPage() {
                     <ChoiceGroup
                       label="Loài"
                       required
-                      value={loai}
-                      onChange={setLoai}
-                      options={LOAI}
+                      value={kind}
+                      onChange={setKind}
+                      options={SPECIES_OPTIONS}
                       cot={2}
                     />
                     <NumberField
@@ -420,7 +420,7 @@ export default function KitPage() {
                 <div className="flex justify-between border-b border-border pb-2">
                   <dt className="text-muted-foreground">Loài</dt>
                   <dd className="font-semibold">
-                    {LOAI.find((l) => l.value === loai)?.label}
+                    {SPECIES_OPTIONS.find((l) => l.value === kind)?.label}
                   </dd>
                 </div>
                 <div className="flex justify-between border-b border-border pb-2">

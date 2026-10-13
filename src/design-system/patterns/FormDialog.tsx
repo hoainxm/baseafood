@@ -24,7 +24,7 @@ import { ChuThichBatBuoc, useCoOBatBuoc } from "./Field";
  * - Điều khiển được (`open`/`onOpenChange`) hoặc tự mở bằng `trigger`.
  */
 
-const RONG: Record<string, string> = {
+const WIDTHS: Record<string, string> = {
   sm: "sm:max-w-md", // ~28rem — xác nhận ngắn
   vua: "sm:max-w-xl", // ~36rem
   rong: "sm:max-w-3xl", // ~48rem — mặc định form
@@ -50,7 +50,7 @@ export function FormDialog({
   tieuDe: string;
   moTa?: React.ReactNode;
   icon?: React.ComponentType<{ className?: string; "aria-hidden"?: boolean }>;
-  rong?: keyof typeof RONG;
+  rong?: keyof typeof WIDTHS;
   /** Nút hành động ở chân (VD Hủy / Lưu). Bỏ trống ⇒ không có chân. */
   chan?: React.ReactNode;
   /** Ép hiện chú thích dấu * kể cả khi không dò thấy `aria-required`. */
@@ -61,7 +61,7 @@ export function FormDialog({
      dấu * — không phải đi bật cờ ở từng chỗ gọi, và không bao giờ hiện thừa ở
      dialog chỉ để xem. */
   const thanRef = React.useRef<HTMLDivElement>(null);
-  const doThayBatBuoc = useCoOBatBuoc(thanRef, [open]);
+  const hasRequiredField = useCoOBatBuoc(thanRef, [open]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -71,7 +71,7 @@ export function FormDialog({
           // dvh, không vh: Safari iOS tính vh theo màn KHI ẨN thanh địa chỉ ⇒ 88vh cao
           // hơn phần nhìn thấy lúc xoay ngang, chân hộp (nút Lưu) lọt xuống dưới mép.
           "flex max-h-[min(88dvh,calc(100dvh-2rem))] flex-col items-stretch gap-0 overflow-hidden p-0 ngang-thap:max-h-[calc(100dvh-1rem)]",
-          RONG[rong]
+          WIDTHS[rong]
         )}
       >
         {/* Đầu — cố định */}
@@ -98,7 +98,7 @@ export function FormDialog({
           ref={thanRef}
           className="scroll-nice min-h-0 flex-1 overflow-y-auto px-6 py-5 ngang-thap:py-3"
         >
-          {(coOBatBuoc || doThayBatBuoc) && <ChuThichBatBuoc className="mb-4" />}
+          {(coOBatBuoc || hasRequiredField) && <ChuThichBatBuoc className="mb-4" />}
           {children}
         </div>
 

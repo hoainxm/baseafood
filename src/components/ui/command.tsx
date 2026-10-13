@@ -110,9 +110,9 @@ function CommandList({
   React.useEffect(() => {
     const el = ref.current
     if (!el) return
-    const chanBubble = (e: WheelEvent) => e.stopPropagation()
-    el.addEventListener("wheel", chanBubble)
-    return () => el.removeEventListener("wheel", chanBubble)
+    const stopBubble = (e: WheelEvent) => e.stopPropagation()
+    el.addEventListener("wheel", stopBubble)
+    return () => el.removeEventListener("wheel", stopBubble)
   }, [])
 
   return (

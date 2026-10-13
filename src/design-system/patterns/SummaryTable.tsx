@@ -102,11 +102,11 @@ export function BangTong<T>({
   const to = useToMau(toMau);
   // Tick dòng: màn truyền `chon` thì dùng của màn (màn tự đặt nút tô vào thanh
   // "Đã chọn" riêng); không thì bảng tự giữ + tự hiện thanh tô màu khi bật toMau.
-  const chonTrong = useChonDong();
+  const internalSelection = useChonDong();
   const neoTick = React.useRef<string | null>(null);
   // Thanh cuộn ngang TRÊN đầu bảng (README § 5a) — vùng cuộn thật là table-container.
   const gocRef = React.useRef<HTMLDivElement>(null);
-  const thanhTren = useThanhCuonTren(
+  const topScrollBar = useThanhCuonTren(
     () => gocRef.current?.querySelector<HTMLElement>('[data-slot="table-container"]') ?? null
   );
   // Bảng rỗng không có dòng thêm thì không vẽ bảng ⇒ khỏi đo.
@@ -122,47 +122,47 @@ export function BangTong<T>({
     );
   }
 
-  const coTong = cot.some((c) => c.tong);
+  const hasTotal = cot.some((c) => c.tong);
   const khoa = rows.map((r, i) => getKey(r, i));
-  const chonDung: ChonBang<T> | undefined =
+  const effectiveSelection: ChonBang<T> | undefined =
     chon ??
     (to.bat
-      ? { daChon: chonTrong.daChon as Set<string>, doi: (k) => chonTrong.doi(k), doiTatCa: chonTrong.doiTatCa }
+      ? { daChon: internalSelection.daChon as Set<string>, doi: (k) => internalSelection.doi(k), doiTatCa: internalSelection.doiTatCa }
       : undefined);
-  const daTick = chonDung ? khoa.filter((k) => chonDung.daChon.has(k)) : [];
-  const chonHet = daTick.length > 0 && daTick.length === khoa.length;
+  const daTick = effectiveSelection ? khoa.filter((k) => effectiveSelection.daChon.has(k)) : [];
+  const isAllSelected = daTick.length > 0 && daTick.length === khoa.length;
   /** Bấm ô tick; Shift ⇒ cả khoảng từ dòng bấm trước (như Shift+bấm ở Excel). */
   const bamTick = (k: string, shift: boolean) => {
-    if (!chonDung) return;
+    if (!effectiveSelection) return;
     const a = neoTick.current ? khoa.indexOf(neoTick.current) : -1;
     const b = khoa.indexOf(k);
     if (shift && a >= 0 && b >= 0) {
-      chonDung.doiTatCa(khoa.slice(Math.min(a, b), Math.max(a, b) + 1), !chonDung.daChon.has(k));
-    } else chonDung.doi(k);
+      effectiveSelection.doiTatCa(khoa.slice(Math.min(a, b), Math.max(a, b) + 1), !effectiveSelection.daChon.has(k));
+    } else effectiveSelection.doi(k);
     neoTick.current = k;
   };
 
-  const coCotDau = Boolean(chonDung);
-  const soCot = cot.length + (coCotDau ? 1 : 0);
+  const hasLeadColumn = Boolean(effectiveSelection);
+  const columnCount = cot.length + (hasLeadColumn ? 1 : 0);
   /* Chữ "Cộng …" ở dòng tổng trải qua cột đầu dòng + các cột đầu KHÔNG có tổng —
      để trong một ô riêng thì chữ dài ("Cộng Nguyên liệu mua ngoài") đẩy cột đầu
      (VD Ngày nhập) rộng gấp rưỡi, cả bảng phải kéo ngang thêm. */
-  const kTongDau = Math.max(0, cot.findIndex((c) => c.tong));
-  const soCotNhan = cot.some((c) => c.tong) ? kTongDau : cot.length;
+  const firstTotalIdx = Math.max(0, cot.findIndex((c) => c.tong));
+  const labelColumnCount = cot.some((c) => c.tong) ? firstTotalIdx : cot.length;
 
   /** Hàng tên cột — vẽ ở bảng thật và (chế độ xoRa) ở hàng tên cột nổi. */
-  const hangDau = (noi: boolean) => (
+  const headerRow = (isSticky: boolean) => (
     <TableRow>
-      {chonDung && (
+      {effectiveSelection && (
         <TableHead className="w-10">
           <input
             type="checkbox"
             className="size-5"
-            checked={chonHet}
-            tabIndex={noi ? -1 : undefined}
-            onChange={() => chonDung.doiTatCa(khoa, !chonHet)}
-            aria-label={chonHet ? "Bỏ chọn tất cả dòng" : "Chọn tất cả dòng"}
-            title={chonHet ? "Bỏ tick mọi dòng của bảng này." : "Tick mọi dòng của bảng này (để tô màu / in đậm / in / xử lý cùng lúc)."}
+            checked={isAllSelected}
+            tabIndex={isSticky ? -1 : undefined}
+            onChange={() => effectiveSelection.doiTatCa(khoa, !isAllSelected)}
+            aria-label={isAllSelected ? "Bỏ chọn tất cả dòng" : "Chọn tất cả dòng"}
+            title={isAllSelected ? "Bỏ tick mọi dòng của bảng này." : "Tick mọi dòng của bảng này (để tô màu / in đậm / in / xử lý cùng lúc)."}
           />
         </TableHead>
       )}
@@ -187,7 +187,7 @@ export function BangTong<T>({
         className
       )}
     >
-      {thanhTren}
+      {topScrollBar}
       {xoRa && (
         // Hàng tên cột NỔI: hộp cao 0 dính dưới header trang (`top-header` = cùng
         // token `--spacing-header` với `h-header` của AppShell). Chỉ hiện khi hàng tên cột
@@ -209,17 +209,17 @@ export function BangTong<T>({
                   <col key={i} style={{ width: w }} />
                 ))}
               </colgroup>
-              <TableHeader>{hangDau(true)}</TableHeader>
+              <TableHeader>{headerRow(true)}</TableHeader>
             </table>
           </div>
         </div>
       )}
       <Table ref={bangRef}>
-        <TableHeader>{hangDau(false)}</TableHeader>
+        <TableHeader>{headerRow(false)}</TableHeader>
         <TableBody>
           {rows.map((r, i) => {
             const k = getKey(r, i);
-            const tick = !!chonDung?.daChon.has(k);
+            const tick = !!effectiveSelection?.daChon.has(k);
             return (
               <TableRow
                 key={k}
@@ -227,7 +227,7 @@ export function BangTong<T>({
                 className={cn(tick && "bg-primary/5")}
                 {...to.thuocTinh(k)}
               >
-                {chonDung && (
+                {effectiveSelection && (
                   <TableCell>
                     <input
                       type="checkbox"
@@ -252,21 +252,21 @@ export function BangTong<T>({
           })}
           {dongThem && (
             <TableRow className="hover:bg-transparent">
-              <TableCell colSpan={soCot} className="bg-muted/30">
+              <TableCell colSpan={columnCount} className="bg-muted/30">
                 {dongThem}
               </TableCell>
             </TableRow>
           )}
         </TableBody>
-        {coTong && (
+        {hasTotal && (
           <TableFooter>
             <TableRow>
-              {(coCotDau ? 1 : 0) + soCotNhan > 0 && (
-                <TableCell colSpan={(coCotDau ? 1 : 0) + soCotNhan} className="font-bold whitespace-normal">
+              {(hasLeadColumn ? 1 : 0) + labelColumnCount > 0 && (
+                <TableCell colSpan={(hasLeadColumn ? 1 : 0) + labelColumnCount} className="font-bold whitespace-normal">
                   {nhanTong}
                 </TableCell>
               )}
-              {cot.slice(soCotNhan).map((c) => (
+              {cot.slice(labelColumnCount).map((c) => (
                 <TableCell
                   key={c.key}
                   className={cn("font-bold", c.so && "text-right tnum")}
@@ -295,7 +295,7 @@ export function BangTong<T>({
       <ThanhToMau
         to={to}
         khoa={daTick}
-        onBoChon={chonTrong.boChon}
+        onBoChon={internalSelection.boChon}
         className={xoRa ? "bottom-8" : undefined}
       />
     )}
@@ -310,32 +310,32 @@ export function BangTong<T>({
  */
 function useXoRa(bat: boolean) {
   const bangRef = React.useRef<HTMLTableElement>(null);
-  const dauNoiRef = React.useRef<HTMLDivElement>(null);
-  const thanhRef = React.useRef<HTMLDivElement>(null);
-  const [rongCot, setRongCot] = React.useState<number[]>([]);
-  const [rongBang, setRongBang] = React.useState(0);
-  const [rongCuon, setRongCuon] = React.useState(0);
+  const sentinelRef = React.useRef<HTMLDivElement>(null);
+  const barRef = React.useRef<HTMLDivElement>(null);
+  const [columnWidths, setColumnWidths] = React.useState<number[]>([]);
+  const [tableWidth, setTableWidth] = React.useState(0);
+  const [scrollWidth, setScrollWidth] = React.useState(0);
   const [tran, setTran] = React.useState(false);
-  const [hienDau, setHienDau] = React.useState(false);
+  const [showHeader, setShowHeader] = React.useState(false);
 
   // Đo cột + tràn ngang mỗi khi bảng / khung đổi cỡ (gõ số, đổi cỡ chữ, thu thanh bên…).
   React.useLayoutEffect(() => {
     if (!bat) return;
     const bang = bangRef.current;
-    const khung = bang?.parentElement; // div[data-slot=table-container] của primitive
-    if (!bang || !khung) return;
+    const container = bang?.parentElement; // div[data-slot=table-container] của primitive
+    if (!bang || !container) return;
     const do_ = () => {
       const o = bang.tHead?.rows[0]?.cells;
       const ws = o ? Array.from(o, (c) => c.getBoundingClientRect().width) : [];
-      setRongCot((cu) => (cu.length === ws.length && cu.every((w, i) => Math.abs(w - ws[i]) < 0.5) ? cu : ws));
-      setRongBang(bang.getBoundingClientRect().width);
-      setRongCuon(khung.scrollWidth);
-      setTran(khung.scrollWidth > khung.clientWidth + 1);
+      setColumnWidths((prev) => (prev.length === ws.length && prev.every((w, i) => Math.abs(w - ws[i]) < 0.5) ? prev : ws));
+      setTableWidth(bang.getBoundingClientRect().width);
+      setScrollWidth(container.scrollWidth);
+      setTran(container.scrollWidth > container.clientWidth + 1);
     };
     do_();
     const ro = new ResizeObserver(do_);
     ro.observe(bang);
-    ro.observe(khung);
+    ro.observe(container);
     for (const c of Array.from(bang.tHead?.rows[0]?.cells ?? [])) ro.observe(c);
     return () => ro.disconnect();
   }, [bat]);
@@ -344,22 +344,22 @@ function useXoRa(bat: boolean) {
   // duyệt không bắn sự kiện ⇒ không vòng lặp.
   React.useEffect(() => {
     if (!bat) return;
-    const khung = bangRef.current?.parentElement;
-    if (!khung) return;
+    const container = bangRef.current?.parentElement;
+    if (!container) return;
     const theoBang = () => {
-      if (dauNoiRef.current) dauNoiRef.current.scrollLeft = khung.scrollLeft;
-      if (thanhRef.current) thanhRef.current.scrollLeft = khung.scrollLeft;
+      if (sentinelRef.current) sentinelRef.current.scrollLeft = container.scrollLeft;
+      if (barRef.current) barRef.current.scrollLeft = container.scrollLeft;
     };
-    const theoThanh = () => {
-      if (thanhRef.current) khung.scrollLeft = thanhRef.current.scrollLeft;
+    const syncFromBar = () => {
+      if (barRef.current) container.scrollLeft = barRef.current.scrollLeft;
     };
-    const thanh = thanhRef.current;
-    khung.addEventListener("scroll", theoBang, { passive: true });
-    thanh?.addEventListener("scroll", theoThanh, { passive: true });
+    const bar = barRef.current;
+    container.addEventListener("scroll", theoBang, { passive: true });
+    bar?.addEventListener("scroll", syncFromBar, { passive: true });
     theoBang();
     return () => {
-      khung.removeEventListener("scroll", theoBang);
-      thanh?.removeEventListener("scroll", theoThanh);
+      container.removeEventListener("scroll", theoBang);
+      bar?.removeEventListener("scroll", syncFromBar);
     };
   }, [bat, tran]);
 
@@ -367,24 +367,24 @@ function useXoRa(bat: boolean) {
   // còn đủ cao bên dưới (gần đáy bảng thì ẩn để khỏi đè dòng tổng).
   React.useEffect(() => {
     if (!bat) return;
-    const tinh = () => {
+    const measure = () => {
       const bang = bangRef.current;
       const dau = bang?.tHead;
       if (!bang || !dau) return;
-      const dinh = dauNoiRef.current?.parentElement?.getBoundingClientRect().top ?? 64;
+      const top = sentinelRef.current?.parentElement?.getBoundingClientRect().top ?? 64;
       const r = bang.getBoundingClientRect();
       const cao = dau.getBoundingClientRect().height;
-      setHienDau(r.top < dinh - 1 && r.bottom > dinh + cao * 2);
+      setShowHeader(r.top < top - 1 && r.bottom > top + cao * 2);
     };
-    tinh();
+    measure();
     // capture: bắt cuộn của MỌI khung (cột nội dung desktop cuộn riêng, điện thoại cuộn trang).
-    document.addEventListener("scroll", tinh, { capture: true, passive: true });
-    window.addEventListener("resize", tinh);
+    document.addEventListener("scroll", measure, { capture: true, passive: true });
+    window.addEventListener("resize", measure);
     return () => {
-      document.removeEventListener("scroll", tinh, { capture: true });
-      window.removeEventListener("resize", tinh);
+      document.removeEventListener("scroll", measure, { capture: true });
+      window.removeEventListener("resize", measure);
     };
   }, [bat]);
 
-  return { bangRef, dauNoiRef, thanhRef, rongCot, rongBang, rongCuon, tran, hienDau };
+  return { bangRef, dauNoiRef: sentinelRef, thanhRef: barRef, rongCot: columnWidths, rongBang: tableWidth, rongCuon: scrollWidth, tran, hienDau: showHeader };
 }

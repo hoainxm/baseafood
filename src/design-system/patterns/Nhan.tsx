@@ -110,10 +110,10 @@ export function sacNhomNL(nhom: string | null | undefined): SacPhanLoai {
 }
 
 /** Phân xưởng: Đông biển · Cá ngọc · Khô cam; kho lớn / khác → xám. */
-export function sacXuong(xuong: string | null | undefined): SacPhanLoai {
+export function sacXuong(workshop: string | null | undefined): SacPhanLoai {
   /* Tách TỪ theo chữ Unicode — `\b` của regex JS không coi "đ", "á", "ô" là chữ cái
      nên /\bđông\b/ không bao giờ khớp "Xưởng Đông". */
-  const tu = (xuong ?? "").toLowerCase().normalize("NFC").split(/[^\p{L}\p{N}]+/u);
+  const tu = (workshop ?? "").toLowerCase().normalize("NFC").split(/[^\p{L}\p{N}]+/u);
   if (tu.includes("đông")) return "bien";
   if (tu.includes("cá")) return "ngoc";
   if (tu.includes("khô")) return "cam";

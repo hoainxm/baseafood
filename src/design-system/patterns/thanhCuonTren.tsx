@@ -16,66 +16,66 @@ import { cn } from "@/lib/utils";
  * `layKhung` trả về phần tử ĐANG cuộn ngang (thường là `[data-slot=table-container]`
  * của primitive `Table`, hoặc chính div `overflow-x-auto` của bảng tự dựng).
  */
-export function useThanhCuonTren(layKhung: () => HTMLElement | null, className?: string) {
-  const trenRef = React.useRef<HTMLDivElement>(null);
-  const [khung, setKhung] = React.useState<HTMLElement | null>(null);
+export function useThanhCuonTren(getFrame: () => HTMLElement | null, className?: string) {
+  const topBarRef = React.useRef<HTMLDivElement>(null);
+  const [container, setContainer] = React.useState<HTMLElement | null>(null);
   const [tran, setTran] = React.useState(false);
-  const [rong, setRong] = React.useState(0);
+  const [width, setWidth] = React.useState(0);
 
   // Tìm lại khung sau mỗi lần vẽ (`layKhung` là hàm mới mỗi lần vẽ) — bảng rỗng →
   // có dòng thì khung mới xuất hiện; chỉ đặt state khi đổi phần tử.
   React.useLayoutEffect(() => {
     // Phần tử DOM là "hệ thống ngoài" của React — đọc sau khi vẽ rồi mới gắn đo.
-    const timLai = () => {
-      const k = layKhung();
-      setKhung((cu) => (cu === k ? cu : k));
+    const refindFrame = () => {
+      const k = getFrame();
+      setContainer((prev) => (prev === k ? prev : k));
     };
-    timLai();
-  }, [layKhung]);
+    refindFrame();
+  }, [getFrame]);
 
   // Đo bề rộng cuộn + có tràn không, mỗi khi khung / bảng đổi cỡ.
   React.useLayoutEffect(() => {
-    if (!khung) return;
-    const doLai = () => {
-      const sw = khung.scrollWidth;
-      setRong((cu) => (Math.abs(cu - sw) < 1 ? cu : sw));
-      setTran(sw > khung.clientWidth + 1);
+    if (!container) return;
+    const remeasure = () => {
+      const sw = container.scrollWidth;
+      setWidth((prev) => (Math.abs(prev - sw) < 1 ? prev : sw));
+      setTran(sw > container.clientWidth + 1);
     };
-    doLai();
-    const ro = new ResizeObserver(doLai);
-    ro.observe(khung);
-    for (const con of Array.from(khung.children)) ro.observe(con);
+    remeasure();
+    const ro = new ResizeObserver(remeasure);
+    ro.observe(container);
+    for (const con of Array.from(container.children)) ro.observe(con);
     return () => ro.disconnect();
-  }, [khung]);
+  }, [container]);
 
   // Đồng bộ hai chiều. Gán scrollLeft bằng giá trị đang có thì trình duyệt không
   // bắn sự kiện ⇒ không vòng lặp.
   React.useEffect(() => {
-    const tren = trenRef.current;
-    if (!khung || !tren || !tran) return;
-    const theoKhung = () => {
-      if (tren.scrollLeft !== khung.scrollLeft) tren.scrollLeft = khung.scrollLeft;
+    const top = topBarRef.current;
+    if (!container || !top || !tran) return;
+    const syncFromFrame = () => {
+      if (top.scrollLeft !== container.scrollLeft) top.scrollLeft = container.scrollLeft;
     };
-    const theoTren = () => {
-      if (khung.scrollLeft !== tren.scrollLeft) khung.scrollLeft = tren.scrollLeft;
+    const syncFromTop = () => {
+      if (container.scrollLeft !== top.scrollLeft) container.scrollLeft = top.scrollLeft;
     };
-    khung.addEventListener("scroll", theoKhung, { passive: true });
-    tren.addEventListener("scroll", theoTren, { passive: true });
-    theoKhung();
+    container.addEventListener("scroll", syncFromFrame, { passive: true });
+    top.addEventListener("scroll", syncFromTop, { passive: true });
+    syncFromFrame();
     return () => {
-      khung.removeEventListener("scroll", theoKhung);
-      tren.removeEventListener("scroll", theoTren);
+      container.removeEventListener("scroll", syncFromFrame);
+      top.removeEventListener("scroll", syncFromTop);
     };
-  }, [khung, tran]);
+  }, [container, tran]);
 
   return tran ? (
     <div
-      ref={trenRef}
+      ref={topBarRef}
       aria-hidden
       title="Kéo để cuộn bảng sang ngang (thanh này chạy cùng thanh cuộn dưới đáy bảng)."
       className={cn("bang-thanh-cuon mb-1 print:hidden", className)}
     >
-      <div style={{ width: rong, height: 1 }} />
+      <div style={{ width: width, height: 1 }} />
     </div>
   ) : null;
 }

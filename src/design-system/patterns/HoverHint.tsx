@@ -43,20 +43,20 @@ interface Neo {
 }
 
 /** Phần tử có thể mang gợi ý: có `title` và không phải đang bị tắt. */
-function timMoc(t: EventTarget | null): HTMLElement | null {
+function findAnchor(t: EventTarget | null): HTMLElement | null {
   if (!(t instanceof Element)) return null;
   const el = t.closest<HTMLElement>("[title], [data-goi-y]");
   return el ?? null;
 }
 
-const layChu = (el: HTMLElement) =>
+const getText = (el: HTMLElement) =>
   (el.getAttribute("data-goi-y") ?? el.getAttribute("title") ?? "").trim();
 
 export function GoiYHover() {
   const [neo, setNeo] = React.useState<Neo | null>(null);
   const hen = React.useRef<number | null>(null);
   /** Phần tử đang bị gỡ `title` — giữ để trả lại đúng chỗ. */
-  const dangGo = React.useRef<HTMLElement | null>(null);
+  const typingEl = React.useRef<HTMLElement | null>(null);
   const hop = React.useRef<HTMLDivElement | null>(null);
 
   React.useEffect(() => {
@@ -72,14 +72,14 @@ export function GoiYHover() {
 
     /** Trả `title` về đúng phần tử đã gỡ. */
     const traTitle = () => {
-      const el = dangGo.current;
+      const el = typingEl.current;
       if (el) {
         const chu = el.getAttribute("data-goi-y");
         if (chu != null) {
           el.setAttribute("title", chu);
           el.removeAttribute("data-goi-y");
         }
-        dangGo.current = null;
+        typingEl.current = null;
       }
     };
 
@@ -90,13 +90,13 @@ export function GoiYHover() {
     };
 
     /** Ghi lại khung của phần tử; chỗ đặt thật tính sau khi đo được hộp chữ. */
-    const datCho = (el: HTMLElement, chu: string) => {
+    const positionAt = (el: HTMLElement, chu: string) => {
       const o = el.getBoundingClientRect();
       setNeo({ chu, trai: o.left, tren: o.top, duoi: o.bottom, rong: o.width });
     };
 
-    const hienSau = (el: HTMLElement, goTitle: boolean) => {
-      const chu = layChu(el);
+    const showAfter = (el: HTMLElement, goTitle: boolean) => {
+      const chu = getText(el);
       if (!chu) return;
       huyHen();
       hen.current = window.setTimeout(() => {
@@ -105,51 +105,51 @@ export function GoiYHover() {
         if (goTitle && el.hasAttribute("title")) {
           el.setAttribute("data-goi-y", chu);
           el.removeAttribute("title");
-          dangGo.current = el;
+          typingEl.current = el;
         }
-        datCho(el, chu);
+        positionAt(el, chu);
       }, TRE_HIEN_MS);
     };
 
-    const vaoChuot = (e: PointerEvent) => {
+    const onPointerEnter = (e: PointerEvent) => {
       if (e.pointerType !== "mouse") return;
-      const el = timMoc(e.target);
+      const el = findAnchor(e.target);
       if (!el) {
         an();
         return;
       }
-      if (el === dangGo.current) return; // vẫn đang ở trên chính nó
+      if (el === typingEl.current) return; // vẫn đang ở trên chính nó
       an();
-      hienSau(el, true);
+      showAfter(el, true);
     };
 
-    const vaoPhim = (e: FocusEvent) => {
-      const el = timMoc(e.target);
+    const onFocusIn = (e: FocusEvent) => {
+      const el = findAnchor(e.target);
       if (!el) return;
       an();
-      hienSau(el, false);
+      showAfter(el, false);
     };
 
-    const nhanPhim = (e: KeyboardEvent) => {
+    const handleKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") an();
     };
 
-    document.addEventListener("pointerover", vaoChuot, true);
+    document.addEventListener("pointerover", onPointerEnter, true);
     document.addEventListener("pointerdown", an, true);
-    document.addEventListener("focusin", vaoPhim, true);
+    document.addEventListener("focusin", onFocusIn, true);
     document.addEventListener("focusout", an, true);
-    document.addEventListener("keydown", nhanPhim, true);
+    document.addEventListener("keydown", handleKey, true);
     // Cuộn / đổi cỡ thì toạ độ cũ sai ngay — ẩn cho gọn.
     window.addEventListener("scroll", an, true);
     window.addEventListener("resize", an);
     window.addEventListener("blur", an);
 
     return () => {
-      document.removeEventListener("pointerover", vaoChuot, true);
+      document.removeEventListener("pointerover", onPointerEnter, true);
       document.removeEventListener("pointerdown", an, true);
-      document.removeEventListener("focusin", vaoPhim, true);
+      document.removeEventListener("focusin", onFocusIn, true);
       document.removeEventListener("focusout", an, true);
-      document.removeEventListener("keydown", nhanPhim, true);
+      document.removeEventListener("keydown", handleKey, true);
       window.removeEventListener("scroll", an, true);
       window.removeEventListener("resize", an);
       window.removeEventListener("blur", an);
@@ -173,22 +173,22 @@ export function GoiYHover() {
     const trongKhoang = (v: number, min: number, max: number) => Math.max(min, Math.min(v, max));
 
     // Mặc định nằm DƯỚI; dưới không đủ chỗ mà trên rộng hơn thì lật lên TRÊN.
-    const chuaDuoi = window.innerHeight - neo.duoi - CACH_LE - LE_MAN;
-    const oTren = chuaDuoi < o.height && neo.tren - CACH_LE - LE_MAN > chuaDuoi;
+    const spaceBelow = window.innerHeight - neo.duoi - CACH_LE - LE_MAN;
+    const placeAbove = spaceBelow < o.height && neo.tren - CACH_LE - LE_MAN > spaceBelow;
 
-    const trai = trongKhoang(
+    const left = trongKhoang(
       neo.trai + neo.rong / 2 - o.width / 2,
       LE_MAN,
       Math.max(LE_MAN, window.innerWidth - LE_MAN - o.width)
     );
-    const tren = trongKhoang(
-      oTren ? neo.tren - CACH_LE - o.height : neo.duoi + CACH_LE,
+    const top = trongKhoang(
+      placeAbove ? neo.tren - CACH_LE - o.height : neo.duoi + CACH_LE,
       LE_MAN,
       Math.max(LE_MAN, window.innerHeight - LE_MAN - o.height)
     );
 
-    el.style.left = `${Math.round(trai)}px`;
-    el.style.top = `${Math.round(tren)}px`;
+    el.style.left = `${Math.round(left)}px`;
+    el.style.top = `${Math.round(top)}px`;
     el.style.opacity = "1";
   }, [neo]);
 

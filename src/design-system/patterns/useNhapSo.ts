@@ -24,20 +24,20 @@ export function useNhapSo({
   onChange: (v: number | null) => void;
   rong0?: boolean;
 }) {
-  const [dangGo, setDangGo] = React.useState(false);
+  const [isTyping, setIsTyping] = React.useState(false);
   const [raw, setRaw] = React.useState("");
   const goc = React.useRef<number | null>(value);
 
-  const hienSo = (v: number | null) => (v == null || (rong0 && v === 0) ? "" : dinhDangSo(v));
-  const laBT = dangGo && laBieuThuc(raw);
-  const xemTruoc = laBT ? { ketQua: parseSoHoacBieuThuc(raw) } : null;
+  const displayNumber = (v: number | null) => (v == null || (rong0 && v === 0) ? "" : dinhDangSo(v));
+  const laBT = isTyping && laBieuThuc(raw);
+  const preview = laBT ? { ketQua: parseSoHoacBieuThuc(raw) } : null;
 
   const props = {
-    value: dangGo ? raw : hienSo(value),
+    value: isTyping ? raw : displayNumber(value),
     onFocus: (e: React.FocusEvent<HTMLInputElement>) => {
       goc.current = value;
-      setRaw(hienSo(value));
-      setDangGo(true);
+      setRaw(displayNumber(value));
+      setIsTyping(true);
       e.currentTarget.select();
     },
     onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -50,17 +50,17 @@ export function useNhapSo({
       const v = parseSoHoacBieuThuc(t);
       if (v != null) onChange(v);
     },
-    onBlur: () => setDangGo(false),
+    onBlur: () => setIsTyping(false),
     onKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => {
-      if (e.key === "Escape" && dangGo) {
+      if (e.key === "Escape" && isTyping) {
         e.preventDefault();
         e.stopPropagation(); // đừng để Esc đóng luôn hộp thoại
         onChange(goc.current);
-        setRaw(hienSo(goc.current));
+        setRaw(displayNumber(goc.current));
       }
     },
   };
 
-  return { props, xemTruoc, dangGo };
+  return { props, xemTruoc: preview, dangGo: isTyping };
 }
 

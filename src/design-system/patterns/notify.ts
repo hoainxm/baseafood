@@ -15,12 +15,12 @@ export const notify = {
    * `thaoTac` = việc nên làm NGAY sau khi lưu (vd "In tem" cho lô vừa ghi). Có cả
    * Hoàn tác thì Hoàn tác giữ nút chính, thao tác kia đứng cạnh.
    */
-  daLuu(message: string, onUndo?: () => void, thaoTac?: { label: string; onClick: () => void }) {
-    const hoanTac = onUndo ? { label: "Hoàn tác", onClick: onUndo } : undefined;
+  daLuu(message: string, onUndo?: () => void, action?: { label: string; onClick: () => void }) {
+    const undo = onUndo ? { label: "Hoàn tác", onClick: onUndo } : undefined;
     toast.success(message, {
       duration: THOI_GIAN,
-      action: hoanTac ?? thaoTac,
-      cancel: hoanTac ? thaoTac : undefined,
+      action: undo ?? action,
+      cancel: undo ? action : undefined,
     });
   },
 

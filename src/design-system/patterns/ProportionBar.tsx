@@ -66,36 +66,36 @@ export function ThanhChiaPhan({
   className?: string;
 }) {
   const ds = phan.filter((p) => p.giaTri > 0);
-  const tong = ds.reduce((s, p) => s + p.giaTri, 0);
-  if (tong <= 0) {
+  const total = ds.reduce((s, p) => s + p.giaTri, 0);
+  if (total <= 0) {
     return (
       <p className="rounded-lg border-2 border-dashed border-border p-6 text-center text-sm text-muted-foreground">
         Chưa có số liệu để chia phần.
       </p>
     );
   }
-  const pt = (v: number) => `${((v / tong) * 100).toLocaleString("vi-VN", { maximumFractionDigits: v / tong < 0.1 ? 1 : 0 })}%`;
+  const pt = (v: number) => `${((v / total) * 100).toLocaleString("vi-VN", { maximumFractionDigits: v / total < 0.1 ? 1 : 0 })}%`;
 
   return (
     <div className={cn("grid gap-3", className)}>
       <div role="img" aria-label={moTa ?? ds.map((p) => `${p.nhan} ${pt(p.giaTri)}`).join(", ")} className="flex h-11 w-full overflow-hidden rounded-lg border-2 border-border">
         {ds.map((p) => {
-          const rong = (p.giaTri / tong) * 100;
+          const width = (p.giaTri / total) * 100;
           return (
             <div
               key={p.khoa}
               title={`${p.nhan}: ${dinhDang(p.giaTri)} ${donVi} (${pt(p.giaTri)})`}
               className={cn("flex min-w-0 items-center justify-center border-r-2 border-card last:border-r-0", NEN[p.sac])}
-              style={{ width: `${rong}%` }}
+              style={{ width: `${width}%` }}
             >
-              {rong >= 7 && <span className="tnum truncate px-1 text-sm font-bold text-white">{pt(p.giaTri)}</span>}
+              {width >= 7 && <span className="tnum truncate px-1 text-sm font-bold text-white">{pt(p.giaTri)}</span>}
             </div>
           );
         })}
       </div>
       <ul className="grid grid-cols-[repeat(auto-fill,minmax(min(12rem,100%),1fr))] gap-2">
         {ds.map((p) => {
-          const noiDung = (
+          const content = (
             <>
               <span aria-hidden className={cn("mt-1 size-3.5 shrink-0 rounded-sm", NEN[p.sac])} />
               <span className="min-w-0 flex-1">
@@ -118,10 +118,10 @@ export function ThanhChiaPhan({
                   title={`Mở màn liên quan tới "${p.nhan}".`}
                   className={cn(cls, "nhan-an cursor-pointer hover:border-primary hover:bg-muted/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring")}
                 >
-                  {noiDung}
+                  {content}
                 </button>
               ) : (
-                <div className={cls}>{noiDung}</div>
+                <div className={cls}>{content}</div>
               )}
             </li>
           );

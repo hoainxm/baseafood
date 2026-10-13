@@ -24,7 +24,7 @@ export function dinhDangSo(n: number | null): string {
  *  - "x" "X" "×" → "*" ; "÷" ":" → "/" (gõ trên điện thoại / theo thói quen giấy)
  *  - số vi-VN: "." phân nghìn (bỏ), "," thập phân (→ ".")
  */
-function chuanHoa(raw: string): string {
+function normalize(raw: string): string {
   return raw
     .replace(/\s/g, "")
     .replace(/^=/, "")
@@ -51,14 +51,14 @@ export function laBieuThuc(raw: string): boolean {
  * ("1000*5%" = 50). KHÔNG dùng `eval`/`Function` — tự tách token nên an toàn với
  * chuỗi bất kỳ. Trả null khi không hợp lệ (thừa ký tự, chia 0, ngoặc lệch).
  */
-function danhGia(s: string): number | null {
+function evaluate(s: string): number | null {
   let i = 0;
-  const xem = () => s[i];
+  const peek = () => s[i];
 
   function bieuThuc(): number | null {
     let v = hang();
     if (v == null) return null;
-    while (xem() === "+" || xem() === "-") {
+    while (peek() === "+" || peek() === "-") {
       const op = s[i++];
       const r = hang();
       if (r == null) return null;
@@ -69,7 +69,7 @@ function danhGia(s: string): number | null {
   function hang(): number | null {
     let v = thua();
     if (v == null) return null;
-    while (xem() === "*" || xem() === "/") {
+    while (peek() === "*" || peek() === "/") {
       const op = s[i++];
       const r = thua();
       if (r == null) return null;
@@ -79,28 +79,28 @@ function danhGia(s: string): number | null {
     return v;
   }
   function thua(): number | null {
-    let v = coSo();
+    let v = parsePrimary();
     if (v == null) return null;
-    while (xem() === "%") {
+    while (peek() === "%") {
       i++;
       v = v / 100;
     }
     return v;
   }
-  function coSo(): number | null {
-    if (xem() === "+") {
+  function parsePrimary(): number | null {
+    if (peek() === "+") {
       i++;
-      return coSo();
+      return parsePrimary();
     }
-    if (xem() === "-") {
+    if (peek() === "-") {
       i++;
-      const v = coSo();
+      const v = parsePrimary();
       return v == null ? null : -v;
     }
-    if (xem() === "(") {
+    if (peek() === "(") {
       i++;
       const v = bieuThuc();
-      if (xem() !== ")") return null;
+      if (peek() !== ")") return null;
       i++;
       return v;
     }
@@ -122,10 +122,10 @@ function danhGia(s: string): number | null {
  */
 export function tinhBieuThuc(raw: string): number | null {
   if (!laBieuThuc(raw)) return null;
-  const s = chuanHoa(raw);
+  const s = normalize(raw);
   if (!s) return null;
   if (!/^[-+*/%().\d]+$/.test(s)) return null; // lẫn ký tự lạ ⇒ không tính
-  const kq = danhGia(s);
+  const kq = evaluate(s);
   // Làm tròn nhiễu dấu phẩy động (0,1+0,2 = 0,30000000000000004) về 6 chữ số lẻ.
   return kq == null ? null : Math.round(kq * 1e6) / 1e6;
 }

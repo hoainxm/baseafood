@@ -46,9 +46,9 @@ export function useCoOBatBuoc(
       setCo(false);
       return;
     }
-    const kiem = () => setCo(!!el.querySelector('[aria-required="true"]'));
-    kiem();
-    const mo = new MutationObserver(kiem);
+    const checkRequired = () => setCo(!!el.querySelector('[aria-required="true"]'));
+    checkRequired();
+    const mo = new MutationObserver(checkRequired);
     mo.observe(el, { subtree: true, childList: true, attributes: true });
     return () => mo.disconnect();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -101,16 +101,16 @@ export function Field({
   /* Đơn vị dài ngắn khác nhau ("kg" vs "đ/USD") nên KHÔNG dùng padding cố định —
      đo bề rộng chữ đơn vị rồi chừa đúng chỗ, tránh số đè lên đơn vị. */
   const unitRef = React.useRef<HTMLSpanElement>(null);
-  const [chuaCho, setChuaCho] = React.useState(0);
+  const [pendingCount, setPendingCount] = React.useState(0);
 
   React.useLayoutEffect(() => {
     if (!unit) {
-      setChuaCho(0);
+      setPendingCount(0);
       return;
     }
     const el = unitRef.current;
     if (!el) return;
-    const do1 = () => setChuaCho(el.offsetWidth + 24);
+    const do1 = () => setPendingCount(el.offsetWidth + 24);
     do1();
     // Đổi cỡ chữ hệ thống → đo lại
     const ro = new ResizeObserver(do1);
@@ -118,7 +118,7 @@ export function Field({
     return () => ro.disconnect();
   }, [unit]);
 
-  const thuocTinh: ThuocTinhONhap = {
+  const inputAttrs: ThuocTinhONhap = {
     id,
     // anNhan: nhãn nhìn thấy bị giấu → chuyển tên ô cho trình đọc màn hình.
     "aria-label": anNhan ? label : undefined,
@@ -127,17 +127,17 @@ export function Field({
     // Dấu * chỉ là tín hiệu THỊ GIÁC (aria-hidden). Trình đọc màn hình lấy
     // thông tin bắt buộc từ đây.
     "aria-required": required && !anNhanBatBuoc ? true : undefined,
-    style: chuaCho ? { paddingRight: chuaCho } : undefined,
+    style: pendingCount ? { paddingRight: pendingCount } : undefined,
   };
 
   const child = oNhapLong
     ? children
     : React.cloneElement(children as React.ReactElement<Record<string, unknown>>, {
-        ...thuocTinh,
+        ...inputAttrs,
         className: (children.props as { className?: string }).className,
         style: {
           ...((children.props as { style?: React.CSSProperties }).style ?? {}),
-          ...thuocTinh.style,
+          ...inputAttrs.style,
         },
       });
 
@@ -176,7 +176,7 @@ export function Field({
       )}
 
       <div className="relative mt-auto">
-        <ONhapCuaField.Provider value={oNhapLong ? thuocTinh : null}>{child}</ONhapCuaField.Provider>
+        <ONhapCuaField.Provider value={oNhapLong ? inputAttrs : null}>{child}</ONhapCuaField.Provider>
         {unit && (
           <span
             ref={unitRef}

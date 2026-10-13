@@ -22,17 +22,17 @@ export function KhungCuonNgang({
   className?: string;
   classNameKhung?: string;
 }) {
-  const khungRef = React.useRef<HTMLDivElement>(null);
-  const thanh = useThanhCuonTren(() => {
-    const el = khungRef.current;
+  const frameRef = React.useRef<HTMLDivElement>(null);
+  const scrollBar = useThanhCuonTren(() => {
+    const el = frameRef.current;
     if (!el) return null;
     // Bọc primitive `Table` ⇒ vùng cuộn thật là div table-container bên trong.
     return el.querySelector<HTMLElement>(':scope > [data-slot="table-container"]') ?? el;
   });
   return (
     <div className={cn("min-w-0", className)}>
-      {thanh}
-      <div ref={khungRef} className={cn("scroll-nice-x overflow-x-auto", classNameKhung)}>
+      {scrollBar}
+      <div ref={frameRef} className={cn("scroll-nice-x overflow-x-auto", classNameKhung)}>
         {children}
       </div>
     </div>

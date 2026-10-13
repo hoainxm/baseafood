@@ -70,7 +70,7 @@ export function NumberField({
 }) {
   const { props: o, xemTruoc } = useNhapSo({ value, onChange });
 
-  const buoc = (delta: number) => onChange(Math.max(0, (value ?? 0) + delta));
+  const stepBy = (delta: number) => onChange(Math.max(0, (value ?? 0) + delta));
 
   const input = (
     <div className="relative">
@@ -113,7 +113,7 @@ export function NumberField({
             variant="outline"
             size="icon"
             aria-label={`Giảm ${label}`}
-            onClick={() => buoc(-step)}
+            onClick={() => stepBy(-step)}
           >
             <Minus />
           </Button>
@@ -126,7 +126,7 @@ export function NumberField({
             variant="outline"
             size="icon"
             aria-label={`Tăng ${label}`}
-            onClick={() => buoc(step)}
+            onClick={() => stepBy(step)}
           >
             <Plus />
           </Button>

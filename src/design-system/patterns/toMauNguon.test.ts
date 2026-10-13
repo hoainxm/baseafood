@@ -22,23 +22,23 @@ function doChoi(hex: string): number {
   const [r, g, b] = kenh.map((c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
-const tuongPhan = (a: string, b: string) => {
+const contrast = (a: string, b: string) => {
   const [x, y] = [doChoi(a), doChoi(b)].sort((p, q) => q - p);
   return (x + 0.05) / (y + 0.05);
 };
 
 describe("bảng màu tô kiểu Excel", () => {
-  const tatCa = LUOI_MAU.flat();
+  const allColors = LUOI_MAU.flat();
 
   test("10 sắc × 5 mức, sắc ở design-system khớp lib", () => {
     expect(SAC_TO).toHaveLength(10);
     expect(MUC_TO).toHaveLength(5);
-    expect(tatCa).toHaveLength(50);
+    expect(allColors).toHaveLength(50);
     expect(SAC_TO.map((s) => s.ma)).toEqual([...SAC_TO_LIB]);
   });
 
   test("mọi mã có token màu + tên đọc được, lib nhận mã", () => {
-    for (const ma of tatCa) {
+    for (const ma of allColors) {
       expect(token(`to-${ma}`)).toMatch(/^#/);
       expect(tenMau(ma)).not.toBe("");
       expect(chuanMau(ma)).toBe(ma);
@@ -48,20 +48,20 @@ describe("bảng màu tô kiểu Excel", () => {
 
   test("chữ thường luôn ≥ 4,5:1 trên mọi ô, kể cả mức đậm nhất", () => {
     const chu = token("foreground");
-    for (const ma of tatCa) expect(tuongPhan(token(`to-${ma}`), chu), ma).toBeGreaterThanOrEqual(4.5);
+    for (const ma of allColors) expect(contrast(token(`to-${ma}`), chu), ma).toBeGreaterThanOrEqual(4.5);
   });
 
   test("MAU_TOI đúng các ô độ chói < 0,68 (chữ phụ/chữ màu đổi về chữ thường)", () => {
-    const toi = tatCa.filter((ma) => doChoi(token(`to-${ma}`)) < 0.68);
-    expect([...MAU_TOI].sort()).toEqual(toi.sort());
+    const darkCodes = allColors.filter((ma) => doChoi(token(`to-${ma}`)) < 0.68);
+    expect([...MAU_TOI].sort()).toEqual(darkCodes.sort());
   });
 
   test("ô không tối: chữ phụ + chữ đỏ vẫn ≥ 4,5:1", () => {
     const phu = token("muted-foreground");
     const loi = token("destructive");
-    for (const ma of tatCa.filter((m) => !MAU_TOI.has(m))) {
-      expect(tuongPhan(token(`to-${ma}`), phu), ma).toBeGreaterThanOrEqual(4.5);
-      expect(tuongPhan(token(`to-${ma}`), loi), ma).toBeGreaterThanOrEqual(4.5);
+    for (const ma of allColors.filter((m) => !MAU_TOI.has(m))) {
+      expect(contrast(token(`to-${ma}`), phu), ma).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(token(`to-${ma}`), loi), ma).toBeGreaterThanOrEqual(4.5);
     }
   });
 });

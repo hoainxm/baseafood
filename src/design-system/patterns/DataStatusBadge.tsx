@@ -14,14 +14,14 @@ import { ketNoi } from "@/lib/connectivity";
 import { cn } from "@/lib/utils";
 import { Cloud, CloudOff, HardDrive, Loader2, RotateCcw } from "lucide-react";
 
-type Trang = "cuc-bo" | "dang-kiem" | "da-noi" | "loi";
+type SyncState = "cuc-bo" | "dang-kiem" | "da-noi" | "loi";
 
 /**
  * Thử một lần đọc thật lên máy chủ để cập nhật đèn trạng thái. Đọc `dai_ly` là
  * phép probe rẻ nhất (bảng nhỏ, luôn có). Kết quả báo vào store `ketNoi` chung —
  * mọi nơi hiển thị trạng thái tự cập nhật.
  */
-async function probeKetNoi(): Promise<void> {
+async function probeConnection(): Promise<void> {
   if (!supabase) return;
   const { error } = await supabase
     .from("suppliers")
@@ -33,7 +33,7 @@ async function probeKetNoi(): Promise<void> {
 }
 
 const CAU_HINH: Record<
-  Trang,
+  SyncState,
   { icon: typeof Cloud; chu: string; phu: string; mau: string }
 > = {
   "cuc-bo": {
@@ -63,14 +63,14 @@ const CAU_HINH: Record<
 };
 
 /** Suy trạng thái hiển thị từ cấu hình môi trường + snapshot store. */
-function useTrangKetNoi() {
+function useConnectionStatus() {
   const anh = React.useSyncExternalStore(ketNoi.subscribe, ketNoi.laySnapshot);
-  const trang: Trang = !hasSupabase
+  const status: SyncState = !hasSupabase
     ? "cuc-bo"
     : anh.trang === "chua-ro"
       ? "dang-kiem"
       : anh.trang;
-  return { trang, loi: anh.loi };
+  return { trang: status, loi: anh.loi };
 }
 
 /**
@@ -78,10 +78,10 @@ function useTrangKetNoi() {
  * `NutTrangThai` (gom thành 1 nút icon) bên dưới.
  */
 export function TrangThaiDuLieu({ className }: { className?: string }) {
-  const { trang, loi } = useTrangKetNoi();
+  const { trang, loi } = useConnectionStatus();
 
   React.useEffect(() => {
-    void probeKetNoi();
+    void probeConnection();
   }, []);
 
   const c = CAU_HINH[trang];
@@ -111,22 +111,22 @@ export function TrangThaiDuLieu({ className }: { className?: string }) {
  * cả click lẫn touch.
  */
 export function NutTrangThai({ className }: { className?: string }) {
-  const { trang, loi } = useTrangKetNoi();
-  const [dangThu, setDangThu] = React.useState(false);
+  const { trang, loi } = useConnectionStatus();
+  const [isRetrying, setIsRetrying] = React.useState(false);
 
   React.useEffect(() => {
-    void probeKetNoi();
+    void probeConnection();
   }, []);
 
   const c = CAU_HINH[trang];
   const Icon = c.icon;
   const phu = trang === "loi" ? loi || c.phu : c.phu;
-  const coTheThu = hasSupabase && trang !== "dang-kiem";
+  const canRetry = hasSupabase && trang !== "dang-kiem";
 
   const thuLai = async () => {
-    setDangThu(true);
-    await probeKetNoi();
-    setDangThu(false);
+    setIsRetrying(true);
+    await probeConnection();
+    setIsRetrying(false);
   };
 
   return (
@@ -145,7 +145,7 @@ export function NutTrangThai({ className }: { className?: string }) {
           <Icon
             className={cn(
               "size-5",
-              (trang === "dang-kiem" || dangThu) && "animate-spin"
+              (trang === "dang-kiem" || isRetrying) && "animate-spin"
             )}
             aria-hidden
           />
@@ -164,18 +164,18 @@ export function NutTrangThai({ className }: { className?: string }) {
           </p>
           {phu && <p className="text-sm text-muted-foreground">{phu}</p>}
         </div>
-        {coTheThu && (
+        {canRetry && (
           <button
             type="button"
             onClick={thuLai}
-            disabled={dangThu}
+            disabled={isRetrying}
             className="mt-2 flex min-h-10 w-full items-center justify-center gap-2 rounded-lg border border-input text-sm font-medium nhan-an hover:bg-muted disabled:opacity-60"
           >
             <RotateCcw
-              className={cn("size-5", dangThu && "animate-spin")}
+              className={cn("size-5", isRetrying && "animate-spin")}
               aria-hidden
             />
-            {dangThu ? "Đang thử…" : "Thử kết nối lại"}
+            {isRetrying ? "Đang thử…" : "Thử kết nối lại"}
           </button>
         )}
       </PopoverContent>

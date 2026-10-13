@@ -39,12 +39,12 @@ export function StepForm({
   const [i, setI] = React.useState(0);
   const [loi, setLoi] = React.useState<LoiNhap[]>([]);
 
-  const tong = steps.length + 1; // + màn xem lại
-  const laXemLai = i === steps.length;
-  const buoc = laXemLai ? null : steps[i];
+  const stepCount = steps.length + 1; // + màn xem lại
+  const isReview = i === steps.length;
+  const step = isReview ? null : steps[i];
 
-  const tien = () => {
-    const ls = buoc?.kiemTra?.() ?? [];
+  const goNext = () => {
+    const ls = step?.kiemTra?.() ?? [];
     setLoi(ls);
     if (ls.length === 0) {
       setLoi([]);
@@ -59,7 +59,7 @@ export function StepForm({
 
   // Bước nào có ô bắt buộc thì bước đó mới hiện chú thích dấu *.
   const thanRef = React.useRef<HTMLDivElement>(null);
-  const coOBatBuoc = useCoOBatBuoc(thanRef, [i]);
+  const hasRequiredField = useCoOBatBuoc(thanRef, [i]);
 
   return (
     <div className="space-y-6">
@@ -67,7 +67,7 @@ export function StepForm({
       <div>
         <div className="flex items-baseline justify-between gap-4">
           <p className="text-sm font-semibold text-muted-foreground">
-            Bước {i + 1} / {tong}
+            Bước {i + 1} / {stepCount}
           </p>
           {onCancel && (
             <Button variant="ghost" size="sm" onClick={onCancel}>
@@ -76,7 +76,7 @@ export function StepForm({
           )}
         </div>
         <div className="mt-2 flex gap-2" aria-hidden>
-          {Array.from({ length: tong }).map((_, k) => (
+          {Array.from({ length: stepCount }).map((_, k) => (
             <div
               key={k}
               className={cn(
@@ -92,12 +92,12 @@ export function StepForm({
 
       <div>
         <h2 className="text-xl font-semibold text-foreground">
-          {laXemLai ? "Xem lại trước khi ghi" : buoc!.tieuDe}
+          {isReview ? "Xem lại trước khi ghi" : step!.tieuDe}
         </h2>
-        {!laXemLai && buoc!.moTa && (
-          <p className="mt-2 text-sm text-muted-foreground">{buoc!.moTa}</p>
+        {!isReview && step!.moTa && (
+          <p className="mt-2 text-sm text-muted-foreground">{step!.moTa}</p>
         )}
-        {laXemLai && (
+        {isReview && (
           <p className="mt-2 text-sm text-muted-foreground">
             Đọc lại số một lượt. Sai chỗ nào bấm "Quay lại" để sửa.
           </p>
@@ -108,8 +108,8 @@ export function StepForm({
           prefers-reduced-motion tắt). thanRef remount theo nhưng useCoOBatBuoc
           dò lại theo dep [i] nên chú thích dấu * vẫn đúng. */}
       <div key={i} ref={thanRef} className="hien-ngang space-y-6">
-        {coOBatBuoc && <ChuThichBatBuoc />}
-        {laXemLai ? xemLai : buoc!.noiDung}
+        {hasRequiredField && <ChuThichBatBuoc />}
+        {isReview ? xemLai : step!.noiDung}
       </div>
 
       <div className="flex flex-col-reverse gap-3 border-t border-border pt-5 sm:flex-row sm:justify-between">
@@ -125,13 +125,13 @@ export function StepForm({
           Quay lại
         </Button>
 
-        {laXemLai ? (
+        {isReview ? (
           <Button size="lg" onClick={onSubmit} title="Ghi toàn bộ những gì đã nhập ở các bước trên vào sổ.">
             <Check />
             {nhanHoanTat}
           </Button>
         ) : (
-          <Button size="lg" onClick={tien} title="Sang bước kế tiếp. Thiếu ô bắt buộc sẽ được nhắc ngay tại đây.">
+          <Button size="lg" onClick={goNext} title="Sang bước kế tiếp. Thiếu ô bắt buộc sẽ được nhắc ngay tại đây.">
             Tiếp tục
             <ArrowRight />
           </Button>

@@ -96,13 +96,13 @@ export function ChoiceGroup({
         )}
       >
         {options.map((o) => {
-          const chon = o.value === value;
+          const isSelected = o.value === value;
           return (
             <button
               key={o.value}
               type="button"
               data-slot="choice-option"
-              aria-pressed={chon}
+              aria-pressed={isSelected}
               onClick={() => onChange(o.value)}
               title={o.moTa ?? `Chọn "${o.label}" cho ${label.toLowerCase()}.`}
               className={cn(
@@ -110,7 +110,7 @@ export function ChoiceGroup({
                    (VD "Ngày nhập hàng" ↔ "Phân xưởng") thẳng hàng.
                    Giữ border-2: viền dày là tín hiệu CHỌN (không chỉ dựa màu). */
                 "flex min-h-10 w-full items-center justify-between gap-4 rounded-lg border-2 px-4 py-2 text-left text-sm font-semibold nhan-an",
-                chon
+                isSelected
                   ? "border-primary bg-accent text-accent-foreground"
                   : "border-input bg-background text-foreground hover:bg-muted"
               )}
@@ -127,7 +127,7 @@ export function ChoiceGroup({
                 aria-hidden
                 className={cn(
                   "size-5 shrink-0 text-primary",
-                  chon ? "opacity-100" : "opacity-0"
+                  isSelected ? "opacity-100" : "opacity-0"
                 )}
               />
             </button>

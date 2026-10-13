@@ -33,7 +33,7 @@ export function NutGiaoDien({
   const [mo, setMo] = React.useState(false);
   const snap = React.useRef<AnhCaiDat | null>(null);
 
-  const doiMo = (open: boolean) => {
+  const handleOpenChange = (open: boolean) => {
     if (open) {
       // Chụp trạng thái để có thể hoàn tác nếu người dùng Hủy.
       snap.current = docCaiDatHienThi(taiKhoan);
@@ -44,7 +44,7 @@ export function NutGiaoDien({
     setMo(open);
   };
 
-  const luu = () => {
+  const save = () => {
     snap.current = null; // đã đồng ý → không hoàn tác nữa
     setMo(false);
     // Không toast: giao diện đổi ngay trước mắt là phản hồi (README luật 8 — cài đặt hiển thị).
@@ -55,7 +55,7 @@ export function NutGiaoDien({
   return (
     <FormDialog
       open={mo}
-      onOpenChange={doiMo}
+      onOpenChange={handleOpenChange}
       tieuDe="Tùy chỉnh giao diện"
       moTa="Xem trước ngay khi chỉnh. Bấm Lưu để giữ cho riêng tài khoản của bạn."
       icon={Palette}
@@ -65,7 +65,7 @@ export function NutGiaoDien({
           <Button variant="outline" onClick={huy}>
             Hủy
           </Button>
-          <Button onClick={luu}>Lưu</Button>
+          <Button onClick={save}>Lưu</Button>
         </>
       }
       trigger={

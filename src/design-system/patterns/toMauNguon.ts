@@ -49,8 +49,8 @@ export const LUOI_MAU: MauTo[][] = MUC_TO.map((_, i) =>
 export function tenMau(ma: string): string {
   const i = ma.lastIndexOf("-");
   const s = SAC_TO.find((x) => x.ma === ma.slice(0, i));
-  const muc = MUC_TO[Number(ma.slice(i + 1)) - 1];
-  return s && muc ? `${s.nhan} ${muc}` : "";
+  const shadeLevel = MUC_TO[Number(ma.slice(i + 1)) - 1];
+  return s && shadeLevel ? `${s.nhan} ${shadeLevel}` : "";
 }
 
 /** Dấu của một dòng. `mau` rỗng = chỉ in đậm. */
@@ -62,22 +62,22 @@ export interface DauDong {
 /** Hợp đồng app cấp cho design-system — đọc/ghi dấu theo khoá bảng. */
 export interface NguonToMau {
   /** Dấu CẢ DÒNG của một bảng: Map(khoá dòng → dấu). Bảng chưa có dấu ⇒ Map rỗng. */
-  dauCuaBang: (maBang: string) => ReadonlyMap<string, DauDong>;
+  dauCuaBang: (tableKey: string) => ReadonlyMap<string, DauDong>;
   /** Đặt dấu cho nhiều dòng một lượt. `null` = bỏ tô (xoá dấu). */
-  dat: (maBang: string, khoaDong: string[], dau: DauDong | null) => void;
+  dat: (tableKey: string, khoaDong: string[], dau: DauDong | null) => void;
 }
 
 export const ToMauContext = React.createContext<NguonToMau | null>(null);
 
-const RONG: ReadonlyMap<string, DauDong> = new Map();
+const EMPTY_MARKS: ReadonlyMap<string, DauDong> = new Map();
 
 /** Vá dấu: chỉ đổi phần được nêu (màu HOẶC in đậm), phần kia giữ theo từng dòng. */
 export type VaDau = Partial<DauDong>;
 
 /** Áp vá lên dấu cũ ⇒ dấu mới (null = hết dấu). */
-export function apVa(cu: DauDong | undefined | null, va: VaDau | null): DauDong | null {
+export function apVa(prev: DauDong | undefined | null, va: VaDau | null): DauDong | null {
   if (!va) return null;
-  const dau = { mau: va.mau ?? cu?.mau ?? "", dam: va.dam ?? cu?.dam ?? false };
+  const dau = { mau: va.mau ?? prev?.mau ?? "", dam: va.dam ?? prev?.dam ?? false };
   return dau.mau || dau.dam ? dau : null;
 }
 
@@ -95,7 +95,7 @@ export interface ToMauBang {
 }
 
 /** Gom các dòng theo dấu đích ⇒ mỗi nhóm một lần ghi. */
-function gomTheoDau(cap: [string, DauDong | null][]) {
+function groupByMark(cap: [string, DauDong | null][]) {
   const nhom = new Map<string, { dau: DauDong | null; khoa: string[] }>();
   for (const [k, d] of cap) {
     const kk = JSON.stringify(d);
@@ -110,25 +110,25 @@ function gomTheoDau(cap: [string, DauDong | null][]) {
  * Hook tô màu của MỘT bảng. `maBang` = khoá ổn định của bảng (VD "ton-kho-thang")
  * — đổi khoá là mất dấu cũ, nên đặt một lần rồi để yên. Bỏ trống ⇒ tắt.
  */
-export function useToMau(maBang?: string): ToMauBang {
-  const nguon = React.useContext(ToMauContext);
-  const bat = Boolean(nguon && maBang);
-  const map = bat && nguon && maBang ? nguon.dauCuaBang(maBang) : RONG;
+export function useToMau(tableKey?: string): ToMauBang {
+  const source = React.useContext(ToMauContext);
+  const bat = Boolean(source && tableKey);
+  const map = bat && source && tableKey ? source.dauCuaBang(tableKey) : EMPTY_MARKS;
 
   return React.useMemo<ToMauBang>(() => {
-    const sua = (khoa: string[], va: VaDau | null) => {
+    const update = (khoa: string[], va: VaDau | null) => {
       const ds = [...new Set(khoa)];
-      if (!nguon || !maBang || ds.length === 0) return;
-      const cu = ds.map((k) => [k, map.get(k) ?? null] as [string, DauDong | null]);
-      const moi = cu.map(([k, d]) => [k, apVa(d, va)] as [string, DauDong | null]);
+      if (!source || !tableKey || ds.length === 0) return;
+      const prev = ds.map((k) => [k, map.get(k) ?? null] as [string, DauDong | null]);
+      const nextMarks = prev.map(([k, d]) => [k, apVa(d, va)] as [string, DauDong | null]);
       // KHÔNG toast (README luật 8): tô màu / in đậm là dấu trình bày, không đổi số
       // sổ sách — màu dòng đổi ngay trước mắt đã là phản hồi; muốn gỡ thì Bỏ tô.
-      for (const g of gomTheoDau(moi)) nguon.dat(maBang, g.khoa, g.dau);
+      for (const g of groupByMark(nextMarks)) source.dat(tableKey, g.khoa, g.dau);
     };
     return {
       bat,
       lay: (k) => map.get(k),
-      sua,
+      sua: update,
       thuocTinh: (k) => {
         const d = map.get(k);
         if (!d) return {};
@@ -139,7 +139,7 @@ export function useToMau(maBang?: string): ToMauBang {
         };
       },
     };
-  }, [bat, map, nguon, maBang]);
+  }, [bat, map, source, tableKey]);
 }
 
 /**
@@ -147,15 +147,15 @@ export function useToMau(maBang?: string): ToMauBang {
  * chọn cả khoảng từ dòng tick trước — như Shift+bấm ở Excel.
  */
 export function useChonDong() {
-  const [daChon, setDaChon] = React.useState<ReadonlySet<string>>(() => new Set());
+  const [selected, setSelected] = React.useState<ReadonlySet<string>>(() => new Set());
   const neo = React.useRef<string | null>(null);
   /** Tick/bỏ một dòng; `shift` + `thuTu` (khoá đang hiện) ⇒ đặt cả khoảng theo dòng vừa bấm. */
   const doi = React.useCallback((k: string, shift = false, thuTu: string[] = []) => {
     const a = neo.current ? thuTu.indexOf(neo.current) : -1;
     neo.current = k;
-    setDaChon((cu) => {
-      const n = new Set(cu);
-      const bat = !cu.has(k);
+    setSelected((prev) => {
+      const n = new Set(prev);
+      const bat = !prev.has(k);
       const b = thuTu.indexOf(k);
       if (shift && a >= 0 && b >= 0) {
         for (const x of thuTu.slice(Math.min(a, b), Math.max(a, b) + 1)) {
@@ -167,9 +167,9 @@ export function useChonDong() {
       return n;
     });
   }, []);
-  const doiTatCa = React.useCallback((keys: string[], bat: boolean) => {
-    setDaChon((cu) => {
-      const n = new Set(cu);
+  const toggleAll = React.useCallback((keys: string[], bat: boolean) => {
+    setSelected((prev) => {
+      const n = new Set(prev);
       for (const k of keys) {
         if (bat) n.add(k);
         else n.delete(k);
@@ -177,6 +177,6 @@ export function useChonDong() {
       return n;
     });
   }, []);
-  const boChon = React.useCallback(() => setDaChon(new Set()), []);
-  return { daChon, doi, doiTatCa, boChon };
+  const clearSelection = React.useCallback(() => setSelected(new Set()), []);
+  return { daChon: selected, doi, doiTatCa: toggleAll, boChon: clearSelection };
 }

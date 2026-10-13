@@ -60,7 +60,7 @@ export function BangChuyen({
       <ol className="flex flex-col gap-1 @3xl:flex-row @3xl:items-stretch">
         {khau.map((k, i) => {
           const thieu = k.viecThieu ?? 0;
-          const noiDung = (
+          const content = (
             <>
               <span className="text-sm font-medium text-muted-foreground">
                 {i + 1}. {k.ten}
@@ -98,10 +98,10 @@ export function BangChuyen({
                     title={`Mở màn ${k.ten.toLowerCase()} để xem chi tiết và làm việc còn thiếu.`}
                     className={cn(cls, "nhan-an cursor-pointer hover:border-primary hover:bg-muted/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring")}
                   >
-                    {noiDung}
+                    {content}
                   </button>
                 ) : (
-                  <div className={cls}>{noiDung}</div>
+                  <div className={cls}>{content}</div>
                 )}
               </li>
             </Fragment>

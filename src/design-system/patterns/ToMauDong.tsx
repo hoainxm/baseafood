@@ -17,7 +17,7 @@ import { LUOI_MAU, tenMau, type MauTo, type ToMauBang } from "./toMauNguon";
  */
 
 /** Ô màu nhỏ kiểu Excel — không chữ; tên màu nằm ở aria-label + title. */
-function OMau({ ma, chon, onChon }: { ma: MauTo; chon: boolean; onChon: () => void }) {
+function ColorSwatch({ ma, chon, onChon }: { ma: MauTo; chon: boolean; onChon: () => void }) {
   const ten = tenMau(ma);
   return (
     <button
@@ -47,9 +47,9 @@ export function NutToMauChon({ to, khoa }: { to: ToMauBang; khoa: string[] }) {
   if (!to.bat || khoa.length === 0) return null;
   const ds = khoa.map((k) => to.lay(k));
   const mau0 = ds[0]?.mau ?? "";
-  const cungMau = mau0 && ds.every((d) => (d?.mau ?? "") === mau0) ? mau0 : "";
-  const datHet = ds.every((d) => d?.dam);
-  const coDau = ds.some(Boolean);
+  const commonColor = mau0 && ds.every((d) => (d?.mau ?? "") === mau0) ? mau0 : "";
+  const isAllBold = ds.every((d) => d?.dam);
+  const hasMarks = ds.some(Boolean);
   const n = khoa.length;
   return (
     <>
@@ -62,10 +62,10 @@ export function NutToMauChon({ to, khoa }: { to: ToMauBang; khoa: string[] }) {
             title={`Chọn màu tô cho ${n} dòng đang tick (giữ nguyên in đậm). Lưu chung — máy khác cũng thấy.`}
           >
             <PaintBucket />
-            {cungMau && (
+            {commonColor && (
               <span
                 aria-hidden
-                style={{ backgroundColor: `var(--to-${cungMau})` }}
+                style={{ backgroundColor: `var(--to-${commonColor})` }}
                 className="inline-block size-3.5 rounded-sm ring-1 ring-foreground/30"
               />
             )}
@@ -76,10 +76,10 @@ export function NutToMauChon({ to, khoa }: { to: ToMauBang; khoa: string[] }) {
         <PopoverContent align="start" className="w-auto max-w-[calc(100vw-1rem)] p-3">
           <div className="grid w-max grid-cols-10 gap-1" role="group" aria-label="Bảng màu">
             {LUOI_MAU.flat().map((ma) => (
-              <OMau
+              <ColorSwatch
                 key={ma}
                 ma={ma}
-                chon={cungMau === ma}
+                chon={commonColor === ma}
                 onChon={() => {
                   to.sua(khoa, { mau: ma });
                   setMo(false);
@@ -92,19 +92,19 @@ export function NutToMauChon({ to, khoa }: { to: ToMauBang; khoa: string[] }) {
       <Button
         type="button"
         size="sm"
-        variant={datHet ? "default" : "outline"}
-        aria-pressed={datHet}
+        variant={isAllBold ? "default" : "outline"}
+        aria-pressed={isAllBold}
         title={
-          datHet
+          isAllBold
             ? `Bỏ in đậm ${n} dòng đang tick (giữ nguyên màu).`
             : `In đậm ${n} dòng đang tick (giữ nguyên màu).`
         }
-        onClick={() => to.sua(khoa, { dam: !datHet })}
+        onClick={() => to.sua(khoa, { dam: !isAllBold })}
       >
         <Bold />
-        {datHet ? "Bỏ in đậm" : "In đậm"}
+        {isAllBold ? "Bỏ in đậm" : "In đậm"}
       </Button>
-      {coDau && (
+      {hasMarks && (
         <Button
           type="button"
           size="sm"

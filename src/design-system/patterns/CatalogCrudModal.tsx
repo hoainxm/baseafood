@@ -31,9 +31,9 @@ export interface TruongDanhMuc<T> {
   viDu?: string;
   /** Ô nhập riêng (combobox, chọn ngày…). Mặc định là ô chữ. */
   render?: (
-    giaTri: string,
-    doiGiaTri: (v: string) => void,
-    dangSua: boolean
+    value: string,
+    changeValue: (v: string) => void,
+    isEditing: boolean
   ) => React.ReactNode;
   /** Hiện thế nào trong bảng. Mặc định in nguyên văn. */
   hienThi?: (row: T) => React.ReactNode;
@@ -81,50 +81,50 @@ export function DanhMucCrud<T extends { id: string }>({
   /** Đang tải danh sách từ máy chủ (chưa có dữ liệu local) → hiện skeleton. */
   dangTai?: boolean;
   /** Kiểm tra thêm (ngoài ô bắt buộc) — vd trùng mã số. Trả về danh sách lỗi. */
-  kiemTraThem?: (dang: T, rows: T[], laThem: boolean) => LoiNhap[];
+  kiemTraThem?: (editing: T, rows: T[], isAdding: boolean) => LoiNhap[];
   /** Tô màu dòng "đã dò" — khoá ổn định của bảng danh mục (VD "danh-muc-khach-hang"). */
   toMau?: string;
 }) {
-  const [dang, setDang] = React.useState<T | null>(null);
-  const [laThem, setLaThem] = React.useState(false);
+  const [editing, setEditing] = React.useState<T | null>(null);
+  const [isAdding, setIsAdding] = React.useState(false);
   const [loi, setLoi] = React.useState<LoiNhap[]>([]);
 
-  const moThem = () => {
-    setDang(taoMoi());
-    setLaThem(true);
+  const openAdd = () => {
+    setEditing(taoMoi());
+    setIsAdding(true);
     setLoi([]);
   };
 
-  const moSua = (r: T) => {
-    setDang({ ...r });
-    setLaThem(false);
+  const openEdit = (r: T) => {
+    setEditing({ ...r });
+    setIsAdding(false);
     setLoi([]);
   };
 
-  const luu = () => {
-    if (!dang) return;
+  const save = () => {
+    if (!editing) return;
     const ls: LoiNhap[] = fields
-      .filter((f) => f.batBuoc && !String(dang[f.key] ?? "").trim())
+      .filter((f) => f.batBuoc && !String(editing[f.key] ?? "").trim())
       .map((f) => ({ truong: f.nhan, thongBao: `Chưa nhập ${f.nhan.toLowerCase()}` }));
-    const lsThem = kiemTraThem?.(dang, rows, laThem) ?? [];
-    const tatCa = [...ls, ...lsThem];
-    setLoi(tatCa);
-    if (tatCa.length > 0) return;
+    const extraErrors = kiemTraThem?.(editing, rows, isAdding) ?? [];
+    const allRows = [...ls, ...extraErrors];
+    setLoi(allRows);
+    if (allRows.length > 0) return;
 
-    if (laThem) {
-      onChange([...rows, dang]);
+    if (isAdding) {
+      onChange([...rows, editing]);
       notify.daLuu(`Đã thêm ${tenDonVi}`);
     } else {
-      onChange(rows.map((r) => (r.id === dang.id ? dang : r)));
+      onChange(rows.map((r) => (r.id === editing.id ? editing : r)));
       notify.daLuu(`Đã lưu thay đổi`);
     }
-    setDang(null);
+    setEditing(null);
   };
 
-  const xoa = (r: T) => {
-    const truoc = rows;
+  const remove = (r: T) => {
+    const prevRows = rows;
     onChange(rows.filter((x) => x.id !== r.id));
-    notify.daXoa(`Đã xóa ${tenDonVi}`, () => onChange(truoc));
+    notify.daXoa(`Đã xóa ${tenDonVi}`, () => onChange(prevRows));
   };
 
   const cols: Cot<T>[] = [
@@ -155,7 +155,7 @@ export function DanhMucCrud<T extends { id: string }>({
         </div>
         <Button
           size="lg"
-          onClick={moThem}
+          onClick={openAdd}
           title={`Mở hộp thoại tạo một ${tenDonVi} mới. Lưu xong dùng được ngay ở mọi màn có ô chọn ${tenDonVi}.`}
         >
           <Plus />
@@ -172,7 +172,7 @@ export function DanhMucCrud<T extends { id: string }>({
           action={
             <Button
               size="lg"
-              onClick={moThem}
+              onClick={openAdd}
               title={`Mở hộp thoại tạo một ${tenDonVi} mới — mục đầu tiên của danh mục này.`}
             >
               <Plus />
@@ -193,7 +193,7 @@ export function DanhMucCrud<T extends { id: string }>({
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => moSua(r)}
+                onClick={() => openEdit(r)}
                 title={`Sửa thông tin ${tenDonVi} "${moTaBanGhi(r)}". Sổ đã ghi trước đó giữ nguyên tên cũ — không hồi tố.`}
               >
                 <Pencil />
@@ -201,7 +201,7 @@ export function DanhMucCrud<T extends { id: string }>({
               </Button>
               <ConfirmDelete
                 moTaBanGhi={moTaBanGhi(r)}
-                onConfirm={() => xoa(r)}
+                onConfirm={() => remove(r)}
                 tieuDe={`Xóa ${tenDonVi} này?`}
                 nhanNut={`Xóa ${tenDonVi}`}
               />
@@ -211,14 +211,14 @@ export function DanhMucCrud<T extends { id: string }>({
       )}
 
       <HopSuaDanhMuc
-        dang={dang}
-        laThem={laThem}
+        dang={editing}
+        laThem={isAdding}
         fields={fields}
         tenDonVi={tenDonVi}
         loi={loi}
-        onDoi={setDang}
-        onLuu={luu}
-        onClose={() => setDang(null)}
+        onDoi={setEditing}
+        onLuu={save}
+        onClose={() => setEditing(null)}
       />
     </div>
   );
@@ -276,22 +276,22 @@ export function HopSuaDanhMuc<T extends { id: string }>({
           <div className="space-y-5 py-2">
             <ErrorSummary loi={loi} />
             {fields.map((f) => {
-              const giaTri = String(dang[f.key] ?? "");
+              const value = String(dang[f.key] ?? "");
               if (khoaTruong?.key === f.key)
                 return (
                   <Field key={f.key} label={f.nhan} hint={khoaTruong.lyDo}>
-                    <Input value={giaTri} readOnly aria-readonly className="bg-muted" />
+                    <Input value={value} readOnly aria-readonly className="bg-muted" />
                   </Field>
                 );
-              const doiGiaTri = (v: string) =>
+              const changeValue = (v: string) =>
                 onDoi((d) => (d ? { ...d, [f.key]: v } : d));
               return f.render ? (
-                <div key={f.key}>{f.render(giaTri, doiGiaTri, !laThem)}</div>
+                <div key={f.key}>{f.render(value, changeValue, !laThem)}</div>
               ) : (
                 <Field key={f.key} label={f.nhan} required={f.batBuoc} hint={f.goiY}>
                   <Input
-                    value={giaTri}
-                    onChange={(e) => doiGiaTri(e.target.value)}
+                    value={value}
+                    onChange={(e) => changeValue(e.target.value)}
                     placeholder={f.viDu}
                   />
                 </Field>

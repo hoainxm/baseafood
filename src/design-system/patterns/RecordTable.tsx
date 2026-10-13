@@ -33,7 +33,7 @@ export interface Cot<T> {
   sapXep?: (row: T) => string | number;
 }
 
-type Huong = "tang" | "giam";
+type SortDir = "tang" | "giam";
 
 /**
  * RecordTable — một nguồn dữ liệu, hai hình thức.
@@ -85,61 +85,61 @@ export function RecordTable<T>({
 }) {
   const to = useToMau(toMau);
   // Tick dòng để tô màu / in đậm nhiều dòng một lúc (chỉ khi bật toMau).
-  const chonDong = useChonDong();
+  const rowSelection = useChonDong();
   // Thanh cuộn ngang TRÊN đầu bảng (README § 5a) — vùng cuộn thật là table-container.
-  const khungBangRef = React.useRef<HTMLDivElement>(null);
-  const thanhTren = useThanhCuonTren(
-    () => khungBangRef.current?.querySelector<HTMLElement>('[data-slot="table-container"]') ?? null,
+  const tableFrameRef = React.useRef<HTMLDivElement>(null);
+  const topScrollBar = useThanhCuonTren(
+    () => tableFrameRef.current?.querySelector<HTMLElement>('[data-slot="table-container"]') ?? null,
     "mx-2 mt-2"
   );
   const [q, setQ] = React.useState("");
   const [sapTheo, setSapTheo] = React.useState<string | null>(null);
-  const [huong, setHuong] = React.useState<Huong>("tang");
-  const [moRong, setMoRong] = React.useState<ReadonlySet<string>>(() => new Set());
-  const doiMoRong = (k: string) =>
-    setMoRong((s) => {
+  const [sortDir, setSortDir] = React.useState<SortDir>("tang");
+  const [expandedRows, setExpandedRows] = React.useState<ReadonlySet<string>>(() => new Set());
+  const toggleExpanded = (k: string) =>
+    setExpandedRows((s) => {
       const n = new Set(s);
       if (n.has(k)) n.delete(k);
       else n.add(k);
       return n;
     });
 
-  const cotSapDuoc = columns.filter((c) => c.sapXep);
+  const sortableColumns = columns.filter((c) => c.sapXep);
   // Chế độ thẻ: chỉ đưa nút sắp theo cột ĐANG HIỆN trên thẻ — 9 nút cho mọi
   // trường (kể cả trường ẩn) rối hơn là giúp.
-  const cotSapThe = cotSapDuoc.filter((c) => !c.anTrenDienThoai);
+  const cardSortableColumns = sortableColumns.filter((c) => !c.anTrenDienThoai);
 
-  const daLoc = React.useMemo(() => {
+  const filtered = React.useMemo(() => {
     const kw = q.trim().toLowerCase();
     if (!kw || !timKiem) return rows;
     return rows.filter((r) => timKiem(r).toLowerCase().includes(kw));
   }, [rows, q, timKiem]);
 
   const daSap = React.useMemo(() => {
-    const cot = columns.find((c) => c.key === sapTheo);
-    if (!cot?.sapXep) return daLoc;
-    const fn = cot.sapXep;
-    return [...daLoc].sort((a, b) => {
+    const column = columns.find((c) => c.key === sapTheo);
+    if (!column?.sapXep) return filtered;
+    const fn = column.sapXep;
+    return [...filtered].sort((a, b) => {
       const va = fn(a);
       const vb = fn(b);
       const cmp =
         typeof va === "number" && typeof vb === "number"
           ? va - vb
           : String(va).localeCompare(String(vb), "vi");
-      return huong === "tang" ? cmp : -cmp;
+      return sortDir === "tang" ? cmp : -cmp;
     });
-  }, [daLoc, columns, sapTheo, huong]);
+  }, [filtered, columns, sapTheo, sortDir]);
 
   const doiSap = (key: string) => {
     if (sapTheo === key) {
-      setHuong((h) => (h === "tang" ? "giam" : "tang"));
+      setSortDir((h) => (h === "tang" ? "giam" : "tang"));
     } else {
       setSapTheo(key);
-      setHuong("tang");
+      setSortDir("tang");
     }
   };
 
-  const thanhCongCu = (timKiem || cotSapDuoc.length > 0) && rows.length > 0 && (
+  const toolbar = (timKiem || sortableColumns.length > 0) && rows.length > 0 && (
     <div className="flex min-w-0 flex-col gap-3 @3xl:flex-row @3xl:items-center">
       {timKiem && (
         <div className="relative min-w-0 flex-1">
@@ -157,10 +157,10 @@ export function RecordTable<T>({
         </div>
       )}
       {/* Sắp xếp trên điện thoại: header bảng không hiện nên cần nút riêng */}
-      {cotSapThe.length > 0 && (
+      {cardSortableColumns.length > 0 && (
         <div className="flex min-w-0 flex-wrap items-center gap-2 @3xl:hidden">
           <span className="text-sm text-muted-foreground">Sắp theo</span>
-          {cotSapThe.map((c) => (
+          {cardSortableColumns.map((c) => (
             <Button
               key={c.key}
               variant={sapTheo === c.key ? "default" : "outline"}
@@ -171,7 +171,7 @@ export function RecordTable<T>({
             >
               <span className="truncate">{c.header}</span>
               {sapTheo === c.key ? (
-                huong === "tang" ? (
+                sortDir === "tang" ? (
                   <ArrowUp />
                 ) : (
                   <ArrowDown />
@@ -211,58 +211,58 @@ export function RecordTable<T>({
     );
   }
 
-  const cotChinh = columns.find((c) => c.chinh) ?? columns[0];
-  const cotBang = columns.filter((c) => !c.phu || c === cotChinh);
-  const cotAnBang = columns.filter((c) => c.phu && c !== cotChinh);
-  const cotThe = columns.filter((c) => c !== cotChinh && !c.anTrenDienThoai);
-  const cotAnThe = columns.filter((c) => c !== cotChinh && c.anTrenDienThoai);
-  const coCotThaoTac = Boolean(actions) || cotAnBang.length > 0;
+  const primaryColumn = columns.find((c) => c.chinh) ?? columns[0];
+  const tableColumns = columns.filter((c) => !c.phu || c === primaryColumn);
+  const hiddenTableColumns = columns.filter((c) => c.phu && c !== primaryColumn);
+  const cardColumns = columns.filter((c) => c !== primaryColumn && !c.anTrenDienThoai);
+  const hiddenCardColumns = columns.filter((c) => c !== primaryColumn && c.anTrenDienThoai);
+  const hasActionColumn = Boolean(actions) || hiddenTableColumns.length > 0;
   /** Nhãn dòng cho trình đọc màn hình của ô tick (chữ của cột chính nếu là chữ). */
-  const nhanDong = (r: T) => {
-    const v = cotChinh.render(r);
+  const rowLabel = (r: T) => {
+    const v = primaryColumn.render(r);
     return typeof v === "string" || typeof v === "number" ? String(v) : getKey(r);
   };
-  const khoaHien = daSap.map((r) => getKey(r));
-  const daTick = khoaHien.filter((k) => chonDong.daChon.has(k));
-  const chonHet = daTick.length > 0 && daTick.length === khoaHien.length;
+  const visibleKeys = daSap.map((r) => getKey(r));
+  const daTick = visibleKeys.filter((k) => rowSelection.daChon.has(k));
+  const isAllSelected = daTick.length > 0 && daTick.length === visibleKeys.length;
   const oTick = (r: T) => {
     const k = getKey(r);
     return (
       <input
         type="checkbox"
         className="mt-0.5 size-5 shrink-0"
-        checked={chonDong.daChon.has(k)}
+        checked={rowSelection.daChon.has(k)}
         onChange={() => {}}
-        onClick={(e) => chonDong.doi(k, e.shiftKey, khoaHien)}
-        aria-label={`Chọn dòng ${nhanDong(r)}`}
+        onClick={(e) => rowSelection.doi(k, e.shiftKey, visibleKeys)}
+        aria-label={`Chọn dòng ${rowLabel(r)}`}
         title="Tick để tô màu / in đậm dòng này (Shift+tick chọn cả khoảng)."
       />
     );
   };
 
-  const nutChiTiet = (k: string, coAn: boolean) =>
-    coAn && (
+  const detailButton = (k: string, hasHidden: boolean) =>
+    hasHidden && (
       <Button
         variant="ghost"
         size="sm"
-        aria-expanded={moRong.has(k)}
-        onClick={() => doiMoRong(k)}
+        aria-expanded={expandedRows.has(k)}
+        onClick={() => toggleExpanded(k)}
         title={
-          moRong.has(k)
+          expandedRows.has(k)
             ? "Thu gọn phần thông tin thêm của dòng này."
             : "Xem các thông tin còn lại của dòng này (đang ẩn cho bảng gọn)."
         }
       >
         <ChevronDown
-          className={cn("transition-transform", moRong.has(k) && "rotate-180")}
+          className={cn("transition-transform", expandedRows.has(k) && "rotate-180")}
         />
-        {moRong.has(k) ? "Thu gọn" : "Chi tiết"}
+        {expandedRows.has(k) ? "Thu gọn" : "Chi tiết"}
       </Button>
     );
 
-  const chiTiet = (r: T, cot: Cot<T>[]) => (
+  const renderDetail = (r: T, column: Cot<T>[]) => (
     <dl className="grid gap-x-8 gap-y-3 @3xl:grid-cols-2 @5xl:grid-cols-3">
-      {cot.map((c) => (
+      {column.map((c) => (
         <div key={c.key} className="min-w-0">
           <dt className="text-sm text-muted-foreground">{c.header}</dt>
           <dd className={cn("text-sm font-medium break-words", c.so && "tnum")}>
@@ -278,7 +278,7 @@ export function RecordTable<T>({
     // bảng ép ô rộng theo nội-dung-tối-thiểu → tránh tràn đè khối bên cạnh.
     // @container: mốc thẻ ↔ bảng đo theo bề rộng CHÍNH VÙNG NÀY.
     <div className={cn("@container min-w-0 space-y-4", className)}>
-      {thanhCongCu}
+      {toolbar}
 
       {daSap.length === 0 ? (
         <div className="rounded-xl border-2 border-dashed border-border px-6 py-10 text-center text-sm text-muted-foreground">
@@ -289,20 +289,20 @@ export function RecordTable<T>({
           {/* Desktop — cuộn ngang khi ô chứa hẹp (VD nằm trong lưới 2 cột) để bảng
               KHÔNG tràn đè khối bên cạnh; đủ rộng thì không có thanh cuộn. */}
           <div
-            ref={khungBangRef}
+            ref={tableFrameRef}
             className="scroll-nice-x hidden overflow-x-auto rounded-xl ring-1 ring-foreground/10 @3xl:block"
           >
-            {thanhTren}
-            <Table className={cn("bang-ghim-dau", coCotThaoTac && "bang-ghim-cuoi")}>
+            {topScrollBar}
+            <Table className={cn("bang-ghim-dau", hasActionColumn && "bang-ghim-cuoi")}>
               <TableHeader>
                 <TableRow>
-                  {cotBang.map((c, ci) => (
+                  {tableColumns.map((c, ci) => (
                     <TableHead
                       key={c.key}
                       className={cn(c.so && "text-right", "p-0 whitespace-normal")}
                       aria-sort={
                         sapTheo === c.key
-                          ? huong === "tang"
+                          ? sortDir === "tang"
                             ? "ascending"
                             : "descending"
                           : undefined
@@ -313,10 +313,10 @@ export function RecordTable<T>({
                         <input
                           type="checkbox"
                           className="ml-(--pad-o,0.75rem) size-5 shrink-0"
-                          checked={chonHet}
-                          onChange={() => chonDong.doiTatCa(khoaHien, !chonHet)}
-                          aria-label={chonHet ? "Bỏ chọn tất cả dòng" : "Chọn tất cả dòng"}
-                          title={chonHet ? "Bỏ tick mọi dòng đang hiện." : "Tick mọi dòng đang hiện (để tô màu / in đậm cùng lúc)."}
+                          checked={isAllSelected}
+                          onChange={() => rowSelection.doiTatCa(visibleKeys, !isAllSelected)}
+                          aria-label={isAllSelected ? "Bỏ chọn tất cả dòng" : "Chọn tất cả dòng"}
+                          title={isAllSelected ? "Bỏ tick mọi dòng đang hiện." : "Tick mọi dòng đang hiện (để tô màu / in đậm cùng lúc)."}
                         />
                       )}
                       {c.sapXep ? (
@@ -331,7 +331,7 @@ export function RecordTable<T>({
                         >
                           {c.header}
                           {sapTheo === c.key ? (
-                            huong === "tang" ? (
+                            sortDir === "tang" ? (
                               <ArrowUp className="size-5 shrink-0 text-primary" />
                             ) : (
                               <ArrowDown className="size-5 shrink-0 text-primary" />
@@ -353,7 +353,7 @@ export function RecordTable<T>({
                       </div>
                     </TableHead>
                   ))}
-                  {coCotThaoTac && (
+                  {hasActionColumn && (
                     <TableHead className="text-right">Thao tác</TableHead>
                   )}
                 </TableRow>
@@ -368,7 +368,7 @@ export function RecordTable<T>({
                   return (
                     <React.Fragment key={k}>
                       <TableRow className="hien-len" {...to.thuocTinh(k)}>
-                        {cotBang.map((c, ci) => (
+                        {tableColumns.map((c, ci) => (
                           <TableCell
                             key={c.key}
                             className={c.so ? "tnum text-right" : undefined}
@@ -387,25 +387,25 @@ export function RecordTable<T>({
                             </div>
                           </TableCell>
                         ))}
-                        {coCotThaoTac && (
+                        {hasActionColumn && (
                           <TableCell className="text-right">
                             <div className="flex items-center justify-end gap-2">
-                              {nutChiTiet(k, cotAnBang.length > 0)}
+                              {detailButton(k, hiddenTableColumns.length > 0)}
                               {actions?.(r)}
                             </div>
                           </TableCell>
                         )}
                       </TableRow>
-                      {moRong.has(k) && cotAnBang.length > 0 && (
+                      {expandedRows.has(k) && hiddenTableColumns.length > 0 && (
                         <TableRow
                           data-chi-tiet=""
                           className="odd:bg-muted/30 even:bg-muted/30 hover:bg-muted/30"
                         >
                           <TableCell
-                            colSpan={cotBang.length + 1}
+                            colSpan={tableColumns.length + 1}
                             className="whitespace-normal"
                           >
-                            {chiTiet(r, cotAnBang)}
+                            {renderDetail(r, hiddenTableColumns)}
                           </TableCell>
                         </TableRow>
                       )}
@@ -429,10 +429,10 @@ export function RecordTable<T>({
               >
                 <div className="mb-3 flex items-start gap-2 text-lg font-semibold text-foreground">
                   {to.bat && oTick(r)}
-                  <div className="min-w-0">{cotChinh.render(r)}</div>
+                  <div className="min-w-0">{primaryColumn.render(r)}</div>
                 </div>
                 <dl className="space-y-2">
-                  {cotThe.map((c) => (
+                  {cardColumns.map((c) => (
                       <div
                         key={c.key}
                         className="flex items-baseline justify-between gap-4 border-b border-border/60 pb-2 last:border-0"
@@ -451,14 +451,14 @@ export function RecordTable<T>({
                       </div>
                     ))}
                 </dl>
-                {moRong.has(k) && cotAnThe.length > 0 && (
+                {expandedRows.has(k) && hiddenCardColumns.length > 0 && (
                   <div className="mt-3 rounded-lg bg-muted/40 p-3">
-                    {chiTiet(r, cotAnThe)}
+                    {renderDetail(r, hiddenCardColumns)}
                   </div>
                 )}
-                {(actions || cotAnThe.length > 0) && (
+                {(actions || hiddenCardColumns.length > 0) && (
                   <div className="mt-4 flex flex-wrap items-center gap-2">
-                    {nutChiTiet(k, cotAnThe.length > 0)}
+                    {detailButton(k, hiddenCardColumns.length > 0)}
                     {actions?.(r)}
                   </div>
                 )}
@@ -466,7 +466,7 @@ export function RecordTable<T>({
               );
             })}
           </ul>
-          <ThanhToMau to={to} khoa={daTick} onBoChon={chonDong.boChon} />
+          <ThanhToMau to={to} khoa={daTick} onBoChon={rowSelection.boChon} />
         </>
       )}
     </div>

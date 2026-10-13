@@ -49,7 +49,7 @@ export function BieuDoCotDoc({
     );
   }
 
-  const donViChu = donVi ? ` ${donVi}` : "";
+  const unitSuffix = donVi ? ` ${donVi}` : "";
 
   return (
     <div className={cn("space-y-4", className)}>
@@ -123,7 +123,7 @@ export function BieuDoCotDoc({
                 style={{ bottom: `${tbPct}%` }}
               >
                 TB: {dinhDang(Math.round(tb))}
-                {donViChu}
+                {unitSuffix}
               </div>
             </div>
           </div>

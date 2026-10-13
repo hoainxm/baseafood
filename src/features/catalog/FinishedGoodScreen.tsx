@@ -28,7 +28,7 @@ import { Search, X } from "lucide-react";
 export default function ThanhPhamScreen() {
   const [nhom, setNhom] = useState("");
   const [items, , { trangThai }] = useFinishedGoods();
-  const dangTai = trangThai === "dang-tai" && items.length === 0;
+  const isLoading = trangThai === "dang-tai" && items.length === 0;
 
   const nhomList = useMemo(
     () => Array.from(new Set(items.map((i) => i.groupName))).sort(),
@@ -106,7 +106,7 @@ export default function ThanhPhamScreen() {
         )}
       </div>
 
-      {dangTai ? (
+      {isLoading ? (
         <SkeletonBang />
       ) : rows.length === 0 ? (
         <EmptyState

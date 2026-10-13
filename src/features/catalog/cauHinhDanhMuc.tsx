@@ -40,7 +40,7 @@ import {
 } from "@/design-system";
 import { ChonBotDiKem } from "./ChonBotDiKem";
 
-const THI_TRUONG = ["Nhật", "EU", "Mỹ", "Hàn Quốc", "Trung Quốc", "Nội địa"];
+const MARKETS = ["Nhật", "EU", "Mỹ", "Hàn Quốc", "Trung Quốc", "Nội địa"];
 
 export type LoaiDanhMuc = "matHang" | "khachHang" | "daiLy" | "loaiNL" | "khoLuu" | "botTam";
 
@@ -55,7 +55,7 @@ export interface CauHinhDanhMuc<T extends { id: string }> {
   taoMoi: () => T;
   timTheo: (r: T) => string;
   moTaBanGhi: (r: T) => string;
-  kiemTraThem?: (dang: T, rows: T[], laThem: boolean) => LoiNhap[];
+  kiemTraThem?: (editing: T, rows: T[], isAdding: boolean) => LoiNhap[];
   dangTai: boolean;
   /** Trường TÊN của bản ghi. */
   truongTen: keyof T & string;
@@ -78,18 +78,18 @@ export interface BoCauHinhDanhMuc {
 
 /** Cảnh báo khi mã số trùng với bản ghi khác (khách hàng / đại lý). Mã trống thì bỏ qua. */
 export function trungMaSo<T extends { id: string; code: string }>(
-  dang: T,
+  editing: T,
   rows: T[],
-  tenDonVi: string
+  entityLabel: string
 ): { truong: string; thongBao: string }[] {
-  const ma = (dang.code ?? "").trim();
+  const ma = (editing.code ?? "").trim();
   if (!ma) return [];
-  const trung = rows.some((r) => r.id !== dang.id && (r.code ?? "").trim() === ma);
+  const trung = rows.some((r) => r.id !== editing.id && (r.code ?? "").trim() === ma);
   return trung
     ? [
         {
           truong: "Mã số",
-          thongBao: `Mã số "${ma}" đã dùng cho ${tenDonVi} khác — đổi số khác hoặc để trống.`,
+          thongBao: `Mã số "${ma}" đã dùng cho ${entityLabel} khác — đổi số khác hoặc để trống.`,
         },
       ]
     : [];
@@ -97,21 +97,21 @@ export function trungMaSo<T extends { id: string; code: string }>(
 
 /** Trùng TÊN (không phân hoa thường) với bản ghi khác — chỉ xét khi tên mới / vừa đổi. */
 function trungTen<T extends { id: string }>(
-  dang: T,
+  editing: T,
   rows: T[],
   truong: keyof T & string,
-  nhan: string,
-  tenDonVi: string
+  label: string,
+  entityLabel: string
 ): LoiNhap[] {
-  const ten = String(dang[truong] ?? "").trim().toLowerCase();
+  const ten = String(editing[truong] ?? "").trim().toLowerCase();
   if (!ten) return [];
-  const cu = rows.find((r) => r.id === dang.id);
-  if (cu && String(cu[truong] ?? "").trim().toLowerCase() === ten) return []; // không đổi tên
-  return rows.some((r) => r.id !== dang.id && String(r[truong] ?? "").trim().toLowerCase() === ten)
+  const prev = rows.find((r) => r.id === editing.id);
+  if (prev && String(prev[truong] ?? "").trim().toLowerCase() === ten) return []; // không đổi tên
+  return rows.some((r) => r.id !== editing.id && String(r[truong] ?? "").trim().toLowerCase() === ten)
     ? [
         {
-          truong: nhan,
-          thongBao: `Đã có ${tenDonVi} khác tên "${String(dang[truong]).trim()}" — chọn ${tenDonVi} đó thay vì đặt trùng tên.`,
+          truong: label,
+          thongBao: `Đã có ${entityLabel} khác tên "${String(editing[truong]).trim()}" — chọn ${entityLabel} đó thay vì đặt trùng tên.`,
         },
       ]
     : [];
@@ -126,19 +126,19 @@ function trungTen<T extends { id: string }>(
  * chỉ cho chọn (VD hộp sửa nhanh ở màn nghiệp vụ không nắm danh mục loại NL).
  */
 export function taoTruongDanhMuc(
-  loaiNL: MaterialType[],
-  thanhPham: FinishedGood[],
-  botTam: BatterType[] = [],
-  themBot?: (ten: string) => string,
-  themLoaiNL?: (ten: string) => string
+  materialTypes: MaterialType[],
+  finishedGoods: FinishedGood[],
+  batterTypes: BatterType[] = [],
+  addBatter?: (ten: string) => string,
+  addMaterialType?: (ten: string) => string
 ) {
-  const optTP141 = thanhPham.map((t) => ({
+  const optTP141 = finishedGoods.map((t) => ({
     value: t.code,
     label: t.name,
     phu: `Mã ${t.code} · ${t.groupName}`,
   }));
 
-  const fMatHang: TruongDanhMuc<Product>[] = [
+  const productFields: TruongDanhMuc<Product>[] = [
     {
       key: "name",
       nhan: "Tên mặt hàng",
@@ -149,40 +149,40 @@ export function taoTruongDanhMuc(
       key: "materialTypeId",
       anTrenBang: true,
       nhan: "Loại nguyên liệu",
-      render: (giaTri, doiGiaTri) => (
+      render: (value, changeValue) => (
         <Combobox
           label="Loại nguyên liệu"
           hint="Thành phẩm này thuộc loại NL nào (VD Bạch tuộc 2 da) — để lọc khi ghi sản lượng."
-          value={giaTri}
-          onChange={doiGiaTri}
-          options={loaiNL.map((l) => ({
+          value={value}
+          onChange={changeValue}
+          options={materialTypes.map((l) => ({
             value: l.id,
             label: l.name,
             phu: l.category || undefined,
           }))}
-          onCreate={themLoaiNL}
+          onCreate={addMaterialType}
           placeholder="— Chọn loại nguyên liệu —"
           emptyText={
-            themLoaiNL
+            addMaterialType
               ? "Chưa có loại NL — gõ tên rồi bấm Thêm mới."
               : "Chưa có loại NL — thêm ở tab Loại nguyên liệu."
           }
         />
       ),
       hienThi: (r) =>
-        loaiNL.find((l) => l.id === r.materialTypeId)?.name || (
+        materialTypes.find((l) => l.id === r.materialTypeId)?.name || (
           <span className="text-muted-foreground">—</span>
         ),
     },
     {
       key: "category",
       nhan: "Loài",
-      render: (giaTri, doiGiaTri) => (
+      render: (value, changeValue) => (
         <Combobox
           label="Loài"
           hint="Bạch tuộc, Mực, Cá… Đây là cấp gom nhóm khi ghi thành phẩm."
-          value={giaTri}
-          onChange={doiGiaTri}
+          value={value}
+          onChange={changeValue}
           options={CATEGORIES.map((l) => ({ value: l, label: l }))}
           onCreate={(t) => t}
           placeholder="— Chọn loài —"
@@ -193,12 +193,12 @@ export function taoTruongDanhMuc(
     {
       key: "processingType",
       nhan: "Kiểu chế biến",
-      render: (giaTri, doiGiaTri) => (
+      render: (value, changeValue) => (
         <Combobox
           label="Kiểu chế biến"
           hint="Luộc, chần, cắt, tẩm bột… Chưa có thì gõ rồi Thêm mới."
-          value={giaTri}
-          onChange={doiGiaTri}
+          value={value}
+          onChange={changeValue}
           options={KIEU_CHE_BIEN.map((k) => ({ value: k, label: k }))}
           onCreate={(t) => t}
           placeholder="— Chọn kiểu chế biến —"
@@ -211,16 +211,16 @@ export function taoTruongDanhMuc(
     {
       key: "batterIds",
       nhan: "Bột đi kèm",
-      render: (giaTri, doiGiaTri) => (
+      render: (value, changeValue) => (
         <ChonBotDiKem
-          value={giaTri}
-          onChange={doiGiaTri}
-          botTam={botTam}
-          onTaoBot={themBot}
+          value={value}
+          onChange={changeValue}
+          botTam={batterTypes}
+          onTaoBot={addBatter}
         />
       ),
       hienThi: (r) => {
-        const ten = tenBotDiKem(r, botTam);
+        const ten = tenBotDiKem(r, batterTypes);
         return ten.length > 0 ? (
           ten.join(" + ")
         ) : (
@@ -233,14 +233,14 @@ export function taoTruongDanhMuc(
       key: "splitComponents",
       anTrenBang: true,
       nhan: "Tách râu + bao tử",
-      render: (giaTri, doiGiaTri) => {
-        const on = giaTri === "1" || giaTri === "true";
+      render: (value, changeValue) => {
+        const on = value === "1" || value === "true";
         return (
           <ChoiceGroup
             label="Tách râu + bao tử (cùng giá)"
             hint="Bật nếu mã này khi làm ra tách 2 thành phần râu + bao tử cùng 1 giá — màn ghi thành phẩm sẽ hiện ô tách. Mã thường để 'Không tách'."
             value={on ? "1" : "0"}
-            onChange={(v) => doiGiaTri(v === "1" ? "1" : "")}
+            onChange={(v) => changeValue(v === "1" ? "1" : "")}
             options={[
               { value: "1", label: "Có tách" },
               { value: "0", label: "Không tách" },
@@ -261,13 +261,13 @@ export function taoTruongDanhMuc(
       key: "blockSpecKg",
       anTrenBang: true,
       nhan: "Quy cách block (kg/khối)",
-      render: (giaTri, doiGiaTri) => (
+      render: (value, changeValue) => (
         <NumberField
           label="Quy cách mỗi block"
           unit="kg"
           hint="Kg mỗi khối khi đóng gói (VD 2, 5). Để trống nếu không cố định — màn ghi tính kg gợi ý = số block × quy cách."
-          value={Number(giaTri) > 0 ? Number(giaTri) : null}
-          onChange={(v) => doiGiaTri(v == null ? "" : String(v))}
+          value={Number(value) > 0 ? Number(value) : null}
+          onChange={(v) => changeValue(v == null ? "" : String(v))}
         />
       ),
       hienThi: (r) => {
@@ -292,12 +292,12 @@ export function taoTruongDanhMuc(
       key: "finishedGoodCode",
       nhan: "Mã thành phẩm (danh mục kế toán)",
       anTrenDienThoai: false,
-      render: (giaTri, doiGiaTri) => (
+      render: (value, changeValue) => (
         <Combobox
           label="Mã thành phẩm (danh mục kế toán)"
-          hint={`Gõ tên hoặc mã để tìm trong ${thanhPham.length} mã. Bỏ trống nếu chưa ánh xạ.`}
-          value={giaTri}
-          onChange={doiGiaTri}
+          hint={`Gõ tên hoặc mã để tìm trong ${finishedGoods.length} mã. Bỏ trống nếu chưa ánh xạ.`}
+          value={value}
+          onChange={changeValue}
           options={optTP141}
           placeholder="— Chưa ánh xạ —"
           emptyText="Không có mã nào khớp."
@@ -312,7 +312,7 @@ export function taoTruongDanhMuc(
     },
   ];
 
-  const fKhachHang: TruongDanhMuc<Customer>[] = [
+  const customerFields: TruongDanhMuc<Customer>[] = [
     { key: "name", nhan: "Tên khách hàng", batBuoc: true, viDu: "VD: Lucky" },
     {
       key: "code",
@@ -323,13 +323,13 @@ export function taoTruongDanhMuc(
     {
       key: "market",
       nhan: "Thị trường",
-      render: (giaTri, doiGiaTri) => (
+      render: (value, changeValue) => (
         <Combobox
           label="Thị trường"
           hint="Chọn trong danh sách, hoặc gõ tên mới rồi bấm Thêm mới."
-          value={giaTri}
-          onChange={doiGiaTri}
-          options={THI_TRUONG.map((t) => ({ value: t, label: t }))}
+          value={value}
+          onChange={changeValue}
+          options={MARKETS.map((t) => ({ value: t, label: t }))}
           onCreate={(ten) => ten}
           placeholder="— Chọn thị trường —"
         />
@@ -337,7 +337,7 @@ export function taoTruongDanhMuc(
     },
   ];
 
-  const fDaiLy: TruongDanhMuc<Supplier>[] = [
+  const supplierFields: TruongDanhMuc<Supplier>[] = [
     { key: "shortName", nhan: "Tên đại lý (gọi tắt)", batBuoc: true, viDu: "VD: Hồng Phú" },
     {
       key: "billingName",
@@ -382,7 +382,7 @@ export function taoTruongDanhMuc(
     { key: "note", anTrenBang: true, nhan: "Ghi chú", anTrenDienThoai: true, viDu: "Ghi chú thêm" },
   ];
 
-  const fLoaiNL: TruongDanhMuc<MaterialType>[] = [
+  const materialTypeFields: TruongDanhMuc<MaterialType>[] = [
     {
       key: "name",
       nhan: "Tên loại nguyên liệu",
@@ -392,12 +392,12 @@ export function taoTruongDanhMuc(
     {
       key: "category",
       nhan: "Loài",
-      render: (giaTri, doiGiaTri) => (
+      render: (value, changeValue) => (
         <Combobox
           label="Loài"
           hint="Bạch tuộc, Mực, Cá…"
-          value={giaTri}
-          onChange={doiGiaTri}
+          value={value}
+          onChange={changeValue}
           options={CATEGORIES.map((l) => ({ value: l, label: l }))}
           placeholder="— Chọn loài —"
         />
@@ -406,7 +406,7 @@ export function taoTruongDanhMuc(
     { key: "note", nhan: "Ghi chú", anTrenDienThoai: true, viDu: "Ghi chú thêm" },
   ];
 
-  const fKhoLuu: TruongDanhMuc<StorageLocation>[] = [
+  const storageLocationFields: TruongDanhMuc<StorageLocation>[] = [
     { key: "code", nhan: "Mã số", viDu: "VD: KHP" },
     {
       key: "name",
@@ -418,12 +418,12 @@ export function taoTruongDanhMuc(
     {
       key: "kind",
       nhan: "Loại kho",
-      render: (giaTri, doiGiaTri) => (
+      render: (value, changeValue) => (
         <Combobox
           label="Loại kho"
           hint="Kho nhà = kho của xí nghiệp; kho thuê ngoài = kho lạnh gửi hàng."
-          value={giaTri || "noi-bo"}
-          onChange={doiGiaTri}
+          value={value || "noi-bo"}
+          onChange={changeValue}
           choPhepXoa={false}
           options={(Object.keys(STORAGE_KIND_LABELS) as (keyof typeof STORAGE_KIND_LABELS)[]).map(
             (k) => ({ value: k, label: STORAGE_KIND_LABELS[k] })
@@ -437,7 +437,7 @@ export function taoTruongDanhMuc(
     { key: "note", anTrenBang: true, nhan: "Ghi chú", anTrenDienThoai: true, viDu: "Ghi chú thêm" },
   ];
 
-  const fBotTam: TruongDanhMuc<BatterType>[] = [
+  const batterFields: TruongDanhMuc<BatterType>[] = [
     {
       key: "name",
       nhan: "Tên loại bột",
@@ -455,12 +455,12 @@ export function taoTruongDanhMuc(
   ];
 
   return {
-    matHang: fMatHang,
-    khachHang: fKhachHang,
-    daiLy: fDaiLy,
-    loaiNL: fLoaiNL,
-    khoLuu: fKhoLuu,
-    botTam: fBotTam,
+    matHang: productFields,
+    khachHang: customerFields,
+    daiLy: supplierFields,
+    loaiNL: materialTypeFields,
+    khoLuu: storageLocationFields,
+    botTam: batterFields,
   };
 }
 
@@ -492,9 +492,9 @@ export function taoCauHinhDanhMuc(
       onChange: n.matHang.onChange,
       fields: truong.matHang,
       dangTai: n.matHang.dangTai,
-      kiemTraThem: (dang, rows) => [
-        ...trungMaSo(dang, rows, "mặt hàng"),
-        ...trungTen(dang, rows, "name", "Tên mặt hàng", "mặt hàng"),
+      kiemTraThem: (editing, rows) => [
+        ...trungMaSo(editing, rows, "mặt hàng"),
+        ...trungTen(editing, rows, "name", "Tên mặt hàng", "mặt hàng"),
       ],
       taoMoi: () => ({
         id: uid(),
@@ -521,7 +521,7 @@ export function taoCauHinhDanhMuc(
       onChange: n.khachHang.onChange,
       fields: truong.khachHang,
       dangTai: n.khachHang.dangTai,
-      kiemTraThem: (dang, rows) => trungMaSo(dang, rows, "khách hàng"),
+      kiemTraThem: (editing, rows) => trungMaSo(editing, rows, "khách hàng"),
       taoMoi: () => ({ id: uid(), code: "", name: "", market: "" }),
       timTheo: (r) => `${r.code} ${r.name} ${r.market}`,
       moTaBanGhi: (r) => `${r.name}${r.market ? ` — thị trường ${r.market}` : ""}`,
@@ -537,7 +537,7 @@ export function taoCauHinhDanhMuc(
       onChange: n.daiLy.onChange,
       fields: truong.daiLy,
       dangTai: n.daiLy.dangTai,
-      kiemTraThem: (dang, rows) => trungMaSo(dang, rows, "đại lý"),
+      kiemTraThem: (editing, rows) => trungMaSo(editing, rows, "đại lý"),
       taoMoi: () => ({
         id: uid(),
         code: "",
@@ -577,17 +577,17 @@ export function taoCauHinhDanhMuc(
       onChange: n.khoLuu.onChange,
       fields: truong.khoLuu,
       dangTai: n.khoLuu.dangTai,
-      kiemTraThem: (dang, rows) => [
-        ...trungMaSo(dang, rows, "kho lưu trữ"),
+      kiemTraThem: (editing, rows) => [
+        ...trungMaSo(editing, rows, "kho lưu trữ"),
         ...(rows.some(
           (r) =>
-            r.id !== dang.id &&
-            r.name.trim().toLowerCase() === (dang.name ?? "").trim().toLowerCase()
+            r.id !== editing.id &&
+            r.name.trim().toLowerCase() === (editing.name ?? "").trim().toLowerCase()
         )
           ? [
               {
                 truong: "Tên kho",
-                thongBao: `Tên "${dang.name}" đã có kho khác dùng — tên là chỗ nối dữ liệu nên không được trùng.`,
+                thongBao: `Tên "${editing.name}" đã có kho khác dùng — tên là chỗ nối dữ liệu nên không được trùng.`,
               },
             ]
           : []),
@@ -614,9 +614,9 @@ export function taoCauHinhDanhMuc(
       onChange: n.botTam.onChange,
       fields: truong.botTam,
       dangTai: n.botTam.dangTai,
-      kiemTraThem: (dang, rows) => [
-        ...trungMaSo(dang, rows, "loại bột"),
-        ...trungTen(dang, rows, "name", "Tên loại bột", "loại bột"),
+      kiemTraThem: (editing, rows) => [
+        ...trungMaSo(editing, rows, "loại bột"),
+        ...trungTen(editing, rows, "name", "Tên loại bột", "loại bột"),
       ],
       taoMoi: (): BatterType => ({ id: uid(), code: "", name: "", note: "" }),
       timTheo: (r) => `${r.code} ${r.name} ${r.note}`,
@@ -629,50 +629,50 @@ export function taoCauHinhDanhMuc(
 
 /** Cấu hình 6 danh mục cho màn Danh mục — gọi trong component (dùng hook catalogRepo). */
 export function useCauHinhDanhMuc(): BoCauHinhDanhMuc {
-  const [matHang, setMatHang, { trangThai: ttMH }] = useProducts();
-  const [khachHang, setKhachHang, { trangThai: ttKH }] = useCustomers();
-  const [daiLy, setDaiLy, { trangThai: ttDL }] = useSuppliers();
-  const [loaiNL, setLoaiNL, { trangThai: ttNL }] = useMaterialTypes();
-  const [khoLuu, setKhoLuu, { trangThai: ttKL }] = useStorageLocations();
-  const [botTam, setBotTam, { trangThai: ttBT }] = useBatterTypes();
-  const [thanhPham] = useFinishedGoods();
+  const [products, setProducts, { trangThai: ttMH }] = useProducts();
+  const [customers, setCustomers, { trangThai: ttKH }] = useCustomers();
+  const [suppliers, setSuppliers, { trangThai: ttDL }] = useSuppliers();
+  const [materialTypes, setMaterialTypes, { trangThai: ttNL }] = useMaterialTypes();
+  const [storageLocations, setStorageLocations, { trangThai: ttKL }] = useStorageLocations();
+  const [batterTypes, setBatterTypes, { trangThai: ttBT }] = useBatterTypes();
+  const [finishedGoods] = useFinishedGoods();
 
-  const taiMH = ttMH === "dang-tai" && matHang.length === 0;
-  const taiKH = ttKH === "dang-tai" && khachHang.length === 0;
-  const taiDL = ttDL === "dang-tai" && daiLy.length === 0;
-  const taiNL = ttNL === "dang-tai" && loaiNL.length === 0;
-  const taiKL = ttKL === "dang-tai" && khoLuu.length === 0;
-  const taiBT = ttBT === "dang-tai" && botTam.length === 0;
+  const isLoadingProducts = ttMH === "dang-tai" && products.length === 0;
+  const isLoadingCustomers = ttKH === "dang-tai" && customers.length === 0;
+  const isLoadingSuppliers = ttDL === "dang-tai" && suppliers.length === 0;
+  const isLoadingMaterials = ttNL === "dang-tai" && materialTypes.length === 0;
+  const isLoadingLocations = ttKL === "dang-tai" && storageLocations.length === 0;
+  const isLoadingBatters = ttBT === "dang-tai" && batterTypes.length === 0;
 
   const truong = useMemo(() => {
     // Tạo loại bột tại chỗ từ ô "Bột đi kèm" — ghi qua ĐÚNG instance của tab Bột tẩm.
-    const themBot = (ten: string): string => {
-      const kq = taoHoacLayBot(botTam, ten);
+    const addBatter = (ten: string): string => {
+      const kq = taoHoacLayBot(batterTypes, ten);
       if (kq.moi) {
-        setBotTam(kq.rows);
+        setBatterTypes(kq.rows);
         notify.daLuu(`Đã thêm loại bột "${kq.bot.name}" vào danh mục`);
       }
       return kq.bot.id;
     };
     // Tạo loại NL tại chỗ từ ô "Loại nguyên liệu" của form mặt hàng — ghi qua ĐÚNG
     // instance của tab Loại nguyên liệu. Trùng tên (không phân hoa thường) ⇒ dùng lại.
-    const themLoaiNL = (ten: string): string => {
+    const addMaterialType = (ten: string): string => {
       const sach = ten.trim();
-      const co = loaiNL.find((l) => l.name.trim().toLowerCase() === sach.toLowerCase());
+      const co = materialTypes.find((l) => l.name.trim().toLowerCase() === sach.toLowerCase());
       if (co) return co.id;
-      const moi: MaterialType = { id: uid(), name: sach, category: "", note: "" };
-      setLoaiNL([...loaiNL, moi]);
+      const created: MaterialType = { id: uid(), name: sach, category: "", note: "" };
+      setMaterialTypes([...materialTypes, created]);
       notify.daLuu(`Đã thêm loại nguyên liệu "${sach}" vào danh mục`);
-      return moi.id;
+      return created.id;
     };
-    return taoTruongDanhMuc(loaiNL, thanhPham, botTam, themBot, themLoaiNL);
-  }, [loaiNL, setLoaiNL, thanhPham, botTam, setBotTam]);
+    return taoTruongDanhMuc(materialTypes, finishedGoods, batterTypes, addBatter, addMaterialType);
+  }, [materialTypes, setMaterialTypes, finishedGoods, batterTypes, setBatterTypes]);
   return taoCauHinhDanhMuc(truong, {
-    matHang: { rows: matHang, onChange: setMatHang, dangTai: taiMH },
-    khachHang: { rows: khachHang, onChange: setKhachHang, dangTai: taiKH },
-    daiLy: { rows: daiLy, onChange: setDaiLy, dangTai: taiDL },
-    loaiNL: { rows: loaiNL, onChange: setLoaiNL, dangTai: taiNL },
-    khoLuu: { rows: khoLuu, onChange: setKhoLuu, dangTai: taiKL },
-    botTam: { rows: botTam, onChange: setBotTam, dangTai: taiBT },
+    matHang: { rows: products, onChange: setProducts, dangTai: isLoadingProducts },
+    khachHang: { rows: customers, onChange: setCustomers, dangTai: isLoadingCustomers },
+    daiLy: { rows: suppliers, onChange: setSuppliers, dangTai: isLoadingSuppliers },
+    loaiNL: { rows: materialTypes, onChange: setMaterialTypes, dangTai: isLoadingMaterials },
+    khoLuu: { rows: storageLocations, onChange: setStorageLocations, dangTai: isLoadingLocations },
+    botTam: { rows: batterTypes, onChange: setBatterTypes, dangTai: isLoadingBatters },
   });
 }

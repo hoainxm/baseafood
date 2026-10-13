@@ -49,9 +49,9 @@ export interface NguonBotTam {
 }
 
 /** Nguồn rỗng cho các danh mục không sửa trong hộp này (chỉ để ráp cấu hình). */
-const rong = <T,>(): NguonDanhMuc<T> => ({ rows: [], onChange: () => {}, dangTai: false });
+const emptySource = <T,>(): NguonDanhMuc<T> => ({ rows: [], onChange: () => {}, dangTai: false });
 
-function HopSuaNhanh<K extends LoaiDanhMuc>({
+function QuickEditDialog<K extends LoaiDanhMuc>({
   loai,
   id,
   rows,
@@ -66,64 +66,64 @@ function HopSuaNhanh<K extends LoaiDanhMuc>({
   rows: BanGhiDanhMuc[K][];
   onChange: (next: BanGhiDanhMuc[K][]) => void;
   onClose: () => void;
-  onDaLuu?: (moi: BanGhiDanhMuc[K], cu: BanGhiDanhMuc[K]) => void;
+  onDaLuu?: (updated: BanGhiDanhMuc[K], prev: BanGhiDanhMuc[K]) => void;
   moTa?: (r: BanGhiDanhMuc[K]) => ReactNode;
   nguonBot?: NguonBotTam;
 }) {
   type T = BanGhiDanhMuc[K];
   // Chỉ ĐỌC để dựng ô chọn trong form mặt hàng — không ghi qua các instance này.
-  const [loaiNL] = useMaterialTypes();
-  const [thanhPham] = useFinishedGoods();
-  const [botTamDoc] = useBatterTypes();
-  const botTam = nguonBot?.rows ?? botTamDoc;
-  const themBot = nguonBot?.them;
+  const [materialTypes] = useMaterialTypes();
+  const [finishedGoods] = useFinishedGoods();
+  const [batterTypesRead] = useBatterTypes();
+  const batterTypes = nguonBot?.rows ?? batterTypesRead;
+  const addBatter = nguonBot?.them;
   const cfg = useMemo(() => {
     // KHÔNG truyền `themLoaiNL`: danh mục loại NL ở đây chỉ là bản ĐỌC (không phải
     // instance của màn gọi) — ghi qua nó thì màn không thấy và lần ghi kế tiếp của
     // màn sẽ đè mất loại vừa tạo. Ô "Loại nguyên liệu" trong hộp sửa nhanh mặt hàng
     // vì vậy chỉ cho CHỌN; thêm loại mới ở ô loại NL của màn hoặc tab Danh mục.
-    const truong = taoTruongDanhMuc(loaiNL, thanhPham, botTam, themBot);
+    const truong = taoTruongDanhMuc(materialTypes, finishedGoods, batterTypes, addBatter);
     const bo = taoCauHinhDanhMuc(truong, {
-      matHang: rong(),
-      khachHang: rong(),
-      daiLy: rong(),
-      loaiNL: rong(),
-      khoLuu: rong(),
-      botTam: rong(),
+      matHang: emptySource(),
+      khachHang: emptySource(),
+      daiLy: emptySource(),
+      loaiNL: emptySource(),
+      khoLuu: emptySource(),
+      botTam: emptySource(),
     });
     return bo[loai] as unknown as CauHinhDanhMuc<T>;
-  }, [loai, loaiNL, thanhPham, botTam, themBot]);
+  }, [loai, materialTypes, finishedGoods, batterTypes, addBatter]);
 
   const goc = rows.find((r) => r.id === id);
-  const [dang, setDang] = useState<T | null>(goc ? { ...goc } : null);
+  const [editing, setEditing] = useState<T | null>(goc ? { ...goc } : null);
   const [loi, setLoi] = useState<LoiNhap[]>([]);
   if (!goc) return null;
 
-  const luu = () => {
-    if (!dang) return;
+  const save = () => {
+    if (!editing) return;
     const ls: LoiNhap[] = [
       ...cfg.fields
-        .filter((f) => f.batBuoc && !String(dang[f.key] ?? "").trim())
+        .filter((f) => f.batBuoc && !String(editing[f.key] ?? "").trim())
         .map((f) => ({ truong: f.nhan, thongBao: `Chưa nhập ${f.nhan.toLowerCase()}` })),
-      ...(cfg.kiemTraThem?.(dang, rows, false) ?? []),
+      ...(cfg.kiemTraThem?.(editing, rows, false) ?? []),
     ];
     setLoi(ls);
     if (ls.length) return;
-    onChange(rows.map((r) => (r.id === dang.id ? dang : r)));
-    notify.daLuu(`Đã lưu ${cfg.tenDonVi} "${cfg.moTaBanGhi(dang)}"`);
-    onDaLuu?.(dang, goc);
+    onChange(rows.map((r) => (r.id === editing.id ? editing : r)));
+    notify.daLuu(`Đã lưu ${cfg.tenDonVi} "${cfg.moTaBanGhi(editing)}"`);
+    onDaLuu?.(editing, goc);
     onClose();
   };
 
   return (
     <HopSuaDanhMuc<T>
-      dang={dang}
+      dang={editing}
       laThem={false}
       fields={cfg.fields}
       tenDonVi={cfg.tenDonVi}
       loi={loi}
-      onDoi={setDang}
-      onLuu={luu}
+      onDoi={setEditing}
+      onLuu={save}
       onClose={onClose}
       moTa={
         moTa?.(goc) ??
@@ -151,12 +151,12 @@ function HopSuaNhanh<K extends LoaiDanhMuc>({
  * `theo`: value trong ô chọn là `id` (mặc định) hay TÊN bản ghi.
  */
 export function useSuaDanhMuc<K extends LoaiDanhMuc>(
-  loai: K,
+  catalogKind: K,
   rows: BanGhiDanhMuc[K][],
   onChange: (next: BanGhiDanhMuc[K][]) => void,
   opts: {
     theo?: "id" | "ten";
-    onDaLuu?: (moi: BanGhiDanhMuc[K], cu: BanGhiDanhMuc[K]) => void;
+    onDaLuu?: (updated: BanGhiDanhMuc[K], prev: BanGhiDanhMuc[K]) => void;
     moTa?: (r: BanGhiDanhMuc[K]) => ReactNode;
     /** Hộp sửa MẶT HÀNG: danh mục bột của màn (thấy + tạo loại bột tại chỗ). */
     nguonBot?: NguonBotTam;
@@ -172,20 +172,20 @@ export function useSuaDanhMuc<K extends LoaiDanhMuc>(
     botTam: "loại bột",
   };
 
-  const moSua = (value: string) => {
+  const openEdit = (value: string) => {
     if (!value) return;
     const r =
       opts.theo === "ten"
-        ? rows.find((x) => tenCua(loai, x).trim() === value.trim())
+        ? rows.find((x) => tenCua(catalogKind, x).trim() === value.trim())
         : rows.find((x) => x.id === value);
     if (r) setId(r.id);
-    else notify.canhBao(`Không tìm thấy ${TEN[loai]} này trong danh mục.`);
+    else notify.canhBao(`Không tìm thấy ${TEN[catalogKind]} này trong danh mục.`);
   };
 
   const hop = id ? (
-    <HopSuaNhanh
+    <QuickEditDialog
       key={id}
-      loai={loai}
+      loai={catalogKind}
       id={id}
       rows={rows}
       onChange={onChange}
@@ -197,19 +197,19 @@ export function useSuaDanhMuc<K extends LoaiDanhMuc>(
   ) : null;
 
   /** Value này có bản ghi trong danh mục không — truyền vào `Combobox.suaDuoc`. */
-  const suaDuoc = (value: string) =>
+  const isEditable = (value: string) =>
     opts.theo === "ten"
-      ? rows.some((x) => tenCua(loai, x).trim() === value.trim())
+      ? rows.some((x) => tenCua(catalogKind, x).trim() === value.trim())
       : rows.some((x) => x.id === value);
 
   return {
-    moSua,
-    suaDuoc,
+    moSua: openEdit,
+    suaDuoc: isEditable,
     hop,
-    nhanSua: `Sửa thông tin ${TEN[loai]} này — lưu thẳng vào Danh mục.`,
+    nhanSua: `Sửa thông tin ${TEN[catalogKind]} này — lưu thẳng vào Danh mục.`,
   };
 }
 
-function tenCua(loai: LoaiDanhMuc, r: BanGhiDanhMuc[LoaiDanhMuc]): string {
-  return loai === "daiLy" ? (r as Supplier).shortName : (r as { name: string }).name;
+function tenCua(catalogKind: LoaiDanhMuc, r: BanGhiDanhMuc[LoaiDanhMuc]): string {
+  return catalogKind === "daiLy" ? (r as Supplier).shortName : (r as { name: string }).name;
 }

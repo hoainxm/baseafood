@@ -28,9 +28,9 @@ export function ChonBotDiKem({
   const hintId = useId();
   const ids = botDiKemIds({ batterIds: value });
   const theoId = new Map(botTam.map((b) => [b.id, b]));
-  const datIds = (next: string[]) => onChange(next.join(","));
+  const setIds = (next: string[]) => onChange(next.join(","));
 
-  const optConLai = botTam
+  const remainingOptions = botTam
     .filter((b) => !ids.includes(b.id))
     .map((b) => ({ value: b.id, label: b.name, phu: b.note || undefined }));
 
@@ -54,7 +54,7 @@ export function ChonBotDiKem({
               )}
               <button
                 type="button"
-                onClick={() => datIds(ids.filter((x) => x !== id))}
+                onClick={() => setIds(ids.filter((x) => x !== id))}
                 aria-label={`Bỏ ${theoId.get(id)?.name ?? "loại bột này"}`}
                 title="Bỏ loại bột này khỏi mặt hàng (không xoá loại bột trong danh mục)."
                 className="inline-flex size-8 items-center justify-center rounded-md text-muted-foreground hover:bg-background hover:text-foreground"
@@ -72,8 +72,8 @@ export function ChonBotDiKem({
         label="Thêm loại bột đi kèm"
         anNhanBatBuoc
         value=""
-        onChange={(id) => id && datIds([...ids, id])}
-        options={optConLai}
+        onChange={(id) => id && setIds([...ids, id])}
+        options={remainingOptions}
         onCreate={onTaoBot}
         placeholder="— Chọn loại bột để thêm —"
         emptyText={

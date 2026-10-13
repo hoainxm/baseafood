@@ -1,15 +1,15 @@
 # 38 — ba-spec: Sổ tồn nguyên liệu LIÊN TỤC theo lô × vị trí × phân xưởng
 
-> Load khi: task chạm hành vi / nghiệp vụ / flow / acceptance của tồn kho NGUYÊN LIỆU theo thời gian thực (sổ sự kiện kho, lô NL, lấy NL ra sàn sản xuất, tiêu hao, cấp đông dự trữ, xả đông, tồn theo ngày, đối chiếu XNT), hoặc khi định thay/nối các sổ tồn đang có (`/nxt-nl`, `/nxt-kho`, `/ton-kho-thang`).
+> Load khi: task chạm hành vi / nghiệp vụ / flow / acceptance của tồn kho NGUYÊN LIỆU theo thời gian thực (sổ sự kiện kho, lô NL, lấy NL ra sàn sản xuất, tiêu hao, cấp đông dự trữ, xả đông, tồn theo ngày, đối chiếu XNT), hoặc khi định thay/nối các sổ tồn đang có (`/nxt-material`, `/nxt-warehouse`, `/monthly-stock`).
 covers: src/lib/inventoryMaterial.ts, src/lib/lotTraceability.ts, src/features/reports/MaterialNxtScreen.tsx, src/features/reports/WarehouseNxtScreen.tsx, src/features/production/WipProductionScreen.tsx
 last_verified: 2026-10-12
-<!-- updated: 2026-10-12 — `computeMaterialTotalStock` (/nxt-nl): tồn đầu khai tay có mốc GIỮA khoảng xem nay vẫn áp (trước: xem "Năm"/01-06…31-07 với baseline 01/07 mất khai tay); quy tắc mốc chung với sổ BTP — xem 31 §Tồn kho NL. `lotTraceability`: `buildLotStockIndex` (tồn W/P dựng một lần), `lui` theo UTC. Không đổi AC sổ liên tục. -->
+<!-- updated: 2026-10-12 — `computeMaterialTotalStock` (/nxt-material): tồn đầu khai tay có mốc GIỮA khoảng xem nay vẫn áp (trước: xem "Năm"/01-06…31-07 với baseline 01/07 mất khai tay); quy tắc mốc chung với sổ BTP — xem 31 §Tồn kho NL. `lotTraceability`: `buildLotStockIndex` (tồn W/P dựng một lần), `lui` theo UTC. Không đổi AC sổ liên tục. -->
 <!-- updated: 2026-10-08 (c) — ĐỊNH NGHĨA LÔ NL ĐỔI ở lotTraceability.ts (chủ dự án chốt, ../spec/qr-truy-xuat-lo.md §6e): `S:<id DÒNG nhập>` = một loại NL của chuyến (trước: `S:<id chuyến>`). Khớp ý "sự kiện theo dòng loại NL" của doc này ở mục Lô; khi build sổ tồn liên tục, khóa lô tươi `S:` dùng id dòng nhập. `S:<id chuyến>` cũ vẫn đọc được (nút cả chuyến). Không đổi AC sổ tồn NL. -->
 <!-- re-verified: 2026-10-08 11:10 — lotTraceability.ts thêm `groupByTraceStage` (tab /qr "Theo giai đoạn", thay `doPhuTruyXuat`): chỉ ĐỌC lô S/W/P + lot_inputs / lot_dispatches / lot_waivers / label_prints để xếp theo khâu; không đổi `computeLotMassBalance` / `listSelectableMaterialLots` / định nghĩa lô — hành vi và AC sổ tồn NL của doc này giữ nguyên. -->
 <!-- updated: 2026-10-08 — `lib/lotTraceability.ts` (covers) mở rộng ở QR đợt 2b: lá B/N (bán lẻ / bán nội địa) qua `lot_dispatches` (mig 0056), `computeLotMassBalance` cho cả lô TP + bán nội địa, `listSelectableMaterialLots` thêm lô NL cũ còn kg (NL cấp đông đem xả) — là cầu tạm trước khi có lô đông `F:` của doc này. Lưu ý khi build `F:`/`K:`: `docMaQr` hiện chỉ nhận mã `S|W|P:<id>` — phải mở regex. KHÔNG đổi hành vi / AC sổ tồn NL. -->
 ttl_days: 90
-<!-- updated: 2026-10-06 (b) — /nxt-kho: thanh "Đã chọn N mã" (cộng tổng + Gán kho lưu) dời xuống SAU bảng, dính đáy màn từ desktop (`md:sticky`), thêm cụm Tô màu ▾ · In đậm · Bỏ tô (`RowMarkActions`, khoá `nxt-kho`) — trước đây bảng xem có tick nhưng KHÔNG có nút tô. Chỉ trình bày, không đổi hành vi tồn. -->
-<!-- updated: 2026-10-06 — tô màu dòng "đã dò" (mig 0055): /nxt-nl `ton-nl-ngay|<xưởng>` + `ton-nl-ho|<từ>|<đến>|<xưởng>`, /nxt-kho `nxt-kho` (cả bảng xem lẫn lưới Ghi — cùng id snapshot nên dấu giữ khi đổi chế độ). Chỉ là dấu trình bày, không đổi hành vi/AC tồn. -->
+<!-- updated: 2026-10-06 (b) — /nxt-warehouse: thanh "Đã chọn N mã" (cộng tổng + Gán kho lưu) dời xuống SAU bảng, dính đáy màn từ desktop (`md:sticky`), thêm cụm Tô màu ▾ · In đậm · Bỏ tô (`RowMarkActions`, khoá `nxt-kho`) — trước đây bảng xem có tick nhưng KHÔNG có nút tô. Chỉ trình bày, không đổi hành vi tồn. -->
+<!-- updated: 2026-10-06 — tô màu dòng "đã dò" (mig 0055): /nxt-material `ton-nl-ngay|<xưởng>` + `ton-nl-ho|<từ>|<đến>|<xưởng>`, /nxt-warehouse `nxt-kho` (cả bảng xem lẫn lưới Ghi — cùng id snapshot nên dấu giữ khi đổi chế độ). Chỉ là dấu trình bày, không đổi hành vi/AC tồn. -->
 
 > **Mục đích**: oracle HÀNH VI cho sổ tồn NL liên tục — USER nào làm nghiệp vụ gì, flow vào/ra sao, đúng-sai đo bằng AC nào. KHÔNG mô tả giao diện (design-spec), KHÔNG chốt schema (03-database khi build). **Trạng thái: v2.1 — ba-spec ĐÃ DUYỆT mức tổng. Chủ dự án chốt Open-1/4/5/6 ngày 2026-09-22 (theo khuyến nghị); Open-2/3 giữ mặc định A1 (không đổi flow). Sẵn sàng sang `ui-design-logic` (design-spec) cho Pha 1; CHƯA build.**
 
@@ -23,10 +23,10 @@ Hôm nay có **năm nguồn tồn nguyên liệu chạy song song, không nguồ
 
 | Nguồn | Hạt | Cách ra số | Thiếu gì |
 |---|---|---|---|
-| `/nxt-nl` — `computeMaterialTotalStock` (PA-a) | họ NL × ngày, 3 xưởng | tồn = tồn đầu + Σ nhập hàng − **xuất SX (= 0, cột chờ)** | **không biết NL đã lấy ra chế biến** ⇒ "tồn theo nhập", không phải tồn thật |
+| `/nxt-material` — `computeMaterialTotalStock` (PA-a) | họ NL × ngày, 3 xưởng | tồn = tồn đầu + Σ nhập hàng − **xuất SX (= 0, cột chờ)** | **không biết NL đã lấy ra chế biến** ⇒ "tồn theo nhập", không phải tồn thật |
 | engine kỳ cũ `computeMaterialNxt` | họ NL × kỳ 5 ngày, chỉ Đông | tồn đầu + đông gửi − xả đông (từ Cân đối) | chỉ còn nuôi 2 cột thông tin |
-| `/nxt-kho` — `nxt_snapshots` (0032) | (kho × mã kế toán `PXĐ.BTNL.TĐ…` × kỳ) | ảnh chụp báo cáo XNT kế toán, ghi tay nhập/xuất từng mã; đã có nhập Excel XNT | **trục mã riêng, không nối giao dịch** (P5-B bế tắc) |
-| `/ton-kho-thang` — `monthly_stock_ledger` (0041) | tháng × nhóm × mặt hàng × size × invoice, theo kho | bảng kê Excel kế toán, dồn kỳ có duyệt | tổng tháng, không theo ngày; nhập/xuất gõ tay |
+| `/nxt-warehouse` — `nxt_snapshots` (0032) | (kho × mã kế toán `PXĐ.BTNL.TĐ…` × kỳ) | ảnh chụp báo cáo XNT kế toán, ghi tay nhập/xuất từng mã; đã có nhập Excel XNT | **trục mã riêng, không nối giao dịch** (P5-B bế tắc) |
+| `/monthly-stock` — `monthly_stock_ledger` (0041) | tháng × nhóm × mặt hàng × size × invoice, theo kho | bảng kê Excel kế toán, dồn kỳ có duyệt | tổng tháng, không theo ngày; nhập/xuất gõ tay |
 | `computeWipStock`/`computeFinishedGoodStock` (`inventory.ts`) | lô BTP/TP (mẻ SX, phiếu đóng gói) | suy từ giao dịch — **đúng mô hình mong muốn**, chỉ cho BTP/TP | không phủ nguyên liệu |
 
 Hệ quả: (a) "hôm nay xưởng còn bao nhiêu kg NL, ở đâu, lô nào" **không trả lời được**; (b) G1 hở — không truy "mẻ nào ăn lô nào bao nhiêu kg" (`lot_inputs.quantity_kg` có cột nhưng chưa là nguồn tồn); (c) kế toán chốt tháng **gõ lại** nhập/xuất vào 2 sổ tay — đúng cái đau gốc.
@@ -46,7 +46,7 @@ Hệ quả: (a) "hôm nay xưởng còn bao nhiêu kg NL, ở đâu, lô nào" *
 | `NHAP_MUA` | + | dòng NL của chuyến về (phái sinh từ `/imports`); hàng đông "mua về" cũng đi đường này với cờ nguồn | Nhập |
 | `LAY_RA` | 0 | **chuyển `kho tươi xưởng` → sàn SX**, giữ lô. *Chỉ từ kho tươi* — kho dự trữ luôn đi `XA_DONG` | Xuất (khỏi kho) |
 | `XA_DONG` | 0 | **chuyển kho dự trữ → sàn SX**, giữ lô F (hai chân một sự kiện) | Xuất |
-| `TIEU_HAO` | − | tự sinh khi chốt ngày SX: Σ sàn − còn dở khai; là "NL đã vào chế biến" (nguồn cột Xuất SX `/nxt-nl`) | — |
+| `TIEU_HAO` | − | tự sinh khi chốt ngày SX: Σ sàn − còn dở khai; là "NL đã vào chế biến" (nguồn cột Xuất SX `/nxt-material`) | — |
 | `CON_DO` | 0 | sàn → `chờ cấp đông` (còn dở khai lúc chốt ngày) | — |
 | `CAP_DONG` | 0 (hao tách riêng) | duyệt: `chờ cấp đông` → kho dự trữ, sinh lô F | **Nhập** (NHAP_LAI_SX) |
 | `CHUYEN_KHO` | 0 | kho A → kho B / kho thuê ngoài / giữa xưởng; hoàn `chờ cấp đông` → sàn (dùng lại) | Xuất A · Nhập B |
@@ -62,7 +62,7 @@ Hệ quả: (a) "hôm nay xưởng còn bao nhiêu kg NL, ở đâu, lô nào" *
 - **Job (kế toán):** khi chốt tháng, tôi muốn **tồn cuối mỗi kho/mã tự ra từ sổ**, khớp báo cáo XNT tôi vẫn nộp, có bằng chứng từng sự kiện.
 - **Job (BGĐ):** thấy **tồn NL thực tế theo ngày** (đã trừ chế biến) để quyết mua thêm hay dùng hàng đông.
 - **Vì sao bây giờ:** realtime T9 đã bật nhưng "NL vào chế biến" = 0 ⇒ mọi tồn NL là số **chưa trừ chế biến**; càng chạy lâu càng gõ tay bù ở 2 sổ.
-- **Đo thành công:** (1) `TIEU_HAO` ≠ 0 mọi ngày có SX và cột Xuất SX `/nxt-nl` = Σ `TIEU_HAO`; (2) tồn cuối tháng suy ↔ báo cáo XNT: 0 lệch không giải thích ở tầng mã (R15); (3) ghi một lần lấy ra ≤ 30 s (quét) / ≤ 60 s (chọn); (4) ≥ 95% kg `LAY_RA` có `recorded_at` cùng ngày `effective_date` (kênh giấy không trễ quá ca).
+- **Đo thành công:** (1) `TIEU_HAO` ≠ 0 mọi ngày có SX và cột Xuất SX `/nxt-material` = Σ `TIEU_HAO`; (2) tồn cuối tháng suy ↔ báo cáo XNT: 0 lệch không giải thích ở tầng mã (R15); (3) ghi một lần lấy ra ≤ 30 s (quét) / ≤ 60 s (chọn); (4) ≥ 95% kg `LAY_RA` có `recorded_at` cùng ngày `effective_date` (kênh giấy không trễ quá ca).
 
 ## 2. User registry
 | User (role) | Là ai | Vòng đời | Thiết bị/bối cảnh |
@@ -130,7 +130,7 @@ Hệ quả: (a) "hôm nay xưởng còn bao nhiêu kg NL, ở đâu, lô nào" *
 ### Flow NV2b — Chốt ngày SX đóng sàn · owner: tổ trưởng SX (hệ phái sinh)
 - **Start**: chốt ngày SX (đã có `production_locks`). **Input**: Σ trên sàn W theo lô (S và F); còn dở khai theo loại NL (đã có `leftover_by_material`), hệ gợi ý phân bổ theo lô trên sàn **theo thứ tự Open-6**.
 - **Steps**: kiểm lô âm ⇒ có thì chặn, đi H7 → `TIEU_HAO` = Σ sàn − Σ còn dở (theo lô; không chỉ rõ ⇒ tỷ lệ, cờ "tự chia", R17) → `CON_DO`: sàn → `chờ cấp đông` (giữ lô gốc).
-- **Output**: sàn W = 0 sau chốt; `TIEU_HAO` là nguồn cột "Xuất SX" `/nxt-nl`; đề nghị cấp đông "chờ duyệt" (H2). **End**: ngày SX chốt; sàn ≠ 0 mà chưa chốt ⇒ nhắc tổ trưởng.
+- **Output**: sàn W = 0 sau chốt; `TIEU_HAO` là nguồn cột "Xuất SX" `/nxt-material`; đề nghị cấp đông "chờ duyệt" (H2). **End**: ngày SX chốt; sàn ≠ 0 mà chưa chốt ⇒ nhắc tổ trưởng.
 
 ### Flow NV3 — Còn dở: duyệt / dùng lại / hủy · owner: tổ trưởng SX
 - **Input**: kg ở `chờ cấp đông` của xưởng, đề nghị còn "chờ duyệt". **Steps**: (a) để thủ kho duyệt (→ NV4); **(b) dùng lại sáng hôm sau**: `CHUYEN_KHO` `chờ cấp đông` → sàn (không qua thủ kho), đề nghị đóng "dùng lại"; **(c) hủy** với lý do ⇒ `HAO_HUT(hủy đề nghị)` hoặc về sàn. Đã duyệt ⇒ chỉ còn đường NV5.
@@ -168,8 +168,8 @@ Hệ quả: (a) "hôm nay xưởng còn bao nhiêu kg NL, ở đâu, lô nào" *
 - **Input**: M đã đối chiếu, 0 Δ tầng mã chưa giải thích, 0 điều chỉnh chưa xác nhận, 0 lô âm, 0 lô chưa ánh xạ. **Steps**: chốt ⇒ M "đã chốt". Ghi bù lùi effective ∈ M sau đó ⇒ M "**chốt bị hở**" (vết: ai, sự kiện nào) ⇒ chốt lại có lịch sử (R12). Ghi bù lùi qua **mốc cutover** ⇒ từ chối. **Output**: tồn đầu M+1 = cộng dồn (không chép). **End**: BGĐ xem (H6).
 
 ### Flow NV10 — Nạp tồn đầu cutover · owner: kế toán
-- **Input**: báo cáo XNT T8 từng kho (`/nxt-kho` đã nạp được xlsx; pdf theo spec cutover); **đếm tồn tươi tại xưởng** ngày mốc (tổ trưởng, H0). **Steps**: nạp → **bắt chọn kho tường minh** (không mặc định — memory K1000T/K1500T) → xem trước → **kiểm chéo với `nxt_snapshots` T8 cùng kho/kỳ** (lệch ⇒ cảnh báo, không chặn) → xác nhận map `accounting_code`→(họ NL, xưởng, NL/BTP) (NV11) → sinh `TON_DAU` một lần/(lô K, vị trí) tại mốc; tồn tươi ⇒ `TON_DAU` ở `kho tươi xưởng` theo lô S nếu chuyến có trong app (effective < mốc, không sinh `NHAP_MUA`). Nạp lại sau khi kế toán sửa báo cáo = `DAO` + mới có lý do.
-- **Output**: tồn 01/09 theo lô/vị trí = báo cáo T8 + tồn tươi. **End**: sổ có điểm gốc; `/nxt-kho` giữ làm sổ đối chiếu.
+- **Input**: báo cáo XNT T8 từng kho (`/nxt-warehouse` đã nạp được xlsx; pdf theo spec cutover); **đếm tồn tươi tại xưởng** ngày mốc (tổ trưởng, H0). **Steps**: nạp → **bắt chọn kho tường minh** (không mặc định — memory K1000T/K1500T) → xem trước → **kiểm chéo với `nxt_snapshots` T8 cùng kho/kỳ** (lệch ⇒ cảnh báo, không chặn) → xác nhận map `accounting_code`→(họ NL, xưởng, NL/BTP) (NV11) → sinh `TON_DAU` một lần/(lô K, vị trí) tại mốc; tồn tươi ⇒ `TON_DAU` ở `kho tươi xưởng` theo lô S nếu chuyến có trong app (effective < mốc, không sinh `NHAP_MUA`). Nạp lại sau khi kế toán sửa báo cáo = `DAO` + mới có lý do.
+- **Output**: tồn 01/09 theo lô/vị trí = báo cáo T8 + tồn tươi. **End**: sổ có điểm gốc; `/nxt-warehouse` giữ làm sổ đối chiếu.
 
 ### Flow NV11 — Ánh xạ mã kế toán · owner: kế toán
 - **Input**: mã kế toán nguyên văn + tên hàng; danh mục họ NL/xưởng. **Steps**: gán mã ↔ (họ NL, xưởng, nhóm tên, **NL hay BTP** — Open-5) một lần; mã mới ⇒ hàng đợi "chưa ánh xạ" (H5). **Output**: mọi lô có `accounting_code` hoặc cờ. **End**: NV9a tầng mã chạy được.
@@ -196,7 +196,7 @@ Hệ quả: (a) "hôm nay xưởng còn bao nhiêu kg NL, ở đâu, lô nào" *
 | Map | Cross-User-Integrity: 15 điểm gãy (d4 · e5 · b1 · c1 · f2 · h1 · g1; a0) | — | **Đã vá ở v2**: NV8 owner kế toán; `LAY_RA` chỉ từ kho tươi; NV7a/7b; NV2c; NV9a/9b; H0/H2b/H7/H8/H9; nhắc quay vòng ≥3 ngày; Quản trị + owner-khi-hỏng; AC-19 = invariant | — | Open-4 vẫn làm owner NV5 phụ thuộc — mặc định an toàn thủ kho |
 
 ## 7. Scope & Priority
-- **Pha 1 — khép G1, tồn thật (Must):** NV1 phái sinh · **NV2 + NV2c + NV2b** (`LAY_RA`, `lot_inputs`, `TIEU_HAO`, `CON_DO` nối `leftover_by_material`) · NV3 (dùng lại/hủy) · NV7a · NV8 · NV11 · NV10 (khi có file). Kết quả đo: cột Xuất SX `/nxt-nl` = Σ `TIEU_HAO` ≠ 0; tồn theo ngày đã trừ chế biến.
+- **Pha 1 — khép G1, tồn thật (Must):** NV1 phái sinh · **NV2 + NV2c + NV2b** (`LAY_RA`, `lot_inputs`, `TIEU_HAO`, `CON_DO` nối `leftover_by_material`) · NV3 (dùng lại/hủy) · NV7a · NV8 · NV11 · NV10 (khi có file). Kết quả đo: cột Xuất SX `/nxt-material` = Σ `TIEU_HAO` ≠ 0; tồn theo ngày đã trừ chế biến.
 - **Pha 2 — vòng đông theo lô (Must):** NV4, NV5, NV6, NV6b, NV7b (hao rã đông, lô F n-gốc, kho thuê ngoài 2 bước).
 - **Pha 3 — một sự thật (Must):** NV9a/NV9b; `nxt_snapshots` + `monthly_stock_ledger` thành sổ đối chiếu + nhận gợi ý điền; dừng gõ tay khi kế toán tuyên (≥ 2 tháng Δ tầng mã = 0 không giải thích).
 - **OUT:** định giá/BQGQ (QĐ-7 chờ — kg-first) · SSCC/GDST · tồn BTP/TP (34) · role-RLS/site_id · khóa cứng bản ghi · cảm biến nhiệt · định mức theo ngày.
@@ -258,8 +258,8 @@ Hệ quả: (a) "hôm nay xưởng còn bao nhiêu kg NL, ở đâu, lô nào" *
 ### AC-3 — Chốt ngày SX đóng sàn: tiêu hao = sàn − còn dở, cột Xuất SX ≠ 0 · Maps to flow: NV2b · Test: e2e
 - **Given** sàn Đông ngày D có S:C 120 kg; tổ trưởng khai còn dở 30 kg Bạch tuộc 2 da; không lô âm
 - **When** chốt ngày SX D
-- **Then** `TIEU_HAO` = 90 (S:C); `CON_DO` 30 kg S:C → `chờ cấp đông`; sàn Đông = 0; `/nxt-nl` ngày D cột Xuất SX = 90; tổng hệ = 410
-- **Assert** Σ TIEU_HAO(D,Đông) == 90 && tồn(S:C,chờ cấp đông) == 30 && tồn(*,sàn Đông) == 0 && xuatSX(/nxt-nl, D, "Bạch tuộc 2 da", Đông) == 90 && tổng hệ == 410
+- **Then** `TIEU_HAO` = 90 (S:C); `CON_DO` 30 kg S:C → `chờ cấp đông`; sàn Đông = 0; `/nxt-material` ngày D cột Xuất SX = 90; tổng hệ = 410
+- **Assert** Σ TIEU_HAO(D,Đông) == 90 && tồn(S:C,chờ cấp đông) == 30 && tồn(*,sàn Đông) == 0 && xuatSX(/nxt-material, D, "Bạch tuộc 2 da", Đông) == 90 && tổng hệ == 410
 
 ### AC-4 — Gắn mẻ ⇒ `lot_inputs` tham chiếu, không trừ lần hai · Maps to flow: NV2c · Test: integration
 - **Given** mẻ W ngày D; S:C có 120 kg trên sàn

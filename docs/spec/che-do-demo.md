@@ -1,7 +1,7 @@
 > Load khi: làm chế độ DEMO (bật/tắt), sinh bộ dữ liệu demo, gỡ màn DEMO dữ liệu mẫu, thêm chức năng mới cần có mặt trong demo.
 > Trạng thái: **ĐÃ CHỐT hướng (2026-10-12)** — chủ dự án chọn **phương án B `site-demo` trong DB thật** · ẩn danh mặc định có công tắc · xóa hẳn `/production` + `/reports` · **chỉ admin** bật demo. Chưa build. Đọc §4b (rào chắn bắt buộc của B) trước khi code.
 last_verified: 2026-10-12
-<!-- updated: 2026-10-12 (d) — ĐÃ BUILD D1–D4 + V6/V10/V12/V16. D1: `lib/demoMode.ts` (cờ `bsf1:che-do`, `SITE_ID` = `site-demo`, khóa chính lên máy chủ tiền tố `demo:`, bản sao/hàng chờ `bsf-demo.*`) nối ở `supabase.ts` / `db.ts` / `repo.ts` (upsert + seed + nạp + XÓA lọc site) / `audit.ts` / `storage.ts`; auth giữ site thật. D2: `lib/demoGenerator.ts` (quét tham số → sinh 60 ngày, ẩn danh, ca cảnh báo cài sau vòng sinh) + `features/shared/CheDoDemo.tsx` (dải vàng, nạp gói qua hook thường, khối bật/tắt ở Tổng quan — chỉ admin). D3: "Làm mới bộ demo" = sinh lại + nạp qua diff của repo (bỏ hàm SQL `demo_reset`); `0058` thêm site. D4: gỡ 5 màn DEMO + `DEMO_IDS`/`demoGuard` + `StatusChip`/`MockPatternData`. `0058` ĐÃ chạy trên DB thật 2026-10-13. Vòng kiểm nghiệm §4b (2026-10-13, đếm qua SQL): số THẬT mọi bảng không đổi so với 2026-10-12 (chỉ audit_log +1 thao tác thường); số demo đã lên `site-demo` TRỪ dòng NL/TP của kỳ cân đối (khóa ngoại `period_id` — đã sửa, xem R1). CHƯA: đếm lại sau khi máy demo tải bản sửa; D5 kịch bản trình bày (xem docs/demo/kich-ban-che-do-demo.md). -->
+<!-- updated: 2026-10-12 (d) — ĐÃ BUILD D1–D4 + V6/V10/V12/V16. D1: `lib/demoMode.ts` (cờ `bsf1:che-do`, `SITE_ID` = `site-demo`, khóa chính lên máy chủ tiền tố `demo:`, bản sao/hàng chờ `bsf-demo.*`) nối ở `supabase.ts` / `db.ts` / `repo.ts` (upsert + seed + nạp + XÓA lọc site) / `audit.ts` / `storage.ts`; auth giữ site thật. D2: `lib/demoGenerator.ts` (quét tham số → sinh 60 ngày, ẩn danh, ca cảnh báo cài sau vòng sinh) + `features/shared/DemoMode.tsx` (dải vàng, nạp gói qua hook thường, khối bật/tắt ở Tổng quan — chỉ admin). D3: "Làm mới bộ demo" = sinh lại + nạp qua diff của repo (bỏ hàm SQL `demo_reset`); `0058` thêm site. D4: gỡ 5 màn DEMO + `DEMO_IDS`/`demoGuard` + `StatusChip`/`MockPatternData`. `0058` ĐÃ chạy trên DB thật 2026-10-13. Vòng kiểm nghiệm §4b (2026-10-13, đếm qua SQL): số THẬT mọi bảng không đổi so với 2026-10-12 (chỉ audit_log +1 thao tác thường); số demo đã lên `site-demo` TRỪ dòng NL/TP của kỳ cân đối (khóa ngoại `period_id` — đã sửa, xem R1). CHƯA: đếm lại sau khi máy demo tải bản sửa; D5 kịch bản trình bày (xem docs/demo/kich-ban-che-do-demo.md). -->
 <!-- updated: 2026-10-12 (c) — người dùng thấy sơ đồ sankey (V3) khó hiểu ⇒ thay bằng HAI THANH CHIA PHẦN (`ProportionBar`): "cứ 100 kg NL vào xưởng ra bao nhiêu BTP / phế liệu / còn dở / bán nội địa / hao hụt" + "hàng trong kho dự trữ đi đâu"; gỡ `d3-sankey`. Thu thanh lọc kỳ về một hàng; thẻ số + băng chuyền + biểu đồ tô cùng màu theo LOẠI số. Định hướng chung: biểu đồ ĐƠN GIẢN đọc là hiểu (thanh, cột, đường, chia phần), không sơ đồ cần học cách đọc. -->
 <!-- updated: 2026-10-12 (b) — §5b ĐÃ BUILD đợt V-a + V-b (Tổng quan): V1 · V2 · V3 · V4 · V5 · V7 (bảng) · V8 · V9. Chốt thêm: làm lại /dashboard, dùng `d3-sankey` (nạp lười), ngưỡng định mức ±5%. Còn: V6 thác nước (màn Cân đối), V10 cây lô vẽ (màn /qr), nhóm P2. -->
 
@@ -92,21 +92,21 @@ Mỗi dòng = mở màn THẬT trong chế độ demo phải có số và làm �
 | 2 | Nhập hàng `/imports` | Ghi chuyến nhiều dòng · 2 ngày (giao / ghi sổ) · chốt ngày · ghi bù bắt lý do · phế liệu ngày · cảnh báo lệch tổng · bộ lọc · tab Báo cáo | T |
 | 3 | ↳ OCR phiếu nhập | Nhận diện ảnh phiếu → điền nháp (cần 1–2 ảnh mẫu trong gói; ảnh không lưu Storage ở demo) | S |
 | 4 | ↳ Mã lô + tem QR chuyến | In tem lô NL theo loại NL của chuyến | T+S |
-| 5 | Tồn kho NL `/nxt-nl` | Tồn đầu + nhập − SX − bán nội địa + đông gửi/xả đông | T+S |
+| 5 | Tồn kho NL `/nxt-material` | Tồn đầu + nhập − SX − bán nội địa + đông gửi/xả đông | T+S |
 | 6 | SX thành phẩm `/wip` | Ghi sản lượng ngày theo xưởng/loại NL · bột tẩm · bán nội địa · gắn lô NL cho phiên · chốt ngày SX (bắt gắn lô/lý do, còn dở theo loại NL) · ghi bù · báo cáo TP ngày + "Gửi báo cáo" | T+S |
 | 7 | Đóng gói `/packaging` | Phiếu BTP tiêu hao → TP ra + hao hụt · gắn lô BTP · tem | S |
 | 8 | Kiểm tra QC `/qc` | Checklist chấm điểm · chốt ngày · ghi bù (ảnh: tắt ở demo) | S |
 | 9 | Kho dự trữ `/warehouse` | Duyệt BTP chờ → đã nhập · tồn đông · mở thẳng hộp duyệt từ link QR | S |
-| 10 | Sổ kho tháng `/ton-kho-thang` | Xem theo tháng · dồn kỳ · sửa inline · nhập Excel bảng kê | T |
+| 10 | Sổ kho tháng `/monthly-stock` | Xem theo tháng · dồn kỳ · sửa inline · nhập Excel bảng kê | T |
 | 11 | Mã lô QR `/qr` | Tra lô (truy ngược/xuôi + cân bằng kg) · Theo giai đoạn 5 khâu · In tem hàng loạt · Thu hồi (In + Excel) | S |
-| 12 | Nhập xuất tồn kho `/nxt-kho` | Báo cáo XNT từ snapshot | T |
+| 12 | Nhập xuất tồn kho `/nxt-warehouse` | Báo cáo XNT từ snapshot | T |
 | 13 | Bán hàng `/sales` | Phiếu bán · quy cách · XK/NĐ · chọn nguồn (Block thô / Đóng gói) · gắn lô · ghi bù · tab Báo cáo | S |
 | 14 | Đơn đặt `/orders` | Gom đơn · lệnh xuất FIFO · kiểm lô xuất + thay lô | T+S |
 | 15 | Cân đối kỳ `/balancing` | Tạo kỳ · chuyến nhập trong ô lưới · hút phế liệu / bán / bán nội địa · định mức · giá thành · lãi/lỗ · 2 dòng kho · in A4 · chốt / chuyển kỳ | T |
-| 16 | Báo cáo thành phẩm `/bc-thanh-pham` | Lưới mặt hàng × ngày + Excel | T+S |
-| 17 | Báo cáo đơn xuất `/bc-don-xuat` | Đơn xuất theo kỳ + Excel | S |
+| 16 | Báo cáo thành phẩm `/production-report` | Lưới mặt hàng × ngày + Excel | T+S |
+| 17 | Báo cáo đơn xuất `/export-report` | Đơn xuất theo kỳ + Excel | S |
 | 18 | Tồn kho thành phẩm `/nxt` | NXT TP suy từ SX/đơn/bán + tồn đầu | S |
-| 19 | Đối soát HĐĐT `/doi-soat` | Upload file mẫu → 4 kiểu đối soát → xuất Excel giữ định dạng | file mẫu |
+| 19 | Đối soát HĐĐT `/reconciliation` | Upload file mẫu → 4 kiểu đối soát → xuất Excel giữ định dạng | file mẫu |
 | 20 | Danh mục `/catalog` | 5+ tab · Combobox thêm mới + bút chì sửa nhanh · 141 mã TK (chỉ xem) | T |
 | 21 | Người dùng `/users` · Nhật ký `/audit` | Xem vai trò; nhật ký demo ghi cục bộ (không lên `audit_log` thật) | S |
 | 22 | Xuyên suốt | Tô màu dòng "đã dò" · thanh cuộn ngang trên+dưới · Cài đặt hiển thị · phân quyền 2 bộ phận (xem như tổ trưởng / thủ kho) · đèn kết nối | — |
@@ -139,17 +139,17 @@ Mục đích demo là cho thấy **số chảy qua hệ thống**: kg nguyên li
 | V1 | **Thẻ KPI chuỗi** (8 thẻ): NL nhập kg · TP sản xuất kg · định mức bình quân · tồn cuối NL / BTP / TP kg · bán + xuất kg · lãi/lỗ kỳ gần nhất · % lô đã gắn · việc tồn đọng (ngày chưa chốt, BTP chờ duyệt, lô chưa gắn) | `/dashboard` đầu trang, có chọn kỳ | "Tháng này xưởng chạy thế nào" trong 5 giây | imports, wips, tồn (`computeWipStock*`), sales/export, `calculateBalancing`, `groupByTraceStage` → `StatCardGrid` | P1 |
 | V2 | **Băng chuyền 5 khâu**: Nhập NL → SX BTP → Nhập kho → Đóng gói → Xuất/bán; mỗi ô: kg đã qua · kg đang chờ · số việc chưa xong; mũi tên ghi % chuyển tiếp | `/dashboard` | "Số đang kẹt ở khâu nào" — bản gọn của sankey, **xem được trên điện thoại** | `groupByTraceStage` + tồn | P1 |
 | V3 | ~~Sơ đồ dòng chảy kg (sankey)~~ ⇒ **thay bằng 2 thanh chia phần** (2026-10-12, người dùng thấy sankey khó hiểu). Bản cũ: Đại lý (5 lớn + khác) → loại NL → xưởng Đông/Cá/Khô → {thành phẩm · phế liệu · hao hụt · còn dở/đông gửi · bán nội địa} → kho dự trữ → {đóng gói → TP} → {xuất khẩu · bán nội địa · tồn} | `/dashboard` (desktop; điện thoại hiện V2 thay) | "1 tấn nguyên liệu đi đâu" — điểm nhấn buổi demo | hàm mới `buildDataFlow(kỳ)`; **test bất biến: tổng vào = tổng ra + tồn + hao hụt** ở mọi nút | P1 |
-| V4 | **Tồn theo ngày** (đường / vùng xếp chồng NL · BTP · TP) + vạch các ngày chốt | `/dashboard`, `/nxt-nl`, `/warehouse` | "Tồn đang tăng hay giảm, có đọng không" | `computeMaterialNxt`, `computeFinishedGoodNxt` theo từng ngày | P1 |
+| V4 | **Tồn theo ngày** (đường / vùng xếp chồng NL · BTP · TP) + vạch các ngày chốt | `/dashboard`, `/nxt-material`, `/warehouse` | "Tồn đang tăng hay giảm, có đọng không" | `computeMaterialNxt`, `computeFinishedGoodNxt` theo từng ngày | P1 |
 | V5 | **Nhập ↔ SX theo ngày** (cột đôi: kg NL vào · kg TP ra) + đường định mức theo ngày | `/dashboard`, `/wip` tab báo cáo | "Ngày nào nhập nhiều mà SX ít" | imports + wips | P1 |
 | V6 | **Thác nước kỳ cân đối**: giá trị NL + chi phí chế biến = giá thành → so với giá trị xuất ⇒ lãi/lỗ; kèm định mức, bình quân/kg NL | `/balancing/:kỳ` (trên bảng A4, không in) | "Kỳ này lãi/lỗ vì đâu" | `calculateBalancing` (không đổi công thức) | P1 |
 | V7 | **So sánh các kỳ**: thanh lãi/lỗ + định mức từng kỳ theo loại NL | `/balancing` danh sách kỳ | "Loại NL nào làm ra lãi, định mức có trôi không" | `calculateBalancing` × mọi kỳ | P1 |
-| V8 | **Định mức theo mặt hàng** (thanh ngang + đường trung bình, tô mặt hàng lệch > ±x%) | `/wip` báo cáo, `/bc-thanh-pham` | "Mặt hàng nào hao NL bất thường" | wips (+ lô gắn) → `BarChart` có sẵn | P1 |
+| V8 | **Định mức theo mặt hàng** (thanh ngang + đường trung bình, tô mặt hàng lệch > ±x%) | `/wip` báo cáo, `/production-report` | "Mặt hàng nào hao NL bất thường" | wips (+ lô gắn) → `BarChart` có sẵn | P1 |
 | V9 | **Bảng cảnh báo chuỗi**: ngày chưa chốt · ghi bù (kèm lý do) · lệch tổng ngày · bán vượt tồn · lô chưa gắn / có lý do · định mức lệch · BTP chờ duyệt quá N ngày. Mỗi dòng bấm ⇒ mở đúng chỗ sửa | `/dashboard` | "Hôm nay phải đốc ai làm gì" — chính là công cụ đốc công | hàm mới `buildChainWarnings()` có test, đọc các cờ engine đã trả | P1 |
 | V10 | **Cây truy xuất lô** vẽ thành sơ đồ (ngược: TP → BTP → NL → đại lý; xuôi: NL → mẻ → đóng gói → khách), độ dày nhánh = kg, kèm cân bằng kg | `/qr` hộ chiếu lô | "Quét một tem ra cả lịch sử" | `traceBackward` / `traceForward` / `computeLotMassBalance` | P1 |
 | V11 | **Độ phủ gắn lô theo khâu** (thanh tiến độ 5 khâu, % kg đã gắn) | `/qr` tab Theo giai đoạn, `/dashboard` | "Truy xuất đã đủ để thu hồi chưa" | `groupByTraceStage` | P2 |
 | V12 | **Tuổi tồn kho đông** (nhóm < 30 · 30–60 · 60–90 · > 90 ngày, theo kho/xưởng) | `/warehouse` | "Hàng nào nằm kho lâu, phải đẩy trước" | `computeWipStockDetail` (FIFO theo lô) | P2 |
 | V13 | **Bản đồ nhiệt nhập hàng** ngày × đại lý (kg) | `/imports` báo cáo | "Đại lý nào giao đều, ai thất thường" | imports | P2 |
-| V14 | **Tiến độ đơn đặt**: đặt vs đã xuất (thanh) theo đơn/khách, hạn giao | `/orders`, `/bc-don-xuat` | "Đơn nào sắp trễ" | sales_orders + export_* | P2 |
+| V14 | **Tiến độ đơn đặt**: đặt vs đã xuất (thanh) theo đơn/khách, hạn giao | `/orders`, `/export-report` | "Đơn nào sắp trễ" | sales_orders + export_* | P2 |
 | V15 | **Cơ cấu bán** (kg): XK / nội địa / bán lẻ theo khách lớn | `/sales` báo cáo | "Hàng ra kênh nào" | sales_items + domestic_sales | P2 |
 | V16 | **Điểm QC theo ngày / xưởng** (đường) + tỉ lệ đạt | `/qc` | "Chất lượng có đi xuống không" | qc_checklists | P2 |
 

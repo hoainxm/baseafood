@@ -46,7 +46,7 @@ Phân loại: **THẬT** = nối kho dữ liệu, ghi/sửa/chốt thật · **D
 | 5a | Đơn đặt → lệnh xuất | Đơn đặt `/orders` | ✅ THẬT | Tạo lệnh xuất FIFO từ tồn WIP → handoff sang Bán hàng |
 | 5b | Bán thành phẩm ra | Bán hàng `/sales` | ✅ THẬT | Phiếu bán · quy cách · XK/NĐ · hút vào cân đối |
 | 6 | Cân đối kỳ | Cân đối `/balancing` | ✅ THẬT | Gộp nhập + WIP + bán theo kỳ 5 ngày |
-| — | Tồn NXT | `/nxt`, `/nxt-nl` | ✅ THẬT | Suy tồn từ sổ gốc |
+| — | Tồn NXT | `/nxt`, `/nxt-material` | ✅ THẬT | Suy tồn từ sổ gốc |
 | — | Tổng quan / Báo cáo / Chất lượng / Truy xuất | `/dashboard` `/reports` `/quality` `/traceability` | 🟡 DEMO | Trưng bày, dữ liệu mẫu |
 
 > ⚠️ **Cảnh báo diễn giải:** app *trông* đã đủ màn, nhưng **~6 màn là DEMO**. Đừng coi màn DEMO là tính năng đã có khi lập kế hoạch.
@@ -59,7 +59,7 @@ Phân loại: **THẬT** = nối kho dữ liệu, ghi/sửa/chốt thật · **D
 
 ### G1 · Sản xuất KHÔNG nối ngược về nguyên liệu nhập 🔴 (đau nhất)
 
-> ✅ **Cập nhật 2026-09-21 (audit PO):** đoạn dưới mô tả hiện trạng lúc họp 22/08. Từ **2026-09-06** G1 đã **KHÉP VÒNG + HẾT CỘNG ĐÔI (hướng 1)**: chốt ngày SX ghi "còn dở" **tách theo loại NL** (`production_locks.leftover_by_material`, mig `0038`), sổ `/nxt-nl` lấy làm đông gửi chính (`dongGui = conDoSX>0 ? conDoSX : Chuyển-kỳ-âm`) ⇒ tồn cuối = tồn đầu + đông gửi − xả đông — xem CLAUDE.md § Trạng thái (G1) và [`36-so-kho-thang`](../app-map/36-so-kho-thang.md). **Còn hở:** SX vẫn chưa ghi lượng NL tiêu hao/yield theo *mẻ* (truy "mẻ nào ăn lô nào" mới ở QR đợt 1) — đó là phần P1-4 trong [`audit 2026-09-21`](../audit/2026-09-21-po-audit.md).
+> ✅ **Cập nhật 2026-09-21 (audit PO):** đoạn dưới mô tả hiện trạng lúc họp 22/08. Từ **2026-09-06** G1 đã **KHÉP VÒNG + HẾT CỘNG ĐÔI (hướng 1)**: chốt ngày SX ghi "còn dở" **tách theo loại NL** (`production_locks.leftover_by_material`, mig `0038`), sổ `/nxt-material` lấy làm đông gửi chính (`dongGui = conDoSX>0 ? conDoSX : Chuyển-kỳ-âm`) ⇒ tồn cuối = tồn đầu + đông gửi − xả đông — xem CLAUDE.md § Trạng thái (G1) và [`36-so-kho-thang`](../app-map/36-so-kho-thang.md). **Còn hở:** SX vẫn chưa ghi lượng NL tiêu hao/yield theo *mẻ* (truy "mẻ nào ăn lô nào" mới ở QR đợt 1) — đó là phần P1-4 trong [`audit 2026-09-21`](../audit/2026-09-21-po-audit.md).
 `WipProductionItem` (kiểm chứng `src/types.ts:292`) có `productId`, **`spec` (quy cách)**, `quantityKg`, `blocksCount`, `warehouse`, `status` (`cho-nhap`/`da-nhap`) — nhưng **không** có tham chiếu lô nhập, **không** ghi lượng nguyên liệu tiêu hao, **không** có hiệu suất (yield). Màn `WipProductionScreen.tsx` chỉ dùng `useMaterialTypes` (chọn **loại** NL làm nhãn), **không** dùng `useMaterialImports` ⇒ không đọc lượng nhập thực trong ngày. Phép *"lượng nhập trong ngày → ra bao nhiêu thành phẩm, hao bao nhiêu"* hiện **chỉ tính gián tiếp ở màn Cân đối** theo kỳ 5 ngày (`Định mức = Tổng NL ÷ Tổng TP`, `yieldRate` ở `balancingCalc.ts`), **không** tính trực tiếp ở bước sản xuất.
 → Hệ quả: không truy được *mẻ nào ăn nguyên liệu nào*; daily-task "hôm nay nhập X kg, ra Y kg thành phẩm, còn Z kg dở" (QĐ-3) **chưa có chỗ ghi Z và chưa tự nhắc**.
 

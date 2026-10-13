@@ -24,7 +24,7 @@ Ba module **Nhập hàng → Cân đối → Tồn kho NL** đã **chạy khép 
 - Còn thiếu: **đơn giá USD + khách** cho BTP (cần giá báo thật) để ra lãi/lỗ; 2 điểm treo với xí nghiệp (quy tắc chia NL cho từng bảng; định nghĩa chỉ số ≈ 0,45).
 
 ### 2.3 Tồn kho NL (NXT) — ✅ MỚI, đã chạy, cần hiệu chỉnh
-- Sổ Nhập–Xuất–Tồn nguyên liệu = **kho đông dự trữ** của vòng gối đầu, **suy thẳng từ chuyển kỳ Cân đối** (đông gửi = +kho, xả đông = −kho), **kg thuần**. Màn `/nxt-nl`, hàm thuần `lib/inventoryMaterial.ts`, tồn đầu khai tay (`material_opening_stock`, migration **0022**).
+- Sổ Nhập–Xuất–Tồn nguyên liệu = **kho đông dự trữ** của vòng gối đầu, **suy thẳng từ chuyển kỳ Cân đối** (đông gửi = +kho, xả đông = −kho), **kg thuần**. Màn `/nxt-material`, hàm thuần `lib/inventoryMaterial.ts`, tồn đầu khai tay (`material_opening_stock`, migration **0022**).
 - **Bộ dò lỗi thật:** tồn cuối < 0 = xả đông vượt tồn → badge + banner đỏ.
 - **Kiểm thử phiên này:** đối chiếu 3 kỳ (tồn đầu 150 → chuỗi → tồn âm cảnh báo); khớp cột Chuyển kỳ của Cân đối tuyệt đối. Đã commit (`990e3f1`). ✓
 - Doc: [31-can-doi-ky.md § Tồn kho nguyên liệu](../app-map/31-can-doi-ky.md) · [04-tang-du-lieu.md](../app-map/04-tang-du-lieu.md).
@@ -41,7 +41,7 @@ Ba module **Nhập hàng → Cân đối → Tồn kho NL** đã **chạy khép 
 ```
 Tờ 1 (NL nhập)  → sổ Nhập hàng → hút Khối 1 Cân đối
 Tờ 2 (BTP ra)   → sổ Sản xuất  → hút Khối 2 Cân đối
-Đông gửi/Xả đông (cột Chuyển kỳ Cân đối) → Tồn kho NL (/nxt-nl)
+Đông gửi/Xả đông (cột Chuyển kỳ Cân đối) → Tồn kho NL (/nxt-material)
 ```
 Đây chính là lời giải cho điểm đau số 1 — *tồn nguyên liệu cuối kỳ sai do ghi tay* — vì tồn suy từ sổ gốc, không chép tay.
 

@@ -27,7 +27,7 @@ Sau buổi: bấm **Làm mới bộ demo** (về nguyên trạng, ai bấm loạ
 | Bước | Màn | Cho xem | Thao tác trực tiếp |
 |---|---|---|---|
 | 1 | Nhập hàng `/imports` | Chuyến theo đại lý, chốt ngày, ghi bù có lý do | Ghi 1 chuyến 2 dòng → chốt ngày |
-| 2 | Tồn kho NL `/nxt-nl` | Tồn đầu + nhập − bán nội địa | — |
+| 2 | Tồn kho NL `/nxt-material` | Tồn đầu + nhập − bán nội địa | — |
 | 3 | Sản xuất `/wip` | Sản lượng ngày theo xưởng, gắn lô NL, chốt ngày SX (bắt gắn lô hoặc lý do) | Ghi 1 mẻ, gắn lô vừa nhập |
 | 4 | Kho dự trữ `/warehouse` | Duyệt chờ → đã nhập, **Hàng nằm kho bao lâu** | Duyệt mẻ đang chờ |
 | 5 | Đóng gói `/packaging` | BTP vào → TP ra + hao hụt, gắn lô BTP | — |
@@ -45,8 +45,8 @@ Sau buổi: bấm **Làm mới bộ demo** (về nguyên trạng, ai bấm loạ
 
 ## 4. Kế toán (tùy thời gian)
 
-- Sổ kho tháng `/ton-kho-thang`, Nhập xuất tồn kho `/nxt-kho`, Báo cáo thành phẩm / đơn xuất (Excel, in A4).
-- Đối soát HĐĐT `/doi-soat`: nạp file mẫu đã chuẩn bị → 4 kiểu đối soát → xuất Excel giữ định dạng.
+- Sổ kho tháng `/monthly-stock`, Nhập xuất tồn kho `/nxt-warehouse`, Báo cáo thành phẩm / đơn xuất (Excel, in A4).
+- Đối soát HĐĐT `/reconciliation`: nạp file mẫu đã chuẩn bị → 4 kiểu đối soát → xuất Excel giữ định dạng.
 - Tô màu dòng "đã dò" trên mọi bảng.
 
 ## Lưu ý khi trình bày

@@ -1,7 +1,7 @@
 # Quy ước đặt tên + kế hoạch dọn tên tiếng Việt không dấu
 
 - **Ngày lập:** 2026-10-12
-- **Trạng thái:** CHỐT 2026-10-12 (chủ dự án duyệt 4 câu ở §6). §2 Luật áp dụng NGAY cho mọi thứ MỚI. §5 chạy theo đợt có lịch, **Đợt 0 → 3 xong 2026-10-13**; đợt kế tiếp: **Đợt 4** (file/thư mục feature + route).
+- **Trạng thái:** CHỐT 2026-10-12 (chủ dự án duyệt 4 câu ở §6). §2 Luật áp dụng NGAY cho mọi thứ MỚI. §5 chạy theo đợt có lịch, **Đợt 0 → 4 xong 2026-10-13**; còn lại: tên TRƯỜNG dữ liệu trong `lib` + literal loại danh mục (xem Kết quả Đợt 4) và **Đợt 5** (5a enum slug + 5f tên policy, mỗi mục một câu xác nhận RED).
 - **Thay cho:** Phần B của [`routing-va-naming.md`](routing-va-naming.md) (dự thảo 2026-08-07; nửa DB + route của nó đã làm xong ở `0016` và đợt react-router).
 - **Liên quan:** [`CLAUDE.md`](../../CLAUDE.md) luật 8 · [`app-map/03-database.md`](../app-map/03-database.md) · [`app-map/04-tang-du-lieu.md`](../app-map/04-tang-du-lieu.md) · [`src/design-system/README.md`](../../src/design-system/README.md)
 
@@ -108,7 +108,7 @@ Phân bố khai báo tên Việt theo khu: `lib` 1.129 · `design-system` 301 ·
 | **1 · Cục bộ** ✅ 2026-10-13 | Biến/hàm không export, theo từng khu: `lib` → `design-system` → mỗi `features/*` | 🟢 | 3–5 ngày, chia nhiều phiên | ratchet giảm, 3 cổng xanh |
 | **2 · API lib + file** ✅ 2026-10-13 | Export của `lib/*` + `types.ts` + test đi kèm; đổi tên file `lib` (`doiSoatHddt.ts` → `einvoiceReconciliation.ts`…) bằng `git mv`; sửa `covers:` app-map, bảng "Code đổi → doc" ở CLAUDE.md, đường dẫn trong hook | 🟡 | 2–3 ngày | 3 cổng + hook doc không cảnh báo sót |
 | **3 · API design-system** ✅ 2026-10-13 | `BangTong` → `SummaryTable`, `LuoiNhap` → `GridInput`, `KhungCuonNgang` → `HorizontalScroll`, prop `nhan/moTa/tieuDe` → `label/description/title`; CSS utility + `data-*`. Giai đoạn chuyển: export cả hai tên, tên cũ gắn `@deprecated` (editor gạch ngang), codemod `features/*`, rồi gỡ alias | 🟡 lan rộng | 2–3 ngày | README design-system cập nhật, không còn import tên cũ |
-| **4 · Route + thư mục feature** | 7 route Việt → tiếng Anh (`/doi-soat` → `/reconciliation`, `/ton-kho-thang` → `/monthly-stock`…), **giữ redirect route cũ vĩnh viễn** (bookmark, link đã gửi Zalo); `?tab=` dùng giá trị mới + đọc cả giá trị cũ; `features/doi-soat` → `features/reconciliation`. **Không đổi id dùng cho phân quyền** trong `nav-access.ts`; nếu đổi thì có bảng ánh xạ | 🟡→🔴 nếu đụng gate vai trò | 0,5–1 ngày | Link cũ mở đúng màn; gate 2 bộ phận không đổi |
+| **4 · Route + thư mục feature** ✅ 2026-10-13 | 7 route Việt → tiếng Anh (`/doi-soat` → `/reconciliation`, `/ton-kho-thang` → `/monthly-stock`…), **giữ redirect route cũ vĩnh viễn** (bookmark, link đã gửi Zalo); `?tab=` dùng giá trị mới + đọc cả giá trị cũ; `features/doi-soat` → `features/reconciliation`. **Không đổi id dùng cho phân quyền** trong `nav-access.ts`; nếu đổi thì có bảng ánh xạ | 🟡→🔴 nếu đụng gate vai trò | 0,5–1 ngày | Link cũ mở đúng màn; gate 2 bộ phận không đổi |
 | **5 · Dữ liệu đã lưu** | (a) 6 họ enum slug: đọc cả cũ + mới, ghi mới, rồi migration `UPDATE` idempotent. (b) 31 khóa `toMau`: migration đổi `row_marks.table_key` cùng lúc deploy code. (c) Khóa localStorage cũ: bộ chuyển một lần, giữ khóa cũ tới khi chắc. (d) 2 cột `component_*_kg`: thêm cột mới, ghi cả hai, rồi bỏ cột cũ. (e) Hàm SQL: tạo tên mới, tên cũ thành vỏ gọi sang. (f) Policy: `ALTER POLICY … RENAME TO` | 🔴 | 2–3 ngày + kiểm 2 chế độ (có / không `.env`, ngắt mạng rồi nối lại) | Backup trước; chạy migration 2 lần không lỗi; số liệu sổ không đổi một dòng |
 
 **Thứ tự bắt buộc:** 0 trước mọi thứ. 1–3 làm xen kẽ được. 4 sau 2 (vì đổi thư mục kéo theo `covers:`). 5 làm cuối, chỉ 5a + 5f (§6 Q1), mỗi mục một câu xác nhận RED riêng.
@@ -162,6 +162,24 @@ Phân bố khai báo tên Việt theo khu: `lib` 1.129 · `design-system` 301 ·
 - **Bài học 2 — file test KHÔNG được kiểm kiểu** (`tsconfig.app.json` loại `*.test.ts`): test dựng object bằng khóa cũ chỉ lộ khi chạy (`rowMarks.test`, `repo.test` — hàng chờ đồng bộ). Cần cổng `tsc` riêng cho test.
 - **Bài học 3 — re-export qua barrel:** language service giữ tên công khai bằng bí danh (`SummaryTable as BangTong` ở `design-system/index.ts`) ⇒ phải đổi tiếp chính bí danh rồi gộp `X as X`.
 - Sau Đợt 3: `declarations` **484** · `fields` **934** · `routes` 6 · `css` **0** · `files` **29**.
+
+### Kết quả Đợt 4 (2026-10-13)
+
+- **Route:** `/doi-soat` → `/reconciliation`, `/ton-kho-thang` → `/monthly-stock`, `/nxt-nl` → `/nxt-material`, `/nxt-kho` → `/nxt-warehouse`, `/bc-thanh-pham` → `/production-report`, `/bc-don-xuat` → `/export-report`. Route cũ redirect VĨNH VIỄN, giữ `?query` (`LegacyPathRedirect`).
+- **`?tab=` + tham số:** Danh mục `dai-ly`… → `suppliers`…, QR `in`/`giai-doan` → `print`/`stages`; `?lo=` → `?lot=` (tem QR ĐÃ IN vẫn tra được — regex `(?:lot|lo)=` + test), `?duyet=` → `?approve=`, `?don=&kiem=` → `?order=&check=`. Một nguồn: `lib/legacyUrls.ts` (+ test).
+- **Phân quyền:** id nav = path ⇒ đổi đồng bộ ở `KIT_NAV`/`NAV_TREE`/guideContent/`nav-access.ts`; `nav-access.test.ts` chốt tập màn từng vai trò (chạy trên code cũ chỉ lệch đúng 2 id đổi tên ⇒ quyền không đổi).
+- **Feature:** 118 export, 382 prop, 957 tên cục bộ (gồm phần lexicon mới bắt thêm ở `lib`), 27 file + thư mục `features/doi-soat` → `features/reconciliation`, `data/thanh-pham.json` → `data/finished-goods.json`. Hook danh mục: `useSuaDanhMuc` → `useQuickCatalogEdit` trả `{ openEdit, canEdit, editLabel, dialog }`.
+- **Lỗi âm thầm bắt được (tsc không báo):** khóa ngày giá không xóa khi bỏ dòng gợi ý (`giaNgay` trong `.map` spread, importHelpers), mô tả rê chuột nhóm nav "Khác" mất (`moTa` trong `.map`). Test không kiểm kiểu: `getSupplierVehicles` trả `{ plates, drivers }` (test cũ còn `{ bienSo, taiXe }`).
+- **CỐ Ý giữ (giá trị `null` trong bảng ánh xạ = không đổi):** khóa loại danh mục (`matHang`, `khachHang`, `daiLy`, `loaiNL`, `botTam`, `khoLuu`) vì đi cùng chuỗi literal `"daiLy"` trong so sánh — language service không đổi chuỗi ⇒ phải làm riêng cùng literal; prop mô phỏng dữ liệu `lib` (`{ nut, cach }`, `{ viTri, cu, moi }`, `dichGoiY`, `veKhong`); `trangThai` trong ép kiểu `as {…}` của CheDoDemo. Khóa bảng tô màu (`"ton-kho-thang"`, `"danh-muc-…"`) — giá trị đã lưu.
+- Sau Đợt 4: `declarations` **0** · `routes` **0** · `css` **0** · `files` **0** · `fields` **603** (tên TRƯỜNG kiểu dữ liệu `lib` + nhóm cố ý giữ ở trên). Cổng đếm file bỏ qua `.md` (tên doc tiếng Việt không dấu là hợp lệ).
+
+### Còn lại sau Đợt 4
+
+| Việc | Tier | Ghi chú |
+|---|---|---|
+| Tên trường kiểu dữ liệu `lib` (`LotNode.nhan`, `FlowStage.ten/kgCho`…) — KHÔNG lưu DB | 🟡 | `rename.mjs --props` trên `src/lib`; LOẠI kiểu trong `types.ts` (đã tiếng Anh) và mọi kiểu đi vào `toRow`/localStorage |
+| Literal loại danh mục (`"daiLy"`…) + `theo: "ten"` + khóa cùng tên | 🟡 | đổi cùng lúc literal + khóa (grep `"daiLy"`), có test |
+| Đợt 5a/5f | 🔴 | xác nhận riêng từng mục |
 
 ### Cách chạy lại codemod
 

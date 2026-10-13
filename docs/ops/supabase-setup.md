@@ -59,7 +59,7 @@ Vài quyết định đáng nhớ:
   khóa ngoại. Sổ sách phải giữ nguyên tên tại thời điểm nhập — đại lý đổi tên
   sau này không được làm sai bản ghi đã chốt.
 - `thanh_pham` khóa chính là **`ma`** (mã kế toán), không phải id sinh tự động.
-  141 mã trong `src/data/thanh-pham.json` giờ chỉ là **seed**: app tự đẩy lên
+  141 mã trong `src/data/finished-goods.json` giờ chỉ là **seed**: app tự đẩy lên
   lần đầu nếu bảng rỗng, sau đó DB là nguồn thật.
 - `check` ràng buộc giá trị hợp lệ ngay ở DB: `phan_xuong ∈ (Đông, Cá, Khô)`,
   `kenh ∈ (Xuất khẩu, Nội địa)`, mọi khối lượng `>= 0`.

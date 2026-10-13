@@ -67,7 +67,7 @@ Phần lớn là **tổ trưởng / thủ kho 45–60 tuổi**, dùng **tablet �
 **Cấu trúc:**
 ```
 src/
-├── data/thanh-pham.json     141 mã thành phẩm (TK 1551) — chỉ là SEED cho bảng thanh_pham
+├── data/finished-goods.json     141 mã thành phẩm (TK 1551) — chỉ là SEED cho bảng thanh_pham
 ├── types.ts                 ThanhPham, DongNhapNL, MatHang, KhachHang, DaiLy, LoaiNguyenLieu, KyCanDoi…
 ├── lib/                     repo (Supabase↔localStorage) · catalogRepo · format (vi-VN) · db · balancingCalc · supabase · store
 ├── components/ui/           primitive shadcn — ĐÃ đè size cho người lớn tuổi

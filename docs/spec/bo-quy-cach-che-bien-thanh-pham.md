@@ -3,7 +3,7 @@
 - **Trạng thái:** Chiều B (kiểu chế biến) **ĐÃ BUILD v1** (`0024` + UI danh mục); Chiều C (quy cách chuẩn hoá) còn dự thảo — chờ chốt với xí nghiệp; **Chiều D (bột đi kèm) ĐÃ BUILD** (`0051`, 2026-10-06 — §2.4)
 - **Ngày lập:** 2026-08-22 · **Cập nhật:** 2026-10-06
 - **Nguồn quyết định:** [`hop-2026-08-22-so-hoa-flow-2-bo-phan.md`](../trien-khai/hop-2026-08-22-so-hoa-flow-2-bo-phan.md) (QĐ-1, QĐ-7)
-- **Đối chiếu:** [`32-danh-muc.md`](../app-map/32-danh-muc.md) (141 mã) · [`34-btp-san-xuat-kho.ba-spec.md`](../app-map/34-btp-san-xuat-kho.ba-spec.md) (quy cách là chiều khóa tồn) · `src/data/thanh-pham.json`
+- **Đối chiếu:** [`32-danh-muc.md`](../app-map/32-danh-muc.md) (141 mã) · [`34-btp-san-xuat-kho.ba-spec.md`](../app-map/34-btp-san-xuat-kho.ba-spec.md) (quy cách là chiều khóa tồn) · `src/data/finished-goods.json`
 
 Tài liệu này đề xuất **cấu trúc dữ liệu để số hóa thành phẩm theo nhiều quy cách và kiểu chế biến** — điều kiện để đạt mục tiêu QĐ-1: *"cùng một mẻ nguyên liệu ra những quy cách/kiểu chế biến nào, mỗi thứ bao nhiêu"*.
 

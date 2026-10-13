@@ -1,4 +1,4 @@
-> Load khi: sửa màn Sổ kho theo tháng (/ton-kho-thang), logic dồn tồn cuối kỳ → đầu kỳ sau, hay công thức tồn cuối/tiền còn lại theo tháng.
+> Load khi: sửa màn Sổ kho theo tháng (/monthly-stock), logic dồn tồn cuối kỳ → đầu kỳ sau, hay công thức tồn cuối/tiền còn lại theo tháng.
 covers: src/features/monthly-stock/MonthlyStockScreen.tsx, src/features/monthly-stock/index.ts, src/lib/monthlyStock.ts, src/lib/monthlyStockExcel.ts
 last_verified: 2026-10-12
 <!-- updated: 2026-10-06 (j) — tô màu / in đậm / bỏ tô KHÔNG còn toast "Đã … N dòng" + Hoàn tác (người dùng thấy phiền; README luật 8 mức 0). Các toast ghi sổ của màn (dán khối, dồn kỳ, xóa, gửi kho…) giữ nguyên. -->
@@ -8,7 +8,7 @@ last_verified: 2026-10-12
 <!-- updated: 2026-10-06 (f) — XỔ BẢNG RA + TÔ MÀU DÒNG: bảng mỗi nhóm đổi `SummaryTable stickyHeader` (khung cuộn riêng ≤70dvh — người dùng than "bọc", khó nhìn tổng quát) → `SummaryTable fullHeight`: bảng trải hết, trang cuộn một mạch; hàng tên cột NỔI dính ngay dưới header trang khi cuộn qua bảng (đo cột thật, khớp 0px, đồng bộ cuộn ngang), bảng rộng (~2.000px ở chế độ gõ) có thanh cuộn ngang DÍNH ĐÁY màn hình. Bật `rowMarkKey="ton-kho-thang"`: nút 🪣 đầu mỗi dòng (cạnh ô tick) tô vàng/xanh lá/xanh dương/đỏ + in đậm + bỏ tô, LƯU CHUNG bảng row_marks (mig 0055) theo id dòng sổ (`msl|…`/`carry|…`/`xlsx|…` — đổi id là mất dấu); thanh "Đã chọn N dòng" có nút "Tô màu N dòng" (hàng loạt, toast + Hoàn tác, đổi màu giữ in đậm riêng từng dòng). Kiểm demo: tô 1 dòng + in đậm, tô hàng loạt 2 dòng, Hoàn tác trả đúng dấu cũ; 360px + 130% không cuộn ngang trang. -->
 <!-- updated: 2026-10-06 (b) — GÕ THẲNG TRÊN BẢNG, BỎ CHẾ ĐỘ "Ghi nhập/xuất" RIÊNG: bảng theo nhóm (SummaryTable, giữ tick dòng · tổng nhóm · nút thao tác) nay là bảng nhập luôn — Ngày nhập (date) · Size · Invoice (input) · Đơn giá · Tồn đầu · Nhập · Xuất (`ONhapSo` + `navCol` trong khung `[data-grid-nav]`: gõ số/biểu thức, Esc trả số cũ, ghi theo phím, Enter/↑/↓ đi dọc cột qua cả các nhóm) · Vị trí (Combobox); Tồn cuối · Tiền còn lại vẫn là ô TÍNH; Tên · nhóm đổi ở ✎. Dán khối TSV từ Excel (`pasteBlock`, cột theo thứ tự Đơn giá·Tồn đầu·Nhập·Xuất, `(2.000)`=−2.000, ô rỗng giữ số cũ, MỘT lần ghi). Hoàn tác/Làm lại (nút + Ctrl+Z/Ctrl+Y, bỏ qua khi gõ trong hộp thoại) cho MỌI lần ghi sổ của màn: `writeLines` bọc lại chụp sổ trước khi ghi, gõ liên tiếp cùng ô = một bước (khuôn Cân đối). "Sửa tay" ở đối chiếu lệch nay lọc bảng bằng ô Tìm. Xem trước dồn kỳ: chỉ hiện số. Kiểm demo: 1200+300 ⇒ 1.500, Enter xuống dòng nhóm kế; Ctrl+Z một bước; dán 2×3 đúng; 360px + 130% không tràn. --><!-- updated: 2026-10-06 — CÂN ĐỐI GHI VÀO SỔ (lib/balancingStockLines.ts): dòng Lấy xả đông ở khối NL Cân đối chọn ĐÍCH DANH một dòng (lô) của sổ ⇒ cột Xuất của lô + dòng vết `⟦CĐ:<id dòng cân đối>:<kg>⟧` trong ghi chú; dòng Gửi đông ⇒ lô RIÊNG id `cd|<id dòng>|<ngày>` nhóm "Nguyên liệu gửi đông" (invoice GĐ-yyyymmdd). Tháng chưa mở ⇒ Cân đối tự kế thừa như nút "Kế thừa & lưu vào sổ". Xem § "Dòng do Cân đối ghi". -->
 ttl_days: 90
-<!-- updated: 2026-10-12 — SỬA LỖI AUDIT SỔ KHO THÁNG + NXT: (1) dồn LẠI không còn xoá trắng tháng sau — MỘT hàm ghi `carryForwardIntoLedger` (monthlyStock.ts) dùng chung cho gõ ở xem trước / "Kế thừa & lưu" / "Dồn sang tháng sau" / Cân đối `ensureMonthOpened`: id carry đã có ⇒ CHỈ đổi openKg/openCtn (giữ nhập/xuất, vị trí, ghi chú, vết ⟦CĐ⟧); carry mất nguồn/nguồn về 0 ⇒ tồn đầu 0 (trống hẳn + không ghi chú thì bỏ). (2) gõ ở xem trước khi đang lọc MỘT kho (tháng đã có dòng kho khác) chỉ dồn kho đó (`khoDon`) — trước đặt lại carry của kho khác. (3) id nạp Excel theo SỐ tháng `xlsx|<kho>|<tháng>|<năm>|<row>` (`idDongNap`) + `ghepNapLai` dọn theo `period` của dòng, nhận id dạng cũ theo tên sheet; cùng vị trí mà tên hàng khác ⇒ không thừa kế vị trí/ghi chú + cảnh báo; hai sheet cùng tháng ⇒ chặn. (4) parser: dòng chỉ có ô "" không làm lệch dòng cộng khối con. (5) dồn kỳ theo KG (dòng còn lẻ kiện không dồn mãi). (6) `num()` không in "-0". (7) /nxt-kho: dòng kho chỉ nhận ở đầu trang (chân file không đẻ kho rác); "Tạo kỳ kế tiếp" dồn mọi dòng của kỳ (không theo chip kho lưu), chỉ cập nhật tồn đầu mã đã có, mang giá trị cuối, mặc định từ ngày = ngày sau kỳ cũ. -->
+<!-- updated: 2026-10-12 — SỬA LỖI AUDIT SỔ KHO THÁNG + NXT: (1) dồn LẠI không còn xoá trắng tháng sau — MỘT hàm ghi `carryForwardIntoLedger` (monthlyStock.ts) dùng chung cho gõ ở xem trước / "Kế thừa & lưu" / "Dồn sang tháng sau" / Cân đối `ensureMonthOpened`: id carry đã có ⇒ CHỈ đổi openKg/openCtn (giữ nhập/xuất, vị trí, ghi chú, vết ⟦CĐ⟧); carry mất nguồn/nguồn về 0 ⇒ tồn đầu 0 (trống hẳn + không ghi chú thì bỏ). (2) gõ ở xem trước khi đang lọc MỘT kho (tháng đã có dòng kho khác) chỉ dồn kho đó (`khoDon`) — trước đặt lại carry của kho khác. (3) id nạp Excel theo SỐ tháng `xlsx|<kho>|<tháng>|<năm>|<row>` (`idDongNap`) + `ghepNapLai` dọn theo `period` của dòng, nhận id dạng cũ theo tên sheet; cùng vị trí mà tên hàng khác ⇒ không thừa kế vị trí/ghi chú + cảnh báo; hai sheet cùng tháng ⇒ chặn. (4) parser: dòng chỉ có ô "" không làm lệch dòng cộng khối con. (5) dồn kỳ theo KG (dòng còn lẻ kiện không dồn mãi). (6) `num()` không in "-0". (7) /nxt-warehouse: dòng kho chỉ nhận ở đầu trang (chân file không đẻ kho rác); "Tạo kỳ kế tiếp" dồn mọi dòng của kỳ (không theo chip kho lưu), chỉ cập nhật tồn đầu mã đã có, mang giá trị cuối, mặc định từ ngày = ngày sau kỳ cũ. -->
 <!-- updated: 2026-10-06 (e) — ô "Ánh xạ … tới" (hộp Đồng bộ danh mục): gõ tên chưa có ⇒ LƯU NGAY vào danh mục đích của dòng (`addCanonicalName` — Mặt hàng hoặc Loại NL theo select đích; trùng tên không phân hoa thường ⇒ dùng lại; đích "Bỏ qua" ⇒ không cho tạo), theo luật ô chọn danh mục (design-system README). Trước đây `onCreate={(t)=>t}` chỉ giữ tên tới khi bấm Đồng bộ. Tên GỐC từ file (chưa ai chọn) vẫn hiện nhãn "mới — thêm … khi bấm Đồng bộ" và `apDongBo` vẫn thêm như cũ (không trùng vì dò `chuan`). -->
 <!-- updated: 2026-09-29 (3) — hộp Đồng bộ danh mục: nút xác nhận "Đồng bộ: n → Mặt hàng · m → Loại NL" chuyển xuống CHÂN hộp (dính đáy khi cuộn, không disabled); ô ánh xạ hiện tên vừa gõ "thêm mới" kèm nhãn "mới"; ô co giãn ở điện thoại. -->
 <!-- updated: 2026-09-29 (2) — Size thành CỘT RIÊNG (bảng xem · lưới Ghi sửa tại ô · phiếu in) thay dòng phụ dưới tên; parser điền ô GỘP dọc cột 0–5 (ngày nhập/invoice gộp cho cả lô nhiều size — trước chỉ dòng đầu có) và đọc KHÔNG cellDates (SheetJS dựng Date lệch giây múi giờ ⇒ ngày lùi 1 ngày ở VN); id nạp không đổi (kiểm file thật). -->
@@ -20,7 +20,7 @@ ttl_days: 90
 <!-- re-verified: 2026-09-11 16:40 — parser cột 0/1/2/3/4/5/8-13 + nhóm "NHẬP KHẨU"/"MUA NGOÀI" + bỏ dòng "TỔNG" (monthlyStockExcel.ts:105-146), nhận sheet số tháng qua suyThang() "1".."12"/"T8"/"Tháng 8" (monthlyStockExcel.ts:94-103), id nạp `xlsx|${maKho}|${sheetName}|${nam}|${rowIndex}` + nạp lại thay-theo-id giuLai=filter(!idMoi) (MonthlyStockScreen.tsx:503,529-531), namTuTenFile year=/20\d{2}/ (monthlyStockExcel.ts:164-167) — khớp code. -->
 <!-- re-verified: 2026-09-15 15:30 — donSangThang(nguon, thangDich) + idDon `carry|<id-nguồn>` (monthlyStock.ts) và EmptyState "Kế thừa tồn cuối tháng trước" (MonthlyStockScreen) đúng như doc mô tả TRƯỚC đợt này; khoaLo = kho·nhóm·tên name-level (monthlyStock.ts:199) vẫn là khóa gộp — tái dùng cho thẻ kho. Đã kiểm trên DB thật: T9/2026 trống, T8 có 143 dòng / 1.478.897,83 kg. -->
 
-# Sổ kho theo THÁNG dương lịch (`/ton-kho-thang`)
+# Sổ kho theo THÁNG dương lịch (`/monthly-stock`)
 
 Số hoá "bảng kê kho" mà kế toán/thủ kho đang giữ trên Excel (mỗi sheet một tháng — nguồn: `kho 1000 năm 2026.xlsx`, "BẢNG KÊ NGUYÊN LIỆU KHO 1500 T"). Trả lời câu: **cuối tháng này tồn bao nhiêu, và số đó tự thành tồn đầu tháng sau** — hết chép tay.
 
@@ -30,14 +30,14 @@ Số hoá "bảng kê kho" mà kế toán/thủ kho đang giữ trên Excel (m�
 
 | Sổ | Kỳ | Đối tượng | Đơn vị |
 |---|---|---|---|
-| `/nxt-nl` (`MaterialNxtScreen`) | kỳ CÂN ĐỐI (lô, ~5 ngày) | nguyên liệu | kg |
+| `/nxt-material` (`MaterialNxtScreen`) | kỳ CÂN ĐỐI (lô, ~5 ngày) | nguyên liệu | kg |
 | `/nxt` (`NxtReportScreen`) | khoảng ngày | thành phẩm/BTP | kg |
-| `/nxt-kho` (`WarehouseNxtScreen`) | khoảng ngày tuỳ ý | 1 nhóm mã (seed bạch tuộc) | kg |
-| **`/ton-kho-thang`** (module này) | **THÁNG dương lịch** | **NL + BTP + TP (chung)** | **kg** (kiện vẫn lưu, không hiện) |
+| `/nxt-warehouse` (`WarehouseNxtScreen`) | khoảng ngày tuỳ ý | 1 nhóm mã (seed bạch tuộc) | kg |
+| **`/monthly-stock`** (module này) | **THÁNG dương lịch** | **NL + BTP + TP (chung)** | **kg** (kiện vẫn lưu, không hiện) |
 
 Bảng kê thật theo dõi song song **kiện** và **kg**, có **đơn giá + tiền còn lại**, nhóm theo **loại hàng** (nhập khẩu / mua ngoài…). File Excel gốc dồn kỳ SAI ở dòng tổng (tồn đầu nhập khẩu đóng băng 859.444 kg suốt 7 tháng, tồn nội địa reset 0 mỗi tháng) — đúng nỗi đau "tồn cuối kỳ sai do ghi tay". Module này **ép cứng** dồn kỳ đúng.
 
-⚠️ Module này KHÔNG đụng `/nxt-nl`, `/nxt`, `/nxt-kho`, `balancingCalc.ts`, `production_locks`, `material_opening_stock` — chỉ đọc/ghi bảng riêng `monthly_stock_ledger`.
+⚠️ Module này KHÔNG đụng `/nxt-material`, `/nxt`, `/nxt-warehouse`, `balancingCalc.ts`, `production_locks`, `material_opening_stock` — chỉ đọc/ghi bảng riêng `monthly_stock_ledger`.
 
 ## Mô hình dữ liệu
 
@@ -223,13 +223,13 @@ Khối nguyên liệu của Cân đối có hai dòng kho ghi THẲNG vào sổ 
 
 ## Cạm bẫy
 
-- **Cộng đôi**: mỗi dòng độc lập trong CÙNG một tháng ⇒ `tongDong` cộng thẳng an toàn. Nhưng KHÔNG cộng dồn tồn đầu/cuối qua NHIỀU tháng (phần kế thừa sẽ đếm lại) — module chỉ tổng trong một tháng.
+- **Cộng đôi**: mỗi dòng độc lập trong CÙNG một tháng ⇒ `getLineTotalKg` cộng thẳng an toàn. Nhưng KHÔNG cộng dồn tồn đầu/cuối qua NHIỀU tháng (phần kế thừa sẽ đếm lại) — module chỉ tổng trong một tháng.
 - **Danh mục mở**: `category` là chuỗi tự do (Combobox tạo mới) — gõ lệch tên sẽ tách nhóm khi tổng hợp; ưu tiên chọn gợi ý sẵn.
 - Tồn cuối < 0 = xuất nhiều hơn đang có ⇒ dấu hiệu ghi sai; thanh bất biến gọi tên.
 - Số hiển thị qua `num()` (lib/format.ts): giá trị làm tròn 2 số lẻ ra 0 (kể cả vụn âm −5,55e−17 của phép cộng trừ) in "0", không còn "-0"; ô `soHoacGach` hiện "—".
 - **Dồn kỳ ≠ sửa lệch tay:** nếu đã chỉnh TAY tồn đầu một dòng `carry|…` (VD lô tách size ở tháng đích), bấm dồn lại sẽ đặt tồn đầu dòng đó về đúng tồn cuối nguồn — sửa tách size bằng dòng riêng, đừng sửa tồn đầu của dòng carry.
 
-## Liên quan: `/nxt-kho` "Tạo kỳ kế tiếp" (WarehouseNxtScreen, 2026-10-12)
+## Liên quan: `/nxt-warehouse` "Tạo kỳ kế tiếp" (WarehouseNxtScreen, 2026-10-12)
 
 Cùng tinh thần dồn kỳ ở trên: kế thừa từ **mọi dòng của kỳ** (`rowsKy`, không theo chip kho lưu đang lọc — trước dồn thiếu dòng); kỳ đích đã có mã nào thì **chỉ đổi tồn đầu** (kg + giá trị) mã đó, giữ nhập/xuất/kho lưu/ghi chú (trước xoá cả kỳ đích); giá trị đầu kỳ mới = giá trị cuối (đầu + nhập − xuất, trước luôn 0); hộp thoại mặc định "từ ngày" = **ngày sau** ngày cuối kỳ đang xem. Nhập Excel NXT (`lib/nxtExcel.ts`): dòng "Chi nhánh:"/"KHO…" chỉ nhận ở **đầu trang, lần đầu** — chân file do chính màn xuất ra không còn đè thành kho rác.
 

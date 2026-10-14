@@ -12,6 +12,9 @@ import {
   getSkippedSuggestedLines,
   getKnownVehicles,
   mergeOcrLines,
+  buildSupplierHistory,
+  defaultOcrSelection,
+  applyOcrSelection,
   createEmptyImportLine,
   type ShipmentHeader,
   type ImportLine,
@@ -386,5 +389,46 @@ describe("OCR phiếu nhập → bảng loại hàng", () => {
       "Bạch tuộc",
     );
     expect(out.map((d) => d.quantityKg)).toEqual([5, 7]);
+  });
+});
+
+describe("buildSupplierHistory — lịch sử giao gửi kèm OCR", () => {
+  it("đại lý giao gần nhất trước, loại mới nhất trước, giá gần nhất, khử trùng", () => {
+    const rows = [
+      dong({ id: "1", deliveryDate: "2026-08-20", supplierName: "Hồng Phú", materialTypeName: "Bạch tuộc 1 da", unitPrice: 150000 }),
+      dong({ id: "2", deliveryDate: "2026-08-22", supplierName: "Hồng Phú", materialTypeName: "Bạch tuộc 1 da", unitPrice: 158000 }),
+      dong({ id: "3", deliveryDate: "2026-08-22", supplierName: "Hồng Phú", materialTypeName: "Bạch tuộc 2 da lớn (80↑)", unitPrice: null }),
+      dong({ id: "4", deliveryDate: "2026-08-21", supplierName: "Phú Quý", materialTypeName: "Mực ống", unitPrice: 90000 }),
+    ];
+    expect(buildSupplierHistory(rows)).toEqual([
+      "Hồng Phú: Bạch tuộc 2 da lớn (80↑) · Bạch tuộc 1 da (158.000)",
+      "Phú Quý: Mực ống (90.000)",
+    ]);
+    expect(buildSupplierHistory(rows, 1)).toHaveLength(1);
+  });
+});
+
+describe("bảng đối chiếu OCR — tick ô nào điền ô đó", () => {
+  const r = {
+    text: "",
+    kgValues: [],
+    materialTypes: [],
+    date: "2026-08-22",
+    supplier: "Hồng Phú",
+    licensePlate: "51M-05772",
+    lines: [
+      { materialType: "Bạch tuộc 1 da", kg: 2014 },
+      { materialType: "Bạch tuộc 2 da lớn (80↑)", kg: 11017 },
+    ],
+  };
+  it("mặc định tick mọi ô đọc được + mọi dòng", () => {
+    const sel = defaultOcrSelection(r);
+    expect([...sel.header].sort()).toEqual(["date", "licensePlate", "supplier"]);
+    expect([...sel.lines]).toEqual([0, 1]);
+  });
+  it("bỏ tick ⇒ ô đó coi như không đọc được, dòng bị loại", () => {
+    const out = applyOcrSelection(r, { header: new Set(["date"]), lines: new Set([1]) });
+    expect(out).toMatchObject({ date: "2026-08-22", supplier: undefined, licensePlate: undefined });
+    expect(out.lines.map((l) => l.kg)).toEqual([11017]);
   });
 });

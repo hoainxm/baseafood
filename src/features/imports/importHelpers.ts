@@ -13,6 +13,7 @@ import type {
 import { calculateImportAmount, isBackdatedImport } from "@/types";
 import { newId } from "@/lib/store";
 import type { FieldError } from "@/design-system";
+import type { KetQuaOcr } from "@/lib/ocr";
 
 export const WORKSHOPS: Workshop[] = ["Đông", "Cá", "Khô"];
 
@@ -409,4 +410,62 @@ export function mergeOcrLines(
     });
   }
   return result.length ? result : [createEmptyImportLine(fallbackCategory)];
+}
+
+/**
+ * Lịch sử giao gửi kèm OCR, mỗi đại lý một dòng "Đại lý: loại (giá) · loại (giá)…" —
+ * đại lý giao gần nhất trước, loại theo lượt mới nhất trước, giá = giá gần nhất. Phiếu
+ * tay chỉ ghi "2Da NL 80↑" (không ghi loài) ⇒ máy cần biết đại lý đó hay giao gì.
+ */
+export function buildSupplierHistory(
+  rows: MaterialImportItem[],
+  maxSuppliers = 60,
+  maxTypes = 8,
+): string[] {
+  const bySupplier = new Map<string, Map<string, number | null>>();
+  for (const r of [...rows].sort(newestFirst)) {
+    if (!r.supplierName || !r.materialTypeName) continue;
+    let types = bySupplier.get(r.supplierName);
+    if (!types) {
+      if (bySupplier.size >= maxSuppliers) continue;
+      types = new Map();
+      bySupplier.set(r.supplierName, types);
+    }
+    if (!types.has(r.materialTypeName) && types.size < maxTypes) types.set(r.materialTypeName, r.unitPrice);
+  }
+  return [...bySupplier].map(
+    ([supplier, types]) =>
+      `${supplier}: ${[...types].map(([t, p]) => (p != null ? `${t} (${p.toLocaleString("vi-VN")})` : t)).join(" · ")}`,
+  );
+}
+
+/** Ô đầu chuyến trong bảng đối chiếu OCR — tick ô nào thì điền ô đó. */
+export const OCR_HEADER_FIELDS = ["date", "supplier", "workshop", "licensePlate", "driverName"] as const;
+export type OcrHeaderField = (typeof OCR_HEADER_FIELDS)[number];
+
+export interface OcrSelection {
+  header: Set<OcrHeaderField>;
+  lines: Set<number>;
+}
+
+/** Mặc định tick mọi ô máy đọc được + mọi dòng — người soát BỎ tick ô sai. */
+export function defaultOcrSelection(r: KetQuaOcr): OcrSelection {
+  return {
+    header: new Set(OCR_HEADER_FIELDS.filter((f) => !!r[f])),
+    lines: new Set(r.lines.map((_, i) => i)),
+  };
+}
+
+/** Kết quả chỉ còn các ô / dòng đang tick (ô bỏ tick = coi như máy không đọc được). */
+export function applyOcrSelection(r: KetQuaOcr, sel: OcrSelection): KetQuaOcr {
+  const pick = <K extends OcrHeaderField>(f: K) => (sel.header.has(f) ? r[f] : undefined);
+  return {
+    ...r,
+    date: pick("date"),
+    supplier: pick("supplier"),
+    workshop: pick("workshop"),
+    licensePlate: pick("licensePlate"),
+    driverName: pick("driverName"),
+    lines: r.lines.filter((_, i) => sel.lines.has(i)),
+  };
 }

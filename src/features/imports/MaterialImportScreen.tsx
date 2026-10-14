@@ -56,7 +56,7 @@ import { useAuth } from "@/lib/auth";
 import { DailyTaskReminder, LotLabelPrint, BlankDailyImportSlip } from "@/features/shared";
 import { useQuickCatalogEdit } from "@/features/catalog/QuickCatalogEdit";
 import { ImportSlipOcr } from "./ImportSlipOcr";
-import { coOcr, type OcrCatalog, type KetQuaOcr, type DongOcr } from "@/lib/ocr";
+import { coOcr, type OcrCatalog, type KetQuaOcr } from "@/lib/ocr";
 import { hasImageStorage, getPhotoUrl } from "@/lib/storage";
 import { KY_OPT, getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
 import {
@@ -95,6 +95,8 @@ import {
   getSupplierVehicles,
   getKnownVehicles,
   mergeOcrLines,
+  buildSupplierHistory,
+  SCRAP_SUGGESTIONS,
   getSupplierLineTemplates,
   applyNewSupplierTemplate,
   getSkippedSuggestedLines,
@@ -657,23 +659,52 @@ export default function MaterialImportScreen() {
       knownPlates: vehicles.plates,
       knownDrivers: vehicles.drivers,
       workshops: WORKSHOPS,
+      supplierHistory: buildSupplierHistory(rows),
+      scrapTypes: SCRAP_SUGGESTIONS,
     };
   }, [suppliers, materialTypes, rows]);
 
   const categoryOfMaterial = (name: string) =>
     (materialTypes.find((l) => l.name === name)?.category || undefined) as Category | undefined;
 
-  /** OCR đề xuất một dòng: điền vào dòng mẫu cùng loại nếu có, không thì thêm cuối bảng. */
-  const addRowFromOcr = (line: DongOcr) =>
-    setTableRows((items) => mergeOcrLines(items, [line], categoryOfMaterial, lastCategory));
-
-  /** OCR điền biển số / tài xế (ô nào máy không đọc được thì giữ nguyên). */
-  const applyVehicleFromOcr = (v: { licensePlate?: string; driverName?: string }) => {
-    setSession((p) =>
-      p ? { ...p, licensePlate: v.licensePlate ?? p.licensePlate, driverName: v.driverName ?? p.driverName } : p
+  /**
+   * Phế liệu ngày đọc từ phiếu ⇒ GHI THẲNG vào sổ phế liệu (như hộp "Phế liệu cân trong
+   * ngày" — nó không có nháp), theo ngày + xưởng của phiếu đang mở. Loại đã ghi cho ngày
+   * đó thì bỏ qua (chống ghi đôi khi đọc lại cùng phiếu). Trả số dòng đã ghi.
+   */
+  const addScrapsFromOcr = (items: { name: string; kg: number }[], date: string, workshop: Workshop): number => {
+    if (isLocked(date, workshop)) {
+      notify.warning(`Ngày ${formatDateVN(date)} xưởng ${workshop} đã chốt — mở chốt rồi mới ghi phế liệu.`);
+      return 0;
+    }
+    const existing = new Set(
+      scraps
+        .filter((r) => r.source === "Nhập hàng" && r.date === date && r.workshop === workshop)
+        .map((r) => r.name.trim().toLowerCase())
     );
-    setIsManualVehicle(false);
-    if (v.licensePlate) setOpenPanel(null);
+    const added = items
+      .filter((x) => !existing.has(x.name.trim().toLowerCase()))
+      .map((x) => ({
+        id: newId(),
+        periodId: "",
+        name: x.name,
+        quantityKg: x.kg,
+        sellingPrice: null,
+        date,
+        workshop,
+        source: "Nhập hàng" as const,
+      }));
+    if (!added.length) {
+      notify.warning("Phế liệu này đã có trong sổ ngày đó — không ghi thêm.");
+      return 0;
+    }
+    const before = scraps;
+    persistScraps([...scraps, ...added]);
+    notify.saved(
+      `Đã ghi phế liệu ${added.map((x) => `${x.name} ${kg(x.quantityKg)}`).join(", ")} — ngày ${formatDateVN(date)}`,
+      () => persistScraps(before)
+    );
+    return added.length;
   };
 
   /**
@@ -2122,12 +2153,11 @@ export default function MaterialImportScreen() {
         <ImportSlipOcr
           catalog={ocrCatalog}
           onImageSaved={(path) => setSessionField("scanPath", path)}
-          onApplySupplier={pickSupplier}
-          onApplyDate={changePostingDate}
-          onApplyWorkshop={(w) => pickWorkshop(w as Workshop)}
-          onApplyVehicle={applyVehicleFromOcr}
-          onAddRow={addRowFromOcr}
           onApplyAll={applyAllFromOcr}
+          onAddScraps={(items, r) =>
+            addScrapsFromOcr(items, r.date ?? session.deliveryDate, (r.workshop as Workshop | undefined) ?? session.workshop)
+          }
+          scrapTarget={(r) => ({ date: r.date ?? session.deliveryDate, workshop: r.workshop ?? session.workshop })}
           onClose={() => setOcrMo(false)}
         />
       )}

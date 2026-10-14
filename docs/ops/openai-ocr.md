@@ -2,6 +2,8 @@
 
 covers: supabase/functions/ocr-import-slip/index.ts, src/lib/ocrCloud.ts
 last_verified: 2026-10-14
+<!-- updated: 2026-10-14 (d) — hàm trả thêm `raw` (chữ chép y từng ô đầu chuyến) + `lines[].raw` cho bảng đối chiếu ở hộp OCR; app cũ bỏ qua. -->
+<!-- updated: 2026-10-14 (c) — QUY ƯỚC PHIẾU (đối chiếu phiếu 22/8/2026 với sổ thật): 10 điều trong prompt + § Quy ước phiếu của xưởng; thêm scraps/totalKg/warnings, lịch sử giao từng đại lý, khớp tên viết tắt chữ đầu (`matchesAbbreviation`), dấu "," nghìn ở parser; test oracle `ocrCloud.test.ts` › "đối chiếu phiếu 22/8/2026". -->
 <!-- updated: 2026-10-14 (b) — hàm đọc thêm biển số · tài xế · xưởng · đơn giá (schema strict thêm licensePlate/driverName/workshop/lines[].unitPrice), nhận thêm knownPlates/knownDrivers/workshops; deploy lại (bản 3). Tương thích hai chiều: app cũ bỏ qua trường mới, app mới thiếu trường thì để trống. -->
 
 # OCR phiếu nhập bằng OpenAI (Edge Function)
@@ -21,6 +23,36 @@ Trình duyệt (/imports) ──ảnh nén ≤1600px + danh mục đại lý/lo�
 - Cổng JWT của Supabase chặn người chưa đăng nhập (401). Trong hàm, `co_vai_tro()` chặn tài khoản tự đăng ký chưa có vai trò (403) ⇒ người lạ không đốt tiền key.
 - Hàm **không ghi bảng nào, không lưu ảnh, không log ảnh**. Ảnh phiếu đã lưu riêng ở bucket `qc` ([supabase-storage](supabase-storage.md)).
 - Ảnh phiếu thật của xưởng được gửi sang OpenAI — chủ dự án đồng ý 2026-10-14.
+
+## Quy ước phiếu của xưởng (đọc OCR theo)
+
+Mẫu phiếu in: **"BÁO CÁO TỔNG HỢP NGUYÊN LIỆU HẰNG NGÀY"** — cột STT · TÊN ĐẠI LÝ · LOẠI NGUYÊN LIỆU · SỐ LƯỢNG · ĐƠN GIÁ · GHI CHÚ, viết tay. Các quy ước dưới đây nằm NGUYÊN VĂN trong `SYSTEM_PROMPT` của hàm (đánh số giống nhau) và có test đối chiếu. Đã đối chiếu với sổ thật bằng phiếu **22/8/2026, Hồng Phú, PXĐ**:
+
+| # | Trên phiếu | Hiểu là | Ví dụ 22/8 → sổ |
+|---|---|---|---|
+| 1 | "PXĐ" / "PXC" / "PXK" dưới tên công ty | xưởng Đông / Cá / Khô | PXĐ → Đông |
+| 2 | "NĂM 26" | 2026 | 22/8/26 → 2026-08-22 |
+| 3 | tên đại lý viết tắt chữ đầu | khớp danh mục theo chữ đầu + tên | "H Phú" → Hồng Phú |
+| 4 | tài xế + biển số ở cột GHI CHÚ, không nhãn; tên đệm viết 1 chữ | khớp TÀI XẾ / XE ĐÃ GHI | "Phạm H Khánh" → Phạm Hoàng Khánh · "51M 05772" → 51M-05772 |
+| 5 | "1Da", "2Da", "NL", "80↑", "80↓"; loài không ghi | loài lấy theo lịch sử giao của đại lý, khớp số da + cỡ | "2Da NL 80↑" → Bạch tuộc 2 da lớn (80↑) |
+| 6 | "." **hoặc** "," trước đúng 3 chữ số | dấu NGHÌN | "11,017" → 11.017 kg (không phải 11,017 kg) |
+| 7 | đơn giá ghi tắt | nghìn đồng/kg | "158" → 158.000 |
+| 8 | số ở chân cột SỐ LƯỢNG | TỔNG để đối chiếu, không phải dòng hàng | 14,410 = 2.014 + 11.017 + 1.379 |
+| 9 | "Nội tạng 1.000 kg" ở ghi chú | PHẾ LIỆU ngày, không phải dòng hàng | → phế liệu Nội tạng 1.000 kg |
+| 10 | nhiều nhóm đại lý trên một phiếu | chỉ lấy đại lý đầu, cảnh báo phần còn lại | — |
+
+Lưới an toàn phía app (`lib/ocrCloud.ts`, không phụ thuộc máy có nghe lời hay không):
+- Tên đại lý / tài xế viết tắt khớp lại bằng `matchesAbbreviation` (cùng số từ, mỗi từ trùng hoặc là chữ đầu, ≥1 từ trùng nguyên) — chỉ nhận khi **duy nhất** một tên khớp.
+- Tổng các dòng ≠ `totalKg` trên phiếu (lệch > 0,5 kg) ⇒ cảnh báo đỏ đầu hộp thoại "soát lại từng số" — bắt lỗi dấu nghìn.
+- Phế liệu chỉ nhận tên trong danh sách (Nội tạng, Dạt); nút **Ghi phế liệu** ghi thẳng vào sổ phế liệu ngày (có Hoàn tác), loại đã có cho ngày + xưởng đó thì bỏ qua — đọc lại cùng phiếu không ghi đôi.
+- App gửi kèm **lịch sử giao** từng đại lý (`buildSupplierHistory`: ≤60 đại lý gần nhất × ≤8 loại, giá gần nhất) để máy suy loài từ "2Da NL 80↑".
+
+### Thêm quy ước khi gặp phiếu đọc sai
+
+1. Lấy ảnh phiếu + số đúng trong sổ ngày đó (đối chiếu từng ô như bảng trên).
+2. Ô sai vì **cách viết của xưởng** ⇒ thêm một điều vào `SYSTEM_PROMPT` (đánh số tiếp, câu ngắn + ví dụ thật) và một dòng vào bảng trên, ghi phiếu nguồn.
+3. Ô sai mà app tự soát được (tên, số, tổng) ⇒ thêm lưới ở `mergeCloudResult` / `parseOcrText`.
+4. Thêm ca vào test `ocrCloud.test.ts` › "đối chiếu phiếu …" (đáp án = sổ thật) rồi deploy lại hàm.
 
 ## Đặt key (chủ dự án tự làm — KHÔNG dán key vào repo/chat/commit)
 

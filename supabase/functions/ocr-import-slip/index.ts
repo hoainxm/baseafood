@@ -32,11 +32,24 @@ const json = (status: number, body: unknown) =>
 const RESULT_SCHEMA = {
   type: "object",
   additionalProperties: false,
-  required: ["text", "date", "supplier", "licensePlate", "driverName", "workshop", "lines"],
+  required: ["text", "raw", "date", "supplier", "licensePlate", "driverName", "workshop", "lines", "scraps", "totalKg", "warnings"],
   properties: {
     text: { type: "string", description: "Toàn văn chữ trên phiếu, giữ xuống dòng theo hàng." },
+    raw: {
+      type: "object",
+      additionalProperties: false,
+      description: "Chữ CHÉP Y như trên phiếu của từng ô (trước khi khớp danh mục), null nếu phiếu không ghi.",
+      required: ["date", "supplier", "workshop", "licensePlate", "driverName"],
+      properties: {
+        date: { type: ["string", "null"] },
+        supplier: { type: ["string", "null"] },
+        workshop: { type: ["string", "null"] },
+        licensePlate: { type: ["string", "null"] },
+        driverName: { type: ["string", "null"] },
+      },
+    },
     date: { type: ["string", "null"], description: "Ngày hàng về dạng yyyy-mm-dd, null nếu không thấy." },
-    supplier: { type: ["string", "null"], description: "Tên đại lý ĐÚNG Y một mục trong danh mục, null nếu không chắc." },
+    supplier: { type: ["string", "null"], description: "Nhãn đại lý ĐÚNG Y một mục trong danh mục, null nếu không chắc." },
     licensePlate: { type: ["string", "null"], description: "Biển số xe chở hàng, null nếu phiếu không ghi." },
     driverName: { type: ["string", "null"], description: "Tên tài xế, null nếu phiếu không ghi." },
     workshop: { type: ["string", "null"], description: "Xưởng nhận hàng: ĐÚNG Y một mục trong danh sách xưởng, null nếu không ghi." },
@@ -45,28 +58,55 @@ const RESULT_SCHEMA = {
       items: {
         type: "object",
         additionalProperties: false,
-        required: ["materialType", "kg", "unitPrice"],
+        required: ["raw", "materialType", "kg", "unitPrice"],
         properties: {
+          raw: { type: "string", description: "Chữ CHÉP Y cả dòng trên phiếu: loại · số lượng · đơn giá (vd \"2Da NL 80↑ · 11,017 · 142\")." },
           materialType: { type: "string", description: "Tên loại NL ĐÚNG Y một mục trong danh mục." },
           kg: { type: "number", description: "Khối lượng kg của dòng đó." },
           unitPrice: { type: ["number", "null"], description: "Đơn giá đồng/kg của dòng đó, null nếu phiếu không ghi." },
         },
       },
     },
+    scraps: {
+      type: "array",
+      description: "Phế liệu cân gộp (nội tạng, dạt…) — KHÔNG đưa vào lines.",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["name", "kg"],
+        properties: {
+          name: { type: "string", description: "Loại phế liệu ĐÚNG Y một mục trong danh sách PHẾ LIỆU." },
+          kg: { type: "number" },
+        },
+      },
+    },
+    totalKg: { type: ["number", "null"], description: "Số tổng ghi ở chân cột số lượng (nếu có), null nếu không ghi." },
+    warnings: { type: "array", items: { type: "string" }, description: "Điều người nhập cần soát lại, câu ngắn tiếng Việt." },
   },
 } as const;
 
-const SYSTEM_PROMPT = `Bạn đọc ảnh PHIẾU NHẬP NGUYÊN LIỆU thủy sản viết tay/in của xí nghiệp Baseafood (Việt Nam).
-Nhiệm vụ: chép lại chữ trên phiếu và bóc các ô để điền form nhập hàng: đại lý, ngày, biển số xe, tài xế, xưởng, và từng dòng loại nguyên liệu + kg + đơn giá.
-Quy tắc:
+// QUY ƯỚC PHIẾU rút từ phiếu thật — mỗi điều ghi nguồn đối chiếu. Thêm điều mới khi soát
+// một phiếu đọc sai (docs/ops/openai-ocr.md § Quy ước phiếu của xưởng).
+const SYSTEM_PROMPT = `Bạn đọc ảnh phiếu nhập nguyên liệu thủy sản viết tay của xí nghiệp Baseafood (Việt Nam), mẫu in "BÁO CÁO TỔNG HỢP NGUYÊN LIỆU HẰNG NGÀY" (cột STT · TÊN ĐẠI LÝ · LOẠI NGUYÊN LIỆU · SỐ LƯỢNG · ĐƠN GIÁ · GHI CHÚ).
+Nhiệm vụ: chép lại chữ trên phiếu và bóc các ô để điền form nhập hàng.
+
+QUY ƯỚC PHIẾU CỦA XƯỞNG (đã đối chiếu với sổ thật):
+1. Xưởng ghi ở góc trên dưới tên công ty: "PXĐ" = phân xưởng Đông, "PXC" = Cá, "PXK" = Khô. Không ghi ⇒ null, đừng đoán theo loại hàng.
+2. Ngày ghi "NGÀY dd THÁNG mm NĂM yy": năm 2 chữ số là 20yy ("26" ⇒ 2026).
+3. Tên đại lý hay viết tắt chữ đầu: "H Phú" = "Hồng Phú". Chọn nhãn trong DANH MỤC ĐẠI LÝ khớp chữ đầu + phần tên còn lại; nhiều nhãn cùng khớp mà không phân biệt được ⇒ null.
+4. Tài xế và biển số thường ghi ở cột GHI CHÚ, không có nhãn: dòng có dạng "51M 05772" là biển số; dòng là tên người ("Phạm H Khánh") là tài xế. Tên đệm hay viết tắt một chữ ("H" = "Hoàng"): nếu khớp một tên trong TÀI XẾ ĐÃ GHI (cùng họ, cùng tên, chữ đầu tên đệm trùng) thì chép y tên đó.
+5. Loại nguyên liệu viết tắt: "1Da" / "1 da" = "1 da"; "2Da" = "2 da"; "NL" = nguyên liệu (bỏ qua). "80↑" / "80 lên" = cỡ lớn (80↑); "80↓" / "80 xuống" = cỡ nhỏ (80↓). Loài (bạch tuộc, mực…) thường không ghi: lấy theo LỊCH SỬ GIAO của đại lý đó, rồi chọn tên trong DANH MỤC LOẠI NL khớp đúng số da + cỡ (vd "2Da NL 80↑" của Hồng Phú = "Bạch tuộc 2 da lớn (80↑)").
+6. Số lượng là KG. Dấu "." HOẶC "," đứng trước đúng 3 chữ số là dấu NGHÌN: "2.014" = 2014, "11,017" = 11017, "1.379" = 1379. Chỉ coi là thập phân khi sau dấu có 1–2 chữ số ("12,5").
+7. Đơn giá ghi tắt theo NGHÌN đồng/kg: "158" = 158000. Cột thành tiền (nếu có) không phải đơn giá; chỉ có thành tiền thì đơn giá = thành tiền ÷ kg. Không ghi giá ⇒ null.
+8. Số ở chân cột SỐ LƯỢNG (vd "14,410") là TỔNG — trả ở "totalKg", không phải một dòng hàng. Tổng các dòng phải bằng tổng này; lệch thì đọc lại từng số, vẫn lệch thì ghi vào "warnings".
+9. Ghi chú kiểu "Nội tạng 1.000 kg", "Dạt 200 kg" là PHẾ LIỆU cân gộp: trả ở "scraps" (tên chọn trong danh sách PHẾ LIỆU), KHÔNG đưa vào "lines".
+10. Phiếu có NHIỀU đại lý (nhiều nhóm STT): chỉ lấy đại lý ĐẦU TIÊN cùng các dòng của nó, và ghi vào "warnings" tên các đại lý còn lại để người nhập ghi chuyến riêng.
+
+Quy tắc trả kết quả:
 - "text": chép nguyên văn mọi hàng chữ đọc được, mỗi hàng một dòng.
-- "date": ngày hàng về (thường ghi dd/mm hoặc dd/mm/yyyy); đổi sang yyyy-mm-dd. Thiếu năm thì dùng năm hiện tại được cho. Không thấy ⇒ null.
-- "supplier": CHỈ chọn một nhãn có trong DANH MỤC ĐẠI LÝ, chép y nhãn đó (khớp theo mã số đứng trước dấu "·", tên tắt, hoặc tên hóa đơn trong ngoặc). Không chắc ⇒ null. Không tự bịa tên.
-- "licensePlate": biển số xe (dạng "72C-166.03"). Nếu gần giống một biển trong danh sách XE ĐÃ GHI thì chép y biển đó. Không có ⇒ null.
-- "driverName": tên tài xế / người giao (dòng "Tài xế", "Lái xe", "TX"). Nếu gần giống một tên trong danh sách TÀI XẾ ĐÃ GHI thì chép y tên đó. Không có ⇒ null.
-- "workshop": xưởng nhận hàng nếu phiếu có ghi, chép y một mục trong danh sách XƯỞNG. Không ghi ⇒ null, đừng đoán theo loại hàng.
-- "lines": mỗi dòng hàng = một loại nguyên liệu + số kg. "materialType" PHẢI là một tên có trong DANH MỤC LOẠI NL (khớp gần đúng chữ viết tay/viết tắt thì chọn tên danh mục gần nhất). Số kg kiểu Việt Nam: "1.234" là một nghìn hai trăm ba mươi tư, "12,5" là mười hai phẩy năm. Dòng có nhiều lần cân thì lấy TỔNG nếu phiếu ghi tổng, không thì cộng các lần cân. Không đọc được số ⇒ bỏ dòng. "unitPrice" là đơn giá ĐỒNG trên 1 kg của dòng đó; phiếu hay ghi tắt theo nghìn ("85", "85k", "85.000") đều là 85000; cột "thành tiền" không phải đơn giá (nếu chỉ có thành tiền thì đơn giá = thành tiền ÷ kg). Không ghi giá ⇒ null.
-- Không đoán bừa: thà bỏ trống còn hơn sai, người dùng sẽ soát lại.`;
+- "raw" và "lines[].raw": chép Y NGUYÊN chữ trên phiếu của ô đó (giữ viết tắt, dấu chấm/phẩy, mũi tên) — người nhập đặt cạnh ảnh để đối chiếu, KHÔNG sửa hay khớp danh mục ở đây.
+- "supplier", "materialType", "workshop", "scraps[].name": CHỈ chép y một mục có trong danh sách được cho; "licensePlate", "driverName": chép y mục trong XE ĐÃ GHI / TÀI XẾ ĐÃ GHI nếu khớp, không thì chép như trên phiếu (biển dạng "51M-05772").
+- Không đoán bừa: thà để null / bỏ dòng còn hơn sai — người nhập soát lại từng ô.`;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
@@ -90,6 +130,8 @@ Deno.serve(async (req) => {
     knownPlates?: unknown;
     knownDrivers?: unknown;
     workshops?: unknown;
+    supplierHistory?: unknown;
+    scrapTypes?: unknown;
     year?: unknown;
   };
   try {
@@ -107,6 +149,8 @@ Deno.serve(async (req) => {
   const knownPlates = asList(body.knownPlates);
   const knownDrivers = asList(body.knownDrivers);
   const workshops = asList(body.workshops);
+  const supplierHistory = asList(body.supplierHistory);
+  const scrapTypes = asList(body.scrapTypes);
   const year = typeof body.year === "number" && body.year > 2000 && body.year < 2100 ? body.year : new Date().getFullYear();
 
   const model = Deno.env.get("OPENAI_MODEL") || "gpt-4.1-mini";
@@ -114,6 +158,8 @@ Deno.serve(async (req) => {
     `Năm hiện tại: ${year}.\n\nDANH MỤC ĐẠI LÝ (mã · tên):\n${suppliers.join("\n") || "(trống)"}\n\n` +
     `DANH MỤC LOẠI NL:\n${materialTypes.join("\n") || "(trống)"}\n\n` +
     `XƯỞNG: ${workshops.join(", ") || "(không có)"}\n\n` +
+    `PHẾ LIỆU: ${scrapTypes.join(", ") || "(không có)"}\n\n` +
+    `LỊCH SỬ GIAO (đại lý: loại hay giao (giá gần nhất)):\n${supplierHistory.join("\n") || "(trống)"}\n\n` +
     `XE ĐÃ GHI:\n${knownPlates.join("\n") || "(trống)"}\n\n` +
     `TÀI XẾ ĐÃ GHI:\n${knownDrivers.join("\n") || "(trống)"}`;
 

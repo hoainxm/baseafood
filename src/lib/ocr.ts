@@ -25,6 +25,17 @@ export interface DongOcr {
   kg: number;
   /** Đơn giá đ/kg nếu phiếu có ghi (chỉ bộ đọc OpenAI bóc được). */
   unitPrice?: number | null;
+  /** Chữ y như trên phiếu của dòng này ("2Da NL 80↑ · 11,017 · 142") — để người đối chiếu. */
+  raw?: string;
+}
+
+/** Chữ y như trên phiếu của từng ô đầu chuyến (trước khi khớp danh mục). */
+export interface OcrRawHeader {
+  date?: string;
+  supplier?: string;
+  workshop?: string;
+  licensePlate?: string;
+  driverName?: string;
 }
 
 /** Kết quả nhận diện + các ứng viên đã bóc tách để tap-áp vào form. */
@@ -45,8 +56,16 @@ export interface KetQuaOcr {
   licensePlate?: string;
   /** Tài xế (khớp tên đã có trong sổ nếu trùng người). */
   driverName?: string;
-  /** Xưởng ghi trên phiếu (Đông / Cá / Khô). */
+  /** Xưởng ghi trên phiếu (Đông / Cá / Khô; "PXĐ" = phân xưởng Đông). */
   workshop?: string;
+  /** Phế liệu cân gộp ghi trên phiếu (vd "Nội tạng 1.000 kg") — KHÔNG phải dòng hàng. */
+  scraps?: { name: string; kg: number }[];
+  /** Tổng số lượng ghi ở chân phiếu — để đối chiếu với tổng các dòng đọc được. */
+  totalKg?: number;
+  /** Điều máy thấy cần người soát (tổng lệch, phiếu nhiều đại lý…). */
+  warnings?: string[];
+  /** Chữ y như trên phiếu của các ô đầu chuyến — bảng đối chiếu hiện cạnh giá trị đã khớp. */
+  rawHeader?: OcrRawHeader;
   /** Máy đã đọc: OpenAI (Edge Function) hay Tesseract trong máy. */
   engine?: "openai" | "tesseract";
   /** Có thử OpenAI mà hỏng ⇒ lý do ngắn, màn báo "đang dùng máy đọc dự phòng". */
@@ -63,6 +82,11 @@ export interface OcrCatalog {
   knownDrivers?: string[];
   /** Xưởng hợp lệ (danh sách cố định). */
   workshops?: string[];
+  /** Lượt giao gần nhất từng đại lý: "Đại lý: loại (giá) · loại (giá)…" — gợi ý máy
+   *  khớp tên viết tắt trên phiếu ("2Da NL 80↑") về đúng loại đại lý hay giao. */
+  supplierHistory?: string[];
+  /** Loại phế liệu hợp lệ (Nội tạng, Dạt…). */
+  scrapTypes?: string[];
 }
 
 /** Bỏ dấu tiếng Việt + hạ chữ thường để so khớp mềm (OCR hay lệch dấu). */
@@ -87,7 +111,9 @@ function parseNumber(tok: string): number | null {
   const hasDot = t.includes(".");
   const coPhay = t.includes(",");
   if (hasDot && coPhay) t = t.replace(/\./g, "").replace(",", ".");
-  else if (coPhay) t = t.replace(",", ".");
+  // Phiếu tay hay dùng "," làm dấu NGHÌN như "." ("11,017" kg = 11017, đối chiếu phiếu
+  // 22/8/2026): đúng 3 chữ số sau dấu ⇒ nghìn; còn lại ("12,5") ⇒ thập phân.
+  else if (coPhay) t = /^\d{1,3}(,\d{3})+$/.test(t) ? t.replace(/,/g, "") : t.replace(",", ".");
   else if (hasDot) {
     const after = t.split(".").pop() ?? "";
     if (after.length === 3) t = t.replace(/\./g, ""); // 1.234 → nghìn
@@ -182,7 +208,7 @@ export function parseOcrText(text: string, dm: OcrCatalog): KetQuaOcr {
     if (!kgs.length) continue;
     const kg = Math.max(...kgs);
     if (!dongOcr.some((x) => x.materialType === materialType.name && x.kg === kg))
-      dongOcr.push({ materialType: materialType.name, kg });
+      dongOcr.push({ materialType: materialType.name, kg, raw: hang });
   }
 
   return {

@@ -465,20 +465,16 @@ export default function MaterialImportScreen() {
     setTableRows((items) => applyNewSupplierTemplate(items, templateRows));
   };
 
-  /** Chạm BIỂN SỐ gợi ý: điền biển + tài xế gần nhất của xe đó rồi nhảy xuống ô kg. */
-  const pickPlate = (x: { licensePlate: string; driverName: string }) => {
-    setSession((p) =>
-      p
-        ? { ...p, licensePlate: x.licensePlate, driverName: x.driverName || p.driverName }
-        : p
-    );
-    focusFirstKgCell();
-  };
-
-  /** Chạm TÀI XẾ gợi ý: đã có biển số ⇒ xong phần xe, nhảy xuống ô kg. */
+  /** Tài xế và xe chọn RIÊNG (một người lái nhiều xe, xe không gắn cố định tài xế):
+   *  chạm tài xế chỉ điền tài xế; chạm biển số chỉ điền biển số. Đủ cả hai ⇒ nhảy ô kg. */
   const pickDriver = (name: string) => {
     setSessionField("driverName", name);
     if (session?.licensePlate.trim()) focusFirstKgCell();
+  };
+
+  const pickPlate = (plate: string) => {
+    setSessionField("licensePlate", plate);
+    if (session?.driverName.trim()) focusFirstKgCell();
   };
 
   /** Đang sửa chuyến đã ghi (khác với tạo chuyến mới). */
@@ -1172,16 +1168,16 @@ export default function MaterialImportScreen() {
           )}
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <Field label="Biển số xe">
-              <Input
-                value={session.licensePlate}
-                onChange={(e) => setSessionField("licensePlate", e.target.value)}
-              />
-            </Field>
             <Field label="Tài xế">
               <Input
                 value={session.driverName}
                 onChange={(e) => setSessionField("driverName", e.target.value)}
+              />
+            </Field>
+            <Field label="Biển số xe">
+              <Input
+                value={session.licensePlate}
+                onChange={(e) => setSessionField("licensePlate", e.target.value)}
               />
             </Field>
             <Field label="Ghi chú" className="sm:col-span-2 lg:col-span-1">
@@ -1192,29 +1188,33 @@ export default function MaterialImportScreen() {
             </Field>
           </div>
 
-          {(truckSuggestions.plates.length > 0 || truckSuggestions.drivers.length > 0) && (
+          {/* Gợi ý từ sổ: tài xế và biển số TÁCH hai hàng — một người lái nhiều xe */}
+          {truckSuggestions.drivers.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm text-muted-foreground">Tài xế đã giao:</span>
+              {truckSuggestions.drivers.map((name) =>
+                quickPick(
+                  `tx-${name}`,
+                  name,
+                  name.toLowerCase() === session.driverName.trim().toLowerCase(),
+                  "Điền tài xế này cho chuyến (chỉ điền tài xế, biển số chọn riêng).",
+                  () => pickDriver(name)
+                )
+              )}
+            </div>
+          )}
+          {truckSuggestions.plates.length > 0 && (
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-sm text-muted-foreground">Xe đã chở:</span>
               {truckSuggestions.plates.map((x) =>
                 quickPick(
                   `xe-${x.licensePlate}`,
-                  x.driverName ? `${x.licensePlate} · ${x.driverName}` : x.licensePlate,
+                  x.licensePlate,
                   normalizePlate(x.licensePlate) === normalizePlate(session.licensePlate),
-                  "Điền biển số này kèm tài xế gần nhất lái xe đó, rồi nhảy xuống gõ số kg.",
-                  () => pickPlate(x)
+                  "Điền biển số xe này cho chuyến (chỉ điền biển số, tài xế chọn riêng).",
+                  () => pickPlate(x.licensePlate)
                 )
               )}
-              {truckSuggestions.drivers
-                .filter((name) => !truckSuggestions.plates.some((x) => x.driverName === name))
-                .map((name) =>
-                  quickPick(
-                    `tx-${name}`,
-                    name,
-                    name.toLowerCase() === session.driverName.trim().toLowerCase(),
-                    "Chọn tài xế này cho chuyến (khác người lái thường ngày của xe).",
-                    () => pickDriver(name)
-                  )
-                )}
             </div>
           )}
 

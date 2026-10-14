@@ -50,7 +50,8 @@ export function DisplaySettingsButton({
     // Không toast: giao diện đổi ngay trước mắt là phản hồi (README luật 8 — cài đặt hiển thị).
   };
 
-  const cancel = () => setMo(false); // onOpenChange(false) sẽ khôi phục snap
+  // Nút Hủy tự đóng (không qua onOpenChange của hộp thoại) ⇒ phải tự khôi phục mốc đã chụp.
+  const cancel = () => handleOpenChange(false);
 
   return (
     <FormDialog

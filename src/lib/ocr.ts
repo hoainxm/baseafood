@@ -23,6 +23,8 @@ export const coOcr = true;
 export interface DongOcr {
   materialType: string;
   kg: number;
+  /** Đơn giá đ/kg nếu phiếu có ghi (chỉ bộ đọc OpenAI bóc được). */
+  unitPrice?: number | null;
 }
 
 /** Kết quả nhận diện + các ứng viên đã bóc tách để tap-áp vào form. */
@@ -39,6 +41,12 @@ export interface KetQuaOcr {
   materialTypes: string[];
   /** Ghép (loại NL + kg) theo từng hàng chữ khi đoán được. */
   lines: DongOcr[];
+  /** Biển số xe (viết hoa; khớp cách viết đã có trong sổ nếu trùng xe). */
+  licensePlate?: string;
+  /** Tài xế (khớp tên đã có trong sổ nếu trùng người). */
+  driverName?: string;
+  /** Xưởng ghi trên phiếu (Đông / Cá / Khô). */
+  workshop?: string;
   /** Máy đã đọc: OpenAI (Edge Function) hay Tesseract trong máy. */
   engine?: "openai" | "tesseract";
   /** Có thử OpenAI mà hỏng ⇒ lý do ngắn, màn báo "đang dùng máy đọc dự phòng". */
@@ -47,8 +55,14 @@ export interface KetQuaOcr {
 
 /** Danh mục để dò khớp tên trên phiếu (tên đại lý, mã đại lý, tên loại NL). */
 export interface OcrCatalog {
-  suppliers: { name: string; code?: string }[];
+  /** `alias` = tên xuất hóa đơn — phiếu hay ghi tên đầy đủ thay tên tắt. */
+  suppliers: { name: string; code?: string; alias?: string }[];
   materialTypes: { name: string }[];
+  /** Biển số / tài xế đã từng ghi trong sổ — để máy khớp chữ tay về đúng cách viết cũ. */
+  knownPlates?: string[];
+  knownDrivers?: string[];
+  /** Xưởng hợp lệ (danh sách cố định). */
+  workshops?: string[];
 }
 
 /** Bỏ dấu tiếng Việt + hạ chữ thường để so khớp mềm (OCR hay lệch dấu). */

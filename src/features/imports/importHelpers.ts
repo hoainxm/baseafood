@@ -348,3 +348,65 @@ export function applyNewSupplierTemplate(prev: ImportLine[], templates: ImportLi
 /** Dòng điền sẵn bị BỎ QUA khi lưu vì chưa gõ kg — để báo rõ, không bỏ im lặng. */
 export const getSkippedSuggestedLines = (items: ImportLine[]): ImportLine[] =>
   items.filter((d) => d.goiY && !(d.quantityKg > 0));
+
+/**
+ * Biển số + tài xế ĐÃ TỪNG ghi (mọi đại lý, mới nhất trước) — gửi kèm OCR để máy khớp
+ * chữ tay trên phiếu về đúng cách viết đã có trong sổ, khỏi đẻ biến thể "72c-16603".
+ */
+export function getKnownVehicles(
+  rows: MaterialImportItem[],
+  maxCount = 300,
+): { plates: string[]; drivers: string[] } {
+  const plates = new Map<string, string>();
+  const drivers = new Map<string, string>();
+  for (const r of [...rows].sort(newestFirst)) {
+    const plate = r.licensePlate.trim().toUpperCase();
+    const driver = r.driverName.trim();
+    if (plate && !plates.has(normalizePlate(plate)) && plates.size < maxCount) plates.set(normalizePlate(plate), plate);
+    if (driver && !drivers.has(driver.toLowerCase()) && drivers.size < maxCount) drivers.set(driver.toLowerCase(), driver);
+  }
+  return { plates: [...plates.values()], drivers: [...drivers.values()] };
+}
+
+/** Một dòng OCR đọc được: loại NL (đã khớp danh mục) + kg + đơn giá nếu phiếu có ghi. */
+export interface OcrLineInput {
+  materialType: string;
+  kg: number;
+  unitPrice?: number | null;
+}
+
+/**
+ * Ghép dòng OCR vào bảng loại hàng. Dòng mẫu (`goiY`) cùng loại còn trống kg ⇒ điền kg
+ * vào đó, giá phiếu ghi thì thay giá mẫu (không ghi thì giữ giá lượt trước). Không có
+ * dòng mẫu ⇒ thêm dòng mới cuối bảng. Dòng trống hẳn (chưa chọn gì) bị bỏ cho gọn.
+ */
+export function mergeOcrLines(
+  items: ImportLine[],
+  lines: OcrLineInput[],
+  categoryOf: (materialType: string) => Category | undefined,
+  fallbackCategory: Category,
+): ImportLine[] {
+  let result = [...items];
+  for (const line of lines) {
+    const price = line.unitPrice != null && line.unitPrice > 0 ? line.unitPrice : null;
+    const idx = result.findIndex((d) => d.materialTypeName === line.materialType && !(d.quantityKg > 0));
+    if (idx >= 0) {
+      const d = result[idx];
+      result[idx] = {
+        ...d,
+        quantityKg: line.kg,
+        unitPrice: price ?? d.unitPrice,
+        priceDate: price != null ? undefined : d.priceDate,
+        goiY: false,
+      };
+      continue;
+    }
+    result = result.filter((d) => d.goiY || importLineHasData(d)).concat({
+      ...createEmptyImportLine(categoryOf(line.materialType) ?? result[result.length - 1]?.category ?? fallbackCategory),
+      materialTypeName: line.materialType,
+      quantityKg: line.kg,
+      unitPrice: price,
+    });
+  }
+  return result.length ? result : [createEmptyImportLine(fallbackCategory)];
+}

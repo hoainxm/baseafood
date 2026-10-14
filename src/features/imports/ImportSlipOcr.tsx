@@ -17,9 +17,9 @@ import {
   toneByName,
 } from "@/design-system";
 import { Camera, Check, Loader2, Plus, RefreshCw } from "lucide-react";
-import { recognizeImportSlip, type OcrCatalog, type KetQuaOcr } from "@/lib/ocr";
+import { recognizeImportSlip, type OcrCatalog, type KetQuaOcr, type DongOcr } from "@/lib/ocr";
 import { hasImageStorage, uploadImage } from "@/lib/storage";
-import { kg as fmtKg, formatDateVN } from "@/lib/format";
+import { kg as fmtKg, formatDateVN, num } from "@/lib/format";
 
 interface Props {
   /** Danh mục để dò khớp tên trên phiếu (đại lý, loại NL). */
@@ -28,9 +28,17 @@ interface Props {
   onImageSaved: (path: string) => void;
   onApplySupplier: (name: string) => void;
   onApplyDate: (iso: string) => void;
-  onAddRow: (materialType: string, kg: number) => void;
+  onApplyWorkshop: (workshop: string) => void;
+  /** Điền biển số và/hoặc tài xế (trường nào máy không đọc được thì để nguyên). */
+  onApplyVehicle: (vehicle: { licensePlate?: string; driverName?: string }) => void;
+  onAddRow: (line: DongOcr) => void;
+  /** Điền một lượt mọi thứ đọc được (đầu chuyến + mọi dòng) theo đúng luồng chọn tay. */
+  onApplyAll: (result: KetQuaOcr) => void;
   onClose: () => void;
 }
+
+/** Ô đầu chuyến máy đọc được — mỗi ô một nút "điền". */
+type HeaderField = "supplier" | "date" | "workshop" | "vehicle";
 
 type Phase = "chon" | "dang-nhan" | "xong" | "loi";
 
@@ -39,7 +47,10 @@ export function ImportSlipOcr({
   onImageSaved: onSavePhoto,
   onApplySupplier,
   onApplyDate,
+  onApplyWorkshop,
+  onApplyVehicle,
   onAddRow,
+  onApplyAll,
   onClose,
 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -47,8 +58,7 @@ export function ImportSlipOcr({
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [percent, setPercent] = useState(0);
   const [result, setResult] = useState<KetQuaOcr | null>(null);
-  const [isSupplierApplied, setIsSupplierApplied] = useState(false);
-  const [isDateApplied, setIsDateApplied] = useState(false);
+  const [appliedFields, setAppliedFields] = useState<Set<HeaderField>>(new Set());
   const [appliedRows, setAppliedRows] = useState<Set<number>>(new Set());
 
   const pickImage = async (file: File) => {
@@ -56,8 +66,7 @@ export function ImportSlipOcr({
     setStage("dang-nhan");
     setPercent(0);
     setResult(null);
-    setIsSupplierApplied(false);
-    setIsDateApplied(false);
+    setAppliedFields(new Set());
     setAppliedRows(new Set());
 
     // Tải ảnh lên Storage song song (ảnh là bằng chứng phiếu, lưu kèm chuyến).
@@ -78,13 +87,43 @@ export function ImportSlipOcr({
     }
   };
 
+  const markField = (f: HeaderField) => setAppliedFields((s) => new Set(s).add(f));
+
   const addAll = () => {
     result?.lines.forEach((d, i) => {
-      if (!appliedRows.has(i)) onAddRow(d.materialType, d.kg);
+      if (!appliedRows.has(i)) onAddRow(d);
     });
     setAppliedRows(new Set(result?.lines.map((_, i) => i)));
     notify.saved("Đã thêm các dòng nhận được — soát lại số trước khi lưu");
   };
+
+  /** Một lượt điền hết rồi đóng hộp — người dùng soát ngay trên phiếu. */
+  const applyEverything = () => {
+    if (!result) return;
+    onApplyAll(result);
+    notify.saved("Đã điền phiếu từ ảnh — soát lại từng ô trước khi lưu");
+    onClose();
+  };
+
+  /** Có ô đầu chuyến nào máy đọc được không (để hiện khối nút). */
+  const hasHeader =
+    !!result && !!(result.supplier || result.date || result.workshop || result.licensePlate || result.driverName);
+  const hasAnything = hasHeader || (result?.lines.length ?? 0) > 0;
+  /** Nút một ô đầu chuyến: chưa điền = nút chính, đã điền = viền + dấu tích. */
+  const fieldButton = (f: HeaderField, label: string, title: string, apply: () => void) => (
+    <Button
+      key={f}
+      title={title}
+      variant={appliedFields.has(f) ? "outline" : "default"}
+      onClick={() => {
+        apply();
+        markField(f);
+      }}
+    >
+      {appliedFields.has(f) ? <Check /> : <Plus />}
+      {label}
+    </Button>
+  );
 
   const changePhoto = () => {
     setStage("chon");
@@ -170,35 +209,40 @@ export function ImportSlipOcr({
                 <Tag variant="phu">{result.engine === "openai" ? "Đọc bằng OpenAI" : "Đọc bằng máy trong trình duyệt"}</Tag>
                 {result.cloudError && <span>OpenAI chưa dùng được lúc này, đang dùng máy dự phòng.</span>}
               </div>
-              {/* Đầu chuyến: đại lý + ngày */}
-              {(result.supplier || result.date) && (
+              {hasAnything && (
+                <Button
+                  title="Điền một lượt mọi thứ máy đọc được (đại lý, ngày, xưởng, xe, tài xế, các dòng loại NL + kg + giá) vào phiếu rồi đóng hộp này. Vẫn soát lại từng ô trước khi lưu."
+                  size="lg"
+                  className="w-full sm:w-auto"
+                  onClick={applyEverything}
+                >
+                  <Check />
+                  Điền tất cả vào phiếu
+                </Button>
+              )}
+
+              {/* Đầu chuyến: đại lý · ngày · xưởng · xe/tài xế — điền từng ô */}
+              {hasHeader && (
                 <div className="flex flex-wrap gap-2">
-                  {result.supplier && (
-                    <Button
-                      title="Điền tên đại lý máy đọc được vào form nhập hàng."
-                      variant={isSupplierApplied ? "outline" : "default"}
-                      onClick={() => {
-                        onApplySupplier(result.supplier!);
-                        setIsSupplierApplied(true);
-                      }}
-                    >
-                      {isSupplierApplied ? <Check /> : <Plus />}
-                      Đại lý: {result.supplier}
-                    </Button>
-                  )}
-                  {result.date && (
-                    <Button
-                      title="Điền ngày máy đọc được vào form nhập hàng."
-                      variant={isDateApplied ? "outline" : "default"}
-                      onClick={() => {
-                        onApplyDate(result.date!);
-                        setIsDateApplied(true);
-                      }}
-                    >
-                      {isDateApplied ? <Check /> : <Plus />}
-                      Ngày: {formatDateVN(result.date)}
-                    </Button>
-                  )}
+                  {result.supplier &&
+                    fieldButton("supplier", `Đại lý: ${result.supplier}`, "Điền tên đại lý máy đọc được vào phiếu (bảng loại hàng dựng lại theo lượt giao gần nhất của đại lý).", () =>
+                      onApplySupplier(result.supplier!),
+                    )}
+                  {result.date &&
+                    fieldButton("date", `Ngày: ${formatDateVN(result.date)}`, "Điền ngày hàng về máy đọc được vào phiếu (đổi cả ngày ghi sổ, không bật ghi bù).", () =>
+                      onApplyDate(result.date!),
+                    )}
+                  {result.workshop &&
+                    fieldButton("workshop", `Xưởng: ${result.workshop}`, "Chọn xưởng máy đọc được trên phiếu.", () => onApplyWorkshop(result.workshop!))}
+                  {(result.licensePlate || result.driverName) &&
+                    fieldButton(
+                      "vehicle",
+                      [result.licensePlate && `Xe: ${result.licensePlate}`, result.driverName && `Tài xế: ${result.driverName}`]
+                        .filter(Boolean)
+                        .join(" · "),
+                      "Điền biển số xe và tài xế máy đọc được vào phiếu.",
+                      () => onApplyVehicle({ licensePlate: result.licensePlate, driverName: result.driverName }),
+                    )}
                 </div>
               )}
 
@@ -210,7 +254,7 @@ export function ImportSlipOcr({
                       Dòng nhận được ({result.lines.length})
                     </span>
                     <Button
-                      title="Điền hết các dòng loại nguyên liệu + kg máy đọc được vào form. Vẫn soát lại từng dòng trước khi lưu." variant="outline" size="sm" onClick={addAll}>
+                      title="Điền hết các dòng loại nguyên liệu + kg (+ giá nếu có) máy đọc được vào phiếu. Vẫn soát lại từng dòng trước khi lưu." variant="outline" size="sm" onClick={addAll}>
                       <Plus />
                       Thêm tất cả
                     </Button>
@@ -223,13 +267,16 @@ export function ImportSlipOcr({
                       >
                         <span className="text-base">
                           {d.materialType} · <span className="tnum font-semibold">{fmtKg(d.kg)}</span>
+                          {d.unitPrice != null && (
+                            <span className="tnum text-muted-foreground"> · {num(d.unitPrice)} đ/kg</span>
+                          )}
                         </span>
                         <Button
                           title="Điền riêng dòng này vào form nhập hàng."
                           variant={appliedRows.has(i) ? "outline" : "default"}
                           size="sm"
                           onClick={() => {
-                            onAddRow(d.materialType, d.kg);
+                            onAddRow(d);
                             setAppliedRows((s) => new Set(s).add(i));
                           }}
                         >

@@ -27,18 +27,48 @@ export interface CloudOcrResponse {
   text?: unknown;
   date?: unknown;
   supplier?: unknown;
+  licensePlate?: unknown;
+  driverName?: unknown;
+  workshop?: unknown;
   lines?: unknown;
   model?: unknown;
 }
 
+/** Giá hợp lý cho một kg nguyên liệu (đ). Ngoài khoảng ⇒ coi như máy đọc nhầm, bỏ. */
+const MIN_PRICE = 1_000;
+const MAX_PRICE = 5_000_000;
+
 const normalize = (x: string) => x.normalize("NFC").trim().toLowerCase().replace(/\s+/g, " ");
+/** Cùng luật với `normalizePlate` ở Nhập hàng: "72c-166.03" ≡ "72C16603". */
+const plateKey = (x: string) => x.replace(/[\s.\-']/g, "").toUpperCase();
 
 /** Dòng danh mục gửi lên: "mã · tên" nếu có mã (phiếu hay ghi mã số đại lý). */
 export function buildCatalogPayload(catalog: OcrCatalog) {
   return {
-    suppliers: catalog.suppliers.map((s) => (s.code ? `${s.code} · ${s.name}` : s.name)),
+    suppliers: catalog.suppliers.map(
+      (s) => `${s.code ? `${s.code} · ` : ""}${s.name}${s.alias && normalize(s.alias) !== normalize(s.name) ? ` (${s.alias})` : ""}`,
+    ),
     materialTypes: catalog.materialTypes.map((m) => m.name),
+    knownPlates: catalog.knownPlates ?? [],
+    knownDrivers: catalog.knownDrivers ?? [],
+    workshops: catalog.workshops ?? [],
   };
+}
+
+/** Biển số: phải có chữ số, 5–12 ký tự sau khi bỏ dấu; trùng xe đã ghi ⇒ cách viết cũ. */
+function cleanPlate(raw: unknown, known: string[]): string | undefined {
+  if (typeof raw !== "string") return undefined;
+  const key = plateKey(raw);
+  if (key.length < 5 || key.length > 12 || !/\d/.test(key) || !/^[A-Z0-9Đ]+$/.test(key)) return undefined;
+  return known.find((p) => plateKey(p) === key) ?? raw.trim().toUpperCase();
+}
+
+/** Tài xế: 2–60 ký tự, có chữ cái; trùng tên đã ghi (không phân hoa thường) ⇒ tên cũ. */
+function cleanDriver(raw: unknown, known: string[]): string | undefined {
+  if (typeof raw !== "string") return undefined;
+  const name = raw.trim().replace(/\s+/g, " ");
+  if (name.length < 2 || name.length > 60 || !/\p{L}/u.test(name)) return undefined;
+  return known.find((d) => normalize(d) === normalize(name)) ?? name;
 }
 
 function isRealDate(iso: string): boolean {
@@ -56,7 +86,11 @@ export function mergeCloudResult(raw: CloudOcrResponse, parsed: KetQuaOcr, catal
   for (const s of catalog.suppliers) {
     supplierByName.set(normalize(s.name), s.name);
     if (s.code) supplierByName.set(normalize(`${s.code} · ${s.name}`), s.name);
+    if (s.alias) supplierByName.set(normalize(s.alias), s.name);
   }
+  // Nhãn đúng như đã gửi lên ("mã · tên (tên hóa đơn)") — máy hay chép lại nguyên nhãn.
+  for (const [i, label] of buildCatalogPayload(catalog).suppliers.entries())
+    supplierByName.set(normalize(label), catalog.suppliers[i].name);
   const materialByName = new Map(catalog.materialTypes.map((m) => [normalize(m.name), m.name]));
 
   const supplier = typeof raw.supplier === "string" ? supplierByName.get(normalize(raw.supplier)) : undefined;
@@ -67,14 +101,21 @@ export function mergeCloudResult(raw: CloudOcrResponse, parsed: KetQuaOcr, catal
     const name = typeof l?.materialType === "string" ? materialByName.get(normalize(l.materialType)) : undefined;
     const kg = typeof l?.kg === "number" ? Math.round(l.kg * 1000) / 1000 : NaN;
     if (!name || !(kg > 0 && kg <= 100000)) continue;
-    if (!lines.some((x) => x.materialType === name && x.kg === kg)) lines.push({ materialType: name, kg });
+    const price = typeof l?.unitPrice === "number" ? Math.round(l.unitPrice) : NaN;
+    const unitPrice = price >= MIN_PRICE && price <= MAX_PRICE ? price : null;
+    if (!lines.some((x) => x.materialType === name && x.kg === kg)) lines.push({ materialType: name, kg, unitPrice });
   }
+  const workshop =
+    typeof raw.workshop === "string" ? (catalog.workshops ?? []).find((w) => normalize(w) === normalize(String(raw.workshop))) : undefined;
 
   return {
     ...parsed,
     supplier: supplier ?? parsed.supplier,
     date: date ?? parsed.date,
     lines: lines.length ? lines : parsed.lines,
+    licensePlate: cleanPlate(raw.licensePlate, catalog.knownPlates ?? []) ?? parsed.licensePlate,
+    driverName: cleanDriver(raw.driverName, catalog.knownDrivers ?? []) ?? parsed.driverName,
+    workshop: workshop ?? parsed.workshop,
     materialTypes: [...new Set([...lines.map((l) => l.materialType), ...parsed.materialTypes])],
     kgValues: [...new Set([...lines.map((l) => l.kg), ...parsed.kgValues])],
   };

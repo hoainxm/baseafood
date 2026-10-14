@@ -32,20 +32,24 @@ const json = (status: number, body: unknown) =>
 const RESULT_SCHEMA = {
   type: "object",
   additionalProperties: false,
-  required: ["text", "date", "supplier", "lines"],
+  required: ["text", "date", "supplier", "licensePlate", "driverName", "workshop", "lines"],
   properties: {
     text: { type: "string", description: "Toàn văn chữ trên phiếu, giữ xuống dòng theo hàng." },
     date: { type: ["string", "null"], description: "Ngày hàng về dạng yyyy-mm-dd, null nếu không thấy." },
     supplier: { type: ["string", "null"], description: "Tên đại lý ĐÚNG Y một mục trong danh mục, null nếu không chắc." },
+    licensePlate: { type: ["string", "null"], description: "Biển số xe chở hàng, null nếu phiếu không ghi." },
+    driverName: { type: ["string", "null"], description: "Tên tài xế, null nếu phiếu không ghi." },
+    workshop: { type: ["string", "null"], description: "Xưởng nhận hàng: ĐÚNG Y một mục trong danh sách xưởng, null nếu không ghi." },
     lines: {
       type: "array",
       items: {
         type: "object",
         additionalProperties: false,
-        required: ["materialType", "kg"],
+        required: ["materialType", "kg", "unitPrice"],
         properties: {
           materialType: { type: "string", description: "Tên loại NL ĐÚNG Y một mục trong danh mục." },
           kg: { type: "number", description: "Khối lượng kg của dòng đó." },
+          unitPrice: { type: ["number", "null"], description: "Đơn giá đồng/kg của dòng đó, null nếu phiếu không ghi." },
         },
       },
     },
@@ -53,12 +57,15 @@ const RESULT_SCHEMA = {
 } as const;
 
 const SYSTEM_PROMPT = `Bạn đọc ảnh PHIẾU NHẬP NGUYÊN LIỆU thủy sản viết tay/in của xí nghiệp Baseafood (Việt Nam).
-Nhiệm vụ: chép lại chữ trên phiếu và bóc các ô để điền form nhập hàng.
+Nhiệm vụ: chép lại chữ trên phiếu và bóc các ô để điền form nhập hàng: đại lý, ngày, biển số xe, tài xế, xưởng, và từng dòng loại nguyên liệu + kg + đơn giá.
 Quy tắc:
 - "text": chép nguyên văn mọi hàng chữ đọc được, mỗi hàng một dòng.
 - "date": ngày hàng về (thường ghi dd/mm hoặc dd/mm/yyyy); đổi sang yyyy-mm-dd. Thiếu năm thì dùng năm hiện tại được cho. Không thấy ⇒ null.
-- "supplier": CHỈ chọn một tên có trong DANH MỤC ĐẠI LÝ (có thể khớp theo mã số đứng trước dấu "·"). Không chắc ⇒ null. Không tự bịa tên.
-- "lines": mỗi dòng hàng = một loại nguyên liệu + số kg. "materialType" PHẢI là một tên có trong DANH MỤC LOẠI NL (khớp gần đúng chữ viết tay/viết tắt thì chọn tên danh mục gần nhất). Số kg kiểu Việt Nam: "1.234" là một nghìn hai trăm ba mươi tư, "12,5" là mười hai phẩy năm. Dòng có nhiều lần cân thì lấy TỔNG nếu phiếu ghi tổng, không thì cộng các lần cân. Không đọc được số ⇒ bỏ dòng.
+- "supplier": CHỈ chọn một nhãn có trong DANH MỤC ĐẠI LÝ, chép y nhãn đó (khớp theo mã số đứng trước dấu "·", tên tắt, hoặc tên hóa đơn trong ngoặc). Không chắc ⇒ null. Không tự bịa tên.
+- "licensePlate": biển số xe (dạng "72C-166.03"). Nếu gần giống một biển trong danh sách XE ĐÃ GHI thì chép y biển đó. Không có ⇒ null.
+- "driverName": tên tài xế / người giao (dòng "Tài xế", "Lái xe", "TX"). Nếu gần giống một tên trong danh sách TÀI XẾ ĐÃ GHI thì chép y tên đó. Không có ⇒ null.
+- "workshop": xưởng nhận hàng nếu phiếu có ghi, chép y một mục trong danh sách XƯỞNG. Không ghi ⇒ null, đừng đoán theo loại hàng.
+- "lines": mỗi dòng hàng = một loại nguyên liệu + số kg. "materialType" PHẢI là một tên có trong DANH MỤC LOẠI NL (khớp gần đúng chữ viết tay/viết tắt thì chọn tên danh mục gần nhất). Số kg kiểu Việt Nam: "1.234" là một nghìn hai trăm ba mươi tư, "12,5" là mười hai phẩy năm. Dòng có nhiều lần cân thì lấy TỔNG nếu phiếu ghi tổng, không thì cộng các lần cân. Không đọc được số ⇒ bỏ dòng. "unitPrice" là đơn giá ĐỒNG trên 1 kg của dòng đó; phiếu hay ghi tắt theo nghìn ("85", "85k", "85.000") đều là 85000; cột "thành tiền" không phải đơn giá (nếu chỉ có thành tiền thì đơn giá = thành tiền ÷ kg). Không ghi giá ⇒ null.
 - Không đoán bừa: thà bỏ trống còn hơn sai, người dùng sẽ soát lại.`;
 
 Deno.serve(async (req) => {
@@ -76,7 +83,15 @@ Deno.serve(async (req) => {
   const apiKey = Deno.env.get("OPENAI_API_KEY");
   if (!apiKey) return json(503, { error: "missing_key", message: "Chưa đặt OPENAI_API_KEY ở Supabase secrets." });
 
-  let body: { image?: unknown; suppliers?: unknown; materialTypes?: unknown; year?: unknown };
+  let body: {
+    image?: unknown;
+    suppliers?: unknown;
+    materialTypes?: unknown;
+    knownPlates?: unknown;
+    knownDrivers?: unknown;
+    workshops?: unknown;
+    year?: unknown;
+  };
   try {
     body = await req.json();
   } catch {
@@ -89,12 +104,18 @@ Deno.serve(async (req) => {
     (Array.isArray(v) ? v : []).filter((x): x is string => typeof x === "string").slice(0, MAX_CATALOG_ITEMS);
   const suppliers = asList(body.suppliers);
   const materialTypes = asList(body.materialTypes);
+  const knownPlates = asList(body.knownPlates);
+  const knownDrivers = asList(body.knownDrivers);
+  const workshops = asList(body.workshops);
   const year = typeof body.year === "number" && body.year > 2000 && body.year < 2100 ? body.year : new Date().getFullYear();
 
   const model = Deno.env.get("OPENAI_MODEL") || "gpt-4.1-mini";
   const userText =
     `Năm hiện tại: ${year}.\n\nDANH MỤC ĐẠI LÝ (mã · tên):\n${suppliers.join("\n") || "(trống)"}\n\n` +
-    `DANH MỤC LOẠI NL:\n${materialTypes.join("\n") || "(trống)"}`;
+    `DANH MỤC LOẠI NL:\n${materialTypes.join("\n") || "(trống)"}\n\n` +
+    `XƯỞNG: ${workshops.join(", ") || "(không có)"}\n\n` +
+    `XE ĐÃ GHI:\n${knownPlates.join("\n") || "(trống)"}\n\n` +
+    `TÀI XẾ ĐÃ GHI:\n${knownDrivers.join("\n") || "(trống)"}`;
 
   const res = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",

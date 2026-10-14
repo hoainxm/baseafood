@@ -56,7 +56,7 @@ import { useAuth } from "@/lib/auth";
 import { DailyTaskReminder, LotLabelPrint, BlankDailyImportSlip } from "@/features/shared";
 import { useQuickCatalogEdit } from "@/features/catalog/QuickCatalogEdit";
 import { ImportSlipOcr } from "./ImportSlipOcr";
-import { coOcr, type OcrCatalog } from "@/lib/ocr";
+import { coOcr, type OcrCatalog, type KetQuaOcr, type DongOcr } from "@/lib/ocr";
 import { hasImageStorage, getPhotoUrl } from "@/lib/storage";
 import { KY_OPT, getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
 import {
@@ -93,6 +93,8 @@ import {
   WORKSHOPS,
   getFrequentSuppliers,
   getSupplierVehicles,
+  getKnownVehicles,
+  mergeOcrLines,
   getSupplierLineTemplates,
   applyNewSupplierTemplate,
   getSkippedSuggestedLines,
@@ -645,23 +647,67 @@ export default function MaterialImportScreen() {
 
   /* ---- OCR: chụp ảnh phiếu → gợi ý điền form (nháp, người soát lại) ---- */
 
-  /** Danh mục để OCR dò khớp tên trên phiếu (đại lý theo tên tắt, loại NL). */
-  const ocrCatalog: OcrCatalog = useMemo(
-    () => ({
-      suppliers: suppliers.map((d) => ({ name: d.shortName, code: d.code })),
+  /** Danh mục để OCR dò khớp tên trên phiếu: đại lý (tên tắt + mã + tên hóa đơn), loại
+   *  NL, xưởng, và xe/tài xế đã từng ghi (khớp chữ tay về đúng cách viết trong sổ). */
+  const ocrCatalog: OcrCatalog = useMemo(() => {
+    const vehicles = getKnownVehicles(rows);
+    return {
+      suppliers: suppliers.map((d) => ({ name: d.shortName, code: d.code, alias: d.billingName })),
       materialTypes: materialTypes.map((l) => ({ name: l.name })),
-    }),
-    [suppliers, materialTypes]
-  );
+      knownPlates: vehicles.plates,
+      knownDrivers: vehicles.drivers,
+      workshops: WORKSHOPS,
+    };
+  }, [suppliers, materialTypes, rows]);
 
-  /** OCR đề xuất một dòng: nối vào bảng (thay dòng trống đầu nếu bảng chưa có data). */
-  const addRowFromOcr = (ten: string, soKg: number) =>
-    setTableRows((items) => {
-      const mt = materialTypes.find((l) => l.name === ten);
-      const cat = (mt?.category || items[items.length - 1]?.category || lastCategory) as Category;
-      const newRow: ImportLine = { ...createEmptyImportLine(cat), materialTypeName: ten, quantityKg: soKg };
-      return items.some(importLineHasData) ? [...items, newRow] : [newRow];
-    });
+  const categoryOfMaterial = (name: string) =>
+    (materialTypes.find((l) => l.name === name)?.category || undefined) as Category | undefined;
+
+  /** OCR đề xuất một dòng: điền vào dòng mẫu cùng loại nếu có, không thì thêm cuối bảng. */
+  const addRowFromOcr = (line: DongOcr) =>
+    setTableRows((items) => mergeOcrLines(items, [line], categoryOfMaterial, lastCategory));
+
+  /** OCR điền biển số / tài xế (ô nào máy không đọc được thì giữ nguyên). */
+  const applyVehicleFromOcr = (v: { licensePlate?: string; driverName?: string }) => {
+    setSession((p) =>
+      p ? { ...p, licensePlate: v.licensePlate ?? p.licensePlate, driverName: v.driverName ?? p.driverName } : p
+    );
+    setIsManualVehicle(false);
+    if (v.licensePlate) setOpenPanel(null);
+  };
+
+  /**
+   * "Điền tất cả" từ OCR — MỘT lượt, cùng luật với chọn tay: đổi đại lý/xưởng (chuyến mới)
+   * ⇒ bảng dựng lại theo lượt giao gần nhất rồi mới điền dòng đọc được vào; ngày đặt cả
+   * ngày ghi sổ lẫn ngày hàng về (không tự bật ghi bù); xe đọc được thay xe cũ.
+   */
+  const applyAllFromOcr = (r: KetQuaOcr) => {
+    if (!session) return;
+    const workshop = (r.workshop as Workshop | undefined) ?? session.workshop;
+    const supplierName = r.supplier ?? session.supplierName;
+    const isSupplierChanged = supplierName !== session.supplierName;
+    const clearVehicle = isSupplierChanged && !isEditingShipment;
+    setSession((p) =>
+      p
+        ? {
+            ...p,
+            workshop,
+            supplierName,
+            ...(r.date ? { postingDate: r.date, deliveryDate: r.date } : {}),
+            licensePlate: r.licensePlate ?? (clearVehicle ? "" : p.licensePlate),
+            driverName: r.driverName ?? (clearVehicle ? "" : p.driverName),
+          }
+        : p
+    );
+    if (supplierName) setOpenPanel(null);
+    if (isSupplierChanged) setSkipTruck(false);
+    setIsManualVehicle(false);
+    const rebuild = !isEditingShipment && (isSupplierChanged || workshop !== session.workshop);
+    const templateRows = rebuild ? getSupplierLineTemplates(rows, supplierName, workshop) : [];
+    setTableRows((items) =>
+      mergeOcrLines(rebuild ? applyNewSupplierTemplate(items, templateRows) : items, r.lines, categoryOfMaterial, lastCategory)
+    );
+  };
 
   /** Mở ảnh phiếu đã đính (signed URL có hạn) để đối chiếu tay. */
   const viewScanImage = async () => {
@@ -2076,9 +2122,12 @@ export default function MaterialImportScreen() {
         <ImportSlipOcr
           catalog={ocrCatalog}
           onImageSaved={(path) => setSessionField("scanPath", path)}
-          onApplySupplier={(name) => setSessionField("supplierName", name)}
-          onApplyDate={(iso) => changeDeliveryDate(iso)}
+          onApplySupplier={pickSupplier}
+          onApplyDate={changePostingDate}
+          onApplyWorkshop={(w) => pickWorkshop(w as Workshop)}
+          onApplyVehicle={applyVehicleFromOcr}
           onAddRow={addRowFromOcr}
+          onApplyAll={applyAllFromOcr}
           onClose={() => setOcrMo(false)}
         />
       )}

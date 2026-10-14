@@ -2,6 +2,7 @@
 
 covers: supabase/functions/ocr-import-slip/index.ts, src/lib/ocrCloud.ts
 last_verified: 2026-10-14
+<!-- updated: 2026-10-14 (b) — hàm đọc thêm biển số · tài xế · xưởng · đơn giá (schema strict thêm licensePlate/driverName/workshop/lines[].unitPrice), nhận thêm knownPlates/knownDrivers/workshops; deploy lại (bản 3). Tương thích hai chiều: app cũ bỏ qua trường mới, app mới thiếu trường thì để trống. -->
 
 # OCR phiếu nhập bằng OpenAI (Edge Function)
 
@@ -12,9 +13,9 @@ Nút **"Nhận diện từ ảnh phiếu"** ở `/imports` đọc ảnh bằng *
 Biến `VITE_*` bị Vite nhúng thẳng vào JS gửi xuống trình duyệt ⇒ ai mở DevTools cũng lấy được. Key OpenAI vì vậy **chỉ** nằm ở Supabase secrets; trình duyệt gọi hàm `ocr-import-slip` bằng phiên đăng nhập. Luật key chung: [05-bao-mat-phan-quyen § Luật về key](../app-map/05-bao-mat-phan-quyen.md#luật-về-key--tuyệt-đối).
 
 ```
-Trình duyệt (/imports) ──ảnh nén ≤1600px + tên danh mục──▶ Edge Function ocr-import-slip ──▶ OpenAI
+Trình duyệt (/imports) ──ảnh nén ≤1600px + danh mục đại lý/loại NL + xe/tài xế đã ghi──▶ Edge Function ocr-import-slip ──▶ OpenAI
         ▲                         (JWT người dùng)              │ kiểm co_vai_tro() (0057)
-        └──────────── JSON nháp {text, date, supplier, lines} ◀─┘ key = secret OPENAI_API_KEY
+        └──────────── JSON nháp {text, date, supplier, licensePlate, driverName, workshop, lines[kg, unitPrice]} ◀─┘ key = secret OPENAI_API_KEY
 ```
 
 - Cổng JWT của Supabase chặn người chưa đăng nhập (401). Trong hàm, `co_vai_tro()` chặn tài khoản tự đăng ký chưa có vai trò (403) ⇒ người lạ không đốt tiền key.

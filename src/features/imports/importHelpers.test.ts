@@ -10,6 +10,9 @@ import {
   getSupplierLineTemplates,
   applyNewSupplierTemplate,
   getSkippedSuggestedLines,
+  getKnownVehicles,
+  mergeOcrLines,
+  createEmptyImportLine,
   type ShipmentHeader,
   type ImportLine,
 } from "./importHelpers";
@@ -320,5 +323,68 @@ describe("gợi ý theo đại lý", () => {
     const m = getSupplierLineTemplates(so, "Hồng Phú", "Đông");
     expect(getSkippedSuggestedLines(m)).toHaveLength(3);
     expect(getSkippedSuggestedLines([{ ...m[0], quantityKg: 5 }, m[1]])).toHaveLength(1);
+  });
+});
+
+describe("OCR phiếu nhập → bảng loại hàng", () => {
+  it("getKnownVehicles: mọi đại lý, mới nhất trước, gộp biến thể biển số / tên", () => {
+    const rows = [
+      dong({ id: "1", deliveryDate: "2026-09-01", supplierName: "A", licensePlate: "72c 16603", driverName: "toàn" }),
+      dong({ id: "2", deliveryDate: "2026-09-05", supplierName: "B", licensePlate: "72C-166.03", driverName: "Toàn" }),
+      dong({ id: "3", deliveryDate: "2026-09-03", supplierName: "C", licensePlate: "51D-12345", driverName: "" }),
+    ];
+    expect(getKnownVehicles(rows)).toEqual({ plates: ["72C-166.03", "51D-12345"], drivers: ["Toàn"] });
+    expect(getKnownVehicles(rows, 1).plates).toEqual(["72C-166.03"]);
+  });
+
+  const templateLine = (name: string, unitPrice: number | null): ImportLine => ({
+    ...createEmptyImportLine("Bạch tuộc"),
+    materialTypeName: name,
+    unitPrice,
+    goiY: true,
+    priceDate: "2026-09-01",
+  });
+  const categoryOf = (n: string) => (n.startsWith("Cá") ? ("Cá" as const) : undefined);
+
+  it("điền kg vào dòng mẫu cùng loại; giá phiếu thay giá mẫu, không ghi giá thì giữ giá cũ", () => {
+    const out = mergeOcrLines(
+      [templateLine("BT 1 da", 150000), templateLine("BT 2 da lớn", 134000)],
+      [
+        { materialType: "BT 1 da", kg: 12, unitPrice: 155000 },
+        { materialType: "BT 2 da lớn", kg: 8 },
+      ],
+      categoryOf,
+      "Bạch tuộc",
+    );
+    expect(out.map((d) => [d.materialTypeName, d.quantityKg, d.unitPrice, d.goiY, d.priceDate])).toEqual([
+      ["BT 1 da", 12, 155000, false, undefined],
+      ["BT 2 da lớn", 8, 134000, false, "2026-09-01"],
+    ]);
+  });
+
+  it("loại không có dòng mẫu ⇒ thêm dòng mới, bỏ dòng trống hẳn, giữ dòng mẫu chưa dùng", () => {
+    const out = mergeOcrLines(
+      [templateLine("BT 1 da", 150000), createEmptyImportLine("Bạch tuộc")],
+      [{ materialType: "Cá thu", kg: 30, unitPrice: null }],
+      categoryOf,
+      "Bạch tuộc",
+    );
+    expect(out.map((d) => [d.materialTypeName, d.quantityKg, d.category])).toEqual([
+      ["BT 1 da", 0, "Bạch tuộc"],
+      ["Cá thu", 30, "Cá"],
+    ]);
+  });
+
+  it("cùng loại đọc hai lần ⇒ dòng mẫu nhận lần đầu, lần sau thành dòng riêng", () => {
+    const out = mergeOcrLines(
+      [templateLine("BT 1 da", 150000)],
+      [
+        { materialType: "BT 1 da", kg: 5 },
+        { materialType: "BT 1 da", kg: 7 },
+      ],
+      categoryOf,
+      "Bạch tuộc",
+    );
+    expect(out.map((d) => d.quantityKg)).toEqual([5, 7]);
   });
 });

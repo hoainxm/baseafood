@@ -636,8 +636,8 @@ export default function WipProductionScreen() {
       note: "",
       customerName: d.customerName.trim(),
       processingType: d.processingType.trim(),
-      componentRauKg: isSplitLine(d) ? d.tentacleKg || 0 : null,
-      componentBaoTuKg: isSplitLine(d) ? d.stomachKg || 0 : null,
+      tentacleKg: isSplitLine(d) ? d.tentacleKg || 0 : null,
+      stomachKg: isSplitLine(d) ? d.stomachKg || 0 : null,
       operator,
       batterKg: sanitizeBatterKg(d.botKg),
     }));

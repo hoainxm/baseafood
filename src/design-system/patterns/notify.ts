@@ -6,9 +6,15 @@ import { toast } from "sonner";
  * Không có phản hồi = người dùng không biết đã lưu chưa = nhập lại lần hai =
  * sai số liệu cuối kỳ. Đây chính là gốc của "tồn nguyên liệu cuối kỳ sai".
  *
- * Thời gian hiện 8 giây (mặc định sonner 4s là quá nhanh để đọc + bấm Hoàn tác).
+ * Thời gian hiện (2026-10-14, người dùng: "để khoảng 2 giây"):
+ * - Báo xong thường (không có nút): 2 giây — chỉ để biết đã lưu, không cản thao tác.
+ * - Có nút (Hoàn tác / In tem): 5 giây — 2 giây không kịp bấm, mất đường lùi khi xóa.
+ * - Lỗi / cảnh báo: 4 giây — phải kịp đọc câu giải thích.
+ * Rê chuột lên thông báo thì đồng hồ dừng (sonner tự lo).
  */
-const THOI_GIAN = 8000;
+const SHORT_MS = 2000;
+const WITH_ACTION_MS = 5000;
+const ALERT_MS = 4000;
 
 export const notify = {
   /**
@@ -18,7 +24,7 @@ export const notify = {
   saved(message: string, onUndo?: () => void, action?: { label: string; onClick: () => void }) {
     const undo = onUndo ? { label: "Hoàn tác", onClick: onUndo } : undefined;
     toast.success(message, {
-      duration: THOI_GIAN,
+      duration: undo || action ? WITH_ACTION_MS : SHORT_MS,
       action: undo ?? action,
       cancel: undo ? action : undefined,
     });
@@ -26,16 +32,16 @@ export const notify = {
 
   deleted(message: string, onUndo?: () => void) {
     toast(message, {
-      duration: THOI_GIAN,
+      duration: onUndo ? WITH_ACTION_MS : SHORT_MS,
       action: onUndo ? { label: "Hoàn tác", onClick: onUndo } : undefined,
     });
   },
 
   error(message: string) {
-    toast.error(message, { duration: THOI_GIAN });
+    toast.error(message, { duration: ALERT_MS });
   },
 
   warning(message: string) {
-    toast.warning(message, { duration: THOI_GIAN });
+    toast.warning(message, { duration: ALERT_MS });
   },
 };

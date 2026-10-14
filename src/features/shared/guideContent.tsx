@@ -486,8 +486,8 @@ export const PAGE_GUIDES: Record<string, PageGuide> = {
         <Section title="In tem ngay lúc ghi">
           <Y>
             <li>
-              Lưu xong chuyến nhập, mẻ sản xuất hay phiếu đóng gói, thông báo góc
-              màn có nút <b>In tem</b> — bấm là in luôn.
+              Lưu xong chuyến nhập, mẻ sản xuất hay phiếu đóng gói, thông báo thả
+              xuống ở đầu màn có nút <b>In tem</b> — bấm là in luôn.
             </li>
             <li>
               In lại sau: <b>Nhập hàng</b> → nút <b>Tem</b> ở cột "Đã ghi ngày", hoặc{" "}

@@ -8,7 +8,12 @@ const Toaster = ({ ...props }: ToasterProps) => {
   return (
     <Sonner
       theme="light"
+      /* Thông báo THẢ XUỐNG từ mép trên ở mọi cỡ màn (2026-10-14 — người dùng: "đưa lên
+         trên, không để dưới"; ở dưới hay che thanh Lưu dính đáy). Chừa tai thỏ / thanh
+         trạng thái iPhone bằng safe-area. Đừng truyền `position` khác ở nơi gắn. */
       position="top-center"
+      offset={{ top: "calc(env(safe-area-inset-top) + 12px)" }}
+      mobileOffset={{ top: "calc(env(safe-area-inset-top) + 8px)" }}
       richColors
       expand
       closeButton

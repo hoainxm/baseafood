@@ -164,7 +164,7 @@ export default function App() {
     return (
       <>
         <LoginScreen login={auth.signIn} />
-        <Toaster position="bottom-center" richColors closeButton />
+        <Toaster />
       </>
     );
   }
@@ -239,7 +239,7 @@ export default function App() {
           <Route path="*" element={<NotFound />} />
         </Routes>
       </HashRouter>
-      <Toaster position="bottom-center" richColors closeButton />
+      <Toaster />
     </>
   );
 }

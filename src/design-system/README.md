@@ -49,6 +49,12 @@ src/features/*                 ← màn nghiệp vụ
    | 2 · xóa / hệ trọng | Xóa bản ghi · chốt sổ · ghi đè · lệnh xuất | `ConfirmDelete` / `ConfirmAction` (8b) **trước**, rồi toast + **Hoàn tác** |
    | — · lỗi, cảnh báo, kết quả kiểm | Ghi hụt, thiếu dữ liệu, kiểm lô đúng/sai, quét tem | `notify.error` / `canhBao` / `daLuu` — LUÔN báo |
 
+   **Vị trí + thời gian (2026-10-14):** toast THẢ XUỐNG từ **giữa mép trên** ở cả web
+   lẫn điện thoại (cấu hình một chỗ ở `components/ui/sonner.tsx`, có safe-area; nơi gắn
+   `<Toaster />` không truyền `position`). Báo xong thường **2 giây**; toast có nút
+   (Hoàn tác / In tem) **5 giây** cho kịp bấm; lỗi / cảnh báo **4 giây**. Rê chuột lên
+   thì dừng đếm. Thời gian đặt ở `patterns/notify.ts` — đừng truyền `duration` riêng.
+
    Xuất file mà nội dung cần giải thích (VD đối soát: "giữ nguyên định dạng gốc, chỉ
    thêm cột…") được giữ toast — vì câu đó là hướng dẫn, không phải "đã xong". Việc
    nên làm NGAY sau khi lưu (vd in tem lô vừa ghi) truyền tham số thứ ba

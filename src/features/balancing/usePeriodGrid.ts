@@ -275,8 +275,8 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
   /* Nhãn kỳ + họ NL để ghi vết / đặt tên lô gửi đông trong Sổ kho tháng. */
   const ngucanh = useMemo(
     () => ({
-      nhanKy: `${ky.materialTypeName} ${ky.dateRangeDescription ?? ""}`.trim(),
-      hoNL: getMaterialFamily(ky.materialTypeName),
+      periodLabel: `${ky.materialTypeName} ${ky.dateRangeDescription ?? ""}`.trim(),
+      materialFamily: getMaterialFamily(ky.materialTypeName),
     }),
     [ky.materialTypeName, ky.dateRangeDescription]
   );
@@ -287,15 +287,15 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
   const writeMaterials = useCallback(
     (rows: BalancingInputItem[], nhom = "nl"): boolean => {
       const result = syncMonthlyStockLedger(monthlyStock, materialInRows, rows, ngucanh);
-      if (result.loi) {
-        notify.error(result.loi);
+      if (result.error) {
+        notify.error(result.error);
         return false;
       }
       saveCheckpoint(nhom);
       writeAllMaterials([...allMaterialRows.filter((r) => r.periodId !== ky.id), ...rows]);
-      if (result.doi) writeStockLedger(result.lines);
-      if (result.keThua > 0)
-        notify.saved(`Sổ kho tháng: đã tự kế thừa ${result.keThua} dòng tồn sang tháng mới`);
+      if (result.changed) writeStockLedger(result.lines);
+      if (result.carriedCount > 0)
+        notify.saved(`Sổ kho tháng: đã tự kế thừa ${result.carriedCount} dòng tồn sang tháng mới`);
       return true;
     },
     [writeAllMaterials, allMaterialRows, ky.id, saveCheckpoint, monthlyStock, materialInRows, ngucanh, writeStockLedger]
@@ -384,8 +384,8 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
           periodId: ky.id,
           groupName: "Thủy sản",
           name: materialType,
-          quantityKg: Object.values(o.theoNgay).reduce((s, v) => s + v, 0),
-          unitPrice: o.donGia,
+          quantityKg: Object.values(o.dailyQuantities).reduce((s, v) => s + v, 0),
+          unitPrice: o.unitPrice,
           ratioPercentage: null,
           sourceWarehouse: "",
           dailyQuantities: {},
@@ -421,11 +421,11 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
           (r) => getMaterialFamily(r.materialTypeName) === o.rowKey && r.deliveryDate === o.date
         );
         const result = writeBackDailyImport(sameDayRows, o.kg);
-        if (result.loai === "tuChoi") {
-          notify.error(result.lyDo);
+        if (result.kind === "tuChoi") {
+          notify.error(result.reason);
           return false;
         }
-        if (result.loai === "sua") {
+        if (result.kind === "sua") {
           edits.set(result.id, result.kg);
           current = current.map((r) => (r.id === result.id ? { ...r, quantityKg: result.kg } : r));
         } else {
@@ -526,7 +526,7 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
         productId,
         customerId: g?.customerId ?? "",
         channel: g?.channel ?? "Xuất khẩu",
-        quantityKg: Object.values(o.theoNgay).reduce((s, v) => s + v, 0),
+        quantityKg: Object.values(o.dailyQuantities).reduce((s, v) => s + v, 0),
         unitPrice: g?.unitPrice ?? null,
         spec: spec ?? "",
         salesItemId: "",
@@ -585,11 +585,11 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
             r.productId === productId && r.spec === spec && r.productionDate === o.date
         );
         const result = writeBackDailyOutput(sameDayRows, o.kg);
-        if (result.loai === "tuChoi") {
-          notify.error(result.lyDo);
+        if (result.kind === "tuChoi") {
+          notify.error(result.reason);
           return false;
         }
-        if (result.loai === "sua") {
+        if (result.kind === "sua") {
           edits.set(result.id, result.kg);
           current = current.map((r) => (r.id === result.id ? { ...r, quantityKg: result.kg } : r));
         } else {
@@ -652,7 +652,7 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
     () =>
       materialInRows.map((r) => {
         const h = materialRows.find((x) => x.id === r.id);
-        return h && h.tong !== r.quantityKg ? { ...r, quantityKg: h.tong } : r;
+        return h && h.total !== r.quantityKg ? { ...r, quantityKg: h.total } : r;
       }),
     [materialInRows, materialRows]
   );
@@ -660,7 +660,7 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
     () =>
       finishedGoods.map((r) => {
         const h = finishedGoodRows.find((x) => x.id === r.id);
-        return h && h.tong !== r.quantityKg ? { ...r, quantityKg: h.tong } : r;
+        return h && h.total !== r.quantityKg ? { ...r, quantityKg: h.total } : r;
       }),
     [finishedGoods, finishedGoodRows]
   );
@@ -728,8 +728,8 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
      phần kế thừa) + kho nhận để Gửi đông + kiểm khớp. */
   const periodMonth = monthOfDate(dates[0] ?? ky.startDate ?? "");
   const selectLot = useCallback(
-    (selected: string[]) => (periodMonth ? listThawLotOptions(monthlyStock, periodMonth, ngucanh.hoNL, selected) : []),
-    [monthlyStock, periodMonth, ngucanh.hoNL]
+    (selected: string[]) => (periodMonth ? listThawLotOptions(monthlyStock, periodMonth, ngucanh.materialFamily, selected) : []),
+    [monthlyStock, periodMonth, ngucanh.materialFamily]
   );
   const storageOptions = useMemo(
     () =>
@@ -758,11 +758,11 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
   const rewriteStockLedger = useCallback(() => {
     const prevRows = monthlyStock;
     const result = syncMonthlyStockLedger(monthlyStock, [], materialInRows, ngucanh);
-    if (result.loi) {
-      notify.error(result.loi);
+    if (result.error) {
+      notify.error(result.error);
       return;
     }
-    if (!result.doi) return;
+    if (!result.changed) return;
     saveCheckpoint(`ghi-lai-so-kho:${ky.id}`);
     writeStockLedger(result.lines);
     notify.saved("Đã ghi lại phần lấy xả đông / gửi đông của kỳ vào Sổ kho tháng", () =>
@@ -798,13 +798,13 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
     const prevFinishedGoods = allOutputs;
     saveCheckpoint(`nhan-chuyen-ky:${prevPeriod.id}`);
 
-    const receivedMaterialIds = new Set(materialCarryOver.map((d) => d.nguonId));
+    const receivedMaterialIds = new Set(materialCarryOver.map((d) => d.sourceId));
     const materialsToAdd: BalancingInputItem[] = materialCarryOver.map((d) => ({
       id: uid(),
       periodId: ky.id,
       /* Hàng kỳ trước cất kho, kỳ này lấy ra dùng ⇒ đúng nhóm Xả đông. */
       groupName: "Xả đông",
-      name: d.ten,
+      name: d.name,
       quantityKg: d.kg,
       unitPrice: null,
       ratioPercentage: null,
@@ -817,14 +817,14 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
       autoSource: "",
     }));
 
-    const receivedFinishedIds = new Set(finishedGoodCarryOver.map((d) => d.nguonId));
+    const receivedFinishedIds = new Set(finishedGoodCarryOver.map((d) => d.sourceId));
     const finishedGoodTemplates = new Map(allOutputs.map((r) => [r.id, r]));
     const finishedGoodsToAdd: BalancingOutputItem[] = finishedGoodCarryOver.map((d) => {
-      const template = finishedGoodTemplates.get(d.nguonId);
+      const template = finishedGoodTemplates.get(d.sourceId);
       return {
         id: uid(),
         periodId: ky.id,
-        productId: d.ten,
+        productId: d.name,
         customerId: template?.customerId ?? "",
         channel: template?.channel ?? "Xuất khẩu",
         quantityKg: d.kg,

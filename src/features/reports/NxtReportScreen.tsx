@@ -106,30 +106,30 @@ export default function NxtReportScreen() {
   const rows = useMemo(
     () =>
       computeFinishedGoodNxt({
-        sanXuat: wips,
+        wips,
         exportOrders,
         exportItems,
         salesItems,
         packagings,
         opening,
         products,
-        tuNgay: tu,
-        denNgay: den,
+        fromDate: tu,
+        toDate: den,
       }),
     [wips, exportOrders, exportItems, salesItems, packagings, opening, products, tu, den]
   );
   const total = useMemo(() => sumFinishedGoodNxt(rows), [rows]);
 
   const the: StatCardData[] = [
-    { label: "Tồn đầu kho", value: `${num(total.tonDau)} kg`, numeric: true, icon: Snowflake, color: "trung-tinh" },
-    { label: "Nhập kho", value: `${num(total.nhap)} kg`, numeric: true, icon: ArrowDownToLine, color: "brand" },
+    { label: "Tồn đầu kho", value: `${num(total.openingKg)} kg`, numeric: true, icon: Snowflake, color: "trung-tinh" },
+    { label: "Nhập kho", value: `${num(total.inKg)} kg`, numeric: true, icon: ArrowDownToLine, color: "brand" },
     {
       label: "Xuất (đơn+bán+gói)",
-      value: `${num(total.xuatDon)} + ${num(total.xuatBan)} + ${num(total.xuatDongGoi)} kg`,
+      value: `${num(total.orderOutKg)} + ${num(total.retailOutKg)} + ${num(total.packagingOutKg)} kg`,
       icon: Ship,
       color: "warning",
     },
-    { label: "Tồn cuối kho", value: `${num(total.tonCuoi)} kg`, numeric: true, icon: Scale, color: "success" },
+    { label: "Tồn cuối kho", value: `${num(total.closingKg)} kg`, numeric: true, icon: Scale, color: "success" },
   ];
 
   const columns: SummaryTableColumn<FinishedGoodNxtRow>[] = [
@@ -141,8 +141,8 @@ export default function NxtReportScreen() {
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-semibold text-foreground">{r.productName}</span>
             {r.spec && <Tag variant="phu">{r.spec}</Tag>}
-            {r.seedTonDau && <Tag variant="nguon">Tồn đầu khai tay</Tag>}
-            {r.canhBaoAm && (
+            {r.hasManualOpening && <Tag variant="nguon">Tồn đầu khai tay</Tag>}
+            {r.isNegative && (
               <Tag variant="loi" icon={AlertTriangle}>
                 Tồn âm
               </Tag>
@@ -154,47 +154,47 @@ export default function NxtReportScreen() {
         </div>
       ),
     },
-    { key: "tonDau", header: "Tồn đầu (kg)", numeric: true, render: (r) => num(r.tonDau), total: () => num(total.tonDau) },
+    { key: "tonDau", header: "Tồn đầu (kg)", numeric: true, render: (r) => num(r.openingKg), total: () => num(total.openingKg) },
     {
       key: "nhap",
       header: "Nhập (kg)",
       numeric: true,
       render: (r) => (
-        <span className={r.nhap > 0 ? "font-semibold text-success" : ""}>{r.nhap ? `+${num(r.nhap)}` : "—"}</span>
+        <span className={r.inKg > 0 ? "font-semibold text-success" : ""}>{r.inKg ? `+${num(r.inKg)}` : "—"}</span>
       ),
-      total: () => num(total.nhap),
+      total: () => num(total.inKg),
     },
     {
       key: "xuatDon",
       header: "Xuất đơn (kg)",
       numeric: true,
-      render: (r) => (r.xuatDon ? `−${num(r.xuatDon)}` : "—"),
-      total: () => num(total.xuatDon),
+      render: (r) => (r.orderOutKg ? `−${num(r.orderOutKg)}` : "—"),
+      total: () => num(total.orderOutKg),
     },
     {
       key: "xuatBan",
       header: "Xuất bán (kg)",
       numeric: true,
-      render: (r) => (r.xuatBan ? `−${num(r.xuatBan)}` : "—"),
-      total: () => num(total.xuatBan),
+      render: (r) => (r.retailOutKg ? `−${num(r.retailOutKg)}` : "—"),
+      total: () => num(total.retailOutKg),
     },
     {
       key: "xuatDongGoi",
       header: "Đóng gói (kg)",
       numeric: true,
-      render: (r) => (r.xuatDongGoi ? `−${num(r.xuatDongGoi)}` : "—"),
-      total: () => num(total.xuatDongGoi),
+      render: (r) => (r.packagingOutKg ? `−${num(r.packagingOutKg)}` : "—"),
+      total: () => num(total.packagingOutKg),
     },
     {
       key: "tonCuoi",
       header: "Tồn cuối (kg)",
       numeric: true,
       render: (r) => (
-        <span className={`tnum font-bold ${r.canhBaoAm ? "text-destructive" : "text-foreground"}`}>
-          {num(r.tonCuoi)}
+        <span className={`tnum font-bold ${r.isNegative ? "text-destructive" : "text-foreground"}`}>
+          {num(r.closingKg)}
         </span>
       ),
-      total: () => num(total.tonCuoi),
+      total: () => num(total.closingKg),
     },
   ];
 
@@ -208,14 +208,14 @@ export default function NxtReportScreen() {
       code: r.productCode || r.productId,
       name: `${r.productName}${r.spec ? ` (${r.spec})` : ""}`,
       category: inferCategory(r.productCode, r.productName),
-      tonDauKg: r.tonDau,
-      giaTriDau: 0,
-      nhapKg: r.nhap,
-      giaTriNhap: 0,
-      xuatKg: r.xuat,
-      giaTriXuat: 0,
-      tonCuoiKg: r.tonCuoi,
-      giaTriCuoi: 0,
+      openingKg: r.openingKg,
+      openingValue: 0,
+      inKg: r.inKg,
+      inValue: 0,
+      outKg: r.outKg,
+      outValue: 0,
+      closingKg: r.closingKg,
+      closingValue: 0,
     }));
     exportNxtToExcel(
       {
@@ -225,14 +225,14 @@ export default function NxtReportScreen() {
         warehouseText: "Chi nhánh: Kho thành phẩm BSF1",
         items,
         totalItemCount: items.length,
-        totalTonDauKg: total.tonDau,
-        totalGiaTriDau: 0,
-        totalNhapKg: total.nhap,
-        totalGiaTriNhap: 0,
-        totalXuatKg: total.xuat,
-        totalGiaTriXuat: 0,
-        totalTonCuoiKg: total.tonCuoi,
-        totalGiaTriCuoi: 0,
+        totalOpeningKg: total.openingKg,
+        totalOpeningValue: 0,
+        totalInKg: total.inKg,
+        totalInValue: 0,
+        totalOutKg: total.outKg,
+        totalOutValue: 0,
+        totalClosingKg: total.closingKg,
+        totalClosingValue: 0,
       },
       `Bao-Cao-NXT-Thanh-Pham-${tu}-${den}.xlsx`
     );
@@ -358,11 +358,11 @@ export default function NxtReportScreen() {
 
       <StatCardGrid cards={the} />
 
-      {total.soCanhBao > 0 && (
+      {total.warningCount > 0 && (
         <div className="flex flex-wrap items-center gap-3 rounded-xl border-2 border-destructive bg-destructive/10 p-4">
           <AlertTriangle className="h-5 w-5 shrink-0 text-destructive" aria-hidden />
           <span className="text-base font-semibold text-destructive">
-            {total.soCanhBao} mặt hàng có tồn cuối ÂM — xuất nhiều hơn số đang trữ. Kiểm lại sản xuất /
+            {total.warningCount} mặt hàng có tồn cuối ÂM — xuất nhiều hơn số đang trữ. Kiểm lại sản xuất /
             đơn đặt / bán hàng (số ghi tay có thể sai, hoặc thiếu khai tồn đầu).
           </span>
         </div>

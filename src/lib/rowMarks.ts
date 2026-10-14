@@ -19,7 +19,7 @@ export interface RowMarkStyle {
 
 /** Đích tô: cả dòng (`cot` null) hoặc một ô. */
 export interface RowMarkTarget {
-  dong: string;
+  row: string;
   columns: string | null;
 }
 
@@ -53,7 +53,7 @@ export const cellKey = (rowId: string, columnKey: string) => `${rowId}\u0001${co
 export function getTableRowMarks(
   marks: RowMark[],
   tableKey: string
-): { dong: Map<string, RowMarkStyle>; o: Map<string, RowMarkStyle> } {
+): { row: Map<string, RowMarkStyle>; o: Map<string, RowMarkStyle> } {
   const dong = new Map<string, RowMarkStyle>();
   const o = new Map<string, RowMarkStyle>();
   for (const m of marks) {
@@ -64,7 +64,7 @@ export function getTableRowMarks(
     if (m.columnKey == null) dong.set(m.rowId, dau);
     else o.set(cellKey(m.rowId, m.columnKey), dau);
   }
-  return { dong, o };
+  return { row: dong, o };
 }
 
 /**
@@ -81,8 +81,8 @@ export function setRowMarks(
   user: string,
   luc: string = new Date().toISOString()
 ): RowMark[] {
-  const items = target.map((d) => (typeof d === "string" ? { dong: d, columns: null } : d));
-  const theoId = new Map(items.map((d) => [idDauTo(tableKey, d.dong, d.columns), d]));
+  const items = target.map((d) => (typeof d === "string" ? { row: d, columns: null } : d));
+  const theoId = new Map(items.map((d) => [idDauTo(tableKey, d.row, d.columns), d]));
   const bo = !dau || (!dau.color && !dau.bold);
   const remaining = marks.filter((m) => !theoId.has(m.id));
   if (bo) return remaining;
@@ -94,7 +94,7 @@ export function setRowMarks(
     return {
       id,
       tableKey,
-      rowId: d.dong,
+      rowId: d.row,
       columnKey: d.columns,
       color: dau.color,
       bold: dau.bold,

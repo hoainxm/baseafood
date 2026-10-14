@@ -15,11 +15,11 @@ const sample: NxtExcelReportData = {
   dateRangeText: "Từ ngày 01/09/2026 đến ngày 30/09/2026",
   warehouseText: "Chi nhánh: KHO Thành Phẩm - KHO 1000",
   items: [
-    { code: "BT01", name: "Bạch tuộc", category: "Hàng trong nước", tonDauKg: 10, giaTriDau: 100, nhapKg: 5, giaTriNhap: 50, xuatKg: 3, giaTriXuat: 30, tonCuoiKg: 12, giaTriCuoi: 120 },
+    { code: "BT01", name: "Bạch tuộc", category: "Hàng trong nước", openingKg: 10, openingValue: 100, inKg: 5, inValue: 50, outKg: 3, outValue: 30, closingKg: 12, closingValue: 120 },
   ],
   totalItemCount: 1,
-  totalTonDauKg: 10, totalGiaTriDau: 100, totalNhapKg: 5, totalGiaTriNhap: 50,
-  totalXuatKg: 3, totalGiaTriXuat: 30, totalTonCuoiKg: 12, totalGiaTriCuoi: 120,
+  totalOpeningKg: 10, totalOpeningValue: 100, totalInKg: 5, totalInValue: 50,
+  totalOutKg: 3, totalOutValue: 30, totalClosingKg: 12, totalClosingValue: 120,
 };
 
 describe("parseNxtExcelFile — dòng kho (#32)", () => {

@@ -46,7 +46,7 @@ const laLo = (k: TraceNodeKind): k is LotKind => !isOutboundKind(k);
 
 /** Dòng lô gọn: nhãn + mô tả; bấm vào là mở hộ chiếu của lô đó. */
 function NodeRow({ node, edgeKg: linkKg, onMo }: { node: LotNode; edgeKg?: number | null; onMo: (n: LotNode) => void }) {
-  const canOpen = laLo(node.kind) && !node.mat;
+  const canOpen = laLo(node.kind) && !node.isMissing;
   return (
     <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
       <Tag variant="phan-loai" tone={toneByName(TRACE_KIND_LABELS[node.kind])}>{TRACE_KIND_LABELS[node.kind]}</Tag>
@@ -54,16 +54,16 @@ function NodeRow({ node, edgeKg: linkKg, onMo }: { node: LotNode; edgeKg?: numbe
         <button
           type="button"
           className="font-medium text-primary underline-offset-4 hover:underline"
-          title={`Mở hộ chiếu của lô ${node.nhan}.`}
+          title={`Mở hộ chiếu của lô ${node.label}.`}
           onClick={() => onMo(node)}
         >
-          {node.nhan}
+          {node.label}
         </button>
       ) : (
-        <span className="font-medium">{node.nhan}</span>
+        <span className="font-medium">{node.label}</span>
       )}
       <span className="text-muted-foreground">
-        {[node.moTa, node.ngay && formatDateVN(node.ngay), node.chiTiet.find((c) => c.nhan === "Đại lý")?.giaTri]
+        {[node.description, node.date && formatDateVN(node.date), node.details.find((c) => c.label === "Đại lý")?.value]
           .filter(Boolean)
           .join(" · ")}
       </span>
@@ -79,11 +79,11 @@ function Tree({ branches, onMo }: { branches: TraceBranch[]; onMo: (n: LotNode) 
   return (
     <ul className="space-y-2">
       {branches.map((n, i) => (
-        <li key={`${n.nut.kind}:${n.nut.id}:${i}`} className="space-y-2">
-          <NodeRow node={n.nut} edgeKg={n.kg} onMo={onMo} />
-          {n.con.length > 0 && (
+        <li key={`${n.node.kind}:${n.node.id}:${i}`} className="space-y-2">
+          <NodeRow node={n.node} edgeKg={n.kg} onMo={onMo} />
+          {n.children.length > 0 && (
             <div className="ml-3 border-l-2 border-border pl-4">
-              <Tree branches={n.con} onMo={onMo} />
+              <Tree branches={n.children} onMo={onMo} />
             </div>
           )}
         </li>
@@ -116,7 +116,7 @@ export default function QrLookupScreen() {
   const tra = (text: string) => {
     const ma = parseQrCode(text);
     if (!ma) return;
-    setParams("kind" in ma ? { lot: `${ma.kind}:${ma.id}` } : { lot: ma.ma });
+    setParams("kind" in ma ? { lot: `${ma.kind}:${ma.id}` } : { lot: ma.code });
   };
   const openLot = (n: LotNode) => {
     if (!laLo(n.kind)) return;
@@ -242,7 +242,7 @@ export default function QrLookupScreen() {
           <p className="font-medium">
             {(() => {
               const ld = explainMultipleLots(lo, ketQua, dl);
-              return ld.cungChuyen ? `${ld.cau}:` : `${ld.cau} (tem in trước đợt nâng cấp không đảm bảo mã duy nhất):`;
+              return ld.sameShipment ? `${ld.message}:` : `${ld.message} (tem in trước đợt nâng cấp không đảm bảo mã duy nhất):`;
             })()}
           </p>
           <ul className="space-y-2">
@@ -261,14 +261,14 @@ export default function QrLookupScreen() {
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex flex-wrap items-center gap-2">
                   <Tag variant="phan-loai" tone={toneByName(TRACE_KIND_LABELS[viewing.kind])}>{TRACE_KIND_LABELS[viewing.kind]}</Tag>
-                  <span className="text-xl font-semibold tnum">{viewing.nhan}</span>
+                  <span className="text-xl font-semibold tnum">{viewing.label}</span>
                 </div>
                 <Button title="In lại tem QR của lô này (tem cũ bong / mờ thì in cái mới)." variant="outline" onClick={() => setIsPrintingLabel(true)}>
                   <Printer aria-hidden /> In tem
                 </Button>
               </div>
               <p className="text-muted-foreground">
-                {[viewing.moTa, viewing.xuong && `xưởng ${viewing.xuong}`].filter(Boolean).join(" · ")}
+                {[viewing.description, viewing.workshop && `xưởng ${viewing.workshop}`].filter(Boolean).join(" · ")}
               </p>
               {laLo(viewing.kind) &&
                 (() => {
@@ -283,18 +283,18 @@ export default function QrLookupScreen() {
                   return (
                     <div className="space-y-1">
                       <p className="flex flex-wrap items-center gap-2">
-                        <Tag variant="xong">Đã in {t.tem} tem</Tag>
+                        <Tag variant="xong">Đã in {t.labelCount} tem</Tag>
                         <span className="text-muted-foreground">
-                          Lần gần nhất {formatDateVN(t.cuoi.printedAt.slice(0, 10))}
-                          {t.cuoi.operator ? ` · ${t.cuoi.operator}` : ""}
+                          Lần gần nhất {formatDateVN(t.lastPrint.printedAt.slice(0, 10))}
+                          {t.lastPrint.operator ? ` · ${t.lastPrint.operator}` : ""}
                         </span>
                       </p>
-                      {t.cuoi.label && t.cuoi.label !== viewing.nhan && (
+                      {t.lastPrint.label && t.lastPrint.label !== viewing.label && (
                         <p className="flex flex-wrap items-center gap-2">
                           <Tag variant="luu-y">Nhãn đã đổi</Tag>
                           <span>
-                            Tem đang dán ghi <b className="tnum">{t.cuoi.label}</b>, nay là{" "}
-                            <b className="tnum">{viewing.nhan}</b> (sửa ngày / xưởng sau khi in). Quét tem cũ vẫn ra đúng lô — in lại nếu cần chữ khớp.
+                            Tem đang dán ghi <b className="tnum">{t.lastPrint.label}</b>, nay là{" "}
+                            <b className="tnum">{viewing.label}</b> (sửa ngày / xưởng sau khi in). Quét tem cũ vẫn ra đúng lô — in lại nếu cần chữ khớp.
                           </span>
                         </p>
                       )}
@@ -302,10 +302,10 @@ export default function QrLookupScreen() {
                   );
                 })()}
               <dl className="grid gap-x-6 gap-y-2 sm:grid-cols-2">
-                {viewing.chiTiet.map((c, i) => (
+                {viewing.details.map((c, i) => (
                   <div key={i} className="flex justify-between gap-3 border-b border-border pb-1">
-                    <dt className="text-muted-foreground">{c.nhan}</dt>
-                    <dd className="tnum text-right font-medium">{c.giaTri}</dd>
+                    <dt className="text-muted-foreground">{c.label}</dt>
+                    <dd className="tnum text-right font-medium">{c.value}</dd>
                   </div>
                 ))}
               </dl>
@@ -316,15 +316,15 @@ export default function QrLookupScreen() {
                     {sameShipmentLots.map((n) => (
                       <li key={n.id} className="flex flex-wrap items-center gap-2">
                         {n.id === viewing.id ? (
-                          <span className="font-medium">{n.moTa}</span>
+                          <span className="font-medium">{n.description}</span>
                         ) : (
                           <button
                             type="button"
                             className="font-medium text-primary underline-offset-4 hover:underline"
-                            title={`Mở hộ chiếu lô ${n.moTa} của cùng chuyến.`}
+                            title={`Mở hộ chiếu lô ${n.description} của cùng chuyến.`}
                             onClick={() => openLot(n)}
                           >
-                            {n.moTa}
+                            {n.description}
                           </button>
                         )}
                         <span className="tnum text-muted-foreground">{kg(n.kg)}</span>
@@ -348,14 +348,14 @@ export default function QrLookupScreen() {
                 <div className="grid gap-2 sm:grid-cols-3">
                   <div>
                     <div className="text-muted-foreground">{viewing.kind === "S" ? "Nhận vào" : viewing.kind === "P" ? "Đóng gói ra" : "Sản xuất"}</div>
-                    <div className="tnum text-lg font-semibold">{kg(canBang.vao)}</div>
+                    <div className="tnum text-lg font-semibold">{kg(canBang.inKg)}</div>
                   </div>
                   <div>
                     <div className="text-muted-foreground">Đã đi</div>
-                    {canBang.ra.length ? (
-                      canBang.ra.map((r) => (
-                        <div key={r.nhan} className="tnum">
-                          {r.nhan}: <span className="font-semibold">{kg(r.kg)}</span>
+                    {canBang.outputs.length ? (
+                      canBang.outputs.map((r) => (
+                        <div key={r.label} className="tnum">
+                          {r.label}: <span className="font-semibold">{kg(r.kg)}</span>
                         </div>
                       ))
                     ) : (
@@ -364,7 +364,7 @@ export default function QrLookupScreen() {
                   </div>
                   <div>
                     <div className="text-muted-foreground">Còn lại (theo hồ sơ lô)</div>
-                    <div className={`tnum text-lg font-semibold ${canBang.con < 0 ? "text-destructive" : ""}`}>{kg(canBang.con)}</div>
+                    <div className={`tnum text-lg font-semibold ${canBang.children < 0 ? "text-destructive" : ""}`}>{kg(canBang.children)}</div>
                     {lotStock != null && (
                       <div className="tnum text-muted-foreground">
                         Tồn trong kho (sổ tồn): <span className="font-semibold text-foreground">{kg(lotStock)}</span>
@@ -373,26 +373,26 @@ export default function QrLookupScreen() {
                   </div>
                 </div>
                 {/* Lô này đi đâu — một thanh 100% kg của lô, chia theo ngả đã đi + phần còn. */}
-                {canBang.vao > 0 && canBang.ra.length > 0 && (
+                {canBang.inKg > 0 && canBang.outputs.length > 0 && (
                   <ProportionBar
                     description="Khối lượng của lô chia theo nơi đã đi tới"
                     segments={[
-                      ...canBang.ra.map((r, i) => ({
+                      ...canBang.outputs.map((r, i) => ({
                         id: `ra-${i}`,
-                        label: r.nhan,
+                        label: r.label,
                         value: r.kg,
                         tone: (["tim", "la", "bang", "hong", "cam", "bien"] as const)[i % 6],
                       })),
-                      ...(canBang.con > 0 ? [{ id: "con", label: "Còn lại (theo hồ sơ lô)", value: canBang.con, tone: "ngoc" as const }] : []),
+                      ...(canBang.children > 0 ? [{ id: "con", label: "Còn lại (theo hồ sơ lô)", value: canBang.children, tone: "ngoc" as const }] : []),
                     ]}
                   />
                 )}
-                {canBang.chuaCan > 0 && (
+                {canBang.unweighedCount > 0 && (
                   <p className="text-muted-foreground">
-                    Có {canBang.chuaCan} lần gắn lô chưa ghi kg — số "còn lại" chưa trừ phần đó.
+                    Có {canBang.unweighedCount} lần gắn lô chưa ghi kg — số "còn lại" chưa trừ phần đó.
                   </p>
                 )}
-                {canBang.con < 0 && (
+                {canBang.children < 0 && (
                   <p className="font-medium text-destructive">Dùng / xuất quá số kg của lô — kiểm tra lại số kg hoặc lô đã gắn.</p>
                 )}
               </section>

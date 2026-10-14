@@ -12,13 +12,13 @@ export interface LotStock {
   productId: string;
   spec: string;
   warehouse: string;
-  ngaySX: string;
-  luongNhap: number;
-  blockNhap: number;
-  luongXuat: number;
-  blockXuat: number;
-  conLai: number; // kg còn = nhập − xuất
-  blockConLai: number;
+  productionDate: string;
+  inKg: number;
+  inBlocks: number;
+  outKg: number;
+  outBlocks: number;
+  remainingKg: number; // kg còn = nhập − xuất
+  remainingBlocks: number;
 }
 
 /** Một lô đã gắn cho dòng trừ tồn (truy xuất QR). kg null = gắn mà chưa cân. */
@@ -38,7 +38,7 @@ export interface StockDeduction {
   productId: string;
   spec: string;
   quantityKg: number;
-  lo?: readonly AssignedLot[];
+  lots?: readonly AssignedLot[];
 }
 
 /**
@@ -79,19 +79,19 @@ export interface Oversale {
 export interface LotStockResult {
   los: LotStock[];
   /** Bán vượt theo (mặt hàng × quy cách); rỗng khi không vượt. */
-  banVuot: Oversale[];
-  tongBanVuot: number;
+  oversales: Oversale[];
+  totalOversoldKg: number;
 }
 
 const ketQua = (los: LotStock[], oversales: Oversale[]): LotStockResult => ({
   los,
-  banVuot: oversales,
-  tongBanVuot: oversales.reduce((s, v) => s + v.kg, 0),
+  oversales,
+  totalOversoldKg: oversales.reduce((s, v) => s + v.kg, 0),
 });
 
 /**
  * Như `computeWipStock`, kèm phần BÁN VƯỢT (dòng trừ tồn không còn lô nào để trừ).
- * Bất biến: Σ conLai các lô − tongBanVuot = nhập − xuất lệnh − mọi dòng `banLe`
+ * Bất biến: Σ remainingKg các lô − totalOversoldKg = nhập − xuất lệnh − mọi dòng `banLe`
  * (cùng con số sổ NXT `inventoryFinished` khi không có tồn đầu khai tay).
  */
 export function computeWipStockDetail(
@@ -115,13 +115,13 @@ export function computeWipStockDetail(
         productId: s.productId,
         spec: s.spec,
         warehouse: s.warehouse,
-        ngaySX: s.productionDate,
-        luongNhap: s.quantityKg,
-        blockNhap: s.blocksCount,
-        luongXuat: x.kg,
-        blockXuat: x.block,
-        conLai: s.quantityKg - x.kg,
-        blockConLai: s.blocksCount - x.block,
+        productionDate: s.productionDate,
+        inKg: s.quantityKg,
+        inBlocks: s.blocksCount,
+        outKg: x.kg,
+        outBlocks: x.block,
+        remainingKg: s.quantityKg - x.kg,
+        remainingBlocks: s.blocksCount - x.block,
       };
     });
 
@@ -138,15 +138,15 @@ export function computeWipStockDetail(
 function deductByLot(los: LotStock[], retailSales: readonly StockDeduction[]): Oversale[] {
   /** Trừ tối đa `kg` khỏi một lô (không vượt phần lô còn). Trả kg đã trừ. */
   const deductFromLot = (lo: LotStock, kg: number): number => {
-    const lay = Math.min(kg, Math.max(0, lo.conLai));
+    const lay = Math.min(kg, Math.max(0, lo.remainingKg));
     if (lay <= 0) return 0;
-    const ty = lo.conLai > 0 ? lay / lo.conLai : 0;
-    lo.blockConLai = Math.max(0, lo.blockConLai - Math.round(lo.blockConLai * ty));
-    lo.conLai -= lay;
-    lo.luongXuat += lay;
+    const ty = lo.remainingKg > 0 ? lay / lo.remainingKg : 0;
+    lo.remainingBlocks = Math.max(0, lo.remainingBlocks - Math.round(lo.remainingBlocks * ty));
+    lo.remainingKg -= lay;
+    lo.outKg += lay;
     return lay;
   };
-  const fifo = (a: LotStock, b: LotStock) => a.ngaySX.localeCompare(b.ngaySX) || a.wipId.localeCompare(b.wipId);
+  const fifo = (a: LotStock, b: LotStock) => a.productionDate.localeCompare(b.productionDate) || a.wipId.localeCompare(b.wipId);
   const theoId = new Map(los.map((l) => [l.wipId, l]));
   const lotOfRow = (b: StockDeduction, g: AssignedLot) => {
     const lo = theoId.get(g.id);
@@ -156,7 +156,7 @@ function deductByLot(los: LotStock[], retailSales: readonly StockDeduction[]): O
 
   // 1. Lô gắn có kg — trừ đúng lô.
   retailSales.forEach((b, i) => {
-    for (const g of b.lo ?? []) {
+    for (const g of b.lots ?? []) {
       if (g.kg == null || !(g.kg > 0) || con[i]! <= 0) continue;
       const lo = lotOfRow(b, g);
       if (lo) con[i]! -= deductFromLot(lo, Math.min(g.kg, con[i]!));
@@ -165,7 +165,7 @@ function deductByLot(los: LotStock[], retailSales: readonly StockDeduction[]): O
   // 2. Lô gắn chưa cân — FIFO trong các lô đã gắn của dòng.
   retailSales.forEach((b, i) => {
     if (con[i]! <= 0) return;
-    const items = (b.lo ?? [])
+    const items = (b.lots ?? [])
       .filter((g) => g.kg == null)
       .map((g) => lotOfRow(b, g))
       .filter((lo): lo is LotStock => !!lo)
@@ -233,7 +233,7 @@ export function filterRetailSales(
             .filter((d) => d.docKind === "sales_item" && d.docId === r.id && d.lotKind === lotKind)
             .map((d) => ({ id: d.lotId, kg: d.quantityKg }))
         : [];
-      return { productId: r.productId, spec: r.spec, quantityKg: r.quantityKg, ...(lo.length ? { lo } : {}) };
+      return { productId: r.productId, spec: r.spec, quantityKg: r.quantityKg, ...(lo.length ? { lots: lo } : {}) };
     });
 }
 
@@ -259,7 +259,7 @@ export function getAvailableKg(
 ): number {
   return stock
     .filter((t) => t.productId === productId && t.spec === spec)
-    .reduce((s, t) => s + Math.max(0, t.conLai), 0);
+    .reduce((s, t) => s + Math.max(0, t.remainingKg), 0);
 }
 
 /** Lô còn hàng của (mặt hàng × quy cách), FIFO — lô cũ (ngày SX sớm) trước. */
@@ -270,9 +270,9 @@ export function listLotsWithStock(
 ): LotStock[] {
   return stock
     .filter(
-      (t) => t.productId === productId && t.spec === spec && t.conLai > 0
+      (t) => t.productId === productId && t.spec === spec && t.remainingKg > 0
     )
-    .sort((a, b) => a.ngaySX.localeCompare(b.ngaySX));
+    .sort((a, b) => a.productionDate.localeCompare(b.productionDate));
 }
 
 /** Lấy thông tin kho BSF1 theo tên hoặc mã kho. */
@@ -301,7 +301,7 @@ export function computeWarehouseOccupancy(stock: LotStock[]): WarehouseOccupancy
   for (const t of stock) {
     if (!t.warehouse) continue;
     const cur = stockByWarehouse.get(t.warehouse) ?? 0;
-    stockByWarehouse.set(t.warehouse, cur + Math.max(0, t.conLai));
+    stockByWarehouse.set(t.warehouse, cur + Math.max(0, t.remainingKg));
   }
 
   return BSF1_WAREHOUSES.map((wh) => {
@@ -344,7 +344,7 @@ export function collectPackagingDeductions(packagings: Packaging[], lotInputs: r
       productId: p.fromProductId,
       spec: p.fromSpec,
       quantityKg: p.inputKg,
-      ...(lo.length ? { lo } : {}),
+      ...(lo.length ? { lots: lo } : {}),
     };
   });
 }
@@ -356,7 +356,7 @@ export interface FinishedGoodStock {
   outputKg: number;
   outputUnits: number;
   soldKg: number;
-  conLai: number; // kg còn = output − bán
+  remainingKg: number; // kg còn = output − bán
 }
 
 /**
@@ -369,7 +369,7 @@ export function computeFinishedGoodStock(packagings: Packaging[], finishedGoodRe
     const k = `${productId}|${spec}`;
     let cur = map.get(k);
     if (!cur) {
-      cur = { productId, spec, outputKg: 0, outputUnits: 0, soldKg: 0, conLai: 0 };
+      cur = { productId, spec, outputKg: 0, outputUnits: 0, soldKg: 0, remainingKg: 0 };
       map.set(k, cur);
     }
     return cur;
@@ -383,25 +383,25 @@ export function computeFinishedGoodStock(packagings: Packaging[], finishedGoodRe
     lay(b.productId, b.spec).soldKg += b.quantityKg || 0;
   }
   const arr = [...map.values()];
-  for (const t of arr) t.conLai = t.outputKg - t.soldKg;
+  for (const t of arr) t.remainingKg = t.outputKg - t.soldKg;
   return arr;
 }
 
 /** Tồn TP khả dụng của một (mặt hàng × quy cách). */
 export function getAvailableFinishedGoodKg(finishedGoodStock: FinishedGoodStock[], productId: string, spec: string): number {
   const t = finishedGoodStock.find((x) => x.productId === productId && x.spec === spec);
-  return t ? t.conLai : 0;
+  return t ? t.remainingKg : 0;
 }
 
 /**
  * Tồn TP THEO LÔ (mỗi phiếu đóng gói là một lô TP `P:<id>`) — tách được lô nào
  * còn bao nhiêu, cho hộ chiếu lô và gắn lô khi bán. `banLeTP` = `filterRetailSales(sales,
  * FG_WAREHOUSE, loGan)`: dòng đã gắn lô TP trừ đúng lô, còn lại FIFO (phiếu đóng gói sớm
- * trước). Ở kết quả, `wipId` là id PHIẾU ĐÓNG GÓI, `blockNhap` là số thùng/gói ra.
+ * trước). Ở kết quả, `wipId` là id PHIẾU ĐÓNG GÓI, `inBlocks` là số thùng/gói ra.
  *
  * KHÔNG phải lúc nào cũng cùng tổng với `computeFinishedGoodStock`: lô không xuống âm, nên khi bán
  * vượt số đã đóng gói thì `computeFinishedGoodStock` âm còn Σ theo lô dừng ở 0. Cần phần vượt ⇒
- * dùng `computeFinishedGoodLotStockDetail` (Σ conLai − tongBanVuot = tổng `computeFinishedGoodStock`).
+ * dùng `computeFinishedGoodLotStockDetail` (Σ remainingKg − totalOversoldKg = tổng `computeFinishedGoodStock`).
  */
 export function computeFinishedGoodLotStock(packagings: Packaging[], finishedGoodRetail: readonly StockDeduction[] = []): LotStock[] {
   return computeFinishedGoodLotStockDetail(packagings, finishedGoodRetail).los;
@@ -414,13 +414,13 @@ export function computeFinishedGoodLotStockDetail(packagings: Packaging[], finis
     productId: p.toProductId,
     spec: p.toSpec,
     warehouse: p.warehouse,
-    ngaySX: p.date,
-    luongNhap: p.outputKg || 0,
-    blockNhap: p.outputUnits || 0,
-    luongXuat: 0,
-    blockXuat: 0,
-    conLai: p.outputKg || 0,
-    blockConLai: p.outputUnits || 0,
+    productionDate: p.date,
+    inKg: p.outputKg || 0,
+    inBlocks: p.outputUnits || 0,
+    outKg: 0,
+    outBlocks: 0,
+    remainingKg: p.outputKg || 0,
+    remainingBlocks: p.outputUnits || 0,
   }));
   return ketQua(los, finishedGoodRetail.length ? deductByLot(los, finishedGoodRetail) : []);
 }

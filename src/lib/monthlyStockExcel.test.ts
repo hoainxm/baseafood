@@ -53,7 +53,7 @@ describe("parseStockStatementFile", () => {
     expect(nhom["4 DA RÂU NGẮN"]).toBe("Nguyên liệu nhập khẩu – 2 DA");
     expect(nhom["B.TUỘC  2 DA"]).toBe("Nguyên liệu mua ngoài");
     expect(nhom["CÁ TRÍCH DẠT"]).toBe("Hàng tạm");
-    expect(parseWarehouseFromTitle(sh.tieuDe)).toBe("1500");
+    expect(parseWarehouseFromTitle(sh.title)).toBe("1500");
   });
 
   test("ô gộp ngày nhập/invoice chép xuống cả lô, ngày không lùi 1 ngày, dòng trống giữ nguyên", async () => {
@@ -77,11 +77,11 @@ describe("parseStockStatementFile", () => {
   test("cột R: kho gửi vs ghi chú thường", async () => {
     const [sh] = await docFile();
     const by = Object.fromEntries(sh.rows.map((r) => [r.itemName, r]));
-    expect(by["SABA"].khoGhi).toBe("Á D");
-    expect(by["CÁ SÒNG"].khoGhi).toBe("HP");
-    expect(by["BẠCH TUỘC <80gr"].khoGhi).toBe("phước cơ");
-    expect(by["B.TUỘC  2 DA"]).toMatchObject({ khoGhi: "", ghiChu: "xuất trả lại 4240" });
-    expect(by["CÁ TRÍCH DẠT"]).toMatchObject({ khoGhi: "", ghiChu: "" });
+    expect(by["SABA"].warehouseNote).toBe("Á D");
+    expect(by["CÁ SÒNG"].warehouseNote).toBe("HP");
+    expect(by["BẠCH TUỘC <80gr"].warehouseNote).toBe("phước cơ");
+    expect(by["B.TUỘC  2 DA"]).toMatchObject({ warehouseNote: "", note: "xuất trả lại 4240" });
+    expect(by["CÁ TRÍCH DẠT"]).toMatchObject({ warehouseNote: "", note: "" });
   });
 });
 
@@ -141,7 +141,7 @@ describe("idDongNap + ghepNapLai — nạp lại không nhân đôi (#28a)", () 
     const result = ghepNapLai(prev, incoming, "K1000T");
     const t8 = result.lines.filter((l) => l.period === "2026-08" && l.warehouse === "Kho 1000 tấn" && l.id.includes("K1000T"));
     expect(t8.map((l) => l.id).sort()).toEqual(["xlsx|K1000T|8|2026|5", "xlsx|K1000T|8|2026|6"]);
-    expect(result.thayIdCu).toBe(2);
+    expect(result.replacedOldIds).toBe(2);
     const saba = result.lines.find((l) => l.id === "xlsx|K1000T|8|2026|5")!;
     expect(saba).toMatchObject({ openKg: 120, storageLocation: "Kho Ánh Dương", note: "đã kiểm" });
     expect(result.lines.some((l) => l.id === "xlsx|K1500T|08|2026|5")).toBe(true);
@@ -154,7 +154,7 @@ describe("idDongNap + ghepNapLai — nạp lại không nhân đôi (#28a)", () 
     const result = ghepNapLai(prev, [dong("xlsx|K1000T|8|2026|5", { itemName: "CÁ THU" })], "K1000T");
     expect(result.lines).toHaveLength(1);
     expect(result.lines[0]).toMatchObject({ itemName: "CÁ THU", storageLocation: "", note: "" });
-    expect(result.lechTen).toHaveLength(1);
+    expect(result.nameMismatches).toHaveLength(1);
   });
 
   test("dòng cũ không còn trong file: trống ⇒ bỏ, còn số ⇒ giữ + báo; file có kho ở cột R thì file thắng", () => {
@@ -165,9 +165,9 @@ describe("idDongNap + ghepNapLai — nạp lại không nhân đôi (#28a)", () 
       dong("msl|2026-08|tach", { note: "Gửi kho (tách từ dòng xlsx|K1000T|8|2026|1)" }),
     ];
     const result = ghepNapLai(prev, [dong("xlsx|K1000T|8|2026|1", { storageLocation: "Kho B" })], "K1000T");
-    expect(result.boRong).toBe(1);
-    expect(result.cuConSo.map((l) => l.id)).toEqual(["xlsx|K1000T|8|2026|10"]);
+    expect(result.droppedEmpty).toBe(1);
+    expect(result.staleWithData.map((l) => l.id)).toEqual(["xlsx|K1000T|8|2026|10"]);
     expect(result.lines.find((l) => l.id === "xlsx|K1000T|8|2026|1")?.storageLocation).toBe("Kho B");
-    expect(result.soTach).toBe(1);
+    expect(result.splitCount).toBe(1);
   });
 });

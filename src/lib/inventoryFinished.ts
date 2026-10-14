@@ -41,7 +41,7 @@ import { RETAIL_WAREHOUSE } from "@/lib/inventory";
  *     + không bán vượt ⇒ Tồn cuối (xem tới hôm nay) == Tổng tồn Kho dự trữ; có khai
  *     tay ⇒ hai số lệch nhau đúng phần khai tay / phát sinh trước mốc.
  *   • Bán/đóng gói VƯỢT tồn: lô không xuống âm ⇒ Kho dự trữ báo riêng "bán vượt X kg"
- *     (`tongBanVuot`), còn ở đây trừ thẳng nên tồn cuối âm (canhBaoAm).
+ *     (`tongBanVuot`), còn ở đây trừ thẳng nên tồn cuối âm (isNegative).
  *   KHÔNG đếm hai lần: bán đóng gói (FG_WAREHOUSE) rút từ kho THÀNH PHẨM riêng (computeFinishedGoodStock),
  *   không đụng kho này; handoff đơn đặt (FG_WAREHOUSE/"Đơn đặt") cũng bỏ qua vì đã tính ở
  *   "xuất đơn".
@@ -55,19 +55,19 @@ export interface FinishedGoodNxtRow {
   productCode: string;
   productName: string;
   spec: string;
-  tonDau: number;
-  nhap: number; // BTP da-nhap trong kỳ
-  xuatDon: number; // xuất đơn đặt (dòng lệnh) trong kỳ
-  xuatBan: number; // bán lẻ block rút kho dự trữ (RETAIL_WAREHOUSE) trong kỳ
-  xuatDongGoi: number; // BTP tiêu hao để đóng gói TP (G3) trong kỳ
-  xuat: number; // xuatDon + xuatBan + xuatDongGoi
-  tonCuoi: number;
-  tonDauBlock: number;
-  nhapBlock: number;
-  xuatBlock: number; // block xuất đơn (bán lẻ/đóng gói không theo dõi block chắc)
-  tonCuoiBlock: number;
-  canhBaoAm: boolean;
-  seedTonDau: boolean; // có tồn đầu khai tay
+  openingKg: number;
+  inKg: number; // BTP da-nhap trong kỳ
+  orderOutKg: number; // xuất đơn đặt (dòng lệnh) trong kỳ
+  retailOutKg: number; // bán lẻ block rút kho dự trữ (RETAIL_WAREHOUSE) trong kỳ
+  packagingOutKg: number; // BTP tiêu hao để đóng gói TP (G3) trong kỳ
+  outKg: number; // orderOutKg + retailOutKg + packagingOutKg
+  closingKg: number;
+  openingBlocks: number;
+  inBlocks: number;
+  outBlocks: number; // block xuất đơn (bán lẻ/đóng gói không theo dõi block chắc)
+  closingBlocks: number;
+  isNegative: boolean;
+  hasManualOpening: boolean; // có tồn đầu khai tay
 }
 
 interface Acc {
@@ -75,21 +75,21 @@ interface Acc {
   spec: string;
   openKg: number;
   openBlock: number;
-  nhapTruocKg: number;
-  nhapTruocBlock: number;
-  nhapKyKg: number;
-  nhapKyBlock: number;
-  xuatDonTruocKg: number;
-  xuatDonTruocBlock: number;
-  xuatDonKyKg: number;
-  xuatDonKyBlock: number;
-  xuatBanTruocKg: number;
-  xuatBanKyKg: number;
-  xuatGoiTruocKg: number;
-  xuatGoiKyKg: number;
+  inBeforeKg: number;
+  inBeforeBlocks: number;
+  inPeriodKg: number;
+  inPeriodBlocks: number;
+  orderOutBeforeKg: number;
+  orderOutBeforeBlocks: number;
+  orderOutPeriodKg: number;
+  orderOutPeriodBlocks: number;
+  retailOutBeforeKg: number;
+  retailOutPeriodKg: number;
+  packagingOutBeforeKg: number;
+  packagingOutPeriodKg: number;
   seed: boolean;
   /** Mốc khai tay mới nhất (yyyy-mm-dd) — phát sinh trước mốc đã nằm trong số khai. */
-  moc: string;
+  anchorDate: string;
 }
 
 function productKey(productId: string, spec: string): string {
@@ -105,20 +105,20 @@ function layAcc(map: Map<string, Acc>, productId: string, spec: string): Acc {
       spec,
       openKg: 0,
       openBlock: 0,
-      nhapTruocKg: 0,
-      nhapTruocBlock: 0,
-      nhapKyKg: 0,
-      nhapKyBlock: 0,
-      xuatDonTruocKg: 0,
-      xuatDonTruocBlock: 0,
-      xuatDonKyKg: 0,
-      xuatDonKyBlock: 0,
-      xuatBanTruocKg: 0,
-      xuatBanKyKg: 0,
-      xuatGoiTruocKg: 0,
-      xuatGoiKyKg: 0,
+      inBeforeKg: 0,
+      inBeforeBlocks: 0,
+      inPeriodKg: 0,
+      inPeriodBlocks: 0,
+      orderOutBeforeKg: 0,
+      orderOutBeforeBlocks: 0,
+      orderOutPeriodKg: 0,
+      orderOutPeriodBlocks: 0,
+      retailOutBeforeKg: 0,
+      retailOutPeriodKg: 0,
+      packagingOutBeforeKg: 0,
+      packagingOutPeriodKg: 0,
       seed: false,
-      moc: "",
+      anchorDate: "",
     };
     map.set(k, a);
   }
@@ -126,24 +126,24 @@ function layAcc(map: Map<string, Acc>, productId: string, spec: string): Acc {
 }
 
 export interface FinishedGoodNxtArgs {
-  sanXuat: WipProductionItem[];
+  wips: WipProductionItem[];
   exportOrders: ExportOrder[];
   exportItems: ExportItem[];
   salesItems: SalesItem[];
   packagings: Packaging[];
   opening: FinishedGoodsOpeningStock[];
   products: Product[];
-  tuNgay: string;
-  denNgay: string;
+  fromDate: string;
+  toDate: string;
 }
 
 /**
- * Dựng sổ NXT kho BTP dự trữ theo (mặt hàng × quy cách) cho khoảng [tuNgay, denNgay].
- * Tồn đầu = khai tay (mốc ≤ denNgay) + lịch sử nhập−xuất từ mốc tới TRƯỚC tuNgay
+ * Dựng sổ NXT kho BTP dự trữ theo (mặt hàng × quy cách) cho khoảng [fromDate, toDate].
+ * Tồn đầu = khai tay (mốc ≤ toDate) + lịch sử nhập−xuất từ mốc tới TRƯỚC fromDate
  * ⇒ chuyển kỳ tự động.
  */
 export function computeFinishedGoodNxt(args: FinishedGoodNxtArgs): FinishedGoodNxtRow[] {
-  const { sanXuat: wips, exportOrders, exportItems, salesItems, packagings, opening, products, tuNgay: fromDate, denNgay: toDate } = args;
+  const { wips, exportOrders, exportItems, salesItems, packagings, opening, products, fromDate, toDate } = args;
   const map = new Map<string, Acc>();
 
   // Ngày xuất của mỗi lệnh
@@ -157,10 +157,10 @@ export function computeFinishedGoodNxt(args: FinishedGoodNxtArgs): FinishedGoodN
     a.openKg += o.quantityKg || 0;
     a.openBlock += o.blocksCount || 0;
     a.seed = true;
-    if (o.asOfDate && o.asOfDate > a.moc) a.moc = o.asOfDate;
+    if (o.asOfDate && o.asOfDate > a.anchorDate) a.anchorDate = o.asOfDate;
   }
   /** Phát sinh trước mốc khai tay đã nằm trong số khai ⇒ bỏ, không cộng chồng. */
-  const isBeforeCutoff = (a: Acc, date: string) => !!a.moc && date < a.moc;
+  const isBeforeCutoff = (a: Acc, date: string) => !!a.anchorDate && date < a.anchorDate;
 
   // Nhập kho = BTP đã duyệt (da-nhap), theo ngày SX
   for (const s of wips) {
@@ -169,11 +169,11 @@ export function computeFinishedGoodNxt(args: FinishedGoodNxtArgs): FinishedGoodN
     const a = layAcc(map, s.productId, s.spec);
     if (isBeforeCutoff(a, s.productionDate)) continue;
     if (s.productionDate < fromDate) {
-      a.nhapTruocKg += s.quantityKg || 0;
-      a.nhapTruocBlock += s.blocksCount || 0;
+      a.inBeforeKg += s.quantityKg || 0;
+      a.inBeforeBlocks += s.blocksCount || 0;
     } else {
-      a.nhapKyKg += s.quantityKg || 0;
-      a.nhapKyBlock += s.blocksCount || 0;
+      a.inPeriodKg += s.quantityKg || 0;
+      a.inPeriodBlocks += s.blocksCount || 0;
     }
   }
 
@@ -184,11 +184,11 @@ export function computeFinishedGoodNxt(args: FinishedGoodNxtArgs): FinishedGoodN
     const a = layAcc(map, d.productId, d.spec);
     if (isBeforeCutoff(a, date)) continue;
     if (date < fromDate) {
-      a.xuatDonTruocKg += d.quantityKg || 0;
-      a.xuatDonTruocBlock += d.blocksCount || 0;
+      a.orderOutBeforeKg += d.quantityKg || 0;
+      a.orderOutBeforeBlocks += d.blocksCount || 0;
     } else {
-      a.xuatDonKyKg += d.quantityKg || 0;
-      a.xuatDonKyBlock += d.blocksCount || 0;
+      a.orderOutPeriodKg += d.quantityKg || 0;
+      a.orderOutPeriodBlocks += d.blocksCount || 0;
     }
   }
 
@@ -198,8 +198,8 @@ export function computeFinishedGoodNxt(args: FinishedGoodNxtArgs): FinishedGoodN
     if (b.deliveryDate > toDate) continue;
     const a = layAcc(map, b.productId, b.spec);
     if (isBeforeCutoff(a, b.deliveryDate)) continue;
-    if (b.deliveryDate < fromDate) a.xuatBanTruocKg += b.quantityKg || 0;
-    else a.xuatBanKyKg += b.quantityKg || 0;
+    if (b.deliveryDate < fromDate) a.retailOutBeforeKg += b.quantityKg || 0;
+    else a.retailOutPeriodKg += b.quantityKg || 0;
   }
 
   // Xuất đóng gói = BTP tiêu hao (inputKg) để đóng gói TP, theo ngày đóng gói
@@ -207,22 +207,22 @@ export function computeFinishedGoodNxt(args: FinishedGoodNxtArgs): FinishedGoodN
     if (p.date > toDate) continue;
     const a = layAcc(map, p.fromProductId, p.fromSpec);
     if (isBeforeCutoff(a, p.date)) continue;
-    if (p.date < fromDate) a.xuatGoiTruocKg += p.inputKg || 0;
-    else a.xuatGoiKyKg += p.inputKg || 0;
+    if (p.date < fromDate) a.packagingOutBeforeKg += p.inputKg || 0;
+    else a.packagingOutPeriodKg += p.inputKg || 0;
   }
 
   const productNameOf = (id: string) => products.find((m) => m.id === id);
   const rows: FinishedGoodNxtRow[] = [];
   for (const a of map.values()) {
     const openingKg =
-      a.openKg + a.nhapTruocKg - a.xuatDonTruocKg - a.xuatBanTruocKg - a.xuatGoiTruocKg;
-    const outKg = a.xuatDonKyKg + a.xuatBanKyKg + a.xuatGoiKyKg;
-    const closingKg = openingKg + a.nhapKyKg - outKg;
-    const openingBlocks = a.openBlock + a.nhapTruocBlock - a.xuatDonTruocBlock;
-    const closingBlocks = openingBlocks + a.nhapKyBlock - a.xuatDonKyBlock;
+      a.openKg + a.inBeforeKg - a.orderOutBeforeKg - a.retailOutBeforeKg - a.packagingOutBeforeKg;
+    const outKg = a.orderOutPeriodKg + a.retailOutPeriodKg + a.packagingOutPeriodKg;
+    const closingKg = openingKg + a.inPeriodKg - outKg;
+    const openingBlocks = a.openBlock + a.inBeforeBlocks - a.orderOutBeforeBlocks;
+    const closingBlocks = openingBlocks + a.inPeriodBlocks - a.orderOutPeriodBlocks;
 
     // Bỏ dòng hoàn toàn trống (không tồn, không phát sinh trong kỳ)
-    if (openingKg === 0 && a.nhapKyKg === 0 && outKg === 0 && closingKg === 0) continue;
+    if (openingKg === 0 && a.inPeriodKg === 0 && outKg === 0 && closingKg === 0) continue;
 
     const p = productNameOf(a.productId);
     rows.push({
@@ -230,19 +230,19 @@ export function computeFinishedGoodNxt(args: FinishedGoodNxtArgs): FinishedGoodN
       productCode: p?.code || "",
       productName: p?.name || `Mặt hàng ${a.productId}`,
       spec: a.spec,
-      tonDau: openingKg,
-      nhap: a.nhapKyKg,
-      xuatDon: a.xuatDonKyKg,
-      xuatBan: a.xuatBanKyKg,
-      xuatDongGoi: a.xuatGoiKyKg,
-      xuat: outKg,
-      tonCuoi: closingKg,
-      tonDauBlock: openingBlocks,
-      nhapBlock: a.nhapKyBlock,
-      xuatBlock: a.xuatDonKyBlock,
-      tonCuoiBlock: closingBlocks,
-      canhBaoAm: closingKg < 0,
-      seedTonDau: a.seed,
+      openingKg,
+      inKg: a.inPeriodKg,
+      orderOutKg: a.orderOutPeriodKg,
+      retailOutKg: a.retailOutPeriodKg,
+      packagingOutKg: a.packagingOutPeriodKg,
+      outKg,
+      closingKg,
+      openingBlocks,
+      inBlocks: a.inPeriodBlocks,
+      outBlocks: a.orderOutPeriodBlocks,
+      closingBlocks,
+      isNegative: closingKg < 0,
+      hasManualOpening: a.seed,
     });
   }
 
@@ -255,27 +255,27 @@ export function computeFinishedGoodNxt(args: FinishedGoodNxtArgs): FinishedGoodN
 }
 
 export interface FinishedGoodNxtTotals {
-  tonDau: number;
-  nhap: number;
-  xuatDon: number;
-  xuatBan: number;
-  xuatDongGoi: number;
-  xuat: number;
-  tonCuoi: number;
-  soMatHang: number;
-  soCanhBao: number;
+  openingKg: number;
+  inKg: number;
+  orderOutKg: number;
+  retailOutKg: number;
+  packagingOutKg: number;
+  outKg: number;
+  closingKg: number;
+  productCount: number;
+  warningCount: number;
 }
 
 export function sumFinishedGoodNxt(rows: FinishedGoodNxtRow[]): FinishedGoodNxtTotals {
   return {
-    tonDau: rows.reduce((s, r) => s + r.tonDau, 0),
-    nhap: rows.reduce((s, r) => s + r.nhap, 0),
-    xuatDon: rows.reduce((s, r) => s + r.xuatDon, 0),
-    xuatBan: rows.reduce((s, r) => s + r.xuatBan, 0),
-    xuatDongGoi: rows.reduce((s, r) => s + r.xuatDongGoi, 0),
-    xuat: rows.reduce((s, r) => s + r.xuat, 0),
-    tonCuoi: rows.reduce((s, r) => s + r.tonCuoi, 0),
-    soMatHang: rows.length,
-    soCanhBao: rows.filter((r) => r.canhBaoAm).length,
+    openingKg: rows.reduce((s, r) => s + r.openingKg, 0),
+    inKg: rows.reduce((s, r) => s + r.inKg, 0),
+    orderOutKg: rows.reduce((s, r) => s + r.orderOutKg, 0),
+    retailOutKg: rows.reduce((s, r) => s + r.retailOutKg, 0),
+    packagingOutKg: rows.reduce((s, r) => s + r.packagingOutKg, 0),
+    outKg: rows.reduce((s, r) => s + r.outKg, 0),
+    closingKg: rows.reduce((s, r) => s + r.closingKg, 0),
+    productCount: rows.length,
+    warningCount: rows.filter((r) => r.isNegative).length,
   };
 }

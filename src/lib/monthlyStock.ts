@@ -31,7 +31,7 @@ export interface MonthlyStockTotals {
   closeCtn: number;
   closeKg: number;
   remainingValue: number;
-  soDong: number;
+  rowCount: number;
 }
 
 /** Suy tồn cuối + tiền còn lại cho một dòng (không lưu, luôn tính lại). */
@@ -50,7 +50,7 @@ export function suyDong(l: MonthlyStockLine): MonthlyStockRow {
 export function sumMonthlyStockRows(rows: MonthlyStockRow[]): MonthlyStockTotals {
   const t: MonthlyStockTotals = {
     openCtn: 0, openKg: 0, inCtn: 0, inKg: 0, outCtn: 0, outKg: 0,
-    closeCtn: 0, closeKg: 0, remainingValue: 0, soDong: rows.length,
+    closeCtn: 0, closeKg: 0, remainingValue: 0, rowCount: rows.length,
   };
   for (const r of rows) {
     t.openCtn += r.openCtn; t.openKg += r.openKg;
@@ -109,7 +109,7 @@ export function listMonths(coSan: string[], moc = getCurrentMonth(), monthCount 
 export interface StockCategoryGroup {
   category: string;
   rows: MonthlyStockRow[];
-  tong: MonthlyStockTotals;
+  totals: MonthlyStockTotals;
 }
 
 /**
@@ -140,7 +140,7 @@ export function groupByCategory(rows: MonthlyStockRow[]): StockCategoryGroup[] {
     .sort((a, b) => priorityOf(a[0]) - priorityOf(b[0]) || a[0].localeCompare(b[0]))
     .map(([category, rs]) => {
       rs.sort((x, y) => x.sortOrder - y.sortOrder || x.itemName.localeCompare(y.itemName));
-      return { category, rows: rs, tong: sumMonthlyStockRows(rs) };
+      return { category, rows: rs, totals: sumMonthlyStockRows(rs) };
     });
 }
 
@@ -148,16 +148,16 @@ export function groupByCategory(rows: MonthlyStockRow[]): StockCategoryGroup[] {
 
 export interface GroupMismatch {
   category: string;
-  closeTruoc: number; // tồn cuối tháng trước (kg)
-  openNay: number; // tồn đầu tháng này (kg)
-  lech: number; // openNay − closeTruoc
+  prevClose: number; // tồn cuối tháng trước (kg)
+  currentOpen: number; // tồn đầu tháng này (kg)
+  diff: number; // currentOpen − prevClose
 }
 
 export interface CarryOverMismatch {
-  closeTruoc: number;
-  openNay: number;
-  lech: number; // tổng: tồn đầu tháng này − tồn cuối tháng trước
-  theoNhom: GroupMismatch[]; // các nhóm có chênh (|lech| > NGUONG)
+  prevClose: number;
+  currentOpen: number;
+  diff: number; // tổng: tồn đầu tháng này − tồn cuối tháng trước
+  groups: GroupMismatch[]; // các nhóm có chênh (|lech| > NGUONG)
 }
 
 const DIFF_THRESHOLD = 1; // < 1 kg coi như khớp (làm tròn số lẻ)
@@ -183,14 +183,14 @@ export function measureCarryForwardGap(priorRows: MonthlyStockRow[], currentRows
   for (const c of cats) {
     const ct = mClose.get(c) ?? 0;
     const on = mOpen.get(c) ?? 0;
-    if (Math.abs(on - ct) > DIFF_THRESHOLD) theoNhom.push({ category: c, closeTruoc: ct, openNay: on, lech: on - ct });
+    if (Math.abs(on - ct) > DIFF_THRESHOLD) theoNhom.push({ category: c, prevClose: ct, currentOpen: on, diff: on - ct });
   }
-  theoNhom.sort((a, b) => Math.abs(b.lech) - Math.abs(a.lech));
-  return { closeTruoc: prevClose, openNay: currentOpening, lech: currentOpening - prevClose, theoNhom };
+  theoNhom.sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff));
+  return { prevClose, currentOpen: currentOpening, diff: currentOpening - prevClose, groups: theoNhom };
 }
 
 /** Có đáng gắn cờ lệch không (có tháng trước + tổng lệch quá ngưỡng). */
-export const hasCarryForwardGap = (l: CarryOverMismatch | null) => !!l && Math.abs(l.lech) > DIFF_THRESHOLD;
+export const hasCarryForwardGap = (l: CarryOverMismatch | null) => !!l && Math.abs(l.diff) > DIFF_THRESHOLD;
 
 /* ---------- Đối chiếu lệch theo MẶT HÀNG (chẩn đoán, không tự sửa) ---------- */
 
@@ -208,17 +208,17 @@ export interface CarryForwardDiff {
   warehouse: string;
   category: string;
   itemName: string;
-  closeTruocKg: number; // tổng tồn cuối tháng trước của mặt hàng
-  openNayKg: number; // tổng tồn đầu tháng này của mặt hàng
-  lechKg: number; // openNay − closeTruoc
-  soDongNay: number; // số dòng tháng này của mặt hàng (để biết sửa ở đâu)
+  prevCloseKg: number; // tổng tồn cuối tháng trước của mặt hàng
+  currentOpenKg: number; // tổng tồn đầu tháng này của mặt hàng
+  diffKg: number; // currentOpen − prevClose
+  currentRowCount: number; // số dòng tháng này của mặt hàng (để biết sửa ở đâu)
 }
 
 function groupByName(rows: MonthlyStockRow[], layKg: (r: MonthlyStockRow) => number) {
-  const m = new Map<string, { kg: number; sl: number; w: string; c: string; ten: string }>();
+  const m = new Map<string, { kg: number; sl: number; w: string; c: string; name: string }>();
   for (const r of rows) {
     const k = stockLineKey(r);
-    const g = m.get(k) ?? { kg: 0, sl: 0, w: r.warehouse, c: r.category, ten: r.itemName };
+    const g = m.get(k) ?? { kg: 0, sl: 0, w: r.warehouse, c: r.category, name: r.itemName };
     g.kg += layKg(r);
     g.sl += 1;
     m.set(k, g);
@@ -247,14 +247,14 @@ export function compareCarryForward(priorRows: MonthlyStockRow[], currentRows: M
       key: k,
       warehouse: g.w,
       category: g.c,
-      itemName: g.ten,
-      closeTruocKg: closeKg,
-      openNayKg: openKg,
-      lechKg: openKg - closeKg,
-      soDongNay: n?.sl ?? 0,
+      itemName: g.name,
+      prevCloseKg: closeKg,
+      currentOpenKg: openKg,
+      diffKg: openKg - closeKg,
+      currentRowCount: n?.sl ?? 0,
     });
   }
-  return out.sort((a, b) => Math.abs(b.lechKg) - Math.abs(a.lechKg));
+  return out.sort((a, b) => Math.abs(b.diffKg) - Math.abs(a.diffKg));
 }
 
 /* ---------- Thẻ kho: lịch sử một MẶT HÀNG qua các tháng ---------- */
@@ -269,7 +269,7 @@ export interface StockCardMonth {
   outKg: number;
   closeCtn: number;
   closeKg: number;
-  soDong: number; // số dòng (lô/size) của mặt hàng trong tháng đó
+  rowCount: number; // số dòng (lô/size) của mặt hàng trong tháng đó
 }
 
 /**
@@ -293,14 +293,14 @@ export function buildProductStockCard(
       {
         period: l.period,
         openCtn: 0, openKg: 0, inCtn: 0, inKg: 0, outCtn: 0, outKg: 0,
-        closeCtn: 0, closeKg: 0, soDong: 0,
+        closeCtn: 0, closeKg: 0, rowCount: 0,
       };
     const r = suyDong(l);
     g.openCtn += r.openCtn; g.openKg += r.openKg;
     g.inCtn += r.inCtn; g.inKg += r.inKg;
     g.outCtn += r.outCtn; g.outKg += r.outKg;
     g.closeCtn += r.closeCtn; g.closeKg += r.closeKg;
-    g.soDong += 1;
+    g.rowCount += 1;
     m.set(l.period, g);
   }
   return [...m.values()]
@@ -357,24 +357,24 @@ export function laRoRang(name: string): boolean {
 
 export interface CatalogSyncItem {
   name: string;
-  nhomGoiY: string;
-  dichGoiY: CatalogTarget; // đích gợi ý (product/material)
+  suggestedGroup: string;
+  suggestedTarget: CatalogTarget; // đích gợi ý (product/material)
   roRang: boolean; // true = tự nhận loài, khỏi bận tâm; false = mã khó, cần đồng bộ
 }
 
 export interface CatalogSyncReport {
-  tongTen: number; // số tên phân biệt trong sổ
-  daCoNL: number; // đã có trong loại NL
-  daCoMH: number; // đã có trong mặt hàng
-  chuaCo: CatalogSyncItem[]; // chưa có ở CẢ HAI (kèm đích + nhóm gợi ý)
-  nhomTrung: { variants: string[] }[]; // các tên TRÙNG CÁCH GHI (>1 biến thể)
+  nameCount: number; // số tên phân biệt trong sổ
+  inMaterialTypes: number; // đã có trong loại NL
+  inProducts: number; // đã có trong mặt hàng
+  missing: CatalogSyncItem[]; // chưa có ở CẢ HAI (kèm đích + nhóm gợi ý)
+  duplicateGroups: { variants: string[] }[]; // các tên TRÙNG CÁCH GHI (>1 biến thể)
 }
 
 /**
  * Phân tích tên trong sổ kho so với CẢ HAI danh mục (loại NL + mặt hàng):
- *  - `chuaCo`: tên chưa có ở cả hai (kèm đích + nhóm gợi ý để định tuyến từng dòng).
- *  - `daCoNL`/`daCoMH`: đã có sẵn ở đâu.
- *  - `nhomTrung`: tên chỉ khác nhau cách ghi (chuẩn hoá ngặt) — gom để sửa tay.
+ *  - `missing`: tên chưa có ở cả hai (kèm đích + nhóm gợi ý để định tuyến từng dòng).
+ *  - `inMaterialTypes`/`inProducts`: đã có sẵn ở đâu.
+ *  - `duplicateGroups`: tên chỉ khác nhau cách ghi (chuẩn hoá ngặt) — gom để sửa tay.
  * KHÔNG sửa gì — chỉ báo. Thành phẩm 141 mã kế toán KHÔNG xét (cố định).
  */
 export function analyzeCatalogSync(
@@ -395,7 +395,7 @@ export function analyzeCatalogSync(
     if (isMaterial) existingMaterialCount++;
     if (isProductName) existingProductCount++;
     if (isMaterial || isProductName) continue;
-    missing.push({ name, nhomGoiY: inferMaterialCategory(name), dichGoiY: inferCatalogTarget(name), roRang: laRoRang(name) });
+    missing.push({ name, suggestedGroup: inferMaterialCategory(name), suggestedTarget: inferCatalogTarget(name), roRang: laRoRang(name) });
   }
 
   // Gom trùng-cách-ghi trong chính danh sách tên của sổ.
@@ -412,11 +412,11 @@ export function analyzeCatalogSync(
     .map((s) => ({ variants: [...s].sort() }));
 
   return {
-    tongTen: distinctNames.length,
-    daCoNL: existingMaterialCount,
-    daCoMH: existingProductCount,
-    chuaCo: missing,
-    nhomTrung: duplicateGroups,
+    nameCount: distinctNames.length,
+    inMaterialTypes: existingMaterialCount,
+    inProducts: existingProductCount,
+    missing,
+    duplicateGroups,
   };
 }
 
@@ -468,15 +468,15 @@ export function buildCarryForwardLines(source: MonthlyStockRow[], targetMonth: s
 export interface CarryForwardResult {
   lines: MonthlyStockLine[];
   /** Số dòng tháng đích đang mang tồn kế thừa (thêm mới + cập nhật). */
-  soDong: number;
-  them: number;
-  capNhat: number;
+  rowCount: number;
+  added: number;
+  updated: number;
   /** Dòng `carry|…` có nguồn đã hết tồn / bị xoá ⇒ tồn đầu đặt về 0 (giữ dòng vì còn số). */
-  veKhong: number;
+  zeroed: number;
   /** Dòng `carry|…` về 0 mà trống hẳn (không nhập/xuất, không ghi chú) ⇒ bỏ. */
-  bo: number;
+  removed: number;
   /** Tổng kg tồn đầu kế thừa. */
-  tongKg: number;
+  totalKg: number;
 }
 
 /**
@@ -534,12 +534,12 @@ export function carryForwardIntoLedger(lines: MonthlyStockLine[], targetMonth: s
   const newCarried = carried.filter((c) => !existing.has(c.id));
   return {
     lines: [...ra, ...newCarried],
-    soDong: carried.length,
-    them: newCarried.length,
-    capNhat: updatedCount,
-    veKhong: zeroedCount,
-    bo,
-    tongKg: carried.reduce((s, c) => s + c.openKg, 0),
+    rowCount: carried.length,
+    added: newCarried.length,
+    updated: updatedCount,
+    zeroed: zeroedCount,
+    removed: bo,
+    totalKg: carried.reduce((s, c) => s + c.openKg, 0),
   };
 }
 
@@ -555,9 +555,9 @@ export type LotActionKind = "xuat" | "nhap" | "chuyen";
 
 export interface LotActionResult {
   /** Dòng gốc sau khi áp (thay đúng id). */
-  dong: MonthlyStockLine;
+  line: MonthlyStockLine;
   /** Dòng MỚI tách ra (chỉ khi chuyển MỘT PHẦN sang vị trí khác). */
-  dongTach: MonthlyStockLine | null;
+  splitLine: MonthlyStockLine | null;
 }
 
 /** Đổi kiện theo cùng tỉ lệ kg (kiện ẩn trên màn nhưng vẫn phải khớp với kg). */
@@ -574,27 +574,27 @@ const tiLeKien = (ctn: number, kg: number, kgBot: number) => (kg > 1e-9 ? (ctn *
  *   tồn đầu trước rồi tới phần nhập trong kỳ (tổng theo mặt hàng giữ nguyên nên
  *   đối chiếu dồn kỳ không báo lệch giả).
  *
- * `ghiChu` được nối vào `note` của dòng để còn vết (ngày · việc · kg).
+ * `note` được nối vào `note` của dòng để còn vết (ngày · việc · kg).
  */
 export function applyLotAction(
   l: MonthlyStockLine,
   kind: LotActionKind,
   kg: number,
-  opts: { viTriDich?: string; ghiChu: string; idMoi: string }
+  opts: { targetLocation?: string; note: string; newId: string }
 ): LotActionResult {
-  const note = (l.note ? l.note + "\n" : "") + opts.ghiChu;
+  const note = (l.note ? l.note + "\n" : "") + opts.note;
   if (kind === "xuat") {
     const ctn = l.kgPerCtn ? kg / l.kgPerCtn : 0;
-    return { dong: { ...l, outKg: l.outKg + kg, outCtn: l.outCtn + ctn, note }, dongTach: null };
+    return { line: { ...l, outKg: l.outKg + kg, outCtn: l.outCtn + ctn, note }, splitLine: null };
   }
   if (kind === "nhap") {
     const ctn = l.kgPerCtn ? kg / l.kgPerCtn : 0;
-    return { dong: { ...l, inKg: l.inKg + kg, inCtn: l.inCtn + ctn, note }, dongTach: null };
+    return { line: { ...l, inKg: l.inKg + kg, inCtn: l.inCtn + ctn, note }, splitLine: null };
   }
-  const target = (opts.viTriDich ?? "").trim();
+  const target = (opts.targetLocation ?? "").trim();
   const closeKg = l.openKg + l.inKg - l.outKg;
   if (kg >= closeKg - 1e-9) {
-    return { dong: { ...l, storageLocation: target, note }, dongTach: null };
+    return { line: { ...l, storageLocation: target, note }, splitLine: null };
   }
   const fromOpening = Math.min(kg, l.openKg);
   const fromIn = kg - fromOpening;
@@ -610,7 +610,7 @@ export function applyLotAction(
   };
   const splitLine: MonthlyStockLine = {
     ...l,
-    id: opts.idMoi,
+    id: opts.newId,
     storageLocation: target,
     openKg: fromOpening,
     openCtn: ctnDau,
@@ -620,7 +620,7 @@ export function applyLotAction(
     outCtn: 0,
     carriedFromId: "",
     sortOrder: l.sortOrder,
-    note: `${opts.ghiChu} (tách từ dòng ${l.id})`,
+    note: `${opts.note} (tách từ dòng ${l.id})`,
   };
-  return { dong, dongTach: splitLine };
+  return { line: dong, splitLine };
 }

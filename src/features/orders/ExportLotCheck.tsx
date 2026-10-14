@@ -70,7 +70,7 @@ export function ExportLotCheck({
   const [isScanning, setIsScanning] = useState(false);
   const [typedCode, setTypedCode] = useState("");
   const [lotDispatches, saveLotDispatches] = useLotDispatches();
-  const { nguoiDung: profile } = useAuth();
+  const { profile } = useAuth();
   const recordedBy = profile?.fullName || profile?.username || "";
   /** Đề nghị thay lô đang chờ xác nhận. */
   const [proposal, setProposal] = useState<{ current: OrderLot; replacement: LotNode } | null>(null);
@@ -129,25 +129,25 @@ export function ExportLotCheck({
     const matchedLot = items.find((n) => lotsOfOrder.some((l) => l.wipId === n.id));
     if (matchedLot) {
       if (checked.has(matchedLot.id)) {
-        notify.warning(`Lô ${matchedLot.nhan} đã kiểm rồi.`);
+        notify.warning(`Lô ${matchedLot.label} đã kiểm rồi.`);
         return;
       }
-      saveLotDispatches([...lotDispatches, ...makeCheckDispatches(matchedLot.id, matchedLot.nhan, orderItems.filter((d) => d.wipId === matchedLot.id), method)]);
-      notify.saved(`Đúng lô ${matchedLot.nhan} — đã ghi kiểm.`);
+      saveLotDispatches([...lotDispatches, ...makeCheckDispatches(matchedLot.id, matchedLot.label, orderItems.filter((d) => d.wipId === matchedLot.id), method)]);
+      notify.saved(`Đúng lô ${matchedLot.label} — đã ghi kiểm.`);
       return;
     }
     // Lô ngoài lệnh: cùng mặt hàng × quy cách với một lô CHƯA quét, đủ tồn ⇒ đề nghị thay.
     const n = items[0]!;
     const w = wips.find((x) => x.id === n.id);
     const cho = w ? lotsOfOrder.find((l) => !checked.has(l.wipId) && l.productId === w.productId && l.spec === w.spec) : undefined;
-    const remaining = stock.find((t) => t.wipId === n.id)?.conLai ?? 0;
+    const remaining = stock.find((t) => t.wipId === n.id)?.remainingKg ?? 0;
     if (!w || !cho) {
-      notify.error(`Lô ${n.nhan} KHÔNG thuộc lệnh xuất này${w ? " và khác mặt hàng các lô còn chờ" : ""} — đừng xếp lên xe.`);
+      notify.error(`Lô ${n.label} KHÔNG thuộc lệnh xuất này${w ? " và khác mặt hàng các lô còn chờ" : ""} — đừng xếp lên xe.`);
       return;
     }
     if (w.status !== "stocked" || remaining < cho.kg) {
       notify.error(
-        `Lô ${n.nhan} cùng mặt hàng nhưng ${w.status !== "stocked" ? "chưa duyệt nhập kho" : `chỉ còn ${kg(Math.max(0, remaining))}, không đủ thay ${kg(cho.kg)}`} — đừng xếp lên xe.`
+        `Lô ${n.label} cùng mặt hàng nhưng ${w.status !== "stocked" ? "chưa duyệt nhập kho" : `chỉ còn ${kg(Math.max(0, remaining))}, không đủ thay ${kg(cho.kg)}`} — đừng xếp lên xe.`
       );
       return;
     }
@@ -162,9 +162,9 @@ export function ExportLotCheck({
     const doi = (d: ExportItem) => d.exportId === order.id && d.wipId === oldLot.wipId;
     const updatedItems = allExportItems.map((d) => (doi(d) ? { ...d, wipId: replacementLot.id } : d));
     onSaveExportItems(updatedItems);
-    saveLotDispatches([...lotDispatches, ...makeCheckDispatches(replacementLot.id, replacementLot.nhan, updatedItems.filter((d) => d.exportId === order.id && d.wipId === replacementLot.id), "scan")]);
+    saveLotDispatches([...lotDispatches, ...makeCheckDispatches(replacementLot.id, replacementLot.label, updatedItems.filter((d) => d.exportId === order.id && d.wipId === replacementLot.id), "scan")]);
     setProposal(null);
-    notify.saved(`Đã thay lô ${oldLot.label} bằng ${replacementLot.nhan} trong lệnh xuất — đã ghi kiểm.`, () => {
+    notify.saved(`Đã thay lô ${oldLot.label} bằng ${replacementLot.label} trong lệnh xuất — đã ghi kiểm.`, () => {
       onSaveExportItems(prevRows);
       saveLotDispatches(prevDispatches);
     });
@@ -239,7 +239,7 @@ export function ExportLotCheck({
       <ConfirmAction
         open={proposal !== null}
         onOpenChange={(o) => !o && setProposal(null)}
-        title={proposal ? `Thay lô ${proposal.current.label} bằng ${proposal.replacement.nhan}?` : ""}
+        title={proposal ? `Thay lô ${proposal.current.label} bằng ${proposal.replacement.label}?` : ""}
         description="Lô vừa quét không có trong lệnh nhưng cùng mặt hàng và quy cách với một lô chưa quét. Thay thì lệnh xuất trỏ sang lô đang xếp lên xe: tồn kho trừ lô mới, lô cũ trả về kho, hồ sơ thu hồi ghi đúng lô thật. Còn nút Hoàn tác."
         detail={proposal ? `${productNameOf(proposal.current.productId)} · ${kg(proposal.current.kg)}${proposal.current.block ? ` · ${proposal.current.block} block` : ""}` : undefined}
         confirmLabel="Thay lô"

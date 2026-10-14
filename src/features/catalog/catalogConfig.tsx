@@ -648,11 +648,11 @@ export function useCatalogConfigs(): CatalogConfigSet {
     // Tạo loại bột tại chỗ từ ô "Bột đi kèm" — ghi qua ĐÚNG instance của tab Bột tẩm.
     const addBatter = (ten: string): string => {
       const result = findOrCreateBatter(batterTypes, ten);
-      if (result.moi) {
+      if (result.isNew) {
         setBatterTypes(result.rows);
-        notify.saved(`Đã thêm loại bột "${result.bot.name}" vào danh mục`);
+        notify.saved(`Đã thêm loại bột "${result.batter.name}" vào danh mục`);
       }
-      return result.bot.id;
+      return result.batter.id;
     };
     // Tạo loại NL tại chỗ từ ô "Loại nguyên liệu" của form mặt hàng — ghi qua ĐÚNG
     // instance của tab Loại nguyên liệu. Trùng tên (không phân hoa thường) ⇒ dùng lại.

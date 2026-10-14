@@ -79,10 +79,10 @@ export function ImportSlipOcr({
   };
 
   const addAll = () => {
-    result?.dong.forEach((d, i) => {
-      if (!appliedRows.has(i)) onAddRow(d.loaiNL, d.kg);
+    result?.lines.forEach((d, i) => {
+      if (!appliedRows.has(i)) onAddRow(d.materialType, d.kg);
     });
-    setAppliedRows(new Set(result?.dong.map((_, i) => i)));
+    setAppliedRows(new Set(result?.lines.map((_, i) => i)));
     notify.saved("Đã thêm các dòng nhận được — soát lại số trước khi lưu");
   };
 
@@ -166,43 +166,43 @@ export function ImportSlipOcr({
           {stage === "xong" && result && (
             <div className="space-y-4">
               {/* Đầu chuyến: đại lý + ngày */}
-              {(result.daiLy || result.ngay) && (
+              {(result.supplier || result.date) && (
                 <div className="flex flex-wrap gap-2">
-                  {result.daiLy && (
+                  {result.supplier && (
                     <Button
                       title="Điền tên đại lý máy đọc được vào form nhập hàng."
                       variant={isSupplierApplied ? "outline" : "default"}
                       onClick={() => {
-                        onApplySupplier(result.daiLy!);
+                        onApplySupplier(result.supplier!);
                         setIsSupplierApplied(true);
                       }}
                     >
                       {isSupplierApplied ? <Check /> : <Plus />}
-                      Đại lý: {result.daiLy}
+                      Đại lý: {result.supplier}
                     </Button>
                   )}
-                  {result.ngay && (
+                  {result.date && (
                     <Button
                       title="Điền ngày máy đọc được vào form nhập hàng."
                       variant={isDateApplied ? "outline" : "default"}
                       onClick={() => {
-                        onApplyDate(result.ngay!);
+                        onApplyDate(result.date!);
                         setIsDateApplied(true);
                       }}
                     >
                       {isDateApplied ? <Check /> : <Plus />}
-                      Ngày: {formatDateVN(result.ngay)}
+                      Ngày: {formatDateVN(result.date)}
                     </Button>
                   )}
                 </div>
               )}
 
               {/* Dòng loại NL + kg đoán được */}
-              {result.dong.length > 0 ? (
+              {result.lines.length > 0 ? (
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-semibold">
-                      Dòng nhận được ({result.dong.length})
+                      Dòng nhận được ({result.lines.length})
                     </span>
                     <Button
                       title="Điền hết các dòng loại nguyên liệu + kg máy đọc được vào form. Vẫn soát lại từng dòng trước khi lưu." variant="outline" size="sm" onClick={addAll}>
@@ -211,20 +211,20 @@ export function ImportSlipOcr({
                     </Button>
                   </div>
                   <ul className="space-y-1.5">
-                    {result.dong.map((d, i) => (
+                    {result.lines.map((d, i) => (
                       <li
                         key={i}
                         className="flex items-center justify-between gap-3 rounded-lg bg-muted px-3 py-2"
                       >
                         <span className="text-base">
-                          {d.loaiNL} · <span className="tnum font-semibold">{fmtKg(d.kg)}</span>
+                          {d.materialType} · <span className="tnum font-semibold">{fmtKg(d.kg)}</span>
                         </span>
                         <Button
                           title="Điền riêng dòng này vào form nhập hàng."
                           variant={appliedRows.has(i) ? "outline" : "default"}
                           size="sm"
                           onClick={() => {
-                            onAddRow(d.loaiNL, d.kg);
+                            onAddRow(d.materialType, d.kg);
                             setAppliedRows((s) => new Set(s).add(i));
                           }}
                         >
@@ -243,22 +243,22 @@ export function ImportSlipOcr({
               )}
 
               {/* Tham khảo: số kg lẻ + loại NL lẻ */}
-              {(result.soKg.length > 0 || result.loaiNL.length > 0) && (
+              {(result.kgValues.length > 0 || result.materialTypes.length > 0) && (
                 <div className="space-y-2 border-t border-border pt-3">
-                  {result.loaiNL.length > 0 && (
+                  {result.materialTypes.length > 0 && (
                     <div className="flex flex-wrap items-center gap-1.5">
                       <span className="text-sm text-muted-foreground">Loại NL:</span>
-                      {result.loaiNL.map((l) => (
+                      {result.materialTypes.map((l) => (
                         <Tag key={l} variant="phan-loai" tone={toneByName(l)}>
                           {l}
                         </Tag>
                       ))}
                     </div>
                   )}
-                  {result.soKg.length > 0 && (
+                  {result.kgValues.length > 0 && (
                     <div className="flex flex-wrap items-center gap-1.5">
                       <span className="text-sm text-muted-foreground">Số nhận được:</span>
-                      {result.soKg.map((n, i) => (
+                      {result.kgValues.map((n, i) => (
                         <Tag key={i} variant="phu" className="tnum">
                           {fmtKg(n)}
                         </Tag>

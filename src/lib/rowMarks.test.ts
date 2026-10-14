@@ -47,9 +47,9 @@ describe("getTableRowMarks", () => {
       dau({ tableKey: "a", rowId: "4", color: "nau-2", bold: false }), // màu lạ, không đậm ⇒ bỏ
     ];
     const r = getTableRowMarks(m, "a");
-    expect([...r.dong.keys()]).toEqual(["1", "3"]);
-    expect(r.dong.get("1")).toEqual({ color: "vang-2", bold: false });
-    expect(r.dong.get("3")).toEqual({ color: "", bold: true });
+    expect([...r.row.keys()]).toEqual(["1", "3"]);
+    expect(r.row.get("1")).toEqual({ color: "vang-2", bold: false });
+    expect(r.row.get("3")).toEqual({ color: "", bold: true });
     expect(r.o.get(cellKey("2", "kg"))).toEqual({ color: "la-4", bold: false });
     expect(r.o.size).toBe(1);
   });
@@ -75,8 +75,8 @@ describe("setRowMarks", () => {
       prev,
       "a",
       [
-        { dong: "1", columns: "kg" },
-        { dong: "2", columns: "kg" },
+        { row: "1", columns: "kg" },
+        { row: "2", columns: "kg" },
       ],
       { color: "do-2", bold: false },
       "x",
@@ -88,7 +88,7 @@ describe("setRowMarks", () => {
       ["a::2::kg", "kg", "do-2"],
     ]);
     const r = getTableRowMarks(nextMarks, "a");
-    expect(r.dong.get("1")?.color).toBe("vang-5");
+    expect(r.row.get("1")?.color).toBe("vang-5");
     expect(r.o.get(cellKey("2", "kg"))?.color).toBe("do-2");
   });
 
@@ -107,9 +107,9 @@ describe("setRowMarks", () => {
   });
 
   it("bỏ tô = xoá dấu (null hoặc không màu + không đậm)", () => {
-    const prev = setRowMarks([], "a", ["1", "2", { dong: "3", columns: "kg" }], { color: "vang-2", bold: true }, "x", luc);
+    const prev = setRowMarks([], "a", ["1", "2", { row: "3", columns: "kg" }], { color: "vang-2", bold: true }, "x", luc);
     expect(setRowMarks(prev, "a", ["1"], null, "x").map((m) => m.id)).toEqual(["a::2::*", "a::3::kg"]);
-    expect(setRowMarks(prev, "a", [{ dong: "3", columns: "kg" }], { color: "", bold: false }, "x").map((m) => m.id)).toEqual([
+    expect(setRowMarks(prev, "a", [{ row: "3", columns: "kg" }], { color: "", bold: false }, "x").map((m) => m.id)).toEqual([
       "a::1::*",
       "a::2::*",
     ]);
@@ -118,6 +118,6 @@ describe("setRowMarks", () => {
   it("chỉ in đậm, không màu vẫn là một dấu", () => {
     const nextMarks = setRowMarks([], "a", ["1"], { color: "", bold: true }, "x", luc);
     expect(nextMarks).toHaveLength(1);
-    expect(getTableRowMarks(nextMarks, "a").dong.get("1")).toEqual({ color: "", bold: true });
+    expect(getTableRowMarks(nextMarks, "a").row.get("1")).toEqual({ color: "", bold: true });
   });
 });

@@ -111,7 +111,7 @@ export default function AuditLogScreen() {
   useEffect(() => {
     let isCancelled = false;
     setIsLoading(true);
-    readAuditLog({ tu, den, loai: actionFilter || undefined, bang: bang || undefined, gioiHan: 1000 })
+    readAuditLog({ fromDate: tu, toDate: den, action: actionFilter || undefined, entity: bang || undefined, limit: 1000 })
       .then((r) => {
         if (!isCancelled) setRows(r);
       })
@@ -125,7 +125,7 @@ export default function AuditLogScreen() {
 
   const reload = () => {
     setIsLoading(true);
-    readAuditLog({ tu, den, loai: actionFilter || undefined, bang: bang || undefined, gioiHan: 1000 })
+    readAuditLog({ fromDate: tu, toDate: den, action: actionFilter || undefined, entity: bang || undefined, limit: 1000 })
       .then(setRows)
       .finally(() => setIsLoading(false));
   };

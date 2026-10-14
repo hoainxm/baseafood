@@ -1206,8 +1206,8 @@ export const MONTHLY_STOCK_TABLE: TableMapping<MonthlyStockLine> = {
    ở repo.test.ts. */
 
 export interface SyncQueue {
-  them: string[];
-  xoa: string[];
+  them: string[]; // naming-ok: hàng chờ LƯU dưới máy (khóa `.cho`) — đổi tên là mất số chờ gửi
+  xoa: string[]; // naming-ok: như trên
 }
 
 function layMsg(e: unknown): string {
@@ -1300,17 +1300,17 @@ export interface PushError {
 /** Cổng gửi lên máy chủ — tách ra để test được không cần Supabase. */
 export interface UploadPort {
   upsert: (rows: Record<string, unknown>[]) => Promise<PushError | null>;
-  xoa: (keys: string[]) => Promise<PushError | null>;
+  remove: (keys: string[]) => Promise<PushError | null>;
 }
 
 export interface QueuePushResult {
   /** khóa đã gửi xong → JSON toRow đã gửi (null = dòng không còn để gửi). */
-  daGuiThem: Map<string, string | null>;
-  daXoa: string[];
+  sentUpserts: Map<string, string | null>;
+  deleted: string[];
   /** Dòng bị server từ chối vì DỮ LIỆU của chính nó (giữ lại trong hàng chờ). */
-  dongLoi: { khoa: string; msg: string }[];
+  rowErrors: { key: string; msg: string }[];
   /** Lỗi chung (mất mạng, bảng/cột chưa có…) — dừng lượt, giữ nguyên phần chưa gửi. */
-  loiChung?: string;
+  generalError?: string;
 }
 
 const pushErrorMessage = (e: PushError) => (e.code ? `${e.code} ${e.message}` : e.message);
@@ -1332,13 +1332,13 @@ export async function pushQueue<T>(
   rows: T[],
   gateway: UploadPort,
 ): Promise<QueuePushResult> {
-  const result: QueuePushResult = { daGuiThem: new Map(), daXoa: [], dongLoi: [] };
+  const result: QueuePushResult = { sentUpserts: new Map(), deleted: [], rowErrors: [] };
   const byKey = new Map(rows.map((x) => [bang.getKey(x), x]));
-  const nhom = new Map<string, { khoa: string; row: Record<string, unknown>; json: string }[]>();
+  const nhom = new Map<string, { key: string; row: Record<string, unknown>; json: string }[]>();
   for (const k of new Set(cho.them)) {
     const x = byKey.get(k);
     if (x === undefined) {
-      result.daGuiThem.set(k, null);
+      result.sentUpserts.set(k, null);
       continue;
     }
     const row = bang.toRow(x);
@@ -1347,41 +1347,41 @@ export async function pushQueue<T>(
       .sort()
       .join(",");
     const items = nhom.get(droppedColumns) ?? [];
-    items.push({ khoa: k, row, json: JSON.stringify(row) });
+    items.push({ key: k, row, json: JSON.stringify(row) });
     nhom.set(droppedColumns, items);
   }
 
   for (const items of nhom.values()) {
     const e = await gateway.upsert(items.map((g) => g.row));
     if (!e) {
-      for (const g of items) result.daGuiThem.set(g.khoa, g.json);
+      for (const g of items) result.sentUpserts.set(g.key, g.json);
       continue;
     }
-    if (!isRowLevelError(e)) return { ...result, loiChung: pushErrorMessage(e) };
+    if (!isRowLevelError(e)) return { ...result, generalError: pushErrorMessage(e) };
     if (items.length === 1) {
-      result.dongLoi.push({ khoa: items[0].khoa, msg: pushErrorMessage(e) });
+      result.rowErrors.push({ key: items[0].key, msg: pushErrorMessage(e) });
       continue;
     }
     for (const g of items) {
       const e1 = await gateway.upsert([g.row]);
-      if (!e1) result.daGuiThem.set(g.khoa, g.json);
-      else if (isRowLevelError(e1)) result.dongLoi.push({ khoa: g.khoa, msg: pushErrorMessage(e1) });
-      else return { ...result, loiChung: pushErrorMessage(e1) };
+      if (!e1) result.sentUpserts.set(g.key, g.json);
+      else if (isRowLevelError(e1)) result.rowErrors.push({ key: g.key, msg: pushErrorMessage(e1) });
+      else return { ...result, generalError: pushErrorMessage(e1) };
     }
   }
 
   const remove = [...new Set(cho.xoa)];
   if (remove.length > 0) {
-    const e = await gateway.xoa(remove);
-    if (!e) result.daXoa.push(...remove);
-    else if (!isRowLevelError(e)) return { ...result, loiChung: pushErrorMessage(e) };
-    else if (remove.length === 1) result.dongLoi.push({ khoa: remove[0], msg: pushErrorMessage(e) });
+    const e = await gateway.remove(remove);
+    if (!e) result.deleted.push(...remove);
+    else if (!isRowLevelError(e)) return { ...result, generalError: pushErrorMessage(e) };
+    else if (remove.length === 1) result.rowErrors.push({ key: remove[0], msg: pushErrorMessage(e) });
     else {
       for (const k of remove) {
-        const e1 = await gateway.xoa([k]);
-        if (!e1) result.daXoa.push(k);
-        else if (isRowLevelError(e1)) result.dongLoi.push({ khoa: k, msg: pushErrorMessage(e1) });
-        else return { ...result, loiChung: pushErrorMessage(e1) };
+        const e1 = await gateway.remove([k]);
+        if (!e1) result.deleted.push(k);
+        else if (isRowLevelError(e1)) result.rowErrors.push({ key: k, msg: pushErrorMessage(e1) });
+        else return { ...result, generalError: pushErrorMessage(e1) };
       }
     }
   }
@@ -1395,13 +1395,13 @@ export async function pushQueue<T>(
  */
 export function dropSentKeys(
   cho: SyncQueue,
-  result: Pick<QueuePushResult, "daGuiThem" | "daXoa">,
+  result: Pick<QueuePushResult, "sentUpserts" | "deleted">,
   currentJson: Map<string, string>,
 ): SyncQueue {
-  const deleted = new Set(result.daXoa);
+  const deleted = new Set(result.deleted);
   return {
     them: cho.them.filter(
-      (k) => !(result.daGuiThem.has(k) && result.daGuiThem.get(k) === (currentJson.get(k) ?? null)),
+      (k) => !(result.sentUpserts.has(k) && result.sentUpserts.get(k) === (currentJson.get(k) ?? null)),
     ),
     xoa: cho.xoa.filter((k) => !deleted.has(k)),
   };
@@ -1477,7 +1477,7 @@ async function syncOnePass<T>(
           ),
       ),
     // Xóa luôn lọc site (rào R2) + khóa theo chế độ: không lệnh xóa nào chạm được site khác.
-    xoa: (keys) =>
+    remove: (keys) =>
       bocLoi(
         db
           .from(bang.table)
@@ -1492,25 +1492,25 @@ async function syncOnePass<T>(
   const freshQueue = napCho(bang.localKey);
   const currentJson = new Map(
     currentRows(bang, rows, freshQueue.them)
-      .filter((x) => result.daGuiThem.has(bang.getKey(x)))
+      .filter((x) => result.sentUpserts.has(bang.getKey(x)))
       .map((x) => [bang.getKey(x), JSON.stringify(bang.toRow(x))]),
   );
   const okCho = saveQueue(bang.localKey, dropSentKeys(freshQueue, result, currentJson));
   // Dòng vừa lên server thì bỏ trường không-cache khỏi bản sao (nhả dung lượng).
-  if (bang.uncachedFields?.length && result.daGuiThem.size > 0)
+  if (bang.uncachedFields?.length && result.sentUpserts.size > 0)
     saveLocalCopy(bang, (latestSnapshot.get(bang.localKey) as T[] | undefined) ?? rows);
 
-  if (result.loiChung) return { ok: false, msg: result.loiChung };
-  if (result.dongLoi.length > 0) {
-    console.error(`[đồng bộ] ${bang.table}: dòng bị máy chủ từ chối`, result.dongLoi);
+  if (result.generalError) return { ok: false, msg: result.generalError };
+  if (result.rowErrors.length > 0) {
+    console.error(`[đồng bộ] ${bang.table}: dòng bị máy chủ từ chối`, result.rowErrors);
     const label = TABLE_LABELS[bang.table] ?? bang.table;
-    const vd = result.dongLoi
+    const vd = result.rowErrors
       .slice(0, 3)
-      .map((d) => `${d.khoa} (${d.msg})`)
+      .map((d) => `${d.key} (${d.msg})`)
       .join("; ");
     return {
       ok: false,
-      msg: `${label}: ${result.dongLoi.length} dòng chưa lên máy chủ vì lỗi dữ liệu — ${vd}${result.dongLoi.length > 3 ? "…" : ""}. Các dòng khác đã lên.`,
+      msg: `${label}: ${result.rowErrors.length} dòng chưa lên máy chủ vì lỗi dữ liệu — ${vd}${result.rowErrors.length > 3 ? "…" : ""}. Các dòng khác đã lên.`,
     };
   }
   if (!okCho) return { ok: false, msg: STORAGE_FULL_ERROR };

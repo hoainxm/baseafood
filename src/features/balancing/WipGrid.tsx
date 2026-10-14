@@ -109,20 +109,20 @@ export function WipGrid({
   };
   const templateRows: FinishedGoodGridRow[] = missingTemplates.map((m) => ({
     id: `mau:${m.id}`,
-    matHangId: m.productId,
-    khachId: m.customerId,
-    quyCach: m.spec,
-    kenh: m.channel,
-    donGia: m.unitPrice,
-    theoNgay: {},
-    chuyenKy: 0,
-    tra: 0,
-    no: 0,
-    tong: 0,
-    tuSoSanXuat: false,
-    nguonIds: [],
+    productId: m.productId,
+    customerId: m.customerId,
+    spec: m.spec,
+    channel: m.channel,
+    unitPrice: m.unitPrice,
+    dailyQuantities: {},
+    carryOverKg: 0,
+    repaidKg: 0,
+    debtKg: 0,
+    total: 0,
+    fromProduction: false,
+    sourceIds: [],
   }));
-  const hasValues = (h: FinishedGoodGridRow) => h.tong !== 0 || h.tra !== 0 || h.no !== 0 || justAdded.has(h.id);
+  const hasValues = (h: FinishedGoodGridRow) => h.total !== 0 || h.repaidKg !== 0 || h.debtKg !== 0 || justAdded.has(h.id);
   /** Thứ tự hiển thị: dòng thật trước, dòng mẫu sau — cùng một mảng cho lưới lẫn dán khối. */
   const hangThat = hideEmptyRows ? finishedGoodRows.filter(hasValues) : finishedGoodRows;
   const visibleRows: FinishedGoodGridRow[] = hideEmptyRows ? hangThat : [...finishedGoodRows, ...templateRows];
@@ -148,8 +148,8 @@ export function WipGrid({
   const writeCell = (rowId: string, colKey: string, v: number | null) => {
     const m = templateById.get(rowId);
     if (m) {
-      if (colKey === "tra") return writeRow(rowId, setRepaidDebt({}, { tra: v ?? 0 }));
-      if (colKey === "no") return writeRow(rowId, setRepaidDebt({}, { no: v ?? 0 }));
+      if (colKey === "tra") return writeRow(rowId, setRepaidDebt({}, { repaidKg: v ?? 0 }));
+      if (colKey === "no") return writeRow(rowId, setRepaidDebt({}, { debtKg: v ?? 0 }));
       if (colKey === "donGia") return writeRow(rowId, { unitPrice: v });
       if (colKey.startsWith("ngay:") && v) return writeRow(rowId, { dailyQuantities: { [colKey.slice(5)]: v } });
       return;
@@ -157,8 +157,8 @@ export function WipGrid({
     const r = theoId.get(rowId);
     if (!r) return;
     /* Trả · Nợ: kế toán gõ số có dấu, Tổng = Σ ngày + Trả + Nợ (quy tắc chuyển kỳ). */
-    if (colKey === "tra") return writeRow(rowId, setRepaidDebt(r, { tra: v ?? 0 }));
-    if (colKey === "no") return writeRow(rowId, setRepaidDebt(r, { no: v ?? 0 }));
+    if (colKey === "tra") return writeRow(rowId, setRepaidDebt(r, { repaidKg: v ?? 0 }));
+    if (colKey === "no") return writeRow(rowId, setRepaidDebt(r, { debtKg: v ?? 0 }));
     if (colKey === "donGia") return writeRow(rowId, { unitPrice: v });
     if (!colKey.startsWith("ngay:")) return;
 
@@ -265,7 +265,7 @@ export function WipGrid({
         <Combobox
           label="Khách hàng"
           hideLabel
-          value={h.khachId}
+          value={h.customerId}
           onChange={(v) => writeRow(h.id, { customerId: v })}
           options={customerOptions}
           onCreate={onAddCustomer}
@@ -279,8 +279,8 @@ export function WipGrid({
     },
     /* Thứ tự theo bảng cân đối giấy: XUẤT KHẨU Lượng · Đơn giá · T.tiền đứng ngay sau
        Khách, rồi các ngày + Tổng; Trả · Nợ (thay cột Chuyển kỳ) đứng CUỐI. "Lượng" = Tổng. */
-    { key: "luong", header: "Lượng (kg)", label: "Lượng", kind: "tinh", minWidth: 110, getValue: (h) => h.tong || null },
-    { key: "donGia", header: "Đơn giá (USD)", label: "Đơn giá", kind: "so", group: "tien", minWidth: 112, getValue: (h) => h.donGia },
+    { key: "luong", header: "Lượng (kg)", label: "Lượng", kind: "tinh", minWidth: 110, getValue: (h) => h.total || null },
+    { key: "donGia", header: "Đơn giá (USD)", label: "Đơn giá", kind: "so", group: "tien", minWidth: 112, getValue: (h) => h.unitPrice },
     {
       key: "thanhTien",
       header: "T.tiền (USD)",
@@ -288,7 +288,7 @@ export function WipGrid({
       kind: "tinh",
       group: "tien",
       minWidth: 148,
-      getValue: (h) => h.tong * (h.donGia ?? 0) || null,
+      getValue: (h) => h.total * (h.unitPrice ?? 0) || null,
     },
     ...dates.map<GridColumn<FinishedGoodGridRow>>((iso) => ({
       key: `ngay:${iso}`,
@@ -297,12 +297,12 @@ export function WipGrid({
       kind: "so",
       group: "ngay",
       minWidth: 96,
-      getValue: (h) => h.theoNgay[iso] ?? null,
+      getValue: (h) => h.dailyQuantities[iso] ?? null,
     })),
     /* Tổng cuối hàng (như cột W bảng giấy) — chỉ khi mở cột ngày; thu ngày thì đã có "Lượng". */
-    { key: "tong", header: "Tổng (kg)", label: "Tổng", kind: "tinh", group: "ngay", minWidth: 116, getValue: (h) => h.tong || null },
-    { key: "tra", header: "Trả", label: "Trả", kind: "so", tint: "chuyen-ky", minWidth: 104, getValue: (h) => h.tra || null },
-    { key: "no", header: "Nợ", label: "Nợ", kind: "so", tint: "chuyen-ky", minWidth: 104, getValue: (h) => h.no || null },
+    { key: "tong", header: "Tổng (kg)", label: "Tổng", kind: "tinh", group: "ngay", minWidth: 116, getValue: (h) => h.total || null },
+    { key: "tra", header: "Trả", label: "Trả", kind: "so", tint: "chuyen-ky", minWidth: 104, getValue: (h) => h.repaidKg || null },
+    { key: "no", header: "Nợ", label: "Nợ", kind: "so", tint: "chuyen-ky", minWidth: 104, getValue: (h) => h.debtKg || null },
   ];
 
   /* Kỳ đã chốt ⇒ khoá TOÀN BỘ ô + gỡ ô điều khiển. Khoá ở một chỗ thay vì rải
@@ -321,8 +321,8 @@ export function WipGrid({
     ...hangThat.map((h) => ({
       id: h.id,
       data: h,
-      label: productName(h.matHangId),
-      subLabel: h.quyCach || undefined,
+      label: productName(h.productId),
+      subLabel: h.spec || undefined,
     })),
     ...(hideEmptyRows || templateRows.length === 0
       ? []
@@ -336,8 +336,8 @@ export function WipGrid({
           ...templateRows.map((h) => ({
             id: h.id,
             data: h,
-            label: <span className="text-muted-foreground">{productName(h.matHangId)}</span>,
-            subLabel: h.quyCach || undefined,
+            label: <span className="text-muted-foreground">{productName(h.productId)}</span>,
+            subLabel: h.spec || undefined,
           })),
         ]),
   ];
@@ -355,9 +355,9 @@ export function WipGrid({
     }
     /* Có sẵn ở dòng mẫu (đang ẩn vì chưa có số) ⇒ biến dòng mẫu đó thành dòng thật. */
     const m =
-      missingTemplates.find((x) => x.khoa === templateKey) ?? missingTemplates.find((x) => x.productId === productId && !x.spec);
+      missingTemplates.find((x) => x.key === templateKey) ?? missingTemplates.find((x) => x.productId === productId && !x.spec);
     const updated = createFromTemplate(
-      m ?? { id: templateKey, khoa: templateKey, productId, spec: "", customerId, channel: g?.channel ?? "Xuất khẩu", unitPrice: g?.unitPrice ?? null },
+      m ?? { id: templateKey, key: templateKey, productId, spec: "", customerId, channel: g?.channel ?? "Xuất khẩu", unitPrice: g?.unitPrice ?? null },
       {}
     );
     saveFinishedGoods([...finishedGoods, updated]);
@@ -367,8 +367,8 @@ export function WipGrid({
     );
   };
 
-  const totalKg = finishedGoodRows.reduce((s, h) => s + h.tong, 0);
-  const totalAmount = finishedGoodRows.reduce((s, h) => s + h.tong * (h.donGia ?? 0), 0);
+  const totalKg = finishedGoodRows.reduce((s, h) => s + h.total, 0);
+  const totalAmount = finishedGoodRows.reduce((s, h) => s + h.total * (h.unitPrice ?? 0), 0);
 
   return (
     <section className="border-t-2 border-border p-5">
@@ -459,7 +459,7 @@ export function WipGrid({
               {!isDateColumnsCollapsed &&
                 dates.map((iso) => (
                   <td key={iso} className="tnum border-t-2 border-l border-border px-3 py-3 text-right">
-                    {num(finishedGoodRows.reduce((s, h) => s + (h.theoNgay[iso] ?? 0), 0)) || "—"}
+                    {num(finishedGoodRows.reduce((s, h) => s + (h.dailyQuantities[iso] ?? 0), 0)) || "—"}
                   </td>
                 ))}
               {!isDateColumnsCollapsed && (
@@ -468,10 +468,10 @@ export function WipGrid({
                 </td>
               )}
               <td className="tnum border-t-2 border-l border-border bg-warning-surface px-3 py-3 text-right">
-                {num(finishedGoodRows.reduce((s, h) => s + h.tra, 0)) || "—"}
+                {num(finishedGoodRows.reduce((s, h) => s + h.repaidKg, 0)) || "—"}
               </td>
               <td className="tnum border-t-2 border-l border-border bg-warning-surface px-3 py-3 text-right">
-                {num(finishedGoodRows.reduce((s, h) => s + h.no, 0)) || "—"}
+                {num(finishedGoodRows.reduce((s, h) => s + h.debtKg, 0)) || "—"}
               </td>
             </tr>
           }

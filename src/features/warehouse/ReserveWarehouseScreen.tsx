@@ -85,7 +85,7 @@ export default function ReserveWarehouseScreen() {
   );
   // Bán lẻ / đóng gói vượt số đang trữ: lô không xuống âm nên phần vượt không nằm
   // trong "Tổng tồn" — phải gọi tên ra, không được nuốt (lỗi ghi chép cần dò).
-  const { los: lotStock, banVuot: oversales, tongBanVuot: totalOversold } = useMemo(
+  const { los: lotStock, oversales, totalOversoldKg: totalOversold } = useMemo(
     () => computeWipStockDetail(wips, exportItems, retailSales),
     [wips, exportItems, retailSales]
   );
@@ -105,10 +105,10 @@ export default function ReserveWarehouseScreen() {
   });
 
   const filteredStock = useMemo(
-    () => lotStock.filter((t) => (!warehouseFilter || t.warehouse === warehouseFilter) && t.conLai > 0),
+    () => lotStock.filter((t) => (!warehouseFilter || t.warehouse === warehouseFilter) && t.remainingKg > 0),
     [lotStock, warehouseFilter]
   );
-  const totalStock = filteredStock.reduce((s, t) => s + t.conLai, 0);
+  const totalStock = filteredStock.reduce((s, t) => s + t.remainingKg, 0);
   const nhomTuoi = useMemo(() => bucketStockByAge(filteredStock, todayIso()), [filteredStock]);
 
   const openApprove = (s: WipProductionItem) => {
@@ -145,7 +145,7 @@ export default function ReserveWarehouseScreen() {
     if (!wip) return;
     setTypedCode("");
     if (wip.status !== "pending") {
-      notify.warning(`Lô ${items[0]!.nhan} đã nhập kho${wip.warehouse ? ` ${wip.warehouse}` : ""} rồi.`);
+      notify.warning(`Lô ${items[0]!.label} đã nhập kho${wip.warehouse ? ` ${wip.warehouse}` : ""} rồi.`);
       return;
     }
     setIsScanning(false);
@@ -206,17 +206,17 @@ export default function ReserveWarehouseScreen() {
     {
       key: "lo",
       header: "Lô (ngày SX)",
-      render: (r) => formatDateVN(r.ngaySX),
-      getSortValue: (r) => r.ngaySX,
+      render: (r) => formatDateVN(r.productionDate),
+      getSortValue: (r) => r.productionDate,
     },
-    { key: "con", header: "Còn (kg)", numeric: true, render: (r) => num(r.conLai), getSortValue: (r) => r.conLai },
-    { key: "blk", header: "Block", numeric: true, render: (r) => num(r.blockConLai) },
+    { key: "con", header: "Còn (kg)", numeric: true, render: (r) => num(r.remainingKg), getSortValue: (r) => r.remainingKg },
+    { key: "blk", header: "Block", numeric: true, render: (r) => num(r.remainingBlocks) },
     {
       key: "nx",
       header: "Nhập / xuất",
       render: (r) => (
         <span className="tnum text-muted-foreground">
-          {num(r.luongNhap)} / {num(r.luongXuat)}
+          {num(r.inKg)} / {num(r.outKg)}
         </span>
       ),
     },
@@ -265,11 +265,11 @@ export default function ReserveWarehouseScreen() {
           <ProportionBar
             description="Tồn kho chia theo số ngày nằm kho"
             segments={nhomTuoi.map((g) => ({
-              id: g.khoa,
-              label: g.nhan,
-              description: `${num(g.soLo)} lô`,
+              id: g.key,
+              label: g.label,
+              description: `${num(g.lotCount)} lô`,
               value: g.kg,
-              tone: ({ "duoi-30": "la", "30-60": "cat", "60-90": "cam", "tren-90": "hong" } as const)[g.khoa],
+              tone: ({ "duoi-30": "la", "30-60": "cat", "60-90": "cam", "tren-90": "hong" } as const)[g.key],
             }))}
           />
         </section>

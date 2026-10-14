@@ -219,10 +219,10 @@ export default function UserManagementScreen({
     );
     setIsCreating(false);
     if (!result.ok) {
-      setCreateErrors([{ field: "Tạo tài khoản", message: result.loi ?? "Thất bại" }]);
+      setCreateErrors([{ field: "Tạo tài khoản", message: result.error ?? "Thất bại" }]);
       return;
     }
-    if (result.nguoiDung) write([...items, result.nguoiDung]);
+    if (result.profile) write([...items, result.profile]);
     notify.saved(`Đã tạo tài khoản ${creating.username}`);
     setCreating(null);
     setCreateErrors([]);

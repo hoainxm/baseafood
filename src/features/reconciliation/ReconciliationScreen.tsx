@@ -80,14 +80,14 @@ import {
 
 type Workbook = Awaited<ReturnType<typeof docWorkbook>>;
 const PM_TAB = "__phan-mem__";
-const editKey = (nv: SuspectItem) => `${nv.sheet}#${nv.soDong}#${nv.cot}`;
+const editKey = (nv: SuspectItem) => `${nv.sheet}#${nv.rowIndex}#${nv.column}`;
 
 function invoiceChip(r: InvoiceRow) {
-  if (r.trangThai === "KHOP") return <Tag variant="xong">Khớp</Tag>;
-  if (r.trangThai === "LECH")
-    return r.ketLuan === "LỆCH THUẾ" ? <Tag variant="luu-y">Lệch thuế</Tag> : <Tag variant="loi">Lệch tiền</Tag>;
+  if (r.status === "KHOP") return <Tag variant="xong">Khớp</Tag>;
+  if (r.status === "LECH")
+    return r.conclusion === "LỆCH THUẾ" ? <Tag variant="luu-y">Lệch thuế</Tag> : <Tag variant="loi">Lệch tiền</Tag>;
   // Hóa đơn đã bị thay thế / hủy: không có trong sổ là ĐÚNG — đừng tô đỏ như việc phải làm.
-  if (r.khongCanVaoSo) return <Tag variant="luu-y">Không cần vào sổ</Tag>;
+  if (r.notRequiredInLedger) return <Tag variant="luu-y">Không cần vào sổ</Tag>;
   return <Tag variant="loi">Chưa vào sổ</Tag>;
 }
 
@@ -205,7 +205,7 @@ function SavedRunsBox({
 
 // ---------- Khối tự kiểm (§6) ----------
 function SelfCheckBox({ checks: trialChecks }: { checks: TrialCheck[] }) {
-  const passedCount = trialChecks.filter((p) => p.dat).length;
+  const passedCount = trialChecks.filter((p) => p.passed).length;
   const allPassed = passedCount === trialChecks.length;
   return (
     <Card>
@@ -229,18 +229,18 @@ function SelfCheckBox({ checks: trialChecks }: { checks: TrialCheck[] }) {
             <li key={i} className="flex flex-col gap-1 border-b border-border/60 pb-3 last:border-0 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0">
                 <div className="flex items-center gap-2 font-medium">
-                  {p.dat ? (
+                  {p.passed ? (
                     <Tag variant="xong">Đạt</Tag>
                   ) : (
                     <Tag variant="loi">Không đạt</Tag>
                   )}
-                  <span>{p.ten}</span>
+                  <span>{p.name}</span>
                 </div>
-                <p className="mt-1 text-sm text-muted-foreground">Bắt lỗi: {p.batLoiGi}</p>
+                <p className="mt-1 text-sm text-muted-foreground">Bắt lỗi: {p.catches}</p>
               </div>
               <div className="shrink-0 text-sm sm:text-right">
-                <div>Đáng lẽ: <span className="tnum font-medium">{p.mong}</span></div>
-                <div>Thực tế: <span className="tnum font-medium">{p.thuc}</span></div>
+                <div>Đáng lẽ: <span className="tnum font-medium">{p.expected}</span></div>
+                <div>Thực tế: <span className="tnum font-medium">{p.actual}</span></div>
               </div>
             </li>
           ))}
@@ -252,8 +252,8 @@ function SelfCheckBox({ checks: trialChecks }: { checks: TrialCheck[] }) {
 
 // ---------- Cầu nối số liệu (§5) ----------
 function BridgeBox({ bridge }: { bridge: ReconciliationBridge }) {
-  const abDiff = bridge.chuaCoBenSo - bridge.chuaCoBenSoTrucTiep;
-  const sumBoc = bridge.bocTach.reduce((s, x) => s + x.tien, 0);
+  const abDiff = bridge.missingInLedger - bridge.missingInLedgerDirect;
+  const sumBoc = bridge.breakdown.reduce((s, x) => s + x.amount, 0);
   return (
     <Card>
       <CardHeader>
@@ -271,15 +271,15 @@ function BridgeBox({ bridge }: { bridge: ReconciliationBridge }) {
           <div className="rounded-xl border border-border p-3">
             <p className="text-sm font-medium text-muted-foreground">Cách 1 — lấy tổng hóa đơn trừ phần đã khớp</p>
             <p className="mt-1 text-sm">
-              Tổng hóa đơn <span className="tnum">{num(bridge.tongFile)}</span> − đã khớp{" "}
-              <span className="tnum">{num(bridge.khopFile)}</span> − lệch tiền{" "}
-              <span className="tnum">{num(bridge.lechFile)}</span>
+              Tổng hóa đơn <span className="tnum">{num(bridge.fileTotal)}</span> − đã khớp{" "}
+              <span className="tnum">{num(bridge.fileMatched)}</span> − lệch tiền{" "}
+              <span className="tnum">{num(bridge.fileMismatched)}</span>
             </p>
-            <p className="mt-1 text-lg font-bold tnum">= {num(bridge.chuaCoBenSo)} đ</p>
+            <p className="mt-1 text-lg font-bold tnum">= {num(bridge.missingInLedger)} đ</p>
           </div>
           <div className="rounded-xl border border-border p-3">
             <p className="text-sm font-medium text-muted-foreground">Cách 2 — cộng thẳng các hóa đơn chưa vào sổ</p>
-            <p className="mt-1 text-lg font-bold tnum">= {num(bridge.chuaCoBenSoTrucTiep)} đ</p>
+            <p className="mt-1 text-lg font-bold tnum">= {num(bridge.missingInLedgerDirect)} đ</p>
             <p className="mt-2 text-sm">
               Hai cách lệch nhau:{" "}
               <span className={Math.abs(abDiff) < 0.5 ? "text-success font-semibold" : "text-destructive font-semibold"}>
@@ -291,23 +291,23 @@ function BridgeBox({ bridge }: { bridge: ReconciliationBridge }) {
         <div className="rounded-xl border border-warning/30 bg-warning-surface p-3">
           <p className="text-sm font-medium">
             Chênh nhỏ giữa hóa đơn và sổ ở các dòng đã khớp:{" "}
-            <span className="tnum font-bold">{num(bridge.duTruCheo)} đ</span>
+            <span className="tnum font-bold">{num(bridge.crossOffset)} đ</span>
           </p>
           <p className="mt-1 text-sm text-muted-foreground">
             <b>Đây KHÔNG phải hóa đơn bị bỏ sót</b> — chỉ là chênh lệch nhỏ do hóa đơn và sổ tách
             tiền hàng/thuế/chiết khấu khác nhau. Máy đã tách rõ theo từng hóa đơn (tổng cộng{" "}
             <span className="tnum">{num(sumBoc)}</span> đ):
           </p>
-          {bridge.bocTach.length > 0 && (
+          {bridge.breakdown.length > 0 && (
             <ul className="mt-2 space-y-1 text-sm">
-              {bridge.bocTach.slice(0, 8).map((b, i) => (
+              {bridge.breakdown.slice(0, 8).map((b, i) => (
                 <li key={i} className="flex justify-between gap-3">
-                  <span className="truncate">{b.mo}</span>
-                  <span className="tnum shrink-0">{num(b.tien)} đ</span>
+                  <span className="truncate">{b.label}</span>
+                  <span className="tnum shrink-0">{num(b.amount)} đ</span>
                 </li>
               ))}
-              {bridge.bocTach.length > 8 && (
-                <li className="text-muted-foreground">… và {num(bridge.bocTach.length - 8)} hóa đơn nữa</li>
+              {bridge.breakdown.length > 8 && (
+                <li className="text-muted-foreground">… và {num(bridge.breakdown.length - 8)} hóa đơn nữa</li>
               )}
             </ul>
           )}
@@ -351,14 +351,14 @@ function SuspectBox({
       key: "nhom",
       header: "Nhóm",
       primary: true,
-      render: (r) => <Tag variant="phan-loai" tone={toneByName(GROUP_NAMES[r.nhom])}>Nhóm {r.nhom} · {GROUP_NAMES[r.nhom]}</Tag>,
+      render: (r) => <Tag variant="phan-loai" tone={toneByName(GROUP_NAMES[r.group])}>Nhóm {r.group} · {GROUP_NAMES[r.group]}</Tag>,
     },
-    { key: "vitri", header: "Vị trí", render: (r) => r.viTri },
-    { key: "dangco", header: "Số đang có", numeric: true, render: (r) => r.soDangCo },
-    { key: "doichung", header: "Số đối chứng", numeric: true, render: (r) => r.soDoiChung },
-    { key: "nguon", header: "Nguồn đối chứng", render: (r) => r.nguonDoiChung },
-    { key: "sai", header: "Sai ở chỗ nào", render: (r) => r.saiOCho },
-    { key: "anhhuong", header: "Ảnh hưởng nếu sửa", render: (r) => r.anhHuong },
+    { key: "vitri", header: "Vị trí", render: (r) => r.location },
+    { key: "dangco", header: "Số đang có", numeric: true, render: (r) => r.currentValue },
+    { key: "doichung", header: "Số đối chứng", numeric: true, render: (r) => r.expectedValue },
+    { key: "nguon", header: "Nguồn đối chứng", render: (r) => r.expectedSource },
+    { key: "sai", header: "Sai ở chỗ nào", render: (r) => r.wrongAt },
+    { key: "anhhuong", header: "Ảnh hưởng nếu sửa", render: (r) => r.impact },
   ];
 
   return (
@@ -398,9 +398,9 @@ function SuspectBox({
               <RecordTable
                 columns={columns}
                 rows={suspects}
-                getKey={(r) => `${r.nhom}-${r.viTri}`}
+                getKey={(r) => `${r.group}-${r.location}`}
                 actions={(r) =>
-                  r.giaTriDung != null ? (
+                  r.correctValue != null ? (
                     edits[editKey(r)] != null ? (
                       <Button
                         title="Bỏ phần sửa tay ở dòng này, trả số về như trong file gốc." variant="outline" size="sm" onClick={() => onUndo(editKey(r))}>
@@ -421,7 +421,7 @@ function SuspectBox({
             )}
 
             {groupedSuspects.map((g) => {
-              const gk = `${g.nhom}-${g.ten}`;
+              const gk = `${g.group}-${g.name}`;
               const mo = expandedGroups[gk];
               return (
                 <div key={gk} className="rounded-xl border border-border p-3">
@@ -433,26 +433,26 @@ function SuspectBox({
                   >
                     <span className="flex items-center gap-2 font-medium">
                       {mo ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
-                      <Tag variant="phan-loai" tone={toneByName(GROUP_NAMES[g.nhom])}>Nhóm {g.nhom}</Tag>
-                      {g.ten}
+                      <Tag variant="phan-loai" tone={toneByName(GROUP_NAMES[g.group])}>Nhóm {g.group}</Tag>
+                      {g.name}
                     </span>
                     <span className="shrink-0 text-sm">
-                      <span className="tnum font-semibold">{num(g.soDong)}</span> dòng ·{" "}
-                      <span className="tnum">{num(g.tongTien)}</span> đ
+                      <span className="tnum font-semibold">{num(g.rowCount)}</span> dòng ·{" "}
+                      <span className="tnum">{num(g.totalAmount)}</span> đ
                     </span>
                   </button>
-                  <p className="mt-2 text-sm text-muted-foreground">{g.canhBao}</p>
-                  {mo && g.chiTiet.length > 0 && (
+                  <p className="mt-2 text-sm text-muted-foreground">{g.warning}</p>
+                  {mo && g.items.length > 0 && (
                     <ul className="mt-3 space-y-2 text-sm">
-                      {g.chiTiet.slice(0, 200).map((nv, i) => (
+                      {g.items.slice(0, 200).map((nv, i) => (
                         <li key={i} className="flex flex-col gap-1 border-t border-border/60 pt-2 sm:flex-row sm:items-center sm:justify-between">
                           <span className="min-w-0">
-                            {nv.viTri} — {nv.saiOCho}
-                            {nv.giaTriDung != null && (
-                              <> · đối chứng <span className="tnum font-medium">{nv.soDoiChung}</span></>
+                            {nv.location} — {nv.wrongAt}
+                            {nv.correctValue != null && (
+                              <> · đối chứng <span className="tnum font-medium">{nv.expectedValue}</span></>
                             )}
                           </span>
-                          {nv.giaTriDung != null &&
+                          {nv.correctValue != null &&
                             (edits[editKey(nv)] != null ? (
                               <Button
                                 title="Bỏ phần sửa tay ở dòng nghi vấn này." variant="outline" size="sm" onClick={() => onUndo(editKey(nv))}>
@@ -497,23 +497,23 @@ function InvoiceTable({
 }) {
   const dem = useMemo(() => {
     const d = { KHOP: 0, LECH: 0, THIEU: 0 } as Record<InvoiceMatchStatus, number>;
-    for (const r of sheet.dong) d[r.trangThai]++;
+    for (const r of sheet.rows) d[r.status]++;
     return d;
   }, [sheet]);
   const rows = useMemo(
-    () => (statusFilter === "all" ? sheet.dong : sheet.dong.filter((r) => r.trangThai === statusFilter)),
+    () => (statusFilter === "all" ? sheet.rows : sheet.rows.filter((r) => r.status === statusFilter)),
     [sheet, statusFilter]
   );
   const columns: RecordTableColumn<InvoiceRow>[] = [
     { key: "kq", header: "Kết quả", primary: true, render: (r) => invoiceChip(r) },
-    { key: "kh", header: "Ký hiệu", render: (r) => r.kyHieu, getSortValue: (r) => r.kyHieu },
-    { key: "so", header: "Số HĐ", render: (r) => r.soHoaDon, getSortValue: (r) => r.soChuan },
-    { key: "ngay", header: "Ngày lập", render: (r) => r.ngayLap, getSortValue: (r) => r.ngayLap },
-    { key: "ban", header: "Người bán", render: (r) => r.tenBan },
-    { key: "tt", header: "Tổng TT (VND)", numeric: true, render: (r) => num(r.tongTtVnd), getSortValue: (r) => r.tongTtVnd },
-    { key: "pm", header: "Tổng trên sổ", numeric: true, render: (r) => (r.trangThai === "THIEU" ? "—" : num(r.tongTtPm)) },
-    { key: "chenh", header: "Chênh", numeric: true, render: (r) => (r.chenh == null ? "—" : num(r.chenh)), getSortValue: (r) => (r.chenh == null ? 0 : Math.abs(r.chenh)) },
-    { key: "bc", header: "Bằng chứng đối chiếu", render: (r) => r.bangChung },
+    { key: "kh", header: "Ký hiệu", render: (r) => r.series, getSortValue: (r) => r.series },
+    { key: "so", header: "Số HĐ", render: (r) => r.invoiceNumber, getSortValue: (r) => r.normalizedNumber },
+    { key: "ngay", header: "Ngày lập", render: (r) => r.issueDate, getSortValue: (r) => r.issueDate },
+    { key: "ban", header: "Người bán", render: (r) => r.sellerName },
+    { key: "tt", header: "Tổng TT (VND)", numeric: true, render: (r) => num(r.totalVnd), getSortValue: (r) => r.totalVnd },
+    { key: "pm", header: "Tổng trên sổ", numeric: true, render: (r) => (r.status === "THIEU" ? "—" : num(r.ledgerTotal)) },
+    { key: "chenh", header: "Chênh", numeric: true, render: (r) => (r.difference == null ? "—" : num(r.difference)), getSortValue: (r) => (r.difference == null ? 0 : Math.abs(r.difference)) },
+    { key: "bc", header: "Bằng chứng đối chiếu", render: (r) => r.evidence },
   ];
   return (
     <div className="space-y-4">
@@ -529,8 +529,8 @@ function InvoiceTable({
       <RecordTable
         columns={columns}
         rows={rows}
-        getKey={(r) => `${r.sheet}#${r.soDong}`}
-        getSearchText={(r) => `${r.kyHieu} ${r.soHoaDon} ${r.tenBan} ${r.bangChung}`}
+        getKey={(r) => `${r.sheet}#${r.rowIndex}`}
+        getSearchText={(r) => `${r.series} ${r.invoiceNumber} ${r.sellerName} ${r.evidence}`}
         searchLabel="Tìm ký hiệu / số HĐ / người bán…"
         emptyText="Không có dòng nào ở trạng thái này."
       />
@@ -549,11 +549,11 @@ function LedgerTable({
 }) {
   const dem = useMemo(() => {
     let missingCount = 0;
-    for (const r of sheet.dong) if (r.trangThai === "THIEU") missingCount++;
+    for (const r of sheet.rows) if (r.status === "THIEU") missingCount++;
     return { thieu: missingCount };
   }, [sheet]);
   const rows = useMemo(
-    () => (showMissingOnly ? sheet.dong.filter((r) => r.trangThai === "THIEU") : sheet.dong),
+    () => (showMissingOnly ? sheet.rows.filter((r) => r.status === "THIEU") : sheet.rows),
     [sheet, showMissingOnly]
   );
   const columns: RecordTableColumn<LedgerRow>[] = [
@@ -562,19 +562,19 @@ function LedgerTable({
       header: "Kết quả",
       primary: true,
       render: (r) =>
-        r.trangThai === "CO" ? <Tag variant="xong">Đã có hóa đơn</Tag> : <Tag variant="loi">Chưa có hóa đơn</Tag>,
+        r.status === "CO" ? <Tag variant="xong">Đã có hóa đơn</Tag> : <Tag variant="loi">Chưa có hóa đơn</Tag>,
     },
-    { key: "phieu", header: "Phiếu", render: (r) => r.phieu },
+    { key: "phieu", header: "Phiếu", render: (r) => r.voucher },
     { key: "ctgs", header: "CTGS", render: (r) => r.ctgs },
-    { key: "kh", header: "Ký hiệu", render: (r) => r.kyHieu, getSortValue: (r) => r.kyHieu },
-    { key: "so", header: "Số HĐ", render: (r) => r.soHoaDon, getSortValue: (r) => r.soChuan },
-    { key: "ban", header: "Người bán", render: (r) => r.tenBan },
-    { key: "tong", header: "Tổng cộng", numeric: true, render: (r) => num(r.tongCong), getSortValue: (r) => r.tongCong },
-    { key: "bc", header: "Bằng chứng đối chiếu", render: (r) => r.bangChung },
+    { key: "kh", header: "Ký hiệu", render: (r) => r.series, getSortValue: (r) => r.series },
+    { key: "so", header: "Số HĐ", render: (r) => r.invoiceNumber, getSortValue: (r) => r.normalizedNumber },
+    { key: "ban", header: "Người bán", render: (r) => r.sellerName },
+    { key: "tong", header: "Tổng cộng", numeric: true, render: (r) => num(r.total), getSortValue: (r) => r.total },
+    { key: "bc", header: "Bằng chứng đối chiếu", render: (r) => r.evidence },
   ];
   return (
     <div className="space-y-4">
-      {sheet.laPhu && (
+      {sheet.isSubset && (
         <div className="rounded-xl border border-warning/30 bg-warning-surface p-3 text-sm">
           Sheet sổ phụ (là một phần của sổ chính) — <b>KHÔNG cộng vào tổng</b>, chỉ để tra cứu (tránh đếm hai lần).
         </div>
@@ -582,7 +582,7 @@ function LedgerTable({
       <div className="flex flex-wrap gap-2">
         <Button
           title="Xem toàn bộ dòng của sổ phần mềm." variant={!showMissingOnly ? "default" : "outline"} size="sm" onClick={() => setShowMissingOnly(false)}>
-          Tất cả <span className="tnum ml-1">({num(sheet.dong.length)})</span>
+          Tất cả <span className="tnum ml-1">({num(sheet.rows.length)})</span>
         </Button>
         <Button
           title="Chỉ xem các dòng phần mềm chưa tìm được hóa đơn tương ứng." variant={showMissingOnly ? "default" : "outline"} size="sm" onClick={() => setShowMissingOnly(true)}>
@@ -592,8 +592,8 @@ function LedgerTable({
       <RecordTable
         columns={columns}
         rows={rows}
-        getKey={(r) => `${r.sheet}#${r.soDong}`}
-        getSearchText={(r) => `${r.phieu} ${r.ctgs} ${r.kyHieu} ${r.soHoaDon} ${r.tenBan} ${r.bangChung}`}
+        getKey={(r) => `${r.sheet}#${r.rowIndex}`}
+        getSearchText={(r) => `${r.voucher} ${r.ctgs} ${r.series} ${r.invoiceNumber} ${r.sellerName} ${r.evidence}`}
         searchLabel="Tìm phiếu / CTGS / số HĐ / người bán…"
         emptyText="Không có dòng nào ở trạng thái này."
       />
@@ -627,37 +627,37 @@ export default function ReconciliationScreen() {
   const [runs, setRuns] = useReconciliationRuns();
 
   const myRuns = useMemo(() => {
-    const list = auth.laAdmin
+    const list = auth.isAdmin
       ? runs
-      : runs.filter((r) => !r.userId || r.userId === auth.nguoiDung?.id);
+      : runs.filter((r) => !r.userId || r.userId === auth.profile?.id);
     return [...list].sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || ""));
-  }, [runs, auth.laAdmin, auth.nguoiDung]);
+  }, [runs, auth.isAdmin, auth.profile]);
 
   const ketQua: ReconciliationResult | null = useMemo(() => {
     if (!wb) return null;
     return reconcile(wb, {
-      nguong: threshold ?? 0,
+      threshold: threshold ?? 0,
       edits,
-      nghiVanBanDau: initialSuspectCount ?? undefined,
-      soChuanTen: ledgerSheetName,
+      initialSuspectCount: initialSuspectCount ?? undefined,
+      ledgerSheetName,
       // Có sổ + hai bản gối nhau thì engine chỉ đối soát bản thuế gửi ⇒ phải biết bên nào.
-      benThue: pickedTaxSides ?? undefined,
+      taxSideSheets: pickedTaxSides ?? undefined,
     });
   }, [wb, threshold, edits, initialSuspectCount, ledgerSheetName, pickedTaxSides]);
 
   // Ba chiều soát ngoài "hóa đơn ⇄ sổ" — cùng hàm thuần lớp xuất dùng, nên số trên màn = số trong file.
-  const invoiceSheetNames = useMemo(() => ketQua?.sheetsHoaDon.map((s) => s.ten) ?? [], [ketQua]);
+  const invoiceSheetNames = useMemo(() => ketQua?.invoiceSheets.map((s) => s.name) ?? [], [ketQua]);
   const sideSplit = useMemo(() => resolveTaxSideSheets(invoiceSheetNames, pickedTaxSides), [invoiceSheetNames, pickedTaxSides]);
   const versionCompare = useMemo(
-    () => (ketQua ? compareTwoInvoiceVersions(ketQua.sheetsHoaDon, ketQua.nguong, sideSplit.benThue) : null),
+    () => (ketQua ? compareTwoInvoiceVersions(ketQua.invoiceSheets, ketQua.threshold, sideSplit.taxSide) : null),
     [ketQua, sideSplit]
   );
   const sameDayGroups = useMemo(
-    () => (ketQua ? groupSameTaxCodeSameDay(ketQua.sheetsHoaDon.filter((s) => !s.laPhu), sideSplit.benThue) : []),
+    () => (ketQua ? groupSameTaxCodeSameDay(ketQua.invoiceSheets.filter((s) => !s.isSubset), sideSplit.taxSide) : []),
     [ketQua, sideSplit]
   );
   const doiBen = (ten: string, isTaxSide: boolean) => {
-    const s = new Set(sideSplit.benThue);
+    const s = new Set(sideSplit.taxSide);
     if (isTaxSide) s.add(ten);
     else s.delete(ten);
     setPickedTaxSides(invoiceSheetNames.filter((t) => s.has(t)));
@@ -665,8 +665,8 @@ export default function ReconciliationScreen() {
   /** Kiểu mặc định theo nội dung file, tính trên kết quả vừa chạy. */
   const modeForFile = (result: ReconciliationResult, pickedSides: string[] | null) =>
     getDefaultReconciliationMode(
-      !!result.sheetPhanMem,
-      !!compareTwoInvoiceVersions(result.sheetsHoaDon, result.nguong, resolveTaxSideSheets(result.sheetsHoaDon.map((s) => s.ten), pickedSides).benThue)
+      !!result.ledgerSheet,
+      !!compareTwoInvoiceVersions(result.invoiceSheets, result.threshold, resolveTaxSideSheets(result.invoiceSheets.map((s) => s.name), pickedSides).taxSide)
     );
 
   const pickFile = () => fileRef.current?.click();
@@ -696,8 +696,8 @@ export default function ReconciliationScreen() {
       // riêng dễ lệch toạ độ dòng/cột, mà toạ độ là thứ cột "Vị trí" dựa vào.
       const originalB64 = await fileSangBase64(file);
       const raw = sheetsTuBase64(originalB64);
-      const kq0 = reconcile(raw, { nguong: threshold ?? 0 });
-      const baseline = kq0.nghiVan.length + kq0.nghiVanGop.reduce((s, g) => s + g.soDong, 0);
+      const kq0 = reconcile(raw, { threshold: threshold ?? 0 });
+      const baseline = kq0.suspects.length + kq0.mergedSuspects.reduce((s, g) => s + g.rowCount, 0);
       setEdits({});
       setEditLog({});
       setInitialSuspectCount(baseline);
@@ -707,15 +707,15 @@ export default function ReconciliationScreen() {
       setSavedRunName(file.name.replace(/\.xls[xmb]?$/i, ""));
       setOpenRunId(null);
       setWb(raw);
-      setTab(kq0.sheetsHoaDon[0]?.ten ?? (kq0.sheetPhanMem ? PM_TAB : ""));
+      setTab(kq0.invoiceSheets[0]?.name ?? (kq0.ledgerSheet ? PM_TAB : ""));
       setInvoiceFilter("all");
       setLedgerMissingOnly(false);
       setPickedTaxSides(null);
       setMode(modeForFile(kq0, null));
       notify.saved(
-        kq0.sheetPhanMem
-          ? `Đối soát xong: ${kq0.tong.khop} khớp · ${kq0.tong.lech + kq0.tong.lechThue} lệch tiền/thuế · ${kq0.tong.thieu} chưa vào sổ · ${baseline} chỗ cần soát.`
-          : `Đã đọc ${kq0.tong.soHoaDon} hóa đơn ở ${kq0.sheetsHoaDon.length} sheet (file không có sổ kế toán) — chọn việc cần soát bên dưới.`
+        kq0.ledgerSheet
+          ? `Đối soát xong: ${kq0.totals.matched} khớp · ${kq0.totals.mismatched + kq0.totals.taxMismatched} lệch tiền/thuế · ${kq0.totals.missing} chưa vào sổ · ${baseline} chỗ cần soát.`
+          : `Đã đọc ${kq0.totals.invoiceCount} hóa đơn ở ${kq0.invoiceSheets.length} sheet (file không có sổ kế toán) — chọn việc cần soát bên dưới.`
       );
     } catch (err) {
       notify.error(`Không đọc được file: ${err instanceof Error ? err.message : String(err)}`);
@@ -755,16 +755,16 @@ export default function ReconciliationScreen() {
   const downloadExcel = () => {
     if (!ketQua) return;
     // Chở cách chia bên thuế/tự tải sang lớp xuất để sheet SO HAI BẢN giống màn hình.
-    void exportFile({ ...ketQua, benThue: pickedTaxSides ?? undefined }, displayName || file?.name || "doi-soat", b64, edits);
+    void exportFile({ ...ketQua, taxSideSheets: pickedTaxSides ?? undefined }, displayName || file?.name || "doi-soat", b64, edits);
   };
 
   const applyFix = (nv: SuspectItem) => {
-    if (nv.giaTriDung == null || nv.sheet == null || nv.soDong == null || nv.cot == null) return;
+    if (nv.correctValue == null || nv.sheet == null || nv.rowIndex == null || nv.column == null) return;
     const k = editKey(nv);
-    setEdits((e) => ({ ...e, [k]: nv.giaTriDung! }));
+    setEdits((e) => ({ ...e, [k]: nv.correctValue! }));
     setEditLog((l) => ({
       ...l,
-      [k]: { viTri: nv.viTri, cu: nv.giaTriCu == null ? "(trống)" : num(nv.giaTriCu), moi: num(nv.giaTriDung!) },
+      [k]: { viTri: nv.location, cu: nv.oldValue == null ? "(trống)" : num(nv.oldValue), moi: num(nv.correctValue!) },
     }));
     notify.saved("Đã áp sửa trong phiên. Giá trị cũ được giữ, sẽ vào file xuất.");
   };
@@ -787,9 +787,9 @@ export default function ReconciliationScreen() {
       notify.warning("Chưa có kết quả để lưu — hãy chọn file và bấm Đối soát.");
       return;
     }
-    const nd = auth.nguoiDung;
+    const nd = auth.profile;
     const now = new Date().toISOString();
-    const t = ketQua.tong;
+    const t = ketQua.totals;
     const id = openRunId ?? crypto.randomUUID();
     const prev = openRunId ? runs.find((r) => r.id === openRunId) : null;
     const run: ReconciliationRun = {
@@ -801,14 +801,14 @@ export default function ReconciliationScreen() {
       period: suyKy(displayName),
       status,
       // Đúng ngưỡng đã tính ra kết quả đang thấy (ô trống = 0), mở lại không đổi kết quả.
-      threshold: ketQua.nguong,
+      threshold: ketQua.threshold,
       fileName: displayName,
       fileB64: b64,
       options: { soChuanTen: ledgerSheetName, edits, benThue: pickedTaxSides ?? undefined, cheDo: mode },
       summary: {
-        soHoaDon: t.soHoaDon, khop: t.khop, lech: t.lech, thieu: t.thieu, ganKhop: t.ganKhop,
-        soDongPm: t.soDongPm, pmCo: t.pmCo, pmThieu: t.pmThieu, tongChenh: t.tongChenh,
-        nguong: ketQua.nguong, savedAt: now,
+        soHoaDon: t.invoiceCount, khop: t.matched, lech: t.mismatched, thieu: t.missing, ganKhop: t.nearMatched,
+        soDongPm: t.ledgerRowCount, pmCo: t.ledgerMatched, pmThieu: t.ledgerMissing, tongChenh: t.totalDifference,
+        nguong: ketQua.threshold, savedAt: now,
       },
       createdAt: prev?.createdAt || now,
       updatedAt: now,
@@ -822,12 +822,12 @@ export default function ReconciliationScreen() {
     try {
       const raw = sheetsTuBase64(run.fileB64);
       const kq0 = reconcile(raw, {
-        nguong: run.threshold,
+        threshold: run.threshold,
         edits: run.options?.edits,
-        soChuanTen: run.options?.soChuanTen,
-        benThue: run.options?.benThue,
+        ledgerSheetName: run.options?.soChuanTen,
+        taxSideSheets: run.options?.benThue,
       });
-      const baseline = kq0.nghiVan.length + kq0.nghiVanGop.reduce((s, g) => s + g.soDong, 0);
+      const baseline = kq0.suspects.length + kq0.mergedSuspects.reduce((s, g) => s + g.rowCount, 0);
       setFile(null);
       setB64(run.fileB64);
       setDisplayName(run.fileName || run.title);
@@ -839,7 +839,7 @@ export default function ReconciliationScreen() {
       setInitialSuspectCount(baseline);
       setOpenRunId(run.id);
       setWb(raw);
-      setTab(kq0.sheetsHoaDon[0]?.ten ?? (kq0.sheetPhanMem ? PM_TAB : ""));
+      setTab(kq0.invoiceSheets[0]?.name ?? (kq0.ledgerSheet ? PM_TAB : ""));
       setInvoiceFilter("all");
       setLedgerMissingOnly(false);
       const savedSides = run.options?.benThue ?? null;
@@ -863,74 +863,74 @@ export default function ReconciliationScreen() {
     try {
       const raw = sheetsTuBase64(run.fileB64);
       const result = reconcile(raw, {
-        nguong: run.threshold,
+        threshold: run.threshold,
         edits: run.options?.edits,
-        soChuanTen: run.options?.soChuanTen,
-        benThue: run.options?.benThue,
+        ledgerSheetName: run.options?.soChuanTen,
+        taxSideSheets: run.options?.benThue,
       });
-      void exportFile({ ...result, benThue: run.options?.benThue }, run.title || "doi-soat", run.fileB64, run.options?.edits);
+      void exportFile({ ...result, taxSideSheets: run.options?.benThue }, run.title || "doi-soat", run.fileB64, run.options?.edits);
     } catch (err) {
       notify.error(`Không xuất được: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
 
   // Drill-down: bấm thẻ tổng → nhảy xuống đúng bảng + lọc sẵn theo trạng thái đó.
-  const firstInvoiceTab = ketQua?.sheetsHoaDon[0]?.ten ?? "";
+  const firstInvoiceTab = ketQua?.invoiceSheets[0]?.name ?? "";
   const goToInvoices = (statusFilter: InvoiceMatchStatus | "all") => {
     if (firstInvoiceTab) setTab(firstInvoiceTab);
     setInvoiceFilter(statusFilter);
     scrollToId("ds-bang");
   };
   const denPM = (onlyMissing: boolean) => {
-    if (ketQua?.sheetPhanMem) setTab(PM_TAB);
+    if (ketQua?.ledgerSheet) setTab(PM_TAB);
     setLedgerMissingOnly(onlyMissing);
     scrollToId("ds-bang");
   };
 
   const the: StatCardData[] = [];
   if (ketQua) {
-    const t = ketQua.tong;
-    const suspectCount = ketQua.nghiVan.length + ketQua.nghiVanGop.reduce((s, g) => s + g.soDong, 0);
+    const t = ketQua.totals;
+    const suspectCount = ketQua.suspects.length + ketQua.mergedSuspects.reduce((s, g) => s + g.rowCount, 0);
     the.push(
-      { label: "Hóa đơn điện tử", value: num(t.soHoaDon), numeric: true, color: "brand", icon: FileSpreadsheet, onSelect: () => goToInvoices("all"), selectHint: "Xem tất cả hóa đơn điện tử" },
-      { label: "Khớp", value: num(t.khop), numeric: true, color: "success", onSelect: () => goToInvoices("KHOP"), selectHint: "Xem hóa đơn đã khớp sổ" },
+      { label: "Hóa đơn điện tử", value: num(t.invoiceCount), numeric: true, color: "brand", icon: FileSpreadsheet, onSelect: () => goToInvoices("all"), selectHint: "Xem tất cả hóa đơn điện tử" },
+      { label: "Khớp", value: num(t.matched), numeric: true, color: "success", onSelect: () => goToInvoices("KHOP"), selectHint: "Xem hóa đơn đã khớp sổ" },
       // tong.lech và tong.lechThue là HAI nhóm rời (cùng trạng thái LECH) — thẻ cộng cả hai cho khớp số ở bộ lọc bảng.
-      { label: "Lệch tiền / thuế", value: num(t.lech + t.lechThue), numeric: true, color: "warning", subtext: `${num(t.lech)} lệch tiền · ${num(t.lechThue)} lệch thuế`, onSelect: () => goToInvoices("LECH"), selectHint: "Xem hóa đơn lệch tiền / lệch thuế" },
+      { label: "Lệch tiền / thuế", value: num(t.mismatched + t.taxMismatched), numeric: true, color: "warning", subtext: `${num(t.mismatched)} lệch tiền · ${num(t.taxMismatched)} lệch thuế`, onSelect: () => goToInvoices("LECH"), selectHint: "Xem hóa đơn lệch tiền / lệch thuế" },
       {
         label: "Chưa vào sổ",
-        value: num(t.thieu),
+        value: num(t.missing),
         numeric: true,
         color: "danger",
-        subtext: [t.thieuKhongCanVaoSo ? `${num(t.thieuKhongCanVaoSo)} không cần vào sổ` : "", t.ganKhop ? `${num(t.ganKhop)} gần khớp` : ""].filter(Boolean).join(" · ") || undefined,
+        subtext: [t.missingNotRequired ? `${num(t.missingNotRequired)} không cần vào sổ` : "", t.nearMatched ? `${num(t.nearMatched)} gần khớp` : ""].filter(Boolean).join(" · ") || undefined,
         onSelect: () => goToInvoices("THIEU"),
         selectHint: "Xem hóa đơn chưa có trong sổ",
       },
-      { label: "Dòng sổ kế toán", value: num(t.soDongPm), numeric: true, color: "brand", onSelect: () => denPM(false), selectHint: "Xem tất cả dòng sổ kế toán" },
-      { label: "Dòng sổ thiếu hóa đơn", value: num(t.pmThieu), numeric: true, color: "danger", onSelect: () => denPM(true), selectHint: "Xem dòng sổ chưa có hóa đơn" },
-      { label: "Tổng tiền lệch", value: num(t.tongChenh), numeric: true, color: "warning", subtext: "ở các hóa đơn lệch tiền", onSelect: () => goToInvoices("LECH"), selectHint: "Xem hóa đơn lệch tiền" },
+      { label: "Dòng sổ kế toán", value: num(t.ledgerRowCount), numeric: true, color: "brand", onSelect: () => denPM(false), selectHint: "Xem tất cả dòng sổ kế toán" },
+      { label: "Dòng sổ thiếu hóa đơn", value: num(t.ledgerMissing), numeric: true, color: "danger", onSelect: () => denPM(true), selectHint: "Xem dòng sổ chưa có hóa đơn" },
+      { label: "Tổng tiền lệch", value: num(t.totalDifference), numeric: true, color: "warning", subtext: "ở các hóa đơn lệch tiền", onSelect: () => goToInvoices("LECH"), selectHint: "Xem hóa đơn lệch tiền" },
       { label: "Cần soát lại", value: num(suspectCount), numeric: true, color: suspectCount ? "warning" : "success", onSelect: suspectCount ? () => scrollToId("ds-nghivan") : undefined, selectHint: suspectCount ? "Xuống mục cần soát lại" : undefined }
     );
   }
 
   const modeCounts: Record<ReconciliationMode, { chu: string; applicable: boolean }> = {
-    so: ketQua?.sheetPhanMem
-      ? { chu: `${num(ketQua.tong.thieu)} chưa vào sổ · ${num(ketQua.tong.lech)} lệch tiền · ${num(ketQua.tong.lechThue)} lệch thuế`, applicable: true }
+    so: ketQua?.ledgerSheet
+      ? { chu: `${num(ketQua.totals.missing)} chưa vào sổ · ${num(ketQua.totals.mismatched)} lệch tiền · ${num(ketQua.totals.taxMismatched)} lệch thuế`, applicable: true }
       : { chu: "File không có sheet sổ kế toán", applicable: false },
     haiBan: versionCompare
-      ? { chu: `${num(versionCompare.tong.chiThue)} bản tự tải thiếu · ${num(versionCompare.tong.lechTien)} lệch tiền`, applicable: true }
+      ? { chu: `${num(versionCompare.totals.sentOnlyCount)} bản tự tải thiếu · ${num(versionCompare.totals.amountMismatchCount)} lệch tiền`, applicable: true }
       : { chu: invoiceSheetNames.length < 2 ? "Cần 2 sheet hóa đơn (thuế gửi + tự tải)" : "Chưa chia được hai bên — bấm để chọn", applicable: false },
     kiemCong: (() => {
-      const items = ketQua?.sheetsHoaDon.filter((s) => !s.laPhu) ?? [];
-      const that = items.reduce((n, s) => n + s.canDoiCot.soDong.lechThat, 0);
+      const items = ketQua?.invoiceSheets.filter((s) => !s.isSubset) ?? [];
+      const that = items.reduce((n, s) => n + s.columnSum.rowCounts.realDiff, 0);
       return { chu: that ? `${num(that)} dòng lệch thật` : "Không có dòng lệch thật", applicable: items.length > 0 };
     })(),
     cungNgay: sameDayGroups.length
-      ? { chu: `${num(sameDayGroups.length)} nhóm · ${num(sameDayGroups.filter((g) => g.trungSoTien).length)} trùng khít tiền`, applicable: true }
+      ? { chu: `${num(sameDayGroups.length)} nhóm · ${num(sameDayGroups.filter((g) => g.sameAmount).length)} trùng khít tiền`, applicable: true }
       : { chu: "Không có nhóm nào", applicable: false },
   };
 
-  const ledgerSheets = ketQua ? [ketQua.sheetPhanMem, ...ketQua.sheetsPhanMemPhu].filter(Boolean) as LedgerSheet[] : [];
-  const selfCheckFailed = ketQua ? ketQua.phepThu.some((p) => !p.dat) : false;
+  const ledgerSheets = ketQua ? [ketQua.ledgerSheet, ...ketQua.extraLedgerSheets].filter(Boolean) as LedgerSheet[] : [];
+  const selfCheckFailed = ketQua ? ketQua.trialChecks.some((p) => !p.passed) : false;
   const isCheckOpenEffective = isCheckOpen || selfCheckFailed; // luôn mở khi có phép tự kiểm chưa đạt
 
   return (
@@ -1004,13 +1004,13 @@ export default function ReconciliationScreen() {
                 {ledgerSheets.map((s) => (
                   <Button
                     title="Chọn sheet này làm sổ phần mềm chuẩn để đối chiếu."
-                    key={s.ten}
+                    key={s.name}
                     size="sm"
-                    variant={ketQua?.sheetPhanMem?.ten === s.ten ? "default" : "outline"}
-                    onClick={() => setLedgerSheetName(s.ten)}
+                    variant={ketQua?.ledgerSheet?.name === s.name ? "default" : "outline"}
+                    onClick={() => setLedgerSheetName(s.name)}
                   >
-                    {s.ten}
-                    {ketQua?.sheetPhanMem?.ten === s.ten && " ✓"}
+                    {s.name}
+                    {ketQua?.ledgerSheet?.name === s.name && " ✓"}
                   </Button>
                 ))}
               </div>
@@ -1056,7 +1056,7 @@ export default function ReconciliationScreen() {
       <SavedRunsBox
         runs={myRuns}
         openRunId={openRunId}
-        laAdmin={auth.laAdmin}
+        laAdmin={auth.isAdmin}
         onMo={openRun}
         onDownload={downloadRunExcel}
         onDelete={removeRun}
@@ -1079,25 +1079,25 @@ export default function ReconciliationScreen() {
           <section className="space-y-3" aria-label="Việc cần soát">
             <h2 className="font-semibold">Bạn cần soát việc gì?</h2>
             <ReconciliationModePicker mode={mode} setMode={setMode} dem={modeCounts} />
-            <ReconciliationRulesBox warnings={ketQua.canhBao} />
+            <ReconciliationRulesBox warnings={ketQua.warnings} />
           </section>
 
           {mode === "haiBan" && (
             <TwoVersionView
               result={versionCompare}
               tenSheets={invoiceSheetNames}
-              taxSheets={sideSplit.benThue}
-              method={sideSplit.cach}
+              taxSheets={sideSplit.taxSide}
+              method={sideSplit.method}
               onDoiBen={doiBen}
               onAutoDetect={() => setPickedTaxSides(null)}
             />
           )}
-          {mode === "kiemCong" && <ColumnSumCheckView sheets={ketQua.sheetsHoaDon} />}
+          {mode === "kiemCong" && <ColumnSumCheckView sheets={ketQua.invoiceSheets} />}
           {mode === "cungNgay" && <SameDayView nhom={sameDayGroups} />}
 
           {mode === "so" && (
           <>
-          {!ketQua.sheetPhanMem && (
+          {!ketQua.ledgerSheet && (
             <div className="rounded-xl border border-warning/30 bg-warning-surface p-3 text-sm">
               File này <b>không có sheet sổ kế toán</b> (PHẦN MỀM / PMEM) nên mọi hóa đơn sẽ hiện “chưa vào sổ”.
               Nếu bạn chỉ cần kiểm cộng cột hay so hai bản hóa đơn, chọn kiểu tương ứng ở trên.
@@ -1108,17 +1108,17 @@ export default function ReconciliationScreen() {
             Bấm vào một thẻ số ở trên để nhảy thẳng xuống danh sách tương ứng bên dưới.
           </p>
 
-          {ketQua.daGoCotCu && (
+          {ketQua.removedOldColumns && (
             <p className="rounded-xl border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
               Đã tự gỡ cột đối soát của lần chạy trước (KẾT QUẢ + các cột phân tích) để chạy lại sạch — file gốc của bạn không bị đổi.
             </p>
           )}
 
-          {(ketQua.nghiVan.length > 0 || ketQua.nghiVanGop.length > 0 || Object.keys(editLog).length > 0) && (
+          {(ketQua.suspects.length > 0 || ketQua.mergedSuspects.length > 0 || Object.keys(editLog).length > 0) && (
             <div id="ds-nghivan">
               <SuspectBox
-                suspects={ketQua.nghiVan}
-                mergedSuspects={ketQua.nghiVanGop}
+                suspects={ketQua.suspects}
+                mergedSuspects={ketQua.mergedSuspects}
                 edits={edits}
                 onEdit={applyFix}
                 onUndo={undoEdit}
@@ -1130,30 +1130,30 @@ export default function ReconciliationScreen() {
           <div id="ds-bang">
             <Tabs value={tab} onValueChange={setTab}>
               <TabsList className="flex-wrap">
-                {ketQua.sheetsHoaDon.map((s) => (
-                  <TabsTrigger key={s.ten} value={s.ten}>
-                    {s.ten}
+                {ketQua.invoiceSheets.map((s) => (
+                  <TabsTrigger key={s.name} value={s.name}>
+                    {s.name}
                   </TabsTrigger>
                 ))}
-                {ketQua.sheetPhanMem && <TabsTrigger value={PM_TAB}>{ketQua.sheetPhanMem.ten}</TabsTrigger>}
-                {ketQua.sheetsPhanMemPhu.map((s) => (
-                  <TabsTrigger key={s.ten} value={`phu-${s.ten}`}>
-                    {s.ten} (phụ)
+                {ketQua.ledgerSheet && <TabsTrigger value={PM_TAB}>{ketQua.ledgerSheet.name}</TabsTrigger>}
+                {ketQua.extraLedgerSheets.map((s) => (
+                  <TabsTrigger key={s.name} value={`phu-${s.name}`}>
+                    {s.name} (phụ)
                   </TabsTrigger>
                 ))}
               </TabsList>
-              {ketQua.sheetsHoaDon.map((s) => (
-                <TabsContent key={s.ten} value={s.ten} className="mt-4">
+              {ketQua.invoiceSheets.map((s) => (
+                <TabsContent key={s.name} value={s.name} className="mt-4">
                   <InvoiceTable sheet={s} filter={invoiceFilter} setFilter={setInvoiceFilter} />
                 </TabsContent>
               ))}
-              {ketQua.sheetPhanMem && (
+              {ketQua.ledgerSheet && (
                 <TabsContent value={PM_TAB} className="mt-4">
-                  <LedgerTable sheet={ketQua.sheetPhanMem} missingOnly={ledgerMissingOnly} setMissingOnly={setLedgerMissingOnly} />
+                  <LedgerTable sheet={ketQua.ledgerSheet} missingOnly={ledgerMissingOnly} setMissingOnly={setLedgerMissingOnly} />
                 </TabsContent>
               )}
-              {ketQua.sheetsPhanMemPhu.map((s) => (
-                <TabsContent key={s.ten} value={`phu-${s.ten}`} className="mt-4">
+              {ketQua.extraLedgerSheets.map((s) => (
+                <TabsContent key={s.name} value={`phu-${s.name}`} className="mt-4">
                   <LedgerTable sheet={s} missingOnly={ledgerMissingOnly} setMissingOnly={setLedgerMissingOnly} />
                 </TabsContent>
               ))}
@@ -1180,22 +1180,22 @@ export default function ReconciliationScreen() {
             </button>
             {isCheckOpenEffective && (
               <>
-                <SelfCheckBox checks={ketQua.phepThu} />
-                <BridgeBox bridge={ketQua.cauNoi} />
-                {ketQua.canhBao.length > 0 && (
+                <SelfCheckBox checks={ketQua.trialChecks} />
+                <BridgeBox bridge={ketQua.bridge} />
+                {ketQua.warnings.length > 0 && (
                   <Card>
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2 text-warning">
                         <AlertTriangle className="size-5" aria-hidden />
-                        Cảnh báo khác ({ketQua.canhBao.length})
+                        Cảnh báo khác ({ketQua.warnings.length})
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
                       <ul className="space-y-1.5 text-sm">
-                        {ketQua.canhBao.slice(0, 40).map((c, i) => (
+                        {ketQua.warnings.slice(0, 40).map((c, i) => (
                           <li key={i} className="flex gap-2">
-                            <span className="font-medium whitespace-nowrap text-muted-foreground">{c.loai}:</span>
-                            <span>{c.chiTiet}</span>
+                            <span className="font-medium whitespace-nowrap text-muted-foreground">{c.kind}:</span>
+                            <span>{c.detail}</span>
                           </li>
                         ))}
                       </ul>

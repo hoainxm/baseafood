@@ -19,7 +19,7 @@ export const coOcr = true;
 
 /** Một dòng loại hàng đoán được từ phiếu (loại NL + số kg cùng một hàng chữ). */
 export interface DongOcr {
-  loaiNL: string;
+  materialType: string;
   kg: number;
 }
 
@@ -28,21 +28,21 @@ export interface KetQuaOcr {
   /** Toàn văn nhận diện (cho người đối chiếu khi máy đoán sai). */
   text: string;
   /** Đại lý khớp danh mục (nếu bắt được). */
-  daiLy?: string;
+  supplier?: string;
   /** Ngày hàng về yyyy-mm-dd (nếu bắt được). */
-  ngay?: string;
+  date?: string;
   /** Các số nghi là khối lượng (kg) — đã lọc khoảng hợp lý, khử trùng. */
-  soKg: number[];
+  kgValues: number[];
   /** Các loại NL khớp danh mục xuất hiện trong phiếu. */
-  loaiNL: string[];
+  materialTypes: string[];
   /** Ghép (loại NL + kg) theo từng hàng chữ khi đoán được. */
-  dong: DongOcr[];
+  lines: DongOcr[];
 }
 
 /** Danh mục để dò khớp tên trên phiếu (tên đại lý, mã đại lý, tên loại NL). */
 export interface OcrCatalog {
-  daiLy: { name: string; code?: string }[];
-  loaiNL: { name: string }[];
+  suppliers: { name: string; code?: string }[];
+  materialTypes: { name: string }[];
 }
 
 /** Bỏ dấu tiếng Việt + hạ chữ thường để so khớp mềm (OCR hay lệch dấu). */
@@ -121,7 +121,7 @@ export function parseOcrText(text: string, dm: OcrCatalog): KetQuaOcr {
   // Đại lý: tên khớp dài nhất trong toàn văn; hoặc mã đại lý = một token số riêng.
   let supplier: string | undefined;
   let supplierLen = 0;
-  for (const d of dm.daiLy) {
+  for (const d of dm.suppliers) {
     const ten = stripAccents(d.name);
     if (ten.length >= 3 && toanVan.includes(ten) && ten.length > supplierLen) {
       supplier = d.name;
@@ -134,7 +134,7 @@ export function parseOcrText(text: string, dm: OcrCatalog): KetQuaOcr {
     for (const h of dong) {
       if (!RE_DL.test(stripAccents(h))) continue;
       const soRieng = new Set(Array.from(h.matchAll(/\b\d{1,6}\b/g), (m) => m[0]));
-      const theoMa = dm.daiLy.find((d) => d.code && soRieng.has(String(d.code)));
+      const theoMa = dm.suppliers.find((d) => d.code && soRieng.has(String(d.code)));
       if (theoMa) {
         supplier = theoMa.name;
         break;
@@ -144,7 +144,7 @@ export function parseOcrText(text: string, dm: OcrCatalog): KetQuaOcr {
 
   // Loại NL: mọi tên danh mục xuất hiện trong toàn văn.
   const materialTypes: string[] = [];
-  for (const l of dm.loaiNL) {
+  for (const l of dm.materialTypes) {
     const ten = stripAccents(l.name);
     if (ten.length >= 2 && toanVan.includes(ten) && !materialTypes.includes(l.name))
       materialTypes.push(l.name);
@@ -154,25 +154,25 @@ export function parseOcrText(text: string, dm: OcrCatalog): KetQuaOcr {
   const dongOcr: DongOcr[] = [];
   for (const hang of dong) {
     const lineNoAccent = stripAccents(hang);
-    const materialType = dm.loaiNL.find(
+    const materialType = dm.materialTypes.find(
       (l) => stripAccents(l.name).length >= 2 && lineNoAccent.includes(stripAccents(l.name))
     );
     if (!materialType) continue;
     const kgs = bocKg(hang);
     if (!kgs.length) continue;
     const kg = Math.max(...kgs);
-    if (!dongOcr.some((x) => x.loaiNL === materialType.name && x.kg === kg))
-      dongOcr.push({ loaiNL: materialType.name, kg });
+    if (!dongOcr.some((x) => x.materialType === materialType.name && x.kg === kg))
+      dongOcr.push({ materialType: materialType.name, kg });
   }
 
   return {
     text,
-    daiLy: supplier,
-    ngay: extractDate(text),
+    supplier,
+    date: extractDate(text),
     // Bỏ cụm ngày khỏi số tham khảo cho đỡ nhiễu (2/9/2026 không phải kg).
-    soKg: bocKg(text.replace(RE_DATE, " ")),
-    loaiNL: materialTypes,
-    dong: dongOcr,
+    kgValues: bocKg(text.replace(RE_DATE, " ")),
+    materialTypes,
+    lines: dongOcr,
   };
 }
 

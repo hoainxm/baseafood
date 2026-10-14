@@ -137,7 +137,7 @@ export default function WipProductionScreen() {
   const [domesticSales, persistDomesticSales] = useDomesticSales();
 
   // Người thao tác = tài khoản đang đăng nhập — gắn vào dòng khi lưu để lưu vết ai gửi.
-  const { nguoiDung: profile } = useAuth();
+  const { profile } = useAuth();
   const operator = profile?.fullName || profile?.username || "";
 
   const [ky, setKy] = useState<ViewPeriod>("ngay");
@@ -326,11 +326,11 @@ export default function WipProductionScreen() {
   /** Tạo loại bột tại chỗ (trùng tên ⇒ dùng lại loại có sẵn). Trả về bản ghi. */
   const addBatterRecord = (ten: string) => {
     const result = findOrCreateBatter(batterTypes, ten);
-    if (result.moi) {
+    if (result.isNew) {
       setBatterTypes(result.rows);
-      notify.saved(`Đã thêm loại bột "${result.bot.name}" vào danh mục`);
+      notify.saved(`Đã thêm loại bột "${result.batter.name}" vào danh mục`);
     }
-    return result.bot;
+    return result.batter;
   };
   const addBatter = (ten: string): string => addBatterRecord(ten).name;
   const batterEditor = useQuickCatalogEdit("botTam", batterTypes, setBatterTypes, { theo: "ten" });
@@ -661,13 +661,13 @@ export default function WipProductionScreen() {
 
     // Lô NL khai cho phiên ⇒ gắn cho mẻ cùng loài + bán nội địa cùng loại NL (kg để trống).
     const sessionLotResult = assignSessionLots({
-      mes: newWips,
-      banNoiDia: newDomesticSales,
-      loNl: sessionLotsOf(session),
-      dl: dlNhe,
-      nguoiGhi: operator,
-      luc: new Date().toISOString(),
-      taoId: newId,
+      wips: newWips,
+      domesticSales: newDomesticSales,
+      materialLots: sessionLotsOf(session),
+      traceData: dlNhe,
+      operator,
+      recordedAt: new Date().toISOString(),
+      newId,
     });
     if (sessionLotResult.lotInputs.length > 0) saveLotInputs([...lotInputs, ...sessionLotResult.lotInputs]);
     if (sessionLotResult.dispatches.length > 0) saveLotDispatches([...lotDispatches, ...sessionLotResult.dispatches]);
@@ -718,9 +718,9 @@ export default function WipProductionScreen() {
         : undefined
     );
 
-    if (sessionLotResult.khongKhop.length > 0)
+    if (sessionLotResult.mismatches.length > 0)
       notify.warning(
-        `${sessionLotResult.khongKhop.length} dòng không cùng loài với lô NL đã khai — chưa gắn lô. Gắn riêng ở sổ ngày ("Gắn lô NL").`
+        `${sessionLotResult.mismatches.length} dòng không cùng loài với lô NL đã khai — chưa gắn lô. Gắn riêng ở sổ ngày ("Gắn lô NL").`
       );
 
     const bg = lockRecordOf(session.productionDate, session.workshop);
@@ -1450,9 +1450,9 @@ export default function WipProductionScreen() {
                   </thead>
                   <tbody>
                     {batterByType.map((b) => (
-                      <tr key={b.ten} className="border-b border-border last:border-0">
-                        <td className="px-3 py-2">{b.ten}</td>
-                        <td className="tnum px-3 py-2 text-right">{num(b.soDong)}</td>
+                      <tr key={b.name} className="border-b border-border last:border-0">
+                        <td className="px-3 py-2">{b.name}</td>
+                        <td className="tnum px-3 py-2 text-right">{num(b.rowCount)}</td>
                         <td className="tnum px-3 py-2 text-right font-semibold">{kg(b.kg)}</td>
                       </tr>
                     ))}

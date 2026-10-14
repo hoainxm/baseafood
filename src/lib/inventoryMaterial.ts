@@ -60,22 +60,22 @@ import { getMaterialFamily, isSameMaterialFamily, getBalancingStockLineKind, get
 /** Một dòng sổ NXT nguyên liệu cho MỘT kỳ cân đối của MỘT họ nguyên liệu. */
 export interface MaterialPeriodNxtRow {
   periodId: string;
-  hoNL: string; // họ nguyên liệu (gom 2 size)
-  tenKy: string; // materialTypeName của kỳ (để hiện)
+  materialFamily: string; // họ nguyên liệu (gom 2 size)
+  periodMaterialName: string; // materialTypeName của kỳ (để hiện)
   startDate: string;
   endDate: string;
-  tonDau: number; // kho đông đầu kỳ (kế thừa kỳ trước / tồn đầu khai tay)
-  dongGui: number; // + vào kho tồn: ĐÔNG GỬI hoà giải (xem nguonDongGui)
+  openingKg: number; // kho đông đầu kỳ (kế thừa kỳ trước / tồn đầu khai tay)
+  freezeDepositKg: number; // + vào kho tồn: ĐÔNG GỬI hoà giải (xem freezeDepositSource)
   /** Đông gửi lấy từ đâu: dòng Gửi đông ở Cân đối › còn dở SX › chuyển kỳ âm (cũ). */
-  nguonDongGui: "can-doi" | "san-xuat" | "chuyen-ky" | "";
-  guiDongCanDoi: number; // Σ dòng "Gửi đông" ở Cân đối (kg dương) — để đối chiếu với conDoSX
-  conDoSX: number; // còn dở khai ở SX (0038) — luôn tính để đối chiếu
-  xaDong: number; // − khỏi kho tồn (dòng Lấy xả đông + chuyển kỳ dương cũ)
-  tonCuoi: number; // tonDau + dongGui − xaDong
-  nhapTuoi: number; // Σ nhập tươi trong kỳ (bối cảnh, không vào kho tồn)
-  theoNgayNhap: DailyQuantities; // nhập tươi theo ngày (cho báo cáo theo ngày)
-  canhBaoAm: boolean; // tonCuoi < 0 → lỗi ghi chép
-  seedTonDau: boolean; // tonDau lấy từ tồn đầu khai tay (kỳ đầu tiên của họ)
+  freezeDepositSource: "can-doi" | "san-xuat" | "chuyen-ky" | "";
+  balancingFreezeDepositKg: number; // Σ dòng "Gửi đông" ở Cân đối (kg dương) — để đối chiếu với productionLeftoverKg
+  productionLeftoverKg: number; // còn dở khai ở SX (0038) — luôn tính để đối chiếu
+  thawKg: number; // − khỏi kho tồn (dòng Lấy xả đông + chuyển kỳ dương cũ)
+  closingKg: number; // openingKg + freezeDepositKg − thawKg
+  freshInKg: number; // Σ nhập tươi trong kỳ (bối cảnh, không vào kho tồn)
+  dailyFreshIn: DailyQuantities; // nhập tươi theo ngày (cho báo cáo theo ngày)
+  isNegative: boolean; // closingKg < 0 → lỗi ghi chép
+  hasManualOpening: boolean; // openingKg lấy từ tồn đầu khai tay (kỳ đầu tiên của họ)
 }
 
 /**
@@ -167,25 +167,25 @@ function leftoverInPeriod(
 export function sumUnmatchedLeftover(
   periods: BalancingPeriod[],
   locks: DailyLock[],
-  range?: { tuNgay?: string; denNgay?: string; workshop?: Workshop },
+  range?: { fromDate?: string; toDate?: string; workshop?: Workshop },
 ): number {
   const workshop = range?.workshop;
   const periodDates = periods.map((ky) => ({
     ky,
-    ngay: new Set(getPeriodDates(ky)),
+    dates: new Set(getPeriodDates(ky)),
   }));
   let unmatched = 0;
   for (const lk of locks) {
     if (workshop && lk.workshop !== workshop) continue;
-    if (range?.tuNgay && lk.lockDate < range.tuNgay) continue;
-    if (range?.denNgay && lk.lockDate > range.denNgay) continue;
+    if (range?.fromDate && lk.lockDate < range.fromDate) continue;
+    if (range?.toDate && lk.lockDate > range.toDate) continue;
     const lb = lk.leftoverByMaterial;
     if (!lb) continue;
     for (const [ten, v] of Object.entries(lb)) {
       const kgv = Number(v) || 0;
       if (kgv <= 0) continue;
       const isMatch = periodDates.some(
-        (p) => p.ngay.has(lk.lockDate) && isSameMaterialFamily(ten, p.ky.materialTypeName),
+        (p) => p.dates.has(lk.lockDate) && isSameMaterialFamily(ten, p.ky.materialTypeName),
       );
       if (!isMatch) unmatched += kgv;
     }
@@ -215,7 +215,7 @@ function freshInByDay(
  * Dựng sổ NXT nguyên liệu theo kỳ, có KẾ THỪA tồn đầu giữa các kỳ cùng họ.
  *
  * Xử lý MỌI kỳ theo thứ tự ngày bắt đầu để chuỗi tồn đúng, rồi trả về những kỳ
- * rơi trong [tuNgay, denNgay] (lọc theo startDate). `workshop` để lọc nhập tươi
+ * rơi trong [fromDate, toDate] (lọc theo startDate). `workshop` để lọc nhập tươi
  * + tồn đầu khai tay; kỳ cân đối hiện chỉ có ở xưởng Đông.
  */
 export function computeMaterialNxt(
@@ -224,14 +224,14 @@ export function computeMaterialNxt(
   imports: MaterialImportItem[],
   opening: MaterialOpeningStock[],
   locks: DailyLock[],
-  range?: { tuNgay?: string; denNgay?: string; workshop?: Workshop },
+  range?: { fromDate?: string; toDate?: string; workshop?: Workshop },
 ): MaterialPeriodNxtRow[] {
   const workshop = range?.workshop;
   const sortedPeriods = [...periods].sort((a, b) =>
     (a.startDate || "").localeCompare(b.startDate || ""),
   );
 
-  const runningStock = new Map<string, number>(); // hoNL(lowercase) → tồn cuối gần nhất
+  const runningStock = new Map<string, number>(); // materialFamily(lowercase) → tồn cuối gần nhất
   const allPeriods: MaterialPeriodNxtRow[] = [];
 
   for (const ky of sortedPeriods) {
@@ -255,7 +255,7 @@ export function computeMaterialNxt(
     const productionLeftover = leftoverInPeriod(locks, ky, workshop);
     const balancingFreezeDeposit = sumBalancingFreezeDeposit(inputs, ky.id);
     const manualFreezeDeposit = sumNegativeCarry(inputs, ky.id);
-    const freezeDepositSource: MaterialPeriodNxtRow["nguonDongGui"] =
+    const freezeDepositSource: MaterialPeriodNxtRow["freezeDepositSource"] =
       balancingFreezeDeposit > 0 ? "can-doi" : productionLeftover > 0 ? "san-xuat" : manualFreezeDeposit > 0 ? "chuyen-ky" : "";
     const freezeDeposit =
       freezeDepositSource === "can-doi" ? balancingFreezeDeposit : freezeDepositSource === "san-xuat" ? productionLeftover : manualFreezeDeposit;
@@ -268,28 +268,28 @@ export function computeMaterialNxt(
 
     allPeriods.push({
       periodId: ky.id,
-      hoNL: materialFamily,
-      tenKy: ky.materialTypeName,
+      materialFamily,
+      periodMaterialName: ky.materialTypeName,
       startDate: ky.startDate || "",
       endDate: ky.endDate || ky.startDate || "",
-      tonDau: openingKg,
-      dongGui: freezeDeposit,
-      nguonDongGui: freezeDepositSource,
-      guiDongCanDoi: balancingFreezeDeposit,
-      conDoSX: productionLeftover,
-      xaDong,
-      tonCuoi: closingKg,
-      nhapTuoi: freshInKg,
-      theoNgayNhap: importsByDate,
-      canhBaoAm: closingKg < 0,
-      seedTonDau: isOpeningSeeded,
+      openingKg,
+      freezeDepositKg: freezeDeposit,
+      freezeDepositSource,
+      balancingFreezeDepositKg: balancingFreezeDeposit,
+      productionLeftoverKg: productionLeftover,
+      thawKg: xaDong,
+      closingKg,
+      freshInKg,
+      dailyFreshIn: importsByDate,
+      isNegative: closingKg < 0,
+      hasManualOpening: isOpeningSeeded,
     });
   }
 
   // Trả kỳ GIAO NHAU với khoảng ngày (không chỉ khớp ngày bắt đầu): kỳ kéo dài
   // nhiều ngày, lọc theo startDate thôi sẽ rụng kỳ đang chạy vắt qua khoảng.
-  const tu = range?.tuNgay;
-  const den = range?.denNgay;
+  const tu = range?.fromDate;
+  const den = range?.toDate;
   return allPeriods.filter((r) => {
     const s0 = r.startDate || "";
     const e0 = r.endDate || r.startDate || "";
@@ -328,43 +328,43 @@ export function computeMaterialNxt(
 
 /** Một dòng tồn NL "tổng" cho MỘT họ nguyên liệu, trong khoảng ngày đang xem. */
 export interface MaterialTotalStockFamily {
-  hoNL: string;
-  tonDau: number; // opening(mốc ≤ cuối kỳ) + Σ nhập từ mốc tới trước kỳ
-  nhapKy: number; // Σ nhập hàng trong kỳ
-  xuatSX: number; // 0 — chờ capture "NL lấy ra sản xuất"
+  materialFamily: string;
+  openingKg: number; // opening(mốc ≤ cuối kỳ) + Σ nhập từ mốc tới trước kỳ
+  inPeriodKg: number; // Σ nhập hàng trong kỳ
+  productionOutKg: number; // 0 — chờ capture "NL lấy ra sản xuất"
   /** Bán nội địa trong kỳ (NL bán thẳng, sổ domestic_sales mig 0054) — XUẤT, trừ tồn. */
-  banNoiDia: number;
-  tonCuoi: number; // tonDau + nhapKy − xuatSX − banNoiDia
-  dongGui: number; // THÔNG TIN (kho đông) — KHÔNG vào tonCuoi
-  xaDong: number; // THÔNG TIN — KHÔNG vào tonCuoi
-  seedTonDau: boolean; // tồn đầu có phần khai tay
-  canhBaoAm: boolean; // tonCuoi < 0
+  domesticSaleKg: number;
+  closingKg: number; // openingKg + inPeriodKg − productionOutKg − domesticSaleKg
+  freezeDepositKg: number; // THÔNG TIN (kho đông) — KHÔNG vào closingKg
+  thawKg: number; // THÔNG TIN — KHÔNG vào closingKg
+  hasManualOpening: boolean; // tồn đầu có phần khai tay
+  isNegative: boolean; // closingKg < 0
 }
 
 /** Một mốc tồn tổng cuối ngày (mọi họ gộp) — cho bảng "tồn theo ngày". */
 export interface MaterialTotalStockDay {
   date: string;
-  nhap: number;
-  xuatSX: number; // 0
-  banNoiDia: number; // NL bán thẳng trong ngày — trừ tồn
-  tonCuoi: number; // tồn tổng cuối ngày = tồn đầu tổng + Σ (nhập − bán nội địa) ≤ ngày
+  inKg: number;
+  productionOutKg: number; // 0
+  domesticSaleKg: number; // NL bán thẳng trong ngày — trừ tồn
+  closingKg: number; // tồn tổng cuối ngày = tồn đầu tổng + Σ (nhập − bán nội địa) ≤ ngày
 }
 
 export interface MaterialTotalStock {
-  theoHo: MaterialTotalStockFamily[];
-  theoNgay: MaterialTotalStockDay[];
-  tongTonDau: number;
-  tongNhap: number;
-  tongBanNoiDia: number;
-  tongTonCuoi: number;
-  tongDongGui: number;
-  tongXaDong: number;
-  soHo: number;
-  soCanhBao: number;
+  families: MaterialTotalStockFamily[];
+  days: MaterialTotalStockDay[];
+  totalOpeningKg: number;
+  totalInKg: number;
+  totalDomesticSaleKg: number;
+  totalClosingKg: number;
+  totalFreezeDepositKg: number;
+  totalThawKg: number;
+  familyCount: number;
+  warningCount: number;
 }
 
 /**
- * Dựng tồn NL "tổng" theo nhập hàng cho khoảng ngày [tuNgay, denNgay] + xưởng.
+ * Dựng tồn NL "tổng" theo nhập hàng cho khoảng ngày [fromDate, toDate] + xưởng.
  * Dòng theo HỌ nguyên liệu (không cần kỳ cân đối) ⇒ phủ cả 3 xưởng. Đông gửi/xả
  * đông lấy làm cột thông tin từ `computeMaterialNxt` (engine kỳ), KHÔNG cộng vào tồn.
  */
@@ -374,23 +374,23 @@ export function computeMaterialTotalStock(
   imports: MaterialImportItem[],
   opening: MaterialOpeningStock[],
   locks: DailyLock[],
-  range?: { tuNgay?: string; denNgay?: string; workshop?: Workshop },
+  range?: { fromDate?: string; toDate?: string; workshop?: Workshop },
   /** Sổ BÁN NỘI ĐỊA (mig 0054) — NL bán thẳng là khoản XUẤT, trừ tồn như nhập là cộng. */
   domesticSales: DomesticSaleItem[] = [],
 ): MaterialTotalStock {
   const workshop = range?.workshop;
-  const tu = range?.tuNgay ?? "0000-01-01";
-  const den = range?.denNgay ?? "9999-12-31";
+  const tu = range?.fromDate ?? "0000-01-01";
+  const den = range?.toDate ?? "9999-12-31";
   const matchesWorkshop = (w?: Workshop) => !workshop || w === workshop;
 
   // Đông gửi / xả đông (THÔNG TIN) — gom theo họ từ engine kỳ (kỳ giao khoảng).
   const kyRows = computeMaterialNxt(periods, inputs, imports, opening, locks, range);
-  const dongXa = new Map<string, { dongGui: number; xaDong: number }>();
+  const dongXa = new Map<string, { freezeDepositKg: number; thawKg: number }>();
   for (const r of kyRows) {
-    const k = r.hoNL.toLowerCase();
-    const cur = dongXa.get(k) ?? { dongGui: 0, xaDong: 0 };
-    cur.dongGui += r.dongGui;
-    cur.xaDong += r.xaDong;
+    const k = r.materialFamily.toLowerCase();
+    const cur = dongXa.get(k) ?? { freezeDepositKg: 0, thawKg: 0 };
+    cur.freezeDepositKg += r.freezeDepositKg;
+    cur.thawKg += r.thawKg;
     dongXa.set(k, cur);
   }
 
@@ -407,35 +407,35 @@ export function computeMaterialTotalStock(
   // Baseline-MỘT-LẦN theo họ: openTruoc (tồn đầu khai tay, mốc ≤ CUỐI khoảng xem —
   // mốc giữa khoảng vẫn áp, xem QUY TẮC MỐC ở trên) + mốc asOfDate mới nhất. Nhập
   // TRƯỚC mốc coi như đã nằm trong tồn đầu ⇒ không cộng lại.
-  const openByHo = new Map<string, { open: number; moc: string }>();
+  const openByHo = new Map<string, { open: number; anchorDate: string }>();
   for (const o of opening) {
     if (!matchesWorkshop(o.workshop)) continue;
     const ho = addFamily(o.materialTypeName);
     if (!ho) continue;
     if (o.asOfDate && o.asOfDate > den) continue; // mốc sau khoảng xem ⇒ chưa áp
     const k = ho.toLowerCase();
-    const cur = openByHo.get(k) ?? { open: 0, moc: "" };
+    const cur = openByHo.get(k) ?? { open: 0, anchorDate: "" };
     cur.open += o.quantityKg || 0;
-    if (o.asOfDate && o.asOfDate > cur.moc) cur.moc = o.asOfDate;
+    if (o.asOfDate && o.asOfDate > cur.anchorDate) cur.anchorDate = o.asOfDate;
     openByHo.set(k, cur);
   }
 
   // Nhập theo họ: tách trước-kỳ / trong-kỳ, LỌC baseline; đồng thời gom nhập theo
   // ngày (chỉ phần đã qua baseline ⇒ tồn theo ngày khớp Σ tồn theo họ).
-  const inByFamily = new Map<string, { truoc: number; ky: number }>();
+  const inByFamily = new Map<string, { before: number; period: number }>();
   const inByDay = new Map<string, number>();
   for (const r of imports) {
     if (!matchesWorkshop(r.workshop)) continue;
     const ho = addFamily(r.materialTypeName);
     if (!ho) continue;
     const k = ho.toLowerCase();
-    const moc = openByHo.get(k)?.moc ?? "";
+    const moc = openByHo.get(k)?.anchorDate ?? "";
     if (moc && r.deliveryDate < moc) continue; // trước baseline → đã trong tồn đầu
     const kg = r.quantityKg || 0;
-    const cur = inByFamily.get(k) ?? { truoc: 0, ky: 0 };
-    if (r.deliveryDate < tu) cur.truoc += kg;
+    const cur = inByFamily.get(k) ?? { before: 0, period: 0 };
+    if (r.deliveryDate < tu) cur.before += kg;
     else if (r.deliveryDate <= den) {
-      cur.ky += kg;
+      cur.period += kg;
       inByDay.set(r.deliveryDate, (inByDay.get(r.deliveryDate) ?? 0) + kg);
     }
     inByFamily.set(k, cur);
@@ -443,7 +443,7 @@ export function computeMaterialTotalStock(
 
   // Bán nội địa theo họ — cùng luật baseline với nhập (bán TRƯỚC mốc khai tồn đầu đã
   // nằm trong số khai tay ⇒ không trừ lại); trước kỳ trừ vào tồn đầu, trong kỳ là cột xuất.
-  const salesByFamily = new Map<string, { truoc: number; ky: number }>();
+  const salesByFamily = new Map<string, { before: number; period: number }>();
   const salesByDay = new Map<string, number>();
   for (const r of domesticSales) {
     if (!matchesWorkshop(r.workshop)) continue;
@@ -452,50 +452,50 @@ export function computeMaterialTotalStock(
     const ho = addFamily(r.materialTypeName);
     if (!ho) continue;
     const k = ho.toLowerCase();
-    const moc = openByHo.get(k)?.moc ?? "";
+    const moc = openByHo.get(k)?.anchorDate ?? "";
     if (moc && r.saleDate < moc) continue;
-    const cur = salesByFamily.get(k) ?? { truoc: 0, ky: 0 };
-    if (r.saleDate < tu) cur.truoc += kg;
+    const cur = salesByFamily.get(k) ?? { before: 0, period: 0 };
+    if (r.saleDate < tu) cur.before += kg;
     else if (r.saleDate <= den) {
-      cur.ky += kg;
+      cur.period += kg;
       salesByDay.set(r.saleDate, (salesByDay.get(r.saleDate) ?? 0) + kg);
     }
     salesByFamily.set(k, cur);
   }
 
   // Họ chỉ có ở kỳ (đông gửi/xả đông) cũng phải hiện.
-  for (const r of kyRows) familyNames.set(r.hoNL.toLowerCase(), r.hoNL);
+  for (const r of kyRows) familyNames.set(r.materialFamily.toLowerCase(), r.materialFamily);
 
   const theoHo: MaterialTotalStockFamily[] = [];
   for (const [k, materialFamily] of familyNames) {
     const priorOpening = openByHo.get(k)?.open ?? 0;
-    const nh = inByFamily.get(k) ?? { truoc: 0, ky: 0 };
-    const ban = salesByFamily.get(k) ?? { truoc: 0, ky: 0 };
-    const info = dongXa.get(k) ?? { dongGui: 0, xaDong: 0 };
+    const nh = inByFamily.get(k) ?? { before: 0, period: 0 };
+    const ban = salesByFamily.get(k) ?? { before: 0, period: 0 };
+    const info = dongXa.get(k) ?? { freezeDepositKg: 0, thawKg: 0 };
     // Bỏ họ trống trơn (không tồn đầu, không nhập/bán, không đông/xả) khỏi bảng.
     if (
-      priorOpening === 0 && nh.truoc === 0 && nh.ky === 0 && ban.truoc === 0 && ban.ky === 0 &&
-      info.dongGui === 0 && info.xaDong === 0
+      priorOpening === 0 && nh.before === 0 && nh.period === 0 && ban.before === 0 && ban.period === 0 &&
+      info.freezeDepositKg === 0 && info.thawKg === 0
     )
       continue;
-    const openingKg = priorOpening + nh.truoc - ban.truoc;
-    const closingKg = openingKg + nh.ky - ban.ky; // − xuất SX(0)
+    const openingKg = priorOpening + nh.before - ban.before;
+    const closingKg = openingKg + nh.period - ban.period; // − xuất SX(0)
     theoHo.push({
-      hoNL: materialFamily,
-      tonDau: openingKg,
-      nhapKy: nh.ky,
-      xuatSX: 0,
-      banNoiDia: ban.ky,
-      tonCuoi: closingKg,
-      dongGui: info.dongGui,
-      xaDong: info.xaDong,
-      seedTonDau: priorOpening > 0,
-      canhBaoAm: closingKg < 0,
+      materialFamily,
+      openingKg,
+      inPeriodKg: nh.period,
+      productionOutKg: 0,
+      domesticSaleKg: ban.period,
+      closingKg,
+      freezeDepositKg: info.freezeDepositKg,
+      thawKg: info.thawKg,
+      hasManualOpening: priorOpening > 0,
+      isNegative: closingKg < 0,
     });
   }
-  theoHo.sort((a, b) => b.tonCuoi - a.tonCuoi);
+  theoHo.sort((a, b) => b.closingKg - a.closingKg);
 
-  const totalOpening = theoHo.reduce((s, r) => s + r.tonDau, 0);
+  const totalOpening = theoHo.reduce((s, r) => s + r.openingKg, 0);
 
   // Tồn tổng theo NGÀY: tồn cuối ngày = tồn đầu tổng + Σ (nhập − bán nội địa) (đã qua
   // baseline) ≤ ngày. Ngày chỉ có bán nội địa cũng thành một dòng.
@@ -504,21 +504,21 @@ export function computeMaterialTotalStock(
     .reduce<MaterialTotalStockDay[]>((acc, date) => {
       const inKg = inByDay.get(date) ?? 0;
       const banND = salesByDay.get(date) ?? 0;
-      const prevRows = acc.length ? acc[acc.length - 1].tonCuoi : totalOpening;
-      acc.push({ date, nhap: inKg, xuatSX: 0, banNoiDia: banND, tonCuoi: prevRows + inKg - banND });
+      const prevRows = acc.length ? acc[acc.length - 1].closingKg : totalOpening;
+      acc.push({ date, inKg, productionOutKg: 0, domesticSaleKg: banND, closingKg: prevRows + inKg - banND });
       return acc;
     }, []);
 
   return {
-    theoHo,
-    theoNgay: byDate,
-    tongTonDau: totalOpening,
-    tongNhap: theoHo.reduce((s, r) => s + r.nhapKy, 0),
-    tongBanNoiDia: theoHo.reduce((s, r) => s + r.banNoiDia, 0),
-    tongTonCuoi: theoHo.reduce((s, r) => s + r.tonCuoi, 0),
-    tongDongGui: theoHo.reduce((s, r) => s + r.dongGui, 0),
-    tongXaDong: theoHo.reduce((s, r) => s + r.xaDong, 0),
-    soHo: theoHo.length,
-    soCanhBao: theoHo.filter((r) => r.canhBaoAm).length,
+    families: theoHo,
+    days: byDate,
+    totalOpeningKg: totalOpening,
+    totalInKg: theoHo.reduce((s, r) => s + r.inPeriodKg, 0),
+    totalDomesticSaleKg: theoHo.reduce((s, r) => s + r.domesticSaleKg, 0),
+    totalClosingKg: theoHo.reduce((s, r) => s + r.closingKg, 0),
+    totalFreezeDepositKg: theoHo.reduce((s, r) => s + r.freezeDepositKg, 0),
+    totalThawKg: theoHo.reduce((s, r) => s + r.thawKg, 0),
+    familyCount: theoHo.length,
+    warningCount: theoHo.filter((r) => r.isNegative).length,
   };
 }

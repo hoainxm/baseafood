@@ -177,7 +177,7 @@ Phân bố khai báo tên Việt theo khu: `lib` 1.129 · `design-system` 301 ·
 
 | Việc | Tier | Ghi chú |
 |---|---|---|
-| Tên trường kiểu dữ liệu `lib` (`LotNode.nhan`, `FlowStage.ten/kgCho`…) — KHÔNG lưu DB | 🟡 | `rename.mjs --props` trên `src/lib`; LOẠI kiểu trong `types.ts` (đã tiếng Anh) và mọi kiểu đi vào `toRow`/localStorage |
+| Tên trường kiểu dữ liệu `lib` (`LotNode.nhan`, `FlowStage.ten/kgCho`…) — KHÔNG lưu DB | 🟡 | ✅ xong 2026-10-14 — xem Kết quả tên trường `lib` |
 | Literal loại danh mục (`"daiLy"`…) + `theo: "ten"` + khóa cùng tên | 🟡 | đổi cùng lúc literal + khóa (grep `"daiLy"`), có test |
 | Đợt 5a/5f | 🔴 | ✅ code xong — xem Kết quả Đợt 5 |
 
@@ -192,6 +192,15 @@ Chủ dự án duyệt cả 5a + 5f, **tự chạy migration ở SQL Editor** (�
 - **`0060_english_policy_names.sql`:** chỉ `alter policy … rename` — policy public có hậu tố `_nguoi_dung/_toan_quyen/_cua_toi/_them/_sua/_xoa/_xem/_doc` thành `<bảng>_authenticated/_full_access/_own_rows/_insert/_update/_delete/_select/_read`; điều kiện quyền không đổi. Tên cũ lưu trong COMMENT để ROLLBACK đổi ngược chính xác. ⚠ Sau 0060 đừng chạy lại 0021/0047/0057 (tạo lại tên cũ song song) — cần thì chạy 0060 ngay sau.
 - **Kiểm:** hai migration chạy 2 lần trên Postgres nhúng (PGlite, lược đồ tối thiểu có CHECK nội tuyến + policy tên cũ + ca trùng tên) — lần 2 không đổi gì; CHECK vẫn chặn giá trị lạ; ROLLBACK trả đúng giá trị, default, tên policy. Preview demo: bộ đệm `cho-nhap` hiện "Chờ nhập", duyệt ghi `stocked`, nhật ký ghi `update`; kho lưu `noi-bo` hiện "Kho nhà".
 - Sau Đợt 5: `fields` **600**.
+
+### Kết quả tên trường `lib` (2026-10-14)
+
+- **Phạm vi:** mọi trường của kiểu khai trong `src/lib` (trừ `types.ts`), gồm cả trường "anh em" bị lexicon bỏ sót vì âm tiết ngắn (`ten`, `nhom`, `tu/den`, `loi`, `dong`…), cùng kiểu nhân bản ở màn hình (`NxtReportScreen`/`WarehouseNxtScreen` theo `nxtExcel`, `SessionLot`, tham số `MonthlyStockScreen`). Thêm các khóa object có kiểu SUY RA mà `--props` không với tới: giá trị trả về của `useAuth()` (`profile · isLoading · requiresLogin · isAdmin · signIn · createAccount · signOut`), `FILL_COLORS.header/edited`, bộ sinh ngẫu nhiên demo (`int`/`pick`).
+- **Thuật ngữ:** theo §2b (`opening/closing`, `inKg/outKg`, `freezeDeposit/thaw`, `yieldRatio`, `materialFamily`, `operator`…). Đối soát HĐĐT: sổ phần mềm = `ledger`, bản thuế gửi / bản tự tải = `sent` / `downloaded`, số hóa đơn = `invoiceNumber` (đếm = `invoiceCount`), ký hiệu = `series`, MST người bán = `sellerTaxCode`, dòng Excel = `fileRow`, chỉ số dòng AOA = `rowIndex`. Cặp lọc ngày `tu/den` → `fromDate/toDate` (`from` là từ khóa nên codemod từ chối); cạnh sơ đồ → `source/target`.
+- **CỐ Ý giữ (dữ liệu đã LƯU):** `SyncQueue.them/xoa` (hàng chờ dưới máy, khóa `.cho`, đánh dấu `naming-ok`); `ReconciliationSummary` + `ReconciliationRun.options` (`soChuanTen/benThue/cheDo`, jsonb `reconciliation_runs`) — màn đối soát ghi/đọc đúng khóa cũ, chỉ phía engine đổi tên; giá trị chế độ `haiBan/cungNgay`; khóa `Record` theo giá trị enum (`TraceStageKey` `nhap/kho`, `SumMismatchKind` `phi/chietKhau/lamTron`); mã cột / mã nút sơ đồ (`key: "tonDau"`, nút `tonBtp`).
+- **Bài học — lỗi `tsc` KHÔNG bắt:** (1) object dựng trong `.map`/biến tạm không có kiểu ngữ cảnh ⇒ rename không đổi khóa theo; sửa theo chẩn đoán `tsc` (chỉ đổi khi tên mới có thật trong kiểu đích). (2) Khóa của `Record<Union, …>` có khai báo rỗng ⇒ bộ sửa tự động suýt đổi `nhap` (giá trị enum) thành `importedKg` — luật: kiểu ánh xạ/chỉ mục chuỗi KHÔNG đụng. (3) Test truyền đầu vào qua `Partial` + spread (`{ sanXuat: [...] }`) ⇒ khóa cũ bị bỏ qua lặng lẽ, test vẫn xanh sai — chỉ lộ khi kiểm kiểu file test. (4) `toEqual({...})` trong test không có kiểu. ⇒ Kiểm kiểu CẢ file test bằng tsconfig tạm (`include: src`, bỏ `exclude`) trong lúc đổi tên.
+- **Kiểm:** `tsc` app + test 0 lỗi, 401 test, lint không thêm cảnh báo. Bộ máy đối soát (gần như không có test) chạy trên **4 file thật** của kế toán ở bản cũ (HEAD) và bản mới: kết quả engine, so hai bản, cùng MST cùng ngày và **mọi ô của file Excel xuất** giống hệt từng byte. Preview demo: 19 màn hiển thị, không lỗi console.
+- Sau đợt: `fields` **600 → 100**. Còn: `types.ts` (trường đã lưu — cần `fromRow`/`patchLegacy` đọc cả tên cũ, 🟡), kiểu khai riêng ở màn hình, khóa literal-union của design-system (`tim`, `vua/rong`, `tinh`, `nguon`) và literal loại danh mục.
 
 ### Cách chạy lại codemod
 

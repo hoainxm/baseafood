@@ -28,11 +28,11 @@ export function isDomesticSaleRow(r: { name: string }): boolean {
 
 export interface PeriodDomesticSales {
   /** kg DƯƠNG theo ngày (dòng Cân đối tự đổi dấu khi ghi). */
-  theoNgay: DailyQuantities;
-  tongKg: number;
+  dailyQuantities: DailyQuantities;
+  totalKg: number;
   /** Đơn giá bình quân gia quyền (VND/kg) trên các dòng có giá; không dòng nào có giá ⇒ null. */
-  giaBinhQuan: number | null;
-  soDong: number;
+  averagePrice: number | null;
+  rowCount: number;
 }
 
 /**
@@ -62,10 +62,10 @@ export function getPeriodDomesticSales(
     }
   }
   return {
-    theoNgay: byDate,
-    tongKg: totalKg,
-    giaBinhQuan: pricedKg > 0 ? Math.round(amount / pricedKg) : null,
-    soDong: rowCount,
+    dailyQuantities: byDate,
+    totalKg,
+    averagePrice: pricedKg > 0 ? Math.round(amount / pricedKg) : null,
+    rowCount,
   };
 }
 

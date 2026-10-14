@@ -367,7 +367,7 @@ export default function MonthlyStockScreen() {
   const baseLinesForWrite = (): { baseLines: MonthlyStockLine[]; carriedCount: number } => {
     if (!isPreview) return { baseLines: lines, carriedCount: 0 };
     const result = carryForwardIntoLedger(lines, month, carryWarehouse());
-    return { baseLines: result.lines, carriedCount: result.soDong };
+    return { baseLines: result.lines, carriedCount: result.rowCount };
   };
   const notifyCarried = (n: number) => {
     if (n) notify.saved(`Đã kế thừa ${n} dòng tồn cuối ${formatMonthLabel(prevMonth)} vào sổ ${formatMonthLabel(month)} rồi ghi số vừa gõ`);
@@ -583,24 +583,24 @@ export default function MonthlyStockScreen() {
   // ---------- Dồn kỳ ----------
   /* Ghi qua `carryForwardIntoLedger` (hàm thuần): dòng carry đã có chỉ đổi tồn đầu, giữ nhập/xuất,
      vị trí, ghi chú, vết Cân đối; dòng carry mất nguồn về tồn đầu 0. */
-  const describeZeroedLines = (result: { veKhong: number; bo: number }) =>
-    (result.veKhong ? ` · ${result.veKhong} dòng về tồn đầu 0 (tháng trước đã hết)` : "") +
-    (result.bo ? ` · bỏ ${result.bo} dòng trống` : "");
+  const describeZeroedLines = (result: { zeroed: number; removed: number }) =>
+    (result.zeroed ? ` · ${result.zeroed} dòng về tồn đầu 0 (tháng trước đã hết)` : "") +
+    (result.removed ? ` · bỏ ${result.removed} dòng trống` : "");
 
   const carryFromPrevMonth = () => {
     const result = carryForwardIntoLedger(lines, month, carryWarehouse());
-    if (!result.soDong && !result.veKhong && !result.bo) {
+    if (!result.rowCount && !result.zeroed && !result.removed) {
       notify.warning(`${formatMonthLabel(prevMonth)} không có tồn để dồn sang.`);
       return;
     }
     writeLines(result.lines);
-    notify.saved(`Đã kế thừa ${result.soDong} dòng · ${num(result.tongKg)} kg từ ${formatMonthLabel(prevMonth)}${describeZeroedLines(result)}`);
+    notify.saved(`Đã kế thừa ${result.rowCount} dòng · ${num(result.totalKg)} kg từ ${formatMonthLabel(prevMonth)}${describeZeroedLines(result)}`);
   };
 
   const carryToNextMonth = () => {
     const target = getNextMonth(month);
     const result = carryForwardIntoLedger(lines, target);
-    if (!result.soDong && !result.veKhong && !result.bo) {
+    if (!result.rowCount && !result.zeroed && !result.removed) {
       notify.warning("Tháng này không còn tồn cuối để dồn sang.");
       return;
     }
@@ -608,7 +608,7 @@ export default function MonthlyStockScreen() {
     setMonth(target);
     setWarehouse(ALL_WAREHOUSES);
     notify.saved(
-      `Đã dồn tồn cuối sang ${formatMonthLabel(target)} · ${result.soDong} dòng (${result.them} mới, ${result.capNhat} cập nhật tồn đầu, giữ nguyên nhập/xuất đã ghi)${describeZeroedLines(result)}`
+      `Đã dồn tồn cuối sang ${formatMonthLabel(target)} · ${result.rowCount} dòng (${result.added} mới, ${result.updated} cập nhật tồn đầu, giữ nguyên nhập/xuất đã ghi)${describeZeroedLines(result)}`
     );
   };
 
@@ -744,10 +744,10 @@ export default function MonthlyStockScreen() {
     const note = `${formatDateVN(date || todayIso())}: ${actionText}${reason.trim() ? ` — ${reason.trim()}` : ""}`;
     const original = lines.find((l) => l.id === row.id);
     if (!original) return;
-    const result = applyLotAction(original, kind, kg, { viTriDich: targetLocation, ghiChu: note, idMoi: `msl|${month}|${uid()}` });
+    const result = applyLotAction(original, kind, kg, { targetLocation, note, newId: `msl|${month}|${uid()}` });
     const prevRows = lines;
-    const updatedLines = lines.map((l) => (l.id === result.dong.id ? result.dong : l));
-    writeLines(result.dongTach ? [...updatedLines, result.dongTach] : updatedLines);
+    const updatedLines = lines.map((l) => (l.id === result.line.id ? result.line : l));
+    writeLines(result.splitLine ? [...updatedLines, result.splitLine] : updatedLines);
     setAction(null);
     notify.saved(`${row.itemName}: ${actionText}`, () => writeLines(prevRows));
   };
@@ -802,15 +802,15 @@ export default function MonthlyStockScreen() {
     setIsSyncOpen(true);
   };
   // Tách: MÃ KHÓ cần người quyết vs tên RÕ RÀNG (tự nhận loài, khỏi bận tâm).
-  const needsSync = catalogSync.chuaCo.filter((x) => !x.roRang);
-  const clearNames = catalogSync.chuaCo.filter((x) => x.roRang);
-  const targetOf = (x: { name: string; dichGoiY: CatalogTarget }): CatalogTarget => savedTargets[x.name] ?? x.dichGoiY;
+  const needsSync = catalogSync.missing.filter((x) => !x.roRang);
+  const clearNames = catalogSync.missing.filter((x) => x.roRang);
+  const targetOf = (x: { name: string; suggestedTarget: CatalogTarget }): CatalogTarget => savedTargets[x.name] ?? x.suggestedTarget;
   // Tên chuẩn được ánh xạ tới (mặc định = tên file nếu chưa chọn).
   const mappedName = (x: { name: string }) => (mapDB[x.name] ?? x.name).trim();
   const normalize = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " ");
   // Đếm trên TOÀN BỘ (cả mã khó lẫn rõ ràng) — mỗi dòng tự chọn đích.
-  const productCount = catalogSync.chuaCo.filter((x) => targetOf(x) === "product").length;
-  const materialCount = catalogSync.chuaCo.filter((x) => targetOf(x) === "material").length;
+  const productCount = catalogSync.missing.filter((x) => targetOf(x) === "product").length;
+  const materialCount = catalogSync.missing.filter((x) => targetOf(x) === "material").length;
 
   /**
    * Áp đồng bộ: mỗi mã (đích ≠ bỏ qua) NỐI vào tên chuẩn (mapCua). Tên chuẩn chưa
@@ -823,7 +823,7 @@ export default function MonthlyStockScreen() {
     const materialsToAdd: MaterialType[] = [];
     const productsToAdd: Product[] = [];
     const renames = new Map<string, string>(); // tên file → tên chuẩn (khi khác nhau)
-    for (const x of catalogSync.chuaCo) {
+    for (const x of catalogSync.missing) {
       const d = targetOf(x);
       if (d === "skip") continue;
       const canon = mappedName(x);
@@ -947,7 +947,7 @@ export default function MonthlyStockScreen() {
       const nam = parseYearFromFileName(file.name);
       // Kho mặc định: kho của bản đã nạp cùng năm (nạp lại chỉ CẬP NHẬT) → kho khớp số ở tiêu đề sheet → K1500T.
       const daNap = lines.find((l) => l.id.startsWith("xlsx|") && l.id.split("|")[3] === String(nam));
-      const so = parseWarehouseFromTitle(sheets[0]?.tieuDe ?? "");
+      const so = parseWarehouseFromTitle(sheets[0]?.title ?? "");
       const titleWarehouse = so ? BSF1_WAREHOUSES.find((w) => w.code.includes(so) || w.name.includes(so))?.name : undefined;
       setNapForm({ sheets, nam, warehouse: daNap?.warehouse ?? titleWarehouse ?? DEFAULT_WAREHOUSE });
     } catch (err) {
@@ -960,7 +960,7 @@ export default function MonthlyStockScreen() {
   /** Soát trước khi nạp: số kho ở tiêu đề sheet + bản nạp cũ của cùng năm ở kho KHÁC (nạp nhầm = cộng đôi). */
   const importCheck = useMemo(() => {
     if (!napForm) return null;
-    const titleWarehouses = [...new Set(napForm.sheets.map((sh) => parseWarehouseFromTitle(sh.tieuDe)).filter(Boolean))];
+    const titleWarehouses = [...new Set(napForm.sheets.map((sh) => parseWarehouseFromTitle(sh.title)).filter(Boolean))];
     const ma = warehouseCode(napForm.warehouse.trim());
     const otherWarehouses = new Map<string, number>();
     for (const l of lines) {
@@ -973,8 +973,8 @@ export default function MonthlyStockScreen() {
     for (const sh of napForm.sheets)
       for (const r of sh.rows) {
         nhom.set(r.category, (nhom.get(r.category) ?? 0) + 1);
-        if (r.khoGhi) {
-          const ten = findWarehouseByText(r.khoGhi, storageLocationCatalog) ?? `${buildNewWarehouseName(r.khoGhi)} (mới)`;
+        if (r.warehouseNote) {
+          const ten = findWarehouseByText(r.warehouseNote, storageLocationCatalog) ?? `${buildNewWarehouseName(r.warehouseNote)} (mới)`;
           noteWarehouses.set(ten, (noteWarehouses.get(ten) ?? 0) + 1);
         }
       }
@@ -1028,7 +1028,7 @@ export default function MonthlyStockScreen() {
           size: r.size,
           origin: r.origin,
           importDate: r.importDate,
-          storageLocation: r.khoGhi ? resolveWarehouse(r.khoGhi) : "",
+          storageLocation: r.warehouseNote ? resolveWarehouse(r.warehouseNote) : "",
           kgPerCtn: r.kgPerCtn,
           unitPrice: r.unitPrice,
           openCtn: r.openCtn,
@@ -1039,7 +1039,7 @@ export default function MonthlyStockScreen() {
           outKg: r.outKg,
           carriedFromId: "",
           sortOrder: idx,
-          note: r.ghiChu ? `Bảng kê: ${r.ghiChu}` : "",
+          note: r.note ? `Bảng kê: ${r.note}` : "",
         });
       });
     }
@@ -1051,14 +1051,14 @@ export default function MonthlyStockScreen() {
     // sheet) mà file mới không còn: toàn số 0 ⇒ bỏ; còn số ⇒ giữ + cảnh báo (không xoá lặng lẽ).
     // Dòng đã TÁCH khi chuyển kho một phần: nạp lại trả dòng gốc về số trong file ⇒ phần tách đếm 2 lần.
     const result = ghepNapLai(lines, newLines, maNap);
-    const { cuConSo: staleWithQty, soTach: splitCount, lechTen: nameMismatches } = result;
+    const { staleWithData: staleWithQty, splitCount, nameMismatches } = result;
     writeLines(result.lines);
     if (addedWarehouses.length) setStorageLocationCatalog(warehouseCatalog);
     if (nameMismatches.length)
       notify.warning(
         `${nameMismatches.length} dòng đổi tên hàng so với lần nạp trước (file chèn/xoá dòng?) — không giữ vị trí/ghi chú cũ cho các dòng này: ${nameMismatches
           .slice(0, 3)
-          .map((x) => `${x.cu.itemName} → ${x.moi.itemName}`)
+          .map((x) => `${x.previous.itemName} → ${x.next.itemName}`)
           .join(", ")}${nameMismatches.length > 3 ? "…" : ""}`
       );
     if (staleWithQty.length)
@@ -1073,7 +1073,7 @@ export default function MonthlyStockScreen() {
     notify.saved(
       `Đã nạp ${newLines.length} dòng · ${new Set(newLines.map((m) => m.period)).size} tháng từ Excel bảng kê` +
         (depositedCount ? ` · ${depositedCount} dòng gửi kho ngoài` : "") +
-        (result.thayIdCu ? ` · thay ${result.thayIdCu} dòng nạp cũ (tên sheet cũ)` : "") +
+        (result.replacedOldIds ? ` · thay ${result.replacedOldIds} dòng nạp cũ (tên sheet cũ)` : "") +
         (addedWarehouses.length ? ` · thêm kho mới: ${addedWarehouses.join(", ")}` : ""),
     );
   };
@@ -1566,11 +1566,11 @@ export default function MonthlyStockScreen() {
                 <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-warning" aria-hidden />
                 <div className="min-w-0 space-y-1">
                   <p className="font-semibold text-foreground">
-                    Lệch dồn kỳ: tồn đầu {formatMonthLabel(month)} ({num(carryGap.openNay)} kg) ≠ tồn cuối{" "}
-                    {formatMonthLabel(prevMonth)} ({num(carryGap.closeTruoc)} kg) — lệch{" "}
+                    Lệch dồn kỳ: tồn đầu {formatMonthLabel(month)} ({num(carryGap.currentOpen)} kg) ≠ tồn cuối{" "}
+                    {formatMonthLabel(prevMonth)} ({num(carryGap.prevClose)} kg) — lệch{" "}
                     <span className="text-warning">
-                      {carryGap.lech > 0 ? "+" : ""}
-                      {num(carryGap.lech)} kg
+                      {carryGap.diff > 0 ? "+" : ""}
+                      {num(carryGap.diff)} kg
                     </span>
                     .
                   </p>
@@ -1579,13 +1579,13 @@ export default function MonthlyStockScreen() {
                     chép dồn kỳ sai — soi các nhóm dưới rồi sửa lô ghi lệch (giữ số theo sổ, không ghi đè
                     tự động).
                   </p>
-                  {carryGap.theoNhom.length > 0 && (
+                  {carryGap.groups.length > 0 && (
                     <ul className="text-sm text-muted-foreground">
-                      {carryGap.theoNhom.map((g) => (
+                      {carryGap.groups.map((g) => (
                         <li key={g.category}>
                           • <span className="font-medium text-foreground">{g.category}</span>: cuối{" "}
-                          {num(g.closeTruoc)} → đầu {num(g.openNay)} ({g.lech > 0 ? "+" : ""}
-                          {num(g.lech)} kg)
+                          {num(g.prevClose)} → đầu {num(g.currentOpen)} ({g.diff > 0 ? "+" : ""}
+                          {num(g.diff)} kg)
                         </li>
                       ))}
                     </ul>
@@ -1609,13 +1609,13 @@ export default function MonthlyStockScreen() {
                   <h2 className="text-lg font-semibold text-foreground">{g.category}</h2>
                   {/* Hai nhãn ngắn thay một nhãn dài — điện thoại + chữ 130% tự xuống dòng, không bị cắt số. */}
                   <span className="flex flex-wrap gap-1">
-                    <Tag variant="phu">Tồn cuối {num(g.tong.closeKg)} kg</Tag>
+                    <Tag variant="phu">Tồn cuối {num(g.totals.closeKg)} kg</Tag>
                     <Tag variant="phu">{g.rows.length} mặt hàng</Tag>
                   </span>
                 </div>
                 <SummaryTable
                   rows={g.rows}
-                  columns={summaryColumns(g.tong)}
+                  columns={summaryColumns(g.totals)}
                   getKey={(r) => r.id}
                   totalLabel={`Cộng ${g.category}`}
                   selection={tableSelection}
@@ -2109,11 +2109,11 @@ export default function MonthlyStockScreen() {
                             {[d.warehouse, d.category].filter(Boolean).join(" · ")}
                           </div>
                         </td>
-                        <td className="tnum px-3 py-2 text-right">{num(d.closeTruocKg)}</td>
-                        <td className="tnum px-3 py-2 text-right">{num(d.openNayKg)}</td>
+                        <td className="tnum px-3 py-2 text-right">{num(d.prevCloseKg)}</td>
+                        <td className="tnum px-3 py-2 text-right">{num(d.currentOpenKg)}</td>
                         <td className="tnum px-3 py-2 text-right font-semibold text-warning">
-                          {d.lechKg > 0 ? "+" : ""}
-                          {num(d.lechKg)}
+                          {d.diffKg > 0 ? "+" : ""}
+                          {num(d.diffKg)}
                         </td>
                         <td className="px-3 py-2 text-right">
                           <Button size="sm" variant="outline" onClick={() => manualFixProduct(d)} title="Mở lưới ghi đã lọc sẵn đúng mặt hàng này, để tự chỉnh tồn đầu / nhập / xuất cho khớp tháng trước.">
@@ -2155,13 +2155,13 @@ export default function MonthlyStockScreen() {
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="flex flex-wrap gap-2 text-sm">
-              <Tag variant="phu">{catalogSync.tongTen} tên trong sổ</Tag>
+              <Tag variant="phu">{catalogSync.nameCount} tên trong sổ</Tag>
               <Tag variant="phu">
-                đã có: {catalogSync.daCoMH} mặt hàng · {catalogSync.daCoNL} loại NL
+                đã có: {catalogSync.inProducts} mặt hàng · {catalogSync.inMaterialTypes} loại NL
               </Tag>
               <Tag variant={needsSync.length > 0 ? "loi" : "phu"}>{needsSync.length} mã khó cần đồng bộ</Tag>
               <Tag variant="phu">{clearNames.length} tên rõ ràng</Tag>
-              <Tag variant={catalogSync.nhomTrung.length > 0 ? "loi" : "phu"}>{catalogSync.nhomTrung.length} nhóm trùng cách ghi</Tag>
+              <Tag variant={catalogSync.duplicateGroups.length > 0 ? "loi" : "phu"}>{catalogSync.duplicateGroups.length} nhóm trùng cách ghi</Tag>
             </div>
 
             {needsSync.length > 0 && (
@@ -2218,11 +2218,11 @@ export default function MonthlyStockScreen() {
               </details>
             )}
 
-            {catalogSync.nhomTrung.length > 0 && (
+            {catalogSync.duplicateGroups.length > 0 && (
               <div className="space-y-2">
                 <h3 className="font-semibold text-foreground">Tên chỉ khác nhau cách ghi (nên gộp về một)</h3>
                 <div className="max-h-[28dvh] space-y-1 overflow-auto rounded-lg border border-warning/40 bg-warning/5 p-2 text-sm">
-                  {catalogSync.nhomTrung.map((g) => (
+                  {catalogSync.duplicateGroups.map((g) => (
                     <div key={g.variants.join("|")} className="text-muted-foreground">
                       • {g.variants.map((v) => `"${v}"`).join("  ·  ")}
                     </div>
@@ -2235,7 +2235,7 @@ export default function MonthlyStockScreen() {
               </div>
             )}
 
-            {catalogSync.chuaCo.length === 0 && catalogSync.nhomTrung.length === 0 && (
+            {catalogSync.missing.length === 0 && catalogSync.duplicateGroups.length === 0 && (
               <div className="flex items-center gap-2 rounded-lg border border-success/50 bg-success/10 p-3 text-success">
                 <CheckCircle2 className="h-5 w-5" aria-hidden />
                 <span className="font-semibold">Tên trong sổ đã khớp danh mục, không có tên trùng cách ghi.</span>
@@ -2333,7 +2333,7 @@ export default function MonthlyStockScreen() {
                         <td className="tnum border-b border-border px-3 py-2 text-right font-bold text-foreground">
                           {num(t.closeKg)}
                         </td>
-                        <td className="tnum border-b border-border px-3 py-2 text-right">{t.soDong}</td>
+                        <td className="tnum border-b border-border px-3 py-2 text-right">{t.rowCount}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -2427,11 +2427,11 @@ function FragmentGroup({ group }: { group: ReturnType<typeof groupByCategory>[nu
       ))}
       <tr>
         <PrintTd bold colSpan={2}>Cộng {group.category}</PrintTd>
-        <PrintTd bold right>{num(group.tong.openKg)}</PrintTd>
-        <PrintTd bold right>{num(group.tong.inKg)}</PrintTd>
-        <PrintTd bold right>{num(group.tong.outKg)}</PrintTd>
-        <PrintTd bold right>{num(group.tong.closeKg)}</PrintTd>
-        <PrintTd bold right>{num(Math.round(group.tong.remainingValue))}</PrintTd>
+        <PrintTd bold right>{num(group.totals.openKg)}</PrintTd>
+        <PrintTd bold right>{num(group.totals.inKg)}</PrintTd>
+        <PrintTd bold right>{num(group.totals.outKg)}</PrintTd>
+        <PrintTd bold right>{num(group.totals.closeKg)}</PrintTd>
+        <PrintTd bold right>{num(Math.round(group.totals.remainingValue))}</PrintTd>
       </tr>
     </>
   );

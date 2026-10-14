@@ -103,8 +103,8 @@ describe("sumBatterByType", () => {
         undefined,
       ])
     ).toEqual([
-      { ten: "Bột 18V", kg: 30, soDong: 1 },
-      { ten: "Bột 24V", kg: 15, soDong: 2 },
+      { name: "Bột 18V", kg: 30, rowCount: 1 },
+      { name: "Bột 24V", kg: 15, rowCount: 2 },
     ]);
   });
 });
@@ -128,19 +128,19 @@ describe("findOrCreateBatter — tạo loại bột tại chỗ, không đẻ b�
   it("gõ trùng tên / mã / tên ngắn ⇒ dùng lại loại có sẵn", () => {
     for (const go of ["Bột 20802", "bột 20802", "20802", " 20802 "]) {
       const result = findOrCreateBatter(BATTER_TYPE_SEED, go);
-      expect(result.moi).toBe(false);
-      expect(result.bot.id).toBe("bot-20802");
+      expect(result.isNew).toBe(false);
+      expect(result.batter.id).toBe("bot-20802");
       expect(result.rows).toBe(BATTER_TYPE_SEED);
     }
   });
   it("gõ mã trơn mới ⇒ tạo 'Bột <mã>' kèm mã; gõ có tiền tố ⇒ giữ nguyên tên", () => {
     const a = findOrCreateBatter(BATTER_TYPE_SEED, "25X");
-    expect(a.moi).toBe(true);
-    expect(a.bot.name).toBe("Bột 25X");
-    expect(a.bot.code).toBe("25X");
+    expect(a.isNew).toBe(true);
+    expect(a.batter.name).toBe("Bột 25X");
+    expect(a.batter.code).toBe("25X");
     expect(a.rows).toHaveLength(BATTER_TYPE_SEED.length + 1);
     const b = findOrCreateBatter(BATTER_TYPE_SEED, "Bột chiên xù");
-    expect(b.bot.name).toBe("Bột chiên xù");
-    expect(b.bot.code).toBe("");
+    expect(b.batter.name).toBe("Bột chiên xù");
+    expect(b.batter.code).toBe("");
   });
 });

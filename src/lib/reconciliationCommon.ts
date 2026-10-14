@@ -27,21 +27,21 @@ export const FILL_COLORS = {
   xanh: "FFC6EFCE",
   vang: "FFFFEB9C",
   do: "FFFFC7CE",
-  tieuDe: "FFD9E1F2",
-  sua: "FFFFD966",
+  header: "FFD9E1F2",
+  edited: "FFFFD966",
   title: "FF17529C",
 } as const;
 
 /** Nền đặc kiểu exceljs. */
 export const solidFill = (argb: string) => ({ type: "pattern" as const, pattern: "solid" as const, fgColor: { argb } });
 
-/** Khóa ô người dùng bấm Sửa: `sheet#soDong#cot` (tên sheet có thể chứa "#"). */
+/** Khóa ô người dùng bấm Sửa: `sheet#rowIndex#cot` (tên sheet có thể chứa "#"). */
 export const buildEditKey = (sheet: string, rowNo: number, columns: number): string => `${sheet}#${rowNo}#${columns}`;
 
 /** Tách khóa ô Sửa ngược lại. */
-export function parseEditKey(k: string): { sheet: string; soDong: number; cot: number } {
+export function parseEditKey(k: string): { sheet: string; rowIndex: number; column: number } {
   const parts = k.split("#");
   const columns = Number(parts.pop());
   const rowNo = Number(parts.pop());
-  return { sheet: parts.join("#"), soDong: rowNo, cot: columns };
+  return { sheet: parts.join("#"), rowIndex: rowNo, column: columns };
 }

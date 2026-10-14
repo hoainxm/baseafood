@@ -202,11 +202,11 @@ export default function BalancingScreen() {
       allMaterialRows.filter((r) => r.periodId === k.id),
       [],
       {
-        nhanKy: `${k.materialTypeName} ${k.dateRangeDescription ?? ""}`.trim(),
-        hoNL: getMaterialFamily(k.materialTypeName),
+        periodLabel: `${k.materialTypeName} ${k.dateRangeDescription ?? ""}`.trim(),
+        materialFamily: getMaterialFamily(k.materialTypeName),
       }
     );
-    if (stockSyncResult.doi) writeStockLedger(stockSyncResult.lines);
+    if (stockSyncResult.changed) writeStockLedger(stockSyncResult.lines);
     persistKy(kyList.filter((x) => x.id !== k.id));
     writeMaterials(allMaterialRows.filter((r) => r.periodId !== k.id));
     /* Phế liệu cân ở màn Nhập hàng chỉ MƯỢN kỳ này — xóa kỳ thì gỡ liên kết,
@@ -242,7 +242,7 @@ export default function BalancingScreen() {
         writeFinishedGoods(prevFinishedGoods);
         writeImports(prevImports);
         writeProductions(prevProduction);
-        if (stockSyncResult.doi) writeStockLedger(prevStock);
+        if (stockSyncResult.changed) writeStockLedger(prevStock);
       }
     );
   };

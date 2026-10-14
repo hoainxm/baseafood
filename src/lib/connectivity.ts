@@ -19,18 +19,18 @@
 export type ConnectionStatus = "chua-ro" | "da-noi" | "loi";
 
 export interface ConnectionSnapshot {
-  trang: ConnectionStatus;
-  loi: string;
+  status: ConnectionStatus;
+  error: string;
 }
 
 // Snapshot bất biến — đổi tham chiếu chỉ khi trạng thái đổi, để
 // useSyncExternalStore không render vô hạn.
-let snapshot: ConnectionSnapshot = { trang: "chua-ro", loi: "" };
+let snapshot: ConnectionSnapshot = { status: "chua-ro", error: "" };
 const listeners = new Set<() => void>();
 
 function setStatus(status: ConnectionStatus, loi: string) {
-  if (snapshot.trang === status && snapshot.loi === loi) return;
-  snapshot = { trang: status, loi };
+  if (snapshot.status === status && snapshot.error === loi) return;
+  snapshot = { status, error: loi };
   listeners.forEach((f) => f());
 }
 

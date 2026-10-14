@@ -110,16 +110,16 @@ export function computeBatterRatio(kgBot: number, finishedGoodKg: number): numbe
 /** Cộng dồn bột của nhiều dòng theo loại — kg + số dòng dùng; nhiều kg đứng trước. */
 export function sumBatterByType(
   items: (Record<string, number> | undefined)[]
-): { ten: string; kg: number; soDong: number }[] {
-  const m = new Map<string, { ten: string; kg: number; soDong: number }>();
+): { name: string; kg: number; rowCount: number }[] {
+  const m = new Map<string, { name: string; kg: number; rowCount: number }>();
   for (const d of items)
     for (const [ten, kg] of Object.entries(sanitizeBatterKg(d))) {
-      const cur = m.get(ten) ?? { ten, kg: 0, soDong: 0 };
+      const cur = m.get(ten) ?? { name: ten, kg: 0, rowCount: 0 };
       cur.kg += kg;
-      cur.soDong += 1;
+      cur.rowCount += 1;
       m.set(ten, cur);
     }
-  return [...m.values()].sort((a, b) => b.kg - a.kg || a.ten.localeCompare(b.ten, "vi"));
+  return [...m.values()].sort((a, b) => b.kg - a.kg || a.name.localeCompare(b.name, "vi"));
 }
 
 /** Nhãn ngắn trong ô hẹp: bỏ tiền tố "Bột " — "Bột 24V" → "24V". */
@@ -147,7 +147,7 @@ export function listVisibleBatters(diKem: string[], botKg: Record<string, number
 export function findOrCreateBatter(
   rows: BatterType[],
   ten: string
-): { bot: BatterType; rows: BatterType[]; moi: boolean } {
+): { batter: BatterType; rows: BatterType[]; isNew: boolean } {
   const trimmedName = ten.trim();
   const labelKey = toShortBatterLabel(trimmedName).toLowerCase();
   const co = rows.find(
@@ -155,7 +155,7 @@ export function findOrCreateBatter(
       toShortBatterLabel(b.name.trim()).toLowerCase() === labelKey ||
       (b.code.trim() !== "" && b.code.trim().toLowerCase() === labelKey)
   );
-  if (co) return { bot: co, rows, moi: false };
+  if (co) return { batter: co, rows, isNew: false };
   const hasPrefix = /^bột\s/i.test(trimmedName);
   const bot: BatterType = {
     id: uid(),
@@ -163,5 +163,5 @@ export function findOrCreateBatter(
     name: hasPrefix ? trimmedName : `Bột ${trimmedName}`,
     note: "",
   };
-  return { bot, rows: [...rows, bot], moi: true };
+  return { batter: bot, rows: [...rows, bot], isNew: true };
 }

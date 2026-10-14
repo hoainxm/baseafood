@@ -64,7 +64,7 @@ describe("hút sổ nhập vào kỳ cân đối", () => {
     expect(lay.map((r) => r.deliveryDate).sort()).toEqual(["2026-09-01", "2026-09-01", "2026-09-03", "2026-09-05"]);
     const grouped = groupImportsByMaterialType(lay);
     expect([...grouped.keys()]).toEqual(["Bạch tuộc 2 da"]);
-    expect(grouped.get("Bạch tuộc 2 da")!.theoNgay).toEqual({ "2026-09-01": 7964, "2026-09-03": 5019, "2026-09-05": 2491 });
+    expect(grouped.get("Bạch tuộc 2 da")!.dailyQuantities).toEqual({ "2026-09-01": 7964, "2026-09-03": 5019, "2026-09-05": 2491 });
   });
 
   test("chuyến đã thuộc kỳ khác không bị hút lại", () => {
@@ -126,7 +126,7 @@ describe("dòng mẫu khối 2", () => {
 
   test("mỗi mặt hàng × khách × GIÁ một dòng mẫu; khác khách hoặc khác giá vẫn tách", () => {
     const templates = buildFinishedGoodTemplateRows(allOutputs.filter((r) => r.periodId === "K2"));
-    expect(templates.map((m) => [m.khoa, m.unitPrice])).toEqual([
+    expect(templates.map((m) => [m.key, m.unitPrice])).toEqual([
       [finishedGoodTemplateKey("luoc230", "", "hanwa"), 10.43],
       [finishedGoodTemplateKey("tambot", "", "jfda"), 9.3],
       [finishedGoodTemplateKey("tambot", "", "dairei"), 9.2],
@@ -170,16 +170,16 @@ describe("dòng kho khối NL — getBalancingStockLineKind", () => {
 
 describe("Trả · Nợ — splitRepaidDebt / setRepaidDebt", () => {
   test("chuyển kỳ cũ (chưa có debtKg) hiện ở Trả", () => {
-    expect(splitRepaidDebt({ carryOverKg: -2000 })).toEqual({ tra: -2000, no: 0 });
+    expect(splitRepaidDebt({ carryOverKg: -2000 })).toEqual({ repaidKg: -2000, debtKg: 0 });
   });
   test("ghi một cột giữ cột kia, tổng chuyển kỳ = Trả + Nợ (có dấu)", () => {
-    const after = setRepaidDebt({ carryOverKg: -2000 }, { no: 258 });
+    const after = setRepaidDebt({ carryOverKg: -2000 }, { debtKg: 258 });
     expect(after).toEqual({ carryOverKg: -1742, debtKg: 258 });
-    expect(splitRepaidDebt(after)).toEqual({ tra: -2000, no: 258 });
-    expect(setRepaidDebt(after, { tra: 0 })).toEqual({ carryOverKg: 258, debtKg: 258 });
+    expect(splitRepaidDebt(after)).toEqual({ repaidKg: -2000, debtKg: 258 });
+    expect(setRepaidDebt(after, { repaidKg: 0 })).toEqual({ carryOverKg: 258, debtKg: 258 });
   });
   test("số lẻ không trôi dấu phẩy động", () => {
-    expect(splitRepaidDebt(setRepaidDebt({ carryOverKg: 0.3 }, { no: 0.1 }))).toEqual({ tra: 0.3, no: 0.1 });
+    expect(splitRepaidDebt(setRepaidDebt({ carryOverKg: 0.3 }, { debtKg: 0.1 }))).toEqual({ repaidKg: 0.3, debtKg: 0.1 });
   });
 });
 

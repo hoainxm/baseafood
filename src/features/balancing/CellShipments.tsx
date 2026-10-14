@@ -53,27 +53,27 @@ export function CellShipments({
             Ngày {formatDateVN(date)} · {n} chuyến · {num(suppliers.reduce((s, d) => s + d.kg, 0))} kg
           </p>
           {suppliers.map((d) => (
-            <div key={d.daiLy} className="space-y-1">
+            <div key={d.supplier} className="space-y-1">
               <p className="text-sm font-semibold text-foreground">
-                {d.daiLy}{" "}
+                {d.supplier}{" "}
                 <span className="font-normal text-muted-foreground">
-                  · {d.chuyen.length} chuyến · {num(d.kg)} kg
-                  {d.tien > 0 ? ` · ${num(Math.round(d.tien))} đ` : ""}
+                  · {d.shipments.length} chuyến · {num(d.kg)} kg
+                  {d.amount > 0 ? ` · ${num(Math.round(d.amount))} đ` : ""}
                 </span>
               </p>
               <ul className="space-y-1 border-l-2 border-border pl-3">
-                {d.chuyen.map((c) => (
+                {d.shipments.map((c) => (
                   <li key={c.shipmentId} className="text-sm">
-                    <span className="font-medium text-foreground">{c.nhan}</span>
+                    <span className="font-medium text-foreground">{c.label}</span>
                     <span className="text-muted-foreground">
                       {" "}
-                      · {num(c.kg)} kg{c.xe ? ` · ${c.xe}` : ""}
+                      · {num(c.kg)} kg{c.vehicle ? ` · ${c.vehicle}` : ""}
                     </span>
                     <ul className="text-muted-foreground">
-                      {c.dong.map((x) => (
+                      {c.lines.map((x) => (
                         <li key={x.id} className="tnum">
-                          {x.loai}: {num(x.kg)} kg
-                          {x.donGia != null ? ` × ${num(x.donGia)} đ` : " · chưa có giá"}
+                          {x.materialType}: {num(x.kg)} kg
+                          {x.unitPrice != null ? ` × ${num(x.unitPrice)} đ` : " · chưa có giá"}
                         </li>
                       ))}
                     </ul>

@@ -67,10 +67,10 @@ function useConnectionStatus() {
   const snapshot = React.useSyncExternalStore(connectivity.subscribe, connectivity.getSnapshot);
   const status: SyncState = !hasSupabase
     ? "cuc-bo"
-    : snapshot.trang === "chua-ro"
+    : snapshot.status === "chua-ro"
       ? "dang-kiem"
-      : snapshot.trang;
-  return { trang: status, loi: snapshot.loi };
+      : snapshot.status;
+  return { trang: status, loi: snapshot.error };
 }
 
 /**

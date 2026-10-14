@@ -25,11 +25,11 @@ const laLo = (n: LotNode) => n.kind === "S" || n.kind === "W" || n.kind === "P";
 /** Các dòng chữ phụ in dưới mã lô. */
 function labelLines(node: LotNode): string[] {
   return [
-    `${TRACE_KIND_LABELS[node.kind]} · ${node.moTa}`,
-    [node.ngay && formatDateVN(node.ngay), node.xuong && `xưởng ${node.xuong}`, node.kg ? kg(Math.round(node.kg * 10) / 10) : ""]
+    `${TRACE_KIND_LABELS[node.kind]} · ${node.description}`,
+    [node.date && formatDateVN(node.date), node.workshop && `xưởng ${node.workshop}`, node.kg ? kg(Math.round(node.kg * 10) / 10) : ""]
       .filter(Boolean)
       .join(" · "),
-    ...node.chiTiet.filter((c) => c.nhan === "Đại lý" || c.nhan === "SSCC").map((c) => `${c.nhan}: ${c.giaTri}`),
+    ...node.details.filter((c) => c.label === "Đại lý" || c.label === "SSCC").map((c) => `${c.label}: ${c.value}`),
   ].filter(Boolean);
 }
 
@@ -58,7 +58,7 @@ export function LotQrLabels({ node, nuts, onClose }: { node?: LotNode; nuts?: Lo
   // Sổ in tem (mig 0049): bấm In là ghi mỗi lô một dòng — biết lô nào đã có tem,
   // và nhãn in ra lúc đó (nhãn BTP/TP suy lại từ bản ghi có thể đổi về sau).
   const [soIn, saveLabelPrints] = useLabelPrints();
-  const { nguoiDung: profile } = useAuth();
+  const { profile } = useAuth();
   const recordPrintCount = (copies: number[]) => {
     const newPrints = buildLabelPrintRecords(items, profile?.fullName || profile?.username || "", new Date().toISOString(), newId, (n) => copies[items.indexOf(n)] ?? 1);
     if (newPrints.length) saveLabelPrints([...soIn, ...newPrints]);
@@ -68,7 +68,7 @@ export function LotQrLabels({ node, nuts, onClose }: { node?: LotNode; nuts?: Lo
   const [wips] = useWipProductions();
   const [packagings] = usePackagings();
   const tems: PrintLabel[] = items.map((n) => ({
-    lotCode: n.nhan,
+    lotCode: n.label,
     qrDataUrl: qr[`${n.kind}:${n.id}`] ?? "",
     lines: labelLines(n),
     copies: getDefaultLabelCount(n, { wips, packagings }),
@@ -90,16 +90,16 @@ export function LotLabelPrint({ shipment, onClose }: { shipment: ImportShipment;
   const tam: LotNode = {
     kind: "S",
     id: shipment.id,
-    nhan: formatMaterialLotLabel(shipment),
-    moTa: "nguyên liệu",
-    ngay: shipment.deliveryDate,
-    xuong: shipment.workshop,
+    label: formatMaterialLotLabel(shipment),
+    description: "nguyên liệu",
+    date: shipment.deliveryDate,
+    workshop: shipment.workshop,
     kg: 0,
-    chiTiet: [
-      { nhan: "Đại lý", giaTri: shipment.supplierName || "—" },
-      ...(shipment.ssccCode ? [{ nhan: "SSCC", giaTri: shipment.ssccCode }] : []),
+    details: [
+      { label: "Đại lý", value: shipment.supplierName || "—" },
+      ...(shipment.ssccCode ? [{ label: "SSCC", value: shipment.ssccCode }] : []),
     ],
-    mat: false,
+    isMissing: false,
   };
   return <LotQrLabels node={tam} onClose={onClose} />;
 }

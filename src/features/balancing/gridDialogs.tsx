@@ -270,13 +270,13 @@ export function ManualRowsDialog({
             <li key={h.id} className="flex flex-wrap items-center gap-3 py-2">
               <span className="min-w-0 flex-1">
                 {rowLabelOf(h)}
-                <span className="tnum ml-2 text-sm text-muted-foreground">{num(h.tong)} kg</span>
+                <span className="tnum ml-2 text-sm text-muted-foreground">{num(h.total)} kg</span>
               </span>
-              {h.laGiam && !h.loaiKho && (hasStock?.(h) ?? true) && (
+              {h.isDecrease && !h.stockLineKind && (hasStock?.(h) ?? true) && (
                 <Combobox
                   label={`Kho nhận — ${rowLabelOf(h)}`}
                   hideLabel
-                  value={h.khoGiam}
+                  value={h.decreaseTarget}
                   onChange={(v) => onChangeWarehouse(h.id, v)}
                   options={workshopWarehouseOptions}
                   placeholder="Chọn kho nhận"
@@ -285,7 +285,7 @@ export function ManualRowsDialog({
                 />
               )}
               <ConfirmDelete
-                recordDescription={`${rowLabelOf(h)} — ${num(h.tong)} kg`}
+                recordDescription={`${rowLabelOf(h)} — ${num(h.total)} kg`}
                 onConfirm={() => onDelete(h.id)}
                 trigger={
                   <Button

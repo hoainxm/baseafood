@@ -57,15 +57,15 @@ export default function BalancingTable({
 
   const dates = getPeriodDates(ky);
   /* Cùng thứ tự với lưới: Lấy xả đông đầu bảng, Gửi đông cuối bảng. */
-  const sortRank = (h: MaterialGridRow) => (h.loaiKho === "lay-xa-dong" ? 0 : h.loaiKho === "gui-dong" ? 2 : 1);
+  const sortRank = (h: MaterialGridRow) => (h.stockLineKind === "lay-xa-dong" ? 0 : h.stockLineKind === "gui-dong" ? 2 : 1);
   const materialRows = buildMaterialGridRows(materialInRows, assignedImports).sort((a, b) => sortRank(a) - sortRank(b));
   /* Cột chuyển kỳ đã bỏ ở khối NL — chỉ in khi kỳ cũ lỡ có số. */
-  const hasLegacyCarryOver = materialRows.some((r) => r.chuyenKy !== 0);
+  const hasLegacyCarryOver = materialRows.some((r) => r.carryOverKg !== 0);
   const materialById = new Map(materialInRows.map((r) => [r.id, r]));
   const stockRowName = (r: MaterialGridRow) => {
     const original = materialById.get(r.id);
     const mt = original && describeStockLine ? describeStockLine(original) : "";
-    const ten = r.loaiKho && r.ten !== BALANCING_STOCK_LINE_NAMES[r.loaiKho] ? `${BALANCING_STOCK_LINE_NAMES[r.loaiKho]} · ${r.ten}` : r.ten;
+    const ten = r.stockLineKind && r.name !== BALANCING_STOCK_LINE_NAMES[r.stockLineKind] ? `${BALANCING_STOCK_LINE_NAMES[r.stockLineKind]} · ${r.name}` : r.name;
     return mt ? `${ten} — ${mt}` : ten;
   };
   const finishedGoodRows = buildFinishedGoodGridRows(finishedGoods, assignedWips);
@@ -159,29 +159,29 @@ export default function BalancingTable({
               {materialRows.map((r) => (
                 <Tr key={r.id}>
                   <Td>
-                    {r.loaiKho ? (
+                    {r.stockLineKind ? (
                       <strong>{stockRowName(r)}</strong>
                     ) : (
                       <>
-                        {r.ten}
+                        {r.name}
                         <span className="ml-1 text-xs text-slate-500">
-                          ({r.laGiam ? "Giảm" : r.nhom})
+                          ({r.isDecrease ? "Giảm" : r.group})
                         </span>
                       </>
                     )}
                   </Td>
-                  <Td right>{num(r.tong)}</Td>
-                  {!hideAmounts && <Td right>{num(r.donGia)}</Td>}
+                  <Td right>{num(r.total)}</Td>
+                  {!hideAmounts && <Td right>{num(r.unitPrice)}</Td>}
                   {/* Chưa khai đơn giá thì để trống — "-0" (dòng giảm × giá 0)
                       đọc như một con số thật, người xem bảng in sẽ tưởng lỗi. */}
-                  {!hideAmounts && <Td right>{r.donGia ? num(r.tong * r.donGia) : ""}</Td>}
-                  {!hideAmounts && <Td right>{r.tyLe != null ? `${num(r.tyLe)}%` : ""}</Td>}
+                  {!hideAmounts && <Td right>{r.unitPrice ? num(r.total * r.unitPrice) : ""}</Td>}
+                  {!hideAmounts && <Td right>{r.ratio != null ? `${num(r.ratio)}%` : ""}</Td>}
                   {materialDateColumns.map((iso) => (
                     <Td key={iso} right>
-                      {r.theoNgay[iso] ? num(r.theoNgay[iso]) : ""}
+                      {r.dailyQuantities[iso] ? num(r.dailyQuantities[iso]) : ""}
                     </Td>
                   ))}
-                  {isMaterialDaysOpen && hasLegacyCarryOver && <Td right>{r.chuyenKy ? num(r.chuyenKy) : ""}</Td>}
+                  {isMaterialDaysOpen && hasLegacyCarryOver && <Td right>{r.carryOverKg ? num(r.carryOverKg) : ""}</Td>}
                 </Tr>
               ))}
               <Tr total>
@@ -194,10 +194,10 @@ export default function BalancingTable({
                 {!hideAmounts && <Td right></Td>}
                 {materialDateColumns.map((iso) => (
                   <Td key={iso} right>
-                    {num(materialRows.reduce((s, r) => s + (r.theoNgay[iso] ?? 0), 0))}
+                    {num(materialRows.reduce((s, r) => s + (r.dailyQuantities[iso] ?? 0), 0))}
                   </Td>
                 ))}
-                {isMaterialDaysOpen && hasLegacyCarryOver && <Td right>{num(materialRows.reduce((s, r) => s + r.chuyenKy, 0))}</Td>}
+                {isMaterialDaysOpen && hasLegacyCarryOver && <Td right>{num(materialRows.reduce((s, r) => s + r.carryOverKg, 0))}</Td>}
               </Tr>
             </tbody>
           </table>
@@ -227,24 +227,24 @@ export default function BalancingTable({
             </thead>
             <tbody>
               {finishedGoodRows.map((r) => {
-                const xk = r.kenh === "Xuất khẩu";
-                const amount = r.tong * (r.donGia ?? 0);
+                const xk = r.channel === "Xuất khẩu";
+                const amount = r.total * (r.unitPrice ?? 0);
                 return (
                   <Tr key={r.id}>
                     <Td>
-                      {productNameOf(r.matHangId)}
-                      {r.quyCach && (
-                        <span className="ml-1 text-xs text-slate-500">{r.quyCach}</span>
+                      {productNameOf(r.productId)}
+                      {r.spec && (
+                        <span className="ml-1 text-xs text-slate-500">{r.spec}</span>
                       )}
                     </Td>
                     <Td>
-                      {tenKH(r.khachId)}
+                      {tenKH(r.customerId)}
                       {!xk && <span className="ml-1 text-xs text-slate-500">(nội địa)</span>}
                     </Td>
-                    <Td right>{num(r.tong)}</Td>
+                    <Td right>{num(r.total)}</Td>
                     {!hideAmounts && (
                       <Td right>
-                        {num(r.donGia)}
+                        {num(r.unitPrice)}
                         {xk ? " $" : ""}
                       </Td>
                     )}
@@ -256,12 +256,12 @@ export default function BalancingTable({
                     )}
                     {dateColumns.map((iso) => (
                       <Td key={iso} right>
-                        {r.theoNgay[iso] ? num(r.theoNgay[iso]) : ""}
+                        {r.dailyQuantities[iso] ? num(r.dailyQuantities[iso]) : ""}
                       </Td>
                     ))}
-                    {dateColumns.length > 0 && <Td right>{num(r.tong)}</Td>}
-                    <Td right>{r.tra ? num(r.tra) : ""}</Td>
-                    <Td right>{r.no ? num(r.no) : ""}</Td>
+                    {dateColumns.length > 0 && <Td right>{num(r.total)}</Td>}
+                    <Td right>{r.repaidKg ? num(r.repaidKg) : ""}</Td>
+                    <Td right>{r.debtKg ? num(r.debtKg) : ""}</Td>
                   </Tr>
                 );
               })}
@@ -272,21 +272,21 @@ export default function BalancingTable({
                 {!hideAmounts && (
                   <Td right>
                     {result.totalOutputKg
-                      ? num(Math.round((finishedGoodRows.reduce((s, r) => s + r.tong * (r.donGia ?? 0), 0) / result.totalOutputKg) * 100) / 100)
+                      ? num(Math.round((finishedGoodRows.reduce((s, r) => s + r.total * (r.unitPrice ?? 0), 0) / result.totalOutputKg) * 100) / 100)
                       : ""}
                   </Td>
                 )}
                 {!hideAmounts && (
-                  <Td right>{num(Math.round(finishedGoodRows.reduce((s, r) => s + r.tong * (r.donGia ?? 0), 0) * 100) / 100)}</Td>
+                  <Td right>{num(Math.round(finishedGoodRows.reduce((s, r) => s + r.total * (r.unitPrice ?? 0), 0) * 100) / 100)}</Td>
                 )}
                 {dateColumns.map((iso) => (
                   <Td key={iso} right>
-                    {num(finishedGoodRows.reduce((s, r) => s + (r.theoNgay[iso] ?? 0), 0))}
+                    {num(finishedGoodRows.reduce((s, r) => s + (r.dailyQuantities[iso] ?? 0), 0))}
                   </Td>
                 ))}
                 {dateColumns.length > 0 && <Td right>{num(result.totalOutputKg)}</Td>}
-                <Td right>{num(finishedGoodRows.reduce((s, r) => s + r.tra, 0))}</Td>
-                <Td right>{num(finishedGoodRows.reduce((s, r) => s + r.no, 0))}</Td>
+                <Td right>{num(finishedGoodRows.reduce((s, r) => s + r.repaidKg, 0))}</Td>
+                <Td right>{num(finishedGoodRows.reduce((s, r) => s + r.debtKg, 0))}</Td>
               </Tr>
             </tbody>
           </table>

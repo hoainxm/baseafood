@@ -91,9 +91,9 @@ function translateSignUpError(msg: string): string {
 
 export interface AuthResult {
   ok: boolean;
-  loi?: string;
+  error?: string;
   /** Hồ sơ vừa tạo (taoTaiKhoan) — để màn admin cập nhật danh sách ngay. */
-  nguoiDung?: UserProfile;
+  profile?: UserProfile;
 }
 
 export function useAuth() {
@@ -141,14 +141,14 @@ export function useAuth() {
 
   const signIn = useCallback(
     async (username: string, password: string): Promise<AuthResult> => {
-      if (!supabase) return { ok: false, loi: "Chưa cấu hình máy chủ" };
+      if (!supabase) return { ok: false, error: "Chưa cấu hình máy chủ" };
       if (!username.trim() || !password)
-        return { ok: false, loi: "Nhập tên đăng nhập và mật khẩu" };
+        return { ok: false, error: "Nhập tên đăng nhập và mật khẩu" };
       const { error } = await supabase.auth.signInWithPassword({
         email: usernameToEmail(username),
         password,
       });
-      if (error) return { ok: false, loi: translateError(error.message) };
+      if (error) return { ok: false, error: translateError(error.message) };
       const u = username.trim().toLowerCase();
       setAuditOperator({ username: u });
       appendAuditEntries([{ action: "login", entity: "auth", entityKey: u, summary: `Đăng nhập: ${u}` }]);
@@ -169,12 +169,12 @@ export function useAuth() {
       password: string,
       roles: Role[] = []
     ): Promise<AuthResult> => {
-      if (!supabase) return { ok: false, loi: "Chưa cấu hình máy chủ" };
+      if (!supabase) return { ok: false, error: "Chưa cấu hình máy chủ" };
       const u = username.trim().toLowerCase();
-      if (!fullName.trim()) return { ok: false, loi: "Nhập họ tên" };
-      if (!u) return { ok: false, loi: "Nhập tên đăng nhập" };
+      if (!fullName.trim()) return { ok: false, error: "Nhập họ tên" };
+      if (!u) return { ok: false, error: "Nhập tên đăng nhập" };
       if (password.length < 6)
-        return { ok: false, loi: "Mật khẩu tối thiểu 6 ký tự" };
+        return { ok: false, error: "Mật khẩu tối thiểu 6 ký tự" };
 
       // Check trùng tên đăng nhập trước (thông báo rõ hơn lỗi Auth).
       const { data: isDuplicate } = await supabase
@@ -182,20 +182,20 @@ export function useAuth() {
         .select("id")
         .eq("username", u)
         .maybeSingle();
-      if (isDuplicate) return { ok: false, loi: "Tên đăng nhập đã tồn tại" };
+      if (isDuplicate) return { ok: false, error: "Tên đăng nhập đã tồn tại" };
 
       const phu = createTempClient();
-      if (!phu) return { ok: false, loi: "Chưa cấu hình máy chủ" };
+      if (!phu) return { ok: false, error: "Chưa cấu hình máy chủ" };
       const { data, error } = await phu.auth.signUp({
         email: usernameToEmail(u),
         password,
         options: { data: { ho_ten: fullName.trim(), username: u } },
       });
-      if (error) return { ok: false, loi: translateSignUpError(error.message) };
+      if (error) return { ok: false, error: translateSignUpError(error.message) };
 
       // Lưu hồ sơ qua client CHÍNH (phiên admin) — vai trò rỗng.
       const uid = data.user?.id;
-      if (!uid) return { ok: false, loi: "Tạo tài khoản không thành công" };
+      if (!uid) return { ok: false, error: "Tạo tài khoản không thành công" };
       await supabase.from("user_profiles").upsert(
         {
           id: uid,
@@ -208,7 +208,7 @@ export function useAuth() {
       );
       return {
         ok: true,
-        nguoiDung: { id: uid, fullName: fullName.trim(), username: u, roles },
+        profile: { id: uid, fullName: fullName.trim(), username: u, roles },
       };
     },
     []
@@ -222,13 +222,13 @@ export function useAuth() {
 
   return {
     session,
-    nguoiDung: profile,
-    dangTai: hasSupabase && !isInitialized,
+    profile,
+    isLoading: hasSupabase && !isInitialized,
     /** Có cần đăng nhập không (chỉ khi đã cấu hình Supabase). */
-    canDangNhap: hasSupabase,
-    laAdmin: rolesList(profile?.roles).includes("admin"),
-    dangNhap: signIn,
-    taoTaiKhoan: createAccount,
-    dangXuat: signOut,
+    requiresLogin: hasSupabase,
+    isAdmin: rolesList(profile?.roles).includes("admin"),
+    signIn,
+    createAccount,
+    signOut,
   };
 }

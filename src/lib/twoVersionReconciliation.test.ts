@@ -4,30 +4,30 @@ import { columnIndexToLetter, isDownloadSide, resolveTaxSideSheets } from "./two
 describe("resolveTaxSideSheets — chia bản thuế gửi / bản tự tải", () => {
   it("tên sheet có chữ 'thuế' ⇒ bên thuế", () => {
     const r = resolveTaxSideSheets(["HDDT THUẾ GỬI", "HDDT TỰ TẢI"]);
-    expect([...r.benThue]).toEqual(["HDDT THUẾ GỬI"]);
-    expect(r.cach).toBe("ten-thue");
+    expect([...r.taxSide]).toEqual(["HDDT THUẾ GỬI"]);
+    expect(r.method).toBe("ten-thue");
   });
 
   it("không sheet nào có 'thuế' nhưng có sheet 'tải' ⇒ phần còn lại là bên thuế (file thật HDDT/MTT vs CTY TẢI)", () => {
     const r = resolveTaxSideSheets(["HDDT", "MTT", "HDDT-CTY TẢI", "MTT-CTY TẢI"]);
-    expect([...r.benThue].sort()).toEqual(["HDDT", "MTT"]);
-    expect(r.cach).toBe("ten-tai");
+    expect([...r.taxSide].sort()).toEqual(["HDDT", "MTT"]);
+    expect(r.method).toBe("ten-tai");
   });
 
   it("không nhận ra ⇒ tập rỗng", () => {
     const r = resolveTaxSideSheets(["CÓ MÃ", "KHÔNG MÃ"]);
-    expect(r.benThue.size).toBe(0);
-    expect(r.cach).toBe("khong-ro");
+    expect(r.taxSide.size).toBe(0);
+    expect(r.method).toBe("khong-ro");
   });
 
   it("mọi sheet đều là 'tải' ⇒ không đoán bừa", () => {
-    expect(resolveTaxSideSheets(["TẢI 1", "TẢI 2"]).cach).toBe("khong-ro");
+    expect(resolveTaxSideSheets(["TẢI 1", "TẢI 2"]).method).toBe("khong-ro");
   });
 
   it("người dùng chỉ định thắng tên sheet, bỏ tên không tồn tại", () => {
     const r = resolveTaxSideSheets(["A THUẾ", "B"], ["B", "KHÔNG CÓ"]);
-    expect([...r.benThue]).toEqual(["B"]);
-    expect(r.cach).toBe("chi-dinh");
+    expect([...r.taxSide]).toEqual(["B"]);
+    expect(r.method).toBe("chi-dinh");
   });
 
   it("'tài khoản' không bị nhận là 'tải' khi đứng trong từ khác", () => {

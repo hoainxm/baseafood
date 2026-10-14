@@ -28,7 +28,7 @@ export function RowMarkProvider({ username: user, children }: { username: string
 
   const theoBang = useMemo(() => {
     const ra = new Map<string, ReadonlyMap<string, MarkStyle>>();
-    for (const k of new Set(marks.map((m) => m.tableKey))) ra.set(k, getTableRowMarks(marks, k).dong);
+    for (const k of new Set(marks.map((m) => m.tableKey))) ra.set(k, getTableRowMarks(marks, k).row);
     return ra;
   }, [marks]);
 

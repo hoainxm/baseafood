@@ -233,9 +233,9 @@ export default function SalesOrderScreen() {
       const los = listLotsWithStock(currentStock, dc.productId, dc.spec);
       for (const lo of los) {
         if (conCan <= 0) break;
-        const lay = Math.min(conCan, lo.conLai);
+        const lay = Math.min(conCan, lo.remainingKg);
         if (lay <= 0) continue;
-        const tyLe = lo.conLai > 0 ? lay / lo.conLai : 0;
+        const tyLe = lo.remainingKg > 0 ? lay / lo.remainingKg : 0;
         newExportItems.push({
           id: newId(),
           exportId: exportOrderId,
@@ -243,9 +243,9 @@ export default function SalesOrderScreen() {
           productId: dc.productId,
           spec: dc.spec,
           quantityKg: lay,
-          blocksCount: Math.round(lo.blockConLai * tyLe),
+          blocksCount: Math.round(lo.remainingBlocks * tyLe),
         });
-        lo.conLai -= lay; // trừ tồn trong bộ nhớ để lô sau tính đúng
+        lo.remainingKg -= lay; // trừ tồn trong bộ nhớ để lô sau tính đúng
         conCan -= lay;
       }
     }
@@ -465,7 +465,7 @@ export default function SalesOrderScreen() {
                 .filter(
                   (t) => t.productId === dc.productId && t.spec === dc.spec
                 )
-                .reduce((s, t) => s + Math.max(0, t.conLai), 0);
+                .reduce((s, t) => s + Math.max(0, t.remainingKg), 0);
               const con = dc.requiredQuantityKg - exportedQty;
               const du = con <= 0.001;
               return (

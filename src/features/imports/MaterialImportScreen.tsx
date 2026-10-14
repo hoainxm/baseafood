@@ -110,7 +110,7 @@ import {
 
 export default function MaterialImportScreen() {
   // Người đang đăng nhập → gắn làm "người ghi" của chuyến khi lưu.
-  const { nguoiDung: profile } = useAuth();
+  const { profile } = useAuth();
   const operator = profile?.fullName || profile?.username || "";
   // kỳ xem sổ: ngày/tuần/tháng/năm/khoảng tự chọn
   const [rows, persist, { trangThai: status }] = useMaterialImports();
@@ -648,8 +648,8 @@ export default function MaterialImportScreen() {
   /** Danh mục để OCR dò khớp tên trên phiếu (đại lý theo tên tắt, loại NL). */
   const ocrCatalog: OcrCatalog = useMemo(
     () => ({
-      daiLy: suppliers.map((d) => ({ name: d.shortName, code: d.code })),
-      loaiNL: materialTypes.map((l) => ({ name: l.name })),
+      suppliers: suppliers.map((d) => ({ name: d.shortName, code: d.code })),
+      materialTypes: materialTypes.map((l) => ({ name: l.name })),
     }),
     [suppliers, materialTypes]
   );

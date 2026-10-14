@@ -65,7 +65,7 @@ function ShellLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
-  const username = auth.nguoiDung?.username;
+  const username = auth.profile?.username;
 
   useEffect(() => {
     applyDisplaySettings(username);
@@ -73,7 +73,7 @@ function ShellLayout() {
 
   // Chế độ demo CHỈ admin bật. Cờ nằm theo máy (localStorage) ⇒ người khác đăng nhập
   // trên máy đó thì tự tắt, về số thật (không ai thấy số demo mà tưởng số xưởng).
-  const isDemoDenied = LA_DEMO && auth.canDangNhap && !!auth.nguoiDung && !auth.laAdmin;
+  const isDemoDenied = LA_DEMO && auth.requiresLogin && !!auth.profile && !auth.isAdmin;
   useEffect(() => {
     if (isDemoDenied) setDemoMode(false);
   }, [isDemoDenied]);
@@ -81,19 +81,19 @@ function ShellLayout() {
   // Ai đang thao tác — cho nhật ký (audit) gắn đúng người.
   useEffect(() => {
     setAuditOperator(
-      auth.nguoiDung
-        ? { id: auth.nguoiDung.id, username: auth.nguoiDung.username }
+      auth.profile
+        ? { id: auth.profile.id, username: auth.profile.username }
         : null
     );
-  }, [auth.nguoiDung]);
+  }, [auth.profile]);
 
   const seg = location.pathname.split("/").filter(Boolean)[0] ?? "dashboard";
-  const roles = auth.nguoiDung?.roles ?? [];
+  const roles = auth.profile?.roles ?? [];
   // 2 giao diện bộ phận: vai trò bộ phận chỉ thấy nav của bộ phận đó (null = đầy đủ).
-  const permittedIds = allowedIds(roles, auth.laAdmin);
+  const permittedIds = allowedIds(roles, auth.isAdmin);
   const base = permittedIds
     ? KIT_NAV.filter((n) => permittedIds.has(n.id))
-    : auth.laAdmin
+    : auth.isAdmin
       ? KIT_NAV
       : KIT_NAV.filter((n) => n.id !== "users" && n.id !== "audit");
   const items = base;
@@ -118,13 +118,13 @@ function ShellLayout() {
           : null
       }
       displayName={
-        auth.nguoiDung?.fullName || auth.nguoiDung?.username || "Người dùng"
+        auth.profile?.fullName || auth.profile?.username || "Người dùng"
       }
-      role={roleLabel(auth.nguoiDung?.roles ?? [])}
+      role={roleLabel(auth.profile?.roles ?? [])}
       ca="Ca A"
       notificationCount={3}
       onLogout={
-        auth.canDangNhap && auth.session ? auth.dangXuat : undefined
+        auth.requiresLogin && auth.session ? auth.signOut : undefined
       }
       items={items}
     >
@@ -148,10 +148,10 @@ function LegacyPathRedirect({ from }: { from: string }) {
 
 export default function App() {
   const auth = useAuth();
-  const roles = auth.nguoiDung?.roles ?? [];
+  const roles = auth.profile?.roles ?? [];
 
   // Đang lấy phiên đăng nhập từ máy chủ → tránh nháy màn login.
-  if (auth.dangTai) {
+  if (auth.isLoading) {
     return (
       <div className="flex min-h-dvh items-center justify-center p-6">
         <ProcessingState text="Đang kết nối…" />
@@ -160,10 +160,10 @@ export default function App() {
   }
 
   // Đã cấu hình máy chủ mà chưa đăng nhập → chặn bằng màn đăng nhập.
-  if (auth.canDangNhap && !auth.session) {
+  if (auth.requiresLogin && !auth.session) {
     return (
       <>
-        <DangNhap login={auth.dangNhap} />
+        <DangNhap login={auth.signIn} />
         <Toaster position="bottom-center" richColors closeButton />
       </>
     );
@@ -213,7 +213,7 @@ export default function App() {
             <Route
               path="/users"
               element={
-                auth.laAdmin && LA_DEMO ? (
+                auth.isAdmin && LA_DEMO ? (
                   // Tài khoản + vai trò là THẬT (không thuộc bộ demo) — sửa ở đây dễ tưởng
                   // đang sửa demo. Bắt thoát demo trước.
                   <EmptyState
@@ -221,8 +221,8 @@ export default function App() {
                     title="Đang ở chế độ demo"
                     description="Người dùng và vai trò là tài khoản thật, không thuộc bộ demo. Thoát demo (nút trên dải vàng) để quản lý người dùng."
                   />
-                ) : auth.laAdmin ? (
-                  <UserManagementScreen createAccount={auth.taoTaiKhoan} />
+                ) : auth.isAdmin ? (
+                  <UserManagementScreen createAccount={auth.createAccount} />
                 ) : (
                   <Navigate to="/dashboard" replace />
                 )
@@ -231,7 +231,7 @@ export default function App() {
             <Route
               path="/audit"
               element={
-                auth.laAdmin ? <AuditLogScreen /> : <Navigate to="/dashboard" replace />
+                auth.isAdmin ? <AuditLogScreen /> : <Navigate to="/dashboard" replace />
               }
             />
             <Route path="/kit" element={<KitPage />} />

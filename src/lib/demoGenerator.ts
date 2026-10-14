@@ -111,15 +111,15 @@ export interface GoiDemo {
 
 export interface DemoOptions {
   /** yyyy-mm-dd — ngày cuối của bộ demo. */
-  homNay: string;
+  today: string;
   /** Số ngày lùi về trước (mặc định 60). */
-  soNgay?: number;
+  days?: number;
   /** Ẩn tên đại lý / khách + đổi giá (mặc định bật). */
-  anDanh?: boolean;
+  anonymize?: boolean;
   /** Hạt ngẫu nhiên — cùng hạt cùng gói. */
   hat?: number;
   /** Mốc giờ ghi (ISO) cho các trường recordedAt / lockedAt. */
-  lucGhi?: string;
+  recordedAt?: string;
 }
 
 const WORKSHOPS: Workshop[] = ["Đông", "Cá", "Khô"];
@@ -140,8 +140,8 @@ function createRandom(hat: number) {
   return {
     r,
     tu: (a0: number, b0: number) => a0 + (b0 - a0) * r(),
-    nguyen: (a0: number, b0: number) => Math.floor(a0 + (b0 - a0 + 1) * r()),
-    chon: <T>(items: readonly T[]) => items[Math.floor(r() * items.length)],
+    int: (a0: number, b0: number) => Math.floor(a0 + (b0 - a0 + 1) * r()),
+    pick: <T>(items: readonly T[]) => items[Math.floor(r() * items.length)],
   };
 }
 
@@ -161,14 +161,14 @@ const so2 = (i: number) => String(i).padStart(2, "0");
  * THAM SỐ quét từ sổ thật — tách riêng để test + để màn hiện "đã quét được gì".
  */
 export interface DemoParams {
-  xuong: Workshop[];
-  nlTheoXuong: Record<string, string[]>;
-  daiLy: string[];
-  kgDong: { thap: number; cao: number };
-  giaNL: Record<string, number>;
-  tiLeTP: number;
-  matHangTheoNL: Record<string, string[]>;
-  soDongNhapThat: number;
+  workshops: Workshop[];
+  materialsByWorkshop: Record<string, string[]>;
+  suppliers: string[];
+  kgPerRow: { low: number; high: number };
+  materialPrices: Record<string, number>;
+  finishedRate: number;
+  productsByMaterial: Record<string, string[]>;
+  realImportRowCount: number;
 }
 
 export function scanDemoParams(n: DemoSource): DemoParams {
@@ -212,34 +212,34 @@ export function scanDemoParams(n: DemoSource): DemoParams {
     productsByMaterial[ten] = items.slice(0, 5).map((p) => p.id);
   }
   return {
-    xuong: workshopList,
-    nlTheoXuong: materialsByWorkshop,
-    daiLy: suppliers.length ? suppliers.slice(0, 10) : ["Hồng Phú", "Bê 3", "Mậu H Tân"],
-    kgDong: { thap: Math.max(200, percentile(kgs, 0.25, 600)), cao: Math.max(400, percentile(kgs, 0.75, 2_400)) },
-    giaNL: materialPrices,
-    tiLeTP: Math.min(0.75, Math.max(0.35, median(tiLe, 0.45))),
-    matHangTheoNL: productsByMaterial,
-    soDongNhapThat: n.imports.length,
+    workshops: workshopList,
+    materialsByWorkshop,
+    suppliers: suppliers.length ? suppliers.slice(0, 10) : ["Hồng Phú", "Bê 3", "Mậu H Tân"],
+    kgPerRow: { low: Math.max(200, percentile(kgs, 0.25, 600)), high: Math.max(400, percentile(kgs, 0.75, 2_400)) },
+    materialPrices,
+    finishedRate: Math.min(0.75, Math.max(0.35, median(tiLe, 0.45))),
+    productsByMaterial,
+    realImportRowCount: n.imports.length,
   };
 }
 
 /** Sinh gói demo đầy đủ chuỗi. Xem chú thích đầu file. */
 export function generateDemoBundle(n: DemoSource, tc: DemoOptions): GoiDemo {
-  const anonymize = tc.anDanh ?? true;
-  const days = Math.max(14, tc.soNgay ?? 60);
+  const anonymize = tc.anonymize ?? true;
+  const days = Math.max(14, tc.days ?? 60);
   const ng = createRandom(tc.hat ?? 20261012);
   const ts = scanDemoParams(n);
-  const luc = tc.lucGhi ?? `${tc.homNay}T08:00:00.000Z`;
-  const ngays = listDatesInRange(subtractDays(tc.homNay, days - 1), tc.homNay);
-  const yesterday = subtractDays(tc.homNay, 1);
+  const luc = tc.recordedAt ?? `${tc.today}T08:00:00.000Z`;
+  const ngays = listDatesInRange(subtractDays(tc.today, days - 1), tc.today);
+  const yesterday = subtractDays(tc.today, 1);
   const priceFactor = anonymize ? 1.07 : 1;
   const ten = (category: "dl" | "kh", i: number) => (category === "dl" ? `Đại lý ${so2(i + 1)}` : `Khách hàng ${so2(i + 1)}`);
-  const supplierNames = new Map(ts.daiLy.map((t, i) => [t, anonymize ? ten("dl", i) : t]));
-  const usedSuppliers = ts.daiLy.map((t) => supplierNames.get(t) as string);
+  const supplierNames = new Map(ts.suppliers.map((t, i) => [t, anonymize ? ten("dl", i) : t]));
+  const usedSuppliers = ts.suppliers.map((t) => supplierNames.get(t) as string);
   const sp = new Map(n.products.map((p) => [p.id, p]));
 
   // ---- Danh mục ----
-  const suppliers: Supplier[] = ts.daiLy.map((t, i) => {
+  const suppliers: Supplier[] = ts.suppliers.map((t, i) => {
     const original = n.suppliers.find((s0) => s0.shortName === t);
     return {
       id: `dm-dl-${i}`, // id mới: id thật có thể chứa tên đối tác
@@ -261,15 +261,15 @@ export function generateDemoBundle(n: DemoSource, tc: DemoOptions): GoiDemo {
 
   // ---- Tồn đầu (mốc = ngày đầu) ----
   const firstDate = ngays[0];
-  const materialOpening: MaterialOpeningStock[] = ts.xuong.map((x, i) => ({
+  const materialOpening: MaterialOpeningStock[] = ts.workshops.map((x, i) => ({
     id: `dm-tdnl-${i}`,
     workshop: x,
-    materialTypeName: ts.nlTheoXuong[x][0],
+    materialTypeName: ts.materialsByWorkshop[x][0],
     asOfDate: firstDate,
     quantityKg: tron(ng.tu(2_000, 5_000), 10),
     note: "Tồn đầu demo",
   }));
-  const allProducts = [...new Set(Object.values(ts.matHangTheoNL).flat())];
+  const allProducts = [...new Set(Object.values(ts.productsByMaterial).flat())];
   const finishedOpening: FinishedGoodsOpeningStock[] = allProducts.slice(0, 2).map((pid, i) => ({
     id: `dm-tdtp-${i}`,
     productId: pid,
@@ -282,7 +282,7 @@ export function generateDemoBundle(n: DemoSource, tc: DemoOptions): GoiDemo {
   }));
 
   // Mặt hàng "lệch định mức" cố ý (cảnh báo định mức) — mặt hàng thứ 2 của xưởng đầu.
-  const offYieldProduct = ts.matHangTheoNL[ts.nlTheoXuong[ts.xuong[0]][0]][1] ?? allProducts[1];
+  const offYieldProduct = ts.productsByMaterial[ts.materialsByWorkshop[ts.workshops[0]][0]][1] ?? allProducts[1];
 
   const shipments: ImportShipment[] = [];
   const imports: MaterialImportItem[] = [];
@@ -303,17 +303,17 @@ export function generateDemoBundle(n: DemoSource, tc: DemoOptions): GoiDemo {
   const remainingMaterial = new Map<string, number>();
   /** Lấy `can` kg NL từ các dòng còn hàng (nhiều nhất trước); trả các phần đã lấy,
    *  rỗng nếu không đủ — không bao giờ gắn quá số kg của lô. */
-  const takeMaterial = (dong: MaterialImportItem[], can: number): { dong: MaterialImportItem; kg: number }[] => {
+  const takeMaterial = (dong: MaterialImportItem[], can: number): { row: MaterialImportItem; kg: number }[] => {
     const total = dong.reduce((s0, d) => s0 + (remainingMaterial.get(d.id) ?? 0), 0);
     if (can <= 0 || total < can) return [];
-    const ra: { dong: MaterialImportItem; kg: number }[] = [];
+    const ra: { row: MaterialImportItem; kg: number }[] = [];
     let shortfall = can;
     for (const d of [...dong].sort((a0, b0) => (remainingMaterial.get(b0.id) ?? 0) - (remainingMaterial.get(a0.id) ?? 0))) {
       if (shortfall <= 0) break;
       const k = Math.min(remainingMaterial.get(d.id) ?? 0, shortfall);
       if (k <= 0) continue;
       remainingMaterial.set(d.id, (remainingMaterial.get(d.id) ?? 0) - k);
-      ra.push({ dong: d, kg: k });
+      ra.push({ row: d, kg: k });
       shortfall -= k;
     }
     return ra;
@@ -323,19 +323,19 @@ export function generateDemoBundle(n: DemoSource, tc: DemoOptions): GoiDemo {
 
   ngays.forEach((date, i) => {
     if (dayOfWeek(date) === 0) return; // Chủ nhật nghỉ
-    const isPast = date < tc.homNay;
+    const isPast = date < tc.today;
     const progress = i / Math.max(1, ngays.length - 1); // 0 → 1: tỉ lệ gắn lô tăng dần
-    ts.xuong.forEach((x) => {
+    ts.workshops.forEach((x) => {
       if (ng.r() < 0.12) return; // vài ngày xưởng không nhận hàng
-      const materialList = ts.nlTheoXuong[x];
+      const materialList = ts.materialsByWorkshop[x];
       let totalIn = 0;
       const todayRows: MaterialImportItem[] = [];
       const shipmentCount = ng.r() < 0.4 ? 2 : 1;
       for (let c = 0; c < shipmentCount; c++) {
         const sid = id("chuyen");
         const isBackdate = isPast && ng.r() < 0.04;
-        const postingDate = isBackdate ? (subtractDays(date, -1) <= tc.homNay ? subtractDays(date, -1) : date) : date;
-        const dl = ng.chon(usedSuppliers.slice(0, Math.max(3, usedSuppliers.length)));
+        const postingDate = isBackdate ? (subtractDays(date, -1) <= tc.today ? subtractDays(date, -1) : date) : date;
+        const dl = ng.pick(usedSuppliers.slice(0, Math.max(3, usedSuppliers.length)));
         shipments.push({
           id: sid,
           deliveryDate: date,
@@ -352,7 +352,7 @@ export function generateDemoBundle(n: DemoSource, tc: DemoOptions): GoiDemo {
         const rowCount = ng.r() < 0.35 && materialList.length > 1 ? 2 : 1;
         for (let d = 0; d < rowCount; d++) {
           const material = materialList[d % materialList.length];
-          const kg = tron(ng.tu(ts.kgDong.thap, ts.kgDong.cao), 5);
+          const kg = tron(ng.tu(ts.kgPerRow.low, ts.kgPerRow.high), 5);
           const dong: MaterialImportItem = {
             id: id("nhap"),
             shipmentId: sid,
@@ -362,7 +362,7 @@ export function generateDemoBundle(n: DemoSource, tc: DemoOptions): GoiDemo {
             supplierName: dl,
             materialTypeName: material,
             quantityKg: kg,
-            unitPrice: tron((ts.giaNL[material] ?? 60_000) * priceFactor * ng.tu(0.95, 1.05), 500),
+            unitPrice: tron((ts.materialPrices[material] ?? 60_000) * priceFactor * ng.tu(0.95, 1.05), 500),
             driverName: "",
             licensePlate: "",
             note: "",
@@ -381,7 +381,7 @@ export function generateDemoBundle(n: DemoSource, tc: DemoOptions): GoiDemo {
 
       // Bán nội địa NL thẳng
       if (ng.r() < 0.2) {
-        const materialRow = ng.chon(todayRows);
+        const materialRow = ng.pick(todayRows);
         const nd: DomesticSaleItem = {
           id: id("nd"),
           saleDate: date,
@@ -398,20 +398,20 @@ export function generateDemoBundle(n: DemoSource, tc: DemoOptions): GoiDemo {
         domesticSales.push(nd);
         if (ng.r() < 0.7)
           for (const p0 of takeMaterial([materialRow], nd.quantityKg))
-            lotDispatches.push({ id: id("lr"), lotKind: "S", lotId: p0.dong.id, lotLabel: p0.dong.materialTypeName, docKind: "domestic_sale", docId: nd.id, quantityKg: p0.kg, method: "picked", operator: "Demo", recordedAt: luc });
+            lotDispatches.push({ id: id("lr"), lotKind: "S", lotId: p0.row.id, lotLabel: p0.row.materialTypeName, docKind: "domestic_sale", docId: nd.id, quantityKg: p0.kg, method: "picked", operator: "Demo", recordedAt: luc });
       }
 
       // Sản xuất BTP: TP ≈ NL × tỉ lệ ra thành phẩm (± nhiễu), chia 2–3 mẻ.
       // ≤ 92% NL vào thành BTP (phần còn: phế liệu, còn dở, bán nội địa, hao hụt) ⇒ NL
       // của ngày đủ để gắn lô cho các mẻ, kể cả mặt hàng "lệch định mức" (+13%).
-      const totalFinishedGood = totalIn * ts.tiLeTP * ng.tu(0.8, 0.9);
+      const totalFinishedGood = totalIn * ts.finishedRate * ng.tu(0.8, 0.9);
       const batchCount = ng.r() < 0.5 ? 3 : 2;
-      const productList = ts.matHangTheoNL[todayRows[0].materialTypeName] ?? allProducts;
+      const productList = ts.productsByMaterial[todayRows[0].materialTypeName] ?? allProducts;
       for (let m = 0; m < batchCount; m++) {
         const pid = productList[(i + m) % productList.length];
         const kg = tron(totalFinishedGood / batchCount, 1);
         // Chờ duyệt: 2 ngày gần nhất (ca "chờ duyệt lâu" cài sau vòng sinh).
-        const isPending = date >= subtractDays(tc.homNay, 1);
+        const isPending = date >= subtractDays(tc.today, 1);
         const isBackdate = isPast && ng.r() < 0.03;
         const w: WipProductionItem = {
           id: id("me"),
@@ -432,10 +432,10 @@ export function generateDemoBundle(n: DemoSource, tc: DemoOptions): GoiDemo {
         wips.push(w);
         // Gắn lô NL: tỉ lệ tăng dần theo thời gian (kể chuyện "từ khi dùng QR").
         const heSo = pid === offYieldProduct ? 1.13 : ng.tu(0.98, 1.02);
-        const materialParts = ng.r() < 0.45 + 0.5 * progress ? takeMaterial(todayRows, tron((kg / ts.tiLeTP) * heSo, 1)) : [];
+        const materialParts = ng.r() < 0.45 + 0.5 * progress ? takeMaterial(todayRows, tron((kg / ts.finishedRate) * heSo, 1)) : [];
         if (materialParts.length > 0) {
           for (const p0 of materialParts)
-            lotInputs.push({ id: id("gl"), outputKind: "W", outputId: w.id, inputKind: "S", inputId: p0.dong.id, inputLabel: p0.dong.materialTypeName, material: p0.dong.materialTypeName, quantityKg: p0.kg, method: "scan", operator: "Demo", recordedAt: `${date}T15:00:00.000Z` });
+            lotInputs.push({ id: id("gl"), outputKind: "W", outputId: w.id, inputKind: "S", inputId: p0.row.id, inputLabel: p0.row.materialTypeName, material: p0.row.materialTypeName, quantityKg: p0.kg, method: "scan", operator: "Demo", recordedAt: `${date}T15:00:00.000Z` });
         } else if (isPast && ng.r() < 0.6) {
           lotWaivers.push({ id: id("ld"), outputKind: "W", outputId: w.id, reason: "Trộn NL nhiều chuyến trong mẻ", operator: "Demo", recordedAt: `${date}T17:00:00.000Z` });
         }
@@ -450,7 +450,7 @@ export function generateDemoBundle(n: DemoSource, tc: DemoOptions): GoiDemo {
       for (const criterion of QC_CRITERIA) {
         const r0 = ng.r();
         const result: QcResult = r0 < 0.85 ? "pass" : r0 < 0.97 ? "conditional" : "fail";
-        qcChecklists.push({ id: id("qc"), date, workshop: x, criterion, result, score: result === "pass" ? ng.nguyen(8, 10) : result === "conditional" ? ng.nguyen(6, 7) : ng.nguyen(3, 5), note: result === "pass" ? "" : "Đã nhắc tổ khắc phục", backdateReason: "" });
+        qcChecklists.push({ id: id("qc"), date, workshop: x, criterion, result, score: result === "pass" ? ng.int(8, 10) : result === "conditional" ? ng.int(6, 7) : ng.int(3, 5), note: result === "pass" ? "" : "Đã nhắc tổ khắc phục", backdateReason: "" });
       }
       if (isPast) qcLocks.push({ id: `${date}|${x}`, lockDate: date, workshop: x, isLocked: true, lockedAt: `${date}T18:00:00.000Z`, totalKgAtLock: 0, reopenReason: "", note: "" });
     });
@@ -458,18 +458,18 @@ export function generateDemoBundle(n: DemoSource, tc: DemoOptions): GoiDemo {
 
   // ---- Cài sẵn ca cảnh báo — chọn đúng ngày CÓ số (không phó mặc ngẫu nhiên) ----
   const newestFirst = (a0: DailyLock, b0: DailyLock) => b0.lockDate.localeCompare(a0.lockDate);
-  const dayBeforeYesterday = subtractDays(tc.homNay, 1);
+  const dayBeforeYesterday = subtractDays(tc.today, 1);
   // 1. Ngày nhập chưa chốt: ngày gần nhất (trước hôm qua) của xưởng đầu.
-  const firstWorkshopLocks = dailyLocks.filter((l) => l.workshop === ts.xuong[0] && l.lockDate < dayBeforeYesterday).sort(newestFirst);
+  const firstWorkshopLocks = dailyLocks.filter((l) => l.workshop === ts.workshops[0] && l.lockDate < dayBeforeYesterday).sort(newestFirst);
   if (firstWorkshopLocks[0]) dailyLocks.splice(dailyLocks.indexOf(firstWorkshopLocks[0]), 1);
   // 2. Sổ nhập sửa sau khi chốt: tổng lúc chốt lệch 37 kg, ngày cách ≥ 7 ngày.
-  const staleLock = firstWorkshopLocks.find((l) => l.lockDate <= subtractDays(tc.homNay, 7));
+  const staleLock = firstWorkshopLocks.find((l) => l.lockDate <= subtractDays(tc.today, 7));
   if (staleLock) staleLock.totalKgAtLock -= 37;
   // 3. Ngày sản xuất chưa chốt: ngày gần nhất của xưởng cuối.
-  const lastWorkshopLocks = productionLocks.filter((l) => l.workshop === ts.xuong[ts.xuong.length - 1] && l.lockDate < dayBeforeYesterday).sort(newestFirst);
+  const lastWorkshopLocks = productionLocks.filter((l) => l.workshop === ts.workshops[ts.workshops.length - 1] && l.lockDate < dayBeforeYesterday).sort(newestFirst);
   if (lastWorkshopLocks[0]) productionLocks.splice(productionLocks.indexOf(lastWorkshopLocks[0]), 1);
   // 4. BTP chờ duyệt lâu: một mẻ 5–9 ngày trước quên duyệt nhập kho.
-  const unapprovedWip = wips.find((w) => w.productionDate <= subtractDays(tc.homNay, 5) && w.productionDate >= subtractDays(tc.homNay, 9));
+  const unapprovedWip = wips.find((w) => w.productionDate <= subtractDays(tc.today, 5) && w.productionDate >= subtractDays(tc.today, 9));
   if (unapprovedWip) unapprovedWip.status = "pending";
 
   // ---- Kho → đóng gói / xuất đơn / bán: theo dõi phần còn của từng mẻ (FIFO) ----
@@ -489,7 +489,7 @@ export function generateDemoBundle(n: DemoSource, tc: DemoOptions): GoiDemo {
   const remainingFinishedGood = new Map<string, number>();
   ngays.forEach((date, i) => {
     if (i < 3 || i % 2 === 1 || dayOfWeek(date) === 0) return;
-    for (const x of ts.xuong) {
+    for (const x of ts.workshops) {
       const w = olderBatches(date, (m) => m.workshop === x)[0];
       if (!w) continue;
       const inputKg = lay(w.id, w.quantityKg * ng.tu(0.4, 0.6));
@@ -516,14 +516,14 @@ export function generateDemoBundle(n: DemoSource, tc: DemoOptions): GoiDemo {
   const productsWithStock = [...kgByProduct.entries()].sort((a0, b0) => b0[1] - a0[1]).map(([k]) => k);
   for (let d = 0; d < soDon; d++) {
     const orderDate = ngays[Math.floor(((d + 0.5) * ngays.length) / soDon) - 3] ?? ngays[0];
-    const exportDate = subtractDays(orderDate, -4) <= tc.homNay ? subtractDays(orderDate, -4) : tc.homNay;
+    const exportDate = subtractDays(orderDate, -4) <= tc.today ? subtractDays(orderDate, -4) : tc.today;
     const kh = customers[d % customers.length];
     const pid = productsWithStock.length ? productsWithStock[d % productsWithStock.length] : allProducts[d % allProducts.length];
     const don: SalesOrder = { id: id("don"), customerId: kh?.id ?? "", orderDate, status: "collecting", note: "Đơn demo" };
     salesOrders.push(don);
     const can = tron(ng.tu(800, 2_000), 10);
     orderItems.push({ id: id("dongdon"), orderId: don.id, productId: pid, spec: "", requiredQuantityKg: can, requiredBlocksCount: tron(can / 10) });
-    const exportOrder: ExportOrder = { id: id("lenh"), orderId: don.id, exportDate, status: exportDate < tc.homNay ? "closed" : "open", note: "" };
+    const exportOrder: ExportOrder = { id: id("lenh"), orderId: don.id, exportDate, status: exportDate < tc.today ? "closed" : "open", note: "" };
     let canCon = can;
     for (const w of olderBatches(exportDate, (m) => m.productId === pid)) {
       if (canCon <= 0) break;
@@ -537,7 +537,7 @@ export function generateDemoBundle(n: DemoSource, tc: DemoOptions): GoiDemo {
     // Chỉ "đã xuất" khi thật có lệnh xuất (kho có hàng) và ngày xuất đã qua.
     if (exportItems.some((x) => x.exportId === exportOrder.id)) {
       exportOrders.push(exportOrder);
-      if (exportDate < tc.homNay) don.status = "closed";
+      if (exportDate < tc.today) don.status = "closed";
     }
   }
 
@@ -548,7 +548,7 @@ export function generateDemoBundle(n: DemoSource, tc: DemoOptions): GoiDemo {
     if (i < 6 || i % 4 !== 2 || dayOfWeek(date) === 0) return;
     const kh = customers[(i / 4) % customers.length | 0];
     const kenh = i % 8 === 2 ? "Xuất khẩu" : "Nội địa";
-    const salesInvoice: SalesInvoice = { id: id("phieu"), deliveryDate: date, postingDate: date, backdateReason: "", workshop: ts.xuong[i % ts.xuong.length], customerId: kh?.id ?? "", channel: kenh, note: "" };
+    const salesInvoice: SalesInvoice = { id: id("phieu"), deliveryDate: date, postingDate: date, backdateReason: "", workshop: ts.workshops[i % ts.workshops.length], customerId: kh?.id ?? "", channel: kenh, note: "" };
     const p = packagings.filter((g) => g.date < date && (remainingFinishedGood.get(g.id) ?? 0) > 10)[0];
     if (p) {
       const kg = Math.floor((remainingFinishedGood.get(p.id) ?? 0) * ng.tu(0.5, 0.8));
@@ -572,19 +572,19 @@ export function generateDemoBundle(n: DemoSource, tc: DemoOptions): GoiDemo {
   const oversoldProduct = allProducts[allProducts.length - 1];
   const productStock = wips.filter((w) => w.productId === oversoldProduct && w.status === "stocked").reduce((s0, w) => s0 + (con.get(w.id) ?? 0), 0);
   const fo = finishedOpening.filter((o) => o.productId === oversoldProduct).reduce((s0, o) => s0 + o.quantityKg, 0);
-  const overSoldInvoice: SalesInvoice = { id: id("phieu"), deliveryDate: yesterday, postingDate: yesterday, backdateReason: "", workshop: ts.xuong[0], customerId: customers[0]?.id ?? "", channel: "Nội địa", note: "" };
+  const overSoldInvoice: SalesInvoice = { id: id("phieu"), deliveryDate: yesterday, postingDate: yesterday, backdateReason: "", workshop: ts.workshops[0], customerId: customers[0]?.id ?? "", channel: "Nội địa", note: "" };
   salesInvoices.push(overSoldInvoice);
   salesItems.push({ id: id("ban"), invoiceId: overSoldInvoice.id, deliveryDate: yesterday, productId: oversoldProduct, spec: "", quantityKg: tron(productStock + fo + 45, 1), unitPrice: tron(120_000 * priceFactor, 1_000), sourceWarehouse: RETAIL_WAREHOUSE });
 
   // ---- Kỳ cân đối: 4 kỳ × 5 ngày của NL chính xưởng đầu, có kỳ lãi + kỳ lỗ ----
-  const mainMaterial = ts.nlTheoXuong[ts.xuong[0]][0];
-  const mainWorkshop = ts.xuong[0];
+  const mainMaterial = ts.materialsByWorkshop[ts.workshops[0]][0];
+  const mainWorkshop = ts.workshops[0];
   const periods: BalancingPeriod[] = [];
   const balancingInputs: BalancingInputItem[] = [];
   const balancingOutputs: BalancingOutputItem[] = [];
   const marginFactors = [1.09, 0.94, 1.12, 1.04];
   marginFactors.forEach((heSo, k) => {
-    const den = subtractDays(tc.homNay, 1 + k * 6);
+    const den = subtractDays(tc.today, 1 + k * 6);
     const tu = subtractDays(den, 4);
     const pid = id("ky");
     const periodImports = imports.filter((r) => r.workshop === mainWorkshop && r.materialTypeName === mainMaterial && r.deliveryDate >= tu && r.deliveryDate <= den);
@@ -658,6 +658,6 @@ export function generateDemoBundle(n: DemoSource, tc: DemoOptions): GoiDemo {
 }
 
 /** Đếm dòng từng bảng của gói — để màn hiện "sẽ nạp gì" trước khi bấm. */
-export function countBundle(g: GoiDemo): { bang: keyof GoiDemo; so: number }[] {
-  return (Object.keys(g) as (keyof GoiDemo)[]).map((bang) => ({ bang, so: g[bang].length }));
+export function countBundle(g: GoiDemo): { table: keyof GoiDemo; count: number }[] {
+  return (Object.keys(g) as (keyof GoiDemo)[]).map((bang) => ({ table: bang, count: g[bang].length }));
 }

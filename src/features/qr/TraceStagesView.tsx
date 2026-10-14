@@ -28,9 +28,9 @@ const STAGES: Record<TraceStageKey, { unit: string; man: { path: string; label: 
 
 const describeNode = (n: LotNode) =>
   [
-    n.moTa,
-    n.ngay && formatDateVN(n.ngay),
-    n.chiTiet.find((c) => c.nhan === "Đại lý" || c.nhan === "Khách")?.giaTri,
+    n.description,
+    n.date && formatDateVN(n.date),
+    n.details.find((c) => c.label === "Đại lý" || c.label === "Khách")?.value,
     n.kg ? kg(n.kg) : "",
   ]
     .filter((x) => x && x !== "—")
@@ -38,21 +38,21 @@ const describeNode = (n: LotNode) =>
 
 /** Một dòng: nhãn lô (bấm mở hộ chiếu) + mô tả, nhãn trạng thái, nút thao tác. */
 function StageRow({ m, status, action: actions }: { m: TraceStageItem; status: ReactNode; action: ReactNode }) {
-  const n = m.nut;
+  const n = m.node;
   return (
     <li className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 border-b border-border py-2 last:border-b-0">
       <div className="min-w-0 flex-1 basis-64 space-y-1">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
           <Tag variant="phan-loai" tone={toneByName(TRACE_KIND_LABELS[n.kind])}>{TRACE_KIND_LABELS[n.kind]}</Tag>
-          {isOutboundKind(n.kind) || n.mat ? (
-            <span className="tnum font-medium">{n.nhan}</span>
+          {isOutboundKind(n.kind) || n.isMissing ? (
+            <span className="tnum font-medium">{n.label}</span>
           ) : (
             <Link
               className="tnum font-medium text-primary underline-offset-4 hover:underline"
-              title={`Mở hộ chiếu của lô ${n.nhan}: làm từ đâu, đã đi đâu, cân bằng kg.`}
+              title={`Mở hộ chiếu của lô ${n.label}: làm từ đâu, đã đi đâu, cân bằng kg.`}
               to={`/qr?lot=${n.kind}:${encodeURIComponent(n.id)}`}
             >
-              {n.nhan}
+              {n.label}
             </Link>
           )}
         </div>
@@ -65,15 +65,15 @@ function StageRow({ m, status, action: actions }: { m: TraceStageItem; status: R
 }
 
 const labelBadge = (m: TraceStageItem) =>
-  m.daIn === undefined ? null : m.daIn > 0 ? <Tag variant="xong">Đã in {m.daIn} tem</Tag> : <Tag variant="cho">Chưa in tem</Tag>;
+  m.printedCount === undefined ? null : m.printedCount > 0 ? <Tag variant="xong">Đã in {m.printedCount} tem</Tag> : <Tag variant="cho">Chưa in tem</Tag>;
 
 const lotBadge = (m: TraceStageItem, ten: string) =>
-  (m.soLo ?? 0) > 0 ? (
+  (m.lotCount ?? 0) > 0 ? (
     <Tag variant="xong">
-      {ten} ({m.soLo})
+      {ten} ({m.lotCount})
     </Tag>
-  ) : m.lyDo ? (
-    <Tag variant="luu-y" title={`Lý do chưa gắn lô: ${m.lyDo}`}>
+  ) : m.reason ? (
+    <Tag variant="luu-y" title={`Lý do chưa gắn lô: ${m.reason}`}>
       Chưa gắn lô · có lý do
     </Tag>
   ) : (
@@ -94,7 +94,7 @@ export function TraceStagesView() {
   const [lotForSalesItem, setLotForSalesItem] = useState<{ dong: SalesItem; lotKind: "W" | "P" } | null>(null);
   const [lotForDomesticSale, setLotForDomesticSale] = useState<DomesticSaleItem | null>(null);
 
-  const items = useMemo(() => groupByTraceStage(dl, { tu, den, xuong: workshop }), [dl, tu, den, workshop]);
+  const items = useMemo(() => groupByTraceStage(dl, { fromDate: tu, toDate: den, workshop }), [dl, tu, den, workshop]);
   const productNameOf = (id: string) => dl.products.find((p) => p.id === id)?.name || "—";
 
   /** Nút: việc còn thiếu thì nổi (default), còn lại viền (outline). */
@@ -105,11 +105,11 @@ export function TraceStagesView() {
     </Button>
   );
   const labelButton = (m: TraceStageItem) =>
-    taskButton(m.thieu.includes("tem"), `In tem QR cho lô ${m.nut.nhan} (mặc định mỗi block / thùng một tem).`, () => setLotLabel(m.nut), <Printer aria-hidden />, "In tem");
+    taskButton(m.missing.includes("tem"), `In tem QR cho lô ${m.node.label} (mặc định mỗi block / thùng một tem).`, () => setLotLabel(m.node), <Printer aria-hidden />, "In tem");
 
   const renderItemRow = (g: TraceStage, m: TraceStageItem): ReactNode => {
-    const n = m.nut;
-    if (g.khoa === "nhap")
+    const n = m.node;
+    if (g.key === "nhap")
       return (
         <StageRow
           key={n.id}
@@ -117,13 +117,13 @@ export function TraceStagesView() {
           status={
             <>
               {labelBadge(m)}
-              {(m.daDung ?? 0) > 0 ? <Tag variant="nguon">Đã dùng cho {m.daDung} mẻ / dòng bán</Tag> : <Tag variant="phu">Chưa dùng</Tag>}
+              {(m.usedKg ?? 0) > 0 ? <Tag variant="nguon">Đã dùng cho {m.usedKg} mẻ / dòng bán</Tag> : <Tag variant="phu">Chưa dùng</Tag>}
             </>
           }
           action={labelButton(m)}
         />
       );
-    if (g.khoa === "san-xuat") {
+    if (g.key === "san-xuat") {
       const w = dl.wips.find((x) => x.id === n.id);
       return (
         <StageRow
@@ -138,33 +138,33 @@ export function TraceStagesView() {
           action={
             <>
               {w &&
-                taskButton(m.thieu.includes("lo"), `Ghi mẻ ${n.nhan} đã dùng lô nguyên liệu nào (quét tem, gõ mã hoặc chọn).`, () => setLotForBatch(w), <Link2 aria-hidden />, (m.soLo ?? 0) > 0 ? "Lô NL" : "Gắn lô NL")}
+                taskButton(m.missing.includes("lo"), `Ghi mẻ ${n.label} đã dùng lô nguyên liệu nào (quét tem, gõ mã hoặc chọn).`, () => setLotForBatch(w), <Link2 aria-hidden />, (m.lotCount ?? 0) > 0 ? "Lô NL" : "Gắn lô NL")}
               {labelButton(m)}
             </>
           }
         />
       );
     }
-    if (g.khoa === "kho")
+    if (g.key === "kho")
       return (
         <StageRow
           key={n.id}
           m={m}
           status={
-            m.kho === "pending" ? (
+            m.warehouseStatus === "pending" ? (
               <Tag variant="cho">Chờ nhập kho</Tag>
             ) : (
-              <Tag variant="xong">Đã nhập kho{m.ton != null ? ` · tồn ${kg(m.ton)}` : ""}</Tag>
+              <Tag variant="xong">Đã nhập kho{m.stockKg != null ? ` · tồn ${kg(m.stockKg)}` : ""}</Tag>
             )
           }
           action={
-            m.kho === "pending"
-              ? taskButton(true, `Mở màn Kho dự trữ với hộp duyệt nhập kho của mẻ ${n.nhan}.`, () => navigate(`/warehouse?approve=W:${encodeURIComponent(n.id)}`), <ClipboardCheck aria-hidden />, "Duyệt nhập kho")
+            m.warehouseStatus === "pending"
+              ? taskButton(true, `Mở màn Kho dự trữ với hộp duyệt nhập kho của mẻ ${n.label}.`, () => navigate(`/warehouse?approve=W:${encodeURIComponent(n.id)}`), <ClipboardCheck aria-hidden />, "Duyệt nhập kho")
               : null
           }
         />
       );
-    if (g.khoa === "dong-goi") {
+    if (g.key === "dong-goi") {
       const p = dl.packagings.find((x) => x.id === n.id);
       return (
         <StageRow
@@ -174,13 +174,13 @@ export function TraceStagesView() {
             <>
               {lotBadge(m, "Lô BTP")}
               {labelBadge(m)}
-              {m.ton != null && <Tag variant="vi-tri">Tồn {kg(m.ton)}</Tag>}
+              {m.stockKg != null && <Tag variant="vi-tri">Tồn {kg(m.stockKg)}</Tag>}
             </>
           }
           action={
             <>
               {p &&
-                taskButton(m.thieu.includes("lo"), `Ghi phiếu ${n.nhan} đã dùng lô bán thành phẩm nào.`, () => setLotForPackaging(p), <Link2 aria-hidden />, (m.soLo ?? 0) > 0 ? "Lô BTP" : "Gắn lô BTP")}
+                taskButton(m.missing.includes("lo"), `Ghi phiếu ${n.label} đã dùng lô bán thành phẩm nào.`, () => setLotForPackaging(p), <Link2 aria-hidden />, (m.lotCount ?? 0) > 0 ? "Lô BTP" : "Gắn lô BTP")}
               {labelButton(m)}
             </>
           }
@@ -193,10 +193,10 @@ export function TraceStagesView() {
         <StageRow
           key={`X:${n.id}`}
           m={m}
-          status={m.daQuet ? <Tag variant="xong">Đã quét kiểm</Tag> : <Tag variant="cho">Chưa quét kiểm</Tag>}
+          status={m.isScanned ? <Tag variant="xong">Đã quét kiểm</Tag> : <Tag variant="cho">Chưa quét kiểm</Tag>}
           action={
-            m.donId && m.lenhId
-              ? taskButton(!m.daQuet, "Mở màn Đơn đặt với hộp kiểm lô bằng quét của lệnh xuất này.", () => navigate(`/orders?order=${encodeURIComponent(m.donId!)}&check=${encodeURIComponent(m.lenhId!)}`), <ScanLine aria-hidden />, "Kiểm lô")
+            m.salesOrderId && m.exportOrderId
+              ? taskButton(!m.isScanned, "Mở màn Đơn đặt với hộp kiểm lô bằng quét của lệnh xuất này.", () => navigate(`/orders?order=${encodeURIComponent(m.salesOrderId!)}&check=${encodeURIComponent(m.exportOrderId!)}`), <ScanLine aria-hidden />, "Kiểm lô")
               : null
           }
         />
@@ -207,10 +207,10 @@ export function TraceStagesView() {
         <StageRow
           key={`B:${n.id}`}
           m={m}
-          status={lotBadge(m, m.loaiLoBan === "P" ? "Lô TP" : "Lô BTP")}
+          status={lotBadge(m, m.soldLotKind === "P" ? "Lô TP" : "Lô BTP")}
           action={
-            b && m.loaiLoBan
-              ? taskButton(m.thieu.includes("lo"), "Ghi dòng bán này lấy từ lô nào — để thu hồi tới được khách.", () => setLotForSalesItem({ dong: b, lotKind: m.loaiLoBan! }), <Link2 aria-hidden />, (m.soLo ?? 0) > 0 ? "Lô" : "Gắn lô")
+            b && m.soldLotKind
+              ? taskButton(m.missing.includes("lo"), "Ghi dòng bán này lấy từ lô nào — để thu hồi tới được khách.", () => setLotForSalesItem({ dong: b, lotKind: m.soldLotKind! }), <Link2 aria-hidden />, (m.lotCount ?? 0) > 0 ? "Lô" : "Gắn lô")
               : null
           }
         />
@@ -222,7 +222,7 @@ export function TraceStagesView() {
         key={`N:${n.id}`}
         m={m}
         status={lotBadge(m, "Lô NL")}
-        action={r ? taskButton(m.thieu.includes("lo"), "Ghi nguyên liệu bán này lấy từ lô NL nào.", () => setLotForDomesticSale(r), <Link2 aria-hidden />, (m.soLo ?? 0) > 0 ? "Lô NL" : "Gắn lô NL") : null}
+        action={r ? taskButton(m.missing.includes("lo"), "Ghi nguyên liệu bán này lấy từ lô NL nào.", () => setLotForDomesticSale(r), <Link2 aria-hidden />, (m.lotCount ?? 0) > 0 ? "Lô NL" : "Gắn lô NL") : null}
       />
     );
   };
@@ -259,25 +259,25 @@ export function TraceStagesView() {
 
       <ol className="space-y-4">
         {items.map((g, i) => {
-          const missingCount = g.muc.filter((m) => m.thieu.length > 0).length;
-          const isVisible = onlyMissing ? g.muc.filter((m) => m.thieu.length > 0) : g.muc;
+          const missingCount = g.items.filter((m) => m.missing.length > 0).length;
+          const isVisible = onlyMissing ? g.items.filter((m) => m.missing.length > 0) : g.items;
           return (
-            <li key={g.khoa} className="space-y-2 rounded-xl border-2 border-border p-4">
+            <li key={g.key} className="space-y-2 rounded-xl border-2 border-border p-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <h2 className="font-semibold">
-                  <span className="tnum">{i + 1}.</span> {g.ten}
+                  <span className="tnum">{i + 1}.</span> {g.name}
                 </h2>
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="tnum text-muted-foreground">
-                    {g.muc.length} {STAGES[g.khoa].unit}
+                    {g.items.length} {STAGES[g.key].unit}
                   </span>
-                  {g.muc.length > 0 &&
+                  {g.items.length > 0 &&
                     (missingCount > 0 ? <Tag variant="loi">Còn thiếu {missingCount}</Tag> : <Tag variant="xong">Đủ</Tag>)}
                 </div>
               </div>
               <p className="text-muted-foreground">
                 Làm ở{" "}
-                {STAGES[g.khoa].man.map((x, k) => (
+                {STAGES[g.key].man.map((x, k) => (
                   <span key={x.path}>
                     {k > 0 && " · "}
                     <Link className="text-primary underline-offset-4 hover:underline" to={x.path}>
@@ -291,14 +291,14 @@ export function TraceStagesView() {
                 <ul>{isVisible.map((m) => renderItemRow(g, m))}</ul>
               ) : (
                 <p className="text-muted-foreground">
-                  {g.muc.length ? "Khâu này không còn mục thiếu." : `Không có ${STAGES[g.khoa].unit} nào trong khoảng này.`}
+                  {g.items.length ? "Khâu này không còn mục thiếu." : `Không có ${STAGES[g.key].unit} nào trong khoảng này.`}
                 </p>
               )}
             </li>
           );
         })}
       </ol>
-      {items.every((g) => g.muc.length === 0) && (
+      {items.every((g) => g.items.length === 0) && (
         <EmptyState title="Chưa có dữ liệu trong khoảng này" description="Nới khoảng ngày hoặc đổi phân xưởng." />
       )}
       <p className="flex items-center gap-2 text-muted-foreground">

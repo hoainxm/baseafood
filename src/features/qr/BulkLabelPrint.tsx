@@ -34,7 +34,7 @@ export function BulkLabelPrint() {
   const [soIn] = useLabelPrints();
   const daIn = useMemo(() => summarizeLabelPrints(soIn), [soIn]);
 
-  const allLots = useMemo(() => listLotsToPrint(dl, { tu, den, xuong: workshop, loai: lotKinds }), [dl, tu, den, workshop, lotKinds]);
+  const allLots = useMemo(() => listLotsToPrint(dl, { fromDate: tu, toDate: den, workshop, kinds: lotKinds }), [dl, tu, den, workshop, lotKinds]);
   const unprintedCount = allLots.filter((n) => !daIn.has(lotKey(n.kind as LotKind, n.id))).length;
   const items = onlyUnprinted ? allLots.filter((n) => !daIn.has(lotKey(n.kind as LotKind, n.id))) : allLots;
   const selected = items.filter((n) => !deselected.has(nodeKey(n)));
@@ -145,7 +145,7 @@ export function BulkLabelPrint() {
             {items.map((n) => {
               const k = nodeKey(n);
               const isSelected = !deselected.has(k);
-              const supplier = n.chiTiet.find((c) => c.nhan === "Đại lý")?.giaTri;
+              const supplier = n.details.find((c) => c.label === "Đại lý")?.value;
               return (
                 <li key={k}>
                   <label className="flex cursor-pointer items-start gap-3 px-3 py-2 hover:bg-muted">
@@ -154,23 +154,23 @@ export function BulkLabelPrint() {
                       className="mt-1 size-5 shrink-0"
                       checked={isSelected}
                       onChange={() => toggleSelect(n)}
-                      aria-label={`In tem lô ${n.nhan} · ${n.moTa}`}
+                      aria-label={`In tem lô ${n.label} · ${n.description}`}
                     />
                     <span className="min-w-0 flex-1 space-y-1">
                       <span className="flex flex-wrap items-center gap-2">
                         <Tag variant="phan-loai" tone={toneByName(TRACE_KIND_LABELS[n.kind])}>{TRACE_KIND_LABELS[n.kind]}</Tag>
-                        <span className="tnum font-semibold">{n.nhan}</span>
+                        <span className="tnum font-semibold">{n.label}</span>
                         {(() => {
                           const t = daIn.get(lotKey(n.kind as LotKind, n.id));
                           return t ? (
-                            <Tag variant="xong">Đã in {t.tem} tem · {formatDateVN(t.cuoi.printedAt.slice(0, 10))}</Tag>
+                            <Tag variant="xong">Đã in {t.labelCount} tem · {formatDateVN(t.lastPrint.printedAt.slice(0, 10))}</Tag>
                           ) : (
                             <Tag variant="cho">Chưa in tem</Tag>
                           );
                         })()}
                       </span>
                       <span className="block text-muted-foreground">
-                        {[n.moTa, formatDateVN(n.ngay), n.xuong && `xưởng ${n.xuong}`, supplier, n.kg ? kg(n.kg) : ""]
+                        {[n.description, formatDateVN(n.date), n.workshop && `xưởng ${n.workshop}`, supplier, n.kg ? kg(n.kg) : ""]
                           .filter(Boolean)
                           .join(" · ")}
                       </span>

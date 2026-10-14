@@ -142,7 +142,7 @@ export default function PackagingScreen() {
   const totalIn = view.reduce((s, r) => s + (r.inputKg || 0), 0);
   const totalOut = view.reduce((s, r) => s + (r.outputKg || 0), 0);
   const totalLoss = totalIn - totalOut;
-  const totalFinishedGoodStock = finishedGoodStock.reduce((s, t) => s + Math.max(0, t.conLai), 0);
+  const totalFinishedGoodStock = finishedGoodStock.reduce((s, t) => s + Math.max(0, t.remainingKg), 0);
 
   const postingDate = isSingleDay ? effectiveFrom : effectiveTo;
   const recordWorkshop: Workshop = workshop === "Tất cả" ? "Đông" : workshop;
@@ -359,7 +359,7 @@ export default function PackagingScreen() {
       </div>
 
       {/* Tồn thành phẩm đóng gói còn kho */}
-      {finishedGoodStock.some((t) => t.conLai > 0) && (
+      {finishedGoodStock.some((t) => t.remainingKg > 0) && (
         <section className="grid gap-3 rounded-xl border-2 border-border bg-card p-5">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-lg font-semibold text-foreground">Tồn thành phẩm đóng gói</h2>
@@ -369,7 +369,7 @@ export default function PackagingScreen() {
           </div>
           <div className="flex flex-wrap gap-2">
             {finishedGoodStock
-              .filter((t) => t.conLai > 0)
+              .filter((t) => t.remainingKg > 0)
               .map((t) => (
                 <span
                   key={`${t.productId}|${t.spec}`}
@@ -377,7 +377,7 @@ export default function PackagingScreen() {
                 >
                   {productNameOf(t.productId)}
                   {t.spec ? <span className="text-muted-foreground"> · {t.spec}</span> : null}:{" "}
-                  <span className="tnum font-semibold text-foreground">{kg(t.conLai)}</span>
+                  <span className="tnum font-semibold text-foreground">{kg(t.remainingKg)}</span>
                 </span>
               ))}
           </div>

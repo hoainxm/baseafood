@@ -30,7 +30,7 @@ export default function LoginScreen({
     setIsSending(true);
     const result = await signIn(username, password);
     setIsSending(false);
-    if (!result.ok) setLoi(result.loi ?? "Đăng nhập thất bại");
+    if (!result.ok) setLoi(result.error ?? "Đăng nhập thất bại");
   };
 
   return (

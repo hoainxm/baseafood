@@ -17,8 +17,8 @@ import { Camera, CameraOff, Link2, Plus, X } from "lucide-react";
 import { kg, formatDateVN } from "@/lib/format";
 
 export interface SessionLot {
-  nut: LotNode;
-  cach: LotInput["method"];
+  node: LotNode;
+  method: LotInput["method"];
 }
 
 export function SessionLotsSection({
@@ -41,23 +41,23 @@ export function SessionLotsSection({
   const [pickPrompt, setPickPrompt] = useState("");
 
   const candidates = useMemo(
-    () => listSelectableMaterialLots(dl, workshop, date).filter((n) => !sessionLots.some((l) => l.nut.id === n.id)),
+    () => listSelectableMaterialLots(dl, workshop, date).filter((n) => !sessionLots.some((l) => l.node.id === n.id)),
     [dl, workshop, date, sessionLots]
   );
   const describeLot = (n: LotNode) =>
-    [n.moTa, n.ngay && formatDateVN(n.ngay), n.chiTiet.find((c) => c.nhan === "Đại lý")?.giaTri, n.kg ? kg(n.kg) : ""].filter(Boolean).join(" · ");
+    [n.description, n.date && formatDateVN(n.date), n.details.find((c) => c.label === "Đại lý")?.value, n.kg ? kg(n.kg) : ""].filter(Boolean).join(" · ");
 
   const addLot = (n: LotNode, method: LotInput["method"]) => {
     if (n.kind !== "S") {
-      notify.warning(`"${n.nhan}" là ${TRACE_KIND_LABELS[n.kind].toLowerCase()}, không phải lô nguyên liệu.`);
+      notify.warning(`"${n.label}" là ${TRACE_KIND_LABELS[n.kind].toLowerCase()}, không phải lô nguyên liệu.`);
       return;
     }
-    if (sessionLots.some((l) => l.nut.id === n.id)) {
-      notify.warning(`Lô ${n.nhan} đã có trong phiên.`);
+    if (sessionLots.some((l) => l.node.id === n.id)) {
+      notify.warning(`Lô ${n.label} đã có trong phiên.`);
       return;
     }
     // Khai lô cho phiên = nháp chưa lưu ⇒ không toast (luật 13); lưu phiên mới ghi.
-    onDoi([...sessionLots, { nut: n, cach: method }]);
+    onDoi([...sessionLots, { node: n, method }]);
     setTypedCode("");
     setChoices([]);
   };
@@ -80,8 +80,8 @@ export function SessionLotsSection({
       // không cần toast. Chỉ mã cũ trùng thật mới cảnh báo.
       const ld = explainMultipleLots(text, result, dl);
       setChoices(result);
-      setPickPrompt(ld.cau);
-      if (!ld.cungChuyen) notify.warning(`${ld.cau} bên dưới.`);
+      setPickPrompt(ld.message);
+      if (!ld.sameShipment) notify.warning(`${ld.message} bên dưới.`);
     }
   };
 
@@ -101,19 +101,19 @@ export function SessionLotsSection({
       {sessionLots.length > 0 && (
         <ul className="flex flex-wrap gap-2">
           {sessionLots.map((l) => (
-            <li key={l.nut.id} className="flex max-w-full items-center gap-2 rounded-md border-2 border-primary/40 bg-accent/40 py-1 pl-3 pr-1">
+            <li key={l.node.id} className="flex max-w-full items-center gap-2 rounded-md border-2 border-primary/40 bg-accent/40 py-1 pl-3 pr-1">
               <span className="min-w-0">
-                <span className="tnum font-semibold">{l.nut.nhan}</span>{" "}
-                <span className="text-muted-foreground">{describeLot(l.nut)}</span>
+                <span className="tnum font-semibold">{l.node.label}</span>{" "}
+                <span className="text-muted-foreground">{describeLot(l.node)}</span>
               </span>
               <Button
                 type="button"
                 variant="ghost"
                 size="icon"
                 className="shrink-0"
-                title={`Bỏ lô ${l.nut.nhan} khỏi phiên (chưa lưu nên chưa gắn vào đâu).`}
-                aria-label={`Bỏ lô ${l.nut.nhan}`}
-                onClick={() => onDoi(sessionLots.filter((x) => x.nut.id !== l.nut.id))}
+                title={`Bỏ lô ${l.node.label} khỏi phiên (chưa lưu nên chưa gắn vào đâu).`}
+                aria-label={`Bỏ lô ${l.node.label}`}
+                onClick={() => onDoi(sessionLots.filter((x) => x.node.id !== l.node.id))}
               >
                 <X />
               </Button>
@@ -156,9 +156,9 @@ export function SessionLotsSection({
           {choices.map((n) => (
             <li key={n.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-2">
               <span className="min-w-0">
-                <span className="font-medium">{n.nhan}</span> <span className="text-muted-foreground">{describeLot(n)}</span>
+                <span className="font-medium">{n.label}</span> <span className="text-muted-foreground">{describeLot(n)}</span>
               </span>
-              <Button type="button" size="sm" title={`Thêm đúng lô ${n.nhan} này vào phiên.`} onClick={() => addLot(n, "typed")}>
+              <Button type="button" size="sm" title={`Thêm đúng lô ${n.label} này vào phiên.`} onClick={() => addLot(n, "typed")}>
                 Chọn lô này
               </Button>
             </li>
@@ -177,8 +177,8 @@ export function SessionLotsSection({
         // Mỗi loại NL của chuyến là một lô cùng mã chuyến ⇒ nhãn ghép loại NL cho phân biệt được.
         options={candidates.map((n) => ({
           value: n.id,
-          label: `${n.nhan} · ${n.moTa}`,
-          phu: [n.ngay && formatDateVN(n.ngay), n.chiTiet.find((c) => c.nhan === "Đại lý")?.giaTri, n.kg ? kg(n.kg) : ""].filter(Boolean).join(" · ") || undefined,
+          label: `${n.label} · ${n.description}`,
+          phu: [n.date && formatDateVN(n.date), n.details.find((c) => c.label === "Đại lý")?.value, n.kg ? kg(n.kg) : ""].filter(Boolean).join(" · ") || undefined,
         }))}
         placeholder={candidates.length ? "— Chọn lô —" : "Không có lô gợi ý"}
         emptyText="Không thấy lô này — quét tem hoặc gõ mã lô ở trên."

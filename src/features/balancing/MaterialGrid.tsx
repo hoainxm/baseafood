@@ -89,13 +89,13 @@ export function MaterialGrid({
   );
   const importById = useMemo(() => new Map(grid.assignedImports.map((r) => [r.id, r])), [grid.assignedImports]);
   const importRowsOf = (h: MaterialGridRow): MaterialImportItem[] =>
-    h.tuSoNhap ? h.nguonIds.flatMap((id) => importById.get(id) ?? []) : [];
+    h.fromImports ? h.sourceIds.flatMap((id) => importById.get(id) ?? []) : [];
   /** Thành tiền thật của từng dòng con đại lý (id dòng con → đ). */
   const childRowAmount = new Map<string, number>();
   /** Dòng loại NL đang mở dòng con theo đại lý. */
   const [expandedSuppliers, setExpandedSuppliers] = useState<ReadonlySet<string>>(() => new Set());
   /** Dòng loại NL có dòng sổ nhập (mở được theo đại lý) — cho nút mở/gập tất cả. */
-  const idsWithSupplier = materialRows.filter((h) => h.tuSoNhap && h.nguonIds.length > 0).map((h) => h.id);
+  const idsWithSupplier = materialRows.filter((h) => h.fromImports && h.sourceIds.length > 0).map((h) => h.id);
   const hasSupplierRows = idsWithSupplier.length > 0;
   const allSuppliersExpanded = hasSupplierRows && idsWithSupplier.every((id) => expandedSuppliers.has(id));
   const toggleSupplierOpen = (id: string) =>
@@ -119,9 +119,9 @@ export function MaterialGrid({
      kho đông đọc từ engine sổ NXT nên cộng trừ ngay theo từng phím. */
   /** Đơn giá bình quân NL thủy sản của kỳ — gợi ý giá cho phần gửi đông. */
   const avgMaterialPrice = useMemo(() => {
-    const ts = materialRows.filter((h) => !h.loaiKho && !h.laGiam && h.nhom === "Thủy sản" && h.donGia != null);
-    const kg = ts.reduce((s, h) => s + h.tong, 0);
-    return kg > 0 ? Math.round(ts.reduce((s, h) => s + h.tong * (h.donGia ?? 0), 0) / kg) : null;
+    const ts = materialRows.filter((h) => !h.stockLineKind && !h.isDecrease && h.group === "Thủy sản" && h.unitPrice != null);
+    const kg = ts.reduce((s, h) => s + h.total, 0);
+    return kg > 0 ? Math.round(ts.reduce((s, h) => s + h.total * (h.unitPrice ?? 0), 0) / kg) : null;
   }, [materialRows]);
 
   const stockLineTemplate = (lineKind: BalancingStockLineKind): BalancingInputItem => ({
@@ -143,22 +143,22 @@ export function MaterialGrid({
     const m = stockLineTemplate(lineKind);
     return {
       id: m.id,
-      ten: m.name,
-      loaiKho: lineKind,
-      nhom: m.groupName,
-      theoNgay: {},
-      chuyenKy: 0,
-      tong: 0,
-      donGia: m.unitPrice,
-      tyLe: null,
-      laGiam: m.isReduction ?? false,
-      khoGiam: m.reductionWarehouseId ?? "",
-      tuSoNhap: false,
-      nguonIds: [],
+      name: m.name,
+      stockLineKind: lineKind,
+      group: m.groupName,
+      dailyQuantities: {},
+      carryOverKg: 0,
+      total: 0,
+      unitPrice: m.unitPrice,
+      ratio: null,
+      isDecrease: m.isReduction ?? false,
+      decreaseTarget: m.reductionWarehouseId ?? "",
+      fromImports: false,
+      sourceIds: [],
     };
   };
-  const thawRows = materialRows.filter((h) => h.loaiKho === "lay-xa-dong");
-  const freezeDepositRows = materialRows.filter((h) => h.loaiKho === "gui-dong");
+  const thawRows = materialRows.filter((h) => h.stockLineKind === "lay-xa-dong");
+  const freezeDepositRows = materialRows.filter((h) => h.stockLineKind === "gui-dong");
   const thawGridRows = thawRows.length ? thawRows : [hangAo("lay-xa-dong")];
   const freezeDepositGridRows = freezeDepositRows.length ? freezeDepositRows : [hangAo("gui-dong")];
   const aoTheoId = new Map<string, BalancingInputItem>(
@@ -221,9 +221,9 @@ export function MaterialGrid({
       return;
     }
     const targetTotal = r.isReduction ? -Math.abs(v ?? 0) : (v ?? 0);
-    const datesWithValues = dates.filter((iso) => (h.theoNgay[iso] ?? 0) !== 0);
+    const datesWithValues = dates.filter((iso) => (h.dailyQuantities[iso] ?? 0) !== 0);
     const iso = datesWithValues.length ? datesWithValues[datesWithValues.length - 1] : dates[0];
-    const updated = (h.theoNgay[iso] ?? 0) + (targetTotal - h.tong);
+    const updated = (h.dailyQuantities[iso] ?? 0) + (targetTotal - h.total);
     /* Đã tính dấu ở trên ⇒ gọi thẳng, không qua lớp "dương → âm" của ghiONgay. */
     if (r.autoSource === "imports") {
       saveImportsMultiDay([{ rowKey: r.name, date: iso, kg: updated }]);
@@ -238,15 +238,15 @@ export function MaterialGrid({
   /* ---------- Bán nội địa (mig 0054): dòng GIẢM "Bán nội địa" ⇄ sổ /wip ----------
      NL bán thẳng cho khách trong nước (bảng giấy: −987). Tổ trưởng ghi ở Sản xuất;
      ở đây chỉ điền / đối chiếu theo từng ngày — dòng giảm âm sẵn đúng công thức. */
-  const isDomesticSale = (h: MaterialGridRow) => h.laGiam && isDomesticSaleRow({ name: h.ten });
+  const isDomesticSale = (h: MaterialGridRow) => h.isDecrease && isDomesticSaleRow({ name: h.name });
   const domesticSaleRow = materialInRows.find((r) => isDomesticSaleRow(r));
   const fillDomesticSales = () => {
-    const daily = negateDailyQuantities(productionDomesticSales.theoNgay);
+    const daily = negateDailyQuantities(productionDomesticSales.dailyQuantities);
     if (domesticSaleRow) {
       // Dòng cũ (Thủy sản kg âm thường) chuyển luôn thành dòng giảm — một dòng, không trừ đôi.
       writeRow(domesticSaleRow.id, {
         dailyQuantities: daily,
-        unitPrice: productionDomesticSales.giaBinhQuan ?? domesticSaleRow.unitPrice,
+        unitPrice: productionDomesticSales.averagePrice ?? domesticSaleRow.unitPrice,
         isReduction: true,
         reductionWarehouseId: "",
       });
@@ -259,7 +259,7 @@ export function MaterialGrid({
           groupName: "Thủy sản",
           name: DOMESTIC_SALE_ROW_NAME,
           quantityKg: sumGridRow(daily, 0),
-          unitPrice: productionDomesticSales.giaBinhQuan,
+          unitPrice: productionDomesticSales.averagePrice,
           ratioPercentage: null,
           sourceWarehouse: "",
           dailyQuantities: daily,
@@ -270,17 +270,17 @@ export function MaterialGrid({
         },
       ]);
     }
-    notify.saved(`Đã ghi Bán nội địa ${num(productionDomesticSales.tongKg)} kg theo sổ Sản xuất`);
+    notify.saved(`Đã ghi Bán nội địa ${num(productionDomesticSales.totalKg)} kg theo sổ Sản xuất`);
   };
   const domesticSaleSubtext = (h: MaterialGridRow) => {
-    if (productionDomesticSales.tongKg <= 0) return undefined;
-    const result = compareDomesticSales(h.theoNgay, productionDomesticSales.theoNgay);
+    if (productionDomesticSales.totalKg <= 0) return undefined;
+    const result = compareDomesticSales(h.dailyQuantities, productionDomesticSales.dailyQuantities);
     if (result === "khop") return <Tag variant="xong" className="mt-0.5">khớp sổ SX</Tag>;
     return (
       <span className="mt-0.5 inline-flex flex-wrap items-center gap-1">
         {result === "lech" && (
           <Tag variant="luu-y">
-            SX ghi {num(productionDomesticSales.tongKg)} · lệch {num(Math.abs(h.tong) - productionDomesticSales.tongKg)}
+            SX ghi {num(productionDomesticSales.totalKg)} · lệch {num(Math.abs(h.total) - productionDomesticSales.totalKg)}
           </Tag>
         )}
         {!grid.isLocked && (
@@ -290,7 +290,7 @@ export function MaterialGrid({
             onClick={fillDomesticSales}
             title="Điền dòng Bán nội địa đúng từng ngày bằng số tổ trưởng ghi ở màn Sản xuất thành phẩm (ghi đè số đang có của dòng này)."
           >
-            {result === "lech" ? "Lấy lại từ SX" : `Lấy ${num(productionDomesticSales.tongKg)} kg từ SX`}
+            {result === "lech" ? "Lấy lại từ SX" : `Lấy ${num(productionDomesticSales.totalKg)} kg từ SX`}
           </Button>
         )}
       </span>
@@ -301,9 +301,9 @@ export function MaterialGrid({
      Lấy xả đông → các nhóm (Thủy sản · Xả đông mua về · Bột) → Giảm → Gửi đông. */
   const groupsWithRows = INPUT_GROUPS.map((nhom) => ({
     nhom,
-    dong: materialRows.filter((h) => !h.loaiKho && h.nhom === nhom && !h.laGiam),
+    dong: materialRows.filter((h) => !h.stockLineKind && h.group === nhom && !h.isDecrease),
   })).filter((g) => g.dong.length > 0);
-  const reductionRows = materialRows.filter((h) => !h.loaiKho && h.laGiam);
+  const reductionRows = materialRows.filter((h) => !h.stockLineKind && h.isDecrease);
   const visibleRows: MaterialGridRow[] = [
     ...thawGridRows,
     ...groupsWithRows.flatMap((g) => g.dong),
@@ -473,7 +473,7 @@ export function MaterialGrid({
 
   /* Cột "Chuyển kỳ" đã bỏ khỏi khối NL (ra/vào kho đi bằng hai dòng kho). Chỉ còn
      hiện khi kỳ CŨ lỡ có số ở đó — giấu đi thì Số lượng ≠ Σ ngày mà không ai hiểu vì sao. */
-  const hasLegacyCarryOver = materialRows.some((h) => h.chuyenKy !== 0);
+  const hasLegacyCarryOver = materialRows.some((h) => h.carryOverKg !== 0);
 
   /* Thứ tự cột theo file cân đối của kế toán (cột A–E): Loại hàng · Số lượng · Đơn giá
      VNĐ · T.tiền · tỷ lệ đứng SÁT tên — số chính luôn thấy, không phải cuộn ngang; phần
@@ -481,9 +481,9 @@ export function MaterialGrid({
   const gridColumns: GridColumn<MaterialGridRow>[] = [
     /* Hai cột "Số lượng" loại trừ nhau: đang MỞ ngày ⇒ ô tính (Σ ngày, gõ ở ô ngày);
        đang THU ngày ⇒ gõ thẳng (ghiSoLuong). */
-    { key: "tong", header: "Số lượng", label: "Số lượng", kind: "tinh", group: "khi-mo-ngay", minWidth: 104, getValue: (h) => h.tong || null },
-    { key: "soLuong", header: "Số lượng", label: "Số lượng", kind: "so", group: "khi-thu-ngay", minWidth: 104, getValue: (h) => (h.laGiam ? Math.abs(h.tong) : h.tong) || null },
-    { key: "donGia", header: "Đơn giá VNĐ", label: "Đơn giá", kind: "so", minWidth: 104, getValue: (h) => h.donGia },
+    { key: "tong", header: "Số lượng", label: "Số lượng", kind: "tinh", group: "khi-mo-ngay", minWidth: 104, getValue: (h) => h.total || null },
+    { key: "soLuong", header: "Số lượng", label: "Số lượng", kind: "so", group: "khi-thu-ngay", minWidth: 104, getValue: (h) => (h.isDecrease ? Math.abs(h.total) : h.total) || null },
+    { key: "donGia", header: "Đơn giá VNĐ", label: "Đơn giá", kind: "so", minWidth: 104, getValue: (h) => h.unitPrice },
     {
       key: "thanhTien",
       header: "T.tiền (đồng)",
@@ -491,9 +491,9 @@ export function MaterialGrid({
       kind: "tinh",
       minWidth: 136,
       // Dòng con đại lý: tiền THẬT của các chuyến (đơn giá hiện đã làm tròn).
-      getValue: (h) => childRowAmount.get(h.id) ?? (h.tong * (h.donGia ?? 0) || null),
+      getValue: (h) => childRowAmount.get(h.id) ?? (h.total * (h.unitPrice ?? 0) || null),
     },
-    { key: "tyLe", header: "Tỷ lệ", label: "Tỷ lệ phần trăm", kind: "so", minWidth: 72, getValue: (h) => h.tyLe },
+    { key: "tyLe", header: "Tỷ lệ", label: "Tỷ lệ phần trăm", kind: "so", minWidth: 72, getValue: (h) => h.ratio },
     ...dates.map<GridColumn<MaterialGridRow>>((iso) => ({
       key: `ngay:${iso}`,
       header: formatDayLabel(iso),
@@ -501,7 +501,7 @@ export function MaterialGrid({
       kind: "so",
       group: "ngay",
       minWidth: 88,
-      getValue: (h) => h.theoNgay[iso] ?? null,
+      getValue: (h) => h.dailyQuantities[iso] ?? null,
       // Ngay dưới số kg: "n chuyến" → đại lý/chuyến làm nên đúng ô này.
       renderCellNote: (h) => <CellShipments dong={importRowsOf(h)} date={iso} lotCodes={lotCodes} />,
     })),
@@ -515,7 +515,7 @@ export function MaterialGrid({
             group: "ngay",
             tint: "chuyen-ky",
             minWidth: 112,
-            getValue: (h) => h.chuyenKy || null,
+            getValue: (h) => h.carryOverKg || null,
           } satisfies GridColumn<MaterialGridRow>,
         ]
       : []),
@@ -534,8 +534,8 @@ export function MaterialGrid({
 
   /* Gửi đông ⇄ còn dở khai ở Sản xuất: cả hai cùng ghi, màn đối chiếu. Gửi đông có
      số thì là số chuẩn của tồn kho đông; chưa có thì tồn tạm lấy còn dở SX. */
-  const productionLeftover = stockRows?.conDoSX ?? 0;
-  const balancingFreezeDeposit = stockRows?.guiDongCanDoi ?? 0;
+  const productionLeftover = stockRows?.productionLeftoverKg ?? 0;
+  const balancingFreezeDeposit = stockRows?.balancingFreezeDepositKg ?? 0;
   const fillFromProduction = () => {
     const daily: DailyQuantities = {};
     for (const [iso, kg] of Object.entries(leftoverByDate)) if (kg) daily[iso] = -Math.abs(kg);
@@ -551,7 +551,7 @@ export function MaterialGrid({
     if (!original) return;
     const lo = grid.lotOptions([loId]).find((x) => x.value === loId);
     /* Giá lấy xả đông = đơn giá của lô (đúng giá vốn); lô chưa có giá thì giữ giá đang có. */
-    writeRow(h.id, { stockLineId: loId, unitPrice: lo?.gia ?? original.unitPrice });
+    writeRow(h.id, { stockLineId: loId, unitPrice: lo?.price ?? original.unitPrice });
   };
 
   const stockRowSubtext = (h: MaterialGridRow, isGroupHead: boolean) => {
@@ -562,9 +562,9 @@ export function MaterialGrid({
     }
     return (
       <span className="mt-1 block space-y-1">
-        {h.loaiKho === "lay-xa-dong" ? (
+        {h.stockLineKind === "lay-xa-dong" ? (
           <Combobox
-            label={`Lô lấy xả đông — ${h.ten}`}
+            label={`Lô lấy xả đông — ${h.name}`}
             hideLabel
             value={original?.stockLineId ?? ""}
             onChange={(v) => pickLot(h, v)}
@@ -575,7 +575,7 @@ export function MaterialGrid({
           />
         ) : (
           <Combobox
-            label={`Kho gửi đông — ${h.ten}`}
+            label={`Kho gửi đông — ${h.name}`}
             hideLabel
             value={original?.stockLocation ?? ""}
             onChange={(v) => writeRow(h.id, { stockLocation: v })}
@@ -584,7 +584,7 @@ export function MaterialGrid({
             clearable={false}
           />
         )}
-        {h.loaiKho === "gui-dong" && isGroupHead && productionLeftover > 0 && (
+        {h.stockLineKind === "gui-dong" && isGroupHead && productionLeftover > 0 && (
           <span className="inline-flex flex-wrap items-center gap-1">
             {balancingFreezeDeposit === 0 ? (
               <Button
@@ -621,8 +621,8 @@ export function MaterialGrid({
       id: h.id,
       data: h,
       /* Chuỗi (không JSX) để nhãn đọc của từng ô mang tên dòng. */
-      label: h.ten === BALANCING_STOCK_LINE_NAMES[h.loaiKho!] ? h.ten : `${BALANCING_STOCK_LINE_NAMES[h.loaiKho!]} · ${h.ten}`,
-      kind: h.loaiKho === "gui-dong" ? "giam" : undefined,
+      label: h.name === BALANCING_STOCK_LINE_NAMES[h.stockLineKind!] ? h.name : `${BALANCING_STOCK_LINE_NAMES[h.stockLineKind!]} · ${h.name}`,
+      kind: h.stockLineKind === "gui-dong" ? "giam" : undefined,
       subLabel: stockRowSubtext(h, i === 0),
     }));
 
@@ -631,12 +631,12 @@ export function MaterialGrid({
   const hang: GridRow<MaterialGridRow>[] = [...stockGridRows(thawGridRows)];
   for (const g of groupsWithRows) {
     for (const h of g.dong) {
-      const suppliers = h.tuSoNhap ? groupImportsBySupplier(importRowsOf(h)) : [];
+      const suppliers = h.fromImports ? groupImportsBySupplier(importRowsOf(h)) : [];
       const mo = expandedSuppliers.has(h.id);
       hang.push({
         id: h.id,
         data: h,
-        label: h.ten,
+        label: h.name,
         subLabel:
           suppliers.length > 0 ? (
             <button
@@ -659,18 +659,18 @@ export function MaterialGrid({
       for (const d of suppliers) {
         const con: MaterialGridRow = {
           ...h,
-          id: `${h.id}::dl::${d.daiLy}`,
-          ten: d.daiLy,
-          theoNgay: d.theoNgay,
-          tong: d.kg,
+          id: `${h.id}::dl::${d.supplier}`,
+          name: d.supplier,
+          dailyQuantities: d.dailyAmounts,
+          total: d.kg,
           // Giá bình quân của đại lý trong kỳ, làm tròn đồng; thành tiền lấy số thật.
-          donGia: d.kg > 0 && d.tien > 0 ? Math.round(d.tien / d.kg) : null,
-          tyLe: null,
-          chuyenKy: 0,
-          nguonIds: d.ids,
+          unitPrice: d.kg > 0 && d.amount > 0 ? Math.round(d.amount / d.kg) : null,
+          ratio: null,
+          carryOverKg: 0,
+          sourceIds: d.ids,
         };
-        childRowAmount.set(con.id, d.tien);
-        hang.push({ id: con.id, data: con, label: d.daiLy, kind: "con" });
+        childRowAmount.set(con.id, d.amount);
+        hang.push({ id: con.id, data: con, label: d.supplier, kind: "con" });
       }
     }
   }
@@ -679,9 +679,9 @@ export function MaterialGrid({
       hang.push({
         id: h.id,
         data: h,
-        label: h.ten,
+        label: h.name,
         kind: "giam",
-        subLabel: isDomesticSale(h) ? domesticSaleSubtext(h) : WORKSHOP_WAREHOUSES.some((k) => k.id === h.khoGiam) ? undefined : (
+        subLabel: isDomesticSale(h) ? domesticSaleSubtext(h) : WORKSHOP_WAREHOUSES.some((k) => k.id === h.decreaseTarget) ? undefined : (
           <Tag variant="loi" className="mt-0.5">
             chưa chọn kho
           </Tag>
@@ -697,14 +697,14 @@ export function MaterialGrid({
     [otherTypeImports, otherPeriodImports]
   );
 
-  const materialTotalKg = materialRows.reduce((s, h) => s + h.tong, 0);
-  const totalAmount = materialRows.reduce((s, h) => s + h.tong * (h.donGia ?? 0), 0);
+  const materialTotalKg = materialRows.reduce((s, h) => s + h.total, 0);
+  const totalAmount = materialRows.reduce((s, h) => s + h.total * (h.unitPrice ?? 0), 0);
 
   /** Gợi ý cho hộp thêm dòng: danh mục + tên các dòng đã có trong kỳ. */
   const typeSuggestions = useMemo(() => {
     const ten = new Set<string>([
       ...catalogMaterialTypes.map((l) => l.name),
-      ...materialRows.filter((h) => !h.laGiam && !h.loaiKho).map((h) => h.ten),
+      ...materialRows.filter((h) => !h.isDecrease && !h.stockLineKind).map((h) => h.name),
     ]);
     return [...ten].filter(Boolean).map((t) => ({ value: t, label: t }));
   }, [catalogMaterialTypes, materialRows]);
@@ -728,7 +728,7 @@ export function MaterialGrid({
               Lấy {importsToPull.length} dòng từ sổ nhập
             </Button>
           )}
-          {!grid.isLocked && !domesticSaleRow?.isReduction && productionDomesticSales.tongKg > 0 && (
+          {!grid.isLocked && !domesticSaleRow?.isReduction && productionDomesticSales.totalKg > 0 && (
             <Button
               title="Tạo dòng giảm Bán nội địa và điền đúng từng ngày bằng số tổ trưởng ghi ở màn Sản xuất thành phẩm (NL bán thẳng, không chế biến)."
               variant="outline"
@@ -736,7 +736,7 @@ export function MaterialGrid({
               onClick={fillDomesticSales}
             >
               <Download />
-              Lấy bán nội địa từ SX ({num(productionDomesticSales.tongKg)} kg)
+              Lấy bán nội địa từ SX ({num(productionDomesticSales.totalKg)} kg)
             </Button>
           )}
           {pickableRows.length > 0 && (
@@ -840,12 +840,12 @@ export function MaterialGrid({
             {!isDateColumnsCollapsed &&
               dates.map((iso) => (
                 <td key={iso} className="tnum border-t-2 border-l border-border px-3 py-3 text-right">
-                  {num(materialRows.reduce((s, h) => s + (h.theoNgay[iso] ?? 0), 0)) || "—"}
+                  {num(materialRows.reduce((s, h) => s + (h.dailyQuantities[iso] ?? 0), 0)) || "—"}
                 </td>
               ))}
             {!isDateColumnsCollapsed && hasLegacyCarryOver && (
               <td className="tnum border-t-2 border-l border-border bg-warning-surface px-3 py-3 text-right">
-                {num(materialRows.reduce((s, h) => s + h.chuyenKy, 0)) || "—"}
+                {num(materialRows.reduce((s, h) => s + h.carryOverKg, 0)) || "—"}
               </td>
             )}
           </tr>
@@ -883,7 +883,7 @@ export function MaterialGrid({
               Gửi thêm kho
             </Button>
           )}
-          {materialRows.some((h) => !h.tuSoNhap) && (
+          {materialRows.some((h) => !h.fromImports) && (
             <Button
               title="Xoá dòng nhập tay hoặc đổi kho nhận của dòng giảm."
               variant="ghost"
@@ -899,8 +899,8 @@ export function MaterialGrid({
 
       {isManualEditOpen && (
         <ManualRowsDialog
-          dong={materialRows.filter((h) => !h.tuSoNhap)}
-          getRowName={(h) => (h.loaiKho ? BALANCING_STOCK_LINE_NAMES[h.loaiKho] : h.ten)}
+          dong={materialRows.filter((h) => !h.fromImports)}
+          getRowName={(h) => (h.stockLineKind ? BALANCING_STOCK_LINE_NAMES[h.stockLineKind] : h.name)}
           workshopWarehouses={WORKSHOP_WAREHOUSES.map((k) => ({ value: k.id, label: k.name }))}
           hasWarehouse={(h) => !isDomesticSale(h)}
           onChangeWarehouse={(id, warehouse) => writeRow(id, { reductionWarehouseId: warehouse })}

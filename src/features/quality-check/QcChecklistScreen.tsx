@@ -126,7 +126,7 @@ export default function QcChecklistScreen() {
 
   // 30 ngày tới ngày đang xem — xu hướng chất lượng của xưởng.
   const qc30 = useMemo(() => countQcByDay(rows, workshop, subtractDays(date, 29), date), [rows, workshop, date]);
-  const coQc30 = qc30.some((x) => x.dat + x.tam + x.khongDat > 0);
+  const coQc30 = qc30.some((x) => x.pass + x.conditional + x.fail > 0);
 
   const scoredRows = dongs.filter((d) => d.result);
   const passCount = scoredRows.filter((d) => d.result === "pass").length;
@@ -257,14 +257,14 @@ export default function QcChecklistScreen() {
         <section className="space-y-3 rounded-xl border-2 border-border p-4">
           <h2 className="text-lg font-semibold text-foreground">30 ngày gần đây · xưởng {workshop}</h2>
           <TimeSeriesChart
-            labels={qc30.map((x) => `${x.ngay.slice(8, 10)}/${x.ngay.slice(5, 7)}`)}
+            labels={qc30.map((x) => `${x.date.slice(8, 10)}/${x.date.slice(5, 7)}`)}
             unit="chỉ tiêu"
             height={220}
             description={`Số chỉ tiêu QC đạt, tạm, không đạt mỗi ngày — xưởng ${workshop}`}
             series={[
-              { id: "dat", name: "Đạt", color: "la", kind: "cot", values: qc30.map((x) => x.dat) },
-              { id: "tam", name: "Tạm (cần khắc phục)", color: "cat", kind: "cot", values: qc30.map((x) => x.tam) },
-              { id: "kd", name: "Không đạt", color: "hong", kind: "cot", values: qc30.map((x) => x.khongDat) },
+              { id: "dat", name: "Đạt", color: "la", kind: "cot", values: qc30.map((x) => x.pass) },
+              { id: "tam", name: "Tạm (cần khắc phục)", color: "cat", kind: "cot", values: qc30.map((x) => x.conditional) },
+              { id: "kd", name: "Không đạt", color: "hong", kind: "cot", values: qc30.map((x) => x.fail) },
             ]}
           />
         </section>

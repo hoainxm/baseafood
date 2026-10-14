@@ -49,15 +49,15 @@ describe("getPeriodDomesticSales", () => {
       ],
       ky
     );
-    expect(result.theoNgay).toEqual({ "2026-07-21": 987, "2026-07-23": 100 });
-    expect(result.tongKg).toBe(1087);
-    expect(result.soDong).toBe(3);
+    expect(result.dailyQuantities).toEqual({ "2026-07-21": 987, "2026-07-23": 100 });
+    expect(result.totalKg).toBe(1087);
+    expect(result.rowCount).toBe(3);
     // (600×145.000 + 387×150.000) / 987 = 146.960,49… ⇒ làm tròn
-    expect(result.giaBinhQuan).toBe(146960);
+    expect(result.averagePrice).toBe(146960);
   });
   it("không dòng nào có giá ⇒ giá null; kỳ thiếu ngày ⇒ rỗng", () => {
-    expect(getPeriodDomesticSales([d({ quantityKg: 5 })], ky).giaBinhQuan).toBeNull();
-    expect(getPeriodDomesticSales([d({ quantityKg: 5 })], { materialTypeName: "Bạch tuộc 2 da" }).tongKg).toBe(0);
+    expect(getPeriodDomesticSales([d({ quantityKg: 5 })], ky).averagePrice).toBeNull();
+    expect(getPeriodDomesticSales([d({ quantityKg: 5 })], { materialTypeName: "Bạch tuộc 2 da" }).totalKg).toBe(0);
   });
 });
 

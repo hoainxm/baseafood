@@ -18,11 +18,11 @@ export function LotRecall({ node, dl, sameShipmentLots = [] }: { node: LotNode; 
   /** Lô NL có nhiều loại cùng chuyến ⇒ cho thu hồi GỘP cả chuyến (nghi cả xe hàng của đại lý). */
   const [wholeShipment, setWholeShipment] = useState(false);
   const isMergedShipment = wholeShipment && sameShipmentLots.length > 1;
-  const { hangRa: outboundItems, loTrongXuong: lotsInPlant } = useMemo(
+  const { shippedItems: outboundItems, inPlantLots: lotsInPlant } = useMemo(
     () => (isMergedShipment ? buildRecallListForLots(sameShipmentLots, dl) : buildRecallList(node.kind, node.id, dl)),
     [isMergedShipment, sameShipmentLots, node, dl]
   );
-  const scope = isMergedShipment ? `chuyến ${node.nhan} (${sameShipmentLots.length} loại NL)` : `lô ${node.nhan}${node.kind === "S" ? ` · ${node.moTa}` : ""}`;
+  const scope = isMergedShipment ? `chuyến ${node.label} (${sameShipmentLots.length} loại NL)` : `lô ${node.label}${node.kind === "S" ? ` · ${node.description}` : ""}`;
   const lotStockNow = useMemo(
     () => {
       const bang = buildLotStockIndex(dl); // một lượt cho mọi lô cần khoanh
@@ -30,23 +30,23 @@ export function LotRecall({ node, dl, sameShipmentLots = [] }: { node: LotNode; 
     },
     [lotsInPlant, dl]
   );
-  const customerCount = new Set(outboundItems.map((r) => r.khach || "khách ?")).size;
+  const customerCount = new Set(outboundItems.map((r) => r.customer || "khách ?")).size;
   const totalKg = outboundItems.reduce((s, r) => s + (r.kg ?? 0), 0);
 
   const downloadExcel = async () => {
     const { exportAoaToXlsx } = await import("@/lib/reportXlsx"); // nạp động — xlsx không vào chunk chính
     exportAoaToXlsx({
       sheetName: "Thu hồi",
-      fileName: `thu-hoi-${node.nhan}-${new Date().toISOString().slice(0, 16).replace(/[:T]/g, "")}.xlsx`,
+      fileName: `thu-hoi-${node.label}-${new Date().toISOString().slice(0, 16).replace(/[:T]/g, "")}.xlsx`,
       colWidths: [14, 28, 12, 26, 32, 12, 22],
       aoa: [
         [`Danh sách thu hồi — ${scope} (${TRACE_KIND_LABELS[node.kind]})`],
         [],
         ["Ngả ra", "Khách", "Ngày", "Chứng từ", "Mặt hàng", "Kg", "Từ lô"],
-        ...outboundItems.map((r) => [TRACE_KIND_LABELS[r.loai], r.khach, r.ngay, r.chungTu, r.matHang, r.kg, r.tuLo]),
+        ...outboundItems.map((r) => [TRACE_KIND_LABELS[r.kind], r.customer, r.date, r.document, r.product, r.kg, r.fromLot]),
         [],
         ["Lô còn trong xưởng", "Mặt hàng", "Ngày", "Tồn trong kho (kg)"],
-        ...lotStockNow.map(({ n, ton: stockKg }) => [`${TRACE_KIND_LABELS[n.kind]} ${n.nhan}`, n.moTa, n.ngay, stockKg]),
+        ...lotStockNow.map(({ n, ton: stockKg }) => [`${TRACE_KIND_LABELS[n.kind]} ${n.label}`, n.description, n.date, stockKg]),
       ],
     });
   };
@@ -102,12 +102,12 @@ export function LotRecall({ node, dl, sameShipmentLots = [] }: { node: LotNode; 
             <tbody>
               {outboundItems.map((r, i) => (
                 <tr key={i} className="border-b border-border">
-                  <td className="py-1 pr-3 font-medium">{r.khach || "khách ?"}</td>
-                  <td className="tnum py-1 pr-3">{r.ngay ? formatDateVN(r.ngay) : "—"}</td>
-                  <td className="py-1 pr-3">{r.chungTu}</td>
-                  <td className="py-1 pr-3">{r.matHang}</td>
+                  <td className="py-1 pr-3 font-medium">{r.customer || "khách ?"}</td>
+                  <td className="tnum py-1 pr-3">{r.date ? formatDateVN(r.date) : "—"}</td>
+                  <td className="py-1 pr-3">{r.document}</td>
+                  <td className="py-1 pr-3">{r.product}</td>
                   <td className="tnum py-1 pr-3 text-right">{kgOrBlank(r.kg)}</td>
-                  <td className="tnum py-1">{r.tuLo}</td>
+                  <td className="tnum py-1">{r.fromLot}</td>
                 </tr>
               ))}
             </tbody>
@@ -121,7 +121,7 @@ export function LotRecall({ node, dl, sameShipmentLots = [] }: { node: LotNode; 
           <ul className="space-y-1">
             {lotStockNow.map(({ n, ton: stockKg }) => (
               <li key={`${n.kind}:${n.id}`} className="tnum text-muted-foreground">
-                {TRACE_KIND_LABELS[n.kind]} <span className="font-medium text-foreground">{n.nhan}</span> · {n.moTa}
+                {TRACE_KIND_LABELS[n.kind]} <span className="font-medium text-foreground">{n.label}</span> · {n.description}
                 {stockKg != null ? ` · tồn trong kho ${kg(stockKg)}` : ""}
               </li>
             ))}
@@ -132,7 +132,7 @@ export function LotRecall({ node, dl, sameShipmentLots = [] }: { node: LotNode; 
       {isPrinting && (
         <PrintSheet
           title="Danh sách thu hồi theo lô"
-          subtitle={`${isMergedShipment ? `Chuyến ${node.nhan} · ${sameShipmentLots.length} loại NL` : `Lô ${node.nhan} · ${TRACE_KIND_LABELS[node.kind]} · ${node.moTa}`}${node.ngay ? ` · ${formatDateVN(node.ngay)}` : ""}`}
+          subtitle={`${isMergedShipment ? `Chuyến ${node.label} · ${sameShipmentLots.length} loại NL` : `Lô ${node.label} · ${TRACE_KIND_LABELS[node.kind]} · ${node.description}`}${node.date ? ` · ${formatDateVN(node.date)}` : ""}`}
           onClose={() => setIsPrinting(false)}
         >
           <table className="w-full border-collapse">
@@ -151,13 +151,13 @@ export function LotRecall({ node, dl, sameShipmentLots = [] }: { node: LotNode; 
               {outboundItems.length ? (
                 outboundItems.map((r, i) => (
                   <tr key={i}>
-                    <PrintTd>{TRACE_KIND_LABELS[r.loai]}</PrintTd>
-                    <PrintTd>{r.khach || "khách ?"}</PrintTd>
-                    <PrintTd>{r.ngay ? formatDateVN(r.ngay) : "—"}</PrintTd>
-                    <PrintTd>{r.chungTu}</PrintTd>
-                    <PrintTd>{r.matHang}</PrintTd>
+                    <PrintTd>{TRACE_KIND_LABELS[r.kind]}</PrintTd>
+                    <PrintTd>{r.customer || "khách ?"}</PrintTd>
+                    <PrintTd>{r.date ? formatDateVN(r.date) : "—"}</PrintTd>
+                    <PrintTd>{r.document}</PrintTd>
+                    <PrintTd>{r.product}</PrintTd>
                     <PrintTd right>{kgOrBlank(r.kg)}</PrintTd>
-                    <PrintTd>{r.tuLo}</PrintTd>
+                    <PrintTd>{r.fromLot}</PrintTd>
                   </tr>
                 ))
               ) : (
@@ -180,9 +180,9 @@ export function LotRecall({ node, dl, sameShipmentLots = [] }: { node: LotNode; 
               <tbody>
                 {lotStockNow.map(({ n, ton: stockKg }) => (
                   <tr key={`${n.kind}:${n.id}`}>
-                    <PrintTd>{`${TRACE_KIND_LABELS[n.kind]} ${n.nhan}`}</PrintTd>
-                    <PrintTd>{n.moTa}</PrintTd>
-                    <PrintTd>{n.ngay ? formatDateVN(n.ngay) : "—"}</PrintTd>
+                    <PrintTd>{`${TRACE_KIND_LABELS[n.kind]} ${n.label}`}</PrintTd>
+                    <PrintTd>{n.description}</PrintTd>
+                    <PrintTd>{n.date ? formatDateVN(n.date) : "—"}</PrintTd>
                     <PrintTd right>{stockKg != null ? kg(stockKg) : "—"}</PrintTd>
                   </tr>
                 ))}

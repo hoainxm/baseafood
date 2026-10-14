@@ -1,6 +1,6 @@
 > Load khi: sửa màn `/reconciliation`, logic đối soát hóa đơn điện tử ⇄ phần mềm kế toán, đọc/ghi file Excel hóa đơn.
 covers: src/features/reconciliation/ReconciliationScreen.tsx, src/features/reconciliation/ReconciliationModeView.tsx, src/features/reconciliation/reconciliationMode.ts, src/features/reconciliation/index.ts, src/lib/einvoiceReconciliation.ts, src/lib/twoVersionReconciliation.ts, src/lib/reconciliationExport.ts, src/lib/reconciliationExportShift.ts, src/lib/reconciliationExportSummary.ts, src/lib/reconciliationCommon.ts
-last_verified: 2026-10-12
+last_verified: 2026-10-14
 ttl_days: 90
 <!-- updated: 2026-10-12 — sửa đợt audit (xem mục "v7.1 — sửa sau audit"): dịch công thức vùng có tên sheet · ngoại tệ của sheet tập con/bản tự tải · có sổ + hai bản gối nhau không đếm đôi · MST chuẩn hóa · soVN · ngoại tệ thiếu tỷ giá + dung sai nguyên tệ · lưu ngưỡng · phép kiểm quy đổi · chữ hướng dẫn · ngày sát nửa đêm · gom tiện ích về `reconciliationCommon.ts`. Test: `einvoiceReconciliation.test.ts`, `reconciliationExportShift.test.ts`. CHƯA chạy trên file thật. -->
 <!-- updated: 2026-10-06 — tô màu dòng (mig 0055): CHỈ danh sách "Bản đã lưu" bật `rowMarkKey="doi-soat-ban-luu"`. Các bảng KẾT QUẢ đối soát chưa tô: khoá dòng là `<sheet>#<dòng>` của file đang mở — đổi file là trùng khoá, dấu nhảy sang dòng khác. Đợt sau: khoá theo id bản đối soát đã lưu (`doi-soat|<runId>|…`), chỉ bật khi đang mở bản đã lưu. -->
@@ -605,7 +605,7 @@ Trước đây module chỉ import → xử lý → tải về (file-only). v4 c
 - **Bảng `reconciliation_runs`** (0043) + hook `useReconciliationRuns()` (khuôn `useBang` — chạy cả Supabase lẫn localStorage). Lưu: `file_b64` (file Excel gốc base64), `options` {soChuanTen, edits}, `summary` (ảnh chụp 4 nhãn + tổng chênh), `status` 'draft'|'official', `user_id`/owner.
 - **Lưu file gốc BASE64 trong bảng** (không dùng Storage): nằm dưới RLS của bảng (tránh cấu hình ACL Storage theo user — nguồn rò rỉ), và lưu được cả khi offline. File xlsx ~150–420KB base64/bản.
 - **Mở lại** = `sheetsTuBase64(file_b64)` → `reconcile` chạy lại với `threshold`+`edits`+`soChuanTen` đã lưu (round-trip đã kiểm: khớp đọc trực tiếp). **Chính thức** đóng băng `summary` (đối chiếu về sau); mở lại vẫn recompute từ file.
-- **Riêng tư theo account ép ở TẦNG APP**: hook lọc `userId === nguoiDung.id` (admin xem tất); chưa đăng nhập / chế độ localStorage ⇒ per-máy. RLS server siết `user_id=auth.uid()` để nhánh 0021 (câu sẵn trong 0043). Xóa qua `ConfirmDelete` + toast Hoàn tác.
+- **Riêng tư theo account ép ở TẦNG APP**: hook lọc `userId === profile.id` (admin xem tất); chưa đăng nhập / chế độ localStorage ⇒ per-máy. RLS server siết `user_id=auth.uid()` để nhánh 0021 (câu sẵn trong 0043). Xóa qua `ConfirmDelete` + toast Hoàn tác.
 - UI: ô "Tên bản" + nút **Lưu nháp** / **Lưu chính thức** (khi có kết quả); card **"Bản đã lưu"** (RecordTable, luôn hiện) với Mở lại / Tải Excel / Xóa. lib thêm `fileSangBase64` / `sheetsTuBase64`.
 
 ## Không thuộc phạm vi (để sau nếu cần)

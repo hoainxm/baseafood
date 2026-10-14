@@ -124,26 +124,26 @@ export default function MaterialNxtScreen() {
         imports,
         opening,
         locks,
-        { tuNgay: tu, denNgay: den, workshop },
+        { fromDate: tu, toDate: den, workshop },
         domesticSales,
       ),
     [periods, inputs, imports, opening, locks, tu, den, workshop, domesticSales],
   );
 
-  const hasFreezeOrThaw = data.tongDongGui > 0 || data.tongXaDong > 0;
+  const hasFreezeOrThaw = data.totalFreezeDepositKg > 0 || data.totalThawKg > 0;
   // Còn dở SX ghi ở ngày KHÔNG có kỳ cân đối nào phủ → không lọt vào cột "Đông gửi"
   // (info) nào. Gọi tên thay vì để số biến mất (luật "màn tự giải thích").
   const unmatchedLeftover = useMemo(
-    () => sumUnmatchedLeftover(periods, locks, { tuNgay: tu, denNgay: den, workshop }),
+    () => sumUnmatchedLeftover(periods, locks, { fromDate: tu, toDate: den, workshop }),
     [periods, locks, tu, den, workshop],
   );
 
   const the: StatCardData[] = [
-    { label: "Tồn đầu kỳ", value: `${num(data.tongTonDau)} kg`, numeric: true, icon: Snowflake, color: "trung-tinh" },
-    { label: "Nhập trong kỳ", value: `${num(data.tongNhap)} kg`, numeric: true, icon: ArrowDownToLine, color: "brand" },
+    { label: "Tồn đầu kỳ", value: `${num(data.totalOpeningKg)} kg`, numeric: true, icon: Snowflake, color: "trung-tinh" },
+    { label: "Nhập trong kỳ", value: `${num(data.totalInKg)} kg`, numeric: true, icon: ArrowDownToLine, color: "brand" },
     { label: "Xuất SX (chờ)", value: "0 kg", numeric: true, icon: Truck, color: "trung-tinh" },
-    { label: "Bán nội địa", value: `${num(data.tongBanNoiDia)} kg`, numeric: true, icon: Store, color: "warning" },
-    { label: "Tồn cuối (chưa trừ SX)", value: `${num(data.tongTonCuoi)} kg`, numeric: true, icon: Scale, color: "success" },
+    { label: "Bán nội địa", value: `${num(data.totalDomesticSaleKg)} kg`, numeric: true, icon: Store, color: "warning" },
+    { label: "Tồn cuối (chưa trừ SX)", value: `${num(data.totalClosingKg)} kg`, numeric: true, icon: Scale, color: "success" },
   ];
 
   // Bảng tồn theo NGÀY (mọi họ gộp) — trục "theo ngày" cho BGĐ.
@@ -157,8 +157,8 @@ export default function MaterialNxtScreen() {
       key: "nhap",
       header: "Nhập (kg)",
       numeric: true,
-      render: (r) => <span className="font-semibold text-primary">+{num(r.nhap)}</span>,
-      total: () => num(data.tongNhap),
+      render: (r) => <span className="font-semibold text-primary">+{num(r.inKg)}</span>,
+      total: () => num(data.totalInKg),
     },
     {
       key: "xuatSX",
@@ -172,18 +172,18 @@ export default function MaterialNxtScreen() {
       header: "Bán nội địa (kg)",
       numeric: true,
       render: (r) =>
-        r.banNoiDia > 0 ? (
-          <span className="font-semibold text-warning">−{num(r.banNoiDia)}</span>
+        r.domesticSaleKg > 0 ? (
+          <span className="font-semibold text-warning">−{num(r.domesticSaleKg)}</span>
         ) : (
           <span className="text-muted-foreground">—</span>
         ),
-      total: () => (data.tongBanNoiDia > 0 ? `−${num(data.tongBanNoiDia)}` : "—"),
+      total: () => (data.totalDomesticSaleKg > 0 ? `−${num(data.totalDomesticSaleKg)}` : "—"),
     },
     {
       key: "tonCuoi",
       header: "Tồn cuối ngày (kg)",
       numeric: true,
-      render: (r) => <span className="tnum font-bold text-foreground">{num(r.tonCuoi)}</span>,
+      render: (r) => <span className="tnum font-bold text-foreground">{num(r.closingKg)}</span>,
     },
   ];
 
@@ -194,9 +194,9 @@ export default function MaterialNxtScreen() {
       header: "Loại nguyên liệu",
       render: (r) => (
         <div className="flex flex-wrap items-center gap-2">
-          <span className="font-semibold text-foreground">{r.hoNL}</span>
-          {r.seedTonDau && <Tag variant="nguon">Tồn đầu khai tay</Tag>}
-          {r.canhBaoAm && (
+          <span className="font-semibold text-foreground">{r.materialFamily}</span>
+          {r.hasManualOpening && <Tag variant="nguon">Tồn đầu khai tay</Tag>}
+          {r.isNegative && (
             <Tag variant="loi" icon={AlertTriangle}>
               Tồn âm
             </Tag>
@@ -204,13 +204,13 @@ export default function MaterialNxtScreen() {
         </div>
       ),
     },
-    { key: "tonDau", header: "Tồn đầu (kg)", numeric: true, render: (r) => num(r.tonDau), total: () => num(data.tongTonDau) },
+    { key: "tonDau", header: "Tồn đầu (kg)", numeric: true, render: (r) => num(r.openingKg), total: () => num(data.totalOpeningKg) },
     {
       key: "nhapKy",
       header: "Nhập (kg)",
       numeric: true,
-      render: (r) => <span className="font-semibold text-primary">+{num(r.nhapKy)}</span>,
-      total: () => num(data.tongNhap),
+      render: (r) => <span className="font-semibold text-primary">+{num(r.inPeriodKg)}</span>,
+      total: () => num(data.totalInKg),
     },
     {
       key: "xuatSX",
@@ -224,38 +224,38 @@ export default function MaterialNxtScreen() {
       header: "Bán nội địa (kg)",
       numeric: true,
       render: (r) =>
-        r.banNoiDia > 0 ? (
-          <span className="font-semibold text-warning">−{num(r.banNoiDia)}</span>
+        r.domesticSaleKg > 0 ? (
+          <span className="font-semibold text-warning">−{num(r.domesticSaleKg)}</span>
         ) : (
           <span className="text-muted-foreground">—</span>
         ),
-      total: () => (data.tongBanNoiDia > 0 ? `−${num(data.tongBanNoiDia)}` : "—"),
+      total: () => (data.totalDomesticSaleKg > 0 ? `−${num(data.totalDomesticSaleKg)}` : "—"),
     },
     {
       key: "tonCuoi",
       header: "Tồn cuối (kg)",
       numeric: true,
       render: (r) => (
-        <span className={`tnum font-bold ${r.canhBaoAm ? "text-destructive" : "text-foreground"}`}>
-          {num(r.tonCuoi)}
+        <span className={`tnum font-bold ${r.isNegative ? "text-destructive" : "text-foreground"}`}>
+          {num(r.closingKg)}
         </span>
       ),
-      total: () => num(data.tongTonCuoi),
+      total: () => num(data.totalClosingKg),
     },
     // Cột THÔNG TIN (kho đông dự trữ) — không vào tồn.
     {
       key: "dongGui",
       header: "Đông gửi (kho đông)",
       numeric: true,
-      render: (r) => <span className="text-muted-foreground">{r.dongGui > 0 ? num(r.dongGui) : "—"}</span>,
-      total: () => (data.tongDongGui > 0 ? num(data.tongDongGui) : "—"),
+      render: (r) => <span className="text-muted-foreground">{r.freezeDepositKg > 0 ? num(r.freezeDepositKg) : "—"}</span>,
+      total: () => (data.totalFreezeDepositKg > 0 ? num(data.totalFreezeDepositKg) : "—"),
     },
     {
       key: "xaDong",
       header: "Xả đông (kho đông)",
       numeric: true,
-      render: (r) => <span className="text-muted-foreground">{r.xaDong > 0 ? num(r.xaDong) : "—"}</span>,
-      total: () => (data.tongXaDong > 0 ? num(data.tongXaDong) : "—"),
+      render: (r) => <span className="text-muted-foreground">{r.thawKg > 0 ? num(r.thawKg) : "—"}</span>,
+      total: () => (data.totalThawKg > 0 ? num(data.totalThawKg) : "—"),
     },
   ];
 
@@ -398,16 +398,16 @@ export default function MaterialNxtScreen() {
       )}
 
       {/* Cảnh báo tồn âm — bộ dò lỗi ghi chép */}
-      {data.soCanhBao > 0 && (
+      {data.warningCount > 0 && (
         <div className="flex flex-wrap items-center gap-3 rounded-xl border-2 border-destructive bg-destructive/10 p-4">
           <AlertTriangle className="h-5 w-5 shrink-0 text-destructive" aria-hidden />
           <span className="text-base font-semibold text-destructive">
-            {data.soCanhBao} loại có tồn cuối ÂM — kiểm lại tồn đầu / nhập hàng đã ghi đúng chưa.
+            {data.warningCount} loại có tồn cuối ÂM — kiểm lại tồn đầu / nhập hàng đã ghi đúng chưa.
           </span>
         </div>
       )}
 
-      {data.soHo === 0 ? (
+      {data.familyCount === 0 ? (
         <EmptyState
           icon={CalendarDays}
           title="Chưa có nhập hàng nào trong khoảng ngày này"
@@ -416,11 +416,11 @@ export default function MaterialNxtScreen() {
       ) : (
         <>
           {/* Tồn theo NGÀY */}
-          {data.theoNgay.length > 0 && (
+          {data.days.length > 0 && (
             <section className="space-y-2">
               <h3 className="text-lg font-semibold text-foreground">Tồn theo ngày</h3>
               <SummaryTable
-                rows={data.theoNgay}
+                rows={data.days}
                 columns={dateColumns}
                 getKey={(r) => r.date}
                 rowMarkKey={`ton-nl-ngay|${workshopFilter}`}
@@ -433,9 +433,9 @@ export default function MaterialNxtScreen() {
           <section className="space-y-2">
             <h3 className="text-lg font-semibold text-foreground">Tồn theo loại nguyên liệu</h3>
             <SummaryTable
-              rows={data.theoHo}
+              rows={data.families}
               columns={materialFamilyColumns}
-              getKey={(r) => r.hoNL}
+              getKey={(r) => r.materialFamily}
               rowMarkKey={`ton-nl-ho|${tu}|${den}|${workshopFilter}`}
               emptyText="Chưa có loại nguyên liệu nào."
             />

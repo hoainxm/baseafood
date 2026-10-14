@@ -10,14 +10,14 @@ export interface NxtExcelRow {
   code: string;
   name: string;
   category: NxtGoodsCategory;
-  tonDauKg: number;
-  giaTriDau: number;
-  nhapKg: number;
-  giaTriNhap: number;
-  xuatKg: number;
-  giaTriXuat: number;
-  tonCuoiKg: number;
-  giaTriCuoi: number;
+  openingKg: number;
+  openingValue: number;
+  inKg: number;
+  inValue: number;
+  outKg: number;
+  outValue: number;
+  closingKg: number;
+  closingValue: number;
 }
 
 export interface NxtExcelReportData {
@@ -27,14 +27,14 @@ export interface NxtExcelReportData {
   warehouseText: string;
   items: NxtExcelRow[];
   totalItemCount: number;
-  totalTonDauKg: number;
-  totalGiaTriDau: number;
-  totalNhapKg: number;
-  totalGiaTriNhap: number;
-  totalXuatKg: number;
-  totalGiaTriXuat: number;
-  totalTonCuoiKg: number;
-  totalGiaTriCuoi: number;
+  totalOpeningKg: number;
+  totalOpeningValue: number;
+  totalInKg: number;
+  totalInValue: number;
+  totalOutKg: number;
+  totalOutValue: number;
+  totalClosingKg: number;
+  totalClosingValue: number;
 }
 
 /** Tự động đoán Phân loại hàng hóa từ mã/tên hàng (NK / Trong nước / Tạm) */
@@ -110,26 +110,26 @@ export async function parseNxtExcelFile(file: File): Promise<NxtExcelReportData>
         code,
         name,
         category: inferCategory(code, name),
-        tonDauKg: openingKg,
-        giaTriDau: openingValue,
-        nhapKg: inKg,
-        giaTriNhap: inValue,
-        xuatKg: outKg,
-        giaTriXuat: outValue,
-        tonCuoiKg: closingKg,
-        giaTriCuoi: closingValue,
+        openingKg,
+        openingValue,
+        inKg,
+        inValue,
+        outKg,
+        outValue,
+        closingKg,
+        closingValue,
       });
     }
   }
 
-  const totalOpeningKg = items.reduce((sum, item) => sum + item.tonDauKg, 0);
-  const totalOpeningValue = items.reduce((sum, item) => sum + item.giaTriDau, 0);
-  const totalInKg = items.reduce((sum, item) => sum + item.nhapKg, 0);
-  const totalInValue = items.reduce((sum, item) => sum + item.giaTriNhap, 0);
-  const totalOutKg = items.reduce((sum, item) => sum + item.xuatKg, 0);
-  const totalOutValue = items.reduce((sum, item) => sum + item.giaTriXuat, 0);
-  const totalClosingKg = items.reduce((sum, item) => sum + item.tonCuoiKg, 0);
-  const totalClosingValue = items.reduce((sum, item) => sum + item.giaTriCuoi, 0);
+  const totalOpeningKg = items.reduce((sum, item) => sum + item.openingKg, 0);
+  const totalOpeningValue = items.reduce((sum, item) => sum + item.openingValue, 0);
+  const totalInKg = items.reduce((sum, item) => sum + item.inKg, 0);
+  const totalInValue = items.reduce((sum, item) => sum + item.inValue, 0);
+  const totalOutKg = items.reduce((sum, item) => sum + item.outKg, 0);
+  const totalOutValue = items.reduce((sum, item) => sum + item.outValue, 0);
+  const totalClosingKg = items.reduce((sum, item) => sum + item.closingKg, 0);
+  const totalClosingValue = items.reduce((sum, item) => sum + item.closingValue, 0);
 
   return {
     createdDateText: createdDateText || `Ngày lập: ${new Date().toLocaleString("vi-VN")}`,
@@ -138,14 +138,14 @@ export async function parseNxtExcelFile(file: File): Promise<NxtExcelReportData>
     warehouseText,
     items,
     totalItemCount: items.length,
-    totalTonDauKg: totalOpeningKg,
-    totalGiaTriDau: totalOpeningValue,
-    totalNhapKg: totalInKg,
-    totalGiaTriNhap: totalInValue,
-    totalXuatKg: totalOutKg,
-    totalGiaTriXuat: totalOutValue,
-    totalTonCuoiKg: totalClosingKg,
-    totalGiaTriCuoi: totalClosingValue,
+    totalOpeningKg,
+    totalOpeningValue,
+    totalInKg,
+    totalInValue,
+    totalOutKg,
+    totalOutValue,
+    totalClosingKg,
+    totalClosingValue,
   };
 }
 
@@ -204,14 +204,14 @@ export function nxtSangMang(data: NxtExcelReportData): any[][] {
   wsData.push([
     `SL mặt hàng: ${data.items.length}`,
     null,
-    data.totalTonDauKg,
-    data.totalGiaTriDau,
-    data.totalNhapKg,
-    data.totalGiaTriNhap,
-    data.totalXuatKg,
-    data.totalGiaTriXuat,
-    data.totalTonCuoiKg,
-    data.totalGiaTriCuoi,
+    data.totalOpeningKg,
+    data.totalOpeningValue,
+    data.totalInKg,
+    data.totalInValue,
+    data.totalOutKg,
+    data.totalOutValue,
+    data.totalClosingKg,
+    data.totalClosingValue,
   ]);
 
   // Rows 8+: Các dòng chi tiết
@@ -219,14 +219,14 @@ export function nxtSangMang(data: NxtExcelReportData): any[][] {
     wsData.push([
       item.code,
       item.name,
-      item.tonDauKg,
-      item.giaTriDau,
-      item.nhapKg,
-      item.giaTriNhap,
-      item.xuatKg,
-      item.giaTriXuat,
-      item.tonCuoiKg,
-      item.giaTriCuoi,
+      item.openingKg,
+      item.openingValue,
+      item.inKg,
+      item.inValue,
+      item.outKg,
+      item.outValue,
+      item.closingKg,
+      item.closingValue,
     ]);
   }
 

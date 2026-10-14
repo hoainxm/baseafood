@@ -14,8 +14,8 @@ import { isEmptyLine } from "@/lib/monthlyStock";
  *   8/9 Tồn đầu (kiện/kg) · 10/11 Nhập (kiện/kg) · 12/13 Xuất (kiện/kg)
  * (Bỏ 6/7 "Nhập đầu kỳ" — số tham chiếu tĩnh; 14/15 Tồn cuối & 16 Tiền = SUY ở app.)
  *
- *   17 (cột R) Ghi chú kho: "GỬI KHO HP" / "GỬI KHO Á D" / "gửi kho phước cơ" → `khoGhi`
- *      (phần sau chữ "KHO"); chữ khác (VD "xuất trả lại 4240") → `ghiChu`.
+ *   17 (cột R) Ghi chú kho: "GỬI KHO HP" / "GỬI KHO Á D" / "gửi kho phước cơ" → `warehouseNote`
+ *      (phần sau chữ "KHO"); chữ khác (VD "xuất trả lại 4240") → `note`.
  *
  * Nhóm lấy từ dòng tiêu đề mục ("I HÀNG NHẬP KHẨU" / "II HÀNG MUA NGOÀI" / "III HÀNG TẠM";
  * mục số La Mã lạ ⇒ nhóm mới theo tên). Khối con có dòng cộng riêng ("TỔNG 2 DA" trong
@@ -39,14 +39,14 @@ export interface StockStatementRow {
   outCtn: number;
   outKg: number;
   rowIndex: number; // vị trí dòng trong sheet (cho id tất định khi nạp lại)
-  khoGhi: string; // viết tắt kho gửi ở cột R ("HP", "Á D", "phước cơ"); "" = hàng ở chính kho của sổ
-  ghiChu: string; // chữ khác ở cột R (không phải kho)
+  warehouseNote: string; // viết tắt kho gửi ở cột R ("HP", "Á D", "phước cơ"); "" = hàng ở chính kho của sổ
+  note: string; // chữ khác ở cột R (không phải kho)
 }
 
 export interface StockStatementSheet {
   sheetName: string;
   monthNum: number | null; // suy từ tên sheet nếu là số tháng 1..12
-  tieuDe: string; // dòng tiêu đề đầu sheet, VD "BẢNG KÊ NGUYÊN LIỆU KHO 1500 THÁNG 08 / 2026"
+  title: string; // dòng tiêu đề đầu sheet, VD "BẢNG KÊ NGUYÊN LIỆU KHO 1500 THÁNG 08 / 2026"
   rows: StockStatementRow[];
 }
 
@@ -110,11 +110,11 @@ function groupFromSection(a: string, b: string): string | null {
 const isSectionTotal = (a: string) => /^(TỔNG|CỘNG)\s+HÀNG\b/i.test(collapseSpaces(a));
 
 /** Cột R → kho gửi (phần sau chữ "KHO") hoặc ghi chú thường. */
-function splitWarehouseNote(v: unknown): { khoGhi: string; ghiChu: string } {
+function splitWarehouseNote(v: unknown): { warehouseNote: string; note: string } {
   const t = typeof v === "string" ? collapseSpaces(v) : ""; // số ở cột R là công thức phụ, không phải ghi chú
-  if (!t) return { khoGhi: "", ghiChu: "" };
+  if (!t) return { warehouseNote: "", note: "" };
   const m = t.match(/\bkho\s+(.+)$/i);
-  return m ? { khoGhi: m[1].trim(), ghiChu: "" } : { khoGhi: "", ghiChu: t };
+  return m ? { warehouseNote: m[1].trim(), note: "" } : { warehouseNote: "", note: t };
 }
 
 const isTotalRow = (a: string) => /^(TỔNG|CỘNG|TONG|CONG)\b/i.test(a.trim());
@@ -196,7 +196,7 @@ function parseSheet(sheetName: string, rows: unknown[][], findBlockStart: FindBl
   return {
     sheetName,
     monthNum: inferMonth(sheetName),
-    tieuDe: collapseSpaces(String(rows[0]?.[0] ?? "")),
+    title: collapseSpaces(String(rows[0]?.[0] ?? "")),
     rows: out,
   };
 }
@@ -319,10 +319,10 @@ export const idDongNap = (warehouseCode: string, monthNum: number, nam: number, 
   `xlsx|${warehouseCode}|${monthNum}|${nam}|${rowIndex}`;
 
 /** Tách id dòng nạp (dạng mới lẫn cũ `xlsx|<kho>|<tên sheet>|<năm>|<rowIndex>`); không phải ⇒ null. */
-export function parseLoadedRowId(id: string): { maKho: string; nam: string; rowIndex: string } | null {
+export function parseLoadedRowId(id: string): { warehouseCode: string; year: string; rowIndex: string } | null {
   const p = id.split("|");
   if (p[0] !== "xlsx" || p.length < 5) return null;
-  return { maKho: p[1], nam: p[p.length - 2], rowIndex: p[p.length - 1] };
+  return { warehouseCode: p[1], year: p[p.length - 2], rowIndex: p[p.length - 1] };
 }
 
 const normalizeName = (s: string) => (s || "").trim().toLowerCase().replace(/\s+/g, " ");
@@ -330,19 +330,19 @@ const normalizeName = (s: string) => (s || "").trim().toLowerCase().replace(/\s+
 export interface ReloadMergeResult {
   lines: MonthlyStockLine[];
   /** Dòng nạp lần trước (cùng kho + tháng) mà file mới không còn, vẫn còn số ⇒ GIỮ, cảnh báo. */
-  cuConSo: MonthlyStockLine[];
+  staleWithData: MonthlyStockLine[];
   /** Dòng cũ trống hẳn không còn trong file ⇒ bỏ. */
-  boRong: number;
+  droppedEmpty: number;
   /** Dòng cũ cùng kho·tháng·vị trí dòng nhưng id dạng cũ (tên sheet khác) ⇒ thay bằng dòng mới. */
-  thayIdCu: number;
+  replacedOldIds: number;
   /** Cùng vị trí dòng mà TÊN HÀNG khác (file chèn/xoá dòng ⇒ rowIndex trượt): không thừa kế vị trí/ghi chú. */
-  lechTen: { cu: MonthlyStockLine; moi: MonthlyStockLine }[];
+  nameMismatches: { previous: MonthlyStockLine; next: MonthlyStockLine }[];
   /** Dòng từng tách (chuyển kho một phần) từ dòng vừa nạp lại ⇒ có thể cộng đôi. */
-  soTach: number;
+  splitCount: number;
 }
 
 /**
- * Ghép bản nạp `moi` (MỘT kho `maKho`) vào sổ. `moi[].storageLocation` / `note` để "" khi
+ * Ghép bản nạp `moi` (MỘT kho `warehouseCode`) vào sổ. `moi[].storageLocation` / `note` để "" khi
  * file không ghi ⇒ thừa kế từ dòng cũ khớp. Dòng cũ khớp = cùng id, hoặc (dữ liệu id dạng
  * cũ theo tên sheet) cùng kho · THÁNG (`period` của dòng) · rowIndex. Dọn dòng cũ theo
  * `period` của dòng chứ không theo tiền tố id ⇒ đổi tên sheet không làm tháng nhân đôi.
@@ -355,19 +355,19 @@ export function ghepNapLai(lines: MonthlyStockLine[], incoming: MonthlyStockLine
   const byLocation = new Map<string, MonthlyStockLine>();
   for (const l of lines) {
     const t = parseLoadedRowId(l.id);
-    if (!t || t.maKho !== warehouseCode || !month.has(l.period)) continue;
+    if (!t || t.warehouseCode !== warehouseCode || !month.has(l.period)) continue;
     theoId.set(l.id, l);
     if (!newIds.has(l.id)) byLocation.set(positionKey(l.period, t.rowIndex), l);
   }
   const idThay = new Set<string>();
-  const nameMismatches: ReloadMergeResult["lechTen"] = [];
+  const nameMismatches: ReloadMergeResult["nameMismatches"] = [];
   const daGhep = incoming.map((m) => {
     const t = parseLoadedRowId(m.id);
     const prev = theoId.get(m.id) ?? (t ? byLocation.get(positionKey(m.period, t.rowIndex)) : undefined);
     if (!prev) return m;
     if (prev.id !== m.id) idThay.add(prev.id);
     if (normalizeName(prev.itemName) !== normalizeName(m.itemName)) {
-      nameMismatches.push({ cu: prev, moi: m });
+      nameMismatches.push({ previous: prev, next: m });
       return m;
     }
     return {
@@ -392,5 +392,5 @@ export function ghepNapLai(lines: MonthlyStockLine[], incoming: MonthlyStockLine
   const splitCount = kept.filter((l) =>
     [...(l.note ?? "").matchAll(/\(tách từ dòng ([^)]+)\)/g)].some((m) => idNap.has(m[1]))
   ).length;
-  return { lines: [...kept, ...daGhep], cuConSo: staleNonEmpty, boRong: emptyDropped, thayIdCu: idThay.size, lechTen: nameMismatches, soTach: splitCount };
+  return { lines: [...kept, ...daGhep], staleWithData: staleNonEmpty, droppedEmpty: emptyDropped, replacedOldIds: idThay.size, nameMismatches, splitCount };
 }

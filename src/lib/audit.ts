@@ -154,13 +154,13 @@ export function appendAuditEntries(list: NewAuditEntry[]): void {
 }
 
 export interface AuditLogFilter {
-  tu?: string; // yyyy-mm-dd
-  den?: string; // yyyy-mm-dd
-  nguoi?: string; // actor_username
-  bang?: string; // entity
-  loai?: string; // action
-  timKiem?: string;
-  gioiHan?: number;
+  fromDate?: string; // yyyy-mm-dd
+  toDate?: string; // yyyy-mm-dd
+  actor?: string; // actor_username
+  entity?: string; // entity
+  action?: string; // action
+  search?: string;
+  limit?: number;
 }
 
 /**
@@ -169,29 +169,29 @@ export interface AuditLogFilter {
  * ngày 11/10 — so thẳng `yyyy-mm-dd` với chuỗi UTC lệch 7 tiếng (thao tác 0h–7h
  * sáng VN rơi sang ngày hôm trước).
  */
-export function toVnDayBoundsUtc(tu?: string, den?: string): { tu?: string; den?: string } {
+export function toVnDayBoundsUtc(tu?: string, den?: string): { fromDate?: string; toDate?: string } {
   const iso = (s: string) => {
     const t = Date.parse(s);
     return Number.isFinite(t) ? new Date(t).toISOString() : undefined;
   };
   return {
-    tu: tu ? iso(`${tu}T00:00:00+07:00`) : undefined,
-    den: den ? iso(`${den}T23:59:59.999+07:00`) : undefined,
+    fromDate: tu ? iso(`${tu}T00:00:00+07:00`) : undefined,
+    toDate: den ? iso(`${den}T23:59:59.999+07:00`) : undefined,
   };
 }
 
 /** Đọc nhật ký cho màn Nhật ký (admin). Server: query audit_log; local: đọc buffer. */
 export async function readAuditLog(filter: AuditLogFilter = {}): Promise<AuditEntry[]> {
-  const gioiHan = filter.gioiHan ?? 500;
-  const bien = toVnDayBoundsUtc(filter.tu, filter.den);
+  const gioiHan = filter.limit ?? 500;
+  const bien = toVnDayBoundsUtc(filter.fromDate, filter.toDate);
   const matches = (r: AuditEntry) => {
-    if (filter.nguoi && r.actorUsername !== filter.nguoi) return false;
-    if (filter.bang && r.entity !== filter.bang) return false;
-    if (filter.loai && normalizeAuditAction(r.action) !== normalizeAuditAction(filter.loai)) return false;
-    if (bien.tu && r.at < bien.tu) return false;
-    if (bien.den && r.at > bien.den) return false;
-    if (filter.timKiem) {
-      const t = filter.timKiem.toLowerCase();
+    if (filter.actor && r.actorUsername !== filter.actor) return false;
+    if (filter.entity && r.entity !== filter.entity) return false;
+    if (filter.action && normalizeAuditAction(r.action) !== normalizeAuditAction(filter.action)) return false;
+    if (bien.fromDate && r.at < bien.fromDate) return false;
+    if (bien.toDate && r.at > bien.toDate) return false;
+    if (filter.search) {
+      const t = filter.search.toLowerCase();
       const hay = `${r.actorUsername} ${r.entity} ${r.entityKey} ${r.summary}`.toLowerCase();
       if (!hay.includes(t)) return false;
     }
@@ -205,15 +205,15 @@ export async function readAuditLog(filter: AuditLogFilter = {}): Promise<AuditEn
       .eq("site_id", SITE_ID)
       .order("at", { ascending: false })
       .limit(gioiHan);
-    if (filter.nguoi) q = q.eq("actor_username", filter.nguoi);
-    if (filter.bang) q = q.eq("entity", filter.bang);
-    if (filter.loai) q = q.in("action", auditActionAliases(filter.loai));
-    if (bien.tu) q = q.gte("at", bien.tu);
-    if (bien.den) q = q.lte("at", bien.den);
+    if (filter.actor) q = q.eq("actor_username", filter.actor);
+    if (filter.entity) q = q.eq("entity", filter.entity);
+    if (filter.action) q = q.in("action", auditActionAliases(filter.action));
+    if (bien.fromDate) q = q.gte("at", bien.fromDate);
+    if (bien.toDate) q = q.lte("at", bien.toDate);
     const { data, error } = await q;
     if (error) return [];
     let rows = (data ?? []).map((r) => fromRow(r as Record<string, unknown>));
-    if (filter.timKiem) rows = rows.filter(matches);
+    if (filter.search) rows = rows.filter(matches);
     return rows;
   }
 

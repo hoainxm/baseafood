@@ -236,7 +236,7 @@ function DemoGeneratorSection() {
 
   const createAndEnter = () => {
     setIsCreating(true);
-    const goi = generateDemoBundle(source, { homNay: todayIso(), anDanh: anonymize === "an", hat: Date.now() % 100_000 });
+    const goi = generateDemoBundle(source, { today: todayIso(), anonymize: anonymize === "an", hat: Date.now() % 100_000 });
     setPendingDemoTask(null);
     if (!saveDemoBundle(goi)) {
       setIsCreating(false);
@@ -270,8 +270,8 @@ function DemoGeneratorSection() {
           <h2 className="text-base font-semibold text-foreground">Chế độ demo (chỉ quản trị thấy)</h2>
           <p className="text-sm text-muted-foreground">
             Trình bày bằng bộ số đầy đủ chuỗi (nhập → sản xuất → kho → đóng gói → bán → lô QR), sinh từ số thật đã
-            nhập: {num(demoParams.soDongNhapThat)} dòng nhập, {demoParams.daiLy.length} đại lý, {demoParams.xuong.length} xưởng, tỉ lệ
-            ra thành phẩm {num(demoParams.tiLeTP * 100)}%. Bộ demo nằm riêng — số thật không bị đụng.
+            nhập: {num(demoParams.realImportRowCount)} dòng nhập, {demoParams.suppliers.length} đại lý, {demoParams.workshops.length} xưởng, tỉ lệ
+            ra thành phẩm {num(demoParams.finishedRate * 100)}%. Bộ demo nằm riêng — số thật không bị đụng.
           </p>
         </div>
       </div>

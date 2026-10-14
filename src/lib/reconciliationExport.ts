@@ -75,8 +75,8 @@ function writeReconcileBlock(
   width: number,
   chuThich: string,
   extraHeaders: readonly string[],
-  dong: readonly { dongFile: number; ketLuan: string; nen: string | null; them: readonly unknown[] }[],
-  editedCells: readonly { dongFile: number; cot: number; giaTri: number }[],
+  dong: readonly { fileRow: number; conclusion: string; fill: string | null; extra: readonly unknown[] }[],
+  editedCells: readonly { fileRow: number; column: number; value: number }[],
   /** Tiêu đề cột A. */
   columnALabel = "KẾT QUẢ",
   /**
@@ -102,7 +102,7 @@ function writeReconcileBlock(
     if (styleCell.font) o.font = { ...styleCell.font, bold: true };
     if (styleCell.border) o.border = { ...styleCell.border };
     o.alignment = { ...(styleCell.alignment ?? {}), vertical: "middle", wrapText: true };
-    o.fill = to(NEN.tieuDe);
+    o.fill = to(NEN.header);
   };
   if (hasColumnA) {
     buildHeader(ws.getCell(headerRow, RESULT_COL), columnALabel);
@@ -125,26 +125,26 @@ function writeReconcileBlock(
 
   // --- từng dòng: nhãn ở cột A + giá trị khối thêm + tô nền cả dòng ---
   for (const d of dong) {
-    if (hasColumnA) ws.getCell(d.dongFile, RESULT_COL).value = d.ketLuan;
-    d.them.forEach((v, i) => {
-      const o = ws.getCell(d.dongFile, cot1 + i);
+    if (hasColumnA) ws.getCell(d.fileRow, RESULT_COL).value = d.conclusion;
+    d.extra.forEach((v, i) => {
+      const o = ws.getCell(d.fileRow, cot1 + i);
       // Công thức sống trỏ thẳng ô gốc: bấm vào là thấy số được TÍNH ra, không phải
       // số chép tay — bằng chứng file xuất không sửa số liệu của thuế.
-      if (isFormula(v)) o.value = { formula: v.ct.replaceAll("{r}", String(d.dongFile)) };
+      if (isFormula(v)) o.value = { formula: v.ct.replaceAll("{r}", String(d.fileRow)) };
       else o.value = toExportCell(v);
     });
     // nen null = dòng không có gì đáng nói ⇒ để nguyên màu gốc, mắt chỉ dừng ở dòng có vấn đề
-    if (d.nen) {
-      const fill = to(d.nen);
-      for (let c = firstShadedColumn; c <= lastColumn; c++) ws.getCell(d.dongFile, c).fill = fill;
+    if (d.fill) {
+      const fill = to(d.fill);
+      for (let c = firstShadedColumn; c <= lastColumn; c++) ws.getCell(d.fileRow, c).fill = fill;
     }
   }
 
   // --- ô người dùng đã bấm Sửa: ghi đè giá trị + đánh dấu vàng để soát lại ---
   for (const e of editedCells) {
-    const o = ws.getCell(e.dongFile, aoaToExcelColumn(origin, e.cot) + columnShift + 1);
-    o.value = e.giaTri;
-    o.fill = to(NEN.sua);
+    const o = ws.getCell(e.fileRow, aoaToExcelColumn(origin, e.column) + columnShift + 1);
+    o.value = e.value;
+    o.fill = to(NEN.edited);
   }
 
   // Bộ lọc: nới vùng lọc sẵn có sang hết khối mới, giữ nguyên ô bắt đầu.
@@ -156,17 +156,17 @@ function writeReconcileBlock(
   ws.autoFilter = { from: batDau, to: { row: headerRow, column: lastColumn } };
 }
 
-const invoiceFill = (d: InvoiceRow) => (d.trangThai === "KHOP" ? NEN.xanh : d.trangThai === "LECH" ? NEN.vang : NEN.do);
+const invoiceFill = (d: InvoiceRow) => (d.status === "KHOP" ? NEN.xanh : d.status === "LECH" ? NEN.vang : NEN.do);
 
 const addInvoiceRow = (d: InvoiceRow): unknown[] => [
-  d.tyGia, d.soChuan, d.khoa, d.chuaThueVnd, d.thueVnd, d.tongTtVnd,
-  d.soDongKhopPm, d.tongTtPm, d.chenh, d.ketLuan, d.phieuKe, d.ctgs, d.ngayGhiSo,
-  d.tkNoCo, d.dienGiaiPm, d.soTienHachToan, d.bangChung,
+  d.exchangeRate, d.normalizedNumber, d.key, d.preTaxVnd, d.taxVnd, d.totalVnd,
+  d.ledgerMatchCount, d.ledgerTotal, d.difference, d.conclusion, d.ledgerVoucher, d.ctgs, d.postingDate,
+  d.debitCreditAccounts, d.ledgerDescription, d.postedAmount, d.evidence,
 ];
 
 const addLedgerRow = (d: LedgerRow): unknown[] => [
-  d.soChuan, d.khoa, d.soHddtKhop, d.ketLuan, d.nguonHddt, d.dongHddt, d.ngayLapHd,
-  d.tenBanHddt, d.tongTtHddt, d.bangChung,
+  d.normalizedNumber, d.key, d.einvoiceMatchCount, d.conclusion, d.einvoiceSource, d.einvoiceRow, d.invoiceIssueDate,
+  d.einvoiceSellerName, d.einvoiceTotal, d.evidence,
 ];
 
 /**
@@ -189,16 +189,16 @@ const HEADER_PM = [...LEDGER_EXTRA_HEADERS];
  * trên sheet, không phải lật qua sheet tổng hợp.
  */
 function sumCheckCells(sh: InvoiceSheet, d: InvoiceRow, shift: number): unknown[] {
-  const cd = sh.canDoiCot;
-  if (cd.cotChua < 0 || cd.cotTong < 0) return ["", "", ""];
-  const A = chuCot(aoaToExcelColumn(sh.goc, cd.cotChua) + shift);
-  const T = chuCot(aoaToExcelColumn(sh.goc, cd.cotTong) + shift);
-  const sumFormula = cd.cotThue >= 0 ? `${A}{r}+${chuCot(aoaToExcelColumn(sh.goc, cd.cotThue) + shift)}{r}` : `${A}{r}`;
+  const cd = sh.columnSum;
+  if (cd.preTaxColumn < 0 || cd.totalColumn < 0) return ["", "", ""];
+  const A = chuCot(aoaToExcelColumn(sh.origin, cd.preTaxColumn) + shift);
+  const T = chuCot(aoaToExcelColumn(sh.origin, cd.totalColumn) + shift);
+  const sumFormula = cd.taxColumn >= 0 ? `${A}{r}+${chuCot(aoaToExcelColumn(sh.origin, cd.taxColumn) + shift)}{r}` : `${A}{r}`;
   // exceljs tự thêm dấu "=" — đừng viết sẵn, không là ra "==N3+O3".
   return [
     { ct: sumFormula },
     { ct: `${T}{r}-(${sumFormula})` },
-    d.lechCong ? SUM_MISMATCH_LABELS[d.lechCong.loai] : "",
+    d.sumMismatch ? SUM_MISMATCH_LABELS[d.sumMismatch.kind] : "",
   ];
 }
 
@@ -207,21 +207,21 @@ function sumCheckCells(sh: InvoiceSheet, d: InvoiceRow, shift: number): unknown[
  * chiết khấu / làm tròn). Dòng khớp để nguyên — tô xanh 3.000 dòng thì mắt không biết dừng đâu.
  */
 const shouldCheck = (d: InvoiceRow) =>
-  !d.lechCong ? null : d.lechCong.loai === "that" ? NEN.do : NEN.vang;
+  !d.sumMismatch ? null : d.sumMismatch.kind === "that" ? NEN.do : NEN.vang;
 
 /** Các ô người dùng bấm Sửa, gom theo sheet (key `edits` = `sheet#soDong#cot`). */
 function editsBySheet(
   edits: Record<string, number> | undefined,
   rowByLineNo: Map<number, number>,
   ten: string
-): { dongFile: number; cot: number; giaTri: number }[] {
+): { fileRow: number; column: number; value: number }[] {
   if (!edits) return [];
-  const ra: { dongFile: number; cot: number; giaTri: number }[] = [];
+  const ra: { fileRow: number; column: number; value: number }[] = [];
   for (const [k, v] of Object.entries(edits)) {
-    const { sheet, soDong: rowNo, cot: col } = parseEditKey(k);
+    const { sheet, rowIndex: rowNo, column: col } = parseEditKey(k);
     if (sheet !== ten) continue;
     const dongFile = rowByLineNo.get(rowNo);
-    if (dongFile != null && Number.isFinite(col)) ra.push({ dongFile, cot: col, giaTri: v });
+    if (dongFile != null && Number.isFinite(col)) ra.push({ fileRow: dongFile, column: col, value: v });
   }
   return ra;
 }
@@ -262,33 +262,33 @@ export async function exportExcelPreserveFormat(
     wb.worksheets.find((w) => w.name === ten) ?? wb.getWorksheet(ten);
 
   const missingSheets: string[] = [];
-  for (const sh of [...result.sheetsHoaDon, result.sheetPhanMem, ...result.sheetsPhanMemPhu])
-    if (sh && !findSheet(sh.ten)) missingSheets.push(sh.ten);
+  for (const sh of [...result.invoiceSheets, result.ledgerSheet, ...result.extraLedgerSheets])
+    if (sh && !findSheet(sh.name)) missingSheets.push(sh.name);
   if (missingSheets.length)
     throw new Error(`Không tìm thấy sheet ${missingSheets.map((t) => `"${t}"`).join(", ")} trong file gốc.`);
 
   // --- B1. Dọn khối cột của lần chạy trước, rồi chèn cột "KẾT QUẢ" làm cột A ---
-  const sheetList = [...result.sheetsHoaDon, result.sheetPhanMem, ...result.sheetsPhanMemPhu].filter(
+  const sheetList = [...result.invoiceSheets, result.ledgerSheet, ...result.extraLedgerSheets].filter(
     (x): x is InvoiceSheet | LedgerSheet => !!x
   );
   // File đã qua một lần xuất thì cột A của nó ĐANG là "KẾT QUẢ": engine gỡ cột
   // đó khỏi dữ liệu đọc vào, nên `aoaToExcelColumn` của cột gốc đầu tiên lệch sẵn 1.
   // Trường hợp đó chỉ ghi đè cột A, KHÔNG chèn thêm — nếu không mỗi lần xuất lại
   // đẻ thêm một cột "KẾT QUẢ" nữa.
-  const hasResultColumn = (sh: InvoiceSheet | LedgerSheet) => aoaToExcelColumn(sh.goc, 0) - sh.goc.c0 >= EXPORT_COLUMN_SHIFT;
+  const hasResultColumn = (sh: InvoiceSheet | LedgerSheet) => aoaToExcelColumn(sh.origin, 0) - sh.origin.c0 >= EXPORT_COLUMN_SHIFT;
   // File CHỈ có bảng kê (không sổ) thì KHÔNG chèn cột A (v6.5): kế toán dò theo địa
   // chỉ ô của chính họ (VD Q3049) — dời sang R3049 là họ lạc. File xuất từ bản cũ
   // đã có cột A thì GỠ nó ra để địa chỉ trở về như file gốc.
-  const hasNoColumnA = !result.sheetPhanMem;
+  const hasNoColumnA = !result.ledgerSheet;
   const canChen = hasNoColumnA ? [] : sheetList.filter((sh) => !hasResultColumn(sh));
-  const tenChen = new Set(canChen.map((sh) => sh.ten));
-  const skippedNames = new Set(hasNoColumnA ? sheetList.filter(hasResultColumn).map((sh) => sh.ten) : []);
+  const tenChen = new Set(canChen.map((sh) => sh.name));
+  const skippedNames = new Set(hasNoColumnA ? sheetList.filter(hasResultColumn).map((sh) => sh.name) : []);
 
   for (const sh of sheetList) {
-    const ws = findSheet(sh.ten)!;
+    const ws = findSheet(sh.name)!;
     // dữ liệu gốc chiếm các cột [lech+1 … lech+rong]; mọi cột sau đó là của lần xuất trước
     const colShift = hasResultColumn(sh) ? EXPORT_COLUMN_SHIFT : 0;
-    deleteTrailingColumns(ws, sh.goc.c0 + colShift + sh.rong + 1);
+    deleteTrailingColumns(ws, sh.origin.c0 + colShift + sh.width + 1);
   }
   for (const ws of wb.worksheets)
     if (tenChen.has(ws.name)) insertLeadingColumns(ws, EXPORT_COLUMN_SHIFT, tenChen);
@@ -299,36 +299,36 @@ export async function exportExcelPreserveFormat(
   /** Cột (0-based) trong FILE RA của cột AOA `c` — cho công thức kiểm + địa chỉ ở sheet kết luận. */
   const outputShift = (sh: InvoiceSheet | LedgerSheet) =>
     hasNoColumnA ? (hasResultColumn(sh) ? -EXPORT_COLUMN_SHIFT : 0) : hasResultColumn(sh) ? 0 : EXPORT_COLUMN_SHIFT;
-  const outputColumn = (sh: InvoiceSheet, c: number) => aoaToExcelColumn(sh.goc, c) + outputShift(sh);
+  const outputColumn = (sh: InvoiceSheet, c: number) => aoaToExcelColumn(sh.origin, c) + outputShift(sh);
 
   // --- B2. Ghi khối đối soát ---
-  const ledgerName = result.sheetPhanMem?.ten ?? "PMKT";
-  const tenTk = result.sheetPhanMem?.tenTk ?? "TK Nợ / TK Có";
+  const ledgerName = result.ledgerSheet?.name ?? "PMKT";
+  const tenTk = result.ledgerSheet?.accountHeader ?? "TK Nợ / TK Có";
   // File CHỈ có bảng kê thuế, không có sheet sổ ⇒ mọi cột đối soát với sổ đều rỗng,
   // in ra chỉ tổ rối. Khi đó chuyển sang CHẾ ĐỘ KIỂM BẢNG KÊ: cột A và màu dòng nói
   // về phép kiểm "chưa thuế + thuế = tổng thanh toán", khối thêm chỉ 3 cột kiểm.
-  const checkListing = !result.sheetPhanMem;
+  const checkListing = !result.ledgerSheet;
   // Có sổ: cột kiểm xuống CUỐI khối, giữ nguyên thứ tự cột theo file mẫu kế toán.
   const INVOICE_HEADERS = checkListing ? [...COLUMN_SUM_CHECK_HEADERS] : [...invoiceHeader(ledgerName, tenTk), ...COLUMN_SUM_CHECK_HEADERS];
 
   const writeInvoiceSheet = (sh: InvoiceSheet) => {
-    const ws = findSheet(sh.ten)!;
+    const ws = findSheet(sh.name)!;
     const chuThich = checkListing
       ? `Dòng ĐỎ = chưa thuế + thuế KHÁC tổng thanh toán, phải soát · dòng VÀNG = lệch do phí / chiết khấu / làm tròn, bình thường · dòng không tô = khớp. 3 cột này là công thức tính từ ô gốc, không ô gốc nào bị sửa.`
-      : sh.laPhu
+      : sh.isSubset
         ? `${CHU_THICH} — (SHEET TRÙNG LẶP / TẬP CON: KHÔNG cộng vào tổng)`
         : CHU_THICH;
     writeReconcileBlock(
-      ws, sh.goc, sh.hIdx, sh.rong, chuThich, INVOICE_HEADERS,
-      sh.dong.map((d) => ({
-        dongFile: d.dongFile,
-        ketLuan: checkListing ? (d.lechCong ? SUM_MISMATCH_LABELS[d.lechCong.loai] : "khớp") : d.ketLuan,
-        nen: checkListing ? shouldCheck(d) : invoiceFill(d),
-        them: checkListing
+      ws, sh.origin, sh.headerIndex, sh.width, chuThich, INVOICE_HEADERS,
+      sh.rows.map((d) => ({
+        fileRow: d.fileRow,
+        conclusion: checkListing ? (d.sumMismatch ? SUM_MISMATCH_LABELS[d.sumMismatch.kind] : "khớp") : d.conclusion,
+        fill: checkListing ? shouldCheck(d) : invoiceFill(d),
+        extra: checkListing
           ? sumCheckCells(sh, d, outputShift(sh))
           : [...addInvoiceRow(d), ...sumCheckCells(sh, d, outputShift(sh))],
       })),
-      editsBySheet(edits, new Map(sh.dong.map((d) => [d.soDong, d.dongFile])), sh.ten),
+      editsBySheet(edits, new Map(sh.rows.map((d) => [d.rowIndex, d.fileRow])), sh.name),
       checkListing ? "KIỂM CỘNG" : "KẾT QUẢ",
       !hasNoColumnA,
       outputShift(sh)
@@ -336,30 +336,30 @@ export async function exportExcelPreserveFormat(
   };
 
   const writeLedgerSheet = (sh: LedgerSheet) => {
-    const ws = findSheet(sh.ten)!;
+    const ws = findSheet(sh.name)!;
     writeReconcileBlock(
-      ws, sh.goc, sh.hIdx, sh.rong,
-      sh.laPhu ? `${LEDGER_NOTE} — (SHEET PHỤ / TẬP CON: KHÔNG cộng vào tổng)` : LEDGER_NOTE,
+      ws, sh.origin, sh.headerIndex, sh.width,
+      sh.isSubset ? `${LEDGER_NOTE} — (SHEET PHỤ / TẬP CON: KHÔNG cộng vào tổng)` : LEDGER_NOTE,
       HEADER_PM,
-      sh.dong.map((d) => ({
-        dongFile: d.dongFile,
-        ketLuan: d.ketLuan,
-        nen: d.trangThai === "CO" ? NEN.xanh : NEN.do,
-        them: addLedgerRow(d),
+      sh.rows.map((d) => ({
+        fileRow: d.fileRow,
+        conclusion: d.conclusion,
+        fill: d.status === "CO" ? NEN.xanh : NEN.do,
+        extra: addLedgerRow(d),
       })),
-      editsBySheet(edits, new Map(sh.dong.map((d) => [d.soDong, d.dongFile])), sh.ten),
+      editsBySheet(edits, new Map(sh.rows.map((d) => [d.rowIndex, d.fileRow])), sh.name),
       "KẾT QUẢ",
       true,
       outputShift(sh)
     );
   };
 
-  for (const sh of result.sheetsHoaDon) writeInvoiceSheet(sh);
-  if (result.sheetPhanMem) writeLedgerSheet(result.sheetPhanMem);
-  for (const p of result.sheetsPhanMemPhu) writeLedgerSheet(p);
+  for (const sh of result.invoiceSheets) writeInvoiceSheet(sh);
+  if (result.ledgerSheet) writeLedgerSheet(result.ledgerSheet);
+  for (const p of result.extraLedgerSheets) writeLedgerSheet(p);
 
   // --- B3. Sheet phụ trợ: KẾT LUẬN CHUNG (+ danh sách có dữ liệu) lên ĐẦU, nhật ký sửa xuống cuối ---
-  if (result.nhatKySua.length) {
+  if (result.editLog.length) {
     const ten = "NHẬT KÝ SỬA";
     const prev = findSheet(ten);
     if (prev) wb.removeWorksheet(prev.id);
@@ -367,8 +367,8 @@ export async function exportExcelPreserveFormat(
     nk.addRow(["NHẬT KÝ SỬA — do người dùng xác nhận, giữ lại giá trị cũ"]);
     nk.addRow(["Vị trí", "Giá trị cũ", "Giá trị mới"]);
     nk.getRow(2).font = { bold: true };
-    nk.getRow(2).fill = to(NEN.tieuDe);
-    for (const n of result.nhatKySua) nk.addRow([n.viTri, n.cu, n.moi]);
+    nk.getRow(2).fill = to(NEN.header);
+    for (const n of result.editLog) nk.addRow([n.location, n.previous, n.next]);
     nk.columns.forEach((c, i) => (c.width = i === 0 ? 54 : 22));
     (nk as unknown as { orderNo: number }).orderNo = 99;
   }

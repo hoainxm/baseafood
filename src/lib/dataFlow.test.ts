@@ -75,15 +75,15 @@ function makeFlowData(p: Partial<DataFlowInput> = {}): DataFlowInput {
 
 /** Bất biến: mọi nút có cả vào lẫn ra ⇒ Σ vào = Σ ra. */
 function checkBalance(dc: DataFlow) {
-  for (const n of dc.nut) {
-    const inputKg = dc.canh.filter((c) => c.den === n.id).reduce((s, c) => s + c.kg, 0);
-    const ra = dc.canh.filter((c) => c.tu === n.id).reduce((s, c) => s + c.kg, 0);
+  for (const n of dc.nodes) {
+    const inputKg = dc.edges.filter((c) => c.target === n.id).reduce((s, c) => s + c.kg, 0);
+    const ra = dc.edges.filter((c) => c.source === n.id).reduce((s, c) => s + c.kg, 0);
     if (inputKg > 0 && ra > 0) expect(Math.abs(inputKg - ra), n.id).toBeLessThan(1e-6);
   }
-  for (const c of dc.canh) expect(c.kg).toBeGreaterThan(0);
+  for (const c of dc.edges) expect(c.kg).toBeGreaterThan(0);
 }
 
-const K = { tu: "2026-09-01", den: "2026-09-30" };
+const K = { fromDate: "2026-09-01", toDate: "2026-09-30" };
 
 // Kịch bản chuỗi: 1.000 kg NL → 600 kg BTP (500 nhập kho, 100 chờ) + phế 50 + còn dở 100
 // → kho: đóng gói 300 (ra 290), xuất đơn 100, bán block 50 → TP: bán 200.
@@ -112,8 +112,8 @@ describe("buildDataFlow", () => {
   it("đi đủ chuỗi, cân bằng kg ở mọi nút, gọi tên phần hụt", () => {
     const dc = buildDataFlow(flowScenario, K);
     checkBalance(dc);
-    const kg = (tu: string, den: string) => dc.canh.find((c) => c.tu === tu && c.den === den)?.kg ?? 0;
-    expect(dc.tongNhap).toBe(1000);
+    const kg = (tu: string, den: string) => dc.edges.find((c) => c.source === tu && c.target === den)?.kg ?? 0;
+    expect(dc.totalImportedKg).toBe(1000);
     expect(kg("dl:Hồng Phú", "x:Đông")).toBe(1000);
     expect(kg("x:Đông", "btp")).toBe(600);
     expect(kg("x:Đông", "pl")).toBe(50);
@@ -129,7 +129,7 @@ describe("buildDataFlow", () => {
     expect(kg("goi", "tonTp")).toBe(90);
     expect(kg("goi", "hdg")).toBe(10);
     // 6 cột: không có nút TP đóng gói riêng.
-    expect(Math.max(...dc.nut.map((n) => n.tang))).toBe(5);
+    expect(Math.max(...dc.nodes.map((n) => n.column))).toBe(5);
   });
 
   it("ra nhiều hơn vào ⇒ thêm nút nguồn 'tồn trước kỳ', vẫn cân bằng", () => {
@@ -140,34 +140,34 @@ describe("buildDataFlow", () => {
       exportOrders: [{ id: "lx", orderId: "d", exportDate: "2026-10-02", status: "closed", note: "" } as ExportOrder],
       exportItems: [{ id: "x", exportId: "lx", wipId: "w9", productId: "mh1", spec: "", quantityKg: 250, blocksCount: 0 } as ExportItem],
     });
-    const dc = buildDataFlow(d, { tu: "2026-10-01", den: "2026-10-31" });
+    const dc = buildDataFlow(d, { fromDate: "2026-10-01", toDate: "2026-10-31" });
     checkBalance(dc);
-    expect(dc.canh.find((c) => c.tu === "nlTruoc")?.kg).toBe(50);
-    expect(dc.canh.find((c) => c.tu === "tonBtpDau")?.kg).toBe(100);
+    expect(dc.edges.find((c) => c.source === "nlTruoc")?.kg).toBe(50);
+    expect(dc.edges.find((c) => c.source === "tonBtpDau")?.kg).toBe(100);
   });
 
   it("đóng gói ra vượt BTP vào ⇒ gọi tên phần dư, vẫn cân bằng", () => {
     const d = makeFlowData({ wips: [me("w", "2026-09-02", "Đông", 100)], packagings: [goi("g", "2026-09-03", 50, 60)] });
     const dc = buildDataFlow(d, K);
     checkBalance(dc);
-    expect(dc.canh.find((c) => c.tu === "goiDu")?.kg).toBe(10);
-    expect(dc.canh.find((c) => c.den === "tonTp")?.kg).toBe(60);
+    expect(dc.edges.find((c) => c.source === "goiDu")?.kg).toBe(10);
+    expect(dc.edges.find((c) => c.target === "tonTp")?.kg).toBe(60);
   });
 
   it("lọc xưởng: chỉ còn số của xưởng đó", () => {
     const d = makeFlowData({
       imports: [makeImport("a", "c", "2026-09-02", "Đông", 100), makeImport("b", "c", "2026-09-02", "Khô", 70, "Bê 3")],
     });
-    const dc = buildDataFlow(d, { ...K, xuong: "Khô" });
-    expect(dc.tongNhap).toBe(70);
-    expect(dc.nut.some((n) => n.id === "x:Đông")).toBe(false);
+    const dc = buildDataFlow(d, { ...K, workshop: "Khô" });
+    expect(dc.totalImportedKg).toBe(70);
+    expect(dc.nodes.some((n) => n.id === "x:Đông")).toBe(false);
   });
 
   it("gộp đại lý nhỏ thành 'Đại lý khác' khi quá 5", () => {
     const items = ["A", "B", "C", "D", "E", "F", "G"].map((t, i) => makeImport(`n${i}`, "c", "2026-09-02", "Đông", 100 - i, t));
     const dc = buildDataFlow(makeFlowData({ imports: items }), K);
-    expect(dc.nut.filter((n) => n.nhom === "nguon").map((n) => n.nhan)).toEqual(["A", "B", "C", "D", "E", "Đại lý khác"]);
-    expect(dc.canh.find((c) => c.tu === "dl:*")?.kg).toBe(94 + 95);
+    expect(dc.nodes.filter((n) => n.group === "nguon").map((n) => n.label)).toEqual(["A", "B", "C", "D", "E", "Đại lý khác"]);
+    expect(dc.edges.find((c) => c.source === "dl:*")?.kg).toBe(94 + 95);
   });
 });
 
@@ -175,44 +175,44 @@ describe("splitOutflows", () => {
   it("chia phần ra của các xưởng: cộng đủ 100%, theo thứ tự cho trước", () => {
     const items = splitOutflows(buildDataFlow(flowScenario, K), (id) => id.startsWith("x:"), ["btp", "pl", "cd", "hh"]);
     expect(items.map((x) => [x.id, x.kg])).toEqual([["btp", 600], ["pl", 50], ["cd", 100], ["hh", 250]]);
-    expect(items.reduce((s, x) => s + x.tiLe, 0)).toBeCloseTo(1);
-    expect(items[0].tiLe).toBeCloseTo(0.6);
+    expect(items.reduce((s, x) => s + x.share, 0)).toBeCloseTo(1);
+    expect(items[0].share).toBeCloseTo(0.6);
   });
   it("phần ra của kho: id ngoài thứ tự xếp sau theo kg giảm dần", () => {
     const items = splitOutflows(buildDataFlow(flowScenario, K), (id) => id === "kho", ["goi"]);
     expect(items.map((x) => x.id)).toEqual(["goi", "xd", "bb", "tonBtp"]);
   });
   it("không có dải nào ⇒ rỗng", () => {
-    expect(splitOutflows({ nut: [], canh: [], tongNhap: 0 }, () => true)).toEqual([]);
+    expect(splitOutflows({ nodes: [], edges: [], totalImportedKg: 0 }, () => true)).toEqual([]);
   });
 });
 
 describe("buildFlowStages", () => {
   it("kg từng khâu, kg chờ duyệt, tỉ lệ chuyển tiếp", () => {
     const conveyor = buildFlowStages(flowScenario, K);
-    expect(conveyor.map((x) => x.khoa)).toEqual(["nhap", "san-xuat", "kho", "dong-goi", "xuat-ban"]);
+    expect(conveyor.map((x) => x.key)).toEqual(["nhap", "san-xuat", "kho", "dong-goi", "xuat-ban"]);
     expect(conveyor.map((x) => x.kg)).toEqual([1000, 600, 500, 290, 350]);
     expect(conveyor[2].kgCho).toBe(100);
-    expect(conveyor[0].tiLeChuyen).toBeNull();
-    expect(conveyor[1].tiLeChuyen).toBeCloseTo(0.6);
+    expect(conveyor[0].conversionRate).toBeNull();
+    expect(conveyor[1].conversionRate).toBeCloseTo(0.6);
     // Đóng gói và xuất/bán cùng rút từ kho ⇒ chia cho kg nhập kho, không chia nối tiếp.
-    expect(conveyor[3].tiLeChuyen).toBeCloseTo(290 / 500);
-    expect(conveyor[4].tiLeChuyen).toBeCloseTo(350 / 500);
+    expect(conveyor[3].conversionRate).toBeCloseTo(290 / 500);
+    expect(conveyor[4].conversionRate).toBeCloseTo(350 / 500);
     // Mẻ chưa gắn lô ⇒ khâu SX có việc thiếu.
-    expect(conveyor[1].viecThieu).toBeGreaterThan(0);
+    expect(conveyor[1].missingTaskCount).toBeGreaterThan(0);
   });
 });
 
 describe("buildDailyFlowSeries", () => {
   it("tồn BTP + TP cuối ngày theo đúng engine sổ tồn", () => {
-    const items = buildDailyFlowSeries(flowScenario, { tu: "2026-09-01", den: "2026-09-07" });
-    const date = (n: string) => items.find((x) => x.ngay === n)!;
+    const items = buildDailyFlowSeries(flowScenario, { fromDate: "2026-09-01", toDate: "2026-09-07" });
+    const date = (n: string) => items.find((x) => x.date === n)!;
     expect(items).toHaveLength(7);
-    expect(date("2026-09-01").tonBtp).toBe(0);
-    expect(date("2026-09-02")).toMatchObject({ nhap: 1000, sanXuat: 500, tonBtp: 500 });
-    expect(date("2026-09-03")).toMatchObject({ sanXuat: 100, tonBtp: 500 }); // mẻ chờ duyệt chưa vào kho
-    expect(date("2026-09-05")).toMatchObject({ tonBtp: 200, tonTp: 290 });
-    expect(date("2026-09-07")).toMatchObject({ tonBtp: 50, tonTp: 90 });
+    expect(date("2026-09-01").wipStockKg).toBe(0);
+    expect(date("2026-09-02")).toMatchObject({ importedKg: 1000, producedKg: 500, wipStockKg: 500 });
+    expect(date("2026-09-03")).toMatchObject({ producedKg: 100, wipStockKg: 500 }); // mẻ chờ duyệt chưa vào kho
+    expect(date("2026-09-05")).toMatchObject({ wipStockKg: 200, finishedStockKg: 290 });
+    expect(date("2026-09-07")).toMatchObject({ wipStockKg: 50, finishedStockKg: 90 });
   });
 });
 
@@ -222,17 +222,17 @@ describe("computeYieldByProduct", () => {
       wips: [me("a", "2026-09-02", "Đông", 100), me("b", "2026-09-02", "Đông", 100, "stocked", "mh2"), me("c", "2026-09-02", "Đông", 100)],
       lotInputs: [lotInput("a", 110), lotInput("b", 130), lotInput("c", null)],
     });
-    const { dong, binhQuan } = computeYieldByProduct(d, K);
+    const { rows: dong, binhQuan } = computeYieldByProduct(d, K);
     expect(binhQuan).toBeCloseTo(240 / 200);
-    expect(dong.map((r) => [r.productId, r.dinhMuc, r.vuotNguong])).toEqual([
+    expect(dong.map((r) => [r.productId, r.yieldRatio, r.exceedsThreshold])).toEqual([
       ["mh2", 1.3, true],
       ["mh1", 1.1, true],
     ]);
     // Ngưỡng nới 10% ⇒ không còn cờ (lệch ±8,3%).
-    expect(computeYieldByProduct(d, K, 0.1).dong.every((r) => !r.vuotNguong)).toBe(true);
+    expect(computeYieldByProduct(d, K, 0.1).rows.every((r) => !r.exceedsThreshold)).toBe(true);
   });
   it("chưa mẻ nào gắn lô ⇒ rỗng, không đoán", () => {
-    expect(computeYieldByProduct(flowScenario, K)).toEqual({ dong: [], binhQuan: null });
+    expect(computeYieldByProduct(flowScenario, K)).toEqual({ rows: [], binhQuan: null });
   });
 });
 
@@ -244,21 +244,21 @@ describe("buildChainWarnings", () => {
       imports: [...flowScenario.imports, makeImport("n9", "c9", "2026-09-10", "Cá", 80, "Bê 3"), makeImport("n10", "c1", "2026-09-02", "Đông", 5)],
     });
     const cb = buildChainWarnings(d, K, "2026-09-20");
-    const warningsOfKind = (l: string) => cb.filter((x) => x.loai === l);
+    const warningsOfKind = (l: string) => cb.filter((x) => x.kind === l);
     expect(warningsOfKind("doi-sau-chot")).toHaveLength(1); // chốt 1.000, nay 1.005
-    expect(warningsOfKind("chua-chot-nhap").map((x) => x.xuong)).toEqual(["Cá"]);
-    expect(warningsOfKind("chua-chot-sx").map((x) => x.ngay)).toEqual(["2026-09-03"]);
+    expect(warningsOfKind("chua-chot-nhap").map((x) => x.workshop)).toEqual(["Cá"]);
+    expect(warningsOfKind("chua-chot-sx").map((x) => x.date)).toEqual(["2026-09-03"]);
     expect(warningsOfKind("ghi-bu").map((x) => x.id)).toEqual(["gbn|c9"]);
-    expect(warningsOfKind("cho-duyet-lau").map((x) => x.duongDan)).toEqual(["/warehouse?approve=W:w2"]);
+    expect(warningsOfKind("cho-duyet-lau").map((x) => x.path)).toEqual(["/warehouse?approve=W:w2"]);
     expect(warningsOfKind("lo-chua-gan").length).toBeGreaterThan(0);
     // Lỗi đứng trước nhắc, nhắc trước tin.
-    const order = cb.map((x) => x.muc);
+    const order = cb.map((x) => x.level);
     expect(order.indexOf("tin")).toBeGreaterThan(order.lastIndexOf("loi"));
   });
 
   it("hôm nay chưa chốt thì chưa nhắc", () => {
     const cb = buildChainWarnings(makeFlowData({ imports: [makeImport("n", "c", "2026-09-20", "Đông", 10)] }), K, "2026-09-20");
-    expect(cb.filter((x) => x.loai === "chua-chot-nhap")).toEqual([]);
+    expect(cb.filter((x) => x.kind === "chua-chot-nhap")).toEqual([]);
   });
 
   it("bán vượt tồn BTP được gọi tên", () => {
@@ -267,9 +267,9 @@ describe("buildChainWarnings", () => {
       salesInvoices: [makeSalesInvoice("pb", "2026-09-03")],
       salesItems: [ban("b", "pb", "2026-09-03", "mh1", 130, RETAIL_WAREHOUSE)],
     });
-    const cb = buildChainWarnings(d, K, "2026-09-20").filter((x) => x.loai === "ban-vuot");
+    const cb = buildChainWarnings(d, K, "2026-09-20").filter((x) => x.kind === "ban-vuot");
     expect(cb).toHaveLength(1);
-    expect(cb[0].tieuDe).toContain("30 kg");
+    expect(cb[0].title).toContain("30 kg");
   });
 
   it("kỳ cân đối định mức lệch bình quân các kỳ cùng loại NL", () => {
@@ -285,7 +285,7 @@ describe("buildChainWarnings", () => {
       balancingOutputs: [ra("k1", 1000), ra("k2", 1000), ra("k3", 1000)],
     });
     expect(computeAllPeriodResults(d).map((x) => x.period.id)).toEqual(["k3", "k2", "k1"]);
-    const cb = buildChainWarnings(d, K, "2026-09-20").filter((x) => x.loai === "ky-dinh-muc-lech");
+    const cb = buildChainWarnings(d, K, "2026-09-20").filter((x) => x.kind === "ky-dinh-muc-lech");
     // Bình quân 6400/3000 = 2,133: k3 (2,4) +12,5% · k1/k2 (2,0) −6,25%.
     expect(cb.map((x) => x.id).sort()).toEqual(["kdm|k1", "kdm|k2", "kdm|k3"]);
   });
@@ -295,14 +295,14 @@ describe("bucketStockByAge", () => {
   it("chia kg tồn theo số ngày nằm kho, bỏ lô hết hàng", () => {
     const items = bucketStockByAge(
       [
-        { ngaySX: "2026-10-01", conLai: 100 }, // 11 ngày
-        { ngaySX: "2026-09-12", conLai: 50 }, // 30 ngày ⇒ nhóm 30–60
-        { ngaySX: "2026-07-01", conLai: 20 }, // 103 ngày
-        { ngaySX: "2026-07-01", conLai: 0 }, // hết hàng
+        { productionDate: "2026-10-01", remainingKg: 100 }, // 11 ngày
+        { productionDate: "2026-09-12", remainingKg: 50 }, // 30 ngày ⇒ nhóm 30–60
+        { productionDate: "2026-07-01", remainingKg: 20 }, // 103 ngày
+        { productionDate: "2026-07-01", remainingKg: 0 }, // hết hàng
       ],
       "2026-10-12",
     );
-    expect(items.map((x) => [x.khoa, x.kg, x.soLo])).toEqual([
+    expect(items.map((x) => [x.key, x.kg, x.lotCount])).toEqual([
       ["duoi-30", 100, 1],
       ["30-60", 50, 1],
       ["60-90", 0, 0],
@@ -316,9 +316,9 @@ describe("countQcByDay", () => {
     const r = (date: string, workshop: Workshop, result: "pass" | "conditional" | "fail") => ({ date, workshop, result });
     const items = countQcByDay([r("2026-10-01", "Đông", "pass"), r("2026-10-01", "Đông", "fail"), r("2026-10-01", "Cá", "pass"), r("2026-10-03", "Đông", "conditional")], "Đông", "2026-10-01", "2026-10-03");
     expect(items).toEqual([
-      { ngay: "2026-10-01", dat: 1, tam: 0, khongDat: 1 },
-      { ngay: "2026-10-02", dat: 0, tam: 0, khongDat: 0 },
-      { ngay: "2026-10-03", dat: 0, tam: 1, khongDat: 0 },
+      { date: "2026-10-01", pass: 1, conditional: 0, fail: 1 },
+      { date: "2026-10-02", pass: 0, conditional: 0, fail: 0 },
+      { date: "2026-10-03", pass: 0, conditional: 1, fail: 0 },
     ]);
   });
 });

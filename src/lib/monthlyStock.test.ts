@@ -32,7 +32,7 @@ describe("carryForwardIntoLedger — dồn lại không xoá trắng số tháng
   test("ca A: dồn T9→T10, ghi nhập/xuất/vị trí/ghi chú ở T10, sửa T9 rồi dồn lại ⇒ chỉ tồn đầu đổi", () => {
     const t9 = [dong("X", "2026-09")];
     const lan1 = carryForwardIntoLedger(t9, "2026-10");
-    expect(lan1.them).toBe(1);
+    expect(lan1.added).toBe(1);
     // Người dùng ghi ở T10: nhập 500, xuất xả đông 200 (Cân đối), vị trí, ghi chú vết.
     const editedLines = lan1.lines.map((l) =>
       l.id === "carry|X"
@@ -42,8 +42,8 @@ describe("carryForwardIntoLedger — dồn lại không xoá trắng số tháng
     // Quay lại T9 sửa xuất 300 rồi dồn lại.
     const editedSep = editedLines.map((l) => (l.id === "X" ? { ...l, outKg: 300 } : l));
     const lan2 = carryForwardIntoLedger(editedSep, "2026-10");
-    expect(lan2.capNhat).toBe(1);
-    expect(lan2.them).toBe(0);
+    expect(lan2.updated).toBe(1);
+    expect(lan2.added).toBe(0);
     const c = findLine(lan2.lines, "carry|X")!;
     expect(c.openKg).toBe(700);
     expect(c.inKg).toBe(500);
@@ -63,14 +63,14 @@ describe("carryForwardIntoLedger — dồn lại không xoá trắng số tháng
     expect(c.openKg).toBe(0);
     expect(c.openCtn).toBe(0);
     expect(c.inKg).toBe(50);
-    expect(result.veKhong).toBe(1);
+    expect(result.zeroed).toBe(1);
   });
 
   test("ca B: dòng T9 bị xoá, carry ở T10 không có số nào khác ⇒ bỏ dòng", () => {
     const items = [dong("carry|X", "2026-10", { carriedFromId: "X", openKg: 1000 })];
     const result = carryForwardIntoLedger(items, "2026-10");
     expect(findLine(result.lines, "carry|X")).toBeUndefined();
-    expect(result.bo).toBe(1);
+    expect(result.removed).toBe(1);
   });
 
   test("carry về 0 mà còn ghi chú ⇒ giữ (không xoá chữ người dùng gõ)", () => {
@@ -103,7 +103,7 @@ describe("carryForwardIntoLedger — phạm vi kho (#27)", () => {
     const result = carryForwardIntoLedger(items, "2026-10", "Kho 1000 tấn");
     expect(findLine(result.lines, "carry|A")).toBe(items[2]);
     expect(findLine(result.lines, "carry|B")?.openKg).toBe(1000);
-    expect(result.soDong).toBe(1);
+    expect(result.rowCount).toBe(1);
   });
 
   test("carry mất nguồn ở kho khác phạm vi ⇒ không về 0", () => {

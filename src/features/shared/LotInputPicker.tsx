@@ -88,7 +88,7 @@ function LotInputDialog({
 
   const addLot = (node: LotNode, method: LotInput["method"]) => {
     if (node.kind !== inputKind) {
-      notify.warning(`"${node.nhan}" là ${TRACE_KIND_LABELS[node.kind].toLowerCase()}, không phải ${inputLabel}.`);
+      notify.warning(`"${node.label}" là ${TRACE_KIND_LABELS[node.kind].toLowerCase()}, không phải ${inputLabel}.`);
       return;
     }
     const blockReason = checkNode?.(node); // gồm cả "đã gắn rồi" — bên gọi biết id lô của mối nối
@@ -120,8 +120,8 @@ function LotInputDialog({
       // Mã chuyến ⇒ các loại NL của chuyến (việc thường ngày, không toast); mã cũ trùng thật ⇒ cảnh báo.
       const ld = explainMultipleLots(text, result, dl);
       setChoices(result);
-      setPickPrompt(ld.cau);
-      if (!ld.cungChuyen) notify.warning(`${ld.cau} bên dưới.`);
+      setPickPrompt(ld.message);
+      if (!ld.sameShipment) notify.warning(`${ld.message} bên dưới.`);
     }
   };
 
@@ -131,12 +131,12 @@ function LotInputDialog({
     return (
       <li key={`${n.kind}:${n.id}`} className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-2">
         <div className="min-w-0">
-          <div className="font-medium">{n.nhan}</div>
+          <div className="font-medium">{n.label}</div>
           <div className="text-muted-foreground">
-            {[n.moTa, n.ngay && formatDateVN(n.ngay), n.chiTiet.find((c) => c.nhan === "Đại lý")?.giaTri, n.kg ? kgChu(n.kg) : ""]
+            {[n.description, n.date && formatDateVN(n.date), n.details.find((c) => c.label === "Đại lý")?.value, n.kg ? kgChu(n.kg) : ""]
               .filter(Boolean)
               .join(" · ")}
-            {lotStock != null ? ` · tồn kho ${kgChu(lotStock)}` : cb && cb.ra.length > 0 ? ` · còn ${kgChu(cb.con)}` : ""}
+            {lotStock != null ? ` · tồn kho ${kgChu(lotStock)}` : cb && cb.outputs.length > 0 ? ` · còn ${kgChu(cb.children)}` : ""}
           </div>
         </div>
         {node}
@@ -209,7 +209,7 @@ function LotInputDialog({
                 {choices.map((n) =>
                   lotRow(
                     n,
-                    <Button size="sm" title={`Gắn đúng lô ${n.nhan} này.`} onClick={() => addLot(n, "typed")}>
+                    <Button size="sm" title={`Gắn đúng lô ${n.label} này.`} onClick={() => addLot(n, "typed")}>
                       Chọn lô này
                     </Button>
                   )
@@ -228,7 +228,7 @@ function LotInputDialog({
               {candidates.map((n) =>
                 lotRow(
                   n,
-                  <Button size="sm" variant="outline" title={`Gắn ${inputLabel} ${n.nhan}.`} onClick={() => addLot(n, "picked")}>
+                  <Button size="sm" variant="outline" title={`Gắn ${inputLabel} ${n.label}.`} onClick={() => addLot(n, "picked")}>
                     Chọn
                   </Button>
                 )
@@ -245,7 +245,7 @@ function LotInputDialog({
 
 /** Họ tên người đang đăng nhập — ghi vào mối nối (KDE "Ai"). */
 function useRecorder() {
-  const { nguoiDung: profile } = useAuth();
+  const { profile } = useAuth();
   return profile?.fullName || profile?.username || "";
 }
 
@@ -297,11 +297,11 @@ export function LotInputPicker({
       candidates={candidates}
       candidatesTitle={`Hoặc chọn ${inputLabel} — xưởng ${workshop}`}
       validateNode={(n) => {
-        if (assigned.some((l) => l.inputId === n.id)) return `Lô ${n.nhan} đã gắn rồi.`;
+        if (assigned.some((l) => l.inputId === n.id)) return `Lô ${n.label} đã gắn rồi.`;
         if (outputKind === "P" && productId) {
           const w = dl.wips.find((x) => x.id === n.id);
           if (w && w.productId !== productId)
-            return `Lô ${n.nhan} là "${n.moTa}", khác mặt hàng BTP của phiếu. Đổi mặt hàng BTP tiêu hao của phiếu trước, hoặc chọn đúng lô.`;
+            return `Lô ${n.label} là "${n.description}", khác mặt hàng BTP của phiếu. Đổi mặt hàng BTP tiêu hao của phiếu trước, hoặc chọn đúng lô.`;
         }
         return null;
       }}
@@ -312,15 +312,15 @@ export function LotInputPicker({
           outputId,
           inputKind,
           inputId: node.id,
-          inputLabel: node.nhan,
-          material: node.moTa,
+          inputLabel: node.label,
+          material: node.description,
           quantityKg: kg,
           method,
           operator: recordedBy,
           recordedAt: new Date().toISOString(),
         };
         saveLotInputs([...lotInputs, created]);
-        notify.saved(`Đã gắn ${inputLabel} ${node.nhan}${kg != null ? ` · ${kgChu(kg)}` : ""}.`);
+        notify.saved(`Đã gắn ${inputLabel} ${node.label}${kg != null ? ` · ${kgChu(kg)}` : ""}.`);
       }}
       onBo={(id) => {
         const prevRows = lotInputs;
@@ -380,7 +380,7 @@ export function LotDispatchPicker({
         : dl.packagings.filter((p) => !productId || p.toProductId === productId).map((p) => buildLotNode("P", p.id, dl));
     return items
       .filter((n) => isUnassigned(n) && (getLotStockKg(n.kind, n.id, dl, lotStockTable) ?? 0) > 0)
-      .sort((a, b) => a.ngay.localeCompare(b.ngay));
+      .sort((a, b) => a.date.localeCompare(b.date));
   }, [dl, lotKind, workshop, date, productId, assigned]);
 
   return (
@@ -394,9 +394,9 @@ export function LotDispatchPicker({
       candidates={candidates}
       candidatesTitle={lotKind === "S" ? `Hoặc chọn lô NL — xưởng ${workshop}` : "Hoặc chọn lô còn tồn — cũ trước"}
       validateNode={(n) => {
-        if (assigned.some((d) => d.lotId === n.id)) return `Lô ${n.nhan} đã gắn rồi.`;
+        if (assigned.some((d) => d.lotId === n.id)) return `Lô ${n.label} đã gắn rồi.`;
         const product = productOf(n);
-        if (productId && product && product !== productId) return `Lô ${n.nhan} là "${n.moTa}", khác mặt hàng của dòng bán.`;
+        if (productId && product && product !== productId) return `Lô ${n.label} là "${n.description}", khác mặt hàng của dòng bán.`;
         return null;
       }}
       onAdd={(node, method, kg) => {
@@ -404,7 +404,7 @@ export function LotDispatchPicker({
           id: crypto.randomUUID(),
           lotKind,
           lotId: node.id,
-          lotLabel: node.nhan,
+          lotLabel: node.label,
           docKind,
           docId,
           quantityKg: kg,
@@ -413,7 +413,7 @@ export function LotDispatchPicker({
           recordedAt: new Date().toISOString(),
         };
         saveLotDispatches([...lotDispatches, created]);
-        notify.saved(`Đã gắn ${inputLabel} ${node.nhan}${kg != null ? ` · ${kgChu(kg)}` : ""}.`);
+        notify.saved(`Đã gắn ${inputLabel} ${node.label}${kg != null ? ` · ${kgChu(kg)}` : ""}.`);
       }}
       onBo={(id) => {
         const prevRows = lotDispatches;

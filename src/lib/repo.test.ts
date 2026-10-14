@@ -38,7 +38,7 @@ function fakeGateway(tuChoi: (row: Record<string, unknown>) => PushError | null 
       }
       return null;
     },
-    xoa: async (keys) => {
+    remove: async (keys) => {
       deleteCalls.push(keys);
       return null;
     },
@@ -71,7 +71,7 @@ describe("kịch bản 1 — ghi chồng trong lúc đang gửi", () => {
         await cho; // lượt 1 đang treo trên mạng
         return null;
       },
-      xoa: async () => null,
+      remove: async () => null,
     };
     const sendPromise = pushQueue(bang, { them: ["A", "C"], xoa: [] }, rows, gateway);
 
@@ -86,7 +86,7 @@ describe("kịch bản 1 — ghi chồng trong lúc đang gửi", () => {
   });
 
   it("khóa không còn dòng nào ⇒ bỏ; tab khác thêm lại dòng đó trong lúc gửi ⇒ giữ", () => {
-    const result = { daGuiThem: new Map<string, string | null>([["X", null], ["Y", null]]), daXoa: [] };
+    const result = { sentUpserts: new Map<string, string | null>([["X", null], ["Y", null]]), deleted: [] };
     const remaining = dropSentKeys({ them: ["X", "Y"], xoa: [] }, result, jsonOf([{ id: "Y", kg: 1 }]));
     expect(remaining.them).toEqual(["Y"]);
   });
@@ -94,7 +94,7 @@ describe("kịch bản 1 — ghi chồng trong lúc đang gửi", () => {
   it("xóa đã gửi thì bỏ tombstone; tombstone mới thêm lúc đang gửi vẫn giữ", () => {
     const remaining = dropSentKeys(
       { them: [], xoa: ["D", "E"] },
-      { daGuiThem: new Map(), daXoa: ["D"] },
+      { sentUpserts: new Map(), deleted: ["D"] },
       new Map(),
     );
     expect(remaining.xoa).toEqual(["E"]);
@@ -113,8 +113,8 @@ describe("kịch bản 2 — một dòng lỗi trong lô", () => {
     );
     const result = await pushQueue(bang, { them: ["A", "HONG", "C"], xoa: [] }, rows, gateway);
 
-    expect(result.loiChung).toBeUndefined();
-    expect(result.dongLoi).toEqual([{ khoa: "HONG", msg: "23505 duplicate key value" }]);
+    expect(result.generalError).toBeUndefined();
+    expect(result.rowErrors).toEqual([{ key: "HONG", msg: "23505 duplicate key value" }]);
     expect(luotUpsert.length).toBe(4); // 1 lượt gộp + 3 lượt từng dòng
     const remaining = dropSentKeys({ them: ["A", "HONG", "C"], xoa: [] }, result, jsonOf(rows));
     expect(remaining.them).toEqual(["HONG"]);
@@ -127,7 +127,7 @@ describe("kịch bản 2 — một dòng lỗi trong lô", () => {
     ];
     const { cong: gateway, luotUpsert } = fakeGateway(() => ({ message: "TypeError: Failed to fetch" }));
     const result = await pushQueue(bang, { them: ["A", "B"], xoa: ["Z"] }, rows, gateway);
-    expect(result.loiChung).toContain("Failed to fetch");
+    expect(result.generalError).toContain("Failed to fetch");
     expect(luotUpsert.length).toBe(1);
     const remaining = dropSentKeys({ them: ["A", "B"], xoa: ["Z"] }, result, jsonOf(rows));
     expect(remaining).toEqual({ them: ["A", "B"], xoa: ["Z"] });

@@ -160,7 +160,7 @@ function periodLabel(ky: ViewPeriod, tu: string, den: string): string {
   return `${formatDateVN(tu)} – ${formatDateVN(den)}`;
 }
 
-const LEVEL_LABELS: Record<FlowWarning["muc"], { chu: string; variant: TagVariant }> = {
+const LEVEL_LABELS: Record<FlowWarning["level"], { chu: string; variant: TagVariant }> = {
   loi: { chu: "Sổ sai", variant: "loi" },
   nhac: { chu: "Chưa làm", variant: "luu-y" },
   tin: { chu: "Để biết", variant: "phu" },
@@ -198,14 +198,14 @@ function Section({
 
 export default function DashboardScreen() {
   const navigate = useNavigate();
-  const { laAdmin, canDangNhap: canSignIn } = useAuth();
+  const { isAdmin: laAdmin, requiresLogin: canSignIn } = useAuth();
   const [ky, setKy] = useState<ViewPeriod>("thang");
   const [moc, setMoc] = useState(todayIso());
   const [tuTC, setTuTC] = useState(todayIso());
   const [denTC, setDenTC] = useState(todayIso());
   const [workshop, setWorkshop] = useState<Workshop | "">("");
   const [tu, den] = getViewPeriodRange(ky, moc, tuTC, denTC);
-  const range: FlowRange = useMemo(() => ({ tu, den, xuong: workshop }), [tu, den, workshop]);
+  const range: FlowRange = useMemo(() => ({ fromDate: tu, toDate: den, workshop }), [tu, den, workshop]);
   const warningsRef = useRef<HTMLDivElement>(null);
 
   // ---- Nạp sổ ----
@@ -231,20 +231,20 @@ export default function DashboardScreen() {
   // Chuỗi theo ngày dừng ở hôm nay — ngày tương lai chưa có số, vẽ ra chỉ là đường phẳng.
   const byDate = useMemo(() => {
     const today = todayIso();
-    return buildDailyFlowSeries(d, { ...range, den: range.den < today ? range.den : today });
+    return buildDailyFlowSeries(d, { ...range, toDate: range.toDate < today ? range.toDate : today });
   }, [d, range]);
   const yieldRatio = useMemo(() => computeYieldByProduct(d, range), [d, range]);
   const warnings = useMemo(() => buildChainWarnings(d, range, todayIso()), [d, range]);
   const cacKy = useMemo(() => computeAllPeriodResults(d), [d]);
 
-  const stageKg = (k: string) => stages.find((x) => x.khoa === k)?.kg ?? 0;
+  const stageKg = (k: string) => stages.find((x) => x.key === k)?.kg ?? 0;
   const inKg = stageKg("nhap");
   const productionKg = stageKg("san-xuat");
   const raKg = stageKg("xuat-ban");
   const last = byDate[byDate.length - 1];
-  const latestPeriod = cacKy.find((x) => x.coThanhPham);
-  const taskCount = warnings.filter((c) => c.muc !== "tin").length;
-  const errorCount = warnings.filter((c) => c.muc === "loi").length;
+  const latestPeriod = cacKy.find((x) => x.hasFinishedGoods);
+  const taskCount = warnings.filter((c) => c.level !== "tin").length;
+  const errorCount = warnings.filter((c) => c.level === "loi").length;
 
   // % kg BTP trong khoảng đã có lô NL (hoặc lý do chưa gắn).
   const lotCoverageRatio = useMemo(() => {
@@ -281,10 +281,10 @@ export default function DashboardScreen() {
     },
     {
       label: "Định mức NL/TP bình quân",
-      value: yieldRatio.binhQuan != null ? num(yieldRatio.binhQuan) : latestPeriod ? num(latestPeriod.kq.norm) : "—",
+      value: yieldRatio.binhQuan != null ? num(yieldRatio.binhQuan) : latestPeriod ? num(latestPeriod.result.norm) : "—",
       subtext:
         yieldRatio.binhQuan != null
-          ? `từ ${yieldRatio.dong.length} mặt hàng có gắn lô cân kg`
+          ? `từ ${yieldRatio.rows.length} mặt hàng có gắn lô cân kg`
           : latestPeriod
             ? `kỳ cân đối ${latestPeriod.period.materialTypeName} gần nhất`
             : "chưa có mẻ gắn lô cân kg",
@@ -294,8 +294,8 @@ export default function DashboardScreen() {
     },
     {
       label: "Tồn BTP kho dự trữ cuối kỳ",
-      value: `${num(last?.tonBtp ?? 0)} kg`,
-      subtext: `TP đóng gói còn ${num(last?.tonTp ?? 0)} kg`,
+      value: `${num(last?.wipStockKg ?? 0)} kg`,
+      subtext: `TP đóng gói còn ${num(last?.finishedStockKg ?? 0)} kg`,
       numeric: true,
       icon: Warehouse,
       tone: KIND_TONES.kho,
@@ -314,11 +314,11 @@ export default function DashboardScreen() {
     },
     {
       label: "Lãi/lỗ kỳ cân đối gần nhất",
-      value: latestPeriod ? formatMoney(latestPeriod.kq.profitOrLoss) : "—",
+      value: latestPeriod ? formatMoney(latestPeriod.result.profitOrLoss) : "—",
       subtext: latestPeriod ? `${latestPeriod.period.materialTypeName} · ${latestPeriod.period.dateRangeDescription}` : "chưa có kỳ có thành phẩm",
       numeric: true,
       icon: Scale,
-      color: !latestPeriod ? "trung-tinh" : latestPeriod.kq.profitOrLoss >= 0 ? "success" : "danger",
+      color: !latestPeriod ? "trung-tinh" : latestPeriod.result.profitOrLoss >= 0 ? "success" : "danger",
       onSelect: latestPeriod ? () => navigate(`/balancing/${latestPeriod.period.id}`) : undefined,
       selectHint: "Mở kỳ cân đối để xem bảng chi tiết.",
     },
@@ -346,19 +346,19 @@ export default function DashboardScreen() {
 
   // ---- Hai thanh "đi đâu" (thay sơ đồ dòng chảy — dễ đọc hơn) ----
   const nodePaths = useMemo(
-    () => Object.fromEntries(dataFlow.nut.filter((n) => n.duongDan).map((n) => [n.id, n.duongDan as string])),
+    () => Object.fromEntries(dataFlow.nodes.filter((n) => n.path).map((n) => [n.id, n.path as string])),
     [dataFlow],
   );
   const toShares = (items: ReturnType<typeof splitOutflows>, ten: typeof MATERIAL_PARTS): ProportionSegment[] =>
-    items.map((x) => ({ id: x.id, label: ten[x.id]?.label ?? x.nhan, tone: ten[x.id]?.tone ?? "xam", description: ten[x.id]?.description, value: x.kg }));
+    items.map((x) => ({ id: x.id, label: ten[x.id]?.label ?? x.label, tone: ten[x.id]?.tone ?? "xam", description: ten[x.id]?.description, value: x.kg }));
   const materialOutflow = useMemo(
     () => splitOutflows(dataFlow, (id) => id.startsWith("x:"), Object.keys(MATERIAL_PARTS)),
     [dataFlow],
   );
   const outOfWarehouse = useMemo(() => splitOutflows(dataFlow, (id) => id === "kho", Object.keys(WAREHOUSE_PARTS)), [dataFlow]);
-  const priorMaterialKg = dataFlow.canh.filter((c) => c.tu === "nlTruoc").reduce((s, c) => s + c.kg, 0);
-  const priorWipStock = dataFlow.canh.filter((c) => c.tu === "tonBtpDau").reduce((s, c) => s + c.kg, 0);
-  const wipRatio = materialOutflow.find((x) => x.id === "btp")?.tiLe ?? 0;
+  const priorMaterialKg = dataFlow.edges.filter((c) => c.source === "nlTruoc").reduce((s, c) => s + c.kg, 0);
+  const priorWipStock = dataFlow.edges.filter((c) => c.source === "tonBtpDau").reduce((s, c) => s + c.kg, 0);
+  const wipRatio = materialOutflow.find((x) => x.id === "btp")?.share ?? 0;
 
   // ---- Bảng việc cần đốc ----
   const warningColumns: SummaryTableColumn<FlowWarning>[] = [
@@ -366,8 +366,8 @@ export default function DashboardScreen() {
       key: "muc",
       header: "Mức",
       render: (r) => (
-        <Tag variant={LEVEL_LABELS[r.muc].variant}>
-          {LEVEL_LABELS[r.muc].chu}
+        <Tag variant={LEVEL_LABELS[r.level].variant}>
+          {LEVEL_LABELS[r.level].chu}
         </Tag>
       ),
     },
@@ -376,24 +376,24 @@ export default function DashboardScreen() {
       header: "Việc",
       render: (r) => (
         <div className="min-w-0">
-          <div className="font-semibold text-foreground">{r.tieuDe}</div>
+          <div className="font-semibold text-foreground">{r.title}</div>
           <div className="text-sm text-muted-foreground">
-            {getWarningKindLabel(r.loai)} · {r.chiTiet}
+            {getWarningKindLabel(r.kind)} · {r.detail}
           </div>
         </div>
       ),
     },
-    { key: "ngay", header: "Ngày", render: (r) => (r.ngay ? formatDateVN(r.ngay) : "—") },
+    { key: "ngay", header: "Ngày", render: (r) => (r.date ? formatDateVN(r.date) : "—") },
     {
       key: "xuong",
       header: "Xưởng",
-      render: (r) => (r.xuong ? <Tag variant="phan-loai" tone={toneForWorkshop(r.xuong)}>{r.xuong}</Tag> : "—"),
+      render: (r) => (r.workshop ? <Tag variant="phan-loai" tone={toneForWorkshop(r.workshop)}>{r.workshop}</Tag> : "—"),
     },
     {
       key: "mo",
       header: "",
       render: (r) => (
-        <Button title="Mở đúng màn để xử lý việc này." variant="outline" size="sm" onClick={() => navigate(r.duongDan)}>
+        <Button title="Mở đúng màn để xử lý việc này." variant="outline" size="sm" onClick={() => navigate(r.path)}>
           Mở
           <ArrowRight className="ml-1 h-4 w-4" />
         </Button>
@@ -413,17 +413,17 @@ export default function DashboardScreen() {
         </div>
       ),
     },
-    { key: "nl", header: "NL vào (kg)", numeric: true, render: (r) => num(r.kq.totalInputKg) },
-    { key: "tp", header: "TP ra (kg)", numeric: true, render: (r) => num(r.kq.totalOutputKg) },
-    { key: "dm", header: "Định mức", numeric: true, render: (r) => (r.coThanhPham ? num(r.kq.norm) : "chưa có TP") },
+    { key: "nl", header: "NL vào (kg)", numeric: true, render: (r) => num(r.result.totalInputKg) },
+    { key: "tp", header: "TP ra (kg)", numeric: true, render: (r) => num(r.result.totalOutputKg) },
+    { key: "dm", header: "Định mức", numeric: true, render: (r) => (r.hasFinishedGoods ? num(r.result.norm) : "chưa có TP") },
     {
       key: "lai",
       header: "Lãi/lỗ (đ)",
       numeric: true,
       render: (r) =>
-        r.coThanhPham ? (
-          <span className={r.kq.profitOrLoss >= 0 ? "font-semibold text-success" : "font-semibold text-destructive"}>
-            {formatMoney(r.kq.profitOrLoss)}
+        r.hasFinishedGoods ? (
+          <span className={r.result.profitOrLoss >= 0 ? "font-semibold text-success" : "font-semibold text-destructive"}>
+            {formatMoney(r.result.profitOrLoss)}
           </span>
         ) : (
           "—"
@@ -488,19 +488,19 @@ export default function DashboardScreen() {
     },
   ];
 
-  const dayLabels = byDate.map((x) => shortDate(x.ngay));
-  const hasDailyFigures = byDate.some((x) => x.nhap > 0 || x.sanXuat > 0);
-  const hasStock = byDate.some((x) => x.tonBtp !== 0 || x.tonTp !== 0);
+  const dayLabels = byDate.map((x) => shortDate(x.date));
+  const hasDailyFigures = byDate.some((x) => x.importedKg > 0 || x.producedKg > 0);
+  const hasStock = byDate.some((x) => x.wipStockKg !== 0 || x.finishedStockKg !== 0);
   const periodKey = `${tu}|${den}|${workshop || "tat-ca"}`;
-  const stagePaths = Object.fromEntries(stages.map((k) => [k.khoa, k.duongDan]));
+  const stagePaths = Object.fromEntries(stages.map((k) => [k.key, k.path]));
   const coloredStages = stages.map((k) => ({
-    id: k.khoa,
-    name: k.ten,
+    id: k.key,
+    name: k.name,
     kg: k.kg,
     pendingKg: k.kgCho,
-    pendingTasks: k.viecThieu,
-    conversionRate: k.tiLeChuyen,
-    tone: STAGE_TONES[k.khoa],
+    pendingTasks: k.missingTaskCount,
+    conversionRate: k.conversionRate,
+    tone: STAGE_TONES[k.key],
   }));
 
   return (
@@ -639,8 +639,8 @@ export default function DashboardScreen() {
               labels={dayLabels}
               description="Biểu đồ kg nhập và sản xuất theo ngày"
               series={[
-                { id: "nhap", name: "NL nhập", color: KIND_TONES.nhap, kind: "cot", values: byDate.map((x) => x.nhap) },
-                { id: "sx", name: "BTP sản xuất", color: KIND_TONES.sanXuat, kind: "cot", values: byDate.map((x) => x.sanXuat) },
+                { id: "nhap", name: "NL nhập", color: KIND_TONES.nhap, kind: "cot", values: byDate.map((x) => x.importedKg) },
+                { id: "sx", name: "BTP sản xuất", color: KIND_TONES.sanXuat, kind: "cot", values: byDate.map((x) => x.producedKg) },
               ]}
             />
           ) : (
@@ -656,8 +656,8 @@ export default function DashboardScreen() {
               labels={dayLabels}
               description="Biểu đồ tồn kho theo ngày"
               series={[
-                { id: "btp", name: "Tồn BTP kho dự trữ", color: KIND_TONES.kho, kind: "duong", area: true, values: byDate.map((x) => x.tonBtp) },
-                { id: "tp", name: "Tồn TP đóng gói", color: KIND_TONES.dongGoi, kind: "duong", values: byDate.map((x) => x.tonTp) },
+                { id: "btp", name: "Tồn BTP kho dự trữ", color: KIND_TONES.kho, kind: "duong", area: true, values: byDate.map((x) => x.wipStockKg) },
+                { id: "tp", name: "Tồn TP đóng gói", color: KIND_TONES.dongGoi, kind: "duong", values: byDate.map((x) => x.finishedStockKg) },
               ]}
             />
           ) : (
@@ -685,14 +685,14 @@ export default function DashboardScreen() {
               : "Chỉ tính mẻ đã gắn lô NL có cân kg."
           }
         >
-          {yieldRatio.dong.length === 0 ? (
+          {yieldRatio.rows.length === 0 ? (
             <EmptyState icon={Gauge} title="Chưa đủ số để tính" description="Khi gắn lô NL cho mẻ ở Sản xuất có ghi kg, định mức từng mặt hàng hiện ở đây." />
           ) : (
             <BarChart
-              data={yieldRatio.dong.map((r) => ({
-                label: r.ten,
-                value: r.dinhMuc,
-                subLabel: `${r.lech > 0 ? "+" : ""}${num(r.lech * 100)}% so bình quân${r.vuotNguong ? " · lệch" : ""}`,
+              data={yieldRatio.rows.map((r) => ({
+                label: r.name,
+                value: r.yieldRatio,
+                subLabel: `${r.deviation > 0 ? "+" : ""}${num(r.deviation * 100)}% so bình quân${r.exceedsThreshold ? " · lệch" : ""}`,
               }))}
               formatValue={(n) => n.toLocaleString("vi-VN", { maximumFractionDigits: 2 })}
               averageValue={yieldRatio.binhQuan ?? undefined}

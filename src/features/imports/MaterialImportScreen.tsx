@@ -557,6 +557,16 @@ export default function MaterialImportScreen() {
    *  để nhắc trước khi chốt ngày, kẻo số vừa gõ chưa tính vào tổng chốt. */
   const hasUnsavedRows = mode === "entry" && validRows.some((d) => !d.id);
   const isSessionLocked = session ? isLocked(session.deliveryDate, session.workshop) : false;
+  /** Còn thiếu gì thì CHƯA lưu được — nói thẳng trên thanh lưu, khỏi bấm rồi mới biết. */
+  const missingForSave: string[] = !session
+    ? []
+    : [
+        ...validateShipmentHeader(session, isSessionLocked).map((e) =>
+          e.field === "Đại lý" ? "chọn đại lý" : e.field === "Lý do ghi bù" ? "ghi lý do ghi bù" : e.message.toLowerCase()
+        ),
+        ...(validRows.length === 0 ? ["gõ số kg cho ít nhất một loại hàng"] : []),
+      ];
+  const isReadyToSave = missingForSave.length === 0;
 
   /** Dòng đã lưu thuộc chuyến đang mở (id-set khi sửa; tạo mới thì chưa có gì). */
   const belongsToSavedSession = (r: MaterialImportItem) =>
@@ -1395,22 +1405,44 @@ export default function MaterialImportScreen() {
               : "border-border"
           )}
         >
-          <p className="min-w-0">
-            <span className="text-muted-foreground">Chuyến này: </span>
-            <span className="tnum text-lg font-semibold">{kg(shipmentTotal)}</span>
-            <span className="text-muted-foreground">
-              {" "}· {validRows.length} loại
-              {shipmentAmount > 0 && <> · <span className="tnum">{num(shipmentAmount)} đ</span></>}
-            </span>
+          <div className="min-w-0 space-y-0.5 sm:flex-1">
+            {/* Dòng 1: đang lưu CÁI GÌ — chuyến mới hay sửa chuyến cũ, của đại lý nào */}
+            <p className="flex flex-wrap items-center gap-x-2 gap-y-1 font-semibold">
+              <span>
+                {isEditingShipment ? "Sửa chuyến đã ghi" : "Chuyến mới"}
+                {session.supplierName ? ` · ${session.supplierName}` : ""}
+              </span>
+              {!isEditingShipment && validRows.length > 0 && <Tag variant="warning">Chưa lưu</Tag>}
+            </p>
+            <p>
+              <span className="tnum text-lg font-semibold">{kg(shipmentTotal)}</span>
+              <span className="text-muted-foreground">
+                {" "}· {validRows.length} loại
+                {shipmentAmount > 0 && <> · <span className="tnum">{num(shipmentAmount)} đ</span></>}
+              </span>
+            </p>
+            {/* Dòng 3: còn thiếu gì / bấm lưu thì chuyện gì xảy ra */}
+            {isReadyToSave ? (
+              <p className="text-sm text-muted-foreground">
+                {isEditingShipment
+                  ? "Bấm lưu để ghi đè chuyến này trong sổ."
+                  : `Bấm lưu để ghi vào sổ ngày ${formatDateVN(session.deliveryDate)} · xưởng ${session.workshop}, rồi mở phiếu trống cho chuyến kế.`}
+              </p>
+            ) : (
+              <p className="flex items-start gap-1.5 text-sm text-warning">
+                <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
+                <span>Chưa lưu được — còn thiếu: {missingForSave.join(" · ")}.</span>
+              </p>
+            )}
             {/* Dòng điền sẵn chưa gõ kg sẽ KHÔNG được lưu — nói rõ tên loại, khỏi sót hàng. */}
             {validRows.length > 0 && skipped.length > 0 && (
-              <span className="block text-sm text-muted-foreground">
+              <p className="text-sm text-muted-foreground">
                 Không lưu {skipped.length} loại chưa gõ kg:{" "}
                 {skipped.map((d) => d.materialTypeName).join(", ")}
-              </span>
+              </p>
             )}
-          </p>
-          <div className="flex w-full flex-wrap gap-2 sm:w-auto [&>*]:flex-1 sm:[&>*]:flex-none">
+          </div>
+          <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:max-w-[45%] sm:shrink-0 sm:justify-end [&>*]:flex-1 sm:[&>*]:flex-none">
             {isEditingShipment && (
               <>
                 <ConfirmDelete
@@ -1424,10 +1456,21 @@ export default function MaterialImportScreen() {
                 </Button>
               </>
             )}
-            <Button variant="save"
-              title="Ghi chuyến đang gõ vào sổ. Chuyến hiện ngay ở khung “Đã ghi trong ngày”; phiếu trống (giữ ngày + xưởng, đại lý để trống) sẵn cho chuyến kế." id="nut-luu-chuyen" className="min-h-11" onClick={finishShipment}>
+            {/* Đủ thông tin ⇒ xanh lá đặc; còn thiếu ⇒ viền (vẫn bấm được — bấm thì hiện
+                danh sách lỗi ở đầu phiếu, nút Lưu không bao giờ disabled). */}
+            <Button
+              title={
+                isEditingShipment
+                  ? "Ghi đè chuyến đang sửa trong sổ (đổi đầu chuyến thì áp cho mọi dòng của chuyến)."
+                  : "Ghi chuyến đang gõ vào sổ. Chuyến hiện ngay ở khung “Đã ghi ngày”; phiếu trống (giữ ngày + xưởng, đại lý để trống) sẵn cho chuyến kế."
+              }
+              id="nut-luu-chuyen"
+              variant={isReadyToSave ? "save" : "outline"}
+              className="h-auto min-h-11 whitespace-normal"
+              onClick={finishShipment}
+            >
               <Save />
-              Lưu chuyến
+              {isEditingShipment ? "Lưu thay đổi chuyến" : "Lưu chuyến vào sổ"}
             </Button>
           </div>
         </div>

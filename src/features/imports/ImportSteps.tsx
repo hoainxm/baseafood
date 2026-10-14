@@ -82,7 +82,7 @@ export function DayShipmentList({
                 <Button
                   title="Mở lại chuyến này lên phiếu để sửa dòng hàng, số kg hay giá."
                   type="button"
-                  variant="outline"
+                  variant="edit"
                   size="sm"
                   onClick={() => onEdit(n)}
                 >

@@ -204,7 +204,7 @@ export function BulkTypeChangeDialog({
           <Button variant="outline" size="lg" onClick={onClose}>
             Hủy
           </Button>
-          <Button
+          <Button variant="save"
             title="Đổi loại nguyên liệu của mọi chuyến đang tick sang loại đích. Sổ ghi lại theo loại mới."
             size="lg"
             onClick={() => {

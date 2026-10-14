@@ -872,6 +872,10 @@ export default function MaterialImportScreen() {
     );
     setIsConfirmingLock(false);
     setLockNote("");
+    // Chốt xong ⇒ dọn phiếu đang mở (đại lý vừa chọn, bảng điền sẵn, xe, dòng gõ dở
+    // của nhánh "Vẫn chốt") — effect form-first mở lại phiếu trống. Lỗi cũ: chốt xong
+    // các ô vẫn còn số vừa nhập, trông như chưa lưu.
+    resetSession();
   };
 
   const reopenDay = () => {
@@ -994,7 +998,7 @@ export default function MaterialImportScreen() {
           {isDayLocked ? (
             <Button
               title="Mở khóa lại ngày đã chốt để sửa hoặc ghi bù. Phải ghi lý do, và việc mở khóa được lưu vết."
-              variant="outline"
+              variant="edit"
               size="lg"
               className="w-full"
               onClick={() => {
@@ -1007,7 +1011,7 @@ export default function MaterialImportScreen() {
               Mở lại ngày
             </Button>
           ) : (
-            <Button
+            <Button variant="lock"
               title="Khóa sổ ngày này lại: chốt tổng nhập trong ngày. Sau khi chốt muốn sửa phải Mở lại ngày và ghi lý do."
               size="lg"
               className="w-full"
@@ -1355,7 +1359,7 @@ export default function MaterialImportScreen() {
                 </Button>
               </>
             )}
-            <Button
+            <Button variant="save"
               title="Ghi chuyến đang gõ vào sổ. Chuyến hiện ngay ở khung “Đã ghi trong ngày”; phiếu trống (giữ ngày + xưởng, đại lý để trống) sẵn cho chuyến kế." id="nut-luu-chuyen" className="min-h-11" onClick={finishShipment}>
               <Save />
               Lưu chuyến
@@ -1522,7 +1526,7 @@ export default function MaterialImportScreen() {
           In phiếu trống
         </Button>
         <Button
-          title="Đổi loại nguyên liệu cho nhiều chuyến cùng lúc — dùng khi gõ nhầm loại cho cả loạt dòng." variant="outline" size="lg" onClick={() => setIsTypeChangeOpen(true)}>
+          title="Đổi loại nguyên liệu cho nhiều chuyến cùng lúc — dùng khi gõ nhầm loại cho cả loạt dòng." variant="edit" size="lg" onClick={() => setIsTypeChangeOpen(true)}>
           <Replace />
           Đổi loại hàng loạt
         </Button>
@@ -1781,7 +1785,7 @@ export default function MaterialImportScreen() {
                       </span>
                       {!isShipmentLocked && (
                         <Button
-                          title="Mở lại chuyến này để sửa dòng hàng, số kg hay giá. Ngày đã chốt thì phải mở khóa trước." variant="outline" onClick={() => openShipmentEdit(n)}>
+                          title="Mở lại chuyến này để sửa dòng hàng, số kg hay giá. Ngày đã chốt thì phải mở khóa trước." variant="edit" onClick={() => openShipmentEdit(n)}>
                           <Pencil />
                           Sửa chuyến
                         </Button>
@@ -1886,7 +1890,7 @@ export default function MaterialImportScreen() {
             >
               Chưa chốt
             </Button>
-            <Button
+            <Button variant="lock"
               title="Xác nhận khóa sổ ngày này." size="lg" onClick={lockDay}>
               <Lock />
               Chốt ngày
@@ -1930,7 +1934,7 @@ export default function MaterialImportScreen() {
             >
               Vẫn chốt (bỏ dòng đang gõ)
             </Button>
-            <Button
+            <Button variant="save"
               title="Ghi dòng đang gõ vào sổ trước, rồi mới chốt ngày — không mất dữ liệu."
               size="lg"
               onClick={() => {
@@ -1980,7 +1984,7 @@ export default function MaterialImportScreen() {
             >
               Giữ khóa
             </Button>
-            <Button
+            <Button variant="edit"
               title="Xác nhận mở khóa ngày này để sửa hoặc ghi bù." size="lg" onClick={reopenDay}>
               <LockOpen />
               Mở lại ngày

@@ -272,7 +272,7 @@ export function ImportSlipOcr({
                     </span>
                     <Button
                       title="Ghi ngay phế liệu này vào sổ phế liệu cân trong ngày (theo ngày và xưởng ghi bên cạnh). Loại đã có trong sổ ngày đó thì bỏ qua."
-                      variant={isScrapSaved ? "outline" : "default"}
+                      variant={isScrapSaved ? "outline" : "save"}
                       size="sm"
                       onClick={() => {
                         if (onAddScraps(result.scraps!, result) > 0)

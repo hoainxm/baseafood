@@ -211,7 +211,7 @@ export function DailyScrapSection({
                 <>
                   <Button
                     title="Sửa dòng phế liệu này (tên · số kg · giá bán)."
-                    variant="outline"
+                    variant="edit"
                     size="sm"
                     onClick={() => {
                       setEditing({ ...r });
@@ -324,7 +324,7 @@ export function DailyScrapSection({
             {isAdding && (
               <Button
                 title="Lưu dòng này rồi để hộp thoại mở để ghi tiếp loại phế liệu khác (VD vừa ghi nội tạng, giờ ghi dạt)."
-                variant="outline"
+                variant="save"
                 size="lg"
                 onClick={() => save(true)}
               >
@@ -338,6 +338,7 @@ export function DailyScrapSection({
                   ? "Lưu dòng phế liệu này vào sổ của ngày đang chọn rồi đóng hộp thoại."
                   : "Lưu thay đổi của dòng phế liệu này."
               }
+              variant="save"
               size="lg"
               onClick={() => save(false)}
             >

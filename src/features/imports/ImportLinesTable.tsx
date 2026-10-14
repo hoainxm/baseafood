@@ -159,7 +159,7 @@ export function ImportLinesTable({
             {canRemove ? (
               <Button
                 title="Bỏ dòng loại hàng này khỏi chuyến đang gõ (chưa lưu nên không đụng sổ)."
-                variant="outline"
+                variant="danger"
                 aria-label="Bỏ dòng"
                 className="col-span-2 justify-center lg:col-span-1"
                 onClick={() => onBo(d.key)}
@@ -206,7 +206,7 @@ function CompactCloseButton({
       <Button
         title="Đổi loài / loại nguyên liệu của dòng điền sẵn này — bung đủ các ô chọn."
         type="button"
-        variant="outline"
+        variant="edit"
         size="icon"
         aria-label={`Đổi loại của dòng ${d.materialTypeName}`}
         onClick={onBung}
@@ -217,7 +217,7 @@ function CompactCloseButton({
         <Button
           title="Bỏ dòng loại hàng này khỏi chuyến đang gõ (chưa lưu nên không đụng sổ)."
           type="button"
-          variant="outline"
+          variant="danger"
           size="icon"
           aria-label={`Bỏ dòng ${d.materialTypeName}`}
           onClick={() => onBo(d.key)}

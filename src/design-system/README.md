@@ -431,6 +431,28 @@ chip đếm/điều khiển của primitive; màn nghiệp vụ **không** dùng
 - Nhãn phụ dưới tên dòng trong `EditableGrid` (`phu`) được đặt `Tag` (VD nguồn "sổ sản
   xuất", "mẫu · chưa có số", lưu ý "giá = kỳ trước").
 
+## 8b. Màu NÚT theo chức năng — `Button variant` (từ 2026-10-14)
+
+Người dùng xưởng phải nhìn màu là biết nút làm gì (yêu cầu 2026-10-14: "xóa, sửa,
+lưu… tách riêng màu"). Giống `Tag`: **chọn variant theo Ý NGHĨA của nút, không chọn
+theo màu**, không tự viết class màu lên nút.
+
+| `variant` | Nghĩa | Màu | Ví dụ |
+|---|---|---|---|
+| `save` | ghi số liệu vào sổ / danh mục | xanh lá đặc (`--success`) | Lưu chuyến · Lưu · Lưu thay đổi · Lưu vào sổ rồi chốt · Ghi phế liệu |
+| `edit` | mở ra để sửa / đổi / mở khóa sửa | viền + chữ xanh thông tin (`--info`) | Sửa · Sửa chuyến · bút chì Đổi loại · Đổi loại hàng loạt · Mở lại ngày |
+| `danger` | NÚT KÍCH HOẠT xóa / bỏ | viền + chữ đỏ (`--destructive`) | Xóa (mặc định của `ConfirmDelete`) · Bỏ dòng |
+| `destructive` | nút XÁC NHẬN xóa trong hộp hỏi | đỏ đặc | "Xóa chuyến" trong `ConfirmDelete` |
+| `lock` | chốt / khóa sổ | hổ phách đặc (`--warning`) | Chốt ngày |
+| `default` | hành động chính khác (thêm, chuyển bước, điền) | xanh thương hiệu | Thêm phế liệu · Điền vào phiếu |
+| `outline` / `ghost` / `link` | phụ, trung tính | xám | Hủy · Báo cáo ngày · In · Xuất Excel |
+
+- Chữ + icon vẫn bắt buộc (`<Save />`, `<Pencil />`, `<Trash2 />`, `<Lock />`): màu không
+  bao giờ là tín hiệu duy nhất. Tương phản chữ/nền ≥ 4,5:1 với token hiện có.
+- Đã áp: `ConfirmDelete` (trigger `danger`), `CatalogCrud` (Sửa `edit`, Lưu `save`), màn
+  Nhập hàng (`features/imports/**`). Màn khác chuyển dần khi đụng tới — nút Lưu/Sửa/Chốt
+  MỚI phải dùng đúng variant ngay.
+
 ## Bảng chọn component
 
 | Tình huống | Dùng |

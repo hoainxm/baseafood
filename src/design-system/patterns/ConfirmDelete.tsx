@@ -42,7 +42,7 @@ export function ConfirmDelete({
       <AlertDialogTrigger asChild>
         {trigger ?? (
           <Button
-            variant="outline"
+            variant="danger"
             size="sm"
             title="Xóa bản ghi này. Có hỏi xác nhận trước, và xóa xong vẫn còn nút Hoàn tác."
           >

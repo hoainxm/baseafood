@@ -21,6 +21,20 @@ const buttonVariants = cva(
         destructive:
           "bg-destructive text-destructive-foreground hover:brightness-90 focus-visible:border-destructive focus-visible:ring-destructive/30",
         link: "text-primary underline-offset-4 hover:underline",
+        /* MÀU THEO CHỨC NĂNG (2026-10-14, README design-system § Màu nút theo chức năng):
+           nhìn màu là biết nút làm gì. Chọn theo Ý NGHĨA của nút, không chọn theo màu. */
+        /* Lưu / ghi số liệu vào sổ — xanh lá đặc */
+        save:
+          "bg-success text-success-foreground hover:brightness-90 active:brightness-85 focus-visible:border-success focus-visible:ring-success/30",
+        /* Sửa / đổi / mở lại để sửa — viền + chữ xanh thông tin */
+        edit:
+          "border-info-line bg-background text-info hover:bg-info-surface aria-expanded:bg-info-surface",
+        /* Mở hộp xóa (nút kích hoạt) — viền + chữ đỏ; nút XÁC NHẬN xóa vẫn dùng `destructive` đặc */
+        danger:
+          "border-destructive-line bg-background text-destructive hover:bg-destructive-surface aria-expanded:bg-destructive-surface",
+        /* Chốt / khóa sổ — hổ phách đặc */
+        lock:
+          "bg-warning text-warning-foreground hover:brightness-90 active:brightness-85 focus-visible:border-warning focus-visible:ring-warning/30",
       },
       /* Vùng chạm: mặc định 40px, hành động chính 44px (mật độ web thường).
          Người cần vùng chạm to hơn: đổi mật độ Thoáng trong Cài đặt hiển thị. */

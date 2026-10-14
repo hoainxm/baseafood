@@ -191,7 +191,7 @@ export function CatalogCrud<T extends { id: string }>({
           actions={(r) => (
             <>
               <Button
-                variant="outline"
+                variant="edit"
                 size="sm"
                 onClick={() => openEdit(r)}
                 title={`Sửa thông tin ${entityName} "${getRecordDescription(r)}". Sổ đã ghi trước đó giữ nguyên tên cũ — không hồi tố.`}
@@ -305,6 +305,7 @@ export function CatalogEditDialog<T extends { id: string }>({
             Hủy
           </Button>
           <Button
+            variant="save"
             size="lg"
             onClick={onSave}
             title={isAdding ? `Lưu ${entityName} mới vào danh mục.` : `Lưu các thay đổi của ${entityName} này vào danh mục.`}

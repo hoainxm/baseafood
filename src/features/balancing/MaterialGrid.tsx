@@ -110,7 +110,7 @@ export function MaterialGrid({
   /** id dòng kho ẢO (chưa lưu) — dòng thật tạo ra DÙNG LẠI đúng id này, nên ô đang gõ
       không bị dựng lại (mất con trỏ, rơi các phím sau) khi phím đầu biến nó thành thật.
       Suy từ id kỳ ⇒ không bao giờ trùng giữa hai kỳ. */
-  const idAo = (lineKind: BalancingStockLineKind) => `${grid.kyId}-${lineKind}`;
+  const idAo = (lineKind: BalancingStockLineKind) => `${grid.periodId}-${lineKind}`;
 
   const theoId = useMemo(() => new Map(materialInRows.map((r) => [r.id, r])), [materialInRows]);
 
@@ -126,7 +126,7 @@ export function MaterialGrid({
 
   const stockLineTemplate = (lineKind: BalancingStockLineKind): BalancingInputItem => ({
     id: idAo(lineKind),
-    periodId: grid.kyId,
+    periodId: grid.periodId,
     groupName: "Xả đông",
     name: BALANCING_STOCK_LINE_NAMES[lineKind],
     quantityKg: 0,
@@ -255,7 +255,7 @@ export function MaterialGrid({
         ...materialInRows,
         {
           id: uid(),
-          periodId: grid.kyId,
+          periodId: grid.periodId,
           groupName: "Thủy sản",
           name: DOMESTIC_SALE_ROW_NAME,
           quantityKg: sumGridRow(daily, 0),
@@ -384,7 +384,7 @@ export function MaterialGrid({
       ...materialInRows,
       {
         id: uid(),
-        periodId: grid.kyId,
+        periodId: grid.periodId,
         groupName: isReduction ? "Thủy sản" : nhom,
         name: ten,
         quantityKg: 0,
@@ -503,7 +503,7 @@ export function MaterialGrid({
       minWidth: 88,
       getValue: (h) => h.dailyQuantities[iso] ?? null,
       // Ngay dưới số kg: "n chuyến" → đại lý/chuyến làm nên đúng ô này.
-      renderCellNote: (h) => <CellShipments dong={importRowsOf(h)} date={iso} lotCodes={lotCodes} />,
+      renderCellNote: (h) => <CellShipments imports={importRowsOf(h)} date={iso} lotCodes={lotCodes} />,
     })),
     ...(hasLegacyCarryOver
       ? [
@@ -899,7 +899,7 @@ export function MaterialGrid({
 
       {isManualEditOpen && (
         <ManualRowsDialog
-          dong={materialRows.filter((h) => !h.fromImports)}
+          rows={materialRows.filter((h) => !h.fromImports)}
           getRowName={(h) => (h.stockLineKind ? BALANCING_STOCK_LINE_NAMES[h.stockLineKind] : h.name)}
           workshopWarehouses={WORKSHOP_WAREHOUSES.map((k) => ({ value: k.id, label: k.name }))}
           hasWarehouse={(h) => !isDomesticSale(h)}
@@ -913,7 +913,7 @@ export function MaterialGrid({
         <AddMaterialRowDialog
           isDecrease={addingGroup === "giam"}
           title={addingGroup === "giam" ? "Thêm dòng giảm" : `Thêm dòng ${addingGroup}`}
-          goiY={
+          suggestions={
             addingGroup === "giam" && !domesticSaleRow
               ? [{ value: DOMESTIC_SALE_ROW_NAME, label: DOMESTIC_SALE_ROW_NAME }, ...typeSuggestions]
               : typeSuggestions
@@ -927,7 +927,7 @@ export function MaterialGrid({
 
       {isImportPickerOpen && (
         <PickImportRowsDialog
-          dong={pickableRows}
+          imports={pickableRows}
           otherPeriodIds={new Set(otherPeriodImports.map((r) => r.id))}
           isSameFamily={grid.isPeriodFamily}
           periodMaterialType={getMaterialFamily(grid.periodMaterialType)}

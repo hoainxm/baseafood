@@ -12,21 +12,21 @@ import { listVisibleBatters, sanitizeBatterKg, sumBatterKg, computeBatterRatio }
 import { X } from "lucide-react";
 
 export function BatterSection({
-  diKem,
-  botKg,
-  onDoi,
-  optBot,
+  bundledIds,
+  batterKg,
+  onChange,
+  batterOptions,
   onCreateBatter,
   onEditBatter,
   productKg: finishedGoodKg,
   columnNavigation: hasColumnNav = false,
 }: {
   /** Tên các loại bột đi kèm của mặt hàng (đúng thứ tự gắn ở Danh mục). */
-  diKem: string[];
-  botKg: Record<string, number>;
-  onDoi: (next: Record<string, number>) => void;
+  bundledIds: string[];
+  batterKg: Record<string, number>;
+  onChange: (next: Record<string, number>) => void;
   /** Danh mục loại bột — value = TÊN (sổ lưu theo tên). */
-  optBot: ComboboxOption[];
+  batterOptions: ComboboxOption[];
   /** Tạo loại bột mới tại chỗ (lưu ngay vào danh mục) — trả về TÊN. */
   onCreateBatter: (ten: string) => string;
   /** Mở hộp sửa nhanh loại bột (value = tên). */
@@ -35,15 +35,15 @@ export function BatterSection({
   /** Ô số nhảy ↑/↓ theo cột trong bảng ghi (khung `[data-grid-nav]`). */
   columnNavigation?: boolean;
 }) {
-  const visibleBatters = listVisibleBatters(diKem, botKg);
-  const total = sumBatterKg(botKg);
+  const visibleBatters = listVisibleBatters(bundledIds, batterKg);
+  const total = sumBatterKg(batterKg);
   const tyLe = computeBatterRatio(total, finishedGoodKg);
-  const batterTypeCount = Object.keys(sanitizeBatterKg(botKg)).length;
+  const batterTypeCount = Object.keys(sanitizeBatterKg(batterKg)).length;
 
   const bo = (ten: string) => {
-    const next = { ...botKg };
+    const next = { ...batterKg };
     delete next[ten];
-    onDoi(next);
+    onChange(next);
   };
 
   return (
@@ -62,7 +62,7 @@ export function BatterSection({
 
       <div className="flex flex-wrap items-end gap-4">
         {visibleBatters.map((ten) => {
-          const isNotBundled = !diKem.includes(ten);
+          const isNotBundled = !bundledIds.includes(ten);
           return (
             <div key={ten} className="flex min-w-0 flex-[1_1_9rem] items-end gap-1 sm:max-w-[13rem]">
               <NumberField
@@ -71,8 +71,8 @@ export function BatterSection({
                 unit="kg"
                 navCol={hasColumnNav ? `bot:${ten}` : undefined}
                 className="min-w-0 flex-1"
-                value={botKg[ten] || null}
-                onChange={(v) => onDoi({ ...botKg, [ten]: v ?? 0 })}
+                value={batterKg[ten] || null}
+                onChange={(v) => onChange({ ...batterKg, [ten]: v ?? 0 })}
               />
               {isNotBundled && (
                 <Button
@@ -95,8 +95,8 @@ export function BatterSection({
             label="Thêm loại bột khác"
             hideRequiredMark
             value=""
-            onChange={(ten) => ten && onDoi({ ...botKg, [ten]: botKg[ten] ?? 0 })}
-            options={optBot.filter((o) => !visibleBatters.includes(o.value))}
+            onChange={(ten) => ten && onChange({ ...batterKg, [ten]: batterKg[ten] ?? 0 })}
+            options={batterOptions.filter((o) => !visibleBatters.includes(o.value))}
             onCreate={onCreateBatter}
             onEditItem={onEditBatter}
             editLabel="Sửa thông tin loại bột này — lưu thẳng vào Danh mục."

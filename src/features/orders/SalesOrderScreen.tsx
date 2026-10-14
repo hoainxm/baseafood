@@ -70,7 +70,7 @@ interface NewOrder {
   customerId: string;
   orderDate: string;
   note: string;
-  dong: NewWeighRow[];
+  rows: NewWeighRow[];
 }
 
 const STATUS_LABELS: Record<SalesOrder["status"], string> = {
@@ -160,7 +160,7 @@ export default function SalesOrderScreen() {
       customerId: "",
       orderDate: todayISO(),
       note: "",
-      dong: [{ productId: "", spec: "", requiredQuantityKg: 0, requiredBlocksCount: 0 }],
+      rows: [{ productId: "", spec: "", requiredQuantityKg: 0, requiredBlocksCount: 0 }],
     });
     setLoi([]);
   };
@@ -185,7 +185,7 @@ export default function SalesOrderScreen() {
   const updateRow = (i: number, patch: Partial<NewWeighRow>) =>
     setCreating((t) =>
       t
-        ? { ...t, dong: t.dong.map((d, j) => (j === i ? { ...d, ...patch } : d)) }
+        ? { ...t, rows: t.rows.map((d, j) => (j === i ? { ...d, ...patch } : d)) }
         : t
     );
 
@@ -193,7 +193,7 @@ export default function SalesOrderScreen() {
     if (!creating) return;
     const ls: FieldError[] = [];
     if (!creating.customerId) ls.push({ field: "Khách", message: "Chưa chọn khách" });
-    const validRows = creating.dong.filter((d) => d.productId && d.requiredQuantityKg > 0);
+    const validRows = creating.rows.filter((d) => d.productId && d.requiredQuantityKg > 0);
     if (validRows.length === 0)
       ls.push({ field: "Dòng cần", message: "Thêm ít nhất 1 mặt hàng cần" });
     setLoi(ls);
@@ -545,7 +545,7 @@ export default function SalesOrderScreen() {
           onSaveOrderItems={persistExportItems}
           lotStock={stock}
           wips={wips}
-          matHang={products}
+          products={products}
           onClose={() => setLotCheckOrder(null)}
         />
       )}
@@ -576,7 +576,7 @@ export default function SalesOrderScreen() {
               />
               <div className="space-y-4">
                 <p className="text-base font-semibold">Mặt hàng cần</p>
-                {creating.dong.map((dc, i) => (
+                {creating.rows.map((dc, i) => (
                   <div
                     key={i}
                     className="space-y-4 rounded-xl border-2 border-border p-4"
@@ -616,13 +616,13 @@ export default function SalesOrderScreen() {
                         onChange={(v) => updateRow(i, { requiredBlocksCount: v ?? 0 })}
                       />
                     </div>
-                    {creating.dong.length > 1 && (
+                    {creating.rows.length > 1 && (
                       <Button
                         title="Bỏ dòng mặt hàng này khỏi đơn đang tạo."
                         variant="outline"
                         onClick={() =>
                           setCreating((t) =>
-                            t ? { ...t, dong: t.dong.filter((_, j) => j !== i) } : t
+                            t ? { ...t, rows: t.rows.filter((_, j) => j !== i) } : t
                           )
                         }
                       >
@@ -641,8 +641,8 @@ export default function SalesOrderScreen() {
                       t
                         ? {
                             ...t,
-                            dong: [
-                              ...t.dong,
+                            rows: [
+                              ...t.rows,
                               { productId: "", spec: "", requiredQuantityKg: 0, requiredBlocksCount: 0 },
                             ],
                           }

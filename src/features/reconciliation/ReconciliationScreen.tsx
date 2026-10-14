@@ -117,14 +117,14 @@ function SavedRunsBox({
   runs,
   openRunId,
   laAdmin,
-  onMo,
+  onOpen,
   onDownload,
   onDelete,
 }: {
   runs: ReconciliationRun[];
   openRunId: string | null;
   laAdmin: boolean;
-  onMo: (r: ReconciliationRun) => void;
+  onOpen: (r: ReconciliationRun) => void;
   onDownload: (r: ReconciliationRun) => void;
   onDelete: (r: ReconciliationRun) => void;
 }) {
@@ -182,7 +182,7 @@ function SavedRunsBox({
           actions={(r) => (
             <>
               <Button
-                title="Mở lại bản đối soát đã lưu và chạy lại trên chính file gốc của nó." size="sm" onClick={() => onMo(r)}>
+                title="Mở lại bản đối soát đã lưu và chạy lại trên chính file gốc của nó." size="sm" onClick={() => onOpen(r)}>
                 <FolderOpen /> Mở lại
               </Button>
               <Button
@@ -341,7 +341,7 @@ function SuspectBox({
   edits: Record<string, number>;
   onEdit: (nv: SuspectItem) => void;
   onUndo: (key: string) => void;
-  editLog: Record<string, { viTri: string; cu: string; moi: string }>;
+  editLog: Record<string, { location: string; previous: string; next: string }>;
 }) {
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
   const editedKeys = Object.keys(editLog);
@@ -377,8 +377,8 @@ function SuspectBox({
               {editedKeys.map((k) => (
                 <li key={k} className="flex items-center justify-between gap-3">
                   <span className="min-w-0 truncate">
-                    {editLog[k].viTri}: <span className="tnum">{editLog[k].cu}</span> →{" "}
-                    <span className="tnum font-medium">{editLog[k].moi}</span>
+                    {editLog[k].location}: <span className="tnum">{editLog[k].previous}</span> →{" "}
+                    <span className="tnum font-medium">{editLog[k].next}</span>
                   </span>
                   <Button
                     title="Bỏ thao tác gộp / sửa vừa làm cho dòng này, trả về như file gốc." variant="outline" size="sm" onClick={() => onUndo(k)}>
@@ -550,7 +550,7 @@ function LedgerTable({
   const dem = useMemo(() => {
     let missingCount = 0;
     for (const r of sheet.rows) if (r.status === "THIEU") missingCount++;
-    return { thieu: missingCount };
+    return { missing: missingCount };
   }, [sheet]);
   const rows = useMemo(
     () => (showMissingOnly ? sheet.rows.filter((r) => r.status === "THIEU") : sheet.rows),
@@ -586,7 +586,7 @@ function LedgerTable({
         </Button>
         <Button
           title="Chỉ xem các dòng phần mềm chưa tìm được hóa đơn tương ứng." variant={showMissingOnly ? "default" : "outline"} size="sm" onClick={() => setShowMissingOnly(true)}>
-          Chưa có hóa đơn <span className="tnum ml-1">({num(dem.thieu)})</span>
+          Chưa có hóa đơn <span className="tnum ml-1">({num(dem.missing)})</span>
         </Button>
       </div>
       <RecordTable
@@ -607,7 +607,7 @@ export default function ReconciliationScreen() {
   const [wb, setWb] = useState<Workbook | null>(null);
   const [threshold, setThreshold] = useState<number | null>(1);
   const [edits, setEdits] = useState<Record<string, number>>({});
-  const [editLog, setEditLog] = useState<Record<string, { viTri: string; cu: string; moi: string }>>({});
+  const [editLog, setEditLog] = useState<Record<string, { location: string; previous: string; next: string }>>({});
   const [initialSuspectCount, setInitialSuspectCount] = useState<number | null>(null);
   const [ledgerSheetName, setLedgerSheetName] = useState<string | undefined>(undefined);
   const [isRunning, setIsRunning] = useState(false);
@@ -764,7 +764,7 @@ export default function ReconciliationScreen() {
     setEdits((e) => ({ ...e, [k]: nv.correctValue! }));
     setEditLog((l) => ({
       ...l,
-      [k]: { viTri: nv.location, cu: nv.oldValue == null ? "(trống)" : num(nv.oldValue), moi: num(nv.correctValue!) },
+      [k]: { location: nv.location, previous: nv.oldValue == null ? "(trống)" : num(nv.oldValue), next: num(nv.correctValue!) },
     }));
     notify.saved("Đã áp sửa trong phiên. Giá trị cũ được giữ, sẽ vào file xuất.");
   };
@@ -912,21 +912,21 @@ export default function ReconciliationScreen() {
     );
   }
 
-  const modeCounts: Record<ReconciliationMode, { chu: string; applicable: boolean }> = {
+  const modeCounts: Record<ReconciliationMode, { text: string; applicable: boolean }> = {
     ledger: ketQua?.ledgerSheet
-      ? { chu: `${num(ketQua.totals.missing)} chưa vào sổ · ${num(ketQua.totals.mismatched)} lệch tiền · ${num(ketQua.totals.taxMismatched)} lệch thuế`, applicable: true }
-      : { chu: "File không có sheet sổ kế toán", applicable: false },
+      ? { text: `${num(ketQua.totals.missing)} chưa vào sổ · ${num(ketQua.totals.mismatched)} lệch tiền · ${num(ketQua.totals.taxMismatched)} lệch thuế`, applicable: true }
+      : { text: "File không có sheet sổ kế toán", applicable: false },
     twoVersion: versionCompare
-      ? { chu: `${num(versionCompare.totals.sentOnlyCount)} bản tự tải thiếu · ${num(versionCompare.totals.amountMismatchCount)} lệch tiền`, applicable: true }
-      : { chu: invoiceSheetNames.length < 2 ? "Cần 2 sheet hóa đơn (thuế gửi + tự tải)" : "Chưa chia được hai bên — bấm để chọn", applicable: false },
+      ? { text: `${num(versionCompare.totals.sentOnlyCount)} bản tự tải thiếu · ${num(versionCompare.totals.amountMismatchCount)} lệch tiền`, applicable: true }
+      : { text: invoiceSheetNames.length < 2 ? "Cần 2 sheet hóa đơn (thuế gửi + tự tải)" : "Chưa chia được hai bên — bấm để chọn", applicable: false },
     columnSum: (() => {
       const items = ketQua?.invoiceSheets.filter((s) => !s.isSubset) ?? [];
       const that = items.reduce((n, s) => n + s.columnSum.rowCounts.realDiff, 0);
-      return { chu: that ? `${num(that)} dòng lệch thật` : "Không có dòng lệch thật", applicable: items.length > 0 };
+      return { text: that ? `${num(that)} dòng lệch thật` : "Không có dòng lệch thật", applicable: items.length > 0 };
     })(),
     sameDay: sameDayGroups.length
-      ? { chu: `${num(sameDayGroups.length)} nhóm · ${num(sameDayGroups.filter((g) => g.sameAmount).length)} trùng khít tiền`, applicable: true }
-      : { chu: "Không có nhóm nào", applicable: false },
+      ? { text: `${num(sameDayGroups.length)} nhóm · ${num(sameDayGroups.filter((g) => g.sameAmount).length)} trùng khít tiền`, applicable: true }
+      : { text: "Không có nhóm nào", applicable: false },
   };
 
   const ledgerSheets = ketQua ? [ketQua.ledgerSheet, ...ketQua.extraLedgerSheets].filter(Boolean) as LedgerSheet[] : [];
@@ -1057,7 +1057,7 @@ export default function ReconciliationScreen() {
         runs={myRuns}
         openRunId={openRunId}
         laAdmin={auth.isAdmin}
-        onMo={openRun}
+        onOpen={openRun}
         onDownload={downloadRunExcel}
         onDelete={removeRun}
       />
@@ -1078,22 +1078,22 @@ export default function ReconciliationScreen() {
         <>
           <section className="space-y-3" aria-label="Việc cần soát">
             <h2 className="font-semibold">Bạn cần soát việc gì?</h2>
-            <ReconciliationModePicker mode={mode} setMode={setMode} dem={modeCounts} />
+            <ReconciliationModePicker mode={mode} setMode={setMode} counts={modeCounts} />
             <ReconciliationRulesBox warnings={ketQua.warnings} />
           </section>
 
           {mode === "twoVersion" && (
             <TwoVersionView
               result={versionCompare}
-              tenSheets={invoiceSheetNames}
+              sheetNames={invoiceSheetNames}
               taxSheets={sideSplit.taxSide}
               method={sideSplit.method}
-              onDoiBen={doiBen}
+              onChangeSide={doiBen}
               onAutoDetect={() => setPickedTaxSides(null)}
             />
           )}
           {mode === "columnSum" && <ColumnSumCheckView sheets={ketQua.invoiceSheets} />}
-          {mode === "sameDay" && <SameDayView nhom={sameDayGroups} />}
+          {mode === "sameDay" && <SameDayView groups={sameDayGroups} />}
 
           {mode === "ledger" && (
           <>

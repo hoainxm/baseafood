@@ -210,6 +210,16 @@ Chủ dự án duyệt cả 5a + 5f, **tự chạy migration ở SQL Editor** (�
 - ⚠ Máy còn mở bản app CŨ (chưa tải lại) đọc bản đối soát lưu bằng bản mới sẽ thấy tổng kết trống và tự chọn chế độ mặc định — chỉ hiển thị, không mất số; hết khi tải lại.
 - Sau đợt: `fields` **100 → 83** (`types.ts` sạch). Còn: kiểu khai riêng ở màn hình, khóa literal-union design-system, literal loại danh mục.
 
+### Kết quả kiểu khai riêng ở màn hình (2026-10-14)
+
+- **Prop + trường kiểu khai trong `src/features`** (76 khai báo): `matHang/botTam/loaiNL` (prop danh sách) → `products/batterTypes/materialTypeCell`; `dong` → `lines/rows/items/imports` theo nghĩa; `onBo/onDoi/onMo` → `onRemove/onChange/onOpen`; `dl` → `traceData`; `ky/onChangeKy` → `period/onChangePeriod`; `choHutBan/onHutBan` → `pendingSales/onPullSales`; `ProductionLine.botKg` → `batterKg`; nav `ten/con/nhom/ca` → `name/children/groups/shift`…
+- **Khóa object có kiểu suy ra** (đổi theo vị trí bằng language service): `useSettings()` của Cài đặt hiển thị (`fontSize · density · width · changeFontSize · changeDensity · changeWidth · reset`), bảng sắc `KIND_TONES` của Tổng quan, object tổng của 3 báo cáo, `diff` của nhật ký "gửi báo cáo SX" (`sender · total · byOperator · batterByType · domesticSale` — chỉ dòng ghi MỚI, lịch sử giữ nguyên).
+- **Biến cục bộ** nhận từ destructuring (`sheetNames: tenSheets`) đổi theo tên prop rồi gộp `x: x` (kiểm trùng tên trong đúng hàm bao quanh).
+- **Bài học — lỗi thật đã lên production rồi vá trong 4 phút:** đợt `types.ts` đổi `componentRauKg` → `tentacleKg` nhưng object dòng SX dựng trong `.map` vẫn dùng khóa cũ (kiểu đích không bắt). Mẻ có tách râu/bao tử sẽ gửi `null` lên máy chủ. Vá ở `9f4858b`; kiểm DB (chỉ đọc) không có mẻ nào ghi trong khung lỗi. ⇒ Sau MỌI lần đổi tên trường: **grep thẳng tên cũ** trên toàn `src` (không chỉ tin `tsc` + bộ dò khóa), nhất là object dựng trong `.map`.
+- **Phát hiện kèm (lỗi có sẵn, đã sửa):** nút **Hủy** của "Tùy chỉnh giao diện" không trả cỡ chữ/mật độ về như lúc mở (gọi `setMo(false)` bỏ qua bước khôi phục) — nay gọi `handleOpenChange(false)`.
+- **CỐ Ý giữ / để sau:** `features/imports` (phiên OCR đang làm), `useBang()` trả `{ trangThai, loi }` (đụng `MaterialImportScreen`), khóa loại danh mục (`matHang`…), khóa màu/cỡ design-system (`tim`, `vua/rong`, `tinh`, `nguon`), giá trị enum làm khóa `Record` (`TraceStageKey` `nhap/kho`, id nút sơ đồ `tonBtp`, `SumMismatchKind`), khóa localStorage Cài đặt hiển thị (`coChu/matDo/beRong` — 5c). Tên cũ CỐ Ý trong `LEGACY_FIELDS` và hàng chờ `them/xoa` đánh dấu `naming-ok`.
+- Sau đợt: `fields` **83 → 38**.
+
 ### Cách chạy lại codemod
 
 ```bash

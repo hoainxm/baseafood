@@ -1407,10 +1407,10 @@ export function dropSentKeys(
 ): SyncQueue {
   const deleted = new Set(result.deleted);
   return {
-    them: cho.them.filter(
+    them: cho.them.filter( // naming-ok: dạng hàng chờ đã LƯU (SyncQueue)
       (k) => !(result.sentUpserts.has(k) && result.sentUpserts.get(k) === (currentJson.get(k) ?? null)),
     ),
-    xoa: cho.xoa.filter((k) => !deleted.has(k)),
+    xoa: cho.xoa.filter((k) => !deleted.has(k)), // naming-ok
   };
 }
 

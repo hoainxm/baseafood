@@ -45,7 +45,7 @@ import { normalizeQrTab, readParam } from "@/lib/legacyUrls";
 const laLo = (k: TraceNodeKind): k is LotKind => !isOutboundKind(k);
 
 /** Dòng lô gọn: nhãn + mô tả; bấm vào là mở hộ chiếu của lô đó. */
-function NodeRow({ node, edgeKg: linkKg, onMo }: { node: LotNode; edgeKg?: number | null; onMo: (n: LotNode) => void }) {
+function NodeRow({ node, edgeKg: linkKg, onOpen }: { node: LotNode; edgeKg?: number | null; onOpen: (n: LotNode) => void }) {
   const canOpen = laLo(node.kind) && !node.isMissing;
   return (
     <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -55,7 +55,7 @@ function NodeRow({ node, edgeKg: linkKg, onMo }: { node: LotNode; edgeKg?: numbe
           type="button"
           className="font-medium text-primary underline-offset-4 hover:underline"
           title={`Mở hộ chiếu của lô ${node.label}.`}
-          onClick={() => onMo(node)}
+          onClick={() => onOpen(node)}
         >
           {node.label}
         </button>
@@ -75,15 +75,15 @@ function NodeRow({ node, edgeKg: linkKg, onMo }: { node: LotNode; edgeKg?: numbe
 }
 
 /** Cây gia phả lô, lồng nhiều tầng. */
-function Tree({ branches, onMo }: { branches: TraceBranch[]; onMo: (n: LotNode) => void }) {
+function Tree({ branches, onOpen }: { branches: TraceBranch[]; onOpen: (n: LotNode) => void }) {
   return (
     <ul className="space-y-2">
       {branches.map((n, i) => (
         <li key={`${n.node.kind}:${n.node.id}:${i}`} className="space-y-2">
-          <NodeRow node={n.node} edgeKg={n.kg} onMo={onMo} />
+          <NodeRow node={n.node} edgeKg={n.kg} onOpen={onOpen} />
           {n.children.length > 0 && (
             <div className="ml-3 border-l-2 border-border pl-4">
-              <Tree branches={n.children} onMo={onMo} />
+              <Tree branches={n.children} onOpen={onOpen} />
             </div>
           )}
         </li>
@@ -248,7 +248,7 @@ export default function QrLookupScreen() {
           <ul className="space-y-2">
             {ketQua.map((n) => (
               <li key={`${n.kind}:${n.id}`}>
-                <NodeRow node={n} onMo={openLot} />
+                <NodeRow node={n} onOpen={openLot} />
               </li>
             ))}
           </ul>
@@ -403,7 +403,7 @@ export default function QrLookupScreen() {
               <h2 className="flex items-center gap-2 font-semibold">
                 <ArrowUpLeft aria-hidden /> Truy ngược — lô này làm từ đâu
               </h2>
-              {nguoc.length ? <Tree branches={nguoc} onMo={openLot} /> : <p className="text-muted-foreground">{loiNguoc[viewing.kind]}</p>}
+              {nguoc.length ? <Tree branches={nguoc} onOpen={openLot} /> : <p className="text-muted-foreground">{loiNguoc[viewing.kind]}</p>}
             </section>
 
             {/* 4. Truy xuôi */}
@@ -412,11 +412,11 @@ export default function QrLookupScreen() {
                 <ArrowDownRight aria-hidden /> Truy xuôi — lô này đã đi đâu
                 <InfoTip label="truy xuôi">Đây là danh sách cần khi phải thu hồi: mọi mẻ, thành phẩm và lệnh xuất có dùng lô này.</InfoTip>
               </h2>
-              {xuoi.length ? <Tree branches={xuoi} onMo={openLot} /> : <p className="text-muted-foreground">{loiXuoi[viewing.kind]}</p>}
+              {xuoi.length ? <Tree branches={xuoi} onOpen={openLot} /> : <p className="text-muted-foreground">{loiXuoi[viewing.kind]}</p>}
             </section>
 
             {/* 5. Thu hồi */}
-            {laLo(viewing.kind) && <LotRecall node={viewing} dl={dl} sameShipmentLots={sameShipmentLots} />}
+            {laLo(viewing.kind) && <LotRecall node={viewing} traceData={dl} sameShipmentLots={sameShipmentLots} />}
           </div>
         )
       )}

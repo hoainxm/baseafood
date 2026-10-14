@@ -123,9 +123,9 @@ export interface NavTreeChild {
   icon?: LucideIcon;
 }
 export interface NavTreeGroup {
-  ten: string;
+  name: string;
   icon: LucideIcon;
-  con: NavTreeChild[];
+  children: NavTreeChild[];
 }
 
 /**
@@ -141,16 +141,16 @@ const TRACUU = (tab: string): NavTreeChild => ({
 });
 
 export const NAV_TREE: NavTreeGroup[] = [
-  { ten: "Tổng quan", icon: LayoutDashboard, con: [{ ref: "dashboard" }] },
+  { name: "Tổng quan", icon: LayoutDashboard, children: [{ ref: "dashboard" }] },
   {
-    ten: "Nhập hàng",
+    name: "Nhập hàng",
     icon: Truck,
-    con: [{ ref: "imports" }, { ref: "nxt-material" }, TRACUU("suppliers")],
+    children: [{ ref: "imports" }, { ref: "nxt-material" }, TRACUU("suppliers")],
   },
   {
-    ten: "Sản xuất",
+    name: "Sản xuất",
     icon: Factory,
-    con: [
+    children: [
       { ref: "wip" },
       { ref: "packaging" },
       { ref: "qc" },
@@ -158,9 +158,9 @@ export const NAV_TREE: NavTreeGroup[] = [
     ],
   },
   {
-    ten: "Kho",
+    name: "Kho",
     icon: Warehouse,
-    con: [
+    children: [
       { ref: "warehouse" },
       { ref: "monthly-stock" },
       { ref: "qr" },
@@ -169,14 +169,14 @@ export const NAV_TREE: NavTreeGroup[] = [
     ],
   },
   {
-    ten: "Kinh doanh",
+    name: "Kinh doanh",
     icon: ShoppingCart,
-    con: [{ ref: "sales" }, { ref: "orders" }, TRACUU("customers")],
+    children: [{ ref: "sales" }, { ref: "orders" }, TRACUU("customers")],
   },
   {
-    ten: "Báo cáo & Cân đối",
+    name: "Báo cáo & Cân đối",
     icon: BarChart3,
-    con: [
+    children: [
       { ref: "balancing" },
       { ref: "production-report" },
       { ref: "export-report" },
@@ -185,9 +185,9 @@ export const NAV_TREE: NavTreeGroup[] = [
     ],
   },
   {
-    ten: "Hệ thống",
+    name: "Hệ thống",
     icon: Library,
-    con: [{ ref: "catalog" }, { ref: "users" }, { ref: "audit" }],
+    children: [{ ref: "catalog" }, { ref: "users" }, { ref: "audit" }],
   },
 ];
 
@@ -202,7 +202,7 @@ interface NavChild {
   isCatalogLink: boolean; // deep-link danh mục (style phụ + ẩn khi thu gọn)
 }
 interface DisplayGroup {
-  ten: string;
+  name: string;
   icon: LucideIcon;
   items: NavChild[];
 }
@@ -220,7 +220,7 @@ function groupTree(items: ShellNavItem[]): DisplayGroup[] {
 
   for (const g of NAV_TREE) {
     const childItems: NavChild[] = [];
-    for (const c of g.con) {
+    for (const c of g.children) {
       if (c.ref) {
         const m = con.get(c.ref);
         if (!m) continue;
@@ -250,13 +250,13 @@ function groupTree(items: ShellNavItem[]): DisplayGroup[] {
     // đầy đủ vẫn vào được ở nhóm Hệ thống. (Admin có đủ màn nên không đụng.)
     const coMan = childItems.some((m) => !m.isCatalogLink);
     const keptItems = coMan ? childItems : [];
-    if (keptItems.length) nhom.push({ ten: g.ten, icon: g.icon, items: keptItems });
+    if (keptItems.length) nhom.push({ name: g.name, icon: g.icon, items: keptItems });
   }
 
   const remaining = items.filter((i) => !used.has(i.id));
   if (remaining.length) {
     nhom.push({
-      ten: "Khác",
+      name: "Khác",
       icon: Library,
       items: remaining.map((m) => ({
         key: m.id,
@@ -347,14 +347,14 @@ function NavItemButton({
  * bỏ nhãn + bỏ deep-link danh mục (còn nút Danh mục đầy đủ), bỏ qua trạng thái gập.
  */
 function NavTree({
-  nhom,
+  groups,
   activeKey,
   onSelect,
   collapsed: isCollapsed = false,
   openGroups,
   onToggle,
 }: {
-  nhom: DisplayGroup[];
+  groups: DisplayGroup[];
   activeKey: string;
   onSelect: (target: string) => void;
   collapsed?: boolean;
@@ -363,12 +363,12 @@ function NavTree({
 }) {
   return (
     <nav className="scroll-nice flex-1 overflow-y-auto p-3">
-      {nhom.map((g, i) => {
+      {groups.map((g, i) => {
         if (isCollapsed) {
           const childItems = g.items.filter((m) => !m.isCatalogLink);
           if (!childItems.length) return null;
           return (
-            <div key={g.ten} className={cn(i > 0 && "mt-4")}>
+            <div key={g.name} className={cn(i > 0 && "mt-4")}>
               {i > 0 && <div className="mx-2 mb-3 border-t-2 border-border" />}
               <div className="space-y-1.5">
                 {childItems.map((m) => (
@@ -387,7 +387,7 @@ function NavTree({
         // Nhóm chỉ một màn (VD Tổng quan) → hiện thẳng, khỏi tiêu đề gập cho đỡ lặp.
         if (g.items.length === 1) {
           return (
-            <div key={g.ten} className={cn(i > 0 && "mt-3")}>
+            <div key={g.name} className={cn(i > 0 && "mt-3")}>
               <NavItemButton
                 m={g.items[0]}
                 isActive={activeKey === g.items[0].key}
@@ -397,17 +397,17 @@ function NavTree({
             </div>
           );
         }
-        const mo = openGroups[g.ten] !== false; // mặc định mở
+        const mo = openGroups[g.name] !== false; // mặc định mở
         const GIcon = g.icon;
         const coActive = g.items.some((m) => m.key === activeKey);
         return (
-          <div key={g.ten} className={cn(i > 0 && "mt-2")}>
+          <div key={g.name} className={cn(i > 0 && "mt-2")}>
             {/* Tiêu đề nhóm module = 1 LỚP: chữ hoa nhỏ + gạch dưới nhạt cho tách
                 lớp; đổi màu brand khi có màn con đang mở hoặc nhóm đang thu. */}
             <button
               title="Gập / mở nhóm menu này. Máy nhớ trạng thái cho lần vào sau."
               type="button"
-              onClick={() => onToggle(g.ten)}
+              onClick={() => onToggle(g.name)}
               aria-expanded={mo}
               className={cn(
                 "press-feedback",
@@ -416,7 +416,7 @@ function NavTree({
               )}
             >
               <GIcon className="size-icon-sm shrink-0" aria-hidden />
-              <span className="min-w-0 flex-1 truncate">{g.ten}</span>
+              <span className="min-w-0 flex-1 truncate">{g.name}</span>
               <ChevronDown
                 className={cn(
                   "size-icon-sm shrink-0 transition-transform duration-base ease-soft",
@@ -478,7 +478,7 @@ export interface AppShellProps {
   account?: string;
   /** Nội dung hướng dẫn của trang đang mở; bỏ trống ⇒ không hiện nút. */
   guide?: ShellPageGuide | null;
-  ca?: string;
+  shift?: string;
   onChangeShift?: () => void;
   notificationCount?: number;
   onOpenNotifications?: () => void;
@@ -502,7 +502,7 @@ export default function AppShell({
   role,
   account,
   guide,
-  ca,
+  shift,
   onChangeShift,
   notificationCount,
   onOpenNotifications,
@@ -573,7 +573,7 @@ export default function AppShell({
           <Logo heightClass="h-9" showWordmark={!isCollapsed} subtitle={isCollapsed ? undefined : "Xí nghiệp BSF1"} />
         </div>
         <NavTree
-          nhom={nhom}
+          groups={nhom}
           activeKey={activeKey}
           onSelect={onSelect}
           collapsed={isCollapsed}
@@ -603,7 +603,7 @@ export default function AppShell({
             </div>
 
             <NavTree
-              nhom={nhom}
+              groups={nhom}
               activeKey={activeKey}
               onSelect={select}
               openGroups={openGroups}
@@ -631,7 +631,7 @@ export default function AppShell({
 
               <div className="flex flex-wrap items-center gap-2">
                 <DisplaySettingsButton account={account} />
-                {ca && (
+                {shift && (
                   <button
                     title="Đổi ca làm việc đang chọn — số liệu trên màn lọc theo ca này."
                     type="button"
@@ -639,7 +639,7 @@ export default function AppShell({
                     className="press-feedback inline-flex min-h-10 items-center gap-2 rounded-lg border border-input px-3.5 text-sm font-semibold text-foreground hover:bg-muted"
                   >
                     <RefreshCw className="size-icon-sm" aria-hidden />
-                    {ca}
+                    {shift}
                   </button>
                 )}
                 {typeof notificationCount === "number" && (
@@ -716,7 +716,7 @@ export default function AppShell({
 
           {/* Phải — điện thoại chỉ giữ trạng thái + hướng dẫn; phần còn lại ở drawer */}
           <div className="flex shrink-0 items-center gap-2 md:gap-3">
-            {ca && (
+            {shift && (
               <button
                 title="Đổi ca làm việc đang chọn — số liệu trên màn lọc theo ca này."
                 type="button"
@@ -724,7 +724,7 @@ export default function AppShell({
                 className="press-feedback hidden min-h-10 items-center gap-2 rounded-lg border border-input px-3.5 text-sm font-semibold text-foreground hover:bg-muted xl:inline-flex"
               >
                 <RefreshCw className="size-icon-sm" aria-hidden />
-                {ca}
+                {shift}
               </button>
             )}
 

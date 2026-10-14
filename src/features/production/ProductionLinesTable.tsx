@@ -25,10 +25,10 @@ import { BatterSection } from "./BatterSection";
  * tẩm": một ô kg cho từng loại bột đi kèm (mig 0051) — không cộng vào kg thành phẩm.
  */
 export function ProductionLinesTable({
-  dong,
-  matHang: products,
+  lines,
+  products,
   onUpdateRow: onEdit,
-  onBo,
+  onRemove,
   onAddRow,
   onAddGroup,
   onChangeGroup,
@@ -37,15 +37,15 @@ export function ProductionLinesTable({
   onEditCustomer,
   customerOptions,
   onCreateCustomer,
-  botTam: batterTypes,
-  optBot,
+  batterTypes,
+  batterOptions,
   onCreateBatter,
   onEditBatter,
 }: {
-  dong: ProductionLine[];
-  matHang: Product[];
+  lines: ProductionLine[];
+  products: Product[];
   onUpdateRow: (key: string, patch: Partial<ProductionLine>) => void;
-  onBo: (key: string) => void;
+  onRemove: (key: string) => void;
   onAddRow: (
     groupId: string,
     processingType: string,
@@ -64,9 +64,9 @@ export function ProductionLinesTable({
   customerOptions: ComboboxOption[];
   onCreateCustomer: (ten: string) => string;
   /** Danh mục loại bột (để ra TÊN bột đi kèm của mặt hàng). */
-  botTam: BatterType[];
+  batterTypes: BatterType[];
   /** Ô chọn loại bột — value = TÊN. */
-  optBot: ComboboxOption[];
+  batterOptions: ComboboxOption[];
   onCreateBatter: (ten: string) => string;
   onEditBatter: (ten: string) => void;
 }) {
@@ -77,7 +77,7 @@ export function ProductionLinesTable({
   // Nhóm theo groupId ỔN ĐỊNH (giữ thứ tự xuất hiện) — sửa nhãn không remount.
   const nhomKeys: string[] = [];
   const nhomRows = new Map<string, ProductionLine[]>();
-  for (const d of dong) {
+  for (const d of lines) {
     if (!nhomRows.has(d.groupId)) {
       nhomRows.set(d.groupId, []);
       nhomKeys.push(d.groupId);
@@ -176,7 +176,7 @@ export function ProductionLinesTable({
                       Boolean(d.productId) &&
                       (isBatteredProduct(p) ||
                         /bột/i.test(d.processingType) ||
-                        Object.keys(d.botKg).length > 0);
+                        Object.keys(d.batterKg).length > 0);
                     return (
                       <Fragment key={d.key}>
                         <tr>
@@ -308,7 +308,7 @@ export function ProductionLinesTable({
                               variant="outline"
                               size="icon"
                               aria-label="Bỏ dòng"
-                              onClick={() => onBo(d.key)}
+                              onClick={() => onRemove(d.key)}
                             >
                               <X />
                             </Button>
@@ -370,10 +370,10 @@ export function ProductionLinesTable({
                                   ô bột xếp dọc trong vùng nhìn thấy, không phải vuốt ngang. */}
                               <div className="sticky left-2 max-w-[calc(100vw-8.5rem)] sm:pl-10">
                                 <BatterSection
-                                  diKem={getProductBatterNames(p, batterTypes)}
-                                  botKg={d.botKg}
-                                  onDoi={(botKg) => onEdit(d.key, { botKg })}
-                                  optBot={optBot}
+                                  bundledIds={getProductBatterNames(p, batterTypes)}
+                                  batterKg={d.batterKg}
+                                  onChange={(botKg) => onEdit(d.key, { batterKg: botKg })}
+                                  batterOptions={batterOptions}
                                   onCreateBatter={onCreateBatter}
                                   onEditBatter={onEditBatter}
                                   productKg={getLineTotalKg(d)}

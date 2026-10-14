@@ -91,7 +91,7 @@ export function TraceStagesView() {
   const [lotLabel, setLotLabel] = useState<LotNode | null>(null);
   const [lotForBatch, setLotForBatch] = useState<WipProductionItem | null>(null);
   const [lotForPackaging, setLotForPackaging] = useState<Packaging | null>(null);
-  const [lotForSalesItem, setLotForSalesItem] = useState<{ dong: SalesItem; lotKind: "W" | "P" } | null>(null);
+  const [lotForSalesItem, setLotForSalesItem] = useState<{ salesItem: SalesItem; lotKind: "W" | "P" } | null>(null);
   const [lotForDomesticSale, setLotForDomesticSale] = useState<DomesticSaleItem | null>(null);
 
   const items = useMemo(() => groupByTraceStage(dl, { fromDate: tu, toDate: den, workshop }), [dl, tu, den, workshop]);
@@ -210,7 +210,7 @@ export function TraceStagesView() {
           status={lotBadge(m, m.soldLotKind === "P" ? "Lô TP" : "Lô BTP")}
           action={
             b && m.soldLotKind
-              ? taskButton(m.missing.includes("lo"), "Ghi dòng bán này lấy từ lô nào — để thu hồi tới được khách.", () => setLotForSalesItem({ dong: b, lotKind: m.soldLotKind! }), <Link2 aria-hidden />, (m.lotCount ?? 0) > 0 ? "Lô" : "Gắn lô")
+              ? taskButton(m.missing.includes("lo"), "Ghi dòng bán này lấy từ lô nào — để thu hồi tới được khách.", () => setLotForSalesItem({ salesItem: b, lotKind: m.soldLotKind! }), <Link2 aria-hidden />, (m.lotCount ?? 0) > 0 ? "Lô" : "Gắn lô")
               : null
           }
         />
@@ -330,12 +330,12 @@ export function TraceStagesView() {
       {lotForSalesItem && (
         <LotDispatchPicker
           docKind="sales_item"
-          docId={lotForSalesItem.dong.id}
-          docLabel={`${productNameOf(lotForSalesItem.dong.productId)} · ${kg(lotForSalesItem.dong.quantityKg)} · ${formatDateVN(lotForSalesItem.dong.deliveryDate)}`}
+          docId={lotForSalesItem.salesItem.id}
+          docLabel={`${productNameOf(lotForSalesItem.salesItem.productId)} · ${kg(lotForSalesItem.salesItem.quantityKg)} · ${formatDateVN(lotForSalesItem.salesItem.deliveryDate)}`}
           lotKind={lotForSalesItem.lotKind}
-          workshop={(dl.salesInvoices ?? []).find((v) => v.id === lotForSalesItem.dong.invoiceId)?.workshop ?? "Đông"}
-          date={lotForSalesItem.dong.deliveryDate}
-          productId={lotForSalesItem.dong.productId}
+          workshop={(dl.salesInvoices ?? []).find((v) => v.id === lotForSalesItem.salesItem.invoiceId)?.workshop ?? "Đông"}
+          date={lotForSalesItem.salesItem.deliveryDate}
+          productId={lotForSalesItem.salesItem.productId}
           onClose={() => setLotForSalesItem(null)}
         />
       )}

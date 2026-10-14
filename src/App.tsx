@@ -121,7 +121,7 @@ function ShellLayout() {
         auth.profile?.fullName || auth.profile?.username || "Người dùng"
       }
       role={roleLabel(auth.profile?.roles ?? [])}
-      ca="Ca A"
+      shift="Ca A"
       notificationCount={3}
       onLogout={
         auth.requiresLogin && auth.session ? auth.signOut : undefined

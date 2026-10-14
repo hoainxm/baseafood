@@ -22,18 +22,18 @@ export interface SessionLot {
 }
 
 export function SessionLotsSection({
-  dl,
+  traceData,
   workshop,
   date,
   sessionLots,
-  onDoi,
+  onChange,
 }: {
-  dl: TraceData;
+  traceData: TraceData;
   workshop: Workshop;
   /** Ngày sản xuất của phiên — mốc lọc lô gần đây. */
   date: string;
   sessionLots: SessionLot[];
-  onDoi: (items: SessionLot[]) => void;
+  onChange: (items: SessionLot[]) => void;
 }) {
   const [isScanning, setIsScanning] = useState(false);
   const [typedCode, setTypedCode] = useState("");
@@ -41,8 +41,8 @@ export function SessionLotsSection({
   const [pickPrompt, setPickPrompt] = useState("");
 
   const candidates = useMemo(
-    () => listSelectableMaterialLots(dl, workshop, date).filter((n) => !sessionLots.some((l) => l.node.id === n.id)),
-    [dl, workshop, date, sessionLots]
+    () => listSelectableMaterialLots(traceData, workshop, date).filter((n) => !sessionLots.some((l) => l.node.id === n.id)),
+    [traceData, workshop, date, sessionLots]
   );
   const describeLot = (n: LotNode) =>
     [n.description, n.date && formatDateVN(n.date), n.details.find((c) => c.label === "Đại lý")?.value, n.kg ? kg(n.kg) : ""].filter(Boolean).join(" · ");
@@ -57,7 +57,7 @@ export function SessionLotsSection({
       return;
     }
     // Khai lô cho phiên = nháp chưa lưu ⇒ không toast (luật 13); lưu phiên mới ghi.
-    onDoi([...sessionLots, { node: n, method }]);
+    onChange([...sessionLots, { node: n, method }]);
     setTypedCode("");
     setChoices([]);
   };
@@ -69,7 +69,7 @@ export function SessionLotsSection({
       notify.warning(`Tem này là ${TRACE_KIND_LABELS[ma.kind].toLowerCase()}, không phải lô nguyên liệu.`);
       return;
     }
-    const result = findLots(ma, dl).filter((n) => n.kind === "S");
+    const result = findLots(ma, traceData).filter((n) => n.kind === "S");
     if (!result.length) {
       notify.warning(`Không tìm thấy lô nguyên liệu "${text}". Kiểm tra lại mã, hoặc chọn trong danh sách.`);
       return;
@@ -78,7 +78,7 @@ export function SessionLotsSection({
     else {
       // Gõ mã chuyến ⇒ ra các loại NL của chuyến: việc thường ngày, chọn ở danh sách dưới,
       // không cần toast. Chỉ mã cũ trùng thật mới cảnh báo.
-      const ld = explainMultipleLots(text, result, dl);
+      const ld = explainMultipleLots(text, result, traceData);
       setChoices(result);
       setPickPrompt(ld.message);
       if (!ld.sameShipment) notify.warning(`${ld.message} bên dưới.`);
@@ -113,7 +113,7 @@ export function SessionLotsSection({
                 className="shrink-0"
                 title={`Bỏ lô ${l.node.label} khỏi phiên (chưa lưu nên chưa gắn vào đâu).`}
                 aria-label={`Bỏ lô ${l.node.label}`}
-                onClick={() => onDoi(sessionLots.filter((x) => x.node.id !== l.node.id))}
+                onClick={() => onChange(sessionLots.filter((x) => x.node.id !== l.node.id))}
               >
                 <X />
               </Button>
@@ -171,7 +171,7 @@ export function SessionLotsSection({
         hint={`Mỗi loại NL của chuyến là một lô. Lô về gần đây của xưởng ${workshop} (mới trước), sau đó lô cũ còn dở — NL cấp đông đem xả.`}
         value=""
         onChange={(id) => {
-          const n = candidates.find((u) => u.id === id) ?? (id ? buildLotNode("S", id, dl) : undefined);
+          const n = candidates.find((u) => u.id === id) ?? (id ? buildLotNode("S", id, traceData) : undefined);
           if (n) addLot(n, "picked");
         }}
         // Mỗi loại NL của chuyến là một lô cùng mã chuyến ⇒ nhãn ghép loại NL cho phân biệt được.

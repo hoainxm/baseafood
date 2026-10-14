@@ -95,7 +95,7 @@ export default function DailyProductionReport() {
   const to = useRowMarkTools(`bao-cao-sx-ngay|${tu}|${den}|${workshop}`);
   const rowSelection = useRowSelection();
 
-  const { days, groups, tongNgayTong: grandTotalByDay, tongKgTong: grandTotalKg, tongBlockTong: grandTotalBlocks, soMatHang: productCount } =
+  const { days, groups, dailyGrandTotal: grandTotalByDay, grandTotalKg, grandTotalBlocks, productCount } =
     useMemo(() => {
       const productNameOf = (id: string) => products.find((m) => m.id === id)?.name || "—";
       const filteredRows = rows.filter(
@@ -160,10 +160,10 @@ export default function DailyProductionReport() {
       return {
         days,
         groups,
-        tongNgayTong: dailyGrandTotal,
-        tongKgTong: groups.reduce((s, g) => s + g.totalKg, 0),
-        tongBlockTong: groups.reduce((s, g) => s + g.totalBlocks, 0),
-        soMatHang: allRows.length,
+        dailyGrandTotal,
+        grandTotalKg: groups.reduce((s, g) => s + g.totalKg, 0),
+        grandTotalBlocks: groups.reduce((s, g) => s + g.totalBlocks, 0),
+        productCount: allRows.length,
       };
     }, [rows, products, tu, den, workshop]);
   /** Khoá các dòng mặt hàng đang hiện — thứ tự cho Shift+tick chọn khoảng. */

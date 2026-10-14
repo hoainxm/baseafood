@@ -109,7 +109,7 @@ const EMPTY_NEW_ROW: NewRow = {
 /** Một phiếu bán hiện trên sổ, gom từ các dòng của nó. */
 interface InvoiceGroup {
   invoice: SalesInvoice;
-  dong: SalesItem[];
+  items: SalesItem[];
   totalKg: number;
   totalAmount: number;
   isBackdated: boolean;
@@ -126,14 +126,14 @@ function groupByInvoice(rows: SalesItem[], salesInvoices: SalesInvoice[]): Invoi
     if (!nhom) {
       nhom = {
         invoice: p,
-        dong: [],
+        items: [],
         totalKg: 0,
         totalAmount: 0,
         isBackdated: isBackdatedSales(p),
       };
       nhoms.set(p.id, nhom);
     }
-    nhom.dong.push(r);
+    nhom.items.push(r);
     nhom.totalKg += r.quantityKg || 0;
     nhom.totalAmount += calculateSalesAmount(r);
   }
@@ -335,7 +335,7 @@ export default function SalesScreen() {
       note: n.invoice.note,
     });
     setSessionInvoiceId(n.invoice.id);
-    setEditRowIds(n.dong.map((r) => r.id));
+    setEditRowIds(n.items.map((r) => r.id));
     setNewRows(EMPTY_NEW_ROW);
     setSessionErrors([]);
   };
@@ -714,7 +714,7 @@ export default function SalesScreen() {
 
                 <RecordTable
                   columns={itemColumns(n.invoice.channel)}
-                  rows={n.dong}
+                  rows={n.items}
                   getKey={(r) => r.id}
                   rowMarkKey="ban-hang"
                   actions={(r) => lotInputButton(r)}

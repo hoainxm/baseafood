@@ -13,22 +13,22 @@ import { FileSpreadsheet, Printer, ShieldAlert } from "lucide-react";
 
 const kgOrBlank = (v: number | null) => (v == null ? "chưa ghi kg" : kg(v));
 
-export function LotRecall({ node, dl, sameShipmentLots = [] }: { node: LotNode; dl: TraceData; sameShipmentLots?: LotNode[] }) {
+export function LotRecall({ node, traceData, sameShipmentLots = [] }: { node: LotNode; traceData: TraceData; sameShipmentLots?: LotNode[] }) {
   const [isPrinting, setIsPrinting] = useState(false);
   /** Lô NL có nhiều loại cùng chuyến ⇒ cho thu hồi GỘP cả chuyến (nghi cả xe hàng của đại lý). */
   const [wholeShipment, setWholeShipment] = useState(false);
   const isMergedShipment = wholeShipment && sameShipmentLots.length > 1;
   const { shippedItems: outboundItems, inPlantLots: lotsInPlant } = useMemo(
-    () => (isMergedShipment ? buildRecallListForLots(sameShipmentLots, dl) : buildRecallList(node.kind, node.id, dl)),
-    [isMergedShipment, sameShipmentLots, node, dl]
+    () => (isMergedShipment ? buildRecallListForLots(sameShipmentLots, traceData) : buildRecallList(node.kind, node.id, traceData)),
+    [isMergedShipment, sameShipmentLots, node, traceData]
   );
   const scope = isMergedShipment ? `chuyến ${node.label} (${sameShipmentLots.length} loại NL)` : `lô ${node.label}${node.kind === "S" ? ` · ${node.description}` : ""}`;
   const lotStockNow = useMemo(
     () => {
-      const bang = buildLotStockIndex(dl); // một lượt cho mọi lô cần khoanh
-      return lotsInPlant.map((n) => ({ n, ton: getLotStockKg(n.kind, n.id, dl, bang) }));
+      const bang = buildLotStockIndex(traceData); // một lượt cho mọi lô cần khoanh
+      return lotsInPlant.map((n) => ({ n, ton: getLotStockKg(n.kind, n.id, traceData, bang) }));
     },
-    [lotsInPlant, dl]
+    [lotsInPlant, traceData]
   );
   const customerCount = new Set(outboundItems.map((r) => r.customer || "khách ?")).size;
   const totalKg = outboundItems.reduce((s, r) => s + (r.kg ?? 0), 0);

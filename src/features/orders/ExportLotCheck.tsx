@@ -52,7 +52,7 @@ export function ExportLotCheck({
   onSaveOrderItems: onSaveExportItems,
   lotStock: stock,
   wips,
-  matHang: products,
+  products,
   onClose,
 }: {
   exportOrder: ExportOrder;
@@ -64,7 +64,7 @@ export function ExportLotCheck({
   /** Tồn từng lô hiện tại (đã trừ mọi lệnh xuất, kể cả lệnh này). */
   lotStock: readonly LotStock[];
   wips: readonly WipProductionItem[];
-  matHang: readonly Product[];
+  products: readonly Product[];
   onClose: () => void;
 }) {
   const [isScanning, setIsScanning] = useState(false);

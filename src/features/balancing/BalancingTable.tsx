@@ -28,10 +28,10 @@ import { num } from "@/lib/format";
 import { ChevronsLeftRight, Coins, Printer, X } from "lucide-react";
 
 export default function BalancingTable({
-  ky,
+  period,
   inputs: materialInRows,
   outputs: finishedGoods,
-  matHang: products,
+  products,
   customers,
   result,
   assignedImports,
@@ -39,10 +39,10 @@ export default function BalancingTable({
   describeStockLine,
   onClose,
 }: {
-  ky: BalancingPeriod;
+  period: BalancingPeriod;
   inputs: BalancingInputItem[];
   outputs: BalancingOutputItem[];
-  matHang: Product[];
+  products: Product[];
   customers: Customer[];
   result: BalancingResult;
   /** So nguon da gan ky — de ban in co cot tung ngay nhu bang giay. */
@@ -55,7 +55,7 @@ export default function BalancingTable({
   const productNameOf = (id: string) => products.find((m) => m.id === id)?.name || "—";
   const tenKH = (id: string) => getBalancingCustomerName(id, customers);
 
-  const dates = getPeriodDates(ky);
+  const dates = getPeriodDates(period);
   /* Cùng thứ tự với lưới: Lấy xả đông đầu bảng, Gửi đông cuối bảng. */
   const sortRank = (h: MaterialGridRow) => (h.stockLineKind === "lay-xa-dong" ? 0 : h.stockLineKind === "gui-dong" ? 2 : 1);
   const materialRows = buildMaterialGridRows(materialInRows, assignedImports).sort((a, b) => sortRank(a) - sortRank(b));
@@ -131,9 +131,9 @@ export default function BalancingTable({
       <div className={inNgang ? "mx-auto max-w-[100rem]" : "mx-auto max-w-5xl"}>
         <div className="text-center">
           <h1 className="text-lg font-bold uppercase tracking-wide">
-            Bảng cân đối {ky.materialTypeName}
+            Bảng cân đối {period.materialTypeName}
           </h1>
-          <p className="text-sm">Ngày {ky.dateRangeDescription || "…"}</p>
+          <p className="text-sm">Ngày {period.dateRangeDescription || "…"}</p>
         </div>
 
         {/* Nguyên liệu vào */}
@@ -299,7 +299,7 @@ export default function BalancingTable({
             <div>
               <KV k="Tổng thành phẩm" v={`${num(result.totalOutputKg)} kg`} />
               <KV k="Định mức chế biến" v={num(result.norm)} strong />
-              <KV k="Chi phí CB /kg TP" v={num(ky.processingCostPerKg)} />
+              <KV k="Chi phí CB /kg TP" v={num(period.processingCostPerKg)} />
               <KV k="Giá Thành" v={num(result.costOfGoods)} />
               <KV k="Giá trị xuất" v={num(result.exportValue)} />
               <KV
@@ -308,7 +308,7 @@ export default function BalancingTable({
                 strong
               />
               <KV k="Bình quân /kg nl" v={num(result.avgProfitPerKgMaterial)} />
-              <KV k="tỉ giá" v={num(ky.exchangeRate)} />
+              <KV k="tỉ giá" v={num(period.exchangeRate)} />
             </div>
             <div>
               <KV k="Tổng nguyên liệu vào" v={`${num(result.totalInputKg)} kg`} />

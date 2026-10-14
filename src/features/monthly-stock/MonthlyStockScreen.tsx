@@ -188,7 +188,7 @@ export default function MonthlyStockScreen() {
 
   // ---------- Nhập Excel bảng kê (seed số cũ) ----------
   const fileRef = useRef<HTMLInputElement>(null);
-  const [napForm, setNapForm] = useState<{ sheets: StockStatementSheet[]; nam: number; warehouse: string } | null>(null);
+  const [napForm, setNapForm] = useState<{ sheets: StockStatementSheet[]; year: number; warehouse: string } | null>(null);
 
   // ---------- Tuỳ chọn tháng / kho ----------
   const monthsWithData = useMemo(
@@ -304,16 +304,16 @@ export default function MonthlyStockScreen() {
   /* Người dùng quen Excel: Ctrl+Z lùi MỌI thứ vừa ghi vào sổ, không riêng ô số. Mỗi
      lần ghi chụp lại sổ TRƯỚC khi ghi; gõ liên tiếp vào CÙNG một ô (cùng `nhom`) chỉ
      là MỘT bước lùi. Lịch sử theo phiên mở màn — rời màn là mất. */
-  const lui = useRef<{ nhom: string; lines: MonthlyStockLine[] }[]>([]);
-  const amount = useRef<{ nhom: string; lines: MonthlyStockLine[] }[]>([]);
+  const lui = useRef<{ group: string; lines: MonthlyStockLine[] }[]>([]);
+  const amount = useRef<{ group: string; lines: MonthlyStockLine[] }[]>([]);
   const [lichSu, setLichSu] = useState({ lui: 0, tien: 0 });
   const demLichSu = () => setLichSu({ lui: lui.current.length, tien: amount.current.length });
 
   /** MỌI lần ghi sổ của màn đi qua đây (thao tác dòng, dồn kỳ, nạp Excel, gõ ô…). */
   const writeLines = (next: MonthlyStockLine[], nhom?: string) => {
     const topSnapshot = lui.current[lui.current.length - 1];
-    if (!nhom || !topSnapshot || topSnapshot.nhom !== nhom) {
-      lui.current.push({ nhom: nhom ?? uid(), lines });
+    if (!nhom || !topSnapshot || topSnapshot.group !== nhom) {
+      lui.current.push({ group: nhom ?? uid(), lines });
       if (lui.current.length > 100) lui.current.shift();
     }
     amount.current = [];
@@ -323,7 +323,7 @@ export default function MonthlyStockScreen() {
   const undo = useCallback(() => {
     const m = lui.current.pop();
     if (!m) return;
-    amount.current.push({ nhom: m.nhom, lines });
+    amount.current.push({ group: m.group, lines });
     writeLinesRaw(m.lines);
     setLichSu({ lui: lui.current.length, tien: amount.current.length });
     notify.saved("Đã hoàn tác");
@@ -331,7 +331,7 @@ export default function MonthlyStockScreen() {
   const redo = useCallback(() => {
     const m = amount.current.pop();
     if (!m) return;
-    lui.current.push({ nhom: m.nhom, lines });
+    lui.current.push({ group: m.group, lines });
     writeLinesRaw(m.lines);
     setLichSu({ lui: lui.current.length, tien: amount.current.length });
     notify.saved("Đã làm lại");
@@ -949,7 +949,7 @@ export default function MonthlyStockScreen() {
       const daNap = lines.find((l) => l.id.startsWith("xlsx|") && l.id.split("|")[3] === String(nam));
       const so = parseWarehouseFromTitle(sheets[0]?.title ?? "");
       const titleWarehouse = so ? BSF1_WAREHOUSES.find((w) => w.code.includes(so) || w.name.includes(so))?.name : undefined;
-      setNapForm({ sheets, nam, warehouse: daNap?.warehouse ?? titleWarehouse ?? DEFAULT_WAREHOUSE });
+      setNapForm({ sheets, year: nam, warehouse: daNap?.warehouse ?? titleWarehouse ?? DEFAULT_WAREHOUSE });
     } catch (err) {
       notify.error(`Không đọc được file: ${err instanceof Error ? err.message : String(err)}`);
     }
@@ -965,7 +965,7 @@ export default function MonthlyStockScreen() {
     const otherWarehouses = new Map<string, number>();
     for (const l of lines) {
       const p = l.id.split("|");
-      if (p[0] === "xlsx" && p[3] === String(napForm.nam) && p[1] !== ma) otherWarehouses.set(l.warehouse, (otherWarehouses.get(l.warehouse) ?? 0) + 1);
+      if (p[0] === "xlsx" && p[3] === String(napForm.year) && p[1] !== ma) otherWarehouses.set(l.warehouse, (otherWarehouses.get(l.warehouse) ?? 0) + 1);
     }
     const titleMismatch = titleWarehouses.length > 0 && !titleWarehouses.some((so) => napForm.warehouse.includes(so) || ma.includes(so));
     const nhom = new Map<string, number>();
@@ -983,8 +983,8 @@ export default function MonthlyStockScreen() {
 
   const confirmImport = () => {
     if (!napForm) return;
-    const { sheets, nam, warehouse: targetWarehouse } = napForm;
-    if (nam < 2000 || nam > 2100) {
+    const { sheets, year, warehouse: targetWarehouse } = napForm;
+    if (year < 2000 || year > 2100) {
       notify.warning("Năm không hợp lệ (2000–2100).");
       return;
     }
@@ -1015,10 +1015,10 @@ export default function MonthlyStockScreen() {
     for (const sh of sheets) {
       const monthNum = sh.monthNum;
       if (monthNum == null) continue;
-      const period = `${nam}-${String(monthNum).padStart(2, "0")}`;
+      const period = `${year}-${String(monthNum).padStart(2, "0")}`;
       sh.rows.forEach((r, idx) => {
         // id theo SỐ tháng, không theo tên sheet (đổi "8" → "T8" vẫn cùng id) — xem idDongNap.
-        const id = idDongNap(maNap, monthNum, nam, r.rowIndex);
+        const id = idDongNap(maNap, monthNum, year, r.rowIndex);
         newLines.push({
           id,
           period,
@@ -1986,10 +1986,10 @@ export default function MonthlyStockScreen() {
                 <Field label="Năm (cho mọi sheet)">
                   <Input
                     inputMode="numeric"
-                    value={String(napForm.nam)}
+                    value={String(napForm.year)}
                     onChange={(e) => {
                       const n = parseInt(e.target.value.replace(/\D/g, "") || "0", 10);
-                      setNapForm((f) => (f ? { ...f, nam: n } : f));
+                      setNapForm((f) => (f ? { ...f, year: n } : f));
                     }}
                   />
                 </Field>
@@ -2016,7 +2016,7 @@ export default function MonthlyStockScreen() {
                         <td className="px-3 py-2 font-mono">{sh.sheetName}</td>
                         <td className="px-3 py-2">
                           {sh.monthNum ? (
-                            formatMonthLabel(`${napForm.nam}-${String(sh.monthNum).padStart(2, "0")}`)
+                            formatMonthLabel(`${napForm.year}-${String(sh.monthNum).padStart(2, "0")}`)
                           ) : (
                             <Tag variant="luu-y">bỏ (tên sheet không phải số tháng)</Tag>
                           )}
@@ -2037,7 +2037,7 @@ export default function MonthlyStockScreen() {
                   )}
                   {importCheck.khacKho.length > 0 && (
                     <p className="font-semibold text-destructive">
-                      Năm {napForm.nam} đã có bản nạp ở{" "}
+                      Năm {napForm.year} đã có bản nạp ở{" "}
                       {importCheck.khacKho.map(([k, n]) => `${k} (${n} dòng)`).join(", ")}. Nạp vào {napForm.warehouse} sẽ
                       tạo BẢN SAO ⇒ "Tất cả kho" cộng đôi. Muốn nạp lại cùng sổ thì chọn đúng kho cũ.
                     </p>

@@ -108,7 +108,7 @@ export default function OrderExportReport() {
     ...customers.map((k) => ({ value: k.id, label: k.name, phu: k.market || undefined })),
   ];
 
-  const { nhom, tongKg: totalKg, tongBlock: totalBlocks } = useMemo(() => {
+  const { nhom, totalKg, totalBlocks } = useMemo(() => {
     const productNameOf = (id: string) => products.find((m) => m.id === id)?.name || "—";
     const tenKH = (id: string) => customers.find((k) => k.id === id)?.name || "(đơn đã xóa)";
     const orderById = (id: string) => don.find((d) => d.id === id);
@@ -150,14 +150,14 @@ export default function OrderExportReport() {
       }
     }
 
-    const nhom = [...map.values()]
+    const groups = [...map.values()]
       .filter((g) => g.lines.length > 0)
       .sort(
         (a, b) =>
           a.customerName.localeCompare(b.customerName, "vi") ||
           a.orderDate.localeCompare(b.orderDate)
       );
-    for (const g of nhom)
+    for (const g of groups)
       g.lines.sort(
         (a, b) =>
           a.exportDate.localeCompare(b.exportDate) ||
@@ -165,9 +165,9 @@ export default function OrderExportReport() {
       );
 
     return {
-      nhom,
-      tongKg: nhom.reduce((s, g) => s + g.totalKg, 0),
-      tongBlock: nhom.reduce((s, g) => s + g.totalBlocks, 0),
+      nhom: groups,
+      totalKg: groups.reduce((s, g) => s + g.totalKg, 0),
+      totalBlocks: groups.reduce((s, g) => s + g.totalBlocks, 0),
     };
   }, [exportOrders, exportItems, don, dongDon, customers, products, tu, den, customerFilter]);
   /** Khoá dòng lệnh xuất đang hiện — thứ tự cho Shift+tick chọn khoảng. */

@@ -17,21 +17,21 @@ import { num, formatDateVN } from "@/lib/format";
  * gõ thẳng vào ô (ghi về sổ nhập) hoặc ở màn Nhập hàng.
  */
 export function CellShipments({
-  dong,
+  imports,
   date,
   lotCodes: lotCodeById,
 }: {
   /** Dòng sổ nhập làm nên dòng lưới (cả kỳ) — lọc theo ngày ở đây. */
-  dong: MaterialImportItem[];
+  imports: MaterialImportItem[];
   date: string;
   /** shipmentId → mã lô (import_shipments.lot_code). */
   lotCodes: Map<string, string>;
 }) {
   const [mo, setMo] = useState(false);
-  const n = countDailyShipments(dong, date);
+  const n = countDailyShipments(imports, date);
   if (n === 0) return null;
   const suppliers = mo
-    ? groupDailyShipments(dong, date, [...lotCodeById].map(([id, lotCode]) => ({ id, lotCode })))
+    ? groupDailyShipments(imports, date, [...lotCodeById].map(([id, lotCode]) => ({ id, lotCode })))
     : [];
   return (
     <Popover open={mo} onOpenChange={setMo}>

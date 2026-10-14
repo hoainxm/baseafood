@@ -215,7 +215,7 @@ export function buildCatalogFields(
         <BatterPicker
           value={value}
           onChange={changeValue}
-          botTam={batterTypes}
+          batterTypes={batterTypes}
           onCreateBatter={addBatter}
         />
       ),

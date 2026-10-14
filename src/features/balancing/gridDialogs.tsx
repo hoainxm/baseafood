@@ -30,7 +30,7 @@ import { Trash2 } from "lucide-react";
 export function AddMaterialRowDialog({
   isDecrease,
   title,
-  goiY,
+  suggestions,
   onCreateMaterialType: onAddMaterialType,
   materialTypeEdit: materialTypeEditor,
   onClose,
@@ -39,7 +39,7 @@ export function AddMaterialRowDialog({
   isDecrease: boolean;
   title: string;
   /** Danh mục loại NL + tên các dòng đã có trong kỳ. */
-  goiY: { value: string; label: string }[];
+  suggestions: { value: string; label: string }[];
   onCreateMaterialType: (ten: string) => string;
   /** Bút chì sửa nhanh loại NL (useQuickCatalogEdit của màn, theo TÊN) — mục không có trong danh mục thì không có bút. */
   materialTypeEdit?: { openEdit: (v: string) => void; canEdit: (v: string) => boolean; editLabel: string };
@@ -64,7 +64,7 @@ export function AddMaterialRowDialog({
           label="Loại nguyên liệu"
           value={ten}
           onChange={setTen}
-          options={goiY}
+          options={suggestions}
           onCreate={onAddMaterialType}
           onEditItem={materialTypeEditor?.openEdit}
           canEdit={materialTypeEditor?.canEdit}
@@ -97,14 +97,14 @@ export function AddMaterialRowDialog({
 /* ---------- Chọn tay dòng sổ nhập để hút ---------- */
 
 export function PickImportRowsDialog({
-  dong: inputRows,
+  imports: inputRows,
   otherPeriodIds: heldIds,
   isSameFamily,
   periodMaterialType: periodMaterialTypeName,
   onClose,
   onSave,
 }: {
-  dong: MaterialImportItem[];
+  imports: MaterialImportItem[];
   /** Id các dòng đang thuộc kỳ KHÁC — tick là kéo về kỳ đang mở. */
   otherPeriodIds: Set<string>;
   /** Dòng có cùng họ nguyên liệu với kỳ không. */
@@ -239,7 +239,7 @@ export function PickImportRowsDialog({
  * đây là một dải thẻ dưới lưới lặp lại tên mọi dòng, làm khối nguyên liệu rối mắt.
  */
 export function ManualRowsDialog({
-  dong,
+  rows,
   getRowName: rowLabelOf,
   workshopWarehouses: workshopWarehouseOptions,
   hasWarehouse: hasStock,
@@ -247,7 +247,7 @@ export function ManualRowsDialog({
   onDelete,
   onClose,
 }: {
-  dong: MaterialGridRow[];
+  rows: MaterialGridRow[];
   getRowName: (h: MaterialGridRow) => string;
   workshopWarehouses: { value: string; label: string }[];
   /** Dòng giảm nào có ô "Kho nhận" — mặc định mọi dòng giảm (Bán nội địa: bán đi, không vào kho). */
@@ -266,7 +266,7 @@ export function ManualRowsDialog({
           </DialogDescription>
         </DialogHeader>
         <ul className="divide-y divide-border">
-          {dong.map((h) => (
+          {rows.map((h) => (
             <li key={h.id} className="flex flex-wrap items-center gap-3 py-2">
               <span className="min-w-0 flex-1">
                 {rowLabelOf(h)}
@@ -315,7 +315,7 @@ export function ManualRowsDialog({
 /* ---------- Thêm mặt hàng vào lưới bán thành phẩm ---------- */
 
 export function AddProductDialog({
-  matHang: products,
+  products,
   customers,
   onCreateProduct: onAddProduct,
   onCreateCustomer: onAddCustomer,
@@ -324,7 +324,7 @@ export function AddProductDialog({
   onClose,
   onSave,
 }: {
-  matHang: Product[];
+  products: Product[];
   customers: Customer[];
   onCreateProduct: (ten: string) => string;
   onCreateCustomer: (ten: string) => string;

@@ -252,9 +252,9 @@ export default function BalancingScreen() {
   if (sel) {
     return (
       <KyDetail
-        ky={sel}
+        period={sel}
         onBack={() => setSelId(null)}
-        onChangeKy={(patch) =>
+        onChangePeriod={(patch) =>
           persistKy(kyList.map((k) => (k.id === sel.id ? { ...k, ...patch } : k)))
         }
       />
@@ -475,15 +475,15 @@ export default function BalancingScreen() {
  * chỗ và nối danh mục.
  */
 function KyDetail({
-  ky,
+  period,
   onBack,
-  onChangeKy,
+  onChangePeriod,
 }: {
-  ky: BalancingPeriod;
+  period: BalancingPeriod;
   onBack: () => void;
-  onChangeKy: (patch: Partial<BalancingPeriod>) => void;
+  onChangePeriod: (patch: Partial<BalancingPeriod>) => void;
 }) {
-  const grid = usePeriodGrid(ky);
+  const grid = usePeriodGrid(period);
   const [products, setProducts] = useProducts();
   const [customers, setCustomers] = useCustomers();
   /** Bút chì sửa nhanh mặt hàng / khách trong lưới bán thành phẩm (nối theo id). */
@@ -530,27 +530,27 @@ function KyDetail({
         const p = salesInvoiceById.get(b.invoiceId);
         if (!p || daHut.has(b.id)) return false;
         return (
-          !ky.startDate ||
-          !ky.endDate ||
-          (p.deliveryDate >= ky.startDate && p.deliveryDate <= ky.endDate)
+          !period.startDate ||
+          !period.endDate ||
+          (p.deliveryDate >= period.startDate && p.deliveryDate <= period.endDate)
         );
       })
-      .map((b) => ({ ban: b, invoice: salesInvoiceById.get(b.invoiceId)! }));
-  }, [allSalesItems, salesInvoices, grid.outputs, ky.startDate, ky.endDate]);
+      .map((b) => ({ salesItem: b, invoice: salesInvoiceById.get(b.invoiceId)! }));
+  }, [allSalesItems, salesInvoices, grid.outputs, period.startDate, period.endDate]);
 
-  const pullSalesIntoPeriod = (items: { ban: SalesItem; invoice: SalesInvoice }[]) => {
+  const pullSalesIntoPeriod = (items: { salesItem: SalesItem; invoice: SalesInvoice }[]) => {
     grid.saveOutputs([
       ...grid.outputs,
-      ...items.map(({ ban, invoice: salesInvoice }) => ({
+      ...items.map(({ salesItem, invoice: salesInvoice }) => ({
         id: uid(),
-        periodId: ky.id,
-        productId: ban.productId,
+        periodId: period.id,
+        productId: salesItem.productId,
         customerId: salesInvoice.customerId,
         channel: salesInvoice.channel,
-        quantityKg: ban.quantityKg,
-        unitPrice: ban.unitPrice,
-        spec: ban.spec,
-        salesItemId: ban.id,
+        quantityKg: salesItem.quantityKg,
+        unitPrice: salesItem.unitPrice,
+        spec: salesItem.spec,
+        salesItemId: salesItem.id,
       })),
     ]);
     notify.saved(`Đã hút ${items.length} dòng bán vào kỳ này`);
@@ -561,7 +561,7 @@ function KyDetail({
   const hasNoFinishedGood = result.totalOutputKg <= 0;
   /** Lệch giữa Tổng NL nhận (thông số kỳ) và Tổng NL vào lưới (khối 1) — hiện
    *  sẵn để khỏi nhẩm tay khi đối chiếu. */
-  const materialDiff = ky.totalInputKg != null ? ky.totalInputKg - result.totalInputKg : null;
+  const materialDiff = period.totalInputKg != null ? period.totalInputKg - result.totalInputKg : null;
   /** Số dòng ở hai sổ nguồn tự động còn chờ hút vào kỳ. */
   const pendingSourceCount = grid.pendingImports.length + grid.pendingWips.length;
 
@@ -575,10 +575,10 @@ function KyDetail({
 
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-foreground">Bảng cân đối {ky.materialTypeName}</h1>
+          <h1 className="text-2xl font-semibold text-foreground">Bảng cân đối {period.materialTypeName}</h1>
           <p className="mt-1 text-base text-muted-foreground">
-            {ky.dateRangeDescription || "Chưa ghi ngày tiếp nhận"}
-            {ky.isLocked && " · đã chốt"}
+            {period.dateRangeDescription || "Chưa ghi ngày tiếp nhận"}
+            {period.isLocked && " · đã chốt"}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -655,24 +655,24 @@ function KyDetail({
           }}
         />
         <ResultNote
-          ky={ky}
+          period={period}
           previousPeriod={grid.previousPeriod}
           result={result}
           hasNoFinishedGood={hasNoFinishedGood}
           materialDiff={materialDiff}
           sideBySide={isHorizontal}
           isLocked={grid.isLocked}
-          onChangeKy={onChangeKy}
+          onChangePeriod={onChangePeriod}
         />
         <div className={isHorizontal ? "2xl:col-span-2" : undefined}>
           <WipGrid
             grid={grid}
-            matHang={products}
+            products={products}
             customers={customers}
             onEditProduct={productEditor.openEdit}
             onEditCustomer={customerEditor.openEdit}
-            choHutBan={banChoHut}
-            onHutBan={pullSalesIntoPeriod}
+            pendingSales={banChoHut}
+            onPullSales={pullSalesIntoPeriod}
             daysCollapsed={hideFinishedGoodDays}
             onToggleDays={() => setHideFinishedGoodDays((v) => !v)}
             onCreateProduct={(ten) => {
@@ -712,43 +712,43 @@ function KyDetail({
       <Card className="flex flex-wrap items-center justify-between gap-3 p-4">
         <div>
           <p className="text-lg font-semibold">
-            {ky.isLocked ? "Kỳ đã chốt" : "Kỳ đang mở"}
+            {period.isLocked ? "Kỳ đã chốt" : "Kỳ đang mở"}
           </p>
-          {ky.isLocked && (
+          {period.isLocked && (
             <p className="text-base text-muted-foreground">
-              Khoá lúc {ky.lockedAt ? new Date(ky.lockedAt).toLocaleString("vi-VN") : "—"}
-              {ky.lockNote ? ` · ${ky.lockNote}` : ""}
+              Khoá lúc {period.lockedAt ? new Date(period.lockedAt).toLocaleString("vi-VN") : "—"}
+              {period.lockNote ? ` · ${period.lockNote}` : ""}
             </p>
           )}
-          {ky.reopenReason && (
-            <p className="text-base text-warning">Lần mở lại gần nhất: {ky.reopenReason}</p>
+          {period.reopenReason && (
+            <p className="text-base text-warning">Lần mở lại gần nhất: {period.reopenReason}</p>
           )}
         </div>
         <Button
           title="Chốt khi đã đối chiếu xong và gửi kế toán — mọi ô trong lưới khoá lại. Kỳ đã chốt thì bấm để mở lại (phải ghi lý do)."
-          variant={ky.isLocked ? "outline" : "default"}
+          variant={period.isLocked ? "outline" : "default"}
           size="lg"
           onClick={() => setIsLockOpen(true)}
         >
-          {ky.isLocked ? <LockOpen /> : <Lock />}
-          {ky.isLocked ? "Mở lại kỳ" : "Chốt kỳ"}
+          {period.isLocked ? <LockOpen /> : <Lock />}
+          {period.isLocked ? "Mở lại kỳ" : "Chốt kỳ"}
         </Button>
       </Card>
 
       {isLockOpen && (
         <PeriodLockDialog
-          isLocked={Boolean(ky.isLocked)}
-          periodName={`${ky.materialTypeName} · ${ky.dateRangeDescription}`}
+          isLocked={Boolean(period.isLocked)}
+          periodName={`${period.materialTypeName} · ${period.dateRangeDescription}`}
           outputTotal={`${num(result.totalOutputKg)} kg bán thành phẩm`}
           onClose={() => setIsLockOpen(false)}
           onSave={(note) => {
             /* Mở lại KHÔNG xoá dấu đã chốt — chỉ hạ cờ và ghi lý do, giữ vết. */
-            onChangeKy(
-              ky.isLocked
+            onChangePeriod(
+              period.isLocked
                 ? { isLocked: false, reopenReason: note }
                 : { isLocked: true, lockedAt: new Date().toISOString(), lockNote: note }
             );
-            notify.saved(ky.isLocked ? "Đã mở lại kỳ" : "Đã chốt kỳ");
+            notify.saved(period.isLocked ? "Đã mở lại kỳ" : "Đã chốt kỳ");
             setIsLockOpen(false);
           }}
         />
@@ -756,10 +756,10 @@ function KyDetail({
 
       {showBang && (
         <BalancingTable
-          ky={ky}
+          period={period}
           inputs={grid.inputs}
           outputs={grid.outputs}
-          matHang={products}
+          products={products}
           customers={customers}
           result={result}
           assignedImports={grid.assignedImports}
@@ -785,23 +785,23 @@ function KyDetail({
  * nhập; khác kỳ trước cùng họ NL thì ghi "kỳ trước …" để biết số đã đổi.
  */
 function ResultNote({
-  ky,
+  period,
   previousPeriod,
   result,
   hasNoFinishedGood,
   materialDiff,
   sideBySide: isHorizontal,
   isLocked,
-  onChangeKy,
+  onChangePeriod,
 }: {
-  ky: BalancingPeriod;
+  period: BalancingPeriod;
   previousPeriod: BalancingPeriod | null;
   result: BalancingResult;
   hasNoFinishedGood: boolean;
   materialDiff: number | null;
   sideBySide: boolean;
   isLocked: boolean;
-  onChangeKy: (patch: Partial<BalancingPeriod>) => void;
+  onChangePeriod: (patch: Partial<BalancingPeriod>) => void;
 }) {
   const lai = result.profitOrLoss >= 0;
   return (
@@ -819,10 +819,10 @@ function ResultNote({
           <KeyValueInput
             k="Chi phí CB / kg TP"
             unit="đ"
-            value={ky.processingCostPerKg}
+            value={period.processingCostPerKg}
             previous={previousPeriod?.processingCostPerKg}
             isLocked={isLocked}
-            onChange={(v) => onChangeKy({ processingCostPerKg: v })}
+            onChange={(v) => onChangePeriod({ processingCostPerKg: v })}
           />
           <KV k="Giá thành" v={`${num(result.costOfGoods)} đ`} />
           <KV k="Giá trị xuất" v={`${num(result.exportValue)} đ`} />
@@ -836,10 +836,10 @@ function ResultNote({
           <KeyValueInput
             k="Tỉ giá"
             unit="đ/USD"
-            value={ky.exchangeRate}
+            value={period.exchangeRate}
             previous={previousPeriod?.exchangeRate}
             isLocked={isLocked}
-            onChange={(v) => onChangeKy({ exchangeRate: v })}
+            onChange={(v) => onChangePeriod({ exchangeRate: v })}
           />
         </div>
         <div>
@@ -848,9 +848,9 @@ function ResultNote({
           <KeyValueInput
             k="Tổng NL nhận cả kỳ"
             unit="kg"
-            value={ky.totalInputKg}
+            value={period.totalInputKg}
             isLocked={isLocked}
-            onChange={(v) => onChangeKy({ totalInputKg: v })}
+            onChange={(v) => onChangePeriod({ totalInputKg: v })}
             note={
               /* Đối chiếu NL nhận (bảng phụ) với NL vào lưới — bắt chỗ vênh khỏi nhẩm tay. */
               materialDiff == null ? undefined : materialDiff === 0 ? (

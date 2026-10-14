@@ -80,12 +80,12 @@ const MODES: { id: ReconciliationMode; label: string; description: string; icon:
 export function ReconciliationModePicker({
   mode,
   setMode,
-  dem,
+  counts,
 }: {
   mode: ReconciliationMode;
   setMode: (c: ReconciliationMode) => void;
   /** Dòng tóm tắt dưới mỗi nút (VD "56 chưa vào sổ"), hoặc lý do chưa áp dụng được. */
-  dem: Record<ReconciliationMode, { chu: string; applicable: boolean }>;
+  counts: Record<ReconciliationMode, { text: string; applicable: boolean }>;
 }) {
   return (
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" role="radiogroup" aria-label="Việc cần soát">
@@ -110,8 +110,8 @@ export function ReconciliationModePicker({
               {isSelected && <span className="ml-auto shrink-0 text-sm font-medium text-primary">Đang xem</span>}
             </span>
             <span className="text-sm text-muted-foreground">{c.description}</span>
-            <span className={`text-sm font-medium ${dem[c.id].applicable ? "text-foreground" : "text-muted-foreground"}`}>
-              {dem[c.id].chu}
+            <span className={`text-sm font-medium ${counts[c.id].applicable ? "text-foreground" : "text-muted-foreground"}`}>
+              {counts[c.id].text}
             </span>
           </button>
         );
@@ -122,18 +122,18 @@ export function ReconciliationModePicker({
 
 // ---------- Quy tắc máy đang áp dụng ----------
 /** Quy tắc đã chốt qua các đợt đối soát thật (doc 37). Giữ câu ngắn, lời thường. */
-const RULES: { ten: string; content: string }[] = [
-  { ten: "Khóa ghép", content: "MST người bán + ký hiệu + số hóa đơn. MST chỉ so phần chữ số (0301234567-001 = 0301234567001), MST mất số 0 đầu được bù lại; số hóa đơn bỏ số 0 ở đầu (00060568 = 60568); ký hiệu bỏ chữ số mẫu số gộp đầu (1C26TTN = C26TTN)." },
-  { ten: "Cộng dồn", content: "Một hóa đơn tách nhiều dòng sổ (theo thuế suất / theo mặt hàng) được cộng lại rồi mới so." },
-  { ten: "So đủ 3 cột", content: "So trước thuế, thuế và tổng ở từng hóa đơn. Tổng lệch ⇒ LỆCH TIỀN; tổng khớp mà thuế lệch ⇒ LỆCH THUẾ; chỉ trước thuế lệch ⇒ vẫn khớp (thường do chiết khấu / phí)." },
-  { ten: "Ngoại tệ", content: "Máy tự dò bản xuất để tiền ở nguyên tệ (phải nhân tỷ giá) hay đã quy sẵn VND, bằng cách so với các hóa đơn đã khớp sổ. Không mặc định nhân. Ngoại tệ thiếu tỷ giá thì máy báo, không tự coi là VND." },
-  { ten: "Không cần vào sổ", content: "Hóa đơn đã bị thay thế / xóa bỏ / hủy không phải kê. Hóa đơn đã bị ĐIỀU CHỈNH vẫn phải kê — không gộp chung." },
-  { ten: "Hóa đơn bán hàng (mẫu số 2)", content: "Không có thuế GTGT: ô thuế trống là đúng, chưa thuế phải bằng tổng thanh toán." },
-  { ten: "Làm tròn", content: "Lệch ±1 đ là làm tròn của bên phát hành, không phải sai. Hóa đơn để nguyên tệ thì chỉ ±1 xu (0,01) mới là làm tròn — lệch 1 USD là lệch thật." },
-  { ten: "Gần khớp", content: "Hóa đơn chưa vào sổ nhưng sổ có dòng cùng MST + cùng số tiền ⇒ nghi gõ sai số hóa đơn ở sổ, tách riêng để khỏi kê hai lần." },
-  { ten: "Ghi chú tay", content: "Dòng ghi chú kế toán gõ dưới bảng (không có ký hiệu, không có MST hợp lệ) bị bỏ qua, không bị coi là hóa đơn." },
-  { ten: "Hai bản", content: "Sheet có chữ “thuế” trong tên là bản thuế gửi; không có thì sheet mang chữ “tải” là bản tự tải. Nhận sai thì chọn lại ở mục So hai bản. File có sổ mà hai bản gối nhau thì chỉ bản thuế gửi được đối chiếu sổ (khỏi đếm hai lần)." },
-  { ten: "Không sửa số", content: "Máy chỉ báo. Số chỉ đổi khi bạn bấm Sửa từng dòng; file xuất giữ nguyên định dạng và địa chỉ ô của file gốc." },
+const RULES: { name: string; content: string }[] = [
+  { name: "Khóa ghép", content: "MST người bán + ký hiệu + số hóa đơn. MST chỉ so phần chữ số (0301234567-001 = 0301234567001), MST mất số 0 đầu được bù lại; số hóa đơn bỏ số 0 ở đầu (00060568 = 60568); ký hiệu bỏ chữ số mẫu số gộp đầu (1C26TTN = C26TTN)." },
+  { name: "Cộng dồn", content: "Một hóa đơn tách nhiều dòng sổ (theo thuế suất / theo mặt hàng) được cộng lại rồi mới so." },
+  { name: "So đủ 3 cột", content: "So trước thuế, thuế và tổng ở từng hóa đơn. Tổng lệch ⇒ LỆCH TIỀN; tổng khớp mà thuế lệch ⇒ LỆCH THUẾ; chỉ trước thuế lệch ⇒ vẫn khớp (thường do chiết khấu / phí)." },
+  { name: "Ngoại tệ", content: "Máy tự dò bản xuất để tiền ở nguyên tệ (phải nhân tỷ giá) hay đã quy sẵn VND, bằng cách so với các hóa đơn đã khớp sổ. Không mặc định nhân. Ngoại tệ thiếu tỷ giá thì máy báo, không tự coi là VND." },
+  { name: "Không cần vào sổ", content: "Hóa đơn đã bị thay thế / xóa bỏ / hủy không phải kê. Hóa đơn đã bị ĐIỀU CHỈNH vẫn phải kê — không gộp chung." },
+  { name: "Hóa đơn bán hàng (mẫu số 2)", content: "Không có thuế GTGT: ô thuế trống là đúng, chưa thuế phải bằng tổng thanh toán." },
+  { name: "Làm tròn", content: "Lệch ±1 đ là làm tròn của bên phát hành, không phải sai. Hóa đơn để nguyên tệ thì chỉ ±1 xu (0,01) mới là làm tròn — lệch 1 USD là lệch thật." },
+  { name: "Gần khớp", content: "Hóa đơn chưa vào sổ nhưng sổ có dòng cùng MST + cùng số tiền ⇒ nghi gõ sai số hóa đơn ở sổ, tách riêng để khỏi kê hai lần." },
+  { name: "Ghi chú tay", content: "Dòng ghi chú kế toán gõ dưới bảng (không có ký hiệu, không có MST hợp lệ) bị bỏ qua, không bị coi là hóa đơn." },
+  { name: "Hai bản", content: "Sheet có chữ “thuế” trong tên là bản thuế gửi; không có thì sheet mang chữ “tải” là bản tự tải. Nhận sai thì chọn lại ở mục So hai bản. File có sổ mà hai bản gối nhau thì chỉ bản thuế gửi được đối chiếu sổ (khỏi đếm hai lần)." },
+  { name: "Không sửa số", content: "Máy chỉ báo. Số chỉ đổi khi bạn bấm Sửa từng dòng; file xuất giữ nguyên định dạng và địa chỉ ô của file gốc." },
 ];
 
 export function ReconciliationRulesBox({ warnings }: { warnings: FlowWarning[] }) {
@@ -156,8 +156,8 @@ export function ReconciliationRulesBox({ warnings }: { warnings: FlowWarning[] }
         <div className="space-y-3 border-t border-border px-3 py-3">
           <ul className="space-y-2 text-sm">
             {RULES.map((q) => (
-              <li key={q.ten}>
-                <span className="font-medium">{q.ten}: </span>
+              <li key={q.name}>
+                <span className="font-medium">{q.name}: </span>
                 <span className="text-muted-foreground">{q.content}</span>
               </li>
             ))}
@@ -182,16 +182,16 @@ const METHOD_LABELS: Record<SideSplitMethod, string> = {
 };
 
 function SideSplitBox({
-  tenSheets,
+  sheetNames,
   taxSheets: taxSides,
   method,
-  onDoi,
+  onChange,
   onAutoDetect,
 }: {
-  tenSheets: string[];
+  sheetNames: string[];
   taxSheets: ReadonlySet<string>;
   method: SideSplitMethod;
-  onDoi: (ten: string, isTaxSide: boolean) => void;
+  onChange: (ten: string, isTaxSide: boolean) => void;
   onAutoDetect: () => void;
 }) {
   return (
@@ -207,7 +207,7 @@ function SideSplitBox({
         )}
       </div>
       <ul className="mt-2 space-y-2">
-        {tenSheets.map((t) => {
+        {sheetNames.map((t) => {
           const isTaxSide = taxSides.has(t);
           return (
             <li key={t} className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -218,7 +218,7 @@ function SideSplitBox({
                   size="sm"
                   variant={isTaxSide ? "default" : "outline"}
                   aria-pressed={isTaxSide}
-                  onClick={() => onDoi(t, true)}
+                  onClick={() => onChange(t, true)}
                 >
                   Thuế gửi
                 </Button>
@@ -227,7 +227,7 @@ function SideSplitBox({
                   size="sm"
                   variant={!isTaxSide ? "default" : "outline"}
                   aria-pressed={!isTaxSide}
-                  onClick={() => onDoi(t, false)}
+                  onClick={() => onChange(t, false)}
                 >
                   Tự tải
                 </Button>
@@ -253,17 +253,17 @@ function twoVersionChip(d: TwoVersionRow) {
 
 export function TwoVersionView({
   result,
-  tenSheets,
+  sheetNames,
   taxSheets: taxSides,
   method,
-  onDoiBen,
+  onChangeSide,
   onAutoDetect,
 }: {
   result: TwoVersionResult | null;
-  tenSheets: string[];
+  sheetNames: string[];
   taxSheets: ReadonlySet<string>;
   method: SideSplitMethod;
-  onDoiBen: (ten: string, isTaxSide: boolean) => void;
+  onChangeSide: (ten: string, isTaxSide: boolean) => void;
   onAutoDetect: () => void;
 }) {
   const [filter, setFilter] = useState<TwoVersionFilter>("all");
@@ -276,10 +276,10 @@ export function TwoVersionView({
   }, [result, filter]);
 
   const sideSplitBox = (
-    <SideSplitBox tenSheets={tenSheets} taxSheets={taxSides} method={method} onDoi={onDoiBen} onAutoDetect={onAutoDetect} />
+    <SideSplitBox sheetNames={sheetNames} taxSheets={taxSides} method={method} onChange={onChangeSide} onAutoDetect={onAutoDetect} />
   );
 
-  if (tenSheets.length < 2)
+  if (sheetNames.length < 2)
     return (
       <EmptyState
         icon={Files}
@@ -485,11 +485,11 @@ export function ColumnSumCheckView({ sheets }: { sheets: InvoiceSheet[] }) {
 }
 
 // ---------- 3. Cùng MST cùng ngày ----------
-export function SameDayView({ nhom }: { nhom: SameDayGroup[] }) {
-  const sameAmountCount = nhom.filter((g) => g.sameAmount).length;
+export function SameDayView({ groups }: { groups: SameDayGroup[] }) {
+  const sameAmountCount = groups.filter((g) => g.sameAmount).length;
   const [onlyDuplicates, setOnlyDuplicates] = useState(sameAmountCount > 0);
-  const rows = useMemo(() => (onlyDuplicates ? nhom.filter((g) => g.sameAmount) : nhom), [nhom, onlyDuplicates]);
-  if (!nhom.length)
+  const rows = useMemo(() => (onlyDuplicates ? groups.filter((g) => g.sameAmount) : groups), [groups, onlyDuplicates]);
+  if (!groups.length)
     return (
       <EmptyState
         icon={CalendarSearch}
@@ -498,8 +498,8 @@ export function SameDayView({ nhom }: { nhom: SameDayGroup[] }) {
       />
     );
   const the: StatCardData[] = [
-    { label: "Nhóm cùng MST cùng ngày", value: num(nhom.length), numeric: true, color: "brand", onSelect: () => setOnlyDuplicates(false), selectHint: "Xem mọi nhóm" },
-    { label: "Hóa đơn trong các nhóm", value: num(nhom.reduce((s, g) => s + g.invoiceCount, 0)), numeric: true, color: "trung-tinh" },
+    { label: "Nhóm cùng MST cùng ngày", value: num(groups.length), numeric: true, color: "brand", onSelect: () => setOnlyDuplicates(false), selectHint: "Xem mọi nhóm" },
+    { label: "Hóa đơn trong các nhóm", value: num(groups.reduce((s, g) => s + g.invoiceCount, 0)), numeric: true, color: "trung-tinh" },
     { label: "Nhóm trùng khít số tiền", value: num(sameAmountCount), numeric: true, color: sameAmountCount ? "warning" : "success", subtext: "dễ kê hai lần — soát trước", onSelect: () => setOnlyDuplicates(true), selectHint: "Xem nhóm trùng khít số tiền" },
   ];
   const columns: RecordTableColumn<SameDayGroup>[] = [
@@ -527,7 +527,7 @@ export function SameDayView({ nhom }: { nhom: SameDayGroup[] }) {
           Trùng khít số tiền <span className="tnum ml-1">({num(sameAmountCount)})</span>
         </Button>
         <Button title="Xem mọi nhóm cùng người bán cùng ngày." size="sm" variant={!onlyDuplicates ? "default" : "outline"} onClick={() => setOnlyDuplicates(false)}>
-          Tất cả <span className="tnum ml-1">({num(nhom.length)})</span>
+          Tất cả <span className="tnum ml-1">({num(groups.length)})</span>
         </Button>
       </div>
       <RecordTable

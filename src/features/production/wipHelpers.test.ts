@@ -23,7 +23,7 @@ describe("createEmptyProductionLine", () => {
     expect(r.processingType).toBe("luộc");
     expect(r.customerName).toBe("Peacock");
     expect(r.productId).toBe("");
-    expect(r.botKg).toEqual({});
+    expect(r.batterKg).toEqual({});
     expect(getLineTotalKg(r)).toBe(0);
     expect(r.key).not.toBe(createEmptyProductionLine("g1").key); // key React ổn định, khác nhau mỗi dòng
   });
@@ -44,8 +44,8 @@ describe("isSplitLine / sumMonthlyStockRows", () => {
 
 describe("bột tẩm không cộng vào thành phẩm", () => {
   it("tổng dòng chỉ tính thành phẩm, bỏ qua kg bột", () => {
-    expect(getLineTotalKg(d({ productId: "p", quantityKg: 470, botKg: { "Bột 24V": 47 } }))).toBe(470);
-    expect(isLineComplete(d({ productId: "p", botKg: { "Bột 24V": 5 } }))).toBe(false); // chỉ có bột, chưa có TP
+    expect(getLineTotalKg(d({ productId: "p", quantityKg: 470, batterKg: { "Bột 24V": 47 } }))).toBe(470);
+    expect(isLineComplete(d({ productId: "p", batterKg: { "Bột 24V": 5 } }))).toBe(false); // chỉ có bột, chưa có TP
   });
 });
 

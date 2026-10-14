@@ -78,7 +78,7 @@ export interface DayCell {
 }
 
 export interface PeriodGrid {
-  kyId: string;
+  periodId: string;
   date: string[];
   /* --- khối 1 --- */
   inputs: BalancingInputItem[];
@@ -135,7 +135,7 @@ export interface PeriodGrid {
   /** Toàn bộ dòng mẫu (để so "giá = kỳ trước"). */
   templateRows: FinishedGoodTemplateRow[];
   /** Gợi ý khách · kênh · giá cho một mặt hàng mới vào kỳ (mẫu → kỳ gần nhất). */
-  goiY: (productId: string, spec: string) => Pick<FinishedGoodTemplateRow, "customerId" | "channel" | "unitPrice"> | null;
+  suggestTemplate: (productId: string, spec: string) => Pick<FinishedGoodTemplateRow, "customerId" | "channel" | "unitPrice"> | null;
   /** Hút cả sổ nhập + sổ sản xuất trong một chạm (KHÔNG đụng sổ bán). */
   pullAllSources: () => void;
   saveWipDayCells: (cells: DayCell[], backdateReason: string) => boolean;
@@ -157,7 +157,7 @@ export interface PeriodGrid {
 
 /** Ảnh chụp bốn bảng mà một kỳ có quyền đụng tới. */
 interface MocLichSu {
-  nhom: string;
+  group: string;
   inputs: BalancingInputItem[];
   outputs: BalancingOutputItem[];
   imports: MaterialImportItem[];
@@ -214,7 +214,7 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
 
   const snapshotCurrent = useCallback(
     (nhom: string): MocLichSu => ({
-      nhom,
+      group: nhom,
       inputs: allMaterialRows,
       outputs: allOutputs,
       imports: allImports,
@@ -229,7 +229,7 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
     (nhom: string) => {
       if (!nhom) return; // ghi tự động (đồng bộ tổng) — không phải việc người dùng làm
       const topSnapshot = lui.current[lui.current.length - 1];
-      if (topSnapshot && topSnapshot.nhom === nhom) return; // gõ tiếp cùng ô — không tạo mốc mới
+      if (topSnapshot && topSnapshot.group === nhom) return; // gõ tiếp cùng ô — không tạo mốc mới
       lui.current.push(snapshotCurrent(nhom));
       if (lui.current.length > MAX_HISTORY_STEPS) lui.current.shift();
       redoStack.current = [];
@@ -252,7 +252,7 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
   const undo = useCallback(() => {
     const m = lui.current.pop();
     if (!m) return;
-    redoStack.current.push(snapshotCurrent(m.nhom));
+    redoStack.current.push(snapshotCurrent(m.group));
     apMoc(m);
     syncHistoryCount();
     notify.saved("Đã hoàn tác");
@@ -261,7 +261,7 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
   const redo = useCallback(() => {
     const m = redoStack.current.pop();
     if (!m) return;
-    lui.current.push(snapshotCurrent(m.nhom));
+    lui.current.push(snapshotCurrent(m.group));
     apMoc(m);
     syncHistoryCount();
     notify.saved("Đã làm lại");
@@ -860,7 +860,7 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
   }, [prevPeriod, materialCarryOver, finishedGoodCarryOver, allMaterialRows, allOutputs, writeAllMaterials, writeAllFinishedGoods, saveCheckpoint, ky.id]);
 
   return {
-    kyId: ky.id,
+    periodId: ky.id,
     date: dates,
     inputs: materialInRows,
     materialRows,
@@ -893,7 +893,7 @@ export function usePeriodGrid(ky: BalancingPeriod): PeriodGrid {
     templatePeriod,
     missingTemplateRows: missingTemplates,
     templateRows: finishedGoodTemplates,
-    goiY,
+    suggestTemplate: goiY,
     pullAllSources,
     saveWipDayCells: writeProductionsMultiDay,
     lockedDates,

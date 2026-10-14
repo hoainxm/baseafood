@@ -52,22 +52,22 @@ import {
  * ĐỂ CỤC BỘ ở màn này (KHÔNG nhét vào types.ts) — đây là cách TRÌNH BÀY, không
  * phải quy tắc phân quyền; phân quyền thật vẫn ở ROLES + lib/nav-access.ts.
  */
-const PHONG_BAN: { id: string; ten: string; icon: LucideIcon; roles: Role[] }[] = [
-  { id: "giam-doc", ten: "Ban giám đốc", icon: Briefcase, roles: ["director", "vice-director"] },
-  { id: "ke-toan", ten: "Phòng kế toán", icon: Calculator, roles: ["chief-accountant", "accountant"] },
+const PHONG_BAN: { id: string; name: string; icon: LucideIcon; roles: Role[] }[] = [
+  { id: "giam-doc", name: "Ban giám đốc", icon: Briefcase, roles: ["director", "vice-director"] },
+  { id: "ke-toan", name: "Phòng kế toán", icon: Calculator, roles: ["chief-accountant", "accountant"] },
   {
     id: "san-xuat",
-    ten: "Phân xưởng sản xuất",
+    name: "Phân xưởng sản xuất",
     icon: Factory,
     roles: ["manager-dong", "manager-ca", "manager-kho", "vice-manager", "team-leader"],
   },
-  { id: "kho", ten: "Kho & nhập hàng", icon: Warehouse, roles: ["warehouse-keeper"] },
-  { id: "he-thong", ten: "Quản trị hệ thống", icon: ShieldCheck, roles: ["admin"] },
+  { id: "kho", name: "Kho & nhập hàng", icon: Warehouse, roles: ["warehouse-keeper"] },
+  { id: "he-thong", name: "Quản trị hệ thống", icon: ShieldCheck, roles: ["admin"] },
 ];
 
 /** Tên phòng ban của một vai trò (dòng phụ trong dropdown chọn vai trò). */
 function departmentOfRole(v: Role): string {
-  return PHONG_BAN.find((pb) => pb.roles.includes(v))?.ten ?? "Khác";
+  return PHONG_BAN.find((pb) => pb.roles.includes(v))?.name ?? "Khác";
 }
 
 /** Xếp một người vào 1 phòng ban theo vai trò cấp CAO NHẤT họ có (rank nhỏ = cao). */
@@ -97,10 +97,10 @@ function sapTheoCap(roles: Role[]): Role[] {
  */
 function RolePicker({
   selected: selectedRoles,
-  onDoi,
+  onChange,
 }: {
   selected: Role[];
-  onDoi: (v: Role[]) => void;
+  onChange: (v: Role[]) => void;
 }) {
   const remaining = ROLES.filter((r) => !selectedRoles.includes(r.value));
   const options: ComboboxOption[] = remaining.map((r) => ({
@@ -120,7 +120,7 @@ function RolePicker({
               {roleLabel([v])}
               <button
                 type="button"
-                onClick={() => onDoi(selectedRoles.filter((x) => x !== v))}
+                onClick={() => onChange(selectedRoles.filter((x) => x !== v))}
                 aria-label={`Bỏ vai trò ${roleLabel([v])}`}
                 title={`Bỏ vai trò ${roleLabel([v])}`}
                 className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-background hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
@@ -138,7 +138,7 @@ function RolePicker({
           label="Thêm vai trò"
           hideRequiredMark
           value=""
-          onChange={(v) => v && onDoi([...selectedRoles, v as Role])}
+          onChange={(v) => v && onChange([...selectedRoles, v as Role])}
           options={options}
           placeholder="Gõ hoặc chọn vai trò để thêm…"
           emptyText="Đã thêm hết vai trò."
@@ -280,7 +280,7 @@ export default function UserManagementScreen({
   const visibleGroups = [
     ...PHONG_BAN.map((pb, i) => ({
       id: pb.id,
-      ten: pb.ten,
+      ten: pb.name,
       icon: pb.icon,
       users: thung[i]
         .sort((a, b) => a.rank - b.rank || userName(a.u).localeCompare(userName(b.u), "vi"))
@@ -445,7 +445,7 @@ export default function UserManagementScreen({
               >
                 <RolePicker
                   selected={creating.roles}
-                  onDoi={(v) => setCreating((t) => (t ? { ...t, roles: v } : t))}
+                  onChange={(v) => setCreating((t) => (t ? { ...t, roles: v } : t))}
                 />
               </Field>
             </div>
@@ -494,7 +494,7 @@ export default function UserManagementScreen({
               >
                 <RolePicker
                   selected={editing.roles}
-                  onDoi={(v) => setEditing((d) => (d ? { ...d, roles: v } : d))}
+                  onChange={(v) => setEditing((d) => (d ? { ...d, roles: v } : d))}
                 />
               </Field>
             </div>

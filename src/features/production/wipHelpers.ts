@@ -42,7 +42,7 @@ export interface ProductionLine {
   stomachKg: number;
   blocksCount: number;
   blockSpecKg: number; // quy cách kg/khối — nhập ngay trên dòng, nhớ về mặt hàng
-  botKg: Record<string, number>; // bột tẩm theo loại — không cộng vào tổng TP
+  batterKg: Record<string, number>; // bột tẩm theo loại — không cộng vào tổng TP
 }
 
 export const createEmptyProductionLine = (
@@ -61,7 +61,7 @@ export const createEmptyProductionLine = (
   stomachKg: 0,
   blocksCount: 0,
   blockSpecKg: 0,
-  botKg: {},
+  batterKg: {},
 });
 
 /** Dòng có tách râu/bao tử = đã nhập ít nhất một trong hai thành phần. */

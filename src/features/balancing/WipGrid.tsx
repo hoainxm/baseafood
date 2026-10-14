@@ -39,19 +39,19 @@ import { ChevronsLeftRight, Download, EyeOff, Layers, Plus } from "lucide-react"
 
 export function WipGrid({
   grid,
-  matHang: products,
+  products,
   customers,
   onCreateProduct: onAddProduct,
   onCreateCustomer: onAddCustomer,
   onEditProduct,
   onEditCustomer,
-  choHutBan,
-  onHutBan,
+  pendingSales,
+  onPullSales,
   daysCollapsed: isDateColumnsCollapsed,
   onToggleDays: onToggleDayColumns,
 }: {
   grid: PeriodGrid;
-  matHang: Product[];
+  products: Product[];
   customers: Customer[];
   onCreateProduct: (ten: string) => string;
   onCreateCustomer: (ten: string) => string;
@@ -59,13 +59,13 @@ export function WipGrid({
   onEditProduct?: (id: string) => void;
   onEditCustomer?: (id: string) => void;
   /** Seam cũ: dòng sổ BÁN trong khoảng ngày, dùng khi output = hàng đã bán ra. */
-  choHutBan: { ban: SalesItem; invoice: SalesInvoice }[];
-  onHutBan: (items: { ban: SalesItem; invoice: SalesInvoice }[]) => void;
+  pendingSales: { salesItem: SalesItem; invoice: SalesInvoice }[];
+  onPullSales: (items: { salesItem: SalesItem; invoice: SalesInvoice }[]) => void;
   /** Dùng chung với khối nguyên liệu — xem ghi chú ở MaterialGrid. */
   daysCollapsed: boolean;
   onToggleDays: () => void;
 }) {
-  const { date: dates, outputs: finishedGoods, finishedGoodRows, pendingWips, saveOutputs: saveFinishedGoods, pullWips: pullProduction, saveWipDayCells: saveProductionMultiDay, lockedDates, templatePeriod, missingTemplateRows: missingTemplates, goiY } =
+  const { date: dates, outputs: finishedGoods, finishedGoodRows, pendingWips, saveOutputs: saveFinishedGoods, pullWips: pullProduction, saveWipDayCells: saveProductionMultiDay, lockedDates, templatePeriod, missingTemplateRows: missingTemplates, suggestTemplate } =
     grid;
   const [isAdding, setIsAdding] = useState(false);
   const [reasonPrompt, setReasonPrompt] = useState<{ cells: DayCell[]; date: string } | null>(null);
@@ -90,7 +90,7 @@ export function WipGrid({
   const createFromTemplate = (m: FinishedGoodTemplateRow, patch: Partial<BalancingOutputItem>): BalancingOutputItem => {
     const r: BalancingOutputItem = {
       id: uid(),
-      periodId: grid.kyId,
+      periodId: grid.periodId,
       productId: m.productId,
       customerId: m.customerId,
       channel: m.channel,
@@ -346,7 +346,7 @@ export function WipGrid({
      theo dòng mẫu / kỳ gần nhất. Cần chọn quy cách, kênh ⇒ vẫn còn nút "Thêm mặt hàng". */
   const quickAdd = (productId: string) => {
     if (!productId) return;
-    const g = goiY(productId, "");
+    const g = suggestTemplate(productId, "");
     const customerId = g?.customerId ?? "";
     const templateKey = finishedGoodTemplateKey(productId, "", customerId);
     if (finishedGoods.some((r) => finishedGoodTemplateKey(r.productId, r.spec ?? "", r.customerId) === templateKey)) {
@@ -382,11 +382,11 @@ export function WipGrid({
               Lấy {pendingWips.length} dòng từ sổ sản xuất
             </Button>
           )}
-          {choHutBan.length > 0 && (
+          {pendingSales.length > 0 && (
             <Button
-              title="Hút các dòng bán trong khoảng ngày của kỳ từ sổ bán hàng vào lưới này." variant="outline" onClick={() => onHutBan(choHutBan)}>
+              title="Hút các dòng bán trong khoảng ngày của kỳ từ sổ bán hàng vào lưới này." variant="outline" onClick={() => onPullSales(pendingSales)}>
               <Download />
-              Lấy {choHutBan.length} dòng từ sổ bán
+              Lấy {pendingSales.length} dòng từ sổ bán
             </Button>
           )}
           <Button
@@ -496,7 +496,7 @@ export function WipGrid({
 
       {isAdding && (
         <AddProductDialog
-          matHang={products}
+          products={products}
           customers={customers}
           onCreateProduct={onAddProduct}
           onCreateCustomer={onAddCustomer}
@@ -516,7 +516,7 @@ export function WipGrid({
               ...finishedGoods,
               {
                 id,
-                periodId: grid.kyId,
+                periodId: grid.periodId,
                 productId,
                 customerId,
                 channel: kenh,

@@ -111,35 +111,35 @@ const WORKSHOP_QUICK = [
  * phần trên màn này để mắt nối được "thẻ xanh dương = nhập", "thẻ tím = sản xuất"…
  */
 const KIND_TONES = {
-  nhap: "bien",
-  sanXuat: "tim",
-  dinhMuc: "cat",
-  kho: "ngoc",
-  dongGoi: "bang",
-  ban: "la",
-  lo: "bang",
+  imports: "bien",
+  production: "tim",
+  yieldRatio: "cat",
+  warehouse: "ngoc",
+  packaging: "bang",
+  sales: "la",
+  lots: "bang",
 } as const satisfies Record<string, CategoryTone>;
 const STAGE_TONES: Record<string, CategoryTone> = {
-  nhap: KIND_TONES.nhap,
-  "san-xuat": KIND_TONES.sanXuat,
-  kho: KIND_TONES.kho,
-  "dong-goi": KIND_TONES.dongGoi,
-  "xuat-ban": KIND_TONES.ban,
+  nhap: KIND_TONES.imports,
+  "san-xuat": KIND_TONES.production,
+  kho: KIND_TONES.warehouse,
+  "dong-goi": KIND_TONES.packaging,
+  "xuat-ban": KIND_TONES.sales,
 };
 
 /** Tên + sắc + câu phụ cho từng phần của hai thanh "đi đâu" (id nút ở lib/dataFlow). */
 const MATERIAL_PARTS: Record<string, { label: string; tone: CategoryTone; description?: string }> = {
-  btp: { label: "Thành bán thành phẩm", tone: KIND_TONES.sanXuat },
-  nd: { label: "Bán thẳng nội địa", tone: KIND_TONES.ban },
-  cd: { label: "Còn dở, gửi đông", tone: KIND_TONES.kho, description: "ghi lúc chốt ngày sản xuất" },
+  btp: { label: "Thành bán thành phẩm", tone: KIND_TONES.production },
+  nd: { label: "Bán thẳng nội địa", tone: KIND_TONES.sales },
+  cd: { label: "Còn dở, gửi đông", tone: KIND_TONES.warehouse, description: "ghi lúc chốt ngày sản xuất" },
   pl: { label: "Phế liệu", tone: "cam" },
   hh: { label: "Hao hụt / chưa ghi ra", tone: "xam", description: "hao hụt chế biến hoặc NL chưa ghi dùng vào đâu" },
 };
 const WAREHOUSE_PARTS: Record<string, { label: string; tone: CategoryTone; description?: string }> = {
-  goi: { label: "Đem đóng gói", tone: KIND_TONES.dongGoi },
-  xd: { label: "Xuất theo đơn", tone: KIND_TONES.ban },
+  goi: { label: "Đem đóng gói", tone: KIND_TONES.packaging },
+  xd: { label: "Xuất theo đơn", tone: KIND_TONES.sales },
   bb: { label: "Bán block thô", tone: "hong" },
-  tonBtp: { label: "Còn trong kho", tone: KIND_TONES.kho },
+  tonBtp: { label: "Còn trong kho", tone: KIND_TONES.warehouse },
 };
 
 /** Lùi / tiến mốc kỳ một bước (ngày · tuần · tháng · năm). */
@@ -160,10 +160,10 @@ function periodLabel(ky: ViewPeriod, tu: string, den: string): string {
   return `${formatDateVN(tu)} – ${formatDateVN(den)}`;
 }
 
-const LEVEL_LABELS: Record<FlowWarning["level"], { chu: string; variant: TagVariant }> = {
-  loi: { chu: "Sổ sai", variant: "loi" },
-  nhac: { chu: "Chưa làm", variant: "luu-y" },
-  tin: { chu: "Để biết", variant: "phu" },
+const LEVEL_LABELS: Record<FlowWarning["level"], { text: string; variant: TagVariant }> = {
+  loi: { text: "Sổ sai", variant: "loi" },
+  nhac: { text: "Chưa làm", variant: "luu-y" },
+  tin: { text: "Để biết", variant: "phu" },
 };
 
 const formatMoney = (n: number) => `${n < 0 ? "−" : ""}${num(Math.abs(Math.round(n)))} đ`;
@@ -172,13 +172,13 @@ const shortDate = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
 function Section({
   title,
   description,
-  hanhDong,
+  actions,
   children,
   className,
 }: {
   title: string;
   description?: ReactNode;
-  hanhDong?: ReactNode;
+  actions?: ReactNode;
   children: ReactNode;
   className?: string;
 }) {
@@ -189,7 +189,7 @@ function Section({
           <h2 className="text-lg font-semibold text-foreground">{title}</h2>
           {description && <p className="mt-1 text-sm text-muted-foreground">{description}</p>}
         </div>
-        {hanhDong}
+        {actions}
       </div>
       {children}
     </section>
@@ -265,7 +265,7 @@ export default function DashboardScreen() {
       subtext: `${new Set(d.imports.filter((r) => r.deliveryDate >= tu && r.deliveryDate <= den && (!workshop || r.workshop === workshop)).map((r) => r.shipmentId)).size} chuyến`,
       numeric: true,
       icon: Truck,
-      tone: KIND_TONES.nhap,
+      tone: KIND_TONES.imports,
       onSelect: () => navigate("/imports"),
       selectHint: "Mở màn Nhập hàng để xem từng chuyến.",
     },
@@ -275,7 +275,7 @@ export default function DashboardScreen() {
       subtext: inKg > 0 ? `= ${num((productionKg / inKg) * 100)}% kg NL nhập` : undefined,
       numeric: true,
       icon: Factory,
-      tone: KIND_TONES.sanXuat,
+      tone: KIND_TONES.production,
       onSelect: () => navigate("/wip"),
       selectHint: "Mở màn Sản xuất thành phẩm.",
     },
@@ -290,7 +290,7 @@ export default function DashboardScreen() {
             : "chưa có mẻ gắn lô cân kg",
       numeric: true,
       icon: Gauge,
-      tone: KIND_TONES.dinhMuc,
+      tone: KIND_TONES.yieldRatio,
     },
     {
       label: "Tồn BTP kho dự trữ cuối kỳ",
@@ -298,7 +298,7 @@ export default function DashboardScreen() {
       subtext: `TP đóng gói còn ${num(last?.finishedStockKg ?? 0)} kg`,
       numeric: true,
       icon: Warehouse,
-      tone: KIND_TONES.kho,
+      tone: KIND_TONES.warehouse,
       onSelect: () => navigate("/warehouse"),
       selectHint: "Mở màn Kho dự trữ để xem tồn theo lô.",
     },
@@ -308,7 +308,7 @@ export default function DashboardScreen() {
       subtext: "xuất theo đơn · bán lẻ · bán nội địa",
       numeric: true,
       icon: ShoppingCart,
-      tone: KIND_TONES.ban,
+      tone: KIND_TONES.sales,
       onSelect: () => navigate("/orders"),
       selectHint: "Mở màn Đơn đặt để xem lệnh xuất.",
     },
@@ -328,7 +328,7 @@ export default function DashboardScreen() {
       subtext: "tính theo kg BTP (gồm mẻ đã ghi lý do)",
       numeric: true,
       icon: QrCode,
-      tone: KIND_TONES.lo,
+      tone: KIND_TONES.lots,
       onSelect: () => navigate("/qr?tab=stages"),
       selectHint: "Mở Mã lô QR — tab Theo giai đoạn để gắn lô còn thiếu.",
     },
@@ -367,7 +367,7 @@ export default function DashboardScreen() {
       header: "Mức",
       render: (r) => (
         <Tag variant={LEVEL_LABELS[r.level].variant}>
-          {LEVEL_LABELS[r.level].chu}
+          {LEVEL_LABELS[r.level].text}
         </Tag>
       ),
     },
@@ -639,8 +639,8 @@ export default function DashboardScreen() {
               labels={dayLabels}
               description="Biểu đồ kg nhập và sản xuất theo ngày"
               series={[
-                { id: "nhap", name: "NL nhập", color: KIND_TONES.nhap, kind: "cot", values: byDate.map((x) => x.importedKg) },
-                { id: "sx", name: "BTP sản xuất", color: KIND_TONES.sanXuat, kind: "cot", values: byDate.map((x) => x.producedKg) },
+                { id: "nhap", name: "NL nhập", color: KIND_TONES.imports, kind: "cot", values: byDate.map((x) => x.importedKg) },
+                { id: "sx", name: "BTP sản xuất", color: KIND_TONES.production, kind: "cot", values: byDate.map((x) => x.producedKg) },
               ]}
             />
           ) : (
@@ -656,8 +656,8 @@ export default function DashboardScreen() {
               labels={dayLabels}
               description="Biểu đồ tồn kho theo ngày"
               series={[
-                { id: "btp", name: "Tồn BTP kho dự trữ", color: KIND_TONES.kho, kind: "duong", area: true, values: byDate.map((x) => x.wipStockKg) },
-                { id: "tp", name: "Tồn TP đóng gói", color: KIND_TONES.dongGoi, kind: "duong", values: byDate.map((x) => x.finishedStockKg) },
+                { id: "btp", name: "Tồn BTP kho dự trữ", color: KIND_TONES.warehouse, kind: "duong", area: true, values: byDate.map((x) => x.wipStockKg) },
+                { id: "tp", name: "Tồn TP đóng gói", color: KIND_TONES.packaging, kind: "duong", values: byDate.map((x) => x.finishedStockKg) },
               ]}
             />
           ) : (
@@ -704,7 +704,7 @@ export default function DashboardScreen() {
       <Section
         title="Tồn kho theo kho (báo cáo Xuất–Nhập–Tồn)"
         description="Tồn cuối của kỳ mới nhất mỗi kho. Nguồn: báo cáo NXT nhập từ hệ thống xí nghiệp."
-        hanhDong={
+        actions={
           warehouseTotals.length > 0 && (
             <Button title="Mở màn Nhập xuất tồn kho để xem số chi tiết theo từng mã hàng." variant="outline" onClick={() => navigate("/nxt-warehouse")}>
               Mở báo cáo XNT kho

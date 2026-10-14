@@ -20,23 +20,23 @@ interface CatalogCell {
 }
 
 export function DomesticSaleSection({
-  dong,
+  lines,
   onUpdateRow: onEdit,
-  onBo,
+  onRemove,
   onAddRow: onAdd,
-  loaiNL: materialTypeCell,
+  materialTypeCell,
   customerField: customers,
 }: {
-  dong: DomesticSaleLine[];
+  lines: DomesticSaleLine[];
   onUpdateRow: (key: string, patch: Partial<DomesticSaleLine>) => void;
-  onBo: (key: string) => void;
+  onRemove: (key: string) => void;
   onAddRow: () => void;
   /** Danh mục loại NL — value = TÊN. */
-  loaiNL: CatalogCell;
+  materialTypeCell: CatalogCell;
   /** Danh mục khách hàng — value = TÊN. */
   customerField: CatalogCell;
 }) {
-  const validItems = dong.filter(isDomesticSaleLineComplete);
+  const validItems = lines.filter(isDomesticSaleLineComplete);
   const totalKg = validItems.reduce((s, d) => s + d.quantityKg, 0);
   const totalAmount = validItems.reduce((s, d) => s + d.quantityKg * (d.unitPrice ?? 0), 0);
 
@@ -65,7 +65,7 @@ export function DomesticSaleSection({
         </Button>
       </div>
 
-      {dong.map((d, i) => (
+      {lines.map((d, i) => (
         <div
           key={d.key}
           className="flex flex-wrap items-end gap-3 rounded-lg border border-border bg-muted/40 p-3"
@@ -126,7 +126,7 @@ export function DomesticSaleSection({
               size="icon"
               aria-label={`Bỏ dòng bán nội địa ${i + 1}`}
               title="Bỏ dòng bán nội địa này khỏi phiên đang gõ (chưa lưu nên không đụng sổ)."
-              onClick={() => onBo(d.key)}
+              onClick={() => onRemove(d.key)}
             >
               <X />
             </Button>

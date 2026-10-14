@@ -204,7 +204,7 @@ export default function WipProductionScreen() {
   const [isConfirmingLock, setIsConfirmingLock] = useState(false);
   const [lockNote, setLockNote] = useState("");
   /** Còn dở cuối ngày SX tách theo loại NL (khép vòng G1) — nhập khi chốt ngày. */
-  const [leftover, setLeftover] = useState<{ id: string; ten: string; kg: number | null }[]>([]);
+  const [leftover, setLeftover] = useState<{ id: string; name: string; kg: number | null }[]>([]);
   const leftoverDraftTotal = leftover.reduce((s, d) => s + (d.kg ?? 0), 0);
 
   /** A4: mốc "đã gửi báo cáo" theo (phạm vi·xưởng), lưu theo máy để phản hồi tại chỗ. */
@@ -523,7 +523,7 @@ export default function WipProductionScreen() {
 
   const validRows = tableRows.filter(isLineComplete);
   const sessionTotal = validRows.reduce((s, d) => s + getLineTotalKg(d), 0);
-  const sessionBatterKg = validRows.reduce((s, d) => s + sumBatterKg(d.botKg), 0);
+  const sessionBatterKg = validRows.reduce((s, d) => s + sumBatterKg(d.batterKg), 0);
   const isSessionLocked = session
     ? isLockedOn(session.productionDate, session.workshop)
     : false;
@@ -639,7 +639,7 @@ export default function WipProductionScreen() {
       tentacleKg: isSplitLine(d) ? d.tentacleKg || 0 : null,
       stomachKg: isSplitLine(d) ? d.stomachKg || 0 : null,
       operator,
-      batterKg: sanitizeBatterKg(d.botKg),
+      batterKg: sanitizeBatterKg(d.batterKg),
     }));
     if (newWips.length > 0) persist([...rows, ...newWips]);
 
@@ -686,7 +686,7 @@ export default function WipProductionScreen() {
       const va: Partial<Product> = { ...productPatches.get(p.id) };
       if (d.blockSpecKg > 0 && blockSpec(p) !== d.blockSpecKg)
         va.blockSpecKg = d.blockSpecKg;
-      const idsBot = Object.keys(sanitizeBatterKg(d.botKg))
+      const idsBot = Object.keys(sanitizeBatterKg(d.batterKg))
         .map((ten) => batterIdByName.get(ten) ?? "")
         .filter(Boolean);
       if (getProductBatterIds(p).length === 0 && idsBot.length > 0 && !va.batterIds)
@@ -899,11 +899,11 @@ export default function WipProductionScreen() {
         entityKey: reportKey,
         summary: `Gửi báo cáo thành phẩm ${rangeDescription} · ${workshop} — tổng ${kg(total)} (${view.length} dòng). ${dong}`,
         diff: {
-          nguoiGui: operator,
-          tong: total,
-          theoNguoi: operatorReport,
-          botTam: batterByType,
-          banNoiDia: { kg: domesticSaleViewTotal, soDong: bndView.length },
+          sender: operator,
+          total,
+          byOperator: operatorReport,
+          batterByType,
+          domesticSale: { kg: domesticSaleViewTotal, rowCount: bndView.length },
         },
       },
     ]);
@@ -953,7 +953,7 @@ export default function WipProductionScreen() {
     // Gom còn dở theo tên loại NL (cộng dồn trùng, bỏ dòng trống / ≤ 0).
     const leftoverByMaterial: Record<string, number> = {};
     for (const d of leftover) {
-      const ten = d.ten.trim();
+      const ten = d.name.trim();
       const kgv = d.kg ?? 0;
       if (!ten || kgv <= 0) continue;
       leftoverByMaterial[ten] = (leftoverByMaterial[ten] ?? 0) + kgv;
@@ -1151,11 +1151,11 @@ export default function WipProductionScreen() {
 
       {/* Lô NL dùng cho phiên (truy xuất QR đợt 2b) — khai một lần, lưu là gắn cho mọi mẻ cùng loài. */}
       <SessionLotsSection
-        dl={dlNhe}
+        traceData={dlNhe}
         workshop={session.workshop}
         date={session.productionDate}
         sessionLots={sessionLotsOf(session)}
-        onDoi={(items) => setDeclaredSessionLots({ date: session.productionDate, workshop: session.workshop, lots: items })}
+        onChange={(items) => setDeclaredSessionLots({ date: session.productionDate, workshop: session.workshop, lots: items })}
       />
 
       {/* Bảng thành phẩm — nhập cả phiên một lượt, lưu một lần */}
@@ -1169,10 +1169,10 @@ export default function WipProductionScreen() {
         </div>
 
         <ProductionLinesTable
-          dong={tableRows}
-          matHang={products}
+          lines={tableRows}
+          products={products}
           onUpdateRow={updateRow}
-          onBo={removeRow}
+          onRemove={removeRow}
           onAddRow={addRow}
           onAddGroup={addGroup}
           onChangeGroup={changeGroup}
@@ -1181,8 +1181,8 @@ export default function WipProductionScreen() {
           onEditCustomer={customerEditor.openEdit}
           customerOptions={customerOptions}
           onCreateCustomer={addCustomer}
-          botTam={batterTypes}
-          optBot={optBot}
+          batterTypes={batterTypes}
+          batterOptions={optBot}
           onCreateBatter={addBatter}
           onEditBatter={batterEditor.openEdit}
         />
@@ -1204,13 +1204,13 @@ export default function WipProductionScreen() {
 
       {/* Bán nội địa (mig 0054): NL bán thẳng — sổ riêng, không cộng vào thành phẩm. */}
       <DomesticSaleSection
-        dong={dongBND}
+        lines={dongBND}
         onUpdateRow={(key, patch) =>
           setDongBND((items) => items.map((d) => (d.key === key ? { ...d, ...patch } : d)))
         }
-        onBo={(key) => setDongBND((items) => items.filter((d) => d.key !== key))}
+        onRemove={(key) => setDongBND((items) => items.filter((d) => d.key !== key))}
         onAddRow={() => setDongBND((items) => [...items, createEmptyDomesticSaleLine(items.at(-1)?.materialTypeName ?? "")])}
-        loaiNL={materialTypeFieldProps}
+        materialTypeCell={materialTypeFieldProps}
         customerField={customerFieldProps}
       />
 
@@ -1586,7 +1586,7 @@ export default function WipProductionScreen() {
                 setLeftover(
                   Object.entries(lb).map(([ten, v]) => ({
                     id: uid(),
-                    ten,
+                    name: ten,
                     kg: Number(v) || null,
                   }))
                 );
@@ -1781,10 +1781,10 @@ export default function WipProductionScreen() {
                 <div className="rounded-lg border border-border p-3">
                   <p className="mb-2 text-base font-semibold">Bột tẩm</p>
                   <BatterSection
-                    diKem={batterNamesOf(edit.productId)}
-                    botKg={edit.batterKg ?? {}}
-                    onDoi={(batterKg) => patchEdit({ batterKg })}
-                    optBot={optBot}
+                    bundledIds={batterNamesOf(edit.productId)}
+                    batterKg={edit.batterKg ?? {}}
+                    onChange={(batterKg) => patchEdit({ batterKg })}
+                    batterOptions={optBot}
                     onCreateBatter={addBatter}
                     onEditBatter={batterEditor.openEdit}
                     productKg={editTotal}
@@ -1987,10 +1987,10 @@ export default function WipProductionScreen() {
                       <Combobox
                         label="Loại nguyên liệu"
                         hideLabel
-                        value={d.ten}
+                        value={d.name}
                         onChange={(v) =>
                           setLeftover((rs) =>
-                            rs.map((x) => (x.id === d.id ? { ...x, ten: v } : x))
+                            rs.map((x) => (x.id === d.id ? { ...x, name: v } : x))
                           )
                         }
                         options={materialTypes.map((l) => ({
@@ -2045,7 +2045,7 @@ export default function WipProductionScreen() {
               variant="outline"
               size="sm"
               onClick={() =>
-                setLeftover((rs) => [...rs, { id: uid(), ten: "", kg: null }])
+                setLeftover((rs) => [...rs, { id: uid(), name: "", kg: null }])
               }
             >
               <Plus />

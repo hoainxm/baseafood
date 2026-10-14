@@ -15,13 +15,13 @@ import { X } from "lucide-react";
 export function BatterPicker({
   value,
   onChange,
-  botTam: batterTypes,
+  batterTypes,
   onCreateBatter,
 }: {
   /** Chuỗi id "id1,id2" (hoặc rỗng). */
   value: string;
   onChange: (v: string) => void;
-  botTam: BatterType[];
+  batterTypes: BatterType[];
   /** Có ⇒ cho tạo loại bột mới tại chỗ (lưu ngay vào danh mục), trả về id. */
   onCreateBatter?: (ten: string) => string;
 }) {

@@ -95,10 +95,10 @@ export function DemoModeBanner() {
 export function DemoPackLoader() {
   const [goi] = useState(() => docGoiDemo<GoiDemo>());
   if (!LA_DEMO || !goi) return null;
-  return <NapGoiDemoThat goi={goi} />;
+  return <NapGoiDemoThat bundle={goi} />;
 }
 
-function NapGoiDemoThat({ goi }: { goi: GoiDemo }) {
+function NapGoiDemoThat({ bundle }: { bundle: GoiDemo }) {
   const bang = {
     products: useProducts(),
     materialTypes: useMaterialTypes(),
@@ -145,13 +145,13 @@ function NapGoiDemoThat({ goi }: { goi: GoiDemo }) {
     try {
       for (const k of Object.keys(bang) as (keyof GoiDemo)[]) {
         const writer = bang[k][1] as (rows: unknown[]) => void;
-        writer(goi[k] ?? []);
+        writer(bundle[k] ?? []);
       }
     } finally {
       setAuditPaused(false);
     }
     clearDemoBundle();
-    const total = Object.values(goi).reduce((s, items) => s + (items as unknown[]).length, 0);
+    const total = Object.values(bundle).reduce((s, items) => s + (items as unknown[]).length, 0);
     notify.saved(`Đã nạp bộ demo: ${num(total)} dòng số trình diễn.`);
     setIsWritten(true);
     // Chạy MỘT lần khi mọi bảng nạp xong (daNap chặn lần hai); `bang` đổi mỗi lần vẽ.

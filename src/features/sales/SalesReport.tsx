@@ -50,7 +50,7 @@ export default function SalesReport() {
   const [denTC, setDenTC] = useState(todayIso());
   const [tu, den] = getViewPeriodRange(ky, moc, tuTC, denTC);
 
-  const { dong, chart, soKhach: customerCount, tongKg: totalKg } = useMemo(() => {
+  const { dong, chart, customerCount, totalKg } = useMemo(() => {
     const invById = new Map(invoices.map((i) => [i.id, i]));
     const tenKH = new Map(customers.map((c) => [c.id, c.name]));
 
@@ -71,7 +71,7 @@ export default function SalesReport() {
       d.amount += calculateSalesAmount(it);
       theoKH.set(inv.customerId, (theoKH.get(inv.customerId) ?? 0) + (it.quantityKg || 0));
     }
-    const dong = [...map.values()].sort(
+    const rows = [...map.values()].sort(
       (a, b) =>
         a.customerName.localeCompare(b.customerName, "vi") ||
         a.channel.localeCompare(b.channel, "vi")
@@ -81,10 +81,10 @@ export default function SalesReport() {
       value,
     }));
     return {
-      dong,
+      dong: rows,
       chart,
-      soKhach: theoKH.size,
-      tongKg: dong.reduce((s, d) => s + d.quantityKg, 0),
+      customerCount: theoKH.size,
+      totalKg: rows.reduce((s, d) => s + d.quantityKg, 0),
     };
   }, [items, invoices, customers, tu, den]);
 

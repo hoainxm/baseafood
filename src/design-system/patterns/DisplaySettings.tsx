@@ -127,25 +127,25 @@ function useSettings(account?: string) {
   }, [account]);
 
   return {
-    coChu: fontSize,
-    matDo: density,
-    beRong: width,
-    doiCoChu: (id: string) => {
+    fontSize,
+    density,
+    width,
+    changeFontSize: (id: string) => {
       setFontSize(id);
       localStorage.setItem(fontSizeKey, id);
       applyFontSize(id);
     },
-    doiMatDo: (id: string) => {
+    changeDensity: (id: string) => {
       setDensity(id);
       localStorage.setItem(densityKey, id);
       applyDensity(id);
     },
-    doiBeRong: (id: string) => {
+    changeWidth: (id: string) => {
       setWidth(id);
       localStorage.setItem(widthKey, id);
       applyWidth(id);
     },
-    datLai: () => {
+    reset: () => {
       setFontSize(DEFAULT_FONT_SIZE);
       setDensity("gon");
       setWidth("toi-da");
@@ -170,7 +170,7 @@ export function FontSizeQuickPicker({
   className?: string;
   account?: string;
 }) {
-  const { coChu: fontSize, doiCoChu: changeFontSize } = useSettings(account);
+  const { fontSize, changeFontSize } = useSettings(account);
 
   return (
     <div
@@ -272,8 +272,8 @@ export function DisplaySettingsPanel({ account }: { account?: string }) {
       <OptionGroup
         label="Cỡ chữ toàn hệ thống"
         description="Áp cho mọi màn. Bố cục giãn theo, không vỡ như khi phóng to trình duyệt."
-        value={c.coChu}
-        onChange={c.doiCoChu}
+        value={c.fontSize}
+        onChange={c.changeFontSize}
         options={FONT_SIZES.map((m) => ({
           id: m.id,
           label: `${m.scale}`,
@@ -284,23 +284,23 @@ export function DisplaySettingsPanel({ account }: { account?: string }) {
       <OptionGroup
         label="Mật độ (chiều cao ô nhập và dòng bảng)"
         description="Thoáng dễ bấm nhất. Gọn cho người quen Excel muốn thấy nhiều dòng."
-        value={c.matDo}
-        onChange={c.doiMatDo}
+        value={c.density}
+        onChange={c.changeDensity}
         options={DENSITIES}
       />
 
       <OptionGroup
         label="Bề rộng nội dung"
         description="Bảng cân đối nhiều cột thì để Rộng hoặc Tối đa."
-        value={c.beRong}
-        onChange={c.doiBeRong}
+        value={c.width}
+        onChange={c.changeWidth}
         options={CONTENT_WIDTHS}
       />
 
       <div className="flex justify-end border-t border-border pt-5">
         <Button
           variant="outline"
-          onClick={c.datLai}
+          onClick={c.reset}
           title="Trả cỡ chữ, mật độ và giao diện sáng/tối về mức mặc định của hệ thống. Chỉ đổi trên máy này."
         >
           <RotateCcw />

@@ -59,16 +59,16 @@ export function auditActionAliases(action: string): string[] {
 export const LEGACY_FIELDS = {
   wip: { componentRauKg: "tentacleKg", componentBaoTuKg: "stomachKg" },
   reconciliationSummary: {
-    soHoaDon: "invoiceCount",
-    khop: "matched",
-    lech: "mismatched",
-    thieu: "missing",
-    ganKhop: "nearMatched",
-    soDongPm: "ledgerRowCount",
-    pmCo: "ledgerMatched",
-    pmThieu: "ledgerMissing",
-    tongChenh: "totalDifference",
-    nguong: "threshold",
+    soHoaDon: "invoiceCount", // naming-ok: khóa bên TRÁI của LEGACY_FIELDS là tên CŨ đã lưu — cố ý
+    khop: "matched", // naming-ok
+    lech: "mismatched", // naming-ok
+    thieu: "missing", // naming-ok
+    ganKhop: "nearMatched", // naming-ok
+    soDongPm: "ledgerRowCount", // naming-ok
+    pmCo: "ledgerMatched", // naming-ok
+    pmThieu: "ledgerMissing", // naming-ok
+    tongChenh: "totalDifference", // naming-ok
+    nguong: "threshold", // naming-ok
   },
   reconciliationOptions: { soChuanTen: "ledgerSheetName", benThue: "taxSideSheets", cheDo: "mode" },
 } as const satisfies Record<string, Record<string, string>>;

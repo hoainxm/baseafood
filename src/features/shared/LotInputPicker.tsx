@@ -55,27 +55,27 @@ function LotInputDialog({
   description,
   inputKind,
   inputLabel,
-  dl,
+  traceData,
   linkedInputs,
   candidates,
   candidatesTitle,
   validateNode: checkNode,
   onAdd,
-  onBo,
+  onRemove,
   onClose,
 }: {
   title: string;
   description: string;
   inputKind: LotKind;
   inputLabel: string;
-  dl: TraceData;
+  traceData: TraceData;
   linkedInputs: LinkedInput[];
   candidates: LotNode[];
   candidatesTitle: string;
   /** Kiểm thêm (VD đúng mặt hàng). Trả câu cảnh báo để chặn, hoặc null. */
   validateNode?: (n: LotNode) => string | null;
   onAdd: (node: LotNode, method: LotInput["method"], kg: number | null) => void;
-  onBo: (id: string) => void;
+  onRemove: (id: string) => void;
   onClose: () => void;
 }) {
   const [isScanning, setIsScanning] = useState(false);
@@ -84,7 +84,7 @@ function LotInputDialog({
   const [choices, setChoices] = useState<LotNode[]>([]); // một mã nhiều lô ⇒ cho người chọn
   const [pickPrompt, setPickPrompt] = useState("");
   // Sổ tồn theo lô dựng MỘT lần cho cả danh sách — tính lại từng dòng là O(n²).
-  const lotStockTable = useMemo(() => buildLotStockIndex(dl), [dl]);
+  const lotStockTable = useMemo(() => buildLotStockIndex(traceData), [traceData]);
 
   const addLot = (node: LotNode, method: LotInput["method"]) => {
     if (node.kind !== inputKind) {
@@ -110,7 +110,7 @@ function LotInputDialog({
   const handleCode = (text: string, method: "scan" | "typed") => {
     const ma = parseQrCode(text);
     if (!ma) return;
-    const result = findLots(ma, dl);
+    const result = findLots(ma, traceData);
     if (!result.length) {
       notify.warning(`Không tìm thấy lô "${text}". Kiểm tra lại mã, hoặc chọn trong danh sách bên dưới.`);
       return;
@@ -118,7 +118,7 @@ function LotInputDialog({
     if (result.length === 1) addLot(result[0]!, method);
     else {
       // Mã chuyến ⇒ các loại NL của chuyến (việc thường ngày, không toast); mã cũ trùng thật ⇒ cảnh báo.
-      const ld = explainMultipleLots(text, result, dl);
+      const ld = explainMultipleLots(text, result, traceData);
       setChoices(result);
       setPickPrompt(ld.message);
       if (!ld.sameShipment) notify.warning(`${ld.message} bên dưới.`);
@@ -126,8 +126,8 @@ function LotInputDialog({
   };
 
   const lotRow = (n: LotNode, node: ReactNode) => {
-    const cb = computeLotMassBalance(n.kind, n.id, dl);
-    const lotStock = getLotStockKg(n.kind, n.id, dl, lotStockTable);
+    const cb = computeLotMassBalance(n.kind, n.id, traceData);
+    const lotStock = getLotStockKg(n.kind, n.id, traceData, lotStockTable);
     return (
       <li key={`${n.kind}:${n.id}`} className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-2">
         <div className="min-w-0">
@@ -159,7 +159,7 @@ function LotInputDialog({
                       {[g.description, g.kg != null ? kgChu(g.kg) : "chưa ghi kg", g.operator].filter(Boolean).join(" · ")}
                     </div>
                   </div>
-                  <Button variant="outline" size="sm" title={`Bỏ lô ${g.label}. Còn nút Hoàn tác.`} onClick={() => onBo(g.id)}>
+                  <Button variant="outline" size="sm" title={`Bỏ lô ${g.label}. Còn nút Hoàn tác.`} onClick={() => onRemove(g.id)}>
                     <Trash2 aria-hidden /> Bỏ
                   </Button>
                 </li>
@@ -292,7 +292,7 @@ export function LotInputPicker({
       description={`Ghi ${outputKind === "W" ? "mẻ sản xuất này" : "phiếu đóng gói này"} đã dùng ${inputLabel} nào. Quét tem, gõ mã, hoặc chọn trong danh sách. Số kg có thể để trống nếu chưa cân.`}
       inputKind={inputKind}
       inputLabel={inputLabel}
-      dl={dl}
+      traceData={dl}
       linkedInputs={assigned.map((l) => ({ id: l.id, label: l.inputLabel, description: l.material, kg: l.quantityKg, method: l.method, operator: l.operator }))}
       candidates={candidates}
       candidatesTitle={`Hoặc chọn ${inputLabel} — xưởng ${workshop}`}
@@ -322,7 +322,7 @@ export function LotInputPicker({
         saveLotInputs([...lotInputs, created]);
         notify.saved(`Đã gắn ${inputLabel} ${node.label}${kg != null ? ` · ${kgChu(kg)}` : ""}.`);
       }}
-      onBo={(id) => {
+      onRemove={(id) => {
         const prevRows = lotInputs;
         const l = lotInputs.find((x) => x.id === id);
         saveLotInputs(lotInputs.filter((x) => x.id !== id));
@@ -389,7 +389,7 @@ export function LotDispatchPicker({
       description="Ghi hàng này lấy từ lô nào để truy xuất tới được khách. Quét tem trên thùng, gõ mã, hoặc chọn lô còn tồn. Số kg có thể để trống nếu chưa cân."
       inputKind={lotKind}
       inputLabel={inputLabel}
-      dl={dl}
+      traceData={dl}
       linkedInputs={assigned.map((d) => ({ id: d.id, label: d.lotLabel, description: "", kg: d.quantityKg, method: d.method, operator: d.operator }))}
       candidates={candidates}
       candidatesTitle={lotKind === "S" ? `Hoặc chọn lô NL — xưởng ${workshop}` : "Hoặc chọn lô còn tồn — cũ trước"}
@@ -415,7 +415,7 @@ export function LotDispatchPicker({
         saveLotDispatches([...lotDispatches, created]);
         notify.saved(`Đã gắn ${inputLabel} ${node.label}${kg != null ? ` · ${kgChu(kg)}` : ""}.`);
       }}
-      onBo={(id) => {
+      onRemove={(id) => {
         const prevRows = lotDispatches;
         const d = lotDispatches.find((x) => x.id === id);
         saveLotDispatches(lotDispatches.filter((x) => x.id !== id));

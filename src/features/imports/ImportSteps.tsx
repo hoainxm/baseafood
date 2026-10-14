@@ -1,140 +1,14 @@
 // ============================================================
 // Tên file: src/features/imports/FormStep.tsx
-// Tên tiếng Việt: Khối giao diện của luồng nhập nhanh — thẻ BƯỚC có số, thẻ CHỌN lớn, chuyến trong ngày
-// Description: Presentational blocks for the guided import flow (no data access).
+// Tên tiếng Việt: Danh sách chuyến đã ghi trong ngày (cột phải màn Nhập hàng)
+// Description: Presentational list of the day's saved shipments (no data access).
 // ============================================================
-import type { ReactNode } from "react";
 import { Button, Tag } from "@/design-system";
 import { kg } from "@/lib/format";
 import { formatMaterialLotLabel } from "@/lib/lotTraceability";
 import { cn } from "@/lib/utils";
-import { Check, Pencil, QrCode } from "lucide-react";
+import { Pencil, QrCode } from "lucide-react";
 import type { ShipmentGroup } from "./importHelpers";
-
-/**
- * Một BƯỚC của phiếu nhập. Đang làm ⇒ mở, viền đậm. Làm xong ⇒ THU lại còn một dòng
- * tóm tắt + nút "Đổi" — màn ngắn lại, mắt chỉ còn nhìn bước đang làm.
- */
-export function StepCard({
-  stepNumber: num,
-  title,
-  done,
-  open,
-  summary,
-  onChange,
-  children,
-}: {
-  stepNumber: number;
-  title: string;
-  /** Bước đã có dữ liệu (đổi số thành dấu ✓). */
-  done: boolean;
-  /** Đang mở để thao tác. */
-  open: boolean;
-  /** Dòng tóm tắt khi thu lại. */
-  summary?: ReactNode;
-  /** Có thì hiện nút "Đổi" lúc thu lại. */
-  onChange?: () => void;
-  children: ReactNode;
-}) {
-  return (
-    <section
-      className={cn(
-        "rounded-xl border-2 bg-card",
-        open ? "border-primary/50" : "border-border",
-      )}
-    >
-      <div className="flex min-h-12 items-center gap-3 px-4 py-2">
-        <span
-          aria-hidden
-          className={cn(
-            "flex size-7 shrink-0 items-center justify-center rounded-full font-semibold tnum",
-            done
-              ? "bg-primary text-primary-foreground"
-              : "border-2 border-primary text-primary",
-          )}
-        >
-          {done ? <Check className="size-4" /> : num}
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className={cn("font-semibold", !open && "text-muted-foreground")}>
-            {title}
-          </p>
-          {!open && summary && (
-            <div className="min-w-0 font-semibold">{summary}</div>
-          )}
-        </div>
-        {!open && onChange && (
-          <Button
-            title={`Mở lại bước "${title}" để chọn lại.`}
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={onChange}
-          >
-            <Pencil />
-            Đổi
-          </Button>
-        )}
-      </div>
-      {open && (
-        <div className="space-y-3 border-t-2 border-border p-4">{children}</div>
-      )}
-    </section>
-  );
-}
-
-/** Thẻ chọn LỚN — một chạm. Trạng thái chọn có ✓ + viền đậm, không chỉ báo bằng màu. */
-export function ChoiceCard({
-  label: cardLabel,
-  phu,
-  isSelected,
-  title,
-  onClick,
-  icon,
-}: {
-  label: string;
-  phu?: string;
-  isSelected?: boolean;
-  /** Câu giải thích khi rê chuột (luật nút thao tác). */
-  title: string;
-  onClick: () => void;
-  icon?: ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      title={title}
-      aria-pressed={isSelected}
-      onClick={onClick}
-      className={cn(
-        "flex min-h-14 w-full min-w-0 items-center gap-3 rounded-lg border-2 px-3 py-2 text-left transition-colors",
-        isSelected
-          ? "border-primary bg-accent"
-          : "border-border bg-card hover:border-primary/50 hover:bg-muted",
-      )}
-    >
-      {icon && (
-        <span
-          className="shrink-0 text-muted-foreground [&_svg]:size-5"
-          aria-hidden
-        >
-          {icon}
-        </span>
-      )}
-      <span className="min-w-0 flex-1">
-        <span className="block font-semibold break-words">{cardLabel}</span>
-        {phu && (
-          <span className="block text-sm break-words text-muted-foreground">
-            {phu}
-          </span>
-        )}
-      </span>
-      {isSelected && (
-        <Check className="size-5 shrink-0 text-primary" aria-hidden />
-      )}
-    </button>
-  );
-}
 
 /** Các chuyến ĐÃ GHI của ngày + xưởng đang nhập — nhìn ngay cạnh phiếu, khỏi đổi tab. */
 export function DayShipmentList({

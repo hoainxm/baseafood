@@ -86,7 +86,7 @@ import { cn } from "@/lib/utils";
 import { BulkTypeChangeDialog } from "./BulkTypeChange";
 
 import { ImportLinesTable } from "./ImportLinesTable";
-import { DayShipmentList, StepCard, ChoiceCard } from "./ImportSteps";
+import { DayShipmentList } from "./ImportSteps";
 import { DailyScrapSection } from "./DailyScrapSection";
 import {
   DEFAULT_CATEGORY,
@@ -151,14 +151,8 @@ export default function MaterialImportScreen() {
    *  luôn nhảy về "Bạch tuộc" (sai ở xưởng Khô/Cá). */
   const [lastCategory, setLastCategory] = useState<Category>(DEFAULT_CATEGORY);
   const [sessionErrors, setSessionErrors] = useState<FieldError[]>([]);
-  // Khối "Xe và ghi chú" (tài xế/biển số) mở sẵn — hầu hết chuyến đều có.
-  const [isExtrasOpen, setIsExtrasOpen] = useState(true);
-  /** Luồng theo bước: bước đang ÉP mở (bấm "Đổi" / đang gõ tay xe). null = tự suy theo dữ liệu. */
-  const [openPanel, setOpenPanel] = useState<"supplier" | "vehicle" | null>(null);
-  /** Người dùng chủ động bỏ qua bước xe (chuyến không ghi xe) ⇒ bước thu lại dù ô trống. */
-  const [skipTruck, setSkipTruck] = useState(false);
-  /** Mở hai ô gõ tay biển số / tài xế (xe chưa từng chở cho đại lý này). */
-  const [isManualVehicle, setIsManualVehicle] = useState(false);
+  /** Khối thu/mở "Mã lô · SSCC" — ít dùng nên thu sẵn khi ghi chuyến mới. */
+  const [isExtrasOpen, setIsExtrasOpen] = useState(false);
   /** Tách "ngày ghi sổ" khỏi "ngày hàng về" (ghi bù). Mặc định MỘT ô ngày cho ca thường. */
   const [splitDates, setSplitDates] = useState(false);
 
@@ -334,13 +328,6 @@ export default function MaterialImportScreen() {
 
   /* ---- Ghi chuyến ---- */
 
-  /** Bảng loại hàng MỞ ĐẦU cho một chuyến mới: đại lý đã có lịch sử ⇒ điền sẵn
-   *  loại + đơn giá gần nhất (chỉ còn gõ kg); chưa có ⇒ một dòng trống. */
-  const newTableRows = (supplier: string, workshop: Workshop, category: Category): ImportLine[] => {
-    const templateRows = getSupplierLineTemplates(rows, supplier, workshop);
-    return templateRows.length ? templateRows : [createEmptyImportLine(category)];
-  };
-
   /** Đưa con trỏ vào ô kg đầu tiên — bước kế tiếp tự nhiên sau khi chọn đại lý/xe. */
   // Focus NGAY trong cú chạm (không hẹn giờ): iPhone chỉ bật bàn phím khi focus nằm
   // trong thao tác của người dùng. Bảng bước ③ luôn có sẵn trong DOM nên làm được.
@@ -361,22 +348,19 @@ export default function MaterialImportScreen() {
   /** Enter ở ô kg CUỐI ⇒ nhảy tới nút lưu (Enter lần nữa là lưu) — gõ liền mạch bằng bàn phím. */
   const focusSaveButton = () => document.getElementById("nut-luu-chuyen")?.focus();
 
-  /** Đưa luồng bước về đầu. `daCoXe`: mở chuyến cũ để sửa ⇒ coi bước xe đã xong. */
-  const resetSteps = (hasVehicle: boolean) => {
-    setOpenPanel(null);
-    setSkipTruck(hasVehicle);
-    setIsManualVehicle(false);
-    setSplitDates(false);
-  };
-
-  const openAdd = () => {
+  /**
+   * Mở phiếu trống cho chuyến MỚI. Đại lý LUÔN để trống — mỗi chuyến một đại lý,
+   * không kế thừa từ chuyến trước hay từ bộ lọc sổ (lỗi cũ: lưu xong mở chuyến kế
+   * vẫn mang tên đại lý vừa ghi). `prev` = chuyến vừa lưu ⇒ giữ ngày + xưởng (+ lý do
+   * ghi bù nếu đang ghi bù) để ghi liền nhiều chuyến cùng ngày khỏi chọn lại.
+   */
+  const openAdd = (prev?: ShipmentHeader, category: Category = lastCategory) => {
     setSession({
-      deliveryDate: postingDate,
-      postingDate: todayISO(),
-      backdateReason: "",
-      workshop: recordWorkshop,
-      // Đang lọc theo một đại lý → điền sẵn đại lý đó, khỏi chọn lại.
-      supplierName: supplierFilter,
+      deliveryDate: prev?.deliveryDate ?? postingDate,
+      postingDate: prev?.postingDate ?? todayISO(),
+      backdateReason: prev?.backdateReason ?? "",
+      workshop: prev?.workshop ?? recordWorkshop,
+      supplierName: "",
       driverName: "",
       licensePlate: "",
       note: "",
@@ -385,11 +369,10 @@ export default function MaterialImportScreen() {
     });
     setSessionShipmentId(null);
     setEditRowIds(null);
-    setTableRows(newTableRows(supplierFilter, recordWorkshop, lastCategory));
+    setTableRows([createEmptyImportLine(category)]);
     setSessionErrors([]);
-    // Ghi chú / SSCC / mã lô ít dùng → thu sẵn; tài xế + biển số đã đưa ra ngoài.
     setIsExtrasOpen(false);
-    resetSteps(false);
+    setSplitDates(false);
   };
 
   // Form-first: vào "Ghi nhập" mà chưa có phiếu → tự mở phiếu trống (không modal).
@@ -440,8 +423,8 @@ export default function MaterialImportScreen() {
       }))
     );
     setSessionErrors([]);
-    setIsExtrasOpen(true);
-    resetSteps(true);
+    setIsExtrasOpen(false);
+    setSplitDates(false);
     setMode("entry"); // sửa chuyến mở trong form inline (chế độ Ghi nhập)
   };
 
@@ -464,13 +447,10 @@ export default function MaterialImportScreen() {
     if (!session) return;
     const isSupplierChanged = v !== session.supplierName;
     setSessionField("supplierName", v);
-    if (v) setOpenPanel(null); // chọn xong ⇒ bước ① thu lại, bước ② (xe) tự mở
-    // Chạm lại đúng đại lý đang chọn (mở "Đổi" rồi thôi) ⇒ không đụng xe / bảng.
+    // Chạm lại đúng đại lý đang chọn ⇒ không đụng xe / bảng.
     if (isEditingShipment || !v || !isSupplierChanged) return;
     // Đổi đại lý ⇒ xe của đại lý cũ không còn đúng (chỉ xóa khi đang ghi chuyến MỚI).
     setSession((p) => (p ? { ...p, driverName: "", licensePlate: "" } : p));
-    setSkipTruck(false);
-    setIsManualVehicle(false);
     // Bảng dựng lại theo đại lý MỚI: giữ kg đã gõ, KHÔNG giữ giá điền sẵn của đại lý cũ.
     const templateRows = getSupplierLineTemplates(rows, v, session.workshop);
     setTableRows((items) => applyNewSupplierTemplate(items, templateRows));
@@ -485,44 +465,20 @@ export default function MaterialImportScreen() {
     setTableRows((items) => applyNewSupplierTemplate(items, templateRows));
   };
 
-  /** Chạm BIỂN SỐ: điền biển + tài xế gần nhất của xe đó (ca thường: một chạm là xong)
-   *  rồi nhảy xuống ô kg. Khác tài xế thì bấm "Đổi" → chạm tên tài xế. */
+  /** Chạm BIỂN SỐ gợi ý: điền biển + tài xế gần nhất của xe đó rồi nhảy xuống ô kg. */
   const pickPlate = (x: { licensePlate: string; driverName: string }) => {
     setSession((p) =>
       p
         ? { ...p, licensePlate: x.licensePlate, driverName: x.driverName || p.driverName }
         : p
     );
-    setOpenPanel(null);
-    setIsManualVehicle(false);
     focusFirstKgCell();
   };
 
-  /** Chạm TÀI XẾ: đã có biển số ⇒ xong bước xe; chưa có ⇒ ở lại chờ chọn biển số. */
+  /** Chạm TÀI XẾ gợi ý: đã có biển số ⇒ xong phần xe, nhảy xuống ô kg. */
   const pickDriver = (name: string) => {
     setSessionField("driverName", name);
-    if (!session?.licensePlate.trim()) {
-      setOpenPanel("vehicle");
-      return;
-    }
-    setOpenPanel(null);
-    setIsManualVehicle(false);
-    focusFirstKgCell();
-  };
-
-  /** Gõ tay xong xe ⇒ thu bước ②, nhảy xuống ô kg. */
-  const finishTruckStep = () => {
-    setOpenPanel(null);
-    focusFirstKgCell();
-  };
-
-  /** Chuyến không ghi xe ⇒ xóa 2 ô, thu bước ②, nhảy xuống ô kg. */
-  const skipTruckStep = () => {
-    setSession((p) => (p ? { ...p, licensePlate: "", driverName: "" } : p));
-    setSkipTruck(true);
-    setIsManualVehicle(false);
-    setOpenPanel(null);
-    focusFirstKgCell();
+    if (session?.licensePlate.trim()) focusFirstKgCell();
   };
 
   /** Đang sửa chuyến đã ghi (khác với tạo chuyến mới). */
@@ -565,11 +521,6 @@ export default function MaterialImportScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [rows, shipments, session?.deliveryDate, session?.workshop]
   );
-  const hasVehicleInfo = !!session && !!(session.licensePlate.trim() || session.driverName.trim());
-  const hasVehicleHints = truckSuggestions.plates.length > 0 || truckSuggestions.drivers.length > 0;
-  /** Bước mở/thu SUY từ dữ liệu, `dangMo` chỉ để ép mở khi bấm "Đổi" / đang gõ tay. */
-  const isSupplierStepOpen = openPanel === "supplier" || !session?.supplierName;
-  const isVehicleStepOpen = !isSupplierStepOpen && (openPanel === "vehicle" || (!hasVehicleInfo && !skipTruck));
   /** Hai ô ngày chỉ hiện khi ghi bù (hoặc người dùng chủ động tách). */
   const twoDates =
     !!session && (splitDates || session.postingDate !== session.deliveryDate);
@@ -730,9 +681,6 @@ export default function MaterialImportScreen() {
           }
         : p
     );
-    if (supplierName) setOpenPanel(null);
-    if (isSupplierChanged) setSkipTruck(false);
-    setIsManualVehicle(false);
     const rebuild = !isEditingShipment && (isSupplierChanged || workshop !== session.workshop);
     const templateRows = rebuild ? getSupplierLineTemplates(rows, supplierName, workshop) : [];
     setTableRows((items) =>
@@ -865,28 +813,15 @@ export default function MaterialImportScreen() {
     setSessionErrors([]);
   };
 
-  /** Lưu xong, đóng dialog. */
+  /** Lưu xong ⇒ phiếu trống cho chuyến kế. Chuyến MỚI vừa lưu ⇒ giữ ngày + xưởng
+   *  (ghi liền nhiều chuyến trong ngày); vừa sửa chuyến cũ ⇒ phiếu mặc định. Đại lý
+   *  luôn để trống. */
   const finishShipment = () => {
-    if (saveSession(false)) resetSession();
-  };
-
-  /** Lưu xong, dọn bảng nhưng GIỮ ngày + xưởng + đại lý cho chuyến kế (một đại
-   *  lý hay giao nhiều lượt trong ngày) — chỉ làm mới xe + bảng loại hàng. */
-  const saveAndAddShipment = () => {
+    const prev = isEditingShipment ? undefined : (session ?? undefined);
+    const nextCategory = validRows.length ? validRows[validRows.length - 1].category : lastCategory;
     if (!saveSession(false)) return;
-    const lastRowCategory = validRows.length
-      ? validRows[validRows.length - 1].category
-      : lastCategory;
-    setSession((p) =>
-      p
-        ? { ...p, driverName: "", licensePlate: "", note: "", ssccCode: "", scanPath: "" }
-        : p
-    );
-    setSessionShipmentId(null);
-    setEditRowIds(null);
-    setTableRows(newTableRows(session?.supplierName ?? "", session?.workshop ?? recordWorkshop, lastRowCategory));
-    setSessionErrors([]);
-    resetSteps(false);
+    resetSession();
+    if (prev) openAdd(prev, nextCategory);
   };
 
 
@@ -1091,121 +1026,29 @@ export default function MaterialImportScreen() {
         </div>
   );
 
-  // FORM NHẬP (form-first, INLINE) — LUỒNG THEO BƯỚC: thanh ngữ cảnh (ngày · xưởng)
-  // → ① Đại lý → ② Xe → ③ Loại hàng & kg → thanh LƯU dính đáy. Bước xong thì thu
-  // lại một dòng. Cột phải (desktop) / bên dưới (điện thoại): chuyến ĐÃ GHI trong
-  // ngày + phế liệu — khỏi đổi tab sang "Sổ ngày" để biết đã ghi gì.
+  /** Nút chọn nhanh (đại lý hay giao / xe đã chở) — nhỏ gọn, một chạm. */
+  const quickPick = (key: string, label: string, isSelected: boolean, title: string, onClick: () => void) => (
+    <Button
+      key={key}
+      type="button"
+      size="sm"
+      variant={isSelected ? "default" : "outline"}
+      aria-pressed={isSelected}
+      title={title}
+      onClick={onClick}
+    >
+      {label}
+    </Button>
+  );
+
+  // FORM NHẬP (form-first, INLINE) — PHẲNG một khối đầu chuyến (ngày · xưởng · đại lý ·
+  // xe · ghi chú, ô nào cũng hiện sẵn, không bước thu/mở) → bảng loại hàng & kg → thanh
+  // LƯU một nút. Cột phải (desktop) / bên dưới (điện thoại): chuyến ĐÃ GHI trong ngày
+  // + phế liệu + chốt ngày.
   const entryForm = session && (
     <div className="grid gap-5 xl:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)] xl:items-start">
       <div className="min-w-0 space-y-4">
         <ErrorSummary errors={sessionErrors} />
-
-        {/* THANH NGỮ CẢNH — ngày + xưởng của cả phiếu */}
-        <div className="space-y-3 rounded-xl border-2 border-border bg-card p-4">
-          <div className="grid gap-4 sm:grid-cols-2">
-            {twoDates ? (
-              <>
-                <DateField
-                  label="Ngày ghi sổ"
-                  required
-                  info="Ngày ghi vào hệ thống. Chọn ngày này thì ngày hàng về tự nhảy theo. Cần khác thì sửa ô ngày hàng về bên cạnh."
-                  value={session.postingDate}
-                  onChange={changePostingDate}
-                />
-                <DateField
-                  label="Ngày hàng về xưởng"
-                  required
-                  info="Ngày xe đổ hàng thật — mọi tổng hợp tính theo ngày này. Sửa tay ô này khi hàng về hôm khác (ghi bù)."
-                  value={session.deliveryDate}
-                  onChange={changeDeliveryDate}
-                />
-              </>
-            ) : (
-              <DateField
-                label="Ngày hàng về"
-                required
-                info="Ngày xe đổ hàng — cũng là ngày ghi sổ. Hàng về hôm trước mà nay mới ghi thì bấm “Ghi bù” bên dưới để tách hai ngày."
-                value={session.deliveryDate}
-                onChange={changePostingDate}
-              />
-            )}
-            <ChoiceGroup
-              label="Phân xưởng"
-              required
-              columns={3}
-              className={twoDates ? "sm:col-span-2" : undefined}
-              value={session.workshop}
-              onChange={(v) => pickWorkshop(v as Workshop)}
-              options={WORKSHOPS.map((p) => ({ value: p, label: p }))}
-            />
-          </div>
-
-          {(isBackdatedImport(session) || isSessionLocked) && (
-            <Field
-              label="Lý do ghi bù"
-              required
-              hint="VD: đại lý chưa xuất hóa đơn, 31/7 mới có chứng từ."
-            >
-              <Input
-                value={session.backdateReason}
-                onChange={(e) => setSessionField("backdateReason", e.target.value)}
-                placeholder="Vì sao tới hôm nay mới ghi?"
-              />
-            </Field>
-          )}
-
-          <div className="flex flex-wrap items-center gap-2">
-            {!twoDates ? (
-              <Button
-                title="Hàng về hôm trước mà nay mới ghi sổ (chờ hóa đơn…): tách thành hai ô ngày ghi sổ / ngày hàng về, kèm lý do."
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-auto min-h-9 max-w-full py-1 text-left whitespace-normal"
-                onClick={() => setSplitDates(true)}
-              >
-                <CalendarRange />
-                Ghi bù (hai ngày khác nhau)
-              </Button>
-            ) : (
-              !isBackdatedImport(session) && (
-                <Button
-                  title="Hàng về đúng ngày ghi sổ: gộp lại còn một ô ngày."
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setSplitDates(false)}
-                >
-                  Gộp lại một ngày
-                </Button>
-              )
-            )}
-            {hasOcr && (
-              <Button
-                title="Chụp hoặc chọn ảnh phiếu nhập viết tay, máy tự đọc ra ngày · đại lý · các dòng loại NL và kg. Kết quả là NHÁP — soát lại rồi mới lưu."
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-auto min-h-9 max-w-full py-1 text-left whitespace-normal"
-                onClick={() => setOcrMo(true)}
-              >
-                <Camera />
-                Nhận diện từ ảnh phiếu
-              </Button>
-            )}
-            {session.scanPath && (
-              <span className="flex items-center gap-1">
-                <Tag variant="done">Đã đính ảnh phiếu</Tag>
-                {hasImageStorage && (
-                  <Button
-                    title="Mở lại ảnh phiếu tay đã lưu kèm chuyến này." type="button" variant="link" size="sm" onClick={viewScanImage}>
-                    Xem
-                  </Button>
-                )}
-              </span>
-            )}
-          </div>
-        </div>
 
         {isSessionLocked && (
           <p className="flex items-start gap-3 rounded-lg bg-accent px-4 py-3 text-base text-accent-foreground">
@@ -1233,162 +1076,196 @@ export default function MaterialImportScreen() {
           </p>
         )}
 
-        {/* ① ĐẠI LÝ — chọn xong là thu lại, kéo theo xe gợi ý + bảng loại hàng điền sẵn */}
-        <StepCard
-          stepNumber={1}
-          title="Đại lý giao hàng"
-          done={!!session.supplierName}
-          open={isSupplierStepOpen}
-          summary={session.supplierName}
-          onChange={() => setOpenPanel("supplier")}
-        >
-          {!isEditingShipment && frequentSuppliers.length > 0 && (
-            <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
-              {frequentSuppliers.map((name) => (
-                <ChoiceCard
-                  key={name}
-                  label={name}
-                  phu={lastDateBySupplier.get(name) ? `Gần nhất ${formatDateVN(lastDateBySupplier.get(name) ?? "")}` : undefined}
-                  isSelected={session.supplierName === name}
-                  title={`Chọn đại lý ${name} — tự điền sẵn các loại hàng và đơn giá theo lượt giao gần nhất, chỉ còn gõ số kg.`}
-                  onClick={() => pickSupplier(name)}
-                />
-              ))}
+        {/* ĐẦU CHUYẾN — mọi ô hiện sẵn trên một khối */}
+        <section className="space-y-4 rounded-xl border-2 border-border bg-card p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="font-semibold">Đầu chuyến</h2>
+            <div className="flex flex-wrap items-center gap-2">
+              {hasOcr && (
+                <Button
+                  title="Chụp hoặc chọn ảnh phiếu nhập viết tay, máy tự đọc ra ngày · đại lý · các dòng loại NL và kg. Kết quả là NHÁP — soát lại rồi mới lưu."
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setOcrMo(true)}
+                >
+                  <Camera />
+                  Đọc ảnh phiếu
+                </Button>
+              )}
+              {session.scanPath && (
+                <span className="flex items-center gap-1">
+                  <Tag variant="done">Đã đính ảnh phiếu</Tag>
+                  {hasImageStorage && (
+                    <Button
+                      title="Mở lại ảnh phiếu tay đã lưu kèm chuyến này." type="button" variant="link" size="sm" onClick={viewScanImage}>
+                      Xem
+                    </Button>
+                  )}
+                </span>
+              )}
             </div>
-          )}
-          <Combobox
-            label={frequentSuppliers.length > 0 && !isEditingShipment ? "Đại lý khác" : "Đại lý giao hàng"}
-            required
-            hideRequiredMark
-            value={session.supplierName}
-            onChange={pickSupplier}
-            options={supplierOptions}
-            onCreate={addSupplier}
-            emptyText="Chưa có đại lý nào trong danh mục."
-            onEditItem={supplierEditor.openEdit}
-            editLabel={supplierEditor.editLabel}
-          />
-        </StepCard>
+          </div>
 
-        {/* ② XE — xe cũ của đại lý bấm một chạm; xe lạ thì gõ tay; không có thì bỏ qua */}
-        <StepCard
-          stepNumber={2}
-          title="Xe chở hàng"
-          done={hasVehicleInfo || skipTruck}
-          open={isVehicleStepOpen}
-          summary={
-            hasVehicleInfo
-              ? [session.licensePlate, session.driverName].filter(Boolean).join(" · ")
-              : session.supplierName
-                ? "Không ghi xe"
-                : undefined
-          }
-          onChange={session.supplierName ? () => setOpenPanel("vehicle") : undefined}
-        >
-          {truckSuggestions.plates.length > 0 && (
-            <div className="space-y-2">
-              <p className="text-sm text-muted-foreground">
-                Biển số — chạm là điền luôn tài xế hay lái xe đó
-              </p>
-              <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
-                {truckSuggestions.plates.map((x) => (
-                  <ChoiceCard
-                    key={x.licensePlate}
-                    icon={<Truck />}
-                    label={x.licensePlate}
-                    phu={x.driverName || undefined}
-                    isSelected={normalizePlate(x.licensePlate) === normalizePlate(session.licensePlate)}
-                    title="Điền biển số này kèm tài xế gần nhất lái xe đó, rồi nhảy xuống gõ số kg. Khác tài xế thì bấm Đổi và chạm tên tài xế."
-                    onClick={() => pickPlate(x)}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-          {truckSuggestions.drivers.length > 0 && (
-            <div className="space-y-2">
-              <p className="text-sm text-muted-foreground">Tài xế</p>
-              <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
-                {truckSuggestions.drivers.map((name) => (
-                  <ChoiceCard
-                    key={name}
-                    label={name}
-                    isSelected={name.toLowerCase() === session.driverName.trim().toLowerCase()}
-                    title="Chọn tài xế này cho chuyến. Đã có biển số thì xong bước xe và nhảy xuống gõ số kg."
-                    onClick={() => pickDriver(name)}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-          {(isManualVehicle || hasVehicleHints === false || hasVehicleInfo) && (
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Biển số xe">
-                <Input
-                  value={session.licensePlate}
-                  onFocus={() => setOpenPanel("vehicle")}
-                  onChange={(e) => setSessionField("licensePlate", e.target.value)}
-                  placeholder="VD: 86C 19555"
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {twoDates ? (
+              <>
+                <DateField
+                  label="Ngày ghi sổ"
+                  required
+                  info="Ngày ghi vào hệ thống. Chọn ngày này thì ngày hàng về tự nhảy theo. Cần khác thì sửa ô ngày hàng về bên cạnh."
+                  value={session.postingDate}
+                  onChange={changePostingDate}
                 />
-              </Field>
-              <Field label="Tài xế">
-                <Input
-                  value={session.driverName}
-                  onFocus={() => setOpenPanel("vehicle")}
-                  onChange={(e) => setSessionField("driverName", e.target.value)}
-                  placeholder="Tên tài xế"
+                <DateField
+                  label="Ngày hàng về xưởng"
+                  required
+                  info="Ngày xe đổ hàng thật — mọi tổng hợp tính theo ngày này. Sửa tay ô này khi hàng về hôm khác (ghi bù)."
+                  value={session.deliveryDate}
+                  onChange={changeDeliveryDate}
                 />
-              </Field>
-            </div>
-          )}
-          <div className="flex flex-wrap gap-2">
-            {!isManualVehicle && hasVehicleHints && !hasVehicleInfo && (
-              <Button
-                title="Xe chưa từng chở cho đại lý này: mở hai ô để gõ tay biển số và tên tài xế."
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  setIsManualVehicle(true);
-                  setOpenPanel("vehicle");
-                }}
-              >
-                <Plus />
-                Xe khác — gõ tay
-              </Button>
-            )}
-            {hasVehicleInfo ? (
-              <Button
-                title="Xong phần xe — thu bước này lại và nhảy xuống gõ số kg."
-                type="button"
-                onClick={finishTruckStep}
-              >
-                Xong, sang gõ kg
-              </Button>
+              </>
             ) : (
+              <DateField
+                label="Ngày hàng về"
+                required
+                info="Ngày xe đổ hàng — cũng là ngày ghi sổ. Hàng về hôm trước mà nay mới ghi thì bấm “Ghi bù” bên dưới để tách hai ngày."
+                value={session.deliveryDate}
+                onChange={changePostingDate}
+              />
+            )}
+            <Combobox
+              label="Phân xưởng"
+              required
+              clearable={false}
+              value={session.workshop}
+              onChange={(v) => v && pickWorkshop(v as Workshop)}
+              options={WORKSHOPS.map((p) => ({ value: p, label: p }))}
+            />
+            <Combobox
+              label="Đại lý giao hàng"
+              required
+              value={session.supplierName}
+              onChange={pickSupplier}
+              options={supplierOptions}
+              onCreate={addSupplier}
+              emptyText="Chưa có đại lý nào trong danh mục."
+              onEditItem={supplierEditor.openEdit}
+              editLabel={supplierEditor.editLabel}
+            />
+          </div>
+
+          {!isEditingShipment && frequentSuppliers.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm text-muted-foreground">Hay giao:</span>
+              {frequentSuppliers.map((name) => {
+                const last = lastDateBySupplier.get(name);
+                return quickPick(
+                  name,
+                  name,
+                  session.supplierName === name,
+                  `Chọn đại lý ${name}${last ? ` (giao gần nhất ${formatDateVN(last)})` : ""} — tự điền sẵn các loại hàng và đơn giá theo lượt giao gần nhất, chỉ còn gõ số kg.`,
+                  () => pickSupplier(name)
+                );
+              })}
+            </div>
+          )}
+
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <Field label="Biển số xe">
+              <Input
+                value={session.licensePlate}
+                onChange={(e) => setSessionField("licensePlate", e.target.value)}
+              />
+            </Field>
+            <Field label="Tài xế">
+              <Input
+                value={session.driverName}
+                onChange={(e) => setSessionField("driverName", e.target.value)}
+              />
+            </Field>
+            <Field label="Ghi chú" className="sm:col-span-2 lg:col-span-1">
+              <Input
+                value={session.note}
+                onChange={(e) => setSessionField("note", e.target.value)}
+              />
+            </Field>
+          </div>
+
+          {(truckSuggestions.plates.length > 0 || truckSuggestions.drivers.length > 0) && (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm text-muted-foreground">Xe đã chở:</span>
+              {truckSuggestions.plates.map((x) =>
+                quickPick(
+                  `xe-${x.licensePlate}`,
+                  x.driverName ? `${x.licensePlate} · ${x.driverName}` : x.licensePlate,
+                  normalizePlate(x.licensePlate) === normalizePlate(session.licensePlate),
+                  "Điền biển số này kèm tài xế gần nhất lái xe đó, rồi nhảy xuống gõ số kg.",
+                  () => pickPlate(x)
+                )
+              )}
+              {truckSuggestions.drivers
+                .filter((name) => !truckSuggestions.plates.some((x) => x.driverName === name))
+                .map((name) =>
+                  quickPick(
+                    `tx-${name}`,
+                    name,
+                    name.toLowerCase() === session.driverName.trim().toLowerCase(),
+                    "Chọn tài xế này cho chuyến (khác người lái thường ngày của xe).",
+                    () => pickDriver(name)
+                  )
+                )}
+            </div>
+          )}
+
+          {(isBackdatedImport(session) || isSessionLocked) && (
+            <Field label="Lý do ghi bù" required>
+              <Input
+                value={session.backdateReason}
+                onChange={(e) => setSessionField("backdateReason", e.target.value)}
+                placeholder="Vì sao tới hôm nay mới ghi?"
+              />
+            </Field>
+          )}
+
+          {!twoDates ? (
+            <Button
+              title="Hàng về hôm trước mà nay mới ghi sổ (chờ hóa đơn…): tách thành hai ô ngày ghi sổ / ngày hàng về, kèm lý do."
+              type="button"
+              variant="link"
+              size="sm"
+              className="h-auto px-0"
+              onClick={() => setSplitDates(true)}
+            >
+              <CalendarRange />
+              Ghi bù (hàng về ngày khác ngày ghi sổ)
+            </Button>
+          ) : (
+            !isBackdatedImport(session) && (
               <Button
-                title="Chuyến này không cần ghi xe / tài xế — bỏ qua bước này và nhảy xuống gõ số kg."
+                title="Hàng về đúng ngày ghi sổ: gộp lại còn một ô ngày."
                 type="button"
-                variant="outline"
-                onClick={skipTruckStep}
+                variant="link"
+                size="sm"
+                className="h-auto px-0"
+                onClick={() => setSplitDates(false)}
               >
-                Không ghi xe
+                Gộp lại một ngày
               </Button>
+            )
+          )}
+        </section>
+
+        {/* LOẠI HÀNG & KG — bảng điền sẵn theo đại lý, chỉ còn gõ số */}
+        <section className="space-y-3 rounded-xl border-2 border-border bg-card p-4">
+          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+            <h2 className="font-semibold">Loại hàng và số kg</h2>
+            {tableRows.some((d) => d.isSuggested) && (
+              <p className="text-sm text-muted-foreground">
+                Đã điền sẵn loại + giá theo lượt gần nhất — chỉ gõ kg. Dòng không có kg tự bỏ qua.
+              </p>
             )}
           </div>
-        </StepCard>
-
-        {/* ③ LOẠI HÀNG & KG — bảng điền sẵn theo đại lý, chỉ còn gõ số */}
-        <StepCard
-          stepNumber={3}
-          title="Loại hàng và số kg"
-          done={validRows.length > 0}
-          open
-        >
-          <p className="text-sm text-muted-foreground">
-            {tableRows.some((d) => d.isSuggested)
-              ? "Đã điền sẵn loại + giá theo lượt gần nhất — chỉ gõ số kg, Enter xuống dòng. Dòng không có kg tự bỏ qua."
-              : "Mỗi loại một dòng. Đơn giá để trống nếu chưa có hóa đơn."}
-          </p>
           <ImportLinesTable
             lines={tableRows}
             onUpdateRow={updateRow}
@@ -1399,35 +1276,27 @@ export default function MaterialImportScreen() {
             onEditMaterialType={materialTypeEditor.openEdit}
             onLastRowEnter={focusSaveButton}
           />
-        </StepCard>
 
-        <div className="rounded-xl border-2 border-border bg-card">
-          <button
-            title="Mở / thu phần ít dùng của chuyến: ghi chú, mã SSCC, mã lô nội bộ (không bắt buộc)."
-            type="button"
-            onClick={() => setIsExtrasOpen((v) => !v)}
-            aria-expanded={isExtrasOpen}
-            className="flex min-h-11 w-full items-center justify-between gap-3 px-4 text-left font-semibold"
-          >
-            <span>
-              Ghi chú · mã lô{" "}
-              <span className="tnum font-normal text-muted-foreground">{sessionLotCode}</span>
-            </span>
-            <ChevronDown
-              className={`size-6 shrink-0 transition-transform ${isExtrasOpen ? "rotate-180" : ""}`}
-              aria-hidden
-            />
-          </button>
-          {isExtrasOpen && (
-            <div className="space-y-4 border-t-2 border-border p-4">
-              <Field label="Ghi chú">
-                <Input
-                  value={session.note}
-                  onChange={(e) => setSessionField("note", e.target.value)}
-                  placeholder="Ghi chú thêm (nếu có)"
-                />
-              </Field>
-              <div className="grid gap-4 sm:grid-cols-2">
+          {/* Mã lô tự sinh + SSCC (ít dùng) — thu sẵn */}
+          <div className="border-t-2 border-border pt-2">
+            <button
+              title="Mở / thu phần ít dùng của chuyến: mã SSCC (nhà nước) và mã lô nội bộ tự sinh."
+              type="button"
+              onClick={() => setIsExtrasOpen((v) => !v)}
+              aria-expanded={isExtrasOpen}
+              className="flex min-h-9 w-full items-center justify-between gap-3 text-left text-sm text-muted-foreground"
+            >
+              <span>
+                Mã lô <span className="tnum">{sessionLotCode}</span> · SSCC
+                {session.ssccCode ? ` ${session.ssccCode}` : ""}
+              </span>
+              <ChevronDown
+                className={`size-5 shrink-0 transition-transform ${isExtrasOpen ? "rotate-180" : ""}`}
+                aria-hidden
+              />
+            </button>
+            {isExtrasOpen && (
+              <div className="grid gap-4 pt-2 sm:grid-cols-2">
                 <Field
                   label="Mã SSCC (nhà nước)"
                   hint="Để trống nếu chưa được cấp — điền sau."
@@ -1435,24 +1304,23 @@ export default function MaterialImportScreen() {
                   <Input
                     value={session.ssccCode}
                     onChange={(e) => setSessionField("ssccCode", e.target.value)}
-                    placeholder="Chưa có — điền sau"
                   />
                 </Field>
                 <Field label="Mã lô nội bộ" hint="Tự sinh, dùng để truy xuất.">
-                  <div className="flex min-h-11 items-center tnum text-base text-muted-foreground">
+                  <div className="flex min-h-9 items-center tnum text-base text-muted-foreground">
                     {sessionLotCode}
                   </div>
                 </Field>
               </div>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        </section>
 
-        {/* THANH LƯU — dính đáy màn: luôn thấy tổng chuyến + nút lưu, khỏi cuộn tìm */}
+        {/* THANH LƯU — dính đáy màn khi có số: luôn thấy tổng chuyến + nút lưu */}
         <div
           className={cn(
-            "flex flex-col gap-2 rounded-xl border-2 bg-card p-3 xl:flex-row xl:items-center xl:justify-between",
-            // Chỉ DÍNH ĐÁY khi đã có số để lưu — phiếu trống thì nằm yên, khỏi che các bước.
+            "flex flex-col gap-2 rounded-xl border-2 bg-card p-3 sm:flex-row sm:items-center sm:justify-between",
+            // Chỉ DÍNH ĐÁY khi đã có số để lưu — phiếu trống thì nằm yên.
             validRows.length > 0 || isEditingShipment
               ? "sticky bottom-2 z-10 border-primary/50 shadow-lg"
               : "border-border"
@@ -1473,9 +1341,8 @@ export default function MaterialImportScreen() {
               </span>
             )}
           </p>
-          {/* Điện thoại: các nút chia đều MỘT hàng (chật thì tự xuống hàng); chữ dài tự xuống dòng. */}
-          <div className="flex w-full flex-wrap gap-2 xl:w-auto [&>*]:flex-1 xl:[&>*]:flex-none">
-            {isEditingShipment ? (
+          <div className="flex w-full flex-wrap gap-2 sm:w-auto [&>*]:flex-1 sm:[&>*]:flex-none">
+            {isEditingShipment && (
               <>
                 <ConfirmDelete
                   recordDescription={`Chuyến ${session?.supplierName || "(chưa có đại lý)"} — ${formatDateVN(session?.deliveryDate ?? "")} — ${savedRowCount} dòng — ${kg(shipmentTotal)}`}
@@ -1487,17 +1354,11 @@ export default function MaterialImportScreen() {
                   Hủy sửa
                 </Button>
               </>
-            ) : (
-              <Button
-                title="Ghi chuyến đang gõ vào sổ rồi mở phiếu mới GIỮ ngày + xưởng + đại lý — cho đại lý giao nhiều lượt trong ngày." variant="outline" className="h-auto min-h-11 whitespace-normal" onClick={saveAndAddShipment}>
-                <Truck />
-                Lưu &amp; chuyến kế
-              </Button>
             )}
             <Button
-              title="Ghi chuyến đang gõ vào sổ. Chuyến hiện ngay ở khung “Đã ghi trong ngày”, phiếu trống sẵn cho chuyến kế." id="nut-luu-chuyen" className="min-h-11" onClick={finishShipment}>
+              title="Ghi chuyến đang gõ vào sổ. Chuyến hiện ngay ở khung “Đã ghi trong ngày”; phiếu trống (giữ ngày + xưởng, đại lý để trống) sẵn cho chuyến kế." id="nut-luu-chuyen" className="min-h-11" onClick={finishShipment}>
               <Save />
-              {isEditingShipment ? "Lưu chuyến" : "Lưu vào sổ"}
+              Lưu chuyến
             </Button>
           </div>
         </div>

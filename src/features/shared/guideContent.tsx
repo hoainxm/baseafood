@@ -64,8 +64,8 @@ export const PAGE_GUIDES: Record<string, PageGuide> = {
               có giá", điền sau.
             </li>
             <li>
-              Một đại lý còn giao lượt nữa: bấm <b>Lưu &amp; thêm chuyến khác</b>.
-              Xong hết thì bấm <b>Xong chuyến</b>.
+              Bấm <b>Lưu chuyến</b>. Phiếu trống hiện ra cho chuyến kế, giữ
+              ngày và phân xưởng, đại lý để trống để chọn lại.
             </li>
           </Step>
         </Section>

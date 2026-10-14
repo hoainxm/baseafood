@@ -1,13 +1,12 @@
 // ============================================================
 // Tên file: src/features/imports/ImportLinesTable.tsx
 // Tên tiếng Việt: Bảng loại hàng của một chuyến (nhập nhiều dòng một lượt)
-// Tách khỏi MaterialImportScreen.tsx ngày 2026-09-21 — KHÔNG đổi logic.
+// Tách khỏi MaterialImportScreen.tsx ngày 2026-09-21. 2026-10-14: mọi dòng cùng một bố cục.
 // ============================================================
 import type { Category } from "@/types";
 import { CATEGORIES } from "@/types";
 import { Button, Combobox, NumberField, type ComboboxOption } from "@/design-system";
-import { useState } from "react";
-import { Pencil, Plus, X } from "lucide-react";
+import { Plus, X } from "lucide-react";
 import { formatDateVN } from "@/lib/format";
 import type { ImportLine } from "./importHelpers";
 
@@ -17,8 +16,13 @@ import type { ImportLine } from "./importHelpers";
  * Bảng nhập ĐƠN GIẢN, TRẢI NGANG: mỗi loại là MỘT HÀNG — các ô nằm ngang trên
  * desktop (Loài · Loại NL · Số lượng · Đơn giá · Bỏ); điện thoại: loài, loại mỗi ô
  * một hàng, Số lượng + Đơn giá đứng CẠNH nhau. Cột kg có Enter/↑/↓ nhảy dọc
- * (`navCol`) — bảng điền sẵn theo đại lý thì chỉ gõ kg rồi Enter. Nhãn luôn hiện để người lớn tuổi đọc rõ. Thêm loại bằng nút ở cuối,
- * dòng mới xuống CUỐI — không tự nhảy, không xô layout.
+ * (`navCol`) — bảng điền sẵn theo đại lý thì chỉ gõ kg rồi Enter. Thêm loại bằng nút
+ * ở cuối, dòng mới xuống CUỐI — không tự nhảy, không xô layout.
+ *
+ * MỌI dòng cùng MỘT bố cục (2026-10-14, người dùng: dòng điền sẵn và dòng thêm mới
+ * trông khác nhau dễ hiểu lầm): dòng điền sẵn theo đại lý chỉ khác ở chỗ các ô đã có
+ * giá trị + một dòng chú thích giá lượt trước bên dưới. Bỏ kiểu "dòng gọn + bút chì
+ * Đổi loại".
  */
 export function ImportLinesTable({
   lines: row,
@@ -42,9 +46,6 @@ export function ImportLinesTable({
   onLastRowEnter?: () => void;
 }) {
   const canRemove = row.length > 1;
-  // Dòng ĐIỀN SẴN theo đại lý hiện GỌN (tên loại là chữ, chỉ còn ô kg + giá) —
-  // bấm "Đổi loại" mới bung đủ ô chọn. Chỉ là trạng thái hiển thị, không đụng dữ liệu.
-  const [bung, setBung] = useState<Set<string>>(new Set());
   return (
     <div
       className="space-y-3"
@@ -58,64 +59,14 @@ export function ImportLinesTable({
         if (items[items.length - 1] === o) onEnterLast?.();
       }}
     >
-      {row.map((d) =>
-        d.isSuggested && !bung.has(d.key) ? (
-          <div
-            key={d.key}
-            className="grid grid-cols-2 gap-x-3 gap-y-2 rounded-lg border border-border bg-card p-3 lg:grid-cols-[1.6fr_0.9fr_0.9fr_auto] lg:items-end"
-          >
-            <div className="col-span-2 flex min-w-0 items-center justify-between gap-2 lg:col-span-1 lg:min-h-11">
-              <div className="min-w-0">
-                <p className="font-semibold">
-                  {d.materialTypeName}
-                  <span className="ml-2 font-normal text-muted-foreground">
-                    {d.category}
-                  </span>
-                </p>
-                {/* Giá điền sẵn là GIÁ CŨ — nói rõ của lượt nào để người nhập soát, khỏi lưu nhầm. */}
-                <p className="text-sm text-muted-foreground">
-                  {d.priceDate
-                    ? `Giá theo lượt ${formatDateVN(d.priceDate).slice(0, 5)} — khác thì sửa ô đơn giá`
-                    : d.unitPrice == null
-                      ? "Chưa có giá lượt trước — để trống nếu chờ hóa đơn"
-                      : "Giá tự nhập"}
-                </p>
-              </div>
-              <span className="flex shrink-0 gap-1 lg:hidden">
-                <CompactCloseButton
-                  d={d}
-                  canRemove={canRemove}
-                  onRemove={onBo}
-                  onBung={() => setBung((b) => new Set(b).add(d.key))}
-                />
-              </span>
-            </div>
-            <NumberField
-              label="Số lượng"
-              required
-              hideRequiredMark
-              unit="kg"
-              navCol="kg"
-              value={d.quantityKg || null}
-              onChange={(v) => onEdit(d.key, { quantityKg: v ?? 0 })}
-            />
-            <NumberField
-              label="Đơn giá"
-              hideRequiredMark
-              unit="đ"
-              value={d.unitPrice}
-              onChange={(v) => onEdit(d.key, { unitPrice: v })}
-            />
-            <span className="hidden gap-1 lg:flex">
-              <CompactCloseButton
-                d={d}
-                canRemove={canRemove}
-                onRemove={onBo}
-                onBung={() => setBung((b) => new Set(b).add(d.key))}
-              />
-            </span>
-          </div>
-        ) : (
+      {row.map((d) => {
+        // Giá điền sẵn là GIÁ CŨ — nói rõ của lượt nào để người nhập soát, khỏi lưu nhầm.
+        const priceNote = d.priceDate
+          ? `Giá theo lượt ${formatDateVN(d.priceDate).slice(0, 5)} — khác thì sửa ô đơn giá`
+          : d.isSuggested && d.unitPrice == null
+            ? "Chưa có giá lượt trước — để trống nếu chờ hóa đơn"
+            : null;
+        return (
           <div
             key={d.key}
             className="grid grid-cols-2 gap-3 rounded-lg border border-border bg-card p-3 lg:grid-cols-[1.1fr_1.6fr_0.9fr_0.9fr_auto] lg:items-end"
@@ -160,7 +111,7 @@ export function ImportLinesTable({
               <Button
                 title="Bỏ dòng loại hàng này khỏi chuyến đang gõ (chưa lưu nên không đụng sổ)."
                 variant="danger"
-                aria-label="Bỏ dòng"
+                aria-label={`Bỏ dòng ${d.materialTypeName || "loại hàng"}`}
                 className="col-span-2 justify-center lg:col-span-1"
                 onClick={() => onBo(d.key)}
               >
@@ -170,9 +121,12 @@ export function ImportLinesTable({
             ) : (
               <span className="hidden lg:block" aria-hidden />
             )}
+            {priceNote && (
+              <p className="col-span-2 text-sm text-muted-foreground lg:col-span-5">{priceNote}</p>
+            )}
           </div>
-        ),
-      )}
+        );
+      })}
 
       <Button
         title="Thêm một dòng loại hàng nữa cho chuyến này — một chuyến chở được nhiều loại."
@@ -186,45 +140,5 @@ export function ImportLinesTable({
         Thêm loại hàng
       </Button>
     </div>
-  );
-}
-
-/** Hai nút nhỏ của dòng gọn: đổi loại (bung đủ ô chọn) · bỏ dòng. */
-function CompactCloseButton({
-  d,
-  canRemove,
-  onRemove: onBo,
-  onBung,
-}: {
-  d: ImportLine;
-  canRemove: boolean;
-  onRemove: (key: string) => void;
-  onBung: () => void;
-}) {
-  return (
-    <>
-      <Button
-        title="Đổi loài / loại nguyên liệu của dòng điền sẵn này — bung đủ các ô chọn."
-        type="button"
-        variant="edit"
-        size="icon"
-        aria-label={`Đổi loại của dòng ${d.materialTypeName}`}
-        onClick={onBung}
-      >
-        <Pencil />
-      </Button>
-      {canRemove && (
-        <Button
-          title="Bỏ dòng loại hàng này khỏi chuyến đang gõ (chưa lưu nên không đụng sổ)."
-          type="button"
-          variant="danger"
-          size="icon"
-          aria-label={`Bỏ dòng ${d.materialTypeName}`}
-          onClick={() => onBo(d.key)}
-        >
-          <X />
-        </Button>
-      )}
-    </>
   );
 }

@@ -146,8 +146,10 @@ export function Field({
        ô nhập LUÔN thẳng hàng dưới cùng — kể cả khi ô bên cạnh có thêm dòng gợi ý
        (VD "Số lượng" cạnh "Đơn giá" có hint → trước đây hai ô lệch nhau). */
     <div className={cn("flex h-full flex-col gap-2", className)}>
+      {/* min-h-9 = cùng chiều cao hàng nhãn của Combobox / DateField (nút ⓘ): ô số đứng
+          cạnh ô chọn trong cùng hàng lưới không bị lệch nhãn (2026-10-14). */}
       {!hideLabel && (
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex min-h-9 flex-wrap items-center gap-2">
           <Label htmlFor={id}>
             {label}
             {!hideRequiredMark && required && (

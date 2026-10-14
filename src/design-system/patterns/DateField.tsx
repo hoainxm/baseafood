@@ -81,7 +81,8 @@ function LabelBlock({
 }) {
   return (
     <>
-      <div className="flex flex-wrap items-center gap-2">
+      {/* min-h-9: hàng nhãn cao bằng nhau dù có / không nút ⓘ — khớp Combobox, Field. */}
+      <div className="flex min-h-9 flex-wrap items-center gap-2">
         <Label htmlFor={htmlFor}>
           {label}
           {!hideRequiredMark && required && (

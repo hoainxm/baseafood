@@ -437,6 +437,13 @@ chip đếm/điều khiển của primitive; màn nghiệp vụ **không** dùng
 - Nhãn phụ dưới tên dòng trong `EditableGrid` (`phu`) được đặt `Tag` (VD nguồn "sổ sản
   xuất", "mẫu · chưa có số", lưu ý "giá = kỳ trước").
 
+### Hàng nhãn cao bằng nhau (2026-10-14)
+
+Hàng nhãn của `Field` (và `NumberField`), `DateField`, `ChoiceGroup`, `Combobox` đều
+`min-h-9` (bằng nút ⓘ) ⇒ các ô khác loại đứng cùng một hàng lưới có nhãn và ô nhập
+thẳng hàng. Nút × bỏ chọn của `Combobox` (`data-slot="combobox-clear"`) cao theo
+`--h-control` như ô nhập. Đừng thêm `min-h` khác hay tự kê `pt-*` để "chỉnh tay" nhãn.
+
 ## 8b. Màu NÚT theo chức năng — `Button variant` (từ 2026-10-14)
 
 Người dùng xưởng phải nhìn màu là biết nút làm gì (yêu cầu 2026-10-14: "xóa, sửa,

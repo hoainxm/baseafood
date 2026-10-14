@@ -359,6 +359,13 @@
   [data-slot="choice-option"] {
     min-height: var(--h-control);
   }
+  /* Nút vuông đứng CẠNH ô nhập (× bỏ chọn của Combobox) cao bằng ô theo mật độ —
+     trước 2026-10-14 nó cứng 40px còn ô Gọn 36px ⇒ ô chọn có × cao hơn ô số bên
+     cạnh, nhãn cả hàng lưới lệch nhau. */
+  [data-slot="combobox-clear"] {
+    width: var(--h-control);
+    height: var(--h-control);
+  }
 }
 
 @layer base {

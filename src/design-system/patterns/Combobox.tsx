@@ -283,6 +283,7 @@ export function Combobox({
             type="button"
             variant="outline"
             size="icon"
+            data-slot="combobox-clear"
             aria-label={`Bỏ chọn ${label}`}
             title="Bỏ chọn"
             onClick={() => onChange("")}

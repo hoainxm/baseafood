@@ -67,7 +67,7 @@ export function ChoiceGroup({
 
   return (
     <fieldset className={cn("min-w-0 space-y-2", className)}>
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex min-h-9 flex-wrap items-center gap-2">
         <legend className="text-sm leading-snug font-semibold text-foreground">
           {label}
           {!hideRequiredMark && required && (

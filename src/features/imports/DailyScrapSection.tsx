@@ -1,352 +1,171 @@
 // ============================================================
 // Tên file: src/features/imports/DailyScrapSection.tsx
-// Tên tiếng Việt: Khối phế liệu cân gộp cuối ngày (nội tạng / dạt)
-// Tách khỏi MaterialImportScreen.tsx ngày 2026-09-21 — KHÔNG đổi logic.
+// Tên tiếng Việt: Phế liệu cân cuối ngày (nội tạng / dạt) — form nhập thẳng, một nút Lưu
+// Description: Inline end-of-day scrap form (controlled draft) shown right above "Chốt ngày".
+// 2026-10-14: bỏ hộp thoại "Thêm phế liệu" (hai nút Lưu trùng việc) + bảng riêng ⇒ ô kg
+// Nội tạng / Dạt hiện sẵn ngay trên nút Chốt ngày, người dùng khỏi quên cân.
 // ============================================================
-import { useMemo, useState } from "react";
-import type { ScrapItem, Workshop } from "@/types";
-import { newId } from "@/lib/store";
+import type { Workshop } from "@/types";
 import {
   Button,
-  RequiredLegend,
   Combobox,
-  ConfirmDelete,
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
   ErrorSummary,
-  Tag,
   NumberField,
-  RecordTable,
-  notify,
-  type RecordTableColumn,
-  type FieldError,
+  Tag,
   type ComboboxOption,
+  type FieldError,
 } from "@/design-system";
 import { kg, num, formatDateVN } from "@/lib/format";
-import { Lock, Pencil, Plus, Scale } from "lucide-react";
-import { SCRAP_SUGGESTIONS } from "./importHelpers";
+import { Plus, Save, Scale } from "lucide-react";
+import { SCRAP_SUGGESTIONS, scrapDraftTotalKg, type ScrapDraftRow } from "./importHelpers";
 
-/* ---------- Phế liệu cân gộp cuối ngày (nội tạng / dạt) ---------- */
+const typeOptions: ComboboxOption[] = SCRAP_SUGGESTIONS.map((t) => ({ value: t, label: t }));
 
 export function DailyScrapSection({
   date,
   workshop,
-  rows,
-  onChange,
+  draft,
+  onDraftChange,
+  onSave,
+  errors,
+  isDirty,
   isLocked,
-  readOnly: isReadOnly = false,
 }: {
   date: string;
   workshop: Workshop;
-  rows: ScrapItem[];
-  onChange: (n: ScrapItem[]) => void;
+  /** Bản nháp các ô (màn giữ state — "Chốt ngày" lưu luôn phần đang gõ). */
+  draft: ScrapDraftRow[];
+  onDraftChange: (rows: ScrapDraftRow[]) => void;
+  onSave: () => void;
+  errors: FieldError[];
+  /** Có số gõ mà chưa lưu. */
+  isDirty: boolean;
   isLocked: boolean;
-  /** Chỉ hiển thị tóm tắt (ngoài trang) — ghi/sửa phế liệu làm trong dialog "Ghi nhập trong ngày". */
-  readOnly?: boolean;
 }) {
-  const [editing, setEditing] = useState<ScrapItem | null>(null);
-  const [isAdding, setIsAdding] = useState(false);
-  const [errors, setErrors] = useState<FieldError[]>([]);
-
-  const dayScrapRows = useMemo(
-    () =>
-      rows.filter(
-        (r) =>
-          r.source === "Nhập hàng" && r.date === date && r.workshop === workshop
-      ),
-    [rows, date, workshop]
-  );
-
-  const totalKg = dayScrapRows.reduce((s, r) => s + (r.quantityKg || 0), 0);
-  const totalAmount = dayScrapRows.reduce(
-    (s, r) => s + r.quantityKg * (r.sellingPrice ?? 0),
+  const totalKg = scrapDraftTotalKg(draft);
+  const totalAmount = draft.reduce(
+    (s, r) => s + (r.quantityKg ?? 0) * (r.sellingPrice ?? 0),
     0
   );
+  const hasSaved = draft.some((r) => r.id);
 
-  /**
-   * Dòng phế liệu mới. Loại mặc định "Nội tạng" (đa số phế liệu là nội tạng);
-   * cân dạt thì người dùng đổi ở ô Loại. Riêng "ghi tiếp loại khác" truyền
-   * `daGhi` để gợi ý loại chưa ghi (vừa ghi nội tạng ⇒ gợi ý Dạt).
-   */
-  const newScrapItem = (recordedNames: string[] = []): ScrapItem => ({
-    id: newId(),
-    periodId: "",
-    name: SCRAP_SUGGESTIONS.find((t) => !recordedNames.includes(t)) ?? SCRAP_SUGGESTIONS[0],
-    quantityKg: 0,
-    sellingPrice: null,
-    date,
-    workshop,
-    source: "Nhập hàng",
-  });
+  const patch = (key: string, p: Partial<ScrapDraftRow>) =>
+    onDraftChange(draft.map((r) => (r.key === key ? { ...r, ...p } : r)));
 
-  const typeOptions: ComboboxOption[] = SCRAP_SUGGESTIONS.map((t) => ({
-    value: t,
-    label: t,
-  }));
-
-  /** `ghiTiep`: lưu xong giữ hộp thoại mở để ghi loại khác (chỉ khi thêm mới). */
-  const save = (keepEntering = false) => {
-    if (!editing) return;
-    const ls: FieldError[] = [];
-    if (!editing.name.trim())
-      ls.push({ field: "Loại phế liệu", message: "Chưa chọn loại phế liệu" });
-    if (!(editing.quantityKg > 0))
-      ls.push({ field: "Số lượng", message: "Phải lớn hơn 0 kg" });
-    setErrors(ls);
-    if (ls.length > 0) return;
-    onChange(
-      isAdding ? [...rows, editing] : rows.map((r) => (r.id === editing.id ? editing : r))
-    );
-    notify.saved(
-      isAdding
-        ? `Đã ghi phế liệu ${editing.name} — ${kg(editing.quantityKg)}`
-        : "Đã lưu thay đổi"
-    );
-    if (isAdding && keepEntering) {
-      // Ghi thêm loại khác: reset form, giữ hộp thoại mở, gợi ý loại chưa ghi.
-      setEditing(newScrapItem([...dayScrapRows.map((r) => r.name), editing.name]));
-      setErrors([]);
-    } else {
-      setEditing(null);
-    }
-  };
-
-  const cols: RecordTableColumn<ScrapItem>[] = [
-    {
-      key: "category",
-      header: "Loại phế liệu",
-      primary: true,
-      render: (r) => r.name,
-      getSortValue: (r) => r.name,
-    },
-    {
-      key: "sl",
-      header: "Số lượng (kg)",
-      numeric: true,
-      render: (r) => num(r.quantityKg),
-      getSortValue: (r) => r.quantityKg,
-    },
-    {
-      key: "gia",
-      header: "Đơn giá bán (đ)",
-      numeric: true,
-      render: (r) =>
-        r.sellingPrice != null ? (
-          num(r.sellingPrice)
-        ) : (
-          <Tag variant="error">Chưa có giá</Tag>
-        ),
-      getSortValue: (r) => r.sellingPrice ?? 0,
-    },
-    {
-      key: "tien",
-      header: "Thành tiền (đ)",
-      numeric: true,
-      render: (r) => num(r.quantityKg * (r.sellingPrice ?? 0)),
-      getSortValue: (r) => r.quantityKg * (r.sellingPrice ?? 0),
-    },
-    {
-      key: "ky",
-      header: "Kỳ cân đối",
-      render: (r) =>
-        r.periodId ? (
-          <Tag variant="done">Đã vào kỳ</Tag>
-        ) : (
-          <Tag variant="pending">Chưa vào kỳ</Tag>
-        ),
-    },
-  ];
+  const addOtherType = () =>
+    onDraftChange([
+      ...draft,
+      { key: `new:${Date.now()}`, id: null, name: "", quantityKg: null, sellingPrice: null, periodId: "" },
+    ]);
 
   return (
-    <section className="space-y-4 rounded-xl border-2 border-border p-5">
-      <div className="flex flex-wrap items-start justify-between gap-x-8 gap-y-3">
-        <div className="flex items-start gap-3">
-          <Scale className="mt-1 size-6 text-muted-foreground" aria-hidden />
-          <div>
-            <h2 className="text-xl font-semibold text-foreground">
-              Phế liệu cân trong ngày (nội tạng, dạt)
-            </h2>
-            <p className="text-base text-muted-foreground">
-              Cân gộp cuối ngày cho xưởng {workshop}, ngày {formatDateVN(date)}. Màn
-              Cân đối lấy lại số này — không nhập lại lần nữa.
-            </p>
-          </div>
-        </div>
-        {isLocked ? (
-          <Tag variant="done" icon={Lock}>
-            Ngày đã chốt
-          </Tag>
-        ) : isReadOnly ? (
-          <Tag variant="source">Ghi ở “Ghi nhập trong ngày”</Tag>
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <Scale className="size-5 shrink-0 text-muted-foreground" aria-hidden />
+        <h3 className="font-semibold text-foreground">Phế liệu cân cuối ngày</h3>
+        {hasSaved ? (
+          <Tag variant="done">Đã cân {kg(scrapDraftTotalKg(draft.filter((r) => r.id)))}</Tag>
         ) : (
-          <Button
-            title="Ghi một dòng phế liệu phát sinh trong ngày (đầu, da, vụn…) để kỳ cân đối hút sang."
-            size="lg"
-            onClick={() => {
-              setEditing(newScrapItem());
-              setIsAdding(true);
-              setErrors([]);
-            }}
-          >
-            <Plus />
-            Thêm phế liệu
-          </Button>
+          <Tag variant="pending">Chưa cân</Tag>
         )}
+        {isDirty && <Tag variant="warning">Chưa lưu</Tag>}
       </div>
+      <p className="text-sm text-muted-foreground">
+        Nội tạng, dạt cân gộp cho xưởng {workshop}, ngày {formatDateVN(date)}. Màn Cân đối lấy
+        lại số này. Muốn bỏ một loại thì xóa số kg rồi lưu.
+      </p>
 
-      <RecordTable
-        columns={cols}
-        rows={dayScrapRows}
-        getKey={(r) => r.id}
-        rowMarkKey="phe-lieu-ngay"
-        emptyText="Chưa cân phế liệu cho ngày này."
-        actions={
-          isLocked || isReadOnly
-            ? undefined
-            : (r) => (
-                <>
-                  <Button
-                    title="Sửa dòng phế liệu này (tên · số kg · giá bán)."
-                    variant="edit"
-                    size="sm"
-                    onClick={() => {
-                      setEditing({ ...r });
-                      setIsAdding(false);
-                      setErrors([]);
-                    }}
-                  >
-                    <Pencil />
-                    Sửa
-                  </Button>
-                  <ConfirmDelete
-                    recordDescription={`${r.name} — ${kg(r.quantityKg)} — ngày ${formatDateVN(r.date)}`}
-                    onConfirm={() => {
-                      const prevRows = rows;
-                      onChange(rows.filter((x) => x.id !== r.id));
-                      notify.deleted(`Đã xóa phế liệu ${r.name}`, () =>
-                        onChange(prevRows)
-                      );
-                    }}
-                    title="Xóa dòng phế liệu này?"
-                    confirmLabel="Xóa dòng"
-                  />
-                </>
-              )
-        }
-      />
+      <ErrorSummary errors={errors} />
 
-      {dayScrapRows.length > 0 && (
-        <div className="flex flex-wrap justify-end gap-x-10 gap-y-3 rounded-xl bg-muted px-5 py-4">
-          <div className="flex items-baseline gap-3">
-            <span className="text-base text-muted-foreground">
-              Tổng phế liệu
-            </span>
-            <span className="tnum text-xl font-semibold">{kg(totalKg)}</span>
-          </div>
-          <div className="flex items-baseline gap-3">
-            <span className="text-base text-muted-foreground">Tổng tiền</span>
-            <span className="tnum text-xl font-semibold">
-              {num(totalAmount)} đ
-            </span>
-          </div>
-        </div>
-      )}
-
-      <Dialog
-        open={editing !== null}
-        onOpenChange={(o) => {
-          if (!o) setEditing(null);
-        }}
-      >
-        <DialogContent className="w-full sm:max-w-2xl">
-          <DialogHeader>
-            <DialogTitle className="text-2xl">
-              {isAdding ? "Thêm phế liệu" : "Sửa phế liệu"}
-            </DialogTitle>
-            <DialogDescription className="text-base">
-              Ngày {formatDateVN(date)} · xưởng {workshop}.
-              {isAdding
-                ? " Có cả nội tạng lẫn dạt: bấm “Lưu, ghi tiếp loại khác” cho loại đầu."
-                : ""}
-            </DialogDescription>
-          </DialogHeader>
-
-          {editing && (
-            <div className="space-y-6 py-2">
-              <ErrorSummary errors={errors} />
-              <RequiredLegend />
-
-              <Combobox
-                label="Loại phế liệu"
-                required
-                hint="Mặc định Nội tạng — cân hàng dạt thì đổi sang Dạt. Loại khác: gõ tên rồi bấm Thêm mới."
-                value={editing.name}
-                onChange={(v) => setEditing((d) => (d ? { ...d, name: v } : d))}
-                options={typeOptions}
-                onCreate={(name) => name}
-              />
-
-              <div className="grid gap-6 sm:grid-cols-2">
+      {isLocked ? (
+        <ul className="space-y-1">
+          {draft.filter((r) => r.id).length === 0 ? (
+            <li className="text-sm text-muted-foreground">Không ghi phế liệu cho ngày này.</li>
+          ) : (
+            draft
+              .filter((r) => r.id)
+              .map((r) => (
+                <li key={r.key} className="flex justify-between gap-3">
+                  <span>{r.name}</span>
+                  <span className="tnum font-semibold">{kg(r.quantityKg ?? 0)}</span>
+                </li>
+              ))
+          )}
+        </ul>
+      ) : (
+        <div className="space-y-3" data-scrap-form>
+          {draft.map((r) => (
+            <div key={r.key} className="grid gap-3 sm:grid-cols-2">
+              {r.id || r.name ? (
                 <NumberField
-                  label="Số lượng"
-                  required
+                  label={r.name || "Loại khác"}
                   unit="kg"
-                  value={editing.quantityKg || null}
-                  onChange={(v) =>
-                    setEditing((d) => (d ? { ...d, quantityKg: v ?? 0 } : d))
-                  }
+                  value={r.quantityKg}
+                  onChange={(v) => patch(r.key, { quantityKg: v })}
                 />
+              ) : (
+                <div className="grid grid-cols-2 gap-3">
+                  <Combobox
+                    label="Loại khác"
+                    value={r.name}
+                    onChange={(v) => patch(r.key, { name: v })}
+                    options={typeOptions}
+                    onCreate={(name) => name}
+                  />
+                  <NumberField
+                    label="Số lượng"
+                    unit="kg"
+                    value={r.quantityKg}
+                    onChange={(v) => patch(r.key, { quantityKg: v })}
+                  />
+                </div>
+              )}
+              <div className="flex items-end gap-2">
                 <NumberField
-                  label="Đơn giá bán"
+                  label={`Giá bán ${r.name ? r.name.toLowerCase() : ""}`.trim()}
                   unit="đ"
-                  value={editing.sellingPrice}
-                  onChange={(v) =>
-                    setEditing((d) => (d ? { ...d, sellingPrice: v } : d))
-                  }
-                  hint="Bỏ trống nếu chưa chốt giá bán."
+                  value={r.sellingPrice}
+                  onChange={(v) => patch(r.key, { sellingPrice: v })}
+                  className="min-w-0 flex-1"
                 />
+                {r.periodId && (
+                  <Tag variant="done" className="mb-2">
+                    Đã vào kỳ
+                  </Tag>
+                )}
               </div>
             </div>
-          )}
+          ))}
 
-          <DialogFooter>
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <Button
+              title="Thêm một dòng cho loại phế liệu khác ngoài nội tạng, dạt (gõ tên mới được)."
+              type="button"
               variant="outline"
-              size="lg"
-              onClick={() => setEditing(null)}
+              size="sm"
+              onClick={addOtherType}
             >
-              Hủy
+              <Plus />
+              Loại khác
             </Button>
-            {isAdding && (
-              <Button
-                title="Lưu dòng này rồi để hộp thoại mở để ghi tiếp loại phế liệu khác (VD vừa ghi nội tạng, giờ ghi dạt)."
-                variant="save"
-                size="lg"
-                onClick={() => save(true)}
-              >
-                <Plus />
-                Lưu, ghi tiếp loại khác
-              </Button>
-            )}
-            <Button
-              title={
-                isAdding
-                  ? "Lưu dòng phế liệu này vào sổ của ngày đang chọn rồi đóng hộp thoại."
-                  : "Lưu thay đổi của dòng phế liệu này."
-              }
-              variant="save"
-              size="lg"
-              onClick={() => save(false)}
-            >
-              Lưu
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </section>
+            <p className="text-sm text-muted-foreground">
+              Tổng <span className="tnum font-semibold text-foreground">{kg(totalKg)}</span>
+              {totalAmount > 0 && <> · <span className="tnum">{num(totalAmount)} đ</span></>}
+            </p>
+          </div>
+
+          <Button
+            title="Ghi số phế liệu đang gõ vào sổ của ngày + xưởng này. Bấm Chốt ngày cũng tự lưu phần này."
+            type="button"
+            variant="save"
+            className="w-full"
+            onClick={onSave}
+          >
+            <Save />
+            Lưu phế liệu
+          </Button>
+        </div>
+      )}
+    </div>
   );
 }

@@ -3,7 +3,7 @@
 // Tên tiếng Việt: Màn hình Nhập Nguyên Liệu ngày
 // Description: Material Import Management Screen
 // ============================================================
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type {
   DailyLock,
   ImportShipment,
@@ -102,6 +102,11 @@ import {
   getSkippedSuggestedLines,
   normalizePlate,
   createEmptyImportLine,
+  buildScrapDraft,
+  applyScrapDraft,
+  scrapDraftTotalKg,
+  validateScrapDraft,
+  type ScrapDraftRow,
   importLineHasData,
   isLineComplete,
   groupShipments,
@@ -159,6 +164,14 @@ export default function MaterialImportScreen() {
   /* Đang sửa một chuyến đã ghi: id các dòng của chuyến đó (null = đang tạo mới).
      Dùng id-set thay vì chỉ chuyenId để sửa được CẢ dữ liệu cũ (không có chuyenId). */
   const [editRowIds, setEditRowIds] = useState<string[] | null>(null);
+
+  /** Phế liệu cuối ngày đang gõ (null = chưa đụng ⇒ form hiện đúng số đã lưu). Gắn
+   *  với khóa ngày|xưởng: đổi ngày/xưởng trên phiếu thì bản nháp cũ tự bỏ. */
+  const [scrapEdit, setScrapEdit] = useState<{ key: string; rows: ScrapDraftRow[] } | null>(null);
+  const [scrapErrors, setScrapErrors] = useState<FieldError[]>([]);
+  /** Đóng hộp chốt bằng "Quay lại cân phế liệu" ⇒ đưa con trỏ vào ô kg phế liệu
+   *  (thay vì Radix trả focus về nút Chốt ngày). */
+  const focusScrapOnClose = useRef(false);
 
   /* Chốt ngày */
   const [isConfirmingLock, setIsConfirmingLock] = useState(false);
@@ -841,6 +854,39 @@ export default function MaterialImportScreen() {
     resetSession();
   };
 
+  /* ---- Phế liệu cân cuối ngày (cùng khối với Chốt ngày) ---- */
+
+  const scrapDate = session?.deliveryDate ?? effectiveFrom;
+  const scrapWorkshop: Workshop = session?.workshop ?? viewedWorkshop;
+  const scrapKey = `${scrapDate}|${scrapWorkshop}`;
+  const daySavedScraps = scraps.filter(
+    (r) => r.source === "Nhập hàng" && r.date === scrapDate && r.workshop === scrapWorkshop
+  );
+  const scrapDraft =
+    scrapEdit && scrapEdit.key === scrapKey ? scrapEdit.rows : buildScrapDraft(daySavedScraps);
+  const isScrapDirty =
+    !!scrapEdit &&
+    scrapEdit.key === scrapKey &&
+    applyScrapDraft(scraps, scrapDraft, scrapDate, scrapWorkshop).changed;
+  const updateScrapDraft = (rows: ScrapDraftRow[]) => setScrapEdit({ key: scrapKey, rows });
+
+  /** Lưu phế liệu đang gõ (một lần, kèm Hoàn tác). Trả false nếu còn lỗi. */
+  const saveScrapDraft = (): boolean => {
+    const errs = validateScrapDraft(scrapDraft);
+    setScrapErrors(errs);
+    if (errs.length) return false;
+    const result = applyScrapDraft(scraps, scrapDraft, scrapDate, scrapWorkshop);
+    setScrapEdit(null);
+    if (!result.changed) return true;
+    const before = scraps;
+    persistScraps(result.next);
+    notify.saved(
+      `Đã lưu phế liệu ngày ${formatDateVN(scrapDate)} · xưởng ${scrapWorkshop} — ${kg(scrapDraftTotalKg(scrapDraft))}`,
+      () => persistScraps(before)
+    );
+    return true;
+  };
+
   /* ---- Chốt / mở lại ngày ---- */
 
   const lockDay = () => {
@@ -848,6 +894,11 @@ export default function MaterialImportScreen() {
        tạo bản mới lúc này có thể trùng chỉ mục duy nhất (site, ngày, xưởng) ⇒ 23505. */
     if (lockStatus === "loading") {
       notify.error("Đang tải sổ chốt ngày từ máy chủ — đợi vài giây rồi bấm chốt lại");
+      return;
+    }
+    // Phế liệu đang gõ dở ⇒ lưu cùng lúc chốt (ô ngay trên nút Chốt ngày).
+    if (isScrapDirty && !saveScrapDraft()) {
+      setIsConfirmingLock(false);
       return;
     }
     const bg = lockRecordOf(effectiveFrom, viewedWorkshop);
@@ -957,10 +1008,23 @@ export default function MaterialImportScreen() {
       : []),
   ];
 
-  // CHỐT NGÀY — nằm CUỐI cột ngày (sau "đã ghi" + phế liệu): xem hết số của ngày rồi
-  // mới chốt. Ngày + xưởng bám theo phiếu (bộ lọc được đồng bộ ở chế độ Ghi nhập).
+  // CUỐI NGÀY — phế liệu cân gộp + CHỐT NGÀY chung MỘT khối, cuối cột ngày: ô kg
+  // nội tạng / dạt nằm ngay trên nút Chốt ngày ⇒ không bỏ quên cân phế liệu; chốt thì
+  // lưu luôn phần đang gõ. Ngày + xưởng bám theo phiếu (bộ lọc đồng bộ ở Ghi nhập).
   const lockSection = isSingleDayWorkshop && (
-        <div className="space-y-3 rounded-xl border-2 border-border bg-card p-4">
+        <section className="space-y-4 rounded-xl border-2 border-border bg-card p-4">
+          <h2 className="text-lg font-semibold text-foreground">Cuối ngày</h2>
+          <DailyScrapSection
+            date={scrapDate}
+            workshop={scrapWorkshop}
+            draft={scrapDraft}
+            onDraftChange={updateScrapDraft}
+            onSave={saveScrapDraft}
+            errors={scrapErrors}
+            isDirty={isScrapDirty}
+            isLocked={isDayLocked}
+          />
+          <div className="space-y-3 border-t-2 border-border pt-4">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             {isDayLocked ? (
               <Lock className="size-6 shrink-0 text-primary" aria-hidden />
@@ -1023,7 +1087,8 @@ export default function MaterialImportScreen() {
               Chốt ngày
             </Button>
           )}
-        </div>
+          </div>
+        </section>
   );
 
   /** Nút chọn nhanh (đại lý hay giao / xe đã chở) — nhỏ gọn, một chạm. */
@@ -1402,15 +1467,6 @@ export default function MaterialImportScreen() {
             </Button>
           </div>
         </div>
-
-        {/* Phế liệu cân trong ngày — GỘP CHUNG một chỗ với nguyên liệu */}
-        <DailyScrapSection
-          date={session.deliveryDate}
-          workshop={session.workshop}
-          rows={scraps}
-          onChange={persistScraps}
-          isLocked={isSessionLocked}
-        />
 
         {lockSection}
       </div>
@@ -1835,14 +1891,22 @@ export default function MaterialImportScreen() {
 
       {/* Phế liệu cân gộp cuối ngày theo phân xưởng */}
       {isSingleDayWorkshop && (
-        <DailyScrapSection
-          date={effectiveFrom}
-          workshop={viewedWorkshop}
-          rows={scraps}
-          onChange={persistScraps}
-          isLocked={isDayLocked}
-          readOnly
-        />
+        <section className="rounded-xl border-2 border-border bg-card p-4">
+          <DailyScrapSection
+            date={effectiveFrom}
+            workshop={viewedWorkshop}
+            draft={buildScrapDraft(
+              scraps.filter(
+                (r) => r.source === "Nhập hàng" && r.date === effectiveFrom && r.workshop === viewedWorkshop
+              )
+            )}
+            onDraftChange={() => undefined}
+            onSave={() => undefined}
+            errors={[]}
+            isDirty={false}
+            isLocked
+          />
+        </section>
       )}
         </>
       )}
@@ -1851,7 +1915,17 @@ export default function MaterialImportScreen() {
 
       {/* ---- Hộp thoại: chốt ngày ---- */}
       <Dialog open={isConfirmingLock} onOpenChange={setIsConfirmingLock}>
-        <DialogContent className="w-full sm:max-w-2xl">
+        <DialogContent
+          className="w-full sm:max-w-2xl"
+          onCloseAutoFocus={(e) => {
+            if (!focusScrapOnClose.current) return;
+            focusScrapOnClose.current = false;
+            e.preventDefault();
+            const first = document.querySelector<HTMLInputElement>("[data-scrap-form] input");
+            first?.focus();
+            first?.scrollIntoView({ block: "center", behavior: "smooth" });
+          }}
+        >
           <DialogHeader>
             <DialogTitle className="text-2xl">Chốt số liệu ngày này?</DialogTitle>
             <DialogDescription className="text-base">
@@ -1872,6 +1946,29 @@ export default function MaterialImportScreen() {
                 </span>
               </div>
             </div>
+            {/* Phế liệu cuối ngày — nhắc ngay lúc chốt, khỏi bỏ quên */}
+            {scrapDraftTotalKg(scrapDraft) > 0 ? (
+              <p className="text-base">
+                <span className="text-muted-foreground">Phế liệu: </span>
+                {scrapDraft
+                  .filter((r) => (r.quantityKg ?? 0) > 0)
+                  .map((r) => `${r.name} ${kg(r.quantityKg ?? 0)}`)
+                  .join(" · ")}
+                {isScrapDirty && (
+                  <span className="block text-sm text-muted-foreground">
+                    Số phế liệu vừa gõ sẽ được lưu cùng lúc chốt.
+                  </span>
+                )}
+              </p>
+            ) : (
+              <p className="flex items-start gap-3 rounded-lg bg-warning-surface px-4 py-3 text-base text-foreground">
+                <TriangleAlert className="mt-0.5 size-5 shrink-0 text-warning" aria-hidden />
+                <span>
+                  <strong>Chưa cân phế liệu</strong> (nội tạng, dạt) cho ngày này. Có cân thì quay
+                  lại gõ số kg ở khối Cuối ngày; hôm nay không có thì vẫn chốt được.
+                </span>
+              </p>
+            )}
             <Field label="Ghi chú khi chốt">
               <Input
                 value={lockNote}
@@ -1882,19 +1979,44 @@ export default function MaterialImportScreen() {
           </div>
 
           <DialogFooter>
-            <Button
-              title="Chưa chốt vội — đóng hộp thoại, sổ ngày vẫn mở."
-              variant="outline"
-              size="lg"
-              onClick={() => setIsConfirmingLock(false)}
-            >
-              Chưa chốt
-            </Button>
-            <Button variant="lock"
-              title="Xác nhận khóa sổ ngày này." size="lg" onClick={lockDay}>
-              <Lock />
-              Chốt ngày
-            </Button>
+            {scrapDraftTotalKg(scrapDraft) > 0 ? (
+              <>
+                <Button
+                  title="Chưa chốt vội — đóng hộp thoại, sổ ngày vẫn mở."
+                  variant="outline"
+                  size="lg"
+                  onClick={() => setIsConfirmingLock(false)}
+                >
+                  Chưa chốt
+                </Button>
+                <Button variant="lock"
+                  title="Xác nhận khóa sổ ngày này (lưu luôn số phế liệu đang gõ)." size="lg" onClick={lockDay}>
+                  <Lock />
+                  Chốt ngày
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button
+                  title="Đóng hộp thoại, quay lại gõ số kg nội tạng / dạt ở khối Cuối ngày rồi chốt."
+                  variant="outline"
+                  size="lg"
+                  className="h-auto min-h-11 whitespace-normal"
+                  onClick={() => {
+                    focusScrapOnClose.current = true;
+                    setIsConfirmingLock(false);
+                  }}
+                >
+                  <Scale />
+                  Quay lại cân phế liệu
+                </Button>
+                <Button variant="lock"
+                  title="Hôm nay không có phế liệu — khóa sổ ngày này luôn." size="lg" className="h-auto min-h-11 whitespace-normal" onClick={lockDay}>
+                  <Lock />
+                  Chốt — không có phế liệu
+                </Button>
+              </>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

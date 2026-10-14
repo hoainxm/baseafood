@@ -8,6 +8,7 @@ import type {
   Category,
   ImportShipment,
   MaterialImportItem,
+  ScrapItem,
   Workshop,
 } from "@/types";
 import { calculateImportAmount, isBackdatedImport } from "@/types";
@@ -19,6 +20,107 @@ export const WORKSHOPS: Workshop[] = ["Đông", "Cá", "Khô"];
 
 /** Loại phế liệu hay gặp — vẫn thêm mới tại chỗ được. */
 export const SCRAP_SUGGESTIONS = ["Nội tạng", "Dạt"];
+
+/* ---------- Phế liệu cân cuối ngày: bản nháp ô nhập (một nút Lưu) ---------- */
+
+/** Một dòng phế liệu trên form cuối ngày. `id` null = loại chưa ghi (ô trống sẵn). */
+export interface ScrapDraftRow {
+  key: string;
+  id: string | null;
+  name: string;
+  quantityKg: number | null;
+  sellingPrice: number | null;
+  /** Đã được kỳ cân đối hút (chỉ để hiện nhãn). */
+  periodId: string;
+}
+
+const sameName = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
+
+/**
+ * Form phế liệu của MỘT ngày + xưởng: mọi dòng đã ghi + ô trống sẵn cho từng loại hay
+ * gặp chưa ghi (Nội tạng, Dạt) ⇒ người dùng thấy ngay phải cân gì, khỏi quên.
+ * Loại hay gặp đứng trước theo thứ tự `SCRAP_SUGGESTIONS`.
+ */
+export function buildScrapDraft(daySaved: ScrapItem[]): ScrapDraftRow[] {
+  const rows: ScrapDraftRow[] = daySaved.map((r) => ({
+    key: r.id,
+    id: r.id,
+    name: r.name,
+    quantityKg: r.quantityKg,
+    sellingPrice: r.sellingPrice,
+    periodId: r.periodId,
+  }));
+  for (const name of SCRAP_SUGGESTIONS)
+    if (!rows.some((r) => sameName(r.name, name)))
+      rows.push({ key: `new:${name}`, id: null, name, quantityKg: null, sellingPrice: null, periodId: "" });
+  const rank = (name: string) => {
+    const i = SCRAP_SUGGESTIONS.findIndex((x) => sameName(x, name));
+    return i < 0 ? SCRAP_SUGGESTIONS.length : i;
+  };
+  return rows
+    .map((r, i) => ({ r, i }))
+    .sort((a, b) => rank(a.r.name) - rank(b.r.name) || a.i - b.i)
+    .map((x) => x.r);
+}
+
+export const scrapDraftTotalKg = (draft: ScrapDraftRow[]): number =>
+  draft.reduce((s, r) => s + (r.quantityKg && r.quantityKg > 0 ? r.quantityKg : 0), 0);
+
+/** Lỗi trước khi lưu: có số kg mà chưa có tên loại. */
+export function validateScrapDraft(draft: ScrapDraftRow[]): FieldError[] {
+  return draft
+    .filter((r) => (r.quantityKg ?? 0) > 0 && !r.name.trim())
+    .map(() => ({ field: "Loại phế liệu", message: "Có dòng đã gõ kg nhưng chưa chọn loại" }));
+}
+
+/**
+ * Áp bản nháp vào sổ phế liệu (một lần, một nút Lưu): dòng đã ghi có kg > 0 ⇒ cập nhật;
+ * dòng đã ghi bị XÓA số kg ⇒ bỏ khỏi sổ; ô trống sẵn có kg > 0 ⇒ ghi mới (nguồn "Nhập
+ * hàng", ngày + xưởng của form, chưa vào kỳ). Dòng của ngày/xưởng khác không đụng.
+ */
+export function applyScrapDraft(
+  all: ScrapItem[],
+  draft: ScrapDraftRow[],
+  date: string,
+  workshop: Workshop,
+): { next: ScrapItem[]; added: number; updated: number; removed: number; changed: boolean } {
+  const removedIds = new Set<string>();
+  const updates = new Map<string, ScrapItem>();
+  const created: ScrapItem[] = [];
+  for (const d of draft) {
+    const kgValue = d.quantityKg ?? 0;
+    const name = d.name.trim();
+    if (d.id) {
+      const orig = all.find((r) => r.id === d.id);
+      if (!orig) continue;
+      if (!(kgValue > 0)) removedIds.add(d.id);
+      else if (orig.name !== name || orig.quantityKg !== kgValue || orig.sellingPrice !== d.sellingPrice)
+        updates.set(d.id, { ...orig, name, quantityKg: kgValue, sellingPrice: d.sellingPrice });
+    } else if (kgValue > 0 && name) {
+      created.push({
+        id: newId(),
+        periodId: "",
+        name,
+        quantityKg: kgValue,
+        sellingPrice: d.sellingPrice,
+        date,
+        workshop,
+        source: "Nhập hàng",
+      });
+    }
+  }
+  const next = [
+    ...all.filter((r) => !removedIds.has(r.id)).map((r) => updates.get(r.id) ?? r),
+    ...created,
+  ];
+  return {
+    next,
+    added: created.length,
+    updated: updates.size,
+    removed: removedIds.size,
+    changed: created.length + updates.size + removedIds.size > 0,
+  };
+}
 
 /** Đầu chuyến đang nhập — dùng chung cho mọi dòng loại hàng trong chuyến. */
 export interface ShipmentHeader {

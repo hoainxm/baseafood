@@ -16,10 +16,14 @@ import {
   defaultOcrSelection,
   applyOcrSelection,
   createEmptyImportLine,
+  buildScrapDraft,
+  applyScrapDraft,
+  scrapDraftTotalKg,
+  validateScrapDraft,
   type ShipmentHeader,
   type ImportLine,
 } from "./importHelpers";
-import type { ImportShipment, MaterialImportItem } from "@/types";
+import type { ImportShipment, MaterialImportItem, ScrapItem } from "@/types";
 
 // Logic gom chuyến / ghi bù / mã lô — CLAUDE.md xếp đây là chỗ đáng test nhất
 // sau balancingCalc. Hàm thuần, tách khỏi màn 2026-09-21.
@@ -430,5 +434,71 @@ describe("bảng đối chiếu OCR — tick ô nào điền ô đó", () => {
     const out = applyOcrSelection(r, { header: new Set(["date"]), lines: new Set([1]) });
     expect(out).toMatchObject({ date: "2026-08-22", supplier: undefined, licensePlate: undefined });
     expect(out.lines.map((l) => l.kg)).toEqual([11017]);
+  });
+});
+
+describe("phế liệu cân cuối ngày — form một nút Lưu", () => {
+  const scrap = (p: Partial<ScrapItem>): ScrapItem => ({
+    id: "s1",
+    periodId: "",
+    name: "Nội tạng",
+    quantityKg: 100,
+    sellingPrice: null,
+    date: "2026-10-14",
+    workshop: "Đông",
+    source: "Nhập hàng",
+    ...p,
+  });
+
+  it("ngày chưa cân ⇒ có sẵn ô trống Nội tạng rồi Dạt", () => {
+    const d = buildScrapDraft([]);
+    expect(d.map((r) => [r.name, r.id, r.quantityKg])).toEqual([
+      ["Nội tạng", null, null],
+      ["Dạt", null, null],
+    ]);
+    expect(scrapDraftTotalKg(d)).toBe(0);
+  });
+
+  it("đã ghi Dạt + loại khác ⇒ giữ dòng đã ghi, chỉ thêm ô Nội tạng, loại hay gặp đứng trước", () => {
+    const d = buildScrapDraft([scrap({ id: "a", name: "Vụn", quantityKg: 5 }), scrap({ id: "b", name: "dạt", quantityKg: 30 })]);
+    expect(d.map((r) => [r.name, r.id])).toEqual([
+      ["Nội tạng", null],
+      ["dạt", "b"],
+      ["Vụn", "a"],
+    ]);
+    expect(scrapDraftTotalKg(d)).toBe(35);
+  });
+
+  it("lưu: ô trống có kg ⇒ ghi mới đúng ngày/xưởng; ô để trống ⇒ không ghi", () => {
+    const draft = buildScrapDraft([]);
+    draft[0].quantityKg = 120;
+    const r = applyScrapDraft([], draft, "2026-10-14", "Cá");
+    expect(r.added).toBe(1);
+    expect(r.next).toHaveLength(1);
+    expect(r.next[0]).toMatchObject({ name: "Nội tạng", quantityKg: 120, date: "2026-10-14", workshop: "Cá", source: "Nhập hàng", periodId: "" });
+  });
+
+  it("lưu: sửa kg dòng cũ ⇒ cập nhật, xóa kg ⇒ bỏ dòng; dòng ngày khác không đụng", () => {
+    const other = scrap({ id: "x", date: "2026-10-13" });
+    const all = [scrap({ id: "a", quantityKg: 100 }), scrap({ id: "b", name: "Dạt", quantityKg: 30, periodId: "k1" }), other];
+    const draft = buildScrapDraft(all.slice(0, 2));
+    draft.find((r) => r.id === "a")!.quantityKg = 90;
+    draft.find((r) => r.id === "b")!.quantityKg = null;
+    const r = applyScrapDraft(all, draft, "2026-10-14", "Đông");
+    expect([r.added, r.updated, r.removed]).toEqual([0, 1, 1]);
+    expect(r.next.find((x) => x.id === "a")?.quantityKg).toBe(90);
+    expect(r.next.some((x) => x.id === "b")).toBe(false);
+    expect(r.next).toContain(other);
+  });
+
+  it("không đổi gì ⇒ changed = false (khỏi báo đã lưu)", () => {
+    const all = [scrap({ id: "a" })];
+    expect(applyScrapDraft(all, buildScrapDraft(all), "2026-10-14", "Đông").changed).toBe(false);
+  });
+
+  it("có kg mà chưa chọn loại ⇒ báo lỗi", () => {
+    const draft = [...buildScrapDraft([]), { key: "n1", id: null, name: " ", quantityKg: 4, sellingPrice: null, periodId: "" }];
+    expect(validateScrapDraft(draft)).toHaveLength(1);
+    expect(validateScrapDraft(buildScrapDraft([]))).toHaveLength(0);
   });
 });

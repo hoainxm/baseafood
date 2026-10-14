@@ -83,10 +83,10 @@ export const PAGE_GUIDES: Record<string, PageGuide> = {
         </Section>
         <Section title="Phế liệu (nội tạng, hàng dạt)">
           <p>
-            Cân gộp cuối ngày, nhập ở hộp <b>Thêm phế liệu</b>. Loại mặc định là
-            Nội tạng, cân hàng dạt thì đổi sang Dạt. Bấm <b>Lưu</b> là ghi rồi
-            đóng; có cả hai loại thì bấm <b>Lưu, ghi tiếp loại khác</b> cho loại
-            đầu. Chỉ nhập một lần ở đây — màn Cân đối sẽ hút sang, không nhập lại.
+            Cân gộp cuối ngày, gõ số kg vào ô <b>Nội tạng</b> và <b>Dạt</b> ở khối{" "}
+            <b>Cuối ngày</b>, ngay trên nút Chốt ngày, rồi bấm <b>Lưu phế liệu</b>.
+            Bấm <b>Chốt ngày</b> cũng tự lưu số đang gõ. Loại khác thì bấm{" "}
+            <b>Loại khác</b>. Chỉ nhập một lần ở đây — màn Cân đối sẽ hút sang.
           </p>
         </Section>
         <Section title="Chốt ngày">

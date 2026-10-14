@@ -1,6 +1,7 @@
 > Load khi: đụng auth, đăng nhập, RLS, `.env`, key, hay có ý định cho app chạy ngoài mạng nội bộ. 🔴
 covers: src/lib/auth.ts, src/lib/username.ts, src/features/auth/LoginScreen.tsx, src/features/users/UserManagementScreen.tsx, supabase/migrations/0006_nguoi_dung.sql, supabase/migrations/0007_seed_admin.sql, supabase/migrations/0010_email_domain_vn.sql, supabase/migrations/0003_siet_rls.sql, src/lib/supabase.ts, .env.example, .gitignore
 last_verified: 2026-10-14
+<!-- updated: 2026-10-14 — Edge Function đầu tiên `ocr-import-slip` (OCR phiếu nhập bằng OpenAI): key OPENAI_API_KEY ở Supabase secrets, verify_jwt bật (gọi không đăng nhập ⇒ 401, đã kiểm), trong hàm gọi rpc co_vai_tro() bằng JWT người gọi ⇒ tài khoản vai trò rỗng 403. Thêm luật key bên thứ ba ở § Luật về key. -->
 <!-- updated: 2026-10-12 (demo) — GỠ `DEMO_IDS` / `laDemo` / `demoGuard` (5 màn DEMO đã xóa; link cũ chuyển sang màn thật). CHẾ ĐỘ DEMO thay thế: CHỈ admin bật (khối ở Tổng quan; máy không đăng nhập — sandbox — cũng thấy); cờ nằm theo máy ⇒ người KHÔNG phải admin đăng nhập trên máy đó thì App tự tắt cờ + tải lại. Demo ghi `site_id = 'site-demo'` trong cùng DB — RLS hiện KHÔNG lọc theo site (mọi người có vai trò đều đọc được dòng demo qua SQL/API); tách site là ở tầng app (lib/demoMode.ts). `/users` bị khóa khi đang demo (tài khoản + vai trò là thật). `auth.ts` ghi `user_profiles` bằng `SITE_ID_THAT`, không theo chế độ. -->
 ttl_days: 90
 <!-- updated: 2026-10-12 — LỖ HỔNG (audit ponytail): màn Người dùng tạo tài khoản bằng `signUp` từ trình duyệt ⇒ Supabase phải mở đăng ký ⇒ người lạ có link app tự đăng ký được, mà RLS chỉ kiểm `auth.uid() is not null` ⇒ đọc/ghi mọi bảng + tự sửa `roles` thành admin. VÁ: `0057_chan_tu_dang_ky.sql` — bảng nghiệp vụ chỉ mở cho người có vai trò KHÁC RỖNG (`co_vai_tro()`), cột vai trò chỉ admin sửa (`la_admin()`). KHÔNG phải role-RLS (quyết định 2026-09-21 vẫn giữ: mọi người có vai trò cùng quyền DB). ⚠️ Hệ quả: người dùng thật vai trò rỗng — app vẫn cho "xem đầy đủ" — sẽ bị khóa ở DB sau khi chạy ⇒ gán vai trò trước. ✅ Chủ dự án đã chạy trên DB thật 2026-10-12 — kiểm 2026-10-12: 0 policy kiểu cũ, 40 policy `co_vai_tro()`, `user_profiles` 4 policy, Storage siết đủ, 0 hồ sơ vai trò rỗng. Cùng đợt: `getOrCreateProfile` thôi ghi đè vai trò rỗng khi select lỗi. -->
@@ -81,6 +82,7 @@ Còn thiếu (làm sau): cột "người ghi/người chốt" (dữ liệu `chot
 - ❌ **Không bao giờ** đặt `service_role` key vào `.env` — Vite nhúng mọi biến `VITE_*` thẳng vào bundle.
 - Anon key từng bị commit ở bất kỳ repo nào ⇒ **rotate** ở Dashboard → Project Settings → API.
 - Không dán URL/key vào commit message, issue, hay doc.
+- **Key dịch vụ bên thứ ba (OpenAI…) chỉ ở Edge Function secrets**, không bao giờ `VITE_*`. Hàm phải bật Verify JWT và tự kiểm `co_vai_tro()` để tài khoản tự đăng ký không dùng được key. Mẫu: `ocr-import-slip` — [`ops/openai-ocr.md`](../ops/openai-ocr.md).
 
 ## Cross-references
 

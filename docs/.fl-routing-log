@@ -63,3 +63,5 @@
 2026-10-12 | demo,reports,ui-chart | docs/spec/che-do-demo.md,src/design-system/README.md,docs/app-map/33-ban-hang.md,docs/app-map/31-can-doi-ky.md,docs/app-map/34-btp-san-xuat-kho.ba-spec.md,docs/app-map/38-so-ton-lien-tuc.ba-spec.md,docs/spec/qr-truy-xuat-lo.md
 2026-10-12 | naming-convention (db,data-layer,routing,app-structure,design-system,docs) | docs/spec/routing-va-naming.md,docs/app-map/03-database.md,docs/app-map/04-tang-du-lieu.md,docs/app-map/01-app-structure.md,docs/app-map/02-pages-navigation.md,src/design-system/README.md,docs/README.md,docs/ops/supabase-setup.md,docs/BAN-GIAO.md
 2026-10-12 | ui-dashboard,design-system | docs/spec/che-do-demo.md,src/design-system/README.md,docs/app-map/02-pages-navigation.md,docs/app-map/01-app-structure.md
+2026-10-13 | monthly-stock,data-layer | docs/app-map/36-so-kho-thang.md,docs/app-map/04-tang-du-lieu.md,docs/app-map/03-database.md
+2026-10-14 | imports,security-secrets,ops-deploy | docs/app-map/30-nhap-hang.md,docs/app-map/05-bao-mat-phan-quyen.md,docs/ops/supabase-storage.md,docs/ops/deploy-vercel.md,docs/trien-khai/hop-2026-09-02-form-nhap-trace-gia-qc.md

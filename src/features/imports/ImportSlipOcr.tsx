@@ -138,7 +138,7 @@ export function ImportSlipOcr({
             <div className="space-y-2">
               <div className="flex items-center gap-2 text-base text-muted-foreground">
                 <Loader2 className="animate-spin" />
-                Đang đọc chữ trên phiếu… {percent}%
+                Đang đọc chữ trên phiếu… {percent > 0 ? `${percent}%` : ""}
               </div>
               <div className="h-2 w-full overflow-hidden rounded bg-muted">
                 <div
@@ -165,6 +165,11 @@ export function ImportSlipOcr({
 
           {stage === "xong" && result && (
             <div className="space-y-4">
+              {/* Máy nào đã đọc — OpenAI hỏng thì nói rõ đang dùng máy dự phòng (đọc chữ tay kém hơn). */}
+              <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                <Tag variant="phu">{result.engine === "openai" ? "Đọc bằng OpenAI" : "Đọc bằng máy trong trình duyệt"}</Tag>
+                {result.cloudError && <span>OpenAI chưa dùng được lúc này, đang dùng máy dự phòng.</span>}
+              </div>
               {/* Đầu chuyến: đại lý + ngày */}
               {(result.supplier || result.date) && (
                 <div className="flex flex-wrap gap-2">

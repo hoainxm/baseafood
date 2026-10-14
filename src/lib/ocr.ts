@@ -4,14 +4,16 @@
 // Description: Client-side OCR (Tesseract) + parser gợi ý điền form
 // ============================================================
 
+import { hasCloudOcr, mergeCloudResult, requestCloudOcr } from "./ocrCloud";
+
 /**
  * OCR chụp phiếu tay → GỢI Ý điền ô ở màn Nhập hàng. Chạy THẲNG trong trình duyệt
  * bằng Tesseract (nạp động, không bundle vào gói đầu; không cần key/dịch vụ mới).
  *
  * ⚠️ Chữ VIẾT TAY nhận chưa chuẩn — kết quả là **bản nháp để người soát lại**,
  * không tin tuyệt đối. Chuẩn hơn với phiếu in/đánh máy. Bộ máy nhận diện tách sau
- * hàm `chayTesseract` để sau nâng cấp cloud (Google Vision qua edge function) chỉ
- * thay MỘT chỗ — phần parser (`parseOcrText`) giữ nguyên.
+ * hàm `runTesseract`; từ 2026-10-14 có thêm bộ đọc OpenAI qua Edge Function
+ * (`lib/ocrCloud.ts`) chạy TRƯỚC, hỏng thì quay về Tesseract — phần parser (`parseOcrText`) giữ nguyên.
  */
 
 /** OCR client-side luôn có (Tesseract nạp động). Cờ để màn quyết định hiện nút. */
@@ -37,6 +39,10 @@ export interface KetQuaOcr {
   materialTypes: string[];
   /** Ghép (loại NL + kg) theo từng hàng chữ khi đoán được. */
   lines: DongOcr[];
+  /** Máy đã đọc: OpenAI (Edge Function) hay Tesseract trong máy. */
+  engine?: "openai" | "tesseract";
+  /** Có thử OpenAI mà hỏng ⇒ lý do ngắn, màn báo "đang dùng máy đọc dự phòng". */
+  cloudError?: string;
 }
 
 /** Danh mục để dò khớp tên trên phiếu (tên đại lý, mã đại lý, tên loại NL). */
@@ -200,6 +206,16 @@ export async function recognizeImportSlip(
   dm: OcrCatalog,
   onProgress?: (percent: number) => void
 ): Promise<KetQuaOcr> {
+  // OpenAI qua Edge Function trước (đọc chữ tay tốt hơn); hỏng thì Tesseract trong máy.
+  let cloudError: string | undefined;
+  if (hasCloudOcr) {
+    try {
+      const raw = await requestCloudOcr(file, dm);
+      return { ...mergeCloudResult(raw, parseOcrText(String(raw.text), dm), dm), engine: "openai" };
+    } catch (e) {
+      cloudError = e instanceof Error ? e.message : String(e);
+    }
+  }
   const text = await runTesseract(file, onProgress);
-  return parseOcrText(text, dm);
+  return { ...parseOcrText(text, dm), engine: "tesseract", cloudError };
 }

@@ -25,7 +25,7 @@ export interface RowMarkTarget {
 
 /* Bản đầu (sáng 2026-10-06) lưu 4 mã trơn — đọc ra mức 2 của sắc tương ứng. */
 const LEGACY_CODES: Record<string, RowMarkColor> = {
-  vang: "vang-2",
+  vang: "vang-2", // naming-ok: mã màu đã lưu trong row_marks (5b)
   "xanh-la": "la-2",
   "xanh-duong": "duong-2",
   do: "do-2",
@@ -42,7 +42,7 @@ export function normalizeRowMarkColor(v: string): RowMarkColor | "" {
  * id TẤT ĐỊNH của một dấu: cùng bảng + cùng dòng (+ cùng cột) ⇒ cùng id ⇒ ghi
  * lại chỉ cập nhật, hai người tô cùng chỗ không đẻ hai dấu. `*` = cả dòng.
  */
-export function idDauTo(tableKey: string, rowId: string, columnKey: string | null = null): string {
+export function rowMarkId(tableKey: string, rowId: string, columnKey: string | null = null): string {
   return `${tableKey}::${rowId}::${columnKey ?? "*"}`;
 }
 
@@ -54,17 +54,17 @@ export function getTableRowMarks(
   marks: RowMark[],
   tableKey: string
 ): { row: Map<string, RowMarkStyle>; o: Map<string, RowMarkStyle> } {
-  const dong = new Map<string, RowMarkStyle>();
+  const row = new Map<string, RowMarkStyle>();
   const o = new Map<string, RowMarkStyle>();
   for (const m of marks) {
     if (m.tableKey !== tableKey) continue;
     const color = normalizeRowMarkColor(m.color);
     if (!color && !m.bold) continue;
-    const dau = { color, bold: m.bold };
-    if (m.columnKey == null) dong.set(m.rowId, dau);
-    else o.set(cellKey(m.rowId, m.columnKey), dau);
+    const mark = { color, bold: m.bold };
+    if (m.columnKey == null) row.set(m.rowId, mark);
+    else o.set(cellKey(m.rowId, m.columnKey), mark);
   }
-  return { row: dong, o };
+  return { row, o };
 }
 
 /**
@@ -77,27 +77,27 @@ export function setRowMarks(
   marks: RowMark[],
   tableKey: string,
   target: (string | RowMarkTarget)[],
-  dau: RowMarkStyle | null,
+  mark: RowMarkStyle | null,
   user: string,
   luc: string = new Date().toISOString()
 ): RowMark[] {
   const items = target.map((d) => (typeof d === "string" ? { row: d, columns: null } : d));
-  const theoId = new Map(items.map((d) => [idDauTo(tableKey, d.row, d.columns), d]));
-  const bo = !dau || (!dau.color && !dau.bold);
+  const theoId = new Map(items.map((d) => [rowMarkId(tableKey, d.row, d.columns), d]));
+  const isEmpty = !mark || (!mark.color && !mark.bold);
   const remaining = marks.filter((m) => !theoId.has(m.id));
-  if (bo) return remaining;
+  if (isEmpty) return remaining;
   const prev = new Map(marks.map((m) => [m.id, m]));
   const nextMarks = [...theoId].map(([id, d]): RowMark => {
     const c = prev.get(id);
     // Giữ nguyên bản cũ khi không đổi gì ⇒ repo không đẩy cập nhật thừa.
-    if (c && normalizeRowMarkColor(c.color) === dau.color && c.bold === dau.bold) return c;
+    if (c && normalizeRowMarkColor(c.color) === mark.color && c.bold === mark.bold) return c;
     return {
       id,
       tableKey,
       rowId: d.row,
       columnKey: d.columns,
-      color: dau.color,
-      bold: dau.bold,
+      color: mark.color,
+      bold: mark.bold,
       markedBy: user,
       markedAt: luc,
     };

@@ -34,7 +34,7 @@ import {
   useRowSelection,
   useRowMarkTools,
 } from "@/design-system";
-import { KY_OPT, getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
+import { PERIOD_OPTIONS, getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
 import { num, formatDateVN } from "@/lib/format";
 import { exportAoaToXlsx, type OExcel } from "@/lib/reportXlsx";
 import {
@@ -54,7 +54,7 @@ const WORKSHOP_OPTIONS = [
 ];
 
 /** Một dòng lưới: mặt hàng × quy cách của một phân xưởng, phân bổ theo ngày. */
-interface DongPivot {
+interface PivotRow {
   workshop: Workshop;
   productId: string;
   productName: string;
@@ -66,7 +66,7 @@ interface DongPivot {
 
 interface WorkshopGroup {
   workshop: Workshop;
-  rows: DongPivot[];
+  rows: PivotRow[];
   byDate: Record<string, number>;
   totalKg: number;
   totalBlocks: number;
@@ -79,20 +79,20 @@ interface WorkshopGroup {
  * xuất được Excel để kế toán đối chiếu.
  */
 export default function DailyProductionReport() {
-  const [rows, , { trangThai: status }] = useWipProductions();
+  const [rows, , { status }] = useWipProductions();
   const [products] = useProducts();
-  const isLoading = status === "dang-tai" && rows.length === 0;
+  const isLoading = status === "loading" && rows.length === 0;
 
-  const [ky, setKy] = useState<ViewPeriod>("thang");
-  const [moc, setMoc] = useState(todayIso());
-  const [tuTC, setTuTC] = useState(todayIso());
-  const [denTC, setDenTC] = useState(todayIso());
+  const [period, setPeriod] = useState<ViewPeriod>("month");
+  const [anchor, setAnchor] = useState(todayIso());
+  const [customFrom, setCustomFrom] = useState(todayIso());
+  const [customTo, setCustomTo] = useState(todayIso());
   const [workshop, setWorkshop] = useState("Tất cả");
   const [inPrint, setInPrint] = useState(false);
-  const [tu, den] = getViewPeriodRange(ky, moc, tuTC, denTC);
+  const [fromDate, toDate] = getViewPeriodRange(period, anchor, customFrom, customTo);
   // Dòng là dòng GỘP (xưởng × mặt hàng × quy cách) ⇒ ghép kỳ + xưởng vào khoá
   // bảng để "đã dò" kỳ này không lan sang kỳ khác.
-  const to = useRowMarkTools(`bao-cao-sx-ngay|${tu}|${den}|${workshop}`);
+  const to = useRowMarkTools(`bao-cao-sx-ngay|${fromDate}|${toDate}|${workshop}`);
   const rowSelection = useRowSelection();
 
   const { days, groups, dailyGrandTotal: grandTotalByDay, grandTotalKg, grandTotalBlocks, productCount } =
@@ -100,13 +100,13 @@ export default function DailyProductionReport() {
       const productNameOf = (id: string) => products.find((m) => m.id === id)?.name || "—";
       const filteredRows = rows.filter(
         (r) =>
-          r.productionDate >= tu &&
-          r.productionDate <= den &&
+          r.productionDate >= fromDate &&
+          r.productionDate <= toDate &&
           (workshop === "Tất cả" || r.workshop === workshop)
       );
 
       const daySet = new Set<string>();
-      const map = new Map<string, DongPivot>();
+      const map = new Map<string, PivotRow>();
       for (const r of filteredRows) {
         daySet.add(r.productionDate);
         const key = `${r.workshop}|||${r.productId}|||${r.spec}`;
@@ -165,7 +165,7 @@ export default function DailyProductionReport() {
         grandTotalBlocks: groups.reduce((s, g) => s + g.totalBlocks, 0),
         productCount: allRows.length,
       };
-    }, [rows, products, tu, den, workshop]);
+    }, [rows, products, fromDate, toDate, workshop]);
   /** Khoá các dòng mặt hàng đang hiện — thứ tự cho Shift+tick chọn khoảng. */
   const rowKeys = groups.flatMap((g) => g.rows.map((r) => `${r.workshop}|||${r.productId}|||${r.spec}`));
 
@@ -175,10 +175,10 @@ export default function DailyProductionReport() {
     subLabel: formatDateVN(d),
   }));
 
-  const the: StatCardData[] = [
-    { label: "Kỳ báo cáo", value: `${formatDateVN(tu)} – ${formatDateVN(den)}`, icon: CalendarRange, color: "trung-tinh" },
+  const cards: StatCardData[] = [
+    { label: "Kỳ báo cáo", value: `${formatDateVN(fromDate)} – ${formatDateVN(toDate)}`, icon: CalendarRange, color: "neutral" },
     { label: "Tổng sản lượng", value: `${num(grandTotalKg)} kg`, numeric: true, icon: Scale, color: "brand" },
-    { label: "Tổng block", value: num(grandTotalBlocks), numeric: true, icon: Layers, color: "trung-tinh" },
+    { label: "Tổng block", value: num(grandTotalBlocks), numeric: true, icon: Layers, color: "neutral" },
     { label: "Số mặt hàng", value: num(productCount), numeric: true, icon: Package, color: "success" },
   ];
 
@@ -189,7 +189,7 @@ export default function DailyProductionReport() {
     }
     const aoa: OExcel[][] = [];
     aoa.push(["Báo cáo tổng hợp thành phẩm sản xuất hàng ngày"]);
-    aoa.push([`Kỳ: ${formatDateVN(tu)} – ${formatDateVN(den)} · Phân xưởng: ${workshop}`]);
+    aoa.push([`Kỳ: ${formatDateVN(fromDate)} – ${formatDateVN(toDate)} · Phân xưởng: ${workshop}`]);
     aoa.push([]);
     aoa.push(["Phân xưởng", "Mặt hàng", "Quy cách", ...days.map((d) => formatDateVN(d)), "Tổng kg", "Tổng block"]);
     for (const g of groups) {
@@ -202,7 +202,7 @@ export default function DailyProductionReport() {
       sheetName: "Thành phẩm ngày",
       aoa,
       colWidths: [12, 30, 12, ...days.map(() => 11), 12, 10],
-      fileName: `bao-cao-thanh-pham-ngay_${tu}_${den}.xlsx`,
+      fileName: `bao-cao-thanh-pham-ngay_${fromDate}_${toDate}.xlsx`,
     });
     // Không toast: trình duyệt đã tự báo tải file xong (README luật 8 — xuất file là thao tác không đổi số).
   };
@@ -235,31 +235,31 @@ export default function DailyProductionReport() {
             label="Kỳ báo cáo"
             hideRequiredMark
             clearable={false}
-            value={ky}
-            onChange={(v) => setKy(v as ViewPeriod)}
-            options={KY_OPT}
+            value={period}
+            onChange={(v) => setPeriod(v as ViewPeriod)}
+            options={PERIOD_OPTIONS}
           />
         </div>
         <div className="min-w-[min(12rem,100%)] flex-1 sm:min-w-[16rem]">
-          {ky === "tuy-chon" ? (
+          {period === "custom" ? (
             <DateRangeField
               label="Khoảng ngày sản xuất"
               hideRequiredMark
               presets={false}
-              startDate={tuTC}
-              endDate={denTC}
+              startDate={customFrom}
+              endDate={customTo}
               onChange={(a, b) => {
-                setTuTC(a);
-                setDenTC(b);
+                setCustomFrom(a);
+                setCustomTo(b);
               }}
             />
           ) : (
             <DateField
-              label={ky === "ngay" ? "Ngày" : "Ngày bất kỳ trong kỳ"}
+              label={period === "day" ? "Ngày" : "Ngày bất kỳ trong kỳ"}
               hideRequiredMark
-              hint={ky === "ngay" ? undefined : `Kỳ: ${formatDateVN(tu)} – ${formatDateVN(den)}`}
-              value={moc}
-              onChange={setMoc}
+              hint={period === "day" ? undefined : `Kỳ: ${formatDateVN(fromDate)} – ${formatDateVN(toDate)}`}
+              value={anchor}
+              onChange={setAnchor}
             />
           )}
         </div>
@@ -275,14 +275,14 @@ export default function DailyProductionReport() {
         </div>
       </div>
 
-      <StatCardGrid cards={the} />
+      <StatCardGrid cards={cards} />
 
       {isLoading ? (
         <TableSkeleton />
       ) : groups.length === 0 ? (
         <EmptyState
           icon={Factory}
-          title={`Chưa có thành phẩm sản xuất trong ${formatDateVN(tu)} – ${formatDateVN(den)}`}
+          title={`Chưa có thành phẩm sản xuất trong ${formatDateVN(fromDate)} – ${formatDateVN(toDate)}`}
           description="Ghi sản lượng ở màn Sản xuất BTP, số liệu sẽ tổng hợp về đây."
         />
       ) : (
@@ -329,9 +329,9 @@ export default function DailyProductionReport() {
                               <input
                                 type="checkbox"
                                 className="size-5 shrink-0"
-                                checked={rowSelection.daChon.has(k)}
+                                checked={rowSelection.selected.has(k)}
                                 onChange={() => {}}
-                                onClick={(e) => rowSelection.doi(k, e.shiftKey, rowKeys)}
+                                onClick={(e) => rowSelection.toggle(k, e.shiftKey, rowKeys)}
                                 aria-label={`Chọn dòng ${r.productName} ${r.spec}`}
                                 title="Tick để tô màu / in đậm dòng này (Shift+tick chọn cả khoảng)."
                               />
@@ -381,14 +381,14 @@ export default function DailyProductionReport() {
               </TableFooter>
             </Table>
           </HorizontalScroll>
-          <RowMarkToolbar marker={to} selectedKeys={rowKeys.filter((k) => rowSelection.daChon.has(k))} onClearSelection={rowSelection.boChon} />
+          <RowMarkToolbar marker={to} selectedKeys={rowKeys.filter((k) => rowSelection.selected.has(k))} onClearSelection={rowSelection.clearSelection} />
         </>
       )}
 
       {inPrint && (
         <PrintSheet
           title="Báo cáo tổng hợp thành phẩm hàng ngày"
-          subtitle={`Kỳ: ${formatDateVN(tu)} – ${formatDateVN(den)}${workshop !== "Tất cả" ? ` · Phân xưởng ${workshop}` : ""}`}
+          subtitle={`Kỳ: ${formatDateVN(fromDate)} – ${formatDateVN(toDate)}${workshop !== "Tất cả" ? ` · Phân xưởng ${workshop}` : ""}`}
           onClose={() => setInPrint(false)}
         >
           <table className="w-full border-collapse">

@@ -57,7 +57,7 @@ export default function BalancingTable({
 
   const dates = getPeriodDates(period);
   /* Cùng thứ tự với lưới: Lấy xả đông đầu bảng, Gửi đông cuối bảng. */
-  const sortRank = (h: MaterialGridRow) => (h.stockLineKind === "lay-xa-dong" ? 0 : h.stockLineKind === "gui-dong" ? 2 : 1);
+  const sortRank = (h: MaterialGridRow) => (h.stockLineKind === "thaw-out" ? 0 : h.stockLineKind === "freeze-deposit" ? 2 : 1);
   const materialRows = buildMaterialGridRows(materialInRows, assignedImports).sort((a, b) => sortRank(a) - sortRank(b));
   /* Cột chuyển kỳ đã bỏ ở khối NL — chỉ in khi kỳ cũ lỡ có số. */
   const hasLegacyCarryOver = materialRows.some((r) => r.carryOverKg !== 0);
@@ -65,12 +65,12 @@ export default function BalancingTable({
   const stockRowName = (r: MaterialGridRow) => {
     const original = materialById.get(r.id);
     const mt = original && describeStockLine ? describeStockLine(original) : "";
-    const ten = r.stockLineKind && r.name !== BALANCING_STOCK_LINE_NAMES[r.stockLineKind] ? `${BALANCING_STOCK_LINE_NAMES[r.stockLineKind]} · ${r.name}` : r.name;
-    return mt ? `${ten} — ${mt}` : ten;
+    const name = r.stockLineKind && r.name !== BALANCING_STOCK_LINE_NAMES[r.stockLineKind] ? `${BALANCING_STOCK_LINE_NAMES[r.stockLineKind]} · ${r.name}` : r.name;
+    return mt ? `${name} — ${mt}` : name;
   };
   const finishedGoodRows = buildFinishedGoodGridRows(finishedGoods, assignedWips);
   /* Nhieu cot ngay ⇒ in NGANG, neu khong bang bi cat mat cot cuoi. */
-  const inNgang = dates.length > 3;
+  const isLandscape = dates.length > 3;
 
   /* Thu/mở cột NGAY TRONG phiếu. Bản trước chỉ có nút này ở lưới ngoài, nên khi
      kỳ dài người dùng phải thoát phiếu, thu cột, mở lại phiếu — ba bước cho một
@@ -92,13 +92,13 @@ export default function BalancingTable({
   return (
     <div
       className={`print-root fixed inset-0 z-50 overflow-auto bg-white p-8 text-slate-900 sm:p-12 ${
-        inNgang ? "print-landscape" : ""
+        isLandscape ? "print-landscape" : ""
       }`}
     >
       {/* Thanh công cụ */}
       <div
         className={`no-print mx-auto mb-6 flex flex-wrap items-center justify-between gap-3 ${
-          inNgang ? "max-w-[100rem]" : "max-w-5xl"
+          isLandscape ? "max-w-[100rem]" : "max-w-5xl"
         }`}
       >
         <Button variant="outline" onClick={onClose}>
@@ -128,7 +128,7 @@ export default function BalancingTable({
       </div>
 
       {/* Rộng hơn + thoáng hơn: bảng cân đối là bảng số dày, chật thì đọc nhầm dòng. */}
-      <div className={inNgang ? "mx-auto max-w-[100rem]" : "mx-auto max-w-5xl"}>
+      <div className={isLandscape ? "mx-auto max-w-[100rem]" : "mx-auto max-w-5xl"}>
         <div className="text-center">
           <h1 className="text-lg font-bold uppercase tracking-wide">
             Bảng cân đối {period.materialTypeName}

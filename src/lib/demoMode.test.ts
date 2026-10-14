@@ -51,9 +51,9 @@ describe("cột khóa ngoại (refColumns) — period_id → balancing_periods.i
     expect(rowToServer({ id: "p1", period_id: "" }, "id", SITE_DEMO, true, ["period_id"]).period_id).toBe("");
   });
   it("demo: đọc về bỏ tiền tố cả khóa ngoại — khớp lại đúng id kỳ của app", () => {
-    const ky = rowFromServer(rowToServer({ id: "ky-1" }, "id", SITE_DEMO, true), "id", true);
-    const dong = rowFromServer(rowToServer({ id: "v1", period_id: "ky-1" }, "id", SITE_DEMO, true, ["period_id"]), "id", true, ["period_id"]);
-    expect(dong?.period_id).toBe(ky?.id);
+    const period = rowFromServer(rowToServer({ id: "ky-1" }, "id", SITE_DEMO, true), "id", true);
+    const row = rowFromServer(rowToServer({ id: "v1", period_id: "ky-1" }, "id", SITE_DEMO, true, ["period_id"]), "id", true, ["period_id"]);
+    expect(row?.period_id).toBe(period?.id);
   });
   it("thật: khóa ngoại không đổi", () => {
     expect(rowToServer({ id: "v1", period_id: "ky-1" }, "id", "bsf1", false, ["period_id"]).period_id).toBe("ky-1");

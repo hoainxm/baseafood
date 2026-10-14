@@ -37,7 +37,7 @@ export function StepForm({
   onCancel?: () => void;
 }) {
   const [i, setI] = React.useState(0);
-  const [loi, setLoi] = React.useState<FieldError[]>([]);
+  const [errors, setErrors] = React.useState<FieldError[]>([]);
 
   const stepCount = steps.length + 1; // + màn xem lại
   const isReview = i === steps.length;
@@ -45,15 +45,15 @@ export function StepForm({
 
   const goNext = () => {
     const ls = step?.validate?.() ?? [];
-    setLoi(ls);
+    setErrors(ls);
     if (ls.length === 0) {
-      setLoi([]);
+      setErrors([]);
       setI((v) => Math.min(v + 1, steps.length));
     }
   };
 
   const lui = () => {
-    setLoi([]);
+    setErrors([]);
     setI((v) => Math.max(0, v - 1));
   };
 
@@ -88,7 +88,7 @@ export function StepForm({
         </div>
       </div>
 
-      <ErrorSummary errors={loi} />
+      <ErrorSummary errors={errors} />
 
       <div>
         <h2 className="text-xl font-semibold text-foreground">

@@ -61,14 +61,14 @@ function Button({
      buộc phải có `aria-label`; thiếu `title` thì mượn luôn nhãn đó làm gợi ý
      hover — không nút icon nào bị câm, không phải gõ hai lần cùng một câu.
      Câu giải thích ĐẦY ĐỦ ("để làm gì") vẫn nên viết ở `title`. */
-  const goiY = title ?? props["aria-label"]
+  const hint = title ?? props["aria-label"]
 
   return (
     <Comp
       data-slot="button"
       data-variant={variant}
       data-size={size}
-      title={goiY}
+      title={hint}
       className={cn(buttonVariants({ variant, size, className }))}
       {...props}
     />

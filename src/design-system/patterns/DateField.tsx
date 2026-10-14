@@ -38,9 +38,9 @@ export function formatWeekdayDate(iso: string | undefined): string {
 }
 
 /** Các ngày trong khoảng (bao gồm hai đầu), dạng ISO. */
-export function getDatesInRange(tu: string, den: string): string[] {
-  const a = isoToDate(tu);
-  const b = isoToDate(den) ?? a;
+export function getDatesInRange(fromDate: string, toDate: string): string[] {
+  const a = isoToDate(fromDate);
+  const b = isoToDate(toDate) ?? a;
   if (!a || !b) return [];
   const out: string[] = [];
   const d = new Date(a);
@@ -275,7 +275,7 @@ export function DateRangeField({
   label: string;
   startDate: string;
   endDate: string;
-  onChange: (tu: string, den: string) => void;
+  onChange: (fromDate: string, toDate: string) => void;
   required?: boolean;
   hint?: string;
   error?: string;
@@ -286,8 +286,8 @@ export function DateRangeField({
   className?: string;
 }) {
   const quickPick = (days: number) => {
-    const den = todayIso();
-    onChange(addDays(den, -(days - 1)), den);
+    const toDate = todayIso();
+    onChange(addDays(toDate, -(days - 1)), toDate);
   };
 
   const dayCount =

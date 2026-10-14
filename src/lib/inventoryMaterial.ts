@@ -67,7 +67,7 @@ export interface MaterialPeriodNxtRow {
   openingKg: number; // kho đông đầu kỳ (kế thừa kỳ trước / tồn đầu khai tay)
   freezeDepositKg: number; // + vào kho tồn: ĐÔNG GỬI hoà giải (xem freezeDepositSource)
   /** Đông gửi lấy từ đâu: dòng Gửi đông ở Cân đối › còn dở SX › chuyển kỳ âm (cũ). */
-  freezeDepositSource: "can-doi" | "san-xuat" | "chuyen-ky" | "";
+  freezeDepositSource: "balancing" | "production" | "carry-over" | "";
   balancingFreezeDepositKg: number; // Σ dòng "Gửi đông" ở Cân đối (kg dương) — để đối chiếu với productionLeftoverKg
   productionLeftoverKg: number; // còn dở khai ở SX (0038) — luôn tính để đối chiếu
   thawKg: number; // − khỏi kho tồn (dòng Lấy xả đông + chuyển kỳ dương cũ)
@@ -87,7 +87,7 @@ function sumThaw(inputs: BalancingInputItem[], periodId: string): number {
   for (const r of inputs) {
     if (r.periodId !== periodId) continue;
     const lineKind = getBalancingStockLineKind(r);
-    if (lineKind === "lay-xa-dong") total += sumGridRow(r.dailyQuantities, r.carryOverKg);
+    if (lineKind === "thaw-out") total += sumGridRow(r.dailyQuantities, r.carryOverKg);
     else if (!lineKind && (r.carryOverKg ?? 0) > 0) total += r.carryOverKg ?? 0;
   }
   return total;
@@ -96,7 +96,7 @@ function sumThaw(inputs: BalancingInputItem[], periodId: string): number {
 /** Σ dòng "Gửi đông" ở Cân đối (lưu âm như dòng giảm) — trả kg DƯƠNG. */
 function sumBalancingFreezeDeposit(inputs: BalancingInputItem[], periodId: string): number {
   return inputs
-    .filter((r) => r.periodId === periodId && getBalancingStockLineKind(r) === "gui-dong")
+    .filter((r) => r.periodId === periodId && getBalancingStockLineKind(r) === "freeze-deposit")
     .reduce((s, r) => s + Math.abs(sumGridRow(r.dailyQuantities, r.carryOverKg)), 0);
 }
 
@@ -131,32 +131,32 @@ function manualOpeningStock(
  */
 export function sumLeftoverByDay(
   locks: DailyLock[],
-  ky: Pick<BalancingPeriod, "startDate" | "endDate" | "materialTypeName">,
+  period: Pick<BalancingPeriod, "startDate" | "endDate" | "materialTypeName">,
   workshop?: Workshop,
 ): DailyQuantities {
-  const dates = new Set(getPeriodDates(ky));
-  const ra: DailyQuantities = {};
-  if (dates.size === 0) return ra;
+  const dates = new Set(getPeriodDates(period));
+  const result: DailyQuantities = {};
+  if (dates.size === 0) return result;
   for (const lk of locks) {
     if (workshop && lk.workshop !== workshop) continue;
     if (!dates.has(lk.lockDate)) continue;
     const lb = lk.leftoverByMaterial;
     if (!lb) continue;
-    for (const [ten, v] of Object.entries(lb)) {
+    for (const [name, v] of Object.entries(lb)) {
       const kg = Number(v) || 0;
-      if (kg && isSameMaterialFamily(ten, ky.materialTypeName))
-        ra[lk.lockDate] = (ra[lk.lockDate] ?? 0) + kg;
+      if (kg && isSameMaterialFamily(name, period.materialTypeName))
+        result[lk.lockDate] = (result[lk.lockDate] ?? 0) + kg;
     }
   }
-  return ra;
+  return result;
 }
 
 function leftoverInPeriod(
   locks: DailyLock[],
-  ky: BalancingPeriod,
+  period: BalancingPeriod,
   workshop?: Workshop,
 ): number {
-  return Object.values(sumLeftoverByDay(locks, ky, workshop)).reduce((s, v) => s + v, 0);
+  return Object.values(sumLeftoverByDay(locks, period, workshop)).reduce((s, v) => s + v, 0);
 }
 
 /**
@@ -170,9 +170,9 @@ export function sumUnmatchedLeftover(
   range?: { fromDate?: string; toDate?: string; workshop?: Workshop },
 ): number {
   const workshop = range?.workshop;
-  const periodDates = periods.map((ky) => ({
-    ky,
-    dates: new Set(getPeriodDates(ky)),
+  const periodDates = periods.map((period) => ({
+    period,
+    dates: new Set(getPeriodDates(period)),
   }));
   let unmatched = 0;
   for (const lk of locks) {
@@ -181,11 +181,11 @@ export function sumUnmatchedLeftover(
     if (range?.toDate && lk.lockDate > range.toDate) continue;
     const lb = lk.leftoverByMaterial;
     if (!lb) continue;
-    for (const [ten, v] of Object.entries(lb)) {
+    for (const [name, v] of Object.entries(lb)) {
       const kgv = Number(v) || 0;
       if (kgv <= 0) continue;
       const isMatch = periodDates.some(
-        (p) => p.dates.has(lk.lockDate) && isSameMaterialFamily(ten, p.ky.materialTypeName),
+        (p) => p.dates.has(lk.lockDate) && isSameMaterialFamily(name, p.period.materialTypeName),
       );
       if (!isMatch) unmatched += kgv;
     }
@@ -195,20 +195,20 @@ export function sumUnmatchedLeftover(
 
 /** Nhập tươi theo ngày của một kỳ: gom material_imports cùng họ NL, ngày trong kỳ. */
 function freshInByDay(
-  ky: BalancingPeriod,
+  period: BalancingPeriod,
   imports: MaterialImportItem[],
   workshop?: Workshop,
 ): DailyQuantities {
-  const dates = new Set(getPeriodDates(ky));
-  const ra: DailyQuantities = {};
-  if (dates.size === 0) return ra;
+  const dates = new Set(getPeriodDates(period));
+  const result: DailyQuantities = {};
+  if (dates.size === 0) return result;
   for (const r of imports) {
     if (workshop && r.workshop !== workshop) continue;
     if (!dates.has(r.deliveryDate)) continue;
-    if (!isSameMaterialFamily(r.materialTypeName, ky.materialTypeName)) continue;
-    ra[r.deliveryDate] = (ra[r.deliveryDate] ?? 0) + (r.quantityKg || 0);
+    if (!isSameMaterialFamily(r.materialTypeName, period.materialTypeName)) continue;
+    result[r.deliveryDate] = (result[r.deliveryDate] ?? 0) + (r.quantityKg || 0);
   }
-  return ra;
+  return result;
 }
 
 /**
@@ -234,8 +234,8 @@ export function computeMaterialNxt(
   const runningStock = new Map<string, number>(); // materialFamily(lowercase) → tồn cuối gần nhất
   const allPeriods: MaterialPeriodNxtRow[] = [];
 
-  for (const ky of sortedPeriods) {
-    const materialFamily = getMaterialFamily(ky.materialTypeName);
+  for (const period of sortedPeriods) {
+    const materialFamily = getMaterialFamily(period.materialTypeName);
     const key = materialFamily.toLowerCase();
 
     let openingKg: number;
@@ -243,7 +243,7 @@ export function computeMaterialNxt(
     if (runningStock.has(key)) {
       openingKg = runningStock.get(key)!;
     } else {
-      openingKg = manualOpeningStock(opening, ky.materialTypeName, ky.startDate || "9999-99-99", workshop);
+      openingKg = manualOpeningStock(opening, period.materialTypeName, period.startDate || "9999-99-99", workshop);
       isOpeningSeeded = openingKg !== 0;
     }
 
@@ -252,32 +252,32 @@ export function computeMaterialNxt(
     // (b) còn dở khai ở SẢN XUẤT (production_locks, hướng 1 chốt 2026-09-06),
     // (c) Chuyển kỳ âm khai tay (cách cũ). Cả (a) lẫn (b) vẫn được trả ra để màn
     // Cân đối ĐỐI CHIẾU hai bên — tổ trưởng ghi ở SX, kế toán ghi ở Cân đối.
-    const productionLeftover = leftoverInPeriod(locks, ky, workshop);
-    const balancingFreezeDeposit = sumBalancingFreezeDeposit(inputs, ky.id);
-    const manualFreezeDeposit = sumNegativeCarry(inputs, ky.id);
+    const productionLeftover = leftoverInPeriod(locks, period, workshop);
+    const balancingFreezeDeposit = sumBalancingFreezeDeposit(inputs, period.id);
+    const manualFreezeDeposit = sumNegativeCarry(inputs, period.id);
     const freezeDepositSource: MaterialPeriodNxtRow["freezeDepositSource"] =
-      balancingFreezeDeposit > 0 ? "can-doi" : productionLeftover > 0 ? "san-xuat" : manualFreezeDeposit > 0 ? "chuyen-ky" : "";
+      balancingFreezeDeposit > 0 ? "balancing" : productionLeftover > 0 ? "production" : manualFreezeDeposit > 0 ? "carry-over" : "";
     const freezeDeposit =
-      freezeDepositSource === "can-doi" ? balancingFreezeDeposit : freezeDepositSource === "san-xuat" ? productionLeftover : manualFreezeDeposit;
-    const xaDong = sumThaw(inputs, ky.id);
-    const closingKg = openingKg + freezeDeposit - xaDong;
+      freezeDepositSource === "balancing" ? balancingFreezeDeposit : freezeDepositSource === "production" ? productionLeftover : manualFreezeDeposit;
+    const thawKg = sumThaw(inputs, period.id);
+    const closingKg = openingKg + freezeDeposit - thawKg;
     runningStock.set(key, closingKg);
 
-    const importsByDate = freshInByDay(ky, imports, workshop);
+    const importsByDate = freshInByDay(period, imports, workshop);
     const freshInKg = Object.values(importsByDate).reduce((s, v) => s + v, 0);
 
     allPeriods.push({
-      periodId: ky.id,
+      periodId: period.id,
       materialFamily,
-      periodMaterialName: ky.materialTypeName,
-      startDate: ky.startDate || "",
-      endDate: ky.endDate || ky.startDate || "",
+      periodMaterialName: period.materialTypeName,
+      startDate: period.startDate || "",
+      endDate: period.endDate || period.startDate || "",
       openingKg,
       freezeDepositKg: freezeDeposit,
       freezeDepositSource,
       balancingFreezeDepositKg: balancingFreezeDeposit,
       productionLeftoverKg: productionLeftover,
-      thawKg: xaDong,
+      thawKg,
       closingKg,
       freshInKg,
       dailyFreshIn: importsByDate,
@@ -288,13 +288,13 @@ export function computeMaterialNxt(
 
   // Trả kỳ GIAO NHAU với khoảng ngày (không chỉ khớp ngày bắt đầu): kỳ kéo dài
   // nhiều ngày, lọc theo startDate thôi sẽ rụng kỳ đang chạy vắt qua khoảng.
-  const tu = range?.fromDate;
-  const den = range?.toDate;
+  const fromDate = range?.fromDate;
+  const toDate = range?.toDate;
   return allPeriods.filter((r) => {
     const s0 = r.startDate || "";
     const e0 = r.endDate || r.startDate || "";
-    if (den && s0 && s0 > den) return false;
-    if (tu && e0 && e0 < tu) return false;
+    if (toDate && s0 && s0 > toDate) return false;
+    if (fromDate && e0 && e0 < fromDate) return false;
     return true;
   });
 }
@@ -379,27 +379,27 @@ export function computeMaterialTotalStock(
   domesticSales: DomesticSaleItem[] = [],
 ): MaterialTotalStock {
   const workshop = range?.workshop;
-  const tu = range?.fromDate ?? "0000-01-01";
-  const den = range?.toDate ?? "9999-12-31";
+  const fromDate = range?.fromDate ?? "0000-01-01";
+  const toDate = range?.toDate ?? "9999-12-31";
   const matchesWorkshop = (w?: Workshop) => !workshop || w === workshop;
 
   // Đông gửi / xả đông (THÔNG TIN) — gom theo họ từ engine kỳ (kỳ giao khoảng).
-  const kyRows = computeMaterialNxt(periods, inputs, imports, opening, locks, range);
-  const dongXa = new Map<string, { freezeDepositKg: number; thawKg: number }>();
-  for (const r of kyRows) {
+  const periodRows = computeMaterialNxt(periods, inputs, imports, opening, locks, range);
+  const freezeThaw = new Map<string, { freezeDepositKg: number; thawKg: number }>();
+  for (const r of periodRows) {
     const k = r.materialFamily.toLowerCase();
-    const cur = dongXa.get(k) ?? { freezeDepositKg: 0, thawKg: 0 };
+    const cur = freezeThaw.get(k) ?? { freezeDepositKg: 0, thawKg: 0 };
     cur.freezeDepositKg += r.freezeDepositKg;
     cur.thawKg += r.thawKg;
-    dongXa.set(k, cur);
+    freezeThaw.set(k, cur);
   }
 
   // Gom theo HỌ NL bằng MỘT lượt qua opening + MỘT lượt qua imports (thay vì lọc
   // toàn bộ imports 3 lần/mỗi họ). Khoá gom = getMaterialFamily(tên).toLowerCase() —
   // đúng bằng cách `isSameMaterialFamily` so khớp trước đây.
   const familyNames = new Map<string, string>(); // key(lower) → tên họ hiển thị
-  const addFamily = (ten: string): string => {
-    const h = getMaterialFamily(ten);
+  const addFamily = (name: string): string => {
+    const h = getMaterialFamily(name);
     if (h) familyNames.set(h.toLowerCase(), h);
     return h;
   };
@@ -410,10 +410,10 @@ export function computeMaterialTotalStock(
   const openByHo = new Map<string, { open: number; anchorDate: string }>();
   for (const o of opening) {
     if (!matchesWorkshop(o.workshop)) continue;
-    const ho = addFamily(o.materialTypeName);
-    if (!ho) continue;
-    if (o.asOfDate && o.asOfDate > den) continue; // mốc sau khoảng xem ⇒ chưa áp
-    const k = ho.toLowerCase();
+    const family = addFamily(o.materialTypeName);
+    if (!family) continue;
+    if (o.asOfDate && o.asOfDate > toDate) continue; // mốc sau khoảng xem ⇒ chưa áp
+    const k = family.toLowerCase();
     const cur = openByHo.get(k) ?? { open: 0, anchorDate: "" };
     cur.open += o.quantityKg || 0;
     if (o.asOfDate && o.asOfDate > cur.anchorDate) cur.anchorDate = o.asOfDate;
@@ -426,15 +426,15 @@ export function computeMaterialTotalStock(
   const inByDay = new Map<string, number>();
   for (const r of imports) {
     if (!matchesWorkshop(r.workshop)) continue;
-    const ho = addFamily(r.materialTypeName);
-    if (!ho) continue;
-    const k = ho.toLowerCase();
-    const moc = openByHo.get(k)?.anchorDate ?? "";
-    if (moc && r.deliveryDate < moc) continue; // trước baseline → đã trong tồn đầu
+    const family = addFamily(r.materialTypeName);
+    if (!family) continue;
+    const k = family.toLowerCase();
+    const anchor = openByHo.get(k)?.anchorDate ?? "";
+    if (anchor && r.deliveryDate < anchor) continue; // trước baseline → đã trong tồn đầu
     const kg = r.quantityKg || 0;
     const cur = inByFamily.get(k) ?? { before: 0, period: 0 };
-    if (r.deliveryDate < tu) cur.before += kg;
-    else if (r.deliveryDate <= den) {
+    if (r.deliveryDate < fromDate) cur.before += kg;
+    else if (r.deliveryDate <= toDate) {
       cur.period += kg;
       inByDay.set(r.deliveryDate, (inByDay.get(r.deliveryDate) ?? 0) + kg);
     }
@@ -449,14 +449,14 @@ export function computeMaterialTotalStock(
     if (!matchesWorkshop(r.workshop)) continue;
     const kg = r.quantityKg || 0;
     if (kg <= 0) continue;
-    const ho = addFamily(r.materialTypeName);
-    if (!ho) continue;
-    const k = ho.toLowerCase();
-    const moc = openByHo.get(k)?.anchorDate ?? "";
-    if (moc && r.saleDate < moc) continue;
+    const family = addFamily(r.materialTypeName);
+    if (!family) continue;
+    const k = family.toLowerCase();
+    const anchor = openByHo.get(k)?.anchorDate ?? "";
+    if (anchor && r.saleDate < anchor) continue;
     const cur = salesByFamily.get(k) ?? { before: 0, period: 0 };
-    if (r.saleDate < tu) cur.before += kg;
-    else if (r.saleDate <= den) {
+    if (r.saleDate < fromDate) cur.before += kg;
+    else if (r.saleDate <= toDate) {
       cur.period += kg;
       salesByDay.set(r.saleDate, (salesByDay.get(r.saleDate) ?? 0) + kg);
     }
@@ -464,28 +464,28 @@ export function computeMaterialTotalStock(
   }
 
   // Họ chỉ có ở kỳ (đông gửi/xả đông) cũng phải hiện.
-  for (const r of kyRows) familyNames.set(r.materialFamily.toLowerCase(), r.materialFamily);
+  for (const r of periodRows) familyNames.set(r.materialFamily.toLowerCase(), r.materialFamily);
 
   const theoHo: MaterialTotalStockFamily[] = [];
   for (const [k, materialFamily] of familyNames) {
     const priorOpening = openByHo.get(k)?.open ?? 0;
     const nh = inByFamily.get(k) ?? { before: 0, period: 0 };
-    const ban = salesByFamily.get(k) ?? { before: 0, period: 0 };
-    const info = dongXa.get(k) ?? { freezeDepositKg: 0, thawKg: 0 };
+    const sales = salesByFamily.get(k) ?? { before: 0, period: 0 };
+    const info = freezeThaw.get(k) ?? { freezeDepositKg: 0, thawKg: 0 };
     // Bỏ họ trống trơn (không tồn đầu, không nhập/bán, không đông/xả) khỏi bảng.
     if (
-      priorOpening === 0 && nh.before === 0 && nh.period === 0 && ban.before === 0 && ban.period === 0 &&
+      priorOpening === 0 && nh.before === 0 && nh.period === 0 && sales.before === 0 && sales.period === 0 &&
       info.freezeDepositKg === 0 && info.thawKg === 0
     )
       continue;
-    const openingKg = priorOpening + nh.before - ban.before;
-    const closingKg = openingKg + nh.period - ban.period; // − xuất SX(0)
+    const openingKg = priorOpening + nh.before - sales.before;
+    const closingKg = openingKg + nh.period - sales.period; // − xuất SX(0)
     theoHo.push({
       materialFamily,
       openingKg,
       inPeriodKg: nh.period,
       productionOutKg: 0,
-      domesticSaleKg: ban.period,
+      domesticSaleKg: sales.period,
       closingKg,
       freezeDepositKg: info.freezeDepositKg,
       thawKg: info.thawKg,

@@ -40,7 +40,7 @@ import {
   useRowSelection,
   useRowMarkTools,
 } from "@/design-system";
-import { KY_OPT, getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
+import { PERIOD_OPTIONS, getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
 import { num, formatDateVN } from "@/lib/format";
 import { exportAoaToXlsx, type OExcel } from "@/lib/reportXlsx";
 import {
@@ -67,7 +67,7 @@ interface ExportRow {
   quantityKg: number;
   blocksCount: number;
 }
-interface NhomDon {
+interface OrderGroup {
   orderId: string;
   customerName: string;
   orderDate: string;
@@ -84,21 +84,21 @@ interface NhomDon {
  * đã đặt của đơn để thấy mức hoàn thành. Chỉ đọc; xuất được Excel.
  */
 export default function OrderExportReport() {
-  const [exportOrders, , { trangThai: status }] = useExportOrders();
+  const [exportOrders, , { status }] = useExportOrders();
   const [exportItems] = useExportItems();
   const [don] = useSalesOrders();
-  const [dongDon] = useOrderItems();
+  const [orderItems] = useOrderItems();
   const [customers] = useCustomers();
   const [products] = useProducts();
-  const isLoading = status === "dang-tai" && exportOrders.length === 0;
+  const isLoading = status === "loading" && exportOrders.length === 0;
 
-  const [ky, setKy] = useState<ViewPeriod>("thang");
-  const [moc, setMoc] = useState(todayIso());
-  const [tuTC, setTuTC] = useState(todayIso());
-  const [denTC, setDenTC] = useState(todayIso());
+  const [period, setPeriod] = useState<ViewPeriod>("month");
+  const [anchor, setAnchor] = useState(todayIso());
+  const [customFrom, setCustomFrom] = useState(todayIso());
+  const [customTo, setCustomTo] = useState(todayIso());
   const [customerFilter, setCustomerFilter] = useState("Tất cả");
   const [inPrint, setInPrint] = useState(false);
-  const [tu, den] = getViewPeriodRange(ky, moc, tuTC, denTC);
+  const [fromDate, toDate] = getViewPeriodRange(period, anchor, customFrom, customTo);
   // Mỗi dòng là một dòng lệnh xuất (id bản ghi) ⇒ dấu "đã dò" khỏi ghép kỳ.
   const to = useRowMarkTools("bao-cao-xuat-don");
   const rowSelection = useRowSelection();
@@ -108,15 +108,15 @@ export default function OrderExportReport() {
     ...customers.map((k) => ({ value: k.id, label: k.name, phu: k.market || undefined })),
   ];
 
-  const { nhom, totalKg, totalBlocks } = useMemo(() => {
+  const { groups: group, totalKg, totalBlocks } = useMemo(() => {
     const productNameOf = (id: string) => products.find((m) => m.id === id)?.name || "—";
     const tenKH = (id: string) => customers.find((k) => k.id === id)?.name || "(đơn đã xóa)";
     const orderById = (id: string) => don.find((d) => d.id === id);
 
-    const periodExportOrders = exportOrders.filter((l) => l.exportDate >= tu && l.exportDate <= den);
+    const periodExportOrders = exportOrders.filter((l) => l.exportDate >= fromDate && l.exportDate <= toDate);
 
     // Gom dòng lệnh (thực xuất) theo ĐƠN.
-    const map = new Map<string, NhomDon>();
+    const map = new Map<string, OrderGroup>();
     for (const l of periodExportOrders) {
       const d = orderById(l.orderId);
       if (customerFilter !== "Tất cả" && d?.customerId !== customerFilter) continue;
@@ -130,23 +130,23 @@ export default function OrderExportReport() {
           lines: [],
           totalKg: 0,
           totalBlocks: 0,
-          requiredKg: dongDon
+          requiredKg: orderItems
             .filter((x) => x.orderId === l.orderId)
             .reduce((s, x) => s + (x.requiredQuantityKg || 0), 0),
         };
         map.set(l.orderId, g);
       }
-      for (const dl of exportItems.filter((x) => x.exportId === l.id)) {
+      for (const item of exportItems.filter((x) => x.exportId === l.id)) {
         g.lines.push({
-          id: dl.id,
+          id: item.id,
           exportDate: l.exportDate,
-          productName: productNameOf(dl.productId),
-          spec: dl.spec,
-          quantityKg: dl.quantityKg || 0,
-          blocksCount: dl.blocksCount || 0,
+          productName: productNameOf(item.productId),
+          spec: item.spec,
+          quantityKg: item.quantityKg || 0,
+          blocksCount: item.blocksCount || 0,
         });
-        g.totalKg += dl.quantityKg || 0;
-        g.totalBlocks += dl.blocksCount || 0;
+        g.totalKg += item.quantityKg || 0;
+        g.totalBlocks += item.blocksCount || 0;
       }
     }
 
@@ -165,32 +165,32 @@ export default function OrderExportReport() {
       );
 
     return {
-      nhom: groups,
+      groups,
       totalKg: groups.reduce((s, g) => s + g.totalKg, 0),
       totalBlocks: groups.reduce((s, g) => s + g.totalBlocks, 0),
     };
-  }, [exportOrders, exportItems, don, dongDon, customers, products, tu, den, customerFilter]);
+  }, [exportOrders, exportItems, don, orderItems, customers, products, fromDate, toDate, customerFilter]);
   /** Khoá dòng lệnh xuất đang hiện — thứ tự cho Shift+tick chọn khoảng. */
-  const rowKeys = nhom.flatMap((g) => g.lines.map((l) => l.id));
+  const rowKeys = group.flatMap((g) => g.lines.map((l) => l.id));
 
-  const the: StatCardData[] = [
-    { label: "Kỳ báo cáo", value: `${formatDateVN(tu)} – ${formatDateVN(den)}`, icon: CalendarRange, color: "trung-tinh" },
+  const cards: StatCardData[] = [
+    { label: "Kỳ báo cáo", value: `${formatDateVN(fromDate)} – ${formatDateVN(toDate)}`, icon: CalendarRange, color: "neutral" },
     { label: "Tổng xuất", value: `${num(totalKg)} kg`, numeric: true, icon: Scale, color: "brand" },
-    { label: "Tổng block", value: num(totalBlocks), numeric: true, icon: Layers, color: "trung-tinh" },
-    { label: "Số đơn được xuất", value: num(nhom.length), numeric: true, icon: PackageCheck, color: "success" },
+    { label: "Tổng block", value: num(totalBlocks), numeric: true, icon: Layers, color: "neutral" },
+    { label: "Số đơn được xuất", value: num(group.length), numeric: true, icon: PackageCheck, color: "success" },
   ];
 
   const exportExcel = () => {
-    if (!nhom.length) {
+    if (!group.length) {
       notify.warning("Không có lệnh xuất trong kỳ để xuất");
       return;
     }
     const aoa: OExcel[][] = [];
     aoa.push(["Báo cáo đơn đặt được xuất hàng"]);
-    aoa.push([`Kỳ: ${formatDateVN(tu)} – ${formatDateVN(den)} · Khách: ${customerFilter === "Tất cả" ? "Tất cả" : nhom[0]?.customerName ?? customerFilter}`]);
+    aoa.push([`Kỳ: ${formatDateVN(fromDate)} – ${formatDateVN(toDate)} · Khách: ${customerFilter === "Tất cả" ? "Tất cả" : group[0]?.customerName ?? customerFilter}`]);
     aoa.push([]);
     aoa.push(["Khách", "Ngày đặt", "Ngày xuất", "Mặt hàng", "Quy cách", "Kg xuất", "Block", "Đã đặt (kg)"]);
-    for (const g of nhom) {
+    for (const g of group) {
       for (const l of g.lines)
         aoa.push([g.customerName, formatDateVN(g.orderDate), formatDateVN(l.exportDate), l.productName, l.spec, l.quantityKg, l.blocksCount, ""]);
       aoa.push([`Cộng đơn ${g.customerName}`, formatDateVN(g.orderDate), "", "", "", g.totalKg, g.totalBlocks, g.requiredKg]);
@@ -200,7 +200,7 @@ export default function OrderExportReport() {
       sheetName: "Đơn xuất",
       aoa,
       colWidths: [24, 12, 12, 30, 12, 12, 10, 12],
-      fileName: `bao-cao-don-xuat_${tu}_${den}.xlsx`,
+      fileName: `bao-cao-don-xuat_${fromDate}_${toDate}.xlsx`,
     });
     // Không toast: trình duyệt đã tự báo tải file xong (README luật 8 — xuất file là thao tác không đổi số).
   };
@@ -213,12 +213,12 @@ export default function OrderExportReport() {
         </h1>
         <div className="flex flex-wrap gap-2">
           <Button
-            title="Xem trước bản in A4 báo cáo đơn xuất rồi in giấy hoặc lưu PDF." size="lg" variant="outline" onClick={() => setInPrint(true)} disabled={!nhom.length}>
+            title="Xem trước bản in A4 báo cáo đơn xuất rồi in giấy hoặc lưu PDF." size="lg" variant="outline" onClick={() => setInPrint(true)} disabled={!group.length}>
             <Printer />
             In A4
           </Button>
           <Button
-            title="Tải báo cáo đơn xuất đang xem ra file Excel." size="lg" variant="outline" onClick={exportExcel} disabled={!nhom.length}>
+            title="Tải báo cáo đơn xuất đang xem ra file Excel." size="lg" variant="outline" onClick={exportExcel} disabled={!group.length}>
             <FileSpreadsheet />
             Xuất Excel
           </Button>
@@ -231,31 +231,31 @@ export default function OrderExportReport() {
             label="Kỳ báo cáo"
             hideRequiredMark
             clearable={false}
-            value={ky}
-            onChange={(v) => setKy(v as ViewPeriod)}
-            options={KY_OPT}
+            value={period}
+            onChange={(v) => setPeriod(v as ViewPeriod)}
+            options={PERIOD_OPTIONS}
           />
         </div>
         <div className="min-w-[min(12rem,100%)] flex-1 sm:min-w-[16rem]">
-          {ky === "tuy-chon" ? (
+          {period === "custom" ? (
             <DateRangeField
               label="Khoảng ngày xuất"
               hideRequiredMark
               presets={false}
-              startDate={tuTC}
-              endDate={denTC}
+              startDate={customFrom}
+              endDate={customTo}
               onChange={(a, b) => {
-                setTuTC(a);
-                setDenTC(b);
+                setCustomFrom(a);
+                setCustomTo(b);
               }}
             />
           ) : (
             <DateField
-              label={ky === "ngay" ? "Ngày xuất" : "Ngày bất kỳ trong kỳ"}
+              label={period === "day" ? "Ngày xuất" : "Ngày bất kỳ trong kỳ"}
               hideRequiredMark
-              hint={ky === "ngay" ? undefined : `Kỳ: ${formatDateVN(tu)} – ${formatDateVN(den)}`}
-              value={moc}
-              onChange={setMoc}
+              hint={period === "day" ? undefined : `Kỳ: ${formatDateVN(fromDate)} – ${formatDateVN(toDate)}`}
+              value={anchor}
+              onChange={setAnchor}
             />
           )}
         </div>
@@ -271,14 +271,14 @@ export default function OrderExportReport() {
         </div>
       </div>
 
-      <StatCardGrid cards={the} />
+      <StatCardGrid cards={cards} />
 
       {isLoading ? (
         <TableSkeleton />
-      ) : nhom.length === 0 ? (
+      ) : group.length === 0 ? (
         <EmptyState
           icon={PackageCheck}
-          title={`Chưa có đơn nào được xuất trong ${formatDateVN(tu)} – ${formatDateVN(den)}`}
+          title={`Chưa có đơn nào được xuất trong ${formatDateVN(fromDate)} – ${formatDateVN(toDate)}`}
           description="Tạo lệnh xuất ở màn Đơn đặt, số liệu xuất sẽ tổng hợp về đây."
         />
       ) : (
@@ -294,7 +294,7 @@ export default function OrderExportReport() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {nhom.map((g) => (
+              {group.map((g) => (
                 <Fragment key={g.orderId}>
                   <TableRow>
                     <TableCell colSpan={5} className="bg-muted">
@@ -303,7 +303,7 @@ export default function OrderExportReport() {
                         <span className="font-normal text-muted-foreground">
                           · đặt {g.orderDate ? formatDateVN(g.orderDate) : "—"}
                         </span>
-                        <Tag variant={g.status === "collecting" ? "cho" : "xong"}>
+                        <Tag variant={g.status === "collecting" ? "pending" : "done"}>
                           {STATUS_LABELS[g.status]}
                         </Tag>
                         {g.requiredKg > 0 && (
@@ -322,9 +322,9 @@ export default function OrderExportReport() {
                             <input
                               type="checkbox"
                               className="size-5 shrink-0"
-                              checked={rowSelection.daChon.has(l.id)}
+                              checked={rowSelection.selected.has(l.id)}
                               onChange={() => {}}
-                              onClick={(e) => rowSelection.doi(l.id, e.shiftKey, rowKeys)}
+                              onClick={(e) => rowSelection.toggle(l.id, e.shiftKey, rowKeys)}
                               aria-label={`Chọn dòng ${l.productName} ${formatDateVN(l.exportDate)}`}
                               title="Tick để tô màu / in đậm dòng này (Shift+tick chọn cả khoảng)."
                             />
@@ -358,12 +358,12 @@ export default function OrderExportReport() {
           </Table>
         </HorizontalScroll>
       )}
-      <RowMarkToolbar marker={to} selectedKeys={rowKeys.filter((k) => rowSelection.daChon.has(k))} onClearSelection={rowSelection.boChon} />
+      <RowMarkToolbar marker={to} selectedKeys={rowKeys.filter((k) => rowSelection.selected.has(k))} onClearSelection={rowSelection.clearSelection} />
 
       {inPrint && (
         <PrintSheet
           title="Báo cáo đơn đặt được xuất hàng"
-          subtitle={`Kỳ: ${formatDateVN(tu)} – ${formatDateVN(den)}${customerFilter !== "Tất cả" ? ` · Khách ${nhom[0]?.customerName ?? ""}` : ""}`}
+          subtitle={`Kỳ: ${formatDateVN(fromDate)} – ${formatDateVN(toDate)}${customerFilter !== "Tất cả" ? ` · Khách ${group[0]?.customerName ?? ""}` : ""}`}
           onClose={() => setInPrint(false)}
         >
           <table className="w-full border-collapse">
@@ -377,7 +377,7 @@ export default function OrderExportReport() {
               </tr>
             </thead>
             <tbody>
-              {nhom.map((g) => (
+              {group.map((g) => (
                 <Fragment key={g.orderId}>
                   <tr>
                     <PrintTd bold colSpan={5}>

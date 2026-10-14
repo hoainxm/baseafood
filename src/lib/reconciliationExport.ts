@@ -31,18 +31,18 @@ import type {
   SourceCellCoord,
 } from "./einvoiceReconciliation";
 import {
-  CHU_THICH,
+  NOTES,
   LEDGER_NOTE,
   EXPORT_COLUMN_SHIFT,
   INVOICE_EXTRA_HEADERS,
   COLUMN_SUM_CHECK_HEADERS,
   SUM_MISMATCH_LABELS,
-  base64SangXlsx,
+  base64ToXlsx,
   LEDGER_EXTRA_HEADERS,
   aoaToExcelColumn,
   formatDisplayDate,
 } from "./einvoiceReconciliation";
-import { FILL_COLORS as NEN, columnIndexToLetter as chuCot, solidFill as to, parseEditKey } from "./reconciliationCommon";
+import { FILL_COLORS, columnIndexToLetter, solidFill as to, parseEditKey } from "./reconciliationCommon";
 import { insertLeadingColumns, shiftCrossSheetRefs, deleteTrailingColumns } from "./reconciliationExportShift";
 import { addSummarySheets } from "./reconciliationExportSummary";
 
@@ -73,9 +73,9 @@ function writeReconcileBlock(
   origin: SourceCellCoord,
   hIdx: number,
   width: number,
-  chuThich: string,
+  note: string,
   extraHeaders: readonly string[],
-  dong: readonly { fileRow: number; conclusion: string; fill: string | null; extra: readonly unknown[] }[],
+  row: readonly { fileRow: number; conclusion: string; fill: string | null; extra: readonly unknown[] }[],
   editedCells: readonly { fileRow: number; column: number; value: number }[],
   /** Tiêu đề cột A. */
   columnALabel = "KẾT QUẢ",
@@ -97,34 +97,34 @@ function writeReconcileBlock(
 
   // --- tiêu đề: lấy dáng từ chính tiêu đề gốc để nhìn liền mạch ---
   const styleCell = ws.getCell(headerRow, origin.c0 + D + 1);
-  const buildHeader = (o: ReturnType<Worksheet["getCell"]>, ten: string) => {
-    o.value = ten;
+  const buildHeader = (o: ReturnType<Worksheet["getCell"]>, name: string) => {
+    o.value = name;
     if (styleCell.font) o.font = { ...styleCell.font, bold: true };
     if (styleCell.border) o.border = { ...styleCell.border };
     o.alignment = { ...(styleCell.alignment ?? {}), vertical: "middle", wrapText: true };
-    o.fill = to(NEN.header);
+    o.fill = to(FILL_COLORS.header);
   };
   if (hasColumnA) {
     buildHeader(ws.getCell(headerRow, RESULT_COL), columnALabel);
     ws.getColumn(RESULT_COL).width = 24;
   }
-  extraHeaders.forEach((ten, i) => {
-    buildHeader(ws.getCell(headerRow, cot1 + i), ten);
+  extraHeaders.forEach((name, i) => {
+    buildHeader(ws.getCell(headerRow, cot1 + i), name);
     const c = ws.getColumn(cot1 + i);
-    if (!c.width) c.width = Math.min(Math.max(ten.length + 2, 12), 42);
+    if (!c.width) c.width = Math.min(Math.max(name.length + 2, 12), 42);
   });
 
   // --- chú thích màu: ô A ngay trên hàng tiêu đề (đúng chỗ file mẫu đặt) ---
   if (headerRow > 1) {
     const oCt = ws.getCell(headerRow - 1, hasColumnA ? RESULT_COL : cot1);
     if (oCt.value == null || oCt.value === "") {
-      oCt.value = chuThich;
+      oCt.value = note;
       oCt.font = { italic: true, size: 10 };
     }
   }
 
   // --- từng dòng: nhãn ở cột A + giá trị khối thêm + tô nền cả dòng ---
-  for (const d of dong) {
+  for (const d of row) {
     if (hasColumnA) ws.getCell(d.fileRow, RESULT_COL).value = d.conclusion;
     d.extra.forEach((v, i) => {
       const o = ws.getCell(d.fileRow, cot1 + i);
@@ -144,19 +144,19 @@ function writeReconcileBlock(
   for (const e of editedCells) {
     const o = ws.getCell(e.fileRow, aoaToExcelColumn(origin, e.column) + columnShift + 1);
     o.value = e.value;
-    o.fill = to(NEN.edited);
+    o.fill = to(FILL_COLORS.edited);
   }
 
   // Bộ lọc: nới vùng lọc sẵn có sang hết khối mới, giữ nguyên ô bắt đầu.
   const autoFilter = ws.autoFilter as string | { from?: { row?: number; column?: number } } | undefined;
-  const batDau =
+  const start =
     typeof autoFilter === "object" && autoFilter?.from?.row != null && autoFilter.from.column != null
       ? { row: autoFilter.from.row, column: autoFilter.from.column }
       : { row: headerRow, column: firstShadedColumn };
-  ws.autoFilter = { from: batDau, to: { row: headerRow, column: lastColumn } };
+  ws.autoFilter = { from: start, to: { row: headerRow, column: lastColumn } };
 }
 
-const invoiceFill = (d: InvoiceRow) => (d.status === "KHOP" ? NEN.xanh : d.status === "LECH" ? NEN.vang : NEN.do);
+const invoiceFill = (d: InvoiceRow) => (d.status === "MATCHED" ? FILL_COLORS.green : d.status === "MISMATCHED" ? FILL_COLORS.yellow : FILL_COLORS.red);
 
 const addInvoiceRow = (d: InvoiceRow): unknown[] => [
   d.exchangeRate, d.normalizedNumber, d.key, d.preTaxVnd, d.taxVnd, d.totalVnd,
@@ -181,7 +181,7 @@ const invoiceHeader = (ledgerName: string, tenTk: string): string[] =>
     : h === "TK Nợ / TK Có" ? tenTk
     : h
   );
-const HEADER_PM = [...LEDGER_EXTRA_HEADERS];
+const LEDGER_HEADER = [...LEDGER_EXTRA_HEADERS];
 
 /**
  * Ba ô kiểm "chưa thuế + thuế = tổng thanh toán" cho một dòng, viết bằng CÔNG THỨC
@@ -191,9 +191,9 @@ const HEADER_PM = [...LEDGER_EXTRA_HEADERS];
 function sumCheckCells(sh: InvoiceSheet, d: InvoiceRow, shift: number): unknown[] {
   const cd = sh.columnSum;
   if (cd.preTaxColumn < 0 || cd.totalColumn < 0) return ["", "", ""];
-  const A = chuCot(aoaToExcelColumn(sh.origin, cd.preTaxColumn) + shift);
-  const T = chuCot(aoaToExcelColumn(sh.origin, cd.totalColumn) + shift);
-  const sumFormula = cd.taxColumn >= 0 ? `${A}{r}+${chuCot(aoaToExcelColumn(sh.origin, cd.taxColumn) + shift)}{r}` : `${A}{r}`;
+  const A = columnIndexToLetter(aoaToExcelColumn(sh.origin, cd.preTaxColumn) + shift);
+  const T = columnIndexToLetter(aoaToExcelColumn(sh.origin, cd.totalColumn) + shift);
+  const sumFormula = cd.taxColumn >= 0 ? `${A}{r}+${columnIndexToLetter(aoaToExcelColumn(sh.origin, cd.taxColumn) + shift)}{r}` : `${A}{r}`;
   // exceljs tự thêm dấu "=" — đừng viết sẵn, không là ra "==N3+O3".
   return [
     { ct: sumFormula },
@@ -207,23 +207,23 @@ function sumCheckCells(sh: InvoiceSheet, d: InvoiceRow, shift: number): unknown[
  * chiết khấu / làm tròn). Dòng khớp để nguyên — tô xanh 3.000 dòng thì mắt không biết dừng đâu.
  */
 const shouldCheck = (d: InvoiceRow) =>
-  !d.sumMismatch ? null : d.sumMismatch.kind === "that" ? NEN.do : NEN.vang;
+  !d.sumMismatch ? null : d.sumMismatch.kind === "real" ? FILL_COLORS.red : FILL_COLORS.yellow;
 
 /** Các ô người dùng bấm Sửa, gom theo sheet (key `edits` = `sheet#soDong#cot`). */
 function editsBySheet(
   edits: Record<string, number> | undefined,
   rowByLineNo: Map<number, number>,
-  ten: string
+  name: string
 ): { fileRow: number; column: number; value: number }[] {
   if (!edits) return [];
-  const ra: { fileRow: number; column: number; value: number }[] = [];
+  const result: { fileRow: number; column: number; value: number }[] = [];
   for (const [k, v] of Object.entries(edits)) {
     const { sheet, rowIndex: rowNo, column: col } = parseEditKey(k);
-    if (sheet !== ten) continue;
-    const dongFile = rowByLineNo.get(rowNo);
-    if (dongFile != null && Number.isFinite(col)) ra.push({ fileRow: dongFile, column: col, value: v });
+    if (sheet !== name) continue;
+    const fileRow = rowByLineNo.get(rowNo);
+    if (fileRow != null && Number.isFinite(col)) result.push({ fileRow, column: col, value: v });
   }
-  return ra;
+  return result;
 }
 
 function downloadFile(bytes: ArrayBuffer, tenFile: string): void {
@@ -253,13 +253,13 @@ export async function exportExcelPreserveFormat(
   const mod = (await import("exceljs")) as unknown as Record<string, unknown>;
   const ExcelJS = ((mod.default as Record<string, unknown> | undefined)?.Workbook ? mod.default : mod) as typeof import("exceljs");
   const wb = new ExcelJS.Workbook();
-  // `base64SangXlsx` đổi vỏ .xls → .xlsx: exceljs chỉ đọc được .xlsx, đưa .xls vào
+  // `base64ToXlsx` đổi vỏ .xls → .xlsx: exceljs chỉ đọc được .xlsx, đưa .xls vào
   // là nó trả workbook RỖNG (không ném lỗi) rồi ta báo "không tìm thấy sheet".
-  const bytes = base64SangXlsx(originalFileB64);
+  const bytes = base64ToXlsx(originalFileB64);
   await wb.xlsx.load(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer);
 
-  const findSheet = (ten: string): Worksheet | undefined =>
-    wb.worksheets.find((w) => w.name === ten) ?? wb.getWorksheet(ten);
+  const findSheet = (name: string): Worksheet | undefined =>
+    wb.worksheets.find((w) => w.name === name) ?? wb.getWorksheet(name);
 
   const missingSheets: string[] = [];
   for (const sh of [...result.invoiceSheets, result.ledgerSheet, ...result.extraLedgerSheets])
@@ -313,13 +313,13 @@ export async function exportExcelPreserveFormat(
 
   const writeInvoiceSheet = (sh: InvoiceSheet) => {
     const ws = findSheet(sh.name)!;
-    const chuThich = checkListing
+    const note = checkListing
       ? `Dòng ĐỎ = chưa thuế + thuế KHÁC tổng thanh toán, phải soát · dòng VÀNG = lệch do phí / chiết khấu / làm tròn, bình thường · dòng không tô = khớp. 3 cột này là công thức tính từ ô gốc, không ô gốc nào bị sửa.`
       : sh.isSubset
-        ? `${CHU_THICH} — (SHEET TRÙNG LẶP / TẬP CON: KHÔNG cộng vào tổng)`
-        : CHU_THICH;
+        ? `${NOTES} — (SHEET TRÙNG LẶP / TẬP CON: KHÔNG cộng vào tổng)`
+        : NOTES;
     writeReconcileBlock(
-      ws, sh.origin, sh.headerIndex, sh.width, chuThich, INVOICE_HEADERS,
+      ws, sh.origin, sh.headerIndex, sh.width, note, INVOICE_HEADERS,
       sh.rows.map((d) => ({
         fileRow: d.fileRow,
         conclusion: checkListing ? (d.sumMismatch ? SUM_MISMATCH_LABELS[d.sumMismatch.kind] : "khớp") : d.conclusion,
@@ -340,11 +340,11 @@ export async function exportExcelPreserveFormat(
     writeReconcileBlock(
       ws, sh.origin, sh.headerIndex, sh.width,
       sh.isSubset ? `${LEDGER_NOTE} — (SHEET PHỤ / TẬP CON: KHÔNG cộng vào tổng)` : LEDGER_NOTE,
-      HEADER_PM,
+      LEDGER_HEADER,
       sh.rows.map((d) => ({
         fileRow: d.fileRow,
         conclusion: d.conclusion,
-        fill: d.status === "CO" ? NEN.xanh : NEN.do,
+        fill: d.status === "FOUND" ? FILL_COLORS.green : FILL_COLORS.red,
         extra: addLedgerRow(d),
       })),
       editsBySheet(edits, new Map(sh.rows.map((d) => [d.rowIndex, d.fileRow])), sh.name),
@@ -360,14 +360,14 @@ export async function exportExcelPreserveFormat(
 
   // --- B3. Sheet phụ trợ: KẾT LUẬN CHUNG (+ danh sách có dữ liệu) lên ĐẦU, nhật ký sửa xuống cuối ---
   if (result.editLog.length) {
-    const ten = "NHẬT KÝ SỬA";
-    const prev = findSheet(ten);
+    const name = "NHẬT KÝ SỬA";
+    const prev = findSheet(name);
     if (prev) wb.removeWorksheet(prev.id);
-    const nk = wb.addWorksheet(ten);
+    const nk = wb.addWorksheet(name);
     nk.addRow(["NHẬT KÝ SỬA — do người dùng xác nhận, giữ lại giá trị cũ"]);
     nk.addRow(["Vị trí", "Giá trị cũ", "Giá trị mới"]);
     nk.getRow(2).font = { bold: true };
-    nk.getRow(2).fill = to(NEN.header);
+    nk.getRow(2).fill = to(FILL_COLORS.header);
     for (const n of result.editLog) nk.addRow([n.location, n.previous, n.next]);
     nk.columns.forEach((c, i) => (c.width = i === 0 ? 54 : 22));
     (nk as unknown as { orderNo: number }).orderNo = 99;

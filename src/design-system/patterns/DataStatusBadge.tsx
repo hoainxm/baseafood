@@ -14,7 +14,7 @@ import { connectivity } from "@/lib/connectivity";
 import { cn } from "@/lib/utils";
 import { Cloud, CloudOff, HardDrive, Loader2, RotateCcw } from "lucide-react";
 
-type SyncState = "cuc-bo" | "dang-kiem" | "da-noi" | "loi";
+type SyncState = "local" | "checking" | "connected" | "error";
 
 /**
  * Thử một lần đọc thật lên máy chủ để cập nhật đèn trạng thái. Đọc `dai_ly` là
@@ -36,25 +36,25 @@ const STATUS_CONFIG: Record<
   SyncState,
   { icon: typeof Cloud; label: string; hint: string; color: string }
 > = {
-  "cuc-bo": {
+  local: {
     icon: HardDrive,
     label: "Lưu trên máy này",
     hint: "Chỉ máy này thấy. Xóa dữ liệu trình duyệt là mất.",
     color: "text-warning",
   },
-  "dang-kiem": {
+  checking: {
     icon: Loader2,
     label: "Đang kiểm tra máy chủ…",
     hint: "",
     color: "text-muted-foreground",
   },
-  "da-noi": {
+  connected: {
     icon: Cloud,
     label: "Đã nối máy chủ",
     hint: `Mọi máy dùng chung số liệu · ${SITE_ID}`,
     color: "text-success",
   },
-  loi: {
+  error: {
     icon: CloudOff,
     label: "Mất kết nối máy chủ",
     hint: "Đang ghi tạm trên máy, nối lại sẽ đồng bộ.",
@@ -66,11 +66,11 @@ const STATUS_CONFIG: Record<
 function useConnectionStatus() {
   const snapshot = React.useSyncExternalStore(connectivity.subscribe, connectivity.getSnapshot);
   const status: SyncState = !hasSupabase
-    ? "cuc-bo"
-    : snapshot.status === "chua-ro"
-      ? "dang-kiem"
+    ? "local"
+    : snapshot.status === "unknown"
+      ? "checking"
       : snapshot.status;
-  return { trang: status, loi: snapshot.error };
+  return { status, error: snapshot.error };
 }
 
 /**
@@ -78,7 +78,7 @@ function useConnectionStatus() {
  * `DataSyncStatusButton` (gom thành 1 nút icon) bên dưới.
  */
 export function DataSyncStatus({ className }: { className?: string }) {
-  const { trang: state, loi } = useConnectionStatus();
+  const { status: state, error } = useConnectionStatus();
 
   React.useEffect(() => {
     void probeConnection();
@@ -86,13 +86,13 @@ export function DataSyncStatus({ className }: { className?: string }) {
 
   const c = STATUS_CONFIG[state];
   const Icon = c.icon;
-  const phu = state === "loi" ? loi || c.hint : c.hint;
+  const phu = state === "error" ? error || c.hint : c.hint;
 
   return (
     <div className={cn("space-y-1", className)}>
       <p className={cn("flex items-center gap-2 text-sm font-semibold", c.color)}>
         <Icon
-          className={cn("size-5 shrink-0", state === "dang-kiem" && "animate-spin")}
+          className={cn("size-5 shrink-0", state === "checking" && "animate-spin")}
           aria-hidden
         />
         {c.label}
@@ -111,7 +111,7 @@ export function DataSyncStatus({ className }: { className?: string }) {
  * cả click lẫn touch.
  */
 export function DataSyncStatusButton({ className }: { className?: string }) {
-  const { trang: state, loi } = useConnectionStatus();
+  const { status: state, error } = useConnectionStatus();
   const [isRetrying, setIsRetrying] = React.useState(false);
 
   React.useEffect(() => {
@@ -120,8 +120,8 @@ export function DataSyncStatusButton({ className }: { className?: string }) {
 
   const c = STATUS_CONFIG[state];
   const Icon = c.icon;
-  const phu = state === "loi" ? loi || c.hint : c.hint;
-  const canRetry = hasSupabase && state !== "dang-kiem";
+  const phu = state === "error" ? error || c.hint : c.hint;
+  const canRetry = hasSupabase && state !== "checking";
 
   const retry = async () => {
     setIsRetrying(true);
@@ -145,7 +145,7 @@ export function DataSyncStatusButton({ className }: { className?: string }) {
           <Icon
             className={cn(
               "size-5",
-              (state === "dang-kiem" || isRetrying) && "animate-spin"
+              (state === "checking" || isRetrying) && "animate-spin"
             )}
             aria-hidden
           />

@@ -27,14 +27,14 @@ export function CellShipments({
   /** shipmentId → mã lô (import_shipments.lot_code). */
   lotCodes: Map<string, string>;
 }) {
-  const [mo, setMo] = useState(false);
+  const [open, setOpen] = useState(false);
   const n = countDailyShipments(imports, date);
   if (n === 0) return null;
-  const suppliers = mo
+  const suppliers = open
     ? groupDailyShipments(imports, date, [...lotCodeById].map(([id, lotCode]) => ({ id, lotCode })))
     : [];
   return (
-    <Popover open={mo} onOpenChange={setMo}>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button
           type="button"

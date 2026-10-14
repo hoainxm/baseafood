@@ -34,7 +34,7 @@ export function save<T>(key: string, rows: T[]): boolean {
 
 /** 16 byte ngẫu nhiên dạng UUID v4. `crypto.randomUUID` chỉ có ở ngữ cảnh an toàn
  *  (https/localhost) — mở app qua http IP mạng nội bộ thì dựng từ getRandomValues. */
-function uuidNgauNhien(): string {
+function randomUuid(): string {
   const c = globalThis.crypto;
   if (typeof c?.randomUUID === "function") return c.randomUUID();
   const b = c.getRandomValues(new Uint8Array(16));
@@ -60,7 +60,7 @@ let lastMs = 0;
 export function uid(): string {
   const ms = Math.max(Date.now(), lastMs + 1);
   lastMs = ms;
-  return `${ms}-${uuidNgauNhien()}`;
+  return `${ms}-${randomUuid()}`;
 }
 
 /**

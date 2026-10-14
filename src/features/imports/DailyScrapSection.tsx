@@ -50,7 +50,7 @@ export function DailyScrapSection({
 }) {
   const [editing, setEditing] = useState<ScrapItem | null>(null);
   const [isAdding, setIsAdding] = useState(false);
-  const [loi, setLoi] = useState<FieldError[]>([]);
+  const [errors, setErrors] = useState<FieldError[]>([]);
 
   const dayScrapRows = useMemo(
     () =>
@@ -96,7 +96,7 @@ export function DailyScrapSection({
       ls.push({ field: "Loại phế liệu", message: "Chưa chọn loại phế liệu" });
     if (!(editing.quantityKg > 0))
       ls.push({ field: "Số lượng", message: "Phải lớn hơn 0 kg" });
-    setLoi(ls);
+    setErrors(ls);
     if (ls.length > 0) return;
     onChange(
       isAdding ? [...rows, editing] : rows.map((r) => (r.id === editing.id ? editing : r))
@@ -109,7 +109,7 @@ export function DailyScrapSection({
     if (isAdding && keepEntering) {
       // Ghi thêm loại khác: reset form, giữ hộp thoại mở, gợi ý loại chưa ghi.
       setEditing(newScrapItem([...dayScrapRows.map((r) => r.name), editing.name]));
-      setLoi([]);
+      setErrors([]);
     } else {
       setEditing(null);
     }
@@ -138,7 +138,7 @@ export function DailyScrapSection({
         r.sellingPrice != null ? (
           num(r.sellingPrice)
         ) : (
-          <Tag variant="loi">Chưa có giá</Tag>
+          <Tag variant="error">Chưa có giá</Tag>
         ),
       getSortValue: (r) => r.sellingPrice ?? 0,
     },
@@ -154,9 +154,9 @@ export function DailyScrapSection({
       header: "Kỳ cân đối",
       render: (r) =>
         r.periodId ? (
-          <Tag variant="xong">Đã vào kỳ</Tag>
+          <Tag variant="done">Đã vào kỳ</Tag>
         ) : (
-          <Tag variant="cho">Chưa vào kỳ</Tag>
+          <Tag variant="pending">Chưa vào kỳ</Tag>
         ),
     },
   ];
@@ -177,11 +177,11 @@ export function DailyScrapSection({
           </div>
         </div>
         {isLocked ? (
-          <Tag variant="xong" icon={Lock}>
+          <Tag variant="done" icon={Lock}>
             Ngày đã chốt
           </Tag>
         ) : isReadOnly ? (
-          <Tag variant="nguon">Ghi ở “Ghi nhập trong ngày”</Tag>
+          <Tag variant="source">Ghi ở “Ghi nhập trong ngày”</Tag>
         ) : (
           <Button
             title="Ghi một dòng phế liệu phát sinh trong ngày (đầu, da, vụn…) để kỳ cân đối hút sang."
@@ -189,7 +189,7 @@ export function DailyScrapSection({
             onClick={() => {
               setEditing(newScrapItem());
               setIsAdding(true);
-              setLoi([]);
+              setErrors([]);
             }}
           >
             <Plus />
@@ -216,7 +216,7 @@ export function DailyScrapSection({
                     onClick={() => {
                       setEditing({ ...r });
                       setIsAdding(false);
-                      setLoi([]);
+                      setErrors([]);
                     }}
                   >
                     <Pencil />
@@ -277,7 +277,7 @@ export function DailyScrapSection({
 
           {editing && (
             <div className="space-y-6 py-2">
-              <ErrorSummary errors={loi} />
+              <ErrorSummary errors={errors} />
               <RequiredLegend />
 
               <Combobox
@@ -287,7 +287,7 @@ export function DailyScrapSection({
                 value={editing.name}
                 onChange={(v) => setEditing((d) => (d ? { ...d, name: v } : d))}
                 options={typeOptions}
-                onCreate={(ten) => ten}
+                onCreate={(name) => name}
               />
 
               <div className="grid gap-6 sm:grid-cols-2">

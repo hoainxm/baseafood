@@ -33,7 +33,7 @@ export function GuideButton({
       title={`Hướng dẫn: ${title}`}
       description={description}
       icon={HelpCircle}
-      size="rong"
+      size="lg"
       footer={<CloseButton>Đã hiểu</CloseButton>}
       trigger={
         <button

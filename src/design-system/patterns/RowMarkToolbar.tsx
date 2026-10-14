@@ -17,16 +17,16 @@ import { MARK_COLOR_GRID, getMarkColorName, type MarkColor, type RowMarkTools } 
  */
 
 /** Ô màu nhỏ kiểu Excel — không chữ; tên màu nằm ở aria-label + title. */
-function ColorSwatch({ code: ma, selected, onSelect }: { code: MarkColor; selected: boolean; onSelect: () => void }) {
-  const ten = getMarkColorName(ma);
+function ColorSwatch({ code: color, selected, onSelect }: { code: MarkColor; selected: boolean; onSelect: () => void }) {
+  const name = getMarkColorName(color);
   return (
     <button
       type="button"
       aria-pressed={selected}
-      aria-label={`Tô ${ten}`}
-      title={`Tô ${ten}`}
+      aria-label={`Tô ${name}`}
+      title={`Tô ${name}`}
       onClick={onSelect}
-      style={{ backgroundColor: `var(--to-${ma})` }}
+      style={{ backgroundColor: `var(--to-${color})` }}
       className={cn(
         "flex size-6 items-center justify-center rounded-sm ring-1 ring-foreground/15 hover:z-10 hover:scale-110 hover:ring-2 hover:ring-foreground/60",
         selected && "ring-2 ring-foreground"
@@ -43,7 +43,7 @@ function ColorSwatch({ code: ma, selected, onSelect }: { code: MarkColor; select
  * tự đặt vào thanh "Đã chọn" riêng của nó (VD Sổ kho tháng).
  */
 export function RowMarkActions({ marker: to, selectedKeys }: { marker: RowMarkTools; selectedKeys: string[] }) {
-  const [mo, setMo] = React.useState(false);
+  const [open, setOpen] = React.useState(false);
   if (!to.enabled || selectedKeys.length === 0) return null;
   const items = selectedKeys.map((k) => to.getMark(k));
   const mau0 = items[0]?.color ?? "";
@@ -53,7 +53,7 @@ export function RowMarkActions({ marker: to, selectedKeys }: { marker: RowMarkTo
   const n = selectedKeys.length;
   return (
     <>
-      <Popover open={mo} onOpenChange={setMo}>
+      <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <Button
             type="button"
@@ -75,14 +75,14 @@ export function RowMarkActions({ marker: to, selectedKeys }: { marker: RowMarkTo
         </PopoverTrigger>
         <PopoverContent align="start" className="w-auto max-w-[calc(100vw-1rem)] p-3">
           <div className="grid w-max grid-cols-10 gap-1" role="group" aria-label="Bảng màu">
-            {MARK_COLOR_GRID.flat().map((ma) => (
+            {MARK_COLOR_GRID.flat().map((color) => (
               <ColorSwatch
-                key={ma}
-                code={ma}
-                selected={commonColor === ma}
+                key={color}
+                code={color}
+                selected={commonColor === color}
                 onSelect={() => {
-                  to.patch(selectedKeys, { color: ma });
-                  setMo(false);
+                  to.patch(selectedKeys, { color });
+                  setOpen(false);
                 }}
               />
             ))}

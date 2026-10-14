@@ -10,19 +10,19 @@
  * đầu → cuối. `tuy-chon` dùng thẳng cặp tuNgay/denNgay.
  * Toán ngày dùng Date local (khớp cách DateField parse), KHÔNG lệ thuộc UTC.
  */
-export type ViewPeriod = "ngay" | "tuan" | "thang" | "nam" | "tuy-chon";
+export type ViewPeriod = "day" | "week" | "month" | "year" | "custom";
 
 export interface ViewPeriodOption {
   value: ViewPeriod;
   label: string;
 }
 
-export const KY_OPT: ViewPeriodOption[] = [
-  { value: "ngay", label: "Ngày" },
-  { value: "tuan", label: "Tuần" },
-  { value: "thang", label: "Tháng" },
-  { value: "nam", label: "Năm" },
-  { value: "tuy-chon", label: "Khoảng tự chọn" },
+export const PERIOD_OPTIONS: ViewPeriodOption[] = [
+  { value: "day", label: "Ngày" },
+  { value: "week", label: "Tuần" },
+  { value: "month", label: "Tháng" },
+  { value: "year", label: "Năm" },
+  { value: "custom", label: "Khoảng tự chọn" },
 ];
 
 function toDate(iso: string): Date {
@@ -55,21 +55,21 @@ export const endOfYear = (iso: string): string => `${iso.slice(0, 4)}-12-31`;
 
 /** [từ, đến] của kỳ đang xem. */
 export function getViewPeriodRange(
-  ky: ViewPeriod,
-  moc: string,
+  period: ViewPeriod,
+  anchor: string,
   startDate: string,
   endDate: string
 ): [string, string] {
-  switch (ky) {
-    case "ngay":
-      return [moc, moc];
-    case "tuan":
-      return [startOfWeek(moc), endOfWeek(moc)];
-    case "thang":
-      return [startOfMonth(moc), endOfMonth(moc)];
-    case "nam":
-      return [startOfYear(moc), endOfYear(moc)];
-    case "tuy-chon":
+  switch (period) {
+    case "day":
+      return [anchor, anchor];
+    case "week":
+      return [startOfWeek(anchor), endOfWeek(anchor)];
+    case "month":
+      return [startOfMonth(anchor), endOfMonth(anchor)];
+    case "year":
+      return [startOfYear(anchor), endOfYear(anchor)];
+    case "custom":
       return [startDate, endDate];
   }
 }

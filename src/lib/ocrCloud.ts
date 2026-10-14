@@ -5,7 +5,7 @@
 // ============================================================
 import { supabase } from "./supabase";
 import { compressImage } from "./storage";
-import type { DongOcr, KetQuaOcr, OcrCatalog } from "./ocr";
+import type { OcrLine, OcrResult, OcrCatalog } from "./ocr";
 
 /**
  * Bộ nhận diện cloud cho OCR phiếu nhập (QĐ-1 nâng cấp, 2026-10-14). Key OpenAI nằm
@@ -124,7 +124,7 @@ function isRealDate(iso: string): boolean {
  * Soát kết quả cloud theo danh mục rồi ghép với parser chữ (`parsed` = parseOcrText
  * trên toàn văn cloud): ô nào cloud bỏ trống/sai thì lấy của parser.
  */
-export function mergeCloudResult(raw: CloudOcrResponse, parsed: KetQuaOcr, catalog: OcrCatalog): KetQuaOcr {
+export function mergeCloudResult(raw: CloudOcrResponse, parsed: OcrResult, catalog: OcrCatalog): OcrResult {
   const supplierByName = new Map<string, string>();
   for (const s of catalog.suppliers) {
     supplierByName.set(normalize(s.name), s.name);
@@ -143,7 +143,7 @@ export function mergeCloudResult(raw: CloudOcrResponse, parsed: KetQuaOcr, catal
       : undefined;
   const date = typeof raw.date === "string" && isRealDate(raw.date) ? raw.date : undefined;
 
-  const lines: DongOcr[] = [];
+  const lines: OcrLine[] = [];
   for (const l of Array.isArray(raw.lines) ? raw.lines : []) {
     const name = typeof l?.materialType === "string" ? materialByName.get(normalize(l.materialType)) : undefined;
     const kg = typeof l?.kg === "number" ? Math.round(l.kg * 1000) / 1000 : NaN;

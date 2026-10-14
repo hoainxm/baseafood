@@ -55,9 +55,9 @@ describe("devicePrefs — localStorage hỏng/không có", () => {
   it("giá trị không tuần tự hóa được (vòng tham chiếu) ⇒ bỏ qua, không ghi", () => {
     const store = fakeStorage();
     vi.stubGlobal("localStorage", store);
-    const vong: Record<string, unknown> = {};
-    vong.self = vong;
-    expect(() => writeDevicePrefJson("k", vong)).not.toThrow();
+    const fakeStore: Record<string, unknown> = {};
+    fakeStore.self = fakeStore;
+    expect(() => writeDevicePrefJson("k", fakeStore)).not.toThrow();
     expect(store.getItem("k")).toBeNull();
   });
 });

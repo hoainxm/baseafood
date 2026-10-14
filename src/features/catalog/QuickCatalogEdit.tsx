@@ -5,8 +5,8 @@
 // Mở từ bút chì trong ô chọn (`Combobox.onEditItem`) hoặc nút cạnh ô. Dùng ĐÚNG
 // bộ trường + luật kiểm tra của màn Danh mục (catalogConfig.tsx) — một nguồn.
 //
-// ⚠️ Ghi qua `rows` / `onChange` CỦA MÀN GỌI (đúng instance `useBang` đang mở):
-// mỗi `useBang` giữ state riêng, tự gọi useCustomers() ở đây thì màn không thấy
+// ⚠️ Ghi qua `rows` / `onChange` CỦA MÀN GỌI (đúng instance `useTable` đang mở):
+// mỗi `useTable` giữ state riêng, tự gọi useCustomers() ở đây thì màn không thấy
 // thay đổi và lần ghi kế tiếp của màn sẽ đè bản cũ lên.
 //
 // Danh mục nối với sổ đã ghi bằng TÊN (đại lý, loại NL, khách hàng, kho lưu, bột
@@ -31,21 +31,21 @@ import {
 } from "./catalogConfig";
 
 export interface CatalogRecordMap {
-  matHang: Product;
-  khachHang: Customer;
-  daiLy: Supplier;
-  loaiNL: MaterialType;
-  khoLuu: StorageLocation;
-  botTam: BatterType;
+  product: Product;
+  customer: Customer;
+  supplier: Supplier;
+  materialType: MaterialType;
+  storageLocation: StorageLocation;
+  batter: BatterType;
 }
 
 /**
  * Danh mục bột tẩm CỦA MÀN GỌI — để ô "Bột đi kèm" trong hộp sửa mặt hàng thấy
- * ngay loại bột vừa tạo tại màn, và tạo mới qua đúng instance `useBang` của màn.
+ * ngay loại bột vừa tạo tại màn, và tạo mới qua đúng instance `useTable` của màn.
  */
 export interface BatterSource {
   rows: BatterType[];
-  create: (ten: string) => string; // trả về id loại bột (mới hoặc có sẵn)
+  create: (name: string) => string; // trả về id loại bột (mới hoặc có sẵn)
 }
 
 /** Nguồn rỗng cho các danh mục không sửa trong hộp này (chỉ để ráp cấu hình). */
@@ -83,20 +83,20 @@ function QuickEditDialog<K extends CatalogKind>({
     // màn sẽ đè mất loại vừa tạo. Ô "Loại nguyên liệu" trong hộp sửa nhanh mặt hàng
     // vì vậy chỉ cho CHỌN; thêm loại mới ở ô loại NL của màn hoặc tab Danh mục.
     const fields = buildCatalogFields(materialTypes, finishedGoods, batterTypes, addBatter);
-    const bo = buildCatalogConfigs(fields, {
-      matHang: emptySource(),
-      khachHang: emptySource(),
-      daiLy: emptySource(),
-      loaiNL: emptySource(),
-      khoLuu: emptySource(),
-      botTam: emptySource(),
+    const configs = buildCatalogConfigs(fields, {
+      product: emptySource(),
+      customer: emptySource(),
+      supplier: emptySource(),
+      materialType: emptySource(),
+      storageLocation: emptySource(),
+      batter: emptySource(),
     });
-    return bo[kind] as unknown as CatalogConfig<T>;
+    return configs[kind] as unknown as CatalogConfig<T>;
   }, [kind, materialTypes, finishedGoods, batterTypes, addBatter]);
 
   const original = rows.find((r) => r.id === id);
   const [editing, setEditing] = useState<T | null>(original ? { ...original } : null);
-  const [loi, setLoi] = useState<FieldError[]>([]);
+  const [errors, setErrors] = useState<FieldError[]>([]);
   if (!original) return null;
 
   const save = () => {
@@ -107,7 +107,7 @@ function QuickEditDialog<K extends CatalogKind>({
         .map((f) => ({ field: f.label, message: `Chưa nhập ${f.label.toLowerCase()}` })),
       ...(cfg.validate?.(editing, rows, false) ?? []),
     ];
-    setLoi(ls);
+    setErrors(ls);
     if (ls.length) return;
     onChange(rows.map((r) => (r.id === editing.id ? editing : r)));
     notify.saved(`Đã lưu ${cfg.entityName} "${cfg.getRecordDescription(editing)}"`);
@@ -121,7 +121,7 @@ function QuickEditDialog<K extends CatalogKind>({
       isAdding={false}
       fields={cfg.fields}
       entityName={cfg.entityName}
-      errors={loi}
+      errors={errors}
       onChange={setEditing}
       onSave={save}
       onClose={onClose}
@@ -144,7 +144,7 @@ function QuickEditDialog<K extends CatalogKind>({
 /**
  * Bật sửa nhanh một danh mục ở màn nghiệp vụ:
  *
- *   const editor = useQuickCatalogEdit("khachHang", customers, setCustomers, { theo: "ten" });
+ *   const editor = useQuickCatalogEdit("customer", customers, setCustomers, { matchBy: "name" });
  *   <Combobox … onEditItem={editor.openEdit} canEdit={editor.canEdit} editLabel={editor.editLabel} />
  *   {editor.dialog}
  *
@@ -155,7 +155,7 @@ export function useQuickCatalogEdit<K extends CatalogKind>(
   rows: CatalogRecordMap[K][],
   onChange: (next: CatalogRecordMap[K][]) => void,
   opts: {
-    theo?: "id" | "ten";
+    matchBy?: "id" | "name";
     onSaved?: (updated: CatalogRecordMap[K], prev: CatalogRecordMap[K]) => void;
     getDescription?: (r: CatalogRecordMap[K]) => ReactNode;
     /** Hộp sửa MẶT HÀNG: danh mục bột của màn (thấy + tạo loại bột tại chỗ). */
@@ -163,23 +163,23 @@ export function useQuickCatalogEdit<K extends CatalogKind>(
   } = {}
 ) {
   const [id, setId] = useState<string | null>(null);
-  const TEN: Record<CatalogKind, string> = {
-    matHang: "mặt hàng",
-    khachHang: "khách hàng",
-    daiLy: "đại lý",
-    loaiNL: "loại nguyên liệu",
-    khoLuu: "kho lưu trữ",
-    botTam: "loại bột",
+  const KIND_NAMES: Record<CatalogKind, string> = {
+    product: "mặt hàng",
+    customer: "khách hàng",
+    supplier: "đại lý",
+    materialType: "loại nguyên liệu",
+    storageLocation: "kho lưu trữ",
+    batter: "loại bột",
   };
 
   const openEdit = (value: string) => {
     if (!value) return;
     const r =
-      opts.theo === "ten"
+      opts.matchBy === "name"
         ? rows.find((x) => nameOf(catalogKind, x).trim() === value.trim())
         : rows.find((x) => x.id === value);
     if (r) setId(r.id);
-    else notify.warning(`Không tìm thấy ${TEN[catalogKind]} này trong danh mục.`);
+    else notify.warning(`Không tìm thấy ${KIND_NAMES[catalogKind]} này trong danh mục.`);
   };
 
   const dialog = id ? (
@@ -198,7 +198,7 @@ export function useQuickCatalogEdit<K extends CatalogKind>(
 
   /** Value này có bản ghi trong danh mục không — truyền vào `Combobox.canEdit`. */
   const isEditable = (value: string) =>
-    opts.theo === "ten"
+    opts.matchBy === "name"
       ? rows.some((x) => nameOf(catalogKind, x).trim() === value.trim())
       : rows.some((x) => x.id === value);
 
@@ -206,10 +206,10 @@ export function useQuickCatalogEdit<K extends CatalogKind>(
     openEdit,
     canEdit: isEditable,
     dialog,
-    editLabel: `Sửa thông tin ${TEN[catalogKind]} này — lưu thẳng vào Danh mục.`,
+    editLabel: `Sửa thông tin ${KIND_NAMES[catalogKind]} này — lưu thẳng vào Danh mục.`,
   };
 }
 
 function nameOf(catalogKind: CatalogKind, r: CatalogRecordMap[CatalogKind]): string {
-  return catalogKind === "daiLy" ? (r as Supplier).shortName : (r as { name: string }).name;
+  return catalogKind === "supplier" ? (r as Supplier).shortName : (r as { name: string }).name;
 }

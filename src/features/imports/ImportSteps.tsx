@@ -16,31 +16,31 @@ import type { ShipmentGroup } from "./importHelpers";
  * tóm tắt + nút "Đổi" — màn ngắn lại, mắt chỉ còn nhìn bước đang làm.
  */
 export function StepCard({
-  so,
+  stepNumber: num,
   title,
-  xong,
-  mo,
+  done,
+  open,
   summary,
-  onDoi,
+  onChange,
   children,
 }: {
-  so: number;
+  stepNumber: number;
   title: string;
   /** Bước đã có dữ liệu (đổi số thành dấu ✓). */
-  xong: boolean;
+  done: boolean;
   /** Đang mở để thao tác. */
-  mo: boolean;
+  open: boolean;
   /** Dòng tóm tắt khi thu lại. */
   summary?: ReactNode;
   /** Có thì hiện nút "Đổi" lúc thu lại. */
-  onDoi?: () => void;
+  onChange?: () => void;
   children: ReactNode;
 }) {
   return (
     <section
       className={cn(
         "rounded-xl border-2 bg-card",
-        mo ? "border-primary/50" : "border-border",
+        open ? "border-primary/50" : "border-border",
       )}
     >
       <div className="flex min-h-12 items-center gap-3 px-4 py-2">
@@ -48,35 +48,35 @@ export function StepCard({
           aria-hidden
           className={cn(
             "flex size-7 shrink-0 items-center justify-center rounded-full font-semibold tnum",
-            xong
+            done
               ? "bg-primary text-primary-foreground"
               : "border-2 border-primary text-primary",
           )}
         >
-          {xong ? <Check className="size-4" /> : so}
+          {done ? <Check className="size-4" /> : num}
         </span>
         <div className="min-w-0 flex-1">
-          <p className={cn("font-semibold", !mo && "text-muted-foreground")}>
+          <p className={cn("font-semibold", !open && "text-muted-foreground")}>
             {title}
           </p>
-          {!mo && summary && (
+          {!open && summary && (
             <div className="min-w-0 font-semibold">{summary}</div>
           )}
         </div>
-        {!mo && onDoi && (
+        {!open && onChange && (
           <Button
             title={`Mở lại bước "${title}" để chọn lại.`}
             type="button"
             variant="outline"
             size="sm"
-            onClick={onDoi}
+            onClick={onChange}
           >
             <Pencil />
             Đổi
           </Button>
         )}
       </div>
-      {mo && (
+      {open && (
         <div className="space-y-3 border-t-2 border-border p-4">{children}</div>
       )}
     </section>
@@ -138,13 +138,13 @@ export function ChoiceCard({
 
 /** Các chuyến ĐÃ GHI của ngày + xưởng đang nhập — nhìn ngay cạnh phiếu, khỏi đổi tab. */
 export function DayShipmentList({
-  nhom,
+  groups: group,
   isLocked,
   editingGroupKey: editingKey,
   onEdit,
   onPrintLabel,
 }: {
-  nhom: ShipmentGroup[];
+  groups: ShipmentGroup[];
   /** Ngày đã chốt ⇒ không cho sửa. */
   isLocked: boolean;
   /** Khóa nhóm đang mở để sửa (tô nổi). */
@@ -153,7 +153,7 @@ export function DayShipmentList({
   /** Có thì chuyến có mã lô hiện nút in tem QR. */
   onPrintLabel?: (n: ShipmentGroup) => void;
 }) {
-  if (nhom.length === 0)
+  if (group.length === 0)
     return (
       <p className="rounded-lg border-2 border-dashed border-border px-4 py-5 text-center text-muted-foreground">
         Chưa ghi chuyến nào cho ngày này.
@@ -161,7 +161,7 @@ export function DayShipmentList({
     );
   return (
     <ul className="space-y-2">
-      {nhom.map((n, i) => (
+      {group.map((n, i) => (
         <li
           key={n.groupKey}
           className={cn(
@@ -178,7 +178,7 @@ export function DayShipmentList({
               </span>
               {n.supplierName || "(chưa có đại lý)"}
               {n.isBackdated && (
-                <Tag variant="luu-y" className="ml-2 align-middle">
+                <Tag variant="warning" className="ml-2 align-middle">
                   Ghi bù
                 </Tag>
               )}
@@ -189,7 +189,7 @@ export function DayShipmentList({
             <p className="min-w-0 text-sm text-muted-foreground">
               {[n.licensePlate, n.driverName].filter(Boolean).join(" · ") ||
                 "Không ghi xe"}{" "}
-              · {n.dong.length} loại
+              · {n.rows.length} loại
             </p>
             <span className="flex shrink-0 gap-1">
               {onPrintLabel && n.shipment && (

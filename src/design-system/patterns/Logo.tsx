@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
  */
 export function Logo({
   className,
-  heightClass: cao = "h-11",
+  heightClass = "h-11",
   showWordmark = true,
   subtitle: phuDe,
 }: {
@@ -29,7 +29,7 @@ export function Logo({
         src="/baseafood-logo.png"
         alt=""
         aria-hidden={showWordmark}
-        className={cn("w-auto shrink-0 object-contain", cao)}
+        className={cn("w-auto shrink-0 object-contain", heightClass)}
       />
       {showWordmark && (
         <span className="min-w-0 shrink-0">

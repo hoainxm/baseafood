@@ -12,12 +12,12 @@ const MIGRATIONS_DIR = join(__dirname, "../../supabase/migrations");
 const SKIPPED_TABLES = new Set(["sites", "xi_nghiep"]);
 
 function businessForeignKeys(): string[] {
-  const ra: string[] = [];
+  const result: string[] = [];
   for (const f of readdirSync(MIGRATIONS_DIR).filter((x) => x.endsWith(".sql")).sort()) {
     const sql = readFileSync(join(MIGRATIONS_DIR, f), "utf8");
-    for (const m of sql.matchAll(/references\s+(?:public\.)?([a-z_]+)\s*\(/gi)) if (!SKIPPED_TABLES.has(m[1])) ra.push(`${f}:${m[1]}`);
+    for (const m of sql.matchAll(/references\s+(?:public\.)?([a-z_]+)\s*\(/gi)) if (!SKIPPED_TABLES.has(m[1])) result.push(`${f}:${m[1]}`);
   }
-  return ra;
+  return result;
 }
 
 describe("khóa ngoại giữa bảng nghiệp vụ ⇄ refColumns", () => {

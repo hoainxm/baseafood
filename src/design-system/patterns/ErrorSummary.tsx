@@ -19,17 +19,17 @@ export interface FieldError {
  * Dùng chung với nguyên tắc: nút "Lưu" KHÔNG BAO GIỜ bị disable —
  * bấm vào thì hiện hộp này, thay vì im lặng không phản ứng.
  */
-export function ErrorSummary({ errors: loi }: { errors: FieldError[] }) {
+export function ErrorSummary({ errors }: { errors: FieldError[] }) {
   const ref = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
-    if (loi.length > 0) {
+    if (errors.length > 0) {
       ref.current?.focus();
       ref.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
     }
-  }, [loi]);
+  }, [errors]);
 
-  if (loi.length === 0) return null;
+  if (errors.length === 0) return null;
 
   return (
     <div
@@ -44,10 +44,10 @@ export function ErrorSummary({ errors: loi }: { errors: FieldError[] }) {
         className="flex items-center gap-3 text-lg font-semibold text-destructive"
       >
         <AlertTriangle className="size-6 shrink-0" aria-hidden />
-        Còn {loi.length} chỗ chưa xong
+        Còn {errors.length} chỗ chưa xong
       </h2>
       <ul className="mt-4 space-y-3">
-        {loi.map((l, i) => (
+        {errors.map((l, i) => (
           <li key={i}>
             {l.targetId ? (
               <button

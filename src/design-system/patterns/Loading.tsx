@@ -30,7 +30,7 @@ export function ThinkingDots({ className }: { className?: string }) {
 
 /** Khối "đang xử lý" giữa vùng trống — chờ tải cả màn hoặc tác vụ dài. */
 export function ProcessingState({
-  text: chu = "Đang xử lý…",
+  text = "Đang xử lý…",
   className,
 }: {
   text?: string;
@@ -46,14 +46,14 @@ export function ProcessingState({
       )}
     >
       <ThinkingDots className="text-primary [&>span]:size-2.5" />
-      <p className="text-sm font-medium text-muted-foreground">{chu}</p>
+      <p className="text-sm font-medium text-muted-foreground">{text}</p>
     </div>
   );
 }
 
 /** Khung xương của một bảng danh sách (RecordTable) trong lúc dữ liệu đang về. */
 export function TableSkeleton({
-  rows: dong = 5,
+  rows: rowCount = 5,
   className,
 }: {
   rows?: number;
@@ -74,7 +74,7 @@ export function TableSkeleton({
       <div className="overflow-hidden rounded-xl ring-1 ring-foreground/10">
         <Skeleton className="h-11 rounded-none" />
         <div className="divide-y divide-border">
-          {Array.from({ length: dong }).map((_, i) => (
+          {Array.from({ length: rowCount }).map((_, i) => (
             <div key={i} className="flex items-center gap-4 px-4 py-3">
               <Skeleton className="h-4 flex-1" />
               <Skeleton className="hidden h-4 w-24 sm:block" />

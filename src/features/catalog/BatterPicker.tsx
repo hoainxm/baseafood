@@ -23,7 +23,7 @@ export function BatterPicker({
   onChange: (v: string) => void;
   batterTypes: BatterType[];
   /** Có ⇒ cho tạo loại bột mới tại chỗ (lưu ngay vào danh mục), trả về id. */
-  onCreateBatter?: (ten: string) => string;
+  onCreateBatter?: (name: string) => string;
 }) {
   const hintId = useId();
   const ids = getProductBatterIds({ batterIds: value });

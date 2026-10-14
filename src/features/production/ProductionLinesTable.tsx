@@ -56,33 +56,33 @@ export function ProductionLinesTable({
     groupId: string,
     patch: Partial<Pick<ProductionLine, "processingType" | "customerName">>
   ) => void;
-  onCreateProduct: (ten: string, processingType: string) => string;
+  onCreateProduct: (name: string, processingType: string) => string;
   /** Mở hộp sửa nhanh thành phẩm đang chọn (tên, loài, kiểu chế biến…). */
   onEditProduct: (productId: string) => void;
   /** Mở hộp sửa nhanh khách hàng (value = tên). */
-  onEditCustomer: (ten: string) => void;
+  onEditCustomer: (name: string) => void;
   customerOptions: ComboboxOption[];
-  onCreateCustomer: (ten: string) => string;
+  onCreateCustomer: (name: string) => string;
   /** Danh mục loại bột (để ra TÊN bột đi kèm của mặt hàng). */
   batterTypes: BatterType[];
   /** Ô chọn loại bột — value = TÊN. */
   batterOptions: ComboboxOption[];
-  onCreateBatter: (ten: string) => string;
-  onEditBatter: (ten: string) => void;
+  onCreateBatter: (name: string) => string;
+  onEditBatter: (name: string) => void;
 }) {
   const th =
     "border-b-2 border-border bg-card px-2 py-2 text-left text-sm font-semibold whitespace-nowrap";
   const td = "border-b border-border px-2 py-2 align-middle";
 
   // Nhóm theo groupId ỔN ĐỊNH (giữ thứ tự xuất hiện) — sửa nhãn không remount.
-  const nhomKeys: string[] = [];
-  const nhomRows = new Map<string, ProductionLine[]>();
+  const groupKeys: string[] = [];
+  const groupRows = new Map<string, ProductionLine[]>();
   for (const d of lines) {
-    if (!nhomRows.has(d.groupId)) {
-      nhomRows.set(d.groupId, []);
-      nhomKeys.push(d.groupId);
+    if (!groupRows.has(d.groupId)) {
+      groupRows.set(d.groupId, []);
+      groupKeys.push(d.groupId);
     }
-    nhomRows.get(d.groupId)!.push(d);
+    groupRows.get(d.groupId)!.push(d);
   }
 
   // Gợi ý kiểu chế biến = các giá trị đã có trên mặt hàng (thêm mới tại chỗ được).
@@ -104,8 +104,8 @@ export function ProductionLinesTable({
   return (
     // data-grid-nav: khung điều hướng ↑/↓/Enter theo cột cho các ô số (navCol).
     <div className="space-y-4" data-grid-nav>
-      {nhomKeys.map((gid) => {
-        const rows = nhomRows.get(gid)!;
+      {groupKeys.map((gid) => {
+        const rows = groupRows.get(gid)!;
         const info = { pt: rows[0].processingType, cust: rows[0].customerName };
         const soThat = rows.filter((d) => !isLineEmpty(d)).length;
         return (
@@ -122,7 +122,7 @@ export function ProductionLinesTable({
                   value={info.pt}
                   onChange={(v) => onChangeGroup(gid, { processingType: v })}
                   options={processingTypeOptions}
-                  onCreate={(ten) => ten}
+                  onCreate={(name) => name}
                   placeholder="VD: 2 da chần, luộc…"
                   emptyText="Chưa có — gõ tên rồi Thêm mới."
                 />
@@ -133,7 +133,7 @@ export function ProductionLinesTable({
                   value={info.cust}
                   onChange={(v) => onChangeGroup(gid, { customerName: v })}
                   options={customerOptions}
-                  onCreate={(ten) => onCreateCustomer(ten)}
+                  onCreate={(name) => onCreateCustomer(name)}
                   onEditItem={onEditCustomer}
                   editLabel="Sửa thông tin khách hàng này — lưu thẳng vào Danh mục."
                   placeholder="VD: Peacock…"
@@ -214,7 +214,7 @@ export function ProductionLinesTable({
                                 });
                               }}
                               options={allProductOptions}
-                              onCreate={(ten) => onCreateProduct(ten, info.pt)}
+                              onCreate={(name) => onCreateProduct(name, info.pt)}
                               emptyText="Chưa có mặt hàng — gõ tên rồi Thêm mới."
                               onEditItem={onEditProduct}
                               editLabel="Sửa thông tin mặt hàng này — lưu thẳng vào Danh mục."
@@ -372,7 +372,7 @@ export function ProductionLinesTable({
                                 <BatterSection
                                   bundledIds={getProductBatterNames(p, batterTypes)}
                                   batterKg={d.batterKg}
-                                  onChange={(botKg) => onEdit(d.key, { batterKg: botKg })}
+                                  onChange={(batterKg) => onEdit(d.key, { batterKg })}
                                   batterOptions={batterOptions}
                                   onCreateBatter={onCreateBatter}
                                   onEditBatter={onEditBatter}

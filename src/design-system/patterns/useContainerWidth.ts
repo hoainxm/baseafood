@@ -22,5 +22,5 @@ export function useContainerWidth<T extends HTMLElement>(minWidth: number) {
     ro.observe(el);
     return () => ro.disconnect();
   }, [minWidth]);
-  return { ref, rong: width };
+  return { ref, width };
 }

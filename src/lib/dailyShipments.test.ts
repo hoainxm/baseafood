@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { MaterialImportItem } from "@/types";
 import { groupDailyShipments, groupImportsBySupplier, countDailyShipments, summarizeImportsByDay } from "./dailyShipments";
 
-const dong = (p: Partial<MaterialImportItem> & Pick<MaterialImportItem, "id">): MaterialImportItem => ({
+const row = (p: Partial<MaterialImportItem> & Pick<MaterialImportItem, "id">): MaterialImportItem => ({
   shipmentId: "",
   deliveryDate: "2026-09-02",
   workshop: "Đông",
@@ -20,10 +20,10 @@ const dong = (p: Partial<MaterialImportItem> & Pick<MaterialImportItem, "id">): 
 describe("summarizeImportsByDay", () => {
   it("đếm chuyến (theo shipmentId) và cộng kg từng ngày", () => {
     const r = summarizeImportsByDay([
-      dong({ id: "1", shipmentId: "s1" }),
-      dong({ id: "2", shipmentId: "s1", quantityKg: 50 }),
-      dong({ id: "3", shipmentId: "s2" }),
-      dong({ id: "4", shipmentId: "s3", deliveryDate: "2026-09-03", quantityKg: 30 }),
+      row({ id: "1", shipmentId: "s1" }),
+      row({ id: "2", shipmentId: "s1", quantityKg: 50 }),
+      row({ id: "3", shipmentId: "s2" }),
+      row({ id: "4", shipmentId: "s3", deliveryDate: "2026-09-03", quantityKg: 30 }),
     ]);
     expect(r.get("2026-09-02")).toEqual({ shipmentCount: 2, kg: 250 });
     expect(r.get("2026-09-03")).toEqual({ shipmentCount: 1, kg: 30 });
@@ -32,11 +32,11 @@ describe("summarizeImportsByDay", () => {
 
 describe("groupDailyShipments", () => {
   const imports = [
-    dong({ id: "1", shipmentId: "s1", supplierName: "Đại lý A", quantityKg: 100, licensePlate: "72C-123", driverName: "Hùng" }),
-    dong({ id: "2", shipmentId: "s1", supplierName: "Đại lý A", materialTypeName: "Bạch tuộc nhỏ", quantityKg: 40, unitPrice: 30000 }),
-    dong({ id: "3", shipmentId: "s2", supplierName: "Đại lý A", quantityKg: 60 }),
-    dong({ id: "4", shipmentId: "s3", supplierName: "Đại lý B", quantityKg: 500, unitPrice: null }),
-    dong({ id: "5", shipmentId: "s4", supplierName: "Đại lý A", deliveryDate: "2026-09-03" }),
+    row({ id: "1", shipmentId: "s1", supplierName: "Đại lý A", quantityKg: 100, licensePlate: "72C-123", driverName: "Hùng" }),
+    row({ id: "2", shipmentId: "s1", supplierName: "Đại lý A", materialTypeName: "Bạch tuộc nhỏ", quantityKg: 40, unitPrice: 30000 }),
+    row({ id: "3", shipmentId: "s2", supplierName: "Đại lý A", quantityKg: 60 }),
+    row({ id: "4", shipmentId: "s3", supplierName: "Đại lý B", quantityKg: 500, unitPrice: null }),
+    row({ id: "5", shipmentId: "s4", supplierName: "Đại lý A", deliveryDate: "2026-09-03" }),
   ];
 
   it("gom đại lý → chuyến → dòng của đúng ngày, đại lý nhiều kg trước", () => {
@@ -57,7 +57,7 @@ describe("groupDailyShipments", () => {
 
   it("dòng cũ không có chuyến: mỗi dòng là một chuyến; đại lý trống có nhãn riêng", () => {
     const r = groupDailyShipments(
-      [dong({ id: "x" }), dong({ id: "y", supplierName: " " })],
+      [row({ id: "x" }), row({ id: "y", supplierName: " " })],
       "2026-09-02"
     );
     expect(r.map((d) => d.supplier).sort()).toEqual(["(chưa ghi đại lý)", "Đại lý A"]);
@@ -72,10 +72,10 @@ describe("groupDailyShipments", () => {
 describe("groupImportsBySupplier", () => {
   it("gom theo đại lý, kg theo ngày, tổng các đại lý = tổng dòng cha", () => {
     const imports = [
-      dong({ id: "1", shipmentId: "s1", supplierName: "A", quantityKg: 100 }),
-      dong({ id: "2", shipmentId: "s1", supplierName: "A", quantityKg: 40, unitPrice: 30000 }),
-      dong({ id: "3", shipmentId: "s2", supplierName: "A", quantityKg: 60, deliveryDate: "2026-09-03" }),
-      dong({ id: "4", shipmentId: "s3", supplierName: "B", quantityKg: 500, unitPrice: null }),
+      row({ id: "1", shipmentId: "s1", supplierName: "A", quantityKg: 100 }),
+      row({ id: "2", shipmentId: "s1", supplierName: "A", quantityKg: 40, unitPrice: 30000 }),
+      row({ id: "3", shipmentId: "s2", supplierName: "A", quantityKg: 60, deliveryDate: "2026-09-03" }),
+      row({ id: "4", shipmentId: "s3", supplierName: "B", quantityKg: 500, unitPrice: null }),
     ];
     const r = groupImportsBySupplier(imports);
     expect(r.map((d) => [d.supplier, d.kg, d.dailyAmounts, d.ids])).toEqual([
@@ -90,10 +90,10 @@ describe("groupImportsBySupplier", () => {
 describe("countDailyShipments", () => {
   it("đếm chuyến khác nhau trong ngày; dòng không chuyến tính riêng", () => {
     const imports = [
-      dong({ id: "1", shipmentId: "s1" }),
-      dong({ id: "2", shipmentId: "s1" }),
-      dong({ id: "3", shipmentId: "" }),
-      dong({ id: "4", shipmentId: "s2", deliveryDate: "2026-09-03" }),
+      row({ id: "1", shipmentId: "s1" }),
+      row({ id: "2", shipmentId: "s1" }),
+      row({ id: "3", shipmentId: "" }),
+      row({ id: "4", shipmentId: "s2", deliveryDate: "2026-09-03" }),
     ];
     expect(countDailyShipments(imports, "2026-09-02")).toBe(2);
     expect(countDailyShipments(imports, "2026-09-03")).toBe(1);

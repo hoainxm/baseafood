@@ -29,15 +29,15 @@ export interface PipelineStage {
 
 /* Liệt kê TRỌN tên lớp để Tailwind quét thấy. */
 const STAGE_TONES: Record<CategoryTone, { border: string; value: string }> = {
-  tim: { border: "border-l-tone-tim", value: "text-tone-tim" },
-  ngoc: { border: "border-l-tone-ngoc", value: "text-tone-ngoc" },
-  bien: { border: "border-l-tone-bien", value: "text-tone-bien" },
-  bang: { border: "border-l-tone-bang", value: "text-tone-bang" },
-  cat: { border: "border-l-tone-cat", value: "text-tone-cat" },
-  hong: { border: "border-l-tone-hong", value: "text-tone-hong" },
-  la: { border: "border-l-tone-la", value: "text-tone-la" },
-  cam: { border: "border-l-tone-cam", value: "text-tone-cam" },
-  xam: { border: "border-l-tone-xam", value: "text-tone-xam" },
+  purple: { border: "border-l-tone-purple", value: "text-tone-purple" },
+  teal: { border: "border-l-tone-teal", value: "text-tone-teal" },
+  blue: { border: "border-l-tone-blue", value: "text-tone-blue" },
+  cyan: { border: "border-l-tone-cyan", value: "text-tone-cyan" },
+  sand: { border: "border-l-tone-sand", value: "text-tone-sand" },
+  pink: { border: "border-l-tone-pink", value: "text-tone-pink" },
+  green: { border: "border-l-tone-green", value: "text-tone-green" },
+  orange: { border: "border-l-tone-orange", value: "text-tone-orange" },
+  gray: { border: "border-l-tone-gray", value: "text-tone-gray" },
 };
 
 export function PipelineStages({

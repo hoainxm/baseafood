@@ -14,7 +14,7 @@
 import { useMemo, useState, type ReactNode } from "react";
 import type { LotDispatch, LotDispatchDoc, LotInput, LotKind, Workshop } from "@/types";
 import { useAuth } from "@/lib/auth";
-import { kg as kgChu, formatDateVN } from "@/lib/format";
+import { kg as formatKg, formatDateVN } from "@/lib/format";
 import {
   TRACE_KIND_LABELS,
   buildLotStockIndex,
@@ -108,9 +108,9 @@ function LotInputDialog({
 
   /** Mã quét/gõ → lô. Trùng nhiều lô (tem cũ) ⇒ hiện danh sách cho chọn, KHÔNG tự chọn. */
   const handleCode = (text: string, method: "scan" | "typed") => {
-    const ma = parseQrCode(text);
-    if (!ma) return;
-    const result = findLots(ma, traceData);
+    const code = parseQrCode(text);
+    if (!code) return;
+    const result = findLots(code, traceData);
     if (!result.length) {
       notify.warning(`Không tìm thấy lô "${text}". Kiểm tra lại mã, hoặc chọn trong danh sách bên dưới.`);
       return;
@@ -133,10 +133,10 @@ function LotInputDialog({
         <div className="min-w-0">
           <div className="font-medium">{n.label}</div>
           <div className="text-muted-foreground">
-            {[n.description, n.date && formatDateVN(n.date), n.details.find((c) => c.label === "Đại lý")?.value, n.kg ? kgChu(n.kg) : ""]
+            {[n.description, n.date && formatDateVN(n.date), n.details.find((c) => c.label === "Đại lý")?.value, n.kg ? formatKg(n.kg) : ""]
               .filter(Boolean)
               .join(" · ")}
-            {lotStock != null ? ` · tồn kho ${kgChu(lotStock)}` : cb && cb.outputs.length > 0 ? ` · còn ${kgChu(cb.children)}` : ""}
+            {lotStock != null ? ` · tồn kho ${formatKg(lotStock)}` : cb && cb.outputs.length > 0 ? ` · còn ${formatKg(cb.remainingKg)}` : ""}
           </div>
         </div>
         {node}
@@ -145,7 +145,7 @@ function LotInputDialog({
   };
 
   return (
-    <FormDialog open onOpenChange={(o) => !o && onClose()} icon={Link2} title={title} description={description} size="rong" footer={<CloseButton />}>
+    <FormDialog open onOpenChange={(o) => !o && onClose()} icon={Link2} title={title} description={description} size="lg" footer={<CloseButton />}>
       <div className="space-y-5">
         <section className="space-y-2">
           <h3 className="font-semibold">Đã gắn ({linkedInputs.length})</h3>
@@ -154,9 +154,9 @@ function LotInputDialog({
               {linkedInputs.map((g) => (
                 <li key={g.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-2">
                   <div className="min-w-0">
-                    <span className="font-medium">{g.label}</span> <Tag variant="nguon">{METHOD_NAMES[g.method]}</Tag>
+                    <span className="font-medium">{g.label}</span> <Tag variant="source">{METHOD_NAMES[g.method]}</Tag>
                     <div className="text-muted-foreground">
-                      {[g.description, g.kg != null ? kgChu(g.kg) : "chưa ghi kg", g.operator].filter(Boolean).join(" · ")}
+                      {[g.description, g.kg != null ? formatKg(g.kg) : "chưa ghi kg", g.operator].filter(Boolean).join(" · ")}
                     </div>
                   </div>
                   <Button variant="outline" size="sm" title={`Bỏ lô ${g.label}. Còn nút Hoàn tác.`} onClick={() => onRemove(g.id)}>
@@ -269,7 +269,7 @@ export function LotInputPicker({
   productId?: string;
   onClose: () => void;
 }) {
-  const { dl, lotInputs, luuLotInputs: saveLotInputs } = useTraceData();
+  const { traceData, lotInputs, saveLotInputs } = useTraceData();
   const recordedBy = useRecorder();
   const inputKind: "S" | "W" = outputKind === "W" ? "S" : "W";
   const inputLabel = outputKind === "W" ? "lô nguyên liệu" : "lô bán thành phẩm";
@@ -280,10 +280,10 @@ export function LotInputPicker({
   );
   const candidates = useMemo(
     () =>
-      (outputKind === "W" ? listSelectableMaterialLots(dl, workshop, date) : listSelectableWipLots(dl, workshop, date, 120, productId)).filter(
+      (outputKind === "W" ? listSelectableMaterialLots(traceData, workshop, date) : listSelectableWipLots(traceData, workshop, date, 120, productId)).filter(
         (n) => !assigned.some((l) => l.inputId === n.id)
       ),
-    [dl, outputKind, workshop, date, productId, assigned]
+    [traceData, outputKind, workshop, date, productId, assigned]
   );
 
   return (
@@ -292,14 +292,14 @@ export function LotInputPicker({
       description={`Ghi ${outputKind === "W" ? "mẻ sản xuất này" : "phiếu đóng gói này"} đã dùng ${inputLabel} nào. Quét tem, gõ mã, hoặc chọn trong danh sách. Số kg có thể để trống nếu chưa cân.`}
       inputKind={inputKind}
       inputLabel={inputLabel}
-      traceData={dl}
+      traceData={traceData}
       linkedInputs={assigned.map((l) => ({ id: l.id, label: l.inputLabel, description: l.material, kg: l.quantityKg, method: l.method, operator: l.operator }))}
       candidates={candidates}
       candidatesTitle={`Hoặc chọn ${inputLabel} — xưởng ${workshop}`}
       validateNode={(n) => {
         if (assigned.some((l) => l.inputId === n.id)) return `Lô ${n.label} đã gắn rồi.`;
         if (outputKind === "P" && productId) {
-          const w = dl.wips.find((x) => x.id === n.id);
+          const w = traceData.wips.find((x) => x.id === n.id);
           if (w && w.productId !== productId)
             return `Lô ${n.label} là "${n.description}", khác mặt hàng BTP của phiếu. Đổi mặt hàng BTP tiêu hao của phiếu trước, hoặc chọn đúng lô.`;
         }
@@ -320,7 +320,7 @@ export function LotInputPicker({
           recordedAt: new Date().toISOString(),
         };
         saveLotInputs([...lotInputs, created]);
-        notify.saved(`Đã gắn ${inputLabel} ${node.label}${kg != null ? ` · ${kgChu(kg)}` : ""}.`);
+        notify.saved(`Đã gắn ${inputLabel} ${node.label}${kg != null ? ` · ${formatKg(kg)}` : ""}.`);
       }}
       onRemove={(id) => {
         const prevRows = lotInputs;
@@ -358,7 +358,7 @@ export function LotDispatchPicker({
   productId?: string;
   onClose: () => void;
 }) {
-  const { dl, lotDispatches, luuLotDispatches: saveLotDispatches } = useTraceData();
+  const { traceData, lotDispatches, saveLotDispatches } = useTraceData();
   const recordedBy = useRecorder();
   const inputLabel = lotKind === "S" ? "lô nguyên liệu" : lotKind === "W" ? "lô bán thành phẩm" : "lô thành phẩm";
 
@@ -367,21 +367,21 @@ export function LotDispatchPicker({
     [lotDispatches, docKind, docId]
   );
   const productOf = (n: LotNode) =>
-    n.kind === "W" ? dl.wips.find((w) => w.id === n.id)?.productId : n.kind === "P" ? dl.packagings.find((p) => p.id === n.id)?.toProductId : undefined;
+    n.kind === "W" ? traceData.wips.find((w) => w.id === n.id)?.productId : n.kind === "P" ? traceData.packagings.find((p) => p.id === n.id)?.toProductId : undefined;
 
   /** Gợi ý: lô cùng mặt hàng còn tồn, lô cũ trước (FIFO). NL: như khi gắn cho mẻ SX. */
   const candidates = useMemo(() => {
     const isUnassigned = (n: LotNode) => !assigned.some((d) => d.lotId === n.id);
-    if (lotKind === "S") return listSelectableMaterialLots(dl, workshop, date).filter(isUnassigned);
-    const lotStockTable = buildLotStockIndex(dl); // một lượt cho mọi lô ứng viên
+    if (lotKind === "S") return listSelectableMaterialLots(traceData, workshop, date).filter(isUnassigned);
+    const lotStockTable = buildLotStockIndex(traceData); // một lượt cho mọi lô ứng viên
     const items =
       lotKind === "W"
-        ? dl.wips.filter((w) => w.status === "stocked" && (!productId || w.productId === productId)).map((w) => buildLotNode("W", w.id, dl))
-        : dl.packagings.filter((p) => !productId || p.toProductId === productId).map((p) => buildLotNode("P", p.id, dl));
+        ? traceData.wips.filter((w) => w.status === "stocked" && (!productId || w.productId === productId)).map((w) => buildLotNode("W", w.id, traceData))
+        : traceData.packagings.filter((p) => !productId || p.toProductId === productId).map((p) => buildLotNode("P", p.id, traceData));
     return items
-      .filter((n) => isUnassigned(n) && (getLotStockKg(n.kind, n.id, dl, lotStockTable) ?? 0) > 0)
+      .filter((n) => isUnassigned(n) && (getLotStockKg(n.kind, n.id, traceData, lotStockTable) ?? 0) > 0)
       .sort((a, b) => a.date.localeCompare(b.date));
-  }, [dl, lotKind, workshop, date, productId, assigned]);
+  }, [traceData, lotKind, workshop, date, productId, assigned]);
 
   return (
     <LotInputDialog
@@ -389,7 +389,7 @@ export function LotDispatchPicker({
       description="Ghi hàng này lấy từ lô nào để truy xuất tới được khách. Quét tem trên thùng, gõ mã, hoặc chọn lô còn tồn. Số kg có thể để trống nếu chưa cân."
       inputKind={lotKind}
       inputLabel={inputLabel}
-      traceData={dl}
+      traceData={traceData}
       linkedInputs={assigned.map((d) => ({ id: d.id, label: d.lotLabel, description: "", kg: d.quantityKg, method: d.method, operator: d.operator }))}
       candidates={candidates}
       candidatesTitle={lotKind === "S" ? `Hoặc chọn lô NL — xưởng ${workshop}` : "Hoặc chọn lô còn tồn — cũ trước"}
@@ -413,7 +413,7 @@ export function LotDispatchPicker({
           recordedAt: new Date().toISOString(),
         };
         saveLotDispatches([...lotDispatches, created]);
-        notify.saved(`Đã gắn ${inputLabel} ${node.label}${kg != null ? ` · ${kgChu(kg)}` : ""}.`);
+        notify.saved(`Đã gắn ${inputLabel} ${node.label}${kg != null ? ` · ${formatKg(kg)}` : ""}.`);
       }}
       onRemove={(id) => {
         const prevRows = lotDispatches;

@@ -156,18 +156,18 @@ function parseSheet(sheetName: string, rows: unknown[][], findBlockStart: FindBl
     if (isTotalRow(a)) {
       // dòng "TỔNG …" — kiểm TRƯỚC khi dò mục (chứa "NHẬP KHẨU")
       if (category && !isSectionTotal(a)) {
-        const ten = collapseSpaces(a.replace(/^(TỔNG|CỘNG|TONG|CONG)\s*/i, ""));
-        const dau = findBlockStart(i);
-        if (ten && dau != null) {
-          const subgroup = `${category} – ${ten}`;
-          for (let k = sectionStart; k < out.length; k++) if (out[k].rowIndex >= dau && out[k].rowIndex < i) out[k].category = subgroup;
+        const name = collapseSpaces(a.replace(/^(TỔNG|CỘNG|TONG|CONG)\s*/i, ""));
+        const blockStart = findBlockStart(i);
+        if (name && blockStart != null) {
+          const subgroup = `${category} – ${name}`;
+          for (let k = sectionStart; k < out.length; k++) if (out[k].rowIndex >= blockStart && out[k].rowIndex < i) out[k].category = subgroup;
         }
       }
       continue;
     }
-    const nhom = groupFromSection(a, b);
-    if (nhom) {
-      category = nhom;
+    const group = groupFromSection(a, b);
+    if (group) {
+      category = group;
       sectionStart = out.length;
       continue;
     }
@@ -217,11 +217,11 @@ function unmergeCells(ws: XLSX.WorkSheet) {
   };
   for (const m of ws["!merges"] ?? []) {
     if (m.s.c !== m.e.c || m.s.c > 5 || m.e.r <= m.s.r) continue;
-    const dau = ws[XLSX.utils.encode_cell(m.s)] as XLSX.CellObject | undefined;
-    if (!dau || dau.v == null || dau.v === "") continue;
+    const blockStart = ws[XLSX.utils.encode_cell(m.s)] as XLSX.CellObject | undefined;
+    if (!blockStart || blockStart.v == null || blockStart.v === "") continue;
     for (let r = m.s.r + 1; r <= m.e.r; r++) {
       const dc = XLSX.utils.encode_cell({ r, c: m.s.c });
-      if (!ws[dc] && hasData(r)) ws[dc] = { ...dau };
+      if (!ws[dc] && hasData(r)) ws[dc] = { ...blockStart };
     }
   }
 }
@@ -239,16 +239,16 @@ export async function parseStockStatementFile(file: File): Promise<StockStatemen
     // blankrows:false giữ chỉ số `rowIndex` cũ (nằm trong id nạp — KHÔNG được đổi); bản đủ dòng
     // chỉ để dịch chỉ số ⇄ số dòng Excel khi đọc công thức SUM của dòng cộng khối con.
     const rows = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, raw: true, blankrows: false });
-    const du = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, raw: true, blankrows: true });
+    const rawRows = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, raw: true, blankrows: true });
     const r0 = ws["!ref"] ? XLSX.utils.decode_range(ws["!ref"]).s.r : 0;
-    const dongExcel: number[] = []; // chỉ số trong `rows` → dòng Excel 0-based
+    const excelRows: number[] = []; // chỉ số trong `rows` → dòng Excel 0-based
     // Phải là ĐÚNG điều kiện giữ dòng của SheetJS blankrows:false (ô có v != null — ô chuỗi
     // rỗng "" vẫn tính là có), không thì chỉ số lệch và dòng cộng khối con đọc SUM sai dòng.
-    du.forEach((row, k) => {
-      if (row.some((v) => v != null)) dongExcel.push(k + r0);
+    rawRows.forEach((row, k) => {
+      if (row.some((v) => v != null)) excelRows.push(k + r0);
     });
     const findBlockStart: FindBlockStart = (i) => {
-      const r = dongExcel[i];
+      const r = excelRows[i];
       if (r == null) return null;
       let min = Infinity;
       for (let c = 6; c <= 16; c++) {
@@ -256,7 +256,7 @@ export async function parseStockStatementFile(file: File): Promise<StockStatemen
         for (const m of f?.matchAll(/[A-Z]+\$?(\d+)\s*:/g) ?? []) min = Math.min(min, Number(m[1]) - 1);
       }
       if (!Number.isFinite(min)) return null;
-      const idx = dongExcel.findIndex((x) => x >= min);
+      const idx = excelRows.findIndex((x) => x >= min);
       return idx === -1 ? null : idx;
     };
     const parsed = parseSheet(name, rows, findBlockStart);
@@ -288,10 +288,10 @@ export function findWarehouseByText(warehouseText: string, catalog: { code: stri
   const k = toWarehouseKey(warehouseText);
   if (!k) return null;
   for (const d of catalog) {
-    const ma = toWarehouseKey(d.code);
-    const ten = toWarehouseKey(d.name);
-    if (ma && (ma === k || ma === `K${k}`)) return d.name;
-    if (ten === k || ten === `KHO${k}`) return d.name;
+    const code = toWarehouseKey(d.code);
+    const name = toWarehouseKey(d.name);
+    if (code && (code === k || code === `K${k}`)) return d.name;
+    if (name === k || name === `KHO${k}`) return d.name;
   }
   return null;
 }
@@ -315,8 +315,8 @@ export function parseYearFromFileName(fileName: string): number {
  * tháng (không phải tên sheet) ⇒ đổi tên sheet "8" → "T8"/"08" rồi nạp lại vẫn ra đúng id
  * cũ, không đẻ bản sao. Sổ thật nạp từ sheet tên "1".."8" ⇒ id cũ giữ nguyên.
  */
-export const idDongNap = (warehouseCode: string, monthNum: number, nam: number, rowIndex: number) =>
-  `xlsx|${warehouseCode}|${monthNum}|${nam}|${rowIndex}`;
+export const loadedRowId = (warehouseCode: string, monthNum: number, year: number, rowIndex: number) =>
+  `xlsx|${warehouseCode}|${monthNum}|${year}|${rowIndex}`;
 
 /** Tách id dòng nạp (dạng mới lẫn cũ `xlsx|<kho>|<tên sheet>|<năm>|<rowIndex>`); không phải ⇒ null. */
 export function parseLoadedRowId(id: string): { warehouseCode: string; year: string; rowIndex: string } | null {
@@ -347,7 +347,7 @@ export interface ReloadMergeResult {
  * cũ theo tên sheet) cùng kho · THÁNG (`period` của dòng) · rowIndex. Dọn dòng cũ theo
  * `period` của dòng chứ không theo tiền tố id ⇒ đổi tên sheet không làm tháng nhân đôi.
  */
-export function ghepNapLai(lines: MonthlyStockLine[], incoming: MonthlyStockLine[], warehouseCode: string): ReloadMergeResult {
+export function mergeReload(lines: MonthlyStockLine[], incoming: MonthlyStockLine[], warehouseCode: string): ReloadMergeResult {
   const newIds = new Set(incoming.map((m) => m.id));
   const month = new Set(incoming.map((m) => m.period));
   const positionKey = (period: string, rowIndex: string) => `${period}|${rowIndex}`;
@@ -359,13 +359,13 @@ export function ghepNapLai(lines: MonthlyStockLine[], incoming: MonthlyStockLine
     theoId.set(l.id, l);
     if (!newIds.has(l.id)) byLocation.set(positionKey(l.period, t.rowIndex), l);
   }
-  const idThay = new Set<string>();
+  const replacedIds = new Set<string>();
   const nameMismatches: ReloadMergeResult["nameMismatches"] = [];
-  const daGhep = incoming.map((m) => {
+  const merged = incoming.map((m) => {
     const t = parseLoadedRowId(m.id);
     const prev = theoId.get(m.id) ?? (t ? byLocation.get(positionKey(m.period, t.rowIndex)) : undefined);
     if (!prev) return m;
-    if (prev.id !== m.id) idThay.add(prev.id);
+    if (prev.id !== m.id) replacedIds.add(prev.id);
     if (normalizeName(prev.itemName) !== normalizeName(m.itemName)) {
       nameMismatches.push({ previous: prev, next: m });
       return m;
@@ -379,7 +379,7 @@ export function ghepNapLai(lines: MonthlyStockLine[], incoming: MonthlyStockLine
   const staleNonEmpty: MonthlyStockLine[] = [];
   let emptyDropped = 0;
   const kept = lines.filter((l) => {
-    if (newIds.has(l.id) || idThay.has(l.id)) return false;
+    if (newIds.has(l.id) || replacedIds.has(l.id)) return false;
     if (!theoId.has(l.id)) return true; // ngoài phạm vi bản nạp (kho / tháng khác, dòng tay, carry…)
     if (isEmptyLine(l)) {
       emptyDropped++;
@@ -388,9 +388,9 @@ export function ghepNapLai(lines: MonthlyStockLine[], incoming: MonthlyStockLine
     staleNonEmpty.push(l);
     return true;
   });
-  const idNap = new Set([...newIds, ...idThay]);
+  const loadedIds = new Set([...newIds, ...replacedIds]);
   const splitCount = kept.filter((l) =>
-    [...(l.note ?? "").matchAll(/\(tách từ dòng ([^)]+)\)/g)].some((m) => idNap.has(m[1]))
+    [...(l.note ?? "").matchAll(/\(tách từ dòng ([^)]+)\)/g)].some((m) => loadedIds.has(m[1]))
   ).length;
-  return { lines: [...kept, ...daGhep], staleWithData: staleNonEmpty, droppedEmpty: emptyDropped, replacedOldIds: idThay.size, nameMismatches, splitCount };
+  return { lines: [...kept, ...merged], staleWithData: staleNonEmpty, droppedEmpty: emptyDropped, replacedOldIds: replacedIds.size, nameMismatches, splitCount };
 }

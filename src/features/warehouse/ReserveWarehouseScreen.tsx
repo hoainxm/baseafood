@@ -57,8 +57,8 @@ interface ApprovalForm {
 }
 
 export default function ReserveWarehouseScreen() {
-  const [wips, persistWips, { trangThai: status }] = useWipProductions();
-  const isLoading = status === "dang-tai" && wips.length === 0;
+  const [wips, persistWips, { status }] = useWipProductions();
+  const isLoading = status === "loading" && wips.length === 0;
   const [exportItems] = useExportItems();
   const [products] = useProducts();
   const [salesItems] = useSalesItems();
@@ -73,7 +73,7 @@ export default function ReserveWarehouseScreen() {
 
   const [warehouseFilter, setWarehouseFilter] = useState("");
   const [approval, setApproval] = useState<ApprovalForm | null>(null);
-  const [loi, setLoi] = useState<FieldError[]>([]);
+  const [errors, setErrors] = useState<FieldError[]>([]);
   const [isScanning, setIsScanning] = useState(false);
   const [typedCode, setTypedCode] = useState("");
 
@@ -109,7 +109,7 @@ export default function ReserveWarehouseScreen() {
     [lotStock, warehouseFilter]
   );
   const totalStock = filteredStock.reduce((s, t) => s + t.remainingKg, 0);
-  const nhomTuoi = useMemo(() => bucketStockByAge(filteredStock, todayIso()), [filteredStock]);
+  const ageBuckets = useMemo(() => bucketStockByAge(filteredStock, todayIso()), [filteredStock]);
 
   const openApprove = (s: WipProductionItem) => {
     setApproval({
@@ -119,7 +119,7 @@ export default function ReserveWarehouseScreen() {
       actualBlocks: s.blocksCount,
       note: "",
     });
-    setLoi([]);
+    setErrors([]);
   };
 
   /**
@@ -127,9 +127,9 @@ export default function ReserveWarehouseScreen() {
    * Thủ kho cầm block nào quét block đó — khỏi dò danh sách, khỏi duyệt nhầm mẻ.
    */
   const approveByLabel = (text: string) => {
-    const ma = parseQrCode(text);
-    if (!ma) return;
-    const items = findLots(ma, {
+    const code = parseQrCode(text);
+    if (!code) return;
+    const items = findLots(code, {
       shipments: [], imports: [], wips, packagings: [], lotInputs: [],
       exportItems: [], exportOrders: [], salesOrders: [], products, customers: [],
     }).filter((n) => n.kind === "W");
@@ -169,7 +169,7 @@ export default function ReserveWarehouseScreen() {
     if (!approval.warehouse.trim()) ls.push({ field: "Kho", message: "Chưa chọn kho" });
     if (!(approval.actualKg > 0))
       ls.push({ field: "Lượng thực", message: "Phải lớn hơn 0 kg" });
-    setLoi(ls);
+    setErrors(ls);
     if (ls.length > 0) return;
     const original = wips.find((s) => s.id === approval.wipId);
     const diff = original ? approval.actualKg - original.quantityKg : 0;
@@ -202,7 +202,7 @@ export default function ReserveWarehouseScreen() {
       render: (r) => productNameOf(r.productId),
       getSortValue: (r) => productNameOf(r.productId),
     },
-    { key: "kho", header: "Kho", render: (r) => <Tag variant="phan-loai" tone={toneByName(r.warehouse)}>{r.warehouse || "—"}</Tag>, getSortValue: (r) => r.warehouse },
+    { key: "kho", header: "Kho", render: (r) => <Tag variant="category" tone={toneByName(r.warehouse)}>{r.warehouse || "—"}</Tag>, getSortValue: (r) => r.warehouse },
     {
       key: "lo",
       header: "Lô (ngày SX)",
@@ -235,8 +235,8 @@ export default function ReserveWarehouseScreen() {
       <StatCardGrid
         className="grid-cols-2 lg:grid-cols-4"
         cards={[
-          { label: "Đang xem", value: "Tồn hiện tại", icon: CalendarRange, color: "trung-tinh" },
-          { label: "Chờ nhập", value: pendingIntake.length, numeric: true, icon: Warehouse, color: "trung-tinh" },
+          { label: "Đang xem", value: "Tồn hiện tại", icon: CalendarRange, color: "neutral" },
+          { label: "Chờ nhập", value: pendingIntake.length, numeric: true, icon: Warehouse, color: "neutral" },
           { label: "Số lô hàng", value: filteredStock.length, numeric: true, icon: ClipboardList, color: "brand" },
           { label: "Tổng tồn", value: kg(totalStock), numeric: true, icon: Scale, color: "success" },
         ]}
@@ -264,12 +264,12 @@ export default function ReserveWarehouseScreen() {
           </p>
           <ProportionBar
             description="Tồn kho chia theo số ngày nằm kho"
-            segments={nhomTuoi.map((g) => ({
+            segments={ageBuckets.map((g) => ({
               id: g.key,
               label: g.label,
               description: `${num(g.lotCount)} lô`,
               value: g.kg,
-              tone: ({ "duoi-30": "la", "30-60": "cat", "60-90": "cam", "tren-90": "hong" } as const)[g.key],
+              tone: ({ "under-30": "green", "30-60": "sand", "60-90": "orange", "over-90": "pink" } as const)[g.key],
             }))}
           />
         </section>
@@ -299,10 +299,10 @@ export default function ReserveWarehouseScreen() {
                 {/* flex-wrap: thẻ hẹp thì nhãn xưởng xuống dòng thay vì bị ép cắt chữ. */}
                 <div className="flex flex-wrap items-center justify-between gap-1">
                   <span className="min-w-0 font-semibold text-sm text-foreground">{item.warehouse.name}</span>
-                  {item.warehouse.type === "xi-nghiep" ? (
-                    <Tag variant="phan-loai" tone={toneByName("Kho lớn")}>Kho lớn</Tag>
+                  {item.warehouse.type === "plant" ? (
+                    <Tag variant="category" tone={toneByName("Kho lớn")}>Kho lớn</Tag>
                   ) : (
-                    <Tag variant="phan-loai" tone={toneForWorkshop(item.warehouse.workshop)}>
+                    <Tag variant="category" tone={toneForWorkshop(item.warehouse.workshop)}>
                       {`Xưởng ${item.warehouse.workshop}`}
                     </Tag>
                   )}
@@ -449,7 +449,7 @@ export default function ReserveWarehouseScreen() {
           </DialogHeader>
           {approval && (
             <div className="space-y-6 py-2">
-              <ErrorSummary errors={loi} />
+              <ErrorSummary errors={errors} />
               <RequiredLegend />
               <Combobox
                 label="Kho (phòng đông)"

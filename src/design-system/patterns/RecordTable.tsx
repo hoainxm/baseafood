@@ -33,7 +33,7 @@ export interface RecordTableColumn<T> {
   getSortValue?: (row: T) => string | number;
 }
 
-type SortDir = "tang" | "giam";
+type SortDir = "asc" | "desc";
 
 /**
  * RecordTable — một nguồn dữ liệu, hai hình thức.
@@ -94,7 +94,7 @@ export function RecordTable<T>({
   );
   const [q, setQ] = React.useState("");
   const [sapTheo, setSapTheo] = React.useState<string | null>(null);
-  const [sortDir, setSortDir] = React.useState<SortDir>("tang");
+  const [sortDir, setSortDir] = React.useState<SortDir>("asc");
   const [expandedRows, setExpandedRows] = React.useState<ReadonlySet<string>>(() => new Set());
   const toggleExpanded = (k: string) =>
     setExpandedRows((s) => {
@@ -120,22 +120,22 @@ export function RecordTable<T>({
     if (!column?.getSortValue) return filtered;
     const fn = column.getSortValue;
     return [...filtered].sort((a, b) => {
-      const va = fn(a);
+      const patch = fn(a);
       const vb = fn(b);
       const cmp =
-        typeof va === "number" && typeof vb === "number"
-          ? va - vb
-          : String(va).localeCompare(String(vb), "vi");
-      return sortDir === "tang" ? cmp : -cmp;
+        typeof patch === "number" && typeof vb === "number"
+          ? patch - vb
+          : String(patch).localeCompare(String(vb), "vi");
+      return sortDir === "asc" ? cmp : -cmp;
     });
   }, [filtered, columns, sapTheo, sortDir]);
 
-  const doiSap = (key: string) => {
+  const toggleSort = (key: string) => {
     if (sapTheo === key) {
-      setSortDir((h) => (h === "tang" ? "giam" : "tang"));
+      setSortDir((h) => (h === "asc" ? "desc" : "asc"));
     } else {
       setSapTheo(key);
-      setSortDir("tang");
+      setSortDir("asc");
     }
   };
 
@@ -165,13 +165,13 @@ export function RecordTable<T>({
               key={c.key}
               variant={sapTheo === c.key ? "default" : "outline"}
               size="sm"
-              onClick={() => doiSap(c.key)}
+              onClick={() => toggleSort(c.key)}
               className="max-w-full min-w-0"
               title={`Sắp danh sách theo cột "${c.header}". Bấm lại để đảo tăng ↔ giảm.`}
             >
               <span className="truncate">{c.header}</span>
               {sapTheo === c.key ? (
-                sortDir === "tang" ? (
+                sortDir === "asc" ? (
                   <ArrowUp />
                 ) : (
                   <ArrowDown />
@@ -223,7 +223,7 @@ export function RecordTable<T>({
     return typeof v === "string" || typeof v === "number" ? String(v) : getKey(r);
   };
   const visibleKeys = daSap.map((r) => getKey(r));
-  const daTick = visibleKeys.filter((k) => rowSelection.daChon.has(k));
+  const daTick = visibleKeys.filter((k) => rowSelection.selected.has(k));
   const isAllSelected = daTick.length > 0 && daTick.length === visibleKeys.length;
   const oTick = (r: T) => {
     const k = getKey(r);
@@ -231,9 +231,9 @@ export function RecordTable<T>({
       <input
         type="checkbox"
         className="mt-0.5 size-5 shrink-0"
-        checked={rowSelection.daChon.has(k)}
+        checked={rowSelection.selected.has(k)}
         onChange={() => {}}
-        onClick={(e) => rowSelection.doi(k, e.shiftKey, visibleKeys)}
+        onClick={(e) => rowSelection.toggle(k, e.shiftKey, visibleKeys)}
         aria-label={`Chọn dòng ${rowLabel(r)}`}
         title="Tick để tô màu / in đậm dòng này (Shift+tick chọn cả khoảng)."
       />
@@ -302,7 +302,7 @@ export function RecordTable<T>({
                       className={cn(c.numeric && "text-right", "p-0 whitespace-normal")}
                       aria-sort={
                         sapTheo === c.key
-                          ? sortDir === "tang"
+                          ? sortDir === "asc"
                             ? "ascending"
                             : "descending"
                           : undefined
@@ -314,7 +314,7 @@ export function RecordTable<T>({
                           type="checkbox"
                           className="ml-(--cell-pad,0.75rem) size-5 shrink-0"
                           checked={isAllSelected}
-                          onChange={() => rowSelection.doiTatCa(visibleKeys, !isAllSelected)}
+                          onChange={() => rowSelection.toggleAll(visibleKeys, !isAllSelected)}
                           aria-label={isAllSelected ? "Bỏ chọn tất cả dòng" : "Chọn tất cả dòng"}
                           title={isAllSelected ? "Bỏ tick mọi dòng đang hiện." : "Tick mọi dòng đang hiện (để tô màu / in đậm cùng lúc)."}
                         />
@@ -322,7 +322,7 @@ export function RecordTable<T>({
                       {c.getSortValue ? (
                         <button
                           type="button"
-                          onClick={() => doiSap(c.key)}
+                          onClick={() => toggleSort(c.key)}
                           title={`Sắp danh sách theo cột "${c.header}". Bấm lại để đảo tăng ↔ giảm.`}
                           className={cn(
                             "flex min-h-11 w-full items-center gap-2 px-(--cell-pad,0.75rem) py-1.5 text-left text-sm leading-snug font-semibold hover:bg-accent",
@@ -331,7 +331,7 @@ export function RecordTable<T>({
                         >
                           {c.header}
                           {sapTheo === c.key ? (
-                            sortDir === "tang" ? (
+                            sortDir === "asc" ? (
                               <ArrowUp className="size-5 shrink-0 text-primary" />
                             ) : (
                               <ArrowDown className="size-5 shrink-0 text-primary" />
@@ -466,7 +466,7 @@ export function RecordTable<T>({
               );
             })}
           </ul>
-          <RowMarkToolbar marker={to} selectedKeys={daTick} onClearSelection={rowSelection.boChon} />
+          <RowMarkToolbar marker={to} selectedKeys={daTick} onClearSelection={rowSelection.clearSelection} />
         </>
       )}
     </div>

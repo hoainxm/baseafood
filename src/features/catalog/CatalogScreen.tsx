@@ -12,7 +12,7 @@ import {
   TabsTrigger,
 } from "@/design-system";
 import { useCatalogConfigs, type CatalogConfig } from "./catalogConfig";
-import ThanhPham141 from "./FinishedGoodScreen";
+import FinishedGoodScreen from "./FinishedGoodScreen";
 import { normalizeCatalogTab } from "@/lib/legacyUrls";
 
 
@@ -65,31 +65,31 @@ export default function CatalogScreen() {
         </TabsList>
 
         <TabsContent value="products" className="pt-6">
-          <CatalogCrudFor cfg={c.matHang} rowMarkKey="danh-muc-mat-hang" />
+          <CatalogCrudFor cfg={c.product} rowMarkKey="danh-muc-mat-hang" />
         </TabsContent>
 
         <TabsContent value="customers" className="pt-6">
-          <CatalogCrudFor cfg={c.khachHang} rowMarkKey="danh-muc-khach-hang" />
+          <CatalogCrudFor cfg={c.customer} rowMarkKey="danh-muc-khach-hang" />
         </TabsContent>
 
         <TabsContent value="suppliers" className="pt-6">
-          <CatalogCrudFor cfg={c.daiLy} rowMarkKey="danh-muc-dai-ly" />
+          <CatalogCrudFor cfg={c.supplier} rowMarkKey="danh-muc-dai-ly" />
         </TabsContent>
 
         <TabsContent value="material-types" className="pt-6">
-          <CatalogCrudFor cfg={c.loaiNL} rowMarkKey="danh-muc-loai-nl" />
+          <CatalogCrudFor cfg={c.materialType} rowMarkKey="danh-muc-loai-nl" />
         </TabsContent>
 
         <TabsContent value="batters" className="pt-6">
-          <CatalogCrudFor cfg={c.botTam} rowMarkKey="danh-muc-bot-tam" />
+          <CatalogCrudFor cfg={c.batter} rowMarkKey="danh-muc-bot-tam" />
         </TabsContent>
 
         <TabsContent value="storage-locations" className="pt-6">
-          <CatalogCrudFor cfg={c.khoLuu} rowMarkKey="danh-muc-kho-luu" />
+          <CatalogCrudFor cfg={c.storageLocation} rowMarkKey="danh-muc-kho-luu" />
         </TabsContent>
 
         <TabsContent value="finished-goods" className="pt-6">
-          <ThanhPham141 />
+          <FinishedGoodScreen />
         </TabsContent>
       </Tabs>
     </div>

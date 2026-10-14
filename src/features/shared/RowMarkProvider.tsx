@@ -12,7 +12,7 @@ const EMPTY_MARKS: ReadonlyMap<string, MarkStyle> = new Map();
 
 /**
  * Gắn MỘT lần ở ShellLayout (App.tsx). Cả app dùng chung một instance
- * `useRowMarks()`: mỗi `useBang` giữ state riêng, nên nếu từng bảng tự gọi hook
+ * `useRowMarks()`: mỗi `useTable` giữ state riêng, nên nếu từng bảng tự gọi hook
  * thì bảng này ghi đè mất dấu bảng kia trong bản sao dưới máy.
  *
  * `nguoi` = username đang đăng nhập — ghi vào `marked_by` (ai tô).
@@ -27,16 +27,16 @@ export function RowMarkProvider({ username: user, children }: { username: string
   }, [marks]);
 
   const theoBang = useMemo(() => {
-    const ra = new Map<string, ReadonlyMap<string, MarkStyle>>();
-    for (const k of new Set(marks.map((m) => m.tableKey))) ra.set(k, getTableRowMarks(marks, k).row);
-    return ra;
+    const result = new Map<string, ReadonlyMap<string, MarkStyle>>();
+    for (const k of new Set(marks.map((m) => m.tableKey))) result.set(k, getTableRowMarks(marks, k).row);
+    return result;
   }, [marks]);
 
   const source = useMemo<RowMarkSource>(
     () => ({
       getTableMarks: (tableKey) => theoBang.get(tableKey) ?? EMPTY_MARKS,
-      setMarks: (tableKey, rowKeys, dau) => {
-        const next = setRowMarks(latest.current, tableKey, rowKeys, dau, user);
+      setMarks: (tableKey, rowKeys, mark) => {
+        const next = setRowMarks(latest.current, tableKey, rowKeys, mark, user);
         latest.current = next;
         write(next);
       },

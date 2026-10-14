@@ -19,11 +19,11 @@ import { ClipboardCheck, Link2, Printer, ScanLine, Search } from "lucide-react";
 
 /** Màn gốc của từng khâu + đơn vị đếm. */
 const STAGES: Record<TraceStageKey, { unit: string; man: { path: string; label: string }[] }> = {
-  nhap: { unit: "lô", man: [{ path: "/imports", label: "Nhập hàng" }] },
-  "san-xuat": { unit: "mẻ", man: [{ path: "/wip", label: "Sản xuất thành phẩm" }] },
-  kho: { unit: "mẻ", man: [{ path: "/warehouse", label: "Kho dự trữ" }] },
-  "dong-goi": { unit: "phiếu", man: [{ path: "/packaging", label: "Đóng gói" }] },
-  "xuat-ban": { unit: "dòng", man: [{ path: "/orders", label: "Đơn đặt" }, { path: "/sales", label: "Bán hàng" }] },
+  imports: { unit: "lô", man: [{ path: "/imports", label: "Nhập hàng" }] },
+  production: { unit: "mẻ", man: [{ path: "/wip", label: "Sản xuất thành phẩm" }] },
+  warehouse: { unit: "mẻ", man: [{ path: "/warehouse", label: "Kho dự trữ" }] },
+  packaging: { unit: "phiếu", man: [{ path: "/packaging", label: "Đóng gói" }] },
+  outbound: { unit: "dòng", man: [{ path: "/orders", label: "Đơn đặt" }, { path: "/sales", label: "Bán hàng" }] },
 };
 
 const describeNode = (n: LotNode) =>
@@ -43,7 +43,7 @@ function StageRow({ m, status, action: actions }: { m: TraceStageItem; status: R
     <li className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 border-b border-border py-2 last:border-b-0">
       <div className="min-w-0 flex-1 basis-64 space-y-1">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          <Tag variant="phan-loai" tone={toneByName(TRACE_KIND_LABELS[n.kind])}>{TRACE_KIND_LABELS[n.kind]}</Tag>
+          <Tag variant="category" tone={toneByName(TRACE_KIND_LABELS[n.kind])}>{TRACE_KIND_LABELS[n.kind]}</Tag>
           {isOutboundKind(n.kind) || n.isMissing ? (
             <span className="tnum font-medium">{n.label}</span>
           ) : (
@@ -65,26 +65,26 @@ function StageRow({ m, status, action: actions }: { m: TraceStageItem; status: R
 }
 
 const labelBadge = (m: TraceStageItem) =>
-  m.printedCount === undefined ? null : m.printedCount > 0 ? <Tag variant="xong">Đã in {m.printedCount} tem</Tag> : <Tag variant="cho">Chưa in tem</Tag>;
+  m.printedCount === undefined ? null : m.printedCount > 0 ? <Tag variant="done">Đã in {m.printedCount} tem</Tag> : <Tag variant="pending">Chưa in tem</Tag>;
 
-const lotBadge = (m: TraceStageItem, ten: string) =>
+const lotBadge = (m: TraceStageItem, name: string) =>
   (m.lotCount ?? 0) > 0 ? (
-    <Tag variant="xong">
-      {ten} ({m.lotCount})
+    <Tag variant="done">
+      {name} ({m.lotCount})
     </Tag>
   ) : m.reason ? (
-    <Tag variant="luu-y" title={`Lý do chưa gắn lô: ${m.reason}`}>
+    <Tag variant="warning" title={`Lý do chưa gắn lô: ${m.reason}`}>
       Chưa gắn lô · có lý do
     </Tag>
   ) : (
-    <Tag variant="loi">Chưa gắn lô</Tag>
+    <Tag variant="error">Chưa gắn lô</Tag>
   );
 
 export function TraceStagesView() {
-  const { dl } = useTraceData();
+  const { traceData } = useTraceData();
   const navigate = useNavigate();
-  const [tu, setTu] = useState(() => addDays(todayIso(), -6));
-  const [den, setDen] = useState(todayIso);
+  const [fromDate, setFromDate] = useState(() => addDays(todayIso(), -6));
+  const [toDate, setToDate] = useState(todayIso);
   const [workshop, setWorkshop] = useState<Workshop | "">("");
   const [onlyMissing, setOnlyMissing] = useState(false);
 
@@ -94,8 +94,8 @@ export function TraceStagesView() {
   const [lotForSalesItem, setLotForSalesItem] = useState<{ salesItem: SalesItem; lotKind: "W" | "P" } | null>(null);
   const [lotForDomesticSale, setLotForDomesticSale] = useState<DomesticSaleItem | null>(null);
 
-  const items = useMemo(() => groupByTraceStage(dl, { fromDate: tu, toDate: den, workshop }), [dl, tu, den, workshop]);
-  const productNameOf = (id: string) => dl.products.find((p) => p.id === id)?.name || "—";
+  const items = useMemo(() => groupByTraceStage(traceData, { fromDate, toDate, workshop }), [traceData, fromDate, toDate, workshop]);
+  const productNameOf = (id: string) => traceData.products.find((p) => p.id === id)?.name || "—";
 
   /** Nút: việc còn thiếu thì nổi (default), còn lại viền (outline). */
   const taskButton = (isMissing: boolean, title: string, onClick: () => void, icon: ReactNode, label: string) => (
@@ -105,11 +105,11 @@ export function TraceStagesView() {
     </Button>
   );
   const labelButton = (m: TraceStageItem) =>
-    taskButton(m.missing.includes("tem"), `In tem QR cho lô ${m.node.label} (mặc định mỗi block / thùng một tem).`, () => setLotLabel(m.node), <Printer aria-hidden />, "In tem");
+    taskButton(m.missing.includes("label"), `In tem QR cho lô ${m.node.label} (mặc định mỗi block / thùng một tem).`, () => setLotLabel(m.node), <Printer aria-hidden />, "In tem");
 
   const renderItemRow = (g: TraceStage, m: TraceStageItem): ReactNode => {
     const n = m.node;
-    if (g.key === "nhap")
+    if (g.key === "imports")
       return (
         <StageRow
           key={n.id}
@@ -117,14 +117,14 @@ export function TraceStagesView() {
           status={
             <>
               {labelBadge(m)}
-              {(m.usedKg ?? 0) > 0 ? <Tag variant="nguon">Đã dùng cho {m.usedKg} mẻ / dòng bán</Tag> : <Tag variant="phu">Chưa dùng</Tag>}
+              {(m.usedKg ?? 0) > 0 ? <Tag variant="source">Đã dùng cho {m.usedKg} mẻ / dòng bán</Tag> : <Tag variant="muted">Chưa dùng</Tag>}
             </>
           }
           action={labelButton(m)}
         />
       );
-    if (g.key === "san-xuat") {
-      const w = dl.wips.find((x) => x.id === n.id);
+    if (g.key === "production") {
+      const w = traceData.wips.find((x) => x.id === n.id);
       return (
         <StageRow
           key={n.id}
@@ -138,23 +138,23 @@ export function TraceStagesView() {
           action={
             <>
               {w &&
-                taskButton(m.missing.includes("lo"), `Ghi mẻ ${n.label} đã dùng lô nguyên liệu nào (quét tem, gõ mã hoặc chọn).`, () => setLotForBatch(w), <Link2 aria-hidden />, (m.lotCount ?? 0) > 0 ? "Lô NL" : "Gắn lô NL")}
+                taskButton(m.missing.includes("lot"), `Ghi mẻ ${n.label} đã dùng lô nguyên liệu nào (quét tem, gõ mã hoặc chọn).`, () => setLotForBatch(w), <Link2 aria-hidden />, (m.lotCount ?? 0) > 0 ? "Lô NL" : "Gắn lô NL")}
               {labelButton(m)}
             </>
           }
         />
       );
     }
-    if (g.key === "kho")
+    if (g.key === "warehouse")
       return (
         <StageRow
           key={n.id}
           m={m}
           status={
             m.warehouseStatus === "pending" ? (
-              <Tag variant="cho">Chờ nhập kho</Tag>
+              <Tag variant="pending">Chờ nhập kho</Tag>
             ) : (
-              <Tag variant="xong">Đã nhập kho{m.stockKg != null ? ` · tồn ${kg(m.stockKg)}` : ""}</Tag>
+              <Tag variant="done">Đã nhập kho{m.stockKg != null ? ` · tồn ${kg(m.stockKg)}` : ""}</Tag>
             )
           }
           action={
@@ -164,8 +164,8 @@ export function TraceStagesView() {
           }
         />
       );
-    if (g.key === "dong-goi") {
-      const p = dl.packagings.find((x) => x.id === n.id);
+    if (g.key === "packaging") {
+      const p = traceData.packagings.find((x) => x.id === n.id);
       return (
         <StageRow
           key={n.id}
@@ -174,13 +174,13 @@ export function TraceStagesView() {
             <>
               {lotBadge(m, "Lô BTP")}
               {labelBadge(m)}
-              {m.stockKg != null && <Tag variant="vi-tri">Tồn {kg(m.stockKg)}</Tag>}
+              {m.stockKg != null && <Tag variant="location">Tồn {kg(m.stockKg)}</Tag>}
             </>
           }
           action={
             <>
               {p &&
-                taskButton(m.missing.includes("lo"), `Ghi phiếu ${n.label} đã dùng lô bán thành phẩm nào.`, () => setLotForPackaging(p), <Link2 aria-hidden />, (m.lotCount ?? 0) > 0 ? "Lô BTP" : "Gắn lô BTP")}
+                taskButton(m.missing.includes("lot"), `Ghi phiếu ${n.label} đã dùng lô bán thành phẩm nào.`, () => setLotForPackaging(p), <Link2 aria-hidden />, (m.lotCount ?? 0) > 0 ? "Lô BTP" : "Gắn lô BTP")}
               {labelButton(m)}
             </>
           }
@@ -193,7 +193,7 @@ export function TraceStagesView() {
         <StageRow
           key={`X:${n.id}`}
           m={m}
-          status={m.isScanned ? <Tag variant="xong">Đã quét kiểm</Tag> : <Tag variant="cho">Chưa quét kiểm</Tag>}
+          status={m.isScanned ? <Tag variant="done">Đã quét kiểm</Tag> : <Tag variant="pending">Chưa quét kiểm</Tag>}
           action={
             m.salesOrderId && m.exportOrderId
               ? taskButton(!m.isScanned, "Mở màn Đơn đặt với hộp kiểm lô bằng quét của lệnh xuất này.", () => navigate(`/orders?order=${encodeURIComponent(m.salesOrderId!)}&check=${encodeURIComponent(m.exportOrderId!)}`), <ScanLine aria-hidden />, "Kiểm lô")
@@ -202,7 +202,7 @@ export function TraceStagesView() {
         />
       );
     if (n.kind === "B") {
-      const b = (dl.salesItems ?? []).find((x) => x.id === n.id);
+      const b = (traceData.salesItems ?? []).find((x) => x.id === n.id);
       return (
         <StageRow
           key={`B:${n.id}`}
@@ -210,19 +210,19 @@ export function TraceStagesView() {
           status={lotBadge(m, m.soldLotKind === "P" ? "Lô TP" : "Lô BTP")}
           action={
             b && m.soldLotKind
-              ? taskButton(m.missing.includes("lo"), "Ghi dòng bán này lấy từ lô nào — để thu hồi tới được khách.", () => setLotForSalesItem({ salesItem: b, lotKind: m.soldLotKind! }), <Link2 aria-hidden />, (m.lotCount ?? 0) > 0 ? "Lô" : "Gắn lô")
+              ? taskButton(m.missing.includes("lot"), "Ghi dòng bán này lấy từ lô nào — để thu hồi tới được khách.", () => setLotForSalesItem({ salesItem: b, lotKind: m.soldLotKind! }), <Link2 aria-hidden />, (m.lotCount ?? 0) > 0 ? "Lô" : "Gắn lô")
               : null
           }
         />
       );
     }
-    const r = (dl.domesticSales ?? []).find((x) => x.id === n.id);
+    const r = (traceData.domesticSales ?? []).find((x) => x.id === n.id);
     return (
       <StageRow
         key={`N:${n.id}`}
         m={m}
         status={lotBadge(m, "Lô NL")}
-        action={r ? taskButton(m.missing.includes("lo"), "Ghi nguyên liệu bán này lấy từ lô NL nào.", () => setLotForDomesticSale(r), <Link2 aria-hidden />, (m.lotCount ?? 0) > 0 ? "Lô NL" : "Gắn lô NL") : null}
+        action={r ? taskButton(m.missing.includes("lot"), "Ghi nguyên liệu bán này lấy từ lô NL nào.", () => setLotForDomesticSale(r), <Link2 aria-hidden />, (m.lotCount ?? 0) > 0 ? "Lô NL" : "Gắn lô NL") : null}
       />
     );
   };
@@ -233,11 +233,11 @@ export function TraceStagesView() {
         <DateRangeField
           label="Khoảng ngày"
           hint="Ngày hàng về · ngày sản xuất · ngày đóng gói · ngày xuất / bán."
-          startDate={tu}
-          endDate={den}
+          startDate={fromDate}
+          endDate={toDate}
           onChange={(a, b) => {
-            setTu(a);
-            setDen(b);
+            setFromDate(a);
+            setToDate(b);
           }}
           hideRequiredMark
         />
@@ -272,7 +272,7 @@ export function TraceStagesView() {
                     {g.items.length} {STAGES[g.key].unit}
                   </span>
                   {g.items.length > 0 &&
-                    (missingCount > 0 ? <Tag variant="loi">Còn thiếu {missingCount}</Tag> : <Tag variant="xong">Đủ</Tag>)}
+                    (missingCount > 0 ? <Tag variant="error">Còn thiếu {missingCount}</Tag> : <Tag variant="done">Đủ</Tag>)}
                 </div>
               </div>
               <p className="text-muted-foreground">
@@ -333,7 +333,7 @@ export function TraceStagesView() {
           docId={lotForSalesItem.salesItem.id}
           docLabel={`${productNameOf(lotForSalesItem.salesItem.productId)} · ${kg(lotForSalesItem.salesItem.quantityKg)} · ${formatDateVN(lotForSalesItem.salesItem.deliveryDate)}`}
           lotKind={lotForSalesItem.lotKind}
-          workshop={(dl.salesInvoices ?? []).find((v) => v.id === lotForSalesItem.salesItem.invoiceId)?.workshop ?? "Đông"}
+          workshop={(traceData.salesInvoices ?? []).find((v) => v.id === lotForSalesItem.salesItem.invoiceId)?.workshop ?? "Đông"}
           date={lotForSalesItem.salesItem.deliveryDate}
           productId={lotForSalesItem.salesItem.productId}
           onClose={() => setLotForSalesItem(null)}

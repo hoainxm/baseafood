@@ -12,7 +12,7 @@ import { formatNumber, isExpression, parseNumberOrExpression } from "./numberExp
  *    ("250+") thì CHƯA ghi — giữ số cũ, không ghi tạm 0/null làm mất số thật.
  *  - Rời ô: hiện lại số đã chốt, có dấu chấm phần nghìn.
  *  - Esc: trả về số lúc vừa bấm vào ô.
- *  - Đang gõ biểu thức: trả `xemTruoc` để hiện "= 550" ngay dưới ô.
+ *  - Đang gõ biểu thức: trả `preview` để hiện "= 550" ngay dưới ô.
  *  - `rong0`: số 0 hiện ô trống (ô lưới — đỡ rối mắt).
  */
 export function useNumberInput({
@@ -30,7 +30,7 @@ export function useNumberInput({
 
   const displayNumber = (v: number | null) => (v == null || (rong0 && v === 0) ? "" : formatNumber(v));
   const laBT = isTyping && isExpression(raw);
-  const preview = laBT ? { ketQua: parseNumberOrExpression(raw) } : null;
+  const preview = laBT ? { result: parseNumberOrExpression(raw) } : null;
 
   const props = {
     value: isTyping ? raw : displayNumber(value),
@@ -61,6 +61,6 @@ export function useNumberInput({
     },
   };
 
-  return { props, xemTruoc: preview, dangGo: isTyping };
+  return { props, preview, isTyping };
 }
 

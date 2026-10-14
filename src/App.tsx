@@ -15,7 +15,7 @@ import {
   useLocation,
   useSearchParams,
 } from "react-router-dom";
-import DangNhap from "@/features/auth";
+import LoginScreen from "@/features/auth";
 import { NotFound } from "@/features/shared";
 import AppShell, { KIT_NAV } from "@/features/shared/AppShell";
 import { RowMarkProvider } from "@/features/shared/RowMarkProvider";
@@ -26,7 +26,7 @@ import { useAuth } from "@/lib/auth";
 import { setAuditOperator } from "@/lib/audit";
 import { roleLabel } from "@/types";
 import { allowedIds, homeFor } from "@/lib/nav-access";
-import { LA_DEMO, setDemoMode } from "@/lib/demoMode";
+import { IS_DEMO, setDemoMode } from "@/lib/demoMode";
 import { DemoModeBanner, DemoPackLoader } from "@/features/shared/DemoMode";
 import { LEGACY_PATHS, normalizeCatalogTab } from "@/lib/legacyUrls";
 
@@ -44,7 +44,7 @@ const MonthlyStockLedgerScreen = lazy(() => import("@/features/monthly-stock"));
 const FinishedGoodReportScreen = lazy(() => import("@/features/reports/DailyProductionReport"));
 const OrderExportReportScreen = lazy(() => import("@/features/reports/OrderExportReport"));
 const SalesOrderScreen = lazy(() => import("@/features/orders"));
-const CanDoiScreen = lazy(() => import("@/features/balancing"));
+const BalancingScreen = lazy(() => import("@/features/balancing"));
 const CatalogScreen = lazy(() => import("@/features/catalog"));
 const UserManagementScreen = lazy(() => import("@/features/users"));
 const AuditLogScreen = lazy(() => import("@/features/audit"));
@@ -73,7 +73,7 @@ function ShellLayout() {
 
   // Chế độ demo CHỈ admin bật. Cờ nằm theo máy (localStorage) ⇒ người khác đăng nhập
   // trên máy đó thì tự tắt, về số thật (không ai thấy số demo mà tưởng số xưởng).
-  const isDemoDenied = LA_DEMO && auth.requiresLogin && !!auth.profile && !auth.isAdmin;
+  const isDemoDenied = IS_DEMO && auth.requiresLogin && !!auth.profile && !auth.isAdmin;
   useEffect(() => {
     if (isDemoDenied) setDemoMode(false);
   }, [isDemoDenied]);
@@ -163,7 +163,7 @@ export default function App() {
   if (auth.requiresLogin && !auth.session) {
     return (
       <>
-        <DangNhap login={auth.signIn} />
+        <LoginScreen login={auth.signIn} />
         <Toaster position="bottom-center" richColors closeButton />
       </>
     );
@@ -202,8 +202,8 @@ export default function App() {
             <Route path="/production-report" element={<FinishedGoodReportScreen />} />
             <Route path="/export-report" element={<OrderExportReportScreen />} />
             <Route path="/orders" element={<SalesOrderScreen />} />
-            <Route path="/balancing" element={<CanDoiScreen />} />
-            <Route path="/balancing/:periodId" element={<CanDoiScreen />} />
+            <Route path="/balancing" element={<BalancingScreen />} />
+            <Route path="/balancing/:periodId" element={<BalancingScreen />} />
             <Route path="/catalog" element={<CatalogScreen />} />
             <Route path="/wip" element={<WipProductionScreen />} />
             <Route path="/packaging" element={<PackagingScreen />} />
@@ -213,7 +213,7 @@ export default function App() {
             <Route
               path="/users"
               element={
-                auth.isAdmin && LA_DEMO ? (
+                auth.isAdmin && IS_DEMO ? (
                   // Tài khoản + vai trò là THẬT (không thuộc bộ demo) — sửa ở đây dễ tưởng
                   // đang sửa demo. Bắt thoát demo trước.
                   <EmptyState

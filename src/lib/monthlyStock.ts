@@ -35,7 +35,7 @@ export interface MonthlyStockTotals {
 }
 
 /** Suy tồn cuối + tiền còn lại cho một dòng (không lưu, luôn tính lại). */
-export function suyDong(l: MonthlyStockLine): MonthlyStockRow {
+export function deriveRow(l: MonthlyStockLine): MonthlyStockRow {
   const closeCtn = l.openCtn + l.inCtn - l.outCtn;
   const closeKg = l.openKg + l.inKg - l.outKg;
   return {
@@ -94,9 +94,9 @@ export function formatMonthLabel(period: string): string {
  * Danh sách N tháng gần đây (mới → cũ) từ mốc `moc` (mặc định tháng hiện tại),
  * hợp nhất với mọi tháng đã có dữ liệu để không bao giờ thiếu kỳ nào trong sổ.
  */
-export function listMonths(coSan: string[], moc = getCurrentMonth(), monthCount = 24): string[] {
-  const set = new Set<string>(coSan);
-  let p = moc;
+export function listMonths(existingMonths: string[], anchor = getCurrentMonth(), monthCount = 24): string[] {
+  const set = new Set<string>(existingMonths);
+  let p = anchor;
   for (let i = 0; i < monthCount; i++) {
     set.add(p);
     p = getPrevMonth(p);
@@ -162,9 +162,9 @@ export interface CarryOverMismatch {
 
 const DIFF_THRESHOLD = 1; // < 1 kg coi như khớp (làm tròn số lẻ)
 
-const sumByGroup = (rows: MonthlyStockRow[], lay: (r: MonthlyStockRow) => number) => {
+const sumByGroup = (rows: MonthlyStockRow[], take: (r: MonthlyStockRow) => number) => {
   const m = new Map<string, number>();
-  for (const r of rows) m.set(r.category || "(Chưa phân nhóm)", (m.get(r.category || "(Chưa phân nhóm)") ?? 0) + lay(r));
+  for (const r of rows) m.set(r.category || "(Chưa phân nhóm)", (m.get(r.category || "(Chưa phân nhóm)") ?? 0) + take(r));
   return m;
 };
 
@@ -179,14 +179,14 @@ export function measureCarryForwardGap(priorRows: MonthlyStockRow[], currentRows
   const mClose = sumByGroup(priorRows, (r) => r.closeKg);
   const mOpen = sumByGroup(currentRows, (r) => r.openKg);
   const cats = new Set([...mClose.keys(), ...mOpen.keys()]);
-  const theoNhom: GroupMismatch[] = [];
+  const byGroup: GroupMismatch[] = [];
   for (const c of cats) {
     const ct = mClose.get(c) ?? 0;
     const on = mOpen.get(c) ?? 0;
-    if (Math.abs(on - ct) > DIFF_THRESHOLD) theoNhom.push({ category: c, prevClose: ct, currentOpen: on, diff: on - ct });
+    if (Math.abs(on - ct) > DIFF_THRESHOLD) byGroup.push({ category: c, prevClose: ct, currentOpen: on, diff: on - ct });
   }
-  theoNhom.sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff));
-  return { prevClose, currentOpen: currentOpening, diff: currentOpening - prevClose, groups: theoNhom };
+  byGroup.sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff));
+  return { prevClose, currentOpen: currentOpening, diff: currentOpening - prevClose, groups: byGroup };
 }
 
 /** Có đáng gắn cờ lệch không (có tháng trước + tổng lệch quá ngưỡng). */
@@ -214,12 +214,12 @@ export interface CarryForwardDiff {
   currentRowCount: number; // số dòng tháng này của mặt hàng (để biết sửa ở đâu)
 }
 
-function groupByName(rows: MonthlyStockRow[], layKg: (r: MonthlyStockRow) => number) {
+function groupByName(rows: MonthlyStockRow[], getKg: (r: MonthlyStockRow) => number) {
   const m = new Map<string, { kg: number; sl: number; w: string; c: string; name: string }>();
   for (const r of rows) {
     const k = stockLineKey(r);
     const g = m.get(k) ?? { kg: 0, sl: 0, w: r.warehouse, c: r.category, name: r.itemName };
-    g.kg += layKg(r);
+    g.kg += getKg(r);
     g.sl += 1;
     m.set(k, g);
   }
@@ -295,7 +295,7 @@ export function buildProductStockCard(
         openCtn: 0, openKg: 0, inCtn: 0, inKg: 0, outCtn: 0, outKg: 0,
         closeCtn: 0, closeKg: 0, rowCount: 0,
       };
-    const r = suyDong(l);
+    const r = deriveRow(l);
     g.openCtn += r.openCtn; g.openKg += r.openKg;
     g.inCtn += r.inCtn; g.inKg += r.inKg;
     g.outCtn += r.outCtn; g.outKg += r.outKg;
@@ -337,11 +337,11 @@ export type CatalogTarget = "product" | "material" | "skip";
  * Chỉ GỢI Ý — người dùng đổi từng dòng.
  */
 export function inferCatalogTarget(name: string): CatalogTarget {
-  const coSize = /(\d+\s*[-/]\s*\d+|\d+\s*up\b|\bup\b|<\s*\d+|>\s*\d+|\d+\s*gr?\b)/i.test(name);
+  const hasSize = /(\d+\s*[-/]\s*\d+|\d+\s*up\b|\bup\b|<\s*\d+|>\s*\d+|\d+\s*gr?\b)/i.test(name);
   const isProcessed = /(r[âa]u|c[ắa]t|lu[ộo]c|ch[ầa]n|t[ẩa]m|b[ộo]t|d[aạ]t|\bc[ổo]\b|bao\s*t[ửu]|mada|vòi|\bda\b)/i.test(
     name.toLowerCase()
   );
-  return coSize || isProcessed ? "product" : "material";
+  return hasSize || isProcessed ? "product" : "material";
 }
 
 /**
@@ -351,8 +351,8 @@ export function inferCatalogTarget(name: string): CatalogTarget {
  * người quyết ánh xạ về danh mục nào.
  */
 export function laRoRang(name: string): boolean {
-  const nhom = inferMaterialCategory(name);
-  return nhom !== "Bạch tuộc" && nhom !== "Khác";
+  const group = inferMaterialCategory(name);
+  return group !== "Bạch tuộc" && group !== "Khác";
 }
 
 export interface CatalogSyncItem {
@@ -495,50 +495,50 @@ export function carryForwardIntoLedger(lines: MonthlyStockLine[], targetMonth: s
   const sourceMonth = getPrevMonth(targetMonth);
   const inWarehouse = (l: MonthlyStockLine) => !warehouse || l.warehouse === warehouse;
   const carried = buildCarryForwardLines(
-    lines.filter((l) => l.period === sourceMonth && inWarehouse(l)).map(suyDong),
+    lines.filter((l) => l.period === sourceMonth && inWarehouse(l)).map(deriveRow),
     targetMonth
   );
   const theoId = new Map(carried.map((c) => [c.id, c]));
   const sourceById = new Map(lines.filter((l) => l.period === sourceMonth).map((l) => [l.id, l]));
   let updatedCount = 0;
   let zeroedCount = 0;
-  let bo = 0;
+  let removed = 0;
   const existing = new Set<string>();
-  const ra: MonthlyStockLine[] = [];
+  const result: MonthlyStockLine[] = [];
   for (const l of lines) {
     const c = theoId.get(l.id);
     if (c) {
       existing.add(l.id);
       updatedCount++;
-      ra.push(l.openKg === c.openKg && l.openCtn === c.openCtn ? l : { ...l, openKg: c.openKg, openCtn: c.openCtn });
+      result.push(l.openKg === c.openKg && l.openCtn === c.openCtn ? l : { ...l, openKg: c.openKg, openCtn: c.openCtn });
       continue;
     }
     if (l.period !== targetMonth || !l.id.startsWith("carry|")) {
-      ra.push(l);
+      result.push(l);
       continue;
     }
     // Dòng dồn cũ không còn nguồn mang tồn. Nguồn còn ⇒ xét kho của nguồn; mất ⇒ kho của dòng.
     const source = sourceById.get(l.carriedFromId || l.id.slice("carry|".length));
     if (!(source ? inWarehouse(source) : inWarehouse(l)) || (l.openKg === 0 && l.openCtn === 0)) {
-      ra.push(l);
+      result.push(l);
       continue;
     }
     const z = { ...l, openKg: 0, openCtn: 0 };
     if (isEmptyLine(z) && !(z.note ?? "").trim()) {
-      bo++;
+      removed++;
       continue;
     }
     zeroedCount++;
-    ra.push(z);
+    result.push(z);
   }
   const newCarried = carried.filter((c) => !existing.has(c.id));
   return {
-    lines: [...ra, ...newCarried],
+    lines: [...result, ...newCarried],
     rowCount: carried.length,
     added: newCarried.length,
     updated: updatedCount,
     zeroed: zeroedCount,
-    removed: bo,
+    removed,
     totalKg: carried.reduce((s, c) => s + c.openKg, 0),
   };
 }
@@ -551,7 +551,7 @@ export function isEmptyLine(l: MonthlyStockLine): boolean {
   return z(l.openKg) && z(l.inKg) && z(l.outKg) && z(l.openCtn) && z(l.inCtn) && z(l.outCtn);
 }
 
-export type LotActionKind = "xuat" | "nhap" | "chuyen";
+export type LotActionKind = "out" | "in" | "transfer";
 
 export interface LotActionResult {
   /** Dòng gốc sau khi áp (thay đúng id). */
@@ -561,7 +561,7 @@ export interface LotActionResult {
 }
 
 /** Đổi kiện theo cùng tỉ lệ kg (kiện ẩn trên màn nhưng vẫn phải khớp với kg). */
-const tiLeKien = (ctn: number, kg: number, kgBot: number) => (kg > 1e-9 ? (ctn * kgBot) / kg : 0);
+const cartonRatio = (ctn: number, kg: number, batterKg: number) => (kg > 1e-9 ? (ctn * batterKg) / kg : 0);
 
 /**
  * Áp một thao tác kho lên một dòng — hàm thuần, màn chỉ việc ghi kết quả.
@@ -583,11 +583,11 @@ export function applyLotAction(
   opts: { targetLocation?: string; note: string; newId: string }
 ): LotActionResult {
   const note = (l.note ? l.note + "\n" : "") + opts.note;
-  if (kind === "xuat") {
+  if (kind === "out") {
     const ctn = l.kgPerCtn ? kg / l.kgPerCtn : 0;
     return { line: { ...l, outKg: l.outKg + kg, outCtn: l.outCtn + ctn, note }, splitLine: null };
   }
-  if (kind === "nhap") {
+  if (kind === "in") {
     const ctn = l.kgPerCtn ? kg / l.kgPerCtn : 0;
     return { line: { ...l, inKg: l.inKg + kg, inCtn: l.inCtn + ctn, note }, splitLine: null };
   }
@@ -598,12 +598,12 @@ export function applyLotAction(
   }
   const fromOpening = Math.min(kg, l.openKg);
   const fromIn = kg - fromOpening;
-  const ctnDau = tiLeKien(l.openCtn, l.openKg, fromOpening);
-  const inCartons = tiLeKien(l.inCtn, l.inKg, fromIn);
-  const dong: MonthlyStockLine = {
+  const openingCtn = cartonRatio(l.openCtn, l.openKg, fromOpening);
+  const inCartons = cartonRatio(l.inCtn, l.inKg, fromIn);
+  const row: MonthlyStockLine = {
     ...l,
     openKg: l.openKg - fromOpening,
-    openCtn: l.openCtn - ctnDau,
+    openCtn: l.openCtn - openingCtn,
     inKg: l.inKg - fromIn,
     inCtn: l.inCtn - inCartons,
     note,
@@ -613,7 +613,7 @@ export function applyLotAction(
     id: opts.newId,
     storageLocation: target,
     openKg: fromOpening,
-    openCtn: ctnDau,
+    openCtn: openingCtn,
     inKg: fromIn,
     inCtn: inCartons,
     outKg: 0,
@@ -622,5 +622,5 @@ export function applyLotAction(
     sortOrder: l.sortOrder,
     note: `${opts.note} (tách từ dòng ${l.id})`,
   };
-  return { line: dong, splitLine };
+  return { line: row, splitLine };
 }

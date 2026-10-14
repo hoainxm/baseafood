@@ -18,32 +18,32 @@ import { cn } from "@/lib/utils";
  * - `phan-loai` phân loại nghiệp vụ (kênh, nhóm NL, xưởng…) → sắc nhạt theo `sac`
  * - `phu`       phụ chú / đếm / DEMO                       → xám
  */
-export type TagVariant = "xong" | "cho" | "luu-y" | "loi" | "nguon" | "vi-tri" | "phan-loai" | "phu";
+export type TagVariant = "done" | "pending" | "warning" | "error" | "source" | "location" | "category" | "muted";
 
 /** Sắc cho nhãn PHÂN LOẠI — không mang nghĩa tốt/xấu, chỉ để phân biệt nhóm. */
-export type CategoryTone = "tim" | "ngoc" | "bien" | "bang" | "cat" | "hong" | "la" | "cam" | "xam";
+export type CategoryTone = "purple" | "teal" | "blue" | "cyan" | "sand" | "pink" | "green" | "orange" | "gray";
 
-const VARIANT_STYLES: Record<Exclude<TagVariant, "phan-loai">, { base: string; dot: string }> = {
-  xong: { base: "border-success-line bg-success-surface text-success", dot: "bg-success" },
-  cho: { base: "border-dashed border-warning-line bg-warning-surface text-warning", dot: "border border-warning bg-transparent" },
-  "luu-y": { base: "border-warning-line bg-warning-surface text-warning", dot: "bg-warning" },
-  loi: { base: "border-destructive-line bg-destructive-surface text-destructive", dot: "bg-destructive" },
-  nguon: { base: "border-info-line bg-info-surface text-info", dot: "bg-info" },
-  "vi-tri": { base: "border-primary/30 bg-accent text-accent-foreground", dot: "bg-primary" },
-  phu: { base: "border-border bg-muted text-muted-foreground", dot: "bg-muted-foreground" },
+const VARIANT_STYLES: Record<Exclude<TagVariant, "category">, { base: string; dot: string }> = {
+  done: { base: "border-success-line bg-success-surface text-success", dot: "bg-success" },
+  pending: { base: "border-dashed border-warning-line bg-warning-surface text-warning", dot: "border border-warning bg-transparent" },
+  warning: { base: "border-warning-line bg-warning-surface text-warning", dot: "bg-warning" },
+  error: { base: "border-destructive-line bg-destructive-surface text-destructive", dot: "bg-destructive" },
+  source: { base: "border-info-line bg-info-surface text-info", dot: "bg-info" },
+  location: { base: "border-primary/30 bg-accent text-accent-foreground", dot: "bg-primary" },
+  muted: { base: "border-border bg-muted text-muted-foreground", dot: "bg-muted-foreground" },
 };
 
 /* Liệt kê TRỌN tên lớp (không ghép chuỗi) để Tailwind quét thấy. */
 const SAC: Record<CategoryTone, { base: string; dot: string }> = {
-  tim: { base: "border-tone-tim-line bg-tone-tim-surface text-tone-tim", dot: "bg-tone-tim" },
-  ngoc: { base: "border-tone-ngoc-line bg-tone-ngoc-surface text-tone-ngoc", dot: "bg-tone-ngoc" },
-  bien: { base: "border-tone-bien-line bg-tone-bien-surface text-tone-bien", dot: "bg-tone-bien" },
-  bang: { base: "border-tone-bang-line bg-tone-bang-surface text-tone-bang", dot: "bg-tone-bang" },
-  cat: { base: "border-tone-cat-line bg-tone-cat-surface text-tone-cat", dot: "bg-tone-cat" },
-  hong: { base: "border-tone-hong-line bg-tone-hong-surface text-tone-hong", dot: "bg-tone-hong" },
-  la: { base: "border-tone-la-line bg-tone-la-surface text-tone-la", dot: "bg-tone-la" },
-  cam: { base: "border-tone-cam-line bg-tone-cam-surface text-tone-cam", dot: "bg-tone-cam" },
-  xam: { base: "border-tone-xam-line bg-tone-xam-surface text-tone-xam", dot: "bg-tone-xam" },
+  purple: { base: "border-tone-purple-line bg-tone-purple-surface text-tone-purple", dot: "bg-tone-purple" },
+  teal: { base: "border-tone-teal-line bg-tone-teal-surface text-tone-teal", dot: "bg-tone-teal" },
+  blue: { base: "border-tone-blue-line bg-tone-blue-surface text-tone-blue", dot: "bg-tone-blue" },
+  cyan: { base: "border-tone-cyan-line bg-tone-cyan-surface text-tone-cyan", dot: "bg-tone-cyan" },
+  sand: { base: "border-tone-sand-line bg-tone-sand-surface text-tone-sand", dot: "bg-tone-sand" },
+  pink: { base: "border-tone-pink-line bg-tone-pink-surface text-tone-pink", dot: "bg-tone-pink" },
+  green: { base: "border-tone-green-line bg-tone-green-surface text-tone-green", dot: "bg-tone-green" },
+  orange: { base: "border-tone-orange-line bg-tone-orange-surface text-tone-orange", dot: "bg-tone-orange" },
+  gray: { base: "border-tone-gray-line bg-tone-gray-surface text-tone-gray", dot: "bg-tone-gray" },
 };
 
 /**
@@ -52,7 +52,7 @@ const SAC: Record<CategoryTone, { base: string; dot: string }> = {
  */
 export function Tag({
   variant,
-  tone: sac = "xam",
+  tone: sac = "gray",
   icon: Icon,
   children,
   title,
@@ -67,7 +67,7 @@ export function Tag({
   title?: string;
   className?: string;
 }) {
-  const k = variant === "phan-loai" ? SAC[sac] : VARIANT_STYLES[variant];
+  const k = variant === "category" ? SAC[sac] : VARIANT_STYLES[variant];
   return (
     <span
       data-slot="nhan"
@@ -92,44 +92,44 @@ export function Tag({
 /* ---------- Sắc cố định theo giá trị nghiệp vụ — cùng giá trị luôn cùng màu ---------- */
 
 /** Kênh bán: Xuất khẩu tím · Nội địa ngọc. */
-export function channelTone(kenh: string | null | undefined): CategoryTone {
-  const k = (kenh ?? "").toLowerCase();
-  if (k.includes("xuất") || k === "xk") return "tim";
-  if (k.includes("nội") || k === "nđ" || k === "nd") return "ngoc";
-  return "xam";
+export function channelTone(channel: string | null | undefined): CategoryTone {
+  const k = (channel ?? "").toLowerCase();
+  if (k.includes("xuất") || k === "xk") return "purple";
+  if (k.includes("nội") || k === "nđ" || k === "nd") return "teal";
+  return "gray";
 }
 
 /** Nhóm nguyên liệu cân đối: Thủy sản biển · Xả đông băng · Bột phụ gia cát · Giảm hồng. */
-export function toneForMaterialGroup(nhom: string | null | undefined): CategoryTone {
-  const k = (nhom ?? "").toLowerCase();
-  if (k.includes("giảm")) return "hong";
-  if (k.includes("xả")) return "bang";
-  if (k.includes("bột")) return "cat";
-  if (k.includes("thủy") || k.includes("thuỷ")) return "bien";
-  return "xam";
+export function toneForMaterialGroup(group: string | null | undefined): CategoryTone {
+  const k = (group ?? "").toLowerCase();
+  if (k.includes("giảm")) return "pink";
+  if (k.includes("xả")) return "cyan";
+  if (k.includes("bột")) return "sand";
+  if (k.includes("thủy") || k.includes("thuỷ")) return "blue";
+  return "gray";
 }
 
 /** Phân xưởng: Đông biển · Cá ngọc · Khô cam; kho lớn / khác → xám. */
 export function toneForWorkshop(workshop: string | null | undefined): CategoryTone {
   /* Tách TỪ theo chữ Unicode — `\b` của regex JS không coi "đ", "á", "ô" là chữ cái
      nên /\bđông\b/ không bao giờ khớp "Xưởng Đông". */
-  const tu = (workshop ?? "").toLowerCase().normalize("NFC").split(/[^\p{L}\p{N}]+/u);
-  if (tu.includes("đông")) return "bien";
-  if (tu.includes("cá")) return "ngoc";
-  if (tu.includes("khô")) return "cam";
-  return "xam";
+  const fromDate = (workshop ?? "").toLowerCase().normalize("NFC").split(/[^\p{L}\p{N}]+/u);
+  if (fromDate.includes("đông")) return "blue";
+  if (fromDate.includes("cá")) return "teal";
+  if (fromDate.includes("khô")) return "orange";
+  return "gray";
 }
 
-const SAC_XOAY: CategoryTone[] = ["bien", "tim", "ngoc", "cam", "hong", "la", "bang", "cat"];
+const SAC_XOAY: CategoryTone[] = ["blue", "purple", "teal", "orange", "pink", "green", "cyan", "sand"];
 
 /**
  * Sắc ổn định theo TÊN cho phân loại mở (kho, nhóm thành phẩm, vai trò, ca, dây
  * chuyền…): cùng tên ⇒ cùng màu ở mọi màn. Băm tên đã chuẩn hoá (bỏ hoa/thường,
  * khoảng trắng thừa).
  */
-export function toneByName(ten: string | null | undefined): CategoryTone {
-  const k = (ten ?? "").trim().toLowerCase().replace(/\s+/g, " ");
-  if (!k) return "xam";
+export function toneByName(name: string | null | undefined): CategoryTone {
+  const k = (name ?? "").trim().toLowerCase().replace(/\s+/g, " ");
+  if (!k) return "gray";
   let h = 0;
   for (let i = 0; i < k.length; i++) h = (h * 31 + k.charCodeAt(i)) >>> 0;
   return SAC_XOAY[h % SAC_XOAY.length];

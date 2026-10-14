@@ -23,22 +23,22 @@ import { sumGridRow } from "@/types";
  */
 export const MAX_PERIOD_DAYS = 62;
 
-export function getPeriodDates(ky: Pick<BalancingPeriod, "startDate" | "endDate">): string[] {
-  const tu = ky.startDate;
-  const den = ky.endDate || ky.startDate;
-  if (!tu || !den || den < tu) return [];
-  const ra: string[] = [];
+export function getPeriodDates(period: Pick<BalancingPeriod, "startDate" | "endDate">): string[] {
+  const fromDate = period.startDate;
+  const toDate = period.endDate || period.startDate;
+  if (!fromDate || !toDate || toDate < fromDate) return [];
+  const result: string[] = [];
   /* Dựng ngày ở giờ UTC và đọc lại bằng UTC. Dùng `new Date("...T00:00:00")`
      rồi `toISOString()` là bẫy kinh điển: giờ Việt Nam +07 ⇒ nửa đêm địa phương
      thành 17:00 UTC HÔM TRƯỚC, kỳ 21–25/7 biến thành 20–24/7 và ngày cuối rơi
      ra ngoài kỳ (dòng nhập hàng ngày 25 không hút được). */
-  const d = new Date(`${tu}T00:00:00Z`);
-  const end = new Date(`${den}T00:00:00Z`);
-  while (d.getTime() <= end.getTime() && ra.length < MAX_PERIOD_DAYS) {
-    ra.push(d.toISOString().slice(0, 10));
+  const d = new Date(`${fromDate}T00:00:00Z`);
+  const end = new Date(`${toDate}T00:00:00Z`);
+  while (d.getTime() <= end.getTime() && result.length < MAX_PERIOD_DAYS) {
+    result.push(d.toISOString().slice(0, 10));
     d.setUTCDate(d.getUTCDate() + 1);
   }
-  return ra;
+  return result;
 }
 
 /** Nhãn cột ngày: "22/7" — ngắn để lưới 5–8 cột vẫn vừa màn tablet. */
@@ -54,8 +54,8 @@ export function formatDayLabel(iso: string): string {
  * "Bạch tuộc 2 da lớn (80↑)" và "Bạch tuộc 2 da nhỏ (80↓)" cùng họ
  * "Bạch tuộc 2 da" ⇒ một kỳ cân đối gom được cả hai, đúng bảng giấy.
  */
-export function getMaterialFamily(ten: string): string {
-  return ten
+export function getMaterialFamily(name: string): string {
+  return name
     .replace(/\s*(lớn|nhỏ)\s*\(\s*80\s*[↑↓]\s*\)\s*$/iu, "")
     .replace(/\s+/g, " ")
     .trim();
@@ -73,18 +73,18 @@ export function isSameMaterialFamily(a: string, b: string): boolean {
  * còn thấy chuyến khác loại (VD 1 da khi kỳ là 2 da) trong hộp "Chọn dòng nhập".
  */
 export function findOverlappingFamilyPeriods(
-  ky: Pick<BalancingPeriod, "id" | "materialTypeName" | "startDate" | "endDate">,
+  period: Pick<BalancingPeriod, "id" | "materialTypeName" | "startDate" | "endDate">,
   all: Pick<BalancingPeriod, "id" | "materialTypeName" | "startDate" | "endDate">[]
 ): typeof all {
-  const tu = ky.startDate;
-  const den = ky.endDate || ky.startDate;
-  if (!tu || !den) return [];
+  const fromDate = period.startDate;
+  const toDate = period.endDate || period.startDate;
+  if (!fromDate || !toDate) return [];
   return all.filter((k) => {
-    if (k.id === ky.id || !isSameMaterialFamily(k.materialTypeName, ky.materialTypeName)) return false;
-    const kTu = k.startDate;
-    const kDen = k.endDate || k.startDate;
-    if (!kTu || !kDen) return false;
-    return kTu <= den && tu <= kDen;
+    if (k.id === period.id || !isSameMaterialFamily(k.materialTypeName, period.materialTypeName)) return false;
+    const kFrom = k.startDate;
+    const kTo = k.endDate || k.startDate;
+    if (!kFrom || !kTo) return false;
+    return kFrom <= toDate && fromDate <= kTo;
   });
 }
 
@@ -96,16 +96,16 @@ export function findOverlappingFamilyPeriods(
  * kéo nhầm cả sổ vào một kỳ trống).
  */
 export function filterEligibleImports(
-  ky: BalancingPeriod,
+  period: BalancingPeriod,
   imports: MaterialImportItem[]
 ): MaterialImportItem[] {
-  const dates = new Set(getPeriodDates(ky));
+  const dates = new Set(getPeriodDates(period));
   if (dates.size === 0) return [];
   return imports.filter(
     (r) =>
       dates.has(r.deliveryDate) &&
-      isSameMaterialFamily(r.materialTypeName, ky.materialTypeName) &&
-      (!r.balancingPeriodId || r.balancingPeriodId === ky.id)
+      isSameMaterialFamily(r.materialTypeName, period.materialTypeName) &&
+      (!r.balancingPeriodId || r.balancingPeriodId === period.id)
   );
 }
 
@@ -115,15 +115,15 @@ export function filterEligibleImports(
  * mặt hàng không mang thông tin nguyên liệu nguồn.
  */
 export function filterEligibleWips(
-  ky: BalancingPeriod,
+  period: BalancingPeriod,
   wips: WipProductionItem[]
 ): WipProductionItem[] {
-  const dates = new Set(getPeriodDates(ky));
+  const dates = new Set(getPeriodDates(period));
   if (dates.size === 0) return [];
   return wips.filter(
     (r) =>
       dates.has(r.productionDate) &&
-      (!r.balancingPeriodId || r.balancingPeriodId === ky.id)
+      (!r.balancingPeriodId || r.balancingPeriodId === period.id)
   );
 }
 
@@ -141,18 +141,18 @@ export const OWN_WAREHOUSE = "Kho mình";
  * cờ 0008), chiều theo `isReduction` (gửi đông là dòng giảm — gõ dương, lưu âm).
  * Dòng "nhận chuyển kỳ" cũ (Xả đông · Kho mình · chuyển kỳ dương) tự là lấy xả đông.
  */
-export type BalancingStockLineKind = "lay-xa-dong" | "gui-dong";
+export type BalancingStockLineKind = "thaw-out" | "freeze-deposit";
 
 export function getBalancingStockLineKind(
   r: Pick<BalancingInputItem, "groupName" | "sourceWarehouse" | "isReduction">
 ): BalancingStockLineKind | null {
   if (r.groupName !== "Xả đông" || r.sourceWarehouse !== OWN_WAREHOUSE) return null;
-  return r.isReduction ? "gui-dong" : "lay-xa-dong";
+  return r.isReduction ? "freeze-deposit" : "thaw-out";
 }
 
 export const BALANCING_STOCK_LINE_NAMES: Record<BalancingStockLineKind, string> = {
-  "lay-xa-dong": "Lấy xả đông",
-  "gui-dong": "Gửi đông",
+  "thaw-out": "Lấy xả đông",
+  "freeze-deposit": "Gửi đông",
 };
 
 /* ---------- Trả · Nợ (khối bán thành phẩm) ---------- */
@@ -229,24 +229,24 @@ export function groupImportsByMaterialType(
      MỘT dòng "Bạch tuộc 2 da" — chốt với chủ dự án: cân đối KHÔNG tách size, gộp
      chung. Sổ Nhập hàng vẫn ghi tên có size (truy nguyên); chỉ khi ĐƯA VÀO cân
      đối mới gộp. Tên không có mốc 80↑/↓ giữ nguyên (getMaterialFamily không cắt). */
-  const ra = new Map<
+  const result = new Map<
     string,
     { dailyQuantities: DailyQuantities; ids: string[]; unitPrice: number | null; sourceNames: Set<string> }
   >();
   for (const r of rows) {
     const k = getMaterialFamily(r.materialTypeName || "") || "(chưa ghi loại)";
-    const o = ra.get(k) ?? { dailyQuantities: {}, ids: [], unitPrice: null, sourceNames: new Set<string>() };
+    const o = result.get(k) ?? { dailyQuantities: {}, ids: [], unitPrice: null, sourceNames: new Set<string>() };
     o.dailyQuantities[r.deliveryDate] = (o.dailyQuantities[r.deliveryDate] ?? 0) + r.quantityKg;
     o.ids.push(r.id);
     o.sourceNames.add(r.materialTypeName || "");
     if (r.unitPrice != null) o.unitPrice = r.unitPrice;
-    ra.set(k, o);
+    result.set(k, o);
   }
   /* Gộp NHIỀU size giá khác nhau (lớn vs nhỏ) ⇒ ĐỂ TRỐNG đơn giá cho kế toán gõ
      MỘT giá chung (chốt) — không gợi ý bừa giá của một size. Một nguồn ⇒ giữ giá
      gợi ý như cũ. */
   const out = new Map<string, { dailyQuantities: DailyQuantities; ids: string[]; unitPrice: number | null }>();
-  for (const [k, o] of ra) {
+  for (const [k, o] of result) {
     out.set(k, { dailyQuantities: o.dailyQuantities, ids: o.ids, unitPrice: o.sourceNames.size > 1 ? null : o.unitPrice });
   }
   return out;
@@ -278,15 +278,15 @@ export function productSpecKey(productId: string, spec: string): string {
 export function groupWipsByProduct(
   rows: WipProductionItem[]
 ): Map<string, { dailyQuantities: DailyQuantities; ids: string[] }> {
-  const ra = new Map<string, { dailyQuantities: DailyQuantities; ids: string[] }>();
+  const result = new Map<string, { dailyQuantities: DailyQuantities; ids: string[] }>();
   for (const r of rows) {
     const k = productSpecKey(r.productId, r.spec);
-    const o = ra.get(k) ?? { dailyQuantities: {}, ids: [] };
+    const o = result.get(k) ?? { dailyQuantities: {}, ids: [] };
     o.dailyQuantities[r.productionDate] = (o.dailyQuantities[r.productionDate] ?? 0) + r.quantityKg;
     o.ids.push(r.id);
-    ra.set(k, o);
+    result.set(k, o);
   }
-  return ra;
+  return result;
 }
 
 /**
@@ -383,16 +383,16 @@ const periodEnd = (k: Pick<BalancingPeriod, "startDate" | "endDate">) => k.endDa
  * còn lại (VD kỳ đầu năm nhưng đã nhập kỳ sau trước).
  */
 export function pickTemplatePeriod<K extends PeriodSummary>(
-  ky: PeriodSummary,
+  period: PeriodSummary,
   allPeriods: K[],
   allOutputs: Pick<BalancingOutputItem, "periodId" | "productId">[]
 ): K | null {
   const periodsWithRows = new Set(allOutputs.filter((r) => r.productId).map((r) => r.periodId));
   const ung = allPeriods
-    .filter((k) => k.id !== ky.id && periodsWithRows.has(k.id) && isSameMaterialFamily(k.materialTypeName, ky.materialTypeName))
+    .filter((k) => k.id !== period.id && periodsWithRows.has(k.id) && isSameMaterialFamily(k.materialTypeName, period.materialTypeName))
     .sort((a, b) => periodEnd(b).localeCompare(periodEnd(a)));
-  const batDau = ky.startDate || "";
-  return ung.find((k) => batDau && periodEnd(k) && periodEnd(k) < batDau) ?? ung[0] ?? null;
+  const start = period.startDate || "";
+  return ung.find((k) => start && periodEnd(k) && periodEnd(k) < start) ?? ung[0] ?? null;
 }
 
 /**
@@ -400,16 +400,16 @@ export function pickTemplatePeriod<K extends PeriodSummary>(
  * khách) mà KHÁC giá ⇒ vẫn là hai dòng (như bảng giấy); trùng cả giá ⇒ một dòng.
  */
 export function buildFinishedGoodTemplateRows(templatePeriodRows: BalancingOutputItem[]): FinishedGoodTemplateRow[] {
-  const ra = new Map<string, FinishedGoodTemplateRow>();
-  const dem = new Map<string, number>();
+  const result = new Map<string, FinishedGoodTemplateRow>();
+  const counts = new Map<string, number>();
   for (const r of templatePeriodRows) {
     if (!r.productId) continue;
     const key = finishedGoodTemplateKey(r.productId, r.spec ?? "", r.customerId);
     const priceKey = `${key}|${r.unitPrice ?? ""}`;
-    if (ra.has(priceKey)) continue;
-    const occurrence = dem.get(key) ?? 0;
-    dem.set(key, occurrence + 1);
-    ra.set(priceKey, {
+    if (result.has(priceKey)) continue;
+    const occurrence = counts.get(key) ?? 0;
+    counts.set(key, occurrence + 1);
+    result.set(priceKey, {
       id: `${key}#${occurrence}`,
       key,
       productId: r.productId,
@@ -419,7 +419,7 @@ export function buildFinishedGoodTemplateRows(templatePeriodRows: BalancingOutpu
       unitPrice: r.unitPrice,
     });
   }
-  return [...ra.values()];
+  return [...result.values()];
 }
 
 /**
@@ -442,9 +442,9 @@ export function findMissingTemplateRows(
   const removed = new Map<string, number>();
   return template.filter((m) => {
     if (missingCustomerKeys.has(productSpecKey(m.productId, m.spec))) return false;
-    const bo = removed.get(m.key) ?? 0;
-    if (bo < (existing.get(m.key) ?? 0)) {
-      removed.set(m.key, bo + 1);
+    const removedKg = removed.get(m.key) ?? 0;
+    if (removedKg < (existing.get(m.key) ?? 0)) {
+      removed.set(m.key, removedKg + 1);
       return false;
     }
     return true;
@@ -483,9 +483,9 @@ export function suggestCustomerPrice(
 /* ---------- Ghi ngược ô ngày về sổ nguồn ---------- */
 
 export type WriteBackResult =
-  | { kind: "sua"; id: string; kg: number }
-  | { kind: "them"; kg: number }
-  | { kind: "tuChoi"; reason: string };
+  | { kind: "update"; id: string; kg: number }
+  | { kind: "add"; kg: number }
+  | { kind: "reject"; reason: string };
 
 /**
  * Sửa một ô ngày của dòng bán thành phẩm ⇒ ghi ngược về sổ Sản xuất.
@@ -500,20 +500,20 @@ export function writeBackDailyOutput(
   daySources: WipProductionItem[],
   newKg: number
 ): WriteBackResult {
-  if (daySources.length === 0) return { kind: "them", kg: newKg };
+  if (daySources.length === 0) return { kind: "add", kg: newKg };
   if (daySources.length === 1) {
-    return { kind: "sua", id: daySources[0].id, kg: newKg };
+    return { kind: "update", id: daySources[0].id, kg: newKg };
   }
   const end = daySources[daySources.length - 1];
   const otherTotal = daySources.slice(0, -1).reduce((s, r) => s + r.quantityKg, 0);
   const remaining = newKg - otherTotal;
   if (remaining < 0) {
     return {
-      kind: "tuChoi",
+      kind: "reject",
       reason: `Ngày này có ${daySources.length} dòng sản xuất, các dòng khác đã ${otherTotal} kg. Sửa trực tiếp ở màn Sản xuất bán thành phẩm.`,
     };
   }
-  return { kind: "sua", id: end.id, kg: remaining };
+  return { kind: "update", id: end.id, kg: remaining };
 }
 
 /**
@@ -526,10 +526,10 @@ export function writeBackDailyOutput(
  * lấy" dù sổ đầy số. Danh sách này là đường lui: cho người dùng tự tick dòng.
  */
 export function filterFreeImportsInPeriod(
-  ky: BalancingPeriod,
+  period: BalancingPeriod,
   imports: MaterialImportItem[]
 ): MaterialImportItem[] {
-  const dates = new Set(getPeriodDates(ky));
+  const dates = new Set(getPeriodDates(period));
   if (dates.size === 0) return [];
   return imports.filter((r) => dates.has(r.deliveryDate) && !r.balancingPeriodId);
 }
@@ -543,10 +543,10 @@ export function filterFreeImportsInPeriod(
  * được ba con số này thì màn chỉ biết nói "chưa có nguyên liệu".
  */
 export function filterAllImportsInPeriod(
-  ky: BalancingPeriod,
+  period: BalancingPeriod,
   imports: MaterialImportItem[]
 ): MaterialImportItem[] {
-  const dates = new Set(getPeriodDates(ky));
+  const dates = new Set(getPeriodDates(period));
   if (dates.size === 0) return [];
   return imports.filter((r) => dates.has(r.deliveryDate));
 }
@@ -560,20 +560,20 @@ export function writeBackDailyImport(
   daySources: MaterialImportItem[],
   newKg: number
 ): WriteBackResult {
-  if (daySources.length === 0) return { kind: "them", kg: newKg };
+  if (daySources.length === 0) return { kind: "add", kg: newKg };
   if (daySources.length === 1) {
-    return { kind: "sua", id: daySources[0].id, kg: newKg };
+    return { kind: "update", id: daySources[0].id, kg: newKg };
   }
   const end = daySources[daySources.length - 1];
   const otherTotal = daySources.slice(0, -1).reduce((s, r) => s + r.quantityKg, 0);
   const remaining = newKg - otherTotal;
   if (remaining < 0) {
     return {
-      kind: "tuChoi",
+      kind: "reject",
       reason: `Ngày này có ${daySources.length} chuyến nhập, các chuyến khác đã ${otherTotal} kg. Sửa trực tiếp ở màn Nhập hàng.`,
     };
   }
-  return { kind: "sua", id: end.id, kg: remaining };
+  return { kind: "update", id: end.id, kg: remaining };
 }
 
 /* ---------- Chuyển kỳ: nối kỳ trước sang kỳ sau ---------- */
@@ -584,17 +584,17 @@ export function writeBackDailyImport(
  * mà kỳ trước đã khai.
  */
 export function findPreviousPeriod(
-  ky: BalancingPeriod,
+  period: BalancingPeriod,
   allPeriods: BalancingPeriod[]
 ): BalancingPeriod | null {
-  const batDau = ky.startDate;
-  if (!batDau) return null;
+  const start = period.startDate;
+  if (!start) return null;
   const prevRows = allPeriods
     .filter(
       (k) =>
-        k.id !== ky.id &&
-        isSameMaterialFamily(k.materialTypeName, ky.materialTypeName) &&
-        (k.endDate || k.startDate || "") < batDau
+        k.id !== period.id &&
+        isSameMaterialFamily(k.materialTypeName, period.materialTypeName) &&
+        (k.endDate || k.startDate || "") < start
     )
     .sort((a, b) => (b.endDate || b.startDate || "").localeCompare(a.endDate || a.startDate || ""));
   return prevRows[0] ?? null;
@@ -616,8 +616,8 @@ export interface CarryOverRow {
  */
 export function listPendingCarryOvers<
   T extends { id: string; carryOverKg?: number; carryOverPeriodId?: string },
->(prevPeriodRows: T[], ten: (r: T) => string): CarryOverRow[] {
+>(prevPeriodRows: T[], name: (r: T) => string): CarryOverRow[] {
   return prevPeriodRows
     .filter((r) => (r.carryOverKg ?? 0) < 0 && !r.carryOverPeriodId)
-    .map((r) => ({ sourceId: r.id, name: ten(r), kg: Math.abs(r.carryOverKg ?? 0) }));
+    .map((r) => ({ sourceId: r.id, name: name(r), kg: Math.abs(r.carryOverKg ?? 0) }));
 }

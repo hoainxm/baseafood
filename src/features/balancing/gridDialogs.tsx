@@ -40,13 +40,13 @@ export function AddMaterialRowDialog({
   title: string;
   /** Danh mục loại NL + tên các dòng đã có trong kỳ. */
   suggestions: { value: string; label: string }[];
-  onCreateMaterialType: (ten: string) => string;
+  onCreateMaterialType: (name: string) => string;
   /** Bút chì sửa nhanh loại NL (useQuickCatalogEdit của màn, theo TÊN) — mục không có trong danh mục thì không có bút. */
   materialTypeEdit?: { openEdit: (v: string) => void; canEdit: (v: string) => boolean; editLabel: string };
   onClose: () => void;
-  onSave: (ten: string) => void;
+  onSave: (name: string) => void;
 }) {
-  const [ten, setTen] = useState("");
+  const [name, setName] = useState("");
   return (
     <Dialog open onOpenChange={(v) => !v && onClose()}>
       <DialogContent>
@@ -62,8 +62,8 @@ export function AddMaterialRowDialog({
             để "Bạch tuộc 2 da lớn" và "BT 2 da lon" thành hai dòng khác nhau. */}
         <Combobox
           label="Loại nguyên liệu"
-          value={ten}
-          onChange={setTen}
+          value={name}
+          onChange={setName}
           options={suggestions}
           onCreate={onAddMaterialType}
           onEditItem={materialTypeEditor?.openEdit}
@@ -78,7 +78,7 @@ export function AddMaterialRowDialog({
             title="Thêm dòng nguyên liệu vừa chọn vào lưới của kỳ."
             size="lg"
             onClick={() => {
-              const t = ten.trim();
+              const t = name.trim();
               if (!t) {
                 notify.error("Chưa chọn loại nguyên liệu");
                 return;
@@ -115,24 +115,24 @@ export function PickImportRowsDialog({
   onSave: (ids: string[]) => void;
 }) {
   /* Dòng CÙNG loại lên trước, dòng khác loại xuống cuối — mắt đọc từ trên xuống. */
-  const dong = [...inputRows].sort(
+  const row = [...inputRows].sort(
     (a, b) => Number(isSameFamily(b)) - Number(isSameFamily(a)) || a.deliveryDate.localeCompare(b.deliveryDate)
   );
   /* Chỉ tick sẵn dòng CÙNG loại mà chưa kỳ nào giữ. Trước đây tick sẵn MỌI dòng chưa
      gắn kỳ — kể cả khác loại — nên kỳ "Bạch tuộc 2 da" tạo trùng ngày bấm vào là kéo
      luôn các chuyến 1 da. Dòng khác loại / đang thuộc kỳ khác: người dùng tự tick. */
   const [selectedIds, setSelectedIds] = useState<Set<string>>(
-    () => new Set(dong.filter((r) => !heldIds.has(r.id) && isSameFamily(r)).map((r) => r.id))
+    () => new Set(row.filter((r) => !heldIds.has(r.id) && isSameFamily(r)).map((r) => r.id))
   );
-  const otherTypeCheckedCount = dong.filter((r) => selectedIds.has(r.id) && !isSameFamily(r)).length;
-  const doi = (id: string) =>
+  const otherTypeCheckedCount = row.filter((r) => selectedIds.has(r.id) && !isSameFamily(r)).length;
+  const toggle = (id: string) =>
     setSelectedIds((prev) => {
       const nextSet = new Set(prev);
       if (nextSet.has(id)) nextSet.delete(id);
       else nextSet.add(id);
       return nextSet;
     });
-  const totalKg = dong
+  const totalKg = row
     .filter((r) => selectedIds.has(r.id))
     .reduce((s, r) => s + r.quantityKg, 0);
 
@@ -166,14 +166,14 @@ export function PickImportRowsDialog({
               </tr>
             </thead>
             <tbody>
-              {dong.map((r) => (
+              {row.map((r) => (
                 <tr key={r.id}>
                   <td className="border-b border-border px-3 py-2">
                     <input
                       type="checkbox"
                       className="size-6"
                       checked={selectedIds.has(r.id)}
-                      onChange={() => doi(r.id)}
+                      onChange={() => toggle(r.id)}
                       aria-label={`Lấy dòng ${r.materialTypeName} ngày ${formatDateVN(r.deliveryDate)}`}
                     />
                   </td>
@@ -185,11 +185,11 @@ export function PickImportRowsDialog({
                   </td>
                   <td className="border-b border-border px-3 py-2">
                     <span className="inline-flex flex-wrap gap-1">
-                      {!isSameFamily(r) && <Tag variant="loi">Khác loại</Tag>}
+                      {!isSameFamily(r) && <Tag variant="error">Khác loại</Tag>}
                       {heldIds.has(r.id) ? (
-                        <Tag variant="luu-y">Đang thuộc kỳ khác</Tag>
+                        <Tag variant="warning">Đang thuộc kỳ khác</Tag>
                       ) : (
-                        <Tag variant="cho">Chưa gắn kỳ</Tag>
+                        <Tag variant="pending">Chưa gắn kỳ</Tag>
                       )}
                     </span>
                   </td>
@@ -326,13 +326,13 @@ export function AddProductDialog({
 }: {
   products: Product[];
   customers: Customer[];
-  onCreateProduct: (ten: string) => string;
-  onCreateCustomer: (ten: string) => string;
+  onCreateProduct: (name: string) => string;
+  onCreateCustomer: (name: string) => string;
   /** Bút chì sửa nhanh bản ghi danh mục (value = id). */
   onEditProduct?: (id: string) => void;
   onEditCustomer?: (id: string) => void;
   onClose: () => void;
-  onSave: (productId: string, customerId: string, spec: string, kenh: SalesChannel) => void;
+  onSave: (productId: string, customerId: string, spec: string, channel: SalesChannel) => void;
 }) {
   const [productId, setProductId] = useState("");
   const [customerId, setCustomerId] = useState("");

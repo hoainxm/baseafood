@@ -60,11 +60,11 @@ export function PrintSheet({
 
 /** Cỡ tem thông dụng (mm) — máy in tem nhiệt hay dùng các khổ này. */
 const LABEL_SIZES = [
-  { rong: 50, cao: 30, nhan: "50×30" },
-  { rong: 40, cao: 30, nhan: "40×30" },
-  { rong: 35, cao: 25, nhan: "35×25" },
-  { rong: 60, cao: 40, nhan: "60×40" },
-  { rong: 100, cao: 50, nhan: "100×50" },
+  { width: 50, height: 30, label: "50×30" },
+  { width: 40, height: 30, label: "40×30" },
+  { width: 35, height: 25, label: "35×25" },
+  { width: 60, height: 40, label: "60×40" },
+  { width: 100, height: 50, label: "100×50" },
 ];
 const keo = (v: number) => Math.max(10, Math.min(200, Math.round(v) || 0));
 const keoBan = (v: number) => Math.max(1, Math.min(500, Math.round(v) || 1));
@@ -79,12 +79,12 @@ export interface PrintLabel {
 }
 
 /** Một tem — co giãn theo khổ nhờ container-query, dùng chung cho xem trước và bản in. */
-function LabelTile({ label, width, height: cao, px, isLast }: { label: PrintLabel; width: number; height: number; px: number; isLast?: boolean }) {
-  const { lotCode, qrDataUrl, lines: dong = [] } = label;
+function LabelTile({ label, width, height, px, isLast }: { label: PrintLabel; width: number; height: number; px: number; isLast?: boolean }) {
+  const { lotCode, qrDataUrl, lines: row = [] } = label;
   return (
     <div
       className={`print-tem-box shrink-0 border border-slate-300 bg-white${isLast ? " print-tem-cuoi" : ""}`}
-      style={{ width: width * px, height: cao * px, containerType: "size" }}
+      style={{ width: width * px, height: height * px, containerType: "size" }}
     >
       <div className="flex h-full w-full items-center" style={{ gap: "4cqw", padding: "6cqmin" }}>
         {qrDataUrl ? (
@@ -114,7 +114,7 @@ function LabelTile({ label, width, height: cao, px, isLast }: { label: PrintLabe
           >
             {lotCode || "—"}
           </div>
-          {dong.map((d, i) => (
+          {row.map((d, i) => (
             <div
               key={i}
               style={{
@@ -151,8 +151,8 @@ export function LabelPrintSheet({
   onClose,
   lotCode = "",
   qrDataUrl = "",
-  lines: dong = [],
-  labels: tems,
+  lines: row = [],
+  labels,
   onPrint: onIn,
   defaultWidth = 50,
   defaultHeight = 30,
@@ -168,21 +168,21 @@ export function LabelPrintSheet({
   defaultHeight?: number;
 }) {
   const [width, setWidth] = useState(defaultWidth);
-  const [cao, setCao] = useState(defaultHeight);
-  const list: PrintLabel[] = tems ?? [{ lotCode, qrDataUrl, lines: dong }];
+  const [height, setHeight] = useState(defaultHeight);
+  const list: PrintLabel[] = labels ?? [{ lotCode, qrDataUrl, lines: row }];
   const [copies, setCopies] = useState<number[]>(() => list.map((t) => keoBan(t.copies ?? 1)));
   const copiesOf = (i: number) => copies[i] ?? 1;
   const totalLabels = list.reduce((s, _, i) => s + copiesOf(i), 0);
   const nhieu = totalLabels > 1;
   const PX = nhieu ? 4 : 6; // px mỗi mm khi xem trước (chỉ ảnh hưởng màn, không ảnh hưởng bản in)
-  const isSelected = (r: number, c: number) => r === width && c === cao;
+  const isSelected = (r: number, c: number) => r === width && c === height;
   const printCss = `@media print {
-  @page { size: ${width}mm ${cao}mm; margin: 0; }
+  @page { size: ${width}mm ${height}mm; margin: 0; }
   html, body { margin: 0 !important; background: #fff !important; }
   body > *:not(.print-tem) { display: none !important; }
   .print-tem { position: static !important; overflow: visible !important; padding: 0 !important; }
   .print-tem-list { display: block !important; }
-  .print-tem-box { width: ${width}mm !important; height: ${cao}mm !important; padding: 2mm; box-sizing: border-box;
+  .print-tem-box { width: ${width}mm !important; height: ${height}mm !important; padding: 2mm; box-sizing: border-box;
     border: 0 !important; margin: 0 !important; break-after: page; break-inside: avoid; }
   .print-tem-box.print-tem-cuoi { break-after: auto; }
   .print-tem-sao { display: block !important; }
@@ -215,16 +215,16 @@ export function LabelPrintSheet({
         <span className="text-sm font-medium text-slate-600">Khổ tem:</span>
         {LABEL_SIZES.map((c) => (
           <Button
-            key={c.nhan}
+            key={c.label}
             size="sm"
-            variant={isSelected(c.rong, c.cao) ? "default" : "outline"}
-            title={`Đổi khổ tem sang ${c.nhan} mm.`}
+            variant={isSelected(c.width, c.height) ? "default" : "outline"}
+            title={`Đổi khổ tem sang ${c.label} mm.`}
             onClick={() => {
-              setWidth(c.rong);
-              setCao(c.cao);
+              setWidth(c.width);
+              setHeight(c.height);
             }}
           >
-            {c.nhan}
+            {c.label}
           </Button>
         ))}
         <span className="ml-1 flex items-center gap-1 text-sm text-slate-600">
@@ -239,8 +239,8 @@ export function LabelPrintSheet({
           />
           <span aria-hidden>×</span>
           <NumberInput
-            value={cao}
-            onChange={(v) => v != null && setCao(keo(v))}
+            value={height}
+            onChange={(v) => v != null && setHeight(keo(v))}
             unit="mm"
             wrapperClassName="inline-block"
             className="w-16 rounded-md border border-slate-300 px-2 py-1 text-sm"
@@ -251,18 +251,18 @@ export function LabelPrintSheet({
       </div>
 
       <p className="no-print mx-auto mb-3 max-w-3xl text-center text-sm text-slate-500">
-        {nhieu ? `${totalLabels} tem — ` : ""}Xem trước (đã phóng to, mỗi lô hiện một tem). Khi in sẽ ra đúng khổ {width}×{cao} mm
+        {nhieu ? `${totalLabels} tem — ` : ""}Xem trước (đã phóng to, mỗi lô hiện một tem). Khi in sẽ ra đúng khổ {width}×{height} mm
         {nhieu ? ", mỗi tem một nhãn" : ""} — chọn máy in tem trong hộp thoại in.
       </p>
 
       <div className="print-tem-list mx-auto flex max-w-5xl flex-wrap justify-center gap-4">
         {list.map((t, i) => (
           <div key={i} className="flex flex-col items-center gap-1">
-            <LabelTile label={t} width={width} height={cao} px={PX} isLast={i === list.length - 1 && copiesOf(i) === 1} />
+            <LabelTile label={t} width={width} height={height} px={PX} isLast={i === list.length - 1 && copiesOf(i) === 1} />
             {/* Bản sao: ẩn trên màn, chỉ hiện khi in (.print-tem-sao trong printCss). */}
             {Array.from({ length: copiesOf(i) - 1 }, (_, k) => (
               <div key={k} className="print-tem-sao" style={{ display: "none" }}>
-                <LabelTile label={t} width={width} height={cao} px={PX} isLast={i === list.length - 1 && k === copiesOf(i) - 2} />
+                <LabelTile label={t} width={width} height={height} px={PX} isLast={i === list.length - 1 && k === copiesOf(i) - 2} />
               </div>
             ))}
             <label className="no-print flex items-center gap-1 text-sm text-slate-600">

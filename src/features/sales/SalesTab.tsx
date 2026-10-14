@@ -13,15 +13,15 @@ import SalesReport from "./SalesReport";
  */
 export default function SalesTab() {
   return (
-    <Tabs defaultValue="so" className="space-y-6">
+    <Tabs defaultValue="ledger" className="space-y-6">
       <TabsList>
-        <TabsTrigger value="so">Sổ bán hàng</TabsTrigger>
-        <TabsTrigger value="bao-cao">Báo cáo</TabsTrigger>
+        <TabsTrigger value="ledger">Sổ bán hàng</TabsTrigger>
+        <TabsTrigger value="report">Báo cáo</TabsTrigger>
       </TabsList>
-      <TabsContent value="so">
+      <TabsContent value="ledger">
         <SalesScreen />
       </TabsContent>
-      <TabsContent value="bao-cao">
+      <TabsContent value="report">
         <SalesReport />
       </TabsContent>
     </Tabs>

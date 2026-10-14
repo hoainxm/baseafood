@@ -137,22 +137,22 @@ const RULES: { name: string; content: string }[] = [
 ];
 
 export function ReconciliationRulesBox({ warnings }: { warnings: FlowWarning[] }) {
-  const [mo, setMo] = useState(false);
+  const [open, setOpen] = useState(false);
   const fxWarnings = warnings.filter((c) => c.kind === "Đơn vị tiền tệ ngoại tệ");
   return (
     <div className="rounded-xl border border-border">
       <button
         type="button"
         title="Mở / thu danh sách quy tắc máy đang dùng để ghép và kết luận."
-        aria-expanded={mo}
-        onClick={() => setMo((v) => !v)}
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
         className="flex min-h-11 w-full items-center gap-2 px-3 py-2 text-left font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
       >
-        {mo ? <ChevronDown className="size-4" aria-hidden /> : <ChevronRight className="size-4" aria-hidden />}
+        {open ? <ChevronDown className="size-4" aria-hidden /> : <ChevronRight className="size-4" aria-hidden />}
         <ListChecks className="size-4 text-muted-foreground" aria-hidden />
         Quy tắc máy đang áp dụng ({RULES.length})
       </button>
-      {mo && (
+      {open && (
         <div className="space-y-3 border-t border-border px-3 py-3">
           <ul className="space-y-2 text-sm">
             {RULES.map((q) => (
@@ -175,10 +175,10 @@ export function ReconciliationRulesBox({ warnings }: { warnings: FlowWarning[] }
 
 // ---------- Chia bên thuế gửi / tự tải ----------
 const METHOD_LABELS: Record<SideSplitMethod, string> = {
-  "chi-dinh": "bạn đã tự chọn",
-  "ten-thue": "máy nhận theo chữ “thuế” trong tên sheet",
-  "ten-tai": "máy nhận theo chữ “tải” trong tên sheet",
-  "khong-ro": "máy chưa nhận ra — hãy chọn",
+  manual: "bạn đã tự chọn",
+  "tax-name": "máy nhận theo chữ “thuế” trong tên sheet",
+  "download-name": "máy nhận theo chữ “tải” trong tên sheet",
+  unknown: "máy chưa nhận ra — hãy chọn",
 };
 
 function SideSplitBox({
@@ -191,7 +191,7 @@ function SideSplitBox({
   sheetNames: string[];
   taxSheets: ReadonlySet<string>;
   method: SideSplitMethod;
-  onChange: (ten: string, isTaxSide: boolean) => void;
+  onChange: (name: string, isTaxSide: boolean) => void;
   onAutoDetect: () => void;
 }) {
   return (
@@ -200,7 +200,7 @@ function SideSplitBox({
         <p className="text-sm font-medium">
           Sheet nào là bản nào? <span className="font-normal text-muted-foreground">({METHOD_LABELS[method]})</span>
         </p>
-        {method === "chi-dinh" && (
+        {method === "manual" && (
           <Button title="Bỏ lựa chọn tay, để máy tự nhận bản thuế / bản tự tải theo tên sheet." variant="outline" size="sm" onClick={onAutoDetect}>
             <RotateCcw /> Để máy tự nhận
           </Button>
@@ -241,14 +241,14 @@ function SideSplitBox({
 }
 
 // ---------- 1. So hai bản ----------
-type TwoVersionFilter = "all" | "CHI_THUE" | "CHI_TAI" | "LECH" | "KHONG_SO";
+type TwoVersionFilter = "all" | "SENT_ONLY" | "DOWNLOADED_ONLY" | "MISMATCH" | "UNCOMPARABLE";
 
 function twoVersionChip(d: TwoVersionRow) {
-  if (d.ben === "CHI_THUE") return <Tag variant="loi">Chỉ bản thuế có</Tag>;
-  if (d.ben === "CHI_TAI") return <Tag variant="luu-y">Chỉ bản tự tải có</Tag>;
-  if (d.amountUncomparable) return <Tag variant="luu-y">Không so được tiền</Tag>;
-  if (d.amountMismatch) return <Tag variant="loi">Lệch tiền</Tag>;
-  return <Tag variant="xong">Khớp</Tag>;
+  if (d.ben === "SENT_ONLY") return <Tag variant="error">Chỉ bản thuế có</Tag>;
+  if (d.ben === "DOWNLOADED_ONLY") return <Tag variant="warning">Chỉ bản tự tải có</Tag>;
+  if (d.amountUncomparable) return <Tag variant="warning">Không so được tiền</Tag>;
+  if (d.amountMismatch) return <Tag variant="error">Lệch tiền</Tag>;
+  return <Tag variant="done">Khớp</Tag>;
 }
 
 export function TwoVersionView({
@@ -263,15 +263,15 @@ export function TwoVersionView({
   sheetNames: string[];
   taxSheets: ReadonlySet<string>;
   method: SideSplitMethod;
-  onChangeSide: (ten: string, isTaxSide: boolean) => void;
+  onChangeSide: (name: string, isTaxSide: boolean) => void;
   onAutoDetect: () => void;
 }) {
   const [filter, setFilter] = useState<TwoVersionFilter>("all");
   const rows = useMemo(() => {
     if (!result) return [];
     if (filter === "all") return result.rows;
-    if (filter === "LECH") return result.rows.filter((d) => d.amountMismatch);
-    if (filter === "KHONG_SO") return result.rows.filter((d) => d.amountUncomparable);
+    if (filter === "MISMATCH") return result.rows.filter((d) => d.amountMismatch);
+    if (filter === "UNCOMPARABLE") return result.rows.filter((d) => d.amountUncomparable);
     return result.rows.filter((d) => d.ben === filter);
   }, [result, filter]);
 
@@ -300,20 +300,20 @@ export function TwoVersionView({
     );
 
   const t = result.totals;
-  const the: StatCardData[] = [
+  const cards: StatCardData[] = [
     { label: "Bản thuế gửi", value: num(t.sentCount), numeric: true, color: "brand", subtext: `${num(t.sentAmount)} đ`, onSelect: () => setFilter("all"), selectHint: "Xem tất cả hóa đơn" },
     { label: "Bản tự tải", value: num(t.downloadedCount), numeric: true, color: "brand", subtext: `${num(t.downloadedAmount)} đ`, onSelect: () => setFilter("all"), selectHint: "Xem tất cả hóa đơn" },
-    { label: "Chỉ bản thuế có", value: num(t.sentOnlyCount), numeric: true, color: t.sentOnlyCount ? "danger" : "success", subtext: `${num(t.sentOnlyAmount)} đ — bản tự tải thiếu`, onSelect: () => setFilter("CHI_THUE"), selectHint: "Xem hóa đơn bản tự tải thiếu" },
-    { label: "Chỉ bản tự tải có", value: num(t.downloadedOnlyCount), numeric: true, color: t.downloadedOnlyCount ? "warning" : "success", subtext: `${num(t.downloadedOnlyAmount)} đ`, onSelect: () => setFilter("CHI_TAI"), selectHint: "Xem hóa đơn bản thuế không có" },
-    { label: "Có cả hai, lệch tiền", value: num(t.amountMismatchCount), numeric: true, color: t.amountMismatchCount ? "warning" : "success", onSelect: () => setFilter("LECH"), selectHint: "Xem hóa đơn lệch tiền giữa hai bản" },
-    { label: "Không so được tiền", value: num(t.uncomparableCount), numeric: true, color: "trung-tinh", subtext: "sheet trộn hai bố cục cột", onSelect: () => setFilter("KHONG_SO"), selectHint: "Xem hóa đơn không so được tiền" },
+    { label: "Chỉ bản thuế có", value: num(t.sentOnlyCount), numeric: true, color: t.sentOnlyCount ? "danger" : "success", subtext: `${num(t.sentOnlyAmount)} đ — bản tự tải thiếu`, onSelect: () => setFilter("SENT_ONLY"), selectHint: "Xem hóa đơn bản tự tải thiếu" },
+    { label: "Chỉ bản tự tải có", value: num(t.downloadedOnlyCount), numeric: true, color: t.downloadedOnlyCount ? "warning" : "success", subtext: `${num(t.downloadedOnlyAmount)} đ`, onSelect: () => setFilter("DOWNLOADED_ONLY"), selectHint: "Xem hóa đơn bản thuế không có" },
+    { label: "Có cả hai, lệch tiền", value: num(t.amountMismatchCount), numeric: true, color: t.amountMismatchCount ? "warning" : "success", onSelect: () => setFilter("MISMATCH"), selectHint: "Xem hóa đơn lệch tiền giữa hai bản" },
+    { label: "Không so được tiền", value: num(t.uncomparableCount), numeric: true, color: "neutral", subtext: "sheet trộn hai bố cục cột", onSelect: () => setFilter("UNCOMPARABLE"), selectHint: "Xem hóa đơn không so được tiền" },
   ];
   const TWO_VERSION_FILTERS: { id: TwoVersionFilter; label: string; n: number }[] = [
     { id: "all", label: "Tất cả", n: result.rows.length },
-    { id: "CHI_THUE", label: "Chỉ bản thuế có", n: t.sentOnlyCount },
-    { id: "CHI_TAI", label: "Chỉ bản tự tải có", n: t.downloadedOnlyCount },
-    { id: "LECH", label: "Lệch tiền", n: t.amountMismatchCount },
-    { id: "KHONG_SO", label: "Không so được", n: t.uncomparableCount },
+    { id: "SENT_ONLY", label: "Chỉ bản thuế có", n: t.sentOnlyCount },
+    { id: "DOWNLOADED_ONLY", label: "Chỉ bản tự tải có", n: t.downloadedOnlyCount },
+    { id: "MISMATCH", label: "Lệch tiền", n: t.amountMismatchCount },
+    { id: "UNCOMPARABLE", label: "Không so được", n: t.uncomparableCount },
   ];
   const columns: RecordTableColumn<TwoVersionRow>[] = [
     { key: "kq", header: "Kết quả", primary: true, render: twoVersionChip },
@@ -330,7 +330,7 @@ export function TwoVersionView({
   return (
     <div className="space-y-4">
       {sideSplitBox}
-      <StatCardGrid cards={the} />
+      <StatCardGrid cards={cards} />
       <div className="flex flex-wrap gap-2">
         {TWO_VERSION_FILTERS.map((l) => (
           <Button key={l.id} title={`Lọc danh sách: ${l.label}.`} size="sm" variant={filter === l.id ? "default" : "outline"} onClick={() => setFilter(l.id)}>
@@ -354,13 +354,13 @@ export function TwoVersionView({
 function SheetSumCheck({ sh }: { sh: InvoiceSheet }) {
   const cd = sh.columnSum;
   const [onlyReal, setOnlyReal] = useState(cd.rowCounts.realDiff > 0);
-  const rows = useMemo(() => (onlyReal ? cd.mismatchRows.filter((d) => d.kind === "that") : cd.mismatchRows), [cd, onlyReal]);
+  const rows = useMemo(() => (onlyReal ? cd.mismatchRows.filter((d) => d.kind === "real") : cd.mismatchRows), [cd, onlyReal]);
   const columnLetter = (c: number) => (c >= 0 ? columnIndexToLetter(aoaToExcelColumn(sh.origin, c)) : "");
-  const columnName = (c: number, ten: string) => (c >= 0 ? `${ten} (cột ${columnLetter(c)})` : ten);
+  const columnName = (c: number, name: string) => (c >= 0 ? `${name} (cột ${columnLetter(c)})` : name);
   const isMatch = Math.abs(cd.diff) < 0.5;
   const o = cd.userDiffCell;
 
-  const bang: [string, number, number | null][] = [
+  const tableRows: [string, number, number | null][] = [
     ["Phí (hợp lệ)", cd.breakdown.fee, cd.rowCounts.fee],
     ["Chiết khấu (hợp lệ)", cd.breakdown.discount, cd.rowCounts.discount],
     ["Làm tròn ±1 đ", cd.breakdown.rounding, cd.rowCounts.rounding],
@@ -368,7 +368,7 @@ function SheetSumCheck({ sh }: { sh: InvoiceSheet }) {
   ];
   const columns: RecordTableColumn<SumMismatchRow>[] = [
     { key: "d", header: "Dòng", primary: true, render: (d) => `dòng ${d.fileRow}`, getSortValue: (d) => d.fileRow },
-    { key: "loai", header: "Nguyên nhân", render: (d) => (d.kind === "that" ? <Tag variant="loi">Lệch thật</Tag> : <Tag variant="luu-y">{SUM_MISMATCH_LABELS[d.kind]}</Tag>) },
+    { key: "loai", header: "Nguyên nhân", render: (d) => (d.kind === "real" ? <Tag variant="error">Lệch thật</Tag> : <Tag variant="warning">{SUM_MISMATCH_LABELS[d.kind]}</Tag>) },
     { key: "ma", header: "Hóa đơn", render: (d) => d.invoice },
     { key: "ngay", header: "Ngày", render: (d) => d.date, hideOnMobile: true },
     { key: "ban", header: "Người bán", render: (d) => d.seller, hideOnMobile: true },
@@ -383,7 +383,7 @@ function SheetSumCheck({ sh }: { sh: InvoiceSheet }) {
       <CardHeader>
         <CardTitle className="flex flex-wrap items-center gap-2">
           Sheet {sh.name}
-          {isMatch ? <Tag variant="xong">Cộng khớp</Tag> : cd.rowCounts.realDiff ? <Tag variant="loi">{`${num(cd.rowCounts.realDiff)} dòng lệch thật`}</Tag> : <Tag variant="luu-y">Lệch bình thường</Tag>}
+          {isMatch ? <Tag variant="done">Cộng khớp</Tag> : cd.rowCounts.realDiff ? <Tag variant="error">{`${num(cd.rowCounts.realDiff)} dòng lệch thật`}</Tag> : <Tag variant="warning">Lệch bình thường</Tag>}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -412,9 +412,9 @@ function SheetSumCheck({ sh }: { sh: InvoiceSheet }) {
                 </tr>
               </thead>
               <tbody>
-                {bang.map(([ten, amount, n]) => (
-                  <tr key={ten} className="border-b border-border/60">
-                    <td className="py-1.5 pr-3">{ten}</td>
+                {tableRows.map(([name, amount, n]) => (
+                  <tr key={name} className="border-b border-border/60">
+                    <td className="py-1.5 pr-3">{name}</td>
                     <td className="tnum py-1.5 pr-3 text-right">{num(n ?? 0)}</td>
                     <td className="tnum py-1.5 text-right">{num(amount)}</td>
                   </tr>
@@ -463,7 +463,7 @@ export function ColumnSumCheckView({ sheets }: { sheets: InvoiceSheet[] }) {
         description="Cần sheet hóa đơn có cột chưa thuế, thuế và tổng thanh toán."
       />
     );
-  const the: StatCardData[] = items.map((s) => {
+  const cards: StatCardData[] = items.map((s) => {
     const cd = s.columnSum;
     const isMatch = Math.abs(cd.diff) < 0.5;
     return {
@@ -476,7 +476,7 @@ export function ColumnSumCheckView({ sheets }: { sheets: InvoiceSheet[] }) {
   });
   return (
     <div className="space-y-4">
-      <StatCardGrid cards={the} />
+      <StatCardGrid cards={cards} />
       {items.map((s) => (
         <SheetSumCheck key={s.name} sh={s} />
       ))}
@@ -497,9 +497,9 @@ export function SameDayView({ groups }: { groups: SameDayGroup[] }) {
         description="Không người bán nào xuất từ 2 hóa đơn trở lên trong cùng một ngày."
       />
     );
-  const the: StatCardData[] = [
+  const cards: StatCardData[] = [
     { label: "Nhóm cùng MST cùng ngày", value: num(groups.length), numeric: true, color: "brand", onSelect: () => setOnlyDuplicates(false), selectHint: "Xem mọi nhóm" },
-    { label: "Hóa đơn trong các nhóm", value: num(groups.reduce((s, g) => s + g.invoiceCount, 0)), numeric: true, color: "trung-tinh" },
+    { label: "Hóa đơn trong các nhóm", value: num(groups.reduce((s, g) => s + g.invoiceCount, 0)), numeric: true, color: "neutral" },
     { label: "Nhóm trùng khít số tiền", value: num(sameAmountCount), numeric: true, color: sameAmountCount ? "warning" : "success", subtext: "dễ kê hai lần — soát trước", onSelect: () => setOnlyDuplicates(true), selectHint: "Xem nhóm trùng khít số tiền" },
   ];
   const columns: RecordTableColumn<SameDayGroup>[] = [
@@ -521,7 +521,7 @@ export function SameDayView({ groups }: { groups: SameDayGroup[] }) {
         Nhiều hóa đơn cùng người bán trong một ngày <b>chưa chắc là sai</b> (xăng dầu, siêu thị, phí ngân hàng…). Nhóm có hóa
         đơn trùng khít số tiền mới đáng soát trước.
       </p>
-      <StatCardGrid cards={the} />
+      <StatCardGrid cards={cards} />
       <div className="flex flex-wrap gap-2">
         <Button title="Chỉ xem nhóm có hóa đơn trùng khít số tiền." size="sm" variant={onlyDuplicates ? "default" : "outline"} onClick={() => setOnlyDuplicates(true)}>
           Trùng khít số tiền <span className="tnum ml-1">({num(sameAmountCount)})</span>

@@ -31,7 +31,7 @@ import { Fish, Plus } from "lucide-react";
  * Sửa cỡ chữ / nhãn ở đây rẻ hơn sửa sau gấp nhiều lần.
  */
 
-interface DongDemo {
+interface DemoRow {
   id: string;
   materialType: string;
   supplierName: string;
@@ -39,7 +39,7 @@ interface DongDemo {
   unitPrice: number;
 }
 
-const DEMO: DongDemo[] = [
+const DEMO: DemoRow[] = [
   {
     id: "1",
     materialType: "Bạch tuộc 2 da",
@@ -81,7 +81,7 @@ export default function KitPage() {
   const [kind, setKind] = useState("bt");
   const [sl, setSl] = useState<number | null>(1250);
   const [supplier, setSupplier] = useState("");
-  const [loi, setLoi] = useState<FieldError[]>([]);
+  const [errors, setErrors] = useState<FieldError[]>([]);
   const [rows, setRows] = useState(DEMO);
   const [date, setDate] = useState(todayIso());
   const [fromDate, setFromDate] = useState(todayIso());
@@ -94,7 +94,7 @@ export default function KitPage() {
     { value: "Bảy Lành", label: "Bảy Lành" },
   ]);
 
-  const cols: RecordTableColumn<DongDemo>[] = [
+  const cols: RecordTableColumn<DemoRow>[] = [
     {
       key: "loai",
       header: "Loại nguyên liệu",
@@ -124,7 +124,7 @@ export default function KitPage() {
     },
   ];
 
-  const remove = (r: DongDemo) => {
+  const remove = (r: DemoRow) => {
     const prevRows = rows;
     setRows((v) => v.filter((x) => x.id !== r.id));
     notify.deleted(`Đã xóa "${r.materialType}"`, () => setRows(prevRows));
@@ -236,9 +236,9 @@ export default function KitPage() {
             label="Khoảng ngày tiếp nhận"
             startDate={fromDate}
             endDate={toDate}
-            onChange={(tu, den) => {
-              setFromDate(tu);
-              setToDate(den);
+            onChange={(fromDate, toDate) => {
+              setFromDate(fromDate);
+              setToDate(toDate);
             }}
           />
         </div>
@@ -255,10 +255,10 @@ export default function KitPage() {
             value={selectedSupplier}
             onChange={setSelectedSupplier}
             options={supplierOptions}
-            onCreate={(ten) => {
-              setSupplierOptions((v) => [...v, { value: ten, label: ten }]);
-              notify.saved(`Đã thêm đại lý "${ten}" vào danh mục`);
-              return ten;
+            onCreate={(name) => {
+              setSupplierOptions((v) => [...v, { value: name, label: name }]);
+              notify.saved(`Đã thêm đại lý "${name}" vào danh mục`);
+              return name;
             }}
             hint="Thử gõ một tên chưa có, VD: Sáu Tèo."
           />
@@ -276,12 +276,12 @@ export default function KitPage() {
         title="7. Gộp lỗi đầu form"
         note="Nút Lưu không bao giờ mờ đi — bấm khi thiếu thì hiện hộp này"
       >
-        <ErrorSummary errors={loi} />
+        <ErrorSummary errors={errors} />
         <Button
           className="mt-4"
           onClick={() =>
-            setLoi(
-              loi.length
+            setErrors(
+              errors.length
                 ? []
                 : [
                     { field: "Đại lý", message: "Chưa nhập tên đại lý" },
@@ -290,7 +290,7 @@ export default function KitPage() {
             )
           }
         >
-          {loi.length ? "Ẩn lỗi" : "Bấm lưu khi còn thiếu"}
+          {errors.length ? "Ẩn lỗi" : "Bấm lưu khi còn thiếu"}
         </Button>
       </Section>
 

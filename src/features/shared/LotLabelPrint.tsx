@@ -67,13 +67,13 @@ export function LotQrLabels({ node, nuts, onClose }: { node?: LotNode; nuts?: Lo
   // Mặc định mỗi block (BTP) / mỗi thùng-gói (TP) một tem; người in sửa được ở xem trước.
   const [wips] = useWipProductions();
   const [packagings] = usePackagings();
-  const tems: PrintLabel[] = items.map((n) => ({
+  const labels: PrintLabel[] = items.map((n) => ({
     lotCode: n.label,
     qrDataUrl: qr[`${n.kind}:${n.id}`] ?? "",
     lines: labelLines(n),
     copies: getDefaultLabelCount(n, { wips, packagings }),
   }));
-  return <LabelPrintSheet onClose={onClose} labels={tems} onPrint={recordPrintCount} />;
+  return <LabelPrintSheet onClose={onClose} labels={labels} onPrint={recordPrintCount} />;
 }
 
 /**
@@ -84,10 +84,10 @@ export function LotQrLabels({ node, nuts, onClose }: { node?: LotNode; nuts?: Lo
  * tem theo đầu chuyến như trước.
  */
 export function LotLabelPrint({ shipment, onClose }: { shipment: ImportShipment; onClose: () => void }) {
-  const { dl } = useTraceData();
-  const byType = getShipmentLines(dl, shipment.id).map((m) => buildLotNode("S", m.id, dl));
+  const { traceData } = useTraceData();
+  const byType = getShipmentLines(traceData, shipment.id).map((m) => buildLotNode("S", m.id, traceData));
   if (byType.length) return <LotQrLabels nuts={byType} onClose={onClose} />;
-  const tam: LotNode = {
+  const placeholder: LotNode = {
     kind: "S",
     id: shipment.id,
     label: formatMaterialLotLabel(shipment),
@@ -101,5 +101,5 @@ export function LotLabelPrint({ shipment, onClose }: { shipment: ImportShipment;
     ],
     isMissing: false,
   };
-  return <LotQrLabels node={tam} onClose={onClose} />;
+  return <LotQrLabels node={placeholder} onClose={onClose} />;
 }

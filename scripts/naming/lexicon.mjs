@@ -25,6 +25,9 @@ export const STRONG_SYLLABLES = new Set(
   thoai luan kieu trung chinh nen chenh khau bieu cung nguong cau cach ke gop
   sach thuc khac phien hieu giu huy chuoi khoang chieu phe vuot duong phep sinh
   toa tham gon nhanh cham lech
+  ky nhom loi moc dau doi chu goi cuu tracuu tho nap lich ket ghep suy xong phong thich xanh
+  ngoc kien thua hoac gach nguoc xuoi phang ngang cac giao vong chiet nguy hiem tuoi giong kem
+  tuoc ngau nhien nhac nhe luot kenh mua khi toan xu trang vang dong
   `
     .split(/\s+/)
     .filter(Boolean)
@@ -40,9 +43,9 @@ export const STRONG_SYLLABLES = new Set(
 export const AMBIGUOUS_SYLLABLES = new Set(
   `
   an do go the con tin hop me bo sang lay ten ma le mat ban
-  dong tam chu co da di ra ve len lo so nam hang cao gap ly mai qua bay
-  ho tu mo bot dau lai bang bien doi loi goi ky ta de nhom bao ca du cat lap
-  pm dl va dem lua che van moc
+  tam co da di ra ve len lo so nam hang cao gap ly mai qua bay
+  ho tu mo bot lai bang bien ta de bao ca du cat lap
+  pm dl va dem lua che van
   `
     .split(/\s+/)
     .filter(Boolean)

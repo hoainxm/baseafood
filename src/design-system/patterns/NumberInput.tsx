@@ -20,7 +20,7 @@ export function ExpressionPreview({
   preview,
   unit,
 }: {
-  preview: { ketQua: number | null } | null;
+  preview: { result: number | null } | null;
   unit?: string;
 }) {
   const ref = React.useRef<HTMLSpanElement>(null);
@@ -44,7 +44,7 @@ export function ExpressionPreview({
     };
   }, [isVisible]);
 
-  const { ketQua } = preview ?? { ketQua: null };
+  const { result } = preview ?? { result: null };
   return (
     <>
       <span ref={ref} hidden />
@@ -57,14 +57,14 @@ export function ExpressionPreview({
             style={{ top: position.top, right: position.right }}
             className={cn(
               "tnum pointer-events-none fixed z-[100] rounded-md border px-2 py-0.5 text-sm font-semibold whitespace-nowrap shadow-sm",
-              ketQua == null
+              result == null
                 ? "border-border bg-popover text-muted-foreground"
                 : "border-primary/40 bg-popover text-foreground"
             )}
           >
-            {ketQua == null
+            {result == null
               ? "Đang gõ phép tính…"
-              : `= ${formatNumber(ketQua)}${unit ? ` ${unit}` : ""}`}
+              : `= ${formatNumber(result)}${unit ? ` ${unit}` : ""}`}
           </span>,
           document.body
         )}
@@ -98,7 +98,7 @@ export const NumberInput = React.forwardRef<
   { value, onChange, unit, emptyIsZero: rong0, className, wrapperClassName, navCol, onKeyDown, onFocus, onBlur, ...rest },
   ref
 ) {
-  const { props, xemTruoc: preview } = useNumberInput({ value, onChange, emptyIsZero: rong0 });
+  const { props, preview } = useNumberInput({ value, onChange, emptyIsZero: rong0 });
   return (
     <span className={cn("relative block", wrapperClassName)}>
       <input

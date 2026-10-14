@@ -44,7 +44,7 @@ export function useTopScrollbar(getFrame: () => HTMLElement | null, className?: 
     remeasure();
     const ro = new ResizeObserver(remeasure);
     ro.observe(container);
-    for (const con of Array.from(container.children)) ro.observe(con);
+    for (const child of Array.from(container.children)) ro.observe(child);
     return () => ro.disconnect();
   }, [container]);
 

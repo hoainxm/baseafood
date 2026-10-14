@@ -61,7 +61,7 @@ import {
 import { useQuickCatalogEdit } from "@/features/catalog/QuickCatalogEdit";
 import { LotDispatchPicker } from "@/features/shared";
 import { kg, num, todayISO, formatDateVN } from "@/lib/format";
-import { KY_OPT, getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
+import { PERIOD_OPTIONS, getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
 import {
   CalendarRange,
   CircleCheck,
@@ -122,20 +122,20 @@ function groupByInvoice(rows: SalesItem[], salesInvoices: SalesInvoice[]): Invoi
   for (const r of rows) {
     const p = theoId.get(r.invoiceId);
     if (!p) continue; // dòng mồ côi (phiếu đã xóa) — bỏ qua
-    let nhom = nhoms.get(p.id);
-    if (!nhom) {
-      nhom = {
+    let group = nhoms.get(p.id);
+    if (!group) {
+      group = {
         invoice: p,
         items: [],
         totalKg: 0,
         totalAmount: 0,
         isBackdated: isBackdatedSales(p),
       };
-      nhoms.set(p.id, nhom);
+      nhoms.set(p.id, group);
     }
-    nhom.items.push(r);
-    nhom.totalKg += r.quantityKg || 0;
-    nhom.totalAmount += calculateSalesAmount(r);
+    group.items.push(r);
+    group.totalKg += r.quantityKg || 0;
+    group.totalAmount += calculateSalesAmount(r);
   }
 
   return [...nhoms.values()].sort(
@@ -163,7 +163,7 @@ function invoiceHeaderErrors(d: InvoiceHeader): FieldError[] {
 
 export default function SalesScreen() {
   const [rows, persist] = useSalesItems();
-  const [salesInvoices, persistSalesInvoices, { trangThai: status }] = useSalesInvoices();
+  const [salesInvoices, persistSalesInvoices, { status }] = useSalesInvoices();
 
   /* Tồn khả dụng để bán: trừ SUY từ chính các dòng bán (theo marker nguồn).
    * - Block thô (RETAIL_WAREHOUSE) trừ tồn BTP; đóng gói (FG_WAREHOUSE) trừ tồn TP.
@@ -202,12 +202,12 @@ export default function SalesScreen() {
     () => computeFinishedGoodStock(packagings, filterRetailSales(rows, FG_WAREHOUSE)),
     [packagings, rows]
   );
-  const isLoading = status === "dang-tai" && salesInvoices.length === 0;
+  const isLoading = status === "loading" && salesInvoices.length === 0;
   const [products, setProducts] = useProducts();
   const [customers, setCustomers] = useCustomers();
 
   // Kỳ xem sổ: ngày/tuần/tháng/năm/khoảng tự chọn
-  const [ky, setKy] = useState<ViewPeriod>("ngay");
+  const [period, setPeriod] = useState<ViewPeriod>("day");
   const [date, setDate] = useState(todayISO());
   const [fromDate, setFromDate] = useState(todayISO());
   const [toDate, setToDate] = useState(todayISO());
@@ -231,9 +231,9 @@ export default function SalesScreen() {
 
   /* Sửa MỘT dòng mặt hàng — chỉ mặt hàng / quy cách / kg / giá. */
   const [editing, setEditing] = useState<SalesItem | null>(null);
-  const [loi, setLoi] = useState<FieldError[]>([]);
+  const [errors, setErrors] = useState<FieldError[]>([]);
 
-  const [effectiveFrom, effectiveTo] = getViewPeriodRange(ky, date, fromDate, toDate);
+  const [effectiveFrom, effectiveTo] = getViewPeriodRange(period, date, fromDate, toDate);
   const isSingleDay = effectiveFrom === effectiveTo;
 
   const productName = (id: string) =>
@@ -252,7 +252,7 @@ export default function SalesScreen() {
     [rows, salesInvoices, effectiveFrom, effectiveTo, workshop]
   );
 
-  const nhomView = useMemo(() => groupByInvoice(view, salesInvoices), [view, salesInvoices]);
+  const groupedView = useMemo(() => groupByInvoice(view, salesInvoices), [view, salesInvoices]);
 
   const rangeDescription = isSingleDay
     ? formatDateVN(effectiveFrom)
@@ -284,25 +284,25 @@ export default function SalesScreen() {
   }));
 
   /** Sửa nhanh khách hàng / mặt hàng tại chỗ (cả hai nối theo id ở phiếu bán). */
-  const customerEditor = useQuickCatalogEdit("khachHang", customers, setCustomers);
-  const productEditor = useQuickCatalogEdit("matHang", products, setProducts);
+  const customerEditor = useQuickCatalogEdit("customer", customers, setCustomers);
+  const productEditor = useQuickCatalogEdit("product", products, setProducts);
 
   // Nhãn có mã số ("12 · tên") nên ô chọn không tự nhận ra tên trùng ⇒ tự dò,
   // trùng tên (không phân hoa thường) thì dùng lại bản có sẵn.
-  const addProduct = (ten: string) => {
-    const co = products.find((m) => m.name.trim().toLowerCase() === ten.trim().toLowerCase());
-    if (co) return co.id;
-    const m: Product = { id: uid(), code: "", name: ten, finishedGoodCode: "" };
+  const addProduct = (name: string) => {
+    const existing = products.find((m) => m.name.trim().toLowerCase() === name.trim().toLowerCase());
+    if (existing) return existing.id;
+    const m: Product = { id: uid(), code: "", name, finishedGoodCode: "" };
     setProducts([...products, m]);
-    notify.saved(`Đã thêm mặt hàng "${ten}" vào danh mục`);
+    notify.saved(`Đã thêm mặt hàng "${name}" vào danh mục`);
     return m.id;
   };
-  const addCustomer = (ten: string) => {
-    const co = customers.find((k) => k.name.trim().toLowerCase() === ten.trim().toLowerCase());
-    if (co) return co.id;
-    const k: Customer = { id: uid(), code: "", name: ten, market: "" };
+  const addCustomer = (name: string) => {
+    const existing = customers.find((k) => k.name.trim().toLowerCase() === name.trim().toLowerCase());
+    if (existing) return existing.id;
+    const k: Customer = { id: uid(), code: "", name, market: "" };
     setCustomers([...customers, k]);
-    notify.saved(`Đã thêm khách hàng "${ten}" vào danh mục`);
+    notify.saved(`Đã thêm khách hàng "${name}" vào danh mục`);
     return k.id;
   };
 
@@ -352,7 +352,7 @@ export default function SalesScreen() {
   const isEditingInvoice = editRowIds !== null;
   const sessionTotal = sessionRows.reduce((s, r) => s + (r.quantityKg || 0), 0);
 
-  const setDong = <K extends keyof NewRow>(k: K, v: NewRow[K]) =>
+  const setRowField = <K extends keyof NewRow>(k: K, v: NewRow[K]) =>
     setNewRows((d) => ({ ...d, [k]: v }));
 
   /** Thêm một dòng mặt hàng — LƯU NGAY thành một dòng ban_hang. */
@@ -381,7 +381,7 @@ export default function SalesScreen() {
       setSessionInvoiceId(invoiceId);
     }
 
-    const dong: SalesItem = {
+    const row: SalesItem = {
       id: newId(),
       invoiceId: invoiceId ?? "",
       deliveryDate: session.deliveryDate,
@@ -399,10 +399,10 @@ export default function SalesScreen() {
       ...rows.map((r) =>
         belongsToInvoice(r) ? { ...r, deliveryDate: session.deliveryDate } : r
       ),
-      dong,
+      row,
     ]);
-    if (editRowIds) setEditRowIds([...editRowIds, dong.id]);
-    notify.saved(`Đã vào sổ: ${productName(dong.productId)} — ${kg(dong.quantityKg)}`);
+    if (editRowIds) setEditRowIds([...editRowIds, row.id]);
+    notify.saved(`Đã vào sổ: ${productName(row.productId)} — ${kg(row.quantityKg)}`);
 
     // Nhớ kênh vừa bán để phiếu sau khỏi lật lại.
     setLastChannel(session.channel);
@@ -423,7 +423,7 @@ export default function SalesScreen() {
   };
 
   /** Đóng phiếu: bỏ phiếu rỗng, áp đầu phiếu lần cuối, kéo bộ lọc về phiếu vừa ghi. */
-  const closeSession = (mo: "dong" | "phieu-khac") => {
+  const closeSession = (open: "close" | "another") => {
     const p = session;
     if (p && sessionInvoiceId && sessionRows.length === 0) {
       persistSalesInvoices(salesInvoices.filter((x) => x.id !== sessionInvoiceId));
@@ -438,14 +438,14 @@ export default function SalesScreen() {
     }
     if (p && sessionRows.length > 0) {
       if (p.deliveryDate < effectiveFrom || p.deliveryDate > effectiveTo) {
-        setKy("ngay");
+        setPeriod("day");
         setDate(p.deliveryDate);
       }
       if (workshop !== "Tất cả" && workshop !== p.workshop)
         setWorkshop(p.workshop);
     }
 
-    if (mo === "dong") {
+    if (open === "close") {
       setSession(null);
       setSessionInvoiceId(null);
       setEditRowIds(null);
@@ -487,7 +487,7 @@ export default function SalesScreen() {
       ls.push({ field: "Mặt hàng", message: "Chưa chọn mặt hàng" });
     if (!(editing.quantityKg > 0))
       ls.push({ field: "Lượng", message: "Phải lớn hơn 0 kg" });
-    setLoi(ls);
+    setErrors(ls);
     if (ls.length > 0) return;
     persist(rows.map((r) => (r.id === editing.id ? editing : r)));
     notify.saved("Đã lưu thay đổi");
@@ -499,9 +499,9 @@ export default function SalesScreen() {
 
   /** Kênh của phiếu đang mở — quyết định đơn vị đơn giá. */
   const priceUnit = session?.channel === "Nội địa" ? "đ" : "USD";
-  const priceUnitFor = (kenh: SalesChannel) => (kenh === "Nội địa" ? "đ" : "USD");
+  const priceUnitFor = (channel: SalesChannel) => (channel === "Nội địa" ? "đ" : "USD");
 
-  const itemColumns = (kenh: SalesChannel): RecordTableColumn<SalesItem>[] => [
+  const itemColumns = (channel: SalesChannel): RecordTableColumn<SalesItem>[] => [
     {
       key: "mh",
       header: "Mặt hàng",
@@ -525,19 +525,19 @@ export default function SalesScreen() {
     },
     {
       key: "gia",
-      header: `Đơn giá (${priceUnitFor(kenh)})`,
+      header: `Đơn giá (${priceUnitFor(channel)})`,
       numeric: true,
       render: (r) =>
         r.unitPrice != null ? (
           num(r.unitPrice)
         ) : (
-          <Tag variant="loi">Chưa có giá</Tag>
+          <Tag variant="error">Chưa có giá</Tag>
         ),
       getSortValue: (r) => r.unitPrice ?? 0,
     },
     {
       key: "tien",
-      header: `Thành tiền (${priceUnitFor(kenh)})`,
+      header: `Thành tiền (${priceUnitFor(channel)})`,
       numeric: true,
       render: (r) => num(calculateSalesAmount(r)),
       getSortValue: (r) => calculateSalesAmount(r),
@@ -562,9 +562,9 @@ export default function SalesScreen() {
       <StatCardGrid
         className="grid-cols-2 sm:grid-cols-3 lg:grid-cols-5"
         cards={[
-          { label: "Đang xem", value: rangeDescription, icon: CalendarRange, color: "trung-tinh" },
-          { label: "Phân xưởng", value: workshop, icon: Warehouse, color: "trung-tinh" },
-          { label: "Số phiếu", value: nhomView.length, numeric: true, icon: Truck, color: "brand" },
+          { label: "Đang xem", value: rangeDescription, icon: CalendarRange, color: "neutral" },
+          { label: "Phân xưởng", value: workshop, icon: Warehouse, color: "neutral" },
+          { label: "Số phiếu", value: groupedView.length, numeric: true, icon: Truck, color: "brand" },
           { label: "Số dòng", value: view.length, numeric: true, icon: FileText, color: "brand" },
           { label: "Tổng bán", value: kg(total), numeric: true, icon: Scale, color: "success" },
         ]}
@@ -577,39 +577,39 @@ export default function SalesScreen() {
             label="Kỳ xem sổ"
             hideRequiredMark
             clearable={false}
-            value={ky}
-            onChange={(v) => setKy(v as ViewPeriod)}
-            options={KY_OPT}
+            value={period}
+            onChange={(v) => setPeriod(v as ViewPeriod)}
+            options={PERIOD_OPTIONS}
             className="min-w-[13rem]"
           />
 
           <div className="min-w-[220px] flex-1">
-            {ky === "tuy-chon" ? (
+            {period === "custom" ? (
               <DateRangeField
                 label="Khoảng ngày xuất bán"
                 hideRequiredMark
                 presets={false}
                 startDate={fromDate}
                 endDate={toDate}
-                onChange={(tu, den) => {
-                  setFromDate(tu);
-                  setToDate(den);
+                onChange={(fromDate, toDate) => {
+                  setFromDate(fromDate);
+                  setToDate(toDate);
                 }}
               />
             ) : (
               <DateField
                 label={
-                  ky === "ngay"
+                  period === "day"
                     ? "Ngày xuất bán"
-                    : ky === "tuan"
+                    : period === "week"
                       ? "Ngày bất kỳ trong tuần"
-                      : ky === "thang"
+                      : period === "month"
                         ? "Ngày bất kỳ trong tháng"
                         : "Ngày bất kỳ trong năm"
                 }
                 hideRequiredMark
                 hint={
-                  ky === "ngay"
+                  period === "day"
                     ? undefined
                     : `Kỳ đang xem: ${formatDateVN(effectiveFrom)} – ${formatDateVN(effectiveTo)}`
                 }
@@ -637,7 +637,7 @@ export default function SalesScreen() {
       {/* Sổ: mỗi phiếu một cụm */}
       {isLoading ? (
         <TableSkeleton />
-      ) : nhomView.length === 0 ? (
+      ) : groupedView.length === 0 ? (
         <EmptyState
           icon={ShoppingCart}
           title={`Chưa có phiếu bán nào trong ${rangeDescription}`}
@@ -657,7 +657,7 @@ export default function SalesScreen() {
       ) : (
         <>
           <div className="space-y-5">
-            {nhomView.map((n, i) => (
+            {groupedView.map((n, i) => (
               <section
                 key={n.invoice.id}
                 className="space-y-4 rounded-xl border-2 border-border p-5"
@@ -676,11 +676,11 @@ export default function SalesScreen() {
                       </span>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
-                      <Tag variant="phan-loai" tone={channelTone(n.invoice.channel)}>
+                      <Tag variant="category" tone={channelTone(n.invoice.channel)}>
                         {n.invoice.channel}
                       </Tag>
                       {n.isBackdated && (
-                        <Tag variant="luu-y">
+                        <Tag variant="warning">
                           Ghi bù {formatDateVN(n.invoice.postingDate)}
                         </Tag>
                       )}
@@ -746,7 +746,7 @@ export default function SalesScreen() {
       <Dialog
         open={session !== null}
         onOpenChange={(o) => {
-          if (!o) closeSession("dong");
+          if (!o) closeSession("close");
         }}
       >
         <DialogContent className="max-h-[92dvh] w-full overflow-y-auto sm:max-w-3xl lg:max-w-5xl">
@@ -876,7 +876,7 @@ export default function SalesScreen() {
                             size="sm"
                             onClick={() => {
                               setEditing({ ...r });
-                              setLoi([]);
+                              setErrors([]);
                             }}
                           >
                             <Pencil />
@@ -907,7 +907,7 @@ export default function SalesScreen() {
                   required
                   hint="Chưa có trong danh mục thì gõ tên rồi bấm Thêm mới."
                   value={newRows.productId}
-                  onChange={(v) => setDong("productId", v)}
+                  onChange={(v) => setRowField("productId", v)}
                   options={productOptions}
                   onCreate={addProduct}
                   emptyText="Chưa có mặt hàng nào trong danh mục."
@@ -918,7 +918,7 @@ export default function SalesScreen() {
                 <ChoiceGroup
                   label="Nguồn bán"
                   value={newRows.source}
-                  onChange={(v) => setDong("source", v)}
+                  onChange={(v) => setRowField("source", v)}
                   options={[
                     { value: RETAIL_WAREHOUSE, label: "Block thô (kho dự trữ)" },
                     { value: FG_WAREHOUSE, label: "Đóng gói (kho thành phẩm)" },
@@ -932,7 +932,7 @@ export default function SalesScreen() {
                 >
                   <Input
                     value={newRows.spec}
-                    onChange={(e) => setDong("spec", e.target.value)}
+                    onChange={(e) => setRowField("spec", e.target.value)}
                     placeholder="VD: 18-20"
                   />
                 </Field>
@@ -943,13 +943,13 @@ export default function SalesScreen() {
                     required
                     unit="kg"
                     value={newRows.quantityKg || null}
-                    onChange={(v) => setDong("quantityKg", v ?? 0)}
+                    onChange={(v) => setRowField("quantityKg", v ?? 0)}
                   />
                   <NumberField
                     label="Đơn giá"
                     unit={priceUnit}
                     value={newRows.unitPrice}
-                    onChange={(v) => setDong("unitPrice", v)}
+                    onChange={(v) => setRowField("unitPrice", v)}
                     hint="Bỏ trống nếu chưa chốt giá."
                   />
                 </div>
@@ -1011,14 +1011,14 @@ export default function SalesScreen() {
                 title="Ghi phiếu đang gõ vào sổ rồi mở phiếu trống để bán tiếp cho khách khác."
                 variant="outline"
                 size="lg"
-                onClick={() => closeSession("phieu-khac")}
+                onClick={() => closeSession("another")}
               >
                 <Truck />
                 Lưu &amp; thêm phiếu khác
               </Button>
             )}
             <Button
-              title="Ghi phiếu đang gõ vào sổ rồi quay về danh sách phiếu bán." size="lg" onClick={() => closeSession("dong")}>
+              title="Ghi phiếu đang gõ vào sổ rồi quay về danh sách phiếu bán." size="lg" onClick={() => closeSession("close")}>
               {isEditingInvoice ? "Xong" : "Xong phiếu"}
             </Button>
           </DialogFooter>
@@ -1043,7 +1043,7 @@ export default function SalesScreen() {
 
           {editing && (
             <div className="space-y-6 py-2">
-              <ErrorSummary errors={loi} />
+              <ErrorSummary errors={errors} />
               <RequiredLegend />
 
               <Combobox

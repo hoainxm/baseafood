@@ -9,7 +9,7 @@ import type { CategoryTone } from "./Tag";
  * icon màu để mắt bắt nhanh. Người 45–60 tuổi đọc "thẻ" nhanh hơn đọc một câu
  * dài gộp Ngày · Xưởng · Tổng. Màu chỉ để phân nhóm, luôn kèm nhãn chữ.
  */
-export type StatCardColor = "brand" | "success" | "warning" | "danger" | "trung-tinh";
+export type StatCardColor = "brand" | "success" | "warning" | "danger" | "neutral";
 
 export interface StatCardData {
   label: string;
@@ -44,20 +44,20 @@ const CARD_COLORS: Record<StatCardColor, { chip: string; border: string }> = {
     border: "border-warning/30",
   },
   danger: { chip: "bg-destructive/10 text-destructive", border: "border-destructive/30" },
-  "trung-tinh": { chip: "bg-muted text-muted-foreground", border: "border-border" },
+  neutral: { chip: "bg-muted text-muted-foreground", border: "border-border" },
 };
 
 /* Liệt kê TRỌN tên lớp (không ghép chuỗi) để Tailwind quét thấy. */
 const SAC_THE: Record<CategoryTone, { card: string; chip: string; value: string }> = {
-  tim: { card: "border-tone-tim-line bg-tone-tim-surface", chip: "bg-tone-tim text-white", value: "text-tone-tim" },
-  ngoc: { card: "border-tone-ngoc-line bg-tone-ngoc-surface", chip: "bg-tone-ngoc text-white", value: "text-tone-ngoc" },
-  bien: { card: "border-tone-bien-line bg-tone-bien-surface", chip: "bg-tone-bien text-white", value: "text-tone-bien" },
-  bang: { card: "border-tone-bang-line bg-tone-bang-surface", chip: "bg-tone-bang text-white", value: "text-tone-bang" },
-  cat: { card: "border-tone-cat-line bg-tone-cat-surface", chip: "bg-tone-cat text-white", value: "text-tone-cat" },
-  hong: { card: "border-tone-hong-line bg-tone-hong-surface", chip: "bg-tone-hong text-white", value: "text-tone-hong" },
-  la: { card: "border-tone-la-line bg-tone-la-surface", chip: "bg-tone-la text-white", value: "text-tone-la" },
-  cam: { card: "border-tone-cam-line bg-tone-cam-surface", chip: "bg-tone-cam text-white", value: "text-tone-cam" },
-  xam: { card: "border-tone-xam-line bg-tone-xam-surface", chip: "bg-tone-xam text-white", value: "text-tone-xam" },
+  purple: { card: "border-tone-purple-line bg-tone-purple-surface", chip: "bg-tone-purple text-white", value: "text-tone-purple" },
+  teal: { card: "border-tone-teal-line bg-tone-teal-surface", chip: "bg-tone-teal text-white", value: "text-tone-teal" },
+  blue: { card: "border-tone-blue-line bg-tone-blue-surface", chip: "bg-tone-blue text-white", value: "text-tone-blue" },
+  cyan: { card: "border-tone-cyan-line bg-tone-cyan-surface", chip: "bg-tone-cyan text-white", value: "text-tone-cyan" },
+  sand: { card: "border-tone-sand-line bg-tone-sand-surface", chip: "bg-tone-sand text-white", value: "text-tone-sand" },
+  pink: { card: "border-tone-pink-line bg-tone-pink-surface", chip: "bg-tone-pink text-white", value: "text-tone-pink" },
+  green: { card: "border-tone-green-line bg-tone-green-surface", chip: "bg-tone-green text-white", value: "text-tone-green" },
+  orange: { card: "border-tone-orange-line bg-tone-orange-surface", chip: "bg-tone-orange text-white", value: "text-tone-orange" },
+  gray: { card: "border-tone-gray-line bg-tone-gray-surface", chip: "bg-tone-gray text-white", value: "text-tone-gray" },
 };
 
 const LG_GRID_COLS: Record<number, string> = {
@@ -80,7 +80,7 @@ function autoColumnCount(cardCount: number): 2 | 3 | 4 | 5 {
 }
 
 export function StatCardGrid({
-  cards: the,
+  cards,
   columns,
   className,
 }: {
@@ -89,7 +89,7 @@ export function StatCardGrid({
   columns?: 2 | 3 | 4 | 5;
   className?: string;
 }) {
-  const columnCount = columns ?? autoColumnCount(the.length);
+  const columnCount = columns ?? autoColumnCount(cards.length);
   // 5 cột trên màn rộng: thẻ hẹp ⇒ icon lên trên nhãn, số nhỏ một bậc, để số dài
   // (1.478.897,83 kg · 29.535.327.023 đ) vẫn nằm trọn một dòng, không ngắt giữa số.
   const isNarrow = columnCount === 5;
@@ -105,7 +105,7 @@ export function StatCardGrid({
         className
       )}
     >
-      {the.map((t) => {
+      {cards.map((t) => {
         const color = CARD_COLORS[t.color ?? "brand"];
         const sac = t.tone ? SAC_THE[t.tone] : null;
         const Icon = t.icon;

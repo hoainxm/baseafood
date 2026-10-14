@@ -80,23 +80,23 @@ const STATUS_LABELS: Record<SalesOrder["status"], string> = {
 };
 
 export default function SalesOrderScreen() {
-  const [don, persistDon, { trangThai: status }] = useSalesOrders();
-  const isLoading = status === "dang-tai" && don.length === 0;
-  const [dongDon, persistDongDon] = useOrderItems();
+  const [don, persistDon, { status }] = useSalesOrders();
+  const isLoading = status === "loading" && don.length === 0;
+  const [orderItems, persistOrderItems] = useOrderItems();
   const [exportOrders, persistExportOrders] = useExportOrders();
   const [exportItems, persistExportItems] = useExportItems();
   const [wips] = useWipProductions();
   const [products, setProducts] = useProducts();
   const [customers, setCustomers] = useCustomers();
   /** Bút chì sửa nhanh danh mục ngay trong ô chọn. */
-  const customerEditor = useQuickCatalogEdit("khachHang", customers, setCustomers);
-  const productEditor = useQuickCatalogEdit("matHang", products, setProducts);
+  const customerEditor = useQuickCatalogEdit("customer", customers, setCustomers);
+  const productEditor = useQuickCatalogEdit("product", products, setProducts);
   const [salesInvoices, persistSalesInvoices] = useSalesInvoices();
   const [salesItems, persistBan] = useSalesItems();
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [creating, setCreating] = useState<NewOrder | null>(null);
-  const [loi, setLoi] = useState<FieldError[]>([]);
+  const [errors, setErrors] = useState<FieldError[]>([]);
   const [lotCheckOrder, setLotCheckOrder] = useState<ExportOrder | null>(null);
 
   // Link từ /qr "Theo giai đoạn" (`?order=<id>&check=<id lệnh xuất>`; link cũ `?don=&kiem=`) ⇒ mở đơn và hộp kiểm
@@ -150,8 +150,8 @@ export default function SalesOrderScreen() {
 
   const selectedOrder = selectedId ? don.find((d) => d.id === selectedId) : undefined;
   const selectedOrderItems = useMemo(
-    () => (selectedId ? dongDon.filter((d) => d.orderId === selectedId) : []),
-    [dongDon, selectedId]
+    () => (selectedId ? orderItems.filter((d) => d.orderId === selectedId) : []),
+    [orderItems, selectedId]
   );
 
   /* ---- Tạo đơn ---- */
@@ -162,21 +162,21 @@ export default function SalesOrderScreen() {
       note: "",
       rows: [{ productId: "", spec: "", requiredQuantityKg: 0, requiredBlocksCount: 0 }],
     });
-    setLoi([]);
+    setErrors([]);
   };
-  const addProduct = (ten: string) => {
-    const trimmedName = ten.trim();
-    const co = products.find((m) => m.name.trim().toLowerCase() === trimmedName.toLowerCase());
-    if (co) return co.id; // trùng tên (không phân hoa thường) ⇒ dùng lại bản có sẵn
+  const addProduct = (name: string) => {
+    const trimmedName = name.trim();
+    const existing = products.find((m) => m.name.trim().toLowerCase() === trimmedName.toLowerCase());
+    if (existing) return existing.id; // trùng tên (không phân hoa thường) ⇒ dùng lại bản có sẵn
     const m = { id: newId(), code: "", name: trimmedName, finishedGoodCode: "" };
     setProducts([...products, m]);
     notify.saved(`Đã thêm mặt hàng "${trimmedName}" vào danh mục`);
     return m.id;
   };
-  const addCustomer = (ten: string) => {
-    const trimmedName = ten.trim();
-    const co = customers.find((k) => k.name.trim().toLowerCase() === trimmedName.toLowerCase());
-    if (co) return co.id; // trùng tên (không phân hoa thường) ⇒ dùng lại bản có sẵn
+  const addCustomer = (name: string) => {
+    const trimmedName = name.trim();
+    const existing = customers.find((k) => k.name.trim().toLowerCase() === trimmedName.toLowerCase());
+    if (existing) return existing.id; // trùng tên (không phân hoa thường) ⇒ dùng lại bản có sẵn
     const k = { id: newId(), code: "", name: trimmedName, market: "" };
     setCustomers([...customers, k]);
     notify.saved(`Đã thêm khách hàng "${trimmedName}" vào danh mục`);
@@ -196,7 +196,7 @@ export default function SalesOrderScreen() {
     const validRows = creating.rows.filter((d) => d.productId && d.requiredQuantityKg > 0);
     if (validRows.length === 0)
       ls.push({ field: "Dòng cần", message: "Thêm ít nhất 1 mặt hàng cần" });
-    setLoi(ls);
+    setErrors(ls);
     if (ls.length > 0) return;
     const donId = newId();
     const newOrder: SalesOrder = {
@@ -215,7 +215,7 @@ export default function SalesOrderScreen() {
       requiredBlocksCount: d.requiredBlocksCount,
     }));
     persistDon([...don, newOrder]);
-    persistDongDon([...dongDon, ...newOrderItems]);
+    persistOrderItems([...orderItems, ...newOrderItems]);
     notify.saved(`Đã tạo đơn cho ${tenKH(creating.customerId)}`);
     setCreating(null);
     setSelectedId(donId);
@@ -223,7 +223,7 @@ export default function SalesOrderScreen() {
 
   /* ---- Tạo lệnh xuất (FIFO, cho xuất một phần) + handoff sổ Bán hàng ---- */
   const createExportOrder = (d: SalesOrder) => {
-    const orderLines = dongDon.filter((x) => x.orderId === d.id);
+    const orderLines = orderItems.filter((x) => x.orderId === d.id);
     const currentStock = computeWipStock(wips, exportItems, retailSales);
     const exportOrderId = newId();
     const newExportItems: ExportItem[] = [];
@@ -231,22 +231,22 @@ export default function SalesOrderScreen() {
       let conCan = dc.requiredQuantityKg - exportedKg(d.id, dc.productId, dc.spec);
       if (conCan <= 0) continue;
       const los = listLotsWithStock(currentStock, dc.productId, dc.spec);
-      for (const lo of los) {
+      for (const lot of los) {
         if (conCan <= 0) break;
-        const lay = Math.min(conCan, lo.remainingKg);
-        if (lay <= 0) continue;
-        const tyLe = lo.remainingKg > 0 ? lay / lo.remainingKg : 0;
+        const take = Math.min(conCan, lot.remainingKg);
+        if (take <= 0) continue;
+        const share = lot.remainingKg > 0 ? take / lot.remainingKg : 0;
         newExportItems.push({
           id: newId(),
           exportId: exportOrderId,
-          wipId: lo.wipId,
+          wipId: lot.wipId,
           productId: dc.productId,
           spec: dc.spec,
-          quantityKg: lay,
-          blocksCount: Math.round(lo.remainingBlocks * tyLe),
+          quantityKg: take,
+          blocksCount: Math.round(lot.remainingBlocks * share),
         });
-        lo.remainingKg -= lay; // trừ tồn trong bộ nhớ để lô sau tính đúng
-        conCan -= lay;
+        lot.remainingKg -= take; // trừ tồn trong bộ nhớ để lô sau tính đúng
+        conCan -= take;
       }
     }
     if (newExportItems.length === 0) {
@@ -272,13 +272,13 @@ export default function SalesOrderScreen() {
       channel: "Xuất khẩu",
       note: `Xuất container từ đơn ${tenKH(d.customerId)}`,
     };
-    const newSalesItems: SalesItem[] = newExportItems.map((dl) => ({
+    const newSalesItems: SalesItem[] = newExportItems.map((item) => ({
       id: newId(),
       invoiceId: salesInvoiceId,
       deliveryDate: todayISO(),
-      productId: dl.productId,
-      spec: dl.spec,
-      quantityKg: dl.quantityKg,
+      productId: item.productId,
+      spec: item.spec,
+      quantityKg: item.quantityKg,
       unitPrice: null,
       sourceWarehouse: "Đơn đặt", // đánh dấu handoff — NXT/tồn kho không đếm hai lần
     }));
@@ -295,9 +295,9 @@ export default function SalesOrderScreen() {
           (exportedKg(d.id, dc.productId, dc.spec) +
             newExportItems
               .filter(
-                (dl) => dl.productId === dc.productId && dl.spec === dc.spec
+                (item) => item.productId === dc.productId && item.spec === dc.spec
               )
-              .reduce((s, dl) => s + dl.quantityKg, 0)) >
+              .reduce((s, item) => s + item.quantityKg, 0)) >
         0.001
     );
     persistDon(
@@ -305,7 +305,7 @@ export default function SalesOrderScreen() {
         x.id === d.id ? { ...x, status: hasMissing ? "collecting" : "closed" } : x
       )
     );
-    const totalOut = newExportItems.reduce((s, dl) => s + dl.quantityKg, 0);
+    const totalOut = newExportItems.reduce((s, item) => s + item.quantityKg, 0);
     notify.saved(
       `Đã xuất ${kg(totalOut)} → sổ Bán hàng (phiếu ${tenKH(d.customerId)})` +
         (hasMissing ? " · đơn còn thiếu, vẫn mở" : " · đơn đóng")
@@ -319,13 +319,13 @@ export default function SalesOrderScreen() {
 
   const deleteOrder = (d: SalesOrder) => {
     const prevOrders = don;
-    const prevRows = dongDon;
+    const prevRows = orderItems;
     persistDon(don.filter((x) => x.id !== d.id));
-    persistDongDon(dongDon.filter((x) => x.orderId !== d.id));
+    persistOrderItems(orderItems.filter((x) => x.orderId !== d.id));
     if (selectedId === d.id) setSelectedId(null);
     notify.deleted(`Đã xóa đơn ${tenKH(d.customerId)}`, () => {
       persistDon(prevOrders);
-      persistDongDon(prevRows);
+      persistOrderItems(prevRows);
     });
   };
 
@@ -336,13 +336,13 @@ export default function SalesOrderScreen() {
       key: "sd",
       header: "Số dòng",
       numeric: true,
-      render: (r) => num(dongDon.filter((d) => d.orderId === r.id).length),
+      render: (r) => num(orderItems.filter((d) => d.orderId === r.id).length),
     },
     {
       key: "tt",
       header: "Trạng thái",
       render: (r) => (
-        <Tag variant={r.status === "collecting" ? "cho" : "xong"}>{STATUS_LABELS[r.status]}</Tag>
+        <Tag variant={r.status === "collecting" ? "pending" : "done"}>{STATUS_LABELS[r.status]}</Tag>
       ),
       getSortValue: (r) => r.status,
     },
@@ -368,7 +368,7 @@ export default function SalesOrderScreen() {
       <StatCardGrid
         className="grid-cols-1 sm:grid-cols-3"
         cards={[
-          { label: "Tổng số đơn", value: don.length, numeric: true, icon: ClipboardList, color: "trung-tinh" },
+          { label: "Tổng số đơn", value: don.length, numeric: true, icon: ClipboardList, color: "neutral" },
           { label: "Đang gom hàng", value: don.filter((d) => d.status === "collecting").length, numeric: true, icon: Package, color: "brand" },
           { label: "Đã xuất xong", value: don.filter((d) => d.status === "closed").length, numeric: true, icon: CheckCircle, color: "success" },
         ]}
@@ -466,8 +466,8 @@ export default function SalesOrderScreen() {
                   (t) => t.productId === dc.productId && t.spec === dc.spec
                 )
                 .reduce((s, t) => s + Math.max(0, t.remainingKg), 0);
-              const con = dc.requiredQuantityKg - exportedQty;
-              const du = con <= 0.001;
+              const remainingKg = dc.requiredQuantityKg - exportedQty;
+              const isComplete = remainingKg <= 0.001;
               return (
                 <li
                   key={dc.id}
@@ -487,10 +487,10 @@ export default function SalesOrderScreen() {
                     <span className="text-muted-foreground">
                       Khả dụng <span className="tnum">{num(kd)}</span>
                     </span>
-                    {du ? (
-                      <Tag variant="xong">Đủ</Tag>
+                    {isComplete ? (
+                      <Tag variant="done">Đủ</Tag>
                     ) : (
-                      <Tag variant="luu-y">Còn thiếu {num(con)} kg</Tag>
+                      <Tag variant="warning">Còn thiếu {num(remainingKg)} kg</Tag>
                     )}
                   </div>
                 </li>
@@ -561,7 +561,7 @@ export default function SalesOrderScreen() {
           </DialogHeader>
           {creating && (
             <div className="space-y-6 py-2">
-              <ErrorSummary errors={loi} />
+              <ErrorSummary errors={errors} />
               <RequiredLegend />
               <Combobox
                 label="Khách hàng"

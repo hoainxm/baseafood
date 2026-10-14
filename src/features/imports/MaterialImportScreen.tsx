@@ -56,9 +56,9 @@ import { useAuth } from "@/lib/auth";
 import { DailyTaskReminder, LotLabelPrint, BlankDailyImportSlip } from "@/features/shared";
 import { useQuickCatalogEdit } from "@/features/catalog/QuickCatalogEdit";
 import { ImportSlipOcr } from "./ImportSlipOcr";
-import { coOcr, type OcrCatalog, type KetQuaOcr } from "@/lib/ocr";
+import { hasOcr, type OcrCatalog, type OcrResult } from "@/lib/ocr";
 import { hasImageStorage, getPhotoUrl } from "@/lib/storage";
-import { KY_OPT, getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
+import { PERIOD_OPTIONS, getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
 import {
   CalendarRange,
   Camera,
@@ -117,20 +117,20 @@ export default function MaterialImportScreen() {
   const { profile } = useAuth();
   const operator = profile?.fullName || profile?.username || "";
   // kỳ xem sổ: ngày/tuần/tháng/năm/khoảng tự chọn
-  const [rows, persist, { trangThai: status }] = useMaterialImports();
-  const isLoading = status === "dang-tai" && rows.length === 0;
+  const [rows, persist, { status }] = useMaterialImports();
+  const isLoading = status === "loading" && rows.length === 0;
   const [shipments, persistShipments] = useImportShipments();
-  const [locks, persistLocks, { trangThai: lockStatus }] = useDailyLocks();
+  const [locks, persistLocks, { status: lockStatus }] = useDailyLocks();
   const [scraps, persistScraps] = useScraps();
 
-  const [ky, setKy] = useState<ViewPeriod>("ngay");
+  const [period, setPeriod] = useState<ViewPeriod>("day");
   const [date, setDate] = useState(todayISO()); // ngày neo cho ngày/tuần/tháng/năm
   const [fromDate, setFromDate] = useState(todayISO());
   const [toDate, setToDate] = useState(todayISO());
   const [workshop, setWorkshop] = useState<Workshop | "Tất cả">("Đông");
   const [supplierFilter, setSupplierFilter] = useState("");
   const [materialTypeFilter, setMaterialTypeFilter] = useState("");
-  const [priceFilter, setPriceFilter] = useState<"tat-ca" | "thieu-gia">("tat-ca");
+  const [priceFilter, setPriceFilter] = useState<"all" | "unpriced">("all");
   const [isMoreFiltersOpen, setIsMoreFiltersOpen] = useState(false);
   const [isTypeChangeOpen, setIsTypeChangeOpen] = useState(false);
   const [showInvoice, setShowInvoice] = useState(false);
@@ -142,7 +142,7 @@ export default function MaterialImportScreen() {
   /* Ghi chuyến: đầu chuyến ở trên, cả BẢNG loại hàng điền một lượt rồi lưu. */
   const [session, setSession] = useState<ShipmentHeader | null>(null);
   /** Ba chế độ phẳng: "nhap" = form ghi (mặc định); "so" = sổ ngày; "bao-cao" = báo cáo tổng hợp. */
-  const [mode, setMode] = useState<"nhap" | "so" | "bao-cao">("nhap");
+  const [mode, setMode] = useState<"entry" | "ledger" | "report">("entry");
   const [ocrMo, setOcrMo] = useState(false); // modal nhận diện ảnh phiếu (OCR)
   const [labelShipment, setLabelShipment] = useState<ImportShipment | null>(null);
   const [sessionShipmentId, setSessionShipmentId] = useState<string | null>(null);
@@ -154,7 +154,7 @@ export default function MaterialImportScreen() {
   // Khối "Xe và ghi chú" (tài xế/biển số) mở sẵn — hầu hết chuyến đều có.
   const [isExtrasOpen, setIsExtrasOpen] = useState(true);
   /** Luồng theo bước: bước đang ÉP mở (bấm "Đổi" / đang gõ tay xe). null = tự suy theo dữ liệu. */
-  const [openPanel, setOpenPanel] = useState<"dai-ly" | "xe" | null>(null);
+  const [openPanel, setOpenPanel] = useState<"supplier" | "vehicle" | null>(null);
   /** Người dùng chủ động bỏ qua bước xe (chuyến không ghi xe) ⇒ bước thu lại dù ô trống. */
   const [skipTruck, setSkipTruck] = useState(false);
   /** Mở hai ô gõ tay biển số / tài xế (xe chưa từng chở cho đại lý này). */
@@ -176,7 +176,7 @@ export default function MaterialImportScreen() {
   const [lockErrors, setLockErrors] = useState<FieldError[]>([]);
 
   /** [từ, đến] của kỳ đang xem — mọi lọc/tổng tính theo khoảng này. */
-  const [effectiveFrom, effectiveTo] = getViewPeriodRange(ky, date, fromDate, toDate);
+  const [effectiveFrom, effectiveTo] = getViewPeriodRange(period, date, fromDate, toDate);
   /** Kỳ chỉ gồm đúng một ngày ⇒ mới có nghĩa để chốt / phế liệu ngày. */
   const isSingleDay = effectiveFrom === effectiveTo;
 
@@ -189,7 +189,7 @@ export default function MaterialImportScreen() {
           const matchesWorkshop = workshop === "Tất cả" || r.workshop === workshop;
           const matchesSupplier = !supplierFilter || r.supplierName === supplierFilter;
           const matchesType = !materialTypeFilter || r.materialTypeName === materialTypeFilter;
-          const matchesPrice = priceFilter === "tat-ca" || r.unitPrice == null;
+          const matchesPrice = priceFilter === "all" || r.unitPrice == null;
           return matchesDate && matchesWorkshop && matchesSupplier && matchesType && matchesPrice;
         })
         .sort(
@@ -200,7 +200,7 @@ export default function MaterialImportScreen() {
     [rows, effectiveFrom, effectiveTo, workshop, supplierFilter, materialTypeFilter, priceFilter]
   );
 
-  const nhomView = useMemo(() => groupShipments(view, shipments), [view, shipments]);
+  const groupedView = useMemo(() => groupShipments(view, shipments), [view, shipments]);
 
   /** Ngày / xưởng mặc định khi ghi chuyến mới — theo bộ lọc đang xem. */
   const postingDate = isSingleDay ? effectiveFrom : effectiveTo;
@@ -225,7 +225,7 @@ export default function MaterialImportScreen() {
 
   /** Số bộ lọc phụ đang bật (đại lý / loại NL / đơn giá) — hiện lên nút gom. */
   const extraFilterCount =
-    (supplierFilter ? 1 : 0) + (materialTypeFilter ? 1 : 0) + (priceFilter !== "tat-ca" ? 1 : 0);
+    (supplierFilter ? 1 : 0) + (materialTypeFilter ? 1 : 0) + (priceFilter !== "all" ? 1 : 0);
 
   /* ---- Chốt ngày ---- */
 
@@ -278,19 +278,19 @@ export default function MaterialImportScreen() {
   }));
 
   /** Sửa nhanh đại lý / loại NL tại chỗ — sổ nhập nối theo TÊN nên ô tên khoá. */
-  const supplierEditor = useQuickCatalogEdit("daiLy", suppliers, setSuppliers, { theo: "ten" });
-  const materialTypeEditor = useQuickCatalogEdit("loaiNL", materialTypes, setMaterialTypes, { theo: "ten" });
+  const supplierEditor = useQuickCatalogEdit("supplier", suppliers, setSuppliers, { matchBy: "name" });
+  const materialTypeEditor = useQuickCatalogEdit("materialType", materialTypes, setMaterialTypes, { matchBy: "name" });
 
-  const addSupplier = (ten: string) => {
+  const addSupplier = (name: string) => {
     // Nhãn có mã số ("1 · Hồng Phú") nên ô chọn không tự nhận ra tên trùng ⇒ tự dò.
-    const co = suppliers.find((d) => d.shortName.trim().toLowerCase() === ten.trim().toLowerCase());
-    if (co) return co.shortName;
+    const existing = suppliers.find((d) => d.shortName.trim().toLowerCase() === name.trim().toLowerCase());
+    if (existing) return existing.shortName;
     setSuppliers([
       ...suppliers,
       {
         id: uid(),
         code: "",
-        shortName: ten,
+        shortName: name,
         billingName: "",
         address: "",
         nationalId: "",
@@ -300,8 +300,8 @@ export default function MaterialImportScreen() {
         note: "",
       },
     ]);
-    notify.saved(`Đã thêm đại lý "${ten}" vào danh mục`);
-    return ten;
+    notify.saved(`Đã thêm đại lý "${name}" vào danh mục`);
+    return name;
   };
 
   /** Tất cả loại NL — dùng cho BỘ LỌC (xem theo loại, không ràng loài). */
@@ -322,23 +322,23 @@ export default function MaterialImportScreen() {
         phu: l.category || undefined,
       }));
 
-  const addMaterialType = (ten: string, category = "") => {
+  const addMaterialType = (name: string, category = "") => {
     // Trùng tên (không phân hoa thường — kể cả loại đang gán loài khác nên không
     // hiện trong ô) ⇒ dùng lại bản có sẵn, không đẻ bản trùng.
-    const co = materialTypes.find((l) => l.name.trim().toLowerCase() === ten.trim().toLowerCase());
-    if (co) return co.name;
-    setMaterialTypes([...materialTypes, { id: uid(), name: ten, category, note: "" }]);
-    notify.saved(`Đã thêm loại nguyên liệu "${ten}" vào danh mục`);
-    return ten;
+    const existing = materialTypes.find((l) => l.name.trim().toLowerCase() === name.trim().toLowerCase());
+    if (existing) return existing.name;
+    setMaterialTypes([...materialTypes, { id: uid(), name, category, note: "" }]);
+    notify.saved(`Đã thêm loại nguyên liệu "${name}" vào danh mục`);
+    return name;
   };
 
   /* ---- Ghi chuyến ---- */
 
   /** Bảng loại hàng MỞ ĐẦU cho một chuyến mới: đại lý đã có lịch sử ⇒ điền sẵn
    *  loại + đơn giá gần nhất (chỉ còn gõ kg); chưa có ⇒ một dòng trống. */
-  const newTableRows = (dl: string, workshop: Workshop, cat: Category): ImportLine[] => {
-    const templateRows = getSupplierLineTemplates(rows, dl, workshop);
-    return templateRows.length ? templateRows : [createEmptyImportLine(cat)];
+  const newTableRows = (supplier: string, workshop: Workshop, category: Category): ImportLine[] => {
+    const templateRows = getSupplierLineTemplates(rows, supplier, workshop);
+    return templateRows.length ? templateRows : [createEmptyImportLine(category)];
   };
 
   /** Đưa con trỏ vào ô kg đầu tiên — bước kế tiếp tự nhiên sau khi chọn đại lý/xe. */
@@ -394,7 +394,7 @@ export default function MaterialImportScreen() {
 
   // Form-first: vào "Ghi nhập" mà chưa có phiếu → tự mở phiếu trống (không modal).
   useEffect(() => {
-    if (mode === "nhap" && session === null && !isLoading) openAdd();
+    if (mode === "entry" && session === null && !isLoading) openAdd();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, session, isLoading]);
 
@@ -404,8 +404,8 @@ export default function MaterialImportScreen() {
   const sessionDate = session?.deliveryDate;
   const sessionWorkshop = session?.workshop;
   useEffect(() => {
-    if (mode === "nhap" && sessionDate !== undefined && sessionWorkshop !== undefined) {
-      setKy("ngay");
+    if (mode === "entry" && sessionDate !== undefined && sessionWorkshop !== undefined) {
+      setPeriod("day");
       setDate(sessionDate);
       setWorkshop(sessionWorkshop);
     }
@@ -426,11 +426,11 @@ export default function MaterialImportScreen() {
       scanPath: n.shipment?.scanPath ?? "",
     });
     setSessionShipmentId(n.shipment?.id ?? null);
-    setEditRowIds(n.dong.map((r) => r.id));
+    setEditRowIds(n.rows.map((r) => r.id));
     // Nạp mọi dòng đã ghi vào bảng (giữ id để cập nhật đúng bản ghi). Muốn thêm
     // loại mới thì bấm nút "Thêm loại hàng" — không tự sinh dòng.
     setTableRows(
-      n.dong.map((r) => ({
+      n.rows.map((r) => ({
         key: r.id,
         id: r.id,
         category: r.category,
@@ -442,7 +442,7 @@ export default function MaterialImportScreen() {
     setSessionErrors([]);
     setIsExtrasOpen(true);
     resetSteps(true);
-    setMode("nhap"); // sửa chuyến mở trong form inline (chế độ Ghi nhập)
+    setMode("entry"); // sửa chuyến mở trong form inline (chế độ Ghi nhập)
   };
 
   const setSessionField = <K extends keyof ShipmentHeader>(k: K, v: ShipmentHeader[K]) =>
@@ -499,10 +499,10 @@ export default function MaterialImportScreen() {
   };
 
   /** Chạm TÀI XẾ: đã có biển số ⇒ xong bước xe; chưa có ⇒ ở lại chờ chọn biển số. */
-  const pickDriver = (ten: string) => {
-    setSessionField("driverName", ten);
+  const pickDriver = (name: string) => {
+    setSessionField("driverName", name);
     if (!session?.licensePlate.trim()) {
-      setOpenPanel("xe");
+      setOpenPanel("vehicle");
       return;
     }
     setOpenPanel(null);
@@ -529,11 +529,11 @@ export default function MaterialImportScreen() {
   const isEditingShipment = editRowIds !== null;
   /** Gợi ý theo sổ đã ghi: đại lý hay giao cho xưởng đang chọn + xe của đại lý đang chọn. */
   // Chỉ gợi ý đại lý CÒN trong danh mục — tên cũ đã đổi/xóa thì ô chọn không hiện được.
-  const dlHayGiao = useMemo(
+  const frequentSuppliers = useMemo(
     () =>
       session
         ? getFrequentSuppliers(rows, session.workshop, 8)
-            .filter((ten) => suppliers.some((d) => d.shortName === ten))
+            .filter((name) => suppliers.some((d) => d.shortName === name))
             .slice(0, 4)
         : [],
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -568,8 +568,8 @@ export default function MaterialImportScreen() {
   const hasVehicleInfo = !!session && !!(session.licensePlate.trim() || session.driverName.trim());
   const hasVehicleHints = truckSuggestions.plates.length > 0 || truckSuggestions.drivers.length > 0;
   /** Bước mở/thu SUY từ dữ liệu, `dangMo` chỉ để ép mở khi bấm "Đổi" / đang gõ tay. */
-  const isSupplierStepOpen = openPanel === "dai-ly" || !session?.supplierName;
-  const isVehicleStepOpen = !isSupplierStepOpen && (openPanel === "xe" || (!hasVehicleInfo && !skipTruck));
+  const isSupplierStepOpen = openPanel === "supplier" || !session?.supplierName;
+  const isVehicleStepOpen = !isSupplierStepOpen && (openPanel === "vehicle" || (!hasVehicleInfo && !skipTruck));
   /** Hai ô ngày chỉ hiện khi ghi bù (hoặc người dùng chủ động tách). */
   const twoDates =
     !!session && (splitDates || session.postingDate !== session.deliveryDate);
@@ -595,7 +595,7 @@ export default function MaterialImportScreen() {
   const savedRowCount = tableRows.filter((d) => d.id).length;
   /** Đang ở "Ghi nhập" và còn dòng hợp lệ CHƯA lưu vào sổ (dòng mới id=null) —
    *  để nhắc trước khi chốt ngày, kẻo số vừa gõ chưa tính vào tổng chốt. */
-  const hasUnsavedRows = mode === "nhap" && validRows.some((d) => !d.id);
+  const hasUnsavedRows = mode === "entry" && validRows.some((d) => !d.id);
   const isSessionLocked = session ? isLocked(session.deliveryDate, session.workshop) : false;
 
   /** Dòng đã lưu thuộc chuyến đang mở (id-set khi sửa; tạo mới thì chưa có gì). */
@@ -626,7 +626,7 @@ export default function MaterialImportScreen() {
         return {
           ...d,
           ...patch,
-          goiY: isTypeEdit ? false : d.goiY,
+          isSuggested: isTypeEdit ? false : d.isSuggested,
           // Giá vừa tự gõ không còn là "giá lượt trước".
           priceDate: isTypeEdit || "unitPrice" in patch ? undefined : d.priceDate,
         };
@@ -636,8 +636,8 @@ export default function MaterialImportScreen() {
   /** Bỏ một dòng; luôn còn ít nhất một dòng để nhập. */
   const removeRow = (key: string) =>
     setTableRows((items) => {
-      const con = items.filter((d) => d.key !== key);
-      return con.length ? con : [createEmptyImportLine(lastCategory)];
+      const remaining = items.filter((d) => d.key !== key);
+      return remaining.length ? remaining : [createEmptyImportLine(lastCategory)];
     });
 
   /** Thêm một dòng trống ở CUỐI bảng (mặc định loài theo dòng cuối cho nhanh). */
@@ -712,7 +712,7 @@ export default function MaterialImportScreen() {
    * ⇒ bảng dựng lại theo lượt giao gần nhất rồi mới điền dòng đọc được vào; ngày đặt cả
    * ngày ghi sổ lẫn ngày hàng về (không tự bật ghi bù); xe đọc được thay xe cũ.
    */
-  const applyAllFromOcr = (r: KetQuaOcr) => {
+  const applyAllFromOcr = (r: OcrResult) => {
     if (!session) return;
     const workshop = (r.workshop as Workshop | undefined) ?? session.workshop;
     const supplierName = r.supplier ?? session.supplierName;
@@ -764,7 +764,7 @@ export default function MaterialImportScreen() {
     if (validRows.length === 0)
       ls.push({
         field: "Loại hàng",
-        message: tableRows.some((d) => d.goiY)
+        message: tableRows.some((d) => d.isSuggested)
           ? "Chưa gõ số kg cho loại hàng nào"
           : "Thêm ít nhất một loại hàng vào chuyến",
       });
@@ -847,13 +847,13 @@ export default function MaterialImportScreen() {
 
     // Ghi ngày ngoài kỳ đang lọc → kéo bộ lọc về chuyến vừa ghi (khỏi tưởng mất).
     if (session.deliveryDate < effectiveFrom || session.deliveryDate > effectiveTo) {
-      setKy("ngay");
+      setPeriod("day");
       setDate(session.deliveryDate);
     }
     if (workshop !== "Tất cả" && workshop !== session.workshop)
       setWorkshop(session.workshop);
     if (supplierFilter && supplierFilter !== session.supplierName) setSupplierFilter("");
-    if (priceFilter === "thieu-gia") setPriceFilter("tat-ca");
+    if (priceFilter === "unpriced") setPriceFilter("all");
     return true;
   };
 
@@ -915,12 +915,12 @@ export default function MaterialImportScreen() {
   const lockDay = () => {
     /* Sổ chốt chưa nạp xong ⇒ chưa biết máy chủ đã có bản ghi (ngày, xưởng) chưa;
        tạo bản mới lúc này có thể trùng chỉ mục duy nhất (site, ngày, xưởng) ⇒ 23505. */
-    if (lockStatus === "dang-tai") {
+    if (lockStatus === "loading") {
       notify.error("Đang tải sổ chốt ngày từ máy chủ — đợi vài giây rồi bấm chốt lại");
       return;
     }
     const bg = lockRecordOf(effectiveFrom, viewedWorkshop);
-    const ban: DailyLock = {
+    const lockRecord: DailyLock = {
       /* Có bản ghi (kể cả đã mở lại) ⇒ dùng lại id. Chưa có ⇒ id CỐ ĐỊNH theo khoá
          nghiệp vụ (ngày|xưởng), không newId(): hai máy cùng chốt một ngày sẽ ghi
          CÙNG một dòng thay vì hai id đụng chỉ mục duy nhất và kẹt hàng chờ. */
@@ -934,7 +934,7 @@ export default function MaterialImportScreen() {
       note: lockNote,
     };
     persistLocks(
-      bg ? locks.map((c) => (c.id === bg.id ? ban : c)) : [...locks, ban]
+      bg ? locks.map((c) => (c.id === bg.id ? lockRecord : c)) : [...locks, lockRecord]
     );
     notify.saved(
       `Đã chốt ngày ${formatDateVN(effectiveFrom)} · xưởng ${viewedWorkshop} — ${kg(actualTotal)}`
@@ -978,7 +978,7 @@ export default function MaterialImportScreen() {
     {
       key: "category",
       header: "Loài",
-      render: (r) => <Tag variant="phan-loai" tone={toneByName(r.category)}>{r.category}</Tag>,
+      render: (r) => <Tag variant="category" tone={toneByName(r.category)}>{r.category}</Tag>,
       getSortValue: (r) => r.category,
     },
     {
@@ -996,7 +996,7 @@ export default function MaterialImportScreen() {
         r.unitPrice != null ? (
           num(r.unitPrice)
         ) : (
-          <Tag variant="loi">Chưa có giá</Tag>
+          <Tag variant="error">Chưa có giá</Tag>
         ),
       getSortValue: (r) => r.unitPrice ?? 0,
     },
@@ -1013,7 +1013,7 @@ export default function MaterialImportScreen() {
             key: "khoa",
             header: "Trạng thái",
             render: () => (
-              <Tag variant="xong" icon={Lock}>
+              <Tag variant="done" icon={Lock}>
                 Đã chốt
               </Tag>
             ),
@@ -1180,7 +1180,7 @@ export default function MaterialImportScreen() {
                 </Button>
               )
             )}
-            {coOcr && (
+            {hasOcr && (
               <Button
                 title="Chụp hoặc chọn ảnh phiếu nhập viết tay, máy tự đọc ra ngày · đại lý · các dòng loại NL và kg. Kết quả là NHÁP — soát lại rồi mới lưu."
                 type="button"
@@ -1195,7 +1195,7 @@ export default function MaterialImportScreen() {
             )}
             {session.scanPath && (
               <span className="flex items-center gap-1">
-                <Tag variant="xong">Đã đính ảnh phiếu</Tag>
+                <Tag variant="done">Đã đính ảnh phiếu</Tag>
                 {hasImageStorage && (
                   <Button
                     title="Mở lại ảnh phiếu tay đã lưu kèm chuyến này." type="button" variant="link" size="sm" onClick={viewScanImage}>
@@ -1235,29 +1235,29 @@ export default function MaterialImportScreen() {
 
         {/* ① ĐẠI LÝ — chọn xong là thu lại, kéo theo xe gợi ý + bảng loại hàng điền sẵn */}
         <StepCard
-          so={1}
+          stepNumber={1}
           title="Đại lý giao hàng"
-          xong={!!session.supplierName}
-          mo={isSupplierStepOpen}
+          done={!!session.supplierName}
+          open={isSupplierStepOpen}
           summary={session.supplierName}
-          onDoi={() => setOpenPanel("dai-ly")}
+          onChange={() => setOpenPanel("supplier")}
         >
-          {!isEditingShipment && dlHayGiao.length > 0 && (
+          {!isEditingShipment && frequentSuppliers.length > 0 && (
             <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
-              {dlHayGiao.map((ten) => (
+              {frequentSuppliers.map((name) => (
                 <ChoiceCard
-                  key={ten}
-                  label={ten}
-                  phu={lastDateBySupplier.get(ten) ? `Gần nhất ${formatDateVN(lastDateBySupplier.get(ten) ?? "")}` : undefined}
-                  isSelected={session.supplierName === ten}
-                  title={`Chọn đại lý ${ten} — tự điền sẵn các loại hàng và đơn giá theo lượt giao gần nhất, chỉ còn gõ số kg.`}
-                  onClick={() => pickSupplier(ten)}
+                  key={name}
+                  label={name}
+                  phu={lastDateBySupplier.get(name) ? `Gần nhất ${formatDateVN(lastDateBySupplier.get(name) ?? "")}` : undefined}
+                  isSelected={session.supplierName === name}
+                  title={`Chọn đại lý ${name} — tự điền sẵn các loại hàng và đơn giá theo lượt giao gần nhất, chỉ còn gõ số kg.`}
+                  onClick={() => pickSupplier(name)}
                 />
               ))}
             </div>
           )}
           <Combobox
-            label={dlHayGiao.length > 0 && !isEditingShipment ? "Đại lý khác" : "Đại lý giao hàng"}
+            label={frequentSuppliers.length > 0 && !isEditingShipment ? "Đại lý khác" : "Đại lý giao hàng"}
             required
             hideRequiredMark
             value={session.supplierName}
@@ -1272,10 +1272,10 @@ export default function MaterialImportScreen() {
 
         {/* ② XE — xe cũ của đại lý bấm một chạm; xe lạ thì gõ tay; không có thì bỏ qua */}
         <StepCard
-          so={2}
+          stepNumber={2}
           title="Xe chở hàng"
-          xong={hasVehicleInfo || skipTruck}
-          mo={isVehicleStepOpen}
+          done={hasVehicleInfo || skipTruck}
+          open={isVehicleStepOpen}
           summary={
             hasVehicleInfo
               ? [session.licensePlate, session.driverName].filter(Boolean).join(" · ")
@@ -1283,7 +1283,7 @@ export default function MaterialImportScreen() {
                 ? "Không ghi xe"
                 : undefined
           }
-          onDoi={session.supplierName ? () => setOpenPanel("xe") : undefined}
+          onChange={session.supplierName ? () => setOpenPanel("vehicle") : undefined}
         >
           {truckSuggestions.plates.length > 0 && (
             <div className="space-y-2">
@@ -1309,13 +1309,13 @@ export default function MaterialImportScreen() {
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">Tài xế</p>
               <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
-                {truckSuggestions.drivers.map((ten) => (
+                {truckSuggestions.drivers.map((name) => (
                   <ChoiceCard
-                    key={ten}
-                    label={ten}
-                    isSelected={ten.toLowerCase() === session.driverName.trim().toLowerCase()}
+                    key={name}
+                    label={name}
+                    isSelected={name.toLowerCase() === session.driverName.trim().toLowerCase()}
                     title="Chọn tài xế này cho chuyến. Đã có biển số thì xong bước xe và nhảy xuống gõ số kg."
-                    onClick={() => pickDriver(ten)}
+                    onClick={() => pickDriver(name)}
                   />
                 ))}
               </div>
@@ -1326,7 +1326,7 @@ export default function MaterialImportScreen() {
               <Field label="Biển số xe">
                 <Input
                   value={session.licensePlate}
-                  onFocus={() => setOpenPanel("xe")}
+                  onFocus={() => setOpenPanel("vehicle")}
                   onChange={(e) => setSessionField("licensePlate", e.target.value)}
                   placeholder="VD: 86C 19555"
                 />
@@ -1334,7 +1334,7 @@ export default function MaterialImportScreen() {
               <Field label="Tài xế">
                 <Input
                   value={session.driverName}
-                  onFocus={() => setOpenPanel("xe")}
+                  onFocus={() => setOpenPanel("vehicle")}
                   onChange={(e) => setSessionField("driverName", e.target.value)}
                   placeholder="Tên tài xế"
                 />
@@ -1349,7 +1349,7 @@ export default function MaterialImportScreen() {
                 variant="outline"
                 onClick={() => {
                   setIsManualVehicle(true);
-                  setOpenPanel("xe");
+                  setOpenPanel("vehicle");
                 }}
               >
                 <Plus />
@@ -1379,20 +1379,20 @@ export default function MaterialImportScreen() {
 
         {/* ③ LOẠI HÀNG & KG — bảng điền sẵn theo đại lý, chỉ còn gõ số */}
         <StepCard
-          so={3}
+          stepNumber={3}
           title="Loại hàng và số kg"
-          xong={validRows.length > 0}
-          mo
+          done={validRows.length > 0}
+          open
         >
           <p className="text-sm text-muted-foreground">
-            {tableRows.some((d) => d.goiY)
+            {tableRows.some((d) => d.isSuggested)
               ? "Đã điền sẵn loại + giá theo lượt gần nhất — chỉ gõ số kg, Enter xuống dòng. Dòng không có kg tự bỏ qua."
               : "Mỗi loại một dòng. Đơn giá để trống nếu chưa có hóa đơn."}
           </p>
           <ImportLinesTable
-            dong={tableRows}
+            lines={tableRows}
             onUpdateRow={updateRow}
-            onBo={removeRow}
+            onRemove={removeRow}
             onAddRow={addNewRow}
             getMaterialTypeOptions={materialTypeOptionsByCategory}
             onCreateMaterialType={addMaterialType}
@@ -1518,7 +1518,7 @@ export default function MaterialImportScreen() {
             </p>
           </div>
           <DayShipmentList
-            nhom={sessionDayGroups}
+            groups={sessionDayGroups}
             isLocked={isSessionLocked}
             editingGroupKey={sessionShipmentId}
             onEdit={openShipmentEdit}
@@ -1565,10 +1565,10 @@ export default function MaterialImportScreen() {
           <button
             title="Sang chế độ Ghi nhập để gõ chuyến nguyên liệu mới."
             type="button"
-            onClick={() => setMode("nhap")}
+            onClick={() => setMode("entry")}
             className={cn(
               "flex-1 px-4 py-2.5 text-base font-semibold transition-colors sm:flex-none",
-              mode === "nhap"
+              mode === "entry"
                 ? "bg-primary text-primary-foreground"
                 : "bg-card text-muted-foreground hover:bg-muted"
             )}
@@ -1578,10 +1578,10 @@ export default function MaterialImportScreen() {
           <button
             title="Tổng hợp nhập hàng theo kỳ (xuất Excel / in) và tra cứu sổ chi tiết các chuyến theo ngày, đại lý, loại, thiếu giá."
             type="button"
-            onClick={() => setMode("bao-cao")}
+            onClick={() => setMode("report")}
             className={cn(
               "flex-1 border-l-2 border-border px-4 py-2.5 text-base font-semibold transition-colors sm:flex-none",
-              mode !== "nhap"
+              mode !== "entry"
                 ? "bg-primary text-primary-foreground"
                 : "bg-card text-muted-foreground hover:bg-muted"
             )}
@@ -1593,12 +1593,12 @@ export default function MaterialImportScreen() {
 
       {/* Trong "Báo cáo": tổng hợp theo kỳ ⇄ sổ chi tiết các chuyến (tab "Sổ ngày" cũ —
           việc xem/sửa chuyến TRONG NGÀY đã nằm ở cột phải của "Ghi nhập"). */}
-      {mode !== "nhap" && (
+      {mode !== "entry" && (
         <div className="flex w-full overflow-hidden rounded-lg border-2 border-border sm:w-fit">
           {(
             [
-              ["bao-cao", "Tổng hợp theo kỳ", "Tổng nhập theo kỳ, gom theo đại lý × loại nguyên liệu; xuất Excel hoặc in."],
-              ["so", "Sổ chi tiết các chuyến", "Tra cứu từng chuyến theo ngày / tuần / tháng, lọc đại lý · loại · chưa có giá; in tem QR, đổi loại hàng loạt."],
+              ["report", "Tổng hợp theo kỳ", "Tổng nhập theo kỳ, gom theo đại lý × loại nguyên liệu; xuất Excel hoặc in."],
+              ["ledger", "Sổ chi tiết các chuyến", "Tra cứu từng chuyến theo ngày / tuần / tháng, lọc đại lý · loại · chưa có giá; in tem QR, đổi loại hàng loạt."],
             ] as const
           ).map(([id, label, description], i) => (
             <button
@@ -1618,20 +1618,20 @@ export default function MaterialImportScreen() {
         </div>
       )}
 
-      {mode === "bao-cao" && <ImportReport />}
+      {mode === "report" && <ImportReport />}
 
       {isTypeChangeOpen && (
         <BulkTypeChangeDialog
           rows={rows}
-          loaiNL={materialTypes}
+          materialTypes={materialTypes}
           onCreateMaterialType={addMaterialType}
           materialTypeEdit={materialTypeEditor}
           onClose={() => setIsTypeChangeOpen(false)}
           onSave={(ids, targetType) => {
-            const bo = new Set(ids);
+            const dropIds = new Set(ids);
             const prevRows = rows;
             persist(
-              rows.map((r) => (bo.has(r.id) ? { ...r, materialTypeName: targetType } : r))
+              rows.map((r) => (dropIds.has(r.id) ? { ...r, materialTypeName: targetType } : r))
             );
             notify.saved(`Đã đổi ${ids.length} chuyến sang "${targetType}"`, () =>
               persist(prevRows)
@@ -1641,13 +1641,13 @@ export default function MaterialImportScreen() {
         />
       )}
 
-      {mode === "nhap" && (
+      {mode === "entry" && (
         <DailyTaskReminder isLocked={isImportLockedToday} task={`chuyến nhập nguyên liệu hôm nay — xưởng ${recordWorkshop}`} />
       )}
 
-      {mode === "nhap" && entryForm}
+      {mode === "entry" && entryForm}
 
-      {mode === "so" && (
+      {mode === "ledger" && (
         <>
       <div className="flex flex-wrap gap-2">
         <Button
@@ -1670,9 +1670,9 @@ export default function MaterialImportScreen() {
       <StatCardGrid
         className="grid-cols-2 sm:grid-cols-3 lg:grid-cols-5"
         cards={[
-          { label: "Đang xem", value: rangeDescription, icon: CalendarRange, color: "trung-tinh" },
-          { label: "Phân xưởng", value: workshop, icon: Warehouse, color: "trung-tinh" },
-          { label: "Số chuyến", value: nhomView.length, numeric: true, icon: Truck, color: "brand" },
+          { label: "Đang xem", value: rangeDescription, icon: CalendarRange, color: "neutral" },
+          { label: "Phân xưởng", value: workshop, icon: Warehouse, color: "neutral" },
+          { label: "Số chuyến", value: groupedView.length, numeric: true, icon: Truck, color: "brand" },
           { label: "Số dòng", value: view.length, numeric: true, icon: FileText, color: "brand" },
           { label: "Tổng nhập", value: kg(total), numeric: true, icon: Scale, color: "success" },
         ]}
@@ -1686,39 +1686,39 @@ export default function MaterialImportScreen() {
             label="Kỳ xem sổ"
             hideRequiredMark
             clearable={false}
-            value={ky}
-            onChange={(v) => setKy(v as ViewPeriod)}
-            options={KY_OPT}
+            value={period}
+            onChange={(v) => setPeriod(v as ViewPeriod)}
+            options={PERIOD_OPTIONS}
             className="min-w-[13rem]"
           />
 
           <div className="min-w-[220px] flex-1">
-            {ky === "tuy-chon" ? (
+            {period === "custom" ? (
               <DateRangeField
                 label="Khoảng ngày hàng về xưởng"
                 hideRequiredMark
                 presets={false}
                 startDate={fromDate}
                 endDate={toDate}
-                onChange={(tu, den) => {
-                  setFromDate(tu);
-                  setToDate(den);
+                onChange={(fromDate, toDate) => {
+                  setFromDate(fromDate);
+                  setToDate(toDate);
                 }}
               />
             ) : (
               <DateField
                 label={
-                  ky === "ngay"
+                  period === "day"
                     ? "Ngày hàng về xưởng"
-                    : ky === "tuan"
+                    : period === "week"
                       ? "Ngày bất kỳ trong tuần"
-                      : ky === "thang"
+                      : period === "month"
                         ? "Ngày bất kỳ trong tháng"
                         : "Ngày bất kỳ trong năm"
                 }
                 hideRequiredMark
                 hint={
-                  ky === "ngay"
+                  period === "day"
                     ? undefined
                     : `Kỳ đang xem: ${formatDateVN(effectiveFrom)} – ${formatDateVN(effectiveTo)}`
                 }
@@ -1787,17 +1787,17 @@ export default function MaterialImportScreen() {
                   : undefined
               }
               value={priceFilter}
-              onChange={(v) => setPriceFilter(v as "tat-ca" | "thieu-gia")}
+              onChange={(v) => setPriceFilter(v as "all" | "unpriced")}
               options={[
-                { value: "tat-ca", label: "Tất cả" },
-                { value: "thieu-gia", label: "Chưa có giá" },
+                { value: "all", label: "Tất cả" },
+                { value: "unpriced", label: "Chưa có giá" },
               ]}
               columns={2}
             />
 
             {(supplierFilter ||
               materialTypeFilter ||
-              priceFilter !== "tat-ca" ||
+              priceFilter !== "all" ||
               workshop === "Tất cả") && (
               <div className="flex justify-end">
                 <Button
@@ -1806,7 +1806,7 @@ export default function MaterialImportScreen() {
                   onClick={() => {
                     setSupplierFilter("");
                     setMaterialTypeFilter("");
-                    setPriceFilter("tat-ca");
+                    setPriceFilter("all");
                     setWorkshop("Đông");
                   }}
                 >
@@ -1822,12 +1822,12 @@ export default function MaterialImportScreen() {
       {/* Sổ: mỗi chuyến một cụm, đúng như sổ giấy đánh STT theo đại lý */}
       {isLoading ? (
         <TableSkeleton />
-      ) : nhomView.length === 0 ? (
+      ) : groupedView.length === 0 ? (
         <EmptyState
           icon={Truck}
           title={`Chưa có chuyến nào trong ${rangeDescription}`}
           description={
-            priceFilter === "thieu-gia"
+            priceFilter === "unpriced"
               ? "Đang lọc “Chưa có giá”. Bỏ lọc để xem đủ sổ."
               : workshop === "Tất cả"
                 ? "Chuyển sang “Ghi nhập” để ghi chuyến đầu tiên."
@@ -1835,7 +1835,7 @@ export default function MaterialImportScreen() {
           }
           action={
             <Button
-              title="Chuyển sang chế độ Ghi để nhập chuyến mới cho ngày này." size="lg" onClick={() => setMode("nhap")}>
+              title="Chuyển sang chế độ Ghi để nhập chuyến mới cho ngày này." size="lg" onClick={() => setMode("entry")}>
               <Plus />
               Sang Ghi nhập
             </Button>
@@ -1844,7 +1844,7 @@ export default function MaterialImportScreen() {
       ) : (
         <>
           <div className="space-y-5">
-            {nhomView.map((n, i) => {
+            {groupedView.map((n, i) => {
               const isShipmentLocked = isLocked(n.deliveryDate, n.workshop);
               return (
                 <section
@@ -1866,25 +1866,25 @@ export default function MaterialImportScreen() {
                       </div>
                       <div className="flex flex-wrap items-center gap-2">
                         {n.isBackdated && (
-                          <Tag variant="luu-y">
+                          <Tag variant="warning">
                             Ghi bù {formatDateVN(n.postingDate)}
                           </Tag>
                         )}
                         {isShipmentLocked && (
-                          <Tag variant="xong" icon={Lock}>
+                          <Tag variant="done" icon={Lock}>
                             Đã chốt
                           </Tag>
                         )}
                         {!n.shipment && (
-                          <Tag variant="nguon">Dữ liệu cũ</Tag>
+                          <Tag variant="source">Dữ liệu cũ</Tag>
                         )}
                         {n.shipment && (
-                          <Tag variant="phu" className="tnum">
+                          <Tag variant="muted" className="tnum">
                             Lô {formatMaterialLotLabel(n.shipment)}
                           </Tag>
                         )}
                         {n.shipment?.ssccCode && (
-                          <Tag variant="phu" className="tnum">
+                          <Tag variant="muted" className="tnum">
                             SSCC {n.shipment.ssccCode}
                           </Tag>
                         )}
@@ -1940,7 +1940,7 @@ export default function MaterialImportScreen() {
 
                   <RecordTable
                     columns={itemColumns(isShipmentLocked)}
-                    rows={n.dong}
+                    rows={n.rows}
                     getKey={(r) => r.id}
                     rowMarkKey="nhap-hang"
                   />
@@ -2131,7 +2131,7 @@ export default function MaterialImportScreen() {
       {/* ---- Phiếu báo cáo tổng hợp nguyên liệu (in A4 ngang, theo kỳ) ---- */}
       {showInvoice && (
         <DailyImportInvoice
-          ky={ky}
+          period={period}
           date={date}
           startDate={fromDate}
           endDate={toDate}

@@ -569,7 +569,7 @@ export interface ExportItem {
 
 /* ---------- BSF1 Warehouse & NXT Report Types ---------- */
 
-export type WarehouseType = "xi-nghiep" | "phan-xuong";
+export type WarehouseType = "plant" | "workshop";
 
 export interface WarehouseInfo {
   id: string;
@@ -594,7 +594,7 @@ export const BSF1_WAREHOUSES: WarehouseInfo[] = [
     id: "kho-1000t",
     code: "K1000T",
     name: "Kho 1000 tấn",
-    type: "xi-nghiep",
+    type: "plant",
     capacityKg: 1000000,
     note: "Kho tổng BSF1 — dung tích 1.000 tấn",
   },
@@ -602,7 +602,7 @@ export const BSF1_WAREHOUSES: WarehouseInfo[] = [
     id: "kho-1500t",
     code: "K1500T",
     name: "Kho 1500 tấn",
-    type: "xi-nghiep",
+    type: "plant",
     capacityKg: 1500000,
     note: "Kho tổng BSF1 — dung tích 1.500 tấn",
   },
@@ -610,7 +610,7 @@ export const BSF1_WAREHOUSES: WarehouseInfo[] = [
     id: "kho-dong",
     code: "KX-DONG",
     name: "Kho xưởng Đông",
-    type: "phan-xuong",
+    type: "workshop",
     capacityKg: 250000,
     workshop: "Đông",
     note: "Kho trong phân xưởng Đông — dung tích 250 tấn",
@@ -619,7 +619,7 @@ export const BSF1_WAREHOUSES: WarehouseInfo[] = [
     id: "kho-ca",
     code: "KX-CA",
     name: "Kho xưởng Cá",
-    type: "phan-xuong",
+    type: "workshop",
     capacityKg: 150000,
     workshop: "Cá",
     note: "Kho trong phân xưởng Cá — dung tích 150 tấn",
@@ -628,7 +628,7 @@ export const BSF1_WAREHOUSES: WarehouseInfo[] = [
     id: "kho-kho",
     code: "KX-KHO",
     name: "Kho xưởng Khô",
-    type: "phan-xuong",
+    type: "workshop",
     capacityKg: 150000,
     workshop: "Khô",
     note: "Kho trong phân xưởng Khô — dung tích 150 tấn",

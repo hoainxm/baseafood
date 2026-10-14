@@ -5,7 +5,7 @@
 // ============================================================
 import type { BalancingInputItem, MonthlyStockLine } from "@/types";
 import { getBalancingStockLineKind } from "@/lib/balancingGrid";
-import { carryForwardIntoLedger, suyDong, getNextMonth, type MonthlyStockRow } from "@/lib/monthlyStock";
+import { carryForwardIntoLedger, deriveRow, getNextMonth, type MonthlyStockRow } from "@/lib/monthlyStock";
 import { num, formatDateVN } from "@/lib/format";
 
 /**
@@ -60,11 +60,11 @@ export function ensureMonthOpened(
 ): { lines: MonthlyStockLine[]; carriedCount: number } {
   if (lines.some((l) => l.period === month)) return { lines, carriedCount: 0 };
   const prevRows = [...new Set(lines.map((l) => l.period))].filter((p) => p < month).sort();
-  const tu = prevRows[prevRows.length - 1];
-  if (!tu) return { lines, carriedCount: 0 };
+  const fromDate = prevRows[prevRows.length - 1];
+  if (!fromDate) return { lines, carriedCount: 0 };
   let items = lines;
   let carriedCount = 0;
-  let source = tu;
+  let source = fromDate;
   for (let i = 0; i < 24 && source < month; i++) {
     const nextMonth = getNextMonth(source);
     if (!items.some((l) => l.period === nextMonth)) {
@@ -84,12 +84,12 @@ export function ensureMonthOpened(
  */
 export function findLotLineInMonth(
   lines: MonthlyStockLine[],
-  loId: string,
+  lotId: string,
   month: string
 ): MonthlyStockLine | null {
-  const original = lines.find((l) => l.id === loId);
+  const original = lines.find((l) => l.id === lotId);
   if (!original || original.period > month) return null;
-  let id = loId;
+  let id = lotId;
   let p = original.period;
   while (p < month) {
     id = `carry|${id}`;
@@ -110,9 +110,9 @@ export function getBalancingShareInLot(l: Pick<MonthlyStockLine, "note">, rowId:
 }
 
 /** Đặt dòng vết của `rowId` trong ghi chú (thay dòng cũ / thêm mới / gỡ khi 0 kg). */
-function appendTrace(note: string, rowId: string, kg: number, chu: string): string {
+function appendTrace(note: string, rowId: string, kg: number, text: string): string {
   const dongs = (note ?? "").split("\n").filter((d) => d.length > 0 && !reVet(rowId).test(d));
-  if (Math.abs(kg) > 1e-9) dongs.push(`⟦CĐ:${rowId}:${+kg.toFixed(3)}⟧ ${chu}`);
+  if (Math.abs(kg) > 1e-9) dongs.push(`⟦CĐ:${rowId}:${+kg.toFixed(3)}⟧ ${text}`);
   return dongs.join("\n");
 }
 
@@ -171,14 +171,14 @@ export function syncMonthlyStockLedger(
   const nextById = new Map(after.filter(isStockLine).map((r) => [r.id, r]));
   let items = lines;
   let carriedCount = 0;
-  let doi = false;
+  let changed = false;
 
   const ensureMonth = (t: string) => {
     const result = ensureMonthOpened(items, t);
     if (result.carriedCount) {
       items = result.lines;
       carriedCount += result.carriedCount;
-      doi = true;
+      changed = true;
     }
   };
 
@@ -191,7 +191,7 @@ export function syncMonthlyStockLedger(
     const b = nextById.get(id);
     const lineKind = getBalancingStockLineKind((b ?? a)!);
 
-    if (lineKind === "lay-xa-dong") {
+    if (lineKind === "thaw-out") {
       const prevStockLineId = a?.stockLineId ?? "";
       const nextStockLineId = b?.stockLineId ?? "";
       const oldParts = a ? thawByMonth(a) : new Map<string, number>();
@@ -216,8 +216,8 @@ export function syncMonthlyStockLedger(
       can.sort((x, y) => x.month.localeCompare(y.month) || (x.kg === 0 ? -1 : 1));
       for (const c of can) {
         ensureMonth(c.month);
-        const dong = findLotLineInMonth(items, c.lot, c.month);
-        if (!dong) {
+        const row = findLotLineInMonth(items, c.lot, c.month);
+        if (!row) {
           if (c.kg === 0) continue; // lô không còn ở tháng đó — không có gì để trả
           return {
             lines,
@@ -226,34 +226,34 @@ export function syncMonthlyStockLedger(
             error: `Lô đã chọn không còn trong sổ kho ${c.month.slice(5)}/${c.month.slice(0, 4)} — chọn lô khác.`,
           };
         }
-        const existing = getBalancingShareInLot(dong, id);
+        const existing = getBalancingShareInLot(row, id);
         const diff = c.kg - existing;
         if (Math.abs(diff) < 1e-9) continue;
-        const outKg = dong.outKg + diff;
-        const stock = dong.openKg + dong.inKg - outKg;
+        const outKg = row.outKg + diff;
+        const stock = row.openKg + row.inKg - outKg;
         if (stock < -1e-6) {
           return {
             lines,
             changed: false,
             carriedCount: 0,
-            error: `Lô ${shortLocationName(dong)} · ${dong.itemName}${dong.origin ? ` · ${dong.origin}` : ""} chỉ còn ${num(
-              dong.openKg + dong.inKg - dong.outKg + existing
+            error: `Lô ${shortLocationName(row)} · ${row.itemName}${row.origin ? ` · ${row.origin}` : ""} chỉ còn ${num(
+              row.openKg + row.inKg - row.outKg + existing
             )} kg — không lấy được ${num(c.kg)} kg.`,
           };
         }
         const updatedLine: MonthlyStockLine = {
-          ...dong,
+          ...row,
           outKg,
-          outCtn: dong.outCtn + (dong.kgPerCtn ? diff / dong.kgPerCtn : 0),
-          note: appendTrace(dong.note, id, c.kg, `Cân đối ${ctx.periodLabel}: lấy xả đông ${num(c.kg)} kg`),
+          outCtn: row.outCtn + (row.kgPerCtn ? diff / row.kgPerCtn : 0),
+          note: appendTrace(row.note, id, c.kg, `Cân đối ${ctx.periodLabel}: lấy xả đông ${num(c.kg)} kg`),
         };
-        items = items.map((l) => (l.id === dong.id ? updatedLine : l));
-        doi = true;
+        items = items.map((l) => (l.id === row.id ? updatedLine : l));
+        changed = true;
       }
       continue;
     }
 
-    if (lineKind === "gui-dong") {
+    if (lineKind === "freeze-deposit") {
       const oldParts = a ? freezeDepositByDay(a) : new Map<string, number>();
       const newParts = b ? freezeDepositByDay(b) : new Map<string, number>();
       const newLocation = b?.stockLocation ?? "";
@@ -274,17 +274,17 @@ export function syncMonthlyStockLedger(
         )
           continue; // ngày này không đổi gì
         const did = freezeDepositRowId(id, date);
-        const coSan = items.find((l) => l.id === did);
+        const existing = items.find((l) => l.id === did);
         if (kg === 0) {
-          if (coSan) {
+          if (existing) {
             items = items.filter((l) => l.id !== did);
-            doi = true;
+            changed = true;
           }
           continue;
         }
         const month = monthOfDate(date);
         ensureMonth(month);
-        const dong: MonthlyStockLine = {
+        const row: MonthlyStockLine = {
           id: did,
           period: month,
           category: FREEZE_DEPOSIT_CATEGORY,
@@ -294,37 +294,37 @@ export function syncMonthlyStockLedger(
           origin: `GĐ-${date.replace(/-/g, "")}`,
           importDate: date,
           storageLocation,
-          kgPerCtn: coSan?.kgPerCtn ?? null,
+          kgPerCtn: existing?.kgPerCtn ?? null,
           unitPrice: b?.unitPrice ?? null,
           openCtn: 0,
           openKg: 0,
-          inCtn: coSan?.kgPerCtn ? kg / coSan.kgPerCtn : 0,
+          inCtn: existing?.kgPerCtn ? kg / existing.kgPerCtn : 0,
           inKg: kg,
-          outCtn: coSan?.outCtn ?? 0,
-          outKg: coSan?.outKg ?? 0,
+          outCtn: existing?.outCtn ?? 0,
+          outKg: existing?.outKg ?? 0,
           carriedFromId: "",
-          sortOrder: coSan?.sortOrder ?? 9000,
+          sortOrder: existing?.sortOrder ?? 9000,
           /* Giữ các dòng vết ⟦CĐ:…⟧ của dòng LẤY từ chính lô gửi này (cùng tháng). */
           note: [
             `Gửi đông từ cân đối ${ctx.periodLabel} — ngày gửi ${formatDateVN(date)}`,
-            ...(coSan?.note ?? "").split("\n").filter((d) => d.startsWith("⟦CĐ:")),
+            ...(existing?.note ?? "").split("\n").filter((d) => d.startsWith("⟦CĐ:")),
           ].join("\n"),
         };
-        const giong =
-          coSan &&
-          coSan.inKg === dong.inKg &&
-          coSan.warehouse === dong.warehouse &&
-          coSan.storageLocation === dong.storageLocation &&
-          coSan.unitPrice === dong.unitPrice &&
-          coSan.itemName === dong.itemName &&
-          coSan.note === dong.note;
-        if (giong) continue;
-        items = coSan ? items.map((l) => (l.id === did ? dong : l)) : [...items, dong];
-        doi = true;
+        const same =
+          existing &&
+          existing.inKg === row.inKg &&
+          existing.warehouse === row.warehouse &&
+          existing.storageLocation === row.storageLocation &&
+          existing.unitPrice === row.unitPrice &&
+          existing.itemName === row.itemName &&
+          existing.note === row.note;
+        if (same) continue;
+        items = existing ? items.map((l) => (l.id === did ? row : l)) : [...items, row];
+        changed = true;
       }
     }
   }
-  return { lines: items, changed: doi, error: null, carriedCount };
+  return { lines: items, changed, error: null, carriedCount };
 }
 
 /* ---------- Kiểm khớp Cân đối ⇄ sổ kho ---------- */
@@ -340,15 +340,15 @@ export function countMonthlyStockMismatches(
   let mismatchCount = 0;
   for (const r of rows) {
     const lineKind = getBalancingStockLineKind(r);
-    if (lineKind === "lay-xa-dong" && r.stockLineId) {
+    if (lineKind === "thaw-out" && r.stockLineId) {
       for (const [t, kg] of thawByMonth(r)) {
-        const dong = findLotLineInMonth(lines, r.stockLineId, t);
-        if (!dong || Math.abs(getBalancingShareInLot(dong, r.id) - kg) > 1e-6) mismatchCount++;
+        const row = findLotLineInMonth(lines, r.stockLineId, t);
+        if (!row || Math.abs(getBalancingShareInLot(row, r.id) - kg) > 1e-6) mismatchCount++;
       }
-    } else if (lineKind === "gui-dong" && r.stockLocation) {
+    } else if (lineKind === "freeze-deposit" && r.stockLocation) {
       for (const [date, kg] of freezeDepositByDay(r)) {
-        const dong = lines.find((l) => l.id === freezeDepositRowId(r.id, date));
-        if (!dong || Math.abs(dong.inKg - kg) > 1e-6) mismatchCount++;
+        const row = lines.find((l) => l.id === freezeDepositRowId(r.id, date));
+        if (!row || Math.abs(row.inKg - kg) > 1e-6) mismatchCount++;
       }
     }
   }
@@ -371,10 +371,10 @@ export function normalizeItemName(s: string): string {
 
 /** Độ khớp tên lô với họ NL của kỳ: số từ của họ có mặt trong tên lô. */
 export function scoreNameMatch(itemName: string, materialFamily: string): number {
-  const tu = new Set(normalizeItemName(itemName).split(" "));
+  const fromDate = new Set(normalizeItemName(itemName).split(" "));
   return normalizeItemName(materialFamily)
     .split(" ")
-    .filter((w) => w && tu.has(w)).length;
+    .filter((w) => w && fromDate.has(w)).length;
 }
 
 export interface LotOption {
@@ -402,7 +402,7 @@ export function listThawLotOptions(
   const keepIds = new Set(selected);
   return items
     .filter((l) => l.period === month)
-    .map((l): MonthlyStockRow => suyDong(l))
+    .map((l): MonthlyStockRow => deriveRow(l))
     .filter((r) => r.closeKg > 1e-9 || keepIds.has(r.id))
     .sort(
       (a, b) =>
@@ -441,18 +441,18 @@ export function listDepositLocationOptions(
     if (!m) return DEFAULT_LEDGER_WAREHOUSE;
     return [...m.entries()].sort((a, b) => b[1] - a[1])[0][0];
   };
-  const ra: { value: string; label: string; phu?: string }[] = [];
+  const result: { value: string; label: string; phu?: string }[] = [];
   const existing = new Set<string>();
   for (const k of plantWarehouses) {
     if (existing.has(k)) continue;
     existing.add(k);
-    ra.push({ value: joinDepositLocation(k, ""), label: k });
+    result.push({ value: joinDepositLocation(k, ""), label: k });
   }
   for (const vt of [...storageLocations, ...qtyByLocation.keys()]) {
     if (!vt || existing.has(vt)) continue;
     existing.add(vt);
-    const so = mainWarehouseOf(vt);
-    ra.push({ value: joinDepositLocation(so, vt), label: vt, phu: `sổ ${so}` });
+    const num = mainWarehouseOf(vt);
+    result.push({ value: joinDepositLocation(num, vt), label: vt, phu: `sổ ${num}` });
   }
-  return ra;
+  return result;
 }

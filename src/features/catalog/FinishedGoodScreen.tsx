@@ -26,18 +26,18 @@ import { Search, X } from "lucide-react";
  * cân đối — nên màn tối ưu cho tìm kiếm và sắp xếp, không phải nhập liệu.
  */
 export default function FinishedGoodScreen() {
-  const [nhom, setNhom] = useState("");
-  const [items, , { trangThai: status }] = useFinishedGoods();
-  const isLoading = status === "dang-tai" && items.length === 0;
+  const [group, setGroup] = useState("");
+  const [items, , { status }] = useFinishedGoods();
+  const isLoading = status === "loading" && items.length === 0;
 
-  const nhomList = useMemo(
+  const groups = useMemo(
     () => Array.from(new Set(items.map((i) => i.groupName))).sort(),
     [items]
   );
 
   const rows = useMemo(
-    () => (nhom ? items.filter((i) => i.groupName === nhom) : items),
-    [nhom, items]
+    () => (group ? items.filter((i) => i.groupName === group) : items),
+    [group, items]
   );
 
   const cols: RecordTableColumn<FinishedGood>[] = [
@@ -57,7 +57,7 @@ export default function FinishedGoodScreen() {
     {
       key: "groupName",
       header: "Nhóm",
-      render: (r) => <Tag variant="phan-loai" tone={toneByName(r.groupName)}>{r.groupName}</Tag>,
+      render: (r) => <Tag variant="category" tone={toneByName(r.groupName)}>{r.groupName}</Tag>,
       getSortValue: (r) => r.groupName,
     },
     {
@@ -84,9 +84,9 @@ export default function FinishedGoodScreen() {
         <div className="min-w-64 flex-1">
           <Combobox
             label="Nhóm hàng"
-            value={nhom}
-            onChange={setNhom}
-            options={nhomList.map((n) => ({ value: n, label: n }))}
+            value={group}
+            onChange={setGroup}
+            options={groups.map((n) => ({ value: n, label: n }))}
             placeholder="Tất cả nhóm"
           />
         </div>
@@ -97,9 +97,9 @@ export default function FinishedGoodScreen() {
           </span>{" "}
           / {items.length} mã
         </p>
-        {nhom && (
+        {group && (
           <Button
-            title="Bỏ lọc theo nhóm — hiện lại toàn bộ 141 mã thành phẩm." variant="outline" className="mb-1" onClick={() => setNhom("")}>
+            title="Bỏ lọc theo nhóm — hiện lại toàn bộ 141 mã thành phẩm." variant="outline" className="mb-1" onClick={() => setGroup("")}>
             <X />
             Bỏ lọc nhóm
           </Button>
@@ -115,7 +115,7 @@ export default function FinishedGoodScreen() {
           description="Bỏ lọc nhóm để xem lại toàn bộ danh mục."
           action={
             <Button
-              title="Bỏ lọc theo nhóm để xem lại toàn bộ danh mục." size="lg" onClick={() => setNhom("")}>
+              title="Bỏ lọc theo nhóm để xem lại toàn bộ danh mục." size="lg" onClick={() => setGroup("")}>
               Bỏ lọc nhóm
             </Button>
           }

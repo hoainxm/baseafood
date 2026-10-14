@@ -7,9 +7,9 @@ const makeShipment = (id: string, date: string, workshop: ImportShipment["worksh
   id, deliveryDate: date, postingDate: date, backdateReason: "", workshop,
   supplierName: "Hồng Phú", driverName: "", licensePlate: "", note: "", lotCode,
 });
-const dong = (shipmentId: string, date: string, kg: number, materialType: string): MaterialImportItem =>
+const row = (shipmentId: string, date: string, kg: number, materialType: string): MaterialImportItem =>
   ({ id: `${shipmentId}-${materialType}`, shipmentId, deliveryDate: date, workshop: "Đông", quantityKg: kg, materialTypeName: materialType, category: materialType }) as MaterialImportItem;
-const me = (id: string, date: string, workshop: WipProductionItem["workshop"]): WipProductionItem => ({
+const wip = (id: string, date: string, workshop: WipProductionItem["workshop"]): WipProductionItem => ({
   id, productionDate: date, postingDate: date, backdateReason: "", workshop, productId: "mh1",
   spec: "", quantityKg: 100, blocksCount: 0, warehouse: "", status: "pending" as WipProductionItem["status"], note: "",
 });
@@ -18,30 +18,30 @@ const salesInvoice = (id: string, date: string): Packaging => ({
   toProductId: "mh2", toSpec: "", outputKg: 48, outputUnits: 4, warehouse: "", note: "",
 });
 
-const dl: TraceData = {
+const traceData: TraceData = {
   shipments: [makeShipment("s1", "2026-09-01", "Đông", "Đ-260901-01"), makeShipment("s2", "2026-09-03", "Cá"), makeShipment("s3", "2026-08-20", "Đông")],
   imports: [
-    dong("s1", "2026-09-01", 1000, "Mực ống"), dong("s1", "2026-09-01", 200, "Bạch tuộc"),
-    dong("s2", "2026-09-03", 300, "Cá thu"), dong("s3", "2026-08-20", 400, "Bạch tuộc"),
+    row("s1", "2026-09-01", 1000, "Mực ống"), row("s1", "2026-09-01", 200, "Bạch tuộc"),
+    row("s2", "2026-09-03", 300, "Cá thu"), row("s3", "2026-08-20", 400, "Bạch tuộc"),
   ],
-  wips: [me("w1", "2026-09-02", "Đông")],
+  wips: [wip("w1", "2026-09-02", "Đông")],
   packagings: [salesInvoice("p1", "2026-09-02")],
   lotInputs: [], exportItems: [], exportOrders: [], salesOrders: [], products: [], customers: [],
 };
 
 describe("listLotsToPrint", () => {
   it("lọc theo khoảng ngày + loại, mới trước, cùng ngày theo NL→BTP→TP; mỗi loại NL một lô", () => {
-    const items = listLotsToPrint(dl, { fromDate: "2026-09-01", toDate: "2026-09-30", workshop: "", kinds: ["S", "W", "P"] });
+    const items = listLotsToPrint(traceData, { fromDate: "2026-09-01", toDate: "2026-09-30", workshop: "", kinds: ["S", "W", "P"] });
     expect(items.map((n) => `${n.kind}:${n.id}`)).toEqual(["S:s2-Cá thu", "W:w1", "P:p1", "S:s1-Bạch tuộc", "S:s1-Mực ống"]);
   });
   it("lọc theo xưởng và loại", () => {
-    expect(listLotsToPrint(dl, { fromDate: "2026-08-01", toDate: "2026-09-30", workshop: "Đông", kinds: ["S"] }).map((n) => n.id)).toEqual([
+    expect(listLotsToPrint(traceData, { fromDate: "2026-08-01", toDate: "2026-09-30", workshop: "Đông", kinds: ["S"] }).map((n) => n.id)).toEqual([
       "s1-Bạch tuộc", "s1-Mực ống", "s3-Bạch tuộc",
     ]);
-    expect(listLotsToPrint(dl, { fromDate: "2026-08-01", toDate: "2026-09-30", workshop: "", kinds: [] })).toEqual([]);
+    expect(listLotsToPrint(traceData, { fromDate: "2026-08-01", toDate: "2026-09-30", workshop: "", kinds: [] })).toEqual([]);
   });
   it("tem NL: mã lô chuyến + MỘT loại hàng + kg của loại đó", () => {
-    const items = listLotsToPrint(dl, { fromDate: "2026-09-01", toDate: "2026-09-01", workshop: "", kinds: ["S"] });
+    const items = listLotsToPrint(traceData, { fromDate: "2026-09-01", toDate: "2026-09-01", workshop: "", kinds: ["S"] });
     expect(items.map((n) => [n.label, n.description, n.kg])).toEqual([
       ["Đ-260901-01", "Bạch tuộc", 200],
       ["Đ-260901-01", "Mực ống", 1000],
@@ -58,7 +58,7 @@ describe("formatMaterialLotLabel", () => {
 describe("sổ in tem", () => {
   it("buildLabelPrintRecords: mỗi lô một dòng, nhãn đông cứng, bỏ lô đã mất", () => {
     let i = 0;
-    const items = buildLabelPrintRecords([buildLotNode("S", "s1", dl), buildLotNode("W", "w1", dl), buildLotNode("W", "khong-co", dl)], "Trúc", "2026-10-02T08:00:00Z", () => `id${++i}`);
+    const items = buildLabelPrintRecords([buildLotNode("S", "s1", traceData), buildLotNode("W", "w1", traceData), buildLotNode("W", "khong-co", traceData)], "Trúc", "2026-10-02T08:00:00Z", () => `id${++i}`);
     expect(items).toEqual([
       { id: "id1", lotKind: "S", lotId: "s1", label: "Đ-260901-01", copies: 1, operator: "Trúc", printedAt: "2026-10-02T08:00:00Z" },
       { id: "id2", lotKind: "W", lotId: "w1", label: items[1]!.label, copies: 1, operator: "Trúc", printedAt: "2026-10-02T08:00:00Z" },
@@ -80,9 +80,9 @@ describe("đợt 2b — chọn lô, chốt ngày, tem, gắn phiên", () => {
 
   it("listSelectableMaterialLots: lô cũ quá 45 ngày vẫn hiện nếu còn kg và đã vào thời truy xuất; lô cũ chưa từng theo dõi thì không", () => {
     const d: TraceData = {
-      ...dl,
+      ...traceData,
       shipments: [makeShipment("moi", "2026-10-01", "Đông"), makeShipment("dong", "2026-07-10", "Đông"), makeShipment("xua", "2026-06-01", "Đông")],
-      imports: [dong("moi", "2026-10-01", 100, "Bạch tuộc"), dong("dong", "2026-07-10", 500, "Bạch tuộc"), dong("xua", "2026-06-01", 300, "Bạch tuộc")],
+      imports: [row("moi", "2026-10-01", 100, "Bạch tuộc"), row("dong", "2026-07-10", 500, "Bạch tuộc"), row("xua", "2026-06-01", 300, "Bạch tuộc")],
       lotInputs: [inputKg("a", "w1", "dong-Bạch tuộc", 200, "2026-07-11T08:00:00Z")],
     };
     expect(listSelectableMaterialLots(d, "Đông", "2026-10-05").map((n) => n.id)).toEqual(["moi-Bạch tuộc", "dong-Bạch tuộc"]);
@@ -96,9 +96,9 @@ describe("đợt 2b — chọn lô, chốt ngày, tem, gắn phiên", () => {
     process.env.TZ = "Asia/Ho_Chi_Minh";
     try {
       const d: TraceData = {
-        ...dl,
+        ...traceData,
         shipments: [makeShipment("bien", "2026-08-24", "Đông"), makeShipment("ngoai", "2026-08-23", "Đông")],
-        imports: [dong("bien", "2026-08-24", 100, "Bạch tuộc"), dong("ngoai", "2026-08-23", 100, "Bạch tuộc")],
+        imports: [row("bien", "2026-08-24", 100, "Bạch tuộc"), row("ngoai", "2026-08-23", 100, "Bạch tuộc")],
       };
       // 08/10 lùi 45 ngày = 24/08: chuyến 24/08 nằm trong cửa sổ, 23/08 thì không.
       expect(listSelectableMaterialLots(d, "Đông", "2026-10-08").map((n) => n.id)).toEqual(["bien-Bạch tuộc"]);
@@ -115,7 +115,7 @@ describe("đợt 2b — chọn lô, chốt ngày, tem, gắn phiên", () => {
   });
 
   it("getDefaultLabelCount: BTP theo số block, TP theo số thùng, NL 1 tem", () => {
-    const d = { wips: [{ ...me("w9", "2026-09-02", "Đông"), blocksCount: 24 }], packagings: [salesInvoice("p9", "2026-09-02")] };
+    const d = { wips: [{ ...wip("w9", "2026-09-02", "Đông"), blocksCount: 24 }], packagings: [salesInvoice("p9", "2026-09-02")] };
     expect(getDefaultLabelCount({ kind: "W", id: "w9" }, d)).toBe(24);
     expect(getDefaultLabelCount({ kind: "P", id: "p9" }, d)).toBe(4);
     expect(getDefaultLabelCount({ kind: "S", id: "s1" }, d)).toBe(1);
@@ -123,12 +123,12 @@ describe("đợt 2b — chọn lô, chốt ngày, tem, gắn phiên", () => {
   });
 
   it("buildLabelPrintRecords ghi đúng số tem từng lô", () => {
-    const items = buildLabelPrintRecords([buildLotNode("W", "w1", dl)], "", "", () => "i", () => 12);
+    const items = buildLabelPrintRecords([buildLotNode("W", "w1", traceData)], "", "", () => "i", () => 12);
     expect(items[0]!.copies).toBe(12);
   });
 
   it("assignSessionLots: không rõ loài vẫn gắn (chiều an toàn), không gắn trùng, báo dòng không khớp", () => {
-    const d: TraceData = { ...dl, products: [{ id: "mh1", code: "", name: "Hàng lạ", finishedGoodCode: "" }], lotInputs: [inputKg("cu", "w1", "s1-Mực ống", null, "")] };
+    const d: TraceData = { ...traceData, products: [{ id: "mh1", code: "", name: "Hàng lạ", finishedGoodCode: "" }], lotInputs: [inputKg("cu", "w1", "s1-Mực ống", null, "")] };
     const result = assignSessionLots({
       wips: [{ id: "w1", productId: "mh1" }, { id: "w2", productId: "mh1" }],
       domesticSales: [{ id: "n1", materialTypeName: "Cá ngừ" }],
@@ -145,12 +145,12 @@ describe("groupByTraceStage — quy mô một năm", () => {
   it("~3.000 mẻ + 3.000 dòng bán: sổ tồn dựng MỘT lần, không tính lại từng lô (trước đây vài giây)", () => {
     const N = 3000;
     const wips = Array.from({ length: N }, (_, i) => ({
-      ...me(`w${i}`, `2026-${String(1 + (i % 12)).padStart(2, "0")}-10`, "Đông"), productId: `p${i % 50}`, status: "stocked" as const,
+      ...wip(`w${i}`, `2026-${String(1 + (i % 12)).padStart(2, "0")}-10`, "Đông"), productId: `p${i % 50}`, status: "stocked" as const,
     }));
     const salesItems = Array.from({ length: N }, (_, i) =>
       ({ id: `b${i}`, productId: `p${i % 50}`, spec: "", quantityKg: 30, sourceWarehouse: "Kho dự trữ", deliveryDate: "2026-06-01", invoiceId: "" }) as SalesItem);
     const t = performance.now();
-    const gd = groupByTraceStage({ ...dl, wips, salesItems, packagings: [] }, { fromDate: "2026-01-01", toDate: "2026-12-31", workshop: "" });
+    const gd = groupByTraceStage({ ...traceData, wips, salesItems, packagings: [] }, { fromDate: "2026-01-01", toDate: "2026-12-31", workshop: "" });
     const ms = performance.now() - t;
     expect(gd[2]!.items).toHaveLength(N);
     expect(gd[2]!.items.reduce((s, m) => s + (m.stockKg ?? 0), 0)).toBe(N * 100 - N * 30);

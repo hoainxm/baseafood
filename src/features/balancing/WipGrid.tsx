@@ -53,8 +53,8 @@ export function WipGrid({
   grid: PeriodGrid;
   products: Product[];
   customers: Customer[];
-  onCreateProduct: (ten: string) => string;
-  onCreateCustomer: (ten: string) => string;
+  onCreateProduct: (name: string) => string;
+  onCreateCustomer: (name: string) => string;
   /** Bút chì sửa nhanh bản ghi danh mục (value = id). */
   onEditProduct?: (id: string) => void;
   onEditCustomer?: (id: string) => void;
@@ -193,12 +193,12 @@ export function WipGrid({
     if (iH < 0 || iC < 0) return;
 
     const productionCells: DayCell[] = [];
-    const doiTay = new Map<string, DailyQuantities>();
+    const manualEdits = new Map<string, DailyQuantities>();
     /* Dán trùm lên dòng MẪU ⇒ dòng đó thành dòng thật (nhập tay). */
     const fromTemplate = new Map<string, BalancingOutputItem>();
     let skippedLocked = 0;
-    block.forEach((dong, i) =>
-      dong.forEach((v, j) => {
+    block.forEach((row, i) =>
+      row.forEach((v, j) => {
         if (v == null) return;
         const h = visibleRows[iH + i];
         const column = dateColumns[iC + j];
@@ -220,23 +220,23 @@ export function WipGrid({
           });
           return;
         }
-        const daily = doiTay.get(h.id) ?? { ...(original.dailyQuantities ?? {}) };
+        const daily = manualEdits.get(h.id) ?? { ...(original.dailyQuantities ?? {}) };
         if (v === 0) delete daily[iso];
         else daily[iso] = v;
-        doiTay.set(h.id, daily);
+        manualEdits.set(h.id, daily);
       })
     );
 
-    if (doiTay.size > 0) {
+    if (manualEdits.size > 0) {
       const createdFromTemplate = [...fromTemplate.entries()]
-        .filter(([id]) => doiTay.has(id))
+        .filter(([id]) => manualEdits.has(id))
         .map(([id, r]) => {
-          const daily = doiTay.get(id)!;
+          const daily = manualEdits.get(id)!;
           return { ...r, dailyQuantities: daily, quantityKg: sumGridRow(daily, r.carryOverKg) };
         });
       saveFinishedGoods([
         ...finishedGoods.map((r) => {
-          const daily = doiTay.get(r.id);
+          const daily = manualEdits.get(r.id);
           if (!daily) return r;
           return { ...r, dailyQuantities: daily, quantityKg: sumGridRow(daily, r.carryOverKg) };
         }),
@@ -255,7 +255,7 @@ export function WipGrid({
       key: "khach",
       header: "Khách",
       label: "Khách hàng",
-      kind: "chu",
+      kind: "text",
       minWidth: 210,
       getValue: () => null,
       /* Chọn trong danh mục, gõ tên lạ thì tạo mới tại chỗ — nhập tự do là
@@ -279,13 +279,13 @@ export function WipGrid({
     },
     /* Thứ tự theo bảng cân đối giấy: XUẤT KHẨU Lượng · Đơn giá · T.tiền đứng ngay sau
        Khách, rồi các ngày + Tổng; Trả · Nợ (thay cột Chuyển kỳ) đứng CUỐI. "Lượng" = Tổng. */
-    { key: "luong", header: "Lượng (kg)", label: "Lượng", kind: "tinh", minWidth: 110, getValue: (h) => h.total || null },
-    { key: "donGia", header: "Đơn giá (USD)", label: "Đơn giá", kind: "so", group: "tien", minWidth: 112, getValue: (h) => h.unitPrice },
+    { key: "luong", header: "Lượng (kg)", label: "Lượng", kind: "computed", minWidth: 110, getValue: (h) => h.total || null },
+    { key: "donGia", header: "Đơn giá (USD)", label: "Đơn giá", kind: "input", group: "tien", minWidth: 112, getValue: (h) => h.unitPrice },
     {
       key: "thanhTien",
       header: "T.tiền (USD)",
       label: "Thành tiền",
-      kind: "tinh",
+      kind: "computed",
       group: "tien",
       minWidth: 148,
       getValue: (h) => h.total * (h.unitPrice ?? 0) || null,
@@ -294,15 +294,15 @@ export function WipGrid({
       key: `ngay:${iso}`,
       header: formatDayLabel(iso),
       label: `Ngày ${formatDateVN(iso)}`,
-      kind: "so",
-      group: "ngay",
+      kind: "input",
+      group: "day",
       minWidth: 96,
       getValue: (h) => h.dailyQuantities[iso] ?? null,
     })),
     /* Tổng cuối hàng (như cột W bảng giấy) — chỉ khi mở cột ngày; thu ngày thì đã có "Lượng". */
-    { key: "tong", header: "Tổng (kg)", label: "Tổng", kind: "tinh", group: "ngay", minWidth: 116, getValue: (h) => h.total || null },
-    { key: "tra", header: "Trả", label: "Trả", kind: "so", tint: "chuyen-ky", minWidth: 104, getValue: (h) => h.repaidKg || null },
-    { key: "no", header: "Nợ", label: "Nợ", kind: "so", tint: "chuyen-ky", minWidth: 104, getValue: (h) => h.debtKg || null },
+    { key: "tong", header: "Tổng (kg)", label: "Tổng", kind: "computed", group: "ngay", minWidth: 116, getValue: (h) => h.total || null },
+    { key: "tra", header: "Trả", label: "Trả", kind: "input", tint: "carry-over", minWidth: 104, getValue: (h) => h.repaidKg || null },
+    { key: "no", header: "Nợ", label: "Nợ", kind: "input", tint: "carry-over", minWidth: 104, getValue: (h) => h.debtKg || null },
   ];
 
   /* Kỳ đã chốt ⇒ khoá TOÀN BỘ ô + gỡ ô điều khiển. Khoá ở một chỗ thay vì rải
@@ -317,7 +317,7 @@ export function WipGrid({
     : gridColumns;
 
   const templatePeriodLabel = templatePeriod ? templatePeriod.dateRangeDescription || `${templatePeriod.startDate} – ${templatePeriod.endDate}` : "";
-  const hang: GridRow<FinishedGoodGridRow>[] = [
+  const gridRows: GridRow<FinishedGoodGridRow>[] = [
     ...hangThat.map((h) => ({
       id: h.id,
       data: h,
@@ -433,7 +433,7 @@ export function WipGrid({
         <EditableGrid
           description="Lưới bán thành phẩm sản xuất theo ngày trong kỳ"
           columns={displayColumns}
-          rows={hang}
+          rows={gridRows}
           rowMarkKey="can-doi-tp"
           collapsedGroups={isDateColumnsCollapsed ? ["ngay"] : []}
           onCellCommit={writeCell}
@@ -486,7 +486,7 @@ export function WipGrid({
             value=""
             onChange={quickAdd}
             options={products.map((m) => ({ value: m.id, label: m.name }))}
-            onCreate={(ten) => onAddProduct(ten)}
+            onCreate={(name) => onAddProduct(name)}
             placeholder="Gõ tên mặt hàng để thêm dòng"
             onEditItem={onEditProduct}
             editLabel="Sửa thông tin mặt hàng này — lưu thẳng vào Danh mục."
@@ -503,7 +503,7 @@ export function WipGrid({
           onEditProduct={onEditProduct}
           onEditCustomer={onEditCustomer}
           onClose={() => setIsAdding(false)}
-          onSave={(productId, customerId, spec, kenh) => {
+          onSave={(productId, customerId, spec, channel) => {
             const isDuplicate = finishedGoods.some(
               (r) => productSpecKey(r.productId, r.spec ?? "") === productSpecKey(productId, spec)
             );
@@ -519,7 +519,7 @@ export function WipGrid({
                 periodId: grid.periodId,
                 productId,
                 customerId,
-                channel: kenh,
+                channel,
                 quantityKg: 0,
                 unitPrice: null,
                 spec,

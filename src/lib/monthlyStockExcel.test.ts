@@ -1,12 +1,12 @@
 import { describe, expect, test } from "vitest";
 import * as XLSX from "xlsx";
 import type { MonthlyStockLine } from "@/types";
-import { parseStockStatementFile, parseWarehouseFromTitle, findWarehouseByText, buildNewWarehouseName, idDongNap, ghepNapLai } from "./monthlyStockExcel";
+import { parseStockStatementFile, parseWarehouseFromTitle, findWarehouseByText, buildNewWarehouseName, loadedRowId, mergeReload } from "./monthlyStockExcel";
 
 /** Dựng sheet theo bố cục bảng kê thật: A tên mục/ngày, B tên hàng, J/L/N kg, R ghi chú kho. */
-function stockRow(ten: string, stock: number, write = ""): unknown[] {
+function stockRow(name: string, stock: number, write = ""): unknown[] {
   const r: unknown[] = Array(18).fill(null);
-  r[1] = ten;
+  r[1] = name;
   r[9] = stock;
   if (write) r[17] = write;
   return r;
@@ -46,13 +46,13 @@ async function docFile(dong6: unknown[] = []): Promise<ReturnType<typeof parseSt
 describe("parseStockStatementFile", () => {
   test("tách nhóm theo mục + khối con TỔNG 2 DA + Hàng tạm", async () => {
     const [sh] = await docFile();
-    const nhom = Object.fromEntries(sh.rows.map((r) => [r.itemName, r.category]));
-    expect(nhom["SABA"]).toBe("Nguyên liệu nhập khẩu");
-    expect(nhom["CÁ SÒNG"]).toBe("Nguyên liệu nhập khẩu");
-    expect(nhom["2 DA RÂU NGẮN"]).toBe("Nguyên liệu nhập khẩu – 2 DA");
-    expect(nhom["4 DA RÂU NGẮN"]).toBe("Nguyên liệu nhập khẩu – 2 DA");
-    expect(nhom["B.TUỘC  2 DA"]).toBe("Nguyên liệu mua ngoài");
-    expect(nhom["CÁ TRÍCH DẠT"]).toBe("Hàng tạm");
+    const group = Object.fromEntries(sh.rows.map((r) => [r.itemName, r.category]));
+    expect(group["SABA"]).toBe("Nguyên liệu nhập khẩu");
+    expect(group["CÁ SÒNG"]).toBe("Nguyên liệu nhập khẩu");
+    expect(group["2 DA RÂU NGẮN"]).toBe("Nguyên liệu nhập khẩu – 2 DA");
+    expect(group["4 DA RÂU NGẮN"]).toBe("Nguyên liệu nhập khẩu – 2 DA");
+    expect(group["B.TUỘC  2 DA"]).toBe("Nguyên liệu mua ngoài");
+    expect(group["CÁ TRÍCH DẠT"]).toBe("Hàng tạm");
     expect(parseWarehouseFromTitle(sh.title)).toBe("1500");
   });
 
@@ -102,7 +102,7 @@ describe("findWarehouseByText", () => {
 });
 
 describe("idDongNap + ghepNapLai — nạp lại không nhân đôi (#28a)", () => {
-  const dong = (id: string, p: Partial<MonthlyStockLine> = {}): MonthlyStockLine => ({
+  const row = (id: string, p: Partial<MonthlyStockLine> = {}): MonthlyStockLine => ({
     id,
     period: "2026-08",
     category: "Nguyên liệu nhập khẩu",
@@ -127,18 +127,18 @@ describe("idDongNap + ghepNapLai — nạp lại không nhân đôi (#28a)", () 
   });
 
   test("id theo số tháng: sheet '8' giữ đúng id cũ", () => {
-    expect(idDongNap("K1000T", 8, 2026, 5)).toBe("xlsx|K1000T|8|2026|5");
+    expect(loadedRowId("K1000T", 8, 2026, 5)).toBe("xlsx|K1000T|8|2026|5");
   });
 
   test("dữ liệu cũ id theo tên sheet '08' + nạp lại (sheet 'T8') ⇒ thay, không nhân đôi, thừa kế vị trí", () => {
     const prev = [
-      dong("xlsx|K1000T|08|2026|5", { storageLocation: "Kho Ánh Dương", note: "đã kiểm" }),
-      dong("xlsx|K1000T|08|2026|6", { itemName: "SÒNG" }),
-      dong("xlsx|K1500T|08|2026|5"), // kho khác — không đụng
-      dong("xlsx|K1000T|7|2026|5", { period: "2026-07" }), // tháng khác — không đụng
+      row("xlsx|K1000T|08|2026|5", { storageLocation: "Kho Ánh Dương", note: "đã kiểm" }),
+      row("xlsx|K1000T|08|2026|6", { itemName: "SÒNG" }),
+      row("xlsx|K1500T|08|2026|5"), // kho khác — không đụng
+      row("xlsx|K1000T|7|2026|5", { period: "2026-07" }), // tháng khác — không đụng
     ];
-    const incoming = [dong(idDongNap("K1000T", 8, 2026, 5), { openKg: 120 }), dong(idDongNap("K1000T", 8, 2026, 6), { itemName: "SÒNG" })];
-    const result = ghepNapLai(prev, incoming, "K1000T");
+    const incoming = [row(loadedRowId("K1000T", 8, 2026, 5), { openKg: 120 }), row(loadedRowId("K1000T", 8, 2026, 6), { itemName: "SÒNG" })];
+    const result = mergeReload(prev, incoming, "K1000T");
     const t8 = result.lines.filter((l) => l.period === "2026-08" && l.warehouse === "Kho 1000 tấn" && l.id.includes("K1000T"));
     expect(t8.map((l) => l.id).sort()).toEqual(["xlsx|K1000T|8|2026|5", "xlsx|K1000T|8|2026|6"]);
     expect(result.replacedOldIds).toBe(2);
@@ -150,8 +150,8 @@ describe("idDongNap + ghepNapLai — nạp lại không nhân đôi (#28a)", () 
   });
 
   test("cùng id mà tên hàng khác (rowIndex trượt) ⇒ không thừa kế vị trí/ghi chú + báo", () => {
-    const prev = [dong("xlsx|K1000T|8|2026|5", { storageLocation: "Kho Hồng Phú", note: "x" })];
-    const result = ghepNapLai(prev, [dong("xlsx|K1000T|8|2026|5", { itemName: "CÁ THU" })], "K1000T");
+    const prev = [row("xlsx|K1000T|8|2026|5", { storageLocation: "Kho Hồng Phú", note: "x" })];
+    const result = mergeReload(prev, [row("xlsx|K1000T|8|2026|5", { itemName: "CÁ THU" })], "K1000T");
     expect(result.lines).toHaveLength(1);
     expect(result.lines[0]).toMatchObject({ itemName: "CÁ THU", storageLocation: "", note: "" });
     expect(result.nameMismatches).toHaveLength(1);
@@ -159,12 +159,12 @@ describe("idDongNap + ghepNapLai — nạp lại không nhân đôi (#28a)", () 
 
   test("dòng cũ không còn trong file: trống ⇒ bỏ, còn số ⇒ giữ + báo; file có kho ở cột R thì file thắng", () => {
     const prev = [
-      dong("xlsx|K1000T|8|2026|1", { storageLocation: "Kho A" }),
-      dong("xlsx|K1000T|8|2026|9", { openKg: 0 }),
-      dong("xlsx|K1000T|8|2026|10", { openKg: 7 }),
-      dong("msl|2026-08|tach", { note: "Gửi kho (tách từ dòng xlsx|K1000T|8|2026|1)" }),
+      row("xlsx|K1000T|8|2026|1", { storageLocation: "Kho A" }),
+      row("xlsx|K1000T|8|2026|9", { openKg: 0 }),
+      row("xlsx|K1000T|8|2026|10", { openKg: 7 }),
+      row("msl|2026-08|tach", { note: "Gửi kho (tách từ dòng xlsx|K1000T|8|2026|1)" }),
     ];
-    const result = ghepNapLai(prev, [dong("xlsx|K1000T|8|2026|1", { storageLocation: "Kho B" })], "K1000T");
+    const result = mergeReload(prev, [row("xlsx|K1000T|8|2026|1", { storageLocation: "Kho B" })], "K1000T");
     expect(result.droppedEmpty).toBe(1);
     expect(result.staleWithData.map((l) => l.id)).toEqual(["xlsx|K1000T|8|2026|10"]);
     expect(result.lines.find((l) => l.id === "xlsx|K1000T|8|2026|1")?.storageLocation).toBe("Kho B");

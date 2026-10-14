@@ -26,7 +26,7 @@ const d = (p: Partial<DomesticSaleItem>): DomesticSaleItem => ({
   ...p,
 });
 
-const ky = { startDate: "2026-07-21", endDate: "2026-07-25", materialTypeName: "Bạch tuộc 2 da" };
+const period = { startDate: "2026-07-21", endDate: "2026-07-25", materialTypeName: "Bạch tuộc 2 da" };
 
 describe("isDomesticSaleRow", () => {
   it("nhận theo TÊN (không phân hoa thường), kể cả dòng cũ không phải dòng giảm — tránh trừ đôi", () => {
@@ -47,7 +47,7 @@ describe("getPeriodDomesticSales", () => {
         d({ quantityKg: 70, materialTypeName: "Bạch tuộc 1 da" }), // khác họ
         d({ quantityKg: 0, unitPrice: 999 }), // ≤ 0 bỏ
       ],
-      ky
+      period
     );
     expect(result.dailyQuantities).toEqual({ "2026-07-21": 987, "2026-07-23": 100 });
     expect(result.totalKg).toBe(1087);
@@ -56,7 +56,7 @@ describe("getPeriodDomesticSales", () => {
     expect(result.averagePrice).toBe(146960);
   });
   it("không dòng nào có giá ⇒ giá null; kỳ thiếu ngày ⇒ rỗng", () => {
-    expect(getPeriodDomesticSales([d({ quantityKg: 5 })], ky).averagePrice).toBeNull();
+    expect(getPeriodDomesticSales([d({ quantityKg: 5 })], period).averagePrice).toBeNull();
     expect(getPeriodDomesticSales([d({ quantityKg: 5 })], { materialTypeName: "Bạch tuộc 2 da" }).totalKg).toBe(0);
   });
 });
@@ -64,11 +64,11 @@ describe("getPeriodDomesticSales", () => {
 describe("compareDomesticSales / negateDailyQuantities", () => {
   it("Cân đối (âm) so sổ SX (dương) theo từng ngày", () => {
     const production = { "2026-07-21": 987 };
-    expect(compareDomesticSales({}, production)).toBe("trong");
-    expect(compareDomesticSales(undefined, production)).toBe("trong");
-    expect(compareDomesticSales({ "2026-07-21": -987 }, production)).toBe("khop");
-    expect(compareDomesticSales({ "2026-07-21": -900 }, production)).toBe("lech");
-    expect(compareDomesticSales({ "2026-07-21": -987, "2026-07-22": -5 }, production)).toBe("lech");
+    expect(compareDomesticSales({}, production)).toBe("empty");
+    expect(compareDomesticSales(undefined, production)).toBe("empty");
+    expect(compareDomesticSales({ "2026-07-21": -987 }, production)).toBe("match");
+    expect(compareDomesticSales({ "2026-07-21": -900 }, production)).toBe("mismatch");
+    expect(compareDomesticSales({ "2026-07-21": -987, "2026-07-22": -5 }, production)).toBe("mismatch");
   });
   it("đổi dấu sang âm, bỏ ngày 0", () => {
     expect(negateDailyQuantities({ a: 5, b: 0, c: -3 })).toEqual({ a: -5, c: -3 });

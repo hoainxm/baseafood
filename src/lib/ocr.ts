@@ -17,10 +17,10 @@ import { hasCloudOcr, mergeCloudResult, requestCloudOcr } from "./ocrCloud";
  */
 
 /** OCR client-side luôn có (Tesseract nạp động). Cờ để màn quyết định hiện nút. */
-export const coOcr = true;
+export const hasOcr = true;
 
 /** Một dòng loại hàng đoán được từ phiếu (loại NL + số kg cùng một hàng chữ). */
-export interface DongOcr {
+export interface OcrLine {
   materialType: string;
   kg: number;
   /** Đơn giá đ/kg nếu phiếu có ghi (chỉ bộ đọc OpenAI bóc được). */
@@ -39,7 +39,7 @@ export interface OcrRawHeader {
 }
 
 /** Kết quả nhận diện + các ứng viên đã bóc tách để tap-áp vào form. */
-export interface KetQuaOcr {
+export interface OcrResult {
   /** Toàn văn nhận diện (cho người đối chiếu khi máy đoán sai). */
   text: string;
   /** Đại lý khớp danh mục (nếu bắt được). */
@@ -51,7 +51,7 @@ export interface KetQuaOcr {
   /** Các loại NL khớp danh mục xuất hiện trong phiếu. */
   materialTypes: string[];
   /** Ghép (loại NL + kg) theo từng hàng chữ khi đoán được. */
-  lines: DongOcr[];
+  lines: OcrLine[];
   /** Biển số xe (viết hoa; khớp cách viết đã có trong sổ nếu trùng xe). */
   licensePlate?: string;
   /** Tài xế (khớp tên đã có trong sổ nếu trùng người). */
@@ -109,11 +109,11 @@ function parseNumber(tok: string): number | null {
   let t = tok.trim();
   if (!t) return null;
   const hasDot = t.includes(".");
-  const coPhay = t.includes(",");
-  if (hasDot && coPhay) t = t.replace(/\./g, "").replace(",", ".");
+  const hasComma = t.includes(",");
+  if (hasDot && hasComma) t = t.replace(/\./g, "").replace(",", ".");
   // Phiếu tay hay dùng "," làm dấu NGHÌN như "." ("11,017" kg = 11017, đối chiếu phiếu
   // 22/8/2026): đúng 3 chữ số sau dấu ⇒ nghìn; còn lại ("12,5") ⇒ thập phân.
-  else if (coPhay) t = /^\d{1,3}(,\d{3})+$/.test(t) ? t.replace(/,/g, "") : t.replace(",", ".");
+  else if (hasComma) t = /^\d{1,3}(,\d{3})+$/.test(t) ? t.replace(/,/g, "") : t.replace(",", ".");
   else if (hasDot) {
     const after = t.split(".").pop() ?? "";
     if (after.length === 3) t = t.replace(/\./g, ""); // 1.234 → nghìn
@@ -131,12 +131,12 @@ const RE_SO = /\d[\d.,]*\d|\d/g;
 
 /** Bóc mọi số kg hợp lý trong một đoạn chữ (đã khử trùng, giữ thứ tự xuất hiện). */
 function bocKg(segment: string): number[] {
-  const ra: number[] = [];
+  const result: number[] = [];
   for (const m of segment.matchAll(RE_SO)) {
     const n = parseNumber(m[0]);
-    if (n != null && isValidKg(n) && !ra.includes(n)) ra.push(n);
+    if (n != null && isValidKg(n) && !result.includes(n)) result.push(n);
   }
-  return ra;
+  return result;
 }
 
 const RE_DATE = /(\d{1,2})\s*[/\-.]\s*(\d{1,2})(?:\s*[/\-.]\s*(\d{2,4}))?/;
@@ -146,20 +146,20 @@ function extractDate(text: string): string | undefined {
   const m = text.match(RE_DATE);
   if (!m) return undefined;
   const d = Number(m[1]);
-  const mo = Number(m[2]);
-  if (d < 1 || d > 31 || mo < 1 || mo > 12) return undefined;
+  const open = Number(m[2]);
+  if (d < 1 || d > 31 || open < 1 || open > 12) return undefined;
   let y = m[3] ? Number(m[3]) : new Date().getFullYear();
   if (y < 100) y += 2000;
-  return `${y}-${String(mo).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+  return `${y}-${String(open).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
 }
 
 /** Từ khóa báo hiệu một hàng chữ đang ghi ĐẠI LÝ (để dò mã số an toàn). */
-const RE_DL = /\b(dai ly|dl|ma dl|ma dai ly|khach)\b/;
+const RE_SUPPLIER = /\b(dai ly|dl|ma dl|ma dai ly|khach)\b/;
 
 /** Parser thuần: từ toàn văn OCR + danh mục → các ứng viên điền form. */
-export function parseOcrText(text: string, dm: OcrCatalog): KetQuaOcr {
-  const toanVan = stripAccents(text);
-  const dong = text
+export function parseOcrText(text: string, dm: OcrCatalog): OcrResult {
+  const fullText = stripAccents(text);
+  const row = text
     .split(/\r?\n/)
     .map((d) => d.trim())
     .filter(Boolean);
@@ -168,17 +168,17 @@ export function parseOcrText(text: string, dm: OcrCatalog): KetQuaOcr {
   let supplier: string | undefined;
   let supplierLen = 0;
   for (const d of dm.suppliers) {
-    const ten = stripAccents(d.name);
-    if (ten.length >= 3 && toanVan.includes(ten) && ten.length > supplierLen) {
+    const name = stripAccents(d.name);
+    if (name.length >= 3 && fullText.includes(name) && name.length > supplierLen) {
       supplier = d.name;
-      supplierLen = ten.length;
+      supplierLen = name.length;
     }
   }
   // Mã số đại lý: CHỈ dò trên hàng chữ có nhắc "đại lý / DL / mã" — tránh trùng
   // với số cân (vd 12,5 kg lẫn thành mã "12").
   if (!supplier) {
-    for (const h of dong) {
-      if (!RE_DL.test(stripAccents(h))) continue;
+    for (const h of row) {
+      if (!RE_SUPPLIER.test(stripAccents(h))) continue;
       const soRieng = new Set(Array.from(h.matchAll(/\b\d{1,6}\b/g), (m) => m[0]));
       const theoMa = dm.suppliers.find((d) => d.code && soRieng.has(String(d.code)));
       if (theoMa) {
@@ -191,24 +191,24 @@ export function parseOcrText(text: string, dm: OcrCatalog): KetQuaOcr {
   // Loại NL: mọi tên danh mục xuất hiện trong toàn văn.
   const materialTypes: string[] = [];
   for (const l of dm.materialTypes) {
-    const ten = stripAccents(l.name);
-    if (ten.length >= 2 && toanVan.includes(ten) && !materialTypes.includes(l.name))
+    const name = stripAccents(l.name);
+    if (name.length >= 2 && fullText.includes(name) && !materialTypes.includes(l.name))
       materialTypes.push(l.name);
   }
 
   // Ghép dòng: mỗi hàng chữ có tên loại NL + số kg lớn nhất trên hàng đó.
-  const dongOcr: DongOcr[] = [];
-  for (const hang of dong) {
-    const lineNoAccent = stripAccents(hang);
+  const ocrLines: OcrLine[] = [];
+  for (const rows of row) {
+    const lineNoAccent = stripAccents(rows);
     const materialType = dm.materialTypes.find(
       (l) => stripAccents(l.name).length >= 2 && lineNoAccent.includes(stripAccents(l.name))
     );
     if (!materialType) continue;
-    const kgs = bocKg(hang);
+    const kgs = bocKg(rows);
     if (!kgs.length) continue;
     const kg = Math.max(...kgs);
-    if (!dongOcr.some((x) => x.materialType === materialType.name && x.kg === kg))
-      dongOcr.push({ materialType: materialType.name, kg, raw: hang });
+    if (!ocrLines.some((x) => x.materialType === materialType.name && x.kg === kg))
+      ocrLines.push({ materialType: materialType.name, kg, raw: rows });
   }
 
   return {
@@ -218,7 +218,7 @@ export function parseOcrText(text: string, dm: OcrCatalog): KetQuaOcr {
     // Bỏ cụm ngày khỏi số tham khảo cho đỡ nhiễu (2/9/2026 không phải kg).
     kgValues: bocKg(text.replace(RE_DATE, " ")),
     materialTypes,
-    lines: dongOcr,
+    lines: ocrLines,
   };
 }
 
@@ -245,7 +245,7 @@ export async function recognizeImportSlip(
   file: File | Blob,
   dm: OcrCatalog,
   onProgress?: (percent: number) => void
-): Promise<KetQuaOcr> {
+): Promise<OcrResult> {
   // OpenAI qua Edge Function trước (đọc chữ tay tốt hơn); hỏng thì Tesseract trong máy.
   let cloudError: string | undefined;
   if (hasCloudOcr) {

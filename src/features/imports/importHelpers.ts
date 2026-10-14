@@ -13,7 +13,7 @@ import type {
 import { calculateImportAmount, isBackdatedImport } from "@/types";
 import { newId } from "@/lib/store";
 import type { FieldError } from "@/design-system";
-import type { KetQuaOcr } from "@/lib/ocr";
+import type { OcrResult } from "@/lib/ocr";
 
 export const WORKSHOPS: Workshop[] = ["Đông", "Cá", "Khô"];
 
@@ -76,7 +76,7 @@ export interface ImportLine {
   /** Dòng ĐIỀN SẴN theo chuyến gần nhất của đại lý (loại + giá), chờ gõ kg. Chưa
    *  có kg thì coi như KHÔNG có dữ liệu: lưu tự bỏ qua, không nài lỗi. Người dùng
    *  tự sửa loại/giá thì cờ này tắt (thành dòng thường). */
-  goiY?: boolean;
+  isSuggested?: boolean;
   /** Ngày của lượt giao mà ĐƠN GIÁ điền sẵn lấy từ đó — hiện cạnh ô giá để người
    *  nhập biết đây là giá cũ, không phải giá vừa gõ. Tự sửa giá thì xóa. */
   priceDate?: string;
@@ -85,10 +85,10 @@ export interface ImportLine {
 export const DEFAULT_CATEGORY: Category = "Bạch tuộc";
 
 /** Dòng trống mới cho bảng (mặc định theo loài đang dùng cho nhanh). */
-export const createEmptyImportLine = (cat: Category = DEFAULT_CATEGORY): ImportLine => ({
+export const createEmptyImportLine = (category: Category = DEFAULT_CATEGORY): ImportLine => ({
   key: newId(),
   id: null,
-  category: cat,
+  category,
   materialTypeName: "",
   quantityKg: 0,
   unitPrice: null,
@@ -96,7 +96,7 @@ export const createEmptyImportLine = (cat: Category = DEFAULT_CATEGORY): ImportL
 
 /** Dòng đã có dữ liệu (dù chưa đủ) — dùng để biết khi nào cần thêm dòng trống. */
 export const importLineHasData = (d: ImportLine): boolean =>
-  d.goiY
+  d.isSuggested
     ? d.quantityKg > 0
     : d.materialTypeName.trim() !== "" ||
       d.quantityKg > 0 ||
@@ -123,7 +123,7 @@ export interface ShipmentGroup {
   driverName: string;
   licensePlate: string;
   note: string;
-  dong: MaterialImportItem[];
+  rows: MaterialImportItem[];
   totalKg: number;
   totalAmount: number;
   isBackdated: boolean;
@@ -141,9 +141,9 @@ export function groupShipments(
     const key = c
       ? c.id
       : `ngam|${r.deliveryDate}|${r.workshop}|${r.supplierName}|${r.driverName}|${r.licensePlate}`;
-    let nhom = nhoms.get(key);
-    if (!nhom) {
-      nhom = {
+    let group = nhoms.get(key);
+    if (!group) {
+      group = {
         groupKey: key,
         shipment: c ?? null,
         deliveryDate: c?.deliveryDate ?? r.deliveryDate,
@@ -154,17 +154,17 @@ export function groupShipments(
         driverName: c?.driverName ?? r.driverName,
         licensePlate: c?.licensePlate ?? r.licensePlate,
         note: c?.note ?? r.note,
-        dong: [],
+        rows: [],
         totalKg: 0,
         totalAmount: 0,
         isBackdated: false,
       };
-      nhom.isBackdated = isBackdatedImport(nhom);
-      nhoms.set(key, nhom);
+      group.isBackdated = isBackdatedImport(group);
+      nhoms.set(key, group);
     }
-    nhom.dong.push(r);
-    nhom.totalKg += r.quantityKg || 0;
-    nhom.totalAmount += calculateImportAmount(r);
+    group.rows.push(r);
+    group.totalKg += r.quantityKg || 0;
+    group.totalAmount += calculateImportAmount(r);
   }
 
   return [...nhoms.values()].sort(
@@ -217,25 +217,25 @@ export function getFrequentSuppliers(
   rows: MaterialImportItem[],
   workshop: Workshop,
   maxCount = 4,
-  xetLuot = 40,
+  lookbackTrips = 40,
 ): string[] {
-  const luot = new Map<string, string>(); // khóa lượt → đại lý (giữ thứ tự mới→cũ)
+  const trips = new Map<string, string>(); // khóa lượt → đại lý (giữ thứ tự mới→cũ)
   for (const r of rows
     .filter((x) => x.workshop === workshop && x.supplierName)
     .sort(newestFirst)) {
-    if (luot.size >= xetLuot && !luot.has(tripKey(r))) break;
-    if (!luot.has(tripKey(r))) luot.set(tripKey(r), r.supplierName);
+    if (trips.size >= lookbackTrips && !trips.has(tripKey(r))) break;
+    if (!trips.has(tripKey(r))) trips.set(tripKey(r), r.supplierName);
   }
-  const dem = new Map<string, { n: number; firstIndex: number }>();
-  [...luot.values()].forEach((ten, i) => {
-    const d = dem.get(ten);
+  const counts = new Map<string, { n: number; firstIndex: number }>();
+  [...trips.values()].forEach((name, i) => {
+    const d = counts.get(name);
     if (d) d.n += 1;
-    else dem.set(ten, { n: 1, firstIndex: i });
+    else counts.set(name, { n: 1, firstIndex: i });
   });
-  return [...dem.entries()]
+  return [...counts.entries()]
     .sort((a, b) => b[1].n - a[1].n || a[1].firstIndex - b[1].firstIndex)
     .slice(0, maxCount)
-    .map(([ten]) => ten);
+    .map(([name]) => name);
 }
 
 /** Một biển số từng chở cho đại lý, kèm tài xế GẦN NHẤT lái xe đó. */
@@ -261,10 +261,10 @@ export function getSupplierVehicles(
     for (const r of rows
       .filter((x) => x.supplierName === supplierName)
       .sort(newestFirst)) {
-      const bien = r.licensePlate.trim().toUpperCase();
+      const plate = r.licensePlate.trim().toUpperCase();
       const tx = r.driverName.trim();
-      if (bien && !plateMap.has(normalizePlate(bien)) && plateMap.size < maxCount)
-        plateMap.set(normalizePlate(bien), { licensePlate: bien, driverName: tx });
+      if (plate && !plateMap.has(normalizePlate(plate)) && plateMap.size < maxCount)
+        plateMap.set(normalizePlate(plate), { licensePlate: plate, driverName: tx });
       if (tx && !drivers.has(tx.toLowerCase()) && drivers.size < maxCount)
         drivers.set(tx.toLowerCase(), tx);
     }
@@ -272,7 +272,7 @@ export function getSupplierVehicles(
 }
 
 /**
- * Mẫu bảng loại hàng cho đại lý: các loại đại lý này giao trong `soLuot` lượt gần
+ * Mẫu bảng loại hàng cho đại lý: các loại đại lý này giao trong `tripCount` lượt gần
  * nhất (loại của lượt mới nhất đứng trước), kèm ĐƠN GIÁ gần nhất của từng loại.
  * Kg để trống — người nhập chỉ còn gõ số. Không có lịch sử ⇒ mảng rỗng.
  */
@@ -280,7 +280,7 @@ export function getSupplierLineTemplates(
   rows: MaterialImportItem[],
   supplierName: string,
   workshop: Workshop,
-  soLuot = 3,
+  tripCount = 3,
   maxCount = 6,
 ): ImportLine[] {
   if (!supplierName) return [];
@@ -288,31 +288,31 @@ export function getSupplierLineTemplates(
     (r) => r.supplierName === supplierName && r.workshop === workshop,
   );
   // Các lượt gần nhất (mới → cũ).
-  const luot: string[] = [];
+  const trips: string[] = [];
   for (const r of [...supplierRows].sort(newestFirst)) {
-    if (luot.includes(tripKey(r))) continue;
-    if (luot.length >= soLuot) break;
-    luot.push(tripKey(r));
+    if (trips.includes(tripKey(r))) continue;
+    if (trips.length >= tripCount) break;
+    trips.push(tripKey(r));
   }
   // Trong một lượt giữ THỨ TỰ GHI (thứ tự mảng gốc) — đúng thứ tự trên tờ giấy.
   const templates = new Map<string, ImportLine>();
-  for (const k of luot)
+  for (const k of trips)
     for (const r of supplierRows) {
       if (tripKey(r) !== k) continue;
-      const ten = r.materialTypeName.trim();
-      if (!ten) continue;
-      const co = templates.get(ten);
-      if (!co)
-        templates.set(ten, {
+      const name = r.materialTypeName.trim();
+      if (!name) continue;
+      const existing = templates.get(name);
+      if (!existing)
+        templates.set(name, {
           ...createEmptyImportLine(r.category),
-          materialTypeName: ten,
+          materialTypeName: name,
           unitPrice: r.unitPrice,
           priceDate: r.unitPrice != null ? r.deliveryDate : undefined,
-          goiY: true,
+          isSuggested: true,
         });
-      else if (co.unitPrice == null && r.unitPrice != null) {
-        co.unitPrice = r.unitPrice;
-        co.priceDate = r.deliveryDate;
+      else if (existing.unitPrice == null && r.unitPrice != null) {
+        existing.unitPrice = r.unitPrice;
+        existing.priceDate = r.deliveryDate;
       }
     }
   return [...templates.values()].slice(0, maxCount);
@@ -328,7 +328,7 @@ export function getSupplierLineTemplates(
 export function applyNewSupplierTemplate(prev: ImportLine[], templates: ImportLine[]): ImportLine[] {
   const oldKgByType = new Map(
     prev
-      .filter((d) => d.goiY && d.quantityKg > 0)
+      .filter((d) => d.isSuggested && d.quantityKg > 0)
       .map((d) => [d.materialTypeName, d.quantityKg]),
   );
   const templateNames = new Set(templates.map((d) => d.materialTypeName));
@@ -336,19 +336,19 @@ export function applyNewSupplierTemplate(prev: ImportLine[], templates: ImportLi
     ...d,
     quantityKg: oldKgByType.get(d.materialTypeName) ?? 0,
   }));
-  const goiYLac = prev
+  const staleSuggestions = prev
     .filter(
-      (d) => d.goiY && d.quantityKg > 0 && !templateNames.has(d.materialTypeName),
+      (d) => d.isSuggested && d.quantityKg > 0 && !templateNames.has(d.materialTypeName),
     )
     .map((d) => ({ ...d, unitPrice: null, priceDate: undefined }));
-  const userEntered = prev.filter((d) => !d.goiY && importLineHasData(d));
-  const result = [...fromTemplate, ...goiYLac, ...userEntered];
+  const userEntered = prev.filter((d) => !d.isSuggested && importLineHasData(d));
+  const result = [...fromTemplate, ...staleSuggestions, ...userEntered];
   return result.length ? result : [createEmptyImportLine()];
 }
 
 /** Dòng điền sẵn bị BỎ QUA khi lưu vì chưa gõ kg — để báo rõ, không bỏ im lặng. */
 export const getSkippedSuggestedLines = (items: ImportLine[]): ImportLine[] =>
-  items.filter((d) => d.goiY && !(d.quantityKg > 0));
+  items.filter((d) => d.isSuggested && !(d.quantityKg > 0));
 
 /**
  * Biển số + tài xế ĐÃ TỪNG ghi (mọi đại lý, mới nhất trước) — gửi kèm OCR để máy khớp
@@ -398,11 +398,11 @@ export function mergeOcrLines(
         quantityKg: line.kg,
         unitPrice: price ?? d.unitPrice,
         priceDate: price != null ? undefined : d.priceDate,
-        goiY: false,
+        isSuggested: false,
       };
       continue;
     }
-    result = result.filter((d) => d.goiY || importLineHasData(d)).concat({
+    result = result.filter((d) => d.isSuggested || importLineHasData(d)).concat({
       ...createEmptyImportLine(categoryOf(line.materialType) ?? result[result.length - 1]?.category ?? fallbackCategory),
       materialTypeName: line.materialType,
       quantityKg: line.kg,
@@ -449,7 +449,7 @@ export interface OcrSelection {
 }
 
 /** Mặc định tick mọi ô máy đọc được + mọi dòng — người soát BỎ tick ô sai. */
-export function defaultOcrSelection(r: KetQuaOcr): OcrSelection {
+export function defaultOcrSelection(r: OcrResult): OcrSelection {
   return {
     header: new Set(OCR_HEADER_FIELDS.filter((f) => !!r[f])),
     lines: new Set(r.lines.map((_, i) => i)),
@@ -457,7 +457,7 @@ export function defaultOcrSelection(r: KetQuaOcr): OcrSelection {
 }
 
 /** Kết quả chỉ còn các ô / dòng đang tick (ô bỏ tick = coi như máy không đọc được). */
-export function applyOcrSelection(r: KetQuaOcr, sel: OcrSelection): KetQuaOcr {
+export function applyOcrSelection(r: OcrResult, sel: OcrSelection): OcrResult {
   const pick = <K extends OcrHeaderField>(f: K) => (sel.header.has(f) ? r[f] : undefined);
   return {
     ...r,

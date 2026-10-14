@@ -13,7 +13,7 @@ import { isDomesticSaleLineComplete, type DomesticSaleLine } from "./wipHelpers"
 
 interface CatalogCell {
   options: ComboboxOption[];
-  onCreate: (ten: string) => string;
+  onCreate: (name: string) => string;
   onEditItem: (value: string) => void;
   canEdit: (value: string) => boolean;
   editLabel: string;

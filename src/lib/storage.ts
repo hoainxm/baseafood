@@ -5,7 +5,7 @@
 // ============================================================
 import { supabase } from "./supabase";
 import { uid } from "./db";
-import { LA_DEMO, SITE_DEMO } from "./demoMode";
+import { IS_DEMO, SITE_DEMO } from "./demoMode";
 
 /**
  * Lưu ảnh sổ sách (ảnh QC chấm điểm, sau này ảnh phiếu tay OCR) trên **Supabase
@@ -30,7 +30,7 @@ function imagePath(): string {
   const d = new Date();
   const yyyy = d.getFullYear();
   const mm = String(d.getMonth() + 1).padStart(2, "0");
-  return `${LA_DEMO ? SITE_DEMO : "bsf1"}/qc/${yyyy}/${mm}/${uid()}.jpg`;
+  return `${IS_DEMO ? SITE_DEMO : "bsf1"}/qc/${yyyy}/${mm}/${uid()}.jpg`;
 }
 
 /**

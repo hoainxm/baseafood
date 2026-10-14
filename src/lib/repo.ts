@@ -136,12 +136,12 @@ function parseDailyQuantities(v: unknown): DailyQuantities {
     }
   }
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
-  const ra: DailyQuantities = {};
-  for (const [date, so] of Object.entries(raw as Record<string, unknown>)) {
-    const x = Number(so);
-    if (Number.isFinite(x)) ra[date] = x;
+  const result: DailyQuantities = {};
+  for (const [date, num] of Object.entries(raw as Record<string, unknown>)) {
+    const x = Number(num);
+    if (Number.isFinite(x)) result[date] = x;
   }
-  return ra;
+  return result;
 }
 
 /* ---------- Ánh xạ camelCase (app) ↔ snake_case (Postgres) ---------- */
@@ -665,8 +665,8 @@ export const WIP_PRODUCTION_TABLE: TableMapping<WipProductionItem> = {
     note: x.note,
     customer_name: x.customerName ?? "",
     processing_type: x.processingType ?? "",
-    component_rau_kg: x.tentacleKg ?? null,
-    component_bao_tu_kg: x.stomachKg ?? null,
+    component_rau_kg: x.tentacleKg ?? null, // naming-ok: cột DB giữ nguyên (5d)
+    component_bao_tu_kg: x.stomachKg ?? null, // naming-ok: cột DB giữ nguyên (5d)
     balancing_period_id: x.balancingPeriodId ?? "",
     operator: x.operator ?? "",
     // Migration 0051 → gửi LUÔN (như leftover_by_material 0038): gửi có điều kiện
@@ -1230,21 +1230,21 @@ function layMsg(e: unknown): string {
 /** Đọc hàng chờ từ chuỗi localStorage. Dạng `{them, xoa}` từ trước tới nay; chịu
  *  chuỗi hỏng / thiếu mảng (ra rỗng) để không vỡ lúc mở app. */
 export function docCho(raw: string | null): SyncQueue {
-  if (!raw) return { them: [], xoa: [] };
+  if (!raw) return { them: [], xoa: [] }; // naming-ok: dạng hàng chờ đã LƯU (SyncQueue)
   try {
     const p = JSON.parse(raw) as Partial<SyncQueue> | null;
     const items = (v: unknown) => (Array.isArray(v) ? v.map(String) : []);
-    return { them: items(p?.them), xoa: items(p?.xoa) };
+    return { them: items(p?.them), xoa: items(p?.xoa) }; // naming-ok: dạng hàng chờ đã LƯU (SyncQueue)
   } catch {
-    return { them: [], xoa: [] };
+    return { them: [], xoa: [] }; // naming-ok: dạng hàng chờ đã LƯU (SyncQueue)
   }
 }
 
-function napCho(localKey: string): SyncQueue {
+function loadQueue(localKey: string): SyncQueue {
   try {
     return docCho(localStorage.getItem(`${modeLocalKey(localKey)}.cho`));
   } catch {
-    return { them: [], xoa: [] };
+    return { them: [], xoa: [] }; // naming-ok: dạng hàng chờ đã LƯU (SyncQueue)
   }
 }
 
@@ -1334,31 +1334,31 @@ const isRowLevelError = (e: PushError) => /^2[123]/.test(e.code ?? "");
  * hỏng ở lại (trước đây một dòng 23505 làm kẹt vĩnh viễn cả bảng).
  */
 export async function pushQueue<T>(
-  bang: Pick<TableMapping<T>, "getKey" | "toRow">,
+  mapping: Pick<TableMapping<T>, "getKey" | "toRow">,
   cho: SyncQueue,
   rows: T[],
   gateway: UploadPort,
 ): Promise<QueuePushResult> {
   const result: QueuePushResult = { sentUpserts: new Map(), deleted: [], rowErrors: [] };
-  const byKey = new Map(rows.map((x) => [bang.getKey(x), x]));
-  const nhom = new Map<string, { key: string; row: Record<string, unknown>; json: string }[]>();
+  const byKey = new Map(rows.map((x) => [mapping.getKey(x), x]));
+  const group = new Map<string, { key: string; row: Record<string, unknown>; json: string }[]>();
   for (const k of new Set(cho.them)) {
     const x = byKey.get(k);
     if (x === undefined) {
       result.sentUpserts.set(k, null);
       continue;
     }
-    const row = bang.toRow(x);
+    const row = mapping.toRow(x);
     const droppedColumns = Object.keys(row)
       .filter((c) => row[c] !== undefined)
       .sort()
       .join(",");
-    const items = nhom.get(droppedColumns) ?? [];
+    const items = group.get(droppedColumns) ?? [];
     items.push({ key: k, row, json: JSON.stringify(row) });
-    nhom.set(droppedColumns, items);
+    group.set(droppedColumns, items);
   }
 
-  for (const items of nhom.values()) {
+  for (const items of group.values()) {
     const e = await gateway.upsert(items.map((g) => g.row));
     if (!e) {
       for (const g of items) result.sentUpserts.set(g.key, g.json);
@@ -1423,29 +1423,29 @@ const sendChains = new Map<string, Promise<unknown>>();
 
 /** Dòng hiện tại để gửi: bản trong tab, bù dòng tab khác (cùng trình duyệt) đã
  *  đưa vào hàng chờ chung mà tab này chưa có — lấy từ bản sao localStorage. */
-function currentRows<T>(bang: TableMapping<T>, rows: T[], toAdd: string[]): T[] {
-  const ban = (latestSnapshot.get(bang.localKey) as T[] | undefined) ?? rows;
-  const co = new Set(ban.map((x) => bang.getKey(x)));
-  const missingKeys = new Set(toAdd.filter((k) => !co.has(k)));
-  if (missingKeys.size === 0) return ban;
-  const missingRows = load<T>(bang.localKey)
-    .map((x) => (bang.patchLegacy ? bang.patchLegacy(x) : x))
-    .filter((x) => missingKeys.has(bang.getKey(x)));
-  return [...ban, ...missingRows];
+function currentRows<T>(mapping: TableMapping<T>, rows: T[], toAdd: string[]): T[] {
+  const snapshot = (latestSnapshot.get(mapping.localKey) as T[] | undefined) ?? rows;
+  const existing = new Set(snapshot.map((x) => mapping.getKey(x)));
+  const missingKeys = new Set(toAdd.filter((k) => !existing.has(k)));
+  if (missingKeys.size === 0) return snapshot;
+  const missingRows = load<T>(mapping.localKey)
+    .map((x) => (mapping.patchLegacy ? mapping.patchLegacy(x) : x))
+    .filter((x) => missingKeys.has(mapping.getKey(x)));
+  return [...snapshot, ...missingRows];
 }
 
 /** Ghi bản sao localStorage (bỏ trường không-cache ở dòng đã đồng bộ). */
-function saveLocalCopy<T>(bang: TableMapping<T>, rows: T[]): boolean {
-  const bo = hasSupabase ? bang.uncachedFields : undefined;
-  if (!bo?.length) return save(bang.localKey, rows);
-  const cho = new Set(napCho(bang.localKey).them);
+function saveLocalCopy<T>(mapping: TableMapping<T>, rows: T[]): boolean {
+  const dropFields = hasSupabase ? mapping.uncachedFields : undefined;
+  if (!dropFields?.length) return save(mapping.localKey, rows);
+  const cho = new Set(loadQueue(mapping.localKey).them);
   return save(
-    bang.localKey,
-    rows.map((x) => (cho.has(bang.getKey(x)) ? x : omitFields(x, bo))),
+    mapping.localKey,
+    rows.map((x) => (cho.has(mapping.getKey(x)) ? x : omitFields(x, dropFields))),
   );
 }
 
-async function bocLoi(
+async function extractError(
   p: PromiseLike<{ error: { message: string; code?: string } | null }>,
 ): Promise<PushError | null> {
   try {
@@ -1457,13 +1457,13 @@ async function bocLoi(
 }
 
 async function syncOnePass<T>(
-  bang: TableMapping<T>,
+  mapping: TableMapping<T>,
   keyColumn: string,
   rows: T[],
 ): Promise<{ ok: boolean; msg?: string }> {
   const db = supabase;
   if (!db) return { ok: true };
-  const cho = napCho(bang.localKey);
+  const cho = loadQueue(mapping.localKey);
   if (cho.them.length === 0 && cho.xoa.length === 0) return { ok: true };
 
   const gateway: UploadPort = {
@@ -1474,43 +1474,43 @@ async function syncOnePass<T>(
        ⇒ hàng chờ kẹt vĩnh viễn: products không lên máy chủ từ 28/08 tới
        02/10/2026 (mọi máy). Đừng bỏ cờ này. */
     upsert: (items) =>
-      bocLoi(
+      extractError(
         db
-          .from(bang.table)
+          .from(mapping.table)
           .upsert(
             // Khóa chính theo chế độ (demo ⇒ tiền tố `demo:`) + site — rào R1 (lib/demoMode.ts).
-            items.map((r) => rowToServer(r, keyColumn, SITE_ID, undefined, bang.refColumns)),
+            items.map((r) => rowToServer(r, keyColumn, SITE_ID, undefined, mapping.refColumns)),
             { onConflict: keyColumn, defaultToNull: false },
           ),
       ),
     // Xóa luôn lọc site (rào R2) + khóa theo chế độ: không lệnh xóa nào chạm được site khác.
     remove: (keys) =>
-      bocLoi(
+      extractError(
         db
-          .from(bang.table)
+          .from(mapping.table)
           .delete()
           .eq("site_id", SITE_ID)
           .in(keyColumn, keys.map((k) => toServerKey(k))),
       ),
   };
-  const result = await pushQueue(bang, cho, currentRows(bang, rows, cho.them), gateway);
+  const result = await pushQueue(mapping, cho, currentRows(mapping, rows, cho.them), gateway);
 
   // Đọc LẠI hàng chờ + bản mới nhất: khóa ghi thêm/sửa tiếp trong lúc gửi phải còn.
-  const freshQueue = napCho(bang.localKey);
+  const freshQueue = loadQueue(mapping.localKey);
   const currentJson = new Map(
-    currentRows(bang, rows, freshQueue.them)
-      .filter((x) => result.sentUpserts.has(bang.getKey(x)))
-      .map((x) => [bang.getKey(x), JSON.stringify(bang.toRow(x))]),
+    currentRows(mapping, rows, freshQueue.them)
+      .filter((x) => result.sentUpserts.has(mapping.getKey(x)))
+      .map((x) => [mapping.getKey(x), JSON.stringify(mapping.toRow(x))]),
   );
-  const okCho = saveQueue(bang.localKey, dropSentKeys(freshQueue, result, currentJson));
+  const okCho = saveQueue(mapping.localKey, dropSentKeys(freshQueue, result, currentJson));
   // Dòng vừa lên server thì bỏ trường không-cache khỏi bản sao (nhả dung lượng).
-  if (bang.uncachedFields?.length && result.sentUpserts.size > 0)
-    saveLocalCopy(bang, (latestSnapshot.get(bang.localKey) as T[] | undefined) ?? rows);
+  if (mapping.uncachedFields?.length && result.sentUpserts.size > 0)
+    saveLocalCopy(mapping, (latestSnapshot.get(mapping.localKey) as T[] | undefined) ?? rows);
 
   if (result.generalError) return { ok: false, msg: result.generalError };
   if (result.rowErrors.length > 0) {
-    console.error(`[đồng bộ] ${bang.table}: dòng bị máy chủ từ chối`, result.rowErrors);
-    const label = TABLE_LABELS[bang.table] ?? bang.table;
+    console.error(`[đồng bộ] ${mapping.table}: dòng bị máy chủ từ chối`, result.rowErrors);
+    const label = TABLE_LABELS[mapping.table] ?? mapping.table;
     const vd = result.rowErrors
       .slice(0, 3)
       .map((d) => `${d.key} (${d.msg})`)
@@ -1526,14 +1526,14 @@ async function syncOnePass<T>(
 
 /** Đẩy hàng chờ của một bảng lên máy chủ — xếp hàng sau lượt đang chạy của bảng đó. */
 function syncQueueFor<T>(
-  bang: TableMapping<T>,
+  mapping: TableMapping<T>,
   keyColumn: string,
   rows: T[],
 ): Promise<{ ok: boolean; msg?: string }> {
-  const prevPromise = sendChains.get(bang.localKey) ?? Promise.resolve();
-  const p = prevPromise.then(() => syncOnePass(bang, keyColumn, rows));
+  const prevPromise = sendChains.get(mapping.localKey) ?? Promise.resolve();
+  const p = prevPromise.then(() => syncOnePass(mapping, keyColumn, rows));
   sendChains.set(
-    bang.localKey,
+    mapping.localKey,
     p.catch(() => undefined),
   );
   return p.catch((e) => ({ ok: false, msg: layMsg(e) }));
@@ -1776,13 +1776,13 @@ const TABLE_LABELS: Record<string, string> = {
 
 /** Trường đổi giữa hai bản ghi → { trường: [trước, sau] }. */
 function diffFields(a: unknown, b: unknown): Record<string, [unknown, unknown]> {
-  const ra: Record<string, [unknown, unknown]> = {};
+  const result: Record<string, [unknown, unknown]> = {};
   const oa = (a ?? {}) as Record<string, unknown>;
   const ob = (b ?? {}) as Record<string, unknown>;
   for (const k of new Set([...Object.keys(oa), ...Object.keys(ob)])) {
-    if (JSON.stringify(oa[k]) !== JSON.stringify(ob[k])) ra[k] = [oa[k], ob[k]];
+    if (JSON.stringify(oa[k]) !== JSON.stringify(ob[k])) result[k] = [oa[k], ob[k]];
   }
-  return ra;
+  return result;
 }
 
 /** Chuỗi dài hơn ngưỡng này không vào nhật ký (file base64 của bản đối soát
@@ -1813,66 +1813,66 @@ export function setAuditPaused(paused: boolean): void {
 }
 
 /** So danh sách cũ↔mới của một bảng, phát entry nhật ký thêm/sửa/xóa. */
-function logChanges<T>(bang: TableMapping<T>, prev: T[], next: T[]): void {
+function logChanges<T>(mapping: TableMapping<T>, prev: T[], next: T[]): void {
   if (isAuditPaused) return;
-  if (bang.table === "audit_log") return; // không tự lưu vết chính mình
+  if (mapping.table === "audit_log") return; // không tự lưu vết chính mình
   // Tô màu dòng chỉ là dấu trình bày (đã có marked_by/marked_at) — kế toán dò cả
   // trăm dòng một buổi, ghi nhật ký từng cú tô chỉ làm ngập /audit.
-  if (bang.table === "row_marks") return;
-  const label = TABLE_LABELS[bang.table] ?? bang.table;
-  const prevByKey = new Map(prev.map((x) => [bang.getKey(x), x]));
-  const nextMap = new Map(next.map((x) => [bang.getKey(x), x]));
+  if (mapping.table === "row_marks") return;
+  const label = TABLE_LABELS[mapping.table] ?? mapping.table;
+  const prevByKey = new Map(prev.map((x) => [mapping.getKey(x), x]));
+  const nextMap = new Map(next.map((x) => [mapping.getKey(x), x]));
   const entries: NewAuditEntry[] = [];
   for (const [k, x] of nextMap) {
     const c = prevByKey.get(k);
     if (c === undefined) {
-      entries.push({ action: "create", entity: bang.table, entityKey: k, summary: `Thêm ${label}`, diff: { _new: compactForAudit(x) } });
+      entries.push({ action: "create", entity: mapping.table, entityKey: k, summary: `Thêm ${label}`, diff: { _new: compactForAudit(x) } });
     } else if (JSON.stringify(c) !== JSON.stringify(x)) {
       const diff = Object.fromEntries(
         Object.entries(diffFields(c, x)).map(([f, [a, b]]) => [f, [compactForAudit(a, f), compactForAudit(b, f)]]),
       );
-      entries.push({ action: "update", entity: bang.table, entityKey: k, summary: `Sửa ${label}`, diff });
+      entries.push({ action: "update", entity: mapping.table, entityKey: k, summary: `Sửa ${label}`, diff });
     }
   }
   for (const [k] of prevByKey) {
-    if (!nextMap.has(k)) entries.push({ action: "delete", entity: bang.table, entityKey: k, summary: `Xóa ${label}` });
+    if (!nextMap.has(k)) entries.push({ action: "delete", entity: mapping.table, entityKey: k, summary: `Xóa ${label}` });
   }
   appendAuditEntries(entries);
 }
 
 /* ---------- Hook ---------- */
 
-export type LoadStatus = "dang-tai" | "san-sang" | "loi";
+export type LoadStatus = "loading" | "ready" | "error";
 
 /**
- * Đồng bộ CÙNG TAB giữa các lần gọi `useBang` của cùng một bảng. Mỗi lần gọi giữ
+ * Đồng bộ CÙNG TAB giữa các lần gọi `useTable` của cùng một bảng. Mỗi lần gọi giữ
  * `rows` riêng: hộp con (VD gắn lô) ghi xong mà màn cha vẫn cầm bản cũ thì lần
  * ghi kế tiếp của màn cha sẽ coi dòng con vừa thêm là "đã xóa" và xóa luôn trên
  * máy chủ. Ghi xong phát sự kiện này để các bản khác nhận đúng `rows` mới — chỉ
  * cập nhật trạng thái, KHÔNG ghi lại, không đụng hàng chờ.
  */
-const SU_KIEN_BANG = "bsf:bang-doi";
-type SuKienBang = { localKey: string; tu: string; rows: unknown[] };
+const TABLE_CHANGE_EVENT = "bsf:bang-doi";
+type TableChangeEvent = { localKey: string; source: string; rows: unknown[] };
 
-export function useBang<T>(bang: TableMapping<T>, seed: () => T[] = () => []) {
-  const keyColumn = bang.primaryKey ?? "id";
-  const va = bang.patchLegacy;
-  const napLocal = (key: string) => {
+export function useTable<T>(mapping: TableMapping<T>, seed: () => T[] = () => []) {
+  const keyColumn = mapping.primaryKey ?? "id";
+  const patch = mapping.patchLegacy;
+  const loadLocal = (key: string) => {
     const xs = load<T>(key);
-    return va ? xs.map(va) : xs;
+    return patch ? xs.map(patch) : xs;
   };
 
   const [rows, setRows] = useState<T[]>(() => {
-    const co = napLocal(bang.localKey);
-    if (co.length > 0) return co;
+    const existing = loadLocal(mapping.localKey);
+    if (existing.length > 0) return existing;
     const s0 = seed();
-    if (s0.length > 0 && !hasSupabase) save(bang.localKey, s0);
+    if (s0.length > 0 && !hasSupabase) save(mapping.localKey, s0);
     return s0;
   });
   const [status, setStatus] = useState<LoadStatus>(
-    hasSupabase ? "dang-tai" : "san-sang"
+    hasSupabase ? "loading" : "ready"
   );
-  const [loi, setLoi] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const prevRows = useRef<T[]>(rows);
   prevRows.current = rows;
   const [instanceId] = useState(() => Math.random().toString(36).slice(2));
@@ -1880,13 +1880,13 @@ export function useBang<T>(bang: TableMapping<T>, seed: () => T[] = () => []) {
   /** Báo kết quả một lượt server lên hook + đèn kết nối ("lần gần nhất thắng"). */
   const reportResult = useCallback((result: { ok: boolean; msg?: string }, fallback: string) => {
     if (result.ok) {
-      setLoi(null);
-      setStatus("san-sang");
+      setLoadError(null);
+      setStatus("ready");
       connectivity.reportOk();
     } else {
       const msg = result.msg ?? fallback;
-      setStatus("loi");
-      setLoi(msg);
+      setStatus("error");
+      setLoadError(msg);
       connectivity.reportError(msg);
     }
   }, []);
@@ -1894,14 +1894,14 @@ export function useBang<T>(bang: TableMapping<T>, seed: () => T[] = () => []) {
   /* Nhận bản mới từ lần gọi khác của cùng bảng (xem SU_KIEN_BANG). */
   useEffect(() => {
     const label = (e: Event) => {
-      const d = (e as CustomEvent<SuKienBang>).detail;
-      if (!d || d.localKey !== bang.localKey || d.tu === instanceId) return;
+      const d = (e as CustomEvent<TableChangeEvent>).detail;
+      if (!d || d.localKey !== mapping.localKey || d.source === instanceId) return;
       prevRows.current = d.rows as T[];
       setRows(d.rows as T[]);
     };
-    window.addEventListener(SU_KIEN_BANG, label);
-    return () => window.removeEventListener(SU_KIEN_BANG, label);
-  }, [bang.localKey, instanceId]);
+    window.addEventListener(TABLE_CHANGE_EVENT, label);
+    return () => window.removeEventListener(TABLE_CHANGE_EVENT, label);
+  }, [mapping.localKey, instanceId]);
 
   /* Nạp từ máy chủ — lúc mở, và NẠP LẠI khi quay lại tab (máy khác có thể vừa
      sửa); có mạng lại thì đẩy hàng chờ. Cùng một đường hoà server + hàng chờ. */
@@ -1912,54 +1912,54 @@ export function useBang<T>(bang: TableMapping<T>, seed: () => T[] = () => []) {
     let isLoading = false;
     let lastLoadAt = 0;
 
-    const nap = async (laLanDau: boolean) => {
+    const load = async (isFirstLoad: boolean) => {
       if (isLoading) return;
       isLoading = true;
       try {
         // Có lần ghi xen giữa lúc đang tải ⇒ bản tải về đã cũ (có thể thiếu dòng
         // vừa lên server rồi ra khỏi hàng chờ) ⇒ tải lại, tối đa 3 lần.
         for (let lan = 0; lan < 3; lan++) {
-          const gen0 = writeCounts.get(bang.localKey) ?? 0;
+          const gen0 = writeCounts.get(mapping.localKey) ?? 0;
           // Nạp THEO TRANG: PostgREST mặc định trả tối đa 1000 dòng/‌lần. Bảng lớn
           // (VD sổ kho theo tháng >1000 dòng) sẽ bị cắt cụt nếu chỉ select một phát.
           // Lặp .range() tới khi trang trả về ít hơn cỡ trang → lấy đủ mọi dòng.
           const PAGE_SIZE = 1000;
-          const thoRaw: Record<string, unknown>[] = [];
-          for (let tu = 0; ; tu += PAGE_SIZE) {
+          const rawRows: Record<string, unknown>[] = [];
+          for (let fromDate = 0; ; fromDate += PAGE_SIZE) {
             const { data, error } = await db
-              .from(bang.table)
+              .from(mapping.table)
               .select("*")
               .eq("site_id", SITE_ID)
               .order(keyColumn)
-              .range(tu, tu + PAGE_SIZE - 1);
+              .range(fromDate, fromDate + PAGE_SIZE - 1);
             if (isCancelled) return;
             if (error) {
               reportResult({ ok: false, msg: error.message }, error.message);
               return;
             }
             const page = data ?? [];
-            for (const r of page) thoRaw.push(r as Record<string, unknown>);
+            for (const r of page) rawRows.push(r as Record<string, unknown>);
             if (page.length < PAGE_SIZE) break;
           }
           // Bỏ tiền tố khóa demo; dòng không thuộc chế độ này (null) bỏ qua.
-          const may = thoRaw
-            .map((r) => rowFromServer(r, keyColumn, undefined, bang.refColumns))
+          const may = rawRows
+            .map((r) => rowFromServer(r, keyColumn, undefined, mapping.refColumns))
             .filter((r): r is Record<string, unknown> => r != null)
-            .map((r) => bang.fromRow(r));
+            .map((r) => mapping.fromRow(r));
 
           // Bảng rỗng lần đầu + máy này cũng chưa có gì → đẩy seed lên danh mục.
-          if (laLanDau && may.length === 0) {
-            const cho0 = napCho(bang.localKey);
-            const prevLocal = napLocal(bang.localKey);
+          if (isFirstLoad && may.length === 0) {
+            const cho0 = loadQueue(mapping.localKey);
+            const prevLocal = loadLocal(mapping.localKey);
             const isEmpty =
               prevLocal.length === 0 && cho0.them.length === 0 && cho0.xoa.length === 0;
             if (isEmpty) {
               const s0 = seed();
               if (s0.length > 0) {
                 const { error: e2 } = await db
-                  .from(bang.table)
+                  .from(mapping.table)
                   .upsert(
-                    s0.map((x) => rowToServer(bang.toRow(x), keyColumn, SITE_ID, undefined, bang.refColumns)),
+                    s0.map((x) => rowToServer(mapping.toRow(x), keyColumn, SITE_ID, undefined, mapping.refColumns)),
                     { onConflict: keyColumn }
                   );
                 if (isCancelled) return;
@@ -1969,8 +1969,8 @@ export function useBang<T>(bang: TableMapping<T>, seed: () => T[] = () => []) {
                 }
                 prevRows.current = s0;
                 setRows(s0);
-                latestSnapshot.set(bang.localKey, s0);
-                save(bang.localKey, s0);
+                latestSnapshot.set(mapping.localKey, s0);
+                save(mapping.localKey, s0);
                 lastLoadAt = Date.now();
                 reportResult({ ok: true }, "");
                 return;
@@ -1978,28 +1978,28 @@ export function useBang<T>(bang: TableMapping<T>, seed: () => T[] = () => []) {
             }
           }
 
-          if (lan < 2 && (writeCounts.get(bang.localKey) ?? 0) !== gen0) continue;
+          if (lan < 2 && (writeCounts.get(mapping.localKey) ?? 0) !== gen0) continue;
 
           /* HOÀ server với dòng local CHƯA đồng bộ — KHÔNG đè mù, nếu không reload
              sẽ nuốt chuyến hàng ghi hụt (dòng chỉ có dưới máy, chưa lên server).
              Bản dưới máy = bản trong tab (mới nhất) nếu có, không thì bản sao. */
           const local =
-            (latestSnapshot.get(bang.localKey) as T[] | undefined) ?? napLocal(bang.localKey);
-          const ketQua = mergeServerAndLocal(
+            (latestSnapshot.get(mapping.localKey) as T[] | undefined) ?? loadLocal(mapping.localKey);
+          const pushResult = mergeServerAndLocal(
             may,
             local,
-            napCho(bang.localKey),
-            bang.getKey,
-            bang.uncachedFields,
+            loadQueue(mapping.localKey),
+            mapping.getKey,
+            mapping.uncachedFields,
           );
-          prevRows.current = ketQua;
-          setRows(ketQua);
-          latestSnapshot.set(bang.localKey, ketQua);
-          const okMay = saveLocalCopy(bang, ketQua);
+          prevRows.current = pushResult;
+          setRows(pushResult);
+          latestSnapshot.set(mapping.localKey, pushResult);
+          const okMay = saveLocalCopy(mapping, pushResult);
           lastLoadAt = Date.now();
 
           // Thử đẩy hàng chờ lên server ngay khi vừa nối được.
-          const result = await syncQueueFor(bang, keyColumn, ketQua);
+          const result = await syncQueueFor(mapping, keyColumn, pushResult);
           if (isCancelled) return;
           reportResult(result.ok && !okMay ? { ok: false, msg: STORAGE_FULL_ERROR } : result, "Lỗi đồng bộ máy chủ");
           return;
@@ -2009,69 +2009,69 @@ export function useBang<T>(bang: TableMapping<T>, seed: () => T[] = () => []) {
       }
     };
 
-    void nap(true);
+    void load(true);
 
     // Quay lại tab sau ≥30 giây ⇒ nạp lại (máy khác có thể đã sửa/xóa dòng).
     const onTabVisible = () => {
       if (document.visibilityState === "visible" && Date.now() - lastLoadAt > 30_000)
-        void nap(false);
+        void load(false);
     };
     // Vừa có mạng lại ⇒ đẩy hàng chờ (trước đây phải đợi lần ghi/mở app kế tiếp).
-    const khiCoMang = () => {
-      void syncQueueFor(bang, keyColumn, prevRows.current).then((result) => {
+    const onOnline = () => {
+      void syncQueueFor(mapping, keyColumn, prevRows.current).then((result) => {
         if (!isCancelled) reportResult(result, "Lỗi đồng bộ máy chủ");
       });
     };
     document.addEventListener("visibilitychange", onTabVisible);
-    window.addEventListener("online", khiCoMang);
+    window.addEventListener("online", onOnline);
     return () => {
       isCancelled = true;
       document.removeEventListener("visibilitychange", onTabVisible);
-      window.removeEventListener("online", khiCoMang);
+      window.removeEventListener("online", onOnline);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bang.table]);
+  }, [mapping.table]);
 
   const write = useCallback(
     (next: T[]) => {
       const prev = prevRows.current;
       prevRows.current = next; // hai lần ghi liền trong cùng thao tác vẫn so đúng bản trước
       setRows(next);
-      latestSnapshot.set(bang.localKey, next);
-      writeCounts.set(bang.localKey, (writeCounts.get(bang.localKey) ?? 0) + 1);
+      latestSnapshot.set(mapping.localKey, next);
+      writeCounts.set(mapping.localKey, (writeCounts.get(mapping.localKey) ?? 0) + 1);
       window.dispatchEvent(
-        new CustomEvent<SuKienBang>(SU_KIEN_BANG, { detail: { localKey: bang.localKey, tu: instanceId, rows: next } })
+        new CustomEvent<TableChangeEvent>(TABLE_CHANGE_EVENT, { detail: { localKey: mapping.localKey, source: instanceId, rows: next } })
       );
 
       // Nhật ký thao tác — chạy cả hai chế độ (server + localStorage).
-      logChanges(bang, prev, next);
+      logChanges(mapping, prev, next);
 
       let okCho = true;
       if (supabase) {
-        const prevByKey = new Map(prev.map((x) => [bang.getKey(x), x]));
-        const newKeys = new Set(next.map((x) => bang.getKey(x)));
+        const prevByKey = new Map(prev.map((x) => [mapping.getKey(x), x]));
+        const newKeys = new Set(next.map((x) => mapping.getKey(x)));
 
         const upsertKeys = next
           .filter((x) => {
-            const c = prevByKey.get(bang.getKey(x));
+            const c = prevByKey.get(mapping.getKey(x));
             return !c || JSON.stringify(c) !== JSON.stringify(x);
           })
-          .map((x) => bang.getKey(x));
+          .map((x) => mapping.getKey(x));
         const deleteKeys = prev
-          .filter((x) => !newKeys.has(bang.getKey(x)))
-          .map((x) => bang.getKey(x));
+          .filter((x) => !newKeys.has(mapping.getKey(x)))
+          .map((x) => mapping.getKey(x));
 
         /* Ghi vào hàng chờ TRƯỚC khi gọi server: hụt thì vẫn còn dấu để đẩy lại
            lần sau. Gộp với hàng chờ cũ nên các dòng hụt trước cũng được đẩy kèm.
            (Ghi hàng chờ trước bản sao: bản sao giữ đủ trường cho dòng đang chờ.) */
-        const cho = napCho(bang.localKey);
+        const cho = loadQueue(mapping.localKey);
         const toAdd = new Set([...cho.them, ...upsertKeys]);
         const remove = new Set([...cho.xoa, ...deleteKeys]);
         deleteKeys.forEach((k) => toAdd.delete(k)); // vừa xóa thì thôi thêm
         upsertKeys.forEach((k) => remove.delete(k)); // thêm/sửa lại thì thôi xóa
-        okCho = saveQueue(bang.localKey, { them: [...toAdd], xoa: [...remove] });
+        okCho = saveQueue(mapping.localKey, { them: [...toAdd], xoa: [...remove] }); // naming-ok: dạng hàng chờ đã LƯU (SyncQueue)
       }
-      const okMay = saveLocalCopy(bang, next) && okCho; // luôn có bản sao dưới máy
+      const okMay = saveLocalCopy(mapping, next) && okCho; // luôn có bản sao dưới máy
 
       if (!supabase) {
         // Chỉ-máy-này: bản sao là kho DUY NHẤT — ghi hụt là mất khi tải lại.
@@ -2079,12 +2079,12 @@ export function useBang<T>(bang: TableMapping<T>, seed: () => T[] = () => []) {
         return;
       }
 
-      void syncQueueFor(bang, keyColumn, next).then((result) =>
+      void syncQueueFor(mapping, keyColumn, next).then((result) =>
         reportResult(result.ok && !okMay ? { ok: false, msg: STORAGE_FULL_ERROR } : result, "Lỗi ghi máy chủ"),
       );
     },
-    [bang, keyColumn, instanceId, reportResult]
+    [mapping, keyColumn, instanceId, reportResult]
   );
 
-  return [rows, write, { trangThai: status, loi }] as const;
+  return [rows, write, { status, error: loadError }] as const;
 }

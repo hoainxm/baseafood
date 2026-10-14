@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { computeWipStock, computeWipStockDetail, filterRetailSales, getAvailableKg, RETAIL_WAREHOUSE, FG_WAREHOUSE, collectWipDeductions, computeFinishedGoodStock, computeFinishedGoodLotStock, computeFinishedGoodLotStockDetail, collectPackagingDeductions } from "@/lib/inventory";
 import type { WipProductionItem, ExportItem, LotDispatch, LotInput, Packaging } from "@/types";
 
-const lo = (
+const lot = (
   id: string,
   productionDate: string,
   quantityKg: number,
@@ -23,7 +23,7 @@ const lo = (
 describe("computeWipStock", () => {
   it("chỉ tính lô đã nhập kho, conLai = nhập − xuất", () => {
     const los = computeWipStock(
-      [lo("w1", "2026-09-01", 100, 10), lo("w2", "2026-09-02", 50, 5, "pending")],
+      [lot("w1", "2026-09-01", 100, 10), lot("w2", "2026-09-02", 50, 5, "pending")],
       [{ wipId: "w1", quantityKg: 30, blocksCount: 3 } as ExportItem],
     );
     expect(los).toHaveLength(1); // w2 "pending" bị loại
@@ -35,7 +35,7 @@ describe("computeWipStock", () => {
 
   it("bán lẻ trừ tồn FIFO theo ngày SX (lô cũ trước)", () => {
     const los = computeWipStock(
-      [lo("wNew", "2026-09-02", 100, 10), lo("wOld", "2026-08-30", 40, 4)],
+      [lot("wNew", "2026-09-02", 100, 10), lot("wOld", "2026-08-30", 40, 4)],
       [],
       [{ productId: "p1", spec: "s1", quantityKg: 50 }],
     );
@@ -81,8 +81,8 @@ describe("getAvailableKg", () => {
 });
 
 describe("trừ tồn theo lô đã gắn (truy xuất QR)", () => {
-  const w0 = lo("w0", "2026-09-29", 100, 10); // lô cũ, không ai gắn
-  const w1 = lo("w1", "2026-10-02", 500, 50);
+  const w0 = lot("w0", "2026-09-29", 100, 10); // lô cũ, không ai gắn
+  const w1 = lot("w1", "2026-10-02", 500, 50);
   const remainingOf = (los: ReturnType<typeof computeWipStock>, id: string) => los.find((l) => l.wipId === id)!.remainingKg;
 
   it("không gắn lô ⇒ y như FIFO cũ", () => {
@@ -98,7 +98,7 @@ describe("trừ tồn theo lô đã gắn (truy xuất QR)", () => {
   });
 
   it("gắn lô chưa cân ⇒ FIFO trong các lô đã gắn", () => {
-    const w2 = lo("w2", "2026-10-03", 50, 5);
+    const w2 = lot("w2", "2026-10-03", 50, 5);
     const los = computeWipStock([w0, w1, w2], [], [{ productId: "p1", spec: "s1", quantityKg: 530, lots: [{ id: "w2", kg: null }, { id: "w1", kg: null }] }]);
     expect(remainingOf(los, "w0")).toBe(100);
     expect(remainingOf(los, "w1")).toBe(0); // w1 cũ hơn w2 ⇒ trừ trước
@@ -112,14 +112,14 @@ describe("trừ tồn theo lô đã gắn (truy xuất QR)", () => {
   });
 
   it("gắn nhầm lô khác mặt hàng ⇒ bỏ qua, trừ FIFO", () => {
-    const otherLot = { ...lo("wx", "2026-09-01", 80, 8), productId: "p9" } as WipProductionItem;
+    const otherLot = { ...lot("wx", "2026-09-01", 80, 8), productId: "p9" } as WipProductionItem;
     const los = computeWipStock([w0, w1, otherLot], [], [{ productId: "p1", spec: "s1", quantityKg: 60, lots: [{ id: "wx", kg: 60 }] }]);
     expect(remainingOf(los, "wx")).toBe(80);
     expect(remainingOf(los, "w0")).toBe(40);
   });
 
   it("collectWipDeductions gom bán lẻ + đóng gói kèm lô gắn từ lot_dispatches / lot_inputs", () => {
-    const ban = [{ id: "b1", productId: "p1", spec: "s1", quantityKg: 100, sourceWarehouse: RETAIL_WAREHOUSE }];
+    const sales = [{ id: "b1", productId: "p1", spec: "s1", quantityKg: 100, sourceWarehouse: RETAIL_WAREHOUSE }];
     const dg = [{ id: "pk1", fromProductId: "p1", fromSpec: "s1", inputKg: 200 } as Packaging];
     const dispatches: LotDispatch[] = [
       { id: "d1", lotKind: "W", lotId: "w1", lotLabel: "", docKind: "sales_item", docId: "b1", quantityKg: 100, method: "scan", operator: "", recordedAt: "" },
@@ -127,11 +127,11 @@ describe("trừ tồn theo lô đã gắn (truy xuất QR)", () => {
     const inputKg: LotInput[] = [
       { id: "l1", outputKind: "P", outputId: "pk1", inputKind: "W", inputId: "w1", inputLabel: "", material: "", quantityKg: 200, method: "scan", operator: "", recordedAt: "" },
     ];
-    const los = computeWipStock([w0, w1], [], collectWipDeductions(ban, dg, inputKg, dispatches));
+    const los = computeWipStock([w0, w1], [], collectWipDeductions(sales, dg, inputKg, dispatches));
     expect(remainingOf(los, "w0")).toBe(100);
     expect(remainingOf(los, "w1")).toBe(200);
     // Không truyền lô gắn ⇒ FIFO như cũ (lô cũ hết trước).
-    const prev = computeWipStock([w0, w1], [], collectWipDeductions(ban, dg));
+    const prev = computeWipStock([w0, w1], [], collectWipDeductions(sales, dg));
     expect(remainingOf(prev, "w0")).toBe(0); // 300 kg: lô cũ 100 trước
     expect(remainingOf(prev, "w1")).toBe(300); // rồi 200 từ lô mới
   });
@@ -170,7 +170,7 @@ describe("trừ tồn theo lô đã gắn (truy xuất QR)", () => {
 });
 
 describe("bán vượt tồn — phần trừ không phân được vào lô nào", () => {
-  const w0 = lo("w0", "2026-09-29", 100, 10);
+  const w0 = lot("w0", "2026-09-29", 100, 10);
   it("BTP: bán 120 trên lô 100 ⇒ lô về 0, bán vượt 20 (không nuốt mất)", () => {
     const result = computeWipStockDetail([w0], [], [{ productId: "p1", spec: "s1", quantityKg: 120 }]);
     expect(result.los[0]!.remainingKg).toBe(0);
@@ -200,13 +200,13 @@ describe("bán vượt tồn — phần trừ không phân được vào lô nà
 
   it("TP: đóng gói 100, bán 120 ⇒ computeFinishedGoodStock −20 = Σ tồn theo lô (0) − bán vượt (20)", () => {
     const pk = { id: "pk1", date: "2026-10-01", toProductId: "tp", toSpec: "1kg", outputKg: 100, outputUnits: 100, warehouse: "" } as Packaging;
-    const ban = [{ productId: "tp", spec: "1kg", quantityKg: 120 }];
-    const total = computeFinishedGoodStock([pk], ban)[0]!.remainingKg;
-    const theoLo = computeFinishedGoodLotStockDetail([pk], ban);
+    const sales = [{ productId: "tp", spec: "1kg", quantityKg: 120 }];
+    const total = computeFinishedGoodStock([pk], sales)[0]!.remainingKg;
+    const theoLo = computeFinishedGoodLotStockDetail([pk], sales);
     expect(total).toBe(-20);
     expect(theoLo.los[0]!.remainingKg).toBe(0);
     expect(theoLo.totalOversoldKg).toBe(20);
     expect(theoLo.los.reduce((s, l) => s + l.remainingKg, 0) - theoLo.totalOversoldKg).toBe(total);
-    expect(computeFinishedGoodLotStock([pk], ban)[0]!.remainingKg).toBe(0);
+    expect(computeFinishedGoodLotStock([pk], sales)[0]!.remainingKg).toBe(0);
   });
 });

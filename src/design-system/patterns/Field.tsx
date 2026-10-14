@@ -39,21 +39,21 @@ export function useHasRequiredField(
   ref: React.RefObject<HTMLElement | null>,
   deps: React.DependencyList = []
 ) {
-  const [co, setCo] = React.useState(false);
+  const [hasRequired, setHasRequired] = React.useState(false);
   React.useEffect(() => {
     const el = ref.current;
     if (!el) {
-      setCo(false);
+      setHasRequired(false);
       return;
     }
-    const checkRequired = () => setCo(!!el.querySelector('[aria-required="true"]'));
+    const checkRequired = () => setHasRequired(!!el.querySelector('[aria-required="true"]'));
     checkRequired();
-    const mo = new MutationObserver(checkRequired);
-    mo.observe(el, { subtree: true, childList: true, attributes: true });
-    return () => mo.disconnect();
+    const observer = new MutationObserver(checkRequired);
+    observer.observe(el, { subtree: true, childList: true, attributes: true });
+    return () => observer.disconnect();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
-  return co;
+  return hasRequired;
 }
 
 export function Field({

@@ -16,7 +16,7 @@
  * ("lần lưu vừa rồi có lên máy chủ không").
  */
 
-export type ConnectionStatus = "chua-ro" | "da-noi" | "loi";
+export type ConnectionStatus = "unknown" | "connected" | "error";
 
 export interface ConnectionSnapshot {
   status: ConnectionStatus;
@@ -25,20 +25,20 @@ export interface ConnectionSnapshot {
 
 // Snapshot bất biến — đổi tham chiếu chỉ khi trạng thái đổi, để
 // useSyncExternalStore không render vô hạn.
-let snapshot: ConnectionSnapshot = { status: "chua-ro", error: "" };
+let snapshot: ConnectionSnapshot = { status: "unknown", error: "" };
 const listeners = new Set<() => void>();
 
-function setStatus(status: ConnectionStatus, loi: string) {
-  if (snapshot.status === status && snapshot.error === loi) return;
-  snapshot = { status, error: loi };
+function setStatus(status: ConnectionStatus, error: string) {
+  if (snapshot.status === status && snapshot.error === error) return;
+  snapshot = { status, error };
   listeners.forEach((f) => f());
 }
 
 export const connectivity = {
   /** Một thao tác server vừa thành công. */
-  reportOk: () => setStatus("da-noi", ""),
+  reportOk: () => setStatus("connected", ""),
   /** Một thao tác server vừa lỗi (kèm thông báo để hiện cho người dùng). */
-  reportError: (message: string) => setStatus("loi", message),
+  reportError: (message: string) => setStatus("error", message),
   subscribe: (f: () => void) => {
     listeners.add(f);
     return () => {

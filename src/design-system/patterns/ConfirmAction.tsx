@@ -41,7 +41,7 @@ export function ConfirmAction({
   detail,
   confirmLabel,
   cancelLabel = "Quay lại",
-  destructive: nguyHiem = false,
+  destructive = false,
   icon: Icon,
   onConfirm,
   trigger,
@@ -84,7 +84,7 @@ export function ConfirmAction({
           <AlertDialogCancel size="lg">{cancelLabel}</AlertDialogCancel>
           <AlertDialogAction
             size="lg"
-            variant={nguyHiem ? "destructive" : "default"}
+            variant={destructive ? "destructive" : "default"}
             onClick={onConfirm}
           >
             {Icon && <Icon aria-hidden />}

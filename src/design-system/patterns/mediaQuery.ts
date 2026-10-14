@@ -11,11 +11,11 @@ export const MEDIA_NARROW_SIDEBAR = "(min-width: 768px) and (max-width: 1023.98p
 /** `true` khi media query đang khớp; tự cập nhật khi xoay máy / đổi cỡ cửa sổ. */
 export function useMediaQuery(query: string): boolean {
   return useSyncExternalStore(
-    (doi) => {
+    (onChange) => {
       const mq = window.matchMedia?.(query);
       if (!mq) return () => {};
-      mq.addEventListener("change", doi);
-      return () => mq.removeEventListener("change", doi);
+      mq.addEventListener("change", onChange);
+      return () => mq.removeEventListener("change", onChange);
     },
     () => window.matchMedia?.(query).matches ?? false,
     () => false

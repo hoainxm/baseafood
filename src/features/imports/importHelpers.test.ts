@@ -38,7 +38,7 @@ const makeShipment = (p: Partial<ImportShipment>): ImportShipment =>
     ...p,
   }) as ImportShipment;
 
-const dong = (p: Partial<MaterialImportItem>): MaterialImportItem =>
+const row = (p: Partial<MaterialImportItem>): MaterialImportItem =>
   ({
     id: "r",
     shipmentId: "",
@@ -71,14 +71,14 @@ describe("groupShipments", () => {
   it("gom dòng theo chuyến THẬT (shipmentId), cộng kg + tiền, cờ ghi bù theo chuyến", () => {
     const cs = [makeShipment({ id: "c1", postingDate: "2026-09-05" })]; // ghi sổ SAU ngày về ⇒ ghi bù
     const rows = [
-      dong({ id: "r1", shipmentId: "c1", quantityKg: 100, unitPrice: 20 }),
-      dong({ id: "r2", shipmentId: "c1", quantityKg: 50, unitPrice: null }),
+      row({ id: "r1", shipmentId: "c1", quantityKg: 100, unitPrice: 20 }),
+      row({ id: "r2", shipmentId: "c1", quantityKg: 50, unitPrice: null }),
     ];
     const g = groupShipments(rows, cs);
     expect(g).toHaveLength(1);
     expect(g[0].groupKey).toBe("c1");
     expect(g[0].shipment?.id).toBe("c1");
-    expect(g[0].dong).toHaveLength(2);
+    expect(g[0].rows).toHaveLength(2);
     expect(g[0].totalKg).toBe(150);
     expect(g[0].totalAmount).toBe(2000); // 100*20 + 50*0
     expect(g[0].isBackdated).toBe(true);
@@ -86,9 +86,9 @@ describe("groupShipments", () => {
 
   it("dòng CŨ không có shipmentId ⇒ gom ngầm theo (ngày|xưởng|đại lý|xe), chuyen=null, không ghi bù", () => {
     const rows = [
-      dong({ id: "r1", quantityKg: 10, licensePlate: "72C-1" }),
-      dong({ id: "r2", quantityKg: 20, licensePlate: "72C-1" }),
-      dong({ id: "r3", quantityKg: 5, licensePlate: "72C-2" }), // xe khác ⇒ nhóm khác
+      row({ id: "r1", quantityKg: 10, licensePlate: "72C-1" }),
+      row({ id: "r2", quantityKg: 20, licensePlate: "72C-1" }),
+      row({ id: "r3", quantityKg: 5, licensePlate: "72C-2" }), // xe khác ⇒ nhóm khác
     ];
     const g = groupShipments(rows, []);
     expect(g).toHaveLength(2);
@@ -101,9 +101,9 @@ describe("groupShipments", () => {
 
   it("sắp theo ngày về rồi tên đại lý", () => {
     const rows = [
-      dong({ id: "a", deliveryDate: "2026-09-03", supplierName: "Bé Ba" }),
-      dong({ id: "b", deliveryDate: "2026-09-01", supplierName: "Hiếu Phấn" }),
-      dong({ id: "c", deliveryDate: "2026-09-01", supplierName: "Bé Ba" }),
+      row({ id: "a", deliveryDate: "2026-09-03", supplierName: "Bé Ba" }),
+      row({ id: "b", deliveryDate: "2026-09-01", supplierName: "Hiếu Phấn" }),
+      row({ id: "c", deliveryDate: "2026-09-01", supplierName: "Bé Ba" }),
     ];
     const g = groupShipments(rows, []);
     expect(g.map((x) => `${x.deliveryDate}|${x.supplierName}`)).toEqual([
@@ -188,8 +188,8 @@ describe("importLineHasData / isLineComplete", () => {
 });
 
 describe("gợi ý theo đại lý", () => {
-  const so: MaterialImportItem[] = [
-    dong({
+  const ledgerRows: MaterialImportItem[] = [
+    row({
       id: "1",
       shipmentId: "s1",
       deliveryDate: "2026-09-01",
@@ -200,7 +200,7 @@ describe("gợi ý theo đại lý", () => {
       unitPrice: 150000,
       quantityKg: 10,
     }),
-    dong({
+    row({
       id: "2",
       shipmentId: "s1",
       deliveryDate: "2026-09-01",
@@ -211,7 +211,7 @@ describe("gợi ý theo đại lý", () => {
       unitPrice: 134000,
       quantityKg: 10,
     }),
-    dong({
+    row({
       id: "3",
       shipmentId: "s2",
       deliveryDate: "2026-09-03",
@@ -222,7 +222,7 @@ describe("gợi ý theo đại lý", () => {
       unitPrice: 158000,
       quantityKg: 10,
     }),
-    dong({
+    row({
       id: "4",
       shipmentId: "s2",
       deliveryDate: "2026-09-03",
@@ -233,7 +233,7 @@ describe("gợi ý theo đại lý", () => {
       unitPrice: null,
       quantityKg: 10,
     }),
-    dong({
+    row({
       id: "5",
       shipmentId: "s3",
       deliveryDate: "2026-09-02",
@@ -245,7 +245,7 @@ describe("gợi ý theo đại lý", () => {
       unitPrice: 160000,
       quantityKg: 10,
     }),
-    dong({
+    row({
       id: "6",
       shipmentId: "s4",
       deliveryDate: "2026-09-02",
@@ -258,46 +258,46 @@ describe("gợi ý theo đại lý", () => {
   ];
 
   it("getFrequentSuppliers: theo xưởng, nhiều lượt đứng trước", () => {
-    expect(getFrequentSuppliers(so, "Đông")).toEqual(["Hồng Phú", "Hương Pháp"]);
-    expect(getFrequentSuppliers(so, "Cá")).toEqual(["Cá Ba"]);
-    expect(getFrequentSuppliers(so, "Khô")).toEqual([]);
+    expect(getFrequentSuppliers(ledgerRows, "Đông")).toEqual(["Hồng Phú", "Hương Pháp"]);
+    expect(getFrequentSuppliers(ledgerRows, "Cá")).toEqual(["Cá Ba"]);
+    expect(getFrequentSuppliers(ledgerRows, "Khô")).toEqual([]);
   });
 
   it("getSupplierVehicles: biển số + tài xế TÁCH riêng; gộp biển viết khác kiểu, hiển thị viết hoa", () => {
-    expect(getSupplierVehicles(so, "Hồng Phú")).toEqual({
+    expect(getSupplierVehicles(ledgerRows, "Hồng Phú")).toEqual({
       plates: [{ licensePlate: "72C 16603", driverName: "toàn" }],
       drivers: ["toàn"],
     });
-    expect(getSupplierVehicles(so, "")).toEqual({ plates: [], drivers: [] });
+    expect(getSupplierVehicles(ledgerRows, "")).toEqual({ plates: [], drivers: [] });
   });
 
   it("getSupplierLineTemplates: loại của lượt mới nhất trước, giá gần nhất, kg trống, cờ goiY", () => {
-    const m = getSupplierLineTemplates(so, "Hồng Phú", "Đông");
+    const m = getSupplierLineTemplates(ledgerRows, "Hồng Phú", "Đông");
     expect(
       m.map((d) => [
         d.materialTypeName,
         d.unitPrice,
         d.priceDate,
         d.quantityKg,
-        d.goiY,
+        d.isSuggested,
       ]),
     ).toEqual([
       ["BT 1 da", 158000, "2026-09-03", 0, true],
       ["BT 2 da nhỏ", null, undefined, 0, true],
       ["BT 2 da lớn", 134000, "2026-09-01", 0, true],
     ]);
-    expect(getSupplierLineTemplates(so, "Đại lý lạ", "Đông")).toEqual([]);
+    expect(getSupplierLineTemplates(ledgerRows, "Đại lý lạ", "Đông")).toEqual([]);
   });
 
   it("dòng gợi ý chưa gõ kg KHÔNG tính là có dữ liệu (lưu tự bỏ qua, không nài lỗi)", () => {
-    const [d] = getSupplierLineTemplates(so, "Hồng Phú", "Đông");
+    const [d] = getSupplierLineTemplates(ledgerRows, "Hồng Phú", "Đông");
     expect(importLineHasData(d)).toBe(false);
     expect(importLineHasData({ ...d, quantityKg: 5 })).toBe(true);
-    expect(importLineHasData({ ...d, goiY: false })).toBe(true); // người dùng tự sửa loại/giá ⇒ dòng thường
+    expect(importLineHasData({ ...d, isSuggested: false })).toBe(true); // người dùng tự sửa loại/giá ⇒ dòng thường
   });
 
   it("applyNewSupplierTemplate: đổi đại lý giữ kg đã gõ nhưng KHÔNG giữ giá của đại lý cũ", () => {
-    const prev = getSupplierLineTemplates(so, "Hồng Phú", "Đông").map((d, i) => ({
+    const prev = getSupplierLineTemplates(ledgerRows, "Hồng Phú", "Đông").map((d, i) => ({
       ...d,
       quantityKg: i === 0 ? 1200 : i === 2 ? 300 : 0, // BT 1 da = 1200, BT 2 da lớn = 300
     }));
@@ -311,7 +311,7 @@ describe("gợi ý theo đại lý", () => {
     };
     const result = applyNewSupplierTemplate(
       [...prev, userEntered],
-      getSupplierLineTemplates(so, "Hương Pháp", "Đông"),
+      getSupplierLineTemplates(ledgerRows, "Hương Pháp", "Đông"),
     );
     expect(
       result.map((d) => [d.materialTypeName, d.quantityKg, d.unitPrice]),
@@ -323,7 +323,7 @@ describe("gợi ý theo đại lý", () => {
   });
 
   it("getSkippedSuggestedLines: đếm dòng điền sẵn chưa gõ kg", () => {
-    const m = getSupplierLineTemplates(so, "Hồng Phú", "Đông");
+    const m = getSupplierLineTemplates(ledgerRows, "Hồng Phú", "Đông");
     expect(getSkippedSuggestedLines(m)).toHaveLength(3);
     expect(getSkippedSuggestedLines([{ ...m[0], quantityKg: 5 }, m[1]])).toHaveLength(1);
   });
@@ -332,9 +332,9 @@ describe("gợi ý theo đại lý", () => {
 describe("OCR phiếu nhập → bảng loại hàng", () => {
   it("getKnownVehicles: mọi đại lý, mới nhất trước, gộp biến thể biển số / tên", () => {
     const rows = [
-      dong({ id: "1", deliveryDate: "2026-09-01", supplierName: "A", licensePlate: "72c 16603", driverName: "toàn" }),
-      dong({ id: "2", deliveryDate: "2026-09-05", supplierName: "B", licensePlate: "72C-166.03", driverName: "Toàn" }),
-      dong({ id: "3", deliveryDate: "2026-09-03", supplierName: "C", licensePlate: "51D-12345", driverName: "" }),
+      row({ id: "1", deliveryDate: "2026-09-01", supplierName: "A", licensePlate: "72c 16603", driverName: "toàn" }),
+      row({ id: "2", deliveryDate: "2026-09-05", supplierName: "B", licensePlate: "72C-166.03", driverName: "Toàn" }),
+      row({ id: "3", deliveryDate: "2026-09-03", supplierName: "C", licensePlate: "51D-12345", driverName: "" }),
     ];
     expect(getKnownVehicles(rows)).toEqual({ plates: ["72C-166.03", "51D-12345"], drivers: ["Toàn"] });
     expect(getKnownVehicles(rows, 1).plates).toEqual(["72C-166.03"]);
@@ -344,7 +344,7 @@ describe("OCR phiếu nhập → bảng loại hàng", () => {
     ...createEmptyImportLine("Bạch tuộc"),
     materialTypeName: name,
     unitPrice,
-    goiY: true,
+    isSuggested: true,
     priceDate: "2026-09-01",
   });
   const categoryOf = (n: string) => (n.startsWith("Cá") ? ("Cá" as const) : undefined);
@@ -359,7 +359,7 @@ describe("OCR phiếu nhập → bảng loại hàng", () => {
       categoryOf,
       "Bạch tuộc",
     );
-    expect(out.map((d) => [d.materialTypeName, d.quantityKg, d.unitPrice, d.goiY, d.priceDate])).toEqual([
+    expect(out.map((d) => [d.materialTypeName, d.quantityKg, d.unitPrice, d.isSuggested, d.priceDate])).toEqual([
       ["BT 1 da", 12, 155000, false, undefined],
       ["BT 2 da lớn", 8, 134000, false, "2026-09-01"],
     ]);
@@ -395,10 +395,10 @@ describe("OCR phiếu nhập → bảng loại hàng", () => {
 describe("buildSupplierHistory — lịch sử giao gửi kèm OCR", () => {
   it("đại lý giao gần nhất trước, loại mới nhất trước, giá gần nhất, khử trùng", () => {
     const rows = [
-      dong({ id: "1", deliveryDate: "2026-08-20", supplierName: "Hồng Phú", materialTypeName: "Bạch tuộc 1 da", unitPrice: 150000 }),
-      dong({ id: "2", deliveryDate: "2026-08-22", supplierName: "Hồng Phú", materialTypeName: "Bạch tuộc 1 da", unitPrice: 158000 }),
-      dong({ id: "3", deliveryDate: "2026-08-22", supplierName: "Hồng Phú", materialTypeName: "Bạch tuộc 2 da lớn (80↑)", unitPrice: null }),
-      dong({ id: "4", deliveryDate: "2026-08-21", supplierName: "Phú Quý", materialTypeName: "Mực ống", unitPrice: 90000 }),
+      row({ id: "1", deliveryDate: "2026-08-20", supplierName: "Hồng Phú", materialTypeName: "Bạch tuộc 1 da", unitPrice: 150000 }),
+      row({ id: "2", deliveryDate: "2026-08-22", supplierName: "Hồng Phú", materialTypeName: "Bạch tuộc 1 da", unitPrice: 158000 }),
+      row({ id: "3", deliveryDate: "2026-08-22", supplierName: "Hồng Phú", materialTypeName: "Bạch tuộc 2 da lớn (80↑)", unitPrice: null }),
+      row({ id: "4", deliveryDate: "2026-08-21", supplierName: "Phú Quý", materialTypeName: "Mực ống", unitPrice: 90000 }),
     ];
     expect(buildSupplierHistory(rows)).toEqual([
       "Hồng Phú: Bạch tuộc 2 da lớn (80↑) · Bạch tuộc 1 da (158.000)",

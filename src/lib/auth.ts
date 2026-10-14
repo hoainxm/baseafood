@@ -189,7 +189,7 @@ export function useAuth() {
       const { data, error } = await phu.auth.signUp({
         email: usernameToEmail(u),
         password,
-        options: { data: { ho_ten: fullName.trim(), username: u } },
+        options: { data: { ho_ten: fullName.trim(), username: u } }, // naming-ok: khóa metadata Supabase Auth đã lưu, trigger 0006 đọc
       });
       if (error) return { ok: false, error: translateSignUpError(error.message) };
 

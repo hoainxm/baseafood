@@ -49,7 +49,7 @@ function NodeRow({ node, edgeKg: linkKg, onOpen }: { node: LotNode; edgeKg?: num
   const canOpen = laLo(node.kind) && !node.isMissing;
   return (
     <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-      <Tag variant="phan-loai" tone={toneByName(TRACE_KIND_LABELS[node.kind])}>{TRACE_KIND_LABELS[node.kind]}</Tag>
+      <Tag variant="category" tone={toneByName(TRACE_KIND_LABELS[node.kind])}>{TRACE_KIND_LABELS[node.kind]}</Tag>
       {canOpen ? (
         <button
           type="button"
@@ -93,7 +93,7 @@ function Tree({ branches, onOpen }: { branches: TraceBranch[]; onOpen: (n: LotNo
 }
 
 export default function QrLookupScreen() {
-  const { dl } = useTraceData();
+  const { traceData } = useTraceData();
   const [params, setParams] = useSearchParams();
   const [isScanning, setIsScanning] = useState(false);
   const [typedCode, setTypedCode] = useState("");
@@ -103,20 +103,20 @@ export default function QrLookupScreen() {
 
   // Mã đang tra nằm trên đường link (?lot=…) ⇒ camera điện thoại quét tem mở thẳng
   // màn này, và copy link gửi người khác là họ thấy đúng lô đó.
-  const lo = readParam(params, "lot") ?? ""; // tem đã in mang ?lo= cũ — vẫn đọc được
+  const lotParam = readParam(params, "lot") ?? ""; // tem đã in mang ?lo= cũ — vẫn đọc được
   // Link quét tem (?lot=…) luôn mở tab Tra, kể cả khi lỡ kèm tab=…
   const tabUrl = params.get("tab");
-    const tab = lo ? "lookup" : normalizeQrTab(tabUrl);
-  const ketQua = useMemo(() => {
-    const ma = parseQrCode(lo);
-    return ma ? findLots(ma, dl) : [];
-  }, [lo, dl]);
-  const viewing = ketQua.length === 1 ? ketQua[0]! : null;
+    const tab = lotParam ? "lookup" : normalizeQrTab(tabUrl);
+  const result = useMemo(() => {
+    const code = parseQrCode(lotParam);
+    return code ? findLots(code, traceData) : [];
+  }, [lotParam, traceData]);
+  const viewing = result.length === 1 ? result[0]! : null;
 
   const tra = (text: string) => {
-    const ma = parseQrCode(text);
-    if (!ma) return;
-    setParams("kind" in ma ? { lot: `${ma.kind}:${ma.id}` } : { lot: ma.code });
+    const code = parseQrCode(text);
+    if (!code) return;
+    setParams("kind" in code ? { lot: `${code.kind}:${code.id}` } : { lot: code.code });
   };
   const openLot = (n: LotNode) => {
     if (!laLo(n.kind)) return;
@@ -124,19 +124,19 @@ export default function QrLookupScreen() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const nguoc = useMemo(() => (viewing ? traceBackward(viewing.kind, viewing.id, dl) : []), [viewing, dl]);
-  const xuoi = useMemo(() => (viewing ? traceForward(viewing.kind, viewing.id, dl) : []), [viewing, dl]);
-  const canBang = useMemo(() => (viewing ? computeLotMassBalance(viewing.kind, viewing.id, dl) : null), [viewing, dl]);
-  const lotStock = useMemo(() => (viewing ? getLotStockKg(viewing.kind, viewing.id, dl) : null), [viewing, dl]);
+  const backward = useMemo(() => (viewing ? traceBackward(viewing.kind, viewing.id, traceData) : []), [viewing, traceData]);
+  const forward = useMemo(() => (viewing ? traceForward(viewing.kind, viewing.id, traceData) : []), [viewing, traceData]);
+  const massBalance = useMemo(() => (viewing ? computeLotMassBalance(viewing.kind, viewing.id, traceData) : null), [viewing, traceData]);
+  const lotStock = useMemo(() => (viewing ? getLotStockKg(viewing.kind, viewing.id, traceData) : null), [viewing, traceData]);
   /** Lô NL: các loại NL khác của CÙNG CHUYẾN (mỗi loại một lô, chốt 2026-10-08). */
-  const sameShipmentLots = useMemo(() => (viewing?.kind === "S" ? findSameShipmentLots(viewing.id, dl) : []), [viewing, dl]);
+  const sameShipmentLots = useMemo(() => (viewing?.kind === "S" ? findSameShipmentLots(viewing.id, traceData) : []), [viewing, traceData]);
 
-  const loiNguoc: Partial<Record<TraceNodeKind, string>> = {
+  const backwardErrors: Partial<Record<TraceNodeKind, string>> = {
     S: "Lô nguyên liệu là đầu chuỗi — nguồn gốc là đại lý / chuyến nhập ghi ở trên.",
     W: "Mẻ này CHƯA gắn lô nguyên liệu nào. Vào Sản xuất BTP, bấm \"Gắn lô NL\" ở dòng của mẻ.",
     P: "Phiếu đóng gói này CHƯA gắn lô bán thành phẩm nào. Vào Đóng gói, bấm \"Gắn lô BTP\".",
   };
-  const loiXuoi: Partial<Record<TraceNodeKind, string>> = {
+  const forwardErrors: Partial<Record<TraceNodeKind, string>> = {
     S: "Lô này chưa được gắn vào mẻ sản xuất nào.",
     W: "Mẻ này chưa được gắn vào phiếu đóng gói hay lệnh xuất nào.",
     P: "Chưa ghi nhận thành phẩm này bán cho ai. Ở Bán hàng, bấm \"Gắn lô\" ở dòng bán đóng gói.",
@@ -230,23 +230,23 @@ export default function QrLookupScreen() {
       </div>
 
       {/* Kết quả */}
-      {!lo ? (
+      {!lotParam ? (
         <EmptyState title="Chưa có mã lô" description="Quét tem QR hoặc gõ mã lô để xem hộ chiếu của lô." />
-      ) : ketQua.length === 0 ? (
+      ) : result.length === 0 ? (
         <EmptyState
-          title={`Không tìm thấy lô "${lo}"`}
+          title={`Không tìm thấy lô "${lotParam}"`}
           description="Kiểm tra lại mã. Lô bán thành phẩm / thành phẩm chỉ có từ khi mẻ hoặc phiếu đóng gói được ghi vào sổ."
         />
-      ) : ketQua.length > 1 ? (
+      ) : result.length > 1 ? (
         <div className="space-y-3 rounded-xl border-2 border-border p-4">
           <p className="font-medium">
             {(() => {
-              const ld = explainMultipleLots(lo, ketQua, dl);
+              const ld = explainMultipleLots(lotParam, result, traceData);
               return ld.sameShipment ? `${ld.message}:` : `${ld.message} (tem in trước đợt nâng cấp không đảm bảo mã duy nhất):`;
             })()}
           </p>
           <ul className="space-y-2">
-            {ketQua.map((n) => (
+            {result.map((n) => (
               <li key={`${n.kind}:${n.id}`}>
                 <NodeRow node={n} onOpen={openLot} />
               </li>
@@ -260,7 +260,7 @@ export default function QrLookupScreen() {
             <section className="space-y-3 rounded-xl border-2 border-border p-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex flex-wrap items-center gap-2">
-                  <Tag variant="phan-loai" tone={toneByName(TRACE_KIND_LABELS[viewing.kind])}>{TRACE_KIND_LABELS[viewing.kind]}</Tag>
+                  <Tag variant="category" tone={toneByName(TRACE_KIND_LABELS[viewing.kind])}>{TRACE_KIND_LABELS[viewing.kind]}</Tag>
                   <span className="text-xl font-semibold tnum">{viewing.label}</span>
                 </div>
                 <Button title="In lại tem QR của lô này (tem cũ bong / mờ thì in cái mới)." variant="outline" onClick={() => setIsPrintingLabel(true)}>
@@ -276,14 +276,14 @@ export default function QrLookupScreen() {
                   if (!t)
                     return (
                       <p className="flex flex-wrap items-center gap-2">
-                        <Tag variant="cho">Chưa in tem</Tag>
+                        <Tag variant="pending">Chưa in tem</Tag>
                         <span className="text-muted-foreground">Lô này chưa có lần in tem nào được ghi lại.</span>
                       </p>
                     );
                   return (
                     <div className="space-y-1">
                       <p className="flex flex-wrap items-center gap-2">
-                        <Tag variant="xong">Đã in {t.labelCount} tem</Tag>
+                        <Tag variant="done">Đã in {t.labelCount} tem</Tag>
                         <span className="text-muted-foreground">
                           Lần gần nhất {formatDateVN(t.lastPrint.printedAt.slice(0, 10))}
                           {t.lastPrint.operator ? ` · ${t.lastPrint.operator}` : ""}
@@ -291,7 +291,7 @@ export default function QrLookupScreen() {
                       </p>
                       {t.lastPrint.label && t.lastPrint.label !== viewing.label && (
                         <p className="flex flex-wrap items-center gap-2">
-                          <Tag variant="luu-y">Nhãn đã đổi</Tag>
+                          <Tag variant="warning">Nhãn đã đổi</Tag>
                           <span>
                             Tem đang dán ghi <b className="tnum">{t.lastPrint.label}</b>, nay là{" "}
                             <b className="tnum">{viewing.label}</b> (sửa ngày / xưởng sau khi in). Quét tem cũ vẫn ra đúng lô — in lại nếu cần chữ khớp.
@@ -328,7 +328,7 @@ export default function QrLookupScreen() {
                           </button>
                         )}
                         <span className="tnum text-muted-foreground">{kg(n.kg)}</span>
-                        {n.id === viewing.id && <Tag variant="xong">Đang xem</Tag>}
+                        {n.id === viewing.id && <Tag variant="done">Đang xem</Tag>}
                       </li>
                     ))}
                   </ul>
@@ -337,7 +337,7 @@ export default function QrLookupScreen() {
             </section>
 
             {/* 2. Cân bằng khối lượng */}
-            {canBang && (
+            {massBalance && (
               <section className="space-y-2 rounded-xl border-2 border-border p-4">
                 <h2 className="flex items-center gap-2 font-semibold">
                   <Scale aria-hidden /> Cân bằng khối lượng
@@ -348,12 +348,12 @@ export default function QrLookupScreen() {
                 <div className="grid gap-2 sm:grid-cols-3">
                   <div>
                     <div className="text-muted-foreground">{viewing.kind === "S" ? "Nhận vào" : viewing.kind === "P" ? "Đóng gói ra" : "Sản xuất"}</div>
-                    <div className="tnum text-lg font-semibold">{kg(canBang.inKg)}</div>
+                    <div className="tnum text-lg font-semibold">{kg(massBalance.inKg)}</div>
                   </div>
                   <div>
                     <div className="text-muted-foreground">Đã đi</div>
-                    {canBang.outputs.length ? (
-                      canBang.outputs.map((r) => (
+                    {massBalance.outputs.length ? (
+                      massBalance.outputs.map((r) => (
                         <div key={r.label} className="tnum">
                           {r.label}: <span className="font-semibold">{kg(r.kg)}</span>
                         </div>
@@ -364,7 +364,7 @@ export default function QrLookupScreen() {
                   </div>
                   <div>
                     <div className="text-muted-foreground">Còn lại (theo hồ sơ lô)</div>
-                    <div className={`tnum text-lg font-semibold ${canBang.children < 0 ? "text-destructive" : ""}`}>{kg(canBang.children)}</div>
+                    <div className={`tnum text-lg font-semibold ${massBalance.remainingKg < 0 ? "text-destructive" : ""}`}>{kg(massBalance.remainingKg)}</div>
                     {lotStock != null && (
                       <div className="tnum text-muted-foreground">
                         Tồn trong kho (sổ tồn): <span className="font-semibold text-foreground">{kg(lotStock)}</span>
@@ -373,26 +373,26 @@ export default function QrLookupScreen() {
                   </div>
                 </div>
                 {/* Lô này đi đâu — một thanh 100% kg của lô, chia theo ngả đã đi + phần còn. */}
-                {canBang.inKg > 0 && canBang.outputs.length > 0 && (
+                {massBalance.inKg > 0 && massBalance.outputs.length > 0 && (
                   <ProportionBar
                     description="Khối lượng của lô chia theo nơi đã đi tới"
                     segments={[
-                      ...canBang.outputs.map((r, i) => ({
+                      ...massBalance.outputs.map((r, i) => ({
                         id: `ra-${i}`,
                         label: r.label,
                         value: r.kg,
-                        tone: (["tim", "la", "bang", "hong", "cam", "bien"] as const)[i % 6],
+                        tone: (["purple", "green", "cyan", "pink", "orange", "blue"] as const)[i % 6],
                       })),
-                      ...(canBang.children > 0 ? [{ id: "con", label: "Còn lại (theo hồ sơ lô)", value: canBang.children, tone: "ngoc" as const }] : []),
+                      ...(massBalance.remainingKg > 0 ? [{ id: "remaining", label: "Còn lại (theo hồ sơ lô)", value: massBalance.remainingKg, tone: "teal" as const }] : []),
                     ]}
                   />
                 )}
-                {canBang.unweighedCount > 0 && (
+                {massBalance.unweighedCount > 0 && (
                   <p className="text-muted-foreground">
-                    Có {canBang.unweighedCount} lần gắn lô chưa ghi kg — số "còn lại" chưa trừ phần đó.
+                    Có {massBalance.unweighedCount} lần gắn lô chưa ghi kg — số "còn lại" chưa trừ phần đó.
                   </p>
                 )}
-                {canBang.children < 0 && (
+                {massBalance.remainingKg < 0 && (
                   <p className="font-medium text-destructive">Dùng / xuất quá số kg của lô — kiểm tra lại số kg hoặc lô đã gắn.</p>
                 )}
               </section>
@@ -403,7 +403,7 @@ export default function QrLookupScreen() {
               <h2 className="flex items-center gap-2 font-semibold">
                 <ArrowUpLeft aria-hidden /> Truy ngược — lô này làm từ đâu
               </h2>
-              {nguoc.length ? <Tree branches={nguoc} onOpen={openLot} /> : <p className="text-muted-foreground">{loiNguoc[viewing.kind]}</p>}
+              {backward.length ? <Tree branches={backward} onOpen={openLot} /> : <p className="text-muted-foreground">{backwardErrors[viewing.kind]}</p>}
             </section>
 
             {/* 4. Truy xuôi */}
@@ -412,11 +412,11 @@ export default function QrLookupScreen() {
                 <ArrowDownRight aria-hidden /> Truy xuôi — lô này đã đi đâu
                 <InfoTip label="truy xuôi">Đây là danh sách cần khi phải thu hồi: mọi mẻ, thành phẩm và lệnh xuất có dùng lô này.</InfoTip>
               </h2>
-              {xuoi.length ? <Tree branches={xuoi} onOpen={openLot} /> : <p className="text-muted-foreground">{loiXuoi[viewing.kind]}</p>}
+              {forward.length ? <Tree branches={forward} onOpen={openLot} /> : <p className="text-muted-foreground">{forwardErrors[viewing.kind]}</p>}
             </section>
 
             {/* 5. Thu hồi */}
-            {laLo(viewing.kind) && <LotRecall node={viewing} traceData={dl} sameShipmentLots={sameShipmentLots} />}
+            {laLo(viewing.kind) && <LotRecall node={viewing} traceData={traceData} sameShipmentLots={sameShipmentLots} />}
           </div>
         )
       )}
@@ -425,7 +425,7 @@ export default function QrLookupScreen() {
       )}
 
       {isPrintingLabel && viewing && laLo(viewing.kind) && (
-        <LotQrLabels node={buildLotNode(viewing.kind, viewing.id, dl)} onClose={() => setIsPrintingLabel(false)} />
+        <LotQrLabels node={buildLotNode(viewing.kind, viewing.id, traceData)} onClose={() => setIsPrintingLabel(false)} />
       )}
     </div>
   );

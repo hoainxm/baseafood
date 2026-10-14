@@ -4,7 +4,7 @@
 // Description: Supabase client initialization and environment variables handling
 // ============================================================
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { LA_DEMO, SITE_DEMO } from "@/lib/demoMode";
+import { IS_DEMO, SITE_DEMO } from "@/lib/demoMode";
 
 /**
  * Client Supabase — dùng chung project "baseafood" với SDFactory.
@@ -47,4 +47,4 @@ export const SITE_ID_THAT =
  * Site của SỐ LIỆU nghiệp vụ: mọi bảng đọc/ghi qua repo lọc theo cột site_id này.
  * Chế độ demo (lib/demoMode.ts) ⇒ `site-demo` — cả app chạy trên bộ số trình diễn.
  */
-export const SITE_ID = LA_DEMO ? SITE_DEMO : SITE_ID_THAT;
+export const SITE_ID = IS_DEMO ? SITE_DEMO : SITE_ID_THAT;

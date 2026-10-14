@@ -98,26 +98,26 @@ export function ExportLotCheck({
   const checked = useMemo(() => {
     const s = new Set<string>();
     for (const l of lotsOfOrder) {
-      const dong = orderItems.filter((d) => d.wipId === l.wipId);
-      if (dong.every((d) => lotDispatches.some((x) => x.docKind === "export_item" && x.docId === d.id && x.lotId === l.wipId)))
+      const row = orderItems.filter((d) => d.wipId === l.wipId);
+      if (row.every((d) => lotDispatches.some((x) => x.docKind === "export_item" && x.docId === d.id && x.lotId === l.wipId)))
         s.add(l.wipId);
     }
     return s;
   }, [lotsOfOrder, orderItems, lotDispatches]);
 
   /** Dấu "đã quét kiểm" cho mọi dòng lệnh của một lô. */
-  const makeCheckDispatches = (wipId: string, label: string, dong: readonly ExportItem[], method: LotDispatch["method"]): LotDispatch[] => {
+  const makeCheckDispatches = (wipId: string, label: string, row: readonly ExportItem[], method: LotDispatch["method"]): LotDispatch[] => {
     const luc = new Date().toISOString();
-    return dong.map((d) => ({
+    return row.map((d) => ({
       id: newId(), lotKind: "W", lotId: wipId, lotLabel: label, docKind: "export_item", docId: d.id,
       quantityKg: d.quantityKg || null, method, operator: recordedBy, recordedAt: luc,
     }));
   };
 
   const checkLot = (text: string, method: "scan" | "typed") => {
-    const ma = parseQrCode(text);
-    if (!ma) return;
-    const items = findLots(ma, {
+    const code = parseQrCode(text);
+    if (!code) return;
+    const items = findLots(code, {
       shipments: [], imports: [], wips: [...wips], packagings: [], lotInputs: [],
       exportItems: [], exportOrders: [], salesOrders: [], products: [...products], customers: [],
     }).filter((n) => n.kind === "W");
@@ -154,13 +154,13 @@ export function ExportLotCheck({
     setProposal({ current: cho, replacement: n });
   };
 
-  const thayLo = () => {
+  const replaceLot = () => {
     if (!proposal) return;
     const { current: oldLot, replacement: replacementLot } = proposal;
     const prevRows = [...allExportItems];
     const prevDispatches = lotDispatches;
-    const doi = (d: ExportItem) => d.exportId === order.id && d.wipId === oldLot.wipId;
-    const updatedItems = allExportItems.map((d) => (doi(d) ? { ...d, wipId: replacementLot.id } : d));
+    const isOldLotItem = (d: ExportItem) => d.exportId === order.id && d.wipId === oldLot.wipId;
+    const updatedItems = allExportItems.map((d) => (isOldLotItem(d) ? { ...d, wipId: replacementLot.id } : d));
     onSaveExportItems(updatedItems);
     saveLotDispatches([...lotDispatches, ...makeCheckDispatches(replacementLot.id, replacementLot.label, updatedItems.filter((d) => d.exportId === order.id && d.wipId === replacementLot.id), "scan")]);
     setProposal(null);
@@ -170,7 +170,7 @@ export function ExportLotCheck({
     });
   };
 
-  const du = lotsOfOrder.length > 0 && checked.size === lotsOfOrder.length;
+  const allChecked = lotsOfOrder.length > 0 && checked.size === lotsOfOrder.length;
 
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
@@ -206,7 +206,7 @@ export function ExportLotCheck({
 
           <p className="font-semibold">
             Đã kiểm <span className="tnum">{checked.size}</span> / {lotsOfOrder.length} lô{" "}
-            {du && <Tag variant="xong">Đủ lô</Tag>}
+            {allChecked && <Tag variant="done">Đủ lô</Tag>}
           </p>
           <ul className="divide-y divide-border rounded-lg border border-border">
             {lotsOfOrder.map((l) => (
@@ -220,7 +220,7 @@ export function ExportLotCheck({
                     {l.block ? ` · ${l.block} block` : ""}
                   </span>
                 </span>
-                {checked.has(l.wipId) ? <Tag variant="xong">Đã quét</Tag> : <Tag variant="cho">Chưa quét</Tag>}
+                {checked.has(l.wipId) ? <Tag variant="done">Đã quét</Tag> : <Tag variant="pending">Chưa quét</Tag>}
               </li>
             ))}
           </ul>
@@ -244,7 +244,7 @@ export function ExportLotCheck({
         detail={proposal ? `${productNameOf(proposal.current.productId)} · ${kg(proposal.current.kg)}${proposal.current.block ? ` · ${proposal.current.block} block` : ""}` : undefined}
         confirmLabel="Thay lô"
         icon={ArrowLeftRight}
-        onConfirm={thayLo}
+        onConfirm={replaceLot}
       />
     </Dialog>
   );

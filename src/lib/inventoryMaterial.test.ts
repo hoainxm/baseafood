@@ -9,11 +9,11 @@ import type {
 } from "@/types";
 import { sumLeftoverByDay, computeMaterialNxt, computeMaterialTotalStock } from "./inventoryMaterial";
 
-const ky = (id: string, startDate: string, endDate: string): BalancingPeriod =>
+const period = (id: string, startDate: string, endDate: string): BalancingPeriod =>
   ({ id, materialTypeName: "Bạch tuộc 2 da", startDate, endDate }) as BalancingPeriod;
 
 let n = 0;
-const dong = (periodId: string, p: Partial<BalancingInputItem>): BalancingInputItem => ({
+const row = (periodId: string, p: Partial<BalancingInputItem>): BalancingInputItem => ({
   id: `i${++n}`,
   periodId,
   groupName: "Thủy sản",
@@ -30,10 +30,10 @@ const dong = (periodId: string, p: Partial<BalancingInputItem>): BalancingInputI
   ...p,
 });
 const thawRow = (periodId: string, daily: Record<string, number>) =>
-  dong(periodId, { groupName: "Xả đông", sourceWarehouse: "Kho mình", name: "Lấy xả đông", dailyQuantities: daily });
+  row(periodId, { groupName: "Xả đông", sourceWarehouse: "Kho mình", name: "Lấy xả đông", dailyQuantities: daily });
 /** Gửi đông là dòng giảm: lưu ÂM. */
 const freezeDeposit = (periodId: string, daily: Record<string, number>) =>
-  dong(periodId, {
+  row(periodId, {
     groupName: "Xả đông",
     sourceWarehouse: "Kho mình",
     name: "Gửi đông",
@@ -53,8 +53,8 @@ const makeLock = (lockDate: string, leftover: Record<string, number>): DailyLock
   leftoverByMaterial: leftover,
 });
 
-const K1 = ky("k1", "2026-09-01", "2026-09-03");
-const K2 = ky("k2", "2026-09-04", "2026-09-06");
+const K1 = period("k1", "2026-09-01", "2026-09-03");
+const K2 = period("k2", "2026-09-04", "2026-09-06");
 
 describe("computeMaterialNxt — hai dòng kho ở Cân đối", () => {
   test("Gửi đông CỘNG tồn, Lấy xả đông kỳ sau TRỪ tồn — tồn chạy nối kỳ", () => {
@@ -63,7 +63,7 @@ describe("computeMaterialNxt — hai dòng kho ở Cân đối", () => {
       thawRow("k2", { "2026-09-04": 1200 }),
     ];
     const [r1, r2] = computeMaterialNxt([K1, K2], inputs, [], [], []);
-    expect(r1).toMatchObject({ openingKg: 0, freezeDepositKg: 2000, thawKg: 0, closingKg: 2000, freezeDepositSource: "can-doi" });
+    expect(r1).toMatchObject({ openingKg: 0, freezeDepositKg: 2000, thawKg: 0, closingKg: 2000, freezeDepositSource: "balancing" });
     expect(r2).toMatchObject({ openingKg: 2000, freezeDepositKg: 0, thawKg: 1200, closingKg: 800 });
   });
 
@@ -79,22 +79,22 @@ describe("computeMaterialNxt — hai dòng kho ở Cân đối", () => {
     expect(r.freezeDepositKg).toBe(650);
     expect(r.balancingFreezeDepositKg).toBe(650);
     expect(r.productionLeftoverKg).toBe(700);
-    expect(r.freezeDepositSource).toBe("can-doi");
+    expect(r.freezeDepositSource).toBe("balancing");
   });
 
   test("Chưa gõ Gửi đông ⇒ lấy còn dở SX (hướng 1 giữ nguyên)", () => {
     const locks = [makeLock("2026-09-02", { "Bạch tuộc 2 da": 700 })];
     const [r] = computeMaterialNxt([K1], [], [], [], locks);
-    expect(r).toMatchObject({ freezeDepositKg: 700, freezeDepositSource: "san-xuat", closingKg: 700 });
+    expect(r).toMatchObject({ freezeDepositKg: 700, freezeDepositSource: "production", closingKg: 700 });
   });
 
   test("Dữ liệu cũ: chuyển kỳ âm/dương ở dòng thường vẫn đọc như trước", () => {
     const inputs = [
-      dong("k1", { dailyQuantities: { "2026-09-01": 5000 }, carryOverKg: -400 }),
-      dong("k2", { groupName: "Xả đông", sourceWarehouse: "Kho mình", carryOverKg: 400 }),
+      row("k1", { dailyQuantities: { "2026-09-01": 5000 }, carryOverKg: -400 }),
+      row("k2", { groupName: "Xả đông", sourceWarehouse: "Kho mình", carryOverKg: 400 }),
     ];
     const [r1, r2] = computeMaterialNxt([K1, K2], inputs, [], [], []);
-    expect(r1).toMatchObject({ freezeDepositKg: 400, freezeDepositSource: "chuyen-ky", closingKg: 400 });
+    expect(r1).toMatchObject({ freezeDepositKg: 400, freezeDepositSource: "carry-over", closingKg: 400 });
     // Dòng nhận chuyển kỳ cũ (Xả đông · Kho mình · chuyển kỳ dương) = lấy xả đông, đếm MỘT lần.
     expect(r2).toMatchObject({ thawKg: 400, closingKg: 0 });
   });
@@ -112,7 +112,7 @@ describe("sumLeftoverByDay", () => {
 });
 
 describe("computeMaterialTotalStock — bán nội địa là khoản XUẤT, trừ tồn NL", () => {
-  const makeImport = (deliveryDate: string, kg: number, ten = "Bạch tuộc 2 da lớn (80↑)"): MaterialImportItem =>
+  const makeImport = (deliveryDate: string, kg: number, name = "Bạch tuộc 2 da lớn (80↑)"): MaterialImportItem =>
     ({
       id: `n${deliveryDate}${kg}`,
       shipmentId: "",
@@ -120,20 +120,20 @@ describe("computeMaterialTotalStock — bán nội địa là khoản XUẤT, tr
       workshop: "Đông",
       category: "Bạch tuộc",
       supplierName: "",
-      materialTypeName: ten,
+      materialTypeName: name,
       quantityKg: kg,
       unitPrice: null,
       driverName: "",
       licensePlate: "",
       note: "",
     }) as MaterialImportItem;
-  const ban = (saleDate: string, kg: number, ten = "Bạch tuộc 2 da nhỏ (80↓)"): DomesticSaleItem => ({
+  const sale = (saleDate: string, kg: number, name = "Bạch tuộc 2 da nhỏ (80↓)"): DomesticSaleItem => ({
     id: `b${saleDate}${kg}`,
     saleDate,
     postingDate: saleDate,
     backdateReason: "",
     workshop: "Đông",
-    materialTypeName: ten,
+    materialTypeName: name,
     quantityKg: kg,
     unitPrice: 145000,
     customerName: "",
@@ -143,7 +143,7 @@ describe("computeMaterialTotalStock — bán nội địa là khoản XUẤT, tr
   const range = { fromDate: "2026-10-05", toDate: "2026-10-07" };
 
   test("trong kỳ: tồn cuối = tồn đầu + nhập − bán nội địa; cùng HỌ gộp lớn/nhỏ", () => {
-    const result = computeMaterialTotalStock([], [], [makeImport("2026-10-05", 5000)], [], [], range, [ban("2026-10-06", 987)]);
+    const result = computeMaterialTotalStock([], [], [makeImport("2026-10-05", 5000)], [], [], range, [sale("2026-10-06", 987)]);
     expect(result.families).toHaveLength(1);
     const h = result.families[0];
     expect(h.domesticSaleKg).toBe(987);
@@ -155,7 +155,7 @@ describe("computeMaterialTotalStock — bán nội địa là khoản XUẤT, tr
   test("bán TRƯỚC kỳ trừ vào tồn đầu; bán ngoài kỳ (sau) không tính", () => {
     const result = computeMaterialTotalStock(
       [], [], [makeImport("2026-10-01", 3000)], [], [], range,
-      [ban("2026-10-02", 500), ban("2026-10-09", 70)],
+      [sale("2026-10-02", 500), sale("2026-10-09", 70)],
     );
     expect(result.families[0].openingKg).toBe(2500);
     expect(result.families[0].domesticSaleKg).toBe(0);
@@ -166,12 +166,12 @@ describe("computeMaterialTotalStock — bán nội địa là khoản XUẤT, tr
     const opening: MaterialOpeningStock[] = [
       { id: "o1", workshop: "Đông", materialTypeName: "Bạch tuộc 2 da", asOfDate: "2026-10-03", quantityKg: 1000, note: "" },
     ];
-    const result = computeMaterialTotalStock([], [], [], opening, [], range, [ban("2026-10-01", 400), ban("2026-10-04", 100)]);
+    const result = computeMaterialTotalStock([], [], [], opening, [], range, [sale("2026-10-01", 400), sale("2026-10-04", 100)]);
     expect(result.families[0].openingKg).toBe(900); // chỉ trừ phần bán từ mốc
   });
 
   test("bảng theo ngày: ngày chỉ có bán nội địa cũng thành dòng, tồn giảm dần", () => {
-    const result = computeMaterialTotalStock([], [], [makeImport("2026-10-05", 2000)], [], [], range, [ban("2026-10-06", 300)]);
+    const result = computeMaterialTotalStock([], [], [makeImport("2026-10-05", 2000)], [], [], range, [sale("2026-10-06", 300)]);
     expect(result.days.map((d) => [d.date, d.inKg, d.domesticSaleKg, d.closingKg])).toEqual([
       ["2026-10-05", 2000, 0, 2000],
       ["2026-10-06", 0, 300, 1700],

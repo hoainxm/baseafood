@@ -52,7 +52,7 @@ import {
  * ĐỂ CỤC BỘ ở màn này (KHÔNG nhét vào types.ts) — đây là cách TRÌNH BÀY, không
  * phải quy tắc phân quyền; phân quyền thật vẫn ở ROLES + lib/nav-access.ts.
  */
-const PHONG_BAN: { id: string; name: string; icon: LucideIcon; roles: Role[] }[] = [
+const DEPARTMENTS: { id: string; name: string; icon: LucideIcon; roles: Role[] }[] = [
   { id: "giam-doc", name: "Ban giám đốc", icon: Briefcase, roles: ["director", "vice-director"] },
   { id: "ke-toan", name: "Phòng kế toán", icon: Calculator, roles: ["chief-accountant", "accountant"] },
   {
@@ -67,23 +67,23 @@ const PHONG_BAN: { id: string; name: string; icon: LucideIcon; roles: Role[] }[]
 
 /** Tên phòng ban của một vai trò (dòng phụ trong dropdown chọn vai trò). */
 function departmentOfRole(v: Role): string {
-  return PHONG_BAN.find((pb) => pb.roles.includes(v))?.name ?? "Khác";
+  return DEPARTMENTS.find((pb) => pb.roles.includes(v))?.name ?? "Khác";
 }
 
 /** Xếp một người vào 1 phòng ban theo vai trò cấp CAO NHẤT họ có (rank nhỏ = cao). */
 function rankDepartment(roles: Role[]): { idx: number; rank: number } {
-  for (let i = 0; i < PHONG_BAN.length; i++) {
-    const hits = roles.map((r) => PHONG_BAN[i].roles.indexOf(r)).filter((x) => x >= 0);
+  for (let i = 0; i < DEPARTMENTS.length; i++) {
+    const hits = roles.map((r) => DEPARTMENTS[i].roles.indexOf(r)).filter((x) => x >= 0);
     if (hits.length) return { idx: i, rank: Math.min(...hits) };
   }
-  return { idx: PHONG_BAN.length, rank: 0 }; // chưa gán vai trò
+  return { idx: DEPARTMENTS.length, rank: 0 }; // chưa gán vai trò
 }
 
 /** Sắp vai trò của một người theo cấp bậc (cao → thấp) để hiện chức vụ chính trước. */
 function sapTheoCap(roles: Role[]): Role[] {
   const key = (r: Role) => {
-    for (let i = 0; i < PHONG_BAN.length; i++) {
-      const j = PHONG_BAN[i].roles.indexOf(r);
+    for (let i = 0; i < DEPARTMENTS.length; i++) {
+      const j = DEPARTMENTS[i].roles.indexOf(r);
       if (j >= 0) return i * 100 + j;
     }
     return 9999;
@@ -176,8 +176,8 @@ export default function UserManagementScreen({
     roles: Role[]
   ) => Promise<AuthResult>;
 }) {
-  const [items, write, { trangThai: status }] = useUserProfiles();
-  const isLoading = status === "dang-tai" && items.length === 0;
+  const [items, write, { status }] = useUserProfiles();
+  const isLoading = status === "loading" && items.length === 0;
   const [editing, setEditing] = useState<UserProfile | null>(null);
   const [q, setQ] = useState("");
 
@@ -251,13 +251,13 @@ export default function UserManagementScreen({
         return vt.length ? (
           <span className="flex flex-wrap gap-1">
             {vt.map((v) => (
-              <Tag key={v} variant="phan-loai" tone={toneByName(roleLabel([v]))}>
+              <Tag key={v} variant="category" tone={toneByName(roleLabel([v]))}>
                 {roleLabel([v])}
               </Tag>
             ))}
           </span>
         ) : (
-          <Tag variant="loi">Chưa gán</Tag>
+          <Tag variant="error">Chưa gán</Tag>
         );
       },
       getSortValue: (r) => roleLabel(r.roles),
@@ -270,17 +270,17 @@ export default function UserManagementScreen({
     ? items.filter((u) => `${u.username} ${u.fullName} ${roleLabel(u.roles)}`.toLowerCase().includes(query))
     : items;
   const userName = (u: UserProfile) => u.fullName || u.username || "";
-  const thung: { u: UserProfile; rank: number }[][] = PHONG_BAN.map(() => []);
+  const thung: { u: UserProfile; rank: number }[][] = DEPARTMENTS.map(() => []);
   const unassigned: UserProfile[] = [];
   for (const u of filtered) {
     const { idx, rank } = rankDepartment(rolesList(u.roles));
-    if (idx < PHONG_BAN.length) thung[idx].push({ u, rank });
+    if (idx < DEPARTMENTS.length) thung[idx].push({ u, rank });
     else unassigned.push(u);
   }
   const visibleGroups = [
-    ...PHONG_BAN.map((pb, i) => ({
+    ...DEPARTMENTS.map((pb, i) => ({
       id: pb.id,
-      ten: pb.name,
+      name: pb.name,
       icon: pb.icon,
       users: thung[i]
         .sort((a, b) => a.rank - b.rank || userName(a.u).localeCompare(userName(b.u), "vi"))
@@ -288,7 +288,7 @@ export default function UserManagementScreen({
     })),
     {
       id: "chua",
-      ten: "Chưa phân công",
+      name: "Chưa phân công",
       icon: UserRound,
       users: [...unassigned].sort((a, b) => userName(a).localeCompare(userName(b), "vi")),
     },
@@ -354,18 +354,18 @@ export default function UserManagementScreen({
           {visibleGroups.length === 0 ? (
             <p className="text-muted-foreground">Không tìm thấy người dùng nào khớp “{q}”.</p>
           ) : (
-            visibleGroups.map((nhom) => {
-              const Icon = nhom.icon;
+            visibleGroups.map((group) => {
+              const Icon = group.icon;
               return (
-                <section key={nhom.id} className="space-y-3">
+                <section key={group.id} className="space-y-3">
                   <h2 className="flex items-center gap-2 text-lg font-semibold text-foreground">
                     <Icon className="size-5 text-muted-foreground" aria-hidden />
-                    {nhom.ten}
-                    <Tag variant="phu">{nhom.users.length}</Tag>
+                    {group.name}
+                    <Tag variant="muted">{group.users.length}</Tag>
                   </h2>
                   <RecordTable
                     columns={cols}
-                    rows={nhom.users}
+                    rows={group.users}
                     getKey={(r) => r.id}
                     rowMarkKey="nguoi-dung"
                     actions={(r) => (

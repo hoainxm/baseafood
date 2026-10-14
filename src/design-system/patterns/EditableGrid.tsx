@@ -25,7 +25,7 @@ import { useRowSelection, useRowMarkTools } from "./rowMarkSource";
  * cột tên dính bên trái để cuộn ngang không lạc dòng.
  */
 
-export type GridCellKind = "so" | "tinh" | "chu";
+export type GridCellKind = "input" | "computed" | "text";
 
 export interface GridColumn<R> {
   key: string;
@@ -54,7 +54,7 @@ export interface GridColumn<R> {
   /** Nhóm cột để gập chung (VD "ngay" cho toàn bộ cột ngày). */
   group?: string;
   /** Tô nền riêng (VD cột Chuyển kỳ). */
-  tint?: "chuyen-ky" | "tinh" | "hut";
+  tint?: "carry-over" | "computed" | "pulled";
   /** Rộng tối thiểu, px. */
   minWidth?: number;
 }
@@ -65,7 +65,7 @@ export interface GridRow<R> {
   /** Dòng tiêu đề nhóm — chỉ hiện chữ, không có ô nhập. */
   groupTitle?: string;
   /** Kiểu dòng: dòng giảm tô đỏ nhạt, dòng tổng in đậm. */
-  kind?: "thuong" | "giam" | "tong" | "con";
+  kind?: "normal" | "decrease" | "total" | "child";
   /** Tên hiện ở cột dính bên trái. */
   label: React.ReactNode;
   /** Chú thích nhỏ dưới tên (VD "hút từ sổ nhập hàng"). */
@@ -73,9 +73,9 @@ export interface GridRow<R> {
 }
 
 const TINT_CLASSES: Record<NonNullable<GridColumn<unknown>["tint"]>, string> = {
-  "chuyen-ky": "bg-warning-surface",
-  tinh: "bg-muted",
-  hut: "bg-primary/8",
+  "carry-over": "bg-warning-surface",
+  computed: "bg-muted",
+  pulled: "bg-primary/8",
 };
 
 /** Khoá ô để định vị khi di chuyển bằng phím. */
@@ -83,7 +83,7 @@ const cellKey = (rowId: string, colKey: string) => `${rowId}|${colKey}`;
 
 export function EditableGrid<R>({
   columns,
-  rows: hang,
+  rows,
   onCellCommit,
   onPasteBlock,
   collapsedGroups = [],
@@ -130,10 +130,10 @@ export function EditableGrid<R>({
     [columns, collapsedGroups]
   );
   /** Chỉ ô gõ được mới nằm trong đường đi của phím mũi tên. */
-  const inputRows = React.useMemo(() => hang.filter((h) => !h.groupTitle), [hang]);
+  const inputRows = React.useMemo(() => rows.filter((h) => !h.groupTitle), [rows]);
   // Dòng con (chỉ đọc, VD tách theo đại lý) không tick tô màu — tô ở dòng cha.
-  const visibleKeys = inputRows.filter((h) => h.kind !== "con").map((h) => h.id);
-  const daTick = visibleKeys.filter((k) => rowSelection.daChon.has(k));
+  const visibleKeys = inputRows.filter((h) => h.kind !== "child").map((h) => h.id);
+  const daTick = visibleKeys.filter((k) => rowSelection.selected.has(k));
   const isAllSelected = daTick.length > 0 && daTick.length === visibleKeys.length;
 
   /**
@@ -172,7 +172,7 @@ export function EditableGrid<R>({
     }
   };
 
-  const xuLyPhim = (e: React.KeyboardEvent<HTMLInputElement>, rowId: string, colKey: string) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, rowId: string, colKey: string) => {
     const k = e.key;
     if (k === "Enter" || k === "ArrowDown") {
       e.preventDefault();
@@ -205,15 +205,15 @@ export function EditableGrid<R>({
       .replace(/\r\n?/g, "\n")
       .replace(/\n+$/, "")
       .split("\n")
-      .map((dong) =>
-        dong.split("\t").map((o) => {
+      .map((row) =>
+        row.split("\t").map((o) => {
           const t = o.trim();
           if (!t) return null;
           /* Kế toán ghi số âm bằng ngoặc: (2.000) = −2.000 */
           const am = /^\(.*\)$/.test(t);
-          const so = parseVnNumber(am ? t.slice(1, -1) : t);
-          if (so == null) return null;
-          return am ? -so : so;
+          const num = parseVnNumber(am ? t.slice(1, -1) : t);
+          if (num == null) return null;
+          return am ? -num : num;
         })
       );
     if (onPasteBlock) {
@@ -223,12 +223,12 @@ export function EditableGrid<R>({
     /* Không khai onDanKhoi → rải từng ô qua onGhiO. */
     const iH = inputRows.findIndex((h) => h.id === rowId);
     const iC = visibleColumns.findIndex((c) => c.key === colKey);
-    block.forEach((dong, i) =>
-      dong.forEach((v, j) => {
+    block.forEach((row, i) =>
+      row.forEach((v, j) => {
         if (v == null) return;
         const h = inputRows[iH + i];
         const c = visibleColumns[iC + j];
-        if (h && c && c.kind === "so" && !c.isLocked?.(h.data)) onCellCommit(h.id, c.key, v);
+        if (h && c && c.kind === "input" && !c.isLocked?.(h.data)) onCellCommit(h.id, c.key, v);
       })
     );
   };
@@ -260,7 +260,7 @@ export function EditableGrid<R>({
                     type="checkbox"
                     className="size-5 shrink-0"
                     checked={isAllSelected}
-                    onChange={() => rowSelection.doiTatCa(visibleKeys, !isAllSelected)}
+                    onChange={() => rowSelection.toggleAll(visibleKeys, !isAllSelected)}
                     aria-label={isAllSelected ? "Bỏ chọn tất cả dòng" : "Chọn tất cả dòng"}
                     title={isAllSelected ? "Bỏ tick mọi dòng." : "Tick mọi dòng (để tô màu / in đậm cùng lúc)."}
                   />
@@ -275,7 +275,7 @@ export function EditableGrid<R>({
                 style={c.minWidth ? { minWidth: c.minWidth } : undefined}
                 className={cn(
                   "border-b-2 border-l border-border bg-card px-2 py-3 text-right align-bottom text-sm font-semibold whitespace-nowrap",
-                  c.tint === "chuyen-ky" && "text-warning"
+                  c.tint === "carry-over" && "text-warning"
                 )}
               >
                 {c.header}
@@ -284,7 +284,7 @@ export function EditableGrid<R>({
           </tr>
         </thead>
         <tbody>
-          {hang.map((h) =>
+          {rows.map((h) =>
             h.groupTitle ? (
               <tr key={h.id}>
                 <td
@@ -298,30 +298,30 @@ export function EditableGrid<R>({
               <tr
                 key={h.id}
                 className={cn(
-                  h.kind === "giam" && "bg-warning-surface/40",
-                  h.kind === "tong" && "bg-muted font-semibold",
-                  h.kind === "con" && "text-muted-foreground"
+                  h.kind === "decrease" && "bg-warning-surface/40",
+                  h.kind === "total" && "bg-muted font-semibold",
+                  h.kind === "child" && "text-muted-foreground"
                 )}
-                {...(h.kind === "con" ? {} : to.getRowProps(h.id))}
+                {...(h.kind === "child" ? {} : to.getRowProps(h.id))}
               >
                 <th
                   scope="row"
                   className={cn(
                     "sticky left-0 z-10 border-r-2 border-b border-border px-3 py-2 text-left align-middle font-normal",
-                    h.kind === "tong" ? "bg-muted font-semibold" : h.kind === "con" ? "bg-muted" : "bg-card",
-                    h.kind === "giam" && "bg-warning-surface/40",
+                    h.kind === "total" ? "bg-muted font-semibold" : h.kind === "child" ? "bg-muted" : "bg-card",
+                    h.kind === "decrease" && "bg-warning-surface/40",
                     // Dòng con: thụt vào + vạch trái nhạt ⇒ đọc ra "thuộc dòng trên".
-                    h.kind === "con" && "pl-10 text-sm shadow-[inset_3px_0_0_var(--border)]"
+                    h.kind === "child" && "pl-10 text-sm shadow-[inset_3px_0_0_var(--border)]"
                   )}
                 >
                   <div className="flex items-start gap-2">
-                    {to.enabled && h.kind !== "con" && (
+                    {to.enabled && h.kind !== "child" && (
                       <input
                         type="checkbox"
                         className="mt-0.5 size-5 shrink-0"
-                        checked={rowSelection.daChon.has(h.id)}
+                        checked={rowSelection.selected.has(h.id)}
                         onChange={() => {}}
-                        onClick={(e) => rowSelection.doi(h.id, e.shiftKey, visibleKeys)}
+                        onClick={(e) => rowSelection.toggle(h.id, e.shiftKey, visibleKeys)}
                         aria-label={`Chọn dòng ${typeof h.label === "string" ? h.label : h.id}`}
                         title="Tick để tô màu / in đậm dòng này (Shift+tick chọn cả khoảng)."
                       />
@@ -335,9 +335,9 @@ export function EditableGrid<R>({
                   </div>
                 </th>
                 {visibleColumns.map((c) => {
-                  const isReadOnly = h.kind === "tong" || h.kind === "con";
+                  const isReadOnly = h.kind === "total" || h.kind === "child";
                   const oRieng = isReadOnly ? undefined : c.renderCell?.(h.data);
-                  const bikhoa = c.kind !== "so" || Boolean(c.isLocked?.(h.data)) || isReadOnly;
+                  const bikhoa = c.kind !== "input" || Boolean(c.isLocked?.(h.data)) || isReadOnly;
                   const phu = c.renderCellNote?.(h.data);
                   const gt = c.getValue(h.data);
                   const tint = c.tint ? TINT_CLASSES[c.tint] : undefined;
@@ -347,8 +347,8 @@ export function EditableGrid<R>({
                       className={cn(
                         "border-b border-l border-border p-0 text-right align-middle",
                         tint,
-                        c.kind === "tinh" && !tint && "bg-muted",
-                        h.kind === "con" && "bg-muted/40 text-sm"
+                        c.kind === "computed" && !tint && "bg-muted",
+                        h.kind === "child" && "bg-muted/40 text-sm"
                       )}
                     >
                       {oRieng ? (
@@ -358,7 +358,7 @@ export function EditableGrid<R>({
                           title={c.lockReason?.(h.data)}
                           className={cn(
                             "tnum flex min-h-11 items-center justify-end px-2 py-2",
-                            c.kind === "tinh" && "font-semibold",
+                            c.kind === "computed" && "font-semibold",
                             gt != null && gt < 0 && "text-destructive"
                           )}
                         >
@@ -378,7 +378,7 @@ export function EditableGrid<R>({
                             else oRef.current.delete(k);
                           }}
                           onCommit={(v) => onCellCommit(h.id, c.key, v)}
-                          onKeyDown={(e) => xuLyPhim(e, h.id, c.key)}
+                          onKeyDown={(e) => handleKeyDown(e, h.id, c.key)}
                           onPaste={(e) => handlePaste(e, h.id, c.key)}
                         />
                       )}
@@ -393,7 +393,7 @@ export function EditableGrid<R>({
         </tbody>
       </table>
     </div>
-    <RowMarkToolbar marker={to} selectedKeys={daTick} onClearSelection={rowSelection.boChon} />
+    <RowMarkToolbar marker={to} selectedKeys={daTick} onClearSelection={rowSelection.clearSelection} />
     </>
   );
 }
@@ -414,7 +414,7 @@ function GridCell({
   label,
   inputRef,
   onCommit,
-  onKeyDown: onPhim,
+  onKeyDown,
   onPaste,
 }: {
   value: number | null;
@@ -427,7 +427,7 @@ function GridCell({
   // Lõi chung với NumberField: gõ số / biểu thức ("250+300", "=12x5"), ra số hợp
   // lệ mới ghi (ô lưới ghi THẲNG về sổ nguồn — biểu thức dở không được ghi tạm),
   // Esc trả số cũ, đang gõ biểu thức hiện "= kết quả" dưới ô.
-  const { props: o, xemTruoc: preview } = useNumberInput({ value, onChange: onCommit, emptyIsZero: true });
+  const { props: o, preview } = useNumberInput({ value, onChange: onCommit, emptyIsZero: true });
 
   return (
     <span className="relative block">
@@ -443,7 +443,7 @@ function GridCell({
       onPaste={onPaste}
       onKeyDown={(e) => {
         o.onKeyDown(e);
-        if (!e.defaultPrevented) onPhim(e);
+        if (!e.defaultPrevented) onKeyDown(e);
       }}
       className={cn(
         "tnum h-11 w-full min-w-20 border-0 bg-transparent px-2 text-right text-sm",

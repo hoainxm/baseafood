@@ -21,27 +21,27 @@ import type { ImportLine } from "./importHelpers";
  * dòng mới xuống CUỐI — không tự nhảy, không xô layout.
  */
 export function ImportLinesTable({
-  dong,
+  lines: row,
   onUpdateRow: onEdit,
-  onBo,
+  onRemove: onBo,
   onAddRow: onAdd,
   getMaterialTypeOptions: materialTypeOptionsByCategory,
   onCreateMaterialType,
   onEditMaterialType,
   onLastRowEnter: onEnterLast,
 }: {
-  dong: ImportLine[];
+  lines: ImportLine[];
   onUpdateRow: (key: string, patch: Partial<ImportLine>) => void;
-  onBo: (key: string) => void;
+  onRemove: (key: string) => void;
   onAddRow: () => void;
   getMaterialTypeOptions: (category: string) => ComboboxOption[];
-  onCreateMaterialType: (ten: string, category: string) => string;
+  onCreateMaterialType: (name: string, category: string) => string;
   /** Bút chì sửa nhanh loại NL trong danh mục (value = tên). */
-  onEditMaterialType?: (ten: string) => void;
+  onEditMaterialType?: (name: string) => void;
   /** Enter ở ô kg của dòng cuối — màn dùng để đưa con trỏ tới nút lưu. */
   onLastRowEnter?: () => void;
 }) {
-  const canRemove = dong.length > 1;
+  const canRemove = row.length > 1;
   // Dòng ĐIỀN SẴN theo đại lý hiện GỌN (tên loại là chữ, chỉ còn ô kg + giá) —
   // bấm "Đổi loại" mới bung đủ ô chọn. Chỉ là trạng thái hiển thị, không đụng dữ liệu.
   const [bung, setBung] = useState<Set<string>>(new Set());
@@ -58,8 +58,8 @@ export function ImportLinesTable({
         if (items[items.length - 1] === o) onEnterLast?.();
       }}
     >
-      {dong.map((d) =>
-        d.goiY && !bung.has(d.key) ? (
+      {row.map((d) =>
+        d.isSuggested && !bung.has(d.key) ? (
           <div
             key={d.key}
             className="grid grid-cols-2 gap-x-3 gap-y-2 rounded-lg border border-border bg-card p-3 lg:grid-cols-[1.6fr_0.9fr_0.9fr_auto] lg:items-end"
@@ -85,7 +85,7 @@ export function ImportLinesTable({
                 <CompactCloseButton
                   d={d}
                   canRemove={canRemove}
-                  onBo={onBo}
+                  onRemove={onBo}
                   onBung={() => setBung((b) => new Set(b).add(d.key))}
                 />
               </span>
@@ -110,7 +110,7 @@ export function ImportLinesTable({
               <CompactCloseButton
                 d={d}
                 canRemove={canRemove}
-                onBo={onBo}
+                onRemove={onBo}
                 onBung={() => setBung((b) => new Set(b).add(d.key))}
               />
             </span>
@@ -138,7 +138,7 @@ export function ImportLinesTable({
               value={d.materialTypeName}
               onChange={(v) => onEdit(d.key, { materialTypeName: v })}
               options={materialTypeOptionsByCategory(d.category)}
-              onCreate={(ten) => onCreateMaterialType(ten, d.category)}
+              onCreate={(name) => onCreateMaterialType(name, d.category)}
               onEditItem={onEditMaterialType}
               editLabel="Sửa thông tin loại nguyên liệu này — lưu thẳng vào Danh mục."
             />
@@ -193,12 +193,12 @@ export function ImportLinesTable({
 function CompactCloseButton({
   d,
   canRemove,
-  onBo,
+  onRemove: onBo,
   onBung,
 }: {
   d: ImportLine;
   canRemove: boolean;
-  onBo: (key: string) => void;
+  onRemove: (key: string) => void;
   onBung: () => void;
 }) {
   return (

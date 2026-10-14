@@ -49,7 +49,7 @@ import {
   type StatCardData,
 } from "@/design-system";
 import { useQuickCatalogEdit } from "@/features/catalog/QuickCatalogEdit";
-import { KY_OPT, getViewPeriodRange, startOfMonth, type ViewPeriod } from "@/lib/periodUtils";
+import { PERIOD_OPTIONS, getViewPeriodRange, startOfMonth, type ViewPeriod } from "@/lib/periodUtils";
 import { num, formatDateVN } from "@/lib/format";
 import { uid } from "@/lib/db";
 import {
@@ -87,19 +87,19 @@ export default function NxtReportScreen() {
   const [packagings] = usePackagings();
   const [products, setProducts] = useProducts();
   /** Bút chì sửa nhanh danh mục ngay trong ô chọn. */
-  const productEditor = useQuickCatalogEdit("matHang", products, setProducts);
+  const productEditor = useQuickCatalogEdit("product", products, setProducts);
   const [opening, writeOpening] = useFinishedGoodsOpeningStock();
 
-  const [ky, setKy] = useState<ViewPeriod>("thang");
-  const [moc, setMoc] = useState(todayIso());
-  const [tuTC, setTuTC] = useState(startOfMonth(todayIso()));
-  const [denTC, setDenTC] = useState(todayIso());
-  const [tu, den] = getViewPeriodRange(ky, moc, tuTC, denTC);
+  const [period, setPeriod] = useState<ViewPeriod>("month");
+  const [anchor, setAnchor] = useState(todayIso());
+  const [customFrom, setCustomFrom] = useState(startOfMonth(todayIso()));
+  const [customTo, setCustomTo] = useState(todayIso());
+  const [fromDate, toDate] = getViewPeriodRange(period, anchor, customFrom, customTo);
 
   // Dialog tồn đầu
   const [isOpeningOpen, setIsOpeningOpen] = useState(false);
   const [form, setForm] = useState<OpeningForm | null>(null);
-  const [loi, setLoi] = useState<FieldError[]>([]);
+  const [errors, setErrors] = useState<FieldError[]>([]);
 
   const productNameOf = (id: string) => products.find((m) => m.id === id)?.name || "—";
 
@@ -113,15 +113,15 @@ export default function NxtReportScreen() {
         packagings,
         opening,
         products,
-        fromDate: tu,
-        toDate: den,
+        fromDate,
+        toDate,
       }),
-    [wips, exportOrders, exportItems, salesItems, packagings, opening, products, tu, den]
+    [wips, exportOrders, exportItems, salesItems, packagings, opening, products, fromDate, toDate]
   );
   const total = useMemo(() => sumFinishedGoodNxt(rows), [rows]);
 
-  const the: StatCardData[] = [
-    { label: "Tồn đầu kho", value: `${num(total.openingKg)} kg`, numeric: true, icon: Snowflake, color: "trung-tinh" },
+  const cards: StatCardData[] = [
+    { label: "Tồn đầu kho", value: `${num(total.openingKg)} kg`, numeric: true, icon: Snowflake, color: "neutral" },
     { label: "Nhập kho", value: `${num(total.inKg)} kg`, numeric: true, icon: ArrowDownToLine, color: "brand" },
     {
       label: "Xuất (đơn+bán+gói)",
@@ -140,10 +140,10 @@ export default function NxtReportScreen() {
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-semibold text-foreground">{r.productName}</span>
-            {r.spec && <Tag variant="phu">{r.spec}</Tag>}
-            {r.hasManualOpening && <Tag variant="nguon">Tồn đầu khai tay</Tag>}
+            {r.spec && <Tag variant="muted">{r.spec}</Tag>}
+            {r.hasManualOpening && <Tag variant="source">Tồn đầu khai tay</Tag>}
             {r.isNegative && (
-              <Tag variant="loi" icon={AlertTriangle}>
+              <Tag variant="error" icon={AlertTriangle}>
                 Tồn âm
               </Tag>
             )}
@@ -221,7 +221,7 @@ export default function NxtReportScreen() {
       {
         createdDateText: `Ngày lập: ${formatDateVN(todayIso())}`,
         title: "Báo cáo xuất nhập tồn thành phẩm",
-        dateRangeText: `Từ ngày ${formatDateVN(tu)} đến ngày ${formatDateVN(den)}`,
+        dateRangeText: `Từ ngày ${formatDateVN(fromDate)} đến ngày ${formatDateVN(toDate)}`,
         warehouseText: "Chi nhánh: Kho thành phẩm BSF1",
         items,
         totalItemCount: items.length,
@@ -234,7 +234,7 @@ export default function NxtReportScreen() {
         totalClosingKg: total.closingKg,
         totalClosingValue: 0,
       },
-      `Bao-Cao-NXT-Thanh-Pham-${tu}-${den}.xlsx`
+      `Bao-Cao-NXT-Thanh-Pham-${fromDate}-${toDate}.xlsx`
     );
     // Không toast: trình duyệt đã tự báo tải file xong (README luật 8 — xuất file là thao tác không đổi số).
   };
@@ -242,10 +242,10 @@ export default function NxtReportScreen() {
   // ----- Tồn đầu: thêm / xóa -----
   const productOptions: ComboboxOption[] = products.map((m) => ({ value: m.id, label: m.name, subLabel: m.code || undefined }));
   /** Thêm mặt hàng tại chỗ — lưu ngay vào danh mục; trùng tên (không phân hoa thường) ⇒ dùng lại. */
-  const addProduct = (ten: string) => {
-    const trimmedName = ten.trim();
-    const co = products.find((m) => m.name.trim().toLowerCase() === trimmedName.toLowerCase());
-    if (co) return co.id;
+  const addProduct = (name: string) => {
+    const trimmedName = name.trim();
+    const existing = products.find((m) => m.name.trim().toLowerCase() === trimmedName.toLowerCase());
+    if (existing) return existing.id;
     const m = { id: uid(), code: "", name: trimmedName, finishedGoodCode: "" };
     setProducts([...products, m]);
     notify.saved(`Đã thêm mặt hàng "${trimmedName}" vào danh mục`);
@@ -262,7 +262,7 @@ export default function NxtReportScreen() {
       warehouse: "",
       note: "",
     });
-    setLoi([]);
+    setErrors([]);
   };
 
   const saveOpening = () => {
@@ -271,7 +271,7 @@ export default function NxtReportScreen() {
     if (!form.productId) ls.push({ field: "Mặt hàng", message: "Chưa chọn mặt hàng" });
     if (!form.asOfDate) ls.push({ field: "Ngày mốc", message: "Chưa chọn ngày tồn đầu" });
     if (!(Number(form.quantityKg) > 0)) ls.push({ field: "Khối lượng", message: "Phải lớn hơn 0 kg" });
-    setLoi(ls);
+    setErrors(ls);
     if (ls.length > 0) return;
     const newOpening: FinishedGoodsOpeningStock = {
       id: uid(),
@@ -326,37 +326,37 @@ export default function NxtReportScreen() {
             label="Kỳ báo cáo"
             hideRequiredMark
             clearable={false}
-            value={ky}
-            onChange={(v) => setKy(v as ViewPeriod)}
-            options={KY_OPT}
+            value={period}
+            onChange={(v) => setPeriod(v as ViewPeriod)}
+            options={PERIOD_OPTIONS}
           />
         </div>
         <div className="min-w-[min(12rem,100%)] flex-1 sm:min-w-[16rem]">
-          {ky === "tuy-chon" ? (
+          {period === "custom" ? (
             <DateRangeField
               label="Khoảng ngày"
               hideRequiredMark
               presets={false}
-              startDate={tuTC}
-              endDate={denTC}
+              startDate={customFrom}
+              endDate={customTo}
               onChange={(a, b) => {
-                setTuTC(a);
-                setDenTC(b);
+                setCustomFrom(a);
+                setCustomTo(b);
               }}
             />
           ) : (
             <DateField
-              label={ky === "ngay" ? "Ngày" : "Ngày bất kỳ trong kỳ"}
+              label={period === "day" ? "Ngày" : "Ngày bất kỳ trong kỳ"}
               hideRequiredMark
-              hint={ky === "ngay" ? undefined : `Kỳ: ${formatDateVN(tu)} – ${formatDateVN(den)}`}
-              value={moc}
-              onChange={setMoc}
+              hint={period === "day" ? undefined : `Kỳ: ${formatDateVN(fromDate)} – ${formatDateVN(toDate)}`}
+              value={anchor}
+              onChange={setAnchor}
             />
           )}
         </div>
       </div>
 
-      <StatCardGrid cards={the} />
+      <StatCardGrid cards={cards} />
 
       {total.warningCount > 0 && (
         <div className="flex flex-wrap items-center gap-3 rounded-xl border-2 border-destructive bg-destructive/10 p-4">
@@ -375,7 +375,7 @@ export default function NxtReportScreen() {
           description="Ghi sản lượng ở Sản xuất BTP, duyệt vào Kho dự trữ, rồi xuất theo Đơn đặt / Bán hàng — số sẽ tổng hợp về đây. Có số dư đông trước khi số hoá thì khai ở nút Tồn đầu."
         />
       ) : (
-        <SummaryTable rows={rows} columns={columns} getKey={(r) => `${r.productId}|||${r.spec}`} rowMarkKey={`nxt-tp|${tu}|${den}`} />
+        <SummaryTable rows={rows} columns={columns} getKey={(r) => `${r.productId}|||${r.spec}`} rowMarkKey={`nxt-tp|${fromDate}|${toDate}`} />
       )}
 
       <p className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
@@ -433,7 +433,7 @@ export default function NxtReportScreen() {
 
             {form ? (
               <div className="space-y-4 rounded-xl border-2 border-primary/40 bg-accent/30 p-4">
-                <ErrorSummary errors={loi} />
+                <ErrorSummary errors={errors} />
                 <RequiredLegend />
                 <Combobox
                   label="Mặt hàng"

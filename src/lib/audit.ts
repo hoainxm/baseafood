@@ -169,27 +169,27 @@ export interface AuditLogFilter {
  * ngày 11/10 — so thẳng `yyyy-mm-dd` với chuỗi UTC lệch 7 tiếng (thao tác 0h–7h
  * sáng VN rơi sang ngày hôm trước).
  */
-export function toVnDayBoundsUtc(tu?: string, den?: string): { fromDate?: string; toDate?: string } {
+export function toVnDayBoundsUtc(fromDate?: string, toDate?: string): { fromDate?: string; toDate?: string } {
   const iso = (s: string) => {
     const t = Date.parse(s);
     return Number.isFinite(t) ? new Date(t).toISOString() : undefined;
   };
   return {
-    fromDate: tu ? iso(`${tu}T00:00:00+07:00`) : undefined,
-    toDate: den ? iso(`${den}T23:59:59.999+07:00`) : undefined,
+    fromDate: fromDate ? iso(`${fromDate}T00:00:00+07:00`) : undefined,
+    toDate: toDate ? iso(`${toDate}T23:59:59.999+07:00`) : undefined,
   };
 }
 
 /** Đọc nhật ký cho màn Nhật ký (admin). Server: query audit_log; local: đọc buffer. */
 export async function readAuditLog(filter: AuditLogFilter = {}): Promise<AuditEntry[]> {
   const gioiHan = filter.limit ?? 500;
-  const bien = toVnDayBoundsUtc(filter.fromDate, filter.toDate);
+  const bounds = toVnDayBoundsUtc(filter.fromDate, filter.toDate);
   const matches = (r: AuditEntry) => {
     if (filter.actor && r.actorUsername !== filter.actor) return false;
     if (filter.entity && r.entity !== filter.entity) return false;
     if (filter.action && normalizeAuditAction(r.action) !== normalizeAuditAction(filter.action)) return false;
-    if (bien.fromDate && r.at < bien.fromDate) return false;
-    if (bien.toDate && r.at > bien.toDate) return false;
+    if (bounds.fromDate && r.at < bounds.fromDate) return false;
+    if (bounds.toDate && r.at > bounds.toDate) return false;
     if (filter.search) {
       const t = filter.search.toLowerCase();
       const hay = `${r.actorUsername} ${r.entity} ${r.entityKey} ${r.summary}`.toLowerCase();
@@ -208,8 +208,8 @@ export async function readAuditLog(filter: AuditLogFilter = {}): Promise<AuditEn
     if (filter.actor) q = q.eq("actor_username", filter.actor);
     if (filter.entity) q = q.eq("entity", filter.entity);
     if (filter.action) q = q.in("action", auditActionAliases(filter.action));
-    if (bien.fromDate) q = q.gte("at", bien.fromDate);
-    if (bien.toDate) q = q.lte("at", bien.toDate);
+    if (bounds.fromDate) q = q.gte("at", bounds.fromDate);
+    if (bounds.toDate) q = q.lte("at", bounds.toDate);
     const { data, error } = await q;
     if (error) return [];
     let rows = (data ?? []).map((r) => fromRow(r as Record<string, unknown>));

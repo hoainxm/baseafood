@@ -17,7 +17,7 @@ import {
   filterEligibleImports,
 } from "./balancingGrid";
 
-const ky = (id: string, startDate: string, endDate: string, materialTypeName = "Bạch tuộc 2 da") =>
+const period = (id: string, startDate: string, endDate: string, materialTypeName = "Bạch tuộc 2 da") =>
   ({ id, materialTypeName, startDate, endDate }) as BalancingPeriod;
 
 let n = 0;
@@ -38,7 +38,7 @@ const makeImport = (deliveryDate: string, materialTypeName: string, quantityKg: 
 });
 
 /* Sổ nhập thật 31/08–06/09/2026 (rút gọn): mỗi ngày 2 da lớn + nhỏ, xen 1 da. */
-const so: MaterialImportItem[] = [
+const num: MaterialImportItem[] = [
   makeImport("2026-08-31", "Bạch tuộc 2 da lớn (80↑)", 1649),
   makeImport("2026-08-31", "Bạch tuộc 1 da", 1525),
   makeImport("2026-09-01", "Bạch tuộc 2 da lớn (80↑)", 6762),
@@ -53,34 +53,34 @@ const so: MaterialImportItem[] = [
 
 describe("hút sổ nhập vào kỳ cân đối", () => {
   test("ngày trong kỳ tính theo UTC, đủ cả hai đầu mút", () => {
-    expect(getPeriodDates(ky("k", "2026-09-01", "2026-09-05"))).toEqual([
+    expect(getPeriodDates(period("k", "2026-09-01", "2026-09-05"))).toEqual([
       "2026-09-01", "2026-09-02", "2026-09-03", "2026-09-04", "2026-09-05",
     ]);
   });
 
   test("chỉ lấy ĐÚNG họ 2 da (lớn + nhỏ) trong ngày của kỳ — không 1 da, không ngày ngoài kỳ", () => {
-    const lay = filterEligibleImports(ky("k", "2026-09-01", "2026-09-05"), so);
-    expect(lay.every((r) => r.materialTypeName.startsWith("Bạch tuộc 2 da"))).toBe(true);
-    expect(lay.map((r) => r.deliveryDate).sort()).toEqual(["2026-09-01", "2026-09-01", "2026-09-03", "2026-09-05"]);
-    const grouped = groupImportsByMaterialType(lay);
+    const eligible = filterEligibleImports(period("k", "2026-09-01", "2026-09-05"), num);
+    expect(eligible.every((r) => r.materialTypeName.startsWith("Bạch tuộc 2 da"))).toBe(true);
+    expect(eligible.map((r) => r.deliveryDate).sort()).toEqual(["2026-09-01", "2026-09-01", "2026-09-03", "2026-09-05"]);
+    const grouped = groupImportsByMaterialType(eligible);
     expect([...grouped.keys()]).toEqual(["Bạch tuộc 2 da"]);
     expect(grouped.get("Bạch tuộc 2 da")!.dailyQuantities).toEqual({ "2026-09-01": 7964, "2026-09-03": 5019, "2026-09-05": 2491 });
   });
 
   test("chuyến đã thuộc kỳ khác không bị hút lại", () => {
-    const assigned = so.map((r) => (r.deliveryDate === "2026-09-01" ? { ...r, balancingPeriodId: "kyA" } : r));
-    const lay = filterEligibleImports(ky("kyB", "2026-09-01", "2026-09-05"), assigned);
-    expect(lay.some((r) => r.deliveryDate === "2026-09-01")).toBe(false);
+    const assigned = num.map((r) => (r.deliveryDate === "2026-09-01" ? { ...r, balancingPeriodId: "kyA" } : r));
+    const eligible = filterEligibleImports(period("kyB", "2026-09-01", "2026-09-05"), assigned);
+    expect(eligible.some((r) => r.deliveryDate === "2026-09-01")).toBe(false);
   });
 });
 
 describe("findOverlappingFamilyPeriods", () => {
   const periods = [
-    ky("A", "2026-09-01", "2026-09-05"),
-    ky("B", "2026-09-01", "2026-09-05"),
-    ky("C", "2026-09-06", "2026-09-10"),
-    ky("D", "2026-09-03", "2026-09-04", "Bạch tuộc 1 da"),
-    ky("E", "2026-09-05", "2026-09-07", "Bạch tuộc 2 da lớn (80↑)"),
+    period("A", "2026-09-01", "2026-09-05"),
+    period("B", "2026-09-01", "2026-09-05"),
+    period("C", "2026-09-06", "2026-09-10"),
+    period("D", "2026-09-03", "2026-09-04", "Bạch tuộc 1 da"),
+    period("E", "2026-09-05", "2026-09-07", "Bạch tuộc 2 da lớn (80↑)"),
   ];
   test("bắt kỳ cùng họ chồng ngày; bỏ qua chính nó, kỳ liền kề không chồng, kỳ khác loại", () => {
     expect(findOverlappingFamilyPeriods(periods[1], periods).map((k) => k.id).sort()).toEqual(["A", "E"]);
@@ -101,11 +101,11 @@ const finishedGoodRow = (periodId: string, productId: string, customerId: string
 
 describe("dòng mẫu khối 2", () => {
   const periods = [
-    ky("K1", "2026-08-20", "2026-08-25"),
-    ky("K2", "2026-08-26", "2026-08-31"),
-    ky("K3", "2026-09-01", "2026-09-05"),
-    ky("K4", "2026-09-10", "2026-09-12"),
-    ky("L1", "2026-08-28", "2026-08-30", "Bạch tuộc 1 da"),
+    period("K1", "2026-08-20", "2026-08-25"),
+    period("K2", "2026-08-26", "2026-08-31"),
+    period("K3", "2026-09-01", "2026-09-05"),
+    period("K4", "2026-09-10", "2026-09-12"),
+    period("L1", "2026-08-28", "2026-08-30", "Bạch tuộc 1 da"),
   ];
   const allOutputs = [
     finishedGoodRow("K1", "luoc230", "hanwa", 10.4),
@@ -120,8 +120,8 @@ describe("dòng mẫu khối 2", () => {
     expect(pickTemplatePeriod(periods[2], periods, allOutputs)?.id).toBe("K2");
     expect(pickTemplatePeriod(periods[3], periods, allOutputs)?.id).toBe("K2");
     // kỳ đầu tiên, không có kỳ trước có dòng ⇒ lấy kỳ mới nhất còn lại
-    expect(pickTemplatePeriod(ky("K0", "2026-08-01", "2026-08-05"), periods, allOutputs)?.id).toBe("K2");
-    expect(pickTemplatePeriod(ky("M", "2026-09-01", "2026-09-05", "Mực ống"), periods, allOutputs)).toBeNull();
+    expect(pickTemplatePeriod(period("K0", "2026-08-01", "2026-08-05"), periods, allOutputs)?.id).toBe("K2");
+    expect(pickTemplatePeriod(period("M", "2026-09-01", "2026-09-05", "Mực ống"), periods, allOutputs)).toBeNull();
   });
 
   test("mỗi mặt hàng × khách × GIÁ một dòng mẫu; khác khách hoặc khác giá vẫn tách", () => {
@@ -158,8 +158,8 @@ describe("dòng mẫu khối 2", () => {
 describe("dòng kho khối NL — getBalancingStockLineKind", () => {
   const base = { groupName: "Xả đông" as const, sourceWarehouse: "Kho mình", isReduction: false };
   test("Xả đông · Kho mình = lấy xả đông; thêm cờ giảm = gửi đông", () => {
-    expect(getBalancingStockLineKind(base)).toBe("lay-xa-dong");
-    expect(getBalancingStockLineKind({ ...base, isReduction: true })).toBe("gui-dong");
+    expect(getBalancingStockLineKind(base)).toBe("thaw-out");
+    expect(getBalancingStockLineKind({ ...base, isReduction: true })).toBe("freeze-deposit");
   });
   test("xả đông mua về / dòng thủy sản / dòng giảm thường KHÔNG phải dòng kho", () => {
     expect(getBalancingStockLineKind({ ...base, sourceWarehouse: "Mua về" })).toBeNull();

@@ -30,7 +30,7 @@ export function DisplaySettingsButton({
   account?: string;
   className?: string;
 }) {
-  const [mo, setMo] = React.useState(false);
+  const [isOpen, setOpen] = React.useState(false);
   const snap = React.useRef<DisplaySettingsSnapshot | null>(null);
 
   const handleOpenChange = (open: boolean) => {
@@ -41,12 +41,12 @@ export function DisplaySettingsButton({
       // Đóng mà chưa Lưu ⇒ trả về mốc đã chụp.
       writeDisplaySettings(account, snap.current);
     }
-    setMo(open);
+    setOpen(open);
   };
 
   const save = () => {
     snap.current = null; // đã đồng ý → không hoàn tác nữa
-    setMo(false);
+    setOpen(false);
     // Không toast: giao diện đổi ngay trước mắt là phản hồi (README luật 8 — cài đặt hiển thị).
   };
 
@@ -55,7 +55,7 @@ export function DisplaySettingsButton({
 
   return (
     <FormDialog
-      open={mo}
+      open={isOpen}
       onOpenChange={handleOpenChange}
       title="Tùy chỉnh giao diện"
       description="Xem trước ngay khi chỉnh. Bấm Lưu để giữ cho riêng tài khoản của bạn."

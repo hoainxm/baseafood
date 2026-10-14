@@ -43,7 +43,7 @@ export function useTraceData() {
   const [labelPrints] = useLabelPrints();
   const [materialTypes] = useMaterialTypes();
 
-  const dl: TraceData = useMemo(
+  const traceData: TraceData = useMemo(
     () => ({
       shipments, imports, wips, packagings, lotInputs,
       exportItems, exportOrders, salesOrders, products, customers,
@@ -54,5 +54,5 @@ export function useTraceData() {
       salesItems, salesInvoices, domesticSales, lotDispatches, lotWaivers, labelPrints, materialTypes,
     ]
   );
-  return { dl, lotInputs, luuLotInputs: saveLotInputs, lotDispatches, luuLotDispatches: saveLotDispatches, lotWaivers, luuLotWaivers: saveLotWaivers };
+  return { traceData, lotInputs, saveLotInputs, lotDispatches, saveLotDispatches, lotWaivers, saveLotWaivers };
 }

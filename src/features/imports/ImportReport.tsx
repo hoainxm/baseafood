@@ -19,7 +19,7 @@ import {
   type StatCardData,
 } from "@/design-system";
 import { useMaterialImports, useScraps } from "@/lib/catalogRepo";
-import { KY_OPT, getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
+import { PERIOD_OPTIONS, getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
 import { num, formatDateVN } from "@/lib/format";
 import { calculateImportAmount } from "@/types";
 import { exportAoaToXlsx, type OExcel } from "@/lib/reportXlsx";
@@ -41,7 +41,7 @@ const WORKSHOP_OPTIONS = [
 ];
 
 /** Dòng nguyên liệu MUA — gom theo đại lý × loại. */
-interface DongMua {
+interface PurchaseRow {
   supplierName: string;
   materialTypeName: string;
   quantityKg: number;
@@ -64,53 +64,53 @@ export default function ImportReport() {
   const [rows] = useMaterialImports();
   const [scraps] = useScraps();
 
-  const [ky, setKy] = useState<ViewPeriod>("thang");
-  const [moc, setMoc] = useState(todayIso());
-  const [tuTC, setTuTC] = useState(todayIso());
-  const [denTC, setDenTC] = useState(todayIso());
+  const [period, setPeriod] = useState<ViewPeriod>("month");
+  const [anchor, setAnchor] = useState(todayIso());
+  const [customFrom, setCustomFrom] = useState(todayIso());
+  const [customTo, setCustomTo] = useState(todayIso());
   const [workshop, setWorkshop] = useState("Tất cả");
-  const [tu, den] = getViewPeriodRange(ky, moc, tuTC, denTC);
+  const [fromDate, toDate] = getViewPeriodRange(period, anchor, customFrom, customTo);
 
   const {
-    dongMua,
-    dongPhe: scrapRows,
+    purchaseRows,
+    scrapRows,
     chart,
-    tongKg: totalKg,
-    tongTien: totalAmount,
-    tongChoGia: totalAwaitingPriceKg,
-    tongKgPhe: totalScrapKg,
-    tongTienPhe: totalScrapAmount,
+    totalKg,
+    totalAmount,
+    totalUnpricedKg: totalAwaitingPriceKg,
+    totalScrapKg,
+    totalScrapAmount,
   } = useMemo(() => {
     const filteredImports = rows.filter(
       (r) =>
-        r.deliveryDate >= tu &&
-        r.deliveryDate <= den &&
+        r.deliveryDate >= fromDate &&
+        r.deliveryDate <= toDate &&
         (workshop === "Tất cả" || r.workshop === workshop)
     );
     const filteredScraps = scraps.filter(
       (r) =>
         r.source === "Nhập hàng" &&
-        r.date >= tu &&
-        r.date <= den &&
+        r.date >= fromDate &&
+        r.date <= toDate &&
         (workshop === "Tất cả" || r.workshop === workshop)
     );
 
     // Gom nguyên liệu MUA
-    const mua = new Map<string, DongMua>();
+    const purchases = new Map<string, PurchaseRow>();
     for (const r of filteredImports) {
       const sup = r.supplierName || "(chưa có đại lý)";
       const mt = r.materialTypeName || "(chưa rõ loại)";
       const k = `${sup}|||${mt}`;
-      let d = mua.get(k);
+      let d = purchases.get(k);
       if (!d) {
         d = { supplierName: sup, materialTypeName: mt, quantityKg: 0, unpricedKg: 0, amount: 0 };
-        mua.set(k, d);
+        purchases.set(k, d);
       }
       d.quantityKg += r.quantityKg || 0;
       if (r.unitPrice == null) d.unpricedKg += r.quantityKg || 0;
       d.amount += calculateImportAmount(r);
     }
-    const dongMua = [...mua.values()].sort(
+    const purchaseRows = [...purchases.values()].sort(
       (a, b) =>
         a.supplierName.localeCompare(b.supplierName, "vi") ||
         a.materialTypeName.localeCompare(b.materialTypeName, "vi")
@@ -147,8 +147,8 @@ export default function ImportReport() {
       d.totalKg += r.quantityKg || 0;
       d.totalAmount += calculateImportAmount(r);
       if (r.shipmentId) d.shipmentIds.add(r.shipmentId);
-      const nhomKey = `${r.supplierName || "(chưa có đại lý)"} · ${r.materialTypeName || "(chưa rõ loại)"}`;
-      d.kgByMaterialType.set(nhomKey, (d.kgByMaterialType.get(nhomKey) ?? 0) + (r.quantityKg || 0));
+      const groupKey = `${r.supplierName || "(chưa có đại lý)"} · ${r.materialTypeName || "(chưa rõ loại)"}`;
+      d.kgByMaterialType.set(groupKey, (d.kgByMaterialType.get(groupKey) ?? 0) + (r.quantityKg || 0));
     }
     const chart: BarChartItem[] = [...ct.keys()].sort().map((date) => {
       const d = ct.get(date)!;
@@ -170,9 +170,9 @@ export default function ImportReport() {
               </div>
             </div>
             <ul className="space-y-1">
-              {typeEntries.slice(0, 16).map(([ten, kg]) => (
-                <li key={ten} className="flex items-baseline justify-between gap-4">
-                  <span className="min-w-0 break-words text-muted-foreground">{ten}</span>
+              {typeEntries.slice(0, 16).map(([name, kg]) => (
+                <li key={name} className="flex items-baseline justify-between gap-4">
+                  <span className="min-w-0 break-words text-muted-foreground">{name}</span>
                   <span className="tnum shrink-0 font-medium text-foreground">{num(kg)} kg</span>
                 </li>
               ))}
@@ -186,19 +186,19 @@ export default function ImportReport() {
     });
 
     return {
-      dongMua,
-      dongPhe: scrapRows,
+      purchaseRows,
+      scrapRows,
       chart,
-      tongKg: dongMua.reduce((s, d) => s + d.quantityKg, 0),
-      tongTien: dongMua.reduce((s, d) => s + d.amount, 0),
-      tongChoGia: dongMua.reduce((s, d) => s + d.unpricedKg, 0),
-      tongKgPhe: scrapRows.reduce((s, d) => s + d.quantityKg, 0),
-      tongTienPhe: scrapRows.reduce((s, d) => s + d.saleValue, 0),
+      totalKg: purchaseRows.reduce((s, d) => s + d.quantityKg, 0),
+      totalAmount: purchaseRows.reduce((s, d) => s + d.amount, 0),
+      totalUnpricedKg: purchaseRows.reduce((s, d) => s + d.unpricedKg, 0),
+      totalScrapKg: scrapRows.reduce((s, d) => s + d.quantityKg, 0),
+      totalScrapAmount: scrapRows.reduce((s, d) => s + d.saleValue, 0),
     };
-  }, [rows, scraps, tu, den, workshop]);
+  }, [rows, scraps, fromDate, toDate, workshop]);
 
-  const the: StatCardData[] = [
-    { label: "Kỳ báo cáo", value: `${formatDateVN(tu)} – ${formatDateVN(den)}`, icon: CalendarRange, color: "trung-tinh" },
+  const cards: StatCardData[] = [
+    { label: "Kỳ báo cáo", value: `${formatDateVN(fromDate)} – ${formatDateVN(toDate)}`, icon: CalendarRange, color: "neutral" },
     { label: "Nhập mua", value: `${num(totalKg)} kg`, numeric: true, icon: Scale, color: "brand" },
     { label: "Giá trị mua", value: `${num(totalAmount)} đ`, numeric: true, icon: Coins, color: "success" },
     {
@@ -206,11 +206,11 @@ export default function ImportReport() {
       value: `${num(totalAwaitingPriceKg)} kg`,
       numeric: true,
       icon: FileClock,
-      color: totalAwaitingPriceKg > 0 ? "warning" : "trung-tinh",
+      color: totalAwaitingPriceKg > 0 ? "warning" : "neutral",
     },
   ];
 
-  const purchaseColumns: SummaryTableColumn<DongMua>[] = [
+  const purchaseColumns: SummaryTableColumn<PurchaseRow>[] = [
     { key: "dl", header: "Đại lý", render: (r) => r.supplierName },
     { key: "loai", header: "Loại nguyên liệu", render: (r) => r.materialTypeName },
     { key: "kg", header: "Số cân (kg)", numeric: true, render: (r) => num(r.quantityKg), total: () => num(totalKg) },
@@ -231,17 +231,17 @@ export default function ImportReport() {
   ];
 
   const exportExcel = () => {
-    if (!dongMua.length && !scrapRows.length) {
+    if (!purchaseRows.length && !scrapRows.length) {
       notify.warning("Không có số liệu để xuất");
       return;
     }
     const aoa: OExcel[][] = [];
     aoa.push(["Báo cáo tổng hợp nhập hàng"]);
-    aoa.push([`Kỳ: ${formatDateVN(tu)} – ${formatDateVN(den)} · Phân xưởng: ${workshop}`]);
+    aoa.push([`Kỳ: ${formatDateVN(fromDate)} – ${formatDateVN(toDate)} · Phân xưởng: ${workshop}`]);
     aoa.push([]);
     aoa.push(["NGUYÊN LIỆU MUA"]);
     aoa.push(["Đại lý", "Loại nguyên liệu", "Số cân (kg)", "Chờ giá (kg)", "Giá trị (đ)"]);
-    for (const r of dongMua)
+    for (const r of purchaseRows)
       aoa.push([r.supplierName, r.materialTypeName, r.quantityKg, r.unpricedKg, r.amount]);
     aoa.push(["Tổng cộng", "", totalKg, totalAwaitingPriceKg, totalAmount]);
     if (scrapRows.length) {
@@ -255,7 +255,7 @@ export default function ImportReport() {
       sheetName: "Nhập hàng",
       aoa,
       colWidths: [26, 26, 14, 14, 16],
-      fileName: `bao-cao-nhap-hang_${tu}_${den}.xlsx`,
+      fileName: `bao-cao-nhap-hang_${fromDate}_${toDate}.xlsx`,
     });
     // Không toast: trình duyệt đã tự báo tải file xong (README luật 8 — xuất file là thao tác không đổi số).
   };
@@ -269,31 +269,31 @@ export default function ImportReport() {
               label="Kỳ báo cáo"
               hideRequiredMark
               clearable={false}
-              value={ky}
-              onChange={(v) => setKy(v as ViewPeriod)}
-              options={KY_OPT}
+              value={period}
+              onChange={(v) => setPeriod(v as ViewPeriod)}
+              options={PERIOD_OPTIONS}
             />
           </div>
           <div className="min-w-[min(12rem,100%)] flex-1 sm:min-w-[16rem]">
-            {ky === "tuy-chon" ? (
+            {period === "custom" ? (
               <DateRangeField
                 label="Khoảng ngày"
                 hideRequiredMark
                 presets={false}
-                startDate={tuTC}
-                endDate={denTC}
+                startDate={customFrom}
+                endDate={customTo}
                 onChange={(a, b) => {
-                  setTuTC(a);
-                  setDenTC(b);
+                  setCustomFrom(a);
+                  setCustomTo(b);
                 }}
               />
             ) : (
               <DateField
-                label={ky === "ngay" ? "Ngày" : "Ngày bất kỳ trong kỳ"}
+                label={period === "day" ? "Ngày" : "Ngày bất kỳ trong kỳ"}
                 hideRequiredMark
-                hint={ky === "ngay" ? undefined : `Kỳ: ${formatDateVN(tu)} – ${formatDateVN(den)}`}
-                value={moc}
-                onChange={setMoc}
+                hint={period === "day" ? undefined : `Kỳ: ${formatDateVN(fromDate)} – ${formatDateVN(toDate)}`}
+                value={anchor}
+                onChange={setAnchor}
               />
             )}
           </div>
@@ -313,14 +313,14 @@ export default function ImportReport() {
           size="lg"
           variant="outline"
           onClick={exportExcel}
-          disabled={!dongMua.length && !scrapRows.length}
+          disabled={!purchaseRows.length && !scrapRows.length}
         >
           <FileSpreadsheet />
           Xuất Excel
         </Button>
       </div>
 
-      <StatCardGrid cards={the} />
+      <StatCardGrid cards={cards} />
 
       {chart.length > 0 && (
         <section className="space-y-3 rounded-xl border-2 border-border bg-card p-5">
@@ -337,10 +337,10 @@ export default function ImportReport() {
       )}
 
       <SummaryTable
-        rows={dongMua}
+        rows={purchaseRows}
         columns={purchaseColumns}
         getKey={(r) => `${r.supplierName}|||${r.materialTypeName}`}
-        rowMarkKey={`bao-cao-nhap|${tu}|${den}|${workshop}`}
+        rowMarkKey={`bao-cao-nhap|${fromDate}|${toDate}|${workshop}`}
         emptyText="Không có nguyên liệu mua trong kỳ này."
       />
 
@@ -356,7 +356,7 @@ export default function ImportReport() {
             rows={scrapRows}
             columns={scrapColumns}
             getKey={(r) => r.name}
-            rowMarkKey={`bao-cao-nhap-phe-lieu|${tu}|${den}|${workshop}`}
+            rowMarkKey={`bao-cao-nhap-phe-lieu|${fromDate}|${toDate}|${workshop}`}
             emptyText="Không có phế liệu trong kỳ này."
           />
         </section>

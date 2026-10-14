@@ -42,8 +42,8 @@ import {
   useSuppliers,
   useWipProductions,
 } from "@/lib/catalogRepo";
-import { LA_DEMO, setDemoMode, setPendingDemoTask, docGoiDemo, readDemoJob, saveDemoBundle, clearDemoBundle } from "@/lib/demoMode";
-import { scanDemoParams, generateDemoBundle, type GoiDemo, type DemoSource } from "@/lib/demoGenerator";
+import { IS_DEMO, setDemoMode, setPendingDemoTask, readDemoBundle, readDemoJob, saveDemoBundle, clearDemoBundle } from "@/lib/demoMode";
+import { scanDemoParams, generateDemoBundle, type DemoBundle, type DemoSource } from "@/lib/demoGenerator";
 import { num } from "@/lib/format";
 
 
@@ -54,14 +54,14 @@ import { num } from "@/lib/format";
  */
 export function DemoModeBanner() {
   useEffect(() => {
-    if (!LA_DEMO) return;
+    if (!IS_DEMO) return;
     const originalTitle = document.title;
     if (!originalTitle.startsWith("[DEMO]")) document.title = `[DEMO] ${originalTitle}`;
     return () => {
       document.title = originalTitle;
     };
   }, []);
-  if (!LA_DEMO) return null;
+  if (!IS_DEMO) return null;
   return (
     <div
       role="status"
@@ -93,13 +93,13 @@ export function DemoModeBanner() {
  * mới ghi, kẻo diff với bản rỗng làm sót dòng cũ.
  */
 export function DemoPackLoader() {
-  const [goi] = useState(() => docGoiDemo<GoiDemo>());
-  if (!LA_DEMO || !goi) return null;
-  return <NapGoiDemoThat bundle={goi} />;
+  const [bundle] = useState(() => readDemoBundle<DemoBundle>());
+  if (!IS_DEMO || !bundle) return null;
+  return <DemoBundleLoader bundle={bundle} />;
 }
 
-function NapGoiDemoThat({ bundle }: { bundle: GoiDemo }) {
-  const bang = {
+function DemoBundleLoader({ bundle }: { bundle: DemoBundle }) {
+  const tables = {
     products: useProducts(),
     materialTypes: useMaterialTypes(),
     suppliers: useSuppliers(),
@@ -133,18 +133,18 @@ function NapGoiDemoThat({ bundle }: { bundle: GoiDemo }) {
     finishedOpening: useFinishedGoodsOpeningStock(),
     nxtSnapshots: useNxtSnapshots(),
     monthlyStock: useMonthlyStock(),
-  } satisfies Record<keyof GoiDemo, unknown>;
-  const daNap = useRef(false);
+  } satisfies Record<keyof DemoBundle, unknown>;
+  const loaded = useRef(false);
   const [isWritten, setIsWritten] = useState(false);
-  const xong = (Object.values(bang) as { 2: { trangThai: string } }[]).every((b) => b[2].trangThai !== "dang-tai");
+  const done = (Object.values(tables) as { 2: { status: string } }[]).every((b) => b[2].status !== "loading");
 
   useEffect(() => {
-    if (!xong || daNap.current) return;
-    daNap.current = true;
+    if (!done || loaded.current) return;
+    loaded.current = true;
     setAuditPaused(true);
     try {
-      for (const k of Object.keys(bang) as (keyof GoiDemo)[]) {
-        const writer = bang[k][1] as (rows: unknown[]) => void;
+      for (const k of Object.keys(tables) as (keyof DemoBundle)[]) {
+        const writer = tables[k][1] as (rows: unknown[]) => void;
         writer(bundle[k] ?? []);
       }
     } finally {
@@ -156,7 +156,7 @@ function NapGoiDemoThat({ bundle }: { bundle: GoiDemo }) {
     setIsWritten(true);
     // Chạy MỘT lần khi mọi bảng nạp xong (daNap chặn lần hai); `bang` đổi mỗi lần vẽ.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [xong]);
+  }, [done]);
 
   if (isWritten) return null;
   return (
@@ -172,7 +172,7 @@ function NapGoiDemoThat({ bundle }: { bundle: GoiDemo }) {
  * lại về chế độ thật để quét, rồi tự vào lại) hoặc thoát.
  */
 export function DemoModeSection() {
-  return LA_DEMO ? <DemoActiveSection /> : <DemoGeneratorSection />;
+  return IS_DEMO ? <DemoActiveSection /> : <DemoGeneratorSection />;
 }
 
 function DemoActiveSection() {
@@ -224,7 +224,7 @@ function DemoGeneratorSection() {
   const [balancingOutputs, , a11] = useBalancingOutputs();
   const [nxtSnapshots, , a12] = useNxtSnapshots();
   const [monthlyStock, , a13] = useMonthlyStock();
-  const daNap = [a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13].every((x) => x.trangThai !== "dang-tai");
+  const loaded = [a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13].every((x) => x.status !== "loading");
   const [anonymize, setAnonymize] = useState("an");
   const [isCreating, setIsCreating] = useState(false);
 
@@ -236,9 +236,9 @@ function DemoGeneratorSection() {
 
   const createAndEnter = () => {
     setIsCreating(true);
-    const goi = generateDemoBundle(source, { today: todayIso(), anonymize: anonymize === "an", hat: Date.now() % 100_000 });
+    const bundle = generateDemoBundle(source, { today: todayIso(), anonymize: anonymize === "an", hat: Date.now() % 100_000 });
     setPendingDemoTask(null);
-    if (!saveDemoBundle(goi)) {
+    if (!saveDemoBundle(bundle)) {
       setIsCreating(false);
       notify.error("Không tạo được bộ demo (bộ nhớ trình duyệt đầy?). Thử xóa bớt dữ liệu trình duyệt rồi làm lại.");
       return;
@@ -249,10 +249,10 @@ function DemoGeneratorSection() {
   // Việc chờ từ chế độ demo ("Làm mới bộ demo"): nạp xong số thật thì tự sinh và vào lại.
   const [pendingCreate] = useState(() => readDemoJob() === "tao");
   useEffect(() => {
-    if (pendingCreate && daNap) createAndEnter();
+    if (pendingCreate && loaded) createAndEnter();
     // taoVaVao tải lại trang ⇒ chỉ chạy một lần.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pendingCreate, daNap]);
+  }, [pendingCreate, loaded]);
 
   if (pendingCreate) {
     return (
@@ -294,9 +294,9 @@ function DemoGeneratorSection() {
             icon={FlaskConical}
             onConfirm={createAndEnter}
             trigger={
-              <Button title="Sinh bộ số demo từ số thật đã nhập rồi chuyển sang chế độ demo." disabled={!daNap || isCreating}>
+              <Button title="Sinh bộ số demo từ số thật đã nhập rồi chuyển sang chế độ demo." disabled={!loaded || isCreating}>
                 <FlaskConical />
-                {daNap ? "Tạo bộ demo mới" : "Đang nạp số thật…"}
+                {loaded ? "Tạo bộ demo mới" : "Đang nạp số thật…"}
               </Button>
             }
           />

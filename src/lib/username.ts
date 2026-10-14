@@ -26,14 +26,14 @@ export function stripAccents(s: string): string {
 }
 
 export function fullNameToUsername(fullName: string): string {
-  const tu = stripAccents(fullName).toLowerCase().trim().split(/\s+/).filter(Boolean);
-  if (tu.length === 0) return "";
-  if (tu.length === 1) return tu[0];
-  const dau = tu
+  const words = stripAccents(fullName).toLowerCase().trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return "";
+  if (words.length === 1) return words[0];
+  const initials = words
     .slice(0, -1)
     .map((t) => t[0])
     .join("");
-  return dau + tu[tu.length - 1];
+  return initials + words[words.length - 1];
 }
 
 /** username → email tổng hợp để đưa vào Supabase Auth. */

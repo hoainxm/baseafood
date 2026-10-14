@@ -25,8 +25,8 @@ export function LotRecall({ node, traceData, sameShipmentLots = [] }: { node: Lo
   const scope = isMergedShipment ? `chuyến ${node.label} (${sameShipmentLots.length} loại NL)` : `lô ${node.label}${node.kind === "S" ? ` · ${node.description}` : ""}`;
   const lotStockNow = useMemo(
     () => {
-      const bang = buildLotStockIndex(traceData); // một lượt cho mọi lô cần khoanh
-      return lotsInPlant.map((n) => ({ n, ton: getLotStockKg(n.kind, n.id, traceData, bang) }));
+      const stockIndex = buildLotStockIndex(traceData); // một lượt cho mọi lô cần khoanh
+      return lotsInPlant.map((n) => ({ n, stockKg: getLotStockKg(n.kind, n.id, traceData, stockIndex) }));
     },
     [lotsInPlant, traceData]
   );
@@ -46,7 +46,7 @@ export function LotRecall({ node, traceData, sameShipmentLots = [] }: { node: Lo
         ...outboundItems.map((r) => [TRACE_KIND_LABELS[r.kind], r.customer, r.date, r.document, r.product, r.kg, r.fromLot]),
         [],
         ["Lô còn trong xưởng", "Mặt hàng", "Ngày", "Tồn trong kho (kg)"],
-        ...lotStockNow.map(({ n, ton: stockKg }) => [`${TRACE_KIND_LABELS[n.kind]} ${n.label}`, n.description, n.date, stockKg]),
+        ...lotStockNow.map(({ n, stockKg }) => [`${TRACE_KIND_LABELS[n.kind]} ${n.label}`, n.description, n.date, stockKg]),
       ],
     });
   };
@@ -119,7 +119,7 @@ export function LotRecall({ node, traceData, sameShipmentLots = [] }: { node: Lo
         <div className="space-y-1">
           <p className="font-medium">Lô còn trong xưởng</p>
           <ul className="space-y-1">
-            {lotStockNow.map(({ n, ton: stockKg }) => (
+            {lotStockNow.map(({ n, stockKg }) => (
               <li key={`${n.kind}:${n.id}`} className="tnum text-muted-foreground">
                 {TRACE_KIND_LABELS[n.kind]} <span className="font-medium text-foreground">{n.label}</span> · {n.description}
                 {stockKg != null ? ` · tồn trong kho ${kg(stockKg)}` : ""}
@@ -178,7 +178,7 @@ export function LotRecall({ node, traceData, sameShipmentLots = [] }: { node: Lo
                 </tr>
               </thead>
               <tbody>
-                {lotStockNow.map(({ n, ton: stockKg }) => (
+                {lotStockNow.map(({ n, stockKg }) => (
                   <tr key={`${n.kind}:${n.id}`}>
                     <PrintTd>{`${TRACE_KIND_LABELS[n.kind]} ${n.label}`}</PrintTd>
                     <PrintTd>{n.description}</PrintTd>

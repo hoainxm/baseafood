@@ -70,7 +70,7 @@ import { kg, num, todayISO, formatDateVN } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
 import { appendAuditEntries } from "@/lib/audit";
-import { KY_OPT, getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
+import { PERIOD_OPTIONS, getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
 import { DailyTaskReminder, LotInputPicker, LotDispatchPicker, BlankDailyWipSlip, LotQrLabels } from "@/features/shared";
 import { useQuickCatalogEdit } from "@/features/catalog/QuickCatalogEdit";
 import { assignSessionLots, findBatchesWithoutLot, formatWipLotLabel, buildLotNode, type TraceData } from "@/lib/lotTraceability";
@@ -126,9 +126,9 @@ const readSavedWorkshop = (): Workshop => {
 };
 
 export default function WipProductionScreen() {
-  const [rows, persist, { trangThai: status }] = useWipProductions();
-  const isLoading = status === "dang-tai" && rows.length === 0;
-  const [locks, persistLocks, { trangThai: lockStatus }] = useProductionLocks();
+  const [rows, persist, { status }] = useWipProductions();
+  const isLoading = status === "loading" && rows.length === 0;
+  const [locks, persistLocks, { status: lockStatus }] = useProductionLocks();
   const [products, setProducts] = useProducts();
   const [customers, setCustomers] = useCustomers();
   const [materialTypes, setMaterialTypes] = useMaterialTypes();
@@ -140,7 +140,7 @@ export default function WipProductionScreen() {
   const { profile } = useAuth();
   const operator = profile?.fullName || profile?.username || "";
 
-  const [ky, setKy] = useState<ViewPeriod>("ngay");
+  const [period, setPeriod] = useState<ViewPeriod>("day");
   const [date, setDate] = useState(todayISO());
   const [fromDate, setFromDate] = useState(todayISO());
   const [toDate, setToDate] = useState(todayISO());
@@ -151,7 +151,7 @@ export default function WipProductionScreen() {
   const [isConsecutiveDays, setIsConsecutiveDays] = useState(true);
   const [tableRows, setTableRows] = useState<ProductionLine[]>([]);
   /** Dòng bán nội địa của phiên đang gõ — mặc định trống, bấm "Thêm dòng" mới hiện. */
-  const [dongBND, setDongBND] = useState<DomesticSaleLine[]>([]);
+  const [domesticSaleLines, setDomesticSaleLines] = useState<DomesticSaleLine[]>([]);
   const [sessionErrors, setSessionErrors] = useState<FieldError[]>([]);
   /** Nhóm (kiểu chế biến × khách) của phiên trước → phiếu mới tự điền sẵn nhóm
    *  đầu, gõ thành phẩm ngay, khỏi tạo nhóm lại. Chỉ sống trong phiên làm việc. */
@@ -171,7 +171,7 @@ export default function WipProductionScreen() {
     (edit?.tentacleKg ?? 0) > 0 || (edit?.stomachKg ?? 0) > 0;
 
   /** Hai chế độ: "nhap" = form ghi (mặc định, form-first cho tổ xưởng); "so" = sổ + báo cáo. */
-  const [mode, setMode] = useState<"nhap" | "so">("nhap");
+  const [mode, setMode] = useState<"entry" | "ledger">("entry");
   const [isPrintingBlank, setIsPrintingBlank] = useState(false);
   // Truy xuất lô (docs/spec/qr-truy-xuat-lo.md): gắn lô NL cho mẻ + in tem lô BTP.
   const [lotInputs, saveLotInputs] = useLotInputs();
@@ -193,7 +193,7 @@ export default function WipProductionScreen() {
   /** Lý do chưa gắn lô cho các mẻ còn thiếu — bắt buộc khi chốt ngày (chốt 2026-10-08). */
   const [waiverReason, setWaiverReason] = useState("");
   /** Dữ liệu tối thiểu cho truy xuất ở màn này (không nạp cả 17 bảng như hộ chiếu lô). */
-  const dlNhe: TraceData = useMemo(
+  const lightTraceData: TraceData = useMemo(
     () => ({
       shipments, imports, wips: rows, packagings: [], lotInputs, exportItems: [], exportOrders: [],
       salesOrders: [], products, customers, lotDispatches, lotWaivers, materialTypes,
@@ -219,7 +219,7 @@ export default function WipProductionScreen() {
   const [reopenReason, setReopenReason] = useState("");
   const [lockErrors, setLockErrors] = useState<FieldError[]>([]);
 
-  const [effectiveFrom, effectiveTo] = getViewPeriodRange(ky, date, fromDate, toDate);
+  const [effectiveFrom, effectiveTo] = getViewPeriodRange(period, date, fromDate, toDate);
   const isSingleDay = effectiveFrom === effectiveTo;
 
   const productNameOf = (id: string) => products.find((m) => m.id === id)?.name || "—";
@@ -238,24 +238,24 @@ export default function WipProductionScreen() {
     subLabel: c.market || undefined,
   }));
 
-  const addProduct = (ten: string, processingType = ""): string => {
+  const addProduct = (name: string, processingType = ""): string => {
     const m: Product = {
       id: uid(),
       code: "",
-      name: ten,
+      name,
       finishedGoodCode: "",
       category: "Bạch tuộc", // xưởng Đông; loài chỉnh sau ở Danh mục nếu cần
       processingType, // gắn KIỂU CHẾ BIẾN của nhóm để mã mới nằm đúng nhóm
     };
     setProducts([...products, m]);
-    notify.saved(`Đã thêm thành phẩm "${ten}"`);
+    notify.saved(`Đã thêm thành phẩm "${name}"`);
     return m.id;
   };
 
   /** Sửa nhanh thành phẩm ngay tại màn (ghi thẳng Danh mục mặt hàng). */
-  const productEditor = useQuickCatalogEdit("matHang", products, setProducts, {
+  const productEditor = useQuickCatalogEdit("product", products, setProducts, {
     // Ô "Bột đi kèm" trong hộp sửa thấy + tạo loại bột qua đúng danh mục của màn.
-    batterSource: { rows: batterTypes, create: (ten) => addBatterRecord(ten).id },
+    batterSource: { rows: batterTypes, create: (name) => addBatterRecord(name).id },
     getDescription: (m) => {
       const n = rows.filter((r) => r.productId === m.id).length;
       return n > 0
@@ -284,20 +284,20 @@ export default function WipProductionScreen() {
   });
   const openProductEdit = productEditor.openEdit;
   /** Ô khách ở /wip lưu theo TÊN (customerName). */
-  const customerEditor = useQuickCatalogEdit("khachHang", customers, setCustomers, { theo: "ten" });
-  const materialTypeEditor = useQuickCatalogEdit("loaiNL", materialTypes, setMaterialTypes, { theo: "ten" });
+  const customerEditor = useQuickCatalogEdit("customer", customers, setCustomers, { matchBy: "name" });
+  const materialTypeEditor = useQuickCatalogEdit("materialType", materialTypes, setMaterialTypes, { matchBy: "name" });
 
-  const addCustomer = (ten: string): string => {
-    setCustomers([...customers, { id: uid(), code: "", name: ten, market: "" }]);
-    notify.saved(`Đã thêm khách hàng "${ten}"`);
-    return ten;
+  const addCustomer = (name: string): string => {
+    setCustomers([...customers, { id: uid(), code: "", name, market: "" }]);
+    notify.saved(`Đã thêm khách hàng "${name}"`);
+    return name;
   };
 
   /* ---- Ô chọn danh mục cho khối Bán nội địa: value = TÊN, thêm mới + bút chì ---- */
-  const addMaterialTypeName = (ten: string): string => {
-    const trimmedName = ten.trim();
-    const co = materialTypes.find((l) => l.name.trim().toLowerCase() === trimmedName.toLowerCase());
-    if (co) return co.name;
+  const addMaterialTypeName = (name: string): string => {
+    const trimmedName = name.trim();
+    const existing = materialTypes.find((l) => l.name.trim().toLowerCase() === trimmedName.toLowerCase());
+    if (existing) return existing.name;
     setMaterialTypes([...materialTypes, { id: uid(), name: trimmedName, category: "", note: "" }]);
     notify.saved(`Đã thêm loại nguyên liệu "${trimmedName}"`);
     return trimmedName;
@@ -318,22 +318,22 @@ export default function WipProductionScreen() {
   };
 
   /* ---- Bột tẩm (mig 0051): danh mục loại bột — dòng sản lượng lưu theo TÊN ---- */
-  const optBot: ComboboxOption[] = batterTypes.map((b) => ({
+  const batterOptions: ComboboxOption[] = batterTypes.map((b) => ({
     value: b.name,
     label: b.name,
     subLabel: [b.code && `Mã ${b.code}`, b.note].filter(Boolean).join(" · ") || undefined,
   }));
   /** Tạo loại bột tại chỗ (trùng tên ⇒ dùng lại loại có sẵn). Trả về bản ghi. */
-  const addBatterRecord = (ten: string) => {
-    const result = findOrCreateBatter(batterTypes, ten);
+  const addBatterRecord = (name: string) => {
+    const result = findOrCreateBatter(batterTypes, name);
     if (result.isNew) {
       setBatterTypes(result.rows);
       notify.saved(`Đã thêm loại bột "${result.batter.name}" vào danh mục`);
     }
     return result.batter;
   };
-  const addBatter = (ten: string): string => addBatterRecord(ten).name;
-  const batterEditor = useQuickCatalogEdit("botTam", batterTypes, setBatterTypes, { theo: "ten" });
+  const addBatter = (name: string): string => addBatterRecord(name).name;
+  const batterEditor = useQuickCatalogEdit("batter", batterTypes, setBatterTypes, { matchBy: "name" });
   /** Tên bột đi kèm của một mặt hàng (theo danh mục bột hiện có). */
   const batterNamesOf = (productId: string) =>
     getProductBatterNames(
@@ -343,7 +343,7 @@ export default function WipProductionScreen() {
   /** "24V 12 · 18V 30" — nhãn gọn cho ô hẹp. */
   const describeBatter = (m: Record<string, number> | undefined) =>
     Object.entries(sanitizeBatterKg(m))
-      .map(([ten, v]) => `${toShortBatterLabel(ten)} ${num(v)}`)
+      .map(([name, v]) => `${toShortBatterLabel(name)} ${num(v)}`)
       .join(" · ");
 
   const view = useMemo(
@@ -476,7 +476,7 @@ export default function WipProductionScreen() {
   // Form-first: vào chế độ "Ghi nhập" mà chưa có phiếu → tự mở một phiếu trống
   // (không cần bấm nút, không modal). Lưu xong phiếu về null → tự mở phiếu mới.
   useEffect(() => {
-    if (mode === "nhap" && session === null && !isLoading) openAdd();
+    if (mode === "entry" && session === null && !isLoading) openAdd();
     // moThem đọc bộ lọc hiện tại; guard theo phien===null nên không lặp.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, session, isLoading]);
@@ -487,8 +487,8 @@ export default function WipProductionScreen() {
   const sessionDate = session?.productionDate;
   const sessionWorkshop = session?.workshop;
   useEffect(() => {
-    if (mode === "nhap" && sessionDate !== undefined && sessionWorkshop !== undefined) {
-      setKy("ngay");
+    if (mode === "entry" && sessionDate !== undefined && sessionWorkshop !== undefined) {
+      setPeriod("day");
       setDate(sessionDate);
       setWorkshop(sessionWorkshop);
     }
@@ -505,15 +505,15 @@ export default function WipProductionScreen() {
   // "Thêm thành phẩm" từng dòng. "Trống" = chưa có SP lẫn kg (nhãn nhóm không
   // tính). Sau khi thêm, nhóm có dòng trống → lần chạy sau không thêm nữa (ổn định).
   useEffect(() => {
-    if (mode !== "nhap" || !session) return;
-    const theoNhom = new Map<string, ProductionLine[]>();
+    if (mode !== "entry" || !session) return;
+    const byGroup = new Map<string, ProductionLine[]>();
     for (const d of tableRows) {
-      const g = theoNhom.get(d.groupId) ?? [];
+      const g = byGroup.get(d.groupId) ?? [];
       g.push(d);
-      theoNhom.set(d.groupId, g);
+      byGroup.set(d.groupId, g);
     }
     const toAdd: ProductionLine[] = [];
-    for (const [gid, items] of theoNhom)
+    for (const [gid, items] of byGroup)
       // Nhóm ĐÃ ĐỦ hết (mọi dòng có SP + kg) → chừa thêm một dòng trống để gõ tiếp.
       // Dòng đang gõ dở (mới chọn mã, chưa có kg) chưa tính → không nhảy dòng non.
       if (items.length > 0 && items.every((d) => isLineComplete(d)))
@@ -589,7 +589,7 @@ export default function WipProductionScreen() {
   const saveSession = (imLang: boolean): boolean => {
     if (!session) return true;
     const validRows = tableRows.filter(isLineComplete);
-    const validDomesticRows = dongBND.filter(isDomesticSaleLineComplete);
+    const validDomesticRows = domesticSaleLines.filter(isDomesticSaleLineComplete);
     const ls: FieldError[] = [...sessionHeaderErrors(session)];
     if (validRows.length === 0 && validDomesticRows.length === 0)
       ls.push({
@@ -597,7 +597,7 @@ export default function WipProductionScreen() {
         message: "Thêm ít nhất một thành phẩm (hoặc một dòng bán nội địa) vào phiên",
       });
     if (!imLang)
-      dongBND.forEach((d, i) => {
+      domesticSaleLines.forEach((d, i) => {
         if (!isDomesticSaleLineEmpty(d) && !isDomesticSaleLineComplete(d))
           ls.push({
             field: `Bán nội địa dòng ${i + 1}`,
@@ -664,7 +664,7 @@ export default function WipProductionScreen() {
       wips: newWips,
       domesticSales: newDomesticSales,
       materialLots: sessionLotsOf(session),
-      traceData: dlNhe,
+      traceData: lightTraceData,
       operator,
       recordedAt: new Date().toISOString(),
       newId,
@@ -677,21 +677,21 @@ export default function WipProductionScreen() {
     //  - quy cách block (kg/khối) vừa nhập;
     //  - bộ BỘT ĐI KÈM: mã CHƯA gắn bột mà dòng có ghi bột ⇒ gắn các loại vừa dùng.
     //    Mã đã gắn thì KHÔNG đổi (bột nhập thêm tại chỗ chỉ là của dòng đó).
-    // Gộp vào MỘT lần setMatHang — gọi hai lần sẽ lấy cùng `matHang` cũ, lần sau đè lần trước.
+    // Gộp vào MỘT lần setMatHang — gọi hai lần sẽ lấy cùng `product` cũ, lần sau đè lần trước.
     const batterIdByName = new Map(batterTypes.map((b) => [b.name.trim(), b.id]));
     const productPatches = new Map<string, Partial<Product>>();
     for (const d of validRows) {
       const p = products.find((m) => m.id === d.productId);
       if (!p) continue;
-      const va: Partial<Product> = { ...productPatches.get(p.id) };
+      const patch: Partial<Product> = { ...productPatches.get(p.id) };
       if (d.blockSpecKg > 0 && blockSpec(p) !== d.blockSpecKg)
-        va.blockSpecKg = d.blockSpecKg;
-      const idsBot = Object.keys(sanitizeBatterKg(d.batterKg))
-        .map((ten) => batterIdByName.get(ten) ?? "")
+        patch.blockSpecKg = d.blockSpecKg;
+      const batterIds = Object.keys(sanitizeBatterKg(d.batterKg))
+        .map((name) => batterIdByName.get(name) ?? "")
         .filter(Boolean);
-      if (getProductBatterIds(p).length === 0 && idsBot.length > 0 && !va.batterIds)
-        va.batterIds = idsBot;
-      if (Object.keys(va).length > 0) productPatches.set(p.id, va);
+      if (getProductBatterIds(p).length === 0 && batterIds.length > 0 && !patch.batterIds)
+        patch.batterIds = batterIds;
+      if (Object.keys(patch).length > 0) productPatches.set(p.id, patch);
     }
     if (productPatches.size > 0)
       setProducts(products.map((m) => (productPatches.has(m.id) ? { ...m, ...productPatches.get(m.id) } : m)));
@@ -734,7 +734,7 @@ export default function WipProductionScreen() {
       session.productionDate < effectiveFrom ||
       session.productionDate > effectiveTo
     ) {
-      setKy("ngay");
+      setPeriod("day");
       setDate(session.productionDate);
     }
     if (workshop !== "Tất cả" && workshop !== session.workshop)
@@ -745,7 +745,7 @@ export default function WipProductionScreen() {
   const resetSession = () => {
     setSession(null);
     setTableRows([]);
-    setDongBND([]);
+    setDomesticSaleLines([]);
     setSessionErrors([]);
   };
   const finishSession = () => {
@@ -889,7 +889,7 @@ export default function WipProductionScreen() {
   /* ---- A4: gửi báo cáo TP lên hệ thống (tách khỏi chốt ngày) ---- */
   const reportKey = `${effectiveFrom}${isSingleDay ? "" : `..${effectiveTo}`}·${workshop}`;
   const submitReport = () => {
-    const dong = operatorReport
+    const row = operatorReport
       .map((b) => `${b.workshop}/${b.operator}: ${b.rowCount} dòng · ${kg(b.kg)}`)
       .join("; ");
     appendAuditEntries([
@@ -897,7 +897,7 @@ export default function WipProductionScreen() {
         action: "submit",
         entity: "production_report",
         entityKey: reportKey,
-        summary: `Gửi báo cáo thành phẩm ${rangeDescription} · ${workshop} — tổng ${kg(total)} (${view.length} dòng). ${dong}`,
+        summary: `Gửi báo cáo thành phẩm ${rangeDescription} · ${workshop} — tổng ${kg(total)} (${view.length} dòng). ${row}`,
         diff: {
           sender: operator,
           total,
@@ -921,7 +921,7 @@ export default function WipProductionScreen() {
   const lockDay = () => {
     /* Sổ chốt SX chưa nạp xong ⇒ chưa biết máy chủ đã có bản ghi (ngày, xưởng)
        chưa; tạo bản mới lúc này có thể trùng chỉ mục duy nhất ⇒ 23505. */
-    if (lockStatus === "dang-tai") {
+    if (lockStatus === "loading") {
       notify.error("Đang tải sổ chốt sản xuất từ máy chủ — đợi vài giây rồi bấm chốt lại");
       return;
     }
@@ -953,13 +953,13 @@ export default function WipProductionScreen() {
     // Gom còn dở theo tên loại NL (cộng dồn trùng, bỏ dòng trống / ≤ 0).
     const leftoverByMaterial: Record<string, number> = {};
     for (const d of leftover) {
-      const ten = d.name.trim();
+      const name = d.name.trim();
       const kgv = d.kg ?? 0;
-      if (!ten || kgv <= 0) continue;
-      leftoverByMaterial[ten] = (leftoverByMaterial[ten] ?? 0) + kgv;
+      if (!name || kgv <= 0) continue;
+      leftoverByMaterial[name] = (leftoverByMaterial[name] ?? 0) + kgv;
     }
     const leftoverTotal = Object.values(leftoverByMaterial).reduce((s, v) => s + v, 0);
-    const ban: DailyLock = {
+    const sale: DailyLock = {
       /* Có bản ghi ⇒ dùng lại id; chưa có ⇒ id CỐ ĐỊNH ngày|xưởng (không newId()):
          hai máy cùng chốt ghi CÙNG một dòng, không đụng chỉ mục duy nhất
          (site, ngày, xưởng) rồi kẹt hàng chờ. */
@@ -974,7 +974,7 @@ export default function WipProductionScreen() {
       leftoverKg: leftoverTotal,
       leftoverByMaterial,
     };
-    persistLocks(bg ? locks.map((c) => (c.id === bg.id ? ban : c)) : [...locks, ban]);
+    persistLocks(bg ? locks.map((c) => (c.id === bg.id ? sale : c)) : [...locks, sale]);
     notify.saved(
       `Đã chốt SX ${formatDateVN(effectiveFrom)} · xưởng ${activeWorkshop} — ${kg(actualTotal)}` +
         (leftoverTotal > 0 ? ` · còn dở ${kg(leftoverTotal)}` : "") +
@@ -1072,11 +1072,11 @@ export default function WipProductionScreen() {
       header: "Trạng thái",
       render: (r) =>
         r.status === "stocked" ? (
-          <Tag variant="xong">
+          <Tag variant="done">
             Đã nhập kho{r.warehouse ? ` · ${r.warehouse}` : ""}
           </Tag>
         ) : (
-          <Tag variant="cho">Chờ nhập kho</Tag>
+          <Tag variant="pending">Chờ nhập kho</Tag>
         ),
       getSortValue: (r) => r.status,
     },
@@ -1151,7 +1151,7 @@ export default function WipProductionScreen() {
 
       {/* Lô NL dùng cho phiên (truy xuất QR đợt 2b) — khai một lần, lưu là gắn cho mọi mẻ cùng loài. */}
       <SessionLotsSection
-        traceData={dlNhe}
+        traceData={lightTraceData}
         workshop={session.workshop}
         date={session.productionDate}
         sessionLots={sessionLotsOf(session)}
@@ -1182,7 +1182,7 @@ export default function WipProductionScreen() {
           customerOptions={customerOptions}
           onCreateCustomer={addCustomer}
           batterTypes={batterTypes}
-          batterOptions={optBot}
+          batterOptions={batterOptions}
           onCreateBatter={addBatter}
           onEditBatter={batterEditor.openEdit}
         />
@@ -1204,12 +1204,12 @@ export default function WipProductionScreen() {
 
       {/* Bán nội địa (mig 0054): NL bán thẳng — sổ riêng, không cộng vào thành phẩm. */}
       <DomesticSaleSection
-        lines={dongBND}
+        lines={domesticSaleLines}
         onUpdateRow={(key, patch) =>
-          setDongBND((items) => items.map((d) => (d.key === key ? { ...d, ...patch } : d)))
+          setDomesticSaleLines((items) => items.map((d) => (d.key === key ? { ...d, ...patch } : d)))
         }
-        onRemove={(key) => setDongBND((items) => items.filter((d) => d.key !== key))}
-        onAddRow={() => setDongBND((items) => [...items, createEmptyDomesticSaleLine(items.at(-1)?.materialTypeName ?? "")])}
+        onRemove={(key) => setDomesticSaleLines((items) => items.filter((d) => d.key !== key))}
+        onAddRow={() => setDomesticSaleLines((items) => [...items, createEmptyDomesticSaleLine(items.at(-1)?.materialTypeName ?? "")])}
         materialTypeCell={materialTypeFieldProps}
         customerField={customerFieldProps}
       />
@@ -1251,10 +1251,10 @@ export default function WipProductionScreen() {
           <button
             title="Sang chế độ Ghi nhập để gõ sản lượng thành phẩm."
             type="button"
-            onClick={() => setMode("nhap")}
+            onClick={() => setMode("entry")}
             className={cn(
               "flex-1 px-4 py-2.5 text-base font-semibold transition-colors sm:flex-none",
-              mode === "nhap"
+              mode === "entry"
                 ? "bg-primary text-primary-foreground"
                 : "bg-card text-muted-foreground hover:bg-muted"
             )}
@@ -1264,10 +1264,10 @@ export default function WipProductionScreen() {
           <button
             title="Xem sổ sản lượng đã ghi trong ngày và báo cáo theo xưởng, chốt ngày tại đây."
             type="button"
-            onClick={() => setMode("so")}
+            onClick={() => setMode("ledger")}
             className={cn(
               "flex-1 border-l-2 border-border px-4 py-2.5 text-base font-semibold transition-colors sm:flex-none",
-              mode === "so"
+              mode === "ledger"
                 ? "bg-primary text-primary-foreground"
                 : "bg-card text-muted-foreground hover:bg-muted"
             )}
@@ -1282,9 +1282,9 @@ export default function WipProductionScreen() {
         task={`thành phẩm làm ra hôm nay — xưởng ${recordWorkshop}`}
       />
 
-      {mode === "nhap" && entryForm}
+      {mode === "entry" && entryForm}
 
-      {mode === "so" && (
+      {mode === "ledger" && (
         <>
       <div className="flex flex-wrap gap-2">
         <Button
@@ -1296,8 +1296,8 @@ export default function WipProductionScreen() {
       <StatCardGrid
         className="grid-cols-2 sm:grid-cols-3 lg:grid-cols-5"
         cards={[
-          { label: "Đang xem", value: rangeDescription, icon: CalendarRange, color: "trung-tinh" },
-          { label: "Phân xưởng", value: workshop, icon: Warehouse, color: "trung-tinh" },
+          { label: "Đang xem", value: rangeDescription, icon: CalendarRange, color: "neutral" },
+          { label: "Phân xưởng", value: workshop, icon: Warehouse, color: "neutral" },
           { label: "Số dòng", value: view.length, numeric: true, icon: ClipboardList, color: "brand" },
           { label: "Chờ nhập kho", value: pendingInCount, numeric: true, icon: Hourglass, color: "warning" },
           { label: "Tổng sản lượng", value: kg(total), numeric: true, icon: Scale, color: "success" },
@@ -1309,22 +1309,22 @@ export default function WipProductionScreen() {
           label="Kỳ xem sổ"
           hideRequiredMark
           clearable={false}
-          value={ky}
-          onChange={(v) => setKy(v as ViewPeriod)}
-          options={KY_OPT}
+          value={period}
+          onChange={(v) => setPeriod(v as ViewPeriod)}
+          options={PERIOD_OPTIONS}
           className="min-w-[13rem]"
         />
         <div className="min-w-[220px] flex-1">
-          {ky === "tuy-chon" ? (
+          {period === "custom" ? (
             <DateRangeField
               label="Khoảng ngày sản xuất"
               hideRequiredMark
               presets={false}
               startDate={fromDate}
               endDate={toDate}
-              onChange={(tu, den) => {
-                setFromDate(tu);
-                setToDate(den);
+              onChange={(fromDate, toDate) => {
+                setFromDate(fromDate);
+                setToDate(toDate);
               }}
             />
           ) : (
@@ -1332,7 +1332,7 @@ export default function WipProductionScreen() {
               label="Ngày sản xuất"
               hideRequiredMark
               hint={
-                ky === "ngay"
+                period === "day"
                   ? undefined
                   : `Kỳ: ${formatDateVN(effectiveFrom)} – ${formatDateVN(effectiveTo)}`
               }
@@ -1364,7 +1364,7 @@ export default function WipProductionScreen() {
           description={`Phân xưởng ${workshop}. Chuyển sang "Ghi nhập" để ghi.`}
           action={
             <Button
-              title="Chuyển sang chế độ Ghi để nhập sản lượng cho ngày này." size="lg" onClick={() => setMode("nhap")}>
+              title="Chuyển sang chế độ Ghi để nhập sản lượng cho ngày này." size="lg" onClick={() => setMode("entry")}>
               <Plus />
               Sang Ghi nhập
             </Button>
@@ -1584,9 +1584,9 @@ export default function WipProductionScreen() {
                 setLockNote(currentLock?.note ?? "");
                 const lb = currentLock?.leftoverByMaterial ?? {};
                 setLeftover(
-                  Object.entries(lb).map(([ten, v]) => ({
+                  Object.entries(lb).map(([name, v]) => ({
                     id: uid(),
-                    name: ten,
+                    name,
                     kg: Number(v) || null,
                   }))
                 );
@@ -1707,7 +1707,7 @@ export default function WipProductionScreen() {
                     value={edit.productId}
                     onChange={(v) => patchEdit({ productId: v })}
                     options={productOptions}
-                    onCreate={(ten) => addProduct(ten)}
+                    onCreate={(name) => addProduct(name)}
                     emptyText="Chưa có thành phẩm — gõ tên rồi Thêm mới."
                     onEditItem={openProductEdit}
                     editLabel={productEditor.editLabel}
@@ -1731,7 +1731,7 @@ export default function WipProductionScreen() {
                 value={edit.customerName ?? ""}
                 onChange={(v) => patchEdit({ customerName: v })}
                 options={customerOptions}
-                onCreate={(ten) => addCustomer(ten)}
+                onCreate={(name) => addCustomer(name)}
                 placeholder="Chọn khách hàng (nếu có)"
                 emptyText="Chưa có khách — gõ tên rồi Thêm mới."
                 onEditItem={customerEditor.openEdit}
@@ -1784,7 +1784,7 @@ export default function WipProductionScreen() {
                     bundledIds={batterNamesOf(edit.productId)}
                     batterKg={edit.batterKg ?? {}}
                     onChange={(batterKg) => patchEdit({ batterKg })}
-                    batterOptions={optBot}
+                    batterOptions={batterOptions}
                     onCreateBatter={addBatter}
                     onEditBatter={batterEditor.openEdit}
                     productKg={editTotal}
@@ -1924,7 +1924,7 @@ export default function WipProductionScreen() {
           {batchesWithoutLot.length > 0 && (
             <div className="min-w-0 space-y-2 rounded-lg border-2 border-warning/60 bg-warning/10 p-3">
               <p className="flex flex-wrap items-center gap-2 font-semibold text-foreground">
-                <Tag variant="luu-y">Chưa gắn lô</Tag>
+                <Tag variant="warning">Chưa gắn lô</Tag>
                 {batchesWithoutLot.length} mẻ chưa ghi đã dùng lô nguyên liệu nào
               </p>
               <p className="text-muted-foreground">
@@ -2001,12 +2001,12 @@ export default function WipProductionScreen() {
                         onEditItem={materialTypeEditor.openEdit}
                         editLabel={materialTypeEditor.editLabel}
                         canEdit={materialTypeEditor.canEdit}
-                        onCreate={(ten) => {
+                        onCreate={(name) => {
                           setMaterialTypes([
                             ...materialTypes,
-                            { id: uid(), name: ten, category: "", note: "" },
+                            { id: uid(), name, category: "", note: "" },
                           ]);
-                          return ten;
+                          return name;
                         }}
                         placeholder="— Chọn loại NL —"
                       />

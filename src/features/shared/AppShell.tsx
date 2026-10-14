@@ -133,7 +133,7 @@ export interface NavTreeGroup {
  * Gom về 1 mục thay vì 1-mục-mỗi-tab: danh mục vốn là MỘT trang nhiều tab, không
  * cần tách sidebar theo từng tab. Danh mục ĐẦY ĐỦ vẫn ở nhóm Hệ thống ("Danh mục").
  */
-const TRACUU = (tab: string): NavTreeChild => ({
+const LOOKUP_CHILD = (tab: string): NavTreeChild => ({
   to: `catalog?tab=${tab}`,
   gateId: "catalog",
   label: "Tra cứu",
@@ -145,7 +145,7 @@ export const NAV_TREE: NavTreeGroup[] = [
   {
     name: "Nhập hàng",
     icon: Truck,
-    children: [{ ref: "imports" }, { ref: "nxt-material" }, TRACUU("suppliers")],
+    children: [{ ref: "imports" }, { ref: "nxt-material" }, LOOKUP_CHILD("suppliers")],
   },
   {
     name: "Sản xuất",
@@ -154,7 +154,7 @@ export const NAV_TREE: NavTreeGroup[] = [
       { ref: "wip" },
       { ref: "packaging" },
       { ref: "qc" },
-      TRACUU("products"),
+      LOOKUP_CHILD("products"),
     ],
   },
   {
@@ -165,13 +165,13 @@ export const NAV_TREE: NavTreeGroup[] = [
       { ref: "monthly-stock" },
       { ref: "qr" },
       { ref: "nxt-warehouse" },
-      TRACUU("storage-locations"),
+      LOOKUP_CHILD("storage-locations"),
     ],
   },
   {
     name: "Kinh doanh",
     icon: ShoppingCart,
-    children: [{ ref: "sales" }, { ref: "orders" }, TRACUU("customers")],
+    children: [{ ref: "sales" }, { ref: "orders" }, LOOKUP_CHILD("customers")],
   },
   {
     name: "Báo cáo & Cân đối",
@@ -214,15 +214,15 @@ interface DisplayGroup {
  * Mục trong `items` không nằm trong cây rơi vào nhóm "Khác" để không mất.
  */
 function groupTree(items: ShellNavItem[]): DisplayGroup[] {
-  const con = new Map(items.map((i) => [i.id, i]));
+  const childById = new Map(items.map((i) => [i.id, i]));
   const used = new Set<string>();
-  const nhom: DisplayGroup[] = [];
+  const group: DisplayGroup[] = [];
 
   for (const g of NAV_TREE) {
     const childItems: NavChild[] = [];
     for (const c of g.children) {
       if (c.ref) {
-        const m = con.get(c.ref);
+        const m = childById.get(c.ref);
         if (!m) continue;
         childItems.push({
           key: m.id === "catalog" ? "catalog" : m.id,
@@ -234,7 +234,7 @@ function groupTree(items: ShellNavItem[]): DisplayGroup[] {
           isCatalogLink: false,
         });
         used.add(c.ref);
-      } else if (c.to && c.gateId && con.has(c.gateId)) {
+      } else if (c.to && c.gateId && childById.has(c.gateId)) {
         childItems.push({
           key: c.to,
           target: c.to,
@@ -248,14 +248,14 @@ function groupTree(items: ShellNavItem[]): DisplayGroup[] {
     // Bỏ deep-link danh mục MỒ CÔI: nếu module không có MÀN thật nào người dùng
     // thấy (vai trò bộ phận), đừng hiện nhánh chỉ có shortcut danh mục — danh mục
     // đầy đủ vẫn vào được ở nhóm Hệ thống. (Admin có đủ màn nên không đụng.)
-    const coMan = childItems.some((m) => !m.isCatalogLink);
-    const keptItems = coMan ? childItems : [];
-    if (keptItems.length) nhom.push({ name: g.name, icon: g.icon, items: keptItems });
+    const hasScreens = childItems.some((m) => !m.isCatalogLink);
+    const keptItems = hasScreens ? childItems : [];
+    if (keptItems.length) group.push({ name: g.name, icon: g.icon, items: keptItems });
   }
 
   const remaining = items.filter((i) => !used.has(i.id));
   if (remaining.length) {
-    nhom.push({
+    group.push({
       name: "Khác",
       icon: Library,
       items: remaining.map((m) => ({
@@ -269,7 +269,7 @@ function groupTree(items: ShellNavItem[]): DisplayGroup[] {
       })),
     });
   }
-  return nhom;
+  return group;
 }
 
 const ICON_BUTTON_CLASS =
@@ -334,7 +334,7 @@ function NavItemButton({
         <span className="min-w-0 whitespace-normal break-words leading-tight">{m.label}</span>
       )}
       {!isCollapsed && m.demo && (
-        <Tag variant="phu" className="ml-auto">
+        <Tag variant="muted" className="ml-auto">
           DEMO
         </Tag>
       )}
@@ -359,7 +359,7 @@ function NavTree({
   onSelect: (target: string) => void;
   collapsed?: boolean;
   openGroups: Record<string, boolean>;
-  onToggle: (ten: string) => void;
+  onToggle: (name: string) => void;
 }) {
   return (
     <nav className="scroll-nice flex-1 overflow-y-auto p-3">
@@ -397,9 +397,9 @@ function NavTree({
             </div>
           );
         }
-        const mo = openGroups[g.name] !== false; // mặc định mở
+        const open = openGroups[g.name] !== false; // mặc định mở
         const GIcon = g.icon;
-        const coActive = g.items.some((m) => m.key === activeKey);
+        const hasActive = g.items.some((m) => m.key === activeKey);
         return (
           <div key={g.name} className={cn(i > 0 && "mt-2")}>
             {/* Tiêu đề nhóm module = 1 LỚP: chữ hoa nhỏ + gạch dưới nhạt cho tách
@@ -408,11 +408,11 @@ function NavTree({
               title="Gập / mở nhóm menu này. Máy nhớ trạng thái cho lần vào sau."
               type="button"
               onClick={() => onToggle(g.name)}
-              aria-expanded={mo}
+              aria-expanded={open}
               className={cn(
                 "press-feedback",
                 "flex min-h-9 w-full items-center gap-2 rounded-lg px-3 text-left text-xs font-bold uppercase tracking-wide transition-colors hover:bg-muted",
-                coActive ? "text-primary" : "text-muted-foreground"
+                hasActive ? "text-primary" : "text-muted-foreground"
               )}
             >
               <GIcon className="size-icon-sm shrink-0" aria-hidden />
@@ -420,12 +420,12 @@ function NavTree({
               <ChevronDown
                 className={cn(
                   "size-icon-sm shrink-0 transition-transform duration-base ease-soft",
-                  mo ? "" : "-rotate-90"
+                  open ? "" : "-rotate-90"
                 )}
                 aria-hidden
               />
             </button>
-            {mo && (
+            {open && (
               // Rail dọc + thụt lề = con thuộc nhóm này (nhìn thấy rõ phân lớp).
               // enter-up: mở nhóm thì danh sách con nhích lên hiện vào.
               <div className="enter-up mt-1 ml-5 space-y-1 border-l-2 border-border pl-2">
@@ -447,9 +447,9 @@ function NavTree({
   );
 }
 
-function Initials(ten: string): string {
+function Initials(name: string): string {
   return (
-    String(ten || "?")
+    String(name || "?")
       .trim()
       .split(/\s+/)
       .slice(-2)
@@ -488,7 +488,7 @@ export interface AppShellProps {
   children: ReactNode;
 }
 
-const KEY_NAV_NHOM = "bsf1:nav-nhom";
+const KEY_NAV_GROUPS = "bsf1:nav-nhom";
 const isGroupFlags = (v: unknown): v is Record<string, boolean> =>
   typeof v === "object" && v !== null && !Array.isArray(v);
 
@@ -518,7 +518,7 @@ export default function AppShell({
   const isCollapsed =
     collapsePick && collapsePick.narrow === isNarrowSidebar ? collapsePick.collapsed : isNarrowSidebar;
   const [moNav, setMoNav] = useState(false);
-  const nhom = groupTree(items);
+  const group = groupTree(items);
 
   // Deep-link danh mục tô sáng theo tab; các màn khác so theo id path.
   const activeKey =
@@ -526,12 +526,12 @@ export default function AppShell({
 
   // Trạng thái gập/mở từng nhóm (mặc định mở), nhớ theo máy.
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() =>
-    readDevicePrefJson(KEY_NAV_NHOM, {}, isGroupFlags),
+    readDevicePrefJson(KEY_NAV_GROUPS, {}, isGroupFlags),
   );
-  const toggleNhom = (ten: string) =>
+  const toggleGroup = (name: string) =>
     setOpenGroups((m) => {
-      const next = { ...m, [ten]: m[ten] === false };
-      writeDevicePrefJson(KEY_NAV_NHOM, next);
+      const next = { ...m, [name]: m[name] === false };
+      writeDevicePrefJson(KEY_NAV_GROUPS, next);
       return next;
     });
 
@@ -573,12 +573,12 @@ export default function AppShell({
           <Logo heightClass="h-9" showWordmark={!isCollapsed} subtitle={isCollapsed ? undefined : "Xí nghiệp BSF1"} />
         </div>
         <NavTree
-          groups={nhom}
+          groups={group}
           activeKey={activeKey}
           onSelect={onSelect}
           collapsed={isCollapsed}
           openGroups={openGroups}
-          onToggle={toggleNhom}
+          onToggle={toggleGroup}
         />
       </aside>
 
@@ -603,11 +603,11 @@ export default function AppShell({
             </div>
 
             <NavTree
-              groups={nhom}
+              groups={group}
               activeKey={activeKey}
               onSelect={select}
               openGroups={openGroups}
-              onToggle={toggleNhom}
+              onToggle={toggleGroup}
             />
 
             {/* Chân drawer: những gì KHÔNG còn chỗ trên header điện thoại. Máy xoay

@@ -1,1 +1,1 @@
-export { default } from "./QrTraCuuScreen";
+export { default } from "./QrLookupScreen";

@@ -33,16 +33,16 @@ import { Layers } from "lucide-react";
  */
 export function BulkTypeChangeDialog({
   rows,
-  loaiNL: materialTypes,
+  materialTypes,
   onCreateMaterialType: onAddMaterialType,
   materialTypeEdit: materialTypeEditor,
   onClose,
   onSave,
 }: {
   rows: MaterialImportItem[];
-  loaiNL: MaterialType[];
-  onCreateMaterialType: (ten: string) => string;
-  /** Bút chì sửa nhanh loại NL (từ `useQuickCatalogEdit("loaiNL", …, { theo: "ten" })` của màn gọi). */
+  materialTypes: MaterialType[];
+  onCreateMaterialType: (names: string) => string;
+  /** Bút chì sửa nhanh loại NL (từ `useQuickCatalogEdit("materialType", …, { matchBy: "name" })` của màn gọi). */
   materialTypeEdit?: {
     openEdit: (value: string) => void;
     canEdit: (value: string) => boolean;
@@ -59,11 +59,11 @@ export function BulkTypeChangeDialog({
 
   /** Tên loại NL có THẬT trong sổ + có trong danh mục — lọc theo cả hai nguồn. */
   const typeOptions = useMemo(() => {
-    const ten = new Set<string>([
+    const names = new Set<string>([
       ...rows.map((r) => r.materialTypeName).filter(Boolean),
       ...materialTypes.map((l) => l.name),
     ]);
-    return [...ten].sort((a, b) => a.localeCompare(b, "vi")).map((t) => ({ value: t, label: t }));
+    return [...names].sort((a, b) => a.localeCompare(b, "vi")).map((t) => ({ value: t, label: t }));
   }, [rows, materialTypes]);
 
   const matchedRows = useMemo(() => {
@@ -75,7 +75,7 @@ export function BulkTypeChangeDialog({
       .sort((a, b) => a.deliveryDate.localeCompare(b.deliveryDate));
   }, [rows, sourceType, fromDate, toDate]);
 
-  const doi = (id: string) =>
+  const toggle = (id: string) =>
     setSelectedIds((prev) => {
       const nextSet = new Set(prev);
       if (nextSet.has(id)) nextSet.delete(id);
@@ -126,9 +126,9 @@ export function BulkTypeChangeDialog({
           hideRequiredMark
           startDate={fromDate}
           endDate={toDate}
-          onChange={(tu, den) => {
-            setFromDate(tu);
-            setToDate(den);
+          onChange={(fromDate, toDate) => {
+            setFromDate(fromDate);
+            setToDate(toDate);
             setSelectedIds(new Set());
           }}
         />
@@ -180,7 +180,7 @@ export function BulkTypeChangeDialog({
                           type="checkbox"
                           className="size-6"
                           checked={selectedIds.has(r.id)}
-                          onChange={() => doi(r.id)}
+                          onChange={() => toggle(r.id)}
                           aria-label={`Đổi loại chuyến ${r.supplierName} ngày ${formatDateVN(r.deliveryDate)}`}
                         />
                       </td>

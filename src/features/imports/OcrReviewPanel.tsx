@@ -6,7 +6,7 @@
 import { useState, type ReactNode } from "react";
 import { Button, Tag } from "@/design-system";
 import { Minus, Plus as PlusIcon, Maximize2 } from "lucide-react";
-import type { KetQuaOcr, OcrCatalog } from "@/lib/ocr";
+import type { OcrResult, OcrCatalog } from "@/lib/ocr";
 import { kg as fmtKg, formatDateVN, num } from "@/lib/format";
 import type { OcrHeaderField, OcrSelection } from "./importHelpers";
 
@@ -98,7 +98,7 @@ export function OcrReviewTable({
   selection,
   onSelectionChange,
 }: {
-  result: KetQuaOcr;
+  result: OcrResult;
   catalog: OcrCatalog;
   selection: OcrSelection;
   onSelectionChange: (s: OcrSelection) => void;
@@ -132,7 +132,7 @@ export function OcrReviewTable({
     if (!v)
       return {
         status: raw[f] ? (
-          <Tag variant="luu-y">
+          <Tag variant="warning">
             {f === "supplier"
               ? "Chưa khớp, chọn tay"
               : "Chưa hiểu, điền tay"}
@@ -141,7 +141,7 @@ export function OcrReviewTable({
       };
     if (f === "date") return { value: formatDateVN(v) };
     if (f === "supplier" || f === "workshop")
-      return { value: v, status: <Tag variant="xong">Khớp danh mục</Tag> };
+      return { value: v, status: <Tag variant="done">Khớp danh mục</Tag> };
     const known =
       f === "licensePlate"
         ? knownPlates.has(v.toUpperCase())
@@ -149,9 +149,9 @@ export function OcrReviewTable({
     return {
       value: v,
       status: known ? (
-        <Tag variant="xong">Đã có trong sổ</Tag>
+        <Tag variant="done">Đã có trong sổ</Tag>
       ) : (
-        <Tag variant="luu-y">Mới, kiểm kỹ</Tag>
+        <Tag variant="warning">Mới, kiểm kỹ</Tag>
       ),
     };
   };
@@ -283,9 +283,9 @@ export function OcrReviewTable({
                       {fmtKg(result.totalKg)}
                     </span>{" "}
                     {totalMatches ? (
-                      <Tag variant="xong">Khớp</Tag>
+                      <Tag variant="done">Khớp</Tag>
                     ) : (
-                      <Tag variant="loi">
+                      <Tag variant="error">
                         Lệch {fmtKg(Math.abs(allLinesKg - result.totalKg))}
                       </Tag>
                     )}

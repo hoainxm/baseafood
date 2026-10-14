@@ -46,9 +46,9 @@ export function summarizeImportsByDay(imports: MaterialImportItem[]): Map<string
     shipments.get(d)!.add(r.shipmentId || r.id);
     kg.set(d, (kg.get(d) ?? 0) + r.quantityKg);
   }
-  const ra = new Map<string, { shipmentCount: number; kg: number }>();
-  for (const [d, s] of shipments) ra.set(d, { shipmentCount: s.size, kg: kg.get(d) ?? 0 });
-  return ra;
+  const result = new Map<string, { shipmentCount: number; kg: number }>();
+  for (const [d, s] of shipments) result.set(d, { shipmentCount: s.size, kg: kg.get(d) ?? 0 });
+  return result;
 }
 
 /**
@@ -64,44 +64,44 @@ export function groupDailyShipments(
   const bySupplier = new Map<string, Map<string, MaterialImportItem[]>>();
   for (const r of imports) {
     if (r.deliveryDate !== date) continue;
-    const dl = r.supplierName.trim() || "(chưa ghi đại lý)";
+    const supplier = r.supplierName.trim() || "(chưa ghi đại lý)";
     const k = r.shipmentId || r.id;
-    if (!bySupplier.has(dl)) bySupplier.set(dl, new Map());
-    const m = bySupplier.get(dl)!;
+    if (!bySupplier.has(supplier)) bySupplier.set(supplier, new Map());
+    const m = bySupplier.get(supplier)!;
     if (!m.has(k)) m.set(k, []);
     m.get(k)!.push(r);
   }
-  const ra: DailySupplierGroup[] = [];
+  const result: DailySupplierGroup[] = [];
   for (const [supplier, m] of bySupplier) {
     let i = 0;
     const shipments: DailyShipment[] = [...m].map(([shipmentId, items]) => {
       i += 1;
-      const dong = items.map((r) => ({
+      const row = items.map((r) => ({
         id: r.id,
         materialType: r.materialTypeName,
         kg: r.quantityKg,
         unitPrice: r.unitPrice,
         amount: rowAmount(r),
       }));
-      const dau = items[0];
+      const first = items[0];
       return {
         shipmentId,
         label: lotCodes.get(shipmentId) || `Chuyến ${i}`,
-        workshop: dau.workshop,
-        vehicle: [dau.licensePlate, dau.driverName].filter(Boolean).join(" · "),
-        lines: dong,
-        kg: dong.reduce((s, d) => s + d.kg, 0),
-        amount: dong.reduce((s, d) => s + d.amount, 0),
+        workshop: first.workshop,
+        vehicle: [first.licensePlate, first.driverName].filter(Boolean).join(" · "),
+        lines: row,
+        kg: row.reduce((s, d) => s + d.kg, 0),
+        amount: row.reduce((s, d) => s + d.amount, 0),
       };
     });
-    ra.push({
+    result.push({
       supplier,
       shipments,
       kg: shipments.reduce((s, c) => s + c.kg, 0),
       amount: shipments.reduce((s, c) => s + c.amount, 0),
     });
   }
-  return ra.sort((a, b) => b.kg - a.kg || a.supplier.localeCompare(b.supplier, "vi"));
+  return result.sort((a, b) => b.kg - a.kg || a.supplier.localeCompare(b.supplier, "vi"));
 }
 
 /** Một đại lý trong CẢ KỲ — cho dòng con theo đại lý dưới dòng loại NL của lưới. */
@@ -122,13 +122,13 @@ export interface PeriodSupplierRow {
 export function groupImportsBySupplier(imports: MaterialImportItem[]): PeriodSupplierRow[] {
   const m = new Map<string, PeriodSupplierRow>();
   for (const r of imports) {
-    const dl = r.supplierName.trim() || "(chưa ghi đại lý)";
-    const o = m.get(dl) ?? { supplier: dl, dailyAmounts: {}, kg: 0, amount: 0, ids: [] };
+    const supplier = r.supplierName.trim() || "(chưa ghi đại lý)";
+    const o = m.get(supplier) ?? { supplier, dailyAmounts: {}, kg: 0, amount: 0, ids: [] };
     o.dailyAmounts[r.deliveryDate] = (o.dailyAmounts[r.deliveryDate] ?? 0) + r.quantityKg;
     o.kg += r.quantityKg;
     o.amount += rowAmount(r);
     o.ids.push(r.id);
-    m.set(dl, o);
+    m.set(supplier, o);
   }
   return [...m.values()].sort((a, b) => b.kg - a.kg || a.supplier.localeCompare(b.supplier, "vi"));
 }

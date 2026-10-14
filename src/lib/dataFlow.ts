@@ -53,19 +53,19 @@ export const APPROVAL_WAIT_DAYS = 3;
 
 const isInRange = (date: string | undefined, k: FlowRange) => !!date && date >= k.fromDate && date <= k.toDate;
 const matchesWorkshop = (x: Workshop | "" | undefined, k: FlowRange) => !k.workshop || x === k.workshop;
-const sum = <T>(items: readonly T[], lay: (x: T) => number) => items.reduce((s, x) => s + (lay(x) || 0), 0);
+const sum = <T>(items: readonly T[], take: (x: T) => number) => items.reduce((s, x) => s + (take(x) || 0), 0);
 
 /** Các ngày yyyy-mm-dd từ `tu` tới `den` (gồm cả hai đầu), theo lịch UTC cho khỏi lệch múi giờ. */
-export function listDatesInRange(tu: string, den: string): string[] {
-  const ra: string[] = [];
-  if (!tu || !den || tu > den) return ra;
-  const d = new Date(`${tu}T00:00:00Z`);
-  const last = new Date(`${den}T00:00:00Z`).getTime();
-  while (d.getTime() <= last && ra.length < 1000) {
-    ra.push(d.toISOString().slice(0, 10));
+export function listDatesInRange(fromDate: string, toDate: string): string[] {
+  const result: string[] = [];
+  if (!fromDate || !toDate || fromDate > toDate) return result;
+  const d = new Date(`${fromDate}T00:00:00Z`);
+  const last = new Date(`${toDate}T00:00:00Z`).getTime();
+  while (d.getTime() <= last && result.length < 1000) {
+    result.push(d.toISOString().slice(0, 10));
     d.setUTCDate(d.getUTCDate() + 1);
   }
-  return ra;
+  return result;
 }
 
 /** Lùi `soNgay` ngày từ một ngày yyyy-mm-dd. */
@@ -99,7 +99,7 @@ function filterByRange(d: DataFlowInput, k: FlowRange) {
 // ---------- V3: sơ đồ dòng chảy kg (sankey) ----------
 
 /** Nhóm nút — quyết định màu: nguồn vào · xưởng · khâu giữa · hàng ra · hao hụt · còn tồn. */
-export type FlowNodeGroup = "nguon" | "xuong" | "giua" | "ra" | "hao" | "ton";
+export type FlowNodeGroup = "source" | "workshop" | "middle" | "out" | "loss" | "stock";
 
 export interface FlowNode {
   id: string;
@@ -142,112 +142,112 @@ export function buildDataFlow(d: DataFlowInput, k: FlowRange): DataFlow {
   const s = filterByRange(d, k);
   const node = new Map<string, FlowNode>();
   const edges: FlowEdge[] = [];
-  const addNode = (id: string, label: string, layer: number, nhom: FlowNodeGroup, path?: string) => {
-    if (!node.has(id)) node.set(id, { id, label, column: layer, group: nhom, kg: 0, path });
+  const addNode = (id: string, label: string, layer: number, group: FlowNodeGroup, path?: string) => {
+    if (!node.has(id)) node.set(id, { id, label, column: layer, group, kg: 0, path });
   };
   /** Nối hai nút; cùng cặp thì cộng dồn — một cặp chỉ một dải trên sơ đồ. */
-  const link = (tu: string, den: string, kg: number) => {
+  const link = (fromDate: string, toDate: string, kg: number) => {
     if (!(kg > 0.0005)) return;
-    const co = edges.find((c) => c.source === tu && c.target === den);
-    if (co) co.kg += kg;
-    else edges.push({ source: tu, target: den, kg });
+    const existing = edges.find((c) => c.source === fromDate && c.target === toDate);
+    if (existing) existing.kg += kg;
+    else edges.push({ source: fromDate, target: toDate, kg });
   };
 
   // Tầng 0 → 1: đại lý → xưởng
   const bySupplier = new Map<string, number>();
   for (const r of s.imports) bySupplier.set(r.supplierName || "(chưa ghi đại lý)", (bySupplier.get(r.supplierName || "(chưa ghi đại lý)") ?? 0) + (r.quantityKg || 0));
-  const lon = new Set([...bySupplier.entries()].sort((a, b) => b[1] - a[1]).slice(0, SUPPLIER_COUNT).map(([t]) => t));
-  const supplierNodeId = (ten: string) => (lon.has(ten) ? `dl:${ten}` : "dl:*");
+  const topSuppliers = new Set([...bySupplier.entries()].sort((a, b) => b[1] - a[1]).slice(0, SUPPLIER_COUNT).map(([t]) => t));
+  const supplierNodeId = (name: string) => (topSuppliers.has(name) ? `supplier:${name}` : "supplier:*");
   for (const r of s.imports) {
-    const ten = r.supplierName || "(chưa ghi đại lý)";
-    const id = supplierNodeId(ten);
-    addNode(id, lon.has(ten) ? ten : "Đại lý khác", 0, "nguon", "/imports");
-    addNode(`x:${r.workshop}`, `Xưởng ${r.workshop}`, 1, "xuong", "/wip");
-    link(id, `x:${r.workshop}`, r.quantityKg || 0);
+    const name = r.supplierName || "(chưa ghi đại lý)";
+    const id = supplierNodeId(name);
+    addNode(id, topSuppliers.has(name) ? name : "Đại lý khác", 0, "source", "/imports");
+    addNode(`workshop:${r.workshop}`, `Xưởng ${r.workshop}`, 1, "workshop", "/wip");
+    link(id, `workshop:${r.workshop}`, r.quantityKg || 0);
   }
 
   // Tầng 1 → 2: xưởng → kết quả xử lý NL
-  addNode("btp", "Bán thành phẩm", 2, "giua", "/wip");
+  addNode("wip", "Bán thành phẩm", 2, "middle", "/wip");
   const xuongs = new Set<Workshop>([
     ...s.imports.map((r) => r.workshop),
     ...s.wips.map((w) => w.workshop),
     ...s.domestic.map((r) => r.workshop),
   ]);
   for (const x of xuongs) {
-    const id = `x:${x}`;
-    addNode(id, `Xưởng ${x}`, 1, "xuong", "/wip");
-    link(id, "btp", sum(s.wips.filter((w) => w.workshop === x), (w) => w.quantityKg));
-    const nd = sum(s.domestic.filter((r) => r.workshop === x), (r) => r.quantityKg);
-    if (nd > 0) addNode("nd", "Bán nội địa NL", 2, "ra", "/wip");
-    link(id, "nd", nd);
-    const pl = sum(s.scraps.filter((r) => r.workshop === x), (r) => r.quantityKg);
-    if (pl > 0) addNode("pl", "Phế liệu", 2, "hao", "/imports");
-    link(id, "pl", pl);
-    const cd = sum(s.leftovers.filter((r) => r.workshop === x), (r) => r.leftoverKg ?? 0);
-    if (cd > 0) addNode("cd", "Còn dở / đông gửi", 2, "ton", "/nxt-material");
-    link(id, "cd", cd);
+    const id = `workshop:${x}`;
+    addNode(id, `Xưởng ${x}`, 1, "workshop", "/wip");
+    link(id, "wip", sum(s.wips.filter((w) => w.workshop === x), (w) => w.quantityKg));
+    const domesticKg = sum(s.domestic.filter((r) => r.workshop === x), (r) => r.quantityKg);
+    if (domesticKg > 0) addNode("domestic-sale", "Bán nội địa NL", 2, "out", "/wip");
+    link(id, "domestic-sale", domesticKg);
+    const scrapKg = sum(s.scraps.filter((r) => r.workshop === x), (r) => r.quantityKg);
+    if (scrapKg > 0) addNode("scrap", "Phế liệu", 2, "loss", "/imports");
+    link(id, "scrap", scrapKg);
+    const leftoverKg = sum(s.leftovers.filter((r) => r.workshop === x), (r) => r.leftoverKg ?? 0);
+    if (leftoverKg > 0) addNode("leftover", "Còn dở / đông gửi", 2, "stock", "/nxt-material");
+    link(id, "leftover", leftoverKg);
   }
 
   // Tầng 2 → 3: BTP → kho dự trữ / chờ duyệt
   const stockedInKg = sum(s.wips.filter((w) => w.status === "stocked"), (w) => w.quantityKg);
   const pendingApproval = sum(s.wips.filter((w) => w.status !== "stocked"), (w) => w.quantityKg);
-  addNode("kho", "Kho dự trữ (BTP)", 3, "giua", "/warehouse");
-  link("btp", "kho", stockedInKg);
-  if (pendingApproval > 0) addNode("cho", "Chờ duyệt nhập kho", 3, "ton", "/warehouse");
-  link("btp", "cho", pendingApproval);
+  addNode("warehouse", "Kho dự trữ (BTP)", 3, "middle", "/warehouse");
+  link("wip", "warehouse", stockedInKg);
+  if (pendingApproval > 0) addNode("pending-approval", "Chờ duyệt nhập kho", 3, "stock", "/warehouse");
+  link("wip", "pending-approval", pendingApproval);
 
   // Tầng 3 → 4: kho → đóng gói · xuất đơn · bán block thô
   const packagingIn = sum(s.packagings, (p) => p.inputKg);
   const packagingOut = sum(s.packagings, (p) => p.outputKg);
-  if (packagingIn > 0 || packagingOut > 0) addNode("goi", "Đóng gói", 4, "giua", "/packaging");
-  link("kho", "goi", packagingIn);
+  if (packagingIn > 0 || packagingOut > 0) addNode("packaging", "Đóng gói", 4, "middle", "/packaging");
+  link("warehouse", "packaging", packagingIn);
   const orderOutKg = sum(s.exportItems, (x) => x.quantityKg);
-  if (orderOutKg > 0) addNode("xd", "Xuất theo đơn", 4, "ra", "/orders");
-  link("kho", "xd", orderOutKg);
-  const banBlock = sum(s.sales.filter((b) => b.sourceWarehouse === RETAIL_WAREHOUSE), (b) => b.quantityKg);
-  if (banBlock > 0) addNode("bb", "Bán block thô", 4, "ra", "/sales");
-  link("kho", "bb", banBlock);
+  if (orderOutKg > 0) addNode("export-order", "Xuất theo đơn", 4, "out", "/orders");
+  link("warehouse", "export-order", orderOutKg);
+  const blockSaleKg = sum(s.sales.filter((b) => b.sourceWarehouse === RETAIL_WAREHOUSE), (b) => b.quantityKg);
+  if (blockSaleKg > 0) addNode("block-sale", "Bán block thô", 4, "out", "/sales");
+  link("warehouse", "block-sale", blockSaleKg);
 
   // Tầng 4 → 5: đóng gói → {bán hàng đóng gói · tồn TP · hao hụt đóng gói}. Không vẽ
   // riêng nút "TP đóng gói" (thêm một cột làm nhãn chật): TP ra đi thẳng tới đích.
   const finishedGoodSales = sum(s.sales.filter((b) => b.sourceWarehouse === FG_WAREHOUSE), (b) => b.quantityKg);
-  if (finishedGoodSales > 0) addNode("btpb", "Bán hàng đóng gói", 5, "ra", "/sales");
-  link("goi", "btpb", Math.min(finishedGoodSales, packagingOut));
-  if (packagingOut > finishedGoodSales) addNode("tonTp", "Tồn TP cuối kỳ", 5, "ton", "/packaging");
-  link("goi", "tonTp", packagingOut - finishedGoodSales);
-  if (packagingIn > packagingOut) addNode("hdg", "Hao hụt đóng gói", 5, "hao", "/packaging");
-  link("goi", "hdg", packagingIn - packagingOut);
+  if (finishedGoodSales > 0) addNode("packaged-sale", "Bán hàng đóng gói", 5, "out", "/sales");
+  link("packaging", "packaged-sale", Math.min(finishedGoodSales, packagingOut));
+  if (packagingOut > finishedGoodSales) addNode("fg-stock", "Tồn TP cuối kỳ", 5, "stock", "/packaging");
+  link("packaging", "fg-stock", packagingOut - finishedGoodSales);
+  if (packagingIn > packagingOut) addNode("packaging-loss", "Hao hụt đóng gói", 5, "loss", "/packaging");
+  link("packaging", "packaging-loss", packagingIn - packagingOut);
   // Bán nhiều hơn TP đóng ra trong kỳ ⇒ phần dư lấy từ TP đóng gói trước kỳ.
-  if (finishedGoodSales > packagingOut) addNode("tonTpDau", "Tồn TP đầu kỳ", 4, "ton", "/packaging");
-  link("tonTpDau", "btpb", finishedGoodSales - packagingOut);
+  if (finishedGoodSales > packagingOut) addNode("fg-opening", "Tồn TP đầu kỳ", 4, "stock", "/packaging");
+  link("fg-opening", "packaged-sale", finishedGoodSales - packagingOut);
 
   // Cân bằng từng nút giữa, theo thứ tự trái → phải (nút cân bằng thêm sau không làm lệch nút trước).
-  const canBang = (id: string, thua: [string, string, FlowNodeGroup, number], deficit: [string, string, FlowNodeGroup, number]) => {
+  const massBalance = (id: string, extra: [string, string, FlowNodeGroup, number], deficit: [string, string, FlowNodeGroup, number]) => {
     if (!node.has(id)) return;
     const inputKg = sum(edges.filter((c) => c.target === id), (c) => c.kg);
-    const ra = sum(edges.filter((c) => c.source === id), (c) => c.kg);
-    if (inputKg - ra > 0.0005) {
-      addNode(thua[0], thua[1], thua[3], thua[2]);
-      link(id, thua[0], inputKg - ra);
-    } else if (ra - inputKg > 0.0005) {
+    const result = sum(edges.filter((c) => c.source === id), (c) => c.kg);
+    if (inputKg - result > 0.0005) {
+      addNode(extra[0], extra[1], extra[3], extra[2]);
+      link(id, extra[0], inputKg - result);
+    } else if (result - inputKg > 0.0005) {
       addNode(deficit[0], deficit[1], deficit[3], deficit[2]);
-      link(deficit[0], id, ra - inputKg);
+      link(deficit[0], id, result - inputKg);
     }
   };
   for (const x of xuongs)
-    canBang(`x:${x}`, ["hh", "Hao hụt / chưa ghi ra", "hao", 2], ["nlTruoc", "NL từ kho / kỳ trước", "ton", 0]);
-  // Nút xưởng đã cân ⇒ "btp" luôn cân (vào = Σ mẻ = đã nhập + chờ duyệt).
-  canBang("kho", ["tonBtp", "Tồn BTP cuối kỳ", "ton", 4], ["tonBtpDau", "Tồn BTP đầu kỳ", "ton", 2]);
+    massBalance(`workshop:${x}`, ["loss", "Hao hụt / chưa ghi ra", "loss", 2], ["material-prior", "NL từ kho / kỳ trước", "stock", 0]);
+  // Nút xưởng đã cân ⇒ "wip" luôn cân (vào = Σ mẻ = đã nhập + chờ duyệt).
+  massBalance("warehouse", ["wip-stock", "Tồn BTP cuối kỳ", "stock", 4], ["wip-opening", "Tồn BTP đầu kỳ", "stock", 2]);
   // Đóng gói ra nhiều hơn BTP vào (ghi nhầm) ⇒ phần dư gọi tên, không ẩn.
   if (packagingOut > packagingIn) {
-    addNode("goiDu", "TP ra vượt BTP vào (soát lại)", 3, "hao", "/packaging");
-    link("goiDu", "goi", packagingOut - packagingIn);
+    addNode("packaging-excess", "TP ra vượt BTP vào (soát lại)", 3, "loss", "/packaging");
+    link("packaging-excess", "packaging", packagingOut - packagingIn);
   }
 
   for (const n of node.values()) {
     const inputKg = sum(edges.filter((c) => c.target === n.id), (c) => c.kg);
-    const ra = sum(edges.filter((c) => c.source === n.id), (c) => c.kg);
-    n.kg = Math.max(inputKg, ra);
+    const result = sum(edges.filter((c) => c.source === n.id), (c) => c.kg);
+    n.kg = Math.max(inputKg, result);
   }
   // Bỏ nút không có cạnh nào (vd xưởng chỉ có số 0).
   const connectedNodes = new Set(edges.flatMap((c) => [c.source, c.target]));
@@ -261,7 +261,7 @@ export function buildDataFlow(d: DataFlowInput, k: FlowRange): DataFlow {
 // ---------- V3 bản dễ đọc: chia phần ra của một nhóm nút ----------
 
 export interface FlowShare {
-  /** id nút đích (vd "btp", "pl", "goi"). */
+  /** id nút đích (vd "wip", "scrap", "packaging"). */
   id: string;
   label: string;
   group: FlowNodeGroup;
@@ -272,7 +272,7 @@ export interface FlowShare {
 
 /**
  * Gom mọi dải ĐI RA từ các nút thoả `laNguon` theo nút đích — để vẽ "thanh chia phần"
- * thay cho sơ đồ dòng chảy: VD `laNguon = id bắt đầu "x:"` ⇒ "100 kg nguyên liệu vào
+ * thay cho sơ đồ dòng chảy: VD `laNguon = id bắt đầu "workshop:"` ⇒ "100 kg nguyên liệu vào
  * xưởng ra thành bao nhiêu BTP, phế liệu, hao hụt…". Thứ tự theo `thuTu` (id không có
  * trong `thuTu` xếp sau, kg giảm dần). Σ share = 1 khi tổng > 0.
  */
@@ -283,7 +283,7 @@ export function splitOutflows(dc: DataFlow, isSource: (id: string) => boolean, o
   const node = new Map(dc.nodes.map((n) => [n.id, n]));
   const orderIndex = (id: string) => (order.includes(id) ? order.indexOf(id) : order.length);
   return [...totals.entries()]
-    .map(([id, kg]) => ({ id, label: node.get(id)?.label ?? id, group: node.get(id)?.group ?? "giua", kg, share: total > 0 ? kg / total : 0 }))
+    .map(([id, kg]) => ({ id, label: node.get(id)?.label ?? id, group: node.get(id)?.group ?? "middle", kg, share: total > 0 ? kg / total : 0 }))
     .sort((a, b) => orderIndex(a.id) - orderIndex(b.id) || b.kg - a.kg);
 }
 
@@ -304,11 +304,11 @@ export interface FlowStage {
 }
 
 const STAGE_PATHS: Record<TraceStageKey, string> = {
-  nhap: "/imports",
-  "san-xuat": "/wip",
-  kho: "/warehouse",
-  "dong-goi": "/packaging",
-  "xuat-ban": "/orders",
+  imports: "/imports",
+  production: "/wip",
+  warehouse: "/warehouse",
+  packaging: "/packaging",
+  outbound: "/orders",
 };
 
 /** Năm khâu nhập → SX → kho → đóng gói → xuất/bán: kg qua, kg chờ, việc còn thiếu. */
@@ -316,26 +316,26 @@ export function buildFlowStages(d: DataFlowInput, k: FlowRange): FlowStage[] {
   const s = filterByRange(d, k);
   const stages = groupByTraceStage(d, { fromDate: k.fromDate, toDate: k.toDate, workshop: k.workshop ?? "" });
   const deficit = new Map(stages.map((g) => [g.key, g.items.filter((m) => m.missing.length > 0).length]));
-  const ten = new Map(stages.map((g) => [g.key, g.name]));
+  const name = new Map(stages.map((g) => [g.key, g.name]));
   const kg: Record<TraceStageKey, [number, number]> = {
-    nhap: [sum(s.imports, (r) => r.quantityKg), 0],
-    "san-xuat": [sum(s.wips, (w) => w.quantityKg), 0],
-    kho: [
+    imports: [sum(s.imports, (r) => r.quantityKg), 0],
+    production: [sum(s.wips, (w) => w.quantityKg), 0],
+    warehouse: [
       sum(s.wips.filter((w) => w.status === "stocked"), (w) => w.quantityKg),
       sum(s.wips.filter((w) => w.status !== "stocked"), (w) => w.quantityKg),
     ],
-    "dong-goi": [sum(s.packagings, (p) => p.outputKg), 0],
-    "xuat-ban": [sum(s.exportItems, (x) => x.quantityKg) + sum(s.sales, (b) => b.quantityKg) + sum(s.domestic, (r) => r.quantityKg), 0],
+    packaging: [sum(s.packagings, (p) => p.outputKg), 0],
+    outbound: [sum(s.exportItems, (x) => x.quantityKg) + sum(s.sales, (b) => b.quantityKg) + sum(s.domestic, (r) => r.quantityKg), 0],
   };
-  const order: TraceStageKey[] = ["nhap", "san-xuat", "kho", "dong-goi", "xuat-ban"];
+  const order: TraceStageKey[] = ["imports", "production", "warehouse", "packaging", "outbound"];
   // Mẫu số = khâu NGUỒN thật: đóng gói và xuất/bán đều rút từ kho dự trữ (không phải
   // xuất/bán ÷ đóng gói — xuất theo đơn đi thẳng từ kho, chia vậy ra > 100% vô nghĩa).
-  const source: Partial<Record<TraceStageKey, TraceStageKey>> = { "san-xuat": "nhap", kho: "san-xuat", "dong-goi": "kho", "xuat-ban": "kho" };
+  const source: Partial<Record<TraceStageKey, TraceStageKey>> = { production: "imports", warehouse: "production", packaging: "warehouse", outbound: "warehouse" };
   return order.map((key) => {
     const prevRows = source[key] ? kg[source[key]][0] : 0;
     return {
       key,
-      name: ten.get(key) ?? key,
+      name: name.get(key) ?? key,
       kg: kg[key][0],
       kgCho: kg[key][1],
       missingTaskCount: deficit.get(key) ?? 0,
@@ -374,12 +374,12 @@ export function buildDailyFlowSeries(d: DataFlowInput, k: FlowRange): DailyFlowP
   // Tồn theo xưởng: lọc mẻ/đóng gói theo xưởng; bán + xuất bám theo mẻ/phiếu nên lọc theo đó.
   const items = <T>(x: readonly T[]) => [...x];
   const wipsX = d.wips.filter((w) => matchesWorkshop(w.workshop, k));
-  const meX = new Set(wipsX.map((w) => w.id));
-  const goiX = d.packagings.filter((p) => matchesWorkshop(p.workshop, k));
+  const wipIdsX = new Set(wipsX.map((w) => w.id));
+  const packagingsInScope = d.packagings.filter((p) => matchesWorkshop(p.workshop, k));
   const salesInvoiceById = new Map((d.salesInvoices ?? []).map((v) => [v.id, v.workshop]));
-  const banX = (d.salesItems ?? []).filter((b) => matchesWorkshop(salesInvoiceById.get(b.invoiceId), k));
-  const workshopExports = d.exportItems.filter((x) => !k.workshop || meX.has(x.wipId));
-  const finishedGoodSales = banX.filter((b) => b.sourceWarehouse === FG_WAREHOUSE);
+  const salesX = (d.salesItems ?? []).filter((b) => matchesWorkshop(salesInvoiceById.get(b.invoiceId), k));
+  const workshopExports = d.exportItems.filter((x) => !k.workshop || wipIdsX.has(x.wipId));
+  const finishedGoodSales = salesX.filter((b) => b.sourceWarehouse === FG_WAREHOUSE);
 
   return listDatesInRange(k.fromDate, k.toDate).map((date) => {
     const wipStock = sumFinishedGoodNxt(
@@ -387,17 +387,17 @@ export function buildDailyFlowSeries(d: DataFlowInput, k: FlowRange): DailyFlowP
         wips: items(wipsX),
         exportOrders: items(d.exportOrders),
         exportItems: items(workshopExports),
-        salesItems: items(banX),
-        packagings: items(goiX),
+        salesItems: items(salesX),
+        packagings: items(packagingsInScope),
         opening: k.workshop ? [] : items(d.finishedOpening),
         products: items(d.products),
         fromDate: date,
         toDate: date,
       }),
     ).closingKg;
-    const goiDen = goiX.filter((p) => p.date <= date);
-    const banDen = filterRetailSales(finishedGoodSales.filter((b) => b.deliveryDate <= date), FG_WAREHOUSE, d.lotDispatches ?? []);
-    const finishedGoodStock = sum(computeFinishedGoodStock(goiDen, banDen), (t) => t.remainingKg);
+    const packagingsUntil = packagingsInScope.filter((p) => p.date <= date);
+    const salesUntil = filterRetailSales(finishedGoodSales.filter((b) => b.deliveryDate <= date), FG_WAREHOUSE, d.lotDispatches ?? []);
+    const finishedGoodStock = sum(computeFinishedGoodStock(packagingsUntil, salesUntil), (t) => t.remainingKg);
     return { date, importedKg: inByDay.get(date) ?? 0, producedKg: productionByDate.get(date) ?? 0, wipStockKg: wipStock, finishedStockKg: finishedGoodStock };
   });
 }
@@ -446,14 +446,14 @@ export function computeYieldByProduct(d: DataFlowInput, k: FlowRange, threshold 
   const totalFinishedGood = sum([...totals.values()], (g) => g.finished);
   if (totalFinishedGood <= 0) return { rows: [], binhQuan: null };
   const binhQuan = totalMaterial / totalFinishedGood;
-  const ten = new Map(d.products.map((p) => [p.id, p.name]));
-  const dong = [...totals.entries()]
+  const name = new Map(d.products.map((p) => [p.id, p.name]));
+  const row = [...totals.entries()]
     .map(([productId, g]) => {
       const yieldRatio = g.material / g.finished;
       const deviation = (yieldRatio - binhQuan) / binhQuan;
       return {
         productId,
-        name: ten.get(productId) ?? `Mặt hàng ${productId}`,
+        name: name.get(productId) ?? `Mặt hàng ${productId}`,
         materialKg: g.material,
         finishedKg: g.finished,
         yieldRatio,
@@ -462,7 +462,7 @@ export function computeYieldByProduct(d: DataFlowInput, k: FlowRange, threshold 
       };
     })
     .sort((a, b) => b.yieldRatio - a.yieldRatio);
-  return { rows: dong, binhQuan };
+  return { rows: row, binhQuan };
 }
 
 // ---------- V6 + V7: kết quả kỳ cân đối ----------
@@ -492,22 +492,22 @@ export function computeAllPeriodResults(d: DataFlowInput): PeriodBalancingResult
 // ---------- V9: cảnh báo chuỗi ----------
 
 export type FlowWarningKind =
-  | "chua-chot-nhap"
-  | "chua-chot-sx"
-  | "doi-sau-chot"
-  | "ghi-bu"
-  | "ban-vuot"
-  | "lo-chua-gan"
-  | "cho-duyet-lau"
-  | "dinh-muc-lech"
-  | "ky-dinh-muc-lech";
+  | "imports-unlocked"
+  | "production-unlocked"
+  | "changed-after-lock"
+  | "backdated"
+  | "oversold"
+  | "lot-unassigned"
+  | "approval-overdue"
+  | "yield-deviation"
+  | "period-yield-deviation";
 
 export interface FlowWarning {
   /** Khoá ổn định (tô màu dòng / React key). */
   id: string;
   kind: FlowWarningKind;
   /** "loi" = sổ sai cần sửa · "nhac" = việc chưa làm · "tin" = để biết. */
-  level: "loi" | "nhac" | "tin";
+  level: "error" | "reminder" | "info";
   title: string;
   detail: string;
   date: string;
@@ -516,15 +516,15 @@ export interface FlowWarning {
 }
 
 const WARNING_KIND_LABELS: Record<FlowWarningKind, string> = {
-  "chua-chot-nhap": "Ngày nhập chưa chốt",
-  "chua-chot-sx": "Ngày sản xuất chưa chốt",
-  "doi-sau-chot": "Sổ nhập đổi sau khi chốt",
-  "ghi-bu": "Ghi bù",
-  "ban-vuot": "Bán / xuất vượt tồn",
-  "lo-chua-gan": "Chưa gắn lô",
-  "cho-duyet-lau": "BTP chờ duyệt lâu",
-  "dinh-muc-lech": "Định mức lệch",
-  "ky-dinh-muc-lech": "Kỳ cân đối định mức lệch",
+  "imports-unlocked": "Ngày nhập chưa chốt",
+  "production-unlocked": "Ngày sản xuất chưa chốt",
+  "changed-after-lock": "Sổ nhập đổi sau khi chốt",
+  backdated: "Ghi bù",
+  oversold: "Bán / xuất vượt tồn",
+  "lot-unassigned": "Chưa gắn lô",
+  "approval-overdue": "BTP chờ duyệt lâu",
+  "yield-deviation": "Định mức lệch",
+  "period-yield-deviation": "Kỳ cân đối định mức lệch",
 };
 export const getWarningKindLabel = (l: FlowWarningKind) => WARNING_KIND_LABELS[l];
 
@@ -537,7 +537,7 @@ const fmtPt = (n: number) => `${n > 0 ? "+" : ""}${new Intl.NumberFormat("vi-VN"
  */
 export function buildChainWarnings(d: DataFlowInput, k: FlowRange, today: string, threshold = YIELD_RATIO_THRESHOLD): FlowWarning[] {
   const s = filterByRange(d, k);
-  const ra: FlowWarning[] = [];
+  const result: FlowWarning[] = [];
   const isLocked = (locks: readonly DailyLock[], date: string, x: Workshop) =>
     locks.some((l) => l.lockDate === date && l.workshop === x && l.isLocked);
 
@@ -549,10 +549,10 @@ export function buildChainWarnings(d: DataFlowInput, k: FlowRange, today: string
     if (date >= today) continue;
     const lock = d.dailyLocks.find((l) => l.lockDate === date && l.workshop === x && l.isLocked);
     if (!lock) {
-      ra.push({ id: `ccn|${key}`, kind: "chua-chot-nhap", level: "nhac", title: `Nhập ${fmtKg(kg)} chưa chốt ngày`, detail: "Chốt ngày để khóa tổng nhập, kế toán mới lấy được số.", date, workshop: x, path: "/imports" });
+      result.push({ id: `ccn|${key}`, kind: "imports-unlocked", level: "reminder", title: `Nhập ${fmtKg(kg)} chưa chốt ngày`, detail: "Chốt ngày để khóa tổng nhập, kế toán mới lấy được số.", date, workshop: x, path: "/imports" });
     } else if (Math.abs(lock.totalKgAtLock - kg) > 0.01) {
       // 3. Sổ đổi sau khi chốt: tổng hiện tại ≠ tổng lúc chốt.
-      ra.push({ id: `dsc|${key}`, kind: "doi-sau-chot", level: "loi", title: `Tổng nhập lệch ${fmtKg(kg - lock.totalKgAtLock)} so với lúc chốt`, detail: `Lúc chốt ${fmtKg(lock.totalKgAtLock)}, nay ${fmtKg(kg)}. Soát lại dòng sửa sau chốt.`, date, workshop: x, path: "/imports" });
+      result.push({ id: `dsc|${key}`, kind: "changed-after-lock", level: "error", title: `Tổng nhập lệch ${fmtKg(kg - lock.totalKgAtLock)} so với lúc chốt`, detail: `Lúc chốt ${fmtKg(lock.totalKgAtLock)}, nay ${fmtKg(kg)}. Soát lại dòng sửa sau chốt.`, date, workshop: x, path: "/imports" });
     }
   }
   const productionKgByDay = new Map<string, number>();
@@ -560,50 +560,50 @@ export function buildChainWarnings(d: DataFlowInput, k: FlowRange, today: string
   for (const [key, kg] of productionKgByDay) {
     const [date, x] = key.split("|") as [string, Workshop];
     if (date >= today || isLocked(d.productionLocks, date, x)) continue;
-    ra.push({ id: `ccs|${key}`, kind: "chua-chot-sx", level: "nhac", title: `Sản xuất ${fmtKg(kg)} chưa chốt ngày`, detail: "Chốt ngày sản xuất để ghi còn dở và khóa lô.", date, workshop: x, path: "/wip" });
+    result.push({ id: `ccs|${key}`, kind: "production-unlocked", level: "reminder", title: `Sản xuất ${fmtKg(kg)} chưa chốt ngày`, detail: "Chốt ngày sản xuất để ghi còn dở và khóa lô.", date, workshop: x, path: "/wip" });
   }
 
   // 4. Ghi bù (nhập + sản xuất) — để biết, lý do đã bắt lúc ghi.
   const shipments = d.shipments.filter((c) => isInRange(c.deliveryDate, k) && matchesWorkshop(c.workshop, k) && isBackdatedImport(c));
   for (const c of shipments)
-    ra.push({ id: `gbn|${c.id}`, kind: "ghi-bu", level: "tin", title: `Chuyến ${c.supplierName || ""} ghi bù ngày ${c.postingDate}`.trim(), detail: c.backdateReason ? `Lý do: ${c.backdateReason}` : "Chưa ghi lý do.", date: c.deliveryDate, workshop: c.workshop, path: "/imports" });
+    result.push({ id: `gbn|${c.id}`, kind: "backdated", level: "info", title: `Chuyến ${c.supplierName || ""} ghi bù ngày ${c.postingDate}`.trim(), detail: c.backdateReason ? `Lý do: ${c.backdateReason}` : "Chưa ghi lý do.", date: c.deliveryDate, workshop: c.workshop, path: "/imports" });
   for (const w of s.wips.filter(isBackdatedWip))
-    ra.push({ id: `gbs|${w.id}`, kind: "ghi-bu", level: "tin", title: `Mẻ ${fmtKg(w.quantityKg)} ghi bù ngày ${w.postingDate}`, detail: w.backdateReason ? `Lý do: ${w.backdateReason}` : "Chưa ghi lý do.", date: w.productionDate, workshop: w.workshop, path: "/wip" });
+    result.push({ id: `gbs|${w.id}`, kind: "backdated", level: "info", title: `Mẻ ${fmtKg(w.quantityKg)} ghi bù ngày ${w.postingDate}`, detail: w.backdateReason ? `Lý do: ${w.backdateReason}` : "Chưa ghi lý do.", date: w.productionDate, workshop: w.workshop, path: "/wip" });
 
   // 5. Bán / đóng gói vượt tồn BTP (toàn bộ sổ — vượt là vượt, không theo khoảng).
-  const ten = new Map(d.products.map((p) => [p.id, p.name]));
+  const name = new Map(d.products.map((p) => [p.id, p.name]));
   const oversold = computeWipStockDetail(
     [...d.wips],
     [...d.exportItems],
     collectWipDeductions([...(d.salesItems ?? [])], [...d.packagings], d.lotInputs, d.lotDispatches ?? []),
   ).oversales;
   for (const v of oversold)
-    ra.push({ id: `bv|${v.productId}|${v.spec}`, kind: "ban-vuot", level: "loi", title: `${ten.get(v.productId) ?? v.productId}${v.spec ? ` · ${v.spec}` : ""} vượt tồn ${fmtKg(v.kg)}`, detail: "Bán / đóng gói nhiều hơn lượng đã nhập kho. Soát ngày nhập kho hoặc dòng bán.", date: today, workshop: "", path: "/warehouse" });
+    result.push({ id: `bv|${v.productId}|${v.spec}`, kind: "oversold", level: "error", title: `${name.get(v.productId) ?? v.productId}${v.spec ? ` · ${v.spec}` : ""} vượt tồn ${fmtKg(v.kg)}`, detail: "Bán / đóng gói nhiều hơn lượng đã nhập kho. Soát ngày nhập kho hoặc dòng bán.", date: today, workshop: "", path: "/warehouse" });
 
   // 6. Mẻ / phiếu đóng gói chưa gắn lô và chưa ghi lý do (đã qua ngày).
   const stages = groupByTraceStage(d, { fromDate: k.fromDate, toDate: k.toDate, workshop: k.workshop ?? "" });
   for (const g of stages) {
-    if (g.key !== "san-xuat" && g.key !== "dong-goi") continue;
+    if (g.key !== "production" && g.key !== "packaging") continue;
     for (const m of g.items) {
-      if (!m.missing.includes("lo") || m.node.date >= today) continue;
-      ra.push({ id: `lo|${m.node.kind}|${m.node.id}`, kind: "lo-chua-gan", level: "nhac", title: `${m.node.label} chưa gắn lô`, detail: g.key === "san-xuat" ? "Gắn lô NL cho mẻ, hoặc ghi lý do khi chốt ngày." : "Gắn lô BTP cho phiếu đóng gói.", date: m.node.date, workshop: m.node.workshop, path: g.key === "san-xuat" ? "/wip" : "/packaging" });
+      if (!m.missing.includes("lot") || m.node.date >= today) continue;
+      result.push({ id: `lo|${m.node.kind}|${m.node.id}`, kind: "lot-unassigned", level: "reminder", title: `${m.node.label} chưa gắn lô`, detail: g.key === "production" ? "Gắn lô NL cho mẻ, hoặc ghi lý do khi chốt ngày." : "Gắn lô BTP cho phiếu đóng gói.", date: m.node.date, workshop: m.node.workshop, path: g.key === "production" ? "/wip" : "/packaging" });
     }
   }
 
   // 7. BTP chờ duyệt nhập kho quá N ngày.
   const han = subtractDays(today, APPROVAL_WAIT_DAYS);
   for (const w of s.wips.filter((w) => w.status === "pending" && w.productionDate < han))
-    ra.push({ id: `cd|${w.id}`, kind: "cho-duyet-lau", level: "nhac", title: `${ten.get(w.productId) ?? "BTP"} ${fmtKg(w.quantityKg)} chờ duyệt quá ${APPROVAL_WAIT_DAYS} ngày`, detail: "Thủ kho duyệt nhập kho để tồn dự trữ đủ.", date: w.productionDate, workshop: w.workshop, path: `/warehouse?approve=W:${w.id}` });
+    result.push({ id: `cd|${w.id}`, kind: "approval-overdue", level: "reminder", title: `${name.get(w.productId) ?? "BTP"} ${fmtKg(w.quantityKg)} chờ duyệt quá ${APPROVAL_WAIT_DAYS} ngày`, detail: "Thủ kho duyệt nhập kho để tồn dự trữ đủ.", date: w.productionDate, workshop: w.workshop, path: `/warehouse?approve=W:${w.id}` });
 
   // 8. Định mức mặt hàng lệch ngưỡng.
   const dm = computeYieldByProduct(d, k, threshold);
   for (const r of dm.rows.filter((x) => x.exceedsThreshold))
-    ra.push({ id: `dm|${r.productId}`, kind: "dinh-muc-lech", level: r.deviation > 0 ? "loi" : "tin", title: `${r.name}: định mức ${r.yieldRatio.toFixed(2)} (${fmtPt(r.deviation)})`, detail: `Bình quân ${dm.binhQuan?.toFixed(2)}. ${r.deviation > 0 ? "Tốn NL hơn mức chung — soát cân hoặc hao hụt." : "Ít NL hơn mức chung — soát lô gắn có thiếu không."}`, date: k.toDate < today ? k.toDate : today, workshop: "", path: "/wip" });
+    result.push({ id: `dm|${r.productId}`, kind: "yield-deviation", level: r.deviation > 0 ? "error" : "info", title: `${r.name}: định mức ${r.yieldRatio.toFixed(2)} (${fmtPt(r.deviation)})`, detail: `Bình quân ${dm.binhQuan?.toFixed(2)}. ${r.deviation > 0 ? "Tốn NL hơn mức chung — soát cân hoặc hao hụt." : "Ít NL hơn mức chung — soát lô gắn có thiếu không."}`, date: k.toDate < today ? k.toDate : today, workshop: "", path: "/wip" });
 
   // 9. Kỳ cân đối có định mức lệch so với bình quân các kỳ cùng loại NL.
-  const ky = computeAllPeriodResults(d).filter((x) => x.hasFinishedGoods);
+  const period = computeAllPeriodResults(d).filter((x) => x.hasFinishedGoods);
   const byType = new Map<string, PeriodBalancingResult[]>();
-  for (const x of ky) byType.set(x.period.materialTypeName, [...(byType.get(x.period.materialTypeName) ?? []), x]);
+  for (const x of period) byType.set(x.period.materialTypeName, [...(byType.get(x.period.materialTypeName) ?? []), x]);
   for (const [kind, items] of byType) {
     if (items.length < 2) continue;
     const bq = sum(items, (x) => x.result.totalInputKg) / sum(items, (x) => x.result.totalOutputKg);
@@ -611,18 +611,18 @@ export function buildChainWarnings(d: DataFlowInput, k: FlowRange, today: string
       const deviation = (x.result.norm - bq) / bq;
       const date = x.period.endDate || x.period.startDate || "";
       if (Math.abs(deviation) <= threshold || (date && !isInRange(date, k))) continue;
-      ra.push({ id: `kdm|${x.period.id}`, kind: "ky-dinh-muc-lech", level: "tin", title: `${kind} · ${x.period.dateRangeDescription}: định mức ${x.result.norm.toFixed(2)} (${fmtPt(deviation)})`, detail: `Bình quân các kỳ ${kind}: ${bq.toFixed(2)}.`, date, workshop: "", path: `/balancing/${x.period.id}` });
+      result.push({ id: `kdm|${x.period.id}`, kind: "period-yield-deviation", level: "info", title: `${kind} · ${x.period.dateRangeDescription}: định mức ${x.result.norm.toFixed(2)} (${fmtPt(deviation)})`, detail: `Bình quân các kỳ ${kind}: ${bq.toFixed(2)}.`, date, workshop: "", path: `/balancing/${x.period.id}` });
     }
   }
 
-  const order = { loi: 0, nhac: 1, tin: 2 } as const;
-  return ra.sort((a, b) => order[a.level] - order[b.level] || b.date.localeCompare(a.date) || a.id.localeCompare(b.id));
+  const order = { error: 0, reminder: 1, info: 2 } as const;
+  return result.sort((a, b) => order[a.level] - order[b.level] || b.date.localeCompare(a.date) || a.id.localeCompare(b.id));
 }
 
 // ---------- V12: tuổi tồn kho ----------
 
 export interface StockAgeBucket {
-  key: "duoi-30" | "30-60" | "60-90" | "tren-90";
+  key: "under-30" | "30-60" | "60-90" | "over-90";
   label: string;
   kg: number;
   lotCount: number;
@@ -633,21 +633,21 @@ export interface StockAgeBucket {
  * · 30–60 · 60–90 · trên 90 ngày. Hàng nằm lâu phải đẩy trước (FIFO). Lô hết hàng bỏ qua.
  */
 export function bucketStockByAge(los: readonly { productionDate: string; remainingKg: number }[], today: string): StockAgeBucket[] {
-  const nhom: StockAgeBucket[] = [
-    { key: "duoi-30", label: "Dưới 30 ngày", kg: 0, lotCount: 0 },
+  const group: StockAgeBucket[] = [
+    { key: "under-30", label: "Dưới 30 ngày", kg: 0, lotCount: 0 },
     { key: "30-60", label: "30–60 ngày", kg: 0, lotCount: 0 },
     { key: "60-90", label: "60–90 ngày", kg: 0, lotCount: 0 },
-    { key: "tren-90", label: "Trên 90 ngày", kg: 0, lotCount: 0 },
+    { key: "over-90", label: "Trên 90 ngày", kg: 0, lotCount: 0 },
   ];
   const todayMs = new Date(`${today}T00:00:00Z`).getTime();
   for (const l of los) {
     if (!(l.remainingKg > 0) || !l.productionDate) continue;
     const date = Math.floor((todayMs - new Date(`${l.productionDate}T00:00:00Z`).getTime()) / 86_400_000);
-    const g = nhom[date < 30 ? 0 : date < 60 ? 1 : date < 90 ? 2 : 3];
+    const g = group[date < 30 ? 0 : date < 60 ? 1 : date < 90 ? 2 : 3];
     g.kg += l.remainingKg;
     g.lotCount += 1;
   }
-  return nhom;
+  return group;
 }
 
 // ---------- V16: QC theo ngày ----------
@@ -663,10 +663,10 @@ export interface DailyQcCount {
 export function countQcByDay(
   rows: readonly { date: string; workshop: Workshop; result: QcResult }[],
   workshop: Workshop | "",
-  tu: string,
-  den: string,
+  fromDate: string,
+  toDate: string,
 ): DailyQcCount[] {
-  const m = new Map(listDatesInRange(tu, den).map((date) => [date, { date, pass: 0, conditional: 0, fail: 0 }]));
+  const m = new Map(listDatesInRange(fromDate, toDate).map((date) => [date, { date, pass: 0, conditional: 0, fail: 0 }]));
   for (const r of rows) {
     if (workshop && r.workshop !== workshop) continue;
     const g = m.get(r.date);

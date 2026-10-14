@@ -28,21 +28,21 @@ export function BatterSection({
   /** Danh mục loại bột — value = TÊN (sổ lưu theo tên). */
   batterOptions: ComboboxOption[];
   /** Tạo loại bột mới tại chỗ (lưu ngay vào danh mục) — trả về TÊN. */
-  onCreateBatter: (ten: string) => string;
+  onCreateBatter: (name: string) => string;
   /** Mở hộp sửa nhanh loại bột (value = tên). */
-  onEditBatter?: (ten: string) => void;
+  onEditBatter?: (name: string) => void;
   productKg: number;
   /** Ô số nhảy ↑/↓ theo cột trong bảng ghi (khung `[data-grid-nav]`). */
   columnNavigation?: boolean;
 }) {
   const visibleBatters = listVisibleBatters(bundledIds, batterKg);
   const total = sumBatterKg(batterKg);
-  const tyLe = computeBatterRatio(total, finishedGoodKg);
+  const ratio = computeBatterRatio(total, finishedGoodKg);
   const batterTypeCount = Object.keys(sanitizeBatterKg(batterKg)).length;
 
-  const bo = (ten: string) => {
+  const remove = (name: string) => {
     const next = { ...batterKg };
-    delete next[ten];
+    delete next[name];
     onChange(next);
   };
 
@@ -61,27 +61,27 @@ export function BatterSection({
       )}
 
       <div className="flex flex-wrap items-end gap-4">
-        {visibleBatters.map((ten) => {
-          const isNotBundled = !bundledIds.includes(ten);
+        {visibleBatters.map((name) => {
+          const isNotBundled = !bundledIds.includes(name);
           return (
-            <div key={ten} className="flex min-w-0 flex-[1_1_9rem] items-end gap-1 sm:max-w-[13rem]">
+            <div key={name} className="flex min-w-0 flex-[1_1_9rem] items-end gap-1 sm:max-w-[13rem]">
               <NumberField
-                label={ten}
+                label={name}
                 hideRequiredMark
                 unit="kg"
-                navCol={hasColumnNav ? `bot:${ten}` : undefined}
+                navCol={hasColumnNav ? `bot:${name}` : undefined}
                 className="min-w-0 flex-1"
-                value={batterKg[ten] || null}
-                onChange={(v) => onChange({ ...batterKg, [ten]: v ?? 0 })}
+                value={batterKg[name] || null}
+                onChange={(v) => onChange({ ...batterKg, [name]: v ?? 0 })}
               />
               {isNotBundled && (
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon"
-                  aria-label={`Bỏ ${ten}`}
+                  aria-label={`Bỏ ${name}`}
                   title="Bỏ loại bột này khỏi dòng (chỉ dòng đang gõ, không đụng danh mục)."
-                  onClick={() => bo(ten)}
+                  onClick={() => remove(name)}
                 >
                   <X />
                 </Button>
@@ -95,7 +95,7 @@ export function BatterSection({
             label="Thêm loại bột khác"
             hideRequiredMark
             value=""
-            onChange={(ten) => ten && onChange({ ...batterKg, [ten]: batterKg[ten] ?? 0 })}
+            onChange={(name) => name && onChange({ ...batterKg, [name]: batterKg[name] ?? 0 })}
             options={batterOptions.filter((o) => !visibleBatters.includes(o.value))}
             onCreate={onCreateBatter}
             onEditItem={onEditBatter}
@@ -110,10 +110,10 @@ export function BatterSection({
         <p className="text-base text-muted-foreground">
           Tổng bột ={" "}
           <span className="tnum font-semibold text-foreground">{num(total)}</span> kg
-          {tyLe != null && (
+          {ratio != null && (
             <>
               {" "}
-              · <span className="tnum">{num(Math.round(tyLe * 10) / 10)}</span>% so với
+              · <span className="tnum">{num(Math.round(ratio * 10) / 10)}</span>% so với
               thành phẩm
             </>
           )}

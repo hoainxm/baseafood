@@ -18,18 +18,18 @@ import { RequiredLegend, useHasRequiredField } from "./Field";
  * dùng khung này để cùng một dáng: đầu cố định (icon + tiêu đề + mô tả), THÂN
  * CUỘN riêng (không đẩy nút xuống khuất), CHÂN cố định chứa nút hành động.
  *
- * - Rộng theo `rong` — form nhiều cột để "rong"/"xl" cho dễ nhìn.
+ * - Rộng theo `size` — form nhiều cột để "lg"/"xl" cho dễ nhìn.
  * - Thân cuộn dùng `scroll-nice` (thanh cuộn bám token), cao tối đa theo màn hình
  *   nên cỡ chữ 130% vẫn không tràn.
  * - Điều khiển được (`open`/`onOpenChange`) hoặc tự mở bằng `trigger`.
  */
 
-const WIDTHS: Record<string, string> = {
+const WIDTHS = {
   sm: "sm:max-w-md", // ~28rem — xác nhận ngắn
-  vua: "sm:max-w-xl", // ~36rem
-  rong: "sm:max-w-3xl", // ~48rem — mặc định form
+  md: "sm:max-w-xl", // ~36rem
+  lg: "sm:max-w-3xl", // ~48rem — mặc định form
   xl: "sm:max-w-5xl", // ~64rem — nhiều cột / bảng / chart
-};
+} as const satisfies Record<string, string>;
 
 export function FormDialog({
   open,
@@ -38,7 +38,7 @@ export function FormDialog({
   title,
   description,
   icon: Icon,
-  size = "rong",
+  size = "lg",
   footer,
   hasRequiredFields = false,
   children,

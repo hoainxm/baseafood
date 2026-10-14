@@ -19,7 +19,7 @@ import { Camera, Check, Loader2, Plus, RefreshCw } from "lucide-react";
 import {
   recognizeImportSlip,
   type OcrCatalog,
-  type KetQuaOcr,
+  type OcrResult,
 } from "@/lib/ocr";
 import { hasImageStorage, uploadImage } from "@/lib/storage";
 import { kg as fmtKg, formatDateVN } from "@/lib/format";
@@ -36,18 +36,18 @@ interface Props {
   /** Đã tải ảnh lên Storage → đường dẫn lưu kèm chuyến. */
   onImageSaved: (path: string) => void;
   /** Điền các ô ĐÃ TICK trong bảng đối chiếu theo đúng luồng chọn tay (nháp, chưa lưu). */
-  onApplyAll: (result: KetQuaOcr) => void;
+  onApplyAll: (result: OcrResult) => void;
   /** Ghi THẲNG phế liệu ngày đọc được vào sổ (không phải nháp). Trả số dòng đã ghi. */
   onAddScraps: (
     items: { name: string; kg: number }[],
-    result: KetQuaOcr,
+    result: OcrResult,
   ) => number;
   /** Ngày + xưởng phế liệu sẽ ghi vào (ngày/xưởng trên phiếu, thiếu thì của phiếu đang mở). */
-  scrapTarget: (result: KetQuaOcr) => { date: string; workshop: string };
+  scrapTarget: (result: OcrResult) => { date: string; workshop: string };
   onClose: () => void;
 }
 
-type Phase = "chon" | "dang-nhan" | "xong" | "loi";
+type Phase = "select" | "recognizing" | "done" | "error";
 
 export function ImportSlipOcr({
   catalog,
@@ -58,10 +58,10 @@ export function ImportSlipOcr({
   onClose,
 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const [stage, setStage] = useState<Phase>("chon");
+  const [stage, setStage] = useState<Phase>("select");
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [percent, setPercent] = useState(0);
-  const [result, setResult] = useState<KetQuaOcr | null>(null);
+  const [result, setResult] = useState<OcrResult | null>(null);
   const [selection, setSelection] = useState<OcrSelection>({
     header: new Set(),
     lines: new Set(),
@@ -70,7 +70,7 @@ export function ImportSlipOcr({
 
   const pickImage = async (file: File) => {
     setPhotoUrl(URL.createObjectURL(file));
-    setStage("dang-nhan");
+    setStage("recognizing");
     setPercent(0);
     setResult(null);
     setIsScrapSaved(false);
@@ -88,9 +88,9 @@ export function ImportSlipOcr({
       const r = await recognizeImportSlip(file, catalog, setPercent);
       setResult(r);
       setSelection(defaultOcrSelection(r));
-      setStage("xong");
+      setStage("done");
     } catch {
-      setStage("loi");
+      setStage("error");
     }
   };
 
@@ -116,12 +116,12 @@ export function ImportSlipOcr({
   };
 
   const changePhoto = () => {
-    setStage("chon");
+    setStage("select");
     setPhotoUrl(null);
     setResult(null);
   };
 
-  const isReviewing = stage === "xong" && !!result && !!photoUrl;
+  const isReviewing = stage === "done" && !!result && !!photoUrl;
 
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
@@ -175,7 +175,7 @@ export function ImportSlipOcr({
             />
           )}
 
-          {stage === "chon" && (
+          {stage === "select" && (
             <Button
               title="Mở máy ảnh hoặc chọn ảnh phiếu nhập viết tay có sẵn trong máy."
               size="lg"
@@ -187,7 +187,7 @@ export function ImportSlipOcr({
             </Button>
           )}
 
-          {stage === "dang-nhan" && (
+          {stage === "recognizing" && (
             <div className="space-y-2">
               <div className="flex items-center gap-2 text-base text-muted-foreground">
                 <Loader2 className="animate-spin" />
@@ -202,7 +202,7 @@ export function ImportSlipOcr({
             </div>
           )}
 
-          {stage === "loi" && (
+          {stage === "error" && (
             <div className="space-y-3">
               <p className="text-base text-muted-foreground">
                 Không đọc được ảnh (có thể mất mạng khi tải bộ nhận diện, hoặc
@@ -230,7 +230,7 @@ export function ImportSlipOcr({
               <div className="min-w-0 space-y-4">
                 {/* Máy nào đã đọc — OpenAI hỏng thì nói rõ đang dùng máy dự phòng (đọc chữ tay kém hơn). */}
                 <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                  <Tag variant="phu">
+                  <Tag variant="muted">
                     {result.engine === "openai"
                       ? "Đọc bằng OpenAI"
                       : "Đọc bằng máy trong trình duyệt"}

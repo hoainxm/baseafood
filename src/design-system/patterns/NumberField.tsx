@@ -68,7 +68,7 @@ export function NumberField({
   navCol?: string;
   className?: string;
 }) {
-  const { props: o, xemTruoc: preview } = useNumberInput({ value, onChange });
+  const { props: o, preview } = useNumberInput({ value, onChange });
 
   const stepBy = (delta: number) => onChange(Math.max(0, (value ?? 0) + delta));
 

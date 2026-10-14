@@ -65,7 +65,7 @@ export function Combobox({
   onChange: (v: string) => void;
   options: ComboboxOption[];
   /** Có hàm này → cho phép tạo mới tại chỗ. Trả về value của mục vừa tạo. */
-  onCreate?: (ten: string) => string;
+  onCreate?: (name: string) => string;
   required?: boolean;
   hint?: string;
   /** Câu hướng dẫn dài → nút ⓘ cạnh nhãn (không đẩy chiều cao ô, canh đều lưới). */

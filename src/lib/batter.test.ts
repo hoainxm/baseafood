@@ -63,8 +63,8 @@ describe("inferBattersFromName — 2 nhóm đã chốt, khớp migration 0051", 
   });
   it("mọi id suy ra đều có trong seed loại bột", () => {
     const ids = new Set(BATTER_TYPE_SEED.map((b) => b.id));
-    for (const ten of ["tẩm bột nước tương", "tẩm bột 5-10"])
-      for (const id of inferBattersFromName(ten)) expect(ids.has(id)).toBe(true);
+    for (const name of ["tẩm bột nước tương", "tẩm bột 5-10"])
+      for (const id of inferBattersFromName(name)) expect(ids.has(id)).toBe(true);
   });
 });
 
@@ -126,8 +126,8 @@ describe("toShortBatterLabel / listVisibleBatters", () => {
 
 describe("findOrCreateBatter — tạo loại bột tại chỗ, không đẻ bản trùng", () => {
   it("gõ trùng tên / mã / tên ngắn ⇒ dùng lại loại có sẵn", () => {
-    for (const go of ["Bột 20802", "bột 20802", "20802", " 20802 "]) {
-      const result = findOrCreateBatter(BATTER_TYPE_SEED, go);
+    for (const typed of ["Bột 20802", "bột 20802", "20802", " 20802 "]) {
+      const result = findOrCreateBatter(BATTER_TYPE_SEED, typed);
       expect(result.isNew).toBe(false);
       expect(result.batter.id).toBe("bot-20802");
       expect(result.rows).toBe(BATTER_TYPE_SEED);

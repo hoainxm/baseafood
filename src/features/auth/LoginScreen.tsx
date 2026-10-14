@@ -21,16 +21,16 @@ export default function LoginScreen({
 }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [loi, setLoi] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoi(null);
+    setError(null);
     setIsSending(true);
     const result = await signIn(username, password);
     setIsSending(false);
-    if (!result.ok) setLoi(result.error ?? "Đăng nhập thất bại");
+    if (!result.ok) setError(result.error ?? "Đăng nhập thất bại");
   };
 
   return (
@@ -45,13 +45,13 @@ export default function LoginScreen({
         </div>
 
         <form onSubmit={submit} className="space-y-5">
-          {loi && (
+          {error && (
             <p
               role="alert"
               className="flex items-start gap-3 rounded-lg bg-warning-surface px-4 py-3 text-base font-medium text-destructive"
             >
               <TriangleAlert className="mt-0.5 size-6 shrink-0" aria-hidden />
-              {loi}
+              {error}
             </p>
           )}
 

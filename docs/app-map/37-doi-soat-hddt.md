@@ -437,7 +437,7 @@ lỗi** — trả về workbook RỖNG, ta báo "không tìm thấy sheet" rồi
 sạch bố cục. Nên **đổi vỏ ngay lúc nạp**: `normalizeToXlsx` dò magic `PK` (zip = đã
 xlsx), còn lại đọc bằng SheetJS rồi ghi lại thành `.xlsx`.
 
-> Một bộ bytes cho TẤT CẢ. Màn hình nạp 1 lần (`fileSangBase64` → `sheetsTuBase64`), bản
+> Một bộ bytes cho TẤT CẢ. Màn hình nạp 1 lần (`fileToBase64` → `sheetsFromBase64`), bản
 > lưu và phần xuất dùng đúng bytes đó. Đọc file hai lần bằng hai đường khác nhau là toạ độ
 > dòng/cột có thể lệch, mà cột "Vị trí" trong NGHI VẤN SỐ LIỆU sống bằng toạ độ.
 >
@@ -606,11 +606,11 @@ Gọn: `reconciliationCommon.ts` gom chữ cột Excel (`columnIndexToLetter`/`c
 
 Trước đây module chỉ import → xử lý → tải về (file-only). v4 cho **lưu bản đối soát theo TÀI KHOẢN** để xem lại/đối chiếu:
 
-- **Bảng `reconciliation_runs`** (0043) + hook `useReconciliationRuns()` (khuôn `useBang` — chạy cả Supabase lẫn localStorage). Lưu: `file_b64` (file Excel gốc base64), `options` {ledgerSheetName, edits, taxSideSheets, mode}, `summary` (ảnh chụp 4 nhãn + tổng chênh — `ReconciliationSummary`), `status` 'draft'|'official', `user_id`/owner.
+- **Bảng `reconciliation_runs`** (0043) + hook `useReconciliationRuns()` (khuôn `useTable` — chạy cả Supabase lẫn localStorage). Lưu: `file_b64` (file Excel gốc base64), `options` {ledgerSheetName, edits, taxSideSheets, mode}, `summary` (ảnh chụp 4 nhãn + tổng chênh — `ReconciliationSummary`), `status` 'draft'|'official', `user_id`/owner.
 - **Lưu file gốc BASE64 trong bảng** (không dùng Storage): nằm dưới RLS của bảng (tránh cấu hình ACL Storage theo user — nguồn rò rỉ), và lưu được cả khi offline. File xlsx ~150–420KB base64/bản.
-- **Mở lại** = `sheetsTuBase64(file_b64)` → `reconcile` chạy lại với `threshold`+`edits`+`ledgerSheetName` đã lưu (round-trip đã kiểm: khớp đọc trực tiếp). **Chính thức** đóng băng `summary` (đối chiếu về sau); mở lại vẫn recompute từ file.
+- **Mở lại** = `sheetsFromBase64(file_b64)` → `reconcile` chạy lại với `threshold`+`edits`+`ledgerSheetName` đã lưu (round-trip đã kiểm: khớp đọc trực tiếp). **Chính thức** đóng băng `summary` (đối chiếu về sau); mở lại vẫn recompute từ file.
 - **Riêng tư theo account ép ở TẦNG APP**: hook lọc `userId === profile.id` (admin xem tất); chưa đăng nhập / chế độ localStorage ⇒ per-máy. RLS server siết `user_id=auth.uid()` để nhánh 0021 (câu sẵn trong 0043). Xóa qua `ConfirmDelete` + toast Hoàn tác.
-- UI: ô "Tên bản" + nút **Lưu nháp** / **Lưu chính thức** (khi có kết quả); card **"Bản đã lưu"** (RecordTable, luôn hiện) với Mở lại / Tải Excel / Xóa. lib thêm `fileSangBase64` / `sheetsTuBase64`.
+- UI: ô "Tên bản" + nút **Lưu nháp** / **Lưu chính thức** (khi có kết quả); card **"Bản đã lưu"** (RecordTable, luôn hiện) với Mở lại / Tải Excel / Xóa. lib thêm `fileToBase64` / `sheetsFromBase64`.
 
 ## Không thuộc phạm vi (để sau nếu cần)
 

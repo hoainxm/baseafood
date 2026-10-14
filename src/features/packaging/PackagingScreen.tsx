@@ -55,7 +55,7 @@ import {
 } from "@/design-system";
 import { useQuickCatalogEdit } from "@/features/catalog/QuickCatalogEdit";
 import { kg, num, todayISO, formatDateVN } from "@/lib/format";
-import { KY_OPT, getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
+import { PERIOD_OPTIONS, getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
 import { Boxes, CalendarRange, Link2, Package, PackageCheck, Plus, QrCode, Scale } from "lucide-react";
 
 const WORKSHOPS: Workshop[] = ["Đông", "Cá", "Khô"];
@@ -77,23 +77,23 @@ interface FormDG {
 }
 
 export default function PackagingScreen() {
-  const [rows, persist, { trangThai: status }] = usePackagings();
-  const isLoading = status === "dang-tai" && rows.length === 0;
+  const [rows, persist, { status }] = usePackagings();
+  const isLoading = status === "loading" && rows.length === 0;
   const [wips] = useWipProductions();
   const [exportItems] = useExportItems();
   const [salesItems] = useSalesItems();
   const [products, setProducts] = useProducts();
   /** Bút chì sửa nhanh danh mục ngay trong ô chọn. */
-  const productEditor = useQuickCatalogEdit("matHang", products, setProducts);
+  const productEditor = useQuickCatalogEdit("product", products, setProducts);
 
-  const [ky, setKy] = useState<ViewPeriod>("ngay");
+  const [period, setPeriod] = useState<ViewPeriod>("day");
   const [date, setDate] = useState(todayISO());
   const [fromDate, setFromDate] = useState(todayISO());
   const [toDate, setToDate] = useState(todayISO());
   const [workshop, setWorkshop] = useState<Workshop | "Tất cả">("Đông");
 
   const [form, setForm] = useState<FormDG | null>(null);
-  const [loi, setLoi] = useState<FieldError[]>([]);
+  const [errors, setErrors] = useState<FieldError[]>([]);
   // Truy xuất lô (docs/spec/qr-truy-xuat-lo.md): gắn lô BTP cho phiếu + in tem lô TP.
   const [lotInputs] = useLotInputs();
   const [lotDispatches] = useLotDispatches();
@@ -101,7 +101,7 @@ export default function PackagingScreen() {
   const [lotLabel, setLotLabel] = useState<Packaging | null>(null);
   const countLotInputs = (id: string) => lotInputs.filter((l) => l.outputKind === "P" && l.outputId === id).length;
 
-  const [effectiveFrom, effectiveTo] = getViewPeriodRange(ky, date, fromDate, toDate);
+  const [effectiveFrom, effectiveTo] = getViewPeriodRange(period, date, fromDate, toDate);
   const isSingleDay = effectiveFrom === effectiveTo;
   const rangeDescription = isSingleDay
     ? formatDateVN(effectiveFrom)
@@ -147,14 +147,14 @@ export default function PackagingScreen() {
   const postingDate = isSingleDay ? effectiveFrom : effectiveTo;
   const recordWorkshop: Workshop = workshop === "Tất cả" ? "Đông" : workshop;
 
-  const addProduct = (ten: string): string => {
+  const addProduct = (name: string): string => {
     // Nhãn có mã số nên ô chọn không tự nhận ra tên trùng ⇒ trùng tên (không phân
     // hoa thường) thì dùng lại bản có sẵn.
-    const co = products.find((x) => x.name.trim().toLowerCase() === ten.trim().toLowerCase());
-    if (co) return co.id;
-    const m: Product = { id: uid(), code: "", name: ten, finishedGoodCode: "", category: "", materialTypeId: "" };
+    const existing = products.find((x) => x.name.trim().toLowerCase() === name.trim().toLowerCase());
+    if (existing) return existing.id;
+    const m: Product = { id: uid(), code: "", name, finishedGoodCode: "", category: "", materialTypeId: "" };
     setProducts([...products, m]);
-    notify.saved(`Đã thêm mặt hàng "${ten}"`);
+    notify.saved(`Đã thêm mặt hàng "${name}"`);
     return m.id;
   };
 
@@ -173,7 +173,7 @@ export default function PackagingScreen() {
       warehouse: FG_WAREHOUSE_NAMES[0] ?? "",
       note: "",
     });
-    setLoi([]);
+    setErrors([]);
   };
   const setField = <K extends keyof FormDG>(k: K, v: FormDG[K]) =>
     setForm((p) => (p ? { ...p, [k]: v } : p));
@@ -191,7 +191,7 @@ export default function PackagingScreen() {
     if (!(form.inputKg > 0)) ls.push({ field: "BTP vào (kg)", message: "Phải lớn hơn 0" });
     if (!form.toProductId) ls.push({ field: "Thành phẩm ra", message: "Chưa chọn mặt hàng TP" });
     if (!(form.outputKg > 0)) ls.push({ field: "TP ra (kg)", message: "Phải lớn hơn 0" });
-    setLoi(ls);
+    setErrors(ls);
     if (ls.length > 0) return;
 
     const p: Packaging = {
@@ -313,11 +313,11 @@ export default function PackagingScreen() {
       <StatCardGrid
         className="grid-cols-2 sm:grid-cols-3 lg:grid-cols-5"
         cards={[
-          { label: "Đang xem", value: rangeDescription, icon: CalendarRange, color: "trung-tinh" },
+          { label: "Đang xem", value: rangeDescription, icon: CalendarRange, color: "neutral" },
           { label: "Số phiếu", value: view.length, numeric: true, icon: Package, color: "brand" },
-          { label: "BTP vào", value: kg(totalIn), numeric: true, icon: Scale, color: "trung-tinh" },
+          { label: "BTP vào", value: kg(totalIn), numeric: true, icon: Scale, color: "neutral" },
           { label: "TP ra", value: kg(totalOut), numeric: true, icon: PackageCheck, color: "success" },
-          { label: "Hao hụt", value: kg(totalLoss), numeric: true, icon: Scale, color: totalLoss < 0 ? "warning" : "trung-tinh" },
+          { label: "Hao hụt", value: kg(totalLoss), numeric: true, icon: Scale, color: totalLoss < 0 ? "warning" : "neutral" },
         ]}
       />
 
@@ -326,22 +326,22 @@ export default function PackagingScreen() {
           label="Kỳ xem"
           hideRequiredMark
           clearable={false}
-          value={ky}
-          onChange={(v) => setKy(v as ViewPeriod)}
-          options={KY_OPT}
+          value={period}
+          onChange={(v) => setPeriod(v as ViewPeriod)}
+          options={PERIOD_OPTIONS}
           className="min-w-[13rem]"
         />
         <div className="min-w-[220px] flex-1">
-          {ky === "tuy-chon" ? (
+          {period === "custom" ? (
             <DateRangeField
               label="Khoảng ngày"
               hideRequiredMark
               presets={false}
               startDate={fromDate}
               endDate={toDate}
-              onChange={(tu, den) => {
-                setFromDate(tu);
-                setToDate(den);
+              onChange={(fromDate, toDate) => {
+                setFromDate(fromDate);
+                setToDate(toDate);
               }}
             />
           ) : (
@@ -363,7 +363,7 @@ export default function PackagingScreen() {
         <section className="grid gap-3 rounded-xl border-2 border-border bg-card p-5">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-lg font-semibold text-foreground">Tồn thành phẩm đóng gói</h2>
-            <Tag variant="phu" icon={Boxes}>
+            <Tag variant="muted" icon={Boxes}>
               {kg(totalFinishedGoodStock)}
             </Tag>
           </div>
@@ -408,7 +408,7 @@ export default function PackagingScreen() {
 
           {form && (
             <div className="space-y-6 py-2">
-              <ErrorSummary errors={loi} />
+              <ErrorSummary errors={errors} />
               <RequiredLegend />
 
               <div className="grid gap-6 sm:grid-cols-2">

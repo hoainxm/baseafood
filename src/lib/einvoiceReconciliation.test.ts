@@ -2,11 +2,11 @@ import { describe, expect, it } from "vitest";
 import { reconcile, soVN } from "./einvoiceReconciliation";
 import { compareTwoInvoiceVersions } from "./twoVersionReconciliation";
 
-// ---------- Dựng workbook giả (đúng hình dạng `docWorkbook` trả về) ----------
+// ---------- Dựng workbook giả (đúng hình dạng `readWorkbook` trả về) ----------
 
 type Sheet = Parameters<typeof reconcile>[0][number];
-const sheet = (ten: string, rows: unknown[][]): Sheet => ({
-  name: ten,
+const sheet = (name: string, rows: unknown[][]): Sheet => ({
+  name,
   rows,
   r0: 0,
   c0: 0,
@@ -18,14 +18,14 @@ const INVOICE_HEADER = [
   "Tổng tiền chưa thuế", "Tổng tiền thuế", "Tổng tiền thanh toán", "Đơn vị tiền tệ", "Tỷ giá",
 ];
 /** Một dòng hóa đơn: [ký hiệu, số, mst, chưa thuế, thuế, tổng, tiền tệ?, tỷ giá?] */
-const makeInvoice = (kh: string, so: string, taxCode: unknown, preTax: number, tax: number, total: number, dvt = "VND", exchangeRate: unknown = 1) =>
-  [kh, so, "05/02/2026", taxCode, "NCC", preTax, tax, total, dvt, exchangeRate];
-const invoiceSheet = (ten: string, dong: unknown[][]) => sheet(ten, [["DANH SÁCH HÓA ĐƠN"], INVOICE_HEADER, ...dong]);
+const makeInvoice = (kh: string, num: string, taxCode: unknown, preTax: number, tax: number, total: number, dvt = "VND", exchangeRate: unknown = 1) =>
+  [kh, num, "05/02/2026", taxCode, "NCC", preTax, tax, total, dvt, exchangeRate];
+const invoiceSheet = (name: string, row: unknown[][]) => sheet(name, [["DANH SÁCH HÓA ĐƠN"], INVOICE_HEADER, ...row]);
 
-const sheetSo = (dong: unknown[][], taxCodeHeader = "RMST") =>
-  sheet("PMEM", [["KY_HIEU", "SO_HD", taxCodeHeader, "TIENHANG", "TIENTHUE", "TONGCONG"], ...dong]);
+const sheetSo = (row: unknown[][], taxCodeHeader = "RMST") =>
+  sheet("PMEM", [["KY_HIEU", "SO_HD", taxCodeHeader, "TIENHANG", "TIENTHUE", "TONGCONG"], ...row]);
 /** Dòng sổ: [ký hiệu, số, mst, tiền hàng, thuế, tổng] */
-const so = (kh: string, invoiceNo: string, taxCode: unknown, hang: number, tax: number) => [kh, invoiceNo, taxCode, hang, tax, hang + tax];
+const parsedNumber = (kh: string, invoiceNo: string, taxCode: unknown, rows: number, tax: number) => [kh, invoiceNo, taxCode, rows, tax, rows + tax];
 
 const TAX_CODE = "0301234567";
 
@@ -50,7 +50,7 @@ describe("soVN — số kiểu Việt/US không phụ thuộc locale", () => {
     ["25.42", 25.42],
     ["1.234.567 đ", 1234567],
     ["1 234 567", 1234567],
-  ])("%s → %s", (input, ra) => expect(soVN(input)).toBe(ra));
+  ])("%s → %s", (input, result) => expect(soVN(input)).toBe(result));
 
   it("số giữ nguyên, rác → null (không mặc định 0)", () => {
     expect(soVN(1234.5)).toBe(1234.5);
@@ -71,7 +71,7 @@ describe("ngoại tệ — sheet tập con (bản tự tải) theo cùng quy ư�
       [
         invoiceSheet("HDDT THUẾ", [usd, vnd]),
         invoiceSheet("HDDT TẢI", [usd]),
-        sheetSo([so("C26TAB", "10161", TAX_CODE, 5_000_000, 500_000), so("C26TCT", "1812", TAX_CODE, 1_000_000, 100_000)]),
+        sheetSo([parsedNumber("C26TAB", "10161", TAX_CODE, 5_000_000, 500_000), parsedNumber("C26TCT", "1812", TAX_CODE, 1_000_000, 100_000)]),
       ],
       { threshold: 1 }
     );
@@ -95,7 +95,7 @@ describe("có sổ + hai bản HĐĐT gối nhau một phần", () => {
     [
       invoiceSheet("HDDT THUẾ", [A, B, C]),
       invoiceSheet("HDDT TẢI", [B, C, D]),
-      sheetSo([so("C26TAA", "1", TAX_CODE, 100, 10), so("C26TAA", "2", TAX_CODE, 200, 20)]),
+      sheetSo([parsedNumber("C26TAA", "1", TAX_CODE, 100, 10), parsedNumber("C26TAA", "2", TAX_CODE, 200, 20)]),
     ],
     { threshold: 1 }
   );
@@ -115,7 +115,7 @@ describe("có sổ + hai bản HĐĐT gối nhau một phần", () => {
 
   it("trùng khóa TRONG cùng một bản vẫn báo", () => {
     const kq2 = reconcile(
-      [invoiceSheet("HDDT THUẾ", [A, A, B]), invoiceSheet("HDDT TẢI", [A, B]), sheetSo([so("C26TAA", "1", TAX_CODE, 100, 10)])],
+      [invoiceSheet("HDDT THUẾ", [A, A, B]), invoiceSheet("HDDT TẢI", [A, B]), sheetSo([parsedNumber("C26TAA", "1", TAX_CODE, 100, 10)])],
       { threshold: 1 }
     );
     expect(kq2.warnings.filter((c) => c.kind === "Trùng khóa HĐĐT")).toHaveLength(1);
@@ -134,7 +134,7 @@ describe("MST chuẩn hóa — chỉ giữ số, bù số 0 đầu bị mất", 
     const result = reconcile(
       [
         invoiceSheet("CÓ MÃ", [makeInvoice("C26TAA", "1", "0301234567-001", 100, 10, 110), makeInvoice("C26TAA", "2", 301234567, 200, 20, 220)]),
-        sheetSo([so("C26TAA", "1", "0301234567001", 100, 10), so("C26TAA", "2", "0301234567", 200, 20)]),
+        sheetSo([parsedNumber("C26TAA", "1", "0301234567001", 100, 10), parsedNumber("C26TAA", "2", "0301234567", 200, 20)]),
       ],
       { threshold: 1 }
     );
@@ -143,7 +143,7 @@ describe("MST chuẩn hóa — chỉ giữ số, bù số 0 đầu bị mất", 
 
   it.each(["MST", "Mã số thuế", "MST người bán"])("nhận tiêu đề cột MST của sổ: %s", (title) => {
     const result = reconcile(
-      [invoiceSheet("CÓ MÃ", [makeInvoice("C26TAA", "1", TAX_CODE, 100, 10, 110)]), sheetSo([so("C26TAA", "1", TAX_CODE, 100, 10)], title)],
+      [invoiceSheet("CÓ MÃ", [makeInvoice("C26TAA", "1", TAX_CODE, 100, 10, 110)]), sheetSo([parsedNumber("C26TAA", "1", TAX_CODE, 100, 10)], title)],
       { threshold: 1 }
     );
     expect(result.totals.matched).toBe(1);
@@ -151,7 +151,7 @@ describe("MST chuẩn hóa — chỉ giữ số, bù số 0 đầu bị mất", 
 
   it("sổ không có cột MST ⇒ cảnh báo, không im lặng", () => {
     const result = reconcile(
-      [invoiceSheet("CÓ MÃ", [makeInvoice("C26TAA", "1", TAX_CODE, 100, 10, 110)]), sheetSo([so("C26TAA", "1", TAX_CODE, 100, 10)], "GHI CHÚ")],
+      [invoiceSheet("CÓ MÃ", [makeInvoice("C26TAA", "1", TAX_CODE, 100, 10, 110)]), sheetSo([parsedNumber("C26TAA", "1", TAX_CODE, 100, 10)], "GHI CHÚ")],
       { threshold: 1 }
     );
     expect(result.warnings.some((c) => c.kind === "Sổ không có cột MST")).toBe(true);
@@ -163,7 +163,7 @@ describe("MST chuẩn hóa — chỉ giữ số, bù số 0 đầu bị mất", 
 describe("ngoại tệ — thiếu tỷ giá, dung sai làm tròn", () => {
   it("tiền tệ khác VND mà không có tỷ giá ⇒ cảnh báo + phép kiểm quy đổi không đạt", () => {
     const result = reconcile(
-      [invoiceSheet("KHÔNG MÃ", [makeInvoice("C26TAB", "9", TAX_CODE, 100, 10, 110, "USD", null)]), sheetSo([so("C26TAB", "9", TAX_CODE, 100, 10)])],
+      [invoiceSheet("KHÔNG MÃ", [makeInvoice("C26TAB", "9", TAX_CODE, 100, 10, 110, "USD", null)]), sheetSo([parsedNumber("C26TAB", "9", TAX_CODE, 100, 10)])],
       { threshold: 1 }
     );
     expect(result.warnings.some((c) => c.kind === "Ngoại tệ thiếu tỷ giá")).toBe(true);
@@ -175,13 +175,13 @@ describe("ngoại tệ — thiếu tỷ giá, dung sai làm tròn", () => {
     const result = reconcile(
       [
         invoiceSheet("KHÔNG MÃ", [makeInvoice("C26TAB", "9", TAX_CODE, 100, 10, 111, "USD", 25_000)]),
-        sheetSo([so("C26TAB", "9", TAX_CODE, 2_500_000, 275_000)]),
+        sheetSo([parsedNumber("C26TAB", "9", TAX_CODE, 2_500_000, 275_000)]),
       ],
       { threshold: 1 }
     );
     const d = result.invoiceSheets[0]!.rows[0]!;
     expect(d.exchangeRate).toBe(25_000);
-    expect(d.sumMismatch?.kind).toBe("that");
+    expect(d.sumMismatch?.kind).toBe("real");
     expect(result.suspects.some((n) => n.group === 1)).toBe(true);
     expect(result.trialChecks.find((p) => p.name.startsWith("Cột quy đổi"))!.passed).toBe(true);
   });
@@ -190,12 +190,12 @@ describe("ngoại tệ — thiếu tỷ giá, dung sai làm tròn", () => {
     const result = reconcile(
       [
         invoiceSheet("KHÔNG MÃ", [makeInvoice("C26TAB", "9", TAX_CODE, 2_500_000, 250_000, 2_750_001, "USD", 25_000)]),
-        sheetSo([so("C26TAB", "9", TAX_CODE, 2_500_000, 250_001)]),
+        sheetSo([parsedNumber("C26TAB", "9", TAX_CODE, 2_500_000, 250_001)]),
       ],
       { threshold: 1 }
     );
     const d = result.invoiceSheets[0]!.rows[0]!;
     expect(d.exchangeRate).toBe(1);
-    expect(d.sumMismatch?.kind).toBe("lamTron");
+    expect(d.sumMismatch?.kind).toBe("rounding");
   });
 });

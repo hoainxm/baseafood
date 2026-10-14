@@ -22,9 +22,9 @@ const LOT_KINDS: { kind: LotKind; description: string }[] = [
 const nodeKey = (n: LotNode) => `${n.kind}:${n.id}`;
 
 export function BulkLabelPrint() {
-  const { dl } = useTraceData();
-  const [tu, setTu] = useState(() => addDays(todayIso(), -6));
-  const [den, setDen] = useState(todayIso);
+  const { traceData } = useTraceData();
+  const [fromDate, setFromDate] = useState(() => addDays(todayIso(), -6));
+  const [toDate, setToDate] = useState(todayIso);
   const [workshop, setWorkshop] = useState<Workshop | "">("");
   const [lotKinds, setLotKinds] = useState<LotKind[]>(["S", "W", "P"]);
   // Lưu những lô người dùng BỎ chọn (mặc định chọn hết) — đổi bộ lọc thì lô mới vào vẫn được chọn.
@@ -34,7 +34,7 @@ export function BulkLabelPrint() {
   const [soIn] = useLabelPrints();
   const daIn = useMemo(() => summarizeLabelPrints(soIn), [soIn]);
 
-  const allLots = useMemo(() => listLotsToPrint(dl, { fromDate: tu, toDate: den, workshop, kinds: lotKinds }), [dl, tu, den, workshop, lotKinds]);
+  const allLots = useMemo(() => listLotsToPrint(traceData, { fromDate, toDate, workshop, kinds: lotKinds }), [traceData, fromDate, toDate, workshop, lotKinds]);
   const unprintedCount = allLots.filter((n) => !daIn.has(lotKey(n.kind as LotKind, n.id))).length;
   const items = onlyUnprinted ? allLots.filter((n) => !daIn.has(lotKey(n.kind as LotKind, n.id))) : allLots;
   const selected = items.filter((n) => !deselected.has(nodeKey(n)));
@@ -59,11 +59,11 @@ export function BulkLabelPrint() {
           <DateRangeField
             label="Ngày của lô"
             hint="Ngày hàng về (nguyên liệu) · ngày sản xuất (bán thành phẩm) · ngày đóng gói (thành phẩm)."
-            startDate={tu}
-            endDate={den}
+            startDate={fromDate}
+            endDate={toDate}
             onChange={(a, b) => {
-              setTu(a);
-              setDen(b);
+              setFromDate(a);
+              setToDate(b);
             }}
             hideRequiredMark
           />
@@ -158,14 +158,14 @@ export function BulkLabelPrint() {
                     />
                     <span className="min-w-0 flex-1 space-y-1">
                       <span className="flex flex-wrap items-center gap-2">
-                        <Tag variant="phan-loai" tone={toneByName(TRACE_KIND_LABELS[n.kind])}>{TRACE_KIND_LABELS[n.kind]}</Tag>
+                        <Tag variant="category" tone={toneByName(TRACE_KIND_LABELS[n.kind])}>{TRACE_KIND_LABELS[n.kind]}</Tag>
                         <span className="tnum font-semibold">{n.label}</span>
                         {(() => {
                           const t = daIn.get(lotKey(n.kind as LotKind, n.id));
                           return t ? (
-                            <Tag variant="xong">Đã in {t.labelCount} tem · {formatDateVN(t.lastPrint.printedAt.slice(0, 10))}</Tag>
+                            <Tag variant="done">Đã in {t.labelCount} tem · {formatDateVN(t.lastPrint.printedAt.slice(0, 10))}</Tag>
                           ) : (
-                            <Tag variant="cho">Chưa in tem</Tag>
+                            <Tag variant="pending">Chưa in tem</Tag>
                           );
                         })()}
                       </span>

@@ -26,26 +26,26 @@ export interface ProportionSegment {
 
 /* Liệt kê TRỌN tên lớp để Tailwind quét thấy. */
 const TONE_BG: Record<CategoryTone, string> = {
-  tim: "bg-tone-tim",
-  ngoc: "bg-tone-ngoc",
-  bien: "bg-tone-bien",
-  bang: "bg-tone-bang",
-  cat: "bg-tone-cat",
-  hong: "bg-tone-hong",
-  la: "bg-tone-la",
-  cam: "bg-tone-cam",
-  xam: "bg-tone-xam",
+  purple: "bg-tone-purple",
+  teal: "bg-tone-teal",
+  blue: "bg-tone-blue",
+  cyan: "bg-tone-cyan",
+  sand: "bg-tone-sand",
+  pink: "bg-tone-pink",
+  green: "bg-tone-green",
+  orange: "bg-tone-orange",
+  gray: "bg-tone-gray",
 };
-const CHU: Record<CategoryTone, string> = {
-  tim: "text-tone-tim",
-  ngoc: "text-tone-ngoc",
-  bien: "text-tone-bien",
-  bang: "text-tone-bang",
-  cat: "text-tone-cat",
-  hong: "text-tone-hong",
-  la: "text-tone-la",
-  cam: "text-tone-cam",
-  xam: "text-tone-xam",
+const TONE_TEXT: Record<CategoryTone, string> = {
+  purple: "text-tone-purple",
+  teal: "text-tone-teal",
+  blue: "text-tone-blue",
+  cyan: "text-tone-cyan",
+  sand: "text-tone-sand",
+  pink: "text-tone-pink",
+  green: "text-tone-green",
+  orange: "text-tone-orange",
+  gray: "text-tone-gray",
 };
 
 export function ProportionBar({
@@ -105,7 +105,7 @@ export function ProportionBar({
                   {formatValue(p.value)} {unit}
                 </span>
               </span>
-              <span className={cn("tnum shrink-0 text-xl font-bold", CHU[p.tone])}>{pt(p.value)}</span>
+              <span className={cn("tnum shrink-0 text-xl font-bold", TONE_TEXT[p.tone])}>{pt(p.value)}</span>
             </>
           );
           const cls = "flex w-full items-start gap-2.5 rounded-lg border-2 border-border bg-card p-2.5 text-left";

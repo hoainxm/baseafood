@@ -34,7 +34,7 @@ const WORKSHOP_OPTIONS: ChoiceOption[] = [
   { value: "Khô", label: "Khô" },
 ];
 
-const KET_QUA_OPT: ChoiceOption[] = [
+const RESULT_OPTIONS: ChoiceOption[] = [
   { value: "pass", label: "Đạt" },
   { value: "conditional", label: "Cần khắc phục" },
   { value: "fail", label: "Không đạt" },
@@ -55,7 +55,7 @@ const DEFAULT_CRITERIA = [
 ];
 
 /** Một dòng chấm điểm trên màn (chưa lưu). */
-interface Dong {
+interface Row {
   criterion: string;
   result: QcResult | "";
   score: number | null;
@@ -65,11 +65,11 @@ interface Dong {
 
 export default function QcChecklistScreen() {
   const [rows, persist] = useQcChecklists();
-  const [locks, persistLocks, { trangThai: lockStatus }] = useQcLocks();
+  const [locks, persistLocks, { status: lockStatus }] = useQcLocks();
 
   const [date, setDate] = useState(todayISO());
   const [workshop, setWorkshop] = useState<Workshop>("Đông");
-  const [dongs, setDongs] = useState<Dong[]>([]);
+  const [dongs, setDongs] = useState<Row[]>([]);
   const [backdateReason, setBackdateReason] = useState("");
   const [newName, setNewName] = useState("");
 
@@ -88,15 +88,15 @@ export default function QcChecklistScreen() {
   useEffect(() => {
     const dayRows = rows.filter((r) => r.date === date && r.workshop === workshop);
     const theoTen = new Map(dayRows.map((r) => [r.criterion, r]));
-    const tenList = [
+    const names = [
       ...DEFAULT_CRITERIA,
       ...dayRows.map((r) => r.criterion).filter((t) => !DEFAULT_CRITERIA.includes(t)),
     ];
     setDongs(
-      tenList.map((ten) => {
-        const prev = theoTen.get(ten);
+      names.map((name) => {
+        const prev = theoTen.get(name);
         return {
-          criterion: ten,
+          criterion: name,
           result: (prev?.result ?? "") as QcResult | "",
           score: prev?.score ?? null,
           note: prev?.note ?? "",
@@ -107,26 +107,26 @@ export default function QcChecklistScreen() {
     setBackdateReason(dayRows.find((r) => r.backdateReason)?.backdateReason ?? "");
   }, [date, workshop, rows]);
 
-  const updateRow = (i: number, patch: Partial<Dong>) =>
+  const updateRow = (i: number, patch: Partial<Row>) =>
     setDongs((items) => items.map((d, k) => (k === i ? { ...d, ...patch } : d)));
 
   const addCriterion = () => {
-    const ten = newName.trim();
-    if (!ten) return;
-    if (dongs.some((d) => d.criterion === ten)) {
+    const name = newName.trim();
+    if (!name) return;
+    if (dongs.some((d) => d.criterion === name)) {
       notify.warning("Chỉ tiêu này đã có trong danh sách");
       return;
     }
     setDongs((items) => [
       ...items,
-      { criterion: ten, result: "", score: null, note: "", photoPaths: [] },
+      { criterion: name, result: "", score: null, note: "", photoPaths: [] },
     ]);
     setNewName("");
   };
 
   // 30 ngày tới ngày đang xem — xu hướng chất lượng của xưởng.
   const qc30 = useMemo(() => countQcByDay(rows, workshop, subtractDays(date, 29), date), [rows, workshop, date]);
-  const coQc30 = qc30.some((x) => x.pass + x.conditional + x.fail > 0);
+  const hasQc30 = qc30.some((x) => x.pass + x.conditional + x.fail > 0);
 
   const scoredRows = dongs.filter((d) => d.result);
   const passCount = scoredRows.filter((d) => d.result === "pass").length;
@@ -169,7 +169,7 @@ export default function QcChecklistScreen() {
       return;
     }
     // Chưa nạp xong sổ chốt ⇒ chưa biết máy chủ đã có bản ghi (ngày, xưởng) chưa.
-    if (lockStatus === "dang-tai") {
+    if (lockStatus === "loading") {
       notify.error("Đang tải sổ chốt QC từ máy chủ — đợi vài giây rồi bấm chốt lại");
       return;
     }
@@ -225,11 +225,11 @@ export default function QcChecklistScreen() {
             {formatDateVN(date)} · xưởng {workshop}
           </span>
           {isLocked ? (
-            <Tag variant="xong" icon={Lock}>
+            <Tag variant="done" icon={Lock}>
               Đã chốt
             </Tag>
           ) : (
-            <Tag variant="cho">Chưa chốt</Tag>
+            <Tag variant="pending">Chưa chốt</Tag>
           )}
           {scoredRows.length > 0 && (
             <span className="text-base text-muted-foreground">
@@ -253,7 +253,7 @@ export default function QcChecklistScreen() {
       </div>
 
       {/* Xu hướng 30 ngày — số chỉ tiêu đạt / tạm / không đạt mỗi ngày */}
-      {coQc30 && (
+      {hasQc30 && (
         <section className="space-y-3 rounded-xl border-2 border-border p-4">
           <h2 className="text-lg font-semibold text-foreground">30 ngày gần đây · xưởng {workshop}</h2>
           <TimeSeriesChart
@@ -262,9 +262,9 @@ export default function QcChecklistScreen() {
             height={220}
             description={`Số chỉ tiêu QC đạt, tạm, không đạt mỗi ngày — xưởng ${workshop}`}
             series={[
-              { id: "dat", name: "Đạt", color: "la", kind: "cot", values: qc30.map((x) => x.pass) },
-              { id: "tam", name: "Tạm (cần khắc phục)", color: "cat", kind: "cot", values: qc30.map((x) => x.conditional) },
-              { id: "kd", name: "Không đạt", color: "hong", kind: "cot", values: qc30.map((x) => x.fail) },
+              { id: "dat", name: "Đạt", color: "green", kind: "bar", values: qc30.map((x) => x.pass) },
+              { id: "tam", name: "Tạm (cần khắc phục)", color: "sand", kind: "bar", values: qc30.map((x) => x.conditional) },
+              { id: "kd", name: "Không đạt", color: "pink", kind: "bar", values: qc30.map((x) => x.fail) },
             ]}
           />
         </section>
@@ -301,7 +301,7 @@ export default function QcChecklistScreen() {
                 label="Kết quả"
                 value={d.result}
                 onChange={(v) => updateRow(i, { result: v as QcResult })}
-                options={KET_QUA_OPT}
+                options={RESULT_OPTIONS}
                 columns={3}
                 hideRequiredMark
               />
@@ -372,10 +372,10 @@ export default function QcChecklistScreen() {
 function PhotoThumb({ path, onDelete }: { path: string; onDelete?: () => void }) {
   const [url, setUrl] = useState<string | null>(null);
   useEffect(() => {
-    let con = true;
-    getPhotoUrl(path).then((u) => con && setUrl(u));
+    let keepGoing = true;
+    getPhotoUrl(path).then((u) => keepGoing && setUrl(u));
     return () => {
-      con = false;
+      keepGoing = false;
     };
   }, [path]);
   return (

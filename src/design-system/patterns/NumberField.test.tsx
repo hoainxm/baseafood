@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 /* Dựng HTML tĩnh (không cần trình duyệt) rồi đọc thuộc tính của thẻ `<input>`. */
 const render = (el: React.ReactElement) => renderToStaticMarkup(el);
 const theInput = (html: string) => html.match(/<input[^>]*>/)?.[0] ?? "";
-const getAttr = (the: string, ten: string) => the.match(new RegExp(`${ten}="([^"]*)"`))?.[1];
+const getAttr = (html: string, attr: string) => html.match(new RegExp(`${attr}="([^"]*)"`))?.[1];
 
 describe("NumberField — thuộc tính của Field nằm trên CHÍNH <input>", () => {
   test("nhãn <label for> trỏ đúng id của ô nhập, thẻ bọc không mang id", () => {

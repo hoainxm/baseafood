@@ -31,7 +31,7 @@ export const HINT_DELAY_MS = 150;
 /** Khoảng cách từ mép phần tử tới tooltip (px). */
 const EDGE_MARGIN = 8;
 /** Chừa mép màn hình (px) — không để tooltip dính sát viền. */
-const LE_MAN = 8;
+const SCREEN_MARGIN = 8;
 
 /** Chỗ neo: câu chữ + khung của phần tử đang rê (toạ độ so với khung nhìn). */
 interface Neo {
@@ -57,7 +57,7 @@ export function HoverHint() {
   const hen = React.useRef<number | null>(null);
   /** Phần tử đang bị gỡ `title` — giữ để trả lại đúng chỗ. */
   const typingEl = React.useRef<HTMLElement | null>(null);
-  const hop = React.useRef<HTMLDivElement | null>(null);
+  const box = React.useRef<HTMLDivElement | null>(null);
 
   React.useEffect(() => {
     // Máy cảm ứng không có "rê chuột" — đừng bật, tránh tooltip nhảy khi chạm.
@@ -74,40 +74,40 @@ export function HoverHint() {
     const traTitle = () => {
       const el = typingEl.current;
       if (el) {
-        const chu = el.getAttribute("data-hint");
-        if (chu != null) {
-          el.setAttribute("title", chu);
+        const text = el.getAttribute("data-hint");
+        if (text != null) {
+          el.setAttribute("title", text);
           el.removeAttribute("data-hint");
         }
         typingEl.current = null;
       }
     };
 
-    const an = () => {
+    const hide = () => {
       cancelTimer();
       traTitle();
       setNeo(null);
     };
 
     /** Ghi lại khung của phần tử; chỗ đặt thật tính sau khi đo được hộp chữ. */
-    const positionAt = (el: HTMLElement, chu: string) => {
+    const positionAt = (el: HTMLElement, text: string) => {
       const o = el.getBoundingClientRect();
-      setNeo({ text: chu, left: o.left, top: o.top, bottom: o.bottom, width: o.width });
+      setNeo({ text, left: o.left, top: o.top, bottom: o.bottom, width: o.width });
     };
 
     const showAfter = (el: HTMLElement, goTitle: boolean) => {
-      const chu = getText(el);
-      if (!chu) return;
+      const text = getText(el);
+      if (!text) return;
       cancelTimer();
       hen.current = window.setTimeout(() => {
         // Gỡ `title` NGAY TRƯỚC khi hiện, để tooltip gốc của trình duyệt không
         // đua lên cùng lúc. Chỉ gỡ khi rê chuột (xem docblock đầu file).
         if (goTitle && el.hasAttribute("title")) {
-          el.setAttribute("data-hint", chu);
+          el.setAttribute("data-hint", text);
           el.removeAttribute("title");
           typingEl.current = el;
         }
-        positionAt(el, chu);
+        positionAt(el, text);
       }, HINT_DELAY_MS);
     };
 
@@ -115,44 +115,44 @@ export function HoverHint() {
       if (e.pointerType !== "mouse") return;
       const el = findAnchor(e.target);
       if (!el) {
-        an();
+        hide();
         return;
       }
       if (el === typingEl.current) return; // vẫn đang ở trên chính nó
-      an();
+      hide();
       showAfter(el, true);
     };
 
     const onFocusIn = (e: FocusEvent) => {
       const el = findAnchor(e.target);
       if (!el) return;
-      an();
+      hide();
       showAfter(el, false);
     };
 
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") an();
+      if (e.key === "Escape") hide();
     };
 
     document.addEventListener("pointerover", onPointerEnter, true);
-    document.addEventListener("pointerdown", an, true);
+    document.addEventListener("pointerdown", hide, true);
     document.addEventListener("focusin", onFocusIn, true);
-    document.addEventListener("focusout", an, true);
+    document.addEventListener("focusout", hide, true);
     document.addEventListener("keydown", handleKey, true);
     // Cuộn / đổi cỡ thì toạ độ cũ sai ngay — ẩn cho gọn.
-    window.addEventListener("scroll", an, true);
-    window.addEventListener("resize", an);
-    window.addEventListener("blur", an);
+    window.addEventListener("scroll", hide, true);
+    window.addEventListener("resize", hide);
+    window.addEventListener("blur", hide);
 
     return () => {
       document.removeEventListener("pointerover", onPointerEnter, true);
-      document.removeEventListener("pointerdown", an, true);
+      document.removeEventListener("pointerdown", hide, true);
       document.removeEventListener("focusin", onFocusIn, true);
-      document.removeEventListener("focusout", an, true);
+      document.removeEventListener("focusout", hide, true);
       document.removeEventListener("keydown", handleKey, true);
-      window.removeEventListener("scroll", an, true);
-      window.removeEventListener("resize", an);
-      window.removeEventListener("blur", an);
+      window.removeEventListener("scroll", hide, true);
+      window.removeEventListener("resize", hide);
+      window.removeEventListener("blur", hide);
       cancelTimer();
       traTitle();
     };
@@ -167,24 +167,24 @@ export function HoverHint() {
    * `useLayoutEffect` chạy TRƯỚC khi vẽ nên không thấy nhấp nháy ở góc màn.
    */
   React.useLayoutEffect(() => {
-    const el = hop.current;
+    const el = box.current;
     if (!el || !neo) return;
     const o = el.getBoundingClientRect();
     const inRange = (v: number, min: number, max: number) => Math.max(min, Math.min(v, max));
 
     // Mặc định nằm DƯỚI; dưới không đủ chỗ mà trên rộng hơn thì lật lên TRÊN.
-    const spaceBelow = window.innerHeight - neo.bottom - EDGE_MARGIN - LE_MAN;
-    const placeAbove = spaceBelow < o.height && neo.top - EDGE_MARGIN - LE_MAN > spaceBelow;
+    const spaceBelow = window.innerHeight - neo.bottom - EDGE_MARGIN - SCREEN_MARGIN;
+    const placeAbove = spaceBelow < o.height && neo.top - EDGE_MARGIN - SCREEN_MARGIN > spaceBelow;
 
     const left = inRange(
       neo.left + neo.width / 2 - o.width / 2,
-      LE_MAN,
-      Math.max(LE_MAN, window.innerWidth - LE_MAN - o.width)
+      SCREEN_MARGIN,
+      Math.max(SCREEN_MARGIN, window.innerWidth - SCREEN_MARGIN - o.width)
     );
     const top = inRange(
       placeAbove ? neo.top - EDGE_MARGIN - o.height : neo.bottom + EDGE_MARGIN,
-      LE_MAN,
-      Math.max(LE_MAN, window.innerHeight - LE_MAN - o.height)
+      SCREEN_MARGIN,
+      Math.max(SCREEN_MARGIN, window.innerHeight - SCREEN_MARGIN - o.height)
     );
 
     el.style.left = `${Math.round(left)}px`;
@@ -196,7 +196,7 @@ export function HoverHint() {
 
   return (
     <div
-      ref={hop}
+      ref={box}
       role="tooltip"
       aria-hidden
       /* Vẽ tạm ở góc với opacity 0; layout-effect ngay sau đó đặt đúng chỗ. */

@@ -87,18 +87,18 @@ export function CatalogCrud<T extends { id: string }>({
 }) {
   const [editing, setEditing] = React.useState<T | null>(null);
   const [isAdding, setIsAdding] = React.useState(false);
-  const [loi, setLoi] = React.useState<FieldError[]>([]);
+  const [errors, setErrors] = React.useState<FieldError[]>([]);
 
   const openAdd = () => {
     setEditing(createEmpty());
     setIsAdding(true);
-    setLoi([]);
+    setErrors([]);
   };
 
   const openEdit = (r: T) => {
     setEditing({ ...r });
     setIsAdding(false);
-    setLoi([]);
+    setErrors([]);
   };
 
   const save = () => {
@@ -108,7 +108,7 @@ export function CatalogCrud<T extends { id: string }>({
       .map((f) => ({ field: f.label, message: `Chưa nhập ${f.label.toLowerCase()}` }));
     const extraErrors = validate?.(editing, rows, isAdding) ?? [];
     const allRows = [...ls, ...extraErrors];
-    setLoi(allRows);
+    setErrors(allRows);
     if (allRows.length > 0) return;
 
     if (isAdding) {
@@ -215,7 +215,7 @@ export function CatalogCrud<T extends { id: string }>({
         isAdding={isAdding}
         fields={fields}
         entityName={entityName}
-        errors={loi}
+        errors={errors}
         onChange={setEditing}
         onSave={save}
         onClose={() => setEditing(null)}
@@ -238,8 +238,8 @@ export function CatalogEditDialog<T extends { id: string }>({
   isAdding,
   fields,
   entityName,
-  errors: loi,
-  onChange: onDoi,
+  errors,
+  onChange,
   onSave,
   onClose,
   description,
@@ -274,7 +274,7 @@ export function CatalogEditDialog<T extends { id: string }>({
 
         {editing && (
           <div className="space-y-5 py-2">
-            <ErrorSummary errors={loi} />
+            <ErrorSummary errors={errors} />
             {fields.map((f) => {
               const value = String(editing[f.key] ?? "");
               if (lockedField?.key === f.key)
@@ -284,7 +284,7 @@ export function CatalogEditDialog<T extends { id: string }>({
                   </Field>
                 );
               const changeValue = (v: string) =>
-                onDoi((d) => (d ? { ...d, [f.key]: v } : d));
+                onChange((d) => (d ? { ...d, [f.key]: v } : d));
               return f.render ? (
                 <div key={f.key}>{f.render(value, changeValue, !isAdding)}</div>
               ) : (

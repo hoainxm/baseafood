@@ -56,29 +56,29 @@ function evaluate(s: string): number | null {
   const peek = () => s[i];
 
   function expression(): number | null {
-    let v = hang();
+    let v = term();
     if (v == null) return null;
     while (peek() === "+" || peek() === "-") {
       const op = s[i++];
-      const r = hang();
+      const r = term();
       if (r == null) return null;
       v = op === "+" ? v + r : v - r;
     }
     return v;
   }
-  function hang(): number | null {
-    let v = thua();
+  function term(): number | null {
+    let v = factor();
     if (v == null) return null;
     while (peek() === "*" || peek() === "/") {
       const op = s[i++];
-      const r = thua();
+      const r = factor();
       if (r == null) return null;
       if (op === "/" && r === 0) return null; // chia 0
       v = op === "*" ? v * r : v / r;
     }
     return v;
   }
-  function thua(): number | null {
+  function factor(): number | null {
     let v = parsePrimary();
     if (v == null) return null;
     while (peek() === "%") {

@@ -26,7 +26,7 @@ export function shiftFormula(
   /** Sheet chứa công thức này có bị chèn cột không — quyết định số phận tham chiếu KHÔNG ghi tên sheet. */
   isFormulaSheetShifted = true
 ): string {
-  let ra = "";
+  let result = "";
   let i = 0;
   let isCurrentSheetShifted = isFormulaSheetShifted; // tham chiếu đang xét thuộc sheet có dịch hay không
   const n = ct.length;
@@ -44,7 +44,7 @@ export function shiftFormula(
         }
         j++;
       }
-      ra += ct.slice(i, j + 1);
+      result += ct.slice(i, j + 1);
       i = j + 1;
       continue;
     }
@@ -60,13 +60,13 @@ export function shiftFormula(
         }
         j++;
       }
-      const ten = ct.slice(i + 1, j).replace(/''/g, "'");
-      ra += ct.slice(i, j + 1);
+      const name = ct.slice(i + 1, j).replace(/''/g, "'");
+      result += ct.slice(i, j + 1);
       i = j + 1;
       if (ct[i] === "!") {
-        ra += "!";
+        result += "!";
         i++;
-        isCurrentSheetShifted = shiftedSheets.has(ten);
+        isCurrentSheetShifted = shiftedSheets.has(name);
       }
       continue;
     }
@@ -74,19 +74,19 @@ export function shiftFormula(
     if (identifier) {
       const tok = identifier[1]!;
       if (ct[i + tok.length] === "(") {
-        ra += tok; // tên hàm
+        result += tok; // tên hàm
         i += tok.length;
         continue;
       }
       if (ct[i + tok.length] === "!") {
-        ra += `${tok}!`; // tên sheet không nháy
+        result += `${tok}!`; // tên sheet không nháy
         i += tok.length + 1;
         isCurrentSheetShifted = shiftedSheets.has(tok);
         continue;
       }
       const o = /^(\$?)([A-Z]{1,3})(\$?)(\d+)(?![A-Za-z0-9_])/.exec(ct.slice(i));
       if (o) {
-        ra += o[1]! + (isCurrentSheetShifted ? shiftColumnLetter(o[2]!, shift) : o[2]!) + o[3]! + o[4]!;
+        result += o[1]! + (isCurrentSheetShifted ? shiftColumnLetter(o[2]!, shift) : o[2]!) + o[3]! + o[4]!;
         i += o[0].length;
         // Ô ĐẦU của vùng `Sheet!A1:B9`: nửa sau vẫn thuộc sheet đó — giữ `sheetNay`,
         // reset ngay là `HDDT!Q3:Q3047` dịch thành `R3:Q3047` (lệch vùng âm thầm).
@@ -97,20 +97,20 @@ export function shiftFormula(
       if (columnMatch) {
         const a = isCurrentSheetShifted ? shiftColumnLetter(columnMatch[2]!, shift) : columnMatch[2]!;
         const b = isCurrentSheetShifted ? shiftColumnLetter(columnMatch[4]!, shift) : columnMatch[4]!;
-        ra += `${columnMatch[1]!}${a}:${columnMatch[3]!}${b}`;
+        result += `${columnMatch[1]!}${a}:${columnMatch[3]!}${b}`;
         i += columnMatch[0].length;
         isCurrentSheetShifted = isFormulaSheetShifted;
         continue;
       }
-      ra += tok;
+      result += tok;
       i += tok.length;
       continue;
     }
     if (ch !== ":" && ch !== "$") isCurrentSheetShifted = isFormulaSheetShifted;
-    ra += ch;
+    result += ch;
     i++;
   }
-  return ra;
+  return result;
 }
 
 /** Dịch một vùng kiểu `B3:T3` sang phải `dich` cột. */
@@ -206,12 +206,12 @@ export function shiftCrossSheetRefs(
 }
 
 /** Viết lại mọi ô công thức của sheet (giữ kết quả cache). */
-function rewriteFormulas(ws: Worksheet, doi: (ct: string) => string): void {
+function rewriteFormulas(ws: Worksheet, rewrite: (ct: string) => string): void {
   ws.eachRow({ includeEmpty: false }, (row) =>
     row.eachCell({ includeEmpty: false }, (cell) => {
       const v = cell.value as { formula?: string; result?: unknown } | null;
       if (v && typeof v === "object" && typeof v.formula === "string")
-        cell.value = { formula: doi(v.formula), result: v.result as never };
+        cell.value = { formula: rewrite(v.formula), result: v.result as never };
     })
   );
 }

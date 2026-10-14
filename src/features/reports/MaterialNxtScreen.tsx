@@ -42,7 +42,7 @@ import {
   useMaterialTypes,
   useProductionLocks,
 } from "@/lib/catalogRepo";
-import { KY_OPT, getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
+import { PERIOD_OPTIONS, getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
 import {
   computeMaterialTotalStock,
   sumUnmatchedLeftover,
@@ -97,22 +97,22 @@ export default function MaterialNxtScreen() {
   const [opening, writeOpening] = useMaterialOpeningStock();
   const [materialTypes, setMaterialTypes] = useMaterialTypes();
   /** Bút chì sửa nhanh danh mục ngay trong ô chọn. */
-  const materialTypeEditor = useQuickCatalogEdit("loaiNL", materialTypes, setMaterialTypes, { theo: "ten" });
+  const materialTypeEditor = useQuickCatalogEdit("materialType", materialTypes, setMaterialTypes, { matchBy: "name" });
   const [locks] = useProductionLocks();
   /** Sổ bán nội địa (mig 0054) — NL bán thẳng ghi ở /wip, là khoản XUẤT trừ tồn. */
   const [domesticSales] = useDomesticSales();
 
-  const [ky, setKy] = useState<ViewPeriod>("thang");
-  const [moc, setMoc] = useState(todayIso());
-  const [tuTC, setTuTC] = useState(todayIso());
-  const [denTC, setDenTC] = useState(todayIso());
+  const [period, setPeriod] = useState<ViewPeriod>("month");
+  const [anchor, setAnchor] = useState(todayIso());
+  const [customFrom, setCustomFrom] = useState(todayIso());
+  const [customTo, setCustomTo] = useState(todayIso());
   const [workshopFilter, setWorkshopFilter] = useState<string>("Tất cả");
-  const [tu, den] = getViewPeriodRange(ky, moc, tuTC, denTC);
+  const [fromDate, toDate] = getViewPeriodRange(period, anchor, customFrom, customTo);
 
   // Dialog tồn đầu
   const [isOpeningOpen, setIsOpeningOpen] = useState(false);
   const [form, setForm] = useState<OpeningForm | null>(null);
-  const [loi, setLoi] = useState<FieldError[]>([]);
+  const [errors, setErrors] = useState<FieldError[]>([]);
 
   const workshop = workshopFilter === "Tất cả" ? undefined : (workshopFilter as Workshop);
 
@@ -124,24 +124,24 @@ export default function MaterialNxtScreen() {
         imports,
         opening,
         locks,
-        { fromDate: tu, toDate: den, workshop },
+        { fromDate, toDate, workshop },
         domesticSales,
       ),
-    [periods, inputs, imports, opening, locks, tu, den, workshop, domesticSales],
+    [periods, inputs, imports, opening, locks, fromDate, toDate, workshop, domesticSales],
   );
 
   const hasFreezeOrThaw = data.totalFreezeDepositKg > 0 || data.totalThawKg > 0;
   // Còn dở SX ghi ở ngày KHÔNG có kỳ cân đối nào phủ → không lọt vào cột "Đông gửi"
   // (info) nào. Gọi tên thay vì để số biến mất (luật "màn tự giải thích").
   const unmatchedLeftover = useMemo(
-    () => sumUnmatchedLeftover(periods, locks, { fromDate: tu, toDate: den, workshop }),
-    [periods, locks, tu, den, workshop],
+    () => sumUnmatchedLeftover(periods, locks, { fromDate, toDate, workshop }),
+    [periods, locks, fromDate, toDate, workshop],
   );
 
-  const the: StatCardData[] = [
-    { label: "Tồn đầu kỳ", value: `${num(data.totalOpeningKg)} kg`, numeric: true, icon: Snowflake, color: "trung-tinh" },
+  const cards: StatCardData[] = [
+    { label: "Tồn đầu kỳ", value: `${num(data.totalOpeningKg)} kg`, numeric: true, icon: Snowflake, color: "neutral" },
     { label: "Nhập trong kỳ", value: `${num(data.totalInKg)} kg`, numeric: true, icon: ArrowDownToLine, color: "brand" },
-    { label: "Xuất SX (chờ)", value: "0 kg", numeric: true, icon: Truck, color: "trung-tinh" },
+    { label: "Xuất SX (chờ)", value: "0 kg", numeric: true, icon: Truck, color: "neutral" },
     { label: "Bán nội địa", value: `${num(data.totalDomesticSaleKg)} kg`, numeric: true, icon: Store, color: "warning" },
     { label: "Tồn cuối (chưa trừ SX)", value: `${num(data.totalClosingKg)} kg`, numeric: true, icon: Scale, color: "success" },
   ];
@@ -195,9 +195,9 @@ export default function MaterialNxtScreen() {
       render: (r) => (
         <div className="flex flex-wrap items-center gap-2">
           <span className="font-semibold text-foreground">{r.materialFamily}</span>
-          {r.hasManualOpening && <Tag variant="nguon">Tồn đầu khai tay</Tag>}
+          {r.hasManualOpening && <Tag variant="source">Tồn đầu khai tay</Tag>}
           {r.isNegative && (
-            <Tag variant="loi" icon={AlertTriangle}>
+            <Tag variant="error" icon={AlertTriangle}>
               Tồn âm
             </Tag>
           )}
@@ -270,7 +270,7 @@ export default function MaterialNxtScreen() {
       quantityKg: null,
       note: "",
     });
-    setLoi([]);
+    setErrors([]);
   };
 
   const saveOpening = () => {
@@ -281,7 +281,7 @@ export default function MaterialNxtScreen() {
     if (!form.asOfDate) ls.push({ field: "Ngày mốc", message: "Chưa chọn ngày tồn đầu" });
     if (!(Number(form.quantityKg) > 0))
       ls.push({ field: "Khối lượng", message: "Phải lớn hơn 0 kg" });
-    setLoi(ls);
+    setErrors(ls);
     if (ls.length > 0) return;
     const newOpening: MaterialOpeningStock = {
       id: uid(),
@@ -333,31 +333,31 @@ export default function MaterialNxtScreen() {
             label="Kỳ báo cáo"
             hideRequiredMark
             clearable={false}
-            value={ky}
-            onChange={(v) => setKy(v as ViewPeriod)}
-            options={KY_OPT}
+            value={period}
+            onChange={(v) => setPeriod(v as ViewPeriod)}
+            options={PERIOD_OPTIONS}
           />
         </div>
         <div className="min-w-[min(12rem,100%)] flex-1 sm:min-w-[16rem]">
-          {ky === "tuy-chon" ? (
+          {period === "custom" ? (
             <DateRangeField
               label="Khoảng ngày"
               hideRequiredMark
               presets={false}
-              startDate={tuTC}
-              endDate={denTC}
+              startDate={customFrom}
+              endDate={customTo}
               onChange={(a, b) => {
-                setTuTC(a);
-                setDenTC(b);
+                setCustomFrom(a);
+                setCustomTo(b);
               }}
             />
           ) : (
             <DateField
-              label={ky === "ngay" ? "Ngày" : "Ngày bất kỳ trong kỳ"}
+              label={period === "day" ? "Ngày" : "Ngày bất kỳ trong kỳ"}
               hideRequiredMark
-              hint={ky === "ngay" ? undefined : `Kỳ: ${formatDateVN(tu)} – ${formatDateVN(den)}`}
-              value={moc}
-              onChange={setMoc}
+              hint={period === "day" ? undefined : `Kỳ: ${formatDateVN(fromDate)} – ${formatDateVN(toDate)}`}
+              value={anchor}
+              onChange={setAnchor}
             />
           )}
         </div>
@@ -373,7 +373,7 @@ export default function MaterialNxtScreen() {
         </div>
       </div>
 
-      <StatCardGrid cards={the} />
+      <StatCardGrid cards={cards} />
 
       {/* Chú thích phạm vi — trung thực (nhất là với BGĐ) */}
       <div className="flex flex-wrap items-start gap-3 rounded-xl border-2 border-warning bg-warning/10 p-4">
@@ -436,7 +436,7 @@ export default function MaterialNxtScreen() {
               rows={data.families}
               columns={materialFamilyColumns}
               getKey={(r) => r.materialFamily}
-              rowMarkKey={`ton-nl-ho|${tu}|${den}|${workshopFilter}`}
+              rowMarkKey={`ton-nl-ho|${fromDate}|${toDate}|${workshopFilter}`}
               emptyText="Chưa có loại nguyên liệu nào."
             />
           </section>
@@ -493,7 +493,7 @@ export default function MaterialNxtScreen() {
             {/* Form thêm */}
             {form ? (
               <div className="space-y-4 rounded-xl border-2 border-primary/40 bg-accent/30 p-4">
-                <ErrorSummary errors={loi} />
+                <ErrorSummary errors={errors} />
                 <RequiredLegend />
                 <div className="grid gap-4 sm:grid-cols-2">
                   <Combobox

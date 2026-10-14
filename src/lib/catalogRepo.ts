@@ -42,7 +42,7 @@ import {
   BATTER_TYPE_TABLE,
   ROW_MARK_TABLE,
   DOMESTIC_SALE_TABLE,
-  useBang,
+  useTable,
 } from "@/lib/repo";
 import type {
   BatterType,
@@ -55,7 +55,7 @@ import type {
 import { DEFAULT_STORAGE_LOCATION } from "@/types";
 import { BATTER_TYPE_SEED, inferBattersFromName } from "@/lib/batter";
 import fgSeed from "@/data/finished-goods.json";
-import nxtBachTuoc from "@/data/nxt-bachtuoc-2026-07.json";
+import octopusNxtSnapshot from "@/data/nxt-bachtuoc-2026-07.json";
 
 /**
  * Các bảng dữ liệu của hệ thống, gói sẵn để màn hình gọi một dòng.
@@ -101,8 +101,8 @@ export const seedFinishedGoods = (): FinishedGood[] =>
  * chủ ý, loài đó cần từ khóa riêng mới bổ sung (spec §5.1). Migration 0034 nhân
  * bản luật này bằng SQL để vá cả bản đã deploy.
  */
-export const inferProcessingType = (ten: string): string => {
-  const t = ten.toLowerCase();
+export const inferProcessingType = (name: string): string => {
+  const t = name.toLowerCase();
   if (t.includes("ncls") || t.includes("nguyên con làm sạch"))
     return "Nguyên con làm sạch";
   if (t.includes("luộc màu")) return "Luộc màu";
@@ -200,7 +200,7 @@ export const seedStorageLocations = (): StorageLocation[] => [
 ];
 
 export const seedNxtSnapshots = (): NxtSnapshotLine[] => {
-  const h = nxtBachTuoc as {
+  const h = octopusNxtSnapshot as {
     warehouseCode: string;
     periodFrom: string;
     periodTo: string;
@@ -227,72 +227,72 @@ export const seedNxtSnapshots = (): NxtSnapshotLine[] => {
 };
 
 /* --- Danh mục --- */
-export const useProducts = () => useBang(PRODUCT_TABLE, seedProducts);
-export const useCustomers = () => useBang(CUSTOMER_TABLE);
-export const useSuppliers = () => useBang(SUPPLIER_TABLE);
-export const useMaterialTypes = () => useBang(MATERIAL_TYPE_TABLE, seedMaterialTypes);
-export const useFinishedGoods = () => useBang(FINISHED_GOOD_TABLE, seedFinishedGoods);
+export const useProducts = () => useTable(PRODUCT_TABLE, seedProducts);
+export const useCustomers = () => useTable(CUSTOMER_TABLE);
+export const useSuppliers = () => useTable(SUPPLIER_TABLE);
+export const useMaterialTypes = () => useTable(MATERIAL_TYPE_TABLE, seedMaterialTypes);
+export const useFinishedGoods = () => useTable(FINISHED_GOOD_TABLE, seedFinishedGoods);
 
 /* --- Nghiệp vụ --- */
-export const useMaterialImports = () => useBang(MATERIAL_IMPORT_TABLE);
-export const useImportShipments = () => useBang(IMPORT_SHIPMENT_TABLE);
-export const useDailyLocks = () => useBang(DAILY_LOCK_TABLE);
-export const useBalancingPeriods = () => useBang(BALANCING_PERIOD_TABLE);
-export const useBalancingInputs = () => useBang(BALANCING_INPUT_TABLE);
-export const useScraps = () => useBang(SCRAP_TABLE);
-export const useBalancingOutputs = () => useBang(BALANCING_OUTPUT_TABLE);
-export const useSalesInvoices = () => useBang(SALES_INVOICE_TABLE);
-export const useSalesItems = () => useBang(SALES_ITEM_TABLE);
-export const useUserProfiles = () => useBang(USER_PROFILE_TABLE);
+export const useMaterialImports = () => useTable(MATERIAL_IMPORT_TABLE);
+export const useImportShipments = () => useTable(IMPORT_SHIPMENT_TABLE);
+export const useDailyLocks = () => useTable(DAILY_LOCK_TABLE);
+export const useBalancingPeriods = () => useTable(BALANCING_PERIOD_TABLE);
+export const useBalancingInputs = () => useTable(BALANCING_INPUT_TABLE);
+export const useScraps = () => useTable(SCRAP_TABLE);
+export const useBalancingOutputs = () => useTable(BALANCING_OUTPUT_TABLE);
+export const useSalesInvoices = () => useTable(SALES_INVOICE_TABLE);
+export const useSalesItems = () => useTable(SALES_ITEM_TABLE);
+export const useUserProfiles = () => useTable(USER_PROFILE_TABLE);
 
 /* --- QC checklist chấm điểm cuối ngày --- */
-export const useQcChecklists = () => useBang(QC_CHECKLIST_TABLE);
-export const useQcLocks = () => useBang(QC_LOCK_TABLE);
+export const useQcChecklists = () => useTable(QC_CHECKLIST_TABLE);
+export const useQcLocks = () => useTable(QC_LOCK_TABLE);
 
 /* --- Module WIP: sản xuất BTP · kho · đơn đặt --- */
-export const useWipProductions = () => useBang(WIP_PRODUCTION_TABLE);
-export const useProductionLocks = () => useBang(PRODUCTION_LOCK_TABLE);
-export const usePackagings = () => useBang(PACKAGING_TABLE);
-export const useSalesOrders = () => useBang(SALES_ORDER_TABLE);
-export const useOrderItems = () => useBang(ORDER_ITEM_TABLE);
-export const useExportOrders = () => useBang(EXPORT_ORDER_TABLE);
-export const useExportItems = () => useBang(EXPORT_ITEM_TABLE);
+export const useWipProductions = () => useTable(WIP_PRODUCTION_TABLE);
+export const useProductionLocks = () => useTable(PRODUCTION_LOCK_TABLE);
+export const usePackagings = () => useTable(PACKAGING_TABLE);
+export const useSalesOrders = () => useTable(SALES_ORDER_TABLE);
+export const useOrderItems = () => useTable(ORDER_ITEM_TABLE);
+export const useExportOrders = () => useTable(EXPORT_ORDER_TABLE);
+export const useExportItems = () => useTable(EXPORT_ITEM_TABLE);
 
 /* --- Tồn kho nguyên liệu (NXT nguyên liệu) --- */
-export const useMaterialOpeningStock = () => useBang(OPENING_STOCK_TABLE);
+export const useMaterialOpeningStock = () => useTable(OPENING_STOCK_TABLE);
 
 /* --- Tồn đầu kho thành phẩm (NXT thành phẩm) --- */
-export const useFinishedGoodsOpeningStock = () => useBang(FINISHED_OPENING_STOCK_TABLE);
+export const useFinishedGoodsOpeningStock = () => useTable(FINISHED_OPENING_STOCK_TABLE);
 
 /* --- Xuất–Nhập–Tồn kho (snapshot từ báo cáo thật) --- */
-export const useNxtSnapshots = () => useBang(NXT_SNAPSHOT_TABLE, seedNxtSnapshots);
+export const useNxtSnapshots = () => useTable(NXT_SNAPSHOT_TABLE, seedNxtSnapshots);
 
 /* --- Sổ BÁN NỘI ĐỊA (mig 0054) — NL bán thẳng, ghi ở /wip, Cân đối lấy làm dòng giảm --- */
-export const useDomesticSales = () => useBang(DOMESTIC_SALE_TABLE);
+export const useDomesticSales = () => useTable(DOMESTIC_SALE_TABLE);
 
 /* --- Danh mục LOẠI BỘT TẨM (mig 0051) — seed id tất định, khớp migration --- */
 export const seedBatterTypes = (): BatterType[] => BATTER_TYPE_SEED.map((b) => ({ ...b }));
-export const useBatterTypes = () => useBang(BATTER_TYPE_TABLE, seedBatterTypes);
+export const useBatterTypes = () => useTable(BATTER_TYPE_TABLE, seedBatterTypes);
 
 /* --- Danh mục kho LƯU hàng (kho nhà + kho lạnh thuê ngoài) --- */
-export const useStorageLocations = () => useBang(STORAGE_LOCATION_TABLE, seedStorageLocations);
+export const useStorageLocations = () => useTable(STORAGE_LOCATION_TABLE, seedStorageLocations);
 
 /* --- Sổ kho theo tháng (dồn tồn cuối kỳ → đầu kỳ sau) --- */
-export const useMonthlyStock = () => useBang(MONTHLY_STOCK_TABLE);
+export const useMonthlyStock = () => useTable(MONTHLY_STOCK_TABLE);
 /** Bản đối soát hóa đơn đã lưu (màn /doi-soat) — nháp/chính thức theo tài khoản. */
-export const useReconciliationRuns = () => useBang(RECONCILIATION_RUN_TABLE);
+export const useReconciliationRuns = () => useTable(RECONCILIATION_RUN_TABLE);
 /** Sự kiện biến đổi lô — mẻ SX / đóng gói đã dùng lô nào (truy xuất QR, mig 0046). */
-export const useLotInputs = () => useBang(LOT_INPUT_TABLE);
+export const useLotInputs = () => useTable(LOT_INPUT_TABLE);
 /** Sổ in tem QR — lô nào đã in tem, nhãn in ra, ai in, lúc nào (mig 0049). */
-export const useLabelPrints = () => useBang(LABEL_PRINT_TABLE);
+export const useLabelPrints = () => useTable(LABEL_PRINT_TABLE);
 /** Lô đi ra — dòng bán lẻ / bán nội địa / quét kiểm lệnh xuất lấy từ lô nào (mig 0056). */
-export const useLotDispatches = () => useBang(LOT_DISPATCH_TABLE);
+export const useLotDispatches = () => useTable(LOT_DISPATCH_TABLE);
 /** Lý do chưa gắn lô khi chốt ngày SX (mig 0056). */
-export const useLotWaivers = () => useBang(LOT_WAIVER_TABLE);
+export const useLotWaivers = () => useTable(LOT_WAIVER_TABLE);
 /** Tô màu dòng "đã dò" kiểu Excel — MỘT bảng dùng chung mọi bảng (mig 0055).
  *  Màn hình KHÔNG gọi thẳng: đi qua `RowMarkProvider` (features/shared) gắn một lần
  *  ở ShellLayout, bảng bật bằng prop `rowMarkKey` của design-system. */
-export const useRowMarks = () => useBang(ROW_MARK_TABLE);
+export const useRowMarks = () => useTable(ROW_MARK_TABLE);
 
 /** Nạp bộ demo hàng loạt không ghi nhật ký (lib/repo.ts) — chỉ DemoPackLoader dùng. */
 export { setAuditPaused } from "@/lib/repo";

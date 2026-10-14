@@ -97,10 +97,10 @@ function monthStart(): string {
  * client. Xem chi tiết trước→sau trong hộp thoại. Xuất Excel.
  */
 export default function AuditLogScreen() {
-  const [tu, setTu] = useState(monthStart());
-  const [den, setDen] = useState(todayIso());
+  const [fromDate, setFromDate] = useState(monthStart());
+  const [toDate, setToDate] = useState(todayIso());
   const [actionFilter, setActionFilter] = useState("");
-  const [bang, setBang] = useState("");
+  const [entity, setEntity] = useState("");
   const [user, setUser] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -111,7 +111,7 @@ export default function AuditLogScreen() {
   useEffect(() => {
     let isCancelled = false;
     setIsLoading(true);
-    readAuditLog({ fromDate: tu, toDate: den, action: actionFilter || undefined, entity: bang || undefined, limit: 1000 })
+    readAuditLog({ fromDate, toDate, action: actionFilter || undefined, entity: entity || undefined, limit: 1000 })
       .then((r) => {
         if (!isCancelled) setRows(r);
       })
@@ -121,11 +121,11 @@ export default function AuditLogScreen() {
     return () => {
       isCancelled = true;
     };
-  }, [tu, den, actionFilter, bang]);
+  }, [fromDate, toDate, actionFilter, entity]);
 
   const reload = () => {
     setIsLoading(true);
-    readAuditLog({ fromDate: tu, toDate: den, action: actionFilter || undefined, entity: bang || undefined, limit: 1000 })
+    readAuditLog({ fromDate, toDate, action: actionFilter || undefined, entity: entity || undefined, limit: 1000 })
       .then(setRows)
       .finally(() => setIsLoading(false));
   };
@@ -136,7 +136,7 @@ export default function AuditLogScreen() {
     return [{ value: "", label: "Tất cả người" }, ...[...set].sort().map((u) => ({ value: u, label: u }))];
   }, [rows]);
 
-  const optBang: ComboboxOption[] = useMemo(() => {
+  const entityOptions: ComboboxOption[] = useMemo(() => {
     const set = new Set(rows.map((r) => r.entity).filter(Boolean));
     return [
       { value: "", label: "Tất cả đối tượng" },
@@ -158,15 +158,15 @@ export default function AuditLogScreen() {
 
   const userCount = useMemo(() => new Set(view.map((r) => r.actorUsername).filter(Boolean)).size, [view]);
 
-  const the: StatCardData[] = [
-    { label: "Khoảng ngày", value: `${tu} → ${den}`, icon: History, color: "trung-tinh" },
+  const cards: StatCardData[] = [
+    { label: "Khoảng ngày", value: `${fromDate} → ${toDate}`, icon: History, color: "neutral" },
     { label: "Số thao tác", value: view.length, numeric: true, icon: History, color: "brand" },
     { label: "Số người", value: userCount, numeric: true, icon: Users, color: "success" },
   ];
 
   const actionLabel = (a: string) => ACTION_LABELS[a] ?? a;
   const badgeKind = (a: string): TagVariant =>
-    a === "delete" ? "loi" : a === "create" ? "xong" : a === "update" ? "luu-y" : "phu";
+    a === "delete" ? "error" : a === "create" ? "done" : a === "update" ? "warning" : "muted";
 
   const cols: RecordTableColumn<AuditEntry>[] = [
     { key: "at", header: "Thời gian", primary: true, render: (r) => formatDate(r.at), getSortValue: (r) => r.at },
@@ -188,7 +188,7 @@ export default function AuditLogScreen() {
     }
     const aoa: OExcel[][] = [];
     aoa.push(["Nhật ký thao tác"]);
-    aoa.push([`Khoảng: ${tu} → ${den}`]);
+    aoa.push([`Khoảng: ${fromDate} → ${toDate}`]);
     aoa.push([]);
     aoa.push(["Thời gian", "Người", "Thao tác", "Đối tượng", "Khóa bản ghi", "Tóm tắt", "Chi tiết"]);
     for (const r of view)
@@ -205,7 +205,7 @@ export default function AuditLogScreen() {
       sheetName: "Nhật ký",
       aoa,
       colWidths: [20, 16, 12, 24, 22, 30, 50],
-      fileName: `nhat-ky-thao-tac_${tu}_${den}.xlsx`,
+      fileName: `nhat-ky-thao-tac_${fromDate}_${toDate}.xlsx`,
     });
     // Không toast: trình duyệt đã tự báo tải file xong (README luật 8 — xuất file là thao tác không đổi số).
   };
@@ -228,20 +228,20 @@ export default function AuditLogScreen() {
         </div>
       </div>
 
-      <StatCardGrid cards={the} />
+      <StatCardGrid cards={cards} />
 
       <div className="flex flex-wrap items-end gap-4 rounded-xl border-2 border-border p-4">
         <div className="min-w-[10rem]">
-          <DateField label="Từ ngày" hideRequiredMark value={tu} onChange={setTu} />
+          <DateField label="Từ ngày" hideRequiredMark value={fromDate} onChange={setFromDate} />
         </div>
         <div className="min-w-[10rem]">
-          <DateField label="Đến ngày" hideRequiredMark value={den} onChange={setDen} />
+          <DateField label="Đến ngày" hideRequiredMark value={toDate} onChange={setToDate} />
         </div>
         <div className="min-w-[12rem]">
           <Combobox label="Thao tác" hideRequiredMark clearable={false} value={actionFilter} onChange={setActionFilter} options={ACTION_OPTIONS} />
         </div>
         <div className="min-w-[12rem]">
-          <Combobox label="Đối tượng" hideRequiredMark clearable={false} value={bang} onChange={setBang} options={optBang} />
+          <Combobox label="Đối tượng" hideRequiredMark clearable={false} value={entity} onChange={setEntity} options={entityOptions} />
         </div>
         <div className="min-w-[12rem]">
           <Combobox label="Người" hideRequiredMark clearable={false} value={user} onChange={setUser} options={userOptions} />

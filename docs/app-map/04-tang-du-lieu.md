@@ -1,6 +1,7 @@
 > Load khi: đụng đọc/ghi dữ liệu, thêm bảng vào app, hay điều tra "số liệu biến mất / không lên máy chủ".
 covers: src/lib/repo.ts, src/lib/db.ts, src/lib/catalogRepo.ts, src/lib/batter.ts, src/lib/domesticSales.ts, src/lib/connectivity.ts, src/lib/supabase.ts, src/lib/store.ts, src/lib/audit.ts, src/lib/storage.ts, src/design-system/patterns/DataStatusBadge.tsx
 last_verified: 2026-10-14
+<!-- updated: 2026-10-14 (c) — đổi tên nhóm A: hook đọc/ghi bảng `useBang` → `useTable`, trả `[rows, write, { status, error }]` với `status` = `loading | ready | error` (trước: `{ trangThai, loi }`, `dang-tai | san-sang | loi`). Sự kiện đồng bộ cùng tab vẫn tên `bsf:bang-doi` (giá trị chuỗi giữ nguyên), kiểu đổi thành `TableChangeEvent { localKey, source, rows }`. Không đổi dạng dữ liệu lưu. -->
 <!-- updated: 2026-10-14 (b) — đổi tên trường ĐÃ LƯU trong types.ts: `WipProductionItem.tentacleKg/stomachKg` (cột DB vẫn `component_rau_kg/component_bao_tu_kg`), `ReconciliationRun.options.{ledgerSheetName,taxSideSheets,mode}` + `summary.{invoiceCount,matched,…}` (jsonb). Ghi tên mới; ĐỌC cả tên cũ qua `renameLegacyFields(x, LEGACY_FIELDS.*)` (lib/legacyValues) ở `fromRow` (dòng máy chủ, jsonb cũ KHÔNG viết lại) + `patchLegacy` (bộ đệm, hàng chờ). Khuôn này dùng cho mọi lần đổi tên trường đã lưu về sau. -->
 <!-- updated: 2026-10-14 — đổi tên trường lib sang tiếng Anh: kết quả đẩy hàng chờ `QueuePushResult` = `sentUpserts · deleted · rowErrors[{key,msg}] · generalError`, cổng gửi `UploadPort.remove`; `useAuth()` trả `profile · isLoading · requiresLogin · isAdmin · signIn · createAccount · signOut`. GIỮ NGUYÊN `SyncQueue.them/xoa` (dạng LƯU dưới máy ở khóa `.cho` — đổi là mất số chờ gửi). -->
 <!-- updated: 2026-10-12 (demo) — CHẾ ĐỘ DEMO (`lib/demoMode.ts`, spec ../spec/che-do-demo.md §4b): `SITE_ID` (supabase.ts) = `site-demo` khi cờ `bsf1:che-do` bật (đọc MỘT lần lúc nạp trang); `db.ts` load/save + `napCho`/`luuCho` đổi khóa `bsf.*` → `bsf-demo.*` (`modeLocalKey`); `repo.ts` upsert/seed gửi khóa chính `demo:<khóa>` (`rowToServer`; 2026-10-13: cả cột khóa ngoại khai ở `TableMapping.refColumns` — `period_id` của balancing_inputs/outputs/scraps), nạp bỏ tiền tố + bỏ dòng thiếu tiền tố (`rowFromServer`), **lệnh XÓA nay luôn `.eq("site_id", SITE_ID)`** (cả chế độ thật); `setAuditPaused` tắt nhật ký khi nạp gói demo; `audit.ts` buffer theo `modeLocalKey`; `storage.ts` path `site-demo/…`. `auth.ts` dùng `SITE_ID_THAT` cho `user_profiles`. -->
@@ -52,7 +53,7 @@ Chạy Supabase hay localStorage là do `.env` quyết định (`src/lib/supabas
 
 ## Vì sao thiết kế "truyền cả danh sách"
 
-Không có `add/update/delete` riêng. `useBang.ghi(next)` **so danh sách cũ với mới** để suy ra dòng nào thêm/sửa/xóa. Đổi lại:
+Không có `add/update/delete` riêng. `useTable.ghi(next)` **so danh sách cũ với mới** để suy ra dòng nào thêm/sửa/xóa. Đổi lại:
 
 - Màn hình viết code thuần (map/filter), không phải nghĩ về API mạng.
 - **Bẫy:** repo trả về **toàn bộ** dòng của mọi kỳ/mọi ngày. Màn nào lọc ra tập con thì lúc ghi **phải ghép lại** với phần còn lại (`KyDetail.ghepLai` trong `BalancingScreen.tsx` là mẫu). Quên ghép = xóa sạch dữ liệu của kỳ khác.
@@ -87,7 +88,7 @@ Hệ quả cho người vận hành: chưa chạy migration mới ⇒ số liệ
 1. Migration DB ([03-database.md](03-database.md)).
 2. Thêm `interface` + bất biến vào `src/types.ts`.
 3. Thêm `X_TABLE: TableMapping<T>` trong `repo.ts`: `table`, `localKey` (**đặt mới, đừng đổi khóa cũ** — đổi là mất dữ liệu đang có trên máy người dùng), `toRow`/`fromRow` đủ hai chiều, `khoaChinh` nếu không phải `id`.
-4. Thêm `export const useX = () => useBang(X_TABLE)` trong `lib/catalogRepo.ts`.
+4. Thêm `export const useX = () => useTable(X_TABLE)` trong `lib/catalogRepo.ts`.
 5. Màn hình gọi hook đó — **không** import `repo.ts` trực tiếp trừ khi cần `TableMapping`.
 
 ## `patchLegacy` — vá dòng cũ, một chỗ
@@ -96,21 +97,21 @@ Bản sao localStorage được đọc thẳng bằng `JSON.parse`, **không đi
 
 **Giá trị enum cũ (Đợt 5 đặt tên, 2026-10-13):** trạng thái / loại / kết quả / cách gắn lô / thao tác nhật ký lưu DB đã sang tiếng Anh (`pending`, `stocked`, `closed`, `internal`, `pass`, `scan`, `create`…). Dòng cũ tiếng Việt còn ở ba nơi: máy chủ chưa chạy `0059`, bộ đệm từng máy, hàng chờ offline. Nên **ghi giá trị mới, đọc qua `normalize*`** của `lib/legacyValues.ts` ở CẢ `fromRow` lẫn `patchLegacy` (7 bảng: `production_wips`, `sales_orders`, `export_orders`, `storage_locations`, `qc_checklists`, `lot_inputs`, `lot_dispatches`). `audit_log` không sửa lịch sử: `readAuditLog` chuẩn hóa `action` lúc đọc và lọc bằng `auditActionAliases` (mới + cũ). Thêm giá trị enum mới ⇒ đặt tiếng Anh ngay, không cần thêm vào `LEGACY_VALUES`.
 
-**Tô màu dòng** (`useRowMarks()` → `ROW_MARK_TABLE` → `row_marks`, mig 0055) là ngoại lệ có chủ đích của "màn gọi hook": chỉ `ToMauProvider` (features/shared, gắn một lần ở `ShellLayout`) gọi hook, rồi cấp cho mọi bảng qua `RowMarkContext` của design-system — bảng bật bằng prop `rowMarkKey="<khoá bảng>"`. Lý do: `useBang` giữ state theo instance, mỗi bảng tự gọi thì lần ghi của bảng này đè mất dấu bảng kia trong bản sao localStorage. Không ghi nhật ký (`logChanges` bỏ qua `row_marks`). Luật dùng: [README design-system § Tô màu dòng](../../src/design-system/README.md#tô-màu-dòng-đã-dò-kiểu-excel).
+**Tô màu dòng** (`useRowMarks()` → `ROW_MARK_TABLE` → `row_marks`, mig 0055) là ngoại lệ có chủ đích của "màn gọi hook": chỉ `RowMarkProvider` (features/shared, gắn một lần ở `ShellLayout`) gọi hook, rồi cấp cho mọi bảng qua `RowMarkContext` của design-system — bảng bật bằng prop `rowMarkKey="<khoá bảng>"`. Lý do: `useTable` giữ state theo instance, mỗi bảng tự gọi thì lần ghi của bảng này đè mất dấu bảng kia trong bản sao localStorage. Không ghi nhật ký (`logChanges` bỏ qua `row_marks`). Luật dùng: [README design-system § Tô màu dòng](../../src/design-system/README.md#tô-màu-dòng-đã-dò-kiểu-excel).
 
-Bán thành phẩm dùng `usePhieuBan()` / `useBanHang()` (`PHIEU_BAN_TABLE` / `BAN_HANG_TABLE`) — cùng khuôn `useBang`, xem [33-ban-hang.md](33-ban-hang.md).
+Bán thành phẩm dùng `usePhieuBan()` / `useBanHang()` (`PHIEU_BAN_TABLE` / `BAN_HANG_TABLE`) — cùng khuôn `useTable`, xem [33-ban-hang.md](33-ban-hang.md).
 
 Tồn kho nguyên liệu dùng `useMaterialOpeningStock()` (`OPENING_STOCK_TABLE` → `material_opening_stock`) — **chỉ** lưu tồn đầu khai tay. Con số Nhập/Xuất/Tồn còn lại **không có bảng riêng**: hàm thuần `lib/inventoryMaterial.ts` suy thẳng từ `material_imports` (nhập tươi) + `carry_over_kg` của `balancing_inputs` (đông gửi/xả đông). Không chép số ⇒ không lệch sổ Cân đối. Xem [31-can-doi-ky.md](31-can-doi-ky.md).
 
 ### Nhật ký thao tác (audit)
 
-Mọi ghi dữ liệu đều qua `useBang.ghi` — nên đây là CHỐT duy nhất để lưu vết. `ghi` so danh sách cũ↔mới, gọi `logChanges()` phát entry **thêm/sửa/xóa** (kèm `diff` trường đổi) rồi `appendAuditEntries()` trong `lib/audit.ts` đẩy vào `audit_log`. Chạy CẢ hai chế độ (chạy trước cả `if (!supabase) return`). Đăng nhập/xuất log ở `auth.ts`. "Ai" lấy từ `setAuditOperator()` (App set theo tài khoản đăng nhập). `diff` đi qua `compactForAudit`: `fileB64` và chuỗi >10KB thay bằng nhãn "[… ký tự — không ghi nhật ký]" (bản đối soát từng ghi 2,7MB/dòng nhật ký). Lọc ngày ở `/audit` theo **giờ VN** (`toVnDayBoundsUtc`: 00:00 VN = 17:00Z hôm trước). Đặc tính: **append-only**, buffer localStorage (cap 3000), đẩy **im lặng** — hụt thì giữ buffer, **KHÔNG** bật đèn đỏ kết nối (nhật ký là phụ, không chặn nghiệp vụ). Màn đọc: `/audit` (chỉ admin). Không tự lưu vết bảng `audit_log`. Migration `0025`.
+Mọi ghi dữ liệu đều qua `useTable.ghi` — nên đây là CHỐT duy nhất để lưu vết. `ghi` so danh sách cũ↔mới, gọi `logChanges()` phát entry **thêm/sửa/xóa** (kèm `diff` trường đổi) rồi `appendAuditEntries()` trong `lib/audit.ts` đẩy vào `audit_log`. Chạy CẢ hai chế độ (chạy trước cả `if (!supabase) return`). Đăng nhập/xuất log ở `auth.ts`. "Ai" lấy từ `setAuditOperator()` (App set theo tài khoản đăng nhập). `diff` đi qua `compactForAudit`: `fileB64` và chuỗi >10KB thay bằng nhãn "[… ký tự — không ghi nhật ký]" (bản đối soát từng ghi 2,7MB/dòng nhật ký). Lọc ngày ở `/audit` theo **giờ VN** (`toVnDayBoundsUtc`: 00:00 VN = 17:00Z hôm trước). Đặc tính: **append-only**, buffer localStorage (cap 3000), đẩy **im lặng** — hụt thì giữ buffer, **KHÔNG** bật đèn đỏ kết nối (nhật ký là phụ, không chặn nghiệp vụ). Màn đọc: `/audit` (chỉ admin). Không tự lưu vết bảng `audit_log`. Migration `0025`.
 
 Tồn kho **thành phẩm** đối xứng: `useFinishedGoodsOpeningStock()` (`FINISHED_OPENING_STOCK_TABLE` → `finished_goods_opening_stock`) **chỉ** lưu tồn đầu khai tay theo (mặt hàng × quy cách). Con số N/X/T suy thẳng ở hàm thuần `lib/inventoryFinished.ts`: **Nhập** = `production_wips` đã `da-nhap` (theo ngày SX), **Xuất** = `export_items` (đơn đặt, theo `export_orders.export_date`) + `sales_items` (bán ngày) *trừ* handoff đơn đặt (`source_warehouse = "Đơn đặt"`, chống đếm hai lần), **Tồn đầu** = khai tay + lịch sử từ MỐC khai tay tới trước kỳ (mốc `asOfDate` ≤ cuối khoảng xem đều áp, kể cả mốc giữa khoảng; phát sinh TRƯỚC mốc đã nằm trong số khai ⇒ bỏ, không cộng chồng — cùng quy tắc mốc với tồn NL `/nxt-material`, sửa 2026-10-12). `lib/inventory.ts#computeWipStock()` nhận thêm tham số `banHang` (tùy chọn, mặc định `[]` = hành vi cũ) để trừ bán ngày FIFO ⇒ tồn Kho dự trữ cùng định nghĩa xuất với NXT thành phẩm, NHƯNG không bằng tuyệt đối: Kho dự trữ (theo lô) không có tồn đầu khai tay, và bán vượt ở đó báo riêng "bán vượt X kg" (`computeWipStockDetail().tongBanVuot`) còn NXT trừ thẳng ra tồn âm. Không chép số ⇒ không lệch các sổ nguồn.
 
 ## Seed
 
-`useBang(bang, seed)` — seed chỉ chạy khi **cả** server lẫn local đều rỗng và hàng chờ rỗng; khi đó seed được đẩy lên server luôn. Đang seed: `loai_nguyen_lieu` (12 loại hay gặp) và `thanh_pham` (141 mã từ `src/data/finished-goods.json`). File JSON đó **chỉ là seed** — nguồn thật là bảng `thanh_pham`.
+`useTable(bang, seed)` — seed chỉ chạy khi **cả** server lẫn local đều rỗng và hàng chờ rỗng; khi đó seed được đẩy lên server luôn. Đang seed: `loai_nguyen_lieu` (12 loại hay gặp) và `thanh_pham` (141 mã từ `src/data/finished-goods.json`). File JSON đó **chỉ là seed** — nguồn thật là bảng `thanh_pham`.
 
 ## Đèn kết nối
 

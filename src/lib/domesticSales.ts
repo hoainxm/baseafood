@@ -41,9 +41,9 @@ export interface PeriodDomesticSales {
  */
 export function getPeriodDomesticSales(
   items: DomesticSaleItem[],
-  ky: Pick<BalancingPeriod, "startDate" | "endDate" | "materialTypeName">
+  period: Pick<BalancingPeriod, "startDate" | "endDate" | "materialTypeName">
 ): PeriodDomesticSales {
-  const dates = new Set(getPeriodDates(ky));
+  const dates = new Set(getPeriodDates(period));
   const byDate: DailyQuantities = {};
   let totalKg = 0;
   let pricedKg = 0;
@@ -52,7 +52,7 @@ export function getPeriodDomesticSales(
   for (const d of items) {
     const kg = Number(d.quantityKg) || 0;
     if (kg <= 0 || !dates.has(d.saleDate)) continue;
-    if (!isSameMaterialFamily(d.materialTypeName, ky.materialTypeName)) continue;
+    if (!isSameMaterialFamily(d.materialTypeName, period.materialTypeName)) continue;
     byDate[d.saleDate] = (byDate[d.saleDate] ?? 0) + kg;
     totalKg += kg;
     rowCount += 1;
@@ -75,24 +75,24 @@ export function getPeriodDomesticSales(
  * Cân đối chưa có số nào.
  */
 export function compareDomesticSales(
-  canDoi: DailyQuantities | undefined,
+  balancingDaily: DailyQuantities | undefined,
   production: DailyQuantities
-): "khop" | "lech" | "trong" {
-  const cd = canDoi ?? {};
+): "match" | "mismatch" | "empty" {
+  const cd = balancingDaily ?? {};
   const hasValues = Object.values(cd).some((v) => (Number(v) || 0) !== 0);
-  if (!hasValues) return "trong";
+  if (!hasValues) return "empty";
   const dates = new Set([...Object.keys(cd), ...Object.keys(production)]);
   for (const iso of dates) {
     const a = Math.abs(Number(cd[iso]) || 0);
     const b = Math.abs(Number(production[iso]) || 0);
-    if (Math.abs(a - b) >= 0.001) return "lech";
+    if (Math.abs(a - b) >= 0.001) return "mismatch";
   }
-  return "khop";
+  return "match";
 }
 
 /** Ngày-theo-kg DƯƠNG → ÂM để ghi vào dòng giảm (bỏ ngày 0). */
 export function negateDailyQuantities(m: DailyQuantities): DailyQuantities {
-  const ra: DailyQuantities = {};
-  for (const [iso, kg] of Object.entries(m)) if (kg) ra[iso] = -Math.abs(kg);
-  return ra;
+  const result: DailyQuantities = {};
+  for (const [iso, kg] of Object.entries(m)) if (kg) result[iso] = -Math.abs(kg);
+  return result;
 }

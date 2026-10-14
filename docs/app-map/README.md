@@ -1,6 +1,6 @@
 > Load khi: bắt đầu bất kỳ task nào trong repo này và chưa biết phải đọc file nào.
 covers: docs/app-map/**
-last_verified: 2026-10-13
+last_verified: 2026-10-14
 <!-- re-verified: 2026-10-13 09:00 — index không thêm file app-map mới; 01–05 cập nhật cho chế độ demo + gỡ 5 màn DEMO (spec ../spec/che-do-demo.md). -->
 <!-- re-verified: 2026-10-08 14:30 — dòng định tuyến QR vẫn đúng sau khi lô NL tách theo loại (chi tiết ở spec §6e, doc 30 · 34 · 38 đã ghi); không thêm doc mới. -->
 <!-- updated: 2026-10-08 — dòng định tuyến "Truy xuất theo lô bằng QR" mở rộng theo đợt 2b (bán hàng, đơn đặt, chốt ngày bắt gắn lô, trừ tồn theo lô) + thêm trỏ 33-ban-hang. -->
@@ -47,7 +47,7 @@ Cửa vào là [`CLAUDE.md`](../../CLAUDE.md) ở root (quy tắc code, risk tie
 | [01-app-structure.md](01-app-structure.md) | Map thư mục `src/` thật, ranh giới import, file nào là ngoại lệ | `src/**` |
 | [02-pages-navigation.md](02-pages-navigation.md) | ~20 route (React Router v7 HashRouter) + nav cây module-centric, gate đăng nhập theo vai trò, màn DEMO gate admin | `src/App.tsx`, `src/main.tsx` |
 | [03-database.md](03-database.md) | Bảng + quy ước đặt tên (English snake_case sau 0016), 55 migration (0001→0055) + thứ tự chạy, trigger updated_at | `supabase/migrations/**` |
-| [04-tang-du-lieu.md](04-tang-du-lieu.md) | `useBang`, hàng chờ đồng bộ, hoà server↔local, seed, `patchLegacy`, đèn kết nối | `src/lib/repo.ts`, `src/lib/db.ts`, `src/lib/catalogRepo.ts`, `src/lib/connectivity.ts`, `src/lib/supabase.ts` |
+| [04-tang-du-lieu.md](04-tang-du-lieu.md) | `useTable`, hàng chờ đồng bộ, hoà server↔local, seed, `patchLegacy`, đèn kết nối | `src/lib/repo.ts`, `src/lib/db.ts`, `src/lib/catalogRepo.ts`, `src/lib/connectivity.ts`, `src/lib/supabase.ts` |
 | [05-bao-mat-phan-quyen.md](05-bao-mat-phan-quyen.md) | Đăng nhập Supabase Auth + `user_profiles`/vai trò (nhiều/người), gate app-level + nav-access 2 bộ phận, thiết lập admin, siết RLS 0021 (+0047 cho 5 bảng post-0021) | `src/lib/auth.ts`, `src/lib/username.ts`, `src/features/auth/LoginScreen.tsx`, `src/features/users/UserManagementScreen.tsx`, `supabase/migrations/0006_nguoi_dung.sql`, `0003_siet_rls.sql` |
 | [30-nhap-hang.md](30-nhap-hang.md) | Sổ nhập ngày: chuyến, hai ngày + ghi bù, chốt ngày, phế liệu ngày | `src/features/imports/MaterialImportScreen.tsx`, `src/types.ts` |
 | [33-ban-hang.md](33-ban-hang.md) | Sổ bán ngày: phiếu bán, quy cách, hai ngày + ghi bù, kênh XK/NĐ, hút vào cân đối | `src/features/sales/SalesScreen.tsx`, `src/types.ts`, `src/lib/repo.ts` |

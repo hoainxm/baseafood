@@ -63,13 +63,13 @@ export function SessionLotsSection({
   };
 
   const handleCode = (text: string, method: "scan" | "typed") => {
-    const ma = parseQrCode(text);
-    if (!ma) return;
-    if ("kind" in ma && ma.kind !== "S") {
-      notify.warning(`Tem này là ${TRACE_KIND_LABELS[ma.kind].toLowerCase()}, không phải lô nguyên liệu.`);
+    const code = parseQrCode(text);
+    if (!code) return;
+    if ("kind" in code && code.kind !== "S") {
+      notify.warning(`Tem này là ${TRACE_KIND_LABELS[code.kind].toLowerCase()}, không phải lô nguyên liệu.`);
       return;
     }
-    const result = findLots(ma, traceData).filter((n) => n.kind === "S");
+    const result = findLots(code, traceData).filter((n) => n.kind === "S");
     if (!result.length) {
       notify.warning(`Không tìm thấy lô nguyên liệu "${text}". Kiểm tra lại mã, hoặc chọn trong danh sách.`);
       return;
@@ -186,7 +186,7 @@ export function SessionLotsSection({
 
       {sessionLots.length === 0 && (
         <p className="flex flex-wrap items-center gap-2 text-muted-foreground">
-          <Tag variant="cho">Chưa khai lô</Tag>
+          <Tag variant="pending">Chưa khai lô</Tag>
           Lưu mà chưa khai thì mẻ chưa có lô — chốt ngày sẽ hỏi gắn lô hoặc lý do.
         </p>
       )}

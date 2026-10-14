@@ -25,7 +25,7 @@ export const isTaxSide = (tenSheet: string): boolean => chuan(tenSheet).includes
 export const isDownloadSide = (tenSheet: string): boolean => /(^|[^a-z0-9])tai([^a-z0-9]|$)/.test(chuan(tenSheet));
 
 /** Cách máy chia hai bên — để màn hình nói rõ vì sao sheet nằm bên nào. */
-export type SideSplitMethod = "chi-dinh" | "ten-thue" | "ten-tai" | "khong-ro";
+export type SideSplitMethod = "manual" | "tax-name" | "download-name" | "unknown";
 
 /**
  * Chia các sheet hóa đơn thành bên THUẾ GỬI / bên TỰ TẢI.
@@ -43,20 +43,20 @@ export function resolveTaxSideSheets(
   specified?: readonly string[] | null
 ): { taxSide: Set<string>; method: SideSplitMethod } {
   if (specified) {
-    const co = new Set(tenSheets);
-    return { taxSide: new Set(specified.filter((t) => co.has(t))), method: "chi-dinh" };
+    const sheetSet = new Set(tenSheets);
+    return { taxSide: new Set(specified.filter((t) => sheetSet.has(t))), method: "manual" };
   }
   const taxSheets = tenSheets.filter(isTaxSide);
-  if (taxSheets.length) return { taxSide: new Set(taxSheets), method: "ten-thue" };
+  if (taxSheets.length) return { taxSide: new Set(taxSheets), method: "tax-name" };
   const downloadSheets = tenSheets.filter(isDownloadSide);
   if (downloadSheets.length && downloadSheets.length < tenSheets.length)
-    return { taxSide: new Set(tenSheets.filter((t) => !isDownloadSide(t))), method: "ten-tai" };
-  return { taxSide: new Set(), method: "khong-ro" };
+    return { taxSide: new Set(tenSheets.filter((t) => !isDownloadSide(t))), method: "download-name" };
+  return { taxSide: new Set(), method: "unknown" };
 }
 
 // ---------- 1. So hai bản hóa đơn điện tử ----------
 
-export type BenCo = "CA_HAI" | "CHI_THUE" | "CHI_TAI";
+export type VersionPresence = "BOTH" | "SENT_ONLY" | "DOWNLOADED_ONLY";
 
 export interface TwoVersionRow {
   key: string;
@@ -65,7 +65,7 @@ export interface TwoVersionRow {
   issueDate: string;
   sellerTaxCode: string;
   sellerName: string;
-  ben: BenCo;
+  ben: VersionPresence;
   /** Số tiền bên bản THUẾ gửi (null = bản thuế không có hóa đơn này). */
   preTaxSent: number | null;
   taxSent: number | null;
@@ -140,10 +140,10 @@ export function compareTwoInvoiceVersions(
   const mT = groupInvoices(benT);
   const mX = groupInvoices(benX);
 
-  const sum = (items: InvoiceRow[] | undefined, lay: (d: InvoiceRow) => number) =>
-    items?.length ? items.reduce((s, d) => s + lay(d), 0) : null;
+  const sum = (items: InvoiceRow[] | undefined, take: (d: InvoiceRow) => number) =>
+    items?.length ? items.reduce((s, d) => s + take(d), 0) : null;
 
-  const dong: TwoVersionRow[] = [];
+  const row: TwoVersionRow[] = [];
   for (const key of new Set([...mT.keys(), ...mX.keys()])) {
     const t = mT.get(key);
     const x = mX.get(key);
@@ -151,12 +151,12 @@ export function compareTwoInvoiceVersions(
     const taxSideTotal = sum(t, (d) => d.totalVnd);
     const downloadSideTotal = sum(x, (d) => d.totalVnd);
     const totalDiff = taxSideTotal != null && downloadSideTotal != null ? taxSideTotal - downloadSideTotal : null;
-    const ben: BenCo = t && x ? "CA_HAI" : t ? "CHI_THUE" : "CHI_TAI";
+    const ben: VersionPresence = t && x ? "BOTH" : t ? "SENT_ONLY" : "DOWNLOADED_ONLY";
     // Dòng lệch bố cục thì cột tiền đọc sai chỗ — so tiền là kết luận bừa.
     const isAmountIncomparable =
-      ben === "CA_HAI" && [...(t ?? []), ...(x ?? [])].some((d) => d.layoutMismatch);
+      ben === "BOTH" && [...(t ?? []), ...(x ?? [])].some((d) => d.layoutMismatch);
     const hasAmountMismatch = !isAmountIncomparable && totalDiff != null && Math.abs(totalDiff) > threshold;
-    dong.push({
+    row.push({
       key,
       series: sample.series,
       invoiceNumber: sample.invoiceNumber,
@@ -180,9 +180,9 @@ export function compareTwoInvoiceVersions(
       downloadedLocation: x?.map(locationOf).join("; ") ?? "",
       note: isAmountIncomparable
         ? "Có ở cả hai bản. KHÔNG so được số tiền: dòng bên bản tự tải nằm ở bố cục cột khác (sheet bị dán hai bản xuất vào làm một) nên cột tiền lệch ô. Tách sheet ra rồi chạy lại mới so được."
-        : ben === "CHI_THUE"
+        : ben === "SENT_ONLY"
           ? "CHỈ có ở bản cơ quan thuế gửi — bản tự tải THIẾU hóa đơn này. Tải lại từ cổng hóa đơn điện tử rồi kê bổ sung."
-          : ben === "CHI_TAI"
+          : ben === "DOWNLOADED_ONLY"
             ? "CHỈ có ở bản tự tải — bản thuế gửi KHÔNG có. Kiểm tra lại: có thể tải nhầm kỳ, hoặc hóa đơn chưa lên hệ thống thuế."
             : hasAmountMismatch
               ? `Có ở cả hai bản nhưng SỐ TIỀN LỆCH ${Math.round(totalDiff ?? 0).toLocaleString("vi-VN")} đ (thuế − tự tải). Đây là chỗ thuế bắt kiểm tra.`
@@ -193,8 +193,8 @@ export function compareTwoInvoiceVersions(
   }
 
   // Thiếu ở bản tự tải xếp lên trước — đó là việc phải đi làm ngay.
-  const priority: Record<BenCo, number> = { CHI_THUE: 0, CHI_TAI: 1, CA_HAI: 2 };
-  dong.sort(
+  const priority: Record<VersionPresence, number> = { SENT_ONLY: 0, DOWNLOADED_ONLY: 1, BOTH: 2 };
+  row.sort(
     (a, b) =>
       priority[a.ben] - priority[b.ben] ||
       Number(b.amountMismatch) - Number(a.amountMismatch) ||
@@ -202,27 +202,27 @@ export function compareTwoInvoiceVersions(
       (b.totalSent ?? b.totalDownloaded ?? 0) - (a.totalSent ?? a.totalDownloaded ?? 0)
   );
 
-  const rowsOfSide = (b: BenCo) => dong.filter((d) => d.ben === b);
-  const sumAmount = (items: TwoVersionRow[], lay: (d: TwoVersionRow) => number | null) =>
-    items.reduce((s, d) => s + (lay(d) ?? 0), 0);
+  const rowsOfSide = (b: VersionPresence) => row.filter((d) => d.ben === b);
+  const sumAmount = (items: TwoVersionRow[], take: (d: TwoVersionRow) => number | null) =>
+    items.reduce((s, d) => s + (take(d) ?? 0), 0);
 
   return {
     sentSheets: benT.map((s) => s.name),
     downloadedSheets: benX.map((s) => s.name),
-    rows: dong,
+    rows: row,
     totals: {
       sentCount: benT.reduce((s, sh) => s + sh.rows.length, 0),
       downloadedCount: benX.reduce((s, sh) => s + sh.rows.length, 0),
-      bothCount: rowsOfSide("CA_HAI").length,
-      sentOnlyCount: rowsOfSide("CHI_THUE").length,
-      downloadedOnlyCount: rowsOfSide("CHI_TAI").length,
-      amountMismatchCount: dong.filter((d) => d.amountMismatch).length,
-      uncomparableCount: dong.filter((d) => d.amountUncomparable).length,
-      sentAmount: sumAmount(dong, (d) => d.totalSent),
-      downloadedAmount: sumAmount(dong, (d) => d.totalDownloaded),
-      sentOnlyAmount: sumAmount(rowsOfSide("CHI_THUE"), (d) => d.totalSent),
-      downloadedOnlyAmount: sumAmount(rowsOfSide("CHI_TAI"), (d) => d.totalDownloaded),
-      totalAmountDiff: sumAmount(dong, (d) => d.totalSent) - sumAmount(dong, (d) => d.totalDownloaded),
+      bothCount: rowsOfSide("BOTH").length,
+      sentOnlyCount: rowsOfSide("SENT_ONLY").length,
+      downloadedOnlyCount: rowsOfSide("DOWNLOADED_ONLY").length,
+      amountMismatchCount: row.filter((d) => d.amountMismatch).length,
+      uncomparableCount: row.filter((d) => d.amountUncomparable).length,
+      sentAmount: sumAmount(row, (d) => d.totalSent),
+      downloadedAmount: sumAmount(row, (d) => d.totalDownloaded),
+      sentOnlyAmount: sumAmount(rowsOfSide("SENT_ONLY"), (d) => d.totalSent),
+      downloadedOnlyAmount: sumAmount(rowsOfSide("DOWNLOADED_ONLY"), (d) => d.totalDownloaded),
+      totalAmountDiff: sumAmount(row, (d) => d.totalSent) - sumAmount(row, (d) => d.totalDownloaded),
     },
   };
 }
@@ -266,31 +266,31 @@ export function groupSameTaxCodeSameDay(
   // File có HAI BẢN (thuế gửi + tự tải) thì mỗi hóa đơn hiện hai lần — một ở mỗi
   // bản. Đếm cả hai là nhóm nào cũng "trùng khít số tiền" (HDONDT 6 tháng: 1790/1923
   // nhóm), danh sách thành vô dụng. Cùng khóa mà KHÁC bên thì chỉ lấy một lần.
-  const benDaThay = new Map<string, boolean>();
+  const replacedSide = new Map<string, boolean>();
   for (const sh of sheets)
     for (const d of sh.rows) {
       const taxCode = chuan(d.sellerTaxCode);
       if (!taxCode || !d.issueDate) continue;
       const ben = taxSides.has(sh.name);
-      const da = benDaThay.get(d.key);
-      if (da !== undefined && da !== ben) continue;
-      benDaThay.set(d.key, ben);
+      const replaced = replacedSide.get(d.key);
+      if (replaced !== undefined && replaced !== ben) continue;
+      replacedSide.set(d.key, ben);
       const k = `${taxCode}#${d.issueDate}`;
       const o = m.get(k);
       if (o) o.items.push(d);
       else m.set(k, { taxCode: d.sellerTaxCode, name: d.sellerName, date: d.issueDate, items: [d] });
     }
 
-  const ra: SameDayGroup[] = [];
-  for (const { taxCode, name: ten, date, items } of m.values()) {
+  const result: SameDayGroup[] = [];
+  for (const { taxCode, name, date, items } of m.values()) {
     if (items.length < 2) continue;
     // cụm trùng khít số tiền trong cùng nhóm
     const byAmount = new Map<number, number>();
     for (const d of items) byAmount.set(d.totalVnd, (byAmount.get(d.totalVnd) ?? 0) + 1);
     const duplicateAmounts = [...byAmount].filter(([, n]) => n > 1);
-    ra.push({
+    result.push({
       sellerTaxCode: taxCode,
-      sellerName: ten,
+      sellerName: name,
       date,
       invoiceCount: items.length,
       totalAmount: items.reduce((s, d) => s + d.totalVnd, 0),
@@ -310,7 +310,7 @@ export function groupSameTaxCodeSameDay(
   }
 
   // Nghi trùng tiền lên đầu, rồi tới nhóm đông hóa đơn / nhiều tiền.
-  return ra.sort(
+  return result.sort(
     (a, b) =>
       Number(b.sameAmount) - Number(a.sameAmount) ||
       b.invoiceCount - a.invoiceCount ||

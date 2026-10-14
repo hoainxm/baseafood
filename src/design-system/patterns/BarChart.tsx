@@ -60,7 +60,7 @@ export function BarChart({
 }) {
   const sap = preserveOrder ? [...data] : [...data].sort((a, b) => b.value - a.value);
   const visibleItems = sap.slice(0, maxItems);
-  const con = sap.length - visibleItems.length;
+  const hiddenCount = sap.length - visibleItems.length;
 
   const max = Math.max(1, ...visibleItems.map((d) => d.value));
   const tb =
@@ -158,9 +158,9 @@ export function BarChart({
         </div>
       </div>
 
-      {con > 0 && (
+      {hiddenCount > 0 && (
         <p className="text-sm text-muted-foreground">
-          … và {con} mục nhỏ hơn không hiển thị (đã gộp vào tổng ở bảng).
+          … và {hiddenCount} mục nhỏ hơn không hiển thị (đã gộp vào tổng ở bảng).
         </p>
       )}
     </div>

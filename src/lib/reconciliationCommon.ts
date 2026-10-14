@@ -24,9 +24,9 @@ export function columnLetterToNumber(s: string): number {
 
 /** Bảng màu nền chuẩn Excel (ARGB) — một nguồn cho mọi lớp xuất. */
 export const FILL_COLORS = {
-  xanh: "FFC6EFCE",
-  vang: "FFFFEB9C",
-  do: "FFFFC7CE",
+  green: "FFC6EFCE",
+  yellow: "FFFFEB9C",
+  red: "FFFFC7CE",
   header: "FFD9E1F2",
   edited: "FFFFD966",
   title: "FF17529C",

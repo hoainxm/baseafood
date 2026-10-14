@@ -65,8 +65,8 @@ export function isBatteredProduct(
  * thì để trống (gắn tay ở Danh mục hoặc tự nhớ khi ghi lần đầu ở /wip). Khớp luật
  * nạp của migration 0051 (bản đã deploy).
  */
-export function inferBattersFromName(ten: string): string[] {
-  const t = ten.toLowerCase();
+export function inferBattersFromName(name: string): string[] {
+  const t = name.toLowerCase();
   if (t.includes("tẩm bột nước tương")) return ["bot-24v", "bot-18v", "bot-220h"];
   if (/tẩm bột 5 ?- ?10( |$)/.test(t)) return ["bot-232", "bot-20802"];
   return [];
@@ -87,14 +87,14 @@ export function sanitizeBatterKg(v: unknown): Record<string, number> {
     }
   }
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
-  const ra: Record<string, number> = {};
-  for (const [ten0, so] of Object.entries(raw as Record<string, unknown>)) {
-    const ten = ten0.trim();
-    const kg = Number(so);
-    if (!ten || !Number.isFinite(kg) || kg <= 0) continue;
-    ra[ten] = (ra[ten] ?? 0) + kg;
+  const result: Record<string, number> = {};
+  for (const [ten0, num] of Object.entries(raw as Record<string, unknown>)) {
+    const name = ten0.trim();
+    const kg = Number(num);
+    if (!name || !Number.isFinite(kg) || kg <= 0) continue;
+    result[name] = (result[name] ?? 0) + kg;
   }
-  return ra;
+  return result;
 }
 
 /** Tổng kg bột của một dòng. */
@@ -103,8 +103,8 @@ export function sumBatterKg(m: Record<string, number> | undefined): number {
 }
 
 /** Tỷ lệ bột trên thành phẩm (%) — null khi chưa có thành phẩm (không chia cho 0). */
-export function computeBatterRatio(kgBot: number, finishedGoodKg: number): number | null {
-  return finishedGoodKg > 0 && kgBot > 0 ? (kgBot / finishedGoodKg) * 100 : null;
+export function computeBatterRatio(batterKg: number, finishedGoodKg: number): number | null {
+  return finishedGoodKg > 0 && batterKg > 0 ? (batterKg / finishedGoodKg) * 100 : null;
 }
 
 /** Cộng dồn bột của nhiều dòng theo loại — kg + số dòng dùng; nhiều kg đứng trước. */
@@ -113,18 +113,18 @@ export function sumBatterByType(
 ): { name: string; kg: number; rowCount: number }[] {
   const m = new Map<string, { name: string; kg: number; rowCount: number }>();
   for (const d of items)
-    for (const [ten, kg] of Object.entries(sanitizeBatterKg(d))) {
-      const cur = m.get(ten) ?? { name: ten, kg: 0, rowCount: 0 };
+    for (const [name, kg] of Object.entries(sanitizeBatterKg(d))) {
+      const cur = m.get(name) ?? { name, kg: 0, rowCount: 0 };
       cur.kg += kg;
       cur.rowCount += 1;
-      m.set(ten, cur);
+      m.set(name, cur);
     }
   return [...m.values()].sort((a, b) => b.kg - a.kg || a.name.localeCompare(b.name, "vi"));
 }
 
 /** Nhãn ngắn trong ô hẹp: bỏ tiền tố "Bột " — "Bột 24V" → "24V". */
-export function toShortBatterLabel(ten: string): string {
-  return ten.replace(/^bột\s+/i, "").trim() || ten;
+export function toShortBatterLabel(name: string): string {
+  return name.replace(/^bột\s+/i, "").trim() || name;
 }
 
 /**
@@ -132,10 +132,10 @@ export function toShortBatterLabel(ten: string): string {
  * gắn), rồi loại đã nhập thêm tại chỗ. Giữ cả loại đang để trống để ô không biến
  * mất khi người dùng xoá số.
  */
-export function listVisibleBatters(diKem: string[], botKg: Record<string, number>): string[] {
-  const ra = [...diKem];
-  for (const ten of Object.keys(botKg)) if (!ra.includes(ten)) ra.push(ten);
-  return ra;
+export function listVisibleBatters(bundledIds: string[], batterKg: Record<string, number>): string[] {
+  const result = [...bundledIds];
+  for (const name of Object.keys(batterKg)) if (!result.includes(name)) result.push(name);
+  return result;
 }
 
 /**
@@ -146,22 +146,22 @@ export function listVisibleBatters(diKem: string[], botKg: Record<string, number
  */
 export function findOrCreateBatter(
   rows: BatterType[],
-  ten: string
+  name: string
 ): { batter: BatterType; rows: BatterType[]; isNew: boolean } {
-  const trimmedName = ten.trim();
+  const trimmedName = name.trim();
   const labelKey = toShortBatterLabel(trimmedName).toLowerCase();
-  const co = rows.find(
+  const existing = rows.find(
     (b) =>
       toShortBatterLabel(b.name.trim()).toLowerCase() === labelKey ||
       (b.code.trim() !== "" && b.code.trim().toLowerCase() === labelKey)
   );
-  if (co) return { batter: co, rows, isNew: false };
+  if (existing) return { batter: existing, rows, isNew: false };
   const hasPrefix = /^bột\s/i.test(trimmedName);
-  const bot: BatterType = {
+  const batter: BatterType = {
     id: uid(),
     code: hasPrefix ? "" : trimmedName,
     name: hasPrefix ? trimmedName : `Bột ${trimmedName}`,
     note: "",
   };
-  return { batter: bot, rows: [...rows, bot], isNew: true };
+  return { batter, rows: [...rows, batter], isNew: true };
 }

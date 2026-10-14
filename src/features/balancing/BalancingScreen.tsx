@@ -78,15 +78,15 @@ import { PeriodLockDialog } from "./gridDialogs";
 import BalancingTable from "./BalancingTable";
 
 /** Chuỗi ngày để in trên bảng, sinh từ khoảng ngày đã chọn. */
-function describeRange(tu?: string, den?: string): string {
-  if (!tu) return "";
-  if (!den || den === tu) return formatDateVN(tu);
-  return `${formatDateVN(tu)} – ${formatDateVN(den)}`;
+function describeRange(fromDate?: string, toDate?: string): string {
+  if (!fromDate) return "";
+  if (!toDate || toDate === fromDate) return formatDateVN(fromDate);
+  return `${formatDateVN(fromDate)} – ${formatDateVN(toDate)}`;
 }
 
 export default function BalancingScreen() {
-  const [kyList, persistKy, { trangThai: ttKy }] = useBalancingPeriods();
-  const isLoadingPeriods = ttKy === "dang-tai" && kyList.length === 0;
+  const [periods, persistPeriods, { status: periodStatus }] = useBalancingPeriods();
+  const isLoadingPeriods = periodStatus === "loading" && periods.length === 0;
   const { periodId } = useParams<{ periodId?: string }>();
   const navigate = useNavigate();
   const selId = periodId || null;
@@ -111,13 +111,13 @@ export default function BalancingScreen() {
   const [monthlyStock, writeStockLedger] = useMonthlyStock();
 
   /** Gõ loại mới trong ô chọn → LƯU LUÔN vào danh mục (rule 7), không để mồ côi. */
-  const addMaterialType = (ten: string) => {
-    setCatalogMaterialTypes([...catalogMaterialTypes, { id: uid(), name: ten, category: "", note: "" }]);
-    notify.saved(`Đã thêm loại nguyên liệu "${ten}" vào danh mục`);
-    return ten;
+  const addMaterialType = (name: string) => {
+    setCatalogMaterialTypes([...catalogMaterialTypes, { id: uid(), name, category: "", note: "" }]);
+    notify.saved(`Đã thêm loại nguyên liệu "${name}" vào danh mục`);
+    return name;
   };
   /** Bút chì sửa nhanh loại NL (value là TÊN; mục gộp họ không trùng tên danh mục thì không có bút chì). */
-  const materialTypeEditor = useQuickCatalogEdit("loaiNL", catalogMaterialTypes, setCatalogMaterialTypes, { theo: "ten" });
+  const materialTypeEditor = useQuickCatalogEdit("materialType", catalogMaterialTypes, setCatalogMaterialTypes, { matchBy: "name" });
 
   /* Chọn loại NL cho kỳ: GỘP biến thể size về HỌ — "Bạch tuộc 2 da lớn (80↑)" +
      "… nhỏ (80↓)" chỉ hiện MỘT mục "Bạch tuộc 2 da" (cân đối không tách size, chốt
@@ -125,20 +125,20 @@ export default function BalancingScreen() {
      ô hiển thị đúng và lưu thẳng tên họ. Danh mục gốc (sổ nhập) vẫn giữ đủ size. */
   const materialTypeOptions = useMemo(() => {
     const existing = new Set<string>();
-    const ra: { value: string; label: string; phu?: string }[] = [];
+    const result: { value: string; label: string; phu?: string }[] = [];
     for (const l of catalogMaterialTypes) {
-      const ho = getMaterialFamily(l.name) || l.name;
-      const key = ho.toLowerCase();
+      const family = getMaterialFamily(l.name) || l.name;
+      const key = family.toLowerCase();
       if (existing.has(key)) continue;
       existing.add(key);
-      ra.push({ value: ho, label: ho, phu: l.category || undefined });
+      result.push({ value: family, label: family, phu: l.category || undefined });
     }
-    return ra;
+    return result;
   }, [catalogMaterialTypes]);
 
   const [editing, setEditing] = useState<BalancingPeriod | null>(null);
   const [isAdding, setIsAdding] = useState(false);
-  const [loi, setLoi] = useState<FieldError[]>([]);
+  const [errors, setErrors] = useState<FieldError[]>([]);
 
   const openAdd = () => {
     const today = dateToIso(new Date());
@@ -154,7 +154,7 @@ export default function BalancingScreen() {
       createdAt: new Date().toISOString(),
     });
     setIsAdding(true);
-    setLoi([]);
+    setErrors([]);
   };
 
   const savePeriod = () => {
@@ -164,10 +164,10 @@ export default function BalancingScreen() {
       ls.push({ field: "Loại nguyên liệu", message: "Chưa chọn loại" });
     if (!editing.startDate)
       ls.push({ field: "Ngày tiếp nhận", message: "Chưa chọn ngày" });
-    setLoi(ls);
+    setErrors(ls);
     if (ls.length > 0) return;
 
-    const ban: BalancingPeriod = {
+    const draft: BalancingPeriod = {
       ...editing,
       // QUY TẮC: kỳ dùng tên HỌ nguyên liệu — "Bạch tuộc 2 da lớn (80↑)" và
       // "… nhỏ (80↓)" đều là "Bạch tuộc 2 da", một kỳ gộp cả hai size. Chuẩn hoá
@@ -177,18 +177,18 @@ export default function BalancingScreen() {
       dateRangeDescription: describeRange(editing.startDate, editing.endDate),
     };
     if (isAdding) {
-      persistKy([ban, ...kyList]);
-      notify.saved(`Đã tạo kỳ cân đối "${ban.materialTypeName}"`);
-      setSelId(ban.id);
+      persistPeriods([draft, ...periods]);
+      notify.saved(`Đã tạo kỳ cân đối "${draft.materialTypeName}"`);
+      setSelId(draft.id);
     } else {
-      persistKy(kyList.map((k) => (k.id === ban.id ? ban : k)));
+      persistPeriods(periods.map((k) => (k.id === draft.id ? draft : k)));
       notify.saved("Đã lưu thay đổi");
     }
     setEditing(null);
   };
 
   const deletePeriod = (k: BalancingPeriod) => {
-    const prevPeriods = kyList;
+    const prevPeriods = periods;
     const prevMaterials = allMaterialRows;
     const prevScrap = allScraps;
     const prevFinishedGoods = allOutputs;
@@ -207,7 +207,7 @@ export default function BalancingScreen() {
       }
     );
     if (stockSyncResult.changed) writeStockLedger(stockSyncResult.lines);
-    persistKy(kyList.filter((x) => x.id !== k.id));
+    persistPeriods(periods.filter((x) => x.id !== k.id));
     writeMaterials(allMaterialRows.filter((r) => r.periodId !== k.id));
     /* Phế liệu cân ở màn Nhập hàng chỉ MƯỢN kỳ này — xóa kỳ thì gỡ liên kết,
        tuyệt đối không xóa theo, vì bản gốc là số cân của sổ nhập hàng. */
@@ -236,7 +236,7 @@ export default function BalancingScreen() {
     notify.deleted(
       `Đã xóa kỳ "${k.materialTypeName}" — số ở sổ nhập hàng và sổ sản xuất vẫn còn`,
       () => {
-        persistKy(prevPeriods);
+        persistPeriods(prevPeriods);
         writeMaterials(prevMaterials);
         writeScraps(prevScrap);
         writeFinishedGoods(prevFinishedGoods);
@@ -247,15 +247,15 @@ export default function BalancingScreen() {
     );
   };
 
-  const sel = kyList.find((k) => k.id === selId) || null;
+  const sel = periods.find((k) => k.id === selId) || null;
 
   if (sel) {
     return (
-      <KyDetail
+      <PeriodDetail
         period={sel}
         onBack={() => setSelId(null)}
         onChangePeriod={(patch) =>
-          persistKy(kyList.map((k) => (k.id === sel.id ? { ...k, ...patch } : k)))
+          persistPeriods(periods.map((k) => (k.id === sel.id ? { ...k, ...patch } : k)))
         }
       />
     );
@@ -308,7 +308,7 @@ export default function BalancingScreen() {
 
       {isLoadingPeriods ? (
         <TableSkeleton />
-      ) : kyList.length === 0 ? (
+      ) : periods.length === 0 ? (
         <EmptyState
           icon={Scale}
           title="Chưa có kỳ cân đối nào"
@@ -324,7 +324,7 @@ export default function BalancingScreen() {
       ) : (
         <RecordTable
           columns={cols}
-          rows={kyList}
+          rows={periods}
           getKey={(r) => r.id}
           rowMarkKey="can-doi-ky"
           getSearchText={(r) => `${r.materialTypeName} ${r.dateRangeDescription}`}
@@ -342,7 +342,7 @@ export default function BalancingScreen() {
                 onClick={() => {
                   setEditing({ ...r });
                   setIsAdding(false);
-                  setLoi([]);
+                  setErrors([]);
                 }}
               >
                 <Pencil />
@@ -374,7 +374,7 @@ export default function BalancingScreen() {
 
           {editing && (
             <div className="space-y-6 py-2">
-              <ErrorSummary errors={loi} />
+              <ErrorSummary errors={errors} />
               <RequiredLegend />
 
               <Combobox
@@ -393,9 +393,9 @@ export default function BalancingScreen() {
                     // NL, chỉ khi chi phí còn trống (chưa gõ) — khỏi gõ lại mỗi
                     // kỳ, vẫn sửa được. kyList mới-nhất-trước nên find lấy kỳ gần.
                     if (d.processingCostPerKg == null) {
-                      const ho = getMaterialFamily(v);
-                      const prevRows = kyList.find(
-                        (k) => getMaterialFamily(k.materialTypeName) === ho
+                      const family = getMaterialFamily(v);
+                      const prevRows = periods.find(
+                        (k) => getMaterialFamily(k.materialTypeName) === family
                       );
                       if (prevRows) {
                         next.processingCostPerKg = prevRows.processingCostPerKg;
@@ -418,8 +418,8 @@ export default function BalancingScreen() {
                 hint="Kỳ xưởng Đông thường 5 ngày — có nút chọn nhanh bên dưới."
                 startDate={editing.startDate ?? ""}
                 endDate={editing.endDate ?? ""}
-                onChange={(tu, den) =>
-                  setEditing((d) => (d ? { ...d, startDate: tu, endDate: den } : d))
+                onChange={(fromDate, toDate) =>
+                  setEditing((d) => (d ? { ...d, startDate: fromDate, endDate: toDate } : d))
                 }
               />
 
@@ -474,7 +474,7 @@ export default function BalancingScreen() {
  * · kết quả. Toàn bộ dữ liệu và thao tác nằm ở `usePeriodGrid`; chỗ này chỉ xếp
  * chỗ và nối danh mục.
  */
-function KyDetail({
+function PeriodDetail({
   period,
   onBack,
   onChangePeriod,
@@ -487,11 +487,11 @@ function KyDetail({
   const [products, setProducts] = useProducts();
   const [customers, setCustomers] = useCustomers();
   /** Bút chì sửa nhanh mặt hàng / khách trong lưới bán thành phẩm (nối theo id). */
-  const productEditor = useQuickCatalogEdit("matHang", products, setProducts);
-  const customerEditor = useQuickCatalogEdit("khachHang", customers, setCustomers);
+  const productEditor = useQuickCatalogEdit("product", products, setProducts);
+  const customerEditor = useQuickCatalogEdit("customer", customers, setCustomers);
   const [catalogMaterialTypes, setCatalogMaterialTypes] = useMaterialTypes();
   /** Bút chì loại NL ở hộp thêm dòng khối 1 (theo TÊN) — instance danh mục của KyDetail. */
-  const periodMaterialTypeEditor = useQuickCatalogEdit("loaiNL", catalogMaterialTypes, setCatalogMaterialTypes, { theo: "ten" });
+  const periodMaterialTypeEditor = useQuickCatalogEdit("materialType", catalogMaterialTypes, setCatalogMaterialTypes, { matchBy: "name" });
   const [showBang, setShowBang] = useState(false);
   /* Công tắc cột ngày RIÊNG từng khối — cả hai MẶC ĐỊNH MỞ (chốt 2026-10-06: kế
      toán đối chiếu theo ngày). Thu lại thì khối NL gõ thẳng Số lượng như bảng giấy. */
@@ -645,13 +645,13 @@ function KyDetail({
           materialTypeEdit={periodMaterialTypeEditor}
           daysCollapsed={hideMaterialDays}
           onToggleDays={() => setHideMaterialDays((v) => !v)}
-          onCreateMaterialType={(ten) => {
+          onCreateMaterialType={(name) => {
             setCatalogMaterialTypes([
               ...catalogMaterialTypes,
-              { id: uid(), name: ten, category: "", note: "" },
+              { id: uid(), name, category: "", note: "" },
             ]);
-            notify.saved(`Đã thêm loại nguyên liệu "${ten}" vào danh mục`);
-            return ten;
+            notify.saved(`Đã thêm loại nguyên liệu "${name}" vào danh mục`);
+            return name;
           }}
         />
         <ResultNote
@@ -675,16 +675,16 @@ function KyDetail({
             onPullSales={pullSalesIntoPeriod}
             daysCollapsed={hideFinishedGoodDays}
             onToggleDays={() => setHideFinishedGoodDays((v) => !v)}
-            onCreateProduct={(ten) => {
-              const m: Product = { id: uid(), code: "", name: ten, finishedGoodCode: "" };
+            onCreateProduct={(name) => {
+              const m: Product = { id: uid(), code: "", name, finishedGoodCode: "" };
               setProducts([...products, m]);
-              notify.saved(`Đã thêm mặt hàng "${ten}" vào danh mục`);
+              notify.saved(`Đã thêm mặt hàng "${name}" vào danh mục`);
               return m.id;
             }}
-            onCreateCustomer={(ten) => {
-              const k: Customer = { id: uid(), code: "", name: ten, market: "" };
+            onCreateCustomer={(name) => {
+              const k: Customer = { id: uid(), code: "", name, market: "" };
               setCustomers([...customers, k]);
-              notify.saved(`Đã thêm khách hàng "${ten}" vào danh mục`);
+              notify.saved(`Đã thêm khách hàng "${name}" vào danh mục`);
               return k.id;
             }}
           />
@@ -803,7 +803,7 @@ function ResultNote({
   isLocked: boolean;
   onChangePeriod: (patch: Partial<BalancingPeriod>) => void;
 }) {
-  const lai = result.profitOrLoss >= 0;
+  const isProfit = result.profitOrLoss >= 0;
   return (
     <section
       className={`border-t-2 border-border p-5 ${isHorizontal ? "2xl:border-t-0 2xl:border-l-2" : ""}`}
@@ -827,9 +827,9 @@ function ResultNote({
           <KV k="Giá thành" v={`${num(result.costOfGoods)} đ`} />
           <KV k="Giá trị xuất" v={`${num(result.exportValue)} đ`} />
           <KV
-            k={hasNoFinishedGood ? "Lãi / Lỗ" : lai ? "Lãi" : "Lỗ"}
+            k={hasNoFinishedGood ? "Lãi / Lỗ" : isProfit ? "Lãi" : "Lỗ"}
             v={hasNoFinishedGood ? "—" : `${num(Math.abs(result.profitOrLoss))} đ`}
-            tone={hasNoFinishedGood ? undefined : lai ? "lai" : "lo"}
+            tone={hasNoFinishedGood ? undefined : isProfit ? "profit" : "loss"}
             strong
           />
           <KV k="Bình quân / kg NL" v={hasNoFinishedGood ? "—" : `${num(result.avgProfitPerKgMaterial)} đ`} />
@@ -869,8 +869,8 @@ function ResultNote({
         <div className="mt-5 grid gap-3 border-t-2 border-border pt-4">
           <h3 className="text-base font-semibold text-foreground">
             Lãi/lỗ đến từ đâu:{" "}
-            <span className={lai ? "text-success" : "text-destructive"}>
-              {lai ? "bán được nhiều hơn tiền bỏ ra" : "tiền bỏ ra nhiều hơn bán được"} {num(Math.abs(result.profitOrLoss))} đ
+            <span className={isProfit ? "text-success" : "text-destructive"}>
+              {isProfit ? "bán được nhiều hơn tiền bỏ ra" : "tiền bỏ ra nhiều hơn bán được"} {num(Math.abs(result.profitOrLoss))} đ
             </span>
           </h3>
           <BarChart
@@ -887,8 +887,8 @@ function ResultNote({
             unit="đ"
             description="Giá thành chia theo tiền nguyên liệu và chi phí chế biến"
             segments={[
-              { id: "nl", label: "Tiền nguyên liệu", value: result.materialValue, tone: "bien" },
-              { id: "cb", label: "Chi phí chế biến", value: result.costOfGoods - result.materialValue, tone: "tim" },
+              { id: "nl", label: "Tiền nguyên liệu", value: result.materialValue, tone: "blue" },
+              { id: "cb", label: "Chi phí chế biến", value: result.costOfGoods - result.materialValue, tone: "purple" },
             ]}
           />
         </div>
@@ -906,7 +906,7 @@ function KV({
   k: string;
   v: string;
   strong?: boolean;
-  tone?: "lai" | "lo";
+  tone?: "profit" | "loss";
 }) {
   return (
     <div className="flex items-baseline justify-between gap-4 border-b border-border py-1.5">
@@ -914,7 +914,7 @@ function KV({
       <span
         className={`tnum shrink-0 whitespace-nowrap text-right text-base ${
           strong ? "font-semibold" : "font-medium"
-        } ${tone === "lai" ? "text-success" : tone === "lo" ? "text-destructive" : strong ? "text-primary" : ""}`}
+        } ${tone === "profit" ? "text-success" : tone === "loss" ? "text-destructive" : strong ? "text-primary" : ""}`}
       >
         {v}
       </span>
@@ -944,7 +944,7 @@ function KeyValueInput({
   onChange: (v: number | null) => void;
   note?: React.ReactNode;
 }) {
-  const doi = previousValue != null && value != null && previousValue !== value;
+  const changed = previousValue != null && value != null && previousValue !== value;
   return (
     <div className="border-b border-border py-1.5">
       {isLocked ? (
@@ -959,9 +959,9 @@ function KeyValueInput({
           className="flex-row flex-wrap items-center justify-between gap-x-4 gap-y-1 [&>div:last-child]:w-44"
         />
       )}
-      {(doi || note) && (
+      {(changed || note) && (
         <p className="mt-0.5 flex flex-wrap justify-end gap-x-3 text-right text-sm text-muted-foreground">
-          {doi && <span>kỳ trước {num(previousValue)} {unit}</span>}
+          {changed && <span>kỳ trước {num(previousValue)} {unit}</span>}
           {note}
         </p>
       )}

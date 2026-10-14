@@ -17,7 +17,7 @@ import {
   type StatCardData,
 } from "@/design-system";
 import { useSalesItems, useSalesInvoices, useCustomers } from "@/lib/catalogRepo";
-import { KY_OPT, getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
+import { PERIOD_OPTIONS, getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
 import { num, formatDateVN } from "@/lib/format";
 import { calculateSalesAmount, type SalesChannel } from "@/types";
 import { CalendarRange, Scale, Users } from "lucide-react";
@@ -44,20 +44,20 @@ export default function SalesReport() {
   const [invoices] = useSalesInvoices();
   const [customers] = useCustomers();
 
-  const [ky, setKy] = useState<ViewPeriod>("thang");
-  const [moc, setMoc] = useState(todayIso());
-  const [tuTC, setTuTC] = useState(todayIso());
-  const [denTC, setDenTC] = useState(todayIso());
-  const [tu, den] = getViewPeriodRange(ky, moc, tuTC, denTC);
+  const [period, setPeriod] = useState<ViewPeriod>("month");
+  const [anchor, setAnchor] = useState(todayIso());
+  const [customFrom, setCustomFrom] = useState(todayIso());
+  const [customTo, setCustomTo] = useState(todayIso());
+  const [fromDate, toDate] = getViewPeriodRange(period, anchor, customFrom, customTo);
 
-  const { dong, chart, customerCount, totalKg } = useMemo(() => {
+  const { rows: row, chart, customerCount, totalKg } = useMemo(() => {
     const invById = new Map(invoices.map((i) => [i.id, i]));
     const tenKH = new Map(customers.map((c) => [c.id, c.name]));
 
     const map = new Map<string, TotalRow>();
     const theoKH = new Map<string, number>();
     for (const it of items) {
-      if (it.deliveryDate < tu || it.deliveryDate > den) continue;
+      if (it.deliveryDate < fromDate || it.deliveryDate > toDate) continue;
       const inv = invById.get(it.invoiceId);
       if (!inv) continue;
       const kh = tenKH.get(inv.customerId) || "(chưa có khách)";
@@ -81,17 +81,17 @@ export default function SalesReport() {
       value,
     }));
     return {
-      dong: rows,
+      rows,
       chart,
       customerCount: theoKH.size,
       totalKg: rows.reduce((s, d) => s + d.quantityKg, 0),
     };
-  }, [items, invoices, customers, tu, den]);
+  }, [items, invoices, customers, fromDate, toDate]);
 
-  const the: StatCardData[] = [
-    { label: "Kỳ báo cáo", value: `${formatDateVN(tu)} – ${formatDateVN(den)}`, icon: CalendarRange, color: "trung-tinh" },
+  const cards: StatCardData[] = [
+    { label: "Kỳ báo cáo", value: `${formatDateVN(fromDate)} – ${formatDateVN(toDate)}`, icon: CalendarRange, color: "neutral" },
     { label: "Tổng bán", value: `${num(totalKg)} kg`, numeric: true, icon: Scale, color: "brand" },
-    { label: "Số khách", value: num(customerCount), numeric: true, icon: Users, color: "trung-tinh" },
+    { label: "Số khách", value: num(customerCount), numeric: true, icon: Users, color: "neutral" },
   ];
 
   const columns: SummaryTableColumn<TotalRow>[] = [
@@ -120,37 +120,37 @@ export default function SalesReport() {
             label="Kỳ báo cáo"
             hideRequiredMark
             clearable={false}
-            value={ky}
-            onChange={(v) => setKy(v as ViewPeriod)}
-            options={KY_OPT}
+            value={period}
+            onChange={(v) => setPeriod(v as ViewPeriod)}
+            options={PERIOD_OPTIONS}
           />
         </div>
         <div className="min-w-[min(12rem,100%)] flex-1 sm:min-w-[16rem]">
-          {ky === "tuy-chon" ? (
+          {period === "custom" ? (
             <DateRangeField
               label="Khoảng ngày"
               hideRequiredMark
               presets={false}
-              startDate={tuTC}
-              endDate={denTC}
+              startDate={customFrom}
+              endDate={customTo}
               onChange={(a, b) => {
-                setTuTC(a);
-                setDenTC(b);
+                setCustomFrom(a);
+                setCustomTo(b);
               }}
             />
           ) : (
             <DateField
-              label={ky === "ngay" ? "Ngày" : "Ngày bất kỳ trong kỳ"}
+              label={period === "day" ? "Ngày" : "Ngày bất kỳ trong kỳ"}
               hideRequiredMark
-              hint={ky === "ngay" ? undefined : `Kỳ: ${formatDateVN(tu)} – ${formatDateVN(den)}`}
-              value={moc}
-              onChange={setMoc}
+              hint={period === "day" ? undefined : `Kỳ: ${formatDateVN(fromDate)} – ${formatDateVN(toDate)}`}
+              value={anchor}
+              onChange={setAnchor}
             />
           )}
         </div>
       </div>
 
-      <StatCardGrid cards={the} />
+      <StatCardGrid cards={cards} />
 
       {chart.length > 0 && (
         <section className="space-y-3 rounded-xl border-2 border-border bg-card p-5">
@@ -162,10 +162,10 @@ export default function SalesReport() {
       )}
 
       <SummaryTable
-        rows={dong}
+        rows={row}
         columns={columns}
         getKey={(r) => `${r.customerName}|||${r.channel}`}
-        rowMarkKey={`bao-cao-ban|${tu}|${den}`}
+        rowMarkKey={`bao-cao-ban|${fromDate}|${toDate}`}
         emptyText="Không có phiếu bán trong kỳ này."
       />
     </div>

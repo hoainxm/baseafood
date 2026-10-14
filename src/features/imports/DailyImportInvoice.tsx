@@ -13,7 +13,7 @@ import {
   getDatesInRange,
 } from "@/design-system";
 import { num, formatDateVN } from "@/lib/format";
-import { KY_OPT, getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
+import { PERIOD_OPTIONS, getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
 import { Printer, X } from "lucide-react";
 
 /** "2026-07-31" → "31 THÁNG 07 NĂM 2026" (đúng giọng phiếu giấy). */
@@ -26,20 +26,20 @@ function dateInWords(iso: string): string {
 /** Gom dòng theo đại lý — mỗi đại lý một cụm, giữ thứ tự xuất hiện. */
 interface SupplierGroup {
   supplierName: string;
-  dong: MaterialImportItem[];
+  rows: MaterialImportItem[];
   note: string[];
 }
 
 function groupBySupplier(rows: MaterialImportItem[]): SupplierGroup[] {
   const map = new Map<string, SupplierGroup>();
   for (const r of rows) {
-    const ten = r.supplierName || "(chưa có đại lý)";
-    let cum = map.get(ten);
+    const name = r.supplierName || "(chưa có đại lý)";
+    let cum = map.get(name);
     if (!cum) {
-      cum = { supplierName: ten, dong: [], note: [] };
-      map.set(ten, cum);
+      cum = { supplierName: name, rows: [], note: [] };
+      map.set(name, cum);
     }
-    cum.dong.push(r);
+    cum.rows.push(r);
     const vehicleDescription = [r.driverName, r.licensePlate].filter(Boolean).join(" - ");
     if (vehicleDescription && !cum.note.includes(vehicleDescription)) cum.note.push(vehicleDescription);
   }
@@ -56,7 +56,7 @@ function groupBySupplier(rows: MaterialImportItem[]): SupplierGroup[] {
  * Chỉ ĐỌC dữ liệu đã nhập — không tạo/sửa bản ghi nào.
  */
 export default function DailyImportInvoice({
-  ky: initialPeriod,
+  period: initialPeriod,
   date: initialDate,
   startDate,
   endDate,
@@ -66,7 +66,7 @@ export default function DailyImportInvoice({
   onClose,
 }: {
   /** Kỳ + ngày neo + khoảng tự chọn — khởi tạo theo bộ lọc ngoài màn. */
-  ky: ViewPeriod;
+  period: ViewPeriod;
   date: string;
   startDate: string;
   endDate: string;
@@ -77,18 +77,18 @@ export default function DailyImportInvoice({
   onClose: () => void;
 }) {
   // Bộ chọn kỳ NGAY trong phiếu — cùng cách với màn Nhập hàng.
-  const [ky, setKy] = useState<ViewPeriod>(initialPeriod);
-  const [moc, setMoc] = useState(initialDate);
-  const [tuTC, setTuTC] = useState(startDate);
-  const [denTC, setDenTC] = useState(endDate);
-  const [tu, den] = getViewPeriodRange(ky, moc, tuTC, denTC);
+  const [period, setPeriod] = useState<ViewPeriod>(initialPeriod);
+  const [anchor, setAnchor] = useState(initialDate);
+  const [customFrom, setCustomFrom] = useState(startDate);
+  const [customTo, setCustomTo] = useState(endDate);
+  const [fromDate, toDate] = getViewPeriodRange(period, anchor, customFrom, customTo);
 
   const isInWorkshop = (px: string) =>
     workshop === "Tất cả" || px === workshop;
 
-  const isSingleDay = tu === den;
+  const isSingleDay = fromDate === toDate;
 
-  const datesWithData = getDatesInRange(tu, den).filter(
+  const datesWithData = getDatesInRange(fromDate, toDate).filter(
     (d) =>
       rows.some((r) => r.deliveryDate === d && isInWorkshop(r.workshop)) ||
       scraps.some(
@@ -98,7 +98,7 @@ export default function DailyImportInvoice({
   );
 
   const periodTotal = rows
-    .filter((r) => r.deliveryDate >= tu && r.deliveryDate <= den && isInWorkshop(r.workshop))
+    .filter((r) => r.deliveryDate >= fromDate && r.deliveryDate <= toDate && isInWorkshop(r.workshop))
     .reduce((s, r) => s + (r.quantityKg || 0), 0);
 
   return (
@@ -114,44 +114,44 @@ export default function DailyImportInvoice({
             label="Kỳ báo cáo"
             hideRequiredMark
             clearable={false}
-            value={ky}
-            onChange={(v) => setKy(v as ViewPeriod)}
-            options={KY_OPT}
+            value={period}
+            onChange={(v) => setPeriod(v as ViewPeriod)}
+            options={PERIOD_OPTIONS}
           />
         </div>
 
         <div className="min-w-[min(12rem,100%)] flex-1 sm:min-w-[16rem]">
-          {ky === "tuy-chon" ? (
+          {period === "custom" ? (
             <DateRangeField
               label="Khoảng ngày"
               hideRequiredMark
               presets={false}
-              startDate={tuTC}
-              endDate={denTC}
+              startDate={customFrom}
+              endDate={customTo}
               onChange={(a, b) => {
-                setTuTC(a);
-                setDenTC(b);
+                setCustomFrom(a);
+                setCustomTo(b);
               }}
             />
           ) : (
             <DateField
               label={
-                ky === "ngay"
+                period === "day"
                   ? "Ngày"
-                  : ky === "tuan"
+                  : period === "week"
                     ? "Ngày bất kỳ trong tuần"
-                    : ky === "thang"
+                    : period === "month"
                       ? "Ngày bất kỳ trong tháng"
                       : "Ngày bất kỳ trong năm"
               }
               hideRequiredMark
               hint={
-                ky === "ngay"
+                period === "day"
                   ? undefined
-                  : `Kỳ: ${formatDateVN(tu)} – ${formatDateVN(den)}`
+                  : `Kỳ: ${formatDateVN(fromDate)} – ${formatDateVN(toDate)}`
               }
-              value={moc}
-              onChange={setMoc}
+              value={anchor}
+              onChange={setAnchor}
             />
           )}
         </div>
@@ -175,8 +175,8 @@ export default function DailyImportInvoice({
           </h1>
           <p className="text-sm font-semibold uppercase">
             {isSingleDay
-              ? `Ngày ${dateInWords(tu)}`
-              : `Từ ${dateInWords(tu)} đến ${dateInWords(den)}`}
+              ? `Ngày ${dateInWords(fromDate)}`
+              : `Từ ${dateInWords(fromDate)} đến ${dateInWords(toDate)}`}
             {workshop !== "Tất cả" ? ` · Phân xưởng ${workshop}` : ""}
           </p>
         </div>
@@ -270,8 +270,8 @@ function DaySection({
         <tbody>
           {cum.map((c) => {
             stt += 1;
-            const n = c.dong.length;
-            return c.dong.map((r, i) => (
+            const n = c.rows.length;
+            return c.rows.map((r, i) => (
               <tr key={r.id}>
                 {i === 0 && (
                   <Td rowSpan={n} className="text-center align-top tnum">

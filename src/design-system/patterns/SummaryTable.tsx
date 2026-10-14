@@ -110,7 +110,7 @@ export function SummaryTable<T>({
     () => rootRef.current?.querySelector<HTMLElement>('[data-slot="table-container"]') ?? null
   );
   // Bảng rỗng không có dòng thêm thì không vẽ bảng ⇒ khỏi đo.
-  const { bangRef, dauNoiRef: floatHeadRef, thanhRef: barRef, rongCot: columnWidths, rongBang: tableWidth, rongCuon: scrollWidth, tran, hienDau: showFloatHead } = useXoRa(
+  const { tableRef, sentinelRef: floatHeadRef, barRef, columnWidths, tableWidth, scrollWidth, tran, showHeader: showFloatHead } = useFullHeight(
     Boolean(fullHeight) && (rows.length > 0 || Boolean(addRow))
   );
 
@@ -127,7 +127,7 @@ export function SummaryTable<T>({
   const effectiveSelection: TableSelection<T> | undefined =
     selection ??
     (to.enabled
-      ? { selectedKeys: internalSelection.daChon as Set<string>, toggle: (k) => internalSelection.doi(k), toggleAll: internalSelection.doiTatCa }
+      ? { selectedKeys: internalSelection.selected as Set<string>, toggle: (k) => internalSelection.toggle(k), toggleAll: internalSelection.toggleAll }
       : undefined);
   const daTick = effectiveSelection ? rowKey.filter((k) => effectiveSelection.selectedKeys.has(k)) : [];
   const isAllSelected = daTick.length > 0 && daTick.length === rowKey.length;
@@ -214,7 +214,7 @@ export function SummaryTable<T>({
           </div>
         </div>
       )}
-      <Table ref={bangRef}>
+      <Table ref={tableRef}>
         <TableHeader>{headerRow(false)}</TableHeader>
         <TableBody>
           {rows.map((r, i) => {
@@ -295,7 +295,7 @@ export function SummaryTable<T>({
       <RowMarkToolbar
         marker={to}
         selectedKeys={daTick}
-        onClearSelection={internalSelection.boChon}
+        onClearSelection={internalSelection.clearSelection}
         className={fullHeight ? "bottom-8" : undefined}
       />
     )}
@@ -308,35 +308,35 @@ export function SummaryTable<T>({
  * bảng có tràn ngang không, đồng bộ cuộn ngang bảng ⇄ hàng tên cột nổi ⇄ thanh
  * cuộn dính đáy, và lúc nào hiện hàng tên cột nổi.
  */
-function useXoRa(bat: boolean) {
-  const bangRef = React.useRef<HTMLTableElement>(null);
+function useFullHeight(bat: boolean) {
+  const tableRef = React.useRef<HTMLTableElement>(null);
   const sentinelRef = React.useRef<HTMLDivElement>(null);
   const barRef = React.useRef<HTMLDivElement>(null);
   const [columnWidths, setColumnWidths] = React.useState<number[]>([]);
   const [tableWidth, setTableWidth] = React.useState(0);
   const [scrollWidth, setScrollWidth] = React.useState(0);
-  const [tran, setTran] = React.useState(false);
+  const [isOverflowing, setTran] = React.useState(false);
   const [showHeader, setShowHeader] = React.useState(false);
 
   // Đo cột + tràn ngang mỗi khi bảng / khung đổi cỡ (gõ số, đổi cỡ chữ, thu thanh bên…).
   React.useLayoutEffect(() => {
     if (!bat) return;
-    const bang = bangRef.current;
-    const container = bang?.parentElement; // div[data-slot=table-container] của primitive
-    if (!bang || !container) return;
-    const do_ = () => {
-      const o = bang.tHead?.rows[0]?.cells;
+    const table = tableRef.current;
+    const container = table?.parentElement; // div[data-slot=table-container] của primitive
+    if (!table || !container) return;
+    const measure = () => {
+      const o = table.tHead?.rows[0]?.cells;
       const ws = o ? Array.from(o, (c) => c.getBoundingClientRect().width) : [];
       setColumnWidths((prev) => (prev.length === ws.length && prev.every((w, i) => Math.abs(w - ws[i]) < 0.5) ? prev : ws));
-      setTableWidth(bang.getBoundingClientRect().width);
+      setTableWidth(table.getBoundingClientRect().width);
       setScrollWidth(container.scrollWidth);
       setTran(container.scrollWidth > container.clientWidth + 1);
     };
-    do_();
-    const ro = new ResizeObserver(do_);
-    ro.observe(bang);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(table);
     ro.observe(container);
-    for (const c of Array.from(bang.tHead?.rows[0]?.cells ?? [])) ro.observe(c);
+    for (const c of Array.from(table.tHead?.rows[0]?.cells ?? [])) ro.observe(c);
     return () => ro.disconnect();
   }, [bat]);
 
@@ -344,7 +344,7 @@ function useXoRa(bat: boolean) {
   // duyệt không bắn sự kiện ⇒ không vòng lặp.
   React.useEffect(() => {
     if (!bat) return;
-    const container = bangRef.current?.parentElement;
+    const container = tableRef.current?.parentElement;
     if (!container) return;
     const theoBang = () => {
       if (sentinelRef.current) sentinelRef.current.scrollLeft = container.scrollLeft;
@@ -361,20 +361,20 @@ function useXoRa(bat: boolean) {
       container.removeEventListener("scroll", theoBang);
       bar?.removeEventListener("scroll", syncFromBar);
     };
-  }, [bat, tran]);
+  }, [bat, isOverflowing]);
 
   // Hiện hàng tên cột nổi khi hàng thật đã trôi lên dưới header trang và bảng
   // còn đủ cao bên dưới (gần đáy bảng thì ẩn để khỏi đè dòng tổng).
   React.useEffect(() => {
     if (!bat) return;
     const measure = () => {
-      const bang = bangRef.current;
-      const dau = bang?.tHead;
-      if (!bang || !dau) return;
+      const table = tableRef.current;
+      const head = table?.tHead;
+      if (!table || !head) return;
       const top = sentinelRef.current?.parentElement?.getBoundingClientRect().top ?? 64;
-      const r = bang.getBoundingClientRect();
-      const cao = dau.getBoundingClientRect().height;
-      setShowHeader(r.top < top - 1 && r.bottom > top + cao * 2);
+      const r = table.getBoundingClientRect();
+      const height = head.getBoundingClientRect().height;
+      setShowHeader(r.top < top - 1 && r.bottom > top + height * 2);
     };
     measure();
     // capture: bắt cuộn của MỌI khung (cột nội dung desktop cuộn riêng, điện thoại cuộn trang).
@@ -386,5 +386,5 @@ function useXoRa(bat: boolean) {
     };
   }, [bat]);
 
-  return { bangRef, dauNoiRef: sentinelRef, thanhRef: barRef, rongCot: columnWidths, rongBang: tableWidth, rongCuon: scrollWidth, tran, hienDau: showHeader };
+  return { tableRef, sentinelRef, barRef, columnWidths, tableWidth, scrollWidth, tran: isOverflowing, showHeader };
 }

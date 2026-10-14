@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { RowMark } from "@/types";
-import { normalizeRowMarkColor, setRowMarks, getTableRowMarks, idDauTo, cellKey } from "./rowMarks";
+import { normalizeRowMarkColor, setRowMarks, getTableRowMarks, rowMarkId, cellKey } from "./rowMarks";
 
-const dau = (p: Partial<RowMark> & Pick<RowMark, "tableKey" | "rowId">): RowMark => ({
-  id: idDauTo(p.tableKey, p.rowId, p.columnKey ?? null),
+const mark = (p: Partial<RowMark> & Pick<RowMark, "tableKey" | "rowId">): RowMark => ({
+  id: rowMarkId(p.tableKey, p.rowId, p.columnKey ?? null),
   columnKey: null,
   color: "vang-2",
   bold: false,
@@ -14,8 +14,8 @@ const dau = (p: Partial<RowMark> & Pick<RowMark, "tableKey" | "rowId">): RowMark
 
 describe("idDauTo", () => {
   it("tất định theo bảng + dòng (+ cột), cả dòng là *", () => {
-    expect(idDauTo("ton-kho-thang", "msl|1")).toBe("ton-kho-thang::msl|1::*");
-    expect(idDauTo("ton-kho-thang", "msl|1", "odKg")).toBe("ton-kho-thang::msl|1::odKg");
+    expect(rowMarkId("ton-kho-thang", "msl|1")).toBe("ton-kho-thang::msl|1::*");
+    expect(rowMarkId("ton-kho-thang", "msl|1", "odKg")).toBe("ton-kho-thang::msl|1::odKg");
   });
 });
 
@@ -40,11 +40,11 @@ describe("normalizeRowMarkColor", () => {
 describe("getTableRowMarks", () => {
   it("tách dấu dòng và dấu ô của đúng bảng", () => {
     const m = [
-      dau({ tableKey: "a", rowId: "1" }),
-      dau({ tableKey: "b", rowId: "1", color: "do-3" }),
-      dau({ tableKey: "a", rowId: "2", columnKey: "kg", color: "la-4" }),
-      dau({ tableKey: "a", rowId: "3", color: "", bold: true }),
-      dau({ tableKey: "a", rowId: "4", color: "nau-2", bold: false }), // màu lạ, không đậm ⇒ bỏ
+      mark({ tableKey: "a", rowId: "1" }),
+      mark({ tableKey: "b", rowId: "1", color: "do-3" }),
+      mark({ tableKey: "a", rowId: "2", columnKey: "kg", color: "la-4" }),
+      mark({ tableKey: "a", rowId: "3", color: "", bold: true }),
+      mark({ tableKey: "a", rowId: "4", color: "nau-2", bold: false }), // màu lạ, không đậm ⇒ bỏ
     ];
     const r = getTableRowMarks(m, "a");
     expect([...r.row.keys()]).toEqual(["1", "3"]);
@@ -59,7 +59,7 @@ describe("setRowMarks", () => {
   const luc = "2026-10-06T08:00:00.000Z";
 
   it("tô nhiều dòng, giữ dấu bảng khác", () => {
-    const prev = [dau({ tableKey: "b", rowId: "1" })];
+    const prev = [mark({ tableKey: "b", rowId: "1" })];
     const nextMarks = setRowMarks(prev, "a", ["1", "2"], { color: "la-3", bold: true }, "truc", luc);
     expect(nextMarks).toHaveLength(3);
     expect(nextMarks[0]).toBe(prev[0]);

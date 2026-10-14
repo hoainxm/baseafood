@@ -74,7 +74,7 @@ export function AddMaterialRowDialog({
           <Button variant="outline" size="lg" onClick={onClose}>
             Hủy
           </Button>
-          <Button
+          <Button variant="save"
             title="Thêm dòng nguyên liệu vừa chọn vào lưới của kỳ."
             size="lg"
             onClick={() => {
@@ -290,7 +290,7 @@ export function ManualRowsDialog({
                 trigger={
                   <Button
                     title="Xoá dòng này khỏi lưới của kỳ (có Hoàn tác)."
-                    variant="ghost"
+                    variant="danger"
                     size="sm"
                     className="min-h-11 min-w-11"
                     aria-label={`Xoá dòng ${rowLabelOf(h)}`}
@@ -381,7 +381,7 @@ export function AddProductDialog({
           <Button variant="outline" size="lg" onClick={onClose}>
             Hủy
           </Button>
-          <Button
+          <Button variant="save"
             title="Thêm mặt hàng vừa chọn vào lưới thành phẩm của kỳ."
             size="lg"
             onClick={() => {
@@ -437,7 +437,7 @@ export function BackdateReasonDialog({
           <Button variant="outline" size="lg" onClick={onClose}>
             Hủy
           </Button>
-          <Button
+          <Button variant="save"
             title="Ghi số vừa sửa kèm lý do. Lý do được lưu vết để đối chiếu về sau."
             size="lg"
             onClick={() => {
@@ -494,7 +494,7 @@ export function PeriodLockDialog({
           <Button variant="outline" size="lg" onClick={onClose}>
             Hủy
           </Button>
-          <Button
+          <Button variant={isLocked ? "edit" : "lock"}
             title="Khóa kỳ lại để chốt số, hoặc mở khóa nếu cần sửa. Mở lại BẮT BUỘC ghi lý do."
             size="lg"
             onClick={() => {

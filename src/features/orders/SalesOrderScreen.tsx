@@ -404,7 +404,7 @@ export default function SalesOrderScreen() {
                 Xem
               </Button>
               <Button
-                title="Xóa đơn đặt này. Có hỏi xác nhận trước." variant="outline" size="sm" onClick={() => deleteOrder(r)}>
+                title="Xóa đơn đặt này. Có hỏi xác nhận trước." variant="danger" size="sm" onClick={() => deleteOrder(r)}>
                 Bỏ
               </Button>
             </div>
@@ -619,7 +619,7 @@ export default function SalesOrderScreen() {
                     {creating.rows.length > 1 && (
                       <Button
                         title="Bỏ dòng mặt hàng này khỏi đơn đang tạo."
-                        variant="outline"
+                        variant="danger"
                         onClick={() =>
                           setCreating((t) =>
                             t ? { ...t, rows: t.rows.filter((_, j) => j !== i) } : t
@@ -669,7 +669,7 @@ export default function SalesOrderScreen() {
             <Button variant="outline" size="lg" onClick={() => setCreating(null)}>
               Hủy
             </Button>
-            <Button
+            <Button variant="save"
               title="Ghi đơn đặt này vào sổ." size="lg" onClick={saveCreate}>
               Tạo đơn
             </Button>

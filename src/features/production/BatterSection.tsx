@@ -77,7 +77,7 @@ export function BatterSection({
               {isNotBundled && (
                 <Button
                   type="button"
-                  variant="ghost"
+                  variant="danger"
                   size="icon"
                   aria-label={`Bỏ ${name}`}
                   title="Bỏ loại bột này khỏi dòng (chỉ dòng đang gõ, không đụng danh mục)."

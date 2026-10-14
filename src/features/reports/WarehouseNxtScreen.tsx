@@ -451,7 +451,7 @@ export default function WarehouseNxtScreen() {
           onConfirm={() => removeRow(r.id, r.itemCode)}
           trigger={
             <Button
-              title="Xóa mã hàng này khỏi kỳ đang xem." size="sm" variant="ghost" aria-label={`Xóa ${r.itemCode}`}>
+              title="Xóa mã hàng này khỏi kỳ đang xem." size="sm" variant="danger" aria-label={`Xóa ${r.itemCode}`}>
               <Trash2 className="size-4" />
             </Button>
           }
@@ -651,7 +651,7 @@ export default function WarehouseNxtScreen() {
           {rows.length > 0 && (
             <div className="flex flex-wrap items-center gap-3">
               <Button
-                variant={isEditMode ? "default" : "outline"}
+                variant={isEditMode ? "default" : "edit"}
                 onClick={() => setIsEditMode((v) => !v)}
                 title={
                   isEditMode
@@ -850,7 +850,7 @@ export default function WarehouseNxtScreen() {
             <Button variant="outline" onClick={() => setAddForm(null)}>
               Hủy
             </Button>
-            <Button onClick={saveAddCode} title="Thêm mã này vào kỳ đang xem với tồn đầu / nhập / xuất = 0.">
+            <Button variant="save" onClick={saveAddCode} title="Thêm mã này vào kỳ đang xem với tồn đầu / nhập / xuất = 0.">
               <Plus className="mr-1 h-4 w-4" />
               Thêm mã
             </Button>
@@ -926,7 +926,7 @@ export default function WarehouseNxtScreen() {
             <Button variant="outline" onClick={() => setPeriodForm(null)}>
               Hủy
             </Button>
-            <Button onClick={saveNewPeriod} title="Tạo kỳ mới và ghi tồn cuối kỳ hiện tại thành tồn đầu kỳ đó. Nhập/xuất để trống chờ ghi.">
+            <Button variant="save" onClick={saveNewPeriod} title="Tạo kỳ mới và ghi tồn cuối kỳ hiện tại thành tồn đầu kỳ đó. Nhập/xuất để trống chờ ghi.">
               <CalendarPlus className="mr-1 h-4 w-4" />
               Tạo kỳ · kế thừa tồn
             </Button>

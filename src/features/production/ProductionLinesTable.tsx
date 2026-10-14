@@ -223,7 +223,7 @@ export function ProductionLinesTable({
                             {d.productId && (
                               <Button
                                 type="button"
-                                variant="ghost"
+                                variant="edit"
                                 size="icon"
                                 aria-label="Sửa thành phẩm này"
                                 title="Sửa thông tin thành phẩm đang chọn (tên, mã số, loài, kiểu chế biến, quy cách) — lưu thẳng vào Danh mục."

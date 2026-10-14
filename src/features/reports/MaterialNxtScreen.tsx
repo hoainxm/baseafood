@@ -476,7 +476,7 @@ export default function MaterialNxtScreen() {
                       onConfirm={() => deleteOpening(o.id)}
                       trigger={
                         <Button
-                          title="Xóa dòng tồn đầu này." size="sm" variant="ghost">
+                          title="Xóa dòng tồn đầu này." size="sm" variant="danger">
                           Xóa
                         </Button>
                       }
@@ -541,7 +541,7 @@ export default function MaterialNxtScreen() {
                   <Button variant="outline" onClick={() => setForm(null)}>
                     Hủy
                   </Button>
-                  <Button
+                  <Button variant="save"
                     title="Ghi số tồn đầu vừa khai vào sổ." onClick={saveOpening}>
                     <PackagePlus className="mr-1 h-4 w-4" />
                     Lưu tồn đầu

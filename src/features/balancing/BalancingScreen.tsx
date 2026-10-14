@@ -337,7 +337,7 @@ export default function BalancingScreen() {
               </Button>
               <Button
                 title="Sửa thông tin kỳ (tên kỳ, khoảng ngày, loại nguyên liệu)."
-                variant="outline"
+                variant="edit"
                 size="sm"
                 onClick={() => {
                   setEditing({ ...r });
@@ -455,7 +455,7 @@ export default function BalancingScreen() {
             <Button variant="outline" size="lg" onClick={() => setEditing(null)}>
               Hủy
             </Button>
-            <Button
+            <Button variant="save"
               title="Ghi kỳ cân đối này vào sổ." size="lg" onClick={savePeriod}>
               {isAdding ? "Tạo kỳ" : "Lưu thay đổi"}
             </Button>
@@ -726,7 +726,7 @@ function PeriodDetail({
         </div>
         <Button
           title="Chốt khi đã đối chiếu xong và gửi kế toán — mọi ô trong lưới khoá lại. Kỳ đã chốt thì bấm để mở lại (phải ghi lý do)."
-          variant={period.isLocked ? "outline" : "default"}
+          variant={period.isLocked ? "edit" : "lock"}
           size="lg"
           onClick={() => setIsLockOpen(true)}
         >

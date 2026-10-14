@@ -407,7 +407,7 @@ function SuspectBox({
                         <Undo2 /> Hoàn tác
                       </Button>
                     ) : (
-                      <Button
+                      <Button variant="edit"
                         title="Sửa tay số hoặc ký hiệu của dòng này để hai bên khớp nhau." size="sm" onClick={() => onEdit(r)}>
                         <Wrench /> Sửa
                       </Button>
@@ -459,7 +459,7 @@ function SuspectBox({
                                 <Undo2 /> Hoàn tác
                               </Button>
                             ) : (
-                              <Button
+                              <Button variant="edit"
                                 title="Sửa tay dòng nghi vấn này cho khớp." size="sm" onClick={() => onEdit(nv)}>
                                 <Wrench /> Sửa
                               </Button>
@@ -1030,10 +1030,10 @@ export default function ReconciliationScreen() {
                   />
                 </div>
                 <Button
-                  title="Lưu lần đối soát này dưới dạng NHÁP — mở lại sửa tiếp được, số chưa đóng băng." variant="outline" onClick={() => saveRun("draft")} className="w-full md:w-auto">
+                  title="Lưu lần đối soát này dưới dạng NHÁP — mở lại sửa tiếp được, số chưa đóng băng." variant="save" onClick={() => saveRun("draft")} className="w-full md:w-auto">
                   <Save /> Lưu nháp
                 </Button>
-                <Button
+                <Button variant="save"
                   title="Lưu lần đối soát này thành bản CHÍNH THỨC — tóm tắt kết quả được đóng băng để đối chiếu về sau." onClick={() => saveRun("official")} className="w-full md:w-auto">
                   <Save /> Lưu chính thức
                 </Button>

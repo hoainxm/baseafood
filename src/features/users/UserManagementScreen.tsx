@@ -371,7 +371,7 @@ export default function UserManagementScreen({
                     actions={(r) => (
                       <Button
                         title="Sửa họ tên hoặc vai trò của tài khoản này."
-                        variant="outline"
+                        variant="edit"
                         size="sm"
                         onClick={() => setEditing({ ...r, roles: rolesList(r.roles) })}
                       >
@@ -455,7 +455,7 @@ export default function UserManagementScreen({
             <Button variant="outline" size="lg" onClick={() => setCreating(null)}>
               Hủy
             </Button>
-            <Button
+            <Button variant="save"
               title="Tạo tài khoản với tên đăng nhập, mật khẩu và vai trò vừa khai." size="lg" onClick={saveCreate} disabled={isCreating}>
               {isCreating ? "Đang tạo…" : "Tạo tài khoản"}
             </Button>
@@ -504,7 +504,7 @@ export default function UserManagementScreen({
             <Button variant="outline" size="lg" onClick={() => setEditing(null)}>
               Hủy
             </Button>
-            <Button
+            <Button variant="save"
               title="Ghi lại thay đổi cho tài khoản này. Vai trò mới có hiệu lực ở lần vào màn kế tiếp." size="lg" onClick={save}>
               Lưu thay đổi
             </Button>

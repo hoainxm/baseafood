@@ -286,7 +286,7 @@ export default function PackagingScreen() {
             Tem
           </Button>
           <Button
-            title="Xóa phiếu đóng gói này. Tồn bán thành phẩm và tồn thành phẩm sẽ được tính lại." variant="outline" size="sm" onClick={() => remove(r)}>
+            title="Xóa phiếu đóng gói này. Tồn bán thành phẩm và tồn thành phẩm sẽ được tính lại." variant="danger" size="sm" onClick={() => remove(r)}>
             Xóa
           </Button>
         </div>
@@ -506,7 +506,7 @@ export default function PackagingScreen() {
             <Button variant="outline" size="lg" onClick={() => setForm(null)}>
               Hủy
             </Button>
-            <Button
+            <Button variant="save"
               title="Ghi phiếu này vào sổ — trừ tồn bán thành phẩm và cộng tồn thành phẩm ngay." size="lg" onClick={save}>
               <PackageCheck />
               Ghi đóng gói

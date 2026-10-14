@@ -22,7 +22,7 @@ import {
   type FieldError,
   type ComboboxOption,
 } from "@/design-system";
-import { Fish, Plus } from "lucide-react";
+import { Fish, Lock, Pencil, Plus, Save, Trash2 } from "lucide-react";
 
 /**
  * Trang duyệt bộ giao diện + cấu hình hiển thị.
@@ -159,11 +159,32 @@ export default function KitPage() {
             <Plus />
             Ghi vào sổ
           </Button>
-          <Button>Lưu</Button>
           <Button variant="outline">Quay lại</Button>
           <Button variant="secondary">Xem bảng</Button>
-          <Button variant="destructive">Xóa dòng</Button>
           <Button variant="ghost">Bỏ qua</Button>
+        </div>
+        {/* Màu theo CHỨC NĂNG (README § 8b) — chọn theo ý nghĩa nút, không chọn theo màu */}
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <Button variant="save">
+            <Save />
+            Lưu
+          </Button>
+          <Button variant="edit">
+            <Pencil />
+            Sửa
+          </Button>
+          <Button variant="danger">
+            <Trash2 />
+            Xóa
+          </Button>
+          <Button variant="destructive">
+            <Trash2 />
+            Xóa dòng (xác nhận)
+          </Button>
+          <Button variant="lock">
+            <Lock />
+            Chốt ngày
+          </Button>
         </div>
       </Section>
 

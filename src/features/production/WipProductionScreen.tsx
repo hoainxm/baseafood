@@ -1229,7 +1229,7 @@ export default function WipProductionScreen() {
             )}
           </span>
         </span>
-        <Button
+        <Button variant="save"
           title="Ghi toàn bộ sản lượng đang gõ vào sổ sản xuất của ngày và xưởng đang chọn." size="lg" onClick={finishSession} className="w-full sm:w-auto">
           <Plus />
           Lưu vào sổ
@@ -1400,12 +1400,12 @@ export default function WipProductionScreen() {
                   Tem
                 </Button>
                 <Button
-                  title="Mở lại dòng sản lượng này để sửa số kg hoặc mặt hàng." variant="outline" size="sm" onClick={() => openEdit(r)}>
+                  title="Mở lại dòng sản lượng này để sửa số kg hoặc mặt hàng." variant="edit" size="sm" onClick={() => openEdit(r)}>
                   <Pencil />
                   Sửa
                 </Button>
                 <Button
-                  title="Bỏ dòng sản lượng này khỏi sổ. Có hỏi xác nhận và còn nút Hoàn tác." variant="outline" size="sm" onClick={() => remove(r)}>
+                  title="Bỏ dòng sản lượng này khỏi sổ. Có hỏi xác nhận và còn nút Hoàn tác." variant="danger" size="sm" onClick={() => remove(r)}>
                   Bỏ
                 </Button>
               </div>
@@ -1503,7 +1503,7 @@ export default function WipProductionScreen() {
                 </Button>
                 <Button
                   title="Mở lại dòng bán nội địa này để sửa ngày, loại nguyên liệu, số lượng, giá hoặc khách."
-                  variant="outline"
+                  variant="edit"
                   size="sm"
                   onClick={() => openDomesticSaleEdit(r)}
                 >
@@ -1516,7 +1516,7 @@ export default function WipProductionScreen() {
                   trigger={
                     <Button
                       title="Bỏ dòng bán nội địa này khỏi sổ. Có hỏi xác nhận và còn nút Hoàn tác."
-                      variant="outline"
+                      variant="danger"
                       size="sm"
                     >
                       Bỏ
@@ -1565,7 +1565,7 @@ export default function WipProductionScreen() {
           {isLocked ? (
             <Button
               title="Mở khóa lại ngày sản xuất đã chốt để sửa hoặc ghi bù. Phải ghi lý do, và việc mở khóa được lưu vết."
-              variant="outline"
+              variant="edit"
               size="lg"
               onClick={() => {
                 setIsConfirmingReopen(true);
@@ -1577,7 +1577,7 @@ export default function WipProductionScreen() {
               Mở lại ngày
             </Button>
           ) : (
-            <Button
+            <Button variant="lock"
               title="Khóa sổ sản xuất ngày này và khai phần nguyên liệu CÒN DỞ tách theo từng loại. Số còn dở đó thành đông gửi ở sổ tồn kho nguyên liệu."
               size="lg"
               onClick={() => {
@@ -1716,7 +1716,7 @@ export default function WipProductionScreen() {
                 {edit.productId && (
                   <Button
                     type="button"
-                    variant="outline"
+                    variant="edit"
                     size="icon"
                     aria-label="Sửa thành phẩm này"
                     title="Sửa thông tin thành phẩm đang chọn (tên, mã số, loài, kiểu chế biến, quy cách) — lưu thẳng vào Danh mục."
@@ -1804,7 +1804,7 @@ export default function WipProductionScreen() {
             <Button variant="outline" size="lg" onClick={() => setEdit(null)}>
               Hủy
             </Button>
-            <Button
+            <Button variant="save"
               title="Ghi đè dòng sản lượng này bằng số vừa sửa." size="lg" onClick={saveEdit}>
               Lưu thay đổi
             </Button>
@@ -1893,7 +1893,7 @@ export default function WipProductionScreen() {
             <Button variant="outline" size="lg" onClick={() => setEditingDomesticSale(null)}>
               Hủy
             </Button>
-            <Button title="Ghi đè dòng bán nội địa này bằng số vừa sửa." size="lg" onClick={saveDomesticSaleEdit}>
+            <Button variant="save" title="Ghi đè dòng bán nội địa này bằng số vừa sửa." size="lg" onClick={saveDomesticSaleEdit}>
               Lưu thay đổi
             </Button>
           </DialogFooter>
@@ -2026,7 +2026,7 @@ export default function WipProductionScreen() {
                     </div>
                     <Button
                       title="Bỏ dòng nguyên liệu còn dở này khỏi phần khai."
-                      variant="ghost"
+                      variant="danger"
                       size="icon"
                       className="shrink-0"
                       aria-label="Xóa dòng còn dở"
@@ -2057,7 +2057,7 @@ export default function WipProductionScreen() {
             <Button variant="outline" size="lg" onClick={() => setIsConfirmingLock(false)}>
               Hủy
             </Button>
-            <Button
+            <Button variant="lock"
               title="Xác nhận khóa sổ sản xuất ngày này kèm phần còn dở đã khai." size="lg" onClick={lockDay}>
               <Lock />
               Chốt ngày
@@ -2088,7 +2088,7 @@ export default function WipProductionScreen() {
             <Button variant="outline" size="lg" onClick={() => setIsConfirmingReopen(false)}>
               Hủy
             </Button>
-            <Button
+            <Button variant="edit"
               title="Xác nhận mở khóa ngày sản xuất này để sửa hoặc ghi bù." size="lg" onClick={reopenDay}>
               <LockOpen />
               Mở lại

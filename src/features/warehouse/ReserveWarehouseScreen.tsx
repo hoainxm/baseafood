@@ -504,7 +504,7 @@ export default function ReserveWarehouseScreen() {
             <Button variant="outline" size="lg" onClick={() => setApproval(null)}>
               Hủy
             </Button>
-            <Button
+            <Button variant="save"
               title="Xác nhận cho lô này vào kho dự trữ — từ đây mới xuất bán hoặc đóng gói được." size="lg" onClick={saveApproval}>
               <PackageCheck />
               Xác nhận nhập kho

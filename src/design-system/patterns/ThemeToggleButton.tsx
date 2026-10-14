@@ -66,7 +66,7 @@ export function DisplaySettingsButton({
           <Button variant="outline" onClick={cancel}>
             Hủy
           </Button>
-          <Button onClick={save}>Lưu</Button>
+          <Button variant="save" onClick={save}>Lưu</Button>
         </>
       }
       trigger={

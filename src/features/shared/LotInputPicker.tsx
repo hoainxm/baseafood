@@ -159,7 +159,7 @@ function LotInputDialog({
                       {[g.description, g.kg != null ? formatKg(g.kg) : "chưa ghi kg", g.operator].filter(Boolean).join(" · ")}
                     </div>
                   </div>
-                  <Button variant="outline" size="sm" title={`Bỏ lô ${g.label}. Còn nút Hoàn tác.`} onClick={() => onRemove(g.id)}>
+                  <Button variant="danger" size="sm" title={`Bỏ lô ${g.label}. Còn nút Hoàn tác.`} onClick={() => onRemove(g.id)}>
                     <Trash2 aria-hidden /> Bỏ
                   </Button>
                 </li>

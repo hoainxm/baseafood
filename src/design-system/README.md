@@ -455,9 +455,16 @@ theo màu**, không tự viết class màu lên nút.
 
 - Chữ + icon vẫn bắt buộc (`<Save />`, `<Pencil />`, `<Trash2 />`, `<Lock />`): màu không
   bao giờ là tín hiệu duy nhất. Tương phản chữ/nền ≥ 4,5:1 với token hiện có.
-- Đã áp: `ConfirmDelete` (trigger `danger`), `CatalogCrud` (Sửa `edit`, Lưu `save`), màn
-  Nhập hàng (`features/imports/**`). Màn khác chuyển dần khi đụng tới — nút Lưu/Sửa/Chốt
-  MỚI phải dùng đúng variant ngay.
+- Đã áp cho MỌI màn (2026-10-14) + `ConfirmDelete` (trigger `danger`) + `CatalogCrud`
+  (Sửa `edit`, Lưu `save`) + trang `/kit`. Nút mới PHẢI dùng đúng variant ngay.
+- **Cổng máy:** `patterns/buttonIntentSource.test.ts` quét mọi `<Button>` /
+  `<AlertDialogAction>` ở `features/**` + `design-system/**`: icon `Pencil`/`LockOpen` ⇒
+  `edit`, `Trash2` ⇒ `danger`/`destructive`, `Lock` ⇒ `lock`, `Save` ⇒ `save`; không có icon
+  thì xét chữ đầu nhãn (Lưu ⇒ `save`, Chốt ⇒ `lock`, Xóa ⇒ `danger`, Sửa / Mở lại ngày-kỳ ⇒
+  `edit`). Variant động (`{cond ? "edit" : "lock"}`) hợp lệ khi có mặt variant đúng nghĩa.
+- Nút ghi dữ liệu mà nhãn không bắt đầu bằng "Lưu" (Tạo kỳ, Nạp N dòng, Xác nhận nhập
+  kho, Thêm ‹…› ở chân hộp thoại) test không dò được — tự đặt `save`. Nút MỞ form
+  (Ghi phiếu bán, Thêm phế liệu) là `default`, không phải `save`.
 
 ## Bảng chọn component
 

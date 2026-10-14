@@ -1275,7 +1275,7 @@ export default function MonthlyStockScreen() {
                 <PackageMinus className="size-4" />
               </Button>
               <Button
-                title="Sửa dòng: ngày nhập · tên hàng · size · invoice · đơn giá · số kg · vị trí." size="icon-sm" variant="ghost" aria-label={`Sửa ${r.itemName}`} onClick={() => openEdit(r)}>
+                title="Sửa dòng: ngày nhập · tên hàng · size · invoice · đơn giá · số kg · vị trí." size="icon-sm" variant="edit" aria-label={`Sửa ${r.itemName}`} onClick={() => openEdit(r)}>
                 <Pencil className="size-4" />
               </Button>
               <ConfirmDelete
@@ -1283,7 +1283,7 @@ export default function MonthlyStockScreen() {
                 onConfirm={() => removeRow(r)}
                 trigger={
                   <Button
-                    title="Xóa dòng này khỏi tháng. Có hỏi xác nhận, xóa xong vẫn còn nút Hoàn tác." size="icon-sm" variant="ghost" aria-label={`Xóa ${r.itemName}`}>
+                    title="Xóa dòng này khỏi tháng. Có hỏi xác nhận, xóa xong vẫn còn nút Hoàn tác." size="icon-sm" variant="danger" aria-label={`Xóa ${r.itemName}`}>
                     <Trash2 className="size-4" />
                   </Button>
                 }
@@ -1697,7 +1697,7 @@ export default function MonthlyStockScreen() {
                     recordDescription={`${selectedRows.length} dòng ${formatMonthLabel(month)}`}
                     onConfirm={deleteSelected}
                     trigger={
-                      <Button size="sm" variant="ghost" title="Xóa các dòng đang tick khỏi tháng này. Có hỏi xác nhận, và xóa xong vẫn còn nút Hoàn tác.">
+                      <Button size="sm" variant="danger" title="Xóa các dòng đang tick khỏi tháng này. Có hỏi xác nhận, và xóa xong vẫn còn nút Hoàn tác.">
                         <Trash2 className="mr-2 h-4 w-4" />
                         Xóa dòng đã chọn
                       </Button>
@@ -1813,7 +1813,7 @@ export default function MonthlyStockScreen() {
             <Button variant="outline" onClick={() => setForm(null)}>
               Hủy
             </Button>
-            <Button onClick={saveRow} title="Ghi dòng này vào sổ tháng đang xem. Tồn cuối và tiền còn lại tự tính, không phải gõ.">
+            <Button variant="save" onClick={saveRow} title="Ghi dòng này vào sổ tháng đang xem. Tồn cuối và tiền còn lại tự tính, không phải gõ.">
               <Plus className="mr-1 h-4 w-4" />
               {form?.id ? "Lưu dòng" : "Thêm dòng"}
             </Button>
@@ -1924,7 +1924,7 @@ export default function MonthlyStockScreen() {
             <Button variant="outline" onClick={() => setAction(null)}>
               Hủy
             </Button>
-            <Button onClick={saveAction} title="Ghi thao tác này vào sổ tháng đang xem, kèm ghi chú ngày và số kg ở nhật ký dòng. Có nút Hoàn tác sau khi lưu.">
+            <Button variant="save" onClick={saveAction} title="Ghi thao tác này vào sổ tháng đang xem, kèm ghi chú ngày và số kg ở nhật ký dòng. Có nút Hoàn tác sau khi lưu.">
               <PackageMinus className="mr-1 h-4 w-4" />
               Lưu thao tác
             </Button>
@@ -2063,7 +2063,7 @@ export default function MonthlyStockScreen() {
             <Button variant="outline" onClick={() => setLoadForm(null)}>
               Hủy
             </Button>
-            <Button onClick={confirmImport} title="Nạp các sheet đã xem trước vào sổ, theo đúng năm và kho đã chọn. Chọn nhầm kho sẽ tạo bản sao ở kho khác — kiểm lại trước khi bấm.">
+            <Button variant="save" onClick={confirmImport} title="Nạp các sheet đã xem trước vào sổ, theo đúng năm và kho đã chọn. Chọn nhầm kho sẽ tạo bản sao ở kho khác — kiểm lại trước khi bấm.">
               <Upload className="mr-1 h-4 w-4" />
               Nạp {importRowCount} dòng
             </Button>
@@ -2116,7 +2116,7 @@ export default function MonthlyStockScreen() {
                           {num(d.diffKg)}
                         </td>
                         <td className="px-3 py-2 text-right">
-                          <Button size="sm" variant="outline" onClick={() => manualFixProduct(d)} title="Mở lưới ghi đã lọc sẵn đúng mặt hàng này, để tự chỉnh tồn đầu / nhập / xuất cho khớp tháng trước.">
+                          <Button size="sm" variant="edit" onClick={() => manualFixProduct(d)} title="Mở lưới ghi đã lọc sẵn đúng mặt hàng này, để tự chỉnh tồn đầu / nhập / xuất cho khớp tháng trước.">
                             <Pencil className="mr-1 h-4 w-4" />
                             Sửa tay
                           </Button>
@@ -2249,7 +2249,7 @@ export default function MonthlyStockScreen() {
               Đóng
             </Button>
             {(needsSync.length > 0 || clearNames.length > 0) && (
-              <Button onClick={applySync} className="h-auto min-h-11 whitespace-normal" title="Thêm các tên chưa có vào danh mục đã chọn, và đổi tên các dòng sổ mang tên cũ sang tên chuẩn đã ánh xạ.">
+              <Button variant="save" onClick={applySync} className="h-auto min-h-11 whitespace-normal" title="Thêm các tên chưa có vào danh mục đã chọn, và đổi tên các dòng sổ mang tên cũ sang tên chuẩn đã ánh xạ.">
                 <Library className="mr-2 h-4 w-4" />
                 Đồng bộ: {productCount} → Mặt hàng · {materialCount} → Loại NL
               </Button>

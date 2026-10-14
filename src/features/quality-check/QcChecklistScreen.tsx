@@ -240,12 +240,12 @@ export default function QcChecklistScreen() {
         </div>
         {isLocked ? (
           <Button
-            title="Mở khóa lại ngày QC đã chốt để sửa hoặc chấm bù." variant="outline" size="lg" onClick={reopen}>
+            title="Mở khóa lại ngày QC đã chốt để sửa hoặc chấm bù." variant="edit" size="lg" onClick={reopen}>
             Mở lại ngày
           </Button>
         ) : (
           <Button
-            title="Khóa sổ QC ngày này. Sau khi chốt muốn sửa phải mở lại ngày." variant="outline" size="lg" onClick={lockDay}>
+            title="Khóa sổ QC ngày này. Sau khi chốt muốn sửa phải mở lại ngày." variant="lock" size="lg" onClick={lockDay}>
             <Lock aria-hidden />
             Chốt ngày
           </Button>
@@ -357,7 +357,7 @@ export default function QcChecklistScreen() {
 
       {/* Lưu — không bao giờ disabled (thiếu thì báo qua toast) */}
       <div className="flex justify-end">
-        <Button
+        <Button variant="save"
           title="Ghi điểm của toàn bộ chỉ tiêu vào sổ QC ngày đang chọn." size="lg" onClick={save}>
           Lưu chấm điểm
         </Button>

@@ -788,7 +788,7 @@ export function MaterialGrid({
           ⚠ Sổ kho tháng lệch {grid.stockLedgerMismatches} chỗ so với dòng Lấy xả đông / Gửi đông của kỳ.
           <Button
             size="sm"
-            variant="outline"
+            variant="save"
             onClick={grid.resyncStockLedger}
             title="Ghi lại phần lấy xả đông / gửi đông của kỳ vào Sổ kho tháng cho khớp (có Hoàn tác)."
           >
@@ -886,7 +886,7 @@ export function MaterialGrid({
           {materialRows.some((h) => !h.fromImports) && (
             <Button
               title="Xoá dòng nhập tay hoặc đổi kho nhận của dòng giảm."
-              variant="ghost"
+              variant="edit"
               onClick={() => setIsManualEditOpen(true)}
             >
               <Pencil />

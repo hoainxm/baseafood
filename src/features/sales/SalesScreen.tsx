@@ -705,7 +705,7 @@ export default function SalesScreen() {
                       {kg(n.totalKg)}
                     </span>
                     <Button
-                      title="Mở lại phiếu bán này để sửa khách hàng, kênh bán hay các dòng hàng." variant="outline" onClick={() => openInvoiceEdit(n)}>
+                      title="Mở lại phiếu bán này để sửa khách hàng, kênh bán hay các dòng hàng." variant="edit" onClick={() => openInvoiceEdit(n)}>
                       <Pencil />
                       Sửa phiếu
                     </Button>
@@ -872,7 +872,7 @@ export default function SalesScreen() {
                           {lotInputButton(r)}
                           <Button
                             title="Sửa dòng bán này (mặt hàng · quy cách · số kg · đơn giá)."
-                            variant="outline"
+                            variant="edit"
                             size="sm"
                             onClick={() => {
                               setEditing({ ...r });
@@ -884,7 +884,7 @@ export default function SalesScreen() {
                           </Button>
                           <Button
                             title="Bỏ dòng bán này khỏi phiếu đang gõ."
-                            variant="outline"
+                            variant="danger"
                             size="sm"
                             onClick={() => removeSessionRow(r)}
                           >
@@ -1009,7 +1009,7 @@ export default function SalesScreen() {
             ) : (
               <Button
                 title="Ghi phiếu đang gõ vào sổ rồi mở phiếu trống để bán tiếp cho khách khác."
-                variant="outline"
+                variant="save"
                 size="lg"
                 onClick={() => closeSession("another")}
               >
@@ -1093,7 +1093,7 @@ export default function SalesScreen() {
             <Button variant="outline" size="lg" onClick={() => setEditing(null)}>
               Hủy
             </Button>
-            <Button
+            <Button variant="save"
               title="Ghi đè dòng bán này bằng số vừa sửa." size="lg" onClick={save}>
               Lưu thay đổi
             </Button>

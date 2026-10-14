@@ -202,6 +202,14 @@ Chủ dự án duyệt cả 5a + 5f, **tự chạy migration ở SQL Editor** (�
 - **Kiểm:** `tsc` app + test 0 lỗi, 401 test, lint không thêm cảnh báo. Bộ máy đối soát (gần như không có test) chạy trên **4 file thật** của kế toán ở bản cũ (HEAD) và bản mới: kết quả engine, so hai bản, cùng MST cùng ngày và **mọi ô của file Excel xuất** giống hệt từng byte. Preview demo: 19 màn hiển thị, không lỗi console.
 - Sau đợt: `fields` **600 → 100**. Còn: `types.ts` (trường đã lưu — cần `fromRow`/`patchLegacy` đọc cả tên cũ, 🟡), kiểu khai riêng ở màn hình, khóa literal-union của design-system (`tim`, `vua/rong`, `tinh`, `nguon`) và literal loại danh mục.
 
+### Kết quả trường `types.ts` (2026-10-14)
+
+- **Đã LƯU nên đổi kèm đọc tên cũ** (🟡): `WipProductionItem.componentRauKg/componentBaoTuKg` → `tentacleKg/stomachKg` (cột DB `component_*_kg` giữ — 5d không làm); `ReconciliationSummary` → `invoiceCount · matched · mismatched · missing · nearMatched · ledgerRowCount · ledgerMatched · ledgerMissing · totalDifference · threshold`; `ReconciliationRun.options` → `ledgerSheetName · taxSideSheets · mode`; giá trị chế độ đối soát `so/haiBan/kiemCong/cungNgay` → `ledger/twoVersion/columnSum/sameDay`. `NxtReportItem` (không còn ai dùng) → `openingKg · inPeriodKg · outPeriodKg · closingKg`.
+- **Khuôn đọc-cả-hai cho trường đã lưu:** `LEGACY_FIELDS` + `renameLegacyFields` trong `lib/legacyValues.ts`, gọi ở `fromRow` (jsonb / dòng máy chủ — KHÔNG viết lại dữ liệu cũ, không migration) và `patchLegacy` (bộ đệm máy, hàng chờ). Ghi luôn tên mới. Có test ở `legacyValues.test.ts` + `repo.test.ts` (dòng máy chủ và bộ đệm mang tên cũ).
+- **Kiểm:** 406 test; preview chế độ máy: cài vào bộ đệm một bản đối soát + một dòng SX mang tên trường cũ ⇒ danh sách bản lưu hiện đúng "7 khớp · 1 lệch · 2 chưa", sổ ngày `/wip` hiện "râu 3 · bao tử 2". Chế độ máy chủ chỉ kiểm qua test `fromRow` (không mở dữ liệu thật).
+- ⚠ Máy còn mở bản app CŨ (chưa tải lại) đọc bản đối soát lưu bằng bản mới sẽ thấy tổng kết trống và tự chọn chế độ mặc định — chỉ hiển thị, không mất số; hết khi tải lại.
+- Sau đợt: `fields` **100 → 83** (`types.ts` sạch). Còn: kiểu khai riêng ở màn hình, khóa literal-union design-system, literal loại danh mục.
+
 ### Cách chạy lại codemod
 
 ```bash

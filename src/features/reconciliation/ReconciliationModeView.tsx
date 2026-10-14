@@ -51,25 +51,25 @@ import {
 
 const MODES: { id: ReconciliationMode; label: string; description: string; icon: typeof Files }[] = [
   {
-    id: "so",
+    id: "ledger",
     label: "Hóa đơn ⇄ sổ kế toán",
     description: "Hóa đơn nào chưa vào sổ, lệch tiền, lệch thuế; dòng sổ nào không có hóa đơn.",
     icon: BookOpenCheck,
   },
   {
-    id: "haiBan",
+    id: "twoVersion",
     label: "So hai bản hóa đơn",
     description: "Bản cơ quan thuế gửi ⇄ bản kế toán tự tải: hóa đơn chỉ một bên có, hóa đơn lệch tiền.",
     icon: Files,
   },
   {
-    id: "kiemCong",
+    id: "columnSum",
     label: "Kiểm cộng cột bảng kê",
     description: "Chưa thuế + thuế có bằng tổng thanh toán không; lệch ở dòng nào, do phí / chiết khấu / làm tròn hay sai thật.",
     icon: Calculator,
   },
   {
-    id: "cungNgay",
+    id: "sameDay",
     label: "Cùng MST cùng ngày",
     description: "Một người bán xuất nhiều hóa đơn trong một ngày — lọc ra nhóm trùng khít số tiền (dễ kê hai lần).",
     icon: CalendarSearch,

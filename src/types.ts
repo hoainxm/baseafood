@@ -449,8 +449,8 @@ export interface WipProductionItem {
   processingType?: string;
   /** Thành phẩm tách 2 thành phần cùng giá (VD cắt chần: râu + bao tử).
    *  null = dòng KHÔNG tách. quantityKg vẫn giữ tổng để cân đối dùng. */
-  componentRauKg?: number | null;
-  componentBaoTuKg?: number | null;
+  tentacleKg?: number | null;
+  stomachKg?: number | null;
   /** Kỳ cân đối đã hút dòng này (rỗng = chưa gắn kỳ nào). */
   balancingPeriodId?: string;
   /** Người thao tác ghi dòng này (họ tên tài khoản đăng nhập) — lưu vết ai gửi
@@ -670,10 +670,10 @@ export interface NxtReportItem {
   productName: string;
   category: NxtGoodsCategory;
   unit: string;
-  tonDauKg: number;
-  nhapTrongKyKg: number;
-  xuatTrongKyKg: number;
-  tonCuoiKg: number;
+  openingKg: number;
+  inPeriodKg: number;
+  outPeriodKg: number;
+  closingKg: number;
   warehouse: string;
   note?: string;
 }
@@ -880,16 +880,16 @@ export interface LabelPrint {
 }
 
 export interface ReconciliationSummary {
-  soHoaDon: number;
-  khop: number;
-  lech: number;
-  thieu: number;
-  ganKhop: number;
-  soDongPm: number;
-  pmCo: number;
-  pmThieu: number;
-  tongChenh: number;
-  nguong: number;
+  invoiceCount: number;
+  matched: number;
+  mismatched: number;
+  missing: number;
+  nearMatched: number;
+  ledgerRowCount: number;
+  ledgerMatched: number;
+  ledgerMissing: number;
+  totalDifference: number;
+  threshold: number;
   savedAt: string; // ISO — thời điểm đóng băng ảnh chụp
 }
 export interface ReconciliationRun {
@@ -904,12 +904,12 @@ export interface ReconciliationRun {
   fileName: string;
   fileB64: string; // file Excel gốc, base64
   options: {
-    soChuanTen?: string;
+    ledgerSheetName?: string;
     edits?: Record<string, number>;
     /** Sheet hóa đơn thuộc bản thuế gửi — người dùng chỉ định (thiếu = máy tự nhận). */
-    benThue?: string[];
+    taxSideSheets?: string[];
     /** Kiểu đối soát đang xem khi lưu (so · haiBan · kiemCong · cungNgay). */
-    cheDo?: string;
+    mode?: string;
   };
   summary: ReconciliationSummary;
   createdAt: string;

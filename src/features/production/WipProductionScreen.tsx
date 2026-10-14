@@ -168,7 +168,7 @@ export default function WipProductionScreen() {
   const [editErrors, setEditErrors] = useState<FieldError[]>([]);
   /** Dòng đang sửa có tách không = đã nhập râu/bao tử (ô tách luôn có sẵn). */
   const isEditSplit =
-    (edit?.componentRauKg ?? 0) > 0 || (edit?.componentBaoTuKg ?? 0) > 0;
+    (edit?.tentacleKg ?? 0) > 0 || (edit?.stomachKg ?? 0) > 0;
 
   /** Hai chế độ: "nhap" = form ghi (mặc định, form-first cho tổ xưởng); "so" = sổ + báo cáo. */
   const [mode, setMode] = useState<"nhap" | "so">("nhap");
@@ -772,7 +772,7 @@ export default function WipProductionScreen() {
     if (!edit.productId)
       ls.push({ field: "Thành phẩm", message: "Chưa chọn thành phẩm" });
     const total = isEditSplit
-      ? (edit.componentRauKg || 0) + (edit.componentBaoTuKg || 0)
+      ? (edit.tentacleKg || 0) + (edit.stomachKg || 0)
       : edit.quantityKg;
     if (!(total > 0))
       ls.push({ field: "Khối lượng", message: "Phải lớn hơn 0 kg" });
@@ -781,8 +781,8 @@ export default function WipProductionScreen() {
     const record: WipProductionItem = {
       ...edit,
       quantityKg: total,
-      componentRauKg: isEditSplit ? edit.componentRauKg ?? 0 : null,
-      componentBaoTuKg: isEditSplit ? edit.componentBaoTuKg ?? 0 : null,
+      tentacleKg: isEditSplit ? edit.tentacleKg ?? 0 : null,
+      stomachKg: isEditSplit ? edit.stomachKg ?? 0 : null,
       batterKg: sanitizeBatterKg(edit.batterKg),
     };
     persist(rows.map((r) => (r.id === edit.id ? record : r)));
@@ -1017,12 +1017,12 @@ export default function WipProductionScreen() {
       header: "Số lượng (kg)",
       numeric: true,
       render: (r) =>
-        r.componentRauKg != null || r.componentBaoTuKg != null ? (
+        r.tentacleKg != null || r.stomachKg != null ? (
           <span>
             {num(r.quantityKg)}
             <span className="block text-sm text-muted-foreground">
-              râu {num(r.componentRauKg ?? 0)} · bao tử{" "}
-              {num(r.componentBaoTuKg ?? 0)}
+              râu {num(r.tentacleKg ?? 0)} · bao tử{" "}
+              {num(r.stomachKg ?? 0)}
             </span>
           </span>
         ) : (
@@ -1090,7 +1090,7 @@ export default function WipProductionScreen() {
   ];
 
   const editTotal = isEditSplit
-    ? (edit?.componentRauKg || 0) + (edit?.componentBaoTuKg || 0)
+    ? (edit?.tentacleKg || 0) + (edit?.stomachKg || 0)
     : edit?.quantityKg || 0;
 
   // FORM NHẬP (form-first) — trước đây nằm trong Dialog, nay render INLINE ở chế độ
@@ -1763,14 +1763,14 @@ export default function WipProductionScreen() {
                   <NumberField
                     label="Râu"
                     unit="kg"
-                    value={edit.componentRauKg ?? null}
-                    onChange={(v) => patchEdit({ componentRauKg: v ?? 0 })}
+                    value={edit.tentacleKg ?? null}
+                    onChange={(v) => patchEdit({ tentacleKg: v ?? 0 })}
                   />
                   <NumberField
                     label="Bao tử"
                     unit="kg"
-                    value={edit.componentBaoTuKg ?? null}
-                    onChange={(v) => patchEdit({ componentBaoTuKg: v ?? 0 })}
+                    value={edit.stomachKg ?? null}
+                    onChange={(v) => patchEdit({ stomachKg: v ?? 0 })}
                   />
                 </div>
               </div>

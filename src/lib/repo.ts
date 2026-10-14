@@ -56,12 +56,15 @@ import { rolesFromCsv, rolesToCsv } from "@/types";
 import { getProductBatterIds, sanitizeBatterKg } from "@/lib/batter";
 import { appendAuditEntries, type NewAuditEntry } from "@/lib/audit";
 import {
+  LEGACY_FIELDS,
   normalizeExportOrderStatus,
   normalizeLotMethod,
   normalizeQcResult,
+  normalizeReconciliationMode,
   normalizeSalesOrderStatus,
   normalizeStorageKind,
   normalizeWipStatus,
+  renameLegacyFields,
 } from "@/lib/legacyValues";
 
 /**
@@ -662,8 +665,8 @@ export const WIP_PRODUCTION_TABLE: TableMapping<WipProductionItem> = {
     note: x.note,
     customer_name: x.customerName ?? "",
     processing_type: x.processingType ?? "",
-    component_rau_kg: x.componentRauKg ?? null,
-    component_bao_tu_kg: x.componentBaoTuKg ?? null,
+    component_rau_kg: x.tentacleKg ?? null,
+    component_bao_tu_kg: x.stomachKg ?? null,
     balancing_period_id: x.balancingPeriodId ?? "",
     operator: x.operator ?? "",
     // Migration 0051 → gửi LUÔN (như leftover_by_material 0038): gửi có điều kiện
@@ -685,25 +688,29 @@ export const WIP_PRODUCTION_TABLE: TableMapping<WipProductionItem> = {
     note: s(r.note),
     customerName: s(r.customer_name),
     processingType: r.processing_type == null ? "" : s(r.processing_type),
-    componentRauKg: r.component_rau_kg == null ? null : Number(r.component_rau_kg),
-    componentBaoTuKg:
+    tentacleKg: r.component_rau_kg == null ? null : Number(r.component_rau_kg),
+    stomachKg:
       r.component_bao_tu_kg == null ? null : Number(r.component_bao_tu_kg),
     balancingPeriodId: s(r.balancing_period_id),
     operator: s(r.operator),
     batterKg: sanitizeBatterKg(r.batter_kg),
   }),
   // Dòng ghi trước 0019/0030/0033/0037/0051 chưa có cột kỳ / khách / chế biến / thành phần / người thao tác / bột → mặc định trống.
-  patchLegacy: (x) => ({
-    ...x,
-    customerName: x.customerName ?? "",
-    processingType: x.processingType ?? "",
-    componentRauKg: x.componentRauKg ?? null,
-    componentBaoTuKg: x.componentBaoTuKg ?? null,
-    balancingPeriodId: x.balancingPeriodId ?? "",
-    operator: x.operator ?? "",
-    batterKg: x.batterKg ?? {},
-    status: normalizeWipStatus(x.status), // bộ đệm / hàng chờ trước Đợt 5 còn "cho-nhap"/"da-nhap" (lib/legacyValues)
-  }),
+  // Bộ đệm / hàng chờ trước 2026-10-14 còn tên trường `componentRauKg/componentBaoTuKg` (lib/legacyValues).
+  patchLegacy: (x0) => {
+    const x = renameLegacyFields(x0, LEGACY_FIELDS.wip);
+    return {
+      ...x,
+      customerName: x.customerName ?? "",
+      processingType: x.processingType ?? "",
+      tentacleKg: x.tentacleKg ?? null,
+      stomachKg: x.stomachKg ?? null,
+      balancingPeriodId: x.balancingPeriodId ?? "",
+      operator: x.operator ?? "",
+      batterKg: x.batterKg ?? {},
+      status: normalizeWipStatus(x.status), // bộ đệm / hàng chờ trước Đợt 5 còn "cho-nhap"/"da-nhap" (lib/legacyValues)
+    };
+  },
 };
 
 /** Chốt ngày sản xuất (bảng riêng, cùng hình dạng DailyLock). */
@@ -1548,6 +1555,16 @@ const parseObj = (v: unknown): Record<string, unknown> => {
  * Bản đối soát hóa đơn đã lưu (màn /doi-soat). file_b64 = file Excel gốc để mở
  * lại chạy lại; options/summary là jsonb. Riêng tư theo tài khoản ép ở tầng app.
  */
+/** jsonb `options` / `summary` lưu trước 2026-10-14 mang tên trường tiếng Việt (`soChuanTen`, `khop`…)
+ *  và giá trị chế độ cũ (`haiBan`…) ⇒ đọc cả hai, ghi tên mới (lib/legacyValues). */
+function readRunOptions(raw: object): ReconciliationRun["options"] {
+  const o = renameLegacyFields(raw as ReconciliationRun["options"], LEGACY_FIELDS.reconciliationOptions);
+  return o.mode ? { ...o, mode: normalizeReconciliationMode(o.mode) } : o;
+}
+function readRunSummary(raw: object): ReconciliationRun["summary"] {
+  return renameLegacyFields(raw as ReconciliationRun["summary"], LEGACY_FIELDS.reconciliationSummary);
+}
+
 export const RECONCILIATION_RUN_TABLE: TableMapping<ReconciliationRun> = {
   table: "reconciliation_runs",
   localKey: "bsf.reconciliation-runs.v1",
@@ -1581,12 +1598,17 @@ export const RECONCILIATION_RUN_TABLE: TableMapping<ReconciliationRun> = {
     threshold: r.threshold == null ? 1 : Number(r.threshold),
     fileName: s(r.file_name),
     fileB64: s(r.file_b64),
-    options: parseObj(r.options) as unknown as ReconciliationRun["options"],
-    summary: parseObj(r.summary) as unknown as ReconciliationRun["summary"],
+    options: readRunOptions(parseObj(r.options)),
+    summary: readRunSummary(parseObj(r.summary)),
     createdAt: s(r.created_at),
     updatedAt: s(r.updated_at),
   }),
-  patchLegacy: (x) => ({ ...x, fileB64: x.fileB64 ?? "" }),
+  patchLegacy: (x) => ({
+    ...x,
+    fileB64: x.fileB64 ?? "",
+    options: readRunOptions(x.options ?? {}),
+    summary: readRunSummary(x.summary ?? {}),
+  }),
   uncachedFields: ["fileB64"],
 };
 

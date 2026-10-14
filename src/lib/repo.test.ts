@@ -4,6 +4,8 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("@/lib/supabase", () => ({ supabase: null, hasSupabase: false, SITE_ID: "test" }));
 
 import {
+  RECONCILIATION_RUN_TABLE,
+  WIP_PRODUCTION_TABLE,
   dropSentKeys,
   docCho,
   compactForAudit,
@@ -186,5 +188,25 @@ describe("compactForAudit — không chép file/chuỗi khổng lồ vào nhật
     expect(g.fileB64).toBe("[file 50 ký tự — không ghi nhật ký]");
     expect((g.options as Record<string, unknown>).note).toBe("[chuỗi 20000 ký tự — không ghi nhật ký]");
     expect(compactForAudit("", "fileB64")).toBe("");
+  });
+});
+
+describe("đọc dữ liệu đã lưu trước khi đổi tên trường (2026-10-14)", () => {
+  it("bản đối soát trên máy chủ: summary/options tên cũ + chế độ cũ", () => {
+    const run = RECONCILIATION_RUN_TABLE.fromRow({
+      id: "r1", threshold: 1, status: "draft",
+      options: { soChuanTen: "PMEM", benThue: ["HDDT"], cheDo: "haiBan", edits: { "a|1|2": 5 } },
+      summary: { soHoaDon: 10, khop: 7, lech: 1, thieu: 2, nguong: 1, savedAt: "t" },
+    });
+    expect(run.options).toEqual({ ledgerSheetName: "PMEM", taxSideSheets: ["HDDT"], mode: "twoVersion", edits: { "a|1|2": 5 } });
+    expect(run.summary).toMatchObject({ invoiceCount: 10, matched: 7, mismatched: 1, missing: 2, threshold: 1 });
+  });
+  it("bộ đệm máy: dòng đối soát + dòng SX mang tên cũ", () => {
+    const run = RECONCILIATION_RUN_TABLE.patchLegacy!({ id: "r1", options: { cheDo: "so" }, summary: { khop: 3 } } as never);
+    expect(run.options.mode).toBe("ledger");
+    expect(run.summary.matched).toBe(3);
+    const wip = WIP_PRODUCTION_TABLE.patchLegacy!({ id: "w1", status: "da-nhap", componentRauKg: 4, componentBaoTuKg: 1 } as never);
+    expect(wip).toMatchObject({ tentacleKg: 4, stomachKg: 1, status: "stocked" });
+    expect("componentRauKg" in wip).toBe(false);
   });
 });

@@ -155,7 +155,7 @@ function SavedRunsBox({
       key: "tom",
       header: "Kết quả (lúc lưu)",
       render: (r) =>
-        `${num(r.summary?.khop ?? 0)} khớp · ${num(r.summary?.lech ?? 0)} lệch · ${num(r.summary?.thieu ?? 0)} chưa`,
+        `${num(r.summary?.matched ?? 0)} khớp · ${num(r.summary?.mismatched ?? 0)} lệch · ${num(r.summary?.missing ?? 0)} chưa`,
     },
     { key: "luc", header: "Lưu lúc", render: (r) => formatDateTime(r.updatedAt), hideOnMobile: true },
     ...(laAdmin
@@ -615,7 +615,7 @@ export default function ReconciliationScreen() {
   const [invoiceFilter, setInvoiceFilter] = useState<InvoiceMatchStatus | "all">("all"); // lọc bảng HĐĐT (điều khiển được từ thẻ tổng)
   const [ledgerMissingOnly, setLedgerMissingOnly] = useState(false); // lọc bảng sổ: chỉ dòng chưa có hóa đơn
   const [isCheckOpen, setIsCheckOpen] = useState(false); // mở khối "Kiểm tra chi tiết"
-  const [mode, setMode] = useState<ReconciliationMode>("so"); // kiểu đối soát đang xem
+  const [mode, setMode] = useState<ReconciliationMode>("ledger"); // kiểu đối soát đang xem
   // Sheet thuộc bản thuế gửi do người dùng chỉ định; null = để máy tự nhận theo tên sheet.
   const [pickedTaxSides, setPickedTaxSides] = useState<string[] | null>(null);
   // Lưu theo tài khoản (v4)
@@ -804,11 +804,11 @@ export default function ReconciliationScreen() {
       threshold: ketQua.threshold,
       fileName: displayName,
       fileB64: b64,
-      options: { soChuanTen: ledgerSheetName, edits, benThue: pickedTaxSides ?? undefined, cheDo: mode },
+      options: { ledgerSheetName, edits, taxSideSheets: pickedTaxSides ?? undefined, mode },
       summary: {
-        soHoaDon: t.invoiceCount, khop: t.matched, lech: t.mismatched, thieu: t.missing, ganKhop: t.nearMatched,
-        soDongPm: t.ledgerRowCount, pmCo: t.ledgerMatched, pmThieu: t.ledgerMissing, tongChenh: t.totalDifference,
-        nguong: ketQua.threshold, savedAt: now,
+        invoiceCount: t.invoiceCount, matched: t.matched, mismatched: t.mismatched, missing: t.missing, nearMatched: t.nearMatched,
+        ledgerRowCount: t.ledgerRowCount, ledgerMatched: t.ledgerMatched, ledgerMissing: t.ledgerMissing, totalDifference: t.totalDifference,
+        threshold: ketQua.threshold, savedAt: now,
       },
       createdAt: prev?.createdAt || now,
       updatedAt: now,
@@ -824,8 +824,8 @@ export default function ReconciliationScreen() {
       const kq0 = reconcile(raw, {
         threshold: run.threshold,
         edits: run.options?.edits,
-        ledgerSheetName: run.options?.soChuanTen,
-        taxSideSheets: run.options?.benThue,
+        ledgerSheetName: run.options?.ledgerSheetName,
+        taxSideSheets: run.options?.taxSideSheets,
       });
       const baseline = kq0.suspects.length + kq0.mergedSuspects.reduce((s, g) => s + g.rowCount, 0);
       setFile(null);
@@ -835,16 +835,16 @@ export default function ReconciliationScreen() {
       setThreshold(run.threshold);
       setEdits(run.options?.edits ?? {});
       setEditLog({});
-      setLedgerSheetName(run.options?.soChuanTen);
+      setLedgerSheetName(run.options?.ledgerSheetName);
       setInitialSuspectCount(baseline);
       setOpenRunId(run.id);
       setWb(raw);
       setTab(kq0.invoiceSheets[0]?.name ?? (kq0.ledgerSheet ? PM_TAB : ""));
       setInvoiceFilter("all");
       setLedgerMissingOnly(false);
-      const savedSides = run.options?.benThue ?? null;
+      const savedSides = run.options?.taxSideSheets ?? null;
       setPickedTaxSides(savedSides);
-      const savedMode = run.options?.cheDo as ReconciliationMode | undefined;
+      const savedMode = run.options?.mode as ReconciliationMode | undefined;
       setMode(savedMode && RECONCILIATION_MODES.includes(savedMode) ? savedMode : modeForFile(kq0, savedSides));
       notify.saved(`Đã mở lại "${run.title}" (${run.status === "official" ? "chính thức" : "nháp"}).`);
     } catch (err) {
@@ -865,10 +865,10 @@ export default function ReconciliationScreen() {
       const result = reconcile(raw, {
         threshold: run.threshold,
         edits: run.options?.edits,
-        ledgerSheetName: run.options?.soChuanTen,
-        taxSideSheets: run.options?.benThue,
+        ledgerSheetName: run.options?.ledgerSheetName,
+        taxSideSheets: run.options?.taxSideSheets,
       });
-      void exportFile({ ...result, taxSideSheets: run.options?.benThue }, run.title || "doi-soat", run.fileB64, run.options?.edits);
+      void exportFile({ ...result, taxSideSheets: run.options?.taxSideSheets }, run.title || "doi-soat", run.fileB64, run.options?.edits);
     } catch (err) {
       notify.error(`Không xuất được: ${err instanceof Error ? err.message : String(err)}`);
     }
@@ -913,18 +913,18 @@ export default function ReconciliationScreen() {
   }
 
   const modeCounts: Record<ReconciliationMode, { chu: string; applicable: boolean }> = {
-    so: ketQua?.ledgerSheet
+    ledger: ketQua?.ledgerSheet
       ? { chu: `${num(ketQua.totals.missing)} chưa vào sổ · ${num(ketQua.totals.mismatched)} lệch tiền · ${num(ketQua.totals.taxMismatched)} lệch thuế`, applicable: true }
       : { chu: "File không có sheet sổ kế toán", applicable: false },
-    haiBan: versionCompare
+    twoVersion: versionCompare
       ? { chu: `${num(versionCompare.totals.sentOnlyCount)} bản tự tải thiếu · ${num(versionCompare.totals.amountMismatchCount)} lệch tiền`, applicable: true }
       : { chu: invoiceSheetNames.length < 2 ? "Cần 2 sheet hóa đơn (thuế gửi + tự tải)" : "Chưa chia được hai bên — bấm để chọn", applicable: false },
-    kiemCong: (() => {
+    columnSum: (() => {
       const items = ketQua?.invoiceSheets.filter((s) => !s.isSubset) ?? [];
       const that = items.reduce((n, s) => n + s.columnSum.rowCounts.realDiff, 0);
       return { chu: that ? `${num(that)} dòng lệch thật` : "Không có dòng lệch thật", applicable: items.length > 0 };
     })(),
-    cungNgay: sameDayGroups.length
+    sameDay: sameDayGroups.length
       ? { chu: `${num(sameDayGroups.length)} nhóm · ${num(sameDayGroups.filter((g) => g.sameAmount).length)} trùng khít tiền`, applicable: true }
       : { chu: "Không có nhóm nào", applicable: false },
   };
@@ -1082,7 +1082,7 @@ export default function ReconciliationScreen() {
             <ReconciliationRulesBox warnings={ketQua.warnings} />
           </section>
 
-          {mode === "haiBan" && (
+          {mode === "twoVersion" && (
             <TwoVersionView
               result={versionCompare}
               tenSheets={invoiceSheetNames}
@@ -1092,10 +1092,10 @@ export default function ReconciliationScreen() {
               onAutoDetect={() => setPickedTaxSides(null)}
             />
           )}
-          {mode === "kiemCong" && <ColumnSumCheckView sheets={ketQua.invoiceSheets} />}
-          {mode === "cungNgay" && <SameDayView nhom={sameDayGroups} />}
+          {mode === "columnSum" && <ColumnSumCheckView sheets={ketQua.invoiceSheets} />}
+          {mode === "sameDay" && <SameDayView nhom={sameDayGroups} />}
 
-          {mode === "so" && (
+          {mode === "ledger" && (
           <>
           {!ketQua.ledgerSheet && (
             <div className="rounded-xl border border-warning/30 bg-warning-surface p-3 text-sm">

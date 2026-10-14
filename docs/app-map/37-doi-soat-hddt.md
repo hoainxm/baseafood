@@ -2,6 +2,7 @@
 covers: src/features/reconciliation/ReconciliationScreen.tsx, src/features/reconciliation/ReconciliationModeView.tsx, src/features/reconciliation/reconciliationMode.ts, src/features/reconciliation/index.ts, src/lib/einvoiceReconciliation.ts, src/lib/twoVersionReconciliation.ts, src/lib/reconciliationExport.ts, src/lib/reconciliationExportShift.ts, src/lib/reconciliationExportSummary.ts, src/lib/reconciliationCommon.ts
 last_verified: 2026-10-14
 ttl_days: 90
+<!-- updated: 2026-10-14 — đổi tên trường engine + dữ liệu lưu sang tiếng Anh (spec quy-uoc-dat-ten): chế độ `ledger/twoVersion/columnSum/sameDay`, `options.{ledgerSheetName,taxSideSheets,mode}`, `summary.{invoiceCount,matched,mismatched,missing,…}`. Bản lưu cũ đọc cả tên cũ (lib/legacyValues). Phần mô tả engine bên dưới còn có chỗ nhắc tên trường cũ (`canDoiCot`, `tong`, `nghiVan`…) — tên hiện hành xem `einvoiceReconciliation.ts`. -->
 <!-- updated: 2026-10-12 — sửa đợt audit (xem mục "v7.1 — sửa sau audit"): dịch công thức vùng có tên sheet · ngoại tệ của sheet tập con/bản tự tải · có sổ + hai bản gối nhau không đếm đôi · MST chuẩn hóa · soVN · ngoại tệ thiếu tỷ giá + dung sai nguyên tệ · lưu ngưỡng · phép kiểm quy đổi · chữ hướng dẫn · ngày sát nửa đêm · gom tiện ích về `reconciliationCommon.ts`. Test: `einvoiceReconciliation.test.ts`, `reconciliationExportShift.test.ts`. CHƯA chạy trên file thật. -->
 <!-- updated: 2026-10-06 — tô màu dòng (mig 0055): CHỈ danh sách "Bản đã lưu" bật `rowMarkKey="doi-soat-ban-luu"`. Các bảng KẾT QUẢ đối soát chưa tô: khoá dòng là `<sheet>#<dòng>` của file đang mở — đổi file là trùng khoá, dấu nhảy sang dòng khác. Đợt sau: khoá theo id bản đối soát đã lưu (`doi-soat|<runId>|…`), chỉ bật khi đang mở bản đã lưu. -->
 <!-- updated: 2026-09-29 — sửa NGÀY LÙI 1 NGÀY: `formatDisplayDate(Date)` làm tròn 10 phút trước khi lấy ngày (SheetJS cellDates dựng Date lệch ~30 giây theo múi giờ ⇒ ở VN ô 01/08 ra 31/07 23:59:30). Kiểm thật TZ VN: "DANH SÁCH HÓA ĐƠN T8" 1.180/1.180 ô ngày lệch → 0; "SO SÁNH GHDON DTU VÀ PMEM" 4.448/4.448 → 0. Chỉ sai ngày HIỂN THỊ/XUẤT — khớp theo ký hiệu+số nên kết quả so không đổi; "cùng MST cùng ngày" cả file cùng lùi nên gom vẫn đúng, chỉ nhãn ngày sai. Giữ cellDates (phần xuất giữ định dạng dựa vào nó). Test `einvoiceDates.test.ts`. -->
@@ -79,17 +80,20 @@ chạy **một lần**, rồi người dùng chọn **"Bạn cần soát việc 
 
 | Kiểu (`ReconciliationMode`, `features/reconciliation/reconciliationMode.ts`) | Nguồn số | Khung xem |
 |---|---|---|
-| `so` — Hóa đơn ⇄ sổ kế toán | `reconcile` (như cũ) | thẻ tổng · chỗ cần soát · bảng theo sheet · tự kiểm |
-| `haiBan` — So hai bản hóa đơn | `compareTwoInvoiceVersions` | chia bên từng sheet · thẻ · lọc chỉ-thuế-có / chỉ-tải-có / lệch / không so được |
-| `kiemCong` — Kiểm cộng cột bảng kê | `InvoiceSheet.canDoiCot` | mỗi sheet: phép cộng có chữ cột, ô tự đặt của kế toán, bảng bóc 4 nguyên nhân, danh sách dòng lệch |
-| `cungNgay` — Cùng MST cùng ngày | `groupSameTaxCodeSameDay` | thẻ · lọc nhóm trùng khít số tiền |
+| `ledger` — Hóa đơn ⇄ sổ kế toán | `reconcile` (như cũ) | thẻ tổng · chỗ cần soát · bảng theo sheet · tự kiểm |
+| `twoVersion` — So hai bản hóa đơn | `compareTwoInvoiceVersions` | chia bên từng sheet · thẻ · lọc chỉ-thuế-có / chỉ-tải-có / lệch / không so được |
+| `columnSum` — Kiểm cộng cột bảng kê | `InvoiceSheet.columnSum` | mỗi sheet: phép cộng có chữ cột, ô tự đặt của kế toán, bảng bóc 4 nguyên nhân, danh sách dòng lệch |
+| `sameDay` — Cùng MST cùng ngày | `groupSameTaxCodeSameDay` | thẻ · lọc nhóm trùng khít số tiền |
 
 - **Màn không tự tính gì** — gọi đúng hàm thuần lớp xuất dùng ⇒ số trên màn = số trong file.
-- Kiểu **mặc định theo file** (`getDefaultReconciliationMode`): có sổ → `so`; có hai bản → `haiBan`; còn lại → `kiemCong`.
-  Lưu bản: `options.cheDo` + `options.benThue` (jsonb, bản cũ thiếu trường ⇒ suy lại theo file).
+- Kiểu **mặc định theo file** (`getDefaultReconciliationMode`): có sổ → `ledger`; có hai bản → `twoVersion`; còn lại → `columnSum`.
+  Lưu bản: `options.mode` + `options.taxSideSheets` (jsonb, bản cũ thiếu trường ⇒ suy lại theo file).
+  Bản lưu trước 2026-10-14 mang tên trường cũ (`cheDo`/`benThue`/`soChuanTen`, `summary.khop`…) và chế độ cũ
+  (`so`/`haiBan`/`kiemCong`/`cungNgay`) — `repo.ts` đọc qua `LEGACY_FIELDS` + `normalizeReconciliationMode`
+  (`lib/legacyValues.ts`), ghi luôn tên mới. Dữ liệu trên máy chủ KHÔNG viết lại.
 - Khối **"Quy tắc máy đang áp dụng"** (`RULES` ở `ReconciliationModeView.tsx`) liệt kê các quy tắc đã chốt ở doc
   này bằng lời thường + kết luận ngoại tệ của chính file. **Chốt quy tắc mới ⇒ thêm một dòng vào `RULES`.**
-- Thẻ "Lệch tiền / thuế" = `tong.lech + tong.lechThue` — hai nhóm **rời nhau** (cùng `trangThai = LECH`),
+- Thẻ "Lệch tiền / thuế" = `totals.mismatched + totals.taxMismatched` — hai nhóm **rời nhau** (cùng `status = LECH`),
   cộng lại mới khớp số ở bộ lọc bảng. Chip dòng: "Lệch thuế" (ketLuan `LỆCH THUẾ`), "Không cần vào sổ" (`isNotBookable`).
 
 ### Chia bản thuế gửi / bản tự tải — `resolveTaxSideSheets`
@@ -602,9 +606,9 @@ Gọn: `reconciliationCommon.ts` gom chữ cột Excel (`columnIndexToLetter`/`c
 
 Trước đây module chỉ import → xử lý → tải về (file-only). v4 cho **lưu bản đối soát theo TÀI KHOẢN** để xem lại/đối chiếu:
 
-- **Bảng `reconciliation_runs`** (0043) + hook `useReconciliationRuns()` (khuôn `useBang` — chạy cả Supabase lẫn localStorage). Lưu: `file_b64` (file Excel gốc base64), `options` {soChuanTen, edits}, `summary` (ảnh chụp 4 nhãn + tổng chênh), `status` 'draft'|'official', `user_id`/owner.
+- **Bảng `reconciliation_runs`** (0043) + hook `useReconciliationRuns()` (khuôn `useBang` — chạy cả Supabase lẫn localStorage). Lưu: `file_b64` (file Excel gốc base64), `options` {ledgerSheetName, edits, taxSideSheets, mode}, `summary` (ảnh chụp 4 nhãn + tổng chênh — `ReconciliationSummary`), `status` 'draft'|'official', `user_id`/owner.
 - **Lưu file gốc BASE64 trong bảng** (không dùng Storage): nằm dưới RLS của bảng (tránh cấu hình ACL Storage theo user — nguồn rò rỉ), và lưu được cả khi offline. File xlsx ~150–420KB base64/bản.
-- **Mở lại** = `sheetsTuBase64(file_b64)` → `reconcile` chạy lại với `threshold`+`edits`+`soChuanTen` đã lưu (round-trip đã kiểm: khớp đọc trực tiếp). **Chính thức** đóng băng `summary` (đối chiếu về sau); mở lại vẫn recompute từ file.
+- **Mở lại** = `sheetsTuBase64(file_b64)` → `reconcile` chạy lại với `threshold`+`edits`+`ledgerSheetName` đã lưu (round-trip đã kiểm: khớp đọc trực tiếp). **Chính thức** đóng băng `summary` (đối chiếu về sau); mở lại vẫn recompute từ file.
 - **Riêng tư theo account ép ở TẦNG APP**: hook lọc `userId === profile.id` (admin xem tất); chưa đăng nhập / chế độ localStorage ⇒ per-máy. RLS server siết `user_id=auth.uid()` để nhánh 0021 (câu sẵn trong 0043). Xóa qua `ConfirmDelete` + toast Hoàn tác.
 - UI: ô "Tên bản" + nút **Lưu nháp** / **Lưu chính thức** (khi có kết quả); card **"Bản đã lưu"** (RecordTable, luôn hiện) với Mở lại / Tải Excel / Xóa. lib thêm `fileSangBase64` / `sheetsTuBase64`.
 

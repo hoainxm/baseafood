@@ -19,6 +19,8 @@ export const LEGACY_VALUES = {
   storageKind: { "noi-bo": "internal", "thue-ngoai": "external" },
   lotMethod: { quet: "scan", go: "typed", chon: "picked" },
   auditAction: { them: "create", sua: "update", xoa: "delete", "dang-nhap": "login", "dang-xuat": "logout", gui: "submit" },
+  /** `reconciliation_runs.options.mode` — kiểu đối soát đang xem khi lưu. */
+  reconciliationMode: { so: "ledger", haiBan: "twoVersion", kiemCong: "columnSum", cungNgay: "sameDay" },
 } as const satisfies Record<string, Record<string, string>>;
 
 type Family = keyof typeof LEGACY_VALUES;
@@ -40,9 +42,47 @@ export const normalizeStorageKind = (v: unknown): StorageKind => normalize("stor
 export const normalizeLotMethod = <M extends LotMethod>(v: unknown): M => normalize("lotMethod", v, "picked") as M;
 /** Nhật ký thao tác: lịch sử KHÔNG sửa (append-only) ⇒ đọc dòng cũ qua đây để hiển thị. */
 export const normalizeAuditAction = (v: unknown): string => normalize("auditAction", v, "");
+/** Kiểu đối soát đã lưu (cũ hoặc mới) → giá trị mới; rỗng ⇒ "" (màn tự chọn mặc định). */
+export const normalizeReconciliationMode = (v: unknown): string => normalize("reconciliationMode", v, "");
 /** Mọi giá trị lưu được của một thao tác (mới + cũ) — để lọc nhật ký trên máy chủ, nơi dòng cũ giữ nguyên. */
 export function auditActionAliases(action: string): string[] {
   const next = normalizeAuditAction(action);
   const olds = Object.entries(LEGACY_VALUES.auditAction).filter(([, v]) => v === next).map(([k]) => k);
   return [next, ...olds];
+}
+
+/**
+ * TÊN TRƯỜNG cũ → mới của dữ liệu ĐÃ LƯU (bộ đệm máy, hàng chờ, jsonb trên máy chủ).
+ * Đổi tên trường trong `types.ts` (2026-10-14) nhưng dòng cũ vẫn mang tên cũ ⇒ đọc qua
+ * `renameLegacyFields`. Ghi luôn dùng tên mới. Cột DB không đổi (`component_rau_kg`…).
+ */
+export const LEGACY_FIELDS = {
+  wip: { componentRauKg: "tentacleKg", componentBaoTuKg: "stomachKg" },
+  reconciliationSummary: {
+    soHoaDon: "invoiceCount",
+    khop: "matched",
+    lech: "mismatched",
+    thieu: "missing",
+    ganKhop: "nearMatched",
+    soDongPm: "ledgerRowCount",
+    pmCo: "ledgerMatched",
+    pmThieu: "ledgerMissing",
+    tongChenh: "totalDifference",
+    nguong: "threshold",
+  },
+  reconciliationOptions: { soChuanTen: "ledgerSheetName", benThue: "taxSideSheets", cheDo: "mode" },
+} as const satisfies Record<string, Record<string, string>>;
+
+/** Bản sao `obj` với tên cũ chuyển sang tên mới (tên mới đã có thì giữ tên mới); bỏ khóa cũ. */
+export function renameLegacyFields<T extends object>(obj: T, fields: Readonly<Record<string, string>>): T {
+  if (!obj || typeof obj !== "object") return obj;
+  const src = obj as Record<string, unknown>;
+  if (!Object.keys(fields).some((k) => k in src)) return obj;
+  const out: Record<string, unknown> = { ...src };
+  for (const [oldKey, newKey] of Object.entries(fields)) {
+    if (!(oldKey in out)) continue;
+    if (out[newKey] === undefined) out[newKey] = out[oldKey];
+    delete out[oldKey];
+  }
+  return out as T;
 }

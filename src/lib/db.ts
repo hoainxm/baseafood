@@ -83,6 +83,10 @@ export function migrateOldLocalStorage(): void {
         nationalId: o.nationalId,
         issuedDate: o.issuedDate,
         issuedPlace: o.issuedPlace,
+        email: "",
+        bankAccount: "",
+        bankName: "",
+        bankBranch: "",
       }),
     },
     {

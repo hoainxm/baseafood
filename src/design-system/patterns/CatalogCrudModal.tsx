@@ -41,6 +41,17 @@ export interface CatalogField<T> {
   hideOnMobile?: boolean;
   /** Cột phụ — ẩn khỏi BẢNG desktop cho gọn, xem qua nút "Chi tiết" cuối dòng */
   hideInTable?: boolean;
+  /**
+   * Nhóm trong hộp Thêm/Sửa (VD "Ghi hóa đơn", "Ngân hàng") — các trường cùng nhóm
+   * đứng chung dưới một tiêu đề nhỏ. Trường liền nhau cùng nhóm mới gộp; bỏ trống ⇒
+   * không tiêu đề.
+   */
+  group?: string;
+  /**
+   * Bề ngang trong lưới hộp Thêm/Sửa (2 cột từ sm; từ lg 3 cột, hoặc 4 cột khi danh
+   * mục có chia `group`). Mặc định một ô; `wide` = 2 ô; `full` = trọn hàng.
+   */
+  span?: "wide" | "full";
 }
 
 /**
@@ -224,6 +235,18 @@ export function CatalogCrud<T extends { id: string }>({
   );
 }
 
+/** Gom các trường LIỀN NHAU cùng `group` thành một khối (giữ thứ tự khai báo). */
+function groupFields<T>(fields: CatalogField<T>[]): { group: string; items: CatalogField<T>[] }[] {
+  const out: { group: string; items: CatalogField<T>[] }[] = [];
+  for (const f of fields) {
+    const g = f.group ?? "";
+    const last = out[out.length - 1];
+    if (last && last.group === g) last.items.push(f);
+    else out.push({ group: g, items: [f] });
+  }
+  return out;
+}
+
 /**
  * Hộp thoại Thêm / Sửa MỘT bản ghi danh mục theo bộ trường `fields` — cùng một
  * dáng ở màn Danh mục (CatalogCrud) và ở hộp SỬA NHANH mở từ bút chì trong ô
@@ -275,28 +298,62 @@ export function CatalogEditDialog<T extends { id: string }>({
         {editing && (
           <div className="space-y-5 py-2">
             <ErrorSummary errors={errors} />
-            {fields.map((f) => {
-              const value = String(editing[f.key] ?? "");
-              if (lockedField?.key === f.key)
-                return (
-                  <Field key={f.key} label={f.label} hint={lockedField.reason}>
-                    <Input value={value} readOnly aria-readonly className="bg-muted" />
-                  </Field>
-                );
-              const changeValue = (v: string) =>
-                onChange((d) => (d ? { ...d, [f.key]: v } : d));
-              return f.render ? (
-                <div key={f.key}>{f.render(value, changeValue, !isAdding)}</div>
-              ) : (
-                <Field key={f.key} label={f.label} required={f.required} hint={f.hint}>
-                  <Input
-                    value={value}
-                    onChange={(e) => changeValue(e.target.value)}
-                    placeholder={f.example}
-                  />
-                </Field>
-              );
-            })}
+            {/* GỌN theo chiều dọc (2026-10-14): trường xếp LƯỚI 2 cột (sm) / 3 cột (lg),
+                gom theo `group` dưới tiêu đề nhỏ — thay cho một cột dài phải cuộn. */}
+            {(() => {
+              // Danh mục chia nhóm (nhiều trường ngắn như đại lý) ⇒ 4 cột ở lg cho đỡ dài.
+              const isGrouped = fields.some((f) => f.group);
+              const gridClass = isGrouped
+                ? "grid gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-4"
+                : "grid gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-3";
+              const spanClass = (f: CatalogField<T>) =>
+                f.span === "wide"
+                  ? "sm:col-span-2"
+                  : f.span === "full"
+                    ? isGrouped
+                      ? "sm:col-span-2 lg:col-span-4"
+                      : "sm:col-span-2 lg:col-span-3"
+                    : undefined;
+              return groupFields(fields).map(({ group, items }, gi) => (
+              <section key={`${group}-${gi}`} className="space-y-3">
+                {group && (
+                  <h3 className="border-b border-border pb-1 text-sm font-semibold text-muted-foreground">
+                    {group}
+                  </h3>
+                )}
+                <div className={gridClass}>
+                  {items.map((f) => {
+                    const value = String(editing[f.key] ?? "");
+                    if (lockedField?.key === f.key)
+                      return (
+                        <div key={f.key} className={spanClass(f)}>
+                          <Field label={f.label} hint={lockedField.reason}>
+                            <Input value={value} readOnly aria-readonly className="bg-muted" />
+                          </Field>
+                        </div>
+                      );
+                    const changeValue = (v: string) =>
+                      onChange((d) => (d ? { ...d, [f.key]: v } : d));
+                    return (
+                      <div key={f.key} className={spanClass(f)}>
+                        {f.render ? (
+                          f.render(value, changeValue, !isAdding)
+                        ) : (
+                          <Field label={f.label} required={f.required} hint={f.hint}>
+                            <Input
+                              value={value}
+                              onChange={(e) => changeValue(e.target.value)}
+                              placeholder={f.example}
+                            />
+                          </Field>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+              ));
+            })()}
           </div>
         )}
 

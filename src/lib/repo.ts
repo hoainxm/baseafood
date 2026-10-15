@@ -161,6 +161,11 @@ export const SUPPLIER_TABLE: TableMapping<Supplier> = {
     national_id: x.nationalId,
     issued_date: x.issuedDate,
     issued_place: x.issuedPlace,
+    // 0061 — PHẢI chạy migration trước khi bản app gửi 4 cột này lên (cột lạ ⇒ kẹt hàng chờ).
+    email: x.email ?? "",
+    bank_account: x.bankAccount ?? "",
+    bank_name: x.bankName ?? "",
+    bank_branch: x.bankBranch ?? "",
   }),
   fromRow: (r) => ({
     id: s(r.id),
@@ -172,7 +177,19 @@ export const SUPPLIER_TABLE: TableMapping<Supplier> = {
     issuedDate: r.issued_date == null ? "" : s(r.issued_date),
     issuedPlace: r.issued_place == null ? "" : s(r.issued_place),
     phone: s(r.phone),
+    email: r.email == null ? "" : s(r.email),
+    bankAccount: r.bank_account == null ? "" : s(r.bank_account),
+    bankName: r.bank_name == null ? "" : s(r.bank_name),
+    bankBranch: r.bank_branch == null ? "" : s(r.bank_branch),
     note: s(r.note),
+  }),
+  // Bản sao dưới máy ghi trước 0061 chưa có 4 trường liên hệ / ngân hàng.
+  patchLegacy: (x) => ({
+    ...x,
+    email: x.email ?? "",
+    bankAccount: x.bankAccount ?? "",
+    bankName: x.bankName ?? "",
+    bankBranch: x.bankBranch ?? "",
   }),
 };
 

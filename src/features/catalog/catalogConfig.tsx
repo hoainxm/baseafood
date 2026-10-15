@@ -337,49 +337,68 @@ export function buildCatalogFields(
     },
   ];
 
+  // Thứ tự = thứ tự trong hộp Thêm/Sửa: chia NHÓM, lưới nhiều cột (gọn chiều dọc).
   const supplierFields: CatalogField<Supplier>[] = [
-    { key: "shortName", label: "Tên đại lý (gọi tắt)", required: true, example: "VD: Hồng Phú" },
+    // Hàng 1 — gọi tên + liên hệ
+    { key: "shortName", group: "Đại lý", label: "Tên đại lý (gọi tắt)", required: true, example: "VD: Hồng Phú" },
+    {
+      key: "code",
+      group: "Đại lý",
+      hideInTable: true,
+      label: "Mã số gọi nhanh",
+      hideOnMobile: true,
+      example: "VD: 1 — gõ ở Nhập hàng ra tên",
+    },
+    { key: "phone", group: "Đại lý", label: "Điện thoại", hideOnMobile: true, example: "VD: 0913 xxx xxx" },
+    { key: "email", group: "Đại lý", hideInTable: true, label: "Email", hideOnMobile: true, example: "VD: tenmien@gmail.com" },
+    // Hàng 2–3 — thông tin ghi trên hóa đơn / phiếu
     {
       key: "billingName",
+      group: "Ghi hóa đơn",
+      span: "wide",
       label: "Tên ghi phiếu (đầy đủ)",
       example: "VD: Công ty TNHH TM Hồng Phú",
     },
+    { key: "nationalId", group: "Ghi hóa đơn", label: "MST / CCCD", hideOnMobile: true, example: "VD: 3500424848" },
+    {
+      key: "issuedDate",
+      group: "Ghi hóa đơn",
+      hideInTable: true,
+      label: "Ngày cấp CCCD",
+      hideOnMobile: true,
+      example: "VD: 12/05/2015",
+    },
     {
       key: "address",
+      group: "Ghi hóa đơn",
+      span: "wide",
       hideInTable: true,
       label: "Địa chỉ",
       hideOnMobile: true,
       example: "Số nhà, đường, phường, tỉnh",
     },
     {
-      key: "nationalId",
-      label: "CMND / CCCD / MST",
-      hideOnMobile: true,
-      example: "VD: 3500424848",
-    },
-    { key: "issuedDate", hideInTable: true, label: "Ngày cấp", hideOnMobile: true, example: "VD: 12/05/2015" },
-    {
       key: "issuedPlace",
+      group: "Ghi hóa đơn",
+      span: "wide",
       hideInTable: true,
-      label: "Nơi cấp",
+      label: "Nơi cấp CCCD",
       hideOnMobile: true,
       example: "VD: CA Bà Rịa - Vũng Tàu",
     },
+    // Hàng 4 — chuyển khoản
+    { key: "bankAccount", group: "Chuyển khoản", hideInTable: true, label: "Số tài khoản", hideOnMobile: true, example: "VD: 1914845758" },
+    { key: "bankName", group: "Chuyển khoản", hideInTable: true, label: "Ngân hàng", hideOnMobile: true, example: "VD: VPBank" },
+    { key: "bankBranch", group: "Chuyển khoản", span: "wide", hideInTable: true, label: "Chi nhánh", hideOnMobile: true, example: "VD: CN Kiên Giang" },
+    // Hàng 5
     {
-      key: "code",
+      key: "note",
+      span: "full",
       hideInTable: true,
-      label: "Mã số",
+      label: "Ghi chú",
       hideOnMobile: true,
-      hint: "Nhập số để gọi nhanh. Gõ số này ở màn Nhập hàng là ra tên.",
-      example: "VD: 1",
+      example: "Tài khoản phụ, tên gọi khác, xe hay chở…",
     },
-    {
-      key: "phone",
-      label: "Điện thoại",
-      hideOnMobile: true,
-      example: "VD: 0913 xxx xxx",
-    },
-    { key: "note", hideInTable: true, label: "Ghi chú", hideOnMobile: true, example: "Ghi chú thêm" },
   ];
 
   const materialTypeFields: CatalogField<MaterialType>[] = [
@@ -548,9 +567,14 @@ export function buildCatalogConfigs(
         issuedDate: "",
         issuedPlace: "",
         phone: "",
+        email: "",
+        bankAccount: "",
+        bankName: "",
+        bankBranch: "",
         note: "",
       }),
-      getSearchText: (r) => `${r.code} ${r.shortName} ${r.billingName} ${r.address} ${r.phone}`,
+      getSearchText: (r) =>
+        `${r.code} ${r.shortName} ${r.billingName} ${r.address} ${r.phone} ${r.nationalId} ${r.email} ${r.bankAccount}`,
       getRecordDescription: (r) => r.shortName,
       nameField: "shortName",
       linkedByName: true, // import_shipments.supplier_name

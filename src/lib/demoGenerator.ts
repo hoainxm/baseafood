@@ -251,6 +251,11 @@ export function generateDemoBundle(n: DemoSource, tc: DemoOptions): DemoBundle {
       issuedDate: "",
       issuedPlace: "",
       phone: anonymize ? "" : original?.phone ?? "",
+      // Tài khoản ngân hàng / email là dữ liệu thật của đối tác — demo không chép sang.
+      email: "",
+      bankAccount: "",
+      bankName: "",
+      bankBranch: "",
       note: "Dữ liệu demo",
     };
   });

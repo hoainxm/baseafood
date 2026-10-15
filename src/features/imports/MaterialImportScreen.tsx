@@ -304,6 +304,10 @@ export default function MaterialImportScreen() {
         issuedDate: "",
         issuedPlace: "",
         phone: "",
+        email: "",
+        bankAccount: "",
+        bankName: "",
+        bankBranch: "",
         note: "",
       },
     ]);

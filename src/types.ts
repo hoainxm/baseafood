@@ -277,6 +277,11 @@ export interface Supplier {
   issuedDate: string;
   issuedPlace: string;
   phone: string;
+  /** 0061 — liên hệ + chuyển khoản, chép từ hóa đơn GTGT của đại lý. */
+  email: string;
+  bankAccount: string;
+  bankName: string;
+  bankBranch: string;
   note: string;
 }
 

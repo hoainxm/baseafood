@@ -486,7 +486,7 @@ theo màu**, không tự viết class màu lên nút.
 | Chọn khoảng ngày | `DateRangeField` (hai ô riêng Từ / Đến) |
 | Danh sách bản ghi | `RecordTable` — truyền `getSortValue` cho cột để bấm tiêu đề sắp xếp, truyền `getSearchText` để hiện ô tìm |
 | Nhập nhiều ô số một lúc (lưới ngày) | `EditableGrid` — cột tổng luôn `kind: "computed"` |
-| Danh mục có Thêm/Sửa/Xóa/Tìm | `CatalogCrud` — nhận `loading` để hiện `TableSkeleton` trong lúc tải, vẫn giữ header + nút Thêm |
+| Danh mục có Thêm/Sửa/Xóa/Tìm | `CatalogCrud` — nhận `loading` để hiện `TableSkeleton` trong lúc tải, vẫn giữ header + nút Thêm. Hộp Thêm/Sửa (`CatalogEditDialog`) xếp trường thành **lưới** 2 cột (sm) / 3 cột (lg); danh mục nhiều trường ngắn khai `CatalogField.group` (tiêu đề nhóm) ⇒ 4 cột ở lg; trường chữ dài khai `span: "wide"` (2 ô) / `"full"` (trọn hàng) — đừng để form một cột dài phải cuộn (2026-10-15) |
 | Xóa bất kỳ thứ gì | `ConfirmDelete` |
 | Thao tác hệ trọng không phải xóa (đăng xuất · chốt sổ · ghi đè · lệnh xuất) | `ConfirmAction` — nêu đích danh việc sắp làm + hệ quả, nút an toàn đứng trước |
 | Form > 5 ô, nhập không thường xuyên | `StepForm` |

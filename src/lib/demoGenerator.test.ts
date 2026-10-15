@@ -11,7 +11,7 @@ const makeImport = (i: number, workshop: MaterialImportItem["workshop"], materia
   id: `n${i}`, shipmentId: `c${i}`, deliveryDate: "2026-09-01", workshop, category: "Mực", supplierName: supplier,
   materialTypeName: material, quantityKg: kg, unitPrice: 55_000, driverName: "", licensePlate: "", note: "",
 });
-const makeSupplier = (name: string): Supplier => ({ id: `s-${name}`, code: "", shortName: name, billingName: `Cơ sở ${name}`, address: "12 Lê Lợi", nationalId: "0123", issuedDate: "", issuedPlace: "", phone: "0909555111", note: "" });
+const makeSupplier = (name: string): Supplier => ({ id: `s-${name}`, code: "", shortName: name, billingName: `Cơ sở ${name}`, address: "12 Lê Lợi", nationalId: "0123", issuedDate: "", issuedPlace: "", phone: "0909555111", email: "", bankAccount: "", bankName: "", bankBranch: "", note: "" });
 
 const SOURCE: DemoSource = {
   products: [makeProduct("p1", "m1"), makeProduct("p2", "m1"), makeProduct("p3", "m2"), makeProduct("p4", "m2")],

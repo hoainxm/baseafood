@@ -2,6 +2,9 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  canOnRow,
+  rowInScope,
+  scopeContextFor,
   LEGACY_ROLE_PERMISSIONS,
   buildRolePermissions,
   buildUserOverrides,
@@ -301,5 +304,39 @@ describe("Đợt 2 — ma trận đọc từ DB (mig 0062)", () => {
     expect(opts.find((o) => o.value === "accountant")?.label).toBe("Kế toán");
     expect(roleNames(["accountant", "role-plan"], [role("role-plan", "Phòng kế hoạch")])).toBe("Kế toán, Phòng kế hoạch");
     expect(roleNames([], [])).toBe("Chưa gán");
+  });
+});
+
+describe("phạm vi dữ liệu — Đợt 5", () => {
+  it("ma trận: quản đốc GHI theo xưởng ở SX/Đóng gói/QC/Kho, XEM cả 3 xưởng; tổ trưởng ghi SX theo dòng mình", () => {
+    const m = resolveFor(["manager-ca"]);
+    for (const r of ["wip", "packaging", "qc"]) {
+      expect(scopeOf(m, r, "view"), r).toBe("all");
+      expect(scopeOf(m, r, "update"), r).toBe("workshop");
+    }
+    expect(scopeOf(m, "wip", "unlock")).toBe("workshop");
+    expect(scopeOf(m, "warehouse", "approve")).toBe("workshop");
+    expect(scopeOf(m, "wip", "export")).toBe("all");
+    const tl = resolveFor(["team-leader"]);
+    expect(scopeOf(tl, "wip", "update")).toBe("own");
+    expect(scopeOf(tl, "packaging", "update")).toBe("all"); // đóng gói không lưu người ghi
+  });
+
+  it("scopeContextFor: xưởng suy từ vai trò quản đốc; tên từ họ tên + tên đăng nhập", () => {
+    expect(scopeContextFor(["vice-director", "manager-dong"], " Hạnh ", "ttmhanh")).toEqual({ workshops: ["Đông"], identities: ["Hạnh", "ttmhanh"] });
+    expect(scopeContextFor(["accountant"]).workshops).toEqual([]);
+  });
+
+  it("rowInScope / canOnRow: ngoài phạm vi ⇒ false; thiếu cột ⇒ theo quyền chung; own khi thêm luôn được", () => {
+    const ctx = scopeContextFor(["manager-kho"], "A", "a");
+    expect(rowInScope("workshop", ctx, { workshop: "Khô" })).toBe(true);
+    expect(rowInScope("workshop", ctx, { workshop: "Đông" })).toBe(false);
+    expect(rowInScope("workshop", ctx, {})).toBe(true);
+    expect(rowInScope("own", ctx, { operator: "B" })).toBe(false);
+    expect(rowInScope("own", ctx, { operator: "B" }, "create")).toBe(true);
+    const p = resolveFor(["manager-kho"]);
+    expect(canOnRow(p, ctx, "wip", "delete", { workshop: "Khô" })).toBe(true);
+    expect(canOnRow(p, ctx, "wip", "delete", { workshop: "Cá" })).toBe(false);
+    expect(canOnRow(p, ctx, "imports", "view", {})).toBe(false); // không có quyền thì phạm vi không cứu
   });
 });

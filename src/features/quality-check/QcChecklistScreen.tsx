@@ -27,7 +27,7 @@ import {
   type ChoiceOption,
   TimeSeriesChart,
 } from "@/design-system";
-import { useCan } from "@/features/shared/PermissionProvider";
+import { useCan, useCanOnRow } from "@/features/shared/PermissionProvider";
 import { Camera, Lock, Plus, X } from "lucide-react";
 
 const WORKSHOP_OPTIONS: ChoiceOption[] = [
@@ -78,6 +78,8 @@ export default function QcChecklistScreen() {
   /** Phân quyền lớp 2 (spec role-permissions §5): không thêm lẫn sửa ⇒ chỉ xem kết quả. */
   const allowed = useCan("qc");
   const canWrite = allowed.create || allowed.update;
+  /** Phạm vi Đợt 5 (spec §3c): quản đốc chấm / chốt / mở lại QC xưởng mình, xem mọi xưởng. */
+  const canRow = useCanOnRow("qc");
 
   const [date, setDate] = useState(todayISO());
   const [workshop, setWorkshop] = useState<Workshop>("Đông");
@@ -94,6 +96,12 @@ export default function QcChecklistScreen() {
     [locks, date, workshop]
   );
   const isLocked = Boolean(lock);
+  const scopeRow = { workshop };
+  /** Ghi được (ngày × xưởng) đang chọn — phạm vi "all" ⇒ trùng `canWrite`. */
+  const canWriteDay = canRow("create", scopeRow, "create") || canRow("update", scopeRow);
+  const writableWorkshops = WORKSHOP_OPTIONS.map((o) => o.value).filter(
+    (w) => canRow("create", { workshop: w }, "create") || canRow("update", { workshop: w })
+  );
   const isBackdate = isLocked || isBackdatedQc(date, todayISO());
 
   // Đổi (ngày × xưởng) hoặc dữ liệu tải xong → nạp lại bảng chấm điểm từ sổ.
@@ -254,14 +262,14 @@ export default function QcChecklistScreen() {
           )}
         </div>
         {isLocked ? (
-          allowed.unlock && (
+          canRow("unlock", scopeRow) && (
           <Button
             title="Mở khóa lại ngày QC đã chốt để sửa hoặc chấm bù." variant="edit" size="lg" onClick={reopen}>
             Mở lại ngày
           </Button>
           )
         ) : (
-          allowed.lock && (
+          canRow("lock", scopeRow) && (
           <Button
             title="Khóa sổ QC ngày này. Sau khi chốt muốn sửa phải mở lại ngày." variant="lock" size="lg" onClick={lockDay}>
             <Lock aria-hidden />
@@ -290,7 +298,13 @@ export default function QcChecklistScreen() {
       )}
 
       {/* Ghi bù: ngày cũ hoặc ngày đã chốt → bắt lý do */}
-      {canWrite && isBackdate && (
+      {canWrite && !canWriteDay && writableWorkshops.length > 0 && (
+        <p className="text-base text-muted-foreground">
+          Bạn chỉ ghi được xưởng {writableWorkshops.join(", ")} — xưởng {workshop} chỉ xem.
+        </p>
+      )}
+
+      {canWriteDay && isBackdate && (
         <Field
           label="Lý do ghi bù"
           required
@@ -309,7 +323,7 @@ export default function QcChecklistScreen() {
       )}
 
       {/* Chỉ xem: liệt kê kết quả đã chấm, không có ô nhập */}
-      {!canWrite ? (
+      {!canWriteDay ? (
         scoredRows.length === 0 ? (
           <EmptyState title="Chưa chấm QC ngày này" description={`${formatDateVN(date)} · xưởng ${workshop}`} />
         ) : (
@@ -375,7 +389,7 @@ export default function QcChecklistScreen() {
       )}
 
       {/* Thêm chỉ tiêu tại chỗ */}
-      {canWrite && (
+      {canWriteDay && (
       <div className="flex flex-wrap items-end gap-3 rounded-xl border-2 border-dashed border-border p-4">
         <Field label="Thêm chỉ tiêu khác" className="min-w-[min(15rem,100%)] flex-1">
           <Input
@@ -399,7 +413,7 @@ export default function QcChecklistScreen() {
       )}
 
       {/* Lưu — không bao giờ disabled (thiếu thì báo qua toast); không quyền thì không có nút */}
-      {canWrite && (
+      {canWriteDay && (
       <div className="flex justify-end">
         <Button variant="save"
           title="Ghi điểm của toàn bộ chỉ tiêu vào sổ QC ngày đang chọn." size="lg" onClick={save}>

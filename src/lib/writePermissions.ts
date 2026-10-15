@@ -11,7 +11,16 @@
 // ở MỘT trong các màn đó là đủ (VD Cân đối ghi lại `production_wips`, Đơn đặt ghi
 // `sales_items`). Đợt 4 siết ma trận thì luật này vẫn đúng; muốn mịn hơn (theo cột)
 // thì sửa ở đây.
-import { PERMISSION_ACTION_LABELS, can, getResource, type EffectivePermissions, type PermissionAction } from "@/lib/permissions";
+import {
+  EMPTY_SCOPE_CONTEXT,
+  PERMISSION_ACTION_LABELS,
+  getResource,
+  rowInScope,
+  scopeOf,
+  type EffectivePermissions,
+  type PermissionAction,
+  type ScopeContext,
+} from "@/lib/permissions";
 
 type Row = Record<string, unknown>;
 
@@ -138,21 +147,32 @@ export interface WriteDenial {
 export function checkTableWrite(
   perms: EffectivePermissions,
   table: string,
-  changes: readonly RowChange[]
+  changes: readonly RowChange[],
+  ctx: ScopeContext = EMPTY_SCOPE_CONTEXT
 ): WriteDenial | null {
   if (perms.isAdmin || !changes.length) return null;
   const rule = TABLE_WRITE_RULES[table];
   if (!rule) return null;
   for (const c of changes) {
     const reqs = rule(c);
-    if (reqs.some(([r, a]) => can(perms, r, a))) continue;
+    // Phạm vi (Đợt 5): dòng TRƯỚC và SAU đều phải trong phạm vi — không "dời" dòng xưởng
+    // khác về xưởng mình, không sửa dòng người khác ghi.
+    const ok = reqs.some(([r, a]) => {
+      const scope = scopeOf(perms, r, a);
+      return scope !== null && rowInScope(scope, ctx, c.prev, c.kind) && rowInScope(scope, ctx, c.next, c.kind);
+    });
+    if (ok) continue;
     const [resource, action] = reqs[0];
     const label = getResource(resource)?.label ?? resource;
+    const hasActionSomewhere = reqs.some(([r, a]) => scopeOf(perms, r, a) !== null);
+    const row = (c.next ?? c.prev) as { workshop?: unknown } | undefined;
     return {
       table,
       resource,
       action,
-      message: `Bạn không có quyền ${PERMISSION_ACTION_LABELS[action].toLowerCase()} ở ${label} — thao tác chưa được lưu. Cần quyền thì báo quản trị viên.`,
+      message: hasActionSomewhere
+        ? `Dòng này ngoài phạm vi của bạn${typeof row?.workshop === "string" && row.workshop ? ` (xưởng ${row.workshop})` : ""} — bạn chỉ ${PERMISSION_ACTION_LABELS[action].toLowerCase()} được dòng của xưởng mình / do mình ghi. Thao tác chưa được lưu.`
+        : `Bạn không có quyền ${PERMISSION_ACTION_LABELS[action].toLowerCase()} ở ${label} — thao tác chưa được lưu. Cần quyền thì báo quản trị viên.`,
     };
   }
   return null;

@@ -55,7 +55,7 @@ import {
   type ComboboxOption,
 } from "@/design-system";
 import { useQuickCatalogEdit } from "@/features/catalog/QuickCatalogEdit";
-import { useCan } from "@/features/shared/PermissionProvider";
+import { useCan, useCanOnRow } from "@/features/shared/PermissionProvider";
 import { kg, num, todayISO, formatDateVN } from "@/lib/format";
 import { PERIOD_OPTIONS, getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
 import { Boxes, CalendarRange, Link2, Package, PackageCheck, Plus, QrCode, Scale } from "lucide-react";
@@ -90,6 +90,11 @@ export default function PackagingScreen() {
   /** Phân quyền lớp 2 (spec role-permissions §5): gắn lô BTP = thêm/sửa trên "packaging". */
   const allowed = useCan("packaging");
   const canWrite = allowed.create || allowed.update;
+  /** Phạm vi Đợt 5 (spec §3c): quản đốc chỉ ghi / xóa phiếu xưởng mình. Phạm vi "all" ⇒ trùng `allowed`. */
+  const canRow = useCanOnRow("packaging");
+  const canCreateIn = (w: Workshop) => canRow("create", { workshop: w }, "create");
+  const writableWorkshops = WORKSHOPS.filter(canCreateIn);
+  const canAdd = allowed.create && writableWorkshops.length > 0;
 
   const [period, setPeriod] = useState<ViewPeriod>("day");
   const [date, setDate] = useState(todayISO());
@@ -166,7 +171,8 @@ export default function PackagingScreen() {
   const openAdd = () => {
     setForm({
       date: postingDate,
-      workshop: recordWorkshop,
+      // Quản đốc: phiếu mới mở ở xưởng mình nếu xưởng đang lọc ngoài phạm vi.
+      workshop: canCreateIn(recordWorkshop) ? recordWorkshop : (writableWorkshops[0] ?? recordWorkshop),
       fromProductId: "",
       fromSpec: "",
       inputKg: 0,
@@ -272,7 +278,7 @@ export default function PackagingScreen() {
       header: "",
       render: (r) => (
         <div className="flex flex-wrap gap-2">
-          {canWrite && (
+          {(canRow("create", r) || canRow("update", r)) && (
           <Button
             title="Ghi phiếu này đã đóng từ lô bán thành phẩm nào (quét tem, gõ mã, hoặc chọn). Có lô thì mới truy được nguồn của thành phẩm."
             variant={countLotInputs(r.id) ? "outline" : "default"}
@@ -292,7 +298,7 @@ export default function PackagingScreen() {
             <QrCode />
             Tem
           </Button>
-          {allowed.delete && (
+          {canRow("delete", r) && (
           <Button
             title="Xóa phiếu đóng gói này. Tồn bán thành phẩm và tồn thành phẩm sẽ được tính lại." variant="danger" size="sm" onClick={() => remove(r)}>
             Xóa
@@ -315,7 +321,7 @@ export default function PackagingScreen() {
             Bán thành phẩm (còn khuôn đá) → đóng gói thành thành phẩm sẵn bán. Đóng gói trừ tồn dự trữ, cộng tồn thành phẩm.
           </p>
         </div>
-        {allowed.create && (
+        {canAdd && (
         <Button
           title="Ghi một phiếu đóng gói: trừ bán thành phẩm đem đóng, cộng thành phẩm ra, phần chênh là hao hụt." size="lg" onClick={openAdd}>
           <Plus />
@@ -405,7 +411,7 @@ export default function PackagingScreen() {
           icon={Package}
           title="Chưa có phiếu đóng gói"
           description={
-            allowed.create
+            canAdd
               ? "Bấm “Ghi phiếu đóng gói” để chuyển bán thành phẩm thành thành phẩm đóng gói."
               : undefined
           }
@@ -437,7 +443,7 @@ export default function PackagingScreen() {
                   clearable={false}
                   value={form.workshop}
                   onChange={(v) => setField("workshop", v as Workshop)}
-                  options={WORKSHOPS.map((p) => ({ value: p, label: p }))}
+                  options={writableWorkshops.map((p) => ({ value: p, label: p }))}
                 />
               </div>
 

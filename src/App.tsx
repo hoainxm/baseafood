@@ -35,7 +35,9 @@ import {
   homeRoutesFromAppRoles,
   resolvePermissions,
   roleNames,
+  scopeContextFor,
   visibleNavIds,
+  EMPTY_SCOPE_CONTEXT,
 } from "@/lib/permissions";
 import { IS_DEMO, setDemoMode } from "@/lib/demoMode";
 import { setWriteGuard } from "@/lib/repo";
@@ -133,20 +135,25 @@ function ShellLayout() {
   // Chốt quyền GHI (lớp 3): chỉ khi đăng nhập máy chủ + đã có hồ sơ. Chạy localStorage /
   // đọc hồ sơ lỗi ⇒ không chốt (giữ hành vi cũ, máy chủ vẫn chặn bằng RLS).
   const isWriteGuarded = auth.requiresLogin && !!profile;
+  // Phạm vi dòng (Đợt 5): xưởng của quản đốc + tên ở cột "người ghi".
+  const scopeContext = useMemo(
+    () => (profile ? scopeContextFor(profile.roles, profile.fullName, profile.username) : EMPTY_SCOPE_CONTEXT),
+    [profile]
+  );
   useEffect(() => {
     if (!isWriteGuarded) {
       setWriteGuard(null);
       return;
     }
     setWriteGuard((table, changes) => {
-      const denial = checkTableWrite(permissions, table, changes);
+      const denial = checkTableWrite(permissions, table, changes, scopeContext);
       if (!denial) return true;
       console.warn("[permissions] Chặn ghi", denial.table, denial.resource, denial.action);
       notify.error(denial.message);
       return false;
     });
     return () => setWriteGuard(null);
-  }, [isWriteGuarded, permissions]);
+  }, [isWriteGuarded, permissions, scopeContext]);
 
   const roles = profile?.roles ?? [];
   const visible = visibleNavIds(permissions);
@@ -201,7 +208,7 @@ function ShellLayout() {
           }
         />
       ) : (
-        <PermissionProvider permissions={permissions}>
+        <PermissionProvider permissions={permissions} scopeContext={scopeContext}>
           {/* Tô màu dòng "đã dò" — một nguồn row_marks cho mọi bảng (prop `rowMarkKey`). */}
           <RowMarkProvider username={username ?? ""}>
             <DemoModeBanner />

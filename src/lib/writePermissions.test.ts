@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import * as repo from "./repo";
-import { DEFAULT_ROLE_PERMISSIONS, PERMISSION_RESOURCES, resolvePermissions, type PermissionGrant } from "./permissions";
+import { DEFAULT_ROLE_PERMISSIONS, PERMISSION_RESOURCES, resolvePermissions, scopeContextFor, type PermissionGrant } from "./permissions";
 import { TABLE_WRITE_RULES, checkTableWrite, type RowChange } from "./writePermissions";
 import type { Role } from "@/types";
 
@@ -100,5 +100,55 @@ describe("checkTableWrite", () => {
     const denial = checkTableWrite(p, "sales_items", [create(), remove()]);
     expect(denial).toMatchObject({ table: "sales_items", resource: "sales", action: "delete" });
     expect(denial?.message).toContain("xóa ở Bán hàng");
+  });
+});
+
+describe("phạm vi dòng — Đợt 5 (xưởng mình / dòng mình ghi)", () => {
+  const eastManager = perms(["manager-dong"]);
+  const eastCtx = scopeContextFor(["manager-dong"], "Lê Văn Đông", "lvdong");
+  const leader = perms(["team-leader"]);
+  const leaderCtx = scopeContextFor(["team-leader"], "Trần Thị Tổ", "tttto");
+
+  it("quản đốc Đông ghi / sửa / xóa / chốt / mở lại được xưởng Đông", () => {
+    expect(checkTableWrite(eastManager, "production_wips", [create({ workshop: "Đông" })], eastCtx)).toBeNull();
+    expect(checkTableWrite(eastManager, "production_wips", [update({ workshop: "Đông", kg: 1 }, { workshop: "Đông", kg: 2 })], eastCtx)).toBeNull();
+    expect(checkTableWrite(eastManager, "production_wips", [remove({ workshop: "Đông" })], eastCtx)).toBeNull();
+    expect(checkTableWrite(eastManager, "production_locks", [create({ workshop: "Đông", isLocked: true })], eastCtx)).toBeNull();
+    expect(checkTableWrite(eastManager, "production_locks", [update({ workshop: "Đông", isLocked: true }, { workshop: "Đông", isLocked: false })], eastCtx)).toBeNull();
+    expect(checkTableWrite(eastManager, "qc_locks", [create({ workshop: "Đông", isLocked: true })], eastCtx)).toBeNull();
+    expect(checkTableWrite(eastManager, "packagings", [create({ workshop: "Đông" })], eastCtx)).toBeNull();
+  });
+
+  it("quản đốc Đông KHÔNG ghi / mở lại / duyệt xưởng Cá, kể cả dời dòng Cá sang Đông", () => {
+    expect(checkTableWrite(eastManager, "production_wips", [create({ workshop: "Cá" })], eastCtx)?.message).toContain("ngoài phạm vi");
+    expect(checkTableWrite(eastManager, "production_locks", [update({ workshop: "Cá", isLocked: true }, { workshop: "Cá", isLocked: false })], eastCtx)).not.toBeNull();
+    expect(checkTableWrite(eastManager, "production_wips", [update({ workshop: "Cá" }, { workshop: "Đông" })], eastCtx)).not.toBeNull();
+    expect(checkTableWrite(eastManager, "production_wips", [update({ workshop: "Cá", status: "pending" }, { workshop: "Cá", status: "stocked" })], eastCtx)).not.toBeNull();
+    expect(checkTableWrite(eastManager, "qc_checklists", [create({ workshop: "Khô" })], eastCtx)).not.toBeNull();
+  });
+
+  it("dòng cũ thiếu xưởng / người ghi ⇒ theo quyền chung (không chặn nhầm sổ cũ)", () => {
+    expect(checkTableWrite(eastManager, "production_wips", [update({ kg: 1 }, { kg: 2 })], eastCtx)).toBeNull();
+    expect(checkTableWrite(leader, "production_wips", [update({ operator: null }, { operator: null, kg: 2 })], leaderCtx)).toBeNull();
+  });
+
+  it("tổ trưởng: thêm được; chỉ sửa dòng MÌNH ghi (so họ tên hoặc tên đăng nhập, không phân hoa thường)", () => {
+    expect(checkTableWrite(leader, "production_wips", [create({ operator: "Trần Thị Tổ" })], leaderCtx)).toBeNull();
+    expect(checkTableWrite(leader, "production_wips", [update({ operator: "trần thị tổ" }, { operator: "trần thị tổ", kg: 2 })], leaderCtx)).toBeNull();
+    expect(checkTableWrite(leader, "production_wips", [update({ operator: "Người Khác" }, { operator: "Người Khác", kg: 2 })], leaderCtx)?.message).toContain("ngoài phạm vi");
+  });
+
+  it("vai trò phạm vi `all` (kế toán) và người kiêm nhiều vai trò lấy phạm vi RỘNG nhất", () => {
+    const acc = perms(["accountant"]);
+    expect(checkTableWrite(acc, "production_wips", [create({ workshop: "Khô" })], scopeContextFor(["accountant"]))).toBeNull();
+    const both = perms(["manager-dong", "accountant"]);
+    expect(checkTableWrite(both, "production_wips", [create({ workshop: "Cá" })], scopeContextFor(["manager-dong", "accountant"]))).toBeNull();
+  });
+
+  it("phó GĐ kiêm quản đốc Đông (người thật): ghi SX xưởng Đông, không ghi xưởng Cá", () => {
+    const p = perms(["vice-director", "manager-dong"]);
+    const ctx = scopeContextFor(["vice-director", "manager-dong"], "Hạnh", "ttmhanh");
+    expect(checkTableWrite(p, "production_wips", [create({ workshop: "Đông" })], ctx)).toBeNull();
+    expect(checkTableWrite(p, "production_wips", [create({ workshop: "Cá" })], ctx)).not.toBeNull();
   });
 });

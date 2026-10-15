@@ -1,5 +1,5 @@
 > Load khi: làm phân quyền theo vai trò / người dùng (xem · thêm · sửa · xóa · chốt · mở lại · duyệt · nạp · xuất), màn "Vai trò & quyền", ẩn/hiện nút theo quyền, siết RLS theo vai trò.
-> Trạng thái: **CHỐT 2026-10-15** — chủ dự án đồng ý cả 6 câu §10 theo khuyến nghị. **Đợt 1 + 2 + 3 + 4 ĐÃ BUILD 2026-10-15** (xem §6 Kết quả). `0062` đã chạy trên DB thật 2026-10-15. Còn Đợt 5–6.
+> Trạng thái: **CHỐT 2026-10-15** — chủ dự án đồng ý cả 6 câu §10 theo khuyến nghị. **Đợt 1 → 5 ĐÃ BUILD 2026-10-15** (xem §6 Kết quả). `0062` đã chạy trên DB thật 2026-10-15. Còn Đợt 6 (RLS, 🔴).
 last_verified: 2026-10-15
 
 # Phân quyền theo chức năng (CRUD+) cho từng vai trò và từng người
@@ -212,6 +212,15 @@ Hook nằm ở `lib/permissions.ts` + `features/shared/PermissionProvider.tsx` (
 - Màn `/roles` (§8, đã build): tab **Theo vai trò** (danh sách vai trò + nhãn Toàn quyền/Đã chỉnh/Tự tạo, ma trận tick có "Tất cả/Bỏ hết" theo hàng, tick ô bất kỳ tự tick Xem, bỏ Xem bỏ cả hàng, Lưu quyền + Hoàn tác, Sao chép, Thêm vai trò, Khôi phục mặc định, Xóa vai trò tự tạo — chặn khi còn người giữ, trang mở đầu, mô tả) · tab **Theo người dùng** (quyền thực + màu nguồn: theo vai trò / cho riêng / chặn riêng; bấm ô đổi; danh sách màn người đó thấy). "Xem như người này" làm dạng **danh sách màn thấy được** thay vì giả lập cả app.
 - Khu **Quản trị** `/admin` + menu tài khoản ở avatar (đổi mật khẩu, giao diện, quản trị, đăng xuất) — yêu cầu thêm của chủ dự án cùng ngày.
 - Thứ tự triển khai: chạy `0062` → deploy app. Lùi: `drop table` 3 bảng ⇒ app về ma trận mặc định.
+
+### Kết quả Đợt 5 (2026-10-15)
+
+- **Không migration:** cột phạm vi đã có — `workshop` ở `production_wips`, `production_locks`, `domestic_sales`, `packagings`, `qc_checklists`, `qc_locks`; `operator` (HỌ TÊN người ghi) ở `production_wips`, `domestic_sales`, `lot_*`. `packagings` / `qc_checklists` KHÔNG có người ghi.
+- `lib/permissions.ts`: `WORKSHOP_BY_ROLE` (manager-dong → Đông, manager-ca → Cá, manager-kho → Khô), `ScopeContext` + `scopeContextFor(roles, fullName, username)`, `rowInScope`, `canOnRow`; `grantsOf(spec, scopes)` — hành động ĐỌC (`view`/`export`/`view-price`) luôn `all`. Ma trận: **quản đốc** phạm vi `workshop` khi ghi ở `wip`, `packaging`, `qc`, `warehouse` (duyệt); **tổ trưởng** `own` khi sửa/xóa ở `wip`. Xem vẫn cả 3 xưởng (§10 câu 2).
+- **Lớp 3** (`checkTableWrite(perms, table, changes, ctx)`): dòng TRƯỚC và SAU đều phải trong phạm vi (không "dời" dòng xưởng khác về xưởng mình); `own` khi thêm luôn được; **dòng thiếu cột hoặc cột rỗng (dữ liệu cũ) ⇒ theo quyền chung** — không chặn nhầm sổ cũ. Câu báo riêng "Dòng này ngoài phạm vi của bạn (xưởng X)…". `ShellLayout` dựng ctx từ hồ sơ.
+- **Lớp 2:** `useCanOnRow(resource)` (`features/shared/PermissionProvider.tsx`) → `canRow(action, row, kind?)`; gắn ở /wip, /packaging, /qc, /warehouse (ẩn Sửa/Bỏ/Gắn lô/Chốt/Mở lại/Duyệt ngoài phạm vi; form ghi của xưởng khác coi như chỉ xem).
+- **Chưa giới hạn được (ghi rõ):** phó QĐ và tổ trưởng là vai trò chung, không gắn xưởng ⇒ chưa giới hạn theo xưởng (cần gán xưởng cho từng người — để sau); tổ trưởng ở Đóng gói / QC vẫn `all` (bảng không lưu người ghi); "dòng của mình" so bằng HỌ TÊN ở cột người ghi — đổi họ tên trong hồ sơ thì dòng cũ coi như của người khác.
+- Test: phạm vi trong ma trận, `rowInScope`/`canOnRow`/`scopeContextFor`, `checkTableWrite` (quản đốc Đông ghi/chốt/mở lại Đông được, Cá thì không kể cả dời dòng; dòng cũ thiếu cột cho qua; tổ trưởng chỉ sửa dòng mình; người kiêm nhiều vai trò lấy phạm vi rộng nhất; phó GĐ kiêm QĐ Đông).
 
 ### Kết quả Đợt 4 (2026-10-15)
 

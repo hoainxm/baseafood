@@ -41,7 +41,7 @@ import {
 import { kg, num, formatDateVN } from "@/lib/format";
 import { AlertTriangle, CalendarRange, Camera, CameraOff, ClipboardList, PackageCheck, Scale, Search, Snowflake, Warehouse } from "lucide-react";
 import { QrScanner } from "@/features/shared";
-import { useCan } from "@/features/shared/PermissionProvider";
+import { useCan, useCanOnRow } from "@/features/shared/PermissionProvider";
 import { parseQrCode, formatWipLotLabel, findLots } from "@/lib/lotTraceability";
 
 import { BSF1_WAREHOUSES } from "@/types";
@@ -64,6 +64,8 @@ export default function ReserveWarehouseScreen() {
   /** Phân quyền lớp 2 (spec role-permissions §5): Duyệt chờ → đã nhập = approve. */
   const allowed = useCan("warehouse");
   const isReadOnly = !allowed.approve && !allowed.update;
+  /** Phạm vi Đợt 5 (spec §3c): quản đốc chỉ duyệt nhập kho lô của xưởng mình. */
+  const canRow = useCanOnRow("warehouse");
   const [exportItems] = useExportItems();
   const [products] = useProducts();
   const [salesItems] = useSalesItems();
@@ -151,6 +153,10 @@ export default function ReserveWarehouseScreen() {
     setTypedCode("");
     if (wip.status !== "pending") {
       notify.warning(`Lô ${items[0]!.label} đã nhập kho${wip.warehouse ? ` ${wip.warehouse}` : ""} rồi.`);
+      return;
+    }
+    if (!canRow("approve", wip)) {
+      notify.warning(`Lô ${items[0]!.label} thuộc xưởng ${wip.workshop} — bạn chỉ duyệt nhập kho được lô của xưởng mình.`);
       return;
     }
     setIsScanning(false);
@@ -392,7 +398,7 @@ export default function ReserveWarehouseScreen() {
                     · SX {formatDateVN(s.productionDate)} · xưởng {s.workshop}
                   </span>
                 </span>
-                {allowed.approve && (
+                {canRow("approve", s) && (
                 <Button
                   title="Duyệt lô bán thành phẩm này từ trạng thái chờ sang đã nhập kho, để tính vào tồn dự trữ." size="sm" onClick={() => openApprove(s)}>
                   <PackageCheck />

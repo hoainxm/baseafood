@@ -74,7 +74,7 @@ import { appendAuditEntries } from "@/lib/audit";
 import { PERIOD_OPTIONS, getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
 import { DailyTaskReminder, LotInputPicker, LotDispatchPicker, BlankDailyWipSlip, LotQrLabels } from "@/features/shared";
 import { useQuickCatalogEdit } from "@/features/catalog/QuickCatalogEdit";
-import { useCan } from "@/features/shared/PermissionProvider";
+import { useCan, useCanOnRow } from "@/features/shared/PermissionProvider";
 import { assignSessionLots, findBatchesWithoutLot, formatWipLotLabel, buildLotNode, type TraceData } from "@/lib/lotTraceability";
 import {
   CalendarRange,
@@ -147,6 +147,15 @@ export default function WipProductionScreen() {
   const allowed = useCan("wip");
   const canWrite = allowed.create || allowed.update;
   const isReadOnly = !canWrite;
+  /** Phạm vi Đợt 5 (spec §3c): quản đốc chỉ ghi / chốt xưởng mình, tổ trưởng chỉ sửa
+   *  dòng mình ghi. Phạm vi "all" ⇒ trùng hệt `allowed`. */
+  const canRow = useCanOnRow("wip");
+  /** Gắn lô = thêm-sửa trên dòng ⇒ dòng phải trong phạm vi. */
+  const canWriteRow = (r: { workshop?: unknown; operator?: unknown }) =>
+    canRow("create", r) || canRow("update", r);
+  /** Xưởng được GHI MỚI (form Ghi nhập). */
+  const canCreateIn = (w: Workshop) => canRow("create", { workshop: w }, "create");
+  const writableWorkshops = WORKSHOPS.filter(canCreateIn);
 
   const [period, setPeriod] = useState<ViewPeriod>("day");
   const [date, setDate] = useState(todayISO());
@@ -181,7 +190,8 @@ export default function WipProductionScreen() {
   /** Hai chế độ: "nhap" = form ghi (mặc định, form-first cho tổ xưởng); "so" = sổ + báo cáo. */
   const [mode, setMode] = useState<"entry" | "ledger">("entry");
   /** Không có quyền thêm ⇒ không có form Ghi nhập, chỉ còn sổ ngày. */
-  const activeMode = allowed.create ? mode : "ledger";
+  const canEnter = allowed.create && writableWorkshops.length > 0;
+  const activeMode = canEnter ? mode : "ledger";
   const [isPrintingBlank, setIsPrintingBlank] = useState(false);
   // Truy xuất lô (docs/spec/qr-truy-xuat-lo.md): gắn lô NL cho mẻ + in tem lô BTP.
   const [lotInputs, saveLotInputs] = useLotInputs();
@@ -457,7 +467,8 @@ export default function WipProductionScreen() {
       productionDate: postingDate,
       postingDate: todayISO(),
       backdateReason: "",
-      workshop: recordWorkshop,
+      // Quản đốc: phiếu mới mở ở xưởng mình nếu xưởng đang chọn ngoài phạm vi.
+      workshop: canCreateIn(recordWorkshop) ? recordWorkshop : (writableWorkshops[0] ?? recordWorkshop),
     });
     setIsConsecutiveDays(postingDate === todayISO());
     // Mở sẵn MỘT nhóm + một dòng trống (điền sẵn nhóm gần nhất) để gõ thành phẩm
@@ -1154,9 +1165,15 @@ export default function WipProductionScreen() {
         clearable={false}
         value={session.workshop}
         onChange={(v) => setSessionField("workshop", v as Workshop)}
-        options={WORKSHOPS.map((p) => ({ value: p, label: p }))}
+        options={writableWorkshops.map((p) => ({ value: p, label: p }))}
       />
 
+      {!canCreateIn(session.workshop) ? (
+        <p className="text-base text-muted-foreground">
+          Bạn chỉ ghi được xưởng {writableWorkshops.join(", ")} — chọn lại phân xưởng ở trên để ghi.
+        </p>
+      ) : (
+      <>
       <div className="border-t-2 border-border pt-1" />
 
       {/* Lô NL dùng cho phiên (truy xuất QR đợt 2b) — khai một lần, lưu là gắn cho mọi mẻ cùng loài. */}
@@ -1248,6 +1265,8 @@ export default function WipProductionScreen() {
           Lưu vào sổ
         </Button>
       </div>
+      </>
+      )}
     </div>
   );
 
@@ -1261,7 +1280,7 @@ export default function WipProductionScreen() {
           </h1>
         </div>
         {/* Tách rõ NHẬP với TRA CỨU: một màn làm một việc. */}
-        {allowed.create && (
+        {canEnter && (
         <div className="flex w-full overflow-hidden rounded-xl border-2 border-border sm:w-auto">
           <button
             title="Sang chế độ Ghi nhập để gõ sản lượng thành phẩm."
@@ -1381,7 +1400,7 @@ export default function WipProductionScreen() {
           title={`Chưa ghi thành phẩm trong ${rangeDescription}`}
           description={`Phân xưởng ${workshop}. Chuyển sang "Ghi nhập" để ghi.`}
           action={
-            allowed.create ? (
+            canEnter ? (
             <Button
               title="Chuyển sang chế độ Ghi để nhập sản lượng cho ngày này." size="lg" onClick={() => setMode("entry")}>
               <Plus />
@@ -1401,7 +1420,7 @@ export default function WipProductionScreen() {
             searchLabel="Tìm theo thành phẩm / khách…"
             actions={(r) => (
               <div className="flex flex-wrap gap-2">
-                {canWrite && (
+                {canWriteRow(r) && (
                 <Button
                   title="Ghi mẻ này đã dùng lô nguyên liệu nào (quét tem, gõ mã, hoặc chọn). Có lô thì mới truy được nguồn của mẻ."
                   variant={countLotInputs(r.id) ? "outline" : "default"}
@@ -1423,14 +1442,14 @@ export default function WipProductionScreen() {
                   Tem
                 </Button>
                 )}
-                {allowed.update && (
+                {canRow("update", r) && (
                 <Button
                   title="Mở lại dòng sản lượng này để sửa số kg hoặc mặt hàng." variant="edit" size="sm" onClick={() => openEdit(r)}>
                   <Pencil />
                   Sửa
                 </Button>
                 )}
-                {allowed.delete && (
+                {canRow("delete", r) && (
                 <Button
                   title="Bỏ dòng sản lượng này khỏi sổ. Có hỏi xác nhận và còn nút Hoàn tác." variant="danger" size="sm" onClick={() => remove(r)}>
                   Bỏ
@@ -1520,7 +1539,7 @@ export default function WipProductionScreen() {
             rowMarkKey="ban-noi-dia"
             actions={(r) => (
               <div className="flex flex-wrap gap-2">
-                {canWrite && (
+                {canWriteRow(r) && (
                 <Button
                   title="Ghi nguyên liệu bán này lấy từ lô NL nào (quét tem, gõ mã, hoặc chọn) — để thu hồi tới được khách."
                   variant={countDomesticSaleLots(r.id) ? "outline" : "default"}
@@ -1531,7 +1550,7 @@ export default function WipProductionScreen() {
                   {countDomesticSaleLots(r.id) ? `Lô NL (${countDomesticSaleLots(r.id)})` : "Gắn lô NL"}
                 </Button>
                 )}
-                {allowed.update && (
+                {canRow("update", r) && (
                 <Button
                   title="Mở lại dòng bán nội địa này để sửa ngày, loại nguyên liệu, số lượng, giá hoặc khách."
                   variant="edit"
@@ -1542,7 +1561,7 @@ export default function WipProductionScreen() {
                   Sửa
                 </Button>
                 )}
-                {allowed.delete && (
+                {canRow("delete", r) && (
                 <ConfirmDelete
                   recordDescription={`Bán nội địa ${r.materialTypeName} — ${kg(r.quantityKg)} (${formatDateVN(r.saleDate)})`}
                   onConfirm={() => removeDomesticSale(r)}
@@ -1597,7 +1616,7 @@ export default function WipProductionScreen() {
             )}
           </div>
           {isLocked ? (
-            allowed.unlock && (
+            canRow("unlock", { workshop: activeWorkshop }) && (
             <Button
               title="Mở khóa lại ngày sản xuất đã chốt để sửa hoặc ghi bù. Phải ghi lý do, và việc mở khóa được lưu vết."
               variant="edit"
@@ -1613,7 +1632,7 @@ export default function WipProductionScreen() {
             </Button>
             )
           ) : (
-            allowed.lock && (
+            canRow("lock", { workshop: activeWorkshop }) && (
             <Button variant="lock"
               title="Khóa sổ sản xuất ngày này và khai phần nguyên liệu CÒN DỞ tách theo từng loại. Số còn dở đó thành đông gửi ở sổ tồn kho nguyên liệu."
               size="lg"
@@ -1737,7 +1756,7 @@ export default function WipProductionScreen() {
                 clearable={false}
                 value={edit.workshop}
                 onChange={(v) => patchEdit({ workshop: v as Workshop })}
-                options={WORKSHOPS.map((p) => ({ value: p, label: p }))}
+                options={WORKSHOPS.filter((p) => p === edit.workshop || canRow("update", { ...edit, workshop: p })).map((p) => ({ value: p, label: p }))}
               />
               <div className="flex items-end gap-2">
                 <div className="min-w-0 flex-1">
@@ -1881,7 +1900,9 @@ export default function WipProductionScreen() {
                   clearable={false}
                   value={editingDomesticSale.workshop}
                   onChange={(v) => patchDomesticSaleEdit({ workshop: v as Workshop })}
-                  options={WORKSHOPS.map((p) => ({ value: p, label: p }))}
+                  options={WORKSHOPS.filter(
+                    (p) => p === editingDomesticSale.workshop || canRow("update", { ...editingDomesticSale, workshop: p })
+                  ).map((p) => ({ value: p, label: p }))}
                 />
               </div>
               <Combobox
@@ -1980,7 +2001,7 @@ export default function WipProductionScreen() {
                     <span className="min-w-0">
                       {productNameOf(r.productId)} · <span className="tnum">{kg(r.quantityKg || 0)}</span>
                     </span>
-                    {canWrite && (
+                    {canWriteRow(r) && (
                     <Button
                       title="Đóng hộp chốt và mở hộp gắn lô nguyên liệu cho mẻ này (quét tem, gõ mã hoặc chọn)."
                       variant="outline"

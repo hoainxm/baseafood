@@ -192,13 +192,87 @@ export const LEGACY_ROLE_PERMISSIONS: RolePermissionMatrix = {
 
 type RoleSpec = Readonly<Record<string, readonly PermissionAction[]>>;
 
-/** Dựng ô quyền từ bảng "tài nguyên → hành động" (bỏ hành động tài nguyên không có). */
-function grantsOf(spec: RoleSpec): PermissionGrant[] {
+/** Hành động ĐỌC — luôn phạm vi `all` (quản đốc xem cả 3 xưởng — spec §10 câu 2). */
+const READ_ACTIONS: readonly PermissionAction[] = ["view", "export", "view-price"];
+
+/**
+ * Dựng ô quyền từ bảng "tài nguyên → hành động" (bỏ hành động tài nguyên không có).
+ * `scopes`: phạm vi cho hành động GHI của từng tài nguyên (Đợt 5); đọc luôn `all`.
+ */
+function grantsOf(spec: RoleSpec, scopes: Readonly<Partial<Record<string, PermissionScope>>> = {}): PermissionGrant[] {
   return Object.entries(spec).flatMap(([resource, actions]) => {
     const r = PERMISSION_RESOURCES.find((x) => x.id === resource);
     if (!r || r.adminOnly) return [];
-    return actions.filter((a) => r.actions.includes(a)).map((action) => ({ resource, action, scope: "all" as const }));
+    return actions
+      .filter((a) => r.actions.includes(a))
+      .map((action) => ({ resource, action, scope: READ_ACTIONS.includes(action) ? "all" : (scopes[resource] ?? "all") }));
   });
+}
+
+/* ---------- Phạm vi dữ liệu (Đợt 5) ---------- */
+
+/** Quản đốc ⇄ xưởng. Vai trò khác không gắn xưởng (phó QĐ, tổ trưởng là vai trò chung). */
+export const WORKSHOP_BY_ROLE: Readonly<Partial<Record<Role, string>>> = {
+  "manager-dong": "Đông",
+  "manager-ca": "Cá",
+  "manager-kho": "Khô",
+};
+
+/** Người đang thao tác — để kiểm phạm vi `workshop` / `own` trên từng dòng. */
+export interface ScopeContext {
+  /** Xưởng của người dùng (suy từ vai trò quản đốc). */
+  workshops: readonly string[];
+  /** Tên có thể nằm ở cột "người ghi" (`operator`): họ tên, tên đăng nhập. */
+  identities: readonly string[];
+}
+
+export const EMPTY_SCOPE_CONTEXT: ScopeContext = { workshops: [], identities: [] };
+
+export function scopeContextFor(roles: readonly string[], fullName = "", username = ""): ScopeContext {
+  return {
+    workshops: [...new Set(roles.map((r) => WORKSHOP_BY_ROLE[r as Role]).filter((x): x is string => !!x))],
+    identities: [fullName, username].map((x) => x.trim()).filter(Boolean),
+  };
+}
+
+/** Một dòng (bản app) mang các cột phạm vi — thiếu cột thì phạm vi không áp. */
+export interface ScopedRow {
+  workshop?: unknown;
+  operator?: unknown;
+}
+
+/**
+ * Dòng có nằm trong phạm vi không. Dòng KHÔNG có cột tương ứng (bảng không lưu xưởng /
+ * người ghi) hoặc cột rỗng (dữ liệu cũ) ⇒ cho qua — không chặn nhầm sổ cũ; spec §3c.
+ * `own` khi THÊM dòng mới luôn được (dòng của chính mình).
+ */
+export function rowInScope(
+  scope: PermissionScope,
+  ctx: ScopeContext,
+  row: ScopedRow | undefined,
+  kind: "create" | "update" | "delete" = "update"
+): boolean {
+  if (scope === "all" || !row) return true;
+  if (scope === "workshop") {
+    const w = typeof row.workshop === "string" ? row.workshop.trim() : "";
+    return !w || ctx.workshops.includes(w);
+  }
+  if (kind === "create") return true;
+  const op = typeof row.operator === "string" ? row.operator.trim() : "";
+  return !op || ctx.identities.some((id) => id.toLowerCase() === op.toLowerCase());
+}
+
+/** `can` + phạm vi trên một dòng cụ thể (lớp 2 dùng để ẩn nút ở dòng ngoài phạm vi). */
+export function canOnRow(
+  perms: EffectivePermissions,
+  ctx: ScopeContext,
+  resource: string,
+  action: PermissionAction,
+  row: ScopedRow | undefined,
+  kind?: "create" | "update" | "delete"
+): boolean {
+  const scope = scopeOf(perms, resource, action);
+  return scope !== null && rowInScope(scope, ctx, row, kind);
 }
 
 const VIEW: readonly PermissionAction[] = ["view"];
@@ -339,6 +413,20 @@ const TEAM_LEADER: RoleSpec = {
 };
 
 /**
+ * Phạm vi Đợt 5 (2026-10-15): quản đốc chỉ GHI / chốt / mở lại / duyệt dòng XƯỞNG MÌNH ở
+ * các khâu có lưu xưởng; tổ trưởng chỉ sửa dòng MÌNH GHI ở /wip (bảng có cột người ghi).
+ * Đóng gói / QC không lưu người ghi ⇒ tổ trưởng ở đó vẫn `all`. Phó QĐ, tổ trưởng không gắn
+ * xưởng nên chưa giới hạn theo xưởng (cần gán xưởng cho từng người — để sau).
+ */
+const MANAGER_SCOPES: Readonly<Partial<Record<string, PermissionScope>>> = {
+  wip: "workshop",
+  packaging: "workshop",
+  qc: "workshop",
+  warehouse: "workshop",
+};
+const TEAM_LEADER_SCOPES: Readonly<Partial<Record<string, PermissionScope>>> = { wip: "own" };
+
+/**
  * Ma trận ĐANG ÁP — Đợt 4 (2026-10-15): ma trận mục tiêu spec §7 + 2 điều chỉnh chủ dự
  * án chốt (kế toán có Thêm/Sửa/Chốt ở Nhập hàng + SX TP; phó QĐ có Xóa ở SX TP).
  * `admin` không có dòng — admin luôn toàn quyền, không đọc ma trận. Vai trò đã chỉnh ở
@@ -350,10 +438,10 @@ export const DEFAULT_ROLE_PERMISSIONS: RolePermissionMatrix = {
   "chief-accountant": grantsOf(CHIEF_ACCOUNTANT),
   accountant: grantsOf(ACCOUNTANT),
   "warehouse-keeper": grantsOf(WAREHOUSE_KEEPER),
-  "team-leader": grantsOf(TEAM_LEADER),
-  "manager-dong": grantsOf(MANAGER),
-  "manager-ca": grantsOf(MANAGER),
-  "manager-kho": grantsOf(MANAGER),
+  "team-leader": grantsOf(TEAM_LEADER, TEAM_LEADER_SCOPES),
+  "manager-dong": grantsOf(MANAGER, MANAGER_SCOPES),
+  "manager-ca": grantsOf(MANAGER, MANAGER_SCOPES),
+  "manager-kho": grantsOf(MANAGER, MANAGER_SCOPES),
   "vice-manager": grantsOf(VICE_MANAGER),
 };
 

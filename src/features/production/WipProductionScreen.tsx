@@ -190,9 +190,6 @@ export default function WipProductionScreen() {
   /** Dòng HÀNG ĐÔNG LẠNH của phiên (→ Hàng tạm ở Sổ kho tháng) — mặc định trống. */
   const [frozenLines, setFrozenLines] = useState<FrozenStockDraft[]>([]);
   const [sessionErrors, setSessionErrors] = useState<FieldError[]>([]);
-  /** Khách của nhóm cuối phiên trước → phiếu mới tự điền sẵn nhóm đầu, gõ thành
-   *  phẩm ngay, khỏi chọn lại. Chỉ sống trong phiên làm việc. */
-  const [lastCustomer, setLastCustomer] = useState("");
 
   /* Sửa một dòng đã ghi (từ bảng sổ). */
   const [edit, setEdit] = useState<WipProductionItem | null>(null);
@@ -524,7 +521,7 @@ export default function WipProductionScreen() {
     setIsConsecutiveDays(postingDate === todayISO());
     // Mở sẵn MỘT nhóm + một dòng trống (điền sẵn nhóm gần nhất) để gõ thành phẩm
     // ngay, khỏi phải bấm "Thêm nhóm" trước.
-    setTableRows([createEmptyProductionLine(newId(), "", lastCustomer)]);
+    setTableRows([createEmptyProductionLine(newId())]);
     setSessionErrors([]);
   };
   const setSessionField = <K extends keyof SessionHeader>(k: K, v: SessionHeader[K]) =>
@@ -611,16 +608,6 @@ export default function WipProductionScreen() {
     setTableRows((items) => items.map((d) => (d.key === key ? { ...d, ...patch } : d)));
   const removeRow = (key: string) =>
     setTableRows((items) => items.filter((d) => d.key !== key));
-  /** Thêm một dòng thành phẩm vào NHÓM đang có (giữ khách của nhóm). */
-  const addRow = (groupId: string, customerName: string) =>
-    setTableRows((items) => [...items, createEmptyProductionLine(groupId, "", customerName)]);
-  /** Thêm một NHÓM mới (groupId mới) kèm một dòng trống để nhập ngay. */
-  const addGroup = () => setTableRows((items) => [...items, createEmptyProductionLine(newId(), "", "")]);
-  /** Sửa khách của cả một nhóm — mọi dòng cùng groupId. */
-  const changeGroup = (groupId: string, patch: Partial<Pick<ProductionLine, "customerName">>) =>
-    setTableRows((items) =>
-      items.map((d) => (d.groupId === groupId ? { ...d, ...patch } : d))
-    );
 
   /** Kiểm đầu phiên (ngày + lý do ghi bù). */
   const sessionHeaderErrors = (p: SessionHeader): FieldError[] => {
@@ -837,14 +824,8 @@ export default function WipProductionScreen() {
     setSessionErrors([]);
   };
   const finishSession = () => {
-    // Nhớ nhóm cuối để phiếu mới điền sẵn (lặp cùng chế biến/khách = 0 thao tác).
-    const last = tableRows.filter(isLineComplete).at(-1);
     // Lưu xong → reset phiếu; effect form-first tự mở phiếu trống mới.
-    if (saveSession(false)) {
-      if (last)
-        setLastCustomer(last.customerName);
-      resetSession();
-    }
+    if (saveSession(false)) resetSession();
   };
 
   /* ---- Sửa / xóa một dòng đã ghi ---- */
@@ -1236,7 +1217,8 @@ export default function WipProductionScreen() {
         </p>
       )}
 
-      <div className="grid gap-6 sm:grid-cols-2">
+      {/* Ba ô đầu phiên MỘT hàng (sm trở lên): ngày ghi sổ · ngày SX · phân xưởng. */}
+      <div className="grid gap-4 sm:grid-cols-3">
         <DateField
           label="Ngày ghi sổ"
           required
@@ -1251,6 +1233,14 @@ export default function WipProductionScreen() {
           value={session.productionDate}
           onChange={changeProductionDate}
         />
+        <Combobox
+          label="Phân xưởng"
+          required
+          clearable={false}
+          value={session.workshop}
+          onChange={(v) => setSessionField("workshop", v as Workshop)}
+          options={writableWorkshops.map((p) => ({ value: p, label: p }))}
+        />
       </div>
 
       {sessionNeedsReason && (
@@ -1262,15 +1252,6 @@ export default function WipProductionScreen() {
           />
         </Field>
       )}
-
-      <Combobox
-        label="Phân xưởng"
-        required
-        clearable={false}
-        value={session.workshop}
-        onChange={(v) => setSessionField("workshop", v as Workshop)}
-        options={writableWorkshops.map((p) => ({ value: p, label: p }))}
-      />
 
       {!canCreateIn(session.workshop) ? (
         <p className="text-base text-muted-foreground">
@@ -1289,13 +1270,13 @@ export default function WipProductionScreen() {
         onChange={(items) => setDeclaredSessionLots({ date: session.productionDate, workshop: session.workshop, lots: items })}
       />
 
-      {/* Bảng thành phẩm — nhập cả phiên một lượt, lưu một lần */}
-      <div className="space-y-4 rounded-xl border-2 border-primary/40 bg-accent/40 p-4">
+      {/* Bảng thành phẩm — nhập cả phiên một lượt, lưu một lần. KHÔNG bọc thêm khung
+          (đã nằm trong khung form) — nhường bề ngang cho cột tên ở tablet. */}
+      <div className="space-y-3">
         <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
           <p className="text-base font-semibold">Thành phẩm làm ra trong ngày</p>
           <p className="text-sm text-muted-foreground">
-            Chọn thành phẩm, gõ số block hoặc kg — dòng mới tự hiện. Quy cách, tách râu
-            + bao tử ở nút “Chi tiết”.
+            Chọn thành phẩm, gõ số block hoặc kg — dòng mới tự hiện. Bấm ✂ để tách râu + bao tử.
           </p>
         </div>
 
@@ -1304,19 +1285,12 @@ export default function WipProductionScreen() {
           products={products}
           onUpdateRow={updateRow}
           onRemove={removeRow}
-          onAddRow={addRow}
-          onAddGroup={addGroup}
-          onChangeGroup={changeGroup}
           onCreateProduct={productEditor.canCreate ? addProduct : undefined}
           onEditProduct={openProductEdit}
           canEditProduct={productEditor.canEdit}
           onDeleteProduct={productDeleter.requestDelete}
           canDeleteProduct={productDeleter.canDelete}
           deleteProductLabel={productDeleter.deleteLabel}
-          onEditCustomer={customerEditor.openEdit}
-          canEditCustomer={customerEditor.canEdit}
-          customerOptions={customerOptions}
-          onCreateCustomer={customerEditor.canCreate ? addCustomer : undefined}
           batterTypes={batterTypes}
           batterOptions={batterOptions}
           onCreateBatter={batterEditor.canCreate ? addBatter : undefined}
@@ -2239,7 +2213,7 @@ export default function WipProductionScreen() {
                         options={materialTypes.map((l) => ({
                           value: l.name,
                           label: l.name,
-                          phu: l.category || undefined,
+                          subLabel: l.category || undefined,
                         }))}
                         onEditItem={materialTypeEditor.openEdit}
                         editLabel={materialTypeEditor.editLabel}

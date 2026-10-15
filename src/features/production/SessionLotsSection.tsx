@@ -11,7 +11,7 @@
 import { useMemo, useState } from "react";
 import type { LotInput, Workshop } from "@/types";
 import { TRACE_KIND_LABELS, parseQrCode, listSelectableMaterialLots, explainMultipleLots, buildLotNode, findLots, type TraceData, type LotNode } from "@/lib/lotTraceability";
-import { Button, Combobox, Field, Input, Tag, notify } from "@/design-system";
+import { Button, Combobox, Field, InfoTip, Input, Tag, notify } from "@/design-system";
 import { QrScanner } from "@/features/shared";
 import { Camera, CameraOff, Link2, Plus, X } from "lucide-react";
 import { kg, formatDateVN } from "@/lib/format";
@@ -87,16 +87,98 @@ export function SessionLotsSection({
 
   return (
     <div className="space-y-3 rounded-xl border-2 border-border p-4">
-      <div className="min-w-0">
+      {/* Đầu khối MỘT hàng: tên + ⓘ (giải thích dài) + trạng thái khai lô. */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="flex items-center gap-2 text-base font-semibold">
           <Link2 className="size-icon shrink-0" aria-hidden />
           Lô nguyên liệu dùng cho phiên này
+          <InfoTip label="Lô nguyên liệu dùng cho phiên">
+            Quét tem các loại nguyên liệu đem ra chế biến (mỗi loại của chuyến một tem). Lưu vào sổ là tự
+            gắn lô cho thành phẩm đúng loại NL (chưa gắn loại thì theo loài) và dòng bán nội địa cùng loại —
+            khỏi gắn từng mẻ. Lưu mà chưa khai thì mẻ chưa có lô — chốt ngày sẽ hỏi gắn lô hoặc lý do.
+          </InfoTip>
         </p>
-        <p className="text-sm text-muted-foreground">
-          Quét tem các loại nguyên liệu đem ra chế biến (mỗi loại của chuyến một tem). Lưu vào sổ là tự gắn lô
-          cho thành phẩm đúng loại NL (chưa gắn loại thì theo loài) và dòng bán nội địa cùng loại — khỏi gắn từng mẻ.
-        </p>
+        {sessionLots.length === 0 ? (
+          <Tag variant="pending">Chưa khai lô — chốt ngày sẽ hỏi</Tag>
+        ) : (
+          <Tag variant="done">{sessionLots.length} lô</Tag>
+        )}
       </div>
+
+      {/* Ba cách khai lô trên MỘT hàng (md+): quét · gõ mã · chọn trong danh sách. */}
+      <div className="grid gap-3 md:grid-cols-[auto_minmax(0,1fr)_minmax(0,1.4fr)] md:items-end">
+        <Button
+          type="button"
+          className="w-full md:w-auto"
+          variant={isScanning ? "outline" : "default"}
+          title={isScanning ? "Tắt camera." : "Mở camera quét tem QR trên sọt / thùng nguyên liệu."}
+          onClick={() => setIsScanning((v) => !v)}
+        >
+          {isScanning ? <CameraOff aria-hidden /> : <Camera aria-hidden />} {isScanning ? "Tắt camera" : "Quét tem NL"}
+        </Button>
+        <Field label="Hoặc gõ mã lô" className="min-w-0">
+          <div className="flex gap-2">
+            <Input
+              className="min-w-0 flex-1"
+              value={typedCode}
+              onChange={(e) => setTypedCode(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleCode(typedCode, "typed")}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              className="shrink-0"
+              title="Tìm lô theo mã vừa gõ rồi thêm vào phiên (Enter cũng được)."
+              onClick={() => handleCode(typedCode, "typed")}
+            >
+              <Plus aria-hidden /> Thêm
+            </Button>
+          </div>
+        </Field>
+        <Combobox
+          label="Hoặc chọn lô nguyên liệu"
+          info={`Mỗi loại NL của chuyến là một lô. Lô về gần đây của xưởng ${workshop} (mới trước), sau đó lô cũ còn dở — NL cấp đông đem xả.`}
+          value=""
+          onChange={(id) => {
+            const n = candidates.find((u) => u.id === id) ?? (id ? buildLotNode("S", id, traceData) : undefined);
+            if (n) addLot(n, "picked");
+          }}
+          // Mỗi loại NL của chuyến là một lô cùng mã chuyến ⇒ nhãn ghép loại NL cho phân biệt được.
+          options={candidates.map((n) => ({
+            value: n.id,
+            label: `${n.label} · ${n.description}`,
+            subLabel: [n.date && formatDateVN(n.date), n.details.find((c) => c.label === "Đại lý")?.value, n.kg ? kg(n.kg) : ""].filter(Boolean).join(" · ") || undefined,
+          }))}
+          placeholder={candidates.length ? "— Chọn lô —" : "Không có lô gợi ý"}
+          emptyText="Không thấy lô này — quét tem hoặc gõ mã lô ở trên."
+        />
+      </div>
+      {isScanning && (
+        <QrScanner
+          onScan={(t) => {
+            setIsScanning(false);
+            handleCode(t, "scan");
+          }}
+        />
+      )}
+
+      {choices.length > 0 && (
+        <div className="space-y-1">
+          <p className="font-medium">{pickPrompt}:</p>
+          <ul className="space-y-1">
+            {choices.map((n) => (
+              <li key={n.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-2">
+                <span className="min-w-0">
+                  <span className="font-medium">{n.label}</span> <span className="text-muted-foreground">{describeLot(n)}</span>
+                </span>
+                <Button type="button" size="sm" title={`Thêm đúng lô ${n.label} này vào phiên.`} onClick={() => addLot(n, "typed")}>
+                  Chọn lô này
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {sessionLots.length > 0 && (
         <ul className="flex flex-wrap gap-2">
@@ -120,75 +202,6 @@ export function SessionLotsSection({
             </li>
           ))}
         </ul>
-      )}
-
-      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end">
-        <Button
-          type="button"
-          className="w-full sm:w-auto"
-          variant={isScanning ? "outline" : "default"}
-          title={isScanning ? "Tắt camera." : "Mở camera quét tem QR trên sọt / thùng nguyên liệu."}
-          onClick={() => setIsScanning((v) => !v)}
-        >
-          {isScanning ? <CameraOff aria-hidden /> : <Camera aria-hidden />} {isScanning ? "Tắt camera" : "Quét tem NL"}
-        </Button>
-        <Field label="Hoặc gõ mã lô" className="min-w-0 flex-1 sm:min-w-48">
-          <Input value={typedCode} onChange={(e) => setTypedCode(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleCode(typedCode, "typed")} />
-        </Field>
-        <Button type="button" variant="outline" className="w-full sm:w-auto" title="Tìm lô theo mã vừa gõ rồi thêm vào phiên." onClick={() => handleCode(typedCode, "typed")}>
-          <Plus aria-hidden /> Thêm
-        </Button>
-      </div>
-      {isScanning && (
-        <QrScanner
-          onScan={(t) => {
-            setIsScanning(false);
-            handleCode(t, "scan");
-          }}
-        />
-      )}
-
-      {choices.length > 0 && (
-        <p className="font-medium">{pickPrompt}:</p>
-      )}
-      {choices.length > 0 && (
-        <ul className="space-y-1">
-          {choices.map((n) => (
-            <li key={n.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-2">
-              <span className="min-w-0">
-                <span className="font-medium">{n.label}</span> <span className="text-muted-foreground">{describeLot(n)}</span>
-              </span>
-              <Button type="button" size="sm" title={`Thêm đúng lô ${n.label} này vào phiên.`} onClick={() => addLot(n, "typed")}>
-                Chọn lô này
-              </Button>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      <Combobox
-        label="Hoặc chọn lô nguyên liệu"
-        hint={`Mỗi loại NL của chuyến là một lô. Lô về gần đây của xưởng ${workshop} (mới trước), sau đó lô cũ còn dở — NL cấp đông đem xả.`}
-        value=""
-        onChange={(id) => {
-          const n = candidates.find((u) => u.id === id) ?? (id ? buildLotNode("S", id, traceData) : undefined);
-          if (n) addLot(n, "picked");
-        }}
-        // Mỗi loại NL của chuyến là một lô cùng mã chuyến ⇒ nhãn ghép loại NL cho phân biệt được.
-        options={candidates.map((n) => ({
-          value: n.id,
-          label: `${n.label} · ${n.description}`,
-          phu: [n.date && formatDateVN(n.date), n.details.find((c) => c.label === "Đại lý")?.value, n.kg ? kg(n.kg) : ""].filter(Boolean).join(" · ") || undefined,
-        }))}
-        placeholder={candidates.length ? "— Chọn lô —" : "Không có lô gợi ý"}
-        emptyText="Không thấy lô này — quét tem hoặc gõ mã lô ở trên."
-      />
-
-      {sessionLots.length === 0 && (
-        <p className="flex flex-wrap items-center gap-2 text-muted-foreground">
-          <Tag variant="pending">Chưa khai lô</Tag>
-          Lưu mà chưa khai thì mẻ chưa có lô — chốt ngày sẽ hỏi gắn lô hoặc lý do.
-        </p>
       )}
     </div>
   );

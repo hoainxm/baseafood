@@ -21,6 +21,7 @@ export function BatterSection({
   canEditBatter,
   productKg: finishedGoodKg,
   columnNavigation: hasColumnNav = false,
+  compact = false,
 }: {
   /** Tên các loại bột đi kèm của mặt hàng (đúng thứ tự gắn ở Danh mục). */
   bundledIds: string[];
@@ -37,6 +38,12 @@ export function BatterSection({
   productKg: number;
   /** Ô số nhảy ↑/↓ theo cột trong bảng ghi (khung `[data-grid-nav]`). */
   columnNavigation?: boolean;
+  /**
+   * MỘT hàng ngang (bảng ghi phiên, chốt 2026-10-15): "Bột tẩm: 24V [ ] 18V [ ] [+ loại
+   * khác] = tổng · %" — nhãn là chữ đứng trước ô, bỏ các câu giải thích (vào `title`).
+   * Trả về các phần tử rời để màn gọi đặt trong khung flex của nó.
+   */
+  compact?: boolean;
 }) {
   const visibleBatters = listVisibleBatters(bundledIds, batterKg);
   const total = sumBatterKg(batterKg);
@@ -48,6 +55,67 @@ export function BatterSection({
     delete next[name];
     onChange(next);
   };
+
+  if (compact)
+    return (
+      <>
+        <span
+          className="text-sm font-medium"
+          title="Bột là phụ gia — ghi riêng từng loại (kg), KHÔNG cộng vào số lượng thành phẩm."
+        >
+          Bột tẩm:
+        </span>
+        {visibleBatters.map((name) => (
+          <span key={name} className="flex items-center gap-1.5">
+            <span className="text-sm">{name}</span>
+            <NumberField
+              hideLabel
+              hideRequiredMark
+              label={`Bột ${name}`}
+              unit="kg"
+              navCol={hasColumnNav ? `bot:${name}` : undefined}
+              className="w-[7.5rem]"
+              value={batterKg[name] || null}
+              onChange={(v) => onChange({ ...batterKg, [name]: v ?? 0 })}
+            />
+            {!bundledIds.includes(name) && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                aria-label={`Bỏ ${name}`}
+                title="Bỏ loại bột này khỏi dòng (chỉ dòng đang gõ, không đụng danh mục)."
+                onClick={() => remove(name)}
+              >
+                <X />
+              </Button>
+            )}
+          </span>
+        ))}
+        <div className="w-[13rem]">
+          <Combobox
+            hideLabel
+            label="Thêm loại bột khác"
+            hideRequiredMark
+            value=""
+            onChange={(name) => name && onChange({ ...batterKg, [name]: batterKg[name] ?? 0 })}
+            options={batterOptions.filter((o) => !visibleBatters.includes(o.value))}
+            onCreate={onCreateBatter}
+            onEditItem={onEditBatter}
+            canEdit={canEditBatter}
+            editLabel="Sửa thông tin loại bột này — lưu thẳng vào Danh mục."
+            placeholder={visibleBatters.length ? "+ Loại bột khác" : "+ Chọn loại bột"}
+            emptyText="Chưa có loại bột này — gõ tên rồi Thêm mới."
+          />
+        </div>
+        {batterTypeCount > 0 && (
+          <span className="text-sm text-muted-foreground">
+            = <span className="tnum font-semibold text-foreground">{num(total)}</span> kg
+            {ratio != null && <> · <span className="tnum">{num(Math.round(ratio * 10) / 10)}</span>%</>}
+          </span>
+        )}
+      </>
+    );
 
   return (
     <div className="space-y-3">

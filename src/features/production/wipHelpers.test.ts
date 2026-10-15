@@ -8,6 +8,9 @@ import {
   getLineTotalKg,
   isLineComplete,
   isLineEmpty,
+  isKgDerived,
+  patchBlocks,
+  patchBlockSpec,
   type ProductionLine,
 } from "./wipHelpers";
 
@@ -74,5 +77,39 @@ describe("dòng bán nội địa (NL bán thẳng — sổ riêng, không cộn
     expect(isDomesticSaleLineEmpty({ ...createEmptyDomesticSaleLine(), unitPrice: 145000 })).toBe(false);
     expect(isDomesticSaleLineEmpty({ ...createEmptyDomesticSaleLine(), customerName: "Chợ Bà Rịa" })).toBe(false);
     expect(isDomesticSaleLineEmpty(createEmptyDomesticSaleLine("Bạch tuộc 2 da"))).toBe(false);
+  });
+});
+
+describe("block × quy cách ⇄ kg (không đè kg gõ tay)", () => {
+  const line = (p: Partial<ProductionLine>): ProductionLine => ({ ...createEmptyProductionLine("g"), ...p });
+
+  it("kg chưa gõ ⇒ gõ block là tự tính kg", () => {
+    const d = line({ blockSpecKg: 4 });
+    expect(isKgDerived(d)).toBe(true);
+    expect(patchBlocks(d, 2)).toEqual({ blocksCount: 2, quantityKg: 8 });
+  });
+
+  it("kg đang tự tính ⇒ đổi block / quy cách tính lại", () => {
+    const d = line({ blockSpecKg: 4, blocksCount: 2, quantityKg: 8 });
+    expect(patchBlocks(d, 3)).toEqual({ blocksCount: 3, quantityKg: 12 });
+    expect(patchBlockSpec(d, 5)).toEqual({ blockSpecKg: 5, quantityKg: 10 });
+  });
+
+  it("kg gõ tay khác block × quy cách ⇒ GIỮ kg", () => {
+    const typedFirst = line({ blockSpecKg: 4, quantityKg: 8.5 });
+    expect(isKgDerived(typedFirst)).toBe(false);
+    expect(patchBlocks(typedFirst, 2)).toEqual({ blocksCount: 2 });
+    const edited = line({ blockSpecKg: 4, blocksCount: 2, quantityKg: 8.5 });
+    expect(patchBlocks(edited, 3)).toEqual({ blocksCount: 3 });
+    expect(patchBlockSpec(edited, 5)).toEqual({ blockSpecKg: 5 });
+  });
+
+  it("chưa có quy cách hoặc dòng đã tách râu/bao tử ⇒ chỉ đổi block", () => {
+    expect(patchBlocks(line({}), 2)).toEqual({ blocksCount: 2 });
+    expect(patchBlocks(line({ blockSpecKg: 4, tentacleKg: 3 }), 2)).toEqual({ blocksCount: 2 });
+  });
+
+  it("gõ quy cách sau khi đã có block (kg chưa gõ) ⇒ tính kg", () => {
+    expect(patchBlockSpec(line({ blocksCount: 2 }), 4)).toEqual({ blockSpecKg: 4, quantityKg: 8 });
   });
 });

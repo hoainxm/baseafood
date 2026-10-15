@@ -13,7 +13,15 @@ import {
 import { num } from "@/lib/format";
 import { isBatteredProduct, getProductBatterNames } from "@/lib/batter";
 import { ChevronDown, Plus, X } from "lucide-react";
-import { isLineEmpty, isSplitLine, getLineTotalKg, type ProductionLine } from "./wipHelpers";
+import {
+  isLineEmpty,
+  isSplitLine,
+  getLineTotalKg,
+  isKgDerived,
+  patchBlocks,
+  patchBlockSpec,
+  type ProductionLine,
+} from "./wipHelpers";
 import { BatterSection } from "./BatterSection";
 
 /**
@@ -21,10 +29,12 @@ import { BatterSection } from "./BatterSection";
  * dòng thành phẩm. Kiểu chế biến KHÔNG còn ô riêng — nó nằm sẵn trong mặt hàng
  * (Danh mục), khi lưu dòng tự mang theo kiểu chế biến của mặt hàng.
  *
- * Một dòng chỉ còn 3 ô chính: Thành phẩm · Số lượng (kg) · Số block (quy cách hiện
- * dưới ô block). Ô phụ — quy cách kg/khối, tách râu + bao tử — nằm trong phần "Chi
- * tiết" (nút ▾ cuối dòng); mã có cờ "tách râu/bao tử" tự mở sẵn. Mã TẨM BỘT tự hiện
- * dòng con "Bột tẩm" (mig 0051) — không cộng vào kg thành phẩm.
+ * Một dòng chỉ còn 3 ô chính: Thành phẩm · Số block · Số lượng (kg). Block đứng trước
+ * vì xưởng đếm block; có quy cách thì đơn vị ô block ghi "× 4 kg" và kg TỰ TÍNH — kg
+ * gõ tay khác block × quy cách thì GIỮ (wipHelpers.patchBlocks), không đè. Ô phụ — quy
+ * cách kg/khối, tách râu + bao tử — trong nút "Chi tiết" (chỉ có khi đã chọn thành
+ * phẩm); ô râu/bao tử chỉ hiện với mã đánh dấu tách hoặc khi bấm "Tách râu + bao tử".
+ * Mã TẨM BỘT tự hiện dòng con "Bột tẩm" (mig 0051) — không cộng vào kg thành phẩm.
  */
 export function ProductionLinesTable({
   lines,
@@ -137,18 +147,23 @@ export function ProductionLinesTable({
             </div>
             {/* Bề rộng tối thiểu do min-w (rem) của từng cột quyết định — co giãn
                 theo cỡ chữ; không ép cứng px cho cả bảng. */}
+            {/* @container: nút "Chi tiết" thu về icon khi vùng bảng hẹp (tablet có thanh bên ~570px). */}
+            <div className="@container">
             <HorizontalScroll>
-              <table className="w-full border-collapse text-sm">
+              {/* table-fixed: cột số + thao tác cố định, cột tên ăn phần còn lại (không nở theo
+                  độ dài chữ gợi ý). Chặn 64rem ⇒ màn rộng tên và số nằm gần nhau. */}
+              <table className="w-full max-w-[64rem] min-w-[30rem] table-fixed border-collapse text-sm">
                 <thead>
                   <tr>
-                    <th className={`${th} min-w-[15rem]`}>
+                    <th className={th}>
                       Thành phẩm <span className="text-destructive">*</span>
                     </th>
-                    <th className={`${th} w-[9.5rem] min-w-[8.5rem]`}>
+                    {/* Block TRƯỚC kg: xưởng đếm block, kg tự tính từ quy cách. */}
+                    <th className={`${th} w-[8.75rem]`}>Số block</th>
+                    <th className={`${th} w-[9rem]`}>
                       Số lượng (kg) <span className="text-destructive">*</span>
                     </th>
-                    <th className={`${th} w-[9.5rem] min-w-[8rem]`}>Số block</th>
-                    <th className={`${th} w-24`} aria-label="Chi tiết · bỏ dòng" />
+                    <th className={`${th} w-[6.25rem] @min-[40rem]:w-[10.75rem]`} aria-label="Chi tiết · bỏ dòng" />
                   </tr>
                 </thead>
                 <tbody>
@@ -164,8 +179,11 @@ export function ProductionLinesTable({
                       (isBatteredProduct(p) ||
                         /bột/i.test(p?.processingType ?? "") ||
                         Object.keys(d.batterKg).length > 0);
-                    // Chi tiết đang có số ⇒ nút "Chi tiết" tô nền để khỏi quên đã gõ gì trong đó.
-                    const hasDetail = isSplit || d.blockSpecKg > 0;
+                    // Ô râu + bao tử chỉ hiện với mã đánh dấu tách, dòng đã gõ tách, hoặc đã bấm "Tách".
+                    const showSplit = hasSplitComponents(p) || isSplit || Boolean(d.splitOpen);
+                    // kg người dùng gõ tay khác block × quy cách ⇒ nhắc (không tự đè).
+                    const kgMismatch =
+                      !isSplit && d.blocksCount > 0 && d.blockSpecKg > 0 && d.quantityKg > 0 && !isKgDerived(d);
                     return (
                       <Fragment key={d.key}>
                         <tr>
@@ -174,15 +192,18 @@ export function ProductionLinesTable({
                               hideLabel
                               label="Thành phẩm"
                               required
+                              // Không nút × bỏ chọn: trong lưới đã có ✕ bỏ dòng, nhường chỗ cho tên dài.
+                              clearable={false}
                               value={d.productId}
                               onChange={(v) => {
                                 const p = products.find((m) => m.id === v);
+                                const spec = blockSpec(p) ?? d.blockSpecKg;
                                 onEdit(d.key, {
                                   productId: v,
                                   // Mã đánh dấu "Có tách" → tự mở chi tiết (ô râu + bao tử).
                                   expanded: hasSplitComponents(p) ? true : d.expanded,
-                                  // Có quy cách đã gắn ở mặt hàng → tự điền kg/khối.
-                                  blockSpecKg: blockSpec(p) ?? d.blockSpecKg,
+                                  // Có quy cách đã gắn ở mặt hàng → tự điền kg/khối (và kg nếu đang tự tính).
+                                  ...patchBlockSpec(d, spec),
                                 });
                               }}
                               options={allProductOptions}
@@ -197,81 +218,81 @@ export function ProductionLinesTable({
                             />
                           </td>
                           <td className={td}>
+                            <NumberField
+                              hideLabel
+                              hideRequiredMark
+                              navCol="block"
+                              label={d.blockSpecKg > 0 ? `Số block (${num(d.blockSpecKg)} kg/khối)` : "Số block"}
+                              // Quy cách nằm ngay trong đơn vị ô — không thêm dòng chữ dưới ô (lệch hàng).
+                              unit={d.blockSpecKg > 0 ? `× ${num(d.blockSpecKg)} kg` : "block"}
+                              value={d.blocksCount || null}
+                              onChange={(v) => onEdit(d.key, patchBlocks(d, v ?? 0))}
+                            />
+                          </td>
+                          <td className={td}>
                             {isSplit ? (
                               <div
-                                className="tnum flex h-10 items-center rounded-md bg-muted px-3 font-semibold"
+                                className="tnum flex h-10 items-center justify-end rounded-md bg-muted px-3 font-semibold"
                                 title="Tổng = râu + bao tử (sửa ở phần Chi tiết)"
                               >
                                 {num(getLineTotalKg(d))}
                               </div>
                             ) : (
-                              <NumberField
-                                hideLabel
-                                navCol="sl"
-                                label="Số lượng"
-                                required
-                                unit="kg"
-                                value={d.quantityKg || null}
-                                onChange={(v) =>
-                                  onEdit(d.key, { quantityKg: v ?? 0 })
+                              <div
+                                title={
+                                  kgMismatch
+                                    ? `Kg gõ tay khác ${num(d.blocksCount)} block × ${num(d.blockSpecKg)} = ${num(d.blocksCount * d.blockSpecKg)} kg — giữ số đã gõ.`
+                                    : d.blocksCount > 0 && d.blockSpecKg > 0
+                                      ? `Tự tính: ${num(d.blocksCount)} block × ${num(d.blockSpecKg)} kg. Gõ đè nếu cân thực tế khác.`
+                                      : undefined
                                 }
-                              />
+                              >
+                                <NumberField
+                                  hideLabel
+                                  navCol="sl"
+                                  label="Số lượng"
+                                  required
+                                  unit={kgMismatch ? `kg ≠${num(d.blocksCount * d.blockSpecKg)}` : "kg"}
+                                  value={d.quantityKg || null}
+                                  onChange={(v) => onEdit(d.key, { quantityKg: v ?? 0 })}
+                                />
+                              </div>
                             )}
                           </td>
-                          <td className={td}>
-                            <NumberField
-                              hideLabel
-                              hideRequiredMark
-                              navCol="block"
-                              label="Số block"
-                              unit="block"
-                              value={d.blocksCount || null}
-                              onChange={(v) => {
-                                const b = v ?? 0;
-                                const s = d.blockSpecKg || 0;
-                                // Có quy cách & chưa tách → tự tính kg = block × quy cách.
-                                onEdit(
-                                  d.key,
-                                  s > 0 && !isSplit
-                                    ? { blocksCount: b, quantityKg: b * s }
-                                    : { blocksCount: b }
-                                );
-                              }}
-                            />
-                            {d.blockSpecKg > 0 && (
-                              <span className="tnum mt-0.5 block text-sm text-muted-foreground">
-                                × {num(d.blockSpecKg)} kg/khối
-                              </span>
-                            )}
-                          </td>
-                          <td className={`${td} whitespace-nowrap text-right`}>
-                            <Button
-                              type="button"
-                              variant={hasDetail ? "secondary" : "ghost"}
-                              size="icon"
-                              onClick={() => onEdit(d.key, { expanded: !d.expanded })}
-                              aria-expanded={d.expanded}
-                              aria-label="Mở/đóng chi tiết dòng"
-                              title="Chi tiết dòng: quy cách kg/khối, tách râu + bao tử (cùng giá)."
-                            >
-                              <ChevronDown
-                                className={`transition-transform ${d.expanded ? "rotate-180" : ""}`}
-                                aria-hidden
-                              />
-                            </Button>
-                            <Button
-                              title="Bỏ dòng thành phẩm này khỏi phiên đang gõ (chưa lưu nên không đụng sổ)."
-                              variant="ghost"
-                              size="icon"
-                              aria-label="Bỏ dòng"
-                              onClick={() => onRemove(d.key)}
-                            >
-                              <X />
-                            </Button>
+                          <td className={`${td} whitespace-nowrap`}>
+                            <div className="flex items-center justify-end gap-1">
+                              {/* Chỉ có chi tiết khi đã chọn thành phẩm (quy cách nhớ về mặt hàng). */}
+                              {d.productId && (
+                                <Button
+                                  type="button"
+                                  variant={isSplit || d.expanded ? "secondary" : "outline"}
+                                  size="sm"
+                                  onClick={() => onEdit(d.key, { expanded: !d.expanded })}
+                                  aria-expanded={d.expanded}
+                                  aria-label="Chi tiết dòng"
+                                  title="Mở/đóng phần chi tiết của dòng: quy cách kg/khối, tách râu + bao tử."
+                                >
+                                  <span className="hidden @min-[40rem]:inline">Chi tiết</span>
+                                  <ChevronDown
+                                    className={`transition-transform ${d.expanded ? "rotate-180" : ""}`}
+                                    aria-hidden
+                                  />
+                                </Button>
+                              )}
+                              <Button
+                                title="Bỏ dòng thành phẩm này khỏi phiên đang gõ (chưa lưu nên không đụng sổ)."
+                                variant="ghost"
+                                size="icon"
+                                aria-label="Bỏ dòng"
+                                onClick={() => onRemove(d.key)}
+                              >
+                                <X />
+                              </Button>
+                            </div>
                           </td>
                         </tr>
 
-                        {d.expanded && (
+                        {d.expanded && d.productId && (
                           <tr className="bg-accent/30">
                             <td className="border-b border-border px-2 pt-2 pb-3" colSpan={4}>
                               <div className="sticky left-2 flex max-w-[calc(100vw-8.5rem)] flex-wrap items-end gap-4">
@@ -281,50 +302,42 @@ export function ProductionLinesTable({
                                   navCol="quycach"
                                   className="min-w-[8rem] flex-1 sm:max-w-[12rem]"
                                   value={d.blockSpecKg || null}
-                                  onChange={(v) => {
-                                    const s = v ?? 0;
-                                    const b = d.blocksCount || 0;
-                                    onEdit(
-                                      d.key,
-                                      b > 0 && s > 0 && !isSplit
-                                        ? { blockSpecKg: s, quantityKg: b * s }
-                                        : { blockSpecKg: s }
-                                    );
-                                  }}
+                                  onChange={(v) => onEdit(d.key, patchBlockSpec(d, v ?? 0))}
                                 />
-                                <NumberField
-                                  label="Râu"
-                                  unit="kg"
-                                  navCol="rau"
-                                  className="min-w-[8rem] flex-1 sm:max-w-[12rem]"
-                                  value={d.tentacleKg || null}
-                                  onChange={(v) =>
-                                    onEdit(d.key, { tentacleKg: v ?? 0 })
-                                  }
-                                />
-                                <NumberField
-                                  label="Bao tử"
-                                  unit="kg"
-                                  navCol="baotu"
-                                  className="min-w-[8rem] flex-1 sm:max-w-[12rem]"
-                                  value={d.stomachKg || null}
-                                  onChange={(v) =>
-                                    onEdit(d.key, { stomachKg: v ?? 0 })
-                                  }
-                                />
+                                {showSplit ? (
+                                  <>
+                                    <NumberField
+                                      label="Râu"
+                                      unit="kg"
+                                      navCol="rau"
+                                      className="min-w-[8rem] flex-1 sm:max-w-[12rem]"
+                                      value={d.tentacleKg || null}
+                                      onChange={(v) => onEdit(d.key, { tentacleKg: v ?? 0 })}
+                                    />
+                                    <NumberField
+                                      label="Bao tử"
+                                      unit="kg"
+                                      navCol="baotu"
+                                      className="min-w-[8rem] flex-1 sm:max-w-[12rem]"
+                                      value={d.stomachKg || null}
+                                      onChange={(v) => onEdit(d.key, { stomachKg: v ?? 0 })}
+                                    />
+                                  </>
+                                ) : (
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    className="border-dashed"
+                                    title="Mặt hàng này bán tách râu + bao tử (cùng giá)? Mở hai ô kg — Số lượng sẽ bằng tổng hai ô."
+                                    onClick={() => onEdit(d.key, { splitOpen: true })}
+                                  >
+                                    <Plus />
+                                    Tách râu + bao tử
+                                  </Button>
+                                )}
                                 <p className="basis-full text-sm text-muted-foreground">
-                                  Quy cách = kg mỗi block: gõ số block là tự tính kg, lưu xong mặt hàng tự
-                                  nhớ. Tách râu + bao tử (cùng giá) thì Số lượng = tổng hai ô
-                                  {isSplit && (
-                                    <>
-                                      {" "}={" "}
-                                      <span className="tnum font-semibold text-foreground">
-                                        {num(getLineTotalKg(d))}
-                                      </span>{" "}
-                                      kg
-                                    </>
-                                  )}
-                                  .
+                                  Quy cách = kg mỗi block, lưu xong mặt hàng tự nhớ.
+                                  {showSplit && " Có tách thì Số lượng = râu + bao tử."}
                                 </p>
                               </div>
                             </td>
@@ -362,6 +375,7 @@ export function ProductionLinesTable({
                 </tbody>
               </table>
             </HorizontalScroll>
+            </div>
             <div className="p-2">
               <Button
                 title="Thêm một dòng thành phẩm nữa vào nhóm này (cùng khách hàng)."

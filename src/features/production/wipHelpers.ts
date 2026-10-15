@@ -36,7 +36,8 @@ export interface ProductionLine {
   processingType: string; // KIỂU CHẾ BIẾN (luộc/chần/cắt…) — nhãn nhóm, lưu theo dòng
   customerName: string; // KHÁCH — nhãn nhóm, lưu theo dòng
   productId: string;
-  expanded: boolean; // dòng con (râu/bao tử) đang mở — trạng thái hiển thị
+  expanded: boolean; // phần "Chi tiết" (quy cách, râu/bao tử) đang mở — trạng thái hiển thị
+  splitOpen?: boolean; // đã bấm "Tách râu + bao tử" cho mã không đánh dấu tách — trạng thái hiển thị
   quantityKg: number; // dùng khi KHÔNG tách
   tentacleKg: number;
   stomachKg: number;
@@ -71,6 +72,27 @@ export const isSplitLine = (d: ProductionLine): boolean =>
 /** Tổng khối lượng một dòng (tách thì cộng 2 thành phần). */
 export const getLineTotalKg = (d: ProductionLine): number =>
   isSplitLine(d) ? (d.tentacleKg || 0) + (d.stomachKg || 0) : d.quantityKg || 0;
+
+/**
+ * Kg đang là số TỰ TÍNH (block × quy cách) hoặc chưa gõ ⇒ được tính lại khi đổi block /
+ * quy cách. Kg người dùng tự gõ khác block × quy cách thì GIỮ — trước 2026-10-15 gõ block
+ * là đè kg không báo (VD 8,5 kg thành 8).
+ */
+export const isKgDerived = (d: ProductionLine): boolean =>
+  !(d.quantityKg > 0) ||
+  (d.blocksCount > 0 && d.blockSpecKg > 0 && Math.abs(d.quantityKg - d.blocksCount * d.blockSpecKg) < 1e-6);
+
+/** Đổi số block: kg tính lại = block × quy cách CHỈ khi kg đang tự tính (không tách). */
+export function patchBlocks(d: ProductionLine, blocks: number): Partial<ProductionLine> {
+  if (isSplitLine(d) || !(d.blockSpecKg > 0) || !isKgDerived(d)) return { blocksCount: blocks };
+  return { blocksCount: blocks, quantityKg: blocks * d.blockSpecKg };
+}
+
+/** Đổi quy cách kg/khối: như đổi block — chỉ tính lại kg khi kg đang tự tính. */
+export function patchBlockSpec(d: ProductionLine, spec: number): Partial<ProductionLine> {
+  if (isSplitLine(d) || !(d.blocksCount > 0) || !(spec > 0) || !isKgDerived(d)) return { blockSpecKg: spec };
+  return { blockSpecKg: spec, quantityKg: d.blocksCount * spec };
+}
 
 /** Dòng đủ để lưu: có thành phẩm + tổng > 0. */
 export const isLineComplete = (d: ProductionLine): boolean => Boolean(d.productId) && getLineTotalKg(d) > 0;

@@ -78,6 +78,12 @@
    iPad ngang cao ≥ 744px ⇒ không bao giờ khớp.
    ============================================================ */
 @custom-variant short-landscape (@media (orientation: landscape) and (max-height: 500px));
+
+/* `dark:` CHỈ bật khi có lớp `.dark` — app CHƯA có giao diện tối (color-scheme: light).
+   Mặc định Tailwind v4 hiểu `dark:` theo chế độ tối của HỆ ĐIỀU HÀNH ⇒ máy để tối thì
+   các class `dark:` của primitive shadcn (VD nút outline `dark:bg-input/30`) vẫn ăn:
+   ô chọn / nút phụ ngả xám trông như bị khóa (người dùng báo 2026-10-15). */
+@custom-variant dark (&:where(.dark, .dark *));
 @media (orientation: landscape) and (max-height: 500px) {
   :root {
     --spacing-header: 3rem;

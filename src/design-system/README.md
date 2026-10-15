@@ -549,6 +549,12 @@ bột tẩm — phải có **đủ hai thứ**, kể cả ô thêm về sau:
    (`features/catalog/QuickProductDelete.tsx`, kiểm bằng `lib/productUsage.ts`) — đang
    bật ở ô Thành phẩm của `/wip` để dọn 263 mục; chỉ hiện khi có quyền Xóa tab đó.
 
+**Không có giao diện tối — `dark:` bị khoá (2026-10-15).** tokens.css khai
+`@custom-variant dark (&:where(.dark, .dark *))`: `dark:` chỉ ăn khi có lớp `.dark`
+(app không dùng). Mặc định Tailwind v4 đọc chế độ tối của HỆ ĐIỀU HÀNH ⇒ máy để tối
+thì primitive shadcn (`dark:bg-input/30` ở nút outline) làm ô chọn / ô ngày / nút phụ
+ngả xám như bị khoá. Muốn làm giao diện tối thì gắn lớp `.dark` lên `<html>`.
+
 Ô chọn nằm TRONG bảng đọc như bảng kê (VD cột Vị trí ở Sổ kho tháng) dùng prop
 **`inline`**: nút không viền/không nền, khung chỉ hiện khi rê chuột / đang chọn.
 

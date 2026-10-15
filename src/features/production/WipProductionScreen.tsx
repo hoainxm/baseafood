@@ -1294,8 +1294,8 @@ export default function WipProductionScreen() {
         <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
           <p className="text-base font-semibold">Thành phẩm làm ra trong ngày</p>
           <p className="text-sm text-muted-foreground">
-            Gõ thẳng thành phẩm + kg — dòng trống kế tiếp tự hiện. Khách hàng đặt ở đầu
-            nhóm. Nút ▾ cuối dòng mở quy cách kg/khối và tách râu + bao tử.
+            Chọn thành phẩm, gõ số block hoặc kg — dòng mới tự hiện. Quy cách, tách râu
+            + bao tử ở nút “Chi tiết”.
           </p>
         </div>
 

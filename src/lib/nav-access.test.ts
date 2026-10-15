@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import { allowedIds, homeFor } from "./nav-access";
 import { PERMISSION_NAV_IDS, PERMISSION_RESOURCES, resolvePermissions } from "./permissions";
 
-// Chốt tập màn của từng vai trò. Đổi id màn (vd đổi route sang tiếng Anh 2026-10-13:
+// Chốt tập màn của từng vai trò (Đợt 4 2026-10-15 cố ý đổi so với Đợt 1–3 — ma trận
+// spec §7; tập cũ còn chốt ở permissions.test.ts › LEGACY). Đổi id màn (vd đổi route sang tiếng Anh 2026-10-13:
 // nxt-nl → nxt-material, ton-kho-thang → monthly-stock) KHÔNG được làm đổi quyền —
 // sửa test này chỉ khi chủ dự án đổi phân quyền thật. Đợt 1 phân quyền (2026-10-15)
 // chuyển tập màn sang lib/permissions.ts: mọi ca dưới đây GIỮ NGUYÊN, trừ ca
@@ -11,22 +12,29 @@ const sorted = (s: Set<string>) => [...s].sort();
 const ADMIN_NAV = new Set(PERMISSION_RESOURCES.filter((r) => r.adminOnly && r.navId).map((r) => r.navId));
 const NON_ADMIN_FULL = PERMISSION_NAV_IDS.filter((id) => !ADMIN_NAV.has(id)).sort();
 
-describe("allowedIds — tập màn theo vai trò", () => {
-  it("thủ kho nhập hàng", () => {
+describe("allowedIds — tập màn theo vai trò (Đợt 4, ma trận spec §7 — 2026-10-15)", () => {
+  const ACCOUNTING = ["balancing", "monthly-stock", "nxt", "nxt-material", "nxt-warehouse", "orders", "reconciliation", "sales"];
+  const PRODUCTION = ["packaging", "qc", "qr", "warehouse", "wip"];
+  const REPORTS = ["dashboard", "export-report", "production-report"];
+  it("ban giám đốc + kế toán trưởng thấy mọi màn nghiệp vụ (chỉ khác quyền BÊN TRONG)", () => {
+    for (const r of ["director", "vice-director", "chief-accountant"] as const) expect(sorted(allowedIds([r], false))).toEqual(NON_ADMIN_FULL);
+  });
+  it("kế toán: mọi màn trừ QC", () => {
+    expect(sorted(allowedIds(["accountant"], false))).toEqual(NON_ADMIN_FULL.filter((id) => id !== "qc"));
+  });
+  it("thủ kho nhập hàng: Nhập hàng + kho/tồn + QR + danh mục", () => {
     expect(sorted(allowedIds(["warehouse-keeper"], false))).toEqual(
-      ["catalog", "imports", "monthly-stock", "nxt-material", "qr", "warehouse"].sort()
+      ["catalog", "imports", "monthly-stock", "nxt", "nxt-material", "nxt-warehouse", "qr", "warehouse"]
     );
   });
-  it("tổ trưởng / quản đốc sản xuất", () => {
-    for (const r of ["team-leader", "manager-dong", "manager-ca", "manager-kho", "vice-manager"] as const)
-      expect(sorted(allowedIds([r], false))).toEqual(["catalog", "packaging", "qc", "qr", "warehouse", "wip"]);
+  it("quản đốc: khâu sản xuất + tồn kho + báo cáo; không sổ kế toán", () => {
+    for (const r of ["manager-dong", "manager-ca", "manager-kho"] as const)
+      expect(sorted(allowedIds([r], false))).toEqual([...PRODUCTION, ...REPORTS, "catalog", "nxt", "nxt-material", "nxt-warehouse"].sort());
   });
-  it("vai trò không giới hạn ⇒ mọi màn trừ màn admin", () => {
-    for (const r of ["director", "vice-director", "chief-accountant", "accountant"] as const)
-      expect(sorted(allowedIds([r], false))).toEqual(NON_ADMIN_FULL);
-    // bộ phận + vai trò không giới hạn (VD phó GĐ kiêm quản đốc Đông) ⇒ hợp = đầy đủ
-    expect(sorted(allowedIds(["warehouse-keeper", "director"], false))).toEqual(NON_ADMIN_FULL);
-    expect(sorted(allowedIds(["vice-director", "manager-dong"], false))).toEqual(NON_ADMIN_FULL);
+  it("phó quản đốc: khâu sản xuất + báo cáo; tổ trưởng: chỉ khâu sản xuất", () => {
+    expect(sorted(allowedIds(["vice-manager"], false))).toEqual([...PRODUCTION, ...REPORTS, "catalog"].sort());
+    expect(sorted(allowedIds(["team-leader"], false))).toEqual([...PRODUCTION, "catalog"].sort());
+    for (const id of ACCOUNTING) expect(allowedIds(["vice-manager"], false).has(id), id).toBe(false);
   });
   it("khu quản trị (Tổng quan quản trị · Người dùng · Vai trò & quyền · Nhật ký) chỉ admin", () => {
     expect([...ADMIN_NAV].sort()).toEqual(["admin", "audit", "roles", "users"]);

@@ -70,7 +70,12 @@ const productionWipRule: TableRule = (c) => {
 export const TABLE_WRITE_RULES: Readonly<Record<string, TableRule | null>> = {
   // Nhập hàng
   import_shipments: owners("imports"),
-  material_imports: owners("imports", "balancing"),
+  // Bỏ một dòng loại NL khi SỬA chuyến = Sửa chuyến (không cần quyền Xóa — kế toán nhập
+  // liệu không có Xóa vẫn sửa được chuyến ghi sai); xóa CẢ chuyến cần Xóa ở import_shipments.
+  material_imports: (c) =>
+    c.kind === "delete"
+      ? [["imports", "update"], ["balancing", "delete"]]
+      : [["imports", crudOf(c)], ["balancing", crudOf(c)]],
   daily_locks: lockOwners("imports"),
   scraps: owners("imports", "balancing"), // phế liệu ngày (nhập) + hút vào kỳ (cân đối)
   // Sản xuất

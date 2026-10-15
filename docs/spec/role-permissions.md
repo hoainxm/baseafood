@@ -1,5 +1,5 @@
 > Load khi: làm phân quyền theo vai trò / người dùng (xem · thêm · sửa · xóa · chốt · mở lại · duyệt · nạp · xuất), màn "Vai trò & quyền", ẩn/hiện nút theo quyền, siết RLS theo vai trò.
-> Trạng thái: **CHỐT 2026-10-15** — chủ dự án đồng ý cả 6 câu §10 theo khuyến nghị. **Đợt 1 + 2 + 3 ĐÃ BUILD 2026-10-15** (xem §6 Kết quả). `0062` đã chạy trên DB thật 2026-10-15. Còn Đợt 4–6.
+> Trạng thái: **CHỐT 2026-10-15** — chủ dự án đồng ý cả 6 câu §10 theo khuyến nghị. **Đợt 1 + 2 + 3 + 4 ĐÃ BUILD 2026-10-15** (xem §6 Kết quả). `0062` đã chạy trên DB thật 2026-10-15. Còn Đợt 5–6.
 last_verified: 2026-10-15
 
 # Phân quyền theo chức năng (CRUD+) cho từng vai trò và từng người
@@ -213,6 +213,16 @@ Hook nằm ở `lib/permissions.ts` + `features/shared/PermissionProvider.tsx` (
 - Khu **Quản trị** `/admin` + menu tài khoản ở avatar (đổi mật khẩu, giao diện, quản trị, đăng xuất) — yêu cầu thêm của chủ dự án cùng ngày.
 - Thứ tự triển khai: chạy `0062` → deploy app. Lùi: `drop table` 3 bảng ⇒ app về ma trận mặc định.
 
+### Kết quả Đợt 4 (2026-10-15)
+
+- **Đối chiếu trước khi siết** (nhật ký `audit_log` 60 ngày): chỉ `nnttruc` (Kế toán) ghi sổ — 48 chuyến nhập, xóa 1 chuyến, chốt ngày nhập 3, 16 dòng SX, chốt ngày SX 3, cân đối, sổ kho tháng, thêm mặt hàng/loại NL; `vtkluyen` (Phó QĐ) xóa 1 dòng SX; 3 kế toán khác, kế toán trưởng, giám đốc: không ghi. Áp nguyên §7 sẽ chặn Trúc ⇒ 2 điều chỉnh ở §7.
+- `DEFAULT_ROLE_PERMISSIONS` = ma trận §7 (dựng bằng bảng tài nguyên → hành động mỗi vai trò, `grantsOf`). Ma trận cũ giữ ở `LEGACY_ROLE_PERMISSIONS` — **lùi khẩn: đổi một dòng `DEFAULT_ROLE_PERMISSIONS = LEGACY_ROLE_PERMISSIONS` rồi deploy** (bảng quyền DB rỗng). Lùi riêng một vai trò không cần deploy: admin tick ở /roles (dòng `app_roles` thắng ma trận).
+- Lớp 3: bỏ một dòng loại NL khi sửa chuyến = **Sửa chuyến** (`material_imports` xóa ⇒ quyền Sửa ở Nhập hàng) — kế toán sửa chuyến ghi sai không vướng; xóa CẢ chuyến vẫn cần Xóa.
+- Test chốt bất biến: giám đốc/phó GĐ không có hành động ghi nào; Mở lại chỉ kế toán trưởng + 3 quản đốc; kế toán không Xóa/Mở lại nhưng có T S C ở Nhập hàng + SX; xưởng không thấy giá, thủ kho thấy giá nhập; phó QĐ Xóa được, không Chốt/Mở lại; người kiêm phó GĐ + quản đốc Đông = hợp quyền. `LEGACY` còn test riêng.
+- Thử trên preview (bản vá tạm, đã gỡ): Kế toán ghi được Nhập hàng/SX/Cân đối/Bán, thấy giá nhập, không nút Xóa, /qc bị đưa về; Giám đốc "Chỉ xem" mọi màn, không nút ghi/xóa; Quản đốc Đông ghi SX/QC/Đóng gói/Duyệt kho, không giá, không vào Nhập hàng/Cân đối/Bán.
+- Người dùng thật bị ảnh hưởng: hmtuong (Giám đốc) — chỉ xem + xuất; ttmhanh (Phó GĐ + QĐ Đông) — ghi SX, chỉ xem sổ kế toán; bthdung (Kế toán trưởng) — không ghi sản lượng/QC; nnttruc + 3 kế toán — không Xóa, không Mở lại, không thấy màn QC; vtkluyen (Phó QĐ) — không Chốt/Mở lại ngày SX, không thấy sổ tồn.
+- Theo dõi 1 tuần (tới 2026-10-22); Đợt 6 (RLS) chỉ cân nhắc sau 2 tuần ổn (§10 câu 6).
+
 ### Kết quả Đợt 3 (2026-10-15)
 
 - **Lớp 3 — chốt ghi:** `lib/writePermissions.ts` (`TABLE_WRITE_RULES` + `checkTableWrite`, có test) + `setWriteGuard` ở đầu `useTable.write` (lib/repo.ts). **Khác §4c:** luật theo màn THẬT SỰ ghi bảng (rà code): đủ quyền ở MỘT trong các màn đó là được — VD `production_wips` ⇐ wip / balancing / warehouse (chuyển `stocked` = Duyệt), `monthly_stock_ledger` ⇐ monthly-stock / balancing, `sales_*` ⇐ sales / orders, `lot_*` ⇐ wip / packaging / qr / orders / sales; bảng chốt (`daily_locks`, `production_locks`, `qc_locks`, `balancing_periods`) theo `isLocked` (chốt ⇒ Chốt, mở/xóa ⇒ Mở lại); danh mục ⇒ quyền tab `catalog.*` kể cả thêm nhanh ở màn khác; `nxt_snapshots` ⇒ Nạp. Bị chặn ⇒ cả lượt bỏ nguyên, báo lỗi, KHÔNG vào hàng chờ. Không chốt khi chạy localStorage / chưa có hồ sơ.
@@ -222,7 +232,9 @@ Hook nằm ở `lib/permissions.ts` + `features/shared/PermissionProvider.tsx` (
 
 Đợt 1–3 giao được giá trị (chặn thao tác nhầm ở giao diện) mà **không đụng RLS**. Đợt 6 chỉ cần khi app mở ra ngoài mạng nội bộ hoặc khi có người cố tình vượt giao diện.
 
-## 7. Ma trận đề xuất (Đợt 4 — để bàn, chưa áp)
+## 7. Ma trận (ĐÃ ÁP Đợt 4 — 2026-10-15, kèm 2 điều chỉnh)
+
+> **Điều chỉnh chủ dự án chốt khi áp** (sau khi đối chiếu nhật ký 60 ngày — chỉ Trúc (Kế toán) nhập liệu): (1) **Kế toán** thêm **T S C** ở Nhập hàng và Sản xuất TP (vẫn không Đ, không M); (2) **Phó QĐ** có **Đ** ở Sản xuất TP. Code: `DEFAULT_ROLE_PERMISSIONS` (lib/permissions.ts). Phạm vi (x)/(của mình) CHƯA chặn — Đợt 5: quản đốc mở lại được mọi xưởng, tổ trưởng sửa được dòng người khác.
 
 Ký hiệu: **X** xem · **T** thêm · **S** sửa · **Đ** xóa · **C** chốt · **M** mở lại · **D** duyệt · **N** nạp · **E** xuất/in · **G** xem giá · (x) = phạm vi xưởng mình · — = không thấy màn.
 

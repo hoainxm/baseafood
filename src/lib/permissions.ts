@@ -167,29 +167,194 @@ const IMPORT_DEPARTMENT_NAV = ["imports", "warehouse", "nxt-material", "monthly-
 const PRODUCTION_DEPARTMENT_NAV = ["wip", "packaging", "warehouse", "qc", "qr", "catalog"];
 
 const FULL = grantAll(() => true);
-const IMPORT_DEPARTMENT = grantAll(byNav(IMPORT_DEPARTMENT_NAV));
-const PRODUCTION_DEPARTMENT = grantAll(byNav(PRODUCTION_DEPARTMENT_NAV));
 
-/**
- * Ma trận mặc định Đợt 1 = HÀNH VI TRƯỚC ĐÂY: vai trò không giới hạn (giám đốc,
- * phó GĐ, kế toán, kế toán trưởng) làm được mọi thứ trừ màn của admin; hai bộ
- * phận làm được mọi thứ trong tập màn của mình. Siết thật là Đợt 4 (spec §7).
- * `admin` không có dòng — admin luôn toàn quyền, không đọc ma trận.
- */
 /** Ma trận theo slug vai trò (vai trò tự tạo không nằm trong kiểu `Role`). */
 export type RolePermissionMatrix = Readonly<Record<string, readonly PermissionGrant[]>>;
 
-export const DEFAULT_ROLE_PERMISSIONS: RolePermissionMatrix = {
+/**
+ * Ma trận Đợt 1–3 = HÀNH VI TRƯỚC 2026-10-15: giám đốc / phó GĐ / kế toán / kế toán
+ * trưởng làm được mọi thứ trừ màn admin; hai bộ phận mọi thứ trong tập màn của mình.
+ * GIỮ LẠI làm đường lùi khẩn: đổi `DEFAULT_ROLE_PERMISSIONS = LEGACY_ROLE_PERMISSIONS`
+ * rồi deploy là mọi người về quyền cũ (bảng quyền DB rỗng thì không cần gì thêm).
+ */
+export const LEGACY_ROLE_PERMISSIONS: RolePermissionMatrix = {
   director: FULL,
   "vice-director": FULL,
   "chief-accountant": FULL,
   accountant: FULL,
-  "warehouse-keeper": IMPORT_DEPARTMENT,
-  "team-leader": PRODUCTION_DEPARTMENT,
-  "manager-dong": PRODUCTION_DEPARTMENT,
-  "manager-ca": PRODUCTION_DEPARTMENT,
-  "manager-kho": PRODUCTION_DEPARTMENT,
-  "vice-manager": PRODUCTION_DEPARTMENT,
+  "warehouse-keeper": grantAll(byNav(IMPORT_DEPARTMENT_NAV)),
+  "team-leader": grantAll(byNav(PRODUCTION_DEPARTMENT_NAV)),
+  "manager-dong": grantAll(byNav(PRODUCTION_DEPARTMENT_NAV)),
+  "manager-ca": grantAll(byNav(PRODUCTION_DEPARTMENT_NAV)),
+  "manager-kho": grantAll(byNav(PRODUCTION_DEPARTMENT_NAV)),
+  "vice-manager": grantAll(byNav(PRODUCTION_DEPARTMENT_NAV)),
+};
+
+type RoleSpec = Readonly<Record<string, readonly PermissionAction[]>>;
+
+/** Dựng ô quyền từ bảng "tài nguyên → hành động" (bỏ hành động tài nguyên không có). */
+function grantsOf(spec: RoleSpec): PermissionGrant[] {
+  return Object.entries(spec).flatMap(([resource, actions]) => {
+    const r = PERMISSION_RESOURCES.find((x) => x.id === resource);
+    if (!r || r.adminOnly) return [];
+    return actions.filter((a) => r.actions.includes(a)).map((action) => ({ resource, action, scope: "all" as const }));
+  });
+}
+
+const VIEW: readonly PermissionAction[] = ["view"];
+const VIEW_EXPORT: readonly PermissionAction[] = ["view", "export"];
+const ALL_ACTIONS: readonly PermissionAction[] = PERMISSION_ACTIONS;
+const CATALOG_TABS = [
+  "catalog.products",
+  "catalog.customers",
+  "catalog.suppliers",
+  "catalog.material-types",
+  "catalog.batters",
+  "catalog.storage-locations",
+] as const;
+const catalogAll = (actions: readonly PermissionAction[]) =>
+  Object.fromEntries([...CATALOG_TABS.map((t) => [t, actions]), ["catalog.finished-goods", VIEW]]);
+
+/** Ban giám đốc: CHỈ xem + xuất, thấy giá (spec §7). */
+const DIRECTOR: RoleSpec = {
+  dashboard: VIEW_EXPORT,
+  imports: ["view", "export", "view-price"],
+  wip: VIEW_EXPORT,
+  packaging: VIEW,
+  qc: VIEW,
+  qr: VIEW_EXPORT,
+  warehouse: VIEW,
+  orders: VIEW,
+  sales: ["view", "view-price"],
+  balancing: ["view", "export", "view-price"],
+  "monthly-stock": VIEW_EXPORT,
+  reconciliation: VIEW_EXPORT,
+  "nxt-material": VIEW_EXPORT,
+  nxt: VIEW_EXPORT,
+  "nxt-warehouse": VIEW_EXPORT,
+  "production-report": VIEW_EXPORT,
+  "export-report": VIEW_EXPORT,
+  ...catalogAll(VIEW),
+};
+
+/** Kế toán trưởng: toàn quyền sổ kế toán, là người MỞ LẠI / XÓA sổ đã ghi. */
+const CHIEF_ACCOUNTANT: RoleSpec = {
+  dashboard: VIEW_EXPORT,
+  imports: ["view", "update", "delete", "lock", "unlock", "export", "view-price"],
+  wip: ["view", "unlock", "export"],
+  packaging: VIEW,
+  qc: VIEW,
+  qr: VIEW_EXPORT,
+  warehouse: VIEW,
+  orders: ["view", "create", "update", "delete"],
+  sales: ["view", "create", "update", "delete", "lock", "unlock", "view-price"],
+  balancing: ALL_ACTIONS,
+  "monthly-stock": ["view", "create", "update", "delete", "import", "export"],
+  reconciliation: ["view", "create", "update", "delete", "export"],
+  "nxt-material": ["view", "create", "update", "delete", "export"],
+  nxt: ["view", "create", "update", "delete", "export"],
+  "nxt-warehouse": ["view", "import", "export"],
+  "production-report": VIEW_EXPORT,
+  "export-report": VIEW_EXPORT,
+  ...catalogAll(["view", "create", "update", "delete"]),
+};
+
+/**
+ * Kế toán: ghi sổ, KHÔNG xóa, KHÔNG mở lại. Chủ dự án nới 2026-10-15: kế toán (Trúc)
+ * đang là người nhập liệu chính ⇒ có Thêm / Sửa / Chốt ở Nhập hàng + Sản xuất TP.
+ */
+const ACCOUNTANT: RoleSpec = {
+  dashboard: VIEW_EXPORT,
+  imports: ["view", "create", "update", "lock", "export", "view-price"],
+  wip: ["view", "create", "update", "lock", "export"],
+  packaging: VIEW,
+  qr: VIEW_EXPORT,
+  warehouse: VIEW,
+  orders: ["view", "create", "update"],
+  sales: ["view", "create", "update", "view-price"],
+  balancing: ["view", "create", "update", "export", "view-price"],
+  "monthly-stock": ["view", "create", "update", "import", "export"],
+  reconciliation: ["view", "create", "update", "export"],
+  "nxt-material": ["view", "create", "update", "export"],
+  nxt: ["view", "create", "update", "export"],
+  "nxt-warehouse": ["view", "import", "export"],
+  "production-report": VIEW_EXPORT,
+  "export-report": VIEW_EXPORT,
+  ...catalogAll(["view", "create", "update"]),
+};
+
+/** Thủ kho nhập hàng: toàn quyền Nhập hàng (thấy giá nhập vì chính họ ghi giá). */
+const WAREHOUSE_KEEPER: RoleSpec = {
+  imports: ["view", "create", "update", "delete", "lock", "export", "view-price"],
+  qr: ["view", "create", "export"],
+  warehouse: VIEW,
+  "monthly-stock": VIEW,
+  "nxt-material": VIEW,
+  nxt: VIEW,
+  "nxt-warehouse": VIEW,
+  ...catalogAll(VIEW),
+  "catalog.suppliers": ["view", "create", "update"],
+  "catalog.material-types": ["view", "create", "update"],
+};
+
+/** Quản đốc xưởng: toàn quyền khâu sản xuất, MỞ LẠI ngày SX (xưởng mình — phạm vi là Đợt 5). Không thấy giá. */
+const MANAGER: RoleSpec = {
+  dashboard: VIEW,
+  wip: ["view", "create", "update", "delete", "lock", "unlock", "export"],
+  packaging: ["view", "create", "update", "delete"],
+  qc: ["view", "create", "update", "lock", "unlock"],
+  qr: ["view", "create", "update", "export"],
+  warehouse: ["view", "approve"],
+  "nxt-material": VIEW,
+  nxt: VIEW,
+  "nxt-warehouse": VIEW,
+  "production-report": VIEW_EXPORT,
+  "export-report": VIEW_EXPORT,
+  ...catalogAll(VIEW),
+  "catalog.products": ["view", "create", "update"],
+  "catalog.batters": ["view", "create", "update"],
+};
+
+/** Phó quản đốc: ghi thành phẩm hằng ngày; được XÓA dòng ghi nhầm (chủ dự án 2026-10-15), không chốt / mở lại. */
+const VICE_MANAGER: RoleSpec = {
+  dashboard: VIEW,
+  wip: ["view", "create", "update", "delete"],
+  packaging: ["view", "create", "update"],
+  qc: ["view", "create", "update"],
+  qr: ["view", "create"],
+  warehouse: ["view", "approve"],
+  "production-report": VIEW_EXPORT,
+  "export-report": VIEW_EXPORT,
+  ...catalogAll(VIEW),
+};
+
+/** Tổ trưởng: ghi sản lượng / đóng gói / QC (dòng của mình — phạm vi là Đợt 5). */
+const TEAM_LEADER: RoleSpec = {
+  wip: ["view", "create", "update"],
+  packaging: ["view", "create", "update"],
+  qc: ["view", "create", "update"],
+  qr: ["view", "create"],
+  warehouse: VIEW,
+  ...catalogAll(VIEW),
+};
+
+/**
+ * Ma trận ĐANG ÁP — Đợt 4 (2026-10-15): ma trận mục tiêu spec §7 + 2 điều chỉnh chủ dự
+ * án chốt (kế toán có Thêm/Sửa/Chốt ở Nhập hàng + SX TP; phó QĐ có Xóa ở SX TP).
+ * `admin` không có dòng — admin luôn toàn quyền, không đọc ma trận. Vai trò đã chỉnh ở
+ * /roles (bảng app_roles) thắng ma trận này.
+ */
+export const DEFAULT_ROLE_PERMISSIONS: RolePermissionMatrix = {
+  director: grantsOf(DIRECTOR),
+  "vice-director": grantsOf(DIRECTOR),
+  "chief-accountant": grantsOf(CHIEF_ACCOUNTANT),
+  accountant: grantsOf(ACCOUNTANT),
+  "warehouse-keeper": grantsOf(WAREHOUSE_KEEPER),
+  "team-leader": grantsOf(TEAM_LEADER),
+  "manager-dong": grantsOf(MANAGER),
+  "manager-ca": grantsOf(MANAGER),
+  "manager-kho": grantsOf(MANAGER),
+  "vice-manager": grantsOf(VICE_MANAGER),
 };
 
 /* ---------- Tính quyền thực ---------- */

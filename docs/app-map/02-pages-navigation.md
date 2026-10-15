@@ -1,6 +1,7 @@
 > Load khi: thêm/bớt màn hình, đổi điều hướng, header, hay tìm xem một màn được gắn vào đâu.
 covers: src/App.tsx, src/features/shared/AppShell.tsx, src/features/shared/AccountMenu.tsx, src/features/admin/AdminHomeScreen.tsx, src/features/shared/NotFound.tsx, src/features/shared/guideContent.tsx, src/lib/nav-access.ts, src/lib/permissions.ts, src/features/shared/PermissionProvider.tsx
 last_verified: 2026-10-15
+<!-- updated: 2026-10-15 (d) — Đợt 4: tập màn từng vai trò theo ma trận §7. -->
 <!-- updated: 2026-10-15 (c) — khu Quản trị (/admin, /roles) + menu tài khoản ở avatar. -->
 <!-- updated: 2026-10-15 (b) — nút Đăng xuất luôn hiện trên header ở mọi cỡ màn. -->
 <!-- updated: 2026-10-15 — Đợt 1 phân quyền (spec/role-permissions.md): nav + chặn URL theo quyền `view` của lib/permissions.ts (tập màn từng vai trò KHÔNG đổi); chưa gán vai trò ⇒ màn "Chưa được cấp quyền"; chờ nạp hồ sơ ⇒ "Đang tải quyền truy cập…"; PermissionProvider bọc Outlet. -->
@@ -132,7 +133,7 @@ Cụm báo cáo khép vòng (đọc dữ liệu thật, không mock): `/producti
 | `/qr?tab=in · giai-doan · do-phu` | `?tab=print · stages` | `normalizeQrTab` |
 | `?lo=` (tem QR **đã in**) · `?duyet=` · `?don=&kiem=` | `?lot=` · `?approve=` · `?order=&check=` | `readParam` (đọc tên mới, không có thì tên cũ) + `parseQrCode` regex `(?:lot|lo)=` |
 
-Id nav = path route ⇒ đổi đồng bộ ở `KIT_NAV`, `NAV_TREE`, `HUONG_DAN` (guideContent) và tập quyền `nav-access.ts`; `nav-access.test.ts` chốt mỗi vai trò thấy ĐÚNG cùng tập màn như trước. **Khóa bảng tô màu (`rowMarkKey="ton-kho-thang"`, `"nxt-kho"`, `"danh-muc-…"`) KHÔNG đổi** — là khóa đã lưu trong `row_marks`.
+**Đợt 4 (2026-10-15) đổi tập màn có chủ đích** — ma trận spec §7: giám đốc/phó GĐ/kế toán trưởng thấy mọi màn nghiệp vụ; kế toán mọi màn trừ QC; thủ kho thêm Tồn TP + NXT kho; quản đốc thêm Tổng quan + tồn + báo cáo; phó QĐ thêm Tổng quan + báo cáo; tổ trưởng như cũ (`nav-access.test.ts` chốt tập mới). Id nav = path route ⇒ đổi đồng bộ ở `KIT_NAV`, `NAV_TREE`, `HUONG_DAN` (guideContent) và tập quyền `nav-access.ts`; `nav-access.test.ts` chốt mỗi vai trò thấy ĐÚNG cùng tập màn như trước. **Khóa bảng tô màu (`rowMarkKey="ton-kho-thang"`, `"nxt-kho"`, `"danh-muc-…"`) KHÔNG đổi** — là khóa đã lưu trong `row_marks`.
 
 ## Cạm bẫy bố cục
 

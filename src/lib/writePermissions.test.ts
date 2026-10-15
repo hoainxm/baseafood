@@ -37,14 +37,26 @@ describe("bảng → luật ghi", () => {
 });
 
 describe("checkTableWrite", () => {
-  it("ma trận mặc định = hành vi cũ: bộ phận ghi được màn của mình, không ghi được màn khác", () => {
+  it("ma trận Đợt 4: bộ phận ghi được màn của mình, không ghi được màn khác; giám đốc không ghi gì", () => {
     const keeper = perms(["warehouse-keeper"]);
     expect(checkTableWrite(keeper, "import_shipments", [create()])).toBeNull();
     expect(checkTableWrite(keeper, "suppliers", [create()])).toBeNull(); // thêm nhanh đại lý
+    expect(checkTableWrite(keeper, "products", [create()])?.resource).toBe("catalog.products");
     expect(checkTableWrite(keeper, "balancing_periods", [create()])?.resource).toBe("balancing");
-    const accountant = perms(["accountant"]);
-    for (const t of Object.keys(TABLE_WRITE_RULES).filter((t) => !["user_profiles", "app_roles", "role_permissions", "user_permissions"].includes(t)))
-      expect(checkTableWrite(accountant, t, [create(), update({}, { a: 1 }), remove()]), t).toBeNull();
+    const director = perms(["director"]);
+    for (const t of Object.keys(TABLE_WRITE_RULES).filter((t) => TABLE_WRITE_RULES[t]))
+      expect(checkTableWrite(director, t, [create()]), t).not.toBeNull();
+  });
+
+  it("kế toán (người nhập liệu): ghi + chốt ngày nhập / SX được; xóa chuyến / mở lại thì không; bỏ dòng khi sửa chuyến = Sửa", () => {
+    const acc = perms(["accountant"]);
+    expect(checkTableWrite(acc, "import_shipments", [create()])).toBeNull();
+    expect(checkTableWrite(acc, "material_imports", [create(), update({ kg: 1 }, { kg: 2 }), remove()])).toBeNull();
+    expect(checkTableWrite(acc, "daily_locks", [create({ isLocked: true })])).toBeNull();
+    expect(checkTableWrite(acc, "production_locks", [create({ isLocked: true })])).toBeNull();
+    expect(checkTableWrite(acc, "production_wips", [create({ status: "pending" })])).toBeNull();
+    expect(checkTableWrite(acc, "import_shipments", [remove()])?.action).toBe("delete");
+    expect(checkTableWrite(acc, "daily_locks", [update({ isLocked: true }, { isLocked: false })])?.action).toBe("unlock");
   });
 
   it("admin luôn được; bảng không chốt luôn được; không có dòng đổi ⇒ được", () => {

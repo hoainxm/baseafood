@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  LEGACY_ROLE_PERMISSIONS,
   buildRolePermissions,
   buildUserOverrides,
   explainPermission,
@@ -113,32 +114,84 @@ describe("resolvePermissions", () => {
   });
 });
 
-describe("ma trận mặc định Đợt 1 = hành vi trước đây", () => {
+describe("ma trận LEGACY (Đợt 1–3) = hành vi trước 2026-10-15 — giữ làm đường lùi khẩn", () => {
+  const legacy = (roles: Role[]) => resolvePermissions({ roles, isAdmin: false, rolePermissions: LEGACY_ROLE_PERMISSIONS });
   it("vai trò không giới hạn làm được MỌI hành động ở mọi màn trừ màn admin", () => {
     for (const role of ["director", "vice-director", "chief-accountant", "accountant"] as const) {
-      const p = resolveFor([role]);
+      const p = legacy([role]);
       for (const r of PERMISSION_RESOURCES)
         for (const a of r.actions) expect(can(p, r.id, a), `${role} ${r.id}:${a}`).toBe(!r.adminOnly);
     }
   });
-
   it("bộ phận làm được mọi hành động trong màn của mình, không gì ngoài", () => {
-    const p = resolveFor(["warehouse-keeper"]);
-    expect(can(p, "imports", "unlock")).toBe(true);
-    expect(can(p, "catalog.suppliers", "create")).toBe(true);
-    expect(can(p, "balancing", "view")).toBe(false);
-    const q = resolveFor(["team-leader"]);
-    expect(can(q, "wip", "delete")).toBe(true);
-    expect(can(q, "imports", "view")).toBe(false);
+    expect(can(legacy(["warehouse-keeper"]), "imports", "unlock")).toBe(true);
+    expect(can(legacy(["warehouse-keeper"]), "balancing", "view")).toBe(false);
+    expect(can(legacy(["team-leader"]), "wip", "delete")).toBe(true);
+  });
+});
+
+describe("ma trận ĐANG ÁP — Đợt 4 (spec §7 + 2 điều chỉnh chủ dự án 2026-10-15)", () => {
+  const writeActions = ["create", "update", "delete", "lock", "unlock", "approve", "import"] as const;
+
+  it("ban giám đốc CHỈ xem + xuất (không thêm/sửa/xóa/chốt/mở lại/duyệt/nạp ở đâu cả), thấy giá", () => {
+    for (const role of ["director", "vice-director"] as const) {
+      const p = resolveFor([role]);
+      for (const r of PERMISSION_RESOURCES) for (const a of writeActions) expect(can(p, r.id, a), `${role} ${r.id}:${a}`).toBe(false);
+      for (const r of ["imports", "sales", "balancing"]) expect(can(p, r, "view-price"), r).toBe(true);
+    }
   });
 
+  it("MỞ LẠI chỉ ở kế toán trưởng (sổ kế toán) + quản đốc (SX, QC); không vai trò nào khác", () => {
+    const unlockers = new Set<string>();
+    for (const [role, grants] of Object.entries(DEFAULT_ROLE_PERMISSIONS))
+      for (const g of grants) if (g.action === "unlock") unlockers.add(role);
+    expect([...unlockers].sort()).toEqual(["chief-accountant", "manager-ca", "manager-dong", "manager-kho"]);
+  });
+
+  it("kế toán KHÔNG xóa, KHÔNG mở lại; có Thêm/Sửa/Chốt ở Nhập hàng + SX TP (người nhập liệu)", () => {
+    const p = resolveFor(["accountant"]);
+    for (const r of PERMISSION_RESOURCES) {
+      expect(can(p, r.id, "delete"), `${r.id}:delete`).toBe(false);
+      expect(can(p, r.id, "unlock"), `${r.id}:unlock`).toBe(false);
+    }
+    for (const r of ["imports", "wip"]) for (const a of ["create", "update", "lock"] as const) expect(can(p, r, a), `${r}:${a}`).toBe(true);
+  });
+
+  it("bộ phận xưởng KHÔNG thấy giá ở đâu; thủ kho thấy giá nhập", () => {
+    for (const role of ["manager-dong", "manager-ca", "manager-kho", "vice-manager", "team-leader"] as const) {
+      const p = resolveFor([role]);
+      for (const r of PERMISSION_RESOURCES) expect(can(p, r.id, "view-price"), `${role} ${r.id}`).toBe(false);
+    }
+    expect(can(resolveFor(["warehouse-keeper"]), "imports", "view-price")).toBe(true);
+    expect(can(resolveFor(["warehouse-keeper"]), "sales", "view")).toBe(false);
+  });
+
+  it("phó quản đốc xóa được dòng SX (chủ dự án chốt) nhưng không chốt / mở lại; tổ trưởng không xóa", () => {
+    const vm = resolveFor(["vice-manager"]);
+    expect(can(vm, "wip", "delete")).toBe(true);
+    expect(can(vm, "wip", "lock")).toBe(false);
+    expect(can(vm, "wip", "unlock")).toBe(false);
+    expect(can(resolveFor(["team-leader"]), "wip", "delete")).toBe(false);
+  });
+
+  it("phó GĐ kiêm quản đốc Đông (người thật) ⇒ HỢP: ghi được SX, chỉ xem sổ kế toán", () => {
+    const p = resolveFor(["vice-director", "manager-dong"]);
+    expect(can(p, "wip", "unlock")).toBe(true);
+    expect(can(p, "balancing", "update")).toBe(false);
+    expect(can(p, "balancing", "view-price")).toBe(true);
+  });
+});
+
+describe("ma trận nào cũng hợp lệ", () => {
   it("mọi vai trò (trừ admin) có dòng; mọi ô trỏ tới tài nguyên + hành động có thật", () => {
-    for (const { value } of ROLES) if (value !== "admin") expect(DEFAULT_ROLE_PERMISSIONS[value], value).toBeDefined();
-    for (const grants of Object.values(DEFAULT_ROLE_PERMISSIONS))
-      for (const g of grants ?? []) {
-        const r = PERMISSION_RESOURCES.find((x) => x.id === g.resource);
-        expect(r && r.actions.includes(g.action), `${g.resource}:${g.action}`).toBe(true);
-      }
+    for (const matrix of [DEFAULT_ROLE_PERMISSIONS, LEGACY_ROLE_PERMISSIONS]) {
+      for (const { value } of ROLES) if (value !== "admin") expect(matrix[value], value).toBeDefined();
+      for (const grants of Object.values(matrix))
+        for (const g of grants ?? []) {
+          const r = PERMISSION_RESOURCES.find((x) => x.id === g.resource);
+          expect(r && r.actions.includes(g.action), `${g.resource}:${g.action}`).toBe(true);
+        }
+    }
   });
 
   it("chạy không đăng nhập (localStorage) ⇒ mọi màn trừ màn admin", () => {
@@ -198,7 +251,8 @@ describe("Đợt 2 — ma trận đọc từ DB (mig 0062)", () => {
     expect(can(acc, "balancing", "delete")).toBe(false);
     expect(can(acc, "imports", "view")).toBe(false);
     const dir = resolveFor(["director"], { rolePermissions: m });
-    expect(can(dir, "imports", "delete")).toBe(true);
+    expect(can(dir, "imports", "view")).toBe(true); // vai trò chưa chỉnh ⇒ ma trận mặc định
+    expect(can(dir, "imports", "delete")).toBe(false);
   });
 
   it("vai trò đã chỉnh mà bỏ hết ô ⇒ không quyền (KHÔNG rơi về mặc định)", () => {

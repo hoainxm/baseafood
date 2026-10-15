@@ -210,3 +210,33 @@ describe("đọc dữ liệu đã lưu trước khi đổi tên trường (2026-
     expect("componentRauKg" in wip).toBe(false);
   });
 });
+
+describe("kịch bản 4 — bị từ chối vì quyền (42501, phân quyền Đợt 6)", () => {
+  it("một dòng 42501 KHÔNG còn chặn cả bảng: dòng được phép lên, dòng bị từ chối ở lại hàng chờ (có cờ permission)", async () => {
+    const rows: Row[] = [
+      { id: "A", kg: 1 },
+      { id: "CAM", kg: 2 },
+      { id: "C", kg: 3 },
+    ];
+    const { gateway } = fakeGateway((r) =>
+      r.id === "CAM" ? { code: "42501", message: "new row violates row-level security policy" } : null,
+    );
+    const result = await pushQueue(mapping, { them: ["A", "CAM", "C"], xoa: [] }, rows, gateway);
+    expect(result.generalError).toBeUndefined();
+    expect(result.rowErrors).toEqual([{ key: "CAM", msg: "42501 new row violates row-level security policy", permission: true }]);
+    const remaining = dropSentKeys({ them: ["A", "CAM", "C"], xoa: [] }, result, jsonOf(rows));
+    expect(remaining.them).toEqual(["CAM"]); // không bỏ — được cấp quyền sẽ tự gửi
+  });
+
+  it("cả bảng bị từ chối (tài khoản không có quyền): chỉ thử vài dòng lẻ rồi giữ nguyên, không bắn hàng trăm yêu cầu", async () => {
+    const rows: Row[] = Array.from({ length: 40 }, (_, i) => ({ id: `R${i}`, kg: i }));
+    const { gateway, upsertBatches } = fakeGateway(() => ({ code: "42501", message: "permission denied" }));
+    const result = await pushQueue(mapping, { them: rows.map((r) => r.id), xoa: [] }, rows, gateway);
+    expect(result.generalError).toBeUndefined();
+    expect(result.rowErrors).toHaveLength(40);
+    expect(result.rowErrors.every((e) => e.permission)).toBe(true);
+    expect(upsertBatches.length).toBe(1 + 5); // 1 lượt gộp + 5 dòng thử
+    const remaining = dropSentKeys({ them: rows.map((r) => r.id), xoa: [] }, result, jsonOf(rows));
+    expect(remaining.them).toHaveLength(40);
+  });
+});

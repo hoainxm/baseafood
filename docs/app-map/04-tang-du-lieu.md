@@ -1,6 +1,7 @@
 > Load khi: đụng đọc/ghi dữ liệu, thêm bảng vào app, hay điều tra "số liệu biến mất / không lên máy chủ".
 covers: src/lib/repo.ts, src/lib/writePermissions.ts, src/lib/db.ts, src/lib/catalogRepo.ts, src/lib/batter.ts, src/lib/domesticSales.ts, src/lib/connectivity.ts, src/lib/supabase.ts, src/lib/store.ts, src/lib/audit.ts, src/lib/storage.ts, src/design-system/patterns/DataStatusBadge.tsx
 last_verified: 2026-10-15
+<!-- updated: 2026-10-15 (d) — hàng chờ: 42501 tách từng dòng, dòng bị từ chối ở lại hàng chờ (Đợt 6a). -->
 <!-- updated: 2026-10-15 (c) — chốt ghi kiểm thêm phạm vi dòng workshop/own (Đợt 5). -->
 <!-- updated: 2026-10-15 (b) — chốt quyền ghi ở useTable.write (writeGuard + lib/writePermissions.ts). -->
 <!-- updated: 2026-10-15 — 3 TableMapping phân quyền (0062) + luật đọc ma trận ở ShellLayout. -->
@@ -76,9 +77,10 @@ Bất biến:
 3. Mọi lần ghi, mở app, quay lại tab, và sự kiện `online` đều thử đẩy lại hàng chờ.
 4. Bản sao localStorage luôn được ghi, kể cả khi đang chạy Supabase — mất mạng giữa ca vẫn còn số để đối chiếu. Ngoại lệ có chủ đích: trường trong `TableMapping.uncachedFields` (hiện chỉ `reconciliation_runs.fileB64`, file Excel ~MB) bị bỏ khỏi bản sao ở dòng **đã lên server** — chép xuống là đầy quota ~5MB, mọi bảng khác mất lưới an toàn. Dòng còn chờ gửi vẫn giữ đủ.
 5. **Các lượt gửi một bảng chạy tuần tự** (`chuoiGui`). Gửi xong **đọc lại** hàng chờ và chỉ bỏ khóa đã gửi mà dòng **chưa đổi tiếp** (`dropSentKeys`, so JSON `toRow`) — dòng ghi/sửa trong lúc đang gửi ở lại cho lượt sau. Đừng quay lại kiểu `luuCho({them:[],xoa:[]})`.
-6. **Một dòng hỏng không được kẹt cả bảng:** lượt upsert/xóa bị từ chối vì dữ liệu (SQLSTATE lớp 21/22/23 — 23505 trùng khóa duy nhất, 23502 NOT NULL…) ⇒ `pushQueue` gửi lại **từng dòng**; dòng lành ra khỏi hàng chờ, dòng hỏng ở lại và đèn đỏ ghi rõ khóa + mã lỗi (console có đủ danh sách). Lỗi mạng / bảng-cột chưa có (42xxx) thì giữ nguyên, không gửi lẻ.
-7. Upsert **gom theo bộ cột**: supabase-js gộp nhiều dòng lấy HỢP các cột, dòng thiếu cột nhận DEFAULT (`defaultToNull:false`) cả ở nhánh UPDATE ⇒ đè mất giá trị đang có. Cột gửi có điều kiện (`file_b64`, `debt_kg`, `stock_line_id`…) vì vậy không bị DEFAULT đè.
-8. `save()` / `luuCho()` trả `false` khi localStorage đầy ⇒ hook báo đèn kết nối (đỏ, "Bộ nhớ trình duyệt đầy…") thay vì nuốt im.
+6. **Bị từ chối vì quyền (`42501`, Đợt 6) cũng tách từng dòng** (trước đây là lỗi chung ⇒ cả bảng dừng): dòng được phép lên, dòng bị từ chối Ở LẠI hàng chờ (có quyền là tự gửi), cả bảng bị từ chối thì chỉ thử 5 dòng; đèn báo "không đủ quyền".
+7. **Một dòng hỏng không được kẹt cả bảng:** lượt upsert/xóa bị từ chối vì dữ liệu (SQLSTATE lớp 21/22/23 — 23505 trùng khóa duy nhất, 23502 NOT NULL…) ⇒ `pushQueue` gửi lại **từng dòng**; dòng lành ra khỏi hàng chờ, dòng hỏng ở lại và đèn đỏ ghi rõ khóa + mã lỗi (console có đủ danh sách). Lỗi mạng / bảng-cột chưa có (42xxx) thì giữ nguyên, không gửi lẻ.
+8. Upsert **gom theo bộ cột**: supabase-js gộp nhiều dòng lấy HỢP các cột, dòng thiếu cột nhận DEFAULT (`defaultToNull:false`) cả ở nhánh UPDATE ⇒ đè mất giá trị đang có. Cột gửi có điều kiện (`file_b64`, `debt_kg`, `stock_line_id`…) vì vậy không bị DEFAULT đè.
+9. `save()` / `luuCho()` trả `false` khi localStorage đầy ⇒ hook báo đèn kết nối (đỏ, "Bộ nhớ trình duyệt đầy…") thay vì nuốt im.
 
 **Chưa làm (có chủ đích): gửi chỉ cột đã đổi.** Hai máy sửa CÙNG dòng thì upsert cả dòng của máy sau vẫn đè cột máy trước vừa đổi; nạp lại khi quay lại tab chỉ thu hẹp cửa sổ này. Patch-cột cần lưu bộ cột đổi vào hàng chờ + upsert từng nhóm cột + dự phòng khi dòng đã bị máy khác xóa (UPDATE trúng 0 dòng = mất lặng) — rủi ro với sổ thật, để khi có yêu cầu cụ thể.
 

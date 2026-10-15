@@ -1393,8 +1393,9 @@ export interface QueuePushResult {
   /** khóa đã gửi xong → JSON toRow đã gửi (null = dòng không còn để gửi). */
   sentUpserts: Map<string, string | null>;
   deleted: string[];
-  /** Dòng bị server từ chối vì DỮ LIỆU của chính nó (giữ lại trong hàng chờ). */
-  rowErrors: { key: string; msg: string }[];
+  /** Dòng bị server từ chối vì DỮ LIỆU của chính nó, hoặc vì tài khoản KHÔNG ĐỦ QUYỀN
+   *  (`permission`, 42501) — cả hai đều GIỮ LẠI trong hàng chờ (có quyền sẽ tự gửi). */
+  rowErrors: { key: string; msg: string; permission?: boolean }[];
   /** Lỗi chung (mất mạng, bảng/cột chưa có…) — dừng lượt, giữ nguyên phần chưa gửi. */
   generalError?: string;
 }
@@ -1403,7 +1404,20 @@ const pushErrorMessage = (e: PushError) => (e.code ? `${e.code} ${e.message}` : 
 /** Lỗi do dữ liệu một/vài dòng (SQLSTATE lớp 21 cardinality, 22 data, 23 ràng
  *  buộc: 23505 trùng khóa duy nhất, 23502 NOT NULL…) — gửi lại từng dòng thì các
  *  dòng lành vẫn lên. Lỗi khác (mạng, 42P01, 42703) dòng nào cũng hỏng như nhau. */
-const isRowLevelError = (e: PushError) => /^2[123]/.test(e.code ?? "");
+const isRowLevelError = (e: PushError) => /^2[123]/.test(e.code ?? "") || isPermissionError(e);
+/**
+ * 42501 insufficient_privilege — RLS / chốt quyền máy chủ từ chối (phân quyền Đợt 6, hoặc
+ * tài khoản chưa có vai trò — 0057). Trước đây thuộc "lỗi chung" ⇒ MỘT dòng bị từ chối là
+ * cả bảng dừng gửi, mọi dòng khác kẹt theo. Giờ tách từng dòng như lỗi dữ liệu: dòng được
+ * phép vẫn lên; dòng bị từ chối Ở LẠI hàng chờ (KHÔNG bỏ — 12/10/2026 cả sổ của một tài
+ * khoản mất hồ sơ bị từ chối, gắn lại hồ sơ là số phải tự lên).
+ */
+const isPermissionError = (e: PushError) => e.code === "42501";
+/** Lượt gộp bị từ chối vì quyền: thử tối đa chừng này dòng lẻ; dòng nào cũng bị từ chối ⇒
+ *  coi cả lượt bị từ chối, không bắn hàng trăm yêu cầu mỗi lần đồng bộ. */
+const PERMISSION_PROBE_ROWS = 5;
+const rowErrorOf = (key: string, e: PushError) =>
+  isPermissionError(e) ? { key, msg: pushErrorMessage(e), permission: true } : { key, msg: pushErrorMessage(e) };
 
 /**
  * Gửi hàng chờ của một bảng qua `cong`. Upsert GOM THEO BỘ CỘT: supabase-js gộp
@@ -1445,14 +1459,23 @@ export async function pushQueue<T>(
     }
     if (!isRowLevelError(e)) return { ...result, generalError: pushErrorMessage(e) };
     if (items.length === 1) {
-      result.rowErrors.push({ key: items[0].key, msg: pushErrorMessage(e) });
+      result.rowErrors.push(rowErrorOf(items[0].key, e));
       continue;
     }
-    for (const g of items) {
+    let deniedStreak = 0;
+    for (let i = 0; i < items.length; i++) {
+      const g = items[i];
+      if (isPermissionError(e) && deniedStreak >= PERMISSION_PROBE_ROWS && deniedStreak === i) {
+        // Mấy dòng đầu đều bị từ chối vì quyền ⇒ phần còn lại cũng vậy; giữ chờ, không gửi.
+        for (const rest of items.slice(i)) result.rowErrors.push(rowErrorOf(rest.key, e));
+        break;
+      }
       const e1 = await gateway.upsert([g.row]);
       if (!e1) result.sentUpserts.set(g.key, g.json);
-      else if (isRowLevelError(e1)) result.rowErrors.push({ key: g.key, msg: pushErrorMessage(e1) });
-      else return { ...result, generalError: pushErrorMessage(e1) };
+      else if (isRowLevelError(e1)) {
+        result.rowErrors.push(rowErrorOf(g.key, e1));
+        if (isPermissionError(e1)) deniedStreak++;
+      } else return { ...result, generalError: pushErrorMessage(e1) };
     }
   }
 
@@ -1461,13 +1484,21 @@ export async function pushQueue<T>(
     const e = await gateway.remove(remove);
     if (!e) result.deleted.push(...remove);
     else if (!isRowLevelError(e)) return { ...result, generalError: pushErrorMessage(e) };
-    else if (remove.length === 1) result.rowErrors.push({ key: remove[0], msg: pushErrorMessage(e) });
+    else if (remove.length === 1) result.rowErrors.push(rowErrorOf(remove[0], e));
     else {
-      for (const k of remove) {
+      let deniedStreak = 0;
+      for (let i = 0; i < remove.length; i++) {
+        const k = remove[i];
+        if (isPermissionError(e) && deniedStreak >= PERMISSION_PROBE_ROWS && deniedStreak === i) {
+          for (const rest of remove.slice(i)) result.rowErrors.push(rowErrorOf(rest, e));
+          break;
+        }
         const e1 = await gateway.remove([k]);
         if (!e1) result.deleted.push(k);
-        else if (isRowLevelError(e1)) result.rowErrors.push({ key: k, msg: pushErrorMessage(e1) });
-        else return { ...result, generalError: pushErrorMessage(e1) };
+        else if (isRowLevelError(e1)) {
+          result.rowErrors.push(rowErrorOf(k, e1));
+          if (isPermissionError(e1)) deniedStreak++;
+        } else return { ...result, generalError: pushErrorMessage(e1) };
       }
     }
   }
@@ -1590,6 +1621,12 @@ async function syncOnePass<T>(
   if (result.rowErrors.length > 0) {
     console.error(`[đồng bộ] ${mapping.table}: dòng bị máy chủ từ chối`, result.rowErrors);
     const label = TABLE_LABELS[mapping.table] ?? mapping.table;
+    const denied = result.rowErrors.filter((d) => d.permission).length;
+    if (denied === result.rowErrors.length)
+      return {
+        ok: false,
+        msg: `${label}: ${denied} dòng chưa lên máy chủ vì tài khoản KHÔNG ĐỦ QUYỀN — số vẫn giữ dưới máy, được cấp quyền sẽ tự gửi. Báo quản trị viên. Các dòng khác đã lên.`,
+      };
     const vd = result.rowErrors
       .slice(0, 3)
       .map((d) => `${d.key} (${d.msg})`)

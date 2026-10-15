@@ -34,10 +34,21 @@ function profileFromRow(r: Record<string, unknown>): UserProfile {
   };
 }
 
+/**
+ * Vì sao chưa vào được dù đã đăng nhập (màn "Chưa được cấp quyền" nói rõ cho người dùng):
+ * - `username-taken`: tài khoản này CHƯA có hồ sơ, tự tạo thì trùng tên đăng nhập với
+ *   hồ sơ của một tài khoản KHÁC (index duy nhất site_id + username) — thường là một
+ *   người có 2 tài khoản đăng nhập (sự cố 2026-10-15). Admin xử lý ở màn Người dùng.
+ * - `create-failed`: chưa có hồ sơ và tạo hụt vì lỗi khác.
+ */
+export type ProfileIssue = "username-taken" | "create-failed";
+
 /** Lấy hồ sơ của tài khoản đang đăng nhập; chưa có thì tạo (vai trò rỗng).
  * Họ tên/username lấy từ metadata lúc đăng ký (nếu có), không thì suy từ email. */
-async function getOrCreateProfile(session: Session): Promise<UserProfile | null> {
-  if (!supabase) return null;
+async function getOrCreateProfile(
+  session: Session
+): Promise<{ profile: UserProfile | null; issue?: ProfileIssue }> {
+  if (!supabase) return { profile: null };
   const id = session.user.id;
   const meta = (session.user.user_metadata ?? {}) as Record<string, unknown>;
   const username = s(meta.username) || emailToUsername(session.user.email ?? "");
@@ -50,16 +61,23 @@ async function getOrCreateProfile(session: Session): Promise<UserProfile | null>
     .maybeSingle();
   // Đọc LỖI (hết hạn token, rớt mạng, timeout) ≠ "chưa có hồ sơ": đừng ghi gì —
   // trước đây nhánh này upsert roles:"" đè mất vai trò thật của tài khoản.
-  if (error) return null;
-  if (data) return profileFromRow(data as Record<string, unknown>);
+  if (error) return { profile: null };
+  if (data) return { profile: profileFromRow(data as Record<string, unknown>) };
 
   // Chưa có hồ sơ thật sự ⇒ tạo mới; ignoreDuplicates: dòng đã có (máy khác vừa
   // tạo / select hụt) thì GIỮ NGUYÊN, không bao giờ đè vai trò.
   const row = { id, site_id: SITE_ID, full_name: fullName, username, roles: "" };
-  await supabase
+  const { error: createError } = await supabase
     .from("user_profiles")
     .upsert(row, { onConflict: "id", ignoreDuplicates: true });
-  return { id, fullName, username, roles: [] };
+  const profile = { id, fullName, username, roles: [] };
+  // Trước đây lỗi này bị nuốt ⇒ tưởng "chưa gán vai trò" trong khi tên đăng nhập đang
+  // gắn với hồ sơ của tài khoản khác. Giờ nói rõ để người dùng báo đúng việc cho admin.
+  if (createError) {
+    console.warn("[auth] Không tạo được hồ sơ người dùng", createError);
+    return { profile, issue: createError.code === "23505" ? "username-taken" : "create-failed" };
+  }
+  return { profile };
 }
 
 /** Dịch lỗi Supabase Auth sang tiếng Việt cho người dùng đọc được. */
@@ -99,7 +117,11 @@ export interface AuthResult {
 export function useAuth() {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [profileIssue, setProfileIssue] = useState<ProfileIssue | undefined>(undefined);
   const [isInitialized, setIsInitialized] = useState(!hasSupabase);
+  // Id tài khoản đã nạp xong hồ sơ (thành công HAY lỗi) — phân biệt "đang nạp"
+  // với "nạp xong mà vai trò rỗng" (màn Chưa được cấp quyền).
+  const [loadedProfileUid, setLoadedProfileUid] = useState<string | null>(null);
 
   useEffect(() => {
     if (!supabase) return;
@@ -131,7 +153,11 @@ export function useAuth() {
     let isCancelled = false;
     (async () => {
       const nd = await getOrCreateProfile(session);
-      if (!isCancelled) setProfile(nd);
+      if (!isCancelled) {
+        setProfile(nd.profile);
+        setProfileIssue(nd.issue);
+        setLoadedProfileUid(session.user.id);
+      }
     })();
     return () => {
       isCancelled = true;
@@ -214,6 +240,39 @@ export function useAuth() {
     []
   );
 
+  /**
+   * Người đang đăng nhập tự đổi mật khẩu. Kiểm mật khẩu HIỆN TẠI trước (đăng nhập
+   * lại bằng chính tài khoản này) — máy để quên đăng nhập thì người khác không đổi
+   * được. Đổi mật khẩu người KHÁC cần service role ⇒ chưa làm (spec role-permissions).
+   */
+  const changePassword = useCallback(
+    async (currentPassword: string, newPassword: string): Promise<AuthResult> => {
+      if (!supabase) return { ok: false, error: "Chưa cấu hình máy chủ" };
+      const email = session?.user.email;
+      if (!email) return { ok: false, error: "Chưa đăng nhập" };
+      if (!currentPassword) return { ok: false, error: "Nhập mật khẩu hiện tại" };
+      if (newPassword.length < 6) return { ok: false, error: "Mật khẩu mới tối thiểu 6 ký tự" };
+      if (newPassword === currentPassword)
+        return { ok: false, error: "Mật khẩu mới phải khác mật khẩu hiện tại" };
+      const check = await supabase.auth.signInWithPassword({ email, password: currentPassword });
+      if (check.error) {
+        return {
+          ok: false,
+          error: /invalid login credentials/i.test(check.error.message)
+            ? "Mật khẩu hiện tại không đúng"
+            : translateError(check.error.message),
+        };
+      }
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) return { ok: false, error: translateSignUpError(error.message) };
+      appendAuditEntries([
+        { action: "change-password", entity: "auth", entityKey: emailToUsername(email), summary: "Đổi mật khẩu" },
+      ]);
+      return { ok: true };
+    },
+    [session]
+  );
+
   const signOut = useCallback(async () => {
     appendAuditEntries([{ action: "logout", entity: "auth", entityKey: "", summary: "Đăng xuất" }]);
     await supabase?.auth.signOut();
@@ -224,11 +283,141 @@ export function useAuth() {
     session,
     profile,
     isLoading: hasSupabase && !isInitialized,
+    /** Tài khoản chưa có hồ sơ và tạo hụt — lý do để màn "Chưa được cấp quyền" nói rõ. */
+    profileIssue,
+    /** Đã đăng nhập, hồ sơ (vai trò) chưa nạp xong. */
+    isProfileLoading: hasSupabase && !!uid && loadedProfileUid !== uid,
     /** Có cần đăng nhập không (chỉ khi đã cấu hình Supabase). */
     requiresLogin: hasSupabase,
     isAdmin: rolesList(profile?.roles).includes("admin"),
     signIn,
     createAccount,
+    changePassword,
     signOut,
   };
+}
+
+/* ---------- Tài khoản đăng nhập chưa có hồ sơ (mig 0063) — CHỈ admin ---------- */
+
+export interface OrphanAccount {
+  id: string;
+  email: string;
+  username: string;
+  fullName: string;
+  createdAt: string;
+  lastSignInAt: string;
+  /** Hồ sơ có sẵn cùng tên đăng nhập (hoặc trùng khi bỏ dấu chấm) — gợi ý "gắn sang". */
+  suggestedProfile: { id: string; username: string; fullName: string; roles: Role[]; accountLastSignInAt: string } | null;
+}
+
+/** Một loại dữ liệu liên quan tới tài khoản (mig 0064 `orphan_account_usage`). */
+export interface AccountUsage {
+  category: string; // profile · self · user_permissions · reconciliation · storage · audit_log · row_marks · operator:<bảng> · recent_sign_in
+  label: string;
+  rowCount: number;
+  lastAt: string;
+  /** true = còn thứ gắn cứng với id tài khoản ⇒ máy chủ TỪ CHỐI xóa. */
+  blocking: boolean;
+}
+
+const usageFromRow = (r: Record<string, unknown>): AccountUsage => ({
+  category: s(r.category),
+  label: s(r.label),
+  rowCount: Number(r.row_count) || 0,
+  lastAt: s(r.last_at),
+  blocking: Boolean(r.blocking),
+});
+
+const orphanFromRow = (r: Record<string, unknown>): OrphanAccount => ({
+  id: s(r.id),
+  email: s(r.email),
+  username: s(r.username),
+  fullName: s(r.full_name),
+  createdAt: s(r.created_at),
+  lastSignInAt: s(r.last_sign_in_at),
+  suggestedProfile: r.suggested_profile_id
+    ? {
+        id: s(r.suggested_profile_id),
+        username: s(r.suggested_profile_username),
+        fullName: s(r.suggested_profile_full_name),
+        roles: rolesFromCsv(s(r.suggested_profile_roles)),
+        accountLastSignInAt: s(r.suggested_account_last_sign_in_at),
+      }
+    : null,
+});
+
+/**
+ * Tài khoản Auth chưa có hồ sơ — chỉ admin (hàm SQL tự kiểm `la_admin()`). Máy chưa
+ * chạy 0063 / không phải admin / chạy localStorage ⇒ `available = false`, màn ẩn mục.
+ * `relink(from, to)`: chuyển hồ sơ có sẵn sang tài khoản đúng (một câu UPDATE ở máy chủ).
+ */
+export function useOrphanAccounts(enabled: boolean) {
+  const [accounts, setAccounts] = useState<OrphanAccount[]>([]);
+  const [isAvailable, setAvailable] = useState(false);
+  const [version, setVersion] = useState(0);
+
+  useEffect(() => {
+    if (!supabase || !enabled) return;
+    let isCancelled = false;
+    supabase.rpc("list_orphan_auth_accounts").then(({ data, error }) => {
+      if (isCancelled) return;
+      if (error) {
+        console.warn("[auth] Không đọc được tài khoản chưa có hồ sơ (0063 chưa chạy?)", error);
+        setAvailable(false);
+        return;
+      }
+      setAvailable(true);
+      setAccounts(((data ?? []) as Record<string, unknown>[]).map(orphanFromRow));
+    });
+    return () => {
+      isCancelled = true;
+    };
+  }, [enabled, version]);
+
+  const reload = useCallback(() => setVersion((v) => v + 1), []);
+
+  const relink = useCallback(async (fromProfileId: string, toAccountId: string): Promise<AuthResult> => {
+    if (!supabase) return { ok: false, error: "Chưa cấu hình máy chủ" };
+    const { error } = await supabase.rpc("relink_user_profile", { p_from: fromProfileId, p_to: toAccountId });
+    if (error) return { ok: false, error: error.message };
+    appendAuditEntries([
+      {
+        action: "update",
+        entity: "user_profiles",
+        entityKey: toAccountId,
+        summary: `Chuyển hồ sơ ${fromProfileId} sang tài khoản đăng nhập ${toAccountId}`,
+      },
+    ]);
+    return { ok: true };
+  }, []);
+
+  /** Báo cáo dữ liệu liên quan trước khi xóa (0064). Lỗi (chưa chạy 0064…) ⇒ `ok: false`. */
+  const usage = useCallback(async (accountId: string): Promise<{ ok: boolean; rows: AccountUsage[]; error?: string }> => {
+    if (!supabase) return { ok: false, rows: [], error: "Chưa cấu hình máy chủ" };
+    const { data, error } = await supabase.rpc("orphan_account_usage", { p_user_id: accountId });
+    if (error) return { ok: false, rows: [], error: error.message };
+    return { ok: true, rows: ((data ?? []) as Record<string, unknown>[]).map(usageFromRow) };
+  }, []);
+
+  /**
+   * XÓA VĨNH VIỄN tài khoản đăng nhập mồ côi (0064). Máy chủ tự kiểm lại dữ liệu chặn
+   * ngay lúc xóa. Không hoàn tác được ⇒ ghi nhật ký kèm tóm tắt dữ liệu đã thấy.
+   */
+  const remove = useCallback(async (account: OrphanAccount, seen: AccountUsage[]): Promise<AuthResult> => {
+    if (!supabase) return { ok: false, error: "Chưa cấu hình máy chủ" };
+    const { error } = await supabase.rpc("delete_orphan_auth_account", { p_user_id: account.id });
+    if (error) return { ok: false, error: error.message };
+    const kept = seen.map((u) => `${u.label}: ${u.rowCount}`).join("; ");
+    appendAuditEntries([
+      {
+        action: "delete",
+        entity: "auth",
+        entityKey: account.id,
+        summary: `Xóa tài khoản đăng nhập chưa có hồ sơ ${account.email}${kept ? ` — dữ liệu liên quan giữ nguyên: ${kept}` : ""}`,
+      },
+    ]);
+    return { ok: true };
+  }, []);
+
+  return { accounts: isAvailable ? accounts : [], isAvailable, reload, relink, usage, remove };
 }

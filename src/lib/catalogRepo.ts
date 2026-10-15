@@ -42,6 +42,9 @@ import {
   BATTER_TYPE_TABLE,
   ROW_MARK_TABLE,
   DOMESTIC_SALE_TABLE,
+  APP_ROLE_TABLE,
+  ROLE_PERMISSION_TABLE,
+  USER_PERMISSION_TABLE,
   useTable,
 } from "@/lib/repo";
 import type {
@@ -293,6 +296,12 @@ export const useLotWaivers = () => useTable(LOT_WAIVER_TABLE);
  *  Màn hình KHÔNG gọi thẳng: đi qua `RowMarkProvider` (features/shared) gắn một lần
  *  ở ShellLayout, bảng bật bằng prop `rowMarkKey` của design-system. */
 export const useRowMarks = () => useTable(ROW_MARK_TABLE);
+
+/** Phân quyền (mig 0062) — vai trò đã chỉnh/tự tạo, ô quyền vai trò, chỉnh riêng từng người.
+ *  Đọc: ShellLayout (tính quyền thực) + màn Vai trò & quyền. Ghi: chỉ admin (RLS). */
+export const useAppRoles = () => useTable(APP_ROLE_TABLE);
+export const useRolePermissions = () => useTable(ROLE_PERMISSION_TABLE);
+export const useUserPermissions = () => useTable(USER_PERMISSION_TABLE);
 
 /** Nạp bộ demo hàng loạt không ghi nhật ký (lib/repo.ts) — chỉ DemoPackLoader dùng. */
 export { setAuditPaused } from "@/lib/repo";

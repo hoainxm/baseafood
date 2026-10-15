@@ -1,32 +1,19 @@
 // ============================================================
 // Tên file: src/lib/nav-access.ts
-// Phân quyền điều hướng theo VAI TRÒ — 2 giao diện bộ phận (họp 2026-08-22).
-// Thuần (pure) — không phụ thuộc React, dễ đổi bảng map ở một chỗ.
+// Điều hướng theo QUYỀN — màn nào thấy được, trang chủ của từng vai trò.
+// Thuần (pure) — không phụ thuộc React.
 // ============================================================
+// Tập màn từng vai trò KHÔNG khai ở đây nữa: lấy từ quyền `view` của
+// lib/permissions.ts (spec docs/spec/role-permissions.md, Đợt 1 2026-10-15).
 import type { Role } from "@/types";
+import {
+  PERMISSION_NAV_IDS,
+  resolvePermissions,
+  visibleNavIds,
+  type EffectivePermissions,
+} from "@/lib/permissions";
 
-/**
- * Hai bộ phận vận hành đầu chuỗi, mỗi bộ phận một tập màn + một trang chủ.
- * Vai trò KHÔNG nằm trong bảng này (giám đốc, phó GĐ, kế toán, kế toán trưởng,
- * admin) = xem đầy đủ — chỉ 2 bộ phận thao tác theo bước bị giới hạn nav cho gọn.
- */
-const DEPT_IMPORT = ["imports", "warehouse", "nxt-material", "monthly-stock", "qr", "catalog"];
-const DEPT_PRODUCTION = ["wip", "packaging", "warehouse", "qc", "qr", "catalog"];
-
-// Màn DEMO dữ liệu mẫu (DEMO_IDS / laDemo) đã GỠ 2026-10-12 — trình diễn dùng chế độ
-// demo (docs/spec/che-do-demo.md, CLAUDE.md quy tắc 15), không thêm màn mẫu nữa.
-
-/** Vai trò bị giới hạn → tập nav id được phép thấy. */
-export const ALLOWED_NAV: Partial<Record<Role, string[]>> = {
-  "warehouse-keeper": DEPT_IMPORT, // thủ kho / nhập hàng
-  "team-leader": DEPT_PRODUCTION, // tổ trưởng sản xuất
-  "manager-dong": DEPT_PRODUCTION, // quản đốc xưởng Đông
-  "manager-ca": DEPT_PRODUCTION, // quản đốc xưởng Cá
-  "manager-kho": DEPT_PRODUCTION, // quản đốc xưởng Khô
-  "vice-manager": DEPT_PRODUCTION, // phó quản đốc — ghi thành phẩm hằng ngày
-};
-
-/** Vai trò bị giới hạn → trang chủ (màn mở đầu khi đăng nhập vào). */
+/** Vai trò bộ phận → trang chủ (màn mở đầu khi đăng nhập vào). */
 export const HOME_BY_ROLE: Partial<Record<Role, string>> = {
   "warehouse-keeper": "imports",
   "team-leader": "wip",
@@ -36,28 +23,28 @@ export const HOME_BY_ROLE: Partial<Record<Role, string>> = {
   "vice-manager": "wip",
 };
 
-/** Trang chủ theo vai trò: vai trò bộ phận đầu tiên khớp, mặc định "dashboard". */
-export function homeFor(roles: Role[]): string {
+/**
+ * Trang chủ: vai trò bộ phận đầu tiên khớp, mặc định "dashboard". Có `perms` thì
+ * chỉ nhận trang thấy được (chống vòng chuyển hướng khi quyền bị chỉnh riêng);
+ * không trang nào thấy được ⇒ `null`.
+ */
+export function homeFor(
+  roles: readonly Role[],
+  perms?: EffectivePermissions,
+  /** Trang chủ admin đặt cho vai trò đã chỉnh (`app_roles.home_route`) — thắng mặc định. */
+  homeOverrides: Readonly<Record<string, string>> = {}
+): string | null {
+  const visible = perms ? visibleNavIds(perms) : null;
+  const ok = (id: string) => !visible || visible.has(id);
   for (const r of roles) {
-    const h = HOME_BY_ROLE[r];
-    if (h) return h;
+    const h = homeOverrides[r] || HOME_BY_ROLE[r];
+    if (h && ok(h)) return h;
   }
-  return "dashboard";
+  if (ok("dashboard")) return "dashboard";
+  return PERMISSION_NAV_IDS.find((id) => visible!.has(id)) ?? null;
 }
 
-/**
- * Tập nav id được phép, hoặc `null` = xem đầy đủ.
- * - Admin: luôn đầy đủ (kể cả /users).
- * - Chưa gán vai trò: đầy đủ (tránh kẹt; /users vẫn chặn riêng ở App).
- * - Có BẤT KỲ vai trò không-giới-hạn (giám đốc/kế toán…): đầy đủ.
- * - CHỈ khi mọi vai trò đều là bộ phận giới hạn → trả về đúng tập của bộ phận.
- */
-export function allowedIds(roles: Role[], laAdmin: boolean): Set<string> | null {
-  if (laAdmin) return null;
-  if (!roles.length) return null;
-  const hasUnrestricted = roles.some((r) => !ALLOWED_NAV[r]);
-  if (hasUnrestricted) return null;
-  const ids = new Set<string>();
-  for (const r of roles) for (const id of ALLOWED_NAV[r] ?? []) ids.add(id);
-  return ids;
+/** Tập mục nav thấy được của một người theo ma trận mặc định. */
+export function allowedIds(roles: readonly Role[], isAdmin: boolean): Set<string> {
+  return visibleNavIds(resolvePermissions({ roles, isAdmin }));
 }

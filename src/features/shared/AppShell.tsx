@@ -10,15 +10,14 @@ import {
   HoverHint,
   Logo,
   MEDIA_NARROW_SIDEBAR,
-  DisplaySettingsButton,
   GuideButton,
   DataSyncStatusButton,
-  ConfirmAction,
   useMediaQuery,
 } from "@/design-system";
 import { cn } from "@/lib/utils";
 import { readDevicePrefJson, writeDevicePrefJson } from "@/lib/devicePrefs";
 import { UpdateBanner } from "./UpdateBanner";
+import { AccountMenu, type AccountMenuProps } from "./AccountMenu";
 import {
   LayoutDashboard,
   ClipboardCheck,
@@ -41,13 +40,15 @@ import {
   CalendarRange,
   Ship,
   History,
+  ShieldCheck,
+  KeyRound,
+  LayoutGrid,
   PanelLeftClose,
   PanelLeftOpen,
   Menu,
   X,
   RefreshCw,
   Bell,
-  LogOut,
   ChevronDown,
   Search,
   type LucideIcon,
@@ -99,7 +100,9 @@ export const KIT_NAV: ShellNavItem[] = [
   { id: "monthly-stock", label: "Sổ kho theo tháng", icon: CalendarRange , description: "Sổ kho theo tháng dương lịch cho cả nguyên liệu, bán thành phẩm và thành phẩm — tồn cuối tháng này tự thành tồn đầu tháng sau." },
   { id: "reconciliation", label: "Đối soát hóa đơn điện tử", icon: FileCheck2 , description: "Đối soát sổ phần mềm với hóa đơn điện tử, tìm dòng lệch và lưu bản đối soát." },
   { id: "catalog", label: "Danh mục", icon: Library , description: "Danh mục dùng chung: mặt hàng, khách hàng, đại lý, loại nguyên liệu, bột tẩm, kho lưu trữ, thành phẩm." },
+  { id: "admin", label: "Tổng quan quản trị", icon: LayoutGrid , description: "Trang riêng của quản trị viên: tình trạng tài khoản, vai trò và lối vào các việc quản trị." },
   { id: "users", label: "Người dùng", icon: Users , description: "Quản lý tài khoản đăng nhập và vai trò của từng người." },
+  { id: "roles", label: "Vai trò & quyền", icon: KeyRound , description: "Tick quyền xem · thêm · sửa · xóa · chốt · mở lại… của từng vai trò ở từng màn, và chỉnh riêng cho từng người." },
   { id: "audit", label: "Nhật ký thao tác", icon: History , description: "Nhật ký thao tác: ai sửa gì, lúc nào, giá trị trước và sau." },
 ];
 
@@ -187,7 +190,13 @@ export const NAV_TREE: NavTreeGroup[] = [
   {
     name: "Hệ thống",
     icon: Library,
-    children: [{ ref: "catalog" }, { ref: "users" }, { ref: "audit" }],
+    children: [{ ref: "catalog" }],
+  },
+  {
+    // Chỉ admin thấy (mọi mục là tài nguyên adminOnly — lib/permissions.ts).
+    name: "Quản trị",
+    icon: ShieldCheck,
+    children: [{ ref: "admin" }, { ref: "users" }, { ref: "roles" }, { ref: "audit" }],
   },
 ];
 
@@ -447,17 +456,6 @@ function NavTree({
   );
 }
 
-function Initials(name: string): string {
-  return (
-    String(name || "?")
-      .trim()
-      .split(/\s+/)
-      .slice(-2)
-      .map((w) => w[0])
-      .join("")
-      .toUpperCase() || "?"
-  );
-}
 
 export interface ShellPageGuide {
   title: string;
@@ -483,6 +481,11 @@ export interface AppShellProps {
   notificationCount?: number;
   onOpenNotifications?: () => void;
   onLogout?: () => void;
+  /** Tên đăng nhập hiện trong menu tài khoản. */
+  username?: string;
+  onChangePassword?: AccountMenuProps["onChangePassword"];
+  /** Có ⇒ menu tài khoản có lối vào khu quản trị (admin). */
+  onOpenAdmin?: () => void;
   /** Danh sách nav (đã lọc theo quyền). Mặc định KIT_NAV. */
   items?: ShellNavItem[];
   children: ReactNode;
@@ -507,6 +510,9 @@ export default function AppShell({
   notificationCount,
   onOpenNotifications,
   onLogout: onSignOut,
+  username,
+  onChangePassword,
+  onOpenAdmin,
   items = KIT_NAV,
   children,
 }: AppShellProps) {
@@ -610,27 +616,10 @@ export default function AppShell({
               onToggle={toggleGroup}
             />
 
-            {/* Chân drawer: những gì KHÔNG còn chỗ trên header điện thoại. Máy xoay
-                ngang thấp: bỏ dòng tên người dùng để menu còn chỗ (chân không được
-                ăn quá nửa chiều cao drawer). */}
+            {/* Chân drawer: những gì KHÔNG còn chỗ trên header điện thoại. Tài khoản
+                (giao diện, mật khẩu, đăng xuất) nằm ở menu avatar trên header. */}
             <div className="shrink-0 space-y-3 border-t border-border p-3 short-landscape:p-2">
-              <div className="flex items-center gap-3 short-landscape:hidden">
-                <span
-                  aria-hidden
-                  className="flex size-tap shrink-0 items-center justify-center rounded-full bg-accent text-sm font-bold text-accent-foreground"
-                >
-                  {Initials(profile)}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold text-foreground">
-                    {profile}
-                  </p>
-                  <p className="truncate text-sm text-muted-foreground">{role}</p>
-                </div>
-              </div>
-
               <div className="flex flex-wrap items-center gap-2">
-                <DisplaySettingsButton account={account} />
                 {shift && (
                   <button
                     title="Đổi ca làm việc đang chọn — số liệu trên màn lọc theo ca này."
@@ -657,27 +646,6 @@ export default function AppShell({
                       </span>
                     )}
                   </button>
-                )}
-                {onSignOut && (
-                  <ConfirmAction
-                    title="Đăng xuất khỏi máy này?"
-                    description="Số liệu đã ghi vẫn còn. Vào lại phải nhập tên đăng nhập và mật khẩu."
-                    detail={`${profile} · ${role}`}
-                    confirmLabel="Đăng xuất"
-                    cancelLabel="Ở lại"
-                    icon={LogOut}
-                    onConfirm={onSignOut}
-                    trigger={
-                      <button
-                        title="Thoát tài khoản và quay về màn đăng nhập."
-                        type="button"
-                        className="press-feedback inline-flex min-h-10 items-center gap-2 rounded-lg border border-input px-3.5 text-sm font-semibold text-foreground hover:bg-muted hover:text-destructive"
-                      >
-                        <LogOut className="size-icon-sm" aria-hidden />
-                        Đăng xuất
-                      </button>
-                    }
-                  />
                 )}
               </div>
             </div>
@@ -751,45 +719,20 @@ export default function AppShell({
                 {guide.content}
               </GuideButton>
             )}
-            <span className="hidden md:inline-flex">
-              <DisplaySettingsButton account={account} />
-            </span>
             <DataSyncStatusButton />
 
-            <div className="hidden items-center gap-2 border-l border-border pl-2 md:flex md:gap-3 md:pl-3">
-              <span
-                aria-hidden
-                className="flex size-tap shrink-0 items-center justify-center rounded-full bg-accent text-sm font-bold text-accent-foreground"
-              >
-                {Initials(profile)}
-              </span>
-              <div className="hidden min-w-0 text-right xl:block">
-                <p className="truncate text-sm font-semibold text-foreground">
-                  {profile}
-                </p>
-                <p className="truncate text-sm text-muted-foreground">{role}</p>
-              </div>
-              {onSignOut && (
-                <ConfirmAction
-                  title="Đăng xuất khỏi máy này?"
-                  description="Số liệu đã ghi vẫn còn. Vào lại phải nhập tên đăng nhập và mật khẩu."
-                  detail={`${profile} · ${role}`}
-                  confirmLabel="Đăng xuất"
-                  cancelLabel="Ở lại"
-                  icon={LogOut}
-                  onConfirm={onSignOut}
-                  trigger={
-                    <button
-                      type="button"
-                      aria-label="Đăng xuất"
-                      title="Đăng xuất"
-                      className={cn(ICON_BUTTON_CLASS, "hover:text-destructive")}
-                    >
-                      <LogOut className="size-icon" aria-hidden />
-                    </button>
-                  }
-                />
-              )}
+            {/* Menu tài khoản ở avatar — MỌI cỡ màn: giao diện · mật khẩu · quản trị ·
+                đăng xuất (trước đây điện thoại chỉ có đăng xuất ở chân drawer). */}
+            <div className="flex items-center md:border-l md:border-border md:pl-3">
+              <AccountMenu
+                displayName={profile}
+                username={username}
+                role={role}
+                account={account}
+                onChangePassword={onChangePassword}
+                onOpenAdmin={onOpenAdmin}
+                onSignOut={onSignOut}
+              />
             </div>
           </div>
         </header>

@@ -4,7 +4,7 @@
 // Description: Main Application Component & Router Setup
 // ============================================================
 // src/App.tsx
-import { lazy, Suspense, useEffect } from "react";
+import { lazy, Suspense, useEffect, useMemo } from "react";
 import {
   HashRouter,
   Routes,
@@ -19,13 +19,24 @@ import LoginScreen from "@/features/auth";
 import { NotFound } from "@/features/shared";
 import AppShell, { KIT_NAV } from "@/features/shared/AppShell";
 import { RowMarkProvider } from "@/features/shared/RowMarkProvider";
+import { PermissionProvider } from "@/features/shared/PermissionProvider";
 import { PAGE_GUIDES } from "@/features/shared/guideContent";
 import { Toaster, applyDisplaySettings, ProcessingState, EmptyState } from "@/design-system";
-import { Users } from "lucide-react";
+import { KeyRound, ShieldOff, Users } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { setAuditOperator } from "@/lib/audit";
-import { roleLabel } from "@/types";
-import { allowedIds, homeFor } from "@/lib/nav-access";
+import { useAppRoles, useRolePermissions, useUserPermissions } from "@/lib/catalogRepo";
+import { homeFor } from "@/lib/nav-access";
+import {
+  OFFLINE_PERMISSIONS,
+  PERMISSION_NAV_IDS,
+  buildRolePermissions,
+  buildUserOverrides,
+  homeRoutesFromAppRoles,
+  resolvePermissions,
+  roleNames,
+  visibleNavIds,
+} from "@/lib/permissions";
 import { IS_DEMO, setDemoMode } from "@/lib/demoMode";
 import { DemoModeBanner, DemoPackLoader } from "@/features/shared/DemoMode";
 import { LEGACY_PATHS, normalizeCatalogTab } from "@/lib/legacyUrls";
@@ -48,6 +59,8 @@ const BalancingScreen = lazy(() => import("@/features/balancing"));
 const CatalogScreen = lazy(() => import("@/features/catalog"));
 const UserManagementScreen = lazy(() => import("@/features/users"));
 const AuditLogScreen = lazy(() => import("@/features/audit"));
+const AdminHomeScreen = lazy(() => import("@/features/admin/AdminHomeScreen")); // Tổng quan quản trị, route /admin
+const RolePermissionsScreen = lazy(() => import("@/features/admin/RolePermissionsScreen")); // Vai trò & quyền, route /roles
 const WipProductionScreen = lazy(() => import("@/features/production")); // Sản xuất BTP (WIP), route /wip
 const PackagingScreen = lazy(() => import("@/features/packaging")); // Đóng gói BTP → TP, route /packaging
 const QcChecklistScreen = lazy(() => import("@/features/quality-check")); // QC checklist chấm điểm, route /qc
@@ -88,21 +101,45 @@ function ShellLayout() {
   }, [auth.profile]);
 
   const seg = location.pathname.split("/").filter(Boolean)[0] ?? "dashboard";
-  const roles = auth.profile?.roles ?? [];
-  // 2 giao diện bộ phận: vai trò bộ phận chỉ thấy nav của bộ phận đó (null = đầy đủ).
-  const permittedIds = allowedIds(roles, auth.isAdmin);
-  const base = permittedIds
-    ? KIT_NAV.filter((n) => permittedIds.has(n.id))
-    : auth.isAdmin
-      ? KIT_NAV
-      : KIT_NAV.filter((n) => n.id !== "users" && n.id !== "audit");
-  const items = base;
+  const profile = auth.profile;
+  // Quyền thực (lib/permissions.ts, spec docs/spec/role-permissions.md). Chạy
+  // localStorage không đăng nhập, hoặc đọc hồ sơ LỖI (rớt mạng) ⇒ giữ hành vi cũ:
+  // mọi màn trừ màn admin (máy chủ vẫn chặn bằng RLS).
+  // Ma trận admin chỉnh (mig 0062). Chỉ tin khi CẢ HAI bảng đã nạp xong (hoặc lỗi ⇒
+  // bản sao dưới máy): đang nạp dở mà dùng thì vai trò đã chỉnh có thể tạm thành
+  // "không quyền" và bị đá về trang chủ. Bảng rỗng ⇒ ma trận mặc định (Đợt 1).
+  const [appRoles, , { status: appRoleStatus }] = useAppRoles();
+  const [rolePermissionRows, , { status: rolePermissionStatus }] = useRolePermissions();
+  const [userPermissionRows] = useUserPermissions();
+  const isMatrixLoaded = appRoleStatus !== "loading" && rolePermissionStatus !== "loading";
+  const matrix = useMemo(
+    () => (isMatrixLoaded ? buildRolePermissions(appRoles, rolePermissionRows) : undefined),
+    [isMatrixLoaded, appRoles, rolePermissionRows]
+  );
+  const permissions = useMemo(
+    () =>
+      auth.requiresLogin && profile
+        ? resolvePermissions({
+            roles: profile.roles,
+            isAdmin: auth.isAdmin,
+            rolePermissions: matrix,
+            overrides: buildUserOverrides(profile.id, userPermissionRows),
+          })
+        : OFFLINE_PERMISSIONS,
+    [auth.requiresLogin, auth.isAdmin, profile, matrix, userPermissionRows]
+  );
+  const roles = profile?.roles ?? [];
+  const visible = visibleNavIds(permissions);
+  const items = KIT_NAV.filter((n) => visible.has(n.id));
+  const home = homeFor(roles, permissions, homeRoutesFromAppRoles(appRoles));
+  // Đã nạp hồ sơ mà chưa được gán vai trò (hoặc bị chặn hết) ⇒ màn báo, không nav.
+  const hasNoAccess = !permissions.isAdmin && (!permissions.hasRoles || home === null);
 
-  // Vào path ngoài bộ phận (gõ URL / link cũ) ⇒ đưa về trang chủ bộ phận.
-  if (permittedIds && seg && !permittedIds.has(seg)) {
-    return <Navigate to={`/${homeFor(roles)}`} replace />;
+  // Vào màn không có quyền xem (gõ URL / link cũ) ⇒ về trang chủ của người đó.
+  if (!hasNoAccess && PERMISSION_NAV_IDS.includes(seg) && !visible.has(seg)) {
+    return <Navigate to={`/${home}`} replace />;
   }
-  const current = KIT_NAV.find((n) => n.id === seg);
+  const current = hasNoAccess ? undefined : KIT_NAV.find((n) => n.id === seg);
   const guide = PAGE_GUIDES[seg];
 
   return (
@@ -120,22 +157,41 @@ function ShellLayout() {
       displayName={
         auth.profile?.fullName || auth.profile?.username || "Người dùng"
       }
-      role={roleLabel(auth.profile?.roles ?? [])}
+      role={roleNames(auth.profile?.roles ?? [], appRoles)}
       shift="Ca A"
       notificationCount={3}
       onLogout={
         auth.requiresLogin && auth.session ? auth.signOut : undefined
       }
-      items={items}
+      username={profile?.username}
+      onChangePassword={auth.requiresLogin && auth.session ? auth.changePassword : undefined}
+      onOpenAdmin={auth.isAdmin ? () => navigate("/admin") : undefined}
+      items={hasNoAccess ? [] : items}
     >
-      {/* Tô màu dòng "đã dò" — một nguồn row_marks cho mọi bảng (prop `rowMarkKey`). */}
-      <RowMarkProvider username={username ?? ""}>
-        <DemoModeBanner />
-        <DemoPackLoader />
-        <Suspense fallback={<ProcessingState text="Đang mở màn hình…" />}>
-          <Outlet />
-        </Suspense>
-      </RowMarkProvider>
+      {hasNoAccess ? (
+        <EmptyState
+          icon={ShieldOff}
+          title="Chưa được cấp quyền"
+          description={
+            auth.profileIssue === "username-taken"
+              ? `Tài khoản bạn vừa đăng nhập chưa có hồ sơ, và tên đăng nhập “${profile?.username ?? ""}” đang gắn với một tài khoản khác. Báo quản trị viên: vào Người dùng → mục “Tài khoản đăng nhập chưa có hồ sơ” để gắn đúng hồ sơ cho bạn.`
+              : auth.profileIssue === "create-failed"
+                ? "Tài khoản của bạn chưa có hồ sơ và hệ thống chưa tạo được (lỗi máy chủ). Thử tải lại trang; vẫn vậy thì báo quản trị viên."
+                : "Tài khoản của bạn chưa được gán vai trò (hoặc vai trò chưa có quyền xem màn nào) nên chưa mở được màn nào. Báo quản trị viên gán vai trò, rồi đăng nhập lại."
+          }
+        />
+      ) : (
+        <PermissionProvider permissions={permissions}>
+          {/* Tô màu dòng "đã dò" — một nguồn row_marks cho mọi bảng (prop `rowMarkKey`). */}
+          <RowMarkProvider username={username ?? ""}>
+            <DemoModeBanner />
+            <DemoPackLoader />
+            <Suspense fallback={<ProcessingState text="Đang mở màn hình…" />}>
+              <Outlet />
+            </Suspense>
+          </RowMarkProvider>
+        </PermissionProvider>
+      )}
     </AppShell>
   );
 }
@@ -169,12 +225,21 @@ export default function App() {
     );
   }
 
+  // Chờ hồ sơ (vai trò) — kẻo nháy màn "Chưa được cấp quyền" hay về nhầm trang chủ.
+  if (auth.isProfileLoading) {
+    return (
+      <div className="flex min-h-dvh items-center justify-center p-6">
+        <ProcessingState text="Đang tải quyền truy cập…" />
+      </div>
+    );
+  }
+
   return (
     <>
       <HashRouter>
         <Routes>
           <Route element={<ShellLayout />}>
-            <Route path="/" element={<Navigate to={`/${homeFor(roles)}`} replace />} />
+            <Route path="/" element={<Navigate to={`/${homeFor(roles) ?? "dashboard"}`} replace />} />
 
             {/* MES */}
             <Route path="/dashboard" element={<DashboardScreen />} />
@@ -223,6 +288,27 @@ export default function App() {
                   />
                 ) : auth.isAdmin ? (
                   <UserManagementScreen createAccount={auth.createAccount} />
+                ) : (
+                  <Navigate to="/dashboard" replace />
+                )
+              }
+            />
+            <Route
+              path="/admin"
+              element={auth.isAdmin ? <AdminHomeScreen /> : <Navigate to="/dashboard" replace />}
+            />
+            <Route
+              path="/roles"
+              element={
+                auth.isAdmin && IS_DEMO ? (
+                  // Quyền là cấu hình THẬT, không thuộc bộ demo — như /users.
+                  <EmptyState
+                    icon={KeyRound}
+                    title="Đang ở chế độ demo"
+                    description="Vai trò và quyền là cấu hình thật, không thuộc bộ demo. Thoát demo (nút trên dải vàng) để chỉnh quyền."
+                  />
+                ) : auth.isAdmin ? (
+                  <RolePermissionsScreen />
                 ) : (
                   <Navigate to="/dashboard" replace />
                 )

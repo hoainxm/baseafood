@@ -31,44 +31,11 @@ export function DisplaySettingsButton({
   className?: string;
 }) {
   const [isOpen, setOpen] = React.useState(false);
-  const snap = React.useRef<DisplaySettingsSnapshot | null>(null);
-
-  const handleOpenChange = (open: boolean) => {
-    if (open) {
-      // Chụp trạng thái để có thể hoàn tác nếu người dùng Hủy.
-      snap.current = readDisplaySettings(account);
-    } else if (snap.current) {
-      // Đóng mà chưa Lưu ⇒ trả về mốc đã chụp.
-      writeDisplaySettings(account, snap.current);
-    }
-    setOpen(open);
-  };
-
-  const save = () => {
-    snap.current = null; // đã đồng ý → không hoàn tác nữa
-    setOpen(false);
-    // Không toast: giao diện đổi ngay trước mắt là phản hồi (README luật 8 — cài đặt hiển thị).
-  };
-
-  // Nút Hủy tự đóng (không qua onOpenChange của hộp thoại) ⇒ phải tự khôi phục mốc đã chụp.
-  const cancel = () => handleOpenChange(false);
-
   return (
-    <FormDialog
+    <DisplaySettingsDialog
+      account={account}
       open={isOpen}
-      onOpenChange={handleOpenChange}
-      title="Tùy chỉnh giao diện"
-      description="Xem trước ngay khi chỉnh. Bấm Lưu để giữ cho riêng tài khoản của bạn."
-      icon={Palette}
-      size="xl"
-      footer={
-        <>
-          <Button variant="outline" onClick={cancel}>
-            Hủy
-          </Button>
-          <Button variant="save" onClick={save}>Lưu</Button>
-        </>
-      }
+      onOpenChange={setOpen}
       trigger={
         <button
           type="button"
@@ -82,6 +49,67 @@ export function DisplaySettingsButton({
           <Palette className="size-6" aria-hidden />
         </button>
       }
+    />
+  );
+}
+
+/**
+ * Hộp "Tùy chỉnh giao diện" điều khiển từ ngoài (menu tài khoản ở header mở nó).
+ * Cùng luật draft: xem trước live, **Lưu** mới giữ, Hủy/đóng trả về như lúc mở.
+ */
+export function DisplaySettingsDialog({
+  account,
+  open,
+  onOpenChange,
+  trigger,
+}: {
+  account?: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  trigger?: React.ReactNode;
+}) {
+  const snap = React.useRef<DisplaySettingsSnapshot | null>(null);
+
+  // Chụp trạng thái lúc MỞ (kể cả mở từ ngoài, không qua trigger) để Hủy trả về được.
+  React.useEffect(() => {
+    if (open && !snap.current) snap.current = readDisplaySettings(account);
+  }, [open, account]);
+
+  const handleOpenChange = (next: boolean) => {
+    if (!next && snap.current) {
+      // Đóng mà chưa Lưu ⇒ trả về mốc đã chụp.
+      writeDisplaySettings(account, snap.current);
+      snap.current = null;
+    }
+    onOpenChange(next);
+  };
+
+  const save = () => {
+    snap.current = null; // đã đồng ý → không hoàn tác nữa
+    onOpenChange(false);
+    // Không toast: giao diện đổi ngay trước mắt là phản hồi (README luật 8 — cài đặt hiển thị).
+  };
+
+  // Nút Hủy tự đóng (không qua onOpenChange của hộp thoại) ⇒ phải tự khôi phục mốc đã chụp.
+  const cancel = () => handleOpenChange(false);
+
+  return (
+    <FormDialog
+      open={open}
+      onOpenChange={handleOpenChange}
+      title="Tùy chỉnh giao diện"
+      description="Xem trước ngay khi chỉnh. Bấm Lưu để giữ cho riêng tài khoản của bạn."
+      icon={Palette}
+      size="xl"
+      footer={
+        <>
+          <Button variant="outline" onClick={cancel}>
+            Hủy
+          </Button>
+          <Button variant="save" onClick={save} title="Giữ cỡ chữ, mật độ và bề rộng vừa chọn cho tài khoản của bạn.">Lưu</Button>
+        </>
+      }
+      trigger={trigger}
     >
       <DisplaySettingsPanel account={account} />
     </FormDialog>

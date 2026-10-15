@@ -47,7 +47,7 @@ export {
   applyDisplaySettings,
 } from "./patterns/DisplaySettings";
 export { DataSyncStatus, DataSyncStatusButton } from "./patterns/DataStatusBadge";
-export { DisplaySettingsButton } from "./patterns/ThemeToggleButton";
+export { DisplaySettingsButton, DisplaySettingsDialog } from "./patterns/ThemeToggleButton";
 export { GuideButton } from "./patterns/GuideButton";
 export { FormDialog, CloseButton } from "./patterns/FormDialog";
 export { SummaryTable, type SummaryTableColumn, type TableSelection } from "./patterns/SummaryTable";

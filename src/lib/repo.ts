@@ -51,6 +51,9 @@ import type {
   BatterType,
   DomesticSaleItem,
   RowMark,
+  AppRole,
+  RolePermission,
+  UserPermission,
 } from "@/types";
 import { rolesFromCsv, rolesToCsv } from "@/types";
 import { getProductBatterIds, sanitizeBatterKg } from "@/lib/batter";
@@ -1134,6 +1137,65 @@ export const ROW_MARK_TABLE: TableMapping<RowMark> = {
   }),
 };
 
+/** Vai trò đã chỉnh / tự tạo (mig 0062) — spec docs/spec/role-permissions.md. */
+export const APP_ROLE_TABLE: TableMapping<AppRole> = {
+  table: "app_roles",
+  localKey: "bsf.app-roles.v1",
+  getKey: theoId,
+  toRow: (x) => ({
+    id: x.id,
+    name: x.name,
+    description: x.description,
+    home_route: x.homeRoute,
+    sort_order: x.sortOrder,
+  }),
+  fromRow: (r) => ({
+    id: s(r.id),
+    name: s(r.name),
+    description: s(r.description),
+    homeRoute: s(r.home_route),
+    sortOrder: Number(r.sort_order) || 0,
+  }),
+};
+
+/** Ô quyền của vai trò đã chỉnh (mig 0062). */
+export const ROLE_PERMISSION_TABLE: TableMapping<RolePermission> = {
+  table: "role_permissions",
+  localKey: "bsf.role-permissions.v1",
+  getKey: theoId,
+  toRow: (x) => ({ id: x.id, role_id: x.roleId, resource: x.resource, action: x.action, scope: x.scope }),
+  fromRow: (r) => ({
+    id: s(r.id),
+    roleId: s(r.role_id),
+    resource: s(r.resource),
+    action: s(r.action),
+    scope: s(r.scope) || "all",
+  }),
+};
+
+/** Chỉnh quyền riêng từng người (mig 0062). */
+export const USER_PERMISSION_TABLE: TableMapping<UserPermission> = {
+  table: "user_permissions",
+  localKey: "bsf.user-permissions.v1",
+  getKey: theoId,
+  toRow: (x) => ({
+    id: x.id,
+    user_id: x.userId,
+    resource: x.resource,
+    action: x.action,
+    effect: x.effect,
+    scope: x.scope,
+  }),
+  fromRow: (r) => ({
+    id: s(r.id),
+    userId: s(r.user_id),
+    resource: s(r.resource),
+    action: s(r.action),
+    effect: s(r.effect) === "deny" ? "deny" : "allow",
+    scope: s(r.scope) || "all",
+  }),
+};
+
 /** Danh mục LOẠI BỘT TẨM (migration 0051) — sổ sản lượng nối theo TÊN. */
 export const BATTER_TYPE_TABLE: TableMapping<BatterType> = {
   table: "batter_types",
@@ -1789,6 +1851,9 @@ const TABLE_LABELS: Record<string, string> = {
   lot_dispatches: "Gắn lô cho hàng ra (truy xuất)",
   lot_waivers: "Lý do chưa gắn lô",
   row_marks: "Tô màu dòng",
+  app_roles: "Vai trò",
+  role_permissions: "Quyền của vai trò",
+  user_permissions: "Quyền riêng của người dùng",
 };
 
 /** Trường đổi giữa hai bản ghi → { trường: [trước, sau] }. */

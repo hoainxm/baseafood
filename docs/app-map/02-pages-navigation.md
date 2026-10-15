@@ -1,6 +1,9 @@
 > Load khi: thêm/bớt màn hình, đổi điều hướng, header, hay tìm xem một màn được gắn vào đâu.
-covers: src/App.tsx, src/features/shared/AppShell.tsx, src/features/shared/NotFound.tsx, src/features/shared/guideContent.tsx, src/lib/nav-access.ts
-last_verified: 2026-10-13
+covers: src/App.tsx, src/features/shared/AppShell.tsx, src/features/shared/AccountMenu.tsx, src/features/admin/AdminHomeScreen.tsx, src/features/shared/NotFound.tsx, src/features/shared/guideContent.tsx, src/lib/nav-access.ts, src/lib/permissions.ts, src/features/shared/PermissionProvider.tsx
+last_verified: 2026-10-15
+<!-- updated: 2026-10-15 (c) — khu Quản trị (/admin, /roles) + menu tài khoản ở avatar. -->
+<!-- updated: 2026-10-15 (b) — nút Đăng xuất luôn hiện trên header ở mọi cỡ màn. -->
+<!-- updated: 2026-10-15 — Đợt 1 phân quyền (spec/role-permissions.md): nav + chặn URL theo quyền `view` của lib/permissions.ts (tập màn từng vai trò KHÔNG đổi); chưa gán vai trò ⇒ màn "Chưa được cấp quyền"; chờ nạp hồ sơ ⇒ "Đang tải quyền truy cập…"; PermissionProvider bọc Outlet. -->
 <!-- updated: 2026-10-13 — Đợt 4 đặt tên: 6 route tiếng Việt → tiếng Anh + redirect vĩnh viễn, ?tab= và tham số mới (đọc cả cũ), id nav/gate đổi đồng bộ có test. -->
 <!-- re-verified: 2026-10-12 15:20 — AppShell: thu/mở sidebar (thuGon), header/sidebar/drawer cùng chiều cao, drawer chân nút toàn cục; FIX drift `h-20` → thật là `h-16`, nay là token `h-header`. -->
 <!-- updated: 2026-10-12 — XOAY NGANG iPhone/iPad: thanh bên TỰ thu về dải icon ở 768–1023px (iPhone ngang, iPad dọc; `useMediaQuery(MEDIA_NARROW_SIDEBAR)`), bấm nút thu/mở vẫn theo ý người dùng trong cùng cỡ màn. Chiều cao header = token `--spacing-header` (`h-header`/`top-header`), máy ngang thấp (cao ≤ 500px) thu 4rem→3rem + ẩn dòng breadcrumb + đệm trang 16px + chân drawer bỏ dòng tên. Khung có vùng an toàn tai thỏ/thanh Home (`px-safe`, `pb-safe`). Đổi màn: fade `enter-fade` (chỉ opacity). Không đổi route/nav/gate. -->
@@ -80,7 +83,7 @@ Cụm trái (`☰` · logo · tiêu đề) được ưu tiên ngân sách ngang 
 | Hướng dẫn "?" | `GuideButton` | Chỉ hiện ở trang có trong `guideContent.tsx` (registry route→nội dung). Mở hộp hướng dẫn dùng trang đó. |
 | Tùy chỉnh giao diện 🎨 | `DisplaySettingsButton` | Mở `DisplaySettingsPanel` (cỡ chữ · mật độ · bề rộng). Lưu **theo username** (`taiKhoan` prop). |
 | Trạng thái máy chủ | `DataSyncStatusButton` | Màu theo store `ketNoi`. Hover/bấm mở popover chi tiết + **Thử kết nối lại** (`probeKetNoi`). |
-| Tài khoản + Đăng xuất | (trong `AppShell`) | Tên + vai trò (ẩn text < xl) và nút Đăng xuất, sát phải. Điện thoại: ở chân drawer. |
+| Tài khoản | `features/shared/AccountMenu.tsx` (trong `AppShell`) | **Avatar ở góc phải header, MỌI cỡ màn** (tên + vai trò hiện từ xl). Bấm ⇒ menu: tên · @username · vai trò · **Tùy chỉnh giao diện** (thay nút 🎨 cũ trên header) · **Đổi mật khẩu** (khi đăng nhập máy chủ) · **Quản trị hệ thống** (admin ⇒ `/admin`) · **Đăng xuất** (hỏi xác nhận). Hộp thoại mở sau khi đóng menu. Chân drawer điện thoại chỉ còn Ca + Thông báo. |
 
 Cỡ chữ / trạng thái kết nối **không còn ở chân sidebar** (đã dời hết lên header). Đổi tài khoản → `ShellLayout` trong `App.tsx` gọi `applyDisplaySettings(username)` nạp lại giao diện của người vừa đăng nhập.
 
@@ -111,7 +114,12 @@ Cụm báo cáo khép vòng (đọc dữ liệu thật, không mock): `/producti
 
 Đối soát hóa đơn điện tử: `/reconciliation` (`features/reconciliation/ReconciliationScreen.tsx` — upload 1 file Excel gồm các sheet HĐĐT cổng thuế + sheet PHẦN MỀM kế toán, đối chiếu theo `MST bán · ký hiệu · số HĐ chuẩn`, quy về VND, ngưỡng khớp chỉnh được; xuất lại Excel tô màu. Công cụ kế toán, KHÔNG đọc DB/`repo.ts`; logic thuần ở `lib/einvoiceReconciliation.ts`. Xem [37-doi-soat-hddt.md](37-doi-soat-hddt.md)).
 
-`App.tsx` lọc `KIT_NAV` theo vai trò (bỏ `users` nếu không phải admin) rồi truyền vào `AppShell` qua prop `items`.
+`ShellLayout` (App.tsx) tính **quyền thực** một lần: `resolvePermissions({ roles, isAdmin })` ở [`lib/permissions.ts`](../../src/lib/permissions.ts) (chạy localStorage không đăng nhập, hoặc đọc hồ sơ lỗi ⇒ `OFFLINE_PERMISSIONS` = mọi màn trừ màn admin, như trước). Rồi:
+- lọc `KIT_NAV` theo `visibleNavIds` (có quyền `view` ở ít nhất một tài nguyên của mục) → prop `items` của `AppShell`;
+- gõ URL một màn có trong sổ tài nguyên mà không có `view` ⇒ `Navigate` về `homeFor(roles, perms)` (trang chủ vai trò; không thấy được thì `dashboard`, rồi màn đầu tiên thấy được). Route chuyển hướng cũ (`/production`…) và `/kit` không bị chặn — đích chuyển tới mới bị chặn;
+- đã nạp hồ sơ mà **chưa gán vai trò** ⇒ khung app không nav + `EmptyState` "Chưa được cấp quyền" (còn nút Đăng xuất). `App` chờ `auth.isProfileLoading` xong mới dựng router (không nháy màn này, không về nhầm trang chủ);
+- bọc `<Outlet />` trong `PermissionProvider` ⇒ màn hỏi `useCan("imports").delete` (gắn vào nút từng màn là Đợt 3).
+**Khu Quản trị** (nhóm nav riêng "Quản trị", chỉ admin — mọi mục là tài nguyên `adminOnly`): `/admin` Tổng quan quản trị (`features/admin/AdminHomeScreen.tsx` — thẻ số tài khoản / chưa gán vai trò / vai trò / người có quyền riêng, lối vào, bảng vai trò đang dùng) · `/users` · `/roles` Vai trò & quyền (`features/admin/RolePermissionsScreen.tsx`, `?tab=users&user=<id>`, `?role=<slug>`) · `/audit`. Bốn route vẫn gate thêm bằng `auth.isAdmin`; `/users` + `/roles` khóa khi đang chế độ demo. Thêm màn mới ⇒ khai tài nguyên trong `PERMISSION_RESOURCES` (test `permissions.test.ts` so `KIT_NAV` + route `App.tsx`, quên là đỏ).
 
 ### Đường dẫn & tham số cũ (tiếng Việt) — giữ vĩnh viễn (2026-10-13)
 

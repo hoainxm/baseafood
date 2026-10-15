@@ -101,6 +101,38 @@ export interface UserProfile {
 }
 
 /**
+ * Vai trò ĐÃ CHỈNH ma trận (vai trò hệ thống) hoặc admin TỰ TẠO (mig 0062).
+ * Vai trò không có dòng ở bảng `app_roles` ⇒ dùng ma trận mặc định trong
+ * lib/permissions.ts. Spec: docs/spec/role-permissions.md.
+ */
+export interface AppRole {
+  id: string; // slug vai trò (hệ thống: "accountant"…; tự tạo: "role-<ngẫu nhiên>")
+  name: string;
+  description: string;
+  homeRoute: string; // "" = theo mặc định
+  sortOrder: number;
+}
+
+/** Một ô quyền của vai trò đã chỉnh — id = `<roleId>|<resource>|<action>`. */
+export interface RolePermission {
+  id: string;
+  roleId: string;
+  resource: string;
+  action: string;
+  scope: string; // "all" | "workshop" | "own"
+}
+
+/** Chỉnh riêng một người — id = `<userId>|<resource>|<action>`. */
+export interface UserPermission {
+  id: string;
+  userId: string;
+  resource: string;
+  action: string;
+  effect: "allow" | "deny";
+  scope: string;
+}
+
+/**
  * Loài (nhóm thủy sản) — DANH SÁCH CHUẨN DUY NHẤT của toàn hệ thống.
  * Dùng cho cả loại nguyên liệu, mặt hàng và sổ nhập. Trước đây có 2 danh sách
  * lệch nhau (thiếu "Ghẹ" ở một nơi, thiếu "Bào ngư" ở nơi kia) → gộp về đây.

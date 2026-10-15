@@ -1,6 +1,8 @@
 > Load khi: thêm file mới, không biết đặt ở đâu, hay chuẩn bị import xuyên tầng.
 covers: src/**
-last_verified: 2026-10-13
+last_verified: 2026-10-15
+<!-- updated: 2026-10-15 (b) — thêm features/admin/ (AdminHomeScreen /admin, RolePermissionsScreen /roles) + features/shared/AccountMenu.tsx (menu avatar). -->
+<!-- updated: 2026-10-15 — thêm lib/permissions.ts (sổ tài nguyên + resolvePermissions, thuần) và features/shared/PermissionProvider.tsx (useCan), Đợt 1 phân quyền. -->
 <!-- re-verified: 2026-10-13 09:40 — danh sách thư mục features đối chiếu `ls src/features` (FIX drift: còn ghi tên Việt cũ nhap-hang/san-xuat/… dù thư mục thật tiếng Anh); THÊM thư mục scripts/ (cổng đặt tên, Đợt 0). -->
 <!-- updated: 2026-10-12 (b) — GỠ thư mục `features/quality/`, `features/traceability/`, `features/cold-storage/` + file `production/WorkOrderScreen.tsx`, `reports/ReportsScreen.tsx` (5 màn DEMO), `design-system/patterns/StatusChip.tsx` + `MockPatternData.tsx` (chỉ màn DEMO dùng); `patterns/SankeyChart*` + dep `d3-sankey` đã gỡ (thay bằng `ProportionBar.tsx` — `ProportionBar`). THÊM `lib/demoMode.ts` (chế độ demo — cờ + khóa/site, test), `lib/demoGenerator.ts` (bộ sinh demo, test; lib → lib: balancingCalc, inventory, dongChay), `features/shared/DemoMode.tsx` (DemoModeBanner · NapGoiDemo · DemoModeSection — App.tsx gắn 2 cái đầu ở ShellLayout, Tổng quan gắn cái cuối). `lib/db.ts` + `lib/supabase.ts` nay import `lib/demoMode.ts` (cheDo không import gì của app — tránh vòng). -->
 <!-- updated: 2026-10-12 — Tổng quan "dòng chảy số liệu": THÊM `src/lib/dataFlow.ts` (hàm THUẦN + test: sankey kg, băng chuyền 5 khâu, tồn theo ngày, định mức theo mặt hàng, cảnh báo chuỗi — lib → lib: inventory, inventoryFinished, truyXuatLo, balancingCalc) · design-system thêm `patterns/ProportionBar.tsx` (`ProportionBar`), `PipelineStages.tsx`, `TimeSeriesChart.tsx`, `useContainerWidth.ts`. `features/dashboard/` XOÁ 6 file mock chết (AlertPanel, CommonWidget, KPICard, LineStatusWidget, WorkOrderTable, mockDashboardData); `DashboardScreen` import `@/features/shared/useDuLieuTruyXuat`. KHÔNG dep mới (bản đầu dùng `d3-sankey` cho sơ đồ dòng chảy — người dùng thấy khó hiểu, đã gỡ cùng ngày, thay bằng `ProportionBar`). Spec: ../spec/che-do-demo.md §5b. -->
@@ -38,6 +40,8 @@ src/
 │   ├── dailyShipments.ts   gom dòng sổ nhập của một ngày → đại lý → chuyến (Cân đối, chỉ đọc) — 31-can-doi-ky.md
 │   ├── rowMarks.ts             tô màu dòng "đã dò": id dấu tất định, gom/đặt dấu (row_marks) — README design-system § Tô màu dòng
 │   ├── auth.ts              useAuth + Supabase Auth — 05-bao-mat-phan-quyen.md
+│   ├── permissions.ts       phân quyền thuần: sổ tài nguyên × 10 hành động, ma trận mặc định, resolvePermissions/can — spec/role-permissions.md
+│   ├── nav-access.ts        trang chủ theo vai trò + tập màn thấy được (lấy từ permissions.ts)
 │   ├── username.ts          họ tên → username + email tổng hợp
 │   ├── format.ts            num/kg/todayISO/viDate (locale vi-VN)
 │   ├── devicePrefs.ts       readDevicePref/writeDevicePref (+ `…Json`) — cài đặt giao diện THEO MÁY (không phải số liệu); màn hình dùng cái này thay vì gọi localStorage (luật 4)

@@ -776,7 +776,9 @@ thuộc về tiêu đề màn, xem § Quy chuẩn mobile.
 
 | Component | Vai trò |
 |---|---|
-| `DisplaySettingsButton` | Icon 🎨 → `FormDialog` chứa `DisplaySettingsPanel`. Nhận `account` để **lưu theo người dùng**. Có **draft**: xem trước live, **Lưu** mới giữ, **Hủy**/đóng khôi phục ảnh chụp (`readDisplaySettings`/`writeDisplaySettings`). |
+| Menu tài khoản (`features/shared/AccountMenu.tsx`) | **Avatar** ở góc phải header (mọi cỡ màn; tên + vai trò từ xl) → `Popover`: Tùy chỉnh giao diện · Đổi mật khẩu · Quản trị hệ thống (admin) · Đăng xuất. Gom MỌI việc của riêng người đăng nhập về một chỗ (2026-10-15); hộp thoại mở SAU khi đóng menu (không lồng hộp trong popover). Thêm việc cá nhân mới ⇒ thêm mục vào menu này, không thêm nút rời lên header. |
+| `DisplaySettingsDialog` | Hộp "Tùy chỉnh giao diện" điều khiển từ ngoài (`open`/`onOpenChange`, `trigger` tùy chọn) — menu tài khoản mở nó. |
+| `DisplaySettingsButton` | Icon 🎨 → `FormDialog` chứa `DisplaySettingsPanel` (không còn gắn trên header — đã vào menu tài khoản). Nhận `account` để **lưu theo người dùng**. Có **draft**: xem trước live, **Lưu** mới giữ, **Hủy**/đóng khôi phục ảnh chụp (`readDisplaySettings`/`writeDisplaySettings`). |
 | `DataSyncStatusButton` | Icon theo màu store `ketNoi`. Popover chi tiết + nút **Thử kết nối lại** (`probeKetNoi`). |
 | `GuideButton` | Icon "?" → hộp hướng dẫn của trang. Nội dung lấy từ `features/shared/guideContent.tsx`, chỉ hiện ở trang có trong registry. |
 

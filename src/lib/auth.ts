@@ -9,7 +9,7 @@ import type { Session } from "@supabase/supabase-js";
 import { supabase, hasSupabase, SITE_ID_THAT as SITE_ID, createTempClient } from "@/lib/supabase";
 import type { UserProfile, Role } from "@/types";
 import { rolesFromCsv, rolesToCsv, rolesList } from "@/types";
-import { emailToUsername, usernameToEmail } from "@/lib/username";
+import { emailToUsername, normalizeUsername, usernameToEmail } from "@/lib/username";
 import { setAuditOperator, appendAuditEntries } from "@/lib/audit";
 
 /**
@@ -175,7 +175,7 @@ export function useAuth() {
         password,
       });
       if (error) return { ok: false, error: translateError(error.message) };
-      const u = username.trim().toLowerCase();
+      const u = normalizeUsername(username);
       setAuditOperator({ username: u });
       appendAuditEntries([{ action: "login", entity: "auth", entityKey: u, summary: `Đăng nhập: ${u}` }]);
       return { ok: true };
@@ -196,7 +196,8 @@ export function useAuth() {
       roles: Role[] = []
     ): Promise<AuthResult> => {
       if (!supabase) return { ok: false, error: "Chưa cấu hình máy chủ" };
-      const u = username.trim().toLowerCase();
+      // Chỉ chữ thường không dấu + số — không dấu chấm (chốt 2026-10-15, lib/username.ts).
+      const u = normalizeUsername(username);
       if (!fullName.trim()) return { ok: false, error: "Nhập họ tên" };
       if (!u) return { ok: false, error: "Nhập tên đăng nhập" };
       if (password.length < 6)

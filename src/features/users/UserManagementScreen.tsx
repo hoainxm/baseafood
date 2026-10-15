@@ -9,7 +9,7 @@ import type { AppRole, UserProfile, Role } from "@/types";
 import { rolesList } from "@/types";
 import { useAppRoles, useUserProfiles } from "@/lib/catalogRepo";
 import { listRoleOptions, roleNames } from "@/lib/permissions";
-import { fullNameToUsername } from "@/lib/username";
+import { fullNameToUsername, normalizeUsername } from "@/lib/username";
 import { useOrphanAccounts, type AccountUsage, type AuthResult, type OrphanAccount } from "@/lib/auth";
 import {
   Tag,
@@ -534,7 +534,7 @@ export default function UserManagementScreen({
   const saveOrphanProfile = () => {
     if (!profileFor) return;
     const f = profileFor.form;
-    const username = f.username.trim().toLowerCase();
+    const username = normalizeUsername(f.username);
     const ls: FieldError[] = [];
     if (!f.fullName.trim()) ls.push({ field: "Họ tên", message: "Chưa nhập họ tên" });
     if (!username) ls.push({ field: "Tên đăng nhập", message: "Chưa nhập tên đăng nhập" });
@@ -704,7 +704,7 @@ export default function UserManagementScreen({
           setProfileErrors([]);
           setProfileFor({
             account,
-            form: { id: account.id, fullName: account.fullName, username: account.username, roles: [] },
+            form: { id: account.id, fullName: account.fullName, username: normalizeUsername(account.username), roles: [] },
           });
         }}
       />
@@ -820,13 +820,13 @@ export default function UserManagementScreen({
               <Field
                 label="Tên đăng nhập"
                 required
-                hint="Gợi ý từ họ tên — sửa được. Người dùng dùng tên này để đăng nhập."
+                hint="Gợi ý từ họ tên — sửa được. Chỉ chữ thường không dấu và số (không dấu chấm, không khoảng trắng). Người dùng dùng tên này để đăng nhập."
               >
                 <Input
                   value={creating.username}
                   onChange={(e) =>
                     setCreating((t) =>
-                      t ? { ...t, username: e.target.value, usernameEdited: true } : t
+                      t ? { ...t, username: normalizeUsername(e.target.value), usernameEdited: true } : t
                     )
                   }
                   autoCapitalize="none"
@@ -904,7 +904,7 @@ export default function UserManagementScreen({
               <Field label="Tên đăng nhập" required hint="Tên hiển thị trong danh sách. Người dùng vẫn đăng nhập bằng tài khoản ở trên.">
                 <Input
                   value={profileFor.form.username}
-                  onChange={(e) => setProfileFor((t) => (t ? { ...t, form: { ...t.form, username: e.target.value } } : t))}
+                  onChange={(e) => setProfileFor((t) => (t ? { ...t, form: { ...t.form, username: normalizeUsername(e.target.value) } } : t))}
                   autoCapitalize="none"
                   autoCorrect="off"
                   spellCheck={false}

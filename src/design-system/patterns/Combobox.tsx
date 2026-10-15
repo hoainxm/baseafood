@@ -16,7 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { InfoTip } from "./InfoTip";
 import { cn } from "@/lib/utils";
-import { Check, ChevronsUpDown, Pencil, Plus, X } from "lucide-react";
+import { Check, ChevronsUpDown, Pencil, Plus, Trash2, X } from "lucide-react";
 
 export interface ComboboxOption {
   value: string;
@@ -39,6 +39,9 @@ export interface ComboboxOption {
  *  - Đã chọn thì có dấu ✓ và nút xóa lựa chọn (không phải xóa bản ghi).
  *  - Có `onEditItem` → mỗi mục có nút bút chì để SỬA bản ghi danh mục đó (mở hộp
  *    sửa của màn gọi). Bấm tên vẫn là chọn; bút chì không chọn mục.
+ *  - Có `onDeleteItem` → thêm nút thùng rác XÓA bản ghi danh mục (dọn danh mục ngay
+ *    lúc chọn). Bấm thì đóng danh sách và gọi hàm — màn gọi TỰ kiểm "đã dùng chưa"
+ *    rồi mở `ConfirmDelete` (+ toast Hoàn tác). Combobox không tự xóa gì.
  */
 export function Combobox({
   label,
@@ -58,6 +61,10 @@ export function Combobox({
   onEditItem,
   editLabel,
   canEdit,
+  onDeleteItem,
+  deleteLabel,
+  canDelete,
+  inline = false,
   className,
 }: {
   label: string;
@@ -93,6 +100,17 @@ export function Combobox({
   editLabel?: string;
   /** Mục nào có bút chì (VD chỉ mục CÓ trong danh mục). Bỏ trống ⇒ mọi mục. */
   canEdit?: (value: string) => boolean;
+  /** Có hàm này → mỗi mục có nút thùng rác "Xóa khỏi danh mục" (màn gọi kiểm + hỏi). */
+  onDeleteItem?: (value: string) => void;
+  /** Câu `title` cho nút thùng rác. */
+  deleteLabel?: string;
+  /** Mục nào có thùng rác. Bỏ trống ⇒ mọi mục. */
+  canDelete?: (value: string) => boolean;
+  /**
+   * Ô nằm TRONG bảng đọc như bảng kê (VD cột Vị trí ở Sổ kho tháng): nút chọn không
+   * viền, không nền — khung chỉ hiện khi rê chuột / đang chọn. Ngoài bảng giữ mặc định.
+   */
+  inline?: boolean;
   className?: string;
 }) {
   const [open, setOpen] = React.useState(false);
@@ -162,7 +180,11 @@ export function Combobox({
               aria-expanded={open}
               aria-invalid={error ? true : undefined}
               aria-required={required && !hideRequiredMark ? true : undefined}
-              className="h-10 min-w-0 flex-1 justify-between px-3 text-sm font-medium"
+              className={cn(
+                "h-10 min-w-0 flex-1 justify-between px-3 text-sm font-medium",
+                inline &&
+                  "h-9 border-transparent bg-transparent px-2 shadow-none hover:border-input hover:bg-transparent aria-expanded:border-ring [&>svg]:opacity-0 hover:[&>svg]:opacity-100"
+              )}
             >
               <span className={cn("truncate", !selectedOption && "text-muted-foreground")}>
                 {selectedOption?.label ?? placeholder ?? usageHint}
@@ -172,7 +194,7 @@ export function Combobox({
           </PopoverTrigger>
 
           <PopoverContent
-            className="w-(--radix-popover-trigger-width) min-w-72 gap-0 p-0"
+            className="w-(--radix-popover-trigger-width) min-w-[min(24rem,calc(100vw-2rem))] gap-0 p-0"
             align="start"
           >
             <Command shouldFilter>
@@ -215,7 +237,7 @@ export function Combobox({
                         setSearchText("");
                         setOpen(false);
                       }}
-                      className={onEditItem ? "group/muc" : undefined}
+                      className={onEditItem || onDeleteItem ? "group/muc" : undefined}
                     >
                       <Check
                         className={cn(
@@ -256,6 +278,30 @@ export function Combobox({
                           )}
                         >
                           <Pencil className="size-4" />
+                        </button>
+                      )}
+                      {onDeleteItem && (!canDelete || canDelete(o.value)) && (
+                        <button
+                          type="button"
+                          aria-label={`Xóa ${o.label} khỏi danh mục`}
+                          title={deleteLabel ?? "Xóa mục này khỏi danh mục (có hỏi xác nhận)."}
+                          onPointerDown={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                          }}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setSearchText("");
+                            setOpen(false);
+                            onDeleteItem(o.value);
+                          }}
+                          className={cn(
+                            "inline-flex size-9 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-destructive/10 hover:text-destructive focus-visible:opacity-100",
+                            "[@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/muc:opacity-100 [@media(hover:hover)]:group-data-[selected=true]/muc:opacity-100"
+                          )}
+                        >
+                          <Trash2 className="size-4" />
                         </button>
                       )}
                     </CommandItem>

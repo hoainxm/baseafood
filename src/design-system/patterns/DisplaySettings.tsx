@@ -28,15 +28,15 @@ function storageKey(base: string, account?: string) {
   return account ? `bsf.${account}.${base}` : `bsf.${base}`;
 }
 
-/** MẶC ĐỊNH là "100" — thang token nền 16px (mật độ web thường). Người mắt kém
+/** MẶC ĐỊNH là "100" — thang token nền 17px (2026-10-15, trước 16px) (mật độ web thường). Người mắt kém
  *  kéo lên 110–130% như một lối phóng to; ai muốn gọn hơn nữa hạ 90%. Thang rem
  *  nên bố cục giãn theo, không vỡ như phóng to trình duyệt. */
 export const FONT_SIZES = [
-  { id: "90", label: "A", scale: "90%", description: "Nhỏ — 14px" },
-  { id: "100", label: "A", scale: "100%", description: "Thường — 16px" },
-  { id: "110", label: "A", scale: "110%", description: "Lớn — 18px" },
-  { id: "120", label: "A", scale: "120%", description: "Rất lớn — 19px" },
-  { id: "130", label: "A", scale: "130%", description: "Cực lớn — 21px" },
+  { id: "90", label: "A", scale: "90%", description: "Nhỏ — 15px" },
+  { id: "100", label: "A", scale: "100%", description: "Thường — 17px" },
+  { id: "110", label: "A", scale: "110%", description: "Lớn — 19px" },
+  { id: "120", label: "A", scale: "120%", description: "Rất lớn — 20px" },
+  { id: "130", label: "A", scale: "130%", description: "Cực lớn — 22px" },
 ] as const;
 
 /** Bậc cỡ chữ mặc định khi chưa ai chọn gì. */

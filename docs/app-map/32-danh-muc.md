@@ -1,11 +1,12 @@
 > Load khi: sửa danh mục (đại lý, loại NL, mặt hàng, khách hàng) hay danh mục 141 mã thành phẩm.
-covers: src/features/catalog/CatalogScreen.tsx, src/features/catalog/FinishedGoodScreen.tsx, src/data/finished-goods.json, src/design-system/patterns/CatalogCrudModal.tsx, src/lib/catalogRepo.ts, src/features/catalog/catalogConfig.tsx, src/features/catalog/BatterPicker.tsx
+covers: src/features/catalog/CatalogScreen.tsx, src/features/catalog/FinishedGoodScreen.tsx, src/data/finished-goods.json, src/design-system/patterns/CatalogCrudModal.tsx, src/lib/catalogRepo.ts, src/features/catalog/catalogConfig.tsx, src/features/catalog/BatterPicker.tsx, src/features/catalog/QuickProductDelete.tsx, src/lib/productUsage.ts
 last_verified: 2026-10-15
 <!-- updated: 2026-10-15 — phân quyền Đợt 3: tab ẩn khi không Xem `catalog.*`; `CatalogCrud` canCreate/canUpdate/canDelete theo tab; `useQuickCatalogEdit` ẩn bút chì khi không Sửa + trả `canCreate` cho `onCreate` ở mọi màn. -->
 <!-- updated: 2026-10-15 — ĐẠI LÝ: thêm email + tài khoản ngân hàng (mig 0061), seed Hồng Hải NT + Trung Vy Phát (Huy Phát đã có — điền TK ACB), hộp Thêm/Sửa chia nhóm lưới 4 cột (`CatalogField.group/span`, áp cho mọi danh mục: không chia nhóm thì lưới 3 cột). Sửa drift: toRow gửi đủ cột, không phải "chỉ khi có giá trị". -->
 <!-- re-verified: 2026-10-13 09:00 — catalogRepo chỉ thêm re-export `setAuditPaused` (nạp bộ demo không ghi nhật ký); hook danh mục, seed 141 mã TK không đổi. Chế độ demo: danh mục của site-demo chép từ danh mục thật lúc sinh bộ (đại lý/khách ẩn tên tùy chọn). -->
 <!-- re-verified: 2026-10-08 10:20 — catalogRepo.ts chỉ thêm `useLotDispatches` / `useLotWaivers` (truy xuất QR, mig 0056); hook danh mục, seed mặt hàng, 141 mã TK 1551 KHÔNG đổi — doc này không cần sửa nội dung. -->
 ttl_days: 90
+<!-- updated: 2026-10-15 — DỌN DANH MỤC MẶT HÀNG ngay trong ô chọn (263 mục, nhiều mục là quy cách NL như "2 DA <80GR" lọt vào từ "Đồng bộ danh mục" của Sổ kho tháng — id tiền tố 1790656350181/2): thùng rác `Combobox.onDeleteItem` ở ô Thành phẩm /wip (bảng ghi + hộp Sửa dòng). Xóa THẬT + ConfirmDelete + toast Hoàn tác, CHẶN khi mục đã có trong sổ (`lib/productUsage.ts`) hoặc gắn 141 mã kế toán. Sẽ khóa lại sau khi người dùng dọn xong. -->
 <!-- updated: 2026-10-06 — tô màu dòng "đã dò" (mig 0055): `CatalogCrud` nhận prop `rowMarks`; 6 tab danh mục bật `danh-muc-<tab>` (mat-hang · khach-hang · dai-ly · loai-nl · bot-tam · kho-luu), tab 141 mã bật `danh-muc-tp-141` (chỉ đánh dấu, vẫn không sửa mã). Không đổi dữ liệu danh mục. -->
 <!-- updated: 2026-10-06 (c) — LUẬT "ô chọn danh mục luôn có Thêm mới + Bút chì sửa nhanh" (README design-system + CLAUDE.md quy tắc 7). Gắn bổ sung: /orders khách (onCreate) · NXT TP mặt hàng (onCreate) · /nxt-warehouse kho lưu (onCreate) · /imports Đổi loại hàng loạt (bút chì) · /balancing hộp kỳ loại NL (bút chì) · /monthly-stock vị trí/kho nhận + ánh xạ (bút chì, themViTri báo daLuu + dùng lại tên trùng) · tab Mặt hàng ô Loại NL (onCreate qua tham số `themLoaiNL` của buildCatalogFields). onCreate ở /imports, /sales, /packaging dò trùng tên không phân hoa thường. Còn thiếu: gridDialogs AddMaterialRowDialog (chờ MaterialGrid truyền suaNL). -->
 <!-- re-verified: 2026-10-03 — tên bảng/cột đại lý + cột sổ nối tên đối chiếu DB thật (suppliers, supplier_name) và repo.ts SUPPLIER_TABLE -->
@@ -66,6 +67,7 @@ Gộp làm một vì ba mục điều hướng cũ có tên gần giống nhau �
 | Thành phẩm 141 mã | Chỉ đọc trong app. Sửa danh mục kế toán ⇒ sửa `src/data/finished-goods.json` **và** cập nhật bảng `thanh_pham` trên server (seed không chạy lại khi bảng đã có dữ liệu). |
 | Thêm trường cho một danh mục | Sửa `types.ts` → `TableMapping.toRow/fromRow` (+ `patchLegacy`) → migration cột → mảng `CatalogField` của tab. Thiếu bước nào cũng ra dữ liệu cụt. |
 | Xóa bản ghi danh mục | Qua `ConfirmDelete` + toast Hoàn tác. |
+| Xóa mặt hàng ngay trong ô chọn (thùng rác, `useQuickProductDelete`) | Chỉ người có Xóa tab Mặt hàng; mục gắn 141 mã kế toán không có thùng rác. Bấm ⇒ đếm dòng dùng mặt hàng ở SX · đóng gói · bán · đơn đặt · lệnh xuất · cân đối · tồn đầu TP (`findProductUsage`) — có ⇒ cảnh báo nêu sổ, KHÔNG xóa; không ⇒ ConfirmDelete + Hoàn tác. Sổ kho tháng nối theo TÊN nên không chặn. Dòng đang gõ dở trỏ mặt hàng vừa xóa ⇒ ô về trống. |
 
 ## Cross-references
 

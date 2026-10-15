@@ -17,17 +17,19 @@
    ============================================================ */
 
 @theme {
-  /* --- Thang chữ: nền 16px (mật độ web thường) ---
+  /* --- Thang chữ: nền 17px (mật độ web thường) ---
      Sửa ngay tại thang nên mọi component shadcn (dùng text-sm/text-base) đổi
      theo, không phải sửa từng file. Người mắt kém phóng to bằng Cài đặt hiển
-     thị (90–130%) — thang rem nên phóng/thu đồng bộ. */
-  --text-xs: 0.75rem; /* 12px — chip / phụ chú */
+     thị (90–130%) — thang rem nên phóng/thu đồng bộ.
+     2026-10-15: người dùng thấy chữ "hơi nhỏ và mảnh" ⇒ ba bậc dưới +1px (bảng,
+     nhãn, nút, ô nhập đều là text-sm) + thân chữ đậm 500 (xem `body`). */
+  --text-xs: 0.8125rem; /* 13px — chip / phụ chú */
   --text-xs--line-height: 1.5;
-  --text-sm: 0.875rem; /* 14px — nhãn · nút · ô nhập */
+  --text-sm: 0.9375rem; /* 15px — nhãn · nút · ô nhập · ô bảng */
   --text-sm--line-height: 1.5;
-  --text-base: 1rem; /* 16px — thân chữ */
+  --text-base: 1.0625rem; /* 17px — thân chữ */
   --text-base--line-height: 1.55;
-  --text-lg: 1.125rem; /* 18px */
+  --text-lg: 1.1875rem; /* 19px */
   --text-lg--line-height: 1.5;
   --text-xl: 1.25rem; /* 20px */
   --text-xl--line-height: 1.4;
@@ -378,6 +380,9 @@
     color: var(--foreground);
     font-family: var(--font-sans);
     font-size: var(--text-base);
+    /* 500 thay 400: Be Vietnam Pro 400 trên màn xưởng trông mảnh (chốt 2026-10-15).
+       Nhấn mạnh vẫn đi bằng font-semibold 600 / font-bold 700. */
+    font-weight: 500;
     line-height: 1.55;
     -webkit-font-smoothing: antialiased;
   }

@@ -24,8 +24,10 @@ src/features/*                 ← màn nghiệp vụ
    Cấm `import … from "@/components/ui/button"` trong `src/features/**`.
 2. **Cấm viết class cỡ chữ / mã màu tay** trong màn nghiệp vụ
    (`text-sm`, `text-slate-400`, `bg-cyan-700`…). Muốn đổi → sửa `tokens.css`.
-3. **Cấm chữ IN HOA cho nội dung** (chậm đọc). Thân chữ dùng `text-sm` (14px) /
-   `text-base` (16px); `text-xs` (12px) chỉ cho chip · badge · phụ chú.
+3. **Cấm chữ IN HOA cho nội dung** (chậm đọc). Thân chữ dùng `text-sm` (15px) /
+   `text-base` (17px); `text-xs` (13px) chỉ cho chip · badge · phụ chú. Thân chữ đậm
+   **500** (đặt ở `body`, tokens.css) — 2026-10-15 người dùng thấy chữ "nhỏ và mảnh"
+   ⇒ thang `xs/sm/base/lg` +1px và bỏ 400. Nhấn mạnh dùng `font-semibold`/`font-bold`.
 4. **Vùng chạm mật độ web thường**: ô/nút mặc định ~40px (`--size-control`), nút
    icon `size-tap` 40px. Cần to hơn → đổi mật độ **Thoáng** ở Cài đặt hiển thị.
 5. **Nút chỉ-icon được phép** nhưng PHẢI có `aria-label` + `title` (vd nút toàn
@@ -395,7 +397,7 @@ thứ tự DOM, tự bỏ ô ẩn của dòng chưa mở); Tab để trình duy�
 - [ ] Thử thêm cỡ chữ **130%** (lối phóng to): vẫn không cuộn ngang, không đè chữ
 - [ ] Xoay ngang **844×390** (iPhone) + **1024×768** (iPad): không cuộn ngang, hộp thoại thấy nút ở chân; chiều cao theo màn dùng `dvh`, không `vh` (§1b)
 - [ ] Nút / ô tick chạm được thoải mái (~40px `size-tap`; ô tick nhỏ bọc `<label>`)
-- [ ] Thân chữ ≥ **`text-sm`** (14px); `text-xs` (12px) CHỈ cho chip/badge/phụ chú
+- [ ] Thân chữ ≥ **`text-sm`** (15px); `text-xs` (13px) CHỈ cho chip/badge/phụ chú
       (đo bằng TOKEN, không bằng px tuyệt đối). Không `fontSize` cứng < 12 trong SVG
 - [ ] Bảng dài đã ra thẻ trên điện thoại (hoặc có `sticky-first-col` nếu là báo cáo Excel)
 - [ ] Bảng tràn ngang có thanh cuộn TRÊN + DƯỚI (pattern dùng chung tự có; bảng tự dựng bọc `HorizontalScroll`)
@@ -540,6 +542,15 @@ bột tẩm — phải có **đủ hai thứ**, kể cả ô thêm về sau:
    `editLabel={editor.editLabel}` + `canEdit={editor.canEdit}`, và render `{editor.dialog}` đúng
    một lần trong màn. Hộp là `CatalogEditDialog` dùng chung bộ trường + luật kiểm tra
    với màn Danh mục — màn nghiệp vụ KHÔNG tự viết hộp.
+3. *(Tuỳ chọn, 2026-10-15)* **Thùng rác dọn danh mục — `onDeleteItem` + `canDelete` +
+   `deleteLabel`.** Combobox chỉ đóng danh sách rồi gọi hàm; màn gọi TỰ kiểm "mục đã
+   nằm trong sổ nào chưa" và mở `ConfirmDelete` (prop `open`/`onOpenChange` — mở theo
+   lệnh, không cần nút kích hoạt) + toast **Hoàn tác**. Mẫu: `useQuickProductDelete`
+   (`features/catalog/QuickProductDelete.tsx`, kiểm bằng `lib/productUsage.ts`) — đang
+   bật ở ô Thành phẩm của `/wip` để dọn 263 mục; chỉ hiện khi có quyền Xóa tab đó.
+
+Ô chọn nằm TRONG bảng đọc như bảng kê (VD cột Vị trí ở Sổ kho tháng) dùng prop
+**`inline`**: nút không viền/không nền, khung chỉ hiện khi rê chuột / đang chọn.
 
 **Ngoại lệ — không gắn:**
 
@@ -807,7 +818,7 @@ trên header. Áp ngay và **nhớ theo từng tài khoản**:
 
 | Cấu hình | Cách áp | Giá trị |
 |---|---|---|
-| Cỡ chữ | `--app-font-scale` trên `<html>` | 90 / **100 (mặc định)** / 110 / 120 / 130 % (nền token 16px) |
+| Cỡ chữ | `--app-font-scale` trên `<html>` | 90 / **100 (mặc định)** / 110 / 120 / 130 % (nền token 17px từ 2026-10-15) |
 | Mật độ | `data-density` trên `<html>` | thoáng 44px · vừa 40px · **gọn 36px (mặc định)** — kèm đệm ngang ô bảng `--cell-pad` 16 · 12 · 10px |
 | Bề rộng nội dung | `--app-content-width` | 64rem / 80rem / 100% |
 

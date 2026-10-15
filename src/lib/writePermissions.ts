@@ -110,7 +110,7 @@ export const TABLE_WRITE_RULES: Readonly<Record<string, TableRule | null>> = {
   balancing_periods: balancingPeriodRule,
   balancing_inputs: owners("balancing"),
   balancing_outputs: owners("balancing"),
-  monthly_stock_ledger: owners("monthly-stock", "balancing"), // Cân đối ghi 2 dòng kho
+  monthly_stock_ledger: owners("monthly-stock", "balancing", "wip"), // Cân đối ghi 2 dòng kho · /wip ghi hàng đông lạnh → Hàng tạm (0066)
   reconciliation_runs: owners("reconciliation"),
   material_opening_stock: owners("nxt-material"),
   finished_goods_opening_stock: owners("nxt"),

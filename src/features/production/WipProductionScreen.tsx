@@ -4,14 +4,16 @@
 // Description: Daily finished-goods production entry (v1: product · qty · customer)
 // ============================================================
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import type {
   DailyLock,
   DomesticSaleItem,
+  MonthlyStockLine,
   WipProductionItem,
   Product,
   Workshop,
 } from "@/types";
-import { isBackdatedWip, hasSplitComponents, blockSpec } from "@/types";
+import { isBackdatedWip, hasSplitComponents, blockSpec, BSF1_WAREHOUSES } from "@/types";
 import { newId } from "@/lib/store";
 import { uid } from "@/lib/db";
 import {
@@ -27,6 +29,7 @@ import {
   useLotWaivers,
   useImportShipments,
   useMaterialImports,
+  useMonthlyStock,
 } from "@/lib/catalogRepo";
 import {
   getProductBatterIds,
@@ -74,6 +77,16 @@ import { appendAuditEntries } from "@/lib/audit";
 import { PERIOD_OPTIONS, getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
 import { DailyTaskReminder, LotInputPicker, LotDispatchPicker, BlankDailyWipSlip, LotQrLabels } from "@/features/shared";
 import { useQuickCatalogEdit } from "@/features/catalog/QuickCatalogEdit";
+import { useQuickProductDelete } from "@/features/catalog/QuickProductDelete";
+import {
+  DEFAULT_FROZEN_WAREHOUSE,
+  TEMPORARY_GOODS_CATEGORY,
+  addFrozenStockToLedger,
+  buildFrozenStockLines,
+  frozenLineRemovalBlocker,
+  frozenLinesOf,
+  isFrozenEntryComplete,
+} from "@/lib/frozenStockLines";
 import { useCan, useCanOnRow } from "@/features/shared/PermissionProvider";
 import { assignSessionLots, findBatchesWithoutLot, formatWipLotLabel, buildLotNode, type TraceData } from "@/lib/lotTraceability";
 import {
@@ -96,10 +109,12 @@ import {
   Warehouse,
   Wheat,
   Store,
+  Snowflake,
 } from "lucide-react";
 import { ProductionLinesTable } from "./ProductionLinesTable";
 import { BatterSection } from "./BatterSection";
 import { DomesticSaleSection } from "./DomesticSaleSection";
+import { FrozenStockSection, createEmptyFrozenDraft, isFrozenDraftEmpty, type FrozenStockDraft } from "./FrozenStockSection";
 import { readDevicePref, writeDevicePref } from "@/lib/devicePrefs";
 import { SessionLotsSection, type SessionLot } from "./SessionLotsSection";
 import {
@@ -128,6 +143,7 @@ const readSavedWorkshop = (): Workshop => {
 };
 
 export default function WipProductionScreen() {
+  const navigate = useNavigate();
   const [rows, persist, { status }] = useWipProductions();
   const isLoading = status === "loading" && rows.length === 0;
   const [locks, persistLocks, { status: lockStatus }] = useProductionLocks();
@@ -137,6 +153,8 @@ export default function WipProductionScreen() {
   const [batterTypes, setBatterTypes] = useBatterTypes();
   /** Sổ BÁN NỘI ĐỊA (mig 0054) — NL bán thẳng, sổ riêng (không lẫn sản lượng TP). */
   const [domesticSales, persistDomesticSales] = useDomesticSales();
+  /** Sổ kho THÁNG — hàng đông lạnh (sơ chế cấp đông) ghi vào nhóm "Hàng tạm" (2026-10-15). */
+  const [monthlyStock, setMonthlyStock] = useMonthlyStock();
 
   // Người thao tác = tài khoản đang đăng nhập — gắn vào dòng khi lưu để lưu vết ai gửi.
   const { profile } = useAuth();
@@ -169,13 +187,12 @@ export default function WipProductionScreen() {
   const [tableRows, setTableRows] = useState<ProductionLine[]>([]);
   /** Dòng bán nội địa của phiên đang gõ — mặc định trống, bấm "Thêm dòng" mới hiện. */
   const [domesticSaleLines, setDomesticSaleLines] = useState<DomesticSaleLine[]>([]);
+  /** Dòng HÀNG ĐÔNG LẠNH của phiên (→ Hàng tạm ở Sổ kho tháng) — mặc định trống. */
+  const [frozenLines, setFrozenLines] = useState<FrozenStockDraft[]>([]);
   const [sessionErrors, setSessionErrors] = useState<FieldError[]>([]);
-  /** Nhóm (kiểu chế biến × khách) của phiên trước → phiếu mới tự điền sẵn nhóm
-   *  đầu, gõ thành phẩm ngay, khỏi tạo nhóm lại. Chỉ sống trong phiên làm việc. */
-  const [lastGroup, setLastGroup] = useState<{ pt: string; cust: string }>({
-    pt: "",
-    cust: "",
-  });
+  /** Khách của nhóm cuối phiên trước → phiếu mới tự điền sẵn nhóm đầu, gõ thành
+   *  phẩm ngay, khỏi chọn lại. Chỉ sống trong phiên làm việc. */
+  const [lastCustomer, setLastCustomer] = useState("");
 
   /* Sửa một dòng đã ghi (từ bảng sổ). */
   const [edit, setEdit] = useState<WipProductionItem | null>(null);
@@ -258,14 +275,14 @@ export default function WipProductionScreen() {
     subLabel: c.market || undefined,
   }));
 
-  const addProduct = (name: string, processingType = ""): string => {
+  const addProduct = (name: string): string => {
     const m: Product = {
       id: uid(),
       code: "",
       name,
       finishedGoodCode: "",
       category: "Bạch tuộc", // xưởng Đông; loài chỉnh sau ở Danh mục nếu cần
-      processingType, // gắn KIỂU CHẾ BIẾN của nhóm để mã mới nằm đúng nhóm
+      processingType: "", // kiểu chế biến đặt ở Danh mục (bút chì) — không còn ô ở /wip
     };
     setProducts([...products, m]);
     notify.saved(`Đã thêm thành phẩm "${name}"`);
@@ -306,6 +323,12 @@ export default function WipProductionScreen() {
   /** Ô khách ở /wip lưu theo TÊN (customerName). */
   const customerEditor = useQuickCatalogEdit("customer", customers, setCustomers, { matchBy: "name" });
   const materialTypeEditor = useQuickCatalogEdit("materialType", materialTypes, setMaterialTypes, { matchBy: "name" });
+  /** Dọn danh mục mặt hàng ngay trong ô chọn (thùng rác) — kiểm đã dùng + hỏi + Hoàn tác. */
+  const productDeleter = useQuickProductDelete(products, setProducts, {
+    wips: rows,
+    // Dòng đang gõ dở trỏ tới mặt hàng vừa xóa ⇒ trả ô về trống.
+    onDeleted: (id) => setTableRows((items) => items.map((d) => (d.productId === id ? { ...d, productId: "" } : d))),
+  });
 
   const addCustomer = (name: string): string => {
     setCustomers([...customers, { id: uid(), code: "", name, market: "" }]);
@@ -336,6 +359,28 @@ export default function WipProductionScreen() {
     canEdit: customerEditor.canEdit,
     editLabel: customerEditor.editLabel,
   };
+
+  /* ---- Hàng đông lạnh → Hàng tạm: tên hàng = tên Hàng tạm đã có trong sổ kho + loại NL ---- */
+  const frozenItemOptions: ComboboxOption[] = useMemo(() => {
+    const seen = new Set<string>();
+    const out: ComboboxOption[] = [];
+    const push = (name: string, subLabel: string) => {
+      const k = name.trim().toLowerCase();
+      if (!k || seen.has(k)) return;
+      seen.add(k);
+      out.push({ value: name.trim(), label: name.trim(), subLabel });
+    };
+    // Tên đã dùng ở nhóm Hàng tạm lên đầu — cùng cách ghi với bảng kê kế toán.
+    [...monthlyStock]
+      .filter((l) => l.category === TEMPORARY_GOODS_CATEGORY)
+      .map((l) => l.itemName)
+      .sort((a, b) => a.localeCompare(b, "vi"))
+      .forEach((n) => push(n, "Đã có ở Hàng tạm"));
+    materialTypes.forEach((l) => push(l.name, l.category ? `Loại NL · ${l.category}` : "Loại NL"));
+    return out;
+  }, [monthlyStock, materialTypes]);
+  const frozenItemCell = { ...materialTypeFieldProps, options: frozenItemOptions };
+  const warehouseOptions: ComboboxOption[] = BSF1_WAREHOUSES.map((w) => ({ value: w.name, label: w.name, subLabel: w.code }));
 
   /* ---- Bột tẩm (mig 0051): danh mục loại bột — dòng sản lượng lưu theo TÊN ---- */
   const batterOptions: ComboboxOption[] = batterTypes.map((b) => ({
@@ -403,6 +448,12 @@ export default function WipProductionScreen() {
     [domesticSales, effectiveFrom, effectiveTo, workshop]
   );
   const domesticSaleViewTotal = bndView.reduce((s, r) => s + (r.quantityKg || 0), 0);
+  /** Lô hàng đông lạnh ghi từ /wip (nhóm Hàng tạm ở Sổ kho tháng) trong phạm vi đang xem. */
+  const frozenView = useMemo(
+    () => frozenLinesOf(monthlyStock, effectiveFrom, effectiveTo, workshop),
+    [monthlyStock, effectiveFrom, effectiveTo, workshop]
+  );
+  const frozenViewTotal = frozenView.reduce((s, l) => s + l.inKg, 0);
 
   /* ---- A4: gom báo cáo TP ngày theo (xưởng × người thao tác) ---- */
   const operatorReport = useMemo(() => {
@@ -473,7 +524,7 @@ export default function WipProductionScreen() {
     setIsConsecutiveDays(postingDate === todayISO());
     // Mở sẵn MỘT nhóm + một dòng trống (điền sẵn nhóm gần nhất) để gõ thành phẩm
     // ngay, khỏi phải bấm "Thêm nhóm" trước.
-    setTableRows([createEmptyProductionLine(newId(), lastGroup.pt, lastGroup.cust)]);
+    setTableRows([createEmptyProductionLine(newId(), "", lastCustomer)]);
     setSessionErrors([]);
   };
   const setSessionField = <K extends keyof SessionHeader>(k: K, v: SessionHeader[K]) =>
@@ -538,7 +589,7 @@ export default function WipProductionScreen() {
       // Nhóm ĐÃ ĐỦ hết (mọi dòng có SP + kg) → chừa thêm một dòng trống để gõ tiếp.
       // Dòng đang gõ dở (mới chọn mã, chưa có kg) chưa tính → không nhảy dòng non.
       if (items.length > 0 && items.every((d) => isLineComplete(d)))
-        toAdd.push(createEmptyProductionLine(gid, items[0].processingType, items[0].customerName));
+        toAdd.push(createEmptyProductionLine(gid, "", items[0].customerName));
     if (toAdd.length) setTableRows((items) => [...items, ...toAdd]);
   }, [tableRows, mode, session]);
 
@@ -560,20 +611,13 @@ export default function WipProductionScreen() {
     setTableRows((items) => items.map((d) => (d.key === key ? { ...d, ...patch } : d)));
   const removeRow = (key: string) =>
     setTableRows((items) => items.filter((d) => d.key !== key));
-  /** Thêm một dòng thành phẩm vào NHÓM đang có (giữ nhãn chế biến × khách). */
-  const addRow = (
-    groupId: string,
-    processingType: string,
-    customerName: string
-  ) => setTableRows((items) => [...items, createEmptyProductionLine(groupId, processingType, customerName)]);
+  /** Thêm một dòng thành phẩm vào NHÓM đang có (giữ khách của nhóm). */
+  const addRow = (groupId: string, customerName: string) =>
+    setTableRows((items) => [...items, createEmptyProductionLine(groupId, "", customerName)]);
   /** Thêm một NHÓM mới (groupId mới) kèm một dòng trống để nhập ngay. */
-  const addGroup = (processingType = "", customerName = "") =>
-    setTableRows((items) => [...items, createEmptyProductionLine(newId(), processingType, customerName)]);
-  /** Sửa nhãn (kiểu chế biến / khách) của cả một nhóm — mọi dòng cùng groupId. */
-  const changeGroup = (
-    groupId: string,
-    patch: Partial<Pick<ProductionLine, "processingType" | "customerName">>
-  ) =>
+  const addGroup = () => setTableRows((items) => [...items, createEmptyProductionLine(newId(), "", "")]);
+  /** Sửa khách của cả một nhóm — mọi dòng cùng groupId. */
+  const changeGroup = (groupId: string, patch: Partial<Pick<ProductionLine, "customerName">>) =>
     setTableRows((items) =>
       items.map((d) => (d.groupId === groupId ? { ...d, ...patch } : d))
     );
@@ -611,11 +655,20 @@ export default function WipProductionScreen() {
     if (!session) return true;
     const validRows = tableRows.filter(isLineComplete);
     const validDomesticRows = domesticSaleLines.filter(isDomesticSaleLineComplete);
+    const validFrozenRows = frozenLines.filter(isFrozenEntryComplete);
     const ls: FieldError[] = [...sessionHeaderErrors(session)];
-    if (validRows.length === 0 && validDomesticRows.length === 0)
+    if (validRows.length === 0 && validDomesticRows.length === 0 && validFrozenRows.length === 0)
       ls.push({
         field: "Thành phẩm",
-        message: "Thêm ít nhất một thành phẩm (hoặc một dòng bán nội địa) vào phiên",
+        message: "Thêm ít nhất một thành phẩm (hoặc một dòng bán nội địa / hàng đông lạnh) vào phiên",
+      });
+    if (!imLang)
+      frozenLines.forEach((d, i) => {
+        if (!isFrozenDraftEmpty(d) && !isFrozenEntryComplete(d))
+          ls.push({
+            field: `Hàng đông lạnh dòng ${i + 1}`,
+            message: !d.itemName.trim() ? "Chưa chọn tên hàng" : "Số lượng phải lớn hơn 0 kg",
+          });
       });
     if (!imLang)
       domesticSaleLines.forEach((d, i) => {
@@ -656,7 +709,8 @@ export default function WipProductionScreen() {
       status: "pending",
       note: "",
       customerName: d.customerName.trim(),
-      processingType: d.processingType.trim(),
+      // Kiểu chế biến lấy từ MẶT HÀNG (bỏ ô riêng 2026-10-15) — sổ vẫn giữ để tra/truy xuất.
+      processingType: (products.find((m) => m.id === d.productId)?.processingType ?? "").trim(),
       tentacleKg: isSplitLine(d) ? d.tentacleKg || 0 : null,
       stomachKg: isSplitLine(d) ? d.stomachKg || 0 : null,
       operator,
@@ -679,6 +733,15 @@ export default function WipProductionScreen() {
       operator,
     }));
     if (newDomesticSales.length > 0) persistDomesticSales([...domesticSales, ...newDomesticSales]);
+
+    // Hàng đông lạnh → lô nhập nhóm "Hàng tạm" ở Sổ kho tháng (tháng theo ngày SX).
+    const newFrozenLines = buildFrozenStockLines(validFrozenRows, {
+      productionDate: session.productionDate,
+      workshop: session.workshop,
+      operator,
+      newId,
+    });
+    if (newFrozenLines.length > 0) setMonthlyStock(addFrozenStockToLedger(monthlyStock, newFrozenLines).lines);
 
     // Lô NL khai cho phiên ⇒ gắn cho mẻ cùng loài + bán nội địa cùng loại NL (kg để trống).
     const sessionLotResult = assignSessionLots({
@@ -720,12 +783,15 @@ export default function WipProductionScreen() {
     const newTotal = newWips.reduce((s, r) => s + r.quantityKg, 0);
     const newBatterKg = newWips.reduce((s, r) => s + sumBatterKg(r.batterKg), 0);
     const newDomesticKg = newDomesticSales.reduce((s, r) => s + r.quantityKg, 0);
+    const newFrozenKg = newFrozenLines.reduce((s, r) => s + r.inKg, 0);
     notify.saved(
       [
         newWips.length > 0 && `Đã lưu ${newWips.length} thành phẩm · ${kg(newTotal)}`,
         newBatterKg > 0 && `bột tẩm ${kg(newBatterKg)}`,
         newDomesticSales.length > 0 &&
           `${newWips.length > 0 ? "bán nội địa" : "Đã lưu bán nội địa"} ${kg(newDomesticKg)}`,
+        newFrozenLines.length > 0 &&
+          `${newWips.length + newDomesticSales.length > 0 ? "hàng đông lạnh" : "Đã lưu hàng đông lạnh"} ${kg(newFrozenKg)} vào Hàng tạm (Sổ kho tháng)`,
         lottedBatchCount > 0 && `gắn lô NL cho ${lottedBatchCount} mẻ`,
       ]
         .filter(Boolean)
@@ -767,6 +833,7 @@ export default function WipProductionScreen() {
     setSession(null);
     setTableRows([]);
     setDomesticSaleLines([]);
+    setFrozenLines([]);
     setSessionErrors([]);
   };
   const finishSession = () => {
@@ -775,7 +842,7 @@ export default function WipProductionScreen() {
     // Lưu xong → reset phiếu; effect form-first tự mở phiếu trống mới.
     if (saveSession(false)) {
       if (last)
-        setLastGroup({ pt: last.processingType, cust: last.customerName });
+        setLastCustomer(last.customerName);
       resetSession();
     }
   };
@@ -805,6 +872,11 @@ export default function WipProductionScreen() {
       tentacleKg: isEditSplit ? edit.tentacleKg ?? 0 : null,
       stomachKg: isEditSplit ? edit.stomachKg ?? 0 : null,
       batterKg: sanitizeBatterKg(edit.batterKg),
+      // Đổi mặt hàng ⇒ kiểu chế biến theo mặt hàng mới (không còn ô riêng).
+      processingType:
+        edit.productId === rows.find((r) => r.id === edit.id)?.productId
+          ? edit.processingType
+          : (products.find((m) => m.id === edit.productId)?.processingType ?? "").trim(),
     };
     persist(rows.map((r) => (r.id === edit.id ? record : r)));
     notify.saved("Đã lưu thay đổi");
@@ -850,6 +922,38 @@ export default function WipProductionScreen() {
       persistDomesticSales(prevRows)
     );
   };
+  /** Bỏ một lô hàng đông lạnh khỏi Sổ kho tháng — chỉ khi chưa lấy ra / chưa dồn tháng. */
+  const removeFrozenLine = (l: MonthlyStockLine) => {
+    const blocker = frozenLineRemovalBlocker(l, monthlyStock);
+    if (blocker) {
+      notify.warning(blocker);
+      return;
+    }
+    const prevLedger = monthlyStock;
+    setMonthlyStock(monthlyStock.filter((x) => x.id !== l.id));
+    notify.deleted(`Đã bỏ ${l.itemName} — ${kg(l.inKg)} khỏi Hàng tạm (Sổ kho tháng)`, () => setMonthlyStock(prevLedger));
+  };
+  const frozenColumns: RecordTableColumn<MonthlyStockLine>[] = [
+    { key: "ngay", header: "Ngày SX", render: (l) => formatDateVN(l.importDate), getSortValue: (l) => l.importDate },
+    { key: "ten", header: "Tên hàng", primary: true, render: (l) => l.itemName, getSortValue: (l) => l.itemName },
+    {
+      key: "kg",
+      header: "Số lượng",
+      numeric: true,
+      render: (l) => kg(l.inKg),
+      getSortValue: (l) => l.inKg,
+    },
+    { key: "kho", header: "Nhập vào kho", render: (l) => l.warehouse, getSortValue: (l) => l.warehouse },
+    {
+      key: "tt",
+      header: "Ở Sổ kho tháng",
+      render: (l) => {
+        const blocker = frozenLineRemovalBlocker(l, monthlyStock);
+        return blocker ? <Tag variant="muted">Đã lấy ra / dồn tháng</Tag> : <Tag variant="done">Lô nhập Hàng tạm</Tag>;
+      },
+    },
+  ];
+
   const domesticSaleColumns: RecordTableColumn<DomesticSaleItem>[] = [
     {
       key: "ngay",
@@ -1190,8 +1294,8 @@ export default function WipProductionScreen() {
         <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
           <p className="text-base font-semibold">Thành phẩm làm ra trong ngày</p>
           <p className="text-sm text-muted-foreground">
-            Gõ thẳng thành phẩm + kg vào bảng — dòng trống kế tiếp tự hiện. Đặt
-            kiểu chế biến / khách ở đầu mỗi nhóm. Bấm ▸ đầu dòng để tách râu + bao tử.
+            Gõ thẳng thành phẩm + kg — dòng trống kế tiếp tự hiện. Khách hàng đặt ở đầu
+            nhóm. Nút ▾ cuối dòng mở quy cách kg/khối và tách râu + bao tử.
           </p>
         </div>
 
@@ -1206,6 +1310,9 @@ export default function WipProductionScreen() {
           onCreateProduct={productEditor.canCreate ? addProduct : undefined}
           onEditProduct={openProductEdit}
           canEditProduct={productEditor.canEdit}
+          onDeleteProduct={productDeleter.requestDelete}
+          canDeleteProduct={productDeleter.canDelete}
+          deleteProductLabel={productDeleter.deleteLabel}
           onEditCustomer={customerEditor.openEdit}
           canEditCustomer={customerEditor.canEdit}
           customerOptions={customerOptions}
@@ -1242,6 +1349,18 @@ export default function WipProductionScreen() {
         onAddRow={() => setDomesticSaleLines((items) => [...items, createEmptyDomesticSaleLine(items.at(-1)?.materialTypeName ?? "")])}
         materialTypeCell={materialTypeFieldProps}
         customerField={customerFieldProps}
+      />
+
+      {/* Hàng đông lạnh (sơ chế cấp đông, chưa phải thành phẩm) → nhóm Hàng tạm ở Sổ kho tháng. */}
+      <FrozenStockSection
+        lines={frozenLines}
+        onUpdateRow={(key, patch) => setFrozenLines((items) => items.map((d) => (d.key === key ? { ...d, ...patch } : d)))}
+        onRemove={(key) => setFrozenLines((items) => items.filter((d) => d.key !== key))}
+        onAddRow={() =>
+          setFrozenLines((items) => [...items, createEmptyFrozenDraft(items.at(-1)?.warehouse || DEFAULT_FROZEN_WAREHOUSE)])
+        }
+        itemCell={frozenItemCell}
+        warehouseOptions={warehouseOptions}
       />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -1519,6 +1638,61 @@ export default function WipProductionScreen() {
         </>
       )}
 
+      {/* Hàng đông lạnh → Hàng tạm (Sổ kho tháng) — hiện cả khi ngày không có thành phẩm. */}
+      {frozenView.length > 0 && (
+        <div className="space-y-3 rounded-xl border-2 border-border p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <h2 className="flex items-center gap-2 text-lg font-semibold text-foreground">
+                <Snowflake className="size-icon shrink-0" aria-hidden />
+                Hàng đông lạnh nhập kho (Hàng tạm)
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                Hàng sơ chế cấp đông — {rangeDescription} · {workshop}. Mỗi dòng là một lô nhập nhóm Hàng
+                tạm ở Sổ kho theo tháng; không nằm trong tổng sản lượng thành phẩm.
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              title="Mở Sổ kho theo tháng để xem các lô này trong nhóm Hàng tạm."
+              onClick={() => navigate("/monthly-stock")}
+            >
+              <Warehouse />
+              Mở Sổ kho tháng
+            </Button>
+          </div>
+          <RecordTable
+            columns={frozenColumns}
+            rows={frozenView}
+            getKey={(l) => l.id}
+            rowMarkKey="hang-dong-lanh-sx"
+            actions={(l) =>
+              canRow("delete", { workshop: activeWorkshop }) && !frozenLineRemovalBlocker(l, monthlyStock) ? (
+                <ConfirmDelete
+                  recordDescription={`Hàng đông lạnh ${l.itemName} — ${kg(l.inKg)} (${formatDateVN(l.importDate)} · ${l.warehouse})`}
+                  onConfirm={() => removeFrozenLine(l)}
+                  trigger={
+                    <Button
+                      title="Bỏ lô này khỏi nhóm Hàng tạm ở Sổ kho tháng (ghi sai). Có hỏi xác nhận và còn nút Hoàn tác."
+                      variant="danger"
+                      size="sm"
+                    >
+                      Bỏ
+                    </Button>
+                  }
+                />
+              ) : null
+            }
+          />
+          <div className="flex flex-wrap justify-end gap-x-10 gap-y-2 rounded-xl bg-muted px-5 py-4">
+            <div className="flex items-baseline gap-3">
+              <span className="text-base text-muted-foreground">Tổng hàng đông lạnh</span>
+              <span className="tnum text-xl font-semibold">{kg(frozenViewTotal)}</span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Bán nội địa (mig 0054) — sổ riêng; hiện cả khi ngày không có thành phẩm. */}
       {bndView.length > 0 && (
         <div className="space-y-3 rounded-xl border-2 border-border p-4">
@@ -1771,6 +1945,9 @@ export default function WipProductionScreen() {
                     onEditItem={openProductEdit}
                     canEdit={productEditor.canEdit}
                     editLabel={productEditor.editLabel}
+                    onDeleteItem={productDeleter.requestDelete}
+                    canDelete={productDeleter.canDelete}
+                    deleteLabel={productDeleter.deleteLabel}
                   />
                 </div>
                 {edit.productId && productEditor.canEdit(edit.productId) && (
@@ -2168,6 +2345,7 @@ export default function WipProductionScreen() {
       </Dialog>
 
       {productEditor.dialog}
+      {productDeleter.dialog}
       {customerEditor.dialog}
       {materialTypeEditor.dialog}
       {batterEditor.dialog}

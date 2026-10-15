@@ -84,6 +84,12 @@ import {
   type StatCardData,
 } from "@/design-system";
 import { useQuickCatalogEdit } from "@/features/catalog/QuickCatalogEdit";
+import {
+  TEMPORARY_GOODS_CATEGORY,
+  isFromProductionFrozen,
+  isProductionFrozenLine,
+  productionFrozenWorkshop,
+} from "@/lib/frozenStockLines";
 import { useCan } from "@/features/shared/PermissionProvider";
 import {
   AlertTriangle,
@@ -1104,8 +1110,13 @@ export default function MonthlyStockScreen() {
      được: lần gõ đầu tự kế thừa & lưu (xem `soNenDeGhi`). Tên · nhóm đổi ở nút ✎. */
   /* Không có quyền sửa (`monthly-stock.update`) ⇒ bảng chỉ hiện số, không có ô gõ. */
   const canEdit = allowed.update;
+  /* Ô gõ KHÔNG viền (người dùng chốt 2026-10-15: bỏ các ô bao quanh dữ liệu — đọc như
+     bảng kê Excel). Khung chỉ hiện khi rê chuột / đang gõ để vẫn biết ô nào sửa được. */
   const textCell =
-    "h-9 rounded-md border border-input bg-background px-2 text-sm focus:border-ring focus:ring-2 focus:ring-ring/40 focus:outline-none";
+    "h-9 rounded-md border border-transparent bg-transparent px-2 text-sm hover:border-input focus:border-ring focus:bg-background focus:ring-2 focus:ring-ring/40 focus:outline-none";
+  /** Ô ngày trống: giấu mặt nạ "dd/mm/yyyy" + icon lịch tới khi rê / bấm vào. */
+  const emptyDateCell =
+    "text-transparent hover:text-muted-foreground focus:text-foreground [&::-webkit-calendar-picker-indicator]:opacity-0 hover:[&::-webkit-calendar-picker-indicator]:opacity-100 focus:[&::-webkit-calendar-picker-indicator]:opacity-100";
   const numberCell = (r: MonthlyStockRow, c: (typeof NUMERIC_COLS)[number], label: string, template?: string) => (
     <NumberInput
       value={r[c] || null}
@@ -1132,7 +1143,7 @@ export default function MonthlyStockScreen() {
             onChange={(e) => editLedger(r.id, { importDate: e.target.value })}
             aria-label={`Ngày nhập — ${r.itemName}`}
             title="Ngày nhập lô — sửa thẳng tại đây."
-            className={`${textCell} w-36`}
+            className={`${textCell} w-36 ${r.importDate ? "" : emptyDateCell}`}
           />
         ) : (
           <span className="tnum whitespace-nowrap">{r.importDate ? formatDateVN(r.importDate) : "—"}</span>
@@ -1143,7 +1154,17 @@ export default function MonthlyStockScreen() {
       header: "Mặt hàng",
       // Tên dài xuống dòng trong khung ≤ 13rem thay vì kéo cả bảng rộng ra.
       render: (r) => (
-        <span className="block max-w-52 min-w-28 font-semibold whitespace-normal text-foreground">{r.itemName}</span>
+        <span className="block max-w-52 min-w-28 font-semibold whitespace-normal text-foreground">
+          {r.itemName}
+          {/* Lô ghi từ /wip (hàng đông lạnh → Hàng tạm) — kế toán biết số này do xưởng ghi. */}
+          {isFromProductionFrozen(r) && (
+            <span className="mt-0.5 block">
+              <Tag variant="source" title="Lô hàng đông lạnh do xưởng ghi ở Sản xuất thành phẩm (/wip) — sửa / bỏ ở đó khi chưa lấy ra.">
+                Từ SX{productionFrozenWorkshop(r) ? ` · ${productionFrozenWorkshop(r)}` : ""}
+              </Tag>
+            </span>
+          )}
+        </span>
       ),
     },
     // Size là CỘT RIÊNG (theo bảng kê của kế toán), không còn là dòng phụ dưới tên hàng.
@@ -1173,7 +1194,7 @@ export default function MonthlyStockScreen() {
             onChange={(e) => editLedger(r.id, { origin: e.target.value })}
             aria-label={`Invoice — ${r.itemName}`}
             title="Số invoice của lô — sửa thẳng tại đây."
-            className={`${textCell} w-28`}
+            className={`${textCell} w-32`}
           />
         ) : (
           r.origin || "—"
@@ -1230,6 +1251,7 @@ export default function MonthlyStockScreen() {
           <div className="w-40">
             <Combobox
               hideLabel
+              inline
               label={`Vị trí — ${r.itemName}`}
               value={r.storageLocation}
               onChange={(v) => editLedger(r.id, { storageLocation: v })}
@@ -1635,6 +1657,28 @@ export default function MonthlyStockScreen() {
                     <Tag variant="muted">{g.rows.length} mặt hàng</Tag>
                   </span>
                 </div>
+                {g.category === TEMPORARY_GOODS_CATEGORY && (() => {
+                  // Hàng đông lạnh xưởng ghi ở /wip trong tháng: mỗi lần ghi = một lô nhập (Từ SX).
+                  const fromProduction = g.rows.filter((r) => isProductionFrozenLine(r) && r.period === month);
+                  return (
+                    <p className="text-sm text-muted-foreground">
+                      Hàng sơ chế cấp đông (dạng nguyên liệu, chưa phải thành phẩm). Xưởng ghi ở{" "}
+                      <b>Sản xuất thành phẩm → Hàng đông lạnh nhập kho</b> — mỗi lần ghi thành một lô nhập có nhãn{" "}
+                      <Tag variant="source">Từ SX</Tag>
+                      {fromProduction.length > 0 ? (
+                        <>
+                          {" "}— tháng này{" "}
+                          <span className="tnum font-semibold text-foreground">
+                            {num(fromProduction.reduce((sum, r) => sum + r.inKg, 0))} kg
+                          </span>{" "}
+                          ({fromProduction.length} lô).
+                        </>
+                      ) : (
+                        <> — tháng này chưa có lô nào từ xưởng.</>
+                      )}
+                    </p>
+                  );
+                })()}
                 <SummaryTable
                   rows={g.rows}
                   columns={summaryColumns(g.totals)}

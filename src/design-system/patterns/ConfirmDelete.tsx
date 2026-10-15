@@ -29,6 +29,8 @@ export function ConfirmDelete({
   title = "Xóa dòng này?",
   confirmLabel = "Xóa dòng",
   trigger,
+  open,
+  onOpenChange,
 }: {
   /** Mô tả bản ghi sắp xóa — hiện nguyên văn trong hộp thoại */
   recordDescription: string;
@@ -36,21 +38,30 @@ export function ConfirmDelete({
   title?: string;
   confirmLabel?: string;
   trigger?: React.ReactNode;
+  /**
+   * Mở theo lệnh (không có nút kích hoạt) — VD thùng rác trong danh sách `Combobox`:
+   * danh sách đóng lại rồi màn mới mở hộp hỏi. Truyền `open` ⇒ bỏ qua `trigger`.
+   */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
+  const isControlled = open !== undefined;
   return (
-    <AlertDialog>
-      <AlertDialogTrigger asChild>
-        {trigger ?? (
-          <Button
-            variant="danger"
-            size="sm"
-            title="Xóa bản ghi này. Có hỏi xác nhận trước, và xóa xong vẫn còn nút Hoàn tác."
-          >
-            <Trash2 />
-            Xóa
-          </Button>
-        )}
-      </AlertDialogTrigger>
+    <AlertDialog open={open} onOpenChange={onOpenChange}>
+      {!isControlled && (
+        <AlertDialogTrigger asChild>
+          {trigger ?? (
+            <Button
+              variant="danger"
+              size="sm"
+              title="Xóa bản ghi này. Có hỏi xác nhận trước, và xóa xong vẫn còn nút Hoàn tác."
+            >
+              <Trash2 />
+              Xóa
+            </Button>
+          )}
+        </AlertDialogTrigger>
+      )}
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle className="text-xl">{title}</AlertDialogTitle>

@@ -102,7 +102,7 @@ export function EditableGrid<R>({
    * ô đang đứng. Không có hàm này thì lưới vẫn dán được từng ô một.
    */
   onPasteBlock?: (rowId: string, colKey: string, block: (number | null)[][]) => void;
-  /** Nhóm cột đang thu gọn (VD ["ngay"]). */
+  /** Nhóm cột đang thu gọn (VD ["day"]). */
   collapsedGroups?: string[];
   /** Dòng tổng cuối bảng, tự dựng ở màn gọi. */
   footer?: React.ReactNode;

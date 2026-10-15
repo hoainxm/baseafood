@@ -70,6 +70,25 @@ import {
 import { sumLeftoverByDay, computeMaterialNxt, type MaterialPeriodNxtRow } from "@/lib/inventoryMaterial";
 import { getPeriodDomesticSales, type PeriodDomesticSales } from "@/lib/domesticSales";
 
+/** Nhóm cột (`GridColumn.group`) mà nút "Thu cột ngày" của cả hai lưới dựa vào —
+    MỘT nguồn để khai cột và `collapsedGroups` không lệch tên (lệch ⇒ cột không thu
+    mà footer lại bỏ ô ⇒ footer lệch cột). Thêm cột phụ thuộc ngày ⇒ gắn đúng nhóm. */
+export const DAY_COLUMN_GROUPS = {
+  /** Cột từng ngày + cột chỉ có nghĩa khi đang mở ngày (Tổng cuối hàng, Chuyển kỳ cũ). */
+  days: "day",
+  /** Chỉ hiện khi MỞ cột ngày (VD "Số lượng" tính từ các ngày). */
+  daysExpandedOnly: "days-expanded-only",
+  /** Chỉ hiện khi THU cột ngày (VD "Số lượng" gõ thẳng). */
+  daysCollapsedOnly: "days-collapsed-only",
+} as const;
+
+/** `collapsedGroups` cho EditableGrid theo trạng thái thu/mở cột ngày. */
+export function collapsedDayGroups(daysCollapsed: boolean): string[] {
+  return daysCollapsed
+    ? [DAY_COLUMN_GROUPS.days, DAY_COLUMN_GROUPS.daysExpandedOnly]
+    : [DAY_COLUMN_GROUPS.daysCollapsedOnly];
+}
+
 /** Một ô ngày cần ghi về sổ nguồn. */
 export interface DayCell {
   /** Khoá dòng lưới: tên loại NL (khối 1) hoặc mặt hàng|quy cách (khối 2). */

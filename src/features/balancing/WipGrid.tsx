@@ -23,7 +23,7 @@ import {
   type FinishedGoodTemplateRow,
   type FinishedGoodGridRow,
 } from "@/lib/balancingGrid";
-import type { DayCell, PeriodGrid } from "./usePeriodGrid";
+import { DAY_COLUMN_GROUPS, collapsedDayGroups, type DayCell, type PeriodGrid } from "./usePeriodGrid";
 import { BackdateReasonDialog, AddProductDialog } from "./gridDialogs";
 import {
   Button,
@@ -306,12 +306,12 @@ export function WipGrid({
       header: formatDayLabel(iso),
       label: `Ngày ${formatDateVN(iso)}`,
       kind: "input",
-      group: "day",
+      group: DAY_COLUMN_GROUPS.days,
       minWidth: 96,
       getValue: (h) => h.dailyQuantities[iso] ?? null,
     })),
     /* Tổng cuối hàng (như cột W bảng giấy) — chỉ khi mở cột ngày; thu ngày thì đã có "Lượng". */
-    { key: "tong", header: "Tổng (kg)", label: "Tổng", kind: "computed", group: "ngay", minWidth: 116, getValue: (h) => h.total || null },
+    { key: "tong", header: "Tổng (kg)", label: "Tổng", kind: "computed", group: DAY_COLUMN_GROUPS.days, minWidth: 116, getValue: (h) => h.total || null },
     { key: "tra", header: "Trả", label: "Trả", kind: "input", tint: "carry-over", minWidth: 104, getValue: (h) => h.repaidKg || null },
     { key: "no", header: "Nợ", label: "Nợ", kind: "input", tint: "carry-over", minWidth: 104, getValue: (h) => h.debtKg || null },
   ];
@@ -452,7 +452,7 @@ export function WipGrid({
           columns={displayColumns}
           rows={gridRows}
           rowMarkKey="can-doi-tp"
-          collapsedGroups={isDateColumnsCollapsed ? ["ngay"] : []}
+          collapsedGroups={collapsedDayGroups(isDateColumnsCollapsed)}
           onCellCommit={writeCell}
           onPasteBlock={pasteBlock}
           footer={

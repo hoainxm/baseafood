@@ -22,7 +22,7 @@ import {
   compareDomesticSales,
   isDomesticSaleRow,
 } from "@/lib/domesticSales";
-import type { DayCell, PeriodGrid } from "./usePeriodGrid";
+import { DAY_COLUMN_GROUPS, collapsedDayGroups, type DayCell, type PeriodGrid } from "./usePeriodGrid";
 import { PickImportRowsDialog, ManualRowsDialog, AddMaterialRowDialog } from "./gridDialogs";
 import { CellShipments } from "./CellShipments";
 import { useImportShipments } from "@/lib/catalogRepo";
@@ -488,8 +488,8 @@ export function MaterialGrid({
   const gridColumns: GridColumn<MaterialGridRow>[] = [
     /* Hai cột "Số lượng" loại trừ nhau: đang MỞ ngày ⇒ ô tính (Σ ngày, gõ ở ô ngày);
        đang THU ngày ⇒ gõ thẳng (ghiSoLuong). */
-    { key: "tong", header: "Số lượng", label: "Số lượng", kind: "computed", group: "khi-mo-ngay", minWidth: 104, getValue: (h) => h.total || null },
-    { key: "soLuong", header: "Số lượng", label: "Số lượng", kind: "input", group: "khi-thu-ngay", minWidth: 104, getValue: (h) => (h.isDecrease ? Math.abs(h.total) : h.total) || null },
+    { key: "tong", header: "Số lượng", label: "Số lượng", kind: "computed", group: DAY_COLUMN_GROUPS.daysExpandedOnly, minWidth: 104, getValue: (h) => h.total || null },
+    { key: "soLuong", header: "Số lượng", label: "Số lượng", kind: "input", group: DAY_COLUMN_GROUPS.daysCollapsedOnly, minWidth: 104, getValue: (h) => (h.isDecrease ? Math.abs(h.total) : h.total) || null },
     { key: "donGia", header: "Đơn giá VNĐ", label: "Đơn giá", kind: "input", minWidth: 104, getValue: (h) => h.unitPrice },
     {
       key: "thanhTien",
@@ -506,7 +506,7 @@ export function MaterialGrid({
       header: formatDayLabel(iso),
       label: `Ngày ${formatDateVN(iso)}`,
       kind: "input",
-      group: "ngay",
+      group: DAY_COLUMN_GROUPS.days,
       minWidth: 88,
       getValue: (h) => h.dailyQuantities[iso] ?? null,
       // Ngay dưới số kg: "n chuyến" → đại lý/chuyến làm nên đúng ô này.
@@ -519,7 +519,7 @@ export function MaterialGrid({
             header: "Chuyển kỳ (cũ)",
             label: "Chuyển kỳ (số cũ)",
             kind: "input",
-            group: "ngay",
+            group: DAY_COLUMN_GROUPS.days,
             tint: "carry-over",
             minWidth: 112,
             getValue: (h) => h.carryOverKg || null,
@@ -827,7 +827,7 @@ export function MaterialGrid({
         columns={displayColumns}
         rows={gridRows}
         rowMarkKey="can-doi-nl"
-        collapsedGroups={isDateColumnsCollapsed ? ["ngay", "khi-mo-ngay"] : ["khi-thu-ngay"]}
+        collapsedGroups={collapsedDayGroups(isDateColumnsCollapsed)}
         onCellCommit={writeCell}
         onPasteBlock={pasteBlock}
         footer={

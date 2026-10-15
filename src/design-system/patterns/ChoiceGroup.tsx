@@ -59,7 +59,7 @@ export function ChoiceGroup({
         options={options.map((o) => ({
           value: o.value,
           label: o.label,
-          phu: o.description,
+          subLabel: o.description,
         }))}
       />
     );

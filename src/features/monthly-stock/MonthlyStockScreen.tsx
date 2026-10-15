@@ -679,7 +679,7 @@ export default function MonthlyStockScreen() {
     const phu = new Map<string, string>(BSF1_WAREHOUSES.map((w) => [w.name, `Kho xí nghiệp · ${w.code}`]));
     for (const k of storageLocationCatalog) if (k.name.trim() && !phu.has(k.name.trim())) phu.set(k.name.trim(), STORAGE_KIND_LABELS[k.kind]);
     for (const l of lines) if (l.storageLocation && !phu.has(l.storageLocation)) phu.set(l.storageLocation, "");
-    return [...phu].map(([n, note]) => ({ value: n, label: n, phu: note || undefined }));
+    return [...phu].map(([n, note]) => ({ value: n, label: n, subLabel: note || undefined }));
   }, [storageLocationCatalog, lines]);
 
   /**
@@ -906,7 +906,7 @@ export default function MonthlyStockScreen() {
     const name = mappedName(x);
     const opts =
       name && !original.some((o) => normalize(o.value) === normalize(name))
-        ? [{ value: name, label: name, phu: `mới — thêm vào ${d === "product" ? "Mặt hàng" : "Loại NL"} khi bấm Đồng bộ` }, ...original]
+        ? [{ value: name, label: name, subLabel: `mới — thêm vào ${d === "product" ? "Mặt hàng" : "Loại NL"} khi bấm Đồng bộ` }, ...original]
         : original;
     return (
       <div key={x.name} className="flex flex-wrap items-center gap-2 rounded p-1 hover:bg-muted/50">

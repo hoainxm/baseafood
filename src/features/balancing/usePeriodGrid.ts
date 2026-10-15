@@ -131,7 +131,7 @@ export interface PeriodGrid {
   /** Lô (Sổ kho tháng) để chọn ĐÍCH DANH cho dòng Lấy xả đông — tháng của ngày đầu kỳ. */
   lotOptions: (selected: string[]) => LotOption[];
   /** Kho nhận cho dòng Gửi đông: "<sổ kho>|<vị trí>". */
-  depositLocationOptions: { value: string; label: string; phu?: string }[];
+  depositLocationOptions: { value: string; label: string; subLabel?: string }[];
   /** Mô tả lô / kho của một dòng kho (bản in, nhãn). */
   describeStockLine: (r: BalancingInputItem) => string;
   /** Số chỗ Sổ kho tháng lệch phần kho của kỳ (VD sổ bị nạp lại đè) — 0 là khớp. */

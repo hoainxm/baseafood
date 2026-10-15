@@ -469,9 +469,9 @@ export function ColumnSumCheckView({ sheets }: { sheets: InvoiceSheet[] }) {
     return {
       label: s.name,
       value: `${num(cd.diff)} đ`,
-      so: true,
+      numeric: true,
       color: isMatch ? "success" : cd.rowCounts.realDiff ? "danger" : "warning",
-      phu: isMatch ? "cộng khớp" : cd.rowCounts.realDiff ? `${num(cd.rowCounts.realDiff)} dòng lệch thật · ${num(cd.breakdown.realDiff)} đ` : "chỉ phí / chiết khấu / làm tròn",
+      subtext: isMatch ? "cộng khớp" : cd.rowCounts.realDiff ? `${num(cd.rowCounts.realDiff)} dòng lệch thật · ${num(cd.breakdown.realDiff)} đ` : "chỉ phí / chiết khấu / làm tròn",
     };
   });
   return (

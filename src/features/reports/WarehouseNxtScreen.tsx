@@ -163,7 +163,7 @@ export default function WarehouseNxtScreen() {
     return [...set].sort().map((n) => ({
       value: n,
       label: n,
-      phu: kindByName.has(n) ? STORAGE_KIND_LABELS[kindByName.get(n)!] : undefined,
+      subLabel: kindByName.has(n) ? STORAGE_KIND_LABELS[kindByName.get(n)!] : undefined,
     }));
   }, [storageLocationCatalog, snapshots]);
 

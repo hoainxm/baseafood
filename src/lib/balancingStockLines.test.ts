@@ -240,7 +240,7 @@ describe("danh sách chọn", () => {
     const ch = listThawLotOptions(items, "2026-10", "Bạch tuộc 2 da");
     expect(ch.map((c) => c.value)).toEqual(["C", "A"]);
     expect(ch[0].label).toBe("Hồng Phú · B.TUỘC  2 DA · SBT001");
-    expect(ch[0].phu).toMatch(/^còn 1\.000 kg · nhập 12\/08\/2026$/);
+    expect(ch[0].subLabel).toMatch(/^còn 1\.000 kg · nhập 12\/08\/2026$/);
     // Lô đang chọn vẫn hiện dù đã hết.
     expect(listThawLotOptions(items, "2026-10", "Bạch tuộc 2 da", ["B"]).some((c) => c.value === "B")).toBe(true);
   });

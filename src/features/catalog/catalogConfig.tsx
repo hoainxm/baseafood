@@ -135,7 +135,7 @@ export function buildCatalogFields(
   const optTP141 = finishedGoods.map((t) => ({
     value: t.code,
     label: t.name,
-    phu: `Mã ${t.code} · ${t.groupName}`,
+    subLabel: `Mã ${t.code} · ${t.groupName}`,
   }));
 
   const productFields: CatalogField<Product>[] = [
@@ -158,7 +158,7 @@ export function buildCatalogFields(
           options={materialTypes.map((l) => ({
             value: l.id,
             label: l.name,
-            phu: l.category || undefined,
+            subLabel: l.category || undefined,
           }))}
           onCreate={addMaterialType}
           placeholder="— Chọn loại nguyên liệu —"

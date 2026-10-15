@@ -32,7 +32,7 @@ export function BatterPicker({
 
   const remainingOptions = batterTypes
     .filter((b) => !ids.includes(b.id))
-    .map((b) => ({ value: b.id, label: b.name, phu: b.note || undefined }));
+    .map((b) => ({ value: b.id, label: b.name, subLabel: b.note || undefined }));
 
   return (
     <div className="flex flex-col gap-2">

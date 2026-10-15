@@ -336,7 +336,7 @@ export default function MaterialImportScreen() {
       .map((l) => ({
         value: l.name,
         label: l.name,
-        phu: l.category || undefined,
+        subLabel: l.category || undefined,
       }));
 
   const addMaterialType = (name: string, category = "") => {

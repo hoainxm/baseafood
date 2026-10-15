@@ -129,13 +129,13 @@ export default function BalancingScreen() {
      ô hiển thị đúng và lưu thẳng tên họ. Danh mục gốc (sổ nhập) vẫn giữ đủ size. */
   const materialTypeOptions = useMemo(() => {
     const existing = new Set<string>();
-    const result: { value: string; label: string; phu?: string }[] = [];
+    const result: { value: string; label: string; subLabel?: string }[] = [];
     for (const l of catalogMaterialTypes) {
       const family = getMaterialFamily(l.name) || l.name;
       const key = family.toLowerCase();
       if (existing.has(key)) continue;
       existing.add(key);
-      result.push({ value: family, label: family, phu: l.category || undefined });
+      result.push({ value: family, label: family, subLabel: l.category || undefined });
     }
     return result;
   }, [catalogMaterialTypes]);

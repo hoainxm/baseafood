@@ -108,7 +108,7 @@ export default function OrderExportReport() {
 
   const customerOptions = [
     { value: "Tất cả", label: "Tất cả khách" },
-    ...customers.map((k) => ({ value: k.id, label: k.name, phu: k.market || undefined })),
+    ...customers.map((k) => ({ value: k.id, label: k.name, subLabel: k.market || undefined })),
   ];
 
   const { groups: group, totalKg, totalBlocks } = useMemo(() => {

@@ -466,6 +466,7 @@ theo màu**, không tự viết class màu lên nút.
   bao giờ là tín hiệu duy nhất. Tương phản chữ/nền ≥ 4,5:1 với token hiện có.
 - Đã áp cho MỌI màn (2026-10-14) + `ConfirmDelete` (trigger `danger`) + `CatalogCrud`
   (Sửa `edit`, Lưu `save`) + trang `/kit`. Nút mới PHẢI dùng đúng variant ngay.
+- **Khóa cũ sau đổi tên (2026-10-15):** dòng phụ ô chọn là `subLabel`, dòng phụ thẻ thống kê `subtext`, số thẳng cột `numeric`. Khóa cũ `phu` / `so` trong object `.map(...)` TypeScript không bắt ⇒ chữ phụ mất lặng lẽ; `patterns/legacyPropKeySource.test.ts` quét features + design-system + lib, gặp lại là CI đỏ.
 - **Cổng máy:** `patterns/buttonIntentSource.test.ts` quét mọi `<Button>` /
   `<AlertDialogAction>` ở `features/**` + `design-system/**`: icon `Pencil`/`LockOpen` ⇒
   `edit`, `Trash2` ⇒ `danger`/`destructive`, `Lock` ⇒ `lock`, `Save` ⇒ `save`; không có icon

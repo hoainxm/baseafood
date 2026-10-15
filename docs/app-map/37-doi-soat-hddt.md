@@ -1,6 +1,7 @@
 > Load khi: sửa màn `/reconciliation`, logic đối soát hóa đơn điện tử ⇄ phần mềm kế toán, đọc/ghi file Excel hóa đơn.
 covers: src/features/reconciliation/ReconciliationScreen.tsx, src/features/reconciliation/ReconciliationModeView.tsx, src/features/reconciliation/reconciliationMode.ts, src/features/reconciliation/index.ts, src/lib/einvoiceReconciliation.ts, src/lib/twoVersionReconciliation.ts, src/lib/reconciliationExport.ts, src/lib/reconciliationExportShift.ts, src/lib/reconciliationExportSummary.ts, src/lib/reconciliationCommon.ts
 last_verified: 2026-10-15
+<!-- updated: 2026-10-15 — thẻ thống kê kiểu "Kiểm cộng cột" hiện lại dòng phụ (cộng khớp / N dòng lệch thật · X đ / chỉ phí · chiết khấu · làm tròn) và số thẳng cột: khóa cũ `phu`/`so` → `subtext`/`numeric` (StatCardData). -->
 <!-- updated: 2026-10-15 — phân quyền Đợt 3: `useCan("reconciliation")` — chọn file + Đối soát (Thêm), lưu/sửa bản (Thêm khi mới, Sửa khi đã lưu), Xóa bản, Tải Excel (Xuất). -->
 ttl_days: 90
 <!-- updated: 2026-10-14 — đổi tên trường engine + dữ liệu lưu sang tiếng Anh (spec quy-uoc-dat-ten): chế độ `ledger/twoVersion/columnSum/sameDay`, `options.{ledgerSheetName,taxSideSheets,mode}`, `summary.{invoiceCount,matched,mismatched,missing,…}`. Bản lưu cũ đọc cả tên cũ (lib/legacyValues). Phần mô tả engine bên dưới còn có chỗ nhắc tên trường cũ (`canDoiCot`, `tong`, `nghiVan`…) — tên hiện hành xem `einvoiceReconciliation.ts`. -->

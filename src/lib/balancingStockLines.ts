@@ -380,7 +380,7 @@ export function scoreNameMatch(itemName: string, materialFamily: string): number
 export interface LotOption {
   value: string;
   label: string;
-  phu: string;
+  subLabel: string;
   /** Tồn cuối hiện tại của lô (đã gồm phần cân đối đã lấy). */
   stockKg: number;
   /** Đơn giá của lô — gợi ý đơn giá dòng Lấy xả đông. */
@@ -414,7 +414,7 @@ export function listThawLotOptions(
     .map((r) => ({
       value: r.id,
       label: `${shortLocationName(r)} · ${r.itemName}${r.size ? ` ${r.size}` : ""}${r.origin ? ` · ${r.origin}` : ""}`,
-      phu: `còn ${num(r.closeKg)} kg${r.importDate ? ` · nhập ${formatDateVN(r.importDate)}` : ""}`,
+      subLabel: `còn ${num(r.closeKg)} kg${r.importDate ? ` · nhập ${formatDateVN(r.importDate)}` : ""}`,
       stockKg: r.closeKg,
       price: r.unitPrice,
     }));
@@ -428,7 +428,7 @@ export function listDepositLocationOptions(
   lines: MonthlyStockLine[],
   plantWarehouses: string[],
   storageLocations: string[]
-): { value: string; label: string; phu?: string }[] {
+): { value: string; label: string; subLabel?: string }[] {
   const qtyByLocation = new Map<string, Map<string, number>>();
   for (const l of lines) {
     if (!l.storageLocation) continue;
@@ -441,7 +441,7 @@ export function listDepositLocationOptions(
     if (!m) return DEFAULT_LEDGER_WAREHOUSE;
     return [...m.entries()].sort((a, b) => b[1] - a[1])[0][0];
   };
-  const result: { value: string; label: string; phu?: string }[] = [];
+  const result: { value: string; label: string; subLabel?: string }[] = [];
   const existing = new Set<string>();
   for (const k of plantWarehouses) {
     if (existing.has(k)) continue;
@@ -452,7 +452,7 @@ export function listDepositLocationOptions(
     if (!vt || existing.has(vt)) continue;
     existing.add(vt);
     const num = mainWarehouseOf(vt);
-    result.push({ value: joinDepositLocation(num, vt), label: vt, phu: `sổ ${num}` });
+    result.push({ value: joinDepositLocation(num, vt), label: vt, subLabel: `sổ ${num}` });
   }
   return result;
 }

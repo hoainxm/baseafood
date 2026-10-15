@@ -217,6 +217,30 @@ describe("syncMonthlyStockLedger — Gửi đông = lô MỚI theo ngày gửi",
   });
 });
 
+describe("syncMonthlyStockLedger — tháng sau ĐÃ MỞ thì tồn đầu đi theo (audit 2026-10-15)", () => {
+  const warehouse = "Kho 1500 tấn|Kho Hồng Phú";
+  test("Gửi đông vào T10 khi T11 đã mở ⇒ T11 có tồn đầu lô gửi; bỏ gửi ⇒ dòng dồn sạch bị gỡ", () => {
+    const s0 = [lot("X", "2026-10"), lot("carry|X", "2026-11", { carriedFromId: "X" })];
+    const r = stockRow("g1", "gui", { "2026-10-02": -400 }, { stockLocation: warehouse });
+    const a = syncMonthlyStockLedger(s0, [], [r], ctx).lines;
+    const did = freezeDepositRowId("g1", "2026-10-02");
+    expect(a.find((l) => l.id === `carry|${did}`)).toMatchObject({ period: "2026-11", openKg: 400 });
+    const b = syncMonthlyStockLedger(a, [r], [], ctx).lines;
+    expect(b.some((l) => l.id.includes(did))).toBe(false);
+    expect(b.find((l) => l.id === "carry|X")!.openKg).toBe(1000); // lô khác không đụng
+  });
+
+  test("Lấy xả đông ở T10 khi T11 đã mở ⇒ tồn đầu T11 của lô giảm theo", () => {
+    const s0 = [lot("L1", "2026-10"), lot("carry|L1", "2026-11", { carriedFromId: "L1" })];
+    const r = stockRow("d1", "lay", { "2026-10-02": 300 }, { stockLineId: "L1" });
+    const a = syncMonthlyStockLedger(s0, [], [r], ctx);
+    expect(a.changed).toBe(true);
+    expect(a.lines.find((l) => l.id === "carry|L1")!.openKg).toBe(700);
+    const back = syncMonthlyStockLedger(a.lines, [r], [], ctx).lines;
+    expect(back.find((l) => l.id === "carry|L1")!.openKg).toBe(1000);
+  });
+});
+
 describe("countMonthlyStockMismatches — kiểm khớp, ghi lại sửa được", () => {
   test("sổ bị nạp đè mất xuất ⇒ báo lệch, ghi lại với truoc=[] thì khớp", () => {
     const r = stockRow("d1", "lay", { "2026-10-02": 300 }, { stockLineId: "L1" });

@@ -86,6 +86,7 @@ import {
   frozenLineRemovalBlocker,
   frozenLinesOf,
   isFrozenEntryComplete,
+  removeFrozenLot,
 } from "@/lib/frozenStockLines";
 import { useCan, useCanOnRow } from "@/features/shared/PermissionProvider";
 import { assignSessionLots, findBatchesWithoutLot, formatWipLotLabel, buildLotNode, type TraceData } from "@/lib/lotTraceability";
@@ -911,7 +912,7 @@ export default function WipProductionScreen() {
       return;
     }
     const prevLedger = monthlyStock;
-    setMonthlyStock(monthlyStock.filter((x) => x.id !== l.id));
+    setMonthlyStock(removeFrozenLot(monthlyStock, l.id));
     notify.deleted(`Đã bỏ ${l.itemName} — ${kg(l.inKg)} khỏi Hàng tạm (Sổ kho tháng)`, () => setMonthlyStock(prevLedger));
   };
   const frozenColumns: RecordTableColumn<MonthlyStockLine>[] = [
@@ -930,7 +931,7 @@ export default function WipProductionScreen() {
       header: "Ở Sổ kho tháng",
       render: (l) => {
         const blocker = frozenLineRemovalBlocker(l, monthlyStock);
-        return blocker ? <Tag variant="muted">Đã lấy ra / dồn tháng</Tag> : <Tag variant="done">Lô nhập Hàng tạm</Tag>;
+        return blocker ? <Tag variant="muted">Đã lấy ra ở sổ kho</Tag> : <Tag variant="done">Lô nhập Hàng tạm</Tag>;
       },
     },
   ];

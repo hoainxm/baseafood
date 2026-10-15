@@ -543,6 +543,77 @@ export function carryForwardIntoLedger(lines: MonthlyStockLine[], targetMonth: s
   };
 }
 
+/** Chuỗi id dồn kỳ của một lô: `carry|<id>`, `carry|carry|<id>`… (tháng sau, tháng sau nữa). */
+export const carryChainIds = (lines: MonthlyStockLine[], lotId: string): string[] => {
+  const ids: string[] = [];
+  for (let id = idDon(lotId); lines.some((l) => l.id === id); id = idDon(id)) ids.push(id);
+  return ids;
+};
+
+/**
+ * ĐẨY TIẾP tồn cuối của ĐÚNG các lô vừa bị ghi sang các tháng sau ĐÃ MỞ (2026-10-15).
+ *
+ * Vì sao: tồn đầu tháng được ĐÓNG BĂNG khi dồn kỳ; ghi thêm lô / lấy ra / bỏ lô ở một
+ * tháng cũ (hàng đông lạnh /wip, Gửi đông · Lấy xả đông của Cân đối) mà tháng sau đã mở
+ * thì tồn đầu tháng sau đứng yên ⇒ lệch dồn kỳ (audit: lô 25 kg ghi vào T10 khi T11 đã
+ * mở không sang T11). Không dồn lại CẢ tháng (sẽ đè tồn đầu kế toán đã chốt của lô khác)
+ * — chỉ đi theo chuỗi `carry|<lô>` của các lô truyền vào:
+ *  - dòng dồn đã có ⇒ CHỈ đặt `openKg/openCtn` = tồn cuối tháng trước (như carryForwardIntoLedger);
+ *  - chưa có mà lô còn tồn ⇒ thêm dòng dồn (`buildCarryForwardLines`);
+ *  - lô đã bị xoá / hết tồn ⇒ dòng dồn về 0, trống hẳn (không số, không ghi chú) thì bỏ;
+ *  - tháng chưa mở ⇒ dừng (mở sau tự kế thừa); dòng dồn đã khớp ⇒ dừng (phía sau không đổi).
+ */
+export function propagateLotsForward(
+  lines: MonthlyStockLine[],
+  lotIds: Iterable<string>
+): { lines: MonthlyStockLine[]; touched: number } {
+  let items = lines;
+  let touched = 0;
+  for (const lotId of new Set(lotIds)) {
+    let sourceId = lotId;
+    let source: MonthlyStockLine | undefined = items.find((l) => l.id === lotId);
+    let month = source ? getNextMonth(source.period) : items.find((l) => l.id === idDon(lotId))?.period;
+    let closeKg = source ? deriveRow(source).closeKg : 0;
+    let closeCtn = source ? deriveRow(source).closeCtn : 0;
+    for (let i = 0; i < 36 && month; i++) {
+      const m = month;
+      if (!items.some((l) => l.period === m)) break; // tháng chưa mở — mở sau tự kế thừa
+      const carryId = idDon(sourceId);
+      const existing = items.find((l) => l.id === carryId);
+      let next: MonthlyStockLine;
+      if (existing) {
+        if (Math.abs(existing.openKg - closeKg) < 1e-9 && Math.abs(existing.openCtn - closeCtn) < 1e-9) break;
+        next = { ...existing, openKg: closeKg, openCtn: closeCtn };
+        if (isEmptyLine(next) && !(next.note ?? "").trim()) {
+          items = items.filter((l) => l.id !== carryId);
+          touched++;
+          source = undefined;
+          sourceId = carryId;
+          closeKg = 0;
+          closeCtn = 0;
+          month = getNextMonth(m);
+          continue;
+        }
+        items = items.map((l) => (l.id === carryId ? next : l));
+      } else {
+        if (!source || Math.abs(closeKg) < 1e-9) break; // hết tồn ⇒ không đẻ dòng dồn
+        const built = buildCarryForwardLines([deriveRow(source)], m)[0];
+        if (!built) break;
+        next = built;
+        items = [...items, next];
+      }
+      touched++;
+      source = next;
+      sourceId = carryId;
+      const r = deriveRow(next);
+      closeKg = r.closeKg;
+      closeCtn = r.closeCtn;
+      month = getNextMonth(m);
+    }
+  }
+  return { lines: items, touched };
+}
+
 /* ---------- Thao tác trên MỘT dòng: lấy ra dùng · nhập thêm · chuyển vị trí ---------- */
 
 /** Dòng KHÔNG có số liệu: tồn đầu, nhập, xuất (kg lẫn kiện) đều bằng 0. */

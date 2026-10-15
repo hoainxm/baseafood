@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import type { MonthlyStockLine } from "@/types";
-import { carryForwardIntoLedger, buildCarryForwardLines, deriveRow } from "./monthlyStock";
+import { carryForwardIntoLedger, buildCarryForwardLines, deriveRow, idDon, propagateLotsForward, carryChainIds } from "./monthlyStock";
 
 const row = (id: string, period: string, p: Partial<MonthlyStockLine> = {}): MonthlyStockLine => ({
   id,
@@ -123,5 +123,47 @@ describe("buildCarryForwardLines — lọc theo kg (#30)", () => {
   test("còn kg ⇒ dồn cả kg lẫn kiện", () => {
     const r = deriveRow(row("X", "2026-09", { outKg: 400, outCtn: 40 }));
     expect(buildCarryForwardLines([r], "2026-10")[0]).toMatchObject({ id: "carry|X", openKg: 600, openCtn: 60 });
+  });
+});
+
+describe("propagateLotsForward — đẩy tiếp ĐÚNG lô vừa ghi sang các tháng sau đã mở", () => {
+  const nov = (id: string, p: Partial<MonthlyStockLine> = {}) => row(id, "2026-11", { openCtn: 0, ...p });
+
+  test("lô mới tháng cũ ⇒ thêm dòng dồn ở mọi tháng sau đã mở; tháng chưa mở thì dừng", () => {
+    const L = row("L", "2026-10", { openKg: 0, openCtn: 0, inKg: 25, inCtn: 0 });
+    const ledger = [L, nov("x"), row("y", "2026-12", { openCtn: 0 })];
+    const { lines, touched } = propagateLotsForward(ledger, ["L"]);
+    expect(touched).toBe(2);
+    expect(lines.find((l) => l.id === idDon("L"))).toMatchObject({ period: "2026-11", openKg: 25, carriedFromId: "L" });
+    expect(lines.find((l) => l.id === idDon(idDon("L")))).toMatchObject({ period: "2026-12", openKg: 25 });
+    expect(lines.some((l) => l.period === "2027-01")).toBe(false);
+  });
+
+  test("dòng dồn đã có ⇒ CHỈ đổi tồn đầu (giữ nhập/xuất/ghi chú); lô khác không đụng", () => {
+    const L = row("L", "2026-10", { openKg: 100, outKg: 30, openCtn: 0 });
+    const cL = nov(idDon("L"), { openKg: 100, outKg: 10, note: "giữ", carriedFromId: "L" });
+    const other = nov(idDon("Z"), { openKg: 999, carriedFromId: "Z" }); // tồn đầu kế toán đã chốt
+    const { lines } = propagateLotsForward([L, cL, row("Z", "2026-10", { openKg: 5 }), other], ["L"]);
+    expect(lines.find((l) => l.id === idDon("L"))).toMatchObject({ openKg: 70, outKg: 10, note: "giữ" });
+    expect(lines.find((l) => l.id === idDon("Z"))!.openKg).toBe(999);
+  });
+
+  test("lô bị xoá ⇒ dòng dồn sạch bị bỏ cả chuỗi; dòng có số thì về 0 và giữ", () => {
+    const c1 = nov(idDon("L"), { openKg: 50, carriedFromId: "L" });
+    const c2 = row(idDon(idDon("L")), "2026-12", { openKg: 50, openCtn: 0, carriedFromId: idDon("L") });
+    expect(propagateLotsForward([c1, c2, nov("keep")], ["L"]).lines.map((l) => l.id)).toEqual(["keep"]);
+    const used = { ...c1, outKg: 5 };
+    const { lines } = propagateLotsForward([used, c2], ["L"]);
+    expect(lines.find((l) => l.id === idDon("L"))).toMatchObject({ openKg: 0, outKg: 5 });
+    expect(lines.find((l) => l.id === idDon(idDon("L")))!.openKg).toBe(-5);
+  });
+
+  test("đã khớp ⇒ không đổi gì (chạy lại idempotent); carryChainIds liệt kê chuỗi", () => {
+    const L = row("L", "2026-10", { openKg: 40, openCtn: 0 });
+    const once = propagateLotsForward([L, nov("x")], ["L"]).lines;
+    const twice = propagateLotsForward(once, ["L"]);
+    expect(twice.touched).toBe(0);
+    expect(twice.lines).toEqual(once);
+    expect(carryChainIds(once, "L")).toEqual([idDon("L")]);
   });
 });

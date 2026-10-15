@@ -12,9 +12,12 @@
 //   - Ngày nhập = ngày SX, Invoice `SX-yyyymmdd`, ghi chú mang vết `⟦SX:<xưởng>⟧`.
 //   - Tháng chưa mở ⇒ kế thừa tồn cuối tháng trước TRƯỚC (`ensureMonthOpened`), không thì
 //     thêm một dòng làm mất bản xem trước dồn kỳ của tháng đó.
-// Xóa ở /wip chỉ khi lô chưa bị lấy ra và chưa dồn sang tháng sau — đã có thì sửa ở Sổ kho tháng.
+// Tháng sau ĐÃ MỞ ⇒ lô mới được đẩy tiếp sang các tháng đó (`propagateLotsForward`) — không
+// thì tồn đầu tháng sau thiếu lô (audit 2026-10-15). Bỏ lô ở /wip ⇒ dọn luôn chuỗi dồn kỳ
+// "sạch" của nó; chỉ chặn khi lô đã lấy ra hoặc tháng sau đã có người nhập/xuất/ghi chú trên lô.
 import type { MonthlyStockLine } from "@/types";
 import { ensureMonthOpened, monthOfDate } from "@/lib/balancingStockLines";
+import { carryChainIds, propagateLotsForward } from "@/lib/monthlyStock";
 
 export const TEMPORARY_GOODS_CATEGORY = "Hàng tạm";
 export const PRODUCTION_FROZEN_ID_PREFIX = "wip|";
@@ -74,11 +77,14 @@ export function buildFrozenStockLines(
   }));
 }
 
-/** Ghi các dòng mới vào sổ: mở tháng (kế thừa) nếu chưa có dòng nào rồi nối thêm. */
+/**
+ * Ghi các dòng mới vào sổ: mở tháng (kế thừa) nếu chưa có dòng nào, nối thêm, rồi ĐẨY TIẾP
+ * lô mới sang các tháng sau đã mở. `propagated` = số dòng dồn kỳ được thêm/cập nhật.
+ */
 export function addFrozenStockToLedger(
   ledger: MonthlyStockLine[],
   newLines: MonthlyStockLine[]
-): { lines: MonthlyStockLine[]; carriedCount: number } {
+): { lines: MonthlyStockLine[]; carriedCount: number; propagated: number } {
   let lines = ledger;
   let carriedCount = 0;
   for (const month of [...new Set(newLines.map((l) => l.period))]) {
@@ -86,16 +92,30 @@ export function addFrozenStockToLedger(
     lines = opened.lines;
     carriedCount += opened.carriedCount;
   }
-  return { lines: [...lines, ...newLines], carriedCount };
+  const pushed = propagateLotsForward([...lines, ...newLines], newLines.map((l) => l.id));
+  return { lines: pushed.lines, carriedCount, propagated: pushed.touched };
 }
+
+/** Dòng dồn kỳ có ai ĐỤNG chưa (nhập / xuất / ghi chú) — chưa thì xóa theo lô được. */
+const isTouchedCarry = (l: MonthlyStockLine) =>
+  l.inKg !== 0 || l.outKg !== 0 || l.inCtn !== 0 || l.outCtn !== 0 || Boolean((l.note ?? "").trim());
 
 /** Lý do KHÔNG cho xóa lô ở /wip (rỗng = xóa được). */
 export function frozenLineRemovalBlocker(line: MonthlyStockLine, ledger: MonthlyStockLine[]): string {
   if (line.outKg > 0 || line.outCtn > 0)
     return "Lô này đã có số lấy ra ở Sổ kho tháng — sửa hay xóa ở đó.";
-  if (ledger.some((l) => l.carriedFromId === line.id && l.openKg !== 0))
-    return "Lô này đã dồn sang tháng sau ở Sổ kho tháng — sửa hay xóa ở đó.";
+  const chain = carryChainIds(ledger, line.id);
+  if (ledger.some((l) => chain.includes(l.id) && isTouchedCarry(l)))
+    return "Tháng sau đã có số lấy ra / ghi chú trên lô này ở Sổ kho tháng — sửa hay xóa ở đó.";
   return "";
+}
+
+/** Bỏ một lô (ghi sai) khỏi sổ + dọn chuỗi dồn kỳ của nó ở các tháng sau. Gọi sau khi blocker rỗng. */
+export function removeFrozenLot(ledger: MonthlyStockLine[], lotId: string): MonthlyStockLine[] {
+  return propagateLotsForward(
+    ledger.filter((l) => l.id !== lotId),
+    [lotId]
+  ).lines;
 }
 
 /** Lô đông lạnh từ SX của một ngày · xưởng (cho sổ ngày ở /wip). */

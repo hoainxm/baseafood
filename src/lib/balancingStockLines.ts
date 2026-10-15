@@ -5,7 +5,7 @@
 // ============================================================
 import type { BalancingInputItem, MonthlyStockLine } from "@/types";
 import { getBalancingStockLineKind } from "@/lib/balancingGrid";
-import { carryForwardIntoLedger, deriveRow, getNextMonth, type MonthlyStockRow } from "@/lib/monthlyStock";
+import { carryForwardIntoLedger, deriveRow, getNextMonth, propagateLotsForward, type MonthlyStockRow } from "@/lib/monthlyStock";
 import { num, formatDateVN } from "@/lib/format";
 
 /**
@@ -172,6 +172,8 @@ export function syncMonthlyStockLedger(
   let items = lines;
   let carriedCount = 0;
   let changed = false;
+  /** Lô vừa bị đặt số (lấy xả đông / gửi đông) — cuối hàm đẩy tiếp sang các tháng sau đã mở. */
+  const touchedLots = new Set<string>();
 
   const ensureMonth = (t: string) => {
     const result = ensureMonthOpened(items, t);
@@ -248,6 +250,7 @@ export function syncMonthlyStockLedger(
           note: appendTrace(row.note, id, c.kg, `Cân đối ${ctx.periodLabel}: lấy xả đông ${num(c.kg)} kg`),
         };
         items = items.map((l) => (l.id === row.id ? updatedLine : l));
+        touchedLots.add(row.id);
         changed = true;
       }
       continue;
@@ -278,6 +281,7 @@ export function syncMonthlyStockLedger(
         if (kg === 0) {
           if (existing) {
             items = items.filter((l) => l.id !== did);
+            touchedLots.add(did);
             changed = true;
           }
           continue;
@@ -320,8 +324,18 @@ export function syncMonthlyStockLedger(
           existing.note === row.note;
         if (same) continue;
         items = existing ? items.map((l) => (l.id === did ? row : l)) : [...items, row];
+        touchedLots.add(did);
         changed = true;
       }
+    }
+  }
+  /* Tháng sau ĐÃ MỞ thì tồn đầu của các lô vừa đổi phải đi theo (audit 2026-10-15) — chỉ
+     chuỗi dồn kỳ của chính các lô này, không dồn lại cả tháng (giữ tồn đầu đã chốt của lô khác). */
+  if (touchedLots.size) {
+    const pushed = propagateLotsForward(items, touchedLots);
+    if (pushed.touched) {
+      items = pushed.lines;
+      changed = true;
     }
   }
   return { lines: items, changed, error: null, carriedCount };

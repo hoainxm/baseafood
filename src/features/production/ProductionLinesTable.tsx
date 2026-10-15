@@ -89,9 +89,10 @@ export function ProductionLinesTable({
     // data-grid-nav: khung điều hướng ↑/↓/Enter theo cột cho các ô số (navCol).
     <div data-grid-nav>
       <HorizontalScroll>
-        {/* table-fixed: cột số + thao tác cố định, cột tên ăn phần còn lại. Chặn 64rem ⇒
-            màn rộng tên và số nằm gần nhau; dưới 34rem thì cuộn ngang trong khung. */}
-        <table className="w-full max-w-[64rem] min-w-[34rem] table-fixed border-collapse text-sm">
+        {/* table-fixed: cột số + thao tác cố định, cột tên ăn phần còn lại; bảng TRẢI HẾT bề
+            ngang (chặn 64rem làm màn rộng trông như bảng bị cắt đôi — người dùng báo 2026-10-15).
+            Dưới 34rem thì cuộn ngang trong khung. */}
+        <table className="w-full min-w-[34rem] table-fixed border-collapse text-sm">
           <thead>
             <tr>
               <th className={th}>

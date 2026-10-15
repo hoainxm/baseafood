@@ -1273,7 +1273,8 @@ export default function WipProductionScreen() {
       {/* Bảng thành phẩm — nhập cả phiên một lượt, lưu một lần. KHÔNG bọc thêm khung
           (đã nằm trong khung form) — nhường bề ngang cho cột tên ở tablet. */}
       <div className="space-y-3">
-        <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+        {/* Câu hướng dẫn ngay dưới tiêu đề (không dạt sang mép phải ở màn rộng). */}
+        <div>
           <p className="text-base font-semibold">Thành phẩm làm ra trong ngày</p>
           <p className="text-sm text-muted-foreground">
             Chọn thành phẩm, gõ số block hoặc kg — dòng mới tự hiện. Bấm ✂ để tách râu + bao tử.

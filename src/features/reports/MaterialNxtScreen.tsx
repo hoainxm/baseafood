@@ -25,6 +25,7 @@ import {
   Input,
   NumberField,
   StatCardGrid,
+  ReadOnlyBadge,
   todayIso,
   notify,
   type SummaryTableColumn,
@@ -33,6 +34,7 @@ import {
   type StatCardData,
 } from "@/design-system";
 import { useQuickCatalogEdit } from "@/features/catalog/QuickCatalogEdit";
+import { useCan } from "@/features/shared/PermissionProvider";
 import {
   useBalancingInputs,
   useBalancingPeriods,
@@ -91,6 +93,9 @@ interface OpeningForm {
  * Ô nhập tay duy nhất là "Tồn đầu". Xem lib/inventoryMaterial.ts#computeMaterialTotalStock.
  */
 export default function MaterialNxtScreen() {
+  // Phân quyền lớp 2: thêm/xóa tồn đầu khai tay theo `create` / `delete`.
+  const allowed = useCan("nxt-material");
+  const isReadOnly = !allowed.create && !allowed.update;
   const [periods] = useBalancingPeriods();
   const [inputs] = useBalancingInputs();
   const [imports] = useMaterialImports();
@@ -313,6 +318,7 @@ export default function MaterialNxtScreen() {
           <h1 className="flex items-center gap-2 text-2xl font-semibold text-foreground">
             <Snowflake className="h-8 w-8 text-primary" />
             Tồn kho nguyên liệu (Nhập – Xuất – Tồn)
+            {isReadOnly && <ReadOnlyBadge />}
           </h1>
           <p className="mt-1 text-muted-foreground">
             Tồn suy thẳng từ sổ Nhập hàng: <b>Tồn cuối = Tồn đầu + Nhập − Xuất SX − Bán nội địa</b>. Cả 3 phân
@@ -471,16 +477,18 @@ export default function MaterialNxtScreen() {
                         {o.note ? ` · ${o.note}` : ""}
                       </span>
                     </span>
-                    <ConfirmDelete
-                      recordDescription={`${o.materialTypeName} — ${num(o.quantityKg)} kg (từ ${formatDateVN(o.asOfDate)})`}
-                      onConfirm={() => deleteOpening(o.id)}
-                      trigger={
-                        <Button
-                          title="Xóa dòng tồn đầu này." size="sm" variant="danger">
-                          Xóa
-                        </Button>
-                      }
-                    />
+                    {allowed.delete && (
+                      <ConfirmDelete
+                        recordDescription={`${o.materialTypeName} — ${num(o.quantityKg)} kg (từ ${formatDateVN(o.asOfDate)})`}
+                        onConfirm={() => deleteOpening(o.id)}
+                        trigger={
+                          <Button
+                            title="Xóa dòng tồn đầu này." size="sm" variant="danger">
+                            Xóa
+                          </Button>
+                        }
+                      />
+                    )}
                   </li>
                 ))}
               </ul>
@@ -549,11 +557,13 @@ export default function MaterialNxtScreen() {
                 </div>
               </div>
             ) : (
-              <Button
-                title="Khai thêm tồn đầu cho một loại nguyên liệu nữa." variant="outline" onClick={openAddOpening}>
-                <PackagePlus className="mr-2 h-4 w-4" />
-                Thêm tồn đầu
-              </Button>
+              allowed.create && (
+                <Button
+                  title="Khai thêm tồn đầu cho một loại nguyên liệu nữa." variant="outline" onClick={openAddOpening}>
+                  <PackagePlus className="mr-2 h-4 w-4" />
+                  Thêm tồn đầu
+                </Button>
+              )
             )}
           </div>
 

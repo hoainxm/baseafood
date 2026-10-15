@@ -49,12 +49,14 @@ import {
   RecordTable,
   StatCardGrid,
   ConfirmAction,
+  ReadOnlyBadge,
   notify,
   type RecordTableColumn,
   type FieldError,
   type ComboboxOption,
 } from "@/design-system";
 import { useQuickCatalogEdit } from "@/features/catalog/QuickCatalogEdit";
+import { useCan } from "@/features/shared/PermissionProvider";
 import { kg, num, todayISO, formatDateVN } from "@/lib/format";
 import { CheckCircle, ClipboardList, Package, PackageCheck, Plus, ScanLine, Truck } from "lucide-react";
 import { ExportLotCheck } from "./ExportLotCheck";
@@ -80,6 +82,10 @@ const STATUS_LABELS: Record<SalesOrder["status"], string> = {
 };
 
 export default function SalesOrderScreen() {
+  // Phân quyền lớp 2 (spec role-permissions §5): không quyền ⇒ ẩn nút; có xem mà
+  // không thêm/sửa ⇒ nhãn "Chỉ xem".
+  const allowed = useCan("orders");
+  const isReadOnly = !allowed.create && !allowed.update;
   const [don, persistDon, { status }] = useSalesOrders();
   const isLoading = status === "loading" && don.length === 0;
   const [orderItems, persistOrderItems] = useOrderItems();
@@ -352,10 +358,14 @@ export default function SalesOrderScreen() {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-foreground">
-            Đơn đặt &amp; lệnh xuất
-          </h1>
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="text-2xl font-semibold text-foreground">
+              Đơn đặt &amp; lệnh xuất
+            </h1>
+            {isReadOnly && <ReadOnlyBadge />}
+          </div>
         </div>
+        {allowed.create && (
         <div className="flex flex-wrap gap-2">
           <Button
             title="Tạo một đơn đặt hàng xuất khẩu: khách, hạn giao, và các mặt hàng cần bao nhiêu kg." size="lg" onClick={openCreate}>
@@ -363,6 +373,7 @@ export default function SalesOrderScreen() {
             Tạo đơn
           </Button>
         </div>
+        )}
       </div>
 
       <StatCardGrid
@@ -380,9 +391,13 @@ export default function SalesOrderScreen() {
         <EmptyState
           icon={ClipboardList}
           title="Chưa có đơn đặt nào"
-          description="Bấm Tạo đơn để khai đơn khách đặt (mặt hàng, quy cách, số lượng cần)."
+          description={
+            allowed.create
+              ? "Bấm Tạo đơn để khai đơn khách đặt (mặt hàng, quy cách, số lượng cần)."
+              : undefined
+          }
           action={
-            <Button
+            allowed.create && <Button
               title="Tạo đơn đặt đầu tiên." size="lg" onClick={openCreate}>
               <Plus />
               Tạo đơn
@@ -403,10 +418,12 @@ export default function SalesOrderScreen() {
                 title="Mở đơn này để xem chi tiết các mặt hàng cần và đối chiếu với tồn kho hiện có." variant="outline" size="sm" onClick={() => setSelectedId(r.id)}>
                 Xem
               </Button>
+              {allowed.delete && (
               <Button
                 title="Xóa đơn đặt này. Có hỏi xác nhận trước." variant="danger" size="sm" onClick={() => deleteOrder(r)}>
                 Bỏ
               </Button>
+              )}
             </div>
           )}
         />
@@ -427,13 +444,16 @@ export default function SalesOrderScreen() {
             <div className="flex min-w-0 flex-wrap gap-2">
               {selectedOrder.status !== "closed" && (
                 <>
+                  {allowed.update && (
                   <Button
                     title="Đánh dấu đơn này đã gom đủ hàng — chuyển trạng thái, chưa xuất kho." variant="outline" onClick={() => confirmFulfilled(selectedOrder)}>
                     <PackageCheck />
                     Xác nhận đủ
                   </Button>
+                  )}
                   {/* Lệnh xuất TRỪ TỒN KHO + đẻ phiếu ở sổ Bán hàng — chạm hai
                       sổ cùng lúc, không có nút hoàn tác. Phải hỏi lại. */}
+                  {allowed.create && (
                   <ConfirmAction
                     title="Xuất hàng cho đơn này?"
                     description="Sẽ trừ tồn kho dự trữ theo FIFO và tạo một phiếu bán (kênh Xuất khẩu) ở sổ Bán hàng. Không hoàn tác được — sai thì phải sửa tay ở cả hai sổ."
@@ -450,6 +470,7 @@ export default function SalesOrderScreen() {
                       </Button>
                     }
                   />
+                  )}
                 </>
               )}
               <Button variant="outline" onClick={() => setSelectedId(null)}>
@@ -518,6 +539,7 @@ export default function SalesOrderScreen() {
                           <span className="tnum font-semibold">{kg(items.reduce((t, d) => t + (d.quantityKg || 0), 0))}</span>
                           <span className="text-muted-foreground"> · {lotCount} lô</span>
                         </span>
+                        {allowed.update && (
                         <Button
                           title="Quét tem từng block khi xếp container: đúng lô của lệnh thì đánh dấu, sai lô thì báo ngay."
                           variant="outline"
@@ -527,6 +549,7 @@ export default function SalesOrderScreen() {
                           <ScanLine />
                           Kiểm lô bằng quét
                         </Button>
+                        )}
                       </li>
                     );
                   })}
@@ -537,7 +560,7 @@ export default function SalesOrderScreen() {
         </div>
       )}
 
-      {lotCheckOrder && (
+      {lotCheckOrder && allowed.update && (
         <ExportLotCheck
           exportOrder={lotCheckOrder}
           orderItems={exportItems.filter((d) => d.exportId === lotCheckOrder.id)}
@@ -569,8 +592,9 @@ export default function SalesOrderScreen() {
                 value={creating.customerId}
                 onChange={(v) => setCreating((t) => (t ? { ...t, customerId: v } : t))}
                 options={customerOptions}
-                onCreate={addCustomer}
+                onCreate={customerEditor.canCreate ? addCustomer : undefined}
                 onEditItem={customerEditor.openEdit}
+                canEdit={customerEditor.canEdit}
                 editLabel={customerEditor.editLabel}
                 emptyText="Chưa có khách nào — gõ tên rồi bấm Thêm mới."
               />
@@ -588,8 +612,9 @@ export default function SalesOrderScreen() {
                       onChange={(v) => updateRow(i, { productId: v })}
                       options={productOptions}
                       onEditItem={productEditor.openEdit}
+                      canEdit={productEditor.canEdit}
                       editLabel={productEditor.editLabel}
-                      onCreate={addProduct}
+                      onCreate={productEditor.canCreate ? addProduct : undefined}
                     />
                     <Field
                       label="Quy cách"

@@ -56,8 +56,10 @@ import {
   type FieldError,
   BarChart,
   ProportionBar,
+  ReadOnlyBadge,
 } from "@/design-system";
 import { useQuickCatalogEdit } from "@/features/catalog/QuickCatalogEdit";
+import { useCan } from "@/features/shared/PermissionProvider";
 import { num, formatDateVN } from "@/lib/format";
 import {
   ChevronLeft,
@@ -85,6 +87,8 @@ function describeRange(fromDate?: string, toDate?: string): string {
 }
 
 export default function BalancingScreen() {
+  /* Phân quyền lớp 2 (spec role-permissions §5): ẩn nút không có quyền, không làm mờ. */
+  const allowed = useCan("balancing");
   const [periods, persistPeriods, { status: periodStatus }] = useBalancingPeriods();
   const isLoadingPeriods = periodStatus === "loading" && periods.length === 0;
   const { periodId } = useParams<{ periodId?: string }>();
@@ -294,16 +298,19 @@ export default function BalancingScreen() {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
+        <div className="flex flex-wrap items-center gap-3">
           <h1 className="text-2xl font-semibold text-foreground">
             Cân đối nguyên liệu
           </h1>
+          {!allowed.create && !allowed.update && <ReadOnlyBadge />}
         </div>
-        <Button
-          title="Mở một kỳ cân đối mới (thường ~5 ngày một lô): khai khoảng ngày rồi hút số liệu nhập · sản xuất · bán vào." size="lg" onClick={openAdd}>
-          <Plus />
-          Tạo kỳ cân đối
-        </Button>
+        {allowed.create && (
+          <Button
+            title="Mở một kỳ cân đối mới (thường ~5 ngày một lô): khai khoảng ngày rồi hút số liệu nhập · sản xuất · bán vào." size="lg" onClick={openAdd}>
+            <Plus />
+            Tạo kỳ cân đối
+          </Button>
+        )}
       </div>
 
       {isLoadingPeriods ? (
@@ -314,11 +321,13 @@ export default function BalancingScreen() {
           title="Chưa có kỳ cân đối nào"
           description="Tạo kỳ đầu tiên: chọn loại nguyên liệu và khoảng ngày tiếp nhận."
           action={
-            <Button
-              title="Mở kỳ cân đối đầu tiên." size="lg" onClick={openAdd}>
-              <Plus />
-              Tạo kỳ cân đối
-            </Button>
+            allowed.create ? (
+              <Button
+                title="Mở kỳ cân đối đầu tiên." size="lg" onClick={openAdd}>
+                <Plus />
+                Tạo kỳ cân đối
+              </Button>
+            ) : undefined
           }
         />
       ) : (
@@ -335,25 +344,29 @@ export default function BalancingScreen() {
                 title="Mở lưới cân đối của kỳ này để nhập số và xem định mức, lãi lỗ." size="sm" onClick={() => setSelId(r.id)}>
                 Mở kỳ
               </Button>
-              <Button
-                title="Sửa thông tin kỳ (tên kỳ, khoảng ngày, loại nguyên liệu)."
-                variant="edit"
-                size="sm"
-                onClick={() => {
-                  setEditing({ ...r });
-                  setIsAdding(false);
-                  setErrors([]);
-                }}
-              >
-                <Pencil />
-                Sửa
-              </Button>
-              <ConfirmDelete
-                recordDescription={`Kỳ "${r.materialTypeName}" — ${r.dateRangeDescription || "chưa ghi ngày"}`}
-                onConfirm={() => deletePeriod(r)}
-                title="Xóa kỳ cân đối này?"
-                confirmLabel="Xóa kỳ"
-              />
+              {allowed.update && (
+                <Button
+                  title="Sửa thông tin kỳ (tên kỳ, khoảng ngày, loại nguyên liệu)."
+                  variant="edit"
+                  size="sm"
+                  onClick={() => {
+                    setEditing({ ...r });
+                    setIsAdding(false);
+                    setErrors([]);
+                  }}
+                >
+                  <Pencil />
+                  Sửa
+                </Button>
+              )}
+              {allowed.delete && (
+                <ConfirmDelete
+                  recordDescription={`Kỳ "${r.materialTypeName}" — ${r.dateRangeDescription || "chưa ghi ngày"}`}
+                  onConfirm={() => deletePeriod(r)}
+                  title="Xóa kỳ cân đối này?"
+                  confirmLabel="Xóa kỳ"
+                />
+              )}
             </>
           )}
         />
@@ -406,7 +419,7 @@ export default function BalancingScreen() {
                   })
                 }
                 options={materialTypeOptions}
-                onCreate={addMaterialType}
+                onCreate={materialTypeEditor.canCreate ? addMaterialType : undefined}
                 onEditItem={materialTypeEditor.openEdit}
                 editLabel={materialTypeEditor.editLabel}
                 canEdit={materialTypeEditor.canEdit}
@@ -433,20 +446,25 @@ export default function BalancingScreen() {
                   }
                   hint="Lấy từ bảng phụ — để tính tỉ lệ thu hồi."
                 />
-                <NumberField
-                  label="Chi phí chế biến / kg TP"
-                  unit="đ"
-                  value={editing.processingCostPerKg}
-                  onChange={(v) =>
-                    setEditing((d) => (d ? { ...d, processingCostPerKg: v } : d))
-                  }
-                />
-                <NumberField
-                  label="Tỉ giá"
-                  unit="đ/USD"
-                  value={editing.exchangeRate}
-                  onChange={(v) => setEditing((d) => (d ? { ...d, exchangeRate: v } : d))}
-                />
+                {/* Chi phí chế biến + tỉ giá là số tiền ⇒ ẩn khi không có quyền xem giá. */}
+                {allowed["view-price"] && (
+                  <NumberField
+                    label="Chi phí chế biến / kg TP"
+                    unit="đ"
+                    value={editing.processingCostPerKg}
+                    onChange={(v) =>
+                      setEditing((d) => (d ? { ...d, processingCostPerKg: v } : d))
+                    }
+                  />
+                )}
+                {allowed["view-price"] && (
+                  <NumberField
+                    label="Tỉ giá"
+                    unit="đ/USD"
+                    value={editing.exchangeRate}
+                    onChange={(v) => setEditing((d) => (d ? { ...d, exchangeRate: v } : d))}
+                  />
+                )}
               </div>
             </div>
           )}
@@ -484,6 +502,7 @@ function PeriodDetail({
   onChangePeriod: (patch: Partial<BalancingPeriod>) => void;
 }) {
   const grid = usePeriodGrid(period);
+  const allowed = useCan("balancing");
   const [products, setProducts] = useProducts();
   const [customers, setCustomers] = useCustomers();
   /** Bút chì sửa nhanh mặt hàng / khách trong lưới bán thành phẩm (nối theo id). */
@@ -575,7 +594,10 @@ function PeriodDetail({
 
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-foreground">Bảng cân đối {period.materialTypeName}</h1>
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="text-2xl font-semibold text-foreground">Bảng cân đối {period.materialTypeName}</h1>
+            {grid.isReadOnly && <ReadOnlyBadge />}
+          </div>
           <p className="mt-1 text-base text-muted-foreground">
             {period.dateRangeDescription || "Chưa ghi ngày tiếp nhận"}
             {period.isLocked && " · đã chốt"}
@@ -593,36 +615,43 @@ function PeriodDetail({
               Lấy {pendingSourceCount} dòng từ sổ
             </Button>
           )}
-          <Button
-            variant="outline"
-            size="lg"
-            onClick={grid.undo}
-            disabled={!grid.canUndo}
-            title="Ctrl+Z"
-          >
-            <Undo2 />
-            Hoàn tác
-          </Button>
-          <Button
-            variant="outline"
-            size="lg"
-            onClick={grid.redo}
-            disabled={!grid.canRedo}
-            title="Ctrl+Y"
-          >
-            <Redo2 />
-            Làm lại
-          </Button>
+          {/* Chỉ xem ⇒ không có gì để hoàn tác: ẩn hẳn hai nút. */}
+          {!grid.isReadOnly && (
+            <Button
+              variant="outline"
+              size="lg"
+              onClick={grid.undo}
+              disabled={!grid.canUndo}
+              title="Ctrl+Z"
+            >
+              <Undo2 />
+              Hoàn tác
+            </Button>
+          )}
+          {!grid.isReadOnly && (
+            <Button
+              variant="outline"
+              size="lg"
+              onClick={grid.redo}
+              disabled={!grid.canRedo}
+              title="Ctrl+Y"
+            >
+              <Redo2 />
+              Làm lại
+            </Button>
+          )}
           <Button
             title="Xoay bảng ngang / dọc cho vừa màn hình — chỉ đổi cách nhìn, không đụng số." variant="outline" size="lg" onClick={() => setIsHorizontal((v) => !v)}>
             {isHorizontal ? <Rows3 /> : <Columns2 />}
             {isHorizontal ? "Xếp dọc" : "Xếp ngang"}
           </Button>
-          <Button
-            title="Xem bảng cân đối đúng khổ in A4 rồi in giấy hoặc lưu PDF." variant="outline" size="lg" onClick={() => setShowBang(true)}>
-            <FileText />
-            Xem / in bảng
-          </Button>
+          {allowed.export && (
+            <Button
+              title="Xem bảng cân đối đúng khổ in A4 rồi in giấy hoặc lưu PDF." variant="outline" size="lg" onClick={() => setShowBang(true)}>
+              <FileText />
+              Xem / in bảng
+            </Button>
+          )}
         </div>
       </div>
 
@@ -645,14 +674,18 @@ function PeriodDetail({
           materialTypeEdit={periodMaterialTypeEditor}
           daysCollapsed={hideMaterialDays}
           onToggleDays={() => setHideMaterialDays((v) => !v)}
-          onCreateMaterialType={(name) => {
-            setCatalogMaterialTypes([
-              ...catalogMaterialTypes,
-              { id: uid(), name, category: "", note: "" },
-            ]);
-            notify.saved(`Đã thêm loại nguyên liệu "${name}" vào danh mục`);
-            return name;
-          }}
+          onCreateMaterialType={
+            periodMaterialTypeEditor.canCreate
+              ? (name) => {
+                  setCatalogMaterialTypes([
+                    ...catalogMaterialTypes,
+                    { id: uid(), name, category: "", note: "" },
+                  ]);
+                  notify.saved(`Đã thêm loại nguyên liệu "${name}" vào danh mục`);
+                  return name;
+                }
+              : undefined
+          }
         />
         <ResultNote
           period={period}
@@ -662,6 +695,7 @@ function PeriodDetail({
           materialDiff={materialDiff}
           sideBySide={isHorizontal}
           isLocked={grid.isLocked}
+          canViewPrice={allowed["view-price"]}
           onChangePeriod={onChangePeriod}
         />
         <div className={isHorizontal ? "2xl:col-span-2" : undefined}>
@@ -671,22 +705,32 @@ function PeriodDetail({
             customers={customers}
             onEditProduct={productEditor.openEdit}
             onEditCustomer={customerEditor.openEdit}
+            canEditProduct={productEditor.canEdit}
+            canEditCustomer={customerEditor.canEdit}
             pendingSales={banChoHut}
             onPullSales={pullSalesIntoPeriod}
             daysCollapsed={hideFinishedGoodDays}
             onToggleDays={() => setHideFinishedGoodDays((v) => !v)}
-            onCreateProduct={(name) => {
-              const m: Product = { id: uid(), code: "", name, finishedGoodCode: "" };
-              setProducts([...products, m]);
-              notify.saved(`Đã thêm mặt hàng "${name}" vào danh mục`);
-              return m.id;
-            }}
-            onCreateCustomer={(name) => {
-              const k: Customer = { id: uid(), code: "", name, market: "" };
-              setCustomers([...customers, k]);
-              notify.saved(`Đã thêm khách hàng "${name}" vào danh mục`);
-              return k.id;
-            }}
+            onCreateProduct={
+              productEditor.canCreate
+                ? (name) => {
+                    const m: Product = { id: uid(), code: "", name, finishedGoodCode: "" };
+                    setProducts([...products, m]);
+                    notify.saved(`Đã thêm mặt hàng "${name}" vào danh mục`);
+                    return m.id;
+                  }
+                : undefined
+            }
+            onCreateCustomer={
+              customerEditor.canCreate
+                ? (name) => {
+                    const k: Customer = { id: uid(), code: "", name, market: "" };
+                    setCustomers([...customers, k]);
+                    notify.saved(`Đã thêm khách hàng "${name}" vào danh mục`);
+                    return k.id;
+                  }
+                : undefined
+            }
           />
         </div>
       </Card>
@@ -724,15 +768,17 @@ function PeriodDetail({
             <p className="text-base text-warning">Lần mở lại gần nhất: {period.reopenReason}</p>
           )}
         </div>
-        <Button
-          title="Chốt khi đã đối chiếu xong và gửi kế toán — mọi ô trong lưới khoá lại. Kỳ đã chốt thì bấm để mở lại (phải ghi lý do)."
-          variant={period.isLocked ? "edit" : "lock"}
-          size="lg"
-          onClick={() => setIsLockOpen(true)}
-        >
-          {period.isLocked ? <LockOpen /> : <Lock />}
-          {period.isLocked ? "Mở lại kỳ" : "Chốt kỳ"}
-        </Button>
+        {(period.isLocked ? allowed.unlock : allowed.lock) && (
+          <Button
+            title="Chốt khi đã đối chiếu xong và gửi kế toán — mọi ô trong lưới khoá lại. Kỳ đã chốt thì bấm để mở lại (phải ghi lý do)."
+            variant={period.isLocked ? "edit" : "lock"}
+            size="lg"
+            onClick={() => setIsLockOpen(true)}
+          >
+            {period.isLocked ? <LockOpen /> : <Lock />}
+            {period.isLocked ? "Mở lại kỳ" : "Chốt kỳ"}
+          </Button>
+        )}
       </Card>
 
       {isLockOpen && (
@@ -792,6 +838,7 @@ function ResultNote({
   materialDiff,
   sideBySide: isHorizontal,
   isLocked,
+  canViewPrice,
   onChangePeriod,
 }: {
   period: BalancingPeriod;
@@ -801,6 +848,8 @@ function ResultNote({
   materialDiff: number | null;
   sideBySide: boolean;
   isLocked: boolean;
+  /** Quyền `balancing.view-price` — không có ⇒ ẩn mọi dòng tiền (kg + định mức vẫn hiện). */
+  canViewPrice: boolean;
   onChangePeriod: (patch: Partial<BalancingPeriod>) => void;
 }) {
   const isProfit = result.profitOrLoss >= 0;
@@ -816,35 +865,39 @@ function ResultNote({
         <div>
           <KV k="Tổng thành phẩm" v={`${num(result.totalOutputKg)} kg`} />
           <KV k="Định mức chế biến" v={hasNoFinishedGood ? "—" : num(result.norm)} strong />
-          <KeyValueInput
-            k="Chi phí CB / kg TP"
-            unit="đ"
-            value={period.processingCostPerKg}
-            previous={previousPeriod?.processingCostPerKg}
-            isLocked={isLocked}
-            onChange={(v) => onChangePeriod({ processingCostPerKg: v })}
-          />
-          <KV k="Giá thành" v={`${num(result.costOfGoods)} đ`} />
-          <KV k="Giá trị xuất" v={`${num(result.exportValue)} đ`} />
-          <KV
-            k={hasNoFinishedGood ? "Lãi / Lỗ" : isProfit ? "Lãi" : "Lỗ"}
-            v={hasNoFinishedGood ? "—" : `${num(Math.abs(result.profitOrLoss))} đ`}
-            tone={hasNoFinishedGood ? undefined : isProfit ? "profit" : "loss"}
-            strong
-          />
-          <KV k="Bình quân / kg NL" v={hasNoFinishedGood ? "—" : `${num(result.avgProfitPerKgMaterial)} đ`} />
-          <KeyValueInput
-            k="Tỉ giá"
-            unit="đ/USD"
-            value={period.exchangeRate}
-            previous={previousPeriod?.exchangeRate}
-            isLocked={isLocked}
-            onChange={(v) => onChangePeriod({ exchangeRate: v })}
-          />
+          {canViewPrice && (
+            <>
+              <KeyValueInput
+                k="Chi phí CB / kg TP"
+                unit="đ"
+                value={period.processingCostPerKg}
+                previous={previousPeriod?.processingCostPerKg}
+                isLocked={isLocked}
+                onChange={(v) => onChangePeriod({ processingCostPerKg: v })}
+              />
+              <KV k="Giá thành" v={`${num(result.costOfGoods)} đ`} />
+              <KV k="Giá trị xuất" v={`${num(result.exportValue)} đ`} />
+              <KV
+                k={hasNoFinishedGood ? "Lãi / Lỗ" : isProfit ? "Lãi" : "Lỗ"}
+                v={hasNoFinishedGood ? "—" : `${num(Math.abs(result.profitOrLoss))} đ`}
+                tone={hasNoFinishedGood ? undefined : isProfit ? "profit" : "loss"}
+                strong
+              />
+              <KV k="Bình quân / kg NL" v={hasNoFinishedGood ? "—" : `${num(result.avgProfitPerKgMaterial)} đ`} />
+              <KeyValueInput
+                k="Tỉ giá"
+                unit="đ/USD"
+                value={period.exchangeRate}
+                previous={previousPeriod?.exchangeRate}
+                isLocked={isLocked}
+                onChange={(v) => onChangePeriod({ exchangeRate: v })}
+              />
+            </>
+          )}
         </div>
         <div>
           <KV k="Tổng NL vào" v={`${num(result.totalInputKg)} kg`} />
-          <KV k="Giá trị NL" v={`${num(result.materialValue)} đ`} />
+          {canViewPrice && <KV k="Giá trị NL" v={`${num(result.materialValue)} đ`} />}
           <KeyValueInput
             k="Tổng NL nhận cả kỳ"
             unit="kg"
@@ -865,7 +918,7 @@ function ResultNote({
       </div>
       {/* Lãi/lỗ đến từ đâu — hai thanh dễ đọc: tiền bán được vs tiền bỏ ra, và tiền bỏ
           ra chia NL / chế biến. Cùng số calculateBalancing ở trên, không tính lại. */}
-      {!hasNoFinishedGood && result.costOfGoods > 0 && (
+      {canViewPrice && !hasNoFinishedGood && result.costOfGoods > 0 && (
         <div className="mt-5 grid gap-3 border-t-2 border-border pt-4">
           <h3 className="text-base font-semibold text-foreground">
             Lãi/lỗ đến từ đâu:{" "}

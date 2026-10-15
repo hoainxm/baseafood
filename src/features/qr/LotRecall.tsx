@@ -10,11 +10,14 @@ import { kg, formatDateVN } from "@/lib/format";
 import { TRACE_KIND_LABELS, buildLotStockIndex, buildRecallList, buildRecallListForLots, getLotStockKg, type TraceData, type LotNode } from "@/lib/lotTraceability";
 import { Button, InfoTip, HorizontalScroll, PrintSheet, PrintTd, PrintTh } from "@/design-system";
 import { FileSpreadsheet, Printer, ShieldAlert } from "lucide-react";
+import { useCan } from "@/features/shared/PermissionProvider";
 
 const kgOrBlank = (v: number | null) => (v == null ? "chưa ghi kg" : kg(v));
 
 export function LotRecall({ node, traceData, sameShipmentLots = [] }: { node: LotNode; traceData: TraceData; sameShipmentLots?: LotNode[] }) {
   const [isPrinting, setIsPrinting] = useState(false);
+  // Phân quyền lớp 2: In / Tải Excel danh sách thu hồi = quyền xuất của /qr.
+  const canExport = useCan("qr").export;
   /** Lô NL có nhiều loại cùng chuyến ⇒ cho thu hồi GỘP cả chuyến (nghi cả xe hàng của đại lý). */
   const [wholeShipment, setWholeShipment] = useState(false);
   const isMergedShipment = wholeShipment && sameShipmentLots.length > 1;
@@ -60,6 +63,7 @@ export function LotRecall({ node, traceData, sameShipmentLots = [] }: { node: Lo
             Đi hết cây truy xuôi: mọi lệnh xuất, dòng bán lẻ, bán nội địa có dùng lô này, kể cả qua mẻ sản xuất / đóng gói trung gian. Chỉ tính các mối nối ĐÃ GẮN LÔ — hàng bán mà chưa gắn lô thì không hiện ở đây (xem tab Theo giai đoạn).
           </InfoTip>
         </h2>
+        {canExport && (
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" title="Mở bản in A4 danh sách thu hồi để in hoặc lưu PDF." onClick={() => setIsPrinting(true)}>
             <Printer aria-hidden /> In danh sách
@@ -68,6 +72,7 @@ export function LotRecall({ node, traceData, sameShipmentLots = [] }: { node: Lo
             <FileSpreadsheet aria-hidden /> Tải Excel
           </Button>
         </div>
+        )}
       </div>
 
       {sameShipmentLots.length > 1 && (

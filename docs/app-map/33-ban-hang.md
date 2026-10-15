@@ -1,6 +1,7 @@
 > Load khi: sửa màn Bán hàng — phiếu bán, dòng bán, quy cách, ghi bù, hoặc hút bán vào cân đối.
 covers: src/features/sales/SalesScreen.tsx, src/features/sales/SalesReport.tsx, src/features/sales/SalesTab.tsx, src/types.ts, src/lib/repo.ts, src/lib/inventory.ts
-last_verified: 2026-10-13
+last_verified: 2026-10-15
+<!-- updated: 2026-10-15 — phân quyền Đợt 3: `useCan("sales")` — Ghi phiếu (Thêm), Sửa phiếu/dòng (Sửa), Bỏ/Xóa phiếu (Xóa), gắn lô (Thêm/Sửa), giá + thành tiền theo Xem giá; Đơn đặt `useCan("orders")`. -->
 <!-- re-verified: 2026-10-13 09:00 — repo.ts đổi ở ranh giới máy chủ cho chế độ demo (khóa tiền tố `demo:`, xóa lọc site_id) — luồng phiếu bán / quy cách / hút bán KHÔNG đổi. -->
 <!-- updated: 2026-10-08 — GẮN LÔ CHO DÒNG BÁN LẺ (truy xuất QR đợt 2b, mig 0056): dòng bán nguồn "Block thô" (KHO_BAN_LE) gắn lô BTP `W`, nguồn "Đóng gói" (KHO_TP) gắn lô TP `P` — nút "Gắn lô" / "Lô (n)" ở từng dòng trong phiếu đang gõ + cột thao tác sổ bán (`GanLoXuat`, quét / gõ / chọn lô còn tồn, kg tùy chọn; lô phải cùng mặt hàng). Ghi `lot_dispatches` doc `sales_item`, KHÔNG thêm cột vào sales_items. Dòng handoff Đơn đặt không có nút (đã trỏ lô qua export_items). TRỪ TỒN: dòng đã gắn lô trừ ĐÚNG lô đó (có kg ⇒ đúng kg; chưa cân ⇒ FIFO trong lô gắn), còn lại FIFO như cũ — dựng qua `collectWipDeductions(...)` (BTP) và `filterRetailSales(rows, FG_WAREHOUSE, lotDispatches)` (TP). Không gắn lô ⇒ số y cũ. Xóa dòng bán KHÔNG xóa dây lô (hộ chiếu hiện "bản ghi không còn"). -->
 <!-- updated: 2026-10-06 — tô màu dòng "đã dò" (mig 0055): sổ bán `rowMarkKey="ban-hang"`, báo cáo bán `bao-cao-ban|<từ>|<đến>` (dòng GỘP khách×kênh ⇒ ghép kỳ). repo.ts thêm ROW_MARK_TABLE (không đụng ánh xạ bán hàng). Không đổi luồng phiếu bán / hút cân đối. -->

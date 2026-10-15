@@ -17,6 +17,7 @@ import { BSF1_WAREHOUSES } from "@/types";
 import { uid } from "@/lib/db";
 import { num, todayISO, formatDateVN } from "@/lib/format";
 import { notify } from "@/design-system";
+import { useCan } from "@/features/shared/PermissionProvider";
 import { calculateBalancing, type BalancingResult } from "@/lib/balancingCalc";
 import {
   buildMaterialGridRows,
@@ -145,7 +146,10 @@ export interface PeriodGrid {
   carryOverRowCount: number;
   applyCarryOver: () => void;
   /* --- chốt kỳ --- */
+  /** Kỳ đã chốt HOẶC người xem không có quyền sửa ⇒ mọi ô khoá, mọi nút ghi ẩn. */
   isLocked: boolean;
+  /** Không có quyền `balancing.update` (chế độ chỉ xem) — tách khỏi chốt kỳ để báo đúng lý do. */
+  isReadOnly: boolean;
   /* --- hoàn tác --- */
   canUndo: boolean;
   canRedo: boolean;
@@ -189,8 +193,10 @@ export function usePeriodGrid(period: BalancingPeriod): PeriodGrid {
   const [monthlyStock, writeStockLedger, { status: stockLedgerStatus }] = useMonthlyStock();
   const [storageLocations] = useStorageLocations();
 
+  /** Không có quyền sửa cân đối ⇒ chỉ xem: khoá như kỳ đã chốt (kể cả ghi tự động). */
+  const isReadOnly = !useCan("balancing").update;
   /** Kỳ đã chốt ⇒ mọi ô khoá, mọi nút ghi ẩn. Mở lại ở thanh cuối màn. */
-  const isLocked = Boolean(period.isLocked);
+  const isLocked = Boolean(period.isLocked) || isReadOnly;
 
   const dates = useMemo(() => getPeriodDates(period), [period]);
 
@@ -901,6 +907,7 @@ export function usePeriodGrid(period: BalancingPeriod): PeriodGrid {
     carryOverRowCount: materialCarryOver.length + finishedGoodCarryOver.length,
     applyCarryOver: receiveCarryOver,
     isLocked,
+    isReadOnly,
     canUndo: historyCount.undo > 0,
     canRedo: historyCount.redo > 0,
     undo,

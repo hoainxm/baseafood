@@ -35,6 +35,10 @@ import {
   type GridRow,
 } from "@/design-system";
 import { num, formatDateVN } from "@/lib/format";
+import { useCan } from "@/features/shared/PermissionProvider";
+
+/** Cột tiền của khối BTP — ẩn khi không có quyền `balancing.view-price`. */
+const PRICE_COLUMN_KEYS = new Set(["donGia", "thanhTien"]);
 import { ChevronsLeftRight, Download, EyeOff, Layers, Plus } from "lucide-react";
 
 export function WipGrid({
@@ -45,6 +49,8 @@ export function WipGrid({
   onCreateCustomer: onAddCustomer,
   onEditProduct,
   onEditCustomer,
+  canEditProduct,
+  canEditCustomer,
   pendingSales,
   onPullSales,
   daysCollapsed: isDateColumnsCollapsed,
@@ -53,11 +59,15 @@ export function WipGrid({
   grid: PeriodGrid;
   products: Product[];
   customers: Customer[];
-  onCreateProduct: (name: string) => string;
-  onCreateCustomer: (name: string) => string;
+  /** Không truyền ⇒ không có quyền thêm vào danh mục: ô chỉ chọn. */
+  onCreateProduct?: (name: string) => string;
+  onCreateCustomer?: (name: string) => string;
   /** Bút chì sửa nhanh bản ghi danh mục (value = id). */
   onEditProduct?: (id: string) => void;
   onEditCustomer?: (id: string) => void;
+  /** Có quyền sửa bản ghi danh mục này không (useQuickCatalogEdit.canEdit). */
+  canEditProduct?: (id: string) => boolean;
+  canEditCustomer?: (id: string) => boolean;
   /** Seam cũ: dòng sổ BÁN trong khoảng ngày, dùng khi output = hàng đã bán ra. */
   pendingSales: { salesItem: SalesItem; invoice: SalesInvoice }[];
   onPullSales: (items: { salesItem: SalesItem; invoice: SalesInvoice }[]) => void;
@@ -67,6 +77,7 @@ export function WipGrid({
 }) {
   const { date: dates, outputs: finishedGoods, finishedGoodRows, pendingWips, saveOutputs: saveFinishedGoods, pullWips: pullProduction, saveWipDayCells: saveProductionMultiDay, lockedDates, templatePeriod, missingTemplateRows: missingTemplates, suggestTemplate } =
     grid;
+  const canViewPrice = useCan("balancing")["view-price"];
   const [isAdding, setIsAdding] = useState(false);
   const [reasonPrompt, setReasonPrompt] = useState<{ cells: DayCell[]; date: string } | null>(null);
   /** Ẩn dòng chưa có số (dòng mẫu + dòng 0 kg) — MẶC ĐỊNH ẨN, xem gọn như bản in. */
@@ -272,7 +283,7 @@ export function WipGrid({
           placeholder="Chọn khách"
           clearable={false}
           onEditItem={onEditCustomer}
-          canEdit={(v) => v !== OTHER_CUSTOMER_ID}
+          canEdit={(v) => v !== OTHER_CUSTOMER_ID && (canEditCustomer?.(v) ?? true)}
           editLabel="Sửa thông tin khách hàng này — lưu thẳng vào Danh mục."
         />
       ),
@@ -307,14 +318,18 @@ export function WipGrid({
 
   /* Kỳ đã chốt ⇒ khoá TOÀN BỘ ô + gỡ ô điều khiển. Khoá ở một chỗ thay vì rải
      `disabled` khắp nơi: thêm cột mới về sau tự động được khoá theo. */
+  const visibleColumns = canViewPrice ? gridColumns : gridColumns.filter((c) => !PRICE_COLUMN_KEYS.has(c.key));
   const displayColumns: GridColumn<FinishedGoodGridRow>[] = grid.isLocked
-    ? gridColumns.map((c) => ({
+    ? visibleColumns.map((c) => ({
         ...c,
         renderCell: undefined,
         isLocked: () => true,
-        lockReason: () => "Kỳ đã chốt — mở lại ở cuối màn mới sửa được",
+        lockReason: () =>
+          grid.isReadOnly
+            ? "Bạn chỉ có quyền xem cân đối — cần sửa thì báo quản trị viên"
+            : "Kỳ đã chốt — mở lại ở cuối màn mới sửa được",
       }))
-    : gridColumns;
+    : visibleColumns;
 
   const templatePeriodLabel = templatePeriod ? templatePeriod.dateRangeDescription || `${templatePeriod.startDate} – ${templatePeriod.endDate}` : "";
   const gridRows: GridRow<FinishedGoodGridRow>[] = [
@@ -375,14 +390,14 @@ export function WipGrid({
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-xl font-semibold">Bán thành phẩm sản xuất</h2>
         <div className="flex flex-wrap gap-2">
-          {pendingWips.length > 0 && (
+          {!grid.isReadOnly && pendingWips.length > 0 && (
             <Button
               title="Hút mọi dòng sản lượng trong khoảng ngày của kỳ từ sổ sản xuất vào lưới này." onClick={pullProduction}>
               <Download />
               Lấy {pendingWips.length} dòng từ sổ sản xuất
             </Button>
           )}
-          {pendingSales.length > 0 && (
+          {!grid.isReadOnly && pendingSales.length > 0 && (
             <Button
               title="Hút các dòng bán trong khoảng ngày của kỳ từ sổ bán hàng vào lưới này." variant="outline" onClick={() => onPullSales(pendingSales)}>
               <Download />
@@ -405,11 +420,13 @@ export function WipGrid({
               {hideEmptyRows ? "Hiện dòng trống" : "Ẩn dòng trống"}
             </Button>
           )}
-          <Button
-            title="Thêm tay một mặt hàng vào lưới thành phẩm của kỳ." variant="outline" onClick={() => setIsAdding(true)}>
-            <Plus />
-            Thêm mặt hàng
-          </Button>
+          {!grid.isReadOnly && (
+            <Button
+              title="Thêm tay một mặt hàng vào lưới thành phẩm của kỳ." variant="outline" onClick={() => setIsAdding(true)}>
+              <Plus />
+              Thêm mặt hàng
+            </Button>
+          )}
         </div>
       </div>
 
@@ -450,12 +467,16 @@ export function WipGrid({
               <td className="tnum border-t-2 border-l border-border px-3 py-3 text-right">
                 {num(totalKg)}
               </td>
-              <td className="tnum border-t-2 border-l border-border px-3 py-3 text-right">
-                {totalKg > 0 ? num(Math.round((totalAmount / totalKg) * 100) / 100) : "—"}
-              </td>
-              <td className="tnum border-t-2 border-l border-border px-3 py-3 text-right">
-                {num(Math.round(totalAmount * 100) / 100)}
-              </td>
+              {canViewPrice && (
+                <td className="tnum border-t-2 border-l border-border px-3 py-3 text-right">
+                  {totalKg > 0 ? num(Math.round((totalAmount / totalKg) * 100) / 100) : "—"}
+                </td>
+              )}
+              {canViewPrice && (
+                <td className="tnum border-t-2 border-l border-border px-3 py-3 text-right">
+                  {num(Math.round(totalAmount * 100) / 100)}
+                </td>
+              )}
               {!isDateColumnsCollapsed &&
                 dates.map((iso) => (
                   <td key={iso} className="tnum border-t-2 border-l border-border px-3 py-3 text-right">
@@ -486,9 +507,10 @@ export function WipGrid({
             value=""
             onChange={quickAdd}
             options={products.map((m) => ({ value: m.id, label: m.name }))}
-            onCreate={(name) => onAddProduct(name)}
+            onCreate={onAddProduct ? (name) => onAddProduct(name) : undefined}
             placeholder="Gõ tên mặt hàng để thêm dòng"
             onEditItem={onEditProduct}
+            canEdit={canEditProduct}
             editLabel="Sửa thông tin mặt hàng này — lưu thẳng vào Danh mục."
           />
         </div>
@@ -502,6 +524,8 @@ export function WipGrid({
           onCreateCustomer={onAddCustomer}
           onEditProduct={onEditProduct}
           onEditCustomer={onEditCustomer}
+          canEditProduct={canEditProduct}
+          canEditCustomer={canEditCustomer}
           onClose={() => setIsAdding(false)}
           onSave={(productId, customerId, spec, channel) => {
             const isDuplicate = finishedGoods.some(

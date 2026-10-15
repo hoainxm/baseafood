@@ -30,6 +30,7 @@ export function DailyScrapSection({
   errors,
   isDirty,
   isLocked,
+  showPrice = true,
 }: {
   date: string;
   workshop: Workshop;
@@ -41,6 +42,8 @@ export function DailyScrapSection({
   /** Có số gõ mà chưa lưu. */
   isDirty: boolean;
   isLocked: boolean;
+  /** Không có quyền xem giá ⇒ ẩn ô giá bán + tổng tiền phế liệu. */
+  showPrice?: boolean;
 }) {
   const totalKg = scrapDraftTotalKg(draft);
   const totalAmount = draft.reduce(
@@ -121,13 +124,15 @@ export function DailyScrapSection({
                 </div>
               )}
               <div className="flex items-end gap-2">
-                <NumberField
-                  label={`Giá bán ${r.name ? r.name.toLowerCase() : ""}`.trim()}
-                  unit="đ"
-                  value={r.sellingPrice}
-                  onChange={(v) => patch(r.key, { sellingPrice: v })}
-                  className="min-w-0 flex-1"
-                />
+                {showPrice && (
+                  <NumberField
+                    label={`Giá bán ${r.name ? r.name.toLowerCase() : ""}`.trim()}
+                    unit="đ"
+                    value={r.sellingPrice}
+                    onChange={(v) => patch(r.key, { sellingPrice: v })}
+                    className="min-w-0 flex-1"
+                  />
+                )}
                 {r.periodId && (
                   <Tag variant="done" className="mb-2">
                     Đã vào kỳ
@@ -150,7 +155,7 @@ export function DailyScrapSection({
             </Button>
             <p className="text-sm text-muted-foreground">
               Tổng <span className="tnum font-semibold text-foreground">{kg(totalKg)}</span>
-              {totalAmount > 0 && <> · <span className="tnum">{num(totalAmount)} đ</span></>}
+              {showPrice && totalAmount > 0 && <> · <span className="tnum">{num(totalAmount)} đ</span></>}
             </p>
           </div>
 

@@ -40,7 +40,8 @@ export function AddMaterialRowDialog({
   title: string;
   /** Danh mục loại NL + tên các dòng đã có trong kỳ. */
   suggestions: { value: string; label: string }[];
-  onCreateMaterialType: (name: string) => string;
+  /** Không truyền ⇒ không có quyền thêm loại NL vào danh mục: ô chỉ chọn. */
+  onCreateMaterialType?: (name: string) => string;
   /** Bút chì sửa nhanh loại NL (useQuickCatalogEdit của màn, theo TÊN) — mục không có trong danh mục thì không có bút. */
   materialTypeEdit?: { openEdit: (v: string) => void; canEdit: (v: string) => boolean; editLabel: string };
   onClose: () => void;
@@ -253,7 +254,8 @@ export function ManualRowsDialog({
   /** Dòng giảm nào có ô "Kho nhận" — mặc định mọi dòng giảm (Bán nội địa: bán đi, không vào kho). */
   hasWarehouse?: (h: MaterialGridRow) => boolean;
   onChangeWarehouse: (id: string, warehouse: string) => void;
-  onDelete: (id: string) => void;
+  /** Không truyền ⇒ không có quyền xóa (`balancing.delete`): ẩn nút xóa dòng. */
+  onDelete?: (id: string) => void;
   onClose: () => void;
 }) {
   return (
@@ -284,21 +286,23 @@ export function ManualRowsDialog({
                   className="w-48"
                 />
               )}
-              <ConfirmDelete
-                recordDescription={`${rowLabelOf(h)} — ${num(h.total)} kg`}
-                onConfirm={() => onDelete(h.id)}
-                trigger={
-                  <Button
-                    title="Xoá dòng này khỏi lưới của kỳ (có Hoàn tác)."
-                    variant="danger"
-                    size="sm"
-                    className="min-h-11 min-w-11"
-                    aria-label={`Xoá dòng ${rowLabelOf(h)}`}
-                  >
-                    <Trash2 />
-                  </Button>
-                }
-              />
+              {onDelete && (
+                <ConfirmDelete
+                  recordDescription={`${rowLabelOf(h)} — ${num(h.total)} kg`}
+                  onConfirm={() => onDelete(h.id)}
+                  trigger={
+                    <Button
+                      title="Xoá dòng này khỏi lưới của kỳ (có Hoàn tác)."
+                      variant="danger"
+                      size="sm"
+                      className="min-h-11 min-w-11"
+                      aria-label={`Xoá dòng ${rowLabelOf(h)}`}
+                    >
+                      <Trash2 />
+                    </Button>
+                  }
+                />
+              )}
             </li>
           ))}
         </ul>
@@ -321,16 +325,22 @@ export function AddProductDialog({
   onCreateCustomer: onAddCustomer,
   onEditProduct,
   onEditCustomer,
+  canEditProduct,
+  canEditCustomer,
   onClose,
   onSave,
 }: {
   products: Product[];
   customers: Customer[];
-  onCreateProduct: (name: string) => string;
-  onCreateCustomer: (name: string) => string;
+  /** Không truyền ⇒ không có quyền thêm vào danh mục: ô chỉ chọn. */
+  onCreateProduct?: (name: string) => string;
+  onCreateCustomer?: (name: string) => string;
   /** Bút chì sửa nhanh bản ghi danh mục (value = id). */
   onEditProduct?: (id: string) => void;
   onEditCustomer?: (id: string) => void;
+  /** Có quyền sửa bản ghi danh mục này không (useQuickCatalogEdit.canEdit). */
+  canEditProduct?: (id: string) => boolean;
+  canEditCustomer?: (id: string) => boolean;
   onClose: () => void;
   onSave: (productId: string, customerId: string, spec: string, channel: SalesChannel) => void;
 }) {
@@ -354,6 +364,7 @@ export function AddProductDialog({
             options={products.map((m) => ({ value: m.id, label: m.name }))}
             onCreate={onAddProduct}
             onEditItem={onEditProduct}
+            canEdit={canEditProduct}
             editLabel="Sửa thông tin mặt hàng này — lưu thẳng vào Danh mục."
           />
           <Field label="Quy cách">
@@ -373,7 +384,7 @@ export function AddProductDialog({
             onCreate={onAddCustomer}
             clearable={false}
             onEditItem={onEditCustomer}
-            canEdit={(v) => v !== OTHER_CUSTOMER_ID}
+            canEdit={(v) => v !== OTHER_CUSTOMER_ID && (canEditCustomer?.(v) ?? true)}
             editLabel="Sửa thông tin khách hàng này — lưu thẳng vào Danh mục."
           />
         </div>

@@ -43,6 +43,7 @@ import {
   Input,
   Tag,
   RecordTable,
+  ReadOnlyBadge,
   StatCardGrid,
   notify,
   toneByName,
@@ -55,6 +56,7 @@ import { formatMaterialLotLabel } from "@/lib/lotTraceability";
 import { useAuth } from "@/lib/auth";
 import { DailyTaskReminder, LotLabelPrint, BlankDailyImportSlip } from "@/features/shared";
 import { useQuickCatalogEdit } from "@/features/catalog/QuickCatalogEdit";
+import { useCan } from "@/features/shared/PermissionProvider";
 import { ImportSlipOcr } from "./ImportSlipOcr";
 import { hasOcr, type OcrCatalog, type OcrResult } from "@/lib/ocr";
 import { hasImageStorage, getPhotoUrl } from "@/lib/storage";
@@ -121,6 +123,10 @@ export default function MaterialImportScreen() {
   // Người đang đăng nhập → gắn làm "người ghi" của chuyến khi lưu.
   const { profile } = useAuth();
   const operator = profile?.fullName || profile?.username || "";
+  // Phân quyền lớp 2 (spec role-permissions §5): nút không có quyền thì ẩn hẳn.
+  const allowed = useCan("imports");
+  const canViewPrice = allowed["view-price"];
+  const isReadOnly = !allowed.create && !allowed.update;
   // kỳ xem sổ: ngày/tuần/tháng/năm/khoảng tự chọn
   const [rows, persist, { status }] = useMaterialImports();
   const isLoading = status === "loading" && rows.length === 0;
@@ -988,25 +994,29 @@ export default function MaterialImportScreen() {
       render: (r) => num(r.quantityKg),
       getSortValue: (r) => r.quantityKg,
     },
-    {
-      key: "gia",
-      header: "Đơn giá (đ)",
-      numeric: true,
-      render: (r) =>
-        r.unitPrice != null ? (
-          num(r.unitPrice)
-        ) : (
-          <Tag variant="error">Chưa có giá</Tag>
-        ),
-      getSortValue: (r) => r.unitPrice ?? 0,
-    },
-    {
-      key: "tien",
-      header: "Thành tiền (đ)",
-      numeric: true,
-      render: (r) => num(calculateImportAmount(r)),
-      getSortValue: (r) => calculateImportAmount(r),
-    },
+    ...(canViewPrice
+      ? ([
+          {
+            key: "gia",
+            header: "Đơn giá (đ)",
+            numeric: true,
+            render: (r) =>
+              r.unitPrice != null ? (
+                num(r.unitPrice)
+              ) : (
+                <Tag variant="error">Chưa có giá</Tag>
+              ),
+            getSortValue: (r) => r.unitPrice ?? 0,
+          },
+          {
+            key: "tien",
+            header: "Thành tiền (đ)",
+            numeric: true,
+            render: (r) => num(calculateImportAmount(r)),
+            getSortValue: (r) => calculateImportAmount(r),
+          },
+        ] as RecordTableColumn<MaterialImportItem>[])
+      : []),
     ...(isShipmentLocked
       ? [
           {
@@ -1036,7 +1046,8 @@ export default function MaterialImportScreen() {
             onSave={saveScrapDraft}
             errors={scrapErrors}
             isDirty={isScrapDirty}
-            isLocked={isDayLocked}
+            isLocked={isDayLocked || isReadOnly}
+            showPrice={canViewPrice}
           />
           <div className="space-y-3 border-t-2 border-border pt-4">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -1074,6 +1085,7 @@ export default function MaterialImportScreen() {
             )}
           </div>
           {isDayLocked ? (
+            allowed.unlock && (
             <Button
               title="Mở khóa lại ngày đã chốt để sửa hoặc ghi bù. Phải ghi lý do, và việc mở khóa được lưu vết."
               variant="edit"
@@ -1088,7 +1100,9 @@ export default function MaterialImportScreen() {
               <LockOpen />
               Mở lại ngày
             </Button>
+            )
           ) : (
+            allowed.lock && (
             <Button variant="lock"
               title="Khóa sổ ngày này lại: chốt tổng nhập trong ngày. Sau khi chốt muốn sửa phải Mở lại ngày và ghi lý do."
               size="lg"
@@ -1100,6 +1114,7 @@ export default function MaterialImportScreen() {
               <Lock />
               Chốt ngày
             </Button>
+            )
           )}
           </div>
         </section>
@@ -1126,6 +1141,8 @@ export default function MaterialImportScreen() {
   // + phế liệu + chốt ngày.
   const entryForm = session && (
     <div className="grid gap-5 xl:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)] xl:items-start">
+      {/* Không có quyền ghi (chuyến mới ⇒ create, sửa chuyến ⇒ update) thì ẩn cả phiếu. */}
+      {(isEditingShipment ? allowed.update : allowed.create) && (
       <div className="min-w-0 space-y-4">
         <ErrorSummary errors={sessionErrors} />
 
@@ -1227,9 +1244,10 @@ export default function MaterialImportScreen() {
               value={session.supplierName}
               onChange={pickSupplier}
               options={supplierOptions}
-              onCreate={addSupplier}
+              onCreate={supplierEditor.canCreate ? addSupplier : undefined}
               emptyText="Chưa có đại lý nào trong danh mục."
               onEditItem={supplierEditor.openEdit}
+              canEdit={supplierEditor.canEdit}
               editLabel={supplierEditor.editLabel}
             />
           </div>
@@ -1355,8 +1373,10 @@ export default function MaterialImportScreen() {
             onRemove={removeRow}
             onAddRow={addNewRow}
             getMaterialTypeOptions={materialTypeOptionsByCategory}
-            onCreateMaterialType={addMaterialType}
+            onCreateMaterialType={materialTypeEditor.canCreate ? addMaterialType : undefined}
             onEditMaterialType={materialTypeEditor.openEdit}
+            canEditMaterialType={materialTypeEditor.canEdit}
+            showPrice={canViewPrice}
             onLastRowEnter={focusSaveButton}
           />
 
@@ -1422,7 +1442,7 @@ export default function MaterialImportScreen() {
               <span className="tnum text-lg font-semibold">{kg(shipmentTotal)}</span>
               <span className="text-muted-foreground">
                 {" "}· {validRows.length} loại
-                {shipmentAmount > 0 && <> · <span className="tnum">{num(shipmentAmount)} đ</span></>}
+                {canViewPrice && shipmentAmount > 0 && <> · <span className="tnum">{num(shipmentAmount)} đ</span></>}
               </span>
             </p>
             {/* Dòng 3: còn thiếu gì / bấm lưu thì chuyện gì xảy ra */}
@@ -1449,12 +1469,14 @@ export default function MaterialImportScreen() {
           <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:max-w-[45%] sm:shrink-0 sm:justify-end [&>*]:flex-1 sm:[&>*]:flex-none">
             {isEditingShipment && (
               <>
+                {allowed.delete && (
                 <ConfirmDelete
                   recordDescription={`Chuyến ${session?.supplierName || "(chưa có đại lý)"} — ${formatDateVN(session?.deliveryDate ?? "")} — ${savedRowCount} dòng — ${kg(shipmentTotal)}`}
                   onConfirm={deleteEditingShipment}
                   title="Xóa cả chuyến này?"
                   confirmLabel="Xóa chuyến"
                 />
+                )}
                 <Button variant="outline" className="min-h-11" onClick={resetSession}>
                   Hủy sửa
                 </Button>
@@ -1479,6 +1501,7 @@ export default function MaterialImportScreen() {
           </div>
         </div>
       </div>
+      )}
 
       {/* CỘT NGÀY — đã ghi gì trong ngày này + phế liệu (chốt ngày ở strip cuối màn) */}
       <div className="min-w-0 space-y-4">
@@ -1497,16 +1520,19 @@ export default function MaterialImportScreen() {
           <DayShipmentList
             groups={sessionDayGroups}
             isLocked={isSessionLocked}
+            canEdit={allowed.update}
             editingGroupKey={sessionShipmentId}
             onEdit={openShipmentEdit}
             onPrintLabel={(n) => n.shipment && setLabelShipment(n.shipment)}
           />
           <div className="flex flex-wrap gap-2 [&>*]:flex-1">
+            {allowed.export && (
             <Button
               title="Xem trước bản in A4 “Báo cáo tổng hợp nguyên liệu” của ngày đang ghi." variant="outline" onClick={() => setShowInvoice(true)}>
               <FileText />
               Báo cáo ngày
             </Button>
+            )}
             <Button
               title="In tờ phiếu trống để tổ trưởng ghi tay ngoài xưởng, tối về nhập lại vào máy." variant="outline" onClick={() => setIsPrintingBlank(true)}>
               <Printer />
@@ -1524,8 +1550,9 @@ export default function MaterialImportScreen() {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-foreground">
+          <h1 className="flex flex-wrap items-center gap-3 text-2xl font-semibold text-foreground">
             Nhập hàng về xưởng
+            {isReadOnly && <ReadOnlyBadge />}
           </h1>
         </div>
         {/* Tách rõ NHẬP với TRA CỨU: một màn làm một việc. */}
@@ -1586,13 +1613,13 @@ export default function MaterialImportScreen() {
         </div>
       )}
 
-      {mode === "report" && <ImportReport />}
+      {mode === "report" && <ImportReport canExport={allowed.export} showPrice={canViewPrice} />}
 
       {isTypeChangeOpen && (
         <BulkTypeChangeDialog
           rows={rows}
           materialTypes={materialTypes}
-          onCreateMaterialType={addMaterialType}
+          onCreateMaterialType={materialTypeEditor.canCreate ? addMaterialType : undefined}
           materialTypeEdit={materialTypeEditor}
           onClose={() => setIsTypeChangeOpen(false)}
           onSave={(ids, targetType) => {
@@ -1618,21 +1645,25 @@ export default function MaterialImportScreen() {
       {mode === "ledger" && (
         <>
       <div className="flex flex-wrap gap-2">
+        {allowed.export && (
         <Button
           title="Xem trước bản in A4 báo cáo nhập hàng của ngày đang chọn." variant="outline" size="lg" onClick={() => setShowInvoice(true)}>
           <FileText />
           Xem báo cáo
         </Button>
+        )}
         <Button
           title="In tờ phiếu trống để tổ trưởng ghi tay ngoài xưởng, tối về nhập lại vào máy." variant="outline" size="lg" onClick={() => setIsPrintingBlank(true)}>
           <Printer />
           In phiếu trống
         </Button>
+        {allowed.update && (
         <Button
           title="Đổi loại nguyên liệu cho nhiều chuyến cùng lúc — dùng khi gõ nhầm loại cho cả loạt dòng." variant="edit" size="lg" onClick={() => setIsTypeChangeOpen(true)}>
           <Replace />
           Đổi loại hàng loạt
         </Button>
+        )}
       </div>
 
       <StatCardGrid
@@ -1746,6 +1777,7 @@ export default function MaterialImportScreen() {
               />
             </div>
 
+            {canViewPrice && (
             <ChoiceGroup
               label="Trạng thái giá"
               hideRequiredMark
@@ -1762,6 +1794,7 @@ export default function MaterialImportScreen() {
               ]}
               columns={2}
             />
+            )}
 
             {(supplierFilter ||
               materialTypeFilter ||
@@ -1802,11 +1835,13 @@ export default function MaterialImportScreen() {
                 : `Phân xưởng ${workshop}. Chuyển sang “Ghi nhập” để ghi chuyến.`
           }
           action={
+            allowed.create ? (
             <Button
               title="Chuyển sang chế độ Ghi để nhập chuyến mới cho ngày này." size="lg" onClick={() => setMode("entry")}>
               <Plus />
               Sang Ghi nhập
             </Button>
+            ) : undefined
           }
         />
       ) : (
@@ -1886,7 +1921,7 @@ export default function MaterialImportScreen() {
                       <span className="tnum text-xl font-semibold">
                         {kg(n.totalKg)}
                       </span>
-                      {!isShipmentLocked && (
+                      {!isShipmentLocked && allowed.update && (
                         <Button
                           title="Mở lại chuyến này để sửa dòng hàng, số kg hay giá. Ngày đã chốt thì phải mở khóa trước." variant="edit" onClick={() => openShipmentEdit(n)}>
                           <Pencil />
@@ -1924,6 +1959,7 @@ export default function MaterialImportScreen() {
               </span>
               <span className="tnum text-xl font-semibold">{kg(total)}</span>
             </div>
+            {canViewPrice && (
             <div className="flex items-baseline gap-3">
               <span className="text-base text-muted-foreground">
                 Tổng tiền hàng
@@ -1932,6 +1968,7 @@ export default function MaterialImportScreen() {
                 {num(totalAmount)} đ
               </span>
             </div>
+            )}
           </div>
         </>
       )}
@@ -1952,6 +1989,7 @@ export default function MaterialImportScreen() {
             errors={[]}
             isDirty={false}
             isLocked
+            showPrice={canViewPrice}
           />
         </section>
       )}
@@ -2172,6 +2210,7 @@ export default function MaterialImportScreen() {
           workshop={workshop}
           rows={rows}
           scraps={scraps}
+          showPrice={canViewPrice}
           onClose={() => setShowInvoice(false)}
         />
       )}

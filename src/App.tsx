@@ -21,7 +21,7 @@ import AppShell, { KIT_NAV } from "@/features/shared/AppShell";
 import { RowMarkProvider } from "@/features/shared/RowMarkProvider";
 import { PermissionProvider } from "@/features/shared/PermissionProvider";
 import { PAGE_GUIDES } from "@/features/shared/guideContent";
-import { Toaster, applyDisplaySettings, ProcessingState, EmptyState } from "@/design-system";
+import { Toaster, applyDisplaySettings, ProcessingState, EmptyState, notify } from "@/design-system";
 import { KeyRound, ShieldOff, Users } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { setAuditOperator } from "@/lib/audit";
@@ -38,6 +38,8 @@ import {
   visibleNavIds,
 } from "@/lib/permissions";
 import { IS_DEMO, setDemoMode } from "@/lib/demoMode";
+import { setWriteGuard } from "@/lib/repo";
+import { checkTableWrite } from "@/lib/writePermissions";
 import { DemoModeBanner, DemoPackLoader } from "@/features/shared/DemoMode";
 import { LEGACY_PATHS, normalizeCatalogTab } from "@/lib/legacyUrls";
 
@@ -128,6 +130,24 @@ function ShellLayout() {
         : OFFLINE_PERMISSIONS,
     [auth.requiresLogin, auth.isAdmin, profile, matrix, userPermissionRows]
   );
+  // Chốt quyền GHI (lớp 3): chỉ khi đăng nhập máy chủ + đã có hồ sơ. Chạy localStorage /
+  // đọc hồ sơ lỗi ⇒ không chốt (giữ hành vi cũ, máy chủ vẫn chặn bằng RLS).
+  const isWriteGuarded = auth.requiresLogin && !!profile;
+  useEffect(() => {
+    if (!isWriteGuarded) {
+      setWriteGuard(null);
+      return;
+    }
+    setWriteGuard((table, changes) => {
+      const denial = checkTableWrite(permissions, table, changes);
+      if (!denial) return true;
+      console.warn("[permissions] Chặn ghi", denial.table, denial.resource, denial.action);
+      notify.error(denial.message);
+      return false;
+    });
+    return () => setWriteGuard(null);
+  }, [isWriteGuarded, permissions]);
+
   const roles = profile?.roles ?? [];
   const visible = visibleNavIds(permissions);
   const items = KIT_NAV.filter((n) => visible.has(n.id));

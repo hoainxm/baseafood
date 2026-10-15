@@ -37,6 +37,7 @@ import {
 import { PERIOD_OPTIONS, getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
 import { num, formatDateVN } from "@/lib/format";
 import { exportAoaToXlsx, type OExcel } from "@/lib/reportXlsx";
+import { useCan } from "@/features/shared/PermissionProvider";
 import {
   CalendarRange,
   Factory,
@@ -80,6 +81,8 @@ interface WorkshopGroup {
  */
 export default function DailyProductionReport() {
   const [rows, , { status }] = useWipProductions();
+  // Phân quyền lớp 2: In A4 / Xuất Excel theo quyền `export`.
+  const allowed = useCan("production-report");
   const [products] = useProducts();
   const isLoading = status === "loading" && rows.length === 0;
 
@@ -215,6 +218,7 @@ export default function DailyProductionReport() {
         <h1 className="text-2xl font-semibold text-foreground">
           Báo cáo thành phẩm hàng ngày
         </h1>
+        {allowed.export && (
         <div className="flex flex-wrap gap-2">
           <Button
             title="Xem trước bản in A4 báo cáo sản lượng ngày rồi in giấy hoặc lưu PDF." size="lg" variant="outline" onClick={() => setInPrint(true)} disabled={!groups.length}>
@@ -227,6 +231,7 @@ export default function DailyProductionReport() {
             Xuất Excel
           </Button>
         </div>
+        )}
       </div>
 
       <div className="flex flex-wrap items-end gap-4 rounded-xl border-2 border-border p-4">

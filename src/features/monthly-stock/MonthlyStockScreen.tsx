@@ -72,6 +72,7 @@ import {
   PrintTh,
   StatCardGrid,
   RowMarkActions,
+  ReadOnlyBadge,
   useRowMarkTools,
   todayIso,
   notify,
@@ -83,6 +84,7 @@ import {
   type StatCardData,
 } from "@/design-system";
 import { useQuickCatalogEdit } from "@/features/catalog/QuickCatalogEdit";
+import { useCan } from "@/features/shared/PermissionProvider";
 import {
   AlertTriangle,
   ArrowDownToLine,
@@ -173,6 +175,8 @@ const numberOrDash = (v: number) => (chuan0(v) ? num(v) : "—");
  * tháng sau" tự chuyển tồn cuối → tồn đầu kỳ sau; hết chép tay chỗ hay sai số.
  */
 export default function MonthlyStockScreen() {
+  /* Phân quyền lớp 2 (spec role-permissions §5): ẩn nút không có quyền, không làm mờ. */
+  const allowed = useCan("monthly-stock");
   const [lines, writeLinesRaw] = useMonthlyStock();
   const [mtypes, setMtypes] = useMaterialTypes();
   const [products, setProducts] = useProducts();
@@ -920,7 +924,7 @@ export default function MonthlyStockScreen() {
             value={mappedName(x)}
             onChange={(v) => setMapDB((m) => ({ ...m, [x.name]: v }))}
             options={opts}
-            onCreate={d === "skip" ? undefined : (t) => addCanonicalName(d, t)}
+            onCreate={d === "skip" || !edit?.canCreate ? undefined : (t) => addCanonicalName(d, t)}
             onEditItem={edit?.openEdit}
             editLabel={edit?.editLabel}
             canEdit={edit?.canEdit}
@@ -1098,7 +1102,8 @@ export default function MonthlyStockScreen() {
      `NumberInput` (gõ biểu thức, Esc trả số cũ, ghi theo phím) có `navCol` ⇒ ↑/↓/Enter đi
      dọc cột trong khung `[data-grid-nav]`; Tab đi ngang. Bản XEM TRƯỚC dồn kỳ cũng gõ
      được: lần gõ đầu tự kế thừa & lưu (xem `soNenDeGhi`). Tên · nhóm đổi ở nút ✎. */
-  const canEdit = true;
+  /* Không có quyền sửa (`monthly-stock.update`) ⇒ bảng chỉ hiện số, không có ô gõ. */
+  const canEdit = allowed.update;
   const textCell =
     "h-9 rounded-md border border-input bg-background px-2 text-sm focus:border-ring focus:ring-2 focus:ring-ring/40 focus:outline-none";
   const numberCell = (r: MonthlyStockRow, c: (typeof NUMERIC_COLS)[number], label: string, template?: string) => (
@@ -1229,7 +1234,7 @@ export default function MonthlyStockScreen() {
               value={r.storageLocation}
               onChange={(v) => editLedger(r.id, { storageLocation: v })}
               options={locationOptions}
-              onCreate={addLocation}
+              onCreate={storageLocationEditor.canCreate ? addLocation : undefined}
               onEditItem={storageLocationEditor.openEdit}
               editLabel={storageLocationEditor.editLabel}
               canEdit={storageLocationEditor.canEdit}
@@ -1265,29 +1270,35 @@ export default function MonthlyStockScreen() {
           </Button>
           {!isPreview && (
             <>
-              <Button
-                size="icon-sm"
-                variant="ghost"
-                aria-label={`Lấy ra / gửi kho ${r.itemName}`}
-                title="Lấy hàng ra sử dụng, nhập thêm, hoặc gửi ra kho ngoài (Ánh Dương, HP…) — nhập số kg rồi lưu."
-                onClick={() => openAction(r)}
-              >
-                <PackageMinus className="size-4" />
-              </Button>
-              <Button
-                title="Sửa dòng: ngày nhập · tên hàng · size · invoice · đơn giá · số kg · vị trí." size="icon-sm" variant="edit" aria-label={`Sửa ${r.itemName}`} onClick={() => openEdit(r)}>
-                <Pencil className="size-4" />
-              </Button>
-              <ConfirmDelete
-                recordDescription={`${r.itemName}${r.size ? " · " + r.size : ""}`}
-                onConfirm={() => removeRow(r)}
-                trigger={
-                  <Button
-                    title="Xóa dòng này khỏi tháng. Có hỏi xác nhận, xóa xong vẫn còn nút Hoàn tác." size="icon-sm" variant="danger" aria-label={`Xóa ${r.itemName}`}>
-                    <Trash2 className="size-4" />
-                  </Button>
-                }
-              />
+              {allowed.update && (
+                <Button
+                  size="icon-sm"
+                  variant="ghost"
+                  aria-label={`Lấy ra / gửi kho ${r.itemName}`}
+                  title="Lấy hàng ra sử dụng, nhập thêm, hoặc gửi ra kho ngoài (Ánh Dương, HP…) — nhập số kg rồi lưu."
+                  onClick={() => openAction(r)}
+                >
+                  <PackageMinus className="size-4" />
+                </Button>
+              )}
+              {allowed.update && (
+                <Button
+                  title="Sửa dòng: ngày nhập · tên hàng · size · invoice · đơn giá · số kg · vị trí." size="icon-sm" variant="edit" aria-label={`Sửa ${r.itemName}`} onClick={() => openEdit(r)}>
+                  <Pencil className="size-4" />
+                </Button>
+              )}
+              {allowed.delete && (
+                <ConfirmDelete
+                  recordDescription={`${r.itemName}${r.size ? " · " + r.size : ""}`}
+                  onConfirm={() => removeRow(r)}
+                  trigger={
+                    <Button
+                      title="Xóa dòng này khỏi tháng. Có hỏi xác nhận, xóa xong vẫn còn nút Hoàn tác." size="icon-sm" variant="danger" aria-label={`Xóa ${r.itemName}`}>
+                      <Trash2 className="size-4" />
+                    </Button>
+                  }
+                />
+              )}
             </>
           )}
         </div>
@@ -1303,10 +1314,13 @@ export default function MonthlyStockScreen() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="flex items-center gap-2 text-2xl font-semibold text-foreground">
-            <CalendarRange className="h-8 w-8 text-primary" />
-            Sổ kho theo tháng
-          </h1>
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="flex items-center gap-2 text-2xl font-semibold text-foreground">
+              <CalendarRange className="h-8 w-8 text-primary" />
+              Sổ kho theo tháng
+            </h1>
+            {!allowed.create && !allowed.update && <ReadOnlyBadge />}
+          </div>
           <p className="mt-1 text-muted-foreground">
             Kỳ = tháng dương lịch. Tồn cuối = tồn đầu + nhập − xuất. Hết tháng, bấm "Dồn sang tháng sau" để tồn
             cuối kỳ này thành tồn đầu kỳ sau — hết chép tay.
@@ -1314,30 +1328,36 @@ export default function MonthlyStockScreen() {
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <input ref={fileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={loadFile} />
-          <Button
-            variant="outline"
-            onClick={pickFile}
-            title="Đọc file Excel 'bảng kê kho' của kế toán — mỗi sheet một tháng. Nạp lại cùng file + cùng kho chỉ cập nhật, không nhân đôi dòng."
-          >
-            <Upload className="mr-2 h-4 w-4" />
-            Nhập Excel bảng kê
-          </Button>
-          <Button
-            variant="outline"
-            onClick={openSyncDialog}
-            title="Đối chiếu tên hàng trong sổ với danh mục Loại nguyên liệu và Mặt hàng, rồi ánh xạ từng tên về tên chuẩn. Không đụng 141 mã thành phẩm kế toán."
-          >
-            <Library className="mr-2 h-4 w-4" />
-            Đồng bộ danh mục{needsSync.length ? ` (${needsSync.length})` : ""}
-          </Button>
-          <Button
-            onClick={() => setMoIn(true)}
-            disabled={!hasData}
-            title="Xem trước bản in A4. Có tick dòng thì chỉ in đúng mấy dòng đó kèm tổng của chúng."
-          >
-            <Printer className="mr-2 h-4 w-4" />
-            In A4{selectedRows.length ? ` (${selectedRows.length} dòng chọn)` : ""}
-          </Button>
+          {allowed.import && (
+            <Button
+              variant="outline"
+              onClick={pickFile}
+              title="Đọc file Excel 'bảng kê kho' của kế toán — mỗi sheet một tháng. Nạp lại cùng file + cùng kho chỉ cập nhật, không nhân đôi dòng."
+            >
+              <Upload className="mr-2 h-4 w-4" />
+              Nhập Excel bảng kê
+            </Button>
+          )}
+          {allowed.update && (
+            <Button
+              variant="outline"
+              onClick={openSyncDialog}
+              title="Đối chiếu tên hàng trong sổ với danh mục Loại nguyên liệu và Mặt hàng, rồi ánh xạ từng tên về tên chuẩn. Không đụng 141 mã thành phẩm kế toán."
+            >
+              <Library className="mr-2 h-4 w-4" />
+              Đồng bộ danh mục{needsSync.length ? ` (${needsSync.length})` : ""}
+            </Button>
+          )}
+          {allowed.export && (
+            <Button
+              onClick={() => setMoIn(true)}
+              disabled={!hasData}
+              title="Xem trước bản in A4. Có tick dòng thì chỉ in đúng mấy dòng đó kèm tổng của chúng."
+            >
+              <Printer className="mr-2 h-4 w-4" />
+              In A4{selectedRows.length ? ` (${selectedRows.length} dòng chọn)` : ""}
+            </Button>
+          )}
         </div>
       </div>
 
@@ -1397,7 +1417,7 @@ export default function MonthlyStockScreen() {
           </Field>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          {hasData && !isPreview && (
+          {hasData && !isPreview && canEdit && (
             <>
               <Button
                 variant="outline"
@@ -1447,7 +1467,7 @@ export default function MonthlyStockScreen() {
               {hideEmptyRows ? `Hiện dòng trống (${emptyRowCount})` : `Ẩn dòng trống (${emptyRowCount})`}
             </Button>
           )}
-          {hasCarryForward && (
+          {allowed.create && hasCarryForward && (
             <Button
               variant="outline"
               className="h-auto min-h-10 max-w-full whitespace-normal text-left"
@@ -1471,7 +1491,7 @@ export default function MonthlyStockScreen() {
               : `Bấm "Thêm dòng" để nhập bảng kê kho của ${formatMonthLabel(month)} (tồn đầu · nhập · xuất theo từng mặt hàng).`
           }
           action={
-            priorRows.length ? (
+            !allowed.create ? undefined : priorRows.length ? (
               <Button
                 onClick={carryFromPrevMonth}
                 title="Lấy tồn cuối tháng trước làm tồn đầu tháng này và GHI vào sổ. Chạy lại chỉ cập nhật, không nhân đôi dòng."
@@ -1503,6 +1523,7 @@ export default function MonthlyStockScreen() {
                     Gõ thẳng vào bảng là tự kế thừa &amp; lưu rồi ghi số vừa gõ (Ctrl+Z lùi cả hai), hoặc bấm
                     "Kế thừa &amp; lưu vào sổ". Chạy lại chỉ cập nhật, không nhân đôi.
                   </p>
+                  {allowed.create && (
                   <div className="pt-1">
                     <Button
                       className="w-full sm:w-auto"
@@ -1513,6 +1534,7 @@ export default function MonthlyStockScreen() {
                       Kế thừa &amp; lưu vào sổ
                     </Button>
                   </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -1536,7 +1558,7 @@ export default function MonthlyStockScreen() {
             </Tag>
           </div>
 
-          {hasData && (
+          {hasData && canEdit && (
             <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
               <span className="font-semibold text-foreground">Cách thao tác:</span>
               <span>gõ thẳng vào ô trên bảng (Enter / ↑ / ↓ đi dọc cột, dán được khối từ Excel, Ctrl+Z hoàn tác); thêm dòng ở ô "Dòng mới" cuối mỗi bảng;</span>
@@ -1622,6 +1644,7 @@ export default function MonthlyStockScreen() {
                   fullHeight
                   rowMarkKey="ton-kho-thang"
                   addRow={
+                    allowed.create ? (
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="flex items-center gap-1 text-sm font-medium text-foreground">
                         <Plus className="size-4" aria-hidden />
@@ -1648,6 +1671,7 @@ export default function MonthlyStockScreen() {
                         Thêm đủ thông tin…
                       </Button>
                     </div>
+                    ) : undefined
                   }
                 />
               </section>
@@ -1681,18 +1705,20 @@ export default function MonthlyStockScreen() {
                 tiền còn lại {num(Math.round(selectedTotal.remainingValue))} đ
               </span>
               <div className="ml-auto flex flex-wrap items-center gap-2">
-                {!isPreview && (
+                {!isPreview && allowed.update && (
                   <Button size="sm" variant="outline" onClick={() => setAssignLocation("")} title="Đánh dấu các dòng đang tick là GỬI ra kho ngoài (VD Kho Ánh Dương, HP). Chỉ ghi nơi để hàng, không đổi số kg.">
                     <MapPin className="mr-2 h-4 w-4" />
                     Gửi kho ngoài
                   </Button>
                 )}
                 <RowMarkActions marker={rowMark} selectedKeys={selectedRows.map((r) => r.id)} />
-                <Button size="sm" variant="outline" onClick={() => setMoIn(true)} title="In riêng các dòng đang tick, kèm dòng tổng của đúng mấy dòng đó.">
-                  <Printer className="mr-2 h-4 w-4" />
-                  In {selectedRows.length} dòng
-                </Button>
-                {!isPreview && (
+                {allowed.export && (
+                  <Button size="sm" variant="outline" onClick={() => setMoIn(true)} title="In riêng các dòng đang tick, kèm dòng tổng của đúng mấy dòng đó.">
+                    <Printer className="mr-2 h-4 w-4" />
+                    In {selectedRows.length} dòng
+                  </Button>
+                )}
+                {!isPreview && allowed.delete && (
                   <ConfirmDelete
                     recordDescription={`${selectedRows.length} dòng ${formatMonthLabel(month)}`}
                     onConfirm={deleteSelected}
@@ -1795,7 +1821,7 @@ export default function MonthlyStockScreen() {
                   value={form.storageLocation}
                   onChange={(v) => setForm((f) => (f ? { ...f, storageLocation: v } : f))}
                   options={locationOptions}
-                  onCreate={addLocation}
+                  onCreate={storageLocationEditor.canCreate ? addLocation : undefined}
                   onEditItem={storageLocationEditor.openEdit}
                   editLabel={storageLocationEditor.editLabel}
                   canEdit={storageLocationEditor.canEdit}
@@ -1886,7 +1912,7 @@ export default function MonthlyStockScreen() {
                   value={action.location}
                   onChange={(v) => setAction((s) => (s ? { ...s, location: v } : s))}
                   options={locationOptions}
-                  onCreate={addLocation}
+                  onCreate={storageLocationEditor.canCreate ? addLocation : undefined}
                   onEditItem={storageLocationEditor.openEdit}
                   editLabel={storageLocationEditor.editLabel}
                   canEdit={storageLocationEditor.canEdit}
@@ -1950,7 +1976,7 @@ export default function MonthlyStockScreen() {
                 value={assignLocation}
                 onChange={(v) => setAssignLocation(v)}
                 options={locationOptions}
-                onCreate={addLocation}
+                onCreate={storageLocationEditor.canCreate ? addLocation : undefined}
                 onEditItem={storageLocationEditor.openEdit}
                 editLabel={storageLocationEditor.editLabel}
                 canEdit={storageLocationEditor.canEdit}
@@ -2116,10 +2142,12 @@ export default function MonthlyStockScreen() {
                           {num(d.diffKg)}
                         </td>
                         <td className="px-3 py-2 text-right">
+                          {allowed.update && (
                           <Button size="sm" variant="edit" onClick={() => manualFixProduct(d)} title="Mở lưới ghi đã lọc sẵn đúng mặt hàng này, để tự chỉnh tồn đầu / nhập / xuất cho khớp tháng trước.">
                             <Pencil className="mr-1 h-4 w-4" />
                             Sửa tay
                           </Button>
+                          )}
                         </td>
                       </tr>
                     ))}

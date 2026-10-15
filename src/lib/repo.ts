@@ -1927,6 +1927,20 @@ function logChanges<T>(mapping: TableMapping<T>, prev: T[], next: T[]): void {
 export type LoadStatus = "loading" | "ready" | "error";
 
 /**
+ * CHỐT QUYỀN GHI (phân quyền lớp 3 — spec role-permissions §5). ShellLayout đặt hàm
+ * kiểm theo quyền người đang đăng nhập; `null` = không chốt (chạy localStorage, chưa
+ * đăng nhập, chưa nạp hồ sơ). Hàm trả `false` ⇒ lượt ghi bị BỎ NGUYÊN (không đổi
+ * state, không vào hàng chờ, không lên máy chủ) — hàm tự báo người dùng. Chặn TRƯỚC
+ * hàng chờ nên không bao giờ có dòng kẹt vì thiếu quyền.
+ */
+export type WriteChange = { kind: "create" | "update" | "delete"; prev?: Record<string, unknown>; next?: Record<string, unknown> };
+export type WriteGuard = (table: string, changes: WriteChange[]) => boolean;
+let writeGuard: WriteGuard | null = null;
+export function setWriteGuard(guard: WriteGuard | null): void {
+  writeGuard = guard;
+}
+
+/**
  * Đồng bộ CÙNG TAB giữa các lần gọi `useTable` của cùng một bảng. Mỗi lần gọi giữ
  * `rows` riêng: hộp con (VD gắn lô) ghi xong mà màn cha vẫn cầm bản cũ thì lần
  * ghi kế tiếp của màn cha sẽ coi dòng con vừa thêm là "đã xóa" và xóa luôn trên
@@ -2115,8 +2129,32 @@ export function useTable<T>(mapping: TableMapping<T>, seed: () => T[] = () => []
   }, [mapping.table]);
 
   const write = useCallback(
-    (next: T[]) => {
+    (next: T[]): boolean => {
       const prev = prevRows.current;
+
+      // Diff MỘT lần — dùng chung cho chốt quyền và hàng chờ.
+      const prevByKey = new Map(prev.map((x) => [mapping.getKey(x), x]));
+      const newKeys = new Set(next.map((x) => mapping.getKey(x)));
+      const upserted = next.filter((x) => {
+        const c = prevByKey.get(mapping.getKey(x));
+        return !c || JSON.stringify(c) !== JSON.stringify(x);
+      });
+      const deleted = prev.filter((x) => !newKeys.has(mapping.getKey(x)));
+
+      if (writeGuard && (upserted.length || deleted.length)) {
+        const asRow = (x: T | undefined) => x as unknown as Record<string, unknown> | undefined;
+        const changes: WriteChange[] = [
+          ...upserted.map((x) => {
+            const old = prevByKey.get(mapping.getKey(x));
+            return old
+              ? { kind: "update" as const, prev: asRow(old), next: asRow(x) }
+              : { kind: "create" as const, next: asRow(x) };
+          }),
+          ...deleted.map((x) => ({ kind: "delete" as const, prev: asRow(x) })),
+        ];
+        if (!writeGuard(mapping.table, changes)) return false;
+      }
+
       prevRows.current = next; // hai lần ghi liền trong cùng thao tác vẫn so đúng bản trước
       setRows(next);
       latestSnapshot.set(mapping.localKey, next);
@@ -2130,18 +2168,8 @@ export function useTable<T>(mapping: TableMapping<T>, seed: () => T[] = () => []
 
       let okCho = true;
       if (supabase) {
-        const prevByKey = new Map(prev.map((x) => [mapping.getKey(x), x]));
-        const newKeys = new Set(next.map((x) => mapping.getKey(x)));
-
-        const upsertKeys = next
-          .filter((x) => {
-            const c = prevByKey.get(mapping.getKey(x));
-            return !c || JSON.stringify(c) !== JSON.stringify(x);
-          })
-          .map((x) => mapping.getKey(x));
-        const deleteKeys = prev
-          .filter((x) => !newKeys.has(mapping.getKey(x)))
-          .map((x) => mapping.getKey(x));
+        const upsertKeys = upserted.map((x) => mapping.getKey(x));
+        const deleteKeys = deleted.map((x) => mapping.getKey(x));
 
         /* Ghi vào hàng chờ TRƯỚC khi gọi server: hụt thì vẫn còn dấu để đẩy lại
            lần sau. Gộp với hàng chờ cũ nên các dòng hụt trước cũng được đẩy kèm.
@@ -2158,12 +2186,13 @@ export function useTable<T>(mapping: TableMapping<T>, seed: () => T[] = () => []
       if (!supabase) {
         // Chỉ-máy-này: bản sao là kho DUY NHẤT — ghi hụt là mất khi tải lại.
         if (!okMay) reportResult({ ok: false, msg: STORAGE_FULL_ERROR }, STORAGE_FULL_ERROR);
-        return;
+        return true;
       }
 
       void syncQueueFor(mapping, keyColumn, next).then((result) =>
         reportResult(result.ok && !okMay ? { ok: false, msg: STORAGE_FULL_ERROR } : result, "Lỗi ghi máy chủ"),
       );
+      return true;
     },
     [mapping, keyColumn, instanceId, reportResult]
   );

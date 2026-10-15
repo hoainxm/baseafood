@@ -17,6 +17,7 @@ import {
   type StatCardData,
 } from "@/design-system";
 import { useSalesItems, useSalesInvoices, useCustomers } from "@/lib/catalogRepo";
+import { useCan } from "@/features/shared/PermissionProvider";
 import { PERIOD_OPTIONS, getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
 import { num, formatDateVN } from "@/lib/format";
 import { calculateSalesAmount, type SalesChannel } from "@/types";
@@ -43,6 +44,7 @@ export default function SalesReport() {
   const [items] = useSalesItems();
   const [invoices] = useSalesInvoices();
   const [customers] = useCustomers();
+  const canViewPrice = useCan("sales")["view-price"];
 
   const [period, setPeriod] = useState<ViewPeriod>("month");
   const [anchor, setAnchor] = useState(todayIso());
@@ -104,12 +106,17 @@ export default function SalesReport() {
       render: (r) => num(r.quantityKg),
       total: () => num(totalKg),
     },
-    {
-      key: "tien",
-      header: "Giá trị",
-      numeric: true,
-      render: (r) => `${num(r.amount)} ${unitOf(r.channel)}`,
-    },
+    // Không có quyền xem giá ⇒ ẩn hẳn cột giá trị (spec role-permissions §5 lớp 2).
+    ...(canViewPrice
+      ? [
+          {
+            key: "tien",
+            header: "Giá trị",
+            numeric: true,
+            render: (r: TotalRow) => `${num(r.amount)} ${unitOf(r.channel)}`,
+          },
+        ]
+      : []),
   ];
 
   return (

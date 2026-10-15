@@ -36,6 +36,7 @@ import {
   PrintTd,
   PrintTh,
   StatCardGrid,
+  ReadOnlyBadge,
   todayIso,
   notify,
   type TableSelection,
@@ -49,6 +50,7 @@ import {
   useRowMarkTools,
 } from "@/design-system";
 import { useQuickCatalogEdit } from "@/features/catalog/QuickCatalogEdit";
+import { useCan } from "@/features/shared/PermissionProvider";
 import { num, formatDateVN } from "@/lib/format";
 import { newId } from "@/lib/store";
 import {
@@ -107,6 +109,10 @@ function parseWarehouse(text: string): string {
  * từng mã ngay trên lưới. Nối tự động với sổ nhập/SX/bán là bước sau (P5-B).
  */
 export default function WarehouseNxtScreen() {
+  // Phân quyền lớp 2: tài nguyên `nxt-warehouse` chỉ có view / import / export — mọi
+  // thao tác ghi sổ NXT (nạp file, lưới ghi, thêm mã, gán kho lưu, tạo kỳ) theo `import`.
+  const allowed = useCan("nxt-warehouse");
+  const canWrite = allowed.import;
   const [snapshots, setSnapshots] = useNxtSnapshots();
   const [storageLocationCatalog, setStorageLocationCatalog] = useStorageLocations();
   /** Bút chì sửa nhanh danh mục ngay trong ô chọn. */
@@ -583,6 +589,7 @@ export default function WarehouseNxtScreen() {
           <h1 className="flex items-center gap-2 text-2xl font-semibold text-foreground">
             <Warehouse className="h-8 w-8 text-primary" />
             Báo cáo Xuất – Nhập – Tồn kho
+            {!canWrite && <ReadOnlyBadge />}
           </h1>
           <p className="mt-1 text-muted-foreground">
             Số thật theo báo cáo của xí nghiệp (Kho × Mã hàng × Kỳ). Tồn cuối = tồn đầu + nhập − xuất.
@@ -590,18 +597,24 @@ export default function WarehouseNxtScreen() {
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <input ref={fileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={loadFile} />
-          <Button variant="outline" onClick={pickFile} title="Đọc file Excel báo cáo Xuất–Nhập–Tồn xuất từ hệ thống xí nghiệp (mẫu 10 cột). Nạp lại cùng kho + cùng kỳ chỉ cập nhật, không nhân đôi dòng.">
-            <Upload className="mr-2 h-4 w-4" />
-            Nhập Excel báo cáo
-          </Button>
-          <Button variant="outline" onClick={exportExcel} disabled={!rows.length} title="Tải kỳ đang xem ra file Excel đúng mẫu báo cáo của xí nghiệp, để gửi kế toán hoặc lưu hồ sơ.">
-            <Download className="mr-2 h-4 w-4" />
-            Xuất Excel
-          </Button>
-          <Button onClick={() => setMoIn(true)} disabled={!rows.length} title="Xem trước bản in A4 của kỳ đang xem, rồi in giấy hoặc lưu PDF.">
-            <Printer className="mr-2 h-4 w-4" />
-            In A4
-          </Button>
+          {canWrite && (
+            <Button variant="outline" onClick={pickFile} title="Đọc file Excel báo cáo Xuất–Nhập–Tồn xuất từ hệ thống xí nghiệp (mẫu 10 cột). Nạp lại cùng kho + cùng kỳ chỉ cập nhật, không nhân đôi dòng.">
+              <Upload className="mr-2 h-4 w-4" />
+              Nhập Excel báo cáo
+            </Button>
+          )}
+          {allowed.export && (
+            <>
+              <Button variant="outline" onClick={exportExcel} disabled={!rows.length} title="Tải kỳ đang xem ra file Excel đúng mẫu báo cáo của xí nghiệp, để gửi kế toán hoặc lưu hồ sơ.">
+                <Download className="mr-2 h-4 w-4" />
+                Xuất Excel
+              </Button>
+              <Button onClick={() => setMoIn(true)} disabled={!rows.length} title="Xem trước bản in A4 của kỳ đang xem, rồi in giấy hoặc lưu PDF.">
+                <Printer className="mr-2 h-4 w-4" />
+                In A4
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
@@ -648,7 +661,7 @@ export default function WarehouseNxtScreen() {
               options={[{ value: ALL, label: "Tất cả kho lưu" }, ...storageLocationOpts]}
             />
           </div>
-          {rows.length > 0 && (
+          {rows.length > 0 && canWrite && (
             <div className="flex flex-wrap items-center gap-3">
               <Button
                 variant={isEditMode ? "default" : "edit"}
@@ -737,7 +750,7 @@ export default function WarehouseNxtScreen() {
             </div>
           )}
 
-          {isEditMode ? (
+          {isEditMode && canWrite ? (
             <div className="space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <p className="text-sm text-muted-foreground">
@@ -791,14 +804,16 @@ export default function WarehouseNxtScreen() {
               </span>
               <div className="ml-auto flex flex-wrap items-center gap-2">
                 <RowMarkActions marker={rowMark} selectedKeys={selectedRows.map((r) => r.id)} />
-                <Button
-                  size="sm"
-                  onClick={() => setAssignLocation(storageLocationFilter === ALL ? DEFAULT_STORAGE_LOCATION : storageLocationFilter)}
-                  title="Ghi lại các mã đang tick là đang nằm ở một kho khác (kho nhà hay kho lạnh thuê ngoài). Sửa danh sách kho ở Danh mục → Kho lưu trữ."
-                >
-                  <PackageOpen className="mr-2 h-4 w-4" />
-                  Gán kho lưu
-                </Button>
+                {canWrite && (
+                  <Button
+                    size="sm"
+                    onClick={() => setAssignLocation(storageLocationFilter === ALL ? DEFAULT_STORAGE_LOCATION : storageLocationFilter)}
+                    title="Ghi lại các mã đang tick là đang nằm ở một kho khác (kho nhà hay kho lạnh thuê ngoài). Sửa danh sách kho ở Danh mục → Kho lưu trữ."
+                  >
+                    <PackageOpen className="mr-2 h-4 w-4" />
+                    Gán kho lưu
+                  </Button>
+                )}
                 <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())} title="Bỏ tick toàn bộ các mã đang chọn.">
                   Bỏ chọn
                 </Button>
@@ -877,7 +892,7 @@ export default function WarehouseNxtScreen() {
                 value={assignLocation}
                 onChange={(v) => setAssignLocation(v)}
                 options={storageLocationOpts}
-                onCreate={addStorageLocation}
+                onCreate={storageLocationEditor.canCreate ? addStorageLocation : undefined}
                 onEditItem={storageLocationEditor.openEdit}
                 editLabel={storageLocationEditor.editLabel}
                 canEdit={storageLocationEditor.canEdit}

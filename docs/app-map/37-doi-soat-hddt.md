@@ -1,6 +1,7 @@
 > Load khi: sửa màn `/reconciliation`, logic đối soát hóa đơn điện tử ⇄ phần mềm kế toán, đọc/ghi file Excel hóa đơn.
 covers: src/features/reconciliation/ReconciliationScreen.tsx, src/features/reconciliation/ReconciliationModeView.tsx, src/features/reconciliation/reconciliationMode.ts, src/features/reconciliation/index.ts, src/lib/einvoiceReconciliation.ts, src/lib/twoVersionReconciliation.ts, src/lib/reconciliationExport.ts, src/lib/reconciliationExportShift.ts, src/lib/reconciliationExportSummary.ts, src/lib/reconciliationCommon.ts
-last_verified: 2026-10-14
+last_verified: 2026-10-15
+<!-- updated: 2026-10-15 — phân quyền Đợt 3: `useCan("reconciliation")` — chọn file + Đối soát (Thêm), lưu/sửa bản (Thêm khi mới, Sửa khi đã lưu), Xóa bản, Tải Excel (Xuất). -->
 ttl_days: 90
 <!-- updated: 2026-10-14 — đổi tên trường engine + dữ liệu lưu sang tiếng Anh (spec quy-uoc-dat-ten): chế độ `ledger/twoVersion/columnSum/sameDay`, `options.{ledgerSheetName,taxSideSheets,mode}`, `summary.{invoiceCount,matched,mismatched,missing,…}`. Bản lưu cũ đọc cả tên cũ (lib/legacyValues). Phần mô tả engine bên dưới còn có chỗ nhắc tên trường cũ (`canDoiCot`, `tong`, `nghiVan`…) — tên hiện hành xem `einvoiceReconciliation.ts`. -->
 <!-- updated: 2026-10-12 — sửa đợt audit (xem mục "v7.1 — sửa sau audit"): dịch công thức vùng có tên sheet · ngoại tệ của sheet tập con/bản tự tải · có sổ + hai bản gối nhau không đếm đôi · MST chuẩn hóa · soVN · ngoại tệ thiếu tỷ giá + dung sai nguyên tệ · lưu ngưỡng · phép kiểm quy đổi · chữ hướng dẫn · ngày sát nửa đêm · gom tiện ích về `reconciliationCommon.ts`. Test: `einvoiceReconciliation.test.ts`, `reconciliationExportShift.test.ts`. CHƯA chạy trên file thật. -->

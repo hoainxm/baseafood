@@ -41,7 +41,8 @@ export function BulkTypeChangeDialog({
 }: {
   rows: MaterialImportItem[];
   materialTypes: MaterialType[];
-  onCreateMaterialType: (names: string) => string;
+  /** Không truyền (không có quyền thêm danh mục) ⇒ ô chỉ chọn. */
+  onCreateMaterialType?: (names: string) => string;
   /** Bút chì sửa nhanh loại NL (từ `useQuickCatalogEdit("materialType", …, { matchBy: "name" })` của màn gọi). */
   materialTypeEdit?: {
     openEdit: (value: string) => void;

@@ -43,6 +43,7 @@ import {
 import { PERIOD_OPTIONS, getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
 import { num, formatDateVN } from "@/lib/format";
 import { exportAoaToXlsx, type OExcel } from "@/lib/reportXlsx";
+import { useCan } from "@/features/shared/PermissionProvider";
 import {
   CalendarRange,
   FileSpreadsheet,
@@ -85,6 +86,8 @@ interface OrderGroup {
  */
 export default function OrderExportReport() {
   const [exportOrders, , { status }] = useExportOrders();
+  // Phân quyền lớp 2: In A4 / Xuất Excel theo quyền `export`.
+  const allowed = useCan("export-report");
   const [exportItems] = useExportItems();
   const [don] = useSalesOrders();
   const [orderItems] = useOrderItems();
@@ -211,6 +214,7 @@ export default function OrderExportReport() {
         <h1 className="text-2xl font-semibold text-foreground">
           Báo cáo đơn đặt được xuất hàng
         </h1>
+        {allowed.export && (
         <div className="flex flex-wrap gap-2">
           <Button
             title="Xem trước bản in A4 báo cáo đơn xuất rồi in giấy hoặc lưu PDF." size="lg" variant="outline" onClick={() => setInPrint(true)} disabled={!group.length}>
@@ -223,6 +227,7 @@ export default function OrderExportReport() {
             Xuất Excel
           </Button>
         </div>
+        )}
       </div>
 
       <div className="flex flex-wrap items-end gap-4 rounded-xl border-2 border-border p-4">

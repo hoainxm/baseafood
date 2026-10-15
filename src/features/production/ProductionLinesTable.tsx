@@ -34,13 +34,16 @@ export function ProductionLinesTable({
   onChangeGroup,
   onCreateProduct,
   onEditProduct,
+  canEditProduct,
   onEditCustomer,
+  canEditCustomer,
   customerOptions,
   onCreateCustomer,
   batterTypes,
   batterOptions,
   onCreateBatter,
   onEditBatter,
+  canEditBatter,
 }: {
   lines: ProductionLine[];
   products: Product[];
@@ -56,19 +59,24 @@ export function ProductionLinesTable({
     groupId: string,
     patch: Partial<Pick<ProductionLine, "processingType" | "customerName">>
   ) => void;
-  onCreateProduct: (name: string, processingType: string) => string;
+  /** Không có quyền thêm vào danh mục ⇒ undefined (ô chỉ chọn). */
+  onCreateProduct?: (name: string, processingType: string) => string;
   /** Mở hộp sửa nhanh thành phẩm đang chọn (tên, loài, kiểu chế biến…). */
   onEditProduct: (productId: string) => void;
+  /** Có hiện bút chì sửa thành phẩm này không (quyền sửa danh mục). */
+  canEditProduct?: (productId: string) => boolean;
   /** Mở hộp sửa nhanh khách hàng (value = tên). */
   onEditCustomer: (name: string) => void;
+  canEditCustomer?: (name: string) => boolean;
   customerOptions: ComboboxOption[];
-  onCreateCustomer: (name: string) => string;
+  onCreateCustomer?: (name: string) => string;
   /** Danh mục loại bột (để ra TÊN bột đi kèm của mặt hàng). */
   batterTypes: BatterType[];
   /** Ô chọn loại bột — value = TÊN. */
   batterOptions: ComboboxOption[];
-  onCreateBatter: (name: string) => string;
+  onCreateBatter?: (name: string) => string;
   onEditBatter: (name: string) => void;
+  canEditBatter?: (name: string) => boolean;
 }) {
   const th =
     "border-b-2 border-border bg-card px-2 py-2 text-left text-sm font-semibold whitespace-nowrap";
@@ -133,8 +141,9 @@ export function ProductionLinesTable({
                   value={info.cust}
                   onChange={(v) => onChangeGroup(gid, { customerName: v })}
                   options={customerOptions}
-                  onCreate={(name) => onCreateCustomer(name)}
+                  onCreate={onCreateCustomer}
                   onEditItem={onEditCustomer}
+                  canEdit={canEditCustomer}
                   editLabel="Sửa thông tin khách hàng này — lưu thẳng vào Danh mục."
                   placeholder="VD: Peacock…"
                   emptyText="Chưa có — gõ tên rồi Thêm mới."
@@ -214,13 +223,14 @@ export function ProductionLinesTable({
                                 });
                               }}
                               options={allProductOptions}
-                              onCreate={(name) => onCreateProduct(name, info.pt)}
+                              onCreate={onCreateProduct ? (name) => onCreateProduct(name, info.pt) : undefined}
                               emptyText="Chưa có mặt hàng — gõ tên rồi Thêm mới."
                               onEditItem={onEditProduct}
+                              canEdit={canEditProduct}
                               editLabel="Sửa thông tin mặt hàng này — lưu thẳng vào Danh mục."
                             />
                             </div>
-                            {d.productId && (
+                            {d.productId && (canEditProduct?.(d.productId) ?? true) && (
                               <Button
                                 type="button"
                                 variant="edit"
@@ -376,6 +386,7 @@ export function ProductionLinesTable({
                                   batterOptions={batterOptions}
                                   onCreateBatter={onCreateBatter}
                                   onEditBatter={onEditBatter}
+                                  canEditBatter={canEditBatter}
                                   productKg={getLineTotalKg(d)}
                                   columnNavigation
                                 />

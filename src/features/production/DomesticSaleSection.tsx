@@ -13,7 +13,8 @@ import { isDomesticSaleLineComplete, type DomesticSaleLine } from "./wipHelpers"
 
 interface CatalogCell {
   options: ComboboxOption[];
-  onCreate: (name: string) => string;
+  /** Không có quyền thêm vào danh mục ⇒ undefined (ô chỉ chọn). */
+  onCreate?: (name: string) => string;
   onEditItem: (value: string) => void;
   canEdit: (value: string) => boolean;
   editLabel: string;

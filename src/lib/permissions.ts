@@ -91,7 +91,7 @@ export const PERMISSION_RESOURCES: readonly PermissionResource[] = [
 
   { id: "wip", label: "Sản xuất thành phẩm", group: "production", navId: "wip", actions: [...CRUD, "lock", "unlock", "export"] },
   { id: "packaging", label: "Đóng gói", group: "production", navId: "packaging", actions: CRUD },
-  { id: "qc", label: "Kiểm tra QC", group: "production", navId: "qc", actions: ["view", "create", "update", "lock", "unlock"] },
+  { id: "qc", label: "Kiểm tra QC", group: "production", navId: "qc", actions: [...CRUD, "lock", "unlock"] },
   { id: "qr", label: "Mã lô QR", group: "production", navId: "qr", actions: [...CRUD, "export"] },
 
   { id: "warehouse", label: "Kho dự trữ", group: "warehouse", navId: "warehouse", actions: ["view", "approve", "update"] },
@@ -102,8 +102,9 @@ export const PERMISSION_RESOURCES: readonly PermissionResource[] = [
   { id: "balancing", label: "Cân đối kỳ", group: "accounting", navId: "balancing", actions: [...CRUD, "lock", "unlock", "export", "view-price"] },
   { id: "monthly-stock", label: "Sổ kho theo tháng", group: "accounting", navId: "monthly-stock", actions: [...CRUD, "import", "export"] },
   { id: "reconciliation", label: "Đối soát hóa đơn điện tử", group: "accounting", navId: "reconciliation", actions: [...CRUD, "export"] },
-  { id: "nxt-material", label: "Tồn kho nguyên liệu", group: "accounting", navId: "nxt-material", actions: ["view", "export"] },
-  { id: "nxt", label: "Tồn kho thành phẩm", group: "accounting", navId: "nxt", actions: ["view", "export"] },
+  // Thêm/sửa/xóa = tồn đầu khai tay (material_opening_stock / finished_goods_opening_stock).
+  { id: "nxt-material", label: "Tồn kho nguyên liệu", group: "accounting", navId: "nxt-material", actions: [...CRUD, "export"] },
+  { id: "nxt", label: "Tồn kho thành phẩm", group: "accounting", navId: "nxt", actions: [...CRUD, "export"] },
   { id: "nxt-warehouse", label: "Nhập xuất tồn kho", group: "accounting", navId: "nxt-warehouse", actions: ["view", "import", "export"] },
 
   { id: "production-report", label: "Báo cáo thành phẩm", group: "reports", navId: "production-report", actions: ["view", "export"] },

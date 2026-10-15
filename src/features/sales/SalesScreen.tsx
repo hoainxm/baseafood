@@ -50,6 +50,7 @@ import {
   Input,
   Tag,
   NumberField,
+  ReadOnlyBadge,
   RecordTable,
   channelTone,
   StatCardGrid,
@@ -60,6 +61,7 @@ import {
 } from "@/design-system";
 import { useQuickCatalogEdit } from "@/features/catalog/QuickCatalogEdit";
 import { LotDispatchPicker } from "@/features/shared";
+import { useCan } from "@/features/shared/PermissionProvider";
 import { kg, num, todayISO, formatDateVN } from "@/lib/format";
 import { PERIOD_OPTIONS, getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
 import {
@@ -162,6 +164,11 @@ function invoiceHeaderErrors(d: InvoiceHeader): FieldError[] {
 }
 
 export default function SalesScreen() {
+  // Phân quyền lớp 2 (spec role-permissions §5): không quyền ⇒ ẩn nút; có xem mà
+  // không thêm/sửa ⇒ chỉ xem; không xem giá ⇒ ẩn cột/ô giá và thành tiền.
+  const allowed = useCan("sales");
+  const canViewPrice = allowed["view-price"];
+  const isReadOnly = !allowed.create && !allowed.update;
   const [rows, persist] = useSalesItems();
   const [salesInvoices, persistSalesInvoices, { status }] = useSalesInvoices();
 
@@ -179,7 +186,7 @@ export default function SalesScreen() {
   const saleLotKind = (r: SalesItem) => (r.sourceWarehouse === FG_WAREHOUSE ? "P" : r.sourceWarehouse === RETAIL_WAREHOUSE ? "W" : null);
   const countSalesLots = (id: string) => lotDispatches.filter((d) => d.docKind === "sales_item" && d.docId === id).length;
   const lotInputButton = (r: SalesItem) =>
-    saleLotKind(r) ? (
+    saleLotKind(r) && (allowed.create || allowed.update) ? (
       <Button
         title={`Ghi dòng bán này lấy từ ${saleLotKind(r) === "P" ? "lô thành phẩm" : "lô bán thành phẩm"} nào (quét tem thùng, gõ mã, hoặc chọn lô còn tồn). Có lô thì thu hồi mới tới được khách.`}
         variant={countSalesLots(r.id) ? "outline" : "default"}
@@ -523,6 +530,11 @@ export default function SalesScreen() {
       render: (r) => num(r.quantityKg),
       getSortValue: (r) => r.quantityKg,
     },
+    ...priceColumns(channel),
+  ];
+
+  const priceColumns = (channel: SalesChannel): RecordTableColumn<SalesItem>[] =>
+    canViewPrice ? [
     {
       key: "gia",
       header: `Đơn giá (${priceUnitFor(channel)})`,
@@ -542,14 +554,18 @@ export default function SalesScreen() {
       render: (r) => num(calculateSalesAmount(r)),
       getSortValue: (r) => calculateSalesAmount(r),
     },
-  ];
+  ] : [];
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-foreground">Bán hàng</h1>
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="text-2xl font-semibold text-foreground">Bán hàng</h1>
+            {isReadOnly && <ReadOnlyBadge />}
+          </div>
         </div>
+        {allowed.create && (
         <div className="flex flex-wrap gap-2">
           <Button
             title="Mở form ghi một phiếu bán mới: chọn khách, kênh bán, rồi thêm từng dòng mặt hàng." size="lg" onClick={openAdd}>
@@ -557,6 +573,7 @@ export default function SalesScreen() {
             Ghi phiếu bán
           </Button>
         </div>
+        )}
       </div>
 
       <StatCardGrid
@@ -642,12 +659,16 @@ export default function SalesScreen() {
           icon={ShoppingCart}
           title={`Chưa có phiếu bán nào trong ${rangeDescription}`}
           description={
-            workshop === "Tất cả"
+            !allowed.create
+              ? workshop === "Tất cả"
+                ? undefined
+                : `Phân xưởng ${workshop}.`
+              : workshop === "Tất cả"
               ? "Bấm nút dưới để ghi phiếu bán đầu tiên."
               : `Phân xưởng ${workshop}. Bấm nút dưới để ghi phiếu bán đầu tiên.`
           }
           action={
-            <Button
+            allowed.create && <Button
               title="Mở form ghi phiếu bán đầu tiên cho ngày này." size="lg" onClick={openAdd}>
               <Plus />
               Ghi phiếu bán
@@ -704,11 +725,13 @@ export default function SalesScreen() {
                     <span className="tnum text-xl font-semibold">
                       {kg(n.totalKg)}
                     </span>
+                    {allowed.update && (
                     <Button
                       title="Mở lại phiếu bán này để sửa khách hàng, kênh bán hay các dòng hàng." variant="edit" onClick={() => openInvoiceEdit(n)}>
                       <Pencil />
                       Sửa phiếu
                     </Button>
+                    )}
                   </div>
                 </div>
 
@@ -730,6 +753,7 @@ export default function SalesScreen() {
               </span>
               <span className="tnum text-xl font-semibold">{kg(total)}</span>
             </div>
+            {canViewPrice && (
             <div className="flex items-baseline gap-3">
               <span className="text-base text-muted-foreground">
                 Tổng tiền bán
@@ -738,6 +762,7 @@ export default function SalesScreen() {
                 {num(totalAmount)}
               </span>
             </div>
+            )}
           </div>
         </>
       )}
@@ -821,9 +846,10 @@ export default function SalesScreen() {
                 value={session.customerId}
                 onChange={(v) => setSessionField("customerId", v)}
                 options={customerOptions}
-                onCreate={addCustomer}
+                onCreate={customerEditor.canCreate ? addCustomer : undefined}
                 emptyText="Chưa có khách hàng nào trong danh mục."
                 onEditItem={customerEditor.openEdit}
+                canEdit={customerEditor.canEdit}
                 editLabel={customerEditor.editLabel}
               />
 
@@ -870,6 +896,7 @@ export default function SalesScreen() {
                         </span>
                         <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
                           {lotInputButton(r)}
+                          {allowed.update && (
                           <Button
                             title="Sửa dòng bán này (mặt hàng · quy cách · số kg · đơn giá)."
                             variant="edit"
@@ -882,6 +909,8 @@ export default function SalesScreen() {
                             <Pencil />
                             Sửa
                           </Button>
+                          )}
+                          {allowed.delete && (
                           <Button
                             title="Bỏ dòng bán này khỏi phiếu đang gõ."
                             variant="danger"
@@ -891,6 +920,7 @@ export default function SalesScreen() {
                             <X />
                             Bỏ
                           </Button>
+                          )}
                         </div>
                       </li>
                     ))}
@@ -899,6 +929,7 @@ export default function SalesScreen() {
               )}
 
               {/* Thêm một mặt hàng — nút chính duy nhất trong thân */}
+              {allowed.create && (
               <div className="space-y-5 rounded-xl border-2 border-primary/40 bg-accent/40 p-4">
                 <p className="text-base font-semibold">Thêm mặt hàng</p>
 
@@ -909,9 +940,10 @@ export default function SalesScreen() {
                   value={newRows.productId}
                   onChange={(v) => setRowField("productId", v)}
                   options={productOptions}
-                  onCreate={addProduct}
+                  onCreate={productEditor.canCreate ? addProduct : undefined}
                   emptyText="Chưa có mặt hàng nào trong danh mục."
                   onEditItem={productEditor.openEdit}
+                  canEdit={productEditor.canEdit}
                   editLabel={productEditor.editLabel}
                 />
 
@@ -945,6 +977,7 @@ export default function SalesScreen() {
                     value={newRows.quantityKg || null}
                     onChange={(v) => setRowField("quantityKg", v ?? 0)}
                   />
+                  {canViewPrice && (
                   <NumberField
                     label="Đơn giá"
                     unit={priceUnit}
@@ -952,6 +985,7 @@ export default function SalesScreen() {
                     onChange={(v) => setRowField("unitPrice", v)}
                     hint="Bỏ trống nếu chưa chốt giá."
                   />
+                  )}
                 </div>
 
                 {newRowAvailable != null ? (
@@ -970,7 +1004,7 @@ export default function SalesScreen() {
                   </div>
                 ) : null}
 
-                {newRows.quantityKg > 0 && newRows.unitPrice ? (
+                {canViewPrice && newRows.quantityKg > 0 && newRows.unitPrice ? (
                   <div className="rounded-lg bg-accent px-4 py-3 text-base text-accent-foreground">
                     Thành tiền:{" "}
                     <span className="tnum text-lg font-semibold">
@@ -985,6 +1019,7 @@ export default function SalesScreen() {
                   Thêm mặt hàng vào sổ
                 </Button>
               </div>
+              )}
 
               {/* Tổng phiếu */}
               <div className="flex flex-wrap items-baseline justify-end gap-x-8 gap-y-2 rounded-xl bg-muted px-5 py-4">
@@ -1000,7 +1035,7 @@ export default function SalesScreen() {
 
           <DialogFooter>
             {isEditingInvoice ? (
-              <ConfirmDelete
+              allowed.delete && <ConfirmDelete
                 recordDescription={`Phiếu ${customerName(session?.customerId ?? "") || "(chưa có khách)"} — ${formatDateVN(session?.deliveryDate ?? "")} — ${sessionRows.length} dòng — ${kg(sessionTotal)}`}
                 onConfirm={deleteEditingInvoice}
                 title="Xóa cả phiếu này?"
@@ -1053,9 +1088,10 @@ export default function SalesScreen() {
                 value={editing.productId}
                 onChange={(v) => set("productId", v)}
                 options={productOptions}
-                onCreate={addProduct}
+                onCreate={productEditor.canCreate ? addProduct : undefined}
                 emptyText="Chưa có mặt hàng nào trong danh mục."
                 onEditItem={productEditor.openEdit}
+                canEdit={productEditor.canEdit}
                 editLabel={productEditor.editLabel}
               />
 
@@ -1078,6 +1114,7 @@ export default function SalesScreen() {
                   value={editing.quantityKg || null}
                   onChange={(v) => set("quantityKg", v ?? 0)}
                 />
+                {canViewPrice && (
                 <NumberField
                   label="Đơn giá"
                   unit={priceUnit}
@@ -1085,6 +1122,7 @@ export default function SalesScreen() {
                   onChange={(v) => set("unitPrice", v)}
                   hint="Bỏ trống nếu chưa chốt giá."
                 />
+                )}
               </div>
             </div>
           )}
@@ -1093,10 +1131,12 @@ export default function SalesScreen() {
             <Button variant="outline" size="lg" onClick={() => setEditing(null)}>
               Hủy
             </Button>
+            {allowed.update && (
             <Button variant="save"
               title="Ghi đè dòng bán này bằng số vừa sửa." size="lg" onClick={save}>
               Lưu thay đổi
             </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

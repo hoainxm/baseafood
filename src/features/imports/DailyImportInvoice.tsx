@@ -63,6 +63,7 @@ export default function DailyImportInvoice({
   workshop,
   rows,
   scraps,
+  showPrice = true,
   onClose,
 }: {
   /** Kỳ + ngày neo + khoảng tự chọn — khởi tạo theo bộ lọc ngoài màn. */
@@ -74,6 +75,8 @@ export default function DailyImportInvoice({
   workshop: Workshop | "Tất cả";
   rows: MaterialImportItem[];
   scraps: ScrapItem[];
+  /** Không có quyền xem giá (`imports.view-price`) ⇒ bỏ cột Đơn giá. */
+  showPrice?: boolean;
   onClose: () => void;
 }) {
   // Bộ chọn kỳ NGAY trong phiếu — cùng cách với màn Nhập hàng.
@@ -195,6 +198,7 @@ export default function DailyImportInvoice({
               scraps={scraps}
               showDayHeading={!isSingleDay}
               pageBreak={i > 0}
+              showPrice={showPrice}
             />
           ))
         )}
@@ -220,6 +224,7 @@ function DaySection({
   scraps,
   showDayHeading: showDateHeader,
   pageBreak,
+  showPrice,
 }: {
   date: string;
   workshop: Workshop | "Tất cả";
@@ -227,6 +232,7 @@ function DaySection({
   scraps: ScrapItem[];
   showDayHeading: boolean;
   pageBreak: boolean;
+  showPrice: boolean;
 }) {
   const isInWorkshop = (px: string) =>
     workshop === "Tất cả" || px === workshop;
@@ -261,9 +267,11 @@ function DaySection({
             <Th right className="w-28">
               Số lượng
             </Th>
-            <Th right className="w-24">
-              Đơn giá
-            </Th>
+            {showPrice && (
+              <Th right className="w-24">
+                Đơn giá
+              </Th>
+            )}
             <Th className="w-64">Ghi chú</Th>
           </tr>
         </thead>
@@ -287,9 +295,11 @@ function DaySection({
                 <Td right className="tnum">
                   {num(r.quantityKg)}
                 </Td>
-                <Td right className="tnum">
-                  {r.unitPrice != null ? num(r.unitPrice) : ""}
-                </Td>
+                {showPrice && (
+                  <Td right className="tnum">
+                    {r.unitPrice != null ? num(r.unitPrice) : ""}
+                  </Td>
+                )}
                 {i === 0 && (
                   <Td rowSpan={n} className="align-top">
                     {c.note.join(" · ")}
@@ -303,7 +313,7 @@ function DaySection({
             <Td right className="tnum">
               {num(totalKg)}
             </Td>
-            <Td />
+            {showPrice && <Td />}
             <Td />
           </tr>
         </tbody>

@@ -14,6 +14,7 @@ import type { ShipmentGroup } from "./importHelpers";
 export function DayShipmentList({
   groups: group,
   isLocked,
+  canEdit = true,
   editingGroupKey: editingKey,
   onEdit,
   onPrintLabel,
@@ -21,6 +22,8 @@ export function DayShipmentList({
   groups: ShipmentGroup[];
   /** Ngày đã chốt ⇒ không cho sửa. */
   isLocked: boolean;
+  /** Có quyền sửa chuyến (phân quyền `imports.update`) — không có thì ẩn nút Sửa. */
+  canEdit?: boolean;
   /** Khóa nhóm đang mở để sửa (tô nổi). */
   editingGroupKey: string | null;
   onEdit: (n: ShipmentGroup) => void;
@@ -78,7 +81,7 @@ export function DayShipmentList({
                   Tem
                 </Button>
               )}
-              {!isLocked && (
+              {!isLocked && canEdit && (
                 <Button
                   title="Mở lại chuyến này lên phiếu để sửa dòng hàng, số kg hay giá."
                   type="button"

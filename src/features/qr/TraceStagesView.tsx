@@ -16,6 +16,7 @@ import { kg, formatDateVN } from "@/lib/format";
 import { TRACE_KIND_LABELS, isOutboundKind, formatWipLotLabel, formatFinishedGoodLotLabel, groupByTraceStage, type TraceStage, type TraceStageKey, type TraceStageItem, type LotNode } from "@/lib/lotTraceability";
 import { Button, ChoiceGroup, DateRangeField, EmptyState, Tag, addDays, todayIso, toneByName } from "@/design-system";
 import { ClipboardCheck, Link2, Printer, ScanLine, Search } from "lucide-react";
+import { useCan } from "@/features/shared/PermissionProvider";
 
 /** Màn gốc của từng khâu + đơn vị đếm. */
 const STAGES: Record<TraceStageKey, { unit: string; man: { path: string; label: string }[] }> = {
@@ -83,6 +84,11 @@ const lotBadge = (m: TraceStageItem, name: string) =>
 export function TraceStagesView() {
   const { traceData } = useTraceData();
   const navigate = useNavigate();
+  // Phân quyền lớp 2: gắn lô = thêm/sửa ở /qr, in tem = xuất; nút mở màn khác theo quyền màn đó.
+  const qrAllowed = useCan("qr");
+  const canLinkLots = qrAllowed.create || qrAllowed.update;
+  const canApproveWarehouse = useCan("warehouse").approve;
+  const canCheckExportLots = useCan("orders").update;
   const [fromDate, setFromDate] = useState(() => addDays(todayIso(), -6));
   const [toDate, setToDate] = useState(todayIso);
   const [workshop, setWorkshop] = useState<Workshop | "">("");
@@ -105,6 +111,7 @@ export function TraceStagesView() {
     </Button>
   );
   const labelButton = (m: TraceStageItem) =>
+    qrAllowed.export &&
     taskButton(m.missing.includes("label"), `In tem QR cho lô ${m.node.label} (mặc định mỗi block / thùng một tem).`, () => setLotLabel(m.node), <Printer aria-hidden />, "In tem");
 
   const renderItemRow = (g: TraceStage, m: TraceStageItem): ReactNode => {
@@ -137,7 +144,7 @@ export function TraceStagesView() {
           }
           action={
             <>
-              {w &&
+              {w && canLinkLots &&
                 taskButton(m.missing.includes("lot"), `Ghi mẻ ${n.label} đã dùng lô nguyên liệu nào (quét tem, gõ mã hoặc chọn).`, () => setLotForBatch(w), <Link2 aria-hidden />, (m.lotCount ?? 0) > 0 ? "Lô NL" : "Gắn lô NL")}
               {labelButton(m)}
             </>
@@ -158,7 +165,7 @@ export function TraceStagesView() {
             )
           }
           action={
-            m.warehouseStatus === "pending"
+            m.warehouseStatus === "pending" && canApproveWarehouse
               ? taskButton(true, `Mở màn Kho dự trữ với hộp duyệt nhập kho của mẻ ${n.label}.`, () => navigate(`/warehouse?approve=W:${encodeURIComponent(n.id)}`), <ClipboardCheck aria-hidden />, "Duyệt nhập kho")
               : null
           }
@@ -179,7 +186,7 @@ export function TraceStagesView() {
           }
           action={
             <>
-              {p &&
+              {p && canLinkLots &&
                 taskButton(m.missing.includes("lot"), `Ghi phiếu ${n.label} đã dùng lô bán thành phẩm nào.`, () => setLotForPackaging(p), <Link2 aria-hidden />, (m.lotCount ?? 0) > 0 ? "Lô BTP" : "Gắn lô BTP")}
               {labelButton(m)}
             </>
@@ -195,7 +202,7 @@ export function TraceStagesView() {
           m={m}
           status={m.isScanned ? <Tag variant="done">Đã quét kiểm</Tag> : <Tag variant="pending">Chưa quét kiểm</Tag>}
           action={
-            m.salesOrderId && m.exportOrderId
+            m.salesOrderId && m.exportOrderId && canCheckExportLots
               ? taskButton(!m.isScanned, "Mở màn Đơn đặt với hộp kiểm lô bằng quét của lệnh xuất này.", () => navigate(`/orders?order=${encodeURIComponent(m.salesOrderId!)}&check=${encodeURIComponent(m.exportOrderId!)}`), <ScanLine aria-hidden />, "Kiểm lô")
               : null
           }
@@ -209,7 +216,7 @@ export function TraceStagesView() {
           m={m}
           status={lotBadge(m, m.soldLotKind === "P" ? "Lô TP" : "Lô BTP")}
           action={
-            b && m.soldLotKind
+            b && m.soldLotKind && canLinkLots
               ? taskButton(m.missing.includes("lot"), "Ghi dòng bán này lấy từ lô nào — để thu hồi tới được khách.", () => setLotForSalesItem({ salesItem: b, lotKind: m.soldLotKind! }), <Link2 aria-hidden />, (m.lotCount ?? 0) > 0 ? "Lô" : "Gắn lô")
               : null
           }
@@ -222,7 +229,7 @@ export function TraceStagesView() {
         key={`N:${n.id}`}
         m={m}
         status={lotBadge(m, "Lô NL")}
-        action={r ? taskButton(m.missing.includes("lot"), "Ghi nguyên liệu bán này lấy từ lô NL nào.", () => setLotForDomesticSale(r), <Link2 aria-hidden />, (m.lotCount ?? 0) > 0 ? "Lô NL" : "Gắn lô NL") : null}
+        action={r && canLinkLots ? taskButton(m.missing.includes("lot"), "Ghi nguyên liệu bán này lấy từ lô NL nào.", () => setLotForDomesticSale(r), <Link2 aria-hidden />, (m.lotCount ?? 0) > 0 ? "Lô NL" : "Gắn lô NL") : null}
       />
     );
   };

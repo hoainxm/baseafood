@@ -40,6 +40,7 @@ export { StepForm, type FormStep } from "./patterns/StepForm";
 export { ContextBar, type ContextBarItem } from "./patterns/ContextBar";
 export { ErrorSummary, type FieldError } from "./patterns/ErrorSummary";
 export { EmptyState } from "./patterns/EmptyState";
+export { ReadOnlyBadge } from "./patterns/ReadOnlyBadge";
 export { InfoTip } from "./patterns/InfoTip";
 export {
   FontSizeQuickPicker,

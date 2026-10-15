@@ -41,6 +41,7 @@ import {
   Input,
   NumberField,
   StatCardGrid,
+  ReadOnlyBadge,
   todayIso,
   notify,
   type SummaryTableColumn,
@@ -49,6 +50,7 @@ import {
   type StatCardData,
 } from "@/design-system";
 import { useQuickCatalogEdit } from "@/features/catalog/QuickCatalogEdit";
+import { useCan } from "@/features/shared/PermissionProvider";
 import { PERIOD_OPTIONS, getViewPeriodRange, startOfMonth, type ViewPeriod } from "@/lib/periodUtils";
 import { num, formatDateVN } from "@/lib/format";
 import { uid } from "@/lib/db";
@@ -80,6 +82,9 @@ interface OpeningForm {
  * Chỉ đọc; ô nhập tay duy nhất là "Tồn đầu" (số dư trước khi số hoá).
  */
 export default function NxtReportScreen() {
+  // Phân quyền lớp 2: thêm/xóa tồn đầu khai tay + xuất Excel theo quyền `nxt`.
+  const allowed = useCan("nxt");
+  const isReadOnly = !allowed.create && !allowed.update;
   const [wips] = useWipProductions();
   const [exportItems] = useExportItems();
   const [exportOrders] = useExportOrders();
@@ -300,6 +305,7 @@ export default function NxtReportScreen() {
           <h1 className="flex items-center gap-2 text-2xl font-semibold text-foreground">
             <Snowflake className="h-8 w-8 text-primary" />
             Báo cáo Nhập – Xuất – Tồn thành phẩm
+            {isReadOnly && <ReadOnlyBadge />}
           </h1>
           <p className="mt-1 text-muted-foreground">
             Kho bán thành phẩm cấp đông dự trữ. Số suy từ sổ Sản xuất, Đơn đặt và Bán hàng — không nhập
@@ -312,11 +318,13 @@ export default function NxtReportScreen() {
             <PackagePlus className="mr-2 h-4 w-4" />
             Tồn đầu ({opening.length})
           </Button>
-          <Button
-            title="Tải báo cáo đang xem ra file Excel." onClick={exportExcel} disabled={!rows.length}>
-            <Download className="mr-2 h-4 w-4" />
-            Xuất Excel
-          </Button>
+          {allowed.export && (
+            <Button
+              title="Tải báo cáo đang xem ra file Excel." onClick={exportExcel} disabled={!rows.length}>
+              <Download className="mr-2 h-4 w-4" />
+              Xuất Excel
+            </Button>
+          )}
         </div>
       </div>
 
@@ -412,16 +420,18 @@ export default function NxtReportScreen() {
                         {o.note ? ` · ${o.note}` : ""}
                       </span>
                     </span>
-                    <ConfirmDelete
-                      recordDescription={`${productNameOf(o.productId)}${o.spec ? ` · ${o.spec}` : ""} — ${num(o.quantityKg)} kg`}
-                      onConfirm={() => deleteOpening(o.id)}
-                      trigger={
-                        <Button
-                          title="Xóa dòng tồn đầu này." size="sm" variant="danger">
-                          Xóa
-                        </Button>
-                      }
-                    />
+                    {allowed.delete && (
+                      <ConfirmDelete
+                        recordDescription={`${productNameOf(o.productId)}${o.spec ? ` · ${o.spec}` : ""} — ${num(o.quantityKg)} kg`}
+                        onConfirm={() => deleteOpening(o.id)}
+                        trigger={
+                          <Button
+                            title="Xóa dòng tồn đầu này." size="sm" variant="danger">
+                            Xóa
+                          </Button>
+                        }
+                      />
+                    )}
                   </li>
                 ))}
               </ul>
@@ -441,8 +451,9 @@ export default function NxtReportScreen() {
                   value={form.productId}
                   onChange={(v) => setForm((f) => (f ? { ...f, productId: v } : f))}
                   options={productOptions}
-                  onCreate={addProduct}
+                  onCreate={productEditor.canCreate ? addProduct : undefined}
                   onEditItem={productEditor.openEdit}
+                  canEdit={productEditor.canEdit}
                   editLabel={productEditor.editLabel}
                   emptyText="Chưa có mặt hàng — gõ tên rồi bấm Thêm mới."
                 />
@@ -500,11 +511,13 @@ export default function NxtReportScreen() {
                 </div>
               </div>
             ) : (
-              <Button
-                title="Khai thêm tồn đầu cho một mã thành phẩm nữa." variant="outline" onClick={openAddOpening}>
-                <PackagePlus className="mr-2 h-4 w-4" />
-                Thêm tồn đầu
-              </Button>
+              allowed.create && (
+                <Button
+                  title="Khai thêm tồn đầu cho một mã thành phẩm nữa." variant="outline" onClick={openAddOpening}>
+                  <PackagePlus className="mr-2 h-4 w-4" />
+                  Thêm tồn đầu
+                </Button>
+              )
             )}
           </div>
 

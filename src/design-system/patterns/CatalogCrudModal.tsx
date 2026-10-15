@@ -20,6 +20,7 @@ import { ConfirmDelete } from "./ConfirmDelete";
 import { ErrorSummary, type FieldError } from "./ErrorSummary";
 import { EmptyState } from "./EmptyState";
 import { TableSkeleton } from "./Loading";
+import { ReadOnlyBadge } from "./ReadOnlyBadge";
 import { notify } from "./notify";
 import { Pencil, Plus } from "lucide-react";
 
@@ -75,6 +76,9 @@ export function CatalogCrud<T extends { id: string }>({
   loading = false,
   validate,
   rowMarkKey,
+  canCreate = true,
+  canUpdate = true,
+  canDelete = true,
 }: {
   title: string;
   description?: string;
@@ -95,6 +99,11 @@ export function CatalogCrud<T extends { id: string }>({
   validate?: (editing: T, rows: T[], isAdding: boolean) => FieldError[];
   /** Tô màu dòng "đã dò" — khoá ổn định của bảng danh mục (VD "danh-muc-khach-hang"). */
   rowMarkKey?: string;
+  /** Phân quyền (spec role-permissions §5 lớp 2): không có quyền ⇒ ẨN nút (không làm mờ).
+   *  Không có cả ba ⇒ nhãn "Chỉ xem". Mặc định cho phép (giữ hành vi cũ). */
+  canCreate?: boolean;
+  canUpdate?: boolean;
+  canDelete?: boolean;
 }) {
   const [editing, setEditing] = React.useState<T | null>(null);
   const [isAdding, setIsAdding] = React.useState(false);
@@ -164,14 +173,18 @@ export function CatalogCrud<T extends { id: string }>({
           <h2 className="text-xl font-semibold text-foreground">{title}</h2>
           {description && <p className="mt-1 text-sm text-muted-foreground">{description}</p>}
         </div>
-        <Button
-          size="lg"
-          onClick={openAdd}
-          title={`Mở hộp thoại tạo một ${entityName} mới. Lưu xong dùng được ngay ở mọi màn có ô chọn ${entityName}.`}
-        >
-          <Plus />
-          Thêm {entityName}
-        </Button>
+        {canCreate ? (
+          <Button
+            size="lg"
+            onClick={openAdd}
+            title={`Mở hộp thoại tạo một ${entityName} mới. Lưu xong dùng được ngay ở mọi màn có ô chọn ${entityName}.`}
+          >
+            <Plus />
+            Thêm {entityName}
+          </Button>
+        ) : (
+          !canUpdate && !canDelete && <ReadOnlyBadge />
+        )}
       </div>
 
       {loading ? (
@@ -179,9 +192,9 @@ export function CatalogCrud<T extends { id: string }>({
       ) : rows.length === 0 ? (
         <EmptyState
           title={`Chưa có ${entityName} nào`}
-          description={`Bấm "Thêm ${entityName}" để tạo mục đầu tiên.`}
+          description={canCreate ? `Bấm "Thêm ${entityName}" để tạo mục đầu tiên.` : undefined}
           action={
-            <Button
+            canCreate && <Button
               size="lg"
               onClick={openAdd}
               title={`Mở hộp thoại tạo một ${entityName} mới — mục đầu tiên của danh mục này.`}
@@ -199,25 +212,33 @@ export function CatalogCrud<T extends { id: string }>({
           getSearchText={getSearchText}
           searchLabel={`Tìm ${entityName}…`}
           rowMarkKey={rowMarkKey}
-          actions={(r) => (
-            <>
-              <Button
-                variant="edit"
-                size="sm"
-                onClick={() => openEdit(r)}
-                title={`Sửa thông tin ${entityName} "${getRecordDescription(r)}". Sổ đã ghi trước đó giữ nguyên tên cũ — không hồi tố.`}
-              >
-                <Pencil />
-                Sửa
-              </Button>
-              <ConfirmDelete
-                recordDescription={getRecordDescription(r)}
-                onConfirm={() => remove(r)}
-                title={`Xóa ${entityName} này?`}
-                confirmLabel={`Xóa ${entityName}`}
-              />
-            </>
-          )}
+          actions={
+            canUpdate || canDelete
+              ? (r) => (
+                  <>
+                    {canUpdate && (
+                      <Button
+                        variant="edit"
+                        size="sm"
+                        onClick={() => openEdit(r)}
+                        title={`Sửa thông tin ${entityName} "${getRecordDescription(r)}". Sổ đã ghi trước đó giữ nguyên tên cũ — không hồi tố.`}
+                      >
+                        <Pencil />
+                        Sửa
+                      </Button>
+                    )}
+                    {canDelete && (
+                      <ConfirmDelete
+                        recordDescription={getRecordDescription(r)}
+                        onConfirm={() => remove(r)}
+                        title={`Xóa ${entityName} này?`}
+                        confirmLabel={`Xóa ${entityName}`}
+                      />
+                    )}
+                  </>
+                )
+              : undefined
+          }
         />
       )}
 

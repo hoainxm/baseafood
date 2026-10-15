@@ -41,6 +41,7 @@ import { ArrowDownRight, ArrowUpLeft, Camera, CameraOff, ListChecks, Printer, Sc
 import type { LotKind } from "@/types";
 import { cn } from "@/lib/utils";
 import { normalizeQrTab, readParam } from "@/lib/legacyUrls";
+import { useCan } from "@/features/shared/PermissionProvider";
 
 const laLo = (k: TraceNodeKind): k is LotKind => !isOutboundKind(k);
 
@@ -106,7 +107,10 @@ export default function QrLookupScreen() {
   const lotParam = readParam(params, "lot") ?? ""; // tem đã in mang ?lo= cũ — vẫn đọc được
   // Link quét tem (?lot=…) luôn mở tab Tra, kể cả khi lỡ kèm tab=…
   const tabUrl = params.get("tab");
-    const tab = lotParam ? "lookup" : normalizeQrTab(tabUrl);
+  // Phân quyền lớp 2: in tem (đơn lẻ + hàng loạt) = quyền xuất của /qr.
+  const canExport = useCan("qr").export;
+  const requestedTab = lotParam ? "lookup" : normalizeQrTab(tabUrl);
+  const tab = requestedTab === "print" && !canExport ? "lookup" : requestedTab;
   const result = useMemo(() => {
     const code = parseQrCode(lotParam);
     return code ? findLots(code, traceData) : [];
@@ -163,7 +167,7 @@ export default function QrLookupScreen() {
             ["stages", "Theo giai đoạn", "Giai đoạn", "Kiểm QR từng khâu nhập → sản xuất → kho → đóng gói → xuất/bán: lô nào chưa in tem, chưa gắn lô, chờ duyệt, chưa quét kiểm.", ListChecks],
             ["print", "In tem hàng loạt", "In tem", "Chọn nhiều lô theo ngày / xưởng / loại rồi in tem một lượt.", Tags],
           ] as const
-        ).map(([id, label, shortLabel, description, Icon], i) => (
+        ).filter(([id]) => id !== "print" || canExport).map(([id, label, shortLabel, description, Icon], i) => (
           <button
             key={id}
             type="button"
@@ -263,9 +267,11 @@ export default function QrLookupScreen() {
                   <Tag variant="category" tone={toneByName(TRACE_KIND_LABELS[viewing.kind])}>{TRACE_KIND_LABELS[viewing.kind]}</Tag>
                   <span className="text-xl font-semibold tnum">{viewing.label}</span>
                 </div>
+                {canExport && (
                 <Button title="In lại tem QR của lô này (tem cũ bong / mờ thì in cái mới)." variant="outline" onClick={() => setIsPrintingLabel(true)}>
                   <Printer aria-hidden /> In tem
                 </Button>
+                )}
               </div>
               <p className="text-muted-foreground">
                 {[viewing.description, viewing.workshop && `xưởng ${viewing.workshop}`].filter(Boolean).join(" · ")}

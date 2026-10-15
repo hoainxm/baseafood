@@ -509,6 +509,21 @@ theo màu**, không tự viết class màu lên nút.
 | **Chấm "đang suy nghĩ" nội tuyến** | `ThinkingDots` — ba chấm nhấp nháy so le, bám màu chữ hiện tại. |
 | **Khối xương tuỳ biến** | `Skeleton` (primitive) — `<Skeleton className="h-4 w-32" />`. Ghép nên khung tải riêng khi `TableSkeleton` không hợp. |
 
+## Phân quyền trên màn — ẨN nút, nhãn "Chỉ xem" (từ 2026-10-15)
+
+Màn hỏi quyền bằng `useCan("<tài nguyên>")` (`features/shared/PermissionProvider.tsx`, spec [`role-permissions`](../../docs/spec/role-permissions.md) §5 lớp 2). Design-system **không biết quyền** — chỉ nhận cờ.
+
+| Tình huống | Cách làm |
+|---|---|
+| Không có quyền làm việc của nút (Thêm, Sửa, Xóa, Chốt, Mở lại, Duyệt, Nạp, Xuất) | **Ẩn hẳn nút**, không làm mờ. Luật "nút Lưu không bao giờ `disabled`" giữ nguyên: không quyền thì không có nút. |
+| Có Xem, không có Thêm lẫn Sửa | `ReadOnlyBadge` cạnh tiêu đề màn ("Chỉ xem", có `title` giải thích); ẩn form nhập / nút Lưu; `EditableGrid` đổi cột `kind: "input"` → `"computed"`. |
+| Không có `view-price` | Ẩn cột / ô giá, thành tiền, lãi lỗ (ẩn cả cột, không để ô trống). |
+| `CatalogCrud` | Prop `canCreate` / `canUpdate` / `canDelete` (mặc định `true`): ẩn "Thêm …", "Sửa", "Xóa"; không cả ba ⇒ `ReadOnlyBadge`. `CatalogScreen` truyền theo quyền từng tab `catalog.*`. |
+| Ô chọn danh mục ở màn nghiệp vụ | `useQuickCatalogEdit` tự ẩn bút chì khi không có quyền Sửa tab đó (`canEdit` trả false) và trả `canCreate` ⇒ màn truyền `onCreate={editor.canCreate ? addX : undefined}`. |
+| Tô màu dòng, lọc, chọn, cài đặt giao diện | Không gate. |
+
+Lưới an toàn: màn nào sót, lượt ghi vẫn bị chốt ở `useTable.write` (`lib/writePermissions.ts`) và báo lỗi — nhưng đừng dựa vào đó thay cho ẩn nút.
+
 ## Ô chọn danh mục: luôn có Thêm mới + Bút chì sửa nhanh
 
 (Chốt 2026-10-06.) **Mọi `Combobox` ĐỂ NHẬP LIỆU mà nguồn là một DANH MỤC có

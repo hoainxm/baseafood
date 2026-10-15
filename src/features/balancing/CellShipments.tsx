@@ -9,6 +9,7 @@ import type { MaterialImportItem } from "@/types";
 import { Popover, PopoverContent, PopoverTrigger } from "@/design-system";
 import { groupDailyShipments, countDailyShipments } from "@/lib/dailyShipments";
 import { num, formatDateVN } from "@/lib/format";
+import { useCan } from "@/features/shared/PermissionProvider";
 
 /**
  * Kế toán dò ô ngày của lưới: "1.530 kg ngày 21/07 này gồm những chuyến nào, của
@@ -28,6 +29,8 @@ export function CellShipments({
   lotCodes: Map<string, string>;
 }) {
   const [open, setOpen] = useState(false);
+  /* Không có quyền xem giá cân đối ⇒ bỏ tiền + đơn giá, chỉ còn kg. */
+  const canViewPrice = useCan("balancing")["view-price"];
   const n = countDailyShipments(imports, date);
   if (n === 0) return null;
   const suppliers = open
@@ -40,7 +43,7 @@ export function CellShipments({
           type="button"
           // Không để phím Enter/↑↓ của lưới nhảy vào đây — nút phụ, không phải ô số.
           tabIndex={-1}
-          title={`Xem ${n} chuyến nhập ngày ${formatDateVN(date)}: đại lý nào, chuyến nào, bao nhiêu kg, giá bao nhiêu.`}
+          title={`Xem ${n} chuyến nhập ngày ${formatDateVN(date)}: đại lý nào, chuyến nào, bao nhiêu kg${canViewPrice ? ", giá bao nhiêu" : ""}.`}
           className="inline-flex items-center gap-1 rounded px-1 text-sm whitespace-nowrap text-primary underline decoration-dotted underline-offset-2 hover:bg-accent"
         >
           <Truck className="size-3.5" aria-hidden />
@@ -58,7 +61,7 @@ export function CellShipments({
                 {d.supplier}{" "}
                 <span className="font-normal text-muted-foreground">
                   · {d.shipments.length} chuyến · {num(d.kg)} kg
-                  {d.amount > 0 ? ` · ${num(Math.round(d.amount))} đ` : ""}
+                  {canViewPrice && d.amount > 0 ? ` · ${num(Math.round(d.amount))} đ` : ""}
                 </span>
               </p>
               <ul className="space-y-1 border-l-2 border-border pl-3">
@@ -73,7 +76,7 @@ export function CellShipments({
                       {c.lines.map((x) => (
                         <li key={x.id} className="tnum">
                           {x.materialType}: {num(x.kg)} kg
-                          {x.unitPrice != null ? ` × ${num(x.unitPrice)} đ` : " · chưa có giá"}
+                          {!canViewPrice ? "" : x.unitPrice != null ? ` × ${num(x.unitPrice)} đ` : " · chưa có giá"}
                         </li>
                       ))}
                     </ul>

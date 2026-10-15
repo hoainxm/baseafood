@@ -1,6 +1,7 @@
 > Load khi: sửa màn Sổ kho theo tháng (/monthly-stock), logic dồn tồn cuối kỳ → đầu kỳ sau, hay công thức tồn cuối/tiền còn lại theo tháng.
 covers: src/features/monthly-stock/MonthlyStockScreen.tsx, src/features/monthly-stock/index.ts, src/lib/monthlyStock.ts, src/lib/monthlyStockExcel.ts
-last_verified: 2026-10-12
+last_verified: 2026-10-15
+<!-- updated: 2026-10-15 — phân quyền Đợt 3: `useCan("monthly-stock")` — sửa inline/Lấy ra/Gửi kho/Đồng bộ danh mục (Sửa), Dồn tháng/Kế thừa/Thêm dòng (Thêm), Xóa dòng (Xóa), Nhập Excel bảng kê (Nạp), In (Xuất). -->
 <!-- updated: 2026-10-06 (j) — tô màu / in đậm / bỏ tô KHÔNG còn toast "Đã … N dòng" + Hoàn tác (người dùng thấy phiền; README luật 8 mức 0). Các toast ghi sổ của màn (dán khối, dồn kỳ, xóa, gửi kho…) giữ nguyên. -->
 <!-- updated: 2026-10-06 (i) — THANH "ĐÃ CHỌN N DÒNG" DỜI XUỐNG SAU CÁC BẢNG + DÍNH ĐÁY (desktop, `md:sticky md:bottom-8` — trên thanh cuộn ngang của bảng xổ): trước nằm đầu trang, tick dòng cuối bảng phải lăn ngược lên mới bấm Tô màu/In/Xóa. Điện thoại không dính (thanh ~3/4 màn ở 360px chữ 130%), nằm ngay dưới bảng. Kiểm demo: tick dòng bảng cuối, cuộn lên đầu/xuống cuối — thanh luôn trong tầm nhìn. -->
 <!-- updated: 2026-10-06 (h) — ĐƠN GIẢN HOÁ TÔ MÀU (người dùng thấy bút tô + nút 🪣 rối): BỎ bút tô và nút 🪣 từng dòng; còn MỘT cách — tick dòng (Shift+tick chọn khoảng) → thanh "Đã chọn N dòng" sẵn có của màn có thêm **Tô màu ▾ · In đậm/Bỏ in đậm · Bỏ tô** (`RowMarkActions`). Dấu ô cũ không còn hiện. -->

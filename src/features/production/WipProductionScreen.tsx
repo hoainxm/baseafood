@@ -57,6 +57,7 @@ import {
   ErrorSummary,
   Field,
   Input,
+  ReadOnlyBadge,
   Tag,
   NumberField,
   RecordTable,
@@ -73,6 +74,7 @@ import { appendAuditEntries } from "@/lib/audit";
 import { PERIOD_OPTIONS, getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
 import { DailyTaskReminder, LotInputPicker, LotDispatchPicker, BlankDailyWipSlip, LotQrLabels } from "@/features/shared";
 import { useQuickCatalogEdit } from "@/features/catalog/QuickCatalogEdit";
+import { useCan } from "@/features/shared/PermissionProvider";
 import { assignSessionLots, findBatchesWithoutLot, formatWipLotLabel, buildLotNode, type TraceData } from "@/lib/lotTraceability";
 import {
   CalendarRange,
@@ -140,6 +142,12 @@ export default function WipProductionScreen() {
   const { profile } = useAuth();
   const operator = profile?.fullName || profile?.username || "";
 
+  /** Phân quyền lớp 2 (spec role-permissions §5): ẩn nút không có quyền. Gắn lô /
+   *  bán nội địa / bột tẩm là thêm-sửa trên "wip"; Gửi báo cáo + In tem = export. */
+  const allowed = useCan("wip");
+  const canWrite = allowed.create || allowed.update;
+  const isReadOnly = !canWrite;
+
   const [period, setPeriod] = useState<ViewPeriod>("day");
   const [date, setDate] = useState(todayISO());
   const [fromDate, setFromDate] = useState(todayISO());
@@ -172,6 +180,8 @@ export default function WipProductionScreen() {
 
   /** Hai chế độ: "nhap" = form ghi (mặc định, form-first cho tổ xưởng); "so" = sổ + báo cáo. */
   const [mode, setMode] = useState<"entry" | "ledger">("entry");
+  /** Không có quyền thêm ⇒ không có form Ghi nhập, chỉ còn sổ ngày. */
+  const activeMode = allowed.create ? mode : "ledger";
   const [isPrintingBlank, setIsPrintingBlank] = useState(false);
   // Truy xuất lô (docs/spec/qr-truy-xuat-lo.md): gắn lô NL cho mẻ + in tem lô BTP.
   const [lotInputs, saveLotInputs] = useLotInputs();
@@ -304,14 +314,14 @@ export default function WipProductionScreen() {
   };
   const materialTypeFieldProps = {
     options: materialTypes.map((l) => ({ value: l.name, label: l.name, subLabel: l.category || undefined })),
-    onCreate: addMaterialTypeName,
+    onCreate: materialTypeEditor.canCreate ? addMaterialTypeName : undefined,
     onEditItem: materialTypeEditor.openEdit,
     canEdit: materialTypeEditor.canEdit,
     editLabel: materialTypeEditor.editLabel,
   };
   const customerFieldProps = {
     options: customerOptions,
-    onCreate: addCustomer,
+    onCreate: customerEditor.canCreate ? addCustomer : undefined,
     onEditItem: customerEditor.openEdit,
     canEdit: customerEditor.canEdit,
     editLabel: customerEditor.editLabel,
@@ -476,10 +486,10 @@ export default function WipProductionScreen() {
   // Form-first: vào chế độ "Ghi nhập" mà chưa có phiếu → tự mở một phiếu trống
   // (không cần bấm nút, không modal). Lưu xong phiếu về null → tự mở phiếu mới.
   useEffect(() => {
-    if (mode === "entry" && session === null && !isLoading) openAdd();
+    if (activeMode === "entry" && session === null && !isLoading) openAdd();
     // moThem đọc bộ lọc hiện tại; guard theo phien===null nên không lặp.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, session, isLoading]);
+  }, [activeMode, session, isLoading]);
 
   // Trong "Ghi nhập", ngày+xưởng của PHIẾU là ngữ cảnh: đồng bộ về bộ lọc để
   // "đã ghi hôm nay", tổng ngày, chốt ngày, báo cáo A4 bám đúng ngày đang ghi.
@@ -487,12 +497,12 @@ export default function WipProductionScreen() {
   const sessionDate = session?.productionDate;
   const sessionWorkshop = session?.workshop;
   useEffect(() => {
-    if (mode === "entry" && sessionDate !== undefined && sessionWorkshop !== undefined) {
+    if (activeMode === "entry" && sessionDate !== undefined && sessionWorkshop !== undefined) {
       setPeriod("day");
       setDate(sessionDate);
       setWorkshop(sessionWorkshop);
     }
-  }, [mode, sessionDate, sessionWorkshop]);
+  }, [activeMode, sessionDate, sessionWorkshop]);
 
   // Nhớ phân xưởng đang chọn theo MÁY → reload khỏi phải chọn lại (device pref).
   useEffect(() => {
@@ -710,7 +720,7 @@ export default function WipProductionScreen() {
         .filter(Boolean)
         .join(" · "),
       undefined,
-      newWips.length > 0
+      newWips.length > 0 && allowed.export
         ? {
             label: newWips.length > 1 ? `In ${newWips.length} tem` : "In tem",
             onClick: () => setLotLabel(newWips),
@@ -1176,15 +1186,18 @@ export default function WipProductionScreen() {
           onAddRow={addRow}
           onAddGroup={addGroup}
           onChangeGroup={changeGroup}
-          onCreateProduct={addProduct}
+          onCreateProduct={productEditor.canCreate ? addProduct : undefined}
           onEditProduct={openProductEdit}
+          canEditProduct={productEditor.canEdit}
           onEditCustomer={customerEditor.openEdit}
+          canEditCustomer={customerEditor.canEdit}
           customerOptions={customerOptions}
-          onCreateCustomer={addCustomer}
+          onCreateCustomer={customerEditor.canCreate ? addCustomer : undefined}
           batterTypes={batterTypes}
           batterOptions={batterOptions}
-          onCreateBatter={addBatter}
+          onCreateBatter={batterEditor.canCreate ? addBatter : undefined}
           onEditBatter={batterEditor.openEdit}
+          canEditBatter={batterEditor.canEdit}
         />
 
         {validRows.length > 0 && (
@@ -1242,11 +1255,13 @@ export default function WipProductionScreen() {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-foreground">
+          <h1 className="flex flex-wrap items-center gap-3 text-2xl font-semibold text-foreground">
             Sản xuất thành phẩm
+            {isReadOnly && <ReadOnlyBadge />}
           </h1>
         </div>
         {/* Tách rõ NHẬP với TRA CỨU: một màn làm một việc. */}
+        {allowed.create && (
         <div className="flex w-full overflow-hidden rounded-xl border-2 border-border sm:w-auto">
           <button
             title="Sang chế độ Ghi nhập để gõ sản lượng thành phẩm."
@@ -1275,6 +1290,7 @@ export default function WipProductionScreen() {
             📖 Sổ ngày & báo cáo
           </button>
         </div>
+        )}
       </div>
 
       <DailyTaskReminder
@@ -1282,10 +1298,11 @@ export default function WipProductionScreen() {
         task={`thành phẩm làm ra hôm nay — xưởng ${recordWorkshop}`}
       />
 
-      {mode === "entry" && entryForm}
+      {activeMode === "entry" && entryForm}
 
-      {mode === "ledger" && (
+      {activeMode === "ledger" && (
         <>
+      {allowed.export && (
       <div className="flex flex-wrap gap-2">
         <Button
           title="In tờ phiếu trống để ghi tay sản lượng ngoài xưởng, tối về nhập lại vào máy." variant="outline" size="lg" onClick={() => setIsPrintingBlank(true)}>
@@ -1293,6 +1310,7 @@ export default function WipProductionScreen() {
           In phiếu trống
         </Button>
       </div>
+      )}
       <StatCardGrid
         className="grid-cols-2 sm:grid-cols-3 lg:grid-cols-5"
         cards={[
@@ -1363,11 +1381,13 @@ export default function WipProductionScreen() {
           title={`Chưa ghi thành phẩm trong ${rangeDescription}`}
           description={`Phân xưởng ${workshop}. Chuyển sang "Ghi nhập" để ghi.`}
           action={
+            allowed.create ? (
             <Button
               title="Chuyển sang chế độ Ghi để nhập sản lượng cho ngày này." size="lg" onClick={() => setMode("entry")}>
               <Plus />
               Sang Ghi nhập
             </Button>
+            ) : undefined
           }
         />
       ) : (
@@ -1381,6 +1401,7 @@ export default function WipProductionScreen() {
             searchLabel="Tìm theo thành phẩm / khách…"
             actions={(r) => (
               <div className="flex flex-wrap gap-2">
+                {canWrite && (
                 <Button
                   title="Ghi mẻ này đã dùng lô nguyên liệu nào (quét tem, gõ mã, hoặc chọn). Có lô thì mới truy được nguồn của mẻ."
                   variant={countLotInputs(r.id) ? "outline" : "default"}
@@ -1390,6 +1411,8 @@ export default function WipProductionScreen() {
                   <Link2 />
                   {countLotInputs(r.id) ? `Lô NL (${countLotInputs(r.id)})` : "Gắn lô NL"}
                 </Button>
+                )}
+                {allowed.export && (
                 <Button
                   title="In tem QR lô bán thành phẩm của mẻ này để dán lên block/thùng. Quét tem là ra nguồn gốc."
                   variant="outline"
@@ -1399,15 +1422,20 @@ export default function WipProductionScreen() {
                   <QrCode />
                   Tem
                 </Button>
+                )}
+                {allowed.update && (
                 <Button
                   title="Mở lại dòng sản lượng này để sửa số kg hoặc mặt hàng." variant="edit" size="sm" onClick={() => openEdit(r)}>
                   <Pencil />
                   Sửa
                 </Button>
+                )}
+                {allowed.delete && (
                 <Button
                   title="Bỏ dòng sản lượng này khỏi sổ. Có hỏi xác nhận và còn nút Hoàn tác." variant="danger" size="sm" onClick={() => remove(r)}>
                   Bỏ
                 </Button>
+                )}
               </div>
             )}
           />
@@ -1492,6 +1520,7 @@ export default function WipProductionScreen() {
             rowMarkKey="ban-noi-dia"
             actions={(r) => (
               <div className="flex flex-wrap gap-2">
+                {canWrite && (
                 <Button
                   title="Ghi nguyên liệu bán này lấy từ lô NL nào (quét tem, gõ mã, hoặc chọn) — để thu hồi tới được khách."
                   variant={countDomesticSaleLots(r.id) ? "outline" : "default"}
@@ -1501,6 +1530,8 @@ export default function WipProductionScreen() {
                   <Link2 />
                   {countDomesticSaleLots(r.id) ? `Lô NL (${countDomesticSaleLots(r.id)})` : "Gắn lô NL"}
                 </Button>
+                )}
+                {allowed.update && (
                 <Button
                   title="Mở lại dòng bán nội địa này để sửa ngày, loại nguyên liệu, số lượng, giá hoặc khách."
                   variant="edit"
@@ -1510,6 +1541,8 @@ export default function WipProductionScreen() {
                   <Pencil />
                   Sửa
                 </Button>
+                )}
+                {allowed.delete && (
                 <ConfirmDelete
                   recordDescription={`Bán nội địa ${r.materialTypeName} — ${kg(r.quantityKg)} (${formatDateVN(r.saleDate)})`}
                   onConfirm={() => removeDomesticSale(r)}
@@ -1523,6 +1556,7 @@ export default function WipProductionScreen() {
                     </Button>
                   }
                 />
+                )}
               </div>
             )}
           />
@@ -1563,6 +1597,7 @@ export default function WipProductionScreen() {
             )}
           </div>
           {isLocked ? (
+            allowed.unlock && (
             <Button
               title="Mở khóa lại ngày sản xuất đã chốt để sửa hoặc ghi bù. Phải ghi lý do, và việc mở khóa được lưu vết."
               variant="edit"
@@ -1576,7 +1611,9 @@ export default function WipProductionScreen() {
               <LockOpen />
               Mở lại ngày
             </Button>
+            )
           ) : (
+            allowed.lock && (
             <Button variant="lock"
               title="Khóa sổ sản xuất ngày này và khai phần nguyên liệu CÒN DỞ tách theo từng loại. Số còn dở đó thành đông gửi ở sổ tồn kho nguyên liệu."
               size="lg"
@@ -1597,6 +1634,7 @@ export default function WipProductionScreen() {
               <Lock />
               Chốt ngày
             </Button>
+            )
           )}
         </div>
       )}
@@ -1618,11 +1656,13 @@ export default function WipProductionScreen() {
               </p>
             </div>
             <div className="flex flex-col items-end gap-1">
+              {allowed.export && (
               <Button
                 title="Gửi báo cáo sản lượng ngày (gom theo xưởng × người ghi) lên hệ thống. Khác với chốt ngày: gửi báo cáo không khóa sổ." onClick={submitReport}>
                 <Send />
                 Gửi báo cáo lên hệ thống
               </Button>
+              )}
               {sentReports[reportKey] && (
                 <span className="text-sm text-success">
                   Đã gửi lúc {sentReports[reportKey]}
@@ -1707,13 +1747,14 @@ export default function WipProductionScreen() {
                     value={edit.productId}
                     onChange={(v) => patchEdit({ productId: v })}
                     options={productOptions}
-                    onCreate={(name) => addProduct(name)}
+                    onCreate={productEditor.canCreate ? (name) => addProduct(name) : undefined}
                     emptyText="Chưa có thành phẩm — gõ tên rồi Thêm mới."
                     onEditItem={openProductEdit}
+                    canEdit={productEditor.canEdit}
                     editLabel={productEditor.editLabel}
                   />
                 </div>
-                {edit.productId && (
+                {edit.productId && productEditor.canEdit(edit.productId) && (
                   <Button
                     type="button"
                     variant="edit"
@@ -1731,10 +1772,11 @@ export default function WipProductionScreen() {
                 value={edit.customerName ?? ""}
                 onChange={(v) => patchEdit({ customerName: v })}
                 options={customerOptions}
-                onCreate={(name) => addCustomer(name)}
+                onCreate={customerEditor.canCreate ? (name) => addCustomer(name) : undefined}
                 placeholder="Chọn khách hàng (nếu có)"
                 emptyText="Chưa có khách — gõ tên rồi Thêm mới."
                 onEditItem={customerEditor.openEdit}
+                canEdit={customerEditor.canEdit}
                 editLabel={customerEditor.editLabel}
               />
 
@@ -1785,8 +1827,9 @@ export default function WipProductionScreen() {
                     batterKg={edit.batterKg ?? {}}
                     onChange={(batterKg) => patchEdit({ batterKg })}
                     batterOptions={batterOptions}
-                    onCreateBatter={addBatter}
+                    onCreateBatter={batterEditor.canCreate ? addBatter : undefined}
                     onEditBatter={batterEditor.openEdit}
+                    canEditBatter={batterEditor.canEdit}
                     productKg={editTotal}
                   />
                 </div>
@@ -1937,6 +1980,7 @@ export default function WipProductionScreen() {
                     <span className="min-w-0">
                       {productNameOf(r.productId)} · <span className="tnum">{kg(r.quantityKg || 0)}</span>
                     </span>
+                    {canWrite && (
                     <Button
                       title="Đóng hộp chốt và mở hộp gắn lô nguyên liệu cho mẻ này (quét tem, gõ mã hoặc chọn)."
                       variant="outline"
@@ -1949,6 +1993,7 @@ export default function WipProductionScreen() {
                       <Link2 />
                       Gắn lô NL
                     </Button>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -2001,13 +2046,17 @@ export default function WipProductionScreen() {
                         onEditItem={materialTypeEditor.openEdit}
                         editLabel={materialTypeEditor.editLabel}
                         canEdit={materialTypeEditor.canEdit}
-                        onCreate={(name) => {
-                          setMaterialTypes([
-                            ...materialTypes,
-                            { id: uid(), name, category: "", note: "" },
-                          ]);
-                          return name;
-                        }}
+                        onCreate={
+                          materialTypeEditor.canCreate
+                            ? (name) => {
+                                setMaterialTypes([
+                                  ...materialTypes,
+                                  { id: uid(), name, category: "", note: "" },
+                                ]);
+                                return name;
+                              }
+                            : undefined
+                        }
                         placeholder="— Chọn loại NL —"
                       />
                     </div>

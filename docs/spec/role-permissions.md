@@ -1,5 +1,5 @@
 > Load khi: làm phân quyền theo vai trò / người dùng (xem · thêm · sửa · xóa · chốt · mở lại · duyệt · nạp · xuất), màn "Vai trò & quyền", ẩn/hiện nút theo quyền, siết RLS theo vai trò.
-> Trạng thái: **CHỐT 2026-10-15** — chủ dự án đồng ý cả 6 câu §10 theo khuyến nghị. **Đợt 1 + Đợt 2 ĐÃ BUILD 2026-10-15** (xem §6 Kết quả). `0062` đã chạy trên DB thật 2026-10-15. Còn Đợt 3–6.
+> Trạng thái: **CHỐT 2026-10-15** — chủ dự án đồng ý cả 6 câu §10 theo khuyến nghị. **Đợt 1 + 2 + 3 ĐÃ BUILD 2026-10-15** (xem §6 Kết quả). `0062` đã chạy trên DB thật 2026-10-15. Còn Đợt 4–6.
 last_verified: 2026-10-15
 
 # Phân quyền theo chức năng (CRUD+) cho từng vai trò và từng người
@@ -212,6 +212,13 @@ Hook nằm ở `lib/permissions.ts` + `features/shared/PermissionProvider.tsx` (
 - Màn `/roles` (§8, đã build): tab **Theo vai trò** (danh sách vai trò + nhãn Toàn quyền/Đã chỉnh/Tự tạo, ma trận tick có "Tất cả/Bỏ hết" theo hàng, tick ô bất kỳ tự tick Xem, bỏ Xem bỏ cả hàng, Lưu quyền + Hoàn tác, Sao chép, Thêm vai trò, Khôi phục mặc định, Xóa vai trò tự tạo — chặn khi còn người giữ, trang mở đầu, mô tả) · tab **Theo người dùng** (quyền thực + màu nguồn: theo vai trò / cho riêng / chặn riêng; bấm ô đổi; danh sách màn người đó thấy). "Xem như người này" làm dạng **danh sách màn thấy được** thay vì giả lập cả app.
 - Khu **Quản trị** `/admin` + menu tài khoản ở avatar (đổi mật khẩu, giao diện, quản trị, đăng xuất) — yêu cầu thêm của chủ dự án cùng ngày.
 - Thứ tự triển khai: chạy `0062` → deploy app. Lùi: `drop table` 3 bảng ⇒ app về ma trận mặc định.
+
+### Kết quả Đợt 3 (2026-10-15)
+
+- **Lớp 3 — chốt ghi:** `lib/writePermissions.ts` (`TABLE_WRITE_RULES` + `checkTableWrite`, có test) + `setWriteGuard` ở đầu `useTable.write` (lib/repo.ts). **Khác §4c:** luật theo màn THẬT SỰ ghi bảng (rà code): đủ quyền ở MỘT trong các màn đó là được — VD `production_wips` ⇐ wip / balancing / warehouse (chuyển `stocked` = Duyệt), `monthly_stock_ledger` ⇐ monthly-stock / balancing, `sales_*` ⇐ sales / orders, `lot_*` ⇐ wip / packaging / qr / orders / sales; bảng chốt (`daily_locks`, `production_locks`, `qc_locks`, `balancing_periods`) theo `isLocked` (chốt ⇒ Chốt, mở/xóa ⇒ Mở lại); danh mục ⇒ quyền tab `catalog.*` kể cả thêm nhanh ở màn khác; `nxt_snapshots` ⇒ Nạp. Bị chặn ⇒ cả lượt bỏ nguyên, báo lỗi, KHÔNG vào hàng chờ. Không chốt khi chạy localStorage / chưa có hồ sơ.
+- **Registry đổi:** `qc` thêm Xóa (màn QC có xóa phiếu kiểm); `nxt-material` / `nxt` thêm Thêm/Sửa/Xóa (= tồn đầu khai tay). Ma trận mặc định tự cấp các ô mới ⇒ không ai mất quyền.
+- **Lớp 2 — trên màn:** `useCan` ở 16 màn + 7 tab danh mục (ẩn nút theo Thêm/Sửa/Xóa/Chốt/Mở lại/Duyệt/Nạp/Xuất, `ReadOnlyBadge` khi chỉ xem, ẩn giá/thành tiền/lãi lỗ theo `view-price` ở Nhập hàng · Bán hàng · Cân đối); `CatalogCrud` có `canCreate/canUpdate/canDelete`; `useQuickCatalogEdit` tự ẩn bút chì + trả `canCreate` cho `onCreate` ở mọi ô danh mục. Thử trên preview (bản vá tạm, đã gỡ): vai trò chỉ-xem ⇒ mọi màn có ghi hiện "Chỉ xem", 0 nút thao tác; đủ quyền trừ Xóa + Xem giá ⇒ nút Thêm/Sửa còn, nút Xóa/Bỏ + chữ giá mất; đủ quyền ⇒ như cũ.
+- **Còn hở (lớp 3 vẫn chặn):** nút "Gỡ" lô trong `features/shared/LotInputPicker.tsx` (picker dùng chung, chưa nhận cờ quyền); bảng duyệt OCR phiếu nhập (`OcrReviewPanel`) còn hiện giá cũ cho người có Thêm mà không có Xem giá; tem in ở /packaging không gate (tài nguyên `packaging` không có Xuất).
 
 Đợt 1–3 giao được giá trị (chặn thao tác nhầm ở giao diện) mà **không đụng RLS**. Đợt 6 chỉ cần khi app mở ra ngoài mạng nội bộ hoặc khi có người cố tình vượt giao diện.
 

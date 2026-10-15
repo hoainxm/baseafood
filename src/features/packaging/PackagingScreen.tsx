@@ -43,6 +43,7 @@ import {
   ErrorSummary,
   Field,
   Input,
+  ReadOnlyBadge,
   Tag,
   NumberField,
   RecordTable,
@@ -54,6 +55,7 @@ import {
   type ComboboxOption,
 } from "@/design-system";
 import { useQuickCatalogEdit } from "@/features/catalog/QuickCatalogEdit";
+import { useCan } from "@/features/shared/PermissionProvider";
 import { kg, num, todayISO, formatDateVN } from "@/lib/format";
 import { PERIOD_OPTIONS, getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
 import { Boxes, CalendarRange, Link2, Package, PackageCheck, Plus, QrCode, Scale } from "lucide-react";
@@ -85,6 +87,9 @@ export default function PackagingScreen() {
   const [products, setProducts] = useProducts();
   /** Bút chì sửa nhanh danh mục ngay trong ô chọn. */
   const productEditor = useQuickCatalogEdit("product", products, setProducts);
+  /** Phân quyền lớp 2 (spec role-permissions §5): gắn lô BTP = thêm/sửa trên "packaging". */
+  const allowed = useCan("packaging");
+  const canWrite = allowed.create || allowed.update;
 
   const [period, setPeriod] = useState<ViewPeriod>("day");
   const [date, setDate] = useState(todayISO());
@@ -267,6 +272,7 @@ export default function PackagingScreen() {
       header: "",
       render: (r) => (
         <div className="flex flex-wrap gap-2">
+          {canWrite && (
           <Button
             title="Ghi phiếu này đã đóng từ lô bán thành phẩm nào (quét tem, gõ mã, hoặc chọn). Có lô thì mới truy được nguồn của thành phẩm."
             variant={countLotInputs(r.id) ? "outline" : "default"}
@@ -276,6 +282,7 @@ export default function PackagingScreen() {
             <Link2 />
             {countLotInputs(r.id) ? `Lô BTP (${countLotInputs(r.id)})` : "Gắn lô BTP"}
           </Button>
+          )}
           <Button
             title="In tem QR lô thành phẩm của phiếu này để dán lên thùng. Quét tem là ra nguồn gốc."
             variant="outline"
@@ -285,10 +292,12 @@ export default function PackagingScreen() {
             <QrCode />
             Tem
           </Button>
+          {allowed.delete && (
           <Button
             title="Xóa phiếu đóng gói này. Tồn bán thành phẩm và tồn thành phẩm sẽ được tính lại." variant="danger" size="sm" onClick={() => remove(r)}>
             Xóa
           </Button>
+          )}
         </div>
       ),
     },
@@ -298,16 +307,21 @@ export default function PackagingScreen() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold text-foreground">Đóng gói thành phẩm</h1>
+          <h1 className="flex flex-wrap items-center gap-3 text-xl font-semibold text-foreground">
+            Đóng gói thành phẩm
+            {!canWrite && <ReadOnlyBadge />}
+          </h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Bán thành phẩm (còn khuôn đá) → đóng gói thành thành phẩm sẵn bán. Đóng gói trừ tồn dự trữ, cộng tồn thành phẩm.
           </p>
         </div>
+        {allowed.create && (
         <Button
           title="Ghi một phiếu đóng gói: trừ bán thành phẩm đem đóng, cộng thành phẩm ra, phần chênh là hao hụt." size="lg" onClick={openAdd}>
           <Plus />
           Ghi phiếu đóng gói
         </Button>
+        )}
       </div>
 
       <StatCardGrid
@@ -390,7 +404,11 @@ export default function PackagingScreen() {
         <EmptyState
           icon={Package}
           title="Chưa có phiếu đóng gói"
-          description="Bấm “Ghi phiếu đóng gói” để chuyển bán thành phẩm thành thành phẩm đóng gói."
+          description={
+            allowed.create
+              ? "Bấm “Ghi phiếu đóng gói” để chuyển bán thành phẩm thành thành phẩm đóng gói."
+              : undefined
+          }
         />
       ) : (
         <RecordTable columns={columns} rows={view} getKey={(r) => r.id} rowMarkKey="dong-goi" />
@@ -432,8 +450,9 @@ export default function PackagingScreen() {
                   onChange={(v) => setField("fromProductId", v)}
                   options={productOptions}
                   onEditItem={productEditor.openEdit}
+                  canEdit={productEditor.canEdit}
                   editLabel={productEditor.editLabel}
-                  onCreate={addProduct}
+                  onCreate={productEditor.canCreate ? addProduct : undefined}
                   emptyText="Chưa có mặt hàng — gõ tên rồi Thêm mới."
                 />
                 <Field label="Quy cách BTP" hint="Size/grade của lô BTP. VD: 230-250.">
@@ -467,8 +486,9 @@ export default function PackagingScreen() {
                   onChange={(v) => setField("toProductId", v)}
                   options={productOptions}
                   onEditItem={productEditor.openEdit}
+                  canEdit={productEditor.canEdit}
                   editLabel={productEditor.editLabel}
-                  onCreate={addProduct}
+                  onCreate={productEditor.canCreate ? addProduct : undefined}
                   emptyText="Chưa có mặt hàng — gõ tên rồi Thêm mới."
                 />
                 <Field label="Quy cách đóng gói" hint="VD: thùng 10 kg, hộp 1 kg.">

@@ -18,6 +18,7 @@ export function BatterSection({
   batterOptions,
   onCreateBatter,
   onEditBatter,
+  canEditBatter,
   productKg: finishedGoodKg,
   columnNavigation: hasColumnNav = false,
 }: {
@@ -28,9 +29,11 @@ export function BatterSection({
   /** Danh mục loại bột — value = TÊN (sổ lưu theo tên). */
   batterOptions: ComboboxOption[];
   /** Tạo loại bột mới tại chỗ (lưu ngay vào danh mục) — trả về TÊN. */
-  onCreateBatter: (name: string) => string;
+  onCreateBatter?: (name: string) => string;
   /** Mở hộp sửa nhanh loại bột (value = tên). */
   onEditBatter?: (name: string) => void;
+  /** Có hiện bút chì sửa loại bột này không (quyền sửa danh mục bột). */
+  canEditBatter?: (name: string) => boolean;
   productKg: number;
   /** Ô số nhảy ↑/↓ theo cột trong bảng ghi (khung `[data-grid-nav]`). */
   columnNavigation?: boolean;
@@ -99,6 +102,7 @@ export function BatterSection({
             options={batterOptions.filter((o) => !visibleBatters.includes(o.value))}
             onCreate={onCreateBatter}
             onEditItem={onEditBatter}
+            canEdit={canEditBatter}
             editLabel="Sửa thông tin loại bột này — lưu thẳng vào Danh mục."
             placeholder="— Chọn loại bột —"
             emptyText="Chưa có loại bột này — gõ tên rồi Thêm mới."

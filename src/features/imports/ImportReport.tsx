@@ -60,7 +60,15 @@ interface ScrapRow {
  * Phế liệu cân trong kỳ để RIÊNG (giá bán ≠ giá mua, không trộn vào "Giá trị nhập").
  * Chỉ đọc sổ nhập; xuất được Excel để kế toán đối chiếu.
  */
-export default function ImportReport() {
+export default function ImportReport({
+  canExport = true,
+  showPrice = true,
+}: {
+  /** Quyền `imports.export` — không có thì ẩn nút Xuất Excel. */
+  canExport?: boolean;
+  /** Quyền `imports.view-price` — không có thì ẩn mọi cột / thẻ / tiền trong file xuất. */
+  showPrice?: boolean;
+} = {}) {
   const [rows] = useMaterialImports();
   const [scraps] = useScraps();
 
@@ -166,7 +174,7 @@ export default function ImportReport() {
               <div className="text-muted-foreground">
                 {d.shipmentIds.size} chuyến ·{" "}
                 <span className="tnum font-semibold text-foreground">{num(d.totalKg)} kg</span>
-                {d.totalAmount > 0 ? ` · ${num(d.totalAmount)} đ` : ""}
+                {showPrice && d.totalAmount > 0 ? ` · ${num(d.totalAmount)} đ` : ""}
               </div>
             </div>
             <ul className="space-y-1">
@@ -195,12 +203,14 @@ export default function ImportReport() {
       totalScrapKg: scrapRows.reduce((s, d) => s + d.quantityKg, 0),
       totalScrapAmount: scrapRows.reduce((s, d) => s + d.saleValue, 0),
     };
-  }, [rows, scraps, fromDate, toDate, workshop]);
+  }, [rows, scraps, fromDate, toDate, workshop, showPrice]);
 
   const cards: StatCardData[] = [
     { label: "Kỳ báo cáo", value: `${formatDateVN(fromDate)} – ${formatDateVN(toDate)}`, icon: CalendarRange, color: "neutral" },
     { label: "Nhập mua", value: `${num(totalKg)} kg`, numeric: true, icon: Scale, color: "brand" },
-    { label: "Giá trị mua", value: `${num(totalAmount)} đ`, numeric: true, icon: Coins, color: "success" },
+    ...(showPrice
+      ? [{ label: "Giá trị mua", value: `${num(totalAmount)} đ`, numeric: true, icon: Coins, color: "success" } as StatCardData]
+      : []),
     {
       label: "Chờ hóa đơn",
       value: `${num(totalAwaitingPriceKg)} kg`,
@@ -221,13 +231,17 @@ export default function ImportReport() {
       render: (r) => (r.unpricedKg ? num(r.unpricedKg) : ""),
       total: () => (totalAwaitingPriceKg ? num(totalAwaitingPriceKg) : ""),
     },
-    { key: "tien", header: "Giá trị (đ)", numeric: true, render: (r) => num(r.amount), total: () => num(totalAmount) },
+    ...(showPrice
+      ? [{ key: "tien", header: "Giá trị (đ)", numeric: true, render: (r) => num(r.amount), total: () => num(totalAmount) } as SummaryTableColumn<PurchaseRow>]
+      : []),
   ];
 
   const scrapColumns: SummaryTableColumn<ScrapRow>[] = [
     { key: "loai", header: "Loại phế liệu", render: (r) => r.name },
     { key: "kg", header: "Số cân (kg)", numeric: true, render: (r) => num(r.quantityKg), total: () => num(totalScrapKg) },
-    { key: "tien", header: "Giá trị bán (đ)", numeric: true, render: (r) => num(r.saleValue), total: () => num(totalScrapAmount) },
+    ...(showPrice
+      ? [{ key: "tien", header: "Giá trị bán (đ)", numeric: true, render: (r) => num(r.saleValue), total: () => num(totalScrapAmount) } as SummaryTableColumn<ScrapRow>]
+      : []),
   ];
 
   const exportExcel = () => {
@@ -240,16 +254,18 @@ export default function ImportReport() {
     aoa.push([`Kỳ: ${formatDateVN(fromDate)} – ${formatDateVN(toDate)} · Phân xưởng: ${workshop}`]);
     aoa.push([]);
     aoa.push(["NGUYÊN LIỆU MUA"]);
-    aoa.push(["Đại lý", "Loại nguyên liệu", "Số cân (kg)", "Chờ giá (kg)", "Giá trị (đ)"]);
+    // Không có quyền xem giá ⇒ file xuất cũng bỏ cột tiền (cột cuối mỗi bảng).
+    const withPrice = (cells: OExcel[], price: OExcel): OExcel[] => (showPrice ? [...cells, price] : cells);
+    aoa.push(withPrice(["Đại lý", "Loại nguyên liệu", "Số cân (kg)", "Chờ giá (kg)"], "Giá trị (đ)"));
     for (const r of purchaseRows)
-      aoa.push([r.supplierName, r.materialTypeName, r.quantityKg, r.unpricedKg, r.amount]);
-    aoa.push(["Tổng cộng", "", totalKg, totalAwaitingPriceKg, totalAmount]);
+      aoa.push(withPrice([r.supplierName, r.materialTypeName, r.quantityKg, r.unpricedKg], r.amount));
+    aoa.push(withPrice(["Tổng cộng", "", totalKg, totalAwaitingPriceKg], totalAmount));
     if (scrapRows.length) {
       aoa.push([]);
-      aoa.push(["PHẾ LIỆU (giá bán, không tính vào giá trị nhập mua)"]);
-      aoa.push(["Loại phế liệu", "Số cân (kg)", "Giá trị bán (đ)"]);
-      for (const r of scrapRows) aoa.push([r.name, r.quantityKg, r.saleValue]);
-      aoa.push(["Tổng cộng", totalScrapKg, totalScrapAmount]);
+      aoa.push([showPrice ? "PHẾ LIỆU (giá bán, không tính vào giá trị nhập mua)" : "PHẾ LIỆU"]);
+      aoa.push(withPrice(["Loại phế liệu", "Số cân (kg)"], "Giá trị bán (đ)"));
+      for (const r of scrapRows) aoa.push(withPrice([r.name, r.quantityKg], r.saleValue));
+      aoa.push(withPrice(["Tổng cộng", totalScrapKg], totalScrapAmount));
     }
     exportAoaToXlsx({
       sheetName: "Nhập hàng",
@@ -308,16 +324,18 @@ export default function ImportReport() {
             />
           </div>
         </div>
-        <Button
-          title="Tải báo cáo nhập hàng đang xem (hàng mua + phế liệu) ra file Excel."
-          size="lg"
-          variant="outline"
-          onClick={exportExcel}
-          disabled={!purchaseRows.length && !scrapRows.length}
-        >
-          <FileSpreadsheet />
-          Xuất Excel
-        </Button>
+        {canExport && (
+          <Button
+            title="Tải báo cáo nhập hàng đang xem (hàng mua + phế liệu) ra file Excel."
+            size="lg"
+            variant="outline"
+            onClick={exportExcel}
+            disabled={!purchaseRows.length && !scrapRows.length}
+          >
+            <FileSpreadsheet />
+            Xuất Excel
+          </Button>
+        )}
       </div>
 
       <StatCardGrid cards={cards} />
@@ -348,9 +366,11 @@ export default function ImportReport() {
         <section className="space-y-3">
           <div className="flex items-baseline gap-3">
             <h3 className="text-lg font-semibold text-foreground">Phế liệu cân trong kỳ</h3>
-            <span className="text-sm text-muted-foreground">
-              (giá bán, tách riêng — không cộng vào giá trị nhập mua)
-            </span>
+            {showPrice && (
+              <span className="text-sm text-muted-foreground">
+                (giá bán, tách riêng — không cộng vào giá trị nhập mua)
+              </span>
+            )}
           </div>
           <SummaryTable
             rows={scrapRows}

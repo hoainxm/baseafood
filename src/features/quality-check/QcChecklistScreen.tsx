@@ -22,10 +22,12 @@ import {
   Button,
   Tag,
   EmptyState,
+  ReadOnlyBadge,
   notify,
   type ChoiceOption,
   TimeSeriesChart,
 } from "@/design-system";
+import { useCan } from "@/features/shared/PermissionProvider";
 import { Camera, Lock, Plus, X } from "lucide-react";
 
 const WORKSHOP_OPTIONS: ChoiceOption[] = [
@@ -39,6 +41,13 @@ const RESULT_OPTIONS: ChoiceOption[] = [
   { value: "conditional", label: "Cần khắc phục" },
   { value: "fail", label: "Không đạt" },
 ];
+
+/** Nhãn kết quả cho chế độ chỉ xem. */
+const RESULT_TAGS: Record<QcResult, { label: string; variant: "done" | "warning" | "error" }> = {
+  pass: { label: "Đạt", variant: "done" },
+  conditional: { label: "Cần khắc phục", variant: "warning" },
+  fail: { label: "Không đạt", variant: "error" },
+};
 
 /** Bộ chỉ tiêu mặc định — chấm nhanh, vẫn thêm chỉ tiêu mới tại chỗ. */
 const DEFAULT_CRITERIA = [
@@ -66,6 +75,9 @@ interface Row {
 export default function QcChecklistScreen() {
   const [rows, persist] = useQcChecklists();
   const [locks, persistLocks, { status: lockStatus }] = useQcLocks();
+  /** Phân quyền lớp 2 (spec role-permissions §5): không thêm lẫn sửa ⇒ chỉ xem kết quả. */
+  const allowed = useCan("qc");
+  const canWrite = allowed.create || allowed.update;
 
   const [date, setDate] = useState(todayISO());
   const [workshop, setWorkshop] = useState<Workshop>("Đông");
@@ -198,7 +210,10 @@ export default function QcChecklistScreen() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-foreground">Kiểm tra QC</h1>
+        <h1 className="flex flex-wrap items-center gap-3 text-2xl font-semibold text-foreground">
+          Kiểm tra QC
+          {!canWrite && <ReadOnlyBadge />}
+        </h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Cuối ngày chấm nhanh các chỉ tiêu vệ sinh / dụng cụ / thiết bị theo phân
           xưởng, rồi chốt ngày. (Ảnh kèm sẽ bổ sung sau.)
@@ -239,16 +254,20 @@ export default function QcChecklistScreen() {
           )}
         </div>
         {isLocked ? (
+          allowed.unlock && (
           <Button
             title="Mở khóa lại ngày QC đã chốt để sửa hoặc chấm bù." variant="edit" size="lg" onClick={reopen}>
             Mở lại ngày
           </Button>
+          )
         ) : (
+          allowed.lock && (
           <Button
             title="Khóa sổ QC ngày này. Sau khi chốt muốn sửa phải mở lại ngày." variant="lock" size="lg" onClick={lockDay}>
             <Lock aria-hidden />
             Chốt ngày
           </Button>
+          )
         )}
       </div>
 
@@ -271,7 +290,7 @@ export default function QcChecklistScreen() {
       )}
 
       {/* Ghi bù: ngày cũ hoặc ngày đã chốt → bắt lý do */}
-      {isBackdate && (
+      {canWrite && isBackdate && (
         <Field
           label="Lý do ghi bù"
           required
@@ -289,8 +308,30 @@ export default function QcChecklistScreen() {
         </Field>
       )}
 
-      {/* Bảng chấm điểm từng chỉ tiêu */}
-      {dongs.length === 0 ? (
+      {/* Chỉ xem: liệt kê kết quả đã chấm, không có ô nhập */}
+      {!canWrite ? (
+        scoredRows.length === 0 ? (
+          <EmptyState title="Chưa chấm QC ngày này" description={`${formatDateVN(date)} · xưởng ${workshop}`} />
+        ) : (
+          <div className="space-y-4">
+            {scoredRows.map((d) => (
+              <div key={d.criterion} className="space-y-2 rounded-xl border-2 border-border p-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-base font-semibold">{d.criterion}</p>
+                  {d.result && (
+                    <Tag variant={RESULT_TAGS[d.result].variant}>{RESULT_TAGS[d.result].label}</Tag>
+                  )}
+                  {d.score != null && <span className="tnum text-base text-muted-foreground">{d.score} điểm</span>}
+                </div>
+                {d.note && <p className="text-base text-muted-foreground">{d.note}</p>}
+                {hasImageStorage && d.photoPaths.length > 0 && (
+                  <CriterionPhoto paths={d.photoPaths} onChange={() => {}} isLocked />
+                )}
+              </div>
+            ))}
+          </div>
+        )
+      ) : dongs.length === 0 ? (
         <EmptyState title="Chưa có chỉ tiêu" description="Thêm chỉ tiêu để bắt đầu chấm." />
       ) : (
         <div className="space-y-4">
@@ -334,6 +375,7 @@ export default function QcChecklistScreen() {
       )}
 
       {/* Thêm chỉ tiêu tại chỗ */}
+      {canWrite && (
       <div className="flex flex-wrap items-end gap-3 rounded-xl border-2 border-dashed border-border p-4">
         <Field label="Thêm chỉ tiêu khác" className="min-w-[min(15rem,100%)] flex-1">
           <Input
@@ -354,14 +396,17 @@ export default function QcChecklistScreen() {
           Thêm chỉ tiêu
         </Button>
       </div>
+      )}
 
-      {/* Lưu — không bao giờ disabled (thiếu thì báo qua toast) */}
+      {/* Lưu — không bao giờ disabled (thiếu thì báo qua toast); không quyền thì không có nút */}
+      {canWrite && (
       <div className="flex justify-end">
         <Button variant="save"
           title="Ghi điểm của toàn bộ chỉ tiêu vào sổ QC ngày đang chọn." size="lg" onClick={save}>
           Lưu chấm điểm
         </Button>
       </div>
+      )}
     </div>
   );
 }

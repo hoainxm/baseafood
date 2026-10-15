@@ -24,6 +24,7 @@ import {
   ErrorSummary,
   Field,
   Input,
+  ReadOnlyBadge,
   Tag,
   NumberField,
   RecordTable,
@@ -40,6 +41,7 @@ import {
 import { kg, num, formatDateVN } from "@/lib/format";
 import { AlertTriangle, CalendarRange, Camera, CameraOff, ClipboardList, PackageCheck, Scale, Search, Snowflake, Warehouse } from "lucide-react";
 import { QrScanner } from "@/features/shared";
+import { useCan } from "@/features/shared/PermissionProvider";
 import { parseQrCode, formatWipLotLabel, findLots } from "@/lib/lotTraceability";
 
 import { BSF1_WAREHOUSES } from "@/types";
@@ -59,6 +61,9 @@ interface ApprovalForm {
 export default function ReserveWarehouseScreen() {
   const [wips, persistWips, { status }] = useWipProductions();
   const isLoading = status === "loading" && wips.length === 0;
+  /** Phân quyền lớp 2 (spec role-permissions §5): Duyệt chờ → đã nhập = approve. */
+  const allowed = useCan("warehouse");
+  const isReadOnly = !allowed.approve && !allowed.update;
   const [exportItems] = useExportItems();
   const [products] = useProducts();
   const [salesItems] = useSalesItems();
@@ -158,7 +163,7 @@ export default function ReserveWarehouseScreen() {
   const approveParam = readParam(searchParams, "approve");
   useEffect(() => {
     if (!approveParam || wips.length === 0) return;
-    approveByLabel(approveParam);
+    if (allowed.approve) approveByLabel(approveParam);
     setSearchParams({}, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ chạy khi link mang mã và sổ SX đã nạp
   }, [approveParam, wips.length]);
@@ -229,7 +234,10 @@ export default function ReserveWarehouseScreen() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-foreground">Kho dự trữ đông</h1>
+        <h1 className="flex flex-wrap items-center gap-3 text-2xl font-semibold text-foreground">
+          Kho dự trữ đông
+          {isReadOnly && <ReadOnlyBadge />}
+        </h1>
       </div>
 
       <StatCardGrid
@@ -343,6 +351,7 @@ export default function ReserveWarehouseScreen() {
             Có {pendingIntake.length} lô sản xuất chờ nhập kho — duyệt để tính vào tồn
           </p>
           {/* Quét tem lô BTP trên block ⇒ mở đúng hộp duyệt. Gõ mã khi tem bong / không có camera. */}
+          {allowed.approve && (
           <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
             <Button
               title={isScanning ? "Tắt camera." : "Bật camera quét tem QR trên block để mở đúng lô cần duyệt nhập kho."}
@@ -365,7 +374,8 @@ export default function ReserveWarehouseScreen() {
               Tìm lô
             </Button>
           </div>
-          {isScanning && <QrScanner onScan={approveByLabel} />}
+          )}
+          {allowed.approve && isScanning && <QrScanner onScan={approveByLabel} />}
           <ul className="divide-y divide-border">
             {pendingIntake.map((s) => (
               <li
@@ -382,11 +392,13 @@ export default function ReserveWarehouseScreen() {
                     · SX {formatDateVN(s.productionDate)} · xưởng {s.workshop}
                   </span>
                 </span>
+                {allowed.approve && (
                 <Button
                   title="Duyệt lô bán thành phẩm này từ trạng thái chờ sang đã nhập kho, để tính vào tồn dự trữ." size="sm" onClick={() => openApprove(s)}>
                   <PackageCheck />
                   Duyệt nhập kho
                 </Button>
+                )}
               </li>
             ))}
           </ul>

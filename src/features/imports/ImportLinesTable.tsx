@@ -8,6 +8,7 @@ import { CATEGORIES } from "@/types";
 import { Button, Combobox, NumberField, type ComboboxOption } from "@/design-system";
 import { Plus, X } from "lucide-react";
 import { formatDateVN } from "@/lib/format";
+import { cn } from "@/lib/utils";
 import type { ImportLine } from "./importHelpers";
 
 /* ---------- Bảng loại hàng của một chuyến (nhập nhiều dòng một lượt) ---------- */
@@ -32,6 +33,8 @@ export function ImportLinesTable({
   getMaterialTypeOptions: materialTypeOptionsByCategory,
   onCreateMaterialType,
   onEditMaterialType,
+  canEditMaterialType,
+  showPrice = true,
   onLastRowEnter: onEnterLast,
 }: {
   lines: ImportLine[];
@@ -39,9 +42,14 @@ export function ImportLinesTable({
   onRemove: (key: string) => void;
   onAddRow: () => void;
   getMaterialTypeOptions: (category: string) => ComboboxOption[];
-  onCreateMaterialType: (name: string, category: string) => string;
+  /** Không truyền (không có quyền thêm danh mục) ⇒ ô chỉ chọn, không "Tạo mới tại chỗ". */
+  onCreateMaterialType?: (name: string, category: string) => string;
   /** Bút chì sửa nhanh loại NL trong danh mục (value = tên). */
   onEditMaterialType?: (name: string) => void;
+  /** Loại NL này có sửa nhanh được không (quyền + có trong danh mục). */
+  canEditMaterialType?: (name: string) => boolean;
+  /** Không có quyền xem giá ⇒ ẩn ô Đơn giá + chú thích giá lượt trước. */
+  showPrice?: boolean;
   /** Enter ở ô kg của dòng cuối — màn dùng để đưa con trỏ tới nút lưu. */
   onLastRowEnter?: () => void;
 }) {
@@ -61,7 +69,9 @@ export function ImportLinesTable({
     >
       {row.map((d) => {
         // Giá điền sẵn là GIÁ CŨ — nói rõ của lượt nào để người nhập soát, khỏi lưu nhầm.
-        const priceNote = d.priceDate
+        const priceNote = !showPrice
+          ? null
+          : d.priceDate
           ? `Giá theo lượt ${formatDateVN(d.priceDate).slice(0, 5)} — khác thì sửa ô đơn giá`
           : d.isSuggested && d.unitPrice == null
             ? "Chưa có giá lượt trước — để trống nếu chờ hóa đơn"
@@ -69,7 +79,12 @@ export function ImportLinesTable({
         return (
           <div
             key={d.key}
-            className="grid grid-cols-2 gap-3 rounded-lg border border-border bg-card p-3 lg:grid-cols-[1.1fr_1.6fr_0.9fr_0.9fr_auto] lg:items-end"
+            className={cn(
+              "grid grid-cols-2 gap-3 rounded-lg border border-border bg-card p-3 lg:items-end",
+              showPrice
+                ? "lg:grid-cols-[1.1fr_1.6fr_0.9fr_0.9fr_auto]"
+                : "lg:grid-cols-[1.1fr_1.6fr_0.9fr_auto]"
+            )}
           >
             <Combobox
               label="Loài"
@@ -89,8 +104,11 @@ export function ImportLinesTable({
               value={d.materialTypeName}
               onChange={(v) => onEdit(d.key, { materialTypeName: v })}
               options={materialTypeOptionsByCategory(d.category)}
-              onCreate={(name) => onCreateMaterialType(name, d.category)}
+              onCreate={
+                onCreateMaterialType ? (name) => onCreateMaterialType(name, d.category) : undefined
+              }
               onEditItem={onEditMaterialType}
+              canEdit={canEditMaterialType}
               editLabel="Sửa thông tin loại nguyên liệu này — lưu thẳng vào Danh mục."
             />
             <NumberField
@@ -98,15 +116,18 @@ export function ImportLinesTable({
               required
               unit="kg"
               navCol="kg"
+              className={showPrice ? undefined : "col-span-2 lg:col-span-1"}
               value={d.quantityKg || null}
               onChange={(v) => onEdit(d.key, { quantityKg: v ?? 0 })}
             />
-            <NumberField
-              label="Đơn giá"
-              unit="đ"
-              value={d.unitPrice}
-              onChange={(v) => onEdit(d.key, { unitPrice: v })}
-            />
+            {showPrice && (
+              <NumberField
+                label="Đơn giá"
+                unit="đ"
+                value={d.unitPrice}
+                onChange={(v) => onEdit(d.key, { unitPrice: v })}
+              />
+            )}
             {canRemove ? (
               <Button
                 title="Bỏ dòng loại hàng này khỏi chuyến đang gõ (chưa lưu nên không đụng sổ)."
@@ -122,7 +143,7 @@ export function ImportLinesTable({
               <span className="hidden lg:block" aria-hidden />
             )}
             {priceNote && (
-              <p className="col-span-2 text-sm text-muted-foreground lg:col-span-5">{priceNote}</p>
+              <p className="col-span-2 text-sm text-muted-foreground lg:col-span-full">{priceNote}</p>
             )}
           </div>
         );

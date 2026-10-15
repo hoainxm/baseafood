@@ -25,6 +25,7 @@ import {
 } from "@/lib/balancingGrid";
 import { Button } from "@/design-system";
 import { num } from "@/lib/format";
+import { useCan } from "@/features/shared/PermissionProvider";
 import { ChevronsLeftRight, Coins, Printer, X } from "lucide-react";
 
 export default function BalancingTable({
@@ -76,7 +77,10 @@ export default function BalancingTable({
      kỳ dài người dùng phải thoát phiếu, thu cột, mở lại phiếu — ba bước cho một
      việc. Thu ở đây còn quyết định bản in ra giấy gồm cột nào. */
   const [hideDays, setHideDays] = useState(false);
-  const [hideAmounts, setHideAmounts] = useState(false);
+  const [hideAmountsToggle, setHideAmounts] = useState(false);
+  /* Không có quyền xem giá ⇒ cột tiền + dòng tiền ở Ghi chú luôn ẩn, không có nút mở lại. */
+  const canViewPrice = useCan("balancing")["view-price"];
+  const hideAmounts = hideAmountsToggle || !canViewPrice;
   const dateColumns = hideDays ? [] : dates;
   /* Khối NL: công tắc ngày riêng — mặc định MỞ như màn (chốt 2026-10-06); thu lại thì
      in đúng bảng giấy (Loại hàng · Số lượng · Đơn giá · T.tiền · tỷ lệ). */
@@ -115,11 +119,13 @@ export default function BalancingTable({
             <ChevronsLeftRight className="size-4" />
             {isMaterialDaysOpen ? "NL: thu cột ngày" : "NL: mở cột ngày"}
           </Button>
-          <Button
-            title="Ẩn / hiện các cột tiền trên bản in." variant="outline" onClick={() => setHideAmounts((v) => !v)}>
-            <Coins className="size-4" />
-            {hideAmounts ? "Mở cột tiền" : "Thu cột tiền"}
-          </Button>
+          {canViewPrice && (
+            <Button
+              title="Ẩn / hiện các cột tiền trên bản in." variant="outline" onClick={() => setHideAmounts((v) => !v)}>
+              <Coins className="size-4" />
+              {hideAmounts ? "Mở cột tiền" : "Thu cột tiền"}
+            </Button>
+          )}
           <Button
             title="Mở hộp in của trình duyệt cho bảng cân đối này (in giấy hoặc lưu PDF)." onClick={() => window.print()}>
             <Printer className="size-4" /> In / Xuất PDF
@@ -299,20 +305,24 @@ export default function BalancingTable({
             <div>
               <KV k="Tổng thành phẩm" v={`${num(result.totalOutputKg)} kg`} />
               <KV k="Định mức chế biến" v={num(result.norm)} strong />
-              <KV k="Chi phí CB /kg TP" v={num(period.processingCostPerKg)} />
-              <KV k="Giá Thành" v={num(result.costOfGoods)} />
-              <KV k="Giá trị xuất" v={num(result.exportValue)} />
-              <KV
-                k={result.profitOrLoss >= 0 ? "Lãi" : "Lỗ"}
-                v={num(Math.abs(result.profitOrLoss))}
-                strong
-              />
-              <KV k="Bình quân /kg nl" v={num(result.avgProfitPerKgMaterial)} />
-              <KV k="tỉ giá" v={num(period.exchangeRate)} />
+              {canViewPrice && (
+                <>
+                  <KV k="Chi phí CB /kg TP" v={num(period.processingCostPerKg)} />
+                  <KV k="Giá Thành" v={num(result.costOfGoods)} />
+                  <KV k="Giá trị xuất" v={num(result.exportValue)} />
+                  <KV
+                    k={result.profitOrLoss >= 0 ? "Lãi" : "Lỗ"}
+                    v={num(Math.abs(result.profitOrLoss))}
+                    strong
+                  />
+                  <KV k="Bình quân /kg nl" v={num(result.avgProfitPerKgMaterial)} />
+                  <KV k="tỉ giá" v={num(period.exchangeRate)} />
+                </>
+              )}
             </div>
             <div>
               <KV k="Tổng nguyên liệu vào" v={`${num(result.totalInputKg)} kg`} />
-              <KV k="Giá trị nguyên liệu" v={num(result.materialValue)} />
+              {canViewPrice && <KV k="Giá trị nguyên liệu" v={num(result.materialValue)} />}
               <KV k="Tỉ lệ thu hồi / tổng nhận" v={result.yieldRate == null ? "—" : num(result.yieldRate)} />
             </div>
           </div>

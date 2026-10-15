@@ -24,6 +24,7 @@ import {
   TabsList,
   TabsTrigger,
   StatCardGrid,
+  ReadOnlyBadge,
   notify,
   toneByName,
   type RecordTableColumn,
@@ -58,6 +59,7 @@ import {
   TwoVersionView,
 } from "./ReconciliationModeView";
 import { RECONCILIATION_MODES, getDefaultReconciliationMode, type ReconciliationMode } from "./reconciliationMode";
+import { useCan } from "@/features/shared/PermissionProvider";
 import { useReconciliationRuns } from "@/lib/catalogRepo";
 import { useAuth } from "@/lib/auth";
 import type { ReconciliationRun } from "@/types";
@@ -125,8 +127,10 @@ function SavedRunsBox({
   openRunId: string | null;
   laAdmin: boolean;
   onOpen: (r: ReconciliationRun) => void;
-  onDownload: (r: ReconciliationRun) => void;
-  onDelete: (r: ReconciliationRun) => void;
+  /** Không truyền ⇒ không có quyền xuất (`reconciliation.export`): ẩn nút Tải Excel. */
+  onDownload?: (r: ReconciliationRun) => void;
+  /** Không truyền ⇒ không có quyền xóa (`reconciliation.delete`): ẩn nút Xóa. */
+  onDelete?: (r: ReconciliationRun) => void;
 }) {
   const columns: RecordTableColumn<ReconciliationRun>[] = [
     {
@@ -185,16 +189,20 @@ function SavedRunsBox({
                 title="Mở lại bản đối soát đã lưu và chạy lại trên chính file gốc của nó." size="sm" onClick={() => onOpen(r)}>
                 <FolderOpen /> Mở lại
               </Button>
-              <Button
-                title="Tải kết quả của bản đối soát này ra file Excel." variant="outline" size="sm" onClick={() => onDownload(r)}>
-                <Download /> Tải Excel
-              </Button>
-              <ConfirmDelete
-                recordDescription={`${r.title} — ${r.period || "không rõ kỳ"} — ${r.status === "official" ? "Chính thức" : "Nháp"}`}
-                title="Xóa bản đối soát này?"
-                confirmLabel="Xóa bản"
-                onConfirm={() => onDelete(r)}
-              />
+              {onDownload && (
+                <Button
+                  title="Tải kết quả của bản đối soát này ra file Excel." variant="outline" size="sm" onClick={() => onDownload(r)}>
+                  <Download /> Tải Excel
+                </Button>
+              )}
+              {onDelete && (
+                <ConfirmDelete
+                  recordDescription={`${r.title} — ${r.period || "không rõ kỳ"} — ${r.status === "official" ? "Chính thức" : "Nháp"}`}
+                  title="Xóa bản đối soát này?"
+                  confirmLabel="Xóa bản"
+                  onConfirm={() => onDelete(r)}
+                />
+              )}
             </>
           )}
         />
@@ -335,6 +343,7 @@ function SuspectBox({
   onEdit,
   onUndo,
   editLog,
+  canEdit,
 }: {
   suspects: SuspectItem[];
   mergedSuspects: MergedSuspect[];
@@ -342,6 +351,8 @@ function SuspectBox({
   onEdit: (nv: SuspectItem) => void;
   onUndo: (key: string) => void;
   editLog: Record<string, { location: string; previous: string; next: string }>;
+  /** Sửa tay / hoàn tác được không (tạo bản mới ⇒ `create`; bản đã lưu đang mở ⇒ `update`). */
+  canEdit: boolean;
 }) {
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
   const editedKeys = Object.keys(editLog);
@@ -380,10 +391,12 @@ function SuspectBox({
                     {editLog[k].location}: <span className="tnum">{editLog[k].previous}</span> →{" "}
                     <span className="tnum font-medium">{editLog[k].next}</span>
                   </span>
-                  <Button
-                    title="Bỏ thao tác gộp / sửa vừa làm cho dòng này, trả về như file gốc." variant="outline" size="sm" onClick={() => onUndo(k)}>
-                    <Undo2 /> Hoàn tác
-                  </Button>
+                  {canEdit && (
+                    <Button
+                      title="Bỏ thao tác gộp / sửa vừa làm cho dòng này, trả về như file gốc." variant="outline" size="sm" onClick={() => onUndo(k)}>
+                      <Undo2 /> Hoàn tác
+                    </Button>
+                  )}
                 </li>
               ))}
             </ul>
@@ -400,7 +413,7 @@ function SuspectBox({
                 rows={suspects}
                 getKey={(r) => `${r.group}-${r.location}`}
                 actions={(r) =>
-                  r.correctValue != null ? (
+                  !canEdit ? null : r.correctValue != null ? (
                     edits[editKey(r)] != null ? (
                       <Button
                         title="Bỏ phần sửa tay ở dòng này, trả số về như trong file gốc." variant="outline" size="sm" onClick={() => onUndo(editKey(r))}>
@@ -452,7 +465,7 @@ function SuspectBox({
                               <> · đối chứng <span className="tnum font-medium">{nv.expectedValue}</span></>
                             )}
                           </span>
-                          {nv.correctValue != null &&
+                          {canEdit && nv.correctValue != null &&
                             (edits[editKey(nv)] != null ? (
                               <Button
                                 title="Bỏ phần sửa tay ở dòng nghi vấn này." variant="outline" size="sm" onClick={() => onUndo(editKey(nv))}>
@@ -625,6 +638,9 @@ export default function ReconciliationScreen() {
   const [openRunId, setOpenRunId] = useState<string | null>(null); // id bản đã lưu đang mở (lưu = cập nhật)
   const auth = useAuth();
   const [runs, setRuns] = useReconciliationRuns();
+  /* Phân quyền lớp 2 (spec role-permissions §5): chạy/lưu bản mới = create, sửa/lưu đè
+     bản đã lưu = update, xóa = delete, tải Excel = export. Ẩn nút, không làm mờ. */
+  const allowed = useCan("reconciliation");
 
   const myRuns = useMemo(() => {
     const list = auth.isAdmin
@@ -932,6 +948,8 @@ export default function ReconciliationScreen() {
   const ledgerSheets = reconResult ? [reconResult.ledgerSheet, ...reconResult.extraLedgerSheets].filter(Boolean) as LedgerSheet[] : [];
   const selfCheckFailed = reconResult ? reconResult.trialChecks.some((p) => !p.passed) : false;
   const isCheckOpenEffective = isCheckOpen || selfCheckFailed; // luôn mở khi có phép tự kiểm chưa đạt
+  /** Đang mở bản đã lưu ⇒ Lưu/Sửa là CẬP NHẬT bản đó; chưa ⇒ tạo bản mới. */
+  const canEditRun = openRunId ? allowed.update : allowed.create;
 
   return (
     <div className="space-y-6">
@@ -939,7 +957,10 @@ export default function ReconciliationScreen() {
       <h1 className="sr-only">Đối soát hóa đơn điện tử</h1>
       <Card>
         <CardHeader>
-          <CardTitle>Đối soát hóa đơn điện tử với phần mềm kế toán</CardTitle>
+          <CardTitle className="flex flex-wrap items-center gap-3">
+            Đối soát hóa đơn điện tử với phần mềm kế toán
+            {!allowed.create && !allowed.update && <ReadOnlyBadge />}
+          </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-muted-foreground">
@@ -950,11 +971,13 @@ export default function ReconciliationScreen() {
           </p>
           <input ref={fileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={loadFile} />
           <div className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-end">
-            <Button
-              title="Chọn file Excel hóa đơn điện tử để đối soát với sổ phần mềm." variant="outline" onClick={pickFile} className="w-full md:w-auto">
-              <Upload />
-              {file ? "Chọn file khác" : "Chọn file Excel"}
-            </Button>
+            {allowed.create && (
+              <Button
+                title="Chọn file Excel hóa đơn điện tử để đối soát với sổ phần mềm." variant="outline" onClick={pickFile} className="w-full md:w-auto">
+                <Upload />
+                {file ? "Chọn file khác" : "Chọn file Excel"}
+              </Button>
+            )}
             <Button
               title="Tải về file Excel mẫu đúng định dạng. Hệ thống vẫn đọc được file khác, đây chỉ là bản chuẩn cho dễ."
               variant="outline"
@@ -976,12 +999,14 @@ export default function ReconciliationScreen() {
                 hint="Chênh ≤ ngưỡng vẫn coi là khớp (nuốt sai số làm tròn)."
               />
             </div>
-            <Button
-              title="Chạy đối soát trên file đã chọn — sau đó chọn việc cần soát: đối chiếu sổ, so hai bản, kiểm cộng cột, cùng MST cùng ngày." onClick={runReconcile} disabled={isRunning} className="w-full md:w-auto">
-              <ScanSearch />
-              {isRunning ? "Đang đối soát…" : "Đối soát"}
-            </Button>
-            {reconResult && (
+            {allowed.create && (
+              <Button
+                title="Chạy đối soát trên file đã chọn — sau đó chọn việc cần soát: đối chiếu sổ, so hai bản, kiểm cộng cột, cùng MST cùng ngày." onClick={runReconcile} disabled={isRunning} className="w-full md:w-auto">
+                <ScanSearch />
+                {isRunning ? "Đang đối soát…" : "Đối soát"}
+              </Button>
+            )}
+            {reconResult && allowed.export && (
               <Button
                 title="Tải toàn bộ kết quả đối soát ra file Excel để gửi kế toán." variant="outline" onClick={downloadExcel} className="w-full md:w-auto">
                 <Download />
@@ -1017,7 +1042,7 @@ export default function ReconciliationScreen() {
             </div>
           )}
           {/* Lưu bản đối soát theo tài khoản (v4) */}
-          {reconResult && (
+          {reconResult && canEditRun && (
             <div className="rounded-xl border border-border p-3">
               <p className="text-sm font-medium">Lưu bản đối soát này theo tài khoản</p>
               <div className="mt-2 flex flex-col gap-2 md:flex-row md:items-end">
@@ -1058,8 +1083,8 @@ export default function ReconciliationScreen() {
         openRunId={openRunId}
         laAdmin={auth.isAdmin}
         onOpen={openRun}
-        onDownload={downloadRunExcel}
-        onDelete={removeRun}
+        onDownload={allowed.export ? downloadRunExcel : undefined}
+        onDelete={allowed.delete ? removeRun : undefined}
       />
 
       {!reconResult ? (
@@ -1068,10 +1093,12 @@ export default function ReconciliationScreen() {
           title="Chưa có kết quả đối soát"
           description="Chọn file Excel rồi bấm Đối soát. File cần ít nhất một sheet hóa đơn điện tử; có thêm sheet sổ kế toán thì đối chiếu được với sổ, có hai bản hóa đơn thì so được hai bản."
           action={
-            <Button
-              title="Chọn file Excel hóa đơn điện tử để bắt đầu." variant="outline" onClick={pickFile}>
-              <Upload /> Chọn file Excel
-            </Button>
+            allowed.create ? (
+              <Button
+                title="Chọn file Excel hóa đơn điện tử để bắt đầu." variant="outline" onClick={pickFile}>
+                <Upload /> Chọn file Excel
+              </Button>
+            ) : undefined
           }
         />
       ) : (
@@ -1123,6 +1150,7 @@ export default function ReconciliationScreen() {
                 onEdit={applyFix}
                 onUndo={undoEdit}
                 editLog={editLog}
+                canEdit={canEditRun}
               />
             </div>
           )}

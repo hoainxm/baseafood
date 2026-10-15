@@ -37,9 +37,13 @@ import {
   type GridRow,
 } from "@/design-system";
 import { num, formatDateVN } from "@/lib/format";
+import { useCan } from "@/features/shared/PermissionProvider";
 import { ChevronDown, ChevronsLeftRight, Combine, Download, ListChecks, Pencil, Plus, Users } from "lucide-react";
 
 const WORKSHOP_WAREHOUSES = BSF1_WAREHOUSES.filter((w) => w.type === "workshop");
+
+/** Cột tiền của khối NL — ẩn khi không có quyền `balancing.view-price`. */
+const PRICE_COLUMN_KEYS = new Set(["donGia", "thanhTien"]);
 
 /** Cắt hậu tố size để gom "2 da lớn"/"2 da nhỏ" về một họ — CHỈ dùng cho nút Gộp,
     KHÔNG đổi `getMaterialFamily` (logic hút) để tránh đụng khớp họ khi hút. */
@@ -56,7 +60,8 @@ export function MaterialGrid({
 }: {
   grid: PeriodGrid;
   materialTypeCatalog: MaterialType[];
-  onCreateMaterialType: (names: string) => string;
+  /** Không truyền ⇒ không có quyền thêm loại NL vào danh mục: ô chỉ chọn. */
+  onCreateMaterialType?: (names: string) => string;
   /** Bút chì sửa nhanh loại NL ở hộp thêm dòng (useQuickCatalogEdit của màn, theo TÊN). */
   materialTypeEdit?: { openEdit: (v: string) => void; canEdit: (v: string) => boolean; editLabel: string };
   daysCollapsed: boolean;
@@ -77,6 +82,8 @@ export function MaterialGrid({
     leftoverByDay: leftoverByDate,
     domesticSales: productionDomesticSales,
   } = grid;
+  const allowed = useCan("balancing");
+  const canViewPrice = allowed["view-price"];
   const [isManualEditOpen, setIsManualEditOpen] = useState(false);
   /* ---------- Chuyến nhập NGAY TRONG lưới (chỉ đọc) ----------
      Ô ngày của dòng lấy từ sổ nhập có nút "n chuyến" (đại lý → chuyến của ô đó);
@@ -523,14 +530,18 @@ export function MaterialGrid({
 
   /* Kỳ đã chốt ⇒ khoá TOÀN BỘ ô + gỡ ô điều khiển. Khoá ở một chỗ thay vì rải
      `disabled` khắp nơi: thêm cột mới về sau tự động được khoá theo. */
+  const visibleColumns = canViewPrice ? gridColumns : gridColumns.filter((c) => !PRICE_COLUMN_KEYS.has(c.key));
   const displayColumns: GridColumn<MaterialGridRow>[] = grid.isLocked
-    ? gridColumns.map((c) => ({
+    ? visibleColumns.map((c) => ({
         ...c,
         renderCell: undefined,
         isLocked: () => true,
-        lockReason: () => "Kỳ đã chốt — mở lại ở cuối màn mới sửa được",
+        lockReason: () =>
+          grid.isReadOnly
+            ? "Bạn chỉ có quyền xem cân đối — cần sửa thì báo quản trị viên"
+            : "Kỳ đã chốt — mở lại ở cuối màn mới sửa được",
       }))
-    : gridColumns;
+    : visibleColumns;
 
   /* Gửi đông ⇄ còn dở khai ở Sản xuất: cả hai cùng ghi, màn đối chiếu. Gửi đông có
      số thì là số chuẩn của tồn kho đông; chưa có thì tồn tạm lấy còn dở SX. */
@@ -721,7 +732,7 @@ export function MaterialGrid({
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-xl font-semibold">Nguyên liệu vào</h2>
         <div className="flex flex-wrap gap-2">
-          {importsToPull.length > 0 && (
+          {!grid.isReadOnly && importsToPull.length > 0 && (
             <Button
               title="Hút mọi dòng nhập nguyên liệu trong khoảng ngày của kỳ từ sổ nhập hàng vào lưới này." onClick={() => pullImports()}>
               <Download />
@@ -739,7 +750,7 @@ export function MaterialGrid({
               Lấy bán nội địa từ SX ({num(productionDomesticSales.totalKg)} kg)
             </Button>
           )}
-          {pickableRows.length > 0 && (
+          {!grid.isReadOnly && pickableRows.length > 0 && (
             <Button
               title="Tự chọn từng dòng nhập muốn đưa vào kỳ, thay vì lấy hết." variant="outline" onClick={() => setIsImportPickerOpen(true)}>
               <ListChecks />
@@ -830,12 +841,16 @@ export function MaterialGrid({
             <td className="tnum border-t-2 border-l border-border px-3 py-3 text-right">
               {num(materialTotalKg)}
             </td>
-            <td className="tnum border-t-2 border-l border-border px-3 py-3 text-right">
-              {materialTotalKg > 0 ? num(Math.round(totalAmount / materialTotalKg)) : "—"}
-            </td>
-            <td className="tnum border-t-2 border-l border-border px-3 py-3 text-right">
-              {num(totalAmount)}
-            </td>
+            {canViewPrice && (
+              <td className="tnum border-t-2 border-l border-border px-3 py-3 text-right">
+                {materialTotalKg > 0 ? num(Math.round(totalAmount / materialTotalKg)) : "—"}
+              </td>
+            )}
+            {canViewPrice && (
+              <td className="tnum border-t-2 border-l border-border px-3 py-3 text-right">
+                {num(totalAmount)}
+              </td>
+            )}
             <td className="border-t-2 border-l border-border" />
             {!isDateColumnsCollapsed &&
               dates.map((iso) => (
@@ -904,7 +919,7 @@ export function MaterialGrid({
           workshopWarehouses={WORKSHOP_WAREHOUSES.map((k) => ({ value: k.id, label: k.name }))}
           hasWarehouse={(h) => !isDomesticSale(h)}
           onChangeWarehouse={(id, warehouse) => writeRow(id, { reductionWarehouseId: warehouse })}
-          onDelete={removeRow}
+          onDelete={allowed.delete ? removeRow : undefined}
           onClose={() => setIsManualEditOpen(false)}
         />
       )}

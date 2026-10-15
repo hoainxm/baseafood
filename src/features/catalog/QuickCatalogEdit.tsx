@@ -22,6 +22,7 @@ import type {
 } from "@/types";
 import { useBatterTypes, useFinishedGoods, useMaterialTypes } from "@/lib/catalogRepo";
 import { CatalogEditDialog, notify, type FieldError } from "@/design-system";
+import { useCan } from "@/features/shared/PermissionProvider";
 import {
   buildCatalogConfigs,
   buildCatalogFields,
@@ -150,6 +151,21 @@ function QuickEditDialog<K extends CatalogKind>({
  *
  * `theo`: value trong ô chọn là `id` (mặc định) hay TÊN bản ghi.
  */
+/** Loại danh mục ⇄ tài nguyên phân quyền (lib/permissions.ts). */
+const KIND_RESOURCE: Record<CatalogKind, string> = {
+  product: "catalog.products",
+  customer: "catalog.customers",
+  supplier: "catalog.suppliers",
+  materialType: "catalog.material-types",
+  storageLocation: "catalog.storage-locations",
+  batter: "catalog.batters",
+};
+
+/**
+ * Phân quyền (spec role-permissions §5 lớp 2): bút chì chỉ hiện khi có quyền SỬA tab
+ * danh mục đó (`canEdit` trả false ⇒ Combobox ẩn bút chì); `canCreate` để màn gọi
+ * truyền `onCreate={editor.canCreate ? addX : undefined}` (không quyền ⇒ ô chỉ chọn).
+ */
 export function useQuickCatalogEdit<K extends CatalogKind>(
   catalogKind: K,
   rows: CatalogRecordMap[K][],
@@ -163,6 +179,7 @@ export function useQuickCatalogEdit<K extends CatalogKind>(
   } = {}
 ) {
   const [id, setId] = useState<string | null>(null);
+  const allowed = useCan(KIND_RESOURCE[catalogKind]);
   const KIND_NAMES: Record<CatalogKind, string> = {
     product: "mặt hàng",
     customer: "khách hàng",
@@ -198,13 +215,16 @@ export function useQuickCatalogEdit<K extends CatalogKind>(
 
   /** Value này có bản ghi trong danh mục không — truyền vào `Combobox.canEdit`. */
   const isEditable = (value: string) =>
-    opts.matchBy === "name"
+    allowed.update &&
+    (opts.matchBy === "name"
       ? rows.some((x) => nameOf(catalogKind, x).trim() === value.trim())
-      : rows.some((x) => x.id === value);
+      : rows.some((x) => x.id === value));
 
   return {
     openEdit,
     canEdit: isEditable,
+    /** Có quyền THÊM vào danh mục này — để bật/tắt "Tạo mới tại chỗ" (`onCreate`). */
+    canCreate: allowed.create,
     dialog,
     editLabel: `Sửa thông tin ${KIND_NAMES[catalogKind]} này — lưu thẳng vào Danh mục.`,
   };

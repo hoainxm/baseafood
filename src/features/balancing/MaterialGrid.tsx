@@ -13,6 +13,8 @@ import {
   getMaterialFamily,
   getBalancingStockLineKind,
   formatDayLabel,
+  findUnpricedMaterialRows,
+  suggestMaterialPrices,
   type MaterialGridRow,
   type BalancingStockLineKind,
 } from "@/lib/balancingGrid";
@@ -184,13 +186,11 @@ export function MaterialGrid({
   };
 
   /** Sửa một dòng lưới + giữ `quantityKg` khớp tổng (công thức đọc trường này). */
-  const writeRow = (id: string, patch: Partial<BalancingInputItem>) => {
+  /** Ghi một dòng; trả false nếu bị từ chối (VD Gửi đông chưa chọn kho — lỗi đã báo). */
+  const writeRow = (id: string, patch: Partial<BalancingInputItem>): boolean => {
     const ao = aoTheoId.get(id);
-    if (ao) {
-      saveMaterials([...materialInRows, tuAo(ao, patch)]);
-      return;
-    }
-    saveMaterials(
+    if (ao) return saveMaterials([...materialInRows, tuAo(ao, patch)]);
+    return saveMaterials(
       materialInRows.map((r) => {
         if (r.id !== id) return r;
         const updated = { ...r, ...patch };
@@ -571,7 +571,8 @@ export function MaterialGrid({
   const fillFromProduction = () => {
     const daily: DailyQuantities = {};
     for (const [iso, kg] of Object.entries(leftoverByDate)) if (kg) daily[iso] = -Math.abs(kg);
-    writeRow(freezeDepositGridRows[0].id, { dailyQuantities: daily });
+    // Bị từ chối (chưa chọn kho…) thì lỗi đã báo — KHÔNG báo "Đã ghi" chồng lên (lỗi 2026-10-16).
+    if (!writeRow(freezeDepositGridRows[0].id, { dailyQuantities: daily })) return;
     notify.saved(`Đã ghi Gửi đông ${num(productionLeftover)} kg theo còn dở của sổ Sản xuất`);
   };
 
@@ -582,8 +583,29 @@ export function MaterialGrid({
     const original = getOriginal(h.id);
     if (!original) return;
     const lot = grid.lotOptions([lotId]).find((x) => x.value === lotId);
-    /* Giá lấy xả đông = đơn giá của lô (đúng giá vốn); lô chưa có giá thì giữ giá đang có. */
-    writeRow(h.id, { stockLineId: lotId, unitPrice: lot?.price ?? original.unitPrice });
+    /* Giá lấy xả đông = đơn giá của lô (đúng giá vốn); lô chưa có giá thì giữ giá đang có,
+       chưa có nữa thì lấy bình quân NL mua vào của kỳ — không để 700 kg xả đông mang giá 0
+       kéo tụt giá thành (lỗi 2026-10-16). */
+    writeRow(h.id, { stockLineId: lotId, unitPrice: lot?.price ?? original.unitPrice ?? avgMaterialPrice });
+  };
+
+  /* Dòng có kg mà chưa có giá ⇒ cảnh báo + giá gợi ý (lib/balancingGrid.suggestMaterialPrices). */
+  const unpricedRows = useMemo(() => findUnpricedMaterialRows(materialRows), [materialRows]);
+  const priceSuggestions = useMemo(
+    () => suggestMaterialPrices(materialRows, grid.assignedImports),
+    [materialRows, grid.assignedImports]
+  );
+  /** Dòng kho ghi kèm lô / kho (hai dòng "Lấy xả đông" khác lô không trùng tên). */
+  const unpricedRowLabel = (h: MaterialGridRow) => {
+    const original = h.stockLineKind ? getOriginal(h.id) : undefined;
+    const detail = original ? grid.describeStockLine(original) : "";
+    return detail ? `${h.name} (${detail})` : h.name;
+  };
+  const fillSuggestedPrices = () => {
+    const ok = saveMaterials(
+      materialInRows.map((r) => (priceSuggestions.has(r.id) ? { ...r, unitPrice: priceSuggestions.get(r.id)! } : r))
+    );
+    if (ok) notify.saved(`Đã điền giá gợi ý cho ${priceSuggestions.size} dòng nguyên liệu`, grid.undo);
   };
 
   /** Gửi đông: NGUYÊN LIỆU nào gửi (lưu ở `name` của dòng — tên lô trong Sổ kho tháng).
@@ -908,6 +930,24 @@ export function MaterialGrid({
           >
             Ghi lại vào sổ kho
           </Button>
+        </p>
+      )}
+      {canViewPrice && unpricedRows.length > 0 && (
+        <p
+          role="status"
+          className="mb-3 flex flex-wrap items-center gap-2 rounded-lg bg-warning-surface px-4 py-2 text-sm font-medium text-destructive"
+        >
+          ⚠ Chưa có đơn giá: {unpricedRows.map(unpricedRowLabel).join(" · ")} — giá trị NL, giá thành và lãi/lỗ đang tính
+          thiếu phần này.
+          {priceSuggestions.size > 0 && !grid.isLocked && !grid.isReadOnly && (
+            <Button
+              size="sm"
+              onClick={fillSuggestedPrices}
+              title="Điền giá gợi ý cho các dòng chưa có giá: dòng nhập gộp = bình quân gia quyền giá các chuyến; dòng xả đông / gửi đông = bình quân NL mua vào của kỳ. Sửa tay lại được, có Hoàn tác."
+            >
+              Điền giá gợi ý
+            </Button>
+          )}
         </p>
       )}
       {grid.overlappingPeriods.length > 0 && (

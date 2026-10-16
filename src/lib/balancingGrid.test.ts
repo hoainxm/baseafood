@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import type { BalancingOutputItem, BalancingPeriod, MaterialImportItem } from "@/types";
+import type { BalancingOutputItem, BalancingPeriod, MaterialImportItem, SalesInvoice, SalesItem } from "@/types";
 import {
   OTHER_CUSTOMER_ID,
   setRepaidDebt,
@@ -15,6 +15,11 @@ import {
   findOverlappingFamilyPeriods,
   getPeriodDates,
   filterEligibleImports,
+  findUnpricedMaterialRows,
+  suggestMaterialPrices,
+  salesItemToOutput,
+  isEmptyPulledSalesOutput,
+  type MaterialGridRow,
 } from "./balancingGrid";
 
 const period = (id: string, startDate: string, endDate: string, materialTypeName = "Bạch tuộc 2 da") =>
@@ -188,5 +193,102 @@ describe("khách Khác", () => {
     expect(getBalancingCustomerName(OTHER_CUSTOMER_ID, [])).toBe("Khác");
     expect(getBalancingCustomerName("k1", [{ id: "k1", name: "Hanwa" }])).toBe("Hanwa");
     expect(getBalancingCustomerName("", [])).toBe("—");
+  });
+});
+
+/* ---------- Giá NL còn trống (audit demo 2026-10-16) ---------- */
+const gridRow = (p: Partial<MaterialGridRow> & Pick<MaterialGridRow, "id" | "total">): MaterialGridRow => ({
+  name: p.id,
+  stockLineKind: null,
+  group: "Thủy sản",
+  dailyQuantities: {},
+  carryOverKg: 0,
+  unitPrice: null,
+  ratio: null,
+  isDecrease: false,
+  decreaseTarget: "",
+  fromImports: false,
+  sourceIds: [],
+  ...p,
+});
+const pricedImport = (id: string, kg: number, price: number | null): MaterialImportItem => ({
+  ...makeImport("2026-10-15", "Bạch tuộc 2 da lớn (80↑)", kg),
+  id,
+  unitPrice: price,
+});
+
+describe("findUnpricedMaterialRows", () => {
+  test("chỉ lấy dòng có kg mà chưa có giá", () => {
+    const rows = [
+      gridRow({ id: "a", total: 100 }),
+      gridRow({ id: "b", total: 0 }),
+      gridRow({ id: "c", total: 50, unitPrice: 1000 }),
+      gridRow({ id: "gui", total: -300, stockLineKind: "freeze-deposit", isDecrease: true }),
+    ];
+    expect(findUnpricedMaterialRows(rows).map((h) => h.id)).toEqual(["a", "gui"]);
+  });
+});
+
+describe("suggestMaterialPrices", () => {
+  /* Số thật của vòng audit: 5 chuyến 2 da (lớn + nhỏ) kỳ 12–16/10. */
+  const imports = [
+    pricedImport("i1", 1960, 148000),
+    pricedImport("i2", 900, 148000),
+    pricedImport("i3", 600, 138000),
+    pricedImport("i4", 1200, 155000),
+    pricedImport("i5", 800, 140000),
+  ];
+  const family = gridRow({ id: "ho", total: 5460, fromImports: true, sourceIds: ["i1", "i2", "i3", "i4", "i5"] });
+  const thaw = gridRow({ id: "xa", total: 500, group: "Xả đông", stockLineKind: "thaw-out" });
+
+  test("dòng nhập gộp = bình quân gia quyền giá các chuyến nguồn", () => {
+    // (1960+900)×148.000 + 600×138.000 + 1200×155.000 + 800×140.000 = 804.080.000 ÷ 5460
+    expect(suggestMaterialPrices([family], imports).get("ho")).toBe(147267);
+  });
+  test("dòng xả đông lô không giá = bình quân NL mua vào (tính cả giá vừa gợi ý)", () => {
+    const s = suggestMaterialPrices([family, thaw], imports);
+    expect(s.get("xa")).toBe(147267);
+  });
+  test("dòng mua đã có giá ⇒ xả đông lấy bình quân các dòng có giá, không đụng dòng đã có giá", () => {
+    const s = suggestMaterialPrices([{ ...family, unitPrice: 150000 }, thaw], imports);
+    expect(s.has("ho")).toBe(false);
+    expect(s.get("xa")).toBe(150000);
+  });
+  test("chuyến nguồn không có giá nào ⇒ không đoán", () => {
+    const s = suggestMaterialPrices([family, thaw], [pricedImport("i1", 1960, null)]);
+    expect(s.size).toBe(0);
+  });
+  test("dòng tay khác (bột, phế liệu) không đoán giá", () => {
+    const batterRow = gridRow({ id: "bot", total: 20, group: "Phụ gia" });
+    expect(suggestMaterialPrices([{ ...family, unitPrice: 150000 }, batterRow], imports).has("bot")).toBe(false);
+  });
+});
+
+describe("salesItemToOutput — hút dòng bán vào kỳ", () => {
+  const invoice: SalesInvoice = {
+    id: "p1", deliveryDate: "2026-10-12", postingDate: "2026-10-12", backdateReason: "",
+    workshop: "Đông" as SalesInvoice["workshop"], customerId: "kh7", channel: "Xuất khẩu", note: "",
+  };
+  const item: SalesItem = {
+    id: "b1", invoiceId: "p1", deliveryDate: "2026-10-12", productId: "sp1", spec: "Khay 1 kg",
+    quantityKg: 25, unitPrice: 7.5, sourceWarehouse: "",
+  };
+  const testPeriod = { id: "k1", startDate: "2026-10-12", endDate: "2026-10-16" };
+
+  test("số kg vào ô NGÀY giao — trước đây chỉ đặt quantityKg nên lưới mất kg", () => {
+    const o = salesItemToOutput(item, invoice, testPeriod, "o1");
+    expect(o.dailyQuantities).toEqual({ "2026-10-12": 25 });
+    expect(o).toMatchObject({ periodId: "k1", productId: "sp1", customerId: "kh7", unitPrice: 7.5, spec: "Khay 1 kg", salesItemId: "b1" });
+  });
+  test("ngày giao của dòng ngoài kỳ ⇒ lấy ngày phiếu", () => {
+    const o = salesItemToOutput({ ...item, deliveryDate: "2026-10-20" }, invoice, testPeriod, "o1");
+    expect(o.dailyQuantities).toEqual({ "2026-10-12": 25 });
+  });
+  test("dòng hút hỏng (không kg) nhận ra để hút lại; dòng có kg / có chuyển kỳ thì không", () => {
+    const base: BalancingOutputItem = { id: "x", periodId: "k1", productId: "sp1", customerId: "", channel: "Xuất khẩu", quantityKg: 25, unitPrice: null, salesItemId: "b1", dailyQuantities: {} };
+    expect(isEmptyPulledSalesOutput(base)).toBe(true);
+    expect(isEmptyPulledSalesOutput({ ...base, dailyQuantities: { "2026-10-12": 25 } })).toBe(false);
+    expect(isEmptyPulledSalesOutput({ ...base, carryOverKg: 10 })).toBe(false);
+    expect(isEmptyPulledSalesOutput({ ...base, salesItemId: "" })).toBe(false);
   });
 });

@@ -30,7 +30,7 @@ import {
 import { syncMonthlyStockLedger } from "@/lib/balancingStockLines";
 import { usePeriodGrid } from "./usePeriodGrid";
 import { MaterialGrid } from "./MaterialGrid";
-import { getMaterialFamily } from "@/lib/balancingGrid";
+import { findUnpricedMaterialRows, getMaterialFamily, isEmptyPulledSalesOutput, salesItemToOutput } from "@/lib/balancingGrid";
 import type { BalancingResult } from "@/lib/balancingCalc";
 import { WipGrid } from "./WipGrid";
 import {
@@ -543,7 +543,8 @@ function PeriodDetail({
   const [salesInvoices] = useSalesInvoices();
   const banChoHut = useMemo(() => {
     const salesInvoiceById = new Map(salesInvoices.map((p) => [p.id, p]));
-    const daHut = new Set(grid.outputs.map((t) => t.salesItemId).filter(Boolean));
+    // Dòng hút hỏng (không có kg — lỗi cũ trước 2026-10-16) KHÔNG tính là đã hút ⇒ hút lại được.
+    const daHut = new Set(grid.outputs.filter((t) => !isEmptyPulledSalesOutput(t)).map((t) => t.salesItemId).filter(Boolean));
     return allSalesItems
       .filter((b) => {
         const p = salesInvoiceById.get(b.invoiceId);
@@ -558,19 +559,11 @@ function PeriodDetail({
   }, [allSalesItems, salesInvoices, grid.outputs, period.startDate, period.endDate]);
 
   const pullSalesIntoPeriod = (items: { salesItem: SalesItem; invoice: SalesInvoice }[]) => {
+    const repulled = new Set(items.map(({ salesItem }) => salesItem.id));
     grid.saveOutputs([
-      ...grid.outputs,
-      ...items.map(({ salesItem, invoice: salesInvoice }) => ({
-        id: uid(),
-        periodId: period.id,
-        productId: salesItem.productId,
-        customerId: salesInvoice.customerId,
-        channel: salesInvoice.channel,
-        quantityKg: salesItem.quantityKg,
-        unitPrice: salesItem.unitPrice,
-        spec: salesItem.spec,
-        salesItemId: salesItem.id,
-      })),
+      // Bỏ dòng hút hỏng của chính các dòng bán đang hút lại — kẻo một dòng bán hai dòng kỳ.
+      ...grid.outputs.filter((t) => !(isEmptyPulledSalesOutput(t) && repulled.has(t.salesItemId ?? ""))),
+      ...items.map(({ salesItem, invoice }) => salesItemToOutput(salesItem, invoice, period, uid())),
     ]);
     notify.saved(`Đã hút ${items.length} dòng bán vào kỳ này`);
   };
@@ -688,6 +681,7 @@ function PeriodDetail({
           }
         />
         <ResultNote
+          unpricedRowCount={findUnpricedMaterialRows(grid.materialRows).length}
           period={period}
           previousPeriod={grid.previousPeriod}
           result={result}
@@ -831,6 +825,7 @@ function PeriodDetail({
  * nhập; khác kỳ trước cùng họ NL thì ghi "kỳ trước …" để biết số đã đổi.
  */
 function ResultNote({
+  unpricedRowCount,
   period,
   previousPeriod,
   result,
@@ -841,6 +836,8 @@ function ResultNote({
   canViewPrice,
   onChangePeriod,
 }: {
+  /** Số dòng NL có kg mà chưa có đơn giá ⇒ giá thành / lãi lỗ đang tính thiếu. */
+  unpricedRowCount: number;
   period: BalancingPeriod;
   previousPeriod: BalancingPeriod | null;
   result: BalancingResult;
@@ -884,6 +881,12 @@ function ResultNote({
                 strong
               />
               <KV k="Bình quân / kg NL" v={hasNoFinishedGood ? "—" : `${num(result.avgProfitPerKgMaterial)} đ`} />
+              {unpricedRowCount > 0 && (
+                <p role="status" className="my-1 rounded-md bg-warning-surface px-3 py-1.5 text-sm font-medium text-destructive">
+                  ⚠ {unpricedRowCount} dòng nguyên liệu chưa có đơn giá — giá thành và lãi/lỗ đang tính THIẾU. Điền giá ở
+                  lưới Nguyên liệu vào.
+                </p>
+              )}
               <KeyValueInput
                 k="Tỉ giá"
                 unit="đ/USD"

@@ -10,6 +10,8 @@ import type {
   MaterialImportItem,
   WipProductionItem,
   DailyQuantities,
+  SalesInvoice,
+  SalesItem,
 } from "@/types";
 import { sumGridRow } from "@/types";
 
@@ -322,6 +324,89 @@ export function buildMaterialGridRows(
       sourceIds: source?.ids ?? [],
     };
   });
+}
+
+/**
+ * Dòng NL có kg mà CHƯA có đơn giá — giá trị NL, giá thành và lãi/lỗ đang tính thiếu
+ * phần này (đơn giá trống = 0). Màn Cân đối cảnh báo thay vì hiện lãi/lỗ như số thật.
+ */
+export function findUnpricedMaterialRows(rows: MaterialGridRow[]): MaterialGridRow[] {
+  return rows.filter((h) => h.total !== 0 && h.unitPrice == null);
+}
+
+/** Bình quân gia quyền theo kg; không có cặp nào có giá ⇒ null. */
+function weightedAveragePrice(pairs: { kg: number; price: number | null }[]): number | null {
+  const priced = pairs.filter((p) => p.price != null && p.kg > 0);
+  const kg = priced.reduce((s, p) => s + p.kg, 0);
+  return kg > 0 ? Math.round(priced.reduce((s, p) => s + p.kg * (p.price ?? 0), 0) / kg) : null;
+}
+
+/**
+ * Giá GỢI Ý cho các dòng NL chưa có giá (kế toán bấm "Điền giá gợi ý", vẫn sửa tay được):
+ *  - Dòng hút từ sổ nhập (gộp 2 da lớn + nhỏ nên để trống giá) ⇒ bình quân gia quyền
+ *    giá các chuyến nguồn của dòng đó.
+ *  - Dòng Lấy xả đông / Gửi đông (lô kho chưa mang giá) ⇒ bình quân NL thủy sản MUA VÀO
+ *    của kỳ (tính cả giá vừa gợi ý ở bước trên) — cùng cách app gợi ý giá gửi đông.
+ * Dòng khác (bột, phế liệu…) không đoán giá. Trả về Map id dòng → giá.
+ */
+export function suggestMaterialPrices(
+  rows: MaterialGridRow[],
+  imports: MaterialImportItem[]
+): Map<string, number> {
+  const importById = new Map(imports.map((i) => [i.id, i]));
+  const out = new Map<string, number>();
+  for (const h of findUnpricedMaterialRows(rows)) {
+    if (!h.fromImports) continue;
+    const price = weightedAveragePrice(
+      h.sourceIds.flatMap((id) => {
+        const i = importById.get(id);
+        return i ? [{ kg: i.quantityKg, price: i.unitPrice }] : [];
+      })
+    );
+    if (price != null) out.set(h.id, price);
+  }
+  const purchaseAverage = weightedAveragePrice(
+    rows
+      .filter((h) => !h.stockLineKind && !h.isDecrease && h.group === "Thủy sản")
+      .map((h) => ({ kg: h.total, price: h.unitPrice ?? out.get(h.id) ?? null }))
+  );
+  if (purchaseAverage != null) {
+    for (const h of findUnpricedMaterialRows(rows)) if (h.stockLineKind && !out.has(h.id)) out.set(h.id, purchaseAverage);
+  }
+  return out;
+}
+
+/**
+ * Dòng bán (sổ Bán hàng) → dòng thành phẩm của kỳ. Số kg đặt vào ô NGÀY giao (lưới
+ * thành phẩm tính tổng từ các ô ngày — chỉ đặt `quantityKg` thì số kg rơi mất, lỗi
+ * 2026-10-16). Ngày giao của dòng nằm ngoài kỳ ⇒ lấy ngày của phiếu.
+ */
+export function salesItemToOutput(
+  salesItem: SalesItem,
+  invoice: SalesInvoice,
+  period: Pick<BalancingPeriod, "id" | "startDate" | "endDate">,
+  id: string
+): BalancingOutputItem {
+  const inPeriod = (d: string) =>
+    Boolean(d) && (!period.startDate || d >= period.startDate) && (!period.endDate || d <= period.endDate);
+  const date = inPeriod(salesItem.deliveryDate) ? salesItem.deliveryDate : invoice.deliveryDate;
+  return {
+    id,
+    periodId: period.id,
+    productId: salesItem.productId,
+    customerId: invoice.customerId,
+    channel: invoice.channel,
+    quantityKg: salesItem.quantityKg,
+    unitPrice: salesItem.unitPrice,
+    spec: salesItem.spec,
+    salesItemId: salesItem.id,
+    dailyQuantities: salesItem.quantityKg ? { [date]: salesItem.quantityKg } : {},
+  };
+}
+
+/** Dòng đã hút từ sổ bán nhưng KHÔNG có kg (hỏng do lỗi cũ) ⇒ cho hút lại, thay dòng hỏng. */
+export function isEmptyPulledSalesOutput(o: BalancingOutputItem): boolean {
+  return Boolean(o.salesItemId) && !Object.values(o.dailyQuantities ?? {}).some(Boolean) && !o.carryOverKg;
 }
 
 export function buildFinishedGoodGridRows(

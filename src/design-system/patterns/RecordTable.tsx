@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, Search, X } from "lucide-react";
 import { RowMarkToolbar } from "./RowMarkToolbar";
 import { useTopScrollbar } from "./topScrollbar";
+import { useFloatingTableHead } from "./floatingTableHead";
 import { useRowSelection, useRowMarkTools } from "./rowMarkSource";
 
 export interface RecordTableColumn<T> {
@@ -91,6 +92,10 @@ export function RecordTable<T>({
   const topScrollBar = useTopScrollbar(
     () => tableFrameRef.current?.querySelector<HTMLElement>('[data-slot="table-container"]') ?? null,
     "mx-2 mt-2"
+  );
+  // Bảng dài ⇒ hàng tên cột nổi dính dưới header trang (chỉ bảng desktop; thẻ điện thoại thì thôi).
+  const floatingHead = useFloatingTableHead(
+    () => tableFrameRef.current?.querySelector<HTMLElement>('[data-slot="table-container"]') ?? null
   );
   const [q, setQ] = React.useState("");
   const [sapTheo, setSapTheo] = React.useState<string | null>(null);
@@ -288,6 +293,7 @@ export function RecordTable<T>({
         <>
           {/* Desktop — cuộn ngang khi ô chứa hẹp (VD nằm trong lưới 2 cột) để bảng
               KHÔNG tràn đè khối bên cạnh; đủ rộng thì không có thanh cuộn. */}
+          {floatingHead}
           <div
             ref={tableFrameRef}
             className="scroll-nice-x hidden overflow-x-auto rounded-xl ring-1 ring-foreground/10 @3xl:block"

@@ -10,6 +10,7 @@ import { ExpressionPreview } from "./NumberInput";
 import { useNumberInput } from "./useNumberInput";
 import { RowMarkToolbar } from "./RowMarkToolbar";
 import { useTopScrollbar } from "./topScrollbar";
+import { useFloatingTableHead } from "./floatingTableHead";
 import { useRowSelection, useRowMarkTools } from "./rowMarkSource";
 
 /**
@@ -57,6 +58,13 @@ export interface GridColumn<R> {
   tint?: "carry-over" | "computed" | "pulled";
   /** Rộng tối thiểu, px. */
   minWidth?: number;
+  /**
+   * Cột GIÃN lấp phần bề ngang còn lại (VD cột Ghi chú cuối lưới). Có ít nhất một cột
+   * `fill` ⇒ mọi cột khác CO VỪA NỘI DUNG (không kéo giãn đều cả bảng) — chốt 2026-10-16.
+   */
+  fill?: boolean;
+  /** Căn chữ của ô khoá + tiêu đề (mặc định phải — cột số). Cột chữ dùng "left". */
+  align?: "left" | "right";
 }
 
 export interface GridRow<R> {
@@ -124,11 +132,23 @@ export function EditableGrid<R>({
   // Thanh cuộn ngang TRÊN đầu lưới (README § 5a) — lưới ngày của Cân đối rất rộng.
   const frameRef = React.useRef<HTMLDivElement>(null);
   const topScrollBar = useTopScrollbar(() => frameRef.current);
+  // Lưới dài (nhiều dòng NL / mặt hàng) ⇒ hàng tên cột (ngày) nổi dính dưới header trang.
+  const floatingHead = useFloatingTableHead(() => frameRef.current);
   const oRef = React.useRef(new Map<string, HTMLInputElement>());
   const visibleColumns = React.useMemo(
     () => columns.filter((c) => !c.group || !collapsedGroups.includes(c.group)),
     [columns, collapsedGroups]
   );
+  /** Có cột giãn ⇒ cột khác co vừa nội dung (width 1% + minWidth) để cột giãn ăn phần còn lại. */
+  const hasFillColumn = visibleColumns.some((c) => c.fill);
+  const columnWidthStyle = (c: GridColumn<R>): React.CSSProperties | undefined =>
+    hasFillColumn
+      ? c.fill
+        ? { minWidth: c.minWidth ?? 160 }
+        : { width: "1%", minWidth: c.minWidth }
+      : c.minWidth
+        ? { minWidth: c.minWidth }
+        : undefined;
   /** Chỉ ô gõ được mới nằm trong đường đi của phím mũi tên. */
   const inputRows = React.useMemo(() => rows.filter((h) => !h.groupTitle), [rows]);
   // Dòng con (chỉ đọc, VD tách theo đại lý) không tick tô màu — tô ở dòng cha.
@@ -235,6 +255,7 @@ export function EditableGrid<R>({
 
   return (
     <>
+    {floatingHead}
     {topScrollBar}
     <div
       ref={frameRef}
@@ -252,6 +273,7 @@ export function EditableGrid<R>({
           <tr>
             <th
               scope="col"
+              style={hasFillColumn ? { width: "1%" } : undefined}
               className="sticky left-0 z-30 min-w-40 border-b-2 border-border bg-card px-3 py-3 text-left align-bottom text-sm font-semibold sm:min-w-52"
             >
               <span className="flex items-center gap-1">
@@ -272,9 +294,10 @@ export function EditableGrid<R>({
               <th
                 key={c.key}
                 scope="col"
-                style={c.minWidth ? { minWidth: c.minWidth } : undefined}
+                style={columnWidthStyle(c)}
                 className={cn(
-                  "border-b-2 border-l border-border bg-card px-2 py-3 text-right align-bottom text-sm font-semibold whitespace-nowrap",
+                  "border-b-2 border-l border-border bg-card px-2 py-3 align-bottom text-sm font-semibold whitespace-nowrap",
+                  c.align === "left" ? "text-left" : "text-right",
                   c.tint === "carry-over" && "text-warning"
                 )}
               >
@@ -314,7 +337,9 @@ export function EditableGrid<R>({
                     h.kind === "child" && "pl-10 text-sm shadow-[inset_3px_0_0_var(--border)]"
                   )}
                 >
-                  <div className="flex items-start gap-2">
+                  {/* Có cột giãn ⇒ cột tên co vừa nội dung nhưng CHẶN 18rem: ô chọn lô / NL chữ dài
+                      tự cắt "…" thay vì kéo cả cột rộng ra. */}
+                  <div className={cn("flex items-start gap-2", hasFillColumn && "max-w-[18rem]")}>
                     {to.enabled && h.kind !== "child" && (
                       <input
                         type="checkbox"
@@ -357,7 +382,8 @@ export function EditableGrid<R>({
                         <span
                           title={c.lockReason?.(h.data)}
                           className={cn(
-                            "tnum flex min-h-11 items-center justify-end px-2 py-2",
+                            "tnum flex min-h-11 items-center px-2 py-2",
+                            c.align === "left" ? "justify-start text-left" : "justify-end",
                             c.kind === "computed" && "font-semibold",
                             gt != null && gt < 0 && "text-destructive"
                           )}

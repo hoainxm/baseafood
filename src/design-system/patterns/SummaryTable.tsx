@@ -84,6 +84,8 @@ export function SummaryTable<T>({
    * trang cuộn một mạch. Hàng tên cột NỔI dính ngay dưới header trang khi cuộn
    * qua bảng; bảng rộng thì thanh cuộn ngang DÍNH ĐÁY màn hình (không phải cuộn
    * xuống tận đáy bảng mới kéo ngang được). Dùng cho sổ dài kế toán dò từng dòng.
+   * MẶC ĐỊNH BẬT từ 2026-10-16 (mọi bảng phải giữ hàng tên cột khi cuộn dài) — trừ khi
+   * màn chọn `stickyHeader` (khung cuộn riêng) hoặc truyền `fullHeight={false}`.
    */
   fullHeight?: boolean;
   /**
@@ -99,6 +101,7 @@ export function SummaryTable<T>({
    */
   addRow?: React.ReactNode;
 }) {
+  const isExpanded = fullHeight ?? !stickyHeader;
   const to = useRowMarkTools(rowMarkKey);
   // Tick dòng: màn truyền `chon` thì dùng của màn (màn tự đặt nút tô vào thanh
   // "Đã chọn" riêng); không thì bảng tự giữ + tự hiện thanh tô màu khi bật rowMarkKey.
@@ -111,7 +114,7 @@ export function SummaryTable<T>({
   );
   // Bảng rỗng không có dòng thêm thì không vẽ bảng ⇒ khỏi đo.
   const { tableRef, sentinelRef: floatHeadRef, barRef, columnWidths, tableWidth, scrollWidth, tran, showHeader: showFloatHead } = useFullHeight(
-    Boolean(fullHeight) && (rows.length > 0 || Boolean(addRow))
+    isExpanded && (rows.length > 0 || Boolean(addRow))
   );
 
   if (rows.length === 0 && !addRow) {
@@ -183,12 +186,12 @@ export function SummaryTable<T>({
       className={cn(
         // fullHeight: gốc KHÔNG được là khung cuộn (sticky của hàng tên cột nổi và thanh
         // cuộn đáy bám theo khung cuộn của trang); cuộn ngang do khung của primitive.
-        fullHeight ? "table-expanded relative" : stickyHeader ? "table-sticky-head" : "scroll-nice-x overflow-x-auto",
+        isExpanded ? "table-expanded relative" : stickyHeader ? "table-sticky-head" : "scroll-nice-x overflow-x-auto",
         className
       )}
     >
       {topScrollBar}
-      {fullHeight && (
+      {isExpanded && (
         // Hàng tên cột NỔI: hộp cao 0 dính dưới header trang (`top-header` = cùng
         // token `--spacing-header` với `h-header` của AppShell). Chỉ hiện khi hàng tên cột
         // thật đã trôi khỏi tầm nhìn mà bảng vẫn còn trên màn.
@@ -278,7 +281,7 @@ export function SummaryTable<T>({
           </TableFooter>
         )}
       </Table>
-      {fullHeight && tran && (
+      {isExpanded && tran && (
         // Thanh cuộn ngang DÍNH ĐÁY màn hình, đồng bộ hai chiều với bảng.
         <div
           ref={barRef}
@@ -296,7 +299,7 @@ export function SummaryTable<T>({
         marker={to}
         selectedKeys={daTick}
         onClearSelection={internalSelection.clearSelection}
-        className={fullHeight ? "bottom-8" : undefined}
+        className={isExpanded ? "bottom-8" : undefined}
       />
     )}
     </>

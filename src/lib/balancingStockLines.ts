@@ -4,7 +4,7 @@
 // Description: Balancing stock rows (draw-from-lot / send-to-freezer) ⇄ monthly stock ledger
 // ============================================================
 import type { BalancingInputItem, MonthlyStockLine } from "@/types";
-import { getBalancingStockLineKind } from "@/lib/balancingGrid";
+import { BALANCING_STOCK_LINE_NAMES, getBalancingStockLineKind } from "@/lib/balancingGrid";
 import { carryForwardIntoLedger, deriveRow, getNextMonth, propagateLotsForward, type MonthlyStockRow } from "@/lib/monthlyStock";
 import { num, formatDateVN } from "@/lib/format";
 
@@ -266,6 +266,10 @@ export function syncMonthlyStockLedger(
         if (b) continue; // chưa chọn kho: chưa có gì trong sổ để đặt
       }
       const { warehouse, storageLocation } = splitDepositLocation(newLocation);
+      /* Tên lô gửi = NGUYÊN LIỆU người dùng chọn trên dòng (lưu ở `name`, VD "2 da lớn" —
+         chốt 2026-10-16); chưa chọn ⇒ tên họ NL của kỳ như trước. */
+      const depositName = (r: BalancingInputItem | undefined) =>
+        r && r.name.trim() && r.name !== BALANCING_STOCK_LINE_NAMES["freeze-deposit"] ? r.name.trim() : ctx.materialFamily;
       for (const date of [...new Set([...oldParts.keys(), ...newParts.keys()])].sort()) {
         const kg = newParts.get(date) ?? 0;
         if (
@@ -273,7 +277,8 @@ export function syncMonthlyStockLedger(
           b &&
           (oldParts.get(date) ?? 0) === kg &&
           a.stockLocation === b.stockLocation &&
-          a.unitPrice === b.unitPrice
+          a.unitPrice === b.unitPrice &&
+          depositName(a) === depositName(b)
         )
           continue; // ngày này không đổi gì
         const did = freezeDepositRowId(id, date);
@@ -293,7 +298,7 @@ export function syncMonthlyStockLedger(
           period: month,
           category: FREEZE_DEPOSIT_CATEGORY,
           warehouse,
-          itemName: ctx.materialFamily,
+          itemName: depositName(b),
           size: "",
           origin: `GĐ-${date.replace(/-/g, "")}`,
           importDate: date,
@@ -427,8 +432,10 @@ export function listThawLotOptions(
     )
     .map((r) => ({
       value: r.id,
-      label: `${shortLocationName(r)} · ${r.itemName}${r.size ? ` ${r.size}` : ""}${r.origin ? ` · ${r.origin}` : ""}`,
-      subLabel: `còn ${num(r.closeKg)} kg${r.importDate ? ` · nhập ${formatDateVN(r.importDate)}` : ""}`,
+      // Nhãn KHÔNG mở đầu bằng kho (người dùng bỏ 2026-10-16 — thừa); kho nằm cuối dòng phụ,
+      // vẫn gõ tên kho để tìm được (Combobox tìm theo nhãn + dòng phụ).
+      label: `${r.itemName}${r.size ? ` ${r.size}` : ""}${r.origin ? ` · ${r.origin}` : ""}`,
+      subLabel: `còn ${num(r.closeKg)} kg${r.importDate ? ` · nhập ${formatDateVN(r.importDate)}` : ""} · ${shortLocationName(r)}`,
       stockKg: r.closeKg,
       price: r.unitPrice,
     }));

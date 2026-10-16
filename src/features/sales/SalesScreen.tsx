@@ -1151,6 +1151,7 @@ export default function SalesScreen() {
           workshop={salesInvoices.find((p) => p.id === lotSalesItem.invoiceId)?.workshop ?? "Đông"}
           date={lotSalesItem.deliveryDate}
           productId={lotSalesItem.productId}
+          canRemove={allowed.delete}
           onClose={() => setLotSalesItem(null)}
         />
       )}

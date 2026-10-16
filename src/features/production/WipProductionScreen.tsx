@@ -2332,6 +2332,7 @@ export default function WipProductionScreen() {
           outputLabel={`mẻ ${formatWipLotLabel(lotTarget)} · ${productNameOf(lotTarget.productId)}`}
           workshop={lotTarget.workshop}
           date={lotTarget.productionDate}
+          canRemove={canRow("delete", lotTarget)}
           onClose={() => setLotTarget(null)}
         />
       )}
@@ -2343,6 +2344,7 @@ export default function WipProductionScreen() {
           lotKind="S"
           workshop={lotDomesticSale.workshop}
           date={lotDomesticSale.saleDate}
+          canRemove={canRow("delete", lotDomesticSale)}
           onClose={() => setLotDomesticSale(null)}
         />
       )}

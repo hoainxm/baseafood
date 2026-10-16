@@ -133,6 +133,39 @@ export function groupImportsBySupplier(imports: MaterialImportItem[]): PeriodSup
   return [...m.values()].sort((a, b) => b.kg - a.kg || a.supplier.localeCompare(b.supplier, "vi"));
 }
 
+/** Một LOẠI NL trong cả kỳ (VD "Bạch tuộc 2 da lớn (80↑)") + các đại lý của loại đó. */
+export interface PeriodMaterialTypeRow extends Omit<PeriodSupplierRow, "supplier"> {
+  materialTypeName: string;
+  suppliers: PeriodSupplierRow[];
+}
+
+/**
+ * Gom dòng sổ nhập của MỘT dòng lưới theo LOẠI NL (dòng lưới gộp họ — "Bạch tuộc 2 da"
+ * gồm cả 2 da lớn lẫn 2 da nhỏ; người dùng muốn xem riêng, chốt 2026-10-16), mỗi loại
+ * kèm danh sách đại lý. Tổng các loại = dòng cha. Loại nhiều kg đứng trước.
+ */
+export function groupImportsByMaterialType(imports: MaterialImportItem[]): PeriodMaterialTypeRow[] {
+  const m = new Map<string, MaterialImportItem[]>();
+  for (const r of imports) {
+    const t = r.materialTypeName.trim() || "(chưa ghi loại)";
+    m.set(t, [...(m.get(t) ?? []), r]);
+  }
+  return [...m.entries()]
+    .map(([materialTypeName, rows]) => {
+      const dailyAmounts: Record<string, number> = {};
+      for (const r of rows) dailyAmounts[r.deliveryDate] = (dailyAmounts[r.deliveryDate] ?? 0) + r.quantityKg;
+      return {
+        materialTypeName,
+        dailyAmounts,
+        kg: rows.reduce((s, r) => s + r.quantityKg, 0),
+        amount: rows.reduce((s, r) => s + rowAmount(r), 0),
+        ids: rows.map((r) => r.id),
+        suppliers: groupImportsBySupplier(rows),
+      };
+    })
+    .sort((a, b) => b.kg - a.kg || a.materialTypeName.localeCompare(b.materialTypeName, "vi"));
+}
+
 /** Số chuyến (shipmentId khác nhau) của các dòng trong một ngày — cho nhãn "n chuyến" ở ô. */
 export function countDailyShipments(imports: MaterialImportItem[], date: string): number {
   return new Set(imports.filter((r) => r.deliveryDate === date).map((r) => r.shipmentId || r.id)).size;

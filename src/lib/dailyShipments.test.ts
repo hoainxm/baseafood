@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { MaterialImportItem } from "@/types";
-import { groupDailyShipments, groupImportsBySupplier, countDailyShipments, summarizeImportsByDay } from "./dailyShipments";
+import { groupDailyShipments, groupImportsBySupplier, groupImportsByMaterialType, countDailyShipments, summarizeImportsByDay } from "./dailyShipments";
 
 const row = (p: Partial<MaterialImportItem> & Pick<MaterialImportItem, "id">): MaterialImportItem => ({
   shipmentId: "",
@@ -98,5 +98,23 @@ describe("countDailyShipments", () => {
     expect(countDailyShipments(imports, "2026-09-02")).toBe(2);
     expect(countDailyShipments(imports, "2026-09-03")).toBe(1);
     expect(countDailyShipments(imports, "2026-09-09")).toBe(0);
+  });
+});
+
+describe("groupImportsByMaterialType — tách 2 da lớn / 2 da nhỏ của một dòng lưới", () => {
+  it("mỗi loại một nhóm (kg theo ngày + đại lý của loại); tổng các loại = dòng cha", () => {
+    const imports = [
+      row({ id: "1", materialTypeName: "2 da lớn", supplierName: "A", quantityKg: 300 }),
+      row({ id: "2", materialTypeName: "2 da nhỏ", supplierName: "A", quantityKg: 100, deliveryDate: "2026-09-03" }),
+      row({ id: "3", materialTypeName: "2 da lớn", supplierName: "B", quantityKg: 200, deliveryDate: "2026-09-03" }),
+    ];
+    const r = groupImportsByMaterialType(imports);
+    expect(r.map((t) => [t.materialTypeName, t.kg, t.dailyAmounts])).toEqual([
+      ["2 da lớn", 500, { "2026-09-02": 300, "2026-09-03": 200 }],
+      ["2 da nhỏ", 100, { "2026-09-03": 100 }],
+    ]);
+    expect(r[0].suppliers.map((d) => [d.supplier, d.kg])).toEqual([["A", 300], ["B", 200]]);
+    expect(r.reduce((s, t) => s + t.kg, 0)).toBe(600);
+    expect(r[0].amount).toBe(500 * 50000);
   });
 });

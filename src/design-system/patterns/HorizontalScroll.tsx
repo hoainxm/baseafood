@@ -6,12 +6,14 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
 import { useTopScrollbar } from "./topScrollbar";
+import { useFloatingTableHead } from "./floatingTableHead";
 
 /**
  * Khung cuộn ngang cho BẢNG TỰ DỰNG ở features (bảng dùng chung `SummaryTable` /
  * `RecordTable` / `EditableGrid` đã có sẵn): thay cho `<div className="overflow-x-auto">`
  * — tự thêm thanh cuộn TRÊN khi bảng tràn (README § 5a), thanh dưới là thanh thật.
  * `className` = khung ngoài, `classNameKhung` = vùng cuộn (viền, bo góc…).
+ * Bảng dài cuộn xuống ⇒ hàng tên cột NỔI dính dưới header trang (floatingTableHead).
  */
 export function HorizontalScroll({
   children,
@@ -29,8 +31,10 @@ export function HorizontalScroll({
     // Bọc primitive `Table` ⇒ vùng cuộn thật là div table-container bên trong.
     return el.querySelector<HTMLElement>(':scope > [data-slot="table-container"]') ?? el;
   });
+  const floatingHead = useFloatingTableHead(() => frameRef.current);
   return (
     <div className={cn("min-w-0", className)}>
+      {floatingHead}
       {scrollBar}
       <div ref={frameRef} className={cn("scroll-nice-x overflow-x-auto", viewportClassName)}>
         {children}

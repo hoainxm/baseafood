@@ -472,6 +472,8 @@ export const BALANCING_INPUT_TABLE: TableMapping<BalancingInputItem> = {
     // DB chưa chạy 0053 thì dòng cũ vẫn lên máy chủ (khuôn 0052 / nguon_kho 0008).
     ...(x.stockLineId != null ? { stock_line_id: x.stockLineId } : {}),
     ...(x.stockLocation != null ? { stock_location: x.stockLocation } : {}),
+    // Cột 0067 (ghi chú dòng): cùng khuôn — chỉ gửi khi dòng đã từng có ghi chú.
+    ...(x.note != null ? { note: x.note } : {}),
   }),
   fromRow: (r) => ({
     id: s(r.id),
@@ -490,6 +492,7 @@ export const BALANCING_INPUT_TABLE: TableMapping<BalancingInputItem> = {
     autoSource: s(r.auto_source) as GridAutoSource,
     stockLineId: r.stock_line_id == null ? undefined : s(r.stock_line_id),
     stockLocation: r.stock_location == null ? undefined : s(r.stock_location),
+    note: r.note == null ? undefined : s(r.note),
   }),
   // Dòng ghi trước 0019 chưa có cột lưới ngày → mặc định rỗng, không vỡ tổng.
   patchLegacy: (x) => ({
@@ -560,6 +563,8 @@ export const BALANCING_OUTPUT_TABLE: TableMapping<BalancingOutputItem> = {
     ...(x.debtKg != null ? { debt_kg: x.debtKg } : {}),
     carry_over_period_id: x.carryOverPeriodId ?? "",
     auto_source: x.autoSource ?? "",
+    // Cột 0067 (ghi chú dòng): chỉ gửi khi dòng đã từng có ghi chú (DB chưa chạy 0067 vẫn ghi được dòng cũ).
+    ...(x.note != null ? { note: x.note } : {}),
   }),
   fromRow: (r) => ({
     id: s(r.id),
@@ -576,6 +581,7 @@ export const BALANCING_OUTPUT_TABLE: TableMapping<BalancingOutputItem> = {
     debtKg: r.debt_kg == null ? undefined : Number(r.debt_kg),
     carryOverPeriodId: s(r.carry_over_period_id),
     autoSource: s(r.auto_source) as GridAutoSource,
+    note: r.note == null ? undefined : s(r.note),
   }),
   // Dòng ghi trước 0005 không có quy cách / nguồn bán → coi là dòng nhập tay.
   // Dòng ghi trước 0019 chưa có lưới ngày / chuyển kỳ → mặc định rỗng.

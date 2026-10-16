@@ -664,8 +664,8 @@ function PeriodDetail({
       <Card
         className={
           isHorizontal
-            ? "grid grid-cols-1 overflow-hidden p-0 2xl:grid-cols-[minmax(0,1fr)_minmax(20rem,24rem)]"
-            : "overflow-hidden p-0"
+            ? "grid grid-cols-1 overflow-clip p-0 2xl:grid-cols-[minmax(0,1fr)_minmax(20rem,24rem)]"
+            : "overflow-clip p-0"
         }
       >
         <MaterialGrid

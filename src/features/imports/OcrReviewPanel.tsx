@@ -97,7 +97,10 @@ export function OcrReviewTable({
   catalog,
   selection,
   onSelectionChange,
+  showPrice = true,
 }: {
+  /** Phân quyền: không có Xem giá ở Nhập hàng ⇒ ẩn đơn giá đọc từ phiếu. */
+  showPrice?: boolean;
   result: OcrResult;
   catalog: OcrCatalog;
   selection: OcrSelection;
@@ -222,7 +225,7 @@ export function OcrReviewTable({
         </table>
       )}
 
-      {/* Dòng loại NL — cùng 3 cột: chữ trên phiếu | loại · kg · giá sẽ điền */}
+      {/* Dòng loại NL — cùng 3 cột: chữ trên phiếu | loại · kg · giá sẽ điền (giá ẩn nếu không có quyền Xem giá) */}
       {result.lines.length > 0 ? (
         <table className="w-full table-fixed border-collapse text-base">
           <thead>
@@ -254,13 +257,17 @@ export function OcrReviewTable({
                   <div className="font-semibold">{l.materialType}</div>
                   <div className="tnum text-sm">
                     <span className="font-semibold">{fmtKg(l.kg)}</span>
-                    {" · "}
-                    {l.unitPrice != null ? (
-                      `${num(l.unitPrice)} đ/kg`
-                    ) : (
-                      <span className="text-muted-foreground">
-                        giữ giá lượt trước
-                      </span>
+                    {showPrice && (
+                      <>
+                        {" · "}
+                        {l.unitPrice != null ? (
+                          `${num(l.unitPrice)} đ/kg`
+                        ) : (
+                          <span className="text-muted-foreground">
+                            giữ giá lượt trước
+                          </span>
+                        )}
+                      </>
                     )}
                   </div>
                 </td>

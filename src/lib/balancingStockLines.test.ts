@@ -241,6 +241,20 @@ describe("syncMonthlyStockLedger — tháng sau ĐÃ MỞ thì tồn đầu đi 
   });
 });
 
+describe("syncMonthlyStockLedger — Gửi đông chọn NGUYÊN LIỆU gửi (2026-10-16)", () => {
+  const warehouse = "Kho 1500 tấn|Kho Hồng Phú";
+  test("chọn NL ⇒ tên lô = NL đó; đổi NL ⇒ lô đổi tên; chưa chọn ⇒ tên họ NL của kỳ", () => {
+    const base = stockRow("g1", "gui", { "2026-10-02": -400 }, { stockLocation: warehouse });
+    const did = freezeDepositRowId("g1", "2026-10-02");
+    const a = syncMonthlyStockLedger([], [], [base], ctx).lines;
+    expect(a.find((l) => l.id === did)!.itemName).toBe("Bạch tuộc 2 da");
+    const named = { ...base, name: "Bạch tuộc 2 da lớn (80↑)" };
+    const b = syncMonthlyStockLedger(a, [base], [named], ctx);
+    expect(b.changed).toBe(true);
+    expect(b.lines.find((l) => l.id === did)).toMatchObject({ itemName: "Bạch tuộc 2 da lớn (80↑)", inKg: 400 });
+  });
+});
+
 describe("countMonthlyStockMismatches — kiểm khớp, ghi lại sửa được", () => {
   test("sổ bị nạp đè mất xuất ⇒ báo lệch, ghi lại với truoc=[] thì khớp", () => {
     const r = stockRow("d1", "lay", { "2026-10-02": 300 }, { stockLineId: "L1" });
@@ -255,7 +269,7 @@ describe("countMonthlyStockMismatches — kiểm khớp, ghi lại sửa đượ
 });
 
 describe("danh sách chọn", () => {
-  test("lô: còn tồn, khớp tên họ NL lên đầu, nhãn có kho · tên · invoice · còn kg", () => {
+  test("lô: còn tồn, khớp tên họ NL lên đầu, nhãn tên · invoice (không mở đầu bằng kho), dòng phụ còn kg · nhập · kho", () => {
     const items = [
       lot("A", "2026-10", { itemName: "CÁ SÒNG", storageLocation: "Kho Ánh Dương" }),
       lot("B", "2026-10", { outKg: 1000 }), // hết hàng ⇒ ẩn
@@ -263,8 +277,8 @@ describe("danh sách chọn", () => {
     ];
     const ch = listThawLotOptions(items, "2026-10", "Bạch tuộc 2 da");
     expect(ch.map((c) => c.value)).toEqual(["C", "A"]);
-    expect(ch[0].label).toBe("Hồng Phú · B.TUỘC  2 DA · SBT001");
-    expect(ch[0].subLabel).toMatch(/^còn 1\.000 kg · nhập 12\/08\/2026$/);
+    expect(ch[0].label).toBe("B.TUỘC  2 DA · SBT001");
+    expect(ch[0].subLabel).toMatch(/^còn 1\.000 kg · nhập 12\/08\/2026 · Hồng Phú$/);
     // Lô đang chọn vẫn hiện dù đã hết.
     expect(listThawLotOptions(items, "2026-10", "Bạch tuộc 2 da", ["B"]).some((c) => c.value === "B")).toBe(true);
   });

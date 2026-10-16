@@ -75,7 +75,8 @@ function LotInputDialog({
   /** Kiểm thêm (VD đúng mặt hàng). Trả câu cảnh báo để chặn, hoặc null. */
   validateNode?: (n: LotNode) => string | null;
   onAdd: (node: LotNode, method: LotInput["method"], kg: number | null) => void;
-  onRemove: (id: string) => void;
+  /** Bỏ trống ⇒ ẩn nút "Bỏ" (người dùng không có quyền Xóa ở màn gọi — phân quyền Đợt 3). */
+  onRemove?: (id: string) => void;
   onClose: () => void;
 }) {
   const [isScanning, setIsScanning] = useState(false);
@@ -159,9 +160,11 @@ function LotInputDialog({
                       {[g.description, g.kg != null ? formatKg(g.kg) : "chưa ghi kg", g.operator].filter(Boolean).join(" · ")}
                     </div>
                   </div>
-                  <Button variant="danger" size="sm" title={`Bỏ lô ${g.label}. Còn nút Hoàn tác.`} onClick={() => onRemove(g.id)}>
-                    <Trash2 aria-hidden /> Bỏ
-                  </Button>
+                  {onRemove && (
+                    <Button variant="danger" size="sm" title={`Bỏ lô ${g.label}. Còn nút Hoàn tác.`} onClick={() => onRemove(g.id)}>
+                      <Trash2 aria-hidden /> Bỏ
+                    </Button>
+                  )}
                 </li>
               ))}
             </ul>
@@ -256,6 +259,7 @@ export function LotInputPicker({
   workshop,
   date,
   productId,
+  canRemove = true,
   onClose,
 }: {
   /** W = mẻ SX BTP (ăn lô NL) · P = phiếu đóng gói (ăn lô BTP) */
@@ -267,6 +271,8 @@ export function LotInputPicker({
   date: string;
   /** Đóng gói: lô BTP phải cùng mặt hàng BTP tiêu hao (để sổ tồn trừ đúng lô). */
   productId?: string;
+  /** Có quyền XÓA ở màn gọi (gỡ lô = xóa dòng lot_inputs — chốt ghi cũng kiểm vậy). Mặc định giữ hành vi cũ. */
+  canRemove?: boolean;
   onClose: () => void;
 }) {
   const { traceData, lotInputs, saveLotInputs } = useTraceData();
@@ -322,12 +328,12 @@ export function LotInputPicker({
         saveLotInputs([...lotInputs, created]);
         notify.saved(`Đã gắn ${inputLabel} ${node.label}${kg != null ? ` · ${formatKg(kg)}` : ""}.`);
       }}
-      onRemove={(id) => {
+      onRemove={canRemove ? (id) => {
         const prevRows = lotInputs;
         const l = lotInputs.find((x) => x.id === id);
         saveLotInputs(lotInputs.filter((x) => x.id !== id));
         notify.deleted(`Đã bỏ lô ${l?.inputLabel ?? ""}.`, () => saveLotInputs(prevRows));
-      }}
+      } : undefined}
       onClose={onClose}
     />
   );
@@ -346,6 +352,7 @@ export function LotDispatchPicker({
   workshop,
   date,
   productId,
+  canRemove = true,
   onClose,
 }: {
   docKind: Exclude<LotDispatchDoc, "export_item">;
@@ -356,6 +363,8 @@ export function LotDispatchPicker({
   date: string;
   /** Mặt hàng của dòng bán (bán lẻ) — lô phải cùng mặt hàng. */
   productId?: string;
+  /** Có quyền XÓA ở màn gọi (gỡ lô = xóa dòng lot_dispatches). Mặc định giữ hành vi cũ. */
+  canRemove?: boolean;
   onClose: () => void;
 }) {
   const { traceData, lotDispatches, saveLotDispatches } = useTraceData();
@@ -415,12 +424,12 @@ export function LotDispatchPicker({
         saveLotDispatches([...lotDispatches, created]);
         notify.saved(`Đã gắn ${inputLabel} ${node.label}${kg != null ? ` · ${formatKg(kg)}` : ""}.`);
       }}
-      onRemove={(id) => {
+      onRemove={canRemove ? (id) => {
         const prevRows = lotDispatches;
         const d = lotDispatches.find((x) => x.id === id);
         saveLotDispatches(lotDispatches.filter((x) => x.id !== id));
         notify.deleted(`Đã bỏ lô ${d?.lotLabel ?? ""}.`, () => saveLotDispatches(prevRows));
-      }}
+      } : undefined}
       onClose={onClose}
     />
   );

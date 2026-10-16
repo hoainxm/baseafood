@@ -1,6 +1,7 @@
 > Load khi: đụng đọc/ghi dữ liệu, thêm bảng vào app, hay điều tra "số liệu biến mất / không lên máy chủ".
 covers: src/lib/repo.ts, src/lib/writePermissions.ts, src/lib/db.ts, src/lib/catalogRepo.ts, src/lib/batter.ts, src/lib/domesticSales.ts, src/lib/connectivity.ts, src/lib/supabase.ts, src/lib/store.ts, src/lib/audit.ts, src/lib/storage.ts, src/design-system/patterns/DataStatusBadge.tsx
 last_verified: 2026-10-15
+<!-- updated: 2026-10-16 — BALANCING_INPUT_TABLE / BALANCING_OUTPUT_TABLE thêm `note` (mig 0067): toRow CHỈ gửi khi `x.note != null` (dòng cũ / DB chưa chạy 0067 không vỡ), fromRow null ⇒ undefined. -->
 <!-- updated: 2026-10-15 (d) — hàng chờ: 42501 tách từng dòng, dòng bị từ chối ở lại hàng chờ (Đợt 6a). -->
 <!-- updated: 2026-10-15 (c) — chốt ghi kiểm thêm phạm vi dòng workshop/own (Đợt 5). -->
 <!-- updated: 2026-10-15 (b) — chốt quyền ghi ở useTable.write (writeGuard + lib/writePermissions.ts). -->

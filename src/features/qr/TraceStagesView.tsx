@@ -320,6 +320,7 @@ export function TraceStagesView() {
           outputLabel={`mẻ ${formatWipLotLabel(lotForBatch)} · ${productNameOf(lotForBatch.productId)}`}
           workshop={lotForBatch.workshop}
           date={lotForBatch.productionDate}
+          canRemove={qrAllowed.delete}
           onClose={() => setLotForBatch(null)}
         />
       )}
@@ -331,6 +332,7 @@ export function TraceStagesView() {
           workshop={lotForPackaging.workshop}
           date={lotForPackaging.date}
           productId={lotForPackaging.fromProductId}
+          canRemove={qrAllowed.delete}
           onClose={() => setLotForPackaging(null)}
         />
       )}
@@ -343,6 +345,7 @@ export function TraceStagesView() {
           workshop={(traceData.salesInvoices ?? []).find((v) => v.id === lotForSalesItem.salesItem.invoiceId)?.workshop ?? "Đông"}
           date={lotForSalesItem.salesItem.deliveryDate}
           productId={lotForSalesItem.salesItem.productId}
+          canRemove={qrAllowed.delete}
           onClose={() => setLotForSalesItem(null)}
         />
       )}
@@ -354,6 +357,7 @@ export function TraceStagesView() {
           lotKind="S"
           workshop={lotForDomesticSale.workshop}
           date={lotForDomesticSale.saleDate}
+          canRemove={qrAllowed.delete}
           onClose={() => setLotForDomesticSale(null)}
         />
       )}

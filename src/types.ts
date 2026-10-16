@@ -379,6 +379,8 @@ export interface BalancingInputItem {
   stockLineId?: string;
   /** Dòng GỬI ĐÔNG: kho nhận `"<sổ kho>|<vị trí>"` (mig 0053), VD "Kho 1500 tấn|Kho Hồng Phú". */
   stockLocation?: string;
+  /** Ghi chú của dòng (cột Ghi chú cuối lưới Cân đối, mig 0067). */
+  note?: string;
 }
 
 export type ScrapSource = "Nhập hàng" | "Cân đối";
@@ -417,6 +419,8 @@ export interface BalancingOutputItem {
   /** Kỳ nhận phần chuyển kỳ âm (dựng dòng đối ứng ở kỳ sau). */
   carryOverPeriodId?: string;
   autoSource?: GridAutoSource;
+  /** Ghi chú của dòng (cột Ghi chú cuối lưới Bán thành phẩm, mig 0067). */
+  note?: string;
 }
 
 /**

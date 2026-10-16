@@ -24,6 +24,7 @@ import {
   type FinishedGoodGridRow,
 } from "@/lib/balancingGrid";
 import { DAY_COLUMN_GROUPS, collapsedDayGroups, type DayCell, type PeriodGrid } from "./usePeriodGrid";
+import { RowNoteCell } from "./RowNoteCell";
 import { BackdateReasonDialog, AddProductDialog } from "./gridDialogs";
 import {
   Button,
@@ -314,6 +315,26 @@ export function WipGrid({
     { key: "tong", header: "Tổng (kg)", label: "Tổng", kind: "computed", group: DAY_COLUMN_GROUPS.days, minWidth: 116, getValue: (h) => h.total || null },
     { key: "tra", header: "Trả", label: "Trả", kind: "input", tint: "carry-over", minWidth: 104, getValue: (h) => h.repaidKg || null },
     { key: "no", header: "Nợ", label: "Nợ", kind: "input", tint: "carry-over", minWidth: 104, getValue: (h) => h.debtKg || null },
+    /* Ghi chú dòng (mig 0067) — cột GIÃN cuối lưới, các cột số co vừa nội dung (2026-10-16).
+       Dòng mẫu (chưa ghi) gõ ghi chú là thành dòng thật như gõ số. */
+    {
+      key: "ghiChu",
+      header: "Ghi chú",
+      label: "Ghi chú",
+      kind: "input",
+      fill: true,
+      align: "left",
+      minWidth: 160,
+      getValue: () => null,
+      renderValue: (h) => finishedGoods.find((r) => r.id === h.id)?.note ?? "",
+      renderCell: (h) => (
+        <RowNoteCell
+          value={finishedGoods.find((r) => r.id === h.id)?.note ?? ""}
+          rowLabel={productName(h.productId)}
+          onCommit={(note) => writeRow(h.id, { note })}
+        />
+      ),
+    },
   ];
 
   /* Kỳ đã chốt ⇒ khoá TOÀN BỘ ô + gỡ ô điều khiển. Khoá ở một chỗ thay vì rải
@@ -494,6 +515,8 @@ export function WipGrid({
               <td className="tnum border-t-2 border-l border-border bg-warning-surface px-3 py-3 text-right">
                 {num(finishedGoodRows.reduce((s, h) => s + h.debtKg, 0)) || "—"}
               </td>
+              {/* ô dưới cột Ghi chú */}
+              <td className="border-t-2 border-l border-border" />
             </tr>
           }
         />

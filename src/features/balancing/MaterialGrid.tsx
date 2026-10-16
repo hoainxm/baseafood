@@ -25,8 +25,9 @@ import {
 import { DAY_COLUMN_GROUPS, collapsedDayGroups, type DayCell, type PeriodGrid } from "./usePeriodGrid";
 import { PickImportRowsDialog, ManualRowsDialog, AddMaterialRowDialog } from "./gridDialogs";
 import { CellShipments } from "./CellShipments";
+import { RowNoteCell } from "./RowNoteCell";
 import { useImportShipments } from "@/lib/catalogRepo";
-import { groupImportsBySupplier } from "@/lib/dailyShipments";
+import { groupImportsBySupplier, groupImportsByMaterialType } from "@/lib/dailyShipments";
 import {
   Button,
   Combobox,
@@ -526,6 +527,26 @@ export function MaterialGrid({
           } satisfies GridColumn<MaterialGridRow>,
         ]
       : []),
+    /* Ghi chú dòng (mig 0067) — cột GIÃN cuối lưới: các cột số co vừa nội dung, ghi chú ăn
+       phần bề ngang còn lại (người dùng chốt 2026-10-16). Dòng con đại lý / loại: chỉ đọc. */
+    {
+      key: "ghiChu",
+      header: "Ghi chú",
+      label: "Ghi chú",
+      kind: "input",
+      fill: true,
+      align: "left",
+      minWidth: 160,
+      getValue: () => null,
+      renderValue: (h) => getOriginal(h.id)?.note ?? "",
+      isLocked: (h) => !getOriginal(h.id),
+      renderCell: (h) => {
+        const original = getOriginal(h.id);
+        return original ? (
+          <RowNoteCell value={original.note ?? ""} rowLabel={h.name} onCommit={(note) => writeRow(h.id, { note })} />
+        ) : null;
+      },
+    },
   ];
 
   /* Kỳ đã chốt ⇒ khoá TOÀN BỘ ô + gỡ ô điều khiển. Khoá ở một chỗ thay vì rải
@@ -565,7 +586,16 @@ export function MaterialGrid({
     writeRow(h.id, { stockLineId: lotId, unitPrice: lot?.price ?? original.unitPrice });
   };
 
-  const stockRowSubtext = (h: MaterialGridRow, isGroupHead: boolean) => {
+  /** Gửi đông: NGUYÊN LIỆU nào gửi (lưu ở `name` của dòng — tên lô trong Sổ kho tháng).
+   *  Loại NL cùng họ với kỳ lên đầu. Chốt 2026-10-16. */
+  const periodFamily = getMaterialFamily(grid.periodMaterialType);
+  const depositMaterialOptions = useMemo(() => {
+    const same = catalogMaterialTypes.filter((l) => getMaterialFamily(l.name) === periodFamily);
+    const rest = catalogMaterialTypes.filter((l) => getMaterialFamily(l.name) !== periodFamily);
+    return [...same, ...rest].map((l) => ({ value: l.name, label: l.name, subLabel: l.category || undefined }));
+  }, [catalogMaterialTypes, periodFamily]);
+
+  const stockRowSubtext = (h: MaterialGridRow, isGroupHead: boolean, isLast: boolean) => {
     const original = getOriginal(h.id);
     if (grid.isLocked) {
       const mt = original ? grid.describeStockLine(original) : "";
@@ -580,20 +610,64 @@ export function MaterialGrid({
             value={original?.stockLineId ?? ""}
             onChange={(v) => pickLot(h, v)}
             options={grid.lotOptions(original?.stockLineId ? [original.stockLineId] : [])}
-            placeholder="Chọn kho · lô"
+            placeholder="Chọn lô"
             emptyText="Sổ kho tháng không còn lô nào có tồn."
             clearable={false}
           />
         ) : (
-          <Combobox
-            label={`Kho gửi đông — ${h.name}`}
-            hideLabel
-            value={original?.stockLocation ?? ""}
-            onChange={(v) => writeRow(h.id, { stockLocation: v })}
-            options={grid.depositLocationOptions}
-            placeholder="Chọn kho gửi"
-            clearable={false}
-          />
+          <>
+            <Combobox
+              label={`Kho gửi đông — ${h.name}`}
+              hideLabel
+              value={original?.stockLocation ?? ""}
+              onChange={(v) => writeRow(h.id, { stockLocation: v })}
+              options={grid.depositLocationOptions}
+              placeholder="Chọn kho gửi"
+              clearable={false}
+            />
+            {/* Chọn kho xong ⇒ chọn NGUYÊN LIỆU gửi (VD 2 da lớn) — thành tên lô gửi đông
+                trong Sổ kho tháng. Bỏ trống ⇒ tên họ NL của kỳ như trước. */}
+            {original?.stockLocation && (
+              <Combobox
+                label={`Nguyên liệu gửi đông — ${h.name}`}
+                hideLabel
+                value={original.name !== BALANCING_STOCK_LINE_NAMES["freeze-deposit"] ? original.name : ""}
+                onChange={(v) => writeRow(h.id, { name: v || BALANCING_STOCK_LINE_NAMES["freeze-deposit"] })}
+                options={depositMaterialOptions}
+                onCreate={onAddMaterialType}
+                onEditItem={materialTypeEditor?.openEdit}
+                canEdit={materialTypeEditor?.canEdit}
+                editLabel={materialTypeEditor?.editLabel}
+                placeholder={`Chọn NL gửi (mặc định ${periodFamily || "họ NL của kỳ"})`}
+                emptyText="Chưa có loại này — gõ tên rồi Thêm mới."
+              />
+            )}
+          </>
+        )}
+        {/* Thêm dòng ngay dưới dòng kho cuối (trước chỉ có nút ở đáy lưới — người dùng không thấy). */}
+        {isLast && h.stockLineKind === "thaw-out" && hasAllLots && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="border-dashed"
+            onClick={() => addStockRow("thaw-out")}
+            title="Lấy xả đông thêm từ một lô khác — thêm một dòng Lấy xả đông nữa ngay dưới."
+          >
+            <Plus />
+            Lấy thêm lô
+          </Button>
+        )}
+        {isLast && h.stockLineKind === "freeze-deposit" && hasAllLocations && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="border-dashed"
+            onClick={() => addStockRow("freeze-deposit")}
+            title="Gửi đông thêm vào kho khác / nguyên liệu khác — thêm một dòng Gửi đông nữa ngay dưới."
+          >
+            <Plus />
+            Gửi thêm
+          </Button>
         )}
         {h.stockLineKind === "freeze-deposit" && isGroupHead && productionLeftover > 0 && (
           <span className="inline-flex flex-wrap items-center gap-1">
@@ -634,7 +708,7 @@ export function MaterialGrid({
       /* Chuỗi (không JSX) để nhãn đọc của từng ô mang tên dòng. */
       label: h.name === BALANCING_STOCK_LINE_NAMES[h.stockLineKind!] ? h.name : `${BALANCING_STOCK_LINE_NAMES[h.stockLineKind!]} · ${h.name}`,
       kind: h.stockLineKind === "freeze-deposit" ? "decrease" : undefined,
-      subLabel: stockRowSubtext(h, i === 0),
+      subLabel: stockRowSubtext(h, i === 0, i === items.length - 1),
     }));
 
   /* Không có dòng tiêu đề nhóm — bảng giấy cũng không: tên loại hàng tự nói nhóm
@@ -642,7 +716,12 @@ export function MaterialGrid({
   const gridRows: GridRow<MaterialGridRow>[] = [...stockGridRows(thawGridRows)];
   for (const g of groupsWithRows) {
     for (const h of g.rows) {
-      const suppliers = h.fromImports ? groupImportsBySupplier(importRowsOf(h)) : [];
+      const rowImports = h.fromImports ? importRowsOf(h) : [];
+      const suppliers = rowImports.length ? groupImportsBySupplier(rowImports) : [];
+      /* Dòng gộp họ (VD "Bạch tuộc 2 da" = 2 da lớn + 2 da nhỏ) ⇒ mở ra theo LOẠI trước,
+         mỗi loại kèm đại lý của nó (người dùng muốn xem riêng lớn / nhỏ — 2026-10-16). */
+      const types = rowImports.length ? groupImportsByMaterialType(rowImports) : [];
+      const bySupplierOnly = types.length <= 1;
       const open = expandedSuppliers.has(h.id);
       gridRows.push({
         id: h.id,
@@ -656,32 +735,47 @@ export function MaterialGrid({
               onClick={() => toggleSupplierOpen(h.id)}
               title={
                 open
-                  ? "Thu gọn các dòng đại lý của loại này."
-                  : `Tách dòng này theo ${suppliers.length} đại lý — mỗi đại lý một dòng, kg theo từng ngày (chỉ xem).`
+                  ? "Thu gọn các dòng chi tiết của loại này."
+                  : bySupplierOnly
+                    ? `Tách dòng này theo ${suppliers.length} đại lý — mỗi đại lý một dòng, kg theo từng ngày (chỉ xem).`
+                    : `Tách dòng này theo ${types.length} loại (${types.map((t) => t.materialTypeName).join(", ")}), mỗi loại kèm đại lý — kg theo từng ngày (chỉ xem).`
               }
               className="mt-0.5 inline-flex items-center gap-1 text-sm text-primary hover:underline"
             >
               <ChevronDown className={`size-4 transition-transform ${open ? "" : "-rotate-90"}`} aria-hidden />
-              {suppliers.length} đại lý
+              {bySupplierOnly ? `${suppliers.length} đại lý` : `${types.length} loại · ${suppliers.length} đại lý`}
             </button>
           ) : undefined,
       });
       if (!open) continue;
-      for (const d of suppliers) {
+      /** Một dòng con chỉ xem (loại hoặc đại lý) — kg theo ngày, giá bình quân, tiền thật. */
+      const pushChild = (
+        id: string,
+        label: string,
+        d: { dailyAmounts: Record<string, number>; kg: number; amount: number; ids: string[] }
+      ) => {
         const childRow: MaterialGridRow = {
           ...h,
-          id: `${h.id}::dl::${d.supplier}`,
-          name: d.supplier,
+          id,
+          name: label,
           dailyQuantities: d.dailyAmounts,
           total: d.kg,
-          // Giá bình quân của đại lý trong kỳ, làm tròn đồng; thành tiền lấy số thật.
+          // Giá bình quân trong kỳ, làm tròn đồng; thành tiền lấy số thật.
           unitPrice: d.kg > 0 && d.amount > 0 ? Math.round(d.amount / d.kg) : null,
           ratio: null,
           carryOverKg: 0,
           sourceIds: d.ids,
         };
         childRowAmount.set(childRow.id, d.amount);
-        gridRows.push({ id: childRow.id, data: childRow, label: d.supplier, kind: "child" });
+        gridRows.push({ id: childRow.id, data: childRow, label, kind: "child" });
+      };
+      if (bySupplierOnly) {
+        for (const d of suppliers) pushChild(`${h.id}::dl::${d.supplier}`, d.supplier, d);
+      } else {
+        for (const t of types) {
+          pushChild(`${h.id}::loai::${t.materialTypeName}`, t.materialTypeName, t);
+          for (const d of t.suppliers) pushChild(`${h.id}::loai::${t.materialTypeName}::dl::${d.supplier}`, `↳ ${d.supplier}`, d);
+        }
       }
     }
   }
@@ -863,6 +957,8 @@ export function MaterialGrid({
                 {num(materialRows.reduce((s, h) => s + h.carryOverKg, 0)) || "—"}
               </td>
             )}
+            {/* ô dưới cột Ghi chú */}
+            <td className="border-t-2 border-l border-border" />
           </tr>
         }
       />
@@ -884,20 +980,6 @@ export function MaterialGrid({
             <Plus />
             Dòng giảm
           </Button>
-          {hasAllLots && (
-            <Button
-              title="Thêm một dòng Lấy xả đông nữa để lấy từ lô / kho khác." variant="outline" onClick={() => addStockRow("thaw-out")}>
-              <Plus />
-              Lấy thêm lô
-            </Button>
-          )}
-          {hasAllLocations && (
-            <Button
-              title="Thêm một dòng Gửi đông nữa để gửi vào kho khác." variant="outline" onClick={() => addStockRow("freeze-deposit")}>
-              <Plus />
-              Gửi thêm kho
-            </Button>
-          )}
           {materialRows.some((h) => !h.fromImports) && (
             <Button
               title="Xoá dòng nhập tay hoặc đổi kho nhận của dòng giảm."

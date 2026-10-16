@@ -289,6 +289,9 @@ export default function PackagingScreen() {
             {countLotInputs(r.id) ? `Lô BTP (${countLotInputs(r.id)})` : "Gắn lô BTP"}
           </Button>
           )}
+          {/* Tài nguyên `packaging` không có quyền Xuất ⇒ in tem theo quyền GHI phiếu (Thêm/Sửa,
+              trong phạm vi xưởng): ai ghi được phiếu xưởng nào thì in tem phiếu xưởng đó. */}
+          {(canRow("create", { workshop: r.workshop }, "create") || canRow("update", r)) && (
           <Button
             title="In tem QR lô thành phẩm của phiếu này để dán lên thùng. Quét tem là ra nguồn gốc."
             variant="outline"
@@ -298,6 +301,7 @@ export default function PackagingScreen() {
             <QrCode />
             Tem
           </Button>
+          )}
           {canRow("delete", r) && (
           <Button
             title="Xóa phiếu đóng gói này. Tồn bán thành phẩm và tồn thành phẩm sẽ được tính lại." variant="danger" size="sm" onClick={() => remove(r)}>
@@ -548,6 +552,7 @@ export default function PackagingScreen() {
           workshop={lotTarget.workshop}
           date={lotTarget.date}
           productId={lotTarget.fromProductId}
+          canRemove={canRow("delete", lotTarget)}
           onClose={() => setLotTarget(null)}
         />
       )}

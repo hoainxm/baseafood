@@ -29,6 +29,7 @@ import {
   type OcrSelection,
 } from "./importHelpers";
 import { OcrReviewTable, SlipImageViewer } from "./OcrReviewPanel";
+import { useCan } from "@/features/shared/PermissionProvider";
 
 interface Props {
   /** Danh mục để dò khớp tên trên phiếu (đại lý, loại NL, xe, tài xế…). */
@@ -58,6 +59,8 @@ export function ImportSlipOcr({
   onClose,
 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
+  // Phân quyền: người có Thêm mà không có Xem giá vẫn dùng OCR, nhưng không thấy giá đọc được.
+  const canViewPrice = useCan("imports")["view-price"];
   const [stage, setStage] = useState<Phase>("select");
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [percent, setPercent] = useState(0);
@@ -251,6 +254,7 @@ export function ImportSlipOcr({
 
                 <OcrReviewTable
                   result={result}
+                  showPrice={canViewPrice}
                   catalog={catalog}
                   selection={selection}
                   onSelectionChange={setSelection}

@@ -20,6 +20,7 @@ import {
   finishedGoodTemplateKey,
   productSpecKey,
   formatDayLabel,
+  sumFinishedGoodAmounts,
   type FinishedGoodTemplateRow,
   type FinishedGoodGridRow,
 } from "@/lib/balancingGrid";
@@ -301,6 +302,12 @@ export function WipGrid({
       group: "tien",
       minWidth: 148,
       getValue: (h) => h.total * (h.unitPrice ?? 0) || null,
+      // Dòng nội địa đơn giá là ĐỒNG ⇒ ghi rõ "đ" kẻo đọc nhầm thành USD.
+      renderValue: (h) => {
+        const v = h.total * (h.unitPrice ?? 0);
+        if (!v) return <span className="text-muted-foreground">—</span>;
+        return h.channel === "Nội địa" ? `${num(v)} đ` : num(Math.round(v * 100) / 100);
+      },
     },
     ...dates.map<GridColumn<FinishedGoodGridRow>>((iso) => ({
       key: `ngay:${iso}`,
@@ -404,7 +411,7 @@ export function WipGrid({
   };
 
   const totalKg = finishedGoodRows.reduce((s, h) => s + h.total, 0);
-  const totalAmount = finishedGoodRows.reduce((s, h) => s + h.total * (h.unitPrice ?? 0), 0);
+  const amounts = sumFinishedGoodAmounts(finishedGoodRows);
 
   return (
     <section className="border-t-2 border-border p-5">
@@ -490,12 +497,18 @@ export function WipGrid({
               </td>
               {canViewPrice && (
                 <td className="tnum border-t-2 border-l border-border px-3 py-3 text-right">
-                  {totalKg > 0 ? num(Math.round((totalAmount / totalKg) * 100) / 100) : "—"}
+                  {/* Bình quân USD chỉ trên kg XUẤT KHẨU — dòng nội địa đơn giá là đồng. */}
+                  {amounts.exportKg > 0 ? num(Math.round((amounts.exportUsd / amounts.exportKg) * 100) / 100) : "—"}
                 </td>
               )}
               {canViewPrice && (
                 <td className="tnum border-t-2 border-l border-border px-3 py-3 text-right">
-                  {num(Math.round(totalAmount * 100) / 100)}
+                  {num(Math.round(amounts.exportUsd * 100) / 100)}
+                  {amounts.domesticVnd > 0 && (
+                    <div className="text-sm font-normal text-muted-foreground" title="Tiền bán nội địa (đồng) — không cộng vào cột USD.">
+                      + {num(amounts.domesticVnd)} đ nội địa
+                    </div>
+                  )}
                 </td>
               )}
               {!isDateColumnsCollapsed &&

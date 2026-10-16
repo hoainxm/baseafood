@@ -19,6 +19,7 @@ import {
   suggestMaterialPrices,
   salesItemToOutput,
   isEmptyPulledSalesOutput,
+  sumFinishedGoodAmounts,
   type MaterialGridRow,
 } from "./balancingGrid";
 
@@ -290,5 +291,20 @@ describe("salesItemToOutput — hút dòng bán vào kỳ", () => {
     expect(isEmptyPulledSalesOutput({ ...base, dailyQuantities: { "2026-10-12": 25 } })).toBe(false);
     expect(isEmptyPulledSalesOutput({ ...base, carryOverKg: 10 })).toBe(false);
     expect(isEmptyPulledSalesOutput({ ...base, salesItemId: "" })).toBe(false);
+  });
+});
+
+describe("sumFinishedGoodAmounts — tổng tiền thành phẩm tách kênh", () => {
+  test("nội địa (đồng) không cộng vào USD — số thật kỳ demo 12–16/10", () => {
+    const rows = [
+      { channel: "Xuất khẩu" as const, total: 500, unitPrice: 9.8 },
+      { channel: "Xuất khẩu" as const, total: 25, unitPrice: 7.5 },
+      { channel: "Nội địa" as const, total: 45, unitPrice: 128000 },
+      { channel: "Xuất khẩu" as const, total: 0, unitPrice: null },
+    ];
+    expect(sumFinishedGoodAmounts(rows)).toEqual({ exportKg: 525, exportUsd: 5087.5, domesticKg: 45, domesticVnd: 5760000 });
+  });
+  test("dòng chưa có giá vẫn tính kg, tiền 0", () => {
+    expect(sumFinishedGoodAmounts([{ channel: "Xuất khẩu", total: 100, unitPrice: null }])).toEqual({ exportKg: 100, exportUsd: 0, domesticKg: 0, domesticVnd: 0 });
   });
 });

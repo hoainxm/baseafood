@@ -409,6 +409,31 @@ export function isEmptyPulledSalesOutput(o: BalancingOutputItem): boolean {
   return Boolean(o.salesItemId) && !Object.values(o.dailyQuantities ?? {}).some(Boolean) && !o.carryOverKg;
 }
 
+/**
+ * Tổng tiền khối thành phẩm TÁCH theo kênh: xuất khẩu tính USD, nội địa tính VND
+ * (đơn giá dòng nội địa là đồng). Hàng "Tổng cộng" trước đây cộng lẫn hai đơn vị vào
+ * cột USD (5.760.000 đ nội địa + 28.246,9 USD = "5.788.246,9 USD", lỗi 2026-10-16).
+ */
+export function sumFinishedGoodAmounts(rows: Pick<FinishedGoodGridRow, "channel" | "total" | "unitPrice">[]): {
+  exportKg: number;
+  exportUsd: number;
+  domesticKg: number;
+  domesticVnd: number;
+} {
+  const out = { exportKg: 0, exportUsd: 0, domesticKg: 0, domesticVnd: 0 };
+  for (const h of rows) {
+    const amount = h.total * (h.unitPrice ?? 0);
+    if (h.channel === "Nội địa") {
+      out.domesticKg += h.total;
+      out.domesticVnd += amount;
+    } else {
+      out.exportKg += h.total;
+      out.exportUsd += amount;
+    }
+  }
+  return out;
+}
+
 export function buildFinishedGoodGridRows(
   outputs: BalancingOutputItem[],
   assignedWips: WipProductionItem[]

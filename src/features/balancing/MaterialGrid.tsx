@@ -718,8 +718,9 @@ export function MaterialGrid({
     for (const h of g.rows) {
       const rowImports = h.fromImports ? importRowsOf(h) : [];
       const suppliers = rowImports.length ? groupImportsBySupplier(rowImports) : [];
-      /* Dòng gộp họ (VD "Bạch tuộc 2 da" = 2 da lớn + 2 da nhỏ) ⇒ mở ra theo LOẠI trước,
-         mỗi loại kèm đại lý của nó (người dùng muốn xem riêng lớn / nhỏ — 2026-10-16). */
+      /* Dòng gộp họ (VD "Bạch tuộc 2 da" = 2 da lớn + 2 da nhỏ) ⇒ vẫn mở ra theo ĐẠI LÝ (mỗi
+         đại lý MỘT dòng), dưới tên đại lý ghi rõ phần từng loại: "2 da lớn 3.091 · 2 da nhỏ
+         3.757" (người dùng chốt 2026-10-16 — không tách thêm dòng theo loại). */
       const types = rowImports.length ? groupImportsByMaterialType(rowImports) : [];
       const bySupplierOnly = types.length <= 1;
       const open = expandedSuppliers.has(h.id);
@@ -743,7 +744,7 @@ export function MaterialGrid({
               className="mt-0.5 inline-flex items-center gap-1 text-sm text-primary hover:underline"
             >
               <ChevronDown className={`size-4 transition-transform ${open ? "" : "-rotate-90"}`} aria-hidden />
-              {bySupplierOnly ? `${suppliers.length} đại lý` : `${types.length} loại · ${suppliers.length} đại lý`}
+              {suppliers.length} đại lý{bySupplierOnly ? "" : ` · ${types.length} loại`}
             </button>
           ) : undefined,
       });
@@ -752,7 +753,8 @@ export function MaterialGrid({
       const pushChild = (
         id: string,
         label: string,
-        d: { dailyAmounts: Record<string, number>; kg: number; amount: number; ids: string[] }
+        d: { dailyAmounts: Record<string, number>; kg: number; amount: number; ids: string[] },
+        subLabel?: string
       ) => {
         const childRow: MaterialGridRow = {
           ...h,
@@ -767,15 +769,22 @@ export function MaterialGrid({
           sourceIds: d.ids,
         };
         childRowAmount.set(childRow.id, d.amount);
-        gridRows.push({ id: childRow.id, data: childRow, label, kind: "child" });
+        gridRows.push({ id: childRow.id, data: childRow, label, kind: "child", subLabel });
       };
-      if (bySupplierOnly) {
-        for (const d of suppliers) pushChild(`${h.id}::dl::${d.supplier}`, d.supplier, d);
-      } else {
-        for (const t of types) {
-          pushChild(`${h.id}::loai::${t.materialTypeName}`, t.materialTypeName, t);
-          for (const d of t.suppliers) pushChild(`${h.id}::loai::${t.materialTypeName}::dl::${d.supplier}`, `↳ ${d.supplier}`, d);
-        }
+      /* Tên loại ngắn dưới tên đại lý: bỏ phần LOÀI đứng đầu tên dòng cha ("Bạch tuộc") —
+         "Bạch tuộc 2 da lớn (80↑)" ⇒ "2 da lớn (80↑)". */
+      const species = h.name.split(/\s+(?=\S*\d)/)[0] ?? "";
+      const shortType = (t: string) =>
+        species && t.toLowerCase().startsWith(species.toLowerCase() + " ") ? t.slice(species.length + 1) : t;
+      for (const d of suppliers) {
+        const parts = bySupplierOnly
+          ? undefined
+          : types
+              .map((t) => ({ name: shortType(t.materialTypeName), kg: t.suppliers.find((x) => x.supplier === d.supplier)?.kg ?? 0 }))
+              .filter((x) => x.kg !== 0)
+              .map((x) => `${x.name} ${num(x.kg)}`)
+              .join(" · ");
+        pushChild(`${h.id}::dl::${d.supplier}`, d.supplier, d, parts);
       }
     }
   }

@@ -42,7 +42,7 @@ import {
 import { IS_DEMO, setDemoMode } from "@/lib/demoMode";
 import { setWriteGuard } from "@/lib/repo";
 import { checkTableWrite } from "@/lib/writePermissions";
-import { DemoModeBanner, DemoPackLoader } from "@/features/shared/DemoMode";
+import { DemoModeBanner, DemoModeHeaderButton, DemoPackLoader } from "@/features/shared/DemoMode";
 import { LEGACY_PATHS, normalizeCatalogTab } from "@/lib/legacyUrls";
 
 // Tổng quan — dòng chảy số liệu
@@ -194,6 +194,8 @@ function ShellLayout() {
       onChangePassword={auth.requiresLogin && auth.session ? auth.changePassword : undefined}
       onOpenAdmin={auth.isAdmin ? () => navigate("/admin") : undefined}
       items={hasNoAccess ? [] : items}
+      // Chế độ demo: admin bật (hoặc máy không đăng nhập — sandbox); đang demo thì ai cũng thấy để thoát.
+      headerActions={auth.isAdmin || !auth.requiresLogin || IS_DEMO ? <DemoModeHeaderButton /> : undefined}
     >
       {hasNoAccess ? (
         <EmptyState

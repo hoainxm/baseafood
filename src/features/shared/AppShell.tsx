@@ -488,6 +488,8 @@ export interface AppShellProps {
   onOpenAdmin?: () => void;
   /** Danh sách nav (đã lọc theo quyền). Mặc định KIT_NAV. */
   items?: ShellNavItem[];
+  /** Nút thêm ở header, đứng trước trạng thái đồng bộ (VD nút Chế độ demo của admin). */
+  headerActions?: ReactNode;
   children: ReactNode;
 }
 
@@ -514,6 +516,7 @@ export default function AppShell({
   onChangePassword,
   onOpenAdmin,
   items = KIT_NAV,
+  headerActions,
   children,
 }: AppShellProps) {
   // Thanh bên thu về dải icon: TỰ ĐỘNG ở màn hẹp (iPhone ngang, iPad dọc) để
@@ -719,6 +722,7 @@ export default function AppShell({
                 {guide.content}
               </GuideButton>
             )}
+            {headerActions}
             <DataSyncStatusButton />
 
             {/* Menu tài khoản ở avatar — MỌI cỡ màn: giao diện · mật khẩu · quản trị ·

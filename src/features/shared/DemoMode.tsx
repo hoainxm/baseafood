@@ -1,11 +1,21 @@
 // ============================================================
 // Tên file: src/features/shared/DemoMode.tsx
-// Tên tiếng Việt: Chế độ demo — dải cảnh báo, nạp bộ demo, nút bật/tắt (admin)
+// Tên tiếng Việt: Chế độ demo — dải cảnh báo, nạp bộ demo, nút Demo trên header (admin)
 // Description: Demo-mode UI (spec docs/spec/che-do-demo.md §4)
 // ============================================================
-import { useEffect, useMemo, useRef, useState } from "react";
+import { forwardRef, useEffect, useMemo, useRef, useState, type ComponentProps } from "react";
 import { FlaskConical, LogOut, RefreshCw } from "lucide-react";
-import { Button, ChoiceGroup, ProcessingState, ConfirmAction, todayIso, notify } from "@/design-system";
+import {
+  Button,
+  ChoiceGroup,
+  ConfirmAction,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+  ProcessingState,
+  todayIso,
+  notify,
+} from "@/design-system";
 import {
   setAuditPaused,
   useBalancingInputs,
@@ -66,22 +76,11 @@ export function DemoModeBanner() {
     <div
       role="status"
       // Dính ngay dưới header trang (cùng token với SummaryTable fullHeight) — cuộn đâu cũng thấy.
-      className="sticky top-header z-20 mb-4 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border-2 border-warning bg-warning px-4 py-2 text-warning-foreground"
+      className="sticky top-header z-20 mb-4 flex items-center gap-2 rounded-md bg-warning px-3 py-1 text-warning-foreground"
     >
-      <FlaskConical className="size-5 shrink-0" aria-hidden />
-      <p className="min-w-0 flex-1 text-sm font-semibold">
-        ĐANG XEM DỮ LIỆU DEMO — số trình diễn, không phải sổ thật của xưởng. Ghi gì ở đây cũng chỉ vào bộ demo.
-      </p>
-      <Button
-        title="Thoát chế độ demo, quay về số thật của xưởng."
-        size="sm"
-        variant="outline"
-        className="bg-card text-foreground"
-        onClick={() => setDemoMode(false)}
-      >
-        <LogOut />
-        Thoát demo
-      </Button>
+      <FlaskConical className="size-4 shrink-0" aria-hidden />
+      {/* Gọn một dòng — nút Thoát / Làm mới ở nút DEMO trên header. */}
+      <p className="min-w-0 flex-1 text-sm font-semibold">ĐANG XEM DỮ LIỆU DEMO — số trình diễn, không phải sổ thật của xưởng.</p>
     </div>
   );
 }
@@ -167,50 +166,94 @@ function DemoBundleLoader({ bundle }: { bundle: DemoBundle }) {
 }
 
 /**
- * Khối "Chế độ demo" cho admin (đặt ở Tổng quan). Chế độ thật: tạo bộ demo mới từ số
- * thật rồi vào demo, hoặc vào demo giữ bộ đang có. Chế độ demo: làm mới bộ demo (tải
- * lại về chế độ thật để quét, rồi tự vào lại) hoặc thoát.
+ * Nút "Demo" trên header (admin; gom gọn 2026-10-16 — trước là khối to ở Tổng quan).
+ * Chế độ thật: menu nhỏ chọn ẩn tên/giữ tên rồi tạo bộ mới hoặc vào demo giữ bộ cũ.
+ * Chế độ demo: nút nổi màu cảnh báo, menu Làm mới / Thoát. Bộ số thật chỉ nạp khi mở
+ * menu lần đầu (không tốn tải ở mọi màn); việc chờ "Làm mới" tự chạy ở bất kỳ màn nào.
  */
-export function DemoModeSection() {
-  return IS_DEMO ? <DemoActiveSection /> : <DemoGeneratorSection />;
+export function DemoModeHeaderButton() {
+  const [pendingCreate] = useState(() => !IS_DEMO && readDemoJob() === "tao");
+  const [isActivated, setIsActivated] = useState(pendingCreate);
+  if (IS_DEMO) return <DemoActiveMenu />;
+  if (!isActivated) return <DemoTriggerButton onClick={() => setIsActivated(true)} />;
+  return <DemoGeneratorMenu autoCreate={pendingCreate} />;
 }
 
-function DemoActiveSection() {
+const DemoTriggerButton = forwardRef<HTMLButtonElement, ComponentProps<typeof Button>>(function DemoTriggerButton(
+  props,
+  ref,
+) {
+  return (
+    <Button
+      ref={ref}
+      title="Chế độ demo: trình bày bằng bộ số sinh từ số thật, số thật không bị đụng."
+      variant="outline"
+      className="text-muted-foreground"
+      {...props}
+    >
+      <FlaskConical />
+      <span className="hidden lg:inline">Demo</span>
+    </Button>
+  );
+});
+
+function DemoActiveMenu() {
+  const [isOpen, setIsOpen] = useState(false);
+  const [isConfirming, setIsConfirming] = useState(false);
   const refresh = () => {
     setPendingDemoTask("tao");
     setDemoMode(false);
   };
   return (
-    <section className="flex flex-wrap items-center gap-3 rounded-xl border-2 border-warning/50 bg-warning-surface p-4">
-      <FlaskConical className="size-6 shrink-0 text-warning" aria-hidden />
-      <div className="min-w-0 flex-1">
-        <h2 className="text-base font-semibold text-foreground">Đang ở chế độ demo</h2>
-        <p className="text-sm text-muted-foreground">Số trên mọi màn là bộ trình diễn. Bấm thử thoải mái — làm mới là về nguyên trạng.</p>
-      </div>
-      <div className="flex flex-wrap gap-2">
-        <ConfirmAction
-          title="Làm mới bộ demo?"
-          description="App quay về chế độ thật một lát để quét số mới nhất, sinh lại bộ demo rồi tự vào lại. Mọi thứ đã ghi trong bộ demo hiện tại bị thay. Số thật không bị đụng."
-          confirmLabel="Làm mới bộ demo"
-          icon={RefreshCw}
-          onConfirm={refresh}
-          trigger={
-            <Button title="Sinh lại bộ demo từ số thật mới nhất, thay bộ đang có." variant="outline">
+    <>
+      <Popover open={isOpen} onOpenChange={setIsOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            title="Đang ở chế độ demo — bấm để làm mới bộ demo hoặc thoát."
+            className="border-warning bg-warning font-bold text-warning-foreground hover:bg-warning/90"
+          >
+            <FlaskConical />
+            DEMO
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent align="end" className="grid w-80 max-w-[calc(100vw-2rem)] gap-3">
+          <div>
+            <p className="font-semibold text-foreground">Đang ở chế độ demo</p>
+            <p className="text-sm text-muted-foreground">Số trên mọi màn là bộ trình diễn. Bấm thử thoải mái, làm mới là về nguyên trạng.</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              title="Sinh lại bộ demo từ số thật mới nhất, thay bộ đang có."
+              variant="outline"
+              onClick={() => {
+                setIsOpen(false);
+                setIsConfirming(true);
+              }}
+            >
               <RefreshCw />
               Làm mới bộ demo
             </Button>
-          }
-        />
-        <Button title="Thoát chế độ demo, quay về số thật của xưởng." onClick={() => setDemoMode(false)}>
-          <LogOut />
-          Thoát demo
-        </Button>
-      </div>
-    </section>
+            <Button title="Thoát chế độ demo, quay về số thật của xưởng." onClick={() => setDemoMode(false)}>
+              <LogOut />
+              Thoát demo
+            </Button>
+          </div>
+        </PopoverContent>
+      </Popover>
+      <ConfirmAction
+        open={isConfirming}
+        onOpenChange={setIsConfirming}
+        title="Làm mới bộ demo?"
+        description="App quay về chế độ thật một lát để quét số mới nhất, sinh lại bộ demo rồi tự vào lại. Mọi thứ đã ghi trong bộ demo hiện tại bị thay. Số thật không bị đụng."
+        confirmLabel="Làm mới bộ demo"
+        icon={RefreshCw}
+        onConfirm={refresh}
+      />
+    </>
   );
 }
 
-function DemoGeneratorSection() {
+function DemoGeneratorMenu({ autoCreate }: { autoCreate: boolean }) {
   const [products, , a1] = useProducts();
   const [materialTypes, , a2] = useMaterialTypes();
   const [suppliers, , a3] = useSuppliers();
@@ -225,6 +268,8 @@ function DemoGeneratorSection() {
   const [nxtSnapshots, , a12] = useNxtSnapshots();
   const [monthlyStock, , a13] = useMonthlyStock();
   const loaded = [a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13].every((x) => x.status !== "loading");
+  const [isOpen, setIsOpen] = useState(!autoCreate);
+  const [isConfirming, setIsConfirming] = useState(false);
   const [anonymize, setAnonymize] = useState("an");
   const [isCreating, setIsCreating] = useState(false);
 
@@ -247,68 +292,71 @@ function DemoGeneratorSection() {
   };
 
   // Việc chờ từ chế độ demo ("Làm mới bộ demo"): nạp xong số thật thì tự sinh và vào lại.
-  const [pendingCreate] = useState(() => readDemoJob() === "tao");
   useEffect(() => {
-    if (pendingCreate && loaded) createAndEnter();
-    // taoVaVao tải lại trang ⇒ chỉ chạy một lần.
+    if (autoCreate && loaded) createAndEnter();
+    // createAndEnter tải lại trang ⇒ chỉ chạy một lần.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pendingCreate, loaded]);
+  }, [autoCreate, loaded]);
 
-  if (pendingCreate) {
+  if (autoCreate) {
     return (
-      <section className="rounded-xl border-2 border-border p-4" role="status">
+      <div className="fixed inset-0 z-50 grid place-items-center bg-background/80" role="status">
         <ProcessingState text="Đang quét số thật để làm mới bộ demo…" />
-      </section>
+      </div>
     );
   }
 
   return (
-    <section className="grid gap-3 rounded-xl border-2 border-dashed border-border p-4">
-      <div className="flex flex-wrap items-start gap-3">
-        <FlaskConical className="mt-0.5 size-6 shrink-0 text-muted-foreground" aria-hidden />
-        <div className="min-w-0 flex-1">
-          <h2 className="text-base font-semibold text-foreground">Chế độ demo (chỉ quản trị thấy)</h2>
-          <p className="text-sm text-muted-foreground">
-            Trình bày bằng bộ số đầy đủ chuỗi (nhập → sản xuất → kho → đóng gói → bán → lô QR), sinh từ số thật đã
-            nhập: {num(demoParams.realImportRowCount)} dòng nhập, {demoParams.suppliers.length} đại lý, {demoParams.workshops.length} xưởng, tỉ lệ
-            ra thành phẩm {num(demoParams.finishedRate * 100)}%. Bộ demo nằm riêng — số thật không bị đụng.
-          </p>
-        </div>
-      </div>
-      <div className="flex flex-wrap items-end gap-3">
-        <ChoiceGroup
-          label="Tên đối tác trong bộ demo"
-          value={anonymize}
-          onChange={setAnonymize}
-          options={[
-            { value: "an", label: "Ẩn tên + đổi giá", description: "Trình bày cho người ngoài" },
-            { value: "giu", label: "Giữ tên thật", description: "Trình bày nội bộ" },
-          ]}
-          className="min-w-[min(20rem,100%)] flex-1"
-        />
-        <div className="flex flex-wrap gap-2">
-          <ConfirmAction
-            title="Tạo bộ demo mới và vào chế độ demo?"
-            description="Quét số thật, sinh bộ demo 60 ngày rồi chuyển cả app sang chế độ demo. Bộ demo cũ (nếu có) bị thay. Số thật của xưởng không bị đụng."
-            confirmLabel="Tạo và vào demo"
-            icon={FlaskConical}
-            onConfirm={createAndEnter}
-            trigger={
-              <Button title="Sinh bộ số demo từ số thật đã nhập rồi chuyển sang chế độ demo." disabled={!loaded || isCreating}>
-                <FlaskConical />
-                {loaded ? "Tạo bộ demo mới" : "Đang nạp số thật…"}
-              </Button>
-            }
+    <>
+      <Popover open={isOpen} onOpenChange={setIsOpen}>
+        <PopoverTrigger asChild>
+          <DemoTriggerButton />
+        </PopoverTrigger>
+        <PopoverContent align="end" className="grid w-96 max-w-[calc(100vw-2rem)] gap-3">
+          <div>
+            <p className="font-semibold text-foreground">Chế độ demo</p>
+            <p className="text-sm text-muted-foreground">
+              {loaded
+                ? `Sinh bộ số đủ chuỗi từ số thật: ${num(demoParams.realImportRowCount)} dòng nhập, ${demoParams.suppliers.length} đại lý, ${demoParams.workshops.length} xưởng, tỉ lệ ra TP ${num(demoParams.finishedRate * 100)}%. Số thật không bị đụng.`
+                : "Đang nạp số thật…"}
+            </p>
+          </div>
+          <ChoiceGroup
+            label="Tên đối tác"
+            value={anonymize}
+            onChange={setAnonymize}
+            options={[
+              { value: "an", label: "Ẩn tên + đổi giá", description: "Cho người ngoài" },
+              { value: "giu", label: "Giữ tên thật", description: "Nội bộ" },
+            ]}
           />
-          <Button
-            title="Vào chế độ demo, giữ nguyên bộ demo đã tạo lần trước."
-            variant="outline"
-            onClick={() => setDemoMode(true)}
-          >
-            Vào demo (giữ bộ cũ)
-          </Button>
-        </div>
-      </div>
-    </section>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              title="Sinh bộ số demo từ số thật đã nhập rồi chuyển sang chế độ demo."
+              disabled={!loaded || isCreating}
+              onClick={() => {
+                setIsOpen(false);
+                setIsConfirming(true);
+              }}
+            >
+              <FlaskConical />
+              Tạo bộ mới
+            </Button>
+            <Button title="Vào chế độ demo, giữ nguyên bộ demo đã tạo lần trước." variant="outline" onClick={() => setDemoMode(true)}>
+              Vào demo (giữ bộ cũ)
+            </Button>
+          </div>
+        </PopoverContent>
+      </Popover>
+      <ConfirmAction
+        open={isConfirming}
+        onOpenChange={setIsConfirming}
+        title="Tạo bộ demo mới và vào chế độ demo?"
+        description="Quét số thật, sinh bộ demo 60 ngày rồi chuyển cả app sang chế độ demo. Bộ demo cũ (nếu có) bị thay. Số thật của xưởng không bị đụng."
+        confirmLabel="Tạo và vào demo"
+        icon={FlaskConical}
+        onConfirm={createAndEnter}
+      />
+    </>
   );
 }

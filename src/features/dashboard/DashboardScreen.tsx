@@ -40,8 +40,6 @@ import {
   useScraps,
 } from "@/lib/catalogRepo";
 import { useTraceData } from "@/features/shared/useTraceData";
-import { DemoModeSection } from "@/features/shared/DemoMode";
-import { useAuth } from "@/lib/auth";
 import {
   buildFlowStages,
   buildChainWarnings,
@@ -199,7 +197,6 @@ function Section({
 
 export default function DashboardScreen() {
   const navigate = useNavigate();
-  const { isAdmin: laAdmin, requiresLogin: canSignIn } = useAuth();
   const [period, setPeriod] = useState<ViewPeriod>("month");
   const [anchor, setAnchor] = useState(todayIso());
   const [customFrom, setCustomFrom] = useState(todayIso());
@@ -513,9 +510,6 @@ export default function DashboardScreen() {
           nào chưa có số thì hình để trống.
         </p>
       </div>
-
-      {/* Chế độ demo — chỉ admin bật (hoặc máy chạy không đăng nhập: sandbox). */}
-      {(laAdmin || !canSignIn) && <DemoModeSection />}
 
       {/* Thanh lọc GỌN một hàng: kỳ (bấm nhanh) · lùi/tiến · xưởng. Tự chọn mới hiện ô ngày. */}
       <div className="grid gap-3 rounded-xl border bg-muted/30 p-3">

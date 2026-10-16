@@ -1,6 +1,7 @@
 > Load khi: thiết kế/xây module WIP — sản xuất bán thành phẩm ngày, kho dự trữ đông, đơn đặt, xuất container.
 covers: src/features/production/WipProductionScreen.tsx, src/features/warehouse/ReserveWarehouseScreen.tsx, src/features/orders/SalesOrderScreen.tsx, src/features/packaging/PackagingScreen.tsx, src/features/catalog/CatalogScreen.tsx, src/lib/inventory.ts, supabase/migrations/0011_wip_san_xuat_kho_don.sql, supabase/migrations/0026_dong_goi_thanh_pham.sql, supabase/migrations/0030_production_customer_components.sql, supabase/migrations/0031_product_split_blockspec.sql, src/features/production/wipHelpers.ts, src/features/production/ProductionLinesTable.tsx, src/features/production/BatterSection.tsx, src/lib/batter.ts, src/features/production/DomesticSaleSection.tsx, src/features/production/SessionLotsSection.tsx, src/features/production/FrozenStockSection.tsx, src/lib/frozenStockLines.ts
-last_verified: 2026-10-15
+last_verified: 2026-10-16
+<!-- updated: 2026-10-16 — phân quyền: nút Tem /packaging theo quyền ghi phiếu (Thêm/Sửa, phạm vi xưởng); nút "Bỏ" lô trong picker gắn lô theo quyền Xóa (canRemove). -->
 ttl_days: 90
 <!-- updated: 2026-10-15 (e) — audit Hàng tạm: ghi lô vào tháng CŨ khi tháng sau đã mở ⇒ lô ĐẨY TIẾP sang tồn đầu các tháng sau (`monthlyStock.propagateLotsForward`); bỏ lô ở /wip dọn luôn chuỗi dồn kỳ sạch (`removeFrozenLot`), chỉ chặn khi lô đã lấy ra hoặc tháng sau có nhập/xuất/ghi chú trên lô. -->
 <!-- updated: 2026-10-15 (d) — form /wip KHÔNG còn ô khách hàng (người dùng bỏ): dòng mới lưu `customer_name` rỗng; khách vẫn sửa được ở hộp Sửa dòng của sổ ngày, cột Khách hàng ở sổ giữ nguyên. Không còn nhóm dòng. Tách râu + bao tử: mã đánh dấu tách tự hiện hàng tách; mã khác bấm ✂ (`ProductionLine.splitOpen`). -->

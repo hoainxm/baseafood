@@ -1,7 +1,8 @@
 # Truy xuất theo lô bằng QR — phân tích & thiết kế
 
 covers: src/lib/lotTraceability.ts, src/lib/inventory.ts, src/features/qr/**, src/features/shared/LotInputPicker.tsx, src/features/shared/QrScanner.tsx, src/features/shared/LotLabelPrint.tsx, src/features/shared/useTraceData.ts, src/features/production/SessionLotsSection.tsx, src/features/orders/ExportLotCheck.tsx, supabase/migrations/0046_lot_inputs.sql, supabase/migrations/0049_label_prints.sql, supabase/migrations/0056_lot_dispatches.sql
-last_verified: 2026-10-14
+last_verified: 2026-10-16
+<!-- updated: 2026-10-16 — LotInputPicker / LotDispatchPicker nhận `canRemove` (phân quyền): màn gọi truyền quyền Xóa; false ⇒ ẩn nút "Bỏ" lô. -->
 <!-- updated: 2026-10-12 — sổ tồn theo lô: phần BÁN VƯỢT (không lô nào để trừ) trả ra `banVuot`/`tongBanVuot` (`computeWipStockDetail`, `computeFinishedGoodLotStockDetail`) + cảnh báo ở /warehouse; `buildLotStockIndex` dựng tồn W/P một lần cho danh sách nhiều lô (GanLoDauVao, theoGiaiDoan, LotRecall) thay vì tinhTon từng lô; `lui` (cửa sổ chọn lô NL 45 ngày / BTP 120 ngày) tính theo UTC — giờ máy +07 trước đây lùi dư 1 ngày. -->
 <!-- updated: 2026-10-08 (c) — lô NL = một dòng loại NL của chuyến (§6e); §4.1 + §7.5 cập nhật. -->
 <!-- re-verified: 2026-10-08 10:05 — §4.1 ba loại lô S/W/P (lotTraceability.buildLotNode/nhanLo*), §6c (meChuaGanLo · duyetTheoTem · ExportLotCheck · label_prints) khớp code trước khi build đợt 2b; §8 dòng RLS đã LỆCH (sửa, xem .escaped-drift.log). -->

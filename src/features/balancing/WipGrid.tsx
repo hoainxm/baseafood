@@ -293,7 +293,7 @@ export function WipGrid({
     /* Thứ tự theo bảng cân đối giấy: XUẤT KHẨU Lượng · Đơn giá · T.tiền đứng ngay sau
        Khách, rồi các ngày + Tổng; Trả · Nợ (thay cột Chuyển kỳ) đứng CUỐI. "Lượng" = Tổng. */
     { key: "luong", header: "Lượng (kg)", label: "Lượng", kind: "computed", minWidth: 110, getValue: (h) => h.total || null },
-    { key: "donGia", header: "Đơn giá (USD)", label: "Đơn giá", kind: "input", group: "tien", minWidth: 112, getValue: (h) => h.unitPrice },
+    { key: "donGia", header: "Đơn giá (USD / đ nội địa)", label: "Đơn giá", kind: "input", group: "tien", minWidth: 112, getValue: (h) => h.unitPrice },
     {
       key: "thanhTien",
       header: "T.tiền (USD)",

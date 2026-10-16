@@ -379,6 +379,12 @@ export interface BalancingInputItem {
   stockLineId?: string;
   /** Dòng GỬI ĐÔNG: kho nhận `"<sổ kho>|<vị trí>"` (mig 0053), VD "Kho 1500 tấn|Kho Hồng Phú". */
   stockLocation?: string;
+  /**
+   * Dòng GỬI ĐÔNG: lô gửi ghi vào NHÓM (bảng) nào của Sổ kho tháng — người dùng chọn trong
+   * hộp "Gửi vào sổ kho" (mig 0068). Rỗng ⇒ giữ nhóm của lô đã ghi, chưa có thì nhóm mặc
+   * định (lib/balancingStockLines DEFAULT_DEPOSIT_CATEGORY).
+   */
+  stockCategory?: string;
   /** Ghi chú của dòng (cột Ghi chú cuối lưới Cân đối, mig 0067). */
   note?: string;
 }

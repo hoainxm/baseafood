@@ -28,8 +28,10 @@ import { DAY_COLUMN_GROUPS, collapsedDayGroups, type DayCell, type PeriodGrid } 
 import { PickImportRowsDialog, ManualRowsDialog, AddMaterialRowDialog } from "./gridDialogs";
 import { CellShipments } from "./CellShipments";
 import { RowNoteCell } from "./RowNoteCell";
+import { DepositTargetDialog, type DepositTargetValue } from "./DepositTargetDialog";
 import { useImportShipments } from "@/lib/catalogRepo";
 import { groupImportsBySupplier, groupImportsByMaterialType } from "@/lib/dailyShipments";
+import { DEFAULT_DEPOSIT_CATEGORY, shortWarehouseLabel } from "@/lib/balancingStockLines";
 import {
   Button,
   Combobox,
@@ -148,6 +150,9 @@ export function MaterialGrid({
     isReduction: lineKind === "freeze-deposit",
     reductionWarehouseId: lineKind === "freeze-deposit" ? (WORKSHOP_WAREHOUSES[0]?.id ?? "") : "",
     autoSource: "",
+    /* Gửi đông mặc định SẴN kho (kho lần gửi gần nhất, chưa có ⇒ Kho 1500 tấn) — gõ số là
+       ghi được ngay, khỏi bị chặn "Chọn kho gửi" (yêu cầu 2026-10-16: mặc định cả kho lẫn NL). */
+    ...(lineKind === "freeze-deposit" ? { stockLocation: grid.defaultDepositLocation } : {}),
   });
   const hangAo = (lineKind: BalancingStockLineKind): MaterialGridRow => {
     const m = stockLineTemplate(lineKind);
@@ -617,6 +622,44 @@ export function MaterialGrid({
     return [...same, ...rest].map((l) => ({ value: l.name, label: l.name, subLabel: l.category || undefined }));
   }, [catalogMaterialTypes, periodFamily]);
 
+  /* Ô kho nhãn tắt: "Kho 1000 tấn" ⇒ K1000, tên đủ ở dòng phụ (vẫn gõ tên đủ để tìm). */
+  const shortLocationOptions = useMemo(
+    () =>
+      grid.depositLocationOptions.map((o) => ({
+        ...o,
+        label: shortWarehouseLabel(o.label),
+        subLabel: o.subLabel ? `${o.label} · ${o.subLabel}` : o.label,
+      })),
+    [grid.depositLocationOptions]
+  );
+  /** Tên NL gửi của dòng; chưa chọn ⇒ tên họ NL của kỳ (mặc định). */
+  const depositMaterialName = (original: BalancingInputItem | undefined) =>
+    original && original.name !== BALANCING_STOCK_LINE_NAMES["freeze-deposit"] ? original.name : periodFamily;
+  /** Bảng của Sổ kho tháng lô gửi vào: đã chọn ⇒ nhóm đó; dòng cũ ⇒ nhóm lô đã ghi; còn lại ⇒ mặc định. */
+  const depositCategoryLabel = (rowId: string, original: BalancingInputItem | undefined) =>
+    original?.stockCategory || grid.depositLotCategory(rowId) || DEFAULT_DEPOSIT_CATEGORY;
+  const [depositRowId, setDepositRowId] = useState<string | null>(null);
+  const saveDepositTarget = (rowId: string, v: DepositTargetValue) => {
+    if (
+      writeRow(rowId, {
+        name: v.name.trim() && v.name.trim() !== periodFamily ? v.name.trim() : BALANCING_STOCK_LINE_NAMES["freeze-deposit"],
+        stockCategory: v.category,
+        stockLocation: v.stockLocation,
+        unitPrice: v.unitPrice,
+      })
+    )
+      notify.saved(`Đã lưu chỗ gửi: ${v.name || periodFamily} → ${v.category}`, grid.undo);
+  };
+  const depositDialogRow = depositRowId ? getOriginal(depositRowId) : undefined;
+  /* Sổ kho của THÁNG lô gửi vào: tháng ngày gửi cuối của dòng; chưa gõ ngày ⇒ tháng ngày cuối kỳ. */
+  const depositDialogMonth = useMemo(() => {
+    const sentDates = Object.entries(depositDialogRow?.dailyQuantities ?? {})
+      .filter(([, v]) => v)
+      .map(([iso]) => iso)
+      .sort();
+    return (sentDates[sentDates.length - 1] ?? dates[dates.length - 1] ?? "").slice(0, 7);
+  }, [depositDialogRow, dates]);
+
   const stockRowSubtext = (h: MaterialGridRow, isGroupHead: boolean, isLast: boolean) => {
     const original = getOriginal(h.id);
     if (grid.isLocked) {
@@ -637,34 +680,31 @@ export function MaterialGrid({
             clearable={false}
           />
         ) : (
-          <>
+          /* Gọn MỘT hàng (yêu cầu kế toán 2026-10-16): ô kho nhỏ nhãn tắt (K1000) đứng trước,
+             rồi nút NL gửi → mở hộp "Gửi vào sổ kho" chọn bảng của Sổ kho tháng ngay tại đây. */
+          <span className="flex items-center gap-1">
             <Combobox
               label={`Kho gửi đông — ${h.name}`}
               hideLabel
+              className="max-w-32 shrink-0"
               value={original?.stockLocation ?? ""}
               onChange={(v) => writeRow(h.id, { stockLocation: v })}
-              options={grid.depositLocationOptions}
-              placeholder="Chọn kho gửi"
+              options={shortLocationOptions}
+              placeholder="Kho"
               clearable={false}
             />
-            {/* Chọn kho xong ⇒ chọn NGUYÊN LIỆU gửi (VD 2 da lớn) — thành tên lô gửi đông
-                trong Sổ kho tháng. Bỏ trống ⇒ tên họ NL của kỳ như trước. */}
-            {original?.stockLocation && (
-              <Combobox
-                label={`Nguyên liệu gửi đông — ${h.name}`}
-                hideLabel
-                value={original.name !== BALANCING_STOCK_LINE_NAMES["freeze-deposit"] ? original.name : ""}
-                onChange={(v) => writeRow(h.id, { name: v || BALANCING_STOCK_LINE_NAMES["freeze-deposit"] })}
-                options={depositMaterialOptions}
-                onCreate={onAddMaterialType}
-                onEditItem={materialTypeEditor?.openEdit}
-                canEdit={materialTypeEditor?.canEdit}
-                editLabel={materialTypeEditor?.editLabel}
-                placeholder={`Chọn NL gửi (mặc định ${periodFamily || "họ NL của kỳ"})`}
-                emptyText="Chưa có loại này — gõ tên rồi Thêm mới."
-              />
-            )}
-          </>
+            <Button
+              variant="outline"
+              size="sm"
+              className="min-w-0 flex-1 justify-start"
+              onClick={() => setDepositRowId(h.id)}
+              title="Chọn nguyên liệu gửi, bảng của Sổ kho tháng để gửi vào và giá gửi — xem sổ kho ngay tại đây."
+            >
+              <span className="truncate">
+                {depositMaterialName(original)} → {depositCategoryLabel(h.id, original)}
+              </span>
+            </Button>
+          </span>
         )}
         {/* Thêm dòng ngay dưới dòng kho cuối (trước chỉ có nút ở đáy lưới — người dùng không thấy). */}
         {isLast && h.stockLineKind === "thaw-out" && hasAllLots && (
@@ -1082,6 +1122,29 @@ export function MaterialGrid({
             pullImports(ids);
             setIsImportPickerOpen(false);
           }}
+        />
+      )}
+
+      {depositRowId && depositDialogRow && (
+        <DepositTargetDialog
+          key={depositRowId}
+          open
+          onOpenChange={(o) => !o && setDepositRowId(null)}
+          month={depositDialogMonth}
+          groups={grid.depositTargetsFor(depositDialogMonth)}
+          initial={{
+            name: depositMaterialName(depositDialogRow),
+            category: depositCategoryLabel(depositRowId, depositDialogRow),
+            stockLocation: depositDialogRow.stockLocation || grid.defaultDepositLocation,
+            unitPrice: depositDialogRow.unitPrice ?? avgMaterialPrice,
+          }}
+          materialOptions={depositMaterialOptions}
+          locationOptions={shortLocationOptions}
+          onCreateMaterial={onAddMaterialType}
+          onEditMaterial={materialTypeEditor?.openEdit}
+          canEditMaterial={materialTypeEditor?.canEdit}
+          editMaterialLabel={materialTypeEditor?.editLabel}
+          onSave={(v) => saveDepositTarget(depositRowId, v)}
         />
       )}
     </section>

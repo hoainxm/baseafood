@@ -82,3 +82,4 @@
 2026-10-16 | balancing+db+data-layer+design-system | docs/app-map/31-can-doi-ky.md, docs/app-map/36-so-kho-thang.md, docs/app-map/03-database.md, docs/app-map/04-tang-du-lieu.md, src/design-system/README.md, docs/spec/che-do-demo.md
 2026-10-16 | permissions-ui+qr+imports | docs/spec/qr-truy-xuat-lo.md,docs/app-map/34-btp-san-xuat-kho.ba-spec.md,docs/app-map/30-nhap-hang.md,docs/app-map/33-ban-hang.md
 2026-10-16 | demo-mode,imports,production,monthly-stock,balancing | docs/spec/che-do-demo.md,docs/app-map/30-nhap-hang.md,docs/app-map/34-btp-san-xuat-kho.ba-spec.md,docs/app-map/36-so-kho-thang.md,docs/app-map/31-can-doi-ky.md,docs/app-map/38-so-ton-lien-tuc.ba-spec.md,docs/app-map/04-tang-du-lieu.md
+2026-10-16 | balancing,monthly-stock,db | docs/app-map/31-can-doi-ky.md,docs/app-map/36-so-kho-thang.md,docs/app-map/03-database.md,docs/app-map/04-tang-du-lieu.md,src/design-system/README.md,docs/spec/che-do-demo.md

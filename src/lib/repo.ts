@@ -472,6 +472,8 @@ export const BALANCING_INPUT_TABLE: TableMapping<BalancingInputItem> = {
     // DB chưa chạy 0053 thì dòng cũ vẫn lên máy chủ (khuôn 0052 / nguon_kho 0008).
     ...(x.stockLineId != null ? { stock_line_id: x.stockLineId } : {}),
     ...(x.stockLocation != null ? { stock_location: x.stockLocation } : {}),
+    // Nhóm Sổ kho tháng của lô gửi đông (mig 0068) — chỉ gửi khi đã chọn, DB chưa có cột không vỡ.
+    ...(x.stockCategory ? { stock_category: x.stockCategory } : {}),
     // Cột 0067 (ghi chú dòng): cùng khuôn — chỉ gửi khi dòng đã từng có ghi chú.
     ...(x.note != null ? { note: x.note } : {}),
   }),
@@ -492,6 +494,7 @@ export const BALANCING_INPUT_TABLE: TableMapping<BalancingInputItem> = {
     autoSource: s(r.auto_source) as GridAutoSource,
     stockLineId: r.stock_line_id == null ? undefined : s(r.stock_line_id),
     stockLocation: r.stock_location == null ? undefined : s(r.stock_location),
+    stockCategory: r.stock_category == null || r.stock_category === "" ? undefined : s(r.stock_category),
     note: r.note == null ? undefined : s(r.note),
   }),
   // Dòng ghi trước 0019 chưa có cột lưới ngày → mặc định rỗng, không vỡ tổng.

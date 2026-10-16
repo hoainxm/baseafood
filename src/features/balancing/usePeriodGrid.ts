@@ -59,12 +59,16 @@ import {
   useWipProductions,
 } from "@/lib/catalogRepo";
 import {
+  DEFAULT_LEDGER_WAREHOUSE,
+  joinDepositLocation,
   listDepositLocationOptions,
+  listDepositTargets,
   listThawLotOptions,
   syncMonthlyStockLedger,
   countMonthlyStockMismatches,
   splitDepositLocation,
   monthOfDate,
+  type DepositTargetGroup,
   type LotOption,
 } from "@/lib/balancingStockLines";
 import { sumLeftoverByDay, computeMaterialNxt, type MaterialPeriodNxtRow } from "@/lib/inventoryMaterial";
@@ -132,6 +136,12 @@ export interface PeriodGrid {
   lotOptions: (selected: string[]) => LotOption[];
   /** Kho nhận cho dòng Gửi đông: "<sổ kho>|<vị trí>". */
   depositLocationOptions: { value: string; label: string; subLabel?: string }[];
+  /** Kho gửi MẶC ĐỊNH của dòng Gửi đông mới: kho lần gửi gần nhất cùng họ NL, chưa có ⇒ Kho 1500 tấn. */
+  defaultDepositLocation: string;
+  /** Các bảng (nhóm) của Sổ kho tháng `month` để chọn chỗ gửi đông — hộp "Gửi vào sổ kho". */
+  depositTargetsFor: (month: string) => DepositTargetGroup[];
+  /** Nhóm Sổ kho tháng của lô gửi đông ĐÃ GHI của một dòng (dòng cũ chưa chọn nhóm) — rỗng nếu chưa có lô. */
+  depositLotCategory: (rowId: string) => string;
   /** Mô tả lô / kho của một dòng kho (bản in, nhãn). */
   describeStockLine: (r: BalancingInputItem) => string;
   /** Số chỗ Sổ kho tháng lệch phần kho của kỳ (VD sổ bị nạp lại đè) — 0 là khớp. */
@@ -734,6 +744,21 @@ export function usePeriodGrid(period: BalancingPeriod): PeriodGrid {
   const productionLeftoverByDate = useMemo(() => sumLeftoverByDay(productionLocks, period), [productionLocks, period]);
   const periodDomesticSales = useMemo(() => getPeriodDomesticSales(domesticSales, period), [domesticSales, period]);
 
+  /* Kho của lần gửi đông gần nhất cùng họ NL (kỳ trước) — mặc định cho dòng Gửi đông mới. */
+  const prevDepositLocation = useMemo(() => {
+    const family = getMaterialFamily(period.materialTypeName);
+    const periodById = new Map(allPeriods.map((k) => [k.id, k]));
+    let latest: { date: string; location: string } | null = null;
+    for (const r of allMaterialRows) {
+      if (r.periodId === period.id || !r.stockLocation || getBalancingStockLineKind(r) !== "freeze-deposit") continue;
+      const k = periodById.get(r.periodId);
+      if (!k || getMaterialFamily(k.materialTypeName) !== family) continue;
+      const d = k.endDate || k.startDate || "";
+      if (!latest || d > latest.date) latest = { date: d, location: r.stockLocation };
+    }
+    return latest?.location ?? joinDepositLocation(DEFAULT_LEDGER_WAREHOUSE, "");
+  }, [allMaterialRows, allPeriods, period.id, period.materialTypeName]);
+
   const prevFreezePrice = useMemo(() => {
     const family = getMaterialFamily(period.materialTypeName);
     const periodById = new Map(allPeriods.map((k) => [k.id, k]));
@@ -755,6 +780,14 @@ export function usePeriodGrid(period: BalancingPeriod): PeriodGrid {
   const selectLot = useCallback(
     (selected: string[]) => (periodMonth ? listThawLotOptions(monthlyStock, periodMonth, ngucanh.materialFamily, selected) : []),
     [monthlyStock, periodMonth, ngucanh.materialFamily]
+  );
+  const depositTargetsFor = useCallback(
+    (month: string) => (month ? listDepositTargets(monthlyStock, month, ngucanh.materialFamily) : []),
+    [monthlyStock, ngucanh.materialFamily]
+  );
+  const depositLotCategory = useCallback(
+    (rowId: string) => monthlyStock.find((l) => l.id.startsWith(`cd|${rowId}|`))?.category ?? "",
+    [monthlyStock]
   );
   const storageOptions = useMemo(
     () =>
@@ -905,6 +938,9 @@ export function usePeriodGrid(period: BalancingPeriod): PeriodGrid {
     lastFreezeDepositPrice: prevFreezePrice,
     lotOptions: selectLot,
     depositLocationOptions: storageOptions,
+    defaultDepositLocation: prevDepositLocation,
+    depositTargetsFor,
+    depositLotCategory,
     describeStockLine,
     stockLedgerMismatches: stockLedgerDiff,
     resyncStockLedger: rewriteStockLedger,

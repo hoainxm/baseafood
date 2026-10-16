@@ -4,6 +4,7 @@
 // Description: Balancing stock rows (draw-from-lot / send-to-freezer) ⇄ monthly stock ledger
 // ============================================================
 import type { BalancingInputItem, MonthlyStockLine } from "@/types";
+import { MONTHLY_STOCK_CATEGORIES } from "@/types";
 import { BALANCING_STOCK_LINE_NAMES, getBalancingStockLineKind } from "@/lib/balancingGrid";
 import { carryForwardIntoLedger, deriveRow, getNextMonth, propagateLotsForward, type MonthlyStockRow } from "@/lib/monthlyStock";
 import { num, formatDateVN } from "@/lib/format";
@@ -12,9 +13,11 @@ import { num, formatDateVN } from "@/lib/format";
  * VÌ SAO — khối NL ở Cân đối có hai dòng kho (chốt 2026-10-06):
  *   - LẤY XẢ ĐÔNG: lấy NL đông ra chế biến từ một LÔ chọn ĐÍCH DANH (dòng của Sổ kho
  *     tháng: kho · tên · invoice). Kg của tháng ghi vào cột XUẤT của đúng lô đó.
- *   - GỬI ĐÔNG: NL không chế biến, cất kho. Mỗi NGÀY GỬI là MỘT LÔ RIÊNG trong sổ (nhóm
- *     "Nguyên liệu gửi đông", invoice `GĐ-yyyymmdd`, ngày nhập = ngày gửi) — tách khỏi
- *     lô nhập khẩu / mua ngoài cho khỏi nhầm, truy ngược được về kỳ cân đối.
+ *   - GỬI ĐÔNG: NL không chế biến, cất kho. Mỗi NGÀY GỬI là MỘT LÔ RIÊNG trong sổ (invoice
+ *     `GĐ-yyyymmdd`, ngày nhập = ngày gửi), truy ngược được về kỳ cân đối. Lô vào NHÓM
+ *     người dùng chọn trong hộp "Gửi vào sổ kho" (Nguyên liệu mua ngoài / nhập khẩu / Hàng
+ *     tạm…) — bỏ nhóm riêng "Nguyên liệu gửi đông" (chốt 2026-10-16: thừa một bảng, kế
+ *     toán muốn lô gửi nằm cùng bảng với hàng cùng loại). Lô đã ghi ở nhóm cũ giữ nguyên.
  *
  * MỘT nơi giữ số kho: Sổ kho tháng. Cân đối ghi theo kiểu ĐẶT GIÁ TRỊ (không cộng dồn
  * theo phím gõ) nên chạy lại bao nhiêu lần cũng ra cùng kết quả:
@@ -28,7 +31,10 @@ import { num, formatDateVN } from "@/lib/format";
  * tháng một — đúng nút "Kế thừa & lưu vào sổ" của màn Sổ kho tháng (chốt với người dùng).
  */
 
-export const FREEZE_DEPOSIT_CATEGORY = "Nguyên liệu gửi đông";
+/** Nhóm CŨ của lô gửi đông (trước 2026-10-16). Không còn ghi mới vào đây; lô đã ghi giữ nguyên. */
+export const LEGACY_FREEZE_DEPOSIT_CATEGORY = "Nguyên liệu gửi đông";
+/** Nhóm mặc định của lô gửi đông khi người dùng chưa chọn: NL mua của đại lý trong nước. */
+export const DEFAULT_DEPOSIT_CATEGORY = "Nguyên liệu mua ngoài";
 /** Sổ kho mặc định khi vị trí gửi là kho ngoài chưa từng xuất hiện trong sổ. */
 export const DEFAULT_LEDGER_WAREHOUSE = "Kho 1500 tấn";
 
@@ -46,6 +52,16 @@ export const joinDepositLocation = (warehouse: string, storageLocation: string) 
 /** Tên ngắn của nơi để hàng: vị trí nếu có, không thì sổ kho; bỏ chữ "Kho " đầu. */
 export const shortLocationName = (l: Pick<MonthlyStockLine, "warehouse" | "storageLocation">) =>
   (l.storageLocation || l.warehouse).replace(/^Kho\s+/i, "");
+
+/**
+ * Nhãn kho RẤT GỌN cho ô chọn kho của dòng Gửi đông (kế toán: "Kho 1000 tấn" đọc K1000 là
+ * hiểu): kho xí nghiệp "Kho <số> tấn" ⇒ "K<số>"; kho ngoài bỏ chữ "Kho " đầu.
+ */
+export function shortWarehouseLabel(name: string): string {
+  const m = /^Kho\s+(\d+)\s*(tấn|t)?$/i.exec(name.trim());
+  if (m) return `K${m[1]}`;
+  return name.trim().replace(/^Kho\s+/i, "");
+}
 
 /* ---------- Tháng của sổ ---------- */
 
@@ -277,6 +293,7 @@ export function syncMonthlyStockLedger(
           b &&
           (oldParts.get(date) ?? 0) === kg &&
           a.stockLocation === b.stockLocation &&
+          (a.stockCategory ?? "") === (b.stockCategory ?? "") &&
           a.unitPrice === b.unitPrice &&
           depositName(a) === depositName(b)
         )
@@ -296,7 +313,9 @@ export function syncMonthlyStockLedger(
         const row: MonthlyStockLine = {
           id: did,
           period: month,
-          category: FREEZE_DEPOSIT_CATEGORY,
+          /* Nhóm người dùng chọn; chưa chọn ⇒ giữ nhóm lô đã ghi (lô cũ ở nhóm "Nguyên liệu
+             gửi đông" không tự dời), lô mới ⇒ nhóm mặc định. */
+          category: b?.stockCategory || existing?.category || DEFAULT_DEPOSIT_CATEGORY,
           warehouse,
           itemName: depositName(b),
           size: "",
@@ -324,6 +343,7 @@ export function syncMonthlyStockLedger(
           existing.inKg === row.inKg &&
           existing.warehouse === row.warehouse &&
           existing.storageLocation === row.storageLocation &&
+          existing.category === row.category &&
           existing.unitPrice === row.unitPrice &&
           existing.itemName === row.itemName &&
           existing.note === row.note;
@@ -435,7 +455,10 @@ export function listThawLotOptions(
       // Nhãn KHÔNG mở đầu bằng kho (người dùng bỏ 2026-10-16 — thừa); kho nằm cuối dòng phụ,
       // vẫn gõ tên kho để tìm được (Combobox tìm theo nhãn + dòng phụ).
       label: `${r.itemName}${r.size ? ` ${r.size}` : ""}${r.origin ? ` · ${r.origin}` : ""}`,
-      subLabel: `còn ${num(r.closeKg)} kg${r.importDate ? ` · nhập ${formatDateVN(r.importDate)}` : ""} · ${shortLocationName(r)}`,
+      // Giá của lô (giá lúc gửi với lô gửi đông) — kế toán thấy ngay khi chọn lô để lấy.
+      subLabel: `còn ${num(r.closeKg)} kg${r.importDate ? ` · nhập ${formatDateVN(r.importDate)}` : ""}${
+        r.unitPrice != null ? ` · giá ${num(r.unitPrice)} đ` : ""
+      } · ${shortLocationName(r)}`,
       stockKg: r.closeKg,
       price: r.unitPrice,
     }));
@@ -476,4 +499,62 @@ export function listDepositLocationOptions(
     result.push({ value: joinDepositLocation(num, vt), label: vt, subLabel: `sổ ${num}` });
   }
   return result;
+}
+
+/* ---------- Gửi đông: chọn BẢNG (nhóm) của Sổ kho tháng để gửi vào ---------- */
+
+export interface DepositTargetRow {
+  id: string;
+  category: string;
+  itemName: string;
+  size: string;
+  origin: string;
+  warehouse: string;
+  storageLocation: string;
+  closeKg: number;
+  unitPrice: number | null;
+}
+
+export interface DepositTargetGroup {
+  category: string;
+  rows: DepositTargetRow[];
+}
+
+/**
+ * Các bảng (nhóm) của Sổ kho tháng `month` để chọn chỗ GỬI ĐÔNG trong hộp "Gửi vào sổ
+ * kho" — xem và đối chiếu ngay ở Cân đối, khỏi qua lại màn Sổ kho tháng. Gồm nhóm gợi ý
+ * mặc định (kể cả đang trống) + nhóm đang có trong sổ; BỎ nhóm cũ "Nguyên liệu gửi đông".
+ * Dòng trong nhóm: tên trùng họ NL của kỳ lên đầu, rồi theo tên. Tháng chưa mở ⇒ xem
+ * trước phần kế thừa (như chọn lô lấy xả đông).
+ */
+export function listDepositTargets(lines: MonthlyStockLine[], month: string, materialFamily: string): DepositTargetGroup[] {
+  const { lines: items } = ensureMonthOpened(lines, month);
+  const byCategory = new Map<string, DepositTargetRow[]>();
+  for (const c of MONTHLY_STOCK_CATEGORIES) byCategory.set(c, []);
+  for (const l of items) {
+    if (l.period !== month || l.category === LEGACY_FREEZE_DEPOSIT_CATEGORY) continue;
+    const d = deriveRow(l);
+    const list = byCategory.get(l.category) ?? [];
+    list.push({
+      id: l.id,
+      category: l.category,
+      itemName: l.itemName,
+      size: l.size,
+      origin: l.origin,
+      warehouse: l.warehouse,
+      storageLocation: l.storageLocation,
+      closeKg: d.closeKg,
+      unitPrice: l.unitPrice,
+    });
+    byCategory.set(l.category, list);
+  }
+  return [...byCategory.entries()].map(([category, rows]) => ({
+    category,
+    rows: rows.sort(
+      (a, b) =>
+        scoreNameMatch(b.itemName, materialFamily) - scoreNameMatch(a.itemName, materialFamily) ||
+        a.itemName.localeCompare(b.itemName, "vi") ||
+        (a.origin || "").localeCompare(b.origin || "")
+    ),
+  }));
 }

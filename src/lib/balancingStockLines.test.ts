@@ -1,7 +1,10 @@
 import { describe, expect, test } from "vitest";
 import type { BalancingInputItem, MonthlyStockLine } from "@/types";
 import {
-  FREEZE_DEPOSIT_CATEGORY,
+  DEFAULT_DEPOSIT_CATEGORY,
+  LEGACY_FREEZE_DEPOSIT_CATEGORY,
+  listDepositTargets,
+  shortWarehouseLabel,
   ensureMonthOpened,
   listDepositLocationOptions,
   listThawLotOptions,
@@ -171,13 +174,13 @@ describe("syncMonthlyStockLedger — Lấy xả đông = cột Xuất của lô 
 
 describe("syncMonthlyStockLedger — Gửi đông = lô MỚI theo ngày gửi", () => {
   const warehouse = "Kho 1500 tấn|Kho Hồng Phú";
-  test("mỗi ngày gửi một lô, nhóm riêng, invoice GĐ-ngày; đổi kho đổi vị trí; xoá dòng gỡ lô", () => {
+  test("mỗi ngày gửi một lô, nhóm mặc định NL mua ngoài, invoice GĐ-ngày; đổi kho đổi vị trí; xoá dòng gỡ lô", () => {
     const r = stockRow("g1", "gui", { "2026-10-02": -400, "2026-10-03": -100 }, { stockLocation: warehouse });
     const a = syncMonthlyStockLedger([lot("X", "2026-10")], [], [r], ctx);
     const l = a.lines.find((x) => x.id === freezeDepositRowId("g1", "2026-10-02"))!;
     expect(l).toMatchObject({
       period: "2026-10",
-      category: FREEZE_DEPOSIT_CATEGORY,
+      category: DEFAULT_DEPOSIT_CATEGORY,
       warehouse: "Kho 1500 tấn",
       storageLocation: "Kho Hồng Phú",
       itemName: "Bạch tuộc 2 da",
@@ -269,7 +272,7 @@ describe("countMonthlyStockMismatches — kiểm khớp, ghi lại sửa đượ
 });
 
 describe("danh sách chọn", () => {
-  test("lô: còn tồn, khớp tên họ NL lên đầu, nhãn tên · invoice (không mở đầu bằng kho), dòng phụ còn kg · nhập · kho", () => {
+  test("lô: còn tồn, khớp tên họ NL lên đầu, nhãn tên · invoice (không mở đầu bằng kho), dòng phụ còn kg · nhập · giá · kho", () => {
     const items = [
       lot("A", "2026-10", { itemName: "CÁ SÒNG", storageLocation: "Kho Ánh Dương" }),
       lot("B", "2026-10", { outKg: 1000 }), // hết hàng ⇒ ẩn
@@ -278,7 +281,8 @@ describe("danh sách chọn", () => {
     const ch = listThawLotOptions(items, "2026-10", "Bạch tuộc 2 da");
     expect(ch.map((c) => c.value)).toEqual(["C", "A"]);
     expect(ch[0].label).toBe("B.TUỘC  2 DA · SBT001");
-    expect(ch[0].subLabel).toMatch(/^còn 1\.000 kg · nhập 12\/08\/2026 · Hồng Phú$/);
+    // Có giá lô (giá lúc gửi với lô gửi đông) để kế toán thấy khi chọn lô lấy xả đông.
+    expect(ch[0].subLabel).toMatch(/^còn 1\.000 kg · nhập 12\/08\/2026 · giá 140\.000 đ · Hồng Phú$/);
     // Lô đang chọn vẫn hiện dù đã hết.
     expect(listThawLotOptions(items, "2026-10", "Bạch tuộc 2 da", ["B"]).some((c) => c.value === "B")).toBe(true);
   });
@@ -293,5 +297,56 @@ describe("danh sách chọn", () => {
       "Kho 1500 tấn|Kho Ánh Dương",
       "Kho 1500 tấn|Kho Hồng Phú",
     ]);
+  });
+});
+
+describe("Gửi đông vào BẢNG người dùng chọn (chốt 2026-10-16, bỏ nhóm riêng)", () => {
+  const warehouse = "Kho 1000 tấn|";
+  test("chọn nhóm ⇒ lô vào đúng nhóm; đổi nhóm ⇒ lô dời theo; giá gửi thành đơn giá lô", () => {
+    const r = stockRow("g1", "gui", { "2026-10-02": -300 }, { stockLocation: warehouse, stockCategory: "Hàng tạm", unitPrice: 147267 });
+    const a = syncMonthlyStockLedger([lot("X", "2026-10")], [], [r], ctx);
+    const did = freezeDepositRowId("g1", "2026-10-02");
+    expect(a.lines.find((x) => x.id === did)).toMatchObject({ category: "Hàng tạm", unitPrice: 147267, inKg: 300 });
+    const r2 = { ...r, stockCategory: "Nguyên liệu nhập khẩu" };
+    const b = syncMonthlyStockLedger(a.lines, [r], [r2], ctx);
+    expect(b.changed).toBe(true);
+    expect(b.lines.find((x) => x.id === did)!.category).toBe("Nguyên liệu nhập khẩu");
+  });
+  test("dòng cũ chưa chọn nhóm: lô đã ghi ở nhóm cũ GIỮ NGUYÊN, không tự dời", () => {
+    const did = freezeDepositRowId("g1", "2026-10-02");
+    const old = { ...lot(did, "2026-10", { category: LEGACY_FREEZE_DEPOSIT_CATEGORY, openKg: 0, inKg: 300 }), origin: "GĐ-20261002" };
+    const r = stockRow("g1", "gui", { "2026-10-02": -300 }, { stockLocation: warehouse });
+    const r2 = { ...r, dailyQuantities: { "2026-10-02": -350 } };
+    const b = syncMonthlyStockLedger([old], [r], [r2], ctx);
+    expect(b.lines.find((x) => x.id === did)).toMatchObject({ category: LEGACY_FREEZE_DEPOSIT_CATEGORY, inKg: 350 });
+  });
+});
+
+describe("listDepositTargets — bảng của Sổ kho tháng để chọn chỗ gửi", () => {
+  test("có nhóm gợi ý kể cả trống, bỏ nhóm cũ, dòng trùng họ NL lên đầu", () => {
+    const lines = [
+      lot("A", "2026-10", { itemName: "SABA", category: "Nguyên liệu nhập khẩu" }),
+      lot("B", "2026-10", { itemName: "B.TUỘC 2 DA", category: "Nguyên liệu mua ngoài" }),
+      lot("C", "2026-10", { itemName: "ABC", category: "Nguyên liệu mua ngoài" }),
+      lot("D", "2026-10", { itemName: "Bạch tuộc 2 da", category: LEGACY_FREEZE_DEPOSIT_CATEGORY }),
+      lot("E", "2026-09", { itemName: "tháng khác", category: "Hàng tạm", outKg: 1000 }),
+    ];
+    const g = listDepositTargets(lines, "2026-10", "Bạch tuộc 2 da");
+    expect(g.map((x) => x.category)).toEqual(["Nguyên liệu nhập khẩu", "Nguyên liệu mua ngoài", "Hàng tạm", "Bán thành phẩm", "Thành phẩm đóng gói"]);
+    expect(g[1].rows.map((x) => x.id)).toEqual(["B", "C"]);
+    expect(g.flatMap((x) => x.rows).some((x) => x.id === "D")).toBe(false);
+    expect(g[0].rows[0]).toMatchObject({ closeKg: 1000, unitPrice: 140000 });
+  });
+  test("tháng chưa mở ⇒ xem trước phần kế thừa", () => {
+    const g = listDepositTargets([lot("L1", "2026-09", { outKg: 200 })], "2026-10", "Bạch tuộc 2 da");
+    expect(g[1].rows[0]).toMatchObject({ id: "carry|L1", closeKg: 800 });
+  });
+});
+
+describe("shortWarehouseLabel", () => {
+  test("Kho <số> tấn ⇒ K<số>; kho ngoài bỏ chữ Kho", () => {
+    expect(shortWarehouseLabel("Kho 1000 tấn")).toBe("K1000");
+    expect(shortWarehouseLabel("Kho 1500 tấn")).toBe("K1500");
+    expect(shortWarehouseLabel("Kho Phước Cơ")).toBe("Phước Cơ");
   });
 });

@@ -26,7 +26,11 @@ import {
   useMaterialImports,
   useMonthlyStock,
   useWipProductions,
+  isServerConnected,
 } from "@/lib/catalogRepo";
+import { useFormDraft } from "@/lib/formDraft";
+import { useAuth } from "@/lib/auth";
+import { DraftRestoredNotice } from "@/features/shared/DraftRestoredNotice";
 import { syncMonthlyStockLedger } from "@/lib/balancingStockLines";
 import { usePeriodGrid } from "./usePeriodGrid";
 import { MaterialGrid } from "./MaterialGrid";
@@ -143,8 +147,46 @@ export default function BalancingScreen() {
   const [editing, setEditing] = useState<BalancingPeriod | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [errors, setErrors] = useState<FieldError[]>([]);
+  /** Hộp kỳ bị đóng ngang (bấm ra ngoài / Esc) ⇒ giữ số đang gõ làm nháp (quy tắc 17). */
+  const [keptEditing, setKeptEditing] = useState<{ editing: BalancingPeriod; isAdding: boolean } | null>(null);
+
+  /* Tự lưu NHÁP hộp Tạo / Sửa kỳ (quy tắc 17, lib/formDraft.ts). Lưới số của kỳ vốn ghi
+     thẳng vào sổ theo từng phím nên không cần nháp; ô Ghi chú tự lưu khi rời trang. */
+  const { profile } = useAuth();
+  const draftValue = editing ? { editing, isAdding } : keptEditing;
+  const periodDraft = useFormDraft({
+    form: "balancing-period",
+    account: profile?.username ?? "",
+    accountReady: profile !== null || !isServerConnected,
+    value: draftValue,
+    isEmpty: (d) => {
+      if (!d) return true;
+      if (d.isAdding)
+        return !d.editing.materialTypeName.trim() && d.editing.totalInputKg == null && d.editing.processingCostPerKg == null;
+      const stored = periods.find((k) => k.id === d.editing.id);
+      return !stored || JSON.stringify(stored) === JSON.stringify(d.editing);
+    },
+    onRestore: (d) => {
+      if (!d) return;
+      setEditing(d.editing);
+      setIsAdding(d.isAdding);
+      setErrors([]);
+    },
+  });
+  const cancelPeriodDialog = () => {
+    setEditing(null);
+    setKeptEditing(null);
+    periodDraft.discard();
+  };
 
   const openAdd = () => {
+    if (keptEditing?.isAdding) {
+      setEditing(keptEditing.editing);
+      setIsAdding(true);
+      setKeptEditing(null);
+      setErrors([]);
+      return;
+    }
     const today = dateToIso(new Date());
     setEditing({
       id: uid(),
@@ -189,6 +231,7 @@ export default function BalancingScreen() {
       notify.saved("Đã lưu thay đổi");
     }
     setEditing(null);
+    setKeptEditing(null);
   };
 
   const deletePeriod = (k: BalancingPeriod) => {
@@ -375,7 +418,11 @@ export default function BalancingScreen() {
       <Dialog
         open={editing !== null}
         onOpenChange={(o) => {
-          if (!o) setEditing(null);
+          // Đóng ngang ⇒ giữ số đang gõ làm nháp; chỉ Hủy / Lưu mới bỏ.
+          if (!o) {
+            if (editing) setKeptEditing({ editing, isAdding });
+            setEditing(null);
+          }
         }}
       >
         <DialogContent className="max-h-[92dvh] overflow-y-auto w-full sm:max-w-3xl lg:max-w-5xl">
@@ -384,6 +431,7 @@ export default function BalancingScreen() {
               {isAdding ? "Tạo kỳ cân đối" : "Sửa kỳ cân đối"}
             </DialogTitle>
           </DialogHeader>
+          <DraftRestoredNotice savedAt={periodDraft.restoredAt} onDiscard={cancelPeriodDialog} />
 
           {editing && (
             <div className="space-y-6 py-2">
@@ -470,7 +518,7 @@ export default function BalancingScreen() {
           )}
 
           <DialogFooter>
-            <Button variant="outline" size="lg" onClick={() => setEditing(null)}>
+            <Button variant="outline" size="lg" onClick={cancelPeriodDialog}>
               Hủy
             </Button>
             <Button variant="save"

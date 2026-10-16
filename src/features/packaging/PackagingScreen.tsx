@@ -16,8 +16,12 @@ import {
   useProducts,
   useLotInputs,
   useLotDispatches,
+  isServerConnected,
 } from "@/lib/catalogRepo";
 import { LotInputPicker, LotQrLabels } from "@/features/shared";
+import { DraftRestoredNotice } from "@/features/shared/DraftRestoredNotice";
+import { useFormDraft } from "@/lib/formDraft";
+import { useAuth } from "@/lib/auth";
 import { formatFinishedGoodLotLabel, buildLotNode } from "@/lib/lotTraceability";
 import {
   computeWipStock,
@@ -103,6 +107,9 @@ export default function PackagingScreen() {
   const [workshop, setWorkshop] = useState<Workshop | "Tất cả">("Đông");
 
   const [form, setForm] = useState<FormDG | null>(null);
+  /** Phiếu gõ dở khi hộp bị đóng ngang (bấm ra ngoài / Esc) — mở lại "Ghi phiếu" là số cũ quay về.
+   *  Chỉ Hủy hoặc Lưu mới bỏ (quy tắc 17). */
+  const [keptForm, setKeptForm] = useState<FormDG | null>(null);
   const [errors, setErrors] = useState<FieldError[]>([]);
   // Truy xuất lô (docs/spec/qr-truy-xuat-lo.md): gắn lô BTP cho phiếu + in tem lô TP.
   const [lotInputs] = useLotInputs();
@@ -169,6 +176,12 @@ export default function PackagingScreen() {
   };
 
   const openAdd = () => {
+    if (keptForm) {
+      setForm(keptForm);
+      setKeptForm(null);
+      setErrors([]);
+      return;
+    }
     setForm({
       date: postingDate,
       // Quản đốc: phiếu mới mở ở xưởng mình nếu xưởng đang lọc ngoài phạm vi.
@@ -188,6 +201,29 @@ export default function PackagingScreen() {
   };
   const setField = <K extends keyof FormDG>(k: K, v: FormDG[K]) =>
     setForm((p) => (p ? { ...p, [k]: v } : p));
+
+  /* Tự lưu NHÁP phiếu đóng gói đang gõ (quy tắc 17, lib/formDraft.ts) — quay lại trang là
+     hộp phiếu tự mở lại đúng số đang gõ dở. Lưu xong / Hủy ⇒ nháp tự xoá. */
+  const { profile } = useAuth();
+  const packagingDraft = useFormDraft({
+    form: "packaging",
+    account: profile?.username ?? "",
+    accountReady: profile !== null || !isServerConnected,
+    value: form ?? keptForm,
+    isEmpty: (f) =>
+      !f ||
+      (!f.fromProductId && !f.toProductId && !f.inputKg && !f.outputKg && !f.inputBlocks && !f.outputUnits && !f.note.trim()),
+    onRestore: (f) => {
+      setForm(f);
+      setErrors([]);
+    },
+  });
+  /** Hủy = bỏ hẳn phiếu đang gõ (cả nháp). */
+  const cancelForm = () => {
+    setForm(null);
+    setKeptForm(null);
+    packagingDraft.discard();
+  };
 
   const wipAvailable = form?.fromProductId
     ? getAvailableKg(wipStock, form.fromProductId, form.fromSpec.trim())
@@ -227,6 +263,7 @@ export default function PackagingScreen() {
       { label: "In tem", onClick: () => setLotLabel(p) }
     );
     setForm(null);
+    setKeptForm(null);
   };
 
   const remove = (r: Packaging) => {
@@ -425,7 +462,16 @@ export default function PackagingScreen() {
       )}
 
       {/* Dialog ghi phiếu */}
-      <Dialog open={form !== null} onOpenChange={(o) => !o && setForm(null)}>
+      <Dialog
+        open={form !== null}
+        onOpenChange={(o) => {
+          // Đóng ngang (bấm ra ngoài / Esc) ⇒ GIỮ phiếu gõ dở làm nháp, không mất số.
+          if (!o) {
+            setKeptForm(form);
+            setForm(null);
+          }
+        }}
+      >
         <DialogContent className="max-h-[92dvh] w-full overflow-y-auto sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle className="text-2xl">Ghi phiếu đóng gói</DialogTitle>
@@ -436,6 +482,7 @@ export default function PackagingScreen() {
 
           {form && (
             <div className="space-y-6 py-2">
+              <DraftRestoredNotice savedAt={packagingDraft.restoredAt} onDiscard={cancelForm} />
               <ErrorSummary errors={errors} />
               <RequiredLegend />
 
@@ -533,7 +580,7 @@ export default function PackagingScreen() {
           )}
 
           <DialogFooter>
-            <Button variant="outline" size="lg" onClick={() => setForm(null)}>
+            <Button variant="outline" size="lg" onClick={cancelForm}>
               Hủy
             </Button>
             <Button variant="save"

@@ -91,6 +91,8 @@ import {
   productionFrozenWorkshop,
 } from "@/lib/frozenStockLines";
 import { useCan } from "@/features/shared/PermissionProvider";
+import { DraftRestoredNotice } from "@/features/shared/DraftRestoredNotice";
+import { useDialogDraft } from "@/lib/formDraft";
 import {
   AlertTriangle,
   ArrowDownToLine,
@@ -520,8 +522,34 @@ export default function MonthlyStockScreen() {
   // ---------- Thêm / sửa dòng ----------
   const [form, setForm] = useState<FormRow | null>(null);
   const [errors, setErrors] = useState<FieldError[]>([]);
+  /* Nháp hộp Thêm / Sửa dòng (quy tắc 17): đóng ngang vẫn giữ, rời trang quay lại vẫn còn. */
+  const formDraft = useDialogDraft<FormRow>({
+    form: "monthly-stock-row",
+    value: form,
+    setValue: setForm,
+    isEmpty: (f) => {
+      if (!f.id)
+        return (
+          !f.itemName.trim() && !f.size.trim() && !f.origin.trim() && f.unitPrice == null &&
+          [f.openKg, f.inKg, f.outKg, f.openCtn, f.inCtn, f.outCtn].every((v) => !v)
+        );
+      const l = lines.find((x) => x.id === f.id);
+      return (
+        !!l &&
+        l.itemName === f.itemName && l.size === f.size && l.origin === f.origin && l.importDate === f.importDate &&
+        l.storageLocation === f.storageLocation && l.kgPerCtn === f.kgPerCtn && l.unitPrice === f.unitPrice &&
+        (l.openKg || null) === f.openKg && (l.inKg || null) === f.inKg && (l.outKg || null) === f.outKg
+      );
+    },
+  });
 
   const openAdd = (pickedCategory?: string) => {
+    const kept = formDraft.takeKept();
+    if (kept && !kept.id) {
+      setForm(kept);
+      setErrors([]);
+      return;
+    }
     // Đang XEM TRƯỚC: lưu dòng mới sẽ TỰ kế thừa & lưu bảng kế thừa trước (luuDong →
     // soNenDeGhi) — trước đây chặn vì lưu riêng 1 dòng làm bảng kế thừa chưa lưu trôi mất.
     // catChon = nhóm của bảng bấm nút (điền sẵn nhóm, khỏi chọn lại). Không có ⇒ nhóm đầu.
@@ -531,6 +559,12 @@ export default function MonthlyStockScreen() {
     setErrors([]);
   };
   const openEdit = (r: MonthlyStockRow) => {
+    const kept = formDraft.takeKept();
+    if (kept && kept.id === r.id) {
+      setForm(kept);
+      setErrors([]);
+      return;
+    }
     setForm({
       id: r.id,
       category: r.category,
@@ -586,7 +620,7 @@ export default function MonthlyStockScreen() {
     const { baseLines, carriedCount } = form.id ? { baseLines: lines, carriedCount: 0 } : baseLinesForWrite();
     writeLines(form.id ? lines.map((l) => (l.id === row.id ? row : l)) : [...baseLines, row]);
     notifyCarried(carriedCount);
-    setForm(null);
+    formDraft.done();
     notify.saved(form.id ? `Đã sửa dòng ${row.itemName}` : `Đã thêm dòng ${row.itemName}`);
   };
 
@@ -724,8 +758,21 @@ export default function MonthlyStockScreen() {
     reason: string;
   } | null>(null);
   const [transferErrors, setTransferErrors] = useState<FieldError[]>([]);
+  /* Nháp hộp Thao tác (lấy ra · nhập thêm · chuyển) — quy tắc 17. */
+  const actionDraft = useDialogDraft({
+    form: "monthly-stock-action",
+    value: action,
+    setValue: setAction,
+    isEmpty: (a) => !a.kg && !a.reason.trim() && !a.location.trim(),
+  });
 
   const openAction = (row: MonthlyStockRow, kind: LotActionKind = "out") => {
+    const kept = actionDraft.takeKept();
+    if (kept && kept.row.id === row.id && kept.kind === kind) {
+      setAction(kept);
+      setTransferErrors([]);
+      return;
+    }
     setAction({ row, kind, kg: null, location: "", date: todayIso(), reason: "" });
     setTransferErrors([]);
   };
@@ -758,7 +805,7 @@ export default function MonthlyStockScreen() {
     const prevRows = lines;
     const updatedLines = lines.map((l) => (l.id === result.line.id ? result.line : l));
     writeLines(result.splitLine ? [...updatedLines, result.splitLine] : updatedLines);
-    setAction(null);
+    actionDraft.done();
     notify.saved(`${row.itemName}: ${actionText}`, () => writeLines(prevRows));
   };
 
@@ -1790,7 +1837,7 @@ export default function MonthlyStockScreen() {
       )}
 
       {/* Dialog thêm / sửa dòng */}
-      <Dialog open={!!form} onOpenChange={(o) => !o && setForm(null)}>
+      <Dialog open={!!form} onOpenChange={(o) => !o && formDraft.dismiss()}>
         <DialogContent className="w-full sm:max-w-3xl">
           <DialogHeader>
             <DialogTitle className="text-2xl">{form?.id ? "Sửa dòng kho" : "Thêm dòng kho"}</DialogTitle>
@@ -1798,6 +1845,7 @@ export default function MonthlyStockScreen() {
               {formatMonthLabel(month)} — nhập tồn đầu · nhập · xuất theo kg. Tồn cuối và tiền còn lại tự tính.
             </DialogDescription>
           </DialogHeader>
+          <DraftRestoredNotice savedAt={formDraft.restoredAt} onDiscard={formDraft.cancel} />
           {form && (
             <div className="max-h-[70dvh] space-y-4 overflow-y-auto py-2 pr-1">
               <ErrorSummary errors={errors} />
@@ -1880,7 +1928,7 @@ export default function MonthlyStockScreen() {
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setForm(null)}>
+            <Button variant="outline" onClick={formDraft.cancel}>
               Hủy
             </Button>
             <Button variant="save" onClick={saveRow} title="Ghi dòng này vào sổ tháng đang xem. Tồn cuối và tiền còn lại tự tính, không phải gõ.">
@@ -1892,7 +1940,7 @@ export default function MonthlyStockScreen() {
       </Dialog>
 
       {/* Dialog thao tác một dòng: lấy ra dùng · nhập thêm · chuyển vị trí */}
-      <Dialog open={!!action} onOpenChange={(o) => !o && setAction(null)}>
+      <Dialog open={!!action} onOpenChange={(o) => !o && actionDraft.dismiss()}>
         <DialogContent className="w-full sm:max-w-xl">
           <DialogHeader>
             <DialogTitle className="text-2xl">
@@ -1905,6 +1953,7 @@ export default function MonthlyStockScreen() {
                 : ""}
             </DialogDescription>
           </DialogHeader>
+          <DraftRestoredNotice savedAt={actionDraft.restoredAt} onDiscard={actionDraft.cancel} />
           {action && (
             <div className="space-y-4 py-2">
               <ErrorSummary errors={transferErrors} />
@@ -1991,7 +2040,7 @@ export default function MonthlyStockScreen() {
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setAction(null)}>
+            <Button variant="outline" onClick={actionDraft.cancel}>
               Hủy
             </Button>
             <Button variant="save" onClick={saveAction} title="Ghi thao tác này vào sổ tháng đang xem, kèm ghi chú ngày và số kg ở nhật ký dòng. Có nút Hoàn tác sau khi lưu.">

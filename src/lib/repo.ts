@@ -1994,6 +1994,57 @@ export function setWriteGuard(guard: WriteGuard | null): void {
  * cập nhật trạng thái, KHÔNG ghi lại, không đụng hàng chờ.
  */
 const TABLE_CHANGE_EVENT = "bsf:bang-doi";
+/** Yêu cầu các hook đang mở NẠP LẠI bảng từ máy chủ (sau một thao tác ghi thẳng trên máy chủ, VD gộp mặt hàng). */
+const TABLE_RELOAD_EVENT = "bsf:table-reload";
+
+/** Báo các bảng `tables` nạp lại từ máy chủ — bản sao dưới máy theo đúng số mới. */
+export function reloadTables(tables: string[]): void {
+  window.dispatchEvent(new CustomEvent(TABLE_RELOAD_EVENT, { detail: tables }));
+}
+
+/* ---------- Gộp mặt hàng trùng tên (hàm máy chủ 0069, một giao dịch) ---------- */
+
+/** Bảng có cột trỏ mặt hàng — nạp lại sau khi gộp / hoàn tác. */
+export const PRODUCT_REFERENCE_TABLES = [
+  "products",
+  "production_wips",
+  "balancing_outputs",
+  "sales_items",
+  "order_items",
+  "export_items",
+  "finished_goods_opening_stock",
+  "packagings",
+];
+
+export type ProductMergeResult = { ok: true; payload: unknown; movedCount: number } | { ok: false; error: string };
+
+/**
+ * Gộp mặt hàng `dropId` vào `keepId` (cùng tên) TRÊN MÁY CHỦ — chuyển mọi dòng sổ rồi xoá
+ * mục trùng trong một giao dịch (supabase/migrations/0069). Chỉ chạy khi có máy chủ;
+ * chế độ localStorage ⇒ màn gọi tự gộp qua các hook.
+ */
+export async function mergeProductsOnServer(keepId: string, dropId: string): Promise<ProductMergeResult> {
+  if (!supabase) return { ok: false, error: "Chưa nối máy chủ." };
+  const { data, error } = await supabase.rpc("merge_products", { p_site: SITE_ID, p_keep: keepId, p_drop: dropId });
+  if (error) {
+    const missing = /merge_products|function .* does not exist|PGRST202/i.test(`${error.code} ${error.message}`);
+    return { ok: false, error: missing ? "Máy chủ chưa có hàm gộp (chạy migration 0069)." : error.message };
+  }
+  const moved = ((data as { moved?: Record<string, unknown[]> } | null)?.moved ?? {}) as Record<string, unknown[]>;
+  reloadTables(PRODUCT_REFERENCE_TABLES);
+  return { ok: true, payload: data, movedCount: Object.values(moved).reduce((n, ids) => n + ids.length, 0) };
+}
+
+/** Hoàn tác một lần gộp (payload trả về từ `mergeProductsOnServer`). */
+export async function undoProductMergeOnServer(payload: unknown): Promise<{ ok: boolean; error?: string }> {
+  if (!supabase) return { ok: false, error: "Chưa nối máy chủ." };
+  const { error } = await supabase.rpc("undo_merge_products", { p_site: SITE_ID, p_payload: payload });
+  if (error) return { ok: false, error: error.message };
+  reloadTables(PRODUCT_REFERENCE_TABLES);
+  return { ok: true };
+}
+
+export { hasSupabase as isServerConnected };
 type TableChangeEvent = { localKey: string; source: string; rows: unknown[] };
 
 export function useTable<T>(mapping: TableMapping<T>, seed: () => T[] = () => []) {
@@ -2153,6 +2204,13 @@ export function useTable<T>(mapping: TableMapping<T>, seed: () => T[] = () => []
 
     void load(true);
 
+    // Có thao tác ghi thẳng trên máy chủ (VD gộp mặt hàng) ⇒ nạp lại ngay bảng liên quan.
+    const onReloadRequest = (e: Event) => {
+      const tables = (e as CustomEvent<string[]>).detail;
+      if (Array.isArray(tables) && tables.includes(mapping.table)) void load(false);
+    };
+    window.addEventListener(TABLE_RELOAD_EVENT, onReloadRequest);
+
     // Quay lại tab sau ≥30 giây ⇒ nạp lại (máy khác có thể đã sửa/xóa dòng).
     const onTabVisible = () => {
       if (document.visibilityState === "visible" && Date.now() - lastLoadAt > 30_000)
@@ -2170,6 +2228,7 @@ export function useTable<T>(mapping: TableMapping<T>, seed: () => T[] = () => []
       isCancelled = true;
       document.removeEventListener("visibilitychange", onTabVisible);
       window.removeEventListener("online", onOnline);
+      window.removeEventListener(TABLE_RELOAD_EVENT, onReloadRequest);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapping.table]);

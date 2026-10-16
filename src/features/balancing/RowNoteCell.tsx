@@ -4,7 +4,8 @@
 // ============================================================
 // Gõ chữ tự do cho từng dòng (khối NL + khối bán thành phẩm). KHÔNG ghi theo từng phím
 // như ô số (ghi sổ mỗi phím là thừa với chữ) — lưu khi rời ô / Enter; Esc trả chữ cũ.
-import { useRef, useState } from "react";
+// Rời trang khi đang gõ (ô bị gỡ trước khi kịp blur) ⇒ VẪN lưu chữ đang gõ (quy tắc 17).
+import { useEffect, useRef, useState } from "react";
 import { Input } from "@/design-system";
 
 export function RowNoteCell({
@@ -21,6 +22,16 @@ export function RowNoteCell({
   /** Esc ⇒ bỏ bản nháp (blur ngay sau đó KHÔNG được lưu — state chưa kịp cập nhật). */
   const cancelled = useRef(false);
   const shown = draft ?? value;
+  /* Bản mới nhất cho bước lưu-khi-gỡ (chuyển trang giữa chừng). */
+  const latest = useRef({ draft, value, onCommit });
+  latest.current = { draft, value, onCommit };
+  useEffect(
+    () => () => {
+      const { draft: d, value: v, onCommit: commitNote } = latest.current;
+      if (!cancelled.current && d != null && d.trim() !== v.trim()) commitNote(d.trim());
+    },
+    []
+  );
   const commit = () => {
     if (cancelled.current) {
       cancelled.current = false;

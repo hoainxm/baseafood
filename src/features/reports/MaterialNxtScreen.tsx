@@ -64,6 +64,8 @@ import {
   Store,
   Truck,
 } from "lucide-react";
+import { useDraftAccount, useFormDraft } from "@/lib/formDraft";
+import { DraftRestoredNotice } from "@/features/shared/DraftRestoredNotice";
 
 const WORKSHOP_OPTIONS: ComboboxOption[] = [
   { value: "Tất cả", label: "Tất cả xưởng" },
@@ -118,6 +120,20 @@ export default function MaterialNxtScreen() {
   const [isOpeningOpen, setIsOpeningOpen] = useState(false);
   const [form, setForm] = useState<OpeningForm | null>(null);
   const [errors, setErrors] = useState<FieldError[]>([]);
+  /* Tự lưu NHÁP dòng tồn đầu đang khai (quy tắc 17, lib/formDraft.ts) — quay lại trang là hộp
+     khai tồn đầu tự mở lại đúng số đang gõ. Lưu / Hủy ⇒ nháp tự xoá. */
+  const draftAccount = useDraftAccount();
+  const openingDraft = useFormDraft({
+    form: "material-opening-stock",
+    ...draftAccount,
+    value: form,
+    isEmpty: (f) => !f || (!f.materialTypeName.trim() && f.quantityKg == null && !f.note.trim()),
+    onRestore: (f) => {
+      if (!f) return;
+      setForm(f);
+      setIsOpeningOpen(true);
+    },
+  });
 
   const workshop = workshopFilter === "Tất cả" ? undefined : (workshopFilter as Workshop);
 
@@ -460,6 +476,7 @@ export default function MaterialNxtScreen() {
               ngày đó coi như đã nằm trong số này, nhập từ ngày đó trở đi cộng thêm.
             </DialogDescription>
           </DialogHeader>
+          <DraftRestoredNotice savedAt={openingDraft.restoredAt} onDiscard={() => { openingDraft.discard(); setForm(null); }} />
 
           <div className="space-y-4 py-2">
             {/* Danh sách đang có */}

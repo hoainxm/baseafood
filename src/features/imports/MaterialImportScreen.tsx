@@ -90,6 +90,9 @@ import { BulkTypeChangeDialog } from "./BulkTypeChange";
 import { ImportLinesTable } from "./ImportLinesTable";
 import { DayShipmentList } from "./ImportSteps";
 import { DailyScrapSection } from "./DailyScrapSection";
+import { DraftRestoredNotice } from "@/features/shared/DraftRestoredNotice";
+import { useFormDraft } from "@/lib/formDraft";
+import { isServerConnected } from "@/lib/catalogRepo";
 import {
   DEFAULT_CATEGORY,
   WORKSHOPS,
@@ -178,6 +181,42 @@ export default function MaterialImportScreen() {
   /** Đóng hộp chốt bằng "Quay lại cân phế liệu" ⇒ đưa con trỏ vào ô kg phế liệu
    *  (thay vì Radix trả focus về nút Chốt ngày). */
   const focusScrapOnClose = useRef(false);
+
+  /* ---- Tự lưu NHÁP phiếu đang gõ (quy tắc 17, lib/formDraft.ts): sang trang khác, tải
+     lại, đăng xuất rồi vào lại vẫn còn. Phiếu về trống (lưu xong / bỏ) ⇒ nháp tự xoá. ---- */
+  const importDraft = useFormDraft({
+    form: "imports",
+    account: profile?.username ?? "",
+    accountReady: profile !== null || !isServerConnected,
+    value: { session, sessionShipmentId, editRowIds, tableRows, splitDates, scrapEdit, lastCategory },
+    isEmpty: (d) =>
+      !d.scrapEdit &&
+      (!d.session ||
+        (d.editRowIds === null &&
+          !d.session.supplierName.trim() &&
+          !d.session.driverName.trim() &&
+          !d.session.licensePlate.trim() &&
+          !d.session.note.trim() &&
+          !d.session.backdateReason.trim() &&
+          !d.session.ssccCode.trim() &&
+          !d.session.scanPath &&
+          d.tableRows.every((l) => !l.quantityKg && !l.materialTypeName.trim() && l.unitPrice == null))),
+    onRestore: (d) => {
+      setMode("entry");
+      setSession(d.session);
+      setSessionShipmentId(d.sessionShipmentId);
+      setEditRowIds(d.editRowIds);
+      setTableRows(d.tableRows);
+      setSplitDates(d.splitDates);
+      setScrapEdit(d.scrapEdit);
+      setLastCategory(d.lastCategory);
+    },
+  });
+  const discardImportDraft = () => {
+    importDraft.discard();
+    setScrapEdit(null);
+    resetSession();
+  };
 
   /* Chốt ngày */
   const [isConfirmingLock, setIsConfirmingLock] = useState(false);
@@ -400,9 +439,10 @@ export default function MaterialImportScreen() {
 
   // Form-first: vào "Ghi nhập" mà chưa có phiếu → tự mở phiếu trống (không modal).
   useEffect(() => {
-    if (mode === "entry" && session === null && !isLoading) openAdd();
+    // Đợi bước mở lại nháp xong (quy tắc 17) — kẻo phiếu trống đè lên nháp.
+    if (mode === "entry" && session === null && !isLoading && importDraft.isReady) openAdd();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, session, isLoading]);
+  }, [mode, session, isLoading, importDraft.isReady]);
 
   // Trong "Ghi nhập", ngày+xưởng của PHIẾU là ngữ cảnh → đồng bộ về bộ lọc để
   // sổ/phế liệu/chốt/tổng ngày bám đúng ngày đang ghi.
@@ -1639,6 +1679,8 @@ export default function MaterialImportScreen() {
       {mode === "entry" && (
         <DailyTaskReminder isLocked={isImportLockedToday} task={`chuyến nhập nguyên liệu hôm nay — xưởng ${recordWorkshop}`} />
       )}
+
+      {mode === "entry" && <DraftRestoredNotice savedAt={importDraft.restoredAt} onDiscard={discardImportDraft} />}
 
       {mode === "entry" && entryForm}
 

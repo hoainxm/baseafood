@@ -305,3 +305,4 @@ export const useUserPermissions = () => useTable(USER_PERMISSION_TABLE);
 
 /** Nạp bộ demo hàng loạt không ghi nhật ký (lib/repo.ts) — chỉ DemoPackLoader dùng. */
 export { setAuditPaused } from "@/lib/repo";
+export { mergeProductsOnServer, undoProductMergeOnServer, isServerConnected } from "@/lib/repo";

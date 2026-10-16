@@ -64,6 +64,8 @@ import {
   Snowflake,
   Store,
 } from "lucide-react";
+import { useDraftAccount, useFormDraft } from "@/lib/formDraft";
+import { DraftRestoredNotice } from "@/features/shared/DraftRestoredNotice";
 
 interface OpeningForm {
   productId: string;
@@ -105,6 +107,20 @@ export default function NxtReportScreen() {
   const [isOpeningOpen, setIsOpeningOpen] = useState(false);
   const [form, setForm] = useState<OpeningForm | null>(null);
   const [errors, setErrors] = useState<FieldError[]>([]);
+  /* Tự lưu NHÁP dòng tồn đầu đang khai (quy tắc 17, lib/formDraft.ts) — quay lại trang là hộp
+     khai tồn đầu tự mở lại đúng số đang gõ. Lưu / Hủy ⇒ nháp tự xoá. */
+  const draftAccount = useDraftAccount();
+  const openingDraft = useFormDraft({
+    form: "finished-opening-stock",
+    ...draftAccount,
+    value: form,
+    isEmpty: (f) => !f || (!f.productId && !f.spec.trim() && f.quantityKg == null && f.blocksCount == null && !f.warehouse.trim() && !f.note.trim()),
+    onRestore: (f) => {
+      if (!f) return;
+      setForm(f);
+      setIsOpeningOpen(true);
+    },
+  });
 
   const productNameOf = (id: string) => products.find((m) => m.id === id)?.name || "—";
 
@@ -402,6 +418,7 @@ export default function NxtReportScreen() {
               cần khai một lần — các kỳ sau tự kế thừa từ lịch sử nhập/xuất.
             </DialogDescription>
           </DialogHeader>
+          <DraftRestoredNotice savedAt={openingDraft.restoredAt} onDiscard={() => { openingDraft.discard(); setForm(null); }} />
 
           <div className="space-y-4 py-2">
             {opening.length > 0 ? (

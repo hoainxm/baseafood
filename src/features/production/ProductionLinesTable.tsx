@@ -20,6 +20,7 @@ import {
   type ProductionLine,
 } from "./wipHelpers";
 import { BatterSection } from "./BatterSection";
+import { duplicateProductNameKeys, normalizeProductName } from "@/lib/productMerge";
 
 /**
  * BẢNG nhập thành phẩm của phiên — mỗi dòng NẰM NGANG một hàng (chốt 2026-10-15):
@@ -79,10 +80,20 @@ export function ProductionLinesTable({
   const subRow = "sticky left-2 flex max-w-[calc(100vw-6rem)] flex-wrap items-center gap-x-3 gap-y-2";
 
   // Mọi mặt hàng (gõ tên để tìm) — không giới hạn theo loài.
+  // Tên TRÙNG với mục khác ⇒ dòng phụ ghi mã kế toán để phân biệt (VD hai "… cắt luộc 3gr").
+  const duplicateNames = duplicateProductNameKeys(products);
   const allProductOptions: ComboboxOption[] = products.map((m) => ({
     value: m.id,
     label: m.code ? `${m.code} · ${m.name}` : m.name,
-    subLabel: [m.code, m.processingType, m.category].filter(Boolean).join(" · ") || undefined,
+    subLabel:
+      [
+        duplicateNames.has(normalizeProductName(m.name)) && m.finishedGoodCode ? `mã ${m.finishedGoodCode}` : "",
+        m.code,
+        m.processingType,
+        m.category,
+      ]
+        .filter(Boolean)
+        .join(" · ") || undefined,
   }));
 
   return (

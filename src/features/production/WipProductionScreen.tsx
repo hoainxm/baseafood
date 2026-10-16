@@ -30,6 +30,7 @@ import {
   useImportShipments,
   useMaterialImports,
   useMonthlyStock,
+  isServerConnected,
 } from "@/lib/catalogRepo";
 import {
   getProductBatterIds,
@@ -132,6 +133,9 @@ import {
   type DomesticSaleLine,
   type ProductionLine,
 } from "./wipHelpers";
+import { duplicateProductNameKeys, normalizeProductName } from "@/lib/productMerge";
+import { DraftRestoredNotice } from "@/features/shared/DraftRestoredNotice";
+import { useFormDraft } from "@/lib/formDraft";
 
 const KEY_WIP_REPORT = "bsf.wip-report-sent.v1";
 /** Nhớ phân xưởng gần nhất THEO MÁY (device pref, không phải số liệu) để lần
@@ -260,10 +264,15 @@ export default function WipProductionScreen() {
   const productNameOf = (id: string) => products.find((m) => m.id === id)?.name || "—";
 
   /** Danh mục thành phẩm — gõ để tìm, thêm mới tại chỗ. */
+  const duplicateNames = duplicateProductNameKeys(products);
   const productOptions: ComboboxOption[] = products.map((m) => ({
     value: m.id,
     label: m.code ? `${m.code} · ${m.name}` : m.name,
-    subLabel: [m.code, m.category].filter(Boolean).join(" · ") || undefined,
+    // Tên trùng mục khác ⇒ ghi mã kế toán để phân biệt.
+    subLabel:
+      [duplicateNames.has(normalizeProductName(m.name)) && m.finishedGoodCode ? `mã ${m.finishedGoodCode}` : "", m.code, m.category]
+        .filter(Boolean)
+        .join(" · ") || undefined,
   }));
 
   /** Danh mục khách hàng — chọn/ thêm mới tại chỗ (lưu theo TÊN). */
@@ -325,7 +334,9 @@ export default function WipProductionScreen() {
   const productDeleter = useQuickProductDelete(products, setProducts, {
     wips: rows,
     // Dòng đang gõ dở trỏ tới mặt hàng vừa xóa ⇒ trả ô về trống.
-    onDeleted: (id) => setTableRows((items) => items.map((d) => (d.productId === id ? { ...d, productId: "" } : d))),
+    // Gộp mục trùng ⇒ dòng đang gõ dở chuyển sang mục giữ lại (không bỏ trống).
+    onDeleted: (id, replacedBy) =>
+      setTableRows((items) => items.map((d) => (d.productId === id ? { ...d, productId: replacedBy ?? "" } : d))),
   });
 
   const addCustomer = (name: string): string => {
@@ -525,6 +536,35 @@ export default function WipProductionScreen() {
     setTableRows([createEmptyProductionLine(newId())]);
     setSessionErrors([]);
   };
+  /* ---- Tự lưu NHÁP phiếu đang gõ (quy tắc 17, lib/formDraft.ts): sang trang khác, tải
+     lại, đăng xuất rồi vào lại vẫn còn. Phiếu về trống (lưu xong / bỏ) ⇒ nháp tự xoá. ---- */
+  const wipDraft = useFormDraft({
+    form: "wip",
+    account: profile?.username ?? "",
+    accountReady: profile !== null || !isServerConnected,
+    value: { session, isConsecutiveDays, tableRows, domesticSaleLines, frozenLines, declaredSessionLots },
+    isEmpty: (d) =>
+      !d.session ||
+      (!d.session.backdateReason.trim() &&
+        d.domesticSaleLines.length === 0 &&
+        d.frozenLines.every((f) => !f.itemName.trim() && !f.kg) &&
+        d.declaredSessionLots.lots.length === 0 &&
+        d.tableRows.every((l) => !l.productId && !l.quantityKg && !l.tentacleKg && !l.stomachKg && !l.blocksCount)),
+    onRestore: (d) => {
+      setMode("entry");
+      setSession(d.session);
+      setIsConsecutiveDays(d.isConsecutiveDays);
+      setTableRows(d.tableRows);
+      setDomesticSaleLines(d.domesticSaleLines);
+      setFrozenLines(d.frozenLines);
+      setDeclaredSessionLots(d.declaredSessionLots);
+    },
+  });
+  const discardWipDraft = () => {
+    wipDraft.discard();
+    setDeclaredSessionLots({ date: "", workshop: "Đông", lots: [] });
+    resetSession();
+  };
   const setSessionField = <K extends keyof SessionHeader>(k: K, v: SessionHeader[K]) =>
     setSession((p) => (p ? { ...p, [k]: v } : p));
 
@@ -546,10 +586,11 @@ export default function WipProductionScreen() {
   // Form-first: vào chế độ "Ghi nhập" mà chưa có phiếu → tự mở một phiếu trống
   // (không cần bấm nút, không modal). Lưu xong phiếu về null → tự mở phiếu mới.
   useEffect(() => {
-    if (activeMode === "entry" && session === null && !isLoading) openAdd();
+    // Đợi bước mở lại nháp xong (quy tắc 17) — kẻo phiếu trống đè lên nháp.
+    if (activeMode === "entry" && session === null && !isLoading && wipDraft.isReady) openAdd();
     // moThem đọc bộ lọc hiện tại; guard theo phien===null nên không lặp.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeMode, session, isLoading]);
+  }, [activeMode, session, isLoading, wipDraft.isReady]);
 
   // Trong "Ghi nhập", ngày+xưởng của PHIẾU là ngữ cảnh: đồng bộ về bộ lọc để
   // "đã ghi hôm nay", tổng ngày, chốt ngày, báo cáo A4 bám đúng ngày đang ghi.
@@ -1202,6 +1243,55 @@ export default function WipProductionScreen() {
 
   // FORM NHẬP (form-first) — trước đây nằm trong Dialog, nay render INLINE ở chế độ
   // "Ghi nhập": điền như tờ giấy, không phải mở modal trong trang quản lý.
+  /** Nút của một dòng sổ sản xuất (gắn lô · tem · sửa · bỏ) — dùng chung cho Sổ ngày và
+   *  khối "Đã ghi ngày …" dưới phiếu ghi. */
+  const wipRowActions = (r: WipProductionItem) => (
+    <div className="flex flex-wrap gap-2">
+      {canWriteRow(r) && (
+      <Button
+        title="Ghi mẻ này đã dùng lô nguyên liệu nào (quét tem, gõ mã, hoặc chọn). Có lô thì mới truy được nguồn của mẻ."
+        variant={countLotInputs(r.id) ? "outline" : "default"}
+        size="sm"
+        onClick={() => setLotTarget(r)}
+      >
+        <Link2 />
+        {countLotInputs(r.id) ? `Lô NL (${countLotInputs(r.id)})` : "Gắn lô NL"}
+      </Button>
+      )}
+      {allowed.export && (
+      <Button
+        title="In tem QR lô bán thành phẩm của mẻ này để dán lên block/thùng. Quét tem là ra nguồn gốc."
+        variant="outline"
+        size="sm"
+        onClick={() => setLotLabel([r])}
+      >
+        <QrCode />
+        Tem
+      </Button>
+      )}
+      {canRow("update", r) && (
+      <Button
+        title="Mở lại dòng sản lượng này để sửa số kg hoặc mặt hàng." variant="edit" size="sm" onClick={() => openEdit(r)}>
+        <Pencil />
+        Sửa
+      </Button>
+      )}
+      {canRow("delete", r) && (
+      <Button
+        title="Bỏ dòng sản lượng này khỏi sổ. Có hỏi xác nhận và còn nút Hoàn tác." variant="danger" size="sm" onClick={() => remove(r)}>
+        Bỏ
+      </Button>
+      )}
+    </div>
+  );
+
+  /* Dòng ĐÃ GHI của ngày · xưởng đang ghi — hiện ngay dưới phiếu (lỗi 2026-10-16: chốt
+     rồi mở lại ngày, phiếu ghi trống trơn, không thấy số đã chốt để sửa). */
+  const sessionDayRows = session
+    ? rows.filter((r) => r.productionDate === session.productionDate && r.workshop === session.workshop)
+    : [];
+  const sessionDayKg = sessionDayRows.reduce((sum, r) => sum + (r.quantityKg || 0), 0);
+
   const entryForm = session && (
     <div className="space-y-6 rounded-xl border-2 border-border bg-card p-4 md:p-6">
       <ErrorSummary errors={sessionErrors} />
@@ -1412,7 +1502,32 @@ export default function WipProductionScreen() {
         task={`thành phẩm làm ra hôm nay — xưởng ${recordWorkshop}`}
       />
 
+      {activeMode === "entry" && <DraftRestoredNotice savedAt={wipDraft.restoredAt} onDiscard={discardWipDraft} />}
+
       {activeMode === "entry" && entryForm}
+
+      {activeMode === "entry" && session && sessionDayRows.length > 0 && (
+        <section className="space-y-3 rounded-xl border-2 border-border p-4 md:p-6" aria-label="Thành phẩm đã ghi trong ngày">
+          <div>
+            <h2 className="text-lg font-semibold text-foreground">
+              Đã ghi ngày {formatDateVN(session.productionDate)} · xưởng {session.workshop}
+              <span className="tnum font-normal text-muted-foreground">
+                {" "}— {num(sessionDayRows.length)} dòng · {kg(sessionDayKg)}
+              </span>
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Số đã lưu vào sổ. Sửa / bỏ từng dòng ngay tại đây; ngày đã chốt thì bấm "Mở lại ngày" ở trên rồi mới sửa được.
+            </p>
+          </div>
+          <RecordTable
+            columns={cols}
+            rows={sessionDayRows}
+            getKey={(r) => r.id}
+            rowMarkKey="san-xuat-tp"
+            actions={wipRowActions}
+          />
+        </section>
+      )}
 
       {activeMode === "ledger" && (
         <>
@@ -1513,45 +1628,7 @@ export default function WipProductionScreen() {
             rowMarkKey="san-xuat-tp"
             getSearchText={(r) => `${productNameOf(r.productId)} ${r.customerName ?? ""}`}
             searchLabel="Tìm theo thành phẩm / khách…"
-            actions={(r) => (
-              <div className="flex flex-wrap gap-2">
-                {canWriteRow(r) && (
-                <Button
-                  title="Ghi mẻ này đã dùng lô nguyên liệu nào (quét tem, gõ mã, hoặc chọn). Có lô thì mới truy được nguồn của mẻ."
-                  variant={countLotInputs(r.id) ? "outline" : "default"}
-                  size="sm"
-                  onClick={() => setLotTarget(r)}
-                >
-                  <Link2 />
-                  {countLotInputs(r.id) ? `Lô NL (${countLotInputs(r.id)})` : "Gắn lô NL"}
-                </Button>
-                )}
-                {allowed.export && (
-                <Button
-                  title="In tem QR lô bán thành phẩm của mẻ này để dán lên block/thùng. Quét tem là ra nguồn gốc."
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setLotLabel([r])}
-                >
-                  <QrCode />
-                  Tem
-                </Button>
-                )}
-                {canRow("update", r) && (
-                <Button
-                  title="Mở lại dòng sản lượng này để sửa số kg hoặc mặt hàng." variant="edit" size="sm" onClick={() => openEdit(r)}>
-                  <Pencil />
-                  Sửa
-                </Button>
-                )}
-                {canRow("delete", r) && (
-                <Button
-                  title="Bỏ dòng sản lượng này khỏi sổ. Có hỏi xác nhận và còn nút Hoàn tác." variant="danger" size="sm" onClick={() => remove(r)}>
-                  Bỏ
-                </Button>
-                )}
-              </div>
-            )}
+            actions={wipRowActions}
           />
           <div className="flex flex-wrap justify-end gap-x-10 gap-y-2 rounded-xl bg-muted px-5 py-4">
             <div className="flex items-baseline gap-3">

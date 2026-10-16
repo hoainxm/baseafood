@@ -9,7 +9,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { QcChecklistItem, QcResult, Workshop } from "@/types";
 import { isBackdatedQc } from "@/types";
 import { newId } from "@/lib/store";
-import { useQcChecklists, useQcLocks } from "@/lib/catalogRepo";
+import { isServerConnected, useQcChecklists, useQcLocks } from "@/lib/catalogRepo";
+import { useFormDraft } from "@/lib/formDraft";
+import { useAuth } from "@/lib/auth";
+import { DraftRestoredNotice } from "@/features/shared/DraftRestoredNotice";
 import { subtractDays, countQcByDay } from "@/lib/dataFlow";
 import { uploadImage, getPhotoUrl, deleteImage, hasImageStorage } from "@/lib/storage";
 import { todayISO, formatDateVN } from "@/lib/format";
@@ -63,6 +66,26 @@ const DEFAULT_CRITERIA = [
   "Hồ sơ ghi chép",
 ];
 
+/** Bảng chấm điểm của (ngày × xưởng) dựng từ sổ: tiêu chí mặc định + tiêu chí đã ghi. */
+function buildQcRows(rows: QcChecklistItem[], date: string, workshop: Workshop): { dongs: Row[]; backdateReason: string } {
+  const dayRows = rows.filter((r) => r.date === date && r.workshop === workshop);
+  const byCriterion = new Map(dayRows.map((r) => [r.criterion, r]));
+  const names = [...DEFAULT_CRITERIA, ...dayRows.map((r) => r.criterion).filter((t) => !DEFAULT_CRITERIA.includes(t))];
+  return {
+    dongs: names.map((name) => {
+      const prev = byCriterion.get(name);
+      return {
+        criterion: name,
+        result: (prev?.result ?? "") as QcResult | "",
+        score: prev?.score ?? null,
+        note: prev?.note ?? "",
+        photoPaths: prev?.photoPaths ?? [],
+      };
+    }),
+    backdateReason: dayRows.find((r) => r.backdateReason)?.backdateReason ?? "",
+  };
+}
+
 /** Một dòng chấm điểm trên màn (chưa lưu). */
 interface Row {
   criterion: string;
@@ -73,7 +96,7 @@ interface Row {
 }
 
 export default function QcChecklistScreen() {
-  const [rows, persist] = useQcChecklists();
+  const [rows, persist, { status: qcStatus }] = useQcChecklists();
   const [locks, persistLocks, { status: lockStatus }] = useQcLocks();
   /** Phân quyền lớp 2 (spec role-permissions §5): không thêm lẫn sửa ⇒ chỉ xem kết quả. */
   const allowed = useCan("qc");
@@ -104,27 +127,44 @@ export default function QcChecklistScreen() {
   );
   const isBackdate = isLocked || isBackdatedQc(date, todayISO());
 
+  /* Tự lưu NHÁP phiếu chấm đang gõ (quy tắc 17, lib/formDraft.ts). Phiếu QC nạp lại từ sổ
+     mỗi khi đổi ngày/xưởng ⇒ nháp mở lại được đổ vào SAU bước nạp (pendingDraft). "Trống" =
+     phiếu y hệt số đã lưu. */
+  const { profile } = useAuth();
+  const pendingDraft = useRef<{ date: string; workshop: Workshop; dongs: Row[]; backdateReason: string } | null>(null);
+  const qcDraft = useFormDraft({
+    form: "qc",
+    account: profile?.username ?? "",
+    accountReady: profile !== null || !isServerConnected,
+    value: { date, workshop, dongs, backdateReason },
+    isEmpty: (d) => {
+      const savedForm = buildQcRows(rows, d.date, d.workshop);
+      return JSON.stringify(savedForm.dongs) === JSON.stringify(d.dongs) && savedForm.backdateReason === d.backdateReason;
+    },
+    onRestore: (d) => {
+      // Effect nạp-từ-sổ sẽ còn chạy (đổi ngày/xưởng hoặc sổ chưa tải xong) ⇒ nhờ nó giữ nháp.
+      const willReload = qcStatus === "loading" || d.date !== date || d.workshop !== workshop;
+      pendingDraft.current = willReload ? d : null;
+      setDate(d.date);
+      setWorkshop(d.workshop);
+      setDongs(d.dongs);
+      setBackdateReason(d.backdateReason);
+    },
+  });
+
   // Đổi (ngày × xưởng) hoặc dữ liệu tải xong → nạp lại bảng chấm điểm từ sổ.
   useEffect(() => {
-    const dayRows = rows.filter((r) => r.date === date && r.workshop === workshop);
-    const theoTen = new Map(dayRows.map((r) => [r.criterion, r]));
-    const names = [
-      ...DEFAULT_CRITERIA,
-      ...dayRows.map((r) => r.criterion).filter((t) => !DEFAULT_CRITERIA.includes(t)),
-    ];
-    setDongs(
-      names.map((name) => {
-        const prev = theoTen.get(name);
-        return {
-          criterion: name,
-          result: (prev?.result ?? "") as QcResult | "",
-          score: prev?.score ?? null,
-          note: prev?.note ?? "",
-          photoPaths: prev?.photoPaths ?? [],
-        };
-      })
-    );
-    setBackdateReason(dayRows.find((r) => r.backdateReason)?.backdateReason ?? "");
+    const p = pendingDraft.current;
+    if (p && p.date === date && p.workshop === workshop) {
+      // Vừa mở lại nháp đúng ngày × xưởng này ⇒ giữ số đang gõ dở, đừng nạp đè từ sổ.
+      pendingDraft.current = null;
+      setDongs(p.dongs);
+      setBackdateReason(p.backdateReason);
+      return;
+    }
+    const built = buildQcRows(rows, date, workshop);
+    setDongs(built.dongs);
+    setBackdateReason(built.backdateReason);
   }, [date, workshop, rows]);
 
   const updateRow = (i: number, patch: Partial<Row>) =>
@@ -227,6 +267,16 @@ export default function QcChecklistScreen() {
           xưởng, rồi chốt ngày. (Ảnh kèm sẽ bổ sung sau.)
         </p>
       </div>
+
+      <DraftRestoredNotice
+        savedAt={qcDraft.restoredAt}
+        onDiscard={() => {
+          qcDraft.discard();
+          const built = buildQcRows(rows, date, workshop);
+          setDongs(built.dongs);
+          setBackdateReason(built.backdateReason);
+        }}
+      />
 
       {/* Bộ lọc: ngày + xưởng */}
       <div className="grid gap-5 rounded-xl border-2 border-border p-4 sm:grid-cols-2">

@@ -18,6 +18,7 @@ import {
   usePackagings,
   useLotInputs,
   useLotDispatches,
+  isServerConnected,
 } from "@/lib/catalogRepo";
 import {
   computeWipStock,
@@ -61,6 +62,9 @@ import {
 } from "@/design-system";
 import { useQuickCatalogEdit } from "@/features/catalog/QuickCatalogEdit";
 import { LotDispatchPicker } from "@/features/shared";
+import { DraftRestoredNotice } from "@/features/shared/DraftRestoredNotice";
+import { useFormDraft } from "@/lib/formDraft";
+import { useAuth } from "@/lib/auth";
 import { useCan } from "@/features/shared/PermissionProvider";
 import { kg, num, todayISO, formatDateVN } from "@/lib/format";
 import { PERIOD_OPTIONS, getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
@@ -235,6 +239,30 @@ export default function SalesScreen() {
    *  luôn về "Xuất khẩu" (người bán Nội địa khỏi lật kênh mỗi phiếu). */
   const [lastChannel, setLastChannel] = useState<SalesChannel>("Xuất khẩu");
   const [sessionErrors, setSessionErrors] = useState<FieldError[]>([]);
+
+  /* Tự lưu NHÁP phiếu bán đang mở (quy tắc 17, lib/formDraft.ts): đầu phiếu + dòng mặt
+     hàng đang gõ dở. Quay lại trang là hộp phiếu tự mở lại; đóng phiếu ⇒ nháp tự xoá. */
+  const { profile } = useAuth();
+  const salesDraft = useFormDraft({
+    form: "sales",
+    account: profile?.username ?? "",
+    accountReady: profile !== null || !isServerConnected,
+    value: { session, sessionInvoiceId, editRowIds, newRows },
+    isEmpty: (d) =>
+      !d.session ||
+      (!d.sessionInvoiceId &&
+        !d.session.customerId &&
+        !d.session.note.trim() &&
+        !d.session.backdateReason.trim() &&
+        !d.newRows.productId &&
+        !d.newRows.quantityKg),
+    onRestore: (d) => {
+      setSession(d.session);
+      setSessionInvoiceId(d.sessionInvoiceId);
+      setEditRowIds(d.editRowIds);
+      setNewRows(d.newRows);
+    },
+  });
 
   /* Sửa MỘT dòng mặt hàng — chỉ mặt hàng / quy cách / kg / giá. */
   const [editing, setEditing] = useState<SalesItem | null>(null);
@@ -785,6 +813,13 @@ export default function SalesScreen() {
                 : "Điền đầu phiếu (khách, kênh, ngày) rồi đổ từng mặt hàng ngay bên dưới — mỗi mặt hàng bấm “Thêm mặt hàng vào sổ” là vào sổ ngay."}
             </DialogDescription>
           </DialogHeader>
+          <DraftRestoredNotice
+            savedAt={salesDraft.restoredAt}
+            onDiscard={() => {
+              salesDraft.discard();
+              setNewRows(EMPTY_NEW_ROW);
+            }}
+          />
 
           {session && (
             <div className="space-y-6 py-2">

@@ -27,6 +27,7 @@ import {
   usePackagings,
   useLotInputs,
   useLotDispatches,
+  isServerConnected,
 } from "@/lib/catalogRepo";
 import { listLotsWithStock, computeWipStock, collectWipDeductions } from "@/lib/inventory";
 import {
@@ -57,6 +58,9 @@ import {
 } from "@/design-system";
 import { useQuickCatalogEdit } from "@/features/catalog/QuickCatalogEdit";
 import { useCan } from "@/features/shared/PermissionProvider";
+import { DraftRestoredNotice } from "@/features/shared/DraftRestoredNotice";
+import { useFormDraft } from "@/lib/formDraft";
+import { useAuth } from "@/lib/auth";
 import { kg, num, todayISO, formatDateVN } from "@/lib/format";
 import { CheckCircle, ClipboardList, Package, PackageCheck, Plus, ScanLine, Truck } from "lucide-react";
 import { ExportLotCheck } from "./ExportLotCheck";
@@ -160,8 +164,36 @@ export default function SalesOrderScreen() {
     [orderItems, selectedId]
   );
 
+  /* Tự lưu NHÁP đơn đang tạo (quy tắc 17, lib/formDraft.ts). Đóng ngang hộp (bấm ra ngoài
+     / Esc) vẫn giữ — mở lại "Tạo đơn" là số cũ quay về; chỉ Hủy / Lưu mới bỏ. */
+  const { profile } = useAuth();
+  const [keptCreating, setKeptCreating] = useState<NewOrder | null>(null);
+  const orderDraft = useFormDraft({
+    form: "orders",
+    account: profile?.username ?? "",
+    accountReady: profile !== null || !isServerConnected,
+    value: creating ?? keptCreating,
+    isEmpty: (t) =>
+      !t || (!t.customerId && !t.note.trim() && t.rows.every((d) => !d.productId && !d.requiredQuantityKg && !d.requiredBlocksCount)),
+    onRestore: (t) => {
+      setCreating(t);
+      setErrors([]);
+    },
+  });
+  const cancelCreate = () => {
+    setCreating(null);
+    setKeptCreating(null);
+    orderDraft.discard();
+  };
+
   /* ---- Tạo đơn ---- */
   const openCreate = () => {
+    if (keptCreating) {
+      setCreating(keptCreating);
+      setKeptCreating(null);
+      setErrors([]);
+      return;
+    }
     setCreating({
       customerId: "",
       orderDate: todayISO(),
@@ -224,6 +256,7 @@ export default function SalesOrderScreen() {
     persistOrderItems([...orderItems, ...newOrderItems]);
     notify.saved(`Đã tạo đơn cho ${tenKH(creating.customerId)}`);
     setCreating(null);
+    setKeptCreating(null);
     setSelectedId(donId);
   };
 
@@ -574,7 +607,16 @@ export default function SalesOrderScreen() {
       )}
 
       {/* Dialog tạo đơn */}
-      <Dialog open={creating !== null} onOpenChange={(o) => !o && setCreating(null)}>
+      <Dialog
+        open={creating !== null}
+        onOpenChange={(o) => {
+          // Đóng ngang ⇒ giữ đơn đang gõ làm nháp (quy tắc 17).
+          if (!o) {
+            setKeptCreating(creating);
+            setCreating(null);
+          }
+        }}
+      >
         <DialogContent className="max-h-[92dvh] w-full overflow-y-auto sm:max-w-3xl">
           <DialogHeader>
             <DialogTitle className="text-2xl">Tạo đơn đặt</DialogTitle>
@@ -582,6 +624,7 @@ export default function SalesOrderScreen() {
               Khách và các mặt hàng cần (mặt hàng · quy cách · kg · block).
             </DialogDescription>
           </DialogHeader>
+          <DraftRestoredNotice savedAt={orderDraft.restoredAt} onDiscard={cancelCreate} />
           {creating && (
             <div className="space-y-6 py-2">
               <ErrorSummary errors={errors} />
@@ -691,7 +734,7 @@ export default function SalesOrderScreen() {
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" size="lg" onClick={() => setCreating(null)}>
+            <Button variant="outline" size="lg" onClick={cancelCreate}>
               Hủy
             </Button>
             <Button variant="save"

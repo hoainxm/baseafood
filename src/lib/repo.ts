@@ -477,6 +477,8 @@ export const BALANCING_INPUT_TABLE: TableMapping<BalancingInputItem> = {
     ...(x.stockCategory ? { stock_category: x.stockCategory } : {}),
     // Cột 0067 (ghi chú dòng): cùng khuôn — chỉ gửi khi dòng đã từng có ghi chú.
     ...(x.note != null ? { note: x.note } : {}),
+    // Giá gửi đông theo ngày (mig 0071): chỉ dòng Gửi đông đã gõ giá theo ngày mới có.
+    ...(x.dailyPrices != null ? { daily_prices: x.dailyPrices } : {}),
   }),
   fromRow: (r) => ({
     id: s(r.id),
@@ -497,6 +499,7 @@ export const BALANCING_INPUT_TABLE: TableMapping<BalancingInputItem> = {
     stockLocation: r.stock_location == null ? undefined : s(r.stock_location),
     stockCategory: r.stock_category == null || r.stock_category === "" ? undefined : s(r.stock_category),
     note: r.note == null ? undefined : s(r.note),
+    dailyPrices: r.daily_prices == null ? undefined : parseDailyQuantities(r.daily_prices),
   }),
   // Dòng ghi trước 0019 chưa có cột lưới ngày → mặc định rỗng, không vỡ tổng.
   patchLegacy: (x) => ({

@@ -13,6 +13,12 @@ import {
   freezeDepositRowId,
   getBalancingShareInLot,
   countMonthlyStockMismatches,
+  depositPriceOn,
+  lastDepositPrice,
+  normalizeDepositPrices,
+  setDepositPriceAllDays,
+  setDepositPricesOn,
+  hasVaryingDepositPrices,
 } from "./balancingStockLines";
 import { deriveRow } from "./monthlyStock";
 
@@ -348,5 +354,74 @@ describe("shortWarehouseLabel", () => {
     expect(shortWarehouseLabel("Kho 1000 tấn")).toBe("K1000");
     expect(shortWarehouseLabel("Kho 1500 tấn")).toBe("K1500");
     expect(shortWarehouseLabel("Kho Phước Cơ")).toBe("Phước Cơ");
+  });
+});
+
+describe("Giá gửi đông THEO NGÀY (mig 0071, kế toán yêu cầu 2026-10-19)", () => {
+  const warehouse = "Kho 1000 tấn|";
+  const d1 = "2026-10-01";
+  const d2 = "2026-10-02";
+  const d3 = "2026-10-03";
+
+  test("dòng cũ (chưa có giá theo ngày): mọi ngày = đơn giá dòng, chuẩn hoá không đụng", () => {
+    const r = stockRow("g1", "gui", { [d1]: -10, [d2]: -20 }, { unitPrice: 150000 });
+    expect(depositPriceOn(r, d1)).toBe(150000);
+    expect(normalizeDepositPrices(r)).toBe(r);
+    expect(setDepositPriceAllDays(r, 155000)).toEqual({ unitPrice: 155000 });
+  });
+
+  test("10 kg × 150.000 + 20 kg × 160.000 ⇒ đơn giá BQ không làm tròn, T.tiền = 4.700.000", () => {
+    const r = normalizeDepositPrices(
+      stockRow("g1", "gui", { [d1]: -10, [d2]: -20 }, { unitPrice: 150000, dailyPrices: { [d1]: 150000, [d2]: 160000 } })
+    );
+    expect(r.unitPrice! * 30).toBeCloseTo(4_700_000, 6);
+    expect(lastDepositPrice(r)).toBe(160000);
+  });
+
+  test("gõ kg ngày mới ⇒ giá tự lấy ngày gần nhất trước đó; ngày bỏ kg ⇒ bỏ giá", () => {
+    const r = normalizeDepositPrices(
+      stockRow("g1", "gui", { [d1]: -10, [d3]: -15 }, { dailyPrices: { [d1]: 150000, [d2]: 160000 } })
+    );
+    expect(r.dailyPrices).toEqual({ [d1]: 150000, [d3]: 150000 });
+    // Ngày đầu chưa có giá ⇒ lấy ngày gần nhất SAU.
+    const r2 = normalizeDepositPrices(stockRow("g1", "gui", { [d1]: -10, [d2]: -5 }, { dailyPrices: { [d2]: 158000 } }));
+    expect(r2.dailyPrices).toEqual({ [d1]: 158000, [d2]: 158000 });
+  });
+
+  test("gõ giá một ngày ở dòng cũ ⇒ ngày khác giữ đơn giá dòng; xoá giá ⇒ lấy lại ngày trước", () => {
+    const r = stockRow("g1", "gui", { [d1]: -10, [d2]: -20 }, { unitPrice: 150000 });
+    expect(hasVaryingDepositPrices(r)).toBe(false);
+    const r2 = normalizeDepositPrices({ ...r, ...setDepositPricesOn(r, { [d2]: 160000 }) });
+    expect(r2.dailyPrices).toEqual({ [d1]: 150000, [d2]: 160000 });
+    expect(hasVaryingDepositPrices(r2)).toBe(true);
+    const r3 = normalizeDepositPrices({ ...r2, ...setDepositPricesOn(r2, { [d2]: null }) });
+    expect(r3.dailyPrices).toEqual({ [d1]: 150000, [d2]: 150000 });
+    expect(r3.unitPrice).toBe(150000);
+  });
+
+  test("gõ ô Đơn giá dòng ⇒ một giá cho mọi ngày gửi", () => {
+    const r = stockRow("g1", "gui", { [d1]: -10, [d2]: -20 }, { dailyPrices: { [d1]: 150000, [d2]: 160000 } });
+    expect(setDepositPriceAllDays(r, 155000)).toEqual({ dailyPrices: { [d1]: 155000, [d2]: 155000 }, unitPrice: 155000 });
+  });
+
+  test("mỗi lô GĐ-ngày mang giá đúng ngày; sửa giá một ngày chỉ đổi lô ngày đó", () => {
+    const r = normalizeDepositPrices(
+      stockRow("g1", "gui", { [d1]: -10, [d2]: -20 }, { stockLocation: warehouse, dailyPrices: { [d1]: 150000, [d2]: 160000 } })
+    );
+    const a = syncMonthlyStockLedger([lot("X", "2026-10")], [], [r], ctx);
+    expect(a.lines.find((x) => x.id === freezeDepositRowId("g1", d1))!.unitPrice).toBe(150000);
+    expect(a.lines.find((x) => x.id === freezeDepositRowId("g1", d2))!.unitPrice).toBe(160000);
+    const r2 = normalizeDepositPrices({ ...r, dailyPrices: { ...r.dailyPrices, [d2]: 155000 } });
+    const b = syncMonthlyStockLedger(a.lines, [r], [r2], ctx);
+    expect(b.lines.find((x) => x.id === freezeDepositRowId("g1", d1))).toBe(a.lines.find((x) => x.id === freezeDepositRowId("g1", d1)));
+    expect(b.lines.find((x) => x.id === freezeDepositRowId("g1", d2))!.unitPrice).toBe(155000);
+  });
+
+  test("Lấy xả đông sửa giá trên dòng KHÔNG đổi giá đã lưu của lô", () => {
+    const l = lot("L1", "2026-10", { unitPrice: 150000 });
+    const r = stockRow("x1", "lay", { [d1]: 100 }, { stockLineId: "L1", unitPrice: 150000 });
+    const a = syncMonthlyStockLedger([l], [], [r], ctx);
+    const b = syncMonthlyStockLedger(a.lines, [r], [{ ...r, unitPrice: 170000 }], ctx);
+    expect(b.lines.find((x) => x.id === "L1")!.unitPrice).toBe(150000);
   });
 });

@@ -72,8 +72,12 @@ export interface GridRow<R> {
   data: R;
   /** Dòng tiêu đề nhóm — chỉ hiện chữ, không có ô nhập. */
   groupTitle?: string;
-  /** Kiểu dòng: dòng giảm tô đỏ nhạt, dòng tổng in đậm. */
-  kind?: "normal" | "decrease" | "total" | "child";
+  /**
+   * Kiểu dòng: dòng giảm tô đỏ nhạt, dòng tổng in đậm, dòng con (chỉ đọc) thụt vào.
+   * `detail` = hàng PHỤ GÕ ĐƯỢC của dòng ngay trên (VD "Giá gửi" theo ngày dưới dòng Gửi
+   * đông): thụt vào như dòng con nhưng ô vẫn gõ được; không tick tô màu riêng.
+   */
+  kind?: "normal" | "decrease" | "total" | "child" | "detail";
   /** Tên hiện ở cột dính bên trái. */
   label: React.ReactNode;
   /** Chú thích nhỏ dưới tên (VD "hút từ sổ nhập hàng"). */
@@ -152,7 +156,7 @@ export function EditableGrid<R>({
   /** Chỉ ô gõ được mới nằm trong đường đi của phím mũi tên. */
   const inputRows = React.useMemo(() => rows.filter((h) => !h.groupTitle), [rows]);
   // Dòng con (chỉ đọc, VD tách theo đại lý) không tick tô màu — tô ở dòng cha.
-  const visibleKeys = inputRows.filter((h) => h.kind !== "child").map((h) => h.id);
+  const visibleKeys = inputRows.filter((h) => h.kind !== "child" && h.kind !== "detail").map((h) => h.id);
   const daTick = visibleKeys.filter((k) => rowSelection.selected.has(k));
   const isAllSelected = daTick.length > 0 && daTick.length === visibleKeys.length;
 
@@ -325,7 +329,7 @@ export function EditableGrid<R>({
                   h.kind === "total" && "bg-muted font-semibold",
                   h.kind === "child" && "text-muted-foreground"
                 )}
-                {...(h.kind === "child" ? {} : to.getRowProps(h.id))}
+                {...(h.kind === "child" || h.kind === "detail" ? {} : to.getRowProps(h.id))}
               >
                 <th
                   scope="row"
@@ -333,14 +337,14 @@ export function EditableGrid<R>({
                     "sticky left-0 z-10 border-r-2 border-b border-border px-3 py-2 text-left align-middle font-normal",
                     h.kind === "total" ? "bg-muted font-semibold" : h.kind === "child" ? "bg-muted" : "bg-card",
                     h.kind === "decrease" && "bg-warning-surface/40",
-                    // Dòng con: thụt vào + vạch trái nhạt ⇒ đọc ra "thuộc dòng trên".
-                    h.kind === "child" && "pl-10 text-sm shadow-[inset_3px_0_0_var(--border)]"
+                    // Dòng con / hàng phụ: thụt vào + vạch trái nhạt ⇒ đọc ra "thuộc dòng trên".
+                    (h.kind === "child" || h.kind === "detail") && "pl-10 text-sm shadow-[inset_3px_0_0_var(--border)]"
                   )}
                 >
                   {/* Có cột giãn ⇒ cột tên co vừa nội dung nhưng CHẶN 18rem: ô chọn lô / NL chữ dài
                       tự cắt "…" thay vì kéo cả cột rộng ra. */}
                   <div className={cn("flex items-start gap-2", hasFillColumn && "max-w-[18rem]")}>
-                    {to.enabled && h.kind !== "child" && (
+                    {to.enabled && h.kind !== "child" && h.kind !== "detail" && (
                       <input
                         type="checkbox"
                         className="mt-0.5 size-5 shrink-0"

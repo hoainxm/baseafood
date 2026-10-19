@@ -154,6 +154,86 @@ function freezeDepositByDay(r: BalancingInputItem): Map<string, number> {
 
 export const freezeDepositRowId = (rowId: string, date: string) => `cd|${rowId}|${date}`;
 
+/* ---------- Giá gửi đông THEO NGÀY (mig 0071, kế toán yêu cầu 2026-10-19) ----------
+   Kế toán tính giá gửi theo từng ngày; mỗi ngày gửi là một lô GĐ-ngày ⇒ lô mang giá ngày
+   đó. Dòng chưa từng gõ giá theo ngày (`dailyPrices` rỗng/undefined) ⇒ mọi ngày = đơn
+   giá dòng, đúng hành vi cũ — KHÔNG tự sinh `dailyPrices` cho dòng cũ (DB chưa chạy 0071
+   thì dòng cũ vẫn ghi được). */
+
+/** Giá gửi của MỘT ngày: giá ngày đó › đơn giá dòng. */
+export function depositPriceOn(
+  r: Pick<BalancingInputItem, "dailyPrices" | "unitPrice">,
+  date: string
+): number | null {
+  return r.dailyPrices?.[date] ?? r.unitPrice ?? null;
+}
+
+/** Giá của ngày gửi CUỐI có kg (gợi ý giá Lấy xả đông kỳ sau); chưa gửi ngày nào ⇒ đơn giá dòng. */
+export function lastDepositPrice(r: BalancingInputItem): number | null {
+  const days = [...freezeDepositByDay(r).keys()].sort();
+  const last = days[days.length - 1];
+  return last ? depositPriceOn(r, last) : (r.unitPrice ?? null);
+}
+
+/**
+ * Chuẩn hoá giá theo ngày của dòng Gửi đông đã có `dailyPrices`:
+ *   - ngày có kg mà chưa có giá ⇒ điền giá ngày GẦN NHẤT TRƯỚC đó (không có thì ngày gần
+ *     nhất sau), không có nữa thì đơn giá dòng — gõ kg ngày mới là có giá sẵn, sửa đè được;
+ *   - ngày không còn kg ⇒ bỏ giá;
+ *   - `unitPrice` = bình quân gia quyền theo kg, KHÔNG làm tròn ⇒ T.tiền dòng = Σ kg×giá
+ *     ngày, công thức kỳ (balancingCalc: kg × đơn giá) không phải đổi.
+ * Dòng khác / dòng chưa có giá theo ngày ⇒ trả nguyên dòng.
+ */
+export function normalizeDepositPrices(r: BalancingInputItem): BalancingInputItem {
+  if (getBalancingStockLineKind(r) !== "freeze-deposit" || r.dailyPrices == null) return r;
+  const days = [...freezeDepositByDay(r).entries()].sort(([x], [y]) => x.localeCompare(y));
+  const given = r.dailyPrices;
+  const prices: Record<string, number> = {};
+  days.forEach(([date], i) => {
+    let p: number | undefined = given[date];
+    for (let j = i - 1; p == null && j >= 0; j--) p = given[days[j][0]];
+    for (let j = i + 1; p == null && j < days.length; j++) p = given[days[j][0]];
+    p ??= r.unitPrice ?? undefined;
+    if (p != null) prices[date] = p;
+  });
+  const pricedKg = days.reduce((s, [date, kg]) => (prices[date] != null ? s + kg : s), 0);
+  const value = days.reduce((s, [date, kg]) => s + kg * (prices[date] ?? 0), 0);
+  return { ...r, dailyPrices: prices, unitPrice: pricedKg > 0 ? value / pricedKg : r.unitPrice };
+}
+
+/**
+ * Gõ giá của MỘT HAY NHIỀU ngày ở hàng phụ "Giá gửi" (`null` = xoá ⇒ chuẩn hoá điền lại giá
+ * ngày gần nhất). Dòng cũ chưa có giá theo ngày: các ngày còn lại giữ đơn giá dòng.
+ */
+export function setDepositPricesOn(
+  r: BalancingInputItem,
+  edits: Record<string, number | null>
+): Partial<BalancingInputItem> {
+  const prices: Record<string, number> = {};
+  for (const date of freezeDepositByDay(r).keys()) {
+    const p = depositPriceOn(r, date);
+    if (p != null) prices[date] = p;
+  }
+  for (const [date, p] of Object.entries(edits)) {
+    if (p == null) delete prices[date];
+    else prices[date] = p;
+  }
+  return { dailyPrices: prices };
+}
+
+/** Các ngày gửi của dòng có giá KHÁC nhau không (ô Đơn giá dòng khi đó là bình quân). */
+export function hasVaryingDepositPrices(r: BalancingInputItem): boolean {
+  return new Set([...freezeDepositByDay(r).keys()].map((d) => depositPriceOn(r, d))).size > 1;
+}
+
+/** Đặt MỘT giá cho mọi ngày gửi của dòng (gõ ở ô Đơn giá của dòng Gửi đông). */
+export function setDepositPriceAllDays(r: BalancingInputItem, price: number | null): Partial<BalancingInputItem> {
+  if (r.dailyPrices == null) return { unitPrice: price };
+  const prices: Record<string, number> = {};
+  if (price != null) for (const date of freezeDepositByDay(r).keys()) prices[date] = price;
+  return { dailyPrices: prices, unitPrice: price };
+}
+
 export interface BalancingPeriodContext {
   /** Nhãn kỳ để ghi vết, VD "Bạch tuộc 2 da 01/10/2026 – 05/10/2026". */
   periodLabel: string;
@@ -294,7 +374,7 @@ export function syncMonthlyStockLedger(
           (oldParts.get(date) ?? 0) === kg &&
           a.stockLocation === b.stockLocation &&
           (a.stockCategory ?? "") === (b.stockCategory ?? "") &&
-          a.unitPrice === b.unitPrice &&
+          depositPriceOn(a, date) === depositPriceOn(b, date) &&
           depositName(a) === depositName(b)
         )
           continue; // ngày này không đổi gì
@@ -323,7 +403,8 @@ export function syncMonthlyStockLedger(
           importDate: date,
           storageLocation,
           kgPerCtn: existing?.kgPerCtn ?? null,
-          unitPrice: b?.unitPrice ?? null,
+          // Giá của ĐÚNG ngày gửi (giá theo ngày, chưa có thì đơn giá dòng).
+          unitPrice: b ? depositPriceOn(b, date) : null,
           openCtn: 0,
           openKg: 0,
           inCtn: existing?.kgPerCtn ? kg / existing.kgPerCtn : 0,

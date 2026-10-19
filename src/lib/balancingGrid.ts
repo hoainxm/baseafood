@@ -218,6 +218,11 @@ export interface MaterialGridRow {
   /** Dòng dựng từ sổ nhập hàng ⇒ ô ngày khoá, sửa ở sổ gốc. */
   fromImports: boolean;
   sourceIds: string[];
+  /**
+   * Hàng phụ "Giá gửi" theo ngày của dòng Gửi đông có id này (chỉ dựng ở màn, không lưu):
+   * ô ngày = giá ngày đó, các cột khác khoá.
+   */
+  priceRowOf?: string;
 }
 
 /**

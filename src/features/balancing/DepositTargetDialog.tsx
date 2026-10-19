@@ -1,13 +1,15 @@
 // ============================================================
 // Tên file: src/features/balancing/DepositTargetDialog.tsx
 // Tên tiếng Việt: Hộp "Gửi đông vào sổ kho" — chọn NL gửi + bảng của Sổ kho tháng
-// Description: Freeze-deposit target picker (material, warehouse, ledger group, deposit price)
+// Description: Freeze-deposit target picker (material, warehouse, ledger group)
 // ============================================================
 // VÌ SAO (người dùng yêu cầu 2026-10-16): lô gửi đông trước luôn vào nhóm riêng "Nguyên
 // liệu gửi đông" và muốn xem sổ kho thì phải sang màn Sổ kho tháng rồi quay lại. Hộp này
 // mở NGAY Ở CÂN ĐỐI bảng sổ kho của tháng, chia theo nhóm (Nguyên liệu mua ngoài / nhập
 // khẩu / Hàng tạm…): bấm một nhóm để gửi vào nhóm đó, bấm một dòng để gửi cùng nhóm, cùng
-// tên hàng, cùng kho với dòng ấy. Giá gửi lưu vào lô — lấy xả đông thấy lại giá này.
+// tên hàng, cùng kho với dòng ấy. Giá gửi KHÔNG gõ ở đây nữa (2026-10-19): kế toán tính giá
+// theo từng ngày gửi ⇒ gõ ở hàng "Giá gửi" ngay dưới dòng Gửi đông trên lưới, mỗi lô GĐ-ngày
+// lưu giá ngày đó (một chỗ gõ giá, khỏi nhầm "ô tổng").
 import { useMemo, useState } from "react";
 import {
   Button,
@@ -15,7 +17,6 @@ import {
   FormDialog,
   HorizontalScroll,
   Input,
-  NumberField,
   Field,
 } from "@/design-system";
 import { cn } from "@/lib/utils";
@@ -34,8 +35,6 @@ export interface DepositTargetValue {
   category: string;
   /** Kho "<sổ kho>|<vị trí>". */
   stockLocation: string;
-  /** Giá gửi đ/kg — thành đơn giá lô. */
-  unitPrice: number | null;
 }
 
 /** Số dòng hiện tối đa mỗi nhóm khi chưa gõ tìm (nhóm nhập khẩu có cả trăm dòng). */
@@ -111,7 +110,7 @@ export function DepositTargetDialog({
           </Button>
           <Button
             variant="save"
-            title="Lưu nguyên liệu, kho, bảng sổ kho và giá gửi cho dòng Gửi đông này — lô trong Sổ kho tháng đổi theo."
+            title="Lưu nguyên liệu, kho và bảng sổ kho cho dòng Gửi đông này — lô trong Sổ kho tháng đổi theo."
             onClick={() => {
               onSave(value);
               onOpenChange(false);
@@ -123,7 +122,7 @@ export function DepositTargetDialog({
       }
     >
       <div className="grid gap-4">
-        <div className="grid gap-3 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]">
+        <div className="grid gap-3 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
           <Combobox
             label="Nguyên liệu gửi"
             value={value.name}
@@ -142,13 +141,6 @@ export function DepositTargetDialog({
             onChange={(v) => setValue((x) => ({ ...x, stockLocation: v }))}
             options={locationOptions}
             clearable={false}
-          />
-          <NumberField
-            label="Giá gửi"
-            unit="đ/kg"
-            value={value.unitPrice}
-            onChange={(v) => setValue((x) => ({ ...x, unitPrice: v }))}
-            hint="Lưu vào lô — lấy xả đông thấy lại giá này."
           />
         </div>
 

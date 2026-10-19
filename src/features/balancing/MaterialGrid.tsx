@@ -31,7 +31,14 @@ import { RowNoteCell } from "./RowNoteCell";
 import { DepositTargetDialog, type DepositTargetValue } from "./DepositTargetDialog";
 import { useImportShipments } from "@/lib/catalogRepo";
 import { groupImportsBySupplier, groupImportsByMaterialType } from "@/lib/dailyShipments";
-import { DEFAULT_DEPOSIT_CATEGORY, shortWarehouseLabel } from "@/lib/balancingStockLines";
+import {
+  DEFAULT_DEPOSIT_CATEGORY,
+  depositPriceOn,
+  hasVaryingDepositPrices,
+  setDepositPriceAllDays,
+  setDepositPricesOn,
+  shortWarehouseLabel,
+} from "@/lib/balancingStockLines";
 import {
   Button,
   Combobox,
@@ -49,6 +56,9 @@ const WORKSHOP_WAREHOUSES = BSF1_WAREHOUSES.filter((w) => w.type === "workshop")
 
 /** Cột tiền của khối NL — ẩn khi không có quyền `balancing.view-price`. */
 const PRICE_COLUMN_KEYS = new Set(["donGia", "thanhTien"]);
+/** Id hàng phụ "Giá gửi" theo ngày dưới dòng Gửi đông (chỉ ở màn, không lưu). */
+const PRICE_ROW_SUFFIX = "::price";
+const priceRowId = (rowId: string) => `${rowId}${PRICE_ROW_SUFFIX}`;
 
 /** Cắt hậu tố size để gom "2 da lớn"/"2 da nhỏ" về một họ — CHỈ dùng cho nút Gộp,
     KHÔNG đổi `getMaterialFamily` (logic hút) để tránh đụng khớp họ khi hút. */
@@ -325,6 +335,13 @@ export function MaterialGrid({
   ];
 
   const writeCell = (rowId: string, colKey: string, v: number | null) => {
+    /* Hàng phụ "Giá gửi": ô ngày = giá gửi của ngày đó (mig 0071) — lô GĐ-ngày đổi giá theo. */
+    if (rowId.endsWith(PRICE_ROW_SUFFIX)) {
+      const parentId = rowId.slice(0, -PRICE_ROW_SUFFIX.length);
+      const parent = getOriginal(parentId);
+      if (parent && colKey.startsWith("ngay:")) writeRow(parentId, setDepositPricesOn(parent, { [colKey.slice(5)]: v }));
+      return;
+    }
     const r = getOriginal(rowId);
     if (!r) return;
     if (colKey === "soLuong") {
@@ -333,7 +350,9 @@ export function MaterialGrid({
       return;
     }
     if (colKey === "chuyenKy") return writeRow(rowId, { carryOverKg: v ?? 0 });
-    if (colKey === "donGia") return writeRow(rowId, { unitPrice: v });
+    /* Gửi đông: gõ Đơn giá của dòng = MỘT giá cho mọi ngày gửi (giá riêng từng ngày gõ ở hàng phụ). */
+    if (colKey === "donGia")
+      return writeRow(rowId, getBalancingStockLineKind(r) === "freeze-deposit" ? setDepositPriceAllDays(r, v) : { unitPrice: v });
     if (colKey === "tyLe") return writeRow(rowId, { ratioPercentage: v });
     if (colKey.startsWith("ngay:")) writeDayCell(r, colKey.slice(5), v);
   };
@@ -355,11 +374,21 @@ export function MaterialGrid({
 
     const importCells: DayCell[] = [];
     const manualEdits = new Map<string, DailyQuantities>();
+    /** Giá gửi theo ngày dán vào hàng phụ "Giá gửi": id dòng Gửi đông → ngày → giá. */
+    const priceEdits = new Map<string, Record<string, number | null>>();
     block.forEach((row, i) =>
       row.forEach((v, j) => {
         if (v == null) return;
-        const h = visibleRows.find((x) => x.id === orderedIds[iH + i]);
+        const targetId = orderedIds[iH + i];
         const column = dateColumns[iC + j];
+        if (targetId?.endsWith(PRICE_ROW_SUFFIX) && column) {
+          const parentId = targetId.slice(0, -PRICE_ROW_SUFFIX.length);
+          // Ngày chưa gửi kg ⇒ ô giá khoá, bỏ qua như ô khoá khác.
+          if (!getOriginal(parentId)?.dailyQuantities?.[column.slice(5)]) return;
+          priceEdits.set(parentId, { ...priceEdits.get(parentId), [column.slice(5)]: v });
+          return;
+        }
+        const h = visibleRows.find((x) => x.id === targetId);
         if (!h || !column) return;
         const original = getOriginal(h.id);
         if (!original) return;
@@ -375,15 +404,17 @@ export function MaterialGrid({
       })
     );
 
-    if (manualEdits.size > 0) {
+    if (manualEdits.size > 0 || priceEdits.size > 0) {
       const createdFromVirtual = [...aoTheoId.entries()]
         .filter(([id]) => manualEdits.has(id))
         .map(([id, ao]) => tuAo(ao, { dailyQuantities: manualEdits.get(id)! }));
       saveMaterials([
         ...materialInRows.map((r) => {
           const daily = manualEdits.get(r.id);
-          if (!daily) return r;
-          return { ...r, dailyQuantities: daily, quantityKg: sumGridRow(daily, r.carryOverKg) };
+          const prices = priceEdits.get(r.id);
+          if (!daily && !prices) return r;
+          const updated = daily ? { ...r, dailyQuantities: daily, quantityKg: sumGridRow(daily, r.carryOverKg) } : r;
+          return prices ? { ...updated, ...setDepositPricesOn(updated, prices) } : updated;
         }),
         ...createdFromVirtual,
       ]);
@@ -496,7 +527,34 @@ export function MaterialGrid({
        đang THU ngày ⇒ gõ thẳng (ghiSoLuong). */
     { key: "tong", header: "Số lượng", label: "Số lượng", kind: "computed", group: DAY_COLUMN_GROUPS.daysExpandedOnly, minWidth: 104, getValue: (h) => h.total || null },
     { key: "soLuong", header: "Số lượng", label: "Số lượng", kind: "input", group: DAY_COLUMN_GROUPS.daysCollapsedOnly, minWidth: 104, getValue: (h) => (h.isDecrease ? Math.abs(h.total) : h.total) || null },
-    { key: "donGia", header: "Đơn giá VNĐ", label: "Đơn giá", kind: "input", minWidth: 104, getValue: (h) => h.unitPrice },
+    {
+      key: "donGia",
+      header: "Đơn giá VNĐ",
+      label: "Đơn giá",
+      kind: "input",
+      minWidth: 104,
+      /* Gửi đông: đơn giá lưu là bình quân KHÔNG làm tròn (T.tiền khớp Σ kg×giá ngày) — chỉ
+         HIỆN tròn đồng. Ô chỉ ghi khi người dùng gõ nên số hiện tròn không đè số lưu. */
+      getValue: (h) => (h.stockLineKind === "freeze-deposit" && h.unitPrice != null ? Math.round(h.unitPrice) : h.unitPrice),
+      /* Gửi đông có giá KHÁC nhau theo ngày ⇒ ô này là bình quân, KHOÁ: ô ghi theo từng phím
+         (Esc trả số bình quân) nên để gõ được thì lỡ tay là san phẳng giá từng ngày. Giá cùng
+         một mức ⇒ gõ được = một giá cho mọi ngày gửi. */
+      isLocked: (h) => {
+        if (h.priceRowOf) return true;
+        const original = h.stockLineKind === "freeze-deposit" ? getOriginal(h.id) : undefined;
+        return Boolean(original && hasVaryingDepositPrices(original));
+      },
+      lockReason: (h) =>
+        h.priceRowOf
+          ? "Giá gửi gõ theo từng ngày ở hàng này; đơn giá bình quân nằm ở dòng Gửi đông ngay trên."
+          : "Giá gửi khác nhau theo ngày — đây là bình quân theo kg. Sửa giá ở hàng Giá gửi ngay dưới (mở cột ngày nếu đang thu).",
+      renderCellNote: (h) => {
+        const original = h.stockLineKind === "freeze-deposit" ? getOriginal(h.id) : undefined;
+        return original && hasVaryingDepositPrices(original) ? (
+          <span className="text-sm text-muted-foreground">BQ theo ngày</span>
+        ) : null;
+      },
+    },
     {
       key: "thanhTien",
       header: "T.tiền (đồng)",
@@ -506,7 +564,7 @@ export function MaterialGrid({
       // Dòng con đại lý: tiền THẬT của các chuyến (đơn giá hiện đã làm tròn).
       getValue: (h) => childRowAmount.get(h.id) ?? (h.total * (h.unitPrice ?? 0) || null),
     },
-    { key: "tyLe", header: "Tỷ lệ", label: "Tỷ lệ phần trăm", kind: "input", minWidth: 72, getValue: (h) => h.ratio },
+    { key: "tyLe", header: "Tỷ lệ", label: "Tỷ lệ phần trăm", kind: "input", minWidth: 72, getValue: (h) => h.ratio, isLocked: (h) => Boolean(h.priceRowOf) },
     ...dates.map<GridColumn<MaterialGridRow>>((iso) => ({
       key: `ngay:${iso}`,
       header: formatDayLabel(iso),
@@ -515,8 +573,11 @@ export function MaterialGrid({
       group: DAY_COLUMN_GROUPS.days,
       minWidth: 88,
       getValue: (h) => h.dailyQuantities[iso] ?? null,
+      // Hàng "Giá gửi": chỉ ngày đã gửi kg mới gõ được giá.
+      isLocked: (h) => Boolean(h.priceRowOf) && !getOriginal(h.priceRowOf!)?.dailyQuantities?.[iso],
+      lockReason: () => "Ngày này chưa gửi kg nào — gõ kg ở dòng Gửi đông trước rồi mới gõ giá.",
       // Ngay dưới số kg: "n chuyến" → đại lý/chuyến làm nên đúng ô này.
-      renderCellNote: (h) => <CellShipments imports={importRowsOf(h)} date={iso} lotCodes={lotCodes} />,
+      renderCellNote: (h) => (h.priceRowOf ? null : <CellShipments imports={importRowsOf(h)} date={iso} lotCodes={lotCodes} />),
     })),
     ...(hasLegacyCarryOver
       ? [
@@ -645,7 +706,6 @@ export function MaterialGrid({
         name: v.name.trim() && v.name.trim() !== periodFamily ? v.name.trim() : BALANCING_STOCK_LINE_NAMES["freeze-deposit"],
         stockCategory: v.category,
         stockLocation: v.stockLocation,
-        unitPrice: v.unitPrice,
       })
     )
       notify.saved(`Đã lưu chỗ gửi: ${v.name || periodFamily} → ${v.category}`, grid.undo);
@@ -660,6 +720,31 @@ export function MaterialGrid({
     return (sentDates[sentDates.length - 1] ?? dates[dates.length - 1] ?? "").slice(0, 7);
   }, [depositDialogRow, dates]);
 
+  /**
+   * Lấy xả đông: giá gửi đã LƯU ở lô (kế toán yêu cầu 2026-10-19: giá lưu để biết, sửa được khi
+   * lấy). Sửa đơn giá dòng lấy KHÔNG đổi giá lô; khác giá lô thì báo "đã sửa" + nút trả về.
+   */
+  const thawLotPriceNote = (h: MaterialGridRow, original: BalancingInputItem | undefined) => {
+    const lotId = original?.stockLineId;
+    const lotPrice = lotId ? (grid.lotOptions([lotId]).find((x) => x.value === lotId)?.price ?? null) : null;
+    if (lotPrice == null) return null;
+    if (h.unitPrice != null && Math.abs(h.unitPrice - lotPrice) < 0.5)
+      return <span className="block">giá gửi lô {num(lotPrice)} đ/kg</span>;
+    return (
+      <span className="flex flex-wrap items-center gap-1">
+        <Tag variant="warning">đã sửa · giá lô {num(lotPrice)} đ</Tag>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => writeRow(h.id, { unitPrice: lotPrice })}
+          title="Đặt lại đơn giá dòng Lấy xả đông bằng giá gửi đã lưu ở lô."
+        >
+          Dùng giá lô
+        </Button>
+      </span>
+    );
+  };
+
   const stockRowSubtext = (h: MaterialGridRow, isGroupHead: boolean, isLast: boolean) => {
     const original = getOriginal(h.id);
     if (grid.isLocked) {
@@ -669,16 +754,19 @@ export function MaterialGrid({
     return (
       <span className="mt-1 block space-y-1">
         {h.stockLineKind === "thaw-out" ? (
-          <Combobox
-            label={`Lô lấy xả đông — ${h.name}`}
-            hideLabel
-            value={original?.stockLineId ?? ""}
-            onChange={(v) => pickLot(h, v)}
-            options={grid.lotOptions(original?.stockLineId ? [original.stockLineId] : [])}
-            placeholder="Chọn lô"
-            emptyText="Sổ kho tháng không còn lô nào có tồn."
-            clearable={false}
-          />
+          <>
+            <Combobox
+              label={`Lô lấy xả đông — ${h.name}`}
+              hideLabel
+              value={original?.stockLineId ?? ""}
+              onChange={(v) => pickLot(h, v)}
+              options={grid.lotOptions(original?.stockLineId ? [original.stockLineId] : [])}
+              placeholder="Chọn lô"
+              emptyText="Sổ kho tháng không còn lô nào có tồn."
+              clearable={false}
+            />
+            {canViewPrice && thawLotPriceNote(h, original)}
+          </>
         ) : (
           /* Gọn MỘT hàng (yêu cầu kế toán 2026-10-16): ô kho nhỏ nhãn tắt (K1000) đứng trước,
              rồi nút NL gửi → mở hộp "Gửi vào sổ kho" chọn bảng của Sổ kho tháng ngay tại đây. */
@@ -698,7 +786,7 @@ export function MaterialGrid({
               size="sm"
               className="min-w-0 flex-1 justify-start"
               onClick={() => setDepositRowId(h.id)}
-              title="Chọn nguyên liệu gửi, bảng của Sổ kho tháng để gửi vào và giá gửi — xem sổ kho ngay tại đây."
+              title="Chọn nguyên liệu gửi và bảng của Sổ kho tháng để gửi vào — xem sổ kho ngay tại đây. Giá gửi gõ theo ngày ở hàng Giá gửi ngay dưới."
             >
               <span className="truncate">
                 {depositMaterialName(original)} → {depositCategoryLabel(h.id, original)}
@@ -763,15 +851,43 @@ export function MaterialGrid({
   const hasAllLots = thawRows.length > 0 && thawRows.every((h) => getOriginal(h.id)?.stockLineId);
   const hasAllLocations = freezeDepositRows.length > 0 && freezeDepositRows.every((h) => getOriginal(h.id)?.stockLocation);
 
+  /**
+   * Hàng phụ "Giá gửi" dưới mỗi dòng Gửi đông (kế toán yêu cầu 2026-10-19: giá gửi THEO NGÀY,
+   * gõ ngay trên bảng): ô ngày = giá gửi ngày đó, chỉ ngày đã gửi kg mới gõ được. Đang thu
+   * cột ngày ⇒ không hiện (gõ ô Đơn giá của dòng = một giá cho mọi ngày).
+   */
+  const depositPriceGridRow = (h: MaterialGridRow): GridRow<MaterialGridRow> | null => {
+    const original = getOriginal(h.id);
+    if (!original || isDateColumnsCollapsed || !canViewPrice) return null;
+    const prices: DailyQuantities = {};
+    for (const [iso, kg] of Object.entries(original.dailyQuantities ?? {})) {
+      const p = kg ? depositPriceOn(original, iso) : null;
+      if (p != null) prices[iso] = p;
+    }
+    const id = priceRowId(h.id);
+    return {
+      id,
+      data: { ...h, id, stockLineKind: null, priceRowOf: h.id, dailyQuantities: prices, total: 0, unitPrice: null, ratio: null, carryOverKg: 0, sourceIds: [] },
+      label: "Giá gửi (đ/kg)",
+      kind: "detail",
+      // Ngắn: ở 360px cột tên dính trái hẹp, câu dài bị cắt (lô GĐ-ngày lưu giá — xem tooltip nút NL gửi).
+      subLabel: grid.isLocked ? undefined : "Gõ giá từng ngày",
+    };
+  };
+
   const stockGridRows = (items: MaterialGridRow[]): GridRow<MaterialGridRow>[] =>
-    items.map((h, i) => ({
-      id: h.id,
-      data: h,
-      /* Chuỗi (không JSX) để nhãn đọc của từng ô mang tên dòng. */
-      label: h.name === BALANCING_STOCK_LINE_NAMES[h.stockLineKind!] ? h.name : `${BALANCING_STOCK_LINE_NAMES[h.stockLineKind!]} · ${h.name}`,
-      kind: h.stockLineKind === "freeze-deposit" ? "decrease" : undefined,
-      subLabel: stockRowSubtext(h, i === 0, i === items.length - 1),
-    }));
+    items.flatMap((h, i) => {
+      const row: GridRow<MaterialGridRow> = {
+        id: h.id,
+        data: h,
+        /* Chuỗi (không JSX) để nhãn đọc của từng ô mang tên dòng. */
+        label: h.name === BALANCING_STOCK_LINE_NAMES[h.stockLineKind!] ? h.name : `${BALANCING_STOCK_LINE_NAMES[h.stockLineKind!]} · ${h.name}`,
+        kind: h.stockLineKind === "freeze-deposit" ? "decrease" : undefined,
+        subLabel: stockRowSubtext(h, i === 0, i === items.length - 1),
+      };
+      const priceRow = h.stockLineKind === "freeze-deposit" ? depositPriceGridRow(h) : null;
+      return priceRow ? [row, priceRow] : [row];
+    });
 
   /* Không có dòng tiêu đề nhóm — bảng giấy cũng không: tên loại hàng tự nói nhóm
      ("x.đ Cò May", "Bột 24v"), dòng Giảm tô đỏ nhạt. Thứ tự vẫn theo nhóm. */
@@ -1136,7 +1252,6 @@ export function MaterialGrid({
             name: depositMaterialName(depositDialogRow),
             category: depositCategoryLabel(depositRowId, depositDialogRow),
             stockLocation: depositDialogRow.stockLocation || grid.defaultDepositLocation,
-            unitPrice: depositDialogRow.unitPrice ?? avgMaterialPrice,
           }}
           materialOptions={depositMaterialOptions}
           locationOptions={shortLocationOptions}

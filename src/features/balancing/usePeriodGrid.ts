@@ -68,6 +68,8 @@ import {
   countMonthlyStockMismatches,
   splitDepositLocation,
   monthOfDate,
+  normalizeDepositPrices,
+  lastDepositPrice,
   type DepositTargetGroup,
   type LotOption,
 } from "@/lib/balancingStockLines";
@@ -320,7 +322,9 @@ export function usePeriodGrid(period: BalancingPeriod): PeriodGrid {
      (Lấy xả đông / Gửi đông) ghi THẲNG vào Sổ kho tháng theo kiểu đặt giá trị — xem
      lib/balancingStockLines.ts. Sổ kho từ chối (vượt tồn lô, chưa chọn lô/kho) ⇒ KHÔNG ghi gì. */
   const writeMaterials = useCallback(
-    (rows: BalancingInputItem[], group = "nl"): boolean => {
+    (written: BalancingInputItem[], group = "nl"): boolean => {
+      /* Giá gửi đông theo ngày: ngày mới gửi tự có giá, đơn giá dòng = bình quân (mig 0071). */
+      const rows = written.map(normalizeDepositPrices);
       const result = syncMonthlyStockLedger(monthlyStock, materialInRows, rows, ngucanh);
       if (result.error) {
         notify.error(result.error);
@@ -764,12 +768,15 @@ export function usePeriodGrid(period: BalancingPeriod): PeriodGrid {
     const periodById = new Map(allPeriods.map((k) => [k.id, k]));
     let latest: { date: string; price: number } | null = null;
     for (const r of allMaterialRows) {
-      if (r.periodId === period.id || r.unitPrice == null || getBalancingStockLineKind(r) !== "freeze-deposit") continue;
+      if (r.periodId === period.id || getBalancingStockLineKind(r) !== "freeze-deposit") continue;
+      // Giá ngày gửi CUỐI (giá gửi theo ngày, mig 0071) — không phải bình quân cả dòng.
+      const price = lastDepositPrice(r);
+      if (price == null) continue;
       const k = periodById.get(r.periodId);
       if (!k || getMaterialFamily(k.materialTypeName) !== family) continue;
       const d = k.endDate || k.startDate || "";
       if (period.startDate && d >= period.startDate) continue;
-      if (!latest || d > latest.date) latest = { date: d, price: r.unitPrice };
+      if (!latest || d > latest.date) latest = { date: d, price };
     }
     return latest?.price ?? null;
   }, [allMaterialRows, allPeriods, period.id, period.materialTypeName, period.startDate]);

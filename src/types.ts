@@ -385,6 +385,13 @@ export interface BalancingInputItem {
    * định (lib/balancingStockLines DEFAULT_DEPOSIT_CATEGORY).
    */
   stockCategory?: string;
+  /**
+   * Dòng GỬI ĐÔNG: giá gửi THEO NGÀY (đ/kg, mig 0071) — kế toán gõ ở hàng phụ "Giá gửi" dưới
+   * dòng; mỗi ngày gửi là một lô GĐ-ngày mang đúng giá ngày đó. Có giá theo ngày thì
+   * `unitPrice` = bình quân gia quyền (không làm tròn) nên công thức kỳ không đổi. Chưa có
+   * (dòng cũ) ⇒ mọi ngày dùng `unitPrice`. Xem lib/balancingStockLines `depositPriceOn`.
+   */
+  dailyPrices?: DailyQuantities;
   /** Ghi chú của dòng (cột Ghi chú cuối lưới Cân đối, mig 0067). */
   note?: string;
 }

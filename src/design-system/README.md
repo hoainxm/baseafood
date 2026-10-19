@@ -339,6 +339,11 @@ Luật khi dùng:
   ô tick tô màu (tô ở dòng cha). Màn tự chèn dòng con ngay dưới dòng cha khi người
   dùng mở (VD tách theo đại lý). Có dòng con thì `onPasteBlock` phải tính dòng theo
   THỨ TỰ TRÊN MÀN (kể cả dòng con) và bỏ qua ô dòng con — kẻo dán trượt số.
+- **Hàng phụ GÕ ĐƯỢC — `GridRow.kind = "detail"`** (2026-10-19): thụt vào như dòng con,
+  không ô tick tô màu, nhưng ô vẫn gõ được (khoá từng ô bằng `isLocked` của cột). VD hàng
+  "Giá gửi (đ/kg)" theo ngày dưới dòng Gửi đông ở Cân đối (id `<id dòng>::price`; màn tự
+  định tuyến ghi / dán theo hậu tố id). Dùng khi một dòng cần thêm MỘT dãy số cùng cột
+  (giá theo ngày…) mà không phải dòng nghiệp vụ riêng.
 
 ### 5d. Ô số: nhập biểu thức + điều hướng phím kiểu Excel
 

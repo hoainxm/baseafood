@@ -715,9 +715,12 @@ function PeriodDetail({
       {/* items-stretch: khối trong cùng hàng cao bằng nhau ⇒ đường kẻ dọc giữa các khối chạy
           hết chiều cao (co theo nội dung thì đường kẻ dừng giữa chừng — lỗi 2026-10-19). */}
       <Card className="flex flex-row flex-wrap items-stretch gap-0 overflow-clip p-0">
-        {/* Nguyên liệu vào (A–E): khối nhập chính — NHẬN phần lớn bề ngang còn dư của hàng (3
-            phần; Xuất khẩu 1 phần, Ghi chú cố định) ⇒ ô chọn lô / kho / NL gửi hiện đủ chữ. */}
-        <div className="w-full min-w-0 xl:w-auto xl:max-w-full xl:grow-[3] xl:basis-auto">
+        {/* Nguyên liệu vào (A–E) | Bán thành phẩm (F–J): HAI CỘT BẰNG NHAU (người dùng chốt
+            2026-10-19: rộng bằng nhau cho trực quan) — lưới 2 cột `minmax(0,1fr)`, cả cặp nhận
+            phần bề ngang còn dư của hàng, Ghi chú cố định bên phải. Hai khối cao bằng nhau
+            (`auto-rows-fr`) ⇒ đường kẻ dọc giữa chạy hết. */}
+        <div className="w-full min-w-0 xl:grid xl:w-auto xl:max-w-full xl:grow xl:basis-auto xl:auto-rows-fr xl:grid-cols-2">
+        <div className="min-w-0">
           <MaterialGrid
             grid={grid}
             materialTypeCatalog={catalogMaterialTypes}
@@ -739,7 +742,7 @@ function PeriodDetail({
             }
           />
         </div>
-        <div className="w-full min-w-0 border-t-2 border-border xl:w-auto xl:max-w-full xl:grow xl:basis-auto xl:border-t-0 xl:border-l-2">
+        <div className="min-w-0 border-t-2 border-border xl:border-t-0 xl:border-l-2">
           <WipGrid
             grid={grid}
             products={products}
@@ -775,8 +778,9 @@ function PeriodDetail({
             }
           />
         </div>
+        </div>
         {/* Ghi chú (K–L): MỘT cột dọc nhãn · số như bảng giấy, rộng cố định (người dùng chốt
-            2026-10-19: không tách hai cột) — phần bề ngang dư dồn cho khối Nguyên liệu. */}
+            2026-10-19: không tách hai cột) — phần bề ngang dư dồn cho hai khối nhập. */}
         <div className="w-full border-t-2 border-border xl:w-56 xl:flex-none xl:border-t-0 xl:border-l-2">
           <ResultNote
             unpricedRowCount={findUnpricedMaterialRows(grid.materialRows).length}

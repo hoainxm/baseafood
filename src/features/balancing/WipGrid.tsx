@@ -43,7 +43,7 @@ import { useCan } from "@/features/shared/PermissionProvider";
 /** Cột tiền của khối BTP — ẩn khi không có quyền `balancing.view-price`. */
 const PRICE_COLUMN_KEYS = new Set(["donGia", "thanhTien"]);
 /** Bề rộng (px) cột bảng CHÍNH khối Xuất khẩu — gọn để A–L vừa một màn. */
-const MAIN_COLUMN_WIDTHS: Record<string, number> = { khach: 136, luong: 76, donGia: 80, thanhTien: 100 };
+const MAIN_COLUMN_WIDTHS: Record<string, number> = { khach: 112, luong: 76, donGia: 80, thanhTien: 104 };
 import { ChevronsLeftRight, Download, EyeOff, Layers, Plus } from "lucide-react";
 
 export function WipGrid({
@@ -281,9 +281,9 @@ export function WipGrid({
          nguồn sai số liệu lớn nhất ("Hanwa" / "hanwa" / "Han wa" thành 3 khách
          khi tổng hợp cuối kỳ). */
       // Bọc bề rộng: ô chọn tự nở theo tên khách dài ⇒ cột Khách to ra, bảng chính lố một màn.
-      // Tối thiểu 8rem (đủ "Seachemot"), cột giãn (màn rộng) thì ô giãn theo.
+      // Tối thiểu 6rem; cột giãn (hai khối bằng nhau giãn đều trên màn rộng) thì ô giãn theo.
       renderCell: (h) => (
-        <div className="w-full min-w-32 [contain:inline-size]">
+        <div className="w-full min-w-24 [contain:inline-size]">
         <Combobox
           label="Khách hàng"
           hideLabel
@@ -500,7 +500,7 @@ export function WipGrid({
           rows={gridRows}
           rowMarkKey="can-doi-tp"
           compact
-          rowHeaderMinWidth={136}
+          rowHeaderMinWidth={128}
           columnWidthsKey="balancing-finished-good-main"
           onCellCommit={writeCell}
           footer={

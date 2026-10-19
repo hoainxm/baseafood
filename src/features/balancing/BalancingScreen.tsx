@@ -32,6 +32,7 @@ import { useFormDraft } from "@/lib/formDraft";
 import { useAuth } from "@/lib/auth";
 import { DraftRestoredNotice } from "@/features/shared/DraftRestoredNotice";
 import { syncMonthlyStockLedger } from "@/lib/balancingStockLines";
+import { readDevicePref, writeDevicePref } from "@/lib/devicePrefs";
 import { usePeriodGrid } from "./usePeriodGrid";
 import { MaterialGrid } from "./MaterialGrid";
 import { findUnpricedMaterialRows, getMaterialFamily, isEmptyPulledSalesOutput, salesItemToOutput } from "@/lib/balancingGrid";
@@ -564,9 +565,18 @@ function PeriodDetail({
      toán đối chiếu theo ngày). Thu lại thì khối NL gõ thẳng Số lượng như bảng giấy. */
   const [hideMaterialDays, setHideMaterialDays] = useState(false);
   const [hideFinishedGoodDays, setHideFinishedGoodDays] = useState(false);
-  /* Mặc định xếp NGANG như bảng giấy (NL + ô GHI CHÚ bên trái, BTP bên phải — từ màn
-     2xl). Người dùng vẫn đổi tay được; không tự nhảy theo bề rộng. */
-  const [isHorizontal, setIsHorizontal] = useState(true);
+  /* Bố cục theo file cân đối của kế toán (2026-10-19): bảng chính A–L (Nguyên liệu ·
+     Xuất khẩu · Ghi chú) LUÔN đứng cạnh nhau; nút Xếp ngang / Xếp dọc chỉ đổi chỗ phần GHI
+     TỪNG NGÀY: bên phải (như cột M–W) hay bên dưới. MẶC ĐỊNH XẾP DỌC (người dùng chốt
+     2026-10-19); nhớ lựa chọn theo máy. */
+  const [isHorizontal, setIsHorizontal] = useState(() => readDevicePref(LAYOUT_PREF_KEY) === "horizontal");
+  const toggleLayout = () => {
+    writeDevicePref(LAYOUT_PREF_KEY, isHorizontal ? "vertical" : "horizontal");
+    setIsHorizontal(!isHorizontal);
+  };
+  /* Chỗ hai lưới vẽ bảng "theo ngày" vào (createPortal) — cùng một lưới, chỉ khác chỗ đặt. */
+  const [materialDaysSlot, setMaterialDaysSlot] = useState<HTMLDivElement | null>(null);
+  const [finishedGoodDaysSlot, setFinishedGoodDaysSlot] = useState<HTMLDivElement | null>(null);
   const [isLockOpen, setIsLockOpen] = useState(false);
 
   /* Ctrl+Z / Ctrl+Y — nghe ở cấp màn, bỏ qua khi con trỏ đang trong hộp thoại. */
@@ -682,7 +692,7 @@ function PeriodDetail({
             </Button>
           )}
           <Button
-            title="Xoay bảng ngang / dọc cho vừa màn hình — chỉ đổi cách nhìn, không đụng số." variant="outline" size="lg" onClick={() => setIsHorizontal((v) => !v)}>
+            title="Đặt phần ghi từng ngày bên phải bảng chính (Xếp ngang, như file Excel) hay bên dưới (Xếp dọc) — chỉ đổi cách nhìn, không đụng số." variant="outline" size="lg" onClick={toggleLayout}>
             {isHorizontal ? <Rows3 /> : <Columns2 />}
             {isHorizontal ? "Xếp dọc" : "Xếp ngang"}
           </Button>
@@ -696,51 +706,40 @@ function PeriodDetail({
         </div>
       </div>
 
-      {/* Hai khối trong MỘT tờ: cùng khung, cùng công tắc cột ngày, chỉ ngăn nhau
-          bằng một đường kẻ — đọc như một bảng cân đối liền mạch. */}
-      {/* Xếp ngang (mặc định, từ 2xl) theo file cân đối của kế toán: hàng trên = khối NL
-          (cột A–E) cạnh ô GHI CHÚ (cột K–L) — hai khối hẹp, đứng chung thì THẤY HẾT,
-          không cắt cột tiền như khi NL chia đôi hàng với khối BTP; hàng dưới = khối BTP
-          trải hết bề ngang (nhiều cột: khách, giá, ngày, Trả, Nợ). Màn hẹp: NL → GHI CHÚ → BTP. */}
-      <Card
-        className={
-          isHorizontal
-            ? "grid grid-cols-1 overflow-clip p-0 2xl:grid-cols-[minmax(0,1fr)_minmax(20rem,24rem)]"
-            : "overflow-clip p-0"
-        }
-      >
-        <MaterialGrid
-          grid={grid}
-          materialTypeCatalog={catalogMaterialTypes}
-          materialTypeEdit={periodMaterialTypeEditor}
-          daysCollapsed={hideMaterialDays}
-          onToggleDays={() => setHideMaterialDays((v) => !v)}
-          onCreateMaterialType={
-            periodMaterialTypeEditor.canCreate
-              ? (name) => {
-                  setCatalogMaterialTypes([
-                    ...catalogMaterialTypes,
-                    { id: uid(), name, category: "", note: "" },
-                  ]);
-                  notify.saved(`Đã thêm loại nguyên liệu "${name}" vào danh mục`);
-                  return name;
-                }
-              : undefined
-          }
-        />
-        <ResultNote
-          unpricedRowCount={findUnpricedMaterialRows(grid.materialRows).length}
-          period={period}
-          previousPeriod={grid.previousPeriod}
-          result={result}
-          hasNoFinishedGood={hasNoFinishedGood}
-          materialDiff={materialDiff}
-          sideBySide={isHorizontal}
-          isLocked={grid.isLocked}
-          canViewPrice={allowed["view-price"]}
-          onChangePeriod={onChangePeriod}
-        />
-        <div className={isHorizontal ? "2xl:col-span-2" : undefined}>
+      {/* Bố cục theo file cân đối Excel của kế toán (2026-10-19): MỘT hàng ngang bảng chính
+          A–E Nguyên liệu · F–J Xuất khẩu · K–L Ghi chú (mỗi khối co theo bảng của nó) — chụp
+          một màn là đủ để gửi; phần GHI TỪNG NGÀY (như cột M–W) bên phải (Xếp ngang) hoặc
+          bên dưới (Xếp dọc). KHÔNG bọc khung cuộn ngang chung: khung cuộn làm hàng tên cột
+          nổi của lưới hết bám — màn hẹp thì khối tự XUỐNG DÒNG, bảng dài cuộn trong khung
+          riêng. Dưới xl: các khối chồng dọc, rộng hết màn. */}
+      {/* items-stretch: khối trong cùng hàng cao bằng nhau ⇒ đường kẻ dọc giữa các khối chạy
+          hết chiều cao (co theo nội dung thì đường kẻ dừng giữa chừng — lỗi 2026-10-19). */}
+      <Card className="flex flex-row flex-wrap items-stretch gap-0 overflow-clip p-0">
+        {/* Nguyên liệu vào (A–E): khối nhập chính — NHẬN phần lớn bề ngang còn dư của hàng (3
+            phần; Xuất khẩu 1 phần, Ghi chú cố định) ⇒ ô chọn lô / kho / NL gửi hiện đủ chữ. */}
+        <div className="w-full min-w-0 xl:w-auto xl:max-w-full xl:grow-[3] xl:basis-auto">
+          <MaterialGrid
+            grid={grid}
+            materialTypeCatalog={catalogMaterialTypes}
+            materialTypeEdit={periodMaterialTypeEditor}
+            daysCollapsed={hideMaterialDays}
+            onToggleDays={() => setHideMaterialDays((v) => !v)}
+            daysSlot={materialDaysSlot}
+            onCreateMaterialType={
+              periodMaterialTypeEditor.canCreate
+                ? (name) => {
+                    setCatalogMaterialTypes([
+                      ...catalogMaterialTypes,
+                      { id: uid(), name, category: "", note: "" },
+                    ]);
+                    notify.saved(`Đã thêm loại nguyên liệu "${name}" vào danh mục`);
+                    return name;
+                  }
+                : undefined
+            }
+          />
+        </div>
+        <div className="w-full min-w-0 border-t-2 border-border xl:w-auto xl:max-w-full xl:grow xl:basis-auto xl:border-t-0 xl:border-l-2">
           <WipGrid
             grid={grid}
             products={products}
@@ -753,6 +752,7 @@ function PeriodDetail({
             onPullSales={pullSalesIntoPeriod}
             daysCollapsed={hideFinishedGoodDays}
             onToggleDays={() => setHideFinishedGoodDays((v) => !v)}
+            daysSlot={finishedGoodDaysSlot}
             onCreateProduct={
               productEditor.canCreate
                 ? (name) => {
@@ -774,6 +774,31 @@ function PeriodDetail({
                 : undefined
             }
           />
+        </div>
+        {/* Ghi chú (K–L): MỘT cột dọc nhãn · số như bảng giấy, rộng cố định (người dùng chốt
+            2026-10-19: không tách hai cột) — phần bề ngang dư dồn cho khối Nguyên liệu. */}
+        <div className="w-full border-t-2 border-border xl:w-56 xl:flex-none xl:border-t-0 xl:border-l-2">
+          <ResultNote
+            unpricedRowCount={findUnpricedMaterialRows(grid.materialRows).length}
+            period={period}
+            previousPeriod={grid.previousPeriod}
+            result={result}
+            hasNoFinishedGood={hasNoFinishedGood}
+            materialDiff={materialDiff}
+            isLocked={grid.isLocked}
+            canViewPrice={allowed["view-price"]}
+            onChangePeriod={onChangePeriod}
+          />
+        </div>
+        {/* Phần GHI TỪNG NGÀY: hai lưới vẽ vào đây (createPortal). Xếp ngang: đứng bên phải
+            khi còn ≥ 28rem, không thì tự xuống dòng; Xếp dọc: luôn một hàng riêng bên dưới. */}
+        <div
+          className={`w-full min-w-0 border-t-2 border-border ${
+            isHorizontal ? "xl:w-auto xl:min-w-[28rem] xl:flex-1 xl:basis-0 xl:border-t-0 xl:border-l-2" : ""
+          } ${hideMaterialDays && hideFinishedGoodDays ? "hidden" : ""}`}
+        >
+          <div ref={setMaterialDaysSlot} />
+          <div ref={setFinishedGoodDaysSlot} className="border-t-2 border-border empty:hidden" />
         </div>
       </Card>
 
@@ -872,6 +897,9 @@ function PeriodDetail({
  * "Thông số kỳ" riêng (trước đây một chỗ sửa, một chỗ xem). Ô sửa được trông như ô
  * nhập; khác kỳ trước cùng họ NL thì ghi "kỳ trước …" để biết số đã đổi.
  */
+/** Cài đặt theo máy: phần ghi từng ngày của Cân đối bên phải ("horizontal") hay bên dưới ("vertical"). */
+const LAYOUT_PREF_KEY = "bsf.balancing-layout.v1";
+
 function ResultNote({
   unpricedRowCount,
   period,
@@ -879,7 +907,6 @@ function ResultNote({
   result,
   hasNoFinishedGood,
   materialDiff,
-  sideBySide: isHorizontal,
   isLocked,
   canViewPrice,
   onChangePeriod,
@@ -891,7 +918,6 @@ function ResultNote({
   result: BalancingResult;
   hasNoFinishedGood: boolean;
   materialDiff: number | null;
-  sideBySide: boolean;
   isLocked: boolean;
   /** Quyền `balancing.view-price` — không có ⇒ ẩn mọi dòng tiền (kg + định mức vẫn hiện). */
   canViewPrice: boolean;
@@ -900,13 +926,13 @@ function ResultNote({
   const isProfit = result.profitOrLoss >= 0;
   return (
     <section
-      className={`border-t-2 border-border p-5 ${isHorizontal ? "2xl:border-t-0 2xl:border-l-2" : ""}`}
+      className="p-5 xl:p-3"
       aria-label="Ghi chú — kết quả cân đối"
     >
       <h2 className="mb-2 text-xl font-semibold">Ghi chú</h2>
-      {/* Xếp ngang (2xl) ô này là cột phải hẹp (20–24rem) ⇒ về MỘT cột, không thì nhãn +
-          số gãy dòng và số tiền dài tràn khung ở chữ 130%. */}
-      <div className={`grid gap-x-8 sm:grid-cols-2 ${isHorizontal ? "2xl:grid-cols-1" : ""}`}>
+      {/* MỘT cột dọc ở mọi cỡ màn (người dùng chốt 2026-10-19) — đúng cột K–L bảng giấy: nhãn
+          sát số, đọc một mạch từ Tổng thành phẩm xuống tỉ giá. */}
+      <div className="grid grid-cols-1">
         <div>
           <KV k="Tổng thành phẩm" v={`${num(result.totalOutputKg)} kg`} />
           <KV k="Định mức chế biến" v={hasNoFinishedGood ? "—" : num(result.norm)} strong />

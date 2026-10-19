@@ -4,6 +4,7 @@
 // Description: Balancing block 2 — WIP output day grid
 // ============================================================
 import { useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import type {
   BalancingOutputItem,
   Customer,
@@ -24,7 +25,7 @@ import {
   type FinishedGoodTemplateRow,
   type FinishedGoodGridRow,
 } from "@/lib/balancingGrid";
-import { DAY_COLUMN_GROUPS, collapsedDayGroups, type DayCell, type PeriodGrid } from "./usePeriodGrid";
+import { DAY_COLUMN_GROUPS, type DayCell, type PeriodGrid } from "./usePeriodGrid";
 import { RowNoteCell } from "./RowNoteCell";
 import { BackdateReasonDialog, AddProductDialog } from "./gridDialogs";
 import {
@@ -41,6 +42,8 @@ import { useCan } from "@/features/shared/PermissionProvider";
 
 /** Cột tiền của khối BTP — ẩn khi không có quyền `balancing.view-price`. */
 const PRICE_COLUMN_KEYS = new Set(["donGia", "thanhTien"]);
+/** Bề rộng (px) cột bảng CHÍNH khối Xuất khẩu — gọn để A–L vừa một màn. */
+const MAIN_COLUMN_WIDTHS: Record<string, number> = { khach: 136, luong: 76, donGia: 80, thanhTien: 100 };
 import { ChevronsLeftRight, Download, EyeOff, Layers, Plus } from "lucide-react";
 
 export function WipGrid({
@@ -57,6 +60,7 @@ export function WipGrid({
   onPullSales,
   daysCollapsed: isDateColumnsCollapsed,
   onToggleDays: onToggleDayColumns,
+  daysSlot,
 }: {
   grid: PeriodGrid;
   products: Product[];
@@ -73,9 +77,11 @@ export function WipGrid({
   /** Seam cũ: dòng sổ BÁN trong khoảng ngày, dùng khi output = hàng đã bán ra. */
   pendingSales: { salesItem: SalesItem; invoice: SalesInvoice }[];
   onPullSales: (items: { salesItem: SalesItem; invoice: SalesInvoice }[]) => void;
-  /** Dùng chung với khối nguyên liệu — xem ghi chú ở MaterialGrid. */
+  /** Ẩn bảng "Thành phẩm theo ngày" (bảng chính Xuất khẩu vẫn hiện). */
   daysCollapsed: boolean;
   onToggleDays: () => void;
+  /** Chỗ đặt bảng "Thành phẩm theo ngày" — xem MaterialGrid (bố cục kế toán 2026-10-19). */
+  daysSlot: HTMLElement | null;
 }) {
   const { date: dates, outputs: finishedGoods, finishedGoodRows, pendingWips, saveOutputs: saveFinishedGoods, pullWips: pullProduction, saveWipDayCells: saveProductionMultiDay, lockedDates, templatePeriod, missingTemplateRows: missingTemplates, suggestTemplate } =
     grid;
@@ -269,12 +275,15 @@ export function WipGrid({
       header: "Khách",
       label: "Khách hàng",
       kind: "text",
-      minWidth: 210,
+      minWidth: 168,
       getValue: () => null,
       /* Chọn trong danh mục, gõ tên lạ thì tạo mới tại chỗ — nhập tự do là
          nguồn sai số liệu lớn nhất ("Hanwa" / "hanwa" / "Han wa" thành 3 khách
          khi tổng hợp cuối kỳ). */
+      // Bọc bề rộng: ô chọn tự nở theo tên khách dài ⇒ cột Khách to ra, bảng chính lố một màn.
+      // Tối thiểu 8rem (đủ "Seachemot"), cột giãn (màn rộng) thì ô giãn theo.
       renderCell: (h) => (
+        <div className="w-full min-w-32 [contain:inline-size]">
         <Combobox
           label="Khách hàng"
           hideLabel
@@ -288,12 +297,13 @@ export function WipGrid({
           canEdit={(v) => v !== OTHER_CUSTOMER_ID && (canEditCustomer?.(v) ?? true)}
           editLabel="Sửa thông tin khách hàng này — lưu thẳng vào Danh mục."
         />
+        </div>
       ),
     },
     /* Thứ tự theo bảng cân đối giấy: XUẤT KHẨU Lượng · Đơn giá · T.tiền đứng ngay sau
        Khách, rồi các ngày + Tổng; Trả · Nợ (thay cột Chuyển kỳ) đứng CUỐI. "Lượng" = Tổng. */
     { key: "luong", header: "Lượng (kg)", label: "Lượng", kind: "computed", minWidth: 110, getValue: (h) => h.total || null },
-    { key: "donGia", header: "Đơn giá (USD / đ nội địa)", label: "Đơn giá", kind: "input", group: "tien", minWidth: 112, getValue: (h) => h.unitPrice },
+    { key: "donGia", header: <>Đơn giá<br />(USD / đ nội địa)</>, label: "Đơn giá", kind: "input", group: "tien", minWidth: 112, getValue: (h) => h.unitPrice },
     {
       key: "thanhTien",
       header: "T.tiền (USD)",
@@ -315,6 +325,7 @@ export function WipGrid({
       label: `Ngày ${formatDateVN(iso)}`,
       kind: "input",
       group: DAY_COLUMN_GROUPS.days,
+      widthKey: "day",
       minWidth: 96,
       getValue: (h) => h.dailyQuantities[iso] ?? null,
     })),
@@ -358,6 +369,13 @@ export function WipGrid({
             : "Kỳ đã chốt — mở lại ở cuối màn mới sửa được",
       }))
     : visibleColumns;
+  /* Bảng CHÍNH (cột F–J bảng cân đối giấy): Mặt hàng · Khách · Lượng · Đơn giá · T.tiền.
+     Bảng THEO NGÀY (cột M–W): các ngày · Tổng · Trả · Nợ · Ghi chú dòng (2026-10-19). */
+  const mainColumns = displayColumns
+    .filter((c) => !["tra", "no", "ghiChu"].includes(c.key) && c.group !== DAY_COLUMN_GROUPS.days)
+    // Bề rộng gần cột F–J file Excel (đủ "Seachemot", "11.591", "10,81", "120.894,1").
+    .map((c) => ({ ...c, minWidth: MAIN_COLUMN_WIDTHS[c.key] ?? c.minWidth }));
+  const dayColumns = displayColumns.filter((c) => ["tra", "no", "ghiChu"].includes(c.key) || c.group === DAY_COLUMN_GROUPS.days);
 
   const templatePeriodLabel = templatePeriod ? templatePeriod.dateRangeDescription || `${templatePeriod.startDate} – ${templatePeriod.endDate}` : "";
   const gridRows: GridRow<FinishedGoodGridRow>[] = [
@@ -414,8 +432,8 @@ export function WipGrid({
   const amounts = sumFinishedGoodAmounts(finishedGoodRows);
 
   return (
-    <section className="border-t-2 border-border p-5">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+    <section className="p-5 xl:p-2">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 xl:w-0 xl:min-w-full">
         <h2 className="text-xl font-semibold">Bán thành phẩm sản xuất</h2>
         <div className="flex flex-wrap gap-2">
           {!grid.isReadOnly && pendingWips.length > 0 && (
@@ -433,9 +451,9 @@ export function WipGrid({
             </Button>
           )}
           <Button
-            title="Ẩn / hiện các cột chia theo ngày. Ẩn đi thì bảng gọn, chỉ còn cột tổng." variant="outline" onClick={onToggleDayColumns}>
+            title="Ẩn / hiện bảng Thành phẩm theo ngày (gõ kg từng ngày, Trả · Nợ, ghi chú dòng)." variant="outline" onClick={onToggleDayColumns}>
             <ChevronsLeftRight />
-            {isDateColumnsCollapsed ? "Mở cột ngày" : "Thu cột ngày"}
+            {isDateColumnsCollapsed ? "Hiện theo ngày" : "Ẩn theo ngày"}
           </Button>
           {(templateRows.length > 0 || finishedGoodRows.some((h) => !hasValues(h))) && (
             <Button
@@ -459,7 +477,7 @@ export function WipGrid({
       </div>
 
       {hideEmptyRows && hangThat.length === 0 && finishedGoodRows.length + templateRows.length > 0 && (
-        <p className="mb-3 text-sm text-muted-foreground">
+        <p className="mb-3 text-sm text-muted-foreground xl:w-0 xl:min-w-full">
           Chưa dòng nào có số — đang ẩn {finishedGoodRows.length + templateRows.length} dòng trống.
         </p>
       )}
@@ -475,14 +493,16 @@ export function WipGrid({
           }
         />
       ) : (
+        <>
         <EditableGrid
-          description="Lưới bán thành phẩm sản xuất theo ngày trong kỳ"
-          columns={displayColumns}
+          description="Bảng xuất khẩu / bán thành phẩm của kỳ (tổng kỳ)"
+          columns={mainColumns}
           rows={gridRows}
           rowMarkKey="can-doi-tp"
-          collapsedGroups={collapsedDayGroups(isDateColumnsCollapsed)}
+          compact
+          rowHeaderMinWidth={136}
+          columnWidthsKey="balancing-finished-good-main"
           onCellCommit={writeCell}
-          onPasteBlock={pasteBlock}
           footer={
             <tr className="bg-muted font-semibold">
               <th
@@ -511,28 +531,53 @@ export function WipGrid({
                   )}
                 </td>
               )}
-              {!isDateColumnsCollapsed &&
-                dates.map((iso) => (
-                  <td key={iso} className="tnum border-t-2 border-l border-border px-3 py-3 text-right">
-                    {num(finishedGoodRows.reduce((s, h) => s + (h.dailyQuantities[iso] ?? 0), 0)) || "—"}
-                  </td>
-                ))}
-              {!isDateColumnsCollapsed && (
-                <td className="tnum border-t-2 border-l border-border px-3 py-3 text-right">
-                  {num(totalKg)}
-                </td>
-              )}
-              <td className="tnum border-t-2 border-l border-border bg-warning-surface px-3 py-3 text-right">
-                {num(finishedGoodRows.reduce((s, h) => s + h.repaidKg, 0)) || "—"}
-              </td>
-              <td className="tnum border-t-2 border-l border-border bg-warning-surface px-3 py-3 text-right">
-                {num(finishedGoodRows.reduce((s, h) => s + h.debtKg, 0)) || "—"}
-              </td>
-              {/* ô dưới cột Ghi chú */}
-              <td className="border-t-2 border-l border-border" />
             </tr>
           }
         />
+        {daysSlot &&
+          !isDateColumnsCollapsed &&
+          createPortal(
+            <section className="p-5" aria-label="Thành phẩm theo ngày">
+              <h3 className="mb-3 text-lg font-semibold">Thành phẩm theo ngày</h3>
+              <EditableGrid
+                description="Lưới bán thành phẩm sản xuất theo ngày trong kỳ"
+                columns={dayColumns}
+                rows={gridRows}
+                rowMarkKey="can-doi-tp"
+                columnWidthsKey="balancing-finished-good-days"
+                onCellCommit={writeCell}
+                onPasteBlock={pasteBlock}
+                footer={
+                  <tr className="bg-muted font-semibold">
+                    <th
+                      scope="row"
+                      className="sticky left-0 z-10 border-t-2 border-r-2 border-border bg-muted px-4 py-3 text-left"
+                    >
+                      Tổng cộng
+                    </th>
+                    {dates.map((iso) => (
+                      <td key={iso} className="tnum border-t-2 border-l border-border px-3 py-3 text-right">
+                        {num(finishedGoodRows.reduce((s, h) => s + (h.dailyQuantities[iso] ?? 0), 0)) || "—"}
+                      </td>
+                    ))}
+                    <td className="tnum border-t-2 border-l border-border px-3 py-3 text-right">
+                      {num(totalKg)}
+                    </td>
+                    <td className="tnum border-t-2 border-l border-border bg-warning-surface px-3 py-3 text-right">
+                      {num(finishedGoodRows.reduce((s, h) => s + h.repaidKg, 0)) || "—"}
+                    </td>
+                    <td className="tnum border-t-2 border-l border-border bg-warning-surface px-3 py-3 text-right">
+                      {num(finishedGoodRows.reduce((s, h) => s + h.debtKg, 0)) || "—"}
+                    </td>
+                    {/* ô dưới cột Ghi chú */}
+                    <td className="border-t-2 border-l border-border" />
+                  </tr>
+                }
+              />
+            </section>,
+            daysSlot
+          )}
+        </>
       )}
 
       {!grid.isLocked && (

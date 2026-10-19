@@ -12,6 +12,8 @@ import { RowMarkToolbar } from "./RowMarkToolbar";
 import { useTopScrollbar } from "./topScrollbar";
 import { useFloatingTableHead } from "./floatingTableHead";
 import { useRowSelection, useRowMarkTools } from "./rowMarkSource";
+import { ColumnResizeHandle, measureFitWidth, useColumnWidths } from "./columnResize";
+import { RotateCcw } from "lucide-react";
 
 /**
  * EditableGrid — lưới nhập liệu thay cho "mở hộp thoại, điền, bấm lưu" từng dòng.
@@ -65,6 +67,11 @@ export interface GridColumn<R> {
   fill?: boolean;
   /** Căn chữ của ô khoá + tiêu đề (mặc định phải — cột số). Cột chữ dùng "left". */
   align?: "left" | "right";
+  /**
+   * Khoá bề rộng khi kéo giãn cột (`columnWidthsKey`): các cột CÙNG khoá dùng chung một bề rộng
+   * (VD mọi cột ngày "day" — kỳ khác ngày khác vẫn giữ bề rộng đã chỉnh). Mặc định = `key`.
+   */
+  widthKey?: string;
 }
 
 export interface GridRow<R> {
@@ -90,6 +97,9 @@ const TINT_CLASSES: Record<NonNullable<GridColumn<unknown>["tint"]>, string> = {
   pulled: "bg-primary/8",
 };
 
+/** Khoá bề rộng cột TÊN dòng (cột dính trái) khi kéo giãn cột. */
+const ROW_HEADER_WIDTH_KEY = "__row-header";
+
 /** Khoá ô để định vị khi di chuyển bằng phím. */
 const cellKey = (rowId: string, colKey: string) => `${rowId}|${colKey}`;
 
@@ -104,6 +114,9 @@ export function EditableGrid<R>({
   description,
   rowHeaderLabel = "Mặt hàng",
   rowMarkKey,
+  compact = false,
+  rowHeaderMinWidth = 128,
+  columnWidthsKey,
 }: {
   columns: GridColumn<R>[];
   rows: GridRow<R>[];
@@ -129,6 +142,22 @@ export function EditableGrid<R>({
    * (phải là id bản ghi). Dòng tiêu đề nhóm không tô. Luật: README § Tô màu dòng.
    */
   rowMarkKey?: string;
+  /**
+   * Lưới GỌN cho bảng phải đứng CẠNH bảng khác trên một màn (VD bảng chính Cân đối A–L:
+   * Nguyên liệu · Xuất khẩu · Ghi chú cạnh nhau để chụp gửi): cột tên KHÔNG đòi bề rộng theo
+   * chữ dài nhất (chỉ `rowHeaderMinWidth`); khung chứa rộng hơn thì MỌI cột giãn theo tỷ lệ
+   * (cột tên giãn ⇒ ô chọn lô / kho hiện đủ chữ); ô số co về đúng `minWidth` của cột (ô nhập mặc định của
+   * trình duyệt rộng ~20 ký tự, tự kéo cột nở to); tên cột được xuống dòng.
+   */
+  compact?: boolean;
+  /** Lưới gọn: bề rộng TỐI THIỂU cột tên (px, gồm cả đệm). Mặc định 128. */
+  rowHeaderMinWidth?: number;
+  /**
+   * Bật KÉO GIÃN CỘT kiểu Excel: kéo mép phải tên cột để đổi bề rộng, nhấp đúp mép để vừa
+   * nội dung, nút ↺ ở góc trả về mặc định. Khoá ỔN ĐỊNH của bảng (tiếng Anh) — bề rộng nhớ
+   * theo máy (lib/devicePrefs). Không truyền ⇒ tắt.
+   */
+  columnWidthsKey?: string;
 }) {
   const to = useRowMarkTools(rowMarkKey);
   // Tick dòng để tô màu / in đậm nhiều dòng một lúc (chỉ khi bật rowMarkKey).
@@ -145,14 +174,47 @@ export function EditableGrid<R>({
   );
   /** Có cột giãn ⇒ cột khác co vừa nội dung (width 1% + minWidth) để cột giãn ăn phần còn lại. */
   const hasFillColumn = visibleColumns.some((c) => c.fill);
+  /* Bề rộng người dùng KÉO (kiểu Excel): cột đã chỉnh giữ ĐÚNG bề rộng đó; bảng đã có cột
+     chỉnh thì co theo tổng bề rộng (w-max) thay vì giãn hết khung — giãn khung thì phần dư
+     lại chia vào cột vừa chỉnh, kéo bao nhiêu cũng không ra đúng cỡ. */
+  const resize = useColumnWidths(columnWidthsKey);
+  const widthKeyOf = (c: GridColumn<R>) => c.widthKey ?? c.key;
+  const customWidthStyle = (px: number | undefined): React.CSSProperties | undefined =>
+    px ? { width: px, minWidth: px, maxWidth: px } : undefined;
   const columnWidthStyle = (c: GridColumn<R>): React.CSSProperties | undefined =>
-    hasFillColumn
+    customWidthStyle(resize.widths[widthKeyOf(c)]) ??
+    (hasFillColumn
       ? c.fill
         ? { minWidth: c.minWidth ?? 160 }
         : { width: "1%", minWidth: c.minWidth }
       : c.minWidth
-        ? { minWidth: c.minWidth }
-        : undefined;
+        ? // Lưới gọn: ĐẶT bề rộng ⇒ cột co đúng cỡ, tên cột dài tự xuống dòng (bảng co theo
+          // nội dung thì tên cột không xuống dòng, cột nở theo cả câu tên).
+          compact
+          ? { width: c.minWidth, minWidth: c.minWidth }
+          : { minWidth: c.minWidth }
+        : undefined);
+  /** Bề rộng đang thấy của mọi cột (đọc từ hàng tên cột) — chốt lại khi bắt đầu kéo. */
+  const currentWidths = (th: HTMLTableCellElement): Record<string, number> => {
+    const cells = th.parentElement instanceof HTMLTableRowElement ? Array.from(th.parentElement.cells) : [];
+    const out: Record<string, number> = {};
+    const keys = [ROW_HEADER_WIDTH_KEY, ...visibleColumns.map(widthKeyOf)];
+    cells.forEach((cell, i) => {
+      const k = keys[i];
+      if (k && out[k] == null) out[k] = Math.round(cell.getBoundingClientRect().width);
+    });
+    return out;
+  };
+  const resizeHandle = (widthKey: string, label: string) =>
+    resize.enabled ? (
+      <ColumnResizeHandle
+        label={label}
+        onStart={(th) => resize.freeze(currentWidths(th))}
+        onResize={(px) => resize.setWidth(widthKey, px)}
+        onCommit={() => resize.persist()}
+        onFit={(th) => resize.fit(widthKey, measureFitWidth(th))}
+      />
+    ) : null;
   /** Chỉ ô gõ được mới nằm trong đường đi của phím mũi tên. */
   const inputRows = React.useMemo(() => rows.filter((h) => !h.groupTitle), [rows]);
   // Dòng con (chỉ đọc, VD tách theo đại lý) không tick tô màu — tô ở dòng cha.
@@ -272,13 +334,24 @@ export function EditableGrid<R>({
           sr-only là position:absolute, mà hộp cuộn ngoài không phải khối định vị
           ⇒ caption rơi ra toạ độ trang, đội chiều cao trang lên và sinh thêm một
           thanh cuộn dọc + mảng trắng dưới cùng. */}
-      <table className="w-full border-collapse text-sm" aria-label={description}>
+      <table className={cn("border-collapse text-sm", resize.isCustomized ? "w-max" : "w-full")} aria-label={description}>
         <thead>
           <tr>
             <th
               scope="col"
-              style={hasFillColumn ? { width: "1%" } : undefined}
-              className="sticky left-0 z-30 min-w-40 border-b-2 border-border bg-card px-3 py-3 text-left align-bottom text-sm font-semibold sm:min-w-52"
+              style={{
+                ...(hasFillColumn ? { width: "1%" } : {}),
+                // Lưới gọn: cột tên cũng ĐẶT bề rộng ⇒ mọi cột đều có bề rộng đặt, khung giãn thì
+                // phần dư chia THEO TỶ LỆ cho mọi cột (như kéo rộng bảng Excel) — không dồn hết
+                // vào cột tên để cột số vẫn sát mức tối thiểu.
+                ...(compact ? { width: rowHeaderMinWidth, minWidth: rowHeaderMinWidth } : {}),
+                // Bề rộng người dùng KÉO thắng mọi mặc định ở trên.
+                ...customWidthStyle(resize.widths[ROW_HEADER_WIDTH_KEY]),
+              }}
+              className={cn(
+                "sticky left-0 z-30 border-b-2 border-border bg-card py-3 text-left align-bottom text-sm font-semibold",
+                compact ? "px-2" : "min-w-40 px-3 sm:min-w-52"
+              )}
             >
               <span className="flex items-center gap-1">
                 {to.enabled && (
@@ -292,7 +365,19 @@ export function EditableGrid<R>({
                   />
                 )}
                 <span className="min-w-0 flex-1">{rowHeaderLabel}</span>
+                {resize.isCustomized && (
+                  <button
+                    type="button"
+                    onClick={resize.reset}
+                    className="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+                    title="Trả bề rộng mọi cột của bảng này về mặc định."
+                    aria-label="Trả bề rộng cột về mặc định"
+                  >
+                    <RotateCcw className="size-4" aria-hidden />
+                  </button>
+                )}
               </span>
+              {resizeHandle(ROW_HEADER_WIDTH_KEY, rowHeaderLabel)}
             </th>
             {visibleColumns.map((c) => (
               <th
@@ -300,12 +385,14 @@ export function EditableGrid<R>({
                 scope="col"
                 style={columnWidthStyle(c)}
                 className={cn(
-                  "border-b-2 border-l border-border bg-card px-2 py-3 align-bottom text-sm font-semibold whitespace-nowrap",
+                  "relative border-b-2 border-l border-border bg-card px-2 py-3 align-bottom text-sm font-semibold",
+                  !compact && !resize.widths[widthKeyOf(c)] && "whitespace-nowrap",
                   c.align === "left" ? "text-left" : "text-right",
                   c.tint === "carry-over" && "text-warning"
                 )}
               >
                 {c.header}
+                {resizeHandle(widthKeyOf(c), c.label)}
               </th>
             ))}
           </tr>
@@ -334,7 +421,8 @@ export function EditableGrid<R>({
                 <th
                   scope="row"
                   className={cn(
-                    "sticky left-0 z-10 border-r-2 border-b border-border px-3 py-2 text-left align-middle font-normal",
+                    "sticky left-0 z-10 border-r-2 border-b border-border py-2 text-left align-middle font-normal",
+                    compact ? "px-2" : "px-3",
                     h.kind === "total" ? "bg-muted font-semibold" : h.kind === "child" ? "bg-muted" : "bg-card",
                     h.kind === "decrease" && "bg-warning-surface/40",
                     // Dòng con / hàng phụ: thụt vào + vạch trái nhạt ⇒ đọc ra "thuộc dòng trên".
@@ -342,8 +430,16 @@ export function EditableGrid<R>({
                   )}
                 >
                   {/* Có cột giãn ⇒ cột tên co vừa nội dung nhưng CHẶN 18rem: ô chọn lô / NL chữ dài
-                      tự cắt "…" thay vì kéo cả cột rộng ra. */}
-                  <div className={cn("flex items-start gap-2", hasFillColumn && "max-w-[18rem]")}>
+                      tự cắt "…" thay vì kéo cả cột rộng ra. Lưới gọn: `contain: inline-size` ⇒
+                      chữ / ô chọn không đòi bề rộng (cột chỉ đòi rowHeaderMinWidth) nhưng vẫn
+                      dùng HẾT bề rộng cột khi khung chứa giãn. */}
+                  <div
+                    className={cn(
+                      "flex items-start gap-2",
+                      // Đã kéo bề rộng cột tên ⇒ chữ / ô chọn theo đúng cột đó, không chặn 18rem.
+                      compact || resize.widths[ROW_HEADER_WIDTH_KEY] ? "[contain:inline-size]" : hasFillColumn && "max-w-[18rem]"
+                    )}
+                  >
                     {to.enabled && h.kind !== "child" && h.kind !== "detail" && (
                       <input
                         type="checkbox"
@@ -410,6 +506,7 @@ export function EditableGrid<R>({
                           onCommit={(v) => onCellCommit(h.id, c.key, v)}
                           onKeyDown={(e) => handleKeyDown(e, h.id, c.key)}
                           onPaste={(e) => handlePaste(e, h.id, c.key)}
+                          compact={compact}
                         />
                       )}
                       {phu && <div className="flex justify-end px-1 pb-1">{phu}</div>}
@@ -446,9 +543,12 @@ function GridCell({
   onCommit,
   onKeyDown,
   onPaste,
+  compact = false,
 }: {
   value: number | null;
   label: string;
+  /** Lưới gọn: ô không tự đòi bề rộng mặc định (~20 ký tự) — co theo cột. */
+  compact?: boolean;
   inputRef: (el: HTMLInputElement | null) => void;
   onCommit: (v: number | null) => void;
   onKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => void;
@@ -467,6 +567,7 @@ function GridCell({
       aria-label={label}
       inputMode="decimal"
       autoComplete="off"
+      size={compact ? 1 : undefined}
       onChange={o.onChange}
       onFocus={o.onFocus}
       onBlur={o.onBlur}
@@ -476,7 +577,8 @@ function GridCell({
         if (!e.defaultPrevented) onKeyDown(e);
       }}
       className={cn(
-        "tnum h-11 w-full min-w-20 border-0 bg-transparent px-2 text-right text-sm",
+        "tnum h-11 w-full border-0 bg-transparent px-2 text-right text-sm",
+        compact ? "min-w-12" : "min-w-20",
         "focus:ring-2 focus:ring-ring focus:ring-inset focus:outline-none",
         value != null && value < 0 && "text-destructive"
       )}

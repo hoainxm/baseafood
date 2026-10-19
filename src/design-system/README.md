@@ -339,6 +339,27 @@ Luật khi dùng:
   ô tick tô màu (tô ở dòng cha). Màn tự chèn dòng con ngay dưới dòng cha khi người
   dùng mở (VD tách theo đại lý). Có dòng con thì `onPasteBlock` phải tính dòng theo
   THỨ TỰ TRÊN MÀN (kể cả dòng con) và bỏ qua ô dòng con — kẻo dán trượt số.
+- **Lưới GỌN — prop `compact`** (2026-10-19): cho bảng phải đứng CẠNH bảng khác trên một
+  màn (bảng chính Cân đối A–L). Cột tên không đòi bề rộng theo chữ dài nhất
+  (`contain: inline-size`, tối thiểu `rowHeaderMinWidth` px, `px-2`), ô số co về `minWidth`
+  của cột (ô `<input>` không đòi bề rộng mặc định ~20 ký tự). MỌI cột (kể cả cột tên) ĐẶT bề
+  rộng = mức tối thiểu ⇒ tên cột dài tự xuống dòng, và khi khung chứa giãn thì phần dư chia
+  THEO TỶ LỆ cho mọi cột (như kéo rộng bảng Excel) — đừng chặn cứng cột tên (ô chọn bị cắt)
+  cũng đừng để cột tên ăn hết phần dư (cột số sát tối thiểu, tên cột gãy chữ). Ô điều khiển
+  trong ô (Combobox) bọc `w-full min-w-* [contain:inline-size]` để giãn theo cột. Khối chứa lưới gọn co theo bảng: tiêu đề / nút đặt
+  `w-0 min-w-full` để không kéo khối rộng hơn bảng. Lưới thường đừng bật (cột tên hẹp làm
+  tên dài gãy dòng).
+- **Kéo giãn cột kiểu Excel — prop `columnWidthsKey`** (2026-10-19, `patterns/columnResize.tsx`):
+  truyền khoá ỔN ĐỊNH tiếng Anh của bảng ⇒ mỗi tên cột có mép kéo ở cạnh phải: KÉO để đổi bề
+  rộng (thả tay mới lưu), NHẤP ĐÚP để vừa nội dung dài nhất, nút ↺ ở góc cột tên trả mọi cột
+  về mặc định. Nhớ theo MÁY (`lib/devicePrefs`, khoá `bsf.grid-column-widths.v1.<khoá bảng>`)
+  — cài đặt trình bày, KHÔNG toast, không ghi sổ. Bắt đầu kéo ⇒ chốt bề rộng ĐANG THẤY của mọi
+  cột (kéo một cột không làm cột khác nhảy); bảng đã chỉnh thì co theo tổng bề rộng (`w-max`).
+  Cột cùng `GridColumn.widthKey` dùng chung bề rộng (VD mọi cột ngày `"day"` — kỳ khác ngày vẫn
+  giữ). Đang bật ở bốn lưới Cân đối.
+- **Một lưới, hai bảng:** cần bảng tổng + bảng chia ngày của CÙNG dòng thì dựng hai
+  `EditableGrid` từ cùng `rows` / `onCellCommit`, chia `columns` (cùng `rowMarkKey` ⇒ màu dòng
+  hiện cả hai). Bảng đặt ở chỗ khác của màn ⇒ `createPortal` vào chỗ màn đưa (VD Cân đối).
 - **Hàng phụ GÕ ĐƯỢC — `GridRow.kind = "detail"`** (2026-10-19): thụt vào như dòng con,
   không ô tick tô màu, nhưng ô vẫn gõ được (khoá từng ô bằng `isLocked` của cột). VD hàng
   "Giá gửi (đ/kg)" theo ngày dưới dòng Gửi đông ở Cân đối (id `<id dòng>::price`; màn tự

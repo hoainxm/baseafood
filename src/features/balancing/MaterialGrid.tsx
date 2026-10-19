@@ -4,6 +4,7 @@
 // Description: Balancing block 1 — material input day grid
 // ============================================================
 import { useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import type { BalancingInputItem, DailyQuantities, InputGroup, MaterialImportItem, MaterialType } from "@/types";
 import { BSF1_WAREHOUSES, INPUT_GROUPS, sumGridRow } from "@/types";
 import { uid } from "@/lib/db";
@@ -24,7 +25,7 @@ import {
   compareDomesticSales,
   isDomesticSaleRow,
 } from "@/lib/domesticSales";
-import { DAY_COLUMN_GROUPS, collapsedDayGroups, type DayCell, type PeriodGrid } from "./usePeriodGrid";
+import { DAY_COLUMN_GROUPS, type DayCell, type PeriodGrid } from "./usePeriodGrid";
 import { PickImportRowsDialog, ManualRowsDialog, AddMaterialRowDialog } from "./gridDialogs";
 import { CellShipments } from "./CellShipments";
 import { RowNoteCell } from "./RowNoteCell";
@@ -59,6 +60,8 @@ const PRICE_COLUMN_KEYS = new Set(["donGia", "thanhTien"]);
 /** Id hàng phụ "Giá gửi" theo ngày dưới dòng Gửi đông (chỉ ở màn, không lưu). */
 const PRICE_ROW_SUFFIX = "::price";
 const priceRowId = (rowId: string) => `${rowId}${PRICE_ROW_SUFFIX}`;
+/** Bề rộng (px) cột bảng CHÍNH khối NL — gọn để A–L (NL · Xuất khẩu · Ghi chú) vừa một màn. */
+const MAIN_COLUMN_WIDTHS: Record<string, number> = { soLuong: 76, donGia: 84, thanhTien: 112, tyLe: 52 };
 
 /** Cắt hậu tố size để gom "2 da lớn"/"2 da nhỏ" về một họ — CHỈ dùng cho nút Gộp,
     KHÔNG đổi `getMaterialFamily` (logic hút) để tránh đụng khớp họ khi hút. */
@@ -72,6 +75,7 @@ export function MaterialGrid({
   materialTypeEdit: materialTypeEditor,
   daysCollapsed: isDateColumnsCollapsed,
   onToggleDays: onToggleDayColumns,
+  daysSlot,
 }: {
   grid: PeriodGrid;
   materialTypeCatalog: MaterialType[];
@@ -79,8 +83,15 @@ export function MaterialGrid({
   onCreateMaterialType?: (names: string) => string;
   /** Bút chì sửa nhanh loại NL ở hộp thêm dòng (useQuickCatalogEdit của màn, theo TÊN). */
   materialTypeEdit?: { openEdit: (v: string) => void; canEdit: (v: string) => boolean; editLabel: string };
+  /** Ẩn bảng "Nguyên liệu theo ngày" (bảng chính A–E vẫn hiện). */
   daysCollapsed: boolean;
   onToggleDays: () => void;
+  /**
+   * Chỗ đặt bảng "Nguyên liệu theo ngày" (bố cục kế toán 2026-10-19): bảng chính A–E đứng
+   * cạnh Xuất khẩu + Ghi chú; phần ghi từng ngày nằm bên phải (Xếp ngang) hoặc bên dưới
+   * (Xếp dọc) — màn quyết định chỗ, lưới này chỉ vẽ vào đó (cùng một nguồn số, cùng đường ghi).
+   */
+  daysSlot: HTMLElement | null;
 }) {
   const {
     date: dates,
@@ -571,6 +582,7 @@ export function MaterialGrid({
       label: `Ngày ${formatDateVN(iso)}`,
       kind: "input",
       group: DAY_COLUMN_GROUPS.days,
+      widthKey: "day",
       minWidth: 88,
       getValue: (h) => h.dailyQuantities[iso] ?? null,
       // Hàng "Giá gửi": chỉ ngày đã gửi kg mới gõ được giá.
@@ -629,6 +641,14 @@ export function MaterialGrid({
             : "Kỳ đã chốt — mở lại ở cuối màn mới sửa được",
       }))
     : visibleColumns;
+  /* Bảng CHÍNH (cột A–E bảng cân đối giấy): Loại hàng · Số lượng (gõ thẳng, phần chênh dồn
+     ngày cuối) · Đơn giá · T.tiền · Tỷ lệ. Bảng THEO NGÀY: các ngày (+ Chuyển kỳ cũ) · Ghi
+     chú dòng. Hai bảng dùng chung cột, dòng, đường ghi — chỉ chia cột (2026-10-19). */
+  const mainColumns = displayColumns
+    .filter((c) => c.group === DAY_COLUMN_GROUPS.daysCollapsedOnly || (!c.group && c.key !== "ghiChu"))
+    // Bề rộng gần cột A–E file Excel: đủ số dài nhất ("-3.000", "145.000", "3.356.750.000").
+    .map((c) => ({ ...c, minWidth: MAIN_COLUMN_WIDTHS[c.key] ?? c.minWidth }));
+  const dayColumns = displayColumns.filter((c) => c.group === DAY_COLUMN_GROUPS.days || c.key === "ghiChu");
 
   /* Gửi đông ⇄ còn dở khai ở Sản xuất: cả hai cùng ghi, màn đối chiếu. Gửi đông có
      số thì là số chuẩn của tồn kho đông; chưa có thì tồn tạm lấy còn dở SX. */
@@ -770,7 +790,9 @@ export function MaterialGrid({
         ) : (
           /* Gọn MỘT hàng (yêu cầu kế toán 2026-10-16): ô kho nhỏ nhãn tắt (K1000) đứng trước,
              rồi nút NL gửi → mở hộp "Gửi vào sổ kho" chọn bảng của Sổ kho tháng ngay tại đây. */
-          <span className="flex items-center gap-1">
+          /* Cột tên hẹp (bảng chính gọn, 2026-10-19) ⇒ nút NL gửi tự XUỐNG DÒNG thay vì bị ép
+             còn một chấm. */
+          <span className="flex flex-wrap items-center gap-1">
             <Combobox
               label={`Kho gửi đông — ${h.name}`}
               hideLabel
@@ -784,7 +806,7 @@ export function MaterialGrid({
             <Button
               variant="outline"
               size="sm"
-              className="min-w-0 flex-1 justify-start"
+              className="min-w-24 flex-1 justify-start"
               onClick={() => setDepositRowId(h.id)}
               title="Chọn nguyên liệu gửi và bảng của Sổ kho tháng để gửi vào — xem sổ kho ngay tại đây. Giá gửi gõ theo ngày ở hàng Giá gửi ngay dưới."
             >
@@ -853,12 +875,12 @@ export function MaterialGrid({
 
   /**
    * Hàng phụ "Giá gửi" dưới mỗi dòng Gửi đông (kế toán yêu cầu 2026-10-19: giá gửi THEO NGÀY,
-   * gõ ngay trên bảng): ô ngày = giá gửi ngày đó, chỉ ngày đã gửi kg mới gõ được. Đang thu
-   * cột ngày ⇒ không hiện (gõ ô Đơn giá của dòng = một giá cho mọi ngày).
+   * gõ ngay trên bảng): ô ngày = giá gửi ngày đó, chỉ ngày đã gửi kg mới gõ được. Chỉ nằm ở
+   * bảng THEO NGÀY (bảng chính không có cột ngày; ô Đơn giá dòng = một giá cho mọi ngày).
    */
   const depositPriceGridRow = (h: MaterialGridRow): GridRow<MaterialGridRow> | null => {
     const original = getOriginal(h.id);
-    if (!original || isDateColumnsCollapsed || !canViewPrice) return null;
+    if (!original || !canViewPrice) return null;
     const prices: DailyQuantities = {};
     for (const [iso, kg] of Object.entries(original.dailyQuantities ?? {})) {
       const p = kg ? depositPriceOn(original, iso) : null;
@@ -982,6 +1004,10 @@ export function MaterialGrid({
     }
   }
   gridRows.push(...stockGridRows(freezeDepositGridRows));
+  /* Bảng chính: dòng đủ ô điều khiển (chọn lô / kho, tách đại lý…), không có hàng Giá gửi
+     theo ngày. Bảng theo ngày: tên dòng TRẦN (như cột M bảng giấy lặp tên) + hàng Giá gửi. */
+  const mainGridRows = gridRows.filter((r) => r.kind !== "detail");
+  const dayGridRows = gridRows.map((r) => (r.kind === "child" || r.kind === "detail" ? r : { ...r, subLabel: undefined }));
 
   /* Dòng lệch tên + dòng đang thuộc kỳ khác đều chọn tay được từ một chỗ. */
   const pickableRows = useMemo(
@@ -1009,7 +1035,10 @@ export function MaterialGrid({
   ].filter(Boolean);
 
   return (
-    <section className="p-5">
+    <section className="p-5 xl:p-2">
+      {/* Màn rộng: khối co theo BẢNG (đứng cạnh Xuất khẩu) — tiêu đề, cảnh báo, nút không
+          được kéo khối rộng hơn bảng (w-0 + min-w-full: rộng đúng bằng khối, tự xuống dòng). */}
+      <div className="xl:w-0 xl:min-w-full">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-xl font-semibold">Nguyên liệu vào</h2>
         <div className="flex flex-wrap gap-2">
@@ -1046,9 +1075,9 @@ export function MaterialGrid({
             </Button>
           )}
           <Button
-            title="Ẩn / hiện các cột chia theo ngày. Ẩn đi thì bảng gọn, gõ thẳng cột Số lượng." variant="outline" onClick={onToggleDayColumns}>
+            title="Ẩn / hiện bảng Nguyên liệu theo ngày (gõ kg, giá gửi từng ngày). Bảng chính vẫn gõ thẳng cột Số lượng." variant="outline" onClick={onToggleDayColumns}>
             <ChevronsLeftRight />
-            {isDateColumnsCollapsed ? "Mở cột ngày" : "Thu cột ngày"}
+            {isDateColumnsCollapsed ? "Hiện theo ngày" : "Ẩn theo ngày"}
           </Button>
           {hasSupplierRows && (
             <Button
@@ -1119,16 +1148,19 @@ export function MaterialGrid({
           kiểm lại ngày của kỳ (theo ngày hàng về xưởng).
         </p>
       )}
+      </div>
 
       <EditableGrid
-        description="Lưới nguyên liệu vào theo ngày trong kỳ"
+        description="Bảng nguyên liệu vào của kỳ (tổng kỳ)"
         rowHeaderLabel="Loại hàng"
-        columns={displayColumns}
-        rows={gridRows}
+        columns={mainColumns}
+        rows={mainGridRows}
         rowMarkKey="can-doi-nl"
-        collapsedGroups={collapsedDayGroups(isDateColumnsCollapsed)}
+        compact
+        // Ô tên khối NL chứa ô chọn lô / kho / NL gửi ⇒ tối thiểu rộng hơn khối Xuất khẩu.
+        rowHeaderMinWidth={160}
+        columnWidthsKey="balancing-material-main"
         onCellCommit={writeCell}
-        onPasteBlock={pasteBlock}
         footer={
           <tr className="bg-muted font-semibold">
             <th
@@ -1151,25 +1183,52 @@ export function MaterialGrid({
               </td>
             )}
             <td className="border-t-2 border-l border-border" />
-            {!isDateColumnsCollapsed &&
-              dates.map((iso) => (
-                <td key={iso} className="tnum border-t-2 border-l border-border px-3 py-3 text-right">
-                  {num(materialRows.reduce((s, h) => s + (h.dailyQuantities[iso] ?? 0), 0)) || "—"}
-                </td>
-              ))}
-            {!isDateColumnsCollapsed && hasLegacyCarryOver && (
-              <td className="tnum border-t-2 border-l border-border bg-warning-surface px-3 py-3 text-right">
-                {num(materialRows.reduce((s, h) => s + h.carryOverKg, 0)) || "—"}
-              </td>
-            )}
-            {/* ô dưới cột Ghi chú */}
-            <td className="border-t-2 border-l border-border" />
           </tr>
         }
       />
+      {daysSlot &&
+        !isDateColumnsCollapsed &&
+        createPortal(
+          <section className="p-5" aria-label="Nguyên liệu theo ngày">
+            <h3 className="mb-3 text-lg font-semibold">Nguyên liệu theo ngày</h3>
+            <EditableGrid
+              description="Lưới nguyên liệu vào theo ngày trong kỳ"
+              rowHeaderLabel="Loại hàng"
+              columns={dayColumns}
+              rows={dayGridRows}
+              rowMarkKey="can-doi-nl"
+              columnWidthsKey="balancing-material-days"
+              onCellCommit={writeCell}
+              onPasteBlock={pasteBlock}
+              footer={
+                <tr className="bg-muted font-semibold">
+                  <th
+                    scope="row"
+                    className="sticky left-0 z-10 border-t-2 border-r-2 border-border bg-muted px-4 py-3 text-left"
+                  >
+                    T. CỘNG
+                  </th>
+                  {dates.map((iso) => (
+                    <td key={iso} className="tnum border-t-2 border-l border-border px-3 py-3 text-right">
+                      {num(materialRows.reduce((s, h) => s + (h.dailyQuantities[iso] ?? 0), 0)) || "—"}
+                    </td>
+                  ))}
+                  {hasLegacyCarryOver && (
+                    <td className="tnum border-t-2 border-l border-border bg-warning-surface px-3 py-3 text-right">
+                      {num(materialRows.reduce((s, h) => s + h.carryOverKg, 0)) || "—"}
+                    </td>
+                  )}
+                  {/* ô dưới cột Ghi chú */}
+                  <td className="border-t-2 border-l border-border" />
+                </tr>
+              }
+            />
+          </section>,
+          daysSlot
+        )}
 
       {!grid.isLocked && (
-        <div className="mt-3 flex flex-wrap gap-2">
+        <div className="mt-3 flex flex-wrap gap-2 xl:w-0 xl:min-w-full">
           <Button
             title="Thêm dòng xả đông hàng mua về (cấp đông ở kho khác). Xả đông hàng kho mình gõ thẳng vào dòng Lấy xả đông." variant="outline" onClick={() => setAddingGroup("Xả đông")}>
             <Plus />

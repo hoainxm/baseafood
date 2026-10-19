@@ -146,9 +146,11 @@ export function ColumnResizeHandle({
       aria-orientation="vertical"
       aria-label={`Đổi bề rộng cột ${label}`}
       title={`Kéo để đổi bề rộng cột ${label} · nhấp đúp để vừa nội dung`}
+      // NẰM GỌN trong ô (không thò ra mép): thò ra dù 4px là bảng tưởng bị tràn ⇒ hiện thanh cuộn
+      // ngang, thanh cuộn đòi bề rộng bằng bảng ⇒ khối Cân đối nở hết hàng, A–L vỡ hàng (lỗi 2026-10-19).
       className={cn(
-        "absolute top-0 right-0 z-10 h-full w-2 translate-x-1/2 cursor-col-resize touch-none select-none",
-        "after:absolute after:inset-y-1 after:left-1/2 after:w-0.5 after:-translate-x-1/2 after:rounded-full after:bg-transparent hover:after:bg-primary/60"
+        "absolute top-0 right-0 z-10 h-full w-2 cursor-col-resize touch-none select-none",
+        "after:absolute after:inset-y-1 after:right-0 after:w-0.5 after:rounded-full after:bg-transparent hover:after:bg-primary/60"
       )}
       onPointerDown={(e) => {
         const th = e.currentTarget.closest("th");

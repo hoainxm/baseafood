@@ -73,7 +73,10 @@ export function useTopScrollbar(getFrame: () => HTMLElement | null, className?: 
       ref={topBarRef}
       aria-hidden
       title="Kéo để cuộn bảng sang ngang (thanh này chạy cùng thanh cuộn dưới đáy bảng)."
-      className={cn("table-scrollbar mb-1 print:hidden", className)}
+      // contain: inline-size — vạch đệm bên trong (rộng bằng bảng) KHÔNG được đòi bề rộng cho khung
+      // chứa: khối co theo nội dung (bảng Cân đối A–L) sẽ nở theo vạch ⇒ bảng w-full nở theo ⇒
+      // vòng lặp tới hết hàng (lỗi 2026-10-19). Thanh vẫn rộng đúng bằng khung như cũ.
+      className={cn("table-scrollbar mb-1 [contain:inline-size] print:hidden", className)}
     >
       <div style={{ width, height: 1 }} />
     </div>

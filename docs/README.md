@@ -3,7 +3,7 @@
 Mục lục của mọi tài liệu. Cửa vào chung của repo vẫn là [`CLAUDE.md`](../CLAUDE.md) ở root (quy tắc code + risk tier + định tuyến task).
 File này trả lời **một câu**: *doc nào ở đâu, và doc mới bỏ vào đâu.*
 
-## 5 bucket — chia theo MỤC ĐÍCH
+## 6 bucket — chia theo MỤC ĐÍCH
 
 | Bucket | Đọc khi | Canonical cho |
 |---|---|---|
@@ -11,6 +11,7 @@ File này trả lời **một câu**: *doc nào ở đâu, và doc mới bỏ v�
 | [`ops/`](ops/README.md) | **đưa app lên chạy** — cài đặt, deploy, cấu hình | Cutover Supabase, deploy Vercel, env, vận hành |
 | [`spec/`](spec/) | **trước khi build** — chốt kiến trúc/đặc tả | ADR, đặc tả kỹ thuật (vd routing; **đặt tên: [`quy-uoc-dat-ten.md`](spec/quy-uoc-dat-ten.md)** — luật mọi lớp + từ điển thuật ngữ) |
 | [`trien-khai/`](trien-khai/README.md) | hiểu **vì sao nghiệp vụ vậy** | Phân tích gốc, 28 câu hỏi đã chốt, thiết kế flow, kế hoạch |
+| [`ho-so-nang-luc/`](ho-so-nang-luc/README.md) | biết **công ty quy định làm thế nào** | Quy trình + biểu mẫu chính thức của xí nghiệp (BRC 9 / Halal), quy tắc rút ra, ánh xạ vào phần mềm |
 | [`BAN-GIAO.md`](BAN-GIAO.md) | **tiếp nhận dự án** | Bối cảnh công ty, đầu mối liên hệ, câu treo với xí nghiệp |
 
 > Ngoài 5 bucket trên: [`demo/`](demo/) chứa kịch bản trình bày — dùng [`demo/kich-ban-che-do-demo.md`](demo/kich-ban-che-do-demo.md) (chế độ demo trong app); seed + kịch bản cũ trong đó **lỗi thời**, `seed_bt2da*.sql` cấm chạy lên DB thật; [`BAN-GIAO-tiep-theo.md`](BAN-GIAO-tiep-theo.md) = việc còn lại + go-live, đọc cùng [`BAN-GIAO.md`](BAN-GIAO.md).
@@ -29,6 +30,7 @@ Hỏi *"doc này trả lời câu gì?"* rồi tra:
 | "Cài / deploy / cấu hình / vận hành thế nào" | `ops/` | tên `<chủ-đề>.md`, không đánh số |
 | "Quyết định kiến trúc / đặc tả trước khi build" | `spec/` | tên `<chủ-đề>.md`, ghi trạng thái (dự thảo/chốt) |
 | "Vì sao nghiệp vụ vậy / phân tích / kế hoạch" | `trien-khai/` | đánh số theo thứ tự đọc |
+| "Quy trình / biểu mẫu chính thức của công ty quy định gì" | `ho-so-nang-luc/` | tên theo mã tài liệu `qti-<phòng>-<số>-<ten-ngan>.md` |
 | "Bàn giao, đầu mối, câu treo" | `BAN-GIAO.md` | 1 file duy nhất ở root docs |
 | Chữ hiển thị / luật UI | `src/design-system/*.md` | **KHÔNG** vào `docs/` |
 

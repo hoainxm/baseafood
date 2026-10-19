@@ -116,6 +116,10 @@ export const PAGE_GUIDES: Record<string, PageGuide> = {
               đính <b>PDF đã ký</b> (bắt buộc) và file Word gốc nếu có.
             </li>
             <li>Lưu xong lần mới có hiệu lực ngay, lần cũ tự chuyển Hết hiệu lực. Không sửa lần đã ban hành, muốn sửa thì ghi lần mới.</li>
+            <li>
+              Lần ban hành <b>chưa có file</b> (vd QTI-KH-01 nạp từ bản giấy): bấm <b>Đính PDF</b> / <b>Đính file gốc</b> ở cột File để đính
+              bản đã có. Chỉ đính được vào ô còn trống, không thay file đã có.
+            </li>
           </Step>
         </Section>
         <Section title="Chứng nhận có hạn">

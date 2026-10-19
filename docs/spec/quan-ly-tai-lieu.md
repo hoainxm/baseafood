@@ -1,7 +1,7 @@
 # Module Tài liệu công ty — kiểm soát tài liệu (đặc tả trước khi build)
 
 > **Load khi:** xây trang `/documents` "Tài liệu công ty": quy trình, hướng dẫn, biểu mẫu, chứng nhận, hồ sơ năng lực; lần ban hành; duyệt; file gốc trên Storage; giới hạn xem theo phòng ban.
-> **Trạng thái:** ✅ **ĐỢT 1 ĐÃ BUILD 2026-10-19** (code + `0072_company_documents.sql`, kiểm PGlite) — ⚠️ **0072 CHƯA chạy trên DB thật**: tạo bucket `documents` → chạy 0072 (2 lần) → mới deploy. Đợt 2 (duyệt trên app) + đợt 3 chưa làm. Còn các câu ở §9 (đang dùng mặc định). Doc code: [`app-map/40-documents.md`](../app-map/40-documents.md).
+> **Trạng thái:** ✅ **ĐỢT 1 ĐÃ BUILD 2026-10-19** (code + `0072_company_documents.sql`, kiểm PGlite) — `0072` ✅ đã chạy trên DB thật 2026-10-19. Đợt 2 (duyệt trên app) + đợt 3 chưa làm. Còn các câu ở §9 (đang dùng mặc định). Doc code: [`app-map/40-documents.md`](../app-map/40-documents.md).
 > **Nguồn:** yêu cầu chủ dự án 2026-10-19 · mẫu tài liệu thật [`ho-so-nang-luc/qti-kh-01-quan-ly-don-hang.md`](../ho-so-nang-luc/qti-kh-01-quan-ly-don-hang.md) · phân quyền [`role-permissions.md`](role-permissions.md) · lưu file [`ops/supabase-storage.md`](../ops/supabase-storage.md).
 > **last_verified:** 2026-10-19
 
@@ -47,7 +47,7 @@ Trạng thái của **tài liệu** = trạng thái lần ban hành mới nhất
 | Mã | Luật |
 |---|---|
 | DOC-R1 | Mỗi tài liệu có **đúng 0 hoặc 1** lần ban hành "Đang hiệu lực". Lần mới có hiệu lực ⇒ lần cũ tự sang "Hết hiệu lực". |
-| DOC-R2 | Lần ban hành đã hiệu lực **không sửa được**. Muốn sửa ⇒ tạo lần mới. Lần cũ **luôn mở xem được**, kèm nhãn "Hết hiệu lực". |
+| DOC-R2 | Lần ban hành đã hiệu lực **không sửa được** — ngoại lệ duy nhất: **đính file vào ô còn trống** (lần nạp từ bản giấy chưa có file), không thay file đã có. Muốn sửa ⇒ tạo lần mới. Lần cũ **luôn mở xem được**, kèm nhãn "Hết hiệu lực". |
 | DOC-R3 | **Hai đường duyệt** *(đợt 1 mới có đường b; PDF chỉ bắt buộc khi đã nối máy chủ — chạy localStorage không lưu được file; dữ liệu đầu QTI-KH-01 nạp từ bản giấy chưa có file, thẻ "Thiếu file PDF" nhắc tải lên)*: (a) *Duyệt trên app* — người soạn gửi ⇒ người xem xét bấm Đạt/Trả lại ⇒ người phê duyệt bấm Duyệt/Trả lại; app ghi người + giờ từng bước. (b) *Bản đã ký giấy* — người có quyền ghi tên soạn/xem xét/duyệt + **bắt buộc đính PDF đã ký**. |
 | DOC-R4 | Người xem xét và người phê duyệt là **tài khoản trong app** khi duyệt trên app. Họ nhận việc ở **Việc của tôi** (`task_assignments`), không dựng chỗ báo riêng. |
 | DOC-R5 | **Phạm vi xem:** tài liệu có *phòng sở hữu* + danh sách *phòng được xem* (mặc định = phòng sở hữu). Hoặc chọn *Cả công ty*. **Ban giám đốc và admin xem tất cả.** Người không thuộc phòng nào được xem ⇒ **không thấy tài liệu trong danh sách** và **không tải được file** (chặn cả ở máy chủ và kho file, không chỉ ẩn nút). |

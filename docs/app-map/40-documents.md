@@ -2,6 +2,7 @@
 covers: src/features/documents/DocumentsScreen.tsx, src/features/documents/DocumentFormDialog.tsx, src/features/documents/VersionFormDialog.tsx, src/features/documents/index.ts, src/lib/documents.ts, src/lib/documentStorage.ts, supabase/migrations/0072_company_documents.sql
 last_verified: 2026-10-19
 ttl_days: 90
+<!-- updated: 2026-10-19 (b) — `0072` ✅ ĐÃ CHẠY trên DB thật (kiểm qua MCP, chỉ đọc: 9 tài liệu, 9 lần ban hành, 8 policy 2 bảng, 3 policy bucket, cột `app_roles.department`, bucket `documents` private 20 MB, 0 file). Thêm nút Đính PDF / Đính file gốc cho lần ban hành còn thiếu file (`attachVersionFile`). -->
 <!-- updated: 2026-10-19 — tạo mới: đợt 1 module Tài liệu công ty (thư viện + ghi bản đã ký giấy + xem theo phòng ban 3 lớp + nhắc gia hạn chứng nhận). `0072` CHƯA chạy trên DB thật — thứ tự: tạo bucket `documents` → chạy 0072 (2 lần) → deploy. Kiểm 0072 trên PGlite 2026-10-19: chạy 2 lần không lỗi; đọc lọc đúng 7 vai (kế toán 2 · tổ trưởng 3 · thủ kho 3 · Kế hoạch / GĐ / admin 9 · chưa phòng 0); ghi không quyền bị chặn, có `update` thì upsert được; mã trùng khác hoa bị chặn; anon bị chặn. -->
 
 # Tài liệu công ty (`/documents`)
@@ -43,6 +44,7 @@ Ghi: hai policy insert/update cùng điều kiện "Thêm HOẶC Sửa" (app ghi
 
 - Danh sách `RecordTable` (`rowMarkKey="documents"`), lọc loại / phòng / trạng thái, tìm mã-tên; 4 thẻ số (xem được · hiệu lực · sắp hết hạn · thiếu PDF).
 - Hộp chi tiết mở qua `?doc=<id>` (link từ Việc của tôi): thông tin, các lần ban hành (Mở PDF / Tải file gốc — link có hạn 10 phút), biểu mẫu con.
+- **Đính file cho lần còn thiếu** (nút "Đính PDF" / "Đính file gốc" ở cột File, khi có quyền ghi + có máy chủ): `attachVersionFile` chỉ điền ô file đang TRỐNG — ngoại lệ duy nhất của DOC-R2, không thay file đã có. Dùng cho dữ liệu đầu QTI-KH-01 (nạp từ bản giấy) — thêm 2026-10-19 sau khi chủ dự án chạy 0072 và thấy không mở được file.
 - `DocumentFormDialog` (nháp `documents-edit`) · `VersionFormDialog` (nháp `documents-version` — chỉ phần chữ, file chọn lại sau tải trang): tải file lên TRƯỚC, ghi dòng SAU; ghi bị chặn / lỗi ⇒ gỡ file vừa tải.
 - Màn Vai trò & quyền: ô **Thuộc phòng ban** chỉ hiện khi máy chủ đã có cột (`hasDepartmentColumn`).
 

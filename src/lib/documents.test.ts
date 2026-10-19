@@ -18,6 +18,7 @@ import {
   normalizeDocumentCode,
   recordPaperVersion,
   safeFileName,
+  attachVersionFile,
 } from "./documents";
 import { DUE_OFFSET_DAYS, defaultDueDate, taskRequirements } from "./myTasks";
 
@@ -151,6 +152,20 @@ describe("lần ban hành (DOC-R1, R2, R3b)", () => {
     expect(documentState(doc(), [ver({ status: "draft" })])).toBe("draft");
     expect(documentState(doc(), [ver()])).toBe("active");
     expect(documentState(doc({ isWithdrawn: true }), [ver()])).toBe("withdrawn");
+  });
+});
+
+describe("đính file cho lần ban hành còn thiếu file (ngoại lệ DOC-R2)", () => {
+  it("điền ô file trống, giữ nguyên mọi thứ khác", () => {
+    const next = attachVersionFile([ver(), ver({ id: "v2", documentId: "d2" })], "v1", "pdf", "bsf1/documents/d1/v1/pdf-a.pdf", "a.pdf");
+    expect(next?.find((v) => v.id === "v1")).toMatchObject({ pdfPath: "bsf1/documents/d1/v1/pdf-a.pdf", pdfFileName: "a.pdf", status: "active", revisionNo: 1 });
+    expect(next?.find((v) => v.id === "v2")?.pdfPath).toBe("");
+    expect(attachVersionFile([ver()], "v1", "source", "p.docx", "p.docx")?.[0]).toMatchObject({ sourcePath: "p.docx", pdfPath: "" });
+  });
+  it("KHÔNG thay file đã có; lần không tồn tại / đường dẫn rỗng ⇒ null", () => {
+    expect(attachVersionFile([ver({ pdfPath: "cu.pdf" })], "v1", "pdf", "moi.pdf", "moi.pdf")).toBeNull();
+    expect(attachVersionFile([ver()], "x", "pdf", "a.pdf", "a.pdf")).toBeNull();
+    expect(attachVersionFile([ver()], "v1", "pdf", "", "a.pdf")).toBeNull();
   });
 });
 

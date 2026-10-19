@@ -180,6 +180,24 @@ export function recordPaperVersion(
   return { versions: [...next, added], version: added };
 }
 
+/**
+ * Đính file cho một lần ban hành CÒN THIẾU file (vd QTI-KH-01 nạp từ bản giấy ở mig 0072).
+ * Ngoại lệ duy nhất của DOC-R2 "không sửa lần đã ban hành": chỉ điền ô file đang TRỐNG,
+ * không thay file đã có (muốn đổi file ⇒ ghi lần ban hành mới). Trả null nếu ô đã có file.
+ */
+export function attachVersionFile(
+  versions: readonly DocumentVersion[],
+  versionId: string,
+  kind: "pdf" | "source",
+  path: string,
+  fileName: string,
+): DocumentVersion[] | null {
+  const v = versions.find((x) => x.id === versionId);
+  if (!v || !path || (kind === "pdf" ? v.pdfPath : v.sourcePath)) return null;
+  const patch = kind === "pdf" ? { pdfPath: path, pdfFileName: fileName } : { sourcePath: path, sourceFileName: fileName };
+  return versions.map((x) => (x.id === versionId ? { ...x, ...patch } : x));
+}
+
 /** yyyy-mm-dd + n năm. */
 function addYears(date: string, years: number): string {
   const [y, m, d] = date.split("-").map(Number);

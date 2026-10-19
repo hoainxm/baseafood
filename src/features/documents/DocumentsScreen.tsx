@@ -7,7 +7,7 @@
 // Spec: docs/spec/quan-ly-tai-lieu.md · doc: docs/app-map/40-documents.md. Luật ở
 // lib/documents.ts (thuần, có test). Máy chủ chặn đọc theo phòng ban ở RLS 0072 — lọc ở đây
 // chỉ để giao diện khớp (chạy không đăng nhập thì thấy hết như các màn khác).
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useRef, useState, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
   Button,
@@ -37,8 +37,12 @@ import {
   DEPARTMENTS,
   DOCUMENT_KINDS,
   DOCUMENT_STATE_LABELS,
+  DOCUMENT_PDF_ACCEPT,
+  DOCUMENT_SOURCE_ACCEPT,
   activeVersionOf,
+  attachVersionFile,
   canDeleteDocument,
+  checkDocumentFile,
   canViewDocument,
   departmentLabel,
   documentKindLabel,
@@ -51,7 +55,7 @@ import {
   versionsOf,
   type DocumentState,
 } from "@/lib/documents";
-import { getDocumentFileUrl, hasDocumentStorage } from "@/lib/documentStorage";
+import { documentFilePath, getDocumentFileUrl, hasDocumentStorage, removeDocumentFiles, uploadDocumentFile } from "@/lib/documentStorage";
 import { formatDateVN } from "@/lib/format";
 import type { CompanyDocument, DocumentVersion } from "@/types";
 import {
@@ -66,6 +70,7 @@ import {
   FileText,
   FileWarning,
   FolderOpen,
+  Paperclip,
   Pencil,
   Trash2,
 } from "lucide-react";
@@ -176,6 +181,28 @@ export default function DocumentsScreen() {
     );
     setVersionDoc(null);
     return true;
+  };
+
+  /** Đính file cho lần ban hành còn thiếu (vd QTI-KH-01 nạp từ bản giấy): tải lên TRƯỚC, ghi dòng SAU. */
+  const attachFile = async (v: DocumentVersion, kind: "pdf" | "source", file: File) => {
+    const err = checkDocumentFile(file, kind);
+    if (err) {
+      notify.error(err);
+      return;
+    }
+    const r = await uploadDocumentFile(documentFilePath(v.documentId, v.id, kind, file.name), file);
+    if ("error" in r) {
+      notify.error(r.error);
+      return;
+    }
+    const prev = versions;
+    const next = attachVersionFile(prev, v.id, kind, r.path, file.name);
+    if (!next) notify.error("Lần ban hành này đã có file — muốn đổi file thì ghi lần ban hành mới.");
+    if (!next || !saveVersions(next)) {
+      void removeDocumentFiles([r.path]);
+      return;
+    }
+    notify.saved(`Đã đính ${kind === "pdf" ? "PDF" : "file gốc"} cho lần ${formatRevision(v.revisionNo)}`, () => saveVersions(prev));
   };
 
   const setWithdrawn = (doc: CompanyDocument, isWithdrawn: boolean) => {
@@ -357,6 +384,7 @@ export default function DocumentsScreen() {
         onEdit={(d) => setFormTarget({ kind: "edit", document: d })}
         onAddChild={(d) => setFormTarget({ kind: "create", parentId: d.id })}
         onRecordVersion={(d) => setVersionDoc(d)}
+        onAttach={attachFile}
         onWithdraw={(d) => setWithdrawing(d)}
         onRestore={(d) => setWithdrawn(d, false)}
         onDelete={(d) => setDeleting(d)}
@@ -416,6 +444,7 @@ function DocumentDetailDialog({
   onEdit,
   onAddChild,
   onRecordVersion,
+  onAttach,
   onWithdraw,
   onRestore,
   onDelete,
@@ -432,6 +461,7 @@ function DocumentDetailDialog({
   onEdit: (d: CompanyDocument) => void;
   onAddChild: (d: CompanyDocument) => void;
   onRecordVersion: (d: CompanyDocument) => void;
+  onAttach: (v: DocumentVersion, kind: "pdf" | "source", file: File) => Promise<void>;
   onWithdraw: (d: CompanyDocument) => void;
   onRestore: (d: CompanyDocument) => void;
   onDelete: (d: CompanyDocument) => void;
@@ -450,6 +480,8 @@ function DocumentDetailDialog({
   const parent = doc.parentId ? documents.find((d) => d.id === doc.parentId) : undefined;
   const state = documentState(doc, versions);
   const expiry = expiryOf(doc, today);
+  // Đính file cho lần còn thiếu: cần quyền ghi + đã nối máy chủ; tài liệu thu hồi thì thôi.
+  const canAttach = can.write && hasDocumentStorage && !doc.isWithdrawn;
 
   const versionColumns: SummaryTableColumn<DocumentVersion>[] = [
     { key: "rev", header: "Lần", render: (v) => <span className="font-semibold">{formatRevision(v.revisionNo)}</span> },
@@ -490,8 +522,19 @@ function DocumentDetailDialog({
               <FileText className="mr-1 h-4 w-4" aria-hidden />
               Mở PDF
             </Button>
+          ) : canAttach ? (
+            <AttachFileButton label="Đính PDF" accept={DOCUMENT_PDF_ACCEPT} onPick={(f) => onAttach(v, "pdf", f)} title="Chọn bản PDF đã ký từ máy để đính vào lần ban hành này (lần này chưa có file)." />
           ) : (
             <Tag variant="warning">Chưa có PDF</Tag>
+          )}
+          {!v.sourcePath && canAttach && v.status !== "draft" && (
+            <AttachFileButton
+              label="Đính file gốc"
+              accept={DOCUMENT_SOURCE_ACCEPT}
+              onPick={(f) => onAttach(v, "source", f)}
+              title="Chọn file Word / Excel gốc từ máy để đính vào lần ban hành này (không bắt buộc)."
+              outline
+            />
           )}
           {v.sourcePath && (
             <Button
@@ -633,5 +676,42 @@ function DocumentDetailDialog({
         )}
       </div>
     </FormDialog>
+  );
+}
+
+/** Nút chọn file từ máy rồi đính ngay (input file ẩn). Đang tải ⇒ đổi chữ, bấm thêm không chạy lại. */
+function AttachFileButton({
+  label,
+  accept,
+  title,
+  onPick,
+  outline,
+}: {
+  label: string;
+  accept: string;
+  title: string;
+  onPick: (file: File) => Promise<void>;
+  outline?: boolean;
+}) {
+  const ref = useRef<HTMLInputElement>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const pick = async (file: File | undefined) => {
+    if (!file || isUploading) return;
+    setIsUploading(true);
+    try {
+      await onPick(file);
+    } finally {
+      setIsUploading(false);
+      if (ref.current) ref.current.value = "";
+    }
+  };
+  return (
+    <>
+      <input ref={ref} type="file" accept={accept} hidden onChange={(e) => void pick(e.target.files?.[0])} />
+      <Button size="sm" variant={outline ? "outline" : "default"} onClick={() => !isUploading && ref.current?.click()} title={title}>
+        <Paperclip className="mr-1 h-4 w-4" aria-hidden />
+        {isUploading ? "Đang tải file…" : label}
+      </Button>
+    </>
   );
 }

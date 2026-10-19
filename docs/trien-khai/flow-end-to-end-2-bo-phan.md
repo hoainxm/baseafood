@@ -3,7 +3,8 @@
 > **Load khi:** thiết kế/nối luồng nhập → sản xuất → kho → bán → cân đối; tách giao diện theo bộ phận; định nghĩa việc-hằng-ngày.
 > **Nguồn quyết định:** [`hop-2026-08-22-so-hoa-flow-2-bo-phan.md`](hop-2026-08-22-so-hoa-flow-2-bo-phan.md) (QĐ-1..6) · bổ sung [`hop-2026-09-02-form-nhap-trace-gia-qc.md`](hop-2026-09-02-form-nhap-trace-gia-qc.md) (form+OCR, ranh giới nhập→SX→kho QĐ-3, khung nhân sự QĐ-5).
 > **Đối chiếu code thật:** [`02-pages-navigation.md`](../app-map/02-pages-navigation.md) · [`34-btp-san-xuat-kho.ba-spec.md`](../app-map/34-btp-san-xuat-kho.ba-spec.md) · [`31-can-doi-ky.md`](../app-map/31-can-doi-ky.md).
-> **last_verified:** 2026-09-21 *(audit PO: cập nhật trạng thái G1 — xem ghi chú ở §3; phần còn lại giữ nguyên)*
+> **last_verified:** 2026-10-19 *(sửa §4: tập màn theo quyền, không còn "chưa gán xem đầy đủ"; §5 đối chiếu `DailyTaskReminder` + `buildChainWarnings` ở `lib/dataFlow.ts` khớp code)*
+<!-- re-verified: 2026-10-19 — DailyTaskReminder chỉ ở /imports + /wip (khớp); trang chủ theo vai trò HOME_BY_ROLE (khớp); FIX drift: "chưa-gán xem đầy đủ" ⇒ nay không quyền. §2 là ảnh chụp 2026-08-22 (màn DEMO đã gỡ 2026-10-12). -->
 
 File này mô tả **chuỗi giá trị end-to-end thật của xưởng**, chỉ đúng **chỗ đang đứt gãy**, và thiết kế **2 giao diện bộ phận** vận hành theo bước với **việc-hằng-ngày** rõ ràng. Danh sách hàm/màn cụ thể đọc thẳng ở app-map + source.
 
@@ -92,7 +93,7 @@ Cùng một cơ sở dữ liệu, **tách theo vai trò** để mỗi bộ phậ
 - **Đi theo bước:** ① chọn ngày SX + xưởng + loại nguyên liệu (từ lượng nhập trong ngày) → ② đổ từng dòng thành phẩm làm ra (mặt hàng + quy cách + kg + số block) → ③ phần **chưa làm xong → để trạng thái "chờ nhập kho"** → ④ thủ kho **duyệt vào kho dự trữ** → ⑤ **chốt ngày sản xuất**.
 - **Chỉ thấy:** Sản xuất BTP + Kho dự trữ + (đọc) lượng nhập trong ngày để đối chiếu.
 
-> **Trạng thái build:** ✅ **route-guard + trang chủ theo vai trò đã làm** (`src/lib/nav-access.ts` + `App.tsx`): vai trò `warehouse-keeper` → bộ phận Nhập hàng (trang chủ `/imports`), `team-leader`/`manager-dong`/`manager-ca`/`manager-kho` → bộ phận Sản xuất (trang chủ `/wip`); mỗi bộ phận chỉ thấy nav của mình, gõ URL ngoài bộ phận bị đưa về trang chủ. Thêm 2 vai trò vào `ROLES` (`team-leader` trước bị thiếu + `warehouse-keeper` mới). Vai trò giám đốc/kế toán/admin/chưa-gán vẫn xem đầy đủ. Thêm banner **nhắc daily-task** (`DailyTaskReminder`) ở đầu `/imports` + `/wip`: hôm nay (theo xưởng đang chọn) đã chốt chưa. **Còn lại:** phân quyền RLS ở server (hiện mới gate UI).
+> **Trạng thái build:** ✅ **route-guard + trang chủ theo vai trò đã làm** (`src/lib/nav-access.ts` + `App.tsx`): vai trò `warehouse-keeper` → bộ phận Nhập hàng (trang chủ `/imports`), `team-leader`/`manager-dong`/`manager-ca`/`manager-kho` → bộ phận Sản xuất (trang chủ `/wip`); mỗi bộ phận chỉ thấy nav của mình, gõ URL ngoài bộ phận bị đưa về trang chủ. Thêm 2 vai trò vào `ROLES` (`team-leader` trước bị thiếu + `warehouse-keeper` mới). ~~Vai trò giám đốc/kế toán/admin/chưa-gán vẫn xem đầy đủ.~~ *(lỗi thời từ 2026-10-15: tập màn lấy theo quyền `view` ở `lib/permissions.ts` — chưa gán vai trò ⇒ màn "Chưa được cấp quyền"; xem [`05`](../app-map/05-bao-mat-phan-quyen.md) + [`spec/role-permissions.md`](../spec/role-permissions.md).)* Thêm banner **nhắc daily-task** (`DailyTaskReminder`) ở đầu `/imports` + `/wip`: hôm nay (theo xưởng đang chọn) đã chốt chưa. **Còn lại:** phân quyền RLS ở server (hiện mới gate UI).
 
 ---
 
@@ -117,6 +118,8 @@ Cùng một cơ sở dữ liệu, **tách theo vai trò** để mỗi bộ phậ
 | 3 | Thủ kho **duyệt BTP vào kho** | ✅ |
 | 4 | **Chốt ngày sản xuất** (khóa số, ghi bù có lý do) | ✅ |
 | — | *Đối chiếu "nhập hôm nay X kg ↔ sản xuất Y kg"* | ✅ read-only trong Dialog `/wip` (G1 v1); nhắc chủ động vẫn cần build |
+
+> ✅ **2026-10-19 — màn "Việc của tôi" `/my-tasks`** gom việc-hằng-ngày của MỌI bộ phận vào một chỗ (kể cả ngày cũ còn sót, không chỉ hôm nay), có hạn + quá hạn, giao việc cho từng người, bấm là tới đúng màn + ngày. Banner `DailyTaskReminder` vẫn giữ ở `/imports` + `/wip`. Xem [`39-my-tasks`](../app-map/39-my-tasks.md).
 
 **Nhịp chốt số** giữ nguyên pattern toàn hệ: nhập nháp nhiều lần trong ngày (sửa được) → **chốt ngày** (khóa) → sửa sau = **ghi bù bắt buộc lý do**.
 

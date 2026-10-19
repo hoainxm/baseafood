@@ -25,7 +25,9 @@ import { Toaster, applyDisplaySettings, ProcessingState, EmptyState, notify } fr
 import { KeyRound, ShieldOff, Users } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { setAuditOperator } from "@/lib/audit";
-import { useAppRoles, useRolePermissions, useUserPermissions } from "@/lib/catalogRepo";
+import { useAppRoles, useRolePermissions, useTaskAssignments, useUserPermissions } from "@/lib/catalogRepo";
+import { countMyOpenAssignments } from "@/lib/myTasks";
+import { todayIso } from "@/design-system";
 import { homeFor } from "@/lib/nav-access";
 import {
   OFFLINE_PERMISSIONS,
@@ -45,6 +47,8 @@ import { checkTableWrite } from "@/lib/writePermissions";
 import { DemoModeBanner, DemoModeHeaderButton, DemoPackLoader } from "@/features/shared/DemoMode";
 import { LEGACY_PATHS, normalizeCatalogTab } from "@/lib/legacyUrls";
 
+// Việc của tôi — việc cần làm, hạn, giao việc
+const MyTasksScreen = lazy(() => import("@/features/my-tasks"));
 // Tổng quan — dòng chảy số liệu
 const DashboardScreen = lazy(() => import("@/features/dashboard/DashboardScreen"));
 
@@ -155,9 +159,14 @@ function ShellLayout() {
     return () => setWriteGuard(null);
   }, [isWriteGuarded, permissions, scopeContext]);
 
+  // Số việc đang được giao cho tôi — chuông header + số trên mục "Việc của tôi". CHỈ đọc
+  // bảng giao việc (một bảng nhỏ); danh sách đầy đủ (gồm việc máy phát hiện) tính ở màn.
+  const [taskAssignments] = useTaskAssignments();
+  const myOpenTasks = countMyOpenAssignments(taskAssignments, profile?.id ?? "local", todayIso());
+
   const roles = profile?.roles ?? [];
   const visible = visibleNavIds(permissions);
-  const items = KIT_NAV.filter((n) => visible.has(n.id));
+  const items = KIT_NAV.filter((n) => visible.has(n.id)).map((n) => (n.id === "my-tasks" ? { ...n, badge: myOpenTasks.open } : n));
   const home = homeFor(roles, permissions, homeRoutesFromAppRoles(appRoles));
   // Đã nạp hồ sơ mà chưa được gán vai trò (hoặc bị chặn hết) ⇒ màn báo, không nav.
   const hasNoAccess = !permissions.isAdmin && (!permissions.hasRoles || home === null);
@@ -186,7 +195,8 @@ function ShellLayout() {
       }
       role={roleNames(auth.profile?.roles ?? [], appRoles)}
       shift="Ca A"
-      notificationCount={3}
+      notificationCount={hasNoAccess || !visible.has("my-tasks") ? undefined : myOpenTasks.open}
+      onOpenNotifications={() => navigate("/my-tasks")}
       onLogout={
         auth.requiresLogin && auth.session ? auth.signOut : undefined
       }
@@ -284,6 +294,8 @@ export default function App() {
             {Object.keys(LEGACY_PATHS).map((old) => (
               <Route key={old} path={`/${old}`} element={<LegacyPathRedirect from={old} />} />
             ))}
+
+            <Route path="/my-tasks" element={<MyTasksScreen />} />
 
             {/* Nghiệp vụ gốc */}
             <Route path="/imports" element={<MaterialImportScreen />} />

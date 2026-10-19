@@ -48,6 +48,7 @@ import type {
   LabelPrint,
   LotDispatch,
   LotWaiver,
+  TaskAssignment,
   BatterType,
   DomesticSaleItem,
   RowMark,
@@ -1860,6 +1861,50 @@ export const LOT_WAIVER_TABLE: TableMapping<LotWaiver> = {
   }),
 };
 
+/** Giao việc — màn "Việc của tôi" (mig 0070). */
+export const TASK_ASSIGNMENT_TABLE: TableMapping<TaskAssignment> = {
+  table: "task_assignments",
+  localKey: "bsf.task-assignments.v1",
+  getKey: theoId,
+  toRow: (x) => ({
+    id: x.id,
+    source: x.source,
+    task_key: x.taskKey,
+    title: x.title,
+    detail: x.detail,
+    path: x.path,
+    workshop: x.workshop,
+    task_date: x.taskDate || null,
+    due_date: x.dueDate || null,
+    assignee_id: x.assigneeId,
+    assignee_name: x.assigneeName,
+    assigned_by_id: x.assignedById,
+    assigned_by_name: x.assignedByName,
+    status: x.status,
+    note: x.note,
+    done_at: x.doneAt || null,
+  }),
+  fromRow: (r) => ({
+    id: s(r.id),
+    source: s(r.source) === "manual" ? "manual" : "system",
+    taskKey: s(r.task_key),
+    title: s(r.title),
+    detail: s(r.detail),
+    path: s(r.path),
+    workshop: (["Đông", "Cá", "Khô"].includes(s(r.workshop)) ? s(r.workshop) : "") as TaskAssignment["workshop"],
+    taskDate: s(r.task_date).slice(0, 10),
+    dueDate: s(r.due_date).slice(0, 10),
+    assigneeId: s(r.assignee_id),
+    assigneeName: s(r.assignee_name),
+    assignedById: s(r.assigned_by_id),
+    assignedByName: s(r.assigned_by_name),
+    status: s(r.status) === "done" ? "done" : s(r.status) === "cancelled" ? "cancelled" : "open",
+    note: s(r.note),
+    doneAt: s(r.done_at),
+    createdAt: s(r.created_at),
+  }),
+};
+
 /* ---------- Nhật ký thao tác (audit) ---------- */
 
 /** Nhãn tiếng Việt của bảng — cho câu tóm tắt nhật ký dễ đọc. */
@@ -1896,6 +1941,7 @@ const TABLE_LABELS: Record<string, string> = {
   label_prints: "In tem QR",
   lot_dispatches: "Gắn lô cho hàng ra (truy xuất)",
   lot_waivers: "Lý do chưa gắn lô",
+  task_assignments: "Giao việc",
   row_marks: "Tô màu dòng",
   app_roles: "Vai trò",
   role_permissions: "Quyền của vai trò",

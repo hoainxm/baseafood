@@ -4,6 +4,8 @@
 // Description: Material Import Management Screen
 // ============================================================
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import { parseDayLink, withoutDayLink } from "@/lib/dataFlow";
 import type {
   DailyLock,
   ImportShipment,
@@ -456,6 +458,25 @@ export default function MaterialImportScreen() {
       setWorkshop(sessionWorkshop);
     }
   }, [mode, sessionDate, sessionWorkshop]);
+
+  // Link mở thẳng một ngày (`?date=&workshop=` — "Việc của tôi", Tổng quan): sang "Sổ chi tiết"
+  // đúng ngày + xưởng. Đợi nháp mở lại xong (onRestore chuyển về "Ghi nhập") và PHẢI đứng sau
+  // effect đồng bộ trên để ngày của link thắng. Nháp đang dở giữ nguyên (bấm "Ghi nhập" là
+  // thấy lại); không có nháp thì bỏ phiếu trống tự mở ⇒ "Ghi nhập" sau đó mở đúng ngày link.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const dayLink = parseDayLink(searchParams);
+  useEffect(() => {
+    if (!importDraft.isReady || !dayLink) return;
+    if (dayLink.date) {
+      setPeriod("day");
+      setDate(dayLink.date);
+    }
+    if (dayLink.workshop) setWorkshop(dayLink.workshop);
+    if (!importDraft.restoredAt) setSession(null);
+    setMode("ledger");
+    setSearchParams(withoutDayLink(searchParams), { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- chạy một lần khi link mang ngày/xưởng và nháp đã mở lại
+  }, [importDraft.isReady, dayLink?.date, dayLink?.workshop]);
 
   /** Mở lại một chuyến đã ghi để sửa — dùng CHUNG dialog với ghi chuyến mới. */
   const openShipmentEdit = (n: ShipmentGroup) => {

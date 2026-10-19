@@ -3,7 +3,9 @@
 // Tên tiếng Việt: Màn hình Đóng gói Bán thành phẩm → Thành phẩm
 // Description: Packaging Screen — BTP consumed → packaged finished goods (G3)
 // ============================================================
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import { parseDayLink, withoutDayLink } from "@/lib/dataFlow";
 import type { Packaging, Product, Workshop } from "@/types";
 import { computePackagingLoss, BSF1_WAREHOUSES } from "@/types";
 import { newId } from "@/lib/store";
@@ -218,6 +220,21 @@ export default function PackagingScreen() {
       setErrors([]);
     },
   });
+  // Link mở thẳng một ngày (`?date=&workshop=` — "Việc của tôi", Tổng quan): bộ lọc về đúng
+  // ngày + xưởng. Màn này luôn là sổ ngày (phiếu là hộp thoại) nên nháp không đụng bộ lọc.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const dayLink = parseDayLink(searchParams);
+  useEffect(() => {
+    if (!dayLink) return;
+    if (dayLink.date) {
+      setPeriod("day");
+      setDate(dayLink.date);
+    }
+    if (dayLink.workshop) setWorkshop(dayLink.workshop);
+    setSearchParams(withoutDayLink(searchParams), { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- chạy một lần khi link mang ngày/xưởng
+  }, [dayLink?.date, dayLink?.workshop]);
+
   /** Hủy = bỏ hẳn phiếu đang gõ (cả nháp). */
   const cancelForm = () => {
     setForm(null);

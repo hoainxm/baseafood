@@ -50,6 +50,38 @@ export interface FlowRange {
 export const YIELD_RATIO_THRESHOLD = 0.05;
 /** BTP chờ duyệt nhập kho quá số ngày này thì cảnh báo. */
 export const APPROVAL_WAIT_DAYS = 3;
+/** Kỳ cân đối hết bao nhiêu ngày mà chưa chốt thì quá hạn (chủ dự án chốt 2026-10-19: 2 ngày). */
+export const PERIOD_LOCK_GRACE_DAYS = 2;
+
+/**
+ * Link mở THẲNG đúng ngày + xưởng ở màn sổ ngày (`/imports`, `/wip`, `/packaging` đọc
+ * `?date=&workshop=`). Không có ngày ⇒ chỉ mở màn.
+ */
+export function dayPath(base: string, date: string, workshop: Workshop | "" = ""): string {
+  if (!date) return base;
+  const q = new URLSearchParams({ date });
+  if (workshop) q.set("workshop", workshop);
+  return `${base}?${q.toString()}`;
+}
+
+const WORKSHOP_VALUES: readonly string[] = ["Đông", "Cá", "Khô"];
+
+/** Đọc link `dayPath` ở màn đích: chỉ nhận ngày yyyy-mm-dd hợp lệ + xưởng có thật; không có gì ⇒ null. */
+export function parseDayLink(params: URLSearchParams): { date?: string; workshop?: Workshop } | null {
+  const rawDate = params.get("date") ?? "";
+  const rawWorkshop = params.get("workshop") ?? "";
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(rawDate) && !Number.isNaN(Date.parse(`${rawDate}T00:00:00Z`)) ? rawDate : undefined;
+  const workshop = WORKSHOP_VALUES.includes(rawWorkshop) ? (rawWorkshop as Workshop) : undefined;
+  return date || workshop ? { date, workshop } : null;
+}
+
+/** Gỡ tham số ngày/xưởng khỏi link sau khi đã mở (giữ tham số khác). */
+export function withoutDayLink(params: URLSearchParams): URLSearchParams {
+  const next = new URLSearchParams(params);
+  next.delete("date");
+  next.delete("workshop");
+  return next;
+}
 
 const isInRange = (date: string | undefined, k: FlowRange) => !!date && date >= k.fromDate && date <= k.toDate;
 const matchesWorkshop = (x: Workshop | "" | undefined, k: FlowRange) => !k.workshop || x === k.workshop;
@@ -499,6 +531,7 @@ export type FlowWarningKind =
   | "oversold"
   | "lot-unassigned"
   | "approval-overdue"
+  | "period-unlocked"
   | "yield-deviation"
   | "period-yield-deviation";
 
@@ -522,7 +555,8 @@ const WARNING_KIND_LABELS: Record<FlowWarningKind, string> = {
   backdated: "Ghi bù",
   oversold: "Bán / xuất vượt tồn",
   "lot-unassigned": "Chưa gắn lô",
-  "approval-overdue": "BTP chờ duyệt lâu",
+  "approval-overdue": "BTP chờ duyệt nhập kho",
+  "period-unlocked": "Kỳ cân đối chưa chốt",
   "yield-deviation": "Định mức lệch",
   "period-yield-deviation": "Kỳ cân đối định mức lệch",
 };
@@ -531,12 +565,30 @@ export const getWarningKindLabel = (l: FlowWarningKind) => WARNING_KIND_LABELS[l
 const fmtKg = (n: number) => `${new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 2 }).format(n)} kg`;
 const fmtPt = (n: number) => `${n > 0 ? "+" : ""}${new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 1 }).format(n * 100)}%`;
 
+export interface ChainWarningOptions {
+  /**
+   * Tính cả việc của HÔM NAY (ngày chưa chốt, mẻ chưa gắn lô). Tổng quan để `false`
+   * (hôm nay còn đang ghi); "Việc của tôi" bật để hiện mục "Hôm nay cần làm".
+   */
+  includeToday?: boolean;
+  /** BTP chờ duyệt bao nhiêu ngày thì báo. "Việc của tôi" truyền 0 = mọi mẻ đang chờ. */
+  approvalWaitDays?: number;
+}
+
 /**
  * Việc cần đốc trong khoảng — mỗi dòng trỏ tới đúng màn sửa. Ngày "hôm nay" truyền
  * vào (không đọc đồng hồ) để test được. Sắp: lỗi → nhắc → tin, mới trước.
  */
-export function buildChainWarnings(d: DataFlowInput, k: FlowRange, today: string, threshold = YIELD_RATIO_THRESHOLD): FlowWarning[] {
+export function buildChainWarnings(
+  d: DataFlowInput,
+  k: FlowRange,
+  today: string,
+  threshold = YIELD_RATIO_THRESHOLD,
+  { includeToday = false, approvalWaitDays = APPROVAL_WAIT_DAYS }: ChainWarningOptions = {},
+): FlowWarning[] {
   const s = filterByRange(d, k);
+  /** Ngày còn đang ghi — chưa tính là việc (trừ khi bật includeToday). */
+  const isOpenDay = (date: string) => (includeToday ? date > today : date >= today);
   const result: FlowWarning[] = [];
   const isLocked = (locks: readonly DailyLock[], date: string, x: Workshop) =>
     locks.some((l) => l.lockDate === date && l.workshop === x && l.isLocked);
@@ -546,29 +598,29 @@ export function buildChainWarnings(d: DataFlowInput, k: FlowRange, today: string
   for (const r of s.imports) importKgByDay.set(`${r.deliveryDate}|${r.workshop}`, (importKgByDay.get(`${r.deliveryDate}|${r.workshop}`) ?? 0) + (r.quantityKg || 0));
   for (const [key, kg] of importKgByDay) {
     const [date, x] = key.split("|") as [string, Workshop];
-    if (date >= today) continue;
+    if (isOpenDay(date)) continue;
     const lock = d.dailyLocks.find((l) => l.lockDate === date && l.workshop === x && l.isLocked);
     if (!lock) {
-      result.push({ id: `ccn|${key}`, kind: "imports-unlocked", level: "reminder", title: `Nhập ${fmtKg(kg)} chưa chốt ngày`, detail: "Chốt ngày để khóa tổng nhập, kế toán mới lấy được số.", date, workshop: x, path: "/imports" });
+      result.push({ id: `ccn|${key}`, kind: "imports-unlocked", level: "reminder", title: `Nhập ${fmtKg(kg)} chưa chốt ngày`, detail: "Chốt ngày để khóa tổng nhập, kế toán mới lấy được số.", date, workshop: x, path: dayPath("/imports", date, x) });
     } else if (Math.abs(lock.totalKgAtLock - kg) > 0.01) {
       // 3. Sổ đổi sau khi chốt: tổng hiện tại ≠ tổng lúc chốt.
-      result.push({ id: `dsc|${key}`, kind: "changed-after-lock", level: "error", title: `Tổng nhập lệch ${fmtKg(kg - lock.totalKgAtLock)} so với lúc chốt`, detail: `Lúc chốt ${fmtKg(lock.totalKgAtLock)}, nay ${fmtKg(kg)}. Soát lại dòng sửa sau chốt.`, date, workshop: x, path: "/imports" });
+      result.push({ id: `dsc|${key}`, kind: "changed-after-lock", level: "error", title: `Tổng nhập lệch ${fmtKg(kg - lock.totalKgAtLock)} so với lúc chốt`, detail: `Lúc chốt ${fmtKg(lock.totalKgAtLock)}, nay ${fmtKg(kg)}. Soát lại dòng sửa sau chốt.`, date, workshop: x, path: dayPath("/imports", date, x) });
     }
   }
   const productionKgByDay = new Map<string, number>();
   for (const w of s.wips) productionKgByDay.set(`${w.productionDate}|${w.workshop}`, (productionKgByDay.get(`${w.productionDate}|${w.workshop}`) ?? 0) + (w.quantityKg || 0));
   for (const [key, kg] of productionKgByDay) {
     const [date, x] = key.split("|") as [string, Workshop];
-    if (date >= today || isLocked(d.productionLocks, date, x)) continue;
-    result.push({ id: `ccs|${key}`, kind: "production-unlocked", level: "reminder", title: `Sản xuất ${fmtKg(kg)} chưa chốt ngày`, detail: "Chốt ngày sản xuất để ghi còn dở và khóa lô.", date, workshop: x, path: "/wip" });
+    if (isOpenDay(date) || isLocked(d.productionLocks, date, x)) continue;
+    result.push({ id: `ccs|${key}`, kind: "production-unlocked", level: "reminder", title: `Sản xuất ${fmtKg(kg)} chưa chốt ngày`, detail: "Chốt ngày sản xuất để ghi còn dở và khóa lô.", date, workshop: x, path: dayPath("/wip", date, x) });
   }
 
   // 4. Ghi bù (nhập + sản xuất) — để biết, lý do đã bắt lúc ghi.
   const shipments = d.shipments.filter((c) => isInRange(c.deliveryDate, k) && matchesWorkshop(c.workshop, k) && isBackdatedImport(c));
   for (const c of shipments)
-    result.push({ id: `gbn|${c.id}`, kind: "backdated", level: "info", title: `Chuyến ${c.supplierName || ""} ghi bù ngày ${c.postingDate}`.trim(), detail: c.backdateReason ? `Lý do: ${c.backdateReason}` : "Chưa ghi lý do.", date: c.deliveryDate, workshop: c.workshop, path: "/imports" });
+    result.push({ id: `gbn|${c.id}`, kind: "backdated", level: "info", title: `Chuyến ${c.supplierName || ""} ghi bù ngày ${c.postingDate}`.trim(), detail: c.backdateReason ? `Lý do: ${c.backdateReason}` : "Chưa ghi lý do.", date: c.deliveryDate, workshop: c.workshop, path: dayPath("/imports", c.deliveryDate, c.workshop) });
   for (const w of s.wips.filter(isBackdatedWip))
-    result.push({ id: `gbs|${w.id}`, kind: "backdated", level: "info", title: `Mẻ ${fmtKg(w.quantityKg)} ghi bù ngày ${w.postingDate}`, detail: w.backdateReason ? `Lý do: ${w.backdateReason}` : "Chưa ghi lý do.", date: w.productionDate, workshop: w.workshop, path: "/wip" });
+    result.push({ id: `gbs|${w.id}`, kind: "backdated", level: "info", title: `Mẻ ${fmtKg(w.quantityKg)} ghi bù ngày ${w.postingDate}`, detail: w.backdateReason ? `Lý do: ${w.backdateReason}` : "Chưa ghi lý do.", date: w.productionDate, workshop: w.workshop, path: dayPath("/wip", w.productionDate, w.workshop) });
 
   // 5. Bán / đóng gói vượt tồn BTP (toàn bộ sổ — vượt là vượt, không theo khoảng).
   const name = new Map(d.products.map((p) => [p.id, p.name]));
@@ -585,15 +637,22 @@ export function buildChainWarnings(d: DataFlowInput, k: FlowRange, today: string
   for (const g of stages) {
     if (g.key !== "production" && g.key !== "packaging") continue;
     for (const m of g.items) {
-      if (!m.missing.includes("lot") || m.node.date >= today) continue;
-      result.push({ id: `lo|${m.node.kind}|${m.node.id}`, kind: "lot-unassigned", level: "reminder", title: `${m.node.label} chưa gắn lô`, detail: g.key === "production" ? "Gắn lô NL cho mẻ, hoặc ghi lý do khi chốt ngày." : "Gắn lô BTP cho phiếu đóng gói.", date: m.node.date, workshop: m.node.workshop, path: g.key === "production" ? "/wip" : "/packaging" });
+      if (!m.missing.includes("lot") || isOpenDay(m.node.date)) continue;
+      result.push({ id: `lo|${m.node.kind}|${m.node.id}`, kind: "lot-unassigned", level: "reminder", title: `${m.node.label} chưa gắn lô`, detail: g.key === "production" ? "Gắn lô NL cho mẻ, hoặc ghi lý do khi chốt ngày." : "Gắn lô BTP cho phiếu đóng gói.", date: m.node.date, workshop: m.node.workshop, path: dayPath(g.key === "production" ? "/wip" : "/packaging", m.node.date, m.node.workshop) });
     }
   }
 
-  // 7. BTP chờ duyệt nhập kho quá N ngày.
-  const han = subtractDays(today, APPROVAL_WAIT_DAYS);
-  for (const w of s.wips.filter((w) => w.status === "pending" && w.productionDate < han))
-    result.push({ id: `cd|${w.id}`, kind: "approval-overdue", level: "reminder", title: `${name.get(w.productId) ?? "BTP"} ${fmtKg(w.quantityKg)} chờ duyệt quá ${APPROVAL_WAIT_DAYS} ngày`, detail: "Thủ kho duyệt nhập kho để tồn dự trữ đủ.", date: w.productionDate, workshop: w.workshop, path: `/warehouse?approve=W:${w.id}` });
+  // 7. BTP chờ duyệt nhập kho quá N ngày (N = 0 ⇒ mọi mẻ đang chờ, kể cả hôm nay).
+  const han = subtractDays(today, approvalWaitDays);
+  for (const w of s.wips.filter((w) => w.status === "pending" && (approvalWaitDays > 0 ? w.productionDate < han : w.productionDate <= today)))
+    result.push({ id: `cd|${w.id}`, kind: "approval-overdue", level: "reminder", title: `${name.get(w.productId) ?? "BTP"} ${fmtKg(w.quantityKg)} ${approvalWaitDays > 0 ? `chờ duyệt quá ${approvalWaitDays} ngày` : "chờ duyệt nhập kho"}`, detail: "Thủ kho duyệt nhập kho để tồn dự trữ đủ.", date: w.productionDate, workshop: w.workshop, path: `/warehouse?approve=W:${w.id}` });
+
+  // 7b. Kỳ cân đối đã hết ngày cuối mà chưa chốt (kỳ hết trong khoảng đang xem).
+  for (const p of d.periods) {
+    const end = p.endDate || "";
+    if (!end || p.isLocked || end >= today || !isInRange(end, k)) continue;
+    result.push({ id: `kcc|${p.id}`, kind: "period-unlocked", level: "reminder", title: `Kỳ ${p.materialTypeName || ""} ${p.dateRangeDescription || ""} chưa chốt`.replace(/\s+/g, " "), detail: `Kỳ hết ngày ${end}. Soát số rồi chốt kỳ để chuyển tồn sang kỳ sau.`, date: end, workshop: "", path: `/balancing/${p.id}` });
+  }
 
   // 8. Định mức mặt hàng lệch ngưỡng.
   const dm = computeYieldByProduct(d, k, threshold);

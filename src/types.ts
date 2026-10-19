@@ -913,6 +913,42 @@ export interface LotWaiver {
 }
 
 /**
+ * GIAO VIỆC (bảng `task_assignments`, mig 0070 — màn "Việc của tôi" `/my-tasks`).
+ * - `system`: việc máy tự phát hiện (`FlowWarning` ở lib/dataFlow.ts — ngày chưa chốt,
+ *   BTP chờ duyệt…) được giao cho MỘT người; `taskKey` = `FlowWarning.id`. Việc tự
+ *   hết khi sổ đã sửa xong (cảnh báo biến mất) — không cần bấm "Xong".
+ * - `manual`: việc giao tay (tiêu đề, hạn, màn cần mở) — người nhận bấm "Xong".
+ * Hạn rỗng ⇒ việc máy theo hạn mặc định của loại việc (lib/myTasks.ts).
+ */
+export type TaskSource = "system" | "manual";
+export type TaskStatus = "open" | "done" | "cancelled";
+
+export interface TaskAssignment {
+  id: string;
+  source: TaskSource;
+  /** Khóa việc máy phát hiện (vd "ccn|2026-10-12|Đông"); việc giao tay để "". */
+  taskKey: string;
+  title: string;
+  detail: string;
+  /** Link mở việc (vd "/imports?date=…&workshop=…"). */
+  path: string;
+  workshop: Workshop | "";
+  /** Ngày nghiệp vụ của việc (yyyy-mm-dd); việc giao tay = ngày giao. */
+  taskDate: string;
+  /** Hạn (yyyy-mm-dd); "" = theo hạn mặc định của loại việc. */
+  dueDate: string;
+  /** `user_profiles.id` người nhận + tên lúc giao (còn đọc được khi hồ sơ đổi). */
+  assigneeId: string;
+  assigneeName: string;
+  assignedById: string;
+  assignedByName: string;
+  status: TaskStatus;
+  note: string;
+  doneAt: string;
+  createdAt: string;
+}
+
+/**
  * Một lần IN TEM QR cho một lô (bảng `label_prints`, mig 0049). `label` là nhãn
  * in ra LÚC IN — đông cứng, để so với nhãn hiện tại (nhãn BTP/TP suy từ bản ghi).
  */

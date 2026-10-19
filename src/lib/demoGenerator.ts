@@ -32,6 +32,7 @@ import type {
   LotDispatch,
   LotInput,
   LotWaiver,
+  TaskAssignment,
   MaterialImportItem,
   MaterialOpeningStock,
   MaterialType,
@@ -97,6 +98,8 @@ export interface DemoBundle {
   lotInputs: LotInput[];
   lotDispatches: LotDispatch[];
   lotWaivers: LotWaiver[];
+  /** Giao việc (mig 0070) — bộ demo để TRỐNG: việc máy phát hiện tự suy từ số demo; nạp bộ mới thì xoá việc giao cũ. */
+  taskAssignments: TaskAssignment[];
   labelPrints: LabelPrint[];
   qcChecklists: QcChecklistItem[];
   qcLocks: DailyLock[];
@@ -649,6 +652,7 @@ export function generateDemoBundle(n: DemoSource, tc: DemoOptions): DemoBundle {
     lotInputs,
     lotDispatches,
     lotWaivers,
+    taskAssignments: [],
     labelPrints,
     qcChecklists,
     qcLocks,

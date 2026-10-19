@@ -20,6 +20,7 @@ import { UpdateBanner } from "./UpdateBanner";
 import { AccountMenu, type AccountMenuProps } from "./AccountMenu";
 import {
   LayoutDashboard,
+  ListTodo,
   ClipboardCheck,
   QrCode,
   BarChart3,
@@ -78,10 +79,13 @@ export interface ShellNavItem {
   description?: string;
   /** Màn còn dùng dữ liệu mẫu (chỉ admin thấy) — hiện cờ "DEMO" trên nav. */
   demo?: boolean;
+  /** Số đỏ cạnh nhãn (vd số việc đang được giao ở "Việc của tôi"); 0 / bỏ trống = không hiện. */
+  badge?: number;
 }
 
 /** id = path route. Danh sách phẳng (icon/nhãn/cờ demo) — thứ tự & gom nhóm do NAV_TREE quyết định. */
 export const KIT_NAV: ShellNavItem[] = [
+  { id: "my-tasks", label: "Việc của tôi", icon: ListTodo, description: "Việc bạn cần làm và việc được giao, có hạn và cảnh báo quá hạn; bấm một việc là tới đúng màn, đúng ngày để làm." },
   { id: "dashboard", label: "Tổng quan", icon: LayoutDashboard , description: "Trang tổng quan: số liệu nổi bật trong ngày và lối tắt sang các màn hay dùng." },
   { id: "wip", label: "Sản xuất thành phẩm", icon: Factory , description: "Ghi sản lượng thành phẩm làm ra mỗi ngày theo xưởng, chốt ngày và gửi báo cáo." },
   { id: "packaging", label: "Đóng gói", icon: Package , description: "Ghi phiếu đóng gói: trừ bán thành phẩm đem đóng, cộng thành phẩm ra, tính hao hụt." },
@@ -144,6 +148,8 @@ const LOOKUP_CHILD = (tab: string): NavTreeChild => ({
 });
 
 export const NAV_TREE: NavTreeGroup[] = [
+  // Một màn ⇒ hiện thẳng, không tiêu đề gập. Đứng đầu: việc cần làm là thứ mở app ra xem trước.
+  { name: "Việc của tôi", icon: ListTodo, children: [{ ref: "my-tasks" }] },
   { name: "Tổng quan", icon: LayoutDashboard, children: [{ ref: "dashboard" }] },
   {
     name: "Nhập hàng",
@@ -208,6 +214,7 @@ interface NavChild {
   description?: string;
   icon: LucideIcon;
   demo?: boolean;
+  badge?: number;
   isCatalogLink: boolean; // deep-link danh mục (style phụ + ẩn khi thu gọn)
 }
 interface DisplayGroup {
@@ -240,6 +247,7 @@ function groupTree(items: ShellNavItem[]): DisplayGroup[] {
           description: m.description,
           icon: m.icon,
           demo: m.demo,
+          badge: m.badge,
           isCatalogLink: false,
         });
         used.add(c.ref);
@@ -274,6 +282,7 @@ function groupTree(items: ShellNavItem[]): DisplayGroup[] {
         description: m.description,
         icon: m.icon,
         demo: m.demo,
+        badge: m.badge,
         isCatalogLink: false,
       })),
     });
@@ -326,9 +335,9 @@ function NavItemButton({
       type="button"
       onClick={() => onSelect(m.target)}
       aria-current={isCurrent ? "page" : undefined}
-      title={isCollapsed ? [m.label, m.description].filter(Boolean).join(" — ") : m.description}
+      title={isCollapsed ? [m.badge ? `${m.label} (${m.badge})` : m.label, m.description].filter(Boolean).join(" — ") : m.description}
       className={cn(
-        "press-feedback flex min-h-10 w-full items-center gap-3 rounded-lg border text-left",
+        "press-feedback relative flex min-h-10 w-full items-center gap-3 rounded-lg border text-left",
         isCollapsed ? "justify-center px-0" : "px-3",
         m.isCatalogLink ? "text-sm font-medium" : "text-sm font-semibold",
         isCurrent
@@ -346,6 +355,17 @@ function NavItemButton({
         <Tag variant="muted" className="ml-auto">
           DEMO
         </Tag>
+      )}
+      {!!m.badge && (
+        <span
+          aria-label={`${m.badge} việc`}
+          className={cn(
+            "tnum rounded-full bg-destructive px-2 text-sm font-bold text-destructive-foreground",
+            isCollapsed ? "absolute -right-1 -top-1" : "ml-auto"
+          )}
+        >
+          {m.badge}
+        </span>
       )}
     </button>
   );
@@ -636,13 +656,13 @@ export default function AppShell({
                 )}
                 {typeof notificationCount === "number" && (
                   <button
-                    title="Xem các thông báo và việc cần làm trong ngày."
+                    title="Mở Việc của tôi: các việc đang được giao cho bạn."
                     type="button"
                     onClick={onOpenNotifications}
                     className="press-feedback inline-flex min-h-10 items-center gap-2 rounded-lg border border-input px-3.5 text-sm font-semibold text-foreground hover:bg-muted"
                   >
                     <Bell className="size-icon-sm" aria-hidden />
-                    Thông báo
+                    Việc được giao
                     {notificationCount > 0 && (
                       <span className="tnum rounded-full bg-destructive px-2 text-xs font-bold text-destructive-foreground">
                         {notificationCount}
@@ -702,7 +722,7 @@ export default function AppShell({
             {typeof notificationCount === "number" && (
               <span className="relative hidden md:inline-flex">
                 <HeaderButton
-                  label={`Thông báo (${notificationCount} chưa đọc)`}
+                  label={`Việc được giao cho bạn (${notificationCount} việc đang mở) — mở Việc của tôi`}
                   icon={Bell}
                   onClick={onOpenNotifications}
                 />

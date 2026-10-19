@@ -86,6 +86,9 @@ const CRUD = ["view", "create", "update", "delete"] as const;
 /** Sổ đăng ký tài nguyên (spec §3a). Thêm màn mới ⇒ thêm ở đây (test bắt). */
 export const PERMISSION_RESOURCES: readonly PermissionResource[] = [
   { id: "dashboard", label: "Tổng quan", group: "overview", navId: "dashboard", actions: ["view", "export"] },
+  // Thêm = giao việc cho người khác; Sửa / Xóa = đổi hạn, thu hồi việc đã giao. Xem: ai có
+  // vai trò cũng có (màn cá nhân — resolvePermissions tự cấp), kể cả vai trò đã chỉnh ở /roles.
+  { id: "my-tasks", label: "Việc của tôi", group: "overview", navId: "my-tasks", actions: CRUD },
 
   { id: "imports", label: "Nhập hàng", group: "imports", navId: "imports", actions: [...CRUD, "lock", "unlock", "export", "view-price"] },
 
@@ -314,6 +317,7 @@ const DIRECTOR: RoleSpec = {
 /** Kế toán trưởng: toàn quyền sổ kế toán, là người MỞ LẠI / XÓA sổ đã ghi. */
 const CHIEF_ACCOUNTANT: RoleSpec = {
   dashboard: VIEW_EXPORT,
+  "my-tasks": ["view", "create", "update", "delete"],
   imports: ["view", "update", "delete", "lock", "unlock", "export", "view-price"],
   wip: ["view", "unlock", "export"],
   packaging: VIEW,
@@ -339,6 +343,7 @@ const CHIEF_ACCOUNTANT: RoleSpec = {
  */
 const ACCOUNTANT: RoleSpec = {
   dashboard: VIEW_EXPORT,
+  "my-tasks": ["view", "create", "update"],
   imports: ["view", "create", "update", "lock", "export", "view-price"],
   wip: ["view", "create", "update", "lock", "export"],
   packaging: VIEW,
@@ -374,6 +379,7 @@ const WAREHOUSE_KEEPER: RoleSpec = {
 /** Quản đốc xưởng: toàn quyền khâu sản xuất, MỞ LẠI ngày SX (xưởng mình — phạm vi là Đợt 5). Không thấy giá. */
 const MANAGER: RoleSpec = {
   dashboard: VIEW,
+  "my-tasks": ["view", "create", "update", "delete"],
   wip: ["view", "create", "update", "delete", "lock", "unlock", "export"],
   packaging: ["view", "create", "update", "delete"],
   qc: ["view", "create", "update", "lock", "unlock"],
@@ -392,6 +398,7 @@ const MANAGER: RoleSpec = {
 /** Phó quản đốc: ghi thành phẩm hằng ngày; được XÓA dòng ghi nhầm (chủ dự án 2026-10-15), không chốt / mở lại. */
 const VICE_MANAGER: RoleSpec = {
   dashboard: VIEW,
+  "my-tasks": ["view", "create", "update"],
   wip: ["view", "create", "update", "delete"],
   packaging: ["view", "create", "update"],
   qc: ["view", "create", "update"],
@@ -466,6 +473,9 @@ function isGrantable(resource: string, action: PermissionAction): boolean {
   return !!r && !r.adminOnly && r.actions.includes(action);
 }
 
+/** Tài nguyên màn "Việc của tôi" — mọi người có vai trò đều xem được. */
+export const MY_TASKS_RESOURCE = "my-tasks";
+
 export interface ResolveInput {
   roles: readonly Role[];
   isAdmin: boolean;
@@ -478,7 +488,8 @@ export interface ResolveInput {
  * Quyền thực của một người (spec §3d):
  * 1. admin ⇒ toàn quyền; 2. không vai trò ⇒ không quyền nào;
  * 3. HỢP quyền các vai trò, phạm vi lấy rộng nhất; vai trò lạ không có quyền;
- * 4. chỉnh riêng: chặn > cho > vai trò; 5. có hành động bất kỳ ⇒ có `view`.
+ * 4. chỉnh riêng: chặn > cho > vai trò; 5. có hành động bất kỳ ⇒ có `view`;
+ * 6. có quyền bất kỳ ⇒ xem được "Việc của tôi".
  */
 export function resolvePermissions({
   roles,
@@ -499,8 +510,12 @@ export function resolvePermissions({
   };
 
   for (const role of roles) for (const g of rolePermissions[role] ?? []) add(g.resource, g.action, g.scope);
-
+  // "Việc của tôi" là màn cá nhân: ai đã có quyền ở đâu đó cũng xem được — kể cả vai trò
+  // đã chỉnh ở /roles (ma trận DB không có ô này). Không quyền gì ⇒ vẫn "Chưa được cấp
+  // quyền" (không mở app chỉ để xem một màn trống). Chặn riêng `view` ở dưới vẫn gỡ được.
   for (const o of overrides) if (o.effect === "allow") add(o.resource, o.action, o.scope ?? "all");
+  if (grants.size > 0) add(MY_TASKS_RESOURCE, "view", "all");
+
   for (const o of overrides) if (o.effect === "deny") grants.delete(keyOf(o.resource, o.action));
 
   // Bất biến: làm được gì đó ⇒ xem được (tick Sửa mà không Xem là vô nghĩa).

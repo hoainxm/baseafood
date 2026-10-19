@@ -1,6 +1,7 @@
 > Load khi: đụng auth, đăng nhập, RLS, `.env`, key, hay có ý định cho app chạy ngoài mạng nội bộ. 🔴
 covers: src/lib/auth.ts, src/lib/username.ts, src/features/auth/LoginScreen.tsx, src/features/users/UserManagementScreen.tsx, supabase/migrations/0006_nguoi_dung.sql, supabase/migrations/0007_seed_admin.sql, supabase/migrations/0010_email_domain_vn.sql, supabase/migrations/0003_siet_rls.sql, src/lib/supabase.ts, .env.example, .gitignore, src/lib/permissions.ts, src/lib/nav-access.ts, src/features/shared/PermissionProvider.tsx, src/features/shared/AccountMenu.tsx, src/features/admin/RolePermissionsScreen.tsx, supabase/migrations/0062_role_permissions.sql, supabase/migrations/0063_orphan_auth_accounts.sql, supabase/migrations/0064_delete_orphan_auth_account.sql
-last_verified: 2026-10-15
+last_verified: 2026-10-19
+<!-- updated: 2026-10-19 — tài nguyên `my-tasks` (Việc của tôi): `resolvePermissions` tự cấp `my-tasks:view` cho ai đã có quyền bất kỳ (kể cả vai trò đã chỉnh ở /roles; không quyền gì ⇒ vẫn "Chưa được cấp quyền"); giao/sửa = quản đốc, phó QĐ, kế toán (trưởng); thu hồi = quản đốc, kế toán trưởng; giám đốc KHÔNG (chỉ xem + xuất). `homeFor` chỉ trả `my-tasks` khi không còn màn nghiệp vụ. Bảng `task_assignments` (0070) RLS `co_vai_tro()`, không trigger 0065, luật ghi app = null. Xem 39-my-tasks.md. -->
 <!-- updated: 2026-10-15 (h) — Đợt 6: 0065 trigger chốt ghi máy chủ + công tắc log/enforce (chưa chạy); hàng chờ 42501. -->
 <!-- updated: 2026-10-15 (g) — Đợt 5 phạm vi dòng (workshop/own). -->
 <!-- updated: 2026-10-15 (f) — Đợt 4: ma trận mặc định = ma trận siết §7 (+ kế toán T S C ở Nhập hàng/SX, phó QĐ Xóa SX); LEGACY giữ làm đường lùi. -->

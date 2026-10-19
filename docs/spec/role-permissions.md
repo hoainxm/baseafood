@@ -1,6 +1,7 @@
 > Load khi: làm phân quyền theo vai trò / người dùng (xem · thêm · sửa · xóa · chốt · mở lại · duyệt · nạp · xuất), màn "Vai trò & quyền", ẩn/hiện nút theo quyền, siết RLS theo vai trò.
 > Trạng thái: **CHỐT 2026-10-15** — chủ dự án đồng ý cả 6 câu §10 theo khuyến nghị. **Đợt 1 → 5 ĐÃ BUILD 2026-10-15; Đợt 6: `0065` ĐÃ CHẠY trên DB thật ở chế độ `log` (2026-10-15 14:44 giờ VN) — chưa bật `enforce`** (xem §6 Kết quả).
-last_verified: 2026-10-16
+last_verified: 2026-10-19
+<!-- updated: 2026-10-19 — tài nguyên MỚI `my-tasks` (view · create · update · delete): view tự cấp cho ai có quyền bất kỳ; giao/sửa: quản đốc, phó QĐ, kế toán, kế toán trưởng; thu hồi: quản đốc, kế toán trưởng; giám đốc không. Ma trận máy chủ thay trọn ở 0070. Xem ../app-map/39-my-tasks.md. -->
 <!-- updated: 2026-10-16 — vá 3 chỗ hở Đợt 3 (canRemove picker lô, giá ở bảng OCR, tem /packaging). -->
 
 # Phân quyền theo chức năng (CRUD+) cho từng vai trò và từng người
@@ -57,6 +58,7 @@ Một sổ đăng ký thuần `lib/permissions.ts` (không React) khai **mọi**
 | | `monthly-stock` | view · create · update · delete · import · export |
 | | `reconciliation` | view · create · update · delete · export |
 | | `nxt-material` · `nxt` · `nxt-warehouse` | view · export (+ `import` cho `nxt-warehouse` nạp báo cáo) |
+| Tổng quan | `my-tasks` (Việc của tôi — giao việc) | view (ai có quyền bất kỳ cũng có) · create = giao · update · delete = thu hồi |
 | Báo cáo | `dashboard` · `production-report` · `export-report` | view · export |
 | Danh mục | `catalog.suppliers` · `catalog.customers` · `catalog.material-types` · `catalog.products` · `catalog.batters` · `catalog.storage-locations` | view · create · update · delete |
 | | `catalog.finished-goods` (141 mã TK 1551) | view (sửa chỉ admin) |

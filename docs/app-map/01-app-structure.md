@@ -1,6 +1,7 @@
 > Load khi: thêm file mới, không biết đặt ở đâu, hay chuẩn bị import xuyên tầng.
 covers: src/**
-last_verified: 2026-10-15
+last_verified: 2026-10-19
+<!-- updated: 2026-10-19 — THÊM feature `src/features/my-tasks/` (MyTasksScreen + AssignTaskDialog + index) — Việc của tôi, route `/my-tasks`. Import `@/design-system` + hook `catalogRepo` + `lib/myTasks.ts` (thuần: hạn, quá hạn, quyền + phạm vi) + `lib/dataFlow.ts` (cảnh báo chuỗi, `dayPath`) + `features/shared` (useTraceData, PermissionProvider, KIT_NAV, DraftRestoredNotice). Xem 39-my-tasks.md. -->
 <!-- updated: 2026-10-15 (b) — thêm features/admin/ (AdminHomeScreen /admin, RolePermissionsScreen /roles) + features/shared/AccountMenu.tsx (menu avatar). -->
 <!-- updated: 2026-10-15 — thêm lib/permissions.ts (sổ tài nguyên + resolvePermissions, thuần) và features/shared/PermissionProvider.tsx (useCan), Đợt 1 phân quyền. -->
 <!-- re-verified: 2026-10-13 09:40 — danh sách thư mục features đối chiếu `ls src/features` (FIX drift: còn ghi tên Việt cũ nhap-hang/san-xuat/… dù thư mục thật tiếng Anh); THÊM thư mục scripts/ (cổng đặt tên, Đợt 0). -->
@@ -53,7 +54,7 @@ src/
 │   ├── patterns/            Field, NumberField, Combobox, DateField, RecordTable, CatalogCrud…
 │   ├── kit/KitPage.tsx      trang duyệt bộ giao diện (đưa người dùng thật bấm thử)
 │   └── index.ts             cửa import DUY NHẤT cho features
-└── features/                thư mục chức năng chia theo route (.DS_Store, audit, auth, balancing, catalog, dashboard, doi-soat, imports, monthly-stock, orders, packaging, production, qr, quality-check, reports, sales, shared, users, warehouse)
+└── features/                thư mục chức năng chia theo route (.DS_Store, audit, auth, balancing, catalog, dashboard, doi-soat, imports, monthly-stock, my-tasks, orders, packaging, production, qr, quality-check, reports, sales, shared, users, warehouse)
 
 scripts/                     công cụ dev chạy bằng node, KHÔNG vào bundle app
 ├── check-naming.mjs         cổng quy ước đặt tên (pre-commit --staged · CI --check ratchet) — ../spec/quy-uoc-dat-ten.md

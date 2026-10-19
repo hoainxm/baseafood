@@ -39,6 +39,7 @@ import {
   LABEL_PRINT_TABLE,
   LOT_DISPATCH_TABLE,
   LOT_WAIVER_TABLE,
+  TASK_ASSIGNMENT_TABLE,
   BATTER_TYPE_TABLE,
   ROW_MARK_TABLE,
   DOMESTIC_SALE_TABLE,
@@ -292,6 +293,8 @@ export const useLabelPrints = () => useTable(LABEL_PRINT_TABLE);
 export const useLotDispatches = () => useTable(LOT_DISPATCH_TABLE);
 /** Lý do chưa gắn lô khi chốt ngày SX (mig 0056). */
 export const useLotWaivers = () => useTable(LOT_WAIVER_TABLE);
+/** Giao việc — màn "Việc của tôi" (mig 0070). */
+export const useTaskAssignments = () => useTable(TASK_ASSIGNMENT_TABLE);
 /** Tô màu dòng "đã dò" kiểu Excel — MỘT bảng dùng chung mọi bảng (mig 0055).
  *  Màn hình KHÔNG gọi thẳng: đi qua `RowMarkProvider` (features/shared) gắn một lần
  *  ở ShellLayout, bảng bật bằng prop `rowMarkKey` của design-system. */

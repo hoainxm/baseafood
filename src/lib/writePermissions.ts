@@ -130,6 +130,10 @@ export const TABLE_WRITE_RULES: Readonly<Record<string, TableRule | null>> = {
   user_permissions: () => [["roles", "update"]],
   // Không chốt: tô màu dòng là thao tác trình bày (quy tắc 12–13)
   row_marks: null,
+  // Không chốt ở lớp ghi: giao việc là ghi chú điều phối, không phải sổ sách — người nhận
+  // phải tự bấm "Xong" được dù không có quyền giao. Ai được GIAO (my-tasks.create) /
+  // sửa / thu hồi do màn /my-tasks kiểm; máy chủ vẫn chặn người không vai trò (RLS 0070).
+  task_assignments: null,
 };
 
 export interface WriteDenial {

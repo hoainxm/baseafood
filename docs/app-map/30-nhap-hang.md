@@ -1,6 +1,7 @@
 > Load khi: sửa bất cứ thứ gì ở màn Nhập hàng — chuyến, ngày, ghi bù, chốt ngày, phế liệu ngày, phiếu báo cáo ngày.
 covers: src/features/imports/MaterialImportScreen.tsx, src/features/imports/ImportSteps.tsx, src/features/imports/DailyImportInvoice.tsx, src/features/imports/ImportReport.tsx, src/features/imports/ImportSlipOcr.tsx, src/features/imports/importHelpers.ts, src/features/imports/ImportLinesTable.tsx, src/features/imports/DailyScrapSection.tsx, src/lib/ocr.ts, src/lib/ocrCloud.ts, src/types.ts
-last_verified: 2026-10-16
+last_verified: 2026-10-19
+<!-- updated: 2026-10-19 — link mở thẳng một ngày `/imports?date=yyyy-mm-dd&workshop=…` (từ Việc của tôi / Tổng quan): sang "Sổ chi tiết các chuyến" đúng ngày + xưởng sau khi nháp mở lại xong; nháp đang dở giữ nguyên, không có nháp thì "Ghi nhập" mở phiếu đúng ngày link; tham số gỡ khỏi URL. Xem 39-my-tasks.md. -->
 <!-- updated: 2026-10-16 (b) — Tự lưu NHÁP phiếu chuyến đang gõ (quy tắc 17): đầu chuyến + bảng loại hàng + chuyến đang sửa + phế liệu đang gõ; quay lại trang / đăng nhập lại ⇒ phiếu mở lại kèm dải "Đã mở lại phiếu đang gõ dở" (nút Bỏ bản nháp). Tự mở phiếu trống đợi `importDraft.isReady`. -->
 <!-- updated: 2026-10-16 — phân quyền: bảng duyệt OCR (OcrReviewTable) ẩn đơn giá đọc từ phiếu khi không có imports view-price (prop showPrice từ ImportSlipOcr). -->
 <!-- updated: 2026-10-15 — phân quyền Đợt 3: `useCan("imports")` — form nhập theo Thêm/Sửa, Xóa chuyến, Chốt/Mở lại ngày, Xuất/Báo cáo ngày theo Xuất, giá + thành tiền + Excel tiền theo Xem giá, "Chỉ xem" khi không Thêm/Sửa. -->

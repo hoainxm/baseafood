@@ -40,6 +40,53 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 }
 
 export const PAGE_GUIDES: Record<string, PageGuide> = {
+  "my-tasks": {
+    title: "Việc của tôi",
+    description: "Việc bạn cần làm, hạn của từng việc, và việc bạn đã giao.",
+    content: (
+      <>
+        <Section title="Ba mục trên màn">
+          <Y>
+            <li>
+              <b>Được giao cho tôi</b>: việc người khác giao riêng cho bạn, có hạn. Việc giao tay thì làm xong bấm <b>Xong</b>.
+            </li>
+            <li>
+              <b>Việc theo quyền của tôi</b>: việc máy tự phát hiện thuộc phần việc của bạn: ngày nhập / sản xuất chưa chốt, BTP chờ
+              duyệt nhập kho, mẻ chưa gắn lô, kỳ cân đối chưa chốt. Quản đốc chỉ thấy việc của xưởng mình.
+            </li>
+            <li>
+              <b>Tôi đã giao</b>: việc bạn giao cho người khác, để đốc. Người nhận để quá hạn thì hiện đỏ.
+            </li>
+          </Y>
+        </Section>
+        <Section title="Làm một việc">
+          <Step>
+            <li>
+              Bấm <b>Mở việc</b>: app mở đúng màn, đúng ngày và xưởng cần sửa.
+            </li>
+            <li>Làm xong ở màn đó (chốt ngày, duyệt kho, gắn lô…). Quay lại đây là việc đã tự hết, không cần bấm gì.</li>
+          </Step>
+        </Section>
+        <Section title="Hạn">
+          <Y>
+            <li>Chốt ngày nhập / sản xuất và gắn lô: trong ngày, sang hôm sau là quá hạn.</li>
+            <li>Duyệt BTP vào kho: trong 3 ngày. Chốt kỳ cân đối: 2 ngày sau ngày cuối kỳ.</li>
+            <li>Việc được giao: theo hạn người giao đặt.</li>
+          </Y>
+        </Section>
+        <Section title="Giao việc (quản đốc, kế toán)">
+          <Y>
+            <li>
+              Bấm <b>Giao</b> ở một việc để giao cho đúng một người. Người khác không thấy việc đó nữa, khỏi làm trùng.
+            </li>
+            <li>
+              <b>Giao việc mới</b>: giao việc tay (tiêu đề, hạn, màn cần mở). <b>Thu hồi</b> thì việc quay về danh sách chung.
+            </li>
+          </Y>
+        </Section>
+      </>
+    ),
+  },
   imports: {
     title: "Nhập hàng",
     description: "Ghi sổ nguyên liệu về xưởng mỗi ngày.",

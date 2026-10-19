@@ -27,6 +27,9 @@ import {
   splitOutflows,
   bucketStockByAge,
   countQcByDay,
+  dayPath,
+  parseDayLink,
+  withoutDayLink,
   type DataFlowInput,
   type DataFlow,
 } from "./dataFlow";
@@ -259,6 +262,50 @@ describe("buildChainWarnings", () => {
   it("hôm nay chưa chốt thì chưa nhắc", () => {
     const cb = buildChainWarnings(makeFlowData({ imports: [makeImport("n", "c", "2026-09-20", "Đông", 10)] }), K, "2026-09-20");
     expect(cb.filter((x) => x.kind === "imports-unlocked")).toEqual([]);
+  });
+
+  it("link mở thẳng đúng ngày + xưởng ở màn sổ ngày", () => {
+    expect(dayPath("/imports", "2026-09-10", "Cá")).toBe(`/imports?date=2026-09-10&workshop=${encodeURIComponent("Cá")}`);
+    expect(dayPath("/wip", "")).toBe("/wip");
+    const cb = buildChainWarnings(makeFlowData({ imports: [makeImport("n", "c", "2026-09-10", "Khô", 10)] }), K, "2026-09-20");
+    expect(cb.find((x) => x.kind === "imports-unlocked")?.path).toBe(dayPath("/imports", "2026-09-10", "Khô"));
+  });
+
+  it("màn đích đọc lại link ngày/xưởng — bỏ giá trị rác, giữ tham số khác khi gỡ", () => {
+    const link = dayPath("/wip", "2026-10-12", "Đông");
+    expect(parseDayLink(new URLSearchParams(link.split("?")[1]))).toEqual({ date: "2026-10-12", workshop: "Đông" });
+    expect(parseDayLink(new URLSearchParams("date=12/10/2026&workshop=Tất cả"))).toBeNull();
+    expect(parseDayLink(new URLSearchParams("workshop=Cá"))).toEqual({ date: undefined, workshop: "Cá" });
+    expect(withoutDayLink(new URLSearchParams("date=2026-10-12&workshop=Cá&tab=x")).toString()).toBe("tab=x");
+  });
+
+  it("includeToday: việc hôm nay vào danh sách (Việc của tôi), tương lai thì không", () => {
+    const d = makeFlowData({
+      imports: [makeImport("n", "c", "2026-09-20", "Đông", 10), makeImport("m", "c", "2026-09-21", "Đông", 5)],
+      wips: [wip("w", "2026-09-20", "Đông", 8)],
+    });
+    const cb = buildChainWarnings(d, K, "2026-09-20", undefined, { includeToday: true });
+    expect(cb.filter((x) => x.kind === "imports-unlocked").map((x) => x.date)).toEqual(["2026-09-20"]);
+    expect(cb.filter((x) => x.kind === "production-unlocked").map((x) => x.date)).toEqual(["2026-09-20"]);
+  });
+
+  it("approvalWaitDays = 0: mọi mẻ đang chờ duyệt đều là việc", () => {
+    const d = makeFlowData({ wips: [wip("a", "2026-09-19", "Đông", 10, "pending"), wip("b", "2026-09-20", "Cá", 5, "pending")] });
+    expect(buildChainWarnings(d, K, "2026-09-20").filter((x) => x.kind === "approval-overdue")).toEqual([]);
+    const all = buildChainWarnings(d, K, "2026-09-20", undefined, { approvalWaitDays: 0 }).filter((x) => x.kind === "approval-overdue");
+    expect(all.map((x) => x.id).sort()).toEqual(["cd|a", "cd|b"]);
+    expect(all[0].title).toContain("chờ duyệt nhập kho");
+  });
+
+  it("kỳ cân đối đã hết mà chưa chốt — kỳ đã chốt / chưa hết thì không", () => {
+    const period = (id: string, end: string, isLocked = false): BalancingPeriod => ({
+      id, materialTypeName: "Mực", dateRangeDescription: id, startDate: end, endDate: end,
+      totalInputKg: null, exchangeRate: 25000, processingCostPerKg: 0, createdAt: end, isLocked,
+    });
+    const d = makeFlowData({ periods: [period("k1", "2026-09-10"), period("k2", "2026-09-12", true), period("k3", "2026-09-20")] });
+    const cb = buildChainWarnings(d, K, "2026-09-20").filter((x) => x.kind === "period-unlocked");
+    expect(cb.map((x) => x.id)).toEqual(["kcc|k1"]);
+    expect(cb[0].path).toBe("/balancing/k1");
   });
 
   it("bán vượt tồn BTP được gọi tên", () => {

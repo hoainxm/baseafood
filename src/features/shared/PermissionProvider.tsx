@@ -39,6 +39,11 @@ export function PermissionProvider({
   );
 }
 
+/** Xưởng + tên của người đang đăng nhập — cho hàm thuần tự kiểm phạm vi (vd lib/myTasks.ts). */
+export function useScopeContext(): ScopeContext {
+  return useContext(ScopeContextContext);
+}
+
 /** Quyền thực của người đang đăng nhập (ít dùng — ưu tiên `useCan`). */
 export function usePermissions(): EffectivePermissions {
   return useContext(PermissionContext);

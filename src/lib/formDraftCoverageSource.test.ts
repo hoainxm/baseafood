@@ -23,6 +23,7 @@ const EXEMPT: Record<string, string> = {
   "features/reconciliation/ReconciliationScreen.tsx": "đối soát chạy trên file tải lên — file là nguồn, chạy lại được",
   "features/reports/WarehouseNxtScreen.tsx": "nạp báo cáo từ file / thêm mã một ô",
   "features/warehouse/ReserveWarehouseScreen.tsx": "xác nhận nhập kho một bước",
+  "features/my-tasks/MyTasksScreen.tsx": "nút Xong đánh dấu việc một chạm; form giao việc ở AssignTaskDialog có nháp",
 };
 
 function listTsx(dir: string): string[] {

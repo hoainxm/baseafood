@@ -3,8 +3,9 @@
 // Tên tiếng Việt: Màn hình Ghi Thành Phẩm ngày (sản xuất)
 // Description: Daily finished-goods production entry (v1: product · qty · customer)
 // ============================================================
-import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { parseDayLink, withoutDayLink } from "@/lib/dataFlow";
 import type {
   DailyLock,
   DomesticSaleItem,
@@ -605,8 +606,36 @@ export default function WipProductionScreen() {
     }
   }, [activeMode, sessionDate, sessionWorkshop]);
 
+  // Link mở thẳng một ngày (`?date=&workshop=` — "Việc của tôi", Tổng quan): sang "Sổ ngày"
+  // đúng ngày + xưởng. Đợi nháp mở lại xong (onRestore chuyển về "Ghi nhập") và PHẢI đứng sau
+  // effect đồng bộ trên để ngày của link thắng. Nháp đang dở giữ nguyên; không có nháp thì
+  // bỏ phiếu trống tự mở ⇒ "Ghi nhập" sau đó mở đúng ngày link. Xưởng của link KHÔNG ghi
+  // đè xưởng nhớ theo máy (mở việc xưởng khác một lần không đổi thói quen của máy).
+  const [searchParams, setSearchParams] = useSearchParams();
+  const dayLink = parseDayLink(searchParams);
+  const skipWorkshopPref = useRef(false);
+  useEffect(() => {
+    if (!wipDraft.isReady || !dayLink) return;
+    if (dayLink.date) {
+      setPeriod("day");
+      setDate(dayLink.date);
+    }
+    if (dayLink.workshop) {
+      skipWorkshopPref.current = true;
+      setWorkshop(dayLink.workshop);
+    }
+    if (!wipDraft.restoredAt) setSession(null);
+    setMode("ledger");
+    setSearchParams(withoutDayLink(searchParams), { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- chạy một lần khi link mang ngày/xưởng và nháp đã mở lại
+  }, [wipDraft.isReady, dayLink?.date, dayLink?.workshop]);
+
   // Nhớ phân xưởng đang chọn theo MÁY → reload khỏi phải chọn lại (device pref).
   useEffect(() => {
+    if (skipWorkshopPref.current) {
+      skipWorkshopPref.current = false;
+      return;
+    }
     if (workshop !== "Tất cả") {
       writeDevicePref(KEY_WIP_WORKSHOP, workshop);
     }

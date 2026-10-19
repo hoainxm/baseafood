@@ -25,23 +25,23 @@ import {
 import type { TraceData } from "@/lib/lotTraceability";
 
 export function useTraceData() {
-  const [shipments] = useImportShipments();
-  const [imports] = useMaterialImports();
-  const [wips] = useWipProductions();
-  const [packagings] = usePackagings();
-  const [lotInputs, saveLotInputs] = useLotInputs();
-  const [exportItems] = useExportItems();
-  const [exportOrders] = useExportOrders();
-  const [salesOrders] = useSalesOrders();
-  const [products] = useProducts();
-  const [customers] = useCustomers();
-  const [salesItems] = useSalesItems();
-  const [salesInvoices] = useSalesInvoices();
-  const [domesticSales] = useDomesticSales();
-  const [lotDispatches, saveLotDispatches] = useLotDispatches();
-  const [lotWaivers, saveLotWaivers] = useLotWaivers();
-  const [labelPrints] = useLabelPrints();
-  const [materialTypes] = useMaterialTypes();
+  const [shipments, , { status: shipmentsStatus }] = useImportShipments();
+  const [imports, , { status: importsStatus }] = useMaterialImports();
+  const [wips, , { status: wipsStatus }] = useWipProductions();
+  const [packagings, , { status: packagingsStatus }] = usePackagings();
+  const [lotInputs, saveLotInputs, { status: lotInputsStatus }] = useLotInputs();
+  const [exportItems, , { status: exportItemsStatus }] = useExportItems();
+  const [exportOrders, , { status: exportOrdersStatus }] = useExportOrders();
+  const [salesOrders, , { status: salesOrdersStatus }] = useSalesOrders();
+  const [products, , { status: productsStatus }] = useProducts();
+  const [customers, , { status: customersStatus }] = useCustomers();
+  const [salesItems, , { status: salesItemsStatus }] = useSalesItems();
+  const [salesInvoices, , { status: salesInvoicesStatus }] = useSalesInvoices();
+  const [domesticSales, , { status: domesticSalesStatus }] = useDomesticSales();
+  const [lotDispatches, saveLotDispatches, { status: lotDispatchesStatus }] = useLotDispatches();
+  const [lotWaivers, saveLotWaivers, { status: lotWaiversStatus }] = useLotWaivers();
+  const [labelPrints, , { status: labelPrintsStatus }] = useLabelPrints();
+  const [materialTypes, , { status: materialTypesStatus }] = useMaterialTypes();
 
   const traceData: TraceData = useMemo(
     () => ({
@@ -54,5 +54,11 @@ export function useTraceData() {
       salesItems, salesInvoices, domesticSales, lotDispatches, lotWaivers, labelPrints, materialTypes,
     ]
   );
-  return { traceData, lotInputs, saveLotInputs, lotDispatches, saveLotDispatches, lotWaivers, saveLotWaivers };
+  /**
+   * Mọi sổ đã nạp xong từ máy chủ (không còn đang tải, không lỗi). Màn nào SUY RA rồi GHI
+   * (vd "Việc của tôi" tự đóng việc đã sửa xong) phải đợi cờ này — đang tải dở thì sổ trống,
+   * suy ra sai.
+   */
+  const isReady = [shipmentsStatus, importsStatus, wipsStatus, packagingsStatus, lotInputsStatus, exportItemsStatus, exportOrdersStatus, salesOrdersStatus, productsStatus, customersStatus, salesItemsStatus, salesInvoicesStatus, domesticSalesStatus, lotDispatchesStatus, lotWaiversStatus, labelPrintsStatus, materialTypesStatus].every((x) => x === "ready");
+  return { traceData, isReady, lotInputs, saveLotInputs, lotDispatches, saveLotDispatches, lotWaivers, saveLotWaivers };
 }

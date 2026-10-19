@@ -8,6 +8,8 @@ import { PERMISSION_NAV_IDS, PERMISSION_RESOURCES, resolvePermissions } from "./
 // sửa test này chỉ khi chủ dự án đổi phân quyền thật. Đợt 1 phân quyền (2026-10-15)
 // chuyển tập màn sang lib/permissions.ts: mọi ca dưới đây GIỮ NGUYÊN, trừ ca
 // "chưa gán vai trò" (trước: thấy đủ; nay: không thấy màn nào — DB đã chặn từ 0057).
+// 2026-10-19: thêm "Việc của tôi" (`my-tasks`) cho MỌI vai trò có quyền — màn cá nhân, chỉ đọc
+// + giao việc; không đổi quyền ở màn nghiệp vụ nào.
 const sorted = (s: Set<string>) => [...s].sort();
 const ADMIN_NAV = new Set(PERMISSION_RESOURCES.filter((r) => r.adminOnly && r.navId).map((r) => r.navId));
 const NON_ADMIN_FULL = PERMISSION_NAV_IDS.filter((id) => !ADMIN_NAV.has(id)).sort();
@@ -24,16 +26,16 @@ describe("allowedIds — tập màn theo vai trò (Đợt 4, ma trận spec §7 
   });
   it("thủ kho nhập hàng: Nhập hàng + kho/tồn + QR + danh mục", () => {
     expect(sorted(allowedIds(["warehouse-keeper"], false))).toEqual(
-      ["catalog", "imports", "monthly-stock", "nxt", "nxt-material", "nxt-warehouse", "qr", "warehouse"]
+      ["catalog", "imports", "monthly-stock", "my-tasks", "nxt", "nxt-material", "nxt-warehouse", "qr", "warehouse"]
     );
   });
   it("quản đốc: khâu sản xuất + tồn kho + báo cáo; không sổ kế toán", () => {
     for (const r of ["manager-dong", "manager-ca", "manager-kho"] as const)
-      expect(sorted(allowedIds([r], false))).toEqual([...PRODUCTION, ...REPORTS, "catalog", "nxt", "nxt-material", "nxt-warehouse"].sort());
+      expect(sorted(allowedIds([r], false))).toEqual([...PRODUCTION, ...REPORTS, "catalog", "my-tasks", "nxt", "nxt-material", "nxt-warehouse"].sort());
   });
   it("phó quản đốc: khâu sản xuất + báo cáo; tổ trưởng: chỉ khâu sản xuất", () => {
-    expect(sorted(allowedIds(["vice-manager"], false))).toEqual([...PRODUCTION, ...REPORTS, "catalog"].sort());
-    expect(sorted(allowedIds(["team-leader"], false))).toEqual([...PRODUCTION, "catalog"].sort());
+    expect(sorted(allowedIds(["vice-manager"], false))).toEqual([...PRODUCTION, ...REPORTS, "catalog", "my-tasks"].sort());
+    expect(sorted(allowedIds(["team-leader"], false))).toEqual([...PRODUCTION, "catalog", "my-tasks"].sort());
     for (const id of ACCOUNTING) expect(allowedIds(["vice-manager"], false).has(id), id).toBe(false);
   });
   it("khu quản trị (Tổng quan quản trị · Người dùng · Vai trò & quyền · Nhật ký) chỉ admin", () => {
@@ -44,6 +46,19 @@ describe("allowedIds — tập màn theo vai trò (Đợt 4, ma trận spec §7 
   });
   it("chưa gán vai trò ⇒ không thấy màn nào", () => {
     expect(allowedIds([], false).size).toBe(0);
+  });
+  it("Việc của tôi: ai có quyền ở đâu đó cũng thấy — kể cả vai trò đã chỉnh / tự tạo; không quyền gì thì không", () => {
+    const custom = resolvePermissions({ roles: ["role-x" as never], isAdmin: false, rolePermissions: { "role-x": [{ resource: "qr", action: "view", scope: "all" }] } });
+    expect(custom.grants.has("my-tasks:view")).toBe(true);
+    const empty = resolvePermissions({ roles: ["role-x" as never], isAdmin: false, rolePermissions: { "role-x": [] } });
+    expect(empty.grants.size).toBe(0);
+    const denied = resolvePermissions({ roles: ["team-leader"], isAdmin: false, overrides: [{ resource: "my-tasks", action: "view", effect: "deny" }] });
+    expect(denied.grants.has("my-tasks:view")).toBe(false);
+  });
+  it("giao việc: quản đốc / kế toán (trưởng) / phó QĐ được giao; thủ kho, tổ trưởng, giám đốc thì không", () => {
+    const canAssign = (r: string) => resolvePermissions({ roles: [r as never], isAdmin: false }).grants.has("my-tasks:create");
+    for (const r of ["manager-dong", "chief-accountant", "accountant", "vice-manager"]) expect(canAssign(r), r).toBe(true);
+    for (const r of ["warehouse-keeper", "team-leader", "director"]) expect(canAssign(r), r).toBe(false);
   });
 });
 

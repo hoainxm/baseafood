@@ -2,6 +2,7 @@
 covers: src/features/my-tasks/MyTasksScreen.tsx, src/features/my-tasks/AssignTaskDialog.tsx, src/features/my-tasks/index.ts, src/lib/myTasks.ts, supabase/migrations/0070_task_assignments.sql
 last_verified: 2026-10-19
 ttl_days: 90
+<!-- updated: 2026-10-19 (b) — thêm nguồn việc thứ hai: `buildDocumentWarnings` (lib/documents.ts) — chứng nhận / hồ sơ năng lực còn ≤ 60 ngày hoặc đã hết hạn, CHỈ tài liệu người xem được (phòng ban); loại `document-expiring` (`DUE_OFFSET_DAYS` = 60 ⇒ hạn = ngày hết hạn), cần quyền `documents.update`; màn nạp thêm `company_documents` + `app_roles` và đợi bảng tài liệu "ready" trước khi tự đóng việc đã giao. Xem [40-documents](40-documents.md). -->
 <!-- updated: 2026-10-19 — tạo mới: màn Việc của tôi + giao việc + link mở thẳng ngày. `0070` ✅ đã chạy trên DB thật 2026-10-19 (kiểm: RLS + 4 policy authenticated, 19 cột, 2 trigger, 22 ô ma trận my-tasks). -->
 
 # Việc của tôi (`/my-tasks`)

@@ -33,6 +33,8 @@ import type {
   LotInput,
   LotWaiver,
   TaskAssignment,
+  CompanyDocument,
+  DocumentVersion,
   MaterialImportItem,
   MaterialOpeningStock,
   MaterialType,
@@ -100,6 +102,10 @@ export interface DemoBundle {
   lotWaivers: LotWaiver[];
   /** Giao việc (mig 0070) — bộ demo để TRỐNG: việc máy phát hiện tự suy từ số demo; nạp bộ mới thì xoá việc giao cũ. */
   taskAssignments: TaskAssignment[];
+  /** Tài liệu công ty (mig 0072) — bộ demo để TRỐNG: file thật không được trỏ sang demo (đường dẫn
+   *  bucket là của site thật); người trình diễn tự thêm tài liệu, file nằm ở `site-demo/…`. */
+  companyDocuments: CompanyDocument[];
+  documentVersions: DocumentVersion[];
   labelPrints: LabelPrint[];
   qcChecklists: QcChecklistItem[];
   qcLocks: DailyLock[];
@@ -653,6 +659,8 @@ export function generateDemoBundle(n: DemoSource, tc: DemoOptions): DemoBundle {
     lotDispatches,
     lotWaivers,
     taskAssignments: [],
+    companyDocuments: [],
+    documentVersions: [],
     labelPrints,
     qcChecklists,
     qcLocks,

@@ -27,6 +27,7 @@ import {
   type FlowWarningKind,
 } from "@/lib/dataFlow";
 import { canOnRow, type EffectivePermissions, type PermissionAction, type ScopeContext } from "@/lib/permissions";
+import { DOCUMENT_EXPIRY_NOTICE_DAYS } from "@/lib/documents";
 
 /**
  * Mốc bắt đầu tính việc: ngày chạy số thật (cutover 01/09/2026). Số T7–T8 nạp bù lúc
@@ -56,6 +57,8 @@ export const DUE_OFFSET_DAYS: Readonly<Record<FlowWarningKind, number | null>> =
   backdated: null,
   "yield-deviation": null,
   "period-yield-deviation": null,
+  // Ngày của việc = ngày bắt đầu báo (hết hạn − 60) ⇒ hạn rơi đúng ngày hết hạn (lib/documents.ts).
+  "document-expiring": DOCUMENT_EXPIRY_NOTICE_DAYS,
 };
 
 type Requirement = readonly [resource: string, action: PermissionAction];
@@ -84,6 +87,8 @@ export function taskRequirements(w: Pick<FlowWarning, "kind" | "path">): readonl
       return [["wip", "unlock"], ["balancing", "update"]];
     case "period-yield-deviation":
       return [["balancing", "update"]];
+    case "document-expiring":
+      return [["documents", "update"]];
   }
 }
 

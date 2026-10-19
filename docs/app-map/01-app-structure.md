@@ -1,6 +1,7 @@
 > Load khi: thêm file mới, không biết đặt ở đâu, hay chuẩn bị import xuyên tầng.
 covers: src/**
 last_verified: 2026-10-19
+<!-- updated: 2026-10-19 (b) — THÊM feature `src/features/documents/` (DocumentsScreen + DocumentFormDialog + VersionFormDialog + index) — Tài liệu công ty, route `/documents`; lib thuần `src/lib/documents.ts` (+ test) và `src/lib/documentStorage.ts` (file trên bucket `documents`). Feature chỉ import `@/design-system` + hook repo + lib thuần. -->
 <!-- updated: 2026-10-19 — THÊM feature `src/features/my-tasks/` (MyTasksScreen + AssignTaskDialog + index) — Việc của tôi, route `/my-tasks`. Import `@/design-system` + hook `catalogRepo` + `lib/myTasks.ts` (thuần: hạn, quá hạn, quyền + phạm vi) + `lib/dataFlow.ts` (cảnh báo chuỗi, `dayPath`) + `features/shared` (useTraceData, PermissionProvider, KIT_NAV, DraftRestoredNotice). Xem 39-my-tasks.md. -->
 <!-- updated: 2026-10-15 (b) — thêm features/admin/ (AdminHomeScreen /admin, RolePermissionsScreen /roles) + features/shared/AccountMenu.tsx (menu avatar). -->
 <!-- updated: 2026-10-15 — thêm lib/permissions.ts (sổ tài nguyên + resolvePermissions, thuần) và features/shared/PermissionProvider.tsx (useCan), Đợt 1 phân quyền. -->

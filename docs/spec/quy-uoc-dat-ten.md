@@ -61,6 +61,10 @@ Repo không chốt quy ước từ đầu. Hệ quả:
 | bột tẩm | `batter` | | sổ kho tháng | `monthlyStockLedger` |
 | lô / tem | `lot` / `label` | | đối soát (HĐĐT) | `reconciliation` (`einvoice`) |
 | gắn lô / lý do chưa gắn | `lotInput` / `lotWaiver` | | truy xuất | `traceability` |
+| tài liệu công ty | `companyDocument` | | lần ban hành | `documentVersion` (số lần = `revisionNo`) |
+| phòng ban | `department` | | xem xét / phê duyệt | `review` / `approve` |
+| biểu mẫu · quy trình · hướng dẫn | `form` · `procedure` · `instruction` | | chứng nhận · hồ sơ năng lực | `certificate` · `capabilityProfile` |
+| thu hồi (tài liệu) | `withdraw` | | hết hiệu lực (lần ban hành) | `obsolete` |
 | danh mục | `catalog` | | tô màu dòng / đã dò | `rowMark` / `marked` |
 | hàng chờ đồng bộ | `syncQueue` | | người thao tác | `operator` |
 

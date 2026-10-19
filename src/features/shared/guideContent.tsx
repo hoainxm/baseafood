@@ -87,6 +87,48 @@ export const PAGE_GUIDES: Record<string, PageGuide> = {
       </>
     ),
   },
+  documents: {
+    title: "Tài liệu công ty",
+    description: "Quy trình, biểu mẫu, chứng nhận và hồ sơ năng lực: bản đang hiệu lực, các lần ban hành, file gốc.",
+    content: (
+      <>
+        <Section title="Bạn thấy tài liệu nào">
+          <Y>
+            <li>Tài liệu của <b>phòng mình</b>, tài liệu mở cho <b>cả công ty</b>, và tài liệu phòng khác chọn cho phòng mình xem.</li>
+            <li>Ban giám đốc và quản trị viên thấy tất cả. Phòng của bạn suy từ vai trò (quản trị đặt ở Vai trò &amp; quyền).</li>
+          </Y>
+        </Section>
+        <Section title="Xem và tải file">
+          <Step>
+            <li>Tìm theo mã hoặc tên, lọc theo loại / phòng / trạng thái.</li>
+            <li>
+              Bấm <b>Xem</b> ở một dòng: thấy lần đang hiệu lực, các lần cũ (vẫn mở được, có nhãn Hết hiệu lực) và biểu mẫu con.
+            </li>
+            <li>
+              Bấm <b>Mở PDF</b> / <b>Tải file gốc</b>. Link mở file chỉ dùng được ít phút, không gửi ra ngoài được.
+            </li>
+          </Step>
+        </Section>
+        <Section title="Ban hành lần mới (người có quyền)">
+          <Step>
+            <li>
+              Trong chi tiết tài liệu bấm <b>Ghi lần ban hành</b>: điền ngày hiệu lực, nội dung sửa, người soạn / xem xét / phê duyệt,
+              đính <b>PDF đã ký</b> (bắt buộc) và file Word gốc nếu có.
+            </li>
+            <li>Lưu xong lần mới có hiệu lực ngay, lần cũ tự chuyển Hết hiệu lực. Không sửa lần đã ban hành, muốn sửa thì ghi lần mới.</li>
+          </Step>
+        </Section>
+        <Section title="Chứng nhận có hạn">
+          <Y>
+            <li>
+              Chứng nhận / hồ sơ năng lực có ngày hết hạn: còn 60 ngày thì hiện việc <b>Gia hạn</b> ở Việc của tôi của người có quyền
+              sửa tài liệu.
+            </li>
+          </Y>
+        </Section>
+      </>
+    ),
+  },
   imports: {
     title: "Nhập hàng",
     description: "Ghi sổ nguyên liệu về xưởng mỗi ngày.",

@@ -1,6 +1,7 @@
 > Load khi: thêm/bớt màn hình, đổi điều hướng, header, hay tìm xem một màn được gắn vào đâu.
 covers: src/App.tsx, src/features/shared/AppShell.tsx, src/features/my-tasks/MyTasksScreen.tsx, src/features/shared/AccountMenu.tsx, src/features/admin/AdminHomeScreen.tsx, src/features/shared/NotFound.tsx, src/features/shared/guideContent.tsx, src/lib/nav-access.ts, src/lib/permissions.ts, src/features/shared/PermissionProvider.tsx
 last_verified: 2026-10-19
+<!-- updated: 2026-10-19 (b) — THÊM route `/documents` "Tài liệu công ty" (features/documents): nhóm nav "Tài liệu công ty" một màn, đặt trước "Hệ thống"; `homeFor` không chọn `documents` làm trang chủ (như `my-tasks`). -->
 <!-- updated: 2026-10-19 — THÊM route `/my-tasks` "Việc của tôi" (features/my-tasks, màn THẬT): mục nav ĐẦU TIÊN (nhóm 1 màn, hiện thẳng), số đỏ trên mục = việc đang được giao cho tôi (`ShellNavItem.badge`); chuông header bỏ số giả `3` ⇒ cùng số đó, bấm mở `/my-tasks`. Tài nguyên quyền `my-tasks` (ai có quyền ở đâu đó cũng xem). Link mở thẳng ngày `?date=&workshop=` ở `/imports` `/wip` `/packaging`. Chi tiết: 39-my-tasks.md. -->
 <!-- updated: 2026-10-15 (d) — Đợt 4: tập màn từng vai trò theo ma trận §7. -->
 <!-- updated: 2026-10-15 (c) — khu Quản trị (/admin, /roles) + menu tài khoản ở avatar. -->
@@ -98,6 +99,7 @@ Cỡ chữ / trạng thái kết nối **không còn ở chân sidebar** (đã d
 |---|---|---|---|---|
 | — | — | Đăng nhập | `features/auth/LoginScreen.tsx` | Màn chặn đăng nhập toàn app (không có route, gate ở `App.tsx`) |
 | `/my-tasks` | `my-tasks` | Việc của tôi | `features/my-tasks/MyTasksScreen.tsx` | Việc cần làm của người đăng nhập: được giao · theo quyền + phạm vi · đã giao; hạn + quá hạn; Mở việc tới đúng màn + ngày. Xem [39-my-tasks.md](39-my-tasks.md) |
+| `/documents` | `documents` | Tài liệu công ty | `features/documents/DocumentsScreen.tsx` | Nhóm nav riêng (1 màn), ai có vai trò cũng mở được; tài liệu nào thấy do phòng ban. `?doc=<id>` mở thẳng chi tiết. Xem [40-documents.md](40-documents.md) |
 | `/imports` | `imports` | Nhập hàng | `features/imports/ImportTab.tsx` | Mặc định khi mở app. Bọc 2 tab: **Sổ** (`MaterialImportScreen`) + **Báo cáo** (`ImportReport`) |
 | `/wip` | `wip` | Sản xuất thành phẩm | `features/production/WipProductionScreen.tsx` | Màn THẬT — ghi sản lượng thành phẩm ngày (WIP). Nhãn dùng "thành phẩm" khớp copy trong màn |
 | `/sales` | `sales` | Bán hàng | `features/sales/SalesTab.tsx` | Bọc 2 tab: **Sổ** (`SalesScreen`) + **Báo cáo** (`SalesReport`) |

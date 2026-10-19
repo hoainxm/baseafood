@@ -49,6 +49,8 @@ import type {
   LotDispatch,
   LotWaiver,
   TaskAssignment,
+  CompanyDocument,
+  DocumentVersion,
   BatterType,
   DomesticSaleItem,
   RowMark,
@@ -1161,6 +1163,9 @@ export const APP_ROLE_TABLE: TableMapping<AppRole> = {
     description: x.description,
     home_route: x.homeRoute,
     sort_order: x.sortOrder,
+    // Cột phòng ban (0072): chỉ gửi khi đã đọc được cột này từ máy chủ — chưa chạy 0072 mà
+    // gửi cột lạ là mọi lần lưu vai trò bị từ chối (bài học 0040 + 0028).
+    ...(x.department !== undefined ? { department: x.department || null } : {}),
   }),
   fromRow: (r) => ({
     id: s(r.id),
@@ -1168,6 +1173,7 @@ export const APP_ROLE_TABLE: TableMapping<AppRole> = {
     description: s(r.description),
     homeRoute: s(r.home_route),
     sortOrder: Number(r.sort_order) || 0,
+    ...("department" in r ? { department: s(r.department) } : {}),
   }),
 };
 
@@ -1908,6 +1914,104 @@ export const TASK_ASSIGNMENT_TABLE: TableMapping<TaskAssignment> = {
   }),
 };
 
+/** Ngày yyyy-mm-dd (cột date) — rỗng ⇒ null khi gửi. */
+const dateOrNull = (v: string) => (v ? v : null);
+const stringList = (v: unknown): string[] => (Array.isArray(v) ? v.map((x) => String(x)).filter(Boolean) : []);
+const DOCUMENT_KIND_VALUES = new Set(["procedure", "instruction", "form", "certificate", "capability_profile", "other"]);
+const VERSION_STATUS_VALUES = new Set(["draft", "in_review", "pending_approval", "active", "obsolete"]);
+
+/** Tài liệu công ty (mig 0072 — màn /documents). Khóa ngoại mềm `parent_id` ⇒ khai refColumns cho chế độ demo. */
+export const COMPANY_DOCUMENT_TABLE: TableMapping<CompanyDocument> = {
+  table: "company_documents",
+  localKey: "bsf.company-documents.v1",
+  getKey: theoId,
+  refColumns: ["parent_id"],
+  toRow: (x) => ({
+    id: x.id,
+    code: x.code,
+    title: x.title,
+    kind: x.kind,
+    parent_id: x.parentId,
+    owner_department: x.ownerDepartment,
+    visibility: x.visibility,
+    visible_departments: x.visibleDepartments,
+    retention_years: x.retentionYears,
+    expires_on: dateOrNull(x.expiresOn),
+    is_withdrawn: x.isWithdrawn,
+    note: x.note,
+  }),
+  fromRow: (r) => ({
+    id: s(r.id),
+    code: s(r.code),
+    title: s(r.title),
+    kind: (DOCUMENT_KIND_VALUES.has(s(r.kind)) ? s(r.kind) : "other") as CompanyDocument["kind"],
+    parentId: s(r.parent_id),
+    ownerDepartment: s(r.owner_department),
+    visibility: s(r.visibility) === "company" ? "company" : "departments",
+    visibleDepartments: stringList(r.visible_departments),
+    retentionYears: Number(r.retention_years) || 0,
+    expiresOn: s(r.expires_on).slice(0, 10),
+    isWithdrawn: r.is_withdrawn === true,
+    note: s(r.note),
+    createdAt: s(r.created_at),
+  }),
+};
+
+/** Lần ban hành của tài liệu (mig 0072). Khóa ngoại mềm `document_id` ⇒ refColumns. */
+export const DOCUMENT_VERSION_TABLE: TableMapping<DocumentVersion> = {
+  table: "document_versions",
+  localKey: "bsf.document-versions.v1",
+  getKey: theoId,
+  refColumns: ["document_id"],
+  toRow: (x) => ({
+    id: x.id,
+    document_id: x.documentId,
+    revision_no: x.revisionNo,
+    effective_date: dateOrNull(x.effectiveDate),
+    change_summary: x.changeSummary,
+    status: x.status,
+    approval_mode: x.approvalMode,
+    prepared_by_name: x.preparedByName,
+    reviewed_by_name: x.reviewedByName,
+    approved_by_name: x.approvedByName,
+    reviewer_id: x.reviewerId,
+    approver_id: x.approverId,
+    reviewed_at: x.reviewedAt || null,
+    approved_at: x.approvedAt || null,
+    return_reason: x.returnReason,
+    pdf_path: x.pdfPath,
+    source_path: x.sourcePath,
+    pdf_file_name: x.pdfFileName,
+    source_file_name: x.sourceFileName,
+    obsoleted_on: dateOrNull(x.obsoletedOn),
+    recorded_by_name: x.recordedByName,
+  }),
+  fromRow: (r) => ({
+    id: s(r.id),
+    documentId: s(r.document_id),
+    revisionNo: Number(r.revision_no) || 0,
+    effectiveDate: s(r.effective_date).slice(0, 10),
+    changeSummary: s(r.change_summary),
+    status: (VERSION_STATUS_VALUES.has(s(r.status)) ? s(r.status) : "draft") as DocumentVersion["status"],
+    approvalMode: s(r.approval_mode) === "app" ? "app" : "paper",
+    preparedByName: s(r.prepared_by_name),
+    reviewedByName: s(r.reviewed_by_name),
+    approvedByName: s(r.approved_by_name),
+    reviewerId: s(r.reviewer_id),
+    approverId: s(r.approver_id),
+    reviewedAt: s(r.reviewed_at),
+    approvedAt: s(r.approved_at),
+    returnReason: s(r.return_reason),
+    pdfPath: s(r.pdf_path),
+    sourcePath: s(r.source_path),
+    pdfFileName: s(r.pdf_file_name),
+    sourceFileName: s(r.source_file_name),
+    obsoletedOn: s(r.obsoleted_on).slice(0, 10),
+    recordedByName: s(r.recorded_by_name),
+    createdAt: s(r.created_at),
+  }),
+};
+
 /* ---------- Nhật ký thao tác (audit) ---------- */
 
 /** Nhãn tiếng Việt của bảng — cho câu tóm tắt nhật ký dễ đọc. */
@@ -1945,6 +2049,8 @@ const TABLE_LABELS: Record<string, string> = {
   lot_dispatches: "Gắn lô cho hàng ra (truy xuất)",
   lot_waivers: "Lý do chưa gắn lô",
   task_assignments: "Giao việc",
+  company_documents: "Tài liệu công ty",
+  document_versions: "Lần ban hành tài liệu",
   row_marks: "Tô màu dòng",
   app_roles: "Vai trò",
   role_permissions: "Quyền của vai trò",

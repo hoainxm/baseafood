@@ -53,6 +53,7 @@ export type ResourceGroup =
   | "sales"
   | "accounting"
   | "reports"
+  | "documents"
   | "catalog"
   | "system";
 
@@ -64,6 +65,7 @@ export const RESOURCE_GROUP_LABELS: Record<ResourceGroup, string> = {
   sales: "Bán hàng",
   accounting: "Kế toán",
   reports: "Báo cáo",
+  documents: "Tài liệu",
   catalog: "Danh mục",
   system: "Hệ thống",
 };
@@ -112,6 +114,13 @@ export const PERMISSION_RESOURCES: readonly PermissionResource[] = [
 
   { id: "production-report", label: "Báo cáo thành phẩm", group: "reports", navId: "production-report", actions: ["view", "export"] },
   { id: "export-report", label: "Báo cáo đơn xuất", group: "reports", navId: "export-report", actions: ["view", "export"] },
+
+  // Tài liệu công ty (mig 0072, spec docs/spec/quan-ly-tai-lieu.md). Xem: ai có vai trò cũng
+  // có (resolvePermissions tự cấp) nhưng CHỈ thấy tài liệu của phòng mình (lib/documents.ts +
+  // RLS 0072). Thêm = tạo tài liệu, ghi lần ban hành · Sửa = sửa thông tin, thu hồi ·
+  // Xóa = xóa tài liệu chưa từng hiệu lực · Duyệt = xem xét / phê duyệt (đợt 2). Ma trận
+  // mặc định KHÔNG cấp ô ghi nào ⇒ trước mắt chỉ admin làm (chủ dự án 2026-10-19).
+  { id: "documents", label: "Tài liệu công ty", group: "documents", navId: "documents", actions: [...CRUD, "approve", "export"] },
 
   { id: "catalog.suppliers", label: "Danh mục · Đại lý", group: "catalog", navId: "catalog", actions: CRUD },
   { id: "catalog.customers", label: "Danh mục · Khách hàng", group: "catalog", navId: "catalog", actions: CRUD },
@@ -475,6 +484,8 @@ function isGrantable(resource: string, action: PermissionAction): boolean {
 
 /** Tài nguyên màn "Việc của tôi" — mọi người có vai trò đều xem được. */
 export const MY_TASKS_RESOURCE = "my-tasks";
+/** Tài nguyên "Tài liệu công ty" — mọi người có vai trò đều mở được màn; tài liệu nào thấy do phòng ban quyết. */
+export const DOCUMENTS_RESOURCE = "documents";
 
 export interface ResolveInput {
   roles: readonly Role[];
@@ -489,7 +500,7 @@ export interface ResolveInput {
  * 1. admin ⇒ toàn quyền; 2. không vai trò ⇒ không quyền nào;
  * 3. HỢP quyền các vai trò, phạm vi lấy rộng nhất; vai trò lạ không có quyền;
  * 4. chỉnh riêng: chặn > cho > vai trò; 5. có hành động bất kỳ ⇒ có `view`;
- * 6. có quyền bất kỳ ⇒ xem được "Việc của tôi".
+ * 6. có quyền bất kỳ ⇒ xem được "Việc của tôi" và mở được "Tài liệu công ty".
  */
 export function resolvePermissions({
   roles,
@@ -514,7 +525,10 @@ export function resolvePermissions({
   // đã chỉnh ở /roles (ma trận DB không có ô này). Không quyền gì ⇒ vẫn "Chưa được cấp
   // quyền" (không mở app chỉ để xem một màn trống). Chặn riêng `view` ở dưới vẫn gỡ được.
   for (const o of overrides) if (o.effect === "allow") add(o.resource, o.action, o.scope ?? "all");
-  if (grants.size > 0) add(MY_TASKS_RESOURCE, "view", "all");
+  if (grants.size > 0) {
+    add(MY_TASKS_RESOURCE, "view", "all");
+    add(DOCUMENTS_RESOURCE, "view", "all");
+  }
 
   for (const o of overrides) if (o.effect === "deny") grants.delete(keyOf(o.resource, o.action));
 

@@ -111,6 +111,12 @@ export interface AppRole {
   description: string;
   homeRoute: string; // "" = theo mặc định
   sortOrder: number;
+  /**
+   * Phòng ban của vai trò (mig 0072, `Department` ở lib/documents.ts) — giới hạn xem
+   * tài liệu công ty. `undefined` = máy chủ chưa có cột (chưa chạy 0072) ⇒ KHÔNG gửi cột
+   * lên khi lưu; "" = theo mặc định của vai trò hệ thống.
+   */
+  department?: string;
 }
 
 /** Một ô quyền của vai trò đã chỉnh — id = `<roleId>|<resource>|<action>`. */
@@ -1006,3 +1012,69 @@ export interface ReconciliationRun {
   updatedAt: string;
 }
 
+/* ---------- Tài liệu công ty (mig 0072 — màn /documents) ---------- */
+
+/** Loại tài liệu (danh sách cố định — spec docs/spec/quan-ly-tai-lieu.md §3). */
+export type DocumentKind = "procedure" | "instruction" | "form" | "certificate" | "capability_profile" | "other";
+/** Ai xem: cả công ty, hay chỉ phòng sở hữu + các phòng được chọn (+ Ban giám đốc, admin). */
+export type DocumentVisibility = "company" | "departments";
+/** Trạng thái MỘT lần ban hành. Đợt 1 chỉ ghi bản đã ký giấy ⇒ `active` ngay; `draft` /
+ *  `in_review` / `pending_approval` cho duyệt trên app (đợt 2). */
+export type DocumentVersionStatus = "draft" | "in_review" | "pending_approval" | "active" | "obsolete";
+/** Duyệt trên app hay ghi lại bản đã ký giấy. */
+export type DocumentApprovalMode = "app" | "paper";
+
+/** Một tài liệu — mã cố định (vd "QTI-KH-01"), nhiều lần ban hành. */
+export interface CompanyDocument {
+  id: string;
+  /** Mã tài liệu của công ty — duy nhất, không phân hoa thường. */
+  code: string;
+  title: string;
+  kind: DocumentKind;
+  /** Tài liệu cha (biểu mẫu thuộc quy trình); "" = không có. */
+  parentId: string;
+  /** Phòng sở hữu (`Department`). */
+  ownerDepartment: string;
+  visibility: DocumentVisibility;
+  /** Phòng được xem thêm (ngoài phòng sở hữu) khi `visibility = departments`. */
+  visibleDepartments: string[];
+  /** Thời hạn lưu (năm) của bản hết hiệu lực; 0 = không đặt. */
+  retentionYears: number;
+  /** Hết hạn (chứng nhận / hồ sơ năng lực) — yyyy-mm-dd; "" = không có hạn. */
+  expiresOn: string;
+  /** Thu hồi cả tài liệu (không xóa — luật 6). */
+  isWithdrawn: boolean;
+  note: string;
+  createdAt: string;
+}
+
+/** Một lần ban hành của tài liệu — KHÔNG ghi đè, lần mới thay lần cũ. */
+export interface DocumentVersion {
+  id: string;
+  documentId: string;
+  /** Lần ban hành (1, 2, …) — in "01", "02". */
+  revisionNo: number;
+  effectiveDate: string;
+  changeSummary: string;
+  status: DocumentVersionStatus;
+  approvalMode: DocumentApprovalMode;
+  /** Tên in trên tài liệu (soạn / xem xét / phê duyệt). */
+  preparedByName: string;
+  reviewedByName: string;
+  approvedByName: string;
+  /** Tài khoản xem xét / phê duyệt khi duyệt trên app (đợt 2). */
+  reviewerId: string;
+  approverId: string;
+  reviewedAt: string;
+  approvedAt: string;
+  returnReason: string;
+  /** Đường dẫn file trên bucket `documents` ("" = chưa có file). */
+  pdfPath: string;
+  sourcePath: string;
+  pdfFileName: string;
+  sourceFileName: string;
+  /** Ngày lần này hết hiệu lực (lần mới thay) — tính thời hạn lưu. */
+  obsoletedOn: string;
+  recordedByName: string;
+  createdAt: string;
+}

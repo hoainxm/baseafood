@@ -34,6 +34,7 @@ import {
   Users,
   FileSpreadsheet,
   FileCheck2,
+  FolderOpen,
   Warehouse,
   Boxes,
   Factory,
@@ -103,6 +104,7 @@ export const KIT_NAV: ShellNavItem[] = [
   { id: "nxt-warehouse", label: "Nhập xuất tồn kho", icon: Warehouse , description: "Sổ Nhập–Xuất–Tồn theo báo cáo thật của xí nghiệp, kèm cột hàng đang nằm ở kho nào." },
   { id: "monthly-stock", label: "Sổ kho theo tháng", icon: CalendarRange , description: "Sổ kho theo tháng dương lịch cho cả nguyên liệu, bán thành phẩm và thành phẩm — tồn cuối tháng này tự thành tồn đầu tháng sau." },
   { id: "reconciliation", label: "Đối soát hóa đơn điện tử", icon: FileCheck2 , description: "Đối soát sổ phần mềm với hóa đơn điện tử, tìm dòng lệch và lưu bản đối soát." },
+  { id: "documents", label: "Tài liệu công ty", icon: FolderOpen, description: "Quy trình, biểu mẫu, chứng nhận, hồ sơ năng lực của công ty: bản đang hiệu lực, các lần ban hành và file gốc. Chỉ thấy tài liệu của phòng mình." },
   { id: "catalog", label: "Danh mục", icon: Library , description: "Danh mục dùng chung: mặt hàng, khách hàng, đại lý, loại nguyên liệu, bột tẩm, kho lưu trữ, thành phẩm." },
   { id: "admin", label: "Tổng quan quản trị", icon: LayoutGrid , description: "Trang riêng của quản trị viên: tình trạng tài khoản, vai trò và lối vào các việc quản trị." },
   { id: "users", label: "Người dùng", icon: Users , description: "Quản lý tài khoản đăng nhập và vai trò của từng người." },
@@ -193,6 +195,7 @@ export const NAV_TREE: NavTreeGroup[] = [
       { ref: "reconciliation" },
     ],
   },
+  { name: "Tài liệu công ty", icon: FolderOpen, children: [{ ref: "documents" }] },
   {
     name: "Hệ thống",
     icon: Library,

@@ -1,6 +1,7 @@
 > Load khi: làm chế độ DEMO (bật/tắt), sinh bộ dữ liệu demo, gỡ màn DEMO dữ liệu mẫu, thêm chức năng mới cần có mặt trong demo.
 > Trạng thái: **ĐÃ CHỐT hướng (2026-10-12)** — chủ dự án chọn **phương án B `site-demo` trong DB thật** · ẩn danh mặc định có công tắc · xóa hẳn `/production` + `/reports` · **chỉ admin** bật demo. Chưa build. Đọc §4b (rào chắn bắt buộc của B) trước khi code.
 last_verified: 2026-10-19
+<!-- updated: 2026-10-19 (b) — bảng MỚI `company_documents` + `document_versions` (0072, Tài liệu công ty) vào `DemoBundle` + `DemoPackLoader`, bộ sinh để TRỐNG (đường dẫn file là của site thật). refColumns `parent_id` / `document_id` (liên kết mềm, không khóa ngoại). Checklist §5 dòng 1c. -->
 <!-- updated: 2026-10-19 — bảng MỚI `task_assignments` (0070, giao việc) vào `DemoBundle` + `DemoPackLoader` — bộ sinh để TRỐNG (việc máy phát hiện tự suy từ số demo; nạp bộ mới xoá việc giao cũ). Ở demo danh sách người nhận rỗng (hồ sơ là site thật) ⇒ chỉ giao cho chính mình. Checklist §5 dòng 1b. Cảnh báo chuỗi thêm `period-unlocked`, link "Mở" mang `?date=&workshop=`. -->
 <!-- updated: 2026-10-16 (c) — Không thêm bảng mới. Nháp form (quy tắc 17) dùng `modeLocalKey` ⇒ demo có nháp riêng `bsf-demo.draft.*`, không lẫn nháp thật. Hàm gộp mặt hàng 0069 nhận `p_site` (SITE_ID): ở `site-demo` tự thêm tiền tố `demo:` khi tra products, cột product_id để thô (không khai refColumns). -->
 <!-- updated: 2026-10-16 — GOM GỌN giao diện demo lên HEADER: bỏ khối to ở Tổng quan; nút "Demo" (admin / máy không đăng nhập) ở header mở menu nhỏ (ẩn tên/giữ tên · Tạo bộ mới · Vào demo giữ bộ cũ, xác nhận qua hộp hỏi). Đang demo: nút "DEMO" màu cảnh báo ở header, menu Làm mới / Thoát. Dải "ĐANG XEM DỮ LIỆU DEMO" giữ nguyên (luôn hiện) nhưng thu còn MỘT dòng mảnh, nút Thoát dời lên nút DEMO. Bộ số thật chỉ nạp khi mở menu lần đầu; việc chờ "Làm mới" tự chạy ở BẤT KỲ màn nào (trước chỉ chạy khi mở Tổng quan). `AppShell` có prop `headerActions`. -->
@@ -93,6 +94,7 @@ Mỗi dòng = mở màn THẬT trong chế độ demo phải có số và làm �
 |---|---|---|---|
 | 1 | Tổng quan `/dashboard` | Số tổng NL vào / SX / tồn / bán theo kỳ | T+S |
 | 1b | Việc của tôi `/my-tasks` | Việc theo quyền (ngày chưa chốt, BTP chờ duyệt, chưa gắn lô, kỳ chưa chốt) có hạn + quá hạn · Mở việc tới đúng ngày · giao việc (cho chính mình ở demo) · Xong · thu hồi · chuông header (`task_assignments`, bộ demo trống) | S |
+| 1c | Tài liệu công ty `/documents` | Thêm tài liệu · sửa · ghi lần ban hành (lần cũ tự Hết hiệu lực) · thu hồi · xóa tài liệu chưa ban hành · nhắc gia hạn chứng nhận ở Việc của tôi (`company_documents` + `document_versions`, **bộ demo trống** — file thật không trỏ sang demo; file demo nằm ở `site-demo/…` trên bucket `documents`) | S |
 | 2 | Nhập hàng `/imports` | Ghi chuyến nhiều dòng · 2 ngày (giao / ghi sổ) · chốt ngày · ghi bù bắt lý do · phế liệu ngày · cảnh báo lệch tổng · bộ lọc · tab Báo cáo | T |
 | 3 | ↳ OCR phiếu nhập | Nhận diện ảnh phiếu → điền nháp (cần 1–2 ảnh mẫu trong gói; ảnh không lưu Storage ở demo) | S |
 | 4 | ↳ Mã lô + tem QR chuyến | In tem lô NL theo loại NL của chuyến | T+S |

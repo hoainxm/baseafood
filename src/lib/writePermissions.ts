@@ -134,6 +134,11 @@ export const TABLE_WRITE_RULES: Readonly<Record<string, TableRule | null>> = {
   // phải tự bấm "Xong" được dù không có quyền giao. Ai được GIAO (my-tasks.create) /
   // sửa / thu hồi do màn /my-tasks kiểm; máy chủ vẫn chặn người không vai trò (RLS 0070).
   task_assignments: null,
+  // Tài liệu công ty (mig 0072): máy chủ chốt bằng RLS RIÊNG của hai bảng (đọc theo phòng
+  // ban, ghi theo ô documents.* qua current_permission_context()) — không qua trigger 0065.
+  // App kiểm ở màn /documents bằng useCan("documents").
+  company_documents: null,
+  document_versions: null,
 };
 
 export interface WriteDenial {

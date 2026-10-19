@@ -533,7 +533,9 @@ export type FlowWarningKind =
   | "approval-overdue"
   | "period-unlocked"
   | "yield-deviation"
-  | "period-yield-deviation";
+  | "period-yield-deviation"
+  /** Chứng nhận / hồ sơ năng lực sắp hết hạn — sinh ở lib/documents.ts (không phải cảnh báo chuỗi sổ). */
+  | "document-expiring";
 
 export interface FlowWarning {
   /** Khoá ổn định (tô màu dòng / React key). */
@@ -559,6 +561,7 @@ const WARNING_KIND_LABELS: Record<FlowWarningKind, string> = {
   "period-unlocked": "Kỳ cân đối chưa chốt",
   "yield-deviation": "Định mức lệch",
   "period-yield-deviation": "Kỳ cân đối định mức lệch",
+  "document-expiring": "Tài liệu sắp hết hạn",
 };
 export const getWarningKindLabel = (l: FlowWarningKind) => WARNING_KIND_LABELS[l];
 

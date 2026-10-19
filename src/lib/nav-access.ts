@@ -41,8 +41,9 @@ export function homeFor(
     if (h && ok(h)) return h;
   }
   if (ok("dashboard")) return "dashboard";
-  // "Việc của tôi" ai cũng thấy ⇒ chỉ làm trang chủ khi không còn màn nghiệp vụ nào.
-  return PERMISSION_NAV_IDS.find((id) => id !== "my-tasks" && visible!.has(id)) ?? (visible!.has("my-tasks") ? "my-tasks" : null);
+  // "Việc của tôi" + "Tài liệu công ty" ai cũng thấy ⇒ chỉ làm trang chủ khi không còn màn nghiệp vụ nào.
+  const personal = new Set(["my-tasks", "documents"]);
+  return PERMISSION_NAV_IDS.find((id) => !personal.has(id) && visible!.has(id)) ?? (visible!.has("my-tasks") ? "my-tasks" : null);
 }
 
 /** Tập mục nav thấy được của một người theo ma trận mặc định. */

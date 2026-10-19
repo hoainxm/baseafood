@@ -52,6 +52,7 @@ import {
   type ResourceGroup,
 } from "@/lib/permissions";
 import { KIT_NAV } from "@/features/shared/AppShell";
+import { DEPARTMENTS, departmentLabel, departmentsOfRoles } from "@/lib/documents";
 import type { AppRole, Role, RolePermission, UserPermission, UserProfile } from "@/types";
 import { Check, Copy, KeyRound, Minus, Plus, RotateCcw, Save, ShieldCheck, Trash2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -278,16 +279,26 @@ function RolesTab({ selectedId, onSelect }: { selectedId: string | null; onSelec
   const holders = users.filter((u) => u.roles.includes(roleId as Role));
 
   const base = roleGrantSet(matrix, roleId);
-  const [draft, setDraft] = useState<{ roleId: string; keys: Set<string>; name: string; description: string; homeRoute: string } | null>(null);
+  const [draft, setDraft] = useState<{ roleId: string; keys: Set<string>; name: string; description: string; homeRoute: string; department: string } | null>(null);
   const current =
     draft?.roleId === roleId
       ? draft
-      : { roleId, keys: base, name: appRole?.name || option.label, description: appRole?.description ?? "", homeRoute: appRole?.homeRoute ?? "" };
+      : {
+          roleId,
+          keys: base,
+          name: appRole?.name || option.label,
+          description: appRole?.description ?? "",
+          homeRoute: appRole?.homeRoute ?? "",
+          department: appRole?.department ?? "",
+        };
   const isDirty =
     !sameSet(current.keys, base) ||
     current.name !== (appRole?.name || option.label) ||
     current.description !== (appRole?.description ?? "") ||
-    current.homeRoute !== (appRole?.homeRoute ?? "");
+    current.homeRoute !== (appRole?.homeRoute ?? "") ||
+    current.department !== (appRole?.department ?? "");
+  // Cột phòng ban (mig 0072) đã có trên máy chủ chưa — chưa có thì ẩn ô, không gửi cột lạ.
+  const hasDepartmentColumn = appRoles.some((r) => r.department !== undefined);
   const patch = (p: Partial<typeof current>) => setDraft({ ...current, ...p });
 
   const [dialog, setDialog] = useState<"create" | "copy" | "reset" | "delete" | null>(null);
@@ -320,6 +331,7 @@ function RolesTab({ selectedId, onSelect }: { selectedId: string | null; onSelec
       description: current.description.trim(),
       homeRoute: current.homeRoute,
       sortOrder: appRole?.sortOrder ?? appRoles.length,
+      ...(hasDepartmentColumn ? { department: current.department } : {}),
     };
     writeAppRoles(appRole ? appRoles.map((r) => (r.id === roleId ? role : r)) : [...appRoles, role]);
     writeRows([...rows.filter((r) => r.roleId !== roleId), ...rowsFor(roleId, current.keys)]);
@@ -351,12 +363,21 @@ function RolesTab({ selectedId, onSelect }: { selectedId: string | null; onSelec
   const createRole = (name: string, description: string, keys: ReadonlySet<string>) => {
     const id = newRoleId();
     const snap = snapshot();
-    writeAppRoles([...appRoles, { id, name, description, homeRoute: "", sortOrder: appRoles.length }]);
+    writeAppRoles([
+      ...appRoles,
+      { id, name, description, homeRoute: "", sortOrder: appRoles.length, ...(hasDepartmentColumn ? { department: "" } : {}) },
+    ]);
     writeRows([...rows, ...rowsFor(id, keys)]);
     setDraft(null);
     onSelect(id);
     notify.saved(`Đã tạo vai trò ${name}`, undoTo(snap));
   };
+
+  const defaultDepartments = departmentsOfRoles([roleId]).map(departmentLabel).join(", ");
+  const departmentOptions: ComboboxOption[] = [
+    { value: "", label: defaultDepartments ? `Theo mặc định (${defaultDepartments})` : "Chưa thuộc phòng nào" },
+    ...DEPARTMENTS.map((d) => ({ value: d.id, label: d.label })),
+  ];
 
   const homeOptions: ComboboxOption[] = [
     { value: "", label: "Theo mặc định" },
@@ -466,6 +487,17 @@ function RolesTab({ selectedId, onSelect }: { selectedId: string | null; onSelec
                 options={homeOptions}
                 clearable={false}
               />
+              {hasDepartmentColumn && (
+                <Combobox
+                  label="Thuộc phòng ban"
+                  hideRequiredMark
+                  value={current.department}
+                  onChange={(v) => patch({ department: v })}
+                  options={departmentOptions}
+                  clearable={false}
+                  hint="Quyết người giữ vai trò này xem được tài liệu công ty của phòng nào."
+                />
+              )}
               <Field label="Mô tả" className="md:col-span-2" hint="Vai trò này dành cho ai, làm việc gì.">
                 <Textarea rows={2} value={current.description} onChange={(e) => patch({ description: e.target.value })} />
               </Field>

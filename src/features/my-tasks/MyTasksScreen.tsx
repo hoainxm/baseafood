@@ -27,6 +27,8 @@ import {
   useBalancingInputs,
   useBalancingOutputs,
   useBalancingPeriods,
+  useAppRoles,
+  useCompanyDocuments,
   useDailyLocks,
   useFinishedGoodsOpeningStock,
   useMaterialOpeningStock,
@@ -39,6 +41,8 @@ import { useAuth } from "@/lib/auth";
 import { useTraceData } from "@/features/shared/useTraceData";
 import { useCan, usePermissions, useScopeContext } from "@/features/shared/PermissionProvider";
 import { buildChainWarnings, type DataFlowInput } from "@/lib/dataFlow";
+import { buildDocumentWarnings, documentViewerFor } from "@/lib/documents";
+import { hasDocumentStorage } from "@/lib/documentStorage";
 import { TASKS_START_DATE, buildMyTasks, findResolvedAssignments, type MyTaskItem, type TaskUrgency } from "@/lib/myTasks";
 import { formatDateVN } from "@/lib/format";
 import type { TaskAssignment } from "@/types";
@@ -99,14 +103,24 @@ export default function MyTasksScreen() {
   const [finishedOpening] = useFinishedGoodsOpeningStock();
   const [assignments, saveAssignments, { status: assignmentStatus }] = useTaskAssignments();
   const [profiles] = useUserProfiles();
+  // Chứng nhận / hồ sơ năng lực sắp hết hạn (lib/documents.ts) — chỉ tài liệu mình xem được.
+  const [documents, , { status: documentStatus }] = useCompanyDocuments();
+  const [appRoles] = useAppRoles();
 
   const d: DataFlowInput = useMemo(
     () => ({ ...traceData, scraps, dailyLocks, productionLocks, periods, balancingInputs, balancingOutputs, materialOpening, finishedOpening }),
     [traceData, scraps, dailyLocks, productionLocks, periods, balancingInputs, balancingOutputs, materialOpening, finishedOpening],
   );
+  const documentViewer = useMemo(
+    () => documentViewerFor({ roles: profile?.roles ?? [], appRoles, isAdmin: permissions.isAdmin, isOffline: !hasDocumentStorage || !profile }),
+    [profile, appRoles, permissions.isAdmin],
+  );
   const warnings = useMemo(
-    () => buildChainWarnings(d, { fromDate: TASKS_START_DATE, toDate: today }, today, undefined, { includeToday: true, approvalWaitDays: 0 }),
-    [d, today],
+    () => [
+      ...buildChainWarnings(d, { fromDate: TASKS_START_DATE, toDate: today }, today, undefined, { includeToday: true, approvalWaitDays: 0 }),
+      ...buildDocumentWarnings(documents, today, documentViewer),
+    ],
+    [d, today, documents, documentViewer],
   );
   const wipOperators = useMemo(() => new Map(d.wips.map((w) => [w.id, w.operator ?? ""])), [d.wips]);
   const tasks = useMemo(
@@ -118,7 +132,7 @@ export default function MyTasksScreen() {
   // xong từ máy chủ (đang tải dở thì sổ trống ⇒ tưởng đã sửa hết ⇒ đóng nhầm). Không toast:
   // không phải thao tác của người dùng; dòng hiện "Đã xong — sổ đã sửa" ở mục Tôi đã giao.
   const isAllReady =
-    isTraceReady && [scrapStatus, dailyLockStatus, productionLockStatus, periodStatus, assignmentStatus].every((s) => s === "ready");
+    isTraceReady && [scrapStatus, dailyLockStatus, productionLockStatus, periodStatus, assignmentStatus, documentStatus].every((s) => s === "ready");
   const closedRef = useRef(new Set<string>());
   useEffect(() => {
     if (!isAllReady) return;

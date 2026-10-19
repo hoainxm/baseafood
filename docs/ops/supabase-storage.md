@@ -8,6 +8,14 @@
 > **Lưu ý:** bucket tên `qc` (KHÔNG phải `bsf-anh` như mẫu mục 1–2 bên dưới) —
 > policy RLS check `bucket_id = 'qc'`.
 
+> **🆕 Bucket thứ hai `documents` (Tài liệu công ty, 2026-10-19):** chủ dự án tạo trên
+> Dashboard → Storage → New bucket: tên `documents`, **Public tắt**, giới hạn **20 MB**,
+> MIME: PDF, Word (.doc/.docx), Excel (.xls/.xlsx), JPEG, PNG. **KHÔNG tạo policy trên
+> Dashboard** — policy đọc phải tra bảng tài liệu theo phòng ban nên nằm trong migration
+> `0072_company_documents.sql` (chạy SAU khi tạo bucket). File giữ nguyên bản, không nén
+> (`lib/documentStorage.ts`, tách khỏi `lib/storage.ts` của ảnh). Xem
+> [`app-map/40-documents`](../app-map/40-documents.md).
+>
 > **✅ ĐÃ BUILD OCR phiếu nhập (QĐ-1, 2026-09-08):** ảnh phiếu tay lưu cùng bucket
 > `qc` (thư mục `bsf1/qc/yyyy/mm/`, tái dùng `lib/storage.ts`) → cột
 > `import_shipments.scan_path` (migration `0040`). Nhận diện chữ chạy **client-side**

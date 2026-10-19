@@ -49,6 +49,8 @@ import { LEGACY_PATHS, normalizeCatalogTab } from "@/lib/legacyUrls";
 
 // Việc của tôi — việc cần làm, hạn, giao việc
 const MyTasksScreen = lazy(() => import("@/features/my-tasks"));
+// Tài liệu công ty — quy trình, biểu mẫu, chứng nhận, hồ sơ năng lực (mig 0072)
+const DocumentsScreen = lazy(() => import("@/features/documents"));
 // Tổng quan — dòng chảy số liệu
 const DashboardScreen = lazy(() => import("@/features/dashboard/DashboardScreen"));
 
@@ -296,6 +298,7 @@ export default function App() {
             ))}
 
             <Route path="/my-tasks" element={<MyTasksScreen />} />
+            <Route path="/documents" element={<DocumentsScreen />} />
 
             {/* Nghiệp vụ gốc */}
             <Route path="/imports" element={<MaterialImportScreen />} />

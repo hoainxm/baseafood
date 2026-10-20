@@ -27,11 +27,10 @@ import {
 } from "@/lib/domesticSales";
 import { DAY_COLUMN_GROUPS, type DayCell, type PeriodGrid } from "./usePeriodGrid";
 import { PickImportRowsDialog, AddMaterialRowDialog } from "./gridDialogs";
-import { CellShipments } from "./CellShipments";
+import { EditImportTripsDialog, type EditImportTripsTarget } from "./EditImportTripsDialog";
 import { TripPriceList } from "./TripPriceList";
 import { RowNoteCell } from "./RowNoteCell";
 import { DepositTargetDialog, type DepositTargetValue } from "./DepositTargetDialog";
-import { useImportShipments } from "@/lib/catalogRepo";
 import {
   DEFAULT_DEPOSIT_CATEGORY,
   depositPriceOn,
@@ -52,7 +51,7 @@ import {
 } from "@/design-system";
 import { num, formatDateVN } from "@/lib/format";
 import { useCan } from "@/features/shared/PermissionProvider";
-import { ChevronDown, ChevronsLeftRight, Combine, Download, ListChecks, Plus, Users } from "lucide-react";
+import { ChevronDown, ChevronsLeftRight, Combine, Download, ListChecks, Pencil, Plus, Users } from "lucide-react";
 
 const WORKSHOP_WAREHOUSES = BSF1_WAREHOUSES.filter((w) => w.type === "workshop");
 
@@ -79,6 +78,7 @@ export function MaterialGrid({
   daysCollapsed: isDateColumnsCollapsed,
   onToggleDays: onToggleDayColumns,
   daysSlot,
+  editorName = "",
 }: {
   grid: PeriodGrid;
   materialTypeCatalog: MaterialType[];
@@ -95,6 +95,8 @@ export function MaterialGrid({
    * (Xếp dọc) — màn quyết định chỗ, lưới này chỉ vẽ vào đó (cùng một nguồn số, cùng đường ghi).
    */
   daysSlot: HTMLElement | null;
+  /** Tên người đang sửa — ghi vào dòng vết khi sửa chuyến nhập từ Cân đối. */
+  editorName?: string;
 }) {
   const {
     date: dates,
@@ -112,15 +114,10 @@ export function MaterialGrid({
   } = grid;
   const allowed = useCan("balancing");
   const canViewPrice = allowed["view-price"];
-  /* ---------- Chuyến nhập NGAY TRONG lưới (chỉ đọc) ----------
-     Ô ngày của dòng lấy từ sổ nhập có nút "n chuyến" (đại lý → chuyến của ô đó);
-     dòng loại NL mở ra dòng con theo ĐẠI LÝ (kg theo ngày, cộng lại = dòng cha).
-     Không đi qua đường ghi: dữ liệu là chính các dòng sổ nhập đã lấy vào kỳ. */
-  const [shipmentList] = useImportShipments();
-  const lotCodes = useMemo(
-    () => new Map(shipmentList.filter((c) => c.lotCode).map((c) => [c.id, c.lotCode ?? ""])),
-    [shipmentList]
-  );
+  /* SỬA CHUYẾN NHẬP từ Cân đối (2026-10-20): chỉ người có quyền sửa Nhập hàng, kỳ chưa chốt;
+     mọi lần sửa qua hộp xem thay đổi + xác nhận (EditImportTripsDialog). */
+  const canEditImports = useCan("imports").update;
+  const [editTripsTarget, setEditTripsTarget] = useState<EditImportTripsTarget | null>(null);
   const importById = useMemo(() => new Map(grid.assignedImports.map((r) => [r.id, r])), [grid.assignedImports]);
   const importRowsOf = (h: MaterialGridRow): MaterialImportItem[] =>
     h.fromImports ? h.sourceIds.flatMap((id) => importById.get(id) ?? []) : [];
@@ -543,7 +540,18 @@ export function MaterialGrid({
     /* Hai cột "Số lượng" loại trừ nhau: đang MỞ ngày ⇒ ô tính (Σ ngày, gõ ở ô ngày);
        đang THU ngày ⇒ gõ thẳng (ghiSoLuong). */
     { key: "tong", header: "Số lượng", label: "Số lượng", kind: "computed", group: DAY_COLUMN_GROUPS.daysExpandedOnly, minWidth: 104, getValue: (h) => h.total || null },
-    { key: "soLuong", header: "Số lượng", label: "Số lượng", kind: "input", group: DAY_COLUMN_GROUPS.daysCollapsedOnly, minWidth: 104, getValue: (h) => (h.isDecrease ? Math.abs(h.total) : h.total) || null },
+    {
+      key: "soLuong",
+      header: "Số lượng",
+      label: "Số lượng",
+      kind: "input",
+      group: DAY_COLUMN_GROUPS.daysCollapsedOnly,
+      minWidth: 104,
+      getValue: (h) => (h.isDecrease ? Math.abs(h.total) : h.total) || null,
+      // Dòng sổ nhập: sửa qua nút ✎ (xem thay đổi + xác nhận), không gõ thẳng tổng.
+      isLocked: (h) => h.fromImports,
+      lockReason: () => "Số của sổ Nhập hàng — sửa bằng nút ✎ Sửa chuyến nhập ở dòng này (có xem lại và xác nhận trước khi ghi).",
+    },
     {
       key: "donGia",
       header: "Đơn giá VNĐ",
@@ -605,15 +613,14 @@ export function MaterialGrid({
       widthKey: "day",
       minWidth: 88,
       getValue: (h) => h.dailyQuantities[iso] ?? null,
-      // Hàng "Giá gửi": chỉ ngày đã gửi kg mới gõ được giá.
-      isLocked: (h) => Boolean(h.priceRowOf) && !getOriginal(h.priceRowOf!)?.dailyQuantities?.[iso],
-      lockReason: () => "Ngày này chưa gửi kg nào — gõ kg ở dòng Gửi đông trước rồi mới gõ giá.",
-      // Ngay dưới số kg: "n chuyến" → đại lý/chuyến làm nên đúng ô này.
-      /* Dòng gộp đang TÁCH 2 loại ⇒ "n chuyến" chỉ ở dòng loại (lặp ở dòng gộp thì rối mắt). */
-      renderCellNote: (h) =>
-        h.priceRowOf || (familyRowIds.includes(h.id) && !collapsedFamilies.has(h.id)) ? null : (
-          <CellShipments imports={importRowsOf(h)} date={iso} lotCodes={lotCodes} />
-        ),
+      /* Hàng "Giá gửi": chỉ ngày đã gửi kg mới gõ được giá. Dòng sổ nhập: KHOÁ — sửa chuyến
+         nhập qua nút ✎ (có xem thay đổi + xác nhận, 2026-10-20), không ghi thẳng theo phím.
+         Bỏ nút "n chuyến" dưới ô (kế toán: không cần, xem ở dòng loại / người bán / giá bên dưới). */
+      isLocked: (h) => h.fromImports || (Boolean(h.priceRowOf) && !getOriginal(h.priceRowOf!)?.dailyQuantities?.[iso]),
+      lockReason: (h) =>
+        h.fromImports
+          ? "Số của sổ Nhập hàng — sửa bằng nút ✎ Sửa chuyến nhập ở dòng này (có xem lại và xác nhận trước khi ghi)."
+          : "Ngày này chưa gửi kg nào — gõ kg ở dòng Gửi đông trước rồi mới gõ giá.",
     })),
     ...(hasLegacyCarryOver
       ? [
@@ -1002,7 +1009,20 @@ export function MaterialGrid({
         id: h.id,
         data: h,
         label: h.name,
-        actions: rowDeleteAction(h, h.name),
+        actions:
+          h.fromImports && trips.length > 0 && canEditImports && !grid.isLocked ? (
+            <Button
+              variant="edit"
+              size="icon-sm"
+              onClick={() => setEditTripsTarget({ rowId: h.id, rowName: h.name, trips })}
+              title="Sửa kg / đơn giá các chuyến nhập của dòng này — xem lại thay đổi và xác nhận trước khi ghi vào sổ Nhập hàng."
+              aria-label={`Sửa chuyến nhập — ${h.name}`}
+            >
+              <Pencil />
+            </Button>
+          ) : (
+            rowDeleteAction(h, h.name)
+          ),
         subLabel:
           types.length > 1 ? (
             <button
@@ -1376,6 +1396,16 @@ export function MaterialGrid({
       )}
 
 
+
+      {editTripsTarget && (
+        <EditImportTripsDialog
+          target={editTripsTarget}
+          onClose={() => setEditTripsTarget(null)}
+          isDayLocked={grid.isImportDayLocked}
+          canViewPrice={canViewPrice}
+          onSave={(changes) => grid.editImportTrips(changes, editorName)}
+        />
+      )}
 
       {addingGroup && (
         <AddMaterialRowDialog

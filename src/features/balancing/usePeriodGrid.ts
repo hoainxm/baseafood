@@ -52,6 +52,7 @@ import {
   useBalancingOutputs,
   useBalancingPeriods,
   useDomesticSales,
+  useDailyLocks,
   useMaterialImports,
   useMaterialOpeningStock,
   useMonthlyStock,
@@ -80,6 +81,13 @@ import { getPeriodDomesticSales, type PeriodDomesticSales } from "@/lib/domestic
 /** Nhóm cột (`GridColumn.group`) mà nút "Thu cột ngày" của cả hai lưới dựa vào —
     MỘT nguồn để khai cột và `collapsedGroups` không lệch tên (lệch ⇒ cột không thu
     mà footer lại bỏ ô ⇒ footer lệch cột). Thêm cột phụ thuộc ngày ⇒ gắn đúng nhóm. */
+/** Một chuyến nhập sửa từ Cân đối: kg + đơn giá mới (đ/kg, null = chưa có giá). */
+export interface ImportTripEdit {
+  id: string;
+  quantityKg: number;
+  unitPrice: number | null;
+}
+
 export const DAY_COLUMN_GROUPS = {
   /** Cột từng ngày + cột chỉ có nghĩa khi đang mở ngày (Tổng cuối hàng, Chuyển kỳ cũ). */
   days: "day",
@@ -129,6 +137,15 @@ export interface PeriodGrid {
   pullImports: (ids?: string[]) => void;
   /** Ghi nhiều ô ngày về sổ Nhập hàng. Trả về false nếu bị từ chối. */
   saveImportDayCells: (cells: DayCell[]) => boolean;
+  /** Ngày nhập hàng (theo xưởng) đã CHỐT ở màn Nhập hàng — sửa từ Cân đối vẫn được, nhưng ghi vết rõ. */
+  isImportDayLocked: (date: string, workshop: string) => boolean;
+  /**
+   * SỬA kg / đơn giá chuyến nhập TỪ CÂN ĐỐI (người dùng yêu cầu 2026-10-20 — hộp hỏi xác nhận
+   * trước, xem EditImportTripsDialog). Ghi thẳng sổ Nhập hàng qua repo (nhật ký thao tác tự ghi
+   * trước/sau) + dòng vết đọc được ở Ghi chú của chuyến; có Hoàn tác. Chuyến thuộc ngày đã chốt
+   * VẪN sửa được (kế toán 2026-10-20) — dòng vết ghi "SAU KHI CHỐT NGÀY". Trả false nếu không ghi.
+   */
+  editImportTrips: (changes: ImportTripEdit[], editorName: string) => boolean;
   /** Tồn kho đông của họ NL này qua kỳ (tồn đầu · gửi đông · xả đông · tồn cuối) — sống theo từng phím gõ. */
   frozenStock: MaterialPeriodNxtRow | null;
   /** Còn dở SX theo ngày chốt trong kỳ (cùng họ) — đối chiếu / điền nhanh dòng Gửi đông. */
@@ -217,6 +234,7 @@ export function usePeriodGrid(period: BalancingPeriod): PeriodGrid {
   const [allMaterialRows, writeAllMaterials, { status: inputStatus }] = useBalancingInputs();
   const [allOutputs, writeAllFinishedGoods, { status: outputStatus }] = useBalancingOutputs();
   const [allImports, writeAllImports, { status: importStatus }] = useMaterialImports();
+  const [importDayLocks] = useDailyLocks();
   const [allWips, writeAllProductions, { status: wipStatus }] = useWipProductions();
   const [productionLocks] = useProductionLocks();
   const [domesticSales] = useDomesticSales();
@@ -451,6 +469,54 @@ export function usePeriodGrid(period: BalancingPeriod): PeriodGrid {
       });
     },
     [allImports, importsToPull, allMaterialRows, materialInRows, assignedImports, writeAllImports, writeAllMaterials, writeMaterials, saveCheckpoint, period.id]
+  );
+
+  const isImportDayLocked = useCallback(
+    (date: string, workshop: string) =>
+      importDayLocks.some((l) => l.lockDate === date && l.workshop === workshop && l.isLocked),
+    [importDayLocks]
+  );
+
+  const editImportTrips = useCallback(
+    (changes: ImportTripEdit[], editorName: string): boolean => {
+      const byId = new Map(allImports.map((r) => [r.id, r]));
+      const real = changes.filter((c) => {
+        const r = byId.get(c.id);
+        return r && (r.quantityKg !== c.quantityKg || r.unitPrice !== c.unitPrice);
+      });
+      if (real.length === 0) return false;
+      /* Kế toán 2026-10-20: ngày đã CHỐT ở Nhập hàng vẫn sửa được từ đây (thao tác dễ), nhưng
+         dòng vết ghi rõ "SAU KHI CHỐT NGÀY dd/mm" để lưu vết — nhật ký thao tác vẫn tự ghi trước/sau. */
+      const lockedCount = real.filter((c) => {
+        const r = byId.get(c.id)!;
+        return isImportDayLocked(r.deliveryDate, r.workshop);
+      }).length;
+      const stamp = new Date().toLocaleString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+      const periodLabel = `${period.materialTypeName} ${period.dateRangeDescription ?? ""}`.trim();
+      const edits = new Map(real.map((c) => [c.id, c]));
+      const prevRows = allImports;
+      saveCheckpoint(`sua-chuyen-nhap:${real.map((c) => c.id).join(",")}`);
+      writeAllImports(
+        allImports.map((r) => {
+          const c = edits.get(r.id);
+          if (!c) return r;
+          const parts = [
+            r.quantityKg !== c.quantityKg ? `kg ${num(r.quantityKg)} → ${num(c.quantityKg)}` : "",
+            r.unitPrice !== c.unitPrice ? `giá ${r.unitPrice == null ? "—" : num(r.unitPrice)} → ${c.unitPrice == null ? "—" : num(c.unitPrice)}` : "",
+          ].filter(Boolean);
+          // Dòng vết đọc được ngay ở màn Nhập hàng (nhật ký thao tác vẫn tự ghi trước/sau mọi trường).
+          const afterLock = isImportDayLocked(r.deliveryDate, r.workshop) ? ` · SAU KHI CHỐT NGÀY ${formatDateVN(r.deliveryDate)}` : "";
+          const trace = `[Sửa từ Cân đối ${periodLabel}${afterLock} · ${stamp}${editorName ? ` · ${editorName}` : ""}] ${parts.join("; ")}`;
+          return { ...r, quantityKg: c.quantityKg, unitPrice: c.unitPrice, note: r.note ? `${r.note}\n${trace}` : trace };
+        })
+      );
+      notify.saved(
+        `Đã sửa ${real.length} chuyến nhập vào sổ Nhập hàng${lockedCount ? ` (${lockedCount} chuyến của ngày đã chốt — đã ghi vết)` : ""}`,
+        () => writeAllImports(prevRows)
+      );
+      return true;
+    },
+    [allImports, isImportDayLocked, period.materialTypeName, period.dateRangeDescription, saveCheckpoint, writeAllImports]
   );
 
   /**
@@ -990,6 +1056,8 @@ export function usePeriodGrid(period: BalancingPeriod): PeriodGrid {
     saveInputs: writeMaterials,
     pullImports,
     saveImportDayCells: writeImportsMultiDay,
+    isImportDayLocked,
+    editImportTrips,
     frozenStock: stockRows,
     leftoverByDay: productionLeftoverByDate,
     lastFreezeDepositPrice: prevFreezePrice,

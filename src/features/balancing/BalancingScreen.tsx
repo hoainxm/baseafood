@@ -299,6 +299,7 @@ export default function BalancingScreen() {
     return (
       <PeriodDetail
         period={sel}
+        editorName={profile?.fullName || profile?.username || ""}
         onBack={() => setSelId(null)}
         onChangePeriod={(patch) =>
           persistPeriods(periods.map((k) => (k.id === sel.id ? { ...k, ...patch } : k)))
@@ -541,10 +542,13 @@ export default function BalancingScreen() {
  */
 function PeriodDetail({
   period,
+  editorName,
   onBack,
   onChangePeriod,
 }: {
   period: BalancingPeriod;
+  /** Tên người đang dùng — ghi vào dòng vết khi sửa chuyến nhập từ Cân đối. */
+  editorName: string;
   onBack: () => void;
   onChangePeriod: (patch: Partial<BalancingPeriod>) => void;
 }) {
@@ -726,6 +730,7 @@ function PeriodDetail({
             daysCollapsed={hideMaterialDays}
             onToggleDays={() => setHideMaterialDays((v) => !v)}
             daysSlot={materialDaysSlot}
+            editorName={editorName}
             onCreateMaterialType={
               periodMaterialTypeEditor.canCreate
                 ? (name) => {

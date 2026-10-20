@@ -609,7 +609,11 @@ export function MaterialGrid({
       isLocked: (h) => Boolean(h.priceRowOf) && !getOriginal(h.priceRowOf!)?.dailyQuantities?.[iso],
       lockReason: () => "Ngày này chưa gửi kg nào — gõ kg ở dòng Gửi đông trước rồi mới gõ giá.",
       // Ngay dưới số kg: "n chuyến" → đại lý/chuyến làm nên đúng ô này.
-      renderCellNote: (h) => (h.priceRowOf ? null : <CellShipments imports={importRowsOf(h)} date={iso} lotCodes={lotCodes} />),
+      /* Dòng gộp đang TÁCH 2 loại ⇒ "n chuyến" chỉ ở dòng loại (lặp ở dòng gộp thì rối mắt). */
+      renderCellNote: (h) =>
+        h.priceRowOf || (familyRowIds.includes(h.id) && !collapsedFamilies.has(h.id)) ? null : (
+          <CellShipments imports={importRowsOf(h)} date={iso} lotCodes={lotCodes} />
+        ),
     })),
     ...(hasLegacyCarryOver
       ? [
@@ -636,6 +640,7 @@ export function MaterialGrid({
          cuối bảng, KHÔNG giãn lấp chỗ trống (trước là cột giãn ăn hết phần dư). */
       align: "left",
       minWidth: 140,
+      fixedWidth: 200,
       getValue: () => null,
       renderValue: (h) => getOriginal(h.id)?.note ?? "",
       isLocked: (h) => !getOriginal(h.id),

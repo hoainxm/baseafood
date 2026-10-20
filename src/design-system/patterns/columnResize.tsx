@@ -30,7 +30,9 @@ export function sanitizeColumnWidths(value: unknown): ColumnWidths {
   return out;
 }
 
-const storageKey = (key: string) => `bsf.grid-column-widths.v1.${key}`;
+/* v2 (2026-10-20): bố cục Cân đối đổi (cột Ghi chú thôi giãn) — bề rộng đã KÉO ở bố cục cũ lưu
+   theo máy giữ cột Ghi chú to + mảng trắng bên phải ⇒ đổi khoá để mọi máy về mặc định mới. */
+const storageKey = (key: string) => `bsf.grid-column-widths.v2.${key}`;
 
 /** Bề rộng cột đã chỉnh của một bảng (khoá ổn định). Không có khoá ⇒ tắt tính năng. */
 export function useColumnWidths(key: string | undefined) {

@@ -343,6 +343,7 @@ export function WipGrid({
       /* Người dùng 2026-10-20: ghi chú không cần ưu tiên hiển thị ⇒ cột HẸP cuối bảng, không giãn. */
       align: "left",
       minWidth: 140,
+      fixedWidth: 200,
       getValue: () => null,
       renderValue: (h) => finishedGoods.find((r) => r.id === h.id)?.note ?? "",
       renderCell: (h) => (

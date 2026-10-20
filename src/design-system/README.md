@@ -356,7 +356,8 @@ Luật khi dùng:
   — cài đặt trình bày, KHÔNG toast, không ghi sổ. Bắt đầu kéo ⇒ chốt bề rộng ĐANG THẤY của mọi
   cột (kéo một cột không làm cột khác nhảy); bảng đã chỉnh thì co theo tổng bề rộng (`w-max`).
   Cột cùng `GridColumn.widthKey` dùng chung bề rộng (VD mọi cột ngày `"day"` — kỳ khác ngày vẫn
-  giữ). Đang bật ở bốn lưới Cân đối.
+  giữ). Đang bật ở bốn lưới Cân đối. Đổi bố cục bảng làm bề rộng đã lưu lỗi thời ⇒ tăng
+  phiên bản khoá (đang `v2`, 2026-10-20). Cột không nên phình: `GridColumn.fixedWidth`.
 - **Một lưới, hai bảng:** cần bảng tổng + bảng chia ngày của CÙNG dòng thì dựng hai
   `EditableGrid` từ cùng `rows` / `onCellCommit`, chia `columns` (cùng `rowMarkKey` ⇒ màu dòng
   hiện cả hai). Bảng đặt ở chỗ khác của màn ⇒ `createPortal` vào chỗ màn đưa (VD Cân đối).

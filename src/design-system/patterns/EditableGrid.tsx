@@ -65,6 +65,11 @@ export interface GridColumn<R> {
    * `fill` ⇒ mọi cột khác CO VỪA NỘI DUNG (không kéo giãn đều cả bảng) — chốt 2026-10-16.
    */
   fill?: boolean;
+  /**
+   * Bề rộng CỐ ĐỊNH (px) — cột không nhận phần dư khi bảng giãn hết khung (phần dư sang các cột
+   * khác). VD cột Ghi chú dòng ở Cân đối: không cần ưu tiên hiển thị, đừng để nó phình to.
+   */
+  fixedWidth?: number;
   /** Căn chữ của ô khoá + tiêu đề (mặc định phải — cột số). Cột chữ dùng "left". */
   align?: "left" | "right";
   /**
@@ -188,6 +193,7 @@ export function EditableGrid<R>({
     px ? { width: px, minWidth: px, maxWidth: px } : undefined;
   const columnWidthStyle = (c: GridColumn<R>): React.CSSProperties | undefined =>
     customWidthStyle(resize.widths[widthKeyOf(c)]) ??
+    customWidthStyle(c.fixedWidth) ??
     (hasFillColumn
       ? c.fill
         ? { minWidth: c.minWidth ?? 160 }

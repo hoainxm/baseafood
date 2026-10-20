@@ -51,7 +51,7 @@ import {
 } from "@/design-system";
 import { num, formatDateVN } from "@/lib/format";
 import { useCan } from "@/features/shared/PermissionProvider";
-import { ChevronDown, ChevronsLeftRight, Combine, Download, ListChecks, Pencil, Plus, Users } from "lucide-react";
+import { ChevronDown, ChevronsLeftRight, Combine, Download, ListChecks, Pencil, Plus } from "lucide-react";
 
 const WORKSHOP_WAREHOUSES = BSF1_WAREHOUSES.filter((w) => w.type === "workshop");
 
@@ -62,6 +62,8 @@ const PRICE_ROW_SUFFIX = "::price";
 const priceRowId = (rowId: string) => `${rowId}${PRICE_ROW_SUFFIX}`;
 /** Hàng "Giá (đ/kg)" THEO NGÀY (chỉ xem) dưới dòng sổ nhập ở bảng theo ngày — không có ở bảng chính. */
 const DAY_PRICE_ROW_SUFFIX = "::day-price";
+/** Dòng LOẠI (2 da lớn / 2 da nhỏ) tách từ một dòng kỳ sổ nhập gộp nhiều loại: id = `<dòng kỳ>::type::<loại>`. */
+const TYPE_ROW_MARKER = "::type::";
 /** Bề rộng (px) cột bảng CHÍNH khối NL — gọn để A–L (NL · Xuất khẩu · Ghi chú) vừa một màn. */
 const MAIN_COLUMN_WIDTHS: Record<string, number> = { soLuong: 76, donGia: 84, thanhTien: 112, tyLe: 52 };
 
@@ -123,10 +125,7 @@ export function MaterialGrid({
     h.fromImports ? h.sourceIds.flatMap((id) => importById.get(id) ?? []) : [];
   /** Thành tiền thật của từng dòng con đại lý (id dòng con → đ). */
   const childRowAmount = new Map<string, number>();
-  /* Kế toán chốt 2026-10-20: dòng gộp họ (2 da lớn + nhỏ) HIỆN SẴN 2 dòng loại; người bán
-     (đại lý) dưới mỗi loại GẬP sẵn, bấm mới mở. `collapsedFamilies` = dòng gộp người dùng tự
-     thu lại; `openSellerRows` = dòng loại đang mở người bán. */
-  const [collapsedFamilies, setCollapsedFamilies] = useState<ReadonlySet<string>>(() => new Set());
+  /* Người bán (đại lý) dưới mỗi dòng loại GẬP sẵn, bấm mới mở (`openSellerRows`). */
   const [openSellerRows, setOpenSellerRows] = useState<ReadonlySet<string>>(() => new Set());
   const toggleIn = (set: (f: (prev: ReadonlySet<string>) => ReadonlySet<string>) => void, id: string) =>
     set((prev) => {
@@ -135,12 +134,6 @@ export function MaterialGrid({
       else n.add(id);
       return n;
     });
-  /** Dòng sổ nhập gộp ≥ 2 LOẠI — có 2 dòng loại hiện sẵn (thu lại được). */
-  const familyRowIds = materialRows
-    .filter((h) => h.fromImports && new Set(importRowsOf(h).filter((i) => i.quantityKg !== 0).map((i) => i.materialTypeName)).size > 1)
-    .map((h) => h.id);
-  const hasFamilyRows = familyRowIds.length > 0;
-  const allFamiliesCollapsed = hasFamilyRows && familyRowIds.every((id) => collapsedFamilies.has(id));
   const [addingGroup, setAddingGroup] = useState<InputGroup | "decrease" | null>(null);
   const [isImportPickerOpen, setIsImportPickerOpen] = useState(false);
   /** id dòng kho ẢO (chưa lưu) — dòng thật tạo ra DÙNG LẠI đúng id này, nên ô đang gõ
@@ -583,7 +576,7 @@ export function MaterialGrid({
       },
       lockReason: (h) =>
         h.fromImports
-          ? "Giá theo TỪNG CHUYẾN của sổ Nhập hàng — tiền = Σ kg × giá từng chuyến. Sửa giá ở màn Nhập hàng; dòng gộp bấm 'n loại' dưới tên để xem từng loại."
+          ? "Giá theo TỪNG CHUYẾN của sổ Nhập hàng — tiền = Σ kg × giá từng chuyến. Sửa bằng nút ✎ Sửa chuyến nhập ở dòng này; bấm số giá (nếu gạch chân) để xem giá từng chuyến."
           : h.priceRowOf
           ? "Giá gửi gõ theo từng ngày ở hàng này; đơn giá bình quân nằm ở dòng Gửi đông ngay trên."
           : "Giá gửi khác nhau theo ngày — đây là bình quân theo kg. Sửa giá ở hàng Giá gửi ngay dưới (mở cột ngày nếu đang thu).",
@@ -603,7 +596,8 @@ export function MaterialGrid({
       // Dòng con đại lý: tiền THẬT của các chuyến (đơn giá hiện đã làm tròn).
       getValue: (h) => childRowAmount.get(h.id) ?? (h.total * (h.unitPrice ?? 0) || null),
     },
-    { key: "tyLe", header: "Tỷ lệ", label: "Tỷ lệ phần trăm", kind: "input", minWidth: 72, getValue: (h) => h.ratio, isLocked: (h) => Boolean(h.priceRowOf) },
+    // Dòng LOẠI (tách từ dòng kỳ sổ nhập) không phải bản ghi riêng ⇒ không gõ tỷ lệ.
+    { key: "tyLe", header: "Tỷ lệ", label: "Tỷ lệ phần trăm", kind: "input", minWidth: 72, getValue: (h) => h.ratio, isLocked: (h) => Boolean(h.priceRowOf) || h.id.includes(TYPE_ROW_MARKER) },
     ...dates.map<GridColumn<MaterialGridRow>>((iso) => ({
       key: `ngay:${iso}`,
       header: formatDayLabel(iso),
@@ -997,46 +991,37 @@ export function MaterialGrid({
   for (const g of groupsWithRows) {
     for (const h of g.rows) {
       /* Kế toán chốt 2026-10-20: "tách 2 dòng 2 da lớn 2 da nhỏ, thu gọn người bán, giá bình
-         quân cần thể hiện ra" ⇒ dòng gộp họ HIỆN SẴN mỗi LOẠI một dòng con (kg theo ngày · giá
-         BÌNH QUÂN · tiền = Σ kg × giá TỪNG chuyến); dưới mỗi loại người bán (đại lý) GẬP sẵn,
-         bấm "n người bán" mới mở. Chỉ một loại ⇒ không tách. Số bình quân bấm được ⇒ xem từng chuyến. */
+         quân cần thể hiện ra" ⇒ mỗi LOẠI một dòng (kg theo ngày · giá BÌNH QUÂN · tiền = Σ kg ×
+         giá TỪNG chuyến); dưới mỗi loại người bán (đại lý) GẬP sẵn, bấm "n người bán" mới mở.
+         Chỉ một loại ⇒ giữ dòng kỳ như cũ. Số bình quân bấm được ⇒ xem từng chuyến. */
       const trips = (h.fromImports ? importRowsOf(h) : []).filter((i) => i.quantityKg !== 0);
       const byType = new Map<string, MaterialImportItem[]>();
       for (const i of trips) byType.set(i.materialTypeName, [...(byType.get(i.materialTypeName) ?? []), i]);
       const types = [...byType.entries()].sort(([a], [b]) => a.localeCompare(b));
-      const open = types.length > 1 && !collapsedFamilies.has(h.id);
-      gridRows.push({
-        id: h.id,
-        data: h,
-        label: h.name,
-        actions:
-          h.fromImports && trips.length > 0 && canEditImports && !grid.isLocked ? (
-            <Button
-              variant="edit"
-              size="icon-sm"
-              onClick={() => setEditTripsTarget({ rowId: h.id, rowName: h.name, trips })}
-              title="Sửa kg / đơn giá các chuyến nhập của dòng này — xem lại thay đổi và xác nhận trước khi ghi vào sổ Nhập hàng."
-              aria-label={`Sửa chuyến nhập — ${h.name}`}
-            >
-              <Pencil />
-            </Button>
-          ) : (
-            rowDeleteAction(h, h.name)
-          ),
-        subLabel:
-          types.length > 1 ? (
-            <button
-              type="button"
-              aria-expanded={open}
-              onClick={() => toggleIn(setCollapsedFamilies, h.id)}
-              title={open ? "Thu gọn — chỉ còn một dòng gộp." : `Tách ra ${types.length} loại (${types.map(([t]) => t).join(", ")}).`}
-              className="mt-0.5 inline-flex items-center gap-1 text-sm text-primary hover:underline"
-            >
-              <ChevronDown className={`size-4 transition-transform ${open ? "" : "-rotate-90"}`} aria-hidden />
-              {open ? "Thu gọn" : `Tách ${types.length} loại`}
-            </button>
-          ) : undefined,
-      });
+      /* Kế toán 2026-10-20 (Aslley): "bỏ cái dòng này đi" — KHÔNG còn dòng gộp họ ("Bạch tuộc 2 da"
+         = tổng 2 loại); họ có ≥ 2 loại ⇒ mỗi LOẠI là một dòng chính riêng (2 da lớn · 2 da nhỏ),
+         mỗi dòng có nút ✎ sửa chuyến nhập CỦA LOẠI ĐÓ. Tổng T. CỘNG vẫn tính từ dòng kỳ thật
+         (không đổi); dòng loại chỉ là cách trình bày các chuyến của dòng kỳ. */
+      const isSplit = types.length > 1;
+      const editTripsAction = (rowId: string, rowName: string, rowTrips: MaterialImportItem[]) =>
+        h.fromImports && rowTrips.length > 0 && canEditImports && !grid.isLocked ? (
+          <Button
+            variant="edit"
+            size="icon-sm"
+            onClick={() => setEditTripsTarget({ rowId, rowName, trips: rowTrips })}
+            title="Sửa kg / đơn giá các chuyến nhập của dòng này — xem lại thay đổi và xác nhận trước khi ghi vào sổ Nhập hàng."
+            aria-label={`Sửa chuyến nhập — ${rowName}`}
+          >
+            <Pencil />
+          </Button>
+        ) : null;
+      if (!isSplit)
+        gridRows.push({
+          id: h.id,
+          data: h,
+          label: h.name,
+          actions: editTripsAction(h.id, h.name, trips) ?? rowDeleteAction(h, h.name),
+        });
       /* Kế toán 2026-10-20: "giá từng ngày nằm đâu… mắc gì ẩn, mở lại cho chị" ⇒ dưới dòng sổ nhập
          (loại, hoặc dòng gộp khi thu / chỉ một loại) LUÔN có hàng "Giá (đ/kg)" chỉ xem ở bảng theo
          ngày: ô ngày = giá của ngày đó (nhiều chuyến khác giá cùng ngày ⇒ bình quân theo kg của
@@ -1060,15 +1045,10 @@ export function MaterialGrid({
           kind: "child",
         };
       };
-      if (!open) {
+      if (!isSplit) {
         if (trips.length > 0 && canViewPrice) gridRows.push(dayPriceRow(h.id, trips));
         continue;
       }
-      /* Tên loại ngắn: bỏ phần LOÀI đứng đầu tên dòng cha ("Bạch tuộc") —
-         "Bạch tuộc 2 da lớn (80↑)" ⇒ "2 da lớn (80↑)". */
-      const species = h.name.split(/\s+(?=\S*\d)/)[0] ?? "";
-      const shortType = (t: string) =>
-        species && t.toLowerCase().startsWith(species.toLowerCase() + " ") ? t.slice(species.length + 1) : t;
       /** Một dòng con chỉ xem (loại hoặc người bán) từ một nhóm chuyến — giá = bình quân theo kg. */
       const tripGroupRow = (id: string, label: string, rows: MaterialImportItem[]): MaterialGridRow => {
         const daily: DailyQuantities = {};
@@ -1092,16 +1072,16 @@ export function MaterialGrid({
         };
       };
       for (const [typeName, rows] of types) {
-        const typeId = `${h.id}::type::${typeName}`;
+        const typeId = `${h.id}${TYPE_ROW_MARKER}${typeName}`;
         const sellers = new Map<string, MaterialImportItem[]>();
         for (const i of rows) sellers.set(i.supplierName || "(chưa ghi đại lý)", [...(sellers.get(i.supplierName || "(chưa ghi đại lý)") ?? []), i]);
         const sellerOpen = openSellerRows.has(typeId);
         const unpriced = rows.filter((i) => i.unitPrice == null).length;
         gridRows.push({
           id: typeId,
-          data: tripGroupRow(typeId, shortType(typeName), rows),
-          label: shortType(typeName),
-          kind: "child",
+          data: tripGroupRow(typeId, typeName, rows),
+          label: typeName,
+          actions: editTripsAction(typeId, typeName, rows) ?? undefined,
           subLabel: (
             <span className="block">
               <button
@@ -1225,21 +1205,6 @@ export function MaterialGrid({
             <ChevronsLeftRight />
             {isDateColumnsCollapsed ? "Hiện theo ngày" : "Ẩn theo ngày"}
           </Button>
-          {hasFamilyRows && (
-            <Button
-              variant="outline"
-              aria-pressed={!allFamiliesCollapsed}
-              title={
-                allFamiliesCollapsed
-                  ? "Tách các dòng gộp (VD Bạch tuộc 2 da) ra 2 da lớn, 2 da nhỏ — kg, giá bình quân, tiền từng loại."
-                  : "Thu gọn — mỗi họ nguyên liệu chỉ còn một dòng gộp."
-              }
-              onClick={() => setCollapsedFamilies(allFamiliesCollapsed ? new Set() : new Set(familyRowIds))}
-            >
-              <Users />
-              {allFamiliesCollapsed ? "Tách theo loại" : "Thu gọn loại"}
-            </Button>
-          )}
         </div>
       </div>
 

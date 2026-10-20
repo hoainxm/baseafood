@@ -13,7 +13,8 @@ import type {
   Customer,
 } from "@/types";
 import type { BalancingResult } from "@/lib/balancingCalc";
-import type { MaterialImportItem, WipProductionItem } from "@/types";
+import type { DailyQuantities, MaterialImportItem, WipProductionItem } from "@/types";
+import { calculateImportAmount } from "@/types";
 import {
   BALANCING_STOCK_LINE_NAMES,
   buildMaterialGridRows,
@@ -21,8 +22,13 @@ import {
   formatDayLabel,
   getPeriodDates,
   getBalancingCustomerName,
+  groupTripsByType,
+  importTypeRowId,
+  buildTripGroupRow,
+  dailyAverageImportPrices,
   type MaterialGridRow,
 } from "@/lib/balancingGrid";
+import { depositPriceOn } from "@/lib/balancingStockLines";
 import { Button } from "@/design-system";
 import { num } from "@/lib/format";
 import { useCan } from "@/features/shared/PermissionProvider";
@@ -69,7 +75,45 @@ export default function BalancingTable({
     const name = r.stockLineKind && r.name !== BALANCING_STOCK_LINE_NAMES[r.stockLineKind] ? `${BALANCING_STOCK_LINE_NAMES[r.stockLineKind]} · ${r.name}` : r.name;
     return mt ? `${name} — ${mt}` : name;
   };
-  const finishedGoodRows = buildFinishedGoodGridRows(finishedGoods, assignedWips);
+  /* GIỐNG BẢNG NGOÀI MÀN (người dùng 2026-10-20: "xem / in bảng giao diện cũng phải giống ở
+     ngoài để bấm xem rồi chụp màn hình gửi đi, người xem dễ hiểu"):
+     - dòng kỳ sổ nhập gộp ≥ 2 loại ⇒ KHÔNG in dòng gộp, in riêng từng LOẠI (2 da lớn · 2 da
+       nhỏ): kg · giá BÌNH QUÂN · tiền = Σ kg × giá từng chuyến (như MaterialGrid);
+     - có cột ngày + được xem giá ⇒ dưới dòng sổ nhập / dòng loại có hàng "Giá (đ/kg)" từng ngày,
+       dưới Gửi đông có hàng "Giá gửi (đ/kg)" từng ngày;
+     - khối thành phẩm bỏ dòng chưa có số (màn mặc định "Ẩn dòng trống"). */
+  const importById = new Map(assignedImports.map((i) => [i.id, i]));
+  type PrintMaterialLine =
+    | { kind: "row"; key: string; row: MaterialGridRow; amount: number | null }
+    | { kind: "price"; key: string; label: string; prices: DailyQuantities };
+  const materialLines: PrintMaterialLine[] = materialRows.flatMap((r): PrintMaterialLine[] => {
+    const trips = r.fromImports ? r.sourceIds.flatMap((id) => importById.get(id) ?? []).filter((i) => i.quantityKg !== 0) : [];
+    const types = groupTripsByType(trips);
+    const amountOf = (rows: MaterialImportItem[]) => rows.reduce((sum, i) => sum + calculateImportAmount(i), 0);
+    const priceLine = (key: string, rows: MaterialImportItem[]): PrintMaterialLine[] =>
+      rows.length > 0 ? [{ kind: "price", key: `${key}::day-price`, label: "Giá (đ/kg)", prices: dailyAverageImportPrices(rows) }] : [];
+    if (types.length > 1)
+      return types.flatMap(([typeName, rows]) => {
+        const id = importTypeRowId(r.id, typeName);
+        return [{ kind: "row" as const, key: id, row: buildTripGroupRow(r, id, typeName, rows), amount: amountOf(rows) }, ...priceLine(id, rows)];
+      });
+    const line: PrintMaterialLine = { kind: "row", key: r.id, row: r, amount: r.fromImports ? amountOf(trips) : r.unitPrice ? r.total * r.unitPrice : null };
+    if (r.fromImports) return [line, ...priceLine(r.id, trips)];
+    const original = materialById.get(r.id);
+    if (r.stockLineKind === "freeze-deposit" && original) {
+      const prices: DailyQuantities = {};
+      for (const [iso, kg] of Object.entries(original.dailyQuantities ?? {})) {
+        const price = kg ? depositPriceOn(original, iso) : null;
+        if (price != null) prices[iso] = price;
+      }
+      return [line, { kind: "price", key: `${r.id}::deposit-price`, label: "Giá gửi (đ/kg)", prices }];
+    }
+    return [line];
+  });
+  const finishedGoodRows = buildFinishedGoodGridRows(finishedGoods, assignedWips).filter(
+    (r) => r.total !== 0 || r.repaidKg !== 0 || r.debtKg !== 0
+  );
+  const hasNoFinishedGood = result.totalOutputKg <= 0;
   /* Nhieu cot ngay ⇒ in NGANG, neu khong bang bi cat mat cot cuoi. */
   const isLandscape = dates.length > 3;
 
@@ -162,36 +206,57 @@ export default function BalancingTable({
               </Tr>
             </thead>
             <tbody>
-              {materialRows.map((r) => (
-                <Tr key={r.id}>
-                  <Td>
-                    {r.stockLineKind ? (
-                      <strong>{stockRowName(r)}</strong>
-                    ) : (
-                      <>
-                        {r.name}
-                        <span className="ml-1 text-xs text-slate-500">
-                          ({r.isDecrease ? "Giảm" : r.group})
-                        </span>
-                      </>
-                    )}
-                  </Td>
-                  <Td right>{num(r.total)}</Td>
-                  {/* Dòng sổ nhập: in giá BÌNH QUÂN theo kg (kế toán chốt 2026-10-20 — như file Excel
-                      mẫu); tiền vẫn = Σ kg × giá từng chuyến. */}
-                  {!hideAmounts && <Td right>{r.unitPrice != null ? num(Math.round(r.unitPrice)) : ""}</Td>}
-                  {/* Chưa khai đơn giá thì để trống — "-0" (dòng giảm × giá 0)
-                      đọc như một con số thật, người xem bảng in sẽ tưởng lỗi. */}
-                  {!hideAmounts && <Td right>{r.unitPrice ? num(r.total * r.unitPrice) : ""}</Td>}
-                  {!hideAmounts && <Td right>{r.ratio != null ? `${num(r.ratio)}%` : ""}</Td>}
-                  {materialDateColumns.map((iso) => (
-                    <Td key={iso} right>
-                      {r.dailyQuantities[iso] ? num(r.dailyQuantities[iso]) : ""}
+              {materialLines.map((line) => {
+                /* Hàng giá theo ngày: chỉ in khi có cột ngày và được xem giá. */
+                if (line.kind === "price") {
+                  if (hideAmounts || materialDateColumns.length === 0) return null;
+                  return (
+                    <Tr key={line.key}>
+                      <Td>
+                        <span className="pl-4 text-xs italic text-slate-600">{line.label}</span>
+                      </Td>
+                      <Td right></Td>
+                      <Td right></Td>
+                      <Td right></Td>
+                      <Td right></Td>
+                      {materialDateColumns.map((iso) => (
+                        <Td key={iso} right>
+                          <span className="text-xs text-slate-600">{line.prices[iso] != null ? num(line.prices[iso]) : ""}</span>
+                        </Td>
+                      ))}
+                      {isMaterialDaysOpen && hasLegacyCarryOver && <Td right></Td>}
+                    </Tr>
+                  );
+                }
+                const r = line.row;
+                return (
+                  <Tr key={line.key}>
+                    <Td>
+                      {r.stockLineKind ? (
+                        <strong>{stockRowName(r)}</strong>
+                      ) : (
+                        <>
+                          {r.name}
+                          {r.isDecrease && <span className="ml-1 text-xs text-slate-500">(Giảm)</span>}
+                        </>
+                      )}
                     </Td>
-                  ))}
-                  {isMaterialDaysOpen && hasLegacyCarryOver && <Td right>{r.carryOverKg ? num(r.carryOverKg) : ""}</Td>}
-                </Tr>
-              ))}
+                    <Td right>{num(r.total)}</Td>
+                    {/* Dòng sổ nhập / dòng loại: giá BÌNH QUÂN theo kg (như màn); tiền = Σ kg × giá từng chuyến. */}
+                    {!hideAmounts && <Td right>{r.unitPrice != null ? num(Math.round(r.unitPrice)) : ""}</Td>}
+                    {/* Chưa khai đơn giá thì để trống — "-0" (dòng giảm × giá 0)
+                        đọc như một con số thật, người xem bảng in sẽ tưởng lỗi. */}
+                    {!hideAmounts && <Td right>{line.amount ? num(Math.round(line.amount)) : ""}</Td>}
+                    {!hideAmounts && <Td right>{r.ratio != null ? `${num(r.ratio)}%` : ""}</Td>}
+                    {materialDateColumns.map((iso) => (
+                      <Td key={iso} right>
+                        {r.dailyQuantities[iso] ? num(r.dailyQuantities[iso]) : ""}
+                      </Td>
+                    ))}
+                    {isMaterialDaysOpen && hasLegacyCarryOver && <Td right>{r.carryOverKg ? num(r.carryOverKg) : ""}</Td>}
+                  </Tr>
+                );
+              })}
               <Tr total>
                 <Td>T. CỘNG</Td>
                 <Td right>{num(result.totalInputKg)}</Td>
@@ -303,29 +368,31 @@ export default function BalancingTable({
         {/* Ghi chú / tính toán */}
         {/* Ô GHI CHÚ của bảng giấy — cột trái đúng thứ tự kế toán đọc, cột phải phần phụ. */}
         <Section title="Ghi chú">
+          {/* Nhãn · đơn vị · thứ tự như khối Ghi chú ngoài màn. */}
           <div className="grid grid-cols-2 gap-x-8 gap-y-1 text-sm">
             <div>
               <KV k="Tổng thành phẩm" v={`${num(result.totalOutputKg)} kg`} />
-              <KV k="Định mức chế biến" v={num(result.norm)} strong />
+              <KV k="Định mức chế biến" v={hasNoFinishedGood ? "—" : num(result.norm)} strong />
               {canViewPrice && (
                 <>
-                  <KV k="Chi phí CB /kg TP" v={num(period.processingCostPerKg)} />
-                  <KV k="Giá Thành" v={num(result.costOfGoods)} />
-                  <KV k="Giá trị xuất" v={num(result.exportValue)} />
+                  <KV k="Chi phí CB / kg TP" v={period.processingCostPerKg != null ? `${num(period.processingCostPerKg)} đ` : "—"} />
+                  <KV k="Giá thành" v={`${num(result.costOfGoods)} đ`} />
+                  <KV k="Giá trị xuất" v={`${num(result.exportValue)} đ`} />
                   <KV
-                    k={result.profitOrLoss >= 0 ? "Lãi" : "Lỗ"}
-                    v={num(Math.abs(result.profitOrLoss))}
+                    k={hasNoFinishedGood ? "Lãi / Lỗ" : result.profitOrLoss >= 0 ? "Lãi" : "Lỗ"}
+                    v={hasNoFinishedGood ? "—" : `${num(Math.abs(result.profitOrLoss))} đ`}
                     strong
                   />
-                  <KV k="Bình quân /kg nl" v={num(result.avgProfitPerKgMaterial)} />
-                  <KV k="tỉ giá" v={num(period.exchangeRate)} />
+                  <KV k="Bình quân / kg NL" v={hasNoFinishedGood ? "—" : `${num(result.avgProfitPerKgMaterial)} đ`} />
+                  <KV k="Tỉ giá" v={period.exchangeRate != null ? `${num(period.exchangeRate)} đ/USD` : "—"} />
                 </>
               )}
             </div>
             <div>
-              <KV k="Tổng nguyên liệu vào" v={`${num(result.totalInputKg)} kg`} />
-              {canViewPrice && <KV k="Giá trị nguyên liệu" v={num(result.materialValue)} />}
-              <KV k="Tỉ lệ thu hồi / tổng nhận" v={result.yieldRate == null ? "—" : num(result.yieldRate)} />
+              <KV k="Tổng NL vào" v={`${num(result.totalInputKg)} kg`} />
+              {canViewPrice && <KV k="Giá trị NL" v={`${num(result.materialValue)} đ`} />}
+              <KV k="Tổng NL nhận cả kỳ" v={period.totalInputKg != null ? `${num(period.totalInputKg)} kg` : "—"} />
+              <KV k="Tỉ lệ thu hồi" v={result.yieldRate == null ? "—" : num(result.yieldRate)} />
             </div>
           </div>
         </Section>

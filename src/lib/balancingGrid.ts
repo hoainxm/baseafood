@@ -13,7 +13,7 @@ import type {
   SalesInvoice,
   SalesItem,
 } from "@/types";
-import { sumGridRow } from "@/types";
+import { calculateImportAmount, sumGridRow } from "@/types";
 
 /* ---------- Ngày trong kỳ ---------- */
 
@@ -362,6 +362,63 @@ export function buildMaterialGridRows(
         : {}),
     };
   });
+}
+
+/* ---------- Dòng LOẠI tách từ dòng kỳ sổ nhập (màn + bản Xem / in dùng chung) ---------- */
+
+/** Dòng LOẠI (2 da lớn / 2 da nhỏ) tách từ một dòng kỳ sổ nhập: id = `<dòng kỳ>::type::<loại>`. */
+export const IMPORT_TYPE_ROW_MARKER = "::type::";
+export const importTypeRowId = (rowId: string, typeName: string): string => `${rowId}${IMPORT_TYPE_ROW_MARKER}${typeName}`;
+
+/** Gom chuyến (bỏ chuyến 0 kg) theo TÊN loại NL, sắp theo tên. */
+export function groupTripsByType(trips: MaterialImportItem[]): [string, MaterialImportItem[]][] {
+  const byType = new Map<string, MaterialImportItem[]>();
+  for (const i of trips) if (i.quantityKg !== 0) byType.set(i.materialTypeName, [...(byType.get(i.materialTypeName) ?? []), i]);
+  return [...byType.entries()].sort(([a], [b]) => a.localeCompare(b));
+}
+
+/**
+ * Một dòng CHỈ XEM gộp từ một nhóm chuyến (loại hoặc người bán) của dòng kỳ `base`:
+ * kg theo ngày · tổng kg · đơn giá = BÌNH QUÂN theo kg KHÔNG làm tròn (kg × đơn giá = đúng
+ * Σ kg × giá từng chuyến) · không có tỷ lệ.
+ */
+export function buildTripGroupRow(base: MaterialGridRow, id: string, label: string, trips: MaterialImportItem[]): MaterialGridRow {
+  const daily: DailyQuantities = {};
+  for (const i of trips) daily[i.deliveryDate] = (daily[i.deliveryDate] ?? 0) + i.quantityKg;
+  const kg = trips.reduce((sum, i) => sum + i.quantityKg, 0);
+  const amount = trips.reduce((sum, i) => sum + calculateImportAmount(i), 0);
+  const priced = trips.filter((i) => i.unitPrice != null);
+  return {
+    ...base,
+    id,
+    name: label,
+    dailyQuantities: daily,
+    total: kg,
+    unitPrice: priced.length && kg ? amount / kg : null,
+    tripPrices: [...new Set(priced.map((i) => i.unitPrice as number))].sort((a, b) => a - b),
+    unpricedTripCount: trips.length - priced.length,
+    ratio: null,
+    carryOverKg: 0,
+    sourceIds: trips.map((i) => i.id),
+  };
+}
+
+/**
+ * Giá (đ/kg) TỪNG NGÀY của một nhóm chuyến — hàng "Giá (đ/kg)" dưới dòng sổ nhập: nhiều chuyến
+ * khác giá cùng ngày ⇒ bình quân theo kg của ngày (làm tròn đồng); ngày không chuyến nào có giá ⇒ vắng.
+ */
+export function dailyAverageImportPrices(trips: MaterialImportItem[]): DailyQuantities {
+  const byDay = new Map<string, { kg: number; amount: number }>();
+  for (const i of trips) {
+    if (i.unitPrice == null) continue;
+    const d = byDay.get(i.deliveryDate) ?? { kg: 0, amount: 0 };
+    d.kg += i.quantityKg;
+    d.amount += calculateImportAmount(i);
+    byDay.set(i.deliveryDate, d);
+  }
+  const prices: DailyQuantities = {};
+  for (const [date, d] of byDay) if (d.kg) prices[date] = Math.round(d.amount / d.kg);
+  return prices;
 }
 
 /**

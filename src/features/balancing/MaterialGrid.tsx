@@ -16,6 +16,11 @@ import {
   formatDayLabel,
   findUnpricedMaterialRows,
   suggestMaterialPrices,
+  IMPORT_TYPE_ROW_MARKER,
+  importTypeRowId,
+  groupTripsByType,
+  buildTripGroupRow,
+  dailyAverageImportPrices,
   type MaterialGridRow,
   type BalancingStockLineKind,
 } from "@/lib/balancingGrid";
@@ -62,8 +67,6 @@ const PRICE_ROW_SUFFIX = "::price";
 const priceRowId = (rowId: string) => `${rowId}${PRICE_ROW_SUFFIX}`;
 /** Hàng "Giá (đ/kg)" THEO NGÀY (chỉ xem) dưới dòng sổ nhập ở bảng theo ngày — không có ở bảng chính. */
 const DAY_PRICE_ROW_SUFFIX = "::day-price";
-/** Dòng LOẠI (2 da lớn / 2 da nhỏ) tách từ một dòng kỳ sổ nhập gộp nhiều loại: id = `<dòng kỳ>::type::<loại>`. */
-const TYPE_ROW_MARKER = "::type::";
 /** Bề rộng (px) cột bảng CHÍNH khối NL — gọn để A–L (NL · Xuất khẩu · Ghi chú) vừa một màn. */
 const MAIN_COLUMN_WIDTHS: Record<string, number> = { soLuong: 76, donGia: 84, thanhTien: 112, tyLe: 52 };
 
@@ -597,7 +600,7 @@ export function MaterialGrid({
       getValue: (h) => childRowAmount.get(h.id) ?? (h.total * (h.unitPrice ?? 0) || null),
     },
     // Dòng LOẠI (tách từ dòng kỳ sổ nhập) không phải bản ghi riêng ⇒ không gõ tỷ lệ.
-    { key: "tyLe", header: "Tỷ lệ", label: "Tỷ lệ phần trăm", kind: "input", minWidth: 72, getValue: (h) => h.ratio, isLocked: (h) => Boolean(h.priceRowOf) || h.id.includes(TYPE_ROW_MARKER) },
+    { key: "tyLe", header: "Tỷ lệ", label: "Tỷ lệ phần trăm", kind: "input", minWidth: 72, getValue: (h) => h.ratio, isLocked: (h) => Boolean(h.priceRowOf) || h.id.includes(IMPORT_TYPE_ROW_MARKER) },
     ...dates.map<GridColumn<MaterialGridRow>>((iso) => ({
       key: `ngay:${iso}`,
       header: formatDayLabel(iso),
@@ -995,9 +998,7 @@ export function MaterialGrid({
          giá TỪNG chuyến); dưới mỗi loại người bán (đại lý) GẬP sẵn, bấm "n người bán" mới mở.
          Chỉ một loại ⇒ giữ dòng kỳ như cũ. Số bình quân bấm được ⇒ xem từng chuyến. */
       const trips = (h.fromImports ? importRowsOf(h) : []).filter((i) => i.quantityKg !== 0);
-      const byType = new Map<string, MaterialImportItem[]>();
-      for (const i of trips) byType.set(i.materialTypeName, [...(byType.get(i.materialTypeName) ?? []), i]);
-      const types = [...byType.entries()].sort(([a], [b]) => a.localeCompare(b));
+      const types = groupTripsByType(trips);
       /* Kế toán 2026-10-20 (Aslley): "bỏ cái dòng này đi" — KHÔNG còn dòng gộp họ ("Bạch tuộc 2 da"
          = tổng 2 loại); họ có ≥ 2 loại ⇒ mỗi LOẠI là một dòng chính riêng (2 da lớn · 2 da nhỏ),
          mỗi dòng có nút ✎ sửa chuyến nhập CỦA LOẠI ĐÓ. Tổng T. CỘNG vẫn tính từ dòng kỳ thật
@@ -1027,16 +1028,7 @@ export function MaterialGrid({
          ngày: ô ngày = giá của ngày đó (nhiều chuyến khác giá cùng ngày ⇒ bình quân theo kg của
          ngày; chi tiết bấm "n chuyến" ở ô kg). Ngày chưa có giá ⇒ "—". */
       const dayPriceRow = (parentId: string, rows: MaterialImportItem[]): GridRow<MaterialGridRow> => {
-        const byDay = new Map<string, { kg: number; amount: number }>();
-        for (const i of rows) {
-          if (i.unitPrice == null) continue;
-          const d = byDay.get(i.deliveryDate) ?? { kg: 0, amount: 0 };
-          d.kg += i.quantityKg;
-          d.amount += calculateImportAmount(i);
-          byDay.set(i.deliveryDate, d);
-        }
-        const prices: DailyQuantities = {};
-        for (const [date, d] of byDay) if (d.kg) prices[date] = Math.round(d.amount / d.kg);
+        const prices = dailyAverageImportPrices(rows);
         const id = `${parentId}${DAY_PRICE_ROW_SUFFIX}`;
         return {
           id,
@@ -1049,30 +1041,13 @@ export function MaterialGrid({
         if (trips.length > 0 && canViewPrice) gridRows.push(dayPriceRow(h.id, trips));
         continue;
       }
-      /** Một dòng con chỉ xem (loại hoặc người bán) từ một nhóm chuyến — giá = bình quân theo kg. */
+      /** Một dòng chỉ xem (loại hoặc người bán) từ một nhóm chuyến — giá = bình quân theo kg. */
       const tripGroupRow = (id: string, label: string, rows: MaterialImportItem[]): MaterialGridRow => {
-        const daily: DailyQuantities = {};
-        for (const i of rows) daily[i.deliveryDate] = (daily[i.deliveryDate] ?? 0) + i.quantityKg;
-        const kg = rows.reduce((sum, i) => sum + i.quantityKg, 0);
-        const amount = rows.reduce((sum, i) => sum + calculateImportAmount(i), 0);
-        const priced = rows.filter((i) => i.unitPrice != null);
-        childRowAmount.set(id, amount);
-        return {
-          ...h,
-          id,
-          name: label,
-          dailyQuantities: daily,
-          total: kg,
-          unitPrice: priced.length && kg ? amount / kg : null,
-          tripPrices: [...new Set(priced.map((i) => i.unitPrice as number))].sort((a, b) => a - b),
-          unpricedTripCount: rows.length - priced.length,
-          ratio: null,
-          carryOverKg: 0,
-          sourceIds: rows.map((i) => i.id),
-        };
+        childRowAmount.set(id, rows.reduce((sum, i) => sum + calculateImportAmount(i), 0));
+        return buildTripGroupRow(h, id, label, rows);
       };
       for (const [typeName, rows] of types) {
-        const typeId = `${h.id}${TYPE_ROW_MARKER}${typeName}`;
+        const typeId = importTypeRowId(h.id, typeName);
         const sellers = new Map<string, MaterialImportItem[]>();
         for (const i of rows) sellers.set(i.supplierName || "(chưa ghi đại lý)", [...(sellers.get(i.supplierName || "(chưa ghi đại lý)") ?? []), i]);
         const sellerOpen = openSellerRows.has(typeId);

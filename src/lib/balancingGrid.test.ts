@@ -1,6 +1,10 @@
 import { describe, expect, test } from "vitest";
 import type { BalancingOutputItem, BalancingPeriod, MaterialImportItem, SalesInvoice, SalesItem } from "@/types";
 import {
+  buildTripGroupRow,
+  dailyAverageImportPrices,
+  groupTripsByType,
+  importTypeRowId,
   OTHER_CUSTOMER_ID,
   setRepaidDebt,
   getBalancingStockLineKind,
@@ -310,6 +314,42 @@ describe("buildMaterialGridRows — giá NL theo TỪNG CHUYẾN (chốt 2026-10
     const [h] = buildMaterialGridRows([{ ...input, autoSource: "" as const, dailyQuantities: { "2026-10-15": 10 } }], imports);
     expect(h.unitPrice).toBe(999);
     expect(h.tripPrices).toBeUndefined();
+  });
+});
+
+describe("dòng LOẠI tách từ dòng kỳ sổ nhập — groupTripsByType / buildTripGroupRow / dailyAverageImportPrices", () => {
+  const small = (id: string, kg: number, price: number | null, date = "2026-10-15"): MaterialImportItem => ({
+    ...makeImport(date, "Bạch tuộc 2 da nhỏ (80↓)", kg),
+    id,
+    unitPrice: price,
+  });
+  const trips = [pricedImport("l1", 1000, 140000), small("n1", 500, 133000), small("n2", 300, 134000, "2026-10-16"), small("n0", 0, 999)];
+  const input = {
+    id: "ho", periodId: "k", groupName: "Thủy sản" as const, name: "Bạch tuộc 2 da", quantityKg: 0,
+    unitPrice: null, ratioPercentage: 5, autoSource: "imports" as const,
+  };
+
+  test("gom theo loại, bỏ chuyến 0 kg, sắp theo tên", () => {
+    expect(groupTripsByType(trips).map(([t, rows]) => [t, rows.map((r) => r.id)])).toEqual([
+      ["Bạch tuộc 2 da lớn (80↑)", ["l1"]],
+      ["Bạch tuộc 2 da nhỏ (80↓)", ["n1", "n2"]],
+    ]);
+  });
+  test("dòng loại: kg theo ngày, tiền = Σ kg × giá từng chuyến, tỷ lệ trống; hai loại cộng lại = dòng kỳ", () => {
+    const [base] = buildMaterialGridRows([input], trips);
+    const rows = groupTripsByType(trips).map(([t, r]) => buildTripGroupRow(base, importTypeRowId(base.id, t), t, r));
+    expect(rows[1].id).toBe("ho::type::Bạch tuộc 2 da nhỏ (80↓)");
+    expect(rows[1].dailyQuantities).toEqual({ "2026-10-15": 500, "2026-10-16": 300 });
+    expect(rows[1].total * (rows[1].unitPrice ?? 0)).toBeCloseTo(500 * 133000 + 300 * 134000, 3);
+    expect(rows[1].ratio).toBeNull();
+    expect(rows[0].total + rows[1].total).toBe(base.total);
+    expect(rows.reduce((s, r) => s + r.total * (r.unitPrice ?? 0), 0)).toBeCloseTo(base.total * (base.unitPrice ?? 0), 3);
+  });
+  test("giá theo ngày: bình quân theo kg của ngày, làm tròn; chuyến chưa có giá không tính", () => {
+    expect(dailyAverageImportPrices([pricedImport("a", 100, 140000), pricedImport("b", 300, 133000), pricedImport("c", 50, null)])).toEqual({
+      "2026-10-15": Math.round((100 * 140000 + 300 * 133000) / 400),
+    });
+    expect(dailyAverageImportPrices([pricedImport("c", 50, null)])).toEqual({});
   });
 });
 

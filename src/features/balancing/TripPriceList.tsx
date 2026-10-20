@@ -13,26 +13,34 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/design-system";
 import { formatDayLabel } from "@/lib/balancingGrid";
 import { num } from "@/lib/format";
 
-export function TripPriceList({ rowName, trips }: { rowName: string; trips: MaterialImportItem[] }) {
+export function TripPriceList({
+  rowName,
+  trips,
+  label = "theo chuyến",
+}: {
+  rowName: string;
+  trips: MaterialImportItem[];
+  /** Chữ trên ô (2026-10-20: giá BÌNH QUÂN theo kg của dòng). */
+  label?: string;
+}) {
   const [open, setOpen] = useState(false);
   const sorted = [...trips]
     .filter((i) => i.quantityKg !== 0)
     .sort((a, b) => a.deliveryDate.localeCompare(b.deliveryDate) || a.supplierName.localeCompare(b.supplierName));
   const totalKg = sorted.reduce((s, i) => s + i.quantityKg, 0);
   const totalAmount = sorted.reduce((s, i) => s + calculateImportAmount(i), 0);
-  /* Tên loại ngắn: bỏ phần loài đầu tên ("Bạch tuộc 2 da lớn (80↑)" ⇒ "2 da lớn (80↑)"). */
-  const species = rowName.split(/\s+(?=\S*\d)/)[0] ?? "";
-  const shortType = (t: string) =>
-    species && t.toLowerCase().startsWith(species.toLowerCase() + " ") ? t.slice(species.length + 1) : t;
+  /* Tên loại ngắn: bỏ phần LOÀI đứng trước con số đầu tiên của chính tên loại
+     ("Bạch tuộc 2 da lớn (80↑)" ⇒ "2 da lớn (80↑)"); tên không có số thì giữ nguyên. */
+  const shortType = (t: string) => t.replace(/^\D+?\s(?=\d)/u, "") || t;
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="text-sm text-primary underline decoration-dotted underline-offset-2 hover:decoration-solid"
-          title={`Xem giá từng chuyến của "${rowName}" trong kỳ (${sorted.length} chuyến).`}
+          className="tnum text-primary underline decoration-dotted underline-offset-2 hover:decoration-solid"
+          title={`Giá bình quân theo kg của "${rowName}" — bấm xem giá từng chuyến (${sorted.length} chuyến).`}
         >
-          theo chuyến
+          {label}
         </button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-auto max-w-[min(32rem,calc(100vw-1rem))] p-3">

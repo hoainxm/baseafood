@@ -61,6 +61,8 @@ const PRICE_COLUMN_KEYS = new Set(["donGia", "thanhTien"]);
 /** Id hàng phụ "Giá gửi" theo ngày dưới dòng Gửi đông (chỉ ở màn, không lưu). */
 const PRICE_ROW_SUFFIX = "::price";
 const priceRowId = (rowId: string) => `${rowId}${PRICE_ROW_SUFFIX}`;
+/** Hàng "Giá (đ/kg)" THEO NGÀY (chỉ xem) dưới dòng sổ nhập ở bảng theo ngày — không có ở bảng chính. */
+const DAY_PRICE_ROW_SUFFIX = "::day-price";
 /** Bề rộng (px) cột bảng CHÍNH khối NL — gọn để A–L (NL · Xuất khẩu · Ghi chú) vừa một màn. */
 const MAIN_COLUMN_WIDTHS: Record<string, number> = { soLuong: 76, donGia: 84, thanhTien: 112, tyLe: 52 };
 
@@ -124,22 +126,24 @@ export function MaterialGrid({
     h.fromImports ? h.sourceIds.flatMap((id) => importById.get(id) ?? []) : [];
   /** Thành tiền thật của từng dòng con đại lý (id dòng con → đ). */
   const childRowAmount = new Map<string, number>();
-  /** Dòng loại NL đang mở dòng con theo đại lý. */
-  const [expandedSuppliers, setExpandedSuppliers] = useState<ReadonlySet<string>>(() => new Set());
-  /** Dòng loại NL có dòng sổ nhập (mở được theo đại lý) — cho nút mở/gập tất cả. */
-  /* Dòng sổ nhập gộp ≥ 2 LOẠI (2 da lớn + nhỏ) — mở ra được theo loại. */
-  const idsWithSupplier = materialRows
-    .filter((h) => h.fromImports && new Set(importRowsOf(h).filter((i) => i.quantityKg !== 0).map((i) => i.materialTypeName)).size > 1)
-    .map((h) => h.id);
-  const hasSupplierRows = idsWithSupplier.length > 0;
-  const allSuppliersExpanded = hasSupplierRows && idsWithSupplier.every((id) => expandedSuppliers.has(id));
-  const toggleSupplierOpen = (id: string) =>
-    setExpandedSuppliers((prev) => {
+  /* Kế toán chốt 2026-10-20: dòng gộp họ (2 da lớn + nhỏ) HIỆN SẴN 2 dòng loại; người bán
+     (đại lý) dưới mỗi loại GẬP sẵn, bấm mới mở. `collapsedFamilies` = dòng gộp người dùng tự
+     thu lại; `openSellerRows` = dòng loại đang mở người bán. */
+  const [collapsedFamilies, setCollapsedFamilies] = useState<ReadonlySet<string>>(() => new Set());
+  const [openSellerRows, setOpenSellerRows] = useState<ReadonlySet<string>>(() => new Set());
+  const toggleIn = (set: (f: (prev: ReadonlySet<string>) => ReadonlySet<string>) => void, id: string) =>
+    set((prev) => {
       const n = new Set(prev);
       if (n.has(id)) n.delete(id);
       else n.add(id);
       return n;
     });
+  /** Dòng sổ nhập gộp ≥ 2 LOẠI — có 2 dòng loại hiện sẵn (thu lại được). */
+  const familyRowIds = materialRows
+    .filter((h) => h.fromImports && new Set(importRowsOf(h).filter((i) => i.quantityKg !== 0).map((i) => i.materialTypeName)).size > 1)
+    .map((h) => h.id);
+  const hasFamilyRows = familyRowIds.length > 0;
+  const allFamiliesCollapsed = hasFamilyRows && familyRowIds.every((id) => collapsedFamilies.has(id));
   const [addingGroup, setAddingGroup] = useState<InputGroup | "decrease" | null>(null);
   const [isImportPickerOpen, setIsImportPickerOpen] = useState(false);
   /** id dòng kho ẢO (chưa lưu) — dòng thật tạo ra DÙNG LẠI đúng id này, nên ô đang gõ
@@ -552,11 +556,14 @@ export function MaterialGrid({
       /* Dòng sổ nhập (+ dòng con chuyến): giá ĐÚNG theo chuyến — cùng một giá thì hiện giá đó,
          nhiều giá ⇒ "theo chuyến" (không hiện số bình quân, chốt 2026-10-20). */
       renderValue: (h) => {
-        const prices = h.fromImports ? (h.tripPrices ?? []) : h.unitPrice != null ? [h.unitPrice] : [];
-        // Bấm "theo chuyến" ⇒ bảng nhỏ giá từng chuyến của dòng (chỉ xem, 2026-10-20).
-        if (h.fromImports && prices.length > 1) return <TripPriceList rowName={h.name} trips={importRowsOf(h)} />;
-        const v = prices[0];
-        return v == null ? <span className="text-muted-foreground">—</span> : num(Math.round(v));
+        /* Kế toán chốt 2026-10-20: "giá bình quân cần thể hiện ra" ⇒ dòng sổ nhập hiện giá BÌNH
+           QUÂN theo kg (= tiền ÷ kg; tiền vẫn Σ kg × giá từng chuyến). Nhiều mức giá ⇒ số bình
+           quân BẤM ĐƯỢC, hiện bảng giá từng chuyến (chỉ xem). */
+        if (h.unitPrice == null) return <span className="text-muted-foreground">—</span>;
+        const average = num(Math.round(h.unitPrice));
+        if (h.fromImports && (h.tripPrices?.length ?? 0) > 1)
+          return <TripPriceList rowName={h.name.replace(/^↳\s*/, "")} trips={importRowsOf(h)} label={average} />;
+        return average;
       },
       /* Gửi đông có giá KHÁC nhau theo ngày ⇒ ô này là bình quân, KHOÁ: ô ghi theo từng phím
          (Esc trả số bình quân) nên để gõ được thì lỡ tay là san phẳng giá từng ngày. Giá cùng
@@ -625,9 +632,10 @@ export function MaterialGrid({
       header: "Ghi chú",
       label: "Ghi chú",
       kind: "input",
-      fill: true,
+      /* Kế toán 2026-10-20: "ghi chú ở nguyên liệu dài quá, không cần ưu tiên hiển thị" ⇒ cột HẸP
+         cuối bảng, KHÔNG giãn lấp chỗ trống (trước là cột giãn ăn hết phần dư). */
       align: "left",
-      minWidth: 160,
+      minWidth: 140,
       getValue: () => null,
       renderValue: (h) => getOriginal(h.id)?.note ?? "",
       isLocked: (h) => !getOriginal(h.id),
@@ -976,15 +984,15 @@ export function MaterialGrid({
   const gridRows: GridRow<MaterialGridRow>[] = [...stockGridRows(thawGridRows)];
   for (const g of groupsWithRows) {
     for (const h of g.rows) {
-      /* Mở ra theo LOẠI (người dùng chốt 2026-10-20: "chỉ cần tách 2 dòng 2 da lớn, 2 da nhỏ,
-         mở ra đọc được là được, còn lại thu gọn"): dòng gộp họ ⇒ mỗi LOẠI một dòng con chỉ
-         xem — kg theo ngày, giá (các chuyến cùng giá ⇒ giá đó, khác giá ⇒ "theo chuyến"), tiền
-         = Σ kg × giá TỪNG chuyến (không bình quân). Chỉ một loại ⇒ không cần mở. Mặc định thu. */
+      /* Kế toán chốt 2026-10-20: "tách 2 dòng 2 da lớn 2 da nhỏ, thu gọn người bán, giá bình
+         quân cần thể hiện ra" ⇒ dòng gộp họ HIỆN SẴN mỗi LOẠI một dòng con (kg theo ngày · giá
+         BÌNH QUÂN · tiền = Σ kg × giá TỪNG chuyến); dưới mỗi loại người bán (đại lý) GẬP sẵn,
+         bấm "n người bán" mới mở. Chỉ một loại ⇒ không tách. Số bình quân bấm được ⇒ xem từng chuyến. */
       const trips = (h.fromImports ? importRowsOf(h) : []).filter((i) => i.quantityKg !== 0);
       const byType = new Map<string, MaterialImportItem[]>();
       for (const i of trips) byType.set(i.materialTypeName, [...(byType.get(i.materialTypeName) ?? []), i]);
       const types = [...byType.entries()].sort(([a], [b]) => a.localeCompare(b));
-      const open = types.length > 1 && expandedSuppliers.has(h.id);
+      const open = types.length > 1 && !collapsedFamilies.has(h.id);
       gridRows.push({
         id: h.id,
         data: h,
@@ -995,35 +1003,58 @@ export function MaterialGrid({
             <button
               type="button"
               aria-expanded={open}
-              onClick={() => toggleSupplierOpen(h.id)}
-              title={
-                open
-                  ? "Thu gọn — về lại một dòng gộp."
-                  : `Tách dòng này thành ${types.length} loại (${types.map(([t]) => t).join(", ")}) — kg, giá, tiền từng loại (chỉ xem).`
-              }
+              onClick={() => toggleIn(setCollapsedFamilies, h.id)}
+              title={open ? "Thu gọn — chỉ còn một dòng gộp." : `Tách ra ${types.length} loại (${types.map(([t]) => t).join(", ")}).`}
               className="mt-0.5 inline-flex items-center gap-1 text-sm text-primary hover:underline"
             >
               <ChevronDown className={`size-4 transition-transform ${open ? "" : "-rotate-90"}`} aria-hidden />
-              {types.length} loại
+              {open ? "Thu gọn" : `Tách ${types.length} loại`}
             </button>
           ) : undefined,
       });
-      if (!open) continue;
+      /* Kế toán 2026-10-20: "giá từng ngày nằm đâu… mắc gì ẩn, mở lại cho chị" ⇒ dưới dòng sổ nhập
+         (loại, hoặc dòng gộp khi thu / chỉ một loại) LUÔN có hàng "Giá (đ/kg)" chỉ xem ở bảng theo
+         ngày: ô ngày = giá của ngày đó (nhiều chuyến khác giá cùng ngày ⇒ bình quân theo kg của
+         ngày; chi tiết bấm "n chuyến" ở ô kg). Ngày chưa có giá ⇒ "—". */
+      const dayPriceRow = (parentId: string, rows: MaterialImportItem[]): GridRow<MaterialGridRow> => {
+        const byDay = new Map<string, { kg: number; amount: number }>();
+        for (const i of rows) {
+          if (i.unitPrice == null) continue;
+          const d = byDay.get(i.deliveryDate) ?? { kg: 0, amount: 0 };
+          d.kg += i.quantityKg;
+          d.amount += calculateImportAmount(i);
+          byDay.set(i.deliveryDate, d);
+        }
+        const prices: DailyQuantities = {};
+        for (const [date, d] of byDay) if (d.kg) prices[date] = Math.round(d.amount / d.kg);
+        const id = `${parentId}${DAY_PRICE_ROW_SUFFIX}`;
+        return {
+          id,
+          data: { ...h, id, name: "Giá (đ/kg)", dailyQuantities: prices, total: 0, unitPrice: null, ratio: null, carryOverKg: 0, fromImports: false, sourceIds: [], tripPrices: undefined, unpricedTripCount: undefined },
+          label: "Giá (đ/kg)",
+          kind: "child",
+        };
+      };
+      if (!open) {
+        if (trips.length > 0 && canViewPrice) gridRows.push(dayPriceRow(h.id, trips));
+        continue;
+      }
       /* Tên loại ngắn: bỏ phần LOÀI đứng đầu tên dòng cha ("Bạch tuộc") —
          "Bạch tuộc 2 da lớn (80↑)" ⇒ "2 da lớn (80↑)". */
       const species = h.name.split(/\s+(?=\S*\d)/)[0] ?? "";
       const shortType = (t: string) =>
         species && t.toLowerCase().startsWith(species.toLowerCase() + " ") ? t.slice(species.length + 1) : t;
-      for (const [typeName, rows] of types) {
+      /** Một dòng con chỉ xem (loại hoặc người bán) từ một nhóm chuyến — giá = bình quân theo kg. */
+      const tripGroupRow = (id: string, label: string, rows: MaterialImportItem[]): MaterialGridRow => {
         const daily: DailyQuantities = {};
         for (const i of rows) daily[i.deliveryDate] = (daily[i.deliveryDate] ?? 0) + i.quantityKg;
         const kg = rows.reduce((sum, i) => sum + i.quantityKg, 0);
         const amount = rows.reduce((sum, i) => sum + calculateImportAmount(i), 0);
         const priced = rows.filter((i) => i.unitPrice != null);
-        const label = shortType(typeName);
-        const childRow: MaterialGridRow = {
+        childRowAmount.set(id, amount);
+        return {
           ...h,
-          id: `${h.id}::type::${typeName}`,
+          id,
           name: label,
           dailyQuantities: daily,
           total: kg,
@@ -1034,14 +1065,40 @@ export function MaterialGrid({
           carryOverKg: 0,
           sourceIds: rows.map((i) => i.id),
         };
-        childRowAmount.set(childRow.id, amount);
+      };
+      for (const [typeName, rows] of types) {
+        const typeId = `${h.id}::type::${typeName}`;
+        const sellers = new Map<string, MaterialImportItem[]>();
+        for (const i of rows) sellers.set(i.supplierName || "(chưa ghi đại lý)", [...(sellers.get(i.supplierName || "(chưa ghi đại lý)") ?? []), i]);
+        const sellerOpen = openSellerRows.has(typeId);
+        const unpriced = rows.filter((i) => i.unitPrice == null).length;
         gridRows.push({
-          id: childRow.id,
-          data: childRow,
-          label,
+          id: typeId,
+          data: tripGroupRow(typeId, shortType(typeName), rows),
+          label: shortType(typeName),
           kind: "child",
-          subLabel: rows.length > priced.length ? `${rows.length - priced.length} chuyến chưa có giá — điền ở Nhập hàng` : undefined,
+          subLabel: (
+            <span className="block">
+              <button
+                type="button"
+                aria-expanded={sellerOpen}
+                onClick={() => toggleIn(setOpenSellerRows, typeId)}
+                title={sellerOpen ? "Gập người bán lại." : `Xem ${sellers.size} người bán (đại lý) của loại này — kg, giá bình quân, tiền.`}
+                className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+              >
+                <ChevronDown className={`size-4 transition-transform ${sellerOpen ? "" : "-rotate-90"}`} aria-hidden />
+                {sellers.size} người bán
+              </button>
+              {unpriced > 0 && <span className="block">{unpriced} chuyến chưa có giá — điền ở Nhập hàng</span>}
+            </span>
+          ),
         });
+        if (canViewPrice) gridRows.push(dayPriceRow(typeId, rows));
+        if (!sellerOpen) continue;
+        for (const [seller, sellerRows] of [...sellers.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+          const sellerId = `${typeId}::seller::${seller}`;
+          gridRows.push({ id: sellerId, data: tripGroupRow(sellerId, `↳ ${seller}`, sellerRows), label: `↳ ${seller}`, kind: "child" });
+        }
       }
     }
   }
@@ -1077,7 +1134,7 @@ export function MaterialGrid({
   gridRows.push(...stockGridRows(freezeDepositGridRows));
   /* Bảng chính: dòng đủ ô điều khiển (chọn lô / kho, tách đại lý…), không có hàng Giá gửi
      theo ngày. Bảng theo ngày: tên dòng TRẦN (như cột M bảng giấy lặp tên) + hàng Giá gửi. */
-  const mainGridRows = gridRows.filter((r) => r.kind !== "detail");
+  const mainGridRows = gridRows.filter((r) => r.kind !== "detail" && !r.id.endsWith(DAY_PRICE_ROW_SUFFIX));
   const dayGridRows = gridRows.map((r) => (r.kind === "child" || r.kind === "detail" ? r : { ...r, subLabel: undefined }));
 
   /* Dòng lệch tên + dòng đang thuộc kỳ khác đều chọn tay được từ một chỗ. */
@@ -1143,19 +1200,19 @@ export function MaterialGrid({
             <ChevronsLeftRight />
             {isDateColumnsCollapsed ? "Hiện theo ngày" : "Ẩn theo ngày"}
           </Button>
-          {hasSupplierRows && (
+          {hasFamilyRows && (
             <Button
               variant="outline"
-              aria-pressed={allSuppliersExpanded}
+              aria-pressed={!allFamiliesCollapsed}
               title={
-                allSuppliersExpanded
-                  ? "Thu gọn — mỗi họ nguyên liệu về lại một dòng gộp."
-                  : "Tách các dòng gộp (VD Bạch tuộc 2 da) thành từng loại: 2 da lớn, 2 da nhỏ — kg, giá, tiền từng loại (chỉ xem)."
+                allFamiliesCollapsed
+                  ? "Tách các dòng gộp (VD Bạch tuộc 2 da) ra 2 da lớn, 2 da nhỏ — kg, giá bình quân, tiền từng loại."
+                  : "Thu gọn — mỗi họ nguyên liệu chỉ còn một dòng gộp."
               }
-              onClick={() => setExpandedSuppliers(allSuppliersExpanded ? new Set() : new Set(idsWithSupplier))}
+              onClick={() => setCollapsedFamilies(allFamiliesCollapsed ? new Set() : new Set(familyRowIds))}
             >
               <Users />
-              {allSuppliersExpanded ? "Gộp loại" : "Tách theo loại"}
+              {allFamiliesCollapsed ? "Tách theo loại" : "Thu gọn loại"}
             </Button>
           )}
         </div>

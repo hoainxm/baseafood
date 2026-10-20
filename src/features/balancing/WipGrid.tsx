@@ -340,9 +340,9 @@ export function WipGrid({
       header: "Ghi chú",
       label: "Ghi chú",
       kind: "input",
-      fill: true,
+      /* Người dùng 2026-10-20: ghi chú không cần ưu tiên hiển thị ⇒ cột HẸP cuối bảng, không giãn. */
       align: "left",
-      minWidth: 160,
+      minWidth: 140,
       getValue: () => null,
       renderValue: (h) => finishedGoods.find((r) => r.id === h.id)?.note ?? "",
       renderCell: (h) => (

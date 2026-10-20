@@ -97,3 +97,4 @@
 2026-10-20 | permissions + documents (cấp quyền ghi tài liệu cho kế toán trưởng) | docs/spec/role-permissions.md, docs/app-map/40-documents.md, docs/app-map/03-database.md
 2026-10-20 | balancing,design-system (hộp Dòng nhập tay thiếu thông tin + gỡ khối Lãi/lỗ đến từ đâu) | docs/app-map/31-can-doi-ky.md,docs/app-map/36-so-kho-thang.md,src/design-system/README.md
 2026-10-20 | balancing,imports,db,data-layer,design-system (tách theo loại, xoá dòng tại chỗ, kỳ tự lấy sổ nhập + kỳ chồng ngày) | docs/app-map/31-can-doi-ky.md,docs/app-map/30-nhap-hang.md,docs/app-map/03-database.md,docs/app-map/04-tang-du-lieu.md,docs/spec/che-do-demo.md,src/design-system/README.md,docs/app-map/34-btp-san-xuat-kho.ba-spec.md
+2026-10-20 | balancing (feedback kế toán: tách 2 loại hiện sẵn, gập người bán, hiện giá bình quân — dùng lại định tuyến cùng phiên) | docs/app-map/31-can-doi-ky.md,src/design-system/README.md

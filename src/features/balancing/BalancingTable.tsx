@@ -177,17 +177,9 @@ export default function BalancingTable({
                     )}
                   </Td>
                   <Td right>{num(r.total)}</Td>
-                  {/* Dòng sổ nhập nhiều mức giá ⇒ "theo chuyến" (tiền vẫn = Σ kg × giá từng chuyến,
-                      không in số bình quân — chốt 2026-10-20). */}
-                  {!hideAmounts && (
-                    <Td right>
-                      {r.fromImports && (r.tripPrices?.length ?? 0) > 1
-                        ? "theo chuyến"
-                        : r.unitPrice != null
-                          ? num(Math.round(r.unitPrice))
-                          : ""}
-                    </Td>
-                  )}
+                  {/* Dòng sổ nhập: in giá BÌNH QUÂN theo kg (kế toán chốt 2026-10-20 — như file Excel
+                      mẫu); tiền vẫn = Σ kg × giá từng chuyến. */}
+                  {!hideAmounts && <Td right>{r.unitPrice != null ? num(Math.round(r.unitPrice)) : ""}</Td>}
                   {/* Chưa khai đơn giá thì để trống — "-0" (dòng giảm × giá 0)
                       đọc như một con số thật, người xem bảng in sẽ tưởng lỗi. */}
                   {!hideAmounts && <Td right>{r.unitPrice ? num(r.total * r.unitPrice) : ""}</Td>}

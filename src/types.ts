@@ -26,7 +26,8 @@ export type Role =
   | "chief-accountant"
   | "accountant"
   | "team-leader"
-  | "warehouse-keeper";
+  | "warehouse-keeper"
+  | "planner";
 
 export const ROLES: { value: Role; label: string }[] = [
   { value: "admin", label: "Quản trị viên" },
@@ -40,6 +41,7 @@ export const ROLES: { value: Role; label: string }[] = [
   { value: "warehouse-keeper", label: "Thủ kho nhập hàng" },
   { value: "chief-accountant", label: "Kế toán trưởng" },
   { value: "accountant", label: "Kế toán" },
+  { value: "planner", label: "Nhân viên Kế hoạch" },
 ];
 
 /**
@@ -303,6 +305,16 @@ export interface Customer {
   code: string;
   name: string;
   market: string; // e.g. Japan, EU, domestic
+  /**
+   * Thông tin khách xuất khẩu (mig 0075, Phòng Kế hoạch). `undefined` = máy chủ chưa có cột
+   * (chưa chạy 0075) ⇒ repo KHÔNG gửi cột này, ghi khách vẫn chạy.
+   */
+  country?: string;
+  address?: string;
+  defaultPort?: string;
+  paymentTerms?: string;
+  contactName?: string;
+  contactEmail?: string;
 }
 
 export interface Supplier {
@@ -1081,5 +1093,215 @@ export interface DocumentVersion {
   /** Ngày lần này hết hiệu lực (lần mới thay) — tính thời hạn lưu. */
   obsoletedOn: string;
   recordedByName: string;
+  createdAt: string;
+}
+
+/* ---------- Phòng Kế hoạch · Xuất khẩu (mig 0075, ba-spec docs/app-map/41-export-planning.ba-spec.md) ---------- */
+
+export type ExportPaymentMethod = "ttr" | "lc" | "other";
+/** Loại chuyến: cont lạnh, xe tải (biển số thay số cont), đóng ghép (không có cont riêng). */
+export type ExportShipmentKind = "20RF" | "40RF" | "40HC-RF" | "truck" | "consolidated";
+export type ExportDocumentKind =
+  | "commercial-invoice"
+  | "packing-list"
+  | "bill-of-lading"
+  | "health-certificate"
+  | "certificate-of-origin"
+  | "expiry-list"
+  | "sample-invoice"
+  | "insurance"
+  | "microbiology-report"
+  | "other";
+
+/** Chứng từ khách yêu cầu trên hợp đồng — giữ form (C/O form VJ…) và người cấp (H/C tự cấp…). */
+export interface ExportRequiredDocument {
+  kind: ExportDocumentKind;
+  form: string;
+  issuer: string;
+}
+
+/** Một dòng hàng của hợp đồng. `unitKind = bundle` ⇒ một kiện gồm `cartonsPerUnit` thùng. */
+export interface ExportContractLine {
+  id: string;
+  description: string;
+  hsCode: string;
+  size: string;
+  packing: string;
+  unitKind: "carton" | "bundle";
+  cartonsPerUnit: number;
+  netKgPerCarton: number | null;
+  quantity: number | null;
+  kg: number | null;
+  unitPrice: number | null;
+  microSpec: string;
+}
+
+/** Điều khoản của MỘT bản hợp đồng (bản 0 hoặc bản sửa). */
+export interface ExportContractTerms {
+  incoterm: string;
+  portOfLoading: string;
+  portOfDischarge: string;
+  paymentMethod: ExportPaymentMethod;
+  depositPct: number | null;
+  lcNo: string;
+  lcExpiry: string;
+  lcLatestShipment: string;
+  currency: string;
+  tolerancePct: number | null;
+  latestShipmentDate: string;
+  containerCount: number | null;
+  containerType: string;
+  requiredDocuments: ExportRequiredDocument[];
+}
+
+/** Hợp đồng — danh tính + trạng thái lưu tay (hủy / đóng tay). Duyệt, khép tự suy (lib/exportPlanning.ts). */
+export interface ExportContract {
+  id: string;
+  customerId: string;
+  contractNo: string;
+  signedOn: string;
+  orderRef: string;
+  status: "open" | "cancelled" | "closed";
+  cancelReason: string;
+  closeReason: string;
+  note: string;
+  createdAt: string;
+}
+
+/** Một bản hợp đồng — KHÔNG ghi đè (KH-R7). Bản hiệu lực = bản `approved` mới nhất. */
+export interface ExportContractRevision {
+  id: string;
+  contractId: string;
+  revisionNo: number;
+  revisedOn: string;
+  changeSummary: string;
+  terms: ExportContractTerms;
+  lines: ExportContractLine[];
+  filePath: string;
+  fileName: string;
+  recordedBy: string;
+  createdAt: string;
+}
+
+export type ExportApprovalDecision = "approved" | "needs-revision" | "rejected";
+
+/** Một lần ghi kết quả BGĐ ký giấy cho MỘT bản (Q4). */
+export interface ExportContractApproval {
+  id: string;
+  contractId: string;
+  revisionId: string;
+  decision: ExportApprovalDecision;
+  approverName: string;
+  decidedOn: string;
+  reason: string;
+  filePath: string;
+  fileName: string;
+  recordedBy: string;
+  createdAt: string;
+}
+
+/** Gia hạn giao hàng khách đã xác nhận (KH-R11) — không cần BGĐ duyệt lại. */
+export interface ExportDeadlineExtension {
+  id: string;
+  contractId: string;
+  newDeadline: string;
+  confirmedOn: string;
+  note: string;
+  filePath: string;
+  fileName: string;
+  recordedBy: string;
+  createdAt: string;
+}
+
+/** Chuyến = một container (Q2). Tháng = ngày đóng ?? ETD ?? tháng kế hoạch (Q1). */
+export interface ExportShipment {
+  id: string;
+  contractId: string;
+  planMonth: string;
+  kind: ExportShipmentKind;
+  goodsSummary: string;
+  plannedKg: number | null;
+  lotCode: string;
+  portOfDischarge: string;
+  bookingNo: string;
+  loadingDate: string;
+  etd: string;
+  eta: string;
+  vesselVoyage: string;
+  containerNo: string;
+  sealNo: string;
+  status: "open" | "cancelled";
+  cancelReason: string;
+  note: string;
+  createdAt: string;
+}
+
+/** Bước / mục của chuyến (bước 2 → 5). Bước 1 theo hợp đồng, bước 6 = tiền về (bảng riêng). */
+export type ExportStep =
+  | "production-order"
+  | "packaging"
+  | "loading-plan"
+  | "loading-photos"
+  | "customs-declaration"
+  | "export-order"
+  | "document";
+
+export type ExportItemState = "not-started" | "in-progress" | "done" | "not-applicable";
+
+export interface ExportStepItem {
+  id: string;
+  shipmentId: string;
+  step: ExportStep;
+  /** Chỉ mục bước 5 (`document`). */
+  docKind: ExportDocumentKind | "";
+  docForm: string;
+  docIssuer: string;
+  state: ExportItemState;
+  number: string;
+  issuedOn: string;
+  note: string;
+  naReason: string;
+  /** "Dùng chung với chuyến …" — id mục ĐÃ XONG của chuyến khác cùng HĐ / cùng booking. */
+  sharedFromId: string;
+  /** Commercial Invoice: tổng thùng / kg tịnh / tiền ⇒ thực xuất (không tính hàng mẫu, không B/L). */
+  cartons: number | null;
+  netKg: number | null;
+  amount: number | null;
+  /** B/L: ngày on board ⇒ tính trễ hạn. */
+  onBoardDate: string;
+  createdAt: string;
+}
+
+/** File / ảnh gắn bước của chuyến. Bước 4a/4b tự xong khi có file. */
+export interface ExportFile {
+  id: string;
+  contractId: string;
+  shipmentId: string;
+  stepItemId: string;
+  step: ExportStep;
+  path: string;
+  fileName: string;
+  layerNo: number | null;
+  caption: string;
+  uploadedBy: string;
+  createdAt: string;
+}
+
+export type ExportPaymentKind = "payment" | "documents-sent";
+
+/** Bước 6: gửi bộ chứng từ cho khách + tiền về (cấp chuyến hoặc cấp HĐ — tiền cọc). Không chặn khép kín (Q5). */
+export interface ExportPayment {
+  id: string;
+  contractId: string;
+  shipmentId: string;
+  kind: ExportPaymentKind;
+  date: string;
+  amount: number | null;
+  currency: string;
+  method: string;
+  note: string;
+  filePath: string;
+  fileName: string;
+  recordedBy: string;
   createdAt: string;
 }

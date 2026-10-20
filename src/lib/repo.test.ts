@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("@/lib/supabase", () => ({ supabase: null, hasSupabase: false, SITE_ID: "test" }));
 
 import {
+  CUSTOMER_TABLE,
   RECONCILIATION_RUN_TABLE,
   WIP_PRODUCTION_TABLE,
   dropSentKeys,
@@ -238,5 +239,18 @@ describe("kịch bản 4 — bị từ chối vì quyền (42501, phân quyền 
     expect(upsertBatches.length).toBe(1 + 5); // 1 lượt gộp + 5 dòng thử
     const remaining = dropSentKeys({ them: rows.map((r) => r.id), xoa: [] }, result, jsonOf(rows));
     expect(remaining.them).toHaveLength(40);
+  });
+});
+
+describe("khách hàng — cột xuất khẩu (mig 0075)", () => {
+  it("máy chủ chưa có cột ⇒ đọc ra undefined, ghi KHÔNG gửi cột (khỏi kẹt hàng chờ)", () => {
+    const c = CUSTOMER_TABLE.fromRow({ id: "k1", code: "1", name: "Seachemot", market: "Nhật" });
+    expect(c.country).toBeUndefined();
+    expect(Object.keys(CUSTOMER_TABLE.toRow(c)).sort()).toEqual(["code", "id", "market", "name"]);
+  });
+  it("máy chủ đã có cột ⇒ đọc + gửi đủ 6 cột", () => {
+    const c = CUSTOMER_TABLE.fromRow({ id: "k1", code: "", name: "SCM", market: "", country: "Nhật Bản", address: "", default_port: "Tokyo", payment_terms: "", contact_name: "", contact_email: "" });
+    expect(c).toMatchObject({ country: "Nhật Bản", defaultPort: "Tokyo", address: "" });
+    expect(CUSTOMER_TABLE.toRow(c)).toMatchObject({ country: "Nhật Bản", default_port: "Tokyo", payment_terms: "", contact_email: "" });
   });
 });

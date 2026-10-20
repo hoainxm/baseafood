@@ -65,6 +65,13 @@ Repo không chốt quy ước từ đầu. Hệ quả:
 | phòng ban | `department` | | xem xét / phê duyệt | `review` / `approve` |
 | biểu mẫu · quy trình · hướng dẫn | `form` · `procedure` · `instruction` | | chứng nhận · hồ sơ năng lực | `certificate` · `capabilityProfile` |
 | thu hồi (tài liệu) | `withdraw` | | hết hiệu lực (lần ban hành) | `obsolete` |
+| hợp đồng (xuất khẩu) | `exportContract` | | bản hợp đồng (rvs / phụ kiện) | `revision` (số bản = `revisionNo`) |
+| kết quả duyệt (BGĐ ký giấy) | `approval` (`decision`) | | gia hạn giao hàng | `deadlineExtension` |
+| chuyến (1 container) | `shipment` | | mã lô xuất khẩu (MSL) | `lotCode` |
+| bước / mục của chuyến | `step` / `stepItem` | | chứng từ (bộ chứng từ) | `document` (`docKind`) |
+| thực xuất | `actuals` | | tiền về / gửi bộ chứng từ | `payment` / `documents-sent` |
+| dung sai | `tolerance` | | khép kín | `closure` (`closed`) |
+| Phòng Kế hoạch · nhân viên kế hoạch | `planning` · `planner` | | người đóng hàng (ảnh đóng cont) | `loading` |
 | danh mục | `catalog` | | tô màu dòng / đã dò | `rowMark` / `marked` |
 | hàng chờ đồng bộ | `syncQueue` | | người thao tác | `operator` |
 

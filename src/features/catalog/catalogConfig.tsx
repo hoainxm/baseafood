@@ -8,6 +8,7 @@
 // "Bột đi kèm" của mặt hàng.
 // ============================================================
 import { useMemo } from "react";
+import { hasExportStorage } from "@/lib/exportFileStorage";
 import type {
   BatterType,
   FinishedGood,
@@ -335,6 +336,13 @@ export function buildCatalogFields(
         />
       ),
     },
+    // Thông tin xuất khẩu (mig 0075) — Phòng Kế hoạch dùng khi lập hợp đồng (điền sẵn cảng đích).
+    { key: "country", group: "Xuất khẩu", label: "Quốc gia", hideInTable: true, example: "VD: Nhật Bản" },
+    { key: "defaultPort", group: "Xuất khẩu", label: "Cảng đích mặc định", hideInTable: true, example: "VD: Tokyo" },
+    { key: "paymentTerms", group: "Xuất khẩu", label: "Điều kiện thanh toán", hideInTable: true, example: "VD: TTR 100% sau chứng từ" },
+    { key: "address", group: "Xuất khẩu", label: "Địa chỉ", hideInTable: true, span: "wide", example: "VD: 2-9-5 Irifune, Chuo-ku, Tokyo" },
+    { key: "contactName", group: "Xuất khẩu", label: "Người liên hệ", hideInTable: true },
+    { key: "contactEmail", group: "Xuất khẩu", label: "Email liên hệ", hideInTable: true },
   ];
 
   // Thứ tự = thứ tự trong hộp Thêm/Sửa: chia NHÓM, lưới nhiều cột (gọn chiều dọc).
@@ -483,6 +491,9 @@ export function buildCatalogFields(
   };
 }
 
+const EXPORT_CUSTOMER_KEYS = new Set<string>(["country", "address", "defaultPort", "paymentTerms", "contactName", "contactEmail"]);
+const hasExportCustomerColumns = (rows: readonly Customer[]) => !hasExportStorage || rows.some((r) => r.country !== undefined);
+
 /** Nguồn dữ liệu của một danh mục — PHẢI là đúng instance `useTable` của màn đang mở. */
 export interface CatalogSource<T> {
   rows: T[];
@@ -538,7 +549,9 @@ export function buildCatalogConfigs(
       entityName: "khách hàng",
       rows: n.customer.rows,
       onChange: n.customer.onChange,
-      fields: fields.customer,
+      // Máy chủ chưa chạy 0075 (đọc khách không thấy cột xuất khẩu) ⇒ ẩn 6 ô xuất khẩu, khỏi gửi
+      // cột chưa có làm kẹt hàng chờ. Chạy chỉ-máy-này thì luôn hiện.
+      fields: hasExportCustomerColumns(n.customer.rows) ? fields.customer : fields.customer.filter((f) => !EXPORT_CUSTOMER_KEYS.has(f.key)),
       loading: n.customer.loading,
       validate: (editing, rows) => checkDuplicateCode(editing, rows, "khách hàng"),
       createEmpty: () => ({ id: uid(), code: "", name: "", market: "" }),

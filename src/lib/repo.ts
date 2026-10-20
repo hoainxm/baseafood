@@ -51,6 +51,16 @@ import type {
   TaskAssignment,
   CompanyDocument,
   DocumentVersion,
+  ExportContract,
+  ExportContractApproval,
+  ExportContractLine,
+  ExportContractRevision,
+  ExportContractTerms,
+  ExportDeadlineExtension,
+  ExportFile,
+  ExportPayment,
+  ExportShipment,
+  ExportStepItem,
   BatterType,
   DomesticSaleItem,
   RowMark,
@@ -294,17 +304,39 @@ export const PRODUCT_TABLE: TableMapping<Product> = {
   }),
 };
 
+/** Cột thông tin xuất khẩu của khách (mig 0075) — app ⇄ DB. */
+const CUSTOMER_EXPORT_COLUMNS = [
+  ["country", "country"],
+  ["address", "address"],
+  ["defaultPort", "default_port"],
+  ["paymentTerms", "payment_terms"],
+  ["contactName", "contact_name"],
+  ["contactEmail", "contact_email"],
+] as const;
+
+/**
+ * Khách hàng. Cột xuất khẩu (0075) chỉ GỬI khi đã có giá trị (đọc được cột từ máy chủ hoặc
+ * người dùng vừa gõ) — máy chủ chưa chạy 0075 thì khách cũ vẫn ghi được, không kẹt hàng chờ.
+ */
 export const CUSTOMER_TABLE: TableMapping<Customer> = {
   table: "customers",
   localKey: "bsf.customers.v2",
   getKey: theoId,
-  toRow: (x) => ({ id: x.id, code: x.code, name: x.name, market: x.market }),
-  fromRow: (r) => ({
-    id: s(r.id),
-    code: s(r.code),
-    name: s(r.name),
-    market: s(r.market),
-  }),
+  toRow: (x) => {
+    const row: Record<string, unknown> = { id: x.id, code: x.code, name: x.name, market: x.market };
+    for (const [k, col] of CUSTOMER_EXPORT_COLUMNS) if (x[k] !== undefined) row[col] = x[k] ?? "";
+    return row;
+  },
+  fromRow: (r) => {
+    const c: Customer = {
+      id: s(r.id),
+      code: s(r.code),
+      name: s(r.name),
+      market: s(r.market),
+    };
+    for (const [k, col] of CUSTOMER_EXPORT_COLUMNS) if (col in r) c[k] = s(r[col]);
+    return c;
+  },
 };
 
 /** Chuyến hàng — một đại lý, một lượt giao, nhiều dòng loại hàng. */
@@ -2031,6 +2063,349 @@ export const DOCUMENT_VERSION_TABLE: TableMapping<DocumentVersion> = {
   }),
 };
 
+/* ---------- Phòng Kế hoạch · Xuất khẩu (mig 0075) ---------- */
+// Không khóa ngoại (khuôn 0070 / 0072): contract_id / revision_id / shipment_id / step_item_id /
+// shared_from_id là liên kết MỀM ⇒ khai refColumns để chế độ demo gắn tiền tố `demo:`.
+
+const numOrNull = (v: unknown) => {
+  const x = n(v);
+  return x != null && Number.isFinite(x) ? x : null;
+};
+const jsonOf = (v: unknown): unknown => {
+  if (typeof v !== "string") return v;
+  try {
+    return JSON.parse(v);
+  } catch {
+    return null;
+  }
+};
+const PAYMENT_METHOD_VALUES = new Set(["ttr", "lc", "other"]);
+const SHIPMENT_KIND_VALUES = new Set(["20RF", "40RF", "40HC-RF", "truck", "consolidated"]);
+const STEP_VALUES = new Set(["production-order", "packaging", "loading-plan", "loading-photos", "customs-declaration", "export-order", "document"]);
+const ITEM_STATE_VALUES = new Set(["not-started", "in-progress", "done", "not-applicable"]);
+const DECISION_VALUES = new Set(["approved", "needs-revision", "rejected"]);
+
+function parseTerms(v: unknown): ExportContractTerms {
+  const t = (jsonOf(v) ?? {}) as Record<string, unknown>;
+  const docs = Array.isArray(t.requiredDocuments) ? (t.requiredDocuments as Record<string, unknown>[]) : [];
+  return {
+    incoterm: s(t.incoterm),
+    portOfLoading: s(t.portOfLoading),
+    portOfDischarge: s(t.portOfDischarge),
+    paymentMethod: (PAYMENT_METHOD_VALUES.has(s(t.paymentMethod)) ? s(t.paymentMethod) : "ttr") as ExportContractTerms["paymentMethod"],
+    depositPct: numOrNull(t.depositPct),
+    lcNo: s(t.lcNo),
+    lcExpiry: s(t.lcExpiry).slice(0, 10),
+    lcLatestShipment: s(t.lcLatestShipment).slice(0, 10),
+    currency: s(t.currency) || "USD",
+    tolerancePct: numOrNull(t.tolerancePct),
+    latestShipmentDate: s(t.latestShipmentDate).slice(0, 10),
+    containerCount: numOrNull(t.containerCount),
+    containerType: s(t.containerType),
+    requiredDocuments: docs.map((d) => ({ kind: (s(d.kind) || "other") as ExportContractTerms["requiredDocuments"][number]["kind"], form: s(d.form), issuer: s(d.issuer) })),
+  };
+}
+
+function parseLines(v: unknown): ExportContractLine[] {
+  const xs = jsonOf(v);
+  if (!Array.isArray(xs)) return [];
+  return (xs as Record<string, unknown>[]).map((l) => ({
+    id: s(l.id),
+    description: s(l.description),
+    hsCode: s(l.hsCode),
+    size: s(l.size),
+    packing: s(l.packing),
+    unitKind: s(l.unitKind) === "bundle" ? "bundle" : "carton",
+    cartonsPerUnit: Number(l.cartonsPerUnit) || 1,
+    netKgPerCarton: numOrNull(l.netKgPerCarton),
+    quantity: numOrNull(l.quantity),
+    kg: numOrNull(l.kg),
+    unitPrice: numOrNull(l.unitPrice),
+    microSpec: s(l.microSpec),
+  }));
+}
+
+export const EXPORT_CONTRACT_TABLE: TableMapping<ExportContract> = {
+  table: "export_contracts",
+  localKey: "bsf.export-contracts.v1",
+  getKey: theoId,
+  toRow: (x) => ({
+    id: x.id,
+    customer_id: x.customerId,
+    contract_no: x.contractNo,
+    signed_on: dateOrNull(x.signedOn),
+    order_ref: x.orderRef,
+    status: x.status,
+    cancel_reason: x.cancelReason,
+    close_reason: x.closeReason,
+    note: x.note,
+  }),
+  fromRow: (r) => ({
+    id: s(r.id),
+    customerId: s(r.customer_id),
+    contractNo: s(r.contract_no),
+    signedOn: s(r.signed_on).slice(0, 10),
+    orderRef: s(r.order_ref),
+    status: s(r.status) === "cancelled" ? "cancelled" : s(r.status) === "closed" ? "closed" : "open",
+    cancelReason: s(r.cancel_reason),
+    closeReason: s(r.close_reason),
+    note: s(r.note),
+    createdAt: s(r.created_at),
+  }),
+};
+
+export const EXPORT_CONTRACT_REVISION_TABLE: TableMapping<ExportContractRevision> = {
+  table: "export_contract_revisions",
+  localKey: "bsf.export-contract-revisions.v1",
+  getKey: theoId,
+  refColumns: ["contract_id"],
+  toRow: (x) => ({
+    id: x.id,
+    contract_id: x.contractId,
+    revision_no: x.revisionNo,
+    revised_on: dateOrNull(x.revisedOn),
+    change_summary: x.changeSummary,
+    terms: x.terms,
+    lines: x.lines,
+    file_path: x.filePath,
+    file_name: x.fileName,
+    recorded_by: x.recordedBy,
+  }),
+  fromRow: (r) => ({
+    id: s(r.id),
+    contractId: s(r.contract_id),
+    revisionNo: Number(r.revision_no) || 0,
+    revisedOn: s(r.revised_on).slice(0, 10),
+    changeSummary: s(r.change_summary),
+    terms: parseTerms(r.terms),
+    lines: parseLines(r.lines),
+    filePath: s(r.file_path),
+    fileName: s(r.file_name),
+    recordedBy: s(r.recorded_by),
+    createdAt: s(r.created_at),
+  }),
+};
+
+export const EXPORT_CONTRACT_APPROVAL_TABLE: TableMapping<ExportContractApproval> = {
+  table: "export_contract_approvals",
+  localKey: "bsf.export-contract-approvals.v1",
+  getKey: theoId,
+  refColumns: ["contract_id", "revision_id"],
+  toRow: (x) => ({
+    id: x.id,
+    contract_id: x.contractId,
+    revision_id: x.revisionId,
+    decision: x.decision,
+    approver_name: x.approverName,
+    decided_on: dateOrNull(x.decidedOn),
+    reason: x.reason,
+    file_path: x.filePath,
+    file_name: x.fileName,
+    recorded_by: x.recordedBy,
+  }),
+  fromRow: (r) => ({
+    id: s(r.id),
+    contractId: s(r.contract_id),
+    revisionId: s(r.revision_id),
+    decision: (DECISION_VALUES.has(s(r.decision)) ? s(r.decision) : "needs-revision") as ExportContractApproval["decision"],
+    approverName: s(r.approver_name),
+    decidedOn: s(r.decided_on).slice(0, 10),
+    reason: s(r.reason),
+    filePath: s(r.file_path),
+    fileName: s(r.file_name),
+    recordedBy: s(r.recorded_by),
+    createdAt: s(r.created_at),
+  }),
+};
+
+export const EXPORT_DEADLINE_EXTENSION_TABLE: TableMapping<ExportDeadlineExtension> = {
+  table: "export_deadline_extensions",
+  localKey: "bsf.export-deadline-extensions.v1",
+  getKey: theoId,
+  refColumns: ["contract_id"],
+  toRow: (x) => ({
+    id: x.id,
+    contract_id: x.contractId,
+    new_deadline: x.newDeadline,
+    confirmed_on: dateOrNull(x.confirmedOn),
+    note: x.note,
+    file_path: x.filePath,
+    file_name: x.fileName,
+    recorded_by: x.recordedBy,
+  }),
+  fromRow: (r) => ({
+    id: s(r.id),
+    contractId: s(r.contract_id),
+    newDeadline: s(r.new_deadline).slice(0, 10),
+    confirmedOn: s(r.confirmed_on).slice(0, 10),
+    note: s(r.note),
+    filePath: s(r.file_path),
+    fileName: s(r.file_name),
+    recordedBy: s(r.recorded_by),
+    createdAt: s(r.created_at),
+  }),
+};
+
+export const EXPORT_SHIPMENT_TABLE: TableMapping<ExportShipment> = {
+  table: "export_shipments",
+  localKey: "bsf.export-shipments.v1",
+  getKey: theoId,
+  refColumns: ["contract_id"],
+  toRow: (x) => ({
+    id: x.id,
+    contract_id: x.contractId,
+    plan_month: x.planMonth,
+    kind: x.kind,
+    goods_summary: x.goodsSummary,
+    planned_kg: x.plannedKg,
+    lot_code: x.lotCode,
+    port_of_discharge: x.portOfDischarge,
+    booking_no: x.bookingNo,
+    loading_date: dateOrNull(x.loadingDate),
+    etd: dateOrNull(x.etd),
+    eta: dateOrNull(x.eta),
+    vessel_voyage: x.vesselVoyage,
+    container_no: x.containerNo,
+    seal_no: x.sealNo,
+    status: x.status,
+    cancel_reason: x.cancelReason,
+    note: x.note,
+  }),
+  fromRow: (r) => ({
+    id: s(r.id),
+    contractId: s(r.contract_id),
+    planMonth: s(r.plan_month),
+    kind: (SHIPMENT_KIND_VALUES.has(s(r.kind)) ? s(r.kind) : "40RF") as ExportShipment["kind"],
+    goodsSummary: s(r.goods_summary),
+    plannedKg: numOrNull(r.planned_kg),
+    lotCode: s(r.lot_code),
+    portOfDischarge: s(r.port_of_discharge),
+    bookingNo: s(r.booking_no),
+    loadingDate: s(r.loading_date).slice(0, 10),
+    etd: s(r.etd).slice(0, 10),
+    eta: s(r.eta).slice(0, 10),
+    vesselVoyage: s(r.vessel_voyage),
+    containerNo: s(r.container_no),
+    sealNo: s(r.seal_no),
+    status: s(r.status) === "cancelled" ? "cancelled" : "open",
+    cancelReason: s(r.cancel_reason),
+    note: s(r.note),
+    createdAt: s(r.created_at),
+  }),
+};
+
+export const EXPORT_STEP_ITEM_TABLE: TableMapping<ExportStepItem> = {
+  table: "export_step_items",
+  localKey: "bsf.export-step-items.v1",
+  getKey: theoId,
+  refColumns: ["shipment_id", "shared_from_id"],
+  toRow: (x) => ({
+    id: x.id,
+    shipment_id: x.shipmentId,
+    step: x.step,
+    doc_kind: x.docKind,
+    doc_form: x.docForm,
+    doc_issuer: x.docIssuer,
+    state: x.state,
+    number: x.number,
+    issued_on: dateOrNull(x.issuedOn),
+    note: x.note,
+    na_reason: x.naReason,
+    shared_from_id: x.sharedFromId,
+    cartons: x.cartons,
+    net_kg: x.netKg,
+    amount: x.amount,
+    on_board_date: dateOrNull(x.onBoardDate),
+  }),
+  fromRow: (r) => ({
+    id: s(r.id),
+    shipmentId: s(r.shipment_id),
+    step: (STEP_VALUES.has(s(r.step)) ? s(r.step) : "document") as ExportStepItem["step"],
+    docKind: s(r.doc_kind) as ExportStepItem["docKind"],
+    docForm: s(r.doc_form),
+    docIssuer: s(r.doc_issuer),
+    state: (ITEM_STATE_VALUES.has(s(r.state)) ? s(r.state) : "not-started") as ExportStepItem["state"],
+    number: s(r.number),
+    issuedOn: s(r.issued_on).slice(0, 10),
+    note: s(r.note),
+    naReason: s(r.na_reason),
+    sharedFromId: s(r.shared_from_id),
+    cartons: numOrNull(r.cartons),
+    netKg: numOrNull(r.net_kg),
+    amount: numOrNull(r.amount),
+    onBoardDate: s(r.on_board_date).slice(0, 10),
+    createdAt: s(r.created_at),
+  }),
+};
+
+export const EXPORT_FILE_TABLE: TableMapping<ExportFile> = {
+  table: "export_files",
+  localKey: "bsf.export-files.v1",
+  getKey: theoId,
+  refColumns: ["contract_id", "shipment_id", "step_item_id"],
+  toRow: (x) => ({
+    id: x.id,
+    contract_id: x.contractId,
+    shipment_id: x.shipmentId,
+    step_item_id: x.stepItemId,
+    step: x.step,
+    path: x.path,
+    file_name: x.fileName,
+    layer_no: x.layerNo,
+    caption: x.caption,
+    uploaded_by: x.uploadedBy,
+  }),
+  fromRow: (r) => ({
+    id: s(r.id),
+    contractId: s(r.contract_id),
+    shipmentId: s(r.shipment_id),
+    stepItemId: s(r.step_item_id),
+    step: (STEP_VALUES.has(s(r.step)) ? s(r.step) : "document") as ExportFile["step"],
+    path: s(r.path),
+    fileName: s(r.file_name),
+    layerNo: numOrNull(r.layer_no),
+    caption: s(r.caption),
+    uploadedBy: s(r.uploaded_by),
+    createdAt: s(r.created_at),
+  }),
+};
+
+export const EXPORT_PAYMENT_TABLE: TableMapping<ExportPayment> = {
+  table: "export_payments",
+  localKey: "bsf.export-payments.v1",
+  getKey: theoId,
+  refColumns: ["contract_id", "shipment_id"],
+  toRow: (x) => ({
+    id: x.id,
+    contract_id: x.contractId,
+    shipment_id: x.shipmentId,
+    kind: x.kind,
+    date: dateOrNull(x.date),
+    amount: x.amount,
+    currency: x.currency,
+    method: x.method,
+    note: x.note,
+    file_path: x.filePath,
+    file_name: x.fileName,
+    recorded_by: x.recordedBy,
+  }),
+  fromRow: (r) => ({
+    id: s(r.id),
+    contractId: s(r.contract_id),
+    shipmentId: s(r.shipment_id),
+    kind: s(r.kind) === "documents-sent" ? "documents-sent" : "payment",
+    date: s(r.date).slice(0, 10),
+    amount: numOrNull(r.amount),
+    currency: s(r.currency) || "USD",
+    method: s(r.method),
+    note: s(r.note),
+    filePath: s(r.file_path),
+    fileName: s(r.file_name),
+    recordedBy: s(r.recorded_by),
+    createdAt: s(r.created_at),
+  }),
+};
+
 /* ---------- Nhật ký thao tác (audit) ---------- */
 
 /** Nhãn tiếng Việt của bảng — cho câu tóm tắt nhật ký dễ đọc. */
@@ -2070,6 +2445,14 @@ const TABLE_LABELS: Record<string, string> = {
   task_assignments: "Giao việc",
   company_documents: "Tài liệu công ty",
   document_versions: "Lần ban hành tài liệu",
+  export_contracts: "Hợp đồng xuất khẩu",
+  export_contract_revisions: "Bản hợp đồng xuất khẩu",
+  export_contract_approvals: "Kết quả duyệt hợp đồng",
+  export_deadline_extensions: "Gia hạn giao hàng",
+  export_shipments: "Chuyến xuất khẩu",
+  export_step_items: "Bước của chuyến xuất khẩu",
+  export_files: "File hồ sơ xuất khẩu",
+  export_payments: "Gửi chứng từ / tiền về",
   row_marks: "Tô màu dòng",
   app_roles: "Vai trò",
   role_permissions: "Quyền của vai trò",

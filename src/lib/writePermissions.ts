@@ -139,6 +139,17 @@ export const TABLE_WRITE_RULES: Readonly<Record<string, TableRule | null>> = {
   // App kiểm ở màn /documents bằng useCan("documents").
   company_documents: null,
   document_versions: null,
+  // Xuất khẩu (mig 0075): máy chủ chốt bằng RLS RIÊNG (has_export_permission — đọc theo 3 tài
+  // nguyên export-plans*, người đóng hàng chỉ thêm file 4a/4b) — không qua trigger 0065.
+  // App kiểm ở màn /planning-export bằng useCan("export-plans" | ".loading" | ".payments").
+  export_contracts: null,
+  export_contract_revisions: null,
+  export_contract_approvals: null,
+  export_deadline_extensions: null,
+  export_shipments: null,
+  export_step_items: null,
+  export_files: null,
+  export_payments: null,
 };
 
 export interface WriteDenial {

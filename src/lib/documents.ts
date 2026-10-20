@@ -52,6 +52,8 @@ export const SYSTEM_ROLE_DEPARTMENTS: Readonly<Partial<Record<Role, readonly Dep
   "manager-kho": ["production-dried"],
   "vice-manager": ["production-frozen", "production-fish", "production-dried"],
   "team-leader": ["production-frozen", "production-fish", "production-dried"],
+  // Phòng Kế hoạch (mig 0075) — hàm SQL current_user_departments() lặp lại đúng dòng này.
+  planner: ["planning"],
 };
 
 /** Phòng ban của một người = HỢP phòng các vai trò. */

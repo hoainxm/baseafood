@@ -42,6 +42,14 @@ import {
   TASK_ASSIGNMENT_TABLE,
   COMPANY_DOCUMENT_TABLE,
   DOCUMENT_VERSION_TABLE,
+  EXPORT_CONTRACT_TABLE,
+  EXPORT_CONTRACT_REVISION_TABLE,
+  EXPORT_CONTRACT_APPROVAL_TABLE,
+  EXPORT_DEADLINE_EXTENSION_TABLE,
+  EXPORT_SHIPMENT_TABLE,
+  EXPORT_STEP_ITEM_TABLE,
+  EXPORT_FILE_TABLE,
+  EXPORT_PAYMENT_TABLE,
   BATTER_TYPE_TABLE,
   ROW_MARK_TABLE,
   DOMESTIC_SALE_TABLE,
@@ -300,6 +308,15 @@ export const useTaskAssignments = () => useTable(TASK_ASSIGNMENT_TABLE);
 /** Tài liệu công ty + lần ban hành — màn /documents (mig 0072). Lọc theo phòng ban ở lib/documents.ts. */
 export const useCompanyDocuments = () => useTable(COMPANY_DOCUMENT_TABLE);
 export const useDocumentVersions = () => useTable(DOCUMENT_VERSION_TABLE);
+/** Phòng Kế hoạch · Xuất khẩu (mig 0075) — luật ở lib/exportPlanning.ts. */
+export const useExportContracts = () => useTable(EXPORT_CONTRACT_TABLE);
+export const useExportContractRevisions = () => useTable(EXPORT_CONTRACT_REVISION_TABLE);
+export const useExportContractApprovals = () => useTable(EXPORT_CONTRACT_APPROVAL_TABLE);
+export const useExportDeadlineExtensions = () => useTable(EXPORT_DEADLINE_EXTENSION_TABLE);
+export const useExportShipments = () => useTable(EXPORT_SHIPMENT_TABLE);
+export const useExportStepItems = () => useTable(EXPORT_STEP_ITEM_TABLE);
+export const useExportFiles = () => useTable(EXPORT_FILE_TABLE);
+export const useExportPayments = () => useTable(EXPORT_PAYMENT_TABLE);
 /** Tô màu dòng "đã dò" kiểu Excel — MỘT bảng dùng chung mọi bảng (mig 0055).
  *  Màn hình KHÔNG gọi thẳng: đi qua `RowMarkProvider` (features/shared) gắn một lần
  *  ở ShellLayout, bảng bật bằng prop `rowMarkKey` của design-system. */

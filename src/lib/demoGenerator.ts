@@ -53,10 +53,19 @@ import type {
   Supplier,
   WipProductionItem,
   Workshop,
+  ExportContract,
+  ExportContractApproval,
+  ExportContractRevision,
+  ExportDeadlineExtension,
+  ExportFile,
+  ExportPayment,
+  ExportShipment,
+  ExportStepItem,
 } from "@/types";
 import { calculateBalancing } from "@/lib/balancingCalc";
 import { RETAIL_WAREHOUSE, FG_WAREHOUSE } from "@/lib/inventory";
 import { listDatesInRange, subtractDays } from "@/lib/dataFlow";
+import { buildExportDemo } from "@/lib/exportPlanningDemo";
 
 /** Sổ thật đưa vào để quét tham số (chỉ ĐỌC). */
 export interface DemoSource {
@@ -106,6 +115,16 @@ export interface DemoBundle {
    *  bucket là của site thật); người trình diễn tự thêm tài liệu, file nằm ở `site-demo/…`. */
   companyDocuments: CompanyDocument[];
   documentVersions: DocumentVersion[];
+  /** Xuất khẩu (mig 0075) — bộ nhỏ dựng sẵn (lib/exportPlanningDemo.ts): 3 HĐ đủ ca khép kín /
+   *  đang đóng cont / chờ duyệt; file là đường dẫn GIỮ CHỖ (`demo-placeholder/…`), không chép file thật. */
+  exportContracts: ExportContract[];
+  exportContractRevisions: ExportContractRevision[];
+  exportContractApprovals: ExportContractApproval[];
+  exportDeadlineExtensions: ExportDeadlineExtension[];
+  exportShipments: ExportShipment[];
+  exportStepItems: ExportStepItem[];
+  exportFiles: ExportFile[];
+  exportPayments: ExportPayment[];
   labelPrints: LabelPrint[];
   qcChecklists: QcChecklistItem[];
   qcLocks: DailyLock[];
@@ -633,6 +652,7 @@ export function generateDemoBundle(n: DemoSource, tc: DemoOptions): DemoBundle {
   const recentMonths = [...new Set(n.monthlyStock.map((m) => m.period))].sort().slice(-3);
   const monthlyStock = n.monthlyStock.filter((m) => recentMonths.includes(m.period)).map((m) => ({ ...m }));
   const nxtSnapshots = n.nxtSnapshots.map((x) => ({ ...x }));
+  const exportDemo = buildExportDemo(customers, tc.today);
 
   return {
     products: n.products.map((p) => ({ ...p })),
@@ -661,6 +681,14 @@ export function generateDemoBundle(n: DemoSource, tc: DemoOptions): DemoBundle {
     taskAssignments: [],
     companyDocuments: [],
     documentVersions: [],
+    exportContracts: exportDemo.contracts,
+    exportContractRevisions: exportDemo.revisions,
+    exportContractApprovals: exportDemo.approvals,
+    exportDeadlineExtensions: exportDemo.extensions,
+    exportShipments: exportDemo.shipments,
+    exportStepItems: exportDemo.items,
+    exportFiles: exportDemo.files,
+    exportPayments: exportDemo.payments,
     labelPrints,
     qcChecklists,
     qcLocks,

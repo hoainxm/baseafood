@@ -53,6 +53,7 @@ export type ResourceGroup =
   | "sales"
   | "accounting"
   | "reports"
+  | "planning"
   | "documents"
   | "catalog"
   | "system";
@@ -65,6 +66,7 @@ export const RESOURCE_GROUP_LABELS: Record<ResourceGroup, string> = {
   sales: "Bán hàng",
   accounting: "Kế toán",
   reports: "Báo cáo",
+  planning: "Kế hoạch",
   documents: "Tài liệu",
   catalog: "Danh mục",
   system: "Hệ thống",
@@ -121,6 +123,14 @@ export const PERMISSION_RESOURCES: readonly PermissionResource[] = [
   // Xóa = xóa tài liệu chưa từng hiệu lực · Duyệt = xem xét / phê duyệt (đợt 2). Ma trận
   // mặc định KHÔNG cấp ô ghi nào ⇒ trước mắt chỉ admin làm (chủ dự án 2026-10-19).
   { id: "documents", label: "Tài liệu công ty", group: "documents", navId: "documents", actions: [...CRUD, "approve", "export"] },
+
+  // Phòng Kế hoạch · Xuất khẩu (mig 0075, ba-spec docs/app-map/41-export-planning.ba-spec.md R11).
+  // `export-plans` = hợp đồng, bản sửa, duyệt giấy, gia hạn, chuyến, bước, file. `.loading` = người
+  // đóng hàng chỉ THÊM ảnh / sơ đồ cont (không thấy giá). `.payments` = bước 6: gửi bộ chứng từ, tiền về.
+  // Máy chủ chặn bằng RLS riêng của 0075 (has_export_permission) — không qua trigger 0065.
+  { id: "export-plans", label: "Kế hoạch · Xuất khẩu", group: "planning", navId: "planning-export", actions: [...CRUD, "export", "view-price"] },
+  { id: "export-plans.loading", label: "Xuất khẩu · Ảnh & sơ đồ đóng cont", group: "planning", navId: "planning-export", actions: ["view", "create"] },
+  { id: "export-plans.payments", label: "Xuất khẩu · Chứng từ gửi khách & tiền về", group: "planning", navId: "planning-export", actions: CRUD },
 
   { id: "catalog.suppliers", label: "Danh mục · Đại lý", group: "catalog", navId: "catalog", actions: CRUD },
   { id: "catalog.customers", label: "Danh mục · Khách hàng", group: "catalog", navId: "catalog", actions: CRUD },
@@ -200,6 +210,8 @@ export const LEGACY_ROLE_PERMISSIONS: RolePermissionMatrix = {
   "manager-ca": grantAll(byNav(PRODUCTION_DEPARTMENT_NAV)),
   "manager-kho": grantAll(byNav(PRODUCTION_DEPARTMENT_NAV)),
   "vice-manager": grantAll(byNav(PRODUCTION_DEPARTMENT_NAV)),
+  // Vai trò mới (0075) — đường lùi khẩn vẫn giữ đúng module của Phòng Kế hoạch.
+  planner: grantAll(byNav(["planning-export", "catalog"])),
 };
 
 type RoleSpec = Readonly<Record<string, readonly PermissionAction[]>>;
@@ -320,6 +332,9 @@ const DIRECTOR: RoleSpec = {
   "nxt-warehouse": VIEW_EXPORT,
   "production-report": VIEW_EXPORT,
   "export-report": VIEW_EXPORT,
+  "export-plans": ["view", "export", "view-price"],
+  "export-plans.loading": VIEW,
+  "export-plans.payments": VIEW,
   ...catalogAll(VIEW),
 };
 
@@ -346,6 +361,10 @@ const CHIEF_ACCOUNTANT: RoleSpec = {
   // Tài liệu công ty: thêm / sửa / ghi lần ban hành / đính file / xóa tài liệu chưa ban hành
   // (chủ dự án cấp 2026-10-20, mig 0073). Duyệt (approve, đợt 2) để Ban giám đốc.
   documents: ["view", "create", "update", "delete", "export"],
+  // Xuất khẩu: xem hợp đồng + giá; ghi bước 6 (gửi bộ chứng từ, tiền về — Q5).
+  "export-plans": ["view", "export", "view-price"],
+  "export-plans.loading": VIEW,
+  "export-plans.payments": ["view", "create", "update", "delete"],
   ...catalogAll(["view", "create", "update", "delete"]),
 };
 
@@ -371,6 +390,10 @@ const ACCOUNTANT: RoleSpec = {
   "nxt-warehouse": ["view", "import", "export"],
   "production-report": VIEW_EXPORT,
   "export-report": VIEW_EXPORT,
+  "export-plans": ["view", "export", "view-price"],
+  "export-plans.loading": VIEW,
+  // Kế toán không xóa (luật chung của vai trò) — ghi sai tiền về thì KTT / phòng KH xóa.
+  "export-plans.payments": ["view", "create", "update"],
   ...catalogAll(["view", "create", "update"]),
 };
 
@@ -386,6 +409,8 @@ const WAREHOUSE_KEEPER: RoleSpec = {
   ...catalogAll(VIEW),
   "catalog.suppliers": ["view", "create", "update"],
   "catalog.material-types": ["view", "create", "update"],
+  // Đóng cont: chỉ THÊM ảnh lớp hàng / seal / sơ đồ (A2) — không thấy giá, không sửa bước khác.
+  "export-plans.loading": ["view", "create"],
 };
 
 /** Quản đốc xưởng: toàn quyền khâu sản xuất, MỞ LẠI ngày SX (xưởng mình — phạm vi là Đợt 5). Không thấy giá. */
@@ -405,6 +430,7 @@ const MANAGER: RoleSpec = {
   ...catalogAll(VIEW),
   "catalog.products": ["view", "create", "update"],
   "catalog.batters": ["view", "create", "update"],
+  "export-plans.loading": ["view", "create"],
 };
 
 /** Phó quản đốc: ghi thành phẩm hằng ngày; được XÓA dòng ghi nhầm (chủ dự án 2026-10-15), không chốt / mở lại. */
@@ -418,6 +444,7 @@ const VICE_MANAGER: RoleSpec = {
   warehouse: ["view", "approve"],
   "production-report": VIEW_EXPORT,
   "export-report": VIEW_EXPORT,
+  "export-plans.loading": ["view", "create"],
   ...catalogAll(VIEW),
 };
 
@@ -429,6 +456,24 @@ const TEAM_LEADER: RoleSpec = {
   qr: ["view", "create"],
   warehouse: VIEW,
   ...catalogAll(VIEW),
+};
+
+/**
+ * Nhân viên Kế hoạch (mig 0075, Q11 chủ dự án đồng ý 2026-10-20): toàn quyền module Xuất khẩu,
+ * ghi bước 6 cùng kế toán (A1), thêm / sửa khách hàng (thông tin xuất khẩu). Thấy giá.
+ * Xem Đơn đặt + báo cáo đơn xuất để đối chiếu; không ghi sổ kho / sản xuất / kế toán.
+ */
+const PLANNER: RoleSpec = {
+  "my-tasks": ["view", "create", "update", "delete"],
+  "export-plans": ["view", "create", "update", "delete", "export", "view-price"],
+  "export-plans.loading": ["view", "create"],
+  "export-plans.payments": ["view", "create", "update", "delete"],
+  orders: VIEW,
+  "export-report": VIEW_EXPORT,
+  qr: VIEW,
+  warehouse: VIEW,
+  ...catalogAll(VIEW),
+  "catalog.customers": ["view", "create", "update"],
 };
 
 /**
@@ -462,6 +507,7 @@ export const DEFAULT_ROLE_PERMISSIONS: RolePermissionMatrix = {
   "manager-ca": grantsOf(MANAGER, MANAGER_SCOPES),
   "manager-kho": grantsOf(MANAGER, MANAGER_SCOPES),
   "vice-manager": grantsOf(VICE_MANAGER),
+  planner: grantsOf(PLANNER),
 };
 
 /* ---------- Tính quyền thực ---------- */

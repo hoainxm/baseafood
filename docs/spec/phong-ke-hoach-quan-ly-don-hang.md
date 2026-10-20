@@ -3,7 +3,8 @@
 > **Load khi:** chuẩn bị xây module Phòng Kế hoạch: hồ sơ đơn hàng, báo giá, hợp đồng/L/C, lệnh sản xuất, theo dõi tiến độ, đề nghị/lệnh xuất hàng có duyệt, chứng từ, lưu hồ sơ.
 > **Trạng thái:** 🟨 **DỰ THẢO** — chưa build, chưa migration. Chờ phòng Kế hoạch xác nhận các mục ở §5 (họp). Sau khi chốt ⇒ viết `ba-spec` ở `app-map/` rồi mới thiết kế màn.
 > **Nguồn:** quy trình công ty [`ho-so-nang-luc/qti-kh-01-quan-ly-don-hang.md`](../ho-so-nang-luc/qti-kh-01-quan-ly-don-hang.md) (13 bước, 8 biểu mẫu, quy tắc KH-R1…R16) · sơ đồ xuất khẩu 6 bước chủ dự án gửi 2026-10-16 · code `/orders` đối chiếu 2026-10-19.
-> **last_verified:** 2026-10-19
+> **Phần Xuất khẩu:** kế hoạch build theo tháng × khách × hợp đồng (thay §4 bên dưới cho Xuất khẩu) ở [`xuat-khau-phong-ke-hoach.md`](xuat-khau-phong-ke-hoach.md) (2026-10-20).
+> **last_verified:** 2026-10-20
 
 ## 1. Vấn đề
 
@@ -81,7 +82,7 @@ YÊU CẦU KHÁCH (sổ 01-01) ──► kết luận: được / hủy (lý do)
 ## 6. Ràng buộc khi build (luật repo)
 
 - Tên kỹ thuật **tiếng Anh** (luật 8) — tra từ điển §2b [`quy-uoc-dat-ten`](quy-uoc-dat-ten.md), thiếu thì bổ sung từ điển trước (hợp đồng, L/C, báo giá, lệnh sản xuất, đề nghị xuất, hồ sơ đơn hàng).
-- **Migration mới từ `0072` trở lên** (`0071` đang do phiên khác giữ) — rà số với `origin` trước khi đặt; chỉ-thêm, idempotent, RLS ngay từ đầu, có câu lùi.
+- **Migration mới từ `0074` trở lên** (tới `0073` đã có trên `origin` 2026-10-20) — rà số với `origin` trước khi đặt; chỉ-thêm, idempotent, RLS ngay từ đầu, có câu lùi.
 - Bảng mới ⇒ cùng commit: `TableMapping` (+ `refColumns` cho khóa ngoại), `DemoBundle` + `DemoPackLoader` + checklist demo (luật 15), `rowMarkKey` (luật 12), nháp form (luật 17), tài nguyên mới trong `lib/permissions.ts` mặc định cấm + hành động `approve` cho BGĐ ([`role-permissions`](role-permissions.md)).
 - Nhắc hạn **dùng lại `/my-tasks`** ([`app-map/39`](../app-map/39-my-tasks.md)), không dựng chuông thứ hai.
 - File chứng từ dùng Supabase Storage — chốt bucket/thư mục + dung lượng trước đợt 1.

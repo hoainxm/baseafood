@@ -19,6 +19,7 @@ import {
   recordPaperVersion,
   safeFileName,
   attachVersionFile,
+  filePreviewKind,
 } from "./documents";
 import { DUE_OFFSET_DAYS, defaultDueDate, taskRequirements } from "./myTasks";
 
@@ -217,6 +218,12 @@ describe("file tải lên", () => {
     expect(checkDocumentFile({ name: "a.docx", size: 1000 }, "pdf")).toMatch(/chỉ PDF/);
     expect(checkDocumentFile({ name: "a.docx", size: 1000 }, "source")).toBeNull();
     expect(checkDocumentFile({ name: "a.pdf", size: 21 * 1024 * 1024 }, "pdf")).toMatch(/20 MB/);
+  });
+  it("cách xem: PDF / ảnh xem ngay, Word / Excel tải về", () => {
+    expect(filePreviewKind("QT.PDF")).toBe("pdf");
+    expect(filePreviewKind("scan.jpeg")).toBe("image");
+    expect(filePreviewKind("mau.docx")).toBe("download");
+    expect(filePreviewKind("khong-duoi")).toBe("download");
   });
   it("tên file an toàn cho đường dẫn (bỏ dấu, ký tự lạ)", () => {
     expect(safeFileName("Quy trình đơn hàng (bản ký).PDF")).toBe("Quy-trinh-don-hang-ban-ky.pdf");

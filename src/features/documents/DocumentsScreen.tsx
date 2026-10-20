@@ -7,7 +7,7 @@
 // Spec: docs/spec/quan-ly-tai-lieu.md · doc: docs/app-map/40-documents.md. Luật ở
 // lib/documents.ts (thuần, có test). Máy chủ chặn đọc theo phòng ban ở RLS 0072 — lọc ở đây
 // chỉ để giao diện khớp (chạy không đăng nhập thì thấy hết như các màn khác).
-import { useMemo, useRef, useState, type ReactNode } from "react";
+import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
   Button,
@@ -16,10 +16,8 @@ import {
   ConfirmAction,
   ConfirmDelete,
   EmptyState,
-  FormDialog,
   RecordTable,
   StatCardGrid,
-  SummaryTable,
   TableSkeleton,
   Tag,
   notify,
@@ -27,7 +25,6 @@ import {
   type ComboboxOption,
   type RecordTableColumn,
   type StatCardData,
-  type SummaryTableColumn,
   type TagVariant,
 } from "@/design-system";
 import { useAppRoles, useCompanyDocuments, useDocumentVersions } from "@/lib/catalogRepo";
@@ -37,11 +34,8 @@ import {
   DEPARTMENTS,
   DOCUMENT_KINDS,
   DOCUMENT_STATE_LABELS,
-  DOCUMENT_PDF_ACCEPT,
-  DOCUMENT_SOURCE_ACCEPT,
   activeVersionOf,
   attachVersionFile,
-  canDeleteDocument,
   checkDocumentFile,
   canViewDocument,
   departmentLabel,
@@ -50,31 +44,24 @@ import {
   documentViewerFor,
   expiryOf,
   formatRevision,
-  isPastRetention,
   recordPaperVersion,
-  versionsOf,
   type DocumentState,
 } from "@/lib/documents";
-import { documentFilePath, getDocumentFileUrl, hasDocumentStorage, removeDocumentFiles, uploadDocumentFile } from "@/lib/documentStorage";
+import { documentFilePath, hasDocumentStorage, removeDocumentFiles, uploadDocumentFile } from "@/lib/documentStorage";
 import { formatDateVN } from "@/lib/format";
 import type { CompanyDocument, DocumentVersion } from "@/types";
 import {
   AlarmClock,
   Archive,
-  ArchiveRestore,
-  Download,
   Eye,
   FileCheck2,
   FilePlus2,
-  FileSignature,
-  FileText,
   FileWarning,
   FolderOpen,
-  Paperclip,
-  Pencil,
-  Trash2,
 } from "lucide-react";
+import { DocumentDetailDialog } from "./DocumentDetailDialog";
 import { DocumentFormDialog, type DocumentFormTarget } from "./DocumentFormDialog";
+import { FilePreviewDialog, type PreviewFile } from "./FilePreviewDialog";
 import { VersionFormDialog } from "./VersionFormDialog";
 
 const STATE_TAGS: Record<DocumentState, TagVariant> = {
@@ -92,24 +79,6 @@ const STATUS_FILTERS = [
 ];
 const KIND_FILTERS: ComboboxOption[] = [{ value: "", label: "Mọi loại" }, ...DOCUMENT_KINDS.map((k) => ({ value: k.id, label: k.label }))];
 const DEPARTMENT_FILTERS: ComboboxOption[] = [{ value: "", label: "Mọi phòng" }, ...DEPARTMENTS.map((d) => ({ value: d.id, label: d.label }))];
-
-/**
- * Mở file trên tab mới. Mở cửa sổ TRƯỚC khi chờ link (trình duyệt chặn cửa sổ mở sau `await`),
- * rồi trỏ sang link có hạn.
- */
-async function openFile(path: string, downloadName?: string) {
-  const w = window.open("", "_blank");
-  const url = await getDocumentFileUrl(path, 600, downloadName);
-  if (!url) {
-    w?.close();
-    notify.error("Không mở được file — tài khoản không được xem tài liệu này, hoặc file đã bị gỡ khỏi máy chủ.");
-    return;
-  }
-  if (w) {
-    w.opener = null;
-    w.location.href = url;
-  } else window.location.assign(url);
-}
 
 export default function DocumentsScreen() {
   const today = todayIso();
@@ -137,8 +106,15 @@ export default function DocumentsScreen() {
   const [kindFilter, setKindFilter] = useState("");
   const [departmentFilter, setDepartmentFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("in-use");
+  const [onlyMissingFile, setOnlyMissingFile] = useState(false);
+  /** Đang hiệu lực mà lần hiện tại chưa có PDF đã ký. */
+  const isMissingFile = (d: CompanyDocument) => {
+    const v = activeVersionOf(versions, d.id);
+    return !d.isWithdrawn && !!v && !v.pdfPath;
+  };
   const rows = visibleDocs.filter(
     (d) =>
+      (!onlyMissingFile || isMissingFile(d)) &&
       (!kindFilter || d.kind === kindFilter) &&
       (!departmentFilter || d.ownerDepartment === departmentFilter || d.visibleDepartments.includes(departmentFilter)) &&
       (statusFilter === "all" || (statusFilter === "withdrawn" ? d.isWithdrawn : !d.isWithdrawn)),
@@ -161,6 +137,7 @@ export default function DocumentsScreen() {
   const [versionDoc, setVersionDoc] = useState<CompanyDocument | null>(null);
   const [withdrawing, setWithdrawing] = useState<CompanyDocument | null>(null);
   const [deleting, setDeleting] = useState<CompanyDocument | null>(null);
+  const [preview, setPreview] = useState<PreviewFile | null>(null);
 
   // ---- Ghi ----
   const saveDocument = (doc: CompanyDocument, isNew: boolean) => {
@@ -231,10 +208,7 @@ export default function DocumentsScreen() {
   const inUse = visibleDocs.filter((d) => !d.isWithdrawn);
   const activeCount = inUse.filter((d) => documentState(d, versions) === "active").length;
   const expiring = inUse.filter((d) => ["expiring", "expired"].includes(expiryOf(d, today).state));
-  const missingFile = inUse.filter((d) => {
-    const v = activeVersionOf(versions, d.id);
-    return !!v && !v.pdfPath;
-  });
+  const missingFile = inUse.filter(isMissingFile);
   const cards: StatCardData[] = [
     { label: "Tài liệu bạn xem được", value: inUse.length, numeric: true, icon: FolderOpen, color: "brand" },
     { label: "Đang hiệu lực", value: activeCount, numeric: true, icon: FileCheck2, color: "success" },
@@ -252,7 +226,9 @@ export default function DocumentsScreen() {
       numeric: true,
       icon: FileWarning,
       color: missingFile.length ? "warning" : "neutral",
-      subtext: "đang hiệu lực mà chưa đính bản đã ký",
+      subtext: missingFile.length ? "bấm để lọc ra các tài liệu này" : "đang hiệu lực mà chưa đính bản đã ký",
+      onSelect: missingFile.length ? () => setOnlyMissingFile(true) : undefined,
+      selectHint: "Lọc danh sách: chỉ tài liệu đang hiệu lực mà chưa có PDF đã ký.",
     },
   ];
 
@@ -294,6 +270,27 @@ export default function DocumentsScreen() {
         );
       },
       getSortValue: (d) => DOCUMENT_STATE_LABELS[documentState(d, versions)],
+    },
+    {
+      key: "file",
+      header: "File",
+      render: (d) => {
+        const v = activeVersionOf(versions, d.id);
+        if (!v) return "—";
+        return v.pdfPath ? (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setPreview({ path: v.pdfPath, name: v.pdfFileName || `${d.code}.pdf`, caption: `${d.code} · lần ${formatRevision(v.revisionNo)}` })}
+            title="Xem bản PDF đang hiệu lực ngay trong app."
+          >
+            <Eye className="mr-1 h-4 w-4" aria-hidden />
+            Xem PDF
+          </Button>
+        ) : (
+          <Tag variant="warning">Chưa có PDF</Tag>
+        );
+      },
     },
     {
       key: "parent",
@@ -342,6 +339,15 @@ export default function DocumentsScreen() {
         />
       </div>
 
+      {onlyMissingFile && (
+        <div role="status" className="flex flex-wrap items-center gap-3 rounded-lg bg-warning-surface px-4 py-2 text-sm">
+          <span className="min-w-0 flex-1">Đang lọc: chỉ tài liệu đang hiệu lực mà chưa có PDF đã ký. Mở từng tài liệu để đính file.</span>
+          <Button size="sm" variant="outline" onClick={() => setOnlyMissingFile(false)} title="Bỏ lọc, hiện lại mọi tài liệu.">
+            Bỏ lọc
+          </Button>
+        </div>
+      )}
+
       {isLoading ? (
         <TableSkeleton />
       ) : visibleDocs.length === 0 ? (
@@ -381,6 +387,7 @@ export default function DocumentsScreen() {
         can={{ write: canWrite, update: can.update, delete: can.delete, create: can.create }}
         onClose={() => openDetail("")}
         onOpen={openDetail}
+        onPreview={setPreview}
         onEdit={(d) => setFormTarget({ kind: "edit", document: d })}
         onAddChild={(d) => setFormTarget({ kind: "create", parentId: d.id })}
         onRecordVersion={(d) => setVersionDoc(d)}
@@ -389,6 +396,8 @@ export default function DocumentsScreen() {
         onRestore={(d) => setWithdrawn(d, false)}
         onDelete={(d) => setDeleting(d)}
       />
+
+      <FilePreviewDialog file={preview} onClose={() => setPreview(null)} />
 
       <DocumentFormDialog target={formTarget} documents={documents} onClose={() => setFormTarget(null)} onSave={saveDocument} />
 
@@ -427,291 +436,5 @@ export default function DocumentsScreen() {
         }}
       />
     </div>
-  );
-}
-
-/* ---------- Hộp chi tiết ---------- */
-
-function DocumentDetailDialog({
-  document: doc,
-  isMissing,
-  documents,
-  versions,
-  today,
-  can,
-  onClose,
-  onOpen,
-  onEdit,
-  onAddChild,
-  onRecordVersion,
-  onAttach,
-  onWithdraw,
-  onRestore,
-  onDelete,
-}: {
-  document: CompanyDocument | null;
-  /** Link `?doc=` trỏ tới tài liệu không có / không được xem. */
-  isMissing: boolean;
-  documents: readonly CompanyDocument[];
-  versions: readonly DocumentVersion[];
-  today: string;
-  can: { write: boolean; update: boolean; delete: boolean; create: boolean };
-  onClose: () => void;
-  onOpen: (id: string) => void;
-  onEdit: (d: CompanyDocument) => void;
-  onAddChild: (d: CompanyDocument) => void;
-  onRecordVersion: (d: CompanyDocument) => void;
-  onAttach: (v: DocumentVersion, kind: "pdf" | "source", file: File) => Promise<void>;
-  onWithdraw: (d: CompanyDocument) => void;
-  onRestore: (d: CompanyDocument) => void;
-  onDelete: (d: CompanyDocument) => void;
-}) {
-  if (isMissing)
-    return (
-      <FormDialog open onOpenChange={(o) => !o && onClose()} title="Không mở được tài liệu" icon={FileWarning} size="sm">
-        <p className="py-2">Tài liệu này không còn, hoặc không thuộc phòng của bạn.</p>
-      </FormDialog>
-    );
-  if (!doc) return null;
-
-  const own = versionsOf(versions, doc.id);
-  const active = own.find((v) => v.status === "active");
-  const children = documents.filter((d) => d.parentId === doc.id);
-  const parent = doc.parentId ? documents.find((d) => d.id === doc.parentId) : undefined;
-  const state = documentState(doc, versions);
-  const expiry = expiryOf(doc, today);
-  // Đính file cho lần còn thiếu: cần quyền ghi + đã nối máy chủ; tài liệu thu hồi thì thôi.
-  const canAttach = can.write && hasDocumentStorage && !doc.isWithdrawn;
-
-  const versionColumns: SummaryTableColumn<DocumentVersion>[] = [
-    { key: "rev", header: "Lần", render: (v) => <span className="font-semibold">{formatRevision(v.revisionNo)}</span> },
-    { key: "date", header: "Hiệu lực", render: (v) => (v.effectiveDate ? formatDateVN(v.effectiveDate) : "—") },
-    {
-      key: "status",
-      header: "Trạng thái",
-      render: (v) => (
-        <div className="flex flex-wrap gap-1">
-          {v.status === "active" ? (
-            <Tag variant="done">Đang hiệu lực</Tag>
-          ) : v.status === "obsolete" ? (
-            <Tag variant="muted">Hết hiệu lực{v.obsoletedOn ? ` ${formatDateVN(v.obsoletedOn)}` : ""}</Tag>
-          ) : (
-            <Tag variant="pending">Dự thảo</Tag>
-          )}
-          {isPastRetention(v, doc.retentionYears, today) && <Tag variant="warning">Quá hạn lưu</Tag>}
-        </div>
-      ),
-    },
-    {
-      key: "people",
-      header: "Soạn · xem xét · phê duyệt",
-      render: (v) => (
-        <div className="min-w-0 text-sm">
-          {[v.preparedByName, v.reviewedByName, v.approvedByName].filter(Boolean).join(" · ") || "—"}
-          {v.changeSummary && <div className="text-muted-foreground">{v.changeSummary}</div>}
-        </div>
-      ),
-    },
-    {
-      key: "files",
-      header: "File",
-      render: (v) => (
-        <div className="flex flex-wrap gap-2">
-          {v.pdfPath ? (
-            <Button size="sm" variant="outline" onClick={() => void openFile(v.pdfPath)} title="Mở bản PDF đã ký của lần ban hành này trên tab mới.">
-              <FileText className="mr-1 h-4 w-4" aria-hidden />
-              Mở PDF
-            </Button>
-          ) : canAttach ? (
-            <AttachFileButton label="Đính PDF" accept={DOCUMENT_PDF_ACCEPT} onPick={(f) => onAttach(v, "pdf", f)} title="Chọn bản PDF đã ký từ máy để đính vào lần ban hành này (lần này chưa có file)." />
-          ) : (
-            <Tag variant="warning">Chưa có PDF</Tag>
-          )}
-          {!v.sourcePath && canAttach && v.status !== "draft" && (
-            <AttachFileButton
-              label="Đính file gốc"
-              accept={DOCUMENT_SOURCE_ACCEPT}
-              onPick={(f) => onAttach(v, "source", f)}
-              title="Chọn file Word / Excel gốc từ máy để đính vào lần ban hành này (không bắt buộc)."
-              outline
-            />
-          )}
-          {v.sourcePath && (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => void openFile(v.sourcePath, v.sourceFileName || undefined)}
-              title="Tải file gốc (Word / Excel) của lần ban hành này về máy."
-            >
-              <Download className="mr-1 h-4 w-4" aria-hidden />
-              Tải file gốc
-            </Button>
-          )}
-        </div>
-      ),
-    },
-  ];
-
-  const info: [string, ReactNode][] = [
-    ["Loại", documentKindLabel(doc.kind)],
-    ["Phòng sở hữu", departmentLabel(doc.ownerDepartment)],
-    [
-      "Ai được xem",
-      doc.visibility === "company"
-        ? "Cả công ty"
-        : [departmentLabel(doc.ownerDepartment), ...doc.visibleDepartments.map(departmentLabel), "Ban giám đốc"].join(" · "),
-    ],
-    ["Thời hạn lưu bản cũ", doc.retentionYears > 0 ? `${doc.retentionYears} năm` : "Không đặt"],
-  ];
-  if (doc.expiresOn)
-    info.push([
-      "Hết hạn",
-      <span key="exp" className="flex flex-wrap items-center gap-2">
-        {formatDateVN(doc.expiresOn)}
-        {expiry.state === "expired" && <Tag variant="error">Đã hết hạn</Tag>}
-        {expiry.state === "expiring" && <Tag variant="warning">{expiry.daysLeft === 0 ? "Hết hạn hôm nay" : `Còn ${expiry.daysLeft} ngày`}</Tag>}
-      </span>,
-    ]);
-  if (parent)
-    info.push([
-      "Thuộc",
-      <button key="parent" type="button" className="font-semibold text-primary underline" onClick={() => onOpen(parent.id)}>
-        {parent.code} · {parent.title}
-      </button>,
-    ]);
-  if (doc.note) info.push(["Ghi chú", doc.note]);
-
-  return (
-    <FormDialog
-      open
-      onOpenChange={(o) => !o && onClose()}
-      title={`${doc.code} · ${doc.title}`}
-      description={
-        active
-          ? `Đang hiệu lực: lần ${formatRevision(active.revisionNo)} từ ${formatDateVN(active.effectiveDate)}`
-          : DOCUMENT_STATE_LABELS[state]
-      }
-      icon={FolderOpen}
-      size="xl"
-    >
-      <div className="grid min-w-0 gap-5 py-2">
-        <div className="flex flex-wrap gap-2">
-          {can.write && !doc.isWithdrawn && (
-            <Button onClick={() => onRecordVersion(doc)} title="Ghi một lần ban hành mới đã ký giấy: ngày hiệu lực, người duyệt, PDF đã ký.">
-              <FileSignature className="mr-2 h-4 w-4" aria-hidden />
-              Ghi lần ban hành
-            </Button>
-          )}
-          {can.update && (
-            <Button variant="edit" onClick={() => onEdit(doc)} title="Sửa mã, tên, phòng sở hữu, ai được xem, thời hạn của tài liệu.">
-              <Pencil className="mr-2 h-4 w-4" aria-hidden />
-              Sửa thông tin
-            </Button>
-          )}
-          {can.create && (doc.kind === "procedure" || doc.kind === "instruction") && (
-            <Button variant="outline" onClick={() => onAddChild(doc)} title="Thêm một biểu mẫu thuộc quy trình này (mặc định cùng phòng, cùng phạm vi xem).">
-              <FilePlus2 className="mr-2 h-4 w-4" aria-hidden />
-              Thêm biểu mẫu con
-            </Button>
-          )}
-          {can.update &&
-            (doc.isWithdrawn ? (
-              <Button variant="edit" onClick={() => onRestore(doc)} title="Đưa tài liệu đã thu hồi về danh sách Đang dùng.">
-                <ArchiveRestore className="mr-2 h-4 w-4" aria-hidden />
-                Mở lại tài liệu
-              </Button>
-            ) : (
-              <Button variant="danger" onClick={() => onWithdraw(doc)} title="Thu hồi cả tài liệu: chuyển Hết hiệu lực, giữ nguyên mọi lần ban hành và file.">
-                <Archive className="mr-2 h-4 w-4" aria-hidden />
-                Thu hồi
-              </Button>
-            ))}
-          {can.delete && canDeleteDocument(doc.id, versions) && (
-            <Button variant="danger" onClick={() => onDelete(doc)} title="Xóa tài liệu chưa từng ban hành (ghi nhầm). Tài liệu đã ban hành chỉ thu hồi được.">
-              <Trash2 className="mr-2 h-4 w-4" aria-hidden />
-              Xóa
-            </Button>
-          )}
-        </div>
-
-        <dl className="grid gap-x-6 gap-y-2 sm:grid-cols-[minmax(0,12rem)_minmax(0,1fr)]">
-          {info.map(([k, v]) => (
-            <div key={k} className="contents">
-              <dt className="text-sm text-muted-foreground">{k}</dt>
-              <dd className="min-w-0 break-words">{v}</dd>
-            </div>
-          ))}
-        </dl>
-
-        <section className="grid min-w-0 gap-2">
-          <h3 className="font-semibold text-foreground">Các lần ban hành ({own.length})</h3>
-          {own.length ? (
-            <SummaryTable rows={own} columns={versionColumns} getKey={(v) => v.id} />
-          ) : (
-            <p className="text-sm text-muted-foreground">Chưa ban hành lần nào{can.write ? " — bấm Ghi lần ban hành." : "."}</p>
-          )}
-        </section>
-
-        {children.length > 0 && (
-          <section className="grid min-w-0 gap-2">
-            <h3 className="font-semibold text-foreground">Biểu mẫu thuộc tài liệu này ({children.length})</h3>
-            <ul className="grid gap-2">
-              {children.map((c) => {
-                const v = activeVersionOf(versions, c.id);
-                return (
-                  <li key={c.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border px-3 py-2">
-                    <span className="min-w-0">
-                      <b>{c.code}</b> · {c.title}
-                      <span className="text-sm text-muted-foreground"> {v ? `· lần ${formatRevision(v.revisionNo)}` : "· chưa ban hành"}</span>
-                    </span>
-                    <Button size="sm" variant="outline" onClick={() => onOpen(c.id)} title="Mở chi tiết biểu mẫu này.">
-                      <Eye className="mr-1 h-4 w-4" aria-hidden />
-                      Xem
-                    </Button>
-                  </li>
-                );
-              })}
-            </ul>
-          </section>
-        )}
-      </div>
-    </FormDialog>
-  );
-}
-
-/** Nút chọn file từ máy rồi đính ngay (input file ẩn). Đang tải ⇒ đổi chữ, bấm thêm không chạy lại. */
-function AttachFileButton({
-  label,
-  accept,
-  title,
-  onPick,
-  outline,
-}: {
-  label: string;
-  accept: string;
-  title: string;
-  onPick: (file: File) => Promise<void>;
-  outline?: boolean;
-}) {
-  const ref = useRef<HTMLInputElement>(null);
-  const [isUploading, setIsUploading] = useState(false);
-  const pick = async (file: File | undefined) => {
-    if (!file || isUploading) return;
-    setIsUploading(true);
-    try {
-      await onPick(file);
-    } finally {
-      setIsUploading(false);
-      if (ref.current) ref.current.value = "";
-    }
-  };
-  return (
-    <>
-      <input ref={ref} type="file" accept={accept} hidden onChange={(e) => void pick(e.target.files?.[0])} />
-      <Button size="sm" variant={outline ? "outline" : "default"} onClick={() => !isUploading && ref.current?.click()} title={title}>
-        <Paperclip className="mr-1 h-4 w-4" aria-hidden />
-        {isUploading ? "Đang tải file…" : label}
-      </Button>
-    </>
   );
 }

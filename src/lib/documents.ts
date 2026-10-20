@@ -275,6 +275,14 @@ export function checkDocumentFile(file: { name: string; size: number }, kind: "p
   return allowed.includes(ext) ? null : `File "${file.name}" không đúng loại (${kind === "pdf" ? "chỉ PDF" : "Word, Excel hoặc ảnh"})`;
 }
 
+/** Cách xem một file trong app: PDF / ảnh xem ngay trong khung, file khác (Word, Excel) tải về. */
+export function filePreviewKind(fileName: string): "pdf" | "image" | "download" {
+  const ext = fileName.toLowerCase().split(".").pop() ?? "";
+  if (ext === "pdf") return "pdf";
+  if (["jpg", "jpeg", "png"].includes(ext)) return "image";
+  return "download";
+}
+
 /** Tên file an toàn cho đường dẫn Storage (bỏ dấu, chỉ giữ chữ-số-gạch). */
 export function safeFileName(name: string): string {
   const dot = name.lastIndexOf(".");

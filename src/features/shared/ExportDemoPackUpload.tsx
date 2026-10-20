@@ -100,7 +100,9 @@ export function ExportDemoPackUpload() {
             hidden
             multiple
             onChange={(e) => {
-              setFiles([...(e.target.files ?? [])]);
+              // Chọn nhiều lần được (cộng dồn, trùng tên thì lấy bản mới) — thư mục gói ~50 file.
+              const picked = [...(e.target.files ?? [])];
+              setFiles((prev) => [...prev.filter((f) => !picked.some((x) => x.name === f.name)), ...picked]);
               setErrors([]);
               e.target.value = "";
             }}
@@ -113,6 +115,9 @@ export function ExportDemoPackUpload() {
           </div>
           {files.length > 0 && (
             <p className="text-sm text-muted-foreground">
+              <Button variant="ghost" size="sm" onClick={() => setFiles([])} title="Bỏ hết file đã chọn để chọn lại.">
+                Bỏ chọn
+              </Button>{" "}
               Đã chọn {files.length} file{files.some((f) => f.name === "pack.json") ? " (có pack.json)" : " — chưa có pack.json"}.
             </p>
           )}

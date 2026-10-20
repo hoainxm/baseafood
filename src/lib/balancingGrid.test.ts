@@ -2,6 +2,9 @@ import { describe, expect, test } from "vitest";
 import type { BalancingOutputItem, BalancingPeriod, MaterialImportItem, SalesInvoice, SalesItem } from "@/types";
 import {
   buildTripGroupRow,
+  importTypeNote,
+  parseImportTypeRowId,
+  patchImportTypeNote,
   dailyAverageImportPrices,
   groupTripsByType,
   importTypeRowId,
@@ -350,6 +353,31 @@ describe("dòng LOẠI tách từ dòng kỳ sổ nhập — groupTripsByType / 
       "2026-10-15": Math.round((100 * 140000 + 300 * 133000) / 400),
     });
     expect(dailyAverageImportPrices([pricedImport("c", 50, null)])).toEqual({});
+  });
+});
+
+describe("ghi chú riêng từng LOẠI (mig 0074)", () => {
+  const big = "Bạch tuộc 2 da lớn (80↑)";
+  const small = "Bạch tuộc 2 da nhỏ (80↓)";
+  test("id dòng loại đọc ngược được; id thường ⇒ null", () => {
+    expect(parseImportTypeRowId(importTypeRowId("ho", small))).toEqual({ rowId: "ho", typeName: small });
+    expect(parseImportTypeRowId("ho")).toBeNull();
+  });
+  test("chưa có ghi chú loại ⇒ loại đầu hiện ghi chú cũ của dòng gộp, loại sau trống", () => {
+    const row = { note: "hàng về trễ" };
+    expect(importTypeNote(row, big, true)).toBe("hàng về trễ");
+    expect(importTypeNote(row, small, false)).toBe("");
+  });
+  test("ghi chú loại có rồi (kể cả chuỗi rỗng) thì thắng ghi chú cũ", () => {
+    expect(importTypeNote({ note: "cũ", typeNotes: { [big]: "" } }, big, true)).toBe("");
+    expect(importTypeNote({ note: "cũ", typeNotes: { [small]: "size nhỏ" } }, small, false)).toBe("size nhỏ");
+  });
+  test("ghi loại đầu lần đầu ⇒ chữ cũ chuyển sang loại (xoá note); ghi loại khác giữ note và loại kia", () => {
+    expect(patchImportTypeNote({ note: "cũ" }, big, true, "cũ — đã dò")).toEqual({ typeNotes: { [big]: "cũ — đã dò" }, note: "" });
+    expect(patchImportTypeNote({ note: "cũ", typeNotes: { [big]: "x" } }, small, false, "y")).toEqual({
+      typeNotes: { [big]: "x", [small]: "y" },
+    });
+    expect(patchImportTypeNote({}, big, true, "mới")).toEqual({ typeNotes: { [big]: "mới" } });
   });
 });
 

@@ -369,6 +369,34 @@ export function buildMaterialGridRows(
 /** Dòng LOẠI (2 da lớn / 2 da nhỏ) tách từ một dòng kỳ sổ nhập: id = `<dòng kỳ>::type::<loại>`. */
 export const IMPORT_TYPE_ROW_MARKER = "::type::";
 export const importTypeRowId = (rowId: string, typeName: string): string => `${rowId}${IMPORT_TYPE_ROW_MARKER}${typeName}`;
+/** Ngược của `importTypeRowId`; id không phải dòng loại ⇒ null. */
+export function parseImportTypeRowId(id: string): { rowId: string; typeName: string } | null {
+  const i = id.indexOf(IMPORT_TYPE_ROW_MARKER);
+  return i < 0 ? null : { rowId: id.slice(0, i), typeName: id.slice(i + IMPORT_TYPE_ROW_MARKER.length) };
+}
+
+/**
+ * Ghi chú hiện ở một dòng LOẠI (mig 0074): ghi chú riêng của loại; loại chưa có ghi chú riêng
+ * mà là loại ĐẦU TIÊN ⇒ hiện ghi chú cũ của dòng kỳ (`note`, ghi khi còn dòng gộp) để chữ cũ
+ * không biến mất.
+ */
+export function importTypeNote(row: Pick<BalancingInputItem, "note" | "typeNotes">, typeName: string, isFirstType: boolean): string {
+  return row.typeNotes?.[typeName] ?? (isFirstType ? (row.note ?? "") : "");
+}
+
+/**
+ * Bản vá ghi ghi chú của một dòng LOẠI vào dòng kỳ. Loại đầu tiên ghi lần đầu (ô đang hiện ghi
+ * chú cũ) ⇒ chữ cũ coi như đã CHUYỂN sang loại này: xoá `note` để không còn nằm khuất hai nơi.
+ */
+export function patchImportTypeNote(
+  row: Pick<BalancingInputItem, "note" | "typeNotes">,
+  typeName: string,
+  isFirstType: boolean,
+  text: string
+): Pick<BalancingInputItem, "typeNotes"> & Partial<Pick<BalancingInputItem, "note">> {
+  const movesLegacyNote = isFirstType && row.typeNotes?.[typeName] === undefined && Boolean(row.note);
+  return { typeNotes: { ...row.typeNotes, [typeName]: text }, ...(movesLegacyNote ? { note: "" } : {}) };
+}
 
 /** Gom chuyến (bỏ chuyến 0 kg) theo TÊN loại NL, sắp theo tên. */
 export function groupTripsByType(trips: MaterialImportItem[]): [string, MaterialImportItem[]][] {

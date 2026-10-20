@@ -150,6 +150,22 @@ function parseDailyQuantities(v: unknown): DailyQuantities {
   return result;
 }
 
+/** Cột `type_notes` (jsonb, mig 0074) → `{ "<tên loại>": "ghi chú" }`; null / hỏng ⇒ undefined. */
+function parseTypeNotes(v: unknown): Record<string, string> | undefined {
+  let raw: unknown = v;
+  if (typeof raw === "string") {
+    try {
+      raw = JSON.parse(raw);
+    } catch {
+      return undefined;
+    }
+  }
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined;
+  const result: Record<string, string> = {};
+  for (const [typeName, text] of Object.entries(raw as Record<string, unknown>)) if (text != null) result[typeName] = String(text);
+  return result;
+}
+
 /* ---------- Ánh xạ camelCase (app) ↔ snake_case (Postgres) ---------- */
 
 export const SUPPLIER_TABLE: TableMapping<Supplier> = {
@@ -481,6 +497,8 @@ export const BALANCING_INPUT_TABLE: TableMapping<BalancingInputItem> = {
     ...(x.note != null ? { note: x.note } : {}),
     // Giá gửi đông theo ngày (mig 0071): chỉ dòng Gửi đông đã gõ giá theo ngày mới có.
     ...(x.dailyPrices != null ? { daily_prices: x.dailyPrices } : {}),
+    // Ghi chú riêng từng loại (mig 0074): chỉ dòng đã gõ ghi chú loại mới có.
+    ...(x.typeNotes != null ? { type_notes: x.typeNotes } : {}),
   }),
   fromRow: (r) => ({
     id: s(r.id),
@@ -502,6 +520,7 @@ export const BALANCING_INPUT_TABLE: TableMapping<BalancingInputItem> = {
     stockCategory: r.stock_category == null || r.stock_category === "" ? undefined : s(r.stock_category),
     note: r.note == null ? undefined : s(r.note),
     dailyPrices: r.daily_prices == null ? undefined : parseDailyQuantities(r.daily_prices),
+    typeNotes: parseTypeNotes(r.type_notes),
   }),
   // Dòng ghi trước 0019 chưa có cột lưới ngày → mặc định rỗng, không vỡ tổng.
   patchLegacy: (x) => ({

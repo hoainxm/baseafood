@@ -400,6 +400,11 @@ export interface BalancingInputItem {
   dailyPrices?: DailyQuantities;
   /** Ghi chú của dòng (cột Ghi chú cuối lưới Cân đối, mig 0067). */
   note?: string;
+  /**
+   * Dòng hút từ sổ nhập gộp ≥ 2 LOẠI: ghi chú RIÊNG từng loại `{ "<tên loại NL>": "…" }`
+   * (mig 0074) — màn hiện mỗi loại một dòng (2 da lớn · 2 da nhỏ), không còn dòng gộp.
+   */
+  typeNotes?: Record<string, string>;
 }
 
 export type ScrapSource = "Nhập hàng" | "Cân đối";

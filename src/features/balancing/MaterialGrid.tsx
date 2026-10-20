@@ -18,6 +18,9 @@ import {
   suggestMaterialPrices,
   IMPORT_TYPE_ROW_MARKER,
   importTypeRowId,
+  parseImportTypeRowId,
+  importTypeNote,
+  patchImportTypeNote,
   groupTripsByType,
   buildTripGroupRow,
   dailyAverageImportPrices,
@@ -128,6 +131,8 @@ export function MaterialGrid({
     h.fromImports ? h.sourceIds.flatMap((id) => importById.get(id) ?? []) : [];
   /** Thành tiền thật của từng dòng con đại lý (id dòng con → đ). */
   const childRowAmount = new Map<string, number>();
+  /** id dòng LOẠI đầu tiên của mỗi dòng kỳ — ô Ghi chú của nó hiện ghi chú cũ của dòng gộp. */
+  const firstTypeRowIds = new Set<string>();
   /* Người bán (đại lý) dưới mỗi dòng loại GẬP sẵn, bấm mới mở (`openSellerRows`). */
   const [openSellerRows, setOpenSellerRows] = useState<ReadonlySet<string>>(() => new Set());
   const toggleIn = (set: (f: (prev: ReadonlySet<string>) => ReadonlySet<string>) => void, id: string) =>
@@ -646,9 +651,32 @@ export function MaterialGrid({
       minWidth: 140,
       fixedWidth: 200,
       getValue: () => null,
-      renderValue: (h) => getOriginal(h.id)?.note ?? "",
-      isLocked: (h) => !getOriginal(h.id),
+      /* Dòng LOẠI (2 da lớn · 2 da nhỏ, không còn dòng gộp — 2026-10-20): ghi chú RIÊNG từng loại
+         lưu trên dòng kỳ (`typeNotes`, mig 0074); loại đầu hiện ghi chú cũ của dòng gộp. */
+      renderValue: (h) => {
+        const typeRef = parseImportTypeRowId(h.id);
+        if (!typeRef) return getOriginal(h.id)?.note ?? "";
+        const parent = getOriginal(typeRef.rowId);
+        return parent ? importTypeNote(parent, typeRef.typeName, firstTypeRowIds.has(h.id)) : "";
+      },
+      isLocked: (h) => {
+        const typeRef = parseImportTypeRowId(h.id);
+        return !getOriginal(typeRef ? typeRef.rowId : h.id);
+      },
       renderCell: (h) => {
+        const typeRef = parseImportTypeRowId(h.id);
+        if (typeRef) {
+          const parent = getOriginal(typeRef.rowId);
+          if (!parent) return null;
+          const isFirst = firstTypeRowIds.has(h.id);
+          return (
+            <RowNoteCell
+              value={importTypeNote(parent, typeRef.typeName, isFirst)}
+              rowLabel={h.name}
+              onCommit={(note) => writeRow(typeRef.rowId, patchImportTypeNote(parent, typeRef.typeName, isFirst, note))}
+            />
+          );
+        }
         const original = getOriginal(h.id);
         return original ? (
           <RowNoteCell value={original.note ?? ""} rowLabel={h.name} onCommit={(note) => writeRow(h.id, { note })} />
@@ -1048,6 +1076,7 @@ export function MaterialGrid({
       };
       for (const [typeName, rows] of types) {
         const typeId = importTypeRowId(h.id, typeName);
+        if (typeName === types[0][0]) firstTypeRowIds.add(typeId);
         const sellers = new Map<string, MaterialImportItem[]>();
         for (const i of rows) sellers.set(i.supplierName || "(chưa ghi đại lý)", [...(sellers.get(i.supplierName || "(chưa ghi đại lý)") ?? []), i]);
         const sellerOpen = openSellerRows.has(typeId);

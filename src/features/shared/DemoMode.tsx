@@ -64,6 +64,8 @@ import {
   useWipProductions,
 } from "@/lib/catalogRepo";
 import { IS_DEMO, setDemoMode, setPendingDemoTask, readDemoBundle, readDemoJob, saveDemoBundle, clearDemoBundle } from "@/lib/demoMode";
+import { fetchExportDemoPack } from "@/lib/exportFileStorage";
+import { ExportDemoPackUpload } from "./ExportDemoPackUpload";
 import { scanDemoParams, generateDemoBundle, type DemoBundle, type DemoSource } from "@/lib/demoGenerator";
 import { num } from "@/lib/format";
 
@@ -301,9 +303,11 @@ function DemoGeneratorMenu({ autoCreate }: { autoCreate: boolean }) {
   );
   const demoParams = useMemo(() => scanDemoParams(source), [source]);
 
-  const createAndEnter = () => {
+  const createAndEnter = async () => {
     setIsCreating(true);
-    const bundle = generateDemoBundle(source, { today: todayIso(), anonymize: anonymize === "an", hat: Date.now() % 100_000 });
+    // Gói demo Xuất khẩu (số + file thật) nằm ở kho file riêng — chưa nạp thì bộ Xuất khẩu dùng số tự đặt.
+    const exportPack = await fetchExportDemoPack();
+    const bundle = generateDemoBundle(source, { today: todayIso(), anonymize: anonymize === "an", hat: Date.now() % 100_000, exportPack });
     setPendingDemoTask(null);
     if (!saveDemoBundle(bundle)) {
       setIsCreating(false);
@@ -315,7 +319,7 @@ function DemoGeneratorMenu({ autoCreate }: { autoCreate: boolean }) {
 
   // Việc chờ từ chế độ demo ("Làm mới bộ demo"): nạp xong số thật thì tự sinh và vào lại.
   useEffect(() => {
-    if (autoCreate && loaded) createAndEnter();
+    if (autoCreate && loaded) void createAndEnter();
     // createAndEnter tải lại trang ⇒ chỉ chạy một lần.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoCreate, loaded]);
@@ -368,6 +372,7 @@ function DemoGeneratorMenu({ autoCreate }: { autoCreate: boolean }) {
               Vào demo (giữ bộ cũ)
             </Button>
           </div>
+          <ExportDemoPackUpload />
         </PopoverContent>
       </Popover>
       <ConfirmAction
@@ -377,7 +382,7 @@ function DemoGeneratorMenu({ autoCreate }: { autoCreate: boolean }) {
         description="Quét số thật, sinh bộ demo 60 ngày rồi chuyển cả app sang chế độ demo. Bộ demo cũ (nếu có) bị thay. Số thật của xưởng không bị đụng."
         confirmLabel="Tạo và vào demo"
         icon={FlaskConical}
-        onConfirm={createAndEnter}
+        onConfirm={() => void createAndEnter()}
       />
     </>
   );

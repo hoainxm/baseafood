@@ -17,6 +17,7 @@ import { IS_DEMO, SITE_DEMO } from "./demoMode";
 import { compressImage } from "./storage";
 import { safeFileName } from "./documents";
 import { DEMO_PLACEHOLDER_PREFIX } from "./exportPlanning";
+import { parseExportDemoPack, type ExportDemoPack } from "./exportPlanningDemo";
 
 export { DEMO_PLACEHOLDER_PREFIX };
 
@@ -80,3 +81,34 @@ export async function removeExportFiles(paths: readonly string[]): Promise<boole
   const { error } = await supabase.storage.from(EXPORT_FILE_BUCKET).remove([...xs]);
   return !error;
 }
+
+/* ---------- Gói demo Xuất khẩu (số + file THẬT cho chế độ demo — R14 v4) ---------- */
+
+/** Thư mục cố định của gói trong bucket riêng — tạo lại bộ demo vẫn giữ file. */
+export const DEMO_PACK_DIR = `${SITE_DEMO}/export-files/demo-pack`;
+export const DEMO_PACK_JSON = `${DEMO_PACK_DIR}/contract/pack.json`;
+
+/** Tải gói demo (JSON) — chưa nối máy chủ / chưa có gói / không có quyền ⇒ null. */
+export async function fetchExportDemoPack(): Promise<ExportDemoPack | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase.storage.from(EXPORT_FILE_BUCKET).download(DEMO_PACK_JSON);
+  if (error || !data) return null;
+  try {
+    return parseExportDemoPack(JSON.parse(await data.text()));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Ghi một file của gói vào đúng đường dẫn cố định (gỡ bản cũ trước — bucket không có quyền ghi đè).
+ * Không nén ảnh: đường dẫn phải khớp đúng tên trong pack.json.
+ */
+export async function uploadExportDemoPackFile(path: string, file: Blob, contentType?: string): Promise<string | null> {
+  if (!supabase) return "Chưa nối máy chủ — chưa tải được gói demo.";
+  if (!path.startsWith(`${DEMO_PACK_DIR}/`)) return "Đường dẫn ngoài thư mục gói demo.";
+  await supabase.storage.from(EXPORT_FILE_BUCKET).remove([path]);
+  const { error } = await supabase.storage.from(EXPORT_FILE_BUCKET).upload(path, file, { contentType: contentType || (file as File).type || undefined });
+  return error ? explainError(error.message) : null;
+}
+

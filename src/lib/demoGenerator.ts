@@ -65,7 +65,7 @@ import type {
 import { calculateBalancing } from "@/lib/balancingCalc";
 import { RETAIL_WAREHOUSE, FG_WAREHOUSE } from "@/lib/inventory";
 import { listDatesInRange, subtractDays } from "@/lib/dataFlow";
-import { buildExportDemo } from "@/lib/exportPlanningDemo";
+import { buildExportDemo, type ExportDemoPack } from "@/lib/exportPlanningDemo";
 
 /** Sổ thật đưa vào để quét tham số (chỉ ĐỌC). */
 export interface DemoSource {
@@ -148,6 +148,8 @@ export interface DemoOptions {
   hat?: number;
   /** Mốc giờ ghi (ISO) cho các trường recordedAt / lockedAt. */
   recordedAt?: string;
+  /** Gói demo Xuất khẩu (số + file thật, tải từ kho file riêng) — không có ⇒ bộ tự đặt. */
+  exportPack?: ExportDemoPack | null;
 }
 
 const WORKSHOPS: Workshop[] = ["Đông", "Cá", "Khô"];
@@ -652,13 +654,20 @@ export function generateDemoBundle(n: DemoSource, tc: DemoOptions): DemoBundle {
   const recentMonths = [...new Set(n.monthlyStock.map((m) => m.period))].sort().slice(-3);
   const monthlyStock = n.monthlyStock.filter((m) => recentMonths.includes(m.period)).map((m) => ({ ...m }));
   const nxtSnapshots = n.nxtSnapshots.map((x) => ({ ...x }));
-  const exportDemo = buildExportDemo(customers, tc.today, n.products);
+  const exportDemo = buildExportDemo(customers, tc.today, {
+    products: n.products,
+    pack: tc.exportPack,
+    originalNames: baseCustomers.map((c) => c.name),
+    anonymize,
+    priceFactor,
+  });
 
   return {
     products: n.products.map((p) => ({ ...p })),
     materialTypes: n.materialTypes.map((m) => ({ ...m })),
     suppliers,
-    customers,
+    // Khách của sổ kế hoạch Xuất khẩu chưa có trong 8 khách demo được thêm vào danh mục.
+    customers: [...customers, ...exportDemo.extraCustomers],
     batterTypes: n.batterTypes.map((b) => ({ ...b })),
     storageLocations: n.storageLocations.map((x) => ({ ...x })),
     shipments,

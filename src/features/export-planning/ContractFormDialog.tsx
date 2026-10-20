@@ -6,7 +6,7 @@
 // ============================================================
 // Luật: ba-spec 41 NV3 / NV5, R2 (tổng hai cách đếm), R3 (bản sửa KHÔNG ghi đè — ghi bản mới),
 // R9 (số HĐ duy nhất theo khách, hạn giao bắt buộc). Tính toán ở lib/exportPlanning.ts.
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Button,
   ChoiceGroup,
@@ -36,6 +36,7 @@ import {
   contractTotals,
   emptyTerms,
   lineAmount,
+  lineKg,
   validateContract,
 } from "@/lib/exportPlanning";
 import { checkExportFile, exportFilePath, hasExportStorage, removeExportFiles, uploadExportFile } from "@/lib/exportFileStorage";
@@ -174,6 +175,8 @@ export function ContractFormDialog({
   const [file, setFile] = useState<File[]>([]);
   const [errors, setErrors] = useState<FieldError[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  /** Dòng đã mở phần "mã HS, vi sinh" (chỉ trình bày, không lưu). */
+  const [openLines, setOpenLines] = useState<Set<string>>(new Set());
   const draft = useDialogDraft({ form: "export-contract", value: form, setValue: setForm, isEmpty: (f) => snapshot(f) === f.initial });
   const customerEditor = useQuickCatalogEdit("customer", customers, (rows) => void setCustomers(rows));
 
@@ -290,12 +293,18 @@ export function ContractFormDialog({
   };
 
   const totals = form ? contractTotals(form.lines) : null;
+  // Lúc hộp đang mờ dần để đóng (form đã về null) vẫn giữ tiêu đề cũ — khỏi nhảy chữ.
+  const shown = useRef<ContractForm | null>(null);
+  if (form) shown.current = form;
+  const head = form ?? shown.current;
   const title =
-    form?.mode === "create"
-      ? "Lập hợp đồng xuất khẩu"
-      : form?.mode === "revise"
-        ? `Ghi bản sửa ${form.revisionNo} · HĐ ${form.contractNo}`
-        : `Sửa bản ${form?.revisionNo ?? ""} đang chờ duyệt · HĐ ${form?.contractNo ?? ""}`;
+    head?.mode === "revise"
+      ? `Ghi bản sửa ${head.revisionNo} · HĐ ${head.contractNo}`
+      : head?.mode === "edit"
+        ? `Sửa bản ${head.revisionNo} đang chờ duyệt · HĐ ${head.contractNo}`
+        : "Lập hợp đồng xuất khẩu";
+  const currency = form?.terms.currency || "USD";
+  const setDocs = (docs: ExportContractTerms["requiredDocuments"]) => setTerm("requiredDocuments", docs);
 
   return (
     <FormDialog
@@ -307,7 +316,7 @@ export function ContractFormDialog({
       }}
       title={title}
       description={
-        form?.mode === "revise"
+        head?.mode === "revise"
           ? "Bản đang hiệu lực giữ nguyên và vẫn tra lại được. Bản sửa có hiệu lực khi ghi kết quả BGĐ đồng ý."
           : "Ghi đúng như hợp đồng giấy. Lưu xong hợp đồng ở trạng thái chờ duyệt — ghi kết quả BGĐ ký ở bước sau."
       }
@@ -316,6 +325,18 @@ export function ContractFormDialog({
       hasRequiredFields
       footer={
         <>
+          {totals && (
+            <span className="tnum mr-auto min-w-0 text-sm text-muted-foreground">
+              {form?.lines.filter((l) => l.description.trim() || l.quantity != null).length ?? 0} dòng · {formatNumber(totals.cartons)} thùng ·{" "}
+              <b className="text-foreground">{formatNumber(totals.kg)} kg</b>
+              {canSeePrice ? (
+                <>
+                  {" "}
+                  · <b className="text-foreground">{formatNumber(totals.amount)} {currency}</b>
+                </>
+              ) : null}
+            </span>
+          )}
           <Button
             variant="outline"
             onClick={() => {
@@ -335,12 +356,11 @@ export function ContractFormDialog({
     >
       <DraftRestoredNotice savedAt={draft.restoredAt} onDiscard={draft.cancel} />
       {form && totals && (
-        <div className="grid min-w-0 gap-6 py-2">
+        <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-5 py-2">
           <ErrorSummary errors={errors} />
 
-          <section className="grid gap-4">
-            <h3 className="font-semibold">Hợp đồng</h3>
-            <div className="grid gap-4 sm:grid-cols-2">
+          <FormSection no={1} title="Hợp đồng" hint="VD số HĐ: 18.26/BSF-SCM.2026 · số đơn của khách: #B182">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {identityLocked ? (
                 <Field label="Khách hàng">
                   <Input value={customers.find((c) => c.id === form.customerId)?.name ?? ""} readOnly />
@@ -359,26 +379,25 @@ export function ContractFormDialog({
                   editLabel={customerEditor.editLabel}
                 />
               )}
-              <Field label="Số hợp đồng" required hint="VD: 18.26/BSF-SCM.2026">
+              <Field label="Số hợp đồng" required>
                 <Input value={form.contractNo} readOnly={identityLocked} onChange={(e) => set("contractNo", e.target.value)} aria-required />
               </Field>
               <DateField label="Ngày ký" required value={form.signedOn} onChange={(v) => set("signedOn", v)} />
-              <Field label="Số đơn của khách (Order)" hint="VD: #B182">
+              <Field label="Số đơn của khách">
                 <Input value={form.orderRef} onChange={(e) => set("orderRef", e.target.value)} />
               </Field>
             </div>
             {form.mode !== "create" && (
               <div className="grid gap-4 sm:grid-cols-[minmax(0,14rem)_minmax(0,1fr)]">
                 <DateField label="Ngày của bản này" value={form.revisedOn} onChange={(v) => set("revisedOn", v)} />
-                <Field label="Nội dung sửa" required={form.mode === "revise"} hint="Ghi ngắn bản này đổi gì so với bản trước.">
+                <Field label={form.mode === "revise" ? "Nội dung sửa (bản này đổi gì)" : "Nội dung sửa"} required={form.mode === "revise"}>
                   <Input value={form.changeSummary} onChange={(e) => set("changeSummary", e.target.value)} />
                 </Field>
               </div>
             )}
-          </section>
+          </FormSection>
 
-          <section className="grid gap-4">
-            <h3 className="font-semibold">Điều khoản</h3>
+          <FormSection no={2} title="Điều khoản & thanh toán" hint="Dung sai áp cho cả lượng lẫn tiền — trống là 0%. Loại cont VD: 40RF.">
             <div className="grid gap-4 sm:grid-cols-3">
               <Combobox
                 label="Incoterm"
@@ -394,14 +413,15 @@ export function ContractFormDialog({
                 <Input value={form.terms.portOfDischarge} onChange={(e) => setTerm("portOfDischarge", e.target.value)} />
               </Field>
               <DateField label="Hạn giao muộn nhất" required value={form.terms.latestShipmentDate} onChange={(v) => setTerm("latestShipmentDate", v)} />
-              <NumberField label="Dung sai (±%)" unit="%" value={form.terms.tolerancePct} onChange={(v) => setTerm("tolerancePct", v)} hint="Áp cho cả lượng lẫn tiền. Trống = 0%." />
+              <NumberField label="Dung sai ±" unit="%" value={form.terms.tolerancePct} onChange={(v) => setTerm("tolerancePct", v)} />
               <Field label="Tiền tệ">
                 <Input value={form.terms.currency} onChange={(e) => setTerm("currency", e.target.value.toUpperCase())} />
               </Field>
               <NumberField label="Số container" unit="cont" value={form.terms.containerCount} onChange={(v) => setTerm("containerCount", v)} />
-              <Field label="Loại container" hint="VD: 40RF">
+              <Field label="Loại container">
                 <Input value={form.terms.containerType} onChange={(e) => setTerm("containerType", e.target.value)} />
               </Field>
+              <NumberField label="Đặt cọc" unit="%" value={form.terms.depositPct} onChange={(v) => setTerm("depositPct", v)} />
             </div>
             <ChoiceGroup
               label="Thanh toán"
@@ -410,179 +430,197 @@ export function ContractFormDialog({
               options={PAYMENT_METHODS}
               columns={3}
             />
-            <div className="grid gap-4 sm:grid-cols-3">
-              <NumberField label="Đặt cọc" unit="%" value={form.terms.depositPct} onChange={(v) => setTerm("depositPct", v)} />
-              {form.terms.paymentMethod === "lc" && (
-                <>
-                  <Field label="Số L/C" required>
-                    <Input value={form.terms.lcNo} onChange={(e) => setTerm("lcNo", e.target.value)} aria-required />
-                  </Field>
-                  <DateField label="L/C hết hạn" value={form.terms.lcExpiry} onChange={(v) => setTerm("lcExpiry", v)} />
-                  <DateField label="Hạn giao theo L/C" value={form.terms.lcLatestShipment} onChange={(v) => setTerm("lcLatestShipment", v)} />
-                </>
-              )}
-            </div>
-          </section>
+            {form.terms.paymentMethod === "lc" && (
+              <div className="grid gap-4 sm:grid-cols-3">
+                <Field label="Số L/C" required>
+                  <Input value={form.terms.lcNo} onChange={(e) => setTerm("lcNo", e.target.value)} aria-required />
+                </Field>
+                <DateField label="L/C hết hạn" value={form.terms.lcExpiry} onChange={(v) => setTerm("lcExpiry", v)} />
+                <DateField label="Hạn giao theo L/C" value={form.terms.lcLatestShipment} onChange={(v) => setTerm("lcLatestShipment", v)} />
+              </div>
+            )}
+          </FormSection>
 
-          <section className="grid gap-3">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <h3 className="font-semibold">Chứng từ khách yêu cầu</h3>
+          <FormSection
+            no={3}
+            title="Chứng từ khách yêu cầu"
+            hint="Mỗi chuyến tự có sẵn các mục này ở bước Bộ chứng từ. Ghi form (VD C/O form VJ) và người cấp (VD H/C công ty tự cấp)."
+            action={
               <div className="flex flex-wrap gap-2">
                 {!form.terms.requiredDocuments.length && (
-                  <Button size="sm" variant="outline" onClick={() => setTerm("requiredDocuments", COMMON_DOCUMENTS)} title="Điền nhanh bộ hay gặp: Invoice, Packing List, B/L, H/C tự cấp, C/O form VJ — sửa lại nếu khác.">
+                  <Button size="sm" variant="outline" onClick={() => setDocs(COMMON_DOCUMENTS)} title="Điền nhanh bộ hay gặp: Invoice, Packing List, B/L, H/C tự cấp, C/O form VJ — sửa lại nếu khác.">
                     Điền bộ hay gặp
                   </Button>
                 )}
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setTerm("requiredDocuments", [...form.terms.requiredDocuments, { kind: "other", form: "", issuer: "" }])}
-                  title="Thêm một chứng từ khách yêu cầu."
-                >
+                <Button size="sm" variant="outline" onClick={() => setDocs([...form.terms.requiredDocuments, { kind: "other", form: "", issuer: "" }])} title="Thêm một chứng từ khách yêu cầu.">
                   <Plus className="mr-1 h-4 w-4" aria-hidden />
                   Thêm chứng từ
                 </Button>
               </div>
-            </div>
-            {!form.terms.requiredDocuments.length && <p className="text-sm text-muted-foreground">Chưa có. Mỗi chuyến sẽ có sẵn mục Commercial Invoice; thêm ở đây những gì hợp đồng bắt buộc.</p>}
-            {form.terms.requiredDocuments.map((d, i) => (
-              <div key={i} className="grid items-end gap-3 rounded-lg border border-border p-3 sm:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1fr)_auto]">
-                <Combobox
-                  label="Loại chứng từ"
-                  hideRequiredMark
-                  clearable={false}
-                  value={d.kind}
-                  onChange={(v) =>
-                    setTerm(
-                      "requiredDocuments",
-                      form.terms.requiredDocuments.map((x, j) => (j === i ? { ...x, kind: (v || "other") as ExportDocumentKind } : x)),
-                    )
-                  }
-                  options={DOCUMENT_KINDS.map((k) => ({ value: k.value, label: k.label }))}
-                />
-                <Field label="Form" hint="VD: VJ (C/O)">
-                  <Input
-                    value={d.form}
-                    onChange={(e) => setTerm("requiredDocuments", form.terms.requiredDocuments.map((x, j) => (j === i ? { ...x, form: e.target.value } : x)))}
-                  />
-                </Field>
-                <Field label="Người cấp" hint="VD: công ty tự cấp">
-                  <Input
-                    value={d.issuer}
-                    onChange={(e) => setTerm("requiredDocuments", form.terms.requiredDocuments.map((x, j) => (j === i ? { ...x, issuer: e.target.value } : x)))}
-                  />
-                </Field>
-                <Button
-                  variant="danger"
-                  onClick={() => setTerm("requiredDocuments", form.terms.requiredDocuments.filter((_, j) => j !== i))}
-                  title="Bỏ chứng từ này khỏi danh sách yêu cầu."
-                >
-                  <Trash2 className="h-4 w-4" aria-hidden />
-                  <span className="sr-only">Bỏ chứng từ</span>
-                </Button>
-              </div>
-            ))}
-          </section>
-
-          <section className="grid gap-3">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <h3 className="font-semibold">Dòng hàng</h3>
-              <span className="tnum text-sm text-muted-foreground">
-                {formatNumber(totals.units)} thùng/kiện · {formatNumber(totals.cartons)} thùng · {formatNumber(totals.kg)} kg
-                {canSeePrice ? ` · ${formatNumber(totals.amount)} ${form.terms.currency}` : ""}
-              </span>
-            </div>
-            {form.lines.map((l, i) => {
-              const auto = computedLineKg(l);
-              return (
-                <div key={l.id} className="grid gap-3 rounded-lg border border-border p-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="font-semibold">Dòng {i + 1}</span>
-                    <Button
-                      size="sm"
-                      variant="danger"
-                      onClick={() => setForm((f) => (f ? { ...f, lines: f.lines.filter((x) => x.id !== l.id) } : f))}
-                      title={`Bỏ dòng ${i + 1} khỏi hợp đồng.`}
-                    >
-                      <Trash2 className="mr-1 h-4 w-4" aria-hidden />
-                      Bỏ dòng
+            }
+          >
+            {!form.terms.requiredDocuments.length && <p className="text-sm text-muted-foreground">Chưa có. Bấm "Điền bộ hay gặp" hoặc thêm từng chứng từ hợp đồng bắt buộc.</p>}
+            {form.terms.requiredDocuments.length > 0 && (
+              <div className="grid grid-cols-[minmax(0,1fr)] gap-3">
+                {form.terms.requiredDocuments.map((d, i) => (
+                  <div key={i} className="grid items-end gap-3 sm:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)_auto]">
+                    <Combobox
+                      label={`Chứng từ ${i + 1}`}
+                      hideRequiredMark
+                      clearable={false}
+                      value={d.kind}
+                      onChange={(v) => setDocs(form.terms.requiredDocuments.map((x, j) => (j === i ? { ...x, kind: (v || "other") as ExportDocumentKind } : x)))}
+                      options={DOCUMENT_KINDS.map((k) => ({ value: k.value, label: k.label }))}
+                    />
+                    <Field label="Form">
+                      <Input value={d.form} onChange={(e) => setDocs(form.terms.requiredDocuments.map((x, j) => (j === i ? { ...x, form: e.target.value } : x)))} />
+                    </Field>
+                    <Field label="Người cấp">
+                      <Input value={d.issuer} onChange={(e) => setDocs(form.terms.requiredDocuments.map((x, j) => (j === i ? { ...x, issuer: e.target.value } : x)))} />
+                    </Field>
+                    <Button variant="danger" onClick={() => setDocs(form.terms.requiredDocuments.filter((_, j) => j !== i))} title={`Bỏ chứng từ ${i + 1} khỏi danh sách yêu cầu.`}>
+                      <Trash2 className="h-4 w-4" aria-hidden />
+                      <span className="sr-only">Bỏ chứng từ</span>
                     </Button>
                   </div>
-                  <div className="grid gap-3 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]">
-                    <Field label="Tên hàng (như trên HĐ)" required>
-                      <Input value={l.description} onChange={(e) => setLine(l.id, { description: e.target.value })} aria-required />
-                    </Field>
-                    <Field label="Size">
-                      <Input value={l.size} onChange={(e) => setLine(l.id, { size: e.target.value })} />
-                    </Field>
-                    <Field label="Mã HS">
-                      <Input value={l.hsCode} onChange={(e) => setLine(l.id, { hsCode: e.target.value })} />
-                    </Field>
-                  </div>
-                  <Field label="Quy cách đóng gói" hint="VD: IQF 1kg/PE × 10/CTN">
-                    <Input value={l.packing} onChange={(e) => setLine(l.id, { packing: e.target.value })} />
-                  </Field>
-                  <div className="grid gap-3 sm:grid-cols-4">
-                    <ChoiceGroup
-                      label="Đếm theo"
-                      hideRequiredMark
-                      value={l.unitKind}
-                      onChange={(v) => setLine(l.id, { unitKind: v === "bundle" ? "bundle" : "carton", cartonsPerUnit: v === "bundle" ? Math.max(2, l.cartonsPerUnit) : 1 })}
-                      options={[
-                        { value: "carton", label: "Thùng" },
-                        { value: "bundle", label: "Kiện" },
-                      ]}
-                      columns={2}
-                    />
-                    {l.unitKind === "bundle" && (
-                      <NumberField label="Thùng / kiện" unit="thùng" value={l.cartonsPerUnit} onChange={(v) => setLine(l.id, { cartonsPerUnit: v ?? 1 })} />
-                    )}
-                    <NumberField label="Số lượng" unit={l.unitKind === "bundle" ? "kiện" : "thùng"} value={l.quantity} onChange={(v) => setLine(l.id, { quantity: v })} />
-                    <NumberField label="Kg tịnh / thùng" value={l.netKgPerCarton} onChange={(v) => setLine(l.id, { netKgPerCarton: v })} />
-                  </div>
-                  <div className="grid gap-3 sm:grid-cols-3">
-                    <NumberField
-                      label="Kg"
-                      value={l.kg ?? auto}
-                      onChange={(v) => setLine(l.id, { kg: v != null && auto != null && Math.abs(v - auto) < 0.005 ? null : v })}
-                      hint={auto != null ? `Tự tính ${formatNumber(auto)} kg — gõ đè nếu HĐ ghi khác.` : "Tự tính khi có số lượng và kg/thùng."}
-                    />
-                    {canSeePrice && (
-                      <>
-                        <NumberField label="Đơn giá" unit={`${form.terms.currency}/kg`} value={l.unitPrice} onChange={(v) => setLine(l.id, { unitPrice: v })} />
-                        <Field label="Thành tiền">
-                          <Input value={formatNumber(lineAmount(l))} readOnly className="tnum" />
-                        </Field>
-                      </>
-                    )}
-                  </div>
-                  <Field label="Yêu cầu vi sinh / ghi chú kỹ thuật">
-                    <Input value={l.microSpec} onChange={(e) => setLine(l.id, { microSpec: e.target.value })} />
-                  </Field>
-                </div>
-              );
-            })}
-            <Button variant="outline" onClick={() => setForm((f) => (f ? { ...f, lines: [...f.lines, blankLine()] } : f))} title="Thêm một dòng hàng vào hợp đồng.">
-              <Plus className="mr-2 h-4 w-4" aria-hidden />
-              Thêm dòng hàng
-            </Button>
-          </section>
+                ))}
+              </div>
+            )}
+          </FormSection>
 
-          <section className="grid gap-3">
-            <h3 className="font-semibold">File hợp đồng đã ký</h3>
-            {form.fileName && <p className="text-sm text-muted-foreground">Đang có: {form.fileName} (chọn file mới để thay)</p>}
+          <FormSection
+            no={4}
+            title="Dòng hàng"
+            hint="Kg tự tính = số thùng × kg tịnh mỗi thùng (đếm theo kiện thì nhân thêm số thùng mỗi kiện); gõ đè nếu hợp đồng ghi khác."
+          >
+            <div className="grid grid-cols-[minmax(0,1fr)] gap-3">
+              {form.lines.map((l, i) => {
+                const auto = computedLineKg(l);
+                const isOpen = openLines.has(l.id) || !!l.hsCode || !!l.microSpec;
+                return (
+                  <div key={l.id} className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-3 rounded-lg border border-border bg-card p-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-semibold">Dòng {i + 1}</span>
+                      <span className="tnum min-w-0 flex-1 text-sm text-muted-foreground">
+                        {formatNumber(lineKg(l))} kg{canSeePrice ? ` · ${formatNumber(lineAmount(l))} ${currency}` : ""}
+                      </span>
+                      <Button
+                        size="sm"
+                        variant="danger"
+                        onClick={() => setForm((f) => (f ? { ...f, lines: f.lines.filter((x) => x.id !== l.id) } : f))}
+                        title={`Bỏ dòng ${i + 1} khỏi hợp đồng.`}
+                      >
+                        <Trash2 className="mr-1 h-4 w-4" aria-hidden />
+                        Bỏ dòng
+                      </Button>
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1.3fr)]">
+                      <Field label="Tên hàng (như trên HĐ)" required>
+                        <Input value={l.description} onChange={(e) => setLine(l.id, { description: e.target.value })} aria-required />
+                      </Field>
+                      <Field label="Size">
+                        <Input value={l.size} onChange={(e) => setLine(l.id, { size: e.target.value })} />
+                      </Field>
+                      <Field label="Quy cách đóng gói">
+                        <Input value={l.packing} onChange={(e) => setLine(l.id, { packing: e.target.value })} />
+                      </Field>
+                    </div>
+                    <div
+                      className={`grid gap-3 sm:grid-cols-3 ${l.unitKind === "bundle" ? "lg:grid-cols-[minmax(11rem,1.3fr)_repeat(5,minmax(0,1fr))]" : "lg:grid-cols-[minmax(11rem,1.3fr)_repeat(4,minmax(0,1fr))]"}`}
+                    >
+                      <ChoiceGroup
+                        label="Đếm theo"
+                        hideRequiredMark
+                        value={l.unitKind}
+                        onChange={(v) => setLine(l.id, { unitKind: v === "bundle" ? "bundle" : "carton", cartonsPerUnit: v === "bundle" ? Math.max(2, l.cartonsPerUnit) : 1 })}
+                        options={[
+                          { value: "carton", label: "Thùng" },
+                          { value: "bundle", label: "Kiện" },
+                        ]}
+                        columns={2}
+                      />
+                      {l.unitKind === "bundle" && <NumberField label="Thùng / kiện" unit="thùng" value={l.cartonsPerUnit} onChange={(v) => setLine(l.id, { cartonsPerUnit: v ?? 1 })} />}
+                      <NumberField label="Số lượng" unit={l.unitKind === "bundle" ? "kiện" : "thùng"} value={l.quantity} onChange={(v) => setLine(l.id, { quantity: v })} />
+                      <NumberField label="Kg tịnh / thùng" value={l.netKgPerCarton} onChange={(v) => setLine(l.id, { netKgPerCarton: v })} />
+                      <NumberField
+                        label={l.kg != null ? "Kg (gõ tay)" : "Kg (tự tính)"}
+                        value={l.kg ?? auto}
+                        onChange={(v) => setLine(l.id, { kg: v != null && auto != null && Math.abs(v - auto) < 0.005 ? null : v })}
+                      />
+                      {canSeePrice && <NumberField label="Đơn giá" unit={`${currency}/kg`} value={l.unitPrice} onChange={(v) => setLine(l.id, { unitPrice: v })} />}
+                    </div>
+                    {isOpen ? (
+                      <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
+                        <Field label="Mã HS">
+                          <Input value={l.hsCode} onChange={(e) => setLine(l.id, { hsCode: e.target.value })} />
+                        </Field>
+                        <Field label="Yêu cầu vi sinh / kỹ thuật">
+                          <Input value={l.microSpec} onChange={(e) => setLine(l.id, { microSpec: e.target.value })} />
+                        </Field>
+                      </div>
+                    ) : (
+                      <div>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-auto max-w-full whitespace-normal text-left"
+                          onClick={() => setOpenLines((s) => new Set(s).add(l.id))}
+                          title="Mở ô mã HS và yêu cầu vi sinh / kỹ thuật của dòng này."
+                        >
+                          <Plus className="mr-1 h-4 w-4 shrink-0" aria-hidden />
+                          Mã HS · vi sinh
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+              <div>
+                <Button variant="outline" onClick={() => setForm((f) => (f ? { ...f, lines: [...f.lines, blankLine()] } : f))} title="Thêm một dòng hàng vào hợp đồng.">
+                  <Plus className="mr-2 h-4 w-4" aria-hidden />
+                  Thêm dòng hàng
+                </Button>
+              </div>
+            </div>
+          </FormSection>
+
+          <FormSection no={5} title="File & ghi chú">
             {hasExportStorage ? (
-              <FilePicker files={file} onChange={setFile} multiple={false} label={form.fileName ? "Chọn file khác" : "Chọn file"} />
+              <Field label="File hợp đồng đã ký">
+                <div className="grid gap-2">
+                  {form.fileName && <span className="text-sm text-muted-foreground">Đang có: {form.fileName} — chọn file mới để thay</span>}
+                  <FilePicker files={file} onChange={setFile} multiple={false} label={form.fileName ? "Chọn file khác" : "Chọn file"} />
+                </div>
+              </Field>
             ) : (
               <p className="rounded-lg bg-warning-surface px-4 py-2 text-sm">Đang chạy không nối máy chủ: chưa lưu được file.</p>
             )}
             <Field label="Ghi chú">
               <Textarea rows={2} value={form.note} onChange={(e) => set("note", e.target.value)} />
             </Field>
-          </section>
+          </FormSection>
         </div>
       )}
       {customerEditor.dialog}
     </FormDialog>
+  );
+}
+
+/** Một khối đánh số của form (design-spec 42): nền nhạt, tiêu đề + câu ví dụ, nút phụ bên phải. */
+function FormSection({ no, title, hint, action, children }: { no: number; title: string; hint?: string; action?: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <section className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4 rounded-xl bg-muted/40 p-4">
+      <div className="flex flex-wrap items-start gap-3">
+        <span className="grid size-7 shrink-0 place-items-center rounded-full bg-primary font-semibold text-primary-foreground" aria-hidden>
+          {no}
+        </span>
+        <div className="grid min-w-0 flex-1 basis-48 gap-0.5">
+          <h3 className="font-semibold">{title}</h3>
+          {hint && <p className="text-sm text-muted-foreground">{hint}</p>}
+        </div>
+        {action}
+      </div>
+      {children}
+    </section>
   );
 }

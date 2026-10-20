@@ -37,10 +37,11 @@ import {
   type PendingContractRow,
   type StepNo,
 } from "@/lib/exportPlanning";
+import { progressText, shipmentProgress } from "./progress";
 import { formatDateVN } from "@/lib/format";
 import type { Customer, ExportItemState } from "@/types";
 import { AlarmClock, CalendarDays, ChevronLeft, ChevronRight, CircleCheck, Container, Eye, FileSpreadsheet, ListChecks } from "lucide-react";
-import { StepDots } from "./parts";
+import { StepBar } from "./parts";
 
 export function MonthView({
   data,
@@ -122,12 +123,14 @@ export function MonthView({
       render: (r) => (
         <span className="grid gap-0.5">
           <span className="font-semibold">{[r.shipment.lotCode && `Lô ${r.shipment.lotCode}`, shipmentKindLabel(r.shipment.kind)].filter(Boolean).join(" · ")}</span>
-          <span className="text-sm text-muted-foreground">{r.shipment.goodsSummary || r.shipment.containerNo}</span>
+          <span className="text-sm text-muted-foreground">
+            HĐ {r.contract.contractNo}
+            {r.shipment.goodsSummary ? ` · ${r.shipment.goodsSummary}` : ""}
+          </span>
         </span>
       ),
       getSortValue: (r) => r.shipment.lotCode,
     },
-    { key: "contract", header: "Hợp đồng", render: (r) => r.contract.contractNo, getSortValue: (r) => r.contract.contractNo },
     {
       key: "dates",
       header: "Đóng · ETD",
@@ -146,17 +149,25 @@ export function MonthView({
       render: (r) => `${formatNumber(r.shipment.plannedKg)}${r.actuals.kg ? ` · ${formatNumber(r.actuals.kg)}` : ""}`,
       getSortValue: (r) => r.shipment.plannedKg ?? 0,
     },
-    { key: "steps", header: "6 bước", render: (r) => <StepDots steps={r.steps} /> },
     {
-      key: "state",
-      header: "Tình trạng",
-      render: (r) => (
-        <div className="flex flex-wrap gap-1">
-          {r.closed ? <Tag variant="done">Khép kín</Tag> : <Tag variant="pending">Đang làm</Tag>}
-          {r.late && <Tag variant="error">Trễ hạn {formatDateVN(r.deadline)}</Tag>}
-          {!r.shipment.bookingNo && <Tag variant="muted">Chờ booking</Tag>}
-        </div>
-      ),
+      key: "progress",
+      header: "Tiến độ",
+      render: (r) => {
+        const p = shipmentProgress(data, r.shipment, opts);
+        return (
+          <div className="grid min-w-0 gap-1.5 lg:min-w-56">
+            <StepBar steps={p.steps} />
+            <span className={`text-sm ${p.next === null ? "font-semibold text-success" : "text-foreground"}`}>{progressText(p)}</span>
+            {(r.late || !r.shipment.bookingNo) && (
+              <div className="flex flex-wrap gap-1">
+                {r.late && <Tag variant="error">Trễ hạn {formatDateVN(r.deadline)}</Tag>}
+                {!r.shipment.bookingNo && <Tag variant="muted">Chờ booking</Tag>}
+              </div>
+            )}
+          </div>
+        );
+      },
+      getSortValue: (r) => shipmentProgress(data, r.shipment, opts).settledCount,
     },
   ];
 
@@ -190,29 +201,34 @@ export function MonthView({
   return (
     <div className="grid min-w-0 gap-6">
       <div className="flex flex-wrap items-end gap-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" onClick={() => onMonthChange(shiftMonth(month, -1))} title="Xem tháng trước." aria-label="Tháng trước">
+        <div className="flex items-center gap-1 rounded-lg border border-border bg-card p-1">
+          <Button variant="ghost" onClick={() => onMonthChange(shiftMonth(month, -1))} title="Xem tháng trước." aria-label="Tháng trước">
             <ChevronLeft className="h-4 w-4" aria-hidden />
           </Button>
-          <span className="flex items-center justify-center gap-2 font-semibold">
+          <span className="flex items-center justify-center gap-2 px-2 font-semibold">
             <CalendarDays className="h-4 w-4 text-muted-foreground" aria-hidden />
             {monthLabel(month)}
           </span>
-          <Button variant="outline" onClick={() => onMonthChange(shiftMonth(month, 1))} title="Xem tháng sau." aria-label="Tháng sau">
+          <Button variant="ghost" onClick={() => onMonthChange(shiftMonth(month, 1))} title="Xem tháng sau." aria-label="Tháng sau">
             <ChevronRight className="h-4 w-4" aria-hidden />
           </Button>
-          {month !== today.slice(0, 7) && (
-            <Button variant="ghost" onClick={() => onMonthChange(today.slice(0, 7))} title="Về tháng hiện tại.">
-              Tháng này
-            </Button>
-          )}
         </div>
-        <div className="min-w-0 flex-1 basis-56">
+        {month !== today.slice(0, 7) && (
+          <Button variant="ghost" onClick={() => onMonthChange(today.slice(0, 7))} title="Về tháng hiện tại.">
+            Tháng này
+          </Button>
+        )}
+        <div className="min-w-0 flex-1 basis-48">
           <Combobox label="Khách hàng" hideRequiredMark value={customerFilter} onChange={setCustomerFilter} options={customerOptions} clearable={false} />
         </div>
         <div className="min-w-0 flex-1 basis-56">
-          <Field label="Tra số giấy tờ" hint="Mã lô, booking, số cont, số invoice, số B/L, số HĐ">
-            <Input value={query} onChange={(e) => setQuery(e.target.value)} type="search" />
+          <Field label="Tra lô · booking · cont · số giấy tờ">
+            <Input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              type="search"
+              title="Gõ mã lô (MSL), số booking, số container, số invoice, số B/L hoặc số hợp đồng."
+            />
           </Field>
         </div>
         {canExport && (
@@ -245,7 +261,8 @@ export function MonthView({
               <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <h3 className="font-semibold">{g.customerName}</h3>
                 <span className="tnum text-sm text-muted-foreground">
-                  {g.rows.length} chuyến · KH {formatNumber(g.plannedKg)} kg{g.actualKg ? ` · thực xuất ${formatNumber(g.actualKg)} kg` : ""}
+                  {g.rows.length} chuyến · {g.rows.filter((r) => r.closed).length} khép kín · KH {formatNumber(g.plannedKg)} kg
+                  {g.actualKg ? ` · thực xuất ${formatNumber(g.actualKg)} kg` : ""}
                 </span>
               </div>
               <RecordTable

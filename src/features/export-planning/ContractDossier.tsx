@@ -6,10 +6,9 @@
 // ============================================================
 import {
   Button,
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
   RecordTable,
   Tag,
   formatNumber,
@@ -31,19 +30,15 @@ import {
   lineAmount,
   lineCartons,
   lineKg,
-  openShipmentsOf,
   pendingRevision,
   requiredDocumentLabel,
   revisionsOf,
   shipmentKindLabel,
-  stepState,
-  STEP_NOS,
   workingRevision,
   type ExportData,
-  type StepNo,
 } from "@/lib/exportPlanning";
 import { formatDateVN } from "@/lib/format";
-import type { ExportContract, ExportContractLine, ExportItemState, ExportShipment } from "@/types";
+import type { ExportContract, ExportContractLine, ExportShipment } from "@/types";
 import {
   ArrowLeft,
   Ban,
@@ -51,13 +46,14 @@ import {
   CheckCircle2,
   FilePen,
   FileSignature,
+  MoreHorizontal,
   Pencil,
   Plus,
-  Ship,
   Trash2,
   Wallet,
 } from "lucide-react";
-import { StepDots, type PreviewTarget } from "./parts";
+import { CollapsibleSection, StepBar, type PreviewTarget } from "./parts";
+import { progressText, shipmentProgress } from "./progress";
 
 export interface DossierCan {
   create: boolean;
@@ -156,6 +152,86 @@ export function ContractDossier({
     { key: "micro", header: "Vi sinh / kỹ thuật", render: (l) => l.microSpec || "—", secondary: true },
   ];
 
+  /** Việc làm tiếp của HĐ — MỘT nút chính (design-spec 42): duyệt → lên chuyến → không có. */
+  const primary: "approve" | "ship" | null = !isOpen
+    ? null
+    : can.update && needsApproval
+      ? "approve"
+      : can.create && (!shipments.some((s) => s.status === "open") || !coverage.covered)
+        ? "ship"
+        : null;
+
+  const menuItems: { key: string; node: React.ReactNode }[] = [];
+  const menuBtn = (key: string, node: React.ReactNode) => menuItems.push({ key, node });
+  if (isOpen) {
+    if (can.update && needsApproval && primary !== "approve")
+      menuBtn("approve", (
+        <Button variant="ghost" className="w-full justify-start" onClick={onApprove} title="Ghi kết quả BGĐ ký giấy cho bản đang chờ duyệt.">
+          <FileSignature className="mr-2 h-4 w-4" aria-hidden />
+          Ghi kết quả duyệt
+        </Button>
+      ));
+    if (can.update && (pending || !eff))
+      menuBtn("edit", (
+        <Button variant="edit" className="w-full justify-start" onClick={onEditPending} title="Sửa bản đang chờ duyệt (chưa có hiệu lực nên sửa thẳng).">
+          <Pencil className="mr-2 h-4 w-4" aria-hidden />
+          Sửa bản chờ duyệt
+        </Button>
+      ));
+    if (can.update && eff && !pending)
+      menuBtn("revise", (
+        <Button variant="ghost" className="w-full justify-start" onClick={onRevise} title="Ghi bản sửa (rvs / phụ kiện / tu chỉnh L/C) — bản đang hiệu lực giữ nguyên tới khi bản sửa được duyệt.">
+          <FilePen className="mr-2 h-4 w-4" aria-hidden />
+          Ghi bản sửa
+        </Button>
+      ));
+    if (can.update)
+      menuBtn("extend", (
+        <Button variant="ghost" className="w-full justify-start" onClick={onExtend} title="Ghi hạn giao mới khách đã xác nhận — không cần BGĐ duyệt lại.">
+          <CalendarClock className="mr-2 h-4 w-4" aria-hidden />
+          Gia hạn giao hàng
+        </Button>
+      ));
+    if (can.create && primary !== "ship")
+      menuBtn("ship", (
+        <Button variant="ghost" className="w-full justify-start" onClick={onAddShipment} title="Lên thêm một chuyến (một container) cho hợp đồng này.">
+          <Plus className="mr-2 h-4 w-4" aria-hidden />
+          Lên thêm chuyến
+        </Button>
+      ));
+    if (can.paymentsWrite)
+      menuBtn("deposit", (
+        <Button variant="ghost" className="w-full justify-start" onClick={onDeposit} title="Ghi tiền cọc / tiền về ở cấp hợp đồng.">
+          <Wallet className="mr-2 h-4 w-4" aria-hidden />
+          Ghi tiền cọc
+        </Button>
+      ));
+    if (can.update && eff && !closure.closed)
+      menuBtn("close", (
+        <Button variant="ghost" className="w-full justify-start" onClick={onCloseManually} title="Đóng hợp đồng bằng tay kèm lý do (VD khách xác nhận giảm lượng).">
+          <CheckCircle2 className="mr-2 h-4 w-4" aria-hidden />
+          Đóng tay
+        </Button>
+      ));
+    if (can.update && canCancel)
+      menuBtn("cancel", (
+        <Button variant="ghost" className="w-full justify-start" onClick={onCancelContract} title="Hủy hợp đồng kèm lý do — các chuyến chưa đóng cont hủy theo. Dữ liệu giữ nguyên.">
+          <Ban className="mr-2 h-4 w-4" aria-hidden />
+          Hủy hợp đồng
+        </Button>
+      ));
+    if (can.delete && canDelete)
+      menuBtn("delete", (
+        <Button variant="danger" className="w-full justify-start" onClick={onDeleteContract} title="Xóa hợp đồng nháp chưa duyệt, chưa có chuyến (có Hoàn tác).">
+          <Trash2 className="mr-2 h-4 w-4" aria-hidden />
+          Xóa hợp đồng
+        </Button>
+      ));
+  }
+
+  const openShipments = shipments.filter((s) => s.status === "open");
+  const termsFirst = !eff || !openShipments.length;
+
   return (
     <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-6">
       <div className="flex flex-wrap items-start gap-3">
@@ -163,7 +239,7 @@ export function ContractDossier({
           <ArrowLeft className="mr-2 h-4 w-4" aria-hidden />
           Quay lại
         </Button>
-        <div className="grid min-w-0 flex-1 gap-1">
+        <div className="grid min-w-0 flex-1 basis-64 gap-1">
           <h2 className="font-semibold">
             HĐ {contract.contractNo} · {customerName}
           </h2>
@@ -188,214 +264,187 @@ export function ContractDossier({
             {contract.status === "closed" && contract.closeReason && <Tag variant="muted">Đóng tay: {contract.closeReason}</Tag>}
           </div>
         </div>
-      </div>
-
-      {isOpen && (can.create || can.update || can.delete || can.paymentsWrite) && (
-        <div className="flex flex-wrap gap-2">
-          {can.update && needsApproval && (
-            <Button onClick={onApprove} title="Ghi kết quả BGĐ ký giấy cho bản đang chờ duyệt (đồng ý / yêu cầu sửa / từ chối).">
+        <div className="flex flex-wrap items-center gap-2">
+          {primary === "approve" && (
+            <Button onClick={onApprove} title="Việc tiếp: ghi kết quả BGĐ ký giấy cho bản đang chờ duyệt (đồng ý / yêu cầu sửa / từ chối).">
               <FileSignature className="mr-2 h-4 w-4" aria-hidden />
               Ghi kết quả duyệt
             </Button>
           )}
-          {can.update && (pending || !eff) && (
-            <Button variant="edit" onClick={onEditPending} title="Sửa bản đang chờ duyệt (chưa có hiệu lực nên sửa thẳng).">
-              <Pencil className="mr-2 h-4 w-4" aria-hidden />
-              Sửa bản chờ duyệt
-            </Button>
-          )}
-          {can.update && eff && !pending && (
-            <Button variant="outline" onClick={onRevise} title="Ghi bản sửa (rvs / phụ kiện / tu chỉnh L/C) — bản đang hiệu lực giữ nguyên tới khi bản sửa được duyệt.">
-              <FilePen className="mr-2 h-4 w-4" aria-hidden />
-              Ghi bản sửa
-            </Button>
-          )}
-          {can.update && (
-            <Button variant="outline" onClick={onExtend} title="Ghi hạn giao mới khách đã xác nhận — không cần BGĐ duyệt lại.">
-              <CalendarClock className="mr-2 h-4 w-4" aria-hidden />
-              Gia hạn
-            </Button>
-          )}
-          {can.create && (
-            <Button variant="outline" onClick={onAddShipment} title="Lên một chuyến (một container) cho hợp đồng này.">
+          {primary === "ship" && (
+            <Button onClick={onAddShipment} title="Việc tiếp: lên một chuyến (một container) cho hợp đồng này.">
               <Plus className="mr-2 h-4 w-4" aria-hidden />
               Lên chuyến
             </Button>
           )}
-          {can.paymentsWrite && (
-            <Button variant="outline" onClick={onDeposit} title="Ghi tiền cọc / tiền về ở cấp hợp đồng.">
-              <Wallet className="mr-2 h-4 w-4" aria-hidden />
-              Ghi tiền cọc
-            </Button>
+          {menuItems.length > 0 && (
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" title="Các thao tác khác của hợp đồng: bản sửa, gia hạn, tiền cọc, đóng tay, hủy…">
+                  <MoreHorizontal className="mr-2 h-4 w-4" aria-hidden />
+                  Thao tác khác
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="grid w-64 gap-1 p-2">
+                {menuItems.map((m) => (
+                  <div key={m.key}>{m.node}</div>
+                ))}
+              </PopoverContent>
+            </Popover>
           )}
-          {can.update && eff && !closure.closed && (
-            <Button variant="outline" onClick={onCloseManually} title="Đóng hợp đồng bằng tay kèm lý do (VD khách xác nhận giảm lượng).">
-              <CheckCircle2 className="mr-2 h-4 w-4" aria-hidden />
-              Đóng tay
-            </Button>
-          )}
-          {can.update && canCancel && (
-            <Button variant="outline" onClick={onCancelContract} title="Hủy hợp đồng kèm lý do — các chuyến chưa đóng cont hủy theo. Dữ liệu giữ nguyên.">
-              <Ban className="mr-2 h-4 w-4" aria-hidden />
-              Hủy hợp đồng
-            </Button>
-          )}
-          {can.delete && canDelete && (
-            <Button variant="danger" onClick={onDeleteContract} title="Xóa hợp đồng nháp chưa duyệt, chưa có chuyến (có Hoàn tác).">
-              <Trash2 className="mr-2 h-4 w-4" aria-hidden />
-              Xóa hợp đồng
+          {contract.status === "closed" && can.update && (
+            <Button variant="outline" onClick={onReopen} title="Bỏ đóng tay — hợp đồng tính khép kín lại theo số.">
+              Bỏ đóng tay
             </Button>
           )}
         </div>
-      )}
-      {contract.status === "closed" && can.update && (
-        <div>
-          <Button variant="outline" onClick={onReopen} title="Bỏ đóng tay — hợp đồng tính khép kín lại theo số.">
-            Bỏ đóng tay
-          </Button>
-        </div>
-      )}
+      </div>
 
       {terms && totals && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Điều khoản {eff ? `(bản ${eff.revisionNo} đang hiệu lực)` : "(chờ duyệt)"}</CardTitle>
-          </CardHeader>
-          <CardContent className="grid grid-cols-[minmax(0,1fr)] gap-4">
-            <dl className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
-              <Info label="Ngày ký" value={formatDateVN(contract.signedOn)} />
-              <Info label="Order" value={contract.orderRef} />
-              <Info label="Incoterm · cảng" value={[terms.incoterm, terms.portOfLoading && `${terms.portOfLoading} → ${terms.portOfDischarge}`].filter(Boolean).join(" · ") || terms.portOfDischarge} />
-              <Info
-                label="Thanh toán"
-                value={[
-                  PAYMENT_METHODS.find((p) => p.value === terms.paymentMethod)?.label,
-                  terms.depositPct != null && `cọc ${formatNumber(terms.depositPct)}%`,
-                  terms.paymentMethod === "lc" && terms.lcNo && `L/C ${terms.lcNo}`,
-                  terms.lcExpiry && `hết hạn ${formatDateVN(terms.lcExpiry)}`,
-                ]
-                  .filter(Boolean)
-                  .join(" · ")}
-              />
-              <Info
-                label="Hạn giao"
-                value={`${formatDateVN(deadline)}${extensions.length ? ` (gia hạn từ ${formatDateVN(terms.latestShipmentDate)})` : ""}`}
-              />
-              <Info label="Dung sai" value={`±${formatNumber(terms.tolerancePct ?? 0)}% (lượng và tiền)`} />
-              <Info label="Container" value={[terms.containerCount != null && `${terms.containerCount} cont`, terms.containerType].filter(Boolean).join(" ")} />
-              <Info
-                label="Tổng"
-                value={`${formatNumber(totals.units)} thùng/kiện · ${formatNumber(totals.cartons)} thùng · ${formatNumber(totals.kg)} kg${can.viewPrice ? ` · ${formatNumber(totals.amount)} ${currency}` : ""}`}
-              />
-            </dl>
-            {terms.requiredDocuments.length > 0 && (
-              <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-2">
-                <p className="text-sm text-muted-foreground">Chứng từ khách yêu cầu</p>
-                <div className="flex flex-wrap gap-1">
-                  {terms.requiredDocuments.map((d, i) => (
-                    <Tag key={i} variant="category" tone="blue" className="max-w-full whitespace-normal">
-                      {requiredDocumentLabel(d)}
-                    </Tag>
-                  ))}
-                </div>
-              </div>
-            )}
-            {(closure.actuals.kg > 0 || pay.received > 0) && (
-              <p className="tnum text-sm">
-                Thực xuất: {formatNumber(closure.actuals.kg)} / {formatNumber(closure.target.kg || totals.kg)} kg
-                {can.viewPrice ? ` · ${formatNumber(closure.actuals.amount)} / ${formatNumber(closure.target.amount || totals.amount)} ${currency} · tiền về ${formatNumber(pay.received)}` : ""}
-              </p>
-            )}
-            {contract.note && <p className="text-sm text-muted-foreground">{contract.note}</p>}
-          </CardContent>
-        </Card>
+        <dl className="grid gap-3 rounded-xl bg-muted/50 px-4 py-3 text-sm sm:grid-cols-2 lg:grid-cols-5">
+          <Info label="Hạn giao" value={`${formatDateVN(deadline)}${extensions.length ? " (đã gia hạn)" : ""}`} />
+          <Info label="Tổng hợp đồng" value={`${formatNumber(totals.kg)} kg${can.viewPrice ? ` · ${formatNumber(totals.amount)} ${currency}` : ""}`} />
+          <Info label="Dung sai" value={`±${formatNumber(terms.tolerancePct ?? 0)}% lượng và tiền`} />
+          <Info label="Chuyến" value={`${openShipments.length}${terms.containerCount != null ? ` / ${terms.containerCount} cont` : ""}`} />
+          <Info
+            label="Thực xuất"
+            value={closure.actuals.kg > 0 ? `${formatNumber(closure.actuals.kg)} kg${can.viewPrice ? ` · tiền về ${formatNumber(pay.received)}` : ""}` : "chưa có invoice"}
+          />
+        </dl>
       )}
 
-      {working && (
-        <RecordTable
-          columns={lineColumns}
-          rows={working.lines}
-          getKey={(l) => l.id}
-          rowMarkKey={`export-contract-lines:${contract.id}`}
-          emptyText="Hợp đồng chưa có dòng hàng."
-        />
+      {openShipments.length === 0 && (
+        <div className="grid justify-items-start gap-2 rounded-xl border border-dashed border-border px-4 py-5">
+          <p className="font-semibold">Chưa lên chuyến nào</p>
+          <p className="text-sm text-muted-foreground">
+            Mỗi chuyến là một container: lệnh sản xuất, bao bì, đóng cont và bộ chứng từ ghi theo từng chuyến.
+            {needsApproval ? " Lên chuyến kế hoạch được ngay, lệnh sản xuất chỉ xong sau khi BGĐ duyệt." : ""}
+          </p>
+        </div>
       )}
-
-      <Card>
-        <CardHeader className="flex flex-row flex-wrap items-center gap-3">
-          <Ship className="h-5 w-5 text-muted-foreground" aria-hidden />
-          <CardTitle className="min-w-0 flex-1">Chuyến ({openShipmentsOf(data, contract.id).length})</CardTitle>
-        </CardHeader>
-        <CardContent className="grid grid-cols-[minmax(0,1fr)] gap-2">
-          {!shipments.length && <p className="text-sm text-muted-foreground">Chưa lên chuyến nào.{can.create && isOpen ? " Bấm Lên chuyến để thêm." : ""}</p>}
-          {shipments.length > 1 &&
-            shipments.map((s) => (
-              <ShipmentRow key={s.id} data={data} shipment={s} selected={s.id === selectedShipmentId} onSelect={() => onSelectShipment(s.id)} filesAvailable={filesAvailable} />
-            ))}
-        </CardContent>
-      </Card>
+      {shipments.length > 1 && (
+        <section className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-2">
+          <h3 className="font-semibold">Chuyến của hợp đồng — chọn để xem các bước</h3>
+          {shipments.map((s) => (
+            <ShipmentRow key={s.id} data={data} shipment={s} selected={s.id === selectedShipmentId} onSelect={() => onSelectShipment(s.id)} filesAvailable={filesAvailable} />
+          ))}
+        </section>
+      )}
 
       {children}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Các bản hợp đồng và kết quả duyệt</CardTitle>
-        </CardHeader>
-        <CardContent className="grid grid-cols-[minmax(0,1fr)] gap-3">
-          {[...revisions].reverse().map((r) => {
-            const st = approvalState(data, r.id);
-            return (
-              <div key={r.id} className="grid gap-2 rounded-lg border border-border p-3 text-sm">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-semibold">Bản {r.revisionNo}</span>
-                  <span className="text-muted-foreground">{formatDateVN(r.revisedOn)}</span>
-                  <Tag variant={st === "approved" ? "done" : st === "rejected" ? "error" : "pending"}>{APPROVAL_LABELS[st]}</Tag>
-                  {eff?.id === r.id && <Tag variant="source">Đang hiệu lực</Tag>}
-                </div>
-                {r.changeSummary && <p>{r.changeSummary}</p>}
-                <p className="tnum text-muted-foreground">
-                  {formatNumber(contractTotals(r.lines).kg)} kg{can.viewPrice ? ` · ${formatNumber(contractTotals(r.lines).amount)} ${r.terms.currency}` : ""} · hạn giao{" "}
-                  {formatDateVN(r.terms.latestShipmentDate)}
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {r.filePath && (
-                    <Button size="sm" variant="outline" onClick={() => onPreview({ path: r.filePath, name: r.fileName, caption: `HĐ ${contract.contractNo} · bản ${r.revisionNo}` })} title="Xem file hợp đồng của bản này.">
-                      File hợp đồng
-                    </Button>
-                  )}
-                  {approvalsOf(data, r.id).map((a) => (
-                    <span key={a.id} className="flex flex-wrap items-center gap-2">
-                      <span>
-                        {APPROVAL_LABELS[a.decision]} · {a.approverName} · {formatDateVN(a.decidedOn)}
-                        {a.reason ? ` · ${a.reason}` : ""}
-                      </span>
-                      {a.filePath && (
-                        <Button size="sm" variant="ghost" onClick={() => onPreview({ path: a.filePath, name: a.fileName, caption: `Bản ký · HĐ ${contract.contractNo} · bản ${r.revisionNo}` })} title="Xem bản ký (scan).">
-                          Bản ký
-                        </Button>
-                      )}
-                    </span>
-                  ))}
-                </div>
+      {terms && totals && (
+        <CollapsibleSection
+          title={`Điều khoản ${eff ? `· bản ${eff.revisionNo} đang hiệu lực` : "· chờ duyệt"}`}
+          summary={[terms.incoterm, terms.portOfDischarge, PAYMENT_METHODS.find((p) => p.value === terms.paymentMethod)?.label].filter(Boolean).join(" · ")}
+          defaultOpen={termsFirst}
+        >
+          <dl className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
+            <Info label="Ngày ký" value={formatDateVN(contract.signedOn)} />
+            <Info label="Order" value={contract.orderRef} />
+            <Info label="Incoterm · cảng" value={[terms.incoterm, terms.portOfLoading && `${terms.portOfLoading} → ${terms.portOfDischarge}`].filter(Boolean).join(" · ") || terms.portOfDischarge} />
+            <Info
+              label="Thanh toán"
+              value={[
+                PAYMENT_METHODS.find((p) => p.value === terms.paymentMethod)?.label,
+                terms.depositPct != null && `cọc ${formatNumber(terms.depositPct)}%`,
+                terms.paymentMethod === "lc" && terms.lcNo && `L/C ${terms.lcNo}`,
+                terms.lcExpiry && `hết hạn ${formatDateVN(terms.lcExpiry)}`,
+              ]
+                .filter(Boolean)
+                .join(" · ")}
+            />
+            <Info label="Hạn giao" value={`${formatDateVN(deadline)}${extensions.length ? ` (gia hạn từ ${formatDateVN(terms.latestShipmentDate)})` : ""}`} />
+            <Info label="Container" value={[terms.containerCount != null && `${terms.containerCount} cont`, terms.containerType].filter(Boolean).join(" ")} />
+            <Info
+              label="Tổng"
+              value={`${formatNumber(totals.units)} thùng/kiện · ${formatNumber(totals.cartons)} thùng · ${formatNumber(totals.kg)} kg${can.viewPrice ? ` · ${formatNumber(totals.amount)} ${currency}` : ""}`}
+            />
+            <Info label="Ghi chú" value={contract.note} />
+          </dl>
+          {terms.requiredDocuments.length > 0 && (
+            <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-2">
+              <p className="text-sm text-muted-foreground">Chứng từ khách yêu cầu</p>
+              <div className="flex flex-wrap gap-1">
+                {terms.requiredDocuments.map((d, i) => (
+                  <Tag key={i} variant="category" tone="blue" className="max-w-full whitespace-normal">
+                    {requiredDocumentLabel(d)}
+                  </Tag>
+                ))}
               </div>
-            );
-          })}
-          {extensions.map((e) => (
-            <div key={e.id} className="flex flex-wrap items-center gap-2 rounded-lg border border-border p-3 text-sm">
-              <CalendarClock className="h-4 w-4 text-muted-foreground" aria-hidden />
-              <span className="min-w-0 flex-1">
-                Gia hạn tới {formatDateVN(e.newDeadline)} · khách xác nhận {formatDateVN(e.confirmedOn)}
-                {e.note ? ` · ${e.note}` : ""}
-              </span>
-              {e.filePath && (
-                <Button size="sm" variant="ghost" onClick={() => onPreview({ path: e.filePath, name: e.fileName, caption: `Gia hạn · HĐ ${contract.contractNo}` })} title="Xem xác nhận của khách.">
-                  Xác nhận
-                </Button>
-              )}
             </div>
-          ))}
-        </CardContent>
-      </Card>
+          )}
+        </CollapsibleSection>
+      )}
+
+      {working && (
+        <CollapsibleSection
+          title={`Dòng hàng (${working.lines.length})`}
+          summary={totals ? `${formatNumber(totals.cartons)} thùng · ${formatNumber(totals.kg)} kg${can.viewPrice ? ` · ${formatNumber(totals.amount)} ${currency}` : ""}` : undefined}
+          defaultOpen={termsFirst}
+        >
+          <RecordTable columns={lineColumns} rows={working.lines} getKey={(l) => l.id} rowMarkKey={`export-contract-lines:${contract.id}`} emptyText="Hợp đồng chưa có dòng hàng." />
+        </CollapsibleSection>
+      )}
+
+      <CollapsibleSection
+        title="Các bản hợp đồng và kết quả duyệt"
+        summary={`${revisions.length} bản${extensions.length ? ` · ${extensions.length} lần gia hạn` : ""}`}
+        defaultOpen={needsApproval}
+      >
+        {[...revisions].reverse().map((r) => {
+          const st = approvalState(data, r.id);
+          return (
+            <div key={r.id} className="grid gap-2 border-b border-border pb-3 text-sm last:border-b-0 last:pb-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-semibold">Bản {r.revisionNo}</span>
+                <span className="text-muted-foreground">{formatDateVN(r.revisedOn)}</span>
+                <Tag variant={st === "approved" ? "done" : st === "rejected" ? "error" : "pending"}>{APPROVAL_LABELS[st]}</Tag>
+                {eff?.id === r.id && <Tag variant="source">Đang hiệu lực</Tag>}
+              </div>
+              {r.changeSummary && <p>{r.changeSummary}</p>}
+              <p className="tnum text-muted-foreground">
+                {formatNumber(contractTotals(r.lines).kg)} kg{can.viewPrice ? ` · ${formatNumber(contractTotals(r.lines).amount)} ${r.terms.currency}` : ""} · hạn giao{" "}
+                {formatDateVN(r.terms.latestShipmentDate)}
+              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                {r.filePath && (
+                  <Button size="sm" variant="outline" onClick={() => onPreview({ path: r.filePath, name: r.fileName, caption: `HĐ ${contract.contractNo} · bản ${r.revisionNo}` })} title="Xem file hợp đồng của bản này.">
+                    File hợp đồng
+                  </Button>
+                )}
+                {approvalsOf(data, r.id).map((a) => (
+                  <span key={a.id} className="flex flex-wrap items-center gap-2">
+                    <span>
+                      {APPROVAL_LABELS[a.decision]} · {a.approverName} · {formatDateVN(a.decidedOn)}
+                      {a.reason ? ` · ${a.reason}` : ""}
+                    </span>
+                    {a.filePath && (
+                      <Button size="sm" variant="ghost" onClick={() => onPreview({ path: a.filePath, name: a.fileName, caption: `Bản ký · HĐ ${contract.contractNo} · bản ${r.revisionNo}` })} title="Xem bản ký (scan).">
+                        Bản ký
+                      </Button>
+                    )}
+                  </span>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+        {extensions.map((e) => (
+          <div key={e.id} className="flex flex-wrap items-center gap-2 text-sm">
+            <CalendarClock className="h-4 w-4 text-muted-foreground" aria-hidden />
+            <span className="min-w-0 flex-1">
+              Gia hạn tới {formatDateVN(e.newDeadline)} · khách xác nhận {formatDateVN(e.confirmedOn)}
+              {e.note ? ` · ${e.note}` : ""}
+            </span>
+            {e.filePath && (
+              <Button size="sm" variant="ghost" onClick={() => onPreview({ path: e.filePath, name: e.fileName, caption: `Gia hạn · HĐ ${contract.contractNo}` })} title="Xem xác nhận của khách.">
+                Xác nhận
+              </Button>
+            )}
+          </div>
+        ))}
+      </CollapsibleSection>
     </div>
   );
 }
@@ -422,15 +471,15 @@ function ShipmentRow({
   onSelect: () => void;
   filesAvailable: boolean;
 }) {
-  const steps = Object.fromEntries(STEP_NOS.map((n) => [n, stepState(data, shipment, n, { filesAvailable })])) as Record<StepNo, ExportItemState>;
+  const p = shipmentProgress(data, shipment, { filesAvailable });
   return (
     <button
       type="button"
       onClick={onSelect}
-      className={`flex flex-wrap items-center gap-3 rounded-lg border p-3 text-left ${selected ? "border-primary bg-accent" : "border-border hover:bg-muted"}`}
+      className={`grid min-w-0 gap-2 rounded-lg border p-3 text-left sm:grid-cols-[minmax(0,1fr)_minmax(12rem,20rem)] sm:items-center ${selected ? "border-primary bg-accent" : "border-border hover:bg-muted"}`}
       title="Mở các bước của chuyến này."
     >
-      <span className="grid min-w-0 flex-1 gap-0.5">
+      <span className="grid min-w-0 gap-0.5">
         <span className="font-semibold">
           {[shipment.lotCode && `Lô ${shipment.lotCode}`, shipmentKindLabel(shipment.kind), shipment.containerNo].filter(Boolean).join(" · ")}
         </span>
@@ -442,7 +491,12 @@ function ShipmentRow({
                 .join(" · ")}
         </span>
       </span>
-      {shipment.status === "open" && <StepDots steps={steps} />}
+      {shipment.status === "open" && (
+        <span className="grid min-w-0 gap-1">
+          <StepBar steps={p.steps} />
+          <span className={`text-sm ${p.next === null ? "font-semibold text-success" : ""}`}>{progressText(p)}</span>
+        </span>
+      )}
     </button>
   );
 }

@@ -7,6 +7,7 @@ ttl_days: 90
 status: ba-spec v3 — ĐÃ BUILD v1 2026-10-20 (code + `0075_export_planning.sql`, kiểm PGlite) — ⏳ 0075 CHƯA chạy trên DB thật: tạo bucket `export-files` → chạy 0075 (2 lần) → deploy
 <!-- re-verified: 2026-10-20 12:40 — AC-4…AC-26 = test `src/lib/exportPlanning.test.ts` (37) + `exportPlanningDemo.test.ts`; AC-1/2/18/27 RLS thử trên PGlite; luồng lập HĐ → lên chuyến → chặn KH-R8 → duyệt → 6 bước → khép kín · bản sửa chờ / bị từ chối · nháp · 360 px + 130 % thử tay preview demo. -->
 
+> **Giao diện:** design-spec [42](42-export-planning-ui.design-spec.md) (oracle giao diện — chỉnh UI đọc file đó).
 > **Mục đích:** oracle HÀNH VI cho đợt 1. Định nghĩa ai làm nghiệp vụ gì, vào gì ra gì, thế nào là đúng (AC). **Không** mô tả giao diện (việc của design-spec).
 > **Nguồn đã chốt:** kế hoạch [`spec/xuat-khau-phong-ke-hoach.md`](../spec/xuat-khau-phong-ke-hoach.md) (§9 chốt 11 câu 2026-10-20) · quy trình [`QTI-KH-01`](../ho-so-nang-luc/qti-kh-01-quan-ly-don-hang.md) (luật KH-R1…R16) · phân quyền [`spec/role-permissions.md`](../spec/role-permissions.md) · tài liệu công ty [`40-documents.md`](40-documents.md) (khuôn file + RLS).
 

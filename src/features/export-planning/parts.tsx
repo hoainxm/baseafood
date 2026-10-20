@@ -4,13 +4,13 @@
 // Description: Shared UI bits for the export planning screens: step state dots, file preview,
 //              multi-file picker, file chips.
 // ============================================================
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Button, FormDialog, ProcessingState, Tag, notify, type TagVariant } from "@/design-system";
 import { ITEM_STATE_LABELS, STEP_TITLES, type StepNo } from "@/lib/exportPlanning";
 import { DEMO_PLACEHOLDER_PREFIX, EXPORT_FILE_ACCEPT, getExportFileUrl } from "@/lib/exportFileStorage";
 import { filePreviewKind } from "@/lib/documents";
 import type { ExportFile, ExportItemState } from "@/types";
-import { Check, CircleDashed, Download, ExternalLink, FileText, Minus, Paperclip, X } from "lucide-react";
+import { Check, ChevronDown, CircleDashed, Download, ExternalLink, FileText, Minus, Paperclip, X } from "lucide-react";
 
 const STATE_TAG: Record<ExportItemState, TagVariant> = {
   done: "done",
@@ -223,11 +223,12 @@ export function FileChips({ files, onPreview, caption }: { files: readonly Expor
           key={f.id}
           size="sm"
           variant="outline"
+          className="max-w-full min-w-0"
           onClick={() => onPreview({ path: f.path, name: f.fileName || "file", caption: [caption, f.layerNo != null ? `lớp ${f.layerNo}` : "", f.caption].filter(Boolean).join(" · ") })}
           title={`Xem file "${f.fileName}"${f.uploadedBy ? ` — ${f.uploadedBy} đính` : ""}.`}
         >
           <FileText className="mr-1 h-4 w-4" aria-hidden />
-          <span className="max-w-48 truncate">{f.layerNo != null ? `Lớp ${f.layerNo} · ` : ""}{f.fileName || "file"}</span>
+          <span className="min-w-0 max-w-48 truncate">{f.layerNo != null ? `Lớp ${f.layerNo} · ` : ""}{f.fileName || "file"}</span>
         </Button>
       ))}
     </div>
@@ -236,4 +237,79 @@ export function FileChips({ files, onPreview, caption }: { files: readonly Expor
 
 export function StateTag({ state }: { state: ExportItemState }) {
   return <Tag variant={STATE_TAG[state]}>{ITEM_STATE_LABELS[state]}</Tag>;
+}
+
+const SEGMENT_TONE: Record<ExportItemState, string> = {
+  done: "bg-success",
+  "in-progress": "bg-warning",
+  "not-started": "bg-border",
+  "not-applicable": "bg-muted-foreground/40",
+};
+
+/** Thanh tiến độ 6 khúc (bước 1 → 6) — mỗi khúc một màu trạng thái, rê ra tên bước. */
+export function StepBar({ steps }: { steps: Record<StepNo, ExportItemState> }) {
+  return (
+    <div className="flex w-full min-w-32 gap-1" role="img" aria-label={([1, 2, 3, 4, 5, 6] as StepNo[]).map((n) => `${STEP_TITLES[n - 1]}: ${ITEM_STATE_LABELS[steps[n]]}`).join("; ")}>
+      {([1, 2, 3, 4, 5, 6] as StepNo[]).map((n) => (
+        <span key={n} title={`Bước ${n} ${STEP_TITLES[n - 1]}: ${ITEM_STATE_LABELS[steps[n]]}`} className={`h-2 flex-1 rounded-full ${SEGMENT_TONE[steps[n]]}`} />
+      ))}
+    </div>
+  );
+}
+
+/** Stepper ngang có nhãn — bấm một bước để nhảy tới khối của bước đó. */
+export function StepStepper({ steps, current, onSelect }: { steps: Record<StepNo, ExportItemState>; current: StepNo | null; onSelect?: (n: StepNo) => void }) {
+  return (
+    <ol className="flex min-w-0 gap-1">
+      {([1, 2, 3, 4, 5, 6] as StepNo[]).map((n) => {
+        const isCurrent = n === current;
+        return (
+          <li key={n} className={`flex min-w-0 flex-col gap-2 ${isCurrent ? "flex-[2]" : "flex-1"} sm:min-w-24 sm:flex-1`}>
+            <span className={`h-1.5 rounded-full ${SEGMENT_TONE[steps[n]]}`} aria-hidden />
+            <button
+              type="button"
+              onClick={() => onSelect?.(n)}
+              title={`Tới bước ${n} ${STEP_TITLES[n - 1]} (${ITEM_STATE_LABELS[steps[n]]}).`}
+              className={`flex min-w-0 items-center gap-2 rounded-md px-1 py-1 text-left hover:bg-muted ${isCurrent ? "font-semibold text-foreground" : "text-muted-foreground"}`}
+            >
+              <StepDot step={n} state={steps[n]} alert={isCurrent && steps[n] !== "done"} />
+              {/* Điện thoại: chỉ bước đang làm hiện nhãn — 6 nhãn không vừa 360 px (design-spec 42). */}
+              <span className={`min-w-0 text-sm leading-tight ${isCurrent ? "" : "hidden sm:inline"}`}>{STEP_TITLES[n - 1]}</span>
+            </button>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+/** Khối có tiêu đề gập / mở được (phần phụ của hồ sơ — design-spec 42). */
+export function CollapsibleSection({
+  title,
+  summary,
+  defaultOpen = true,
+  children,
+}: {
+  title: string;
+  summary?: ReactNode;
+  defaultOpen?: boolean;
+  children: ReactNode;
+}) {
+  const [isOpen, setIsOpen] = useState(defaultOpen);
+  return (
+    <section className="grid min-w-0 grid-cols-[minmax(0,1fr)] rounded-xl border border-border bg-card">
+      <button
+        type="button"
+        onClick={() => setIsOpen((o) => !o)}
+        aria-expanded={isOpen}
+        title={isOpen ? `Gập phần "${title}".` : `Mở phần "${title}".`}
+        className="flex min-w-0 items-center gap-3 px-4 py-3 text-left"
+      >
+        <ChevronDown className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${isOpen ? "" : "-rotate-90"}`} aria-hidden />
+        <span className="font-semibold">{title}</span>
+        {summary && <span className="tnum min-w-0 flex-1 truncate text-right text-sm text-muted-foreground">{summary}</span>}
+      </button>
+      {isOpen && <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4 border-t border-border px-4 py-4">{children}</div>}
+    </section>
+  );
 }

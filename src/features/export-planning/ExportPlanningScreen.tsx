@@ -9,7 +9,7 @@
 // Máy chủ chặn bằng RLS riêng của mig 0075 (has_export_permission); màn ẩn nút theo useCan.
 import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Button, ChoiceGroup, ConfirmDelete, EmptyState, TableSkeleton, notify, todayIso } from "@/design-system";
+import { Button, ConfirmDelete, EmptyState, TableSkeleton, Tabs, TabsList, TabsTrigger, notify, todayIso } from "@/design-system";
 import { useCustomers } from "@/lib/catalogRepo";
 import { useAuth } from "@/lib/auth";
 import { useCan } from "@/features/shared/PermissionProvider";
@@ -35,7 +35,7 @@ import {
 } from "@/lib/exportPlanning";
 import { hasExportStorage } from "@/lib/exportFileStorage";
 import type { ExportContract, ExportFile, ExportPayment, ExportShipment, ExportShipmentKind, ExportStepItem } from "@/types";
-import { FilePlus2, FolderLock } from "lucide-react";
+import { CalendarDays, FilePlus2, FileText, FolderLock } from "lucide-react";
 import { ContractDossier } from "./ContractDossier";
 import { ContractFormDialog, type ContractFormTarget, type ContractSavePayload } from "./ContractFormDialog";
 import { ContractListView } from "./ContractListView";
@@ -62,11 +62,6 @@ import {
   type StepItemTarget,
 } from "./ShipmentDialogs";
 import { useExportData } from "./useExportData";
-
-const VIEW_OPTIONS = [
-  { value: "month", label: "Theo tháng" },
-  { value: "contracts", label: "Hợp đồng" },
-];
 
 const KIND_FROM_TEXT = (t: string): ExportShipmentKind => {
   const x = t.toUpperCase();
@@ -389,11 +384,22 @@ export default function ExportPlanningScreen() {
     <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-6">
       {!contract && (
         <>
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <p className="max-w-3xl text-base text-muted-foreground">
-              Kế hoạch xuất khẩu theo tháng: mỗi khách, mỗi hợp đồng, mỗi chuyến container đang ở bước nào — hợp đồng → lệnh sản xuất → bao bì → đóng cont → bộ
-              chứng từ → khác — và còn thiếu gì cho tới khi khép kín.
-            </p>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="grid min-w-0 flex-1 basis-64 grid-cols-[minmax(0,1fr)] gap-3">
+              <p className="max-w-3xl text-muted-foreground">Mỗi chuyến container của từng khách đang ở bước nào và còn thiếu gì, tới khi bộ hợp đồng khép kín.</p>
+              <Tabs value={view} onValueChange={(v) => setParam({ view: v === "contracts" ? "contracts" : "" }, true)}>
+                <TabsList className="h-auto max-w-full flex-wrap">
+                  <TabsTrigger value="month" title="Xem chuyến theo tháng đóng cont, gom theo khách.">
+                    <CalendarDays className="mr-2 h-4 w-4" aria-hidden />
+                    Theo tháng
+                  </TabsTrigger>
+                  <TabsTrigger value="contracts" title="Danh sách mọi hợp đồng, lọc theo trạng thái.">
+                    <FileText className="mr-2 h-4 w-4" aria-hidden />
+                    Hợp đồng
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </div>
             {can.create && (
               <Button onClick={() => setContractForm({ mode: "create" })} title="Lập hồ sơ hợp đồng xuất khẩu mới: khách, số HĐ, điều khoản, dòng hàng, file ký.">
                 <FilePlus2 className="mr-2 h-4 w-4" aria-hidden />
@@ -403,10 +409,9 @@ export default function ExportPlanningScreen() {
           </div>
           {!filesAvailable && (
             <p role="status" className="rounded-lg bg-warning-surface px-4 py-2 text-sm">
-              Đang chạy không nối máy chủ: ghi được thông tin trên máy này, chưa tải / mở được file. Ghi chú và số chứng từ được tính thay file làm bằng chứng.
+              Đang chạy không nối máy chủ: chưa tải / mở được file — ghi chú và số chứng từ được tính thay file.
             </p>
           )}
-          <ChoiceGroup label="Xem theo" hideRequiredMark value={view} onChange={(v) => setParam({ view: v === "contracts" ? "contracts" : "" }, true)} options={VIEW_OPTIONS} columns={2} />
           {store.isLoading ? (
             <TableSkeleton />
           ) : view === "month" ? (
